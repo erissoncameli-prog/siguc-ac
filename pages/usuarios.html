@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>SIGUC-AC · Usuários</title>
+<link rel="stylesheet" href="../css/global.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../js/config.js"></script>
+<script src="../js/layout.js"></script>
+</head>
+<body>
+<div id="app"></div>
+
+<div class="modal-overlay" id="modal-usuario">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-titulo">Novo Usuário</div>
+      <button class="modal-close" onclick="fecharModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label">Nome Completo <span class="obrig">*</span></label><input class="form-control" id="f-nome" placeholder="Nome do servidor"></div>
+      <div class="form-group"><label class="form-label">E-mail <span class="obrig">*</span></label><input class="form-control" id="f-email" type="email" placeholder="email@sema.ac.gov.br"></div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Perfil <span class="obrig">*</span></label>
+          <select class="form-control" id="f-perfil">
+            <option value="visualizador">Visualizador</option>
+            <option value="tecnico">Técnico</option>
+            <option value="financeiro">Financeiro</option>
+            <option value="gestor">Gestor</option>
+            <option value="super_admin">Super Admin</option>
+          </select>
+        </div>
+        <div class="form-group"><label class="form-label">UC de Atuação</label>
+          <select class="form-control" id="f-uc"><option value="">Todas as UCs</option></select>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Cargo</label><input class="form-control" id="f-cargo" placeholder="Analista Ambiental"></div>
+        <div class="form-group"><label class="form-label">Telefone</label><input class="form-control" id="f-tel" placeholder="(68) 99999-9999"></div>
+      </div>
+      <div id="bloco-senha">
+        <div class="form-group"><label class="form-label">Senha Inicial <span class="obrig">*</span></label>
+          <input class="form-control" id="f-senha" type="password" placeholder="Mínimo 6 caracteres">
+          <div class="form-hint">O usuário será solicitado a trocar na primeira entrada.</div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="fecharModal()">Cancelar</button>
+      <button class="btn btn-primary" id="btn-salvar" onclick="salvar()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let editId = null
+
+;(async function () {
+  const usuario = await carregarUsuario()
+  if (!usuario) { window.location.href = '../index.html'; return }
+  if (!['super_admin','gestor'].includes(usuario.perfil)) { window.location.href = 'dashboard.html'; return }
+
+  document.getElementById('app').innerHTML =
+    gerarLayout('Usuários', 'usuarios') +
+    `<div class="fade-in">
+      <div class="filter-bar">
+        <input class="form-control search-input" id="busca" placeholder="Buscar usuário..." oninput="filtrar()">
+        <select class="form-control" id="fil-perfil" style="width:150px" onchange="filtrar()">
+          <option value="">Todos os perfis</option>
+          <option value="super_admin">Super Admin</option>
+          <option value="gestor">Gestor</option>
+          <option value="tecnico">Técnico</option>
+          <option value="financeiro">Financeiro</option>
+          <option value="visualizador">Visualizador</option>
+        </select>
+        <button class="btn btn-primary" onclick="abrirModal()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Novo Usuário
+        </button>
+      </div>
+      <div class="card">
+        <div class="table-wrap"><div class="table-scroll">
+          <table>
+            <thead><tr><th>Nome</th><th>E-mail</th><th>Perfil</th><th>UC de Atuação</th><th>Status</th><th>Ações</th></tr></thead>
+            <tbody id="tbody"><tr><td colspan="6" style="text-align:center;padding:32px;color:#9CA3AF">Carregando...</td></tr></tbody>
+          </table>
+        </div></div>
+      </div>
+    </div>` +
+    '</div></div></div>'
+
+  carregarLogosSidebar()
+  await carregarUCsOpcoes()
+  await carregar()
+})()
+
+async function carregarUCsOpcoes() {
+  const { data } = await db.from('unidades_conservacao').select('id,nome,codigo').eq('ativo',true).order('codigo')
+  const sel = document.getElementById('f-uc')
+  data?.forEach(u => { const o = document.createElement('option'); o.value = u.id; o.textContent = `${u.codigo} — ${u.nome}`; sel.appendChild(o) })
+}
+
+let _dados = []
+async function carregar() {
+  const { data } = await db.from('usuarios')
+    .select('*,unidades_conservacao(nome,codigo)')
+    .order('nome_completo')
+  _dados = data || []
+  renderTabela(_dados)
+}
+
+function filtrar() {
+  const q = document.getElementById('busca').value.toLowerCase()
+  const perfil = document.getElementById('fil-perfil').value
+  renderTabela(_dados.filter(u =>
+    (!q || u.nome_completo.toLowerCase().includes(q) || u.email.toLowerCase().includes(q)) &&
+    (!perfil || u.perfil === perfil)
+  ))
+}
+
+const BADGE_PERFIL = { super_admin:'badge-erro', gestor:'badge-roxo', tecnico:'badge-blue', financeiro:'badge-ouro', visualizador:'badge-cinza' }
+
+function renderTabela(lista) {
+  const tbody = document.getElementById('tbody')
+  if (!lista.length) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:32px;color:#9CA3AF">Nenhum usuário encontrado</td></tr>'; return }
+  tbody.innerHTML = lista.map(u => `
+    <tr>
+      <td>
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,#F4D35E,#D4A017);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#1F4E2C;flex-shrink:0">${iniciais(u.nome_completo)}</div>
+          <div>
+            <div style="font-weight:600;font-size:13px">${esc(u.nome_completo)}</div>
+            ${u.cargo ? `<div style="font-size:11px;color:#9CA3AF">${esc(u.cargo)}</div>` : ''}
+          </div>
+        </div>
+      </td>
+      <td style="font-size:12px;color:#6B7280">${esc(u.email)}</td>
+      <td><span class="badge ${BADGE_PERFIL[u.perfil]||'badge-cinza'}">${esc(t('perfis.'+u.perfil))}</span></td>
+      <td style="font-size:12px">${u.unidades_conservacao ? `${esc(u.unidades_conservacao.codigo)} — ${esc(u.unidades_conservacao.nome)}` : '<span style="color:#9CA3AF">Todas</span>'}</td>
+      <td><span class="badge ${u.ativo?'badge-verde':'badge-erro'}">${u.ativo?'Ativo':'Inativo'}</span></td>
+      <td>
+        <div style="display:flex;gap:4px">
+          <button class="btn btn-xs btn-ghost" onclick='editarUsuario(${JSON.stringify(u)})'>Editar</button>
+          <button class="btn btn-xs ${u.ativo?'btn-ghost':'btn-ghost'}" onclick="toggleAtivo('${u.id}',${u.ativo})">${u.ativo?'Desativar':'Ativar'}</button>
+        </div>
+      </td>
+    </tr>`).join('')
+}
+
+function abrirModal(u = null) {
+  editId = u?.id || null
+  document.getElementById('modal-titulo').textContent = u ? 'Editar Usuário' : 'Novo Usuário'
+  document.getElementById('f-nome').value = u?.nome_completo || ''
+  document.getElementById('f-email').value = u?.email || ''
+  document.getElementById('f-email').disabled = !!u
+  document.getElementById('f-perfil').value = u?.perfil || 'visualizador'
+  document.getElementById('f-uc').value = u?.uc_id || ''
+  document.getElementById('f-cargo').value = u?.cargo || ''
+  document.getElementById('f-tel').value = u?.telefone || ''
+  document.getElementById('bloco-senha').style.display = u ? 'none' : ''
+  document.getElementById('modal-usuario').classList.add('aberto')
+}
+
+function editarUsuario(u) { abrirModal(u) }
+function fecharModal() { document.getElementById('modal-usuario').classList.remove('aberto'); editId = null; document.getElementById('f-email').disabled = false }
+
+async function salvar() {
+  const nome_completo = document.getElementById('f-nome').value.trim()
+  const email = document.getElementById('f-email').value.trim()
+  if (!nome_completo || !email) { toast('Nome e e-mail são obrigatórios', 'error'); return }
+
+  const btn = document.getElementById('btn-salvar')
+  btn.disabled = true; btn.textContent = 'Salvando...'
+
+  try {
+    if (editId) {
+      const { error } = await db.from('usuarios').update({
+        nome_completo, perfil: document.getElementById('f-perfil').value,
+        uc_id: document.getElementById('f-uc').value || null,
+        cargo: document.getElementById('f-cargo').value.trim() || null,
+        telefone: document.getElementById('f-tel').value.trim() || null,
+      }).eq('id', editId)
+      if (error) throw error
+      toast('Usuário atualizado!', 'success')
+    } else {
+      const senha = document.getElementById('f-senha').value
+      if (!senha || senha.length < 6) { toast('Senha deve ter no mínimo 6 caracteres', 'error'); return }
+      // Criar via Supabase Admin — requer service_role; aqui usa signUp
+      const { data: auth, error: authErr } = await db.auth.signUp({ email, password: senha, options: { data: { nome: nome_completo } } })
+      if (authErr) throw authErr
+      if (auth.user) {
+        const { error: dbErr } = await db.from('usuarios').upsert({
+          id: auth.user.id, email, nome_completo,
+          perfil: document.getElementById('f-perfil').value,
+          uc_id: document.getElementById('f-uc').value || null,
+          cargo: document.getElementById('f-cargo').value.trim() || null,
+          telefone: document.getElementById('f-tel').value.trim() || null,
+          deve_trocar_senha: true, ativo: true
+        })
+        if (dbErr) throw dbErr
+      }
+      toast('Usuário criado! Um e-mail de confirmação foi enviado.', 'success')
+    }
+    fecharModal(); await carregar()
+  } catch(e) { toast(e.message || 'Erro ao salvar', 'error') }
+  finally { btn.disabled = false; btn.textContent = 'Salvar' }
+}
+
+async function toggleAtivo(id, ativoAtual) {
+  if (!confirm(ativoAtual ? 'Desativar este usuário?' : 'Reativar este usuário?')) return
+  const { error } = await db.from('usuarios').update({ ativo: !ativoAtual }).eq('id', id)
+  if (error) { toast(error.message, 'error'); return }
+  toast(ativoAtual ? 'Usuário desativado' : 'Usuário reativado', 'success')
+  await carregar()
+}
+</script>
+</body>
+</html>

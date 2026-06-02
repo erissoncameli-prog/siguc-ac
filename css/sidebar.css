@@ -1,0 +1,26 @@
+/* sidebar.css — complementos de navegação */
+
+#siguc-progress-bar {
+  position: fixed; top: 0; left: 0;
+  height: 3px; width: 0%;
+  background: linear-gradient(90deg, #34d399 0%, #60a5fa 100%);
+  z-index: 99999; border-radius: 0 3px 3px 0;
+  pointer-events: none;
+  box-shadow: 0 0 8px rgba(52,211,153,.55);
+  transition: width 0.38s cubic-bezier(0.4,0,0.2,1);
+}
+
+body.siguc-saindo { opacity: 0.5; transition: opacity 0.17s ease; pointer-events: none; }
+
+@keyframes siguc-entrada {
+  from { opacity: 0; transform: translateY(9px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.page-body { animation: siguc-entrada 0.28s ease forwards; }
+
+.sidebar::after {
+  content: ''; position: absolute; bottom: 80px; left: -30px;
+  width: 140px; height: 140px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(82,183,136,.06) 0%, transparent 70%);
+  pointer-events: none;
+}

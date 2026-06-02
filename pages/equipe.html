@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>SIGUC-AC · Equipe</title>
+<link rel="stylesheet" href="../css/global.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../js/config.js"></script>
+<script src="../js/layout.js"></script>
+</head>
+<body>
+<div id="app"></div>
+
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-titulo">Novo Servidor</div>
+      <button class="modal-close" onclick="fecharModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label">Unidade de Conservação <span class="obrig">*</span></label>
+        <select class="form-control" id="f-uc"><option value="">Selecione...</option></select>
+      </div>
+      <div class="form-group"><label class="form-label">Nome Completo <span class="obrig">*</span></label><input class="form-control" id="f-nome" placeholder="Nome do servidor"></div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Cargo / Função</label><input class="form-control" id="f-cargo" placeholder="Analista Ambiental"></div>
+        <div class="form-group"><label class="form-label">Matrícula</label><input class="form-control" id="f-matricula" placeholder="000000"></div>
+      </div>
+      <div class="form-group"><label class="form-label">Vínculo</label>
+        <select class="form-control" id="f-vinculo">
+          <option value="efetivo">Efetivo</option>
+          <option value="comissionado">Comissionado</option>
+          <option value="terceirizado">Terceirizado</option>
+          <option value="voluntario">Voluntário</option>
+        </select>
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Data de Entrada</label><input class="form-control" id="f-entrada" type="date"></div>
+        <div class="form-group"><label class="form-label">Data de Saída</label><input class="form-control" id="f-saida" type="date"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="fecharModal()">Cancelar</button>
+      <button class="btn btn-primary" id="btn-salvar" onclick="salvar()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let editId = null
+
+;(async function () {
+  const usuario = await carregarUsuario()
+  if (!usuario) { window.location.href = '../index.html'; return }
+  const podeEditar = ['super_admin','gestor'].includes(usuario.perfil)
+
+  document.getElementById('app').innerHTML =
+    gerarLayout('Equipe', 'equipe') +
+    `<div class="fade-in">
+      <div class="filter-bar">
+        <input class="form-control search-input" id="busca" placeholder="Buscar servidor..." oninput="filtrar()">
+        <select class="form-control" id="fil-uc" style="width:200px" onchange="filtrar()"><option value="">Todas as UCs</option></select>
+        <select class="form-control" id="fil-vinculo" style="width:140px" onchange="filtrar()">
+          <option value="">Vínculo</option>
+          <option value="efetivo">Efetivo</option>
+          <option value="comissionado">Comissionado</option>
+          <option value="terceirizado">Terceirizado</option>
+        </select>
+        ${podeEditar ? '<button class="btn btn-primary" onclick="abrirModal()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Adicionar</button>' : ''}
+      </div>
+      <div class="card">
+        <div class="table-wrap"><div class="table-scroll">
+          <table>
+            <thead><tr><th>Nome</th><th>UC</th><th>Cargo</th><th>Matrícula</th><th>Vínculo</th><th>Data Entrada</th>${podeEditar?'<th>Ações</th>':''}</tr></thead>
+            <tbody id="tbody"><tr><td colspan="7" style="text-align:center;padding:32px;color:#9CA3AF">Carregando...</td></tr></tbody>
+          </table>
+        </div></div>
+      </div>
+    </div>` +
+    '</div></div></div>'
+
+  window._podeEditar = podeEditar
+  carregarLogosSidebar()
+  await carregarUCs()
+  await carregar()
+})()
+
+async function carregarUCs() {
+  const { data } = await db.from('unidades_conservacao').select('id,nome,codigo').eq('ativo',true).order('codigo')
+  const sel1 = document.getElementById('f-uc'), sel2 = document.getElementById('fil-uc')
+  data?.forEach(u => {
+    const opt = `<option value="${u.id}">${u.codigo} — ${u.nome}</option>`
+    sel1?.insertAdjacentHTML('beforeend', opt); sel2?.insertAdjacentHTML('beforeend', opt)
+  })
+}
+
+const CORES_VINCULO = { efetivo:'badge-verde', comissionado:'badge-blue', terceirizado:'badge-ouro', voluntario:'badge-cinza' }
+
+let _dados = []
+async function carregar() {
+  const { data } = await db.from('equipe_servidores')
+    .select('*,unidades_conservacao(nome,codigo)')
+    .eq('ativo', true)
+    .order('nome')
+  _dados = data || []
+  renderTabela(_dados)
+}
+
+function filtrar() {
+  const q = document.getElementById('busca').value.toLowerCase()
+  const uc = document.getElementById('fil-uc').value
+  const vinculo = document.getElementById('fil-vinculo').value
+  renderTabela(_dados.filter(s =>
+    (!q || s.nome.toLowerCase().includes(q)) &&
+    (!uc || s.uc_id === uc) && (!vinculo || s.tipo_vinculo === vinculo)
+  ))
+}
+
+function renderTabela(lista) {
+  const pe = window._podeEditar
+  const tbody = document.getElementById('tbody')
+  if (!lista.length) { tbody.innerHTML = `<tr><td colspan="${pe?7:6}" style="text-align:center;padding:32px;color:#9CA3AF">Nenhum servidor encontrado</td></tr>`; return }
+  tbody.innerHTML = lista.map(s => `
+    <tr>
+      <td><strong>${esc(s.nome)}</strong></td>
+      <td style="font-size:12px">${s.unidades_conservacao ? `<strong>${esc(s.unidades_conservacao.codigo)}</strong><br><span style="color:#9CA3AF">${esc(s.unidades_conservacao.nome)}</span>` : '—'}</td>
+      <td style="font-size:12px">${esc(s.cargo||'—')}</td>
+      <td class="mono">${esc(s.matricula||'—')}</td>
+      <td>${s.tipo_vinculo ? `<span class="badge ${CORES_VINCULO[s.tipo_vinculo]||'badge-cinza'}">${esc(s.tipo_vinculo)}</span>` : '—'}</td>
+      <td class="mono">${formatData(s.data_entrada)}</td>
+      ${pe ? `<td><button class="btn btn-xs btn-ghost" onclick='abrirModal(${JSON.stringify(s)})'>Editar</button></td>` : ''}
+    </tr>`).join('')
+}
+
+function abrirModal(s = null) {
+  editId = s?.id || null
+  document.getElementById('modal-titulo').textContent = s ? 'Editar Servidor' : 'Novo Servidor'
+  document.getElementById('f-uc').value = s?.uc_id || ''
+  document.getElementById('f-nome').value = s?.nome || ''
+  document.getElementById('f-cargo').value = s?.cargo || ''
+  document.getElementById('f-matricula').value = s?.matricula || ''
+  document.getElementById('f-vinculo').value = s?.tipo_vinculo || 'efetivo'
+  document.getElementById('f-entrada').value = s?.data_entrada || ''
+  document.getElementById('f-saida').value = s?.data_saida || ''
+  document.getElementById('modal').classList.add('aberto')
+}
+function fecharModal() { document.getElementById('modal').classList.remove('aberto'); editId = null }
+
+async function salvar() {
+  const uc_id = document.getElementById('f-uc').value
+  const nome = document.getElementById('f-nome').value.trim()
+  if (!uc_id || !nome) { toast('UC e nome são obrigatórios', 'error'); return }
+  const payload = {
+    uc_id, nome,
+    cargo: document.getElementById('f-cargo').value.trim() || null,
+    matricula: document.getElementById('f-matricula').value.trim() || null,
+    tipo_vinculo: document.getElementById('f-vinculo').value,
+    data_entrada: document.getElementById('f-entrada').value || null,
+    data_saida: document.getElementById('f-saida').value || null,
+    ativo: true,
+  }
+  const btn = document.getElementById('btn-salvar')
+  btn.disabled = true; btn.textContent = 'Salvando...'
+  try {
+    if (editId) {
+      const { error } = await db.from('equipe_servidores').update(payload).eq('id', editId)
+      if (error) throw error
+      toast('Servidor atualizado!', 'success')
+    } else {
+      const { error } = await db.from('equipe_servidores').insert(payload)
+      if (error) throw error
+      toast('Servidor adicionado!', 'success')
+    }
+    fecharModal(); await carregar()
+  } catch(e) { toast(e.message || 'Erro ao salvar', 'error') }
+  finally { btn.disabled = false; btn.textContent = 'Salvar' }
+}
+</script>
+</body>
+</html>

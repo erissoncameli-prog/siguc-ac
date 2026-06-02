@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>SIGUC-AC · Monitoramento</title>
+<link rel="stylesheet" href="../css/global.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../js/config.js"></script>
+<script src="../js/layout.js"></script>
+</head>
+<body>
+<div id="app"></div>
+
+<div class="modal-overlay" id="modal">
+  <div class="modal" style="max-width:640px">
+    <div class="modal-header">
+      <div class="modal-title">Novo Registro de Monitoramento</div>
+      <button class="modal-close" onclick="fecharModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label">Unidade de Conservação <span class="obrig">*</span></label>
+        <select class="form-control" id="f-uc"><option value="">Selecione...</option></select>
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Indicador <span class="obrig">*</span></label><input class="form-control" id="f-indicador" placeholder="Ex: Área desmatada, Nº de espécies"></div>
+        <div class="form-group"><label class="form-label">Data de Referência <span class="obrig">*</span></label><input class="form-control" id="f-data" type="date"></div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Valor</label><input class="form-control" id="f-valor" type="number" step="any" placeholder="0"></div>
+        <div class="form-group"><label class="form-label">Unidade</label><input class="form-control" id="f-unidade" placeholder="ha, %, nº indivíduos..."></div>
+      </div>
+      <div class="form-group"><label class="form-label">Categoria</label>
+        <select class="form-control" id="f-categoria">
+          <option value="">Selecione...</option>
+          <option value="biodiversidade">Biodiversidade</option>
+          <option value="pressao_antropica">Pressão Antrópica</option>
+          <option value="cobertura_vegetal">Cobertura Vegetal</option>
+          <option value="recursos_hidricos">Recursos Hídricos</option>
+          <option value="socioeconomico">Socioeconômico</option>
+          <option value="governanca">Governança</option>
+          <option value="outro">Outro</option>
+        </select>
+      </div>
+      <div class="form-group"><label class="form-label">Metodologia</label><textarea class="form-control" id="f-metodologia" rows="2" placeholder="Descreva como foi obtido o dado..."></textarea></div>
+      <div class="form-group"><label class="form-label">Observações</label><textarea class="form-control" id="f-obs" rows="3"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="fecharModal()">Cancelar</button>
+      <button class="btn btn-primary" id="btn-salvar" onclick="salvar()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+;(async function () {
+  const usuario = await carregarUsuario()
+  if (!usuario) { window.location.href = '../index.html'; return }
+  const podeEditar = ['super_admin','gestor','tecnico'].includes(usuario.perfil)
+
+  document.getElementById('app').innerHTML =
+    gerarLayout('Monitoramento', 'monitoramento') +
+    `<div class="fade-in">
+      <div class="filter-bar">
+        <input class="form-control search-input" id="busca" placeholder="Buscar indicador ou UC..." oninput="filtrar()">
+        <select class="form-control" id="fil-uc" style="width:200px" onchange="filtrar()"><option value="">Todas as UCs</option></select>
+        <select class="form-control" id="fil-cat" style="width:160px" onchange="filtrar()">
+          <option value="">Categoria</option>
+          <option value="biodiversidade">Biodiversidade</option>
+          <option value="pressao_antropica">Pressão Antrópica</option>
+          <option value="cobertura_vegetal">Cobertura Vegetal</option>
+          <option value="recursos_hidricos">Recursos Hídricos</option>
+          <option value="socioeconomico">Socioeconômico</option>
+          <option value="governanca">Governança</option>
+        </select>
+        ${podeEditar ? '<button class="btn btn-primary" onclick="abrirModal()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Novo Registro</button>' : ''}
+      </div>
+      <div class="card">
+        <div class="table-wrap"><div class="table-scroll">
+          <table>
+            <thead><tr><th>UC</th><th>Indicador</th><th>Categoria</th><th>Valor</th><th>Data Ref.</th><th>Metodologia</th></tr></thead>
+            <tbody id="tbody"><tr><td colspan="6" style="text-align:center;padding:32px;color:#9CA3AF">Carregando...</td></tr></tbody>
+          </table>
+        </div></div>
+      </div>
+    </div>` +
+    '</div></div></div>'
+
+  carregarLogosSidebar()
+  await carregarUCs()
+  await carregar()
+})()
+
+async function carregarUCs() {
+  const { data } = await db.from('unidades_conservacao').select('id,nome,codigo').eq('ativo',true).order('codigo')
+  const sel1 = document.getElementById('f-uc')
+  const sel2 = document.getElementById('fil-uc')
+  data?.forEach(u => {
+    const opt = `<option value="${u.id}">${u.codigo} — ${u.nome}</option>`
+    if (sel1) sel1.insertAdjacentHTML('beforeend', opt)
+    if (sel2) sel2.insertAdjacentHTML('beforeend', opt)
+  })
+}
+
+const CORES_CAT = { biodiversidade:'badge-verde', pressao_antropica:'badge-erro', cobertura_vegetal:'badge-teal', recursos_hidricos:'badge-blue', socioeconomico:'badge-ouro', governanca:'badge-roxo', outro:'badge-cinza' }
+
+let _dados = []
+async function carregar() {
+  const { data } = await db.from('monitoramento_registros')
+    .select('*,unidades_conservacao(nome,codigo)')
+    .order('data_referencia', { ascending: false })
+  _dados = data || []
+  renderTabela(_dados)
+}
+
+function filtrar() {
+  const q = document.getElementById('busca').value.toLowerCase()
+  const uc = document.getElementById('fil-uc').value
+  const cat = document.getElementById('fil-cat').value
+  renderTabela(_dados.filter(r =>
+    (!q || (r.nome_indicador||'').toLowerCase().includes(q) || (r.unidades_conservacao?.nome||'').toLowerCase().includes(q)) &&
+    (!uc || r.uc_id === uc) && (!cat || r.categoria === cat)
+  ))
+}
+
+function renderTabela(lista) {
+  const tbody = document.getElementById('tbody')
+  if (!lista.length) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:32px;color:#9CA3AF">Nenhum registro encontrado</td></tr>'; return }
+  tbody.innerHTML = lista.map(r => `
+    <tr>
+      <td style="font-size:12px"><strong>${esc(r.unidades_conservacao?.codigo||'—')}</strong><br><span style="color:#9CA3AF">${esc(r.unidades_conservacao?.nome||'')}</span></td>
+      <td>${esc(r.nome_indicador||'—')}</td>
+      <td>${r.categoria ? `<span class="badge ${CORES_CAT[r.categoria]||'badge-cinza'}">${esc(r.categoria)}</span>` : '—'}</td>
+      <td class="mono">${r.valor != null ? `<strong>${formatNum(r.valor,2)}</strong> ${esc(r.unidade||'')}` : '—'}</td>
+      <td class="mono">${formatData(r.data_referencia)}</td>
+      <td style="font-size:12px;color:#6B7280;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.metodologia||'—')}</td>
+    </tr>`).join('')
+}
+
+function abrirModal() {
+  document.getElementById('f-data').value = new Date().toISOString().slice(0,10)
+  document.getElementById('modal').classList.add('aberto')
+}
+function fecharModal() { document.getElementById('modal').classList.remove('aberto') }
+
+async function salvar() {
+  const uc_id = document.getElementById('f-uc').value
+  const nome_indicador = document.getElementById('f-indicador').value.trim()
+  const data_referencia = document.getElementById('f-data').value
+  if (!uc_id || !nome_indicador || !data_referencia) { toast('Preencha os campos obrigatórios', 'error'); return }
+
+  const payload = {
+    uc_id, nome_indicador, data_referencia,
+    valor: parseFloat(document.getElementById('f-valor').value) || null,
+    unidade: document.getElementById('f-unidade').value.trim() || null,
+    categoria: document.getElementById('f-categoria').value || null,
+    metodologia: document.getElementById('f-metodologia').value.trim() || null,
+    observacoes: document.getElementById('f-obs').value.trim() || null,
+  }
+
+  const btn = document.getElementById('btn-salvar')
+  btn.disabled = true; btn.textContent = 'Salvando...'
+  try {
+    const { error } = await db.from('monitoramento_registros').insert(payload)
+    if (error) throw error
+    toast('Registro salvo!', 'success')
+    fecharModal(); await carregar()
+  } catch(e) { toast(e.message || 'Erro ao salvar', 'error') }
+  finally { btn.disabled = false; btn.textContent = 'Salvar' }
+}
+</script>
+</body>
+</html>

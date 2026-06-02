@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>SIGUC-AC · Documentos</title>
+<link rel="stylesheet" href="../css/global.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../js/config.js"></script>
+<script src="../js/layout.js"></script>
+</head>
+<body>
+<div id="app"></div>
+
+<div class="modal-overlay" id="modal">
+  <div class="modal" style="max-width:640px">
+    <div class="modal-header">
+      <div class="modal-title">Novo Documento</div>
+      <button class="modal-close" onclick="fecharModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label">Título <span class="obrig">*</span></label><input class="form-control" id="f-titulo" placeholder="Título do documento"></div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Tipo <span class="obrig">*</span></label>
+          <select class="form-control" id="f-tipo">
+            <option value="plano_manejo">Plano de Manejo</option>
+            <option value="decreto_criacao">Decreto de Criação</option>
+            <option value="ata_reuniao">Ata de Reunião</option>
+            <option value="relatorio_tecnico">Relatório Técnico</option>
+            <option value="contrato">Contrato</option>
+            <option value="mapeamento">Mapeamento</option>
+            <option value="outro">Outro</option>
+          </select>
+        </div>
+        <div class="form-group"><label class="form-label">UC (opcional)</label>
+          <select class="form-control" id="f-uc"><option value="">Documento institucional</option></select>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Data do Documento</label><input class="form-control" id="f-data" type="date"></div>
+        <div class="form-group"><label class="form-label">Visível ao público?</label>
+          <select class="form-control" id="f-publico"><option value="false">Não (restrito)</option><option value="true">Sim (público)</option></select>
+        </div>
+      </div>
+      <div class="form-group"><label class="form-label">URL do Arquivo <span class="obrig">*</span></label><input class="form-control" id="f-url" type="url" placeholder="https://..."></div>
+      <div class="form-group"><label class="form-label">Nome do Arquivo</label><input class="form-control" id="f-nome-arq" placeholder="plano-manejo-resex.pdf"></div>
+      <div class="form-group"><label class="form-label">Descrição</label><textarea class="form-control" id="f-descricao" rows="3"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="fecharModal()">Cancelar</button>
+      <button class="btn btn-primary" id="btn-salvar" onclick="salvar()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const ICONE_TIPO = { plano_manejo:'📋', decreto_criacao:'🏛️', ata_reuniao:'📝', relatorio_tecnico:'📊', contrato:'📄', mapeamento:'🗺️', outro:'📁' }
+
+;(async function () {
+  const usuario = await carregarUsuario()
+  if (!usuario) { window.location.href = '../index.html'; return }
+  const podeEditar = ['super_admin','gestor','tecnico'].includes(usuario.perfil)
+
+  document.getElementById('app').innerHTML =
+    gerarLayout('Documentos', 'documentos') +
+    `<div class="fade-in">
+      <div class="filter-bar">
+        <input class="form-control search-input" id="busca" placeholder="Buscar documento..." oninput="filtrar()">
+        <select class="form-control" id="fil-tipo" style="width:180px" onchange="filtrar()">
+          <option value="">Todos os tipos</option>
+          <option value="plano_manejo">Plano de Manejo</option>
+          <option value="decreto_criacao">Decreto de Criação</option>
+          <option value="ata_reuniao">Ata de Reunião</option>
+          <option value="relatorio_tecnico">Relatório Técnico</option>
+          <option value="mapeamento">Mapeamento</option>
+          <option value="outro">Outro</option>
+        </select>
+        <select class="form-control" id="fil-uc" style="width:180px" onchange="filtrar()"><option value="">Todas as UCs</option></select>
+        ${podeEditar ? '<button class="btn btn-primary" onclick="abrirModal()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Adicionar</button>' : ''}
+      </div>
+      <div id="grid-docs" class="grid-3" style="gap:14px"></div>
+    </div>` +
+    '</div></div></div>'
+
+  carregarLogosSidebar()
+  await carregarUCs()
+  await carregar()
+})()
+
+async function carregarUCs() {
+  const { data } = await db.from('unidades_conservacao').select('id,nome,codigo').eq('ativo',true).order('codigo')
+  const sel1 = document.getElementById('f-uc'), sel2 = document.getElementById('fil-uc')
+  data?.forEach(u => {
+    const opt = `<option value="${u.id}">${u.codigo} — ${u.nome}</option>`
+    sel1?.insertAdjacentHTML('beforeend', opt); sel2?.insertAdjacentHTML('beforeend', opt)
+  })
+}
+
+let _dados = []
+async function carregar() {
+  const { data } = await db.from('documentos')
+    .select('*,unidades_conservacao(nome,codigo)')
+    .order('criado_em', { ascending: false })
+  _dados = data || []
+  renderGrid(_dados)
+}
+
+function filtrar() {
+  const q = document.getElementById('busca').value.toLowerCase()
+  const tipo = document.getElementById('fil-tipo').value
+  const uc = document.getElementById('fil-uc').value
+  renderGrid(_dados.filter(d =>
+    (!q || d.titulo.toLowerCase().includes(q)) &&
+    (!tipo || d.tipo === tipo) &&
+    (!uc || d.uc_id === uc)
+  ))
+}
+
+function renderGrid(lista) {
+  const grid = document.getElementById('grid-docs')
+  if (!lista.length) { grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1"><div class="empty-state-icon">📁</div><div class="empty-state-msg">Nenhum documento encontrado</div></div>'; return }
+  grid.innerHTML = lista.map(d => `
+    <div class="card" style="padding:0">
+      <div style="padding:16px 18px 12px">
+        <div style="display:flex;align-items:flex-start;gap:10px">
+          <span style="font-size:24px;flex-shrink:0">${ICONE_TIPO[d.tipo]||'📁'}</span>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13px;font-weight:600;color:#111827;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(d.titulo)}</div>
+            ${d.unidades_conservacao ? `<div style="font-size:11px;color:#9CA3AF;margin-top:2px">${esc(d.unidades_conservacao.codigo)} — ${esc(d.unidades_conservacao.nome)}</div>` : '<div style="font-size:11px;color:#9CA3AF">Institucional</div>'}
+          </div>
+          ${d.publico ? '<span class="badge badge-verde badge-outline" style="flex-shrink:0">Público</span>' : ''}
+        </div>
+        ${d.descricao ? `<div style="font-size:12px;color:#6B7280;margin-top:8px;line-height:1.45;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${esc(d.descricao)}</div>` : ''}
+      </div>
+      <div class="card-footer" style="display:flex;align-items:center;justify-content:space-between">
+        <span style="font-size:11px;color:#9CA3AF">${d.data_documento ? formatData(d.data_documento) : formatData(d.criado_em)}</span>
+        <a href="${esc(d.arquivo_url)}" target="_blank" class="btn btn-xs btn-secondary">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Baixar
+        </a>
+      </div>
+    </div>`).join('')
+}
+
+function abrirModal() { document.getElementById('modal').classList.add('aberto') }
+function fecharModal() { document.getElementById('modal').classList.remove('aberto') }
+
+async function salvar() {
+  const titulo = document.getElementById('f-titulo').value.trim()
+  const arquivo_url = document.getElementById('f-url').value.trim()
+  if (!titulo || !arquivo_url) { toast('Preencha título e URL do arquivo', 'error'); return }
+
+  const payload = {
+    titulo, arquivo_url,
+    tipo: document.getElementById('f-tipo').value,
+    uc_id: document.getElementById('f-uc').value || null,
+    data_documento: document.getElementById('f-data').value || null,
+    publico: document.getElementById('f-publico').value === 'true',
+    arquivo_nome: document.getElementById('f-nome-arq').value.trim() || null,
+    descricao: document.getElementById('f-descricao').value.trim() || null,
+  }
+
+  const btn = document.getElementById('btn-salvar')
+  btn.disabled = true; btn.textContent = 'Salvando...'
+  try {
+    const { error } = await db.from('documentos').insert(payload)
+    if (error) throw error
+    toast('Documento adicionado!', 'success'); fecharModal(); await carregar()
+  } catch(e) { toast(e.message || 'Erro ao salvar', 'error') }
+  finally { btn.disabled = false; btn.textContent = 'Salvar' }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SIGUC-AC — Sistema de Gestão de Unidades de Conservação</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400;1,9..144,500&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --floresta:#0A1A0F; --floresta-m:#0F2218; --verde:#1F4E2C; --verde-m:#2D6A4F; --verde-c:#52B788;
+  --ouro:#C9A84C; --ouro-c:#F0CB6A; --ouro-dim:rgba(201,168,76,.14);
+  --t1:#F4EFE6; --t2:rgba(244,239,230,.62); --t3:rgba(244,239,230,.32); --bdr:rgba(244,239,230,.10);
+  --ff-display:'Fraunces',Georgia,serif; --ff-ui:'DM Sans',system-ui,sans-serif;
+}
+html,body{height:100%}
+body{font-family:var(--ff-ui);min-height:100vh;display:flex;overflow:hidden;background:var(--floresta)}
+
+.painel-esq{flex:1;position:relative;overflow:hidden}
+.slide{position:absolute;inset:0;background-size:cover;background-position:center;opacity:0;transform:scale(1.06);transition:opacity 2.2s cubic-bezier(.4,0,.2,1),transform 14s ease-out}
+.slide.ativo{opacity:1;transform:scale(1)}
+.slide-overlay{position:absolute;inset:0;background:linear-gradient(to bottom,rgba(6,16,9,.85) 0%,rgba(6,16,9,.28) 30%,rgba(6,16,9,.20) 60%,rgba(4,12,7,.92) 100%),linear-gradient(120deg,rgba(15,42,22,.55) 0%,transparent 55%);z-index:1}
+.topo-gradiente{position:absolute;top:0;left:0;right:0;height:220px;background:linear-gradient(to bottom,rgba(0,0,0,.6) 0%,transparent 100%);z-index:2;pointer-events:none}
+.painel-esq::after{content:'';position:absolute;inset:0;z-index:2;pointer-events:none;opacity:.035;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");background-size:200px}
+.painel-conteudo{position:relative;z-index:3;display:flex;flex-direction:column;justify-content:space-between;height:100%;padding:26px 34px}
+
+.logos-topo{display:flex;align-items:center;gap:10px;background:rgba(0,0,0,.28);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid rgba(255,255,255,.12);border-radius:100px;padding:6px 14px 6px 10px;width:fit-content}
+.logo-gov{height:clamp(22px,3vw,36px);width:auto;object-fit:contain;filter:drop-shadow(0 1px 4px rgba(0,0,0,.5))}
+.logo-sep-topo{width:1px;height:clamp(16px,2.2vw,26px);background:rgba(255,255,255,.18);flex-shrink:0}
+.logo-sema{height:clamp(11px,1.6vw,20px);width:auto;object-fit:contain;filter:brightness(0) invert(1);opacity:.75}
+
+.projeto-info{background:rgba(0,0,0,.42);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border:1px solid rgba(255,255,255,.10);border-left:2px solid var(--ouro);border-radius:10px;padding:15px 20px}
+.proj-badge{font-size:9px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--ouro-c);margin-bottom:8px;display:flex;align-items:center;gap:7px}
+.proj-badge-dot{width:5px;height:5px;border-radius:50%;background:var(--ouro-c);flex-shrink:0;animation:pulso 2.5s ease-in-out infinite}
+@keyframes pulso{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.75)}}
+.proj-nome{font-family:var(--ff-display);font-size:clamp(13px,1.15vw,15.5px);font-weight:500;font-style:italic;color:#fff;line-height:1.45;margin-bottom:5px}
+.proj-sub{font-size:10px;font-weight:300;letter-spacing:.02em;color:rgba(255,255,255,.48);margin-bottom:12px}
+.slide-dots{display:flex;gap:5px;align-items:center;flex-wrap:wrap}
+.slide-dot{width:5px;height:5px;border-radius:50%;background:rgba(255,255,255,.22);transition:all .4s cubic-bezier(.4,0,.2,1);cursor:pointer;border:none;padding:0}
+.slide-dot.ativo{background:var(--ouro);width:20px;border-radius:2px}
+.foto-contador{position:absolute;bottom:11px;left:13px;z-index:4;font-size:9px;color:rgba(255,255,255,.28);font-family:monospace;letter-spacing:.04em}
+
+.painel-dir{width:440px;flex-shrink:0;background:linear-gradient(160deg,#122019 0%,#0A1A0F 55%,#081410 100%);display:flex;align-items:center;justify-content:center;padding:28px 20px;position:relative;overflow:hidden;border-left:1px solid rgba(201,168,76,.18)}
+@keyframes blobA{0%,100%{transform:translate(0,0) scale(1)}33%{transform:translate(-28px,18px) scale(1.08)}66%{transform:translate(14px,-24px) scale(0.94)}}
+@keyframes blobB{0%,100%{transform:translate(0,0) scale(1)}40%{transform:translate(22px,-18px) scale(1.06)}75%{transform:translate(-16px,22px) scale(0.96)}}
+.painel-dir::before{content:'';position:absolute;bottom:-80px;right:-80px;width:420px;height:420px;background:radial-gradient(ellipse at 60% 60%,rgba(45,106,79,.26) 0%,transparent 65%);pointer-events:none;z-index:0;animation:blobA 16s ease-in-out infinite}
+.painel-dir::after{content:'';position:absolute;top:-80px;left:-60px;width:340px;height:340px;background:radial-gradient(ellipse at 38% 38%,rgba(201,168,76,.10) 0%,transparent 65%);pointer-events:none;z-index:0;animation:blobB 20s ease-in-out infinite}
+
+.login-box{width:100%;max-width:360px;position:relative;z-index:1;background:rgba(244,239,230,.045);border:1px solid rgba(244,239,230,.10);border-radius:22px;padding:34px 30px 30px;backdrop-filter:blur(28px);-webkit-backdrop-filter:blur(28px);box-shadow:0 8px 48px rgba(0,0,0,.32),inset 0 1px 0 rgba(244,239,230,.09),inset 0 -1px 0 rgba(0,0,0,.12)}
+.siguc-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:38px}
+.siguc-wordmark{display:flex;align-items:center;gap:10px}
+.siguc-icon{width:34px;height:34px;background:linear-gradient(135deg,var(--verde-m) 0%,var(--verde-c) 100%);border-radius:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 3px 14px rgba(82,183,136,.28)}
+.siguc-name{font-size:11px;font-weight:600;color:var(--t1);letter-spacing:.18em;text-transform:uppercase}
+.siguc-name-sub{font-size:9px;color:var(--t3);letter-spacing:.04em;margin-top:2px}
+
+.login-head{margin-bottom:26px}
+.login-titulo{font-family:Arial,Helvetica,sans-serif !important;font-size:clamp(28px,2.6vw,36px);font-weight:700;line-height:1.12;color:var(--t1);letter-spacing:-.01em;margin-bottom:7px}
+.login-sub{font-size:12px;font-weight:300;color:var(--t2);letter-spacing:.01em}
+.erro-msg{background:rgba(239,68,68,.09);border:1px solid rgba(239,68,68,.28);color:#FCA5A5;border-radius:7px;padding:10px 13px;font-size:11.5px;margin-bottom:18px;display:none;line-height:1.5}
+
+.form-group{margin-bottom:18px}
+.form-label{display:block;font-size:9.5px;font-weight:500;letter-spacing:.10em;text-transform:uppercase;color:rgba(244,239,230,.50);margin-bottom:8px}
+.form-input{width:100%;height:48px;background:rgba(255,255,255,.06);border:1.5px solid rgba(244,239,230,.13);border-radius:10px;padding:0 14px;font-size:14px;font-weight:400;color:var(--t1);outline:none;transition:background .22s,border-color .22s,box-shadow .22s}
+.form-input:hover{background:rgba(255,255,255,.08);border-color:rgba(244,239,230,.22)}
+.form-input:focus{background:rgba(255,255,255,.09);border-color:rgba(201,168,76,.55);box-shadow:0 0 0 3.5px rgba(201,168,76,.15)}
+.form-input::placeholder{color:rgba(244,239,230,.28);font-size:13px}
+.form-input:-webkit-autofill{-webkit-box-shadow:0 0 0 40px #14261a inset;-webkit-text-fill-color:var(--t1);caret-color:var(--t1)}
+
+@keyframes shimmerBtn{from{left:-80%}to{left:140%}}
+.btn-login{width:100%;height:48px;margin-top:10px;background:linear-gradient(135deg,var(--ouro-c) 0%,#B8943E 100%);color:#0A1A0F;border:none;border-radius:10px;font-size:13.5px;font-weight:600;letter-spacing:.04em;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 4px 22px rgba(201,168,76,.28);transition:all .22s;position:relative;overflow:hidden}
+.btn-login::after{content:'';position:absolute;top:0;left:-80%;width:50%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.32),transparent);transform:skewX(-18deg);opacity:0;transition:opacity .1s}
+.btn-login:hover::after{opacity:1;animation:shimmerBtn .52s ease forwards}
+.btn-login:hover{box-shadow:0 6px 32px rgba(201,168,76,.46);transform:translateY(-1px)}
+.btn-login:active{transform:translateY(0);box-shadow:none}
+.btn-login:disabled{opacity:.48;cursor:not-allowed;transform:none}
+
+.login-footer{margin-top:22px;text-align:center;font-size:9px;color:var(--t3);letter-spacing:.04em;line-height:1.6}
+@keyframes spin{to{transform:rotate(360deg)}}
+.spinner-sm{width:15px;height:15px;border:2px solid rgba(10,26,15,.3);border-top-color:#0A1A0F;border-radius:50%;animation:spin .6s linear infinite;display:none}
+
+@keyframes fadeUp{from{opacity:0;transform:translateY(13px)}to{opacity:1;transform:translateY(0)}}
+.siguc-header{animation:fadeUp .5s .06s ease both}
+.login-head{animation:fadeUp .5s .16s ease both}
+.form-group:nth-of-type(1){animation:fadeUp .5s .26s ease both}
+.form-group:nth-of-type(2){animation:fadeUp .5s .33s ease both}
+.btn-login{animation:fadeUp .5s .40s ease both}
+.login-footer{animation:fadeUp .5s .50s ease both}
+
+@media(max-width:900px){
+  body{flex-direction:column;overflow:auto;background:#1F4E2C}
+  html,body{height:auto}
+  .painel-esq{height:320px;min-height:320px;max-height:320px;flex:none}
+  .painel-conteudo{padding:50px 22px 28px;justify-content:flex-end}
+  .projeto-info{background:transparent !important;backdrop-filter:none !important;border:none !important;border-left:none !important;padding:0 !important;text-align:center}
+  .proj-badge{justify-content:center}
+  .proj-nome{font-size:14.5px;text-align:center}
+  .proj-sub{text-align:center}
+  .slide-dots{justify-content:center}
+  .painel-dir{width:100%;min-height:calc(100vh - 320px);background:#ffffff !important;border-radius:28px 28px 0 0;border-left:none !important;padding:0;margin-top:-28px;position:relative;z-index:1;flex-direction:column;align-items:center;justify-content:flex-start;box-shadow:0 -6px 32px rgba(0,0,0,.12)}
+  .painel-dir::before,.painel-dir::after{display:none}
+  .login-box::before{content:'';display:block;width:36px;height:4px;border-radius:2px;background:#E5E7EB;margin:0 auto 22px}
+  .login-box{max-width:none;width:100%;padding:18px 26px 44px;background:transparent;border:none;border-radius:0;box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none}
+  .siguc-name{color:#0A1A0F}
+  .siguc-name-sub{color:#9CA3AF}
+  .login-titulo{color:#0A1A0F;font-size:32px}
+  .login-sub{color:#9CA3AF}
+  .form-label{color:#9CA3AF}
+  .form-input{color:#111827;background:rgba(0,0,0,.035);border:1.5px solid #E5E7EB}
+  .form-input:focus{background:#fff;border-color:#52B788;box-shadow:0 0 0 3.5px rgba(82,183,136,.14)}
+  .btn-login{background:linear-gradient(135deg,#1F4E2C 0%,#2D6A4F 100%);color:#fff;box-shadow:0 4px 20px rgba(31,78,44,.28)}
+  .spinner-sm{border-color:rgba(255,255,255,.25);border-top-color:#fff}
+  .login-footer{color:#C5C8D0}
+  .logos-topo{padding:4px 10px 4px 8px;gap:6px}
+  .logo-gov{height:13px}
+  .logo-sep-topo{height:10px}
+  .logo-sema{height:7px}
+}
+</style>
+</head>
+<body>
+
+<!-- PAINEL ESQUERDO — slideshow floresta/UCs -->
+<div class="painel-esq">
+  <div class="slide ativo" id="slide-0" style="background-image:url('assets/foto1.jpg')"></div>
+  <div class="slide"       id="slide-1" style="background-image:url('assets/foto2.jpg')"></div>
+  <div class="slide"       id="slide-2" style="background-image:url('assets/foto3.jpg')"></div>
+  <div class="slide"       id="slide-3" style="background-image:url('assets/foto4.jpg')"></div>
+  <div class="slide"       id="slide-4" style="background-image:url('assets/foto5.jpg')"></div>
+
+  <div class="slide-overlay"></div>
+  <div class="topo-gradiente"></div>
+
+  <div class="painel-conteudo">
+    <div>
+      <div class="logos-topo">
+        <img class="logo-gov" src="assets/brasao-acre.png" alt="Governo do Acre" onerror="this.style.display='none'">
+        <div class="logo-sep-topo"></div>
+        <img class="logo-sema" src="assets/logo-sema.png" alt="SEMA/AC" onerror="this.style.display='none'">
+      </div>
+    </div>
+    <div>
+      <div class="projeto-info">
+        <div class="proj-badge">
+          <div class="proj-badge-dot"></div>
+          SEMA/AC · Governo do Estado do Acre
+        </div>
+        <div class="proj-nome">Sistema de Gestão de Unidades de Conservação Estaduais do Acre</div>
+        <div class="proj-sub">Rio Branco, Acre — Secretaria de Estado do Meio Ambiente</div>
+        <div class="slide-dots" id="slide-dots"></div>
+      </div>
+    </div>
+  </div>
+  <div class="foto-contador" id="foto-contador">1 / 5</div>
+</div>
+
+<!-- PAINEL DIREITO — login -->
+<div class="painel-dir">
+  <div class="login-box">
+    <div class="siguc-header">
+      <div class="siguc-wordmark">
+        <div class="siguc-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+            <polyline points="9 22 9 12 15 12 15 22"/>
+          </svg>
+        </div>
+        <div>
+          <div class="siguc-name">SIGUC-AC</div>
+          <div class="siguc-name-sub">Gestão de UCs · SEMA/AC</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="login-head">
+      <div class="login-titulo">Entrar no sistema</div>
+      <div class="login-sub">Acesse com suas credenciais institucionais</div>
+    </div>
+
+    <div class="erro-msg" id="erro-msg"></div>
+
+    <div class="form-group">
+      <label class="form-label">E-mail</label>
+      <input class="form-input" type="email" id="inp-email" autocomplete="email" placeholder="seu@sema.ac.gov.br">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Senha</label>
+      <input class="form-input" type="password" id="inp-senha" autocomplete="current-password">
+    </div>
+
+    <button class="btn-login" id="btn-login" onclick="fazerLogin()">
+      <span id="btn-texto">Entrar</span>
+      <div class="spinner-sm" id="spinner"></div>
+    </button>
+
+    <div class="login-footer">
+      Acesso restrito a servidores e colaboradores autorizados<br>
+      SEMA/AC · Sistema de Unidades de Conservação Estaduais
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const SUPABASE_URL = 'https://atqtybcsvepdabsvgaly.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF0cXR5YmNzdmVwZGFic3ZnYWx5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0MjMzNzgsImV4cCI6MjA5NTk5OTM3OH0.hWx1AB2rK7xdco1Dgagm0XUOBPQbxZVE614SW4SKoLk';
+const { createClient } = supabase;
+const db = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let TOTAL = 5, slideAtual = 0, timer;
+const dotsEl = document.getElementById('slide-dots');
+for (let i = 0; i < TOTAL; i++) {
+  const btn = document.createElement('button');
+  btn.className = 'slide-dot' + (i === 0 ? ' ativo' : '');
+  btn.onclick = () => { clearInterval(timer); irParaSlide(i); iniciarTimer(); };
+  dotsEl.appendChild(btn);
+}
+
+function irParaSlide(n) {
+  document.getElementById('slide-' + slideAtual).classList.remove('ativo');
+  document.querySelectorAll('.slide-dot')[slideAtual].classList.remove('ativo');
+  slideAtual = (n + TOTAL) % TOTAL;
+  document.getElementById('slide-' + slideAtual).classList.add('ativo');
+  document.querySelectorAll('.slide-dot')[slideAtual].classList.add('ativo');
+  document.getElementById('foto-contador').textContent = (slideAtual + 1) + ' / ' + TOTAL;
+}
+function iniciarTimer() { timer = setInterval(() => irParaSlide(slideAtual + 1), 6000); }
+iniciarTimer();
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'ArrowRight') { clearInterval(timer); irParaSlide(slideAtual + 1); iniciarTimer(); }
+  if (e.key === 'ArrowLeft')  { clearInterval(timer); irParaSlide(slideAtual - 1); iniciarTimer(); }
+});
+
+async function fazerLogin() {
+  const email = document.getElementById('inp-email').value.trim();
+  const senha = document.getElementById('inp-senha').value;
+  const erroEl = document.getElementById('erro-msg');
+  const btn = document.getElementById('btn-login');
+  const spinner = document.getElementById('spinner');
+  const btnTexto = document.getElementById('btn-texto');
+  if (!email || !senha) return;
+  erroEl.style.display = 'none';
+  btn.disabled = true; spinner.style.display = 'inline-block'; btnTexto.style.opacity = '0.6';
+  try {
+    const { data, error } = await db.auth.signInWithPassword({ email, password: senha });
+    if (error) {
+      const msg = error.message || '';
+      let texto = 'Erro ao conectar. Tente novamente.';
+      if (msg.includes('Invalid login credentials') || msg.includes('invalid_credentials')) texto = 'E-mail ou senha incorretos.';
+      else if (msg.includes('Email not confirmed')) texto = 'E-mail não confirmado. Contate o administrador.';
+      else if (msg.includes('Too many requests')) texto = 'Muitas tentativas. Aguarde alguns minutos.';
+      erroEl.textContent = texto; erroEl.style.display = 'block'; return;
+    }
+    const { data: u } = await db.from('usuarios').select('ativo,deve_trocar_senha').eq('id', data.user.id).single();
+    if (!u?.ativo) { await db.auth.signOut(); erroEl.textContent = 'Conta desativada. Contate o administrador.'; erroEl.style.display = 'block'; return; }
+    const destino = u?.deve_trocar_senha ? 'pages/trocar-senha.html' : (localStorage.getItem('siguc_redirect') || 'pages/dashboard.html');
+    localStorage.removeItem('siguc_redirect');
+    window.location.replace(destino);
+  } catch(e) {
+    erroEl.textContent = 'Erro ao conectar. Tente novamente.'; erroEl.style.display = 'block';
+  } finally {
+    btn.disabled = false; spinner.style.display = 'none'; btnTexto.style.opacity = '1';
+  }
+}
+document.getElementById('inp-senha').addEventListener('keydown', e => { if (e.key === 'Enter') fazerLogin(); });
+document.getElementById('inp-email').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('inp-senha').focus(); });
+
+(async () => {
+  const { data: { session } } = await db.auth.getSession();
+  if (session) {
+    const { data: u } = await db.from('usuarios').select('deve_trocar_senha').eq('id', session.user.id).single();
+    const destino = localStorage.getItem('siguc_redirect');
+    localStorage.removeItem('siguc_redirect');
+    window.location.href = u?.deve_trocar_senha ? 'pages/trocar-senha.html' : (destino || 'pages/dashboard.html');
+  }
+})();
+</script>
+</body>
+</html>

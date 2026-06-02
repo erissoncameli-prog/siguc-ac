@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>SIGUC-AC · Relatórios</title>
+<link rel="stylesheet" href="../css/global.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../js/config.js"></script>
+<script src="../js/layout.js"></script>
+</head>
+<body>
+<div id="app"></div>
+<script>
+;(async function () {
+  const usuario = await carregarUsuario()
+  if (!usuario) { window.location.href = '../index.html'; return }
+
+  document.getElementById('app').innerHTML =
+    gerarLayout('Relatórios', 'relatorios') +
+    `<div class="fade-in">
+      <div class="grid-2" style="gap:16px;margin-bottom:20px">
+
+        <div class="card" id="card-resumo">
+          <div class="card-header"><div class="card-title">Resumo Geral do Sistema</div><button class="btn btn-sm btn-secondary" onclick="gerarResumoGeral()">Atualizar</button></div>
+          <div class="card-body" id="resumo-geral"><div style="color:#9CA3AF;font-size:13px">Clique em Atualizar</div></div>
+        </div>
+
+        <div class="card">
+          <div class="card-header"><div class="card-title">Ocorrências por Tipo</div></div>
+          <div class="card-body" id="chart-tipo-oc"><div style="color:#9CA3AF;font-size:13px">Carregando...</div></div>
+        </div>
+
+      </div>
+
+      <div class="card" style="margin-bottom:20px">
+        <div class="card-header">
+          <div><div class="card-title">Relatório por Unidade de Conservação</div><div class="card-subtitle">Selecione uma UC para ver o resumo detalhado</div></div>
+        </div>
+        <div class="card-body">
+          <div class="filter-bar" style="margin-bottom:16px">
+            <select class="form-control" id="sel-uc" style="width:300px" onchange="gerarRelatorioUC()">
+              <option value="">Selecione uma UC...</option>
+            </select>
+          </div>
+          <div id="relatorio-uc"></div>
+        </div>
+      </div>
+
+    </div>` +
+    '</div></div></div>'
+
+  carregarLogosSidebar()
+  await carregarUCsOpcoes()
+  await carregarGraficos()
+  gerarResumoGeral()
+})()
+
+async function carregarUCsOpcoes() {
+  const { data } = await db.from('unidades_conservacao').select('id,nome,codigo').eq('ativo',true).order('codigo')
+  const sel = document.getElementById('sel-uc')
+  data?.forEach(u => { const o = document.createElement('option'); o.value = u.id; o.textContent = `${u.codigo} — ${u.nome}`; sel.appendChild(o) })
+}
+
+async function gerarResumoGeral() {
+  const el = document.getElementById('resumo-geral')
+  el.innerHTML = '<div style="color:#9CA3AF">Carregando...</div>'
+  const [{ data: ucs }, { data: ocs }, { data: monit }, { data: docs }] = await Promise.all([
+    db.from('unidades_conservacao').select('area_ha,categoria').eq('ativo',true),
+    db.from('ocorrencias').select('status,severidade'),
+    db.from('monitoramento_registros').select('id'),
+    db.from('documentos').select('id'),
+  ])
+  const areaTotal = ucs?.reduce((s,u)=>s+(u.area_ha||0),0)||0
+  const ocAbertas = ocs?.filter(o=>o.status==='aberta').length||0
+  const ocCrit = ocs?.filter(o=>['critica','alta'].includes(o.severidade)&&o.status!=='resolvida').length||0
+  el.innerHTML = `
+    <div class="kpi-grid" style="grid-template-columns:repeat(2,1fr);gap:12px;margin:0">
+      <div class="kpi-card" style="padding:14px 16px"><div class="kpi-label">Total de UCs</div><div class="kpi-valor">${ucs?.length||0}</div></div>
+      <div class="kpi-card ouro" style="padding:14px 16px"><div class="kpi-label">Área Protegida</div><div class="kpi-valor" style="font-size:18px">${formatNum(areaTotal,0)} ha</div></div>
+      <div class="kpi-card azul" style="padding:14px 16px"><div class="kpi-label">Registros Monit.</div><div class="kpi-valor">${monit?.length||0}</div></div>
+      <div class="kpi-card ${ocCrit>0?'erro':''}" style="padding:14px 16px"><div class="kpi-label">Oc. Críticas/Altas</div><div class="kpi-valor">${ocCrit}</div></div>
+    </div>
+    <div style="margin-top:14px;font-size:12px;color:#6B7280">
+      <strong>${docs?.length||0}</strong> documentos · <strong>${ocAbertas}</strong> ocorrências abertas
+    </div>`
+}
+
+async function carregarGraficos() {
+  const { data: ocs } = await db.from('ocorrencias').select('tipo,severidade,status')
+  const porTipo = {}
+  ocs?.forEach(o => { porTipo[o.tipo] = (porTipo[o.tipo]||0)+1 })
+  const total = ocs?.length || 1
+  const el = document.getElementById('chart-tipo-oc')
+  const TIPOS = { incendio:'Incêndio', desmatamento:'Desmatamento', invasao:'Invasão', caca_pesca_ilegal:'Caça/Pesca', mineracao_ilegal:'Mineração', contaminacao:'Contaminação', especie_invasora:'Esp. Invasora', outro:'Outro' }
+  if (!ocs?.length) { el.innerHTML = '<div style="color:#9CA3AF;font-size:13px">Sem ocorrências</div>'; return }
+  el.innerHTML = Object.entries(porTipo).sort((a,b)=>b[1]-a[1]).map(([tipo,n]) => `
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+      <span style="font-size:12px;width:120px;flex-shrink:0;color:#374151">${TIPOS[tipo]||tipo}</span>
+      <div class="prog-bar" style="flex:1"><div class="prog-fill" style="width:${Math.round(n/total*100)}%"></div></div>
+      <span class="prog-pct">${n}</span>
+    </div>`).join('')
+}
+
+async function gerarRelatorioUC() {
+  const uc_id = document.getElementById('sel-uc').value
+  const el = document.getElementById('relatorio-uc')
+  if (!uc_id) { el.innerHTML = ''; return }
+  el.innerHTML = '<div style="color:#9CA3AF;padding:16px">Carregando...</div>'
+
+  const [{ data: uc }, { data: ocs }, { data: monit }, { data: docs }, { data: equipe }] = await Promise.all([
+    db.from('unidades_conservacao').select('*').eq('id',uc_id).single(),
+    db.from('ocorrencias').select('*').eq('uc_id',uc_id).order('data_ocorrencia',{ascending:false}),
+    db.from('monitoramento_registros').select('*').eq('uc_id',uc_id).order('data_referencia',{ascending:false}).limit(5),
+    db.from('documentos').select('*').eq('uc_id',uc_id),
+    db.from('equipe_servidores').select('*').eq('uc_id',uc_id).eq('ativo',true),
+  ])
+
+  const ocAb = ocs?.filter(o=>o.status!=='arquivada'&&o.status!=='resolvida').length||0
+  el.innerHTML = `
+    <div class="grid-3" style="gap:12px;margin-bottom:16px">
+      <div class="kpi-card" style="padding:14px"><div class="kpi-label">Área</div><div class="kpi-valor" style="font-size:20px">${uc?.area_ha ? formatNum(uc.area_ha,0)+' ha' : '—'}</div></div>
+      <div class="kpi-card ${ocAb>0?'erro':''}" style="padding:14px"><div class="kpi-label">Oc. Abertas</div><div class="kpi-valor" style="font-size:20px">${ocAb}</div></div>
+      <div class="kpi-card azul" style="padding:14px"><div class="kpi-label">Servidores</div><div class="kpi-valor" style="font-size:20px">${equipe?.length||0}</div></div>
+    </div>
+    <div class="grid-2" style="gap:14px">
+      <div>
+        <div style="font-size:12px;font-weight:700;color:#374151;margin-bottom:8px;text-transform:uppercase;letter-spacing:.06em">Últimas Ocorrências</div>
+        ${ocs?.length ? ocs.slice(0,5).map(o=>`
+          <div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid #F3F4F6">
+            <span class="badge ${BADGE_SEVERIDADE[o.severidade]||'badge-cinza'}">${o.severidade}</span>
+            <span style="flex:1;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(o.titulo)}</span>
+            <span class="badge ${BADGE_STATUS_OC[o.status]||'badge-cinza'}">${o.status}</span>
+          </div>`).join('') : '<div style="color:#9CA3AF;font-size:13px">Nenhuma ocorrência</div>'}
+      </div>
+      <div>
+        <div style="font-size:12px;font-weight:700;color:#374151;margin-bottom:8px;text-transform:uppercase;letter-spacing:.06em">Monitoramento Recente</div>
+        ${monit?.length ? monit.map(r=>`
+          <div style="padding:7px 0;border-bottom:1px solid #F3F4F6">
+            <div style="font-size:12px;font-weight:500">${esc(r.nome_indicador||'—')}</div>
+            <div style="font-size:11px;color:#9CA3AF">${r.valor!=null?formatNum(r.valor,2)+' '+(r.unidade||''):'—'} · ${formatData(r.data_referencia)}</div>
+          </div>`).join('') : '<div style="color:#9CA3AF;font-size:13px">Sem registros</div>'}
+        <div style="margin-top:12px;font-size:12px;color:#6B7280"><strong>${docs?.length||0}</strong> documento(s) associado(s)</div>
+      </div>
+    </div>`
+}
+</script>
+</body>
+</html>

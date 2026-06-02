@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>SIGUC-AC · Mapa das UCs</title>
+<link rel="stylesheet" href="../css/global.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+  #mapa-container { height: calc(100vh - 140px); border-radius: 12px; overflow: hidden; border: 1px solid #E5E7EB; }
+  .leaflet-popup-content { font-family: 'DM Sans', sans-serif; font-size: 13px; }
+  .popup-titulo { font-weight: 700; font-size: 14px; color: #1F2937; margin-bottom: 4px; }
+  .popup-badge { display: inline-block; padding: 2px 8px; border-radius: 99px; font-size: 10px; font-weight: 700; text-transform: uppercase; }
+  .map-legenda { position: absolute; bottom: 40px; right: 10px; z-index: 1000; background: white; border-radius: 8px; padding: 10px 14px; font-size: 11px; box-shadow: 0 2px 12px rgba(0,0,0,.15); min-width: 140px; }
+  .leg-item { display: flex; align-items: center; gap: 6px; margin-bottom: 5px; }
+  .leg-cor { width: 12px; height: 12px; border-radius: 2px; flex-shrink: 0; }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../js/config.js"></script>
+<script src="../js/layout.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+</head>
+<body>
+<div id="app"></div>
+<script>
+;(async function () {
+  const usuario = await carregarUsuario()
+  if (!usuario) { window.location.href = '../index.html'; return }
+
+  document.getElementById('app').innerHTML =
+    gerarLayout('Mapa das UCs', 'mapa') +
+    `<div class="fade-in" style="position:relative">
+      <div class="filter-bar" style="margin-bottom:12px">
+        <select class="form-control" id="fil-grupo" style="width:180px" onchange="atualizarFiltros()">
+          <option value="">Todos os grupos</option>
+          <option value="protecao_integral">Proteção Integral</option>
+          <option value="uso_sustentavel">Uso Sustentável</option>
+        </select>
+        <select class="form-control" id="fil-cat" style="width:160px" onchange="atualizarFiltros()">
+          <option value="">Todas categorias</option>
+          <option value="APA">APA</option><option value="RESEX">RESEX</option>
+          <option value="FLONA">FLONA</option><option value="RDS">RDS</option>
+          <option value="PI">Parque</option><option value="ESEC">ESEC</option>
+          <option value="REBIO">REBIO</option><option value="RPPN">RPPN</option>
+        </select>
+        <span id="contagem-ucs" style="font-size:12px;color:#6B7280;margin-left:4px"></span>
+      </div>
+      <div id="mapa-container"></div>
+    </div>` +
+    '</div></div></div>'
+
+  carregarLogosSidebar()
+
+  const mapa = L.map('mapa-container', { center: [-9.5, -70.0], zoom: 7 })
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap contributors', maxZoom: 18
+  }).addTo(mapa)
+
+  // Cores por categoria
+  const COR_CAT = {
+    APA: '#f59e0b', ARIE: '#d97706', ESEC: '#059669', FLONA: '#16a34a',
+    MONA: '#7c3aed', PI: '#15803d', REBIO: '#065f46', RDS: '#0e7490',
+    RESEX: '#0891b2', RPPN: '#2563eb', RVS: '#7c3aed'
+  }
+
+  let _layers = [], _ucs = []
+
+  // Carregar UCs com geometria
+  const { data: ucs } = await db.from('unidades_conservacao')
+    .select('id,codigo,nome,categoria,grupo,area_ha,status,municipios,geom_json:geom')
+    .eq('ativo', true)
+
+  _ucs = ucs || []
+  document.getElementById('contagem-ucs').textContent = `${_ucs.length} UC(s) cadastradas`
+
+  // Carregar ocorrências abertas
+  const { data: ocAbts } = await db.from('ocorrencias')
+    .select('uc_id,severidade').eq('status','aberta')
+
+  const ocPorUC = {}
+  ocAbts?.forEach(o => {
+    if (!ocPorUC[o.uc_id]) ocPorUC[o.uc_id] = []
+    ocPorUC[o.uc_id].push(o.severidade)
+  })
+
+  window._renderMapa = function(lista) {
+    _layers.forEach(l => mapa.removeLayer(l)); _layers = []
+
+    lista.forEach(uc => {
+      const cor = COR_CAT[uc.categoria] || '#6B7280'
+      const ocUC = ocPorUC[uc.id] || []
+      const temCritica = ocUC.some(s => ['critica','alta'].includes(s))
+
+      // Se tiver geometria, renderizar polígono
+      if (uc.geom_json) {
+        try {
+          const geom = typeof uc.geom_json === 'string' ? JSON.parse(uc.geom_json) : uc.geom_json
+          const layer = L.geoJSON(geom, {
+            style: { color: temCritica ? '#DC2626' : cor, weight: 2, fillOpacity: 0.22, fillColor: cor }
+          })
+          layer.bindPopup(popupHTML(uc, ocUC))
+          layer.addTo(mapa); _layers.push(layer)
+        } catch(e) { /* geometria inválida, usa marcador */ }
+        return
+      }
+
+      // Sem geometria: marcador no centroide aproximado do Acre
+      const jitter = () => (Math.random()-0.5) * 3
+      const marker = L.circleMarker([-9.5 + jitter(), -70.0 + jitter()], {
+        radius: 10, color: temCritica ? '#DC2626' : cor,
+        fillColor: cor, fillOpacity: 0.8, weight: 2
+      })
+      marker.bindPopup(popupHTML(uc, ocUC))
+      marker.addTo(mapa); _layers.push(marker)
+    })
+  }
+
+  function popupHTML(uc, ocUC) {
+    const cor = COR_CAT[uc.categoria] || '#6B7280'
+    return `<div style="min-width:200px">
+      <div class="popup-titulo">${esc(uc.nome)}</div>
+      <span class="popup-badge" style="background:${cor}20;color:${cor};margin-bottom:6px">${esc(uc.categoria)}</span>
+      <div style="font-size:12px;color:#374151;margin-top:6px">
+        <div>📐 Área: <strong>${uc.area_ha ? formatNum(uc.area_ha,0)+' ha' : '—'}</strong></div>
+        <div>🏛️ Status: ${esc(t('status_uc.'+uc.status))}</div>
+        ${uc.municipios?.length ? `<div>📍 ${uc.municipios.join(', ')}</div>` : ''}
+        ${ocUC.length ? `<div style="margin-top:6px;color:#DC2626">⚠️ ${ocUC.length} ocorrência(s) aberta(s)</div>` : ''}
+      </div>
+    </div>`
+  }
+
+  window.atualizarFiltros = function() {
+    const grupo = document.getElementById('fil-grupo').value
+    const cat = document.getElementById('fil-cat').value
+    const lista = _ucs.filter(u => (!grupo || u.grupo===grupo) && (!cat || u.categoria===cat))
+    document.getElementById('contagem-ucs').textContent = `${lista.length} UC(s) exibidas`
+    window._renderMapa(lista)
+  }
+
+  window._renderMapa(_ucs)
+
+  // Legenda
+  const legEl = document.createElement('div'); legEl.className = 'map-legenda'
+  legEl.innerHTML = `<div style="font-weight:700;margin-bottom:6px;font-size:11px;color:#374151">Legenda</div>` +
+    Object.entries(COR_CAT).slice(0,8).map(([cat,cor])=>
+      `<div class="leg-item"><div class="leg-cor" style="background:${cor}"></div><span>${cat}</span></div>`
+    ).join('') +
+    `<div class="leg-item" style="margin-top:4px;border-top:1px solid #E5E7EB;padding-top:4px"><div class="leg-cor" style="background:#DC2626"></div><span>Ocorrência aberta</span></div>`
+  document.getElementById('mapa-container').style.position = 'relative'
+  document.getElementById('mapa-container').appendChild(legEl)
+})()
+</script>
+</body>
+</html>

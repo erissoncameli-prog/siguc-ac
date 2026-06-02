@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>SIGUC-AC · Unidades de Conservação</title>
+<link rel="stylesheet" href="../css/global.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../js/config.js"></script>
+<script src="../js/layout.js"></script>
+</head>
+<body>
+<div id="app"></div>
+
+<!-- Modal fora do #app -->
+<div class="modal-overlay" id="modal-uc">
+  <div class="modal" style="max-width:720px">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-titulo">Nova Unidade de Conservação</div>
+      <button class="modal-close" onclick="fecharModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Código <span class="obrig">*</span></label><input class="form-control" id="f-codigo" placeholder="UC-001"></div>
+        <div class="form-group"><label class="form-label">Sigla</label><input class="form-control" id="f-sigla" placeholder="RESEX-xxx"></div>
+      </div>
+      <div class="form-group"><label class="form-label">Nome Completo <span class="obrig">*</span></label><input class="form-control" id="f-nome" placeholder="Nome oficial da UC"></div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Categoria <span class="obrig">*</span></label>
+          <select class="form-control" id="f-categoria">
+            <option value="">Selecione...</option>
+            <option value="APA">APA — Área de Proteção Ambiental</option>
+            <option value="ARIE">ARIE — Área de Relevante Int. Ecológico</option>
+            <option value="ESEC">ESEC — Estação Ecológica</option>
+            <option value="FLONA">FLONA — Floresta Nacional</option>
+            <option value="MONA">MONA — Monumento Natural</option>
+            <option value="PI">PI — Parque</option>
+            <option value="REBIO">REBIO — Reserva Biológica</option>
+            <option value="RDS">RDS — Reserva de Desenvolvimento Sustentável</option>
+            <option value="RESEX">RESEX — Reserva Extrativista</option>
+            <option value="RPPN">RPPN — Reserva Part. do Patrimônio Natural</option>
+            <option value="RVS">RVS — Refúgio de Vida Silvestre</option>
+          </select>
+        </div>
+        <div class="form-group"><label class="form-label">Esfera <span class="obrig">*</span></label>
+          <select class="form-control" id="f-esfera">
+            <option value="estadual">Estadual</option>
+            <option value="federal">Federal</option>
+            <option value="municipal">Municipal</option>
+            <option value="privada">Privada</option>
+          </select>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Área (ha)</label><input class="form-control" id="f-area" type="number" step="0.0001" placeholder="0,00"></div>
+        <div class="form-group"><label class="form-label">Status</label>
+          <select class="form-control" id="f-status">
+            <option value="criada">Criada</option>
+            <option value="em_regularizacao">Em Regularização</option>
+            <option value="regularizada">Regularizada</option>
+            <option value="decreto_suspenso">Decreto Suspenso</option>
+            <option value="em_revisao">Em Revisão</option>
+          </select>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Ato de Criação</label><input class="form-control" id="f-ato" placeholder="Decreto nº 12.345 de 01/01/2000"></div>
+        <div class="form-group"><label class="form-label">Data de Criação</label><input class="form-control" id="f-data-criacao" type="date"></div>
+      </div>
+      <div class="form-group"><label class="form-label">Municípios (separados por vírgula)</label><input class="form-control" id="f-municipios" placeholder="Rio Branco, Senador Guiomard"></div>
+      <div class="form-group"><label class="form-label">Observações</label><textarea class="form-control" id="f-obs" rows="3"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="fecharModal()">Cancelar</button>
+      <button class="btn btn-primary" id="btn-salvar" onclick="salvarUC()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let ucEditId = null
+
+;(async function () {
+  const usuario = await carregarUsuario()
+  if (!usuario) { window.location.href = '../index.html'; return }
+
+  const podeEditar = ['super_admin','gestor'].includes(usuario.perfil)
+
+  document.getElementById('app').innerHTML =
+    gerarLayout('Unidades de Conservação', 'unidades') +
+    `<div class="fade-in">
+      <div class="filter-bar">
+        <input class="form-control search-input" id="busca" placeholder="Buscar UC..." oninput="filtrar()">
+        <select class="form-control" id="fil-categoria" style="width:160px" onchange="filtrar()">
+          <option value="">Todas as categorias</option>
+          <option value="APA">APA</option><option value="ARIE">ARIE</option>
+          <option value="ESEC">ESEC</option><option value="FLONA">FLONA</option>
+          <option value="MONA">MONA</option><option value="PI">Parque</option>
+          <option value="REBIO">REBIO</option><option value="RDS">RDS</option>
+          <option value="RESEX">RESEX</option><option value="RPPN">RPPN</option>
+          <option value="RVS">RVS</option>
+        </select>
+        <select class="form-control" id="fil-grupo" style="width:160px" onchange="filtrar()">
+          <option value="">Todos os grupos</option>
+          <option value="protecao_integral">Proteção Integral</option>
+          <option value="uso_sustentavel">Uso Sustentável</option>
+        </select>
+        <select class="form-control" id="fil-status" style="width:160px" onchange="filtrar()">
+          <option value="">Todos os status</option>
+          <option value="regularizada">Regularizada</option>
+          <option value="em_regularizacao">Em Regularização</option>
+          <option value="criada">Criada</option>
+        </select>
+        ${podeEditar ? '<button class="btn btn-primary" onclick="abrirModal()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Nova UC</button>' : ''}
+      </div>
+      <div class="card">
+        <div class="table-wrap">
+          <div class="table-scroll">
+            <table>
+              <thead><tr><th>Código</th><th>Nome</th><th>Categoria</th><th>Grupo</th><th>Área (ha)</th><th>Municípios</th><th>Status</th>${podeEditar?'<th>Ações</th>':''}</tr></thead>
+              <tbody id="tbody-ucs"><tr><td colspan="8" style="text-align:center;padding:32px;color:#9CA3AF">Carregando...</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>` +
+    '</div></div></div>'
+
+  window._podeEditar = podeEditar
+  carregarLogosSidebar()
+  await carregarUCs()
+})()
+
+let _ucs = []
+async function carregarUCs() {
+  const { data } = await db.from('unidades_conservacao').select('*').eq('ativo', true).order('codigo')
+  _ucs = data || []
+  renderTabela(_ucs)
+}
+
+function filtrar() {
+  const q = document.getElementById('busca').value.toLowerCase()
+  const cat = document.getElementById('fil-categoria').value
+  const grupo = document.getElementById('fil-grupo').value
+  const status = document.getElementById('fil-status').value
+  const lista = _ucs.filter(u =>
+    (!q || u.nome.toLowerCase().includes(q) || u.codigo.toLowerCase().includes(q)) &&
+    (!cat || u.categoria === cat) &&
+    (!grupo || u.grupo === grupo) &&
+    (!status || u.status === status)
+  )
+  renderTabela(lista)
+}
+
+function renderTabela(lista) {
+  const pe = window._podeEditar
+  const tbody = document.getElementById('tbody-ucs')
+  if (!lista.length) {
+    tbody.innerHTML = `<tr><td colspan="${pe?8:7}" style="text-align:center;padding:32px;color:#9CA3AF">Nenhuma unidade encontrada</td></tr>`
+    return
+  }
+  tbody.innerHTML = lista.map(u => `
+    <tr>
+      <td class="mono"><strong>${esc(u.codigo)}</strong></td>
+      <td>${esc(u.nome)}${u.sigla?` <span style="font-size:11px;color:#9CA3AF">(${esc(u.sigla)})</span>`:''}</td>
+      <td><span class="badge ${BADGE_CATEGORIA[u.categoria]||'badge-cinza'}">${esc(u.categoria)}</span></td>
+      <td><span class="badge ${u.grupo==='protecao_integral'?'badge-verde':'badge-teal'}">${u.grupo==='protecao_integral'?'Prot. Integral':'Uso Sust.'}</span></td>
+      <td class="mono">${u.area_ha ? formatNum(u.area_ha, 0) : '—'}</td>
+      <td style="font-size:12px;color:#6B7280">${u.municipios?.join(', ')||'—'}</td>
+      <td><span class="badge ${BADGE_STATUS_UC[u.status]||'badge-cinza'}">${esc(t('status_uc.'+u.status))}</span></td>
+      ${pe ? `<td><button class="btn btn-xs btn-ghost" onclick='editarUC(${JSON.stringify(u)})'>Editar</button></td>` : ''}
+    </tr>`).join('')
+}
+
+function abrirModal(uc = null) {
+  ucEditId = uc?.id || null
+  document.getElementById('modal-titulo').textContent = uc ? 'Editar UC' : 'Nova Unidade de Conservação'
+  document.getElementById('f-codigo').value = uc?.codigo || ''
+  document.getElementById('f-sigla').value = uc?.sigla || ''
+  document.getElementById('f-nome').value = uc?.nome || ''
+  document.getElementById('f-categoria').value = uc?.categoria || ''
+  document.getElementById('f-esfera').value = uc?.esfera || 'estadual'
+  document.getElementById('f-area').value = uc?.area_ha || ''
+  document.getElementById('f-status').value = uc?.status || 'criada'
+  document.getElementById('f-ato').value = uc?.ato_criacao || ''
+  document.getElementById('f-data-criacao').value = uc?.data_criacao || ''
+  document.getElementById('f-municipios').value = uc?.municipios?.join(', ') || ''
+  document.getElementById('f-obs').value = uc?.observacoes || ''
+  document.getElementById('modal-uc').classList.add('aberto')
+}
+
+function editarUC(uc) { abrirModal(uc) }
+function fecharModal() { document.getElementById('modal-uc').classList.remove('aberto'); ucEditId = null }
+
+async function salvarUC() {
+  const codigo = document.getElementById('f-codigo').value.trim()
+  const nome = document.getElementById('f-nome').value.trim()
+  const categoria = document.getElementById('f-categoria').value
+  if (!codigo || !nome || !categoria) { toast('Preencha os campos obrigatórios', 'error'); return }
+
+  const grupo = ['APA','ARIE','FLONA','RESEX','RDS','RPPN'].includes(categoria) ? 'uso_sustentavel' : 'protecao_integral'
+  const muns = document.getElementById('f-municipios').value.split(',').map(s=>s.trim()).filter(Boolean)
+
+  const payload = {
+    codigo, nome, sigla: document.getElementById('f-sigla').value.trim() || null,
+    categoria, grupo, esfera: document.getElementById('f-esfera').value,
+    area_ha: parseFloat(document.getElementById('f-area').value) || null,
+    status: document.getElementById('f-status').value,
+    ato_criacao: document.getElementById('f-ato').value.trim() || null,
+    data_criacao: document.getElementById('f-data-criacao').value || null,
+    municipios: muns.length ? muns : null,
+    observacoes: document.getElementById('f-obs').value.trim() || null,
+  }
+
+  const btn = document.getElementById('btn-salvar')
+  btn.disabled = true; btn.textContent = 'Salvando...'
+  try {
+    if (ucEditId) {
+      const { error } = await db.from('unidades_conservacao').update(payload).eq('id', ucEditId)
+      if (error) throw error
+      toast('UC atualizada com sucesso!', 'success')
+    } else {
+      const { error } = await db.from('unidades_conservacao').insert(payload)
+      if (error) throw error
+      toast('UC cadastrada com sucesso!', 'success')
+    }
+    fecharModal()
+    await carregarUCs()
+  } catch(e) {
+    toast(e.message || 'Erro ao salvar', 'error')
+  } finally {
+    btn.disabled = false; btn.textContent = 'Salvar'
+  }
+}
+</script>
+</body>
+</html>

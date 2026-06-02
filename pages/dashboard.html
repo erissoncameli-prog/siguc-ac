@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>SIGUC-AC · Visão Geral</title>
+<link rel="stylesheet" href="../css/global.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../js/config.js"></script>
+<script src="../js/layout.js"></script>
+</head>
+<body>
+<div id="app"></div>
+<script>
+;(async function () {
+  const usuario = await carregarUsuario()
+  if (!usuario) { window.location.href = '../index.html'; return }
+
+  document.getElementById('app').innerHTML =
+    gerarLayout('Visão Geral', 'dashboard') +
+    `<div class="fade-in">
+
+      <div class="kpi-grid" id="kpi-grid">
+        <div class="kpi-card"><div class="kpi-label">Total de UCs</div><div class="kpi-valor" id="kpi-total">—</div><div class="kpi-sub">Unidades cadastradas</div></div>
+        <div class="kpi-card ouro"><div class="kpi-label">Área Total</div><div class="kpi-valor" id="kpi-area">—</div><div class="kpi-sub">Hectares protegidos</div></div>
+        <div class="kpi-card azul"><div class="kpi-label">Ocorrências Abertas</div><div class="kpi-valor" id="kpi-oc">—</div><div class="kpi-sub">Requerem atenção</div></div>
+        <div class="kpi-card erro"><div class="kpi-label">Ocorrências Críticas</div><div class="kpi-valor" id="kpi-crit">—</div><div class="kpi-sub">Severidade crítica/alta</div></div>
+      </div>
+
+      <div class="grid-60-40" style="gap:16px;margin-bottom:20px">
+        <div class="card">
+          <div class="card-header">
+            <div><div class="card-title">Unidades de Conservação</div><div class="card-subtitle">Últimas cadastradas / atualizadas</div></div>
+            <a href="unidades.html" class="btn btn-sm btn-secondary">Ver todas</a>
+          </div>
+          <div class="table-wrap">
+            <table id="tbl-ucs">
+              <thead><tr><th>Código</th><th>Nome</th><th>Categoria</th><th>Área (ha)</th><th>Status</th></tr></thead>
+              <tbody id="tbody-ucs"><tr><td colspan="5" style="text-align:center;color:#9CA3AF;padding:24px">Carregando...</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><div class="card-title">Ocorrências Recentes</div></div>
+          <div id="lista-ocorrencias" style="padding:8px 0">
+            <div style="text-align:center;padding:24px;color:#9CA3AF">Carregando...</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid-2" style="gap:16px">
+        <div class="card">
+          <div class="card-header"><div class="card-title">UCs por Categoria</div></div>
+          <div class="card-body" id="chart-categoria" style="min-height:160px">
+            <div style="text-align:center;color:#9CA3AF">Carregando...</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><div class="card-title">UCs por Status</div></div>
+          <div class="card-body" id="chart-status" style="min-height:160px">
+            <div style="text-align:center;color:#9CA3AF">Carregando...</div>
+          </div>
+        </div>
+      </div>
+
+    </div>` +
+    '</div></div></div>'
+
+  carregarLogosSidebar()
+  await carregarDados()
+})()
+
+async function carregarDados() {
+  const [{ data: ucs }, { data: ocorrencias }] = await Promise.all([
+    db.from('unidades_conservacao').select('id,codigo,nome,categoria,grupo,area_ha,status').eq('ativo', true).order('criado_em', { ascending: false }),
+    db.from('ocorrencias').select('id,titulo,tipo,severidade,status,data_ocorrencia,uc_id,unidades_conservacao(nome)').neq('status','arquivada').order('criado_em', { ascending: false }).limit(20)
+  ])
+
+  // KPIs
+  const total = ucs?.length || 0
+  const areaTotal = ucs?.reduce((s, u) => s + (u.area_ha || 0), 0) || 0
+  const ocAbertas = ocorrencias?.filter(o => o.status !== 'resolvida' && o.status !== 'arquivada').length || 0
+  const ocCriticas = ocorrencias?.filter(o => ['critica','alta'].includes(o.severidade) && o.status !== 'resolvida').length || 0
+
+  document.getElementById('kpi-total').textContent = total
+  document.getElementById('kpi-area').textContent = formatNum(areaTotal, 0)
+  document.getElementById('kpi-oc').textContent = ocAbertas
+  document.getElementById('kpi-crit').textContent = ocCriticas
+
+  // Tabela UCs
+  const tbody = document.getElementById('tbody-ucs')
+  if (!ucs?.length) {
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#9CA3AF;padding:24px">Nenhuma UC cadastrada</td></tr>'
+  } else {
+    tbody.innerHTML = ucs.slice(0, 8).map(u => `
+      <tr>
+        <td class="mono">${esc(u.codigo)}</td>
+        <td><strong>${esc(u.nome)}</strong></td>
+        <td><span class="badge ${BADGE_CATEGORIA[u.categoria]||'badge-cinza'}">${esc(u.categoria)}</span></td>
+        <td class="mono">${u.area_ha ? formatNum(u.area_ha, 0) : '—'}</td>
+        <td><span class="badge ${BADGE_STATUS_UC[u.status]||'badge-cinza'}">${esc(t('status_uc.'+u.status))}</span></td>
+      </tr>`).join('')
+  }
+
+  // Lista ocorrências
+  const lista = document.getElementById('lista-ocorrencias')
+  if (!ocorrencias?.length) {
+    lista.innerHTML = '<div style="text-align:center;padding:24px;color:#9CA3AF">Nenhuma ocorrência registrada</div>'
+  } else {
+    lista.innerHTML = ocorrencias.slice(0, 6).map(o => `
+      <div style="display:flex;align-items:flex-start;gap:10px;padding:10px 16px;border-bottom:1px solid #F3F4F6">
+        <span class="badge ${BADGE_SEVERIDADE[o.severidade]||'badge-cinza'}" style="flex-shrink:0;margin-top:2px">${esc(o.severidade)}</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:12px;font-weight:600;color:#111827;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(o.titulo)}</div>
+          <div style="font-size:11px;color:#9CA3AF;margin-top:2px">${esc(o.unidades_conservacao?.nome||'—')} · ${formatData(o.data_ocorrencia)}</div>
+        </div>
+        <span class="badge ${BADGE_STATUS_OC[o.status]||'badge-cinza'}">${esc(o.status)}</span>
+      </div>`).join('')
+  }
+
+  // Gráfico categorias
+  const porCategoria = {}
+  ucs?.forEach(u => { porCategoria[u.categoria] = (porCategoria[u.categoria]||0)+1 })
+  document.getElementById('chart-categoria').innerHTML = Object.entries(porCategoria)
+    .sort((a,b)=>b[1]-a[1])
+    .map(([cat, n]) => `
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+        <span class="badge ${BADGE_CATEGORIA[cat]||'badge-cinza'}" style="width:52px;justify-content:center">${esc(cat)}</span>
+        <div class="prog-bar" style="flex:1">
+          <div class="prog-fill" style="width:${Math.round(n/total*100)}%"></div>
+        </div>
+        <span class="prog-pct">${n}</span>
+      </div>`).join('') || '<div style="color:#9CA3AF;font-size:13px">Sem dados</div>'
+
+  // Gráfico status
+  const porStatus = {}
+  ucs?.forEach(u => { porStatus[u.status] = (porStatus[u.status]||0)+1 })
+  document.getElementById('chart-status').innerHTML = Object.entries(porStatus)
+    .map(([s, n]) => `
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+        <span class="badge ${BADGE_STATUS_UC[s]||'badge-cinza'}" style="min-width:120px;justify-content:center">${esc(t('status_uc.'+s))}</span>
+        <div class="prog-bar" style="flex:1">
+          <div class="prog-fill" style="width:${Math.round(n/total*100)}%"></div>
+        </div>
+        <span class="prog-pct">${n}</span>
+      </div>`).join('') || '<div style="color:#9CA3AF;font-size:13px">Sem dados</div>'
+}
+</script>
+</body>
+</html>

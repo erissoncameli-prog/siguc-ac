@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>SIGUC-AC · Ocorrências</title>
+<link rel="stylesheet" href="../css/global.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../js/config.js"></script>
+<script src="../js/layout.js"></script>
+</head>
+<body>
+<div id="app"></div>
+
+<div class="modal-overlay" id="modal-oc">
+  <div class="modal" style="max-width:680px">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-titulo">Nova Ocorrência</div>
+      <button class="modal-close" onclick="fecharModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label">Unidade de Conservação <span class="obrig">*</span></label>
+        <select class="form-control" id="f-uc"><option value="">Selecione...</option></select>
+      </div>
+      <div class="form-group"><label class="form-label">Título <span class="obrig">*</span></label><input class="form-control" id="f-titulo" placeholder="Descrição breve da ocorrência"></div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Tipo <span class="obrig">*</span></label>
+          <select class="form-control" id="f-tipo">
+            <option value="">Selecione...</option>
+            <option value="incendio">Incêndio</option>
+            <option value="desmatamento">Desmatamento</option>
+            <option value="invasao">Invasão</option>
+            <option value="caca_pesca_ilegal">Caça/Pesca Ilegal</option>
+            <option value="mineracao_ilegal">Mineração Ilegal</option>
+            <option value="contaminacao">Contaminação</option>
+            <option value="especie_invasora">Espécie Invasora</option>
+            <option value="outro">Outro</option>
+          </select>
+        </div>
+        <div class="form-group"><label class="form-label">Severidade <span class="obrig">*</span></label>
+          <select class="form-control" id="f-severidade">
+            <option value="baixa">Baixa</option>
+            <option value="media" selected>Média</option>
+            <option value="alta">Alta</option>
+            <option value="critica">Crítica</option>
+          </select>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Data da Ocorrência <span class="obrig">*</span></label><input class="form-control" id="f-data" type="date"></div>
+        <div class="form-group"><label class="form-label">Área Afetada (ha)</label><input class="form-control" id="f-area" type="number" step="0.01" placeholder="0,00"></div>
+      </div>
+      <div class="form-group"><label class="form-label">Descrição Detalhada</label><textarea class="form-control" id="f-descricao" rows="4" placeholder="Descreva a ocorrência, localização, circunstâncias..."></textarea></div>
+      <div class="form-group"><label class="form-label">Status</label>
+        <select class="form-control" id="f-status">
+          <option value="aberta">Aberta</option>
+          <option value="em_atendimento">Em Atendimento</option>
+          <option value="resolvida">Resolvida</option>
+          <option value="arquivada">Arquivada</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="fecharModal()">Cancelar</button>
+      <button class="btn btn-primary" id="btn-salvar" onclick="salvar()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let ocEditId = null
+
+;(async function () {
+  const usuario = await carregarUsuario()
+  if (!usuario) { window.location.href = '../index.html'; return }
+  const podeEditar = ['super_admin','gestor','tecnico'].includes(usuario.perfil)
+
+  document.getElementById('app').innerHTML =
+    gerarLayout('Ocorrências', 'ocorrencias') +
+    `<div class="fade-in">
+      <div class="kpi-grid">
+        <div class="kpi-card erro"><div class="kpi-label">Críticas/Altas Abertas</div><div class="kpi-valor" id="k-crit">—</div></div>
+        <div class="kpi-card ouro"><div class="kpi-label">Em Atendimento</div><div class="kpi-valor" id="k-atend">—</div></div>
+        <div class="kpi-card"><div class="kpi-label">Resolvidas (30 dias)</div><div class="kpi-valor" id="k-res">—</div></div>
+        <div class="kpi-card azul"><div class="kpi-label">Total Abertas</div><div class="kpi-valor" id="k-total">—</div></div>
+      </div>
+      <div class="filter-bar">
+        <input class="form-control search-input" id="busca" placeholder="Buscar ocorrência..." oninput="filtrar()">
+        <select class="form-control" id="fil-sev" style="width:130px" onchange="filtrar()">
+          <option value="">Severidade</option>
+          <option value="critica">Crítica</option><option value="alta">Alta</option>
+          <option value="media">Média</option><option value="baixa">Baixa</option>
+        </select>
+        <select class="form-control" id="fil-tipo" style="width:150px" onchange="filtrar()">
+          <option value="">Tipo</option>
+          <option value="incendio">Incêndio</option><option value="desmatamento">Desmatamento</option>
+          <option value="invasao">Invasão</option><option value="caca_pesca_ilegal">Caça/Pesca</option>
+          <option value="mineracao_ilegal">Mineração Ilegal</option>
+        </select>
+        <select class="form-control" id="fil-status" style="width:140px" onchange="filtrar()">
+          <option value="">Status</option>
+          <option value="aberta">Aberta</option><option value="em_atendimento">Em Atendimento</option>
+          <option value="resolvida">Resolvida</option>
+        </select>
+        ${podeEditar ? '<button class="btn btn-primary" onclick="abrirModal()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Registrar</button>' : ''}
+      </div>
+      <div class="card">
+        <div class="table-wrap"><div class="table-scroll">
+          <table>
+            <thead><tr><th>UC</th><th>Título</th><th>Tipo</th><th>Severidade</th><th>Data</th><th>Área (ha)</th><th>Status</th>${podeEditar?'<th>Ações</th>':''}</tr></thead>
+            <tbody id="tbody"></tbody>
+          </table>
+        </div></div>
+      </div>
+    </div>` +
+    '</div></div></div>'
+
+  window._podeEditar = podeEditar
+  carregarLogosSidebar()
+  await carregarUCs()
+  await carregar()
+})()
+
+async function carregarUCs() {
+  const { data } = await db.from('unidades_conservacao').select('id,nome,codigo').eq('ativo',true).order('codigo')
+  const sel = document.getElementById('f-uc')
+  if (sel) data?.forEach(u => { const o = document.createElement('option'); o.value = u.id; o.textContent = `${u.codigo} — ${u.nome}`; sel.appendChild(o) })
+}
+
+let _dados = []
+async function carregar() {
+  const { data } = await db.from('ocorrencias')
+    .select('*,unidades_conservacao(nome,codigo)')
+    .order('data_ocorrencia', { ascending: false })
+  _dados = data || []
+
+  const hoje = new Date(); const d30 = new Date(hoje); d30.setDate(d30.getDate()-30)
+  document.getElementById('k-crit').textContent = _dados.filter(o=>['critica','alta'].includes(o.severidade)&&o.status==='aberta').length
+  document.getElementById('k-atend').textContent = _dados.filter(o=>o.status==='em_atendimento').length
+  document.getElementById('k-res').textContent = _dados.filter(o=>o.status==='resolvida'&&new Date(o.data_resolucao||o.atualizado_em)>=d30).length
+  document.getElementById('k-total').textContent = _dados.filter(o=>o.status==='aberta').length
+
+  renderTabela(_dados)
+}
+
+function filtrar() {
+  const q = document.getElementById('busca').value.toLowerCase()
+  const sev = document.getElementById('fil-sev').value
+  const tipo = document.getElementById('fil-tipo').value
+  const status = document.getElementById('fil-status').value
+  renderTabela(_dados.filter(o =>
+    (!q || o.titulo.toLowerCase().includes(q) || (o.unidades_conservacao?.nome||'').toLowerCase().includes(q)) &&
+    (!sev || o.severidade === sev) && (!tipo || o.tipo === tipo) && (!status || o.status === status)
+  ))
+}
+
+function renderTabela(lista) {
+  const pe = window._podeEditar
+  const tbody = document.getElementById('tbody')
+  if (!lista.length) { tbody.innerHTML = `<tr><td colspan="${pe?8:7}" style="text-align:center;padding:32px;color:#9CA3AF">Nenhuma ocorrência encontrada</td></tr>`; return }
+  tbody.innerHTML = lista.map(o => `
+    <tr>
+      <td style="font-size:12px"><strong>${esc(o.unidades_conservacao?.codigo||'—')}</strong><br><span style="color:#9CA3AF">${esc(o.unidades_conservacao?.nome||'')}</span></td>
+      <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(o.titulo)}</td>
+      <td style="font-size:12px">${esc(t('tipo_ocorrencia.'+o.tipo)||o.tipo)}</td>
+      <td><span class="badge ${BADGE_SEVERIDADE[o.severidade]||'badge-cinza'}">${esc(o.severidade)}</span></td>
+      <td class="mono">${formatData(o.data_ocorrencia)}</td>
+      <td class="mono">${o.area_afetada_ha ? formatNum(o.area_afetada_ha,1) : '—'}</td>
+      <td><span class="badge ${BADGE_STATUS_OC[o.status]||'badge-cinza'}">${esc(o.status)}</span></td>
+      ${pe ? `<td><button class="btn btn-xs btn-ghost" onclick='abrirModal(${JSON.stringify(o)})'>Editar</button></td>` : ''}
+    </tr>`).join('')
+}
+
+function abrirModal(oc = null) {
+  ocEditId = oc?.id || null
+  document.getElementById('modal-titulo').textContent = oc ? 'Editar Ocorrência' : 'Nova Ocorrência'
+  document.getElementById('f-uc').value = oc?.uc_id || ''
+  document.getElementById('f-titulo').value = oc?.titulo || ''
+  document.getElementById('f-tipo').value = oc?.tipo || ''
+  document.getElementById('f-severidade').value = oc?.severidade || 'media'
+  document.getElementById('f-data').value = oc?.data_ocorrencia || new Date().toISOString().slice(0,10)
+  document.getElementById('f-area').value = oc?.area_afetada_ha || ''
+  document.getElementById('f-descricao').value = oc?.descricao || ''
+  document.getElementById('f-status').value = oc?.status || 'aberta'
+  document.getElementById('modal-oc').classList.add('aberto')
+}
+
+function fecharModal() { document.getElementById('modal-oc').classList.remove('aberto'); ocEditId = null }
+
+async function salvar() {
+  const uc_id = document.getElementById('f-uc').value
+  const titulo = document.getElementById('f-titulo').value.trim()
+  const tipo = document.getElementById('f-tipo').value
+  const data_ocorrencia = document.getElementById('f-data').value
+  if (!uc_id || !titulo || !tipo || !data_ocorrencia) { toast('Preencha os campos obrigatórios', 'error'); return }
+
+  const payload = {
+    uc_id, titulo, tipo,
+    severidade: document.getElementById('f-severidade').value,
+    data_ocorrencia,
+    area_afetada_ha: parseFloat(document.getElementById('f-area').value) || null,
+    descricao: document.getElementById('f-descricao').value.trim() || null,
+    status: document.getElementById('f-status').value,
+  }
+
+  const btn = document.getElementById('btn-salvar')
+  btn.disabled = true; btn.textContent = 'Salvando...'
+  try {
+    if (ocEditId) {
+      const { error } = await db.from('ocorrencias').update(payload).eq('id', ocEditId)
+      if (error) throw error
+      toast('Ocorrência atualizada!', 'success')
+    } else {
+      const { error } = await db.from('ocorrencias').insert(payload)
+      if (error) throw error
+      toast('Ocorrência registrada!', 'success')
+    }
+    fecharModal(); await carregar()
+  } catch(e) { toast(e.message || 'Erro ao salvar', 'error') }
+  finally { btn.disabled = false; btn.textContent = 'Salvar' }
+}
+</script>
+</body>
+</html>
