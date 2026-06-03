@@ -104,9 +104,15 @@ async function carregarUCsOpcoes() {
 
 let _dados = []
 async function carregar() {
-  const { data } = await db.from('usuarios')
+  const { data, error } = await db.from('usuarios')
     .select('*,unidades_conservacao(nome,codigo)')
     .order('nome_completo')
+  if (error) {
+    console.error('Erro ao carregar usuários:', error)
+    document.getElementById('tbody').innerHTML =
+      `<tr><td colspan="6" style="text-align:center;padding:32px;color:#DC2626">Erro ao carregar: ${esc(error.message)}</td></tr>`
+    return
+  }
   _dados = data || []
   renderTabela(_dados)
 }
