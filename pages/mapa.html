@@ -1233,6 +1233,9 @@ function _renderizarZonas(){
       const p = f.properties;
       if(_zonasFiltroUC !== 'todas' && p.uc_nome !== _zonasFiltroUC) return false;
       if(tiposAtivos.size > 0 && !tiposAtivos.has(p.zona_codigo)) return false;
+      // Filtro per-UC definido pelo popup
+      const selUC = _zonasSelecaoPorUC[p.uc_nome];
+      if(selUC && !selUC.has(p.zona_codigo)) return false;
       count++;
       return true;
     },
