@@ -777,6 +777,15 @@ function _renderizarUC(){
   const esfFed=(document.getElementById('uc-esfera-federal')?.checked??true);
   const esfEst=(document.getElementById('uc-esfera-estadual')?.checked??true);
   const esfMun=(document.getElementById('uc-esfera-municipal')?.checked??true);
+  // Sincronizar visibilidade dos itens da lista com as esferas ativas
+  document.querySelectorAll('.uc-filtro-label').forEach(row=>{
+    const cb=row.querySelector('[data-uc-nome]'); if(!cb) return;
+    const nome=cb.dataset.ucNome;
+    const feat=(_ucGeojson?.features||[]).find(f=>f.properties.nome===nome);
+    const esf=(feat?.properties?.esfera||'').toLowerCase();
+    const esfOk=(esf==='federal'?esfFed:esf==='estadual'?esfEst:esf==='municipal'?esfMun:true);
+    row.style.display=esfOk?'':'none';
+  });
   const nomesAtivos=new Set(Array.from(document.querySelectorAll('[data-uc-nome]:checked')).map(e=>e.dataset.ucNome));
   let count=0;
   _ucLayer=L.geoJSON(_ucGeojson,{
