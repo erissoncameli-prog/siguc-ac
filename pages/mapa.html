@@ -231,6 +231,7 @@ let _acreGeojson = null, _acreLayers = [], _acreAtivo = true;
 let _zonasGeojson = null, _zonasLayer = null, _zonasAtivo = false, _zonasOpacity = 0.55;
 let _zonasFiltroUC = 'todas';
 let _zonasTiposAtivos = new Set(['ZI','ZP','ZOA','ZOC','ZEX','ZPO','ZPR','ZUE','ZUP','ZUC','ZOT']);
+let _zonasSelecaoPorUC = {}; // { ucNome: Set<codigoZona> } — null = todas visíveis
 let _acreEstilo = { cor:'#1F4E2C', espessura:4, opacidade:1, dashArray:'none', sombraCor:'#000000', sombraBlur:14, sombraOpacidade:0.55, sombraOffset:3 };
 let _carLayer = null, _carFeatures = [], _carCarregado = false, _carCarregando = false;
 let _carAbertoCod = null;
