@@ -561,7 +561,7 @@ function _adicionarControleBasemap(){
     const div = L.DomUtil.create('div','mapa-modo-ctrl');
     div.innerHTML = `<div class="bmg-header" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'':'none'">
       <span class="bmg-header-title">🗺 Mapa Base</span><span style="font-size:11px;color:#9ca3af">▾</span></div>
-      <div class="bmg-body">` +
+      <div class="bmg-body" style="display:none">` +
       BASEMAP_GROUPS.map(g=>`<div class="bmg-group-title">${escHtml(g.grupo)}</div><div class="bmg-grid">` +
         g.itens.map(b=>`<div class="bmg-tile${b.id===modoMapaAtual?' ativo':''}" data-modo="${b.id}" onclick="_aplicarBasemap('${b.id}')">
           <div class="bmg-thumb"><img src="${escHtml(b.thumb)}" loading="lazy" onerror="this.style.display='none'"></div>
