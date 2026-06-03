@@ -833,7 +833,7 @@ function _renderizarUC(){
           ${det.conselho_gestor?`<span style="font-size:10px;padding:2px 7px;border-radius:10px;background:#dbeafe;color:#1e40af;border:1px solid #bfdbfe">✓ Conselho Gestor</span>`:''}
           ${det.status==='provisória'?`<span style="font-size:10px;padding:2px 7px;border-radius:10px;background:#fef3c7;color:#92400e;border:1px solid #fde68a">Provisória</span>`:''}
         </div>`:'';
-      const detFonte=det.fonte_url?`<div style="margin-top:6px"><a href="${escHtml(det.fonte_url)}" target="_blank" style="font-size:10px;color:#1d4ed8">→ Página SEMA</a></div>`:'';
+      const detFonte=det.fonte_url?`<div style="margin-top:6px"><a href="${escHtml(det.fonte_url)}" target="_blank" style="font-size:10px;color:#1d4ed8">→ ${det.esfera==='federal'?'Página ICMBio':'Página SEMA'}</a></div>`:'';
       layer.bindPopup(`<div class="camada-popup">
         <div class="cp-header" style="background:#1a5f38">🌿 Unidade de Conservação</div>
         <div class="cp-layer">
