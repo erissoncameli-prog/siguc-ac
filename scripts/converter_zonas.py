@@ -117,11 +117,11 @@ def main():
                 shp_path = os.path.join(root, f)
                 feats = shp_para_features(shp_path, uc_nome, meta)
                 if feats:
-                    print(f'  ✓ {f} → {len(feats)} polígono(s) [{meta["codigo"]}]')
+                    print(f'  + {f} -> {len(feats)} poligono(s) [{meta["codigo"]}]')
                     todas_features.extend(feats)
                     total_shp += 1
                 else:
-                    print(f'  ○ {f} → sem polígonos')
+                    print(f'  - {f} -> sem poligonos')
 
     geojson = {
         'type': 'FeatureCollection',
