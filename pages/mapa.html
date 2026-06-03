@@ -443,8 +443,8 @@ function iniciarMapa(){
   mapaL.createPane('carPane'); mapaL.getPane('carPane').style.zIndex = 450;
   requestAnimationFrame(() => mapaL.invalidateSize());
   mapaL.on('click', onMapaClick);
-  // Abrir painel UC por padrão e carregar estaduais
-  toggleLayerBar('uc');
+  // Pré-renderizar painel UC no DOM (sem abrir visualmente) e carregar estaduais
+  document.getElementById('mlb-dropdown').innerHTML = _renderDropdown('uc');
   toggleUC(true);
 }
 
