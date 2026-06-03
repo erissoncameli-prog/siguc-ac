@@ -813,6 +813,24 @@ function _renderizarUC(){
         tt.setLatLng([p.centro_lat,p.centro_lon]); tt.addTo(mapaL);
         layer._ucLabel=tt; layer.on('remove',()=>{ try{mapaL.removeLayer(tt);}catch(x){} });
       }
+      const det=_ucDetalhes[p.nome]||{};
+      const detGestor=det.gestor_nome?`
+        <div style="margin-top:8px;padding-top:8px;border-top:1px solid #e5e7eb">
+          <div style="font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Gestor(a)</div>
+          <div style="font-size:11px;font-weight:600;color:#111827">${escHtml(det.gestor_nome)}</div>
+          <div style="font-size:10px;color:#6b7280">${escHtml(det.gestor_cargo||'')}</div>
+          ${det.gestor_portaria?`<div style="font-size:10px;color:#6b7280;margin-top:1px">${escHtml(det.gestor_portaria)}</div>`:''}
+          ${det.gestor_email?`<div style="font-size:10px;margin-top:2px"><a href="mailto:${escHtml(det.gestor_email)}" style="color:#1d4ed8">${escHtml(det.gestor_email)}</a></div>`:''}
+        </div>`:'';
+      const detDocs=det.plano_manejo!==undefined?`
+        <div style="margin-top:8px;padding-top:8px;border-top:1px solid #e5e7eb;display:flex;gap:6px;flex-wrap:wrap">
+          <span style="font-size:10px;padding:2px 7px;border-radius:10px;background:${det.plano_manejo?'#dcfce7':'#fee2e2'};color:${det.plano_manejo?'#166534':'#991b1b'};border:1px solid ${det.plano_manejo?'#bbf7d0':'#fecaca'}">
+            ${det.plano_manejo?'✓ Plano de Manejo':'✗ Sem Plano de Manejo'}
+          </span>
+          ${det.conselho_gestor?`<span style="font-size:10px;padding:2px 7px;border-radius:10px;background:#dbeafe;color:#1e40af;border:1px solid #bfdbfe">✓ Conselho Gestor</span>`:''}
+          ${det.status==='provisória'?`<span style="font-size:10px;padding:2px 7px;border-radius:10px;background:#fef3c7;color:#92400e;border:1px solid #fde68a">Provisória</span>`:''}
+        </div>`:'';
+      const detFonte=det.fonte_url?`<div style="margin-top:6px"><a href="${escHtml(det.fonte_url)}" target="_blank" style="font-size:10px;color:#1d4ed8">→ Página SEMA</a></div>`:'';
       layer.bindPopup(`<div class="camada-popup">
         <div class="cp-header" style="background:#1a5f38">🌿 Unidade de Conservação</div>
         <div class="cp-layer">
@@ -823,10 +841,13 @@ function _renderizarUC(){
           ${p.ano_cria?`<div class="cp-row"><strong>Criação</strong><span>${escHtml(p.ano_cria)}</span></div>`:''}
           ${p.ato_cria?`<div class="cp-row"><strong>Ato legal</strong><span style="font-size:10px">${escHtml(p.ato_cria)}</span></div>`:''}
           ${ha?`<div class="cp-row"><strong>Área (ha)</strong><span>${ha}</span></div>`:''}
-          ${p.gestor?`<div class="cp-row"><strong>Gestor</strong><span>${escHtml(p.gestor)}</span></div>`:''}
-          <div class="cp-badge" style="background:${corG}11;border-color:${corG};color:${corG}">${lblG}</div>
+          ${p.gestor?`<div class="cp-row"><strong>Órgão gestor</strong><span>${escHtml(p.gestor)}</span></div>`:''}
+          ${detGestor}
+          ${detDocs}
+          ${detFonte}
+          <div class="cp-badge" style="background:${corG}11;border-color:${corG};color:${corG};margin-top:8px">${lblG}</div>
         </div>
-      </div>`,{className:'camada-popup-wrap',maxWidth:340});
+      </div>`,{className:'camada-popup-wrap',maxWidth:360});
     }
   });
   _ucLayer.addTo(mapaL);
