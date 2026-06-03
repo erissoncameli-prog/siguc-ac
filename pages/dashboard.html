@@ -73,7 +73,7 @@
 
 async function carregarDados() {
   const [{ data: ucs }, { data: ocorrencias }] = await Promise.all([
-    db.from('unidades_conservacao').select('id,codigo,nome,categoria,grupo,area_ha,status').eq('ativo', true).order('criado_em', { ascending: false }),
+    db.from('unidades_conservacao').select('id,codigo,nome,categoria,grupo,area_ha,status,esfera').eq('ativo', true).order('criado_em', { ascending: false }),
     db.from('ocorrencias').select('id,titulo,tipo,severidade,status,data_ocorrencia,uc_id,unidades_conservacao(nome)').neq('status','arquivada').order('criado_em', { ascending: false }).limit(20)
   ])
 
