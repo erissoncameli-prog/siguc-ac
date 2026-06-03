@@ -928,10 +928,8 @@ function _renderizarUC(){
           ${detFonte}
           <div class="cp-badge" style="background:${corG}11;border-color:${corG};color:${corG};margin-top:8px">${lblG}</div>
           <div class="uc-zona-popup-section" data-uc="${escHtml(p.nome)}" style="margin-top:10px;padding-top:8px;border-top:1px solid #e5e7eb">
-            <div class="uc-zona-popup-toggle" onclick="this.parentElement.querySelector('.uc-zona-popup-body').style.display=this.parentElement.querySelector('.uc-zona-popup-body').style.display==='none'?'':'none';this.querySelector('span').textContent=this.parentElement.querySelector('.uc-zona-popup-body').style.display==='none'?'▸':'▾'" style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:10px;font-weight:700;color:#1F4E2C;text-transform:uppercase;letter-spacing:.05em;user-select:none">
-              🗂 Zonas de Manejo <span style="font-size:11px">▸</span>
-            </div>
-            <div class="uc-zona-popup-body" style="display:none;margin-top:6px">
+            <div style="font-size:10px;font-weight:700;color:#1F4E2C;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">🗂 Zonas de Manejo</div>
+            <div class="uc-zona-popup-body">
               <div class="uc-zona-popup-conteudo" style="font-size:11px;color:#6b7280">Carregando...</div>
             </div>
           </div>
