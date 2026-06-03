@@ -943,20 +943,90 @@ function _renderizarUC(){
   const badge=document.getElementById('uc-count-badge'); if(badge){badge.textContent=count;badge.style.display=count?'':'none';}
 }
 
-function _ucStatsAtualizar(){
-  const feats=_ucGeojson?.features||[];
-  const total=feats.length;
-  const areaTotal=feats.reduce((s,f)=>s+(parseFloat(f.properties?.area_ha)||0),0);
-  document.getElementById('usc-total').textContent=total;
-  document.getElementById('usc-area').textContent=(areaTotal/1e6).toFixed(2);
-  document.getElementById('usc-pct').textContent=((areaTotal/16421980)*100).toFixed(1)+'%'; // área Acre
-  document.getElementById('usc-sub').textContent=total+' UCs · '+areaTotal.toLocaleString('pt-BR',{maximumFractionDigits:0})+' ha';
-  const pi=feats.filter(f=>_ucGrupoId(f.properties?.grupo)==='pi').length;
-  const us=feats.length-pi;
-  document.getElementById('usc-grupos').innerHTML=`<div style="display:flex;gap:12px;font-size:11px">
-    <span><strong style="color:#dc2626">${pi}</strong> Proteção Integral</span>
-    <span><strong style="color:#2563eb">${us}</strong> Uso Sustentável</span>
-  </div>`;
+function _ucStatsAtualizar(filteredFeats){
+  const ACRE_HA = 16421980;
+  const feats = filteredFeats || [];
+  const total = feats.length;
+  const areaTotal = feats.reduce((s,f)=>s+(parseFloat(f.properties?.area_ha)||0),0);
+  const pct = (areaTotal/ACRE_HA)*100;
+
+  // Totais
+  document.getElementById('usc-total').textContent = total;
+  document.getElementById('usc-area').textContent = (areaTotal/1e6).toFixed(2);
+  document.getElementById('usc-pct').textContent = pct.toFixed(1)+'%';
+  document.getElementById('usc-sub').textContent = total+' UC'+(total!==1?'s':'')+' · '+areaTotal.toLocaleString('pt-BR',{maximumFractionDigits:0})+' ha';
+
+  // Donut SVG (r=26, circunferência=163.36)
+  const CIRC = 163.36;
+  const arc = Math.min(pct/100, 1) * CIRC;
+  const donutArc = document.getElementById('usc-donut-arc');
+  const donutTxt = document.getElementById('usc-donut-txt');
+  if(donutArc){ donutArc.setAttribute('stroke-dasharray', arc.toFixed(1)+' '+CIRC.toFixed(1)); }
+  if(donutTxt){ donutTxt.textContent = pct.toFixed(1)+'%'; }
+
+  // Filtros ativos (badges de esfera)
+  const esfFed = document.getElementById('uc-esfera-federal')?.checked??false;
+  const esfEst = document.getElementById('uc-esfera-estadual')?.checked??true;
+  const esfMun = document.getElementById('uc-esfera-municipal')?.checked??false;
+  const badgeCfg = {
+    estadual:{label:'Estadual',bg:'#fefce8',co:'#854d0e',brd:'#fde68a'},
+    federal:{label:'Federal',bg:'#eff6ff',co:'#1d4ed8',brd:'#bfdbfe'},
+    municipal:{label:'Municipal',bg:'#f0fdf4',co:'#166534',brd:'#86efac'},
+  };
+  const ativosBadge = [esfEst&&'estadual',esfFed&&'federal',esfMun&&'municipal'].filter(Boolean);
+  const filtrosEl = document.getElementById('usc-filtros-ativos');
+  if(filtrosEl) filtrosEl.innerHTML = ativosBadge.map(e=>{
+    const c=badgeCfg[e];
+    return `<span class="usc-filtro-badge" style="background:${c.bg};color:${c.co};border-color:${c.brd}">${c.label}</span>`;
+  }).join('');
+
+  // Breakdown por esfera (só mostra se >1 esfera ativa)
+  const esfEl = document.getElementById('usc-esferas');
+  const esfCores = {estadual:'#d97706',federal:'#2563eb',municipal:'#16a34a'};
+  if(esfEl){
+    if(ativosBadge.length > 1){
+      const byEsfera = {};
+      feats.forEach(f=>{
+        const esf=(f.properties.esfera||'outro').toLowerCase();
+        if(!byEsfera[esf]) byEsfera[esf]={count:0,area:0};
+        byEsfera[esf].count++;
+        byEsfera[esf].area += parseFloat(f.properties.area_ha)||0;
+      });
+      const maxArea = Math.max(...Object.values(byEsfera).map(v=>v.area),1);
+      esfEl.style.display='';
+      esfEl.innerHTML = '<div style="font-size:9px;font-weight:700;color:var(--cinza-400);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Por esfera de gestão</div>' +
+        ativosBadge.map(esf=>{
+          const d=byEsfera[esf]||{count:0,area:0};
+          const barW = areaTotal>0 ? Math.max(4,(d.area/maxArea)*100).toFixed(0) : 4;
+          const cor = esfCores[esf]||'#6b7280';
+          return `<div class="usc-esfera-row">
+            <span style="width:52px;color:var(--cinza-700);text-transform:capitalize;flex-shrink:0">${badgeCfg[esf]?.label||esf}</span>
+            <div style="flex:1;display:flex;align-items:center;gap:4px">
+              <div class="usc-esfera-bar" style="width:${barW}%;background:${cor}"></div>
+            </div>
+            <span style="width:22px;text-align:right;font-weight:700;color:${cor}">${d.count}</span>
+            <span style="width:52px;text-align:right;color:var(--cinza-500)">${(d.area/1e6).toFixed(2)}M</span>
+          </div>`;
+        }).join('');
+    } else {
+      esfEl.style.display='none';
+    }
+  }
+
+  // PI vs US
+  const pi = feats.filter(f=>_ucGrupoId(f.properties?.grupo)==='pi');
+  const us = feats.filter(f=>_ucGrupoId(f.properties?.grupo)==='us');
+  const piArea = pi.reduce((s,f)=>s+(parseFloat(f.properties.area_ha)||0),0);
+  const usArea = us.reduce((s,f)=>s+(parseFloat(f.properties.area_ha)||0),0);
+  document.getElementById('usc-grupos').innerHTML=`
+    <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:4px">
+      <span style="font-weight:700;color:#dc2626">${pi.length} Proteção Integral</span>
+      <span style="color:var(--cinza-500)">${(piArea/1e6).toFixed(2)}M ha</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;font-size:10px">
+      <span style="font-weight:700;color:#2563eb">${us.length} Uso Sustentável</span>
+      <span style="color:var(--cinza-500)">${(usArea/1e6).toFixed(2)}M ha</span>
+    </div>`;
 }
 
 var _ucPickerEl=null, _ucPickerNome=null;
