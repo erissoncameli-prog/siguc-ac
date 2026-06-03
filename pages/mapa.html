@@ -522,7 +522,7 @@ function iniciarMapa(){
   mapaL.createPane('carPane'); mapaL.getPane('carPane').style.zIndex = 450;
   requestAnimationFrame(() => mapaL.invalidateSize());
   mapaL.on('click', onMapaClick);
-  _iniciarDragCard('uc-stats-card','usc-drag-handle');
+  _iniciarDragCard('uc-stats-card','uc-stats-card');
   // Elementos cartográficos obrigatórios
   CART.init(mapaL);
   // Pré-renderizar painel UC no DOM (sem abrir visualmente) e carregar estaduais
