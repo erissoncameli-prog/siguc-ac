@@ -1737,8 +1737,17 @@ function _preencherZonaSection(section, ucNome){
   btn.textContent = 'Aplicar filtro';
   btn.style.cssText = 'width:100%;background:#1F4E2C;color:#fff;border:none;border-radius:6px;padding:5px 0;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit';
   btn.addEventListener('click', () => {
-    if(!_zonasAtivo){ toggleZonas(true); const c=document.getElementById('zonas-toggle'); if(c) c.checked=true; }
-    else _renderizarZonas();
+    // Filtra APENAS esta UC
+    _zonasFiltroUC = ucNome;
+    const selEl = document.getElementById('zonas-sel-uc');
+    if(selEl) selEl.value = ucNome;
+    if(!_zonasAtivo){
+      toggleZonas(true);
+      const c = document.getElementById('zonas-toggle');
+      if(c) c.checked = true;
+    } else {
+      _renderizarZonas();
+    }
     btn.textContent = '✓ Aplicado!';
     setTimeout(() => btn.textContent = 'Aplicar filtro', 1500);
   });
