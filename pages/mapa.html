@@ -274,8 +274,13 @@ function renderPagina(){
     <div class="mapa-topbar">
       <div style="flex:1">
         <h2 style="margin:0;font-size:17px;font-weight:600;color:var(--cinza-900)">Mapa das Unidades de Conservação</h2>
-        <p style="margin:2px 0 0;font-size:11px;color:var(--cinza-500)">Acre — SEMA/AC · ${new Date().getFullYear()}</p>
+        <p style="margin:2px 0 0;font-size:11px;color:var(--cinza-500)">Acre — SEMA/AC · ${new Date().getFullYear()} · SIRGAS 2000 / WGS 84</p>
       </div>
+      <button onclick="CART.imprimir('Mapa das Unidades de Conservação — Acre')"
+        style="display:flex;align-items:center;gap:6px;padding:6px 13px;background:#1F4E2C;color:#fff;border:none;border-radius:7px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;flex-shrink:0"
+        title="Imprimir / Exportar mapa com elementos cartográficos">
+        🖨 Imprimir
+      </button>
     </div>
 
     <!-- Barra de camadas -->
