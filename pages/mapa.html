@@ -1497,6 +1497,99 @@ function onMapaClick(e){
 }
 function vincularEventos(){
   document.addEventListener('keydown', e => { if(e.key==='Escape') fecharDetalhesCAR(); });
+
+  // Popup de UC: preenche seção de zonas ao abrir
+  mapaL.on('popupopen', e => {
+    const el = e.popup.getElement ? e.popup.getElement() : null;
+    if(!el) return;
+    const section = el.querySelector('.uc-zona-popup-section');
+    if(!section) return;
+    const ucNome = section.dataset.uc;
+    const conteudo = section.querySelector('.uc-zona-popup-conteudo');
+    if(!conteudo || conteudo.dataset.ready) return;
+    conteudo.dataset.ready = '1';
+    conteudo.innerHTML = _buildZonasPopupHtml(ucNome);
+  });
+}
+
+// ── Helpers de zonas por UC ───────────────────────────────────────────────────
+
+function _zonasParaUC(ucNome){
+  if(!_zonasGeojson) return [];
+  return [...new Set(
+    (_zonasGeojson.features||[])
+      .filter(f => f.properties.uc_nome === ucNome)
+      .map(f => f.properties.zona_codigo)
+  )];
+}
+
+function _buildZonasPopupHtml(ucNome){
+  const zonas = _zonasParaUC(ucNome);
+  if(!zonas.length){
+    if(!_zonasGeojson){
+      return `<div style="color:#9ca3af;font-size:11px">
+        <button onclick="(async()=>{await toggleZonas(true);const cb=document.getElementById('zonas-toggle');if(cb)cb.checked=true;const el=document.querySelector('.uc-zona-popup-conteudo[data-ready=\\'1\\']');if(el){el.dataset.ready='';el.innerHTML=_buildZonasPopupHtml('${ucNome.replace(/'/g,"\\'").replace(/"/g,'&quot;')}');}})()" style="background:#f0fdf4;border:1px solid #86efac;color:#166534;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;font-family:inherit">
+          Carregar zonas
+        </button>
+      </div>`;
+    }
+    return `<div style="color:#9ca3af;font-size:11px">Nenhuma zona disponível para esta UC.</div>`;
+  }
+  const sel = _zonasSelecaoPorUC[ucNome] || new Set(zonas);
+  const ucId = btoa(unescape(encodeURIComponent(ucNome))).replace(/[^a-zA-Z0-9]/g,'');
+  const todasAtivas = zonas.every(z => sel.has(z));
+  return `
+    <label style="display:flex;align-items:center;gap:6px;padding:3px 0 5px;border-bottom:1px solid #f3f4f6;cursor:pointer;font-weight:600;color:#374151">
+      <input type="checkbox" id="zona-todas-${ucId}" ${todasAtivas?'checked':''} style="accent-color:#1F4E2C;width:12px;height:12px;cursor:pointer"
+        onchange="_zonasToggleTodas('${ucNome.replace(/\\/g,'\\\\').replace(/'/g,"\\'")}', this.checked)">
+      Selecionar todas
+    </label>
+    ${zonas.map(cod => {
+      const meta = ZONA_META[cod]||{nome:cod,cor:'#6b7280'};
+      const ativo = sel.has(cod);
+      return `<label style="display:flex;align-items:center;gap:6px;padding:2px 0;cursor:pointer;color:#374151">
+        <input type="checkbox" ${ativo?'checked':''} data-zona-uc="${ucId}" data-zona-cod="${cod}"
+          style="accent-color:${meta.cor};width:11px;height:11px;cursor:pointer;flex-shrink:0"
+          onchange="_zonasToggleUCZona('${ucNome.replace(/\\/g,'\\\\').replace(/'/g,"\\'")}','${cod}',this.checked,'${ucId}')">
+        <div style="width:10px;height:10px;border-radius:2px;background:${meta.cor};flex-shrink:0"></div>
+        <span style="font-size:11px">${escHtml(meta.nome)}</span>
+      </label>`;
+    }).join('')}
+    <div style="margin-top:6px;padding-top:4px;border-top:1px solid #f3f4f6">
+      <button onclick="_zonasAplicarFiltroUC('${ucNome.replace(/\\/g,'\\\\').replace(/'/g,"\\'")}');this.textContent='✓ Aplicado!';setTimeout(()=>this.textContent='Aplicar filtro',1500)"
+        style="width:100%;background:#1F4E2C;color:#fff;border:none;border-radius:6px;padding:5px 0;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit">
+        Aplicar filtro
+      </button>
+    </div>`;
+}
+
+function _zonasToggleUCZona(ucNome, cod, ativo, ucId){
+  if(!_zonasSelecaoPorUC[ucNome]) _zonasSelecaoPorUC[ucNome] = new Set(_zonasParaUC(ucNome));
+  if(ativo) _zonasSelecaoPorUC[ucNome].add(cod);
+  else      _zonasSelecaoPorUC[ucNome].delete(cod);
+  // Atualizar checkbox "todas"
+  const todasEl = document.getElementById('zona-todas-'+ucId);
+  if(todasEl){
+    const zonas = _zonasParaUC(ucNome);
+    todasEl.checked = zonas.every(z => _zonasSelecaoPorUC[ucNome].has(z));
+  }
+}
+
+function _zonasToggleTodas(ucNome, ativo){
+  const zonas = _zonasParaUC(ucNome);
+  _zonasSelecaoPorUC[ucNome] = ativo ? new Set(zonas) : new Set();
+  const ucId = btoa(unescape(encodeURIComponent(ucNome))).replace(/[^a-zA-Z0-9]/g,'');
+  document.querySelectorAll(`[data-zona-uc="${ucId}"]`).forEach(cb => cb.checked = ativo);
+}
+
+function _zonasAplicarFiltroUC(ucNome){
+  if(!_zonasAtivo){
+    toggleZonas(true);
+    const cb = document.getElementById('zonas-toggle');
+    if(cb) cb.checked = true;
+  } else {
+    _renderizarZonas();
+  }
 }
 
 // ══════════════════════════════════════════════════════════════
