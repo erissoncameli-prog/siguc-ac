@@ -367,15 +367,47 @@ function renderPagina(){
         </div>
 
         <div id="uc-stats-card">
-          <div class="usc-header"><div><div class="usc-header-titulo">UCs do Acre</div><div class="usc-header-sub" id="usc-sub">Carregando...</div></div>
-          <button onclick="document.getElementById('uc-stats-card').classList.remove('visivel')" style="background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:6px;padding:2px 8px;cursor:pointer;font-size:12px">✕</button></div>
+          <div class="usc-header" id="usc-drag-handle" style="cursor:grab">
+            <div style="flex:1">
+              <div class="usc-header-titulo">UCs do Acre</div>
+              <div class="usc-header-sub" id="usc-sub">Carregando...</div>
+            </div>
+            <button onclick="document.getElementById('uc-stats-card').classList.remove('visivel')" style="background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:6px;padding:2px 8px;cursor:pointer;font-size:12px">✕</button>
+          </div>
+          <!-- Filtros ativos -->
+          <div id="usc-filtros-ativos" style="padding:5px 12px 0;display:flex;gap:4px;flex-wrap:wrap"></div>
           <div class="usc-body">
+            <!-- Totais -->
             <div class="usc-totais">
               <div class="usc-total-bloco"><div class="usc-total-val" id="usc-total">—</div><div class="usc-total-lbl">Total</div></div>
               <div class="usc-total-bloco"><div class="usc-total-val" id="usc-area">—</div><div class="usc-total-lbl">Milhões ha</div></div>
               <div class="usc-total-bloco"><div class="usc-total-val" id="usc-pct">—</div><div class="usc-total-lbl">% do Acre</div></div>
             </div>
-            <div id="usc-grupos" style="font-size:11px;color:var(--cinza-600)"></div>
+            <!-- Gráfico de rosca -->
+            <div style="display:flex;align-items:center;gap:10px">
+              <svg id="usc-donut" width="68" height="68" viewBox="0 0 68 68" style="flex-shrink:0">
+                <circle cx="34" cy="34" r="26" fill="none" stroke="#e5e7eb" stroke-width="9"/>
+                <circle id="usc-donut-arc" cx="34" cy="34" r="26" fill="none" stroke="#1F4E2C" stroke-width="9"
+                  stroke-linecap="round" stroke-dasharray="0 163.4" stroke-dashoffset="40.85"
+                  transform="rotate(-90 34 34)" style="transition:stroke-dasharray .5s ease"/>
+                <text id="usc-donut-txt" x="34" y="37" text-anchor="middle" font-size="11" font-weight="700" font-family="DM Sans,sans-serif" fill="#1F4E2C">0%</text>
+              </svg>
+              <div style="flex:1;font-size:10px;color:var(--cinza-600);line-height:1.5">
+                <div style="display:flex;align-items:center;gap:5px;margin-bottom:3px">
+                  <span style="width:10px;height:10px;border-radius:2px;background:#1F4E2C;flex-shrink:0;display:inline-block"></span>
+                  <span>UCs selecionadas</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:5px">
+                  <span style="width:10px;height:10px;border-radius:2px;background:#e5e7eb;flex-shrink:0;display:inline-block"></span>
+                  <span>Restante do Acre</span>
+                </div>
+                <div style="margin-top:5px;font-size:9px;color:var(--cinza-400)">Área total: 16,4 M ha</div>
+              </div>
+            </div>
+            <!-- Breakdown por esfera -->
+            <div id="usc-esferas" style="display:none;border-top:1px solid var(--cinza-100);padding-top:6px"></div>
+            <!-- PI vs US -->
+            <div id="usc-grupos" style="border-top:1px solid var(--cinza-100);padding-top:6px;font-size:11px;color:var(--cinza-600)"></div>
           </div>
         </div>
       </div>
