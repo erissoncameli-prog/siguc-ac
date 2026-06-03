@@ -586,6 +586,31 @@ function _renderDropdown(id){
     </div>
     <div id="ti-stat" style="font-size:10px;color:var(--cinza-400);text-align:right;margin-top:6px"></div>
   ` + foot;
+  if(id==='zonas') return hdr('🗂 Zonas de Manejo das UCs') + `
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;cursor:pointer">
+        <input type="checkbox" id="zonas-toggle" style="accent-color:#1F4E2C;width:14px;height:14px" onchange="toggleZonas(this.checked)">
+        Exibir zonas de manejo
+      </label>
+    </div>
+    <div id="zonas-loading" style="display:none;align-items:center;gap:8px;font-size:11px;color:var(--cinza-500);padding:4px 0 8px"><div class="spinner" style="width:14px;height:14px"></div> Carregando...</div>
+    <div id="zonas-controles">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+        <span style="font-size:11px;color:var(--cinza-600);flex-shrink:0">Opacidade:</span>
+        <input type="range" id="zonas-opacity" min="0" max="100" value="55" style="flex:1;accent-color:#1F4E2C" oninput="zonasAlterarOpacidade(this.value)">
+        <span style="font-size:11px;color:var(--cinza-600);width:28px" id="zonas-opacity-val">55%</span>
+      </div>
+      <div style="margin-bottom:8px">
+        <label style="font-size:11px;font-weight:600;color:var(--cinza-600)">Filtrar por UC:</label>
+        <select id="zonas-sel-uc" style="width:100%;font-size:11px;padding:4px 7px;border:1px solid var(--borda);border-radius:var(--raio);margin-top:4px;font-family:inherit" onchange="zonasFiltrarUC(this.value)">
+          <option value="todas">Todas as UCs</option>
+        </select>
+      </div>
+      <div style="font-size:10px;font-weight:700;color:var(--cinza-500);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Tipos de zona:</div>
+      <div id="zonas-tipos-lista" style="display:flex;flex-direction:column;gap:4px"></div>
+    </div>
+    <div id="zonas-stat" style="font-size:10px;color:var(--cinza-400);text-align:right;margin-top:8px"></div>
+  ` + foot;
   if(id==='mun') return hdr('🏙 Municípios do Acre') + `
     <div><label style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;cursor:pointer">
       <input type="checkbox" id="mun-toggle" style="accent-color:#6366f1;width:14px;height:14px" onchange="toggleMunicipios(this.checked)">
