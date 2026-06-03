@@ -1247,6 +1247,7 @@ async function toggleTI(ativo){
   _tiAtivo=ativo;
   if(ativo&&!_tiGeojson) await _carregarTI();
   else _renderizarTI();
+  _atualizarLegendaMapa();
 }
 function tiAlterarOpacidade(v){ _tiOpacity=v/100; _renderizarTI(); }
 async function _carregarTI(){
