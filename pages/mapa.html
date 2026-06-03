@@ -976,7 +976,8 @@ function _renderizarUC(){
           ${det.status==='provisória'?`<span style="font-size:10px;padding:2px 7px;border-radius:10px;background:#fef3c7;color:#92400e;border:1px solid #fde68a">Provisória</span>`:''}
         </div>`:'';
       const detFonte=det.fonte_url?`<div style="margin-top:6px"><a href="${escHtml(det.fonte_url)}" target="_blank" style="font-size:10px;color:#1d4ed8">→ ${det.esfera==='federal'?'Página ICMBio':'Página SEMA'}</a></div>`:'';
-      layer.bindPopup(`<div class="camada-popup">
+      const _ucNome = p.nome; // captura em closure para o on('add')
+      const _popupHtml = `<div class="camada-popup">
         <div class="cp-header" style="background:#1a5f38">🌿 Unidade de Conservação</div>
         <div class="cp-layer">
           <div class="cp-layer-nome" style="color:${cor}">${escHtml((p.sigla||'')+(p.sigla?' — ':'')+p.nome)}</div>
@@ -991,14 +992,19 @@ function _renderizarUC(){
           ${detDocs}
           ${detFonte}
           <div class="cp-badge" style="background:${corG}11;border-color:${corG};color:${corG};margin-top:8px">${lblG}</div>
-          <div class="uc-zona-popup-section" data-uc="${escHtml(p.nome)}" style="margin-top:10px;padding-top:8px;border-top:1px solid #e5e7eb">
+          <div class="uc-zona-popup-section" style="margin-top:10px;padding-top:8px;border-top:1px solid #e5e7eb">
             <div style="font-size:10px;font-weight:700;color:#1F4E2C;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">🗂 Zonas de Manejo</div>
-            <div class="uc-zona-popup-body">
-              <div class="uc-zona-popup-conteudo" style="font-size:11px;color:#6b7280">Carregando...</div>
-            </div>
+            <div class="uc-zona-popup-conteudo" style="font-size:11px;color:#9ca3af">…</div>
           </div>
         </div>
-      </div>`,{className:'camada-popup-wrap',maxWidth:380});
+      </div>`;
+      const _popup = L.popup({className:'camada-popup-wrap', maxWidth:380}).setContent(_popupHtml);
+      _popup.on('add', () => {
+        const el = _popup.getElement();
+        const section = el && el.querySelector('.uc-zona-popup-section');
+        if(section) _preencherZonaSection(section, _ucNome);
+      });
+      layer.bindPopup(_popup);
     }
   });
   _ucLayer.addTo(mapaL);
