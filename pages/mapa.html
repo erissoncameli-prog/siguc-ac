@@ -1,154 +1,950 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>SIGUC-AC · Mapa das UCs</title>
-<link rel="stylesheet" href="../css/global.css">
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SIGUC-AC — Mapa das Unidades de Conservação</title>
+<link href="../css/global.css" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet-minimap@3.6.1/dist/Control.MiniMap.min.css"/>
 <style>
-  #mapa-container { height: calc(100vh - 140px); border-radius: 12px; overflow: hidden; border: 1px solid #E5E7EB; }
-  .leaflet-popup-content { font-family: 'DM Sans', sans-serif; font-size: 13px; }
-  .popup-titulo { font-weight: 700; font-size: 14px; color: #1F2937; margin-bottom: 4px; }
-  .popup-badge { display: inline-block; padding: 2px 8px; border-radius: 99px; font-size: 10px; font-weight: 700; text-transform: uppercase; }
-  .map-legenda { position: absolute; bottom: 40px; right: 10px; z-index: 1000; background: white; border-radius: 8px; padding: 10px 14px; font-size: 11px; box-shadow: 0 2px 12px rgba(0,0,0,.15); min-width: 140px; }
-  .leg-item { display: flex; align-items: center; gap: 6px; margin-bottom: 5px; }
-  .leg-cor { width: 12px; height: 12px; border-radius: 2px; flex-shrink: 0; }
+/* ── Layout ──────────────────────────────────────────────────── */
+.mapa-wrapper{display:flex;flex-direction:column;gap:10px;height:calc(100vh - 108px);min-height:500px;}
+.mapa-topbar{display:flex;align-items:center;gap:8px;flex-shrink:0;flex-wrap:wrap;}
+.mapa-container{display:flex;gap:12px;flex:1;min-height:0;}
+#mapa{flex:1;border-radius:var(--raio-lg);border:1px solid var(--borda);z-index:0;min-height:0;}
+.mapa-painel{width:268px;flex-shrink:0;display:flex;flex-direction:column;gap:8px;overflow-y:auto;padding-right:2px;scrollbar-width:none;-ms-overflow-style:none;}
+.mapa-painel::-webkit-scrollbar{display:none;}
+.mapa-painel-wrap{display:flex;flex-direction:row;gap:5px;flex-shrink:0;min-height:0;}
+#mapa-scrollbar-outer{width:8px;flex-shrink:0;position:relative;border-radius:6px;background:var(--cinza-100);cursor:pointer;}
+#mapa-scrollbar-thumb{position:absolute;left:1px;right:1px;background:#2D6A4F;border-radius:5px;cursor:pointer;min-height:24px;transition:top .06s linear;opacity:.75;}
+#mapa-scrollbar-thumb:hover{opacity:1;}
+/* Blocos de filtro */
+.filtro-bloco{background:var(--branco);border:1px solid var(--borda);border-radius:var(--raio-lg);overflow:hidden;}
+.filtro-bloco-header{display:flex;align-items:center;gap:6px;padding:9px 12px;border-bottom:1px solid var(--borda);cursor:pointer;user-select:none;}
+.filtro-bloco-header h4{margin:0;font-size:11px;font-weight:600;color:var(--cinza-500);text-transform:uppercase;letter-spacing:.06em;flex:1;}
+.filtro-bloco-body{padding:8px 12px 10px;}
+.filtro-item{display:flex;align-items:flex-start;gap:7px;padding:4px 0;font-size:12px;color:var(--cinza-700);}
+.filtro-item input[type=checkbox]{accent-color:#1F4E2C;width:13px;height:13px;cursor:pointer;flex-shrink:0;margin-top:2px;}
+/* Barra de camadas */
+.mapa-layerbar{position:relative;flex-shrink:0;}
+.mlb-tabs{display:flex;gap:4px;align-items:center;flex-wrap:wrap;}
+.mlb-tab{display:flex;align-items:center;gap:5px;padding:5px 12px;font-size:11px;font-weight:600;font-family:'DM Sans',sans-serif;background:#fff;border:1px solid var(--borda);border-radius:6px;cursor:pointer;color:var(--cinza-600);transition:all .15s;white-space:nowrap;line-height:1;}
+.mlb-tab:hover{background:var(--cinza-50);border-color:var(--cinza-300);}
+.mlb-tab.ativo{background:#1F4E2C;color:#fff;border-color:#1F4E2C;}
+.mlb-badge{font-size:9px;background:rgba(255,255,255,.25);border-radius:99px;padding:1px 5px;font-weight:700;}
+.mlb-tab:not(.ativo) .mlb-badge{background:#eff6ff;color:#1d4ed8;}
+.mlb-dropdown{position:absolute;top:calc(100% + 4px);left:0;z-index:500;background:#fff;border:1px solid var(--borda);border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,.18);min-width:320px;max-width:640px;overflow:hidden;animation:mlb-in .15s ease;}
+@keyframes mlb-in{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
+.mlb-dropdown-header{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--cinza-50);border-bottom:1px solid var(--borda);}
+.mlb-dropdown-title{font-size:11px;font-weight:700;color:var(--cinza-700);text-transform:uppercase;letter-spacing:.06em;}
+.mlb-close{background:none;border:none;cursor:pointer;font-size:14px;color:var(--cinza-400);padding:0 2px;line-height:1;}
+.mlb-close:hover{color:var(--cinza-700);}
+.mlb-dropdown-body{padding:10px 12px;display:flex;flex-direction:column;gap:8px;max-height:420px;overflow-y:auto;}
+/* Popup */
+.mapa-popup{min-width:200px;max-width:280px;font-family:'DM Sans',sans-serif;}
+.camada-popup{font-family:'DM Sans',sans-serif;font-size:12px;color:#374151;}
+.camada-popup .cp-header{background:#1F4E2C;color:#fff;padding:8px 13px;font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;}
+.camada-popup .cp-layer{padding:9px 13px 10px;}
+.camada-popup .cp-layer-nome{font-size:10px;font-weight:700;color:#2D6A4F;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;padding-bottom:5px;border-bottom:1px solid #e5e7eb;}
+.camada-popup .cp-row{display:flex;gap:5px;font-size:11px;color:#374151;margin-bottom:3px;line-height:1.4;align-items:flex-start;}
+.camada-popup .cp-row strong{color:#111827;min-width:72px;flex-shrink:0;font-weight:600;}
+.camada-popup .cp-badge{display:inline-flex;align-items:center;gap:4px;border-radius:99px;padding:2px 9px;font-size:10px;font-weight:700;margin-top:5px;border:1px solid;}
+/* CAR */
+.car-det-panel{position:fixed;top:0;right:-420px;width:360px;height:100vh;background:#fff;z-index:600;display:flex;flex-direction:column;box-shadow:-4px 0 32px rgba(0,0,0,.22);transition:right .28s cubic-bezier(.4,0,.2,1);overflow:hidden;min-width:280px;}
+.car-det-panel.aberto{right:0;}
+.car-det-resize-handle{position:absolute;top:0;left:0;width:5px;height:100%;cursor:ew-resize;z-index:10;}
+.car-det-resize-handle:hover,.car-det-resize-handle.dragging{background:rgba(45,106,79,.35);}
+.car-det-header{padding:14px 16px 12px;border-bottom:1px solid var(--borda);flex-shrink:0;background:linear-gradient(135deg,#1a3c2a,#2D6A4F);}
+.car-det-header h4{margin:0;font-size:14px;font-weight:700;color:#fff;}
+.car-det-header p{margin:3px 0 0;font-size:11px;color:rgba(255,255,255,.7);}
+.car-det-body{flex:1;overflow-y:auto;padding:14px 16px;}
+.car-det-field{display:flex;flex-direction:column;gap:2px;padding:8px 0;border-bottom:1px solid var(--cinza-100);}
+.car-det-field:last-child{border-bottom:none;}
+.car-det-label{font-size:10px;font-weight:700;color:var(--cinza-400);text-transform:uppercase;letter-spacing:.06em;}
+.car-det-value{font-size:13px;color:var(--cinza-800);font-weight:500;line-height:1.4;}
+/* UCs */
+.uc-secao-titulo{font-size:10px;font-weight:700;color:var(--cinza-500);text-transform:uppercase;letter-spacing:.06em;padding:6px 0 4px;border-bottom:1px solid var(--cinza-100);margin-bottom:4px;}
+.uc-filtro-label{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--cinza-700);cursor:pointer;padding:2px 0;}
+.uc-filtro-label input{accent-color:#1F4E2C;width:12px;height:12px;cursor:pointer;flex-shrink:0;}
+.uc-label-tt{background:rgba(26,95,56,.88)!important;border:1px solid rgba(26,95,56,.5)!important;border-radius:3px!important;box-shadow:0 1px 5px rgba(0,0,0,.35)!important;font-size:11px!important;font-weight:700!important;color:#fff!important;padding:3px 8px!important;white-space:nowrap!important;pointer-events:none!important;max-width:190px!important;overflow:hidden!important;text-overflow:ellipsis!important;text-transform:uppercase!important;letter-spacing:.04em!important;text-shadow:0 1px 2px rgba(0,0,0,.6)!important;}
+.uc-label-tt::before{display:none!important;}
+/* Stats card */
+#uc-stats-card{position:absolute;bottom:28px;left:10px;z-index:500;width:260px;background:#fff;border-radius:12px;box-shadow:0 4px 24px rgba(0,0,0,.22);overflow:hidden;font-family:'DM Sans',sans-serif;display:none;}
+#uc-stats-card.visivel{display:block;}
+.usc-header{background:linear-gradient(135deg,#1a3c2a,#2D6A4F);padding:10px 13px;display:flex;align-items:center;gap:6px;cursor:grab;user-select:none;}
+.usc-header-titulo{font-size:11px;font-weight:700;color:#fff;text-transform:uppercase;letter-spacing:.06em;}
+.usc-header-sub{font-size:10px;color:rgba(255,255,255,.65);margin-top:1px;}
+.usc-body{padding:10px 13px 12px;display:flex;flex-direction:column;gap:8px;}
+.usc-totais{display:flex;gap:8px;}
+.usc-total-bloco{flex:1;background:var(--cinza-50);border:1px solid var(--borda);border-radius:8px;padding:7px 10px;text-align:center;}
+.usc-total-val{font-size:17px;font-weight:700;color:#1F4E2C;line-height:1;}
+.usc-total-lbl{font-size:9px;color:var(--cinza-500);text-transform:uppercase;letter-spacing:.05em;margin-top:2px;}
+/* Rosa dos ventos */
+.rosa-norte{width:52px;height:52px;background:rgba(255,255,255,.92);border-radius:50%;box-shadow:0 2px 10px rgba(0,0,0,.28);display:flex;align-items:center;justify-content:center;backdrop-filter:blur(3px);}
+.rosa-norte svg{width:44px;height:44px;}
+/* Mini mapa */
+.leaflet-control-minimap{border-radius:8px!important;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,.32)!important;border:2px solid rgba(255,255,255,.85)!important;}
+/* Sub-bacia labels */
+.subbacia-label{background:rgba(255,255,255,.82)!important;border:1px solid rgba(0,0,0,.12)!important;border-radius:4px!important;font-size:11px!important;font-weight:700!important;color:#1a3c2a!important;padding:2px 7px!important;white-space:nowrap!important;pointer-events:none!important;}
+.subbacia-label::before{display:none!important;}
+/* Popup camadas */
+.leaflet-popup.camada-popup-wrap .leaflet-popup-content-wrapper{padding:0;border-radius:10px;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,.22);}
+.leaflet-popup.camada-popup-wrap .leaflet-popup-content{margin:0;min-width:200px;max-width:300px;}
+/* Basemap modal */
+.mapa-modo-ctrl{background:#fff;border-radius:10px;box-shadow:0 4px 18px rgba(0,0,0,.26);width:230px;overflow:hidden;font-family:'DM Sans',sans-serif;}
+.bmg-header{display:flex;align-items:center;justify-content:space-between;padding:8px 10px 6px;border-bottom:1px solid #e5e7eb;cursor:pointer;user-select:none;}
+.bmg-header-title{font-size:11px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.06em;display:flex;align-items:center;gap:5px;}
+.bmg-body{padding:6px 8px 8px;}
+.bmg-group-title{font-size:9px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.08em;padding:5px 2px 4px;}
+.bmg-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin-bottom:2px;}
+.bmg-tile{display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;border-radius:6px;padding:4px 2px;transition:background .15s;border:2px solid transparent;}
+.bmg-tile:hover{background:#f3f4f6;}
+.bmg-tile.ativo{border-color:#1F4E2C;background:#f0fdf4;}
+.bmg-thumb{width:56px;height:40px;border-radius:4px;overflow:hidden;border:1px solid #e5e7eb;}
+.bmg-thumb img{width:100%;height:100%;object-fit:cover;display:block;}
+.bmg-label{font-size:9px;font-weight:500;color:#374151;text-align:center;line-height:1.2;max-width:60px;}
+.bmg-tile.ativo .bmg-label{color:#1F4E2C;font-weight:700;}
+/* Ocorrência marker */
+.oc-marker{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;color:#fff;box-shadow:0 2px 8px rgba(0,0,0,.4);border:2px solid rgba(255,255,255,.8);line-height:1;}
+/* Mobile */
+.btn-filtros-mobile{display:none;position:fixed;bottom:76px;right:16px;z-index:302;background:#2D6A4F;color:#fff;border:none;border-radius:50px;padding:11px 18px;font-size:13px;font-weight:600;cursor:pointer;align-items:center;gap:7px;box-shadow:0 4px 18px rgba(0,0,0,.28);font-family:var(--font-sans);}
+.mapa-backdrop{display:none;position:fixed;inset:0;z-index:299;background:rgba(0,0,0,.38);}
+.mapa-backdrop.ativo{display:block;}
+@media(max-width:768px){
+  .mapa-wrapper{height:calc(100vh - 94px);}
+  .mapa-painel-wrap{display:none;}
+  .mapa-painel-wrap.mobile-aberto{display:flex;flex-direction:column;position:fixed;bottom:0;left:0;right:0;height:62vh;z-index:300;background:#fff;border-radius:16px 16px 0 0;box-shadow:0 -4px 24px rgba(0,0,0,.18);overflow:hidden;}
+  .mapa-painel-wrap.mobile-aberto::before{content:'';display:block;width:36px;height:4px;background:#d1d5db;border-radius:2px;margin:10px auto 6px;flex-shrink:0;}
+  .mapa-painel-wrap.mobile-aberto .mapa-painel{width:100%;flex:1;padding:0 14px 20px;overflow-y:auto;}
+  .mapa-painel-wrap.mobile-aberto #mapa-scrollbar-outer{display:none;}
+  .btn-filtros-mobile{display:flex;}
+}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="../js/config.js"></script>
 <script src="../js/layout.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<script src="https://unpkg.com/leaflet-minimap@3.6.1/dist/Control.MiniMap.min.js"></script>
 </head>
 <body>
-<div id="app"></div>
+<div id="app"><div style="display:flex;align-items:center;justify-content:center;height:100vh"><div class="spinner"></div></div></div>
+
+<!-- Painel lateral CAR -->
+<div class="car-det-panel" id="car-det-panel">
+  <div class="car-det-resize-handle" id="car-resize"></div>
+  <div class="car-det-header">
+    <h4 id="car-det-titulo">Imóvel Rural</h4>
+    <p id="car-det-cod" style="font-size:10px;color:rgba(255,255,255,.6)"></p>
+    <button onclick="fecharDetalhesCAR()" style="position:absolute;top:12px;right:14px;background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:12px">✕ Fechar</button>
+  </div>
+  <div class="car-det-body" id="car-det-body">
+    <div style="color:var(--cinza-400);font-size:13px;text-align:center;padding:24px">Selecione um imóvel no mapa</div>
+  </div>
+</div>
+
 <script>
-;(async function () {
-  const usuario = await carregarUsuario()
-  if (!usuario) { window.location.href = '../index.html'; return }
+// ══════════════════════════════════════════════════════════════
+// BASEMAP GALLERY
+// ══════════════════════════════════════════════════════════════
+const BASEMAP_GROUPS = [
+  { grupo:'Imagens', itens:[
+    { id:'satelite', label:'Satélite',   emoji:'🛰', thumb:'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/4/6/5',    url:'https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', opts:{maxZoom:22,subdomains:['mt0','mt1','mt2','mt3']} },
+    { id:'hibrido',  label:'Híbrido',    emoji:'🗺', thumb:'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/4/6/5',    url:'https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', opts:{maxZoom:22,subdomains:['mt0','mt1','mt2','mt3']} },
+    { id:'ruas',     label:'Ruas',       emoji:'🏙', thumb:'https://tile.openstreetmap.org/4/6/6.png',                                                   url:'https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', opts:{maxZoom:22,subdomains:['mt0','mt1','mt2','mt3']} },
+  ]},
+  { grupo:'Terreno', itens:[
+    { id:'topo',   label:'Topografia', emoji:'⛰', thumb:'https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/4/6/5',            url:'https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}',           opts:{maxZoom:22,maxNativeZoom:19,attribution:'ESRI Topo'} },
+    { id:'relevo', label:'Relevo',     emoji:'🏔', thumb:'https://server.arcgisonline.com/ArcGIS/rest/services/World_Shaded_Relief/MapServer/tile/4/6/5',       url:'https://server.arcgisonline.com/ArcGIS/rest/services/World_Shaded_Relief/MapServer/tile/{z}/{y}/{x}',     opts:{maxZoom:22,maxNativeZoom:13,attribution:'ESRI Relevo'} },
+    { id:'osm',    label:'OpenStreet', emoji:'🗾', thumb:'https://tile.openstreetmap.org/4/5/6.png',                                                           url:'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',                                                     opts:{maxZoom:22,maxNativeZoom:19,attribution:'© OSM',subdomains:['a','b','c']} },
+  ]},
+  { grupo:'Especial', itens:[
+    { id:'claro',  label:'Claro',    emoji:'⬜', thumb:'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/4/6/5', url:'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}', opts:{maxZoom:22,maxNativeZoom:16,attribution:'ESRI Gray'} },
+    { id:'natgeo', label:'Nat. Geo.', emoji:'🌿', thumb:'https://server.arcgisonline.com/ArcGIS/rest/services/NatGeo_World_Map/MapServer/tile/4/6/5',           url:'https://server.arcgisonline.com/ArcGIS/rest/services/NatGeo_World_Map/MapServer/tile/{z}/{y}/{x}',           opts:{maxZoom:22,maxNativeZoom:16,attribution:'ESRI NatGeo'} },
+  ]},
+];
+const MODOS_MAPA = {};
+BASEMAP_GROUPS.forEach(g => g.itens.forEach(b => { MODOS_MAPA[b.id] = b; }));
+let googleLayer = null, modoMapaAtual = 'satelite';
+
+function _reaplicarTiles(){
+  if(googleLayer){ mapaL.removeLayer(googleLayer); googleLayer = null; }
+  const bm = MODOS_MAPA[modoMapaAtual];
+  googleLayer = L.tileLayer(bm.url, bm.opts);
+  googleLayer.addTo(mapaL);
+}
+
+// ══════════════════════════════════════════════════════════════
+// WMS — Cobertura Vegetal
+// ══════════════════════════════════════════════════════════════
+const VEG_LAYERS = {
+  mapbiomas: { layer:null, make(op){ return L.tileLayer('https://storage.googleapis.com/mapbiomas-public/brasil/collection-8/lclu/coverage/{z}/{x}/{y}.png',{attribution:'MapBiomas Coleção 8',opacity:op/100,maxZoom:22,maxNativeZoom:12}); } },
+  prodes:    { layer:null, make(op){ return L.tileLayer.wms('https://terrabrasilis.dpi.inpe.br/geoserver/prodes-amazon-nb/wms',{layers:'prodes-amazon-nb:yearly_deforestation_biome',format:'image/png',transparent:true,version:'1.1.1',attribution:'PRODES/INPE',opacity:op/100,maxZoom:22,maxNativeZoom:15}); } },
+  prodes_hist:{ layer:null, make(op){ return L.tileLayer.wms('https://terrabrasilis.dpi.inpe.br/geoserver/prodes-amazon-nb/wms',{layers:'prodes-amazon-nb:accumulated_deforestation_2007_biome',format:'image/png',transparent:true,version:'1.1.1',attribution:'PRODES/INPE Acumulado',opacity:op/100,maxZoom:22,maxNativeZoom:15}); } },
+};
+function toggleCamadaVeg(id, ativo){
+  const cfg = VEG_LAYERS[id]; if(!cfg) return;
+  if(ativo){ const op = parseInt(document.getElementById('veg-'+id+'-opacity')?.value||70); cfg.layer=cfg.make(op); cfg.layer.addTo(mapaL); cfg.layer.setZIndex(150); }
+  else { if(cfg.layer){ mapaL.removeLayer(cfg.layer); cfg.layer=null; } }
+}
+function atualizarOpacidadeVeg(id){
+  const cfg = VEG_LAYERS[id]; if(!cfg?.layer) return;
+  const op = parseInt(document.getElementById('veg-'+id+'-opacity')?.value||70);
+  cfg.layer.setOpacity(op/100);
+}
+
+// ══════════════════════════════════════════════════════════════
+// ESTADO GLOBAL
+// ══════════════════════════════════════════════════════════════
+let mapaL = null, clusters = null;
+let camadas = [];
+let _ocLayer = null, _monitLayer = null;
+let _ucGeojson = null, _ucLayer = null, _ucAtivo = false, _ucLabels = true, _ucOpacity = 0.4;
+let _tiGeojson = null, _tiLayer = null, _tiAtivo = false;
+let _munGeojson = null, _munLayer = null, _munAtivo = false;
+let _carLayer = null, _carFeatures = [], _carCarregado = false, _carCarregando = false;
+let _carAbertoCod = null;
+const SUBBACIA_PALETTE = ['#16a34a','#2563eb','#d97706','#7c3aed','#0891b2','#dc2626','#65a30d','#db2777','#ea580c'];
+const OC_CORES = { critica:'#DC2626', alta:'#F97316', media:'#F59E0B', baixa:'#059669' };
+const OC_ICONES = { incendio:'🔥', desmatamento:'🌳', invasao:'🚨', caca_pesca_ilegal:'🎣', mineracao_ilegal:'⛏', contaminacao:'☠', especie_invasora:'🦎', outro:'⚠' };
+
+function escHtml(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+// ══════════════════════════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', async () => {
+  const u = await carregarUsuario();
+  if(!u){ window.location.href='../index.html'; return; }
 
   document.getElementById('app').innerHTML =
-    gerarLayout('Mapa das UCs', 'mapa') +
-    `<div class="fade-in" style="position:relative">
-      <div class="filter-bar" style="margin-bottom:12px">
-        <select class="form-control" id="fil-grupo" style="width:180px" onchange="atualizarFiltros()">
-          <option value="">Todos os grupos</option>
-          <option value="protecao_integral">Proteção Integral</option>
-          <option value="uso_sustentavel">Uso Sustentável</option>
-        </select>
-        <select class="form-control" id="fil-cat" style="width:160px" onchange="atualizarFiltros()">
-          <option value="">Todas categorias</option>
-          <option value="APA">APA</option><option value="RESEX">RESEX</option>
-          <option value="FLONA">FLONA</option><option value="RDS">RDS</option>
-          <option value="PI">Parque</option><option value="ESEC">ESEC</option>
-          <option value="REBIO">REBIO</option><option value="RPPN">RPPN</option>
-        </select>
-        <span id="contagem-ucs" style="font-size:12px;color:#6B7280;margin-left:4px"></span>
+    gerarLayout('Mapa das UCs','mapa') + renderPagina() + '</div></div></div>';
+
+  setTimeout(async () => {
+    iniciarMapa();
+    await Promise.all([carregarCamadas(), carregarOcorrencias()]);
+    vincularEventos();
+    initScrollbarCustom();
+    carregarLogosSidebar();
+  }, 0);
+});
+
+// ══════════════════════════════════════════════════════════════
+// HTML DA PÁGINA
+// ══════════════════════════════════════════════════════════════
+function renderPagina(){
+  const ehAdmin = appState.perfil === 'super_admin' || appState.perfil === 'gestor';
+  return `
+  <div class="mapa-wrapper">
+    <div class="mapa-topbar">
+      <div style="flex:1">
+        <h2 style="margin:0;font-size:17px;font-weight:600;color:var(--cinza-900)">Mapa das Unidades de Conservação</h2>
+        <p style="margin:2px 0 0;font-size:11px;color:var(--cinza-500)">Acre — SEMA/AC · ${new Date().getFullYear()}</p>
       </div>
-      <div id="mapa-container"></div>
-    </div>` +
-    '</div></div></div>'
+    </div>
 
-  carregarLogosSidebar()
+    <!-- Barra de camadas -->
+    <div class="mapa-layerbar" id="mapa-layerbar">
+      <div class="mlb-tabs">
+        <button class="mlb-tab" id="mlb-btn-veg" onclick="toggleLayerBar('veg')">🌿 Cobertura Vegetal</button>
+        <button class="mlb-tab" id="mlb-btn-car" onclick="toggleLayerBar('car')">🏡 CAR — Imóveis Rurais <span class="mlb-badge" id="car-count-badge" style="display:none">0</span></button>
+        <button class="mlb-tab" id="mlb-btn-uc"  onclick="toggleLayerBar('uc')">🌿 Unidades de Conservação <span class="mlb-badge" id="uc-count-badge" style="display:none">0</span></button>
+        <button class="mlb-tab" id="mlb-btn-ti"  onclick="toggleLayerBar('ti')">🪶 Terras Indígenas <span class="mlb-badge" id="ti-count-badge" style="display:none">0</span></button>
+        <button class="mlb-tab" id="mlb-btn-mun" onclick="toggleLayerBar('mun')">🏙 Municípios</button>
+      </div>
+      <div class="mlb-dropdown" id="mlb-dropdown" style="display:none"></div>
+    </div>
 
-  const mapa = L.map('mapa-container', { center: [-9.5, -70.0], zoom: 7 })
+    <div class="mapa-container">
+      <!-- MAPA -->
+      <div id="mapa" style="position:relative">
+        <div id="uc-stats-card">
+          <div class="usc-header"><div><div class="usc-header-titulo">UCs do Acre</div><div class="usc-header-sub" id="usc-sub">Carregando...</div></div>
+          <button onclick="document.getElementById('uc-stats-card').classList.remove('visivel')" style="background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:6px;padding:2px 8px;cursor:pointer;font-size:12px">✕</button></div>
+          <div class="usc-body">
+            <div class="usc-totais">
+              <div class="usc-total-bloco"><div class="usc-total-val" id="usc-total">—</div><div class="usc-total-lbl">Total</div></div>
+              <div class="usc-total-bloco"><div class="usc-total-val" id="usc-area">—</div><div class="usc-total-lbl">Milhões ha</div></div>
+              <div class="usc-total-bloco"><div class="usc-total-val" id="usc-pct">—</div><div class="usc-total-lbl">% do Acre</div></div>
+            </div>
+            <div id="usc-grupos" style="font-size:11px;color:var(--cinza-600)"></div>
+          </div>
+        </div>
+      </div>
 
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© OpenStreetMap contributors', maxZoom: 18
-  }).addTo(mapa)
+      <!-- PAINEL FILTROS -->
+      <div class="mapa-painel-wrap" id="mapa-painel-wrap">
+        <div class="mapa-painel" id="mapa-painel">
 
-  // Cores por categoria
-  const COR_CAT = {
-    APA: '#f59e0b', ARIE: '#d97706', ESEC: '#059669', FLONA: '#16a34a',
-    MONA: '#7c3aed', PI: '#15803d', REBIO: '#065f46', RDS: '#0e7490',
-    RESEX: '#0891b2', RPPN: '#2563eb', RVS: '#7c3aed'
+          <!-- Ocorrências -->
+          <div class="filtro-bloco">
+            <div class="filtro-bloco-header" onclick="toggleBloco('bloco-oc')">
+              <h4>⚠ Ocorrências</h4>
+              <span id="oc-count-lbl" style="font-size:10px;color:var(--cinza-400)"></span>
+              <span style="font-size:11px;color:var(--cinza-300)">▾</span>
+            </div>
+            <div class="filtro-bloco-body" id="bloco-oc">
+              <div style="font-size:11px;color:var(--cinza-600);margin-bottom:8px">Filtrar por severidade:</div>
+              ${['critica','alta','media','baixa'].map(s=>`
+              <div class="filtro-item"><input type="checkbox" checked data-oc-sev="${s}" onchange="renderOcorrencias()">
+                <div style="width:10px;height:10px;border-radius:50%;background:${OC_CORES[s]};flex-shrink:0;margin-top:2px"></div>
+                <span style="text-transform:capitalize">${s}</span>
+              </div>`).join('')}
+              <div style="font-size:11px;color:var(--cinza-600);margin:8px 0 4px">Filtrar por tipo:</div>
+              ${Object.keys(OC_ICONES).map(tipo=>`
+              <div class="filtro-item"><input type="checkbox" checked data-oc-tipo="${tipo}" onchange="renderOcorrencias()">
+                <span>${OC_ICONES[tipo]}</span>
+                <span style="font-size:11px">${escHtml(tipo.replace(/_/g,' '))}</span>
+              </div>`).join('')}
+            </div>
+          </div>
+
+          <!-- Camadas personalizadas -->
+          <div class="filtro-bloco">
+            <div class="filtro-bloco-header" onclick="toggleBloco('bloco-camadas')">
+              <h4>📐 Camadas</h4>
+              <span style="font-size:11px;color:var(--cinza-300)">▾</span>
+            </div>
+            <div class="filtro-bloco-body" id="bloco-camadas">
+              <div id="bloco-camadas-lista" style="max-height:200px;overflow-y:auto;font-size:12px;color:var(--cinza-400)">Carregando...</div>
+            </div>
+          </div>
+
+        </div>
+        <div id="mapa-scrollbar-outer"><div id="mapa-scrollbar-thumb"></div></div>
+      </div>
+    </div>
+  </div>
+  <div class="mapa-backdrop" id="mapa-backdrop" onclick="fecharPainelMobile()"></div>
+  <button class="btn-filtros-mobile" onclick="abrirPainelMobile()">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>
+    Filtros
+  </button>
+  `;
+}
+
+function toggleBloco(id){
+  const el = document.getElementById(id); if(!el) return;
+  el.style.display = el.style.display === 'none' ? '' : 'none';
+}
+function abrirPainelMobile(){ document.getElementById('mapa-painel-wrap').classList.add('mobile-aberto'); document.getElementById('mapa-backdrop').classList.add('ativo'); }
+function fecharPainelMobile(){ document.getElementById('mapa-painel-wrap').classList.remove('mobile-aberto'); document.getElementById('mapa-backdrop').classList.remove('ativo'); }
+
+// ══════════════════════════════════════════════════════════════
+// INICIAR MAPA
+// ══════════════════════════════════════════════════════════════
+function iniciarMapa(){
+  mapaL = L.map('mapa',{ center:[-9.5,-70.0], zoom:7 });
+  _aplicarBasemap('satelite');
+  _adicionarRosaDosVentos();
+  _adicionarMiniMapa();
+  _adicionarControleBasemap();
+  clusters = L.markerClusterGroup({ maxClusterRadius:40, disableClusteringAtZoom:14 });
+  mapaL.addLayer(clusters);
+  mapaL.createPane('carPane'); mapaL.getPane('carPane').style.zIndex = 450;
+  requestAnimationFrame(() => mapaL.invalidateSize());
+  mapaL.on('click', onMapaClick);
+}
+
+function _aplicarBasemap(modo){
+  modoMapaAtual = modo;
+  if(googleLayer){ mapaL.removeLayer(googleLayer); googleLayer = null; }
+  const bm = MODOS_MAPA[modo];
+  googleLayer = L.tileLayer(bm.url, bm.opts);
+  googleLayer.addTo(mapaL);
+  document.querySelectorAll('.bmg-tile').forEach(t => t.classList.toggle('ativo', t.dataset.modo===modo));
+}
+
+function _adicionarRosaDosVentos(){
+  const Ctrl = L.Control.extend({ options:{position:'bottomleft'}, onAdd(){
+    const div = L.DomUtil.create('div','rosa-norte'); div.title='Norte';
+    div.innerHTML=`<svg viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="22" cy="22" r="20" fill="none" stroke="#e5e7eb" stroke-width="1"/>
+      <polygon points="22,3 26,22 22,19 18,22" fill="#dc2626"/>
+      <polygon points="22,41 18,22 22,25 26,22" fill="#9ca3af"/>
+      <circle cx="22" cy="22" r="3" fill="#1f2937"/>
+      <text x="22" y="14" text-anchor="middle" font-size="6" font-weight="700" font-family="DM Sans,sans-serif" fill="#dc2626">N</text>
+      <text x="22" y="43" text-anchor="middle" font-size="5.5" font-weight="600" font-family="DM Sans,sans-serif" fill="#6b7280">S</text>
+      <text x="41" y="23.5" text-anchor="middle" font-size="5.5" font-weight="600" font-family="DM Sans,sans-serif" fill="#6b7280">L</text>
+      <text x="3" y="23.5" text-anchor="middle" font-size="5.5" font-weight="600" font-family="DM Sans,sans-serif" fill="#6b7280">O</text>
+    </svg>`;
+    L.DomEvent.disableClickPropagation(div); return div;
+  }});
+  new Ctrl().addTo(mapaL);
+}
+
+function _adicionarMiniMapa(){
+  const miniTile = L.tileLayer('https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',{maxZoom:22,subdomains:['mt0','mt1','mt2','mt3']});
+  new L.Control.MiniMap(miniTile,{position:'bottomright',width:140,height:110,zoomLevelOffset:-5,toggleDisplay:true,minimized:false,
+    aimingRectOptions:{color:'#dc2626',weight:2,opacity:.9,fillOpacity:.1},
+    shadowRectOptions:{color:'#dc2626',weight:1,opacity:.4,fillOpacity:0}
+  }).addTo(mapaL);
+}
+
+function _adicionarControleBasemap(){
+  const Ctrl = L.Control.extend({ options:{position:'topright'}, onAdd(){
+    const div = L.DomUtil.create('div','mapa-modo-ctrl');
+    div.innerHTML = `<div class="bmg-header" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'':'none'">
+      <span class="bmg-header-title">🗺 Mapa Base</span><span style="font-size:11px;color:#9ca3af">▾</span></div>
+      <div class="bmg-body">` +
+      BASEMAP_GROUPS.map(g=>`<div class="bmg-group-title">${escHtml(g.grupo)}</div><div class="bmg-grid">` +
+        g.itens.map(b=>`<div class="bmg-tile${b.id===modoMapaAtual?' ativo':''}" data-modo="${b.id}" onclick="_aplicarBasemap('${b.id}')">
+          <div class="bmg-thumb"><img src="${escHtml(b.thumb)}" loading="lazy" onerror="this.style.display='none'"></div>
+          <div class="bmg-label">${escHtml(b.emoji)} ${escHtml(b.label)}</div>
+        </div>`).join('')
+      +'</div>').join('') + '</div>';
+    L.DomEvent.disableClickPropagation(div); return div;
+  }});
+  new Ctrl().addTo(mapaL);
+}
+
+// ══════════════════════════════════════════════════════════════
+// BARRA DE CAMADAS SUPERIOR
+// ══════════════════════════════════════════════════════════════
+let _layerBarAtiva = null;
+function toggleLayerBar(id){
+  const dd = document.getElementById('mlb-dropdown');
+  if(_layerBarAtiva === id){ dd.style.display='none'; _layerBarAtiva=null; document.querySelectorAll('.mlb-tab').forEach(t=>t.classList.remove('ativo')); return; }
+  _layerBarAtiva = id;
+  document.querySelectorAll('.mlb-tab').forEach(t => t.classList.toggle('ativo', t.id==='mlb-btn-'+id));
+  dd.innerHTML = _renderDropdown(id);
+  dd.style.display = '';
+}
+document.addEventListener('click', e => {
+  const lb = document.getElementById('mapa-layerbar');
+  if(lb && !lb.contains(e.target)){ document.getElementById('mlb-dropdown').style.display='none'; _layerBarAtiva=null; document.querySelectorAll('.mlb-tab').forEach(t=>t.classList.remove('ativo')); }
+});
+
+function _renderDropdown(id){
+  const hdr = (titulo) => `<div class="mlb-dropdown-header"><span class="mlb-dropdown-title">${titulo}</span><button class="mlb-close" onclick="toggleLayerBar('${id}')">✕</button></div><div class="mlb-dropdown-body">`;
+  const foot = '</div>';
+  if(id==='veg') return hdr('🌿 Cobertura Vegetal & Desmatamento') + `
+    ${_vegCard('mapbiomas','MapBiomas Coleção 8','Uso e cobertura do solo. Resolução 30m. Ano base 2023.','#16a34a')}
+    ${_vegCard('prodes','PRODES — Desmatamento Anual','INPE/TerraBrasilis · Desmatamento incremental por ano.','#dc2626')}
+    ${_vegCard('prodes_hist','PRODES — Desmatamento Acumulado','INPE · Desmatamento acumulado até 2008.','#d97706')}
+  ` + foot;
+  if(id==='car') return hdr('🏡 CAR — Cadastro Ambiental Rural') + `
+    <div><label style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;cursor:pointer">
+      <input type="checkbox" id="car-toggle" style="accent-color:#1F4E2C;width:14px;height:14px" onchange="toggleCamadaCAR(this)">
+      Exibir imóveis CAR do Acre</label>
+      <p style="font-size:11px;color:var(--cinza-500);margin:5px 0 10px">Dados públicos do SICAR. Carregamento por UC selecionada.</p>
+    </div>
+    <div id="car-filtros-wrap" style="display:none;flex-direction:column;gap:8px">
+      <div><label style="font-size:11px;font-weight:600;color:var(--cinza-600)">Filtrar por UC:</label>
+        <select id="car-sel-uc" style="width:100%;font-size:12px;padding:5px 8px;border:1px solid var(--borda);border-radius:var(--raio);margin-top:4px" onchange="carregarDadosCAR(this.value)">
+          <option value="todas">Selecione uma UC...</option>
+        </select>
+      </div>
+      <div style="font-size:11px;color:var(--cinza-500)" id="car-status-txt"></div>
+    </div>
+  ` + foot;
+  if(id==='uc') return hdr('🌿 Unidades de Conservação') + `
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;cursor:pointer">
+        <input type="checkbox" id="uc-toggle" style="accent-color:#1F4E2C;width:14px;height:14px" onchange="toggleUC(this.checked)">
+        Exibir no mapa
+      </label>
+      <label style="display:flex;align-items:center;gap:5px;font-size:11px;cursor:pointer;margin-left:8px">
+        <input type="checkbox" id="uc-labels-toggle" checked style="accent-color:#1F4E2C;width:12px;height:12px" onchange="ucToggleLabels(this.checked)"> Labels
+      </label>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+      <span style="font-size:11px;color:var(--cinza-600);flex-shrink:0">Opacidade:</span>
+      <input type="range" id="uc-opacity" min="0" max="100" value="40" style="flex:1;accent-color:#1F4E2C" oninput="ucAlterarOpacidade(this.value)">
+      <span style="font-size:11px;color:var(--cinza-600);width:28px" id="uc-opacity-val">40%</span>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+      <label style="font-size:11px;cursor:pointer;display:flex;align-items:center;gap:4px"><input type="checkbox" id="uc-esfera-estadual" checked style="accent-color:#1F4E2C" onchange="_renderizarUC()"> Estadual</label>
+      <label style="font-size:11px;cursor:pointer;display:flex;align-items:center;gap:4px"><input type="checkbox" id="uc-esfera-federal"   checked style="accent-color:#1F4E2C" onchange="_renderizarUC()"> Federal</label>
+      <label style="font-size:11px;cursor:pointer;display:flex;align-items:center;gap:4px"><input type="checkbox" id="uc-esfera-municipal" checked style="accent-color:#1F4E2C" onchange="_renderizarUC()"> Municipal</label>
+    </div>
+    <div id="uc-loading" style="display:none;align-items:center;gap:8px;font-size:11px;color:var(--cinza-500);padding:8px 0"><div class="spinner" style="width:14px;height:14px"></div> Carregando...</div>
+    <div id="uc-controles" style="display:none">
+      <div class="uc-secao-titulo">Proteção Integral</div><div id="uc-tipos-pi"></div>
+      <div class="uc-secao-titulo" style="margin-top:8px">Uso Sustentável</div><div id="uc-tipos-us"></div>
+    </div>
+    <div id="uc-stat" style="font-size:10px;color:var(--cinza-400);text-align:right;margin-top:6px"></div>
+  ` + foot;
+  if(id==='ti') return hdr('🪶 Terras Indígenas') + `
+    <div><label style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;cursor:pointer">
+      <input type="checkbox" id="ti-toggle" style="accent-color:#d97706;width:14px;height:14px" onchange="toggleTI(this.checked)">
+      Exibir Terras Indígenas</label>
+      <p style="font-size:11px;color:var(--cinza-500);margin:5px 0 0">Fonte: FUNAI · GeoJSON oficial. Inclui TIs homologadas, declaradas e em estudo.</p>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;margin-top:10px">
+      <span style="font-size:11px;color:var(--cinza-600);flex-shrink:0">Opacidade:</span>
+      <input type="range" id="ti-opacity" min="0" max="100" value="40" style="flex:1;accent-color:#d97706" oninput="tiAlterarOpacidade(this.value)">
+    </div>
+    <div id="ti-stat" style="font-size:10px;color:var(--cinza-400);text-align:right;margin-top:6px"></div>
+  ` + foot;
+  if(id==='mun') return hdr('🏙 Municípios do Acre') + `
+    <div><label style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;cursor:pointer">
+      <input type="checkbox" id="mun-toggle" style="accent-color:#6366f1;width:14px;height:14px" onchange="toggleMunicipios(this.checked)">
+      Exibir limites municipais</label>
+      <p style="font-size:11px;color:var(--cinza-500);margin:5px 0 0">22 municípios do Acre.</p>
+    </div>
+  ` + foot;
+  return '<div style="padding:16px;color:var(--cinza-500)">Em desenvolvimento</div>';
+}
+
+function _vegCard(id, titulo, desc, cor){
+  return `<div style="border:1px solid var(--borda);border-radius:var(--raio);padding:10px 12px">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+      <div style="width:14px;height:14px;border-radius:3px;background:${cor};flex-shrink:0"></div>
+      <label style="font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;flex:1">
+        <input type="checkbox" style="accent-color:${cor};width:13px;height:13px" onchange="toggleCamadaVeg('${id}',this.checked)"> ${escHtml(titulo)}
+      </label>
+    </div>
+    <p style="font-size:10px;color:var(--cinza-500);margin:0 0 8px">${escHtml(desc)}</p>
+    <div style="display:flex;align-items:center;gap:8px">
+      <span style="font-size:10px;color:var(--cinza-500);flex-shrink:0">Opacidade:</span>
+      <input type="range" id="veg-${id}-opacity" min="0" max="100" value="70" style="flex:1;accent-color:${cor}" oninput="atualizarOpacidadeVeg('${id}')">
+    </div>
+  </div>`;
+}
+
+// ══════════════════════════════════════════════════════════════
+// CAMADAS PERSONALIZADAS (Supabase camadas_mapa)
+// ══════════════════════════════════════════════════════════════
+async function carregarCamadas(){
+  const { data } = await db.from('camadas_mapa').select('*').order('ordem');
+  camadas = (data||[]).map(c => ({ ...c, layer:null }));
+  camadas.forEach(c => { if(c.visivel) _renderizarCamada(c); });
+  renderCamadasHtml();
+}
+
+function _renderizarCamada(c){
+  if(c.layer){ mapaL.removeLayer(c.layer); c.layer=null; }
+  if(!c.geojson) return;
+  const sc = c.style_config||{}, fo = sc.fillOpacity!=null?sc.fillOpacity:0.22, sw = sc.strokeWidth!=null?sc.strokeWidth:2;
+  const hidden = new Set(sc.hiddenFeatures||[]), featFill = c.feature_colors||{};
+  const allF = c.geojson.features||[];
+  const hasNames = allF.some(f => f.properties && (f.properties.name||f.properties.Name||f.properties.NAME));
+  const paletaFixa = {};
+  allF.forEach((f,i) => { const n=f.properties?.name||f.properties?.Name||f.properties?.NAME||''; if(n&&!paletaFixa[n]) paletaFixa[n]=SUBBACIA_PALETTE[i%SUBBACIA_PALETTE.length]; });
+  const visF = hidden.size>0 ? allF.filter(f => { const n=f.properties?.name||f.properties?.Name||f.properties?.NAME||''; return !hidden.has(n); }) : allF;
+  c.layer = L.geoJSON({...c.geojson,features:visF},{
+    style: hasNames
+      ? (f) => { const n=f.properties?.name||f.properties?.Name||f.properties?.NAME||''; const fill=featFill[n]||paletaFixa[n]||c.cor; return {color:fill,weight:sw,opacity:.9,fillColor:fill,fillOpacity:fo,dashArray:'5 4'}; }
+      : { color:c.cor, weight:sw, opacity:.9, fillColor:c.cor, fillOpacity:fo, dashArray:'5 4' },
+    onEachFeature: hasNames ? (f,layer) => {
+      const n=f.properties?.name||f.properties?.Name||f.properties?.NAME||'';
+      if(n){ layer.bindTooltip(n,{permanent:true,direction:'center',className:'subbacia-label'}); layer.on('add',()=>layer.openTooltip()); }
+    } : undefined
+  });
+  c.layer.addTo(mapaL);
+}
+
+function renderCamadasHtml(){
+  const el = document.getElementById('bloco-camadas-lista'); if(!el) return;
+  if(!camadas.length){ el.innerHTML = '<div style="color:var(--cinza-400);font-size:11px">Nenhuma camada personalizada.</div>'; return; }
+  el.innerHTML = camadas.map(c => `
+    <div style="display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid var(--cinza-100)">
+      <input type="checkbox" ${c.visivel?'checked':''} style="accent-color:${c.cor};width:13px;height:13px;cursor:pointer" onchange="toggleCamada('${c.id}',this.checked)">
+      <div style="width:12px;height:12px;border-radius:2px;background:${c.cor};flex-shrink:0"></div>
+      <span style="font-size:12px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(c.nome)}</span>
+    </div>`).join('');
+}
+
+function toggleCamada(id, vis){
+  const c = camadas.find(x=>x.id===id); if(!c) return;
+  c.visivel = vis;
+  if(vis) _renderizarCamada(c); else { if(c.layer){ mapaL.removeLayer(c.layer); c.layer=null; } }
+}
+
+// ══════════════════════════════════════════════════════════════
+// OCORRÊNCIAS — marcadores com clustering
+// ══════════════════════════════════════════════════════════════
+let _todasOcorrencias = [];
+async function carregarOcorrencias(){
+  const { data } = await db.from('ocorrencias')
+    .select('id,titulo,tipo,severidade,status,data_ocorrencia,area_afetada_ha,descricao,uc_id,unidades_conservacao(nome,codigo)')
+    .neq('status','arquivada');
+  _todasOcorrencias = data||[];
+  renderOcorrencias();
+  const el = document.getElementById('oc-count-lbl');
+  if(el) el.textContent = _todasOcorrencias.length + ' registro(s)';
+}
+
+function renderOcorrencias(){
+  if(!clusters||!mapaL) return;
+  clusters.clearLayers();
+  const sevAtivas  = new Set(Array.from(document.querySelectorAll('[data-oc-sev]:checked')).map(e=>e.dataset.ocSev));
+  const tiposAtivos = new Set(Array.from(document.querySelectorAll('[data-oc-tipo]:checked')).map(e=>e.dataset.ocTipo));
+  _todasOcorrencias
+    .filter(o => sevAtivas.has(o.severidade) && tiposAtivos.has(o.tipo))
+    .forEach(o => {
+      // Sem coordenada: usa centroide aproximado da UC com jitter
+      const lat = -9.5 + (Math.random()-.5)*5, lng = -70+(Math.random()-.5)*8;
+      const cor = OC_CORES[o.severidade]||'#6b7280';
+      const icone = OC_ICONES[o.tipo]||'⚠';
+      const marker = L.marker([lat,lng], { icon: L.divIcon({
+        className:'',
+        html:`<div class="oc-marker" style="background:${cor}">${icone}</div>`,
+        iconSize:[28,28], iconAnchor:[14,14], popupAnchor:[0,-16]
+      })});
+      const ucNome = o.unidades_conservacao?.nome || '—';
+      marker.bindPopup(`<div class="camada-popup">
+        <div class="cp-header" style="background:${cor}">⚠ Ocorrência</div>
+        <div class="cp-layer">
+          <div class="cp-layer-nome">${escHtml(o.titulo)}</div>
+          <div class="cp-row"><strong>UC</strong><span>${escHtml(ucNome)}</span></div>
+          <div class="cp-row"><strong>Tipo</strong><span>${escHtml(o.tipo.replace(/_/g,' '))}</span></div>
+          <div class="cp-row"><strong>Data</strong><span>${o.data_ocorrencia||'—'}</span></div>
+          ${o.area_afetada_ha?`<div class="cp-row"><strong>Área</strong><span>${Number(o.area_afetada_ha).toLocaleString('pt-BR')} ha</span></div>`:''}
+          ${o.descricao?`<div class="cp-row" style="margin-top:4px"><span style="font-size:11px;color:#6B7280">${escHtml(o.descricao.substring(0,140))}${o.descricao.length>140?'…':''}</span></div>`:''}
+          <div class="cp-badge" style="background:${cor}11;border-color:${cor};color:${cor}">${escHtml(o.severidade)}</div>
+        </div>
+      </div>`);
+      clusters.addLayer(marker);
+    });
+}
+
+// ══════════════════════════════════════════════════════════════
+// UNIDADES DE CONSERVAÇÃO — GeoJSON + PostGIS
+// ══════════════════════════════════════════════════════════════
+var _ucCoresLS = {}; try{ _ucCoresLS = JSON.parse(localStorage.getItem('siguc_uc_cores')||'{}'); }catch(e){}
+function _ucCorNome(nome, fallback){ return _ucCoresLS[nome]||fallback||'#059669'; }
+
+function _ucGrupoId(g){ if(!g) return 'us'; const v=g.toLowerCase(); return(v==='pi'||v.includes('integral'))?'pi':'us'; }
+
+async function toggleUC(ativo){
+  _ucAtivo = ativo;
+  if(ativo && !_ucGeojson) await _carregarUC();
+  else _renderizarUC();
+  if(ativo) document.getElementById('uc-stats-card').classList.add('visivel');
+  else document.getElementById('uc-stats-card').classList.remove('visivel');
+}
+function ucToggleLabels(v){ _ucLabels=v; _renderizarUC(); }
+function ucAlterarOpacidade(v){ _ucOpacity=v/100; document.getElementById('uc-opacity-val').textContent=v+'%'; _renderizarUC(); }
+function filtrarUC(){ _renderizarUC(); }
+
+async function _carregarUC(){
+  document.getElementById('uc-loading').style.display='flex';
+  try{
+    const r = await fetch('../data/uc_acre.geojson');
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    _ucGeojson = await r.json();
+  }catch(e){
+    document.getElementById('uc-loading').style.display='none';
+    document.getElementById('uc-stat').textContent='⚠ Erro: '+e.message; return;
   }
+  document.getElementById('uc-loading').style.display='none';
+  document.getElementById('uc-controles').style.display='';
+  _ucConstruirPainel(); _renderizarUC(); _ucStatsAtualizar();
+  document.getElementById('uc-stats-card').classList.add('visivel');
+  // Popular select do CAR com as UCs
+  _popularFiltroCarUC();
+}
 
-  let _layers = [], _ucs = []
+function _ucConstruirPainel(){
+  const pi=[], us=[];
+  (_ucGeojson.features||[]).forEach(f=>{
+    const p=f.properties; const g=_ucGrupoId(p.grupo);
+    const item={nome:p.nome||'',sigla:p.sigla||'',esfera:p.esfera||'',cor:_ucCorNome(p.nome,p.cor)};
+    (g==='pi'?pi:us).push(item);
+  });
+  function esferaBadge(e){ const m={federal:'#eff6ff/#1d4ed8/#bfdbfe',estadual:'#fefce8/#854d0e/#fde68a'}[e]||'#f0fdf4/#166534/#86efac'; const[bg,co,brd]=m.split('/'); return `<span style="font-size:8px;padding:1px 4px;border-radius:3px;background:${bg};color:${co};border:1px solid ${brd};flex-shrink:0">${e}</span>`; }
+  function buildList(items){ return items.sort((a,b)=>a.nome.localeCompare(b.nome)).map(item=>`
+    <div class="uc-filtro-label" style="gap:5px;padding:3px 0;align-items:center">
+      <input type="checkbox" checked data-uc-nome="${escHtml(item.nome)}" style="accent-color:${item.cor};width:12px;height:12px;cursor:pointer;flex-shrink:0" onchange="filtrarUC()">
+      <div style="background:${item.cor};width:12px;height:12px;border-radius:2px;flex-shrink:0;cursor:pointer" title="Mudar cor" onclick="ucAbrirColorPicker('${escHtml(item.nome).replace(/'/g,"\\'")}',this)"></div>
+      <span style="font-size:10px;font-weight:600;color:var(--cinza-500);flex-shrink:0">${escHtml(item.sigla)}</span>
+      <span style="font-size:10px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(item.nome)}</span>
+      ${esferaBadge(item.esfera)}
+    </div>`).join(''); }
+  const piEl=document.getElementById('uc-tipos-pi'), usEl=document.getElementById('uc-tipos-us');
+  if(piEl) piEl.innerHTML=pi.length?buildList(pi):'<span style="font-size:10px;color:var(--cinza-400)">Nenhuma</span>';
+  if(usEl) usEl.innerHTML=us.length?buildList(us):'<span style="font-size:10px;color:var(--cinza-400)">Nenhuma</span>';
+}
 
-  // Carregar UCs com geometria
-  const { data: ucs } = await db.from('unidades_conservacao')
-    .select('id,codigo,nome,categoria,grupo,area_ha,status,municipios,geom_json:geom')
-    .eq('ativo', true)
-
-  _ucs = ucs || []
-  document.getElementById('contagem-ucs').textContent = `${_ucs.length} UC(s) cadastradas`
-
-  // Carregar ocorrências abertas
-  const { data: ocAbts } = await db.from('ocorrencias')
-    .select('uc_id,severidade').eq('status','aberta')
-
-  const ocPorUC = {}
-  ocAbts?.forEach(o => {
-    if (!ocPorUC[o.uc_id]) ocPorUC[o.uc_id] = []
-    ocPorUC[o.uc_id].push(o.severidade)
-  })
-
-  window._renderMapa = function(lista) {
-    _layers.forEach(l => mapa.removeLayer(l)); _layers = []
-
-    lista.forEach(uc => {
-      const cor = COR_CAT[uc.categoria] || '#6B7280'
-      const ocUC = ocPorUC[uc.id] || []
-      const temCritica = ocUC.some(s => ['critica','alta'].includes(s))
-
-      // Se tiver geometria, renderizar polígono
-      if (uc.geom_json) {
-        try {
-          const geom = typeof uc.geom_json === 'string' ? JSON.parse(uc.geom_json) : uc.geom_json
-          const layer = L.geoJSON(geom, {
-            style: { color: temCritica ? '#DC2626' : cor, weight: 2, fillOpacity: 0.22, fillColor: cor }
-          })
-          layer.bindPopup(popupHTML(uc, ocUC))
-          layer.addTo(mapa); _layers.push(layer)
-        } catch(e) { /* geometria inválida, usa marcador */ }
-        return
+function _renderizarUC(){
+  if(_ucLayer){ mapaL.removeLayer(_ucLayer); _ucLayer=null; }
+  if(!_ucGeojson||!_ucAtivo) return;
+  const esfFed=(document.getElementById('uc-esfera-federal')?.checked??true);
+  const esfEst=(document.getElementById('uc-esfera-estadual')?.checked??true);
+  const esfMun=(document.getElementById('uc-esfera-municipal')?.checked??true);
+  const nomesAtivos=new Set(Array.from(document.querySelectorAll('[data-uc-nome]:checked')).map(e=>e.dataset.ucNome));
+  let count=0;
+  _ucLayer=L.geoJSON(_ucGeojson,{
+    style: f => { const p=f.properties; const cor=_ucCorNome(p.nome,p.cor); return {color:cor,weight:2,opacity:.9,fillColor:cor,fillOpacity:_ucOpacity}; },
+    filter: f => {
+      const esf=(f.properties.esfera||'').toLowerCase();
+      if(esf==='federal'&&!esfFed) return false;
+      if(esf==='estadual'&&!esfEst) return false;
+      if(esf==='municipal'&&!esfMun) return false;
+      if(nomesAtivos.size>0&&!nomesAtivos.has(f.properties.nome)) return false;
+      count++; return true;
+    },
+    onEachFeature: (f,layer) => {
+      const p=f.properties; const cor=_ucCorNome(p.nome,p.cor);
+      const gid=_ucGrupoId(p.grupo); const corG=gid==='pi'?'#dc2626':'#2563eb'; const lblG=gid==='pi'?'Proteção Integral':'Uso Sustentável';
+      const ha=p.area_ha?Number(p.area_ha).toLocaleString('pt-BR',{maximumFractionDigits:0}):'';
+      if(_ucLabels&&p.centro_lon&&p.centro_lat){
+        const tt=L.tooltip({permanent:true,direction:'center',className:'uc-label-tt',interactive:false});
+        tt.setContent(`<span style="color:${cor}">${escHtml(p.sigla||'')}</span> ${escHtml(p.nome||'')}`);
+        tt.setLatLng([p.centro_lat,p.centro_lon]); tt.addTo(mapaL);
+        layer._ucLabel=tt; layer.on('remove',()=>{ try{mapaL.removeLayer(tt);}catch(x){} });
       }
+      layer.bindPopup(`<div class="camada-popup">
+        <div class="cp-header" style="background:#1a5f38">🌿 Unidade de Conservação</div>
+        <div class="cp-layer">
+          <div class="cp-layer-nome" style="color:${cor}">${escHtml((p.sigla||'')+(p.sigla?' — ':'')+p.nome)}</div>
+          <div class="cp-row"><strong>Categoria</strong><span>${escHtml(p.categoria||p.sigla||'')}</span></div>
+          <div class="cp-row"><strong>Esfera</strong><span style="text-transform:capitalize">${escHtml(p.esfera||'')}</span></div>
+          ${p.municipios?`<div class="cp-row"><strong>Municípios</strong><span>${escHtml(p.municipios)}</span></div>`:''}
+          ${p.ano_cria?`<div class="cp-row"><strong>Criação</strong><span>${escHtml(p.ano_cria)}</span></div>`:''}
+          ${p.ato_cria?`<div class="cp-row"><strong>Ato legal</strong><span style="font-size:10px">${escHtml(p.ato_cria)}</span></div>`:''}
+          ${ha?`<div class="cp-row"><strong>Área (ha)</strong><span>${ha}</span></div>`:''}
+          ${p.gestor?`<div class="cp-row"><strong>Gestor</strong><span>${escHtml(p.gestor)}</span></div>`:''}
+          <div class="cp-badge" style="background:${corG}11;border-color:${corG};color:${corG}">${lblG}</div>
+        </div>
+      </div>`,{className:'camada-popup-wrap',maxWidth:340});
+    }
+  });
+  _ucLayer.addTo(mapaL);
+  const stat=document.getElementById('uc-stat'); if(stat) stat.textContent=count+' UC'+(count!==1?'s':'')+' exibida'+(count!==1?'s':'');
+  const badge=document.getElementById('uc-count-badge'); if(badge){badge.textContent=count;badge.style.display=count?'':'none';}
+}
 
-      // Sem geometria: marcador no centroide aproximado do Acre
-      const jitter = () => (Math.random()-0.5) * 3
-      const marker = L.circleMarker([-9.5 + jitter(), -70.0 + jitter()], {
-        radius: 10, color: temCritica ? '#DC2626' : cor,
-        fillColor: cor, fillOpacity: 0.8, weight: 2
-      })
-      marker.bindPopup(popupHTML(uc, ocUC))
-      marker.addTo(mapa); _layers.push(marker)
-    })
+function _ucStatsAtualizar(){
+  const feats=_ucGeojson?.features||[];
+  const total=feats.length;
+  const areaTotal=feats.reduce((s,f)=>s+(parseFloat(f.properties?.area_ha)||0),0);
+  document.getElementById('usc-total').textContent=total;
+  document.getElementById('usc-area').textContent=(areaTotal/1e6).toFixed(2);
+  document.getElementById('usc-pct').textContent=((areaTotal/16421980)*100).toFixed(1)+'%'; // área Acre
+  document.getElementById('usc-sub').textContent=total+' UCs · '+areaTotal.toLocaleString('pt-BR',{maximumFractionDigits:0})+' ha';
+  const pi=feats.filter(f=>_ucGrupoId(f.properties?.grupo)==='pi').length;
+  const us=feats.length-pi;
+  document.getElementById('usc-grupos').innerHTML=`<div style="display:flex;gap:12px;font-size:11px">
+    <span><strong style="color:#dc2626">${pi}</strong> Proteção Integral</span>
+    <span><strong style="color:#2563eb">${us}</strong> Uso Sustentável</span>
+  </div>`;
+}
+
+var _ucPickerEl=null, _ucPickerNome=null;
+function ucAbrirColorPicker(nome,el){
+  if(!_ucPickerEl){ _ucPickerEl=document.createElement('input'); _ucPickerEl.type='color'; _ucPickerEl.style.cssText='position:fixed;opacity:0;width:0;height:0;pointer-events:none'; document.body.appendChild(_ucPickerEl); _ucPickerEl.addEventListener('input',e=>{ if(_ucPickerNome){ _ucCoresLS[_ucPickerNome]=e.target.value; try{localStorage.setItem('siguc_uc_cores',JSON.stringify(_ucCoresLS));}catch(x){} const sw=document.querySelector('[data-ucsw="'+_ucPickerNome+'"]'); if(sw)sw.style.background=e.target.value; if(_ucLayer)_ucLayer.eachLayer(l=>{ if(l.feature?.properties?.nome===_ucPickerNome)l.setStyle({color:e.target.value,fillColor:e.target.value}); }); } }); }
+  _ucPickerNome=nome; _ucPickerEl.value=(_ucCoresLS[nome]||'#059669'); _ucPickerEl.click();
+}
+
+// ══════════════════════════════════════════════════════════════
+// TERRAS INDÍGENAS
+// ══════════════════════════════════════════════════════════════
+async function toggleTI(ativo){
+  _tiAtivo=ativo;
+  if(ativo&&!_tiGeojson) await _carregarTI();
+  else _renderizarTI();
+}
+function tiAlterarOpacidade(v){ _tiOpacity=v/100; _renderizarTI(); }
+async function _carregarTI(){
+  try{
+    const r=await fetch('../data/ti_acre.geojson'); if(!r.ok) throw new Error('HTTP '+r.status);
+    _tiGeojson=await r.json();
+  }catch(e){ document.getElementById('ti-stat').textContent='⚠ Erro: '+e.message; return; }
+  _renderizarTI();
+  const count=_tiGeojson.features?.length||0;
+  const stat=document.getElementById('ti-stat'); if(stat) stat.textContent=count+' Terra'+(count!==1?'s':'')+' Indígena'+(count!==1?'s':'')+' carregada'+(count!==1?'s':'');
+  const badge=document.getElementById('ti-count-badge'); if(badge){badge.textContent=count;badge.style.display=count?'':'none';}
+}
+function _renderizarTI(){
+  if(_tiLayer){mapaL.removeLayer(_tiLayer);_tiLayer=null;}
+  if(!_tiGeojson||!_tiAtivo) return;
+  _tiLayer=L.geoJSON(_tiGeojson,{
+    style:{color:'#d97706',weight:2,opacity:.9,fillColor:'#f59e0b',fillOpacity:_tiOpacity,dashArray:'6 4'},
+    onEachFeature:(f,layer)=>{
+      const p=f.properties; const nome=p.terrai_nom||p.nome||p.NAME||p.name||'Terra Indígena';
+      const etnia=p.etniaind||p.etnia||'';
+      const ha=p.area_ha||p.areaha||p.AREAHA||'';
+      layer.bindPopup(`<div class="camada-popup">
+        <div class="cp-header" style="background:#92400e">🪶 Terra Indígena</div>
+        <div class="cp-layer">
+          <div class="cp-layer-nome" style="color:#d97706">${escHtml(nome)}</div>
+          ${etnia?`<div class="cp-row"><strong>Etnia</strong><span>${escHtml(etnia)}</span></div>`:''}
+          ${ha?`<div class="cp-row"><strong>Área</strong><span>${Number(ha).toLocaleString('pt-BR',{maximumFractionDigits:0})} ha</span></div>`:''}
+          ${p.fase_ti||p.fase?`<div class="cp-row"><strong>Fase</strong><span>${escHtml(p.fase_ti||p.fase)}</span></div>`:''}
+        </div>
+      </div>`,{className:'camada-popup-wrap',maxWidth:280});
+    }
+  });
+  _tiLayer.addTo(mapaL);
+}
+
+// ══════════════════════════════════════════════════════════════
+// MUNICÍPIOS
+// ══════════════════════════════════════════════════════════════
+async function toggleMunicipios(ativo){
+  _munAtivo=ativo;
+  if(ativo&&!_munGeojson) await _carregarMunicipios();
+  else _renderizarMunicipios();
+}
+async function _carregarMunicipios(){
+  try{
+    const r=await fetch('../data/municipios_acre.geojson'); if(!r.ok) throw new Error('HTTP '+r.status);
+    _munGeojson=await r.json();
+  }catch(e){ return; }
+  _renderizarMunicipios();
+}
+function _renderizarMunicipios(){
+  if(_munLayer){mapaL.removeLayer(_munLayer);_munLayer=null;}
+  if(!_munGeojson||!_munAtivo) return;
+  _munLayer=L.geoJSON(_munGeojson,{
+    style:{color:'#6366f1',weight:1.5,opacity:.6,fillColor:'#6366f1',fillOpacity:.04,dashArray:'4 6'},
+    onEachFeature:(f,layer)=>{
+      const nome=f.properties?.name||f.properties?.nome||f.properties?.NM_MUN||'Município';
+      layer.bindTooltip(nome,{permanent:false,direction:'center',className:'subbacia-label'});
+    }
+  });
+  _munLayer.addTo(mapaL);
+}
+
+// ══════════════════════════════════════════════════════════════
+// CAR — Cadastro Ambiental Rural
+// ══════════════════════════════════════════════════════════════
+const CAR_WFS_BASE = 'https://geoserver.car.gov.br/geoserver/sicar/wfs';
+const CAR_PAGE = 500;
+let _carCarregando = false;
+
+function _popularFiltroCarUC(){
+  const sel = document.getElementById('car-sel-uc'); if(!sel) return;
+  const nomes=(_ucGeojson?.features||[]).map(f=>f.properties?.nome).filter(Boolean).sort();
+  sel.innerHTML='<option value="todas">Selecione uma UC...</option>'+nomes.map(n=>`<option value="${escHtml(n)}">${escHtml(n)}</option>`).join('');
+}
+
+async function toggleCamadaCAR(el){
+  if(!el.checked){ if(_carLayer){mapaL.removeLayer(_carLayer); _carLayer=null;} fecharDetalhesCAR(); document.getElementById('car-filtros-wrap').style.display='none'; document.getElementById('car-count-badge').style.display='none'; return; }
+  if(!_ucGeojson) await _carregarUC();
+  _popularFiltroCarUC();
+  document.getElementById('car-filtros-wrap').style.display='flex';
+}
+
+async function carregarDadosCAR(ucNome){
+  if(ucNome==='todas'||!ucNome) return;
+  if(_carCarregando) return;
+  _carCarregando=true;
+  const statusEl=document.getElementById('car-status-txt'); if(statusEl) statusEl.textContent='⏳ Buscando imóveis...';
+
+  // Encontrar BBOX da UC selecionada
+  let bbox = '-74,-12,-66,-7,EPSG:4326'; // Bbox do Acre inteiro como fallback
+  const ucFeat=(_ucGeojson?.features||[]).find(f=>f.properties?.nome===ucNome);
+  if(ucFeat?.geometry){
+    try{
+      let coords=[];
+      const extractCoords=(g)=>{ if(g.type==='MultiPolygon') g.coordinates.forEach(p=>p.forEach(r=>r.forEach(c=>coords.push(c)))); else if(g.type==='Polygon') g.coordinates.forEach(r=>r.forEach(c=>coords.push(c))); };
+      extractCoords(ucFeat.geometry);
+      if(coords.length){ const lngs=coords.map(c=>c[0]),lats=coords.map(c=>c[1]); const pad=0.01; bbox=`${Math.min(...lngs)-pad},${Math.min(...lats)-pad},${Math.max(...lngs)+pad},${Math.max(...lats)+pad},EPSG:4326`; }
+    }catch(e){}
   }
 
-  function popupHTML(uc, ocUC) {
-    const cor = COR_CAT[uc.categoria] || '#6B7280'
-    return `<div style="min-width:200px">
-      <div class="popup-titulo">${esc(uc.nome)}</div>
-      <span class="popup-badge" style="background:${cor}20;color:${cor};margin-bottom:6px">${esc(uc.categoria)}</span>
-      <div style="font-size:12px;color:#374151;margin-top:6px">
-        <div>📐 Área: <strong>${uc.area_ha ? formatNum(uc.area_ha,0)+' ha' : '—'}</strong></div>
-        <div>🏛️ Status: ${esc(t('status_uc.'+uc.status))}</div>
-        ${uc.municipios?.length ? `<div>📍 ${uc.municipios.join(', ')}</div>` : ''}
-        ${ocUC.length ? `<div style="margin-top:6px;color:#DC2626">⚠️ ${ocUC.length} ocorrência(s) aberta(s)</div>` : ''}
-      </div>
-    </div>`
+  try{
+    const url=`${CAR_WFS_BASE}?service=WFS&version=1.1.0&request=GetFeature&typeName=sicar:sicar_imovel&outputFormat=application/json&srsName=EPSG:4326&BBOX=${bbox}&maxFeatures=${CAR_PAGE}`;
+    const r=await fetch(url); if(!r.ok) throw new Error('HTTP '+r.status);
+    const gj=await r.json();
+    _carFeatures=gj.features||[];
+    _aplicarCamadaCAR();
+    if(statusEl) statusEl.textContent=`✅ ${_carFeatures.length} imóvel(is) carregado(s)`;
+    const badge=document.getElementById('car-count-badge'); if(badge){badge.textContent=_carFeatures.length;badge.style.display=_carFeatures.length?'':'none';}
+  }catch(e){
+    if(statusEl) statusEl.textContent='⚠ Erro ao carregar CAR: '+e.message;
   }
+  _carCarregando=false;
+}
 
-  window.atualizarFiltros = function() {
-    const grupo = document.getElementById('fil-grupo').value
-    const cat = document.getElementById('fil-cat').value
-    const lista = _ucs.filter(u => (!grupo || u.grupo===grupo) && (!cat || u.categoria===cat))
-    document.getElementById('contagem-ucs').textContent = `${lista.length} UC(s) exibidas`
-    window._renderMapa(lista)
+function _carCor(condicao){
+  const c=(condicao||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+  if(c.includes('ativo')) return '#16a34a';
+  if(c.includes('aguardando')) return '#d97706';
+  if(c.includes('analise')||c.includes('análise')) return '#2563eb';
+  return '#9ca3af';
+}
+
+function _aplicarCamadaCAR(){
+  if(_carLayer){mapaL.removeLayer(_carLayer); _carLayer=null;}
+  if(!_carFeatures.length) return;
+  const renderer=L.canvas({pane:'carPane'});
+  _carLayer=L.geoJSON({type:'FeatureCollection',features:_carFeatures},{
+    renderer, pane:'carPane',
+    style: f => { const cor=_carCor(f.properties?.condicao||f.properties?.ind_status); return {color:cor,weight:1.5,opacity:1,fillColor:cor,fillOpacity:0.18}; },
+    onEachFeature:(f,layer)=>{
+      layer.on('click',e=>{ L.DomEvent.stopPropagation(e); _abrirDetalhesCAR(f,layer); });
+      layer.on('mouseover',()=>layer.setStyle({fillOpacity:0.4,weight:2.5}));
+      layer.on('mouseout',()=>layer.setStyle({fillOpacity:0.18,weight:1.5}));
+    }
+  });
+  _carLayer.addTo(mapaL);
+}
+
+function _abrirDetalhesCAR(f,layer){
+  const p=f.properties||{};
+  const panel=document.getElementById('car-det-panel');
+  document.getElementById('car-det-titulo').textContent=p.nom_imovel||p.NOM_IMOVEL||'Imóvel Rural';
+  document.getElementById('car-det-cod').textContent=p.cod_imovel||p.COD_IMOVEL||'';
+  const cor=_carCor(p.condicao||p.ind_status);
+  document.getElementById('car-det-body').innerHTML=`
+    ${_carDetField('Cod. Imóvel', p.cod_imovel||p.COD_IMOVEL)}
+    ${_carDetField('Nome', p.nom_imovel||p.NOM_IMOVEL)}
+    ${_carDetField('Município', p.nom_municipio||p.NOM_MUNICIPIO||p.municipio)}
+    ${_carDetField('Área (ha)', p.num_area_t||p.num_area_i ? (parseFloat(p.num_area_t||p.num_area_i||0)).toLocaleString('pt-BR',{maximumFractionDigits:2}) : null)}
+    ${_carDetField('Status', `<span style="display:inline-flex;align-items:center;gap:4px;background:${cor}15;color:${cor};border:1px solid ${cor}40;border-radius:99px;padding:2px 10px;font-size:11px;font-weight:700">${escHtml(p.condicao||p.ind_status||'—')}</span>`)}
+    ${_carDetField('CPF/CNPJ', _mascarar(p.cpf_cnpj_p||p.CPF_CNPJ_P))}
+    ${_carDetField('Tipo', p.cod_tipo||p.tipo_imovel)}
+  `;
+  panel.classList.add('aberto');
+  _carAbertoCod=p.cod_imovel;
+}
+function _carDetField(lbl,val){ if(!val&&val!==0) return ''; return `<div class="car-det-field"><div class="car-det-label">${escHtml(lbl)}</div><div class="car-det-value">${val}</div></div>`; }
+function _mascarar(v){ if(!v) return '—'; const d=String(v).replace(/\D/g,''); if(d.length<6) return d; return d.slice(0,3)+'*'.repeat(d.length-5)+d.slice(-2); }
+function fecharDetalhesCAR(){ document.getElementById('car-det-panel').classList.remove('aberto'); _carAbertoCod=null; }
+_iniciarResizeCAR();
+function _iniciarResizeCAR(){
+  const handle=document.getElementById('car-resize'); if(!handle) return setTimeout(_iniciarResizeCAR,200);
+  const panel=document.getElementById('car-det-panel');
+  let dragging=false, startX=0, startW=0;
+  handle.addEventListener('mousedown',e=>{ dragging=true; startX=e.clientX; startW=panel.offsetWidth; handle.classList.add('dragging'); e.preventDefault(); });
+  document.addEventListener('mousemove',e=>{ if(!dragging) return; const w=Math.max(280,Math.min(680,startW-(e.clientX-startX))); panel.style.width=w+'px'; });
+  document.addEventListener('mouseup',()=>{ dragging=false; handle.classList.remove('dragging'); });
+}
+
+// ══════════════════════════════════════════════════════════════
+// CLICK NO MAPA
+// ══════════════════════════════════════════════════════════════
+function onMapaClick(e){
+  if(document.getElementById('car-det-panel').classList.contains('aberto')) fecharDetalhesCAR();
+}
+function vincularEventos(){
+  document.addEventListener('keydown', e => { if(e.key==='Escape') fecharDetalhesCAR(); });
+}
+
+// ══════════════════════════════════════════════════════════════
+// SCROLLBAR CUSTOMIZADA DO PAINEL
+// ══════════════════════════════════════════════════════════════
+function initScrollbarCustom(){
+  const outer=document.getElementById('mapa-scrollbar-outer');
+  const thumb=document.getElementById('mapa-scrollbar-thumb');
+  const painel=document.getElementById('mapa-painel');
+  if(!outer||!thumb||!painel) return;
+  function atualizar(){
+    const ratio=painel.clientHeight/painel.scrollHeight;
+    if(ratio>=1){ outer.style.display='none'; return; }
+    outer.style.display='';
+    const thumbH=Math.max(24,outer.clientHeight*ratio);
+    thumb.style.height=thumbH+'px';
+    const maxTop=outer.clientHeight-thumbH;
+    thumb.style.top=(painel.scrollTop/(painel.scrollHeight-painel.clientHeight)*maxTop)+'px';
   }
-
-  window._renderMapa(_ucs)
-
-  // Legenda
-  const legEl = document.createElement('div'); legEl.className = 'map-legenda'
-  legEl.innerHTML = `<div style="font-weight:700;margin-bottom:6px;font-size:11px;color:#374151">Legenda</div>` +
-    Object.entries(COR_CAT).slice(0,8).map(([cat,cor])=>
-      `<div class="leg-item"><div class="leg-cor" style="background:${cor}"></div><span>${cat}</span></div>`
-    ).join('') +
-    `<div class="leg-item" style="margin-top:4px;border-top:1px solid #E5E7EB;padding-top:4px"><div class="leg-cor" style="background:#DC2626"></div><span>Ocorrência aberta</span></div>`
-  document.getElementById('mapa-container').style.position = 'relative'
-  document.getElementById('mapa-container').appendChild(legEl)
-})()
+  painel.addEventListener('scroll',atualizar);
+  new ResizeObserver(atualizar).observe(painel);
+  atualizar();
+  let drag=false, startY=0, startScroll=0;
+  thumb.addEventListener('mousedown',e=>{ drag=true; startY=e.clientY; startScroll=painel.scrollTop; e.preventDefault(); });
+  document.addEventListener('mousemove',e=>{ if(!drag) return; const dy=e.clientY-startY; const ratio=(painel.scrollHeight-painel.clientHeight)/(outer.clientHeight-thumb.offsetHeight||1); painel.scrollTop=startScroll+dy*ratio; });
+  document.addEventListener('mouseup',()=>{ drag=false; });
+  outer.addEventListener('click',e=>{ if(e.target===thumb) return; const rect=outer.getBoundingClientRect(); const clickRatio=(e.clientY-rect.top)/outer.clientHeight; painel.scrollTop=clickRatio*(painel.scrollHeight-painel.clientHeight); });
+}
 </script>
 </body>
 </html>
