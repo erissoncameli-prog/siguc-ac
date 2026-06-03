@@ -388,7 +388,7 @@ function renderPagina(){
               <span id="oc-count-lbl" style="font-size:10px;color:var(--cinza-400)"></span>
               <span style="font-size:11px;color:var(--cinza-300)">▾</span>
             </div>
-            <div class="filtro-bloco-body" id="bloco-oc">
+            <div class="filtro-bloco-body" id="bloco-oc" style="display:none">
               <div style="font-size:11px;color:var(--cinza-600);margin-bottom:8px">Filtrar por severidade:</div>
               ${['critica','alta','media','baixa'].map(s=>`
               <div class="filtro-item"><input type="checkbox" checked data-oc-sev="${s}" onchange="renderOcorrencias()">
