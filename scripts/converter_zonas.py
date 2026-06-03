@@ -88,7 +88,7 @@ def shp_para_features(caminho_shp, uc_nome, meta_zona):
                 'properties': props
             })
     except Exception as e:
-        print(f'  ERRO ao ler {caminho_shp}: {e}')
+        print(f'  ERRO ao ler {os.path.basename(caminho_shp)}: {e}')
     return features
 
 def main():
