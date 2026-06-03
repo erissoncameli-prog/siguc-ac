@@ -1120,6 +1120,131 @@ function _renderizarTI(){
 }
 
 // ══════════════════════════════════════════════════════════════
+// ZONAS DE MANEJO DAS UCs
+// ══════════════════════════════════════════════════════════════
+const ZONA_META = {
+  ZOA: { nome:'Zona de Amortecimento',    cor:'#fbbf24' },
+  ZOC: { nome:'Zona de Conservação',      cor:'#166534' },
+  ZEX: { nome:'Zona de Extrativismo',     cor:'#15803d' },
+  ZPR: { nome:'Zona de Produção',         cor:'#0891b2' },
+  ZPO: { nome:'Zona Populacional',        cor:'#7c3aed' },
+  ZUE: { nome:'Zona de Uso Especial',     cor:'#db2777' },
+  ZUP: { nome:'Zona de Uso Público',      cor:'#ea580c' },
+  ZUC: { nome:'Zona de Uso Conflitante',  cor:'#dc2626' },
+};
+
+async function toggleZonas(ativo){
+  _zonasAtivo = ativo;
+  if(ativo && !_zonasGeojson) await _carregarZonas();
+  else _renderizarZonas();
+}
+
+async function _carregarZonas(){
+  const loadEl = document.getElementById('zonas-loading');
+  if(loadEl) loadEl.style.display = 'flex';
+  try{
+    const r = await fetch('../data/uc_zonas_acre.geojson');
+    if(!r.ok) throw new Error('HTTP ' + r.status);
+    _zonasGeojson = await r.json();
+  }catch(e){
+    if(loadEl) loadEl.style.display = 'none';
+    const stat = document.getElementById('zonas-stat');
+    if(stat) stat.textContent = '⚠ Erro: ' + e.message;
+    return;
+  }
+  if(loadEl) loadEl.style.display = 'none';
+  _zonasConstruirPainel();
+  _renderizarZonas();
+}
+
+function _zonasConstruirPainel(){
+  const feats = _zonasGeojson?.features || [];
+  // Popular select de UCs
+  const sel = document.getElementById('zonas-sel-uc');
+  if(sel){
+    const ucs = [...new Set(feats.map(f => f.properties.uc_nome).filter(Boolean))].sort();
+    sel.innerHTML = '<option value="todas">Todas as UCs</option>' +
+      ucs.map(u => `<option value="${escHtml(u)}">${escHtml(u)}</option>`).join('');
+  }
+  // Popular lista de tipos
+  const lista = document.getElementById('zonas-tipos-lista');
+  if(lista){
+    const tiposPresentes = [...new Set(feats.map(f => f.properties.zona_codigo).filter(Boolean))];
+    lista.innerHTML = Object.entries(ZONA_META)
+      .filter(([cod]) => tiposPresentes.includes(cod))
+      .map(([cod, meta]) => {
+        const n = feats.filter(f => f.properties.zona_codigo === cod).length;
+        return `<label style="display:flex;align-items:center;gap:7px;font-size:11px;color:var(--cinza-700);cursor:pointer;padding:2px 0">
+          <input type="checkbox" checked data-zona-tipo="${cod}" style="accent-color:${meta.cor};width:12px;height:12px;cursor:pointer;flex-shrink:0" onchange="_renderizarZonas()">
+          <div style="width:12px;height:12px;border-radius:2px;background:${meta.cor};flex-shrink:0"></div>
+          <span style="flex:1">${escHtml(meta.nome)}</span>
+          <span style="font-size:10px;color:var(--cinza-400)">${n}</span>
+        </label>`;
+      }).join('');
+  }
+}
+
+function zonasFiltrarUC(uc){
+  _zonasFiltroUC = uc;
+  _renderizarZonas();
+}
+
+function zonasAlterarOpacidade(v){
+  _zonasOpacity = v / 100;
+  document.getElementById('zonas-opacity-val').textContent = v + '%';
+  if(_zonasLayer) _zonasLayer.eachLayer(l => l.setStyle({ fillOpacity: _zonasOpacity }));
+}
+
+function _renderizarZonas(){
+  if(_zonasLayer){ mapaL.removeLayer(_zonasLayer); _zonasLayer = null; }
+  if(!_zonasGeojson || !_zonasAtivo) return;
+
+  const tiposAtivos = new Set(
+    Array.from(document.querySelectorAll('[data-zona-tipo]:checked')).map(e => e.dataset.zonaTipo)
+  );
+
+  let count = 0;
+  _zonasLayer = L.geoJSON(_zonasGeojson, {
+    style: f => {
+      const meta = ZONA_META[f.properties.zona_codigo] || {};
+      const cor = meta.cor || '#6b7280';
+      return { color: cor, weight: 1.5, opacity: .9, fillColor: cor, fillOpacity: _zonasOpacity, dashArray: '4 3' };
+    },
+    filter: f => {
+      const p = f.properties;
+      if(_zonasFiltroUC !== 'todas' && p.uc_nome !== _zonasFiltroUC) return false;
+      if(tiposAtivos.size > 0 && !tiposAtivos.has(p.zona_codigo)) return false;
+      count++;
+      return true;
+    },
+    onEachFeature: (f, layer) => {
+      const p = f.properties;
+      const meta = ZONA_META[p.zona_codigo] || {};
+      const cor = meta.cor || '#6b7280';
+      const ha = p.hectares ? Number(String(p.hectares).replace(',','.')).toLocaleString('pt-BR',{maximumFractionDigits:0}) : '';
+      layer.bindPopup(`<div class="camada-popup">
+        <div class="cp-header" style="background:${cor}">🗂 Zona de Manejo</div>
+        <div class="cp-layer">
+          <div class="cp-layer-nome" style="color:${cor}">${escHtml(p.zona_codigo)} — ${escHtml(p.zona_nome)}</div>
+          <div class="cp-row"><strong>UC</strong><span>${escHtml(p.uc_nome)}</span></div>
+          ${ha ? `<div class="cp-row"><strong>Área</strong><span>${ha} ha</span></div>` : ''}
+          <div class="cp-badge" style="background:${cor}18;border-color:${cor};color:${cor}">${escHtml(p.zona_codigo)}</div>
+        </div>
+      </div>`, {className:'camada-popup-wrap', maxWidth:280});
+      layer.on('mouseover', () => layer.setStyle({weight:2.5, fillOpacity: Math.min(_zonasOpacity + 0.2, 1)}));
+      layer.on('mouseout',  () => layer.setStyle({weight:1.5, fillOpacity: _zonasOpacity}));
+    }
+  });
+  _zonasLayer.addTo(mapaL);
+  _zonasLayer.setZIndex && _zonasLayer.setZIndex(200);
+
+  const stat = document.getElementById('zonas-stat');
+  if(stat) stat.textContent = count + ' zona' + (count !== 1 ? 's' : '') + ' exibida' + (count !== 1 ? 's' : '');
+  const badge = document.getElementById('zonas-count-badge');
+  if(badge){ badge.textContent = count; badge.style.display = count ? '' : 'none'; }
+}
+
+// ══════════════════════════════════════════════════════════════
 // MUNICÍPIOS
 // ══════════════════════════════════════════════════════════════
 async function toggleMunicipios(ativo){
