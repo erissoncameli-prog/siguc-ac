@@ -133,9 +133,9 @@ def main():
     with open(OUT, 'w', encoding='utf-8') as fp:
         json.dump(geojson, fp, ensure_ascii=False, separators=(',', ':'))
 
-    print(f'\n✅ {total_shp} shapefile(s) processado(s)')
-    print(f'✅ {len(todas_features)} features no total')
-    print(f'✅ Salvo em: {os.path.abspath(OUT)}')
+    print(f'\nOK: {total_shp} shapefile(s) processado(s)')
+    print(f'OK: {len(todas_features)} features no total')
+    print(f'OK: Salvo em: {os.path.abspath(OUT)}')
 
 if __name__ == '__main__':
     main()
