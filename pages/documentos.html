@@ -483,7 +483,10 @@ function renderArvore(lista) {
           ${uc && _logoMap[uc.id]
             ? `<img src="${_logoMap[uc.id]}" style="width:36px;height:36px;object-fit:contain;border-radius:4px;flex-shrink:0" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'tree-uc-icone',textContent:'🌿'}))">`
             : '<span class="tree-uc-icone">🌿</span>'}
-          <span class="tree-uc-nome">${nome}</span>
+          <div style="flex:1;min-width:0">
+            <div class="tree-uc-nome">${nome}</div>
+            ${uc ? (() => { const info = _infoMap[uc.id]||{}; const area = info.area_ha ? Number(info.area_ha).toLocaleString('pt-BR',{maximumFractionDigits:0})+' ha' : ''; const gestor = info.gestor_nome || info.orgao_gestor || ''; return (area||gestor) ? `<div style="font-size:11px;color:var(--cinza-400);margin-top:1px;display:flex;gap:10px;flex-wrap:wrap">${area?`<span>📐 ${area}</span>`:''}${gestor?`<span>👤 ${gestor}</span>`:''}</div>` : ''; })() : ''}
+          </div>
           ${codigo ? `<span class="tree-uc-codigo">${codigo}</span>` : ''}
           <span class="tree-uc-badge">${docs.length} doc${docs.length !== 1 ? 's' : ''}</span>
         </div>
