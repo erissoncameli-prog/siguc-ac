@@ -202,8 +202,11 @@ const Observability = (() => {
     }
   }
 
-  // ── Init ──────────────────────────────────────────────────────
+  // ── Init (idempotente) ────────────────────────────────────────
+  let _initialized = false;
   function init() {
+    if (_initialized) return;
+    _initialized = true;
     _setupErrorHandlers();
     setInterval(_collectMemory, 30_000);
     logger.info('Observability initialized', { thresholds: THRESHOLDS });
