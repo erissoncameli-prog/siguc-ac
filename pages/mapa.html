@@ -814,13 +814,16 @@ function _renderizarUC(){
         layer._ucLabel=tt; layer.on('remove',()=>{ try{mapaL.removeLayer(tt);}catch(x){} });
       }
       const det=_ucDetalhes[p.nome]||{};
-      const detGestor=det.gestor_nome?`
+      const detGestor=(det.gestor_nome||det.orgao_gestor)?`
         <div style="margin-top:8px;padding-top:8px;border-top:1px solid #e5e7eb">
-          <div style="font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Gestor(a)</div>
-          <div style="font-size:11px;font-weight:600;color:#111827">${escHtml(det.gestor_nome)}</div>
-          <div style="font-size:10px;color:#6b7280">${escHtml(det.gestor_cargo||'')}</div>
+          <div style="font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">${det.gestor_nome?'Gestor(a)':'Órgão Gestor'}</div>
+          ${det.orgao_gestor&&!det.gestor_nome?`<div style="font-size:11px;font-weight:600;color:#111827">${escHtml(det.orgao_gestor)}</div>`:''}
+          ${det.gestor_nome?`<div style="font-size:11px;font-weight:600;color:#111827">${escHtml(det.gestor_nome)}</div>`:''}
+          ${det.gestor_cargo?`<div style="font-size:10px;color:#6b7280">${escHtml(det.gestor_cargo)}</div>`:''}
           ${det.gestor_portaria?`<div style="font-size:10px;color:#6b7280;margin-top:1px">${escHtml(det.gestor_portaria)}</div>`:''}
           ${det.gestor_email?`<div style="font-size:10px;margin-top:2px"><a href="mailto:${escHtml(det.gestor_email)}" style="color:#1d4ed8">${escHtml(det.gestor_email)}</a></div>`:''}
+          ${det.gestor_telefone?`<div style="font-size:10px;color:#6b7280;margin-top:1px">☎ ${escHtml(det.gestor_telefone)}</div>`:''}
+          ${det.sede?`<div style="font-size:10px;color:#9ca3af;margin-top:2px">${escHtml(det.sede)}</div>`:''}
         </div>`:'';
       const detDocs=det.plano_manejo!==undefined?`
         <div style="margin-top:8px;padding-top:8px;border-top:1px solid #e5e7eb;display:flex;gap:6px;flex-wrap:wrap">
