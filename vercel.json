@@ -7,9 +7,21 @@
       "source": "/(.*)",
       "headers": [
         { "key": "X-Content-Type-Options", "value": "nosniff" },
-        { "key": "X-Frame-Options", "value": "DENY" },
-        { "key": "X-XSS-Protection", "value": "1; mode=block" }
+        { "key": "X-Frame-Options",        "value": "DENY" },
+        { "key": "X-XSS-Protection",       "value": "1; mode=block" },
+        { "key": "X-Request-ID",           "value": "" }
       ]
+    }
+  ],
+  "functions": {
+    "api/health.js":       { "maxDuration": 10 },
+    "api/health/live.js":  { "maxDuration": 5  },
+    "api/metrics.js":      { "maxDuration": 5  }
+  },
+  "crons": [
+    {
+      "path":     "/api/health",
+      "schedule": "*/5 * * * *"
     }
   ]
 }
