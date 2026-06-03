@@ -2,8 +2,12 @@
 const SUPABASE_URL = 'https://atqtybcsvepdabsvgaly.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF0cXR5YmNzdmVwZGFic3ZnYWx5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0MjMzNzgsImV4cCI6MjA5NTk5OTM3OH0.hWx1AB2rK7xdco1Dgagm0XUOBPQbxZVE614SW4SKoLk';
 
+// Observabilidade — inicializada antes de qualquer chamada ao banco
+Observability.init();
+
 const { createClient } = supabase;
-const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// db instrumentado para logar tempo de queries (Regra 5)
+const db = createInstrumentedDb(createClient(SUPABASE_URL, SUPABASE_ANON_KEY));
 
 // ── Estado global ─────────────────────────────────────────────
 const appState = { usuario: null, perfil: null };
