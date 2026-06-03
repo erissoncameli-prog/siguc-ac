@@ -74,6 +74,26 @@
 /* Stats card */
 #uc-stats-card{position:absolute;bottom:28px;left:10px;z-index:500;width:260px;background:#fff;border-radius:12px;box-shadow:0 4px 24px rgba(0,0,0,.22);overflow:hidden;font-family:'DM Sans',sans-serif;display:none;}
 #uc-stats-card.visivel{display:block;}
+/* Editor de delimitação do Acre */
+#acre-editor{position:absolute;top:14px;left:14px;z-index:501;width:272px;background:#fff;border-radius:12px;box-shadow:0 4px 28px rgba(0,0,0,.28);overflow:hidden;font-family:'DM Sans',sans-serif;display:none;}
+#acre-editor.visivel{display:block;}
+.acre-ed-header{background:linear-gradient(135deg,#1a3c2a,#2D6A4F);padding:10px 13px;display:flex;align-items:center;gap:6px;cursor:grab;user-select:none;}
+.acre-ed-titulo{font-size:11px;font-weight:700;color:#fff;text-transform:uppercase;letter-spacing:.06em;flex:1;}
+.acre-ed-body{padding:12px 14px;display:flex;flex-direction:column;gap:10px;}
+.acre-ed-row{display:flex;align-items:center;gap:8px;}
+.acre-ed-lbl{font-size:10px;font-weight:700;color:var(--cinza-500);text-transform:uppercase;letter-spacing:.05em;width:88px;flex-shrink:0;}
+.acre-ed-val{font-size:10px;font-weight:700;color:var(--cinza-700);width:30px;text-align:right;flex-shrink:0;}
+.acre-ed-slider{flex:1;height:4px;accent-color:#2D6A4F;cursor:pointer;min-width:0;}
+.acre-ed-color{width:28px;height:22px;padding:1px;border:1px solid var(--borda);border-radius:4px;cursor:pointer;background:none;flex-shrink:0;}
+.acre-ed-select{flex:1;font-size:11px;padding:3px 6px;border:1px solid var(--borda);border-radius:var(--raio);font-family:inherit;cursor:pointer;}
+.acre-ed-preview{height:36px;border-radius:6px;border:1px solid var(--borda);background:var(--cinza-50);display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--cinza-400);margin-top:2px;overflow:hidden;position:relative;}
+#acre-prev-svg{width:100%;height:100%;}
+.acre-ed-footer{padding:8px 14px 12px;border-top:1px solid var(--borda);display:flex;gap:6px;}
+.acre-ed-footer button{flex:1;padding:6px 0;border-radius:var(--raio);font-size:11px;font-weight:600;cursor:pointer;border:1px solid;transition:all .15s;}
+.btn-acre-apply{background:#1F4E2C;color:#fff;border-color:#1F4E2C;}
+.btn-acre-apply:hover{background:#164025;}
+.btn-acre-reset{background:var(--branco);color:var(--cinza-600);border-color:var(--borda);}
+.btn-acre-reset:hover{background:var(--cinza-50);}
 .usc-header{background:linear-gradient(135deg,#1a3c2a,#2D6A4F);padding:10px 13px;display:flex;align-items:center;gap:6px;cursor:grab;user-select:none;}
 .usc-header-titulo{font-size:11px;font-weight:700;color:#fff;text-transform:uppercase;letter-spacing:.06em;}
 .usc-header-sub{font-size:10px;color:rgba(255,255,255,.65);margin-top:1px;}
@@ -205,6 +225,8 @@ let _ocLayer = null, _monitLayer = null;
 let _ucGeojson = null, _ucLayer = null, _ucAtivo = false, _ucLabels = true, _ucOpacity = 0.4;
 let _tiGeojson = null, _tiLayer = null, _tiAtivo = false;
 let _munGeojson = null, _munLayer = null, _munAtivo = false;
+let _acreGeojson = null, _acreLayers = [], _acreAtivo = true;
+let _acreEstilo = { cor:'#1F4E2C', espessura:4, opacidade:1, dashArray:'none', sombraCor:'#000000', sombraBlur:14, sombraOpacidade:0.55, sombraOffset:3 };
 let _carLayer = null, _carFeatures = [], _carCarregado = false, _carCarregando = false;
 let _carAbertoCod = null;
 const SUBBACIA_PALETTE = ['#16a34a','#2563eb','#d97706','#7c3aed','#0891b2','#dc2626','#65a30d','#db2777','#ea580c'];
@@ -225,7 +247,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   setTimeout(async () => {
     iniciarMapa();
-    await Promise.all([carregarCamadas(), carregarOcorrencias()]);
+    await Promise.all([carregarCamadas(), carregarOcorrencias(), carregarDelimitacaoAcre()]);
     vincularEventos();
     initScrollbarCustom();
     carregarLogosSidebar();
@@ -254,6 +276,7 @@ function renderPagina(){
         <button class="mlb-tab" id="mlb-btn-uc"  onclick="toggleLayerBar('uc')">🌿 Unidades de Conservação <span class="mlb-badge" id="uc-count-badge" style="display:none">0</span></button>
         <button class="mlb-tab" id="mlb-btn-ti"  onclick="toggleLayerBar('ti')">🪶 Terras Indígenas <span class="mlb-badge" id="ti-count-badge" style="display:none">0</span></button>
         <button class="mlb-tab" id="mlb-btn-mun" onclick="toggleLayerBar('mun')">🏙 Municípios</button>
+        <button class="mlb-tab" id="mlb-btn-acre" onclick="toggleLayerBar('acre')">🗺 Delimitação do Acre</button>
       </div>
       <div class="mlb-dropdown" id="mlb-dropdown" style="display:none"></div>
     </div>
@@ -261,6 +284,79 @@ function renderPagina(){
     <div class="mapa-container">
       <!-- MAPA -->
       <div id="mapa" style="position:relative">
+
+        <!-- Editor de delimitação do Acre -->
+        <div id="acre-editor" class="visivel">
+          <div class="acre-ed-header" id="acre-ed-drag">
+            <span class="acre-ed-titulo">🗺 Delimitação do Acre</span>
+            <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:10px;color:rgba(255,255,255,.75)">
+              <input type="checkbox" id="acre-ativo" checked style="accent-color:#F4D35E;width:12px;height:12px;cursor:pointer" onchange="acreToggle(this.checked)"> Visível
+            </label>
+            <button onclick="document.getElementById('acre-editor').classList.remove('visivel')" style="background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:5px;padding:2px 7px;cursor:pointer;font-size:11px;margin-left:4px">✕</button>
+          </div>
+          <div class="acre-ed-body">
+            <!-- Cor da borda -->
+            <div class="acre-ed-row">
+              <span class="acre-ed-lbl">Cor da borda</span>
+              <input type="color" class="acre-ed-color" id="acre-cor" value="#1F4E2C" oninput="acreAplicar()">
+              <span style="font-size:10px;color:var(--cinza-500);flex:1" id="acre-cor-hex">#1F4E2C</span>
+            </div>
+            <!-- Espessura -->
+            <div class="acre-ed-row">
+              <span class="acre-ed-lbl">Espessura</span>
+              <input type="range" class="acre-ed-slider" id="acre-esp" min="1" max="20" value="4" oninput="acreAplicar();document.getElementById('acre-esp-val').textContent=this.value+'px'">
+              <span class="acre-ed-val" id="acre-esp-val">4px</span>
+            </div>
+            <!-- Estilo da linha -->
+            <div class="acre-ed-row">
+              <span class="acre-ed-lbl">Estilo</span>
+              <select class="acre-ed-select" id="acre-dash" onchange="acreAplicar()">
+                <option value="none">Sólido ——</option>
+                <option value="8,6">Tracejado - - -</option>
+                <option value="2,6">Pontilhado · · ·</option>
+                <option value="12,4,4,4">Traço-Ponto -.-.·</option>
+              </select>
+            </div>
+            <!-- Opacidade da borda -->
+            <div class="acre-ed-row">
+              <span class="acre-ed-lbl">Opacidade</span>
+              <input type="range" class="acre-ed-slider" id="acre-op" min="0" max="100" value="100" oninput="acreAplicar();document.getElementById('acre-op-val').textContent=this.value+'%'">
+              <span class="acre-ed-val" id="acre-op-val">100%</span>
+            </div>
+            <div style="border-top:1px solid var(--borda);margin:2px 0;padding-top:8px">
+              <div style="font-size:10px;font-weight:700;color:var(--cinza-500);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Sombra / Brilho</div>
+              <!-- Cor da sombra -->
+              <div class="acre-ed-row">
+                <span class="acre-ed-lbl">Cor</span>
+                <input type="color" class="acre-ed-color" id="acre-sombra-cor" value="#000000" oninput="acreAplicar()">
+                <span style="font-size:10px;color:var(--cinza-500);flex:1" id="acre-scor-hex">#000000</span>
+              </div>
+              <!-- Blur da sombra -->
+              <div class="acre-ed-row" style="margin-top:6px">
+                <span class="acre-ed-lbl">Blur</span>
+                <input type="range" class="acre-ed-slider" id="acre-blur" min="0" max="40" value="14" oninput="acreAplicar();document.getElementById('acre-blur-val').textContent=this.value+'px'">
+                <span class="acre-ed-val" id="acre-blur-val">14px</span>
+              </div>
+              <!-- Opacidade da sombra -->
+              <div class="acre-ed-row">
+                <span class="acre-ed-lbl">Intensidade</span>
+                <input type="range" class="acre-ed-slider" id="acre-sop" min="0" max="100" value="55" oninput="acreAplicar();document.getElementById('acre-sop-val').textContent=this.value+'%'">
+                <span class="acre-ed-val" id="acre-sop-val">55%</span>
+              </div>
+              <!-- Offset da sombra -->
+              <div class="acre-ed-row">
+                <span class="acre-ed-lbl">Deslocamento</span>
+                <input type="range" class="acre-ed-slider" id="acre-soff" min="0" max="20" value="3" oninput="acreAplicar();document.getElementById('acre-soff-val').textContent=this.value+'px'">
+                <span class="acre-ed-val" id="acre-soff-val">3px</span>
+              </div>
+            </div>
+          </div>
+          <div class="acre-ed-footer">
+            <button class="btn-acre-reset" onclick="acreReset()">↺ Padrão</button>
+            <button class="btn-acre-apply" onclick="acreSalvar()">💾 Salvar</button>
+          </div>
+        </div>
+
         <div id="uc-stats-card">
           <div class="usc-header"><div><div class="usc-header-titulo">UCs do Acre</div><div class="usc-header-sub" id="usc-sub">Carregando...</div></div>
           <button onclick="document.getElementById('uc-stats-card').classList.remove('visivel')" style="background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:6px;padding:2px 8px;cursor:pointer;font-size:12px">✕</button></div>
@@ -486,6 +582,20 @@ function _renderDropdown(id){
       Exibir limites municipais</label>
       <p style="font-size:11px;color:var(--cinza-500);margin:5px 0 0">22 municípios do Acre.</p>
     </div>
+  ` + foot;
+  if(id==='acre') return hdr('🗺 Delimitação do Estado do Acre') + `
+    <div style="display:flex;align-items:flex-start;gap:10px;padding:4px 0 10px">
+      <div style="width:36px;height:36px;border-radius:8px;background:#f0fdf4;border:2px solid #1F4E2C;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:18px">🗺</div>
+      <div>
+        <div style="font-size:12px;font-weight:600;color:var(--cinza-800)">Limite estadual do Acre</div>
+        <div style="font-size:11px;color:var(--cinza-500);margin-top:2px">Fonte: IBGE · Malha estadual oficial. Borda espessa com sombra configurável.</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-sm btn-primary" style="flex:1" onclick="toggleLayerBar('acre');document.getElementById('acre-editor').classList.add('visivel')">⚙ Abrir Editor</button>
+      <button class="btn btn-sm btn-secondary" onclick="acreReset();toggleLayerBar('acre')">↺ Padrão</button>
+    </div>
+    <div style="font-size:10px;color:var(--cinza-400);margin-top:8px;text-align:center">O painel editor flutua sobre o mapa e pode ser arrastado</div>
   ` + foot;
   return '<div style="padding:16px;color:var(--cinza-500)">Em desenvolvimento</div>';
 }
@@ -730,6 +840,167 @@ var _ucPickerEl=null, _ucPickerNome=null;
 function ucAbrirColorPicker(nome,el){
   if(!_ucPickerEl){ _ucPickerEl=document.createElement('input'); _ucPickerEl.type='color'; _ucPickerEl.style.cssText='position:fixed;opacity:0;width:0;height:0;pointer-events:none'; document.body.appendChild(_ucPickerEl); _ucPickerEl.addEventListener('input',e=>{ if(_ucPickerNome){ _ucCoresLS[_ucPickerNome]=e.target.value; try{localStorage.setItem('siguc_uc_cores',JSON.stringify(_ucCoresLS));}catch(x){} const sw=document.querySelector('[data-ucsw="'+_ucPickerNome+'"]'); if(sw)sw.style.background=e.target.value; if(_ucLayer)_ucLayer.eachLayer(l=>{ if(l.feature?.properties?.nome===_ucPickerNome)l.setStyle({color:e.target.value,fillColor:e.target.value}); }); } }); }
   _ucPickerNome=nome; _ucPickerEl.value=(_ucCoresLS[nome]||'#059669'); _ucPickerEl.click();
+}
+
+// ══════════════════════════════════════════════════════════════
+// DELIMITAÇÃO DO ESTADO DO ACRE
+// Fonte: IBGE Malhas https://servicodados.ibge.gov.br/api/v3/malhas/estados/12
+// ══════════════════════════════════════════════════════════════
+
+async function carregarDelimitacaoAcre(){
+  // Recupera estilo salvo no localStorage
+  try{ const s=localStorage.getItem('siguc_acre_estilo'); if(s) _acreEstilo={..._acreEstilo,...JSON.parse(s)}; }catch(e){}
+  _sincronizarEditor();
+
+  try{
+    const r = await fetch('https://servicodados.ibge.gov.br/api/v3/malhas/estados/12?formato=application/vnd.geo+json&resolucao=2');
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    _acreGeojson = await r.json();
+  }catch(e){
+    // Fallback: tenta o GeoJSON local de municípios como approximação
+    if(!_munGeojson){ try{ const r2=await fetch('../data/municipios_acre.geojson'); _munGeojson=await r2.json(); }catch(e2){} }
+    _acreGeojson = _munGeojson;
+  }
+  _renderizarAcre();
+  _iniciarDragEditor();
+}
+
+function _renderizarAcre(){
+  // Remove camadas anteriores
+  _acreLayers.forEach(l=>{ try{ mapaL.removeLayer(l); }catch(e){} });
+  _acreLayers = [];
+  if(!_acreGeojson || !_acreAtivo) return;
+
+  const e = _acreEstilo;
+  const dash = e.dashArray === 'none' ? null : e.dashArray;
+
+  // ── Camada 1: sombra (stroke mais espesso, cor da sombra, sem fill) ────────
+  if(e.sombraBlur > 0 || e.sombraOffset > 0){
+    const shadowLayer = L.geoJSON(_acreGeojson, {
+      style: {
+        color: e.sombraCor,
+        weight: e.espessura + e.sombraBlur * 0.6,
+        opacity: e.sombraOpacidade,
+        fillOpacity: 0,
+        dashArray: dash,
+        lineCap: 'round',
+        lineJoin: 'round',
+      }
+    });
+    shadowLayer.addTo(mapaL);
+    // Drop-shadow via CSS no pane SVG
+    _aplicarFiltroPaneSombra(shadowLayer, e);
+    _acreLayers.push(shadowLayer);
+  }
+
+  // ── Camada 2: borda principal ─────────────────────────────────────────────
+  const borderLayer = L.geoJSON(_acreGeojson, {
+    style: {
+      color: e.cor,
+      weight: e.espessura,
+      opacity: e.opacidade,
+      fillOpacity: 0,
+      dashArray: dash,
+      lineCap: 'round',
+      lineJoin: 'round',
+    }
+  });
+  borderLayer.addTo(mapaL);
+  _acreLayers.push(borderLayer);
+}
+
+function _aplicarFiltroPaneSombra(layer, e){
+  // Aplica drop-shadow CSS no container SVG da camada
+  requestAnimationFrame(() => {
+    layer.eachLayer(l => {
+      const el = l.getElement ? l.getElement() : null;
+      if(el){
+        const blur = e.sombraBlur;
+        const off  = e.sombraOffset;
+        const op   = e.sombraOpacidade;
+        const cor  = _hexParaRgba(e.sombraCor, op);
+        el.style.filter = `drop-shadow(${off}px ${off}px ${blur}px ${cor}) drop-shadow(-${off/2}px -${off/2}px ${blur}px ${cor})`;
+      }
+    });
+    // fallback: aplica no pane inteiro
+    const pane = mapaL.getPane('overlayPane');
+    if(pane && _acreLayers.length > 0){
+      // Não aplica no pane inteiro para não afetar outras camadas
+    }
+  });
+}
+
+function _hexParaRgba(hex, opacity){
+  const r=parseInt(hex.slice(1,3),16), g=parseInt(hex.slice(3,5),16), b=parseInt(hex.slice(5,7),16);
+  return `rgba(${r},${g},${b},${opacity})`;
+}
+
+function acreToggle(ativo){
+  _acreAtivo = ativo;
+  _renderizarAcre();
+}
+
+function acreAplicar(){
+  const e = _acreEstilo;
+  e.cor            = document.getElementById('acre-cor').value;
+  e.espessura      = parseInt(document.getElementById('acre-esp').value);
+  e.opacidade      = parseInt(document.getElementById('acre-op').value) / 100;
+  e.dashArray      = document.getElementById('acre-dash').value;
+  e.sombraCor      = document.getElementById('acre-sombra-cor').value;
+  e.sombraBlur     = parseInt(document.getElementById('acre-blur').value);
+  e.sombraOpacidade= parseInt(document.getElementById('acre-sop').value) / 100;
+  e.sombraOffset   = parseInt(document.getElementById('acre-soff').value);
+  // Atualizar hex labels
+  document.getElementById('acre-cor-hex').textContent  = e.cor;
+  document.getElementById('acre-scor-hex').textContent = e.sombraCor;
+  _renderizarAcre();
+}
+
+function acreSalvar(){
+  try{ localStorage.setItem('siguc_acre_estilo', JSON.stringify(_acreEstilo)); }catch(e){}
+  toast('Estilo da delimitação salvo!','success');
+}
+
+function acreReset(){
+  _acreEstilo = { cor:'#1F4E2C', espessura:4, opacidade:1, dashArray:'none', sombraCor:'#000000', sombraBlur:14, sombraOpacidade:0.55, sombraOffset:3 };
+  try{ localStorage.removeItem('siguc_acre_estilo'); }catch(e){}
+  _sincronizarEditor();
+  _renderizarAcre();
+}
+
+function _sincronizarEditor(){
+  const e = _acreEstilo;
+  const get = id => document.getElementById(id);
+  if(!get('acre-cor')) return; // Editor ainda não renderizado
+  get('acre-cor').value   = e.cor;
+  get('acre-esp').value   = e.espessura;    if(get('acre-esp-val'))  get('acre-esp-val').textContent  = e.espessura+'px';
+  get('acre-op').value    = Math.round(e.opacidade*100); if(get('acre-op-val'))   get('acre-op-val').textContent   = Math.round(e.opacidade*100)+'%';
+  get('acre-dash').value  = e.dashArray;
+  get('acre-sombra-cor').value = e.sombraCor;
+  get('acre-blur').value  = e.sombraBlur;   if(get('acre-blur-val')) get('acre-blur-val').textContent = e.sombraBlur+'px';
+  get('acre-sop').value   = Math.round(e.sombraOpacidade*100); if(get('acre-sop-val'))  get('acre-sop-val').textContent  = Math.round(e.sombraOpacidade*100)+'%';
+  get('acre-soff').value  = e.sombraOffset; if(get('acre-soff-val')) get('acre-soff-val').textContent = e.sombraOffset+'px';
+  if(get('acre-cor-hex'))  get('acre-cor-hex').textContent  = e.cor;
+  if(get('acre-scor-hex')) get('acre-scor-hex').textContent = e.sombraCor;
+}
+
+function _iniciarDragEditor(){
+  const card  = document.getElementById('acre-editor');
+  const handle= document.getElementById('acre-ed-drag');
+  if(!card || !handle) return;
+  let drag=false, ox=0, oy=0, startX=0, startY=0;
+  handle.addEventListener('mousedown', e => {
+    drag=true; startX=e.clientX; startY=e.clientY;
+    const rect=card.getBoundingClientRect(); ox=rect.left; oy=rect.top;
+    card.style.cursor='grabbing'; e.preventDefault();
+  });
+  document.addEventListener('mousemove', e => {
+    if(!drag) return;
+    const nx = ox + (e.clientX - startX), ny = oy + (e.clientY - startY);
+    card.style.left=Math.max(0,nx)+'px'; card.style.top=Math.max(0,ny)+'px';
+    card.style.right='auto'; card.style.bottom='auto';
+  });
+  document.addEventListener('mouseup', () => { drag=false; card.style.cursor=''; });
 }
 
 // ══════════════════════════════════════════════════════════════
