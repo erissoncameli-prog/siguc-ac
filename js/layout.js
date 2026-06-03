@@ -164,6 +164,80 @@ function toggleSidebarMobile() {
 }
 
 async function fazerLogout() {
+  const u = appState.usuario;
+  if (u) {
+    try { await db.rpc('registrar_saida_acesso', { p_usuario_id: u.id, p_email: u.email, p_tipo: 'logout' }) } catch {}
+  }
   await db.auth.signOut();
   window.location.href = '../index.html';
 }
+
+// ── Guard de inatividade de sessão ────────────────────────────
+
+const SessionGuard = {
+  _timer: null,
+  _avisoTimer: null,
+  _avisoEl: null,
+  _usuario: null,
+  _LIMITE_MS:  30 * 60 * 1000,
+  _AVISO_MS:   25 * 60 * 1000,
+
+  init(usuario) {
+    this._usuario = usuario;
+    this._montarAviso();
+    this._resetar();
+    ['mousemove','mousedown','keydown','scroll','touchstart','click'].forEach(ev =>
+      document.addEventListener(ev, () => this._resetar(), { passive: true })
+    );
+  },
+
+  _resetar() {
+    clearTimeout(this._timer);
+    clearTimeout(this._avisoTimer);
+    if (this._avisoEl) this._avisoEl.style.display = 'none';
+    this._avisoTimer = setTimeout(() => this._mostrarAviso(), this._AVISO_MS);
+    this._timer      = setTimeout(() => this._expirar(),      this._LIMITE_MS);
+  },
+
+  _montarAviso() {
+    if (document.getElementById('session-aviso')) return;
+    const el = document.createElement('div');
+    el.id = 'session-aviso';
+    el.style.cssText = 'display:none;position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.55);align-items:center;justify-content:center;font-family:"DM Sans",sans-serif';
+    el.innerHTML = `
+      <div style="background:#fff;border-radius:16px;padding:32px 36px;max-width:360px;width:90%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+        <div style="width:48px;height:48px;border-radius:50%;background:#FEF3C7;display:flex;align-items:center;justify-content:center;margin:0 auto 16px">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#D97706" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        </div>
+        <div style="font-size:16px;font-weight:700;color:#111827;margin-bottom:8px">Sessão prestes a expirar</div>
+        <div style="font-size:13px;color:#6B7280;margin-bottom:24px">Por inatividade, sua sessão será encerrada em <strong id="session-countdown">5:00</strong>.</div>
+        <button onclick="SessionGuard._resetar()" style="width:100%;height:44px;background:#1F4E2C;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer">
+          Continuar conectado
+        </button>
+      </div>`;
+    document.body.appendChild(el);
+    this._avisoEl = el;
+  },
+
+  _mostrarAviso() {
+    if (!this._avisoEl) return;
+    this._avisoEl.style.display = 'flex';
+    let restante = (this._LIMITE_MS - this._AVISO_MS) / 1000;
+    const ct = document.getElementById('session-countdown');
+    const tick = setInterval(() => {
+      restante--;
+      if (!ct || restante <= 0) { clearInterval(tick); return; }
+      const m = Math.floor(restante / 60), s = String(restante % 60).padStart(2, '0');
+      ct.textContent = `${m}:${s}`;
+    }, 1000);
+  },
+
+  async _expirar() {
+    const u = this._usuario;
+    if (u) {
+      try { await db.rpc('registrar_saida_acesso', { p_usuario_id: u.id, p_email: u.email, p_tipo: 'sessao_expirada' }) } catch {}
+    }
+    await db.auth.signOut();
+    window.location.href = '../index.html?motivo=inatividade';
+  }
+};

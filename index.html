@@ -177,6 +177,9 @@ body{font-family:var(--ff-ui);min-height:100vh;display:flex;overflow:hidden;back
     </div>
 
     <div class="erro-msg" id="erro-msg"></div>
+    <div id="aviso-inatividade" style="display:none;background:rgba(217,119,6,.09);border:1px solid rgba(217,119,6,.35);color:#92400E;border-radius:7px;padding:10px 13px;font-size:11.5px;margin-bottom:18px;line-height:1.5">
+      Sua sessão foi encerrada por inatividade. Faça login novamente.
+    </div>
 
     <div class="form-group">
       <label class="form-label">E-mail</label>
@@ -207,7 +210,9 @@ const SUPABASE_URL = 'https://atqtybcsvepdabsvgaly.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF0cXR5YmNzdmVwZGFic3ZnYWx5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0MjMzNzgsImV4cCI6MjA5NTk5OTM3OH0.hWx1AB2rK7xdco1Dgagm0XUOBPQbxZVE614SW4SKoLk';
 const { createClient } = supabase;
 Observability.init();
-const db = createInstrumentedDb(createClient(SUPABASE_URL, SUPABASE_KEY));
+const db = createInstrumentedDb(createClient(SUPABASE_URL, SUPABASE_KEY, {
+  auth: { storage: window.sessionStorage, persistSession: true, autoRefreshToken: true, detectSessionInUrl: false }
+}));
 
 let TOTAL = 5, slideAtual = 0, timer;
 const dotsEl = document.getElementById('slide-dots');
@@ -311,6 +316,10 @@ async function fazerLogin() {
 }
 document.getElementById('inp-senha').addEventListener('keydown', e => { if (e.key === 'Enter') fazerLogin(); });
 document.getElementById('inp-email').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('inp-senha').focus(); });
+
+if (new URLSearchParams(window.location.search).get('motivo') === 'inatividade') {
+  document.getElementById('aviso-inatividade').style.display = 'block';
+}
 
 (async () => {
   const { data: { session } } = await db.auth.getSession();

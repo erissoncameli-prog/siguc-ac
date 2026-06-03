@@ -6,8 +6,10 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 Observability.init();
 
 const { createClient } = supabase;
-// db instrumentado para logar tempo de queries (Regra 5)
-const db = createInstrumentedDb(createClient(SUPABASE_URL, SUPABASE_ANON_KEY));
+// sessionStorage: sessão encerra ao fechar o navegador (Regra de segurança)
+const db = createInstrumentedDb(createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: { storage: window.sessionStorage, persistSession: true, autoRefreshToken: true, detectSessionInUrl: false }
+}));
 
 // ── Estado global ─────────────────────────────────────────────
 const appState = { usuario: null, perfil: null };
@@ -98,6 +100,7 @@ async function carregarUsuario() {
   if (!u || !u.ativo) { await db.auth.signOut(); return null; }
   appState.usuario = u;
   appState.perfil = u.perfil;
+  if (window.SessionGuard) SessionGuard.init(u);
   return u;
 }
 
