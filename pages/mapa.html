@@ -403,6 +403,37 @@ function renderPagina(){
             </div>
           </div>
 
+          <!-- Zonas de Manejo das UCs -->
+          <div class="filtro-bloco">
+            <div class="filtro-bloco-header" onclick="toggleBloco('bloco-zonas')">
+              <h4>🗂 Zonas de Manejo</h4>
+              <span id="zonas-count-badge" style="font-size:10px;color:var(--cinza-400)"></span>
+              <span style="font-size:11px;color:var(--cinza-300)">▾</span>
+            </div>
+            <div class="filtro-bloco-body" id="bloco-zonas">
+              <label style="display:flex;align-items:center;gap:7px;font-size:12px;font-weight:600;cursor:pointer;margin-bottom:8px">
+                <input type="checkbox" id="zonas-toggle" style="accent-color:#1F4E2C;width:13px;height:13px" onchange="toggleZonas(this.checked)">
+                Exibir zonas de manejo
+              </label>
+              <div id="zonas-loading" style="display:none;align-items:center;gap:6px;font-size:11px;color:var(--cinza-500);padding:2px 0 6px"><div class="spinner" style="width:12px;height:12px"></div> Carregando...</div>
+              <div id="zonas-controles" style="display:none">
+                <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+                  <span style="font-size:10px;color:var(--cinza-600);flex-shrink:0">Opacidade:</span>
+                  <input type="range" id="zonas-opacity" min="0" max="100" value="55" style="flex:1;accent-color:#1F4E2C" oninput="zonasAlterarOpacidade(this.value)">
+                  <span style="font-size:10px;color:var(--cinza-600);width:24px" id="zonas-opacity-val">55%</span>
+                </div>
+                <div style="margin-bottom:6px">
+                  <select id="zonas-sel-uc" style="width:100%;font-size:11px;padding:3px 6px;border:1px solid var(--borda);border-radius:var(--raio);font-family:inherit" onchange="zonasFiltrarUC(this.value)">
+                    <option value="todas">Todas as UCs</option>
+                  </select>
+                </div>
+                <div style="font-size:10px;font-weight:700;color:var(--cinza-500);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">Tipo de zona:</div>
+                <div id="zonas-tipos-lista" style="display:flex;flex-direction:column;gap:3px"></div>
+              </div>
+              <div id="zonas-stat" style="font-size:10px;color:var(--cinza-400);margin-top:6px"></div>
+            </div>
+          </div>
+
           <!-- Camadas personalizadas -->
           <div class="filtro-bloco">
             <div class="filtro-bloco-header" onclick="toggleBloco('bloco-camadas')">
