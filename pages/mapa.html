@@ -806,7 +806,8 @@ function _renderizarUC(){
     onEachFeature: (f,layer) => {
       const p=f.properties; const cor=_ucCorNome(p.nome,p.cor);
       const gid=_ucGrupoId(p.grupo); const corG=gid==='pi'?'#dc2626':'#2563eb'; const lblG=gid==='pi'?'Proteção Integral':'Uso Sustentável';
-      const ha=p.area_ha?Number(p.area_ha).toLocaleString('pt-BR',{maximumFractionDigits:0}):'';
+      const _areaHa=Number(p.area_ha)||Number(det.area_ha)||0;
+      const ha=_areaHa?_areaHa.toLocaleString('pt-BR',{maximumFractionDigits:0}):'';
       if(_ucLabels&&p.centro_lon&&p.centro_lat){
         const tt=L.tooltip({permanent:true,direction:'center',className:'uc-label-tt',interactive:false});
         tt.setContent(`<span style="color:${cor}">${escHtml(p.sigla||'')}</span> ${escHtml(p.nome||'')}`);
