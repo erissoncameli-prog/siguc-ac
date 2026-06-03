@@ -814,10 +814,11 @@ async function toggleUC(ativo){
   else _renderizarUC();
   if(ativo) document.getElementById('uc-stats-card').classList.add('visivel');
   else document.getElementById('uc-stats-card').classList.remove('visivel');
+  _atualizarLegendaMapa();
 }
 function ucToggleLabels(v){ _ucLabels=v; _renderizarUC(); }
 function ucAlterarOpacidade(v){ _ucOpacity=v/100; document.getElementById('uc-opacity-val').textContent=v+'%'; _renderizarUC(); }
-function filtrarUC(){ _renderizarUC(); }
+function filtrarUC(){ _renderizarUC(); _atualizarLegendaMapa(); }
 
 let _ucDetalhes = {};
 async function _carregarUC(){
