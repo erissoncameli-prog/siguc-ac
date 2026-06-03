@@ -373,7 +373,7 @@ function renderArvore(lista) {
       <div class="tree-uc">
         <div class="tree-uc-header" id="${ucId}-h" onclick="toggleUC('${ucId}')">
           <svg class="tree-uc-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-          <span class="tree-uc-icone">🌿</span>
+          ${(() => { const det = uc ? (Object.values(_detalhes).find(d => d.nome_full && uc.nome && d.nome_full.includes(uc.nome.replace(/^(Parque Estadual|APA|ARIE|Floresta Estadual d[oa]?) /,''))) || Object.entries(_detalhes).find(([k]) => uc.nome && uc.nome.includes(k))?.[1]) : null; return det?.logo_url ? `<img src="${det.logo_url}" style="width:36px;height:36px;object-fit:contain;border-radius:4px;flex-shrink:0" onerror="this.style.display='none';this.nextSibling.style.display='inline'"><span class="tree-uc-icone" style="display:none">🌿</span>` : '<span class="tree-uc-icone">🌿</span>'; })()}
           <span class="tree-uc-nome">${nome}</span>
           ${codigo ? `<span class="tree-uc-codigo">${codigo}</span>` : ''}
           <span class="tree-uc-badge">${docs.length} doc${docs.length !== 1 ? 's' : ''}</span>
