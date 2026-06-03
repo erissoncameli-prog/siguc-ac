@@ -61,10 +61,10 @@ def main():
                         help="Mostra todas as UCs, incluindo as OK")
     args = parser.parse_args()
 
-    # ── Carregar arquivos ─────────────────────────────────────────
-    with open(GEO_PATH, encoding="utf-8") as f:
+    # ── Carregar arquivos (utf-8-sig suporta BOM e sem BOM) ───────
+    with open(GEO_PATH, encoding="utf-8-sig") as f:
         geojson = json.load(f)
-    with open(DET_PATH, encoding="utf-8") as f:
+    with open(DET_PATH, encoding="utf-8-sig") as f:
         detalhes_raw = json.load(f)
 
     # Remover _meta
