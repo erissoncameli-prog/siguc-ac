@@ -12,10 +12,17 @@
 ;(function() {
   const bar = document.createElement('div');
   bar.id = 'siguc-progress-bar';
-  document.body.appendChild(bar);
-  requestAnimationFrame(() => requestAnimationFrame(() => { bar.style.width = '42%'; }));
-  setTimeout(() => { bar.style.width = '72%'; }, 460);
-  window._sigucBar = bar;
+  function _mountBar() {
+    if (document.body) {
+      document.body.appendChild(bar);
+      requestAnimationFrame(() => requestAnimationFrame(() => { bar.style.width = '42%'; }));
+      setTimeout(() => { bar.style.width = '72%'; }, 460);
+      window._sigucBar = bar;
+    } else {
+      document.addEventListener('DOMContentLoaded', _mountBar, { once: true });
+    }
+  }
+  _mountBar();
 })();
 
 function _sigucBarCompleta() {
