@@ -73,18 +73,18 @@ UC_ARQUIVO_UNICO = {
     'Parque Estadual Chandless': {
         'shp':        os.path.join('DADOS RENOMEADOS', 'zoneamento5.shp'),
         'campo_tipo': 'Tipo_Zonea',
-        'uc_nome':    'Parque Estadual Chandless',
+        'uc_nome':    'Chandles',   # nome exato de uc_acre.geojson
     },
 }
 
-# Mapeamento de pasta → nome oficial da UC (para UCs com arquivos separados por zona)
+# Mapeamento de pasta → nome exato usado em uc_acre.geojson
 UC_NOMES = {
-    '1_Floresta_Estadual_Rio_Gregorio':  'Floresta Estadual do Rio Gregório',
-    '2_Floresta_Estadual_Mogno':         'Floresta Estadual do Mogno',
-    '3_Floresta_Estadual_Rio_Liberdade': 'Floresta Estadual do Rio Liberdade',
-    'Apa_LagodoAmapa':                   'APA Lago do Amapá',
-    'APA_Sao_Francisco':                 'APA São Francisco',
-    'Plano_Gestor_Antimary':             'Floresta Estadual do Antimary',
+    '1_Floresta_Estadual_Rio_Gregorio':  'Rio Gregório',
+    '2_Floresta_Estadual_Mogno':         'Mogno',
+    '3_Floresta_Estadual_Rio_Liberdade': 'Rio Liberdade',
+    'Apa_LagodoAmapa':                   'Lago do Amapá',
+    'APA_Sao_Francisco':                 'São Francisco',
+    'Plano_Gestor_Antimary':             'Antimary',
     'UGAIs':                             'UGAIs',
 }
 
