@@ -105,7 +105,7 @@ async function carregarUCsOpcoes() {
 let _dados = []
 async function carregar() {
   const { data, error } = await db.from('usuarios')
-    .select('*,unidades_conservacao(nome,codigo)')
+    .select('*,unidades_conservacao!fk_usuarios_uc(nome,codigo)')
     .order('nome_completo')
   if (error) {
     console.error('Erro ao carregar usuários:', error)
