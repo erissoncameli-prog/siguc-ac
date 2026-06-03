@@ -1183,6 +1183,8 @@ async function _carregarZonas(){
     return;
   }
   if(loadEl) loadEl.style.display = 'none';
+  const ctrl = document.getElementById('zonas-controles');
+  if(ctrl) ctrl.style.display = '';
   _zonasConstruirPainel();
   _renderizarZonas();
 }
