@@ -1004,7 +1004,8 @@ function _ucStatsAtualizar(filteredFeats){
         const esf=(f.properties.esfera||'outro').toLowerCase();
         if(!byEsfera[esf]) byEsfera[esf]={count:0,area:0};
         byEsfera[esf].count++;
-        byEsfera[esf].area += parseFloat(f.properties.area_ha)||0;
+        const det=_ucDetalhes[f.properties?.nome]||{};
+        byEsfera[esf].area += parseFloat(det.area_ha)||parseFloat(f.properties.area_ha)||0;
       });
       const maxArea = Math.max(...Object.values(byEsfera).map(v=>v.area),1);
       esfEl.style.display='';
