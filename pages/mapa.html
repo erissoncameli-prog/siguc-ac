@@ -509,7 +509,8 @@ function toggleLayerBar(id){
   if(_layerBarAtiva === id){ dd.style.display='none'; _layerBarAtiva=null; document.querySelectorAll('.mlb-tab').forEach(t=>t.classList.remove('ativo')); return; }
   _layerBarAtiva = id;
   document.querySelectorAll('.mlb-tab').forEach(t => t.classList.toggle('ativo', t.id==='mlb-btn-'+id));
-  dd.innerHTML = _renderDropdown(id);
+  // Não re-renderizar UC se o GeoJSON já foi carregado — preserva o estado do painel
+  if(!(id === 'uc' && _ucGeojson)) dd.innerHTML = _renderDropdown(id);
   dd.style.display = '';
 }
 document.addEventListener('click', e => {
