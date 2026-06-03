@@ -1710,18 +1710,7 @@ function onMapaClick(e){
 }
 function vincularEventos(){
   document.addEventListener('keydown', e => { if(e.key==='Escape') fecharDetalhesCAR(); });
-
-  // Popup de UC: preenche / atualiza seção de zonas sempre que o popup abre
-  mapaL.on('popupopen', e => {
-    const el = e.popup.getElement ? e.popup.getElement() : null;
-    if(!el) return;
-    const section = el.querySelector('.uc-zona-popup-section');
-    if(!section) return;
-    const ucNome = section.dataset.uc;
-    // Guarda UC ativa para os handlers sem parâmetro de string
-    window._popupUCAtual = ucNome;
-    _preencherZonaSection(section, ucNome);
-  });
+  // Nota: o preenchimento das zonas no popup é feito via popup.on('add') em _renderizarUC
 }
 
 // ── Helpers de zonas por UC ───────────────────────────────────────────────────
