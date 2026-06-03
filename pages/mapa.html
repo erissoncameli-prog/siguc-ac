@@ -215,6 +215,7 @@ function toggleCamadaVeg(id, ativo){
   const cfg = VEG_LAYERS[id]; if(!cfg) return;
   if(ativo){ const op = parseInt(document.getElementById('veg-'+id+'-opacity')?.value||70); cfg.layer=cfg.make(op); cfg.layer.addTo(mapaL); cfg.layer.setZIndex(150); }
   else { if(cfg.layer){ mapaL.removeLayer(cfg.layer); cfg.layer=null; } }
+  _atualizarLegendaMapa();
 }
 function atualizarOpacidadeVeg(id){
   const cfg = VEG_LAYERS[id]; if(!cfg?.layer) return;
