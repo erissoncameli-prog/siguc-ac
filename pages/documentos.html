@@ -230,6 +230,22 @@
 <body>
 <div id="app"></div>
 
+<!-- Viewer de documento -->
+<div class="doc-viewer-overlay" id="doc-viewer">
+  <div class="doc-viewer-box">
+    <div class="doc-viewer-header">
+      <span style="font-size:16px">📄</span>
+      <span class="doc-viewer-titulo" id="doc-viewer-titulo"></span>
+      <a id="doc-viewer-baixar" href="#" target="_blank" download class="tree-doc-baixar" style="margin-right:4px">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Baixar
+      </a>
+      <button class="doc-viewer-close" onclick="fecharViewer()">×</button>
+    </div>
+    <iframe class="doc-viewer-frame" id="doc-viewer-frame" src=""></iframe>
+  </div>
+</div>
+
 <div class="modal-overlay" id="modal">
   <div class="modal" style="max-width:640px">
     <div class="modal-header">
