@@ -528,6 +528,21 @@ function toggleTipo(id) {
   b.classList.toggle('aberto', !aberto)
 }
 
+function abrirViewer(titulo, url) {
+  document.getElementById('doc-viewer-titulo').textContent = titulo
+  document.getElementById('doc-viewer-frame').src = url
+  document.getElementById('doc-viewer-baixar').href = url
+  document.getElementById('doc-viewer').classList.add('aberto')
+}
+function fecharViewer() {
+  document.getElementById('doc-viewer').classList.remove('aberto')
+  document.getElementById('doc-viewer-frame').src = ''
+}
+// Fechar ao clicar fora
+document.addEventListener('click', e => {
+  if (e.target.id === 'doc-viewer') fecharViewer()
+})
+
 function abrirModal() { document.getElementById('modal').classList.add('aberto') }
 function fecharModal() { document.getElementById('modal').classList.remove('aberto') }
 
