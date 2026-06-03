@@ -749,6 +749,58 @@ function toggleCamada(id, vis){
   const c = camadas.find(x=>x.id===id); if(!c) return;
   c.visivel = vis;
   if(vis) _renderizarCamada(c); else { if(c.layer){ mapaL.removeLayer(c.layer); c.layer=null; } }
+  _atualizarLegendaMapa();
+}
+
+// ══════════════════════════════════════════════════════════════
+// LEGENDA CARTOGRÁFICA — atualiza dinamicamente conforme camadas
+// ══════════════════════════════════════════════════════════════
+function _atualizarLegendaMapa(){
+  if(typeof CART === 'undefined') return;
+  const itens = [];
+
+  // Unidades de Conservação
+  if(_ucAtivo && _ucGeojson){
+    const feats = _ucGeojson.features || [];
+    const temPI = feats.some(f => _ucGrupoId(f.properties?.grupo) === 'pi');
+    const temUS = feats.some(f => _ucGrupoId(f.properties?.grupo) === 'us');
+    if(temPI) itens.push({ simbolo:'rect', cor:'#059669', opacidade:_ucOpacity, label:'UC — Proteção Integral' });
+    if(temUS) itens.push({ simbolo:'rect', cor:'#3b82f6', opacidade:_ucOpacity, label:'UC — Uso Sustentável' });
+  }
+
+  // Terras Indígenas
+  if(_tiAtivo) itens.push({ simbolo:'rect', cor:'#f59e0b', opacidade:0.4, label:'Terras Indígenas' });
+
+  // Municípios
+  if(_munAtivo) itens.push({ simbolo:'rect', cor:'#6366f1', opacidade:0, somente_borda:true, label:'Municípios' });
+
+  // Delimitação do Acre
+  if(_acreAtivo) itens.push({ simbolo:'line', cor:_acreEstilo.cor, dash:_acreEstilo.dashArray!=='none', label:'Limite Estadual — Acre' });
+
+  // Ocorrências ativas
+  const sevAtivas = Array.from(document.querySelectorAll('[data-oc-sev]:checked')).map(e=>e.dataset.ocSev);
+  sevAtivas.forEach(s => {
+    const cor = OC_CORES[s]; if(!cor) return;
+    itens.push({ simbolo:'circle', cor, label:'Ocorrência — '+s.charAt(0).toUpperCase()+s.slice(1) });
+  });
+
+  // Zonas de Manejo
+  if(_zonasAtivo) itens.push({ simbolo:'rect', cor:'#7c3aed', opacidade:_zonasOpacity, dash:true, label:'Zonas de Manejo' });
+
+  // CAR
+  if(_carLayer) itens.push({ simbolo:'rect', cor:'#d97706', opacidade:0.15, label:'CAR — Imóveis Rurais' });
+
+  // Cobertura Vegetal
+  if(VEG_LAYERS.mapbiomas?.layer)  itens.push({ simbolo:'rect', cor:'#16a34a', opacidade:0.7, label:'MapBiomas Coleção 8' });
+  if(VEG_LAYERS.prodes?.layer)     itens.push({ simbolo:'rect', cor:'#dc2626', opacidade:0.7, label:'PRODES — Desmatamento' });
+  if(VEG_LAYERS.prodes_hist?.layer)itens.push({ simbolo:'rect', cor:'#b45309', opacidade:0.7, label:'PRODES — Acumulado' });
+
+  // Camadas personalizadas
+  camadas.filter(c=>c.visivel).forEach(c => {
+    itens.push({ simbolo:'rect', cor:c.cor, opacidade:0.4, dash:true, label:c.nome });
+  });
+
+  CART.legendaAtualizar(itens);
 }
 
 // ══════════════════════════════════════════════════════════════
