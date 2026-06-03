@@ -1113,66 +1113,74 @@ function _bboxUC(ucNome){
   }catch(e){ return null; }
 }
 
-// Monta URL do WFS — suporta WFS 1.1.0 e 2.0.0
-function _buildCarUrl(base, typeName, bbox, version='1.1.0'){
-  const bboxStr = version==='2.0.0'
-    ? `${bbox.minLng},${bbox.minLat},${bbox.maxLng},${bbox.maxLat}`
-    : `${bbox.minLng},${bbox.minLat},${bbox.maxLng},${bbox.maxLat},EPSG:4326`;
-  const typeParam = version==='2.0.0' ? 'typeNames' : 'typeName';
-  const params = new URLSearchParams({
-    service: 'WFS',
-    version,
-    request: 'GetFeature',
-    [typeParam]: typeName,
-    outputFormat: 'application/json',
-    srsName: 'EPSG:4326',
-    BBOX: bboxStr,
-    maxFeatures: String(CAR_PAGE),
-  });
-  return `${base}?${params.toString()}`;
+// Estratégias de BBOX para WFS — cada item é { bboxStr, srsName }
+// WFS 1.1.0 EPSG:4326 = lat-lon (Y,X) por spec OGC → minLat,minLon,maxLat,maxLon
+// CRS:84 / urn:CRS84  = lon-lat (X,Y) explícito   → minLon,minLat,maxLon,maxLat
+function _buildCarCandidates(base, typeName, bb){
+  const { minLng:x0, minLat:y0, maxLng:x1, maxLat:y1 } = bb;
+  return [
+    // CRS84 (lon-lat explícito) — mais compatível e sem ambiguidade
+    { url: `${base}?service=WFS&version=1.1.0&request=GetFeature&typeName=${typeName}&outputFormat=application%2Fjson&srsName=CRS%3A84&BBOX=${x0},${y0},${x1},${y1},CRS:84&maxFeatures=${CAR_PAGE}` },
+    // EPSG:4326 lon-lat (implementações lenientes — maioria dos GeoServers brasileiros)
+    { url: `${base}?service=WFS&version=1.1.0&request=GetFeature&typeName=${typeName}&outputFormat=application%2Fjson&srsName=EPSG%3A4326&BBOX=${x0},${y0},${x1},${y1},EPSG:4326&maxFeatures=${CAR_PAGE}` },
+    // EPSG:4326 lat-lon (spec OGC estrita — servidores que seguem a norma)
+    { url: `${base}?service=WFS&version=1.1.0&request=GetFeature&typeName=${typeName}&outputFormat=application%2Fjson&srsName=EPSG%3A4326&BBOX=${y0},${x0},${y1},${x1},EPSG:4326&maxFeatures=${CAR_PAGE}` },
+    // WFS 2.0.0 + CRS84
+    { url: `${base}?service=WFS&version=2.0.0&request=GetFeature&typeNames=${typeName}&outputFormat=application%2Fjson&srsName=CRS%3A84&BBOX=${x0},${y0},${x1},${y1}&count=${CAR_PAGE}` },
+    // Sem BBOX — tudo dentro do estado (fallback pesado, mas garante resultado)
+    { url: `${base}?service=WFS&version=1.1.0&request=GetFeature&typeName=${typeName}&outputFormat=application%2Fjson&srsName=CRS%3A84&BBOX=${-74},${-12},${-66},${-7},CRS:84&maxFeatures=${CAR_PAGE}` },
+  ];
 }
 
 async function _tentarFetchCAR(url){
-  const r = await fetch(url, { signal: AbortSignal.timeout(15000) });
+  const r = await fetch(url, { signal: AbortSignal.timeout(18000) });
   const txt = await r.text();
-  // Detecta resposta XML de erro (WFS Exception ou HTML)
   if(txt.trimStart().startsWith('<')){
-    // Extrai mensagem de erro do XML
     const match = txt.match(/<ows:ExceptionText[^>]*>([\s\S]*?)<\/ows:ExceptionText>/)
-                || txt.match(/<ServiceException[^>]*>([\s\S]*?)<\/ServiceException>/);
-    const msg = match ? match[1].trim().substring(0,200) : 'Resposta XML inválida do servidor';
-    throw new Error(msg);
+                || txt.match(/<ServiceException[^>]*>([\s\S]*?)<\/ServiceException>/)
+                || txt.match(/<Message>([\s\S]*?)<\/Message>/);
+    throw new Error(match ? match[1].trim().substring(0,200) : 'Servidor retornou XML em vez de JSON');
   }
-  return JSON.parse(txt);
+  const gj = JSON.parse(txt);
+  if(!gj.features) throw new Error('GeoJSON sem features');
+  return gj;
 }
 
 async function carregarDadosCAR(ucNome){
   if(ucNome==='todas'||!ucNome) return;
   if(_carCarregando) return;
   _carCarregando = true;
+
   const statusEl = document.getElementById('car-status-txt');
-  if(statusEl) statusEl.innerHTML = '⏳ Buscando imóveis CAR...';
+  const setStatus = html => { if(statusEl) statusEl.innerHTML = html; };
 
-  const bbox = _bboxUC(ucNome) || { minLng:-74, minLat:-12, maxLng:-66, maxLat:-7 };
+  // BBOX da UC — padding generoso para capturar imóveis no entorno
+  const rawBbox = _bboxUC(ucNome);
+  const bbox = rawBbox
+    ? { ...rawBbox, minLng: rawBbox.minLng-0.05, minLat: rawBbox.minLat-0.05, maxLng: rawBbox.maxLng+0.05, maxLat: rawBbox.maxLat+0.05 }
+    : { minLng:-74, minLat:-12, maxLng:-66, maxLat:-7 };
 
-  let sucesso = false;
-  let ultimoErro = '';
+  setStatus(`⏳ Buscando imóveis CAR para <strong>${escHtml(ucNome)}</strong>...`);
+  if(!rawBbox) setStatus(`⏳ UC não encontrada no GeoJSON — buscando no Acre inteiro...`);
 
-  // Tenta cada endpoint + layer name + versão WFS em sequência
+  let resultado = null;
+  let ultimoErro = 'Sem resposta';
+
+  // Tenta cada endpoint × cada estratégia de BBOX × cada typeName
   externo: for(const base of CAR_ENDPOINTS){
     for(const typeName of CAR_TYPE_NAMES){
-      for(const version of ['1.1.0','2.0.0']){
+      const candidatos = _buildCarCandidates(base, typeName, bbox);
+      for(let i=0; i<candidatos.length; i++){
+        const { url } = candidatos[i];
         try{
-          const url = _buildCarUrl(base, typeName, bbox, version);
-          if(statusEl) statusEl.innerHTML = `⏳ Tentando <code style="font-size:10px">${typeName}</code> (WFS ${version})...`;
+          setStatus(`⏳ Tentando estratégia ${i+1}/${candidatos.length} · <code style="font-size:9px">${typeName}</code>...`);
           const gj = await _tentarFetchCAR(url);
-          _carFeatures = gj.features || [];
-          _aplicarCamadaCAR();
-          if(statusEl) statusEl.textContent = `✅ ${_carFeatures.length} imóvel(is) carregado(s)`;
-          const badge = document.getElementById('car-count-badge');
-          if(badge){ badge.textContent=_carFeatures.length; badge.style.display=_carFeatures.length?'':'none'; }
-          sucesso = true;
-          break externo;
+          if(gj.features.length > 0){
+            resultado = gj;
+            break externo; // Achou features → para tudo
+          }
+          // 0 features → tenta próxima estratégia (pode ser ordem errada)
+          ultimoErro = `0 imóveis com estratégia ${i+1}`;
         }catch(e){
           ultimoErro = e.message;
         }
@@ -1180,23 +1188,29 @@ async function carregarDadosCAR(ucNome){
     }
   }
 
-  if(!sucesso){
-    // Última tentativa: proxy CORS público
+  // Fallback via proxy CORS público se todos os diretos falharam ou retornaram 0
+  if(!resultado){
     try{
-      const bboxStr=`${bbox.minLng},${bbox.minLat},${bbox.maxLng},${bbox.maxLat},EPSG:4326`;
-      const target = encodeURIComponent(`https://geoserver.car.gov.br/geoserver/sicar/wfs?service=WFS&version=1.1.0&request=GetFeature&typeName=sicar:sicar_imovel&outputFormat=application/json&srsName=EPSG:4326&BBOX=${bboxStr}&maxFeatures=${CAR_PAGE}`);
-      const gj = await _tentarFetchCAR(`https://corsproxy.io/?url=${target}`);
-      _carFeatures = gj.features || [];
-      _aplicarCamadaCAR();
-      if(statusEl) statusEl.textContent = `✅ ${_carFeatures.length} imóvel(is) (via proxy)`;
-      sucesso = true;
-    }catch(e2){
-      ultimoErro = e2.message;
-    }
+      setStatus('⏳ Tentando via proxy CORS...');
+      const bboxStr=`${bbox.minLng},${bbox.minLat},${bbox.maxLng},${bbox.maxLat},CRS:84`;
+      const apiUrl = `https://geoserver.car.gov.br/geoserver/sicar/wfs?service=WFS&version=1.1.0&request=GetFeature&typeName=sicar:sicar_imovel&outputFormat=application%2Fjson&srsName=CRS%3A84&BBOX=${bboxStr}&maxFeatures=${CAR_PAGE}`;
+      const gj = await _tentarFetchCAR(`https://corsproxy.io/?url=${encodeURIComponent(apiUrl)}`);
+      if(gj.features.length > 0) resultado = gj;
+      else ultimoErro = 'Proxy retornou 0 imóveis';
+    }catch(e2){ ultimoErro = e2.message; }
   }
 
-  if(!sucesso){
-    if(statusEl) statusEl.innerHTML = `⚠ CAR indisponível: <span style="font-size:10px;color:var(--cinza-500)">${escHtml(ultimoErro.substring(0,120))}</span>`;
+  if(resultado){
+    _carFeatures = resultado.features;
+    _aplicarCamadaCAR();
+    const n = _carFeatures.length;
+    setStatus(`✅ <strong>${n}</strong> imóvel(is) carregado(s)`);
+    const badge = document.getElementById('car-count-badge');
+    if(badge){ badge.textContent=n; badge.style.display=n?'':'none'; }
+    // Zoom para a área carregada
+    if(n>0 && mapaL){ try{ mapaL.fitBounds(_carLayer.getBounds(),{padding:[20,20]}); }catch(e){} }
+  }else{
+    setStatus(`⚠ Nenhum imóvel encontrado — ${escHtml(ultimoErro.substring(0,100))}`);
   }
 
   _carCarregando = false;
