@@ -941,6 +941,16 @@ function _renderizarUC(){
   _ucLayer.addTo(mapaL);
   const stat=document.getElementById('uc-stat'); if(stat) stat.textContent=count+' UC'+(count!==1?'s':'')+' exibida'+(count!==1?'s':'');
   const badge=document.getElementById('uc-count-badge'); if(badge){badge.textContent=count;badge.style.display=count?'':'none';}
+  // Coletar features visíveis para o stats card
+  const _filteredFeats=(_ucGeojson?.features||[]).filter(f=>{
+    const esf=(f.properties.esfera||'').toLowerCase();
+    if(esf==='federal'&&!esfFed) return false;
+    if(esf==='estadual'&&!esfEst) return false;
+    if(esf==='municipal'&&!esfMun) return false;
+    if(nomesAtivos.size>0&&!nomesAtivos.has(f.properties.nome)) return false;
+    return true;
+  });
+  _ucStatsAtualizar(_filteredFeats);
 }
 
 function _ucStatsAtualizar(filteredFeats){
