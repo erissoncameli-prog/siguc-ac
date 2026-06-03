@@ -88,19 +88,30 @@ async function carregarDados() {
   document.getElementById('kpi-oc').textContent = ocAbertas
   document.getElementById('kpi-crit').textContent = ocCriticas
 
-  // Tabela UCs
+  // Tabela UCs — estaduais primeiro, depois federais, municipais por último
   const tbody = document.getElementById('tbody-ucs')
   if (!ucs?.length) {
-    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#9CA3AF;padding:24px">Nenhuma UC cadastrada</td></tr>'
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#9CA3AF;padding:24px">Nenhuma UC cadastrada</td></tr>'
   } else {
-    tbody.innerHTML = ucs.slice(0, 8).map(u => `
-      <tr>
+    const ordemEsfera = { estadual: 0, federal: 1, municipal: 2 }
+    const ucOrdenadas = [...ucs].sort((a, b) => {
+      const ea = ordemEsfera[(a.esfera||'').toLowerCase()] ?? 3
+      const eb = ordemEsfera[(b.esfera||'').toLowerCase()] ?? 3
+      return ea - eb
+    })
+    const BADGE_ESFERA = { estadual:'badge-verde', federal:'badge-blue', municipal:'badge-ouro' }
+    tbody.innerHTML = ucOrdenadas.slice(0, 10).map(u => {
+      const esfera = (u.esfera||'').toLowerCase()
+      const estadualDestaque = esfera === 'estadual' ? 'background:#f0fdf4;' : ''
+      return `<tr style="${estadualDestaque}">
         <td class="mono">${esc(u.codigo)}</td>
         <td><strong>${esc(u.nome)}</strong></td>
+        <td><span class="badge ${BADGE_ESFERA[esfera]||'badge-cinza'}" style="font-size:10px;text-transform:capitalize">${esc(u.esfera||'—')}</span></td>
         <td><span class="badge ${BADGE_CATEGORIA[u.categoria]||'badge-cinza'}">${esc(u.categoria)}</span></td>
         <td class="mono">${u.area_ha ? formatNum(u.area_ha, 0) : '—'}</td>
         <td><span class="badge ${BADGE_STATUS_UC[u.status]||'badge-cinza'}">${esc(t('status_uc.'+u.status))}</span></td>
-      </tr>`).join('')
+      </tr>`
+    }).join('')
   }
 
   // Lista ocorrências
