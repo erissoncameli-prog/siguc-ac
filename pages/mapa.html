@@ -1076,7 +1076,13 @@ function _renderizarMunicipios(){
 // ══════════════════════════════════════════════════════════════
 // CAR — Cadastro Ambiental Rural
 // ══════════════════════════════════════════════════════════════
-const CAR_WFS_BASE = 'https://geoserver.car.gov.br/geoserver/sicar/wfs';
+// Endpoints CAR — tenta em ordem até um funcionar
+const CAR_ENDPOINTS = [
+  'https://geoserver.car.gov.br/geoserver/sicar/wfs',
+  'https://geocar.car.gov.br/geoserver/sicar/wfs',
+];
+// Nomes de layer conhecidos no SICAR
+const CAR_TYPE_NAMES = ['sicar:sicar_imovel','sicar:area_imovel','sicar:imoveis'];
 const CAR_PAGE = 500;
 
 function _popularFiltroCarUC(){
@@ -1092,36 +1098,108 @@ async function toggleCamadaCAR(el){
   document.getElementById('car-filtros-wrap').style.display='flex';
 }
 
+// Calcula BBOX de uma UC pelo GeoJSON
+function _bboxUC(ucNome){
+  const ucFeat = (_ucGeojson?.features||[]).find(f=>f.properties?.nome===ucNome);
+  if(!ucFeat?.geometry) return null;
+  try{
+    const coords=[];
+    const ext = g => { if(g.type==='MultiPolygon') g.coordinates.forEach(p=>p.forEach(r=>r.forEach(c=>coords.push(c)))); else if(g.type==='Polygon') g.coordinates.forEach(r=>r.forEach(c=>coords.push(c))); };
+    ext(ucFeat.geometry);
+    if(!coords.length) return null;
+    const lngs=coords.map(c=>c[0]), lats=coords.map(c=>c[1]);
+    const pad=0.02;
+    return { minLng:Math.min(...lngs)-pad, minLat:Math.min(...lats)-pad, maxLng:Math.max(...lngs)+pad, maxLat:Math.max(...lats)+pad };
+  }catch(e){ return null; }
+}
+
+// Monta URL do WFS — suporta WFS 1.1.0 e 2.0.0
+function _buildCarUrl(base, typeName, bbox, version='1.1.0'){
+  const bboxStr = version==='2.0.0'
+    ? `${bbox.minLng},${bbox.minLat},${bbox.maxLng},${bbox.maxLat}`
+    : `${bbox.minLng},${bbox.minLat},${bbox.maxLng},${bbox.maxLat},EPSG:4326`;
+  const typeParam = version==='2.0.0' ? 'typeNames' : 'typeName';
+  const params = new URLSearchParams({
+    service: 'WFS',
+    version,
+    request: 'GetFeature',
+    [typeParam]: typeName,
+    outputFormat: 'application/json',
+    srsName: 'EPSG:4326',
+    BBOX: bboxStr,
+    maxFeatures: String(CAR_PAGE),
+  });
+  return `${base}?${params.toString()}`;
+}
+
+async function _tentarFetchCAR(url){
+  const r = await fetch(url, { signal: AbortSignal.timeout(15000) });
+  const txt = await r.text();
+  // Detecta resposta XML de erro (WFS Exception ou HTML)
+  if(txt.trimStart().startsWith('<')){
+    // Extrai mensagem de erro do XML
+    const match = txt.match(/<ows:ExceptionText[^>]*>([\s\S]*?)<\/ows:ExceptionText>/)
+                || txt.match(/<ServiceException[^>]*>([\s\S]*?)<\/ServiceException>/);
+    const msg = match ? match[1].trim().substring(0,200) : 'Resposta XML inválida do servidor';
+    throw new Error(msg);
+  }
+  return JSON.parse(txt);
+}
+
 async function carregarDadosCAR(ucNome){
   if(ucNome==='todas'||!ucNome) return;
   if(_carCarregando) return;
-  _carCarregando=true;
-  const statusEl=document.getElementById('car-status-txt'); if(statusEl) statusEl.textContent='⏳ Buscando imóveis...';
+  _carCarregando = true;
+  const statusEl = document.getElementById('car-status-txt');
+  if(statusEl) statusEl.innerHTML = '⏳ Buscando imóveis CAR...';
 
-  // Encontrar BBOX da UC selecionada
-  let bbox = '-74,-12,-66,-7,EPSG:4326'; // Bbox do Acre inteiro como fallback
-  const ucFeat=(_ucGeojson?.features||[]).find(f=>f.properties?.nome===ucNome);
-  if(ucFeat?.geometry){
+  const bbox = _bboxUC(ucNome) || { minLng:-74, minLat:-12, maxLng:-66, maxLat:-7 };
+
+  let sucesso = false;
+  let ultimoErro = '';
+
+  // Tenta cada endpoint + layer name + versão WFS em sequência
+  externo: for(const base of CAR_ENDPOINTS){
+    for(const typeName of CAR_TYPE_NAMES){
+      for(const version of ['1.1.0','2.0.0']){
+        try{
+          const url = _buildCarUrl(base, typeName, bbox, version);
+          if(statusEl) statusEl.innerHTML = `⏳ Tentando <code style="font-size:10px">${typeName}</code> (WFS ${version})...`;
+          const gj = await _tentarFetchCAR(url);
+          _carFeatures = gj.features || [];
+          _aplicarCamadaCAR();
+          if(statusEl) statusEl.textContent = `✅ ${_carFeatures.length} imóvel(is) carregado(s)`;
+          const badge = document.getElementById('car-count-badge');
+          if(badge){ badge.textContent=_carFeatures.length; badge.style.display=_carFeatures.length?'':'none'; }
+          sucesso = true;
+          break externo;
+        }catch(e){
+          ultimoErro = e.message;
+        }
+      }
+    }
+  }
+
+  if(!sucesso){
+    // Última tentativa: proxy CORS público
     try{
-      let coords=[];
-      const extractCoords=(g)=>{ if(g.type==='MultiPolygon') g.coordinates.forEach(p=>p.forEach(r=>r.forEach(c=>coords.push(c)))); else if(g.type==='Polygon') g.coordinates.forEach(r=>r.forEach(c=>coords.push(c))); };
-      extractCoords(ucFeat.geometry);
-      if(coords.length){ const lngs=coords.map(c=>c[0]),lats=coords.map(c=>c[1]); const pad=0.01; bbox=`${Math.min(...lngs)-pad},${Math.min(...lats)-pad},${Math.max(...lngs)+pad},${Math.max(...lats)+pad},EPSG:4326`; }
-    }catch(e){}
+      const bboxStr=`${bbox.minLng},${bbox.minLat},${bbox.maxLng},${bbox.maxLat},EPSG:4326`;
+      const target = encodeURIComponent(`https://geoserver.car.gov.br/geoserver/sicar/wfs?service=WFS&version=1.1.0&request=GetFeature&typeName=sicar:sicar_imovel&outputFormat=application/json&srsName=EPSG:4326&BBOX=${bboxStr}&maxFeatures=${CAR_PAGE}`);
+      const gj = await _tentarFetchCAR(`https://corsproxy.io/?url=${target}`);
+      _carFeatures = gj.features || [];
+      _aplicarCamadaCAR();
+      if(statusEl) statusEl.textContent = `✅ ${_carFeatures.length} imóvel(is) (via proxy)`;
+      sucesso = true;
+    }catch(e2){
+      ultimoErro = e2.message;
+    }
   }
 
-  try{
-    const url=`${CAR_WFS_BASE}?service=WFS&version=1.1.0&request=GetFeature&typeName=sicar:sicar_imovel&outputFormat=application/json&srsName=EPSG:4326&BBOX=${bbox}&maxFeatures=${CAR_PAGE}`;
-    const r=await fetch(url); if(!r.ok) throw new Error('HTTP '+r.status);
-    const gj=await r.json();
-    _carFeatures=gj.features||[];
-    _aplicarCamadaCAR();
-    if(statusEl) statusEl.textContent=`✅ ${_carFeatures.length} imóvel(is) carregado(s)`;
-    const badge=document.getElementById('car-count-badge'); if(badge){badge.textContent=_carFeatures.length;badge.style.display=_carFeatures.length?'':'none';}
-  }catch(e){
-    if(statusEl) statusEl.textContent='⚠ Erro ao carregar CAR: '+e.message;
+  if(!sucesso){
+    if(statusEl) statusEl.innerHTML = `⚠ CAR indisponível: <span style="font-size:10px;color:var(--cinza-500)">${escHtml(ultimoErro.substring(0,120))}</span>`;
   }
-  _carCarregando=false;
+
+  _carCarregando = false;
 }
 
 function _carCor(condicao){
