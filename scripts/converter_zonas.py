@@ -100,7 +100,7 @@ def main():
         if not os.path.isdir(uc_dir):
             continue
         uc_nome = UC_NOMES.get(pasta_uc, pasta_uc)
-        print(f'\n📂 {uc_nome}')
+        print(f'\n[UC] {uc_nome}')
 
         # Busca shapefiles de zonas (recursivo)
         for root, dirs, files in os.walk(uc_dir):
