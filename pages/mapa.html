@@ -1187,6 +1187,24 @@ function _sincronizarEditor(){
   if(get('acre-scor-hex')) get('acre-scor-hex').textContent = e.sombraCor;
 }
 
+function _iniciarDragCard(cardId, handleId){
+  const card=document.getElementById(cardId), handle=document.getElementById(handleId);
+  if(!card||!handle) return;
+  let drag=false, ox=0, oy=0, sx=0, sy=0;
+  handle.addEventListener('mousedown', e=>{
+    drag=true; sx=e.clientX; sy=e.clientY;
+    const r=card.getBoundingClientRect(); ox=r.left; oy=r.top;
+    handle.style.cursor='grabbing'; e.preventDefault();
+  });
+  document.addEventListener('mousemove', e=>{
+    if(!drag) return;
+    const nx=ox+(e.clientX-sx), ny=oy+(e.clientY-sy);
+    card.style.left=Math.max(0,nx)+'px'; card.style.top=Math.max(0,ny)+'px';
+    card.style.right='auto'; card.style.bottom='auto';
+  });
+  document.addEventListener('mouseup', ()=>{ drag=false; handle.style.cursor='grab'; });
+}
+
 function _iniciarDragEditor(){
   const card  = document.getElementById('acre-editor');
   const handle= document.getElementById('acre-ed-drag');
