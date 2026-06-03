@@ -1,8 +1,187 @@
 {
   "_meta": {
-    "fonte": "SEMA-AC (https://sema.ac.gov.br/departamentos-e-divisoes/divisao-de-areas-naturais-protegidas-e-biodiversidade/)",
+    "fontes": "SEMA-AC e ICMBio (gov.br/icmbio)",
     "atualizado": "2026-06-02",
     "nota": "Chave = campo 'nome' do uc_acre.geojson"
+  },
+
+  "Rio Acre": {
+    "nome_full": "Estação Ecológica do Rio Acre",
+    "area_ha": 79395.22,
+    "municipios": "Assis Brasil",
+    "esfera": "federal",
+    "orgao_gestor": "ICMBio – CT Rio Branco/AC",
+    "gestor_nome": null,
+    "gestor_email": "esecrioacre@icmbio.gov.br",
+    "gestor_telefone": "(91) 98408-4997",
+    "sede": "Rua Henrique Dias nº 162, Bosque, Rio Branco/AC – CEP 69900-571",
+    "base_avancada": "Rua Dom Giocondo Maria Grotti, 311, Centro, Assis Brasil/AC",
+    "conselho_gestor": true,
+    "conselho_portaria": "Portaria nº 42, de 25/06/2008",
+    "plano_manejo": true,
+    "plano_manejo_portaria": "Portaria nº 66, de 27 de agosto de 2010",
+    "plano_manejo_url": "https://www.gov.br/icmbio/pt-br/assuntos/biodiversidade/unidade-de-conservacao/unidades-de-biomas/amazonia/lista-de-ucs/esec-rio-acre/arquivos/esec_rio_acre.pdf",
+    "fonte_url": "https://www.gov.br/icmbio/pt-br/assuntos/biodiversidade/unidade-de-conservacao/unidades-de-biomas/amazonia/lista-de-ucs/esec-rio-acre/",
+    "status": "regular"
+  },
+
+  "Alto Juruá": {
+    "nome_full": "Reserva Extrativista do Alto Juruá",
+    "area_ha": 537946.00,
+    "municipios": "Marechal Thaumaturgo",
+    "esfera": "federal",
+    "orgao_gestor": "ICMBio – CT Rio Branco/AC",
+    "gestor_nome": null,
+    "gestor_email": null,
+    "conselho_gestor": true,
+    "plano_manejo": false,
+    "fonte_url": "https://www.gov.br/icmbio/pt-br/assuntos/biodiversidade/unidade-de-conservacao/unidades-de-biomas/amazonia/lista-de-ucs/resex-do-alto-jurua/resex-do-alto-jurua-1",
+    "status": "regular"
+  },
+
+  "Riozinho da Liberdade": {
+    "nome_full": "Reserva Extrativista Riozinho da Liberdade",
+    "area_ha": 325000.00,
+    "municipios": "Cruzeiro do Sul, Marechal Thaumaturgo, Porto Walter, Tarauacá",
+    "esfera": "federal",
+    "orgao_gestor": "ICMBio – NGI Cruzeiro do Sul",
+    "gestor_nome": null,
+    "gestor_email": "ngicruzeirodosul@gmail.com",
+    "gestor_telefone": "(91) 98412-9218",
+    "sede": "Rua Jaminauas, 1556 - Vinte e Cinco de Agosto, Cruzeiro do Sul/AC – CEP 69980-000",
+    "conselho_gestor": true,
+    "plano_manejo": true,
+    "fonte_url": "https://www.gov.br/icmbio/pt-br/assuntos/biodiversidade/unidade-de-conservacao/unidades-de-biomas/amazonia/lista-de-ucs/resex-riozinho-da-liberdade",
+    "status": "regular"
+  },
+
+  "Chico Mendes": {
+    "nome_full": "Reserva Extrativista Chico Mendes",
+    "area_ha": 931542.94,
+    "municipios": "Xapuri, Rio Branco, Brasiléia, Sena Madureira, Epitaciolândia, Assis Brasil, Capixaba",
+    "esfera": "federal",
+    "orgao_gestor": "ICMBio – CT Rio Branco/AC",
+    "gestor_nome": null,
+    "gestor_telefone": "(68) 3546-3043",
+    "sede": "Rua Henrique Dias nº 162, Bosque, Rio Branco/AC – CEP 69900-571",
+    "conselho_gestor": true,
+    "plano_manejo": true,
+    "plano_manejo_portaria": "Portaria nº 60, de 28 de agosto de 2008",
+    "plano_manejo_url": "https://www.gov.br/icmbio/pt-br/assuntos/biodiversidade/unidade-de-conservacao/unidades-de-biomas/amazonia/lista-de-ucs/resex-chico-mendes/arquivos/plano_de_manejo_reserva_extrativista_chico_mendes.pdf",
+    "fonte_url": "https://www.gov.br/icmbio/pt-br/assuntos/biodiversidade/unidade-de-conservacao/unidades-de-biomas/amazonia/lista-de-ucs/resex-chico-mendes/",
+    "status": "regular"
+  },
+
+  "Alto Tarauacá": {
+    "nome_full": "Reserva Extrativista do Alto Tarauacá",
+    "area_ha": 154133.85,
+    "municipios": "Jordão, Tarauacá, Marechal Thaumaturgo",
+    "esfera": "federal",
+    "orgao_gestor": "ICMBio – CT Rio Branco/AC",
+    "gestor_nome": null,
+    "gestor_telefone": "(91) 98414-2040",
+    "sede": "Rua Henrique Dias nº 162, Bosque, Rio Branco/AC – CEP 69900-568",
+    "conselho_gestor": true,
+    "plano_manejo": true,
+    "plano_manejo_portaria": "Portaria nº 807, de 19 de dezembro de 2019",
+    "fonte_url": "https://www.gov.br/icmbio/pt-br/assuntos/biodiversidade/unidade-de-conservacao/unidades-de-biomas/amazonia/lista-de-ucs/resex-do-alto-taracuaca",
+    "status": "regular"
+  },
+
+  "São Francisco": {
+    "nome_full": "Floresta Nacional de São Francisco",
+    "area_ha": 21147.67,
+    "municipios": "Sena Madureira",
+    "esfera": "federal",
+    "orgao_gestor": "ICMBio – NGI Sena Madureira",
+    "gestor_nome": null,
+    "gestor_email": "ngi.sena@icmbio.gov.br",
+    "sede": "Rua Henrique Dias nº 162, Bosque, Rio Branco/AC – CEP 69900-571",
+    "conselho_gestor": true,
+    "plano_manejo": true,
+    "plano_manejo_portaria": "Portaria nº 53, de 20 de maio de 2016",
+    "fonte_url": "https://www.gov.br/icmbio/pt-br/assuntos/biodiversidade/unidade-de-conservacao/unidades-de-biomas/amazonia/lista-de-ucs/flona-de-sao-francisco",
+    "status": "regular"
+  },
+
+  "Cazumbá-Iracema": {
+    "nome_full": "Reserva Extrativista do Cazumbá-Iracema",
+    "area_ha": 754987.10,
+    "municipios": "Sena Madureira",
+    "esfera": "federal",
+    "orgao_gestor": "ICMBio – CR1 Porto Velho/RO",
+    "gestor_nome": null,
+    "gestor_telefone": "(68) 3612-3204",
+    "sede": "Av. Avelino Chaves, nº 1935 – CEP 69940-000",
+    "conselho_gestor": true,
+    "plano_manejo": true,
+    "plano_manejo_portaria": "Portaria nº 56, de 28 de agosto de 2008",
+    "plano_manejo_url": "https://www.gov.br/icmbio/pt-br/assuntos/biodiversidade/unidade-de-conservacao/unidades-de-biomas/amazonia/lista-de-ucs/resex-do-cazumba-iracema/arquivos/resex_cazumbairacema.pdf",
+    "fonte_url": "https://www.gov.br/icmbio/pt-br/assuntos/biodiversidade/unidade-de-conservacao/unidades-de-biomas/amazonia/lista-de-ucs/resex-do-cazumba-iracema",
+    "status": "regular"
+  },
+
+  "Macauã": {
+    "nome_full": "Floresta Nacional do Macauã",
+    "area_ha": 176349.02,
+    "municipios": "Sena Madureira",
+    "esfera": "federal",
+    "orgao_gestor": "ICMBio – NGI Sena Madureira",
+    "gestor_nome": null,
+    "gestor_email": "ngi.sena@icmbio.gov.br",
+    "sede": "Rua Henrique Dias nº 162, Bosque, Rio Branco/AC – CEP 69900-571",
+    "conselho_gestor": true,
+    "plano_manejo": true,
+    "plano_manejo_portaria": "Portaria nº 53, de 20 de maio de 2016",
+    "fonte_url": "https://www.gov.br/icmbio/pt-br/assuntos/biodiversidade/unidade-de-conservacao/unidades-de-biomas/amazonia/lista-de-ucs/flona-do-macaua",
+    "status": "regular"
+  },
+
+  "Serra do Divisor": {
+    "nome_full": "Parque Nacional da Serra do Divisor",
+    "area_ha": 784079.00,
+    "municipios": "Mâncio Lima, Porto Walter, Cruzeiro do Sul, Rodrigues Alves, Marechal Thaumaturgo",
+    "esfera": "federal",
+    "orgao_gestor": "ICMBio – NGI Cruzeiro do Sul",
+    "gestor_nome": null,
+    "gestor_email": "ngicruzeirodosul@gmail.com",
+    "gestor_telefone": "(91) 98412-9218",
+    "sede": "Rua Jaminauas, 1556 - Vinte e Cinco de Agosto, Cruzeiro do Sul/AC – CEP 69980-000",
+    "conselho_gestor": true,
+    "plano_manejo": true,
+    "plano_manejo_url": "https://www.gov.br/icmbio/pt-br/assuntos/biodiversidade/unidade-de-conservacao/unidades-de-biomas/amazonia/lista-de-ucs/parna-da-serra-do-divisor/arquivos/pm_pn_da_serra_do_divisor_parte2_planejamento.pdf",
+    "fonte_url": "https://www.gov.br/icmbio/pt-br/assuntos/biodiversidade/unidade-de-conservacao/unidades-de-biomas/amazonia/lista-de-ucs/parna-da-serra-do-divisor/",
+    "status": "regular"
+  },
+
+  "Santa Rosa do Purus": {
+    "nome_full": "Floresta Nacional de Santa Rosa do Purus",
+    "area_ha": 231555.52,
+    "municipios": "Feijó, Santa Rosa do Purus",
+    "esfera": "federal",
+    "orgao_gestor": "ICMBio – CR1 Porto Velho/RO",
+    "gestor_nome": null,
+    "gestor_telefone": "(68) 3612-3204",
+    "sede": "Rua Henrique Dias nº 162, Bosque, Rio Branco/AC – CEP 69900-571",
+    "conselho_gestor": false,
+    "plano_manejo": false,
+    "fonte_url": "https://www.gov.br/icmbio/pt-br/assuntos/biodiversidade/unidade-de-conservacao/unidades-de-biomas/amazonia/lista-de-ucs/flona-de-santa-rosa-do-perus",
+    "status": "regular"
+  },
+
+  "Seringal Nova Esperança": {
+    "nome_full": "ARIE Seringal Nova Esperança",
+    "area_ha": 2573.97,
+    "municipios": "Epitaciolândia, Xapuri",
+    "esfera": "federal",
+    "orgao_gestor": "ICMBio – CT Rio Branco/AC",
+    "gestor_nome": null,
+    "gestor_telefone": "(68) 3546-3043",
+    "sede": "Rua Henrique Dias nº 162, Bosque, Rio Branco/AC – CEP 69900-571",
+    "conselho_gestor": false,
+    "plano_manejo": false,
+    "fonte_url": "https://www.gov.br/icmbio/pt-br/assuntos/biodiversidade/unidade-de-conservacao/unidades-de-biomas/amazonia/lista-de-ucs/arie-seringal-nova-esperanca",
+    "status": "regular"
   },
 
   "Chandles": {
