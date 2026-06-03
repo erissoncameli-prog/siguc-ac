@@ -7,6 +7,153 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="../js/config.js"></script>
 <script src="../js/layout.js"></script>
+<style>
+/* ── Árvore de documentos ── */
+.tree-uc {
+  background: var(--branco);
+  border: 1px solid var(--borda);
+  border-radius: var(--raio-lg);
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+.tree-uc-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 13px 16px;
+  cursor: pointer;
+  user-select: none;
+  transition: background .15s;
+}
+.tree-uc-header:hover { background: #f9fafb; }
+.tree-uc-header.aberto { border-bottom: 1px solid var(--borda); }
+.tree-uc-chevron {
+  width: 16px; height: 16px;
+  color: var(--cinza-400);
+  flex-shrink: 0;
+  transition: transform .2s;
+}
+.tree-uc-header.aberto .tree-uc-chevron { transform: rotate(90deg); }
+.tree-uc-icone { font-size: 18px; flex-shrink: 0; }
+.tree-uc-nome {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--cinza-900);
+  flex: 1;
+}
+.tree-uc-codigo {
+  font-size: 11px;
+  color: var(--cinza-400);
+  font-family: var(--font-mono);
+}
+.tree-uc-badge {
+  font-size: 10px;
+  background: #f0fdf4;
+  color: #166534;
+  border: 1px solid #bbf7d0;
+  border-radius: 10px;
+  padding: 1px 8px;
+  flex-shrink: 0;
+}
+.tree-uc-body { display: none; }
+.tree-uc-body.aberto { display: block; }
+
+/* Grupo de tipo */
+.tree-tipo {
+  border-bottom: 1px solid #f3f4f6;
+}
+.tree-tipo:last-child { border-bottom: none; }
+.tree-tipo-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 16px 9px 36px;
+  cursor: pointer;
+  user-select: none;
+  background: #fafafa;
+  transition: background .15s;
+}
+.tree-tipo-header:hover { background: #f3f4f6; }
+.tree-tipo-header.aberto { border-bottom: 1px solid #f3f4f6; }
+.tree-tipo-chevron {
+  width: 13px; height: 13px;
+  color: var(--cinza-400);
+  flex-shrink: 0;
+  transition: transform .2s;
+}
+.tree-tipo-header.aberto .tree-tipo-chevron { transform: rotate(90deg); }
+.tree-tipo-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--cinza-600);
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  flex: 1;
+}
+.tree-tipo-count {
+  font-size: 10px;
+  color: var(--cinza-400);
+  background: #f3f4f6;
+  border-radius: 8px;
+  padding: 1px 6px;
+}
+.tree-tipo-body { display: none; }
+.tree-tipo-body.aberto { display: block; }
+
+/* Linha de documento */
+.tree-doc {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 16px 9px 52px;
+  border-bottom: 1px solid #f9fafb;
+  transition: background .12s;
+}
+.tree-doc:last-child { border-bottom: none; }
+.tree-doc:hover { background: #f9fafb; }
+.tree-doc-icone { font-size: 14px; flex-shrink: 0; color: var(--cinza-400); }
+.tree-doc-titulo {
+  font-size: 12px;
+  color: var(--cinza-800);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tree-doc-baixar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: #1d4ed8;
+  text-decoration: none;
+  padding: 3px 8px;
+  border-radius: 5px;
+  border: 1px solid #bfdbfe;
+  background: #eff6ff;
+  flex-shrink: 0;
+  white-space: nowrap;
+  transition: background .12s;
+}
+.tree-doc-baixar:hover { background: #dbeafe; }
+.tree-doc-pub {
+  font-size: 10px;
+  color: #166534;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  padding: 1px 6px;
+  flex-shrink: 0;
+}
+
+/* Vazio */
+.tree-vazio {
+  padding: 32px;
+  text-align: center;
+  color: var(--cinza-400);
+  font-size: 13px;
+}
+</style>
 </head>
 <body>
 <div id="app"></div>
@@ -53,7 +200,25 @@
 </div>
 
 <script>
-const ICONE_TIPO = { plano_manejo:'📋', decreto_criacao:'🏛️', ata_reuniao:'📝', relatorio_tecnico:'📊', contrato:'📄', mapeamento:'🗺️', outro:'📁' }
+const TIPO_LABEL = {
+  plano_manejo: 'Plano de Manejo',
+  decreto_criacao: 'Decreto de Criação',
+  ata_reuniao: 'Ata de Reunião',
+  relatorio_tecnico: 'Relatório Técnico',
+  contrato: 'Contrato',
+  mapeamento: 'Mapeamento',
+  outro: 'Outros Documentos'
+}
+const TIPO_ICONE = {
+  plano_manejo: '📋',
+  decreto_criacao: '🏛️',
+  ata_reuniao: '📝',
+  relatorio_tecnico: '📊',
+  contrato: '📄',
+  mapeamento: '🗺️',
+  outro: '📁'
+}
+const TIPO_ORDEM = ['decreto_criacao','plano_manejo','relatorio_tecnico','ata_reuniao','mapeamento','contrato','outro']
 
 ;(async function () {
   const usuario = await carregarUsuario()
@@ -72,12 +237,12 @@ const ICONE_TIPO = { plano_manejo:'📋', decreto_criacao:'🏛️', ata_reuniao
           <option value="ata_reuniao">Ata de Reunião</option>
           <option value="relatorio_tecnico">Relatório Técnico</option>
           <option value="mapeamento">Mapeamento</option>
-          <option value="outro">Outro</option>
+          <option value="outro">Outros</option>
         </select>
-        <select class="form-control" id="fil-uc" style="width:180px" onchange="filtrar()"><option value="">Todas as UCs</option></select>
+        <select class="form-control" id="fil-uc" style="width:200px" onchange="filtrar()"><option value="">Todas as UCs</option></select>
         ${podeEditar ? '<button class="btn btn-primary" onclick="abrirModal()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Adicionar</button>' : ''}
       </div>
-      <div id="grid-docs" class="grid-3" style="gap:14px"></div>
+      <div id="arvore"></div>
     </div>` +
     '</div></div></div>'
 
@@ -86,59 +251,167 @@ const ICONE_TIPO = { plano_manejo:'📋', decreto_criacao:'🏛️', ata_reuniao
   await carregar()
 })()
 
+let _dados = []
+let _ucs = []
+
 async function carregarUCs() {
   const { data } = await db.from('unidades_conservacao').select('id,nome,codigo').eq('ativo',true).order('codigo')
-  const sel1 = document.getElementById('f-uc'), sel2 = document.getElementById('fil-uc')
-  data?.forEach(u => {
+  _ucs = data || []
+  const sel1 = document.getElementById('f-uc')
+  const sel2 = document.getElementById('fil-uc')
+  _ucs.forEach(u => {
     const opt = `<option value="${u.id}">${u.codigo} — ${u.nome}</option>`
-    sel1?.insertAdjacentHTML('beforeend', opt); sel2?.insertAdjacentHTML('beforeend', opt)
+    sel1?.insertAdjacentHTML('beforeend', opt)
+    sel2?.insertAdjacentHTML('beforeend', opt)
   })
 }
 
-let _dados = []
 async function carregar() {
   const { data } = await db.from('documentos')
-    .select('*,unidades_conservacao(nome,codigo)')
-    .order('criado_em', { ascending: false })
+    .select('*,unidades_conservacao(id,nome,codigo)')
+    .order('titulo', { ascending: true })
   _dados = data || []
-  renderGrid(_dados)
+  renderArvore(_dados)
 }
 
 function filtrar() {
   const q = document.getElementById('busca').value.toLowerCase()
   const tipo = document.getElementById('fil-tipo').value
   const uc = document.getElementById('fil-uc').value
-  renderGrid(_dados.filter(d =>
+  const filtrado = _dados.filter(d =>
     (!q || d.titulo.toLowerCase().includes(q)) &&
     (!tipo || d.tipo === tipo) &&
     (!uc || d.uc_id === uc)
-  ))
+  )
+  renderArvore(filtrado)
 }
 
-function renderGrid(lista) {
-  const grid = document.getElementById('grid-docs')
-  if (!lista.length) { grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1"><div class="empty-state-icon">📁</div><div class="empty-state-msg">Nenhum documento encontrado</div></div>'; return }
-  grid.innerHTML = lista.map(d => `
-    <div class="card" style="padding:0">
-      <div style="padding:16px 18px 12px">
-        <div style="display:flex;align-items:flex-start;gap:10px">
-          <span style="font-size:24px;flex-shrink:0">${ICONE_TIPO[d.tipo]||'📁'}</span>
-          <div style="flex:1;min-width:0">
-            <div style="font-size:13px;font-weight:600;color:#111827;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(d.titulo)}</div>
-            ${d.unidades_conservacao ? `<div style="font-size:11px;color:#9CA3AF;margin-top:2px">${esc(d.unidades_conservacao.codigo)} — ${esc(d.unidades_conservacao.nome)}</div>` : '<div style="font-size:11px;color:#9CA3AF">Institucional</div>'}
+function renderArvore(lista) {
+  const container = document.getElementById('arvore')
+  if (!lista.length) {
+    container.innerHTML = '<div class="tree-vazio">📁 Nenhum documento encontrado</div>'
+    return
+  }
+
+  // Agrupar por UC
+  const porUC = new Map()
+
+  // Documentos institucionais (sem UC)
+  lista.filter(d => !d.uc_id).forEach(d => {
+    if (!porUC.has('__inst__')) porUC.set('__inst__', { uc: null, docs: [] })
+    porUC.get('__inst__').docs.push(d)
+  })
+
+  // Documentos por UC — respeitar ordem do _ucs
+  _ucs.forEach(u => {
+    const docs = lista.filter(d => d.uc_id === u.id)
+    if (docs.length) porUC.set(u.id, { uc: u, docs })
+  })
+
+  // Documentos de UCs não listadas em _ucs (fallback)
+  lista.filter(d => d.uc_id && !_ucs.find(u => u.id === d.uc_id)).forEach(d => {
+    const id = d.uc_id
+    if (!porUC.has(id)) porUC.set(id, { uc: d.unidades_conservacao, docs: [] })
+    porUC.get(id).docs.push(d)
+  })
+
+  let html = ''
+  let ucIdx = 0
+
+  porUC.forEach(({ uc, docs }, key) => {
+    const ucId = `uc-node-${ucIdx++}`
+    const nome = uc ? esc(uc.nome) : 'Documentos Institucionais'
+    const codigo = uc ? esc(uc.codigo) : ''
+
+    // Agrupar docs por tipo dentro desta UC
+    const porTipo = new Map()
+    TIPO_ORDEM.forEach(t => {
+      const d = docs.filter(x => x.tipo === t)
+      if (d.length) porTipo.set(t, d)
+    })
+    // Tipos não previstos na ordem
+    docs.forEach(d => {
+      if (!TIPO_ORDEM.includes(d.tipo) && !porTipo.has(d.tipo)) porTipo.set(d.tipo, [])
+      if (!TIPO_ORDEM.includes(d.tipo)) porTipo.get(d.tipo).push(d)
+    })
+
+    let tiposHtml = ''
+    let tipoIdx = 0
+    porTipo.forEach((tdocs, tipo) => {
+      const tipoId = `${ucId}-tipo-${tipoIdx++}`
+      const docsHtml = tdocs.map(d => `
+        <div class="tree-doc">
+          <span class="tree-doc-icone">📄</span>
+          <span class="tree-doc-titulo" title="${esc(d.titulo)}">${esc(d.titulo)}</span>
+          ${d.publico ? '<span class="tree-doc-pub">Público</span>' : ''}
+          <a href="${esc(d.arquivo_url)}" target="_blank" class="tree-doc-baixar">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Baixar
+          </a>
+        </div>`).join('')
+
+      tiposHtml += `
+        <div class="tree-tipo">
+          <div class="tree-tipo-header" id="${tipoId}-h" onclick="toggleTipo('${tipoId}')">
+            <svg class="tree-tipo-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+            <span style="font-size:13px">${TIPO_ICONE[tipo]||'📁'}</span>
+            <span class="tree-tipo-label">${TIPO_LABEL[tipo]||tipo}</span>
+            <span class="tree-tipo-count">${tdocs.length}</span>
           </div>
-          ${d.publico ? '<span class="badge badge-verde badge-outline" style="flex-shrink:0">Público</span>' : ''}
+          <div class="tree-tipo-body" id="${tipoId}-b">${docsHtml}</div>
+        </div>`
+    })
+
+    html += `
+      <div class="tree-uc">
+        <div class="tree-uc-header" id="${ucId}-h" onclick="toggleUC('${ucId}')">
+          <svg class="tree-uc-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+          <span class="tree-uc-icone">🌿</span>
+          <span class="tree-uc-nome">${nome}</span>
+          ${codigo ? `<span class="tree-uc-codigo">${codigo}</span>` : ''}
+          <span class="tree-uc-badge">${docs.length} doc${docs.length !== 1 ? 's' : ''}</span>
         </div>
-        ${d.descricao ? `<div style="font-size:12px;color:#6B7280;margin-top:8px;line-height:1.45;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${esc(d.descricao)}</div>` : ''}
-      </div>
-      <div class="card-footer" style="display:flex;align-items:center;justify-content:space-between">
-        <span style="font-size:11px;color:#9CA3AF">${d.data_documento ? formatData(d.data_documento) : formatData(d.criado_em)}</span>
-        <a href="${esc(d.arquivo_url)}" target="_blank" class="btn btn-xs btn-secondary">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          Baixar
-        </a>
-      </div>
-    </div>`).join('')
+        <div class="tree-uc-body" id="${ucId}-b">${tiposHtml}</div>
+      </div>`
+  })
+
+  container.innerHTML = html
+
+  // Auto-expandir se filtro ativo ou poucos nós
+  if (porUC.size <= 3 || document.getElementById('busca').value) {
+    porUC.forEach((_, key) => {
+      let i = 0
+      document.querySelectorAll('[id^="uc-node-"]').forEach(el => {
+        if (el.id.endsWith('-h')) expandUC(el.id.replace('-h', ''))
+      })
+    })
+  }
+}
+
+function toggleUC(id) {
+  const h = document.getElementById(id + '-h')
+  const b = document.getElementById(id + '-b')
+  if (!h || !b) return
+  const aberto = b.classList.contains('aberto')
+  h.classList.toggle('aberto', !aberto)
+  b.classList.toggle('aberto', !aberto)
+}
+
+function expandUC(id) {
+  const h = document.getElementById(id + '-h')
+  const b = document.getElementById(id + '-b')
+  if (!h || !b) return
+  h.classList.add('aberto')
+  b.classList.add('aberto')
+}
+
+function toggleTipo(id) {
+  const h = document.getElementById(id + '-h')
+  const b = document.getElementById(id + '-b')
+  if (!h || !b) return
+  const aberto = b.classList.contains('aberto')
+  h.classList.toggle('aberto', !aberto)
+  b.classList.toggle('aberto', !aberto)
 }
 
 function abrirModal() { document.getElementById('modal').classList.add('aberto') }
