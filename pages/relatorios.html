@@ -61,6 +61,8 @@
   await carregarUCsOpcoes()
   await carregarGraficos()
   gerarResumoGeral()
+  // Rodapé cartográfico obrigatório
+  document.getElementById('cart-fontes-body').innerHTML = CART.rodapeHTML('Relatório Geral')
 })()
 
 async function carregarUCsOpcoes() {
