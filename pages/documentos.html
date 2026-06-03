@@ -341,11 +341,12 @@ const TIPO_ORDEM = ['decreto_criacao','plano_manejo','relatorio_tecnico','ata_re
 
 let _dados = []
 let _ucs = []
-let _logoMap = {} // ucId → logo_url
+let _logoMap = {}    // ucId → logo_url
+let _infoMap = {}   // ucId → { area_ha, gestor_nome, gestor_cargo, orgao_gestor }
 
 async function carregarUCs() {
   const [ucRes, detRes] = await Promise.all([
-    db.from('unidades_conservacao').select('id,nome,codigo,esfera').eq('ativo',true).order('codigo'),
+    db.from('unidades_conservacao').select('id,nome,codigo,esfera,area_ha').eq('ativo',true).order('codigo'),
     fetch('../data/uc_detalhes.json').then(r => r.ok ? r.json() : {})
   ])
   const detalhes = detRes || {}
@@ -353,14 +354,15 @@ async function carregarUCs() {
   const { data } = ucRes
   _ucs = data || []
 
-  // Montar mapa ucId → logo_url usando as chaves do uc_detalhes.json
-  // As chaves são o nome curto da UC (campo "nome" do GeoJSON)
-  // Os nomes do Supabase contêm prefixos (ex: "Parque Estadual Chandless")
-  // Estratégia: para cada UC do Supabase, procurar a chave do detalhes
-  // cujo nome_full bate com o nome completo da UC
   _ucs.forEach(u => {
     const match = Object.values(detalhes).find(d => d.nome_full === u.nome)
     if (match?.logo_url) _logoMap[u.id] = match.logo_url
+    _infoMap[u.id] = {
+      area_ha: u.area_ha || match?.area_ha || null,
+      gestor_nome: match?.gestor_nome || null,
+      gestor_cargo: match?.gestor_cargo || null,
+      orgao_gestor: match?.orgao_gestor || null
+    }
   })
 
   const sel1 = document.getElementById('f-uc')
