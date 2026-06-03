@@ -228,6 +228,9 @@ let _ucGeojson = null, _ucLayer = null, _ucAtivo = false, _ucLabels = true, _ucO
 let _tiGeojson = null, _tiLayer = null, _tiAtivo = false;
 let _munGeojson = null, _munLayer = null, _munAtivo = false;
 let _acreGeojson = null, _acreLayers = [], _acreAtivo = true;
+let _zonasGeojson = null, _zonasLayer = null, _zonasAtivo = false, _zonasOpacity = 0.55;
+let _zonasFiltroUC = 'todas';
+let _zonasTiposAtivos = new Set(['ZOA','ZOC','ZEX','ZPO','ZPR','ZUE','ZUP','ZUC']);
 let _acreEstilo = { cor:'#1F4E2C', espessura:4, opacidade:1, dashArray:'none', sombraCor:'#000000', sombraBlur:14, sombraOpacidade:0.55, sombraOffset:3 };
 let _carLayer = null, _carFeatures = [], _carCarregado = false, _carCarregando = false;
 let _carAbertoCod = null;
