@@ -143,7 +143,7 @@ def main():
     if args.dry_run:
         print(f"\n⚡ DRY-RUN: arquivo NÃO foi salvo.")
     else:
-        with open(GEO_PATH, "w", encoding="utf-8") as f:
+        with open(GEO_PATH, "w", encoding="utf-8", newline="\n") as f:
             json.dump(geojson, f, ensure_ascii=False, indent=2)
         print(f"\n💾 Arquivo salvo: {GEO_PATH.name}")
         print(f"   {len(alteracoes)} UC(s) corrigida(s).")
