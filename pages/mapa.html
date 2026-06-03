@@ -769,7 +769,7 @@ function _atualizarLegendaMapa(){
   }
 
   // Terras Indígenas
-  if(_tiAtivo) itens.push({ simbolo:'rect', cor:'#f59e0b', opacidade:0.4, label:'Terras Indígenas' });
+  if(_tiAtivo) itens.push({ simbolo:'rect', cor:'#f59e0b', opacidade:(_tiOpacity||0.4), label:'Terras Indígenas' });
 
   // Municípios
   if(_munAtivo) itens.push({ simbolo:'rect', cor:'#6366f1', opacidade:0, somente_borda:true, label:'Municípios' });
