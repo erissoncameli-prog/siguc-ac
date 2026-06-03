@@ -51,6 +51,51 @@ window.CART = (function () {
     });
     _legCtrl = new Ctrl();
     _legCtrl.addTo(_map);
+    // Aguarda o DOM montar e ativa drag
+    requestAnimationFrame(() => _ativarDragLegenda());
+  }
+
+  function _ativarDragLegenda() {
+    const div = document.getElementById('cart-legenda-ctrl');
+    if (!div) return;
+    div.style.cursor = 'grab';
+
+    let dragging = false, startX = 0, startY = 0, origLeft = 0, origTop = 0;
+
+    div.addEventListener('mousedown', e => {
+      // Ignora cliques em checkboxes/botões dentro do card
+      if (e.target.closest('input,button,select')) return;
+      dragging = true;
+      const r = div.getBoundingClientRect();
+      // Converte para posição fixed desacoplando do container Leaflet
+      div.style.position = 'fixed';
+      div.style.left   = r.left + 'px';
+      div.style.top    = r.top  + 'px';
+      div.style.bottom = 'auto';
+      div.style.right  = 'auto';
+      div.style.margin = '0';
+      origLeft = r.left;
+      origTop  = r.top;
+      startX   = e.clientX;
+      startY   = e.clientY;
+      div.style.cursor = 'grabbing';
+      e.preventDefault();
+      L.DomEvent.stopPropagation(e);
+    });
+
+    document.addEventListener('mousemove', e => {
+      if (!dragging) return;
+      const nx = origLeft + (e.clientX - startX);
+      const ny = origTop  + (e.clientY - startY);
+      div.style.left = Math.max(0, Math.min(nx, window.innerWidth  - div.offsetWidth))  + 'px';
+      div.style.top  = Math.max(0, Math.min(ny, window.innerHeight - div.offsetHeight)) + 'px';
+    });
+
+    document.addEventListener('mouseup', () => {
+      if (!dragging) return;
+      dragging = false;
+      div.style.cursor = 'grab';
+    });
   }
 
   function _legendaVazia() {
