@@ -1,0 +1,174 @@
+{
+  "_meta": {
+    "fonte": "SEMA-AC (https://sema.ac.gov.br/departamentos-e-divisoes/divisao-de-areas-naturais-protegidas-e-biodiversidade/)",
+    "atualizado": "2026-06-02",
+    "nota": "Chave = campo 'nome' do uc_acre.geojson"
+  },
+
+  "Chandless": {
+    "nome_full": "Parque Estadual Chandless",
+    "area_ha": 695303.00,
+    "municipios": "Manoel Urbano, Sena Madureira, Santa Rosa do Purus",
+    "esfera": "estadual",
+    "gestor_nome": "Jomara Katrine Vitoriano de Souza",
+    "gestor_cargo": "Gestora Ambiental e Arquiteta",
+    "gestor_portaria": "PORTARIA SEMA Nº 104, de 30 de abril de 2025",
+    "gestor_email": "jkvitoriano@gmail.com",
+    "conselho_gestor": true,
+    "conselho_portaria_criacao_url": "https://sema.ac.gov.br/wp-content/uploads/2025/01/Chandless-portaria-de-nomeacao-do-conselho.pdf",
+    "conselho_portaria_nomeacao_url": "https://sema.ac.gov.br/wp-content/uploads/2025/01/Chandless-conselho-gestor.pdf",
+    "plano_manejo": true,
+    "decreto_criacao_url": "https://sema.ac.gov.br/wp-content/uploads/2025/01/Chandless-criacao.pdf",
+    "fonte_url": "https://sema.ac.gov.br/departamentos-e-divisoes/divisao-de-areas-naturais-protegidas-e-biodiversidade/parque-estadual-chandless/",
+    "status": "regular"
+  },
+
+  "Lago do Amapá": {
+    "nome_full": "APA Lago do Amapá",
+    "area_ha": 5208.33,
+    "municipios": "Rio Branco",
+    "esfera": "estadual",
+    "gestor_nome": "Samyr Vieira de Farias",
+    "gestor_cargo": "Engenheiro Florestal",
+    "gestor_portaria": "PORTARIA SEMAPI Nº 224, de 09 de agosto de 2023",
+    "gestor_email": "samyr.vieira.farias@gmail.com",
+    "conselho_gestor": true,
+    "plano_manejo": true,
+    "plano_manejo_url": "https://sema.ac.gov.br/wp-content/uploads/2024/01/Plano-de-Manejo-da-UC_APA-Lago-do-Amapa.pdf",
+    "plano_manejo_miolo_url": "https://sema.ac.gov.br/wp-content/uploads/2024/01/Plano_Manejo_APA_Lago_Amapa_MIOLO_FINAL.pdf",
+    "plano_uso_publico_url": "https://sema.ac.gov.br/wp-content/uploads/2026/04/Plano-de-Uso-Publico-APA-Lago-do-Amapa.pdf",
+    "fonte_url": "https://sema.ac.gov.br/departamentos-e-divisoes/divisao-de-areas-naturais-protegidas-e-biodiversidade/apa-lago-do-amapa/",
+    "status": "regular"
+  },
+
+  "Igarapé São Francisco": {
+    "nome_full": "APA Igarapé São Francisco",
+    "area_ha": 30004.13,
+    "municipios": "Rio Branco, Bujari",
+    "esfera": "estadual",
+    "gestor_nome": "Ricardo Antônio de Andrade Plácido",
+    "gestor_cargo": "Biólogo",
+    "gestor_portaria": "PORTARIA SEMAPI Nº 130, de 11 de maio de 2023",
+    "gestor_email": "ricardoplacido13@gmail.com",
+    "conselho_gestor": true,
+    "conselho_portaria": "Portaria de Nomeação dos Conselheiros (setembro 2025)",
+    "plano_manejo": true,
+    "plano_manejo_url": "https://sema.ac.gov.br/wp-content/uploads/2025/04/Plano_de_Manejo_APA_Igarape_Sao_Francisco.pdf",
+    "fonte_url": "https://sema.ac.gov.br/apa-igarape-sao-francisco/",
+    "status": "regular"
+  },
+
+  "Antimary": {
+    "nome_full": "Floresta Estadual do Antimary",
+    "area_ha": 47064.67,
+    "municipios": "Bujari, Sena Madureira",
+    "esfera": "estadual",
+    "gestor_nome": "Átila de Araújo Magalhães",
+    "gestor_cargo": "Geógrafo",
+    "gestor_portaria": "PORTARIA SEMA Nº 160, de 22 de julho de 2024",
+    "gestor_email": "atila.acre@gmail.com",
+    "conselho_gestor": true,
+    "conselho_portaria_criacao": "Portaria Nº 324, de 22 de dezembro de 2025",
+    "conselho_portaria_nomeacao": "Portaria Nº 325, de 22 de dezembro de 2025",
+    "plano_manejo": true,
+    "fonte_url": "https://sema.ac.gov.br/departamentos-e-divisoes/divisao-de-areas-naturais-protegidas-e-biodiversidade/fe-antimary/",
+    "status": "regular"
+  },
+
+  "Rio Gregório": {
+    "nome_full": "Floresta Estadual do Rio Gregório",
+    "area_ha": 216062.00,
+    "municipios": "Tarauacá",
+    "esfera": "estadual",
+    "gestor_nome": "Claudia Lima Silva",
+    "gestor_cargo": "Engenheira Florestal",
+    "gestor_portaria": "PORTARIA SEMA Nº 136, de 11 de maio de 2023",
+    "gestor_email": "limaclaudia.cl@gmail.com",
+    "conselho_gestor": true,
+    "conselho_portaria": "PORTARIA SEMA Nº 218/2025",
+    "plano_manejo": true,
+    "plano_manejo_url": "https://sema.ac.gov.br/wp-content/uploads/2020/11/Volume_II_Planejamento_PlanoManejoUC_FEGregorio_revisado_final.pdf",
+    "fonte_url": "https://sema.ac.gov.br/departamentos-e-divisoes/divisao-de-areas-naturais-protegidas-e-biodiversidade/fe-gregorio/",
+    "status": "regular"
+  },
+
+  "Mogno": {
+    "nome_full": "Floresta Estadual do Mogno",
+    "area_ha": 143897.00,
+    "municipios": "Tarauacá",
+    "esfera": "estadual",
+    "gestor_nome": "Claudia Lima Silva",
+    "gestor_cargo": "Engenheira Florestal",
+    "gestor_portaria": "PORTARIA SEMA Nº 136, de 11 de maio de 2023",
+    "gestor_email": "limaclaudia.cl@gmail.com",
+    "conselho_gestor": true,
+    "plano_manejo": true,
+    "fonte_url": "https://sema.ac.gov.br/departamentos-e-divisoes/divisao-de-areas-naturais-protegidas-e-biodiversidade/fe-do-mogno/",
+    "status": "regular"
+  },
+
+  "Liberdade": {
+    "nome_full": "Floresta Estadual do Rio Liberdade",
+    "area_ha": 126360.00,
+    "municipios": "Tarauacá",
+    "esfera": "estadual",
+    "gestor_nome": "Claudia Lima Silva",
+    "gestor_cargo": "Engenheira Florestal",
+    "gestor_portaria": "PORTARIA SEMA Nº 136, de 11 de maio de 2023",
+    "gestor_email": "limaclaudia.cl@gmail.com",
+    "conselho_gestor": true,
+    "conselho_portaria": "PORTARIA SEMA Nº 218/2025",
+    "plano_manejo": true,
+    "fonte_url": "https://sema.ac.gov.br/departamentos-e-divisoes/divisao-de-areas-naturais-protegidas-e-biodiversidade/fe-liberdade/",
+    "status": "regular"
+  },
+
+  "Afluente": {
+    "nome_full": "Floresta Estadual do Afluente",
+    "area_ha": 155120.06,
+    "municipios": "Manoel Urbano, Feijó",
+    "esfera": "estadual",
+    "gestor_nome": "Raco Tanomaru Junior",
+    "gestor_cargo": "Engenheiro Florestal",
+    "gestor_portaria": "PORTARIA SEMA Nº 161, de 16 de julho de 2024",
+    "gestor_email": "rtanomaru@gmail.com",
+    "conselho_gestor": true,
+    "conselho_portaria_criacao_url": "https://sema.ac.gov.br/wp-content/uploads/2025/12/PORTARIA-DE-CRIACAO-DO-CONSELHO-GESTOR-DO-AFLUENTE-1.pdf",
+    "decreto_criacao_url": "https://sema.ac.gov.br/wp-content/uploads/2025/01/Afluente-criacao-.pdf",
+    "plano_manejo": false,
+    "fonte_url": "https://sema.ac.gov.br/departamentos-e-divisoes/divisao-de-areas-naturais-protegidas-e-biodiversidade/fe-do-afluente/",
+    "status": "provisória"
+  },
+
+  "Japiim Pentecoste": {
+    "nome_full": "ARIE Japiim Pentecoste",
+    "area_ha": 25750.98,
+    "municipios": "Mâncio Lima, Cruzeiro do Sul",
+    "esfera": "estadual",
+    "gestor_nome": "Cláudia Lima Silva",
+    "gestor_cargo": "Engenheira Florestal",
+    "gestor_portaria": "PORTARIA SEMA Nº 166, de 14 de julho de 2025",
+    "gestor_email": "limaclaudia.cl@gmail.com",
+    "conselho_gestor": true,
+    "plano_manejo": true,
+    "fonte_url": "https://sema.ac.gov.br/departamentos-e-divisoes/divisao-de-areas-naturais-protegidas-e-biodiversidade/arie-japiim-pentecoste/",
+    "status": "regular"
+  },
+
+  "Irineu Serra": {
+    "nome_full": "APA Irineu Serra",
+    "area_ha": 908.74,
+    "municipios": "Rio Branco",
+    "esfera": "municipal",
+    "gestor_nome": null,
+    "gestor_cargo": null,
+    "gestor_portaria": null,
+    "gestor_email": null,
+    "conselho_gestor": false,
+    "plano_manejo": false,
+    "decreto_criacao": "Decreto Nº 500, de 07 de junho de 2005",
+    "orgao_gestor": "SEMEIA – Secretaria Municipal de Meio Ambiente de Rio Branco",
+    "fonte_url": "https://sema.ac.gov.br/departamentos-e-divisoes/divisao-de-areas-naturais-protegidas-e-biodiversidade/apa-irineu-serra/",
+    "status": "regular"
+  }
+}
