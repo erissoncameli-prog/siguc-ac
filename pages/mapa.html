@@ -810,6 +810,7 @@ function _renderizarUC(){
     onEachFeature: (f,layer) => {
       const p=f.properties; const cor=_ucCorNome(p.nome,p.cor);
       const gid=_ucGrupoId(p.grupo); const corG=gid==='pi'?'#dc2626':'#2563eb'; const lblG=gid==='pi'?'Proteção Integral':'Uso Sustentável';
+      const det=_ucDetalhes[p.nome]||{};
       const _areaHa=Number(p.area_ha)||Number(det.area_ha)||0;
       const ha=_areaHa?_areaHa.toLocaleString('pt-BR',{maximumFractionDigits:0}):'';
       if(_ucLabels&&p.centro_lon&&p.centro_lat){
@@ -818,7 +819,6 @@ function _renderizarUC(){
         tt.setLatLng([p.centro_lat,p.centro_lon]); tt.addTo(mapaL);
         layer._ucLabel=tt; layer.on('remove',()=>{ try{mapaL.removeLayer(tt);}catch(x){} });
       }
-      const det=_ucDetalhes[p.nome]||{};
       const detGestor=(det.gestor_nome||det.orgao_gestor)?`
         <div style="margin-top:8px;padding-top:8px;border-top:1px solid #e5e7eb">
           <div style="font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">${det.gestor_nome?'Gestor(a)':'Órgão Gestor'}</div>
