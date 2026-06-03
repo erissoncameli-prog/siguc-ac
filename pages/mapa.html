@@ -1423,6 +1423,7 @@ async function toggleMunicipios(ativo){
   _munAtivo=ativo;
   if(ativo&&!_munGeojson) await _carregarMunicipios();
   else _renderizarMunicipios();
+  _atualizarLegendaMapa();
 }
 async function _carregarMunicipios(){
   try{
