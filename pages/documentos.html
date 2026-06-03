@@ -253,9 +253,16 @@ const TIPO_ORDEM = ['decreto_criacao','plano_manejo','relatorio_tecnico','ata_re
 
 let _dados = []
 let _ucs = []
+let _detalhes = {}
 
 async function carregarUCs() {
-  const { data } = await db.from('unidades_conservacao').select('id,nome,codigo').eq('ativo',true).order('codigo')
+  const [ucRes, detRes] = await Promise.all([
+    db.from('unidades_conservacao').select('id,nome,codigo').eq('ativo',true).order('codigo'),
+    fetch('../data/uc_detalhes.json').then(r => r.ok ? r.json() : {})
+  ])
+  if (detRes && detRes._meta === undefined) _detalhes = detRes
+  else { const d = detRes; delete d._meta; _detalhes = d }
+  const { data } = ucRes
   _ucs = data || []
   const sel1 = document.getElementById('f-uc')
   const sel2 = document.getElementById('fil-uc')
