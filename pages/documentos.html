@@ -434,10 +434,16 @@ function renderArvore(lista) {
           <span class="tree-doc-icone">📄</span>
           <span class="tree-doc-titulo" title="${esc(d.titulo)}">${esc(d.titulo)}</span>
           ${d.publico ? '<span class="tree-doc-pub">Público</span>' : ''}
-          <a href="${esc(d.arquivo_url)}" target="_blank" class="tree-doc-baixar">
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            Baixar
-          </a>
+          <div class="tree-doc-acoes">
+            <button class="tree-doc-ver" onclick="abrirViewer(${JSON.stringify(esc(d.titulo))},${JSON.stringify(esc(d.arquivo_url))})">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              Visualizar
+            </button>
+            <a href="${esc(d.arquivo_url)}" target="_blank" download class="tree-doc-baixar">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Baixar
+            </a>
+          </div>
         </div>`).join('')
 
       tiposHtml += `
