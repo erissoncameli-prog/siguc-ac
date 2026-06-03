@@ -884,7 +884,8 @@ function _renderizarUC(){
       const p=f.properties; const cor=_ucCorNome(p.nome,p.cor);
       const gid=_ucGrupoId(p.grupo); const corG=gid==='pi'?'#dc2626':'#2563eb'; const lblG=gid==='pi'?'Proteção Integral':'Uso Sustentável';
       const det=_ucDetalhes[p.nome]||{};
-      const _areaHa=Number(p.area_ha)||Number(det.area_ha)||0;
+      // uc_detalhes é a fonte oficial (SNUC/ICMBio/SEMA) — GeoJSON é fallback
+      const _areaHa=Number(det.area_ha)||Number(p.area_ha)||0;
       const ha=_areaHa?_areaHa.toLocaleString('pt-BR',{maximumFractionDigits:0}):'';
       if(_ucLabels&&p.centro_lon&&p.centro_lat){
         const tt=L.tooltip({permanent:true,direction:'center',className:'uc-label-tt',interactive:false});
