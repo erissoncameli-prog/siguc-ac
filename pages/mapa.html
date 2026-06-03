@@ -443,6 +443,8 @@ function iniciarMapa(){
   mapaL.createPane('carPane'); mapaL.getPane('carPane').style.zIndex = 450;
   requestAnimationFrame(() => mapaL.invalidateSize());
   mapaL.on('click', onMapaClick);
+  // Carregar UCs estaduais por padrão
+  toggleUC(true);
 }
 
 function _aplicarBasemap(modo){
