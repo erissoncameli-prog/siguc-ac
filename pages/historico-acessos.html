@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>SIGUC-AC · Histórico de Acessos</title>
+<link rel="stylesheet" href="../css/global.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../js/observability.js"></script>
+<script src="../js/queryLogger.js"></script>
+<script src="../js/config.js"></script>
+<script src="../js/layout.js"></script>
+<style>
+.stat-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; margin-bottom:20px }
+.stat-card { background:#fff; border:1px solid #E5E7EB; border-radius:12px; padding:16px 18px }
+.stat-label { font-size:11px; color:#9CA3AF; font-weight:500; letter-spacing:.04em; text-transform:uppercase; margin-bottom:6px }
+.stat-val { font-size:26px; font-weight:700; color:#111827; line-height:1 }
+.stat-sub { font-size:11px; color:#9CA3AF; margin-top:4px }
+.stat-card.danger .stat-val { color:#DC2626 }
+.stat-card.warn .stat-val { color:#D97706 }
+.stat-card.ok .stat-val { color:#059669 }
+.evento-badge { display:inline-flex; align-items:center; gap:5px; padding:3px 9px; border-radius:6px; font-size:11px; font-weight:600 }
+.ev-login { background:#D1FAE5; color:#065F46 }
+.ev-falha { background:#FEE2E2; color:#991B1B }
+.ev-logout { background:#E0E7FF; color:#3730A3 }
+.ev-sessao { background:#FEF3C7; color:#92400E }
+.ip-cell { font-family:monospace; font-size:11.5px; color:#6B7280 }
+.ua-cell { font-size:11px; color:#9CA3AF; max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+.filter-chip { display:inline-flex; align-items:center; gap:4px; padding:5px 11px; border-radius:8px; font-size:12px; font-weight:500; cursor:pointer; border:1.5px solid #E5E7EB; background:#fff; color:#374151; transition:all .15s }
+.filter-chip.ativo { background:#1F4E2C; color:#fff; border-color:#1F4E2C }
+.filter-chips { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:16px }
+.vol-btn { display:inline-flex; align-items:center; gap:6px; padding:6px 12px; border-radius:8px; border:1.5px solid #E5E7EB; background:#fff; color:#374151; font-size:12px; font-weight:500; cursor:pointer; text-decoration:none; margin-bottom:16px; transition:all .15s }
+.vol-btn:hover { background:#F9FAFB; border-color:#D1D5DB }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+let _dados = [], _usuarioFiltro = null, _tipoFiltro = '', _paginaAtual = 1
+const POR_PAGINA = 50
+
+;(async function () {
+  const usuario = await carregarUsuario()
+  if (!usuario) { window.location.href = '../index.html'; return }
+  if (!['super_admin','gestor'].includes(usuario.perfil)) { window.location.href = 'dashboard.html'; return }
+
+  const params = new URLSearchParams(window.location.search)
+  _usuarioFiltro = params.get('usuario_id') || null
+  const nomeUsuario = params.get('nome') || null
+
+  document.getElementById('app').innerHTML =
+    gerarLayout('Histórico de Acessos', 'usuarios') +
+    `<div class="fade-in">
+      ${nomeUsuario
+        ? `<a class="vol-btn" href="usuarios.html">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+            Voltar para Usuários
+           </a>
+           <div style="margin-bottom:16px">
+             <div style="font-size:18px;font-weight:700;color:#111827">${esc(nomeUsuario)}</div>
+             <div style="font-size:12px;color:#9CA3AF">Histórico de acessos deste usuário</div>
+           </div>`
+        : `<div style="margin-bottom:16px">
+             <div style="font-size:18px;font-weight:700;color:#111827">Histórico de Acessos</div>
+             <div style="font-size:12px;color:#9CA3AF">Registro completo de logins, falhas e sessões</div>
+           </div>`
+      }
+      <div class="stat-grid" id="stats-grid">
+        <div class="stat-card"><div class="stat-label">Carregando...</div><div class="stat-val">—</div></div>
+      </div>
+      <div class="card">
+        <div style="padding:16px 18px;border-bottom:1px solid #F3F4F6;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <div class="filter-chips" id="filter-chips">
+            <button class="filter-chip ativo" onclick="setTipo('')">Todos</button>
+            <button class="filter-chip" onclick="setTipo('login')">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              Logins
+            </button>
+            <button class="filter-chip" onclick="setTipo('falha_login')">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              Falhas
+            </button>
+            <button class="filter-chip" onclick="setTipo('logout')">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+              Logouts
+            </button>
+          </div>
+          <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
+            <input type="date" class="form-control" id="fil-de" style="width:140px;font-size:12px" onchange="carregar()" title="A partir de">
+            <span style="font-size:12px;color:#9CA3AF">até</span>
+            <input type="date" class="form-control" id="fil-ate" style="width:140px;font-size:12px" onchange="carregar()" title="Até">
+            <input class="form-control" id="fil-busca" placeholder="Buscar e-mail ou IP..." style="width:190px;font-size:12px" oninput="renderTabela()">
+          </div>
+        </div>
+        <div class="table-wrap"><div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Data / Hora</th>
+                ${!_usuarioFiltro ? '<th>Usuário</th>' : ''}
+                <th>Evento</th>
+                <th>IP</th>
+                <th>Navegador / Dispositivo</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="tbody"><tr><td colspan="6" style="text-align:center;padding:32px;color:#9CA3AF">Carregando...</td></tr></tbody>
+          </table>
+        </div></div>
+        <div id="paginacao" style="padding:12px 18px;display:flex;align-items:center;justify-content:space-between;border-top:1px solid #F3F4F6;font-size:12px;color:#9CA3AF"></div>
+      </div>
+    </div>` +
+    '</div></div></div>'
+
+  carregarLogosSidebar()
+  await carregar()
+})()
+
+async function carregar() {
+  _paginaAtual = 1
+  let q = db.from('auditoria_acessos')
+    .select('*,usuarios!auditoria_acessos_usuario_id_fkey(nome_completo)')
+    .order('created_at', { ascending: false })
+    .limit(2000)
+
+  if (_usuarioFiltro) q = q.eq('usuario_id', _usuarioFiltro)
+  if (_tipoFiltro)    q = q.eq('tipo_evento', _tipoFiltro)
+
+  const de  = document.getElementById('fil-de')?.value
+  const ate = document.getElementById('fil-ate')?.value
+  if (de)  q = q.gte('created_at', de + 'T00:00:00')
+  if (ate) q = q.lte('created_at', ate + 'T23:59:59')
+
+  const { data, error } = await q
+  if (error) {
+    document.getElementById('tbody').innerHTML =
+      `<tr><td colspan="6" style="text-align:center;padding:32px;color:#DC2626">Erro: ${esc(error.message)}</td></tr>`
+    return
+  }
+  _dados = data || []
+  renderStats()
+  renderTabela()
+}
+
+function renderStats() {
+  const total   = _dados.length
+  const logins  = _dados.filter(r => r.tipo_evento === 'login').length
+  const falhas  = _dados.filter(r => r.tipo_evento === 'falha_login').length
+  const hoje    = new Date().toISOString().slice(0,10)
+  const hojeCt  = _dados.filter(r => r.created_at?.startsWith(hoje)).length
+
+  document.getElementById('stats-grid').innerHTML = `
+    <div class="stat-card ok">
+      <div class="stat-label">Logins bem-sucedidos</div>
+      <div class="stat-val">${logins}</div>
+      <div class="stat-sub">no período</div>
+    </div>
+    <div class="stat-card danger">
+      <div class="stat-label">Falhas de login</div>
+      <div class="stat-val">${falhas}</div>
+      <div class="stat-sub">tentativas incorretas</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Total de eventos</div>
+      <div class="stat-val">${total}</div>
+      <div class="stat-sub">todos os tipos</div>
+    </div>
+    <div class="stat-card ${hojeCt > 0 ? 'ok' : ''}">
+      <div class="stat-label">Acessos hoje</div>
+      <div class="stat-val">${hojeCt}</div>
+      <div class="stat-sub">${new Date().toLocaleDateString('pt-BR')}</div>
+    </div>`
+}
+
+function renderTabela() {
+  const busca = (document.getElementById('fil-busca')?.value || '').toLowerCase()
+  let lista = _dados
+  if (busca) lista = lista.filter(r =>
+    r.email?.toLowerCase().includes(busca) ||
+    r.ip_address?.toLowerCase().includes(busca) ||
+    r.usuarios?.nome_completo?.toLowerCase().includes(busca)
+  )
+
+  const total = lista.length
+  const inicio = (_paginaAtual - 1) * POR_PAGINA
+  const pagina = lista.slice(inicio, inicio + POR_PAGINA)
+
+  const tbody = document.getElementById('tbody')
+  if (!pagina.length) {
+    const cols = _usuarioFiltro ? 5 : 6
+    tbody.innerHTML = `<tr><td colspan="${cols}" style="text-align:center;padding:32px;color:#9CA3AF">Nenhum registro encontrado</td></tr>`
+  } else {
+    tbody.innerHTML = pagina.map(r => {
+      const ev = eventoLabel(r.tipo_evento)
+      const ua = parseUA(r.user_agent || '')
+      const dt = new Date(r.created_at)
+      const dtStr = dt.toLocaleDateString('pt-BR') + ' ' + dt.toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit', second:'2-digit' })
+      return `<tr>
+        <td style="font-size:12px;white-space:nowrap">${dtStr}</td>
+        ${!_usuarioFiltro ? `<td>
+          <div style="font-size:12px;font-weight:600">${esc(r.usuarios?.nome_completo || '—')}</div>
+          <div style="font-size:11px;color:#9CA3AF">${esc(r.email)}</div>
+        </td>` : ''}
+        <td><span class="evento-badge ${ev.cls}">${ev.icon} ${ev.label}</span>
+          ${r.motivo_falha ? `<div style="font-size:10px;color:#9CA3AF;margin-top:2px">${esc(r.motivo_falha)}</div>` : ''}
+        </td>
+        <td class="ip-cell">${esc(r.ip_address || '—')}</td>
+        <td class="ua-cell" title="${esc(r.user_agent || '')}">${esc(ua)}</td>
+        <td><span class="badge ${r.sucesso ? 'badge-verde' : 'badge-erro'}">${r.sucesso ? 'Sucesso' : 'Falha'}</span></td>
+      </tr>`
+    }).join('')
+  }
+
+  const totalPags = Math.ceil(total / POR_PAGINA)
+  const pag = document.getElementById('paginacao')
+  pag.innerHTML = total <= POR_PAGINA
+    ? `<span>${total} registro${total !== 1 ? 's' : ''}</span>`
+    : `<span>${inicio + 1}–${Math.min(inicio + POR_PAGINA, total)} de ${total}</span>
+       <div style="display:flex;gap:4px">
+         <button class="btn btn-xs btn-ghost" onclick="mudarPag(${_paginaAtual - 1})" ${_paginaAtual <= 1 ? 'disabled' : ''}>‹ Anterior</button>
+         <button class="btn btn-xs btn-ghost" onclick="mudarPag(${_paginaAtual + 1})" ${_paginaAtual >= totalPags ? 'disabled' : ''}>Próximo ›</button>
+       </div>`
+}
+
+function mudarPag(n) { _paginaAtual = n; renderTabela(); document.querySelector('.table-scroll')?.scrollTo(0,0) }
+
+function setTipo(tipo) {
+  _tipoFiltro = tipo
+  document.querySelectorAll('.filter-chip').forEach((el, i) => {
+    el.classList.toggle('ativo', (i === 0 && !tipo) || el.getAttribute('onclick')?.includes(`'${tipo}'`))
+  })
+  carregar()
+}
+
+function eventoLabel(tipo) {
+  const map = {
+    login:       { label: 'Login',    cls: 'ev-login',  icon: '✓' },
+    falha_login: { label: 'Falha',    cls: 'ev-falha',  icon: '✕' },
+    logout:      { label: 'Logout',   cls: 'ev-logout', icon: '→' },
+    sessao_expirada: { label: 'Expirou', cls: 'ev-sessao', icon: '⏱' },
+  }
+  return map[tipo] || { label: tipo, cls: 'ev-sessao', icon: '·' }
+}
+
+function parseUA(ua) {
+  if (!ua) return '—'
+  if (/Chrome\/(\d+)/i.test(ua) && !/Edg|OPR/i.test(ua)) {
+    const v = ua.match(/Chrome\/(\d+)/)?.[1]
+    const os = ua.includes('Windows') ? 'Windows' : ua.includes('Mac') ? 'macOS' : ua.includes('Linux') ? 'Linux' : ua.includes('Android') ? 'Android' : 'iOS'
+    return `Chrome ${v} · ${os}`
+  }
+  if (/Firefox\/(\d+)/i.test(ua)) { const v = ua.match(/Firefox\/(\d+)/)?.[1]; return `Firefox ${v}` }
+  if (/Edg\/(\d+)/i.test(ua))     { const v = ua.match(/Edg\/(\d+)/)?.[1]; return `Edge ${v}` }
+  if (/Safari\/(\d+)/i.test(ua) && !/Chrome/i.test(ua)) return 'Safari'
+  return ua.substring(0, 60)
+}
+</script>
+</body>
+</html>

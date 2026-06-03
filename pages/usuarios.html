@@ -75,6 +75,10 @@ let editId = null
           <option value="financeiro">Financeiro</option>
           <option value="visualizador">Visualizador</option>
         </select>
+        <a class="btn btn-secondary" href="historico-acessos.html">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          Histórico de Acessos
+        </a>
         <button class="btn btn-primary" onclick="abrirModal()">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
           Novo Usuário
@@ -83,8 +87,8 @@ let editId = null
       <div class="card">
         <div class="table-wrap"><div class="table-scroll">
           <table>
-            <thead><tr><th>Nome</th><th>E-mail</th><th>Perfil</th><th>UC de Atuação</th><th>Status</th><th>Ações</th></tr></thead>
-            <tbody id="tbody"><tr><td colspan="6" style="text-align:center;padding:32px;color:#9CA3AF">Carregando...</td></tr></tbody>
+            <thead><tr><th>Nome</th><th>E-mail</th><th>Perfil</th><th>UC de Atuação</th><th>Último Acesso</th><th>Status</th><th>Ações</th></tr></thead>
+            <tbody id="tbody"><tr><td colspan="7" style="text-align:center;padding:32px;color:#9CA3AF">Carregando...</td></tr></tbody>
           </table>
         </div></div>
       </div>
@@ -145,11 +149,15 @@ function renderTabela(lista) {
       <td style="font-size:12px;color:#6B7280">${esc(u.email)}</td>
       <td><span class="badge ${BADGE_PERFIL[u.perfil]||'badge-cinza'}">${esc(t('perfis.'+u.perfil))}</span></td>
       <td style="font-size:12px">${u.unidades_conservacao ? `${esc(u.unidades_conservacao.codigo)} — ${esc(u.unidades_conservacao.nome)}` : '<span style="color:#9CA3AF">Todas</span>'}</td>
+      <td style="font-size:12px;white-space:nowrap">${u.ultimo_login ? `<span style="color:#374151">${new Date(u.ultimo_login).toLocaleDateString('pt-BR')}</span><br><span style="color:#9CA3AF;font-size:11px">${new Date(u.ultimo_login).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}</span>` : '<span style="color:#D1D5DB">—</span>'}</td>
       <td><span class="badge ${u.ativo?'badge-verde':'badge-erro'}">${u.ativo?'Ativo':'Inativo'}</span></td>
       <td>
         <div style="display:flex;gap:4px">
           <button class="btn btn-xs btn-ghost" onclick='editarUsuario(${JSON.stringify(u)})'>Editar</button>
-          <button class="btn btn-xs ${u.ativo?'btn-ghost':'btn-ghost'}" onclick="toggleAtivo('${u.id}',${u.ativo})">${u.ativo?'Desativar':'Ativar'}</button>
+          <button class="btn btn-xs btn-ghost" onclick="toggleAtivo('${u.id}',${u.ativo})">${u.ativo?'Desativar':'Ativar'}</button>
+          <a class="btn btn-xs btn-ghost" href="historico-acessos.html?usuario_id=${u.id}&nome=${encodeURIComponent(u.nome_completo)}" title="Ver histórico de acessos">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          </a>
         </div>
       </td>
     </tr>`).join('')

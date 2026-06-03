@@ -234,6 +234,22 @@ document.addEventListener('keydown', e => {
   if (e.key === 'ArrowLeft')  { clearInterval(timer); irParaSlide(slideAtual - 1); iniciarTimer(); }
 });
 
+async function obterIP() {
+  try {
+    const r = await Promise.race([
+      fetch('https://api.ipify.org?format=json'),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 3000))
+    ]);
+    const j = await r.json();
+    return j.ip || null;
+  } catch { return null; }
+}
+
+function formatarTempoRestante(ate) {
+  const diff = Math.max(0, Math.ceil((new Date(ate) - Date.now()) / 60000));
+  return diff <= 1 ? '1 minuto' : `${diff} minutos`;
+}
+
 async function fazerLogin() {
   const email = document.getElementById('inp-email').value.trim();
   const senha = document.getElementById('inp-senha').value;
@@ -245,17 +261,45 @@ async function fazerLogin() {
   erroEl.style.display = 'none';
   btn.disabled = true; spinner.style.display = 'inline-block'; btnTexto.style.opacity = '0.6';
   try {
+    // Verificar bloqueio por tentativas antes de tentar o login
+    const { data: bloqueio } = await db.rpc('verificar_bloqueio', { p_email: email });
+    if (bloqueio?.bloqueado) {
+      erroEl.textContent = `Conta temporariamente bloqueada por excesso de tentativas. Tente novamente em ${formatarTempoRestante(bloqueio.ate)}.`;
+      erroEl.style.display = 'block'; return;
+    }
+
+    const ip = await obterIP();
+    const ua = navigator.userAgent.substring(0, 250);
+
     const { data, error } = await db.auth.signInWithPassword({ email, password: senha });
     if (error) {
       const msg = error.message || '';
-      let texto = 'Erro ao conectar. Tente novamente.';
-      if (msg.includes('Invalid login credentials') || msg.includes('invalid_credentials')) texto = 'E-mail ou senha incorretos.';
-      else if (msg.includes('Email not confirmed')) texto = 'E-mail não confirmado. Contate o administrador.';
-      else if (msg.includes('Too many requests')) texto = 'Muitas tentativas. Aguarde alguns minutos.';
+      let texto = 'E-mail ou senha incorretos.';
+      let motivo = 'credenciais_invalidas';
+      if (msg.includes('Email not confirmed')) { texto = 'E-mail não confirmado. Contate o administrador.'; motivo = 'email_nao_confirmado'; }
+      else if (msg.includes('Too many requests')) { texto = 'Muitas tentativas. Aguarde alguns minutos.'; motivo = 'rate_limit'; }
+
+      // Registrar falha e verificar se atingiu o limite
+      const { data: reg } = await db.rpc('registrar_tentativa_acesso', {
+        p_email: email, p_sucesso: false, p_ip: ip, p_user_agent: ua, p_motivo_falha: motivo
+      });
+      if (reg?.tentativas >= 5) {
+        texto = 'Conta bloqueada por 30 minutos após 5 tentativas incorretas. Contate o administrador se necessário.';
+      } else if (reg?.tentativas >= 3) {
+        texto += ` (${5 - reg.tentativas} tentativa${5 - reg.tentativas > 1 ? 's' : ''} restante${5 - reg.tentativas > 1 ? 's' : ''} antes do bloqueio)`;
+      }
       erroEl.textContent = texto; erroEl.style.display = 'block'; return;
     }
+
     const { data: u } = await db.from('usuarios').select('ativo,deve_trocar_senha').eq('id', data.user.id).single();
-    if (!u?.ativo) { await db.auth.signOut(); erroEl.textContent = 'Conta desativada. Contate o administrador.'; erroEl.style.display = 'block'; return; }
+    if (!u?.ativo) {
+      await db.auth.signOut();
+      erroEl.textContent = 'Conta desativada. Contate o administrador.'; erroEl.style.display = 'block'; return;
+    }
+
+    // Registrar login bem-sucedido (assíncrono, não bloqueia o redirect)
+    db.rpc('registrar_tentativa_acesso', { p_email: email, p_sucesso: true, p_ip: ip, p_user_agent: ua });
+
     const destino = u?.deve_trocar_senha ? 'pages/trocar-senha.html' : (localStorage.getItem('siguc_redirect') || 'pages/dashboard.html');
     localStorage.removeItem('siguc_redirect');
     window.location.replace(destino);
