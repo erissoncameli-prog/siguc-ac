@@ -957,9 +957,10 @@ function _ucStatsAtualizar(filteredFeats){
   const ACRE_HA = 16421980;
   const feats = filteredFeats || [];
   const total = feats.length;
+  // Fonte oficial: uc_detalhes (SNUC/ICMBio/SEMA) > GeoJSON > 0
   const areaTotal = feats.reduce((s,f)=>{
     const det=_ucDetalhes[f.properties?.nome]||{};
-    return s+(parseFloat(f.properties?.area_ha)||parseFloat(det.area_ha)||0);
+    return s+(parseFloat(det.area_ha)||parseFloat(f.properties?.area_ha)||0);
   },0);
   const pct = (areaTotal/ACRE_HA)*100;
 
