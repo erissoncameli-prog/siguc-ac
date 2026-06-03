@@ -3,8 +3,8 @@
   "configurations": [
     {
       "name": "siguc-ac",
-      "runtimeExecutable": "npx",
-      "runtimeArgs": ["serve", "-l", "3456", "."],
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "3456"],
       "port": 3456
     }
   ]
