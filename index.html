@@ -297,8 +297,8 @@ async function fazerLogin() {
       erroEl.textContent = 'Conta desativada. Contate o administrador.'; erroEl.style.display = 'block'; return;
     }
 
-    // Registrar login bem-sucedido (assíncrono, não bloqueia o redirect)
-    db.rpc('registrar_tentativa_acesso', { p_email: email, p_sucesso: true, p_ip: ip, p_user_agent: ua });
+    // Aguardar registro antes de redirecionar para não cancelar a requisição
+    await db.rpc('registrar_tentativa_acesso', { p_email: email, p_sucesso: true, p_ip: ip, p_user_agent: ua });
 
     const destino = u?.deve_trocar_senha ? 'pages/trocar-senha.html' : (localStorage.getItem('siguc_redirect') || 'pages/dashboard.html');
     localStorage.removeItem('siguc_redirect');
