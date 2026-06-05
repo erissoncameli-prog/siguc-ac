@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>SIGUC-AC · Acompanhamento de Pesquisa</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@700;800&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root { --floresta:#0A1A0F; --verde-c:#52B788; --ouro-c:#F0CB6A; --t1:#F4EFE6; --borda:#E5E7EB; --raio:10px; }
+body { font-family:'DM Sans',sans-serif; background:var(--t1); min-height:100vh; color:#111827; }
+
+.pub-header { background:var(--floresta); padding:20px 32px; display:flex; align-items:center; gap:16px; }
+.pub-logo    { font-family:'Fraunces',serif; font-size:26px; font-weight:800; color:var(--ouro-c); letter-spacing:-.02em; }
+.pub-logo-sub{ font-size:10px; color:#9CA3AF; letter-spacing:.08em; text-transform:uppercase; margin-top:2px; }
+.pub-header-right { margin-left:auto; font-size:12px; color:#9CA3AF; }
+.pub-header-right a { color:var(--verde-c); text-decoration:none; font-weight:600; }
+
+.pub-main { max-width:720px; margin:0 auto; padding:32px 16px 64px; }
+
+/* Busca */
+.busca-card { background:#fff; border-radius:14px; border:1px solid var(--borda); padding:28px 32px; margin-bottom:24px; }
+.busca-card h1 { font-family:'Fraunces',serif; font-size:22px; font-weight:800; color:var(--floresta); margin-bottom:8px; }
+.busca-card p  { font-size:13px; color:#6B7280; margin-bottom:16px; }
+.busca-row { display:flex; gap:10px; }
+.busca-input { flex:1; padding:12px 16px; border:1px solid var(--borda); border-radius:var(--raio); font-size:14px; font-family:inherit; outline:none; }
+.busca-input:focus { border-color:var(--verde-c); }
+.busca-btn { padding:12px 24px; background:var(--floresta); color:#fff; border:none; border-radius:var(--raio); font-weight:700; font-size:14px; cursor:pointer; font-family:inherit; }
+.busca-btn:hover { background:#1F4E2C; }
+
+/* Status card */
+.status-card { background:#fff; border-radius:14px; border:1px solid var(--borda); padding:28px 32px; margin-bottom:16px; }
+.status-header { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:20px; }
+.status-numero { font-family:monospace; font-size:13px; color:#6B7280; font-weight:700; }
+.status-titulo { font-size:18px; font-weight:800; color:var(--floresta); margin-top:4px; }
+
+/* Etapa badge */
+.etapa-badge { display:inline-block; padding:6px 14px; border-radius:20px; font-size:12px; font-weight:800; background:#F0FDF4; color:#15803D; }
+.etapa-badge.alerta { background:#FFF7ED; color:#C2410C; }
+.etapa-badge.danger { background:#FEF2F2; color:#DC2626; }
+
+/* Info grid */
+.info-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:16px 0; }
+@media(max-width:500px){ .info-grid { grid-template-columns:1fr; } }
+.info-item { background:#F9FAFB; border-radius:8px; padding:10px 14px; }
+.info-key   { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:#9CA3AF; margin-bottom:3px; }
+.info-val   { font-size:13px; color:#374151; font-weight:600; }
+
+/* AAP box */
+.aap-box { background:linear-gradient(135deg,#0A1A0F,#1F4E2C); border-radius:12px; padding:20px 24px; color:#fff; margin:16px 0; }
+.aap-num  { font-size:18px; font-weight:800; color:var(--ouro-c); font-family:monospace; }
+.aap-sub  { font-size:11px; color:#9CA3AF; margin-top:4px; }
+.aap-val  { font-size:12px; color:#A7F3D0; margin-top:6px; font-weight:600; }
+
+/* Timeline */
+.timeline { display:flex; flex-direction:column; gap:0; }
+.tl-item  { display:flex; gap:12px; }
+.tl-left  { display:flex; flex-direction:column; align-items:center; }
+.tl-dot   { width:22px; height:22px; border-radius:50%; background:var(--verde-c); display:flex; align-items:center; justify-content:center; font-size:11px; color:#fff; font-weight:800; flex-shrink:0; }
+.tl-dot.pend { background:#E5E7EB; color:#9CA3AF; }
+.tl-line  { width:2px; flex:1; background:#E5E7EB; margin:4px 0; min-height:16px; }
+.tl-content { padding-bottom:16px; flex:1; }
+.tl-etapa   { font-size:13px; font-weight:700; color:#111827; }
+.tl-etapa.pend { color:#9CA3AF; font-weight:500; }
+.tl-quando  { font-size:11px; color:#9CA3AF; margin-top:2px; }
+.tl-obs     { font-size:12px; color:#6B7280; margin-top:3px; font-style:italic; background:#F9FAFB; border-radius:6px; padding:6px 10px; }
+
+/* Alerta complementação */
+.comp-box { background:#FFFBEB; border:1px solid #FDE68A; border-radius:var(--raio); padding:16px 18px; margin:16px 0; }
+.comp-title { font-size:13px; font-weight:800; color:#92400E; margin-bottom:6px; }
+.comp-msg   { font-size:13px; color:#78350F; line-height:1.6; }
+.comp-prazo { font-size:11px; font-weight:700; color:#B45309; margin-top:6px; }
+
+/* Upload complementar */
+.upload-comp { border:2px dashed #FDE68A; border-radius:var(--raio); padding:16px; text-align:center; cursor:pointer; background:#FFFBEB; position:relative; margin-top:10px; }
+.upload-comp input { position:absolute; inset:0; opacity:0; cursor:pointer; }
+.upload-comp:hover { border-color:#F59E0B; background:#FEF9C3; }
+.upload-comp.has-file { border-color:#22C55E; background:#F0FDF4; }
+
+/* Documentos */
+.doc-list { display:flex; flex-direction:column; gap:8px; }
+.doc-item { display:flex; align-items:center; gap:10px; padding:10px 14px; background:#F9FAFB; border-radius:8px; border:1px solid #F3F4F6; }
+.doc-tipo  { font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.04em; padding:2px 8px; border-radius:20px; background:#E5E7EB; color:#374151; }
+.doc-nome  { font-size:12px; color:#374151; flex:1; }
+.doc-data  { font-size:10px; color:#9CA3AF; }
+
+/* Botões */
+.btn { padding:10px 22px; border-radius:var(--raio); font-size:13px; font-weight:700; cursor:pointer; border:none; font-family:inherit; }
+.btn-primary   { background:var(--verde-c); color:#fff; }
+.btn-secondary { background:#fff; color:#374151; border:1px solid var(--borda); }
+.btn:hover { opacity:.9; }
+.btn:disabled { opacity:.5; cursor:not-allowed; }
+
+/* Toast */
+.toast-pub { position:fixed; bottom:24px; right:24px; background:#1F4E2C; color:#fff; padding:12px 20px; border-radius:var(--raio); font-size:13px; font-weight:600; z-index:9999; opacity:0; transform:translateY(10px); transition:all .25s; pointer-events:none; }
+.toast-pub.show { opacity:1; transform:translateY(0); }
+.toast-pub.erro { background:#DC2626; }
+
+/* Inadimplente */
+.inad-box { background:#FEF2F2; border:1px solid #FECACA; border-radius:var(--raio); padding:14px 16px; color:#991B1B; font-size:13px; margin:12px 0; }
+</style>
+</head>
+<body>
+
+<header class="pub-header">
+  <div>
+    <div class="pub-logo">SIGUC</div>
+    <div class="pub-logo-sub">Gestão de UCs · SEMA/AC</div>
+  </div>
+  <div class="pub-header-right">
+    <a href="pesquisa-publica.html">← Submeter nova pesquisa</a>
+    &nbsp;·&nbsp;
+    <a href="../index.html">Acesso restrito</a>
+  </div>
+</header>
+
+<main class="pub-main">
+
+  <!-- Busca -->
+  <div class="busca-card">
+    <h1>Acompanhamento de Pesquisa</h1>
+    <p>Informe o token de acompanhamento recebido por e-mail após a submissão.</p>
+    <div class="busca-row">
+      <input class="busca-input" id="campo-token" placeholder="Cole aqui o token de acompanhamento…"
+        value="" onkeydown="if(event.key==='Enter')buscar()">
+      <button class="busca-btn" onclick="buscar()">Consultar →</button>
+    </div>
+    <div id="erro-busca" style="margin-top:10px;font-size:13px;color:#DC2626;display:none"></div>
+  </div>
+
+  <!-- Resultado (oculto até busca) -->
+  <div id="resultado" style="display:none"></div>
+
+</main>
+
+<div class="toast-pub" id="toast-pub"></div>
+
+<script>
+const SUPABASE_URL      = 'https://atqtybcsvepdabsvgaly.supabase.co'
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF0cXR5YmNzdmVwZGFic3ZnYWx5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0MjMzNzgsImV4cCI6MjA5NTk5OTM3OH0.hWx1AB2rK7xdco1Dgagm0XUOBPQbxZVE614SW4SKoLk'
+const { createClient } = supabase
+const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+
+const ETAPAS_LABEL = {
+  submetida:'Submetida', triagem:'Triagem', analise_tecnica:'Análise Técnica',
+  parecer_juridico:'Parecer Jurídico', aap_emissao:'Emissão de AAP',
+  aap_assinatura:'Assinatura da AAP', aap_publicada:'AAP Publicada',
+  em_campo:'Em Campo', relatorio_parcial:'Relatório Parcial',
+  relatorio_final:'Relatório Final', analise_relatorio:'Análise do Relatório',
+  encerrada:'Encerrada', arquivada:'Arquivada',
+}
+const ETAPAS_ORD = Object.keys(ETAPAS_LABEL)
+
+const DOC_LABEL = {
+  formulario:'Formulário', proposta:'Proposta', sisbio:'SISBIO',
+  conep:'CONEP', aap_pdf:'AAP (PDF)', relatorio_parcial:'Rel. Parcial',
+  relatorio_final:'Rel. Final', complementar:'Complementar', outro:'Outro',
+}
+
+let _pesquisa = null
+let _arquivoComp = null
+
+// ── Auto-busca por token na URL ───────────────────────────────
+window.addEventListener('load', () => {
+  const token = new URLSearchParams(location.search).get('token')
+  if (token) {
+    document.getElementById('campo-token').value = token
+    buscar()
+  }
+})
+
+// ── Busca ─────────────────────────────────────────────────────
+async function buscar() {
+  const token = document.getElementById('campo-token').value.trim()
+  if (!token) { mostrarErro('Informe o token de acompanhamento.'); return }
+
+  mostrarErro('')
+  document.getElementById('resultado').innerHTML =
+    '<div style="text-align:center;padding:40px;color:#9CA3AF">Consultando…</div>'
+  document.getElementById('resultado').style.display = ''
+
+  const { data, error } = await db.rpc('buscar_pesquisa_por_token', { p_token: token })
+
+  if (error || !data) {
+    mostrarErro('Token não encontrado. Verifique o código recebido por e-mail.')
+    document.getElementById('resultado').style.display = 'none'
+    return
+  }
+
+  _pesquisa = data
+  renderResultado()
+}
+
+function mostrarErro(msg) {
+  const el = document.getElementById('erro-busca')
+  el.textContent = msg
+  el.style.display = msg ? '' : 'none'
+}
+
+// ── Render resultado ──────────────────────────────────────────
+function renderResultado() {
+  const p = _pesquisa
+  const etapaIdx = ETAPAS_ORD.indexOf(p.etapa)
+  const isComp   = p.complementacao_solicitada
+  const isInad   = p.inadimplente
+
+  const tipoLabel = { fauna:'Fauna', flora:'Flora', genetica:'Genética', ecossistema:'Ecossistema', socioambiental:'Socioambiental', outro:'Outro' }
+
+  // Badge da etapa
+  const badgeClass = p.etapa === 'arquivada' ? 'danger' : isComp ? 'alerta' : ''
+  const etapaLabel = ETAPAS_LABEL[p.etapa] || p.etapa
+
+  // Documentos entregues
+  const docs = p.documentos || []
+  const docsHtml = docs.length ? `
+<div class="doc-list">
+  ${docs.map(d => `
+  <div class="doc-item">
+    <span class="doc-tipo">${DOC_LABEL[d.tipo] || d.tipo}</span>
+    <span class="doc-nome">${esc(d.nome_original)}</span>
+    <span class="doc-data">${fmtData(d.criado_em)}</span>
+  </div>`).join('')}
+</div>` : '<p style="font-size:12px;color:#9CA3AF">Nenhum documento registrado.</p>'
+
+  // Timeline
+  const hist = p.historico || []
+  const timelineHtml = ETAPAS_ORD.map((e, i) => {
+    const h      = hist.find(h => h.etapa_nova === e)
+    const feita  = i <= etapaIdx
+    const atual  = i === etapaIdx
+    const ultimo = i === ETAPAS_ORD.length - 1
+    return `
+<div class="tl-item">
+  <div class="tl-left">
+    <div class="tl-dot ${feita ? '' : 'pend'}">${feita ? (atual ? '●' : '✓') : String(i + 1)}</div>
+    ${!ultimo ? '<div class="tl-line"></div>' : ''}
+  </div>
+  <div class="tl-content">
+    <div class="tl-etapa ${feita ? '' : 'pend'}">${ETAPAS_LABEL[e]}</div>
+    ${h ? `<div class="tl-quando">${fmtData(h.criado_em)}</div>` : ''}
+    ${h?.observacao ? `<div class="tl-obs">${esc(h.observacao)}</div>` : ''}
+  </div>
+</div>`
+  }).join('')
+
+  document.getElementById('resultado').innerHTML = `
+
+<!-- Card principal -->
+<div class="status-card">
+  <div class="status-header">
+    <div>
+      <div class="status-numero">${esc(p.numero_processo || '—')}</div>
+      <div class="status-titulo">${esc(p.titulo)}</div>
+    </div>
+    <span class="etapa-badge ${badgeClass}">${etapaLabel}</span>
+  </div>
+
+  ${isInad ? `<div class="inad-box">⚠️ <strong>Atenção:</strong> Há pendências registradas no seu processo que impedem o avanço. Entre em contato com a DEUC/DIMA para regularização.</div>` : ''}
+
+  <div class="info-grid">
+    <div class="info-item"><div class="info-key">Pesquisador</div><div class="info-val">${esc(p.pesquisador_nome || '—')}</div></div>
+    <div class="info-item"><div class="info-key">Tipo</div><div class="info-val">${tipoLabel[p.tipo] || p.tipo}</div></div>
+    <div class="info-item"><div class="info-key">UC de interesse</div><div class="info-val">${esc(p.uc_nome || '—')}</div></div>
+    <div class="info-item"><div class="info-key">Período previsto</div><div class="info-val">${p.data_inicio_prevista || '?'} → ${p.data_fim_prevista || '?'}</div></div>
+    <div class="info-item"><div class="info-key">Submetida em</div><div class="info-val">${fmtData(p.criado_em)}</div></div>
+    <div class="info-item"><div class="info-key">Processo</div><div class="info-val" style="font-family:monospace">${esc(p.numero_processo || '—')}</div></div>
+  </div>
+
+  ${p.aap_numero ? `
+  <div class="aap-box">
+    <div style="font-size:11px;color:#A7F3D0;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Autorização de Acesso e Pesquisa</div>
+    <div class="aap-num">${esc(p.aap_numero)}</div>
+    <div class="aap-sub">Assinado por ${esc(p.assinado_por || '—')}</div>
+    ${p.aap_validade ? `<div class="aap-val">Válida até ${p.aap_validade}</div>` : ''}
+  </div>` : ''}
+</div>
+
+<!-- Complementação solicitada -->
+${isComp ? `
+<div class="status-card">
+  <div class="comp-box">
+    <div class="comp-title">📎 Documentação complementar solicitada</div>
+    <div class="comp-msg">${esc(p.complementacao_motivo || '')}</div>
+    ${p.complementacao_prazo ? `<div class="comp-prazo">⏰ Prazo: ${p.complementacao_prazo}</div>` : ''}
+  </div>
+  <div style="margin-top:4px">
+    <label style="font-size:12px;font-weight:700;color:#374151;display:block;margin-bottom:6px">Enviar documento solicitado:</label>
+    <div class="upload-comp" id="uz-comp" ondragover="event.preventDefault();this.classList.add('has-file')" ondrop="dropComp(event)">
+      <input type="file" accept=".pdf,.PDF,.doc,.docx,.jpg,.jpeg,.png" onchange="selecionarComp(this)">
+      📎 Clique ou arraste o documento aqui
+      <div id="fi-comp" style="font-size:12px;color:#15803D;font-weight:600;margin-top:6px;display:none"></div>
+    </div>
+    <button class="btn btn-primary" id="btn-comp" onclick="enviarComplementacao()" style="margin-top:12px">Enviar documento →</button>
+  </div>
+</div>` : ''}
+
+<!-- Documentos -->
+<div class="status-card">
+  <div style="font-size:14px;font-weight:800;color:#374151;margin-bottom:14px">📁 Documentos entregues</div>
+  ${docsHtml}
+
+  ${!isComp && !['encerrada','arquivada'].includes(p.etapa) ? `
+  <div style="margin-top:16px;padding-top:16px;border-top:1px solid #F3F4F6">
+    <div style="font-size:12px;font-weight:700;color:#374151;margin-bottom:8px">Enviar documento adicional:</div>
+    <div class="upload-comp" id="uz-extra" ondragover="event.preventDefault()" ondrop="dropExtra(event)">
+      <input type="file" onchange="selecionarExtra(this)">
+      📎 Documento adicional (relatórios, adendos…)
+      <div id="fi-extra" style="display:none;font-size:12px;color:#15803D;font-weight:600;margin-top:6px"></div>
+    </div>
+    <button class="btn btn-secondary" onclick="enviarExtra()" style="margin-top:10px">Enviar</button>
+  </div>` : ''}
+</div>
+
+<!-- Timeline -->
+<div class="status-card">
+  <div style="font-size:14px;font-weight:800;color:#374151;margin-bottom:16px">📋 Histórico do processo</div>
+  <div class="timeline">${timelineHtml}</div>
+</div>
+
+<!-- Contato -->
+<div style="text-align:center;padding:20px;font-size:12px;color:#9CA3AF;line-height:1.8">
+  Dúvidas? Entre em contato com a DEUC/DIMA<br>
+  <a href="mailto:sema.gabin@gmail.com" style="color:var(--verde-c);font-weight:700">sema.gabin@gmail.com</a>
+  · Seg–Sex 7h–14h
+</div>`
+}
+
+// ── Upload complementação ─────────────────────────────────────
+let _arquivoExtra = null
+
+function selecionarComp(input) {
+  _arquivoComp = input.files?.[0]
+  if (_arquivoComp) {
+    const uz = document.getElementById('uz-comp')
+    uz.classList.add('has-file')
+    document.getElementById('fi-comp').textContent = `✓ ${_arquivoComp.name}`
+    document.getElementById('fi-comp').style.display = ''
+  }
+}
+
+function dropComp(e) {
+  e.preventDefault()
+  const file = e.dataTransfer.files?.[0]
+  if (!file) return
+  _arquivoComp = file
+  document.getElementById('uz-comp').classList.add('has-file')
+  document.getElementById('fi-comp').textContent = `✓ ${file.name}`
+  document.getElementById('fi-comp').style.display = ''
+}
+
+function selecionarExtra(input) {
+  _arquivoExtra = input.files?.[0]
+  if (_arquivoExtra) {
+    document.getElementById('fi-extra').textContent = `✓ ${_arquivoExtra.name}`
+    document.getElementById('fi-extra').style.display = ''
+  }
+}
+
+function dropExtra(e) {
+  e.preventDefault()
+  const file = e.dataTransfer.files?.[0]
+  if (!file) return
+  _arquivoExtra = file
+  document.getElementById('fi-extra').textContent = `✓ ${file.name}`
+  document.getElementById('fi-extra').style.display = ''
+}
+
+async function enviarComplementacao() {
+  if (!_arquivoComp) { toastPub('Selecione o arquivo antes de enviar', true); return }
+  await uploadDoc(_arquivoComp, 'complementar')
+}
+
+async function enviarExtra() {
+  if (!_arquivoExtra) { toastPub('Selecione o arquivo antes de enviar', true); return }
+  await uploadDoc(_arquivoExtra, 'outro')
+}
+
+async function uploadDoc(arquivo, tipo) {
+  const ext  = arquivo.name.split('.').pop()
+  const path = `${_pesquisa.id}/${tipo}_${Date.now()}.${ext}`
+
+  const { error: upErr } = await db.storage
+    .from('pesquisa-documentos')
+    .upload(path, arquivo, { contentType: arquivo.type })
+
+  if (upErr) { toastPub('Erro ao enviar arquivo: ' + upErr.message, true); return }
+
+  await db.from('pesquisa_documentos').insert({
+    pesquisa_id:   _pesquisa.id,
+    tipo,
+    nome_original: arquivo.name,
+    storage_path:  path,
+    tamanho_bytes: arquivo.size,
+    mime_type:     arquivo.type,
+    enviado_por:   'pesquisador',
+    observacao:    tipo === 'complementar' ? 'Enviado em atendimento à solicitação de complementação.' : null,
+  })
+
+  toastPub('Documento enviado com sucesso!')
+  // Atualiza complementacao_solicitada se for complementar
+  if (tipo === 'complementar') {
+    await db.from('pesquisas')
+      .update({ complementacao_solicitada: false, complementacao_motivo: null })
+      .eq('id', _pesquisa.id)
+  }
+  await buscar()
+}
+
+// ── Helpers ───────────────────────────────────────────────────
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') }
+function fmtData(d) {
+  if (!d) return '—'
+  return new Date(d).toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' })
+}
+
+function toastPub(msg, erro = false) {
+  const el = document.getElementById('toast-pub')
+  el.textContent = msg
+  el.className   = 'toast-pub show' + (erro ? ' erro' : '')
+  clearTimeout(el._t)
+  el._t = setTimeout(() => el.classList.remove('show'), 3500)
+}
+</script>
+</body>
+</html>
