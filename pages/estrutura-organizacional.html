@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>SIGUC-AC · Estrutura Organizacional</title>
+<link rel="stylesheet" href="../css/global.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../js/observability.js"></script>
+<script src="../js/queryLogger.js"></script>
+<script src="../js/config.js"></script>
+<script src="../js/layout.js"></script>
+<style>
+/* ── Abas ─────────────────────────────────────────────── */
+.tabs { display:flex; gap:4px; margin-bottom:20px; border-bottom:2px solid #E5E7EB; }
+.tab-btn {
+  padding:10px 20px; font-size:13px; font-weight:600; border:none;
+  background:none; color:#6B7280; cursor:pointer; border-bottom:2px solid transparent;
+  margin-bottom:-2px; transition:color .15s,border-color .15s;
+}
+.tab-btn.ativo { color:var(--verde-c); border-bottom-color:var(--verde-c); }
+.tab-btn:hover:not(.ativo) { color:#374151; }
+.tab-panel { display:none; }
+.tab-panel.ativo { display:block; }
+
+/* ── Organograma ──────────────────────────────────────── */
+.org-tree { display:flex; flex-direction:column; gap:24px; }
+.org-nivel { display:flex; flex-wrap:wrap; gap:16px; justify-content:center; }
+.org-nivel-label {
+  width:100%; font-size:11px; font-weight:700; color:#9CA3AF;
+  text-transform:uppercase; letter-spacing:.08em; margin-bottom:4px;
+}
+.org-card {
+  background:#fff; border:1px solid #E5E7EB; border-radius:12px;
+  padding:16px 20px; min-width:220px; max-width:280px; flex:1;
+  box-shadow:0 1px 4px rgba(0,0,0,.06); position:relative;
+}
+.org-card-unidade {
+  font-size:10px; font-weight:700; color:#9CA3AF;
+  text-transform:uppercase; letter-spacing:.06em; margin-bottom:4px;
+}
+.org-card-cargo { font-size:13px; font-weight:700; color:#111827; margin-bottom:8px; }
+.org-card-titular {
+  display:flex; align-items:center; gap:8px; margin-top:8px;
+}
+.org-avatar {
+  width:32px; height:32px; border-radius:50%;
+  background:linear-gradient(135deg,#F4D35E,#D4A017);
+  display:flex; align-items:center; justify-content:center;
+  font-size:11px; font-weight:700; color:#1F4E2C; flex-shrink:0;
+}
+.org-card-nome { font-size:12px; font-weight:600; color:#374151; }
+.org-card-portaria { font-size:11px; color:#9CA3AF; margin-top:2px; }
+.org-card-vago { font-size:12px; color:#D1D5DB; font-style:italic; margin-top:8px; }
+.org-badge-sub {
+  display:inline-flex; align-items:center; gap:4px;
+  background:#FEF3C7; color:#92400E; border-radius:20px;
+  font-size:10px; font-weight:600; padding:2px 8px; margin-top:6px;
+}
+.org-card-nivel-secretario { border-top:3px solid var(--ouro); }
+.org-card-nivel-diretor     { border-top:3px solid var(--verde-c); }
+.org-card-nivel-coordenador { border-top:3px solid #60A5FA; }
+.org-card-nivel-chefe_deuc  { border-top:3px solid #A78BFA; }
+.org-card-nivel-gestor_uc   { border-top:3px solid #34D399; }
+.org-card-nivel-analista_uc { border-top:3px solid #9CA3AF; }
+.org-connector { text-align:center; color:#D1D5DB; font-size:18px; line-height:1; }
+
+/* ── Vazio ────────────────────────────────────────────── */
+.empty-state {
+  text-align:center; padding:48px 24px; color:#9CA3AF;
+}
+.empty-state svg { opacity:.3; margin-bottom:12px; }
+.empty-state p { font-size:14px; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<!-- Modal: Registrar Ocupação -->
+<div class="modal-overlay" id="modal-ocupacao">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="ocup-titulo">Registrar Ocupação</div>
+      <button class="modal-close" onclick="fecharModalOcupacao()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Cargo <span class="obrig">*</span></label>
+        <select class="form-control" id="ocup-cargo"></select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Servidor <span class="obrig">*</span></label>
+        <select class="form-control" id="ocup-usuario"></select>
+      </div>
+      <div class="grid-2">
+        <div class="form-group">
+          <label class="form-label">Data de Início <span class="obrig">*</span></label>
+          <input class="form-control" type="date" id="ocup-inicio">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Data de Fim</label>
+          <input class="form-control" type="date" id="ocup-fim">
+          <div class="form-hint">Deixe vazio se ainda vigente.</div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Portaria</label>
+        <input class="form-control" id="ocup-portaria" placeholder="Portaria nº __/____">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Observações</label>
+        <textarea class="form-control" id="ocup-obs" rows="2" placeholder="Opcional"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="fecharModalOcupacao()">Cancelar</button>
+      <button class="btn btn-primary" id="ocup-btn-salvar" onclick="salvarOcupacao()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Nova Delegação -->
+<div class="modal-overlay" id="modal-delegacao">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Nova Delegação Temporária</div>
+      <button class="modal-close" onclick="fecharModalDelegacao()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Cargo <span class="obrig">*</span></label>
+        <select class="form-control" id="del-cargo"></select>
+      </div>
+      <div class="grid-2">
+        <div class="form-group">
+          <label class="form-label">Titular (Delegante) <span class="obrig">*</span></label>
+          <select class="form-control" id="del-delegante"></select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Substituto (Delegado) <span class="obrig">*</span></label>
+          <select class="form-control" id="del-delegado"></select>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group">
+          <label class="form-label">Data de Início <span class="obrig">*</span></label>
+          <input class="form-control" type="date" id="del-inicio">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Data de Fim <span class="obrig">*</span></label>
+          <input class="form-control" type="date" id="del-fim">
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group">
+          <label class="form-label">Motivo</label>
+          <select class="form-control" id="del-motivo">
+            <option value="">Selecione...</option>
+            <option value="ferias">Férias</option>
+            <option value="licenca">Licença</option>
+            <option value="interinidade">Interinidade</option>
+            <option value="viagem">Viagem de serviço</option>
+            <option value="outro">Outro</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Portaria</label>
+          <input class="form-control" id="del-portaria" placeholder="Portaria nº __/____">
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="fecharModalDelegacao()">Cancelar</button>
+      <button class="btn btn-primary" id="del-btn-salvar" onclick="salvarDelegacao()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const NIVEL_LABEL = {
+  secretario:'Secretário', diretor:'Diretor', coordenador:'Coordenador',
+  chefe_deuc:'Chefe de Depto.', gestor_uc:'Gestor de UC',
+  analista_uc:'Analista', pesquisador_externo:'Pesquisador'
+}
+const NIVEL_ORDEM = ['secretario','diretor','coordenador','chefe_deuc','gestor_uc','analista_uc','pesquisador_externo']
+
+let _cargosAtuais = []
+let _cargos = []
+let _usuarios = []
+let _ocupacoes = []
+let _delegacoes = []
+let _unidades = []
+let _perfilUsuario = ''
+
+;(async function () {
+  const usuario = await carregarUsuario()
+  if (!usuario) { window.location.href = '../index.html'; return }
+  _perfilUsuario = usuario.perfil
+
+  document.getElementById('app').innerHTML =
+    gerarLayout('Estrutura Organizacional', 'estrutura-organizacional') +
+    `<div class="fade-in">
+      <div class="tabs">
+        <button class="tab-btn ativo" onclick="ativarAba('organograma', this)">Organograma</button>
+        <button class="tab-btn" onclick="ativarAba('cargos', this)">Cargos</button>
+        <button class="tab-btn" onclick="ativarAba('delegacoes', this)">Delegações</button>
+        <button class="tab-btn" onclick="ativarAba('unidades', this)">Unidades</button>
+      </div>
+
+      <div id="tab-organograma" class="tab-panel ativo">
+        <div id="organograma-content"><p style="color:#9CA3AF;padding:32px;text-align:center">Carregando...</p></div>
+      </div>
+
+      <div id="tab-cargos" class="tab-panel">
+        <div class="filter-bar">
+          <input class="form-control search-input" id="busca-cargos" placeholder="Buscar cargo ou titular..." oninput="filtrarCargos()">
+          ${['super_admin','gestor'].includes(usuario.perfil) ? `
+          <button class="btn btn-primary" onclick="abrirModalOcupacao()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Registrar Ocupação
+          </button>` : ''}
+        </div>
+        <div class="card">
+          <div class="table-wrap"><div class="table-scroll">
+            <table>
+              <thead><tr><th>Cargo</th><th>Unidade</th><th>Nível</th><th>Símbolo</th><th>Titular Atual</th><th>Desde</th><th>Portaria</th>${['super_admin','gestor'].includes(usuario.perfil) ? '<th>Ações</th>' : ''}</tr></thead>
+              <tbody id="tbody-cargos"><tr><td colspan="8" style="text-align:center;padding:32px;color:#9CA3AF">Carregando...</td></tr></tbody>
+            </table>
+          </div></div>
+        </div>
+      </div>
+
+      <div id="tab-delegacoes" class="tab-panel">
+        <div class="filter-bar">
+          <select class="form-control" id="fil-del-status" style="width:160px" onchange="filtrarDelegacoes()">
+            <option value="ativa">Ativas</option>
+            <option value="todas">Todas</option>
+          </select>
+          ${['super_admin','gestor'].includes(usuario.perfil) ? `
+          <button class="btn btn-primary" onclick="abrirModalDelegacao()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Nova Delegação
+          </button>` : ''}
+        </div>
+        <div class="card">
+          <div class="table-wrap"><div class="table-scroll">
+            <table>
+              <thead><tr><th>Cargo</th><th>Titular</th><th>Substituto</th><th>Período</th><th>Motivo</th><th>Portaria</th><th>Status</th>${['super_admin'].includes(usuario.perfil) ? '<th>Ações</th>' : ''}</tr></thead>
+              <tbody id="tbody-delegacoes"><tr><td colspan="8" style="text-align:center;padding:32px;color:#9CA3AF">Carregando...</td></tr></tbody>
+            </table>
+          </div></div>
+        </div>
+      </div>
+
+      <div id="tab-unidades" class="tab-panel">
+        <div id="unidades-content"><p style="color:#9CA3AF;padding:32px;text-align:center">Carregando...</p></div>
+      </div>
+    </div>` +
+    '</div></div></div>'
+
+  carregarLogosSidebar()
+  await Promise.all([carregarDados()])
+})()
+
+async function carregarDados() {
+  const [r1, r2, r3, r4, r5] = await Promise.all([
+    db.from('cargos_atuais').select('*'),
+    db.from('cargos').select('*,unidades_organizacionais(sigla,nome)').eq('ativo', true).order('nivel'),
+    db.from('usuarios').select('id,nome_completo,email,perfil').eq('ativo', true).order('nome_completo'),
+    db.from('cargo_ocupacoes').select('*,cargos(denominacao),usuarios(nome_completo)').order('data_inicio', { ascending: false }),
+    db.from('delegacoes_temporarias').select('*,cargos(denominacao),delegante:usuarios!delegacoes_temporarias_delegante_id_fkey(nome_completo),delegado:usuarios!delegacoes_temporarias_delegado_id_fkey(nome_completo)').order('data_inicio', { ascending: false }),
+  ])
+  _cargosAtuais = r1.data || []
+  _cargos       = r2.data || []
+  _usuarios     = r3.data || []
+  _ocupacoes    = r4.data || []
+  _delegacoes   = r5.data || []
+
+  const r6 = await db.from('unidades_organizacionais').select('*').eq('ativo', true).order('criado_em')
+  _unidades = r6.data || []
+
+  renderOrganograma()
+  renderCargos(_cargosAtuais)
+  filtrarDelegacoes()
+  renderUnidades()
+  popularSelects()
+}
+
+// ── Organograma ──────────────────────────────────────────
+
+function renderOrganograma() {
+  const niveis = NIVEL_ORDEM.filter(n => _cargosAtuais.some(c => c.nivel === n))
+  if (!niveis.length) {
+    document.getElementById('organograma-content').innerHTML =
+      `<div class="empty-state"><p>Nenhum cargo cadastrado.</p></div>`
+    return
+  }
+
+  let html = '<div class="org-tree">'
+  niveis.forEach((nivel, i) => {
+    const cards = _cargosAtuais.filter(c => c.nivel === nivel)
+    html += `<div class="org-nivel">
+      <div class="org-nivel-label">${NIVEL_LABEL[nivel] || nivel}</div>`
+    cards.forEach(c => {
+      html += `<div class="org-card org-card-nivel-${nivel}">
+        <div class="org-card-unidade">${esc(c.unidade_sigla)}</div>
+        <div class="org-card-cargo">${esc(c.denominacao)}</div>`
+      if (c.titular_nome) {
+        html += `<div class="org-card-titular">
+          <div class="org-avatar">${iniciais(c.titular_nome)}</div>
+          <div>
+            <div class="org-card-nome">${esc(c.titular_nome)}</div>
+            ${c.portaria_nomeacao ? `<div class="org-card-portaria">${esc(c.portaria_nomeacao)}</div>` : ''}
+          </div>
+        </div>`
+        if (c.substituto_nome) {
+          html += `<div class="org-badge-sub">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            Substituto: ${esc(c.substituto_nome)}
+            (${formatData(c.delegacao_inicio)} – ${formatData(c.delegacao_fim)})
+          </div>`
+        }
+      } else {
+        html += `<div class="org-card-vago">Vago</div>`
+      }
+      html += `</div>`
+    })
+    html += `</div>`
+    if (i < niveis.length - 1) html += `<div class="org-connector">↓</div>`
+  })
+  html += '</div>'
+  document.getElementById('organograma-content').innerHTML = html
+}
+
+// ── Cargos ────────────────────────────────────────────────
+
+function filtrarCargos() {
+  const q = (document.getElementById('busca-cargos')?.value || '').toLowerCase()
+  const lista = _cargosAtuais.filter(c =>
+    !q ||
+    c.denominacao.toLowerCase().includes(q) ||
+    (c.titular_nome || '').toLowerCase().includes(q) ||
+    c.unidade_sigla.toLowerCase().includes(q)
+  )
+  renderCargos(lista)
+}
+
+function renderCargos(lista) {
+  const podeEditar = ['super_admin','gestor'].includes(_perfilUsuario)
+  const tbody = document.getElementById('tbody-cargos')
+  if (!lista.length) {
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:32px;color:#9CA3AF">Nenhum cargo encontrado</td></tr>`
+    return
+  }
+  tbody.innerHTML = lista.map(c => `
+    <tr>
+      <td style="font-weight:600;font-size:13px">${esc(c.denominacao)}</td>
+      <td><span class="badge badge-cinza">${esc(c.unidade_sigla)}</span></td>
+      <td><span class="badge badge-blue">${esc(NIVEL_LABEL[c.nivel] || c.nivel)}</span></td>
+      <td style="font-size:12px;color:#6B7280">${c.simbolo ? esc(c.simbolo) : '<span style="color:#D1D5DB">—</span>'}</td>
+      <td>
+        ${c.titular_nome
+          ? `<div style="display:flex;align-items:center;gap:8px">
+               <div class="org-avatar" style="width:24px;height:24px;font-size:9px">${iniciais(c.titular_nome)}</div>
+               <div>
+                 <div style="font-size:12px;font-weight:600">${esc(c.titular_nome)}</div>
+                 ${c.substituto_nome ? `<div style="font-size:10px;color:#92400E;background:#FEF3C7;border-radius:4px;padding:1px 5px;display:inline-block;margin-top:2px">Sub: ${esc(c.substituto_nome)}</div>` : ''}
+               </div>
+             </div>`
+          : '<span style="color:#D1D5DB;font-size:12px">Vago</span>'}
+      </td>
+      <td style="font-size:12px;white-space:nowrap">${c.titular_desde ? formatData(c.titular_desde) : '<span style="color:#D1D5DB">—</span>'}</td>
+      <td style="font-size:11px;color:#6B7280">${c.portaria_nomeacao ? esc(c.portaria_nomeacao) : '<span style="color:#D1D5DB">—</span>'}</td>
+      ${podeEditar ? `<td><button class="btn btn-xs btn-ghost" onclick="abrirModalOcupacao('${c.cargo_id}')">Registrar ocup.</button></td>` : ''}
+    </tr>`).join('')
+}
+
+// ── Delegações ────────────────────────────────────────────
+
+function filtrarDelegacoes() {
+  const status = document.getElementById('fil-del-status')?.value || 'ativa'
+  const hoje = new Date().toISOString().slice(0, 10)
+  const lista = status === 'ativa'
+    ? _delegacoes.filter(d => d.ativa && d.data_fim >= hoje)
+    : _delegacoes
+  renderDelegacoes(lista)
+}
+
+function renderDelegacoes(lista) {
+  const podeAdmin = _perfilUsuario === 'super_admin'
+  const tbody = document.getElementById('tbody-delegacoes')
+  if (!lista.length) {
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:32px;color:#9CA3AF">Nenhuma delegação encontrada</td></tr>`
+    return
+  }
+  const hoje = new Date().toISOString().slice(0, 10)
+  tbody.innerHTML = lista.map(d => {
+    const ativa = d.ativa && d.data_fim >= hoje
+    return `<tr>
+      <td style="font-size:13px;font-weight:600">${esc(d.cargos?.denominacao || '—')}</td>
+      <td style="font-size:12px">${esc(d.delegante?.nome_completo || '—')}</td>
+      <td style="font-size:12px">${esc(d.delegado?.nome_completo || '—')}</td>
+      <td style="font-size:12px;white-space:nowrap">${formatData(d.data_inicio)} → ${formatData(d.data_fim)}</td>
+      <td style="font-size:12px">${d.motivo ? esc(d.motivo) : '<span style="color:#D1D5DB">—</span>'}</td>
+      <td style="font-size:11px;color:#6B7280">${d.portaria ? esc(d.portaria) : '<span style="color:#D1D5DB">—</span>'}</td>
+      <td><span class="badge ${ativa ? 'badge-verde' : 'badge-cinza'}">${ativa ? 'Ativa' : 'Encerrada'}</span></td>
+      ${podeAdmin ? `<td><button class="btn btn-xs btn-ghost" onclick="encerrarDelegacao('${d.id}',${d.ativa})">Encerrar</button></td>` : ''}
+    </tr>`
+  }).join('')
+}
+
+// ── Unidades ──────────────────────────────────────────────
+
+function renderUnidades() {
+  if (!_unidades.length) {
+    document.getElementById('unidades-content').innerHTML =
+      `<div class="empty-state"><p>Nenhuma unidade cadastrada.</p></div>`
+    return
+  }
+
+  const raizes = _unidades.filter(u => !u.pai_id)
+  function renderNo(u, nivel) {
+    const filhos = _unidades.filter(f => f.pai_id === u.id)
+    const indent = nivel * 24
+    let html = `<div style="display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid #F3F4F6;margin-left:${indent}px">
+      <span class="badge badge-cinza" style="min-width:64px;text-align:center">${esc(u.sigla)}</span>
+      <div>
+        <div style="font-size:13px;font-weight:600;color:#111827">${esc(u.nome)}</div>
+        <div style="font-size:11px;color:#9CA3AF">${esc(u.tipo.replace('_',' '))}</div>
+      </div>
+    </div>`
+    filhos.forEach(f => { html += renderNo(f, nivel + 1) })
+    return html
+  }
+
+  let html = '<div class="card" style="overflow:hidden">'
+  raizes.forEach(r => { html += renderNo(r, 0) })
+  html += '</div>'
+  document.getElementById('unidades-content').innerHTML = html
+}
+
+// ── Selects dos modais ────────────────────────────────────
+
+function popularSelects() {
+  const optsCargo = _cargos.map(c =>
+    `<option value="${c.id}">${esc(c.denominacao)} (${esc(c.unidades_organizacionais?.sigla || '')})</option>`
+  ).join('')
+  const optsUser = _usuarios.map(u =>
+    `<option value="${u.id}">${esc(u.nome_completo)}</option>`
+  ).join('')
+
+  document.getElementById('ocup-cargo').innerHTML = '<option value="">Selecione o cargo...</option>' + optsCargo
+  document.getElementById('ocup-usuario').innerHTML = '<option value="">Selecione o servidor...</option>' + optsUser
+  document.getElementById('del-cargo').innerHTML = '<option value="">Selecione o cargo...</option>' + optsCargo
+  document.getElementById('del-delegante').innerHTML = '<option value="">Selecione o titular...</option>' + optsUser
+  document.getElementById('del-delegado').innerHTML = '<option value="">Selecione o substituto...</option>' + optsUser
+}
+
+// ── Modal Ocupação ────────────────────────────────────────
+
+function abrirModalOcupacao(cargoId = null) {
+  document.getElementById('ocup-cargo').value = cargoId || ''
+  document.getElementById('ocup-usuario').value = ''
+  document.getElementById('ocup-inicio').value = ''
+  document.getElementById('ocup-fim').value = ''
+  document.getElementById('ocup-portaria').value = ''
+  document.getElementById('ocup-obs').value = ''
+  document.getElementById('modal-ocupacao').classList.add('aberto')
+}
+
+function fecharModalOcupacao() {
+  document.getElementById('modal-ocupacao').classList.remove('aberto')
+}
+
+async function salvarOcupacao() {
+  const cargo_id   = document.getElementById('ocup-cargo').value
+  const usuario_id = document.getElementById('ocup-usuario').value
+  const data_inicio = document.getElementById('ocup-inicio').value
+  if (!cargo_id || !usuario_id || !data_inicio) {
+    toast('Cargo, servidor e data de início são obrigatórios', 'error'); return
+  }
+  const btn = document.getElementById('ocup-btn-salvar')
+  btn.disabled = true; btn.textContent = 'Salvando...'
+  try {
+    const { error } = await db.from('cargo_ocupacoes').insert({
+      cargo_id, usuario_id, data_inicio,
+      data_fim:    document.getElementById('ocup-fim').value || null,
+      portaria:    document.getElementById('ocup-portaria').value.trim() || null,
+      observacoes: document.getElementById('ocup-obs').value.trim() || null,
+    })
+    if (error) throw error
+    toast('Ocupação registrada!', 'success')
+    fecharModalOcupacao()
+    await carregarDados()
+  } catch(e) { toast(e.message || 'Erro ao salvar', 'error') }
+  finally { btn.disabled = false; btn.textContent = 'Salvar' }
+}
+
+// ── Modal Delegação ───────────────────────────────────────
+
+function abrirModalDelegacao() {
+  ['del-cargo','del-delegante','del-delegado','del-motivo'].forEach(id => {
+    document.getElementById(id).value = ''
+  })
+  document.getElementById('del-inicio').value = ''
+  document.getElementById('del-fim').value = ''
+  document.getElementById('del-portaria').value = ''
+  document.getElementById('modal-delegacao').classList.add('aberto')
+}
+
+function fecharModalDelegacao() {
+  document.getElementById('modal-delegacao').classList.remove('aberto')
+}
+
+async function salvarDelegacao() {
+  const cargo_id     = document.getElementById('del-cargo').value
+  const delegante_id = document.getElementById('del-delegante').value
+  const delegado_id  = document.getElementById('del-delegado').value
+  const data_inicio  = document.getElementById('del-inicio').value
+  const data_fim     = document.getElementById('del-fim').value
+  if (!cargo_id || !delegante_id || !delegado_id || !data_inicio || !data_fim) {
+    toast('Preencha todos os campos obrigatórios', 'error'); return
+  }
+  if (delegante_id === delegado_id) {
+    toast('Titular e substituto não podem ser a mesma pessoa', 'error'); return
+  }
+  const btn = document.getElementById('del-btn-salvar')
+  btn.disabled = true; btn.textContent = 'Salvando...'
+  try {
+    const { error } = await db.from('delegacoes_temporarias').insert({
+      cargo_id, delegante_id, delegado_id, data_inicio, data_fim,
+      motivo:   document.getElementById('del-motivo').value || null,
+      portaria: document.getElementById('del-portaria').value.trim() || null,
+      ativa: true,
+    })
+    if (error) throw error
+    toast('Delegação registrada!', 'success')
+    fecharModalDelegacao()
+    await carregarDados()
+  } catch(e) { toast(e.message || 'Erro ao salvar', 'error') }
+  finally { btn.disabled = false; btn.textContent = 'Salvar' }
+}
+
+async function encerrarDelegacao(id, ativa) {
+  if (!ativa) return
+  if (!confirm('Encerrar esta delegação?')) return
+  const { error } = await db.from('delegacoes_temporarias')
+    .update({ ativa: false, data_fim: new Date().toISOString().slice(0, 10) })
+    .eq('id', id)
+  if (error) { toast(error.message, 'error'); return }
+  toast('Delegação encerrada', 'success')
+  await carregarDados()
+}
+
+// ── Abas ──────────────────────────────────────────────────
+
+function ativarAba(nome, btn) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('ativo'))
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('ativo'))
+  document.getElementById('tab-' + nome).classList.add('ativo')
+  btn.classList.add('ativo')
+}
+</script>
+</body>
+</html>
