@@ -776,6 +776,16 @@ function toggleLayerBar(id){
   document.querySelectorAll('.mlb-tab').forEach(t => t.classList.toggle('ativo', t.id==='mlb-btn-'+id));
   dd.innerHTML = _renderDropdown(id);
   dd.style.display = '';
+  // Ao abrir aba UC, sincroniza checkboxes com estado atual das variáveis
+  if(id === 'uc' && _ucGeojson) {
+    const elFed = document.getElementById('uc-esfera-federal');
+    const elEst = document.getElementById('uc-esfera-estadual');
+    const elMun = document.getElementById('uc-esfera-municipal');
+    if(elFed) elFed.checked = _ucEsfFed;
+    if(elEst) elEst.checked = _ucEsfEst;
+    if(elMun) elMun.checked = _ucEsfMun;
+    if(_ucGeojson) _ucConstruirPainel();
+  }
 }
 document.addEventListener('click', e => {
   const lb = document.getElementById('mapa-layerbar');
