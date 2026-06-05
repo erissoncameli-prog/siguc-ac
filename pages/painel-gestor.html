@@ -211,7 +211,8 @@ async function carregarNotifs() {
       destinatario:usuarios!notificacoes_destinatario_id_fkey(id, nome_completo, perfil),
       remetente:usuarios!notificacoes_remetente_id_fkey(id, nome_completo),
       escalado_para_usr:usuarios!notificacoes_escalado_para_fkey(id, nome_completo),
-      uc:unidades_conservacao(id, nome)
+      uc:unidades_conservacao(id, nome),
+      projeto:projetos_analise(id, titulo, status, tipo)
     `)
     .order('criado_em', { ascending: false })
     .limit(200);
