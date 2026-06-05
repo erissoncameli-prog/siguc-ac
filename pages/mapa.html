@@ -437,6 +437,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     vincularEventos();
     initScrollbarCustom();
     carregarLogosSidebar();
+    // Auto-abrir modal se vier de alertas-ambientais.html
+    const _alertaProjetoId = new URLSearchParams(location.search).get('alerta_projeto')
+    if (_alertaProjetoId) _abrirProjetoPorAlertaId(_alertaProjetoId)
   }, 0);
 });
 
