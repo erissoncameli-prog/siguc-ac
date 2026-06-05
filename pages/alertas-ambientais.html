@@ -81,6 +81,44 @@ function _alertaIcone(tipo, severidade) {
 }
 
 let _alertas = [], _mapaL = null, _marcadores = [], _perfilUsuario = ''
+let _ucGeojsonAlerta = null  // GeoJSON das UCs para cruzamento local
+
+// Algoritmo ray-casting: ponto dentro de polígono (anel de coordenadas)
+function _pipRing(pt, ring) {
+  let inside = false
+  const [x, y] = pt
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi, yi] = ring[i], [xj, yj] = ring[j]
+    if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) inside = !inside
+  }
+  return inside
+}
+
+function _pipGeom(pt, geom) {
+  if (!geom) return false
+  const rings = geom.type === 'Polygon'
+    ? geom.coordinates
+    : geom.type === 'MultiPolygon'
+      ? geom.coordinates.flat(1)
+      : []
+  // Verifica exterior de cada polígono (ignora buracos para simplicidade)
+  return rings.some(r => _pipRing(pt, r))
+}
+
+function ucNomeParaCoordenada(lat, lng) {
+  if (!_ucGeojsonAlerta?.features) return null
+  const pt = [lng, lat]
+  const feat = _ucGeojsonAlerta.features.find(f => _pipGeom(pt, f.geometry))
+  return feat ? (feat.properties?.nome || feat.properties?.NAME || feat.properties?.name || null) : null
+}
+
+async function _carregarUCGeojson() {
+  if (_ucGeojsonAlerta) return
+  try {
+    const r = await fetch('../data/uc_acre.geojson')
+    _ucGeojsonAlerta = await r.json()
+  } catch {}
+}
 
 ;(async function () {
   const usuario = await carregarUsuario()
