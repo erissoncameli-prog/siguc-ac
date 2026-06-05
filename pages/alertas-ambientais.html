@@ -205,10 +205,17 @@ function renderMarcadores(lista) {
     // geom vem como texto WKT ou objeto — tentamos parsear
     let lat, lng
     try {
-      // formato: "POINT(lng lat)"
-      const m = String(a.geom).match(/POINT\(([^ ]+) ([^ )]+)\)/)
-      if (m) { lng = parseFloat(m[1]); lat = parseFloat(m[2]) }
-      else return
+      if (a.geom && typeof a.geom === 'object' && a.geom.coordinates) {
+        // GeoJSON: {"type":"Point","coordinates":[lng,lat]}
+        lng = a.geom.coordinates[0]
+        lat = a.geom.coordinates[1]
+      } else {
+        // WKT fallback: "POINT(lng lat)"
+        const m = String(a.geom).match(/POINT\(([^ ]+) ([^ )]+)\)/)
+        if (m) { lng = parseFloat(m[1]); lat = parseFloat(m[2]) }
+        else return
+      }
+      if (!lat || !lng) return
     } catch { return }
 
     const cor = COR_SEV[a.severidade] ?? '#6B7280'
