@@ -2011,14 +2011,10 @@ function _renderizarMunicipios(){
 // ══════════════════════════════════════════════════════════════
 // CAR — Cadastro Ambiental Rural
 // ══════════════════════════════════════════════════════════════
-// Endpoints CAR — tenta em ordem até um funcionar
-const CAR_ENDPOINTS = [
-  'https://geoserver.car.gov.br/geoserver/sicar/wfs',
-  'https://geocar.car.gov.br/geoserver/sicar/wfs',
-];
-// Nomes de layer conhecidos no SICAR
-const CAR_TYPE_NAMES = ['sicar:sicar_imovel','sicar:area_imovel','sicar:sicar_imoveis_5','sicar:sicar_imoveis','sicar:imoveis'];
-const CAR_PAGE = 500;
+const CAR_WFS_BASE = 'https://geoserver.car.gov.br/geoserver/sicar/wfs';
+const CAR_PAGE     = 1000;
+
+let _carCacheUC = new Map(); // ucNome → features[]
 
 function _popularFiltroCarUC(){
   const sel = document.getElementById('car-sel-uc'); if(!sel) return;
@@ -2027,137 +2023,112 @@ function _popularFiltroCarUC(){
 }
 
 async function toggleCamadaCAR(el){
-  if(!el.checked){ if(_carLayer){mapaL.removeLayer(_carLayer); _carLayer=null;} fecharDetalhesCAR(); document.getElementById('car-filtros-wrap').style.display='none'; document.getElementById('car-count-badge').style.display='none'; return; }
+  if(!el.checked){
+    if(_carLayer){mapaL.removeLayer(_carLayer); _carLayer=null;}
+    fecharDetalhesCAR();
+    document.getElementById('car-filtros-wrap').style.display='none';
+    document.getElementById('car-count-badge').style.display='none';
+    return;
+  }
   if(!_ucGeojson) await _carregarUC();
   _popularFiltroCarUC();
   document.getElementById('car-filtros-wrap').style.display='flex';
 }
 
-// Calcula BBOX de uma UC pelo GeoJSON
-function _bboxUC(ucNome){
+// Calcula BBOX [minX,minY,maxX,maxY] de uma UC
+function _bboxUCArr(ucNome){
   const ucFeat = (_ucGeojson?.features||[]).find(f=>f.properties?.nome===ucNome);
   if(!ucFeat?.geometry) return null;
   try{
     const coords=[];
-    const ext = g => { if(g.type==='MultiPolygon') g.coordinates.forEach(p=>p.forEach(r=>r.forEach(c=>coords.push(c)))); else if(g.type==='Polygon') g.coordinates.forEach(r=>r.forEach(c=>coords.push(c))); };
+    const ext = g => {
+      if(g.type==='MultiPolygon') g.coordinates.forEach(p=>p.forEach(r=>r.forEach(c=>coords.push(c))));
+      else if(g.type==='Polygon') g.coordinates.forEach(r=>r.forEach(c=>coords.push(c)));
+    };
     ext(ucFeat.geometry);
     if(!coords.length) return null;
     const lngs=coords.map(c=>c[0]), lats=coords.map(c=>c[1]);
-    const pad=0.02;
-    return { minLng:Math.min(...lngs)-pad, minLat:Math.min(...lats)-pad, maxLng:Math.max(...lngs)+pad, maxLat:Math.max(...lats)+pad };
+    return [Math.min(...lngs), Math.min(...lats), Math.max(...lngs), Math.max(...lats)];
   }catch(e){ return null; }
 }
 
-// Estratégias de BBOX para WFS — cada item é { bboxStr, srsName }
-// WFS 1.1.0 EPSG:4326 = lat-lon (Y,X) por spec OGC → minLat,minLon,maxLat,maxLon
-// CRS:84 / urn:CRS84  = lon-lat (X,Y) explícito   → minLon,minLat,maxLon,maxLat
-function _buildCarCandidates(base, typeName, bb){
-  const { minLng:x0, minLat:y0, maxLng:x1, maxLat:y1 } = bb;
-  return [
-    // CRS84 (lon-lat explícito) — mais compatível e sem ambiguidade
-    { url: `${base}?service=WFS&version=1.1.0&request=GetFeature&typeName=${typeName}&outputFormat=application%2Fjson&srsName=CRS%3A84&BBOX=${x0},${y0},${x1},${y1},CRS:84&maxFeatures=${CAR_PAGE}` },
-    // EPSG:4326 lon-lat (implementações lenientes — maioria dos GeoServers brasileiros)
-    { url: `${base}?service=WFS&version=1.1.0&request=GetFeature&typeName=${typeName}&outputFormat=application%2Fjson&srsName=EPSG%3A4326&BBOX=${x0},${y0},${x1},${y1},EPSG:4326&maxFeatures=${CAR_PAGE}` },
-    // EPSG:4326 lat-lon (spec OGC estrita — servidores que seguem a norma)
-    { url: `${base}?service=WFS&version=1.1.0&request=GetFeature&typeName=${typeName}&outputFormat=application%2Fjson&srsName=EPSG%3A4326&BBOX=${y0},${x0},${y1},${x1},EPSG:4326&maxFeatures=${CAR_PAGE}` },
-    // WFS 2.0.0 + CRS84
-    { url: `${base}?service=WFS&version=2.0.0&request=GetFeature&typeNames=${typeName}&outputFormat=application%2Fjson&srsName=CRS%3A84&BBOX=${x0},${y0},${x1},${y1}&count=${CAR_PAGE}` },
-    // Sem BBOX — tudo dentro do estado (fallback pesado, mas garante resultado)
-    { url: `${base}?service=WFS&version=1.1.0&request=GetFeature&typeName=${typeName}&outputFormat=application%2Fjson&srsName=CRS%3A84&BBOX=${-74},${-12},${-66},${-7},CRS:84&maxFeatures=${CAR_PAGE}` },
-  ];
-}
-
-async function _tentarFetchCAR(url){
-  const r = await fetch(url, { signal: AbortSignal.timeout(18000) });
-  const txt = await r.text();
-  if(txt.trimStart().startsWith('<')){
-    const match = txt.match(/<ows:ExceptionText[^>]*>([\s\S]*?)<\/ows:ExceptionText>/)
-                || txt.match(/<ServiceException[^>]*>([\s\S]*?)<\/ServiceException>/)
-                || txt.match(/<Message>([\s\S]*?)<\/Message>/);
-    throw new Error(match ? match[1].trim().substring(0,200) : 'Servidor retornou XML em vez de JSON');
-  }
-  const gj = JSON.parse(txt);
-  if(!Array.isArray(gj.features)){
-    // Tenta extrair mensagem de erro do corpo JSON
-    const msg = gj?.exceptions?.[0]?.text
-             || gj?.exceptions?.[0]?.locator
-             || gj?.error?.message
-             || gj?.message
-             || (gj?.type === 'ServiceExceptionReport' ? 'ServiceExceptionReport' : null)
-             || `resposta sem features: ${JSON.stringify(gj).substring(0,150)}`;
-    throw new Error(msg);
-  }
-  return gj;
-}
-
 async function carregarDadosCAR(ucNome){
-  if(ucNome==='todas'||!ucNome) return;
+  if(!ucNome || ucNome==='todas') return;
   if(_carCarregando) return;
-  _carCarregando = true;
 
   const statusEl = document.getElementById('car-status-txt');
   const setStatus = html => { if(statusEl) statusEl.innerHTML = html; };
 
-  // BBOX da UC — padding generoso para capturar imóveis no entorno
-  const rawBbox = _bboxUC(ucNome);
-  const bbox = rawBbox
-    ? { ...rawBbox, minLng: rawBbox.minLng-0.05, minLat: rawBbox.minLat-0.05, maxLng: rawBbox.maxLng+0.05, maxLat: rawBbox.maxLat+0.05 }
-    : { minLng:-74, minLat:-12, maxLng:-66, maxLat:-7 };
-
-  setStatus(`⏳ Buscando imóveis CAR para <strong>${escHtml(ucNome)}</strong>...`);
-  if(!rawBbox) setStatus(`⏳ UC não encontrada no GeoJSON — buscando no Acre inteiro...`);
-
-  let resultado = null;
-  let ultimoErro = 'Sem resposta';
-
-  // Tenta cada endpoint × cada estratégia de BBOX × cada typeName
-  externo: for(const base of CAR_ENDPOINTS){
-    for(const typeName of CAR_TYPE_NAMES){
-      const candidatos = _buildCarCandidates(base, typeName, bbox);
-      for(let i=0; i<candidatos.length; i++){
-        const { url } = candidatos[i];
-        try{
-          setStatus(`⏳ Tentando estratégia ${i+1}/${candidatos.length} · <code style="font-size:9px">${typeName}</code>...`);
-          const gj = await _tentarFetchCAR(url);
-          if(gj.features.length > 0){
-            resultado = gj;
-            break externo; // Achou features → para tudo
-          }
-          // 0 features → tenta próxima estratégia (pode ser ordem errada)
-          ultimoErro = `0 imóveis com estratégia ${i+1}`;
-        }catch(e){
-          ultimoErro = e.message;
-        }
-      }
-    }
-  }
-
-  // Fallback via proxy próprio (Vercel serverless) se direto falhou por CORS
-  if(!resultado){
-    try{
-      setStatus('⏳ Tentando via proxy SIGUC...');
-      const bboxStr=`${bbox.minLng},${bbox.minLat},${bbox.maxLng},${bbox.maxLat},CRS:84`;
-      const apiUrl = `https://geoserver.car.gov.br/geoserver/sicar/wfs?service=WFS&version=1.1.0&request=GetFeature&typeName=sicar:sicar_imovel&outputFormat=application%2Fjson&srsName=CRS%3A84&BBOX=${bboxStr}&maxFeatures=${CAR_PAGE}`;
-      const gj = await _tentarFetchCAR(`/api/car-proxy?url=${encodeURIComponent(apiUrl)}`);
-      if(gj.features.length > 0) resultado = gj;
-      else ultimoErro = 'Proxy retornou 0 imóveis';
-    }catch(e2){ ultimoErro = e2.message; }
-  }
-
-  if(resultado){
-    _carFeatures = resultado.features;
+  // Cache hit
+  if(_carCacheUC.has(ucNome)){
+    _carFeatures = _carCacheUC.get(ucNome);
     _aplicarCamadaCAR();
     const n = _carFeatures.length;
+    setStatus(`✅ <strong>${n}</strong> imóvel(is) carregado(s) (cache)`);
+    const badge = document.getElementById('car-count-badge');
+    if(badge){ badge.textContent=n; badge.style.display=n?'':'none'; }
+    if(n>0 && mapaL){ try{ mapaL.fitBounds(_carLayer.getBounds(),{padding:[20,20]}); }catch(e){} }
+    return;
+  }
+
+  _carCarregando = true;
+
+  const ucFeat = (_ucGeojson?.features||[]).find(f=>f.properties?.nome===ucNome);
+  const bboxArr = _bboxUCArr(ucNome);
+  const bbox = bboxArr
+    ? `${bboxArr[0]},${bboxArr[1]},${bboxArr[2]},${bboxArr[3]},EPSG:4326`
+    : '-73.5,-11.2,-66.5,-7.1,EPSG:4326';
+
+  setStatus(`⏳ Buscando imóveis CAR para <strong>${escHtml(ucNome)}</strong>...`);
+
+  try{
+    // WFS 2.0.0 com layer específico do Acre (sicar:sicar_imoveis_ac)
+    const url0 = `${CAR_WFS_BASE}?service=WFS&version=2.0.0&request=GetFeature`
+               + `&typeNames=sicar:sicar_imoveis_ac&outputFormat=application/json`
+               + `&BBOX=${bbox}&count=${CAR_PAGE}&startindex=0`;
+
+    const res0 = await fetch(url0).then(r => r.json());
+    const total = res0.numberMatched || res0.totalFeatures || (res0.features||[]).length;
+    const features = [...(res0.features || [])];
+
+    // Páginas adicionais em paralelo se houver mais de uma página
+    if(total > CAR_PAGE){
+      const npages = Math.ceil(total / CAR_PAGE);
+      setStatus(`⏳ Carregando ${npages} páginas de imóveis CAR...`);
+      const promises = [];
+      for(let i=1; i<npages; i++){
+        const u = `${CAR_WFS_BASE}?service=WFS&version=2.0.0&request=GetFeature`
+                + `&typeNames=sicar:sicar_imoveis_ac&outputFormat=application/json`
+                + `&BBOX=${bbox}&count=${CAR_PAGE}&startindex=${i*CAR_PAGE}`;
+        promises.push(fetch(u).then(r=>r.json()));
+      }
+      const pages = await Promise.all(promises);
+      pages.forEach(p => features.push(...(p.features||[])));
+    }
+
+    // Filtra: mantém só imóveis cujo centroide está dentro do polígono da UC
+    let dentro = features;
+    if(ucFeat?.geometry && typeof turf !== 'undefined'){
+      dentro = features.filter(f => {
+        if(!f.geometry) return false;
+        try{ return turf.booleanPointInPolygon(turf.centroid(f), ucFeat); }catch(e){ return false; }
+      });
+    }
+
+    _carCacheUC.set(ucNome, dentro);
+    _carFeatures = dentro;
+    _aplicarCamadaCAR();
+    const n = dentro.length;
     setStatus(`✅ <strong>${n}</strong> imóvel(is) carregado(s)`);
     const badge = document.getElementById('car-count-badge');
     if(badge){ badge.textContent=n; badge.style.display=n?'':'none'; }
-    // Zoom para a área carregada
     if(n>0 && mapaL){ try{ mapaL.fitBounds(_carLayer.getBounds(),{padding:[20,20]}); }catch(e){} }
-  }else{
-    setStatus(`⚠ Nenhum imóvel encontrado — ${escHtml(ultimoErro.substring(0,100))}`);
+    if(!n) setStatus(`⚠ Nenhum imóvel CAR encontrado dentro de <strong>${escHtml(ucNome)}</strong>`);
+  }catch(err){
+    setStatus(`⚠ Erro ao carregar CAR: ${escHtml(err.message.substring(0,120))}`);
+  }finally{
+    _carCarregando = false;
   }
-
-  _carCarregando = false;
 }
 
 function _carCor(condicao){
