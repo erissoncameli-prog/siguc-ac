@@ -809,6 +809,9 @@ function _atualizarLegendaMapa(){
   // Zonas de Manejo
   if(_zonasAtivo) itens.push({ simbolo:'rect', cor:'#7c3aed', opacidade:_zonasOpacity, dash:true, label:'Zonas de Manejo' });
 
+  // Alertas Ambientais
+  if(_alertasAtivo && _alertasLayer) itens.push({ simbolo:'circle', cor:'#f97316', label:'Alertas Ambientais' });
+
   // CAR
   if(_carLayer) itens.push({ simbolo:'rect', cor:'#d97706', opacidade:0.15, label:'CAR — Imóveis Rurais' });
 
