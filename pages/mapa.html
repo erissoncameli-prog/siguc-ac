@@ -2132,13 +2132,13 @@ async function carregarDadosCAR(ucNome){
     }
   }
 
-  // Fallback via proxy CORS público se todos os diretos falharam ou retornaram 0
+  // Fallback via proxy próprio (Vercel serverless) se direto falhou por CORS
   if(!resultado){
     try{
-      setStatus('⏳ Tentando via proxy CORS...');
+      setStatus('⏳ Tentando via proxy SIGUC...');
       const bboxStr=`${bbox.minLng},${bbox.minLat},${bbox.maxLng},${bbox.maxLat},CRS:84`;
       const apiUrl = `https://geoserver.car.gov.br/geoserver/sicar/wfs?service=WFS&version=1.1.0&request=GetFeature&typeName=sicar:sicar_imovel&outputFormat=application%2Fjson&srsName=CRS%3A84&BBOX=${bboxStr}&maxFeatures=${CAR_PAGE}`;
-      const gj = await _tentarFetchCAR(`https://corsproxy.io/?url=${encodeURIComponent(apiUrl)}`);
+      const gj = await _tentarFetchCAR(`/api/car-proxy?url=${encodeURIComponent(apiUrl)}`);
       if(gj.features.length > 0) resultado = gj;
       else ultimoErro = 'Proxy retornou 0 imóveis';
     }catch(e2){ ultimoErro = e2.message; }
