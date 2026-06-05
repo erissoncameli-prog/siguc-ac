@@ -68,7 +68,8 @@ function gerarLayout(tituloPagina, paginaAtiva) {
     {
       label: 'Principal',
       itens: [
-        { id: 'dashboard',  href: '../pages/dashboard.html',  label: t('nav.dashboard') },
+        { id: 'dashboard',            href: '../pages/dashboard.html',            label: t('nav.dashboard') },
+        { id: 'dashboard-executivo', href: '../pages/dashboard-executivo.html', label: 'Dashboard Executivo' },
         { id: 'mapa',       href: '../pages/mapa.html',       label: t('nav.mapa') },
         { id: 'unidades',   href: '../pages/unidades.html',   label: t('nav.unidades') },
       ]
