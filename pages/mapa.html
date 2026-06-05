@@ -2077,7 +2077,16 @@ async function _tentarFetchCAR(url){
     throw new Error(match ? match[1].trim().substring(0,200) : 'Servidor retornou XML em vez de JSON');
   }
   const gj = JSON.parse(txt);
-  if(!gj.features) throw new Error('GeoJSON sem features');
+  if(!Array.isArray(gj.features)){
+    // Tenta extrair mensagem de erro do corpo JSON
+    const msg = gj?.exceptions?.[0]?.text
+             || gj?.exceptions?.[0]?.locator
+             || gj?.error?.message
+             || gj?.message
+             || (gj?.type === 'ServiceExceptionReport' ? 'ServiceExceptionReport' : null)
+             || `resposta sem features: ${JSON.stringify(gj).substring(0,150)}`;
+    throw new Error(msg);
+  }
   return gj;
 }
 
