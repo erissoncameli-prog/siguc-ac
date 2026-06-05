@@ -93,6 +93,50 @@
 <body>
 <div id="app"></div>
 
+<!-- Modal: Unidade Organizacional -->
+<div class="modal-overlay" id="modal-unidade">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="unid-titulo">Nova Unidade</div>
+      <button class="modal-close" onclick="fecharModalUnidade()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="grid-2">
+        <div class="form-group">
+          <label class="form-label">Sigla <span class="obrig">*</span></label>
+          <input class="form-control" id="unid-sigla" placeholder="Ex: DEUC" style="text-transform:uppercase">
+          <div class="form-hint">Imutável após criação.</div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Tipo <span class="obrig">*</span></label>
+          <select class="form-control" id="unid-tipo">
+            <option value="secretaria">Secretaria</option>
+            <option value="diretoria">Diretoria</option>
+            <option value="departamento" selected>Departamento</option>
+            <option value="coordenacao">Coordenação</option>
+            <option value="divisao">Divisão</option>
+            <option value="setor">Setor</option>
+            <option value="nucleo">Núcleo</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Nome Completo <span class="obrig">*</span></label>
+        <input class="form-control" id="unid-nome" placeholder="Ex: Departamento de Unidades de Conservação">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Vinculada a (unidade pai)</label>
+        <select class="form-control" id="unid-pai"></select>
+        <div class="form-hint">Um servidor pode estar vinculado a mais de uma unidade registrando múltiplas ocupações de cargo.</div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="fecharModalUnidade()">Cancelar</button>
+      <button class="btn btn-primary" id="unid-btn-salvar" onclick="salvarUnidade()">Salvar</button>
+    </div>
+  </div>
+</div>
+
 <!-- Modal: Registrar Ocupação -->
 <div class="modal-overlay" id="modal-ocupacao">
   <div class="modal">
