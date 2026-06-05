@@ -179,12 +179,35 @@ async function _carregarUCGeojson() {
           </div>
 
           <div class="fil-group">
+            <div class="fil-label">Localização</div>
+            <div style="display:flex;flex-direction:column;gap:3px">
+              <label style="display:flex;align-items:center;gap:5px;font-size:11px;cursor:pointer">
+                <input type="radio" name="fil-loc" value="todos" checked onchange="filtrar()" style="accent-color:#52B788">
+                <span>Todos os alertas</span>
+              </label>
+              <label style="display:flex;align-items:center;gap:5px;font-size:11px;cursor:pointer">
+                <input type="radio" name="fil-loc" value="em_uc" onchange="filtrar()" style="accent-color:#52B788">
+                <span>🌿 Somente dentro de UCs</span>
+              </label>
+              <label style="display:flex;align-items:center;gap:5px;font-size:11px;cursor:pointer">
+                <input type="radio" name="fil-loc" value="fora_uc" onchange="filtrar()" style="accent-color:#52B788">
+                <span>⚠ Somente fora de UCs</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="fil-group">
             <div class="fil-label">Fonte</div>
             <div style="display:flex;flex-direction:column;gap:3px">
-              ${['FIRMS','DETER','BDQUEIMADAS','PRODES'].map(f => `
-              <label style="display:flex;align-items:center;gap:5px;font-size:11px;cursor:pointer">
-                <input type="checkbox" checked data-fonte="${f}" onchange="filtrar()">
-                ${f}
+              ${[
+                ['FIRMS',      '🛰 FIRMS / NASA',        '#7c3aed'],
+                ['DETER',      '🌳 DETER / INPE',        '#dc2626'],
+                ['BDQUEIMADAS','🔥 BDQueimadas / INPE',  '#ea580c'],
+                ['PRODES',     '📊 PRODES / INPE',       '#b45309'],
+              ].map(([f, label, cor]) => `
+              <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;padding:2px 0">
+                <input type="checkbox" checked data-fonte="${f}" onchange="filtrar()" style="accent-color:${cor}">
+                <span>${label}</span>
               </label>`).join('')}
             </div>
           </div>
