@@ -1575,6 +1575,11 @@ function _ucStatsAtualizar(filteredFeats){
       <span style="font-weight:700;color:#2563eb">${us.length} Uso Sustentável</span>
       <span style="color:var(--cinza-500)">${(usArea/1e6).toFixed(2)}M ha</span>
     </div>`;
+
+  // Re-renderiza alertas se o filtro de localização estiver ativo
+  if (_alertasAtivo && document.querySelector('[name="alerta-loc"]:checked')?.value !== 'todos') {
+    renderAlertasMapa()
+  }
 }
 
 var _ucPickerEl=null, _ucPickerNome=null;
