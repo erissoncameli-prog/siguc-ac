@@ -548,7 +548,7 @@ async function carregarUCs() {
   const el = document.getElementById('badge-ucs')
   if (el) el.textContent = _ucs.length
 
-  renderTabelaUCs(_ucs)
+  filtrarUCs()
 }
 
 function filtrarUCs() {
