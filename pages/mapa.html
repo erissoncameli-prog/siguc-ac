@@ -52,6 +52,20 @@
 .camada-popup .cp-row{display:flex;gap:5px;font-size:11px;color:#374151;margin-bottom:3px;line-height:1.4;align-items:flex-start;}
 .camada-popup .cp-row strong{color:#111827;min-width:72px;flex-shrink:0;font-weight:600;}
 .camada-popup .cp-badge{display:inline-flex;align-items:center;gap:4px;border-radius:99px;padding:2px 9px;font-size:10px;font-weight:700;margin-top:5px;border:1px solid;}
+/* CAR — Modal de configurações */
+#car-cfg-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:700;display:none;align-items:center;justify-content:center}
+#car-cfg-overlay.aberto{display:flex}
+#car-cfg-modal{background:#fff;border-radius:14px;width:min(520px,94vw);max-height:85vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 16px 48px rgba(0,0,0,.32);font-family:'DM Sans',sans-serif}
+.car-cfg-header{background:linear-gradient(135deg,#1a3c2a,#2D6A4F);padding:14px 18px;display:flex;align-items:center;gap:10px;flex-shrink:0}
+.car-cfg-header h3{margin:0;font-size:14px;font-weight:700;color:#fff;flex:1}
+.car-cfg-body{flex:1;overflow-y:auto;padding:18px}
+.car-cfg-section{margin-bottom:18px}
+.car-cfg-section-title{font-size:10px;font-weight:700;color:var(--cinza-500);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px;padding-bottom:5px;border-bottom:1px solid var(--cinza-100)}
+.car-cfg-row{display:flex;align-items:center;gap:8px;padding:4px 0}
+.car-cfg-lbl{font-size:10px;font-weight:700;color:var(--cinza-500);text-transform:uppercase;letter-spacing:.05em;width:90px;flex-shrink:0}
+.car-cfg-val{font-size:10px;font-weight:700;color:var(--cinza-700);width:38px;text-align:right;flex-shrink:0}
+.car-cfg-slider{flex:1;height:4px;accent-color:#1F4E2C;cursor:pointer;min-width:0}
+.car-cfg-footer{padding:12px 18px;border-top:1px solid var(--borda);display:flex;gap:8px;flex-shrink:0}
 /* CAR */
 .car-det-panel{position:fixed;top:0;right:-420px;width:360px;height:100vh;background:#fff;z-index:600;display:flex;flex-direction:column;box-shadow:-4px 0 32px rgba(0,0,0,.22);transition:right .28s cubic-bezier(.4,0,.2,1);overflow:hidden;min-width:280px;max-width:680px;}
 .car-det-panel.aberto{right:0;}
