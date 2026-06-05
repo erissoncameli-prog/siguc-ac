@@ -9,7 +9,6 @@ jobs:
     runs-on: ubuntu-latest
     env:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-      SUPABASE_DB_PASSWORD:  ${{ secrets.SUPABASE_DB_PASSWORD }}
 
     steps:
       - name: Checkout
@@ -20,11 +19,5 @@ jobs:
         with:
           version: latest
 
-      - name: Link ao projeto
-        run: supabase link --project-ref atqtybcsvepdabsvgaly
-
-      - name: Aplicar migrations pendentes
-        run: supabase db push --linked
-
       - name: Deploy Edge Functions
-        run: supabase functions deploy --linked
+        run: supabase functions deploy --project-ref atqtybcsvepdabsvgaly
