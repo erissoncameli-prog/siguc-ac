@@ -82,7 +82,6 @@ function gerarLayout(tituloPagina, paginaAtiva) {
         { id: 'painel-gestor',     href: '../pages/painel-gestor.html',     label: 'Painel do Gestor' },
         { id: 'pesquisas',         href: '../pages/pesquisas.html',         label: 'Pesquisas' },
         { id: 'ocorrencias',        href: '../pages/ocorrencias.html',        label: t('nav.ocorrencias') },
-        { id: 'documentos',    href: '../pages/documentos.html',    label: t('nav.documentos') },
         { id: 'relatorios',    href: '../pages/relatorios.html',    label: t('nav.relatorios') },
         { id: 'equipe',        href: '../pages/equipe.html',        label: t('nav.equipe') },
       ]
