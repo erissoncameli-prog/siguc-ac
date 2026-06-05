@@ -675,12 +675,12 @@ function _renderDropdown(id){
         <div>
           <div style="font-size:10px;font-weight:700;color:#78350f;text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Data</div>
           <div style="display:flex;gap:5px;align-items:center">
-            <input type="date" id="gibs-data" value="${new Date().toISOString().slice(0,10)}"
+            <input type="date" id="gibs-data" value="${_gibsDataDefault()}"
               max="${new Date().toISOString().slice(0,10)}"
               style="flex:1;font-size:11px;padding:4px 6px;border:1px solid #fed7aa;border-radius:var(--raio);font-family:inherit"
               onchange="gibsAlterarData()">
-            <button onclick="document.getElementById('gibs-data').value=new Date().toISOString().slice(0,10);gibsAlterarData()"
-              style="font-size:10px;padding:4px 8px;background:#f97316;color:#fff;border:none;border-radius:var(--raio);cursor:pointer;font-weight:600;white-space:nowrap">Hoje</button>
+            <button onclick="document.getElementById('gibs-data').value=_gibsDataDefault();gibsAlterarData()"
+              style="font-size:10px;padding:4px 8px;background:#f97316;color:#fff;border:none;border-radius:var(--raio);cursor:pointer;font-weight:600;white-space:nowrap">Recente</button>
           </div>
         </div>
         <div style="display:flex;align-items:center;gap:8px">
