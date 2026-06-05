@@ -692,6 +692,14 @@ async function encerrarDelegacao(id, ativa) {
   await carregarDados()
 }
 
+// ── Selects: popular pai no modal unidade ─────────────────
+// (já definido em abrirModalUnidade, mas atualiza após carregarDados)
+function atualizarSelectUnidadePai() {
+  if (_editUnidadeId !== undefined && document.getElementById('modal-unidade').classList.contains('aberto')) {
+    popularSelectPai(document.getElementById('unid-pai').value)
+  }
+}
+
 // ── Abas ──────────────────────────────────────────────────
 
 function ativarAba(nome, btn) {
