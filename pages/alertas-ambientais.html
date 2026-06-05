@@ -414,7 +414,7 @@ async function dispararMonitoramento() {
       }
       if (data.erros?.length) {
         console.warn('[Monitoramento] Erros:', data.erros)
-        data.erros.forEach((e: string) => toast('⚠ ' + e, 'error'))
+        data.erros.forEach(e => toast('⚠ ' + e, 'error'))
       }
       await carregar()
     } else {
