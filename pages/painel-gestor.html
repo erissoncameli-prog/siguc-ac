@@ -369,12 +369,17 @@ function renderDetalhe() {
 
   const proxStatus = proximoStatus(n.status);
 
+  const btnCriarProjeto = !n.projeto && n.status !== 'resolvida'
+    ? `<button class="btn-acao" onclick="abrirModalCriarProjeto()" style="background:#EEF2FF;color:#3730A3;border-color:#C7D2FE">🔬 Criar Projeto de Análise</button>`
+    : '';
+
   const acoesHtml = n.status !== 'resolvida' ? `
 <div class="acoes-row">
   ${proxStatus ? `<button class="btn-acao primary" onclick="avancarStatus('${proxStatus}', null, true)">
     ✓ Mover para: ${LABEL_STATUS[proxStatus]}
   </button>` : ''}
   ${n.status !== 'encaminhada' ? `<button class="btn-acao" onclick="abrirModalEscalar()">↗ Escalar</button>` : ''}
+  ${btnCriarProjeto}
   <button class="btn-acao danger" onclick="avancarStatus('resolvida', null, true)">✓ Resolver</button>
 </div>` : `<p style="font-size:12px;color:#22C55E;font-weight:700">✓ Resolvida em ${formatData(n.resolvido_em)}</p>`;
 
