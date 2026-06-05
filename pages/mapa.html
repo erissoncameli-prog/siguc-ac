@@ -2181,60 +2181,517 @@ async function carregarDadosCAR(ucNome){
   }
 }
 
-function _carCor(condicao){
+// ── Estado extra CAR ─────────────────────────────────────────────────────
+let _carSelecionado  = null;
+let _carAbertoFeat   = null;
+let _carDetAba       = 'atributos';
+let _carMarcados     = new Map();
+let _carDadosLocais  = new Map();
+let _carDiagCache    = new Map();
+let _carUltimoEstilo = null;
+let _carRenderer     = null;
+const _carProdesCache = new Map();
+const CAR_WIDTH_KEY   = 'siguc_car_panel_width';
+
+// ── Helpers de cor / status ───────────────────────────────────────────────
+function _carStatusKey(condicao){
   const c=(condicao||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
-  if(c.includes('ativo')) return '#16a34a';
-  if(c.includes('aguardando')) return '#d97706';
-  if(c.includes('analise')||c.includes('análise')) return '#2563eb';
-  return '#9ca3af';
+  if(c.includes('ativo'))      return 'ativo';
+  if(c.includes('aguardando')) return 'aguardando';
+  if(c.includes('analise'))    return 'analise';
+  return 'outro';
+}
+function _carCor(key){
+  return {ativo:'#16a34a',aguardando:'#d97706',analise:'#2563eb',outro:'#9ca3af'}[key]||'#9ca3af';
+}
+function _estiloCAR(f, hover, sel){
+  const cod     = f.properties?.cod_imovel;
+  const custom  = _carMarcados.get(cod);
+  const corBase = _carCor(_carStatusKey(f.properties?.condicao));
+  if(sel)  return {color:'#7c3aed',weight:3,opacity:1,fillColor:custom?.fill_color||'#7c3aed',fillOpacity:0.35};
+  if(hover) return {color:custom?.stroke_color||corBase,weight:(custom?.stroke_width||1.5)+1,opacity:1,fillColor:custom?.fill_color||corBase,fillOpacity:0.38};
+  return {color:custom?.stroke_color||corBase,weight:custom?.stroke_width||1.5,opacity:1,fillColor:custom?.fill_color||corBase,fillOpacity:custom?.fill_opacity??0.18};
 }
 
+// ── Camada no mapa ────────────────────────────────────────────────────────
 function _aplicarCamadaCAR(){
-  if(_carLayer){mapaL.removeLayer(_carLayer); _carLayer=null;}
+  if(_carLayer){ mapaL.removeLayer(_carLayer); _carLayer=null; }
   if(!_carFeatures.length) return;
-  const renderer=L.canvas({pane:'carPane'});
-  _carLayer=L.geoJSON({type:'FeatureCollection',features:_carFeatures},{
-    renderer, pane:'carPane',
-    style: f => { const cor=_carCor(f.properties?.condicao||f.properties?.ind_status); return {color:cor,weight:1.5,opacity:1,fillColor:cor,fillOpacity:0.18}; },
+  if(!_carRenderer) _carRenderer = L.canvas({pane:'carPane', padding:0.5});
+  _carLayer = L.geoJSON({type:'FeatureCollection',features:_carFeatures},{
+    pane:'carPane', renderer:_carRenderer,
+    style: f => _estiloCAR(f,false,false),
     onEachFeature:(f,layer)=>{
-      layer.on('click',e=>{ L.DomEvent.stopPropagation(e); _abrirDetalhesCAR(f,layer); });
-      layer.on('mouseover',()=>layer.setStyle({fillOpacity:0.4,weight:2.5}));
-      layer.on('mouseout',()=>layer.setStyle({fillOpacity:0.18,weight:1.5}));
+      layer.on('mouseover',()=>{ if(layer!==_carSelecionado) layer.setStyle(_estiloCAR(f,true,false)); mapaL.getContainer().style.cursor='pointer'; });
+      layer.on('mouseout', ()=>{ if(layer!==_carSelecionado) layer.setStyle(_estiloCAR(f,false,false)); mapaL.getContainer().style.cursor=''; });
+      layer.on('click',e=>{ L.DomEvent.stopPropagation(e); _selecionarCAR(f,layer); });
     }
-  });
-  _carLayer.addTo(mapaL);
+  }).addTo(mapaL);
+  _atualizarBadgeCAR();
 }
 
-function _abrirDetalhesCAR(f,layer){
-  const p=f.properties||{};
-  const panel=document.getElementById('car-det-panel');
-  document.getElementById('car-det-titulo').textContent=p.nom_imovel||p.NOM_IMOVEL||'Imóvel Rural';
-  document.getElementById('car-det-cod').textContent=p.cod_imovel||p.COD_IMOVEL||'';
-  const cor=_carCor(p.condicao||p.ind_status);
-  document.getElementById('car-det-body').innerHTML=`
-    ${_carDetField('Cod. Imóvel', p.cod_imovel||p.COD_IMOVEL)}
-    ${_carDetField('Nome', p.nom_imovel||p.NOM_IMOVEL)}
-    ${_carDetField('Município', p.nom_municipio||p.NOM_MUNICIPIO||p.municipio)}
-    ${_carDetField('Área (ha)', p.num_area_t||p.num_area_i ? (parseFloat(p.num_area_t||p.num_area_i||0)).toLocaleString('pt-BR',{maximumFractionDigits:2}) : null)}
-    ${_carDetField('Status', `<span style="display:inline-flex;align-items:center;gap:4px;background:${cor}15;color:${cor};border:1px solid ${cor}40;border-radius:99px;padding:2px 10px;font-size:11px;font-weight:700">${escHtml(p.condicao||p.ind_status||'—')}</span>`)}
-    ${_carDetField('CPF/CNPJ', _mascarar(p.cpf_cnpj_p||p.CPF_CNPJ_P))}
-    ${_carDetField('Tipo', p.cod_tipo||p.tipo_imovel)}
-  `;
-  panel.classList.add('aberto');
-  _carAbertoCod=p.cod_imovel;
+function _atualizarBadgeCAR(){
+  const badge = document.getElementById('car-count-badge');
+  if(badge){ badge.textContent=_carFeatures.length.toLocaleString('pt-BR'); badge.style.display='inline-flex'; }
+  const sb = document.getElementById('car-status-txt');
+  if(sb && _carFeatures.length){
+    const porStatus={};
+    _carFeatures.forEach(f=>{ const k=_carStatusKey(f.properties?.condicao); porStatus[k]=(porStatus[k]||0)+1; });
+    const areaTot=_carFeatures.reduce((s,f)=>s+(parseFloat(f.properties?.area)||0),0);
+    sb.innerHTML=`✅ <strong>${_carFeatures.length}</strong> imóvel(is) · ${areaTot.toLocaleString('pt-BR',{maximumFractionDigits:0})} ha declarados`;
+  }
 }
-function _carDetField(lbl,val){ if(!val&&val!==0) return ''; return `<div class="car-det-field"><div class="car-det-label">${escHtml(lbl)}</div><div class="car-det-value">${val}</div></div>`; }
-function _mascarar(v){ if(!v) return '—'; const d=String(v).replace(/\D/g,''); if(d.length<6) return d; return d.slice(0,3)+'*'.repeat(d.length-5)+d.slice(-2); }
-function fecharDetalhesCAR(){ document.getElementById('car-det-panel').classList.remove('aberto'); _carAbertoCod=null; }
-_iniciarResizeCAR();
-function _iniciarResizeCAR(){
-  const handle=document.getElementById('car-resize'); if(!handle) return setTimeout(_iniciarResizeCAR,200);
+
+// ── Seleção ───────────────────────────────────────────────────────────────
+function _selecionarCAR(f, layer){
+  if(_carSelecionado) _carSelecionado.setStyle(_estiloCAR(_carSelecionado.feature||f,false,false));
+  _carSelecionado = layer;
+  layer.setStyle(_estiloCAR(f,false,true));
+  layer.bringToFront();
+  abrirDetalhesCAR(f);
+}
+
+// ── Dados do Supabase ─────────────────────────────────────────────────────
+async function _buscarDadosLocais(cod){
+  if(!cod) return null;
+  if(_carDadosLocais.has(cod)) return _carDadosLocais.get(cod);
+  const {data} = await db.from('car_dados_locais').select('*').eq('cod_imovel',cod).maybeSingle();
+  _carDadosLocais.set(cod, data||null);
+  return data||null;
+}
+async function _carregarMarcados(){
+  const {data} = await db.from('car_marcados').select('*');
+  _carMarcados = new Map((data||[]).map(r=>[r.cod_imovel,r]));
+  _atualizarContadorPins();
+}
+function _atualizarContadorPins(){
+  const el=document.getElementById('car-pin-count-tab');
+  if(el) el.textContent=_carMarcados.size;
+}
+
+// ── Abas ──────────────────────────────────────────────────────────────────
+function abaCarDet(aba){
+  _carDetAba=aba;
+  document.querySelectorAll('.car-det-tab').forEach(b=>b.classList.toggle('ativo',b.dataset.tab===aba));
+  _renderCarDetBody();
+}
+function _atualizarAbas(){
+  document.querySelectorAll('.car-det-tab').forEach(b=>b.classList.toggle('ativo',b.dataset.tab===_carDetAba));
+}
+function _renderCarDetBody(){
+  const bod=document.getElementById('car-det-body'); if(!bod) return;
+  if(_carDetAba==='atributos')        bod.innerHTML=_htmlCarAtributos(_carAbertoFeat);
+  else if(_carDetAba==='diagnostico'){bod.innerHTML=_htmlCarDiagLoading(); _iniciarDiagnosticoCAR(_carAbertoFeat);}
+  else if(_carDetAba==='estilo')      bod.innerHTML=_htmlCarEstilo(_carAbertoFeat);
+  else if(_carDetAba==='marcados')    bod.innerHTML=_htmlCarMarcados();
+}
+
+// ── Aba Dados ─────────────────────────────────────────────────────────────
+function _mascaraCpfCnpj(v){
+  if(!v) return '—';
+  const d=String(v).replace(/\D/g,'');
+  if(d.length<6) return d;
+  return d.slice(0,3)+'*'.repeat(d.length-5)+d.slice(-2);
+}
+function _badgeClassCAR(nome_class){
+  if(!nome_class) return '<span style="font-size:10px;color:var(--cinza-400)">—</span>';
+  const cfg={
+    'Verde':           {bg:'#f0fdf4',cor:'#16a34a',brd:'#86efac',ico:'🟢'},
+    'Amarelo':         {bg:'#fffbeb',cor:'#d97706',brd:'#fde68a',ico:'🟡'},
+    'Vermelho':        {bg:'#fef2f2',cor:'#dc2626',brd:'#fca5a5',ico:'🔴'},
+    'Não Classificado':{bg:'#f3f4f6',cor:'#6b7280',brd:'#d1d5db',ico:'⚪'},
+  };
+  const c=cfg[nome_class]||{bg:'#f3f4f6',cor:'#6b7280',brd:'#d1d5db',ico:'○'};
+  return `<span style="display:inline-flex;align-items:center;gap:4px;background:${c.bg};color:${c.cor};border:1px solid ${c.brd};border-radius:99px;padding:2px 9px;font-size:11px;font-weight:700">${c.ico} ${escHtml(nome_class)}</span>`;
+}
+function _htmlCarAtributos(f){
+  if(!f) return '<div style="padding:24px;text-align:center;color:var(--cinza-400);font-size:12px">Nenhum imóvel selecionado</div>';
+  const p=f.properties||{};
+  const cod=p.cod_imovel;
+  const key=_carStatusKey(p.condicao);
+  const badgeCls={ativo:'car-status-ativo',aguardando:'car-status-aguardando',analise:'car-status-analise',outro:'car-status-outro'}[key]||'car-status-outro';
+  const labels={ativo:'Ativo',aguardando:'Aguardando análise',analise:'Em análise',outro:'Outro'};
+  const f2=n=>Number(n||0).toLocaleString('pt-BR',{maximumFractionDigits:2});
+  const fDt=d=>d?new Date(d).toLocaleDateString('pt-BR'):'—';
+  const local=_carDadosLocais.get(cod);
+  const carregando=!_carDadosLocais.has(cod);
+
+  const secaoLocal=carregando
+    ?`<div class="car-det-field" style="background:var(--cinza-50);border-radius:var(--raio)">
+        <div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--cinza-400);padding:4px 0">
+          <div style="width:10px;height:10px;border:2px solid #e5e7eb;border-top-color:#2D6A4F;border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0"></div>
+          Buscando dados cadastrais…
+        </div></div>`
+    :local?`
+    <div style="background:var(--cinza-50);border:1px solid var(--borda);border-radius:var(--raio);padding:8px 0;margin:6px 0">
+      <div style="font-size:9px;font-weight:700;color:var(--cinza-400);text-transform:uppercase;letter-spacing:.06em;padding:0 12px 6px;border-bottom:1px solid var(--cinza-100);margin-bottom:4px">📋 Dados Cadastrais — SICAR Acre</div>
+      ${local.nom_imovel?`<div class="car-det-field"><div class="car-det-label">Nome do Imóvel</div><div class="car-det-value" style="font-size:13px;font-weight:700;color:var(--cinza-900)">${escHtml(local.nom_imovel)}</div></div>`:''}
+      ${local.nome_compl?`<div class="car-det-field"><div class="car-det-label">Proprietário / Possuidor</div><div class="car-det-value">${escHtml(local.nome_compl)}</div></div>`:''}
+      ${local.cpf_cnpj?`<div class="car-det-field"><div class="car-det-label">CPF / CNPJ</div><div class="car-det-value" style="font-family:monospace">${escHtml(_mascaraCpfCnpj(local.cpf_cnpj))}</div></div>`:''}
+      ${local.num_area_i?`<div class="car-det-field"><div class="car-det-label">Área (SICAR)</div><div class="car-det-value" style="font-weight:700;color:#1F4E2C">${Number(local.num_area_i).toLocaleString('pt-BR',{maximumFractionDigits:4})} ha</div></div>`:''}
+      ${local.num_modulo?`<div class="car-det-field"><div class="car-det-label">Módulos Fiscais</div><div class="car-det-value">${Number(local.num_modulo).toLocaleString('pt-BR',{maximumFractionDigits:4})}</div></div>`:''}
+      ${local.nom_munici?`<div class="car-det-field"><div class="car-det-label">Município (SICAR)</div><div class="car-det-value">${escHtml(local.nom_munici)}</div></div>`:''}
+      ${local.condicao_i?`<div class="car-det-field"><div class="car-det-label">Situação (SICAR)</div><div class="car-det-value">${escHtml(local.condicao_i)}</div></div>`:''}
+      ${local.nome_class?`<div class="car-det-field"><div class="car-det-label">Classificação Ambiental</div><div class="car-det-value">${_badgeClassCAR(local.nome_class)}</div></div>`:''}
+      ${local.tipo_docum?`<div class="car-det-field"><div class="car-det-label">Relação Jurídica</div><div class="car-det-value">${escHtml(local.tipo_docum)}</div></div>`:''}
+      ${local.nome_docum?`<div class="car-det-field"><div class="car-det-label">Documento</div><div class="car-det-value" style="font-size:11px">${escHtml(local.nome_docum)}</div></div>`:''}
+    </div>`:
+    `<div style="padding:8px 10px;background:var(--cinza-50);border:1px dashed var(--borda);border-radius:var(--raio);font-size:11px;color:var(--cinza-400);margin:6px 0">
+      ℹ️ Dados cadastrais da planilha SICAR não disponíveis para este imóvel.
+    </div>`;
+
+  const areaExib=local?.num_area_i?Number(local.num_area_i).toLocaleString('pt-BR',{maximumFractionDigits:4}):f2(p.area);
+  const municExib=local?.nom_munici||p.municipio||'—';
+
+  return `
+    ${secaoLocal}
+    <div class="car-det-field"><div class="car-det-label">Situação CAR</div>
+      <div class="car-det-value"><span class="car-det-badge ${badgeCls}">${labels[key]||key}</span></div></div>
+    <div class="car-det-field"><div class="car-det-label">Área Declarada</div>
+      <div class="car-det-value" style="font-size:18px;font-weight:700;color:#1F4E2C">${areaExib} ha</div></div>
+    <div class="car-det-field"><div class="car-det-label">Município</div>
+      <div class="car-det-value">${escHtml(municExib)} · ${escHtml(p.uf||'AC')}</div></div>
+    <div class="car-det-field"><div class="car-det-label">Tipo de Imóvel</div>
+      <div class="car-det-value">${escHtml(p.tipo_imovel||'—')}</div></div>
+    <div class="car-det-field"><div class="car-det-label">UC correspondente</div>
+      <div class="car-det-value">${_carUCAtual?'🌿 '+escHtml(_carUCAtual):'—'}</div></div>
+    <div class="car-det-field"><div class="car-det-label">Data de Cadastro</div>
+      <div class="car-det-value">${fDt(p.dat_criacao||p.dat_criaca)}</div></div>
+    <div class="car-det-field"><div class="car-det-label">Código CAR</div>
+      <div class="car-det-value" style="font-family:monospace;font-size:10px;word-break:break-all;color:var(--cinza-400)">${escHtml(p.cod_imovel||'—')}</div></div>`;
+}
+
+// ── Aba Diagnóstico ───────────────────────────────────────────────────────
+function _htmlCarDiagLoading(){
+  return `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:200px;gap:10px;color:var(--cinza-500)">
+    <div style="width:24px;height:24px;border:3px solid #e5e7eb;border-top-color:#1F4E2C;border-radius:50%;animation:spin .8s linear infinite"></div>
+    <div style="font-size:12px">Calculando diagnóstico espacial…</div>
+    <div style="font-size:10px;color:var(--cinza-400)">Cruzando com camadas de delimitação</div>
+  </div>`;
+}
+async function _iniciarDiagnosticoCAR(f){
+  if(!f) return;
+  const cod=f.properties?.cod_imovel; if(!cod) return;
+  if(_carDiagCache.has(cod)){
+    if(_carAbertoCod===cod && _carDetAba==='diagnostico')
+      document.getElementById('car-det-body').innerHTML=_htmlCarDiagnostico(_carDiagCache.get(cod),f);
+    return;
+  }
+  const dados=await _calcularDiagnosticoCAR(f);
+  _carDiagCache.set(cod,dados);
+  if(_carAbertoCod===cod && _carDetAba==='diagnostico'){
+    const bod=document.getElementById('car-det-body');
+    if(bod) bod.innerHTML=_htmlCarDiagnostico(dados,f);
+  }
+}
+async function _calcularDiagnosticoCAR(f){
+  const p=f.properties||{};
+  let carPoly;
+  try{ carPoly=turf.feature(f.geometry); }catch(e){ return {erro:'Geometria inválida para este imóvel.'}; }
+  const carBbox=turf.bbox(carPoly);
+
+  // Localiza camadas carregadas (UC geojson local é suficiente; outras camadas opcionais)
+  const ucGeojson = _ucGeojson;
+  const ucFeat = ucGeojson?.features?.find(uc=>uc.properties?.nome===_carUCAtual);
+
+  function intersectArea(feats){
+    if(!feats) return 0;
+    let total=0;
+    for(const feat of feats){
+      try{
+        const fb=turf.bbox(feat);
+        if(fb[2]<carBbox[0]||fb[0]>carBbox[2]||fb[3]<carBbox[1]||fb[1]>carBbox[3]) continue;
+        const inter=turf.intersect(carPoly,turf.feature(feat.geometry));
+        if(inter) total+=turf.area(inter);
+      }catch(_){}
+    }
+    return total/10000;
+  }
+  function countPoints(feats){
+    if(!feats) return 0;
+    let n=0;
+    for(const feat of feats){
+      try{
+        if(turf.booleanPointInPolygon(turf.feature(feat.geometry),carPoly)) n++;
+      }catch(_){}
+    }
+    return n;
+  }
+
+  const areaCAR=parseFloat(p.area)||turf.area(carPoly)/10000;
+  // Sem camadas locais específicas, retorna métricas básicas
+  const emUC = ucFeat ? (() => { try{ return turf.booleanIntersects(carPoly,turf.feature(ucFeat.geometry)); }catch(_){ return false; } })() : false;
+  const areaUC = ucFeat ? intersectArea([ucFeat]) : 0;
+  const pctUC  = areaCAR>0 ? areaUC/areaCAR*100 : 0;
+
+  return { areaCAR, emUC, areaUC, pctUC, erro:null };
+}
+function _htmlCarDiagnostico(d, f){
+  if(!d||d.erro) return `<div style="padding:24px;text-align:center;color:var(--cinza-400);font-size:12px">
+    ${d?.erro||'Não foi possível calcular o diagnóstico.'}<br>
+    <small>Verifique se as camadas estão ativas.</small></div>`;
+  const p=f?.properties||{};
+  const local=_carDadosLocais.get(p.cod_imovel)||{};
+  const f2=n=>Number(n||0).toLocaleString('pt-BR',{maximumFractionDigits:2});
+  const f1=n=>Number(n||0).toLocaleString('pt-BR',{maximumFractionDigits:1});
+  const barra=(val,max,cor)=>`<div style="height:5px;background:#e5e7eb;border-radius:3px;overflow:hidden;margin-top:3px"><div style="height:100%;width:${Math.min(100,val/max*100).toFixed(1)}%;background:${cor};border-radius:3px"></div></div>`;
+
+  return `
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px">
+    <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:var(--raio);padding:10px 12px">
+      <div style="font-size:10px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em">Área CAR</div>
+      <div style="font-size:18px;font-weight:700;color:#1F4E2C">${f2(d.areaCAR)} ha</div>
+    </div>
+    <div style="background:${d.emUC?'#f0fdf4':'#fffbeb'};border:1px solid ${d.emUC?'#86efac':'#fde68a'};border-radius:var(--raio);padding:10px 12px">
+      <div style="font-size:10px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em">Dentro da UC</div>
+      <div style="font-size:14px;font-weight:700;color:${d.emUC?'#16a34a':'#d97706'}">${d.emUC?'Sim':'Não'}</div>
+      ${d.areaUC>0?`<div style="font-size:10px;color:#6b7280">${f1(d.pctUC)}% da área (${f2(d.areaUC)} ha)</div>${barra(d.pctUC,100,'#16a34a')}`:''}
+    </div>
+  </div>
+
+  <div style="padding:8px 10px;background:var(--cinza-50);border:1px solid var(--borda);border-radius:var(--raio);font-size:11px;margin-bottom:10px">
+    <div style="font-weight:700;color:var(--cinza-700);margin-bottom:6px">📋 Informações do Imóvel</div>
+    <div style="display:flex;justify-content:space-between;padding:2px 0"><span>Situação CAR</span><strong>${escHtml(p.condicao||'—')}</strong></div>
+    <div style="display:flex;justify-content:space-between;padding:2px 0"><span>Município</span><strong>${escHtml(p.municipio||local.nom_munici||'—')}</strong></div>
+    ${local.nome_class?`<div style="display:flex;justify-content:space-between;padding:2px 0"><span>Classificação</span><strong>${_badgeClassCAR(local.nome_class)}</strong></div>`:''}
+    ${local.num_modulo?`<div style="display:flex;justify-content:space-between;padding:2px 0"><span>Módulos fiscais</span><strong>${Number(local.num_modulo).toLocaleString('pt-BR',{maximumFractionDigits:2})}</strong></div>`:''}
+  </div>
+
+  ${local.nome_class?`
+  <div style="background:var(--cinza-50);border-left:3px solid #1F4E2C;padding:10px 12px;border-radius:0 var(--raio) var(--raio) 0;font-size:11px;color:var(--cinza-700);line-height:1.7;margin-bottom:10px">
+    <div style="font-size:9px;font-weight:700;color:#1F4E2C;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">📋 Diagnóstico</div>
+    ${{'Verde':'✅ Classificado como <strong>Verde</strong> no SICAR — imóvel em conformidade com o Código Florestal.',
+       'Amarelo':'🟡 Classificado como <strong>Amarelo</strong> no SICAR — pendências de regularização a resolver.',
+       'Vermelho':'🔴 Classificado como <strong>Vermelho</strong> — imóvel em <strong>não conformidade</strong> com o Código Florestal.',
+       'Não Classificado':'⚪ <strong>Não classificado</strong> no SICAR — análise técnica pendente.'}[local.nome_class]||''}
+    ${d.emUC?`<p style="margin:5px 0 0">⚠️ Imóvel com sobreposição com <strong>${escHtml(_carUCAtual||'UC')}</strong> — situação requer análise de regularização fundiária.</p>`:''}
+  </div>`:''}
+
+  <div style="font-size:9px;color:var(--cinza-400);text-align:center">
+    📐 Cálculo via Turf.js · Área UC via GeoJSON local
+  </div>`;
+}
+
+// ── Aba Estilo ────────────────────────────────────────────────────────────
+function _htmlCarEstilo(f){
+  if(!f) return '<div style="padding:24px;text-align:center;color:var(--cinza-400);font-size:12px">Selecione um imóvel primeiro</div>';
+  const cod=f.properties?.cod_imovel;
+  const custom=_carMarcados.get(cod)||{};
+  const corBase=_carCor(_carStatusKey(f.properties?.condicao));
+  const fill=custom.fill_color||corBase;
+  const fo=custom.fill_opacity!=null?Math.round(custom.fill_opacity*100):18;
+  const stroke=custom.stroke_color||corBase;
+  const sw=custom.stroke_width!=null?custom.stroke_width:1.5;
+  const podeRepetir=_carUltimoEstilo&&_carUltimoEstilo.cod_imovel!==cod;
+  return `
+  ${podeRepetir?`<div style="margin-bottom:12px;padding:9px 12px;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:var(--raio);display:flex;align-items:center;gap:8px">
+    <div style="flex:1;min-width:0"><div style="font-size:11px;font-weight:600;color:#7c3aed">🎨 Repetir estilo anterior</div>
+    <div style="font-size:10px;color:#9ca3af">Preench. <span style="font-family:monospace">${_carUltimoEstilo.fill_color||'—'}</span> · Borda <span style="font-family:monospace">${_carUltimoEstilo.stroke_color||'—'}</span></div></div>
+    <button onclick="_aplicarUltimoEstiloCAR()" style="font-size:11px;border:1px solid #7c3aed;color:#7c3aed;background:#fff;border-radius:var(--raio);padding:4px 10px;cursor:pointer">Aplicar</button>
+  </div>`:''}
+  <div style="padding:0 0 10px;font-size:11px;color:var(--cinza-500);line-height:1.5">Personalize a aparência. Visível para todos os usuários.</div>
+  <div class="car-style-row"><span class="car-style-lbl">Preenchimento</span><input type="color" value="${fill}" id="cs-fill" style="width:28px;height:22px;border:1px solid var(--borda);border-radius:4px;cursor:pointer" oninput="_previewCarEstilo()"></div>
+  <div class="car-style-row"><span class="car-style-lbl">Opacidade</span><input type="range" min="0" max="100" step="5" value="${fo}" id="cs-fo" class="car-style-slider" oninput="_previewCarEstilo();this.nextElementSibling.textContent=this.value+'%'"><span class="car-style-val">${fo}%</span></div>
+  <div class="car-style-row" style="margin-top:8px"><span class="car-style-lbl">Borda (cor)</span><input type="color" value="${stroke}" id="cs-stroke" style="width:28px;height:22px;border:1px solid var(--borda);border-radius:4px;cursor:pointer" oninput="_previewCarEstilo()"></div>
+  <div class="car-style-row"><span class="car-style-lbl">Espessura</span><input type="range" min="0.5" max="6" step="0.5" value="${sw}" id="cs-sw" class="car-style-slider" oninput="_previewCarEstilo();this.nextElementSibling.textContent=this.value+'px'"><span class="car-style-val">${sw}px</span></div>
+  <div style="display:flex;gap:7px;margin-top:14px">
+    <button onclick="salvarCarEstilo()" class="btn btn-primary" style="font-size:12px;flex:1">💾 Salvar estilo</button>
+    <button onclick="restaurarCarEstilo()" class="btn btn-outline" style="font-size:12px;flex:1">↩ Restaurar</button>
+  </div>`;
+}
+function _aplicarUltimoEstiloCAR(){
+  if(!_carUltimoEstilo) return;
+  const u=_carUltimoEstilo;
+  const fo=Math.round((u.fill_opacity??0.18)*100);
+  const fillEl=document.getElementById('cs-fill');
+  const foEl=document.getElementById('cs-fo');
+  const strokeEl=document.getElementById('cs-stroke');
+  const swEl=document.getElementById('cs-sw');
+  if(fillEl&&u.fill_color)   fillEl.value=u.fill_color;
+  if(foEl){ foEl.value=fo; foEl.nextElementSibling&&(foEl.nextElementSibling.textContent=fo+'%'); }
+  if(strokeEl&&u.stroke_color) strokeEl.value=u.stroke_color;
+  if(swEl){ swEl.value=u.stroke_width??1.5; swEl.nextElementSibling&&(swEl.nextElementSibling.textContent=(u.stroke_width??1.5)+'px'); }
+  _previewCarEstilo();
+}
+function _previewCarEstilo(){
+  if(!_carAbertoFeat) return;
+  const cod=_carAbertoFeat.properties?.cod_imovel;
+  const cur=_carMarcados.get(cod)||{};
+  const prev={...cur,
+    fill_color:document.getElementById('cs-fill')?.value||cur.fill_color,
+    fill_opacity:(document.getElementById('cs-fo')?.value||18)/100,
+    stroke_color:document.getElementById('cs-stroke')?.value||cur.stroke_color,
+    stroke_width:parseFloat(document.getElementById('cs-sw')?.value||1.5),
+  };
+  _carLayer?.eachLayer(l=>{
+    if(l.feature?.properties?.cod_imovel!==cod) return;
+    _carMarcados.set(cod,prev);
+    l.setStyle(_estiloCAR(l.feature,false,_carSelecionado===l));
+  });
+}
+async function salvarCarEstilo(){
+  if(!_carAbertoFeat) return;
+  const cod=_carAbertoFeat.properties?.cod_imovel;
+  const p=_carAbertoFeat.properties||{};
+  const payload={cod_imovel:cod,area:parseFloat(p.area)||null,municipio:p.municipio||null,condicao:p.condicao||null,
+    fill_color:document.getElementById('cs-fill')?.value||null,
+    fill_opacity:(document.getElementById('cs-fo')?.value||18)/100,
+    stroke_color:document.getElementById('cs-stroke')?.value||null,
+    stroke_width:parseFloat(document.getElementById('cs-sw')?.value||1.5),
+    atualizado_em:new Date().toISOString()};
+  const {error}=await db.from('car_marcados').upsert(payload,{onConflict:'cod_imovel'});
+  if(error){ toast('Erro ao salvar: '+error.message,'error'); return; }
+  _carMarcados.set(cod,payload);
+  _carUltimoEstilo={fill_color:payload.fill_color,fill_opacity:payload.fill_opacity,stroke_color:payload.stroke_color,stroke_width:payload.stroke_width,cod_imovel:cod};
+  _atualizarLayerCAR(cod);
+  _atualizarBtnMarcar();
+  _atualizarContadorPins();
+  _renderCarDetBody();
+  toast('Estilo salvo!','success');
+}
+async function restaurarCarEstilo(){
+  if(!_carAbertoFeat) return;
+  const cod=_carAbertoFeat.properties?.cod_imovel;
+  _carMarcados.delete(cod);
+  await db.from('car_marcados').delete().eq('cod_imovel',cod);
+  _atualizarLayerCAR(cod);
+  _renderCarDetBody();
+  _atualizarBtnMarcar();
+  _atualizarContadorPins();
+  toast('Estilo restaurado ao padrão','info');
+}
+
+// ── Aba Marcados ──────────────────────────────────────────────────────────
+function _htmlCarMarcados(){
+  const lista=[..._carMarcados.entries()];
+  if(!lista.length) return `<div style="padding:32px 16px;text-align:center;color:var(--cinza-400)">
+    <div style="font-size:32px;margin-bottom:8px">📌</div>
+    <div style="font-size:13px;font-weight:600;margin-bottom:4px">Nenhum imóvel marcado</div>
+    <div style="font-size:11px">Abra um imóvel e clique em 📌 Marcar</div></div>`;
+  const f2=n=>Number(n||0).toLocaleString('pt-BR',{maximumFractionDigits:2});
+  const areaTot=lista.reduce((s,[,r])=>s+(parseFloat(r.area)||0),0);
+  return `
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0 10px;border-bottom:1px solid var(--borda);margin-bottom:4px">
+    <span style="font-size:12px;font-weight:600;color:var(--cinza-700)">${lista.length} marcado(s) · ${f2(areaTot)} ha</span>
+    <button onclick="limparTodosMarcados()" style="font-size:11px;color:#dc2626;border:1px solid #fca5a5;background:#fff;border-radius:var(--raio);padding:3px 10px;cursor:pointer">🗑 Limpar</button>
+  </div>
+  ${lista.map(([cod,r])=>`
+  <div class="car-pin-item" onclick="irParaCAR('${escHtml(cod)}')">
+    <div style="width:10px;height:10px;border-radius:50%;background:#7c3aed;border:2px solid #c4b5fd;flex-shrink:0"></div>
+    <div style="flex:1;min-width:0">
+      <div style="font-size:11px;font-weight:600;color:var(--cinza-800);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escHtml(cod)}">${escHtml(cod.slice(-12))}…</div>
+      <div style="font-size:10px;color:var(--cinza-500)">${escHtml(r.municipio||'—')} · ${f2(r.area)} ha</div>
+    </div>
+    <button onclick="event.stopPropagation();desmarcarCAR('${escHtml(cod)}')"
+      style="font-size:11px;padding:2px 7px;border:1px solid #fca5a5;border-radius:4px;background:#fff;color:#dc2626;cursor:pointer;flex-shrink:0">✕</button>
+  </div>`).join('')}
+  <div style="padding:10px 0 4px;font-size:11px;color:var(--cinza-400);text-align:center;border-top:1px solid var(--cinza-100);margin-top:6px">Clique em um item para centralizar no mapa</div>`;
+}
+
+// ── Marcação ──────────────────────────────────────────────────────────────
+async function toggleMarcarCAR(){
+  if(!_carAbertoFeat) return;
+  const cod=_carAbertoFeat.properties?.cod_imovel;
+  if(_carMarcados.has(cod)){ await desmarcarCAR(cod); return; }
+  const p=_carAbertoFeat.properties||{};
+  const payload={cod_imovel:cod,area:parseFloat(p.area)||null,municipio:p.municipio||null,condicao:p.condicao||null,atualizado_em:new Date().toISOString()};
+  const {error}=await db.from('car_marcados').upsert(payload,{onConflict:'cod_imovel'});
+  if(error){ toast('Erro: '+error.message,'error'); return; }
+  _carMarcados.set(cod,payload);
+  _atualizarLayerCAR(cod);
+  _atualizarBtnMarcar();
+  _atualizarContadorPins();
+  if(_carDetAba==='marcados') _renderCarDetBody();
+  toast('Imóvel marcado!','success');
+}
+async function desmarcarCAR(cod){
+  const {error}=await db.from('car_marcados').delete().eq('cod_imovel',cod);
+  if(error){ toast('Erro: '+error.message,'error'); return; }
+  _carMarcados.delete(cod);
+  _atualizarLayerCAR(cod);
+  if(cod===_carAbertoCod) _atualizarBtnMarcar();
+  _atualizarContadorPins();
+  if(_carDetAba==='marcados') _renderCarDetBody();
+  toast('Marcação removida','info');
+}
+async function limparTodosMarcados(){
+  if(!confirm(`Remover todos os ${_carMarcados.size} imóveis marcados?`)) return;
+  const {error}=await db.from('car_marcados').delete().neq('cod_imovel','__nenhum__');
+  if(error){ toast('Erro: '+error.message,'error'); return; }
+  const cods=[..._carMarcados.keys()];
+  _carMarcados.clear();
+  cods.forEach(c=>_atualizarLayerCAR(c));
+  _atualizarBtnMarcar();
+  _atualizarContadorPins();
+  _renderCarDetBody();
+  toast('Todos os marcados foram removidos','info');
+}
+function irParaCAR(cod){
+  if(!_carLayer) return;
+  let found=null;
+  _carLayer.eachLayer(l=>{ if(!found&&l.feature?.properties?.cod_imovel===cod) found=l; });
+  if(!found){ toast('Este imóvel está fora do filtro atual','warning'); return; }
+  try{ mapaL.fitBounds(found.getBounds(),{maxZoom:17,padding:[30,30]}); }catch(_){}
+  _selecionarCAR(found.feature,found);
+}
+function _atualizarLayerCAR(cod){
+  if(!_carLayer) return;
+  _carLayer.eachLayer(l=>{
+    if(l.feature?.properties?.cod_imovel!==cod) return;
+    l.setStyle(_estiloCAR(l.feature,false,_carSelecionado===l));
+  });
+}
+function _atualizarBtnMarcar(){
+  const cod=_carAbertoFeat?.properties?.cod_imovel;
+  const marcado=cod&&_carMarcados.has(cod);
+  const btnFoot=document.getElementById('btn-car-marcar');
+  const btnHdr=document.getElementById('btn-car-pin-hdr');
+  if(btnFoot){ btnFoot.textContent=marcado?'📌 Desmarcar':'📌 Marcar'; btnFoot.classList.toggle('btn-car-marcado',!!marcado); }
+  if(btnHdr) btnHdr.style.background=marcado?'#7c3aed':'rgba(255,255,255,.15)';
+}
+
+// ── Abrir / fechar painel ─────────────────────────────────────────────────
+async function abrirDetalhesCAR(f){
+  _carAbertoFeat=f;
+  _carAbertoCod=f.properties?.cod_imovel;
+  const panel=document.getElementById('car-det-panel'); if(!panel) return;
+  const cod=document.getElementById('car-det-codigo');
+  const lnk=document.getElementById('car-det-link-sicar');
+  if(cod) cod.textContent=_carAbertoCod||'—';
+  if(_carDetAba==='marcados') _carDetAba='atributos';
+  _atualizarAbas();
+  _renderCarDetBody();
+  _atualizarBtnMarcar();
+  if(lnk&&_carAbertoCod)
+    lnk.href=`https://consultapublica.car.gov.br/publico/imoveis/index?idImovel=${encodeURIComponent(_carAbertoCod)}`;
+  panel.classList.add('aberto');
+  // Busca dados enriquecidos (Supabase) em segundo plano
+  if(_carDetAba==='atributos'){
+    await _buscarDadosLocais(_carAbertoCod);
+    if(_carAbertoCod===f.properties?.cod_imovel && _carDetAba==='atributos') _renderCarDetBody();
+  }
+}
+function fecharDetalhesCAR(){
+  document.getElementById('car-det-panel')?.classList.remove('aberto');
+  if(_carSelecionado){
+    try{ _carSelecionado.setStyle(_estiloCAR(_carSelecionado.feature||{properties:{}},false,false)); }catch(_){}
+    _carSelecionado=null;
+  }
+  _carAbertoFeat=null; _carAbertoCod=null;
+}
+
+// ── Resize do painel ──────────────────────────────────────────────────────
+(function _iniciarResizeCAR(){
+  const handle=document.getElementById('car-resize-handle');
+  if(!handle) return setTimeout(_iniciarResizeCAR,300);
   const panel=document.getElementById('car-det-panel');
   let dragging=false, startX=0, startW=0;
+  const saved=parseInt(localStorage.getItem(CAR_WIDTH_KEY));
+  if(saved&&saved>=280&&saved<=680) panel.style.width=saved+'px';
   handle.addEventListener('mousedown',e=>{ dragging=true; startX=e.clientX; startW=panel.offsetWidth; handle.classList.add('dragging'); e.preventDefault(); });
   document.addEventListener('mousemove',e=>{ if(!dragging) return; const w=Math.max(280,Math.min(680,startW-(e.clientX-startX))); panel.style.width=w+'px'; });
-  document.addEventListener('mouseup',()=>{ dragging=false; handle.classList.remove('dragging'); });
-}
+  document.addEventListener('mouseup',()=>{ if(!dragging) return; dragging=false; handle.classList.remove('dragging'); localStorage.setItem(CAR_WIDTH_KEY,panel.offsetWidth); });
+}());
 
 // ══════════════════════════════════════════════════════════════
 // CLICK NO MAPA
