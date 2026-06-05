@@ -36,7 +36,7 @@ const i18n = {
     categorias: {
       PI: 'Parque (PI)', REBIO: 'Reserva Biológica', ESEC: 'Estação Ecológica',
       MONA: 'Monumento Natural', RVS: 'Refúgio de Vida Silvestre',
-      FLONA: 'Floresta Nacional', RESEX: 'Reserva Extrativista',
+      FLONA: 'Floresta Nacional', FLOE: 'Floresta Estadual', RESEX: 'Reserva Extrativista',
       RDS: 'Reserva de Des. Sustentável', RPPN: 'RPPN', APA: 'APA', ARIE: 'ARIE'
     },
     grupos: { protecao_integral: 'Proteção Integral', uso_sustentavel: 'Uso Sustentável' },
