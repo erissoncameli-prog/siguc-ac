@@ -73,8 +73,9 @@ function gerarLayout(tituloPagina, paginaAtiva) {
     {
       label: 'Gestão',
       itens: [
-        { id: 'monitoramento', href: '../pages/monitoramento.html', label: t('nav.monitoramento') },
-        { id: 'ocorrencias',   href: '../pages/ocorrencias.html',   label: t('nav.ocorrencias') },
+        { id: 'monitoramento',      href: '../pages/monitoramento.html',      label: t('nav.monitoramento') },
+        { id: 'alertas-ambientais', href: '../pages/alertas-ambientais.html', label: 'Alertas Ambientais' },
+        { id: 'ocorrencias',        href: '../pages/ocorrencias.html',        label: t('nav.ocorrencias') },
         { id: 'documentos',    href: '../pages/documentos.html',    label: t('nav.documentos') },
         { id: 'relatorios',    href: '../pages/relatorios.html',    label: t('nav.relatorios') },
         { id: 'equipe',        href: '../pages/equipe.html',        label: t('nav.equipe') },
