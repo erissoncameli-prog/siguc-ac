@@ -2364,6 +2364,27 @@ async function salvarProjeto() {
   await carregarProjetos()
 }
 
+// Carrega alerta do banco e abre modal (chamado via URL param)
+async function _abrirProjetoPorAlertaId(id) {
+  const { data } = await db.from('alertas_ambientais')
+    .select('id,tipo,severidade,fonte,uc_id,uc_nome,area_ha,data_referencia,geom')
+    .eq('id', id).single()
+  if (!data) return
+  let lat, lng
+  try {
+    if (data.geom && typeof data.geom === 'object' && data.geom.coordinates) {
+      lng = data.geom.coordinates[0]; lat = data.geom.coordinates[1]
+    } else {
+      const m = String(data.geom).match(/POINT\(([^ ]+) ([^ )]+)\)/)
+      if (m) { lng = parseFloat(m[1]); lat = parseFloat(m[2]) }
+    }
+  } catch {}
+  const ucNome = data.uc_nome || (lat && lng ? _ucNomePorCoordenada(lat, lng) : null)
+  abrirModalProjeto({ ...data, uc_nome: ucNome, _lat: lat, _lng: lng })
+  // Limpa param da URL sem recarregar
+  history.replaceState(null, '', location.pathname)
+}
+
 // ── Camada de projetos no mapa ──────────────────────────────
 async function carregarProjetos() {
   const { data } = await db.from('projetos_analise')
