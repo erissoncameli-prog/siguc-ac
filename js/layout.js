@@ -79,6 +79,7 @@ function gerarLayout(tituloPagina, paginaAtiva) {
         { id: 'monitoramento',      href: '../pages/monitoramento.html',      label: t('nav.monitoramento') },
         { id: 'alertas-ambientais', href: '../pages/alertas-ambientais.html', label: 'Alertas Ambientais' },
         { id: 'painel-gestor',     href: '../pages/painel-gestor.html',     label: 'Painel do Gestor' },
+        { id: 'pesquisas',         href: '../pages/pesquisas.html',         label: 'Pesquisas' },
         { id: 'ocorrencias',        href: '../pages/ocorrencias.html',        label: t('nav.ocorrencias') },
         { id: 'documentos',    href: '../pages/documentos.html',    label: t('nav.documentos') },
         { id: 'relatorios',    href: '../pages/relatorios.html',    label: t('nav.relatorios') },
