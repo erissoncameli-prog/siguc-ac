@@ -1172,6 +1172,11 @@ function renderAlertasMapa() {
     const icone    = ICONE_ALERTA[a.tipo]       ?? '⚠'
     const ucNome   = a.uc_nome || _ucNomePorCoordenada(lat, lng)
     const coordStr = `${lat.toFixed(5)}, ${lng.toFixed(5)}`
+    // Guarda lat/lng no objeto para o modal
+    const alertaModal = { ...a, uc_nome: ucNome, _lat: lat, _lng: lng }
+    const alertaKey   = `_alerta_${a.id}`
+    window[alertaKey] = alertaModal
+
     L.marker([lat, lng], { icon: _alertaMarkerIcon(a.tipo, a.severidade) })
     .bindPopup(`<div class="camada-popup">
       <div class="cp-header" style="background:${corTipo}">${icone} ${escHtml(a.tipo.charAt(0).toUpperCase()+a.tipo.slice(1))}</div>
@@ -1181,12 +1186,16 @@ function renderAlertasMapa() {
         <div class="cp-row"><strong>Data evento</strong><span>${escHtml(a.data_referencia)}</span></div>
         ${a.area_ha ? `<div class="cp-row"><strong>Área</strong><span>${Number(a.area_ha).toLocaleString('pt-BR')} ha</span></div>` : ''}
         <div class="cp-row" style="color:#9CA3AF;font-size:10px">📍 ${coordStr}</div>
-        <div style="margin-top:6px;display:flex;gap:5px">
+        <div style="margin-top:6px;display:flex;gap:5px;flex-wrap:wrap">
           <span class="cp-badge" style="background:${corTipo}22;border-color:${corTipo};color:${corTipo}">${icone} ${escHtml(a.tipo)}</span>
           <span class="cp-badge" style="background:${cor}22;border-color:${cor};color:${cor}">${escHtml(a.severidade)}</span>
         </div>
+        <button onclick="abrirModalProjeto(window['${alertaKey}'])"
+          style="margin-top:8px;width:100%;padding:6px 0;background:#1F4E2C;color:#fff;border:none;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif">
+          📐 Abrir Projeto de Análise
+        </button>
       </div>
-    </div>`).addTo(_alertasLayer)
+    </div>`, { maxWidth: 260 }).addTo(_alertasLayer)
   })
   _alertasLayer.addTo(mapaL)
 
