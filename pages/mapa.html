@@ -405,6 +405,9 @@ let mapaL = null, clusters = null;
 let camadas = [];
 let _ocLayer = null, _monitLayer = null;
 let _ucGeojson = null, _ucLayer = null, _ucAtivo = false, _ucLabels = true, _ucOpacity = 0.4;
+// Estado das esferas — persiste mesmo quando o dropdown é trocado
+let _ucEsfEst = true, _ucEsfFed = false, _ucEsfMun = false;
+let _ucNomesAtivos = null; // null = todos visíveis
 let _tiGeojson = null, _tiLayer = null, _tiAtivo = false;
 let _munGeojson = null, _munLayer = null, _munAtivo = false;
 let _acreGeojson = null, _acreLayers = [], _acreAtivo = true;
