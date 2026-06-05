@@ -303,50 +303,81 @@ async function carregarDados() {
   popularSelects()
 }
 
-// ── Organograma ──────────────────────────────────────────
+// ── Organograma (árvore pai_id) ──────────────────────────
 
 function renderOrganograma() {
-  const niveis = NIVEL_ORDEM.filter(n => _cargosAtuais.some(c => c.nivel === n))
-  if (!niveis.length) {
+  if (!_unidades.length) {
     document.getElementById('organograma-content').innerHTML =
-      `<div class="empty-state"><p>Nenhum cargo cadastrado.</p></div>`
+      `<div class="empty-state"><p>Nenhuma unidade cadastrada.</p></div>`
     return
   }
-
+  const raizes = _unidades.filter(u => !u.pai_id)
   let html = '<div class="org-tree">'
-  niveis.forEach((nivel, i) => {
-    const cards = _cargosAtuais.filter(c => c.nivel === nivel)
-    html += `<div class="org-nivel">
-      <div class="org-nivel-label">${NIVEL_LABEL[nivel] || nivel}</div>`
-    cards.forEach(c => {
-      html += `<div class="org-card org-card-nivel-${nivel}">
-        <div class="org-card-unidade">${esc(c.unidade_sigla)}</div>
-        <div class="org-card-cargo">${esc(c.denominacao)}</div>`
-      if (c.titular_nome) {
-        html += `<div class="org-card-titular">
-          <div class="org-avatar">${iniciais(c.titular_nome)}</div>
-          <div>
-            <div class="org-card-nome">${esc(c.titular_nome)}</div>
-            ${c.portaria_nomeacao ? `<div class="org-card-portaria">${esc(c.portaria_nomeacao)}</div>` : ''}
-          </div>
-        </div>`
-        if (c.substituto_nome) {
-          html += `<div class="org-badge-sub">
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-            Substituto: ${esc(c.substituto_nome)}
-            (${formatData(c.delegacao_inicio)} – ${formatData(c.delegacao_fim)})
-          </div>`
-        }
-      } else {
-        html += `<div class="org-card-vago">Vago</div>`
-      }
-      html += `</div>`
-    })
-    html += `</div>`
-    if (i < niveis.length - 1) html += `<div class="org-connector">↓</div>`
-  })
+  raizes.forEach(r => { html += renderNo(r, true) })
   html += '</div>'
   document.getElementById('organograma-content').innerHTML = html
+}
+
+function renderNo(unidade, aberto) {
+  const filhos = _unidades.filter(u => u.pai_id === unidade.id)
+  const cargosNo = _cargosAtuais.filter(c => c.unidade_sigla === unidade.sigla)
+  const temFilhos = filhos.length > 0 || cargosNo.length > 0
+  const uid = 'no-' + unidade.id.replace(/-/g, '')
+  const tipoClass = 'org-tipo-' + unidade.tipo
+
+  let html = `<div class="org-no">`
+  html += `<div class="org-no-header" onclick="toggleNo('${uid}')">`
+  if (temFilhos) {
+    html += `<svg class="org-chevron ${aberto ? 'aberto' : ''}" id="chev-${uid}" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>`
+  } else {
+    html += `<span style="width:14px;display:inline-block"></span>`
+  }
+  html += `<span class="org-tipo-badge ${tipoClass}">${esc(unidade.tipo.replace('_',' '))}</span>`
+  html += `<span class="org-no-sigla">${esc(unidade.sigla)}</span>`
+  html += `<span class="org-no-nome">${esc(unidade.nome !== unidade.sigla ? unidade.nome : '')}</span>`
+  html += `</div>`
+
+  if (temFilhos) {
+    html += `<div class="org-no-filhos ${aberto ? '' : 'colapsado'}" id="${uid}">`
+
+    if (cargosNo.length) {
+      html += `<div class="org-cargos">`
+      cargosNo.forEach(c => {
+        html += `<div class="org-cargo-card">
+          <div class="org-cargo-denom">${esc(c.denominacao)}</div>`
+        if (c.titular_nome) {
+          html += `<div class="org-cargo-titular">
+            <div class="org-avatar">${iniciais(c.titular_nome)}</div>
+            <div>
+              <div class="org-cargo-nome">${esc(c.titular_nome)}</div>
+              ${c.portaria_nomeacao ? `<div class="org-cargo-portaria">${esc(c.portaria_nomeacao)}</div>` : ''}
+            </div>
+          </div>`
+          if (c.substituto_nome) {
+            html += `<div class="org-badge-sub">Sub: ${esc(c.substituto_nome)}</div>`
+          }
+        } else {
+          html += `<div class="org-cargo-vago">Vago</div>`
+        }
+        html += `</div>`
+      })
+      html += `</div>`
+    }
+
+    filhos.forEach(f => { html += renderNo(f, unidade.tipo !== 'nucleo') })
+    html += `</div>`
+  }
+
+  html += `</div>`
+  return html
+}
+
+function toggleNo(uid) {
+  const el = document.getElementById(uid)
+  const chev = document.getElementById('chev-' + uid)
+  if (!el) return
+  el.classList.toggle('colapsado')
+  chev?.classList.toggle('aberto')
 }
 
 // ── Cargos ────────────────────────────────────────────────
