@@ -210,17 +210,52 @@ const VEG_LAYERS = {
   mapbiomas: { layer:null, make(op){ return L.tileLayer('https://storage.googleapis.com/mapbiomas-public/brasil/collection-8/lclu/coverage/{z}/{x}/{y}.png',{attribution:'MapBiomas Coleção 8',opacity:op/100,maxZoom:22,maxNativeZoom:12}); } },
   prodes:    { layer:null, make(op){ return L.tileLayer.wms('https://terrabrasilis.dpi.inpe.br/geoserver/prodes-amazon-nb/wms',{layers:'prodes-amazon-nb:yearly_deforestation_biome',format:'image/png',transparent:true,version:'1.1.1',attribution:'PRODES/INPE',opacity:op/100,maxZoom:22,maxNativeZoom:15}); } },
   prodes_hist:{ layer:null, make(op){ return L.tileLayer.wms('https://terrabrasilis.dpi.inpe.br/geoserver/prodes-amazon-nb/wms',{layers:'prodes-amazon-nb:accumulated_deforestation_2007_biome',format:'image/png',transparent:true,version:'1.1.1',attribution:'PRODES/INPE Acumulado',opacity:op/100,maxZoom:22,maxNativeZoom:15}); } },
+  gibs: { layer:null, make(op, data, camada){ return L.tileLayer(
+    `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/${camada}/default/${data}/GoogleMapsCompatible/{z}/{y}/{x}.jpg`,
+    {attribution:'NASA GIBS / Earthdata',opacity:op/100,maxZoom:9,maxNativeZoom:9}); }
+  },
 };
+
+const GIBS_CAMADAS = [
+  { id:'MODIS_Terra_CorrectedReflectance_TrueColor',  label:'MODIS Terra — Cor Real',        desc:'250m · revisita diária' },
+  { id:'VIIRS_SNPP_CorrectedReflectance_TrueColor',   label:'VIIRS SNPP — Cor Real',         desc:'375m · mais detalhes' },
+  { id:'MODIS_Terra_Thermal_Anomalies_Day',            label:'MODIS — Anomalias Térmicas',    desc:'Focos de calor em vermelho' },
+  { id:'VIIRS_SNPP_Fires_375m_Day',                   label:'VIIRS FIRMS — Focos 375m',      desc:'Alta resolução · focos do dia' },
+  { id:'MODIS_Terra_Land_Surface_Temp_Day',            label:'MODIS — Temperatura Superfície',desc:'Escala de cores °C' },
+];
+
 function toggleCamadaVeg(id, ativo){
   const cfg = VEG_LAYERS[id]; if(!cfg) return;
-  if(ativo){ const op = parseInt(document.getElementById('veg-'+id+'-opacity')?.value||70); cfg.layer=cfg.make(op); cfg.layer.addTo(mapaL); cfg.layer.setZIndex(150); }
-  else { if(cfg.layer){ mapaL.removeLayer(cfg.layer); cfg.layer=null; } }
+  if(ativo){
+    const op = parseInt(document.getElementById('veg-'+id+'-opacity')?.value||70);
+    if(id === 'gibs'){
+      const data   = document.getElementById('gibs-data')?.value   || new Date().toISOString().slice(0,10);
+      const camada = document.getElementById('gibs-camada')?.value || GIBS_CAMADAS[0].id;
+      cfg.layer = cfg.make(op, data, camada);
+    } else {
+      cfg.layer = cfg.make(op);
+    }
+    cfg.layer.addTo(mapaL); cfg.layer.setZIndex(150);
+  } else {
+    if(cfg.layer){ mapaL.removeLayer(cfg.layer); cfg.layer=null; }
+  }
   _atualizarLegendaMapa();
 }
 function atualizarOpacidadeVeg(id){
   const cfg = VEG_LAYERS[id]; if(!cfg?.layer) return;
   const op = parseInt(document.getElementById('veg-'+id+'-opacity')?.value||70);
   cfg.layer.setOpacity(op/100);
+}
+function gibsAlterarData(){
+  const cfg = VEG_LAYERS.gibs; if(!cfg?.layer) return;
+  // Recriar a camada com nova data/camada mantendo opacidade
+  const op = parseInt(document.getElementById('veg-gibs-opacity')?.value||80);
+  mapaL.removeLayer(cfg.layer);
+  const data   = document.getElementById('gibs-data')?.value   || new Date().toISOString().slice(0,10);
+  const camada = document.getElementById('gibs-camada')?.value || GIBS_CAMADAS[0].id;
+  cfg.layer = cfg.make(op, data, camada);
+  cfg.layer.addTo(mapaL); cfg.layer.setZIndex(150);
+  _atualizarLegendaMapa();
 }
 
 // ══════════════════════════════════════════════════════════════
