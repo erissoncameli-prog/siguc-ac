@@ -1388,9 +1388,17 @@ function _alertaEmUCVisivel(lat, lng) {
 function _renderizarUC(){
   if(_ucLayer){ mapaL.removeLayer(_ucLayer); _ucLayer=null; }
   if(!_ucGeojson||!_ucAtivo) return;
-  const esfFed=(document.getElementById('uc-esfera-federal')?.checked??true);
-  const esfEst=(document.getElementById('uc-esfera-estadual')?.checked??true);
-  const esfMun=(document.getElementById('uc-esfera-municipal')?.checked??true);
+  // Usa variáveis persistentes — não lê do DOM (pode estar em outra aba)
+  const esfFed = _ucEsfFed;
+  const esfEst = _ucEsfEst;
+  const esfMun = _ucEsfMun;
+  // Sincroniza checkboxes do DOM com as variáveis (se estiverem visíveis)
+  const elFed = document.getElementById('uc-esfera-federal');
+  const elEst = document.getElementById('uc-esfera-estadual');
+  const elMun = document.getElementById('uc-esfera-municipal');
+  if(elFed) elFed.checked = esfFed;
+  if(elEst) elEst.checked = esfEst;
+  if(elMun) elMun.checked = esfMun;
   // Sincronizar visibilidade dos itens da lista com as esferas ativas
   document.querySelectorAll('.uc-filtro-label').forEach(row=>{
     const cb=row.querySelector('[data-uc-nome]'); if(!cb) return;
