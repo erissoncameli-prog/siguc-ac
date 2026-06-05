@@ -214,6 +214,97 @@
 <body>
 <div id="app"><div style="display:flex;align-items:center;justify-content:center;height:100vh"><div class="spinner"></div></div></div>
 
+<!-- Modal de Configurações CAR -->
+<div id="car-cfg-overlay" onclick="if(event.target===this)fecharCfgCAR()">
+  <div id="car-cfg-modal">
+    <div class="car-cfg-header">
+      <span style="font-size:20px">🏡</span>
+      <h3>Configurações CAR — Imóveis Rurais</h3>
+      <button onclick="fecharCfgCAR()" style="background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:50%;width:28px;height:28px;cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center">✕</button>
+    </div>
+    <div class="car-cfg-body">
+
+      <!-- Seleção de UC -->
+      <div class="car-cfg-section">
+        <div class="car-cfg-section-title">🌿 Unidade de Conservação</div>
+        <label style="font-size:11px;color:var(--cinza-600);display:block;margin-bottom:4px">Selecione a UC para carregar os imóveis:</label>
+        <select id="car-sel-uc-modal" style="width:100%;font-size:12px;padding:6px 8px;border:1px solid var(--borda);border-radius:var(--raio);font-family:inherit" onchange="_carModalUCChange(this.value)">
+          <option value="todas">Selecione uma UC...</option>
+        </select>
+        <div id="car-cfg-status" style="font-size:11px;color:var(--cinza-500);margin-top:6px"></div>
+      </div>
+
+      <!-- Filtro por situação -->
+      <div class="car-cfg-section">
+        <div class="car-cfg-section-title">📊 Filtrar por Situação</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+          <label style="display:flex;align-items:center;gap:7px;font-size:12px;color:var(--cinza-700);cursor:pointer;padding:5px 8px;border:1px solid #86efac;background:#f0fdf4;border-radius:var(--raio)">
+            <input type="checkbox" checked data-car-filtro="ativo" style="accent-color:#16a34a;cursor:pointer;width:13px;height:13px" onchange="aplicarFiltroStatusCAR()">
+            <span style="color:#16a34a;font-weight:600">● Ativo</span>
+          </label>
+          <label style="display:flex;align-items:center;gap:7px;font-size:12px;color:var(--cinza-700);cursor:pointer;padding:5px 8px;border:1px solid #fde68a;background:#fffbeb;border-radius:var(--raio)">
+            <input type="checkbox" checked data-car-filtro="aguardando" style="accent-color:#d97706;cursor:pointer;width:13px;height:13px" onchange="aplicarFiltroStatusCAR()">
+            <span style="color:#d97706;font-weight:600">● Aguardando</span>
+          </label>
+          <label style="display:flex;align-items:center;gap:7px;font-size:12px;color:var(--cinza-700);cursor:pointer;padding:5px 8px;border:1px solid #bfdbfe;background:#eff6ff;border-radius:var(--raio)">
+            <input type="checkbox" checked data-car-filtro="analise" style="accent-color:#2563eb;cursor:pointer;width:13px;height:13px" onchange="aplicarFiltroStatusCAR()">
+            <span style="color:#2563eb;font-weight:600">● Em análise</span>
+          </label>
+          <label style="display:flex;align-items:center;gap:7px;font-size:12px;color:var(--cinza-700);cursor:pointer;padding:5px 8px;border:1px solid var(--borda);background:var(--cinza-50);border-radius:var(--raio)">
+            <input type="checkbox" checked data-car-filtro="cancelado" style="accent-color:#dc2626;cursor:pointer;width:13px;height:13px" onchange="aplicarFiltroStatusCAR()">
+            <span style="color:#dc2626;font-weight:600">● Cancelado</span>
+          </label>
+          <label style="display:flex;align-items:center;gap:7px;font-size:12px;color:var(--cinza-700);cursor:pointer;padding:5px 8px;border:1px solid var(--borda);background:var(--cinza-50);border-radius:var(--raio)" style="grid-column:1/-1">
+            <input type="checkbox" checked data-car-filtro="outro" style="accent-color:#9ca3af;cursor:pointer;width:13px;height:13px" onchange="aplicarFiltroStatusCAR()">
+            <span style="color:#9ca3af;font-weight:600">● Outros</span>
+          </label>
+        </div>
+        <div style="margin-top:8px;padding:7px 10px;background:var(--cinza-50);border:1px solid var(--borda);border-radius:var(--raio);font-size:11px" id="car-cfg-stats"></div>
+      </div>
+
+      <!-- Estilo global da camada -->
+      <div class="car-cfg-section">
+        <div class="car-cfg-section-title">🎨 Estilo Global da Camada</div>
+        <div class="car-cfg-row">
+          <span class="car-cfg-lbl">Opacidade fill</span>
+          <input type="range" min="0" max="100" step="5" value="18" id="car-gl-fo" class="car-cfg-slider"
+            oninput="this.nextElementSibling.textContent=this.value+'%';_previewEstiloGlobalCAR()">
+          <span class="car-cfg-val">18%</span>
+        </div>
+        <div class="car-cfg-row">
+          <span class="car-cfg-lbl">Espessura borda</span>
+          <input type="range" min="0.5" max="5" step="0.5" value="1.5" id="car-gl-sw" class="car-cfg-slider"
+            oninput="this.nextElementSibling.textContent=this.value+'px';_previewEstiloGlobalCAR()">
+          <span class="car-cfg-val">1.5px</span>
+        </div>
+        <div style="margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div>
+            <div style="font-size:10px;font-weight:700;color:var(--cinza-500);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Cor — Ativo</div>
+            <input type="color" id="car-gl-c-ativo" value="#16a34a" style="width:100%;height:28px;border:1px solid var(--borda);border-radius:var(--raio);cursor:pointer" oninput="_previewEstiloGlobalCAR()">
+          </div>
+          <div>
+            <div style="font-size:10px;font-weight:700;color:var(--cinza-500);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Cor — Aguardando</div>
+            <input type="color" id="car-gl-c-aguardando" value="#d97706" style="width:100%;height:28px;border:1px solid var(--borda);border-radius:var(--raio);cursor:pointer" oninput="_previewEstiloGlobalCAR()">
+          </div>
+          <div>
+            <div style="font-size:10px;font-weight:700;color:var(--cinza-500);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Cor — Em análise</div>
+            <input type="color" id="car-gl-c-analise" value="#2563eb" style="width:100%;height:28px;border:1px solid var(--borda);border-radius:var(--raio);cursor:pointer" oninput="_previewEstiloGlobalCAR()">
+          </div>
+          <div>
+            <div style="font-size:10px;font-weight:700;color:var(--cinza-500);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Cor — Cancelado</div>
+            <input type="color" id="car-gl-c-cancelado" value="#dc2626" style="width:100%;height:28px;border:1px solid var(--borda);border-radius:var(--raio);cursor:pointer" oninput="_previewEstiloGlobalCAR()">
+          </div>
+        </div>
+        <button onclick="_resetarEstiloGlobalCAR()" style="margin-top:10px;width:100%;padding:6px;font-size:11px;border:1px solid var(--borda);border-radius:var(--raio);background:var(--cinza-50);cursor:pointer;font-family:inherit">↩ Restaurar cores padrão</button>
+      </div>
+
+    </div>
+    <div class="car-cfg-footer">
+      <button onclick="fecharCfgCAR()" class="btn btn-primary" style="flex:1;font-size:12px">✓ Fechar</button>
+    </div>
+  </div>
+</div>
+
 <!-- Painel lateral CAR -->
 <div class="car-det-panel" id="car-det-panel">
   <div class="car-det-resize-handle" id="car-resize-handle" title="Arrastar para redimensionar"></div>
