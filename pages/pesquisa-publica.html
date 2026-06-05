@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>SIGUC-AC · Submissão de Pesquisa Científica</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@700;800&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --floresta: #0A1A0F;
+  --verde-c:  #52B788;
+  --ouro:     #C9A84C;
+  --ouro-c:   #F0CB6A;
+  --t1:       #F4EFE6;
+  --borda:    #E5E7EB;
+  --raio:     10px;
+}
+
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--t1);
+  min-height: 100vh;
+  color: #111827;
+}
+
+/* ── Header ── */
+.pub-header {
+  background: var(--floresta);
+  padding: 20px 32px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.pub-logo { font-family: 'Fraunces', Georgia, serif; font-size: 26px; font-weight: 800; color: var(--ouro-c); letter-spacing: -.02em; }
+.pub-logo-sub { font-size: 10px; color: #9CA3AF; letter-spacing: .08em; text-transform: uppercase; margin-top: 2px; }
+.pub-header-right { margin-left: auto; font-size: 12px; color: #9CA3AF; text-align: right; }
+.pub-header-right a { color: var(--verde-c); text-decoration: none; font-weight: 600; }
+
+/* ── Container ── */
+.pub-main { max-width: 760px; margin: 0 auto; padding: 32px 16px 64px; }
+
+/* ── Hero ── */
+.pub-hero { background: #fff; border-radius: 14px; padding: 28px 32px; margin-bottom: 24px; border: 1px solid var(--borda); }
+.pub-hero h1 { font-family: 'Fraunces', serif; font-size: 24px; font-weight: 800; color: var(--floresta); margin-bottom: 8px; }
+.pub-hero p  { font-size: 14px; color: #6B7280; line-height: 1.7; }
+.pub-hero .docs-list { margin-top: 14px; display: flex; flex-direction: column; gap: 6px; }
+.pub-hero .doc-item  { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #374151; }
+.pub-hero .doc-item .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--verde-c); flex-shrink: 0; }
+.pub-hero .doc-cond { font-size: 11px; color: #F59E0B; font-weight: 700; }
+
+/* ── Steps indicator ── */
+.steps-bar { display: flex; align-items: center; margin-bottom: 24px; }
+.step-item  { display: flex; align-items: center; gap: 8px; flex: 1; }
+.step-num   { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content:center; font-size: 13px; font-weight: 800; flex-shrink: 0; background: #E5E7EB; color: #9CA3AF; transition: all .2s; }
+.step-num.ativo  { background: var(--floresta); color: #fff; }
+.step-num.feito  { background: var(--verde-c);  color: #fff; }
+.step-label { font-size: 12px; font-weight: 600; color: #9CA3AF; }
+.step-label.ativo { color: var(--floresta); }
+.step-line  { flex: 1; height: 2px; background: #E5E7EB; margin: 0 8px; }
+.step-line.feita { background: var(--verde-c); }
+
+/* ── Card de passo ── */
+.passo-card { background: #fff; border-radius: 14px; border: 1px solid var(--borda); padding: 28px 32px; }
+.passo-title { font-size: 17px; font-weight: 800; color: var(--floresta); margin-bottom: 20px; display: flex; align-items: center; gap: 10px; }
+
+/* ── Campos ── */
+.field-group { display: flex; flex-direction: column; gap: 14px; }
+.field-row   { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 600px) { .field-row { grid-template-columns: 1fr; } }
+
+.field { display: flex; flex-direction: column; gap: 5px; }
+.field label { font-size: 12px; font-weight: 700; color: #374151; }
+.field label .req { color: #DC2626; margin-left: 2px; }
+.field label .opt { font-size: 10px; color: #9CA3AF; font-weight: 400; margin-left: 4px; }
+.field input, .field select, .field textarea {
+  padding: 10px 14px; border: 1px solid var(--borda); border-radius: var(--raio);
+  font-size: 13px; font-family: inherit; outline: none; transition: border-color .15s;
+  background: #fff;
+}
+.field input:focus, .field select:focus, .field textarea:focus { border-color: var(--verde-c); }
+.field .hint { font-size: 11px; color: #9CA3AF; margin-top: 2px; }
+
+/* ── Toggle checkbox ── */
+.toggle-field { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--borda); border-radius: var(--raio); cursor: pointer; transition: border-color .15s; }
+.toggle-field:hover { border-color: var(--verde-c); }
+.toggle-field input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--verde-c); cursor: pointer; }
+.toggle-field .toggle-label { font-size: 13px; font-weight: 600; color: #374151; }
+.toggle-field .toggle-sub   { font-size: 11px; color: #9CA3AF; margin-top: 2px; }
+
+/* ── Upload zone ── */
+.upload-zone {
+  border: 2px dashed var(--borda); border-radius: var(--raio);
+  padding: 20px; text-align: center; cursor: pointer;
+  transition: all .15s; background: #FAFAFA; position: relative;
+}
+.upload-zone:hover, .upload-zone.dragover { border-color: var(--verde-c); background: #F0FDF4; }
+.upload-zone input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.upload-icon { font-size: 28px; margin-bottom: 6px; }
+.upload-label { font-size: 13px; font-weight: 600; color: #374151; }
+.upload-sub   { font-size: 11px; color: #9CA3AF; margin-top: 3px; }
+.upload-zone.has-file { border-color: var(--verde-c); background: #F0FDF4; }
+.upload-file-info { font-size: 12px; color: #15803D; font-weight: 600; margin-top: 6px; display: none; }
+.upload-zone.has-file .upload-file-info { display: block; }
+.upload-obrigatorio { border-color: #FECACA; background: #FFF5F5; }
+.upload-obrigatorio .upload-label { color: #DC2626; }
+
+/* ── Botões ── */
+.btn-nav { display: flex; gap: 12px; justify-content: space-between; margin-top: 24px; }
+.btn { padding: 12px 28px; border-radius: var(--raio); font-size: 14px; font-weight: 700; cursor: pointer; border: none; font-family: inherit; transition: all .15s; }
+.btn-secondary { background: #fff; color: #374151; border: 1px solid var(--borda); }
+.btn-secondary:hover { background: #F9FAFB; }
+.btn-primary { background: var(--floresta); color: #fff; }
+.btn-primary:hover { background: #1F4E2C; }
+.btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+
+/* ── Sucesso ── */
+.sucesso-card { background: #fff; border-radius: 14px; border: 1px solid var(--borda); padding: 40px 32px; text-align: center; }
+.sucesso-icon { font-size: 52px; margin-bottom: 16px; }
+.sucesso-titulo { font-family: 'Fraunces', serif; font-size: 22px; font-weight: 800; color: var(--floresta); margin-bottom: 8px; }
+.sucesso-sub    { font-size: 14px; color: #6B7280; line-height: 1.7; margin-bottom: 24px; }
+.codigo-box { background: var(--floresta); color: var(--ouro-c); font-family: monospace; font-size: 22px; font-weight: 800; padding: 16px 32px; border-radius: var(--raio); display: inline-block; letter-spacing: .05em; margin-bottom: 20px; }
+.sucesso-aviso { background: #FFF7ED; border: 1px solid #FDE68A; border-radius: var(--raio); padding: 14px 18px; font-size: 13px; color: #92400E; margin-bottom: 20px; line-height: 1.6; }
+.btn-status { display: inline-flex; align-items: center; gap: 8px; padding: 12px 28px; background: var(--verde-c); color: #fff; border-radius: var(--raio); font-weight: 700; font-size: 14px; text-decoration: none; }
+
+/* ── Toast ── */
+.toast-pub { position: fixed; bottom: 24px; right: 24px; background: #1F4E2C; color: #fff; padding: 12px 20px; border-radius: var(--raio); font-size: 13px; font-weight: 600; z-index: 9999; opacity: 0; transform: translateY(10px); transition: all .25s; pointer-events: none; }
+.toast-pub.show { opacity: 1; transform: translateY(0); }
+.toast-pub.erro { background: #DC2626; }
+</style>
+</head>
+<body>
+
+<header class="pub-header">
+  <div>
+    <div class="pub-logo">SIGUC</div>
+    <div class="pub-logo-sub">Gestão de UCs · SEMA/AC</div>
+  </div>
+  <div class="pub-header-right">
+    Já é servidor? <a href="../index.html">Acessar o sistema →</a>
+  </div>
+</header>
+
+<main class="pub-main" id="pub-main">
+
+  <!-- Hero -->
+  <div class="pub-hero">
+    <h1>Submissão de Pesquisa Científica</h1>
+    <p>Preencha o formulário abaixo para submeter sua proposta de pesquisa nas Unidades de Conservação Estaduais do Acre. Após o envio, você receberá um e-mail de confirmação com o número do processo para acompanhamento.</p>
+    <div class="docs-list">
+      <div style="font-size:12px;font-weight:700;color:#374151;margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em">Documentos necessários para submissão:</div>
+      <div class="doc-item"><span class="dot"></span> Formulário de pesquisa assinado (PDF) <strong style="margin-left:4px">✱ obrigatório</strong></div>
+      <div class="doc-item"><span class="dot"></span> Proposta digital do projeto (PDF ou DOCX) <strong style="margin-left:4px">✱ obrigatório</strong></div>
+      <div class="doc-item"><span class="dot"></span> Comprovante de registro no SISBIO <span class="doc-cond">⚠ se coleta de material biológico</span></div>
+      <div class="doc-item"><span class="dot"></span> Registro CONEP <span class="doc-cond">⚠ se pesquisa com seres humanos</span></div>
+    </div>
+  </div>
+
+  <!-- Steps -->
+  <div class="steps-bar" id="steps-bar">
+    <div class="step-item">
+      <div class="step-num ativo" id="sn1">1</div>
+      <div class="step-label ativo" id="sl1">Identificação</div>
+    </div>
+    <div class="step-line" id="sl12"></div>
+    <div class="step-item">
+      <div class="step-num" id="sn2">2</div>
+      <div class="step-label" id="sl2">Projeto</div>
+    </div>
+    <div class="step-line" id="sl23"></div>
+    <div class="step-item">
+      <div class="step-num" id="sn3">3</div>
+      <div class="step-label" id="sl3">Documentos</div>
+    </div>
+  </div>
+
+  <!-- Passo 1 -->
+  <div class="passo-card" id="passo1">
+    <div class="passo-title">👤 Identificação do Pesquisador</div>
+    <div class="field-group">
+      <div class="field-row">
+        <div class="field">
+          <label>Nome completo <span class="req">✱</span></label>
+          <input type="text" id="p-nome" placeholder="Seu nome completo" autocomplete="name">
+        </div>
+        <div class="field">
+          <label>CPF <span class="req">✱</span></label>
+          <input type="text" id="p-cpf" placeholder="000.000.000-00" maxlength="14">
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>E-mail institucional <span class="req">✱</span></label>
+          <input type="email" id="p-email" placeholder="seu@instituicao.br" autocomplete="email">
+          <span class="hint">As notificações do processo serão enviadas para este e-mail.</span>
+        </div>
+        <div class="field">
+          <label>Telefone <span class="opt">(opcional)</span></label>
+          <input type="tel" id="p-tel" placeholder="(XX) XXXXX-XXXX">
+        </div>
+      </div>
+      <div class="field">
+        <label>Instituição / Universidade <span class="req">✱</span></label>
+        <input type="text" id="p-inst" placeholder="Ex: UFAC, INPA, EMBRAPA…">
+      </div>
+      <div class="field">
+        <label>Lattes / Currículo <span class="opt">(opcional)</span></label>
+        <input type="url" id="p-lattes" placeholder="http://lattes.cnpq.br/…">
+      </div>
+    </div>
+    <div class="btn-nav">
+      <span></span>
+      <button class="btn btn-primary" onclick="irPasso(2)">Próximo →</button>
+    </div>
+  </div>
+
+  <!-- Passo 2 (oculto) -->
+  <div class="passo-card" id="passo2" style="display:none">
+    <div class="passo-title">🔬 Dados do Projeto de Pesquisa</div>
+    <div class="field-group">
+      <div class="field">
+        <label>Título da pesquisa <span class="req">✱</span></label>
+        <input type="text" id="p-titulo" placeholder="Título completo do projeto">
+      </div>
+      <div class="field">
+        <label>Resumo <span class="req">✱</span></label>
+        <textarea id="p-resumo" rows="4" placeholder="Descreva os objetivos, metodologia e relevância científica da pesquisa (mínimo 100 caracteres)"></textarea>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>Tipo de pesquisa <span class="req">✱</span></label>
+          <select id="p-tipo">
+            <option value="fauna">Fauna</option>
+            <option value="flora">Flora</option>
+            <option value="genetica">Genética</option>
+            <option value="ecossistema">Ecossistema</option>
+            <option value="socioambiental">Socioambiental</option>
+            <option value="outro">Outro</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Unidade de Conservação <span class="req">✱</span></label>
+          <select id="p-uc">
+            <option value="">Selecione a UC…</option>
+          </select>
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>Início previsto</label>
+          <input type="date" id="p-inicio">
+        </div>
+        <div class="field">
+          <label>Fim previsto</label>
+          <input type="date" id="p-fim">
+        </div>
+      </div>
+      <div class="field">
+        <label>Área de atuação estimada (ha) <span class="opt">(opcional)</span></label>
+        <input type="number" id="p-area" step="0.01" min="0" placeholder="Ex: 1250.50">
+      </div>
+
+      <div style="border-top:1px solid #F3F4F6;padding-top:14px">
+        <div style="font-size:12px;font-weight:700;color:#374151;margin-bottom:10px">Autorizações especiais — marque se aplicável:</div>
+        <label class="toggle-field">
+          <input type="checkbox" id="p-coleta" onchange="atualizarCondicionais()">
+          <div>
+            <div class="toggle-label">🧬 Haverá coleta de material biológico</div>
+            <div class="toggle-sub">Requer comprovante de registro no SISBIO (IBAMA)</div>
+          </div>
+        </label>
+        <label class="toggle-field" style="margin-top:8px">
+          <input type="checkbox" id="p-humanos" onchange="atualizarCondicionais()">
+          <div>
+            <div class="toggle-label">👥 A pesquisa envolve seres humanos</div>
+            <div class="toggle-sub">Requer registro na CONEP (Comissão Nacional de Ética em Pesquisa)</div>
+          </div>
+        </label>
+      </div>
+
+      <div class="field-row" id="sisbio-row" style="display:none">
+        <div class="field">
+          <label>Número do SISBIO <span class="req">✱</span></label>
+          <input type="text" id="p-sisbio" placeholder="Ex: 12345-1">
+        </div>
+        <div class="field">
+          <label>Número do SISGEN <span class="opt">(se aplicável)</span></label>
+          <input type="text" id="p-sisgen" placeholder="Ex: AB123456">
+        </div>
+      </div>
+    </div>
+    <div class="btn-nav">
+      <button class="btn btn-secondary" onclick="irPasso(1)">← Voltar</button>
+      <button class="btn btn-primary" onclick="irPasso(3)">Próximo →</button>
+    </div>
+  </div>
+
+  <!-- Passo 3 (oculto) -->
+  <div class="passo-card" id="passo3" style="display:none">
+    <div class="passo-title">📎 Documentos Obrigatórios</div>
+    <div class="field-group">
+
+      <div class="field">
+        <label>Formulário de pesquisa assinado <span class="req">✱ obrigatório</span></label>
+        <div class="hint" style="margin-bottom:6px">
+          <a href="https://sema.ac.gov.br" target="_blank" style="color:var(--verde-c);font-weight:600">Baixe o formulário aqui →</a>
+          , assine e envie em PDF.
+        </div>
+        <div class="upload-zone upload-obrigatorio" id="uz-formulario" ondragover="dragOver(event,'formulario')" ondragleave="dragLeave('formulario')" ondrop="dropFile(event,'formulario')">
+          <input type="file" accept=".pdf,.PDF" onchange="selecionarArquivo(this,'formulario')">
+          <div class="upload-icon">📄</div>
+          <div class="upload-label">Clique ou arraste o formulário aqui</div>
+          <div class="upload-sub">Somente PDF · Máx. 10 MB</div>
+          <div class="upload-file-info" id="fi-formulario"></div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Proposta digital do projeto <span class="req">✱ obrigatório</span></label>
+        <div class="upload-zone upload-obrigatorio" id="uz-proposta" ondragover="dragOver(event,'proposta')" ondragleave="dragLeave('proposta')" ondrop="dropFile(event,'proposta')">
+          <input type="file" accept=".pdf,.PDF,.doc,.docx" onchange="selecionarArquivo(this,'proposta')">
+          <div class="upload-icon">📝</div>
+          <div class="upload-label">Clique ou arraste a proposta aqui</div>
+          <div class="upload-sub">PDF ou Word · Máx. 20 MB</div>
+          <div class="upload-file-info" id="fi-proposta"></div>
+        </div>
+      </div>
+
+      <div class="field" id="field-sisbio" style="display:none">
+        <label>Comprovante SISBIO <span class="req">✱ obrigatório (coleta biológica)</span></label>
+        <div class="upload-zone upload-obrigatorio" id="uz-sisbio" ondragover="dragOver(event,'sisbio')" ondragleave="dragLeave('sisbio')" ondrop="dropFile(event,'sisbio')">
+          <input type="file" accept=".pdf,.PDF,.jpg,.jpeg,.png" onchange="selecionarArquivo(this,'sisbio')">
+          <div class="upload-icon">🧬</div>
+          <div class="upload-label">Clique ou arraste o comprovante SISBIO</div>
+          <div class="upload-sub">PDF ou imagem · Máx. 10 MB</div>
+          <div class="upload-file-info" id="fi-sisbio"></div>
+        </div>
+      </div>
+
+      <div class="field" id="field-conep" style="display:none">
+        <label>Registro CONEP <span class="req">✱ obrigatório (pesquisa com humanos)</span></label>
+        <div class="upload-zone upload-obrigatorio" id="uz-conep" ondragover="dragOver(event,'conep')" ondragleave="dragLeave('conep')" ondrop="dropFile(event,'conep')">
+          <input type="file" accept=".pdf,.PDF,.jpg,.jpeg,.png" onchange="selecionarArquivo(this,'conep')">
+          <div class="upload-icon">👥</div>
+          <div class="upload-label">Clique ou arraste o registro CONEP</div>
+          <div class="upload-sub">PDF ou imagem · Máx. 10 MB</div>
+          <div class="upload-file-info" id="fi-conep"></div>
+        </div>
+      </div>
+
+      <div style="background:#F0FDF4;border-radius:var(--raio);padding:14px 16px;font-size:13px;color:#166534;line-height:1.6">
+        ✅ Após o envio, você receberá um e-mail de confirmação com o número do processo e poderá acompanhar o andamento pelo portal.
+      </div>
+    </div>
+    <div class="btn-nav">
+      <button class="btn btn-secondary" onclick="irPasso(2)">← Voltar</button>
+      <button class="btn btn-primary" id="btn-enviar" onclick="enviarSubmissao()">Enviar Pesquisa →</button>
+    </div>
+  </div>
+
+  <!-- Sucesso (oculto) -->
+  <div class="sucesso-card" id="passo-sucesso" style="display:none">
+    <div class="sucesso-icon">🎉</div>
+    <div class="sucesso-titulo">Pesquisa submetida com sucesso!</div>
+    <p class="sucesso-sub">Seu processo foi registrado. Guarde o número abaixo — você precisará dele para acompanhar o andamento.</p>
+    <div class="codigo-box" id="sucesso-codigo">—</div>
+    <div class="sucesso-aviso">
+      📧 Um e-mail de confirmação com todos os detalhes e o link de acompanhamento foi enviado para <strong id="sucesso-email">—</strong>.<br>
+      Verifique sua caixa de entrada (e a pasta de spam).
+    </div>
+    <a class="btn-status" id="link-status" href="#">
+      📊 Acompanhar minha pesquisa
+    </a>
+  </div>
+
+</main>
+
+<div class="toast-pub" id="toast-pub"></div>
+
+<script>
+const SUPABASE_URL      = 'https://atqtybcsvepdabsvgaly.supabase.co'
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF0cXR5YmNzdmVwZGFic3ZnYWx5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0MjMzNzgsImV4cCI6MjA5NTk5OTM3OH0.hWx1AB2rK7xdco1Dgagm0XUOBPQbxZVE614SW4SKoLk'
+const { createClient } = supabase
+const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+
+// ── Estado ────────────────────────────────────────────────────
+const _arquivos = { formulario: null, proposta: null, sisbio: null, conep: null }
+let   _passoAtual = 1
+let   _ucs = []
+
+// ── Init ─────────────────────────────────────────────────────
+async function init() {
+  const { data } = await db.from('unidades_conservacao')
+    .select('id,nome').eq('status','regularizada').order('nome')
+  _ucs = data || []
+  const sel = document.getElementById('p-uc')
+  _ucs.forEach(uc => {
+    const opt = document.createElement('option')
+    opt.value = uc.id
+    opt.textContent = uc.nome
+    sel.appendChild(opt)
+  })
+}
+
+// ── Navegação de passos ───────────────────────────────────────
+function irPasso(n) {
+  if (n > _passoAtual && !validarPasso(_passoAtual)) return
+
+  ;['passo1','passo2','passo3'].forEach((id, i) => {
+    document.getElementById(id).style.display = (i + 1 === n) ? '' : 'none'
+  })
+
+  ;[1,2,3].forEach(i => {
+    const num = document.getElementById('sn' + i)
+    const lbl = document.getElementById('sl' + i)
+    num.className = 'step-num ' + (i < n ? 'feito' : i === n ? 'ativo' : '')
+    lbl.className = 'step-label ' + (i === n ? 'ativo' : '')
+    num.textContent = i < n ? '✓' : String(i)
+  })
+  if (n > 1) document.getElementById('sl12').classList.toggle('feita', n > 2 || n >= 2)
+  if (n > 2) document.getElementById('sl23').classList.add('feita')
+
+  _passoAtual = n
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
+
+function validarPasso(n) {
+  if (n === 1) {
+    const nome  = document.getElementById('p-nome').value.trim()
+    const cpf   = document.getElementById('p-cpf').value.trim()
+    const email = document.getElementById('p-email').value.trim()
+    const inst  = document.getElementById('p-inst').value.trim()
+    if (!nome || !cpf || !email || !inst) { toastPub('Preencha todos os campos obrigatórios', true); return false }
+    if (!/\S+@\S+\.\S+/.test(email))      { toastPub('E-mail inválido', true); return false }
+    return true
+  }
+  if (n === 2) {
+    const titulo = document.getElementById('p-titulo').value.trim()
+    const resumo = document.getElementById('p-resumo').value.trim()
+    const uc     = document.getElementById('p-uc').value
+    if (!titulo || !resumo || !uc)        { toastPub('Preencha título, resumo e UC', true); return false }
+    if (resumo.length < 100)              { toastPub('O resumo deve ter ao menos 100 caracteres', true); return false }
+    return true
+  }
+  return true
+}
+
+// ── Condicionais SISBIO / CONEP ───────────────────────────────
+function atualizarCondicionais() {
+  const coleta  = document.getElementById('p-coleta').checked
+  const humanos = document.getElementById('p-humanos').checked
+
+  document.getElementById('sisbio-row').style.display   = coleta ? '' : 'none'
+  document.getElementById('field-sisbio').style.display = coleta ? '' : 'none'
+  document.getElementById('field-conep').style.display  = humanos ? '' : 'none'
+}
+
+// ── Upload de arquivos ────────────────────────────────────────
+const MAX_MB = { formulario: 10, proposta: 20, sisbio: 10, conep: 10 }
+
+function selecionarArquivo(input, tipo) {
+  const file = input.files?.[0]
+  if (!file) return
+  if (file.size > MAX_MB[tipo] * 1024 * 1024) {
+    toastPub(`Arquivo muito grande. Máx ${MAX_MB[tipo]}MB`, true)
+    input.value = ''
+    return
+  }
+  _arquivos[tipo] = file
+  const zone = document.getElementById('uz-' + tipo)
+  zone.classList.add('has-file')
+  zone.classList.remove('upload-obrigatorio')
+  const fi = document.getElementById('fi-' + tipo)
+  fi.textContent = `✓ ${file.name} (${(file.size/1024/1024).toFixed(1)} MB)`
+}
+
+function dragOver(e, tipo) { e.preventDefault(); document.getElementById('uz-' + tipo).classList.add('dragover') }
+function dragLeave(tipo)    { document.getElementById('uz-' + tipo).classList.remove('dragover') }
+function dropFile(e, tipo)  {
+  e.preventDefault()
+  dragLeave(tipo)
+  const file = e.dataTransfer.files?.[0]
+  if (!file) return
+  const input = document.querySelector(`#uz-${tipo} input[type=file]`)
+  const dt = new DataTransfer()
+  dt.items.add(file)
+  input.files = dt.files
+  selecionarArquivo(input, tipo)
+}
+
+// ── Envio ─────────────────────────────────────────────────────
+async function enviarSubmissao() {
+  // Valida documentos obrigatórios
+  const coleta  = document.getElementById('p-coleta').checked
+  const humanos = document.getElementById('p-humanos').checked
+
+  if (!_arquivos.formulario) { toastPub('Anexe o formulário de pesquisa assinado', true); return }
+  if (!_arquivos.proposta)   { toastPub('Anexe a proposta do projeto', true); return }
+  if (coleta  && !_arquivos.sisbio) { toastPub('Anexe o comprovante SISBIO (coleta biológica marcada)', true); return }
+  if (humanos && !_arquivos.conep)  { toastPub('Anexe o registro CONEP (pesquisa com humanos marcada)', true); return }
+
+  const btn = document.getElementById('btn-enviar')
+  btn.disabled = true
+  btn.textContent = 'Enviando…'
+
+  try {
+    // 1. Cria registro no banco
+    const { data: resultado, error } = await db.rpc('submeter_pesquisa_publica', {
+      p_titulo:               document.getElementById('p-titulo').value.trim(),
+      p_resumo:               document.getElementById('p-resumo').value.trim(),
+      p_tipo:                 document.getElementById('p-tipo').value,
+      p_uc_id:                document.getElementById('p-uc').value || null,
+      p_data_inicio_prevista: document.getElementById('p-inicio').value || null,
+      p_data_fim_prevista:    document.getElementById('p-fim').value || null,
+      p_area_ha:              parseFloat(document.getElementById('p-area').value) || null,
+      p_pesquisador_nome:     document.getElementById('p-nome').value.trim(),
+      p_pesquisador_cpf:      document.getElementById('p-cpf').value.trim(),
+      p_pesquisador_email:    document.getElementById('p-email').value.trim(),
+      p_pesquisador_inst:     document.getElementById('p-inst').value.trim(),
+      p_sisbio_numero:        document.getElementById('p-sisbio')?.value.trim() || null,
+      p_sisgen_numero:        document.getElementById('p-sisgen')?.value.trim() || null,
+      p_coleta_biologica:     coleta,
+      p_pesquisa_humanos:     humanos,
+    })
+
+    if (error) throw new Error(error.message)
+
+    const { id: pesquisaId, numero_processo, token_publico } = resultado
+
+    // 2. Upload dos documentos
+    const uploads = [
+      { tipo: 'formulario', arquivo: _arquivos.formulario },
+      { tipo: 'proposta',   arquivo: _arquivos.proposta },
+      coleta  ? { tipo: 'sisbio', arquivo: _arquivos.sisbio } : null,
+      humanos ? { tipo: 'conep',  arquivo: _arquivos.conep  } : null,
+    ].filter(Boolean)
+
+    for (const { tipo, arquivo } of uploads) {
+      const ext  = arquivo.name.split('.').pop()
+      const path = `${pesquisaId}/${tipo}_${Date.now()}.${ext}`
+
+      const { error: upErr } = await db.storage
+        .from('pesquisa-documentos')
+        .upload(path, arquivo, { contentType: arquivo.type })
+
+      if (upErr) throw new Error(`Erro ao enviar ${tipo}: ${upErr.message}`)
+
+      await db.from('pesquisa_documentos').insert({
+        pesquisa_id:   pesquisaId,
+        tipo,
+        nome_original: arquivo.name,
+        storage_path:  path,
+        tamanho_bytes: arquivo.size,
+        mime_type:     arquivo.type,
+        enviado_por:   'pesquisador',
+      })
+    }
+
+    // 3. Dispara e-mail de confirmação via Edge Function
+    await fetch(`${SUPABASE_URL}/functions/v1/pesquisa-email`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY },
+      body: JSON.stringify({
+        evento:             'submissao',
+        pesquisa_id:        pesquisaId,
+        enviar_copia_sema:  true,
+      })
+    })
+
+    // 4. Mostra sucesso
+    ;['passo1','passo2','passo3','steps-bar'].forEach(id => {
+      const el = document.getElementById(id)
+      if (el) el.style.display = 'none'
+    })
+    document.getElementById('passo-sucesso').style.display = ''
+    document.getElementById('sucesso-codigo').textContent = numero_processo
+    document.getElementById('sucesso-email').textContent  = document.getElementById('p-email').value.trim()
+    document.getElementById('link-status').href = `pesquisa-status.html?token=${token_publico}`
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+
+  } catch (err) {
+    toastPub('Erro ao enviar: ' + err.message, true)
+    btn.disabled = false
+    btn.textContent = 'Enviar Pesquisa →'
+  }
+}
+
+// ── Toast ─────────────────────────────────────────────────────
+function toastPub(msg, erro = false) {
+  const el = document.getElementById('toast-pub')
+  el.textContent = msg
+  el.className   = 'toast-pub show' + (erro ? ' erro' : '')
+  clearTimeout(el._t)
+  el._t = setTimeout(() => el.classList.remove('show'), 3500)
+}
+
+// ── Formatação CPF ────────────────────────────────────────────
+document.getElementById('p-cpf').addEventListener('input', function() {
+  let v = this.value.replace(/\D/g,'').slice(0,11)
+  if (v.length > 9) v = v.replace(/(\d{3})(\d{3})(\d{3})(\d{0,2})/,'$1.$2.$3-$4')
+  else if (v.length > 6) v = v.replace(/(\d{3})(\d{3})(\d{0,3})/,'$1.$2.$3')
+  else if (v.length > 3) v = v.replace(/(\d{3})(\d{0,3})/,'$1.$2')
+  this.value = v
+})
+
+init()
+</script>
+</body>
+</html>
