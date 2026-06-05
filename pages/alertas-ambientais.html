@@ -275,8 +275,14 @@ function focarAlerta(id) {
   const a = _alertas.find(x => x.id === id)
   if (!a?.geom) return
   try {
-    const m = String(a.geom).match(/POINT\(([^ ]+) ([^ )]+)\)/)
-    if (m) _mapaL.setView([parseFloat(m[2]), parseFloat(m[1])], 12)
+    let lat, lng
+    if (a.geom && typeof a.geom === 'object' && a.geom.coordinates) {
+      lng = a.geom.coordinates[0]; lat = a.geom.coordinates[1]
+    } else {
+      const m = String(a.geom).match(/POINT\(([^ ]+) ([^ )]+)\)/)
+      if (m) { lng = parseFloat(m[1]); lat = parseFloat(m[2]) }
+    }
+    if (lat && lng) _mapaL.setView([lat, lng], 12)
   } catch {}
 }
 
