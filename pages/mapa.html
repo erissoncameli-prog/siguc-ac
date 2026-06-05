@@ -2327,21 +2327,108 @@ let _carStatusAtivos = new Set(['ativo','aguardando','analise','cancelado','outr
 // ── Helpers de cor / status ───────────────────────────────────────────────
 function _carStatusKey(condicao){
   const c=(condicao||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
-  if(c.includes('ativo'))      return 'ativo';
-  if(c.includes('aguardando')) return 'aguardando';
-  if(c.includes('analise'))    return 'analise';
+  if(c.includes('cancelado')||c.includes('cancel')) return 'cancelado';
+  if(c.includes('ativo'))                           return 'ativo';
+  if(c.includes('aguardando'))                      return 'aguardando';
+  if(c.includes('analise'))                         return 'analise';
   return 'outro';
 }
 function _carCor(key){
-  return {ativo:'#16a34a',aguardando:'#d97706',analise:'#2563eb',outro:'#9ca3af'}[key]||'#9ca3af';
+  return _carGlobal.cores[key] || '#9ca3af';
 }
 function _estiloCAR(f, hover, sel){
   const cod     = f.properties?.cod_imovel;
   const custom  = _carMarcados.get(cod);
   const corBase = _carCor(_carStatusKey(f.properties?.condicao));
-  if(sel)  return {color:'#7c3aed',weight:3,opacity:1,fillColor:custom?.fill_color||'#7c3aed',fillOpacity:0.35};
-  if(hover) return {color:custom?.stroke_color||corBase,weight:(custom?.stroke_width||1.5)+1,opacity:1,fillColor:custom?.fill_color||corBase,fillOpacity:0.38};
-  return {color:custom?.stroke_color||corBase,weight:custom?.stroke_width||1.5,opacity:1,fillColor:custom?.fill_color||corBase,fillOpacity:custom?.fill_opacity??0.18};
+  const fo      = custom?.fill_opacity ?? _carGlobal.fillOpacity;
+  const sw      = custom?.stroke_width ?? _carGlobal.strokeWidth;
+  if(sel)   return {color:'#7c3aed',weight:3,opacity:1,fillColor:custom?.fill_color||'#7c3aed',fillOpacity:0.35};
+  if(hover) return {color:custom?.stroke_color||corBase,weight:sw+1,opacity:1,fillColor:custom?.fill_color||corBase,fillOpacity:Math.min(fo+0.2,1)};
+  return     {color:custom?.stroke_color||corBase,weight:sw,opacity:1,fillColor:custom?.fill_color||corBase,fillOpacity:fo};
+}
+
+// ── Modal de Configurações CAR ────────────────────────────────────────────
+function abrirCfgCAR(){
+  // Sincroniza select do modal com o select do painel
+  _popularFiltroCarUC('car-sel-uc-modal');
+  const selModal = document.getElementById('car-sel-uc-modal');
+  const selPanel = document.getElementById('car-sel-uc');
+  if(selModal && selPanel) selModal.value = selPanel.value || 'todas';
+  // Sincroniza controles de estilo
+  const fo = document.getElementById('car-gl-fo');
+  if(fo){ fo.value = Math.round(_carGlobal.fillOpacity*100); fo.nextElementSibling.textContent = fo.value+'%'; }
+  const sw = document.getElementById('car-gl-sw');
+  if(sw){ sw.value = _carGlobal.strokeWidth; sw.nextElementSibling.textContent = sw.value+'px'; }
+  Object.entries(_carGlobal.cores).forEach(([k,v])=>{
+    const el = document.getElementById('car-gl-c-'+k); if(el) el.value = v;
+  });
+  // Sincroniza checkboxes de status
+  document.querySelectorAll('[data-car-filtro]').forEach(cb=>{
+    cb.checked = _carStatusAtivos.has(cb.dataset.carFiltro);
+  });
+  _atualizarCfgStats();
+  document.getElementById('car-cfg-overlay').classList.add('aberto');
+}
+function fecharCfgCAR(){
+  document.getElementById('car-cfg-overlay').classList.remove('aberto');
+}
+function _carModalUCChange(val){
+  // Sincroniza com o select do painel e dispara carregamento
+  const selPanel = document.getElementById('car-sel-uc');
+  if(selPanel) selPanel.value = val;
+  const statusEl = document.getElementById('car-cfg-status');
+  if(statusEl) statusEl.textContent = val==='todas' ? '' : '⏳ Carregando...';
+  carregarDadosCAR(val).then(()=>{
+    if(statusEl) statusEl.textContent = _carFeatures.length ? `✅ ${_carFeatures.length.toLocaleString('pt-BR')} imóveis carregados` : '';
+    _atualizarCfgStats();
+  });
+}
+function aplicarFiltroStatusCAR(){
+  _carStatusAtivos.clear();
+  document.querySelectorAll('[data-car-filtro]').forEach(cb=>{
+    if(cb.checked) _carStatusAtivos.add(cb.dataset.carFiltro);
+  });
+  if(_carLayer) _aplicarCamadaCAR();
+  _atualizarCfgStats();
+}
+function _atualizarCfgStats(){
+  const sb = document.getElementById('car-cfg-stats'); if(!sb) return;
+  if(!_carFeatures.length){ sb.innerHTML = '<span style="color:var(--cinza-400)">Nenhuma UC selecionada</span>'; return; }
+  const visiveis = _carFeatures.filter(f=>_carStatusAtivos.has(_carStatusKey(f.properties?.condicao)));
+  const porKey = {};
+  _carFeatures.forEach(f=>{ const k=_carStatusKey(f.properties?.condicao); porKey[k]=(porKey[k]||0)+1; });
+  const cor = {ativo:'#16a34a',aguardando:'#d97706',analise:'#2563eb',cancelado:'#dc2626',outro:'#9ca3af'};
+  sb.innerHTML = `
+    <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+      <span style="font-weight:600">Total carregado</span><strong>${_carFeatures.length.toLocaleString('pt-BR')}</strong>
+    </div>
+    <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+      <span style="font-weight:600">Visíveis (filtro)</span><strong style="color:#1F4E2C">${visiveis.length.toLocaleString('pt-BR')}</strong>
+    </div>
+    ${Object.entries(porKey).map(([k,n])=>`
+    <div style="display:flex;justify-content:space-between;font-size:10px;padding:1px 0">
+      <span style="color:${cor[k]||'#9ca3af'}">● ${k.charAt(0).toUpperCase()+k.slice(1)}</span><span>${n.toLocaleString('pt-BR')}</span>
+    </div>`).join('')}`;
+}
+function _previewEstiloGlobalCAR(){
+  _carGlobal.fillOpacity = (document.getElementById('car-gl-fo')?.value||18)/100;
+  _carGlobal.strokeWidth = parseFloat(document.getElementById('car-gl-sw')?.value||1.5);
+  ['ativo','aguardando','analise','cancelado'].forEach(k=>{
+    const el=document.getElementById('car-gl-c-'+k); if(el) _carGlobal.cores[k]=el.value;
+  });
+  // Atualiza legenda inline
+  ['ativo','aguardando','analise','cancelado'].forEach(k=>{
+    const leg=document.getElementById('car-leg-'+k); if(leg) leg.style.background=_carGlobal.cores[k];
+  });
+  if(_carLayer) _aplicarCamadaCAR();
+}
+function _resetarEstiloGlobalCAR(){
+  _carGlobal = {fillOpacity:0.18,strokeWidth:1.5,cores:{ativo:'#16a34a',aguardando:'#d97706',analise:'#2563eb',cancelado:'#dc2626',outro:'#9ca3af'}};
+  const fo=document.getElementById('car-gl-fo'); if(fo){fo.value=18;fo.nextElementSibling.textContent='18%';}
+  const sw=document.getElementById('car-gl-sw'); if(sw){sw.value=1.5;sw.nextElementSibling.textContent='1.5px';}
+  Object.entries(_carGlobal.cores).forEach(([k,v])=>{ const el=document.getElementById('car-gl-c-'+k); if(el) el.value=v; });
+  if(_carLayer) _aplicarCamadaCAR();
+  toast('Cores restauradas ao padrão','info');
 }
 
 // ── Camada no mapa ────────────────────────────────────────────────────────
