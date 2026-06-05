@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>SIGUC-AC · Dashboard Executivo</title>
+<link rel="stylesheet" href="../css/global.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../js/observability.js"></script>
+<script src="../js/queryLogger.js"></script>
+<script src="../js/config.js"></script>
+<script src="../js/layout.js"></script>
+<style>
+/* ── layout ── */
+.dx-wrapper { display:flex; flex-direction:column; gap:16px; }
+
+/* ── seletor de nível ── */
+.nivel-tabs { display:flex; gap:4px; background:#F3F4F6; border-radius:12px; padding:4px; width:fit-content; }
+.nivel-btn  { padding:8px 20px; border:none; border-radius:9px; font-size:13px; font-weight:700; cursor:pointer; background:transparent; color:#6B7280; transition:all .15s; font-family:inherit; }
+.nivel-btn.ativo { background:#fff; color:#1F4E2C; box-shadow:0 1px 4px rgba(0,0,0,.12); }
+
+/* ── KPI grid ── */
+.kpi-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(160px, 1fr)); gap:12px; }
+.kpi-card { background:#fff; border:1px solid var(--borda); border-radius:12px; padding:16px 18px; }
+.kpi-card.destaque { border-color:var(--verde-c); background:linear-gradient(135deg,#F0FDF4,#fff); }
+.kpi-icon  { font-size:22px; margin-bottom:6px; }
+.kpi-val   { font-size:28px; font-weight:800; color:#111827; line-height:1; }
+.kpi-lbl   { font-size:11px; color:#9CA3AF; margin-top:4px; text-transform:uppercase; letter-spacing:.05em; }
+.kpi-delta { font-size:11px; margin-top:4px; font-weight:600; }
+.kpi-up    { color:#16a34a; }
+.kpi-down  { color:#dc2626; }
+
+/* ── seção ── */
+.sec-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+.sec-title  { font-size:13px; font-weight:800; color:#374151; }
+.sec-sub    { font-size:11px; color:#9CA3AF; }
+
+/* ── barra horizontal ── */
+.bar-row    { display:flex; flex-direction:column; gap:8px; }
+.bar-item   { display:flex; align-items:center; gap:10px; }
+.bar-label  { font-size:12px; color:#374151; width:160px; flex-shrink:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.bar-track  { flex:1; background:#F3F4F6; border-radius:6px; height:8px; overflow:hidden; }
+.bar-fill   { height:100%; border-radius:6px; background:var(--verde-c); transition:width .4s; }
+.bar-val    { font-size:11px; font-weight:700; color:#374151; width:40px; text-align:right; }
+
+/* ── cards de UC ── */
+.uc-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:12px; }
+.uc-card { background:#fff; border:1px solid var(--borda); border-radius:10px; padding:14px 16px; }
+.uc-card:hover { box-shadow:0 2px 8px rgba(0,0,0,.08); }
+.uc-nome { font-size:13px; font-weight:800; color:#111827; margin-bottom:6px; }
+.uc-meta { display:flex; gap:10px; flex-wrap:wrap; font-size:11px; color:#6B7280; margin-bottom:8px; }
+.uc-indicators { display:flex; gap:6px; flex-wrap:wrap; }
+.uc-ind  { display:flex; flex-direction:column; align-items:center; background:#F9FAFB; border-radius:8px; padding:6px 10px; min-width:50px; }
+.uc-ind-val { font-size:16px; font-weight:800; color:#1F4E2C; }
+.uc-ind-lbl { font-size:9px; color:#9CA3AF; text-transform:uppercase; margin-top:1px; }
+.uc-ind.alert .uc-ind-val { color:#DC2626; }
+.uc-ind.warn  .uc-ind-val { color:#F97316; }
+
+/* ── tabela resumo ── */
+.res-table { width:100%; border-collapse:collapse; font-size:12px; }
+.res-table th { background:#F9FAFB; padding:8px 12px; text-align:left; font-size:10px; font-weight:700; color:#6B7280; text-transform:uppercase; letter-spacing:.05em; border-bottom:1px solid var(--borda); }
+.res-table td { padding:10px 12px; border-bottom:1px solid #F3F4F6; }
+.res-table tr:last-child td { border-bottom:none; }
+
+/* ── donut simples (SVG) ── */
+.donut-wrap { display:flex; align-items:center; gap:16px; }
+.donut-legend { display:flex; flex-direction:column; gap:6px; }
+.leg-item { display:flex; align-items:center; gap:6px; font-size:11px; color:#374151; }
+.leg-dot  { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+
+/* ── alertas recentes ── */
+.alerta-mini { display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid #F3F4F6; }
+.alerta-mini:last-child { border-bottom:none; }
+.alerta-sev  { width:6px; height:32px; border-radius:3px; flex-shrink:0; }
+
+/* ── painel 2 colunas ── */
+.cols-2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+.cols-3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; }
+@media(max-width:900px){ .cols-2,.cols-3 { grid-template-columns:1fr; } }
+
+/* ── card container ── */
+.card-box { background:#fff; border:1px solid var(--borda); border-radius:12px; padding:16px; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+let _nivel   = 'secretaria'  // 'uc' | 'diretoria' | 'secretaria'
+let _ucFiltro = null
+let _dados   = {}
+
+// ── Init ─────────────────────────────────────────────────────
+
+async function init() {
+  await carregarUsuario()
+  // Nível padrão por perfil
+  const perfil = appState.usuario?.perfil
+  if (perfil === 'tecnico') _nivel = 'uc'
+  else if (perfil === 'gestor') _nivel = 'diretoria'
+
+  document.getElementById('app').innerHTML =
+    gerarLayout('Dashboard Executivo', 'dashboard-executivo') +
+    `<div class="fade-in dx-wrapper" id="dx-wrapper">${renderShell()}</div></div></div>`
+
+  await carregarTodos()
+  _sigucBarCompleta()
+}
+
+function renderShell() {
+  return `
+<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+  <div class="nivel-tabs">
+    <button class="nivel-btn ${_nivel==='uc'?'ativo':''}"          onclick="mudarNivel('uc')">🌿 Unidade de Conservação</button>
+    <button class="nivel-btn ${_nivel==='diretoria'?'ativo':''}"    onclick="mudarNivel('diretoria')">🏛 Diretoria (DIMA)</button>
+    <button class="nivel-btn ${_nivel==='secretaria'?'ativo':''}"   onclick="mudarNivel('secretaria')">🗂 Secretaria (SEMA)</button>
+  </div>
+  <span style="font-size:11px;color:#9CA3AF" id="dx-atualizado"></span>
+</div>
+<div id="dx-corpo"><div style="text-align:center;padding:60px;color:#9CA3AF">Carregando…</div></div>`
+}
+
+async function mudarNivel(nivel) {
+  _nivel = nivel
+  document.querySelectorAll('.nivel-btn').forEach((b,i) =>
+    b.classList.toggle('ativo', ['uc','diretoria','secretaria'][i] === nivel))
+  renderNivel()
+}
+
+// ── Carga de dados ────────────────────────────────────────────
+
+async function carregarTodos() {
+  const [ucs, ocorr, alertas, pesquisas, projetos, notifs] = await Promise.all([
+    db.from('unidades_conservacao').select('id,nome,categoria,grupo,area_ha,status'),
+    db.from('ocorrencias').select('id,severidade,status,uc_id,criado_em'),
+    db.from('alertas_ambientais').select('id,severidade,tipo,status,uc_id,detectado_em').order('detectado_em',{ascending:false}).limit(200),
+    db.from('pesquisas').select('id,etapa,uc_id,inadimplente'),
+    db.from('projetos_analise').select('id,status,uc_id'),
+    db.from('notificacoes').select('id,status,sla_prazo').neq('status','resolvida'),
+  ])
+
+  _dados = {
+    ucs:       ucs.data || [],
+    ocorr:     ocorr.data || [],
+    alertas:   alertas.data || [],
+    pesquisas: pesquisas.data || [],
+    projetos:  projetos.data || [],
+    notifs:    notifs.data || [],
+  }
+
+  const agora = new Date().toLocaleString('pt-BR')
+  document.getElementById('dx-atualizado').textContent = `Atualizado às ${agora}`
+  renderNivel()
+}
+
+// ── Render por nível ──────────────────────────────────────────
+
+function renderNivel() {
+  const el = document.getElementById('dx-corpo')
+  if (_nivel === 'uc')         el.innerHTML = renderUC()
+  else if (_nivel === 'diretoria') el.innerHTML = renderDiretoria()
+  else                         el.innerHTML = renderSecretaria()
+}
+
+// ══ NÍVEL UC ════════════════════════════════════════════════
+
+function renderUC() {
+  const { ucs, ocorr, alertas, pesquisas, projetos } = _dados
+  const agora = new Date()
+
+  const ucCards = ucs.map(uc => {
+    const ocAbertos  = ocorr.filter(o => o.uc_id === uc.id && o.status === 'aberta').length
+    const alertAtivos = alertas.filter(a => a.uc_id === uc.id && a.status !== 'resolvido').length
+    const pesqAtivas = pesquisas.filter(p => p.uc_id === uc.id && !['encerrada','arquivada'].includes(p.etapa)).length
+    const projAtivos = projetos.filter(p => p.uc_id === uc.id && p.status === 'em_analise').length
+
+    return `
+<div class="uc-card">
+  <div class="uc-nome">${esc(uc.nome)}</div>
+  <div class="uc-meta">
+    <span>${uc.categoria || '—'}</span>
+    <span>${uc.area_ha ? formatNum(uc.area_ha) + ' ha' : '—'}</span>
+    <span class="badge" style="background:#F0FDF4;color:#15803D;padding:1px 6px">${uc.status || '—'}</span>
+  </div>
+  <div class="uc-indicators">
+    <div class="uc-ind ${ocAbertos > 0 ? 'alert' : ''}">
+      <div class="uc-ind-val">${ocAbertos}</div>
+      <div class="uc-ind-lbl">Ocorr.</div>
+    </div>
+    <div class="uc-ind ${alertAtivos > 0 ? (alertAtivos > 3 ? 'alert' : 'warn') : ''}">
+      <div class="uc-ind-val">${alertAtivos}</div>
+      <div class="uc-ind-lbl">Alertas</div>
+    </div>
+    <div class="uc-ind">
+      <div class="uc-ind-val">${pesqAtivas}</div>
+      <div class="uc-ind-lbl">Pesquisas</div>
+    </div>
+    <div class="uc-ind">
+      <div class="uc-ind-val">${projAtivos}</div>
+      <div class="uc-ind-lbl">Projetos</div>
+    </div>
+  </div>
+</div>`
+  })
+
+  if (!ucCards.length) return '<div class="vazio" style="text-align:center;padding:60px;color:#9CA3AF">Nenhuma UC cadastrada</div>'
+
+  return `
+<div class="sec-header">
+  <span class="sec-title">🌿 Unidades de Conservação — Visão Individual</span>
+  <span class="sec-sub">${ucs.length} UCs cadastradas</span>
+</div>
+<div class="uc-grid">${ucCards.join('')}</div>`
+}
+
+// ══ NÍVEL DIRETORIA (DIMA) ════════════════════════════════════
+
+function renderDiretoria() {
+  const { ucs, ocorr, alertas, pesquisas, projetos, notifs } = _dados
+  const agora = new Date()
+
+  // KPIs
+  const totalUCs    = ucs.length
+  const ocAbertas   = ocorr.filter(o => o.status === 'aberta').length
+  const ocCriticas  = ocorr.filter(o => o.status === 'aberta' && o.severidade === 'critica').length
+  const alertAtivos = alertas.filter(a => a.status !== 'resolvido').length
+  const pesqAtivas  = pesquisas.filter(p => !['encerrada','arquivada'].includes(p.etapa)).length
+  const inad        = pesquisas.filter(p => p.inadimplente).length
+  const slaVencidos = notifs.filter(n => n.sla_prazo && new Date(n.sla_prazo) < agora).length
+  const projAtivos  = projetos.filter(p => p.status === 'em_analise').length
+
+  // Top UCs por alertas
+  const ucAlertas = ucs.map(uc => ({
+    nome: uc.nome,
+    n: alertas.filter(a => a.uc_id === uc.id && a.status !== 'resolvido').length
+  })).sort((a,b) => b.n - a.n).slice(0, 6)
+  const maxA = ucAlertas[0]?.n || 1
+
+  // Distribuição por grupo
+  const pi = ucs.filter(u => u.grupo === 'protecao_integral').length
+  const us = ucs.filter(u => u.grupo === 'uso_sustentavel').length
+
+  // Pesquisas por etapa (simplificado em 4 blocos)
+  const pesqBlocos = [
+    { label:'Tramitação', n: pesquisas.filter(p=>['submetida','triagem','analise_tecnica','parecer_juridico'].includes(p.etapa)).length, cor:'#818cf8' },
+    { label:'AAP', n: pesquisas.filter(p=>['aap_emissao','aap_assinatura','aap_publicada'].includes(p.etapa)).length, cor:'#34d399' },
+    { label:'Em Campo', n: pesquisas.filter(p=>['em_campo','relatorio_parcial','relatorio_final','analise_relatorio'].includes(p.etapa)).length, cor:'#38bdf8' },
+    { label:'Encerradas', n: pesquisas.filter(p=>['encerrada','arquivada'].includes(p.etapa)).length, cor:'#9ca3af' },
+  ]
+
+  return `
+<!-- KPIs principais -->
+<div class="kpi-grid">
+  <div class="kpi-card destaque">
+    <div class="kpi-icon">🌿</div>
+    <div class="kpi-val">${totalUCs}</div>
+    <div class="kpi-lbl">UCs Gerenciadas</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-icon">⚠️</div>
+    <div class="kpi-val" style="color:${ocCriticas>0?'#DC2626':'#111827'}">${ocAbertas}</div>
+    <div class="kpi-lbl">Ocorrências Abertas</div>
+    ${ocCriticas > 0 ? `<div class="kpi-delta kpi-down">${ocCriticas} críticas</div>` : ''}
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-icon">🔥</div>
+    <div class="kpi-val" style="color:${alertAtivos>10?'#DC2626':alertAtivos>5?'#F97316':'#111827'}">${alertAtivos}</div>
+    <div class="kpi-lbl">Alertas Ativos</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-icon">🔬</div>
+    <div class="kpi-val">${pesqAtivas}</div>
+    <div class="kpi-lbl">Pesquisas em Andamento</div>
+    ${inad > 0 ? `<div class="kpi-delta kpi-down">${inad} inadimplentes</div>` : ''}
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-icon">📐</div>
+    <div class="kpi-val">${projAtivos}</div>
+    <div class="kpi-lbl">Projetos de Campo</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-icon">⏱️</div>
+    <div class="kpi-val" style="color:${slaVencidos>0?'#DC2626':'#111827'}">${slaVencidos}</div>
+    <div class="kpi-lbl">SLA Vencidos</div>
+  </div>
+</div>
+
+<div class="cols-2">
+  <!-- Top UCs por alertas -->
+  <div class="card-box">
+    <div class="sec-header">
+      <span class="sec-title">🔥 UCs com mais alertas ativos</span>
+    </div>
+    <div class="bar-row">
+      ${ucAlertas.map(u => `
+      <div class="bar-item">
+        <div class="bar-label" title="${esc(u.nome)}">${esc(u.nome)}</div>
+        <div class="bar-track"><div class="bar-fill" style="width:${Math.round(u.n/maxA*100)}%;background:${u.n>5?'#DC2626':u.n>2?'#F97316':'#52B788'}"></div></div>
+        <div class="bar-val">${u.n}</div>
+      </div>`).join('')}
+      ${!ucAlertas.length ? '<p style="font-size:12px;color:#9CA3AF">Nenhum alerta ativo</p>' : ''}
+    </div>
+  </div>
+
+  <!-- Pesquisas por fase -->
+  <div class="card-box">
+    <div class="sec-header">
+      <span class="sec-title">🔬 Pesquisas por fase</span>
+      <span class="sec-sub">${pesquisas.length} total</span>
+    </div>
+    ${renderDonut(pesqBlocos)}
+  </div>
+</div>
+
+<div class="cols-2">
+  <!-- Distribuição por grupo de UC -->
+  <div class="card-box">
+    <div class="sec-header"><span class="sec-title">🌿 UCs por grupo</span></div>
+    ${renderDonut([
+      { label:'Proteção Integral', n:pi, cor:'#1F4E2C' },
+      { label:'Uso Sustentável',   n:us, cor:'#52B788' },
+    ])}
+  </div>
+
+  <!-- Alertas recentes -->
+  <div class="card-box">
+    <div class="sec-header">
+      <span class="sec-title">🔔 Alertas recentes</span>
+    </div>
+    <div>
+      ${alertas.slice(0,6).map(a => {
+        const cor = {critica:'#DC2626',alta:'#F97316',media:'#F59E0B',baixa:'#22C55E'}[a.severidade] || '#9CA3AF'
+        const uc = ucs.find(u => u.id === a.uc_id)
+        return `<div class="alerta-mini">
+          <div class="alerta-sev" style="background:${cor}"></div>
+          <div style="flex:1">
+            <div style="font-size:12px;font-weight:600">${a.tipo ? a.tipo.replace('_',' ') : '—'}</div>
+            <div style="font-size:10px;color:#9CA3AF">${esc(uc?.nome||'—')} · ${formatData(a.detectado_em)}</div>
+          </div>
+          <span class="badge" style="background:#FEF3C7;color:#92400E;font-size:9px">${a.severidade}</span>
+        </div>`
+      }).join('')}
+      ${!alertas.length ? '<p style="font-size:12px;color:#9CA3AF;text-align:center;padding:20px">Nenhum alerta</p>' : ''}
+    </div>
+  </div>
+</div>`
+}
+
+// ══ NÍVEL SECRETARIA (SEMA) ═══════════════════════════════════
+
+function renderSecretaria() {
+  const { ucs, ocorr, alertas, pesquisas, projetos, notifs } = _dados
+  const agora = new Date()
+
+  const totalHa     = ucs.reduce((s,u) => s + (parseFloat(u.area_ha)||0), 0)
+  const regularizadas = ucs.filter(u => u.status === 'regularizada').length
+  const emReg       = ucs.filter(u => u.status === 'em_regularizacao').length
+  const pesqTotal   = pesquisas.length
+  const aapEmitidas = pesquisas.filter(p => p.etapa !== 'submetida').length
+  const ocTotal     = ocorr.length
+  const slaVenc     = notifs.filter(n => n.sla_prazo && new Date(n.sla_prazo) < agora).length
+
+  // Status das UCs
+  const statusUC = {
+    regularizada:      ucs.filter(u=>u.status==='regularizada').length,
+    em_regularizacao:  ucs.filter(u=>u.status==='em_regularizacao').length,
+    criada:            ucs.filter(u=>u.status==='criada').length,
+    decreto_suspenso:  ucs.filter(u=>u.status==='decreto_suspenso').length,
+    em_revisao:        ucs.filter(u=>u.status==='em_revisao').length,
+  }
+
+  // Ocorrências por severidade
+  const ocSev = {
+    critica: ocorr.filter(o=>o.severidade==='critica'&&o.status==='aberta').length,
+    alta:    ocorr.filter(o=>o.severidade==='alta'&&o.status==='aberta').length,
+    media:   ocorr.filter(o=>o.severidade==='media'&&o.status==='aberta').length,
+    baixa:   ocorr.filter(o=>o.severidade==='baixa'&&o.status==='aberta').length,
+  }
+
+  return `
+<!-- KPIs macro -->
+<div class="kpi-grid">
+  <div class="kpi-card destaque">
+    <div class="kpi-icon">🌳</div>
+    <div class="kpi-val">${formatNum(Math.round(totalHa/1000))}k</div>
+    <div class="kpi-lbl">Hectares Protegidos</div>
+    <div class="kpi-delta" style="color:#52B788">${ucs.length} UCs</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-icon">✅</div>
+    <div class="kpi-val">${regularizadas}</div>
+    <div class="kpi-lbl">UCs Regularizadas</div>
+    <div class="kpi-delta" style="color:#F97316">${emReg} em regularização</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-icon">🔬</div>
+    <div class="kpi-val">${pesqTotal}</div>
+    <div class="kpi-lbl">Pesquisas (total)</div>
+    <div class="kpi-delta kpi-up">${aapEmitidas} com AAP</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-icon">🚨</div>
+    <div class="kpi-val" style="color:${ocTotal>0?'#DC2626':'#111827'}">${ocTotal}</div>
+    <div class="kpi-lbl">Ocorrências Registradas</div>
+    <div class="kpi-delta kpi-down">${ocSev.critica} críticas abertas</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-icon">📋</div>
+    <div class="kpi-val">${pesquisas.filter(p=>p.etapa==='em_campo').length}</div>
+    <div class="kpi-lbl">Pesquisas em Campo</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-icon">⏱️</div>
+    <div class="kpi-val" style="color:${slaVenc>0?'#DC2626':'#111827'}">${slaVenc}</div>
+    <div class="kpi-lbl">SLA Vencidos</div>
+  </div>
+</div>
+
+<div class="cols-3">
+  <!-- Status das UCs -->
+  <div class="card-box">
+    <div class="sec-header"><span class="sec-title">🏷 Status das UCs</span></div>
+    ${renderDonut([
+      { label:'Regularizada',     n:statusUC.regularizada,     cor:'#22C55E' },
+      { label:'Em Regularização', n:statusUC.em_regularizacao, cor:'#F59E0B' },
+      { label:'Criada',           n:statusUC.criada,           cor:'#60A5FA' },
+      { label:'Dec. Suspenso',    n:statusUC.decreto_suspenso, cor:'#F87171' },
+    ])}
+  </div>
+
+  <!-- Ocorrências abertas por severidade -->
+  <div class="card-box">
+    <div class="sec-header"><span class="sec-title">⚠️ Ocorrências abertas</span></div>
+    ${renderDonut([
+      { label:'Crítica', n:ocSev.critica, cor:'#DC2626' },
+      { label:'Alta',    n:ocSev.alta,    cor:'#F97316' },
+      { label:'Média',   n:ocSev.media,   cor:'#F59E0B' },
+      { label:'Baixa',   n:ocSev.baixa,   cor:'#22C55E' },
+    ])}
+  </div>
+
+  <!-- Alertas por tipo -->
+  <div class="card-box">
+    <div class="sec-header"><span class="sec-title">🔥 Alertas por tipo</span></div>
+    ${renderDonut([
+      { label:'Queimada',     n:alertas.filter(a=>a.tipo==='queimada').length,     cor:'#DC2626' },
+      { label:'Desmatamento', n:alertas.filter(a=>a.tipo==='desmatamento').length, cor:'#166534' },
+      { label:'Degradação',   n:alertas.filter(a=>a.tipo==='degradacao').length,   cor:'#92400E' },
+    ])}
+  </div>
+</div>
+
+<!-- Tabela macro por UC -->
+<div class="card-box">
+  <div class="sec-header">
+    <span class="sec-title">📊 Consolidado por UC</span>
+    <span class="sec-sub">Todas as ${ucs.length} unidades</span>
+  </div>
+  <table class="res-table">
+    <thead>
+      <tr>
+        <th>UC</th><th>Categoria</th><th>Área (ha)</th><th>Status</th>
+        <th>Alertas</th><th>Ocorr.</th><th>Pesquisas</th><th>Projetos</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${ucs.map(uc => {
+        const al = alertas.filter(a=>a.uc_id===uc.id&&a.status!=='resolvido').length
+        const oc = ocorr.filter(o=>o.uc_id===uc.id&&o.status==='aberta').length
+        const pe = pesquisas.filter(p=>p.uc_id===uc.id&&!['encerrada','arquivada'].includes(p.etapa)).length
+        const pr = projetos.filter(p=>p.uc_id===uc.id&&p.status==='em_analise').length
+        return `<tr>
+          <td style="font-weight:600">${esc(uc.nome)}</td>
+          <td><span class="badge" style="background:#F0F9FF;color:#0369A1">${uc.categoria||'—'}</span></td>
+          <td>${uc.area_ha ? formatNum(uc.area_ha) : '—'}</td>
+          <td><span class="badge" style="background:#F0FDF4;color:#15803D">${uc.status||'—'}</span></td>
+          <td style="color:${al>0?(al>3?'#DC2626':'#F97316'):'#9CA3AF'};font-weight:${al>0?'700':'400'}">${al||'—'}</td>
+          <td style="color:${oc>0?'#DC2626':'#9CA3AF'};font-weight:${oc>0?'700':'400'}">${oc||'—'}</td>
+          <td>${pe||'—'}</td>
+          <td>${pr||'—'}</td>
+        </tr>`
+      }).join('')}
+    </tbody>
+  </table>
+</div>`
+}
+
+// ── Donut SVG simples ─────────────────────────────────────────
+
+function renderDonut(itens) {
+  const total = itens.reduce((s,i) => s + i.n, 0)
+  if (!total) return '<p style="font-size:12px;color:#9CA3AF;padding:20px 0">Sem dados</p>'
+
+  const r = 40, cx = 50, cy = 50
+  let ang = -90
+  const paths = itens.map(item => {
+    if (!item.n) return ''
+    const pct = item.n / total
+    const a1  = ang * Math.PI / 180
+    ang += pct * 360
+    const a2  = ang * Math.PI / 180
+    const large = pct > 0.5 ? 1 : 0
+    const x1 = cx + r * Math.cos(a1), y1 = cy + r * Math.sin(a1)
+    const x2 = cx + r * Math.cos(a2), y2 = cy + r * Math.sin(a2)
+    return `<path d="M${cx},${cy} L${x1},${y1} A${r},${r} 0 ${large},1 ${x2},${y2} Z" fill="${item.cor}" opacity=".85"/>`
+  }).join('')
+
+  return `
+<div class="donut-wrap">
+  <svg width="100" height="100" viewBox="0 0 100 100">
+    ${paths}
+    <circle cx="50" cy="50" r="22" fill="#fff"/>
+    <text x="50" y="54" text-anchor="middle" font-size="13" font-weight="800" fill="#111827">${total}</text>
+  </svg>
+  <div class="donut-legend">
+    ${itens.map(i => `
+    <div class="leg-item">
+      <div class="leg-dot" style="background:${i.cor}"></div>
+      <span>${esc(i.label)}: <strong>${i.n}</strong></span>
+    </div>`).join('')}
+  </div>
+</div>`
+}
+
+// ── Boot ──────────────────────────────────────────────────────
+init()
+</script>
+</body>
+</html>
