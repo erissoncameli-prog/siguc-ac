@@ -1016,19 +1016,21 @@ function renderAlertasMapa() {
       lng = parseFloat(m[1]); lat = parseFloat(m[2])
     }
     if (!lat || !lng) return
-    const cor = COR_ALERTA[a.severidade] ?? '#6b7280'
-    const icone = a.tipo === 'queimada' ? '🔥' : '🌳'
-    L.circleMarker([lat, lng], {
-      radius: a.severidade === 'critica' ? 9 : a.severidade === 'alta' ? 7 : 5,
-      color: '#fff', weight: 1.5, fillColor: cor, fillOpacity: 0.85
-    }).bindPopup(`<div class="camada-popup">
-      <div class="cp-header" style="background:${cor}">${icone} Alerta — ${escHtml(a.tipo)}</div>
+    const cor     = COR_ALERTA[a.severidade]     ?? '#6b7280'
+    const corTipo = COR_ALERTA_TIPO[a.tipo]      ?? '#6b7280'
+    const icone   = ICONE_ALERTA[a.tipo]         ?? '⚠'
+    L.marker([lat, lng], { icon: _alertaMarkerIcon(a.tipo, a.severidade) })
+    .bindPopup(`<div class="camada-popup">
+      <div class="cp-header" style="background:${corTipo}">${icone} ${escHtml(a.tipo.charAt(0).toUpperCase()+a.tipo.slice(1))}</div>
       <div class="cp-layer">
         <div class="cp-row"><strong>UC</strong><span>${escHtml(a.uc_nome ?? 'Fora de UC')}</span></div>
         <div class="cp-row"><strong>Fonte</strong><span>${escHtml(a.fonte)}</span></div>
-        <div class="cp-row"><strong>Data</strong><span>${escHtml(a.data_referencia)}</span></div>
+        <div class="cp-row"><strong>Data evento</strong><span>${escHtml(a.data_referencia)}</span></div>
         ${a.area_ha ? `<div class="cp-row"><strong>Área</strong><span>${Number(a.area_ha).toLocaleString('pt-BR')} ha</span></div>` : ''}
-        <div class="cp-badge" style="background:${cor}22;border-color:${cor};color:${cor}">${escHtml(a.severidade)}</div>
+        <div style="margin-top:6px;display:flex;gap:5px">
+          <span class="cp-badge" style="background:${corTipo}22;border-color:${corTipo};color:${corTipo}">${icone} ${escHtml(a.tipo)}</span>
+          <span class="cp-badge" style="background:${cor}22;border-color:${cor};color:${cor}">${escHtml(a.severidade)}</span>
+        </div>
       </div>
     </div>`).addTo(_alertasLayer)
   })
