@@ -219,6 +219,8 @@ function iniciarMapa() {
 }
 
 async function carregar() {
+  await _carregarUCGeojson()
+
   const { data, error } = await db.from('alertas_ambientais')
     .select('*')
     .eq('ativo', true)
