@@ -515,7 +515,7 @@ function trocarAba(aba, pushHash = true) {
 // ── UCs ──
 async function carregarUCs() {
   const [ucRes, detRes] = await Promise.all([
-    db.from('unidades_conservacao').select('*').eq('ativo', true).order('codigo'),
+    db.from('unidades_conservacao').select('*').eq('ativo', true).order('esfera').order('codigo'),
     fetch('../data/uc_detalhes.json').then(r => r.ok ? r.json() : {})
   ])
   const detalhes = detRes || {}
