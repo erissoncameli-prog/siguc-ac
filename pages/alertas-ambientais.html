@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>SIGUC-AC · Alertas Ambientais</title>
+<link rel="stylesheet" href="../css/global.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../js/observability.js"></script>
+<script src="../js/queryLogger.js"></script>
+<script src="../js/config.js"></script>
+<script src="../js/layout.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+.alerta-wrapper { display:flex; flex-direction:column; gap:12px; height:calc(100vh - 108px); min-height:500px; }
+.alerta-topbar  { display:flex; align-items:center; gap:8px; flex-wrap:wrap; flex-shrink:0; }
+.alerta-body    { display:flex; gap:12px; flex:1; min-height:0; }
+#alerta-mapa    { flex:1; border-radius:var(--raio-lg); border:1px solid var(--borda); z-index:0; }
+.alerta-painel  { width:300px; flex-shrink:0; display:flex; flex-direction:column; gap:8px; overflow-y:auto; }
+
+/* KPI cards */
+.kpi-row  { display:flex; gap:8px; flex-shrink:0; }
+.kpi-card { flex:1; background:#fff; border:1px solid var(--borda); border-radius:10px; padding:10px 14px; text-align:center; }
+.kpi-val  { font-size:22px; font-weight:800; color:#1F4E2C; line-height:1; }
+.kpi-lbl  { font-size:10px; color:#9CA3AF; text-transform:uppercase; letter-spacing:.06em; margin-top:3px; }
+.kpi-card.critica .kpi-val { color:#DC2626; }
+.kpi-card.alta    .kpi-val { color:#F97316; }
+
+/* Lista de alertas */
+.alerta-item {
+  background:#fff; border:1px solid var(--borda); border-radius:8px;
+  padding:10px 12px; cursor:pointer; transition:border-color .15s;
+  border-left:4px solid #E5E7EB;
+}
+.alerta-item:hover { border-color:var(--verde-c); }
+.alerta-item.sev-critica { border-left-color:#DC2626; }
+.alerta-item.sev-alta    { border-left-color:#F97316; }
+.alerta-item.sev-media   { border-left-color:#F59E0B; }
+.alerta-item.sev-baixa   { border-left-color:#059669; }
+.alerta-item-header { display:flex; align-items:center; gap:6px; margin-bottom:4px; }
+.alerta-item-tipo   { font-size:11px; font-weight:700; color:#374151; flex:1; }
+.alerta-item-fonte  { font-size:9px; font-weight:700; background:#EDE9FE; color:#5B21B6; padding:1px 6px; border-radius:20px; }
+.alerta-item-uc     { font-size:11px; color:#6B7280; }
+.alerta-item-meta   { display:flex; gap:8px; margin-top:4px; font-size:10px; color:#9CA3AF; }
+
+/* Filtros */
+.fil-group { background:#fff; border:1px solid var(--borda); border-radius:8px; padding:10px 12px; }
+.fil-label  { font-size:10px; font-weight:700; color:#9CA3AF; text-transform:uppercase; letter-spacing:.06em; margin-bottom:6px; }
+
+/* Marcador no mapa */
+.alerta-dot { width:12px; height:12px; border-radius:50%; border:2px solid rgba(255,255,255,.8); box-shadow:0 1px 4px rgba(0,0,0,.4); }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+const COR_SEV = { critica:'#DC2626', alta:'#F97316', media:'#F59E0B', baixa:'#059669' }
+const ICONE_TIPO = { queimada:'🔥', desmatamento:'🌳', degradacao:'🍂' }
+const LABEL_FONTE = { FIRMS:'FIRMS/NASA', DETER:'DETER/INPE', BDQUEIMADAS:'BDQueimadas', PRODES:'PRODES' }
+
+let _alertas = [], _mapaL = null, _marcadores = [], _perfilUsuario = ''
+
+;(async function () {
+  const usuario = await carregarUsuario()
+  if (!usuario) { window.location.href = '../index.html'; return }
+  _perfilUsuario = usuario.perfil
+
+  document.getElementById('app').innerHTML =
+    gerarLayout('Alertas Ambientais', 'alertas-ambientais') +
+    `<div class="alerta-wrapper fade-in">
+
+      <!-- Topbar -->
+      <div class="alerta-topbar">
+        <div style="flex:1">
+          <h2 style="margin:0;font-size:17px;font-weight:600;color:var(--cinza-900)">Alertas Ambientais</h2>
+          <p style="margin:2px 0 0;font-size:11px;color:var(--cinza-500)">Focos de calor e desmatamento — FIRMS · DETER · BDQueimadas</p>
+        </div>
+        ${['super_admin','gestor'].includes(usuario.perfil) ? `
+        <button id="btn-disparar" class="btn btn-primary" onclick="dispararMonitoramento()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          Monitorar Agora
+        </button>` : ''}
+      </div>
+
+      <!-- KPIs -->
+      <div class="kpi-row" id="kpi-row">
+        <div class="kpi-card"><div class="kpi-val" id="kpi-total">—</div><div class="kpi-lbl">Total</div></div>
+        <div class="kpi-card critica"><div class="kpi-val" id="kpi-criticos">—</div><div class="kpi-lbl">Críticos</div></div>
+        <div class="kpi-card alta"><div class="kpi-val" id="kpi-altos">—</div><div class="kpi-lbl">Altos</div></div>
+        <div class="kpi-card"><div class="kpi-val" id="kpi-ucs">—</div><div class="kpi-lbl">UCs afetadas</div></div>
+      </div>
+
+      <!-- Body: mapa + painel -->
+      <div class="alerta-body">
+        <div id="alerta-mapa"></div>
+
+        <div class="alerta-painel">
+
+          <!-- Filtros -->
+          <div class="fil-group">
+            <div class="fil-label">Período</div>
+            <select class="form-control" id="fil-dias" onchange="filtrar()" style="font-size:12px">
+              <option value="1">Últimas 24h</option>
+              <option value="7" selected>Últimos 7 dias</option>
+              <option value="30">Últimos 30 dias</option>
+              <option value="0">Todos</option>
+            </select>
+          </div>
+
+          <div class="fil-group">
+            <div class="fil-label">Severidade</div>
+            <div style="display:flex;flex-wrap:wrap;gap:4px">
+              ${['critica','alta','media','baixa'].map(s => `
+              <label style="display:flex;align-items:center;gap:4px;font-size:11px;cursor:pointer">
+                <input type="checkbox" checked data-sev="${s}" onchange="filtrar()" style="accent-color:${COR_SEV[s]}">
+                <span style="color:${COR_SEV[s]};font-weight:600">${s}</span>
+              </label>`).join('')}
+            </div>
+          </div>
+
+          <div class="fil-group">
+            <div class="fil-label">Fonte</div>
+            <div style="display:flex;flex-direction:column;gap:3px">
+              ${['FIRMS','DETER','BDQUEIMADAS','PRODES'].map(f => `
+              <label style="display:flex;align-items:center;gap:5px;font-size:11px;cursor:pointer">
+                <input type="checkbox" checked data-fonte="${f}" onchange="filtrar()">
+                ${f}
+              </label>`).join('')}
+            </div>
+          </div>
+
+          <!-- Lista -->
+          <div style="font-size:10px;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:.06em">Registros</div>
+          <div id="lista-alertas" style="display:flex;flex-direction:column;gap:6px;overflow-y:auto;flex:1">
+            <div style="text-align:center;padding:24px;color:#9CA3AF;font-size:13px">Carregando...</div>
+          </div>
+        </div>
+      </div>
+    </div>` +
+    '</div></div></div>'
+
+  carregarLogosSidebar()
+  iniciarMapa()
+  await carregar()
+})()
+
+function iniciarMapa() {
+  _mapaL = L.map('alerta-mapa', { center: [-9.5, -70.0], zoom: 7 })
+  L.tileLayer('https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
+    maxZoom: 22, subdomains: ['mt0','mt1','mt2','mt3']
+  }).addTo(_mapaL)
+
+  // Carregar GeoJSON das UCs como referência
+  fetch('../data/uc_acre.geojson').then(r => r.json()).then(gj => {
+    L.geoJSON(gj, {
+      style: { color:'#52B788', weight:1.5, opacity:.7, fillColor:'#52B788', fillOpacity:.08 }
+    }).addTo(_mapaL)
+  }).catch(() => {})
+}
+
+async function carregar() {
+  const { data, error } = await db.from('alertas_ambientais')
+    .select('*')
+    .eq('ativo', true)
+    .order('data_deteccao', { ascending: false })
+    .limit(500)
+
+  if (error) { toast('Erro ao carregar alertas: ' + error.message, 'error'); return }
+  _alertas = data || []
+  filtrar()
+}
+
+function filtrar() {
+  const dias = parseInt(document.getElementById('fil-dias').value)
+  const sevs = new Set([...document.querySelectorAll('[data-sev]:checked')].map(e => e.dataset.sev))
+  const fontes = new Set([...document.querySelectorAll('[data-fonte]:checked')].map(e => e.dataset.fonte))
+  const corte = dias > 0 ? new Date(Date.now() - dias * 86400000).toISOString() : null
+
+  const filtrados = _alertas.filter(a =>
+    sevs.has(a.severidade) &&
+    fontes.has(a.fonte) &&
+    (!corte || a.data_deteccao >= corte)
+  )
+
+  atualizarKPIs(filtrados)
+  renderMarcadores(filtrados)
+  renderLista(filtrados)
+}
+
+function atualizarKPIs(lista) {
+  document.getElementById('kpi-total').textContent = lista.length
+  document.getElementById('kpi-criticos').textContent = lista.filter(a => a.severidade === 'critica').length
+  document.getElementById('kpi-altos').textContent = lista.filter(a => a.severidade === 'alta').length
+  const ucs = new Set(lista.filter(a => a.uc_id).map(a => a.uc_id))
+  document.getElementById('kpi-ucs').textContent = ucs.size
+}
+
+function renderMarcadores(lista) {
+  _marcadores.forEach(m => _mapaL.removeLayer(m))
+  _marcadores = []
+
+  lista.forEach(a => {
+    if (!a.geom) return
+    // geom vem como texto WKT ou objeto — tentamos parsear
+    let lat, lng
+    try {
+      // formato: "POINT(lng lat)"
+      const m = String(a.geom).match(/POINT\(([^ ]+) ([^ )]+)\)/)
+      if (m) { lng = parseFloat(m[1]); lat = parseFloat(m[2]) }
+      else return
+    } catch { return }
+
+    const cor = COR_SEV[a.severidade] ?? '#6B7280'
+    const marker = L.circleMarker([lat, lng], {
+      radius: a.severidade === 'critica' ? 9 : a.severidade === 'alta' ? 7 : 5,
+      color: '#fff', weight: 1.5,
+      fillColor: cor, fillOpacity: 0.85
+    })
+
+    marker.bindPopup(`
+      <div style="font-family:'DM Sans',sans-serif;min-width:180px">
+        <div style="background:${cor};color:#fff;padding:6px 10px;margin:-7px -11px 8px;border-radius:4px 4px 0 0;font-weight:700;font-size:12px">
+          ${ICONE_TIPO[a.tipo] ?? '⚠'} ${a.tipo}
+        </div>
+        <div style="font-size:12px;color:#374151">
+          <div><strong>UC:</strong> ${esc(a.uc_nome ?? 'Fora de UC')}</div>
+          <div><strong>Fonte:</strong> ${esc(LABEL_FONTE[a.fonte] ?? a.fonte)}</div>
+          <div><strong>Data:</strong> ${a.data_referencia}</div>
+          ${a.area_ha ? `<div><strong>Área:</strong> ${Number(a.area_ha).toLocaleString('pt-BR')} ha</div>` : ''}
+          <div style="margin-top:4px"><span style="background:${cor}22;color:${cor};border:1px solid ${cor};border-radius:20px;padding:1px 8px;font-size:10px;font-weight:700">${a.severidade}</span></div>
+        </div>
+      </div>`)
+
+    marker.addTo(_mapaL)
+    _marcadores.push(marker)
+  })
+}
+
+function renderLista(lista) {
+  const el = document.getElementById('lista-alertas')
+  if (!lista.length) {
+    el.innerHTML = `<div style="text-align:center;padding:32px;color:#9CA3AF;font-size:13px">Nenhum alerta no período</div>`
+    return
+  }
+  el.innerHTML = lista.slice(0, 100).map(a => {
+    const cor = COR_SEV[a.severidade] ?? '#6B7280'
+    return `<div class="alerta-item sev-${a.severidade}" onclick="focarAlerta('${a.id}')">
+      <div class="alerta-item-header">
+        <span class="alerta-item-tipo">${ICONE_TIPO[a.tipo] ?? '⚠'} ${a.tipo}</span>
+        <span class="alerta-item-fonte">${esc(a.fonte)}</span>
+      </div>
+      <div class="alerta-item-uc">${esc(a.uc_nome ?? 'Fora de UC cadastrada')}</div>
+      <div class="alerta-item-meta">
+        <span>${a.data_referencia}</span>
+        ${a.area_ha ? `<span>· ${Number(a.area_ha).toLocaleString('pt-BR')} ha</span>` : ''}
+        <span style="color:${cor};font-weight:700">· ${a.severidade}</span>
+      </div>
+    </div>`
+  }).join('')
+
+  if (lista.length > 100) {
+    el.innerHTML += `<div style="text-align:center;font-size:11px;color:#9CA3AF;padding:8px">Exibindo 100 de ${lista.length} alertas</div>`
+  }
+}
+
+function focarAlerta(id) {
+  const a = _alertas.find(x => x.id === id)
+  if (!a?.geom) return
+  try {
+    const m = String(a.geom).match(/POINT\(([^ ]+) ([^ )]+)\)/)
+    if (m) _mapaL.setView([parseFloat(m[2]), parseFloat(m[1])], 12)
+  } catch {}
+}
+
+async function dispararMonitoramento() {
+  const btn = document.getElementById('btn-disparar')
+  btn.disabled = true
+  btn.textContent = 'Monitorando...'
+  toast('Monitoramento iniciado. Pode levar até 30 segundos.', 'success')
+  try {
+    const { data: { session } } = await db.auth.getSession()
+    const res = await fetch(
+      `${appState.supabaseUrl ?? ''}/functions/v1/monitorar-alertas`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session?.access_token}`,
+          'Content-Type': 'application/json',
+        }
+      }
+    )
+    const json = await res.json()
+    if (json.ok) {
+      toast(`✅ ${json.novos_alertas} novos alertas detectados`, 'success')
+      await carregar()
+    } else {
+      toast('Erro: ' + (json.erro ?? 'Falha no monitoramento'), 'error')
+    }
+  } catch (e) {
+    toast('Erro ao disparar: ' + e.message, 'error')
+  } finally {
+    btn.disabled = false
+    btn.textContent = 'Monitorar Agora'
+    btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg> Monitorar Agora`
+  }
+}
+</script>
+</body>
+</html>
