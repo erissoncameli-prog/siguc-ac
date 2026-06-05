@@ -905,15 +905,57 @@ function _renderDropdown(id){
       </label>
       <p style="font-size:11px;color:var(--cinza-500);margin:5px 0 10px">Focos de calor e desmatamento dos últimos 7 dias.</p>
     </div>
-    <div id="alertas-filtros-wrap" style="display:none;flex-direction:column;gap:6px">
-      <div style="display:flex;flex-wrap:wrap;gap:6px">
-        ${['critica','alta','media','baixa'].map(s=>{
-          const c={critica:'#DC2626',alta:'#F97316',media:'#F59E0B',baixa:'#059669'}[s]
-          return `<label style="display:flex;align-items:center;gap:4px;font-size:11px;cursor:pointer">
-            <input type="checkbox" checked data-alerta-sev="${s}" style="accent-color:${c}" onchange="renderAlertasMapa()">
-            <span style="color:${c};font-weight:600">${s}</span></label>`
-        }).join('')}
+    <div id="alertas-filtros-wrap" style="display:none;flex-direction:column;gap:10px">
+
+      <!-- Severidade -->
+      <div>
+        <div style="font-size:10px;font-weight:700;color:var(--cinza-400);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">Severidade</div>
+        <div style="display:flex;flex-wrap:wrap;gap:5px">
+          ${['critica','alta','media','baixa'].map(s=>{
+            const c={critica:'#DC2626',alta:'#F97316',media:'#F59E0B',baixa:'#059669'}[s]
+            return `<label style="display:flex;align-items:center;gap:4px;font-size:11px;cursor:pointer">
+              <input type="checkbox" checked data-alerta-sev="${s}" style="accent-color:${c}" onchange="renderAlertasMapa()">
+              <span style="color:${c};font-weight:600">${s}</span></label>`
+          }).join('')}
+        </div>
       </div>
+
+      <!-- Localização -->
+      <div>
+        <div style="font-size:10px;font-weight:700;color:var(--cinza-400);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">Localização</div>
+        <div style="display:flex;flex-direction:column;gap:4px">
+          <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer">
+            <input type="radio" name="alerta-loc" value="todos" checked style="accent-color:#52B788" onchange="renderAlertasMapa()">
+            <span>Todos os alertas</span>
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer">
+            <input type="radio" name="alerta-loc" value="em_uc" style="accent-color:#52B788" onchange="renderAlertasMapa()">
+            <span>🌿 Somente dentro de UCs</span>
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer">
+            <input type="radio" name="alerta-loc" value="fora_uc" style="accent-color:#52B788" onchange="renderAlertasMapa()">
+            <span>⚠ Somente fora de UCs</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Fonte -->
+      <div>
+        <div style="font-size:10px;font-weight:700;color:var(--cinza-400);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">Fonte</div>
+        <div style="display:flex;flex-direction:column;gap:4px">
+          ${[
+            ['FIRMS',       '🛰 FIRMS / NASA',       '#7c3aed'],
+            ['DETER',       '🌳 DETER / INPE',       '#dc2626'],
+            ['BDQUEIMADAS', '🔥 BDQueimadas / INPE', '#ea580c'],
+            ['PRODES',      '📊 PRODES / INPE',      '#b45309'],
+          ].map(([f,label,c]) => `
+          <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer">
+            <input type="checkbox" checked data-alerta-fonte="${f}" style="accent-color:${c}" onchange="renderAlertasMapa()">
+            <span>${label}</span>
+          </label>`).join('')}
+        </div>
+      </div>
+
       <div id="alertas-mapa-stat" style="font-size:10px;color:var(--cinza-400)"></div>
       <a href="../pages/alertas-ambientais.html" style="font-size:11px;color:var(--verde-c);text-decoration:none;font-weight:600">→ Ver página completa de alertas</a>
     </div>
