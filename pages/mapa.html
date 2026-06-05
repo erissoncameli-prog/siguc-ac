@@ -2315,6 +2315,15 @@ let _carRenderer     = null;
 const _carProdesCache = new Map();
 const CAR_WIDTH_KEY   = 'siguc_car_panel_width';
 
+// Estilo global da camada CAR (editável no modal)
+let _carGlobal = {
+  fillOpacity: 0.18,
+  strokeWidth: 1.5,
+  cores: { ativo:'#16a34a', aguardando:'#d97706', analise:'#2563eb', cancelado:'#dc2626', outro:'#9ca3af' }
+};
+// Filtros de status ativos
+let _carStatusAtivos = new Set(['ativo','aguardando','analise','cancelado','outro']);
+
 // ── Helpers de cor / status ───────────────────────────────────────────────
 function _carStatusKey(condicao){
   const c=(condicao||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
