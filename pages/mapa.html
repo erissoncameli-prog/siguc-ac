@@ -962,8 +962,22 @@ function renderOcorrencias(){
 // ══════════════════════════════════════════════════════════════
 // ALERTAS AMBIENTAIS — camada sobre o mapa
 // ══════════════════════════════════════════════════════════════
-const COR_ALERTA = { critica:'#DC2626', alta:'#F97316', media:'#F59E0B', baixa:'#059669' }
+const COR_ALERTA      = { critica:'#DC2626', alta:'#F97316', media:'#F59E0B', baixa:'#059669' }
+const COR_ALERTA_TIPO = { queimada:'#DC2626', desmatamento:'#166534', degradacao:'#92400E' }
+const ICONE_ALERTA    = { queimada:'🔥', desmatamento:'🌳', degradacao:'🍂' }
 let _alertasLayer = null, _alertasMapa = [], _alertasAtivo = false
+
+function _alertaMarkerIcon(tipo, severidade) {
+  const emoji = ICONE_ALERTA[tipo]      ?? '⚠'
+  const cor   = COR_ALERTA_TIPO[tipo]   ?? '#6B7280'
+  const borda = COR_ALERTA[severidade]  ?? '#6B7280'
+  const sz    = severidade === 'critica' ? 32 : severidade === 'alta' ? 27 : 22
+  return L.divIcon({
+    className: '',
+    html: `<div style="width:${sz}px;height:${sz}px;border-radius:50%;background:${cor};border:3px solid ${borda};display:flex;align-items:center;justify-content:center;font-size:${Math.round(sz*.55)}px;line-height:1;box-shadow:0 2px 6px rgba(0,0,0,.45);cursor:pointer">${emoji}</div>`,
+    iconSize: [sz, sz], iconAnchor: [sz/2, sz/2], popupAnchor: [0, -sz/2 - 4]
+  })
+}
 
 async function toggleAlertasMapa(ativo) {
   _alertasAtivo = ativo
