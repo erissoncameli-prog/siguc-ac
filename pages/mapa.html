@@ -467,7 +467,7 @@ let _zonasTiposAtivos = new Set(['ZI','ZP','ZOA','ZOC','ZEX','ZPO','ZPR','ZUE','
 let _zonasSelecaoPorUC = {}; // { ucNome: Set<codigoZona> } — null = todas visíveis
 let _acreEstilo = { cor:'#1F4E2C', espessura:4, opacidade:1, dashArray:'none', sombraCor:'#000000', sombraBlur:14, sombraOpacidade:0.55, sombraOffset:3 };
 let _carLayer = null, _carFeatures = [], _carCarregado = false, _carCarregando = false;
-let _carAbertoCod = null;
+let _carAbertoCod = null, _carUCAtual = null;
 const SUBBACIA_PALETTE = ['#16a34a','#2563eb','#d97706','#7c3aed','#0891b2','#dc2626','#65a30d','#db2777','#ea580c'];
 const OC_CORES = { critica:'#DC2626', alta:'#F97316', media:'#F59E0B', baixa:'#059669' };
 const OC_ICONES = { incendio:'🔥', desmatamento:'🌳', invasao:'🚨', caca_pesca_ilegal:'🎣', mineracao_ilegal:'⛏', contaminacao:'☠', especie_invasora:'🦎', outro:'⚠' };
