@@ -1224,13 +1224,21 @@ function renderAlertasMapa() {
   const visiveis = _alertasMapa.filter(a => {
     if (!sevs.has(a.severidade)) return false
     if (!fontes.has(a.fonte))    return false
-    if (loc === 'em_uc') {
-      const temUC = a.uc_nome || a.uc_id
-      if (!temUC) return false
-    }
-    if (loc === 'fora_uc') {
-      const temUC = a.uc_nome || a.uc_id
-      if (temUC) return false
+    if (loc !== 'todos') {
+      // Extrai coordenadas do alerta
+      let lat, lng
+      try {
+        if (typeof a.geom === 'object' && a.geom?.coordinates) {
+          lng = a.geom.coordinates[0]; lat = a.geom.coordinates[1]
+        } else {
+          const m = String(a.geom).match(/POINT\(([^ ]+) ([^ )]+)\)/)
+          if (m) { lng = parseFloat(m[1]); lat = parseFloat(m[2]) }
+        }
+      } catch {}
+      if (!lat || !lng) return loc === 'fora_uc' // sem geom: conta como fora
+      const emUC = _alertaEmUCVisivel(lat, lng)
+      if (loc === 'em_uc'   && !emUC) return false
+      if (loc === 'fora_uc' &&  emUC) return false
     }
     return true
   })
