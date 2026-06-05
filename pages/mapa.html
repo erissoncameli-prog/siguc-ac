@@ -2167,6 +2167,8 @@ async function carregarDadosCAR(ucNome){
 
     _carCacheUC.set(ucNome, dentro);
     _carFeatures = dentro;
+    _carUCAtual  = ucNome;
+    await _carregarMarcados();
     _aplicarCamadaCAR();
     const n = dentro.length;
     setStatus(`✅ <strong>${n}</strong> imóvel(is) carregado(s)`);
