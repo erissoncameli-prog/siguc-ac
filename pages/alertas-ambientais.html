@@ -408,6 +408,14 @@ async function dispararMonitoramento() {
     if (error) throw error
     if (data?.ok) {
       toast(`✅ ${data.novos_alertas} novos alertas detectados`, 'success')
+      // Avisar se FIRMS_MAP_KEY não está configurada
+      if (data.fontes?.firms_key_configurada === false) {
+        toast('⚠ FIRMS_MAP_KEY não configurada — focos de calor não foram buscados. Configure nos secrets da edge function no Supabase.', 'error')
+      }
+      if (data.erros?.length) {
+        console.warn('[Monitoramento] Erros:', data.erros)
+        data.erros.forEach((e: string) => toast('⚠ ' + e, 'error'))
+      }
       await carregar()
     } else {
       toast('Erro: ' + (data?.erro ?? 'Falha no monitoramento'), 'error')
