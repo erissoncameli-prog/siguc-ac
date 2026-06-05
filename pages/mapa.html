@@ -1348,6 +1348,30 @@ function _ucConstruirPainel(){
   if(usEl) usEl.innerHTML=us.length?buildList(us):'<span style="font-size:10px;color:var(--cinza-400)">Nenhuma</span>';
 }
 
+// Retorna as features do GeoJSON que estão atualmente visíveis no mapa
+function _ucsFeaturesVisiveis() {
+  if (!_ucGeojson || !_ucAtivo) return []
+  const esfFed = document.getElementById('uc-esfera-federal')?.checked  ?? false
+  const esfEst = document.getElementById('uc-esfera-estadual')?.checked ?? true
+  const esfMun = document.getElementById('uc-esfera-municipal')?.checked ?? false
+  const nomesAtivos = new Set(
+    Array.from(document.querySelectorAll('[data-uc-nome]:checked')).map(e => e.dataset.ucNome)
+  )
+  return (_ucGeojson.features || []).filter(f => {
+    const esf = (f.properties.esfera || '').toLowerCase()
+    if (esf === 'federal'   && !esfFed) return false
+    if (esf === 'estadual'  && !esfEst) return false
+    if (esf === 'municipal' && !esfMun) return false
+    if (nomesAtivos.size > 0 && !nomesAtivos.has(f.properties.nome)) return false
+    return true
+  })
+}
+
+function _alertaEmUCVisivel(lat, lng) {
+  const pt = [lng, lat]
+  return _ucsFeaturesVisiveis().some(f => _pipGeom(pt, f.geometry))
+}
+
 function _renderizarUC(){
   if(_ucLayer){ mapaL.removeLayer(_ucLayer); _ucLayer=null; }
   if(!_ucGeojson||!_ucAtivo) return;
