@@ -784,7 +784,9 @@ function toggleLayerBar(id){
     if(elFed) elFed.checked = _ucEsfFed;
     if(elEst) elEst.checked = _ucEsfEst;
     if(elMun) elMun.checked = _ucEsfMun;
-    if(_ucGeojson) _ucConstruirPainel();
+    const ctrl = document.getElementById('uc-controles');
+    if(ctrl) ctrl.style.display = '';
+    _ucConstruirPainel();
   }
 }
 document.addEventListener('click', e => {
