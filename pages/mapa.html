@@ -1183,6 +1183,8 @@ async function toggleAlertasMapa(ativo) {
   _alertasAtivo = ativo
   document.getElementById('alertas-filtros-wrap').style.display = ativo ? 'flex' : 'none'
   if (ativo && !_alertasMapa.length) {
+    // Garante que o GeoJSON das UCs está carregado para o PIP
+    if (!_ucGeojson) await _carregarUC()
     const corte = new Date(Date.now() - 7 * 86400000).toISOString()
     const { data } = await db.from('alertas_ambientais')
       .select('id,tipo,severidade,fonte,uc_id,uc_nome,area_ha,data_referencia,geom')
