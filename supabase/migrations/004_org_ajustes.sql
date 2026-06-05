@@ -15,10 +15,11 @@ ALTER TABLE unidades_conservacao
 
 CREATE INDEX IF NOT EXISTS idx_uc_unidade_org ON unidades_conservacao (unidade_org_id);
 
--- ── Atualizar nome completo do CIGMA (permanece sob DIMA) ───
+-- ── CIGMA: mover para SECRETARIA e atualizar nome completo ──
 
 UPDATE unidades_organizacionais
-SET nome = 'Centro Integrado de Inteligência, Geoprocessamento e Monitoramento Ambiental'
+SET pai_id = (SELECT id FROM unidades_organizacionais WHERE sigla = 'SECRETARIA'),
+    nome   = 'Centro Integrado de Inteligência, Geoprocessamento e Monitoramento Ambiental'
 WHERE sigla = 'CIGMA';
 
 -- ── Novos departamentos sob DIMA ─────────────────────────────
