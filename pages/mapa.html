@@ -2185,10 +2185,28 @@ const CAR_PAGE     = 1000;
 
 let _carCacheUC = new Map(); // ucNome → features[]
 
-function _popularFiltroCarUC(){
-  const sel = document.getElementById('car-sel-uc'); if(!sel) return;
-  const nomes=(_ucGeojson?.features||[]).map(f=>f.properties?.nome).filter(Boolean).sort();
-  sel.innerHTML='<option value="todas">Selecione uma UC...</option>'+nomes.map(n=>`<option value="${escHtml(n)}">${escHtml(n)}</option>`).join('');
+function _popularFiltroCarUC(targetId = 'car-sel-uc'){
+  const sel = document.getElementById(targetId); if(!sel) return;
+  const feats = _ucGeojson?.features || [];
+  // Agrupa por esfera: estadual primeiro, depois federal, municipal, privada
+  const ordem = ['estadual','federal','municipal','privada'];
+  const grupos = {};
+  feats.forEach(f=>{
+    const nome = f.properties?.nome; if(!nome) return;
+    const esfera = (f.properties?.esfera||'outro').toLowerCase();
+    const g = ordem.includes(esfera) ? esfera : 'outro';
+    (grupos[g] = grupos[g]||[]).push(nome);
+  });
+  Object.values(grupos).forEach(arr => arr.sort());
+  const labels = {estadual:'🌿 Estaduais (SEMA-AC)', federal:'🏛 Federais (ICMBio)', municipal:'🏙 Municipais', privada:'🔒 Privadas', outro:'Outras'};
+  let html = '<option value="todas">Selecione uma UC...</option>';
+  [...ordem, 'outro'].forEach(g => {
+    if(!grupos[g]?.length) return;
+    html += `<optgroup label="${labels[g]||g}">`;
+    html += grupos[g].map(n=>`<option value="${escHtml(n)}">${escHtml(n)}</option>`).join('');
+    html += '</optgroup>';
+  });
+  sel.innerHTML = html;
 }
 
 async function toggleCamadaCAR(el){
@@ -2197,10 +2215,11 @@ async function toggleCamadaCAR(el){
     fecharDetalhesCAR();
     document.getElementById('car-filtros-wrap').style.display='none';
     document.getElementById('car-count-badge').style.display='none';
+    document.getElementById('car-legenda-inline').style.display='none';
     return;
   }
   if(!_ucGeojson) await _carregarUC();
-  _popularFiltroCarUC();
+  _popularFiltroCarUC('car-sel-uc');
   document.getElementById('car-filtros-wrap').style.display='flex';
 }
 
