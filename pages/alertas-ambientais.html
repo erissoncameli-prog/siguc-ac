@@ -296,10 +296,14 @@ function renderMarcadores(lista) {
           <div><strong>Data evento:</strong> ${a.data_referencia}</div>
           ${a.area_ha ? `<div><strong>Área:</strong> ${Number(a.area_ha).toLocaleString('pt-BR')} ha</div>` : ''}
           <div style="font-size:10px;color:#9CA3AF;margin-top:2px">📍 ${coordStr}</div>
-          <div style="margin-top:4px;display:flex;gap:5px;align-items:center">
+          <div style="margin-top:4px;display:flex;gap:5px;align-items:center;flex-wrap:wrap">
             <span style="background:${corTipo}22;color:${corTipo};border:1px solid ${corTipo};border-radius:20px;padding:1px 8px;font-size:10px;font-weight:700">${ICONE_TIPO[a.tipo]??'⚠'} ${a.tipo}</span>
             <span style="background:${cor}22;color:${cor};border:1px solid ${cor};border-radius:20px;padding:1px 8px;font-size:10px;font-weight:700">${a.severidade}</span>
           </div>
+          <a href="../pages/mapa.html?alerta_projeto=${encodeURIComponent(a.id)}"
+            style="display:block;margin-top:8px;text-align:center;padding:6px 0;background:#1F4E2C;color:#fff;border-radius:6px;font-size:11px;font-weight:600;text-decoration:none;font-family:'DM Sans',sans-serif">
+            📐 Abrir Projeto de Análise
+          </a>
         </div>
       </div>`)
 
