@@ -272,6 +272,31 @@ function gibsAlterarData(){
 }
 
 // ══════════════════════════════════════════════════════════════
+// PIP — Ponto dentro de polígono (ray-casting)
+// ══════════════════════════════════════════════════════════════
+function _pipRing(pt, ring) {
+  let inside = false
+  const [x, y] = pt
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi, yi] = ring[i], [xj, yj] = ring[j]
+    if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) inside = !inside
+  }
+  return inside
+}
+function _pipGeom(pt, geom) {
+  if (!geom) return false
+  const rings = geom.type === 'Polygon' ? geom.coordinates
+    : geom.type === 'MultiPolygon' ? geom.coordinates.flat(1) : []
+  return rings.some(r => _pipRing(pt, r))
+}
+function _ucNomePorCoordenada(lat, lng) {
+  if (!_ucGeojson?.features) return null
+  const pt = [lng, lat]
+  const f = _ucGeojson.features.find(f => _pipGeom(pt, f.geometry))
+  return f ? (f.properties?.nome || f.properties?.NAME || f.properties?.name || null) : null
+}
+
+// ══════════════════════════════════════════════════════════════
 // ESTADO GLOBAL
 // ══════════════════════════════════════════════════════════════
 let mapaL = null, clusters = null;
