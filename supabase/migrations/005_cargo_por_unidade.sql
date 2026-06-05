@@ -58,7 +58,7 @@ CREATE TRIGGER trg_unid_criar_cargo
 -- ── Trigger: sincronizar cargo ao atualizar unidade ──────────
 
 CREATE OR REPLACE FUNCTION trg_sincronizar_cargo_unidade()
-RETURNS trigger LANGUAGE plpgsql AS $$
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER AS $$
 BEGIN
   -- Nome, tipo ou vínculo pai mudou → atualiza cargo
   IF NEW.nome <> OLD.nome OR NEW.tipo <> OLD.tipo THEN
