@@ -36,7 +36,7 @@ $$;
 -- ── Trigger: criar cargo ao inserir unidade ──────────────────
 
 CREATE OR REPLACE FUNCTION trg_criar_cargo_unidade()
-RETURNS trigger LANGUAGE plpgsql AS $$
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER AS $$
 BEGIN
   INSERT INTO cargos (unidade_org_id, denominacao, tipo, nivel, ativo)
   VALUES (
