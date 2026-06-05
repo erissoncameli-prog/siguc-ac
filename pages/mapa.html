@@ -2151,6 +2151,232 @@ function _preencherZonaSection(section, ucNome){
 }
 
 // ══════════════════════════════════════════════════════════════
+// PROJETOS DE ANÁLISE
+// ══════════════════════════════════════════════════════════════
+let _drawControl = null, _drawLayer = null, _projetoGeom = null, _projetosLayer = null
+
+function abrirModalProjeto(alerta) {
+  // Cancela qualquer desenho em curso
+  _cancelarDesenho()
+
+  // Limpa estado
+  _projetoGeom = null
+  document.getElementById('proj-draw-area').classList.remove('desenhado','ativo')
+  document.getElementById('proj-draw-instrucao').style.display = ''
+  document.getElementById('proj-draw-resultado').style.display = 'none'
+  document.getElementById('proj-area-val').textContent = '— ha'
+  document.getElementById('proj-obs').value = ''
+  document.getElementById('proj-status').value = 'rascunho'
+  document.getElementById('proj-tipo').value = 'verificacao_campo'
+  document.getElementById('proj-alerta-id').value = ''
+  document.getElementById('proj-uc-id').value = ''
+
+  if (alerta) {
+    // Pré-preenche com dados do alerta
+    const icone = { queimada:'🔥', desmatamento:'🌳', degradacao:'🍂' }[alerta.tipo] ?? '⚠'
+    const data  = alerta.data_referencia ?? ''
+    document.getElementById('proj-titulo').value =
+      `${icone} Verificação ${alerta.tipo} — ${alerta.uc_nome ?? 'Área sem UC'} — ${data}`
+    document.getElementById('proj-uc-nome').value  = alerta.uc_nome  ?? ''
+    document.getElementById('proj-uc-id').value    = alerta.uc_id    ?? ''
+    document.getElementById('proj-alerta-id').value = alerta.id      ?? ''
+
+    const corTipo = { queimada:'#DC2626', desmatamento:'#166534', degradacao:'#92400E' }[alerta.tipo] ?? '#374151'
+    document.getElementById('proj-alerta-card').style.display = ''
+    document.getElementById('proj-alerta-label').innerHTML =
+      `<span style="color:${corTipo}">${icone} Alerta vinculado — ${alerta.tipo} (${alerta.severidade})</span>`
+    document.getElementById('proj-alerta-detalhe').textContent =
+      `Fonte: ${alerta.fonte} · Data: ${data}` + (alerta.area_ha ? ` · ${Number(alerta.area_ha).toLocaleString('pt-BR')} ha` : '')
+
+    // Centraliza mapa no alerta
+    if (alerta._lat && alerta._lng) mapaL.setView([alerta._lat, alerta._lng], 14)
+  } else {
+    document.getElementById('proj-titulo').value = ''
+    document.getElementById('proj-uc-nome').value = ''
+    document.getElementById('proj-alerta-card').style.display = 'none'
+  }
+
+  document.getElementById('proj-overlay').style.display = 'flex'
+}
+
+function fecharModalProjeto() {
+  _cancelarDesenho()
+  document.getElementById('proj-overlay').style.display = 'none'
+}
+
+function iniciarDesenho() {
+  // Fecha modal temporariamente para ver o mapa
+  document.getElementById('proj-overlay').style.display = 'none'
+  document.getElementById('proj-draw-area').classList.add('ativo')
+
+  // Cria layer de desenho se não existir
+  if (!_drawLayer) {
+    _drawLayer = new L.FeatureGroup()
+    mapaL.addLayer(_drawLayer)
+  } else {
+    _drawLayer.clearLayers()
+  }
+
+  // Toast instrução
+  toast('Clique no mapa para delimitar a área. Duplo-clique para finalizar.', 'success')
+
+  _drawControl = new L.Draw.Polygon(mapaL, {
+    shapeOptions: { color:'#2D6A4F', weight:2.5, opacity:.9, fillColor:'#2D6A4F', fillOpacity:.15 },
+    showArea: true,
+    metric: true,
+  })
+  _drawControl.enable()
+
+  // Listener único para quando o polígono for criado
+  mapaL.once(L.Draw.Event.CREATED, (e) => {
+    _drawLayer.clearLayers()
+    _drawLayer.addLayer(e.layer)
+    _projetoGeom = e.layer.toGeoJSON().geometry
+
+    // Calcula área em ha via Shoelace + fator geodésico aproximado
+    const areaM2 = _calcularAreaM2(_projetoGeom.coordinates[0])
+    const areaHa = (areaM2 / 10000).toFixed(2)
+
+    document.getElementById('proj-area-val').textContent = `${Number(areaHa).toLocaleString('pt-BR')} ha`
+    document.getElementById('proj-draw-instrucao').style.display = 'none'
+    document.getElementById('proj-draw-resultado').style.display = ''
+    document.getElementById('proj-draw-area').classList.remove('ativo')
+    document.getElementById('proj-draw-area').classList.add('desenhado')
+
+    // Reabre modal
+    document.getElementById('proj-overlay').style.display = 'flex'
+  })
+
+  // Se cancelar (ESC)
+  mapaL.once(L.Draw.Event.DRAWSTOP, () => {
+    if (!_projetoGeom) {
+      document.getElementById('proj-draw-area').classList.remove('ativo')
+      document.getElementById('proj-overlay').style.display = 'flex'
+    }
+  })
+}
+
+function redesenhar() {
+  _projetoGeom = null
+  if (_drawLayer) _drawLayer.clearLayers()
+  document.getElementById('proj-draw-instrucao').style.display = ''
+  document.getElementById('proj-draw-resultado').style.display = 'none'
+  document.getElementById('proj-draw-area').classList.remove('desenhado')
+  iniciarDesenho()
+}
+
+function _cancelarDesenho() {
+  if (_drawControl) { try { _drawControl.disable() } catch {} ; _drawControl = null }
+}
+
+// Área pelo método de Haversine aproximado (Shoelace em graus × fator lat)
+function _calcularAreaM2(coords) {
+  let area = 0
+  const R = 6371000 // raio médio Terra em metros
+  const toRad = d => d * Math.PI / 180
+  for (let i = 0, j = coords.length - 1; i < coords.length; j = i++) {
+    const [x1, y1] = coords[j], [x2, y2] = coords[i]
+    area += (toRad(x2) - toRad(x1)) * (2 + Math.sin(toRad(y1)) + Math.sin(toRad(y2)))
+  }
+  return Math.abs(area * R * R / 2)
+}
+
+async function salvarProjeto() {
+  const titulo = document.getElementById('proj-titulo').value.trim()
+  if (!titulo) { toast('Informe o título do projeto.', 'error'); return }
+
+  const btn = document.getElementById('proj-btn-salvar')
+  btn.disabled = true
+  btn.textContent = 'Salvando...'
+
+  const ucNome   = document.getElementById('proj-uc-nome').value.trim() || null
+  const ucId     = document.getElementById('proj-uc-id').value   || null
+  const alertaId = document.getElementById('proj-alerta-id').value || null
+
+  // Monta payload — geom como WKT se existir
+  const payload = {
+    titulo,
+    tipo:            document.getElementById('proj-tipo').value,
+    status:          document.getElementById('proj-status').value,
+    uc_nome:         ucNome,
+    uc_id:           ucId   || null,
+    alerta_id:       alertaId || null,
+    observacoes:     document.getElementById('proj-obs').value.trim() || null,
+    responsavel_id:  appState.usuario?.id ?? null,
+    criado_por:      appState.usuario?.id ?? null,
+  }
+
+  // Adiciona geometria como WKT se delimitada
+  if (_projetoGeom) {
+    const coords = _projetoGeom.coordinates[0]
+      .map(([lng, lat]) => `${lng} ${lat}`).join(', ')
+    payload.geom = `SRID=4326;POLYGON((${coords}))`
+  }
+
+  const { data, error } = await db.from('projetos_analise').insert(payload).select().single()
+
+  btn.disabled = false
+  btn.textContent = '💾 Salvar Projeto'
+
+  if (error) {
+    toast('Erro ao salvar: ' + error.message, 'error')
+    return
+  }
+
+  toast('✅ Projeto salvo com sucesso!', 'success')
+  fecharModalProjeto()
+  await carregarProjetos()
+}
+
+// ── Camada de projetos no mapa ──────────────────────────────
+async function carregarProjetos() {
+  const { data } = await db.from('projetos_analise')
+    .select('id,titulo,tipo,status,uc_nome,area_calculada_ha,geom,alerta_id,criado_em')
+    .not('geom', 'is', null)
+    .neq('status', 'arquivado')
+
+  if (_projetosLayer) { mapaL.removeLayer(_projetosLayer) }
+  _projetosLayer = L.layerGroup()
+
+  const COR_STATUS = { rascunho:'#64748b', em_analise:'#2563eb', concluido:'#16a34a', arquivado:'#9ca3af' }
+  const ICONE_TIPO_PROJ = { verificacao_campo:'🥾', sobrevoo:'✈', analise_imagem:'🛰', fiscalizacao:'⚖', outro:'📋' }
+
+  ;(data || []).forEach(p => {
+    if (!p.geom) return
+    let geojsonGeom
+    try {
+      geojsonGeom = typeof p.geom === 'object' ? p.geom : JSON.parse(p.geom)
+    } catch { return }
+
+    const cor = COR_STATUS[p.status] ?? '#64748b'
+    const icone = ICONE_TIPO_PROJ[p.tipo] ?? '📋'
+    const areaStr = p.area_calculada_ha
+      ? `${Number(p.area_calculada_ha).toLocaleString('pt-BR')} ha`
+      : 'sem área'
+
+    L.geoJSON({ type:'Feature', geometry: geojsonGeom }, {
+      style: { color: cor, weight: 2.5, opacity: .9, fillColor: cor, fillOpacity: .18, dashArray: '6 4' }
+    }).bindPopup(`<div class="camada-popup">
+      <div class="cp-header" style="background:${cor}">${icone} Projeto de Análise</div>
+      <div class="cp-layer">
+        <div class="cp-layer-nome">${escHtml(p.titulo)}</div>
+        <div class="cp-row"><strong>UC</strong><span>${escHtml(p.uc_nome ?? '—')}</span></div>
+        <div class="cp-row"><strong>Tipo</strong><span>${escHtml(p.tipo.replace(/_/g,' '))}</span></div>
+        <div class="cp-row"><strong>Área</strong><span>${areaStr}</span></div>
+        <div class="cp-row"><strong>Criado</strong><span>${new Date(p.criado_em).toLocaleDateString('pt-BR')}</span></div>
+        <div class="cp-badge" style="background:${cor}22;border-color:${cor};color:${cor}">${escHtml(p.status.replace(/_/g,' '))}</div>
+      </div>
+    </div>`).addTo(_projetosLayer)
+  })
+
+  _projetosLayer.addTo(mapaL)
+
+  // Atualiza badge
+  const badge = document.getElementById('projetos-count-badge')
+  if (badge) { badge.textContent = (data||[]).length; badge.style.display = (data||[]).length ? '' : 'none' }
+}
+
+// ══════════════════════════════════════════════════════════════
 // SCROLLBAR CUSTOMIZADA DO PAINEL
 // ══════════════════════════════════════════════════════════════
 function initScrollbarCustom(){
