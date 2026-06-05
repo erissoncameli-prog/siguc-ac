@@ -1048,6 +1048,10 @@ function _atualizarLegendaMapa(){
   // Alertas Ambientais
   if(_alertasAtivo && _alertasLayer) itens.push({ simbolo:'circle', cor:'#f97316', label:'Alertas Ambientais' });
 
+  // Projetos de Análise
+  if(_projetosLayer && _projetosLayer.getLayers?.().length)
+    itens.push({ simbolo:'rect', cor:'#2563eb', opacidade:0.18, dash:true, label:'Projetos de Análise' });
+
   // CAR
   if(_carLayer) itens.push({ simbolo:'rect', cor:'#d97706', opacidade:0.15, label:'CAR — Imóveis Rurais' });
 
