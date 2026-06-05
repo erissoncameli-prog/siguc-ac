@@ -310,11 +310,18 @@ function slaClass(n) {
   return 'sla-ok';
 }
 
+const LABEL_PROJETO_STATUS = {
+  rascunho:'Rascunho', em_analise:'Em Análise', concluido:'Concluído', arquivado:'Arquivado'
+};
+
 function renderCard(n) {
   const sla = slaClass(n);
   const ativo = _notifAtiva?.id === n.id ? ' ativo' : '';
   const ucChip = n.uc ? `<span class="notif-uc">📍 ${esc(n.uc.nome)}</span>` : '';
   const prazoStr = n.sla_prazo ? `SLA: ${formatData(n.sla_prazo)}` : '';
+  const projetoChip = n.projeto
+    ? `<span class="projeto-chip">🔬 ${esc(n.projeto.titulo)} · ${LABEL_PROJETO_STATUS[n.projeto.status] || n.projeto.status}</span>`
+    : '';
   return `
 <div class="notif-card ${sla}${ativo}" onclick="selecionarNotif('${n.id}')">
   <div class="notif-header">
@@ -328,6 +335,7 @@ function renderCard(n) {
     ${prazoStr ? `<span>${prazoStr}</span>` : ''}
     ${n.destinatario ? `<span>Para: ${esc(n.destinatario.nome_completo)}</span>` : ''}
   </div>
+  ${projetoChip ? `<div style="margin-top:6px">${projetoChip}</div>` : ''}
 </div>`;
 }
 
