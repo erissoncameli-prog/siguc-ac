@@ -113,7 +113,7 @@ function iniciais(nome) {
 // Badge helpers
 const BADGE_CATEGORIA = {
   PI:'badge-verde', REBIO:'badge-verde', ESEC:'badge-verde', MONA:'badge-verde', RVS:'badge-verde',
-  FLONA:'badge-teal', RESEX:'badge-teal', RDS:'badge-teal', RPPN:'badge-blue', APA:'badge-ouro', ARIE:'badge-ouro'
+  FLONA:'badge-teal', FLOE:'badge-teal', RESEX:'badge-teal', RDS:'badge-teal', RPPN:'badge-blue', APA:'badge-ouro', ARIE:'badge-ouro'
 };
 const BADGE_SEVERIDADE = { critica:'badge-erro', alta:'badge-erro', media:'badge-ouro', baixa:'badge-verde' };
 const BADGE_STATUS_OC = { aberta:'badge-erro', em_atendimento:'badge-ouro', resolvida:'badge-verde', arquivada:'badge-cinza' };
