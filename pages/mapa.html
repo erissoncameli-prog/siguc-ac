@@ -217,21 +217,35 @@ const VEG_LAYERS = {
 };
 
 const GIBS_CAMADAS = [
-  { id:'MODIS_Terra_CorrectedReflectance_TrueColor',  label:'MODIS Terra — Cor Real',        desc:'250m · revisita diária' },
-  { id:'VIIRS_SNPP_CorrectedReflectance_TrueColor',   label:'VIIRS SNPP — Cor Real',         desc:'375m · mais detalhes' },
-  { id:'MODIS_Terra_Thermal_Anomalies_Day',            label:'MODIS — Anomalias Térmicas',    desc:'Focos de calor em vermelho' },
-  { id:'VIIRS_SNPP_Fires_375m_Day',                   label:'VIIRS FIRMS — Focos 375m',      desc:'Alta resolução · focos do dia' },
-  { id:'MODIS_Terra_Land_Surface_Temp_Day',            label:'MODIS — Temperatura Superfície',desc:'Escala de cores °C' },
+  { id:'MODIS_Terra_CorrectedReflectance_TrueColor', fmt:'jpg', label:'MODIS Terra — Cor Real',         desc:'250m · revisita diária' },
+  { id:'VIIRS_SNPP_CorrectedReflectance_TrueColor',  fmt:'jpg', label:'VIIRS SNPP — Cor Real',          desc:'375m · mais detalhes' },
+  { id:'MODIS_Terra_Thermal_Anomalies_Day',           fmt:'png', label:'MODIS — Anomalias Térmicas',     desc:'Focos de calor em vermelho' },
+  { id:'VIIRS_SNPP_Fires_375m_Day',                  fmt:'png', label:'VIIRS FIRMS — Focos 375m',       desc:'Alta resolução · focos do dia' },
+  { id:'MODIS_Terra_Land_Surface_Temp_Day',           fmt:'png', label:'MODIS — Temperatura Superfície', desc:'Escala de cores °C' },
 ];
+
+function _gibsDataDefault(){
+  // GIBS tem delay de ~1-2 dias — usa anteontem como padrão seguro
+  const d = new Date(); d.setDate(d.getDate() - 2);
+  return d.toISOString().slice(0, 10);
+}
+
+function _gibsMake(op, data, camadaId){
+  const cfg = GIBS_CAMADAS.find(c => c.id === camadaId) || GIBS_CAMADAS[0];
+  return L.tileLayer(
+    `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/${cfg.id}/default/${data}/GoogleMapsCompatible/{z}/{y}/{x}.${cfg.fmt}`,
+    { attribution:'NASA GIBS / Earthdata', opacity:op/100, maxZoom:9, maxNativeZoom:9, errorTileUrl:'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==' }
+  );
+}
 
 function toggleCamadaVeg(id, ativo){
   const cfg = VEG_LAYERS[id]; if(!cfg) return;
   if(ativo){
     const op = parseInt(document.getElementById('veg-'+id+'-opacity')?.value||70);
     if(id === 'gibs'){
-      const data   = document.getElementById('gibs-data')?.value   || new Date().toISOString().slice(0,10);
+      const data   = document.getElementById('gibs-data')?.value   || _gibsDataDefault();
       const camada = document.getElementById('gibs-camada')?.value || GIBS_CAMADAS[0].id;
-      cfg.layer = cfg.make(op, data, camada);
+      cfg.layer = _gibsMake(op, data, camada);
     } else {
       cfg.layer = cfg.make(op);
     }
@@ -248,12 +262,11 @@ function atualizarOpacidadeVeg(id){
 }
 function gibsAlterarData(){
   const cfg = VEG_LAYERS.gibs; if(!cfg?.layer) return;
-  // Recriar a camada com nova data/camada mantendo opacidade
-  const op = parseInt(document.getElementById('veg-gibs-opacity')?.value||80);
-  mapaL.removeLayer(cfg.layer);
-  const data   = document.getElementById('gibs-data')?.value   || new Date().toISOString().slice(0,10);
+  const op     = parseInt(document.getElementById('veg-gibs-opacity')?.value||80);
+  const data   = document.getElementById('gibs-data')?.value   || _gibsDataDefault();
   const camada = document.getElementById('gibs-camada')?.value || GIBS_CAMADAS[0].id;
-  cfg.layer = cfg.make(op, data, camada);
+  mapaL.removeLayer(cfg.layer);
+  cfg.layer = _gibsMake(op, data, camada);
   cfg.layer.addTo(mapaL); cfg.layer.setZIndex(150);
   _atualizarLegendaMapa();
 }
