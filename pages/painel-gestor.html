@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>SIGUC-AC · Painel do Gestor</title>
+<link rel="stylesheet" href="../css/global.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../js/observability.js"></script>
+<script src="../js/queryLogger.js"></script>
+<script src="../js/config.js"></script>
+<script src="../js/layout.js"></script>
+<style>
+/* ── layout ── */
+.pg-wrapper { display:flex; flex-direction:column; gap:14px; height:calc(100vh - 108px); min-height:500px; }
+.pg-topbar  { display:flex; align-items:center; gap:10px; flex-wrap:wrap; flex-shrink:0; }
+.pg-body    { display:flex; gap:12px; flex:1; min-height:0; }
+.pg-inbox   { flex:1; display:flex; flex-direction:column; gap:8px; overflow-y:auto; padding-right:2px; }
+.pg-detalhe { width:340px; flex-shrink:0; display:flex; flex-direction:column; gap:10px; overflow-y:auto; }
+
+/* ── KPI bar ── */
+.kpi-bar   { display:flex; gap:8px; }
+.kpi-chip  { flex:1; background:#fff; border:1px solid var(--borda); border-radius:10px; padding:10px 14px; text-align:center; }
+.kpi-val   { font-size:22px; font-weight:800; color:var(--verde-c); line-height:1; }
+.kpi-lbl   { font-size:10px; color:#9CA3AF; text-transform:uppercase; letter-spacing:.06em; margin-top:3px; }
+.kpi-chip.vencido .kpi-val { color:#DC2626; }
+.kpi-chip.critico .kpi-val { color:#F97316; }
+
+/* ── tabs ── */
+.tab-row  { display:flex; gap:4px; background:#F3F4F6; border-radius:10px; padding:3px; flex-shrink:0; }
+.tab-btn  { flex:1; padding:6px 14px; border:none; border-radius:8px; font-size:12px; font-weight:600; cursor:pointer; background:transparent; color:#6B7280; transition:all .15s; }
+.tab-btn.ativo { background:#fff; color:#1F4E2C; box-shadow:0 1px 3px rgba(0,0,0,.1); }
+
+/* ── notif card ── */
+.notif-card {
+  background:#fff; border:1px solid var(--borda); border-radius:10px;
+  padding:12px 14px; cursor:pointer; border-left:4px solid #E5E7EB;
+  transition:border-color .15s, box-shadow .15s; flex-shrink:0;
+}
+.notif-card:hover { box-shadow:0 2px 8px rgba(0,0,0,.08); border-color:var(--verde-c); }
+.notif-card.ativo { border-color:var(--verde-c); background:#F0FDF4; }
+.notif-card.sla-vencido { border-left-color:#DC2626; }
+.notif-card.sla-critico { border-left-color:#F97316; }
+.notif-card.sla-atencao { border-left-color:#F59E0B; }
+.notif-card.sla-ok      { border-left-color:#22C55E; }
+
+.notif-header { display:flex; align-items:flex-start; gap:8px; margin-bottom:4px; }
+.notif-tipo   { font-size:10px; font-weight:700; padding:2px 8px; border-radius:20px; flex-shrink:0; }
+.notif-titulo { font-size:13px; font-weight:700; color:#111827; flex:1; line-height:1.3; }
+.notif-meta   { display:flex; gap:10px; font-size:11px; color:#9CA3AF; margin-top:5px; align-items:center; }
+.notif-uc     { font-size:11px; color:#52B788; font-weight:600; }
+.notif-badge  { padding:2px 8px; border-radius:20px; font-size:10px; font-weight:700; }
+
+/* badge por status */
+.nb-gerada      { background:#EFF6FF; color:#1E40AF; }
+.nb-enviada     { background:#F0F9FF; color:#0369A1; }
+.nb-visualizada { background:#F5F3FF; color:#5B21B6; }
+.nb-em_analise  { background:#FFF7ED; color:#C2410C; }
+.nb-encaminhada { background:#FEF3C7; color:#92400E; }
+.nb-resolvida   { background:#F0FDF4; color:#15803D; }
+
+/* badge por tipo */
+.nt-alerta_ambiental   { background:#FEF2F2; color:#991B1B; }
+.nt-ocorrencia         { background:#FFF7ED; color:#9A3412; }
+.nt-documento_pendente { background:#FFFBEB; color:#92400E; }
+.nt-sla_vencendo       { background:#FFF1F2; color:#9F1239; }
+.nt-escalamento        { background:#F5F3FF; color:#5B21B6; }
+.nt-sistema            { background:#F1F5F9; color:#475569; }
+
+/* ── painel detalhe ── */
+.det-card { background:#fff; border:1px solid var(--borda); border-radius:10px; padding:16px; }
+.det-titulo { font-size:15px; font-weight:800; color:#111827; margin-bottom:4px; }
+.det-mensagem { font-size:13px; color:#374151; line-height:1.6; margin-bottom:12px; }
+.det-row  { display:flex; align-items:center; gap:6px; font-size:12px; color:#6B7280; margin-bottom:4px; }
+.det-label { font-weight:700; color:#374151; min-width:90px; }
+
+/* SLA visual */
+.sla-bar-wrap { background:#F3F4F6; border-radius:8px; height:6px; margin:4px 0 8px; overflow:hidden; }
+.sla-bar      { height:100%; border-radius:8px; transition:width .3s; }
+.sla-ok       .sla-bar { background:#22C55E; }
+.sla-atencao  .sla-bar { background:#F59E0B; }
+.sla-critico  .sla-bar { background:#F97316; }
+.sla-vencido  .sla-bar { background:#DC2626; width:100% !important; }
+
+/* ações */
+.acoes-row { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
+.btn-acao  { padding:7px 14px; border-radius:8px; border:1px solid var(--borda); font-size:12px; font-weight:600; cursor:pointer; background:#fff; color:#374151; transition:all .15s; }
+.btn-acao:hover { background:#F9FAFB; }
+.btn-acao.primary { background:var(--verde-c); color:#fff; border-color:var(--verde-c); }
+.btn-acao.primary:hover { background:#3a9a72; }
+.btn-acao.danger  { background:#FEF2F2; color:#DC2626; border-color:#FECACA; }
+
+/* histórico timeline */
+.timeline { display:flex; flex-direction:column; gap:0; }
+.tl-item  { display:flex; gap:10px; position:relative; }
+.tl-dot   { width:10px; height:10px; border-radius:50%; background:var(--verde-c); flex-shrink:0; margin-top:4px; }
+.tl-line  { position:absolute; left:4px; top:14px; bottom:0; width:2px; background:#E5E7EB; }
+.tl-content { padding-bottom:14px; flex:1; }
+.tl-status  { font-size:11px; font-weight:700; color:#374151; }
+.tl-quando  { font-size:10px; color:#9CA3AF; margin-top:1px; }
+.tl-obs     { font-size:11px; color:#6B7280; margin-top:2px; font-style:italic; }
+
+/* modal escalamento */
+.modal-bg { position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:999; display:flex; align-items:center; justify-content:center; }
+.modal    { background:#fff; border-radius:14px; padding:24px; width:400px; max-width:92vw; }
+.modal h3 { font-size:16px; font-weight:800; margin-bottom:16px; }
+
+/* vazio */
+.vazio { text-align:center; padding:60px 20px; color:#9CA3AF; }
+.vazio svg { opacity:.3; margin-bottom:12px; }
+
+/* search */
+.search-input { padding:8px 14px; border:1px solid var(--borda); border-radius:8px; font-size:13px; width:220px; outline:none; }
+.search-input:focus { border-color:var(--verde-c); }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+// ── Constantes ───────────────────────────────────────────────
+
+const LABEL_STATUS = {
+  gerada:'Gerada', enviada:'Enviada', visualizada:'Visualizada',
+  em_analise:'Em Análise', encaminhada:'Encaminhada', resolvida:'Resolvida'
+};
+const LABEL_TIPO = {
+  alerta_ambiental:'Alerta Ambiental', ocorrencia:'Ocorrência',
+  documento_pendente:'Documento Pendente', sla_vencendo:'SLA Vencendo',
+  escalamento:'Escalamento', sistema:'Sistema'
+};
+const ICONE_TIPO = {
+  alerta_ambiental:'🔥', ocorrencia:'⚠️', documento_pendente:'📄',
+  sla_vencendo:'⏱️', escalamento:'↗️', sistema:'🔔'
+};
+
+// Ordem dos status (para lógica de avanço)
+const STATUS_ORD = ['gerada','enviada','visualizada','em_analise','encaminhada','resolvida'];
+
+let _notifs = [];
+let _notifAtiva = null;
+let _historico = [];
+let _usuarios = [];
+let _tabAtiva = 'pendentes';
+let _busca = '';
+let _filtroTipo = '';
+
+// ── Inicialização ────────────────────────────────────────────
+
+async function init() {
+  await carregarUsuario();
+  document.getElementById('app').innerHTML = gerarLayout('Painel do Gestor', 'painel-gestor');
+  document.querySelector('.page-content').innerHTML = renderEstrutura();
+  await Promise.all([carregarNotifs(), carregarUsuariosList()]);
+  _sigucBarCompleta();
+}
+
+function renderEstrutura() {
+  return `
+<div class="pg-wrapper">
+  <div class="kpi-bar" id="kpi-bar">
+    <div class="kpi-chip"><div class="kpi-val" id="kpi-total">—</div><div class="kpi-lbl">Total Pendentes</div></div>
+    <div class="kpi-chip vencido"><div class="kpi-val" id="kpi-venc">—</div><div class="kpi-lbl">SLA Vencido</div></div>
+    <div class="kpi-chip critico"><div class="kpi-val" id="kpi-crit">—</div><div class="kpi-lbl">SLA Crítico</div></div>
+    <div class="kpi-chip"><div class="kpi-val" id="kpi-hoje">—</div><div class="kpi-lbl">Novas Hoje</div></div>
+  </div>
+
+  <div class="pg-topbar">
+    <div class="tab-row">
+      <button class="tab-btn ativo" onclick="mudarTab('pendentes')">📥 Pendentes</button>
+      <button class="tab-btn" onclick="mudarTab('em_analise')">🔍 Em Análise</button>
+      <button class="tab-btn" onclick="mudarTab('encaminhadas')">↗ Encaminhadas</button>
+      <button class="tab-btn" onclick="mudarTab('todas')">📋 Todas</button>
+    </div>
+    <input class="search-input" placeholder="Buscar notificação..." oninput="buscar(this.value)">
+    <select class="search-input" style="width:160px" onchange="filtrarTipo(this.value)">
+      <option value="">Todos os tipos</option>
+      ${Object.entries(LABEL_TIPO).map(([v,l]) => `<option value="${v}">${l}</option>`).join('')}
+    </select>
+    <button class="btn btn-primary" onclick="abrirModalNova()" style="margin-left:auto">
+      + Nova Notificação
+    </button>
+  </div>
+
+  <div class="pg-body">
+    <div class="pg-inbox" id="pg-inbox">
+      <div class="vazio">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        <p>Carregando…</p>
+      </div>
+    </div>
+    <div class="pg-detalhe" id="pg-detalhe">
+      <div class="det-card" style="text-align:center;padding:40px 20px;color:#9CA3AF">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="opacity:.3;margin-bottom:8px"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M8 10h8M8 14h5"/></svg>
+        <p style="font-size:13px">Selecione uma notificação para ver detalhes</p>
+      </div>
+    </div>
+  </div>
+</div>`;
+}
+
+// ── Dados ─────────────────────────────────────────────────────
+
+async function carregarNotifs() {
+  const { data, error } = await db.from('notificacoes')
+    .select(`
+      *,
+      destinatario:usuarios!notificacoes_destinatario_id_fkey(id, nome_completo, perfil),
+      remetente:usuarios!notificacoes_remetente_id_fkey(id, nome_completo),
+      escalado_para_usr:usuarios!notificacoes_escalado_para_fkey(id, nome_completo),
+      uc:unidades_conservacao(id, nome)
+    `)
+    .order('criado_em', { ascending: false })
+    .limit(200);
+
+  if (error) { toast('Erro ao carregar notificações', 'erro'); return; }
+  _notifs = data || [];
+  atualizarKPIs();
+  renderInbox();
+}
+
+async function carregarUsuariosList() {
+  const { data } = await db.from('usuarios').select('id, nome_completo, perfil').eq('ativo', true);
+  _usuarios = data || [];
+}
+
+async function carregarHistorico(notifId) {
+  const { data } = await db.from('notificacoes_historico')
+    .select('*, usuario:usuarios(nome_completo)')
+    .eq('notificacao_id', notifId)
+    .order('criado_em', { ascending: true });
+  _historico = data || [];
+}
+
+// ── KPIs ──────────────────────────────────────────────────────
+
+function atualizarKPIs() {
+  const pendentes = _notifs.filter(n => n.status !== 'resolvida');
+  const agora = new Date();
+  const vencidos = pendentes.filter(n => n.sla_prazo && new Date(n.sla_prazo) < agora);
+  const criticos = pendentes.filter(n => {
+    if (!n.sla_prazo) return false;
+    const diff = (new Date(n.sla_prazo) - agora) / 3600000;
+    return diff >= 0 && diff < 6;
+  });
+  const hoje = _notifs.filter(n => {
+    const d = new Date(n.criado_em);
+    return d.toDateString() === agora.toDateString();
+  });
+  document.getElementById('kpi-total').textContent = pendentes.length;
+  document.getElementById('kpi-venc').textContent  = vencidos.length;
+  document.getElementById('kpi-crit').textContent  = criticos.length;
+  document.getElementById('kpi-hoje').textContent  = hoje.length;
+}
+
+// ── Filtros / tabs ────────────────────────────────────────────
+
+function mudarTab(tab) {
+  _tabAtiva = tab;
+  document.querySelectorAll('.tab-btn').forEach((b, i) => {
+    b.classList.toggle('ativo', ['pendentes','em_analise','encaminhadas','todas'][i] === tab);
+  });
+  renderInbox();
+}
+
+function buscar(v) { _busca = v.toLowerCase(); renderInbox(); }
+function filtrarTipo(v) { _filtroTipo = v; renderInbox(); }
+
+function notifsFiltradas() {
+  let list = _notifs;
+  if (_tabAtiva === 'pendentes') list = list.filter(n => !['resolvida','em_analise','encaminhada'].includes(n.status));
+  else if (_tabAtiva === 'em_analise') list = list.filter(n => n.status === 'em_analise');
+  else if (_tabAtiva === 'encaminhadas') list = list.filter(n => n.status === 'encaminhada');
+
+  if (_filtroTipo) list = list.filter(n => n.tipo === _filtroTipo);
+  if (_busca) list = list.filter(n =>
+    n.titulo.toLowerCase().includes(_busca) ||
+    n.mensagem.toLowerCase().includes(_busca) ||
+    (n.uc?.nome || '').toLowerCase().includes(_busca)
+  );
+  return list;
+}
+
+// ── Render inbox ──────────────────────────────────────────────
+
+function renderInbox() {
+  const lista = notifsFiltradas();
+  const el = document.getElementById('pg-inbox');
+  if (!lista.length) {
+    el.innerHTML = `<div class="vazio">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+      <p>Nenhuma notificação encontrada</p></div>`;
+    return;
+  }
+  el.innerHTML = lista.map(n => renderCard(n)).join('');
+}
+
+function slaClass(n) {
+  if (!n.sla_prazo || n.status === 'resolvida') return '';
+  const agora = new Date();
+  const prazo = new Date(n.sla_prazo);
+  if (prazo < agora) return 'sla-vencido';
+  const diff = (prazo - agora) / 3600000;
+  if (diff < 6)  return 'sla-critico';
+  if (diff < 24) return 'sla-atencao';
+  return 'sla-ok';
+}
+
+function renderCard(n) {
+  const sla = slaClass(n);
+  const ativo = _notifAtiva?.id === n.id ? ' ativo' : '';
+  const ucChip = n.uc ? `<span class="notif-uc">📍 ${esc(n.uc.nome)}</span>` : '';
+  const prazoStr = n.sla_prazo ? `SLA: ${formatData(n.sla_prazo)}` : '';
+  return `
+<div class="notif-card ${sla}${ativo}" onclick="selecionarNotif('${n.id}')">
+  <div class="notif-header">
+    <span class="notif-tipo nt-${n.tipo}">${ICONE_TIPO[n.tipo] || '🔔'} ${LABEL_TIPO[n.tipo] || n.tipo}</span>
+    <span class="notif-titulo">${esc(n.titulo)}</span>
+    <span class="notif-badge nb-${n.status}">${LABEL_STATUS[n.status] || n.status}</span>
+  </div>
+  <div class="notif-meta">
+    ${ucChip}
+    <span>${formatData(n.criado_em)}</span>
+    ${prazoStr ? `<span>${prazoStr}</span>` : ''}
+    ${n.destinatario ? `<span>Para: ${esc(n.destinatario.nome_completo)}</span>` : ''}
+  </div>
+</div>`;
+}
+
+// ── Detalhe ───────────────────────────────────────────────────
+
+async function selecionarNotif(id) {
+  _notifAtiva = _notifs.find(n => n.id === id);
+  if (!_notifAtiva) return;
+
+  // Marcar como visualizada automaticamente
+  if (_notifAtiva.status === 'enviada' || _notifAtiva.status === 'gerada') {
+    await avancarStatus('visualizada', null, false);
+  }
+
+  await carregarHistorico(id);
+  renderInbox();
+  renderDetalhe();
+}
+
+function renderDetalhe() {
+  const n = _notifAtiva;
+  if (!n) return;
+
+  const sla = slaClass(n);
+  const agora = new Date();
+  const prazo = n.sla_prazo ? new Date(n.sla_prazo) : null;
+  const diffH = prazo ? (prazo - agora) / 3600000 : null;
+  const pct = prazo && n.sla_horas
+    ? Math.max(0, Math.min(100, (diffH / n.sla_horas) * 100))
+    : 0;
+
+  const proxStatus = proximoStatus(n.status);
+
+  const acoesHtml = n.status !== 'resolvida' ? `
+<div class="acoes-row">
+  ${proxStatus ? `<button class="btn-acao primary" onclick="avancarStatus('${proxStatus}', null, true)">
+    ✓ Mover para: ${LABEL_STATUS[proxStatus]}
+  </button>` : ''}
+  ${n.status !== 'encaminhada' ? `<button class="btn-acao" onclick="abrirModalEscalar()">↗ Escalar</button>` : ''}
+  <button class="btn-acao danger" onclick="avancarStatus('resolvida', null, true)">✓ Resolver</button>
+</div>` : `<p style="font-size:12px;color:#22C55E;font-weight:700">✓ Resolvida em ${formatData(n.resolvido_em)}</p>`;
+
+  const histHtml = _historico.length ? `
+<div class="timeline">
+  ${_historico.map((h, i) => `
+  <div class="tl-item">
+    <div style="position:relative">
+      <div class="tl-dot"></div>
+      ${i < _historico.length - 1 ? '<div class="tl-line"></div>' : ''}
+    </div>
+    <div class="tl-content">
+      <div class="tl-status">${LABEL_STATUS[h.status_anterior] || '—'} → ${LABEL_STATUS[h.status_novo]}</div>
+      <div class="tl-quando">${formatData(h.criado_em)} · ${esc(h.usuario?.nome_completo || 'Sistema')}</div>
+      ${h.observacao ? `<div class="tl-obs">"${esc(h.observacao)}"</div>` : ''}
+    </div>
+  </div>`).join('')}
+</div>` : '<p style="font-size:12px;color:#9CA3AF">Nenhum histórico ainda.</p>';
+
+  document.getElementById('pg-detalhe').innerHTML = `
+<div class="det-card">
+  <div class="det-titulo">${esc(n.titulo)}</div>
+  <span class="notif-badge nb-${n.status}" style="display:inline-block;margin-bottom:10px">${LABEL_STATUS[n.status]}</span>
+  <p class="det-mensagem">${esc(n.mensagem)}</p>
+
+  <div class="det-row"><span class="det-label">Tipo</span>${ICONE_TIPO[n.tipo]} ${LABEL_TIPO[n.tipo]}</div>
+  ${n.uc ? `<div class="det-row"><span class="det-label">UC</span>${esc(n.uc.nome)}</div>` : ''}
+  ${n.destinatario ? `<div class="det-row"><span class="det-label">Destinatário</span>${esc(n.destinatario.nome_completo)}</div>` : ''}
+  ${n.remetente ? `<div class="det-row"><span class="det-label">Remetente</span>${esc(n.remetente.nome_completo)}</div>` : ''}
+  <div class="det-row"><span class="det-label">Criado em</span>${formatData(n.criado_em)}</div>
+
+  ${prazo ? `
+  <div style="margin-top:10px">
+    <div class="det-row"><span class="det-label">SLA</span>${formatData(prazo)} (${n.sla_horas}h)</div>
+    <div class="sla-bar-wrap ${sla}"><div class="sla-bar" style="width:${pct}%"></div></div>
+    <div style="font-size:11px;color:#6B7280">
+      ${diffH !== null ? (diffH < 0 ? `Vencido há ${Math.abs(diffH).toFixed(1)}h` : `${diffH.toFixed(1)}h restantes`) : ''}
+    </div>
+  </div>` : ''}
+
+  ${n.escalado_para_usr ? `<div class="det-row" style="margin-top:6px"><span class="det-label">Escalado para</span>${esc(n.escalado_para_usr.nome_completo)}</div>` : ''}
+
+  ${acoesHtml}
+</div>
+
+<div class="det-card">
+  <div style="font-size:12px;font-weight:800;color:#374151;margin-bottom:10px">Histórico de Status</div>
+  ${histHtml}
+</div>`;
+}
+
+// ── Ações ─────────────────────────────────────────────────────
+
+function proximoStatus(atual) {
+  const idx = STATUS_ORD.indexOf(atual);
+  if (idx === -1 || idx >= STATUS_ORD.length - 1) return null;
+  const prox = STATUS_ORD[idx + 1];
+  return prox === 'resolvida' ? null : prox;
+}
+
+async function avancarStatus(novoStatus, observacao = null, reload = true) {
+  if (!_notifAtiva) return;
+  const { error } = await db.rpc('avancar_notificacao', {
+    p_notificacao_id: _notifAtiva.id,
+    p_novo_status: novoStatus,
+    p_observacao: observacao
+  });
+  if (error) { toast('Erro ao atualizar status', 'erro'); return; }
+  _notifAtiva.status = novoStatus;
+  // Atualiza localmente
+  const idx = _notifs.findIndex(n => n.id === _notifAtiva.id);
+  if (idx !== -1) _notifs[idx].status = novoStatus;
+  atualizarKPIs();
+  if (reload) {
+    await carregarHistorico(_notifAtiva.id);
+    renderInbox();
+    renderDetalhe();
+    toast('Status atualizado', 'sucesso');
+  }
+}
+
+// ── Modal Escalar ─────────────────────────────────────────────
+
+function abrirModalEscalar() {
+  const opts = _usuarios
+    .filter(u => u.id !== appState.usuario?.id)
+    .map(u => `<option value="${u.id}">${esc(u.nome_completo)} (${u.perfil})</option>`)
+    .join('');
+
+  document.body.insertAdjacentHTML('beforeend', `
+<div class="modal-bg" id="modal-escalar" onclick="fecharModalEscalar(event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <h3>↗ Escalar Notificação</h3>
+    <div style="margin-bottom:12px">
+      <label style="font-size:12px;font-weight:700;display:block;margin-bottom:4px">Encaminhar para</label>
+      <select id="escalar-usuario" style="width:100%;padding:8px;border:1px solid var(--borda);border-radius:8px;font-size:13px">
+        <option value="">Selecione…</option>${opts}
+      </select>
+    </div>
+    <div style="margin-bottom:16px">
+      <label style="font-size:12px;font-weight:700;display:block;margin-bottom:4px">Observação</label>
+      <textarea id="escalar-obs" rows="3" style="width:100%;padding:8px;border:1px solid var(--borda);border-radius:8px;font-size:13px;resize:vertical" placeholder="Motivo do escalamento…"></textarea>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn-acao" onclick="fecharModalEscalar()">Cancelar</button>
+      <button class="btn-acao primary" onclick="confirmarEscalar()">Confirmar Escalamento</button>
+    </div>
+  </div>
+</div>`);
+}
+
+function fecharModalEscalar(e) {
+  if (!e || e.target.id === 'modal-escalar') document.getElementById('modal-escalar')?.remove();
+}
+
+async function confirmarEscalar() {
+  const uid = document.getElementById('escalar-usuario').value;
+  const obs = document.getElementById('escalar-obs').value.trim() || null;
+  if (!uid) { toast('Selecione um usuário', 'aviso'); return; }
+
+  const { error } = await db.rpc('escalar_notificacao', {
+    p_notificacao_id: _notifAtiva.id,
+    p_usuario_destino: uid,
+    p_observacao: obs
+  });
+  if (error) { toast('Erro ao escalar', 'erro'); return; }
+  fecharModalEscalar();
+  toast('Notificação escalada', 'sucesso');
+  await carregarNotifs();
+  if (_notifAtiva) {
+    _notifAtiva = _notifs.find(n => n.id === _notifAtiva.id);
+    await carregarHistorico(_notifAtiva.id);
+    renderDetalhe();
+  }
+}
+
+// ── Modal Nova Notificação ────────────────────────────────────
+
+async function abrirModalNova() {
+  const opts = _usuarios.map(u => `<option value="${u.id}">${esc(u.nome_completo)} (${u.perfil})</option>`).join('');
+  const { data: ucs } = await db.from('unidades_conservacao').select('id,nome').order('nome');
+  const optsUC = (ucs || []).map(u => `<option value="${u.id}">${esc(u.nome)}</option>`).join('');
+  const optsT = Object.entries(LABEL_TIPO).map(([v,l]) => `<option value="${v}">${l}</option>`).join('');
+
+  document.body.insertAdjacentHTML('beforeend', `
+<div class="modal-bg" id="modal-nova" onclick="if(event.target.id==='modal-nova')fecharModalNova()">
+  <div class="modal" onclick="event.stopPropagation()">
+    <h3>+ Nova Notificação</h3>
+    <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px">
+      <div>
+        <label style="font-size:12px;font-weight:700;display:block;margin-bottom:3px">Título</label>
+        <input id="nova-titulo" type="text" style="width:100%;padding:8px;border:1px solid var(--borda);border-radius:8px;font-size:13px" placeholder="Título da notificação">
+      </div>
+      <div>
+        <label style="font-size:12px;font-weight:700;display:block;margin-bottom:3px">Tipo</label>
+        <select id="nova-tipo" style="width:100%;padding:8px;border:1px solid var(--borda);border-radius:8px;font-size:13px"><option value="">Selecione…</option>${optsT}</select>
+      </div>
+      <div>
+        <label style="font-size:12px;font-weight:700;display:block;margin-bottom:3px">Mensagem</label>
+        <textarea id="nova-mensagem" rows="3" style="width:100%;padding:8px;border:1px solid var(--borda);border-radius:8px;font-size:13px;resize:vertical" placeholder="Descreva a notificação…"></textarea>
+      </div>
+      <div>
+        <label style="font-size:12px;font-weight:700;display:block;margin-bottom:3px">Destinatário</label>
+        <select id="nova-dest" style="width:100%;padding:8px;border:1px solid var(--borda);border-radius:8px;font-size:13px"><option value="">Selecione…</option>${opts}</select>
+      </div>
+      <div>
+        <label style="font-size:12px;font-weight:700;display:block;margin-bottom:3px">UC (opcional)</label>
+        <select id="nova-uc" style="width:100%;padding:8px;border:1px solid var(--borda);border-radius:8px;font-size:13px"><option value="">Nenhuma</option>${optsUC}</select>
+      </div>
+      <div>
+        <label style="font-size:12px;font-weight:700;display:block;margin-bottom:3px">SLA (horas)</label>
+        <input id="nova-sla" type="number" value="48" min="1" style="width:100%;padding:8px;border:1px solid var(--borda);border-radius:8px;font-size:13px">
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn-acao" onclick="fecharModalNova()">Cancelar</button>
+      <button class="btn-acao primary" onclick="criarNotificacao()">Criar Notificação</button>
+    </div>
+  </div>
+</div>`);
+}
+
+function fecharModalNova() { document.getElementById('modal-nova')?.remove(); }
+
+async function criarNotificacao() {
+  const titulo   = document.getElementById('nova-titulo').value.trim();
+  const tipo     = document.getElementById('nova-tipo').value;
+  const mensagem = document.getElementById('nova-mensagem').value.trim();
+  const dest     = document.getElementById('nova-dest').value || null;
+  const ucId     = document.getElementById('nova-uc').value || null;
+  const slaH     = parseInt(document.getElementById('nova-sla').value) || 48;
+
+  if (!titulo || !tipo || !mensagem) { toast('Preencha todos os campos obrigatórios', 'aviso'); return; }
+
+  const sla_prazo = new Date(Date.now() + slaH * 3600 * 1000).toISOString();
+
+  const { error } = await db.from('notificacoes').insert({
+    titulo, tipo, mensagem,
+    destinatario_id: dest,
+    remetente_id: appState.usuario?.id,
+    uc_id: ucId,
+    sla_horas: slaH,
+    sla_prazo,
+    status: 'enviada'
+  });
+
+  if (error) { toast('Erro ao criar notificação', 'erro'); return; }
+  fecharModalNova();
+  toast('Notificação criada com sucesso', 'sucesso');
+  await carregarNotifs();
+}
+
+// ── Boot ──────────────────────────────────────────────────────
+
+init();
+</script>
+</body>
+</html>
