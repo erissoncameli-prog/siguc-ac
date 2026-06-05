@@ -643,6 +643,40 @@ function _renderDropdown(id){
     ${_vegCard('mapbiomas','MapBiomas Coleção 8','Uso e cobertura do solo. Resolução 30m. Ano base 2023.','#16a34a')}
     ${_vegCard('prodes','PRODES — Desmatamento Anual','INPE/TerraBrasilis · Desmatamento incremental por ano.','#dc2626')}
     ${_vegCard('prodes_hist','PRODES — Desmatamento Acumulado','INPE · Desmatamento acumulado até 2008.','#d97706')}
+    <div style="border:1px solid #fed7aa;border-radius:var(--raio);padding:10px 12px;background:#fff7ed">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+        <div style="width:14px;height:14px;border-radius:3px;background:#f97316;flex-shrink:0"></div>
+        <label style="font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;flex:1">
+          <input type="checkbox" id="veg-gibs-chk" style="accent-color:#f97316;width:13px;height:13px" onchange="toggleCamadaVeg('gibs',this.checked)">
+          🛰 NASA GIBS — Satélite Diário
+        </label>
+      </div>
+      <p style="font-size:10px;color:#92400e;margin:0 0 8px">Earthdata · imagens atualizadas diariamente. Zoom máximo: 9.</p>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <div>
+          <div style="font-size:10px;font-weight:700;color:#78350f;text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Camada</div>
+          <select id="gibs-camada" style="width:100%;font-size:11px;padding:4px 6px;border:1px solid #fed7aa;border-radius:var(--raio);font-family:inherit;background:#fff" onchange="gibsAlterarData()">
+            ${GIBS_CAMADAS.map(c=>`<option value="${c.id}">${c.label} — ${c.desc}</option>`).join('')}
+          </select>
+        </div>
+        <div>
+          <div style="font-size:10px;font-weight:700;color:#78350f;text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Data</div>
+          <div style="display:flex;gap:5px;align-items:center">
+            <input type="date" id="gibs-data" value="${new Date().toISOString().slice(0,10)}"
+              max="${new Date().toISOString().slice(0,10)}"
+              style="flex:1;font-size:11px;padding:4px 6px;border:1px solid #fed7aa;border-radius:var(--raio);font-family:inherit"
+              onchange="gibsAlterarData()">
+            <button onclick="document.getElementById('gibs-data').value=new Date().toISOString().slice(0,10);gibsAlterarData()"
+              style="font-size:10px;padding:4px 8px;background:#f97316;color:#fff;border:none;border-radius:var(--raio);cursor:pointer;font-weight:600;white-space:nowrap">Hoje</button>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:10px;color:#92400e;flex-shrink:0">Opacidade:</span>
+          <input type="range" id="veg-gibs-opacity" min="0" max="100" value="80" style="flex:1;accent-color:#f97316" oninput="atualizarOpacidadeVeg('gibs')">
+          <span style="font-size:10px;color:#92400e;width:28px">80%</span>
+        </div>
+      </div>
+    </div>
   ` + foot;
   if(id==='car') return hdr('🏡 CAR — Cadastro Ambiental Rural') + `
     <div><label style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;cursor:pointer">
