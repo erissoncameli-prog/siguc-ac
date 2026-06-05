@@ -279,23 +279,13 @@ async function dispararMonitoramento() {
   btn.textContent = 'Monitorando...'
   toast('Monitoramento iniciado. Pode levar até 30 segundos.', 'success')
   try {
-    const { data: { session } } = await db.auth.getSession()
-    const res = await fetch(
-      `${appState.supabaseUrl ?? ''}/functions/v1/monitorar-alertas`,
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${session?.access_token}`,
-          'Content-Type': 'application/json',
-        }
-      }
-    )
-    const json = await res.json()
-    if (json.ok) {
-      toast(`✅ ${json.novos_alertas} novos alertas detectados`, 'success')
+    const { data, error } = await db.functions.invoke('monitorar-alertas', { method: 'POST', body: {} })
+    if (error) throw error
+    if (data?.ok) {
+      toast(`✅ ${data.novos_alertas} novos alertas detectados`, 'success')
       await carregar()
     } else {
-      toast('Erro: ' + (json.erro ?? 'Falha no monitoramento'), 'error')
+      toast('Erro: ' + (data?.erro ?? 'Falha no monitoramento'), 'error')
     }
   } catch (e) {
     toast('Erro ao disparar: ' + e.message, 'error')
