@@ -992,18 +992,32 @@ function _renderDropdown(id){
     </div>
   ` + foot;
   if(id==='car') return hdr('🏡 CAR — Cadastro Ambiental Rural') + `
-    <div><label style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;cursor:pointer">
-      <input type="checkbox" id="car-toggle" style="accent-color:#1F4E2C;width:14px;height:14px" onchange="toggleCamadaCAR(this)">
-      Exibir imóveis CAR do Acre</label>
-      <p style="font-size:11px;color:var(--cinza-500);margin:5px 0 10px">Dados públicos do SICAR. Carregamento por UC selecionada.</p>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+      <label style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;cursor:pointer;flex:1">
+        <input type="checkbox" id="car-toggle" style="accent-color:#1F4E2C;width:14px;height:14px" onchange="toggleCamadaCAR(this)">
+        Exibir imóveis CAR do Acre
+      </label>
+      <button onclick="abrirCfgCAR()" title="Configurações avançadas"
+        style="background:#f0fdf4;border:1px solid #86efac;color:#1F4E2C;border-radius:var(--raio);padding:4px 9px;cursor:pointer;font-size:12px;font-weight:600;font-family:inherit;display:flex;align-items:center;gap:4px;white-space:nowrap">
+        ⚙ Configurar
+      </button>
     </div>
+    <p style="font-size:11px;color:var(--cinza-500);margin:0 0 10px">Dados públicos do SICAR. Carregamento por UC selecionada.</p>
     <div id="car-filtros-wrap" style="display:none;flex-direction:column;gap:8px">
-      <div><label style="font-size:11px;font-weight:600;color:var(--cinza-600)">Filtrar por UC:</label>
-        <select id="car-sel-uc" style="width:100%;font-size:12px;padding:5px 8px;border:1px solid var(--borda);border-radius:var(--raio);margin-top:4px" onchange="carregarDadosCAR(this.value)">
+      <div>
+        <label style="font-size:11px;font-weight:600;color:var(--cinza-600);display:block;margin-bottom:4px">Filtrar por UC:</label>
+        <select id="car-sel-uc" style="width:100%;font-size:12px;padding:5px 8px;border:1px solid var(--borda);border-radius:var(--raio)" onchange="carregarDadosCAR(this.value)">
           <option value="todas">Selecione uma UC...</option>
         </select>
       </div>
       <div style="font-size:11px;color:var(--cinza-500)" id="car-status-txt"></div>
+      <div id="car-legenda-inline" style="display:none;gap:6px;flex-wrap:wrap">
+        <span style="font-size:10px;font-weight:700;color:var(--cinza-500);width:100%;margin-bottom:2px">LEGENDA:</span>
+        <span style="display:inline-flex;align-items:center;gap:4px;font-size:10px"><span id="car-leg-ativo" style="display:inline-block;width:14px;height:8px;border-radius:2px;background:#16a34a;border:1px solid #15803d"></span>Ativo</span>
+        <span style="display:inline-flex;align-items:center;gap:4px;font-size:10px"><span id="car-leg-aguardando" style="display:inline-block;width:14px;height:8px;border-radius:2px;background:#d97706;border:1px solid #b45309"></span>Aguardando</span>
+        <span style="display:inline-flex;align-items:center;gap:4px;font-size:10px"><span id="car-leg-analise" style="display:inline-block;width:14px;height:8px;border-radius:2px;background:#2563eb;border:1px solid #1d4ed8"></span>Em análise</span>
+        <span style="display:inline-flex;align-items:center;gap:4px;font-size:10px"><span id="car-leg-cancelado" style="display:inline-block;width:14px;height:8px;border-radius:2px;background:#dc2626;border:1px solid #b91c1c"></span>Cancelado</span>
+      </div>
     </div>
   ` + foot;
   if(id==='uc') return hdr('🌿 Unidades de Conservação') + `
