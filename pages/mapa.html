@@ -684,6 +684,27 @@ function _renderDropdown(id){
     </div>
     <div style="font-size:10px;color:var(--cinza-400);margin-top:8px;text-align:center">O painel editor flutua sobre o mapa e pode ser arrastado</div>
   ` + foot;
+  if(id==='alertas') return hdr('🔥 Alertas Ambientais') + `
+    <div>
+      <label style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;cursor:pointer">
+        <input type="checkbox" id="alertas-toggle" style="accent-color:#f97316;width:14px;height:14px" onchange="toggleAlertasMapa(this.checked)">
+        Exibir alertas no mapa
+      </label>
+      <p style="font-size:11px;color:var(--cinza-500);margin:5px 0 10px">Focos de calor e desmatamento dos últimos 7 dias.</p>
+    </div>
+    <div id="alertas-filtros-wrap" style="display:none;flex-direction:column;gap:6px">
+      <div style="display:flex;flex-wrap:wrap;gap:6px">
+        ${['critica','alta','media','baixa'].map(s=>{
+          const c={critica:'#DC2626',alta:'#F97316',media:'#F59E0B',baixa:'#059669'}[s]
+          return `<label style="display:flex;align-items:center;gap:4px;font-size:11px;cursor:pointer">
+            <input type="checkbox" checked data-alerta-sev="${s}" style="accent-color:${c}" onchange="renderAlertasMapa()">
+            <span style="color:${c};font-weight:600">${s}</span></label>`
+        }).join('')}
+      </div>
+      <div id="alertas-mapa-stat" style="font-size:10px;color:var(--cinza-400)"></div>
+      <a href="../pages/alertas-ambientais.html" style="font-size:11px;color:var(--verde-c);text-decoration:none;font-weight:600">→ Ver página completa de alertas</a>
+    </div>
+  ` + foot;
   return '<div style="padding:16px;color:var(--cinza-500)">Em desenvolvimento</div>';
 }
 
