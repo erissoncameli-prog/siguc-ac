@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>SIGUC-AC · Gestão de Pesquisa</title>
+<link rel="stylesheet" href="../css/global.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../js/observability.js"></script>
+<script src="../js/queryLogger.js"></script>
+<script src="../js/config.js"></script>
+<script src="../js/layout.js"></script>
+<style>
+/* ── layout ── */
+.ps-wrapper { display:flex; flex-direction:column; gap:14px; }
+.ps-topbar  { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+
+/* ── KPI bar ── */
+.kpi-bar  { display:flex; gap:8px; flex-wrap:wrap; }
+.kpi-chip { flex:1; min-width:110px; background:#fff; border:1px solid var(--borda); border-radius:10px; padding:10px 14px; text-align:center; }
+.kpi-val  { font-size:22px; font-weight:800; color:#1F4E2C; line-height:1; }
+.kpi-lbl  { font-size:10px; color:#9CA3AF; text-transform:uppercase; letter-spacing:.06em; margin-top:3px; }
+
+/* ── pipeline de etapas ── */
+.pipeline { display:flex; gap:0; margin:4px 0; overflow-x:auto; padding-bottom:4px; }
+.pipe-step {
+  flex:1; min-width:80px; text-align:center; padding:6px 4px;
+  font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:.04em;
+  color:#9CA3AF; border-bottom:3px solid #E5E7EB; cursor:pointer; transition:all .15s;
+  white-space:nowrap;
+}
+.pipe-step:hover { color:#374151; }
+.pipe-step.ativo { color:#1F4E2C; border-bottom-color:var(--verde-c); }
+.pipe-step.tem-itens::after { content:attr(data-count); display:inline-block; margin-left:4px; background:#E5E7EB; color:#374151; border-radius:20px; padding:0 5px; font-size:8px; }
+.pipe-step.ativo.tem-itens::after { background:var(--verde-c); color:#fff; }
+
+/* ── tabela de pesquisas ── */
+.ps-table { width:100%; border-collapse:collapse; background:#fff; border:1px solid var(--borda); border-radius:10px; overflow:hidden; font-size:13px; }
+.ps-table th { background:#F9FAFB; padding:10px 14px; text-align:left; font-size:11px; font-weight:700; color:#6B7280; text-transform:uppercase; letter-spacing:.05em; border-bottom:1px solid var(--borda); }
+.ps-table td { padding:12px 14px; border-bottom:1px solid #F3F4F6; vertical-align:middle; }
+.ps-table tr:last-child td { border-bottom:none; }
+.ps-table tr:hover td { background:#F9FAFB; }
+.ps-table tr { cursor:pointer; }
+
+/* badges */
+.badge { display:inline-flex; align-items:center; gap:3px; padding:2px 8px; border-radius:20px; font-size:10px; font-weight:700; }
+.badge-submetida      { background:#EFF6FF; color:#1E40AF; }
+.badge-triagem        { background:#FEF3C7; color:#92400E; }
+.badge-analise_tecnica{ background:#F5F3FF; color:#5B21B6; }
+.badge-parecer_juridico{background:#FFF7ED; color:#C2410C; }
+.badge-aap_emissao    { background:#ECFDF5; color:#065F46; }
+.badge-aap_assinatura { background:#D1FAE5; color:#065F46; }
+.badge-aap_publicada  { background:#A7F3D0; color:#064E3B; }
+.badge-em_campo       { background:#E0F2FE; color:#075985; }
+.badge-relatorio_parcial{background:#FEF9C3; color:#713F12; }
+.badge-relatorio_final{ background:#FEF08A; color:#713F12; }
+.badge-analise_relatorio{background:#F3E8FF; color:#581C87; }
+.badge-encerrada      { background:#F0FDF4; color:#15803D; }
+.badge-arquivada      { background:#F1F5F9; color:#475569; }
+.badge-inadimplente   { background:#FEF2F2; color:#DC2626; }
+
+/* sisbio/sisgen chips */
+.api-chip { display:inline-flex; align-items:center; gap:3px; padding:2px 7px; border-radius:20px; font-size:9px; font-weight:700; }
+.api-ok   { background:#DCFCE7; color:#15803D; }
+.api-pend { background:#FEF9C3; color:#92400E; }
+.api-err  { background:#FEE2E2; color:#DC2626; }
+
+/* ── modal ── */
+.modal-bg  { position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:999; display:flex; align-items:center; justify-content:center; padding:16px; }
+.modal-box { background:#fff; border-radius:14px; width:680px; max-width:100%; max-height:90vh; overflow-y:auto; }
+.modal-header { padding:20px 24px 0; display:flex; align-items:center; justify-content:space-between; }
+.modal-header h3 { font-size:16px; font-weight:800; }
+.modal-body { padding:16px 24px; display:flex; flex-direction:column; gap:14px; }
+.modal-footer { padding:0 24px 20px; display:flex; gap:8px; justify-content:flex-end; }
+
+.field-label { font-size:11px; font-weight:700; color:#374151; display:block; margin-bottom:4px; }
+.field-input { width:100%; padding:8px 12px; border:1px solid var(--borda); border-radius:8px; font-size:13px; font-family:inherit; outline:none; box-sizing:border-box; }
+.field-input:focus { border-color:var(--verde-c); }
+.field-grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.field-grid-3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; }
+
+/* secções do modal */
+.sec-title { font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.06em; color:#6B7280; border-bottom:1px solid #F3F4F6; padding-bottom:6px; margin-bottom:2px; }
+
+/* ações */
+.btn-acao  { padding:8px 16px; border-radius:8px; border:1px solid var(--borda); font-size:12px; font-weight:600; cursor:pointer; background:#fff; color:#374151; font-family:inherit; }
+.btn-acao.primary { background:var(--verde-c); color:#fff; border-color:var(--verde-c); }
+.btn-acao.danger  { background:#FEF2F2; color:#DC2626; border-color:#FECACA; }
+.btn-acao:hover { opacity:.9; }
+
+/* detalhe lateral */
+.ps-detalhe { background:#fff; border:1px solid var(--borda); border-radius:10px; padding:20px; }
+.det-sec { margin-bottom:14px; }
+.det-sec-title { font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.06em; color:#9CA3AF; margin-bottom:8px; }
+.det-row { display:flex; gap:8px; font-size:12px; color:#6B7280; margin-bottom:5px; align-items:flex-start; }
+.det-key { font-weight:700; color:#374151; min-width:130px; flex-shrink:0; }
+
+/* timeline de etapas */
+.etapa-flow { display:flex; flex-direction:column; gap:6px; }
+.etapa-item { display:flex; align-items:center; gap:8px; font-size:11px; }
+.etapa-dot  { width:20px; height:20px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:9px; flex-shrink:0; }
+.etapa-done { background:#DCFCE7; color:#15803D; }
+.etapa-curr { background:#1F4E2C; color:#fff; }
+.etapa-pend { background:#F3F4F6; color:#9CA3AF; }
+
+/* sisbio validation */
+.api-validar-row { display:flex; gap:8px; align-items:flex-end; }
+.api-validar-row .field-input { flex:1; }
+.api-resultado { margin-top:8px; padding:10px 12px; border-radius:8px; font-size:12px; }
+.api-resultado.ok   { background:#F0FDF4; color:#166534; border:1px solid #BBF7D0; }
+.api-resultado.erro { background:#FEF2F2; color:#991B1B; border:1px solid #FECACA; }
+
+/* vazio */
+.vazio { text-align:center; padding:60px 20px; color:#9CA3AF; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+// ── Constantes ───────────────────────────────────────────────
+
+const ETAPAS = [
+  { id:'submetida',          label:'1. Submetida' },
+  { id:'triagem',            label:'2. Triagem' },
+  { id:'analise_tecnica',    label:'3. Análise Técnica' },
+  { id:'parecer_juridico',   label:'4. Parecer Jurídico' },
+  { id:'aap_emissao',        label:'5. Emissão AAP' },
+  { id:'aap_assinatura',     label:'6. Assinatura AAP' },
+  { id:'aap_publicada',      label:'7. AAP Publicada' },
+  { id:'em_campo',           label:'8. Em Campo' },
+  { id:'relatorio_parcial',  label:'9. Rel. Parcial' },
+  { id:'relatorio_final',    label:'10. Rel. Final' },
+  { id:'analise_relatorio',  label:'11. Análise Rel.' },
+  { id:'encerrada',          label:'12. Encerrada' },
+  { id:'arquivada',          label:'13. Arquivada' },
+]
+
+const PROXIMA_ETAPA = {
+  submetida:'triagem', triagem:'analise_tecnica',
+  analise_tecnica:'parecer_juridico', parecer_juridico:'aap_emissao',
+  aap_emissao:'aap_assinatura', aap_assinatura:'aap_publicada',
+  aap_publicada:'em_campo', em_campo:'relatorio_parcial',
+  relatorio_parcial:'relatorio_final', relatorio_final:'analise_relatorio',
+  analise_relatorio:'encerrada', encerrada:'arquivada',
+}
+
+const TIPO_LABEL = {
+  fauna:'Fauna', flora:'Flora', genetica:'Genética',
+  ecossistema:'Ecossistema', socioambiental:'Socioambiental', outro:'Outro'
+}
+
+let _pesquisas  = []
+let _ucs        = []
+let _usuarios   = []
+let _etapaFiltro = ''
+let _busca      = ''
+let _detalhe    = null
+let _perfil     = null
+
+// ── Init ─────────────────────────────────────────────────────
+
+async function init() {
+  await carregarUsuario()
+  _perfil = appState.usuario?.perfil
+  document.getElementById('app').innerHTML =
+    gerarLayout('Gestão de Pesquisa', 'pesquisas') +
+    `<div class="fade-in ps-wrapper">${renderEstrutura()}</div></div></div>`
+
+  await Promise.all([carregarPesquisas(), carregarUCs(), carregarUsuarios()])
+  _sigucBarCompleta()
+}
+
+function renderEstrutura() {
+  const podeNova = ['gestor','super_admin','tecnico'].includes(_perfil)
+  return `
+<div class="kpi-bar" id="kpi-bar">
+  <div class="kpi-chip"><div class="kpi-val" id="kpi-total">—</div><div class="kpi-lbl">Total</div></div>
+  <div class="kpi-chip"><div class="kpi-val" id="kpi-ativas">—</div><div class="kpi-lbl">Em Andamento</div></div>
+  <div class="kpi-chip"><div class="kpi-val" id="kpi-aap">—</div><div class="kpi-lbl">Com AAP</div></div>
+  <div class="kpi-chip"><div class="kpi-val" id="kpi-inad" style="color:#DC2626">—</div><div class="kpi-lbl">Inadimplentes</div></div>
+</div>
+
+<div class="ps-topbar">
+  <div class="pipeline" id="pipeline"></div>
+  <input style="padding:8px 14px;border:1px solid var(--borda);border-radius:8px;font-size:13px;width:220px;outline:none"
+    placeholder="Buscar pesquisa…" oninput="buscar(this.value)">
+  ${podeNova ? `<button class="btn btn-primary" onclick="abrirModalNova()" style="margin-left:auto">+ Nova Pesquisa</button>` : ''}
+</div>
+
+<div id="ps-corpo"></div>`
+}
+
+// ── Dados ─────────────────────────────────────────────────────
+
+async function carregarPesquisas() {
+  const { data, error } = await db.from('pesquisas')
+    .select(`*, uc:unidades_conservacao(id,nome), analista:usuarios!pesquisas_analista_id_fkey(nome_completo)`)
+    .order('criado_em', { ascending: false })
+  if (error) { toast('Erro ao carregar pesquisas', 'erro'); return }
+  _pesquisas = data || []
+  atualizarKPIs()
+  renderPipeline()
+  renderTabela()
+}
+
+async function carregarUCs() {
+  const { data } = await db.from('unidades_conservacao').select('id,nome').order('nome')
+  _ucs = data || []
+}
+
+async function carregarUsuarios() {
+  const { data } = await db.from('usuarios').select('id,nome_completo,perfil').eq('ativo', true)
+  _usuarios = data || []
+}
+
+// ── KPIs ──────────────────────────────────────────────────────
+
+function atualizarKPIs() {
+  const ativas = _pesquisas.filter(p => !['encerrada','arquivada'].includes(p.etapa))
+  const comAAP = _pesquisas.filter(p => p.aap_numero)
+  const inad   = _pesquisas.filter(p => p.inadimplente)
+  document.getElementById('kpi-total').textContent  = _pesquisas.length
+  document.getElementById('kpi-ativas').textContent = ativas.length
+  document.getElementById('kpi-aap').textContent    = comAAP.length
+  document.getElementById('kpi-inad').textContent   = inad.length
+}
+
+// ── Pipeline ──────────────────────────────────────────────────
+
+function renderPipeline() {
+  const contagem = {}
+  ETAPAS.forEach(e => { contagem[e.id] = _pesquisas.filter(p => p.etapa === e.id).length })
+  document.getElementById('pipeline').innerHTML =
+    `<div class="pipe-step ${!_etapaFiltro?'ativo':''}" onclick="filtrarEtapa('')">Todas (${_pesquisas.length})</div>` +
+    ETAPAS.map(e => {
+      const n    = contagem[e.id] || 0
+      const curr = _etapaFiltro === e.id
+      return `<div class="pipe-step ${curr?'ativo':''} ${n?'tem-itens':''}" data-count="${n}"
+        onclick="filtrarEtapa('${e.id}')">${e.label}</div>`
+    }).join('')
+}
+
+// ── Filtros ────────────────────────────────────────────────────
+
+function filtrarEtapa(e) { _etapaFiltro = e; renderPipeline(); renderTabela() }
+function buscar(v) { _busca = v.toLowerCase(); renderTabela() }
+
+function pesquisasFiltradas() {
+  let list = _pesquisas
+  if (_etapaFiltro) list = list.filter(p => p.etapa === _etapaFiltro)
+  if (_busca) list = list.filter(p =>
+    p.titulo.toLowerCase().includes(_busca) ||
+    (p.pesquisador_nome||'').toLowerCase().includes(_busca) ||
+    (p.numero_processo||'').toLowerCase().includes(_busca) ||
+    (p.uc?.nome||'').toLowerCase().includes(_busca)
+  )
+  return list
+}
+
+// ── Tabela ────────────────────────────────────────────────────
+
+function renderTabela() {
+  const lista = pesquisasFiltradas()
+  const el = document.getElementById('ps-corpo')
+  if (!lista.length) {
+    el.innerHTML = `<div class="vazio">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="opacity:.3;margin-bottom:12px"><path d="M9 12h6m-3-3v6"/><path d="M3 12a9 9 0 1 0 18 0 9 9 0 0 0-18 0"/></svg>
+      <p>Nenhuma pesquisa encontrada</p></div>`
+    return
+  }
+  el.innerHTML = `
+<table class="ps-table">
+  <thead>
+    <tr>
+      <th>Processo</th><th>Título</th><th>UC</th><th>Tipo</th>
+      <th>Pesquisador</th><th>Etapa</th><th>SISBIO/SISGEN</th><th>Ações</th>
+    </tr>
+  </thead>
+  <tbody>
+    ${lista.map(p => `
+    <tr onclick="verDetalhe('${p.id}')">
+      <td style="font-family:monospace;font-size:11px;color:#6B7280">${esc(p.numero_processo || '—')}</td>
+      <td style="font-weight:600;max-width:200px">
+        ${esc(p.titulo)}
+        ${p.inadimplente ? '<span class="badge badge-inadimplente" style="margin-left:4px">⚠ Inadimplente</span>' : ''}
+      </td>
+      <td style="font-size:12px">${esc(p.uc?.nome || '—')}</td>
+      <td><span class="badge" style="background:#F0F9FF;color:#0369A1">${TIPO_LABEL[p.tipo]||p.tipo}</span></td>
+      <td style="font-size:12px">${esc(p.pesquisador_nome || '—')}</td>
+      <td><span class="badge badge-${p.etapa}">${ETAPAS.find(e=>e.id===p.etapa)?.label||p.etapa}</span></td>
+      <td>
+        ${p.sisbio_numero ? `<span class="api-chip ${p.sisbio_status==='validado'?'api-ok':p.sisbio_status==='invalido'?'api-err':'api-pend'}">SB ${p.sisbio_status==='validado'?'✓':p.sisbio_status==='invalido'?'✗':'?'}</span>` : ''}
+        ${p.sisgen_numero ? `<span class="api-chip ${p.sisgen_status==='validado'?'api-ok':p.sisgen_status==='invalido'?'api-err':'api-pend'}" style="margin-left:3px">SG ${p.sisgen_status==='validado'?'✓':p.sisgen_status==='invalido'?'✗':'?'}</span>` : ''}
+        ${!p.sisbio_numero && !p.sisgen_numero ? '<span style="font-size:11px;color:#9CA3AF">—</span>' : ''}
+      </td>
+      <td onclick="event.stopPropagation()">
+        <button class="btn-acao" style="padding:5px 10px;font-size:11px" onclick="verDetalhe('${p.id}')">Ver</button>
+      </td>
+    </tr>`).join('')}
+  </tbody>
+</table>`
+}
+
+// ── Detalhe ───────────────────────────────────────────────────
+
+async function verDetalhe(id) {
+  _detalhe = _pesquisas.find(p => p.id === id)
+  if (!_detalhe) return
+
+  const { data: hist } = await db.from('pesquisa_historico')
+    .select('*, usuario:usuarios(nome_completo)')
+    .eq('pesquisa_id', id).order('criado_em')
+
+  const etapaIdx = ETAPAS.findIndex(e => e.id === _detalhe.etapa)
+  const podeAvancar = ['gestor','super_admin','tecnico'].includes(_perfil) && _detalhe.etapa !== 'arquivada'
+  const podeAAP     = ['gestor','super_admin'].includes(_perfil) && _detalhe.etapa === 'aap_emissao' && !_detalhe.aap_numero
+  const podeAssinar = ['gestor','super_admin'].includes(_perfil) && _detalhe.etapa === 'aap_emissao' && _detalhe.aap_numero && !_detalhe.aap_assinado_em
+  const podePublicar = ['gestor','super_admin'].includes(_perfil) && _detalhe.etapa === 'aap_assinatura'
+  const podeInad    = ['gestor','super_admin','financeiro'].includes(_perfil) && !_detalhe.inadimplente
+
+  const proxEtapa = PROXIMA_ETAPA[_detalhe.etapa]
+
+  document.body.insertAdjacentHTML('beforeend', `
+<div class="modal-bg" id="modal-detalhe" onclick="if(event.target.id==='modal-detalhe')fecharDetalhe()">
+<div class="modal-box" onclick="event.stopPropagation()" style="width:760px">
+  <div class="modal-header">
+    <div>
+      <h3>${esc(_detalhe.titulo)}</h3>
+      <div style="margin-top:4px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+        <span class="badge badge-${_detalhe.etapa}">${ETAPAS.find(e=>e.id===_detalhe.etapa)?.label}</span>
+        ${_detalhe.inadimplente ? '<span class="badge badge-inadimplente">⚠ Inadimplente</span>' : ''}
+        ${_detalhe.aap_numero ? `<span style="font-size:11px;font-weight:700;color:#065F46">📋 ${esc(_detalhe.aap_numero)}</span>` : ''}
+      </div>
+    </div>
+    <button onclick="fecharDetalhe()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#9CA3AF">✕</button>
+  </div>
+
+  <div class="modal-body">
+    <!-- Dados gerais -->
+    <div class="det-sec">
+      <div class="det-sec-title">Informações Gerais</div>
+      <div class="field-grid-2">
+        <div>
+          <div class="det-row"><span class="det-key">Processo</span>${esc(_detalhe.numero_processo||'Aguardando triagem')}</div>
+          <div class="det-row"><span class="det-key">Tipo</span>${TIPO_LABEL[_detalhe.tipo]||_detalhe.tipo}</div>
+          <div class="det-row"><span class="det-key">UC</span>${esc(_detalhe.uc?.nome||'—')}</div>
+          <div class="det-row"><span class="det-key">Área</span>${_detalhe.area_pesquisa_ha ? _detalhe.area_pesquisa_ha + ' ha' : '—'}</div>
+        </div>
+        <div>
+          <div class="det-row"><span class="det-key">Pesquisador</span>${esc(_detalhe.pesquisador_nome||'—')}</div>
+          <div class="det-row"><span class="det-key">E-mail</span>${esc(_detalhe.pesquisador_email||'—')}</div>
+          <div class="det-row"><span class="det-key">Instituição</span>${esc(_detalhe.pesquisador_instituicao||'—')}</div>
+          <div class="det-row"><span class="det-key">Período</span>${_detalhe.data_inicio_prevista||'?'} → ${_detalhe.data_fim_prevista||'?'}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SISBIO / SISGEN -->
+    <div class="det-sec">
+      <div class="det-sec-title">Autorizações Externas</div>
+      <div class="field-grid-2">
+        <div>
+          <div class="det-row"><span class="det-key">SISBIO nº</span>${esc(_detalhe.sisbio_numero||'—')}</div>
+          <div class="det-row"><span class="det-key">Status SISBIO</span>
+            <span class="api-chip ${_detalhe.sisbio_status==='validado'?'api-ok':_detalhe.sisbio_status==='invalido'?'api-err':'api-pend'}">
+              ${_detalhe.sisbio_status}
+            </span>
+            ${_detalhe.sisbio_numero && _detalhe.sisbio_status !== 'validado' ? `<button class="btn-acao" style="padding:3px 8px;font-size:10px;margin-left:6px" onclick="validarAPI('sisbio')">Validar</button>` : ''}
+          </div>
+          ${_detalhe.sisbio_validade ? `<div class="det-row"><span class="det-key">Validade</span>${_detalhe.sisbio_validade}</div>` : ''}
+        </div>
+        <div>
+          <div class="det-row"><span class="det-key">SISGEN nº</span>${esc(_detalhe.sisgen_numero||'—')}</div>
+          <div class="det-row"><span class="det-key">Status SISGEN</span>
+            <span class="api-chip ${_detalhe.sisgen_status==='validado'?'api-ok':_detalhe.sisgen_status==='invalido'?'api-err':'api-pend'}">
+              ${_detalhe.sisgen_status}
+            </span>
+            ${_detalhe.sisgen_numero && _detalhe.sisgen_status !== 'validado' ? `<button class="btn-acao" style="padding:3px 8px;font-size:10px;margin-left:6px" onclick="validarAPI('sisgen')">Validar</button>` : ''}
+          </div>
+        </div>
+      </div>
+      <div id="api-resultado"></div>
+    </div>
+
+    <!-- AAP -->
+    ${_detalhe.aap_numero ? `
+    <div class="det-sec" style="background:#F0FDF4;border-radius:8px;padding:12px">
+      <div class="det-sec-title" style="color:#15803D">Autorização de Acesso e Pesquisa (AAP)</div>
+      <div class="field-grid-2">
+        <div>
+          <div class="det-row"><span class="det-key">Número AAP</span><strong>${esc(_detalhe.aap_numero)}</strong></div>
+          <div class="det-row"><span class="det-key">Emitida em</span>${formatData(_detalhe.aap_emitida_em)}</div>
+          <div class="det-row"><span class="det-key">Validade</span>${_detalhe.aap_validade||'—'}</div>
+        </div>
+        <div>
+          <div class="det-row"><span class="det-key">Assinada em</span>${_detalhe.aap_assinado_em ? formatData(_detalhe.aap_assinado_em) : 'Pendente'}</div>
+          <div class="det-row"><span class="det-key">Token QR</span><span style="font-family:monospace;font-size:10px">${esc(_detalhe.aap_qr_token||'—')}</span></div>
+        </div>
+      </div>
+    </div>` : ''}
+
+    <!-- Etapas -->
+    <div class="det-sec">
+      <div class="det-sec-title">Fluxo de Etapas</div>
+      <div class="etapa-flow">
+        ${ETAPAS.map((e, i) => {
+          const cls = i < etapaIdx ? 'etapa-done' : i === etapaIdx ? 'etapa-curr' : 'etapa-pend'
+          const icon = i < etapaIdx ? '✓' : i === etapaIdx ? '●' : String(i+1)
+          const h = hist?.find(h => h.etapa_nova === e.id)
+          return `<div class="etapa-item">
+            <div class="etapa-dot ${cls}">${icon}</div>
+            <div style="flex:1">
+              <span style="font-size:12px;font-weight:${i===etapaIdx?'800':'500'};color:${i<=etapaIdx?'#111827':'#9CA3AF'}">${e.label}</span>
+              ${h ? `<span style="font-size:10px;color:#9CA3AF;margin-left:6px">${formatData(h.criado_em)} · ${esc(h.usuario?.nome_completo||'Sistema')}</span>` : ''}
+            </div>
+          </div>`
+        }).join('')}
+      </div>
+    </div>
+
+    <!-- Ações -->
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      ${podeAvancar && proxEtapa ? `
+        <button class="btn-acao primary" onclick="avancarEtapa('${proxEtapa}')">
+          ✓ Avançar para: ${ETAPAS.find(e=>e.id===proxEtapa)?.label}
+        </button>` : ''}
+      ${podeAAP ? `<button class="btn-acao" style="background:#ECFDF5;color:#065F46;border-color:#A7F3D0" onclick="emitirAAP()">📋 Emitir AAP</button>` : ''}
+      ${podeAssinar ? `<button class="btn-acao" style="background:#D1FAE5;color:#065F46;border-color:#6EE7B7" onclick="assinarAAP()">✍ Assinar AAP</button>` : ''}
+      ${podePublicar ? `<button class="btn-acao" style="background:#A7F3D0;color:#064E3B;border-color:#34D399" onclick="publicarAAP()">📤 Publicar AAP</button>` : ''}
+      ${podeInad ? `<button class="btn-acao danger" onclick="marcarInadimplencia()">⚠ Marcar Inadimplente</button>` : ''}
+      ${_detalhe.inadimplente && ['gestor','super_admin'].includes(_perfil) ? `<button class="btn-acao" onclick="regularizar()">✓ Regularizar</button>` : ''}
+    </div>
+  </div>
+</div>
+</div>`)
+}
+
+function fecharDetalhe() {
+  document.getElementById('modal-detalhe')?.remove()
+  _detalhe = null
+}
+
+// ── Ações de etapa ────────────────────────────────────────────
+
+async function avancarEtapa(novaEtapa) {
+  const obs = prompt(`Observação para avançar para "${ETAPAS.find(e=>e.id===novaEtapa)?.label}" (opcional):`) ?? ''
+  const { error } = await db.rpc('avancar_etapa_pesquisa', {
+    p_pesquisa_id: _detalhe.id, p_nova_etapa: novaEtapa, p_observacao: obs || null
+  })
+  if (error) { toast('Erro: ' + error.message, 'erro'); return }
+  toast('Etapa avançada com sucesso', 'sucesso')
+  fecharDetalhe()
+  await carregarPesquisas()
+}
+
+async function emitirAAP() {
+  const dias = parseInt(prompt('Validade da AAP em dias (padrão: 365):') || '365') || 365
+  const { data, error } = await db.rpc('emitir_aap', { p_pesquisa_id: _detalhe.id, p_validade_dias: dias })
+  if (error) { toast('Erro: ' + error.message, 'erro'); return }
+  toast('AAP emitida: ' + data.aap_numero, 'sucesso')
+  fecharDetalhe()
+  await carregarPesquisas()
+}
+
+async function assinarAAP() {
+  const { error } = await db.rpc('assinar_aap', { p_pesquisa_id: _detalhe.id })
+  if (error) { toast('Erro: ' + error.message, 'erro'); return }
+  toast('AAP assinada', 'sucesso')
+  fecharDetalhe()
+  await carregarPesquisas()
+}
+
+async function publicarAAP() {
+  const { error } = await db.rpc('publicar_aap', { p_pesquisa_id: _detalhe.id })
+  if (error) { toast('Erro: ' + error.message, 'erro'); return }
+  toast('AAP publicada', 'sucesso')
+  fecharDetalhe()
+  await carregarPesquisas()
+}
+
+async function marcarInadimplencia() {
+  const motivo = prompt('Motivo da inadimplência:')
+  if (!motivo) return
+  const { error } = await db.rpc('marcar_inadimplencia', { p_pesquisa_id: _detalhe.id, p_motivo: motivo })
+  if (error) { toast('Erro: ' + error.message, 'erro'); return }
+  toast('Inadimplência registrada', 'sucesso')
+  fecharDetalhe()
+  await carregarPesquisas()
+}
+
+async function regularizar() {
+  const { error } = await db.from('pesquisas').update({
+    inadimplente: false, inadimplencia_motivo: null, inadimplencia_em: null
+  }).eq('id', _detalhe.id)
+  if (error) { toast('Erro: ' + error.message, 'erro'); return }
+  toast('Pesquisador regularizado', 'sucesso')
+  fecharDetalhe()
+  await carregarPesquisas()
+}
+
+// ── Validação SISBIO / SISGEN ─────────────────────────────────
+
+async function validarAPI(sistema) {
+  const numero = sistema === 'sisbio' ? _detalhe.sisbio_numero : _detalhe.sisgen_numero
+  if (!numero) return
+  const el = document.getElementById('api-resultado')
+  el.innerHTML = `<div class="api-resultado" style="background:#F9FAFB;color:#6B7280">⏳ Validando ${sistema.toUpperCase()} nº ${esc(numero)}…</div>`
+
+  const { data: { session } } = await db.auth.getSession()
+  const resp = await fetch(`${SUPABASE_URL}/functions/v1/sisbio-sisgen`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${session?.access_token}`
+    },
+    body: JSON.stringify({ sistema, numero, pesquisa_id: _detalhe.id })
+  })
+  const resultado = await resp.json()
+
+  if (resultado.valido) {
+    el.innerHTML = `<div class="api-resultado ok">✓ ${sistema.toUpperCase()} válido — Titular: ${esc(resultado.dados?.titular||'—')} · Validade: ${esc(resultado.dados?.validade||'—')}</div>`
+  } else {
+    el.innerHTML = `<div class="api-resultado erro">✗ ${resultado.erro || sistema.toUpperCase() + ' inválido ou não encontrado'}</div>`
+  }
+  await carregarPesquisas()
+}
+
+// ── Modal Nova Pesquisa ───────────────────────────────────────
+
+function abrirModalNova() {
+  const optsUC   = _ucs.map(u => `<option value="${u.id}">${esc(u.nome)}</option>`).join('')
+  const optsAnl  = _usuarios.filter(u=>['tecnico','gestor','super_admin'].includes(u.perfil))
+                             .map(u=>`<option value="${u.id}">${esc(u.nome_completo)}</option>`).join('')
+
+  document.body.insertAdjacentHTML('beforeend', `
+<div class="modal-bg" id="modal-nova" onclick="if(event.target.id==='modal-nova')fecharModalNova()">
+<div class="modal-box" onclick="event.stopPropagation()">
+  <div class="modal-header"><h3>+ Nova Pesquisa</h3>
+    <button onclick="fecharModalNova()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#9CA3AF">✕</button>
+  </div>
+  <div class="modal-body">
+    <div>
+      <div class="sec-title">Dados da Pesquisa</div>
+      <div style="margin-top:10px;display:flex;flex-direction:column;gap:10px">
+        <div><label class="field-label">Título *</label>
+          <input class="field-input" id="n-titulo" placeholder="Título do projeto de pesquisa"></div>
+        <div><label class="field-label">Resumo *</label>
+          <textarea class="field-input" id="n-resumo" rows="3" placeholder="Descreva o objeto e objetivos da pesquisa"></textarea></div>
+        <div class="field-grid-2">
+          <div><label class="field-label">Tipo *</label>
+            <select class="field-input" id="n-tipo">
+              ${Object.entries(TIPO_LABEL).map(([v,l])=>`<option value="${v}">${l}</option>`).join('')}
+            </select></div>
+          <div><label class="field-label">UC</label>
+            <select class="field-input" id="n-uc"><option value="">Selecione…</option>${optsUC}</select></div>
+        </div>
+        <div class="field-grid-2">
+          <div><label class="field-label">Início previsto</label>
+            <input class="field-input" id="n-inicio" type="date"></div>
+          <div><label class="field-label">Fim previsto</label>
+            <input class="field-input" id="n-fim" type="date"></div>
+        </div>
+        <div><label class="field-label">Área estimada (ha)</label>
+          <input class="field-input" id="n-area" type="number" step="0.01" placeholder="Ex: 1250.50"></div>
+      </div>
+    </div>
+    <div>
+      <div class="sec-title">Pesquisador</div>
+      <div style="margin-top:10px;display:flex;flex-direction:column;gap:10px">
+        <div class="field-grid-2">
+          <div><label class="field-label">Nome completo *</label>
+            <input class="field-input" id="n-pnome" placeholder="Nome do pesquisador"></div>
+          <div><label class="field-label">CPF</label>
+            <input class="field-input" id="n-pcpf" placeholder="000.000.000-00"></div>
+        </div>
+        <div class="field-grid-2">
+          <div><label class="field-label">E-mail</label>
+            <input class="field-input" id="n-pemail" type="email"></div>
+          <div><label class="field-label">Instituição</label>
+            <input class="field-input" id="n-pinst" placeholder="Ex: UFAC, INPA…"></div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="sec-title">Autorizações (SISBIO / SISGEN)</div>
+      <div style="margin-top:10px" class="field-grid-2">
+        <div><label class="field-label">Nº SISBIO</label>
+          <input class="field-input" id="n-sisbio" placeholder="Ex: 12345-1"></div>
+        <div><label class="field-label">Nº SISGEN</label>
+          <input class="field-input" id="n-sisgen" placeholder="Ex: AB123456"></div>
+      </div>
+    </div>
+    <div>
+      <div class="sec-title">Responsável Interno</div>
+      <div style="margin-top:10px" class="field-grid-2">
+        <div><label class="field-label">Analista responsável</label>
+          <select class="field-input" id="n-analista"><option value="">Selecione…</option>${optsAnl}</select></div>
+        <div><label class="field-label">Gestor UC</label>
+          <select class="field-input" id="n-gestor"><option value="">Selecione…</option>${optsAnl}</select></div>
+      </div>
+    </div>
+  </div>
+  <div class="modal-footer">
+    <button class="btn-acao" onclick="fecharModalNova()">Cancelar</button>
+    <button class="btn-acao primary" onclick="salvarNova()">Cadastrar Pesquisa</button>
+  </div>
+</div>
+</div>`)
+}
+
+function fecharModalNova() { document.getElementById('modal-nova')?.remove() }
+
+async function salvarNova() {
+  const titulo  = document.getElementById('n-titulo').value.trim()
+  const resumo  = document.getElementById('n-resumo').value.trim()
+  const pnome   = document.getElementById('n-pnome').value.trim()
+  if (!titulo || !resumo || !pnome) { toast('Preencha os campos obrigatórios (*)', 'aviso'); return }
+
+  const sisbio  = document.getElementById('n-sisbio').value.trim() || null
+  const sisgen  = document.getElementById('n-sisgen').value.trim() || null
+
+  const payload = {
+    titulo, resumo,
+    tipo:                     document.getElementById('n-tipo').value,
+    uc_id:                    document.getElementById('n-uc').value || null,
+    data_inicio_prevista:     document.getElementById('n-inicio').value || null,
+    data_fim_prevista:        document.getElementById('n-fim').value || null,
+    area_pesquisa_ha:         parseFloat(document.getElementById('n-area').value) || null,
+    pesquisador_nome:         pnome,
+    pesquisador_cpf:          document.getElementById('n-pcpf').value.trim() || null,
+    pesquisador_email:        document.getElementById('n-pemail').value.trim() || null,
+    pesquisador_instituicao:  document.getElementById('n-pinst').value.trim() || null,
+    sisbio_numero:            sisbio,
+    sisbio_status:            sisbio ? 'pendente' : 'nao_requerido',
+    sisgen_numero:            sisgen,
+    sisgen_status:            sisgen ? 'pendente' : 'nao_requerido',
+    analista_id:              document.getElementById('n-analista').value || null,
+    gestor_uc_id:             document.getElementById('n-gestor').value || null,
+    criado_por:               appState.usuario?.id,
+    etapa:                    'submetida',
+  }
+
+  const { error } = await db.from('pesquisas').insert(payload)
+  if (error) { toast('Erro ao cadastrar: ' + error.message, 'erro'); return }
+  toast('Pesquisa cadastrada com sucesso', 'sucesso')
+  fecharModalNova()
+  await carregarPesquisas()
+}
+
+// ── Boot ──────────────────────────────────────────────────────
+init()
+</script>
+</body>
+</html>
