@@ -554,11 +554,13 @@ async function carregarUCs() {
 function filtrarUCs() {
   const q = document.getElementById('busca-uc').value.toLowerCase()
   const cat = document.getElementById('fil-categoria').value
+  const esfera = document.getElementById('fil-esfera').value
   const grupo = document.getElementById('fil-grupo').value
   const status = document.getElementById('fil-status').value
   renderTabelaUCs(_ucs.filter(u =>
     (!q || u.nome.toLowerCase().includes(q) || u.codigo.toLowerCase().includes(q)) &&
     (!cat || u.categoria === cat) &&
+    (!esfera || u.esfera === esfera) &&
     (!grupo || u.grupo === grupo) &&
     (!status || u.status === status)
   ))
