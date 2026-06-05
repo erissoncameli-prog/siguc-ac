@@ -911,9 +911,15 @@ function renderAlertasMapa() {
   _alertasLayer = L.layerGroup()
   visiveis.forEach(a => {
     if (!a.geom) return
-    const m = String(a.geom).match(/POINT\(([^ ]+) ([^ )]+)\)/)
-    if (!m) return
-    const lng = parseFloat(m[1]), lat = parseFloat(m[2])
+    let lat, lng
+    if (typeof a.geom === 'object' && a.geom.coordinates) {
+      lng = a.geom.coordinates[0]; lat = a.geom.coordinates[1]
+    } else {
+      const m = String(a.geom).match(/POINT\(([^ ]+) ([^ )]+)\)/)
+      if (!m) return
+      lng = parseFloat(m[1]); lat = parseFloat(m[2])
+    }
+    if (!lat || !lng) return
     const cor = COR_ALERTA[a.severidade] ?? '#6b7280'
     const icone = a.tipo === 'queimada' ? '🔥' : '🌳'
     L.circleMarker([lat, lng], {
