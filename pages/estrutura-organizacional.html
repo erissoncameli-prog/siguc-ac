@@ -467,31 +467,116 @@ function renderDelegacoes(lista) {
 // ── Unidades ──────────────────────────────────────────────
 
 function renderUnidades() {
+  const podeAdmin = _perfilUsuario === 'super_admin'
   if (!_unidades.length) {
     document.getElementById('unidades-content').innerHTML =
       `<div class="empty-state"><p>Nenhuma unidade cadastrada.</p></div>`
     return
   }
 
-  const raizes = _unidades.filter(u => !u.pai_id)
-  function renderNo(u, nivel) {
-    const filhos = _unidades.filter(f => f.pai_id === u.id)
+  // inclui inativas para super_admin poder reativar
+  const todas = podeAdmin
+    ? _unidades
+    : _unidades.filter(u => u.ativo)
+
+  const raizes = todas.filter(u => !u.pai_id)
+
+  function renderLinhaUnidade(u, nivel) {
+    const filhos = todas.filter(f => f.pai_id === u.id)
     const indent = nivel * 24
-    let html = `<div style="display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid #F3F4F6;margin-left:${indent}px">
-      <span class="badge badge-cinza" style="min-width:64px;text-align:center">${esc(u.sigla)}</span>
-      <div>
+    const tipoClass = 'org-tipo-' + u.tipo
+    const inativa = !u.ativo
+    let html = `<div style="display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid #F3F4F6;margin-left:${indent}px;${inativa ? 'opacity:.45;' : ''}">
+      <span class="org-tipo-badge ${tipoClass}" style="min-width:80px;text-align:center">${esc(u.tipo.replace(/_/g,' '))}</span>
+      <span style="font-size:11px;font-weight:700;color:#6B7280;min-width:70px">${esc(u.sigla)}</span>
+      <div style="flex:1">
         <div style="font-size:13px;font-weight:600;color:#111827">${esc(u.nome)}</div>
-        <div style="font-size:11px;color:#9CA3AF">${esc(u.tipo.replace('_',' '))}</div>
+        ${inativa ? '<span style="font-size:10px;color:#EF4444">Inativa</span>' : ''}
       </div>
+      ${podeAdmin ? `<div style="display:flex;gap:4px;flex-shrink:0">
+        <button class="btn btn-xs btn-ghost" onclick='editarUnidade(${JSON.stringify(u)})'>Editar</button>
+        <button class="btn btn-xs btn-ghost" onclick="toggleUnidade('${u.id}',${u.ativo})">${u.ativo ? 'Desativar' : 'Reativar'}</button>
+      </div>` : ''}
     </div>`
-    filhos.forEach(f => { html += renderNo(f, nivel + 1) })
+    filhos.forEach(f => { html += renderLinhaUnidade(f, nivel + 1) })
     return html
   }
 
   let html = '<div class="card" style="overflow:hidden">'
-  raizes.forEach(r => { html += renderNo(r, 0) })
+  raizes.forEach(r => { html += renderLinhaUnidade(r, 0) })
   html += '</div>'
   document.getElementById('unidades-content').innerHTML = html
+}
+
+let _editUnidadeId = null
+
+function abrirModalUnidade(u = null) {
+  _editUnidadeId = u?.id || null
+  document.getElementById('unid-titulo').textContent = u ? 'Editar Unidade' : 'Nova Unidade'
+  document.getElementById('unid-sigla').value = u?.sigla || ''
+  document.getElementById('unid-sigla').disabled = !!u  // sigla imutável após criação
+  document.getElementById('unid-nome').value = u?.nome || ''
+  document.getElementById('unid-tipo').value = u?.tipo || 'departamento'
+  popularSelectPai(u?.pai_id || '')
+  document.getElementById('modal-unidade').classList.add('aberto')
+}
+
+function editarUnidade(u) { abrirModalUnidade(u) }
+
+function fecharModalUnidade() {
+  document.getElementById('modal-unidade').classList.remove('aberto')
+  document.getElementById('unid-sigla').disabled = false
+  _editUnidadeId = null
+}
+
+function popularSelectPai(valorAtual) {
+  const sel = document.getElementById('unid-pai')
+  sel.innerHTML = '<option value="">— Raiz (sem pai) —</option>'
+  // exibe todas ativas, exceto a própria unidade sendo editada
+  _unidades.filter(u => u.ativo && u.id !== _editUnidadeId).forEach(u => {
+    const opt = document.createElement('option')
+    opt.value = u.id
+    opt.textContent = `${u.sigla} — ${u.nome}`
+    if (u.id === valorAtual) opt.selected = true
+    sel.appendChild(opt)
+  })
+}
+
+async function salvarUnidade() {
+  const sigla = document.getElementById('unid-sigla').value.trim().toUpperCase()
+  const nome  = document.getElementById('unid-nome').value.trim()
+  const tipo  = document.getElementById('unid-tipo').value
+  const pai_id = document.getElementById('unid-pai').value || null
+
+  if (!sigla || !nome) { toast('Sigla e nome são obrigatórios', 'error'); return }
+
+  const btn = document.getElementById('unid-btn-salvar')
+  btn.disabled = true; btn.textContent = 'Salvando...'
+  try {
+    if (_editUnidadeId) {
+      const { error } = await db.from('unidades_organizacionais')
+        .update({ nome, tipo, pai_id })
+        .eq('id', _editUnidadeId)
+      if (error) throw error
+      toast('Unidade atualizada!', 'success')
+    } else {
+      const { error } = await db.from('unidades_organizacionais')
+        .insert({ sigla, nome, tipo, pai_id })
+      if (error) throw error
+      toast('Unidade criada!', 'success')
+    }
+    fecharModalUnidade()
+    await carregarDados()
+  } catch(e) { toast(e.message || 'Erro ao salvar', 'error') }
+  finally { btn.disabled = false; btn.textContent = 'Salvar' }
+}
+
+async function toggleUnidade(id, ativoAtual) {
+  if (!confirm(ativoAtual ? 'Desativar esta unidade? Subunidades vinculadas continuarão ativas.' : 'Reativar esta unidade?')) return
+  const { error } = await db.from('unidades_organizacionais').update({ ativo: !ativoAtual }).eq('id', id)
+  if (error) { toast(error.message, 'error'); return }
+  toast(ativoAtual ? 'Unidade desativada' : 'Unidade reativada', 'success')
+  await carregarDados()
 }
 
 // ── Selects dos modais ────────────────────────────────────
