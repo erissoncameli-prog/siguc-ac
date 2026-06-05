@@ -1201,8 +1201,23 @@ function renderAlertasMapa() {
   if (_alertasLayer) { mapaL.removeLayer(_alertasLayer); _alertasLayer = null }
   if (!_alertasAtivo || !_alertasMapa.length) return
 
-  const sevs = new Set([...document.querySelectorAll('[data-alerta-sev]:checked')].map(e => e.dataset.alertaSev))
-  const visiveis = _alertasMapa.filter(a => sevs.has(a.severidade))
+  const sevs   = new Set([...document.querySelectorAll('[data-alerta-sev]:checked')].map(e => e.dataset.alertaSev))
+  const fontes = new Set([...document.querySelectorAll('[data-alerta-fonte]:checked')].map(e => e.dataset.alertaFonte))
+  const loc    = document.querySelector('[name="alerta-loc"]:checked')?.value ?? 'todos'
+
+  const visiveis = _alertasMapa.filter(a => {
+    if (!sevs.has(a.severidade)) return false
+    if (!fontes.has(a.fonte))    return false
+    if (loc === 'em_uc') {
+      const temUC = a.uc_nome || a.uc_id
+      if (!temUC) return false
+    }
+    if (loc === 'fora_uc') {
+      const temUC = a.uc_nome || a.uc_id
+      if (temUC) return false
+    }
+    return true
+  })
 
   _alertasLayer = L.layerGroup()
   visiveis.forEach(a => {
