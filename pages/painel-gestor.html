@@ -607,6 +607,86 @@ async function criarNotificacao() {
   await carregarNotifs();
 }
 
+// ── Modal Criar Projeto de Análise ────────────────────────────
+
+const LABEL_TIPO_PROJETO = {
+  verificacao_campo:'Verificação de Campo', sobrevoo:'Sobrevoo',
+  analise_imagem:'Análise de Imagem', fiscalizacao:'Fiscalização', outro:'Outro'
+};
+
+function abrirModalCriarProjeto() {
+  if (!_notifAtiva) return;
+  const optsT = Object.entries(LABEL_TIPO_PROJETO)
+    .map(([v,l]) => `<option value="${v}">${l}</option>`).join('');
+  const tituloSugerido = `Verificação — ${_notifAtiva.titulo}`;
+
+  document.body.insertAdjacentHTML('beforeend', `
+<div class="modal-bg" id="modal-projeto" onclick="if(event.target.id==='modal-projeto')fecharModalProjeto()">
+  <div class="modal" onclick="event.stopPropagation()">
+    <h3>🔬 Criar Projeto de Análise</h3>
+    <p style="font-size:12px;color:#6B7280;margin-bottom:14px">
+      O projeto será vinculado a esta notificação. Ao avançar o projeto,
+      o status da notificação será atualizado automaticamente.
+    </p>
+    <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px">
+      <div>
+        <label style="font-size:12px;font-weight:700;display:block;margin-bottom:3px">Título do Projeto</label>
+        <input id="proj-titulo" type="text" value="${esc(tituloSugerido)}"
+          style="width:100%;padding:8px;border:1px solid var(--borda);border-radius:8px;font-size:13px">
+      </div>
+      <div>
+        <label style="font-size:12px;font-weight:700;display:block;margin-bottom:3px">Tipo</label>
+        <select id="proj-tipo" style="width:100%;padding:8px;border:1px solid var(--borda);border-radius:8px;font-size:13px">
+          ${optsT}
+        </select>
+      </div>
+      <div>
+        <label style="font-size:12px;font-weight:700;display:block;margin-bottom:3px">Observações</label>
+        <textarea id="proj-obs" rows="3"
+          style="width:100%;padding:8px;border:1px solid var(--borda);border-radius:8px;font-size:13px;resize:vertical"
+          placeholder="Descreva o escopo do projeto…"></textarea>
+      </div>
+    </div>
+    <div style="background:#F0FDF4;border-radius:8px;padding:10px 12px;font-size:11px;color:#166534;margin-bottom:16px">
+      ✓ Notificação passará automaticamente para <strong>Em Análise</strong> ao criar o projeto.
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn-acao" onclick="fecharModalProjeto()">Cancelar</button>
+      <button class="btn-acao primary" onclick="confirmarCriarProjeto()">Criar Projeto</button>
+    </div>
+  </div>
+</div>`);
+}
+
+function fecharModalProjeto() { document.getElementById('modal-projeto')?.remove(); }
+
+async function confirmarCriarProjeto() {
+  const titulo = document.getElementById('proj-titulo').value.trim();
+  const tipo   = document.getElementById('proj-tipo').value;
+  const obs    = document.getElementById('proj-obs').value.trim() || null;
+
+  if (!titulo) { toast('Informe o título do projeto', 'aviso'); return; }
+
+  const { data: projetoId, error } = await db.rpc('criar_projeto_de_notificacao', {
+    p_notificacao_id: _notifAtiva.id,
+    p_titulo: titulo,
+    p_tipo: tipo,
+    p_observacoes: obs
+  });
+
+  if (error) { toast('Erro ao criar projeto: ' + error.message, 'erro'); return; }
+
+  fecharModalProjeto();
+  toast('Projeto criado e notificação atualizada para Em Análise', 'sucesso');
+  await carregarNotifs();
+  _notifAtiva = _notifs.find(n => n.id === _notifAtiva.id);
+  if (_notifAtiva) {
+    await carregarHistorico(_notifAtiva.id);
+    renderInbox();
+    renderDetalhe();
+  }
+}
+
 // ── Boot ──────────────────────────────────────────────────────
 
 init();
