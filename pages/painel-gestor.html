@@ -399,6 +399,19 @@ function renderDetalhe() {
   </div>`).join('')}
 </div>` : '<p style="font-size:12px;color:#9CA3AF">Nenhum histórico ainda.</p>';
 
+  const projetoCard = n.projeto ? `
+<div class="det-card" style="border-color:#C7D2FE;background:#EEF2FF">
+  <div style="font-size:12px;font-weight:800;color:#3730A3;margin-bottom:8px">🔬 Projeto de Análise Vinculado</div>
+  <div class="det-row"><span class="det-label">Título</span>${esc(n.projeto.titulo)}</div>
+  <div class="det-row"><span class="det-label">Tipo</span>${n.projeto.tipo}</div>
+  <div class="det-row"><span class="det-label">Status</span>
+    <span class="notif-badge" style="background:#fff;color:#3730A3;border:1px solid #C7D2FE">${LABEL_PROJETO_STATUS[n.projeto.status] || n.projeto.status}</span>
+  </div>
+  <div style="margin-top:10px;font-size:11px;color:#6B7280">
+    Alterações no projeto atualizam automaticamente esta notificação.
+  </div>
+</div>` : '';
+
   document.getElementById('pg-detalhe').innerHTML = `
 <div class="det-card">
   <div class="det-titulo">${esc(n.titulo)}</div>
@@ -424,6 +437,8 @@ function renderDetalhe() {
 
   ${acoesHtml}
 </div>
+
+${projetoCard}
 
 <div class="det-card">
   <div style="font-size:12px;font-weight:800;color:#374151;margin-bottom:10px">Histórico de Status</div>
