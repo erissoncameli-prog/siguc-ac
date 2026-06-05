@@ -83,8 +83,9 @@ function gerarLayout(tituloPagina, paginaAtiva) {
       label: 'Administração',
       perfis: ['super_admin', 'gestor'],
       itens: [
-        { id: 'usuarios',      href: '../pages/usuarios.html',      label: t('nav.usuarios') },
-        { id: 'configuracoes', href: '../pages/configuracoes.html', label: t('nav.configuracoes') },
+        { id: 'usuarios',                  href: '../pages/usuarios.html',                  label: t('nav.usuarios') },
+        { id: 'estrutura-organizacional', href: '../pages/estrutura-organizacional.html', label: 'Estrutura Org.' },
+        { id: 'configuracoes',             href: '../pages/configuracoes.html',             label: t('nav.configuracoes') },
       ]
     },
   ];
