@@ -915,6 +915,29 @@ function _renderDropdown(id){
       <a href="../pages/alertas-ambientais.html" style="font-size:11px;color:var(--verde-c);text-decoration:none;font-weight:600">→ Ver página completa de alertas</a>
     </div>
   ` + foot;
+  if(id==='projetos') return hdr('📐 Projetos de Análise de Campo') + `
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <p style="font-size:11px;color:var(--cinza-500);margin:0">Polígonos delimitados por técnicos vinculados a alertas ou criados independentemente.</p>
+      <div style="display:flex;gap:6px">
+        <button onclick="toggleLayerBar('projetos');abrirModalProjeto(null)"
+          style="flex:1;padding:7px 0;background:#1F4E2C;color:#fff;border:none;border-radius:var(--raio);font-size:11px;font-weight:600;cursor:pointer;font-family:inherit">
+          ＋ Novo Projeto
+        </button>
+        <button onclick="carregarProjetos();toggleLayerBar('projetos')"
+          style="padding:7px 12px;background:#fff;color:var(--cinza-600);border:1px solid var(--borda);border-radius:var(--raio);font-size:11px;font-weight:600;cursor:pointer;font-family:inherit">
+          ↺ Atualizar
+        </button>
+      </div>
+      <div style="font-size:10px;color:var(--cinza-400)">Legenda por status:</div>
+      <div style="display:flex;flex-direction:column;gap:3px;font-size:11px">
+        ${[['rascunho','#64748b','📝'],['em_analise','#2563eb','🔍'],['concluido','#16a34a','✅']].map(([s,c,i])=>
+          `<div style="display:flex;align-items:center;gap:6px">
+            <div style="width:28px;height:6px;background:${c};border-radius:3px;opacity:.8"></div>
+            <span style="color:${c};font-weight:600">${i} ${s.replace('_',' ')}</span>
+          </div>`).join('')}
+      </div>
+    </div>
+  ` + foot;
   return '<div style="padding:16px;color:var(--cinza-500)">Em desenvolvimento</div>';
 }
 
