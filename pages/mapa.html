@@ -875,6 +875,66 @@ function renderOcorrencias(){
 }
 
 // ══════════════════════════════════════════════════════════════
+// ALERTAS AMBIENTAIS — camada sobre o mapa
+// ══════════════════════════════════════════════════════════════
+const COR_ALERTA = { critica:'#DC2626', alta:'#F97316', media:'#F59E0B', baixa:'#059669' }
+let _alertasLayer = null, _alertasMapa = [], _alertasAtivo = false
+
+async function toggleAlertasMapa(ativo) {
+  _alertasAtivo = ativo
+  document.getElementById('alertas-filtros-wrap').style.display = ativo ? 'flex' : 'none'
+  if (ativo && !_alertasMapa.length) {
+    const corte = new Date(Date.now() - 7 * 86400000).toISOString()
+    const { data } = await db.from('alertas_ambientais')
+      .select('id,tipo,severidade,fonte,uc_nome,area_ha,data_referencia,geom')
+      .eq('ativo', true)
+      .gte('data_deteccao', corte)
+      .limit(500)
+    _alertasMapa = data || []
+    const badge = document.getElementById('alertas-count-badge')
+    if (badge) { badge.textContent = _alertasMapa.length; badge.style.display = _alertasMapa.length ? '' : 'none' }
+  }
+  renderAlertasMapa()
+  _atualizarLegendaMapa()
+}
+
+function renderAlertasMapa() {
+  if (_alertasLayer) { mapaL.removeLayer(_alertasLayer); _alertasLayer = null }
+  if (!_alertasAtivo || !_alertasMapa.length) return
+
+  const sevs = new Set([...document.querySelectorAll('[data-alerta-sev]:checked')].map(e => e.dataset.alertaSev))
+  const visiveis = _alertasMapa.filter(a => sevs.has(a.severidade))
+
+  _alertasLayer = L.layerGroup()
+  visiveis.forEach(a => {
+    if (!a.geom) return
+    const m = String(a.geom).match(/POINT\(([^ ]+) ([^ )]+)\)/)
+    if (!m) return
+    const lng = parseFloat(m[1]), lat = parseFloat(m[2])
+    const cor = COR_ALERTA[a.severidade] ?? '#6b7280'
+    const icone = a.tipo === 'queimada' ? '🔥' : '🌳'
+    L.circleMarker([lat, lng], {
+      radius: a.severidade === 'critica' ? 9 : a.severidade === 'alta' ? 7 : 5,
+      color: '#fff', weight: 1.5, fillColor: cor, fillOpacity: 0.85
+    }).bindPopup(`<div class="camada-popup">
+      <div class="cp-header" style="background:${cor}">${icone} Alerta — ${escHtml(a.tipo)}</div>
+      <div class="cp-layer">
+        <div class="cp-row"><strong>UC</strong><span>${escHtml(a.uc_nome ?? 'Fora de UC')}</span></div>
+        <div class="cp-row"><strong>Fonte</strong><span>${escHtml(a.fonte)}</span></div>
+        <div class="cp-row"><strong>Data</strong><span>${escHtml(a.data_referencia)}</span></div>
+        ${a.area_ha ? `<div class="cp-row"><strong>Área</strong><span>${Number(a.area_ha).toLocaleString('pt-BR')} ha</span></div>` : ''}
+        <div class="cp-badge" style="background:${cor}22;border-color:${cor};color:${cor}">${escHtml(a.severidade)}</div>
+      </div>
+    </div>`).addTo(_alertasLayer)
+  })
+  _alertasLayer.addTo(mapaL)
+
+  const stat = document.getElementById('alertas-mapa-stat')
+  if (stat) stat.textContent = `${visiveis.length} alertas exibidos`
+  _atualizarLegendaMapa()
+}
+
+// ══════════════════════════════════════════════════════════════
 // UNIDADES DE CONSERVAÇÃO — GeoJSON + PostGIS
 // ══════════════════════════════════════════════════════════════
 var _ucCoresLS = {}; try{ _ucCoresLS = JSON.parse(localStorage.getItem('siguc_uc_cores')||'{}'); }catch(e){}
