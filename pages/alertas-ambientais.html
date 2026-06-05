@@ -239,24 +239,24 @@ function renderMarcadores(lista) {
       if (!lat || !lng) return
     } catch { return }
 
-    const cor = COR_SEV[a.severidade] ?? '#6B7280'
-    const marker = L.circleMarker([lat, lng], {
-      radius: a.severidade === 'critica' ? 9 : a.severidade === 'alta' ? 7 : 5,
-      color: '#fff', weight: 1.5,
-      fillColor: cor, fillOpacity: 0.85
-    })
+    const cor      = COR_SEV[a.severidade]  ?? '#6B7280'
+    const corTipo  = COR_TIPO[a.tipo]       ?? '#6B7280'
+    const marker = L.marker([lat, lng], { icon: _alertaIcone(a.tipo, a.severidade) })
 
     marker.bindPopup(`
-      <div style="font-family:'DM Sans',sans-serif;min-width:180px">
-        <div style="background:${cor};color:#fff;padding:6px 10px;margin:-7px -11px 8px;border-radius:4px 4px 0 0;font-weight:700;font-size:12px">
-          ${ICONE_TIPO[a.tipo] ?? '⚠'} ${a.tipo}
+      <div style="font-family:'DM Sans',sans-serif;min-width:190px">
+        <div style="background:${corTipo};color:#fff;padding:6px 10px;margin:-7px -11px 8px;border-radius:4px 4px 0 0;font-weight:700;font-size:12px">
+          ${ICONE_TIPO[a.tipo] ?? '⚠'} ${a.tipo.charAt(0).toUpperCase()+a.tipo.slice(1)}
         </div>
         <div style="font-size:12px;color:#374151">
           <div><strong>UC:</strong> ${esc(a.uc_nome ?? 'Fora de UC')}</div>
           <div><strong>Fonte:</strong> ${esc(LABEL_FONTE[a.fonte] ?? a.fonte)}</div>
-          <div><strong>Data:</strong> ${a.data_referencia}</div>
+          <div><strong>Data evento:</strong> ${a.data_referencia}</div>
           ${a.area_ha ? `<div><strong>Área:</strong> ${Number(a.area_ha).toLocaleString('pt-BR')} ha</div>` : ''}
-          <div style="margin-top:4px"><span style="background:${cor}22;color:${cor};border:1px solid ${cor};border-radius:20px;padding:1px 8px;font-size:10px;font-weight:700">${a.severidade}</span></div>
+          <div style="margin-top:6px;display:flex;gap:5px;align-items:center">
+            <span style="background:${corTipo}22;color:${corTipo};border:1px solid ${corTipo};border-radius:20px;padding:1px 8px;font-size:10px;font-weight:700">${ICONE_TIPO[a.tipo]??'⚠'} ${a.tipo}</span>
+            <span style="background:${cor}22;color:${cor};border:1px solid ${cor};border-radius:20px;padding:1px 8px;font-size:10px;font-weight:700">${a.severidade}</span>
+          </div>
         </div>
       </div>`)
 
