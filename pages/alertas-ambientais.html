@@ -255,17 +255,38 @@ async function carregar() {
   filtrar()
 }
 
-function filtrar() {
-  const dias = parseInt(document.getElementById('fil-dias').value)
-  const sevs = new Set([...document.querySelectorAll('[data-sev]:checked')].map(e => e.dataset.sev))
-  const fontes = new Set([...document.querySelectorAll('[data-fonte]:checked')].map(e => e.dataset.fonte))
-  const corte = dias > 0 ? new Date(Date.now() - dias * 86400000).toISOString() : null
+function _alertaEmUC(a) {
+  if (a.uc_id || a.uc_nome) return true
+  // fallback: cruzamento local pelo GeoJSON
+  if (!a.geom) return false
+  try {
+    let lat, lng
+    if (typeof a.geom === 'object' && a.geom.coordinates) {
+      lng = a.geom.coordinates[0]; lat = a.geom.coordinates[1]
+    } else {
+      const m = String(a.geom).match(/POINT\(([^ ]+) ([^ )]+)\)/)
+      if (m) { lng = parseFloat(m[1]); lat = parseFloat(m[2]) }
+      else return false
+    }
+    return !!ucNomeParaCoordenada(lat, lng)
+  } catch { return false }
+}
 
-  const filtrados = _alertas.filter(a =>
-    sevs.has(a.severidade) &&
-    fontes.has(a.fonte) &&
-    (!corte || a.data_deteccao >= corte)
-  )
+function filtrar() {
+  const dias   = parseInt(document.getElementById('fil-dias').value)
+  const sevs   = new Set([...document.querySelectorAll('[data-sev]:checked')].map(e => e.dataset.sev))
+  const fontes = new Set([...document.querySelectorAll('[data-fonte]:checked')].map(e => e.dataset.fonte))
+  const loc    = document.querySelector('[name="fil-loc"]:checked')?.value ?? 'todos'
+  const corte  = dias > 0 ? new Date(Date.now() - dias * 86400000).toISOString() : null
+
+  const filtrados = _alertas.filter(a => {
+    if (!sevs.has(a.severidade))  return false
+    if (!fontes.has(a.fonte))     return false
+    if (corte && a.data_deteccao < corte) return false
+    if (loc === 'em_uc'   && !_alertaEmUC(a)) return false
+    if (loc === 'fora_uc' &&  _alertaEmUC(a)) return false
+    return true
+  })
 
   atualizarKPIs(filtrados)
   renderMarcadores(filtrados)
