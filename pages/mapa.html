@@ -2112,6 +2112,7 @@ async function carregarDadosCAR(ucNome){
   // Cache hit
   if(_carCacheUC.has(ucNome)){
     _carFeatures = _carCacheUC.get(ucNome);
+    _carUCAtual  = ucNome;
     _aplicarCamadaCAR();
     const n = _carFeatures.length;
     setStatus(`✅ <strong>${n}</strong> imóvel(is) carregado(s) (cache)`);
