@@ -2453,9 +2453,11 @@ function _resetarEstiloGlobalCAR(){
 // ── Camada no mapa ────────────────────────────────────────────────────────
 function _aplicarCamadaCAR(){
   if(_carLayer){ mapaL.removeLayer(_carLayer); _carLayer=null; }
-  if(!_carFeatures.length) return;
+  // Aplica filtro de status
+  const visiveis = _carFeatures.filter(f => _carStatusAtivos.has(_carStatusKey(f.properties?.condicao)));
+  if(!visiveis.length){ _atualizarBadgeCAR(visiveis); return; }
   if(!_carRenderer) _carRenderer = L.canvas({pane:'carPane', padding:0.5});
-  _carLayer = L.geoJSON({type:'FeatureCollection',features:_carFeatures},{
+  _carLayer = L.geoJSON({type:'FeatureCollection', features:visiveis},{
     pane:'carPane', renderer:_carRenderer,
     style: f => _estiloCAR(f,false,false),
     onEachFeature:(f,layer)=>{
@@ -2464,19 +2466,30 @@ function _aplicarCamadaCAR(){
       layer.on('click',e=>{ L.DomEvent.stopPropagation(e); _selecionarCAR(f,layer); });
     }
   }).addTo(mapaL);
-  _atualizarBadgeCAR();
+  _atualizarBadgeCAR(visiveis);
 }
 
-function _atualizarBadgeCAR(){
+function _atualizarBadgeCAR(visiveis){
+  const all = _carFeatures;
+  const vis = visiveis || all;
   const badge = document.getElementById('car-count-badge');
-  if(badge){ badge.textContent=_carFeatures.length.toLocaleString('pt-BR'); badge.style.display='inline-flex'; }
+  if(badge){ badge.textContent=vis.length.toLocaleString('pt-BR'); badge.style.display=vis.length?'inline-flex':'none'; }
   const sb = document.getElementById('car-status-txt');
-  if(sb && _carFeatures.length){
-    const porStatus={};
-    _carFeatures.forEach(f=>{ const k=_carStatusKey(f.properties?.condicao); porStatus[k]=(porStatus[k]||0)+1; });
-    const areaTot=_carFeatures.reduce((s,f)=>s+(parseFloat(f.properties?.area)||0),0);
-    sb.innerHTML=`✅ <strong>${_carFeatures.length}</strong> imóvel(is) · ${areaTot.toLocaleString('pt-BR',{maximumFractionDigits:0})} ha declarados`;
+  if(sb && all.length){
+    const areaTot=all.reduce((s,f)=>s+(parseFloat(f.properties?.area)||0),0);
+    const filtrado = vis.length < all.length ? ` <span style="color:#d97706">(${vis.length.toLocaleString('pt-BR')} visíveis)</span>` : '';
+    sb.innerHTML=`✅ <strong>${all.length.toLocaleString('pt-BR')}</strong> imóvel(is) · ${areaTot.toLocaleString('pt-BR',{maximumFractionDigits:0})} ha${filtrado}`;
   }
+  // Mostra legenda inline com as cores atuais
+  const leg = document.getElementById('car-legenda-inline');
+  if(leg && all.length){
+    leg.style.display='flex';
+    ['ativo','aguardando','analise','cancelado'].forEach(k=>{
+      const el=document.getElementById('car-leg-'+k);
+      if(el) el.style.background=_carGlobal.cores[k];
+    });
+  }
+  _atualizarCfgStats();
 }
 
 // ── Seleção ───────────────────────────────────────────────────────────────
