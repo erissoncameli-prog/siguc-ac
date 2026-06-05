@@ -191,6 +191,89 @@
   </div>
 </div>
 
+<!-- Modal Projeto de Análise -->
+<div class="proj-overlay" id="proj-overlay" style="display:none" onclick="if(event.target===this)fecharModalProjeto()">
+  <div class="proj-modal">
+    <div class="proj-modal-header">
+      <span style="font-size:18px">📐</span>
+      <div class="proj-modal-titulo" id="proj-modal-titulo">Novo Projeto de Análise</div>
+      <button onclick="fecharModalProjeto()" style="background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:6px;padding:4px 9px;cursor:pointer;font-size:13px">✕</button>
+    </div>
+    <div class="proj-modal-body">
+
+      <!-- Card do alerta vinculado -->
+      <div class="proj-alerta-card" id="proj-alerta-card" style="display:none">
+        <div style="font-weight:700;margin-bottom:3px" id="proj-alerta-label"></div>
+        <div style="color:#374151" id="proj-alerta-detalhe"></div>
+      </div>
+
+      <!-- Título -->
+      <div class="proj-field">
+        <label class="proj-label">Título do Projeto</label>
+        <input class="proj-input" id="proj-titulo" type="text" placeholder="Ex: Verificação foco FIRMS — Reserva Chico Mendes">
+      </div>
+
+      <!-- Tipo + Status -->
+      <div style="display:flex;gap:10px">
+        <div class="proj-field" style="flex:1">
+          <label class="proj-label">Tipo</label>
+          <select class="proj-input" id="proj-tipo">
+            <option value="verificacao_campo">🥾 Verificação de Campo</option>
+            <option value="sobrevoo">✈ Sobrevoo</option>
+            <option value="analise_imagem">🛰 Análise de Imagem</option>
+            <option value="fiscalizacao">⚖ Fiscalização</option>
+            <option value="outro">📋 Outro</option>
+          </select>
+        </div>
+        <div class="proj-field" style="flex:1">
+          <label class="proj-label">Status</label>
+          <select class="proj-input" id="proj-status">
+            <option value="rascunho">📝 Rascunho</option>
+            <option value="em_analise">🔍 Em Análise</option>
+            <option value="concluido">✅ Concluído</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- UC -->
+      <div class="proj-field">
+        <label class="proj-label">Unidade de Conservação</label>
+        <input class="proj-input" id="proj-uc-nome" type="text" placeholder="Nome da UC (opcional)">
+        <input type="hidden" id="proj-uc-id">
+        <input type="hidden" id="proj-alerta-id">
+      </div>
+
+      <!-- Delimitação no mapa -->
+      <div class="proj-field">
+        <label class="proj-label">Área Delimitada no Mapa</label>
+        <div class="proj-draw-area" id="proj-draw-area" onclick="iniciarDesenho()">
+          <div id="proj-draw-instrucao">
+            <div style="font-size:22px;margin-bottom:4px">✏️</div>
+            <div style="font-size:12px;font-weight:600;color:#475569">Clique para delimitar a área no mapa</div>
+            <div style="font-size:11px;color:#94a3b8;margin-top:2px">Desenhe um polígono clicando nos vértices. Duplo-clique para fechar.</div>
+          </div>
+          <div id="proj-draw-resultado" style="display:none">
+            <div style="font-size:11px;color:#166534;font-weight:600">✅ Área delimitada</div>
+            <div class="proj-area-val" id="proj-area-val">— ha</div>
+            <button onclick="event.stopPropagation();redesenhar()" style="margin-top:6px;font-size:10px;background:none;border:1px solid #2D6A4F;color:#2D6A4F;border-radius:5px;padding:2px 8px;cursor:pointer">↺ Redesenhar</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Observações -->
+      <div class="proj-field">
+        <label class="proj-label">Observações</label>
+        <textarea class="proj-input" id="proj-obs" rows="3" placeholder="Descreva as características observadas, metodologia, condições de campo..."></textarea>
+      </div>
+
+    </div>
+    <div class="proj-modal-footer">
+      <button onclick="fecharModalProjeto()" style="flex:1;padding:8px;background:#fff;border:1px solid var(--borda);border-radius:var(--raio);font-size:13px;font-weight:600;cursor:pointer;color:var(--cinza-600);font-family:inherit">Cancelar</button>
+      <button onclick="salvarProjeto()" id="proj-btn-salvar" style="flex:2;padding:8px;background:#1F4E2C;border:none;border-radius:var(--raio);font-size:13px;font-weight:600;cursor:pointer;color:#fff;font-family:inherit">💾 Salvar Projeto</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // ══════════════════════════════════════════════════════════════
 // BASEMAP GALLERY
