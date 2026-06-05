@@ -448,6 +448,13 @@ let _abaAtiva = 'lista'
             <option value="RESEX">RESEX</option><option value="RPPN">RPPN</option>
             <option value="RVS">RVS</option>
           </select>
+          <select class="form-control" id="fil-esfera" style="width:140px" onchange="filtrarUCs()">
+            <option value="">Todas as esferas</option>
+            <option value="estadual" selected>Estadual</option>
+            <option value="federal">Federal</option>
+            <option value="municipal">Municipal</option>
+            <option value="privada">Privada</option>
+          </select>
           <select class="form-control" id="fil-grupo" style="width:160px" onchange="filtrarUCs()">
             <option value="">Todos os grupos</option>
             <option value="protecao_integral">Proteção Integral</option>
