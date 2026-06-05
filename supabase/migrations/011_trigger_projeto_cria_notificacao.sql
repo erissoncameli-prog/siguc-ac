@@ -66,3 +66,64 @@ $$;
 CREATE TRIGGER trigger_projeto_cria_notificacao
   BEFORE INSERT ON projetos_analise
   FOR EACH ROW EXECUTE FUNCTION notificar_novo_projeto();
+
+-- ─── Backfill: projetos existentes sem notificação ────────────
+
+DO $$
+DECLARE
+  r            RECORD;
+  v_notif_id   uuid;
+  v_destinatario uuid;
+  v_uc_label   text;
+  v_titulo     text;
+  v_mensagem   text;
+BEGIN
+  FOR r IN
+    SELECT * FROM projetos_analise
+    WHERE notificacao_id IS NULL
+      AND status <> 'arquivado'
+    ORDER BY criado_em
+  LOOP
+    v_destinatario := COALESCE(r.responsavel_id, r.criado_por);
+    IF v_destinatario IS NULL THEN CONTINUE; END IF;
+
+    v_uc_label := COALESCE(r.uc_nome, 'UC não informada');
+    v_titulo   := 'Projeto existente: ' || r.titulo;
+    v_mensagem := format(
+      'Projeto de análise "%s" criado na %s (migrado para o painel). Tipo: %s. Status atual: %s.',
+      r.titulo, v_uc_label, r.tipo::text, r.status::text
+    );
+
+    INSERT INTO notificacoes (
+      tipo, status, titulo, mensagem,
+      destinatario_id, remetente_id,
+      uc_id, sla_horas, sla_prazo, projeto_id, meta
+    )
+    VALUES (
+      'sistema',
+      CASE r.status
+        WHEN 'concluido' THEN 'resolvida'
+        WHEN 'em_analise' THEN 'em_analise'
+        ELSE 'enviada'
+      END,
+      v_titulo, v_mensagem,
+      v_destinatario, v_destinatario,
+      r.uc_id, 72,
+      CASE WHEN r.status IN ('concluido','arquivado') THEN NULL
+           ELSE r.criado_em + interval '72 hours' END,
+      r.id,
+      jsonb_build_object('origem', 'backfill_011', 'projeto_id', r.id)
+    )
+    RETURNING id INTO v_notif_id;
+
+    INSERT INTO notificacoes_historico (notificacao_id, status_anterior, status_novo, usuario_id, observacao)
+    VALUES (v_notif_id, NULL,
+      CASE r.status WHEN 'concluido' THEN 'resolvida' WHEN 'em_analise' THEN 'em_analise' ELSE 'enviada' END,
+      v_destinatario, 'Migrado pelo backfill da migration 011.');
+
+    -- Vincula nos dois sentidos
+    UPDATE projetos_analise SET notificacao_id = v_notif_id WHERE id = r.id;
+    UPDATE notificacoes SET projeto_id = r.id WHERE id = v_notif_id;
+  END LOOP;
+END;
+$$;
