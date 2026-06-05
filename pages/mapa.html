@@ -433,7 +433,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   setTimeout(async () => {
     iniciarMapa();
-    await Promise.all([carregarCamadas(), carregarOcorrencias(), carregarDelimitacaoAcre()]);
+    await Promise.all([carregarCamadas(), carregarOcorrencias(), carregarDelimitacaoAcre(), carregarProjetos()]);
     vincularEventos();
     initScrollbarCustom();
     carregarLogosSidebar();
