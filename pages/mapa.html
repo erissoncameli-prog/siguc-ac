@@ -53,10 +53,12 @@
 .camada-popup .cp-row strong{color:#111827;min-width:72px;flex-shrink:0;font-weight:600;}
 .camada-popup .cp-badge{display:inline-flex;align-items:center;gap:4px;border-radius:99px;padding:2px 9px;font-size:10px;font-weight:700;margin-top:5px;border:1px solid;}
 /* CAR */
-.car-det-panel{position:fixed;top:0;right:-420px;width:360px;height:100vh;background:#fff;z-index:600;display:flex;flex-direction:column;box-shadow:-4px 0 32px rgba(0,0,0,.22);transition:right .28s cubic-bezier(.4,0,.2,1);overflow:hidden;min-width:280px;}
+.car-det-panel{position:fixed;top:0;right:-420px;width:360px;height:100vh;background:#fff;z-index:600;display:flex;flex-direction:column;box-shadow:-4px 0 32px rgba(0,0,0,.22);transition:right .28s cubic-bezier(.4,0,.2,1);overflow:hidden;min-width:280px;max-width:680px;}
 .car-det-panel.aberto{right:0;}
-.car-det-resize-handle{position:absolute;top:0;left:0;width:5px;height:100%;cursor:ew-resize;z-index:10;}
+.car-det-resize-handle{position:absolute;top:0;left:0;width:5px;height:100%;cursor:ew-resize;z-index:10;background:transparent;transition:background .15s;}
 .car-det-resize-handle:hover,.car-det-resize-handle.dragging{background:rgba(45,106,79,.35);}
+.car-det-resize-handle::after{content:'';position:absolute;top:50%;left:1px;transform:translateY(-50%);width:3px;height:36px;border-radius:2px;background:#d1d5db;transition:background .15s;}
+.car-det-resize-handle:hover::after,.car-det-resize-handle.dragging::after{background:#2D6A4F;}
 .car-det-header{padding:14px 16px 12px;border-bottom:1px solid var(--borda);flex-shrink:0;background:linear-gradient(135deg,#1a3c2a,#2D6A4F);}
 .car-det-header h4{margin:0;font-size:14px;font-weight:700;color:#fff;}
 .car-det-header p{margin:3px 0 0;font-size:11px;color:rgba(255,255,255,.7);}
@@ -65,6 +67,25 @@
 .car-det-field:last-child{border-bottom:none;}
 .car-det-label{font-size:10px;font-weight:700;color:var(--cinza-400);text-transform:uppercase;letter-spacing:.06em;}
 .car-det-value{font-size:13px;color:var(--cinza-800);font-weight:500;line-height:1.4;}
+.car-det-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:99px;font-size:11px;font-weight:700;border:1px solid;}
+.car-status-ativo{background:#f0fdf4;color:#16a34a;border-color:#86efac;}
+.car-status-aguardando{background:#fffbeb;color:#d97706;border-color:#fde68a;}
+.car-status-analise{background:#eff6ff;color:#1d4ed8;border-color:#bfdbfe;}
+.car-status-outro{background:var(--cinza-100);color:var(--cinza-600);border-color:var(--borda);}
+.car-det-tab{padding:9px 14px;font-size:12px;font-weight:500;border:none;background:transparent;cursor:pointer;border-bottom:2px solid transparent;color:var(--cinza-500);font-family:'DM Sans',sans-serif;transition:all .15s;white-space:nowrap;flex:1;text-align:center;}
+.car-det-tab.ativo{color:#1F4E2C;border-bottom-color:#1F4E2C;background:#fff;}
+.car-det-tab:hover:not(.ativo){background:var(--cinza-50);}
+.car-pin-item{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--cinza-100);cursor:pointer;transition:background .12s;border-radius:var(--raio);}
+.car-pin-item:hover{background:var(--cinza-50);}
+.car-pin-item:last-child{border-bottom:none;}
+.btn-car-marcado{background:#f5f3ff!important;border-color:#7c3aed!important;color:#7c3aed!important;}
+.car-style-row{display:flex;align-items:center;gap:8px;padding:4px 0;}
+.car-style-lbl{font-size:10px;font-weight:700;color:var(--cinza-500);text-transform:uppercase;letter-spacing:.05em;width:80px;flex-shrink:0;}
+.car-style-val{font-size:10px;font-weight:700;color:var(--cinza-700);width:36px;text-align:right;flex-shrink:0;}
+.car-style-slider{flex:1;height:4px;accent-color:#7c3aed;cursor:pointer;min-width:0;}
+.car-stat-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--cinza-100);font-size:12px;}
+.car-stat-row:last-child{border-bottom:none;}
+.car-stat-val{font-weight:700;color:var(--cinza-900);}
 /* UCs */
 .uc-secao-titulo{font-size:10px;font-weight:700;color:var(--cinza-500);text-transform:uppercase;letter-spacing:.06em;padding:6px 0 4px;border-bottom:1px solid var(--cinza-100);margin-bottom:4px;}
 .uc-filtro-label{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--cinza-700);cursor:pointer;padding:2px 0;}
