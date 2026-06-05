@@ -148,8 +148,9 @@ let _filtroTipo = '';
 
 async function init() {
   await carregarUsuario();
-  document.getElementById('app').innerHTML = gerarLayout('Painel do Gestor', 'painel-gestor');
-  document.querySelector('.page-content').innerHTML = renderEstrutura();
+  document.getElementById('app').innerHTML =
+    gerarLayout('Painel do Gestor', 'painel-gestor') +
+    `<div class="fade-in">${renderEstrutura()}</div></div></div>`;
   await Promise.all([carregarNotifs(), carregarUsuariosList()]);
   _sigucBarCompleta();
 }
