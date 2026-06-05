@@ -1185,11 +1185,25 @@ async function toggleAlertasMapa(ativo) {
   if (ativo && !_alertasMapa.length) {
     const corte = new Date(Date.now() - 7 * 86400000).toISOString()
     const { data } = await db.from('alertas_ambientais')
-      .select('id,tipo,severidade,fonte,uc_nome,area_ha,data_referencia,geom')
+      .select('id,tipo,severidade,fonte,uc_id,uc_nome,area_ha,data_referencia,geom')
       .eq('ativo', true)
       .gte('data_deteccao', corte)
       .limit(500)
-    _alertasMapa = data || []
+    // Pré-calcula uc_nome via PIP para alertas sem UC no banco
+    _alertasMapa = (data || []).map(a => {
+      if (a.uc_nome) return a
+      try {
+        let lat, lng
+        if (typeof a.geom === 'object' && a.geom?.coordinates) {
+          lng = a.geom.coordinates[0]; lat = a.geom.coordinates[1]
+        } else {
+          const m = String(a.geom).match(/POINT\(([^ ]+) ([^ )]+)\)/)
+          if (m) { lng = parseFloat(m[1]); lat = parseFloat(m[2]) }
+        }
+        if (lat && lng) a = { ...a, uc_nome: _ucNomePorCoordenada(lat, lng) }
+      } catch {}
+      return a
+    })
     const badge = document.getElementById('alertas-count-badge')
     if (badge) { badge.textContent = _alertasMapa.length; badge.style.display = _alertasMapa.length ? '' : 'none' }
   }
