@@ -80,6 +80,10 @@ function abrirModalRelatorio() {
     </div>
   </div>`;
   document.body.appendChild(el);
+  } catch(err) {
+    console.error('[Relatório] Erro ao abrir modal:', err);
+    toast('Erro ao abrir relatório: ' + err.message, 'error');
+  }
 }
 
 function _fecharModalRelatorio() {
