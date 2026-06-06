@@ -3167,7 +3167,7 @@ function _htmlProdes(d, f, focosExt){
     const ha  = anual.porAno[ano];
     const w   = (ha/maxAnualHa*100).toFixed(1);
     // cor por conformidade CF (primeiro feature deste ano)
-    const clf = d.anual.geojsonFeatures.find(ft=>ft.properties?.ano===ano)?.properties?.clf;
+    const clf = anual.geojsonFeatures.find(ft=>ft.properties?.ano===ano)?.properties?.clf;
     const cor = clf?.cor||'#dc2626';
     return `<div style="display:flex;align-items:center;gap:6px;padding:3px 0">
       <span style="font-size:10px;color:var(--cinza-500);width:32px;flex-shrink:0">${ano}</span>
