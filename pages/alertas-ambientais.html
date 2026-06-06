@@ -62,6 +62,16 @@
 </head>
 <body>
 <div id="app"></div>
+<div id="analise-overlay" onclick="fecharAnalise()" style="display:none;position:fixed;inset:0;z-index:640;background:rgba(0,0,0,.2)"></div>
+<div id="analise-panel" class="analise-panel">
+  <div id="analise-header"></div>
+  <div class="analise-tabs-bar">
+    <button class="analise-tab ativo" id="atab-prodes" onclick="tabAnalise('prodes')">🌳 PRODES</button>
+    <button class="analise-tab" id="atab-focos" onclick="tabAnalise('focos')">🔥 Focos</button>
+    <button class="analise-tab" id="atab-legal" onclick="tabAnalise('legal')">⚖ Legal</button>
+  </div>
+  <div id="analise-body" class="analise-body"></div>
+</div>
 
 <script>
 const COR_SEV   = { critica:'#DC2626', alta:'#F97316', media:'#F59E0B', baixa:'#059669' }
