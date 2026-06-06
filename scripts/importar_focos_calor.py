@@ -185,7 +185,7 @@ def main():
                 print(f'  {ano}: 0 focos')
 
     print(f'\n{"="*60}')
-    print(f'CONCLUÍDO: {total_inseridos} focos inseridos | {total_requests} requests')
+    print(f'CONCLUIDO: {total_inseridos} focos inseridos | {total_requests} requests')
     print(f'{"="*60}')
 
 if __name__ == '__main__':
