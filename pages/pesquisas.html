@@ -111,6 +111,31 @@
 
 /* vazio */
 .vazio { text-align:center; padding:60px 20px; color:#9CA3AF; }
+
+/* ── despacho radio ── */
+.radio-group { display:flex; flex-direction:column; gap:8px; }
+.radio-opt   { display:flex; align-items:flex-start; gap:10px; padding:10px 12px; border:1px solid var(--borda); border-radius:8px; cursor:pointer; transition:all .15s; }
+.radio-opt:hover { border-color:var(--verde-c); background:#F0FDF4; }
+.radio-opt input[type=radio] { margin-top:2px; accent-color:var(--verde-c); }
+.radio-opt.selecionado { border-color:var(--verde-c); background:#F0FDF4; }
+.radio-opt-label { font-size:13px; font-weight:700; color:#111827; }
+.radio-opt-desc  { font-size:11px; color:#6B7280; margin-top:2px; }
+
+/* ── bloco condicional ── */
+.bloco-condicional { background:#F9FAFB; border:1px solid var(--borda); border-radius:8px; padding:14px; display:flex; flex-direction:column; gap:10px; }
+.bloco-condicional.danger { background:#FEF2F2; border-color:#FECACA; }
+.bloco-condicional.warning { background:#FFFBEB; border-color:#FDE68A; }
+
+/* ── checklist ── */
+.check-item { display:flex; align-items:center; gap:8px; font-size:12px; color:#374151; }
+.check-item input[type=checkbox] { accent-color:var(--verde-c); width:14px; height:14px; }
+
+/* ── resumo pesquisa no modal ── */
+.resumo-pesquisa { background:#F0FDF4; border:1px solid #A7F3D0; border-radius:8px; padding:12px 16px; font-size:12px; }
+.resumo-pesquisa strong { color:#065F46; }
+
+/* ── selo de posição ── */
+.selo-posicao { display:inline-flex; align-items:center; gap:5px; padding:3px 10px; background:#EFF6FF; border:1px solid #BFDBFE; border-radius:20px; font-size:10px; font-weight:700; color:#1E40AF; }
 </style>
 </head>
 <body>
