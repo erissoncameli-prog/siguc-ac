@@ -1475,6 +1475,18 @@ async function salvarStyleCamada(id){
   if(error){ toast('Erro ao salvar: '+error.message,'error'); return; }
   toast('Estilo salvo!','success');
 }
+async function renomearCamada(id){
+  const c=camadas.find(x=>x.id===id); if(!c) return;
+  const novoNome=prompt('Novo nome para a camada:',c.nome);
+  if(!novoNome||novoNome.trim()===''||novoNome.trim()===c.nome) return;
+  const nome=novoNome.trim();
+  const {error}=await db.from('camadas_mapa').update({nome}).eq('id',id);
+  if(error){ toast('Erro ao renomear: '+error.message,'error'); return; }
+  c.nome=nome;
+  renderCamadasHtml();
+  toast('Camada renomeada com sucesso!','success');
+}
+
 async function removerCamada(id){
   if(!confirm('Remover esta camada permanentemente?')) return;
   const c=camadas.find(x=>x.id===id);
