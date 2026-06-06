@@ -27,7 +27,12 @@ let _relModo   = 'detalhado'; // 'sintetico' | 'detalhado'
 
 function abrirModalRelatorio() {
   try {
-    if (!_carAbertoCod) { toast('Abra um imóvel CAR primeiro.','warning'); return; }
+    // DEBUG TEMPORÁRIO — remover após confirmar funcionamento
+    console.log('[Relatório] abrirModalRelatorio chamada. _carAbertoCod=', _carAbertoCod);
+    if (!_carAbertoCod) {
+      toast('⚠️ Selecione um imóvel CAR no mapa antes de gerar o relatório.','warning');
+      return;
+    }
 
     const nMarcados = (_carMarcados instanceof Map) ? _carMarcados.size : 0;
     const dadosLocais = (_carDadosLocais instanceof Map) ? _carDadosLocais.get(_carAbertoCod) : null;
