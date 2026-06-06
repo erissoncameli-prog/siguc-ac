@@ -41,8 +41,12 @@ function abrirModalRelatorio() {
       _carAbertoFeat?.properties?.cod_imovel || _carAbertoCod
     );
 
+  // Remove modal anterior se existir
+  document.getElementById('rel-modal-overlay')?.remove();
+
   const el = document.createElement('div');
   el.id = 'rel-modal-overlay';
+  el.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;';
   el.innerHTML = `
   <div id="rel-modal">
     <div class="rm-hdr">
