@@ -27,10 +27,8 @@ let _relModo   = 'detalhado'; // 'sintetico' | 'detalhado'
 
 function abrirModalRelatorio() {
   try {
-    // DEBUG TEMPORÁRIO — remover após confirmar funcionamento
-    console.log('[Relatório] abrirModalRelatorio chamada. _carAbertoCod=', _carAbertoCod);
     if (!_carAbertoCod) {
-      toast('⚠️ Selecione um imóvel CAR no mapa antes de gerar o relatório.','warning');
+      toast('Selecione um imóvel CAR no mapa antes de gerar o relatório.','warning');
       return;
     }
 
