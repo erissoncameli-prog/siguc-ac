@@ -2954,11 +2954,9 @@ async function _fetchProdesCAR(f){
         method:'POST', headers:{'Content-Type':'application/json'},
         body: JSON.stringify({ bbox }), signal: AbortSignal.timeout(35000),
       }).then(r => r.json()),
-      fetch('/api/focos-proxy', {
-        method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ bbox, geojson_poly: f.geometry }),
+      fetch(`/api/focos-proxy?minLon=${bbox[0]}&minLat=${bbox[1]}&maxLon=${bbox[2]}&maxLat=${bbox[3]}`, {
         signal: AbortSignal.timeout(20000),
-      }).then(r => r.json()),
+      }).then(r => r.ok ? r.json() : { historico:[], recentes:{total:0,focos:[]}, erro:`HTTP ${r.status}` }),
       cod
         ? db.from('sinaflor_asv')
             .select('num_asv,area_ha,data_emissao,data_validade,tipo_supressao,status')
