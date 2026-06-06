@@ -49,6 +49,15 @@
 
 /* Marcador no mapa */
 .alerta-dot { width:12px; height:12px; border-radius:50%; border:2px solid rgba(255,255,255,.8); box-shadow:0 1px 4px rgba(0,0,0,.4); }
+
+/* Painel análise ambiental */
+.analise-panel{position:fixed;top:0;right:0;width:420px;height:100vh;background:#fff;z-index:650;display:flex;flex-direction:column;box-shadow:-4px 0 32px rgba(0,0,0,.22);transition:transform .28s cubic-bezier(.4,0,.2,1);overflow:hidden;min-width:300px;max-width:640px;transform:translateX(100%);}
+.analise-panel.aberto{transform:translateX(0);}
+.analise-tabs-bar{display:flex;border-bottom:1px solid var(--borda);flex-shrink:0;background:#fff;}
+.analise-tab{flex:1;padding:10px 0;font-size:12px;font-weight:500;border:none;background:transparent;cursor:pointer;border-bottom:2px solid transparent;color:#6B7280;font-family:'DM Sans',sans-serif;transition:all .15s;}
+.analise-tab.ativo{color:#1F4E2C;border-bottom-color:#1F4E2C;}
+.analise-tab:hover:not(.ativo){background:#f9fafb;}
+.analise-body{flex:1;overflow-y:auto;padding:14px 16px;}
 </style>
 </head>
 <body>
