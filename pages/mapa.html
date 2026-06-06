@@ -3162,9 +3162,9 @@ function _htmlProdes(d, f, focosExt){
   const nomeClass= local.nome_class||'';
 
   // ── Gráfico barras PRODES anual ─────────────────────────────────────────
-  const maxAnualHa = Math.max(...Object.values(d.anual.porAno), 0.01);
+  const maxAnualHa = Math.max(...Object.values(anual.porAno), 0.01);
   const barrasAnos = d.anosAnual.map(ano => {
-    const ha  = d.anual.porAno[ano];
+    const ha  = anual.porAno[ano];
     const w   = (ha/maxAnualHa*100).toFixed(1);
     // cor por conformidade CF (primeiro feature deste ano)
     const clf = d.anual.geojsonFeatures.find(ft=>ft.properties?.ano===ano)?.properties?.clf;
