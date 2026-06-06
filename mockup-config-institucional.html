@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mockup — Configurações Institucionais</title>
+<style>
+  :root{
+    --floresta:#0A1A0F;--verde-c:#52B788;--ouro:#C9A84C;--ouro-c:#F0CB6A;
+    --t1:#F4EFE6;--borda:#E5E7EB;--raio:8px;
+    --cinza-50:#F9FAFB;--cinza-100:#F3F4F6;--cinza-400:#9CA3AF;
+    --cinza-500:#6B7280;--cinza-600:#4B5563;--cinza-700:#374151;--cinza-900:#111827;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'DM Sans',system-ui,sans-serif;background:#F4EFE6;color:#111827;font-size:14px;}
+
+  /* Layout simulando o sistema */
+  .layout{display:flex;min-height:100vh;}
+  .sidebar{width:220px;background:#0A1A0F;flex-shrink:0;padding:20px 0;}
+  .sidebar-logo{padding:0 20px 20px;border-bottom:1px solid rgba(255,255,255,.08);margin-bottom:12px;}
+  .sidebar-logo .nome{color:#C9A84C;font-size:18px;font-weight:800;letter-spacing:-0.5px;}
+  .sidebar-logo .sub{color:rgba(255,255,255,.4);font-size:10px;}
+  .sidebar-item{padding:10px 20px;color:rgba(255,255,255,.55);font-size:12px;cursor:pointer;display:flex;align-items:center;gap:8px;}
+  .sidebar-item.ativo{color:#fff;background:rgba(255,255,255,.07);border-left:2px solid #52B788;}
+  .conteudo{flex:1;overflow-y:auto;}
+  .topbar{background:#fff;border-bottom:1px solid var(--borda);padding:14px 28px;display:flex;align-items:center;justify-content:space-between;}
+  .topbar h1{font-size:16px;font-weight:700;color:var(--floresta);}
+  .topbar .breadcrumb{font-size:11px;color:var(--cinza-400);}
+  .pagina{padding:24px 28px;max-width:960px;}
+
+  /* Componentes */
+  .card{background:#fff;border:1px solid var(--borda);border-radius:var(--raio);margin-bottom:20px;}
+  .card-hdr{padding:14px 18px;border-bottom:1px solid var(--borda);display:flex;align-items:center;gap:10px;}
+  .card-hdr h3{font-size:13px;font-weight:700;color:var(--cinza-700);}
+  .card-hdr .badge{font-size:10px;padding:2px 8px;background:#f0fdf4;color:#16a34a;border-radius:99px;border:1px solid #86efac;}
+  .card-body{padding:18px;}
+
+  .form-grid{display:grid;gap:14px;}
+  .form-grid-2{grid-template-columns:1fr 1fr;}
+  .form-grid-3{grid-template-columns:1fr 1fr 1fr;}
+  .field label{font-size:11px;font-weight:700;color:var(--cinza-500);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:5px;}
+  .field input,.field select,.field textarea{width:100%;padding:8px 10px;border:1px solid var(--borda);border-radius:6px;font-size:13px;color:var(--cinza-700);background:#fff;font-family:inherit;}
+  .field input:focus,.field select:focus{outline:none;border-color:#52B788;box-shadow:0 0 0 2px rgba(82,183,136,.15);}
+  .field textarea{resize:vertical;min-height:60px;}
+  .field .hint{font-size:10px;color:var(--cinza-400);margin-top:3px;}
+
+  /* Upload logo */
+  .logo-upload{border:2px dashed var(--borda);border-radius:8px;padding:16px;text-align:center;cursor:pointer;transition:all .15s;background:var(--cinza-50);}
+  .logo-upload:hover{border-color:#52B788;background:#f0fdf4;}
+  .logo-upload .icone{font-size:28px;margin-bottom:6px;}
+  .logo-upload .label{font-size:12px;font-weight:600;color:var(--cinza-600);}
+  .logo-upload .hint{font-size:10px;color:var(--cinza-400);margin-top:3px;}
+  .logo-preview{display:flex;align-items:center;gap:10px;padding:10px;background:var(--cinza-50);border-radius:6px;border:1px solid var(--borda);}
+  .logo-preview img{height:48px;object-fit:contain;}
+  .logo-preview .info{flex:1;}
+  .logo-preview .info .nome{font-size:12px;font-weight:600;}
+  .logo-preview .info .tam{font-size:10px;color:var(--cinza-400);}
+  .logo-preview .remover{font-size:11px;color:#dc2626;cursor:pointer;border:none;background:none;padding:4px 8px;border-radius:4px;}
+  .logo-preview .remover:hover{background:#fef2f2;}
+
+  /* Hierarquia */
+  .hierarquia{display:flex;flex-direction:column;gap:8px;}
+  .hierarquia-nivel{display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--cinza-50);border:1px solid var(--borda);border-radius:6px;}
+  .hierarquia-nivel .nivel-num{width:22px;height:22px;border-radius:50%;background:#0A1A0F;color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .hierarquia-nivel .nivel-sigla{font-size:12px;font-weight:700;color:var(--cinza-700);width:80px;}
+  .hierarquia-nivel .nivel-nome{flex:1;}
+  .hierarquia-nivel input{border:1px solid var(--borda);border-radius:4px;padding:5px 8px;font-size:12px;width:100%;font-family:inherit;}
+  .hierarquia-nivel .arraste{color:var(--cinza-400);cursor:grab;font-size:14px;}
+
+  /* Preview cabeçalho */
+  .preview-cabecalho{border:2px solid var(--borda);border-radius:8px;overflow:hidden;background:#fff;}
+  .preview-label{font-size:10px;font-weight:700;color:var(--cinza-400);text-transform:uppercase;letter-spacing:.06em;padding:8px 12px;background:var(--cinza-50);border-bottom:1px solid var(--borda);}
+  .cab-preview{padding:16px 20px;display:flex;align-items:center;gap:16px;border-bottom:3px solid #0A1A0F;}
+  .cab-preview .logos{display:flex;align-items:center;gap:12px;}
+  .cab-logo{width:52px;height:52px;border-radius:6px;background:var(--cinza-100);display:flex;align-items:center;justify-content:center;font-size:22px;}
+  .cab-divisor{width:1px;height:48px;background:var(--borda);}
+  .cab-texto{flex:1;}
+  .cab-texto .gov{font-size:9px;color:var(--cinza-400);text-transform:uppercase;letter-spacing:.06em;}
+  .cab-texto .secretaria{font-size:13px;font-weight:700;color:#0A1A0F;}
+  .cab-texto .diretoria{font-size:11px;color:var(--cinza-500);}
+  .cab-meta{text-align:right;font-size:10px;color:var(--cinza-400);line-height:1.6;}
+  .cab-rodape{padding:8px 20px;background:var(--cinza-50);display:flex;justify-content:space-between;font-size:9px;color:var(--cinza-400);}
+
+  /* Tabs config */
+  .config-tabs{display:flex;border-bottom:2px solid var(--borda);margin-bottom:0;background:#fff;border-radius:var(--raio) var(--raio) 0 0;}
+  .config-tab{padding:11px 18px;font-size:12px;font-weight:500;border:none;background:transparent;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;color:var(--cinza-500);font-family:inherit;}
+  .config-tab.ativo{color:#0A1A0F;border-bottom-color:#52B788;font-weight:700;}
+  .config-tab:hover:not(.ativo){background:var(--cinza-50);}
+
+  /* Alerta */
+  .alerta-info{display:flex;gap:10px;padding:10px 14px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;font-size:11px;color:#1e40af;line-height:1.5;margin-bottom:16px;}
+
+  /* Botões */
+  .btn{padding:9px 18px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;border:none;font-family:inherit;display:inline-flex;align-items:center;gap:6px;}
+  .btn-primary{background:#1F4E2C;color:#fff;}
+  .btn-primary:hover{background:#0A1A0F;}
+  .btn-outline{background:#fff;color:var(--cinza-700);border:1px solid var(--borda);}
+  .btn-outline:hover{background:var(--cinza-50);}
+  .form-footer{display:flex;justify-content:flex-end;gap:10px;padding:14px 18px;border-top:1px solid var(--borda);background:var(--cinza-50);border-radius:0 0 var(--raio) var(--raio);}
+
+  .section-title{font-size:11px;font-weight:700;color:var(--cinza-500);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px;padding-bottom:6px;border-bottom:1px solid var(--cinza-100);}
+
+  /* Anotação mockup */
+  .nota{position:relative;}
+  .nota::after{content:attr(data-nota);position:absolute;right:-12px;top:50%;transform:translateY(-50%);background:#fbbf24;color:#000;font-size:9px;padding:2px 6px;border-radius:4px;white-space:nowrap;font-weight:700;z-index:10;}
+</style>
+</head>
+<body>
+<div class="layout">
+  <!-- Sidebar simulada -->
+  <div class="sidebar">
+    <div class="sidebar-logo">
+      <div class="nome">SIGUC</div>
+      <div class="sub">SEMA-AC · DIMA</div>
+    </div>
+    <div class="sidebar-item">🗺 Mapa das UCs</div>
+    <div class="sidebar-item">📊 Dashboard</div>
+    <div class="sidebar-item">🔥 Alertas</div>
+    <div class="sidebar-item" style="margin-top:auto;border-top:1px solid rgba(255,255,255,.08);margin-top:20px;padding-top:20px;">👥 Usuários</div>
+    <div class="sidebar-item ativo">⚙️ Configurações</div>
+  </div>
+
+  <!-- Conteúdo -->
+  <div class="conteudo">
+    <div class="topbar">
+      <div>
+        <div class="breadcrumb">Administração › Configurações do Sistema</div>
+        <h1>⚙️ Configurações Institucionais</h1>
+      </div>
+      <div style="font-size:11px;color:var(--cinza-400)">Acesso restrito — <strong>super_admin</strong></div>
+    </div>
+
+    <div class="pagina">
+
+      <!-- Tabs -->
+      <div class="card" style="padding:0;overflow:hidden;">
+        <div class="config-tabs">
+          <button class="config-tab ativo">🏛 Identidade</button>
+          <button class="config-tab">🖼 Logos</button>
+          <button class="config-tab">🏗 Hierarquia</button>
+          <button class="config-tab">📄 Cabeçalho</button>
+          <button class="config-tab">📋 Relatórios</button>
+        </div>
+
+        <!-- TAB: Identidade -->
+        <div class="card-body">
+          <div class="alerta-info">
+            ℹ️ Estas informações são usadas no cabeçalho de todos os relatórios gerados pelo SIGUC-AC. Somente <strong>super_admin</strong> pode editar.
+          </div>
+
+          <div class="section-title">Governo Estadual</div>
+          <div class="form-grid form-grid-2" style="margin-bottom:20px;">
+            <div class="field">
+              <label>Nome do Governo</label>
+              <input type="text" value="Governo do Estado do Acre">
+              <div class="hint">Ex: Governo do Estado do Acre</div>
+            </div>
+            <div class="field">
+              <label>Gestão / Mandato</label>
+              <input type="text" value="2023–2026" placeholder="Ex: 2023–2026">
+            </div>
+          </div>
+
+          <div class="section-title">Secretaria</div>
+          <div class="form-grid form-grid-2" style="margin-bottom:20px;">
+            <div class="field">
+              <label>Nome completo</label>
+              <input type="text" value="Secretaria de Estado do Meio Ambiente do Acre">
+            </div>
+            <div class="field">
+              <label>Sigla</label>
+              <input type="text" value="SEMA-AC" style="width:120px">
+            </div>
+            <div class="field">
+              <label>Endereço</label>
+              <input type="text" value="Rua Benjamin Constant, 906 — Centro, Rio Branco/AC">
+            </div>
+            <div class="field">
+              <label>CEP</label>
+              <input type="text" value="69900-160" style="width:120px">
+            </div>
+            <div class="field">
+              <label>Telefone</label>
+              <input type="text" value="(68) 3212-3100">
+            </div>
+            <div class="field">
+              <label>E-mail institucional</label>
+              <input type="text" value="sema@sema.ac.gov.br">
+            </div>
+            <div class="field" style="grid-column:1/-1">
+              <label>Site</label>
+              <input type="text" value="https://sema.ac.gov.br">
+            </div>
+          </div>
+
+          <div class="section-title">Diretoria responsável (DIMA)</div>
+          <div class="form-grid form-grid-2">
+            <div class="field">
+              <label>Nome da Diretoria</label>
+              <input type="text" value="Diretoria de Meio Ambiente">
+              <div class="hint">Aparece na linha 2 do cabeçalho</div>
+            </div>
+            <div class="field">
+              <label>Sigla</label>
+              <input type="text" value="DIMA">
+            </div>
+            <div class="field">
+              <label>Departamento / Divisão</label>
+              <input type="text" value="Departamento de Unidades de Conservação">
+              <div class="hint">Linha 3 do cabeçalho (opcional)</div>
+            </div>
+            <div class="field">
+              <label>Sigla</label>
+              <input type="text" value="DEUC">
+            </div>
+          </div>
+        </div>
+
+        <div class="form-footer">
+          <button class="btn btn-outline">Cancelar</button>
+          <button class="btn btn-primary">💾 Salvar Identidade</button>
+        </div>
+      </div>
+
+      <!-- Preview cabeçalho gerado -->
+      <div class="preview-cabecalho">
+        <div class="preview-label">👁 Pré-visualização do Cabeçalho — como aparecerá nos relatórios</div>
+        <div class="cab-preview">
+          <div class="logos">
+            <div class="cab-logo">🌿</div>
+            <div class="cab-divisor"></div>
+            <div class="cab-logo">🏛</div>
+          </div>
+          <div class="cab-divisor" style="margin:0 4px"></div>
+          <div class="cab-texto">
+            <div class="gov">Governo do Estado do Acre · 2023–2026</div>
+            <div class="secretaria">Secretaria de Estado do Meio Ambiente do Acre — SEMA-AC</div>
+            <div class="diretoria">Diretoria de Meio Ambiente · Departamento de Unidades de Conservação</div>
+          </div>
+          <div class="cab-meta">
+            SIGUC-AC<br>
+            Emitido em 06/06/2026<br>
+            Doc. nº 2026-0042
+          </div>
+        </div>
+        <div class="cab-rodape">
+          <span>Rua Benjamin Constant, 906 — Centro, Rio Branco/AC · CEP 69900-160</span>
+          <span>(68) 3212-3100 · sema@sema.ac.gov.br · sema.ac.gov.br</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Indicadores de navegação de aba -->
+<script>
+document.querySelectorAll('.config-tab').forEach(tab=>{
+  tab.addEventListener('click',()=>{
+    document.querySelectorAll('.config-tab').forEach(t=>t.classList.remove('ativo'));
+    tab.classList.add('ativo');
+  });
+});
+</script>
+</body>
+</html>
