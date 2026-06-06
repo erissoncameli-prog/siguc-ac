@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>SIGUC-AC · Configurações</title>
+<link rel="stylesheet" href="../css/global.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../js/observability.js"></script>
+<script src="../js/queryLogger.js"></script>
+<script src="../js/config.js"></script>
+<script src="../js/layout.js"></script>
+<script src="../js/config-sistema.js"></script>
+<style>
+.cfg-tabs{display:flex;border-bottom:2px solid var(--borda);background:#fff;border-radius:var(--raio) var(--raio) 0 0;overflow-x:auto}
+.cfg-tab{padding:11px 18px;font-size:12px;font-weight:500;border:none;background:transparent;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;color:var(--cinza-500);font-family:inherit;white-space:nowrap;flex-shrink:0}
+.cfg-tab.ativo{color:var(--floresta);border-bottom-color:var(--verde-c);font-weight:700}
+.cfg-tab:hover:not(.ativo){background:var(--cinza-50)}
+
+.cfg-section{margin-bottom:20px}
+.cfg-section-title{font-size:11px;font-weight:700;color:var(--cinza-500);text-transform:uppercase;letter-spacing:.05em;margin-bottom:12px;padding-bottom:6px;border-bottom:1px solid var(--cinza-100)}
+
+.field{margin-bottom:14px}
+.field label{display:block;font-size:11px;font-weight:700;color:var(--cinza-500);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px}
+.field input,.field textarea,.field select{width:100%;padding:8px 10px;border:1px solid var(--borda);border-radius:6px;font-size:13px;color:var(--cinza-700);background:#fff;font-family:inherit}
+.field input:focus,.field textarea:focus{outline:none;border-color:var(--verde-c);box-shadow:0 0 0 2px rgba(82,183,136,.15)}
+.field .hint{font-size:10px;color:var(--cinza-400);margin-top:3px}
+.field textarea{resize:vertical;min-height:60px}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+
+.logo-drop{border:2px dashed var(--borda);border-radius:8px;padding:20px;text-align:center;cursor:pointer;transition:all .15s;background:var(--cinza-50)}
+.logo-drop:hover{border-color:var(--verde-c);background:#f0fdf4}
+.logo-drop input[type=file]{display:none}
+.logo-drop .ld-ico{font-size:28px;margin-bottom:6px}
+.logo-drop .ld-label{font-size:12px;font-weight:600;color:var(--cinza-600)}
+.logo-drop .ld-hint{font-size:10px;color:var(--cinza-400);margin-top:3px}
+
+.logo-preview-wrap{display:flex;align-items:center;gap:10px;padding:10px;background:var(--cinza-50);border-radius:6px;border:1px solid var(--borda)}
+.logo-preview-wrap img{height:52px;max-width:120px;object-fit:contain;border-radius:4px}
+.logo-preview-wrap .lp-info{flex:1}
+.logo-preview-wrap .lp-info .lp-nome{font-size:12px;font-weight:600;color:var(--cinza-700)}
+.logo-preview-wrap .lp-info .lp-hint{font-size:10px;color:var(--cinza-400);margin-top:2px}
+.logo-preview-wrap .lp-rem{font-size:11px;color:#dc2626;cursor:pointer;border:1px solid #fca5a5;background:#fef2f2;border-radius:4px;padding:4px 10px;font-family:inherit}
+
+/* Preview cabeçalho */
+.cab-preview{border:1.5px solid var(--borda);border-radius:var(--raio);overflow:hidden}
+.cab-preview-label{font-size:10px;font-weight:700;color:var(--cinza-400);text-transform:uppercase;letter-spacing:.06em;padding:8px 12px;background:var(--cinza-50);border-bottom:1px solid var(--borda)}
+.cab-prev-body{padding:14px 18px;display:flex;align-items:center;gap:14px;border-bottom:3px solid var(--floresta)}
+.cab-prev-logos{display:flex;align-items:center;gap:10px}
+.cab-prev-logo{width:48px;height:48px;background:var(--cinza-100);border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:22px;overflow:hidden}
+.cab-prev-logo img{width:100%;height:100%;object-fit:contain}
+.cab-prev-div{width:1px;height:44px;background:var(--borda)}
+.cab-prev-txt{flex:1}
+.cab-prev-txt .gov{font-size:8px;color:var(--cinza-400);text-transform:uppercase;letter-spacing:.06em}
+.cab-prev-txt .sec{font-size:12px;font-weight:700;color:var(--floresta);line-height:1.2}
+.cab-prev-txt .dir{font-size:10px;color:var(--cinza-500)}
+.cab-prev-meta{text-align:right;font-size:9px;color:var(--cinza-400);line-height:1.6}
+.cab-prev-foot{padding:7px 18px;background:var(--cinza-50);display:flex;justify-content:space-between;font-size:9px;color:var(--cinza-400)}
+
+.alerta-info{display:flex;gap:10px;padding:10px 14px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;font-size:11px;color:#1e40af;line-height:1.5;margin-bottom:16px}
+
+/* Tab content */
+.cfg-pane{display:none}.cfg-pane.ativo{display:block}
+
+/* Hierarquia drag */
+.hier-item{display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--cinza-50);border:1px solid var(--borda);border-radius:6px;margin-bottom:6px;cursor:grab}
+.hier-item:active{cursor:grabbing;opacity:.8}
+.hier-item .hi-handle{color:var(--cinza-400);font-size:16px;flex-shrink:0}
+.hier-item .hi-num{width:22px;height:22px;border-radius:50%;background:var(--floresta);color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.hier-item .hi-label{flex:1;font-size:12px;font-weight:600;color:var(--cinza-700)}
+.hier-item .hi-toggle{font-size:11px;color:var(--cinza-500);cursor:pointer;border:1px solid var(--borda);border-radius:4px;padding:3px 8px;background:#fff;font-family:inherit}
+
+/* Form footer */
+.form-footer{display:flex;justify-content:flex-end;gap:10px;padding:14px 18px;border-top:1px solid var(--borda);background:var(--cinza-50);border-radius:0 0 var(--raio) var(--raio)}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+;(async function(){
+  const u = await carregarUsuario();
+  if(!u){ window.location.href='../index.html'; return; }
+  if(appState.perfil !== 'super_admin'){
+    window.location.href='../pages/dashboard.html'; return;
+  }
+
+  document.getElementById('app').innerHTML =
+    gerarLayout('Configurações','configuracoes') +
+    `<div class="page-content">
+      <div class="page-header">
+        <div>
+          <div class="page-title">⚙️ Configurações Institucionais</div>
+          <div class="page-subtitle">Identidade, logos e cabeçalho dos relatórios</div>
+        </div>
+        <div style="font-size:11px;color:var(--cinza-400)">Acesso restrito — <strong>super_admin</strong></div>
+      </div>
+      <div id="cfg-content" style="max-width:900px"></div>
+    </div></div></div></div>`;
+
+  // Carregar dados
+  const cfg = await getConfigSistema();
+  renderCfg(cfg);
+}());
+
+function renderCfg(cfg){
+  const c = document.getElementById('cfg-content');
+  c.innerHTML = `
+  <div class="card" style="overflow:hidden;margin-bottom:20px">
+    <div class="cfg-tabs">
+      <button class="cfg-tab ativo" onclick="trocarAba('identidade',this)">🏛 Identidade</button>
+      <button class="cfg-tab"       onclick="trocarAba('logos',this)">🖼 Logos</button>
+      <button class="cfg-tab"       onclick="trocarAba('hierarquia',this)">🏗 Hierarquia</button>
+      <button class="cfg-tab"       onclick="trocarAba('relatorios',this)">📋 Relatórios</button>
+    </div>
+
+    <!-- TAB: IDENTIDADE -->
+    <div id="pane-identidade" class="cfg-pane ativo" style="padding:20px">
+      <div class="alerta-info">ℹ️ Estas informações aparecem no cabeçalho de todos os relatórios do SIGUC-AC.</div>
+
+      <div class="cfg-section">
+        <div class="cfg-section-title">Governo Estadual</div>
+        <div class="grid-2">
+          <div class="field"><label>Nome do Governo</label><input id="f-gov-nome" value="${esc(cfg.governo?.nome||'Governo do Estado do Acre')}"></div>
+          <div class="field"><label>Gestão / Mandato</label><input id="f-gov-gestao" value="${esc(cfg.governo?.gestao||'')}"></div>
+        </div>
+      </div>
+
+      <div class="cfg-section">
+        <div class="cfg-section-title">Secretaria</div>
+        <div class="grid-2">
+          <div class="field"><label>Nome completo</label><input id="f-sec-nome" value="${esc(cfg.secretaria?.nome||'')}"></div>
+          <div class="field"><label>Sigla</label><input id="f-sec-sigla" value="${esc(cfg.secretaria?.sigla||'SEMA-AC')}"></div>
+          <div class="field"><label>Endereço</label><input id="f-sec-end" value="${esc(cfg.secretaria?.endereco||'')}"></div>
+          <div class="field"><label>CEP</label><input id="f-sec-cep" value="${esc(cfg.secretaria?.cep||'')}"></div>
+          <div class="field"><label>Telefone</label><input id="f-sec-tel" value="${esc(cfg.secretaria?.telefone||'')}"></div>
+          <div class="field"><label>E-mail</label><input id="f-sec-email" value="${esc(cfg.secretaria?.email||'')}"></div>
+          <div class="field" style="grid-column:1/-1"><label>Site</label><input id="f-sec-site" value="${esc(cfg.secretaria?.site||'')}"></div>
+        </div>
+      </div>
+
+      <div class="cfg-section">
+        <div class="cfg-section-title">Diretoria (DIMA)</div>
+        <div class="grid-2">
+          <div class="field"><label>Nome</label><input id="f-dir-nome" value="${esc(cfg.diretoria?.nome||'')}"><div class="hint">Linha 2 do cabeçalho</div></div>
+          <div class="field"><label>Sigla</label><input id="f-dir-sigla" value="${esc(cfg.diretoria?.sigla||'DIMA')}"></div>
+        </div>
+      </div>
+
+      <div class="cfg-section">
+        <div class="cfg-section-title">Departamento (DEUC)</div>
+        <div class="grid-2">
+          <div class="field"><label>Nome</label><input id="f-dep-nome" value="${esc(cfg.departamento?.nome||'')}"><div class="hint">Linha 3 do cabeçalho (opcional)</div></div>
+          <div class="field"><label>Sigla</label><input id="f-dep-sigla" value="${esc(cfg.departamento?.sigla||'DEUC')}"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: LOGOS -->
+    <div id="pane-logos" class="cfg-pane" style="padding:20px">
+      <div class="grid-2">
+        <div>
+          <div class="cfg-section-title">Logo do Governo</div>
+          <div id="logo-gov-area">${_renderLogoArea('gov', cfg.logos?.governo_url)}</div>
+        </div>
+        <div>
+          <div class="cfg-section-title">Logo da Secretaria</div>
+          <div id="logo-sec-area">${_renderLogoArea('sec', cfg.logos?.secretaria_url)}</div>
+        </div>
+      </div>
+      <div class="hint" style="margin-top:10px">Formatos aceitos: PNG, SVG, JPG — máximo 2 MB. As logos são enviadas para o Supabase Storage.</div>
+    </div>
+
+    <!-- TAB: HIERARQUIA -->
+    <div id="pane-hierarquia" class="cfg-pane" style="padding:20px">
+      <p style="font-size:12px;color:var(--cinza-500);margin-bottom:14px">Ordem dos níveis no cabeçalho dos relatórios. Desative os que não quiser exibir.</p>
+      <div id="hier-list">
+        ${(cfg.hierarquia_cabecalho||['governo','secretaria','diretoria','departamento']).map((k,i)=>`
+        <div class="hier-item" draggable="true" data-key="${k}">
+          <span class="hi-handle">⠿</span>
+          <span class="hi-num">${i+1}</span>
+          <span class="hi-label">${_hierLabel(k)}</span>
+          <button class="hi-toggle">✓ Ativo</button>
+        </div>`).join('')}
+      </div>
+    </div>
+
+    <!-- TAB: RELATÓRIOS -->
+    <div id="pane-relatorios" class="cfg-pane" style="padding:20px">
+      <div class="field"><label>Texto de rodapé padrão</label><textarea id="f-rodape" rows="3">${esc(cfg.rodape_texto||'')}</textarea></div>
+      <div class="field"><label>Aviso legal</label><textarea id="f-aviso" rows="2">${esc(cfg.aviso_legal||'')}</textarea></div>
+      <div class="grid-2">
+        <div class="field"><label>Formato de protocolo</label><input id="f-proto" value="${esc(cfg.protocolo_formato||'SIGUC-{ANO}-{SEQ}')}"><div class="hint">Variáveis: {ANO}, {SEQ}</div></div>
+        <div class="field"><label>Sequencial atual</label><input id="f-seq" type="number" min="0" value="${cfg.protocolo_seq||0}"><div class="hint">Próximo relatório: ${_proxProtocolo(cfg)}</div></div>
+      </div>
+    </div>
+
+    <div class="form-footer">
+      <button class="btn btn-secondary" onclick="renderCfg(_configSistemaCache)">Cancelar</button>
+      <button class="btn btn-primary" onclick="salvarCfg()">💾 Salvar Configurações</button>
+    </div>
+  </div>
+
+  <!-- Preview -->
+  <div class="cab-preview" id="cab-preview-live">
+    <div class="cab-preview-label">👁 Pré-visualização do cabeçalho</div>
+    <div class="cab-prev-body">
+      <div class="cab-prev-logos">
+        <div class="cab-prev-logo" id="prev-logo-gov">${cfg.logos?.governo_url?`<img src="${cfg.logos.governo_url}" alt="Logo Governo">`:'🌿'}</div>
+        <div class="cab-prev-div"></div>
+        <div class="cab-prev-logo" id="prev-logo-sec">${cfg.logos?.secretaria_url?`<img src="${cfg.logos.secretaria_url}" alt="Logo Secretaria">`:'🏛'}</div>
+      </div>
+      <div class="cab-prev-div" style="margin:0 6px"></div>
+      <div class="cab-prev-txt">
+        <div class="gov" id="prev-gov">${esc(cfg.governo?.nome||'')}${cfg.governo?.gestao?' · '+cfg.governo.gestao:''}</div>
+        <div class="sec" id="prev-sec">${esc(cfg.secretaria?.nome||'')} — ${esc(cfg.secretaria?.sigla||'')}</div>
+        <div class="dir" id="prev-dir">${esc(cfg.diretoria?.nome||'')} · ${esc(cfg.departamento?.nome||'')}</div>
+      </div>
+      <div class="cab-prev-meta">SIGUC-AC<br>Emitido: ${new Date().toLocaleDateString('pt-BR')}<br>Prot. ${_proxProtocolo(cfg)}</div>
+    </div>
+    <div class="cab-prev-foot">
+      <span id="prev-end">${esc(cfg.secretaria?.endereco||'')}${cfg.secretaria?.cep?' · CEP '+cfg.secretaria.cep:''}</span>
+      <span id="prev-cont">${esc(cfg.secretaria?.telefone||'')}${cfg.secretaria?.email?' · '+cfg.secretaria.email:''}${cfg.secretaria?.site?' · '+cfg.secretaria.site:''}</span>
+    </div>
+  </div>`;
+
+  // Live preview
+  ['f-gov-nome','f-gov-gestao','f-sec-nome','f-sec-sigla','f-dir-nome','f-dir-sigla','f-dep-nome','f-dep-sigla','f-sec-end','f-sec-cep','f-sec-tel','f-sec-email','f-sec-site'].forEach(id=>{
+    document.getElementById(id)?.addEventListener('input', _atualizarPreview);
+  });
+}
+
+function _hierLabel(k){ return {governo:'Governo Estadual',secretaria:'Secretaria',diretoria:'Diretoria (DIMA)',departamento:'Departamento (DEUC)'}[k]||k; }
+function _proxProtocolo(cfg){
+  const seq = (cfg?.protocolo_seq||0)+1;
+  const fmt = cfg?.protocolo_formato||'SIGUC-{ANO}-{SEQ}';
+  return fmt.replace('{ANO}',new Date().getFullYear()).replace('{SEQ}',String(seq).padStart(4,'0'));
+}
+
+function _renderLogoArea(tipo, url){
+  if(url) return `
+  <div class="logo-preview-wrap">
+    <img src="${esc(url)}" alt="Logo ${tipo}">
+    <div class="lp-info"><div class="lp-nome">Logo carregada</div><div class="lp-hint">Clique em remover para trocar</div></div>
+    <button class="lp-rem" onclick="_removerLogo('${tipo}')">Remover</button>
+  </div>`;
+  return `
+  <label class="logo-drop" onclick="document.getElementById('input-logo-${tipo}').click()">
+    <input type="file" id="input-logo-${tipo}" accept="image/png,image/jpeg,image/svg+xml" onchange="_uploadLogo('${tipo}',this)">
+    <div class="ld-ico">🖼</div>
+    <div class="ld-label">Clique para enviar</div>
+    <div class="ld-hint">PNG, SVG ou JPG · máx. 2 MB</div>
+  </label>`;
+}
+
+function _atualizarPreview(){
+  const v = id => document.getElementById(id)?.value||'';
+  document.getElementById('prev-gov').textContent = v('f-gov-nome')+(v('f-gov-gestao')?' · '+v('f-gov-gestao'):'');
+  document.getElementById('prev-sec').textContent = v('f-sec-nome')+(v('f-sec-sigla')?' — '+v('f-sec-sigla'):'');
+  document.getElementById('prev-dir').textContent = v('f-dir-nome')+(v('f-dep-nome')?' · '+v('f-dep-nome'):'');
+  document.getElementById('prev-end').textContent = v('f-sec-end')+(v('f-sec-cep')?' · CEP '+v('f-sec-cep'):'');
+  document.getElementById('prev-cont').textContent = v('f-sec-tel')+(v('f-sec-email')?' · '+v('f-sec-email'):'')+(v('f-sec-site')?' · '+v('f-sec-site'):'');
+}
+
+function trocarAba(id, btn){
+  document.querySelectorAll('.cfg-pane').forEach(p=>p.classList.remove('ativo'));
+  document.querySelectorAll('.cfg-tab').forEach(t=>t.classList.remove('ativo'));
+  document.getElementById('pane-'+id)?.classList.add('ativo');
+  btn.classList.add('ativo');
+}
+
+async function _uploadLogo(tipo, input){
+  const file = input.files[0];
+  if(!file) return;
+  if(file.size > 2*1024*1024){ toast('Arquivo muito grande — máximo 2 MB.','warning'); return; }
+  const ext = file.name.split('.').pop().toLowerCase();
+  const path = `logos/${tipo}_${Date.now()}.${ext}`;
+  toast('Enviando logo…','info');
+  const { data, error } = await db.storage.from('config-logos').upload(path, file, { upsert: true, contentType: file.type });
+  if(error){ toast('Erro no upload: '+error.message,'error'); return; }
+  const { data: { publicUrl } } = db.storage.from('config-logos').getPublicUrl(path);
+  // Salva URL na config
+  const cfg = await getConfigSistema();
+  const novas = { ...cfg, logos: { ...(cfg.logos||{}), [tipo==='gov'?'governo_url':'secretaria_url']: publicUrl } };
+  await _salvarDados(novas);
+  document.getElementById('logo-'+tipo+'-area').innerHTML = _renderLogoArea(tipo, publicUrl);
+  document.getElementById('prev-logo-'+tipo).innerHTML = `<img src="${publicUrl}" alt="Logo">`;
+  toast('Logo salva com sucesso.','success');
+}
+
+async function _removerLogo(tipo){
+  const cfg = await getConfigSistema();
+  const novas = { ...cfg, logos: { ...(cfg.logos||{}), [tipo==='gov'?'governo_url':'secretaria_url']: null } };
+  await _salvarDados(novas);
+  document.getElementById('logo-'+tipo+'-area').innerHTML = _renderLogoArea(tipo, null);
+  document.getElementById('prev-logo-'+tipo).innerHTML = tipo==='gov'?'🌿':'🏛';
+  toast('Logo removida.','info');
+}
+
+async function salvarCfg(){
+  const v = id => document.getElementById(id)?.value?.trim()||'';
+  const cfg = await getConfigSistema();
+  const novas = {
+    ...cfg,
+    governo:    { nome: v('f-gov-nome'), gestao: v('f-gov-gestao') },
+    secretaria: { nome: v('f-sec-nome'), sigla: v('f-sec-sigla'), endereco: v('f-sec-end'), cep: v('f-sec-cep'), telefone: v('f-sec-tel'), email: v('f-sec-email'), site: v('f-sec-site') },
+    diretoria:  { nome: v('f-dir-nome'), sigla: v('f-dir-sigla') },
+    departamento:{ nome: v('f-dep-nome'), sigla: v('f-dep-sigla') },
+    rodape_texto: v('f-rodape'),
+    aviso_legal:  v('f-aviso'),
+    protocolo_formato: v('f-proto'),
+    protocolo_seq: parseInt(v('f-seq')||'0'),
+  };
+  await _salvarDados(novas);
+  toast('Configurações salvas com sucesso.','success');
+}
+
+async function _salvarDados(dados){
+  const { error } = await db.from('config_sistema').upsert({
+    id: 1, dados, atualizado_em: new Date().toISOString(), atualizado_por: appState.usuario?.id||null
+  });
+  if(error) throw new Error(error.message);
+  invalidarConfigCache();
+}
+</script>
+</body>
+</html>
