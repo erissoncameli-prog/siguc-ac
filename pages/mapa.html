@@ -1404,6 +1404,7 @@ function renderCamadasHtml(){
           ${escHtml(c.nome)}
           ${c.unidades_conservacao?`<span style="font-size:10px;color:var(--cinza-400);display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(c.unidades_conservacao.sigla||c.unidades_conservacao.nome)}</span>`:''}
         </span>
+        ${ehAdmin?`<button class="btn-camada-exp" title="Renomear camada" onclick="renomearCamada('${c.id}')">✏</button>`:''}
         ${ehAdmin?`<button id="btn-exp-${c.id}" class="btn-camada-exp" title="Configurar estilo" onclick="toggleExpandirCamada('${c.id}')">⚙</button>`:''}
         ${ehAdmin?`<button onclick="removerCamada('${c.id}')" title="Remover"
           style="font-size:11px;padding:1px 5px;border:1px solid #FCA5A5;border-radius:4px;background:#FEF2F2;color:#DC2626;cursor:pointer;flex-shrink:0">✕</button>`:''}
