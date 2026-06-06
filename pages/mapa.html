@@ -2843,19 +2843,45 @@ async function _iniciarProdesCAR(f){
     return;
   }
 
-  // Busca PRODES + focos em paralelo
-  const bb = turf.bbox(turf.feature(f.geometry));
-  const [dadosProdes, dadosFocos] = await Promise.all([
-    _carProdesCache.has(cod) ? Promise.resolve(_carProdesCache.get(cod)) : _fetchProdesCAR(f),
-    _carFocosCache.has(cod)  ? Promise.resolve(_carFocosCache.get(cod))  : _fetchFocosCAR(bb),
-  ]);
+  try{
+    // bbox com proteção contra geometria inválida
+    let bb = null;
+    try{ bb = turf.bbox(turf.feature(f.geometry)); }catch(_){}
 
-  _carProdesCache.set(cod, dadosProdes);
-  _carFocosCache.set(cod, dadosFocos);
+    // allSettled → nunca rejeita; cada falha vira dado de erro
+    const [prodesRes, focosRes] = await Promise.allSettled([
+      _carProdesCache.has(cod)
+        ? Promise.resolve(_carProdesCache.get(cod))
+        : _fetchProdesCAR(f),
+      _carFocosCache.has(cod) || !bb
+        ? Promise.resolve(_carFocosCache.has(cod)
+            ? _carFocosCache.get(cod)
+            : { historico:[], recentes:{total:0,focos:[]} })
+        : _fetchFocosCAR(bb),
+    ]);
 
-  if(_carAbertoCod===cod && _carDetAba==='prodes'){
-    const bod = document.getElementById('car-det-body');
-    if(bod) bod.innerHTML = _htmlProdes(dadosProdes, f, dadosFocos);
+    const dadosProdes = prodesRes.status==='fulfilled'
+      ? prodesRes.value
+      : { erro: prodesRes.reason?.message || 'Erro PRODES' };
+    const dadosFocos  = focosRes.status==='fulfilled'
+      ? focosRes.value
+      : { historico:[], recentes:{total:0,focos:[]}, erro: focosRes.reason?.message };
+
+    _carProdesCache.set(cod, dadosProdes);
+    _carFocosCache.set(cod, dadosFocos);
+
+    if(_carAbertoCod===cod && _carDetAba==='prodes'){
+      const bod = document.getElementById('car-det-body');
+      if(bod) bod.innerHTML = _htmlProdes(dadosProdes, f, dadosFocos);
+    }
+  }catch(e){
+    if(_carAbertoCod===cod && _carDetAba==='prodes'){
+      const bod = document.getElementById('car-det-body');
+      if(bod) bod.innerHTML = `<div style="padding:20px;text-align:center;color:#dc2626;font-size:12px">
+        ⚠️ Erro: ${escHtml(e.message)}<br>
+        <button onclick="_iniciarProdesCAR(_carAbertoFeat)" class="btn btn-outline" style="margin-top:10px;font-size:11px">🔄 Tentar novamente</button>
+      </div>`;
+    }
   }
 }
 
