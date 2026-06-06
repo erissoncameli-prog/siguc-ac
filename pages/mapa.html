@@ -1569,9 +1569,10 @@ async function salvarNovaCamada(){
   if(!_novaCamadaGeoJson){ toast('Selecione um arquivo GeoJSON ou Shapefile .zip.','error'); return; }
   const btn=document.getElementById('btn-salvar-nova-camada');
   btn.disabled=true; btn.textContent='Salvando…';
+  const uc_id=document.getElementById('nc-uc').value||null;
   const {data,error}=await db.from('camadas_mapa').insert({
     nome, cor, geojson:_novaCamadaGeoJson, visivel:true,
-    uploaded_by:appState.usuario?.id||null
+    uc_id, uploaded_by:appState.usuario?.id||null
   }).select().single();
   btn.disabled=false; btn.textContent='Salvar camada';
   if(error){ toast('Erro ao salvar: '+error.message,'error'); return; }
