@@ -392,16 +392,37 @@ let   _ucs = []
 
 // ── Init ─────────────────────────────────────────────────────
 async function init() {
-  const { data } = await db.from('unidades_conservacao')
-    .select('id,nome').eq('status','regularizada').order('nome')
-  _ucs = data || []
   const sel = document.getElementById('p-uc')
-  _ucs.forEach(uc => {
+  try {
+    const { data, error } = await db.from('unidades_conservacao')
+      .select('id,nome')
+      .eq('esfera', 'estadual')
+      .in('status', ['regularizada', 'em_regularizacao', 'criada'])
+      .order('nome')
+    if (error) throw error
+    _ucs = data || []
+    if (_ucs.length === 0) {
+      const opt = document.createElement('option')
+      opt.value = ''
+      opt.textContent = 'Nenhuma UC estadual disponível'
+      opt.disabled = true
+      sel.appendChild(opt)
+      return
+    }
+    _ucs.forEach(uc => {
+      const opt = document.createElement('option')
+      opt.value = uc.id
+      opt.textContent = uc.nome
+      sel.appendChild(opt)
+    })
+  } catch (err) {
     const opt = document.createElement('option')
-    opt.value = uc.id
-    opt.textContent = uc.nome
+    opt.value = ''
+    opt.textContent = 'Erro ao carregar UCs — tente recarregar a página'
+    opt.disabled = true
     sel.appendChild(opt)
-  })
+    console.error('Erro ao carregar UCs:', err.message)
+  }
 }
 
 // ── Navegação de passos ───────────────────────────────────────
