@@ -48,9 +48,9 @@ function abrirModalRelatorio() {
   el.id = 'rel-modal-overlay';
   el.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;';
   el.innerHTML = `
-  <div id="rel-modal">
-    <div class="rm-hdr">
-      <h3>🖨️ Gerar Relatório do Imóvel</h3>
+  <div id="rel-modal" style="background:#fff;border-radius:12px;width:460px;max-width:95vw;box-shadow:0 20px 60px rgba(0,0,0,.25);overflow:hidden;font-family:'DM Sans',system-ui,sans-serif;">
+    <div class="rm-hdr" style="padding:16px 20px;background:linear-gradient(135deg,#0A1A0F,#1F4E2C);">
+      <h3 style="font-size:14px;font-weight:700;color:#fff;margin:0;">🖨️ Gerar Relatório do Imóvel</h3>
       <p>${nomeImovel} · ${_relEsc(_carAbertoCod)}</p>
     </div>
     <div class="rm-body">
