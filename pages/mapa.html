@@ -3140,23 +3140,7 @@ function _htmlProdes(d, f, focosExt){
     </div>`;
   }).join('');
 
-  // ── Gráfico barras focos de calor ───────────────────────────────────────
-  const focos = d.focos||{};
-  const focosAnos = focos.porAno||[];
-  const maxFocos  = Math.max(...focosAnos.map(r=>Number(r.total)), 1);
-  const anosComDesmat = new Set(d.anosAnual);
-  const barrasFocos = focosAnos.map(r => {
-    const w      = (Number(r.total)/maxFocos*100).toFixed(1);
-    const correl = anosComDesmat.has(String(r.ano));
-    return `<div style="display:flex;align-items:center;gap:6px;padding:3px 0">
-      <span style="font-size:10px;color:var(--cinza-500);width:32px;flex-shrink:0">${r.ano}</span>
-      <div style="flex:1;height:14px;background:#f3f4f6;border-radius:3px;overflow:hidden">
-        <div style="height:100%;width:${w}%;background:#f97316;border-radius:3px"></div>
-      </div>
-      <span style="font-size:10px;font-weight:600;color:var(--cinza-700);width:38px;text-align:right">${r.total}</span>
-      ${correl?`<span style="font-size:9px" title="Ano com desmatamento PRODES e foco de calor — possível correlação">⚠️</span>`:'<span style="width:16px"></span>'}
-    </div>`;
-  }).join('');
+  // focos vêm via parâmetro focosExt — renderizados por _htmlFocosSection abaixo
 
   // ── Card conformidade CF ────────────────────────────────────────────────
   const haIlLbl = d.asvBase ? 'Ilegal / sem ASV' : 'A verificar (sem base ASV)';
