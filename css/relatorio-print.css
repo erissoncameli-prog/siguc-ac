@@ -201,17 +201,35 @@
 
 /* ── @media print ────────────────────────────────────────────────────────── */
 @media print {
-  body > *:not(#rel-print-root) { display: none !important; }
-  #rel-print-root { display: block !important; }
-  #rel-preview-overlay { position: static !important; background: none !important; display: block !important; }
-  #rel-preview-toolbar { display: none !important; }
-  #rel-preview-area { padding: 0 !important; overflow: visible !important; display: block !important; }
+  /* Esconde TUDO exceto o overlay de preview */
+  body > *:not(#rel-preview-overlay) { display: none !important; }
 
+  /* Toolbar não imprime */
+  #rel-preview-toolbar { display: none !important; }
+
+  /* Overlay vira bloco estático para impressão */
+  #rel-preview-overlay {
+    position: static !important;
+    background: none !important;
+    display: block !important;
+    height: auto !important;
+    overflow: visible !important;
+    z-index: auto !important;
+  }
+
+  /* Área de preview sem scroll */
+  #rel-preview-area {
+    padding: 0 !important;
+    overflow: visible !important;
+    display: block !important;
+    height: auto !important;
+  }
+
+  /* Folhas A4 */
   .rel-a4 {
     width: 210mm; min-height: 297mm;
-    page-break-after: always;
+    page-break-after: always; break-after: page;
     box-shadow: none !important; margin: 0 !important;
-    break-after: page;
   }
   .rel-a4:last-child { page-break-after: avoid; break-after: avoid; }
   .rel-mapa-wrap { page-break-inside: avoid; break-inside: avoid; }
