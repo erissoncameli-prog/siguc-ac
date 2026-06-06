@@ -2817,20 +2817,72 @@ function _htmlProdesLoading(){
   </div>`;
 }
 
+const _carFocosCache = new Map(); // cod_imovel → dados focos
+
 async function _iniciarProdesCAR(f){
   if(!f) return;
   const cod = f.properties?.cod_imovel; if(!cod) return;
-  if(_carProdesCache.has(cod)){
+
+  // Cache hit — ambos disponíveis
+  if(_carProdesCache.has(cod) && _carFocosCache.has(cod)){
     if(_carAbertoCod===cod && _carDetAba==='prodes')
-      document.getElementById('car-det-body').innerHTML = _htmlProdes(_carProdesCache.get(cod), f);
+      document.getElementById('car-det-body').innerHTML =
+        _htmlProdes(_carProdesCache.get(cod), f, _carFocosCache.get(cod));
     return;
   }
-  const dados = await _fetchProdesCAR(f);
-  _carProdesCache.set(cod, dados);
+
+  // Busca PRODES + focos em paralelo
+  const bb = turf.bbox(turf.feature(f.geometry));
+  const [dadosProdes, dadosFocos] = await Promise.all([
+    _carProdesCache.has(cod) ? Promise.resolve(_carProdesCache.get(cod)) : _fetchProdesCAR(f),
+    _carFocosCache.has(cod)  ? Promise.resolve(_carFocosCache.get(cod))  : _fetchFocosCAR(bb),
+  ]);
+
+  _carProdesCache.set(cod, dadosProdes);
+  _carFocosCache.set(cod, dadosFocos);
+
   if(_carAbertoCod===cod && _carDetAba==='prodes'){
     const bod = document.getElementById('car-det-body');
-    if(bod) bod.innerHTML = _htmlProdes(dados, f);
+    if(bod) bod.innerHTML = _htmlProdes(dadosProdes, f, dadosFocos);
   }
+}
+
+// ── Fetch focos de calor (Supabase + FIRMS NRT) ───────────────────────────
+async function _fetchFocosCAR(bb){
+  try{
+    const [x0,y0,x1,y1] = bb;
+    const url = `/api/focos-proxy?minLon=${x0}&minLat=${y0}&maxLon=${x1}&maxLat=${y1}`;
+    const r = await fetch(url, { signal: AbortSignal.timeout(15000) });
+    if(!r.ok) return { historico:[], recentes:{total:0,focos:[]}, erro: `HTTP ${r.status}` };
+    return await r.json();
+  }catch(e){
+    return { historico:[], recentes:{total:0,focos:[]}, erro: e.message };
+  }
+}
+
+// ── Camada de focos no mapa ───────────────────────────────────────────────
+let _focosLayer = null;
+function _toggleFocosLayer(ativo){
+  if(_focosLayer){ mapaL.removeLayer(_focosLayer); _focosLayer=null; }
+  if(!ativo) return;
+  const cod  = _carAbertoCod;
+  const data = cod ? _carFocosCache.get(cod) : null;
+  const pts  = [...(data?.historico||[]).flatMap(()=>[]),
+                ...(data?.recentes?.focos||[])];
+
+  // Coleta coordenadas do histórico (reconstruídas via focos recentes + cache)
+  const todos = data?.recentes?.focos || [];
+  if(!todos.length){ toast('Nenhum foco recente para exibir no mapa.','info'); const el=document.getElementById('focos-mapa-toggle'); if(el) el.checked=false; return; }
+
+  _focosLayer = L.layerGroup();
+  todos.forEach(f => {
+    L.circleMarker([f.lat, f.lon], {
+      radius:5, fillColor:'#ef4444', fillOpacity:0.8,
+      color:'#991b1b', weight:1
+    }).bindTooltip(`🔥 ${f.acq_date} · ${f.satellite||'VIIRS'} · FRP: ${f.frp||'—'} MW`)
+      .addTo(_focosLayer);
+  });
+  _focosLayer.addTo(mapaL);
 }
 
 // Classifica um polígono PRODES pelo Código Florestal (Lei 12.651/2012)
