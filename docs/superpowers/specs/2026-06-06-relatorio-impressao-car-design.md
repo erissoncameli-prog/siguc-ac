@@ -224,8 +224,9 @@ Os mapas são renderizados via **Leaflet** dentro do HTML do relatório, não co
 
 1. `gerarHTMLRelatorio()` insere `<div id="mapa-loc-{cod}" style="height:220px">` no HTML
 2. `inicializarMapasRelatorio()` inicializa cada div com um `L.map()` usando os dados já em memória
-3. Para impressão (`window.print()`): o browser captura o canvas do Leaflet no momento do print
-4. Para garantir renderização antes do print: `leaflet-image` library para converter o mapa em `<img>` se necessário
+3. Para impressão: antes de chamar `window.print()`, aguardar todos os tiles carregarem via evento `tileloadend` de cada mapa
+4. Estratégia: `map.once('idle', resolve)` + timeout de 3s como fallback — só então chama `window.print()`
+5. Se o browser não capturar o canvas corretamente (conhecido em Firefox), converter via `leaflet-image` para `<img>` antes do print
 
 **Cálculo de escala numérica:**
 ```js
