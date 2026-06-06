@@ -1,0 +1,221 @@
+/* SIGUC-AC · Relatório de Impressão CAR */
+
+/* ── Overlay de preview ──────────────────────────────────────────────────── */
+#rel-preview-overlay {
+  position: fixed; inset: 0; background: #374151;
+  z-index: 1100; display: flex; flex-direction: column;
+}
+#rel-preview-toolbar {
+  background: #1F4E2C; padding: 10px 20px;
+  display: flex; align-items: center; gap: 10px; flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(0,0,0,.3);
+}
+#rel-preview-toolbar .rel-tb-titulo { color:#fff; font-size:13px; font-weight:700; flex:1; }
+#rel-preview-toolbar .rel-tb-modo  { background:rgba(255,255,255,.15); color:#fff; font-size:10px; padding:3px 10px; border-radius:99px; }
+#rel-preview-area { flex:1; overflow-y:auto; padding:24px; display:flex; flex-direction:column; align-items:center; gap:0; }
+
+/* ── Folha A4 ────────────────────────────────────────────────────────────── */
+.rel-a4 {
+  background: #fff; width: 794px; min-height: 1123px;
+  position: relative; box-shadow: 0 4px 32px rgba(0,0,0,.35);
+  display: flex; flex-direction: column; margin-bottom: 12px;
+  font-family: 'DM Sans', system-ui, sans-serif; font-size: 11px; color: #111827;
+}
+
+/* ── Cabeçalho ABNT ──────────────────────────────────────────────────────── */
+.rel-cabecalho {
+  padding: 14px 24px; border-bottom: 3px solid #0A1A0F;
+  display: flex; align-items: center; gap: 14px; flex-shrink: 0;
+}
+.rel-logos { display: flex; align-items: center; gap: 10px; }
+.rel-logo {
+  width: 48px; height: 48px; border-radius: 4px;
+  display: flex; align-items: center; justify-content: center;
+  background: #f3f4f6; font-size: 20px; flex-shrink: 0; overflow: hidden;
+}
+.rel-logo img { width: 100%; height: 100%; object-fit: contain; }
+.rel-cab-div { width: 1px; height: 44px; background: #e5e7eb; }
+.rel-inst { flex: 1; }
+.rel-inst .gov  { font-size: 8px; color: #9ca3af; text-transform: uppercase; letter-spacing: .06em; }
+.rel-inst .sec  { font-size: 12px; font-weight: 700; color: #0A1A0F; line-height: 1.2; }
+.rel-inst .dir  { font-size: 10px; color: #6b7280; }
+.rel-meta { text-align: right; font-size: 9px; color: #9ca3af; line-height: 1.6; white-space: nowrap; }
+.rel-cabecalho-mini { padding: 8px 24px; border-bottom: 1px solid #e5e7eb; flex-shrink: 0; }
+.rel-cabecalho-mini .sec { font-size: 9px; font-weight: 700; color: #0A1A0F; }
+
+/* ── Corpo ───────────────────────────────────────────────────────────────── */
+.rel-body { padding: 16px 24px; flex: 1; }
+.rel-secao { margin-bottom: 18px; }
+.rel-secao-titulo {
+  font-size: 10px; font-weight: 800; color: #0A1A0F;
+  text-transform: uppercase; letter-spacing: .06em;
+  border-bottom: 2px solid #0A1A0F; padding-bottom: 4px; margin-bottom: 8px;
+}
+.rel-secao-subtitulo {
+  font-size: 9px; font-weight: 700; color: #4b5563;
+  text-transform: uppercase; letter-spacing: .05em; margin: 8px 0 5px;
+}
+
+/* ── Título do laudo ─────────────────────────────────────────────────────── */
+.rel-titulo-bloco {
+  text-align: center; padding: 14px 0 12px;
+  border-bottom: 1px solid #f3f4f6; margin-bottom: 14px;
+}
+.rel-tipo-label { font-size: 10px; font-weight: 700; color: #9ca3af; text-transform: uppercase; letter-spacing: .06em; }
+.rel-nome-imovel { font-size: 20px; font-weight: 800; color: #0A1A0F; letter-spacing: -.3px; margin-top: 3px; }
+.rel-cod-imovel { font-size: 10px; color: #6b7280; margin-top: 2px; }
+.rel-badges { margin-top: 8px; display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; }
+.rel-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 10px; border-radius: 99px; font-size: 9px; font-weight: 700; border: 1px solid;
+}
+
+/* ── KPI cards ───────────────────────────────────────────────────────────── */
+.rel-kpi-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 7px; margin-bottom: 10px; }
+.rel-kpi { padding: 9px 11px; border-radius: 6px; border: 1px solid; }
+.rel-kpi .kl { font-size: 7px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 3px; color: #9ca3af; }
+.rel-kpi .kv { font-size: 16px; font-weight: 800; line-height: 1.1; }
+.rel-kpi .ks { font-size: 7px; margin-top: 1px; color: #9ca3af; }
+.kpi-verde   { background:#f0fdf4; border-color:#86efac; } .kpi-verde   .kv{color:#16a34a;}
+.kpi-verm    { background:#fef2f2; border-color:#fca5a5; } .kpi-verm    .kv{color:#dc2626;}
+.kpi-lrnj    { background:#fff7ed; border-color:#fed7aa; } .kpi-lrnj    .kv{color:#c2410c;}
+.kpi-roxo    { background:#faf5ff; border-color:#e9d5ff; } .kpi-roxo    .kv{color:#7c3aed;}
+
+/* ── Conformidade CF ─────────────────────────────────────────────────────── */
+.rel-conf-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 7px; margin-bottom: 10px; }
+.rel-conf { padding: 8px 10px; border-radius: 6px; border: 1px solid; }
+.rel-conf .cl { font-size: 7px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 3px; }
+.rel-conf .cv { font-size: 14px; font-weight: 800; }
+.rel-conf .cs { font-size: 7px; margin-top: 1px; }
+.conf-cons { background:#fff7ed; border-color:#fed7aa; color:#9a3412; }
+.conf-aut  { background:#f0fdf4; border-color:#86efac; color:#166534; }
+.conf-il   { background:#fef2f2; border-color:#fca5a5; color:#991b1b; }
+
+/* ── Tabelas ─────────────────────────────────────────────────────────────── */
+.rel-table { width: 100%; border-collapse: collapse; font-size: 10px; }
+.rel-table th { background: #0A1A0F; color: #fff; padding: 5px 9px; text-align: left; font-size: 8px; text-transform: uppercase; letter-spacing: .05em; }
+.rel-table td { padding: 5px 9px; border-bottom: 1px solid #f3f4f6; color: #374151; }
+.rel-table tr:nth-child(even) td { background: #f9fafb; }
+.rel-table td:first-child { font-weight: 600; color: #6b7280; width: 38%; }
+.rel-table-sm th { font-size: 7px; padding: 4px 7px; background: #374151; }
+.rel-table-sm td { font-size: 9px; padding: 4px 7px; }
+
+/* ── Mapas ABNT ──────────────────────────────────────────────────────────── */
+.rel-mapa-wrap { border: 1.5px solid #374151; margin-bottom: 10px; }
+.rel-mapa-titulo { background: #0A1A0F; color: #fff; padding: 5px 10px; font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
+.rel-mapa-div { background: #e8f4e8; }
+.rel-mapa-rodape {
+  background: #f9fafb; border-top: 1px solid #374151;
+  padding: 5px 10px; display: grid;
+  grid-template-columns: 28px auto auto 1fr; gap: 12px; align-items: start;
+}
+.rel-mapa-norte { width:26px; height:26px; background:#fff; border:1px solid #e5e7eb; border-radius:4px; display:flex; align-items:center; justify-content:center; font-size:14px; flex-shrink:0; }
+.rel-mapa-info { font-size: 7px; color: #4b5563; line-height: 1.6; }
+.rel-mapa-info strong { display: block; font-size: 7px; text-transform: uppercase; letter-spacing: .04em; color: #0A1A0F; }
+.rel-mapa-fonte { font-size: 7px; color: #9ca3af; text-align: right; line-height: 1.6; }
+.rel-mapa-legenda { font-size: 7px; color: #4b5563; line-height: 1.7; }
+.rel-mapa-legenda span { display: block; }
+
+/* ── Gráficos de barras ──────────────────────────────────────────────────── */
+.rel-barras { display: flex; flex-direction: column; gap: 3px; }
+.rel-barra-row { display: flex; align-items: center; gap: 5px; }
+.rel-barra-ano { font-size: 8px; color: #6b7280; width: 28px; flex-shrink: 0; }
+.rel-barra-bg  { flex: 1; height: 11px; background: #f3f4f6; border-radius: 2px; overflow: hidden; }
+.rel-barra-fill{ height: 100%; border-radius: 2px; }
+.rel-barra-val { font-size: 8px; font-weight: 700; color: #374151; width: 52px; text-align: right; flex-shrink: 0; }
+.rel-barra-clf { font-size: 8px; width: 14px; text-align: center; flex-shrink: 0; }
+
+/* ── Reserva Legal ───────────────────────────────────────────────────────── */
+.rel-rl-barra { height: 14px; background: #f3f4f6; border-radius: 3px; overflow: hidden; margin: 5px 0; }
+.rel-rl-fill  { height: 100%; background: #16a34a; border-radius: 3px; }
+
+/* ── Narrativa jurídica ──────────────────────────────────────────────────── */
+.rel-narrativa {
+  font-size: 10px; color: #374151; line-height: 1.8;
+  padding: 10px 12px; background: #f9fafb;
+  border-left: 3px solid #0A1A0F; border-radius: 0 4px 4px 0;
+}
+.rel-refs {
+  margin-top: 7px; padding: 6px 10px;
+  background: #f0fdf4; border: 1px solid #86efac; border-radius: 4px;
+  font-size: 8px; color: #166534; line-height: 1.7;
+}
+
+/* ── Badge status ────────────────────────────────────────────────────────── */
+.asv-badge { display:inline-block; padding:1px 6px; border-radius:99px; font-size:8px; font-weight:700; }
+.asv-vigente { background:#dcfce7; color:#166534; }
+.asv-vencida  { background:#fee2e2; color:#991b1b; }
+.asv-suspensa { background:#fef9c3; color:#854d0e; }
+
+/* ── Rodapé da folha ─────────────────────────────────────────────────────── */
+.rel-pag-rodape {
+  padding: 7px 24px; background: #f9fafb; border-top: 1px solid #e5e7eb;
+  display: flex; justify-content: space-between;
+  font-size: 8px; color: #9ca3af; flex-shrink: 0;
+}
+
+/* ── Aviso legal ─────────────────────────────────────────────────────────── */
+.rel-aviso {
+  margin-top: 14px; padding: 9px 12px;
+  background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 6px;
+  font-size: 8px; color: #9ca3af; line-height: 1.6; text-align: center;
+}
+
+/* ── Modal de seleção ────────────────────────────────────────────────────── */
+#rel-modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,.5);
+  z-index: 1050; display: flex; align-items: center; justify-content: center;
+}
+#rel-modal {
+  background: #fff; border-radius: 12px; width: 460px;
+  box-shadow: 0 20px 60px rgba(0,0,0,.25); overflow: hidden;
+}
+#rel-modal .rm-hdr { padding: 16px 20px; background: linear-gradient(135deg,#0A1A0F,#1F4E2C); }
+#rel-modal .rm-hdr h3 { font-size: 14px; font-weight: 700; color: #fff; }
+#rel-modal .rm-hdr p  { font-size: 10px; color: rgba(255,255,255,.6); margin-top: 2px; }
+#rel-modal .rm-body { padding: 18px 20px; }
+#rel-modal .rm-footer { padding: 12px 20px; border-top: 1px solid #e5e7eb; display: flex; gap: 8px; justify-content: flex-end; background: #f9fafb; }
+
+.rm-opcao {
+  border: 2px solid #e5e7eb; border-radius: 8px; padding: 12px 14px;
+  cursor: pointer; transition: all .15s; margin-bottom: 8px;
+  display: flex; align-items: flex-start; gap: 10px;
+}
+.rm-opcao:hover { border-color: #52B788; background: #f0fdf4; }
+.rm-opcao.ativo  { border-color: #1F4E2C; background: #f0fdf4; }
+.rm-opcao .rm-ic { font-size: 22px; flex-shrink: 0; margin-top: 1px; }
+.rm-opcao .rm-tx h4 { font-size: 12px; font-weight: 700; color: #0A1A0F; }
+.rm-opcao .rm-tx p  { font-size: 10px; color: #6b7280; margin-top: 2px; line-height: 1.4; }
+.rm-opcao .rm-badge { margin-left: auto; font-size: 9px; padding: 2px 8px; border-radius: 99px; background: #dcfce7; color: #166534; border: 1px solid #86efac; white-space: nowrap; flex-shrink: 0; }
+
+.rm-label { font-size: 10px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 8px; }
+.rm-modos { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.rm-modo  { border: 2px solid #e5e7eb; border-radius: 8px; padding: 12px; cursor: pointer; transition: all .15s; text-align: center; }
+.rm-modo:hover { border-color: #52B788; }
+.rm-modo.ativo  { border-color: #1F4E2C; background: #f0fdf4; }
+.rm-modo .rm-mi { font-size: 20px; margin-bottom: 4px; }
+.rm-modo h4 { font-size: 11px; font-weight: 700; color: #0A1A0F; }
+.rm-modo p  { font-size: 9px; color: #9ca3af; margin-top: 3px; line-height: 1.4; }
+
+.rm-sep { border: none; border-top: 1px solid #e5e7eb; margin: 14px 0; }
+
+/* ── @media print ────────────────────────────────────────────────────────── */
+@media print {
+  body > *:not(#rel-print-root) { display: none !important; }
+  #rel-print-root { display: block !important; }
+  #rel-preview-overlay { position: static !important; background: none !important; display: block !important; }
+  #rel-preview-toolbar { display: none !important; }
+  #rel-preview-area { padding: 0 !important; overflow: visible !important; display: block !important; }
+
+  .rel-a4 {
+    width: 210mm; min-height: 297mm;
+    page-break-after: always;
+    box-shadow: none !important; margin: 0 !important;
+    break-after: page;
+  }
+  .rel-a4:last-child { page-break-after: avoid; break-after: avoid; }
+  .rel-mapa-wrap { page-break-inside: avoid; break-inside: avoid; }
+  .rel-secao     { page-break-inside: avoid; break-inside: avoid; }
+}
+
+@page { size: A4 portrait; margin: 0; }
