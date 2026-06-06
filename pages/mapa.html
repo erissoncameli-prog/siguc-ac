@@ -1293,7 +1293,12 @@ function _vegCard(id, titulo, desc, cor){
 // ══════════════════════════════════════════════════════════════
 async function carregarCamadas(){
   const { data } = await db.from('camadas_mapa').select('*').order('ordem');
-  camadas = (data||[]).map(c => ({ ...c, layer:null }));
+  const visPref = JSON.parse(localStorage.getItem('siguc_camadas_vis')||'{}');
+  camadas = (data||[]).map(c => ({
+    ...c,
+    visivel: visPref.hasOwnProperty(c.id) ? visPref[c.id] : c.visivel,
+    layer: null
+  }));
   camadas.forEach(c => { if(c.visivel) _renderizarCamada(c); });
   renderCamadasHtml();
 }
@@ -1302,16 +1307,25 @@ function _renderizarCamada(c){
   if(c.layer){ mapaL.removeLayer(c.layer); c.layer=null; }
   if(!c.geojson) return;
   const sc = c.style_config||{}, fo = sc.fillOpacity!=null?sc.fillOpacity:0.22, sw = sc.strokeWidth!=null?sc.strokeWidth:2;
-  const hidden = new Set(sc.hiddenFeatures||[]), featFill = c.feature_colors||{};
+  const globalStroke = sc.strokeColor||null;
+  const hidden = new Set(sc.hiddenFeatures||[]);
+  const featFill = c.feature_colors||{};
+  const featStroke = sc.featureStrokeColors||{};
   const allF = c.geojson.features||[];
   const hasNames = allF.some(f => f.properties && (f.properties.name||f.properties.Name||f.properties.NAME));
   const paletaFixa = {};
   allF.forEach((f,i) => { const n=f.properties?.name||f.properties?.Name||f.properties?.NAME||''; if(n&&!paletaFixa[n]) paletaFixa[n]=SUBBACIA_PALETTE[i%SUBBACIA_PALETTE.length]; });
   const visF = hidden.size>0 ? allF.filter(f => { const n=f.properties?.name||f.properties?.Name||f.properties?.NAME||''; return !hidden.has(n); }) : allF;
+  const usePalette = hasNames && allF.length > 1;
   c.layer = L.geoJSON({...c.geojson,features:visF},{
-    style: hasNames
-      ? (f) => { const n=f.properties?.name||f.properties?.Name||f.properties?.NAME||''; const fill=featFill[n]||paletaFixa[n]||c.cor; return {color:fill,weight:sw,opacity:.9,fillColor:fill,fillOpacity:fo,dashArray:'5 4'}; }
-      : { color:c.cor, weight:sw, opacity:.9, fillColor:c.cor, fillOpacity:fo, dashArray:'5 4' },
+    pointToLayer: (feature,latlng) => L.marker(latlng, { icon: L.divIcon({
+      className:'',
+      html:`<div style="width:14px;height:14px;border-radius:50%;background:${c.cor};border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>`,
+      iconSize:[14,14], iconAnchor:[7,7]
+    })}),
+    style: usePalette
+      ? (f) => { const n=f.properties?.name||f.properties?.Name||f.properties?.NAME||''; const fill=featFill[n]||paletaFixa[n]||'#9ca3af'; const stroke=featStroke[n]||globalStroke||fill; return {color:stroke,weight:sw,opacity:.9,fillColor:fill,fillOpacity:fo,dashArray:'5 4'}; }
+      : { color:globalStroke||c.cor, weight:sw, opacity:.9, fillColor:c.cor, fillOpacity:fo, dashArray:'5 4' },
     onEachFeature: hasNames ? (f,layer) => {
       const n=f.properties?.name||f.properties?.Name||f.properties?.NAME||'';
       if(n){ layer.bindTooltip(n,{permanent:true,direction:'center',className:'subbacia-label'}); layer.on('add',()=>layer.openTooltip()); }
@@ -1321,21 +1335,229 @@ function _renderizarCamada(c){
 }
 
 function renderCamadasHtml(){
+  const ehAdmin = appState.perfil==='super_admin'||appState.perfil==='gestor';
+  const btnAdd = document.getElementById('btn-add-camada');
+  if(btnAdd) btnAdd.style.display = ehAdmin ? 'flex' : 'none';
   const el = document.getElementById('bloco-camadas-lista'); if(!el) return;
-  if(!camadas.length){ el.innerHTML = '<div style="color:var(--cinza-400);font-size:11px">Nenhuma camada personalizada.</div>'; return; }
-  el.innerHTML = camadas.map(c => `
-    <div style="display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid var(--cinza-100)">
-      <input type="checkbox" ${c.visivel?'checked':''} style="accent-color:${c.cor};width:13px;height:13px;cursor:pointer" onchange="toggleCamada('${c.id}',this.checked)">
-      <div style="width:12px;height:12px;border-radius:2px;background:${c.cor};flex-shrink:0"></div>
-      <span style="font-size:12px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(c.nome)}</span>
-    </div>`).join('');
+  if(!camadas.length){
+    el.innerHTML = `<div style="font-size:11px;color:var(--cinza-400);padding:4px 0">${ehAdmin?'Nenhuma camada. Clique em ＋ para adicionar.':'Nenhuma camada disponível.'}</div>`;
+    return;
+  }
+  el.innerHTML = camadas.map(c => {
+    const sc=c.style_config||{}, fo=sc.fillOpacity!=null?sc.fillOpacity:0.22, sw=sc.strokeWidth!=null?sc.strokeWidth:2, sco=sc.strokeColor||c.cor;
+    const hidden=new Set(sc.hiddenFeatures||[]), featFill=c.feature_colors||{}, featStroke=sc.featureStrokeColors||{};
+    const allF=c.geojson?.features||[];
+    const hasNames=allF.some(f=>f.properties&&(f.properties.name||f.properties.Name||f.properties.NAME));
+    const namedFeats=hasNames?allF.map((f,i)=>{
+      const nome=f.properties?.name||f.properties?.Name||f.properties?.NAME||`Feature ${i+1}`;
+      return { nome, fill:featFill[nome]||SUBBACIA_PALETTE[i%SUBBACIA_PALETTE.length], stroke:featStroke[nome]||sco };
+    }):[];
+    const featRowsHtml=namedFeats.length>1?`
+      <div class="camada-expand-section">
+        <div class="camada-expand-section-title">Sub-camadas
+          <button class="camada-link-btn" onclick="_toggleAllFeats('${c.id}',true)">Todas</button>
+          <button class="camada-link-btn" onclick="_toggleAllFeats('${c.id}',false)">Nenhuma</button>
+        </div>
+        ${namedFeats.map(({nome,fill,stroke})=>`
+          <div class="camada-feat-row">
+            <input type="checkbox" ${!hidden.has(nome)?'checked':''} style="accent-color:var(--verde-c);width:12px;height:12px;cursor:pointer;flex-shrink:0"
+              onchange="_onFeatVis('${c.id}','${nome.replace(/'/g,"\\'")}',this.checked)">
+            <input type="color" value="${fill}" class="camada-color-mini" title="Cor de preenchimento"
+              oninput="_onFeatFillColor('${c.id}','${nome.replace(/'/g,"\\'")}',this.value)">
+            <input type="color" value="${stroke}" class="camada-color-mini" title="Cor da borda" style="outline:2px solid rgba(0,0,0,.15);outline-offset:-1px"
+              oninput="_onFeatStrokeColor('${c.id}','${nome.replace(/'/g,"\\'")}',this.value)">
+            <span class="camada-feat-nome" title="${escHtml(nome)}">${escHtml(nome)}</span>
+          </div>`).join('')}
+      </div>`:'' ;
+    const styleHtml=ehAdmin?`
+      <div class="camada-expand-section">
+        <div class="camada-expand-section-title">Estilo da camada</div>
+        ${!hasNames?`<div class="camada-style-row"><span class="camada-style-lbl">Cor preench.</span>
+          <input type="color" value="${c.cor}" class="camada-color-mini" oninput="_onCamadaFillColor('${c.id}',this.value)"></div>`:''}
+        <div class="camada-style-row"><span class="camada-style-lbl">Opacidade</span>
+          <input type="range" min="0" max="100" step="5" value="${Math.round(fo*100)}" class="camada-slider"
+            oninput="_onCamadaStyle('${c.id}','fillOpacity',this.value/100);this.nextElementSibling.textContent=this.value+'%'">
+          <span class="camada-style-val">${Math.round(fo*100)}%</span></div>
+        <div class="camada-style-row"><span class="camada-style-lbl">Cor borda</span>
+          <input type="color" value="${sco}" class="camada-color-mini" oninput="_onCamadaStyle('${c.id}','strokeColor',this.value)"></div>
+        <div class="camada-style-row"><span class="camada-style-lbl">Espessura</span>
+          <input type="range" min="0.5" max="6" step="0.5" value="${sw}" class="camada-slider"
+            oninput="_onCamadaStyle('${c.id}','strokeWidth',parseFloat(this.value));this.nextElementSibling.textContent=this.value+'px'">
+          <span class="camada-style-val">${sw}px</span></div>
+        <button id="btn-ssc-${c.id}" onclick="salvarStyleCamada('${c.id}')"
+          class="btn btn-primary" style="font-size:11px;padding:5px 0;margin-top:4px;width:100%">💾 Salvar estilo</button>
+      </div>`:'';
+    return `
+    <div class="camada-row-outer">
+      <div class="camada-row">
+        <input type="checkbox" ${c.visivel?'checked':''} style="accent-color:var(--verde-c);width:13px;height:13px;cursor:pointer;flex-shrink:0"
+          onchange="toggleCamada('${c.id}',this.checked)">
+        <div style="width:12px;height:12px;border-radius:2px;background:${c.cor};flex-shrink:0"></div>
+        <span style="font-size:12px;color:var(--cinza-700);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
+          title="${escHtml(c.nome)}">${escHtml(c.nome)}</span>
+        ${ehAdmin?`<button id="btn-exp-${c.id}" class="btn-camada-exp" title="Configurar estilo" onclick="toggleExpandirCamada('${c.id}')">⚙</button>`:''}
+        ${ehAdmin?`<button onclick="removerCamada('${c.id}')" title="Remover"
+          style="font-size:11px;padding:1px 5px;border:1px solid #FCA5A5;border-radius:4px;background:#FEF2F2;color:#DC2626;cursor:pointer;flex-shrink:0">✕</button>`:''}
+      </div>
+      ${ehAdmin?`<div id="camada-expand-${c.id}" class="camada-expand-body" style="display:none">${featRowsHtml}${styleHtml}</div>`:''}
+    </div>`;
+  }).join('');
 }
 
 function toggleCamada(id, vis){
   const c = camadas.find(x=>x.id===id); if(!c) return;
   c.visivel = vis;
   if(vis) _renderizarCamada(c); else { if(c.layer){ mapaL.removeLayer(c.layer); c.layer=null; } }
+  const visPref = JSON.parse(localStorage.getItem('siguc_camadas_vis')||'{}');
+  visPref[id] = vis;
+  localStorage.setItem('siguc_camadas_vis', JSON.stringify(visPref));
   _atualizarLegendaMapa();
+}
+
+function toggleExpandirCamada(id){
+  const body=document.getElementById(`camada-expand-${id}`), btn=document.getElementById(`btn-exp-${id}`);
+  if(!body) return;
+  const aberto=body.style.display!=='none';
+  body.style.display=aberto?'none':'block';
+  if(btn) btn.classList.toggle('ativo',!aberto);
+}
+
+function _onFeatVis(id,nome,visivel){
+  const c=camadas.find(x=>x.id===id); if(!c) return;
+  if(!c.style_config) c.style_config={};
+  const h=new Set(c.style_config.hiddenFeatures||[]);
+  visivel?h.delete(nome):h.add(nome);
+  c.style_config.hiddenFeatures=[...h];
+  _renderizarCamada(c);
+}
+function _toggleAllFeats(id,mostrar){
+  const c=camadas.find(x=>x.id===id); if(!c) return;
+  if(!c.style_config) c.style_config={};
+  c.style_config.hiddenFeatures=mostrar?[]:(c.geojson?.features||[]).map(f=>f.properties?.name||f.properties?.Name||f.properties?.NAME||'').filter(Boolean);
+  _renderizarCamada(c); renderCamadasHtml();
+}
+function _onFeatFillColor(id,nome,cor){
+  const c=camadas.find(x=>x.id===id); if(!c) return;
+  if(!c.feature_colors) c.feature_colors={};
+  c.feature_colors[nome]=cor; _renderizarCamada(c);
+}
+function _onFeatStrokeColor(id,nome,cor){
+  const c=camadas.find(x=>x.id===id); if(!c) return;
+  if(!c.style_config) c.style_config={};
+  if(!c.style_config.featureStrokeColors) c.style_config.featureStrokeColors={};
+  c.style_config.featureStrokeColors[nome]=cor; _renderizarCamada(c);
+}
+function _onCamadaFillColor(id,cor){
+  const c=camadas.find(x=>x.id===id); if(!c) return;
+  c.cor=cor; _renderizarCamada(c);
+}
+function _onCamadaStyle(id,prop,valor){
+  const c=camadas.find(x=>x.id===id); if(!c) return;
+  if(!c.style_config) c.style_config={};
+  c.style_config[prop]=valor; _renderizarCamada(c);
+}
+async function salvarStyleCamada(id){
+  const c=camadas.find(x=>x.id===id); if(!c) return;
+  const btn=document.getElementById(`btn-ssc-${id}`);
+  if(btn){ btn.disabled=true; btn.textContent='Salvando…'; }
+  const {error}=await db.from('camadas_mapa').update({cor:c.cor,feature_colors:c.feature_colors||{},style_config:c.style_config||{}}).eq('id',id);
+  if(btn){ btn.disabled=false; btn.textContent='💾 Salvar estilo'; }
+  if(error){ toast('Erro ao salvar: '+error.message,'error'); return; }
+  toast('Estilo salvo!','success');
+}
+async function removerCamada(id){
+  if(!confirm('Remover esta camada permanentemente?')) return;
+  const c=camadas.find(x=>x.id===id);
+  if(c?.layer) mapaL.removeLayer(c.layer);
+  camadas=camadas.filter(x=>x.id!==id);
+  renderCamadasHtml(); _atualizarLegendaMapa();
+  await db.from('camadas_mapa').delete().eq('id',id);
+}
+
+let _novaCamadaGeoJson=null;
+function abrirModalNovaCamada(){
+  _novaCamadaGeoJson=null;
+  document.getElementById('nc-nome').value='';
+  document.getElementById('nc-cor').value='#16a34a';
+  document.getElementById('nc-arquivo-status').textContent='Nenhum arquivo selecionado';
+  document.getElementById('nc-arquivo-status').style.color='var(--cinza-400)';
+  document.getElementById('nc-arquivo').value='';
+  document.getElementById('modal-nova-camada').style.display='flex';
+}
+function fecharModalNovaCamada(){
+  document.getElementById('modal-nova-camada').style.display='none';
+  _novaCamadaGeoJson=null;
+}
+function onNovaCamadaArquivo(file){
+  if(!file) return;
+  const statusEl=document.getElementById('nc-arquivo-status');
+  statusEl.textContent='Processando…'; statusEl.style.color='var(--cinza-500)';
+  const isZip=file.name.toLowerCase().endsWith('.zip');
+  if(isZip){
+    const reader=new FileReader();
+    reader.onload=async e=>{
+      try{
+        const zip=await JSZip.loadAsync(e.target.result);
+        const allFiles=Object.keys(zip.files).filter(f=>!zip.files[f].dir);
+        const shpFiles=allFiles.filter(f=>f.toLowerCase().endsWith('.shp'));
+        if(!shpFiles.length){ statusEl.textContent='Nenhum .shp encontrado.'; statusEl.style.color='#dc2626'; return; }
+        const allFeatures=[];
+        for(const shpPath of shpFiles){
+          const baseLower=shpPath.toLowerCase().replace(/\.shp$/,'');
+          const dbfPath=allFiles.find(f=>f.toLowerCase().replace(/\.dbf$/,'')===baseLower&&f.toLowerCase().endsWith('.dbf'));
+          const prjPath=allFiles.find(f=>f.toLowerCase().replace(/\.prj$/,'')===baseLower&&f.toLowerCase().endsWith('.prj'));
+          if(!dbfPath) continue;
+          const fileName=shpPath.split('/').pop().replace(/\.shp$/i,'');
+          const flatZip=new JSZip();
+          flatZip.file(fileName+'.shp',await zip.files[shpPath].async('arraybuffer'));
+          flatZip.file(fileName+'.dbf',await zip.files[dbfPath].async('arraybuffer'));
+          if(prjPath) flatZip.file(fileName+'.prj',await zip.files[prjPath].async('arraybuffer'));
+          const flatBuf=await flatZip.generateAsync({type:'arraybuffer'});
+          const result=await shp(flatBuf);
+          const feats=Array.isArray(result)?result.flatMap(g=>g.features||[]):(result.features||[]);
+          allFeatures.push(...feats);
+        }
+        if(!allFeatures.length){ statusEl.textContent='Nenhuma geometria encontrada.'; statusEl.style.color='#dc2626'; return; }
+        _novaCamadaGeoJson={type:'FeatureCollection',features:allFeatures};
+        const count=allFeatures.length;
+        statusEl.textContent=`✓ ${count} geometria${count>1?'s':''} processada${count>1?'s':''} com sucesso`;
+        statusEl.style.color='#16a34a';
+      }catch(err){ statusEl.textContent='Erro: '+err.message; statusEl.style.color='#dc2626'; }
+    };
+    reader.readAsArrayBuffer(file);
+  } else {
+    const reader=new FileReader();
+    reader.onload=e=>{
+      try{
+        _novaCamadaGeoJson=JSON.parse(e.target.result);
+        const count=(_novaCamadaGeoJson.features||[]).length||1;
+        statusEl.textContent=`✓ GeoJSON carregado — ${count} geometria${count>1?'s':''}`;
+        statusEl.style.color='#16a34a';
+      }catch(err){ statusEl.textContent='GeoJSON inválido: '+err.message; statusEl.style.color='#dc2626'; }
+    };
+    reader.readAsText(file,'utf-8');
+  }
+}
+async function salvarNovaCamada(){
+  const nome=document.getElementById('nc-nome').value.trim();
+  const cor=document.getElementById('nc-cor').value;
+  if(!nome){ toast('Informe um nome para a camada.','error'); return; }
+  if(!_novaCamadaGeoJson){ toast('Selecione um arquivo GeoJSON ou Shapefile .zip.','error'); return; }
+  const btn=document.getElementById('btn-salvar-nova-camada');
+  btn.disabled=true; btn.textContent='Salvando…';
+  const {data,error}=await db.from('camadas_mapa').insert({
+    nome, cor, geojson:_novaCamadaGeoJson, visivel:true,
+    uploaded_by:appState.usuario?.id||null
+  }).select().single();
+  btn.disabled=false; btn.textContent='Salvar camada';
+  if(error){ toast('Erro ao salvar: '+error.message,'error'); return; }
+  fecharModalNovaCamada();
+  const novaCamada={...data,layer:null};
+  camadas.push(novaCamada);
+  _renderizarCamada(novaCamada);
+  if(novaCamada.layer) try{ mapaL.fitBounds(novaCamada.layer.getBounds(),{padding:[20,20]}); }catch(_){}
+  renderCamadasHtml(); _atualizarLegendaMapa();
+  toast(`Camada "${nome}" adicionada com sucesso!`,'success');
 }
 
 // ══════════════════════════════════════════════════════════════
