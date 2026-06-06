@@ -3012,7 +3012,91 @@ async function _fetchProdesCAR(f){
   }
 }
 
-function _htmlProdes(d, f){
+// ── Seção Focos de Calor ──────────────────────────────────────────────────
+function _htmlFocosSection(focos, prodesData){
+  if(!focos) return `<div style="padding:8px 10px;background:var(--cinza-50);border:1px dashed var(--borda);border-radius:var(--raio);font-size:11px;color:var(--cinza-400)">
+    🔥 Focos de calor: carregando dados históricos...
+  </div>`;
+
+  if(focos.erro && !focos.historico?.length) return `<div style="padding:8px 10px;background:#fef2f2;border:1px solid #fca5a5;border-radius:var(--raio);font-size:11px;color:#dc2626">
+    ⚠️ Focos de calor: ${escHtml(focos.erro||'indisponível')}
+  </div>`;
+
+  const hist    = focos.historico || [];
+  const recentes = focos.recentes || { total:0, focos:[] };
+  const totalHist = hist.reduce((s,r)=>s+Number(r.total||0), 0);
+  const total   = totalHist + recentes.total;
+  const ultimo  = hist.reduce((m,r)=> r.ultimo_registro>m?r.ultimo_registro:m, '') ||
+                  recentes.focos[0]?.acq_date || '—';
+
+  if(!total) return `<div style="padding:10px 12px;background:#f0fdf4;border:1px solid #86efac;border-radius:var(--raio);font-size:11px;color:#16a34a;margin-bottom:10px">
+    ✅ Nenhum foco de calor registrado dentro deste imóvel (julho–outubro, histórico MODIS/VIIRS + recentes).
+  </div>`;
+
+  // Anos com PRODES para correlação
+  const anosProdes = new Set();
+  if(prodesData && !prodesData.erro){
+    Object.keys(prodesData.anual?.porAno||{}).forEach(a=>anosProdes.add(a));
+    Object.keys(prodesData.historico?.porAno||{}).forEach(a=>anosProdes.add(a));
+  }
+
+  const maxTotal = Math.max(...hist.map(r=>Number(r.total||0)), recentes.total||1, 1);
+  const barras = hist.map(r => {
+    const n   = Number(r.total||0);
+    const w   = (n/maxTotal*100).toFixed(1);
+    const corrProdes = anosProdes.has(String(r.ano));
+    const cor = corrProdes ? '#ef4444' : '#f97316';
+    return `<div style="display:flex;align-items:center;gap:6px;padding:2px 0">
+      <span style="font-size:10px;color:var(--cinza-500);width:32px;flex-shrink:0">${r.ano}</span>
+      <div style="flex:1;height:13px;background:#f3f4f6;border-radius:3px;overflow:hidden;position:relative">
+        <div style="height:100%;width:${w}%;background:${cor};border-radius:3px"></div>
+      </div>
+      <span style="font-size:10px;font-weight:600;color:var(--cinza-700);width:30px;text-align:right">${n}</span>
+      ${corrProdes?`<span title="Desmatamento PRODES no mesmo ano" style="font-size:9px;color:#dc2626">⚠</span>`:`<span style="width:12px"></span>`}
+    </div>`;
+  }).join('');
+
+  // Focos recentes (NRT)
+  const recHtml = recentes.total > 0 ? `
+  <div style="padding:7px 10px;background:#fef2f2;border:1px solid #fca5a5;border-radius:var(--raio);font-size:11px;margin-bottom:8px;display:flex;align-items:center;gap:8px">
+    <span style="font-size:16px">🔥</span>
+    <div><strong style="color:#dc2626">${recentes.total} foco(s) nos últimos 3 dias</strong>
+    <div style="font-size:10px;color:#9ca3af">Satélite VIIRS/NOAA-20 · Tempo Real (NRT)</div></div>
+  </div>` : '';
+
+  return `
+  <div style="padding:10px 12px;background:#fff7ed;border:1px solid #fed7aa;border-radius:var(--raio);margin-bottom:10px">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+      <div>
+        <div style="font-size:10px;font-weight:700;color:#9a3412;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px">🔥 Focos de Calor — INPE/FIRMS</div>
+        <div style="font-size:22px;font-weight:700;color:#ea580c;line-height:1.1">${total.toLocaleString('pt-BR')}</div>
+        <div style="font-size:10px;color:#9a3412">focos históricos (jul–out, MODIS+VIIRS)</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:9px;color:#9a3412;font-weight:600">Último registro</div>
+        <div style="font-size:11px;font-weight:700;color:#7c2d12">${ultimo}</div>
+        ${anosProdes.size?`<div style="font-size:9px;color:#dc2626;margin-top:3px">⚠ Correlação c/ PRODES</div>`:''}
+      </div>
+    </div>
+    ${recHtml}
+    ${hist.length?`<div style="margin-bottom:4px">
+      <div style="font-size:9px;font-weight:700;color:#9a3412;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">
+        Série histórica · <span style="color:#ef4444">■</span> com desmatamento PRODES
+      </div>
+      ${barras}
+    </div>`:''}
+    <label style="display:flex;align-items:center;gap:7px;cursor:pointer;padding:5px 0;border-top:1px solid #fed7aa;margin-top:6px">
+      <input type="checkbox" id="focos-mapa-toggle" style="accent-color:#ef4444;width:13px;height:13px;cursor:pointer"
+        onchange="_toggleFocosLayer(this.checked)">
+      <span style="font-size:11px;color:#7c2d12">🗺 Exibir focos recentes no mapa</span>
+    </label>
+    <div style="font-size:9px;color:#d97706;margin-top:4px;line-height:1.4">
+      📊 Fonte: MODIS Terra/Aqua (2001+) e VIIRS SNPP (2012+) via NASA FIRMS · Cobertura: julho–outubro de cada ano
+    </div>
+  </div>`;
+}
+
+function _htmlProdes(d, f, focos){
   const p = f?.properties||{};
   if(d?.erro) return `
     <div style="padding:20px;display:flex;flex-direction:column;gap:10px">
