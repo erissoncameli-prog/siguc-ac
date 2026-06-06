@@ -3150,9 +3150,12 @@ function _htmlProdes(d, f, focosExt){
   const f2 = n => Number(n||0).toLocaleString('pt-BR',{maximumFractionDigits:2});
   const f1 = n => Number(n||0).toLocaleString('pt-BR',{maximumFractionDigits:1});
   const pct = (v,tot) => tot>0 ? (v/tot*100) : 0;
-  const pctGeral = pct(d.totalGeral, d.areaCAR);
-  const pctAnual = pct(d.anual.totalHa, d.areaCAR);
-  const pctHist  = pct(d.historico.totalHa, d.areaCAR);
+  // Null-safe: protege contra dados incompletos
+  const anual    = d.anual    || { totalHa:0, porAno:{}, nIntersect:0, geojsonFeatures:[] };
+  const historico= d.historico|| { totalHa:0, porAno:{}, nIntersect:0, geojsonFeatures:[] };
+  const pctGeral = pct(d.totalGeral||0, d.areaCAR||1);
+  const pctAnual = pct(anual.totalHa, d.areaCAR||1);
+  const pctHist  = pct(historico.totalHa, d.areaCAR||1);
   const corGeral = pctGeral>30?'#dc2626':pctGeral>10?'#d97706':'#16a34a';
   const semDados = d.totalGeral===0;
   const local    = _carDadosLocais?.get?.(p.cod_imovel)||{};
