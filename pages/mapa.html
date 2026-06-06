@@ -2895,26 +2895,93 @@ function _htmlProdes(d, f){
 
   const f2 = n => Number(n||0).toLocaleString('pt-BR',{maximumFractionDigits:2});
   const f1 = n => Number(n||0).toLocaleString('pt-BR',{maximumFractionDigits:1});
-  const pctGeral = d.areaCAR>0 ? d.totalGeral/d.areaCAR*100 : 0;
-  const pctAnual = d.areaCAR>0 ? d.anual.totalHa/d.areaCAR*100 : 0;
-  const pctHist  = d.areaCAR>0 ? d.historico.totalHa/d.areaCAR*100 : 0;
+  const pct = (v,tot) => tot>0 ? (v/tot*100) : 0;
+  const pctGeral = pct(d.totalGeral, d.areaCAR);
+  const pctAnual = pct(d.anual.totalHa, d.areaCAR);
+  const pctHist  = pct(d.historico.totalHa, d.areaCAR);
   const corGeral = pctGeral>30?'#dc2626':pctGeral>10?'#d97706':'#16a34a';
   const semDados = d.totalGeral===0;
+  const local    = _carDadosLocais?.get?.(p.cod_imovel)||{};
+  const nomeClass= local.nome_class||'';
 
+  // ── Gráfico barras PRODES anual ─────────────────────────────────────────
   const maxAnualHa = Math.max(...Object.values(d.anual.porAno), 0.01);
   const barrasAnos = d.anosAnual.map(ano => {
-    const ha = d.anual.porAno[ano];
-    const w  = (ha/maxAnualHa*100).toFixed(1);
+    const ha  = d.anual.porAno[ano];
+    const w   = (ha/maxAnualHa*100).toFixed(1);
+    // cor por conformidade CF (primeiro feature deste ano)
+    const clf = d.anual.geojsonFeatures.find(ft=>ft.properties?.ano===ano)?.properties?.clf;
+    const cor = clf?.cor||'#dc2626';
     return `<div style="display:flex;align-items:center;gap:6px;padding:3px 0">
       <span style="font-size:10px;color:var(--cinza-500);width:32px;flex-shrink:0">${ano}</span>
       <div style="flex:1;height:14px;background:#f3f4f6;border-radius:3px;overflow:hidden">
-        <div style="height:100%;width:${w}%;background:#dc2626;border-radius:3px"></div>
+        <div style="height:100%;width:${w}%;background:${cor};border-radius:3px"></div>
       </div>
       <span style="font-size:10px;font-weight:600;color:var(--cinza-700);width:60px;text-align:right">${f2(ha)} ha</span>
+      ${clf&&clf.tipo!=='consolidado'?`<span style="font-size:9px;color:${cor};width:16px;text-align:center" title="${clf.label} — ${clf.art}">${clf.tipo==='autorizado'?'✅':clf.tipo==='irregular'?'🟠':'🔴'}</span>`:''}
     </div>`;
   }).join('');
 
+  // ── Gráfico barras focos de calor ───────────────────────────────────────
+  const focos = d.focos||{};
+  const focosAnos = focos.porAno||[];
+  const maxFocos  = Math.max(...focosAnos.map(r=>Number(r.total)), 1);
+  const anosComDesmat = new Set(d.anosAnual);
+  const barrasFocos = focosAnos.map(r => {
+    const w      = (Number(r.total)/maxFocos*100).toFixed(1);
+    const correl = anosComDesmat.has(String(r.ano));
+    return `<div style="display:flex;align-items:center;gap:6px;padding:3px 0">
+      <span style="font-size:10px;color:var(--cinza-500);width:32px;flex-shrink:0">${r.ano}</span>
+      <div style="flex:1;height:14px;background:#f3f4f6;border-radius:3px;overflow:hidden">
+        <div style="height:100%;width:${w}%;background:#f97316;border-radius:3px"></div>
+      </div>
+      <span style="font-size:10px;font-weight:600;color:var(--cinza-700);width:38px;text-align:right">${r.total}</span>
+      ${correl?`<span style="font-size:9px" title="Ano com desmatamento PRODES e foco de calor — possível correlação">⚠️</span>`:'<span style="width:16px"></span>'}
+    </div>`;
+  }).join('');
+
+  // ── Card conformidade CF ────────────────────────────────────────────────
+  const haIlLbl = d.asvBase ? 'Ilegal / sem ASV' : 'A verificar (sem base ASV)';
+  const pctIl   = pct(d.haAVerificar+d.haIrregular, d.areaCAR);
+  const pctAut  = pct(d.haAutorizado, d.areaCAR);
+  const pctCons = pct(d.haConsolidado, d.areaCAR);
+  const conformBg  = (d.haAVerificar+d.haIrregular)>0 ? '#fef2f2' : semDados ? '#f0fdf4' : '#fffbeb';
+  const conformBor = (d.haAVerificar+d.haIrregular)>0 ? '#fca5a5' : semDados ? '#86efac' : '#fde68a';
+  // RL
+  const modTxt = d.pequenaPropriedade ? `⚖️ Pequena propriedade (${f1(d.numModulo)} mód.) — Art. 67 CF aplicável` : '';
+
+  const cardConformidade = `
+  <div style="padding:10px 12px;background:${conformBg};border:1px solid ${conformBor};border-radius:var(--raio);margin-bottom:10px">
+    <div style="font-size:10px;font-weight:700;color:var(--cinza-600);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">⚖️ Conformidade — Lei 12.651/2012</div>
+    ${!d.asvBase?`<div style="font-size:10px;color:#92400e;background:#fffbeb;border:1px solid #fde68a;border-radius:4px;padding:5px 8px;margin-bottom:8px">⚠️ Base SINAFLOR não carregada — desmatamentos pós-2008 classificados como <strong>a verificar</strong></div>`:''}
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:11px">
+      <div style="padding:7px 9px;background:#fff7ed;border-radius:4px">
+        <div style="font-size:9px;font-weight:700;color:#9a3412;margin-bottom:2px">🟡 Consolidado</div>
+        <div style="font-weight:700;color:#c2410c">${f2(d.haConsolidado)} ha</div>
+        <div style="font-size:9px;color:#9a3412">${f1(pctCons)}% · Art. 61-A</div>
+      </div>
+      <div style="padding:7px 9px;background:#f0fdf4;border-radius:4px">
+        <div style="font-size:9px;font-weight:700;color:#166534;margin-bottom:2px">✅ Autorizado</div>
+        <div style="font-weight:700;color:#16a34a">${f2(d.haAutorizado)} ha</div>
+        <div style="font-size:9px;color:#166534">${f1(pctAut)}% · Arts. 26-27</div>
+      </div>
+      <div style="padding:7px 9px;background:#fef2f2;border-radius:4px;grid-column:1/-1">
+        <div style="font-size:9px;font-weight:700;color:#991b1b;margin-bottom:2px">🔴 ${escHtml(haIlLbl)}</div>
+        <div style="font-weight:700;color:#dc2626">${f2(d.haAVerificar+d.haIrregular)} ha</div>
+        <div style="font-size:9px;color:#991b1b">${f1(pctIl)}% · Art. 38 CF</div>
+      </div>
+    </div>
+    ${d.deficitRL>0?`
+    <div style="margin-top:8px;padding:6px 8px;background:#faf5ff;border:1px solid #e9d5ff;border-radius:4px;font-size:10px;color:#6d28d9">
+      📐 <strong>Déficit de Reserva Legal estimado: ${f2(d.deficitRL)} ha</strong>
+      <div style="font-size:9px;color:#7c3aed;margin-top:2px">Exigência: 80% = ${f2(d.exigenciaRL)} ha · Remanescente estimado: ${f2(d.florestaRemanescente)} ha — Art. 12, I CF${d.pequenaPropriedade?' · '+modTxt:''}</div>
+    </div>`:''}
+    ${nomeClass==='Vermelho'?`<div style="margin-top:6px;font-size:10px;color:#dc2626;padding:5px 8px;background:#fef2f2;border-radius:4px">🔴 Imóvel Vermelho no SICAR — Art. 78-A CF: restrição de crédito rural aplicável.</div>`:''}
+  </div>`;
+
   return `<div style="padding:4px 0">
+    ${cardConformidade}
+
     <!-- KPI total -->
     <div style="margin:0 0 10px;padding:14px;background:${semDados?'#f0fdf4':'#fef2f2'};border:1px solid ${semDados?'#86efac':'#fca5a5'};border-radius:var(--raio);text-align:center">
       <div style="font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Total desmatado — PRODES/INPE</div>
@@ -2934,7 +3001,7 @@ function _htmlProdes(d, f){
         <div style="font-size:9px;font-weight:700;color:#9a3412;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">🕰 Acumulado pré-2008</div>
         <div style="font-size:18px;font-weight:700;color:#c2410c">${f2(d.historico.totalHa)} ha</div>
         <div style="font-size:10px;color:#9a3412;margin-top:2px">${f1(pctHist)}% da área</div>
-        <div style="font-size:9px;color:#fdba74;margin-top:4px">Passivo histórico antes do monitoramento</div>
+        <div style="font-size:9px;color:#fdba74;margin-top:4px">Área consolidada — Art. 61-A</div>
       </div>
       <div style="padding:10px 12px;background:#fef2f2;border:1px solid #fca5a5;border-radius:var(--raio)">
         <div style="font-size:9px;font-weight:700;color:#991b1b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">📅 Anual 2008–hoje</div>
@@ -2945,9 +3012,29 @@ function _htmlProdes(d, f){
     </div>
     ${d.anosAnual.length?`
     <div style="padding:10px 12px;background:var(--cinza-50);border:1px solid var(--borda);border-radius:var(--raio);margin-bottom:10px">
-      <div style="font-size:10px;font-weight:700;color:var(--cinza-600);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Detalhamento anual (2008–hoje)</div>
+      <div style="font-size:10px;font-weight:700;color:var(--cinza-600);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Desmatamento anual — colorido por conformidade CF</div>
+      <div style="font-size:9px;color:var(--cinza-400);margin-bottom:8px">✅ autorizado · 🟠 irregular · 🔴 a verificar/ilegal · ⚠️ = foco no mesmo ano</div>
       ${barrasAnos}
     </div>`:''}`}
+
+    <!-- Focos de calor -->
+    <div style="padding:10px 12px;background:${focosAnos.length?'#fff7ed':'var(--cinza-50)'};border:1px solid ${focosAnos.length?'#fed7aa':'var(--borda)'};border-radius:var(--raio);margin-bottom:10px">
+      <div style="font-size:10px;font-weight:700;color:${focosAnos.length?'#9a3412':'var(--cinza-600)'};text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">
+        🔥 Focos de Calor — BDQueimadas/INPE
+        ${focos.total>0?`<span style="font-size:12px;margin-left:6px;font-weight:700">${focos.total}</span> <span style="font-size:9px;font-weight:400">total histórico</span>`:''}
+      </div>
+      ${!focos.temHistorico?`
+      <div style="font-size:10px;color:#6b7280;line-height:1.5">
+        Base histórica vazia — importe dados FIRMS/BDQueimadas para o Supabase.
+        ${!focos.temFirmsKey?`<br>Configure <code>FIRMS_MAP_KEY</code> no Vercel para dados NRT (últimos 10 dias).`:''}
+        <br><a href="https://firms.modaps.eosdis.nasa.gov/api/" target="_blank" style="color:#2563eb">Obter MAP_KEY gratuito →</a>
+        &nbsp;|&nbsp;
+        <a href="https://queimadas.dgi.inpe.br/queimadas/bdqueimadas" target="_blank" style="color:#2563eb">BDQueimadas →</a>
+      </div>`:`
+      ${focos.correlacionados?.length?`<div style="font-size:10px;color:#c2410c;background:#fef2f2;border-radius:4px;padding:4px 7px;margin-bottom:6px">⚠️ Correlação temporal: focos detectados em ${focos.correlacionados.length} ano(s) com desmatamento PRODES.</div>`:''}
+      ${focosAnos.length?`<div style="font-size:9px;color:var(--cinza-400);margin-bottom:6px">${focos.anoMin}–${focos.anoMax} · ⚠️ = ano com desmatamento PRODES</div>${barrasFocos}`:''}
+      ${focos.nrt?.length?`<div style="margin-top:6px;font-size:10px;color:#9a3412">🔴 ${focos.nrt.length} foco(s) NRT (últimos 10 dias) na área do imóvel.</div>`:''}`}
+    </div>
 
     <!-- Metadados -->
     <div style="padding:8px 10px;background:var(--cinza-50);border:1px solid var(--borda);border-radius:var(--raio);margin-bottom:10px;font-size:11px">
@@ -2958,6 +3045,10 @@ function _htmlProdes(d, f){
       <div style="display:flex;justify-content:space-between;padding:2px 0">
         <span style="color:var(--cinza-500)">Polígonos anuais intersectados</span>
         <strong>${d.anual.nIntersect} / ${d.nFeaturesAnual}</strong>
+      </div>
+      <div style="display:flex;justify-content:space-between;padding:2px 0">
+        <span style="color:var(--cinza-500)">Base SINAFLOR (ASVs)</span>
+        <strong>${d.asvBase?`${d.asvList.length} registro(s)`:'⚠️ não carregada'}</strong>
       </div>
     </div>
 
@@ -2973,13 +3064,20 @@ function _htmlProdes(d, f){
         <input type="checkbox" id="prodes-toggle-anual" style="accent-color:#dc2626;width:13px;height:13px;cursor:pointer"
           onchange="_toggleProdesCarLayer('anual',this.checked)">
         <div style="width:12px;height:12px;background:#dc2626;border-radius:2px;flex-shrink:0;opacity:.85"></div>
-        <span style="font-size:11px;color:var(--cinza-700);flex:1">Desmatamento anual (2008–hoje)</span>
+        <span style="font-size:11px;color:var(--cinza-700);flex:1">Desmatamento anual (2008–hoje) — colorido por CF</span>
       </label>
-      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:4px 0">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:4px 0;border-bottom:1px solid var(--cinza-100)">
         <input type="checkbox" id="prodes-toggle-hist" style="accent-color:#c2410c;width:13px;height:13px;cursor:pointer"
           onchange="_toggleProdesCarLayer('hist',this.checked)">
         <div style="width:12px;height:12px;background:#c2410c;border-radius:2px;flex-shrink:0;opacity:.85"></div>
-        <span style="font-size:11px;color:var(--cinza-700);flex:1">Acumulado pré-2008</span>
+        <span style="font-size:11px;color:var(--cinza-700);flex:1">Acumulado pré-2008 (área consolidada)</span>
+      </label>
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:4px 0">
+        <input type="checkbox" id="prodes-toggle-focos" style="accent-color:#f97316;width:13px;height:13px;cursor:pointer"
+          onchange="_toggleProdesCarLayer('focos',this.checked)">
+        <div style="width:12px;height:12px;background:#f97316;border-radius:50%;flex-shrink:0;opacity:.9"></div>
+        <span style="font-size:11px;color:var(--cinza-700);flex:1">Focos de calor</span>
+        ${(focos.pontos?.length||focos.nrt?.length)?`<span style="font-size:9px;color:#f97316;font-weight:600">${focos.pontos?.length||focos.nrt?.length} pts</span>`:''}
       </label>
     </div>
 
