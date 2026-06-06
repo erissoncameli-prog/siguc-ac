@@ -1481,14 +1481,32 @@ async function removerCamada(id){
 }
 
 let _novaCamadaGeoJson=null;
+let _ucOpcoes=[];
+
+async function _carregarUCsNoSelect(){
+  if(_ucOpcoes.length) return;
+  const {data}=await db.from('unidades_conservacao').select('id,nome,sigla,categoria').order('nome');
+  _ucOpcoes=data||[];
+  const sel=document.getElementById('nc-uc');
+  if(!sel) return;
+  _ucOpcoes.forEach(uc=>{
+    const opt=document.createElement('option');
+    opt.value=uc.id;
+    opt.textContent=`${uc.sigla?uc.sigla+' — ':''}${uc.nome}`;
+    sel.appendChild(opt);
+  });
+}
+
 function abrirModalNovaCamada(){
   _novaCamadaGeoJson=null;
   document.getElementById('nc-nome').value='';
   document.getElementById('nc-cor').value='#16a34a';
+  document.getElementById('nc-uc').value='';
   document.getElementById('nc-arquivo-status').textContent='Nenhum arquivo selecionado';
   document.getElementById('nc-arquivo-status').style.color='var(--cinza-400)';
   document.getElementById('nc-arquivo').value='';
   document.getElementById('modal-nova-camada').style.display='flex';
+  _carregarUCsNoSelect();
 }
 function fecharModalNovaCamada(){
   document.getElementById('modal-nova-camada').style.display='none';
