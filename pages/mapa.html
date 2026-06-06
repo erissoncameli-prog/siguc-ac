@@ -197,6 +197,14 @@
   .mapa-painel-wrap.mobile-aberto #mapa-scrollbar-outer{display:none;}
   .btn-filtros-mobile{display:flex;}
 }
+/* Painel análise alerta */
+.malerta-panel{position:fixed;top:0;right:0;width:400px;height:100vh;background:#fff;z-index:650;display:flex;flex-direction:column;box-shadow:-4px 0 32px rgba(0,0,0,.22);transition:transform .28s cubic-bezier(.4,0,.2,1);overflow:hidden;min-width:280px;max-width:600px;transform:translateX(100%);}
+.malerta-panel.aberto{transform:translateX(0);}
+.malerta-tabs-bar{display:flex;border-bottom:1px solid var(--borda);flex-shrink:0;background:#fff;}
+.malerta-tab{flex:1;padding:10px 0;font-size:12px;font-weight:500;border:none;background:transparent;cursor:pointer;border-bottom:2px solid transparent;color:#6B7280;font-family:'DM Sans',sans-serif;transition:all .15s;}
+.malerta-tab.ativo{color:#1F4E2C;border-bottom-color:#1F4E2C;}
+.malerta-tab:hover:not(.ativo){background:#f9fafb;}
+.malerta-body{flex:1;overflow-y:auto;padding:14px 16px;}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="../js/observability.js"></script>
