@@ -2751,23 +2751,55 @@ async function _iniciarProdesCAR(f){
   }
 }
 
+// Classifica um polígono PRODES pelo Código Florestal (Lei 12.651/2012)
+function _classificarDesmatamentoCF(ano, asvList){
+  if(!ano || ano < 2008) return { tipo:'consolidado', cor:'#d97706', label:'🟡 Consolidado', art:'Art. 61-A' };
+  if(!asvList || !asvList.length) return { tipo:'a_verificar', cor:'#dc2626', label:'🔴 A verificar', art:'Art. 38 · sem base ASV' };
+  const inicio = new Date(`${ano}-01-01`);
+  const fim    = new Date(`${ano}-12-31`);
+  const asv = asvList.find(a => {
+    if(!a.data_emissao || !a.data_validade) return false;
+    return new Date(a.data_emissao) <= fim && new Date(a.data_validade) >= inicio;
+  });
+  if(!asv) return { tipo:'ilegal', cor:'#dc2626', label:'🔴 Ilegal', art:'Art. 38 CF' };
+  if(new Date(asv.data_validade) < inicio) return { tipo:'irregular', cor:'#f97316', label:'🟠 Irregular', art:'ASV vencida' };
+  return { tipo:'autorizado', cor:'#16a34a', label:'✅ Autorizado', art:'Arts. 26-27 CF' };
+}
+
 async function _fetchProdesCAR(f){
   let carPoly;
   try{ carPoly = turf.feature(f.geometry); }
   catch(e){ return { erro: 'Geometria inválida para este imóvel.' }; }
 
-  const bb = turf.bbox(carPoly);
+  const bb   = turf.bbox(carPoly);
   const bbox = [bb[0]-0.01, bb[1]-0.01, bb[2]+0.01, bb[3]+0.01];
+  const cod     = f.properties?.cod_imovel;
+  const cpfCnpj = f.properties?.cpf_cnpj;
 
   try{
-    const res = await fetch('/api/prodes-proxy', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ bbox }),
-      signal: AbortSignal.timeout(35000),
-    });
-    const json = await res.json();
-    if(!res.ok || json.error) throw new Error(json.error || `HTTP ${res.status}`);
+    const [prodesRes, focosRes, asvRes] = await Promise.allSettled([
+      fetch('/api/prodes-proxy', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ bbox }), signal: AbortSignal.timeout(35000),
+      }).then(r => r.json()),
+      fetch('/api/focos-proxy', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ bbox, geojson_poly: f.geometry }),
+        signal: AbortSignal.timeout(20000),
+      }).then(r => r.json()),
+      cod
+        ? db.from('sinaflor_asv')
+            .select('num_asv,area_ha,data_emissao,data_validade,tipo_supressao,status')
+            .or(`cod_imovel.eq.${cod}${cpfCnpj?`,cpf_cnpj.eq.${cpfCnpj}`:''}`)
+            .order('data_emissao')
+        : Promise.resolve({ data: [], error: null }),
+    ]);
+
+    const json = prodesRes.status === 'fulfilled' ? prodesRes.value : null;
+    if(!json || json.error) throw new Error(json?.error || 'Erro PRODES');
+
+    const asvList   = asvRes.status==='fulfilled' ? (asvRes.value?.data||[]) : [];
+    const focosData = focosRes.status==='fulfilled' ? focosRes.value : { porAno:[], pontos:[], nrt:[], total:0, temHistorico:false, temFirmsKey:false };
 
     const areaCAR = parseFloat(f.properties?.area) || turf.area(carPoly)/10000;
 
@@ -2779,13 +2811,14 @@ async function _fetchProdesCAR(f){
         try{
           const inter = turf.intersect(carPoly, turf.feature(feat.geometry));
           if(!inter) continue;
-          const ha = turf.area(inter)/10000;
+          const ha  = turf.area(inter)/10000;
           if(ha < 0.01) continue;
           const ano = String(feat.properties?.year||feat.properties?.ano
             ||feat.properties?.data_detec?.slice(0,4)||'N/D');
+          const clf = _classificarDesmatamentoCF(parseInt(ano), asvList);
           porAno[ano] = (porAno[ano]||0) + ha;
           totalHa += ha; nIntersect++;
-          geojsonFeatures.push({...inter, properties:{...feat.properties, ha_calc:ha, ano}});
+          geojsonFeatures.push({...inter, properties:{...feat.properties, ha_calc:ha, ano, clf}});
         }catch(_){}
       }
       return { porAno, totalHa, nIntersect, geojsonFeatures };
@@ -2795,10 +2828,47 @@ async function _fetchProdesCAR(f){
     const historico = calcIntersect(json.historico?.features);
     const totalGeral = anual.totalHa + historico.totalHa;
     const anosAnual  = Object.keys(anual.porAno).sort();
+
+    // Totais por conformidade CF (somente polígonos 2008+)
+    let haAutorizado=0, haIlegal=0, haAVerificar=0, haIrregular=0;
+    for(const feat of anual.geojsonFeatures){
+      const ha  = feat.properties.ha_calc;
+      const tp  = feat.properties.clf?.tipo;
+      if(tp==='autorizado')  haAutorizado  += ha;
+      else if(tp==='irregular') haIrregular += ha;
+      else                    haAVerificar  += ha; // ilegal + a_verificar
+    }
+
+    // Reserva Legal (Art. 12, I — 80% na Amazônia)
+    const numModulo        = parseFloat(f.properties?.num_modulo || 0);
+    const pequenaPropriedade = numModulo > 0 && numModulo <= 4;
+    const exigenciaRL      = areaCAR * 0.80;
+    const florestaRemanescente = Math.max(0, areaCAR - totalGeral);
+    const deficitRL        = Math.max(0, exigenciaRL - florestaRemanescente);
+
+    // Correlação focos × desmatamento (mesmo ano)
+    const anosComDesmat = new Set(anosAnual);
+    const focosCorrel   = (focosData.porAno||[]).filter(r => anosComDesmat.has(String(r.ano)));
+    const focosAnos     = (focosData.porAno||[]);
+    const totalFocos    = focosData.total || 0;
+    const anoMinFocos   = focosAnos.length ? Math.min(...focosAnos.map(r=>r.ano)) : null;
+    const anoMaxFocos   = focosAnos.length ? Math.max(...focosAnos.map(r=>r.ano)) : null;
+
     return {
       anual, historico, totalGeral, anosAnual, areaCAR,
       nFeaturesAnual:     json.anual?.features?.length||0,
       nFeaturesHistorico: json.historico?.features?.length||0,
+      // conformidade CF
+      haConsolidado: historico.totalHa, haAutorizado, haAVerificar, haIrregular,
+      asvList, asvBase: asvList.length > 0,
+      // RL
+      numModulo, pequenaPropriedade, exigenciaRL, florestaRemanescente, deficitRL,
+      // focos
+      focos: {
+        porAno: focosAnos, pontos: focosData.pontos||[], nrt: focosData.nrt||[],
+        total: totalFocos, temHistorico: focosData.temHistorico, temFirmsKey: focosData.temFirmsKey,
+        correlacionados: focosCorrel, anoMin: anoMinFocos, anoMax: anoMaxFocos,
+      },
     };
   }catch(e){
     const msg = e.name==='TimeoutError'
