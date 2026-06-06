@@ -3782,10 +3782,7 @@ async function _abrirProjetoPorAlertaId(id) {
 
 // ── Camada de projetos no mapa ──────────────────────────────
 async function carregarProjetos() {
-  const { data } = await db.from('projetos_analise')
-    .select('id,titulo,tipo,status,uc_nome,area_calculada_ha,geom,alerta_id,criado_em')
-    .not('geom', 'is', null)
-    .neq('status', 'arquivado')
+  const { data } = await db.rpc('listar_projetos_mapa')
 
   if (_projetosLayer) { mapaL.removeLayer(_projetosLayer) }
   _projetosLayer = L.layerGroup()
@@ -3794,10 +3791,10 @@ async function carregarProjetos() {
   const ICONE_TIPO_PROJ = { verificacao_campo:'🥾', sobrevoo:'✈', analise_imagem:'🛰', fiscalizacao:'⚖', outro:'📋' }
 
   ;(data || []).forEach(p => {
-    if (!p.geom) return
+    if (!p.geom_geojson) return
     let geojsonGeom
     try {
-      geojsonGeom = typeof p.geom === 'object' ? p.geom : JSON.parse(p.geom)
+      geojsonGeom = JSON.parse(p.geom_geojson)
     } catch { return }
 
     const cor = COR_STATUS[p.status] ?? '#64748b'
