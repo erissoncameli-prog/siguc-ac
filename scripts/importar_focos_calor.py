@@ -180,7 +180,7 @@ def main():
 
                 n = inserir_supabase(uniq, headers)
                 total_inseridos += n
-                print(f'  {ano}: {len(uniq)} focos únicos → {n} inseridos')
+                print(f'  {ano}: {len(uniq)} focos unicos -> {n} inseridos')
             else:
                 print(f'  {ano}: 0 focos')
 
