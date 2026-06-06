@@ -261,6 +261,52 @@
 <body>
 <div id="app"><div style="display:flex;align-items:center;justify-content:center;height:100vh"><div class="spinner"></div></div></div>
 
+<!-- Modal Nova Camada -->
+<div id="modal-nova-camada" onclick="if(event.target===this)fecharModalNovaCamada()">
+  <div class="nc-modal">
+    <div class="nc-header">
+      <span style="font-size:20px">📐</span>
+      <h3>Nova Camada Personalizada</h3>
+      <button onclick="fecharModalNovaCamada()" style="background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:50%;width:28px;height:28px;cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center">✕</button>
+    </div>
+    <div class="nc-body">
+      <div class="nc-field">
+        <label class="nc-label">Nome da camada</label>
+        <input id="nc-nome" class="nc-input" type="text" placeholder="Ex: Zonas de Amortecimento, Hidrografia...">
+      </div>
+      <div style="display:flex;gap:10px">
+        <div class="nc-field" style="flex:1">
+          <label class="nc-label">Cor padrão</label>
+          <input id="nc-cor" class="nc-input" type="color" value="#16a34a" style="height:38px;cursor:pointer">
+        </div>
+      </div>
+      <div class="nc-field">
+        <label class="nc-label">Arquivo</label>
+        <div class="nc-drop-area" id="nc-drop-area"
+          onclick="document.getElementById('nc-arquivo').click()"
+          ondragover="event.preventDefault();this.classList.add('hover')"
+          ondragleave="this.classList.remove('hover')"
+          ondrop="event.preventDefault();this.classList.remove('hover');onNovaCamadaArquivo(event.dataTransfer.files[0])">
+          <div class="nc-drop-icon">📂</div>
+          <div class="nc-drop-txt">Clique ou arraste o arquivo aqui</div>
+          <div class="nc-drop-tipos">Aceita: <strong>.geojson</strong> · <strong>.json</strong> · <strong>.zip</strong> (Shapefile)</div>
+        </div>
+        <input type="file" id="nc-arquivo" accept=".geojson,.json,.zip" style="display:none"
+          onchange="onNovaCamadaArquivo(this.files[0])">
+        <div id="nc-arquivo-status" style="font-size:11px;color:var(--cinza-400);margin-top:5px">Nenhum arquivo selecionado</div>
+      </div>
+      <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:10px 12px;font-size:11px;color:#92400e;line-height:1.5">
+        <strong>Shapefile:</strong> compacte os arquivos <code>.shp</code>, <code>.dbf</code> e <code>.prj</code> em um único <code>.zip</code>.<br>
+        <strong>GeoJSON:</strong> envie o arquivo <code>.geojson</code> ou <code>.json</code> diretamente.
+      </div>
+    </div>
+    <div class="nc-footer">
+      <button onclick="fecharModalNovaCamada()" class="btn btn-secondary" style="flex:1">Cancelar</button>
+      <button id="btn-salvar-nova-camada" onclick="salvarNovaCamada()" class="btn btn-primary" style="flex:2">Salvar camada</button>
+    </div>
+  </div>
+</div>
+
 <!-- Modal de Configurações CAR -->
 <div id="car-cfg-overlay" onclick="if(event.target===this)fecharCfgCAR()">
   <div id="car-cfg-modal">
