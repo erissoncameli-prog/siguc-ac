@@ -776,8 +776,20 @@ async function _imprimirRelatorio() {
 }
 
 async function _executarPrint() {
-  // Aguarda tiles antes de imprimir
-  await new Promise(r => setTimeout(r, 800));
+  // Aguarda todos os tiles (img) do preview carregarem antes de imprimir
+  const area = document.getElementById('rel-preview-area');
+  if (area) {
+    const imgs = [...area.querySelectorAll('img')];
+    if (imgs.length) {
+      toast('Aguardando mapas carregarem…', 'info');
+      await Promise.allSettled(imgs.map(img =>
+        img.complete ? Promise.resolve() :
+        new Promise(r => { img.onload = r; img.onerror = r; setTimeout(r, 8000); })
+      ));
+    }
+  }
+  // Delay extra para garantir render do canvas Leaflet
+  await new Promise(r => setTimeout(r, 600));
   window.print();
 }
 
