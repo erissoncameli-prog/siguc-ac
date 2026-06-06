@@ -2711,13 +2711,85 @@ function _htmlCarDiagnostico(d, f){
 
   ${local.nome_class?`
   <div style="background:var(--cinza-50);border-left:3px solid #1F4E2C;padding:10px 12px;border-radius:0 var(--raio) var(--raio) 0;font-size:11px;color:var(--cinza-700);line-height:1.7;margin-bottom:10px">
-    <div style="font-size:9px;font-weight:700;color:#1F4E2C;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">📋 Diagnóstico</div>
+    <div style="font-size:9px;font-weight:700;color:#1F4E2C;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">📋 Diagnóstico SICAR</div>
     ${{'Verde':'✅ Classificado como <strong>Verde</strong> no SICAR — imóvel em conformidade com o Código Florestal.',
        'Amarelo':'🟡 Classificado como <strong>Amarelo</strong> no SICAR — pendências de regularização a resolver.',
        'Vermelho':'🔴 Classificado como <strong>Vermelho</strong> — imóvel em <strong>não conformidade</strong> com o Código Florestal.',
        'Não Classificado':'⚪ <strong>Não classificado</strong> no SICAR — análise técnica pendente.'}[local.nome_class]||''}
     ${d.emUC?`<p style="margin:5px 0 0">⚠️ Imóvel com sobreposição com <strong>${escHtml(_carUCAtual||'UC')}</strong> — situação requer análise de regularização fundiária.</p>`:''}
   </div>`:''}
+
+  ${(()=>{
+    // Narrativa jurídica integrada — usa dados PRODES+focos do cache se disponível
+    const pr = _carProdesCache?.get?.(p.cod_imovel);
+    if(!pr || pr.erro) return `
+    <div style="padding:8px 10px;background:var(--cinza-50);border:1px solid var(--borda);border-radius:var(--raio);margin-bottom:10px;font-size:10px;color:var(--cinza-500);text-align:center">
+      📊 Acesse a aba <strong>🌳 PRODES</strong> para análise integrada de conformidade com o Código Florestal.
+    </div>`;
+    const f2n = n => Number(n||0).toLocaleString('pt-BR',{maximumFractionDigits:2});
+    const f1n = n => Number(n||0).toLocaleString('pt-BR',{maximumFractionDigits:1});
+    const nome    = escHtml(local.nom_imovel||local.nome_compl||p.cod_imovel||'Este imóvel');
+    const totalHa = f2n(pr.totalGeral);
+    const haConsol= f2n(pr.haConsolidado);
+    const haPos   = f2n(pr.anual?.totalHa||0);
+    const haIl    = f2n((pr.haAVerificar||0)+(pr.haIrregular||0));
+    const haAut   = f2n(pr.haAutorizado||0);
+    const focos   = pr.focos||{};
+    const nFocos  = focos.total||0;
+    const anoMin  = focos.anoMin;
+    const anoMax  = focos.anoMax;
+    const nCorrel = focos.correlacionados?.length||0;
+    const classe  = escHtml(local.nome_class||'Não Classificado');
+    const defRL   = pr.deficitRL||0;
+    const exigRL  = f2n(pr.exigenciaRL||0);
+    const defRLf  = f2n(defRL);
+    const modf    = pr.numModulo>0 ? f1n(pr.numModulo) : null;
+    const pequena = pr.pequenaPropriedade;
+
+    // Recomendação
+    const ilegalHa = (pr.haAVerificar||0)+(pr.haIrregular||0);
+    let recomendacao;
+    if(pr.totalGeral===0) recomendacao='<strong>Recomendação:</strong> Imóvel sem registro de desmatamento no PRODES — manter monitoramento periódico.';
+    else if(ilegalHa>0 && nFocos>0 && nCorrel>0) recomendacao='<strong>Recomendação:</strong> Instaurar procedimento administrativo — desmatamento ilegal correlacionado com focos de calor (Arts. 38 e 50 CF). Verificar necessidade de embargo e PRA (Arts. 59-68 CF).';
+    else if(ilegalHa>0) recomendacao=`<strong>Recomendação:</strong> Verificar ASVs vigentes no SINAFLOR${pr.asvBase?'',' base local vazia'}. Desmatamento pós-2008 sem autorização localizada configura infração (Art. 38 CF). Avaliar PRA (Arts. 59-68 CF) ou embargo.`;
+    else if(defRL>0 && !pequena) recomendacao=`<strong>Recomendação:</strong> Déficit de Reserva Legal de ${defRLf} ha — proprietário obrigado à recomposição (Art. 66 CF).`;
+    else if(classe==='Vermelho') recomendacao='<strong>Recomendação:</strong> Imóvel Vermelho no SICAR — regularização obrigatória para acesso ao crédito rural (Art. 78-A CF). Orientar adesão ao PRA.';
+    else recomendacao='<strong>Recomendação:</strong> Regularização em andamento. Monitorar prazo de adesão ao PRA e recomposição de Reserva Legal.';
+
+    // Trecho SINAFLOR
+    const sinaflorTxt = pr.asvBase
+      ? `Dos ${haPos} ha suprimidos após 2008, ${haAut} ha possuem ASV vigente no SINAFLOR (Arts. 26-27, Lei 12.651/2012)`+(ilegalHa>0?` e ${haIl} ha não possuem autorização localizada`:'')+'.'
+      : `Dos ${haPos} ha suprimidos após 2008, nenhuma autorização de supressão (ASV) foi localizada na base local do SINAFLOR — situação a verificar junto ao IBAMA/SEMA-AC (Arts. 26-27, Lei 12.651/2012).`;
+
+    // Trecho focos
+    const focosTxt = nFocos>0
+      ? `Foram detectados <strong>${nFocos}</strong> focos de calor dentro do imóvel${anoMin?` entre ${anoMin} e ${anoMax}`:''}${nCorrel>0?`, com <strong>correlação temporal em ${nCorrel} ano(s)</strong> com polígonos de desmatamento PRODES — indício de incêndio associado a supressão ilegal`:''}.`
+      : 'Não foram detectados focos de calor históricos dentro do imóvel na base atual.';
+
+    // Trecho RL
+    const rlTxt = !pr.deficitRL && pr.deficitRL!==0 ? '' : defRL>0
+      ? `O imóvel apresenta <strong>déficit estimado de Reserva Legal de ${defRLf} ha</strong> (exigência: 80% = ${exigRL} ha — Art. 12, I, CF${pequena?`; pequena propriedade Art. 67 CF — ${modf} módulos fiscais`:''}).`
+      : `A cobertura remanescente estimada atende à Reserva Legal de 80% (Art. 12, I, CF${pequena?`; pequena propriedade Art. 67 CF — ${modf} módulos fiscais`:''}).`;
+
+    return `
+    <div style="background:#f8fafc;border:1px solid var(--borda);border-radius:var(--raio);padding:10px 12px;margin-bottom:10px">
+      <div style="font-size:9px;font-weight:700;color:#1F4E2C;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">⚖️ Análise de Conformidade — Lei 12.651/2012</div>
+      <p style="font-size:11px;color:var(--cinza-700);line-height:1.7;margin:0 0 6px">
+        <strong>${nome}</strong> possui <strong>${totalHa} ha</strong> de desmatamento detectado pelo PRODES/INPE.
+        Desses, <strong>${haConsol} ha</strong> foram suprimidos antes de 22/07/2008
+        (área consolidada — Art. 61-A, Lei 12.651/2012). ${sinaflorTxt}
+      </p>
+      <p style="font-size:11px;color:var(--cinza-700);line-height:1.7;margin:0 0 6px">${focosTxt}</p>
+      <p style="font-size:11px;color:var(--cinza-700);line-height:1.7;margin:0 0 6px">
+        O imóvel está classificado como <strong>${classe}</strong> no SICAR${classe==='Vermelho'?' — <strong>Art. 78-A CF: restrição de crédito rural aplicável</strong>':''}.
+        ${rlTxt}
+      </p>
+      <p style="font-size:11px;color:var(--cinza-700);line-height:1.7;margin:0">${recomendacao}</p>
+      <div style="margin-top:8px;padding-top:7px;border-top:1px solid var(--cinza-100);font-size:9px;color:var(--cinza-400);line-height:1.6">
+        Refs.: Arts. 3/II (APP) · 3/III (RL) · 12/I (RL 80% Amazônia) · 26 (vedação supressão) · 38 (crime desmatamento) · 61-A (áreas consolidadas) · 66 (recomposição RL) · 67 (≤4 módulos) · 78-A (crédito rural) — Lei 12.651/2012
+      </div>
+    </div>`;
+  })()}
 
   <div style="font-size:9px;color:var(--cinza-400);text-align:center">
     📐 Cálculo via Turf.js · Área UC via GeoJSON local
