@@ -3127,6 +3127,7 @@ function _atualizarBtnMarcar(){
 
 // ── Abrir / fechar painel ─────────────────────────────────────────────────
 async function abrirDetalhesCAR(f){
+  _limparProdesCarLayers();
   _carAbertoFeat=f;
   _carAbertoCod=f.properties?.cod_imovel;
   const panel=document.getElementById('car-det-panel'); if(!panel) return;
