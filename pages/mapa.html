@@ -3172,7 +3172,7 @@ function _toggleProdesCarLayer(tipo, ativo){
 
   if(tipo==='focos'){
     // Usa pontos históricos do Supabase; fallback para NRT FIRMS
-    const pts = (dados.focos?.pontos?.length ? dados.focos.pontos : dados.focos?.nrt)||[];
+    const pts = dados.focos?.pontos||[];
     if(!pts.length){
       toast('Nenhum foco de calor registrado neste imóvel.','info');
       const el=document.getElementById('prodes-toggle-focos'); if(el) el.checked=false; return;
