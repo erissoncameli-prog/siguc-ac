@@ -3093,26 +3093,80 @@ function _htmlProdes(d, f){
 function _toggleProdesCarLayer(tipo, ativo){
   if(_prodesCarLayers[tipo]){ mapaL.removeLayer(_prodesCarLayers[tipo]); _prodesCarLayers[tipo]=null; }
   if(!ativo) return;
-  const cod = _carAbertoCod;
+  const cod   = _carAbertoCod;
   const dados = cod ? _carProdesCache.get(cod) : null;
-  if(!dados||dados.erro){ toast('Dados PRODES não carregados — acesse a aba 🌳 PRODES primeiro.','warning'); const el=document.getElementById(`prodes-toggle-${tipo}`); if(el) el.checked=false; return; }
-  const src = tipo==='anual' ? dados.anual : dados.historico;
+  if(!dados||dados.erro){
+    toast('Dados PRODES não carregados — acesse a aba 🌳 PRODES primeiro.','warning');
+    const el=document.getElementById(`prodes-toggle-${tipo}`); if(el) el.checked=false; return;
+  }
+
+  if(tipo==='focos'){
+    // Usa pontos históricos do Supabase; fallback para NRT FIRMS
+    const pts = (dados.focos?.pontos?.length ? dados.focos.pontos : dados.focos?.nrt)||[];
+    if(!pts.length){
+      toast('Nenhum foco de calor registrado neste imóvel.','info');
+      const el=document.getElementById('prodes-toggle-focos'); if(el) el.checked=false; return;
+    }
+    let carPoly;
+    try{ carPoly = turf.feature(_carAbertoFeat?.geometry); }catch(_){}
+    const markers = [];
+    for(const pt of pts){
+      try{
+        if(carPoly){
+          const p=turf.point([pt.lon,pt.lat]);
+          if(!turf.booleanPointInPolygon(p, carPoly)) continue;
+        }
+        const m = L.circleMarker([pt.lat, pt.lon],{
+          radius:5, fillColor:'#f97316', fillOpacity:0.85,
+          color:'#9a3412', weight:1,
+        });
+        const dt = pt.data_hora ? new Date(pt.data_hora).toLocaleDateString('pt-BR') : pt.ano||'—';
+        m.bindTooltip(`🔥 <strong>Foco de calor</strong><br>Data: ${dt}<br>Satélite: ${pt.satelite||'—'}<br>Fonte: ${pt.fonte||'—'}`,{sticky:true});
+        markers.push(m);
+      }catch(_){}
+    }
+    if(!markers.length){
+      toast('Nenhum foco de calor dentro do polígono deste imóvel.','info');
+      const el=document.getElementById('prodes-toggle-focos'); if(el) el.checked=false; return;
+    }
+    _prodesCarLayers.focos = L.layerGroup(markers).addTo(mapaL);
+    return;
+  }
+
+  const src   = tipo==='anual' ? dados.anual : dados.historico;
   const feats = src.geojsonFeatures||[];
-  if(!feats.length){ toast('Nenhum polígono PRODES neste imóvel.','info'); const el=document.getElementById(`prodes-toggle-${tipo}`); if(el) el.checked=false; return; }
-  const corFill   = tipo==='anual'?'#dc2626':'#c2410c';
-  const corStroke = tipo==='anual'?'#991b1b':'#7c2d12';
+  if(!feats.length){
+    toast('Nenhum polígono PRODES neste imóvel.','info');
+    const el=document.getElementById(`prodes-toggle-${tipo}`); if(el) el.checked=false; return;
+  }
+
   _prodesCarLayers[tipo] = L.geoJSON({type:'FeatureCollection',features:feats},{
-    style:{fillColor:corFill,fillOpacity:0.55,color:corStroke,weight:1,opacity:0.9},
+    style(feat){
+      const clf = feat.properties?.clf;
+      if(tipo==='anual' && clf){
+        const cor = clf.cor||'#dc2626';
+        return {fillColor:cor, fillOpacity:0.55, color:cor, weight:1, opacity:0.9};
+      }
+      const corFill   = tipo==='anual'?'#dc2626':'#c2410c';
+      const corStroke = tipo==='anual'?'#991b1b':'#7c2d12';
+      return {fillColor:corFill, fillOpacity:0.55, color:corStroke, weight:1, opacity:0.9};
+    },
     onEachFeature(feat,layer){
-      const pr=feat.properties||{};
-      const ha=Number(pr.ha_calc||0).toLocaleString('pt-BR',{maximumFractionDigits:2});
-      layer.bindTooltip(`<strong>PRODES ${tipo==='anual'?'Anual':'Pré-2008'}</strong><br>Ano: ${pr.ano||'—'}<br>Área: ${ha} ha`,{sticky:true});
+      const pr = feat.properties||{};
+      const ha = Number(pr.ha_calc||0).toLocaleString('pt-BR',{maximumFractionDigits:2});
+      const clf = pr.clf;
+      layer.bindTooltip(
+        `<strong>PRODES ${tipo==='anual'?'Anual':'Pré-2008'}</strong><br>`+
+        `Ano: ${pr.ano||'—'}<br>Área: ${ha} ha`+
+        (clf?`<br>${clf.label} — ${clf.art}`:''),
+        {sticky:true}
+      );
     }
   }).addTo(mapaL);
 }
 
 function _limparProdesCarLayers(){
-  ['anual','hist'].forEach(t=>{ if(_prodesCarLayers[t]){ mapaL.removeLayer(_prodesCarLayers[t]); _prodesCarLayers[t]=null; } });
+  ['anual','hist','focos'].forEach(t=>{ if(_prodesCarLayers[t]){ mapaL.removeLayer(_prodesCarLayers[t]); _prodesCarLayers[t]=null; } });
 }
 
 // ── Aba Estilo ────────────────────────────────────────────────────────────
