@@ -872,12 +872,14 @@ function renderPagina(){
 
           <!-- Camadas personalizadas -->
           <div class="filtro-bloco">
-            <div class="filtro-bloco-header" onclick="toggleBloco('bloco-camadas')">
+            <div class="filtro-bloco-header" onclick="toggleBloco('bloco-camadas')" style="cursor:pointer">
               <h4>📐 Camadas</h4>
-              <span style="font-size:11px;color:var(--cinza-300)">▾</span>
+              <button id="btn-add-camada" onclick="event.stopPropagation();abrirModalNovaCamada()" title="Adicionar camada"
+                style="display:none;background:#1F4E2C;color:#fff;border:none;border-radius:50%;width:20px;height:20px;font-size:14px;cursor:pointer;line-height:1;padding:0;flex-shrink:0">＋</button>
+              <span id="chevron-bloco-camadas" style="font-size:11px;color:var(--cinza-300)">▾</span>
             </div>
             <div class="filtro-bloco-body" id="bloco-camadas">
-              <div id="bloco-camadas-lista" style="max-height:200px;overflow-y:auto;font-size:12px;color:var(--cinza-400)">Carregando...</div>
+              <div id="bloco-camadas-lista" style="max-height:320px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:#2D6A4F #f3f4f6">Carregando...</div>
             </div>
           </div>
 
