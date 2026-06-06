@@ -3596,6 +3596,7 @@ function fecharDetalhesCAR(){
   }
   _carAbertoFeat=null; _carAbertoCod=null;
   _limparProdesCarLayers();
+  if(_focosLayer){ mapaL.removeLayer(_focosLayer); _focosLayer=null; }
 }
 
 // ── Resize do painel ──────────────────────────────────────────────────────
