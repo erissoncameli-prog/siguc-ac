@@ -106,7 +106,7 @@ def normalizar(df, source):
     return rows
 
 def inserir_supabase(rows, headers):
-    """Insere linhas no Supabase em lotes."""
+    """Insere linhas no Supabase em lotes (INSERT simples, sem upsert)."""
     if not rows:
         return 0
     ok = 0
@@ -115,11 +115,22 @@ def inserir_supabase(rows, headers):
         r = requests.post(
             f'{SUPABASE_URL}/rest/v1/focos_calor_ac',
             json=batch,
-            headers={**headers, 'Prefer': 'resolution=ignore-duplicates,return=minimal'},
+            headers={**headers, 'Prefer': 'return=minimal'},
             timeout=60
         )
         if r.status_code in (200, 201, 204):
             ok += len(batch)
+        elif r.status_code == 409:
+            # Conflito de chave única — insere um a um saltando duplicatas
+            for row in batch:
+                rr = requests.post(
+                    f'{SUPABASE_URL}/rest/v1/focos_calor_ac',
+                    json=[row],
+                    headers={**headers, 'Prefer': 'return=minimal'},
+                    timeout=15
+                )
+                if rr.status_code in (200, 201, 204):
+                    ok += 1
         else:
             print(f'  INSERT ERRO {r.status_code}: {r.text[:150]}')
     return ok
