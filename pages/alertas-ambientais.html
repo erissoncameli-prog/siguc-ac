@@ -413,7 +413,7 @@ function focarAlerta(id) {
       const m = String(a.geom).match(/POINT\(([^ ]+) ([^ )]+)\)/)
       if (m) { lng = parseFloat(m[1]); lat = parseFloat(m[2]) }
     }
-    if (lat && lng) _mapaL.setView([lat, lng], 12)
+    if (lat && lng) { _mapaL.setView([lat, lng], 12); _abrirAnaliseAlerta(id) }
   } catch {}
 }
 
