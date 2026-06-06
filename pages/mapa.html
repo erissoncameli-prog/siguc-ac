@@ -1298,7 +1298,7 @@ function _vegCard(id, titulo, desc, cor){
 // CAMADAS PERSONALIZADAS (Supabase camadas_mapa)
 // ══════════════════════════════════════════════════════════════
 async function carregarCamadas(){
-  const { data } = await db.from('camadas_mapa').select('*').order('ordem');
+  const { data } = await db.from('camadas_mapa').select('*, unidades_conservacao(id,nome,sigla)').order('ordem');
   const visPref = JSON.parse(localStorage.getItem('siguc_camadas_vis')||'{}');
   camadas = (data||[]).map(c => ({
     ...c,
