@@ -92,7 +92,7 @@ Campos de texto organizados em grid 2 colunas:
 #### Aba 🖼 Logos
 - Upload de dois arquivos: **Logo do Governo** + **Logo da Secretaria**
 - Aceita: PNG, SVG, JPG — máximo 2 MB cada
-- Upload → convertido para base64 → salvo no JSONB `logos`
+- Upload → enviado ao **Supabase Storage** (bucket público `config-logos`) → URL pública salva no JSONB `logos`
 - Preview imediato após upload
 - Botão "Remover" para apagar cada logo
 
