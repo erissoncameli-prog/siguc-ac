@@ -2871,7 +2871,7 @@ async function _fetchProdesCAR(f){
     if(!json || json.error) throw new Error(json?.error || 'Erro PRODES');
 
     const asvList   = asvRes.status==='fulfilled' ? (asvRes.value?.data||[]) : [];
-    const focosData = focosRes.status==='fulfilled' ? focosRes.value : { porAno:[], pontos:[], nrt:[], total:0, temHistorico:false, temFirmsKey:false };
+    const focosData = focosRes.status==='fulfilled' ? focosRes.value : { porAno:[], pontos:[], total:0, temDados:false };
 
     const areaCAR = parseFloat(f.properties?.area) || turf.area(carPoly)/10000;
 
