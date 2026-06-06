@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mockup — Relatório CAR</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+:root{
+  --floresta:#0A1A0F;--verde-c:#52B788;--ouro:#C9A84C;
+  --t1:#F4EFE6;--borda:#E5E7EB;--raio:8px;
+  --cinza-50:#F9FAFB;--cinza-100:#F3F4F6;--cinza-400:#9CA3AF;
+  --cinza-500:#6B7280;--cinza-600:#4B5563;--cinza-700:#374151;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'DM Sans',system-ui,sans-serif;background:#F4EFE6;font-size:14px;}
+
+/* ── MODAL DE SELEÇÃO ── */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:900;display:flex;align-items:center;justify-content:center;}
+.modal{background:#fff;border-radius:12px;width:480px;box-shadow:0 20px 60px rgba(0,0,0,.25);overflow:hidden;}
+.modal-hdr{padding:18px 22px;background:linear-gradient(135deg,#0A1A0F,#1F4E2C);color:#fff;}
+.modal-hdr h3{font-size:15px;font-weight:700;}
+.modal-hdr p{font-size:11px;color:rgba(255,255,255,.65);margin-top:3px;}
+.modal-body{padding:20px 22px;}
+.modal-footer{padding:14px 22px;border-top:1px solid var(--borda);display:flex;gap:8px;justify-content:flex-end;background:var(--cinza-50);}
+
+.opcao-card{border:2px solid var(--borda);border-radius:8px;padding:14px 16px;cursor:pointer;transition:all .15s;margin-bottom:10px;display:flex;align-items:flex-start;gap:12px;}
+.opcao-card:hover{border-color:#52B788;background:#f0fdf4;}
+.opcao-card.ativo{border-color:#1F4E2C;background:#f0fdf4;}
+.opcao-card .icone{font-size:24px;flex-shrink:0;margin-top:2px;}
+.opcao-card .texto h4{font-size:13px;font-weight:700;color:var(--floresta);}
+.opcao-card .texto p{font-size:11px;color:var(--cinza-500);margin-top:2px;line-height:1.5;}
+.opcao-card .badge{margin-left:auto;font-size:10px;padding:2px 8px;border-radius:99px;background:#dcfce7;color:#166534;border:1px solid #86efac;white-space:nowrap;flex-shrink:0;}
+
+.modo-label{font-size:11px;font-weight:700;color:var(--cinza-500);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px;}
+.modo-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.modo-card{border:2px solid var(--borda);border-radius:8px;padding:12px 14px;cursor:pointer;transition:all .15s;text-align:center;}
+.modo-card:hover{border-color:#52B788;}
+.modo-card.ativo{border-color:#1F4E2C;background:#f0fdf4;}
+.modo-card .modo-icon{font-size:22px;margin-bottom:4px;}
+.modo-card h4{font-size:12px;font-weight:700;color:var(--floresta);}
+.modo-card p{font-size:10px;color:var(--cinza-400);margin-top:3px;line-height:1.4;}
+
+.btn{padding:9px 18px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;border:none;font-family:inherit;display:inline-flex;align-items:center;gap:6px;}
+.btn-primary{background:#1F4E2C;color:#fff;}
+.btn-outline{background:#fff;color:var(--cinza-700);border:1px solid var(--borda);}
+.btn-ghost{background:transparent;color:var(--cinza-500);border:1px solid var(--borda);}
+.separador{border:none;border-top:1px solid var(--borda);margin:16px 0;}
+
+/* ── PREVIEW DO RELATÓRIO ── */
+.preview-overlay{position:fixed;inset:0;background:#374151;z-index:950;display:flex;flex-direction:column;}
+.preview-toolbar{background:#1F4E2C;padding:10px 20px;display:flex;align-items:center;gap:12px;flex-shrink:0;}
+.preview-toolbar .titulo{color:#fff;font-size:13px;font-weight:700;flex:1;}
+.preview-toolbar .modo-badge{background:rgba(255,255,255,.15);color:#fff;font-size:10px;padding:3px 10px;border-radius:99px;}
+.preview-area{flex:1;overflow-y:auto;padding:20px;display:flex;justify-content:center;}
+
+/* ── FOLHA A4 ── */
+.a4{background:#fff;width:794px;min-height:1123px;padding:0;box-shadow:0 4px 40px rgba(0,0,0,.3);position:relative;margin-bottom:20px;}
+.a4-2{margin-top:0;}
+
+/* Cabeçalho ABNT */
+.rel-cabecalho{padding:16px 24px;border-bottom:3px solid #0A1A0F;display:flex;align-items:center;gap:14px;}
+.rel-logos{display:flex;align-items:center;gap:10px;}
+.rel-logo{width:48px;height:48px;background:var(--cinza-100);border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;}
+.rel-divisor{width:1px;height:44px;background:var(--borda);}
+.rel-inst{flex:1;}
+.rel-inst .gov{font-size:8px;color:var(--cinza-400);text-transform:uppercase;letter-spacing:.06em;}
+.rel-inst .sec{font-size:12px;font-weight:700;color:#0A1A0F;line-height:1.2;}
+.rel-inst .dir{font-size:10px;color:var(--cinza-500);}
+.rel-meta{text-align:right;font-size:9px;color:var(--cinza-400);line-height:1.6;}
+.rel-rodape-inf{position:absolute;bottom:0;left:0;right:0;padding:8px 24px;background:var(--cinza-50);border-top:1px solid var(--borda);display:flex;justify-content:space-between;font-size:8px;color:var(--cinza-400);}
+
+/* Título do relatório */
+.rel-titulo-bloco{padding:16px 24px 12px;border-bottom:1px solid var(--cinza-100);}
+.rel-titulo-principal{font-size:16px;font-weight:800;color:#0A1A0F;letter-spacing:-.3px;}
+.rel-subtitulo{font-size:11px;color:var(--cinza-500);margin-top:3px;}
+.rel-tipo-badge{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:99px;font-size:10px;font-weight:700;background:#dcfce7;color:#166534;border:1px solid #86efac;margin-top:8px;}
+
+/* Corpo do relatório */
+.rel-body{padding:16px 24px;}
+.rel-secao{margin-bottom:20px;}
+.rel-secao-titulo{font-size:11px;font-weight:800;color:#0A1A0F;text-transform:uppercase;letter-spacing:.06em;border-bottom:2px solid #0A1A0F;padding-bottom:4px;margin-bottom:10px;}
+.rel-secao-subtitulo{font-size:10px;font-weight:700;color:var(--cinza-600);text-transform:uppercase;letter-spacing:.05em;margin:10px 0 6px;}
+
+/* Tabela de identificação */
+.rel-tabela{width:100%;border-collapse:collapse;font-size:11px;}
+.rel-tabela th{background:#0A1A0F;color:#fff;padding:6px 10px;text-align:left;font-size:9px;text-transform:uppercase;letter-spacing:.05em;font-weight:700;}
+.rel-tabela td{padding:6px 10px;border-bottom:1px solid var(--cinza-100);color:var(--cinza-700);}
+.rel-tabela tr:nth-child(even) td{background:var(--cinza-50);}
+.rel-tabela td:first-child{font-weight:600;color:var(--cinza-600);width:38%;}
+
+/* KPI Cards */
+.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px;}
+.kpi-card{padding:10px 12px;border-radius:6px;border:1px solid var(--borda);}
+.kpi-card .kpi-label{font-size:8px;font-weight:700;color:var(--cinza-400);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px;}
+.kpi-card .kpi-val{font-size:17px;font-weight:800;line-height:1.1;}
+.kpi-card .kpi-sub{font-size:8px;color:var(--cinza-400);margin-top:2px;}
+.kpi-verde{background:#f0fdf4;border-color:#86efac;}.kpi-verde .kpi-val{color:#16a34a;}
+.kpi-vermelho{background:#fef2f2;border-color:#fca5a5;}.kpi-vermelho .kpi-val{color:#dc2626;}
+.kpi-laranja{background:#fff7ed;border-color:#fed7aa;}.kpi-laranja .kpi-val{color:#c2410c;}
+.kpi-roxo{background:#faf5ff;border-color:#e9d5ff;}.kpi-roxo .kpi-val{color:#7c3aed;}
+
+/* Conformidade */
+.conf-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px;}
+.conf-item{padding:8px 10px;border-radius:6px;border:1px solid;}
+.conf-item .ci-label{font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px;}
+.conf-item .ci-val{font-size:14px;font-weight:800;}
+.conf-item .ci-sub{font-size:8px;margin-top:1px;}
+.ci-consol{background:#fff7ed;border-color:#fed7aa;color:#9a3412;}
+.ci-aut{background:#f0fdf4;border-color:#86efac;color:#166534;}
+.ci-ilegal{background:#fef2f2;border-color:#fca5a5;color:#991b1b;}
+
+/* Mapa ABNT */
+.mapa-container{position:relative;border:1.5px solid #374151;margin-bottom:10px;}
+.mapa-titulo{background:#0A1A0F;color:#fff;padding:5px 10px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;}
+.mapa-leaflet{height:260px;background:#e8f4e8;}
+.mapa-rodape{background:var(--cinza-50);border-top:1px solid #374151;padding:5px 10px;display:grid;grid-template-columns:auto auto auto 1fr;gap:16px;align-items:center;}
+.mapa-info{font-size:8px;color:var(--cinza-600);line-height:1.5;}
+.mapa-info strong{color:#0A1A0F;display:block;font-size:7px;text-transform:uppercase;letter-spacing:.04em;}
+.mapa-norte{width:28px;height:28px;background:#fff;border:1px solid var(--borda);border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:16px;}
+.mapa-fonte{font-size:7px;color:var(--cinza-400);text-align:right;line-height:1.5;}
+
+/* Barra de focos */
+.focos-barra-wrap{display:flex;flex-direction:column;gap:3px;}
+.foco-row{display:flex;align-items:center;gap:6px;}
+.foco-ano{font-size:9px;color:var(--cinza-500);width:28px;flex-shrink:0;}
+.foco-bar-bg{flex:1;height:10px;background:var(--cinza-100);border-radius:2px;overflow:hidden;}
+.foco-bar-fill{height:100%;background:#f97316;border-radius:2px;}
+.foco-num{font-size:9px;font-weight:700;color:var(--cinza-700);width:24px;text-align:right;}
+.foco-alerta{font-size:8px;color:#dc2626;}
+
+/* Narrativa jurídica */
+.narrativa{font-size:10px;color:var(--cinza-700);line-height:1.8;padding:10px 12px;background:var(--cinza-50);border-left:3px solid #0A1A0F;border-radius:0 4px 4px 0;}
+.refs-legais{margin-top:8px;padding:6px 10px;background:#f0fdf4;border:1px solid #86efac;border-radius:4px;font-size:8px;color:#166534;line-height:1.7;}
+
+/* ASV tabela */
+.asv-tabela{width:100%;border-collapse:collapse;font-size:9px;}
+.asv-tabela th{background:#374151;color:#fff;padding:4px 8px;text-align:left;font-size:8px;text-transform:uppercase;letter-spacing:.04em;}
+.asv-tabela td{padding:4px 8px;border-bottom:1px solid var(--cinza-100);}
+.asv-badge{display:inline-block;padding:1px 6px;border-radius:99px;font-size:8px;font-weight:700;}
+.asv-vigente{background:#dcfce7;color:#166534;}
+.asv-vencida{background:#fee2e2;color:#991b1b;}
+
+/* RL */
+.rl-barra{height:14px;background:var(--cinza-100);border-radius:3px;overflow:hidden;position:relative;margin:6px 0;}
+.rl-remanescente{height:100%;background:#16a34a;border-radius:3px;}
+.rl-deficit{height:100%;background:#dc2626;border-radius:3px;position:absolute;right:0;top:0;}
+
+/* Rodapé página */
+.pag-rodape{margin-top:auto;}
+
+/* ── PRODES barras ── */
+.prodes-row{display:flex;align-items:center;gap:6px;margin-bottom:2px;}
+.prodes-ano{font-size:9px;color:var(--cinza-500);width:28px;}
+.prodes-bar-bg{flex:1;height:11px;background:var(--cinza-100);border-radius:2px;overflow:hidden;}
+.prodes-bar-fill{height:100%;border-radius:2px;}
+.prodes-ha{font-size:9px;font-weight:700;color:var(--cinza-700);width:55px;text-align:right;}
+.prodes-clf{font-size:8px;width:14px;text-align:center;}
+
+/* ── TABS MOCKUP ── */
+.tabs{display:flex;gap:4px;margin-bottom:16px;}
+.tab{padding:7px 16px;border-radius:6px;font-size:12px;cursor:pointer;border:2px solid var(--borda);background:#fff;font-family:inherit;font-weight:500;color:var(--cinza-500);}
+.tab.ativo{border-color:#1F4E2C;background:#f0fdf4;color:#1F4E2C;font-weight:700;}
+
+.page-select{display:flex;align-items:center;justify-content:center;gap:10px;padding:8px;color:rgba(255,255,255,.6);font-size:12px;}
+.page-select button{background:rgba(255,255,255,.15);border:none;color:#fff;padding:4px 12px;border-radius:4px;cursor:pointer;font-size:11px;}
+</style>
+</head>
+<body>
+
+<!-- TELA 1: MODAL DE SELEÇÃO -->
+<div id="tela-modal" class="modal-overlay">
+  <div class="modal">
+    <div class="modal-hdr">
+      <h3>🖨️ Gerar Relatório do Imóvel</h3>
+      <p>Imóvel aberto: Fazenda Santa Maria · AC-1234567-89ABC</p>
+    </div>
+    <div class="modal-body">
+
+      <!-- Escopo -->
+      <div class="modo-label">Escopo do relatório</div>
+      <div class="opcao-card ativo" onclick="this.classList.add('ativo');document.querySelector('.opcao-card:last-of-type').classList.remove('ativo')">
+        <div class="icone">🏡</div>
+        <div class="texto">
+          <h4>Imóvel atual</h4>
+          <p>Gera relatório apenas para a Fazenda Santa Maria (imóvel aberto no painel)</p>
+        </div>
+      </div>
+      <div class="opcao-card" onclick="this.classList.add('ativo');document.querySelector('.opcao-card:first-of-type').classList.remove('ativo')">
+        <div class="icone">📌</div>
+        <div class="texto">
+          <h4>Todos os imóveis marcados</h4>
+          <p>Gera relatório consolidado com todos os imóveis marcados. Cada um vira uma seção com mapa de detalhe próprio.</p>
+        </div>
+        <div class="badge">3 marcados</div>
+      </div>
+
+      <hr class="separador">
+
+      <!-- Modo -->
+      <div class="modo-label">Nível de detalhamento</div>
+      <div class="modo-grid">
+        <div class="modo-card" onclick="document.querySelectorAll('.modo-card').forEach(m=>m.classList.remove('ativo'));this.classList.add('ativo')">
+          <div class="modo-icon">📋</div>
+          <h4>Sintético</h4>
+          <p>1–2 páginas por imóvel. KPIs, mapas e conclusão. Ideal para despachos e notificações.</p>
+        </div>
+        <div class="modo-card ativo" onclick="document.querySelectorAll('.modo-card').forEach(m=>m.classList.remove('ativo'));this.classList.add('ativo')">
+          <div class="modo-icon">📑</div>
+          <h4>Detalhado</h4>
+          <p>Laudo técnico completo. Gráficos, tabelas, narrativa jurídica, todas as referências legais.</p>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="document.getElementById('tela-modal').style.display='none'">Cancelar</button>
+      <button class="btn btn-outline" onclick="document.getElementById('tela-modal').style.display='none';document.getElementById('tela-preview').style.display='flex'">👁 Pré-visualizar</button>
+      <button class="btn btn-primary" onclick="document.getElementById('tela-modal').style.display='none';document.getElementById('tela-preview').style.display='flex'">🖨️ Imprimir / PDF</button>
+    </div>
+  </div>
+</div>
+
+<!-- TELA 2: PREVIEW DO RELATÓRIO -->
+<div id="tela-preview" style="display:none" class="preview-overlay">
+  <div class="preview-toolbar">
+    <span class="titulo">📑 Relatório Técnico — Fazenda Santa Maria</span>
+    <span class="modo-badge">DETALHADO</span>
+    <button class="btn btn-outline" style="font-size:11px" onclick="document.getElementById('tela-preview').style.display='none';document.getElementById('tela-modal').style.display='flex'">← Voltar</button>
+    <button class="btn btn-outline" style="font-size:11px">↗ Nova aba</button>
+    <button class="btn btn-primary" style="font-size:11px">🖨️ Imprimir / Salvar PDF</button>
+  </div>
+
+  <div class="preview-area">
+
+  <!-- FOLHA 1: Capa + Identificação + Mapa de Localização -->
+  <div class="a4">
+    <!-- Cabeçalho ABNT -->
+    <div class="rel-cabecalho">
+      <div class="rel-logos">
+        <div class="rel-logo">🌿</div>
+        <div class="rel-divisor"></div>
+        <div class="rel-logo">🏛</div>
+      </div>
+      <div class="rel-divisor" style="margin:0 6px"></div>
+      <div class="rel-inst">
+        <div class="gov">Governo do Estado do Acre · 2023–2026</div>
+        <div class="sec">Secretaria de Estado do Meio Ambiente do Acre — SEMA-AC</div>
+        <div class="dir">Diretoria de Meio Ambiente · Departamento de Unidades de Conservação</div>
+      </div>
+      <div class="rel-meta">SIGUC-AC<br>Emitido: 06/06/2026<br>Prot. nº 2026-0042</div>
+    </div>
+
+    <div class="rel-body">
+      <!-- Título -->
+      <div style="text-align:center;padding:14px 0 12px;border-bottom:1px solid var(--cinza-100);margin-bottom:16px;">
+        <div style="font-size:13px;font-weight:700;color:var(--cinza-400);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Laudo Técnico de Análise Ambiental — CAR</div>
+        <div style="font-size:19px;font-weight:800;color:#0A1A0F">Fazenda Santa Maria</div>
+        <div style="font-size:11px;color:var(--cinza-500);margin-top:3px">AC-1234567-89ABC · Acrelândia/AC · Bioma Amazônia</div>
+        <div style="margin-top:8px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+          <span style="background:#fef2f2;color:#dc2626;border:1px solid #fca5a5;padding:3px 10px;border-radius:99px;font-size:10px;font-weight:700">🔴 Vermelho — SICAR</span>
+          <span style="background:#f0fdf4;color:#166534;border:1px solid #86efac;padding:3px 10px;border-radius:99px;font-size:10px;font-weight:700">✅ CAR Ativo</span>
+          <span style="background:#fff7ed;color:#9a3412;border:1px solid #fed7aa;padding:3px 10px;border-radius:99px;font-size:10px;font-weight:700">📐 2,3 módulos fiscais</span>
+        </div>
+      </div>
+
+      <!-- KPIs -->
+      <div class="rel-secao">
+        <div class="rel-secao-titulo">Indicadores Principais</div>
+        <div class="kpi-grid">
+          <div class="kpi-card kpi-laranja"><div class="kpi-label">Área declarada</div><div class="kpi-val">487,3<span style="font-size:11px"> ha</span></div><div class="kpi-sub">Fonte: SICAR</div></div>
+          <div class="kpi-card kpi-vermelho"><div class="kpi-label">Desmatamento total</div><div class="kpi-val">124,8<span style="font-size:11px"> ha</span></div><div class="kpi-sub">PRODES/INPE · 25,6%</div></div>
+          <div class="kpi-card kpi-vermelho"><div class="kpi-label">Déficit Reserva Legal</div><div class="kpi-val">65,2<span style="font-size:11px"> ha</span></div><div class="kpi-sub">Exigência: 80% = 389,8 ha</div></div>
+          <div class="kpi-card kpi-laranja"><div class="kpi-label">Focos de calor</div><div class="kpi-val">47</div><div class="kpi-sub">2015–2025 · 3 correlações</div></div>
+        </div>
+        <div class="conf-grid">
+          <div class="conf-item ci-consol"><div class="ci-label">🟡 Consolidado pré-2008</div><div class="ci-val">58,4 ha</div><div class="ci-sub">Art. 61-A CF · 47%</div></div>
+          <div class="conf-item ci-aut"><div class="ci-label">✅ Autorizado (ASV)</div><div class="ci-val">12,1 ha</div><div class="ci-sub">Arts. 26-27 CF · 10%</div></div>
+          <div class="conf-item ci-ilegal"><div class="ci-label">🔴 A verificar / Ilegal</div><div class="ci-val">54,3 ha</div><div class="ci-sub">Art. 38 CF · sem ASV · 43%</div></div>
+        </div>
+      </div>
+
+      <!-- Identificação -->
+      <div class="rel-secao">
+        <div class="rel-secao-titulo">1. Identificação do Imóvel</div>
+        <table class="rel-tabela">
+          <tr><td>Código CAR</td><td style="font-family:monospace">AC-1234567-89ABCDEF0123456789</td></tr>
+          <tr><td>Nome do Imóvel</td><td>Fazenda Santa Maria</td></tr>
+          <tr><td>Proprietário</td><td>João da Silva Proprietário</td></tr>
+          <tr><td>CPF/CNPJ</td><td>***.456.789-**</td></tr>
+          <tr><td>Município</td><td>Acrelândia — Acre</td></tr>
+          <tr><td>Área declarada</td><td>487,3 ha</td></tr>
+          <tr><td>Módulos fiscais</td><td>2,3 módulos (pequena propriedade — Art. 67 CF aplicável)</td></tr>
+          <tr><td>Situação CAR</td><td>Ativo — Aguardando análise</td></tr>
+          <tr><td>Classificação SICAR</td><td><span style="color:#dc2626;font-weight:700">🔴 Vermelho</span> — Art. 78-A aplicável (restrição crédito rural)</td></tr>
+          <tr><td>Data de cadastro</td><td>14/03/2016</td></tr>
+        </table>
+      </div>
+
+      <!-- Mapa de Localização -->
+      <div class="rel-secao">
+        <div class="rel-secao-titulo">2. Localização</div>
+        <div class="rel-secao-subtitulo">Mapa 1 — Localização Regional</div>
+        <div class="mapa-container">
+          <div class="mapa-titulo">Mapa de Localização — Estado do Acre · Município de Acrelândia</div>
+          <div id="mapa-loc" class="mapa-leaflet" style="height:220px"></div>
+          <div class="mapa-rodape">
+            <div class="mapa-norte">🧭</div>
+            <div class="mapa-info"><strong>Escala</strong>1:1.500.000</div>
+            <div class="mapa-info"><strong>Sistema de Referência</strong>SIRGAS 2000 — Geográfico</div>
+            <div class="mapa-fonte">
+              Fonte: OpenStreetMap / IBGE · Elaborado por: SIGUC-AC/SEMA-AC<br>
+              Data: 06/06/2026 · Projeção: Geográfica (lat/lon) · Datum: SIRGAS 2000
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+    <div class="rel-rodape-inf">
+      <span>SIGUC-AC — Sistema de Gestão de Unidades de Conservação do Acre · SEMA-AC/DIMA/DEUC</span>
+      <span>Página 1 de 3 · Prot. 2026-0042</span>
+    </div>
+  </div><!-- /a4 -->
+
+  <!-- FOLHA 2: Mapa Detalhe + PRODES + Focos -->
+  <div class="a4 a4-2">
+    <div class="rel-cabecalho" style="padding:8px 24px;">
+      <div class="rel-inst"><div class="sec" style="font-size:10px">SEMA-AC · DIMA · Laudo Técnico — Fazenda Santa Maria · AC-1234567-89ABC</div></div>
+      <div class="rel-meta" style="font-size:8px">Prot. 2026-0042 · Página 2/3</div>
+    </div>
+    <div class="rel-body">
+
+      <!-- Mapa Detalhe -->
+      <div class="rel-secao">
+        <div class="rel-secao-subtitulo">Mapa 2 — Detalhe do Imóvel com Camadas Temáticas</div>
+        <div class="mapa-container">
+          <div class="mapa-titulo">Mapa Temático — Desmatamento PRODES · Focos de Calor · Imóvel CAR</div>
+          <div id="mapa-det" class="mapa-leaflet" style="height:300px"></div>
+          <div class="mapa-rodape" style="grid-template-columns:auto auto auto auto 1fr">
+            <div class="mapa-norte">🧭</div>
+            <div class="mapa-info"><strong>Escala</strong>1:50.000</div>
+            <div class="mapa-info"><strong>Referência</strong>SIRGAS 2000</div>
+            <div class="mapa-info">
+              <strong>Legenda</strong>
+              <span style="display:block">▬ Limite CAR · </span>
+              <span style="display:block;color:#dc2626">■ PRODES Anual · </span>
+              <span style="display:block;color:#c2410c">■ Acum. Pré-2008 · </span>
+              <span style="display:block;color:#f97316">● Focos Calor</span>
+            </div>
+            <div class="mapa-fonte">
+              Fonte: PRODES/INPE · SICAR/SFB · FIRMS/NASA<br>
+              Elaborado: SIGUC-AC · Data: 06/06/2026<br>
+              Datum: SIRGAS 2000 · Projeção Geográfica
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PRODES -->
+      <div class="rel-secao">
+        <div class="rel-secao-titulo">3. Análise de Desmatamento — PRODES/INPE</div>
+        <div class="focos-barra-wrap" style="margin-bottom:10px">
+          <div style="display:flex;gap:6px;margin-bottom:4px;font-size:8px;color:var(--cinza-400)">
+            <span style="width:28px"></span><span style="flex:1"></span>
+            <span style="color:#16a34a;margin-right:4px">✅ Autorizado</span>
+            <span style="color:#d97706;margin-right:4px">🟡 Consolidado</span>
+            <span style="color:#dc2626">🔴 Ilegal/verificar</span>
+          </div>
+          ${['2010','2013','2016','2019','2021','2023','2024'].map((ano,i)=>{
+            const ha=[4.2,6.8,12.1,18.4,8.9,22.3,15.6][i];
+            const pct=Math.round(ha/22.3*100);
+            const cores=['#d97706','#d97706','#dc2626','#dc2626','#16a34a','#dc2626','#dc2626'];
+            const clfs=['🟡','🟡','🔴','🔴','✅','🔴','🔴'];
+            return `<div class="prodes-row">
+              <span class="prodes-ano">${ano}</span>
+              <div class="prodes-bar-bg"><div class="prodes-bar-fill" style="width:${pct}%;background:${cores[i]}"></div></div>
+              <span class="prodes-ha">${ha} ha</span>
+              <span class="prodes-clf">${clfs[i]}</span>
+            </div>`;
+          }).join('')}
+        </div>
+        <table class="asv-tabela" style="margin-top:8px">
+          <tr><th>Ano</th><th>Área (ha)</th><th>Conformidade CF</th><th>Base Legal</th></tr>
+          <tr><td>Pré-2008 (acum.)</td><td>58,4</td><td>🟡 Consolidado</td><td>Art. 61-A</td></tr>
+          <tr><td>2008–2017</td><td>32,1</td><td>🔴 A verificar</td><td>Art. 38</td></tr>
+          <tr><td>2018–2020</td><td>12,1</td><td>✅ Autorizado (ASV)</td><td>Arts. 26-27</td></tr>
+          <tr><td>2021–2024</td><td>22,2</td><td>🔴 Ilegal</td><td>Art. 38</td></tr>
+        </table>
+      </div>
+
+      <!-- Focos -->
+      <div class="rel-secao">
+        <div class="rel-secao-titulo">4. Focos de Calor — BDQueimadas/INPE · FIRMS/NASA</div>
+        <div class="focos-barra-wrap">
+          ${['2015','2016','2019','2020','2022','2023','2025'].map((ano,i)=>{
+            const n=[3,7,12,5,8,9,3][i];
+            const pct=Math.round(n/12*100);
+            const correl=[false,false,true,false,true,true,false][i];
+            return `<div class="foco-row">
+              <span class="foco-ano">${ano}</span>
+              <div class="foco-bar-bg"><div class="foco-bar-fill" style="width:${pct}%"></div></div>
+              <span class="foco-num">${n}</span>
+              <span class="foco-alerta">${correl?'⚠️ +PRODES':''}</span>
+            </div>`;
+          }).join('')}
+        </div>
+        <div style="font-size:9px;color:var(--cinza-400);margin-top:6px">⚠️ = correlação temporal com desmatamento PRODES detectado no mesmo ano</div>
+      </div>
+
+      <!-- SINAFLOR -->
+      <div class="rel-secao">
+        <div class="rel-secao-titulo">5. Autorizações de Supressão — SINAFLOR/IBAMA</div>
+        <table class="asv-tabela">
+          <tr><th>Nº ASV</th><th>Emissão</th><th>Validade</th><th>Área (ha)</th><th>Tipo</th><th>Status</th></tr>
+          <tr><td>10318202307078</td><td>15/03/2023</td><td>15/03/2025</td><td>12,1</td><td>Corte raso</td><td><span class="asv-badge asv-vencida">Vencida</span></td></tr>
+        </table>
+        <div style="font-size:9px;color:var(--cinza-400);margin-top:6px">Fonte: IBAMA Dados Abertos · Atualizado em 06/06/2026 · 1 ASV localizada para este imóvel</div>
+      </div>
+
+    </div>
+    <div class="rel-rodape-inf">
+      <span>SIGUC-AC — Sistema de Gestão de Unidades de Conservação do Acre</span>
+      <span>Página 2 de 3 · Prot. 2026-0042</span>
+    </div>
+  </div><!-- /a4 -->
+
+  <!-- FOLHA 3: RL + Narrativa + Conclusão -->
+  <div class="a4 a4-2">
+    <div class="rel-cabecalho" style="padding:8px 24px;">
+      <div class="rel-inst"><div class="sec" style="font-size:10px">SEMA-AC · DIMA · Laudo Técnico — Fazenda Santa Maria</div></div>
+      <div class="rel-meta" style="font-size:8px">Prot. 2026-0042 · Página 3/3</div>
+    </div>
+    <div class="rel-body">
+
+      <!-- Reserva Legal -->
+      <div class="rel-secao">
+        <div class="rel-secao-titulo">6. Reserva Legal — Art. 12, I · Lei 12.651/2012</div>
+        <div style="font-size:10px;color:var(--cinza-600);margin-bottom:8px">Amazônia: exigência de 80% da área total cadastrada</div>
+        <table class="rel-tabela" style="margin-bottom:10px">
+          <tr><td>Área total declarada</td><td><strong>487,3 ha</strong></td></tr>
+          <tr><td>Exigência de Reserva Legal (80%)</td><td><strong>389,8 ha</strong></td></tr>
+          <tr><td>Desmatamento total detectado</td><td><strong style="color:#dc2626">124,8 ha</strong></td></tr>
+          <tr><td>Floresta remanescente (estimada)</td><td><strong style="color:#16a34a">362,5 ha</strong></td></tr>
+          <tr><td>Déficit de Reserva Legal</td><td><strong style="color:#dc2626">27,3 ha</strong></td></tr>
+          <tr><td>Módulos fiscais</td><td>2,3 módulos — pequena propriedade (Art. 67 CF)</td></tr>
+        </table>
+        <div style="font-size:9px;color:var(--cinza-500);margin-bottom:4px">Cobertura estimada vs. exigência legal:</div>
+        <div class="rl-barra" style="height:16px">
+          <div class="rl-remanescente" style="width:93%"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:8px;color:var(--cinza-400)">
+          <span>Remanescente: 362,5 ha (93,2% da exigência)</span>
+          <span style="color:#dc2626">Déficit: 27,3 ha (6,8%)</span>
+        </div>
+      </div>
+
+      <!-- Narrativa -->
+      <div class="rel-secao">
+        <div class="rel-secao-titulo">7. Análise de Conformidade — Lei 12.651/2012</div>
+        <div class="narrativa">
+          O imóvel <strong>Fazenda Santa Maria</strong> (AC-1234567-89ABC) possui <strong>124,8 ha</strong> de desmatamento detectado pelo PRODES/INPE. Desses, <strong>58,4 ha</strong> foram suprimidos antes de 22/07/2008 (área consolidada — Art. 61-A, Lei 12.651/2012). Dos <strong>66,4 ha</strong> suprimidos após 2008, <strong>12,1 ha</strong> possuem ASV vigente no SINAFLOR (Arts. 26-27) e <strong>54,3 ha</strong> não possuem autorização localizada na base local do SINAFLOR — situação a verificar junto ao IBAMA/SEMA-AC.
+          <br><br>
+          Foram detectados <strong>47 focos de calor</strong> dentro do imóvel entre 2015 e 2025, com <strong>correlação temporal em 3 anos</strong> com polígonos de desmatamento PRODES — indício de incêndio associado a supressão ilegal.
+          <br><br>
+          O imóvel está classificado como <strong>Vermelho</strong> no SICAR — <strong>Art. 78-A CF: restrição de crédito rural aplicável</strong>. O imóvel apresenta <strong>déficit estimado de Reserva Legal de 27,3 ha</strong> (exigência: 80% = 389,8 ha — Art. 12, I, CF; pequena propriedade Art. 67 CF — 2,3 módulos fiscais).
+          <br><br>
+          <strong>Recomendação:</strong> Instaurar procedimento administrativo — desmatamento ilegal correlacionado com focos de calor (Arts. 38 e 50 CF). Verificar necessidade de embargo e PRA (Arts. 59-68 CF). Restrição de crédito rural aplicável (Art. 78-A).
+        </div>
+        <div class="refs-legais">
+          <strong>Referências legais:</strong> Art. 3/II (APP) · Art. 3/III (Reserva Legal) · Art. 12/I (RL 80% Amazônia) · Art. 26 (vedação supressão sem autorização) · Art. 38 (crime de desmatamento ilegal) · Art. 61-A (áreas consolidadas — corte 22/07/2008) · Art. 66 (obrigação de recomposição de RL) · Art. 67 (pequenas propriedades — ≤4 módulos fiscais) · Art. 78-A (restrição de crédito para imóveis irregulares) — Lei nº 12.651, de 25 de maio de 2012.
+        </div>
+      </div>
+
+      <!-- Conclusão -->
+      <div class="rel-secao">
+        <div class="rel-secao-titulo">8. Conclusão</div>
+        <table class="rel-tabela">
+          <tr><th colspan="2" style="background:#991b1b">Situação de Não Conformidade — Ação Recomendada</th></tr>
+          <tr><td>Prioridade</td><td><strong style="color:#dc2626">🔴 Alta</strong></td></tr>
+          <tr><td>Ação imediata</td><td>Verificar 54,3 ha pós-2008 sem ASV + correlação com 3 focos de calor</td></tr>
+          <tr><td>Prazo</td><td>Imediato — Art. 50 CF</td></tr>
+          <tr><td>Instrumento</td><td>Auto de infração + notificação + PRA (Arts. 59-68 CF)</td></tr>
+        </table>
+      </div>
+
+      <div style="margin-top:16px;padding:10px 12px;background:var(--cinza-50);border:1px solid var(--borda);border-radius:6px;font-size:9px;color:var(--cinza-400);line-height:1.6;text-align:center">
+        Documento gerado automaticamente pelo SIGUC-AC em 06/06/2026 às 10:32 por Erisson Cameli Santiago (super_admin).<br>
+        Não substitui vistoria de campo. As análises são baseadas em dados de sensoriamento remoto com margem de erro de 5–15%.<br>
+        SEMA-AC · DIMA · DEUC · (68) 3212-3100 · sema@sema.ac.gov.br · sema.ac.gov.br
+      </div>
+    </div>
+    <div class="rel-rodape-inf">
+      <span>SIGUC-AC — Sistema de Gestão de Unidades de Conservação do Acre · SEMA-AC/DIMA/DEUC</span>
+      <span>Página 3 de 3 · Prot. 2026-0042</span>
+    </div>
+  </div><!-- /a4 -->
+
+  </div><!-- /preview-area -->
+</div><!-- /preview-overlay -->
+
+<script>
+// Iniciar mapas Leaflet no preview
+setTimeout(()=>{
+  // Mapa de localização
+  try{
+    const mLoc = L.map('mapa-loc',{zoomControl:false,attributionControl:false}).setView([-9.5,-70.5],6);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(mLoc);
+    // Simulando polígono do imóvel
+    L.polygon([[-9.8,-67.1],[-9.8,-67.05],[-9.75,-67.05],[-9.75,-67.1]],
+      {color:'#dc2626',weight:2,fillOpacity:0.3}).addTo(mLoc);
+    L.control.scale({imperial:false,metric:true}).addTo(mLoc);
+  }catch(e){}
+  // Mapa de detalhe
+  try{
+    const mDet = L.map('mapa-det',{zoomControl:true,attributionControl:false}).setView([-9.78,-67.075],13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(mDet);
+    // CAR boundary
+    L.polygon([[-9.8,-67.1],[-9.8,-67.05],[-9.75,-67.05],[-9.75,-67.1]],
+      {color:'#1F4E2C',weight:2.5,fillOpacity:0.05,dashArray:'6 3'}).addTo(mDet);
+    // PRODES anual simulado
+    L.polygon([[-9.77,-67.09],[-9.77,-67.07],[-9.76,-67.07],[-9.76,-67.09]],
+      {color:'#dc2626',weight:1,fillColor:'#dc2626',fillOpacity:0.5}).addTo(mDet);
+    // PRODES pre-2008
+    L.polygon([[-9.79,-67.08],[-9.79,-67.06],[-9.78,-67.06],[-9.78,-67.08]],
+      {color:'#c2410c',weight:1,fillColor:'#c2410c',fillOpacity:0.45}).addTo(mDet);
+    // Focos
+    [[-9.775,-67.085],[-9.768,-9.068+67.1],[-9.772,-67.078]].forEach(ll=>{
+      L.circleMarker(ll,{radius:5,fillColor:'#f97316',color:'#9a3412',weight:1,fillOpacity:0.9}).addTo(mDet);
+    });
+    L.control.scale({imperial:false,metric:true}).addTo(mDet);
+  }catch(e){}
+}, 500);
+</script>
+
+</body>
+</html>
