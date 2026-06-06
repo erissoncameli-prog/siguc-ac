@@ -384,13 +384,27 @@ async function verDetalhe(id) {
     .eq('pesquisa_id', id).order('criado_em')
 
   const etapaIdx = ETAPAS.findIndex(e => e.id === _detalhe.etapa)
-  const podeAvancar = ['gestor','super_admin','tecnico'].includes(_perfil) && _detalhe.etapa !== 'arquivada'
-  const podeAAP     = ['gestor','super_admin'].includes(_perfil) && _detalhe.etapa === 'aap_emissao' && !_detalhe.aap_numero
-  const podeAssinar = ['gestor','super_admin'].includes(_perfil) && _detalhe.etapa === 'aap_emissao' && _detalhe.aap_numero && !_detalhe.aap_assinado_em
-  const podePublicar = ['gestor','super_admin'].includes(_perfil) && _detalhe.etapa === 'aap_assinatura'
-  const podeInad    = ['gestor','super_admin','financeiro'].includes(_perfil) && !_detalhe.inadimplente
 
-  const proxEtapa = PROXIMA_ETAPA[_detalhe.etapa]
+  // Botões de despacho conforme fase e posição do usuário
+  const btTriagem      = podeDespachar('triagem')
+  const btAnaliseTec   = podeDespachar('analise_tecnica')
+  const btParecerDima  = podeDespachar('parecer_dima')
+  const btAutoSec      = podeDespachar('autorizacao_secretario')
+  const btEmissaoAAP   = podeDespachar('emissao_aap')
+  const btEntregaAAP   = podeDespachar('entrega_aap')
+  const btAvaliarRel   = podeDespachar('avaliar_relatorio')
+  const btHomologarRel = podeDespachar('homologar_relatorio')
+  const btEncerramento = podeDespachar('encerramento')
+  const btInad         = podeDespachar('inadimplencia')
+
+  // Fases simples (em_campo → rel_parcial → rel_final → analise_relatorio)
+  const fasesSimples = {
+    em_campo:          { prox:'relatorio_parcial',  label:'Registrar início em campo',         icon:'🌿' },
+    relatorio_parcial: { prox:'relatorio_final',    label:'Registrar entrega do rel. parcial', icon:'📄' },
+    relatorio_final:   { prox:'analise_relatorio',  label:'Registrar entrega do rel. final',   icon:'📋' },
+  }
+  const faseSimples = fasesSimples[_detalhe.etapa]
+  const btFaseSimples = faseSimples && podeDespachar('fase_simples')
 
   document.body.insertAdjacentHTML('beforeend', `
 <div class="modal-bg" id="modal-detalhe" onclick="if(event.target.id==='modal-detalhe')fecharDetalhe()">
@@ -434,19 +448,14 @@ async function verDetalhe(id) {
         <div>
           <div class="det-row"><span class="det-key">SISBIO nº</span>${esc(_detalhe.sisbio_numero||'—')}</div>
           <div class="det-row"><span class="det-key">Status SISBIO</span>
-            <span class="api-chip ${_detalhe.sisbio_status==='validado'?'api-ok':_detalhe.sisbio_status==='invalido'?'api-err':'api-pend'}">
-              ${_detalhe.sisbio_status}
-            </span>
+            <span class="api-chip ${_detalhe.sisbio_status==='validado'?'api-ok':_detalhe.sisbio_status==='invalido'?'api-err':'api-pend'}">${_detalhe.sisbio_status}</span>
             ${_detalhe.sisbio_numero && _detalhe.sisbio_status !== 'validado' ? `<button class="btn-acao" style="padding:3px 8px;font-size:10px;margin-left:6px" onclick="validarAPI('sisbio')">Validar</button>` : ''}
           </div>
-          ${_detalhe.sisbio_validade ? `<div class="det-row"><span class="det-key">Validade</span>${_detalhe.sisbio_validade}</div>` : ''}
         </div>
         <div>
           <div class="det-row"><span class="det-key">SISGEN nº</span>${esc(_detalhe.sisgen_numero||'—')}</div>
           <div class="det-row"><span class="det-key">Status SISGEN</span>
-            <span class="api-chip ${_detalhe.sisgen_status==='validado'?'api-ok':_detalhe.sisgen_status==='invalido'?'api-err':'api-pend'}">
-              ${_detalhe.sisgen_status}
-            </span>
+            <span class="api-chip ${_detalhe.sisgen_status==='validado'?'api-ok':_detalhe.sisgen_status==='invalido'?'api-err':'api-pend'}">${_detalhe.sisgen_status}</span>
             ${_detalhe.sisgen_numero && _detalhe.sisgen_status !== 'validado' ? `<button class="btn-acao" style="padding:3px 8px;font-size:10px;margin-left:6px" onclick="validarAPI('sisgen')">Validar</button>` : ''}
           </div>
         </div>
@@ -465,13 +474,31 @@ async function verDetalhe(id) {
           <div class="det-row"><span class="det-key">Validade</span>${_detalhe.aap_validade||'—'}</div>
         </div>
         <div>
-          <div class="det-row"><span class="det-key">Assinada em</span>${_detalhe.aap_assinado_em ? formatData(_detalhe.aap_assinado_em) : 'Pendente'}</div>
+          <div class="det-row"><span class="det-key">Autorizado por</span>${_detalhe.aap_assinado_em ? formatData(_detalhe.aap_assinado_em) : 'Pendente'}</div>
           <div class="det-row"><span class="det-key">Token QR</span><span style="font-family:monospace;font-size:10px">${esc(_detalhe.aap_qr_token||'—')}</span></div>
         </div>
       </div>
     </div>` : ''}
 
-    <!-- Etapas -->
+    <!-- Sub-etapa de relatório -->
+    ${_detalhe.etapa === 'analise_relatorio' ? `
+    <div class="det-sec" style="background:#F5F3FF;border-radius:8px;padding:12px">
+      <div class="det-sec-title" style="color:#5B21B6">Avaliação de Relatórios</div>
+      <div class="det-row">
+        <span class="det-key">Avaliação analista</span>
+        ${_detalhe.relatorio_avaliado_em
+          ? `<span style="color:#15803D;font-weight:700">✓ Concluída em ${formatData(_detalhe.relatorio_avaliado_em)}</span>`
+          : `<span style="color:#92400E">⏳ Pendente</span>`}
+      </div>
+      <div class="det-row">
+        <span class="det-key">Homologação chefe</span>
+        ${_detalhe.relatorio_homologado_em
+          ? `<span style="color:#15803D;font-weight:700">✓ Homologado em ${formatData(_detalhe.relatorio_homologado_em)}</span>`
+          : `<span style="color:#92400E">⏳ Pendente</span>`}
+      </div>
+    </div>` : ''}
+
+    <!-- Fluxo de Etapas -->
     <div class="det-sec">
       <div class="det-sec-title">Fluxo de Etapas</div>
       <div class="etapa-flow">
@@ -490,17 +517,20 @@ async function verDetalhe(id) {
       </div>
     </div>
 
-    <!-- Ações -->
-    <div style="display:flex;gap:8px;flex-wrap:wrap">
-      ${podeAvancar && proxEtapa ? `
-        <button class="btn-acao primary" onclick="avancarEtapa('${proxEtapa}')">
-          ✓ Avançar para: ${ETAPAS.find(e=>e.id===proxEtapa)?.label}
-        </button>` : ''}
-      ${podeAAP ? `<button class="btn-acao" style="background:#ECFDF5;color:#065F46;border-color:#A7F3D0" onclick="emitirAAP()">📋 Emitir AAP</button>` : ''}
-      ${podeAssinar ? `<button class="btn-acao" style="background:#D1FAE5;color:#065F46;border-color:#6EE7B7" onclick="assinarAAP()">✍ Assinar AAP</button>` : ''}
-      ${podePublicar ? `<button class="btn-acao" style="background:#A7F3D0;color:#064E3B;border-color:#34D399" onclick="publicarAAP()">📤 Publicar AAP</button>` : ''}
-      ${podeInad ? `<button class="btn-acao danger" onclick="marcarInadimplencia()">⚠ Marcar Inadimplente</button>` : ''}
-      ${_detalhe.inadimplente && ['gestor','super_admin'].includes(_perfil) ? `<button class="btn-acao" onclick="regularizar()">✓ Regularizar</button>` : ''}
+    <!-- Botões de despacho -->
+    <div style="display:flex;gap:8px;flex-wrap:wrap;border-top:1px solid #F3F4F6;padding-top:14px">
+      ${btTriagem      ? `<button class="btn-acao primary" onclick="abrirModalTriagem()">📋 Realizar Triagem</button>` : ''}
+      ${btAnaliseTec   ? `<button class="btn-acao primary" onclick="abrirModalAnaliseTec()">🔬 Emitir Parecer Técnico</button>` : ''}
+      ${btParecerDima  ? `<button class="btn-acao primary" onclick="abrirModalParecerDima()">📨 Parecer DIMA</button>` : ''}
+      ${btAutoSec      ? `<button class="btn-acao primary" onclick="abrirModalAutoSecretario()">✅ Autorização Secretário</button>` : ''}
+      ${btEmissaoAAP   ? `<button class="btn-acao primary" onclick="abrirModalEmissaoAAP()">📋 Emitir AAP</button>` : ''}
+      ${btEntregaAAP   ? `<button class="btn-acao primary" onclick="abrirModalEntregaAAP()">📤 Registrar Entrega da AAP</button>` : ''}
+      ${btFaseSimples  ? `<button class="btn-acao primary" onclick="abrirModalFaseSimples('${faseSimples?.prox}','${faseSimples?.label}')">${faseSimples?.icon} ${faseSimples?.label}</button>` : ''}
+      ${btAvaliarRel   ? `<button class="btn-acao primary" onclick="abrirModalAvaliarRelatorio()">📊 Avaliar Relatório</button>` : ''}
+      ${btHomologarRel ? `<button class="btn-acao primary" onclick="abrirModalHomologarRelatorio()">✅ Homologar Relatório</button>` : ''}
+      ${btEncerramento ? `<button class="btn-acao primary" onclick="abrirModalEncerramento()">🔒 Encerrar Processo</button>` : ''}
+      ${btInad         ? `<button class="btn-acao danger" onclick="abrirModalInadimplencia()">⚠ Marcar Inadimplente</button>` : ''}
+      ${_detalhe.inadimplente && _posicao && ['chefe_deuc','chefe_debio','diretor'].includes(_posicao.nivel) ? `<button class="btn-acao" onclick="regularizar()">✓ Regularizar</button>` : ''}
     </div>
   </div>
 </div>
@@ -512,52 +542,715 @@ function fecharDetalhe() {
   _detalhe = null
 }
 
-// ── Ações de etapa ────────────────────────────────────────────
+// ── Helper: fechar modal de despacho e recarregar ────────────
 
-async function avancarEtapa(novaEtapa) {
-  const obs = prompt(`Observação para avançar para "${ETAPAS.find(e=>e.id===novaEtapa)?.label}" (opcional):`) ?? ''
-  const { error } = await db.rpc('avancar_etapa_pesquisa', {
-    p_pesquisa_id: _detalhe.id, p_nova_etapa: novaEtapa, p_observacao: obs || null
+async function _posDespacho(modalId) {
+  document.getElementById(modalId)?.remove()
+  fecharDetalhe()
+  await carregarPesquisas()
+}
+
+function _resumoPesquisa() {
+  return `<div class="resumo-pesquisa">
+    <strong>${esc(_detalhe.numero_processo||'Sem nº')}</strong> · ${esc(_detalhe.titulo)}<br>
+    <span style="color:#6B7280">Pesquisador: ${esc(_detalhe.pesquisador_nome||'—')} · UC: ${esc(_detalhe.uc?.nome||'—')}</span>
+  </div>`
+}
+
+// ══════════════════════════════════════════════════════════════
+// MODAIS DE DESPACHO
+// ══════════════════════════════════════════════════════════════
+
+// ── Modal 1: Triagem ──────────────────────────────────────────
+
+function abrirModalTriagem() {
+  const optsAnalistas = _usuarios
+    .filter(u => ['tecnico','gestor'].includes(u.perfil))
+    .map(u => `<option value="${u.id}">${esc(u.nome_completo)}</option>`).join('')
+
+  document.body.insertAdjacentHTML('beforeend', `
+<div class="modal-bg" id="modal-triagem" onclick="if(event.target.id==='modal-triagem')this.remove()">
+<div class="modal-box" onclick="event.stopPropagation()">
+  <div class="modal-header">
+    <h3>📋 Realizar Triagem</h3>
+    <button onclick="document.getElementById('modal-triagem').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#9CA3AF">✕</button>
+  </div>
+  <div class="modal-body">
+    ${_resumoPesquisa()}
+    <div>
+      <div class="sec-title" style="margin-bottom:10px">Resultado da Triagem</div>
+      <div class="radio-group">
+        <label class="radio-opt" onclick="selecionarRadio(this,'triagem-resultado','aprovada');toggleBlocoTriagem()">
+          <input type="radio" name="triagem-resultado" value="aprovada">
+          <div><div class="radio-opt-label">✅ Aprovada — encaminhar para Análise Técnica</div>
+          <div class="radio-opt-desc">Documentação completa. Processo segue para análise técnica do DEUC.</div></div>
+        </label>
+        <label class="radio-opt" onclick="selecionarRadio(this,'triagem-resultado','exigencia');toggleBlocoTriagem()">
+          <input type="radio" name="triagem-resultado" value="exigencia">
+          <div><div class="radio-opt-label">⚠ Exigência — devolver para complementação</div>
+          <div class="radio-opt-desc">Documentação incompleta. Pesquisador deverá complementar e reenviar.</div></div>
+        </label>
+        <label class="radio-opt" onclick="selecionarRadio(this,'triagem-resultado','rejeitada');toggleBlocoTriagem()">
+          <input type="radio" name="triagem-resultado" value="rejeitada">
+          <div><div class="radio-opt-label">❌ Rejeitada — arquivar processo</div>
+          <div class="radio-opt-desc">Pesquisa não atende requisitos mínimos. O processo será arquivado definitivamente.</div></div>
+        </label>
+      </div>
+    </div>
+
+    <div id="bloco-triagem-aprovada" class="bloco-condicional" style="display:none">
+      <label class="field-label">Atribuir analista responsável</label>
+      <select class="field-input" id="triagem-analista">
+        <option value="">Manter atual / sem atribuição</option>
+        ${optsAnalistas}
+      </select>
+    </div>
+
+    <div id="bloco-triagem-negativa" class="bloco-condicional danger" style="display:none">
+      <label class="field-label">Pendências / Motivo da devolução *</label>
+      <textarea class="field-input" id="triagem-motivo" rows="4"
+        placeholder="Descreva detalhadamente o que precisa ser corrigido ou o motivo da rejeição…"></textarea>
+    </div>
+
+    <div>
+      <label class="field-label">Observação geral (opcional)</label>
+      <textarea class="field-input" id="triagem-obs" rows="2" placeholder="Observações adicionais…"></textarea>
+    </div>
+  </div>
+  <div class="modal-footer">
+    <button class="btn-acao" onclick="document.getElementById('modal-triagem').remove()">Cancelar</button>
+    <button class="btn-acao primary" onclick="confirmarTriagem()">Confirmar Despacho</button>
+  </div>
+</div>
+</div>`)
+}
+
+function toggleBlocoTriagem() {
+  const val = document.querySelector('input[name="triagem-resultado"]:checked')?.value
+  document.getElementById('bloco-triagem-aprovada').style.display = val === 'aprovada' ? '' : 'none'
+  document.getElementById('bloco-triagem-negativa').style.display = (val === 'exigencia' || val === 'rejeitada') ? '' : 'none'
+}
+
+async function confirmarTriagem() {
+  const resultado = document.querySelector('input[name="triagem-resultado"]:checked')?.value
+  if (!resultado) { toast('Selecione um resultado', 'aviso'); return }
+  const motivo  = document.getElementById('triagem-motivo')?.value.trim()
+  const obs     = document.getElementById('triagem-obs')?.value.trim()
+  const analista = document.getElementById('triagem-analista')?.value || null
+
+  if ((resultado === 'exigencia' || resultado === 'rejeitada') && !motivo) {
+    toast('Informe o motivo / pendências', 'aviso'); return
+  }
+
+  const observacao = motivo ? (motivo + (obs ? '\n' + obs : '')) : (obs || null)
+  const { error } = await db.rpc('despachar_triagem', {
+    p_pesquisa_id: _detalhe.id,
+    p_resultado:   resultado,
+    p_observacao:  observacao,
+    p_analista_id: analista || null
+  })
+  if (error) { toast('Erro: ' + error.message, 'erro'); return }
+  toast(resultado === 'aprovada' ? 'Triagem aprovada — processo avançado' : resultado === 'exigencia' ? 'Exigência registrada — pesquisador será notificado' : 'Processo rejeitado e arquivado', 'sucesso')
+  await _posDespacho('modal-triagem')
+}
+
+// ── Modal 2: Análise Técnica ──────────────────────────────────
+
+function abrirModalAnaliseTec() {
+  document.body.insertAdjacentHTML('beforeend', `
+<div class="modal-bg" id="modal-analise" onclick="if(event.target.id==='modal-analise')this.remove()">
+<div class="modal-box" onclick="event.stopPropagation()">
+  <div class="modal-header">
+    <h3>🔬 Parecer Técnico DEUC</h3>
+    <button onclick="document.getElementById('modal-analise').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#9CA3AF">✕</button>
+  </div>
+  <div class="modal-body">
+    ${_resumoPesquisa()}
+    <div>
+      <div class="sec-title" style="margin-bottom:10px">Checklist Técnico</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <label class="check-item"><input type="checkbox" id="chk-docs"> Documentação completa e válida</label>
+        <label class="check-item"><input type="checkbox" id="chk-area"> Área de pesquisa compatível com a UC</label>
+        <label class="check-item"><input type="checkbox" id="chk-met"> Metodologia adequada e viável</label>
+        <label class="check-item"><input type="checkbox" id="chk-auth"> Autorizações externas (SISBIO/SISGEN) verificadas</label>
+        <label class="check-item"><input type="checkbox" id="chk-imp"> Impactos avaliados e mitigações previstas</label>
+      </div>
+    </div>
+    <div>
+      <div class="sec-title" style="margin-bottom:10px">Resultado do Parecer</div>
+      <div class="radio-group">
+        <label class="radio-opt" onclick="selecionarRadio(this,'analise-resultado','favoravel');toggleBlocoAnalise()">
+          <input type="radio" name="analise-resultado" value="favoravel">
+          <div><div class="radio-opt-label">✅ Favorável — encaminhar ao Diretor DIMA</div>
+          <div class="radio-opt-desc">Pesquisa aprovada tecnicamente. Seguirá para Parecer da DIMA.</div></div>
+        </label>
+        <label class="radio-opt" onclick="selecionarRadio(this,'analise-resultado','desfavoravel');toggleBlocoAnalise()">
+          <input type="radio" name="analise-resultado" value="desfavoravel">
+          <div><div class="radio-opt-label">🔄 Devolver para Triagem</div>
+          <div class="radio-opt-desc">Inconsistências identificadas. Processo retorna à triagem com pendências.</div></div>
+        </label>
+      </div>
+    </div>
+    <div id="bloco-analise-dev" class="bloco-condicional warning" style="display:none">
+      <label class="field-label">Pendências técnicas identificadas *</label>
+      <textarea class="field-input" id="analise-pendencias" rows="4"
+        placeholder="Descreva as inconsistências técnicas que precisam ser corrigidas…"></textarea>
+    </div>
+    <div>
+      <label class="field-label">Observações técnicas</label>
+      <textarea class="field-input" id="analise-obs" rows="3"
+        placeholder="Considerações técnicas, ressalvas, recomendações…"></textarea>
+    </div>
+  </div>
+  <div class="modal-footer">
+    <button class="btn-acao" onclick="document.getElementById('modal-analise').remove()">Cancelar</button>
+    <button class="btn-acao primary" onclick="confirmarAnaliseTec()">Confirmar Parecer</button>
+  </div>
+</div>
+</div>`)
+}
+
+function toggleBlocoAnalise() {
+  const val = document.querySelector('input[name="analise-resultado"]:checked')?.value
+  document.getElementById('bloco-analise-dev').style.display = val === 'desfavoravel' ? '' : 'none'
+}
+
+async function confirmarAnaliseTec() {
+  const resultado = document.querySelector('input[name="analise-resultado"]:checked')?.value
+  if (!resultado) { toast('Selecione um resultado', 'aviso'); return }
+  const pendencias = document.getElementById('analise-pendencias')?.value.trim()
+  const obs        = document.getElementById('analise-obs')?.value.trim()
+
+  if (resultado === 'desfavoravel' && !pendencias) {
+    toast('Informe as pendências técnicas', 'aviso'); return
+  }
+
+  const observacao = (pendencias ? pendencias + '\n' : '') + (obs || '')
+  const { error } = await db.rpc('despachar_analise_tecnica', {
+    p_pesquisa_id: _detalhe.id,
+    p_favoravel:   resultado === 'favoravel',
+    p_observacao:  observacao.trim() || null
+  })
+  if (error) { toast('Erro: ' + error.message, 'erro'); return }
+  toast(resultado === 'favoravel' ? 'Parecer favorável — encaminhado ao Diretor DIMA' : 'Processo devolvido para triagem', 'sucesso')
+  await _posDespacho('modal-analise')
+}
+
+// ── Modal 3: Parecer DIMA ─────────────────────────────────────
+
+function abrirModalParecerDima() {
+  document.body.insertAdjacentHTML('beforeend', `
+<div class="modal-bg" id="modal-dima" onclick="if(event.target.id==='modal-dima')this.remove()">
+<div class="modal-box" onclick="event.stopPropagation()">
+  <div class="modal-header">
+    <h3>📨 Parecer DIMA</h3>
+    <button onclick="document.getElementById('modal-dima').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#9CA3AF">✕</button>
+  </div>
+  <div class="modal-body">
+    ${_resumoPesquisa()}
+    <div class="radio-group">
+      <label class="radio-opt" onclick="selecionarRadio(this,'dima-resultado','encaminhar');toggleBlocoDima()">
+        <input type="radio" name="dima-resultado" value="encaminhar">
+        <div><div class="radio-opt-label">✅ Visto e encaminhar ao Secretário de Estado</div>
+        <div class="radio-opt-desc">Parecer técnico do DEUC satisfatório. Encaminha para autorização do Secretário.</div></div>
+      </label>
+      <label class="radio-opt" onclick="selecionarRadio(this,'dima-resultado','diligencia');toggleBlocoDima()">
+        <input type="radio" name="dima-resultado" value="diligencia">
+        <div><div class="radio-opt-label">🔄 Diligência — devolver para análise técnica</div>
+        <div class="radio-opt-desc">Necessário complementação técnica antes de encaminhar ao Secretário.</div></div>
+      </label>
+    </div>
+    <div id="bloco-dima-dilg" class="bloco-condicional warning" style="display:none">
+      <label class="field-label">Pendências para diligência *</label>
+      <textarea class="field-input" id="dima-pendencias" rows="3" placeholder="Descreva o que precisa ser complementado…"></textarea>
+    </div>
+    <div>
+      <label class="field-label">Observação / Despacho</label>
+      <textarea class="field-input" id="dima-obs" rows="3" placeholder="Considerações do Diretor DIMA…"></textarea>
+    </div>
+  </div>
+  <div class="modal-footer">
+    <button class="btn-acao" onclick="document.getElementById('modal-dima').remove()">Cancelar</button>
+    <button class="btn-acao primary" onclick="confirmarParecerDima()">Confirmar Despacho</button>
+  </div>
+</div>
+</div>`)
+}
+
+function toggleBlocoDima() {
+  const val = document.querySelector('input[name="dima-resultado"]:checked')?.value
+  document.getElementById('bloco-dima-dilg').style.display = val === 'diligencia' ? '' : 'none'
+}
+
+async function confirmarParecerDima() {
+  const resultado   = document.querySelector('input[name="dima-resultado"]:checked')?.value
+  if (!resultado) { toast('Selecione uma opção', 'aviso'); return }
+  const pendencias  = document.getElementById('dima-pendencias')?.value.trim()
+  const obs         = document.getElementById('dima-obs')?.value.trim()
+  if (resultado === 'diligencia' && !pendencias) { toast('Informe as pendências da diligência', 'aviso'); return }
+  const observacao  = (pendencias ? pendencias + '\n' : '') + (obs || '')
+  const { error } = await db.rpc('despachar_parecer_dima', {
+    p_pesquisa_id: _detalhe.id,
+    p_encaminhar:  resultado === 'encaminhar',
+    p_observacao:  observacao.trim() || null
+  })
+  if (error) { toast('Erro: ' + error.message, 'erro'); return }
+  toast(resultado === 'encaminhar' ? 'Encaminhado ao Secretário de Estado' : 'Diligência registrada — devolvido para análise técnica', 'sucesso')
+  await _posDespacho('modal-dima')
+}
+
+// ── Modal 4: Autorização do Secretário ───────────────────────
+
+function abrirModalAutoSecretario() {
+  document.body.insertAdjacentHTML('beforeend', `
+<div class="modal-bg" id="modal-secretario" onclick="if(event.target.id==='modal-secretario')this.remove()">
+<div class="modal-box" onclick="event.stopPropagation()">
+  <div class="modal-header">
+    <h3>✅ Autorização — Secretário de Estado</h3>
+    <button onclick="document.getElementById('modal-secretario').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#9CA3AF">✕</button>
+  </div>
+  <div class="modal-body">
+    ${_resumoPesquisa()}
+    <div style="background:#F0FDF4;border:1px solid #A7F3D0;border-radius:8px;padding:14px;font-size:12px;color:#065F46">
+      <strong>Esta ação autoriza formalmente a pesquisa</strong> nas Unidades de Conservação do Estado do Acre.<br>
+      Após autorização, o DEUC emitirá a Autorização de Acesso e Pesquisa (AAP).
+    </div>
+    <div class="radio-group">
+      <label class="radio-opt" onclick="selecionarRadio(this,'sec-resultado','autorizar');toggleBlocoSec()">
+        <input type="radio" name="sec-resultado" value="autorizar">
+        <div><div class="radio-opt-label">✅ Autorizar — emitir AAP</div>
+        <div class="radio-opt-desc">Pesquisa autorizada pelo Secretário. DEUC procederá com a emissão da AAP.</div></div>
+      </label>
+      <label class="radio-opt" onclick="selecionarRadio(this,'sec-resultado','negar');toggleBlocoSec()">
+        <input type="radio" name="sec-resultado" value="negar">
+        <div><div class="radio-opt-label">❌ Negar — arquivar processo</div>
+        <div class="radio-opt-desc">Pesquisa não autorizada. Processo arquivado definitivamente. Pesquisador será notificado.</div></div>
+      </label>
+    </div>
+    <div id="bloco-sec-negativa" class="bloco-condicional danger" style="display:none">
+      <label class="field-label">Fundamento da negativa *</label>
+      <textarea class="field-input" id="sec-motivo" rows="4" placeholder="Informe o fundamento legal ou administrativo da negativa…"></textarea>
+    </div>
+    <div>
+      <label class="field-label">Observação / Despacho</label>
+      <textarea class="field-input" id="sec-obs" rows="2" placeholder="Considerações do Secretário de Estado…"></textarea>
+    </div>
+  </div>
+  <div class="modal-footer">
+    <button class="btn-acao" onclick="document.getElementById('modal-secretario').remove()">Cancelar</button>
+    <button class="btn-acao primary" onclick="confirmarAutoSecretario()">Confirmar Despacho</button>
+  </div>
+</div>
+</div>`)
+}
+
+function toggleBlocoSec() {
+  const val = document.querySelector('input[name="sec-resultado"]:checked')?.value
+  document.getElementById('bloco-sec-negativa').style.display = val === 'negar' ? '' : 'none'
+}
+
+async function confirmarAutoSecretario() {
+  const resultado = document.querySelector('input[name="sec-resultado"]:checked')?.value
+  if (!resultado) { toast('Selecione uma opção', 'aviso'); return }
+  const motivo = document.getElementById('sec-motivo')?.value.trim()
+  const obs    = document.getElementById('sec-obs')?.value.trim()
+  if (resultado === 'negar' && !motivo) { toast('Informe o fundamento da negativa', 'aviso'); return }
+  const observacao = (motivo ? motivo + '\n' : '') + (obs || '')
+  const { error } = await db.rpc('despachar_autorizacao_secretario', {
+    p_pesquisa_id: _detalhe.id,
+    p_autorizado:  resultado === 'autorizar',
+    p_observacao:  observacao.trim() || null
+  })
+  if (error) { toast('Erro: ' + error.message, 'erro'); return }
+  toast(resultado === 'autorizar' ? 'Pesquisa autorizada — DEUC pode emitir a AAP' : 'Pesquisa negada e arquivada', 'sucesso')
+  await _posDespacho('modal-secretario')
+}
+
+// ── Modal 5: Emissão da AAP ───────────────────────────────────
+
+function abrirModalEmissaoAAP() {
+  const hoje = new Date()
+  const validade = new Date(hoje.getFullYear() + 1, hoje.getMonth(), hoje.getDate())
+    .toISOString().split('T')[0]
+  document.body.insertAdjacentHTML('beforeend', `
+<div class="modal-bg" id="modal-aap" onclick="if(event.target.id==='modal-aap')this.remove()">
+<div class="modal-box" onclick="event.stopPropagation()">
+  <div class="modal-header">
+    <h3>📋 Emissão da AAP</h3>
+    <button onclick="document.getElementById('modal-aap').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#9CA3AF">✕</button>
+  </div>
+  <div class="modal-body">
+    ${_resumoPesquisa()}
+    <div style="background:#F0FDF4;border:1px solid #A7F3D0;border-radius:8px;padding:12px;font-size:12px;color:#065F46">
+      Pesquisa autorizada pelo Secretário de Estado em ${formatData(_detalhe.aap_assinado_em)}.<br>
+      Preencha os dados para gerar a Autorização de Acesso e Pesquisa.
+    </div>
+    <div class="field-grid-2">
+      <div>
+        <label class="field-label">Validade da AAP</label>
+        <input class="field-input" type="date" id="aap-validade" value="${validade}">
+      </div>
+      <div>
+        <label class="field-label">Duração (dias)</label>
+        <input class="field-input" type="number" id="aap-dias" value="365" min="30" max="1825"
+          oninput="atualizarValidadeAAP(this.value)">
+      </div>
+    </div>
+    <div>
+      <label class="field-label">Condicionantes da AAP (opcional)</label>
+      <textarea class="field-input" id="aap-condicionantes" rows="4"
+        placeholder="Liste as condições e obrigações do pesquisador durante a execução da pesquisa…"></textarea>
+    </div>
+  </div>
+  <div class="modal-footer">
+    <button class="btn-acao" onclick="document.getElementById('modal-aap').remove()">Cancelar</button>
+    <button class="btn-acao primary" onclick="confirmarEmissaoAAP()">📋 Gerar AAP</button>
+  </div>
+</div>
+</div>`)
+}
+
+function atualizarValidadeAAP(dias) {
+  if (!dias || isNaN(dias)) return
+  const d = new Date()
+  d.setDate(d.getDate() + parseInt(dias))
+  document.getElementById('aap-validade').value = d.toISOString().split('T')[0]
+}
+
+async function confirmarEmissaoAAP() {
+  const validadeStr    = document.getElementById('aap-validade')?.value
+  const condicionantes = document.getElementById('aap-condicionantes')?.value.trim() || null
+  if (!validadeStr) { toast('Informe a validade da AAP', 'aviso'); return }
+  const hoje = new Date(); hoje.setHours(0,0,0,0)
+  const val  = new Date(validadeStr)
+  const dias = Math.round((val - hoje) / 86400000)
+  if (dias < 1) { toast('Data de validade deve ser futura', 'aviso'); return }
+  const { error } = await db.rpc('despachar_emissao_aap', {
+    p_pesquisa_id:   _detalhe.id,
+    p_validade_dias: dias,
+    p_condicionantes: condicionantes
+  })
+  if (error) { toast('Erro: ' + error.message, 'erro'); return }
+  toast('AAP emitida com sucesso!', 'sucesso')
+  await _posDespacho('modal-aap')
+}
+
+// ── Modal 6: Entrega da AAP ───────────────────────────────────
+
+function abrirModalEntregaAAP() {
+  const hoje = new Date().toISOString().split('T')[0]
+  document.body.insertAdjacentHTML('beforeend', `
+<div class="modal-bg" id="modal-entrega-aap" onclick="if(event.target.id==='modal-entrega-aap')this.remove()">
+<div class="modal-box" onclick="event.stopPropagation()">
+  <div class="modal-header">
+    <h3>📤 Registrar Entrega da AAP</h3>
+    <button onclick="document.getElementById('modal-entrega-aap').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#9CA3AF">✕</button>
+  </div>
+  <div class="modal-body">
+    ${_resumoPesquisa()}
+    <div style="background:#F0FDF4;border:1px solid #A7F3D0;border-radius:8px;padding:12px;font-size:12px">
+      <strong>AAP:</strong> ${esc(_detalhe.aap_numero||'—')} · <strong>Válida até:</strong> ${_detalhe.aap_validade||'—'}
+    </div>
+    <div class="field-grid-2">
+      <div>
+        <label class="field-label">Canal de entrega</label>
+        <select class="field-input" id="entrega-canal">
+          <option value="presencial">Presencial</option>
+          <option value="email">E-mail</option>
+          <option value="portal">Portal SIGUC</option>
+        </select>
+      </div>
+      <div>
+        <label class="field-label">Data de início real em campo</label>
+        <input class="field-input" type="date" id="entrega-inicio" value="${_detalhe.data_inicio_prevista || hoje}">
+      </div>
+    </div>
+    <div>
+      <label class="field-label">Observação</label>
+      <textarea class="field-input" id="entrega-obs" rows="2" placeholder="Informações sobre a entrega…"></textarea>
+    </div>
+  </div>
+  <div class="modal-footer">
+    <button class="btn-acao" onclick="document.getElementById('modal-entrega-aap').remove()">Cancelar</button>
+    <button class="btn-acao primary" onclick="confirmarEntregaAAP()">✅ Confirmar Entrega</button>
+  </div>
+</div>
+</div>`)
+}
+
+async function confirmarEntregaAAP() {
+  const inicio = document.getElementById('entrega-inicio')?.value || null
+  const obs    = document.getElementById('entrega-obs')?.value.trim() || null
+  const canal  = document.getElementById('entrega-canal')?.value
+  const obsCompleta = `AAP entregue via ${canal}.` + (obs ? ' ' + obs : '')
+  const { error } = await db.rpc('despachar_entrega_aap', {
+    p_pesquisa_id:      _detalhe.id,
+    p_data_inicio_real: inicio,
+    p_observacao:       obsCompleta
+  })
+  if (error) { toast('Erro: ' + error.message, 'erro'); return }
+  toast('AAP entregue — pesquisa em campo', 'sucesso')
+  await _posDespacho('modal-entrega-aap')
+}
+
+// ── Modal 7: Fase simples (em_campo → rel_parcial → rel_final) ─
+
+function abrirModalFaseSimples(novaEtapa, labelAcao) {
+  const hoje = new Date().toISOString().split('T')[0]
+  document.body.insertAdjacentHTML('beforeend', `
+<div class="modal-bg" id="modal-fase-simples" onclick="if(event.target.id==='modal-fase-simples')this.remove()">
+<div class="modal-box" onclick="event.stopPropagation()" style="width:520px">
+  <div class="modal-header">
+    <h3>${esc(labelAcao)}</h3>
+    <button onclick="document.getElementById('modal-fase-simples').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#9CA3AF">✕</button>
+  </div>
+  <div class="modal-body">
+    ${_resumoPesquisa()}
+    ${novaEtapa === 'relatorio_parcial' || novaEtapa === 'relatorio_final' ? `
+    <div>
+      <label class="field-label">Data de entrega</label>
+      <input class="field-input" type="date" id="fase-data" value="${hoje}">
+    </div>` : ''}
+    <div>
+      <label class="field-label">Observação (opcional)</label>
+      <textarea class="field-input" id="fase-obs" rows="3" placeholder="Informações adicionais…"></textarea>
+    </div>
+  </div>
+  <div class="modal-footer">
+    <button class="btn-acao" onclick="document.getElementById('modal-fase-simples').remove()">Cancelar</button>
+    <button class="btn-acao primary" onclick="confirmarFaseSimples('${novaEtapa}')">Confirmar</button>
+  </div>
+</div>
+</div>`)
+}
+
+async function confirmarFaseSimples(novaEtapa) {
+  const obs  = document.getElementById('fase-obs')?.value.trim() || null
+  const data = document.getElementById('fase-data')?.value || null
+  const obsCompleta = (data ? `Data: ${data}. ` : '') + (obs || '')
+  const { error } = await db.rpc('despachar_fase_simples', {
+    p_pesquisa_id: _detalhe.id,
+    p_nova_etapa:  novaEtapa,
+    p_observacao:  obsCompleta.trim() || null
   })
   if (error) { toast('Erro: ' + error.message, 'erro'); return }
   toast('Etapa avançada com sucesso', 'sucesso')
-  fecharDetalhe()
-  await carregarPesquisas()
+  await _posDespacho('modal-fase-simples')
 }
 
-async function emitirAAP() {
-  const dias = parseInt(prompt('Validade da AAP em dias (padrão: 365):') || '365') || 365
-  const { data, error } = await db.rpc('emitir_aap', { p_pesquisa_id: _detalhe.id, p_validade_dias: dias })
+// ── Modal 8: Avaliação de Relatório (analista) ────────────────
+
+function abrirModalAvaliarRelatorio() {
+  document.body.insertAdjacentHTML('beforeend', `
+<div class="modal-bg" id="modal-avaliar-rel" onclick="if(event.target.id==='modal-avaliar-rel')this.remove()">
+<div class="modal-box" onclick="event.stopPropagation()">
+  <div class="modal-header">
+    <h3>📊 Avaliação de Relatório — Analista</h3>
+    <button onclick="document.getElementById('modal-avaliar-rel').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#9CA3AF">✕</button>
+  </div>
+  <div class="modal-body">
+    ${_resumoPesquisa()}
+    <div>
+      <div class="sec-title" style="margin-bottom:10px">Critérios de Avaliação</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <label class="check-item"><input type="checkbox" id="rel-chk-completude"> Relatório completo conforme roteiro</label>
+        <label class="check-item"><input type="checkbox" id="rel-chk-dados"> Dados coletados condizentes com a AAP</label>
+        <label class="check-item"><input type="checkbox" id="rel-chk-metodologia"> Metodologia aplicada corretamente</label>
+        <label class="check-item"><input type="checkbox" id="rel-chk-cronograma"> Cronograma de execução respeitado</label>
+      </div>
+    </div>
+    <div class="radio-group">
+      <label class="radio-opt" onclick="selecionarRadio(this,'avaliar-resultado','aprovado');toggleBlocoAvaliar()">
+        <input type="radio" name="avaliar-resultado" value="aprovado">
+        <div><div class="radio-opt-label">✅ Aprovado — encaminhar para homologação do Chefe DEUC</div></div>
+      </label>
+      <label class="radio-opt" onclick="selecionarRadio(this,'avaliar-resultado','exigencia');toggleBlocoAvaliar()">
+        <input type="radio" name="avaliar-resultado" value="exigencia">
+        <div><div class="radio-opt-label">🔄 Exigência — devolver ao pesquisador para complementação</div></div>
+      </label>
+    </div>
+    <div id="bloco-avaliar-exig" class="bloco-condicional warning" style="display:none">
+      <label class="field-label">Pendências para complementação *</label>
+      <textarea class="field-input" id="avaliar-pendencias" rows="3" placeholder="Descreva o que precisa ser complementado no relatório…"></textarea>
+    </div>
+    <div>
+      <label class="field-label">Observações técnicas</label>
+      <textarea class="field-input" id="avaliar-obs" rows="3" placeholder="Parecer técnico do analista…"></textarea>
+    </div>
+  </div>
+  <div class="modal-footer">
+    <button class="btn-acao" onclick="document.getElementById('modal-avaliar-rel').remove()">Cancelar</button>
+    <button class="btn-acao primary" onclick="confirmarAvaliarRelatorio()">Confirmar Avaliação</button>
+  </div>
+</div>
+</div>`)
+}
+
+function toggleBlocoAvaliar() {
+  const val = document.querySelector('input[name="avaliar-resultado"]:checked')?.value
+  document.getElementById('bloco-avaliar-exig').style.display = val === 'exigencia' ? '' : 'none'
+}
+
+async function confirmarAvaliarRelatorio() {
+  const resultado   = document.querySelector('input[name="avaliar-resultado"]:checked')?.value
+  if (!resultado) { toast('Selecione um resultado', 'aviso'); return }
+  const pendencias  = document.getElementById('avaliar-pendencias')?.value.trim()
+  const obs         = document.getElementById('avaliar-obs')?.value.trim()
+  if (resultado === 'exigencia' && !pendencias) { toast('Informe as pendências', 'aviso'); return }
+  const observacao  = (pendencias ? pendencias + '\n' : '') + (obs || '')
+  const { error } = await db.rpc('despachar_avaliar_relatorio', {
+    p_pesquisa_id: _detalhe.id,
+    p_aprovado:    resultado === 'aprovado',
+    p_observacao:  observacao.trim() || null
+  })
   if (error) { toast('Erro: ' + error.message, 'erro'); return }
-  toast('AAP emitida: ' + data.aap_numero, 'sucesso')
-  fecharDetalhe()
-  await carregarPesquisas()
+  toast(resultado === 'aprovado' ? 'Relatório avaliado — aguarda homologação do Chefe DEUC' : 'Exigência registrada — pesquisador será notificado', 'sucesso')
+  await _posDespacho('modal-avaliar-rel')
 }
 
-async function assinarAAP() {
-  const { error } = await db.rpc('assinar_aap', { p_pesquisa_id: _detalhe.id })
+// ── Modal 9: Homologação de Relatório (chefe_deuc) ────────────
+
+function abrirModalHomologarRelatorio() {
+  document.body.insertAdjacentHTML('beforeend', `
+<div class="modal-bg" id="modal-homologar-rel" onclick="if(event.target.id==='modal-homologar-rel')this.remove()">
+<div class="modal-box" onclick="event.stopPropagation()">
+  <div class="modal-header">
+    <h3>✅ Homologação de Relatório — Chefe DEUC</h3>
+    <button onclick="document.getElementById('modal-homologar-rel').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#9CA3AF">✕</button>
+  </div>
+  <div class="modal-body">
+    ${_resumoPesquisa()}
+    <div style="background:#F0FDF4;border:1px solid #A7F3D0;border-radius:8px;padding:12px;font-size:12px;color:#065F46">
+      ✓ Relatório avaliado pelo analista em <strong>${formatData(_detalhe.relatorio_avaliado_em)}</strong>.<br>
+      Homologação do Chefe DEUC encerra o processo e marca a pesquisa como concluída.
+    </div>
+    <div class="radio-group">
+      <label class="radio-opt" onclick="selecionarRadio(this,'homologar-resultado','homologar')">
+        <input type="radio" name="homologar-resultado" value="homologar">
+        <div><div class="radio-opt-label">✅ Homologar — encerrar processo</div>
+        <div class="radio-opt-desc">Relatório aceito. O processo será formalmente encerrado.</div></div>
+      </label>
+      <label class="radio-opt" onclick="selecionarRadio(this,'homologar-resultado','devolver')">
+        <input type="radio" name="homologar-resultado" value="devolver">
+        <div><div class="radio-opt-label">🔄 Não homologar — devolver ao pesquisador</div>
+        <div class="radio-opt-desc">Relatório não aceito pelo Chefe DEUC. Pesquisador deverá reenviar.</div></div>
+      </label>
+    </div>
+    <div>
+      <label class="field-label">Observação do Chefe DEUC</label>
+      <textarea class="field-input" id="homologar-obs" rows="3" placeholder="Considerações da homologação…"></textarea>
+    </div>
+  </div>
+  <div class="modal-footer">
+    <button class="btn-acao" onclick="document.getElementById('modal-homologar-rel').remove()">Cancelar</button>
+    <button class="btn-acao primary" onclick="confirmarHomologarRelatorio()">Confirmar</button>
+  </div>
+</div>
+</div>`)
+}
+
+async function confirmarHomologarRelatorio() {
+  const resultado = document.querySelector('input[name="homologar-resultado"]:checked')?.value
+  if (!resultado) { toast('Selecione uma opção', 'aviso'); return }
+  const obs = document.getElementById('homologar-obs')?.value.trim() || null
+  const { error } = await db.rpc('despachar_homologar_relatorio', {
+    p_pesquisa_id: _detalhe.id,
+    p_aprovado:    resultado === 'homologar',
+    p_observacao:  obs
+  })
   if (error) { toast('Erro: ' + error.message, 'erro'); return }
-  toast('AAP assinada', 'sucesso')
-  fecharDetalhe()
-  await carregarPesquisas()
+  toast(resultado === 'homologar' ? 'Relatório homologado — processo encerrado' : 'Não homologado — devolvido ao pesquisador', 'sucesso')
+  await _posDespacho('modal-homologar-rel')
 }
 
-async function publicarAAP() {
-  const { error } = await db.rpc('publicar_aap', { p_pesquisa_id: _detalhe.id })
+// ── Modal 10: Encerramento ────────────────────────────────────
+
+function abrirModalEncerramento() {
+  const hoje = new Date().toISOString().split('T')[0]
+  document.body.insertAdjacentHTML('beforeend', `
+<div class="modal-bg" id="modal-encerramento" onclick="if(event.target.id==='modal-encerramento')this.remove()">
+<div class="modal-box" onclick="event.stopPropagation()" style="width:520px">
+  <div class="modal-header">
+    <h3>🔒 Encerrar e Arquivar Processo</h3>
+    <button onclick="document.getElementById('modal-encerramento').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#9CA3AF">✕</button>
+  </div>
+  <div class="modal-body">
+    ${_resumoPesquisa()}
+    <div style="background:#F0FDF4;border:1px solid #A7F3D0;border-radius:8px;padding:12px;font-size:12px;color:#065F46">
+      Relatório homologado. Esta ação move o processo para o status <strong>Arquivado</strong> definitivamente.
+    </div>
+    <div>
+      <label class="field-label">Data de encerramento real</label>
+      <input class="field-input" type="date" id="encerr-data" value="${_detalhe.data_fim_real || hoje}">
+    </div>
+    <div>
+      <label class="field-label">Observação final</label>
+      <textarea class="field-input" id="encerr-obs" rows="3" placeholder="Considerações finais do processo…"></textarea>
+    </div>
+    <label class="check-item" style="margin-top:4px">
+      <input type="checkbox" id="encerr-confirma">
+      <span style="font-size:12px;font-weight:700;color:#374151">Confirmo o encerramento formal deste processo de pesquisa</span>
+    </label>
+  </div>
+  <div class="modal-footer">
+    <button class="btn-acao" onclick="document.getElementById('modal-encerramento').remove()">Cancelar</button>
+    <button class="btn-acao primary" onclick="confirmarEncerramento()">🔒 Arquivar</button>
+  </div>
+</div>
+</div>`)
+}
+
+async function confirmarEncerramento() {
+  if (!document.getElementById('encerr-confirma')?.checked) {
+    toast('Confirme o encerramento marcando a caixa', 'aviso'); return
+  }
+  const data = document.getElementById('encerr-data')?.value || null
+  const obs  = document.getElementById('encerr-obs')?.value.trim() || null
+  const { error } = await db.rpc('despachar_encerramento', {
+    p_pesquisa_id:   _detalhe.id,
+    p_data_fim_real: data,
+    p_observacao:    obs
+  })
   if (error) { toast('Erro: ' + error.message, 'erro'); return }
-  toast('AAP publicada', 'sucesso')
-  fecharDetalhe()
-  await carregarPesquisas()
+  toast('Processo encerrado e arquivado', 'sucesso')
+  await _posDespacho('modal-encerramento')
 }
 
-async function marcarInadimplencia() {
-  const motivo = prompt('Motivo da inadimplência:')
-  if (!motivo) return
+// ── Modal 11: Inadimplência ───────────────────────────────────
+
+function abrirModalInadimplencia() {
+  document.body.insertAdjacentHTML('beforeend', `
+<div class="modal-bg" id="modal-inad" onclick="if(event.target.id==='modal-inad')this.remove()">
+<div class="modal-box" onclick="event.stopPropagation()" style="width:520px">
+  <div class="modal-header">
+    <h3>⚠ Marcar Inadimplência</h3>
+    <button onclick="document.getElementById('modal-inad').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#9CA3AF">✕</button>
+  </div>
+  <div class="modal-body">
+    ${_resumoPesquisa()}
+    <div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:8px;padding:12px;font-size:12px;color:#991B1B">
+      ⚠ Pesquisadores inadimplentes têm o avanço de etapas bloqueado até regularização.
+    </div>
+    <div>
+      <label class="field-label">Motivo da inadimplência *</label>
+      <textarea class="field-input" id="inad-motivo" rows="3" placeholder="Ex: Relatório parcial não entregue dentro do prazo…"></textarea>
+    </div>
+  </div>
+  <div class="modal-footer">
+    <button class="btn-acao" onclick="document.getElementById('modal-inad').remove()">Cancelar</button>
+    <button class="btn-acao danger" onclick="confirmarInadimplencia()">⚠ Confirmar Inadimplência</button>
+  </div>
+</div>
+</div>`)
+}
+
+async function confirmarInadimplencia() {
+  const motivo = document.getElementById('inad-motivo')?.value.trim()
+  if (!motivo) { toast('Informe o motivo', 'aviso'); return }
   const { error } = await db.rpc('marcar_inadimplencia', { p_pesquisa_id: _detalhe.id, p_motivo: motivo })
   if (error) { toast('Erro: ' + error.message, 'erro'); return }
   toast('Inadimplência registrada', 'sucesso')
-  fecharDetalhe()
-  await carregarPesquisas()
+  await _posDespacho('modal-inad')
 }
 
 async function regularizar() {
@@ -568,6 +1261,16 @@ async function regularizar() {
   toast('Pesquisador regularizado', 'sucesso')
   fecharDetalhe()
   await carregarPesquisas()
+}
+
+// ── Helper: selecionar radio com estilo ───────────────────────
+
+function selecionarRadio(el, name, value) {
+  document.querySelectorAll(`input[name="${name}"]`).forEach(r => {
+    r.closest('.radio-opt')?.classList.remove('selecionado')
+  })
+  el.classList.add('selecionado')
+  el.querySelector(`input[name="${name}"]`).checked = true
 }
 
 // ── Validação SISBIO / SISGEN ─────────────────────────────────
