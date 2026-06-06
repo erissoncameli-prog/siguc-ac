@@ -3301,7 +3301,7 @@ function _htmlProdes(d, f, focosExt){
           onchange="_toggleProdesCarLayer('focos',this.checked)">
         <div style="width:12px;height:12px;background:#f97316;border-radius:50%;flex-shrink:0;opacity:.9"></div>
         <span style="font-size:11px;color:var(--cinza-700);flex:1">Focos de calor</span>
-        ${focos.pontos?.length?`<span style="font-size:9px;color:#f97316;font-weight:600">${focos.pontos.length} pts</span>`:''}
+        ${focosExt?.recentes?.total?`<span style="font-size:9px;color:#f97316;font-weight:600">${focosExt.recentes.total} recentes</span>`:''}
       </label>
     </div>
 
