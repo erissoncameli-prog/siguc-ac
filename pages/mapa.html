@@ -197,6 +197,40 @@
   .mapa-painel-wrap.mobile-aberto #mapa-scrollbar-outer{display:none;}
   .btn-filtros-mobile{display:flex;}
 }
+/* ── Painel Camadas ──────────────────────────────────────────── */
+.camada-row-outer{border-bottom:1px solid var(--cinza-100);}
+.camada-row-outer:last-child{border-bottom:none;}
+.camada-row{display:flex;align-items:center;gap:6px;padding:5px 2px;}
+.camada-expand-body{padding:6px 2px 8px;display:flex;flex-direction:column;gap:6px;}
+.camada-expand-section{background:var(--cinza-50);border:1px solid var(--cinza-100);border-radius:6px;padding:7px 8px;display:flex;flex-direction:column;gap:5px;}
+.camada-expand-section-title{font-size:9px;font-weight:700;color:var(--cinza-500);text-transform:uppercase;letter-spacing:.07em;display:flex;align-items:center;gap:5px;}
+.camada-link-btn{background:none;border:none;font-size:9px;color:#2D6A4F;cursor:pointer;font-weight:700;padding:0 3px;font-family:inherit;}
+.camada-link-btn:hover{text-decoration:underline;}
+.camada-feat-row{display:flex;align-items:center;gap:5px;padding:2px 0;}
+.camada-feat-nome{font-size:11px;color:var(--cinza-700);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.camada-color-mini{width:20px;height:20px;padding:1px;border:1px solid var(--borda);border-radius:3px;cursor:pointer;flex-shrink:0;}
+.camada-style-row{display:flex;align-items:center;gap:7px;padding:2px 0;}
+.camada-style-lbl{font-size:9px;font-weight:700;color:var(--cinza-500);text-transform:uppercase;letter-spacing:.05em;width:72px;flex-shrink:0;}
+.camada-style-val{font-size:9px;font-weight:700;color:var(--cinza-700);width:30px;text-align:right;flex-shrink:0;}
+.camada-slider{flex:1;height:3px;accent-color:#1F4E2C;cursor:pointer;min-width:0;}
+.btn-camada-exp{background:none;border:1px solid var(--borda);border-radius:4px;width:20px;height:20px;font-size:11px;cursor:pointer;color:var(--cinza-400);display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s;}
+.btn-camada-exp:hover,.btn-camada-exp.ativo{background:#f0fdf4;border-color:#2D6A4F;color:#2D6A4F;}
+/* Modal Nova Camada */
+#modal-nova-camada{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:800;display:none;align-items:center;justify-content:center;padding:16px;}
+.nc-modal{background:#fff;border-radius:14px;width:100%;max-width:440px;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.35);overflow:hidden;font-family:'DM Sans',sans-serif;}
+.nc-header{background:linear-gradient(135deg,#1a3c2a,#2D6A4F);padding:14px 18px;display:flex;align-items:center;gap:10px;flex-shrink:0;}
+.nc-header h3{margin:0;font-size:14px;font-weight:700;color:#fff;flex:1;}
+.nc-body{padding:18px;overflow-y:auto;display:flex;flex-direction:column;gap:12px;}
+.nc-footer{padding:12px 18px;border-top:1px solid var(--borda);display:flex;gap:8px;flex-shrink:0;}
+.nc-field{display:flex;flex-direction:column;gap:4px;}
+.nc-label{font-size:10px;font-weight:700;color:var(--cinza-500);text-transform:uppercase;letter-spacing:.06em;}
+.nc-input{padding:7px 10px;border:1px solid var(--borda);border-radius:var(--raio);font-size:13px;font-family:inherit;color:var(--cinza-800);transition:border-color .15s;}
+.nc-input:focus{outline:none;border-color:#2D6A4F;box-shadow:0 0 0 3px rgba(45,106,79,.12);}
+.nc-drop-area{background:#f8fafc;border:2px dashed #94a3b8;border-radius:8px;padding:16px;text-align:center;cursor:pointer;transition:all .15s;}
+.nc-drop-area:hover,.nc-drop-area.hover{border-color:#2D6A4F;background:#f0fdf4;}
+.nc-drop-icon{font-size:24px;margin-bottom:4px;}
+.nc-drop-txt{font-size:11px;color:var(--cinza-500);}
+.nc-drop-tipos{font-size:10px;color:var(--cinza-400);margin-top:3px;}
 /* Painel análise alerta */
 .malerta-panel{position:fixed;top:0;right:0;width:400px;height:100vh;background:#fff;z-index:650;display:flex;flex-direction:column;box-shadow:-4px 0 32px rgba(0,0,0,.22);transition:transform .28s cubic-bezier(.4,0,.2,1);overflow:hidden;min-width:280px;max-width:600px;transform:translateX(100%);}
 .malerta-panel.aberto{transform:translateX(0);}
