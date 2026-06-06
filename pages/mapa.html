@@ -3978,6 +3978,292 @@ function initScrollbarCustom(){
   document.addEventListener('mouseup',()=>{ drag=false; });
   outer.addEventListener('click',e=>{ if(e.target===thumb) return; const rect=outer.getBoundingClientRect(); const clickRatio=(e.clientY-rect.top)/outer.clientHeight; painel.scrollTop=clickRatio*(painel.scrollHeight-painel.clientHeight); });
 }
+
+// ─── Painel análise ambiental (aba Alertas) ──────────────────────────────────
+
+let _mAlertaAberto   = null
+let _mAnaliseDados   = null
+let _mAnaliseTabAtiva = 'prodes'
+const _mAnaliseCache  = {}
+
+function _mGeomAreaHa(geometry) {
+  const LAT_M = 111200, LON_M = 109800
+  const ring = r => {
+    let a = 0
+    for (let i = 0, j = r.length - 1; i < r.length; j = i++)
+      a += (r[j][0] + r[i][0]) * (r[j][1] - r[i][1])
+    return Math.abs(a / 2) * LON_M * LAT_M / 10000
+  }
+  if (!geometry) return 0
+  if (geometry.type === 'Polygon')      return ring(geometry.coordinates[0])
+  if (geometry.type === 'MultiPolygon') return geometry.coordinates.reduce((s,p) => s + ring(p[0]), 0)
+  return 0
+}
+
+function _mBboxAlerta(a) {
+  const lat = a._lat, lng = a._lng
+  if (!lat || !lng) return null
+  const buf = 0.05
+  let bbox = [lng - buf, lat - buf, lng + buf, lat + buf]
+  if ((a.uc_id || a.uc_nome) && _ucGeojson?.features) {
+    const nome = a.uc_nome
+    const feat = nome ? _ucGeojson.features.find(f => {
+      const n = f.properties?.nome || f.properties?.NAME || f.properties?.name || ''
+      return n === nome || n.toLowerCase().includes(nome.toLowerCase().slice(0, 10))
+    }) : null
+    if (feat?.geometry) {
+      const flat = feat.geometry.type === 'Polygon'
+        ? feat.geometry.coordinates.flat(1)
+        : feat.geometry.type === 'MultiPolygon'
+          ? feat.geometry.coordinates.flat(2)
+          : []
+      if (flat.length) {
+        const lons = flat.map(c => c[0]), lats = flat.map(c => c[1])
+        bbox = [Math.min(...lons), Math.min(...lats), Math.max(...lons), Math.max(...lats)]
+      }
+    }
+  }
+  return bbox
+}
+
+async function abrirAnaliseAlertaMapa(alertaKey) {
+  const a = window[alertaKey]
+  if (!a) return
+  const bbox = _mBboxAlerta(a)
+  if (!bbox) { toast('Alerta sem coordenadas.', 'error'); return }
+
+  _mAlertaAberto = a
+  const COR_TIPO_M  = { queimada:'#DC2626', desmatamento:'#166534', degradacao:'#92400E' }
+  const ICONE_TIPO_M = { queimada:'🔥', desmatamento:'🌳', degradacao:'🍂' }
+  const LABEL_FONTE_M = { FIRMS:'FIRMS/NASA', DETER:'DETER/INPE', BDQUEIMADAS:'BDQueimadas', PRODES:'PRODES' }
+  const cor = COR_TIPO_M[a.tipo] ?? '#1F4E2C'
+
+  document.getElementById('malerta-header').innerHTML = `
+    <div style="display:flex;align-items:flex-start;gap:8px;padding:14px 16px 12px;background:linear-gradient(135deg,${cor}ee,${cor}99)">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:700;color:#fff;line-height:1.3">
+          ${ICONE_TIPO_M[a.tipo]??'⚠'} ${a.tipo.charAt(0).toUpperCase()+a.tipo.slice(1)}
+          <span style="font-size:10px;font-weight:600;background:rgba(255,255,255,.2);border-radius:99px;padding:1px 7px;margin-left:4px">${(a.severidade||'').toUpperCase()}</span>
+        </div>
+        <div style="font-size:11px;color:rgba(255,255,255,.85);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+          ${escHtml(a.uc_nome ?? 'Fora de UC')} · ${a.data_referencia ?? ''}
+        </div>
+        <div style="font-size:10px;color:rgba(255,255,255,.65);margin-top:1px">${LABEL_FONTE_M[a.fonte]??escHtml(a.fonte??'')}</div>
+      </div>
+      <button onclick="fecharAnaliseAlertaMapa()" style="background:rgba(255,255,255,.2);border:none;color:#fff;border-radius:6px;cursor:pointer;padding:4px 9px;font-size:14px;line-height:1;flex-shrink:0">✕</button>
+    </div>`
+
+  document.getElementById('malerta-overlay').style.display = ''
+  document.getElementById('malerta-panel').classList.add('aberto')
+  tabAnaliseAlertaMapa('prodes')
+  document.getElementById('malerta-body').innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:48px 16px;gap:12px">
+    <div style="width:28px;height:28px;border:3px solid #e5e7eb;border-top-color:#52B788;border-radius:50%;animation:_malspin .8s linear infinite"></div>
+    <div style="font-size:12px;color:#9CA3AF">Consultando PRODES/INPE e FIRMS...</div>
+    <style>@keyframes _malspin{to{transform:rotate(360deg)}}</style>
+  </div>`
+
+  const cid = String(a.id)
+  if (_mAnaliseCache[cid]) {
+    _mAnaliseDados = _mAnaliseCache[cid]
+    _mRenderAba(_mAnaliseTabAtiva, _mAnaliseDados, a)
+    return
+  }
+
+  const [pr, fo] = await Promise.allSettled([
+    _mFetchProdes(bbox),
+    _fetchFocosCAR(bbox)
+  ])
+
+  _mAnaliseDados = {
+    prodes: pr.status === 'fulfilled' ? pr.value : { erro: 'Falha na consulta PRODES' },
+    focos:  fo.status === 'fulfilled' ? fo.value : { historico:[], recentes:{total:0,focos:[]}, erro:'Falha' },
+    bbox
+  }
+  _mAnaliseCache[cid] = _mAnaliseDados
+  _mRenderAba(_mAnaliseTabAtiva, _mAnaliseDados, a)
+}
+
+function tabAnaliseAlertaMapa(tab) {
+  _mAnaliseTabAtiva = tab
+  ;['prodes','focos','legal'].forEach(t => document.getElementById('maltab-'+t)?.classList.toggle('ativo', t===tab))
+  if (_mAlertaAberto && _mAnaliseDados) _mRenderAba(tab, _mAnaliseDados, _mAlertaAberto)
+}
+
+function _mRenderAba(tab, dados, a) {
+  const bod = document.getElementById('malerta-body')
+  if (!bod) return
+  if (tab === 'prodes') bod.innerHTML = _mHtmlProdes(dados.prodes, a)
+  else if (tab === 'focos') bod.innerHTML = _htmlFocosSection(dados.focos, dados.prodes.erro ? null : dados.prodes)
+  else bod.innerHTML = _mHtmlLegal(a, dados.prodes)
+}
+
+function fecharAnaliseAlertaMapa() {
+  document.getElementById('malerta-panel').classList.remove('aberto')
+  document.getElementById('malerta-overlay').style.display = 'none'
+  _mAlertaAberto = null
+  _mAnaliseDados  = null
+}
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape') fecharAnaliseAlertaMapa() })
+
+async function _mFetchProdes(bbox) {
+  try {
+    const r = await fetch('/api/prodes-proxy', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ bbox }),
+      signal: AbortSignal.timeout(30000)
+    })
+    if (!r.ok) return { erro: `HTTP ${r.status}` }
+    return await r.json()
+  } catch(e) {
+    return { erro: e.name==='TimeoutError' ? 'Tempo limite — servidor INPE pode estar lento.' : e.message }
+  }
+}
+
+function _mHtmlProdes(d, alerta) {
+  const f2 = n => Number(n||0).toLocaleString('pt-BR', { maximumFractionDigits:1 })
+  if (!d || d.erro) return `<div style="padding:14px;background:#fef2f2;border:1px solid #fca5a5;border-radius:8px;font-size:12px;color:#dc2626;display:flex;flex-direction:column;gap:8px">
+    <div>⚠ ${escHtml(d?.erro ?? 'Dados indisponíveis')}</div>
+    <a href="https://terrabrasilis.dpi.inpe.br" target="_blank" style="font-size:11px;color:#2563eb">Acessar TerraBrasilis →</a>
+    <button onclick="_mFetchProdes(_mAnaliseDados?.bbox).then(r=>{_mAnaliseDados.prodes=r;_mRenderAba('prodes',_mAnaliseDados,_mAlertaAberto)})" class="btn btn-outline" style="font-size:11px">🔄 Tentar novamente</button>
+  </div>`
+
+  const anualFeats = d.anual?.features  || []
+  const histFeats  = d.historico?.features || []
+  const porAno = {}
+  anualFeats.forEach(f => {
+    const ano = String(f.properties?.year || f.properties?.ano || f.properties?.data_detec?.slice(0,4) || 'N/D')
+    porAno[ano] = (porAno[ano] || 0) + _mGeomAreaHa(f.geometry)
+  })
+  const totalAnual = Object.values(porAno).reduce((s,v) => s+v, 0)
+  const totalHist  = histFeats.reduce((s,f) => s + _mGeomAreaHa(f.geometry), 0)
+  const total = totalAnual + totalHist
+  const anos  = Object.keys(porAno).sort()
+  const maxHa = Math.max(...Object.values(porAno), 0.01)
+  const bboxInfo = alerta.uc_nome ? `UC: ${escHtml(alerta.uc_nome)}` : 'Buffer ~0.05° ao redor do ponto'
+
+  if (total < 0.01) return `<div style="padding:16px;background:#f0fdf4;border:1px solid #86efac;border-radius:8px;text-align:center;font-size:12px;color:#16a34a">
+    ✅ Nenhum polígono de desmatamento PRODES detectado no entorno.
+    <div style="font-size:10px;color:#9CA3AF;margin-top:6px">${bboxInfo}</div>
+  </div>`
+
+  const corTotal = total > 100 ? '#dc2626' : total > 20 ? '#d97706' : '#f59e0b'
+  const anoMaior = anos.length ? anos.reduce((m,a) => porAno[a] > (porAno[m]||0) ? a : m, anos[0]) : null
+
+  const barras = anos.map(ano => {
+    const ha = porAno[ano], w = (ha/maxHa*100).toFixed(1)
+    return `<div style="display:flex;align-items:center;gap:6px;padding:2px 0">
+      <span style="font-size:10px;color:#6b7280;width:32px;flex-shrink:0">${ano}</span>
+      <div style="flex:1;height:13px;background:#f3f4f6;border-radius:3px;overflow:hidden">
+        <div style="height:100%;width:${w}%;background:#dc2626;border-radius:3px"></div>
+      </div>
+      <span style="font-size:10px;font-weight:600;color:#374151;width:58px;text-align:right">${f2(ha)} ha</span>
+    </div>`
+  }).join('')
+
+  return `<div style="display:flex;flex-direction:column;gap:10px">
+    <div style="padding:14px;background:#fef2f2;border:1px solid #fca5a5;border-radius:8px;text-align:center">
+      <div style="font-size:10px;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Total desmatado — PRODES/INPE</div>
+      <div style="font-size:30px;font-weight:700;color:${corTotal};line-height:1.1">${f2(total)} ha</div>
+      <div style="font-size:10px;color:#9CA3AF;margin-top:3px">${bboxInfo}</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <div style="padding:10px 12px;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px">
+        <div style="font-size:9px;font-weight:700;color:#9a3412;text-transform:uppercase;margin-bottom:3px">🕰 Pré-2008</div>
+        <div style="font-size:18px;font-weight:700;color:#c2410c">${f2(totalHist)} ha</div>
+        <div style="font-size:9px;color:#9a3412">Área consolidada</div>
+      </div>
+      <div style="padding:10px 12px;background:#fef2f2;border:1px solid #fca5a5;border-radius:8px">
+        <div style="font-size:9px;font-weight:700;color:#991b1b;text-transform:uppercase;margin-bottom:3px">📅 2008–hoje</div>
+        <div style="font-size:18px;font-weight:700;color:#dc2626">${f2(totalAnual)} ha</div>
+        <div style="font-size:9px;color:#991b1b">${anos.length} ano(s) com dado</div>
+      </div>
+    </div>
+    ${anoMaior ? `<div style="padding:8px 12px;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;font-size:11px;color:#92400e">
+      📌 Maior registro: <strong>${anoMaior}</strong> — <strong>${f2(porAno[anoMaior])} ha</strong>
+    </div>` : ''}
+    ${anos.length ? `<div style="padding:10px 12px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px">
+      <div style="font-size:10px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Desmatamento anual</div>
+      ${barras}
+    </div>` : ''}
+    <div style="padding:8px 10px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;font-size:10px;color:#92400e;line-height:1.5">
+      ⚠ Dados referem-se ao entorno do ponto do alerta. Para análise de imóvel rural, use o painel CAR.
+    </div>
+    <a href="https://terrabrasilis.dpi.inpe.br/app/dashboard/deforestation/biomes/amazon/increments" target="_blank"
+      style="font-size:11px;color:#2563eb;text-align:center;display:block">📊 Ver painel oficial PRODES/INPE →</a>
+  </div>`
+}
+
+function _mHtmlLegal(a, prod) {
+  const emUC = !!(a.uc_id || a.uc_nome)
+  const tipo = a.tipo, sev = a.severidade
+  const itens = []
+
+  if (emUC) {
+    itens.push({ icon:'🔴', cor:'#dc2626', bg:'#fef2f2', bord:'#fca5a5',
+      titulo:'Ocorrência dentro de Unidade de Conservação',
+      desc:'Supressão vedada pelo Art. 28 da Lei 9.985/2000 (SNUC) e Art. 26 da Lei 12.651/2012 (Código Florestal).' })
+    if (tipo==='queimada') itens.push({ icon:'🔴', cor:'#dc2626', bg:'#fef2f2', bord:'#fca5a5',
+      titulo:'Incêndio em UC',
+      desc:'Art. 41 da Lei 9.605/1998 — reclusão de 2 a 4 anos, acrescida de multa.' })
+    if (tipo==='desmatamento') itens.push({ icon:'🔴', cor:'#dc2626', bg:'#fef2f2', bord:'#fca5a5',
+      titulo:'Desmatamento em UC',
+      desc:'Art. 38 CF e Art. 50 da Lei 9.605/1998. Acionar IBAMA/SEMA e MP.' })
+    if (tipo==='mineracao_ilegal') itens.push({ icon:'🔴', cor:'#dc2626', bg:'#fef2f2', bord:'#fca5a5',
+      titulo:'Mineração em UC — Gravíssima',
+      desc:'Art. 55 da Lei 9.605/1998 + Art. 44 da Lei 9.985/2000. Comunicar DNPM/ANM.' })
+  } else {
+    if (tipo==='desmatamento') {
+      const histLen = prod?.historico?.features?.length || 0
+      const anuLen  = prod?.anual?.features?.length || 0
+      if (histLen > 0 && anuLen === 0)
+        itens.push({ icon:'🟡', cor:'#d97706', bg:'#fffbeb', bord:'#fde68a',
+          titulo:'Provável área consolidada anterior a 2008',
+          desc:'Art. 61-A CF: consolidação admitida. Verificar CAR e PRA.' })
+      else
+        itens.push({ icon:'🔴', cor:'#dc2626', bg:'#fef2f2', bord:'#fca5a5',
+          titulo:'Desmatamento fora de UC — verificar ASV',
+          desc:'Art. 26 CF: supressão exige ASV. Consultar SINAFLOR. Art. 38 CF: crime sem autorização.' })
+    }
+    if (tipo==='queimada') itens.push({ icon:'🟠', cor:'#f97316', bg:'#fff7ed', bord:'#fed7aa',
+      titulo:'Foco de calor — verificar autorização',
+      desc:'Art. 38-A CF: uso de fogo exige autorização do órgão ambiental.' })
+    if (tipo==='degradacao') itens.push({ icon:'🟡', cor:'#d97706', bg:'#fffbeb', bord:'#fde68a',
+      titulo:'Degradação de vegetação nativa',
+      desc:'Arts. 38 e 61-A CF + Art. 50 Lei 9.605/1998. Verificar extensão e forma de recuperação.' })
+  }
+
+  const acao = { critica:{ label:'🚨 Ação imediata — acionar fiscalização', cor:'#dc2626' },
+                 alta:   { label:'⚠ Alta prioridade — responder em 24h',    cor:'#f97316' },
+                 media:  { label:'👁 Monitorar — verificar em campo',         cor:'#d97706' },
+                 baixa:  { label:'📋 Registro preventivo — monitorar',        cor:'#059669' }
+               }[sev] || { label:'Verificar', cor:'#6b7280' }
+
+  return `<div style="display:flex;flex-direction:column;gap:8px">
+    <div style="padding:10px 12px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px">
+      <div style="font-size:12px;font-weight:700;color:${acao.cor}">${acao.label}</div>
+      <div style="font-size:10px;color:#6b7280;margin-top:2px">${(sev||'').toUpperCase()} · ${emUC ? `UC: ${escHtml(a.uc_nome)}` : 'Fora de UC cadastrada'}</div>
+    </div>
+    ${itens.map(i => `<div style="padding:10px 12px;background:${i.bg};border:1px solid ${i.bord};border-radius:8px">
+      <div style="font-size:13px;margin-bottom:4px">${i.icon} <strong style="font-size:12px;color:${i.cor}">${i.titulo}</strong></div>
+      <div style="font-size:11px;color:#374151;line-height:1.5">${i.desc}</div>
+    </div>`).join('')}
+    ${!itens.length?`<div style="padding:14px;text-align:center;color:#6b7280;font-size:12px">Sem disposições específicas identificadas automaticamente.</div>`:''}
+    <div style="padding:8px 10px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;font-size:10px;color:#6b7280;line-height:1.5">
+      ℹ Análise automática e orientativa. Consultar assessoria jurídica da SEMA-AC para fins legais.
+    </div>
+  </div>`
+}
 </script>
+<div id="malerta-overlay" onclick="fecharAnaliseAlertaMapa()" style="display:none;position:fixed;inset:0;z-index:640;background:rgba(0,0,0,.2)"></div>
+<div id="malerta-panel" class="malerta-panel">
+  <div id="malerta-header"></div>
+  <div class="malerta-tabs-bar">
+    <button class="malerta-tab ativo" id="maltab-prodes" onclick="tabAnaliseAlertaMapa('prodes')">🌳 PRODES</button>
+    <button class="malerta-tab" id="maltab-focos" onclick="tabAnaliseAlertaMapa('focos')">🔥 Focos</button>
+    <button class="malerta-tab" id="maltab-legal" onclick="tabAnaliseAlertaMapa('legal')">⚖ Legal</button>
+  </div>
+  <div id="malerta-body" class="malerta-body"></div>
+</div>
 </body>
 </html>
