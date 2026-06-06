@@ -26,13 +26,15 @@ let _relModo   = 'detalhado'; // 'sintetico' | 'detalhado'
 // ── Abrir modal de seleção ─────────────────────────────────────────────────
 
 function abrirModalRelatorio() {
-  if (!_carAbertoCod) { toast('Abra um imóvel CAR primeiro.','warning'); return; }
+  try {
+    if (!_carAbertoCod) { toast('Abra um imóvel CAR primeiro.','warning'); return; }
 
-  const nMarcados = _carMarcados ? _carMarcados.size : 0;
-  const nomeImovel = _relEsc(
-    (_carDadosLocais?.get?.(_carAbertoCod)?.nom_imovel) ||
-    _carAbertoFeat?.properties?.cod_imovel || _carAbertoCod
-  );
+    const nMarcados = (_carMarcados instanceof Map) ? _carMarcados.size : 0;
+    const dadosLocais = (_carDadosLocais instanceof Map) ? _carDadosLocais.get(_carAbertoCod) : null;
+    const nomeImovel = _relEsc(
+      dadosLocais?.nom_imovel ||
+      _carAbertoFeat?.properties?.cod_imovel || _carAbertoCod
+    );
 
   const el = document.createElement('div');
   el.id = 'rel-modal-overlay';
