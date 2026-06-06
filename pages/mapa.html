@@ -3219,22 +3219,7 @@ function _htmlProdes(d, f, focosExt){
       ${barrasAnos}
     </div>`:''}`}
 
-    <!-- Focos de calor -->
-    <div style="padding:10px 12px;background:${focosAnos.length?'#fff7ed':'var(--cinza-50)'};border:1px solid ${focosAnos.length?'#fed7aa':'var(--borda)'};border-radius:var(--raio);margin-bottom:10px">
-      <div style="font-size:10px;font-weight:700;color:${focosAnos.length?'#9a3412':'var(--cinza-600)'};text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">
-        🔥 Focos de Calor — BDQueimadas/INPE
-        ${focos.total>0?`<span style="font-size:12px;margin-left:6px;font-weight:700">${focos.total}</span> <span style="font-size:9px;font-weight:400">total histórico</span>`:''}
-      </div>
-      ${!focos.temDados?`
-      <div style="font-size:10px;color:#6b7280;line-height:1.6">
-        Nenhum foco registrado neste imóvel ainda — a Edge Function <strong>monitorar-alertas</strong>
-        coleta FIRMS + BDQueimadas diariamente a partir de hoje.
-        Para histórico anterior, importe o CSV do BDQueimadas para a tabela <code>focos_calor</code>.
-        <br><a href="https://queimadas.dgi.inpe.br/queimadas/bdqueimadas" target="_blank" style="color:#2563eb">BDQueimadas/INPE →</a>
-      </div>`:`
-      ${focos.correlacionados?.length?`<div style="font-size:10px;color:#c2410c;background:#fef2f2;border-radius:4px;padding:4px 7px;margin-bottom:6px">⚠️ Correlação temporal: focos detectados em ${focos.correlacionados.length} ano(s) com desmatamento PRODES.</div>`:''}
-      ${focosAnos.length?`<div style="font-size:9px;color:var(--cinza-400);margin-bottom:6px">${focos.anoMin}–${focos.anoMax} · ⚠️ = ano com desmatamento PRODES</div>${barrasFocos}`:''}`}
-    </div>
+    <!-- Focos de calor renderizados por _htmlFocosSection abaixo -->
 
     <!-- Metadados -->
     <div style="padding:8px 10px;background:var(--cinza-50);border:1px solid var(--borda);border-radius:var(--raio);margin-bottom:10px;font-size:11px">
