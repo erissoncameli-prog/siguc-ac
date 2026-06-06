@@ -3095,17 +3095,15 @@ function _htmlProdes(d, f){
         🔥 Focos de Calor — BDQueimadas/INPE
         ${focos.total>0?`<span style="font-size:12px;margin-left:6px;font-weight:700">${focos.total}</span> <span style="font-size:9px;font-weight:400">total histórico</span>`:''}
       </div>
-      ${!focos.temHistorico?`
-      <div style="font-size:10px;color:#6b7280;line-height:1.5">
-        Base histórica vazia — importe dados FIRMS/BDQueimadas para o Supabase.
-        ${!focos.temFirmsKey?`<br>Configure <code>FIRMS_MAP_KEY</code> no Vercel para dados NRT (últimos 10 dias).`:''}
-        <br><a href="https://firms.modaps.eosdis.nasa.gov/api/" target="_blank" style="color:#2563eb">Obter MAP_KEY gratuito →</a>
-        &nbsp;|&nbsp;
-        <a href="https://queimadas.dgi.inpe.br/queimadas/bdqueimadas" target="_blank" style="color:#2563eb">BDQueimadas →</a>
+      ${!focos.temDados?`
+      <div style="font-size:10px;color:#6b7280;line-height:1.6">
+        Nenhum foco registrado neste imóvel ainda — a Edge Function <strong>monitorar-alertas</strong>
+        coleta FIRMS + BDQueimadas diariamente a partir de hoje.
+        Para histórico anterior, importe o CSV do BDQueimadas para a tabela <code>focos_calor</code>.
+        <br><a href="https://queimadas.dgi.inpe.br/queimadas/bdqueimadas" target="_blank" style="color:#2563eb">BDQueimadas/INPE →</a>
       </div>`:`
       ${focos.correlacionados?.length?`<div style="font-size:10px;color:#c2410c;background:#fef2f2;border-radius:4px;padding:4px 7px;margin-bottom:6px">⚠️ Correlação temporal: focos detectados em ${focos.correlacionados.length} ano(s) com desmatamento PRODES.</div>`:''}
-      ${focosAnos.length?`<div style="font-size:9px;color:var(--cinza-400);margin-bottom:6px">${focos.anoMin}–${focos.anoMax} · ⚠️ = ano com desmatamento PRODES</div>${barrasFocos}`:''}
-      ${focos.nrt?.length?`<div style="margin-top:6px;font-size:10px;color:#9a3412">🔴 ${focos.nrt.length} foco(s) NRT (últimos 10 dias) na área do imóvel.</div>`:''}`}
+      ${focosAnos.length?`<div style="font-size:9px;color:var(--cinza-400);margin-bottom:6px">${focos.anoMin}–${focos.anoMax} · ⚠️ = ano com desmatamento PRODES</div>${barrasFocos}`:''}`}
     </div>
 
     <!-- Metadados -->
