@@ -2937,8 +2937,8 @@ async function _fetchProdesCAR(f){
       numModulo, pequenaPropriedade, exigenciaRL, florestaRemanescente, deficitRL,
       // focos
       focos: {
-        porAno: focosAnos, pontos: focosData.pontos||[], nrt: focosData.nrt||[],
-        total: totalFocos, temHistorico: focosData.temHistorico, temFirmsKey: focosData.temFirmsKey,
+        porAno: focosAnos, pontos: focosData.pontos||[],
+        total: totalFocos, temDados: focosData.temDados||totalFocos>0,
         correlacionados: focosCorrel, anoMin: anoMinFocos, anoMax: anoMaxFocos,
       },
     };
