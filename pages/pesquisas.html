@@ -145,27 +145,25 @@
 
 const ETAPAS = [
   { id:'submetida',          label:'1. Submetida' },
-  { id:'triagem',            label:'2. Triagem' },
+  { id:'triagem',            label:'2. Triagem DEUC' },
   { id:'analise_tecnica',    label:'3. Análise Técnica' },
-  { id:'parecer_juridico',   label:'4. Parecer Jurídico' },
-  { id:'aap_emissao',        label:'5. Emissão AAP' },
-  { id:'aap_assinatura',     label:'6. Assinatura AAP' },
-  { id:'aap_publicada',      label:'7. AAP Publicada' },
+  { id:'parecer_juridico',   label:'4. Parecer DIMA' },
+  { id:'aap_emissao',        label:'5. Autorização Secretário' },
+  { id:'aap_assinatura',     label:'6. Emissão da AAP' },
+  { id:'aap_publicada',      label:'7. AAP Entregue' },
   { id:'em_campo',           label:'8. Em Campo' },
-  { id:'relatorio_parcial',  label:'9. Rel. Parcial' },
-  { id:'relatorio_final',    label:'10. Rel. Final' },
-  { id:'analise_relatorio',  label:'11. Análise Rel.' },
+  { id:'relatorio_parcial',  label:'9. Rel. Parcial Pendente' },
+  { id:'relatorio_final',    label:'10. Rel. Final Pendente' },
+  { id:'analise_relatorio',  label:'11. Avaliação Relatórios' },
   { id:'encerrada',          label:'12. Encerrada' },
   { id:'arquivada',          label:'13. Arquivada' },
 ]
 
-const PROXIMA_ETAPA = {
-  submetida:'triagem', triagem:'analise_tecnica',
-  analise_tecnica:'parecer_juridico', parecer_juridico:'aap_emissao',
-  aap_emissao:'aap_assinatura', aap_assinatura:'aap_publicada',
-  aap_publicada:'em_campo', em_campo:'relatorio_parcial',
-  relatorio_parcial:'relatorio_final', relatorio_final:'analise_relatorio',
-  analise_relatorio:'encerrada', encerrada:'arquivada',
+const NIVEL_LABEL = {
+  secretario:'Secretário de Estado', diretor:'Diretor DIMA',
+  chefe_deuc:'Chefe DEUC', chefe_debio:'Chefe DEBIO',
+  coordenador:'Coordenador', gestor_uc:'Gestor UC',
+  analista_uc:'Analista UC', pesquisador_externo:'Pesquisador'
 }
 
 const TIPO_LABEL = {
@@ -173,19 +171,25 @@ const TIPO_LABEL = {
   ecossistema:'Ecossistema', socioambiental:'Socioambiental', outro:'Outro'
 }
 
-let _pesquisas  = []
-let _ucs        = []
-let _usuarios   = []
+let _pesquisas   = []
+let _ucs         = []
+let _usuarios    = []
 let _etapaFiltro = ''
-let _busca      = ''
-let _detalhe    = null
-let _perfil     = null
+let _busca       = ''
+let _detalhe     = null
+let _posicao     = null   // { nivel, uc_id, unidade_sigla }
+let _uid         = null
 
 // ── Init ─────────────────────────────────────────────────────
 
 async function init() {
   await carregarUsuario()
-  _perfil = appState.usuario?.perfil
+  _uid = appState.usuario?.id
+
+  // Resolver posição hierárquica do usuário logado
+  const { data: pos } = await db.rpc('minha_posicao')
+  _posicao = pos?.[0] || null
+
   document.getElementById('app').innerHTML =
     gerarLayout('Gestão de Pesquisa', 'pesquisas') +
     `<div class="fade-in ps-wrapper">${renderEstrutura()}</div></div></div>`
@@ -195,7 +199,8 @@ async function init() {
 }
 
 function renderEstrutura() {
-  const podeNova = ['gestor','super_admin','tecnico'].includes(_perfil)
+  const podeNova = _posicao && ['gestor_uc','analista_uc','chefe_deuc','chefe_debio','diretor'].includes(_posicao.nivel)
+  const nivelStr = _posicao ? `<span class="selo-posicao">👤 ${NIVEL_LABEL[_posicao.nivel] || _posicao.nivel}</span>` : ''
   return `
 <div class="kpi-bar" id="kpi-bar">
   <div class="kpi-chip"><div class="kpi-val" id="kpi-total">—</div><div class="kpi-lbl">Total</div></div>
@@ -205,6 +210,7 @@ function renderEstrutura() {
 </div>
 
 <div class="ps-topbar">
+  ${nivelStr}
   <div class="pipeline" id="pipeline"></div>
   <input style="padding:8px 14px;border:1px solid var(--borda);border-radius:8px;font-size:13px;width:220px;outline:none"
     placeholder="Buscar pesquisa…" oninput="buscar(this.value)">
@@ -212,6 +218,48 @@ function renderEstrutura() {
 </div>
 
 <div id="ps-corpo"></div>`
+}
+
+// ── Gates de permissão por fase ───────────────────────────────
+
+function podeDespachar(etapa) {
+  if (!_posicao || !_detalhe) return false
+  const { nivel, uc_id } = _posicao
+  const p = _detalhe
+  const mesmaUC = uc_id === p.uc_id
+  const ehAnalista = _uid === p.analista_id
+
+  switch(etapa) {
+    case 'triagem':
+      return ((['gestor_uc','analista_uc'].includes(nivel) && mesmaUC) || ['chefe_deuc','chefe_debio'].includes(nivel))
+        && p.etapa === 'submetida'
+    case 'analise_tecnica':
+      return (ehAnalista || ['chefe_deuc','chefe_debio'].includes(nivel))
+        && p.etapa === 'analise_tecnica'
+    case 'parecer_dima':
+      return nivel === 'diretor' && p.etapa === 'parecer_juridico'
+    case 'autorizacao_secretario':
+      return nivel === 'secretario' && p.etapa === 'aap_emissao'
+    case 'emissao_aap':
+      return ['chefe_deuc','chefe_debio'].includes(nivel) && p.etapa === 'aap_assinatura'
+    case 'entrega_aap':
+      return ((['gestor_uc','analista_uc'].includes(nivel) && mesmaUC) || ['chefe_deuc','chefe_debio'].includes(nivel))
+        && p.etapa === 'aap_publicada'
+    case 'fase_simples':
+      return (ehAnalista || (['gestor_uc','analista_uc'].includes(nivel) && mesmaUC) || ['chefe_deuc','chefe_debio','diretor'].includes(nivel))
+    case 'avaliar_relatorio':
+      return (ehAnalista || ['chefe_deuc','chefe_debio'].includes(nivel))
+        && p.etapa === 'analise_relatorio' && !p.relatorio_avaliado_em
+    case 'homologar_relatorio':
+      return ['chefe_deuc','chefe_debio'].includes(nivel)
+        && p.etapa === 'analise_relatorio' && !!p.relatorio_avaliado_em
+    case 'encerramento':
+      return ['chefe_deuc','chefe_debio'].includes(nivel) && p.etapa === 'encerrada'
+    case 'inadimplencia':
+      return ['chefe_deuc','chefe_debio','diretor','secretario'].includes(nivel) && !p.inadimplente
+    default:
+      return false
+  }
 }
 
 // ── Dados ─────────────────────────────────────────────────────
