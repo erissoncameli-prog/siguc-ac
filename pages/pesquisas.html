@@ -171,9 +171,17 @@ const TIPO_LABEL = {
   ecossistema:'Ecossistema', socioambiental:'Socioambiental', outro:'Outro'
 }
 
+const TIPO_DOC_LABEL = {
+  formulario:'Formulário assinado', proposta:'Proposta do projeto',
+  sisbio:'Comprovante SISBIO', conep:'Registro CONEP',
+  aap_pdf:'AAP (PDF)', relatorio_parcial:'Relatório Parcial',
+  relatorio_final:'Relatório Final', complementar:'Documento complementar', outro:'Outro'
+}
+
 let _pesquisas   = []
 let _ucs         = []
 let _usuarios    = []
+let _docs        = []   // documentos da pesquisa atual
 let _etapaFiltro = ''
 let _busca       = ''
 let _detalhe     = null
