@@ -1,0 +1,45 @@
+name: Revisão por IA (Claude)
+
+# Agente de revisão: em cada PR, o Claude inspeciona o diff em busca de
+# bugs, problemas de segurança (RLS, vazamento de dados/PII, SECURITY
+# DEFINER, etc.) e regressões, e comenta no PR.
+#
+# Requer o secret ANTHROPIC_API_KEY no repositório
+# (Settings → Secrets and variables → Actions). Sem ele, o job é pulado.
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+  issue_comment:
+    types: [created]          # permite acionar com "@claude" em comentários
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  revisao:
+    if: ${{ github.event_name == 'pull_request' || contains(github.event.comment.body, '@claude') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+
+      - name: Claude Code Review
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            Revise o diff deste PR para o sistema SIGUC-AC (Supabase + JS vanilla),
+            um sistema de governo que trata dados pessoais (CPF, e-mail) com RLS.
+            Foque, em ordem de prioridade:
+              1. Falhas de segurança: políticas RLS frouxas (WITH CHECK true),
+                 funções SECURITY DEFINER sem checagem de permissão ou sem
+                 search_path, exposição de PII em RPCs/views públicas,
+                 vazamento de SERVICE_ROLE_KEY no frontend, CORS aberto.
+              2. Bugs de correção: contagem de colunas em INSERT...SELECT,
+                 etapas do fluxo de pesquisa, gates de inadimplência, e-mails.
+              3. Regressões e simplificações de baixo risco.
+            Comente inline no PR apenas achados acionáveis, com severidade.
+            Responda em português.

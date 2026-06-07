@@ -1,0 +1,62 @@
+name: QA — segurança, código e testes
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 8 * * 1'   # segunda 08:00 UTC (smoke semanal)
+
+permissions:
+  contents: read
+
+jobs:
+  # ── 1. Inspeção de código (guardrails do projeto) ───────────────
+  guardrails:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Guardrails estáticos
+        run: bash scripts/guardrails.sh
+
+  # ── 2. Varredura de segredos (gitleaks) ─────────────────────────
+  segredos:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - name: Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ── 3. SAST (Semgrep — OWASP + JS) ──────────────────────────────
+  sast:
+    runs-on: ubuntu-latest
+    container: semgrep/semgrep
+    steps:
+      - uses: actions/checkout@v4
+      - name: Semgrep scan
+        run: semgrep scan --config p/owasp-top-ten --config p/javascript --error --skip-unknown-extensions
+
+  # ── 4. E2E read-only (Playwright contra a URL pública) ──────────
+  e2e:
+    if: github.event_name != 'push'   # não bloqueia o deploy do main
+    runs-on: ubuntu-latest
+    env:
+      TEST_BASE_URL: ${{ vars.TEST_BASE_URL || 'https://siguc-ac.vercel.app' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+      - run: npm install -D @playwright/test
+      - run: npx playwright install --with-deps chromium
+      - name: Smoke + fluxo de pesquisa (read-only)
+        run: npx playwright test tests/smoke.test.js tests/pesquisa-flow.test.js
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
