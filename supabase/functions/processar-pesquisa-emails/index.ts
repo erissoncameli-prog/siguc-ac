@@ -18,6 +18,7 @@ const CORS = {
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
 const SUPABASE_SRK = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+const SUPABASE_ANON = Deno.env.get('SUPABASE_ANON_KEY') ?? ''
 
 // Eventos cujo e-mail interno (cópia SEMA) também deve ser enviado
 const COPIA_SEMA = new Set(['submissao'])
@@ -28,8 +29,10 @@ async function dispararEmail(emailLogId: string, evento: string): Promise<boolea
   const resp = await fetch(`${SUPABASE_URL}/functions/v1/pesquisa-email`, {
     method: 'POST',
     headers: {
+      // apikey (anon, público) roteia no gateway; bearer (service role)
+      // é a autenticação interna verificada por pesquisa-email.
       'Authorization': `Bearer ${SUPABASE_SRK}`,
-      'apikey': SUPABASE_SRK,
+      'apikey': SUPABASE_ANON || SUPABASE_SRK,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({

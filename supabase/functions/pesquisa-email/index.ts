@@ -22,6 +22,10 @@ function aplicarCors(req: Request) {
   CORS['Access-Control-Allow-Origin'] = ALLOWED.includes(origin) ? origin : ALLOWED[0]
 }
 
+// Segredo interno: só quem possui a service role (a função drainer)
+// pode invocar. Substitui o verify_jwt do gateway (que rejeitava a
+// service role em projetos com novo formato de chave).
+const AUTH_SECRET    = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 const RESEND_KEY     = Deno.env.get('RESEND_API_KEY') ?? ''
 const FROM_EMAIL     = Deno.env.get('EMAIL_FROM')     ?? 'noreply@siguc.sema.ac.gov.br'
 const FROM_NAME      = 'SIGUC · SEMA/AC'
@@ -266,6 +270,14 @@ async function enviarEmail(para: string, assunto: string, html: string): Promise
 serve(async (req) => {
   aplicarCors(req)
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
+
+  // Autenticação interna (a função roda com verify_jwt=false).
+  const auth = req.headers.get('Authorization') ?? ''
+  if (!AUTH_SECRET || auth !== `Bearer ${AUTH_SECRET}`) {
+    return new Response(JSON.stringify({ error: 'não autorizado' }), {
+      status: 401, headers: { ...CORS, 'Content-Type': 'application/json' },
+    })
+  }
 
   const supabaseAdmin = createClient(
     Deno.env.get('SUPABASE_URL')!,
