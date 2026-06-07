@@ -22,11 +22,18 @@ jobs:
   revisao:
     if: ${{ github.event_name == 'pull_request' || contains(github.event.comment.body, '@claude') }}
     runs-on: ubuntu-latest
+    env:
+      TEM_CHAVE: ${{ secrets.ANTHROPIC_API_KEY != '' }}
     steps:
       - uses: actions/checkout@v4
         with: { fetch-depth: 0 }
 
+      - name: Aviso se sem chave
+        if: ${{ env.TEM_CHAVE != 'true' }}
+        run: echo "::notice::ANTHROPIC_API_KEY ausente — revisão por IA desativada. Adicione o secret para ativar."
+
       - name: Claude Code Review
+        if: ${{ env.TEM_CHAVE == 'true' }}
         uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
