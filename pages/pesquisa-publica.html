@@ -581,16 +581,9 @@ async function enviarSubmissao() {
       if (docErr) throw new Error(`Erro ao registrar ${tipo}: ${docErr.message}`)
     }
 
-    // 3. Dispara e-mail de confirmação via Edge Function
-    await fetch(`${SUPABASE_URL}/functions/v1/pesquisa-email`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY },
-      body: JSON.stringify({
-        evento:             'submissao',
-        pesquisa_id:        pesquisaId,
-        enviar_copia_sema:  true,
-      })
-    })
+    // 3. O e-mail de confirmação é enfileirado por submeter_pesquisa_publica
+    //    e enviado pela função processar-pesquisa-emails (cron). Não é mais
+    //    disparado direto daqui (evita chamada sem JWT à edge function).
 
     // 4. Mostra sucesso
     ;['passo1','passo2','passo3','steps-bar'].forEach(id => {

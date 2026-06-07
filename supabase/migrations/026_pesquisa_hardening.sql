@@ -59,11 +59,13 @@ $$;
 -- ─── M6. Constraints de documentos ───────────────────────────
 -- NOT VALID: aplica-se a novos registros sem reprocessar os antigos.
 
+ALTER TABLE pesquisa_documentos DROP CONSTRAINT IF EXISTS pesq_docs_tamanho_chk;
 ALTER TABLE pesquisa_documentos
   ADD CONSTRAINT pesq_docs_tamanho_chk
   CHECK (tamanho_bytes IS NULL OR (tamanho_bytes > 0 AND tamanho_bytes <= 20971520))
   NOT VALID;
 
+ALTER TABLE pesquisa_documentos DROP CONSTRAINT IF EXISTS pesq_docs_mime_chk;
 ALTER TABLE pesquisa_documentos
   ADD CONSTRAINT pesq_docs_mime_chk
   CHECK (mime_type IS NULL OR mime_type IN (
