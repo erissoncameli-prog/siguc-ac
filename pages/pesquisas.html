@@ -976,6 +976,10 @@ function abrirModalEmissaoAAP() {
   </div>
   <div class="modal-body">
     ${_resumoPesquisa()}
+    <div>
+      <div class="sec-title" style="margin-bottom:6px">📎 Documentos do Pesquisador</div>
+      <div style="display:flex;flex-direction:column;gap:5px">${_renderDocsList(_docs)}</div>
+    </div>
     <div style="background:#F0FDF4;border:1px solid #A7F3D0;border-radius:8px;padding:12px;font-size:12px;color:#065F46">
       Pesquisa autorizada pelo Secretário de Estado em ${formatData(_detalhe.aap_assinado_em)}.<br>
       Preencha os dados para gerar a Autorização de Acesso e Pesquisa.
