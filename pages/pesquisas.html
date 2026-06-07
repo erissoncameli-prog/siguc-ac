@@ -1030,8 +1030,42 @@ async function confirmarEmissaoAAP() {
     p_condicionantes: condicionantes
   })
   if (error) { toast('Erro: ' + error.message, 'erro'); return }
-  toast('AAP emitida com sucesso!', 'sucesso')
+  toast('AAP emitida — gerando PDF…', 'sucesso')
   await _posDespacho('modal-aap')
+  // Gera o PDF em background e abre ao concluir
+  gerarPdfAAP(_detalhe?.id || _pesquisas.find(p => p.aap_numero)?.id)
+}
+
+async function gerarPdfAAP(pesquisaId) {
+  if (!pesquisaId) return
+  try {
+    const { data: { session } } = await db.auth.getSession()
+    const resp = await fetch(`${SUPABASE_URL}/functions/v1/gerar-aap`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session?.access_token}`
+      },
+      body: JSON.stringify({ pesquisa_id: pesquisaId })
+    })
+    const json = await resp.json()
+    if (!resp.ok || !json.url) {
+      toast('PDF não gerado: ' + (json.error || 'erro desconhecido'), 'erro'); return
+    }
+    toast('PDF da AAP gerado!', 'sucesso')
+    window.open(json.url, '_blank')
+    // Atualiza estado local para mostrar botão de download
+    if (_detalhe) _detalhe.aap_pdf_path = json.filename
+    const btnArea = document.querySelector('#modal-detalhe .detalhe-aap-btn')
+    if (btnArea) btnArea.innerHTML = _btnBaixarAAP()
+  } catch (e) {
+    toast('Erro ao gerar PDF: ' + e.message, 'erro')
+  }
+}
+
+function _btnBaixarAAP() {
+  if (!_detalhe?.aap_pdf_path) return ''
+  return `<button class="btn-acao" style="background:#F0FDF4;border:1px solid #A7F3D0;color:#065F46" onclick="abrirDocumento('${esc(_detalhe.aap_pdf_path)}','AAP.pdf')">📥 Baixar AAP (PDF)</button>`
 }
 
 // ── Modal 6: Entrega da AAP ───────────────────────────────────
