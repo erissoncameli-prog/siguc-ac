@@ -539,18 +539,7 @@ async function verDetalhe(id) {
     <!-- Documentos -->
     <div class="det-sec">
       <div class="det-sec-title">Documentos Anexados</div>
-      ${_docs.length ? `
-      <div style="display:flex;flex-direction:column;gap:6px;margin-top:6px">
-        ${_docs.map(d => `
-        <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:#F9FAFB;border:1px solid var(--borda);border-radius:8px">
-          <span style="font-size:16px">${d.mime_type?.includes('pdf') ? '📄' : d.mime_type?.includes('image') ? '🖼️' : '📎'}</span>
-          <div style="flex:1;min-width:0">
-            <div style="font-size:12px;font-weight:600;color:#111827;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(d.nome_original)}</div>
-            <div style="font-size:10px;color:#9CA3AF">${TIPO_DOC_LABEL[d.tipo]||d.tipo}${d.tamanho_bytes ? ' · ' + formatBytes(d.tamanho_bytes) : ''} · ${formatData(d.criado_em)}</div>
-          </div>
-          <button class="btn-acao" style="padding:4px 10px;font-size:11px;flex-shrink:0" onclick="abrirDocumento('${esc(d.storage_path)}','${esc(d.nome_original)}')">🔍 Abrir</button>
-        </div>`).join('')}
-      </div>` : `<div style="font-size:12px;color:#9CA3AF;margin-top:6px">Nenhum documento anexado.</div>`}
+      <div style="display:flex;flex-direction:column;gap:5px;margin-top:6px">${_renderDocsList(_docs)}</div>
     </div>
 
     <!-- AAP -->
