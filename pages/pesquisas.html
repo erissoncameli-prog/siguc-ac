@@ -835,6 +835,10 @@ function abrirModalParecerDima() {
   </div>
   <div class="modal-body">
     ${_resumoPesquisa()}
+    <div>
+      <div class="sec-title" style="margin-bottom:6px">📎 Documentos do Pesquisador</div>
+      <div style="display:flex;flex-direction:column;gap:5px">${_renderDocsList(_docs)}</div>
+    </div>
     <div class="radio-group">
       <label class="radio-opt" onclick="selecionarRadio(this,'dima-resultado','encaminhar');toggleBlocoDima()">
         <input type="radio" name="dima-resultado" value="encaminhar">
