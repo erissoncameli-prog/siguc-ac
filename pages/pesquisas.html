@@ -299,11 +299,28 @@ function atualizarKPIs() {
 
 // ── Pipeline ──────────────────────────────────────────────────
 
+// ── SLA / atraso ──────────────────────────────────────────────
+function diasParado(p) {
+  if (!p.atualizado_em) return null
+  return Math.floor((Date.now() - new Date(p.atualizado_em)) / 86400000)
+}
+function estaAtrasada(p) {
+  if (['encerrada','arquivada'].includes(p.etapa)) return false
+  if (p.inadimplente) return true
+  if (p.complementacao_solicitada && p.complementacao_prazo &&
+      new Date(p.complementacao_prazo) < new Date()) return true
+  const d = diasParado(p)
+  return d != null && d > 30
+}
+
 function renderPipeline() {
   const contagem = {}
   ETAPAS.forEach(e => { contagem[e.id] = _pesquisas.filter(p => p.etapa === e.id).length })
+  const nAtras = _pesquisas.filter(estaAtrasada).length
   document.getElementById('pipeline').innerHTML =
     `<div class="pipe-step ${!_etapaFiltro?'ativo':''}" onclick="filtrarEtapa('')">Todas (${_pesquisas.length})</div>` +
+    `<div class="pipe-step ${_etapaFiltro==='__atrasadas__'?'ativo':''} ${nAtras?'tem-itens':''}" data-count="${nAtras}"
+       style="color:#DC2626;font-weight:700" onclick="filtrarEtapa('__atrasadas__')">⚠ Atrasadas (${nAtras})</div>` +
     ETAPAS.map(e => {
       const n    = contagem[e.id] || 0
       const curr = _etapaFiltro === e.id
@@ -319,7 +336,8 @@ function buscar(v) { _busca = v.toLowerCase(); renderTabela() }
 
 function pesquisasFiltradas() {
   let list = _pesquisas
-  if (_etapaFiltro) list = list.filter(p => p.etapa === _etapaFiltro)
+  if (_etapaFiltro === '__atrasadas__') list = list.filter(estaAtrasada)
+  else if (_etapaFiltro) list = list.filter(p => p.etapa === _etapaFiltro)
   if (_busca) list = list.filter(p =>
     p.titulo.toLowerCase().includes(_busca) ||
     (p.pesquisador_nome||'').toLowerCase().includes(_busca) ||
@@ -345,7 +363,7 @@ function renderTabela() {
   <thead>
     <tr>
       <th>Processo</th><th>Título</th><th>UC</th><th>Tipo</th>
-      <th>Pesquisador</th><th>Etapa</th><th>SISBIO/SISGEN</th><th>Ações</th>
+      <th>Pesquisador</th><th>Etapa</th><th>Parada há</th><th>SISBIO/SISGEN</th><th>Ações</th>
     </tr>
   </thead>
   <tbody>
@@ -360,6 +378,13 @@ function renderTabela() {
       <td><span class="badge" style="background:#F0F9FF;color:#0369A1">${TIPO_LABEL[p.tipo]||p.tipo}</span></td>
       <td style="font-size:12px">${esc(p.pesquisador_nome || '—')}</td>
       <td><span class="badge badge-${p.etapa}">${ETAPAS.find(e=>e.id===p.etapa)?.label||p.etapa}</span></td>
+      <td>${(() => {
+        if (['encerrada','arquivada'].includes(p.etapa)) return '<span style="font-size:11px;color:#9CA3AF">—</span>'
+        const d = diasParado(p)
+        if (d == null) return '<span style="font-size:11px;color:#9CA3AF">—</span>'
+        const cor = estaAtrasada(p) ? '#DC2626' : (d > 15 ? '#D97706' : '#059669')
+        return `<span style="font-size:11px;font-weight:700;color:${cor}">${d}d</span>`
+      })()}</td>
       <td>
         ${p.sisbio_numero ? `<span class="api-chip ${p.sisbio_status==='validado'?'api-ok':p.sisbio_status==='invalido'?'api-err':'api-pend'}">SB ${p.sisbio_status==='validado'?'✓':p.sisbio_status==='invalido'?'✗':'?'}</span>` : ''}
         ${p.sisgen_numero ? `<span class="api-chip ${p.sisgen_status==='validado'?'api-ok':p.sisgen_status==='invalido'?'api-err':'api-pend'}" style="margin-left:3px">SG ${p.sisgen_status==='validado'?'✓':p.sisgen_status==='invalido'?'✗':'?'}</span>` : ''}

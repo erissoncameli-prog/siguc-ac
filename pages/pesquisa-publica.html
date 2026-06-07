@@ -568,15 +568,17 @@ async function enviarSubmissao() {
 
       if (upErr) throw new Error(`Erro ao enviar ${tipo}: ${upErr.message}`)
 
-      await db.from('pesquisa_documentos').insert({
-        pesquisa_id:   pesquisaId,
-        tipo,
-        nome_original: arquivo.name,
-        storage_path:  path,
-        tamanho_bytes: arquivo.size,
-        mime_type:     arquivo.type,
-        enviado_por:   'pesquisador',
+      // Registro via RPC (valida o token); o INSERT direto do anon
+      // não é mais permitido pelo RLS.
+      const { error: docErr } = await db.rpc('anexar_documento_publico', {
+        p_token:        token_publico,
+        p_tipo:         tipo,
+        p_nome:         arquivo.name,
+        p_storage_path: path,
+        p_tamanho:      arquivo.size,
+        p_mime:         arquivo.type,
       })
+      if (docErr) throw new Error(`Erro ao registrar ${tipo}: ${docErr.message}`)
     }
 
     // 3. Dispara e-mail de confirmação via Edge Function
