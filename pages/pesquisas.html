@@ -1378,17 +1378,44 @@ function formatBytes(bytes) {
   return (bytes / 1048576).toFixed(1) + ' MB'
 }
 
+function nomeEnviadoPor(enviado_por) {
+  if (!enviado_por || enviado_por === 'pesquisador') return 'Pesquisador'
+  const u = _usuarios.find(u => u.id === enviado_por)
+  return u ? u.nome_completo : 'Usuário interno'
+}
+
+function contextoDoc(doc) {
+  if (['relatorio_parcial','relatorio_final'].includes(doc.tipo))
+    return { label: 'Relatório', cor: '#5B21B6', bg: '#F5F3FF' }
+  if (doc.tipo === 'complementar')
+    return { label: 'Complementação', cor: '#B45309', bg: '#FFFBEB' }
+  if (_detalhe?.criado_em) {
+    const diff = new Date(doc.criado_em) - new Date(_detalhe.criado_em)
+    if (diff <= 48 * 3600 * 1000) return { label: 'Submissão', cor: '#065F46', bg: '#F0FDF4' }
+  }
+  return { label: 'Posterior', cor: '#374151', bg: '#F3F4F6' }
+}
+
 function _renderDocsList(docs) {
   if (!docs?.length) return `<div style="font-size:11px;color:#9CA3AF;padding:8px 0">Nenhum documento anexado.</div>`
-  return docs.map(d => `
+  return docs.map(d => {
+    const ctx  = contextoDoc(d)
+    const quem = nomeEnviadoPor(d.enviado_por)
+    return `
   <div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:#F9FAFB;border:1px solid var(--borda);border-radius:7px">
     <span style="font-size:14px">${d.mime_type?.includes('pdf') ? '📄' : d.mime_type?.includes('image') ? '🖼️' : '📎'}</span>
     <div style="flex:1;min-width:0">
       <div style="font-size:12px;font-weight:600;color:#111827;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(d.nome_original)}</div>
-      <div style="font-size:10px;color:#9CA3AF">${TIPO_DOC_LABEL[d.tipo]||d.tipo}${d.tamanho_bytes?' · '+formatBytes(d.tamanho_bytes):''}</div>
+      <div style="font-size:10px;color:#6B7280;margin-top:2px;display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+        <span style="background:${ctx.bg};color:${ctx.cor};padding:1px 6px;border-radius:4px;font-weight:600;font-size:9px">${ctx.label}</span>
+        <span>${TIPO_DOC_LABEL[d.tipo]||d.tipo}${d.tamanho_bytes ? ' · '+formatBytes(d.tamanho_bytes) : ''}</span>
+        <span>${formatData(d.criado_em)}</span>
+        <span>por ${esc(quem)}</span>
+      </div>
     </div>
     <button class="btn-acao" style="padding:3px 9px;font-size:11px;flex-shrink:0" onclick="abrirDocumento('${esc(d.storage_path)}','${esc(d.nome_original)}')">🔍 Abrir</button>
-  </div>`).join('')
+  </div>`
+  }).join('')
 }
 
 // ── Helper: selecionar radio com estilo ───────────────────────
