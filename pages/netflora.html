@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>SIGUC-AC · Netflora — Inventário Florestal</title>
+<link rel="stylesheet" href="../css/global.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../js/observability.js"></script>
+<script src="../js/queryLogger.js"></script>
+<script src="../js/config.js"></script>
+<script src="../js/layout.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+.nf-wrapper   { display:flex; flex-direction:column; gap:12px; height:calc(100vh - 108px); min-height:500px; }
+.nf-topbar    { display:flex; align-items:center; gap:8px; flex-wrap:wrap; flex-shrink:0; }
+.nf-body      { display:flex; gap:12px; flex:1; min-height:0; }
+.nf-lista     { width:320px; flex-shrink:0; display:flex; flex-direction:column; gap:8px; overflow-y:auto; }
+#nf-mapa      { flex:1; border-radius:var(--raio-lg); border:1px solid var(--borda); z-index:0; }
+
+/* KPI */
+.kpi-row  { display:flex; gap:8px; flex-shrink:0; }
+.kpi-card { flex:1; background:#fff; border:1px solid var(--borda); border-radius:10px; padding:10px 14px; text-align:center; }
+.kpi-val  { font-size:22px; font-weight:800; color:#1F4E2C; line-height:1; }
+.kpi-lbl  { font-size:10px; color:#9CA3AF; text-transform:uppercase; letter-spacing:.06em; margin-top:3px; }
+
+/* Tabs */
+.nf-tabs  { display:flex; gap:2px; background:#F3F4F6; border-radius:8px; padding:3px; flex-shrink:0; }
+.nf-tab   { flex:1; padding:6px 12px; border:none; border-radius:6px; font-size:12px; font-weight:500;
+             background:transparent; cursor:pointer; color:#6B7280; font-family:'DM Sans',sans-serif; transition:all .15s; }
+.nf-tab.ativo { background:#fff; color:#1F4E2C; font-weight:700; box-shadow:0 1px 3px rgba(0,0,0,.1); }
+
+/* Card inventário */
+.inv-card {
+  background:#fff; border:1px solid var(--borda); border-radius:8px;
+  padding:10px 12px; cursor:pointer; transition:border-color .15s;
+  border-left:4px solid #52B788;
+}
+.inv-card:hover { border-color:#0A1A0F; }
+.inv-card.selecionado { border-left-color:#C9A84C; border-color:#C9A84C; }
+.inv-card-header { display:flex; align-items:center; gap:6px; margin-bottom:4px; }
+.inv-card-nome   { font-size:12px; font-weight:700; color:#1F4E2C; flex:1; }
+.inv-card-status { font-size:9px; font-weight:700; padding:2px 7px; border-radius:20px; }
+.inv-card-status.processando { background:#FEF3C7; color:#92400E; }
+.inv-card-status.concluido   { background:#D1FAE5; color:#065F46; }
+.inv-card-status.erro        { background:#FEE2E2; color:#991B1B; }
+.inv-card-uc   { font-size:11px; color:#6B7280; }
+.inv-card-meta { display:flex; gap:8px; margin-top:5px; font-size:10px; color:#9CA3AF; flex-wrap:wrap; }
+.inv-card-chip { background:#F0FDF4; color:#166534; border-radius:20px; padding:2px 8px; font-size:10px; font-weight:600; }
+
+/* Painel lateral detalhe */
+.nf-detalhe { position:fixed; top:0; right:0; width:440px; height:100vh; background:#fff;
+               z-index:650; display:flex; flex-direction:column;
+               box-shadow:-4px 0 32px rgba(0,0,0,.22);
+               transition:transform .28s cubic-bezier(.4,0,.2,1); overflow:hidden;
+               transform:translateX(100%); }
+.nf-detalhe.aberto { transform:translateX(0); }
+.nf-det-header { padding:16px; border-bottom:1px solid var(--borda); display:flex; align-items:center; gap:10px; flex-shrink:0; }
+.nf-det-titulo { font-size:15px; font-weight:700; color:#1F4E2C; flex:1; }
+.nf-det-body   { flex:1; overflow-y:auto; padding:14px 16px; }
+.nf-det-tabs   { display:flex; border-bottom:1px solid var(--borda); flex-shrink:0; background:#fff; }
+.nf-det-tab    { flex:1; padding:10px 0; font-size:12px; font-weight:500; border:none; background:transparent;
+                  cursor:pointer; border-bottom:2px solid transparent; color:#6B7280;
+                  font-family:'DM Sans',sans-serif; transition:all .15s; }
+.nf-det-tab.ativo { color:#1F4E2C; border-bottom-color:#1F4E2C; }
+
+/* Tabela de espécies */
+.esp-table { width:100%; border-collapse:collapse; font-size:11px; }
+.esp-table th { background:#F0FDF4; color:#166534; font-size:10px; font-weight:700; padding:6px 8px;
+                text-align:left; text-transform:uppercase; letter-spacing:.06em; border-bottom:1px solid #BBF7D0; }
+.esp-table td { padding:6px 8px; border-bottom:1px solid var(--borda); vertical-align:middle; }
+.esp-table tr:last-child td { border-bottom:none; }
+.esp-table .nome-sci { font-style:italic; color:#374151; }
+.esp-table .nome-pop { font-size:10px; color:#6B7280; }
+.esp-badge-com { background:#DCFCE7; color:#166534; padding:1px 6px; border-radius:20px; font-size:9px; font-weight:700; }
+
+/* DOF painel */
+.dof-item { background:#FFF7ED; border:1px solid #FED7AA; border-radius:8px; padding:10px 12px; margin-bottom:6px; }
+.dof-item-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; }
+.dof-num  { font-size:11px; font-weight:700; color:#9A3412; font-family:monospace; }
+.dof-vol  { font-size:11px; font-weight:700; color:#7C3AED; }
+.dof-meta { font-size:10px; color:#6B7280; }
+.dof-alert { background:#FEE2E2; border-color:#FECACA; }
+.dof-alert .dof-num { color:#991B1B; }
+
+/* Modal novo inventário */
+.modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:700; align-items:center; justify-content:center; }
+.modal-overlay.aberto { display:flex; }
+.modal-box { background:#fff; border-radius:12px; padding:24px; width:500px; max-width:95vw; max-height:90vh; overflow-y:auto; }
+.modal-titulo { font-size:18px; font-weight:700; color:#1F4E2C; margin-bottom:16px; }
+.form-grid { display:grid; gap:12px; }
+.form-row  { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.form-label { font-size:11px; font-weight:600; color:#374151; margin-bottom:4px; display:block; }
+.form-input { width:100%; padding:8px 10px; border:1px solid var(--borda); border-radius:6px;
+               font-size:13px; font-family:'DM Sans',sans-serif; outline:none; box-sizing:border-box; }
+.form-input:focus { border-color:#52B788; box-shadow:0 0 0 3px rgba(82,183,136,.15); }
+.form-textarea { resize:vertical; min-height:60px; }
+.btn-salvar { background:#1F4E2C; color:#fff; border:none; padding:10px 20px; border-radius:7px;
+               font-size:13px; font-weight:600; cursor:pointer; font-family:'DM Sans',sans-serif; }
+.btn-salvar:hover { background:#2D6A3F; }
+.btn-cancel { background:#F3F4F6; color:#374151; border:none; padding:10px 16px; border-radius:7px;
+               font-size:13px; cursor:pointer; font-family:'DM Sans',sans-serif; }
+
+/* Formulário de importação CSV */
+.upload-area { border:2px dashed #BBF7D0; border-radius:10px; padding:24px; text-align:center;
+                background:#F0FDF4; cursor:pointer; transition:all .15s; }
+.upload-area:hover { border-color:#52B788; background:#DCFCE7; }
+.upload-area input { display:none; }
+.upload-icon { font-size:28px; margin-bottom:6px; }
+.upload-txt  { font-size:12px; color:#166534; font-weight:500; }
+.upload-sub  { font-size:10px; color:#9CA3AF; margin-top:3px; }
+
+/* Vazio / loading */
+.nf-vazio { display:flex; flex-direction:column; align-items:center; justify-content:center;
+             height:200px; gap:8px; color:#9CA3AF; }
+.nf-vazio svg { opacity:.4; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="nf-overlay" onclick="fecharDetalhe()" style="display:none;position:fixed;inset:0;z-index:640;background:rgba(0,0,0,.2)"></div>
+
+<!-- Painel de detalhe lateral -->
+<div id="nf-detalhe" class="nf-detalhe">
+  <div class="nf-det-header">
+    <div>
+      <div class="nf-det-titulo" id="det-titulo">—</div>
+      <div style="font-size:11px;color:#9CA3AF;" id="det-sub">—</div>
+    </div>
+    <button onclick="fecharDetalhe()" style="background:none;border:none;cursor:pointer;font-size:18px;color:#9CA3AF;padding:4px;">✕</button>
+  </div>
+  <div class="nf-det-tabs">
+    <button class="nf-det-tab ativo" id="dtab-esp"  onclick="tabDetalhe('especies')">Espécies</button>
+    <button class="nf-det-tab"       id="dtab-dof"  onclick="tabDetalhe('dof')">DOF/ASV</button>
+    <button class="nf-det-tab"       id="dtab-info" onclick="tabDetalhe('info')">Dados</button>
+  </div>
+  <div id="det-body" class="nf-det-body"></div>
+</div>
+
+<!-- Modal novo inventário -->
+<div id="modal-novo" class="modal-overlay">
+  <div class="modal-box">
+    <div class="modal-titulo">Novo Inventário Netflora</div>
+    <div class="form-grid">
+      <div>
+        <label class="form-label">Nome do inventário *</label>
+        <input class="form-input" id="f-nome" placeholder="Ex: RESEX Chico Mendes — Setor A (2025)">
+      </div>
+      <div class="form-row">
+        <div>
+          <label class="form-label">UC vinculada</label>
+          <select class="form-input" id="f-uc"><option value="">— selecionar —</option></select>
+        </div>
+        <div>
+          <label class="form-label">Data do voo *</label>
+          <input class="form-input" type="date" id="f-data">
+        </div>
+      </div>
+      <div class="form-row">
+        <div>
+          <label class="form-label">Área coberta (ha)</label>
+          <input class="form-input" type="number" id="f-area" min="0" step="0.01" placeholder="0.00">
+        </div>
+        <div>
+          <label class="form-label">Altitude de voo (m)</label>
+          <input class="form-input" type="number" id="f-alt" min="0" step="0.1" placeholder="120">
+        </div>
+      </div>
+      <div class="form-row">
+        <div>
+          <label class="form-label">Sensor/câmera</label>
+          <input class="form-input" id="f-sensor" placeholder="Ex: DJI Zenmuse P1">
+        </div>
+        <div>
+          <label class="form-label">Sobreposição (%)</label>
+          <input class="form-input" type="number" id="f-sobrep" min="0" max="100" placeholder="80">
+        </div>
+      </div>
+      <div>
+        <label class="form-label">Observação</label>
+        <textarea class="form-input form-textarea" id="f-obs" placeholder="Condições de voo, problemas, etc."></textarea>
+      </div>
+      <div>
+        <label class="form-label">Importar espécies (CSV Netflora/QGIS)</label>
+        <div class="upload-area" onclick="document.getElementById('f-csv').click()" id="upload-area">
+          <input type="file" id="f-csv" accept=".csv,.tsv" onchange="onCsvSelect(this)">
+          <div class="upload-icon">📂</div>
+          <div class="upload-txt" id="upload-txt">Clique para selecionar arquivo CSV</div>
+          <div class="upload-sub">Colunas: especie_nome, nome_popular, quantidade, confianca_media, lat, lon</div>
+        </div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:20px;">
+      <button class="btn-cancel" onclick="fecharModal()">Cancelar</button>
+      <button class="btn-salvar" onclick="salvarInventario()">Salvar inventário</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Estado ────────────────────────────────────────────────────────────────
+let mapa, csvDados = [], inventarioSelecionado = null;
+const layersEspecies = {};
+let tabAtiva = 'inventarios';
+
+// ── Init ──────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', async () => {
+  await carregarUsuario();
+  gerarLayout('Netflora — Inventário Florestal', 'netflora');
+
+  const app = document.getElementById('app');
+  app.innerHTML = `
+  <div class="nf-wrapper">
+    <div class="nf-topbar">
+      <div class="nf-tabs">
+        <button class="nf-tab ativo" onclick="mudarTab('inventarios')">Inventários</button>
+        <button class="nf-tab"       onclick="mudarTab('dof')">DOF / Extração</button>
+      </div>
+      <select id="filtro-uc" class="form-input" style="width:200px;padding:6px 10px;font-size:12px;" onchange="carregarDados()">
+        <option value="">Todas as UCs</option>
+      </select>
+      <select id="filtro-ano" class="form-input" style="width:100px;padding:6px 10px;font-size:12px;" onchange="carregarDados()">
+        <option value="">Todos anos</option>
+      </select>
+      <div style="flex:1"></div>
+      <button onclick="abrirModal()" style="background:#1F4E2C;color:#fff;border:none;padding:8px 16px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Novo Inventário
+      </button>
+    </div>
+    <div class="kpi-row" id="kpi-row">
+      <div class="kpi-card"><div class="kpi-val" id="kpi-inv">—</div><div class="kpi-lbl">Inventários</div></div>
+      <div class="kpi-card"><div class="kpi-val" id="kpi-esp">—</div><div class="kpi-lbl">Espécies</div></div>
+      <div class="kpi-card"><div class="kpi-val" id="kpi-ind">—</div><div class="kpi-lbl">Indivíduos</div></div>
+      <div class="kpi-card"><div class="kpi-val" id="kpi-ha">—</div><div class="kpi-lbl">Hectares</div></div>
+      <div class="kpi-card"><div class="kpi-val" id="kpi-dof" style="color:#C9A84C">—</div><div class="kpi-lbl">DOF/Acre (ano)</div></div>
+    </div>
+    <div class="nf-body">
+      <div class="nf-lista" id="nf-lista"></div>
+      <div id="nf-mapa"></div>
+    </div>
+  </div>`;
+
+  iniciarMapa();
+  await Promise.all([carregarUCs(), carregarAnos()]);
+  await carregarDados();
+  _sigucBarCompleta();
+});
+
+// ── Mapa ─────────────────────────────────────────────────────────────────
+function iniciarMapa() {
+  mapa = L.map('nf-mapa', { center: [-9.5, -70.5], zoom: 7 });
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+    attribution: '© OpenStreetMap © CARTO', maxZoom: 19
+  }).addTo(mapa);
+}
+
+// ── Carregar UCs e anos ───────────────────────────────────────────────────
+async function carregarUCs() {
+  const { data } = await db.from('unidades_conservacao')
+    .select('id,nome').order('nome');
+  const sel = document.getElementById('filtro-uc');
+  const selM = document.getElementById('f-uc');
+  (data || []).forEach(u => {
+    sel.innerHTML  += `<option value="${u.id}">${u.nome}</option>`;
+    selM.innerHTML += `<option value="${u.id}">${u.nome}</option>`;
+  });
+}
+
+function carregarAnos() {
+  const ano = new Date().getFullYear();
+  const sel = document.getElementById('filtro-ano');
+  for (let a = ano; a >= 2020; a--) {
+    sel.innerHTML += `<option value="${a}">${a}</option>`;
+  }
+}
+
+// ── Tabs principais ───────────────────────────────────────────────────────
+function mudarTab(tab) {
+  tabAtiva = tab;
+  document.querySelectorAll('.nf-tab').forEach((b, i) => {
+    b.classList.toggle('ativo', (i === 0 && tab === 'inventarios') || (i === 1 && tab === 'dof'));
+  });
+  carregarDados();
+}
+
+async function carregarDados() {
+  if (tabAtiva === 'inventarios') await carregarInventarios();
+  else await carregarDof();
+}
+
+// ── Inventários ───────────────────────────────────────────────────────────
+async function carregarInventarios() {
+  const uc  = document.getElementById('filtro-uc')?.value;
+  const ano = document.getElementById('filtro-ano')?.value;
+  const lista = document.getElementById('nf-lista');
+  lista.innerHTML = '<div style="padding:20px;text-align:center;color:#9CA3AF;font-size:12px;">Carregando…</div>';
+
+  let q = db.from('netflora_inventarios')
+    .select(`id,nome,uc_nome,data_voo,area_ha,status,uc_id`)
+    .order('data_voo', { ascending: false });
+
+  if (uc)  q = q.eq('uc_id', uc);
+  if (ano) q = q.gte('data_voo', `${ano}-01-01`).lte('data_voo', `${ano}-12-31`);
+
+  const { data, error } = await q;
+  if (error) { lista.innerHTML = `<div style="color:red;padding:16px;font-size:12px;">Erro: ${esc(error.message)}</div>`; return; }
+
+  // KPI básico
+  document.getElementById('kpi-inv').textContent = (data || []).length;
+  const areas = (data || []).reduce((s, i) => s + (i.area_ha || 0), 0);
+  document.getElementById('kpi-ha').textContent = formatNum(areas, 0);
+  carregarKpiEspecies(uc);
+  carregarKpiDof();
+
+  if (!data?.length) {
+    lista.innerHTML = `<div class="nf-vazio">
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#D1D5DB" stroke-width="1.5"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+      <span style="font-size:12px;">Nenhum inventário encontrado</span>
+      <span style="font-size:11px;color:#D1D5DB;">Clique em "+ Novo Inventário" para começar</span>
+    </div>`;
+    return;
+  }
+
+  lista.innerHTML = data.map(inv => `
+    <div class="inv-card ${inventarioSelecionado?.id === inv.id ? 'selecionado' : ''}"
+         onclick="selecionarInventario('${inv.id}')">
+      <div class="inv-card-header">
+        <span class="inv-card-nome">${esc(inv.nome)}</span>
+        <span class="inv-card-status ${inv.status}">${inv.status}</span>
+      </div>
+      <div class="inv-card-uc">${esc(inv.uc_nome || '—')}</div>
+      <div class="inv-card-meta">
+        <span>${formatData(inv.data_voo)}</span>
+        ${inv.area_ha ? `<span>${formatNum(inv.area_ha, 1)} ha</span>` : ''}
+      </div>
+    </div>`).join('');
+}
+
+async function carregarKpiEspecies(ucId) {
+  let q = db.from('netflora_especies')
+    .select('quantidade, especie_nome, inventario_id!inner(status, uc_id)')
+    .eq('inventario_id.status', 'concluido');
+  if (ucId) q = q.eq('inventario_id.uc_id', ucId);
+  const { data } = await q;
+  const esp = new Set((data || []).map(e => e.especie_nome)).size;
+  const ind = (data || []).reduce((s, e) => s + (e.quantidade || 0), 0);
+  document.getElementById('kpi-esp').textContent = esp;
+  document.getElementById('kpi-ind').textContent = formatNum(ind, 0);
+}
+
+async function carregarKpiDof() {
+  const ano = new Date().getFullYear();
+  const { count } = await db.from('dof_transportes')
+    .select('id', { count: 'exact', head: true })
+    .eq('estado_origem', 'AC')
+    .eq('ano_referencia', ano);
+  document.getElementById('kpi-dof').textContent = formatNum(count || 0, 0);
+}
+
+// ── Selecionar inventário → abrir painel ─────────────────────────────────
+async function selecionarInventario(id) {
+  const { data: inv } = await db.from('netflora_inventarios').select('*').eq('id', id).single();
+  if (!inv) return;
+  inventarioSelecionado = inv;
+
+  document.getElementById('det-titulo').textContent = inv.nome;
+  document.getElementById('det-sub').textContent = `${inv.uc_nome || '—'} · ${formatData(inv.data_voo)}`;
+
+  document.getElementById('nf-overlay').style.display = 'block';
+  document.getElementById('nf-detalhe').classList.add('aberto');
+  tabDetalhe('especies');
+
+  // Atualizar seleção na lista
+  document.querySelectorAll('.inv-card').forEach(c => c.classList.remove('selecionado'));
+  document.querySelectorAll('.inv-card').forEach(c => {
+    if (c.getAttribute('onclick')?.includes(id)) c.classList.add('selecionado');
+  });
+}
+
+function fecharDetalhe() {
+  document.getElementById('nf-overlay').style.display = 'none';
+  document.getElementById('nf-detalhe').classList.remove('aberto');
+  inventarioSelecionado = null;
+}
+
+// ── Tabs do painel de detalhe ─────────────────────────────────────────────
+async function tabDetalhe(tab) {
+  document.querySelectorAll('.nf-det-tab').forEach(b => b.classList.remove('ativo'));
+  document.getElementById(`dtab-${tab === 'especies' ? 'esp' : tab === 'dof' ? 'dof' : 'info'}`).classList.add('ativo');
+
+  const body = document.getElementById('det-body');
+  if (!inventarioSelecionado) return;
+
+  if (tab === 'especies') {
+    body.innerHTML = '<div style="color:#9CA3AF;font-size:12px;padding:10px 0;">Carregando…</div>';
+    const { data } = await db.from('netflora_especies')
+      .select('*')
+      .eq('inventario_id', inventarioSelecionado.id)
+      .order('quantidade', { ascending: false });
+
+    if (!data?.length) {
+      body.innerHTML = '<div style="color:#9CA3AF;font-size:12px;padding:20px 0;text-align:center;">Sem espécies registradas</div>';
+      return;
+    }
+    body.innerHTML = `
+      <div style="margin-bottom:8px;font-size:11px;color:#6B7280;">${data.length} espécies · ${data.reduce((s,e)=>s+(e.quantidade||0),0)} indivíduos</div>
+      <table class="esp-table">
+        <thead><tr>
+          <th>Espécie</th><th>Qtd</th><th>Confiança</th><th></th>
+        </tr></thead>
+        <tbody>
+          ${data.map(e => `<tr>
+            <td>
+              <div class="nome-sci">${esc(e.especie_nome)}</div>
+              ${e.nome_popular ? `<div class="nome-pop">${esc(e.nome_popular)}</div>` : ''}
+            </td>
+            <td style="font-weight:700;color:#1F4E2C;">${e.quantidade || 0}</td>
+            <td style="color:#6B7280;">${e.confianca_media ? e.confianca_media.toFixed(1)+'%' : '—'}</td>
+            <td>${e.valor_comercial ? '<span class="esp-badge-com">Comercial</span>' : ''}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>`;
+
+  } else if (tab === 'dof') {
+    body.innerHTML = '<div style="color:#9CA3AF;font-size:12px;padding:10px 0;">Carregando…</div>';
+    // Busca DOF e ASV vinculados ao município do inventário
+    const { data: asv } = await db.from('sinaflor_asv').select('*')
+      .eq('municipio', inventarioSelecionado.uc_nome || '')
+      .order('data_emissao', { ascending: false })
+      .limit(20);
+
+    if (!asv?.length) {
+      body.innerHTML = `
+        <div style="background:#FFF7ED;border:1px solid #FED7AA;border-radius:8px;padding:14px;font-size:12px;color:#9A3412;">
+          Nenhuma ASV (Autorização de Supressão Vegetal) encontrada vinculada a esta área.<br>
+          <span style="color:#6B7280;font-size:11px;margin-top:4px;display:block;">
+            Os dados DOF são importados manualmente via planilha SINAFLOR ou via API IBAMA.
+          </span>
+        </div>`;
+      return;
+    }
+    body.innerHTML = asv.map(a => `
+      <div class="dof-item ${!a.num_asv ? 'dof-alert' : ''}">
+        <div class="dof-item-header">
+          <span class="dof-num">ASV ${esc(a.num_asv || '—')}</span>
+          <span class="dof-vol">${formatNum(a.area_ha || 0, 2)} ha</span>
+        </div>
+        <div class="dof-meta">${esc(a.tipo_supressao || '—')} · ${formatData(a.data_emissao)} → ${formatData(a.data_validade)}</div>
+        <div class="dof-meta" style="margin-top:2px;">Status: <strong>${esc(a.status)}</strong></div>
+      </div>`).join('');
+
+  } else {
+    const inv = inventarioSelecionado;
+    body.innerHTML = `
+      <div style="display:grid;gap:10px;">
+        ${campo('UC', inv.uc_nome)}
+        ${campo('Data do voo', formatData(inv.data_voo))}
+        ${campo('Área coberta', inv.area_ha ? formatNum(inv.area_ha, 2) + ' ha' : '—')}
+        ${campo('Altitude de voo', inv.altitude_m ? inv.altitude_m + ' m' : '—')}
+        ${campo('Sobreposição', inv.sobreposicao_pct ? inv.sobreposicao_pct + '%' : '—')}
+        ${campo('Sensor', inv.sensor)}
+        ${campo('Software', inv.software)}
+        ${campo('Arquivo origem', inv.arquivo_origem)}
+        ${campo('Status', inv.status)}
+        ${inv.observacao ? campo('Observação', inv.observacao) : ''}
+      </div>`;
+  }
+}
+
+function campo(label, val) {
+  return `<div><div style="font-size:10px;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:.06em;">${label}</div>
+  <div style="font-size:13px;color:#374151;margin-top:2px;">${esc(String(val || '—'))}</div></div>`;
+}
+
+// ── Tab DOF (view principal) ──────────────────────────────────────────────
+async function carregarDof() {
+  const uc  = document.getElementById('filtro-uc')?.value;
+  const ano = document.getElementById('filtro-ano')?.value || new Date().getFullYear();
+  const lista = document.getElementById('nf-lista');
+
+  lista.innerHTML = '<div style="padding:20px;text-align:center;color:#9CA3AF;font-size:12px;">Carregando DOF…</div>';
+
+  let q = db.from('dof_transportes').select('*')
+    .eq('estado_origem', 'AC')
+    .order('data_emissao', { ascending: false })
+    .limit(100);
+  if (ano) q = q.eq('ano_referencia', ano);
+
+  const { data, error } = await q;
+  if (error) { lista.innerHTML = `<div style="color:red;padding:16px;font-size:12px;">Erro: ${esc(error.message)}</div>`; return; }
+
+  document.getElementById('kpi-dof').textContent = formatNum((data || []).length, 0);
+
+  if (!data?.length) {
+    lista.innerHTML = `<div class="nf-vazio">
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#D1D5DB" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      <span style="font-size:12px;">Sem dados DOF importados</span>
+      <span style="font-size:11px;color:#D1D5DB;">Importe via planilha SINAFLOR ou via API IBAMA</span>
+    </div>`;
+    return;
+  }
+
+  lista.innerHTML = data.map(d => `
+    <div class="dof-item ${!d.num_asv ? 'dof-alert' : ''}">
+      <div class="dof-item-header">
+        <span class="dof-num">DOF ${esc(d.num_dof || '—')}</span>
+        <span class="dof-vol">${formatNum(d.volume_m3 || 0, 2)} m³</span>
+      </div>
+      <div class="dof-meta">${esc(d.produto || '—')} · ${esc(d.municipio_origem || '—')} → ${esc(d.municipio_destino || '—')}</div>
+      <div class="dof-meta" style="margin-top:2px;">
+        ${formatData(d.data_emissao)}
+        ${!d.num_asv ? ' · <strong style="color:#991B1B;">Sem ASV</strong>' : ''}
+      </div>
+    </div>`).join('');
+}
+
+// ── Modal novo inventário ─────────────────────────────────────────────────
+function abrirModal() {
+  document.getElementById('modal-novo').classList.add('aberto');
+  document.getElementById('f-data').value = new Date().toISOString().slice(0, 10);
+}
+
+function fecharModal() {
+  document.getElementById('modal-novo').classList.remove('aberto');
+  csvDados = [];
+  document.getElementById('upload-txt').textContent = 'Clique para selecionar arquivo CSV';
+  document.getElementById('f-csv').value = '';
+}
+
+// ── Importar CSV do Netflora/QGIS ─────────────────────────────────────────
+function onCsvSelect(input) {
+  const file = input.files[0];
+  if (!file) return;
+  document.getElementById('upload-txt').textContent = `📄 ${file.name}`;
+
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      csvDados = parseCsv(e.target.result);
+      document.getElementById('upload-area').style.borderColor = '#52B788';
+      document.getElementById('upload-txt').textContent = `✓ ${file.name} (${csvDados.length} espécies)`;
+    } catch (err) {
+      toast(`Erro ao ler CSV: ${err.message}`, 'erro');
+    }
+  };
+  reader.readAsText(file);
+}
+
+function parseCsv(txt) {
+  const linhas = txt.trim().split('\n').filter(Boolean);
+  if (linhas.length < 2) throw new Error('CSV vazio');
+  const headers = linhas[0].split(',').map(h => h.trim().toLowerCase().replace(/"/g,''));
+  return linhas.slice(1).map(linha => {
+    const cols = linha.split(',').map(c => c.trim().replace(/"/g,''));
+    const obj = {};
+    headers.forEach((h, i) => { obj[h] = cols[i] || ''; });
+    return obj;
+  }).filter(r => r.especie_nome || r.espécie_nome || r.species);
+}
+
+// ── Salvar inventário ─────────────────────────────────────────────────────
+async function salvarInventario() {
+  const nome  = document.getElementById('f-nome').value.trim();
+  const data  = document.getElementById('f-data').value;
+  const ucId  = document.getElementById('f-uc').value;
+  const area  = parseFloat(document.getElementById('f-area').value) || null;
+  const alt   = parseFloat(document.getElementById('f-alt').value) || null;
+  const sensor = document.getElementById('f-sensor').value.trim();
+  const sob   = parseFloat(document.getElementById('f-sobrep').value) || null;
+  const obs   = document.getElementById('f-obs').value.trim();
+
+  if (!nome || !data) { toast('Nome e data são obrigatórios', 'erro'); return; }
+
+  let ucNome = '';
+  if (ucId) {
+    const { data: uc } = await db.from('unidades_conservacao').select('nome').eq('id', ucId).single();
+    ucNome = uc?.nome || '';
+  }
+
+  const { data: inv, error } = await db.from('netflora_inventarios').insert({
+    nome, data_voo: data,
+    uc_id: ucId || null, uc_nome: ucNome,
+    area_ha: area, altitude_m: alt, sensor,
+    sobreposicao_pct: sob, observacao: obs,
+    operador_id: appState.usuario?.id,
+    status: csvDados.length > 0 ? 'processando' : 'concluido',
+  }).select().single();
+
+  if (error) { toast('Erro ao salvar: ' + error.message, 'erro'); return; }
+
+  // Importar espécies do CSV
+  if (csvDados.length > 0) {
+    const especies = csvDados.map(r => ({
+      inventario_id:   inv.id,
+      especie_nome:    r.especie_nome || r['espécie_nome'] || r.species || r.especie || '?',
+      nome_popular:    r.nome_popular || r.common_name || r.nome || null,
+      familia:         r.familia || r.family || null,
+      quantidade:      parseInt(r.quantidade || r.count || 1),
+      confianca_media: parseFloat(r.confianca_media || r.confidence || 0) || null,
+      dap_medio_cm:    parseFloat(r.dap_medio_cm || r.dap || 0) || null,
+      valor_comercial: (r.valor_comercial || r.commercial || '').toLowerCase() === 'true' || false,
+    }));
+    const { error: eEsp } = await db.from('netflora_especies').insert(especies);
+    if (!eEsp) {
+      await db.from('netflora_inventarios').update({ status: 'concluido' }).eq('id', inv.id);
+    } else {
+      await db.from('netflora_inventarios').update({ status: 'erro' }).eq('id', inv.id);
+    }
+  }
+
+  toast('Inventário salvo com sucesso!', 'sucesso');
+  fecharModal();
+  await carregarInventarios();
+}
+</script>
+</body>
+</html>
