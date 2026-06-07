@@ -5,21 +5,33 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-// Allowlist de origens via env ALLOWED_ORIGINS (separadas por vírgula).
-// Sem a env, mantém '*' para não quebrar o ambiente atual.
+// Allowlist de origens. Se ALLOWED_ORIGINS (env) existir, usa match exato.
+// Caso contrário, libera o domínio oficial, qualquer preview *.vercel.app
+// e localhost — bloqueando sites de terceiros.
 const ALLOWED = (Deno.env.get('ALLOWED_ORIGINS') ?? '')
   .split(',').map(o => o.trim()).filter(Boolean)
+const DEFAULT_ALLOW = [
+  'https://siguc.sema.ac.gov.br',
+  'https://siguc-ac.vercel.app',
+]
+function origemPermitida(origin: string): boolean {
+  if (!origin) return false
+  if (ALLOWED.length) return ALLOWED.includes(origin)
+  if (DEFAULT_ALLOW.includes(origin)) return true
+  if (/^https:\/\/[a-z0-9-]+\.vercel\.app$/.test(origin)) return true
+  if (/^http:\/\/localhost(:\d+)?$/.test(origin)) return true
+  return false
+}
 
 const CORS: Record<string, string> = {
-  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Origin': DEFAULT_ALLOW[0],
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Vary': 'Origin',
 }
 
 function aplicarCors(req: Request) {
-  if (!ALLOWED.length) { CORS['Access-Control-Allow-Origin'] = '*'; return }
   const origin = req.headers.get('origin') ?? ''
-  CORS['Access-Control-Allow-Origin'] = ALLOWED.includes(origin) ? origin : ALLOWED[0]
+  CORS['Access-Control-Allow-Origin'] = origemPermitida(origin) ? origin : (ALLOWED[0] ?? DEFAULT_ALLOW[0])
 }
 
 // ── Endpoints das APIs governamentais ────────────────────────
