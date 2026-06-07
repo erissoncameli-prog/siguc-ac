@@ -223,9 +223,29 @@ function renderEstrutura() {
 // ── Gates de permissão por fase ───────────────────────────────
 
 function podeDespachar(etapa) {
-  if (!_posicao || !_detalhe) return false
-  const { nivel, uc_id } = _posicao
+  if (!_detalhe) return false
   const p = _detalhe
+
+  // super_admin bypassa restrições de nível, respeitando apenas a etapa
+  if (appState.perfil === 'super_admin') {
+    switch(etapa) {
+      case 'triagem':              return p.etapa === 'submetida'
+      case 'analise_tecnica':      return p.etapa === 'analise_tecnica'
+      case 'parecer_dima':         return p.etapa === 'parecer_juridico'
+      case 'autorizacao_secretario': return p.etapa === 'aap_emissao'
+      case 'emissao_aap':          return p.etapa === 'aap_assinatura'
+      case 'entrega_aap':          return p.etapa === 'aap_publicada'
+      case 'fase_simples':         return true
+      case 'avaliar_relatorio':    return p.etapa === 'analise_relatorio' && !p.relatorio_avaliado_em
+      case 'homologar_relatorio':  return p.etapa === 'analise_relatorio' && !!p.relatorio_avaliado_em
+      case 'encerramento':         return p.etapa === 'encerrada'
+      case 'inadimplencia':        return !p.inadimplente
+      default: return false
+    }
+  }
+
+  if (!_posicao) return false
+  const { nivel, uc_id } = _posicao
   const mesmaUC = uc_id === p.uc_id
   const ehAnalista = _uid === p.analista_id
 
