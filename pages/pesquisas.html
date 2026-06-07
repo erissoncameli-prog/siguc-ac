@@ -1109,6 +1109,10 @@ function abrirModalFaseSimples(novaEtapa, labelAcao) {
   </div>
   <div class="modal-body">
     ${_resumoPesquisa()}
+    <div>
+      <div class="sec-title" style="margin-bottom:6px">📎 Documentos do Pesquisador</div>
+      <div style="display:flex;flex-direction:column;gap:5px">${_renderDocsList(_docs)}</div>
+    </div>
     ${novaEtapa === 'relatorio_parcial' || novaEtapa === 'relatorio_final' ? `
     <div>
       <label class="field-label">Data de entrega</label>
