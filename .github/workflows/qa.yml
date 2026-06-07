@@ -40,6 +40,21 @@ jobs:
       - name: Semgrep scan
         run: semgrep scan --config p/owasp-top-ten --config p/javascript --error --skip-unknown-extensions
 
+  # ── 3b. Trivy (vulnerabilidades de deps, misconfig e segredos) ──
+  trivy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Trivy filesystem scan
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: fs
+          scanners: vuln,misconfig,secret
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          format: table
+          exit-code: '0'   # report (não bloqueia). Mude p/ '1' para travar o merge.
+
   # ── 4. E2E read-only (Playwright contra a URL pública) ──────────
   e2e:
     if: github.event_name != 'push'   # não bloqueia o deploy do main

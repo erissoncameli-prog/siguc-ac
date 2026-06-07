@@ -9,8 +9,10 @@ Camadas de validação automática para não depender de teste manual a cada mud
 | **Inspeção de código (projeto)** | `scripts/guardrails.sh` | `qa.yml` job `guardrails` | ✅ já funciona |
 | **Vazamento de segredos** | Gitleaks | `qa.yml` job `segredos` | ✅ já funciona |
 | **SAST (OWASP/JS)** | Semgrep | `qa.yml` job `sast` | ✅ já funciona |
+| **Deps / misconfig / segredos** | Trivy (`aquasecurity/trivy-action`) | `qa.yml` job `trivy` | ✅ report (exit-code 0; mude p/ 1 p/ travar) |
 | **E2E read-only** | Playwright | `qa.yml` job `e2e` | ✅ contra `siguc-ac.vercel.app` |
-| **Revisão por IA** | Claude Code Action | `claude-review.yml` | ⚙️ requer `ANTHROPIC_API_KEY` |
+| **Revisão de código por IA** | Claude Code Action | `claude-review.yml` | ⚙️ requer `ANTHROPIC_API_KEY` |
+| **Revisão de SEGURANÇA por IA** | `anthropics/claude-code-security-review` | `security-review.yml` | ⚙️ requer `ANTHROPIC_API_KEY` |
 | **Linter do banco** | Supabase advisors | sob demanda (MCP) / dashboard | ⚙️ manual/agendável |
 | **E2E com escrita (fluxo completo)** | Playwright | `tests/pesquisa-flow.test.js` (bloco staging) | ⚙️ requer ambiente de STAGING |
 
