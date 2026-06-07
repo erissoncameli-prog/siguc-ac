@@ -1347,6 +1347,10 @@ function abrirModalInadimplencia() {
   </div>
   <div class="modal-body">
     ${_resumoPesquisa()}
+    <div>
+      <div class="sec-title" style="margin-bottom:6px">📎 Documentos do Pesquisador</div>
+      <div style="display:flex;flex-direction:column;gap:5px">${_renderDocsList(_docs)}</div>
+    </div>
     <div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:8px;padding:12px;font-size:12px;color:#991B1B">
       ⚠ Pesquisadores inadimplentes têm o avanço de etapas bloqueado até regularização.
     </div>
