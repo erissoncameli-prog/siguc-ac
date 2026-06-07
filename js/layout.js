@@ -56,6 +56,7 @@ function gerarLayout(tituloPagina, paginaAtiva) {
     'painel-gestor':            { svg: '<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/><circle cx="18" cy="5" r="3" fill="currentColor"/>', cor: '#818cf8', bg: 'rgba(129,140,248,0.22)' },
     'pesquisas':                { svg: '<path d="M9 2H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 2v20m0 0h10a2 2 0 0 0 2-2V8M9 22H5a2 2 0 0 1-2-2V8m0 0h18"/>', cor: '#38bdf8', bg: 'rgba(56,189,248,0.22)' },
     'dashboard-executivo':      { svg: '<path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/>', cor: '#4ade80', bg: 'rgba(74,222,128,0.22)' },
+    'netflora':                 { svg: '<path d="M12 2a10 10 0 0 1 10 10c0 4-2 7-5 9M12 2a10 10 0 0 0-10 10c0 4 2 7 5 9M12 2v20M2 12h20"/>', cor: '#86efac', bg: 'rgba(134,239,172,0.22)' },
   };
 
   function renderPill(id, size) {
@@ -78,6 +79,7 @@ function gerarLayout(tituloPagina, paginaAtiva) {
       label: 'Gestão',
       itens: [
         { id: 'monitoramento',      href: '../pages/monitoramento.html',      label: t('nav.monitoramento') },
+        { id: 'netflora',           href: '../pages/netflora.html',           label: 'Netflora — Inventário' },
         { id: 'alertas-ambientais', href: '../pages/alertas-ambientais.html', label: 'Alertas Ambientais' },
         { id: 'painel-gestor',     href: '../pages/painel-gestor.html',     label: 'Painel do Gestor' },
         { id: 'pesquisas',         href: '../pages/pesquisas.html',         label: 'Pesquisas' },
