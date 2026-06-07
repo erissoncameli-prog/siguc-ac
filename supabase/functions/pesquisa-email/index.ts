@@ -179,6 +179,54 @@ const TEMPLATES: Record<string, (d: Dados) => { assunto: string; html: string }>
       ${btn('Ver histórico completo', `${BASE_URL}/pages/pesquisa-status.html?token=${d.token}`)}
     `),
   }),
+
+  triagem_exigencia: (d) => ({
+    assunto: `[SIGUC] ${d.numero} — Documentação complementar necessária (triagem)`,
+    html: wrapLayout('Exigência na triagem', `
+      ${h2('📎 Sua pesquisa precisa de ajustes')}
+      ${p(`Olá, <strong>${d.pesquisador_nome}</strong>. Na triagem da pesquisa <strong>${d.numero}</strong> foram identificadas pendências que precisam ser atendidas antes de prosseguir.`)}
+      ${d.motivo ? `<div style="background:#FFFBEB;border-left:4px solid #F59E0B;padding:14px 16px;border-radius:4px;margin:16px 0"><p style="font-size:13px;color:#92400E;margin:0"><strong>O que é solicitado:</strong><br>${d.motivo}</p></div>` : ''}
+      ${p('Acesse o portal abaixo para enviar os documentos ou esclarecimentos solicitados:')}
+      ${btn('Atender exigência', `${BASE_URL}/pages/pesquisa-status.html?token=${d.token}`)}
+    `),
+  }),
+
+  relatorio_exigencia: (d) => ({
+    assunto: `[SIGUC] ${d.numero} — Complementação do relatório necessária`,
+    html: wrapLayout('Complementação do relatório', `
+      ${h2('📄 Relatório precisa de complementação')}
+      ${p(`Olá, <strong>${d.pesquisador_nome}</strong>. A análise do relatório da pesquisa <strong>${d.numero}</strong> apontou a necessidade de complementação.`)}
+      ${d.motivo ? `<div style="background:#FFFBEB;border-left:4px solid #F59E0B;padding:14px 16px;border-radius:4px;margin:16px 0"><p style="font-size:13px;color:#92400E;margin:0"><strong>Observações:</strong><br>${d.motivo}</p></div>` : ''}
+      ${p('Acesse o portal para reenviar o relatório com os ajustes solicitados:')}
+      ${btn('Reenviar relatório', `${BASE_URL}/pages/pesquisa-status.html?token=${d.token}`)}
+    `),
+  }),
+
+  autorizacao_negada: (d) => ({
+    assunto: `[SIGUC] ${d.numero} — Pesquisa não autorizada`,
+    html: wrapLayout('Pesquisa não autorizada', `
+      ${h2('Pesquisa não autorizada')}
+      ${p(`Olá, <strong>${d.pesquisador_nome}</strong>. Após análise final, a pesquisa <strong>${d.numero}</strong> não foi autorizada pelo Secretário de Estado do Meio Ambiente.`)}
+      ${d.motivo ? `<div style="background:#FEF2F2;border-left:4px solid #DC2626;padding:12px 16px;border-radius:4px;margin:12px 0"><p style="font-size:13px;color:#991B1B;margin:0"><strong>Fundamento:</strong> ${d.motivo}</p></div>` : ''}
+      ${p('Para mais informações ou eventual recurso, entre em contato com a DEUC/DIMA.')}
+      <a href="mailto:sema.gabin@gmail.com" style="display:inline-block;margin:12px 0;padding:10px 22px;background:#0A1A0F;color:#fff;border-radius:8px;text-decoration:none;font-size:13px;font-weight:700">Entrar em contato</a>
+    `),
+  }),
+
+  // Evento interno: avisa o Secretário que há pesquisa aguardando autorização
+  aviso_secretario: (d) => ({
+    assunto: `[SIGUC] ${d.numero} — Pesquisa aguarda autorização do Secretário`,
+    html: wrapLayout('Pesquisa aguarda autorização', `
+      ${h2('Pesquisa aguardando autorização')}
+      ${p('Uma pesquisa concluiu o parecer da DIMA e aguarda autorização do Gabinete.')}
+      ${infoTable([
+        info('Número', d.numero),
+        info('Título', d.titulo),
+        info('UC', d.uc || 'A definir'),
+      ])}
+      ${btn('Abrir no sistema', `${BASE_URL}/pages/pesquisas.html`)}
+    `),
+  }),
 }
 
 // ── Envio via Resend ─────────────────────────────────────────
