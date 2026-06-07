@@ -545,7 +545,10 @@ async function verDetalhe(id) {
     <!-- AAP -->
     ${_detalhe.aap_numero ? `
     <div class="det-sec" style="background:#F0FDF4;border-radius:8px;padding:12px">
-      <div class="det-sec-title" style="color:#15803D">Autorização de Acesso e Pesquisa (AAP)</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px">
+        <div class="det-sec-title" style="color:#15803D;margin-bottom:0">Autorização de Acesso e Pesquisa (AAP)</div>
+        <div class="detalhe-aap-btn">${_btnBaixarAAP()}</div>
+      </div>
       <div class="field-grid-2">
         <div>
           <div class="det-row"><span class="det-key">Número AAP</span><strong>${esc(_detalhe.aap_numero)}</strong></div>
@@ -557,6 +560,9 @@ async function verDetalhe(id) {
           <div class="det-row"><span class="det-key">Token QR</span><span style="font-family:monospace;font-size:10px">${esc(_detalhe.aap_qr_token||'—')}</span></div>
         </div>
       </div>
+      ${!_detalhe.aap_pdf_path ? `
+      <button class="btn-acao" style="margin-top:8px;font-size:11px;background:#ECFDF5;border:1px dashed #6EE7B7;color:#065F46"
+        onclick="gerarPdfAAP('${_detalhe.id}')">📄 Gerar PDF da AAP</button>` : ''}
     </div>` : ''}
 
     <!-- Sub-etapa de relatório -->
