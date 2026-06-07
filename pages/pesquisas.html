@@ -1355,6 +1355,34 @@ async function regularizar() {
   await carregarPesquisas()
 }
 
+// ── Helper: abrir documento com URL assinada ─────────────────
+
+async function abrirDocumento(path, nome) {
+  const { data, error } = await db.storage.from('pesquisa-documentos').createSignedUrl(path, 3600)
+  if (error || !data?.signedUrl) { toast('Não foi possível gerar o link do documento', 'erro'); return }
+  window.open(data.signedUrl, '_blank')
+}
+
+function formatBytes(bytes) {
+  if (!bytes) return ''
+  if (bytes < 1024) return bytes + ' B'
+  if (bytes < 1048576) return (bytes / 1024).toFixed(0) + ' KB'
+  return (bytes / 1048576).toFixed(1) + ' MB'
+}
+
+function _renderDocsList(docs) {
+  if (!docs?.length) return `<div style="font-size:11px;color:#9CA3AF;padding:8px 0">Nenhum documento anexado.</div>`
+  return docs.map(d => `
+  <div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:#F9FAFB;border:1px solid var(--borda);border-radius:7px">
+    <span style="font-size:14px">${d.mime_type?.includes('pdf') ? '📄' : d.mime_type?.includes('image') ? '🖼️' : '📎'}</span>
+    <div style="flex:1;min-width:0">
+      <div style="font-size:12px;font-weight:600;color:#111827;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(d.nome_original)}</div>
+      <div style="font-size:10px;color:#9CA3AF">${TIPO_DOC_LABEL[d.tipo]||d.tipo}${d.tamanho_bytes?' · '+formatBytes(d.tamanho_bytes):''}</div>
+    </div>
+    <button class="btn-acao" style="padding:3px 9px;font-size:11px;flex-shrink:0" onclick="abrirDocumento('${esc(d.storage_path)}','${esc(d.nome_original)}')">🔍 Abrir</button>
+  </div>`).join('')
+}
+
 // ── Helper: selecionar radio com estilo ───────────────────────
 
 function selecionarRadio(el, name, value) {
