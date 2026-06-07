@@ -12,6 +12,7 @@ on:
 permissions:
   contents: read
   pull-requests: write
+  id-token: write          # OIDC (caso a action exija)
 
 jobs:
   security-review:
