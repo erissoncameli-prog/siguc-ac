@@ -5,9 +5,21 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-const CORS = {
+// Allowlist de origens via env ALLOWED_ORIGINS (separadas por vírgula).
+// Sem a env, mantém '*' para não quebrar o ambiente atual.
+const ALLOWED = (Deno.env.get('ALLOWED_ORIGINS') ?? '')
+  .split(',').map(o => o.trim()).filter(Boolean)
+
+const CORS: Record<string, string> = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Vary': 'Origin',
+}
+
+function aplicarCors(req: Request) {
+  if (!ALLOWED.length) { CORS['Access-Control-Allow-Origin'] = '*'; return }
+  const origin = req.headers.get('origin') ?? ''
+  CORS['Access-Control-Allow-Origin'] = ALLOWED.includes(origin) ? origin : ALLOWED[0]
 }
 
 // ── Endpoints das APIs governamentais ────────────────────────
@@ -125,6 +137,7 @@ async function validarSISGEN(numero: string): Promise<{
 
 // ── Handler principal ─────────────────────────────────────────
 serve(async (req) => {
+  aplicarCors(req)
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
 
   try {
