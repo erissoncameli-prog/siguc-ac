@@ -386,24 +386,21 @@ async function uploadDoc(arquivo, tipo) {
 
   if (upErr) { toastPub('Erro ao enviar arquivo: ' + upErr.message, true); return }
 
-  await db.from('pesquisa_documentos').insert({
-    pesquisa_id:   _pesquisa.id,
-    tipo,
-    nome_original: arquivo.name,
-    storage_path:  path,
-    tamanho_bytes: arquivo.size,
-    mime_type:     arquivo.type,
-    enviado_por:   'pesquisador',
-    observacao:    tipo === 'complementar' ? 'Enviado em atendimento à solicitação de complementação.' : null,
+  // Registro via RPC SECURITY DEFINER (valida o token e limpa a
+  // pendência de complementação). O INSERT direto do anon não é
+  // mais permitido pelo RLS.
+  const token = document.getElementById('campo-token').value.trim()
+  const { error: rpcErr } = await db.rpc('anexar_documento_publico', {
+    p_token:        token,
+    p_tipo:         tipo,
+    p_nome:         arquivo.name,
+    p_storage_path: path,
+    p_tamanho:      arquivo.size,
+    p_mime:         arquivo.type,
   })
+  if (rpcErr) { toastPub('Erro ao registrar documento: ' + rpcErr.message, true); return }
 
   toastPub('Documento enviado com sucesso!')
-  // Atualiza complementacao_solicitada se for complementar
-  if (tipo === 'complementar') {
-    await db.from('pesquisas')
-      .update({ complementacao_solicitada: false, complementacao_motivo: null })
-      .eq('id', _pesquisa.id)
-  }
   await buscar()
 }
 
