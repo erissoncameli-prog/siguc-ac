@@ -902,6 +902,10 @@ function abrirModalAutoSecretario() {
   </div>
   <div class="modal-body">
     ${_resumoPesquisa()}
+    <div>
+      <div class="sec-title" style="margin-bottom:6px">📎 Documentos do Pesquisador</div>
+      <div style="display:flex;flex-direction:column;gap:5px">${_renderDocsList(_docs)}</div>
+    </div>
     <div style="background:#F0FDF4;border:1px solid #A7F3D0;border-radius:8px;padding:14px;font-size:12px;color:#065F46">
       <strong>Esta ação autoriza formalmente a pesquisa</strong> nas Unidades de Conservação do Estado do Acre.<br>
       Após autorização, o DEUC emitirá a Autorização de Acesso e Pesquisa (AAP).
