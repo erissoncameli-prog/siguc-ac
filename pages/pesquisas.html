@@ -231,30 +231,30 @@ function podeDespachar(etapa) {
 
   switch(etapa) {
     case 'triagem':
-      return ((['gestor_uc','analista_uc'].includes(nivel) && mesmaUC) || ['chefe_deuc','chefe_debio'].includes(nivel))
+      return ((['gestor_uc','analista_uc'].includes(nivel) && mesmaUC) || ['chefe_deuc','chefe_debio','secretario'].includes(nivel))
         && p.etapa === 'submetida'
     case 'analise_tecnica':
-      return (ehAnalista || ['chefe_deuc','chefe_debio'].includes(nivel))
+      return (ehAnalista || ['chefe_deuc','chefe_debio','secretario'].includes(nivel))
         && p.etapa === 'analise_tecnica'
     case 'parecer_dima':
-      return nivel === 'diretor' && p.etapa === 'parecer_juridico'
+      return ['diretor','secretario'].includes(nivel) && p.etapa === 'parecer_juridico'
     case 'autorizacao_secretario':
       return nivel === 'secretario' && p.etapa === 'aap_emissao'
     case 'emissao_aap':
-      return ['chefe_deuc','chefe_debio'].includes(nivel) && p.etapa === 'aap_assinatura'
+      return ['chefe_deuc','chefe_debio','secretario'].includes(nivel) && p.etapa === 'aap_assinatura'
     case 'entrega_aap':
-      return ((['gestor_uc','analista_uc'].includes(nivel) && mesmaUC) || ['chefe_deuc','chefe_debio'].includes(nivel))
+      return ((['gestor_uc','analista_uc'].includes(nivel) && mesmaUC) || ['chefe_deuc','chefe_debio','secretario'].includes(nivel))
         && p.etapa === 'aap_publicada'
     case 'fase_simples':
-      return (ehAnalista || (['gestor_uc','analista_uc'].includes(nivel) && mesmaUC) || ['chefe_deuc','chefe_debio','diretor'].includes(nivel))
+      return (ehAnalista || (['gestor_uc','analista_uc'].includes(nivel) && mesmaUC) || ['chefe_deuc','chefe_debio','diretor','secretario'].includes(nivel))
     case 'avaliar_relatorio':
-      return (ehAnalista || ['chefe_deuc','chefe_debio'].includes(nivel))
+      return (ehAnalista || ['chefe_deuc','chefe_debio','secretario'].includes(nivel))
         && p.etapa === 'analise_relatorio' && !p.relatorio_avaliado_em
     case 'homologar_relatorio':
-      return ['chefe_deuc','chefe_debio'].includes(nivel)
+      return ['chefe_deuc','chefe_debio','secretario'].includes(nivel)
         && p.etapa === 'analise_relatorio' && !!p.relatorio_avaliado_em
     case 'encerramento':
-      return ['chefe_deuc','chefe_debio'].includes(nivel) && p.etapa === 'encerrada'
+      return ['chefe_deuc','chefe_debio','secretario'].includes(nivel) && p.etapa === 'encerrada'
     case 'inadimplencia':
       return ['chefe_deuc','chefe_debio','diretor','secretario'].includes(nivel) && !p.inadimplente
     default:
