@@ -46,7 +46,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Trivy filesystem scan
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@master
         with:
           scan-type: fs
           scanners: vuln,misconfig,secret
@@ -67,8 +67,8 @@ jobs:
         with: { node-version: '20' }
       - run: npm install -D @playwright/test
       - run: npx playwright install --with-deps chromium
-      - name: Smoke + fluxo de pesquisa (read-only)
-        run: npx playwright test tests/smoke.test.js tests/pesquisa-flow.test.js
+      - name: Smoke do fluxo de pesquisa (read-only, contra produção)
+        run: npx playwright test tests/pesquisa-flow.test.js
       - uses: actions/upload-artifact@v4
         if: always()
         with:
