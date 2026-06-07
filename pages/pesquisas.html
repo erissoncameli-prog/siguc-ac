@@ -313,6 +313,20 @@ function estaAtrasada(p) {
   return d != null && d > 30
 }
 
+// Desabilita o botão durante a ação assíncrona. Se a ação fechar o
+// modal (sucesso), o botão é removido do DOM e nada precisa ser feito;
+// se permanecer (validação abortada ou erro), o botão é restaurado.
+async function comBotao(btn, fn) {
+  if (!btn || btn.disabled) return
+  const orig = btn.innerHTML
+  btn.disabled = true
+  btn.innerHTML = '⏳ Processando…'
+  try { await fn() }
+  finally {
+    if (btn.isConnected) { btn.disabled = false; btn.innerHTML = orig }
+  }
+}
+
 function renderPipeline() {
   const contagem = {}
   ETAPAS.forEach(e => { contagem[e.id] = _pesquisas.filter(p => p.etapa === e.id).length })
@@ -555,7 +569,7 @@ async function verDetalhe(id) {
       ${btHomologarRel ? `<button class="btn-acao primary" onclick="abrirModalHomologarRelatorio()">✅ Homologar Relatório</button>` : ''}
       ${btEncerramento ? `<button class="btn-acao primary" onclick="abrirModalEncerramento()">🔒 Encerrar Processo</button>` : ''}
       ${btInad         ? `<button class="btn-acao danger" onclick="abrirModalInadimplencia()">⚠ Marcar Inadimplente</button>` : ''}
-      ${_detalhe.inadimplente && _posicao && ['chefe_deuc','chefe_debio','diretor'].includes(_posicao.nivel) ? `<button class="btn-acao" onclick="regularizar()">✓ Regularizar</button>` : ''}
+      ${_detalhe.inadimplente && _posicao && ['chefe_deuc','chefe_debio','diretor'].includes(_posicao.nivel) ? `<button class="btn-acao" onclick="comBotao(this, regularizar)">✓ Regularizar</button>` : ''}
     </div>
   </div>
 </div>
@@ -644,7 +658,7 @@ function abrirModalTriagem() {
   </div>
   <div class="modal-footer">
     <button class="btn-acao" onclick="document.getElementById('modal-triagem').remove()">Cancelar</button>
-    <button class="btn-acao primary" onclick="confirmarTriagem()">Confirmar Despacho</button>
+    <button class="btn-acao primary" onclick="comBotao(this, confirmarTriagem)">Confirmar Despacho</button>
   </div>
 </div>
 </div>`)
@@ -729,7 +743,7 @@ function abrirModalAnaliseTec() {
   </div>
   <div class="modal-footer">
     <button class="btn-acao" onclick="document.getElementById('modal-analise').remove()">Cancelar</button>
-    <button class="btn-acao primary" onclick="confirmarAnaliseTec()">Confirmar Parecer</button>
+    <button class="btn-acao primary" onclick="comBotao(this, confirmarAnaliseTec)">Confirmar Parecer</button>
   </div>
 </div>
 </div>`)
@@ -796,7 +810,7 @@ function abrirModalParecerDima() {
   </div>
   <div class="modal-footer">
     <button class="btn-acao" onclick="document.getElementById('modal-dima').remove()">Cancelar</button>
-    <button class="btn-acao primary" onclick="confirmarParecerDima()">Confirmar Despacho</button>
+    <button class="btn-acao primary" onclick="comBotao(this, confirmarParecerDima)">Confirmar Despacho</button>
   </div>
 </div>
 </div>`)
@@ -863,7 +877,7 @@ function abrirModalAutoSecretario() {
   </div>
   <div class="modal-footer">
     <button class="btn-acao" onclick="document.getElementById('modal-secretario').remove()">Cancelar</button>
-    <button class="btn-acao primary" onclick="confirmarAutoSecretario()">Confirmar Despacho</button>
+    <button class="btn-acao primary" onclick="comBotao(this, confirmarAutoSecretario)">Confirmar Despacho</button>
   </div>
 </div>
 </div>`)
@@ -929,7 +943,7 @@ function abrirModalEmissaoAAP() {
   </div>
   <div class="modal-footer">
     <button class="btn-acao" onclick="document.getElementById('modal-aap').remove()">Cancelar</button>
-    <button class="btn-acao primary" onclick="confirmarEmissaoAAP()">📋 Gerar AAP</button>
+    <button class="btn-acao primary" onclick="comBotao(this, confirmarEmissaoAAP)">📋 Gerar AAP</button>
   </div>
 </div>
 </div>`)
@@ -997,7 +1011,7 @@ function abrirModalEntregaAAP() {
   </div>
   <div class="modal-footer">
     <button class="btn-acao" onclick="document.getElementById('modal-entrega-aap').remove()">Cancelar</button>
-    <button class="btn-acao primary" onclick="confirmarEntregaAAP()">✅ Confirmar Entrega</button>
+    <button class="btn-acao primary" onclick="comBotao(this, confirmarEntregaAAP)">✅ Confirmar Entrega</button>
   </div>
 </div>
 </div>`)
@@ -1105,7 +1119,7 @@ function abrirModalAvaliarRelatorio() {
   </div>
   <div class="modal-footer">
     <button class="btn-acao" onclick="document.getElementById('modal-avaliar-rel').remove()">Cancelar</button>
-    <button class="btn-acao primary" onclick="confirmarAvaliarRelatorio()">Confirmar Avaliação</button>
+    <button class="btn-acao primary" onclick="comBotao(this, confirmarAvaliarRelatorio)">Confirmar Avaliação</button>
   </div>
 </div>
 </div>`)
@@ -1168,7 +1182,7 @@ function abrirModalHomologarRelatorio() {
   </div>
   <div class="modal-footer">
     <button class="btn-acao" onclick="document.getElementById('modal-homologar-rel').remove()">Cancelar</button>
-    <button class="btn-acao primary" onclick="confirmarHomologarRelatorio()">Confirmar</button>
+    <button class="btn-acao primary" onclick="comBotao(this, confirmarHomologarRelatorio)">Confirmar</button>
   </div>
 </div>
 </div>`)
@@ -1219,7 +1233,7 @@ function abrirModalEncerramento() {
   </div>
   <div class="modal-footer">
     <button class="btn-acao" onclick="document.getElementById('modal-encerramento').remove()">Cancelar</button>
-    <button class="btn-acao primary" onclick="confirmarEncerramento()">🔒 Arquivar</button>
+    <button class="btn-acao primary" onclick="comBotao(this, confirmarEncerramento)">🔒 Arquivar</button>
   </div>
 </div>
 </div>`)
@@ -1263,7 +1277,7 @@ function abrirModalInadimplencia() {
   </div>
   <div class="modal-footer">
     <button class="btn-acao" onclick="document.getElementById('modal-inad').remove()">Cancelar</button>
-    <button class="btn-acao danger" onclick="confirmarInadimplencia()">⚠ Confirmar Inadimplência</button>
+    <button class="btn-acao danger" onclick="comBotao(this, confirmarInadimplencia)">⚠ Confirmar Inadimplência</button>
   </div>
 </div>
 </div>`)
@@ -1404,7 +1418,7 @@ function abrirModalNova() {
   </div>
   <div class="modal-footer">
     <button class="btn-acao" onclick="fecharModalNova()">Cancelar</button>
-    <button class="btn-acao primary" onclick="salvarNova()">Cadastrar Pesquisa</button>
+    <button class="btn-acao primary" onclick="comBotao(this, salvarNova)">Cadastrar Pesquisa</button>
   </div>
 </div>
 </div>`)
