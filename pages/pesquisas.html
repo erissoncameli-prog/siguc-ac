@@ -1254,9 +1254,11 @@ async function confirmarInadimplencia() {
 }
 
 async function regularizar() {
-  const { error } = await db.from('pesquisas').update({
-    inadimplente: false, inadimplencia_motivo: null, inadimplencia_em: null
-  }).eq('id', _detalhe.id)
+  const obs = prompt('Observação da regularização (opcional):') || null
+  const { error } = await db.rpc('regularizar_pesquisador', {
+    p_pesquisa_id: _detalhe.id,
+    p_observacao:  obs
+  })
   if (error) { toast('Erro: ' + error.message, 'erro'); return }
   toast('Pesquisador regularizado', 'sucesso')
   fecharDetalhe()
