@@ -1,0 +1,35 @@
+name: Revisão de segurança por IA (Claude)
+
+# Action oficial da Anthropic: em cada PR, o Claude analisa o diff
+# em busca de vulnerabilidades (RLS, exposição de PII, SECURITY DEFINER,
+# injeção, vazamento de chave, etc.) e comenta no PR.
+# Requer o secret ANTHROPIC_API_KEY. Sem ele, o job se autodesativa.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  security-review:
+    runs-on: ubuntu-latest
+    env:
+      TEM_CHAVE: ${{ secrets.ANTHROPIC_API_KEY != '' }}
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+
+      - name: Aviso se sem chave
+        if: ${{ env.TEM_CHAVE != 'true' }}
+        run: echo "::notice::ANTHROPIC_API_KEY ausente — revisão de segurança por IA desativada. Adicione o secret para ativar."
+
+      - name: Claude Security Review
+        if: ${{ env.TEM_CHAVE == 'true' }}
+        uses: anthropics/claude-code-security-review@main
+        with:
+          claude-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
+          comment-pr: true
+          exclude-directories: 'data,docs'
