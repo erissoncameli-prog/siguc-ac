@@ -199,7 +199,7 @@ async function init() {
 }
 
 function renderEstrutura() {
-  const podeNova = _posicao && ['gestor_uc','analista_uc','chefe_deuc','chefe_debio','diretor'].includes(_posicao.nivel)
+  const podeNova = _posicao && ['gestor_uc','analista_uc','chefe_deuc','chefe_debio','diretor','secretario'].includes(_posicao.nivel)
   const nivelStr = _posicao ? `<span class="selo-posicao">👤 ${NIVEL_LABEL[_posicao.nivel] || _posicao.nivel}</span>` : ''
   return `
 <div class="kpi-bar" id="kpi-bar">
