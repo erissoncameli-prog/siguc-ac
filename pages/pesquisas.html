@@ -761,6 +761,10 @@ function abrirModalAnaliseTec() {
   <div class="modal-body">
     ${_resumoPesquisa()}
     <div>
+      <div class="sec-title" style="margin-bottom:8px">📎 Documentos do Pesquisador</div>
+      <div style="display:flex;flex-direction:column;gap:5px">${_renderDocsList(_docs)}</div>
+    </div>
+    <div>
       <div class="sec-title" style="margin-bottom:10px">Checklist Técnico</div>
       <div style="display:flex;flex-direction:column;gap:8px">
         <label class="check-item"><input type="checkbox" id="chk-docs"> Documentação completa e válida</label>
