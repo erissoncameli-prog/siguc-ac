@@ -547,6 +547,36 @@ async function verDetalhe(id) {
       <div style="display:flex;flex-direction:column;gap:5px;margin-top:6px">${_renderDocsList(_docs)}</div>
     </div>
 
+    <!-- Equipe -->
+    <div class="det-sec">
+      <div class="det-sec-title" style="display:flex;align-items:center;gap:8px">
+        👥 Equipe de Pesquisa
+        ${_equipe.length ? `<span style="background:#F0FDF4;color:#15803D;border:1px solid #A7F3D0;border-radius:20px;padding:1px 9px;font-size:10px;font-weight:700">${_equipe.length} membro${_equipe.length>1?'s':''}</span>` : ''}
+      </div>
+      ${_equipe.length ? `
+      <div style="display:flex;flex-direction:column;gap:6px;margin-top:8px">
+        ${_equipe.map(m => `
+        <div style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;background:#F9FAFB;border:1px solid var(--borda);border-radius:8px">
+          <div style="width:34px;height:34px;border-radius:50%;background:var(--floresta);color:var(--ouro-c);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;flex-shrink:0">${iniciais(m.nome_completo)}</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13px;font-weight:700;color:#111827">${esc(m.nome_completo)}</div>
+            <div style="font-size:11px;color:#374151;margin-top:2px">
+              ${FUNCAO_EQUIPE_LABEL[m.funcao]||m.funcao}
+              ${m.titulacao ? ` · <em>${esc(m.titulacao)}</em>` : ''}
+            </div>
+            <div style="font-size:11px;color:#6B7280;margin-top:2px">
+              ${esc(m.instituicao||'—')} · ${esc(m.email)}
+              ${m.telefone ? ' · ' + esc(m.telefone) : ''}
+            </div>
+            <div style="font-size:10px;color:#9CA3AF;margin-top:2px">
+              CPF: ${esc(m.cpf)}${m.rg ? ' · RG: ' + esc(m.rg) : ''}
+              ${m.lattes ? ` · <a href="${esc(m.lattes)}" target="_blank" style="color:var(--verde-claro)">Lattes</a>` : ''}
+            </div>
+          </div>
+        </div>`).join('')}
+      </div>` : `<div style="font-size:12px;color:#9CA3AF;padding:8px 0">Nenhum membro de equipe cadastrado.</div>`}
+    </div>
+
     <!-- AAP -->
     ${_detalhe.aap_numero ? `
     <div class="det-sec" style="background:#F0FDF4;border-radius:8px;padding:12px">
