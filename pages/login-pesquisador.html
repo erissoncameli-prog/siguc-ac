@@ -187,6 +187,22 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 const { createClient } = supabase
 const db = createClient(SUPABASE_URL, SUPABASE_KEY)
 
+async function carregarLogos() {
+  try {
+    const { data } = await db.from('config_sistema').select('dados').eq('id', 1).single()
+    const logos = data?.dados?.logos || {}
+    const gov  = document.getElementById('logo-gov')
+    const sec  = document.getElementById('logo-sema')
+    const sep  = document.getElementById('logo-sep')
+    const wrap = document.getElementById('logos-topo')
+    if (logos.governo_url)    { gov.src = logos.governo_url;    gov.style.display = '' }
+    if (logos.secretaria_url) { sec.src = logos.secretaria_url; sec.style.display = '' }
+    if (logos.governo_url && logos.secretaria_url) sep.style.display = ''
+    if (logos.governo_url || logos.secretaria_url) wrap.style.display = ''
+  } catch(e) {}
+}
+carregarLogos()
+
 // Slideshow
 let total = 5, atual = 0, timer
 const dotsEl = document.getElementById('slide-dots')
