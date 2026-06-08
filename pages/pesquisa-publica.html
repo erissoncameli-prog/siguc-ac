@@ -2041,29 +2041,18 @@ async function enviarSubmissao() {
   btn.disabled = true; btn.textContent = 'Enviando…'
 
   try {
-    const { data: resultado, error } = await db.rpc('submeter_pesquisa_publica', {
-      p_titulo:                  document.getElementById('p-titulo').value.trim(),
-      p_resumo:                  document.getElementById('p-resumo').value.trim(),
-      p_tipo:                    document.getElementById('p-tipo').value,
-      p_uc_id:                   document.getElementById('p-uc').value || null,
-      p_data_inicio_prevista:    document.getElementById('p-inicio').value || null,
-      p_data_fim_prevista:       document.getElementById('p-fim').value || null,
-      p_area_ha:                 parseFloat(document.getElementById('p-area').value) || null,
-      p_pesquisador_nome:        document.getElementById('p-nome').value.trim(),
-      p_pesquisador_cpf:         document.getElementById('p-cpf').value.trim(),
-      p_pesquisador_email:       document.getElementById('p-email').value.trim(),
-      p_pesquisador_inst:        document.getElementById('p-inst').value.trim(),
-      p_pesquisador_telefone:    document.getElementById('p-tel').value.trim() || null,
-      p_pesquisador_lattes:      document.getElementById('p-lattes').value.trim() || null,
-      p_pesquisador_titulacao:       document.getElementById('p-titulacao').value || null,
-      p_pesquisador_rg:              document.getElementById('p-rg').value.trim() || null,
-      p_pesquisador_area_formacao:   document.getElementById('p-area-formacao').value || null,
-      p_pesquisador_especialidade:   document.getElementById('p-especialidade').value.trim() || null,
-      p_sisbio_numero:           document.getElementById('p-sisbio')?.value.trim() || null,
-      p_sisgen_numero:           document.getElementById('p-sisgen')?.value.trim() || null,
-      p_coleta_biologica:        coleta,
-      p_pesquisa_humanos:        humanos,
-      p_aceite_in_em:            _aceiteInEm ? _aceiteInEm.toISOString() : new Date().toISOString(),
+    const { data: resultado, error } = await db.rpc('submeter_pesquisa_autenticada', {
+      p_titulo:               document.getElementById('p-titulo').value.trim(),
+      p_resumo:               document.getElementById('p-resumo').value.trim(),
+      p_tipo:                 document.getElementById('p-tipo').value,
+      p_uc_id:                document.getElementById('p-uc').value || null,
+      p_data_inicio_prevista: document.getElementById('p-inicio').value || null,
+      p_data_fim_prevista:    document.getElementById('p-fim').value || null,
+      p_area_ha:              parseFloat(document.getElementById('p-area').value) || null,
+      p_sisbio_numero:        document.getElementById('p-sisbio')?.value.trim() || null,
+      p_sisgen_numero:        document.getElementById('p-sisgen')?.value.trim() || null,
+      p_coleta_biologica:     coleta,
+      p_pesquisa_humanos:     humanos,
     })
     if (error) throw new Error(error.message)
 
