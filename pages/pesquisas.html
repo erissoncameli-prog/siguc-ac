@@ -1443,11 +1443,13 @@ async function confirmarAvaliarRelatorio() {
   const pendencias  = document.getElementById('avaliar-pendencias')?.value.trim()
   const obs         = document.getElementById('avaliar-obs')?.value.trim()
   if (resultado === 'exigencia' && !pendencias) { toast('Informe as pendências', 'aviso'); return }
-  const observacao  = (pendencias ? pendencias + '\n' : '') + (obs || '')
+  const extras      = [pendencias, obs].filter(Boolean).join('\n')
+  const observacao  = _getDespacho(extras)
+  if (!observacao) return
   const { error } = await db.rpc('despachar_avaliar_relatorio', {
     p_pesquisa_id: _detalhe.id,
     p_aprovado:    resultado === 'aprovado',
-    p_observacao:  observacao.trim() || null
+    p_observacao:  observacao
   })
   if (error) { toast('Erro: ' + error.message, 'erro'); return }
   toast(resultado === 'aprovado' ? 'Relatório avaliado — aguarda homologação do Chefe DEUC' : 'Exigência registrada — pesquisador será notificado', 'sucesso')
