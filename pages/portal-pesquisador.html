@@ -179,16 +179,24 @@ body{font-family:var(--ff-ui);background:var(--bg);color:var(--texto);min-height
 
 <!-- Header -->
 <header class="portal-header">
-  <div class="h-brand">
-    <div class="h-brand-icon">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
-    </div>
-    <div>
-      <div class="h-brand-name">SIGUC-AC</div>
-      <div class="h-brand-sub">Gestão de UCs · SEMA/AC</div>
+  <div style="display:flex;align-items:center;gap:16px">
+    <div class="h-logos">
+      <img class="h-logo-ac" src="../assets/brasao-acre.png" alt="Governo do Acre" onerror="this.style.display='none'">
+      <div class="h-logos-sep"></div>
+      <img class="h-logo-sema" src="../assets/logo-sema.png" alt="SEMA/AC" onerror="this.style.display='none'">
     </div>
     <div class="h-sep"></div>
-    <div class="h-portal-label">Portal do Pesquisador</div>
+    <div class="h-brand">
+      <div class="h-brand-icon">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+      </div>
+      <div>
+        <div class="h-brand-name">SIGUC-AC</div>
+        <div class="h-brand-sub">Gestão de UCs · SEMA/AC</div>
+      </div>
+      <div class="h-sep"></div>
+      <div class="h-portal-label">Portal do Pesquisador</div>
+    </div>
   </div>
   <div class="h-user">
     <div class="h-user-info">
