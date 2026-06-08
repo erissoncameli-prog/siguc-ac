@@ -1042,11 +1042,11 @@ body {
 
 <!-- ── HEADER ─────────────────────────────────────────────────── -->
 <header class="pub-header">
-  <!-- Logos institucionais -->
-  <div class="gov-logos">
-    <img src="../img/logo-governo-ac.svg" alt="Governo do Estado do Acre" class="gov-logo gov-logo-ac">
-    <div class="gov-logos-divider"></div>
-    <img src="../img/logo-sema.svg" alt="SEMA – Secretaria de Estado de Meio Ambiente" class="gov-logo gov-logo-sema">
+  <!-- Logos institucionais (carregadas dinamicamente do Supabase) -->
+  <div class="gov-logos" id="gov-logos-wrap" style="display:none">
+    <img id="logo-gov" src="" alt="Governo do Estado do Acre" class="gov-logo gov-logo-ac" style="display:none">
+    <div class="gov-logos-divider" id="gov-logos-divider" style="display:none"></div>
+    <img id="logo-sec" src="" alt="SEMA – Secretaria de Estado de Meio Ambiente" class="gov-logo gov-logo-sema" style="display:none">
   </div>
 
   <div class="logo-wrap">
