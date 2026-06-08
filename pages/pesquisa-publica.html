@@ -1749,6 +1749,8 @@ async function init() {
 
   gerarCaptcha()
 
+  if (_pesquisadorConta) preencherDadosPesquisador(_pesquisadorConta)
+
   const sel = document.getElementById('p-uc')
   try {
     const { data, error } = await db.from('unidades_conservacao')
