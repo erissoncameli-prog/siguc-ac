@@ -1851,7 +1851,9 @@ function validarPasso(n) {
     if (!nome || !cpf || !rg || !tit || !email || !tel || !inst || !area) {
       toastPub('Preencha todos os campos obrigatórios', true); return false
     }
+    if (!validarCPF(cpf)) { toastPub('CPF inválido — verifique os dígitos verificadores', true); return false }
     if (!/\S+@\S+\.\S+/.test(email)) { toastPub('E-mail inválido', true); return false }
+    if (tel.replace(/\D/g,'').length < 7) { toastPub('Telefone inválido — mínimo 7 dígitos', true); return false }
     return true
   }
   if (n === 2) {
