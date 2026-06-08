@@ -1648,6 +1648,52 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 const { createClient } = supabase
 const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
 
+// ── Auth guard: exige conta de pesquisador ────────────────────
+let _pesquisadorConta = null
+
+async function verificarAuthEIniciar() {
+  const { data: { session } } = await db.auth.getSession()
+  if (!session) { window.location.replace('login-pesquisador.html?next=pesquisa'); return }
+
+  const { data: pesq } = await db
+    .from('pesquisadores')
+    .select('id,nome_completo,cpf,email,telefone,instituicao,titulacao,area_formacao,especialidade,lattes,rg,ativo')
+    .eq('user_id', session.user.id)
+    .single()
+
+  if (!pesq || !pesq.ativo) {
+    await db.auth.signOut()
+    window.location.replace('login-pesquisador.html?msg=sem_conta')
+    return
+  }
+  _pesquisadorConta = pesq
+  init()
+}
+
+function preencherDadosPesquisador(p) {
+  const mapa = {
+    'p-nome': p.nome_completo, 'p-cpf': p.cpf||'', 'p-rg': p.rg||'',
+    'p-email': p.email, 'p-tel': p.telefone||'', 'p-inst': p.instituicao||'',
+    'p-lattes': p.lattes||'', 'p-especialidade': p.especialidade||''
+  }
+  for (const [id, val] of Object.entries(mapa)) {
+    const el = document.getElementById(id)
+    if (el) { el.value = val; el.readOnly = true; el.style.opacity = '0.7'; el.style.cursor = 'default' }
+  }
+  const selTit = document.getElementById('p-titulacao')
+  if (selTit && p.titulacao) { selTit.value = p.titulacao; selTit.disabled = true }
+  const selArea = document.getElementById('p-area-formacao')
+  if (selArea && p.area_formacao) { selArea.value = p.area_formacao; selArea.disabled = true }
+
+  // Banner de conta vinculada
+  const banner = document.createElement('div')
+  banner.style.cssText = 'background:#EFF6FF;border:1px solid #BFDBFE;border-radius:8px;padding:10px 14px;font-size:12px;color:#1E40AF;margin-bottom:16px;display:flex;align-items:center;gap:8px'
+  banner.innerHTML = `<span>✓</span><span>Dados preenchidos automaticamente da sua <strong>conta de pesquisador</strong>. <a href="portal-pesquisador.html" style="color:#1E40AF">Voltar ao portal</a></span>`
+  const passo1 = document.getElementById('passo1')
+  const primeiroField = passo1?.querySelector('.field-group')
+  if (primeiroField) passo1.insertBefore(banner, primeiroField)
+}
+
 // ── Estado ────────────────────────────────────────────────────
 const _arquivos   = { formulario: null, proposta: null, sisbio: null, conep: null }
 let   _equipe     = []
