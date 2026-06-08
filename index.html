@@ -195,19 +195,13 @@ body{font-family:var(--ff-ui);min-height:100vh;display:flex;overflow:hidden;back
       <div class="spinner-sm" id="spinner"></div>
     </button>
 
-    <div style="margin-top:16px;padding:14px 16px;background:rgba(82,183,136,.08);border:1px solid rgba(82,183,136,.25);border-radius:10px;text-align:center">
-      <div style="font-size:11px;color:#52B788;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">🔬 Pesquisador?</div>
-      <a href="pages/pesquisa-publica.html" style="font-size:13px;font-weight:700;color:#52B788;text-decoration:none;display:block">
-        Submeta sua pesquisa nas UCs do Acre →
-      </a>
-      <div style="font-size:11px;color:#9CA3AF;margin-top:3px">Sem necessidade de cadastro no sistema</div>
-    </div>
-
-    <div style="margin-top:8px;text-align:center">
-      <a href="pages/pesquisa-status.html" style="font-size:12px;color:#9CA3AF;text-decoration:none">
-        Acompanhar pesquisa já submetida →
-      </a>
-    </div>
+    <a href="pages/login-pesquisador.html" style="margin-top:16px;display:flex;align-items:center;justify-content:space-between;padding:13px 16px;background:rgba(82,183,136,.07);border:1px solid rgba(82,183,136,.22);border-radius:10px;text-decoration:none;transition:background .2s,border-color .2s" onmouseover="this.style.background='rgba(82,183,136,.13)';this.style.borderColor='rgba(82,183,136,.36)'" onmouseout="this.style.background='rgba(82,183,136,.07)';this.style.borderColor='rgba(82,183,136,.22)'">
+      <div>
+        <div style="font-size:11px;color:#52B788;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">🔬 Pesquisador?</div>
+        <div style="font-size:12.5px;color:rgba(244,239,230,.65)">Acesse o portal para submeter e acompanhar pesquisas</div>
+      </div>
+      <div style="font-size:18px;color:#52B788;opacity:.7">→</div>
+    </a>
 
     <div class="login-footer">
       Acesso restrito a servidores e colaboradores autorizados<br>
