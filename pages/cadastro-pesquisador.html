@@ -232,20 +232,28 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 const { createClient } = supabase
 const db = createClient(SUPABASE_URL, SUPABASE_KEY)
 
+function validarCPF(cpf) {
+  cpf = cpf.replace(/\D/g, '')
+  if (cpf.length !== 11 || /^(\d)\1{10}$/.test(cpf)) return false
+  let s = 0, r
+  for (let i = 0; i < 9; i++) s += +cpf[i] * (10 - i)
+  r = (s * 10) % 11; if (r === 10 || r === 11) r = 0
+  if (r !== +cpf[9]) return false
+  s = 0
+  for (let i = 0; i < 10; i++) s += +cpf[i] * (11 - i)
+  r = (s * 10) % 11; if (r === 10 || r === 11) r = 0
+  return r === +cpf[10]
+}
+
 function mascaraCPF(el) {
   let v = el.value.replace(/\D/g,'').slice(0,11)
   if (v.length > 9)      v = v.replace(/(\d{3})(\d{3})(\d{3})(\d{0,2})/,'$1.$2.$3-$4')
   else if (v.length > 6) v = v.replace(/(\d{3})(\d{3})(\d{0,3})/,'$1.$2.$3')
   else if (v.length > 3) v = v.replace(/(\d{3})(\d{0,3})/,'$1.$2')
   el.value = v
-}
-
-function mascaraTel(el) {
-  let v = el.value.replace(/\D/g,'').slice(0,11)
-  if (v.length > 10)     v = v.replace(/(\d{2})(\d{5})(\d{4})/,'($1) $2-$3')
-  else if (v.length > 6) v = v.replace(/(\d{2})(\d{4,5})(\d{0,4})/,'($1) $2-$3')
-  else if (v.length > 2) v = v.replace(/(\d{2})(\d{0,5})/,'($1) $2')
-  el.value = v
+  const completo = v.replace(/\D/g,'').length === 11
+  el.style.borderColor = completo ? (validarCPF(v) ? '' : '#EF4444') : ''
+  el.title = completo && !validarCPF(v) ? 'CPF inválido — verifique os dígitos verificadores' : ''
 }
 
 function avaliarSenha(v) {
