@@ -309,7 +309,6 @@ async function cadastrar() {
   if (senha.length < 8) { erroMsg('A senha deve ter pelo menos 8 caracteres.'); return }
   if (senha !== senha2) { erroMsg('As senhas não coincidem.'); return }
   if (!validarCPF(cpf)) { erroMsg('CPF inválido — verifique os dígitos verificadores.'); return }
-  const tel = document.getElementById('c-tel').value.trim()
   if (tel && tel.replace(/\D/g,'').length < 7) { erroMsg('Telefone inválido — mínimo 7 dígitos.'); return }
 
   const btn = document.getElementById('btn-cad')
