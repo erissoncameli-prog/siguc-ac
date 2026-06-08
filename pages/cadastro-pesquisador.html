@@ -307,7 +307,7 @@ function avaliarSenha(v) {
 
 function erroMsg(msg) {
   const el = document.getElementById('erro-msg')
-  el.textContent = msg; el.style.display = 'block'
+  el.innerHTML = msg; el.style.display = 'block'
   el.scrollIntoView({ behavior:'smooth', block:'center' })
 }
 
