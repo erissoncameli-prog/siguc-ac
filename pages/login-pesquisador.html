@@ -334,6 +334,43 @@ async function fazerLogin() {
 document.getElementById('inp-senha').addEventListener('keydown', e => { if (e.key === 'Enter') fazerLogin() })
 document.getElementById('inp-email').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('inp-senha').focus() })
 
+function toggleRecuperacao() {
+  const painel = document.getElementById('painel-recuperacao')
+  const show = painel.style.display === 'none'
+  painel.style.display = show ? 'block' : 'none'
+  document.getElementById('btn-recuperar').textContent = show ? '← Voltar ao login' : 'Esqueceu sua senha?'
+  document.getElementById('rec-ok').style.display = 'none'
+  document.getElementById('rec-err').style.display = 'none'
+}
+
+async function enviarRecuperacao() {
+  const email = document.getElementById('rec-email').value.trim()
+  const ok  = document.getElementById('rec-ok')
+  const err = document.getElementById('rec-err')
+  ok.style.display = 'none'; err.style.display = 'none'
+
+  if (!email || !/\S+@\S+\.\S+/.test(email)) {
+    err.textContent = 'Informe um e-mail válido.'; err.style.display = 'block'; return
+  }
+
+  const btn = document.getElementById('btn-rec')
+  const sp  = document.getElementById('rec-spinner')
+  const txt = document.getElementById('rec-btn-txt')
+  btn.disabled = true; sp.style.display = 'inline-block'; txt.style.opacity = '0.6'
+
+  try {
+    await db.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin + '/pages/redefinir-senha-pesquisador.html'
+    })
+    ok.style.display = 'block'
+    document.getElementById('rec-email').value = ''
+  } catch(e) {
+    err.textContent = 'Erro ao enviar. Tente novamente.'; err.style.display = 'block'
+  } finally {
+    btn.disabled = false; sp.style.display = 'none'; txt.style.opacity = '1'
+  }
+}
+
 // Se já estiver logado como pesquisador, vai direto pro portal
 ;(async () => {
   const { data: { session } } = await db.auth.getSession()
