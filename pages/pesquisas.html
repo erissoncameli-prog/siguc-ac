@@ -910,7 +910,9 @@ async function confirmarTriagem() {
     toast('Informe o motivo / pendências', 'aviso'); return
   }
 
-  const observacao = motivo ? (motivo + (obs ? '\n' + obs : '')) : (obs || null)
+  const extras   = [motivo, obs].filter(Boolean).join('\n')
+  const observacao = _getDespacho(extras)
+  if (!observacao) return
   const { error } = await db.rpc('despachar_triagem', {
     p_pesquisa_id: _detalhe.id,
     p_resultado:   resultado,
