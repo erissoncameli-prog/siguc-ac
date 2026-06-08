@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SIGUC-AC — Área do Pesquisador</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400;1,9..144,500&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --floresta:#0A1A0F;--floresta-m:#0F2218;--verde:#1F4E2C;--verde-m:#2D6A4F;--verde-c:#52B788;
+  --ouro:#C9A84C;--ouro-c:#F0CB6A;--ouro-dim:rgba(201,168,76,.14);
+  --t1:#F4EFE6;--t2:rgba(244,239,230,.62);--t3:rgba(244,239,230,.32);--bdr:rgba(244,239,230,.10);
+  --ff-display:'Fraunces',Georgia,serif;--ff-ui:'DM Sans',system-ui,sans-serif;
+}
+html,body{height:100%}
+body{font-family:var(--ff-ui);min-height:100vh;display:flex;overflow:hidden;background:var(--floresta)}
+
+.painel-esq{flex:1;position:relative;overflow:hidden}
+.slide{position:absolute;inset:0;background-size:cover;background-position:center;opacity:0;transform:scale(1.06);transition:opacity 2.2s cubic-bezier(.4,0,.2,1),transform 14s ease-out}
+.slide.ativo{opacity:1;transform:scale(1)}
+.slide-overlay{position:absolute;inset:0;background:linear-gradient(to bottom,rgba(6,16,9,.85) 0%,rgba(6,16,9,.28) 30%,rgba(6,16,9,.20) 60%,rgba(4,12,7,.92) 100%),linear-gradient(120deg,rgba(15,42,22,.55) 0%,transparent 55%);z-index:1}
+.painel-esq-conteudo{position:relative;z-index:3;display:flex;flex-direction:column;justify-content:space-between;height:100%;padding:26px 34px}
+.logos-topo{display:flex;align-items:center;gap:10px;background:rgba(0,0,0,.28);backdrop-filter:blur(14px);border:1px solid rgba(255,255,255,.12);border-radius:100px;padding:6px 14px 6px 10px;width:fit-content}
+.logo-gov{height:clamp(22px,3vw,36px);width:auto;filter:drop-shadow(0 1px 4px rgba(0,0,0,.5))}
+.logo-sep{width:1px;height:clamp(16px,2.2vw,26px);background:rgba(255,255,255,.18)}
+.logo-sema{height:clamp(11px,1.6vw,20px);width:auto;filter:brightness(0) invert(1);opacity:.75}
+.proj-info{background:rgba(0,0,0,.42);backdrop-filter:blur(18px);border:1px solid rgba(255,255,255,.10);border-left:2px solid var(--ouro);border-radius:10px;padding:15px 20px}
+.proj-badge{font-size:9px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--ouro-c);margin-bottom:8px;display:flex;align-items:center;gap:7px}
+.proj-badge-dot{width:5px;height:5px;border-radius:50%;background:var(--ouro-c);flex-shrink:0;animation:pulso 2.5s ease-in-out infinite}
+@keyframes pulso{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.75)}}
+.proj-nome{font-family:var(--ff-display);font-size:clamp(13px,1.15vw,15.5px);font-weight:500;font-style:italic;color:#fff;line-height:1.45;margin-bottom:5px}
+.proj-sub{font-size:10px;font-weight:300;color:rgba(255,255,255,.48)}
+.slide-dots{display:flex;gap:5px;align-items:center;flex-wrap:wrap;margin-top:12px}
+.slide-dot{width:5px;height:5px;border-radius:50%;background:rgba(255,255,255,.22);transition:all .4s cubic-bezier(.4,0,.2,1);cursor:pointer;border:none;padding:0}
+.slide-dot.ativo{background:var(--ouro);width:20px;border-radius:2px}
+
+.painel-dir{width:440px;flex-shrink:0;background:linear-gradient(160deg,#122019 0%,#0A1A0F 55%,#081410 100%);display:flex;align-items:center;justify-content:center;padding:28px 20px;position:relative;overflow:hidden;border-left:1px solid rgba(201,168,76,.18)}
+@keyframes blobA{0%,100%{transform:translate(0,0) scale(1)}33%{transform:translate(-28px,18px) scale(1.08)}66%{transform:translate(14px,-24px) scale(0.94)}}
+@keyframes blobB{0%,100%{transform:translate(0,0) scale(1)}40%{transform:translate(22px,-18px) scale(1.06)}75%{transform:translate(-16px,22px) scale(0.96)}}
+.painel-dir::before{content:'';position:absolute;bottom:-80px;right:-80px;width:420px;height:420px;background:radial-gradient(ellipse at 60% 60%,rgba(45,106,79,.26) 0%,transparent 65%);pointer-events:none;z-index:0;animation:blobA 16s ease-in-out infinite}
+.painel-dir::after{content:'';position:absolute;top:-80px;left:-60px;width:340px;height:340px;background:radial-gradient(ellipse at 38% 38%,rgba(201,168,76,.10) 0%,transparent 65%);pointer-events:none;z-index:0;animation:blobB 20s ease-in-out infinite}
+
+.login-box{width:100%;max-width:360px;position:relative;z-index:1;background:rgba(244,239,230,.045);border:1px solid rgba(244,239,230,.10);border-radius:22px;padding:34px 30px 28px;backdrop-filter:blur(28px);box-shadow:0 8px 48px rgba(0,0,0,.32),inset 0 1px 0 rgba(244,239,230,.09)}
+
+.pesq-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(82,183,136,.12);border:1px solid rgba(82,183,136,.28);border-radius:20px;padding:4px 10px;font-size:9.5px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:#52B788;margin-bottom:24px}
+.pesq-badge-icon{font-size:11px}
+
+.login-titulo{font-family:var(--ff-display);font-size:clamp(24px,2.4vw,30px);font-weight:500;line-height:1.2;color:var(--t1);margin-bottom:7px}
+.login-sub{font-size:12px;font-weight:300;color:var(--t2);margin-bottom:24px}
+.erro-msg{background:rgba(239,68,68,.09);border:1px solid rgba(239,68,68,.28);color:#FCA5A5;border-radius:7px;padding:10px 13px;font-size:11.5px;margin-bottom:18px;display:none;line-height:1.5}
+.sucesso-msg{background:rgba(82,183,136,.09);border:1px solid rgba(82,183,136,.28);color:#A7F3D0;border-radius:7px;padding:10px 13px;font-size:11.5px;margin-bottom:18px;display:none;line-height:1.5}
+
+.form-group{margin-bottom:16px}
+.form-label{display:block;font-size:9.5px;font-weight:500;letter-spacing:.10em;text-transform:uppercase;color:rgba(244,239,230,.50);margin-bottom:7px}
+.form-input{width:100%;height:46px;background:rgba(255,255,255,.06);border:1.5px solid rgba(244,239,230,.13);border-radius:10px;padding:0 14px;font-size:14px;color:var(--t1);outline:none;transition:background .22s,border-color .22s,box-shadow .22s;font-family:var(--ff-ui)}
+.form-input:hover{background:rgba(255,255,255,.08);border-color:rgba(244,239,230,.22)}
+.form-input:focus{background:rgba(255,255,255,.09);border-color:rgba(82,183,136,.55);box-shadow:0 0 0 3.5px rgba(82,183,136,.15)}
+.form-input::placeholder{color:rgba(244,239,230,.28);font-size:13px}
+.form-input:-webkit-autofill{-webkit-box-shadow:0 0 0 40px #14261a inset;-webkit-text-fill-color:var(--t1);caret-color:var(--t1)}
+
+@keyframes shimmerBtn{from{left:-80%}to{left:140%}}
+.btn-entrar{width:100%;height:46px;margin-top:8px;background:linear-gradient(135deg,#52B788 0%,#2D6A4F 100%);color:#fff;border:none;border-radius:10px;font-size:13.5px;font-weight:600;letter-spacing:.04em;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 4px 22px rgba(82,183,136,.25);transition:all .22s;position:relative;overflow:hidden;font-family:var(--ff-ui)}
+.btn-entrar::after{content:'';position:absolute;top:0;left:-80%;width:50%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.25),transparent);transform:skewX(-18deg);opacity:0;transition:opacity .1s}
+.btn-entrar:hover::after{opacity:1;animation:shimmerBtn .52s ease forwards}
+.btn-entrar:hover{box-shadow:0 6px 32px rgba(82,183,136,.42);transform:translateY(-1px)}
+.btn-entrar:active{transform:translateY(0);box-shadow:none}
+.btn-entrar:disabled{opacity:.48;cursor:not-allowed;transform:none}
+
+.divider{display:flex;align-items:center;gap:10px;margin:18px 0}
+.divider-line{flex:1;height:1px;background:rgba(244,239,230,.10)}
+.divider-txt{font-size:10px;color:rgba(244,239,230,.30);letter-spacing:.06em}
+
+.link-cadastro{display:block;text-align:center;padding:11px;background:rgba(82,183,136,.07);border:1px solid rgba(82,183,136,.18);border-radius:10px;font-size:13px;font-weight:500;color:#52B788;text-decoration:none;transition:all .2s}
+.link-cadastro:hover{background:rgba(82,183,136,.13);border-color:rgba(82,183,136,.30)}
+.link-cadastro span{font-size:10px;font-weight:300;color:rgba(82,183,136,.7);display:block;margin-top:2px}
+
+.link-voltar{display:block;text-align:center;margin-top:20px;font-size:11px;color:var(--t3);text-decoration:none;transition:color .2s}
+.link-voltar:hover{color:var(--t2)}
+
+@keyframes spin{to{transform:rotate(360deg)}}
+.spinner-sm{width:15px;height:15px;border:2px solid rgba(255,255,255,.25);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite;display:none}
+
+@keyframes fadeUp{from{opacity:0;transform:translateY(13px)}to{opacity:1;transform:translateY(0)}}
+.pesq-badge{animation:fadeUp .5s .06s ease both}
+.login-titulo{animation:fadeUp .5s .14s ease both}
+.login-sub{animation:fadeUp .5s .20s ease both}
+.form-group:nth-of-type(1){animation:fadeUp .5s .28s ease both}
+.form-group:nth-of-type(2){animation:fadeUp .5s .34s ease both}
+.btn-entrar{animation:fadeUp .5s .42s ease both}
+.divider{animation:fadeUp .5s .48s ease both}
+.link-cadastro{animation:fadeUp .5s .52s ease both}
+.link-voltar{animation:fadeUp .5s .58s ease both}
+
+@media(max-width:900px){
+  body{flex-direction:column;overflow:auto;background:#1F4E2C}
+  html,body{height:auto}
+  .painel-esq{height:260px;min-height:260px;max-height:260px;flex:none}
+  .painel-esq-conteudo{padding:46px 22px 22px;justify-content:flex-end}
+  .proj-info{background:transparent !important;backdrop-filter:none !important;border:none !important;border-left:none !important;padding:0 !important;text-align:center}
+  .proj-badge{justify-content:center}
+  .proj-nome{text-align:center;font-size:14px}
+  .proj-sub{text-align:center}
+  .slide-dots{justify-content:center}
+  .painel-dir{width:100%;min-height:calc(100vh - 260px);background:#fff !important;border-radius:28px 28px 0 0;border-left:none !important;padding:0;margin-top:-28px;position:relative;z-index:1}
+  .painel-dir::before,.painel-dir::after{display:none}
+  .login-box::before{content:'';display:block;width:36px;height:4px;border-radius:2px;background:#E5E7EB;margin:0 auto 22px}
+  .login-box{max-width:none;width:100%;padding:18px 26px 44px;background:transparent;border:none;border-radius:0;box-shadow:none;backdrop-filter:none}
+  .login-titulo{color:#0A1A0F}
+  .login-sub{color:#9CA3AF}
+  .form-label{color:#9CA3AF}
+  .form-input{color:#111827;background:rgba(0,0,0,.035);border:1.5px solid #E5E7EB}
+  .form-input:focus{background:#fff;border-color:#52B788;box-shadow:0 0 0 3.5px rgba(82,183,136,.14)}
+  .link-voltar{color:#9CA3AF}
+  .divider-line{background:rgba(0,0,0,.08)}
+  .divider-txt{color:#9CA3AF}
+}
+</style>
+</head>
+<body>
+
+<div class="painel-esq">
+  <div class="slide ativo" id="slide-0" style="background-image:url('../assets/foto1.jpg')"></div>
+  <div class="slide"       id="slide-1" style="background-image:url('../assets/foto2.jpg')"></div>
+  <div class="slide"       id="slide-2" style="background-image:url('../assets/foto3.jpg')"></div>
+  <div class="slide"       id="slide-3" style="background-image:url('../assets/foto4.jpg')"></div>
+  <div class="slide"       id="slide-4" style="background-image:url('../assets/foto5.jpg')"></div>
+  <div class="slide-overlay"></div>
+  <div class="painel-esq-conteudo">
+    <div>
+      <div class="logos-topo">
+        <img class="logo-gov" src="../assets/brasao-acre.png" alt="Governo do Acre" onerror="this.style.display='none'">
+        <div class="logo-sep"></div>
+        <img class="logo-sema" src="../assets/logo-sema.png" alt="SEMA/AC" onerror="this.style.display='none'">
+      </div>
+    </div>
+    <div>
+      <div class="proj-info">
+        <div class="proj-badge"><div class="proj-badge-dot"></div>SEMA/AC · Pesquisa Científica em UCs</div>
+        <div class="proj-nome">Portal de Acompanhamento de Pesquisas Científicas nas Unidades de Conservação do Acre</div>
+        <div class="proj-sub">Gerencie suas pesquisas, acompanhe etapas e acesse documentos</div>
+        <div class="slide-dots" id="slide-dots"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="painel-dir">
+  <div class="login-box">
+    <div class="pesq-badge"><span class="pesq-badge-icon">🔬</span> Área do Pesquisador</div>
+
+    <div class="login-titulo">Acesse seu painel</div>
+    <div class="login-sub">Acompanhe o andamento das suas pesquisas nas UCs do Acre</div>
+
+    <div class="erro-msg"   id="erro-msg"></div>
+    <div class="sucesso-msg" id="sucesso-msg"></div>
+
+    <div class="form-group">
+      <label class="form-label">E-mail</label>
+      <input class="form-input" type="email" id="inp-email" autocomplete="email" placeholder="seu@email.com">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Senha</label>
+      <input class="form-input" type="password" id="inp-senha" autocomplete="current-password">
+    </div>
+
+    <button class="btn-entrar" id="btn-entrar" onclick="fazerLogin()">
+      <span id="btn-texto">Entrar no portal</span>
+      <div class="spinner-sm" id="spinner"></div>
+    </button>
+
+    <div class="divider">
+      <div class="divider-line"></div>
+      <div class="divider-txt">ou</div>
+      <div class="divider-line"></div>
+    </div>
+
+    <a href="cadastro-pesquisador.html" class="link-cadastro">
+      Primeiro acesso? Cadastre-se aqui
+      <span>Crie sua conta para submeter e acompanhar pesquisas</span>
+    </a>
+
+    <a href="../index.html" class="link-voltar">← Voltar ao sistema SIGUC-AC</a>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const SUPABASE_URL = 'https://atqtybcsvepdabsvgaly.supabase.co'
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF0cXR5YmNzdmVwZGFic3ZnYWx5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0MjMzNzgsImV4cCI6MjA5NTk5OTM3OH0.hWx1AB2rK7xdco1Dgagm0XUOBPQbxZVE614SW4SKoLk'
+const { createClient } = supabase
+const db = createClient(SUPABASE_URL, SUPABASE_KEY)
+
+// Slideshow
+let total = 5, atual = 0, timer
+const dotsEl = document.getElementById('slide-dots')
+for (let i = 0; i < total; i++) {
+  const btn = document.createElement('button')
+  btn.className = 'slide-dot' + (i === 0 ? ' ativo' : '')
+  btn.onclick = () => { clearInterval(timer); irParaSlide(i); iniciarTimer() }
+  dotsEl.appendChild(btn)
+}
+function irParaSlide(n) {
+  document.getElementById('slide-' + atual).classList.remove('ativo')
+  document.querySelectorAll('.slide-dot')[atual].classList.remove('ativo')
+  atual = (n + total) % total
+  document.getElementById('slide-' + atual).classList.add('ativo')
+  document.querySelectorAll('.slide-dot')[atual].classList.add('ativo')
+}
+function iniciarTimer() { timer = setInterval(() => irParaSlide(atual + 1), 6000) }
+iniciarTimer()
+
+// Mensagem pós-cadastro ou pós-confirmação
+const params = new URLSearchParams(window.location.search)
+if (params.get('cadastro') === 'ok') {
+  document.getElementById('sucesso-msg').textContent = 'Conta criada! Verifique seu e-mail para confirmar antes de entrar.'
+  document.getElementById('sucesso-msg').style.display = 'block'
+}
+if (params.get('msg') === 'sem_conta') {
+  document.getElementById('erro-msg').textContent = 'Conta não encontrada. Cadastre-se para acessar o portal.'
+  document.getElementById('erro-msg').style.display = 'block'
+}
+
+async function criarPerfilSeNecessario(user) {
+  const { data: pesq } = await db.from('pesquisadores')
+    .select('id,ativo')
+    .eq('user_id', user.id)
+    .single()
+
+  if (pesq) return pesq
+
+  // Tenta criar a partir de user_metadata (preenchido no cadastro)
+  const meta = user.user_metadata || {}
+  if (!meta.nome_completo) return null
+
+  const { data: novo, error } = await db.from('pesquisadores').insert({
+    user_id:       user.id,
+    nome_completo: meta.nome_completo,
+    cpf:           meta.cpf       || null,
+    email:         user.email,
+    telefone:      meta.telefone  || null,
+    instituicao:   meta.instituicao || null,
+    titulacao:     meta.titulacao || null,
+    area_formacao: meta.area_formacao || null,
+    especialidade: meta.especialidade || null,
+    lattes:        meta.lattes    || null,
+    rg:            meta.rg        || null
+  }).select('id,ativo').single()
+
+  if (error) return null
+  return novo
+}
+
+async function fazerLogin() {
+  const email = document.getElementById('inp-email').value.trim()
+  const senha = document.getElementById('inp-senha').value
+  const erroEl   = document.getElementById('erro-msg')
+  const btn      = document.getElementById('btn-entrar')
+  const spinner  = document.getElementById('spinner')
+  const btnTexto = document.getElementById('btn-texto')
+
+  if (!email || !senha) { erroEl.textContent = 'Preencha e-mail e senha.'; erroEl.style.display = 'block'; return }
+  erroEl.style.display = 'none'
+  btn.disabled = true; spinner.style.display = 'inline-block'; btnTexto.style.opacity = '0.6'
+
+  try {
+    const { data, error } = await db.auth.signInWithPassword({ email, password: senha })
+    if (error) {
+      let msg = 'E-mail ou senha incorretos.'
+      if (error.message?.includes('Email not confirmed')) msg = 'E-mail não confirmado. Verifique sua caixa de entrada.'
+      if (error.message?.includes('Too many requests'))   msg = 'Muitas tentativas. Aguarde alguns minutos.'
+      erroEl.textContent = msg; erroEl.style.display = 'block'; return
+    }
+
+    const pesq = await criarPerfilSeNecessario(data.user)
+    if (!pesq) {
+      await db.auth.signOut()
+      erroEl.textContent = 'Cadastro incompleto. Conclua seu cadastro para acessar o portal.'
+      erroEl.style.display = 'block'; return
+    }
+    if (!pesq.ativo) {
+      await db.auth.signOut()
+      erroEl.textContent = 'Conta inativa. Entre em contato com o DEUC/SEMA-AC.'
+      erroEl.style.display = 'block'; return
+    }
+
+    // Vincula submissões públicas antigas pelo e-mail, se houver
+    await db.rpc('vincular_pesquisas_por_email').catch(() => {})
+
+    window.location.replace('portal-pesquisador.html')
+  } catch (e) {
+    erroEl.textContent = 'Erro ao conectar. Tente novamente.'
+    erroEl.style.display = 'block'
+  } finally {
+    btn.disabled = false; spinner.style.display = 'none'; btnTexto.style.opacity = '1'
+  }
+}
+
+document.getElementById('inp-senha').addEventListener('keydown', e => { if (e.key === 'Enter') fazerLogin() })
+document.getElementById('inp-email').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('inp-senha').focus() })
+
+// Se já estiver logado como pesquisador, vai direto pro portal
+;(async () => {
+  const { data: { session } } = await db.auth.getSession()
+  if (!session) return
+  const { data: pesq } = await db.from('pesquisadores').select('id,ativo').eq('user_id', session.user.id).single()
+  if (pesq?.ativo) window.location.replace('portal-pesquisador.html')
+})()
+</script>
+</body>
+</html>
