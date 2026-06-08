@@ -538,12 +538,20 @@ body {
 .field-row   { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .field-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
 
+@media (max-width: 768px) {
+  .gov-logo-sema { display: none; }
+  .gov-logos-divider { display: none; }
+  .gov-logo-ac { height: 28px; }
+}
+
 @media (max-width: 600px) {
   .field-row, .field-row-3 { grid-template-columns: 1fr; }
   .passo-card, .passo0-card { padding: 20px 18px; }
   .pub-hero h1 { font-size: 26px; }
-  .pub-header { padding: 14px 20px; }
+  .pub-header { padding: 14px 16px; gap: 10px; }
   .doc-chips { gap: 6px; }
+  .gov-logos { display: none; }
+  .logo-wrap { margin-left: 0; }
 }
 
 .field { display: flex; flex-direction: column; gap: 6px; }
