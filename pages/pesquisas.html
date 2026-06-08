@@ -447,15 +447,19 @@ async function verDetalhe(id) {
   _detalhe = _pesquisas.find(p => p.id === id)
   if (!_detalhe) return
 
-  const [{ data: hist }, { data: docs }] = await Promise.all([
+  const [{ data: hist }, { data: docs }, { data: equipe }] = await Promise.all([
     db.from('pesquisa_historico')
       .select('*, usuario:usuarios(nome_completo)')
       .eq('pesquisa_id', id).order('criado_em'),
     db.from('pesquisa_documentos')
       .select('*')
+      .eq('pesquisa_id', id).order('criado_em'),
+    db.from('pesquisa_equipe')
+      .select('*')
       .eq('pesquisa_id', id).order('criado_em')
   ])
-  _docs = docs || []
+  _docs   = docs   || []
+  _equipe = equipe || []
 
   const etapaIdx = ETAPAS.findIndex(e => e.id === _detalhe.etapa)
 
