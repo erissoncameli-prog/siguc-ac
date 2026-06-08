@@ -1069,11 +1069,13 @@ async function confirmarParecerDima() {
   const pendencias  = document.getElementById('dima-pendencias')?.value.trim()
   const obs         = document.getElementById('dima-obs')?.value.trim()
   if (resultado === 'diligencia' && !pendencias) { toast('Informe as pendências da diligência', 'aviso'); return }
-  const observacao  = (pendencias ? pendencias + '\n' : '') + (obs || '')
+  const extras      = [pendencias, obs].filter(Boolean).join('\n')
+  const observacao  = _getDespacho(extras)
+  if (!observacao) return
   const { error } = await db.rpc('despachar_parecer_dima', {
     p_pesquisa_id: _detalhe.id,
     p_encaminhar:  resultado === 'encaminhar',
-    p_observacao:  observacao.trim() || null
+    p_observacao:  observacao
   })
   if (error) { toast('Erro: ' + error.message, 'erro'); return }
   toast(resultado === 'encaminhar' ? 'Encaminhado ao Secretário de Estado' : 'Diligência registrada — devolvido para análise técnica', 'sucesso')
