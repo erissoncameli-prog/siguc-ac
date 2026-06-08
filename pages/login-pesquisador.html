@@ -184,6 +184,22 @@ body{font-family:var(--ff-ui);min-height:100vh;display:flex;overflow:hidden;back
     </a>
 
     <a href="../index.html" class="link-voltar">← Voltar ao sistema SIGUC-AC</a>
+
+    <button class="link-recuperar" id="btn-recuperar" onclick="toggleRecuperacao()">Esqueceu sua senha?</button>
+
+    <div class="rec-panel" id="painel-recuperacao" style="display:none">
+      <div class="rec-panel-desc">Informe seu e-mail para receber o link de redefinição de senha.</div>
+      <div class="form-group" style="margin-bottom:12px">
+        <label class="form-label">E-mail cadastrado</label>
+        <input class="form-input" type="email" id="rec-email" placeholder="seu@email.com" style="height:42px">
+      </div>
+      <button class="btn-entrar" id="btn-rec" onclick="enviarRecuperacao()" style="height:42px;margin-top:0">
+        <span id="rec-btn-txt">Enviar link de redefinição</span>
+        <div class="spinner-sm" id="rec-spinner"></div>
+      </button>
+      <div class="rec-ok" id="rec-ok">Se este e-mail estiver cadastrado, você receberá o link em instantes.<br>Verifique também a pasta de spam.</div>
+      <div class="rec-err" id="rec-err"></div>
+    </div>
   </div>
 </div>
 
