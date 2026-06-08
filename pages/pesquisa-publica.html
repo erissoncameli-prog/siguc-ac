@@ -769,10 +769,18 @@ const { createClient } = supabase
 const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
 
 // ── Estado ────────────────────────────────────────────────────
-const _arquivos  = { formulario: null, proposta: null, sisbio: null, conep: null }
-let   _equipe    = []   // array de objetos {nome_completo, cpf, rg, ...}
+const _arquivos   = { formulario: null, proposta: null, sisbio: null, conep: null }
+let   _equipe     = []   // array de objetos {nome_completo, cpf, rg, ...}
 let   _passoAtual = 1
 let   _ucs        = []
+
+// Segurança
+let   _formInicio  = Date.now()     // timestamp de abertura da página (timer anti-bot)
+let   _aceiteInEm  = null           // quando o pesquisador aceitou a IN
+let   _inScrollado = false          // se rolou até o final do texto da IN
+let   _captchaA    = 0              // primeiro operando
+let   _captchaB    = 0              // segundo operando
+let   _captchaResp = 0              // resposta correta
 
 const FUNCAO_LABEL = {
   co_orientador:           'Co-orientador(a)',
