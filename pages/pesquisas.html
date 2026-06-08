@@ -376,6 +376,129 @@ async function comBotao(btn, fn) {
   }
 }
 
+// ══════════════════════════════════════════════════════════════
+// CONFIRMAÇÃO COM SENHA — obrigatória em todos os despachos
+// ══════════════════════════════════════════════════════════════
+
+let _despachoCallbackPendente = null
+
+// Substitui comBotao para todos os botões de despacho.
+// Abre overlay com campo de despacho + senha antes de executar fn().
+function pedirSenhaEDespachar(btn, fn) {
+  _despachoCallbackPendente = { btn, fn }
+  document.getElementById('modal-senha-despacho')?.remove()
+
+  document.body.insertAdjacentHTML('beforeend', `
+<div class="modal-bg modal-senha-overlay" id="modal-senha-despacho">
+<div class="modal-box modal-senha-box" onclick="event.stopPropagation()">
+  <div class="modal-senha-header">
+    <h3>🔐 Confirmar Despacho Oficial</h3>
+    <button onclick="document.getElementById('modal-senha-despacho').remove()">✕</button>
+  </div>
+  <div class="modal-body">
+    <div class="despacho-alerta">
+      ⚠️ Esta ação movimenta o processo oficial e é <strong>irreversível</strong>.
+      O despacho será registrado no histórico com data, hora e sua identidade.
+    </div>
+
+    <div style="margin-bottom:14px">
+      <label class="field-label">Despacho / Justificativa oficial <span style="color:#DC2626">✱</span></label>
+      <textarea class="field-input" id="ds-texto" rows="4"
+        placeholder="Descreva a justificativa ou fundamentação deste despacho…"
+        style="border-color:#FCA5A5"></textarea>
+      <div style="font-size:11px;color:#9CA3AF;margin-top:3px">
+        Mínimo 10 caracteres · Registrado no histórico do processo
+      </div>
+    </div>
+
+    <div>
+      <label class="field-label">Confirme sua senha de acesso <span style="color:#DC2626">✱</span></label>
+      <input class="field-input" type="password" id="ds-senha"
+        placeholder="Sua senha do SIGUC-AC…"
+        autocomplete="current-password"
+        onkeydown="if(event.key==='Enter')_confirmarDespacho()">
+    </div>
+
+    <div class="despacho-erro-box" id="ds-erro"></div>
+  </div>
+  <div class="modal-footer">
+    <button class="btn-acao" onclick="document.getElementById('modal-senha-despacho').remove()">Cancelar</button>
+    <button class="btn-acao primary" id="ds-btn-ok" onclick="_confirmarDespacho()">🔐 Confirmar e Despachar</button>
+  </div>
+</div>
+</div>`)
+
+  setTimeout(() => document.getElementById('ds-texto')?.focus(), 80)
+}
+
+async function _confirmarDespacho() {
+  const texto = document.getElementById('ds-texto')?.value.trim()
+  const senha = document.getElementById('ds-senha')?.value
+  const erroEl = document.getElementById('ds-erro')
+  const btn    = document.getElementById('ds-btn-ok')
+
+  const _mostrarErro = (msg) => {
+    erroEl.textContent = msg
+    erroEl.style.display = ''
+  }
+
+  erroEl.style.display = 'none'
+
+  if (!texto || texto.length < 10) {
+    _mostrarErro('O texto do despacho deve ter no mínimo 10 caracteres.')
+    document.getElementById('ds-texto')?.focus()
+    return
+  }
+  if (!senha) {
+    _mostrarErro('Informe sua senha para confirmar o despacho.')
+    document.getElementById('ds-senha')?.focus()
+    return
+  }
+
+  btn.disabled = true
+  btn.innerHTML = '⏳ Verificando…'
+
+  try {
+    const email = appState.usuario?.email
+    if (!email) throw new Error('Sessão expirada. Faça login novamente.')
+
+    const { error: authErr } = await db.auth.signInWithPassword({ email, password: senha })
+    if (authErr) throw new Error('Senha incorreta. Verifique e tente novamente.')
+
+    // Disponibiliza o texto para as funções confirmarXxx()
+    window._despachoTextoFinal = texto
+
+    // Fecha o overlay e executa a ação
+    document.getElementById('modal-senha-despacho').remove()
+
+    if (_despachoCallbackPendente) {
+      const { fn } = _despachoCallbackPendente
+      _despachoCallbackPendente = null
+      await fn()
+    }
+  } catch (err) {
+    _mostrarErro(err.message)
+    btn.disabled = false
+    btn.innerHTML = '🔐 Confirmar e Despachar'
+    if (document.getElementById('ds-senha')) {
+      document.getElementById('ds-senha').value = ''
+      document.getElementById('ds-senha').focus()
+    }
+  }
+}
+
+// Helper chamado por cada confirmarXxx(): obtém e limpa o despacho final.
+// Retorna null se não houver despacho pendente (segurança extra).
+function _getDespacho(textoComplementar = '') {
+  const t = window._despachoTextoFinal || ''
+  window._despachoTextoFinal = null
+  if (!t) {
+    toast('Despacho não confirmado. Use o botão "Confirmar e Despachar".', 'erro')
+    return null
+  }
+  return textoComplementar ? t + '\n' + textoComplementar : t
+}
+
 function renderPipeline() {
   const contagem = {}
   ETAPAS.forEach(e => { contagem[e.id] = _pesquisas.filter(p => p.etapa === e.id).length })
