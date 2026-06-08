@@ -1889,7 +1889,7 @@ function copiarInstituicao() {
   if (inst) document.getElementById('m-inst').value = inst
 }
 
-function adicionarMembro() {
+async function adicionarMembro() {
   const nome   = document.getElementById('m-nome').value.trim()
   const cpf    = document.getElementById('m-cpf').value.trim()
   const email  = document.getElementById('m-email').value.trim()
@@ -1905,8 +1905,20 @@ function adicionarMembro() {
   if (!/\S+@\S+\.\S+/.test(email)) { toastPub('E-mail do membro inválido', true); return }
 
   if (_equipe.some(m => m.cpf === cpf)) {
-    toastPub('Este CPF já foi adicionado à equipe', true); return
+    toastPub('Este CPF já foi adicionado à equipe desta pesquisa', true); return
   }
+
+  // Checar se CPF já existe como pesquisador cadastrado (informativo, não bloqueia)
+  try {
+    const { data: dup } = await db.rpc('verificar_pesquisador_duplicado', {
+      p_email: email,
+      p_cpf: cpf.replace(/\D/g, '')
+    })
+    if (dup?.existe) {
+      const quem = dup.nome ? ` (${dup.nome})` : ''
+      toastPub(`ℹ️ Este pesquisador${quem} já possui conta no SIGUC-AC e será vinculado automaticamente`, false, 5000)
+    }
+  } catch(e) {}
 
   _equipe.push({
     nome_completo:   nome,
