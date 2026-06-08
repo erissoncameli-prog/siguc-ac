@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SIGUC-AC — Meu Perfil</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --floresta:#0A1A0F;--verde:#1F4E2C;--verde-m:#2D6A4F;--verde-c:#52B788;
+  --ouro:#C9A84C;--ouro-c:#F0CB6A;
+  --bg:#F7F4EE;--card:#FFFFFF;--borda:#E0D8CC;
+  --texto:#1A120A;--texto-m:#5A4A3A;--texto-s:#9A8C7A;
+  --ff-display:'Fraunces',Georgia,serif;--ff-ui:'DM Sans',system-ui,sans-serif;
+}
+body{font-family:var(--ff-ui);min-height:100vh;background:var(--bg);color:var(--texto)}
+
+/* ── Header institucional ── */
+.pub-header{background:var(--floresta);background-image:repeating-linear-gradient(60deg,transparent,transparent 20px,rgba(82,183,136,.02) 20px,rgba(82,183,136,.02) 21px),repeating-linear-gradient(120deg,transparent,transparent 20px,rgba(82,183,136,.02) 20px,rgba(82,183,136,.02) 21px);padding:13px 32px;display:flex;align-items:center;gap:16px;position:sticky;top:0;z-index:10;position:relative}
+.pub-header::after{content:'';position:absolute;bottom:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(201,168,76,.30) 25%,rgba(201,168,76,.30) 75%,transparent)}
+.gov-logos{display:flex;align-items:center;gap:12px;flex-shrink:0}
+.gov-logo-ac{height:32px;width:auto}
+.gov-logo-sema{height:36px;width:auto;filter:brightness(0) invert(1);opacity:.80}
+.gov-logos-divider{width:1px;height:28px;background:rgba(255,255,255,.16)}
+.pub-header-divider{width:1px;height:34px;background:rgba(255,255,255,.10);flex-shrink:0;margin:0 4px}
+.pub-header-info{flex:1}
+.pub-titulo{font-size:12.5px;font-weight:600;color:rgba(244,239,230,.88);letter-spacing:.02em}
+.pub-sub{font-size:10px;color:rgba(244,239,230,.45);margin-top:2px}
+.header-link{font-size:11px;color:rgba(244,239,230,.55);text-decoration:none;transition:color .2s;white-space:nowrap;flex-shrink:0}
+.header-link:hover{color:rgba(244,239,230,.92)}
+
+/* ── Layout ── */
+.main{max-width:700px;margin:0 auto;padding:32px 20px 60px}
+.page-titulo{font-family:var(--ff-display);font-size:clamp(20px,2.2vw,26px);font-weight:500;color:var(--texto);margin-bottom:4px}
+.page-sub{font-size:13px;color:var(--texto-m);margin-bottom:28px}
+
+/* ── Cards ── */
+.card{background:var(--card);border:1px solid var(--borda);border-radius:14px;padding:24px;margin-bottom:20px;box-shadow:0 1px 4px rgba(10,26,15,.05)}
+.card-titulo{font-size:10px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--verde-m);margin-bottom:18px;display:flex;align-items:center;gap:8px}
+.card-titulo-num{width:18px;height:18px;border-radius:50%;background:rgba(45,106,79,.12);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:var(--verde-m);flex-shrink:0}
+
+/* ── Grid ── */
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.grid-3{display:grid;grid-template-columns:120px 1fr 120px;gap:14px}
+.grid-1{display:grid;grid-template-columns:1fr;gap:14px}
+@media(max-width:560px){.grid-2,.grid-3{grid-template-columns:1fr}}
+
+/* ── Form ── */
+.form-group{display:flex;flex-direction:column}
+.form-label{font-size:9.5px;font-weight:500;letter-spacing:.10em;text-transform:uppercase;color:var(--texto-s);margin-bottom:7px}
+.form-label .req{color:var(--verde-c);margin-left:2px}
+.form-input,.form-select{width:100%;height:44px;background:#fff;border:1.5px solid var(--borda);border-radius:9px;padding:0 12px;font-size:13.5px;color:var(--texto);outline:none;transition:border-color .2s,box-shadow .2s;font-family:var(--ff-ui);-webkit-appearance:none}
+.form-input:hover:not([readonly]),.form-select:hover{border-color:#C4BDB5}
+.form-input:focus:not([readonly]),.form-select:focus{border-color:var(--verde-c);box-shadow:0 0 0 3px rgba(82,183,136,.12)}
+.form-input[readonly]{background:#F7F4EE;color:var(--texto-m);cursor:default;border-color:#E8E0D0}
+.form-input::placeholder{color:#C0B8B0;font-size:13px}
+.form-input:-webkit-autofill{-webkit-box-shadow:0 0 0 40px #fff inset;-webkit-text-fill-color:var(--texto)}
+.form-select option{background:#fff;color:var(--texto)}
+.form-hint{font-size:10.5px;color:var(--texto-s);margin-top:5px}
+.readonly-badge{font-size:9px;background:#E8E0D0;color:var(--texto-s);padding:1px 6px;border-radius:10px;margin-left:6px;font-weight:500;letter-spacing:.04em;text-transform:none}
+
+/* ── CEP row ── */
+.cep-row{display:grid;grid-template-columns:150px 1fr;gap:14px;align-items:start}
+@media(max-width:480px){.cep-row{grid-template-columns:1fr}}
+.btn-cep{height:44px;padding:0 16px;background:rgba(45,106,79,.10);border:1.5px solid rgba(45,106,79,.22);border-radius:9px;font-size:12px;font-weight:600;color:var(--verde-m);cursor:pointer;transition:all .2s;font-family:var(--ff-ui);white-space:nowrap}
+.btn-cep:hover{background:rgba(45,106,79,.16)}
+.btn-cep:disabled{opacity:.5;cursor:not-allowed}
+
+/* ── Msgs ── */
+.msg-erro{background:#FEF2F2;border:1px solid #FECACA;color:#991B1B;border-radius:8px;padding:11px 14px;font-size:12px;margin-bottom:18px;display:none;line-height:1.5}
+.msg-ok{background:#F0FDF4;border:1px solid #BBF7D0;color:#166534;border-radius:8px;padding:11px 14px;font-size:12px;margin-bottom:18px;display:none;line-height:1.5}
+
+/* ── Botão salvar ── */
+.btn-salvar{width:100%;height:48px;background:linear-gradient(135deg,var(--verde-c) 0%,var(--verde-m) 100%);color:#fff;border:none;border-radius:11px;font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 4px 20px rgba(82,183,136,.20);transition:all .22s;font-family:var(--ff-ui);margin-top:8px}
+.btn-salvar:hover{box-shadow:0 6px 28px rgba(82,183,136,.34);transform:translateY(-1px)}
+.btn-salvar:disabled{opacity:.48;cursor:not-allowed;transform:none}
+@keyframes spin{to{transform:rotate(360deg)}}
+.spinner-sm{width:15px;height:15px;border:2px solid rgba(255,255,255,.25);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite;display:none}
+
+/* ── Avatar section ── */
+.avatar-row{display:flex;align-items:center;gap:20px;padding:20px 0 20px;border-bottom:1px solid var(--borda);margin-bottom:20px}
+.avatar-grande{width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,rgba(45,106,79,.15),rgba(82,183,136,.20));border:2px solid rgba(82,183,136,.30);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;color:var(--verde-m);flex-shrink:0;font-family:var(--ff-display)}
+.avatar-info .nome{font-family:var(--ff-display);font-size:18px;font-weight:500;color:var(--texto)}
+.avatar-info .email{font-size:12px;color:var(--texto-s);margin-top:3px}
+.avatar-info .inst{font-size:12px;color:var(--texto-m);margin-top:2px}
+
+/* ── Loading ── */
+.loading-page{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:50;flex-direction:column;gap:12px}
+.loading-spinner{width:26px;height:26px;border:2.5px solid #E0D8CC;border-top-color:var(--verde-c);border-radius:50%;animation:spin .7s linear infinite}
+.loading-txt{font-size:12px;color:var(--texto-s);font-style:italic;font-family:var(--ff-display)}
+
+@media(max-width:600px){.pub-header{padding:12px 16px;gap:10px}.pub-sub{display:none}}
+</style>
+</head>
+<body>
+
+<!-- Loading -->
+<div class="loading-page" id="loading">
+  <div class="loading-spinner"></div>
+  <div class="loading-txt">Carregando perfil…</div>
+</div>
+
+<header class="pub-header">
+  <div class="gov-logos" id="gov-logos-wrap" style="display:none">
+    <img class="gov-logo-ac" id="logo-gov" src="" alt="Governo do Acre" style="display:none">
+    <div class="gov-logos-divider" id="gov-logos-div" style="display:none"></div>
+    <img class="gov-logo-sema" id="logo-sema" src="" alt="SEMA/AC" style="display:none">
+  </div>
+  <div class="pub-header-divider"></div>
+  <div class="pub-header-info">
+    <div class="pub-titulo">Meu Perfil</div>
+    <div class="pub-sub">Portal de Pesquisa Científica em UCs · SEMA/AC</div>
+  </div>
+  <a href="portal-pesquisador.html" class="header-link">← Voltar ao portal</a>
+</header>
+
+<div class="main">
+
+  <div class="msg-erro" id="msg-erro"></div>
+  <div class="msg-ok"   id="msg-ok">Perfil atualizado com sucesso!</div>
+
+  <!-- Avatar / cabeçalho do perfil -->
+  <div class="avatar-row">
+    <div class="avatar-grande" id="avatar-ini">?</div>
+    <div class="avatar-info">
+      <div class="nome" id="p-nome-display">Carregando…</div>
+      <div class="email" id="p-email-display"></div>
+      <div class="inst" id="p-inst-display"></div>
+    </div>
+  </div>
+
+  <!-- 1. Dados de acesso -->
+  <div class="card">
+    <div class="card-titulo">
+      <div class="card-titulo-num">1</div>
+      Dados de acesso
+      <span class="readonly-badge">somente leitura</span>
+    </div>
+    <div class="grid-2">
+      <div class="form-group">
+        <label class="form-label">E-mail</label>
+        <input class="form-input" type="email" id="p-email" readonly tabindex="-1">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Membro desde</label>
+        <input class="form-input" type="text" id="p-criado" readonly tabindex="-1">
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. Identificação -->
+  <div class="card">
+    <div class="card-titulo"><div class="card-titulo-num">2</div>Identificação pessoal</div>
+    <div class="grid-1">
+      <div class="form-group">
+        <label class="form-label">Nome completo<span class="req">*</span></label>
+        <input class="form-input" type="text" id="p-nome" placeholder="Seu nome completo">
+      </div>
+      <div class="grid-2">
+        <div class="form-group">
+          <label class="form-label">CPF <span class="readonly-badge">somente leitura</span></label>
+          <input class="form-input" type="text" id="p-cpf" readonly tabindex="-1">
+        </div>
+        <div class="form-group">
+          <label class="form-label">RG</label>
+          <input class="form-input" type="text" id="p-rg" placeholder="Número do RG">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Telefone / WhatsApp</label>
+        <input class="form-input" type="tel" id="p-tel" placeholder="+55 11 99999-9999 ou formato internacional">
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. Formação -->
+  <div class="card">
+    <div class="card-titulo"><div class="card-titulo-num">3</div>Formação e vínculo institucional</div>
+    <div class="grid-1">
+      <div class="form-group">
+        <label class="form-label">Instituição<span class="req">*</span></label>
+        <input class="form-input" type="text" id="p-inst" placeholder="Universidade, órgão ou empresa">
+      </div>
+      <div class="grid-2">
+        <div class="form-group">
+          <label class="form-label">Titulação<span class="req">*</span></label>
+          <select class="form-select" id="p-tit">
+            <option value="">Selecione</option>
+            <option value="graduado">Graduado</option>
+            <option value="especialista">Especialista</option>
+            <option value="mestre">Mestre</option>
+            <option value="doutor">Doutor</option>
+            <option value="pos_doutor">Pós-Doutor</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Grande área (CNPq)</label>
+          <select class="form-select" id="p-area">
+            <option value="">Selecione</option>
+            <option value="ciencias_agrarias">Ciências Agrárias</option>
+            <option value="ciencias_biologicas">Ciências Biológicas</option>
+            <option value="ciencias_da_saude">Ciências da Saúde</option>
+            <option value="ciencias_exatas">Ciências Exatas e da Terra</option>
+            <option value="ciencias_humanas">Ciências Humanas</option>
+            <option value="ciencias_sociais">Ciências Sociais Aplicadas</option>
+            <option value="engenharias">Engenharias</option>
+            <option value="linguistica">Linguística, Letras e Artes</option>
+            <option value="multidisciplinar">Multidisciplinar</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Especialidade / Subárea</label>
+        <input class="form-input" type="text" id="p-esp" placeholder="Ex: Ecologia de mamíferos, Botânica tropical">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Currículo Lattes (URL)</label>
+        <input class="form-input" type="url" id="p-lattes" placeholder="http://lattes.cnpq.br/...">
+      </div>
+    </div>
+  </div>
+
+  <!-- 4. Endereço -->
+  <div class="card">
+    <div class="card-titulo"><div class="card-titulo-num">4</div>Endereço</div>
+    <div class="grid-1">
+      <div class="cep-row">
+        <div class="form-group">
+          <label class="form-label">CEP</label>
+          <input class="form-input" type="text" id="p-cep" placeholder="00000-000" maxlength="9" oninput="mascaraCEP(this)">
+        </div>
+        <div class="form-group" style="justify-content:flex-end">
+          <label class="form-label" style="visibility:hidden">.</label>
+          <button class="btn-cep" id="btn-cep" onclick="buscarCEP()">🔍 Buscar CEP</button>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group" style="grid-column:1/-1">
+          <label class="form-label">Logradouro</label>
+          <input class="form-input" type="text" id="p-logradouro" placeholder="Rua, avenida, alameda…">
+        </div>
+      </div>
+      <div class="grid-3">
+        <div class="form-group">
+          <label class="form-label">Número</label>
+          <input class="form-input" type="text" id="p-numero" placeholder="Nº">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Complemento</label>
+          <input class="form-input" type="text" id="p-complemento" placeholder="Apto, sala, bloco…">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Bairro</label>
+          <input class="form-input" type="text" id="p-bairro" placeholder="Bairro">
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group">
+          <label class="form-label">Município</label>
+          <input class="form-input" type="text" id="p-municipio" placeholder="Cidade">
+        </div>
+        <div class="form-group">
+          <label class="form-label">UF</label>
+          <select class="form-select" id="p-uf">
+            <option value="">—</option>
+            <option value="AC">AC — Acre</option>
+            <option value="AL">AL — Alagoas</option>
+            <option value="AP">AP — Amapá</option>
+            <option value="AM">AM — Amazonas</option>
+            <option value="BA">BA — Bahia</option>
+            <option value="CE">CE — Ceará</option>
+            <option value="DF">DF — Distrito Federal</option>
+            <option value="ES">ES — Espírito Santo</option>
+            <option value="GO">GO — Goiás</option>
+            <option value="MA">MA — Maranhão</option>
+            <option value="MT">MT — Mato Grosso</option>
+            <option value="MS">MS — Mato Grosso do Sul</option>
+            <option value="MG">MG — Minas Gerais</option>
+            <option value="PA">PA — Pará</option>
+            <option value="PB">PB — Paraíba</option>
+            <option value="PR">PR — Paraná</option>
+            <option value="PE">PE — Pernambuco</option>
+            <option value="PI">PI — Piauí</option>
+            <option value="RJ">RJ — Rio de Janeiro</option>
+            <option value="RN">RN — Rio Grande do Norte</option>
+            <option value="RS">RS — Rio Grande do Sul</option>
+            <option value="RO">RO — Rondônia</option>
+            <option value="RR">RR — Roraima</option>
+            <option value="SC">SC — Santa Catarina</option>
+            <option value="SP">SP — São Paulo</option>
+            <option value="SE">SE — Sergipe</option>
+            <option value="TO">TO — Tocantins</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">País</label>
+        <input class="form-input" type="text" id="p-pais" placeholder="Brasil">
+      </div>
+    </div>
+  </div>
+
+  <div class="msg-erro" id="msg-erro-bottom" style="margin-top:0;margin-bottom:16px"></div>
+
+  <button class="btn-salvar" id="btn-salvar" onclick="salvarPerfil()">
+    <span id="btn-txt">Salvar alterações</span>
+    <div class="spinner-sm" id="spinner"></div>
+  </button>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const SUPABASE_URL = 'https://atqtybcsvepdabsvgaly.supabase.co'
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF0cXR5YmNzdmVwZGFic3ZnYWx5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0MjMzNzgsImV4cCI6MjA5NTk5OTM3OH0.hWx1AB2rK7xdco1Dgagm0XUOBPQbxZVE614SW4SKoLk'
+const { createClient } = supabase
+const db = createClient(SUPABASE_URL, SUPABASE_KEY)
+
+let _userId = null
+
+// ── Logos ─────────────────────────────────────────────────
+async function carregarLogos() {
+  try {
+    const { data } = await db.from('config_sistema').select('dados').eq('id', 1).single()
+    const logos = data?.dados?.logos || {}
+    const gov = document.getElementById('logo-gov'), sec = document.getElementById('logo-sema')
+    const div = document.getElementById('gov-logos-div'), wrap = document.getElementById('gov-logos-wrap')
+    if (logos.governo_url)    { gov.src = logos.governo_url;    gov.style.display = '' }
+    if (logos.secretaria_url) { sec.src = logos.secretaria_url; sec.style.display = '' }
+    if (logos.governo_url && logos.secretaria_url) div.style.display = ''
+    if (logos.governo_url || logos.secretaria_url) wrap.style.display = ''
+  } catch(e) {}
+}
+carregarLogos()
+
+// ── Helpers ───────────────────────────────────────────────
+function iniciais(nome) {
+  const p = (nome||'').trim().split(' ').filter(Boolean)
+  if (!p.length) return '?'
+  return p.length === 1 ? p[0][0].toUpperCase() : (p[0][0] + p[p.length-1][0]).toUpperCase()
+}
+
+function set(id, val) { const el = document.getElementById(id); if(el) el.value = val || '' }
+
+function mascaraCEP(el) {
+  let v = el.value.replace(/\D/g,'').slice(0,8)
+  if (v.length > 5) v = v.slice(0,5) + '-' + v.slice(5)
+  el.value = v
+}
+
+// ── Buscar CEP via ViaCEP ─────────────────────────────────
+async function buscarCEP() {
+  const cep = document.getElementById('p-cep').value.replace(/\D/g,'')
+  if (cep.length !== 8) { mostrarErro('Informe um CEP válido com 8 dígitos.'); return }
+  const btn = document.getElementById('btn-cep')
+  btn.disabled = true; btn.textContent = '⏳ Buscando…'
+  try {
+    const r = await fetch(`https://viacep.com.br/ws/${cep}/json/`)
+    const d = await r.json()
+    if (d.erro) { mostrarErro('CEP não encontrado.'); return }
+    set('p-logradouro', d.logradouro)
+    set('p-bairro',     d.bairro)
+    set('p-municipio',  d.localidade)
+    const ufSel = document.getElementById('p-uf')
+    if (ufSel) ufSel.value = d.uf || ''
+    document.getElementById('p-numero').focus()
+  } catch(e) { mostrarErro('Erro ao consultar ViaCEP. Preencha manualmente.') }
+  finally { btn.disabled = false; btn.textContent = '🔍 Buscar CEP' }
+}
+
+// ── Mensagens ─────────────────────────────────────────────
+function mostrarErro(msg) {
+  const el = document.getElementById('msg-erro')
+  el.textContent = msg; el.style.display = 'block'
+  el.scrollIntoView({ behavior:'smooth', block:'center' })
+  document.getElementById('msg-ok').style.display = 'none'
+}
+function mostrarOk() {
+  document.getElementById('msg-ok').style.display = 'block'
+  document.getElementById('msg-erro').style.display = 'none'
+  document.getElementById('msg-erro-bottom').style.display = 'none'
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
+
+// ── Carregar perfil ───────────────────────────────────────
+async function carregarPerfil() {
+  const { data: { session } } = await db.auth.getSession()
+  if (!session) { window.location.replace('login-pesquisador.html'); return }
+  _userId = session.user.id
+
+  const { data: p, error } = await db
+    .from('pesquisadores')
+    .select('*')
+    .eq('user_id', _userId)
+    .single()
+
+  if (error || !p) { window.location.replace('portal-pesquisador.html'); return }
+
+  // Cabeçalho
+  document.getElementById('avatar-ini').textContent = iniciais(p.nome_completo)
+  document.getElementById('p-nome-display').textContent = p.nome_completo || '—'
+  document.getElementById('p-email-display').textContent = p.email || ''
+  document.getElementById('p-inst-display').textContent = p.instituicao || ''
+
+  // Campos
+  set('p-email',  p.email)
+  set('p-criado', p.criado_em ? new Date(p.criado_em).toLocaleDateString('pt-BR') : '')
+  set('p-nome',   p.nome_completo)
+  set('p-cpf',    p.cpf ? p.cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4') : '')
+  set('p-rg',     p.rg)
+  set('p-tel',    p.telefone)
+  set('p-inst',   p.instituicao)
+  document.getElementById('p-tit').value  = p.titulacao || ''
+  document.getElementById('p-area').value = p.area_formacao || ''
+  set('p-esp',    p.especialidade)
+  set('p-lattes', p.lattes)
+  // Endereço
+  set('p-cep',         p.cep ? p.cep.replace(/(\d{5})(\d{3})/, '$1-$2') : '')
+  set('p-logradouro',  p.logradouro)
+  set('p-numero',      p.numero)
+  set('p-complemento', p.complemento)
+  set('p-bairro',      p.bairro)
+  set('p-municipio',   p.municipio)
+  document.getElementById('p-uf').value = p.uf || ''
+  set('p-pais', p.pais || 'Brasil')
+
+  document.getElementById('loading').style.display = 'none'
+}
+
+// ── Salvar perfil ─────────────────────────────────────────
+async function salvarPerfil() {
+  const nome = document.getElementById('p-nome').value.trim()
+  const inst = document.getElementById('p-inst').value.trim()
+  const tit  = document.getElementById('p-tit').value
+
+  document.getElementById('msg-erro').style.display = 'none'
+  document.getElementById('msg-ok').style.display = 'none'
+  document.getElementById('msg-erro-bottom').style.display = 'none'
+
+  if (!nome) { mostrarErro('O nome completo é obrigatório.'); return }
+  if (!inst) { mostrarErro('A instituição é obrigatória.'); return }
+  if (!tit)  { mostrarErro('Selecione a titulação.'); return }
+
+  const btn = document.getElementById('btn-salvar')
+  const sp  = document.getElementById('spinner')
+  const txt = document.getElementById('btn-txt')
+  btn.disabled = true; sp.style.display = 'inline-block'; txt.style.opacity = '0.6'
+
+  const payload = {
+    nome_completo:  nome,
+    rg:             document.getElementById('p-rg').value.trim() || null,
+    telefone:       document.getElementById('p-tel').value.trim() || null,
+    instituicao:    inst,
+    titulacao:      tit,
+    area_formacao:  document.getElementById('p-area').value || null,
+    especialidade:  document.getElementById('p-esp').value.trim() || null,
+    lattes:         document.getElementById('p-lattes').value.trim() || null,
+    cep:            document.getElementById('p-cep').value.replace(/\D/g,'') || null,
+    logradouro:     document.getElementById('p-logradouro').value.trim() || null,
+    numero:         document.getElementById('p-numero').value.trim() || null,
+    complemento:    document.getElementById('p-complemento').value.trim() || null,
+    bairro:         document.getElementById('p-bairro').value.trim() || null,
+    municipio:      document.getElementById('p-municipio').value.trim() || null,
+    uf:             document.getElementById('p-uf').value || null,
+    pais:           document.getElementById('p-pais').value.trim() || 'Brasil',
+  }
+
+  try {
+    const { error } = await db.from('pesquisadores').update(payload).eq('user_id', _userId)
+    if (error) throw error
+    // Atualiza cabeçalho
+    document.getElementById('p-nome-display').textContent = nome
+    document.getElementById('p-inst-display').textContent = inst
+    document.getElementById('avatar-ini').textContent = iniciais(nome)
+    mostrarOk()
+  } catch(e) {
+    const el = document.getElementById('msg-erro-bottom')
+    el.textContent = 'Erro ao salvar: ' + (e.message || 'tente novamente.')
+    el.style.display = 'block'
+  } finally {
+    btn.disabled = false; sp.style.display = 'none'; txt.style.opacity = '1'
+  }
+}
+
+carregarPerfil()
+</script>
+</body>
+</html>
