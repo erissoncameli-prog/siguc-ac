@@ -1898,6 +1898,7 @@ function adicionarMembro() {
 
   if (!nome)   { toastPub('Informe o nome do membro', true); return }
   if (!cpf)    { toastPub('Informe o CPF do membro', true); return }
+  if (!validarCPF(cpf)) { toastPub('CPF do membro inválido — verifique os dígitos verificadores', true); return }
   if (!email)  { toastPub('Informe o e-mail do membro', true); return }
   if (!inst)   { toastPub('Informe a instituição do membro', true); return }
   if (!funcao) { toastPub('Selecione a função do membro', true); return }
