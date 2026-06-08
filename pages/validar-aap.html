@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>SIGUC-AC · Validação de AAP</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@700;800&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --floresta: #0A1A0F;
+  --verde-c:  #52B788;
+  --ouro:     #C9A84C;
+  --ouro-c:   #F0CB6A;
+  --t1:       #F4EFE6;
+  --borda:    #E5E7EB;
+  --raio:     12px;
+}
+body { font-family: 'DM Sans', sans-serif; background: var(--t1); min-height: 100vh; color: #111827; }
+
+/* ── Header ── */
+.header {
+  background: var(--floresta);
+  padding: 18px 32px;
+  display: flex; align-items: center; gap: 16px;
+  position: relative;
+}
+.header::after {
+  content: '';
+  position: absolute; bottom: 0; left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg, transparent, var(--ouro) 25%, var(--ouro) 75%, transparent);
+}
+.logo { font-family: 'Fraunces', serif; font-size: 24px; font-weight: 800; color: var(--ouro-c); letter-spacing: -.02em; }
+.logo-sub { font-size: 10px; color: #9CA3AF; letter-spacing: .08em; text-transform: uppercase; margin-top: 2px; }
+.header-right { margin-left: auto; font-size: 11px; color: #6B7280; }
+.header-right a { color: var(--verde-c); text-decoration: none; font-weight: 600; }
+
+/* ── Main ── */
+.main { max-width: 700px; margin: 0 auto; padding: 40px 16px 80px; }
+
+/* ── Card ── */
+.card {
+  background: #fff;
+  border-radius: var(--raio);
+  border: 1px solid var(--borda);
+  overflow: hidden;
+  box-shadow: 0 2px 12px rgba(10,26,15,.06);
+}
+
+/* ── Card header — status badge ── */
+.card-status {
+  padding: 20px 28px;
+  display: flex; align-items: center; gap: 14px;
+  border-bottom: 1px solid var(--borda);
+}
+.status-icon {
+  width: 52px; height: 52px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px; flex-shrink: 0;
+}
+.status-icon.valida   { background: #DCFCE7; }
+.status-icon.expirada { background: #FEF2F2; }
+.status-icon.invalida { background: #FFF3CD; }
+.status-badge {
+  display: inline-block;
+  padding: 4px 14px; border-radius: 20px;
+  font-size: 12px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase;
+  margin-bottom: 4px;
+}
+.status-badge.valida   { background: #DCFCE7; color: #15803D; }
+.status-badge.expirada { background: #FEE2E2; color: #DC2626; }
+.status-badge.invalida { background: #FEF9C3; color: #854D0E; }
+.status-title { font-family: 'Fraunces', serif; font-size: 18px; font-weight: 800; color: var(--floresta); }
+
+/* ── Seções internas ── */
+.card-body { padding: 24px 28px; display: flex; flex-direction: column; gap: 20px; }
+
+.sec-title {
+  font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase;
+  color: #9CA3AF; margin-bottom: 10px;
+}
+
+.info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+@media(max-width:520px){ .info-grid { grid-template-columns: 1fr; } }
+
+.info-item { background: #F9FAFB; border-radius: 8px; padding: 10px 14px; }
+.info-key  { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: #9CA3AF; margin-bottom: 3px; }
+.info-val  { font-size: 13px; color: #374151; font-weight: 600; }
+
+/* ── Bloco AAP ── */
+.aap-box {
+  background: linear-gradient(135deg, var(--floresta), #1F4E2C);
+  border-radius: 10px; padding: 18px 22px; color: #fff;
+}
+.aap-num { font-size: 20px; font-weight: 800; color: var(--ouro-c); font-family: monospace; letter-spacing: .04em; }
+.aap-sub { font-size: 10px; color: #9CA3AF; margin-top: 4px; letter-spacing: .05em; text-transform: uppercase; }
+.aap-meta { display: flex; gap: 20px; margin-top: 10px; flex-wrap: wrap; }
+.aap-meta-item { font-size: 12px; }
+.aap-meta-label { color: #9CA3AF; }
+.aap-meta-val   { color: #A7F3D0; font-weight: 700; }
+
+/* ── Blocos de assinatura ── */
+.sign-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+@media(max-width:520px){ .sign-grid { grid-template-columns: 1fr; } }
+
+.sign-block {
+  border-radius: 8px; padding: 14px 16px;
+  display: flex; flex-direction: column; gap: 3px;
+}
+.sign-block.secretario { background: #0A1A0F; border: 1px solid var(--ouro); }
+.sign-block.emitente   { background: #F9FAFB; border: 1px solid var(--borda); }
+
+.sign-role {
+  font-size: 9px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase;
+  margin-bottom: 6px;
+}
+.sign-block.secretario .sign-role { color: var(--ouro-c); }
+.sign-block.emitente   .sign-role { color: #9CA3AF; }
+
+.sign-name {
+  font-size: 14px; font-weight: 800;
+}
+.sign-block.secretario .sign-name { color: #fff; }
+.sign-block.emitente   .sign-name { color: #111827; }
+
+.sign-cargo {
+  font-size: 11px;
+}
+.sign-block.secretario .sign-cargo { color: var(--ouro-c); }
+.sign-block.emitente   .sign-cargo { color: #6B7280; }
+
+.sign-date {
+  font-size: 10px; margin-top: 6px;
+  color: #6B7280;
+}
+
+/* ── Condicionantes ── */
+.cond-box {
+  background: #FFFBEB; border: 1px solid #FDE68A; border-radius: 8px; padding: 14px 16px;
+}
+.cond-text { font-size: 12px; color: #374151; line-height: 1.7; white-space: pre-wrap; }
+
+/* ── Token de verificação ── */
+.token-box {
+  background: #F9FAFB; border: 1px dashed var(--borda); border-radius: 8px;
+  padding: 12px 16px; display: flex; align-items: center; gap: 10px;
+}
+.token-val { font-family: monospace; font-size: 12px; color: #374151; word-break: break-all; flex: 1; }
+.copy-btn {
+  flex-shrink: 0; padding: 5px 12px;
+  background: var(--floresta); color: var(--ouro-c);
+  border: none; border-radius: 6px; font-size: 11px; font-weight: 700;
+  cursor: pointer; font-family: inherit;
+  transition: opacity .15s;
+}
+.copy-btn:hover { opacity: .85; }
+
+/* ── Skeleton / loading ── */
+.skeleton-wrap { display: flex; flex-direction: column; gap: 16px; padding: 32px; }
+.sk { background: #E5E7EB; border-radius: 6px; animation: sk-pulse 1.4s ease infinite; }
+@keyframes sk-pulse { 0%,100%{opacity:.5} 50%{opacity:1} }
+.sk-h1 { height: 22px; width: 60%; }
+.sk-h2 { height: 14px; width: 80%; }
+.sk-h3 { height: 14px; width: 45%; }
+
+/* ── Erro / não encontrado ── */
+.error-card {
+  background: #fff; border-radius: var(--raio); border: 1px solid #FCA5A5;
+  padding: 40px 28px; text-align: center;
+}
+.error-icon { font-size: 40px; margin-bottom: 12px; }
+.error-title { font-family: 'Fraunces', serif; font-size: 20px; font-weight: 800; color: #DC2626; margin-bottom: 8px; }
+.error-msg   { font-size: 13px; color: #6B7280; line-height: 1.6; }
+
+/* ── Nota legal ── */
+.legal-note {
+  font-size: 11px; color: #9CA3AF; text-align: center;
+  border-top: 1px solid var(--borda); padding: 16px 24px; line-height: 1.6;
+}
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div>
+    <div class="logo">SIGUC-AC</div>
+    <div class="logo-sub">Sistema de Gestão de UCs · SEMA-AC</div>
+  </div>
+  <div class="header-right">
+    Validação de documento público ·
+    <a href="/pages/pesquisa-publica.html">Submeter pesquisa</a>
+  </div>
+</header>
+
+<main class="main">
+  <div id="conteudo">
+    <!-- Skeleton de carregamento -->
+    <div class="skeleton-wrap">
+      <div class="sk sk-h1"></div>
+      <div class="sk sk-h2"></div>
+      <div class="sk sk-h3"></div>
+      <div class="sk sk-h2" style="width:70%"></div>
+    </div>
+  </div>
+</main>
+
+<script>
+const SUPABASE_URL  = 'https://atqtybcsvepdabsvgaly.supabase.co'
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF0cXR5YmNzdmVwZGFic3ZnYWx5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDY3MjkxNjIsImV4cCI6MjA2MjMwNTE2Mn0.UMQ7HdpCjUIQ0nxvSFQaK4XE3RlJBOiV3XZfDy-VXrI'
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON)
+
+function esc(s) { return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') }
+
+function fmtData(dt) {
+  if (!dt) return '—'
+  const d = new Date(dt)
+  return d.toLocaleDateString('pt-BR', { day:'2-digit', month:'2-digit', year:'numeric' })
+}
+
+function fmtDataHora(dt) {
+  if (!dt) return '—'
+  const d = new Date(dt)
+  return d.toLocaleDateString('pt-BR', { day:'2-digit', month:'2-digit', year:'numeric' }) +
+    ' às ' + d.toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' })
+}
+
+async function validar() {
+  const params = new URLSearchParams(location.search)
+  const token  = params.get('token')
+
+  if (!token) {
+    renderErro('Token não informado', 'Acesse esta página via QR code ou com o parâmetro <code>?token=...</code> na URL.')
+    return
+  }
+
+  const { data, error } = await db
+    .from('v_aap_publica')
+    .select('*')
+    .eq('aap_qr_token', token)
+    .maybeSingle()
+
+  if (error || !data) {
+    renderErro('Documento não encontrado', 'O token informado não corresponde a nenhuma AAP emitida pelo SIGUC-AC. Verifique se o QR code foi lido corretamente.')
+    return
+  }
+
+  renderAAP(data)
+}
+
+function renderAAP(d) {
+  const valida   = d.status_validade === 'valida'
+  const statusCls = valida ? 'valida' : 'expirada'
+  const statusIcon = valida ? '✅' : '❌'
+  const statusLabel = valida ? 'Documento válido' : 'Documento expirado'
+  const statusSub   = valida
+    ? `Válido até ${fmtData(d.aap_validade)}`
+    : `Venceu em ${fmtData(d.aap_validade)}`
+
+  document.getElementById('conteudo').innerHTML = `
+<div class="card">
+  <div class="card-status">
+    <div class="status-icon ${statusCls}">${statusIcon}</div>
+    <div>
+      <div class="status-badge ${statusCls}">${valida ? 'AAP Válida' : 'AAP Expirada'}</div>
+      <div class="status-title">${esc(statusLabel)}</div>
+      <div style="font-size:12px;color:#6B7280;margin-top:2px">${esc(statusSub)}</div>
+    </div>
+  </div>
+
+  <div class="card-body">
+
+    <!-- Número AAP -->
+    <div class="aap-box">
+      <div class="aap-num">${esc(d.aap_numero)}</div>
+      <div class="aap-sub">Autorização de Acesso e Pesquisa · SEMA-AC</div>
+      <div class="aap-meta">
+        <div class="aap-meta-item">
+          <span class="aap-meta-label">Emitida em: </span>
+          <span class="aap-meta-val">${fmtData(d.aap_emitida_em)}</span>
+        </div>
+        <div class="aap-meta-item">
+          <span class="aap-meta-label">Válida até: </span>
+          <span class="aap-meta-val">${fmtData(d.aap_validade)}</span>
+        </div>
+        <div class="aap-meta-item">
+          <span class="aap-meta-label">Processo: </span>
+          <span class="aap-meta-val">${esc(d.numero_processo ?? '—')}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pesquisador -->
+    <div>
+      <div class="sec-title">Pesquisador responsável</div>
+      <div class="info-grid">
+        <div class="info-item">
+          <div class="info-key">Nome completo</div>
+          <div class="info-val">${esc(d.pesquisador_nome)}</div>
+        </div>
+        <div class="info-item">
+          <div class="info-key">Instituição</div>
+          <div class="info-val">${esc(d.pesquisador_instituicao ?? '—')}</div>
+        </div>
+        <div class="info-item">
+          <div class="info-key">CPF</div>
+          <div class="info-val">${esc(d.pesquisador_cpf ?? '—')}</div>
+        </div>
+        <div class="info-item">
+          <div class="info-key">E-mail</div>
+          <div class="info-val" style="font-size:12px">${esc(d.pesquisador_email ?? '—')}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pesquisa -->
+    <div>
+      <div class="sec-title">Dados da pesquisa</div>
+      <div class="info-grid">
+        <div class="info-item" style="grid-column:1/-1">
+          <div class="info-key">Título</div>
+          <div class="info-val">${esc(d.titulo)}</div>
+        </div>
+        <div class="info-item">
+          <div class="info-key">Unidade de Conservação</div>
+          <div class="info-val">${esc(d.uc_nome ?? '—')}</div>
+        </div>
+        <div class="info-item">
+          <div class="info-key">Tipo de pesquisa</div>
+          <div class="info-val">${esc(d.tipo ?? '—')}</div>
+        </div>
+      </div>
+    </div>
+
+    ${d.aap_condicionantes ? `
+    <!-- Condicionantes -->
+    <div>
+      <div class="sec-title">Condicionantes e obrigações</div>
+      <div class="cond-box">
+        <div class="cond-text">${esc(d.aap_condicionantes)}</div>
+      </div>
+    </div>` : ''}
+
+    <!-- Assinaturas -->
+    <div>
+      <div class="sec-title">Assinaturas eletrônicas (Lei 14.063/2020)</div>
+      <div class="sign-grid">
+        <div class="sign-block secretario">
+          <div class="sign-role">Autorizado por</div>
+          <div class="sign-name">${esc(d.autorizador_nome ?? 'Leonardo das Neves Carvalho')}</div>
+          <div class="sign-cargo">Secretário de Estado do Meio Ambiente do Acre</div>
+          <div class="sign-date">Assinado em: ${fmtDataHora(d.aap_assinado_em)}</div>
+        </div>
+        <div class="sign-block emitente">
+          <div class="sign-role">Emitido por</div>
+          <div class="sign-name">${esc(d.emitente_nome ?? '—')}</div>
+          <div class="sign-cargo">Chefe do Departamento de Unidades de Conservação — DEUC/DIMA/SEMA-AC</div>
+          <div class="sign-date">Emitido em: ${fmtDataHora(d.aap_emitida_em)}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Token de verificação -->
+    <div>
+      <div class="sec-title">Token de verificação</div>
+      <div class="token-box">
+        <div class="token-val">${esc(d.aap_qr_token)}</div>
+        <button class="copy-btn" onclick="copiarToken('${esc(d.aap_qr_token)}', this)">Copiar</button>
+      </div>
+      <div style="font-size:11px;color:#9CA3AF;margin-top:6px">
+        Este token é único e identifica a autenticidade do documento.
+        Consulte sempre em <strong>siguc-ac.vercel.app</strong>.
+      </div>
+    </div>
+
+  </div>
+
+  <div class="legal-note">
+    Documento emitido eletronicamente pelo SIGUC-AC — Sistema de Gestão de Unidades de Conservação do Acre.<br>
+    Assinatura eletrônica simples nos termos da <strong>Lei Federal nº 14.063/2020</strong>.<br>
+    Secretaria de Estado do Meio Ambiente do Acre — SEMA-AC · Diretoria de Meio Ambiente · DEUC
+  </div>
+</div>
+  `
+}
+
+function renderErro(titulo, msg) {
+  document.getElementById('conteudo').innerHTML = `
+<div class="error-card">
+  <div class="error-icon">⚠️</div>
+  <div class="error-title">${esc(titulo)}</div>
+  <div class="error-msg">${msg}</div>
+  <div style="margin-top:20px">
+    <a href="/pages/pesquisa-publica.html" style="color:var(--verde-c);font-size:13px;font-weight:600;text-decoration:none">
+      ← Voltar ao portal de pesquisa
+    </a>
+  </div>
+</div>`
+}
+
+function copiarToken(token, btn) {
+  navigator.clipboard.writeText(token).then(() => {
+    const orig = btn.textContent
+    btn.textContent = 'Copiado!'
+    setTimeout(() => { btn.textContent = orig }, 2000)
+  })
+}
+
+validar()
+</script>
+</body>
+</html>
