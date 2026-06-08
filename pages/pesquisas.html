@@ -1142,11 +1142,13 @@ async function confirmarAutoSecretario() {
   const motivo = document.getElementById('sec-motivo')?.value.trim()
   const obs    = document.getElementById('sec-obs')?.value.trim()
   if (resultado === 'negar' && !motivo) { toast('Informe o fundamento da negativa', 'aviso'); return }
-  const observacao = (motivo ? motivo + '\n' : '') + (obs || '')
+  const extras     = [motivo, obs].filter(Boolean).join('\n')
+  const observacao = _getDespacho(extras)
+  if (!observacao) return
   const { error } = await db.rpc('despachar_autorizacao_secretario', {
     p_pesquisa_id: _detalhe.id,
     p_autorizado:  resultado === 'autorizar',
-    p_observacao:  observacao.trim() || null
+    p_observacao:  observacao
   })
   if (error) { toast('Erro: ' + error.message, 'erro'); return }
   toast(resultado === 'autorizar' ? 'Pesquisa autorizada — DEUC pode emitir a AAP' : 'Pesquisa negada e arquivada', 'sucesso')
