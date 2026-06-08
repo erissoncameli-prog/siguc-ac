@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 44" fill="none">
+  <!-- Ícone folha/ambiente -->
+  <g transform="translate(2, 6)">
+    <path d="M16 32V16" stroke="rgba(82,183,136,0.8)" stroke-width="1.5" stroke-linecap="round"/>
+    <path d="M16 16C16 16 6 11 6 21C6 27.1 10.5 32 16 32C21.5 32 26 27.1 26 21C26 11 16 16 16 16Z"
+          fill="rgba(82,183,136,0.15)" stroke="rgba(82,183,136,0.75)" stroke-width="1.5" stroke-linejoin="round"/>
+    <path d="M16 22L10 17" stroke="rgba(82,183,136,0.5)" stroke-width="1" stroke-linecap="round"/>
+    <path d="M16 26L22 21" stroke="rgba(82,183,136,0.4)" stroke-width="1" stroke-linecap="round"/>
+  </g>
+  <!-- SEMA em destaque -->
+  <text x="36" y="20" font-family="'Arial',sans-serif" font-size="15" font-weight="800"
+        fill="rgba(255,255,255,0.9)" letter-spacing="1">SEMA</text>
+  <!-- Subtítulo -->
+  <text x="36" y="33" font-family="'Arial',sans-serif" font-size="7" font-weight="400"
+        fill="rgba(255,255,255,0.5)" letter-spacing="0.3">Secretaria de Estado de</text>
+  <text x="36" y="42" font-family="'Arial',sans-serif" font-size="7" font-weight="400"
+        fill="rgba(255,255,255,0.5)" letter-spacing="0.3">Meio Ambiente</text>
+</svg>
