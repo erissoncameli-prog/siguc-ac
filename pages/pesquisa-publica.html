@@ -19,30 +19,19 @@
   --raio:     10px;
 }
 
-body {
-  font-family: 'DM Sans', sans-serif;
-  background: var(--t1);
-  min-height: 100vh;
-  color: #111827;
-}
+body { font-family: 'DM Sans', sans-serif; background: var(--t1); min-height: 100vh; color: #111827; }
 
-/* ── Header ── */
-.pub-header {
-  background: var(--floresta);
-  padding: 20px 32px;
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
+/* Header */
+.pub-header { background: var(--floresta); padding: 20px 32px; display: flex; align-items: center; gap: 16px; }
 .pub-logo { font-family: 'Fraunces', Georgia, serif; font-size: 26px; font-weight: 800; color: var(--ouro-c); letter-spacing: -.02em; }
 .pub-logo-sub { font-size: 10px; color: #9CA3AF; letter-spacing: .08em; text-transform: uppercase; margin-top: 2px; }
 .pub-header-right { margin-left: auto; font-size: 12px; color: #9CA3AF; text-align: right; }
 .pub-header-right a { color: var(--verde-c); text-decoration: none; font-weight: 600; }
 
-/* ── Container ── */
+/* Container */
 .pub-main { max-width: 760px; margin: 0 auto; padding: 32px 16px 64px; }
 
-/* ── Hero ── */
+/* Hero */
 .pub-hero { background: #fff; border-radius: 14px; padding: 28px 32px; margin-bottom: 24px; border: 1px solid var(--borda); }
 .pub-hero h1 { font-family: 'Fraunces', serif; font-size: 24px; font-weight: 800; color: var(--floresta); margin-bottom: 8px; }
 .pub-hero p  { font-size: 14px; color: #6B7280; line-height: 1.7; }
@@ -51,25 +40,26 @@ body {
 .pub-hero .doc-item .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--verde-c); flex-shrink: 0; }
 .pub-hero .doc-cond { font-size: 11px; color: #F59E0B; font-weight: 700; }
 
-/* ── Steps indicator ── */
+/* Steps */
 .steps-bar { display: flex; align-items: center; margin-bottom: 24px; }
-.step-item  { display: flex; align-items: center; gap: 8px; flex: 1; }
-.step-num   { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content:center; font-size: 13px; font-weight: 800; flex-shrink: 0; background: #E5E7EB; color: #9CA3AF; transition: all .2s; }
+.step-item  { display: flex; align-items: center; gap: 6px; }
+.step-num   { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content:center; font-size: 12px; font-weight: 800; flex-shrink: 0; background: #E5E7EB; color: #9CA3AF; transition: all .2s; }
 .step-num.ativo  { background: var(--floresta); color: #fff; }
 .step-num.feito  { background: var(--verde-c);  color: #fff; }
-.step-label { font-size: 12px; font-weight: 600; color: #9CA3AF; }
+.step-label { font-size: 11px; font-weight: 600; color: #9CA3AF; white-space: nowrap; }
 .step-label.ativo { color: var(--floresta); }
-.step-line  { flex: 1; height: 2px; background: #E5E7EB; margin: 0 8px; }
+.step-line  { flex: 1; height: 2px; background: #E5E7EB; margin: 0 6px; }
 .step-line.feita { background: var(--verde-c); }
 
-/* ── Card de passo ── */
+/* Card */
 .passo-card { background: #fff; border-radius: 14px; border: 1px solid var(--borda); padding: 28px 32px; }
 .passo-title { font-size: 17px; font-weight: 800; color: var(--floresta); margin-bottom: 20px; display: flex; align-items: center; gap: 10px; }
 
-/* ── Campos ── */
+/* Campos */
 .field-group { display: flex; flex-direction: column; gap: 14px; }
 .field-row   { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-@media (max-width: 600px) { .field-row { grid-template-columns: 1fr; } }
+.field-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+@media (max-width: 600px) { .field-row, .field-row-3 { grid-template-columns: 1fr; } }
 
 .field { display: flex; flex-direction: column; gap: 5px; }
 .field label { font-size: 12px; font-weight: 700; color: #374151; }
@@ -77,20 +67,19 @@ body {
 .field label .opt { font-size: 10px; color: #9CA3AF; font-weight: 400; margin-left: 4px; }
 .field input, .field select, .field textarea {
   padding: 10px 14px; border: 1px solid var(--borda); border-radius: var(--raio);
-  font-size: 13px; font-family: inherit; outline: none; transition: border-color .15s;
-  background: #fff;
+  font-size: 13px; font-family: inherit; outline: none; transition: border-color .15s; background: #fff;
 }
 .field input:focus, .field select:focus, .field textarea:focus { border-color: var(--verde-c); }
 .field .hint { font-size: 11px; color: #9CA3AF; margin-top: 2px; }
 
-/* ── Toggle checkbox ── */
+/* Toggle */
 .toggle-field { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--borda); border-radius: var(--raio); cursor: pointer; transition: border-color .15s; }
 .toggle-field:hover { border-color: var(--verde-c); }
 .toggle-field input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--verde-c); cursor: pointer; }
 .toggle-field .toggle-label { font-size: 13px; font-weight: 600; color: #374151; }
 .toggle-field .toggle-sub   { font-size: 11px; color: #9CA3AF; margin-top: 2px; }
 
-/* ── Upload zone ── */
+/* Upload */
 .upload-zone {
   border: 2px dashed var(--borda); border-radius: var(--raio);
   padding: 20px; text-align: center; cursor: pointer;
@@ -107,7 +96,7 @@ body {
 .upload-obrigatorio { border-color: #FECACA; background: #FFF5F5; }
 .upload-obrigatorio .upload-label { color: #DC2626; }
 
-/* ── Botões ── */
+/* Botões */
 .btn-nav { display: flex; gap: 12px; justify-content: space-between; margin-top: 24px; }
 .btn { padding: 12px 28px; border-radius: var(--raio); font-size: 14px; font-weight: 700; cursor: pointer; border: none; font-family: inherit; transition: all .15s; }
 .btn-secondary { background: #fff; color: #374151; border: 1px solid var(--borda); }
@@ -115,8 +104,48 @@ body {
 .btn-primary { background: var(--floresta); color: #fff; }
 .btn-primary:hover { background: #1F4E2C; }
 .btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+.btn-verde  { background: var(--verde-c); color: #fff; }
+.btn-verde:hover { background: #3DA774; }
 
-/* ── Sucesso ── */
+/* Equipe */
+.equipe-form-box {
+  background: #F9FAFB; border: 1px solid var(--borda);
+  border-radius: 12px; padding: 20px 24px; margin-bottom: 20px;
+}
+.equipe-form-title {
+  font-size: 13px; font-weight: 800; color: var(--floresta);
+  margin-bottom: 16px; display: flex; align-items: center; gap: 8px;
+}
+.membro-card {
+  background: #fff; border: 1px solid var(--borda); border-radius: 10px;
+  padding: 14px 16px; margin-bottom: 10px;
+  display: flex; align-items: flex-start; gap: 12px;
+  animation: fadeIn .2s ease;
+}
+@keyframes fadeIn { from { opacity:0; transform:translateY(-4px); } to { opacity:1; transform:none; } }
+.membro-avatar {
+  width: 36px; height: 36px; border-radius: 50%;
+  background: var(--floresta); color: var(--ouro-c);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 800; flex-shrink: 0; letter-spacing: -.02em;
+}
+.membro-info { flex: 1; min-width: 0; }
+.membro-nome { font-size: 13px; font-weight: 700; color: #111827; }
+.membro-sub  { font-size: 11px; color: #6B7280; margin-top: 2px; line-height: 1.5; }
+.btn-remover { background: none; border: none; cursor: pointer; color: #9CA3AF; font-size: 20px; padding: 0; line-height: 1; flex-shrink: 0; transition: color .15s; }
+.btn-remover:hover { color: #DC2626; }
+.equipe-vazia {
+  text-align: center; padding: 24px 16px; color: #9CA3AF; font-size: 13px;
+  border: 1px dashed var(--borda); border-radius: 10px;
+}
+.equipe-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: #F0FDF4; color: #15803D; border-radius: 20px;
+  padding: 3px 10px; font-size: 11px; font-weight: 700;
+  border: 1px solid #A7F3D0; margin-left: 8px;
+}
+
+/* Sucesso */
 .sucesso-card { background: #fff; border-radius: 14px; border: 1px solid var(--borda); padding: 40px 32px; text-align: center; }
 .sucesso-icon { font-size: 52px; margin-bottom: 16px; }
 .sucesso-titulo { font-family: 'Fraunces', serif; font-size: 22px; font-weight: 800; color: var(--floresta); margin-bottom: 8px; }
@@ -125,8 +154,8 @@ body {
 .sucesso-aviso { background: #FFF7ED; border: 1px solid #FDE68A; border-radius: var(--raio); padding: 14px 18px; font-size: 13px; color: #92400E; margin-bottom: 20px; line-height: 1.6; }
 .btn-status { display: inline-flex; align-items: center; gap: 8px; padding: 12px 28px; background: var(--verde-c); color: #fff; border-radius: var(--raio); font-weight: 700; font-size: 14px; text-decoration: none; }
 
-/* ── Toast ── */
-.toast-pub { position: fixed; bottom: 24px; right: 24px; background: #1F4E2C; color: #fff; padding: 12px 20px; border-radius: var(--raio); font-size: 13px; font-weight: 600; z-index: 9999; opacity: 0; transform: translateY(10px); transition: all .25s; pointer-events: none; }
+/* Toast */
+.toast-pub { position: fixed; bottom: 24px; right: 24px; background: #1F4E2C; color: #fff; padding: 12px 20px; border-radius: var(--raio); font-size: 13px; font-weight: 600; z-index: 9999; opacity: 0; transform: translateY(10px); transition: all .25s; pointer-events: none; max-width: 320px; }
 .toast-pub.show { opacity: 1; transform: translateY(0); }
 .toast-pub.erro { background: #DC2626; }
 </style>
@@ -148,17 +177,17 @@ body {
   <!-- Hero -->
   <div class="pub-hero">
     <h1>Submissão de Pesquisa Científica</h1>
-    <p>Preencha o formulário abaixo para submeter sua proposta de pesquisa nas Unidades de Conservação Estaduais do Acre. Após o envio, você receberá um e-mail de confirmação com o número do processo para acompanhamento.</p>
+    <p>Preencha o formulário para submeter sua proposta nas Unidades de Conservação Estaduais do Acre. Após o envio você receberá um e-mail de confirmação com o número do processo.</p>
     <div class="docs-list">
-      <div style="font-size:12px;font-weight:700;color:#374151;margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em">Documentos necessários para submissão:</div>
+      <div style="font-size:12px;font-weight:700;color:#374151;margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em">Documentos necessários:</div>
       <div class="doc-item"><span class="dot"></span> Formulário de pesquisa assinado (PDF) <strong style="margin-left:4px">✱ obrigatório</strong></div>
       <div class="doc-item"><span class="dot"></span> Proposta digital do projeto (PDF ou DOCX) <strong style="margin-left:4px">✱ obrigatório</strong></div>
-      <div class="doc-item"><span class="dot"></span> Comprovante de registro no SISBIO <span class="doc-cond">⚠ se coleta de material biológico</span></div>
-      <div class="doc-item"><span class="dot"></span> Registro CONEP <span class="doc-cond">⚠ se pesquisa com seres humanos</span></div>
+      <div class="doc-item"><span class="dot"></span> Comprovante de registro no SISBIO <span class="doc-cond">⚠ se coleta biológica</span></div>
+      <div class="doc-item"><span class="dot"></span> Registro CONEP <span class="doc-cond">⚠ se pesquisa com humanos</span></div>
     </div>
   </div>
 
-  <!-- Steps -->
+  <!-- Steps (4) -->
   <div class="steps-bar" id="steps-bar">
     <div class="step-item">
       <div class="step-num ativo" id="sn1">1</div>
@@ -172,14 +201,20 @@ body {
     <div class="step-line" id="sl23"></div>
     <div class="step-item">
       <div class="step-num" id="sn3">3</div>
-      <div class="step-label" id="sl3">Documentos</div>
+      <div class="step-label" id="sl3">Equipe</div>
+    </div>
+    <div class="step-line" id="sl34"></div>
+    <div class="step-item">
+      <div class="step-num" id="sn4">4</div>
+      <div class="step-label" id="sl4">Documentos</div>
     </div>
   </div>
 
-  <!-- Passo 1 -->
+  <!-- ─── Passo 1: Identificação do Responsável ─────────────── -->
   <div class="passo-card" id="passo1">
-    <div class="passo-title">👤 Identificação do Pesquisador</div>
+    <div class="passo-title">👤 Identificação do Pesquisador Responsável</div>
     <div class="field-group">
+
       <div class="field-row">
         <div class="field">
           <label>Nome completo <span class="req">✱</span></label>
@@ -190,25 +225,52 @@ body {
           <input type="text" id="p-cpf" placeholder="000.000.000-00" maxlength="14">
         </div>
       </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label>RG <span class="req">✱</span></label>
+          <input type="text" id="p-rg" placeholder="Número do RG">
+          <span class="hint">Exigido para acesso físico à UC.</span>
+        </div>
+        <div class="field">
+          <label>Titulação <span class="req">✱</span></label>
+          <select id="p-titulacao">
+            <option value="">Selecione…</option>
+            <option value="graduando">Graduando(a)</option>
+            <option value="graduado">Graduado(a)</option>
+            <option value="especialista">Especialista</option>
+            <option value="mestrando">Mestrando(a)</option>
+            <option value="mestre">Mestre</option>
+            <option value="doutorando">Doutorando(a)</option>
+            <option value="doutor">Doutor(a)</option>
+            <option value="pos_doutor">Pós-Doutor(a)</option>
+          </select>
+        </div>
+      </div>
+
       <div class="field-row">
         <div class="field">
           <label>E-mail institucional <span class="req">✱</span></label>
           <input type="email" id="p-email" placeholder="seu@instituicao.br" autocomplete="email">
-          <span class="hint">As notificações do processo serão enviadas para este e-mail.</span>
+          <span class="hint">Notificações do processo serão enviadas aqui.</span>
         </div>
         <div class="field">
-          <label>Telefone <span class="opt">(opcional)</span></label>
+          <label>Telefone / WhatsApp <span class="req">✱</span></label>
           <input type="tel" id="p-tel" placeholder="(XX) XXXXX-XXXX">
+          <span class="hint">Contato de emergência em campo.</span>
         </div>
       </div>
+
       <div class="field">
         <label>Instituição / Universidade <span class="req">✱</span></label>
         <input type="text" id="p-inst" placeholder="Ex: UFAC, INPA, EMBRAPA…">
       </div>
+
       <div class="field">
-        <label>Lattes / Currículo <span class="opt">(opcional)</span></label>
+        <label>Currículo Lattes <span class="opt">(opcional)</span></label>
         <input type="url" id="p-lattes" placeholder="http://lattes.cnpq.br/…">
       </div>
+
     </div>
     <div class="btn-nav">
       <span></span>
@@ -216,18 +278,21 @@ body {
     </div>
   </div>
 
-  <!-- Passo 2 (oculto) -->
+  <!-- ─── Passo 2: Projeto ───────────────────────────────────── -->
   <div class="passo-card" id="passo2" style="display:none">
     <div class="passo-title">🔬 Dados do Projeto de Pesquisa</div>
     <div class="field-group">
+
       <div class="field">
         <label>Título da pesquisa <span class="req">✱</span></label>
         <input type="text" id="p-titulo" placeholder="Título completo do projeto">
       </div>
+
       <div class="field">
         <label>Resumo <span class="req">✱</span></label>
-        <textarea id="p-resumo" rows="4" placeholder="Descreva os objetivos, metodologia e relevância científica da pesquisa (mínimo 100 caracteres)"></textarea>
+        <textarea id="p-resumo" rows="4" placeholder="Descreva os objetivos, metodologia e relevância científica (mínimo 100 caracteres)"></textarea>
       </div>
+
       <div class="field-row">
         <div class="field">
           <label>Tipo de pesquisa <span class="req">✱</span></label>
@@ -247,6 +312,7 @@ body {
           </select>
         </div>
       </div>
+
       <div class="field-row">
         <div class="field">
           <label>Início previsto</label>
@@ -257,6 +323,7 @@ body {
           <input type="date" id="p-fim">
         </div>
       </div>
+
       <div class="field">
         <label>Área de atuação estimada (ha) <span class="opt">(opcional)</span></label>
         <input type="number" id="p-area" step="0.01" min="0" placeholder="Ex: 1250.50">
@@ -275,7 +342,7 @@ body {
           <input type="checkbox" id="p-humanos" onchange="atualizarCondicionais()">
           <div>
             <div class="toggle-label">👥 A pesquisa envolve seres humanos</div>
-            <div class="toggle-sub">Requer registro na CONEP (Comissão Nacional de Ética em Pesquisa)</div>
+            <div class="toggle-sub">Requer registro na CONEP</div>
           </div>
         </label>
       </div>
@@ -290,6 +357,7 @@ body {
           <input type="text" id="p-sisgen" placeholder="Ex: AB123456">
         </div>
       </div>
+
     </div>
     <div class="btn-nav">
       <button class="btn btn-secondary" onclick="irPasso(1)">← Voltar</button>
@@ -297,16 +365,128 @@ body {
     </div>
   </div>
 
-  <!-- Passo 3 (oculto) -->
+  <!-- ─── Passo 3: Equipe ────────────────────────────────────── -->
   <div class="passo-card" id="passo3" style="display:none">
+    <div class="passo-title">
+      👥 Equipe de Pesquisa
+      <span class="equipe-badge" id="badge-equipe" style="display:none"></span>
+    </div>
+
+    <div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:10px;padding:14px 16px;font-size:13px;color:#1E40AF;margin-bottom:20px;line-height:1.6">
+      <strong>Importante:</strong> Apenas pesquisadores listados aqui estarão autorizados a acessar a UC em nome desta pesquisa. O cadastro de equipe é <strong>opcional</strong> e pode ser complementado após a aprovação mediante nova solicitação.
+    </div>
+
+    <!-- Formulário de adição de membro -->
+    <div class="equipe-form-box">
+      <div class="equipe-form-title">➕ Adicionar membro</div>
+      <div class="field-group">
+
+        <div class="field-row">
+          <div class="field">
+            <label>Nome completo <span class="req">✱</span></label>
+            <input type="text" id="m-nome" placeholder="Nome completo do membro">
+          </div>
+          <div class="field">
+            <label>CPF <span class="req">✱</span></label>
+            <input type="text" id="m-cpf" placeholder="000.000.000-00" maxlength="14">
+          </div>
+        </div>
+
+        <div class="field-row">
+          <div class="field">
+            <label>RG</label>
+            <input type="text" id="m-rg" placeholder="Número do RG">
+          </div>
+          <div class="field">
+            <label>Data de nascimento</label>
+            <input type="date" id="m-nascimento">
+          </div>
+        </div>
+
+        <div class="field-row">
+          <div class="field">
+            <label>E-mail <span class="req">✱</span></label>
+            <input type="email" id="m-email" placeholder="email@instituicao.br">
+            <span class="hint">Receberá notificações do processo.</span>
+          </div>
+          <div class="field">
+            <label>Telefone / WhatsApp</label>
+            <input type="tel" id="m-telefone" placeholder="(XX) XXXXX-XXXX">
+          </div>
+        </div>
+
+        <div class="field-row">
+          <div class="field">
+            <label>Instituição <span class="req">✱</span></label>
+            <input type="text" id="m-inst" placeholder="UFAC, INPA, EMBRAPA…">
+            <button type="button" onclick="copiarInstituicao()" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--verde-c);font-weight:600;text-align:left;margin-top:3px;padding:0">↑ Copiar do responsável</button>
+          </div>
+          <div class="field">
+            <label>Função na equipe <span class="req">✱</span></label>
+            <select id="m-funcao">
+              <option value="">Selecione…</option>
+              <option value="co_orientador">Co-orientador(a)</option>
+              <option value="pesquisador_colaborador">Pesquisador(a) colaborador(a)</option>
+              <option value="mestrando">Mestrando(a)</option>
+              <option value="doutorando">Doutorando(a)</option>
+              <option value="bolsista">Bolsista</option>
+              <option value="tecnico_campo">Técnico(a) de campo</option>
+              <option value="estagiario">Estagiário(a)</option>
+              <option value="auxiliar">Auxiliar de pesquisa</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field-row">
+          <div class="field">
+            <label>Titulação <span class="opt">(opcional)</span></label>
+            <select id="m-titulacao">
+              <option value="">—</option>
+              <option value="graduando">Graduando(a)</option>
+              <option value="graduado">Graduado(a)</option>
+              <option value="especialista">Especialista</option>
+              <option value="mestrando">Mestrando(a)</option>
+              <option value="mestre">Mestre</option>
+              <option value="doutorando">Doutorando(a)</option>
+              <option value="doutor">Doutor(a)</option>
+              <option value="pos_doutor">Pós-Doutor(a)</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Currículo Lattes <span class="opt">(opcional)</span></label>
+            <input type="url" id="m-lattes" placeholder="http://lattes.cnpq.br/…">
+          </div>
+        </div>
+
+      </div>
+      <button class="btn btn-verde" style="margin-top:16px;width:100%" onclick="adicionarMembro()">
+        + Adicionar à equipe
+      </button>
+    </div>
+
+    <!-- Lista de membros -->
+    <div id="lista-equipe">
+      <div class="equipe-vazia" id="equipe-vazia">
+        Nenhum membro adicionado ainda.<br>
+        <span style="font-size:12px">Use o formulário acima para incluir pesquisadores, bolsistas e técnicos de campo.</span>
+      </div>
+    </div>
+
+    <div class="btn-nav">
+      <button class="btn btn-secondary" onclick="irPasso(2)">← Voltar</button>
+      <button class="btn btn-primary" onclick="irPasso(4)">Próximo →</button>
+    </div>
+  </div>
+
+  <!-- ─── Passo 4: Documentos ───────────────────────────────── -->
+  <div class="passo-card" id="passo4" style="display:none">
     <div class="passo-title">📎 Documentos Obrigatórios</div>
     <div class="field-group">
 
       <div class="field">
         <label>Formulário de pesquisa assinado <span class="req">✱ obrigatório</span></label>
         <div class="hint" style="margin-bottom:6px">
-          <a href="https://sema.ac.gov.br" target="_blank" style="color:var(--verde-c);font-weight:600">Baixe o formulário aqui →</a>
-          , assine e envie em PDF.
+          <a href="https://sema.ac.gov.br" target="_blank" style="color:var(--verde-c);font-weight:600">Baixe o formulário aqui →</a>, assine e envie em PDF.
         </div>
         <div class="upload-zone upload-obrigatorio" id="uz-formulario" ondragover="dragOver(event,'formulario')" ondragleave="dragLeave('formulario')" ondrop="dropFile(event,'formulario')">
           <input type="file" accept=".pdf,.PDF" onchange="selecionarArquivo(this,'formulario')">
@@ -351,24 +531,27 @@ body {
       </div>
 
       <div style="background:#F0FDF4;border-radius:var(--raio);padding:14px 16px;font-size:13px;color:#166534;line-height:1.6">
-        ✅ Após o envio, você receberá um e-mail de confirmação com o número do processo e poderá acompanhar o andamento pelo portal.
+        ✅ Após o envio você receberá um e-mail com o número do processo e poderá acompanhar o andamento pelo portal.
       </div>
+
     </div>
     <div class="btn-nav">
-      <button class="btn btn-secondary" onclick="irPasso(2)">← Voltar</button>
+      <button class="btn btn-secondary" onclick="irPasso(3)">← Voltar</button>
       <button class="btn btn-primary" id="btn-enviar" onclick="enviarSubmissao()">Enviar Pesquisa →</button>
     </div>
   </div>
 
-  <!-- Sucesso (oculto) -->
+  <!-- Sucesso -->
   <div class="sucesso-card" id="passo-sucesso" style="display:none">
     <div class="sucesso-icon">🎉</div>
     <div class="sucesso-titulo">Pesquisa submetida com sucesso!</div>
     <p class="sucesso-sub">Seu processo foi registrado. Guarde o número abaixo — você precisará dele para acompanhar o andamento.</p>
     <div class="codigo-box" id="sucesso-codigo">—</div>
+    <div class="sucesso-aviso" id="sucesso-equipe-aviso" style="display:none">
+      👥 <strong id="sucesso-n-membros"></strong> da equipe foram cadastrados e receberão e-mail de acompanhamento após aprovação da pesquisa.
+    </div>
     <div class="sucesso-aviso">
-      📧 Um e-mail de confirmação com todos os detalhes e o link de acompanhamento foi enviado para <strong id="sucesso-email">—</strong>.<br>
-      Verifique sua caixa de entrada (e a pasta de spam).
+      📧 Confirmação enviada para <strong id="sucesso-email">—</strong>. Verifique também a pasta de spam.
     </div>
     <a class="btn-status" id="link-status" href="#">
       📊 Acompanhar minha pesquisa
@@ -386,9 +569,21 @@ const { createClient } = supabase
 const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
 
 // ── Estado ────────────────────────────────────────────────────
-const _arquivos = { formulario: null, proposta: null, sisbio: null, conep: null }
+const _arquivos  = { formulario: null, proposta: null, sisbio: null, conep: null }
+let   _equipe    = []   // array de objetos {nome_completo, cpf, rg, ...}
 let   _passoAtual = 1
-let   _ucs = []
+let   _ucs        = []
+
+const FUNCAO_LABEL = {
+  co_orientador:           'Co-orientador(a)',
+  pesquisador_colaborador: 'Pesquisador(a) colaborador(a)',
+  mestrando:               'Mestrando(a)',
+  doutorando:              'Doutorando(a)',
+  bolsista:                'Bolsista',
+  tecnico_campo:           'Técnico(a) de campo',
+  estagiario:              'Estagiário(a)',
+  auxiliar:                'Auxiliar de pesquisa'
+}
 
 // ── Init ─────────────────────────────────────────────────────
 async function init() {
@@ -401,27 +596,22 @@ async function init() {
       .order('nome')
     if (error) throw error
     _ucs = data || []
-    if (_ucs.length === 0) {
+    if (!_ucs.length) {
       const opt = document.createElement('option')
-      opt.value = ''
+      opt.value = ''; opt.disabled = true
       opt.textContent = 'Nenhuma UC estadual disponível'
-      opt.disabled = true
-      sel.appendChild(opt)
-      return
+      sel.appendChild(opt); return
     }
     _ucs.forEach(uc => {
       const opt = document.createElement('option')
-      opt.value = uc.id
-      opt.textContent = uc.nome
+      opt.value = uc.id; opt.textContent = uc.nome
       sel.appendChild(opt)
     })
   } catch (err) {
     const opt = document.createElement('option')
-    opt.value = ''
-    opt.textContent = 'Erro ao carregar UCs — tente recarregar a página'
-    opt.disabled = true
+    opt.value = ''; opt.disabled = true
+    opt.textContent = 'Erro ao carregar UCs — recarregue a página'
     sel.appendChild(opt)
-    console.error('Erro ao carregar UCs:', err.message)
   }
 }
 
@@ -429,19 +619,24 @@ async function init() {
 function irPasso(n) {
   if (n > _passoAtual && !validarPasso(_passoAtual)) return
 
-  ;['passo1','passo2','passo3'].forEach((id, i) => {
-    document.getElementById(id).style.display = (i + 1 === n) ? '' : 'none'
+  ;['passo1','passo2','passo3','passo4'].forEach((id, i) => {
+    const el = document.getElementById(id)
+    if (el) el.style.display = (i + 1 === n) ? '' : 'none'
   })
 
-  ;[1,2,3].forEach(i => {
+  ;[1,2,3,4].forEach(i => {
     const num = document.getElementById('sn' + i)
     const lbl = document.getElementById('sl' + i)
+    if (!num || !lbl) return
     num.className = 'step-num ' + (i < n ? 'feito' : i === n ? 'ativo' : '')
     lbl.className = 'step-label ' + (i === n ? 'ativo' : '')
     num.textContent = i < n ? '✓' : String(i)
   })
-  if (n > 1) document.getElementById('sl12').classList.toggle('feita', n > 2 || n >= 2)
-  if (n > 2) document.getElementById('sl23').classList.add('feita')
+
+  const lines = { sl12: n > 1, sl23: n > 2, sl34: n > 3 }
+  Object.entries(lines).forEach(([id, ativa]) => {
+    document.getElementById(id)?.classList.toggle('feita', ativa)
+  })
 
   _passoAtual = n
   window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -451,34 +646,144 @@ function validarPasso(n) {
   if (n === 1) {
     const nome  = document.getElementById('p-nome').value.trim()
     const cpf   = document.getElementById('p-cpf').value.trim()
+    const rg    = document.getElementById('p-rg').value.trim()
+    const tit   = document.getElementById('p-titulacao').value
     const email = document.getElementById('p-email').value.trim()
+    const tel   = document.getElementById('p-tel').value.trim()
     const inst  = document.getElementById('p-inst').value.trim()
-    if (!nome || !cpf || !email || !inst) { toastPub('Preencha todos os campos obrigatórios', true); return false }
-    if (!/\S+@\S+\.\S+/.test(email))      { toastPub('E-mail inválido', true); return false }
+    if (!nome || !cpf || !rg || !tit || !email || !tel || !inst) {
+      toastPub('Preencha todos os campos obrigatórios', true); return false
+    }
+    if (!/\S+@\S+\.\S+/.test(email)) { toastPub('E-mail inválido', true); return false }
     return true
   }
   if (n === 2) {
     const titulo = document.getElementById('p-titulo').value.trim()
     const resumo = document.getElementById('p-resumo').value.trim()
     const uc     = document.getElementById('p-uc').value
-    if (!titulo || !resumo || !uc)        { toastPub('Preencha título, resumo e UC', true); return false }
-    if (resumo.length < 100)              { toastPub('O resumo deve ter ao menos 100 caracteres', true); return false }
+    if (!titulo || !resumo || !uc) { toastPub('Preencha título, resumo e UC', true); return false }
+    if (resumo.length < 100)       { toastPub('O resumo deve ter ao menos 100 caracteres', true); return false }
     return true
   }
-  return true
+  return true  // passo 3 (equipe) é opcional
 }
 
 // ── Condicionais SISBIO / CONEP ───────────────────────────────
 function atualizarCondicionais() {
   const coleta  = document.getElementById('p-coleta').checked
   const humanos = document.getElementById('p-humanos').checked
-
-  document.getElementById('sisbio-row').style.display   = coleta ? '' : 'none'
-  document.getElementById('field-sisbio').style.display = coleta ? '' : 'none'
+  document.getElementById('sisbio-row').style.display   = coleta  ? '' : 'none'
+  document.getElementById('field-sisbio').style.display = coleta  ? '' : 'none'
   document.getElementById('field-conep').style.display  = humanos ? '' : 'none'
 }
 
-// ── Upload de arquivos ────────────────────────────────────────
+// ── Equipe ────────────────────────────────────────────────────
+function iniciais(nome) {
+  const partes = (nome || '').trim().split(' ').filter(Boolean)
+  if (!partes.length) return '?'
+  if (partes.length === 1) return partes[0][0].toUpperCase()
+  return (partes[0][0] + partes[partes.length - 1][0]).toUpperCase()
+}
+
+function copiarInstituicao() {
+  const inst = document.getElementById('p-inst').value.trim()
+  if (inst) document.getElementById('m-inst').value = inst
+}
+
+function adicionarMembro() {
+  const nome   = document.getElementById('m-nome').value.trim()
+  const cpf    = document.getElementById('m-cpf').value.trim()
+  const email  = document.getElementById('m-email').value.trim()
+  const inst   = document.getElementById('m-inst').value.trim()
+  const funcao = document.getElementById('m-funcao').value
+
+  if (!nome)   { toastPub('Informe o nome do membro', true); return }
+  if (!cpf)    { toastPub('Informe o CPF do membro', true); return }
+  if (!email)  { toastPub('Informe o e-mail do membro', true); return }
+  if (!inst)   { toastPub('Informe a instituição do membro', true); return }
+  if (!funcao) { toastPub('Selecione a função do membro', true); return }
+  if (!/\S+@\S+\.\S+/.test(email)) { toastPub('E-mail do membro inválido', true); return }
+
+  // Verifica CPF duplicado
+  if (_equipe.some(m => m.cpf === cpf)) {
+    toastPub('Este CPF já foi adicionado à equipe', true); return
+  }
+
+  _equipe.push({
+    nome_completo:   nome,
+    cpf:             cpf,
+    rg:              document.getElementById('m-rg').value.trim(),
+    data_nascimento: document.getElementById('m-nascimento').value || '',
+    email:           email,
+    telefone:        document.getElementById('m-telefone').value.trim(),
+    instituicao:     inst,
+    funcao:          funcao,
+    titulacao:       document.getElementById('m-titulacao').value,
+    lattes:          document.getElementById('m-lattes').value.trim(),
+  })
+
+  // Limpa formulário
+  ;['m-nome','m-cpf','m-rg','m-email','m-telefone','m-inst','m-lattes'].forEach(id => {
+    document.getElementById(id).value = ''
+  })
+  document.getElementById('m-nascimento').value = ''
+  document.getElementById('m-funcao').value    = ''
+  document.getElementById('m-titulacao').value = ''
+
+  renderEquipe()
+  toastPub(`${nome} adicionado(a) à equipe`)
+}
+
+function removerMembro(i) {
+  const nome = _equipe[i]?.nome_completo
+  _equipe.splice(i, 1)
+  renderEquipe()
+  if (nome) toastPub(`${nome} removido(a) da equipe`)
+}
+
+function renderEquipe() {
+  const lista = document.getElementById('lista-equipe')
+  const badge = document.getElementById('badge-equipe')
+
+  if (!_equipe.length) {
+    lista.innerHTML = `<div class="equipe-vazia">
+      Nenhum membro adicionado ainda.<br>
+      <span style="font-size:12px">Use o formulário acima para incluir pesquisadores, bolsistas e técnicos de campo.</span>
+    </div>`
+    badge.style.display = 'none'
+    return
+  }
+
+  badge.style.display = ''
+  badge.textContent   = `${_equipe.length} membro${_equipe.length > 1 ? 's' : ''}`
+
+  lista.innerHTML = _equipe.map((m, i) => `
+  <div class="membro-card">
+    <div class="membro-avatar">${iniciais(m.nome_completo)}</div>
+    <div class="membro-info">
+      <div class="membro-nome">${esc(m.nome_completo)}</div>
+      <div class="membro-sub">
+        ${FUNCAO_LABEL[m.funcao] || m.funcao}
+        ${m.titulacao ? ' · ' + esc(m.titulacao) : ''}
+      </div>
+      <div class="membro-sub">
+        ${esc(m.instituicao || '—')} · ${esc(m.email)}
+        ${m.telefone ? ' · ' + esc(m.telefone) : ''}
+      </div>
+      <div class="membro-sub" style="color:#9CA3AF">
+        CPF: ${esc(m.cpf)}${m.rg ? ' · RG: ' + esc(m.rg) : ''}
+      </div>
+    </div>
+    <button class="btn-remover" onclick="removerMembro(${i})" title="Remover membro">×</button>
+  </div>`).join('')
+}
+
+function esc(s) {
+  if (!s) return ''
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')
+}
+
+// ── Upload ────────────────────────────────────────────────────
 const MAX_MB = { formulario: 10, proposta: 20, sisbio: 10, conep: 10 }
 
 function selecionarArquivo(input, tipo) {
@@ -486,74 +791,79 @@ function selecionarArquivo(input, tipo) {
   if (!file) return
   if (file.size > MAX_MB[tipo] * 1024 * 1024) {
     toastPub(`Arquivo muito grande. Máx ${MAX_MB[tipo]}MB`, true)
-    input.value = ''
-    return
+    input.value = ''; return
   }
   _arquivos[tipo] = file
   const zone = document.getElementById('uz-' + tipo)
-  zone.classList.add('has-file')
-  zone.classList.remove('upload-obrigatorio')
-  const fi = document.getElementById('fi-' + tipo)
-  fi.textContent = `✓ ${file.name} (${(file.size/1024/1024).toFixed(1)} MB)`
+  zone.classList.add('has-file'); zone.classList.remove('upload-obrigatorio')
+  document.getElementById('fi-' + tipo).textContent = `✓ ${file.name} (${(file.size/1024/1024).toFixed(1)} MB)`
 }
 
-function dragOver(e, tipo) { e.preventDefault(); document.getElementById('uz-' + tipo).classList.add('dragover') }
-function dragLeave(tipo)    { document.getElementById('uz-' + tipo).classList.remove('dragover') }
-function dropFile(e, tipo)  {
-  e.preventDefault()
-  dragLeave(tipo)
-  const file = e.dataTransfer.files?.[0]
-  if (!file) return
+function dragOver(e, tipo)  { e.preventDefault(); document.getElementById('uz-' + tipo).classList.add('dragover') }
+function dragLeave(tipo)     { document.getElementById('uz-' + tipo).classList.remove('dragover') }
+function dropFile(e, tipo)   {
+  e.preventDefault(); dragLeave(tipo)
+  const file = e.dataTransfer.files?.[0]; if (!file) return
   const input = document.querySelector(`#uz-${tipo} input[type=file]`)
-  const dt = new DataTransfer()
-  dt.items.add(file)
-  input.files = dt.files
-  selecionarArquivo(input, tipo)
+  const dt = new DataTransfer(); dt.items.add(file)
+  input.files = dt.files; selecionarArquivo(input, tipo)
 }
 
 // ── Envio ─────────────────────────────────────────────────────
 async function enviarSubmissao() {
-  // Valida documentos obrigatórios
   const coleta  = document.getElementById('p-coleta').checked
   const humanos = document.getElementById('p-humanos').checked
 
   if (!_arquivos.formulario) { toastPub('Anexe o formulário de pesquisa assinado', true); return }
   if (!_arquivos.proposta)   { toastPub('Anexe a proposta do projeto', true); return }
-  if (coleta  && !_arquivos.sisbio) { toastPub('Anexe o comprovante SISBIO (coleta biológica marcada)', true); return }
-  if (humanos && !_arquivos.conep)  { toastPub('Anexe o registro CONEP (pesquisa com humanos marcada)', true); return }
+  if (coleta  && !_arquivos.sisbio) { toastPub('Anexe o comprovante SISBIO', true); return }
+  if (humanos && !_arquivos.conep)  { toastPub('Anexe o registro CONEP', true); return }
 
   const btn = document.getElementById('btn-enviar')
-  btn.disabled = true
-  btn.textContent = 'Enviando…'
+  btn.disabled = true; btn.textContent = 'Enviando…'
 
   try {
-    // 1. Cria registro no banco
+    // 1. Cria registro
     const { data: resultado, error } = await db.rpc('submeter_pesquisa_publica', {
-      p_titulo:               document.getElementById('p-titulo').value.trim(),
-      p_resumo:               document.getElementById('p-resumo').value.trim(),
-      p_tipo:                 document.getElementById('p-tipo').value,
-      p_uc_id:                document.getElementById('p-uc').value || null,
-      p_data_inicio_prevista: document.getElementById('p-inicio').value || null,
-      p_data_fim_prevista:    document.getElementById('p-fim').value || null,
-      p_area_ha:              parseFloat(document.getElementById('p-area').value) || null,
-      p_pesquisador_nome:     document.getElementById('p-nome').value.trim(),
-      p_pesquisador_cpf:      document.getElementById('p-cpf').value.trim(),
-      p_pesquisador_email:    document.getElementById('p-email').value.trim(),
-      p_pesquisador_inst:     document.getElementById('p-inst').value.trim(),
-      p_sisbio_numero:        document.getElementById('p-sisbio')?.value.trim() || null,
-      p_sisgen_numero:        document.getElementById('p-sisgen')?.value.trim() || null,
-      p_coleta_biologica:     coleta,
-      p_pesquisa_humanos:     humanos,
+      p_titulo:                  document.getElementById('p-titulo').value.trim(),
+      p_resumo:                  document.getElementById('p-resumo').value.trim(),
+      p_tipo:                    document.getElementById('p-tipo').value,
+      p_uc_id:                   document.getElementById('p-uc').value || null,
+      p_data_inicio_prevista:    document.getElementById('p-inicio').value || null,
+      p_data_fim_prevista:       document.getElementById('p-fim').value || null,
+      p_area_ha:                 parseFloat(document.getElementById('p-area').value) || null,
+      p_pesquisador_nome:        document.getElementById('p-nome').value.trim(),
+      p_pesquisador_cpf:         document.getElementById('p-cpf').value.trim(),
+      p_pesquisador_email:       document.getElementById('p-email').value.trim(),
+      p_pesquisador_inst:        document.getElementById('p-inst').value.trim(),
+      p_pesquisador_telefone:    document.getElementById('p-tel').value.trim() || null,
+      p_pesquisador_lattes:      document.getElementById('p-lattes').value.trim() || null,
+      p_pesquisador_titulacao:   document.getElementById('p-titulacao').value || null,
+      p_pesquisador_rg:          document.getElementById('p-rg').value.trim() || null,
+      p_sisbio_numero:           document.getElementById('p-sisbio')?.value.trim() || null,
+      p_sisgen_numero:           document.getElementById('p-sisgen')?.value.trim() || null,
+      p_coleta_biologica:        coleta,
+      p_pesquisa_humanos:        humanos,
     })
-
     if (error) throw new Error(error.message)
 
     const { id: pesquisaId, numero_processo, token_publico } = resultado
 
-    // 2. Upload dos documentos
+    // 2. Insere equipe (se houver)
+    if (_equipe.length > 0) {
+      btn.textContent = `Cadastrando equipe (${_equipe.length} membros)…`
+      const { error: eqErr } = await db.rpc('inserir_equipe_pesquisa_publica', {
+        p_token:   token_publico,
+        p_membros: _equipe
+      })
+      if (eqErr) throw new Error('Erro ao cadastrar equipe: ' + eqErr.message)
+    }
+
+    // 3. Upload dos documentos
+    btn.textContent = 'Enviando documentos…'
     const uploads = [
       { tipo: 'formulario', arquivo: _arquivos.formulario },
-      { tipo: 'proposta',   arquivo: _arquivos.proposta },
+      { tipo: 'proposta',   arquivo: _arquivos.proposta   },
       coleta  ? { tipo: 'sisbio', arquivo: _arquivos.sisbio } : null,
       humanos ? { tipo: 'conep',  arquivo: _arquivos.conep  } : null,
     ].filter(Boolean)
@@ -561,45 +871,39 @@ async function enviarSubmissao() {
     for (const { tipo, arquivo } of uploads) {
       const ext  = arquivo.name.split('.').pop()
       const path = `${pesquisaId}/${tipo}_${Date.now()}.${ext}`
-
       const { error: upErr } = await db.storage
         .from('pesquisa-documentos')
         .upload(path, arquivo, { contentType: arquivo.type })
-
       if (upErr) throw new Error(`Erro ao enviar ${tipo}: ${upErr.message}`)
-
-      // Registro via RPC (valida o token); o INSERT direto do anon
-      // não é mais permitido pelo RLS.
       const { error: docErr } = await db.rpc('anexar_documento_publico', {
-        p_token:        token_publico,
-        p_tipo:         tipo,
-        p_nome:         arquivo.name,
-        p_storage_path: path,
-        p_tamanho:      arquivo.size,
-        p_mime:         arquivo.type,
+        p_token: token_publico, p_tipo: tipo,
+        p_nome: arquivo.name, p_storage_path: path,
+        p_tamanho: arquivo.size, p_mime: arquivo.type,
       })
       if (docErr) throw new Error(`Erro ao registrar ${tipo}: ${docErr.message}`)
     }
 
-    // 3. O e-mail de confirmação é enfileirado por submeter_pesquisa_publica
-    //    e enviado pela função processar-pesquisa-emails (cron). Não é mais
-    //    disparado direto daqui (evita chamada sem JWT à edge function).
-
-    // 4. Mostra sucesso
-    ;['passo1','passo2','passo3','steps-bar'].forEach(id => {
+    // 4. Sucesso
+    ;['passo1','passo2','passo3','passo4','steps-bar'].forEach(id => {
       const el = document.getElementById(id)
       if (el) el.style.display = 'none'
     })
+    document.querySelector('.pub-hero').style.display = 'none'
     document.getElementById('passo-sucesso').style.display = ''
-    document.getElementById('sucesso-codigo').textContent = numero_processo
-    document.getElementById('sucesso-email').textContent  = document.getElementById('p-email').value.trim()
+    document.getElementById('sucesso-codigo').textContent  = numero_processo
+    document.getElementById('sucesso-email').textContent   = document.getElementById('p-email').value.trim()
     document.getElementById('link-status').href = `pesquisa-status.html?token=${token_publico}`
+
+    if (_equipe.length > 0) {
+      document.getElementById('sucesso-equipe-aviso').style.display = ''
+      document.getElementById('sucesso-n-membros').textContent =
+        `${_equipe.length} membro${_equipe.length > 1 ? 's' : ''}`
+    }
     window.scrollTo({ top: 0, behavior: 'smooth' })
 
   } catch (err) {
     toastPub('Erro ao enviar: ' + err.message, true)
-    btn.disabled = false
-    btn.textContent = 'Enviar Pesquisa →'
+    btn.disabled = false; btn.textContent = 'Enviar Pesquisa →'
   }
 }
 
@@ -612,14 +916,17 @@ function toastPub(msg, erro = false) {
   el._t = setTimeout(() => el.classList.remove('show'), 3500)
 }
 
-// ── Formatação CPF ────────────────────────────────────────────
-document.getElementById('p-cpf').addEventListener('input', function() {
-  let v = this.value.replace(/\D/g,'').slice(0,11)
-  if (v.length > 9) v = v.replace(/(\d{3})(\d{3})(\d{3})(\d{0,2})/,'$1.$2.$3-$4')
+// ── Máscaras ──────────────────────────────────────────────────
+function aplicarMascaraCPF(el) {
+  let v = el.value.replace(/\D/g,'').slice(0,11)
+  if (v.length > 9)      v = v.replace(/(\d{3})(\d{3})(\d{3})(\d{0,2})/,'$1.$2.$3-$4')
   else if (v.length > 6) v = v.replace(/(\d{3})(\d{3})(\d{0,3})/,'$1.$2.$3')
   else if (v.length > 3) v = v.replace(/(\d{3})(\d{0,3})/,'$1.$2')
-  this.value = v
-})
+  el.value = v
+}
+
+document.getElementById('p-cpf').addEventListener('input', function() { aplicarMascaraCPF(this) })
+document.getElementById('m-cpf').addEventListener('input', function() { aplicarMascaraCPF(this) })
 
 init()
 </script>
