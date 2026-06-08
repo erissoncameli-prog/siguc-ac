@@ -4,249 +4,1070 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>SIGUC-AC · Submissão de Pesquisa Científica</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@700;800&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,700;0,9..144,800;1,9..144,400;1,9..144,700&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --floresta: #0A1A0F;
-  --verde-c:  #52B788;
-  --ouro:     #C9A84C;
-  --ouro-c:   #F0CB6A;
-  --t1:       #F4EFE6;
-  --borda:    #E5E7EB;
-  --raio:     10px;
+  --floresta:  #0A1A0F;
+  --floresta2: #142A1A;
+  --musgo:     #1F4E2C;
+  --verde-c:   #52B788;
+  --verde-l:   #A7D9BE;
+  --ouro:      #C9A84C;
+  --ouro-c:    #F0CB6A;
+  --t1:        #F4EFE6;
+  --casca:     #E8E0D0;
+  --borda:     #D9D0BE;
+  --texto:     #1A120A;
+  --texto-m:   #6B5C48;
+  --texto-s:   #9A8C7A;
+  --card:      #FDFAF5;
+  --raio:      12px;
+  --raio-s:    8px;
+  --sombra:    0 2px 8px rgba(10,26,15,.06), 0 1px 2px rgba(10,26,15,.04);
+  --sombra-m:  0 8px 32px rgba(10,26,15,.10), 0 2px 8px rgba(10,26,15,.06);
 }
 
-body { font-family: 'DM Sans', sans-serif; background: var(--t1); min-height: 100vh; color: #111827; }
-
-/* Header */
-.pub-header { background: var(--floresta); padding: 20px 32px; display: flex; align-items: center; gap: 16px; }
-.pub-logo { font-family: 'Fraunces', Georgia, serif; font-size: 26px; font-weight: 800; color: var(--ouro-c); letter-spacing: -.02em; }
-.pub-logo-sub { font-size: 10px; color: #9CA3AF; letter-spacing: .08em; text-transform: uppercase; margin-top: 2px; }
-.pub-header-right { margin-left: auto; font-size: 12px; color: #9CA3AF; text-align: right; }
-.pub-header-right a { color: var(--verde-c); text-decoration: none; font-weight: 600; }
-
-/* Container */
-.pub-main { max-width: 760px; margin: 0 auto; padding: 32px 16px 64px; }
-
-/* Hero */
-.pub-hero { background: #fff; border-radius: 14px; padding: 28px 32px; margin-bottom: 24px; border: 1px solid var(--borda); }
-.pub-hero h1 { font-family: 'Fraunces', serif; font-size: 24px; font-weight: 800; color: var(--floresta); margin-bottom: 8px; }
-.pub-hero p  { font-size: 14px; color: #6B7280; line-height: 1.7; }
-.pub-hero .docs-list { margin-top: 14px; display: flex; flex-direction: column; gap: 6px; }
-.pub-hero .doc-item  { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #374151; }
-.pub-hero .doc-item .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--verde-c); flex-shrink: 0; }
-.pub-hero .doc-cond { font-size: 11px; color: #F59E0B; font-weight: 700; }
-
-/* Steps */
-.steps-bar { display: flex; align-items: center; margin-bottom: 24px; }
-.step-item  { display: flex; align-items: center; gap: 6px; }
-.step-num   { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content:center; font-size: 12px; font-weight: 800; flex-shrink: 0; background: #E5E7EB; color: #9CA3AF; transition: all .2s; }
-.step-num.ativo  { background: var(--floresta); color: #fff; }
-.step-num.feito  { background: var(--verde-c);  color: #fff; }
-.step-label { font-size: 11px; font-weight: 600; color: #9CA3AF; white-space: nowrap; }
-.step-label.ativo { color: var(--floresta); }
-.step-line  { flex: 1; height: 2px; background: #E5E7EB; margin: 0 6px; }
-.step-line.feita { background: var(--verde-c); }
-
-/* Card */
-.passo-card { background: #fff; border-radius: 14px; border: 1px solid var(--borda); padding: 28px 32px; }
-.passo-title { font-size: 17px; font-weight: 800; color: var(--floresta); margin-bottom: 20px; display: flex; align-items: center; gap: 10px; }
-
-/* Campos */
-.field-group { display: flex; flex-direction: column; gap: 14px; }
-.field-row   { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-.field-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
-@media (max-width: 600px) { .field-row, .field-row-3 { grid-template-columns: 1fr; } }
-
-.field { display: flex; flex-direction: column; gap: 5px; }
-.field label { font-size: 12px; font-weight: 700; color: #374151; }
-.field label .req { color: #DC2626; margin-left: 2px; }
-.field label .opt { font-size: 10px; color: #9CA3AF; font-weight: 400; margin-left: 4px; }
-.field input, .field select, .field textarea {
-  padding: 10px 14px; border: 1px solid var(--borda); border-radius: var(--raio);
-  font-size: 13px; font-family: inherit; outline: none; transition: border-color .15s; background: #fff;
-}
-.field input:focus, .field select:focus, .field textarea:focus { border-color: var(--verde-c); }
-.field .hint { font-size: 11px; color: #9CA3AF; margin-top: 2px; }
-
-/* Toggle */
-.toggle-field { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--borda); border-radius: var(--raio); cursor: pointer; transition: border-color .15s; }
-.toggle-field:hover { border-color: var(--verde-c); }
-.toggle-field input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--verde-c); cursor: pointer; }
-.toggle-field .toggle-label { font-size: 13px; font-weight: 600; color: #374151; }
-.toggle-field .toggle-sub   { font-size: 11px; color: #9CA3AF; margin-top: 2px; }
-
-/* Upload */
-.upload-zone {
-  border: 2px dashed var(--borda); border-radius: var(--raio);
-  padding: 20px; text-align: center; cursor: pointer;
-  transition: all .15s; background: #FAFAFA; position: relative;
-}
-.upload-zone:hover, .upload-zone.dragover { border-color: var(--verde-c); background: #F0FDF4; }
-.upload-zone input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
-.upload-icon { font-size: 28px; margin-bottom: 6px; }
-.upload-label { font-size: 13px; font-weight: 600; color: #374151; }
-.upload-sub   { font-size: 11px; color: #9CA3AF; margin-top: 3px; }
-.upload-zone.has-file { border-color: var(--verde-c); background: #F0FDF4; }
-.upload-file-info { font-size: 12px; color: #15803D; font-weight: 600; margin-top: 6px; display: none; }
-.upload-zone.has-file .upload-file-info { display: block; }
-.upload-obrigatorio { border-color: #FECACA; background: #FFF5F5; }
-.upload-obrigatorio .upload-label { color: #DC2626; }
-
-/* Botões */
-.btn-nav { display: flex; gap: 12px; justify-content: space-between; margin-top: 24px; }
-.btn { padding: 12px 28px; border-radius: var(--raio); font-size: 14px; font-weight: 700; cursor: pointer; border: none; font-family: inherit; transition: all .15s; }
-.btn-secondary { background: #fff; color: #374151; border: 1px solid var(--borda); }
-.btn-secondary:hover { background: #F9FAFB; }
-.btn-primary { background: var(--floresta); color: #fff; }
-.btn-primary:hover { background: #1F4E2C; }
-.btn-primary:disabled { opacity: .5; cursor: not-allowed; }
-.btn-verde  { background: var(--verde-c); color: #fff; }
-.btn-verde:hover { background: #3DA774; }
-
-/* Equipe */
-.equipe-form-box {
-  background: #F9FAFB; border: 1px solid var(--borda);
-  border-radius: 12px; padding: 20px 24px; margin-bottom: 20px;
-}
-.equipe-form-title {
-  font-size: 13px; font-weight: 800; color: var(--floresta);
-  margin-bottom: 16px; display: flex; align-items: center; gap: 8px;
-}
-.membro-card {
-  background: #fff; border: 1px solid var(--borda); border-radius: 10px;
-  padding: 14px 16px; margin-bottom: 10px;
-  display: flex; align-items: flex-start; gap: 12px;
-  animation: fadeIn .2s ease;
-}
-@keyframes fadeIn { from { opacity:0; transform:translateY(-4px); } to { opacity:1; transform:none; } }
-.membro-avatar {
-  width: 36px; height: 36px; border-radius: 50%;
-  background: var(--floresta); color: var(--ouro-c);
-  display: flex; align-items: center; justify-content: center;
-  font-size: 12px; font-weight: 800; flex-shrink: 0; letter-spacing: -.02em;
-}
-.membro-info { flex: 1; min-width: 0; }
-.membro-nome { font-size: 13px; font-weight: 700; color: #111827; }
-.membro-sub  { font-size: 11px; color: #6B7280; margin-top: 2px; line-height: 1.5; }
-.btn-remover { background: none; border: none; cursor: pointer; color: #9CA3AF; font-size: 20px; padding: 0; line-height: 1; flex-shrink: 0; transition: color .15s; }
-.btn-remover:hover { color: #DC2626; }
-.equipe-vazia {
-  text-align: center; padding: 24px 16px; color: #9CA3AF; font-size: 13px;
-  border: 1px dashed var(--borda); border-radius: 10px;
-}
-.equipe-badge {
-  display: inline-flex; align-items: center; gap: 4px;
-  background: #F0FDF4; color: #15803D; border-radius: 20px;
-  padding: 3px 10px; font-size: 11px; font-weight: 700;
-  border: 1px solid #A7F3D0; margin-left: 8px;
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--t1);
+  background-image:
+    radial-gradient(ellipse 90% 70% at 5% 0%,  rgba(82,183,136,.07) 0%, transparent 55%),
+    radial-gradient(ellipse 70% 60% at 95% 100%, rgba(201,168,76,.05) 0%, transparent 50%);
+  min-height: 100vh;
+  color: var(--texto);
+  line-height: 1.5;
 }
 
-/* Sucesso */
-.sucesso-card { background: #fff; border-radius: 14px; border: 1px solid var(--borda); padding: 40px 32px; text-align: center; }
-.sucesso-icon { font-size: 52px; margin-bottom: 16px; }
-.sucesso-titulo { font-family: 'Fraunces', serif; font-size: 22px; font-weight: 800; color: var(--floresta); margin-bottom: 8px; }
-.sucesso-sub    { font-size: 14px; color: #6B7280; line-height: 1.7; margin-bottom: 24px; }
-.codigo-box { background: var(--floresta); color: var(--ouro-c); font-family: monospace; font-size: 22px; font-weight: 800; padding: 16px 32px; border-radius: var(--raio); display: inline-block; letter-spacing: .05em; margin-bottom: 20px; }
-.sucesso-aviso { background: #FFF7ED; border: 1px solid #FDE68A; border-radius: var(--raio); padding: 14px 18px; font-size: 13px; color: #92400E; margin-bottom: 20px; line-height: 1.6; }
-.btn-status { display: inline-flex; align-items: center; gap: 8px; padding: 12px 28px; background: var(--verde-c); color: #fff; border-radius: var(--raio); font-weight: 700; font-size: 14px; text-decoration: none; }
+/* ── HEADER ───────────────────────────────────────────────────── */
+.pub-header {
+  background: var(--floresta);
+  background-image:
+    repeating-linear-gradient(
+      60deg,
+      transparent 0px, transparent 20px,
+      rgba(82,183,136,.022) 20px, rgba(82,183,136,.022) 21px
+    ),
+    repeating-linear-gradient(
+      120deg,
+      transparent 0px, transparent 20px,
+      rgba(82,183,136,.022) 20px, rgba(82,183,136,.022) 21px
+    );
+  padding: 18px 44px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  position: relative;
+}
 
-/* Toast */
-.toast-pub { position: fixed; bottom: 24px; right: 24px; background: #1F4E2C; color: #fff; padding: 12px 20px; border-radius: var(--raio); font-size: 13px; font-weight: 600; z-index: 9999; opacity: 0; transform: translateY(10px); transition: all .25s; pointer-events: none; max-width: 320px; }
-.toast-pub.show { opacity: 1; transform: translateY(0); }
-.toast-pub.erro { background: #DC2626; }
+.pub-header::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent 0%, rgba(201,168,76,.35) 25%, rgba(201,168,76,.35) 75%, transparent 100%);
+}
 
-/* ── Passo 0 — Concordância com a IN ─────────────────────── */
-.passo0-card { background: #fff; border-radius: 14px; border: 1px solid var(--borda); padding: 28px 32px; }
-.passo0-badge { display: inline-flex; align-items: center; gap: 6px; background: #FFF7ED; border: 1px solid #FDE68A; color: #92400E; border-radius: 6px; padding: 4px 12px; font-size: 11px; font-weight: 700; margin-bottom: 16px; letter-spacing: .04em; text-transform: uppercase; }
-.in-header { display: flex; align-items: flex-start; gap: 14px; margin-bottom: 20px; }
-.in-icon { font-size: 38px; flex-shrink: 0; line-height: 1; }
-.in-header h2 { font-family: 'Fraunces', serif; font-size: 19px; font-weight: 800; color: var(--floresta); margin-bottom: 6px; }
-.in-header p  { font-size: 13px; color: #6B7280; line-height: 1.65; }
-.in-scroll-wrap { position: relative; margin-bottom: 20px; }
+.logo-wrap { display: flex; align-items: center; gap: 13px; }
+
+.logo-leaf-svg { flex-shrink: 0; }
+
+.pub-logo {
+  font-family: 'Fraunces', Georgia, serif;
+  font-size: 27px;
+  font-weight: 800;
+  color: var(--ouro-c);
+  letter-spacing: -.03em;
+  line-height: 1;
+}
+
+.pub-logo span { color: var(--verde-c); }
+
+.pub-logo-sub {
+  font-size: 9.5px;
+  color: rgba(255,255,255,.32);
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  margin-top: 4px;
+  font-weight: 500;
+}
+
+.pub-header-right {
+  margin-left: auto;
+  font-size: 12px;
+  color: rgba(255,255,255,.35);
+}
+
+.pub-header-right a {
+  color: var(--verde-c);
+  text-decoration: none;
+  font-weight: 600;
+  transition: color .15s;
+}
+
+.pub-header-right a:hover { color: var(--ouro-c); }
+
+/* ── MAIN ─────────────────────────────────────────────────────── */
+.pub-main { max-width: 780px; margin: 0 auto; padding: 36px 20px 80px; }
+
+/* ── HERO ─────────────────────────────────────────────────────── */
+.pub-hero {
+  margin-bottom: 28px;
+  animation: fadeUp .45s ease both;
+}
+
+.pub-hero h1 {
+  font-family: 'Fraunces', serif;
+  font-size: 34px;
+  font-weight: 800;
+  color: var(--floresta);
+  line-height: 1.12;
+  letter-spacing: -.025em;
+  margin-bottom: 12px;
+}
+
+.pub-hero h1 em {
+  font-style: italic;
+  font-weight: 700;
+  color: var(--musgo);
+}
+
+.pub-hero p {
+  font-size: 14px;
+  color: var(--texto-m);
+  line-height: 1.8;
+  max-width: 580px;
+}
+
+.docs-header {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--texto-s);
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  margin: 18px 0 10px;
+}
+
+.doc-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.doc-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 14px 8px 12px;
+  background: var(--card);
+  border: 1px solid var(--borda);
+  border-radius: 40px;
+  font-size: 12px;
+  color: var(--texto);
+  font-weight: 500;
+  box-shadow: var(--sombra);
+  animation: fadeUp .45s ease both;
+}
+
+.doc-chip:nth-child(1) { animation-delay: .06s; }
+.doc-chip:nth-child(2) { animation-delay: .10s; }
+.doc-chip:nth-child(3) { animation-delay: .14s; }
+.doc-chip:nth-child(4) { animation-delay: .18s; }
+
+.chip-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--verde-c);
+  flex-shrink: 0;
+}
+
+.chip-dot.cond { background: var(--ouro); }
+
+.chip-obrig {
+  color: #C0392B;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.chip-cond-tag {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--ouro);
+  letter-spacing: .02em;
+}
+
+/* ── PASSO 0 — Leitura da IN ──────────────────────────────────── */
+.passo0-card {
+  background: var(--floresta);
+  background-image:
+    repeating-linear-gradient(
+      -45deg,
+      rgba(82,183,136,.028) 0px, rgba(82,183,136,.028) 1px,
+      transparent 1px, transparent 26px
+    );
+  border-radius: 16px;
+  padding: 32px 36px;
+  color: rgba(244,239,230,.88);
+  box-shadow: var(--sombra-m), 0 0 0 1px rgba(82,183,136,.1);
+  animation: fadeUp .45s ease .05s both;
+}
+
+.passo0-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(201,168,76,.12);
+  border: 1px solid rgba(201,168,76,.22);
+  color: var(--ouro-c);
+  border-radius: 6px;
+  padding: 5px 12px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  margin-bottom: 22px;
+}
+
+.in-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 22px;
+}
+
+.in-icon {
+  width: 46px; height: 46px;
+  border-radius: 10px;
+  background: rgba(82,183,136,.1);
+  border: 1px solid rgba(82,183,136,.18);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 21px;
+  flex-shrink: 0;
+}
+
+.in-header h2 {
+  font-family: 'Fraunces', serif;
+  font-size: 19px;
+  font-weight: 700;
+  color: var(--ouro-c);
+  margin-bottom: 7px;
+  letter-spacing: -.015em;
+}
+
+.in-header p {
+  font-size: 13px;
+  color: rgba(244,239,230,.6);
+  line-height: 1.72;
+}
+
+.in-header p strong { color: rgba(244,239,230,.88); }
+
+.in-scroll-progress {
+  height: 2px;
+  background: rgba(255,255,255,.07);
+  border-radius: 2px;
+  margin-bottom: 10px;
+  overflow: hidden;
+}
+
+.in-scroll-progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, var(--verde-c), var(--ouro-c));
+  border-radius: 2px;
+  width: 0%;
+  transition: width .15s;
+}
+
+.in-scroll-wrap { position: relative; margin-bottom: 22px; }
+
 .in-scroll-box {
-  max-height: 330px; overflow-y: auto; border: 1px solid var(--borda);
-  border-radius: 10px; padding: 20px 22px; background: #F9FAFB;
-  font-size: 13px; line-height: 1.8; color: #374151; scroll-behavior: smooth;
+  max-height: 310px;
+  overflow-y: auto;
+  background: rgba(255,255,255,.035);
+  border: 1px solid rgba(255,255,255,.09);
+  border-radius: var(--raio);
+  padding: 20px 24px;
+  font-size: 13px;
+  line-height: 1.85;
+  color: rgba(244,239,230,.7);
+  scroll-behavior: smooth;
 }
-.in-scroll-box::-webkit-scrollbar { width: 5px; }
-.in-scroll-box::-webkit-scrollbar-track { background: #F3F4F6; border-radius: 3px; }
-.in-scroll-box::-webkit-scrollbar-thumb { background: var(--verde-c); border-radius: 3px; }
+
+.in-scroll-box::-webkit-scrollbar { width: 4px; }
+.in-scroll-box::-webkit-scrollbar-track { background: rgba(255,255,255,.04); }
+.in-scroll-box::-webkit-scrollbar-thumb { background: var(--verde-c); border-radius: 4px; }
+
 .in-scroll-hint {
-  position: absolute; bottom: 0; left: 0; right: 0; height: 56px;
-  background: linear-gradient(transparent, #F9FAFB);
-  border-radius: 0 0 10px 10px; pointer-events: none;
-  display: flex; align-items: flex-end; justify-content: center; padding-bottom: 8px;
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 60px;
+  background: linear-gradient(transparent, var(--floresta));
+  border-radius: 0 0 var(--raio) var(--raio);
+  pointer-events: none;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 8px;
   transition: opacity .4s;
 }
-.in-scroll-hint span { font-size: 11px; color: #6B7280; font-weight: 700; animation: arrowbounce .7s ease infinite alternate; }
-@keyframes arrowbounce { from { transform: translateY(0); } to { transform: translateY(5px); } }
-.in-artigo { margin-bottom: 14px; }
-.in-artigo b { color: var(--floresta); }
-.in-artigo ul { margin: 5px 0 0 18px; }
-.in-artigo li { margin-bottom: 3px; }
-.in-secao-titulo { font-size: 10px; font-weight: 800; color: #9CA3AF; letter-spacing: .1em; text-transform: uppercase; margin: 18px 0 10px; border-top: 1px solid #E5E7EB; padding-top: 14px; }
-.in-gate-wrap { transition: opacity .35s, filter .35s; }
-.in-gate-wrap.bloqueado { opacity: .35; pointer-events: none; filter: blur(1px); }
-.in-checkbox-label {
-  display: flex; align-items: flex-start; gap: 12px; padding: 14px 16px;
-  border: 1.5px solid var(--borda); border-radius: 10px; cursor: pointer;
-  background: #F9FAFB; transition: border-color .2s, background .2s;
+
+.in-scroll-hint span {
+  font-size: 10px;
+  color: rgba(244,239,230,.38);
+  font-weight: 700;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  animation: arrowbounce .7s ease infinite alternate;
 }
-.in-checkbox-label:hover { border-color: var(--verde-c); background: #F0FDF4; }
-.in-checkbox-label input[type=checkbox] { width: 18px; height: 18px; flex-shrink: 0; accent-color: var(--verde-c); margin-top: 1px; cursor: pointer; }
-.in-checkbox-texto { font-size: 13px; color: #374151; line-height: 1.6; font-weight: 500; }
-.in-checkbox-texto em { color: #DC2626; font-style: normal; font-weight: 700; }
-.in-scroll-progress { height: 3px; background: #E5E7EB; border-radius: 3px; margin-bottom: 8px; overflow: hidden; }
-.in-scroll-progress-bar { height: 100%; background: var(--verde-c); border-radius: 3px; width: 0%; transition: width .15s; }
 
-/* ── Honeypot (jamais visível para humanos) ──────────────── */
-.hp-trap { position: absolute; left: -9999px; width: 1px; height: 1px; opacity: 0; pointer-events: none; tab-size: 0; }
+@keyframes arrowbounce {
+  from { transform: translateY(0); }
+  to   { transform: translateY(4px); }
+}
 
-/* ── Captcha ─────────────────────────────────────────────── */
-.captcha-wrap { background: #F9FAFB; border: 1px solid var(--borda); border-radius: 10px; padding: 16px 20px; margin-bottom: 4px; }
-.captcha-titulo { font-size: 11px; font-weight: 700; color: #9CA3AF; letter-spacing: .07em; text-transform: uppercase; margin-bottom: 12px; }
-.captcha-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-.captcha-eq { font-size: 22px; font-weight: 800; color: var(--floresta); font-family: 'Fraunces', serif; letter-spacing: .04em; }
-.captcha-igual { font-size: 18px; color: #9CA3AF; font-weight: 700; }
-.captcha-wrap input { width: 76px; text-align: center; font-size: 20px; font-weight: 800; padding: 8px 0; border: 1.5px solid var(--borda); border-radius: 8px; font-family: 'Fraunces', serif; color: var(--floresta); background: #fff; }
-.captcha-wrap input:focus { border-color: var(--verde-c); outline: none; }
-.captcha-sub { font-size: 11px; color: #9CA3AF; margin-top: 8px; }
+.in-artigo { margin-bottom: 15px; }
+.in-artigo b { color: rgba(244,239,230,.95); font-weight: 700; }
+.in-artigo ul { margin: 6px 0 0 20px; }
+.in-artigo li { margin-bottom: 4px; }
+
+.in-secao-titulo {
+  font-size: 9px;
+  font-weight: 800;
+  color: var(--verde-c);
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  margin: 20px 0 12px;
+  border-top: 1px solid rgba(82,183,136,.12);
+  padding-top: 16px;
+}
+
+.in-gate-wrap { transition: opacity .35s, filter .35s; }
+.in-gate-wrap.bloqueado { opacity: .28; pointer-events: none; filter: blur(1px); }
+
+.in-checkbox-label {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 16px 18px;
+  border: 1.5px solid rgba(82,183,136,.18);
+  border-radius: var(--raio);
+  cursor: pointer;
+  background: rgba(82,183,136,.05);
+  transition: border-color .2s, background .2s;
+}
+
+.in-checkbox-label:hover {
+  border-color: rgba(82,183,136,.35);
+  background: rgba(82,183,136,.08);
+}
+
+.in-checkbox-label input[type=checkbox] {
+  width: 18px; height: 18px;
+  flex-shrink: 0;
+  accent-color: var(--verde-c);
+  margin-top: 2px;
+  cursor: pointer;
+}
+
+.in-checkbox-texto {
+  font-size: 13px;
+  color: rgba(244,239,230,.75);
+  line-height: 1.65;
+  font-weight: 500;
+}
+
+.in-checkbox-texto em {
+  color: var(--ouro-c);
+  font-style: normal;
+  font-weight: 700;
+}
+
+.passo0-card .btn-nav {
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(255,255,255,.07);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.passo0-card .btn-primary {
+  background: var(--ouro);
+  color: var(--floresta);
+}
+
+.passo0-card .btn-primary::after { display: none; }
+
+.passo0-card .btn-primary:hover:not(:disabled) {
+  background: var(--ouro-c);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 20px rgba(201,168,76,.3);
+}
+
+.passo0-card .btn-primary:disabled {
+  opacity: .35;
+  cursor: not-allowed;
+}
+
+/* ── STEPS BAR ────────────────────────────────────────────────── */
+.steps-bar {
+  display: flex;
+  align-items: center;
+  margin-bottom: 22px;
+  padding: 15px 22px;
+  background: var(--card);
+  border-radius: var(--raio);
+  border: 1px solid var(--borda);
+  box-shadow: var(--sombra);
+  animation: fadeUp .3s ease both;
+}
+
+.step-item { display: flex; align-items: center; gap: 8px; }
+
+.step-num {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 800;
+  flex-shrink: 0;
+  background: var(--casca);
+  color: var(--texto-s);
+  transition: all .25s cubic-bezier(.34,1.56,.64,1);
+}
+
+.step-num.ativo {
+  background: var(--floresta);
+  color: var(--ouro-c);
+  box-shadow: 0 0 0 3px rgba(10,26,15,.1);
+  transform: scale(1.08);
+}
+
+.step-num.feito {
+  background: var(--verde-c);
+  color: #fff;
+}
+
+.step-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--texto-s);
+  white-space: nowrap;
+  letter-spacing: .01em;
+}
+
+.step-label.ativo { color: var(--floresta); font-weight: 700; }
+
+.step-line {
+  flex: 1;
+  height: 1px;
+  background: var(--borda);
+  margin: 0 8px;
+  position: relative;
+  overflow: hidden;
+}
+
+.step-line::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--verde-c);
+  transform: translateX(-100%);
+  transition: transform .4s ease;
+}
+
+.step-line.feita::after { transform: translateX(0); }
+
+/* ── FORM CARDS ───────────────────────────────────────────────── */
+.passo-card {
+  background: var(--card);
+  border-radius: 16px;
+  border: 1px solid var(--borda);
+  padding: 32px 36px;
+  box-shadow: var(--sombra);
+  animation: fadeUp .3s ease both;
+}
+
+.passo-title {
+  font-family: 'Fraunces', serif;
+  font-size: 19px;
+  font-weight: 700;
+  color: var(--floresta);
+  margin-bottom: 24px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--casca);
+  letter-spacing: -.015em;
+}
+
+/* ── FIELDS ───────────────────────────────────────────────────── */
+.field-group { display: flex; flex-direction: column; gap: 16px; }
+.field-row   { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.field-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+
+@media (max-width: 600px) {
+  .field-row, .field-row-3 { grid-template-columns: 1fr; }
+  .passo-card, .passo0-card { padding: 20px 18px; }
+  .pub-hero h1 { font-size: 26px; }
+  .pub-header { padding: 14px 20px; }
+  .doc-chips { gap: 6px; }
+}
+
+.field { display: flex; flex-direction: column; gap: 6px; }
+
+.field label {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--texto-m);
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+
+.field label .req { color: #C0392B; margin-left: 2px; }
+.field label .opt {
+  font-size: 10px;
+  color: var(--texto-s);
+  font-weight: 400;
+  margin-left: 4px;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.field input, .field select, .field textarea {
+  padding: 11px 14px;
+  border: 1px solid var(--borda);
+  border-radius: var(--raio-s);
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color .15s, box-shadow .15s;
+  background: #fff;
+  color: var(--texto);
+}
+
+.field input::placeholder, .field textarea::placeholder { color: var(--texto-s); }
+
+.field input:focus, .field select:focus, .field textarea:focus {
+  border-color: var(--verde-c);
+  box-shadow: 0 0 0 3px rgba(82,183,136,.1);
+}
+
+.field .hint { font-size: 11px; color: var(--texto-s); line-height: 1.5; }
+
+/* ── TOGGLE ───────────────────────────────────────────────────── */
+.toggle-field {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 13px 16px;
+  border: 1px solid var(--borda);
+  border-radius: var(--raio-s);
+  cursor: pointer;
+  transition: border-color .15s, background .15s;
+  background: var(--t1);
+}
+
+.toggle-field:hover {
+  border-color: var(--verde-c);
+  background: rgba(82,183,136,.04);
+}
+
+.toggle-field input[type=checkbox] {
+  width: 18px; height: 18px;
+  accent-color: var(--verde-c);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.toggle-label { font-size: 13px; font-weight: 600; color: var(--texto); }
+.toggle-sub   { font-size: 11px; color: var(--texto-s); margin-top: 2px; }
+
+/* ── UPLOAD ───────────────────────────────────────────────────── */
+.upload-zone {
+  border: 1.5px dashed var(--borda);
+  border-radius: var(--raio);
+  padding: 26px 20px;
+  text-align: center;
+  cursor: pointer;
+  transition: all .2s;
+  background: rgba(244,239,230,.5);
+  position: relative;
+}
+
+.upload-zone:hover, .upload-zone.dragover {
+  border-color: var(--verde-c);
+  background: rgba(82,183,136,.04);
+}
+
+.upload-zone input[type=file] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.upload-icon { font-size: 30px; margin-bottom: 8px; display: block; }
+.upload-label { font-size: 13px; font-weight: 600; color: var(--texto); margin-bottom: 4px; }
+.upload-sub   { font-size: 11px; color: var(--texto-s); }
+
+.upload-zone.has-file {
+  border-color: var(--verde-c);
+  border-style: solid;
+  background: rgba(82,183,136,.04);
+}
+
+.upload-file-info {
+  font-size: 12px;
+  color: #15803D;
+  font-weight: 600;
+  margin-top: 8px;
+  display: none;
+}
+
+.upload-zone.has-file .upload-file-info { display: block; }
+
+.upload-obrigatorio {
+  border-color: rgba(220,38,38,.22);
+  background: rgba(254,242,242,.4);
+}
+
+.upload-obrigatorio .upload-label { color: #DC2626; }
+
+/* ── EQUIPE ───────────────────────────────────────────────────── */
+.equipe-form-box {
+  background: var(--t1);
+  border: 1px solid var(--borda);
+  border-radius: var(--raio);
+  padding: 22px 24px;
+  margin-bottom: 20px;
+}
+
+.equipe-form-title {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--floresta);
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  letter-spacing: -.01em;
+}
+
+.membro-card {
+  background: #fff;
+  border: 1px solid var(--borda);
+  border-radius: var(--raio-s);
+  padding: 14px 16px;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  animation: fadeIn .2s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.membro-avatar {
+  width: 38px; height: 38px;
+  border-radius: 50%;
+  background: var(--floresta);
+  color: var(--ouro-c);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 800;
+  flex-shrink: 0;
+  letter-spacing: -.02em;
+}
+
+.membro-info { flex: 1; min-width: 0; }
+.membro-nome { font-size: 13px; font-weight: 700; color: var(--texto); }
+.membro-sub  { font-size: 11px; color: var(--texto-m); margin-top: 2px; line-height: 1.5; }
+
+.btn-remover {
+  background: none; border: none;
+  cursor: pointer; color: var(--texto-s);
+  font-size: 20px; padding: 0;
+  line-height: 1; flex-shrink: 0;
+  transition: color .15s;
+}
+
+.btn-remover:hover { color: #DC2626; }
+
+.equipe-vazia {
+  text-align: center;
+  padding: 28px 16px;
+  color: var(--texto-s);
+  font-size: 13px;
+  border: 1px dashed var(--borda);
+  border-radius: var(--raio-s);
+}
+
+.equipe-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #F0FDF4;
+  color: #15803D;
+  border-radius: 20px;
+  padding: 3px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  border: 1px solid #A7F3D0;
+  margin-left: 8px;
+}
+
+/* ── BUTTONS ──────────────────────────────────────────────────── */
+.btn-nav {
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 28px;
+  padding-top: 20px;
+  border-top: 1px solid var(--casca);
+}
+
+.btn {
+  padding: 12px 28px;
+  border-radius: var(--raio-s);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  border: none;
+  font-family: inherit;
+  transition: all .18s;
+  letter-spacing: -.01em;
+}
+
+.btn-secondary {
+  background: transparent;
+  color: var(--texto-m);
+  border: 1px solid var(--borda);
+}
+
+.btn-secondary:hover {
+  background: var(--casca);
+  color: var(--texto);
+}
+
+.btn-primary {
+  background: var(--floresta);
+  color: var(--ouro-c);
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-primary::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(201,168,76,.12) 0%, transparent 60%);
+  pointer-events: none;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--musgo);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(10,26,15,.2);
+}
+
+.btn-primary:disabled { opacity: .4; cursor: not-allowed; }
+
+.btn-verde { background: var(--verde-c); color: #fff; }
+.btn-verde:hover {
+  background: #3DA774;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(82,183,136,.3);
+}
+
+/* ── SUCESSO ──────────────────────────────────────────────────── */
+.sucesso-card {
+  background: var(--card);
+  border-radius: 16px;
+  border: 1px solid var(--borda);
+  padding: 52px 36px;
+  text-align: center;
+  box-shadow: var(--sombra-m);
+  animation: fadeUp .4s ease both;
+}
+
+.sucesso-icon-wrap {
+  width: 72px; height: 72px;
+  border-radius: 50%;
+  background: var(--floresta);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 22px;
+  font-size: 30px;
+  box-shadow: 0 8px 28px rgba(10,26,15,.25);
+  animation: popIn .45s cubic-bezier(.175,.885,.32,1.275) .1s both;
+}
+
+@keyframes popIn {
+  from { opacity: 0; transform: scale(.5); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+.sucesso-titulo {
+  font-family: 'Fraunces', serif;
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--floresta);
+  margin-bottom: 10px;
+  letter-spacing: -.02em;
+}
+
+.sucesso-sub {
+  font-size: 14px;
+  color: var(--texto-m);
+  line-height: 1.8;
+  margin-bottom: 28px;
+  max-width: 460px;
+  margin-inline: auto;
+}
+
+.codigo-box {
+  display: inline-block;
+  background: var(--floresta);
+  color: var(--ouro-c);
+  font-family: 'Fraunces', serif;
+  font-size: 28px;
+  font-weight: 800;
+  padding: 18px 44px;
+  border-radius: var(--raio);
+  letter-spacing: .06em;
+  margin-bottom: 24px;
+  box-shadow: 0 8px 32px rgba(10,26,15,.2);
+}
+
+.sucesso-aviso {
+  background: #FFFBEB;
+  border: 1px solid #FDE68A;
+  border-radius: var(--raio-s);
+  padding: 14px 18px;
+  font-size: 13px;
+  color: #92400E;
+  margin-bottom: 14px;
+  line-height: 1.65;
+  text-align: left;
+}
+
+.btn-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 32px;
+  background: var(--verde-c);
+  color: #fff;
+  border-radius: var(--raio-s);
+  font-weight: 700;
+  font-size: 14px;
+  text-decoration: none;
+  transition: all .18s;
+  margin-top: 8px;
+}
+
+.btn-status:hover {
+  background: #3DA774;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 18px rgba(82,183,136,.3);
+}
+
+/* ── CAPTCHA ──────────────────────────────────────────────────── */
+.captcha-wrap {
+  background: var(--t1);
+  border: 1px solid var(--borda);
+  border-radius: var(--raio-s);
+  padding: 16px 20px;
+}
+
+.captcha-titulo {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--texto-s);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  margin-bottom: 12px;
+}
+
+.captcha-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+
+.captcha-eq {
+  font-family: 'Fraunces', serif;
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--floresta);
+  letter-spacing: .04em;
+}
+
+.captcha-igual { font-size: 20px; color: var(--texto-s); font-weight: 700; }
+
+.captcha-wrap input {
+  width: 76px;
+  text-align: center;
+  font-family: 'Fraunces', serif;
+  font-size: 22px;
+  font-weight: 800;
+  padding: 8px 0;
+  border: 1.5px solid var(--borda);
+  border-radius: 8px;
+  color: var(--floresta);
+  background: #fff;
+  outline: none;
+}
+
+.captcha-wrap input:focus {
+  border-color: var(--verde-c);
+  box-shadow: 0 0 0 3px rgba(82,183,136,.1);
+}
+
+.captcha-sub { font-size: 11px; color: var(--texto-s); margin-top: 8px; }
+
+/* ── ALERTS ───────────────────────────────────────────────────── */
+.alert-info {
+  background: #EFF6FF;
+  border: 1px solid #BFDBFE;
+  border-radius: var(--raio-s);
+  padding: 14px 16px;
+  font-size: 13px;
+  color: #1E40AF;
+  line-height: 1.65;
+}
+
+.alert-success {
+  background: #F0FDF4;
+  border: 1px solid #A7F3D0;
+  border-radius: var(--raio-s);
+  padding: 14px 16px;
+  font-size: 13px;
+  color: #166534;
+  line-height: 1.65;
+}
+
+/* ── TOAST ────────────────────────────────────────────────────── */
+.toast-pub {
+  position: fixed;
+  bottom: 28px; right: 28px;
+  background: var(--musgo);
+  color: #fff;
+  padding: 13px 20px;
+  border-radius: var(--raio-s);
+  font-size: 13px;
+  font-weight: 600;
+  z-index: 9999;
+  opacity: 0;
+  transform: translateY(8px);
+  transition: all .25s;
+  pointer-events: none;
+  max-width: 320px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.15);
+}
+
+.toast-pub.show  { opacity: 1; transform: translateY(0); }
+.toast-pub.erro  { background: #DC2626; }
+
+/* ── HONEYPOT ─────────────────────────────────────────────────── */
+.hp-trap {
+  position: absolute; left: -9999px;
+  width: 1px; height: 1px;
+  opacity: 0; pointer-events: none; tab-size: 0;
+}
+
+/* ── ANIMATIONS ───────────────────────────────────────────────── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── MISC ─────────────────────────────────────────────────────── */
+.divider-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--texto-m);
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+
+.secao-divider {
+  border-top: 1px solid var(--casca);
+  padding-top: 16px;
+  margin-top: 4px;
+}
 </style>
 </head>
 <body>
 
+<!-- ── HEADER ─────────────────────────────────────────────────── -->
 <header class="pub-header">
-  <div>
-    <div class="pub-logo">SIGUC</div>
-    <div class="pub-logo-sub">Gestão de UCs · SEMA/AC</div>
+  <div class="logo-wrap">
+    <svg class="logo-leaf-svg" width="34" height="34" viewBox="0 0 34 34" fill="none">
+      <path d="M17 30V14" stroke="rgba(82,183,136,0.45)" stroke-width="1.5" stroke-linecap="round"/>
+      <path d="M17 14C17 14 8 9.5 8 19.5C8 25.299 12.029 30 17 30C21.971 30 26 25.299 26 19.5C26 9.5 17 14 17 14Z" fill="rgba(82,183,136,0.1)" stroke="rgba(82,183,136,0.35)" stroke-width="1.5" stroke-linejoin="round"/>
+      <path d="M17 20L11 14.5" stroke="rgba(82,183,136,0.28)" stroke-width="1" stroke-linecap="round"/>
+      <path d="M17 24L23 18.5" stroke="rgba(82,183,136,0.22)" stroke-width="1" stroke-linecap="round"/>
+    </svg>
+    <div>
+      <div class="pub-logo">SIGUC<span>·AC</span></div>
+      <div class="pub-logo-sub">Gestão de UCs · SEMA/AC</div>
+    </div>
   </div>
   <div class="pub-header-right">
     Já é servidor? <a href="../index.html">Acessar o sistema →</a>
   </div>
 </header>
 
+<!-- ── MAIN ───────────────────────────────────────────────────── -->
 <main class="pub-main" id="pub-main">
 
   <!-- Hero -->
   <div class="pub-hero">
-    <h1>Submissão de Pesquisa Científica</h1>
+    <h1>Submissão de<br><em>Pesquisa Científica</em></h1>
     <p>Preencha o formulário para submeter sua proposta nas Unidades de Conservação Estaduais do Acre. Após o envio você receberá um e-mail de confirmação com o número do processo.</p>
-    <div class="docs-list">
-      <div style="font-size:12px;font-weight:700;color:#374151;margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em">Documentos necessários:</div>
-      <div class="doc-item"><span class="dot"></span> Formulário de pesquisa assinado (PDF) <strong style="margin-left:4px">✱ obrigatório</strong></div>
-      <div class="doc-item"><span class="dot"></span> Proposta digital do projeto (PDF ou DOCX) <strong style="margin-left:4px">✱ obrigatório</strong></div>
-      <div class="doc-item"><span class="dot"></span> Comprovante de registro no SISBIO <span class="doc-cond">⚠ se coleta biológica</span></div>
-      <div class="doc-item"><span class="dot"></span> Registro CONEP <span class="doc-cond">⚠ se pesquisa com humanos</span></div>
+    <div class="docs-header">Documentos necessários</div>
+    <div class="doc-chips">
+      <div class="doc-chip">
+        <span class="chip-dot"></span>
+        <strong class="chip-obrig">✱</strong>
+        Formulário assinado
+        <span style="color:var(--texto-s)">· PDF</span>
+      </div>
+      <div class="doc-chip">
+        <span class="chip-dot"></span>
+        <strong class="chip-obrig">✱</strong>
+        Proposta do projeto
+        <span style="color:var(--texto-s)">· PDF/DOCX</span>
+      </div>
+      <div class="doc-chip">
+        <span class="chip-dot cond"></span>
+        Comprovante SISBIO
+        <span class="chip-cond-tag">⚠ coleta biológica</span>
+      </div>
+      <div class="doc-chip">
+        <span class="chip-dot cond"></span>
+        Registro CONEP
+        <span class="chip-cond-tag">⚠ pesquisa humanos</span>
+      </div>
     </div>
   </div>
 
-  <!-- ─── Passo 0: Concordância com a IN ──────────────────── -->
+  <!-- ── Passo 0: Concordância com a IN ─────────────────────── -->
   <div class="passo0-card" id="passo0">
-    <div class="passo0-badge">⚖️ Leitura obrigatória</div>
+    <div class="passo0-badge">⚖ Leitura obrigatória</div>
     <div class="in-header">
       <div class="in-icon">📋</div>
       <div>
@@ -255,7 +1076,6 @@ body { font-family: 'DM Sans', sans-serif; background: var(--t1); min-height: 10
       </div>
     </div>
 
-    <!-- Barra de progresso de leitura -->
     <div class="in-scroll-progress"><div class="in-scroll-progress-bar" id="in-progress-bar"></div></div>
 
     <div class="in-scroll-wrap">
@@ -350,15 +1170,15 @@ body { font-family: 'DM Sans', sans-serif; background: var(--t1); min-height: 10
           São responsáveis solidários <b>os pesquisadores que compõem a equipe e a instituição</b> a que o projeto estiver vinculado sobre eventuais danos causados à Unidade de Conservação.
         </div>
 
-        <div style="background:#F0FDF4;border:1px solid #A7F3D0;border-radius:8px;padding:12px 16px;font-size:12px;color:#166534;margin-top:18px;line-height:1.6">
-          ✅ <strong>Referência legal:</strong> Instrução Normativa SEMAPI Nº 1, de 19 de agosto de 2021, publicada no Diário Oficial do Estado do Acre, 30/08/2021, Nº 13.117. Base legal: Lei Federal nº 9.985/2000 (SNUC), Decreto Federal nº 4.340/2002, Lei Estadual 1.426/2001 (SEANP).
+        <div style="background:rgba(82,183,136,.08);border:1px solid rgba(82,183,136,.15);border-radius:8px;padding:12px 16px;font-size:12px;color:rgba(244,239,230,.6);margin-top:18px;line-height:1.6">
+          ✅ <strong style="color:rgba(244,239,230,.85)">Referência legal:</strong> Instrução Normativa SEMAPI Nº 1, de 19 de agosto de 2021, publicada no Diário Oficial do Estado do Acre, 30/08/2021, Nº 13.117. Base legal: Lei Federal nº 9.985/2000 (SNUC), Decreto Federal nº 4.340/2002, Lei Estadual 1.426/2001 (SEANP).
         </div>
 
-      </div><!-- /in-scroll-box -->
+      </div>
       <div class="in-scroll-hint" id="in-scroll-hint"><span>↓ role para continuar</span></div>
-    </div><!-- /in-scroll-wrap -->
+    </div>
 
-    <!-- Zona de aceite — bloqueada até scroll completo -->
+    <!-- Aceite — bloqueado até scroll completo -->
     <div class="in-gate-wrap bloqueado" id="in-gate">
       <label class="in-checkbox-label">
         <input type="checkbox" id="in-aceito" onchange="validarAceiteIN()">
@@ -368,11 +1188,11 @@ body { font-family: 'DM Sans', sans-serif; background: var(--t1); min-height: 10
       </label>
     </div>
 
-    <div class="btn-nav" style="margin-top:20px">
+    <div class="passo0-card btn-nav">
       <span></span>
       <button class="btn btn-primary" id="btn-prosseguir" onclick="aceitarIN()" disabled>Prosseguir →</button>
     </div>
-  </div><!-- /passo0 -->
+  </div>
 
   <!-- Steps (4) -->
   <div class="steps-bar" id="steps-bar" style="display:none">
@@ -397,7 +1217,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--t1); min-height: 10
     </div>
   </div>
 
-  <!-- ─── Passo 1: Identificação do Responsável ─────────────── -->
+  <!-- ── Passo 1: Identificação ─────────────────────────────── -->
   <div class="passo-card" id="passo1" style="display:none">
     <!-- Honeypot anti-bot: humanos nunca veem nem preenchem este campo -->
     <input type="text" id="hp-website" name="website" class="hp-trap" tabindex="-1" autocomplete="off" aria-hidden="true">
@@ -467,7 +1287,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--t1); min-height: 10
     </div>
   </div>
 
-  <!-- ─── Passo 2: Projeto ───────────────────────────────────── -->
+  <!-- ── Passo 2: Projeto ──────────────────────────────────────── -->
   <div class="passo-card" id="passo2" style="display:none">
     <div class="passo-title">🔬 Dados do Projeto de Pesquisa</div>
     <div class="field-group">
@@ -518,8 +1338,8 @@ body { font-family: 'DM Sans', sans-serif; background: var(--t1); min-height: 10
         <input type="number" id="p-area" step="0.01" min="0" placeholder="Ex: 1250.50">
       </div>
 
-      <div style="border-top:1px solid #F3F4F6;padding-top:14px">
-        <div style="font-size:12px;font-weight:700;color:#374151;margin-bottom:10px">Autorizações especiais — marque se aplicável:</div>
+      <div class="secao-divider">
+        <div class="divider-label">Autorizações especiais — marque se aplicável</div>
         <label class="toggle-field">
           <input type="checkbox" id="p-coleta" onchange="atualizarCondicionais()">
           <div>
@@ -554,18 +1374,17 @@ body { font-family: 'DM Sans', sans-serif; background: var(--t1); min-height: 10
     </div>
   </div>
 
-  <!-- ─── Passo 3: Equipe ────────────────────────────────────── -->
+  <!-- ── Passo 3: Equipe ───────────────────────────────────────── -->
   <div class="passo-card" id="passo3" style="display:none">
     <div class="passo-title">
       👥 Equipe de Pesquisa
       <span class="equipe-badge" id="badge-equipe" style="display:none"></span>
     </div>
 
-    <div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:10px;padding:14px 16px;font-size:13px;color:#1E40AF;margin-bottom:20px;line-height:1.6">
+    <div class="alert-info" style="margin-bottom:20px">
       <strong>Importante:</strong> Apenas pesquisadores listados aqui estarão autorizados a acessar a UC em nome desta pesquisa. O cadastro de equipe é <strong>opcional</strong> e pode ser complementado após a aprovação mediante nova solicitação.
     </div>
 
-    <!-- Formulário de adição de membro -->
     <div class="equipe-form-box">
       <div class="equipe-form-title">➕ Adicionar membro</div>
       <div class="field-group">
@@ -653,7 +1472,6 @@ body { font-family: 'DM Sans', sans-serif; background: var(--t1); min-height: 10
       </button>
     </div>
 
-    <!-- Lista de membros -->
     <div id="lista-equipe">
       <div class="equipe-vazia" id="equipe-vazia">
         Nenhum membro adicionado ainda.<br>
@@ -667,19 +1485,19 @@ body { font-family: 'DM Sans', sans-serif; background: var(--t1); min-height: 10
     </div>
   </div>
 
-  <!-- ─── Passo 4: Documentos ───────────────────────────────── -->
+  <!-- ── Passo 4: Documentos ───────────────────────────────────── -->
   <div class="passo-card" id="passo4" style="display:none">
     <div class="passo-title">📎 Documentos Obrigatórios</div>
     <div class="field-group">
 
       <div class="field">
         <label>Formulário de pesquisa assinado <span class="req">✱ obrigatório</span></label>
-        <div class="hint" style="margin-bottom:6px">
+        <div class="hint" style="margin-bottom:8px">
           <a href="https://sema.ac.gov.br" target="_blank" style="color:var(--verde-c);font-weight:600">Baixe o formulário aqui →</a>, assine e envie em PDF.
         </div>
         <div class="upload-zone upload-obrigatorio" id="uz-formulario" ondragover="dragOver(event,'formulario')" ondragleave="dragLeave('formulario')" ondrop="dropFile(event,'formulario')">
           <input type="file" accept=".pdf,.PDF" onchange="selecionarArquivo(this,'formulario')">
-          <div class="upload-icon">📄</div>
+          <span class="upload-icon">📄</span>
           <div class="upload-label">Clique ou arraste o formulário aqui</div>
           <div class="upload-sub">Somente PDF · Máx. 10 MB</div>
           <div class="upload-file-info" id="fi-formulario"></div>
@@ -690,7 +1508,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--t1); min-height: 10
         <label>Proposta digital do projeto <span class="req">✱ obrigatório</span></label>
         <div class="upload-zone upload-obrigatorio" id="uz-proposta" ondragover="dragOver(event,'proposta')" ondragleave="dragLeave('proposta')" ondrop="dropFile(event,'proposta')">
           <input type="file" accept=".pdf,.PDF,.doc,.docx" onchange="selecionarArquivo(this,'proposta')">
-          <div class="upload-icon">📝</div>
+          <span class="upload-icon">📝</span>
           <div class="upload-label">Clique ou arraste a proposta aqui</div>
           <div class="upload-sub">PDF ou Word · Máx. 20 MB</div>
           <div class="upload-file-info" id="fi-proposta"></div>
@@ -701,7 +1519,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--t1); min-height: 10
         <label>Comprovante SISBIO <span class="req">✱ obrigatório (coleta biológica)</span></label>
         <div class="upload-zone upload-obrigatorio" id="uz-sisbio" ondragover="dragOver(event,'sisbio')" ondragleave="dragLeave('sisbio')" ondrop="dropFile(event,'sisbio')">
           <input type="file" accept=".pdf,.PDF,.jpg,.jpeg,.png" onchange="selecionarArquivo(this,'sisbio')">
-          <div class="upload-icon">🧬</div>
+          <span class="upload-icon">🧬</span>
           <div class="upload-label">Clique ou arraste o comprovante SISBIO</div>
           <div class="upload-sub">PDF ou imagem · Máx. 10 MB</div>
           <div class="upload-file-info" id="fi-sisbio"></div>
@@ -712,14 +1530,14 @@ body { font-family: 'DM Sans', sans-serif; background: var(--t1); min-height: 10
         <label>Registro CONEP <span class="req">✱ obrigatório (pesquisa com humanos)</span></label>
         <div class="upload-zone upload-obrigatorio" id="uz-conep" ondragover="dragOver(event,'conep')" ondragleave="dragLeave('conep')" ondrop="dropFile(event,'conep')">
           <input type="file" accept=".pdf,.PDF,.jpg,.jpeg,.png" onchange="selecionarArquivo(this,'conep')">
-          <div class="upload-icon">👥</div>
+          <span class="upload-icon">👥</span>
           <div class="upload-label">Clique ou arraste o registro CONEP</div>
           <div class="upload-sub">PDF ou imagem · Máx. 10 MB</div>
           <div class="upload-file-info" id="fi-conep"></div>
         </div>
       </div>
 
-      <div style="background:#F0FDF4;border-radius:var(--raio);padding:14px 16px;font-size:13px;color:#166534;line-height:1.6">
+      <div class="alert-success">
         ✅ Após o envio você receberá um e-mail com o número do processo e poderá acompanhar o andamento pelo portal.
       </div>
 
@@ -743,7 +1561,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--t1); min-height: 10
 
   <!-- Sucesso -->
   <div class="sucesso-card" id="passo-sucesso" style="display:none">
-    <div class="sucesso-icon">🎉</div>
+    <div class="sucesso-icon-wrap">🌿</div>
     <div class="sucesso-titulo">Pesquisa submetida com sucesso!</div>
     <p class="sucesso-sub">Seu processo foi registrado. Guarde o número abaixo — você precisará dele para acompanhar o andamento.</p>
     <div class="codigo-box" id="sucesso-codigo">—</div>
@@ -770,17 +1588,17 @@ const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
 
 // ── Estado ────────────────────────────────────────────────────
 const _arquivos   = { formulario: null, proposta: null, sisbio: null, conep: null }
-let   _equipe     = []   // array de objetos {nome_completo, cpf, rg, ...}
+let   _equipe     = []
 let   _passoAtual = 1
 let   _ucs        = []
 
 // Segurança
-let   _formInicio  = Date.now()     // timestamp de abertura da página (timer anti-bot)
-let   _aceiteInEm  = null           // quando o pesquisador aceitou a IN
-let   _inScrollado = false          // se rolou até o final do texto da IN
-let   _captchaA    = 0              // primeiro operando
-let   _captchaB    = 0              // segundo operando
-let   _captchaResp = 0              // resposta correta
+let   _formInicio  = Date.now()
+let   _aceiteInEm  = null
+let   _inScrollado = false
+let   _captchaA    = 0
+let   _captchaB    = 0
+let   _captchaResp = 0
 
 const FUNCAO_LABEL = {
   co_orientador:           'Co-orientador(a)',
@@ -795,13 +1613,10 @@ const FUNCAO_LABEL = {
 
 // ── Init ─────────────────────────────────────────────────────
 async function init() {
-  // Scroll gate da IN
   const scrollBox = document.getElementById('in-scroll-box')
   scrollBox.addEventListener('scroll', function() {
     const ratio = this.scrollTop / (this.scrollHeight - this.clientHeight)
-    // Barra de progresso
     document.getElementById('in-progress-bar').style.width = Math.min(ratio * 100, 100) + '%'
-    // Desbloqueio ao chegar nos últimos 5%
     if (ratio >= 0.95 && !_inScrollado) {
       _inScrollado = true
       document.getElementById('in-scroll-hint').style.opacity = '0'
@@ -810,10 +1625,8 @@ async function init() {
     }
   })
 
-  // Gera captcha
   gerarCaptcha()
 
-  // Carrega UCs
   const sel = document.getElementById('p-uc')
   try {
     const { data, error } = await db.from('unidades_conservacao')
@@ -856,7 +1669,6 @@ function aceitarIN() {
     toastPub('Marque a caixa de concordância para prosseguir', true); return
   }
   _aceiteInEm = new Date()
-  // Esconde passo0, mostra steps bar + passo1
   document.getElementById('passo0').style.display   = 'none'
   document.getElementById('steps-bar').style.display = ''
   document.getElementById('passo1').style.display    = ''
@@ -925,7 +1737,7 @@ function validarPasso(n) {
     if (resumo.length < 100)       { toastPub('O resumo deve ter ao menos 100 caracteres', true); return false }
     return true
   }
-  return true  // passo 3 (equipe) é opcional
+  return true
 }
 
 // ── Condicionais SISBIO / CONEP ───────────────────────────────
@@ -964,7 +1776,6 @@ function adicionarMembro() {
   if (!funcao) { toastPub('Selecione a função do membro', true); return }
   if (!/\S+@\S+\.\S+/.test(email)) { toastPub('E-mail do membro inválido', true); return }
 
-  // Verifica CPF duplicado
   if (_equipe.some(m => m.cpf === cpf)) {
     toastPub('Este CPF já foi adicionado à equipe', true); return
   }
@@ -982,7 +1793,6 @@ function adicionarMembro() {
     lattes:          document.getElementById('m-lattes').value.trim(),
   })
 
-  // Limpa formulário
   ;['m-nome','m-cpf','m-rg','m-email','m-telefone','m-inst','m-lattes'].forEach(id => {
     document.getElementById(id).value = ''
   })
@@ -1030,7 +1840,7 @@ function renderEquipe() {
         ${esc(m.instituicao || '—')} · ${esc(m.email)}
         ${m.telefone ? ' · ' + esc(m.telefone) : ''}
       </div>
-      <div class="membro-sub" style="color:#9CA3AF">
+      <div class="membro-sub" style="color:var(--texto-s)">
         CPF: ${esc(m.cpf)}${m.rg ? ' · RG: ' + esc(m.rg) : ''}
       </div>
     </div>
@@ -1074,23 +1884,22 @@ async function enviarSubmissao() {
   const coleta  = document.getElementById('p-coleta').checked
   const humanos = document.getElementById('p-humanos').checked
 
-  // ── Camada 1: Honeypot ────────────────────────────────────
+  // Camada 1: Honeypot
   if (document.getElementById('hp-website').value) {
-    // Bot preencheu campo oculto — rejeitar silenciosamente
     await new Promise(r => setTimeout(r, 1200))
     document.getElementById('btn-enviar').disabled = false
     document.getElementById('btn-enviar').textContent = 'Enviar Pesquisa →'
     return
   }
 
-  // ── Camada 2: Timer anti-bot (mínimo 90 s) ────────────────
+  // Camada 2: Timer anti-bot (mínimo 90 s)
   const tempoDecorrido = (Date.now() - _formInicio) / 1000
   if (tempoDecorrido < 90) {
     toastPub('Por favor, revise seus dados antes de enviar.', true)
     return
   }
 
-  // ── Camada 3: Captcha matemático ──────────────────────────
+  // Camada 3: Captcha matemático
   const resposta = parseInt(document.getElementById('captcha-resp').value, 10)
   if (isNaN(resposta) || resposta !== _captchaResp) {
     toastPub('Verificação de segurança incorreta. Tente novamente.', true)
@@ -1107,7 +1916,6 @@ async function enviarSubmissao() {
   btn.disabled = true; btn.textContent = 'Enviando…'
 
   try {
-    // 1. Cria registro
     const { data: resultado, error } = await db.rpc('submeter_pesquisa_publica', {
       p_titulo:                  document.getElementById('p-titulo').value.trim(),
       p_resumo:                  document.getElementById('p-resumo').value.trim(),
@@ -1134,7 +1942,6 @@ async function enviarSubmissao() {
 
     const { id: pesquisaId, numero_processo, token_publico } = resultado
 
-    // 2. Insere equipe (se houver)
     if (_equipe.length > 0) {
       btn.textContent = `Cadastrando equipe (${_equipe.length} membros)…`
       const { error: eqErr } = await db.rpc('inserir_equipe_pesquisa_publica', {
@@ -1144,7 +1951,6 @@ async function enviarSubmissao() {
       if (eqErr) throw new Error('Erro ao cadastrar equipe: ' + eqErr.message)
     }
 
-    // 3. Upload dos documentos
     btn.textContent = 'Enviando documentos…'
     const uploads = [
       { tipo: 'formulario', arquivo: _arquivos.formulario },
@@ -1168,7 +1974,6 @@ async function enviarSubmissao() {
       if (docErr) throw new Error(`Erro ao registrar ${tipo}: ${docErr.message}`)
     }
 
-    // 4. Sucesso
     ;['passo1','passo2','passo3','passo4','steps-bar'].forEach(id => {
       const el = document.getElementById(id)
       if (el) el.style.display = 'none'
