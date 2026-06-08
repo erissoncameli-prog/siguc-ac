@@ -136,6 +136,15 @@
 
 /* ── selo de posição ── */
 .selo-posicao { display:inline-flex; align-items:center; gap:5px; padding:3px 10px; background:#EFF6FF; border:1px solid #BFDBFE; border-radius:20px; font-size:10px; font-weight:700; color:#1E40AF; }
+
+/* ── modal de confirmação com senha ── */
+.modal-senha-overlay { z-index:10000 !important; background:rgba(10,26,15,.75) !important; }
+.modal-senha-box { max-width:460px; border-top:3px solid var(--floresta); }
+.modal-senha-header { background:var(--floresta); padding:14px 20px; display:flex; align-items:center; justify-content:space-between; border-radius:10px 10px 0 0; }
+.modal-senha-header h3 { color:#fff; font-size:14px; font-weight:800; margin:0; display:flex; align-items:center; gap:8px; }
+.modal-senha-header button { background:none; border:none; font-size:20px; cursor:pointer; color:#9CA3AF; line-height:1; }
+.despacho-alerta { background:#FFF7ED; border:1px solid #FDE68A; border-radius:8px; padding:12px 14px; font-size:12px; color:#92400E; line-height:1.55; margin-bottom:14px; }
+.despacho-erro-box { display:none; color:#DC2626; font-size:12px; font-weight:600; margin-top:10px; padding:8px 12px; background:#FEF2F2; border:1px solid #FECACA; border-radius:7px; }
 </style>
 </head>
 <body>
