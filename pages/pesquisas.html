@@ -1562,8 +1562,9 @@ async function confirmarEncerramento() {
   if (!document.getElementById('encerr-confirma')?.checked) {
     toast('Confirme o encerramento marcando a caixa', 'aviso'); return
   }
-  const data = document.getElementById('encerr-data')?.value || null
-  const obs  = document.getElementById('encerr-obs')?.value.trim() || null
+  const data       = document.getElementById('encerr-data')?.value || null
+  const obs        = document.getElementById('encerr-obs')?.value.trim()
+  const observacao = _getDespacho(obs || '')
   const { error } = await db.rpc('despachar_encerramento', {
     p_pesquisa_id:   _detalhe.id,
     p_data_fim_real: data,
