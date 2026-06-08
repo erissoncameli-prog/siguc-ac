@@ -1367,11 +1367,13 @@ function abrirModalFaseSimples(novaEtapa, labelAcao) {
 async function confirmarFaseSimples(novaEtapa) {
   const obs  = document.getElementById('fase-obs')?.value.trim() || null
   const data = document.getElementById('fase-data')?.value || null
-  const obsCompleta = (data ? `Data: ${data}. ` : '') + (obs || '')
+  const extras   = [(data ? `Data: ${data}.` : ''), obs].filter(Boolean).join(' ')
+  const observacao = _getDespacho(extras)
+  if (!observacao) return
   const { error } = await db.rpc('despachar_fase_simples', {
     p_pesquisa_id: _detalhe.id,
     p_nova_etapa:  novaEtapa,
-    p_observacao:  obsCompleta.trim() || null
+    p_observacao:  observacao
   })
   if (error) { toast('Erro: ' + error.message, 'erro'); return }
   toast('Etapa avançada com sucesso', 'sucesso')
