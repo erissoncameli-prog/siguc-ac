@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SIGUC-AC — Portal do Pesquisador</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --floresta:#0A1A0F;--verde:#1F4E2C;--verde-m:#2D6A4F;--verde-c:#52B788;
+  --ouro:#C9A84C;--ouro-c:#F0CB6A;
+  --t1:#F4EFE6;--t2:rgba(244,239,230,.62);--t3:rgba(244,239,230,.32);
+  --texto:#1A120A;--texto-m:#6B5C48;--texto-s:#9A8C7A;
+  --card:#FDFAF5;--borda:#D9D0BE;--bg:#F4EFE6;
+  --ff-display:'Fraunces',Georgia,serif;--ff-ui:'DM Sans',system-ui,sans-serif;
+  --raio:12px;--sombra:0 2px 8px rgba(10,26,15,.06),0 1px 2px rgba(10,26,15,.04);
+  --sombra-m:0 6px 24px rgba(10,26,15,.09),0 2px 6px rgba(10,26,15,.05);
+}
+body{font-family:var(--ff-ui);background:var(--bg);color:var(--texto);min-height:100vh}
+
+/* ── Header ── */
+.portal-header{background:var(--floresta);background-image:repeating-linear-gradient(60deg,transparent,transparent 20px,rgba(82,183,136,.018) 20px,rgba(82,183,136,.018) 21px),repeating-linear-gradient(120deg,transparent,transparent 20px,rgba(82,183,136,.018) 20px,rgba(82,183,136,.018) 21px);border-bottom:1px solid rgba(201,168,76,.2);padding:0 32px;height:64px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:20}
+.h-brand{display:flex;align-items:center;gap:12px}
+.h-brand-icon{width:34px;height:34px;background:linear-gradient(135deg,var(--verde-m),var(--verde-c));border-radius:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 2px 10px rgba(82,183,136,.3)}
+.h-brand-name{font-size:11px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--t1)}
+.h-brand-sub{font-size:9px;color:var(--t3);margin-top:1px}
+.h-sep{width:1px;height:28px;background:rgba(244,239,230,.12);margin:0 4px}
+.h-portal-label{font-family:var(--ff-display);font-size:13px;font-style:italic;color:rgba(244,239,230,.65)}
+.h-user{display:flex;align-items:center;gap:12px}
+.h-user-info{text-align:right}
+.h-user-nome{font-size:12px;font-weight:500;color:var(--t1);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.h-user-cargo{font-size:10px;color:rgba(244,239,230,.45)}
+.h-avatar{width:34px;height:34px;border-radius:50%;background:rgba(82,183,136,.18);border:1.5px solid rgba(82,183,136,.35);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--verde-c);flex-shrink:0}
+.h-btn-sair{height:32px;padding:0 12px;background:rgba(244,239,230,.06);border:1px solid rgba(244,239,230,.12);border-radius:7px;font-size:11px;color:var(--t3);cursor:pointer;transition:all .2s;font-family:var(--ff-ui)}
+.h-btn-sair:hover{background:rgba(239,68,68,.10);border-color:rgba(239,68,68,.25);color:#FCA5A5}
+
+/* ── Banner de alerta ── */
+.alerta-banner{margin:24px 32px 0;border-radius:var(--raio);padding:14px 18px;display:flex;align-items:flex-start;gap:12px;display:none}
+.alerta-banner.inadimplente{background:#FEF2F2;border:1px solid #FECACA}
+.alerta-banner.pendencia{background:#FFFBEB;border:1px solid #FDE68A}
+.alerta-icon{font-size:18px;flex-shrink:0;margin-top:1px}
+.alerta-body{flex:1}
+.alerta-titulo{font-size:13px;font-weight:600;color:#991B1B;margin-bottom:3px}
+.alerta-banner.pendencia .alerta-titulo{color:#92400E}
+.alerta-txt{font-size:12px;color:#B91C1C;line-height:1.5}
+.alerta-banner.pendencia .alerta-txt{color:#B45309}
+
+/* ── Main ── */
+.portal-main{max-width:900px;margin:0 auto;padding:28px 32px 60px}
+
+/* ── Boas-vindas ── */
+.bv-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:28px;gap:16px;flex-wrap:wrap}
+.bv-titulo{font-family:var(--ff-display);font-size:clamp(20px,2vw,24px);font-weight:500;color:var(--texto)}
+.bv-sub{font-size:13px;color:var(--texto-m);margin-top:3px}
+.btn-nova-pesquisa{display:inline-flex;align-items:center;gap:8px;height:40px;padding:0 20px;background:linear-gradient(135deg,var(--verde-c),var(--verde-m));color:#fff;border:none;border-radius:9px;font-size:13px;font-weight:600;cursor:pointer;text-decoration:none;transition:all .22s;box-shadow:0 3px 14px rgba(82,183,136,.22);font-family:var(--ff-ui);white-space:nowrap}
+.btn-nova-pesquisa:hover{transform:translateY(-1px);box-shadow:0 5px 20px rgba(82,183,136,.36)}
+
+/* ── Stats ── */
+.stats-row{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:28px}
+.stat-card{background:var(--card);border:1px solid var(--borda);border-radius:var(--raio);padding:16px 18px;box-shadow:var(--sombra)}
+.stat-num{font-family:var(--ff-display);font-size:28px;font-weight:600;color:var(--texto);line-height:1;margin-bottom:4px}
+.stat-num.verde{color:var(--verde-c)}
+.stat-num.ouro{color:var(--ouro)}
+.stat-num.vermelho{color:#EF4444}
+.stat-label{font-size:11px;color:var(--texto-s);text-transform:uppercase;letter-spacing:.08em}
+
+/* ── Seção ── */
+.secao-titulo{font-size:11px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--texto-s);margin-bottom:16px;display:flex;align-items:center;gap:8px}
+.secao-titulo::after{content:'';flex:1;height:1px;background:var(--borda)}
+
+/* ── Card de pesquisa ── */
+.pesquisa-card{background:var(--card);border:1px solid var(--borda);border-radius:var(--raio);padding:20px 22px;margin-bottom:14px;box-shadow:var(--sombra);transition:box-shadow .2s}
+.pesquisa-card:hover{box-shadow:var(--sombra-m)}
+.pesquisa-card.com-pendencia{border-left:3px solid var(--ouro)}
+.pesquisa-card.inadimplente{border-left:3px solid #EF4444}
+.pesquisa-card.encerrada{opacity:.72}
+
+.pc-topo{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px;flex-wrap:wrap}
+.pc-numero{font-size:10px;font-weight:600;letter-spacing:.10em;color:var(--verde-c);text-transform:uppercase}
+.pc-badges{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:600;letter-spacing:.04em;text-transform:uppercase}
+.badge-tipo{background:#E8F5EE;color:#2D6A4F}
+.badge-fauna{background:#E0F2FE;color:#0369A1}
+.badge-flora{background:#DCFCE7;color:#166534}
+.badge-genetica{background:#FAE8FF;color:#7E22CE}
+.badge-ecossistema{background:#FFF7ED;color:#C2410C}
+.badge-socioambiental{background:#F0FDF4;color:#15803D}
+.badge-outro{background:#F3F4F6;color:#374151}
+.badge-status-aguardando{background:#EFF6FF;color:#1D4ED8}
+.badge-status-acao{background:#FFFBEB;color:#B45309}
+.badge-status-campo{background:#F0FDF4;color:#15803D}
+.badge-status-ok{background:#F0FDF4;color:#15803D}
+.badge-status-problema{background:#FEF2F2;color:#991B1B}
+.badge-status-encerrada{background:#F3F4F6;color:#374151}
+
+.pc-titulo{font-size:15px;font-weight:600;color:var(--texto);line-height:1.35;margin-bottom:6px}
+.pc-meta{font-size:11.5px;color:var(--texto-s);display:flex;gap:16px;flex-wrap:wrap;margin-bottom:14px}
+.pc-meta span{display:flex;align-items:center;gap:4px}
+
+/* ── Timeline de etapas ── */
+.etapas-wrap{margin-bottom:14px}
+.etapas-label{font-size:10px;color:var(--texto-s);margin-bottom:6px;display:flex;justify-content:space-between}
+.etapas-bar{height:6px;background:#E8E0D0;border-radius:3px;overflow:visible;position:relative}
+.etapas-fill{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--verde-c),var(--verde-m));transition:width .5s}
+.etapas-dots{display:flex;gap:3px;margin-top:6px}
+.etapa-dot{flex:1;height:4px;border-radius:2px;background:#E8E0D0}
+.etapa-dot.feita{background:var(--verde-c)}
+.etapa-dot.atual{background:var(--ouro);box-shadow:0 0 0 1.5px rgba(201,168,76,.35)}
+
+/* ── Pendência ── */
+.pendencia-box{background:#FFFBEB;border:1px solid #FDE68A;border-radius:8px;padding:10px 13px;display:flex;align-items:flex-start;gap:9px;margin-bottom:12px}
+.pendencia-icon{font-size:14px;flex-shrink:0;margin-top:1px}
+.pendencia-txt{flex:1}
+.pendencia-titulo{font-size:12px;font-weight:600;color:#92400E;margin-bottom:2px}
+.pendencia-desc{font-size:11.5px;color:#B45309;line-height:1.45}
+.pendencia-box.problema{background:#FEF2F2;border-color:#FECACA}
+.pendencia-box.problema .pendencia-titulo{color:#991B1B}
+.pendencia-box.problema .pendencia-desc{color:#B91C1C}
+.pendencia-box.info{background:#EFF6FF;border-color:#BFDBFE}
+.pendencia-box.info .pendencia-titulo{color:#1E40AF}
+.pendencia-box.info .pendencia-desc{color:#1D4ED8}
+
+/* ── Footer card ── */
+.pc-footer{display:flex;align-items:center;justify-content:space-between;padding-top:12px;border-top:1px solid var(--borda);flex-wrap:wrap;gap:8px}
+.pc-data{font-size:11px;color:var(--texto-s)}
+.pc-acoes{display:flex;gap:8px}
+.btn-sm{height:30px;padding:0 12px;border-radius:7px;font-size:11.5px;font-weight:500;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:5px;transition:all .18s;font-family:var(--ff-ui)}
+.btn-sm-ver{background:transparent;border:1px solid var(--borda);color:var(--verde-m)}
+.btn-sm-ver:hover{background:var(--verde-c);border-color:var(--verde-c);color:#fff}
+.btn-sm-aap{background:#FFFBEB;border:1px solid #FDE68A;color:#92400E}
+.btn-sm-aap:hover{background:#FEF3C7;border-color:#F59E0B}
+
+/* ── Empty state ── */
+.empty-state{text-align:center;padding:56px 20px;background:var(--card);border:1px dashed var(--borda);border-radius:var(--raio)}
+.empty-icon{font-size:40px;margin-bottom:14px;opacity:.6}
+.empty-titulo{font-family:var(--ff-display);font-size:18px;font-weight:500;color:var(--texto);margin-bottom:8px}
+.empty-txt{font-size:13px;color:var(--texto-m);line-height:1.6;margin-bottom:20px}
+
+/* ── Loading ── */
+.loading-overlay{position:fixed;inset:0;background:var(--floresta);display:flex;align-items:center;justify-content:center;z-index:100;flex-direction:column;gap:16px}
+.loading-logo{font-family:var(--ff-display);font-size:18px;color:rgba(244,239,230,.7);font-style:italic}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-spinner{width:28px;height:28px;border:2.5px solid rgba(82,183,136,.2);border-top-color:var(--verde-c);border-radius:50%;animation:spin .7s linear infinite}
+
+/* ── Perfil dropdown ── */
+.perfil-dropdown{position:relative}
+.perfil-btn{display:flex;align-items:center;gap:8px;background:none;border:none;cursor:pointer;padding:4px}
+.dropdown-menu{position:absolute;right:0;top:calc(100% + 8px);background:#fff;border:1px solid var(--borda);border-radius:10px;box-shadow:0 8px 24px rgba(10,26,15,.12);min-width:180px;overflow:hidden;display:none;z-index:30}
+.dropdown-menu.aberto{display:block}
+.dropdown-item{display:block;padding:10px 14px;font-size:12.5px;color:var(--texto);text-decoration:none;transition:background .15s;cursor:pointer;border:none;background:none;width:100%;text-align:left;font-family:var(--ff-ui)}
+.dropdown-item:hover{background:#F4EFE6}
+.dropdown-item.danger{color:#DC2626}
+.dropdown-item.danger:hover{background:#FEF2F2}
+.dropdown-sep{height:1px;background:var(--borda)}
+
+@media(max-width:640px){
+  .portal-header{padding:0 16px}
+  .h-sep,.h-portal-label{display:none}
+  .portal-main{padding:20px 16px 50px}
+  .stats-row{grid-template-columns:1fr 1fr}
+  .stats-row .stat-card:last-child{grid-column:span 2}
+  .alerta-banner{margin:16px 16px 0}
+}
+</style>
+</head>
+<body>
+
+<!-- Loading -->
+<div class="loading-overlay" id="loading">
+  <div class="loading-spinner"></div>
+  <div class="loading-logo">Carregando portal…</div>
+</div>
+
+<!-- Header -->
+<header class="portal-header">
+  <div class="h-brand">
+    <div class="h-brand-icon">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+    </div>
+    <div>
+      <div class="h-brand-name">SIGUC-AC</div>
+      <div class="h-brand-sub">Gestão de UCs · SEMA/AC</div>
+    </div>
+    <div class="h-sep"></div>
+    <div class="h-portal-label">Portal do Pesquisador</div>
+  </div>
+  <div class="h-user">
+    <div class="h-user-info">
+      <div class="h-user-nome" id="h-nome">Carregando…</div>
+      <div class="h-user-cargo">Pesquisador externo</div>
+    </div>
+    <div class="perfil-dropdown">
+      <button class="perfil-btn" onclick="toggleDropdown()" id="avatar-btn">
+        <div class="h-avatar" id="h-avatar">?</div>
+      </button>
+      <div class="dropdown-menu" id="dropdown">
+        <a href="perfil-pesquisador.html" class="dropdown-item">Meu perfil</a>
+        <div class="dropdown-sep"></div>
+        <button class="dropdown-item danger" onclick="sair()">Sair</button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- Banner de alerta global -->
+<div class="alerta-banner" id="alerta-banner">
+  <div class="alerta-icon" id="alerta-icon"></div>
+  <div class="alerta-body">
+    <div class="alerta-titulo" id="alerta-titulo"></div>
+    <div class="alerta-txt" id="alerta-txt"></div>
+  </div>
+</div>
+
+<!-- Main -->
+<main class="portal-main">
+
+  <div class="bv-row">
+    <div>
+      <div class="bv-titulo" id="bv-titulo">Olá! Bem-vindo ao portal</div>
+      <div class="bv-sub">Acompanhe suas pesquisas científicas nas Unidades de Conservação do Acre</div>
+    </div>
+    <a href="pesquisa-publica.html" class="btn-nova-pesquisa" id="btn-nova">
+      + Nova pesquisa
+    </a>
+  </div>
+
+  <div class="stats-row" id="stats-row">
+    <div class="stat-card"><div class="stat-num" id="stat-total">—</div><div class="stat-label">Pesquisas</div></div>
+    <div class="stat-card"><div class="stat-num verde" id="stat-ativas">—</div><div class="stat-label">Em andamento</div></div>
+    <div class="stat-card"><div class="stat-num ouro" id="stat-pendencias">—</div><div class="stat-label">Com pendências</div></div>
+  </div>
+
+  <div class="secao-titulo">Minhas pesquisas</div>
+
+  <div id="lista-pesquisas">
+    <!-- carregado via JS -->
+  </div>
+
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const SUPABASE_URL = 'https://atqtybcsvepdabsvgaly.supabase.co'
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF0cXR5YmNzdmVwZGFic3ZnYWx5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0MjMzNzgsImV4cCI6MjA5NTk5OTM3OH0.hWx1AB2rK7xdco1Dgagm0XUOBPQbxZVE614SW4SKoLk'
+const { createClient } = supabase
+const db = createClient(SUPABASE_URL, SUPABASE_KEY)
+
+let _pesquisador = null
+
+const ETAPAS = [
+  { key:'submetida',         label:'Submetida',           pos:1  },
+  { key:'triagem',           label:'Em triagem',           pos:2  },
+  { key:'analise_tecnica',   label:'Análise técnica',      pos:3  },
+  { key:'parecer_juridico',  label:'Parecer jurídico',     pos:4  },
+  { key:'aap_emissao',       label:'Emissão de AAP',       pos:5  },
+  { key:'aap_assinatura',    label:'Assinatura de AAP',    pos:6  },
+  { key:'aap_publicada',     label:'AAP publicada',        pos:7  },
+  { key:'em_campo',          label:'Em campo',             pos:8  },
+  { key:'relatorio_parcial', label:'Relatório parcial',    pos:9  },
+  { key:'relatorio_final',   label:'Relatório final',      pos:10 },
+  { key:'analise_relatorio', label:'Análise dos relatórios',pos:11},
+  { key:'encerrada',         label:'Encerrada',            pos:12 },
+  { key:'arquivada',         label:'Arquivada',            pos:13 },
+]
+const TOTAL_ETAPAS = ETAPAS.length
+
+const TIPO_BADGE = {
+  fauna:'badge-fauna', flora:'badge-flora', genetica:'badge-genetica',
+  ecossistema:'badge-ecossistema', socioambiental:'badge-socioambiental', outro:'badge-outro'
+}
+const TIPO_LABEL = {
+  fauna:'Fauna', flora:'Flora', genetica:'Genética',
+  ecossistema:'Ecossistema', socioambiental:'Socioambiental', outro:'Outro'
+}
+
+function iniciais(nome) {
+  const p = (nome||'').trim().split(' ').filter(Boolean)
+  if (!p.length) return '?'
+  if (p.length === 1) return p[0][0].toUpperCase()
+  return (p[0][0] + p[p.length-1][0]).toUpperCase()
+}
+
+function esc(s) {
+  if (!s) return ''
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')
+}
+
+function fmtData(d) {
+  if (!d) return '—'
+  return new Date(d).toLocaleDateString('pt-BR', { day:'2-digit', month:'2-digit', year:'numeric' })
+}
+
+function fmtDataCurta(d) {
+  if (!d) return '—'
+  return new Date(d).toLocaleDateString('pt-BR', { day:'2-digit', month:'short', year:'numeric' })
+}
+
+function diasRestantes(data) {
+  if (!data) return null
+  const diff = Math.ceil((new Date(data) - Date.now()) / 86400000)
+  return diff
+}
+
+function toggleDropdown() {
+  document.getElementById('dropdown').classList.toggle('aberto')
+}
+document.addEventListener('click', e => {
+  const btn = document.getElementById('avatar-btn')
+  const menu = document.getElementById('dropdown')
+  if (!btn.contains(e.target)) menu.classList.remove('aberto')
+})
+
+async function sair() {
+  await db.auth.signOut()
+  window.location.replace('login-pesquisador.html')
+}
+
+function etapaPos(key) {
+  return ETAPAS.find(e => e.key === key)?.pos || 1
+}
+
+function statusBadge(pesquisa) {
+  const { etapa, inadimplente, complementacao_solicitada, triagem_resultado } = pesquisa
+  if (inadimplente)                    return { cls:'badge-status-problema', label:'Inadimplente' }
+  if (triagem_resultado === 'rejeitada') return { cls:'badge-status-problema', label:'Rejeitada' }
+  if (['encerrada','arquivada'].includes(etapa)) return { cls:'badge-status-encerrada', label:etapa==='encerrada'?'Encerrada':'Arquivada' }
+  if (complementacao_solicitada)       return { cls:'badge-status-acao', label:'Complementação pendente' }
+  if (etapa === 'em_campo')            return { cls:'badge-status-campo', label:'Em campo' }
+  if (['relatorio_parcial','relatorio_final'].includes(etapa)) return { cls:'badge-status-acao', label:'Relatório pendente' }
+  return { cls:'badge-status-aguardando', label:'Aguardando SEMA' }
+}
+
+function pendenciasCard(pesquisa) {
+  const alertas = []
+  if (pesquisa.inadimplente) {
+    alertas.push({ tipo:'problema', icone:'⛔', titulo:'Pesquisador inadimplente', desc: pesquisa.inadimplencia_motivo || 'Regularize pendências com o DEUC/SEMA-AC para prosseguir.' })
+  }
+  if (pesquisa.complementacao_solicitada) {
+    const prazo = pesquisa.complementacao_prazo
+    const dias  = diasRestantes(prazo)
+    const prazoTxt = prazo ? ` — prazo: ${fmtData(prazo)}${dias !== null && dias <= 5 ? ` (<strong>${dias <= 0 ? 'VENCIDO' : dias + ' dias'}</strong>)` : ''}` : ''
+    alertas.push({ tipo:'acao', icone:'📎', titulo:'Documentação complementar solicitada', desc: (pesquisa.complementacao_motivo||'Envie os documentos solicitados pelo DEUC.') + prazoTxt })
+  }
+  if (pesquisa.etapa === 'relatorio_parcial') {
+    alertas.push({ tipo:'acao', icone:'📋', titulo:'Relatório parcial pendente', desc:'Você está em campo. Lembre-se de enviar o relatório parcial conforme o cronograma.' })
+  }
+  if (pesquisa.etapa === 'relatorio_final') {
+    alertas.push({ tipo:'acao', icone:'📋', titulo:'Relatório final pendente', desc:'A pesquisa de campo foi concluída. Envie o relatório final para encerrar o processo.' })
+  }
+  if (pesquisa.aap_numero && pesquisa.aap_validade) {
+    const diasVal = diasRestantes(pesquisa.aap_validade)
+    if (diasVal !== null && diasVal <= 30 && diasVal > 0) {
+      alertas.push({ tipo:'acao', icone:'⏳', titulo:`AAP vence em ${diasVal} dias`, desc:`A AAP ${pesquisa.aap_numero} vence em ${fmtData(pesquisa.aap_validade)}. Contate o DEUC se precisar de prorrogação.` })
+    } else if (diasVal !== null && diasVal <= 0) {
+      alertas.push({ tipo:'problema', icone:'⚠️', titulo:'AAP vencida', desc:`A Autorização de Acesso e Pesquisa venceu em ${fmtData(pesquisa.aap_validade)}. Não é permitida pesquisa de campo sem AAP válida.` })
+    }
+  }
+  return alertas
+}
+
+function renderCard(p) {
+  const pos    = etapaPos(p.etapa)
+  const pct    = Math.round(((pos - 1) / (TOTAL_ETAPAS - 1)) * 100)
+  const status = statusBadge(p)
+  const alertas= pendenciasCard(p)
+  const tipoBadge = TIPO_BADGE[p.tipo] || 'badge-outro'
+  const tipoLabel = TIPO_LABEL[p.tipo] || p.tipo
+  const etapaLabel= ETAPAS.find(e => e.key === p.etapa)?.label || p.etapa
+  const hasProblema = p.inadimplente || p.triagem_resultado === 'rejeitada'
+  const hasPendencia= alertas.length > 0
+
+  const dotsHtml = ETAPAS.map((e,i) => {
+    const cls = i < pos-1 ? 'feita' : i === pos-1 ? 'atual' : ''
+    return `<div class="etapa-dot ${cls}" title="${e.label}"></div>`
+  }).join('')
+
+  const alertasHtml = alertas.map(a => `
+    <div class="pendencia-box ${a.tipo}">
+      <div class="pendencia-icon">${a.icone}</div>
+      <div class="pendencia-txt">
+        <div class="pendencia-titulo">${esc(a.titulo)}</div>
+        <div class="pendencia-desc">${a.desc}</div>
+      </div>
+    </div>`).join('')
+
+  const aapBtn = p.aap_numero ? `<a href="pesquisa-status.html?token=${encodeURIComponent(p.token_publico)}&aba=aap" class="btn-sm btn-sm-aap">📄 AAP</a>` : ''
+
+  const periodos = []
+  if (p.data_inicio_prevista) periodos.push(`Início: ${fmtData(p.data_inicio_prevista)}`)
+  if (p.data_fim_prevista)    periodos.push(`Fim: ${fmtData(p.data_fim_prevista)}`)
+
+  return `
+  <div class="pesquisa-card ${hasPendencia && !hasProblema ? 'com-pendencia' : ''} ${hasProblema ? 'inadimplente' : ''} ${['encerrada','arquivada'].includes(p.etapa) ? 'encerrada' : ''}">
+    <div class="pc-topo">
+      <div>
+        <div class="pc-numero">${esc(p.numero_processo || '—')}</div>
+      </div>
+      <div class="pc-badges">
+        <span class="badge ${tipoBadge}">${tipoLabel}</span>
+        <span class="badge ${status.cls}">${status.label}</span>
+      </div>
+    </div>
+    <div class="pc-titulo">${esc(p.titulo)}</div>
+    <div class="pc-meta">
+      ${p.uc_nome ? `<span>🌿 ${esc(p.uc_nome)}</span>` : ''}
+      ${periodos.length ? `<span>📅 ${periodos.join(' — ')}</span>` : ''}
+      <span>📍 Etapa ${pos}/13: ${etapaLabel}</span>
+    </div>
+
+    <div class="etapas-wrap">
+      <div class="etapas-label">
+        <span>Progresso</span>
+        <span>${pos}/13 etapas</span>
+      </div>
+      <div class="etapas-bar"><div class="etapas-fill" style="width:${pct}%"></div></div>
+      <div class="etapas-dots">${dotsHtml}</div>
+    </div>
+
+    ${alertasHtml}
+
+    <div class="pc-footer">
+      <div class="pc-data">Submetida em ${fmtDataCurta(p.criado_em)}</div>
+      <div class="pc-acoes">
+        ${aapBtn}
+        <a href="pesquisa-status.html?token=${encodeURIComponent(p.token_publico || '')}" class="btn-sm btn-sm-ver">Ver detalhes →</a>
+      </div>
+    </div>
+  </div>`
+}
+
+async function carregarPortal() {
+  const { data: { session } } = await db.auth.getSession()
+  if (!session) { window.location.replace('login-pesquisador.html'); return }
+
+  const { data: pesq, error: pesqErr } = await db
+    .from('pesquisadores')
+    .select('id,nome_completo,email,instituicao,ativo')
+    .eq('user_id', session.user.id)
+    .single()
+
+  if (pesqErr || !pesq || !pesq.ativo) {
+    await db.auth.signOut()
+    window.location.replace('login-pesquisador.html?msg=sem_conta')
+    return
+  }
+
+  _pesquisador = pesq
+
+  // Atualiza header
+  document.getElementById('h-nome').textContent = pesq.nome_completo
+  document.getElementById('h-avatar').textContent = iniciais(pesq.nome_completo)
+  document.getElementById('bv-titulo').textContent = `Olá, ${pesq.nome_completo.split(' ')[0]}!`
+
+  // Busca pesquisas
+  const { data: pesquisas } = await db
+    .from('pesquisas')
+    .select(`
+      id, numero_processo, titulo, tipo, etapa, criado_em,
+      data_inicio_prevista, data_fim_prevista,
+      aap_numero, aap_validade, token_publico,
+      inadimplente, inadimplencia_motivo, inadimplencia_em,
+      complementacao_solicitada, complementacao_motivo, complementacao_prazo,
+      triagem_resultado,
+      unidades_conservacao!uc_id ( nome )
+    `)
+    .order('criado_em', { ascending: false })
+
+  const lista = (pesquisas || []).map(p => ({ ...p, uc_nome: p.unidades_conservacao?.nome || null }))
+
+  // Stats
+  const ativas    = lista.filter(p => !['encerrada','arquivada'].includes(p.etapa)).length
+  const pendencias= lista.filter(p => pendenciasCard(p).length > 0).length
+  document.getElementById('stat-total').textContent    = lista.length
+  document.getElementById('stat-ativas').textContent   = ativas
+  document.getElementById('stat-pendencias').textContent = pendencias
+  if (pendencias > 0) document.getElementById('stat-pendencias').classList.add('ouro')
+
+  // Banner global: inadimplência em alguma pesquisa
+  const inadimplentes = lista.filter(p => p.inadimplente)
+  if (inadimplentes.length) {
+    const b = document.getElementById('alerta-banner')
+    b.classList.add('inadimplente')
+    b.style.display = 'flex'
+    document.getElementById('alerta-icon').textContent = '⛔'
+    document.getElementById('alerta-titulo').textContent = 'Situação de inadimplência'
+    document.getElementById('alerta-txt').textContent =
+      `Você possui ${inadimplentes.length} pesquisa(s) com inadimplência registrada. Regularize a situação com o DEUC/SEMA-AC para continuar enviando novos projetos e avançar nas etapas vigentes.`
+    // Desabilita botão de nova pesquisa
+    document.getElementById('btn-nova').style.opacity = '0.4'
+    document.getElementById('btn-nova').style.pointerEvents = 'none'
+    document.getElementById('btn-nova').title = 'Regularize a inadimplência antes de submeter novas pesquisas'
+  }
+
+  // Renderiza lista
+  const container = document.getElementById('lista-pesquisas')
+  if (!lista.length) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">🔬</div>
+        <div class="empty-titulo">Nenhuma pesquisa submetida ainda</div>
+        <div class="empty-txt">
+          Clique em <strong>"+ Nova pesquisa"</strong> para submeter seu projeto de pesquisa<br>
+          em uma das Unidades de Conservação estaduais do Acre.
+        </div>
+        <a href="pesquisa-publica.html" class="btn-nova-pesquisa">+ Submeter primeira pesquisa</a>
+      </div>`
+  } else {
+    container.innerHTML = lista.map(renderCard).join('')
+  }
+
+  // Remove loading
+  document.getElementById('loading').style.display = 'none'
+}
+
+carregarPortal()
+</script>
+</body>
+</html>
