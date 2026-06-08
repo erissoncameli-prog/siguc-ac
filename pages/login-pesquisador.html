@@ -35,29 +35,25 @@ body{font-family:var(--ff-ui);min-height:100vh;display:flex;overflow:hidden;back
 .slide-dot{width:5px;height:5px;border-radius:50%;background:rgba(255,255,255,.22);transition:all .4s cubic-bezier(.4,0,.2,1);cursor:pointer;border:none;padding:0}
 .slide-dot.ativo{background:var(--ouro);width:20px;border-radius:2px}
 
-.painel-dir{width:440px;flex-shrink:0;background:linear-gradient(160deg,#122019 0%,#0A1A0F 55%,#081410 100%);display:flex;align-items:center;justify-content:center;padding:28px 20px;position:relative;overflow:hidden;border-left:1px solid rgba(201,168,76,.18)}
-@keyframes blobA{0%,100%{transform:translate(0,0) scale(1)}33%{transform:translate(-28px,18px) scale(1.08)}66%{transform:translate(14px,-24px) scale(0.94)}}
-@keyframes blobB{0%,100%{transform:translate(0,0) scale(1)}40%{transform:translate(22px,-18px) scale(1.06)}75%{transform:translate(-16px,22px) scale(0.96)}}
-.painel-dir::before{content:'';position:absolute;bottom:-80px;right:-80px;width:420px;height:420px;background:radial-gradient(ellipse at 60% 60%,rgba(45,106,79,.26) 0%,transparent 65%);pointer-events:none;z-index:0;animation:blobA 16s ease-in-out infinite}
-.painel-dir::after{content:'';position:absolute;top:-80px;left:-60px;width:340px;height:340px;background:radial-gradient(ellipse at 38% 38%,rgba(201,168,76,.10) 0%,transparent 65%);pointer-events:none;z-index:0;animation:blobB 20s ease-in-out infinite}
+.painel-dir{width:440px;flex-shrink:0;background:#FDFBF7;display:flex;align-items:center;justify-content:center;padding:28px 20px;position:relative;overflow:hidden;border-left:1px solid #E0D8CC}
 
-.login-box{width:100%;max-width:360px;position:relative;z-index:1;background:rgba(244,239,230,.045);border:1px solid rgba(244,239,230,.10);border-radius:22px;padding:34px 30px 28px;backdrop-filter:blur(28px);box-shadow:0 8px 48px rgba(0,0,0,.32),inset 0 1px 0 rgba(244,239,230,.09)}
+.login-box{width:100%;max-width:360px;position:relative;z-index:1}
 
-.pesq-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(82,183,136,.12);border:1px solid rgba(82,183,136,.28);border-radius:20px;padding:4px 10px;font-size:9.5px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:#52B788;margin-bottom:24px}
+.pesq-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(45,106,79,.09);border:1px solid rgba(45,106,79,.22);border-radius:20px;padding:4px 10px;font-size:9.5px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--verde-m);margin-bottom:24px}
 .pesq-badge-icon{font-size:11px}
 
-.login-titulo{font-family:var(--ff-display);font-size:clamp(24px,2.4vw,30px);font-weight:500;line-height:1.2;color:var(--t1);margin-bottom:7px}
-.login-sub{font-size:12px;font-weight:300;color:var(--t2);margin-bottom:24px}
-.erro-msg{background:rgba(239,68,68,.09);border:1px solid rgba(239,68,68,.28);color:#FCA5A5;border-radius:7px;padding:10px 13px;font-size:11.5px;margin-bottom:18px;display:none;line-height:1.5}
-.sucesso-msg{background:rgba(82,183,136,.09);border:1px solid rgba(82,183,136,.28);color:#A7F3D0;border-radius:7px;padding:10px 13px;font-size:11.5px;margin-bottom:18px;display:none;line-height:1.5}
+.login-titulo{font-family:var(--ff-display);font-size:clamp(24px,2.4vw,30px);font-weight:500;line-height:1.2;color:#1A120A;margin-bottom:7px}
+.login-sub{font-size:12px;font-weight:300;color:#6B5C48;margin-bottom:24px}
+.erro-msg{background:#FEF2F2;border:1px solid #FECACA;color:#991B1B;border-radius:7px;padding:10px 13px;font-size:11.5px;margin-bottom:18px;display:none;line-height:1.5}
+.sucesso-msg{background:#F0FDF4;border:1px solid #BBF7D0;color:#166534;border-radius:7px;padding:10px 13px;font-size:11.5px;margin-bottom:18px;display:none;line-height:1.5}
 
 .form-group{margin-bottom:16px}
-.form-label{display:block;font-size:9.5px;font-weight:500;letter-spacing:.10em;text-transform:uppercase;color:rgba(244,239,230,.50);margin-bottom:7px}
-.form-input{width:100%;height:46px;background:rgba(255,255,255,.06);border:1.5px solid rgba(244,239,230,.13);border-radius:10px;padding:0 14px;font-size:14px;color:var(--t1);outline:none;transition:background .22s,border-color .22s,box-shadow .22s;font-family:var(--ff-ui)}
-.form-input:hover{background:rgba(255,255,255,.08);border-color:rgba(244,239,230,.22)}
-.form-input:focus{background:rgba(255,255,255,.09);border-color:rgba(82,183,136,.55);box-shadow:0 0 0 3.5px rgba(82,183,136,.15)}
-.form-input::placeholder{color:rgba(244,239,230,.28);font-size:13px}
-.form-input:-webkit-autofill{-webkit-box-shadow:0 0 0 40px #14261a inset;-webkit-text-fill-color:var(--t1);caret-color:var(--t1)}
+.form-label{display:block;font-size:9.5px;font-weight:500;letter-spacing:.10em;text-transform:uppercase;color:#9A8C7A;margin-bottom:7px}
+.form-input{width:100%;height:46px;background:#fff;border:1.5px solid #D4CCC0;border-radius:10px;padding:0 14px;font-size:14px;color:#1A120A;outline:none;transition:border-color .22s,box-shadow .22s;font-family:var(--ff-ui)}
+.form-input:hover{border-color:#C4BDB5}
+.form-input:focus{border-color:#52B788;box-shadow:0 0 0 3.5px rgba(82,183,136,.14)}
+.form-input::placeholder{color:#C0B8B0;font-size:13px}
+.form-input:-webkit-autofill{-webkit-box-shadow:0 0 0 40px #fff inset;-webkit-text-fill-color:#1A120A;caret-color:#1A120A}
 
 @keyframes shimmerBtn{from{left:-80%}to{left:140%}}
 .btn-entrar{width:100%;height:46px;margin-top:8px;background:linear-gradient(135deg,#52B788 0%,#2D6A4F 100%);color:#fff;border:none;border-radius:10px;font-size:13.5px;font-weight:600;letter-spacing:.04em;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 4px 22px rgba(82,183,136,.25);transition:all .22s;position:relative;overflow:hidden;font-family:var(--ff-ui)}
