@@ -1611,7 +1611,9 @@ function abrirModalInadimplencia() {
 async function confirmarInadimplencia() {
   const motivo = document.getElementById('inad-motivo')?.value.trim()
   if (!motivo) { toast('Informe o motivo', 'aviso'); return }
-  const { error } = await db.rpc('marcar_inadimplencia', { p_pesquisa_id: _detalhe.id, p_motivo: motivo })
+  const observacao = _getDespacho(motivo)
+  if (!observacao) return
+  const { error } = await db.rpc('marcar_inadimplencia', { p_pesquisa_id: _detalhe.id, p_motivo: observacao })
   if (error) { toast('Erro: ' + error.message, 'erro'); return }
   toast('Inadimplência registrada', 'sucesso')
   await _posDespacho('modal-inad')
