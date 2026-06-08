@@ -1799,7 +1799,8 @@ function validarPasso(n) {
     const email = document.getElementById('p-email').value.trim()
     const tel   = document.getElementById('p-tel').value.trim()
     const inst  = document.getElementById('p-inst').value.trim()
-    if (!nome || !cpf || !rg || !tit || !email || !tel || !inst) {
+    const area  = document.getElementById('p-area-formacao').value
+    if (!nome || !cpf || !rg || !tit || !email || !tel || !inst || !area) {
       toastPub('Preencha todos os campos obrigatórios', true); return false
     }
     if (!/\S+@\S+\.\S+/.test(email)) { toastPub('E-mail inválido', true); return false }
