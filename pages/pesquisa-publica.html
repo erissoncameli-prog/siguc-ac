@@ -1074,6 +1074,30 @@ async function enviarSubmissao() {
   const coleta  = document.getElementById('p-coleta').checked
   const humanos = document.getElementById('p-humanos').checked
 
+  // ── Camada 1: Honeypot ────────────────────────────────────
+  if (document.getElementById('hp-website').value) {
+    // Bot preencheu campo oculto — rejeitar silenciosamente
+    await new Promise(r => setTimeout(r, 1200))
+    document.getElementById('btn-enviar').disabled = false
+    document.getElementById('btn-enviar').textContent = 'Enviar Pesquisa →'
+    return
+  }
+
+  // ── Camada 2: Timer anti-bot (mínimo 90 s) ────────────────
+  const tempoDecorrido = (Date.now() - _formInicio) / 1000
+  if (tempoDecorrido < 90) {
+    toastPub('Por favor, revise seus dados antes de enviar.', true)
+    return
+  }
+
+  // ── Camada 3: Captcha matemático ──────────────────────────
+  const resposta = parseInt(document.getElementById('captcha-resp').value, 10)
+  if (isNaN(resposta) || resposta !== _captchaResp) {
+    toastPub('Verificação de segurança incorreta. Tente novamente.', true)
+    gerarCaptcha()
+    return
+  }
+
   if (!_arquivos.formulario) { toastPub('Anexe o formulário de pesquisa assinado', true); return }
   if (!_arquivos.proposta)   { toastPub('Anexe a proposta do projeto', true); return }
   if (coleta  && !_arquivos.sisbio) { toastPub('Anexe o comprovante SISBIO', true); return }
