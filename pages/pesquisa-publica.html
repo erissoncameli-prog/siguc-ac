@@ -398,7 +398,9 @@ body { font-family: 'DM Sans', sans-serif; background: var(--t1); min-height: 10
   </div>
 
   <!-- ─── Passo 1: Identificação do Responsável ─────────────── -->
-  <div class="passo-card" id="passo1">
+  <div class="passo-card" id="passo1" style="display:none">
+    <!-- Honeypot anti-bot: humanos nunca veem nem preenchem este campo -->
+    <input type="text" id="hp-website" name="website" class="hp-trap" tabindex="-1" autocomplete="off" aria-hidden="true">
     <div class="passo-title">👤 Identificação do Pesquisador Responsável</div>
     <div class="field-group">
 
