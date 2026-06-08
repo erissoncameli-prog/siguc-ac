@@ -1565,10 +1565,11 @@ async function confirmarEncerramento() {
   const data       = document.getElementById('encerr-data')?.value || null
   const obs        = document.getElementById('encerr-obs')?.value.trim()
   const observacao = _getDespacho(obs || '')
+  if (!observacao) return
   const { error } = await db.rpc('despachar_encerramento', {
     p_pesquisa_id:   _detalhe.id,
     p_data_fim_real: data,
-    p_observacao:    obs
+    p_observacao:    observacao
   })
   if (error) { toast('Erro: ' + error.message, 'erro'); return }
   toast('Processo encerrado e arquivado', 'sucesso')
