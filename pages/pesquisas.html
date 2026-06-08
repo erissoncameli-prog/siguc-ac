@@ -1344,7 +1344,7 @@ function abrirModalFaseSimples(novaEtapa, labelAcao) {
   </div>
   <div class="modal-footer">
     <button class="btn-acao" onclick="document.getElementById('modal-fase-simples').remove()">Cancelar</button>
-    <button class="btn-acao primary" onclick="confirmarFaseSimples('${novaEtapa}')">Confirmar</button>
+    <button class="btn-acao primary" onclick="pedirSenhaEDespachar(this, ()=>confirmarFaseSimples('${novaEtapa}'))">🔐 Confirmar</button>
   </div>
 </div>
 </div>`)
