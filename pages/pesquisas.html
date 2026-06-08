@@ -1218,9 +1218,12 @@ async function confirmarEmissaoAAP() {
   const val  = new Date(validadeStr)
   const dias = Math.round((val - hoje) / 86400000)
   if (dias < 1) { toast('Data de validade deve ser futura', 'aviso'); return }
+  const extras     = condicionantes ? 'Condicionantes: ' + condicionantes : ''
+  const observacao = _getDespacho(extras)
+  if (!observacao) return
   const { error } = await db.rpc('despachar_emissao_aap', {
-    p_pesquisa_id:   _detalhe.id,
-    p_validade_dias: dias,
+    p_pesquisa_id:    _detalhe.id,
+    p_validade_dias:  dias,
     p_condicionantes: condicionantes
   })
   if (error) { toast('Erro: ' + error.message, 'erro'); return }
