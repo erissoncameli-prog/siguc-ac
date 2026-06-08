@@ -1504,11 +1504,13 @@ function abrirModalHomologarRelatorio() {
 async function confirmarHomologarRelatorio() {
   const resultado = document.querySelector('input[name="homologar-resultado"]:checked')?.value
   if (!resultado) { toast('Selecione uma opção', 'aviso'); return }
-  const obs = document.getElementById('homologar-obs')?.value.trim() || null
+  const obs        = document.getElementById('homologar-obs')?.value.trim()
+  const observacao = _getDespacho(obs || '')
+  if (!observacao) return
   const { error } = await db.rpc('despachar_homologar_relatorio', {
     p_pesquisa_id: _detalhe.id,
     p_aprovado:    resultado === 'homologar',
-    p_observacao:  obs
+    p_observacao:  observacao
   })
   if (error) { toast('Erro: ' + error.message, 'erro'); return }
   toast(resultado === 'homologar' ? 'Relatório homologado — processo encerrado' : 'Não homologado — devolvido ao pesquisador', 'sucesso')
