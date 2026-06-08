@@ -1316,11 +1316,13 @@ async function confirmarEntregaAAP() {
   const inicio = document.getElementById('entrega-inicio')?.value || null
   const obs    = document.getElementById('entrega-obs')?.value.trim() || null
   const canal  = document.getElementById('entrega-canal')?.value
-  const obsCompleta = `AAP entregue via ${canal}.` + (obs ? ' ' + obs : '')
+  const extras  = `AAP entregue via ${canal}.` + (obs ? ' ' + obs : '')
+  const observacao = _getDespacho(extras)
+  if (!observacao) return
   const { error } = await db.rpc('despachar_entrega_aap', {
     p_pesquisa_id:      _detalhe.id,
     p_data_inicio_real: inicio,
-    p_observacao:       obsCompleta
+    p_observacao:       observacao
   })
   if (error) { toast('Erro: ' + error.message, 'erro'); return }
   toast('AAP entregue — pesquisa em campo', 'sucesso')
