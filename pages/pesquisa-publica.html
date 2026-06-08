@@ -723,6 +723,17 @@ body { font-family: 'DM Sans', sans-serif; background: var(--t1); min-height: 10
         ✅ Após o envio você receberá um e-mail com o número do processo e poderá acompanhar o andamento pelo portal.
       </div>
 
+      <!-- Verificação anti-robô -->
+      <div class="captcha-wrap">
+        <div class="captcha-titulo">🤖 Verificação de segurança</div>
+        <div class="captcha-row">
+          <span class="captcha-eq" id="captcha-pergunta">?</span>
+          <span class="captcha-igual">=</span>
+          <input type="number" id="captcha-resp" placeholder="?" min="0" max="99" autocomplete="off">
+        </div>
+        <div class="captcha-sub">Resolva a conta acima para confirmar que você não é um robô.</div>
+      </div>
+
     </div>
     <div class="btn-nav">
       <button class="btn btn-secondary" onclick="irPasso(3)">← Voltar</button>
