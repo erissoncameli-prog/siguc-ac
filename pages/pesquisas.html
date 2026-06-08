@@ -999,11 +999,14 @@ async function confirmarAnaliseTec() {
     toast('Informe as pendências técnicas', 'aviso'); return
   }
 
-  const observacao = (pendencias ? pendencias + '\n' : '') + (obs || '')
+  const extras     = [pendencias, obs].filter(Boolean).join('\n')
+  const observacao = _getDespacho(extras)
+  if (!observacao) return
+
   const { error } = await db.rpc('despachar_analise_tecnica', {
     p_pesquisa_id: _detalhe.id,
     p_favoravel:   resultado === 'favoravel',
-    p_observacao:  observacao.trim() || null
+    p_observacao:  observacao
   })
   if (error) { toast('Erro: ' + error.message, 'erro'); return }
   toast(resultado === 'favoravel' ? 'Parecer favorável — encaminhado ao Diretor DIMA' : 'Processo devolvido para triagem', 'sucesso')
