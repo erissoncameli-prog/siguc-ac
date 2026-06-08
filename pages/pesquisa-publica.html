@@ -795,6 +795,25 @@ const FUNCAO_LABEL = {
 
 // ── Init ─────────────────────────────────────────────────────
 async function init() {
+  // Scroll gate da IN
+  const scrollBox = document.getElementById('in-scroll-box')
+  scrollBox.addEventListener('scroll', function() {
+    const ratio = this.scrollTop / (this.scrollHeight - this.clientHeight)
+    // Barra de progresso
+    document.getElementById('in-progress-bar').style.width = Math.min(ratio * 100, 100) + '%'
+    // Desbloqueio ao chegar nos últimos 5%
+    if (ratio >= 0.95 && !_inScrollado) {
+      _inScrollado = true
+      document.getElementById('in-scroll-hint').style.opacity = '0'
+      document.getElementById('in-gate').classList.remove('bloqueado')
+      toastPub('✓ Leitura concluída — marque o campo abaixo para prosseguir')
+    }
+  })
+
+  // Gera captcha
+  gerarCaptcha()
+
+  // Carrega UCs
   const sel = document.getElementById('p-uc')
   try {
     const { data, error } = await db.from('unidades_conservacao')
@@ -821,6 +840,39 @@ async function init() {
     opt.textContent = 'Erro ao carregar UCs — recarregue a página'
     sel.appendChild(opt)
   }
+}
+
+// ── Passo 0: aceite da IN ─────────────────────────────────────
+function validarAceiteIN() {
+  const checked = document.getElementById('in-aceito').checked
+  document.getElementById('btn-prosseguir').disabled = !(_inScrollado && checked)
+}
+
+function aceitarIN() {
+  if (!_inScrollado) {
+    toastPub('Role o texto até o final antes de prosseguir', true); return
+  }
+  if (!document.getElementById('in-aceito').checked) {
+    toastPub('Marque a caixa de concordância para prosseguir', true); return
+  }
+  _aceiteInEm = new Date()
+  // Esconde passo0, mostra steps bar + passo1
+  document.getElementById('passo0').style.display   = 'none'
+  document.getElementById('steps-bar').style.display = ''
+  document.getElementById('passo1').style.display    = ''
+  _passoAtual = 1
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
+
+// ── Captcha ───────────────────────────────────────────────────
+function gerarCaptcha() {
+  _captchaA    = Math.floor(Math.random() * 9) + 1
+  _captchaB    = Math.floor(Math.random() * 9) + 1
+  _captchaResp = _captchaA + _captchaB
+  const pergEl = document.getElementById('captcha-pergunta')
+  if (pergEl) pergEl.textContent = `${_captchaA} + ${_captchaB}`
+  const respEl = document.getElementById('captcha-resp')
+  if (respEl) respEl.value = ''
 }
 
 // ── Navegação de passos ───────────────────────────────────────
