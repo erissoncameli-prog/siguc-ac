@@ -1648,6 +1648,20 @@ const FUNCAO_LABEL = {
 
 // ── Init ─────────────────────────────────────────────────────
 async function init() {
+  // Carrega logos institucionais da config_sistema (mesmas do cabeçalho do relatório)
+  try {
+    const { data: cfgRow } = await db.from('config_sistema').select('dados').eq('id', 1).single()
+    const logos = cfgRow?.dados?.logos || {}
+    const govEl  = document.getElementById('logo-gov')
+    const secEl  = document.getElementById('logo-sec')
+    const divEl  = document.getElementById('gov-logos-divider')
+    const wrap   = document.getElementById('gov-logos-wrap')
+    if (logos.governo_url)    { govEl.src = logos.governo_url;    govEl.style.display = '' }
+    if (logos.secretaria_url) { secEl.src = logos.secretaria_url; secEl.style.display = '' }
+    if (logos.governo_url && logos.secretaria_url) divEl.style.display = ''
+    if (logos.governo_url || logos.secretaria_url) wrap.style.display = ''
+  } catch (_) {}
+
   const scrollBox = document.getElementById('in-scroll-box')
   scrollBox.addEventListener('scroll', function() {
     const ratio = this.scrollTop / (this.scrollHeight - this.clientHeight)
