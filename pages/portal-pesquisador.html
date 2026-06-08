@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SIGUC-AC — Portal do Pesquisador</title>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -34,11 +35,23 @@ body{font-family:var(--ff-ui);background:var(--bg);color:var(--texto);min-height
 .h-portal-label{font-family:var(--ff-display);font-size:13px;font-style:italic;color:var(--texto-m)}
 .h-user{display:flex;align-items:center;gap:12px}
 .h-user-info{text-align:right}
-.h-user-nome{font-size:12px;font-weight:500;color:var(--texto);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.h-user-nome{font-size:12px;font-weight:500;color:var(--verde-m);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;text-decoration:none;display:block}
+.h-user-nome:hover{text-decoration:underline}
 .h-user-cargo{font-size:10px;color:var(--texto-s)}
 .h-avatar{width:34px;height:34px;border-radius:50%;background:rgba(82,183,136,.12);border:1.5px solid rgba(82,183,136,.30);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--verde-m);flex-shrink:0}
 .h-btn-sair{height:32px;padding:0 12px;background:#fff;border:1px solid var(--borda);border-radius:7px;font-size:11px;color:var(--texto-m);cursor:pointer;transition:all .2s;font-family:var(--ff-ui)}
 .h-btn-sair:hover{background:#FEF2F2;border-color:#FECACA;color:#DC2626}
+
+/* ── Perfil dropdown ── */
+.perfil-dropdown{position:relative}
+.perfil-btn{display:flex;align-items:center;gap:8px;background:none;border:none;cursor:pointer;padding:4px}
+.dropdown-menu{position:absolute;right:0;top:calc(100% + 8px);background:#fff;border:1px solid var(--borda);border-radius:10px;box-shadow:0 8px 24px rgba(10,26,15,.12);min-width:180px;overflow:hidden;display:none;z-index:30}
+.dropdown-menu.aberto{display:block}
+.dropdown-item{display:block;padding:10px 14px;font-size:12.5px;color:var(--texto);text-decoration:none;transition:background .15s;cursor:pointer;border:none;background:none;width:100%;text-align:left;font-family:var(--ff-ui)}
+.dropdown-item:hover{background:#F4EFE6}
+.dropdown-item.danger{color:#DC2626}
+.dropdown-item.danger:hover{background:#FEF2F2}
+.dropdown-sep{height:1px;background:var(--borda)}
 
 /* ── Banner de alerta ── */
 .alerta-banner{margin:24px 32px 0;border-radius:var(--raio);padding:14px 18px;display:flex;align-items:flex-start;gap:12px;display:none}
@@ -62,13 +75,21 @@ body{font-family:var(--ff-ui);background:var(--bg);color:var(--texto);min-height
 .btn-nova-pesquisa:hover{transform:translateY(-1px);box-shadow:0 5px 20px rgba(82,183,136,.36)}
 
 /* ── Stats ── */
-.stats-row{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:28px}
+.stats-row{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:24px}
 .stat-card{background:var(--card);border:1px solid var(--borda);border-radius:var(--raio);padding:16px 18px;box-shadow:var(--sombra)}
 .stat-num{font-family:var(--ff-display);font-size:28px;font-weight:600;color:var(--texto);line-height:1;margin-bottom:4px}
 .stat-num.verde{color:var(--verde-c)}
 .stat-num.ouro{color:var(--ouro)}
 .stat-num.vermelho{color:#EF4444}
 .stat-label{font-size:11px;color:var(--texto-s);text-transform:uppercase;letter-spacing:.08em}
+
+/* ── Tabs ── */
+.tabs-nav{display:flex;gap:4px;background:var(--card);border:1px solid var(--borda);border-radius:11px;padding:5px;margin-bottom:24px;box-shadow:var(--sombra)}
+.tab-btn{flex:1;height:36px;border:none;border-radius:8px;font-size:12.5px;font-weight:500;cursor:pointer;font-family:var(--ff-ui);color:var(--texto-m);background:transparent;transition:all .18s;display:flex;align-items:center;justify-content:center;gap:6px}
+.tab-btn:hover{background:rgba(82,183,136,.07)}
+.tab-btn.ativo{background:linear-gradient(135deg,var(--verde-c),var(--verde-m));color:#fff;box-shadow:0 2px 8px rgba(82,183,136,.28)}
+.tab-panel{display:none}
+.tab-panel.ativo{display:block}
 
 /* ── Seção ── */
 .secao-titulo{font-size:11px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--texto-s);margin-bottom:16px;display:flex;align-items:center;gap:8px}
@@ -80,7 +101,6 @@ body{font-family:var(--ff-ui);background:var(--bg);color:var(--texto);min-height
 .pesquisa-card.com-pendencia{border-left:3px solid var(--ouro)}
 .pesquisa-card.inadimplente{border-left:3px solid #EF4444}
 .pesquisa-card.encerrada{opacity:.72}
-
 .pc-topo{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px;flex-wrap:wrap}
 .pc-numero{font-size:10px;font-weight:600;letter-spacing:.10em;color:var(--verde-c);text-transform:uppercase}
 .pc-badges{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
@@ -98,12 +118,9 @@ body{font-family:var(--ff-ui);background:var(--bg);color:var(--texto);min-height
 .badge-status-ok{background:#F0FDF4;color:#15803D}
 .badge-status-problema{background:#FEF2F2;color:#991B1B}
 .badge-status-encerrada{background:#F3F4F6;color:#374151}
-
 .pc-titulo{font-size:15px;font-weight:600;color:var(--texto);line-height:1.35;margin-bottom:6px}
 .pc-meta{font-size:11.5px;color:var(--texto-s);display:flex;gap:16px;flex-wrap:wrap;margin-bottom:14px}
 .pc-meta span{display:flex;align-items:center;gap:4px}
-
-/* ── Timeline de etapas ── */
 .etapas-wrap{margin-bottom:14px}
 .etapas-label{font-size:10px;color:var(--texto-s);margin-bottom:6px;display:flex;justify-content:space-between}
 .etapas-bar{height:6px;background:#E8E0D0;border-radius:3px;overflow:visible;position:relative}
@@ -112,8 +129,6 @@ body{font-family:var(--ff-ui);background:var(--bg);color:var(--texto);min-height
 .etapa-dot{flex:1;height:4px;border-radius:2px;background:#E8E0D0}
 .etapa-dot.feita{background:var(--verde-c)}
 .etapa-dot.atual{background:var(--ouro);box-shadow:0 0 0 1.5px rgba(201,168,76,.35)}
-
-/* ── Pendência ── */
 .pendencia-box{background:#FFFBEB;border:1px solid #FDE68A;border-radius:8px;padding:10px 13px;display:flex;align-items:flex-start;gap:9px;margin-bottom:12px}
 .pendencia-icon{font-size:14px;flex-shrink:0;margin-top:1px}
 .pendencia-txt{flex:1}
@@ -125,8 +140,6 @@ body{font-family:var(--ff-ui);background:var(--bg);color:var(--texto);min-height
 .pendencia-box.info{background:#EFF6FF;border-color:#BFDBFE}
 .pendencia-box.info .pendencia-titulo{color:#1E40AF}
 .pendencia-box.info .pendencia-desc{color:#1D4ED8}
-
-/* ── Footer card ── */
 .pc-footer{display:flex;align-items:center;justify-content:space-between;padding-top:12px;border-top:1px solid var(--borda);flex-wrap:wrap;gap:8px}
 .pc-data{font-size:11px;color:var(--texto-s)}
 .pc-acoes{display:flex;gap:8px}
@@ -148,16 +161,25 @@ body{font-family:var(--ff-ui);background:var(--bg);color:var(--texto);min-height
 @keyframes spin{to{transform:rotate(360deg)}}
 .loading-spinner{width:28px;height:28px;border:2.5px solid rgba(82,183,136,.2);border-top-color:var(--verde-c);border-radius:50%;animation:spin .7s linear infinite}
 
-/* ── Perfil dropdown ── */
-.perfil-dropdown{position:relative}
-.perfil-btn{display:flex;align-items:center;gap:8px;background:none;border:none;cursor:pointer;padding:4px}
-.dropdown-menu{position:absolute;right:0;top:calc(100% + 8px);background:#fff;border:1px solid var(--borda);border-radius:10px;box-shadow:0 8px 24px rgba(10,26,15,.12);min-width:180px;overflow:hidden;display:none;z-index:30}
-.dropdown-menu.aberto{display:block}
-.dropdown-item{display:block;padding:10px 14px;font-size:12.5px;color:var(--texto);text-decoration:none;transition:background .15s;cursor:pointer;border:none;background:none;width:100%;text-align:left;font-family:var(--ff-ui)}
-.dropdown-item:hover{background:#F4EFE6}
-.dropdown-item.danger{color:#DC2626}
-.dropdown-item.danger:hover{background:#FEF2F2}
-.dropdown-sep{height:1px;background:var(--borda)}
+/* ── Gráficos ── */
+.graficos-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:0}
+.grafico-card{background:var(--card);border:1px solid var(--borda);border-radius:var(--raio);padding:20px;box-shadow:var(--sombra)}
+.grafico-titulo{font-size:11px;font-weight:600;letter-spacing:.10em;text-transform:uppercase;color:var(--texto-s);margin-bottom:16px}
+.chart-wrap{position:relative;height:200px;display:flex;align-items:center;justify-content:center}
+.grafico-vazio{font-size:12px;color:var(--texto-s);font-style:italic;text-align:center;padding:40px 0}
+@media(max-width:600px){.graficos-grid{grid-template-columns:1fr}}
+
+/* ── Mapa ── */
+#mapa-uc{width:100%;height:460px;border-radius:var(--raio);border:1px solid var(--borda);box-shadow:var(--sombra);overflow:hidden}
+.mapa-legenda{margin-top:12px;display:flex;flex-wrap:wrap;gap:12px;font-size:11.5px;color:var(--texto-m)}
+.leg-item{display:flex;align-items:center;gap:6px}
+.leg-cor{width:14px;height:14px;border-radius:3px;flex-shrink:0}
+
+/* Leaflet popup custom */
+.leaflet-popup-content{font-family:var(--ff-ui);font-size:12.5px;line-height:1.5}
+.popup-nome{font-family:var(--ff-display);font-size:14px;font-weight:500;color:var(--texto);margin-bottom:4px}
+.popup-meta{color:var(--texto-s);font-size:11.5px}
+.popup-destaque{background:#E8F5EE;color:#1F4E2C;border-radius:4px;padding:3px 8px;font-size:10.5px;font-weight:600;display:inline-block;margin-top:6px}
 
 @media(max-width:640px){
   .portal-header{padding:0 14px}
@@ -168,18 +190,18 @@ body{font-family:var(--ff-ui);background:var(--bg);color:var(--texto);min-height
   .stats-row{grid-template-columns:1fr 1fr}
   .stats-row .stat-card:last-child{grid-column:span 2}
   .alerta-banner{margin:16px 16px 0}
+  .tabs-nav{gap:3px;padding:4px}
+  .tab-btn{font-size:11px}
 }
 </style>
 </head>
 <body>
 
-<!-- Loading -->
 <div class="loading-overlay" id="loading">
   <div class="loading-spinner"></div>
   <div class="loading-logo">Carregando portal…</div>
 </div>
 
-<!-- Header -->
 <header class="portal-header">
   <div style="display:flex;align-items:center;gap:16px">
     <div class="h-logos" id="h-logos-wrap" style="display:none">
@@ -202,7 +224,7 @@ body{font-family:var(--ff-ui);background:var(--bg);color:var(--texto);min-height
   </div>
   <div class="h-user">
     <div class="h-user-info">
-      <div class="h-user-nome" id="h-nome">Carregando…</div>
+      <a href="perfil-pesquisador.html" class="h-user-nome" id="h-nome">Carregando…</a>
       <div class="h-user-cargo">Pesquisador externo</div>
     </div>
     <div class="perfil-dropdown">
@@ -218,7 +240,6 @@ body{font-family:var(--ff-ui);background:var(--bg);color:var(--texto);min-height
   </div>
 </header>
 
-<!-- Banner de alerta global -->
 <div class="alerta-banner" id="alerta-banner">
   <div class="alerta-icon" id="alerta-icon"></div>
   <div class="alerta-body">
@@ -227,7 +248,6 @@ body{font-family:var(--ff-ui);background:var(--bg);color:var(--texto);min-height
   </div>
 </div>
 
-<!-- Main -->
 <main class="portal-main">
 
   <div class="bv-row">
@@ -246,15 +266,50 @@ body{font-family:var(--ff-ui);background:var(--bg);color:var(--texto);min-height
     <div class="stat-card"><div class="stat-num ouro" id="stat-pendencias">—</div><div class="stat-label">Com pendências</div></div>
   </div>
 
-  <div class="secao-titulo">Minhas pesquisas</div>
+  <!-- Tabs -->
+  <nav class="tabs-nav">
+    <button class="tab-btn ativo" onclick="mostrarTab('pesquisas')" id="tab-btn-pesquisas">🔬 Minhas pesquisas</button>
+    <button class="tab-btn" onclick="mostrarTab('graficos')" id="tab-btn-graficos">📊 Estatísticas</button>
+    <button class="tab-btn" onclick="mostrarTab('mapa')" id="tab-btn-mapa">🗺️ Mapa de UCs</button>
+  </nav>
 
-  <div id="lista-pesquisas">
-    <!-- carregado via JS -->
+  <!-- Tab: pesquisas -->
+  <div class="tab-panel ativo" id="tab-pesquisas">
+    <div class="secao-titulo">Minhas pesquisas</div>
+    <div id="lista-pesquisas"></div>
+  </div>
+
+  <!-- Tab: gráficos -->
+  <div class="tab-panel" id="tab-graficos">
+    <div class="secao-titulo">Distribuição por tipo e etapa</div>
+    <div class="graficos-grid">
+      <div class="grafico-card">
+        <div class="grafico-titulo">Por tipo de pesquisa</div>
+        <div class="chart-wrap"><canvas id="chart-tipo"></canvas><div class="grafico-vazio" id="vazio-tipo" style="display:none">Nenhum dado ainda</div></div>
+      </div>
+      <div class="grafico-card">
+        <div class="grafico-titulo">Por etapa atual</div>
+        <div class="chart-wrap" style="height:260px"><canvas id="chart-etapa"></canvas><div class="grafico-vazio" id="vazio-etapa" style="display:none">Nenhum dado ainda</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab: mapa -->
+  <div class="tab-panel" id="tab-mapa">
+    <div class="secao-titulo">Unidades de Conservação do Acre</div>
+    <div id="mapa-uc"></div>
+    <div class="mapa-legenda">
+      <div class="leg-item"><div class="leg-cor" style="background:#52B788"></div>UC com sua pesquisa</div>
+      <div class="leg-item"><div class="leg-cor" style="background:#A5C4A5;opacity:.6"></div>Proteção integral</div>
+      <div class="leg-item"><div class="leg-cor" style="background:#C9A84C;opacity:.5"></div>Uso sustentável</div>
+    </div>
   </div>
 
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 const SUPABASE_URL = 'https://atqtybcsvepdabsvgaly.supabase.co'
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF0cXR5YmNzdmVwZGFic3ZnYWx5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0MjMzNzgsImV4cCI6MjA5NTk5OTM3OH0.hWx1AB2rK7xdco1Dgagm0XUOBPQbxZVE614SW4SKoLk'
@@ -278,78 +333,52 @@ async function carregarLogos() {
 carregarLogos()
 
 let _pesquisador = null
+let _pesquisas   = []
+let _mapaIniciado = false
+let _graficosRenderizados = false
 
 const ETAPAS = [
-  { key:'submetida',         label:'Submetida',           pos:1  },
-  { key:'triagem',           label:'Em triagem',           pos:2  },
-  { key:'analise_tecnica',   label:'Análise técnica',      pos:3  },
-  { key:'parecer_juridico',  label:'Parecer jurídico',     pos:4  },
-  { key:'aap_emissao',       label:'Emissão de AAP',       pos:5  },
-  { key:'aap_assinatura',    label:'Assinatura de AAP',    pos:6  },
-  { key:'aap_publicada',     label:'AAP publicada',        pos:7  },
-  { key:'em_campo',          label:'Em campo',             pos:8  },
-  { key:'relatorio_parcial', label:'Relatório parcial',    pos:9  },
-  { key:'relatorio_final',   label:'Relatório final',      pos:10 },
-  { key:'analise_relatorio', label:'Análise dos relatórios',pos:11},
-  { key:'encerrada',         label:'Encerrada',            pos:12 },
-  { key:'arquivada',         label:'Arquivada',            pos:13 },
+  { key:'submetida',         label:'Submetida',            pos:1  },
+  { key:'triagem',           label:'Em triagem',            pos:2  },
+  { key:'analise_tecnica',   label:'Análise técnica',       pos:3  },
+  { key:'parecer_juridico',  label:'Parecer jurídico',      pos:4  },
+  { key:'aap_emissao',       label:'Emissão de AAP',        pos:5  },
+  { key:'aap_assinatura',    label:'Assinatura de AAP',     pos:6  },
+  { key:'aap_publicada',     label:'AAP publicada',         pos:7  },
+  { key:'em_campo',          label:'Em campo',              pos:8  },
+  { key:'relatorio_parcial', label:'Relatório parcial',     pos:9  },
+  { key:'relatorio_final',   label:'Relatório final',       pos:10 },
+  { key:'analise_relatorio', label:'Análise dos relatórios',pos:11 },
+  { key:'encerrada',         label:'Encerrada',             pos:12 },
+  { key:'arquivada',         label:'Arquivada',             pos:13 },
 ]
 const TOTAL_ETAPAS = ETAPAS.length
 
-const TIPO_BADGE = {
-  fauna:'badge-fauna', flora:'badge-flora', genetica:'badge-genetica',
-  ecossistema:'badge-ecossistema', socioambiental:'badge-socioambiental', outro:'badge-outro'
-}
-const TIPO_LABEL = {
-  fauna:'Fauna', flora:'Flora', genetica:'Genética',
-  ecossistema:'Ecossistema', socioambiental:'Socioambiental', outro:'Outro'
-}
+const TIPO_BADGE  = { fauna:'badge-fauna', flora:'badge-flora', genetica:'badge-genetica', ecossistema:'badge-ecossistema', socioambiental:'badge-socioambiental', outro:'badge-outro' }
+const TIPO_LABEL  = { fauna:'Fauna', flora:'Flora', genetica:'Genética', ecossistema:'Ecossistema', socioambiental:'Socioambiental', outro:'Outro' }
+const TIPO_CORES  = { fauna:'#0EA5E9', flora:'#22C55E', genetica:'#A855F7', ecossistema:'#F97316', socioambiental:'#10B981', outro:'#94A3B8' }
 
 function iniciais(nome) {
   const p = (nome||'').trim().split(' ').filter(Boolean)
   if (!p.length) return '?'
-  if (p.length === 1) return p[0][0].toUpperCase()
-  return (p[0][0] + p[p.length-1][0]).toUpperCase()
+  return p.length === 1 ? p[0][0].toUpperCase() : (p[0][0] + p[p.length-1][0]).toUpperCase()
 }
-
 function esc(s) {
   if (!s) return ''
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')
 }
+function fmtData(d) { if (!d) return '—'; return new Date(d).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric'}) }
+function fmtDataCurta(d) { if (!d) return '—'; return new Date(d).toLocaleDateString('pt-BR',{day:'2-digit',month:'short',year:'numeric'}) }
+function diasRestantes(data) { if (!data) return null; return Math.ceil((new Date(data) - Date.now()) / 86400000) }
 
-function fmtData(d) {
-  if (!d) return '—'
-  return new Date(d).toLocaleDateString('pt-BR', { day:'2-digit', month:'2-digit', year:'numeric' })
-}
-
-function fmtDataCurta(d) {
-  if (!d) return '—'
-  return new Date(d).toLocaleDateString('pt-BR', { day:'2-digit', month:'short', year:'numeric' })
-}
-
-function diasRestantes(data) {
-  if (!data) return null
-  const diff = Math.ceil((new Date(data) - Date.now()) / 86400000)
-  return diff
-}
-
-function toggleDropdown() {
-  document.getElementById('dropdown').classList.toggle('aberto')
-}
+function toggleDropdown() { document.getElementById('dropdown').classList.toggle('aberto') }
 document.addEventListener('click', e => {
-  const btn = document.getElementById('avatar-btn')
-  const menu = document.getElementById('dropdown')
+  const btn = document.getElementById('avatar-btn'), menu = document.getElementById('dropdown')
   if (!btn.contains(e.target)) menu.classList.remove('aberto')
 })
+async function sair() { await db.auth.signOut(); window.location.replace('login-pesquisador.html') }
 
-async function sair() {
-  await db.auth.signOut()
-  window.location.replace('login-pesquisador.html')
-}
-
-function etapaPos(key) {
-  return ETAPAS.find(e => e.key === key)?.pos || 1
-}
+function etapaPos(key) { return ETAPAS.find(e => e.key === key)?.pos || 1 }
 
 function statusBadge(pesquisa) {
   const { etapa, inadimplente, complementacao_solicitada, triagem_resultado } = pesquisa
@@ -391,46 +420,26 @@ function pendenciasCard(pesquisa) {
 }
 
 function renderCard(p) {
-  const pos    = etapaPos(p.etapa)
-  const pct    = Math.round(((pos - 1) / (TOTAL_ETAPAS - 1)) * 100)
-  const status = statusBadge(p)
-  const alertas= pendenciasCard(p)
-  const tipoBadge = TIPO_BADGE[p.tipo] || 'badge-outro'
-  const tipoLabel = TIPO_LABEL[p.tipo] || p.tipo
-  const etapaLabel= ETAPAS.find(e => e.key === p.etapa)?.label || p.etapa
+  const pos     = etapaPos(p.etapa)
+  const pct     = Math.round(((pos - 1) / (TOTAL_ETAPAS - 1)) * 100)
+  const status  = statusBadge(p)
+  const alertas = pendenciasCard(p)
+  const tipoBadge  = TIPO_BADGE[p.tipo] || 'badge-outro'
+  const tipoLabel  = TIPO_LABEL[p.tipo] || p.tipo
+  const etapaLabel = ETAPAS.find(e => e.key === p.etapa)?.label || p.etapa
   const hasProblema = p.inadimplente || p.triagem_resultado === 'rejeitada'
-  const hasPendencia= alertas.length > 0
-
-  const dotsHtml = ETAPAS.map((e,i) => {
-    const cls = i < pos-1 ? 'feita' : i === pos-1 ? 'atual' : ''
-    return `<div class="etapa-dot ${cls}" title="${e.label}"></div>`
-  }).join('')
-
-  const alertasHtml = alertas.map(a => `
-    <div class="pendencia-box ${a.tipo}">
-      <div class="pendencia-icon">${a.icone}</div>
-      <div class="pendencia-txt">
-        <div class="pendencia-titulo">${esc(a.titulo)}</div>
-        <div class="pendencia-desc">${a.desc}</div>
-      </div>
-    </div>`).join('')
-
+  const hasPendencia = alertas.length > 0
+  const dotsHtml = ETAPAS.map((e,i) => `<div class="etapa-dot ${i < pos-1 ? 'feita' : i === pos-1 ? 'atual' : ''}" title="${e.label}"></div>`).join('')
+  const alertasHtml = alertas.map(a => `<div class="pendencia-box ${a.tipo}"><div class="pendencia-icon">${a.icone}</div><div class="pendencia-txt"><div class="pendencia-titulo">${esc(a.titulo)}</div><div class="pendencia-desc">${a.desc}</div></div></div>`).join('')
   const aapBtn = p.aap_numero ? `<a href="pesquisa-status.html?token=${encodeURIComponent(p.token_publico)}&aba=aap" class="btn-sm btn-sm-aap">📄 AAP</a>` : ''
-
   const periodos = []
   if (p.data_inicio_prevista) periodos.push(`Início: ${fmtData(p.data_inicio_prevista)}`)
   if (p.data_fim_prevista)    periodos.push(`Fim: ${fmtData(p.data_fim_prevista)}`)
-
   return `
   <div class="pesquisa-card ${hasPendencia && !hasProblema ? 'com-pendencia' : ''} ${hasProblema ? 'inadimplente' : ''} ${['encerrada','arquivada'].includes(p.etapa) ? 'encerrada' : ''}">
     <div class="pc-topo">
-      <div>
-        <div class="pc-numero">${esc(p.numero_processo || '—')}</div>
-      </div>
-      <div class="pc-badges">
-        <span class="badge ${tipoBadge}">${tipoLabel}</span>
-        <span class="badge ${status.cls}">${status.label}</span>
-      </div>
+      <div><div class="pc-numero">${esc(p.numero_processo || '—')}</div></div>
+      <div class="pc-badges"><span class="badge ${tipoBadge}">${tipoLabel}</span><span class="badge ${status.cls}">${status.label}</span></div>
     </div>
     <div class="pc-titulo">${esc(p.titulo)}</div>
     <div class="pc-meta">
@@ -438,18 +447,12 @@ function renderCard(p) {
       ${periodos.length ? `<span>📅 ${periodos.join(' — ')}</span>` : ''}
       <span>📍 Etapa ${pos}/13: ${etapaLabel}</span>
     </div>
-
     <div class="etapas-wrap">
-      <div class="etapas-label">
-        <span>Progresso</span>
-        <span>${pos}/13 etapas</span>
-      </div>
+      <div class="etapas-label"><span>Progresso</span><span>${pos}/13 etapas</span></div>
       <div class="etapas-bar"><div class="etapas-fill" style="width:${pct}%"></div></div>
       <div class="etapas-dots">${dotsHtml}</div>
     </div>
-
     ${alertasHtml}
-
     <div class="pc-footer">
       <div class="pc-data">Submetida em ${fmtDataCurta(p.criado_em)}</div>
       <div class="pc-acoes">
@@ -460,6 +463,118 @@ function renderCard(p) {
   </div>`
 }
 
+// ── Tab switching ──────────────────────────────────────────
+function mostrarTab(id) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('ativo'))
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('ativo'))
+  document.getElementById('tab-' + id).classList.add('ativo')
+  document.getElementById('tab-btn-' + id).classList.add('ativo')
+  if (id === 'graficos' && !_graficosRenderizados) renderGraficos()
+  if (id === 'mapa'     && !_mapaIniciado)         iniciarMapa()
+}
+
+// ── Gráficos ───────────────────────────────────────────────
+function renderGraficos() {
+  _graficosRenderizados = true
+  if (!_pesquisas.length) {
+    document.getElementById('vazio-tipo').style.display  = 'block'
+    document.getElementById('vazio-etapa').style.display = 'block'
+    document.getElementById('chart-tipo').style.display  = 'none'
+    document.getElementById('chart-etapa').style.display = 'none'
+    return
+  }
+
+  // Donut por tipo
+  const contTipo = {}
+  _pesquisas.forEach(p => { const t = p.tipo || 'outro'; contTipo[t] = (contTipo[t]||0) + 1 })
+  const tipoLabels = Object.keys(contTipo)
+  const tipoVals   = tipoLabels.map(k => contTipo[k])
+  const tipoCores  = tipoLabels.map(k => TIPO_CORES[k] || '#94A3B8')
+
+  new Chart(document.getElementById('chart-tipo'), {
+    type: 'doughnut',
+    data: { labels: tipoLabels.map(k => TIPO_LABEL[k] || k), datasets: [{ data: tipoVals, backgroundColor: tipoCores, borderWidth: 2, borderColor: '#fff' }] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position:'bottom', labels:{ font:{family:'DM Sans',size:11}, padding:10, boxWidth:12, color:'#6B5C48' } } }
+    }
+  })
+
+  // Barras horizontais por etapa
+  const contEtapa = {}
+  _pesquisas.forEach(p => { contEtapa[p.etapa] = (contEtapa[p.etapa]||0) + 1 })
+  const etOrdem = ETAPAS.filter(e => contEtapa[e.key])
+  const etLabels = etOrdem.map(e => e.label)
+  const etVals   = etOrdem.map(e => contEtapa[e.key])
+
+  new Chart(document.getElementById('chart-etapa'), {
+    type: 'bar',
+    data: {
+      labels: etLabels,
+      datasets: [{ data: etVals, backgroundColor: 'rgba(82,183,136,.72)', borderRadius: 5, borderSkipped: false }]
+    },
+    options: {
+      indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { stepSize: 1, font:{ family:'DM Sans', size:10 }, color:'#9A8C7A' }, grid:{ color:'rgba(0,0,0,.05)' } },
+        y: { ticks: { font:{ family:'DM Sans', size:10 }, color:'#6B5C48' }, grid:{ display:false } }
+      }
+    }
+  })
+}
+
+// ── Mapa Leaflet ────────────────────────────────────────────
+function iniciarMapa() {
+  _mapaIniciado = true
+  const mapa = L.map('mapa-uc', { zoomControl: true }).setView([-9.0, -70.5], 6)
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    maxZoom: 16
+  }).addTo(mapa)
+
+  // UCs com pesquisa deste pesquisador
+  const ucsComPesquisa = new Set(_pesquisas.filter(p => p.uc_id).map(p => p.uc_id))
+  const ucNomeParaPesquisas = {}
+  _pesquisas.filter(p => p.uc_id).forEach(p => {
+    if (!ucNomeParaPesquisas[p.uc_id]) ucNomeParaPesquisas[p.uc_id] = []
+    ucNomeParaPesquisas[p.uc_id].push(p.titulo)
+  })
+
+  fetch('../data/uc_acre.geojson')
+    .then(r => r.json())
+    .then(geojson => {
+      L.geoJSON(geojson, {
+        style(feature) {
+          const ucId = feature.properties?.id || feature.properties?.gid
+          const temPesquisa = ucsComPesquisa.has(String(ucId))
+          const grupo = (feature.properties?.grupo_uc || '').toLowerCase()
+          if (temPesquisa) return { fillColor:'#52B788', fillOpacity:.75, color:'#2D6A4F', weight:2 }
+          if (grupo === 'protecao_integral') return { fillColor:'#A5C4A5', fillOpacity:.35, color:'#6B9E6B', weight:1 }
+          return { fillColor:'#C9A84C', fillOpacity:.30, color:'#9A7A30', weight:1 }
+        },
+        onEachFeature(feature, layer) {
+          const p = feature.properties || {}
+          const ucId = p.id || p.gid
+          const pesqs = ucNomeParaPesquisas[String(ucId)] || []
+          const destaque = pesqs.length
+            ? `<div class="popup-destaque">✓ ${pesqs.length} pesquisa(s) sua(s) nesta UC</div><br><small style="font-size:10.5px;color:#2D6A4F">${pesqs.map(t => `• ${t}`).join('<br>')}</small>`
+            : ''
+          layer.bindPopup(`
+            <div class="popup-nome">${p.nome || p.name || 'UC'}</div>
+            <div class="popup-meta">${p.categoria_uc || p.categoria || ''} · ${p.esfera_uc || p.esfera || ''}</div>
+            ${destaque}
+          `, { maxWidth: 260 })
+        }
+      }).addTo(mapa)
+    })
+    .catch(() => {
+      document.getElementById('mapa-uc').innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;font-size:13px;color:#9A8C7A;font-style:italic">Mapa não disponível neste momento.</div>'
+    })
+}
+
+// ── Carregar portal ─────────────────────────────────────────
 async function carregarPortal() {
   const { data: { session } } = await db.auth.getSession()
   if (!session) { window.location.replace('login-pesquisador.html'); return }
@@ -477,13 +592,10 @@ async function carregarPortal() {
   }
 
   _pesquisador = pesq
-
-  // Atualiza header
-  document.getElementById('h-nome').textContent = pesq.nome_completo
+  document.getElementById('h-nome').textContent   = pesq.nome_completo
   document.getElementById('h-avatar').textContent = iniciais(pesq.nome_completo)
   document.getElementById('bv-titulo').textContent = `Olá, ${pesq.nome_completo.split(' ')[0]}!`
 
-  // Busca pesquisas
   const { data: pesquisas } = await db
     .from('pesquisas')
     .select(`
@@ -492,55 +604,49 @@ async function carregarPortal() {
       aap_numero, aap_validade, token_publico,
       inadimplente, inadimplencia_motivo, inadimplencia_em,
       complementacao_solicitada, complementacao_motivo, complementacao_prazo,
-      triagem_resultado,
+      triagem_resultado, uc_id,
       unidades_conservacao!uc_id ( nome )
     `)
     .order('criado_em', { ascending: false })
 
-  const lista = (pesquisas || []).map(p => ({ ...p, uc_nome: p.unidades_conservacao?.nome || null }))
+  _pesquisas = (pesquisas || []).map(p => ({ ...p, uc_nome: p.unidades_conservacao?.nome || null }))
 
   // Stats
-  const ativas    = lista.filter(p => !['encerrada','arquivada'].includes(p.etapa)).length
-  const pendencias= lista.filter(p => pendenciasCard(p).length > 0).length
-  document.getElementById('stat-total').textContent    = lista.length
-  document.getElementById('stat-ativas').textContent   = ativas
+  const ativas     = _pesquisas.filter(p => !['encerrada','arquivada'].includes(p.etapa)).length
+  const pendencias = _pesquisas.filter(p => pendenciasCard(p).length > 0).length
+  document.getElementById('stat-total').textContent     = _pesquisas.length
+  document.getElementById('stat-ativas').textContent    = ativas
   document.getElementById('stat-pendencias').textContent = pendencias
   if (pendencias > 0) document.getElementById('stat-pendencias').classList.add('ouro')
 
-  // Banner global: inadimplência em alguma pesquisa
-  const inadimplentes = lista.filter(p => p.inadimplente)
+  // Banner inadimplência
+  const inadimplentes = _pesquisas.filter(p => p.inadimplente)
   if (inadimplentes.length) {
     const b = document.getElementById('alerta-banner')
     b.classList.add('inadimplente')
     b.style.display = 'flex'
     document.getElementById('alerta-icon').textContent = '⛔'
     document.getElementById('alerta-titulo').textContent = 'Situação de inadimplência'
-    document.getElementById('alerta-txt').textContent =
-      `Você possui ${inadimplentes.length} pesquisa(s) com inadimplência registrada. Regularize a situação com o DEUC/SEMA-AC para continuar enviando novos projetos e avançar nas etapas vigentes.`
-    // Desabilita botão de nova pesquisa
+    document.getElementById('alerta-txt').textContent = `Você possui ${inadimplentes.length} pesquisa(s) com inadimplência registrada. Regularize a situação com o DEUC/SEMA-AC para continuar enviando novos projetos e avançar nas etapas vigentes.`
     document.getElementById('btn-nova').style.opacity = '0.4'
     document.getElementById('btn-nova').style.pointerEvents = 'none'
     document.getElementById('btn-nova').title = 'Regularize a inadimplência antes de submeter novas pesquisas'
   }
 
-  // Renderiza lista
+  // Lista de pesquisas
   const container = document.getElementById('lista-pesquisas')
-  if (!lista.length) {
+  if (!_pesquisas.length) {
     container.innerHTML = `
       <div class="empty-state">
         <div class="empty-icon">🔬</div>
         <div class="empty-titulo">Nenhuma pesquisa submetida ainda</div>
-        <div class="empty-txt">
-          Clique em <strong>"+ Nova pesquisa"</strong> para submeter seu projeto de pesquisa<br>
-          em uma das Unidades de Conservação estaduais do Acre.
-        </div>
+        <div class="empty-txt">Clique em <strong>"+ Nova pesquisa"</strong> para submeter seu projeto<br>em uma das Unidades de Conservação estaduais do Acre.</div>
         <a href="pesquisa-publica.html" class="btn-nova-pesquisa">+ Submeter primeira pesquisa</a>
       </div>`
   } else {
-    container.innerHTML = lista.map(renderCard).join('')
+    container.innerHTML = _pesquisas.map(renderCard).join('')
   }
 
-  // Remove loading
   document.getElementById('loading').style.display = 'none'
 }
 
