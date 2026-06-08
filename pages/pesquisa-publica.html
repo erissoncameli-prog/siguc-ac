@@ -2122,6 +2122,20 @@ function toastPub(msg, erro = false) {
   el._t = setTimeout(() => el.classList.remove('show'), 3500)
 }
 
+// ── Validação de CPF (dígito verificador) ─────────────────────
+function validarCPF(cpf) {
+  cpf = cpf.replace(/\D/g, '')
+  if (cpf.length !== 11 || /^(\d)\1{10}$/.test(cpf)) return false
+  let s = 0, r
+  for (let i = 0; i < 9; i++) s += +cpf[i] * (10 - i)
+  r = (s * 10) % 11; if (r === 10 || r === 11) r = 0
+  if (r !== +cpf[9]) return false
+  s = 0
+  for (let i = 0; i < 10; i++) s += +cpf[i] * (11 - i)
+  r = (s * 10) % 11; if (r === 10 || r === 11) r = 0
+  return r === +cpf[10]
+}
+
 // ── Máscaras ──────────────────────────────────────────────────
 function aplicarMascaraCPF(el) {
   let v = el.value.replace(/\D/g,'').slice(0,11)
@@ -2129,6 +2143,9 @@ function aplicarMascaraCPF(el) {
   else if (v.length > 6) v = v.replace(/(\d{3})(\d{3})(\d{0,3})/,'$1.$2.$3')
   else if (v.length > 3) v = v.replace(/(\d{3})(\d{0,3})/,'$1.$2')
   el.value = v
+  const completo = v.replace(/\D/g,'').length === 11
+  el.style.borderColor = completo ? (validarCPF(v) ? '' : '#EF4444') : ''
+  el.title = completo && !validarCPF(v) ? 'CPF inválido — verifique os dígitos' : ''
 }
 
 document.getElementById('p-cpf').addEventListener('input', function() { aplicarMascaraCPF(this) })
