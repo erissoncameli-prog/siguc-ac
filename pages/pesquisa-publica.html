@@ -280,6 +280,27 @@ body {
 
 .in-header p strong { color: var(--texto); }
 
+.in-download-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--musgo);
+  text-decoration: none;
+  border: 1px solid rgba(82,183,136,.35);
+  background: rgba(82,183,136,.08);
+  border-radius: 6px;
+  padding: 5px 12px;
+  transition: background .15s, border-color .15s;
+}
+
+.in-download-link:hover {
+  background: rgba(82,183,136,.15);
+  border-color: var(--verde-c);
+}
+
 .in-scroll-progress {
   height: 2px;
   background: rgba(82,183,136,.15);
