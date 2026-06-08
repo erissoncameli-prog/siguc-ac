@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SIGUC-AC — Cadastro de Pesquisador</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --floresta:#0A1A0F;--verde:#1F4E2C;--verde-m:#2D6A4F;--verde-c:#52B788;
+  --ouro:#C9A84C;--ouro-c:#F0CB6A;
+  --t1:#F4EFE6;--t2:rgba(244,239,230,.62);--t3:rgba(244,239,230,.32);
+  --ff-display:'Fraunces',Georgia,serif;--ff-ui:'DM Sans',system-ui,sans-serif;
+}
+body{font-family:var(--ff-ui);min-height:100vh;background:var(--floresta);color:var(--t1);padding:0}
+
+/* ── Header ── */
+.cad-header{background:rgba(0,0,0,.35);backdrop-filter:blur(14px);border-bottom:1px solid rgba(244,239,230,.08);padding:14px 32px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10}
+.header-brand{display:flex;align-items:center;gap:10px}
+.brand-icon{width:30px;height:30px;background:linear-gradient(135deg,var(--verde-m),var(--verde-c));border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.brand-name{font-size:10px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--t1)}
+.brand-sub{font-size:9px;color:var(--t3);letter-spacing:.04em}
+.header-link{font-size:11px;color:var(--t3);text-decoration:none;transition:color .2s}
+.header-link:hover{color:var(--t2)}
+
+/* ── Layout ── */
+.cad-main{max-width:680px;margin:0 auto;padding:36px 20px 60px}
+.cad-titulo{font-family:var(--ff-display);font-size:clamp(22px,2.4vw,28px);font-weight:500;color:var(--t1);margin-bottom:6px}
+.cad-sub{font-size:13px;font-weight:300;color:var(--t2);margin-bottom:32px}
+
+/* ── Cards ── */
+.card{background:rgba(244,239,230,.05);border:1px solid rgba(244,239,230,.10);border-radius:14px;padding:24px;margin-bottom:20px}
+.card-titulo{font-size:10px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--verde-c);margin-bottom:18px;display:flex;align-items:center;gap:8px}
+.card-titulo-num{width:18px;height:18px;border-radius:50%;background:rgba(82,183,136,.18);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:var(--verde-c);flex-shrink:0}
+
+/* ── Grid ── */
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.grid-1{display:grid;grid-template-columns:1fr;gap:14px}
+@media(max-width:560px){.grid-2{grid-template-columns:1fr}}
+
+/* ── Form ── */
+.form-group{display:flex;flex-direction:column}
+.form-label{font-size:9.5px;font-weight:500;letter-spacing:.10em;text-transform:uppercase;color:rgba(244,239,230,.50);margin-bottom:7px}
+.form-label .req{color:var(--verde-c);margin-left:2px}
+.form-input,.form-select{width:100%;height:44px;background:rgba(255,255,255,.06);border:1.5px solid rgba(244,239,230,.13);border-radius:9px;padding:0 12px;font-size:13.5px;color:var(--t1);outline:none;transition:background .2s,border-color .2s,box-shadow .2s;font-family:var(--ff-ui);-webkit-appearance:none}
+.form-input:hover,.form-select:hover{background:rgba(255,255,255,.08);border-color:rgba(244,239,230,.22)}
+.form-input:focus,.form-select:focus{background:rgba(255,255,255,.09);border-color:rgba(82,183,136,.55);box-shadow:0 0 0 3px rgba(82,183,136,.14)}
+.form-input::placeholder{color:rgba(244,239,230,.28);font-size:13px}
+.form-input:-webkit-autofill{-webkit-box-shadow:0 0 0 40px #14261a inset;-webkit-text-fill-color:var(--t1)}
+.form-select option{background:#1a2e1f;color:var(--t1)}
+.form-hint{font-size:10.5px;color:rgba(244,239,230,.35);margin-top:5px}
+
+/* ── Senha strength ── */
+.senha-strength{margin-top:6px;display:none}
+.strength-bar{height:3px;border-radius:2px;background:rgba(244,239,230,.10);overflow:hidden;margin-bottom:4px}
+.strength-fill{height:100%;border-radius:2px;transition:width .3s,background .3s}
+.strength-txt{font-size:10px;color:rgba(244,239,230,.45)}
+
+/* ── Buttons ── */
+.btn-cadastrar{width:100%;height:48px;background:linear-gradient(135deg,var(--verde-c) 0%,var(--verde-m) 100%);color:#fff;border:none;border-radius:11px;font-size:14px;font-weight:600;letter-spacing:.03em;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 4px 22px rgba(82,183,136,.22);transition:all .22s;font-family:var(--ff-ui);margin-top:24px}
+.btn-cadastrar:hover{box-shadow:0 6px 30px rgba(82,183,136,.38);transform:translateY(-1px)}
+.btn-cadastrar:active{transform:translateY(0)}
+.btn-cadastrar:disabled{opacity:.48;cursor:not-allowed;transform:none}
+@keyframes spin{to{transform:rotate(360deg)}}
+.spinner-sm{width:16px;height:16px;border:2px solid rgba(255,255,255,.25);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite;display:none}
+
+/* ── Msgs ── */
+.erro-msg{background:rgba(239,68,68,.09);border:1px solid rgba(239,68,68,.28);color:#FCA5A5;border-radius:8px;padding:12px 14px;font-size:12px;margin-bottom:20px;display:none;line-height:1.5}
+
+/* ── Sucesso ── */
+.sucesso-panel{display:none;text-align:center;padding:40px 20px}
+.sucesso-icon{font-size:48px;margin-bottom:16px}
+.sucesso-titulo{font-family:var(--ff-display);font-size:22px;font-weight:500;color:var(--t1);margin-bottom:10px}
+.sucesso-txt{font-size:13px;color:var(--t2);line-height:1.6;margin-bottom:24px}
+.btn-ir-login{display:inline-flex;align-items:center;gap:8px;padding:12px 24px;background:linear-gradient(135deg,var(--verde-c),var(--verde-m));color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:600;text-decoration:none;transition:all .2s;cursor:pointer}
+.btn-ir-login:hover{transform:translateY(-1px);box-shadow:0 4px 20px rgba(82,183,136,.32)}
+
+/* ── Footer ── */
+.cad-footer{text-align:center;font-size:10px;color:rgba(244,239,230,.28);letter-spacing:.04em;margin-top:20px}
+</style>
+</head>
+<body>
+
+<div class="cad-header">
+  <div class="header-brand">
+    <div class="brand-icon">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+    </div>
+    <div>
+      <div class="brand-name">SIGUC-AC</div>
+      <div class="brand-sub">Portal do Pesquisador</div>
+    </div>
+  </div>
+  <a href="login-pesquisador.html" class="header-link">← Já tenho conta</a>
+</div>
+
+<div class="cad-main">
+
+  <div id="form-panel">
+    <div class="cad-titulo">Criar conta de pesquisador</div>
+    <div class="cad-sub">Preencha seus dados para submeter e acompanhar pesquisas nas UCs do Acre</div>
+
+    <div class="erro-msg" id="erro-msg"></div>
+
+    <!-- Acesso -->
+    <div class="card">
+      <div class="card-titulo"><div class="card-titulo-num">1</div>Dados de acesso</div>
+      <div class="grid-1">
+        <div class="form-group">
+          <label class="form-label">E-mail<span class="req">*</span></label>
+          <input class="form-input" type="email" id="c-email" autocomplete="email" placeholder="seu@email.com">
+        </div>
+        <div class="grid-2">
+          <div class="form-group">
+            <label class="form-label">Senha<span class="req">*</span></label>
+            <input class="form-input" type="password" id="c-senha" autocomplete="new-password" placeholder="Mínimo 8 caracteres" oninput="avaliarSenha(this.value)">
+            <div class="senha-strength" id="strength">
+              <div class="strength-bar"><div class="strength-fill" id="strength-fill"></div></div>
+              <div class="strength-txt" id="strength-txt"></div>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Confirmar senha<span class="req">*</span></label>
+            <input class="form-input" type="password" id="c-senha2" autocomplete="new-password" placeholder="Repita a senha">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Identificação -->
+    <div class="card">
+      <div class="card-titulo"><div class="card-titulo-num">2</div>Identificação pessoal</div>
+      <div class="grid-1">
+        <div class="form-group">
+          <label class="form-label">Nome completo<span class="req">*</span></label>
+          <input class="form-input" type="text" id="c-nome" autocomplete="name" placeholder="Seu nome completo">
+        </div>
+        <div class="grid-2">
+          <div class="form-group">
+            <label class="form-label">CPF<span class="req">*</span></label>
+            <input class="form-input" type="text" id="c-cpf" placeholder="000.000.000-00" maxlength="14" oninput="mascaraCPF(this)">
+          </div>
+          <div class="form-group">
+            <label class="form-label">RG</label>
+            <input class="form-input" type="text" id="c-rg" placeholder="Número do RG">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Telefone / WhatsApp</label>
+          <input class="form-input" type="text" id="c-tel" placeholder="(00) 00000-0000" maxlength="16" oninput="mascaraTel(this)">
+        </div>
+      </div>
+    </div>
+
+    <!-- Formação -->
+    <div class="card">
+      <div class="card-titulo"><div class="card-titulo-num">3</div>Formação e vínculo institucional</div>
+      <div class="grid-1">
+        <div class="form-group">
+          <label class="form-label">Instituição<span class="req">*</span></label>
+          <input class="form-input" type="text" id="c-inst" placeholder="Universidade, órgão ou empresa">
+        </div>
+        <div class="grid-2">
+          <div class="form-group">
+            <label class="form-label">Titulação<span class="req">*</span></label>
+            <select class="form-select" id="c-tit">
+              <option value="">Selecione</option>
+              <option value="graduado">Graduado</option>
+              <option value="especialista">Especialista</option>
+              <option value="mestre">Mestre</option>
+              <option value="doutor">Doutor</option>
+              <option value="pos_doutor">Pós-Doutor</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Grande área (CNPq)<span class="req">*</span></label>
+            <select class="form-select" id="c-area">
+              <option value="">Selecione</option>
+              <option value="ciencias_agrarias">Ciências Agrárias</option>
+              <option value="ciencias_biologicas">Ciências Biológicas</option>
+              <option value="ciencias_da_saude">Ciências da Saúde</option>
+              <option value="ciencias_exatas">Ciências Exatas e da Terra</option>
+              <option value="ciencias_humanas">Ciências Humanas</option>
+              <option value="ciencias_sociais">Ciências Sociais Aplicadas</option>
+              <option value="engenharias">Engenharias</option>
+              <option value="linguistica">Linguística, Letras e Artes</option>
+              <option value="multidisciplinar">Multidisciplinar</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Especialidade / Subárea</label>
+          <input class="form-input" type="text" id="c-esp" placeholder="Ex: Ecologia de mamíferos, Botânica tropical">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Currículo Lattes (URL)</label>
+          <input class="form-input" type="url" id="c-lattes" placeholder="http://lattes.cnpq.br/...">
+          <div class="form-hint">Opcional, mas recomendado para análise técnica</div>
+        </div>
+      </div>
+    </div>
+
+    <button class="btn-cadastrar" id="btn-cad" onclick="cadastrar()">
+      <span id="btn-txt">Criar minha conta</span>
+      <div class="spinner-sm" id="spinner"></div>
+    </button>
+
+    <div class="cad-footer">
+      Seus dados são usados exclusivamente para gestão de pesquisas científicas nas UCs do Acre<br>
+      SEMA/AC — Secretaria de Estado do Meio Ambiente · Rio Branco, AC
+    </div>
+  </div>
+
+  <!-- Painel de sucesso -->
+  <div class="sucesso-panel" id="sucesso-panel">
+    <div class="sucesso-icon">✅</div>
+    <div class="sucesso-titulo">Conta criada com sucesso!</div>
+    <div class="sucesso-txt" id="sucesso-txt">
+      Verifique seu e-mail para confirmar a conta antes de entrar.<br>
+      Após a confirmação, volte aqui para acessar seu painel.
+    </div>
+    <a href="login-pesquisador.html" class="btn-ir-login">Ir para o login →</a>
+  </div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const SUPABASE_URL = 'https://atqtybcsvepdabsvgaly.supabase.co'
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF0cXR5YmNzdmVwZGFic3ZnYWx5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0MjMzNzgsImV4cCI6MjA5NTk5OTM3OH0.hWx1AB2rK7xdco1Dgagm0XUOBPQbxZVE614SW4SKoLk'
+const { createClient } = supabase
+const db = createClient(SUPABASE_URL, SUPABASE_KEY)
+
+function mascaraCPF(el) {
+  let v = el.value.replace(/\D/g,'').slice(0,11)
+  if (v.length > 9)      v = v.replace(/(\d{3})(\d{3})(\d{3})(\d{0,2})/,'$1.$2.$3-$4')
+  else if (v.length > 6) v = v.replace(/(\d{3})(\d{3})(\d{0,3})/,'$1.$2.$3')
+  else if (v.length > 3) v = v.replace(/(\d{3})(\d{0,3})/,'$1.$2')
+  el.value = v
+}
+
+function mascaraTel(el) {
+  let v = el.value.replace(/\D/g,'').slice(0,11)
+  if (v.length > 10)     v = v.replace(/(\d{2})(\d{5})(\d{4})/,'($1) $2-$3')
+  else if (v.length > 6) v = v.replace(/(\d{2})(\d{4,5})(\d{0,4})/,'($1) $2-$3')
+  else if (v.length > 2) v = v.replace(/(\d{2})(\d{0,5})/,'($1) $2')
+  el.value = v
+}
+
+function avaliarSenha(v) {
+  const el = document.getElementById('strength')
+  const fill = document.getElementById('strength-fill')
+  const txt  = document.getElementById('strength-txt')
+  if (!v) { el.style.display = 'none'; return }
+  el.style.display = 'block'
+  let score = 0
+  if (v.length >= 8)  score++
+  if (v.length >= 12) score++
+  if (/[A-Z]/.test(v) && /[a-z]/.test(v)) score++
+  if (/\d/.test(v)) score++
+  if (/[^A-Za-z0-9]/.test(v)) score++
+  const niveis = [
+    { pct:'20%', bg:'#EF4444', label:'Muito fraca' },
+    { pct:'40%', bg:'#F97316', label:'Fraca' },
+    { pct:'60%', bg:'#EAB308', label:'Média' },
+    { pct:'80%', bg:'#22C55E', label:'Forte' },
+    { pct:'100%',bg:'#16A34A', label:'Muito forte' },
+  ]
+  const n = niveis[Math.min(score,4)]
+  fill.style.width = n.pct; fill.style.background = n.bg
+  txt.textContent = n.label; txt.style.color = n.bg
+}
+
+function erroMsg(msg) {
+  const el = document.getElementById('erro-msg')
+  el.textContent = msg; el.style.display = 'block'
+  el.scrollIntoView({ behavior:'smooth', block:'center' })
+}
+
+async function cadastrar() {
+  const email = document.getElementById('c-email').value.trim()
+  const senha = document.getElementById('c-senha').value
+  const senha2= document.getElementById('c-senha2').value
+  const nome  = document.getElementById('c-nome').value.trim()
+  const cpf   = document.getElementById('c-cpf').value.trim()
+  const rg    = document.getElementById('c-rg').value.trim()
+  const tel   = document.getElementById('c-tel').value.trim()
+  const inst  = document.getElementById('c-inst').value.trim()
+  const tit   = document.getElementById('c-tit').value
+  const area  = document.getElementById('c-area').value
+  const esp   = document.getElementById('c-esp').value.trim()
+  const lattes= document.getElementById('c-lattes').value.trim()
+
+  document.getElementById('erro-msg').style.display = 'none'
+
+  if (!email || !senha || !nome || !cpf || !inst || !tit || !area) {
+    erroMsg('Preencha todos os campos obrigatórios (marcados com *).'); return
+  }
+  if (!/\S+@\S+\.\S+/.test(email)) { erroMsg('E-mail inválido.'); return }
+  if (senha.length < 8) { erroMsg('A senha deve ter pelo menos 8 caracteres.'); return }
+  if (senha !== senha2) { erroMsg('As senhas não coincidem.'); return }
+  if (!/^\d{3}\.\d{3}\.\d{3}-\d{2}$/.test(cpf)) { erroMsg('CPF inválido. Use o formato 000.000.000-00.'); return }
+
+  const btn = document.getElementById('btn-cad')
+  const spinner = document.getElementById('spinner')
+  const btnTxt = document.getElementById('btn-txt')
+  btn.disabled = true; spinner.style.display = 'inline-block'; btnTxt.style.opacity = '0.6'
+
+  try {
+    const { data, error } = await db.auth.signUp({
+      email,
+      password: senha,
+      options: {
+        data: { nome_completo: nome, cpf, rg: rg||null, telefone: tel||null, instituicao: inst, titulacao: tit, area_formacao: area, especialidade: esp||null, lattes: lattes||null }
+      }
+    })
+
+    if (error) {
+      let msg = 'Erro ao criar conta: ' + error.message
+      if (error.message?.includes('already registered') || error.message?.includes('User already registered')) {
+        msg = 'Este e-mail já está cadastrado. Acesse pelo login ou recupere sua senha.'
+      }
+      erroMsg(msg); return
+    }
+
+    // Se sessão imediata (confirmação desabilitada), cria o perfil agora
+    if (data.session && data.user) {
+      await db.from('pesquisadores').insert({
+        user_id: data.user.id, nome_completo: nome, cpf, email,
+        rg: rg||null, telefone: tel||null, instituicao: inst,
+        titulacao: tit, area_formacao: area, especialidade: esp||null, lattes: lattes||null
+      }).catch(() => {})
+      window.location.replace('portal-pesquisador.html')
+      return
+    }
+
+    // Confirmação por e-mail pendente
+    document.getElementById('form-panel').style.display = 'none'
+    const painel = document.getElementById('sucesso-panel')
+    document.getElementById('sucesso-txt').innerHTML =
+      `Enviamos um link de confirmação para <strong>${email}</strong>.<br>
+       Clique no link para ativar sua conta e, em seguida, faça login.`
+    painel.style.display = 'block'
+
+  } catch(e) {
+    erroMsg('Erro inesperado. Tente novamente.')
+  } finally {
+    btn.disabled = false; spinner.style.display = 'none'; btnTxt.style.opacity = '1'
+  }
+}
+
+// Enter no último campo
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && document.activeElement.tagName === 'INPUT') {
+    const inputs = [...document.querySelectorAll('.form-input')]
+    const idx = inputs.indexOf(document.activeElement)
+    if (idx >= 0 && idx < inputs.length - 1) inputs[idx+1].focus()
+    else if (idx === inputs.length - 1) cadastrar()
+  }
+})
+</script>
+</body>
+</html>
