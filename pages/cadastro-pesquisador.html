@@ -336,6 +336,21 @@ async function cadastrar() {
   if (!validarCPF(cpf)) { erroMsg('CPF inválido — verifique os dígitos verificadores.'); return }
   if (tel && tel.replace(/\D/g,'').length < 7) { erroMsg('Telefone inválido — mínimo 7 dígitos.'); return }
 
+  // Verificar duplicata antes de criar conta
+  try {
+    const { data: dup } = await db.rpc('verificar_pesquisador_duplicado', {
+      p_email: email,
+      p_cpf: cpf.replace(/\D/g, '')
+    })
+    if (dup?.existe) {
+      const nome = dup.nome ? ` (${dup.nome})` : ''
+      const msg = dup.motivo === 'email'
+        ? `Este e-mail já possui conta no portal${nome}. <a href="login-pesquisador.html" style="color:#991B1B;font-weight:700;text-decoration:underline">Faça login aqui →</a>`
+        : `Este CPF já está cadastrado no sistema${nome}. <a href="login-pesquisador.html" style="color:#991B1B;font-weight:700;text-decoration:underline">Acesse com sua conta →</a>`
+      erroMsg(msg); return
+    }
+  } catch(e) {}
+
   const btn = document.getElementById('btn-cad')
   const spinner = document.getElementById('spinner')
   const btnTxt = document.getElementById('btn-txt')
