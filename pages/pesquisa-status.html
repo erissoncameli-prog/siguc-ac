@@ -48,10 +48,13 @@ body { font-family:'DM Sans',sans-serif; background:var(--t1); min-height:100vh;
 .info-val   { font-size:13px; color:#374151; font-weight:600; }
 
 /* AAP box */
-.aap-box { background:linear-gradient(135deg,#0A1A0F,#1F4E2C); border-radius:12px; padding:20px 24px; color:#fff; margin:16px 0; }
+.aap-box { background:linear-gradient(135deg,#0A1A0F,#1F4E2C); border-radius:12px; padding:20px 24px; color:#fff; margin:16px 0; transition:opacity .15s; }
+.aap-box.abrivel { cursor:pointer; }
+.aap-box.abrivel:hover { opacity:.88; }
 .aap-num  { font-size:18px; font-weight:800; color:var(--ouro-c); font-family:monospace; }
 .aap-sub  { font-size:11px; color:#9CA3AF; margin-top:4px; }
 .aap-val  { font-size:12px; color:#A7F3D0; margin-top:6px; font-weight:600; }
+.aap-dl   { display:inline-block; margin-top:10px; background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.25); border-radius:6px; padding:5px 14px; font-size:12px; font-weight:700; color:#F0CB6A; }
 
 /* Timeline */
 .timeline { display:flex; flex-direction:column; gap:0; }
