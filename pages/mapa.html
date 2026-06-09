@@ -2198,7 +2198,7 @@ function _ucStatsAtualizar(filteredFeats){
     totalTI = tiFeats.length;
     areaTI = tiFeats.reduce((s,f)=>{
       const p = f.properties||{};
-      return s+(parseFloat(p.area_ha||p.areaha||p.AREAHA||p.area||0));
+      return s+(parseFloat(p.superficie_perimetro_ha||p.area_ha||p.areaha||p.AREAHA||p.area||0));
     },0);
     const pctTI = (areaTI/ACRE_HA)*100;
     document.getElementById('usc-ti-total').textContent = totalTI;
