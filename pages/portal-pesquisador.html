@@ -465,6 +465,31 @@ function renderCard(p) {
   </div>`
 }
 
+// ── Download AAP ──────────────────────────────────────────
+async function baixarAAP(pesquisaId, pdfPath, qrToken) {
+  // Se tem PDF no Storage, gera URL assinada e abre
+  if (pdfPath) {
+    const { data, error } = await db.storage
+      .from('pesquisa-documentos')
+      .createSignedUrl(pdfPath, 300) // 5 min
+    if (data?.signedUrl) {
+      window.open(data.signedUrl, '_blank')
+      return
+    }
+    if (error) console.warn('Erro signed URL:', error.message)
+  }
+  // Fallback: abre página de validação pública pelo QR token
+  if (qrToken) {
+    window.open(`validar-aap.html?token=${encodeURIComponent(qrToken)}`, '_blank')
+    return
+  }
+  // Último recurso: página de status
+  const p = _pesquisas.find(x => x.id === pesquisaId)
+  if (p?.token_publico) {
+    window.open(`pesquisa-status.html?token=${encodeURIComponent(p.token_publico)}`, '_blank')
+  }
+}
+
 // ── Tab switching ──────────────────────────────────────────
 function mostrarTab(id) {
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('ativo'))
