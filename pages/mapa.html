@@ -2483,17 +2483,83 @@ function _renderizarTI(){
 // ZONAS DE MANEJO DAS UCs
 // ══════════════════════════════════════════════════════════════
 const ZONA_META = {
-  ZI:  { nome:'Zona Intangível',              cor:'#7f1d1d' },
-  ZP:  { nome:'Zona Primitiva',               cor:'#14532d' },
-  ZOA: { nome:'Zona de Amortecimento',        cor:'#fbbf24' },
-  ZOC: { nome:'Zona de Conservação',          cor:'#166534' },
-  ZEX: { nome:'Zona de Extrativismo',         cor:'#15803d' },
-  ZPR: { nome:'Zona de Produção',             cor:'#0891b2' },
-  ZPO: { nome:'Zona Populacional',            cor:'#7c3aed' },
-  ZUE: { nome:'Zona de Uso Especial',         cor:'#db2777' },
-  ZUP: { nome:'Zona de Uso Público',          cor:'#ea580c' },
-  ZUC: { nome:'Zona de Uso Conflitante',      cor:'#dc2626' },
-  ZOT: { nome:'Zona de Ocupação Temporária',  cor:'#9333ea' },
+  ZI: {
+    nome: 'Zona Intangível', cor: '#7f1d1d',
+    descricao: 'Área de máxima proteção, onde os recursos naturais devem permanecer intocados.',
+    atividades: ['Pesquisa científica não manipulativa', 'Monitoramento ambiental'],
+    restricoes: ['Qualquer uso direto dos recursos naturais', 'Acesso humano, exceto para pesquisa autorizada'],
+    base_legal: 'Art. 9º, SNUC (Lei 9.985/2000) — corresponde ao núcleo irredutível da UC'
+  },
+  ZP: {
+    nome: 'Zona Primitiva', cor: '#14532d',
+    descricao: 'Área com pouca ou nenhuma alteração humana, contendo espécies raras ou ameaçadas.',
+    atividades: ['Pesquisa científica', 'Educação ambiental', 'Turismo de baixo impacto', 'Manejo para recuperação'],
+    restricoes: ['Obras e instalações permanentes', 'Uso de recursos naturais para fins econômicos'],
+    base_legal: 'Art. 9º, SNUC — Art. 3º, Lei 12.651/2012 (Código Florestal): área de preservação permanente quando em beira de cursos d\'água'
+  },
+  ZOA: {
+    nome: 'Zona de Amortecimento', cor: '#fbbf24',
+    descricao: 'Entorno da UC onde atividades são reguladas para minimizar impactos negativos.',
+    atividades: ['Uso sustentável de recursos', 'Agropecuária compatível com a conservação', 'Recuperação de APPs e Reserva Legal'],
+    restricoes: ['Desmatamento fora de Reserva Legal (mínimo 80% em Amazônia — art. 12, Lei 12.651/2012)', 'Supressão de APPs sem autorização (art. 8º, Lei 12.651/2012)'],
+    base_legal: 'Art. 25, SNUC — Art. 8º e 12, Lei 12.651/2012 (Código Florestal)'
+  },
+  ZOC: {
+    nome: 'Zona de Conservação', cor: '#166534',
+    descricao: 'Área com alteração antrópica, mas com potencial de recuperação e conservação dos recursos.',
+    atividades: ['Recuperação ambiental', 'Pesquisa', 'Educação ambiental', 'Manejo florestal sustentável'],
+    restricoes: ['Exploração econômica intensiva', 'Novos desmatamentos'],
+    base_legal: 'Plano de Manejo da UC — Art. 3º, II, Lei 12.651/2012 (área de uso restrito)'
+  },
+  ZEX: {
+    nome: 'Zona de Extrativismo', cor: '#15803d',
+    descricao: 'Área destinada às populações tradicionais com uso sustentável dos recursos naturais.',
+    atividades: ['Extrativismo vegetal (castanha, borracha, açaí)', 'Pesca artesanal', 'Agricultura de subsistência', 'Manejo florestal comunitário'],
+    restricoes: ['Exploração madeireira sem plano de manejo aprovado', 'Uso comercial em escala industrial'],
+    base_legal: 'Art. 18, SNUC — Art. 3º, II e Art. 56, Lei 12.651/2012 (Código Florestal)'
+  },
+  ZPR: {
+    nome: 'Zona de Produção', cor: '#0891b2',
+    descricao: 'Área com potencial para exploração de recursos naturais de forma ordenada e sustentável.',
+    atividades: ['Manejo florestal sustentável', 'PFNM (Produtos Florestais Não Madeireiros)', 'Piscicultura e pesca', 'Agroflorestas'],
+    restricoes: ['Corte raso', 'Atividades sem plano de manejo aprovado pelo órgão gestor'],
+    base_legal: 'Plano de Manejo da UC — Art. 31, Lei 12.651/2012 (manejo florestal sustentável)'
+  },
+  ZPO: {
+    nome: 'Zona Populacional', cor: '#7c3aed',
+    descricao: 'Área com presença de populações tradicionais residentes dentro dos limites da UC.',
+    atividades: ['Moradia das populações tradicionais', 'Agricultura familiar', 'Criação de animais domésticos', 'Pequenas obras de infraestrutura comunitária'],
+    restricoes: ['Expansão de área construída sem anuência do órgão gestor', 'Atividades que comprometam a qualidade de vida e o ambiente'],
+    base_legal: 'Art. 42, SNUC — Art. 3º, XI, Lei 12.651/2012 (comunidades tradicionais)'
+  },
+  ZUE: {
+    nome: 'Zona de Uso Especial', cor: '#db2777',
+    descricao: 'Área destinada à infraestrutura administrativa e de apoio às operações da UC.',
+    atividades: ['Sede administrativa', 'Alojamento para servidores e pesquisadores', 'Estações de monitoramento', 'Guaritas e cancelas'],
+    restricoes: ['Expansão de infraestrutura sem aprovação', 'Uso residencial não relacionado à gestão da UC'],
+    base_legal: 'Plano de Manejo da UC — Art. 8º, §1º, Lei 12.651/2012 (utilidade pública)'
+  },
+  ZUP: {
+    nome: 'Zona de Uso Público', cor: '#ea580c',
+    descricao: 'Área destinada ao turismo ecológico, recreação e educação ambiental.',
+    atividades: ['Visitação turística', 'Trilhas e mirantes', 'Educação ambiental', 'Infraestrutura de visitação (área de camping, centro de visitantes)'],
+    restricoes: ['Visitação acima da capacidade de carga definida no Plano de Manejo', 'Coleta de flora e fauna'],
+    base_legal: 'Art. 11, SNUC — Art. 8º, §1º, Lei 12.651/2012 (utilidade pública e interesse social)'
+  },
+  ZUC: {
+    nome: 'Zona de Uso Conflitante', cor: '#dc2626',
+    descricao: 'Área com usos incompatíveis com os objetivos da UC, tolerados temporariamente por obrigações legais preexistentes.',
+    atividades: ['Passagem de linhas de transmissão autorizadas', 'Rodovias e hidrelétricas preexistentes'],
+    restricoes: ['Novos empreendimentos incompatíveis', 'Ampliação dos impactos existentes sem compensação ambiental'],
+    base_legal: 'Art. 36, SNUC — Art. 8º, §1º, Lei 12.651/2012 — Resolução CONAMA 428/2010'
+  },
+  ZOT: {
+    nome: 'Zona de Ocupação Temporária', cor: '#9333ea',
+    descricao: 'Área com população não tradicional a ser realocada conforme prazo do Plano de Manejo.',
+    atividades: ['Atividades de subsistência enquanto durar o prazo de realocação', 'Negociações e indenizações'],
+    restricoes: ['Novas construções ou benfeitorias permanentes', 'Ampliação da área ocupada'],
+    base_legal: 'Art. 42, SNUC — Prazo de reassentamento definido no Plano de Manejo'
+  },
 };
 
 async function toggleZonas(ativo){
@@ -2589,16 +2655,41 @@ function _renderizarZonas(){
       const p = f.properties;
       const meta = ZONA_META[p.zona_codigo] || {};
       const cor = meta.cor || '#6b7280';
-      const ha = p.hectares ? Number(String(p.hectares).replace(',','.')).toLocaleString('pt-BR',{maximumFractionDigits:0}) : '';
-      layer.bindPopup(`<div class="camada-popup">
-        <div class="cp-header" style="background:${cor}">🗂 Zona de Manejo</div>
-        <div class="cp-layer">
-          <div class="cp-layer-nome" style="color:${cor}">${escHtml(p.zona_codigo)} — ${escHtml(p.zona_nome)}</div>
-          <div class="cp-row"><strong>UC</strong><span>${escHtml(p.uc_nome)}</span></div>
-          ${ha ? `<div class="cp-row"><strong>Área</strong><span>${ha} ha</span></div>` : ''}
-          <div class="cp-badge" style="background:${cor}18;border-color:${cor};color:${cor}">${escHtml(p.zona_codigo)}</div>
-        </div>
-      </div>`, {className:'camada-popup-wrap', maxWidth:280});
+      const ha = p.hectares ? Number(String(p.hectares).replace(',','.')).toLocaleString('pt-BR',{maximumFractionDigits:2}) : null;
+      const atv = (meta.atividades||[]).map(a=>`<li style="margin-bottom:2px">${escHtml(a)}</li>`).join('');
+      const rst = (meta.restricoes||[]).map(r=>`<li style="margin-bottom:2px">${escHtml(r)}</li>`).join('');
+      layer.bindPopup(`
+        <div style="font-family:'DM Sans',sans-serif;font-size:12px;color:#374151;min-width:260px;max-width:340px">
+          <div style="background:${cor};color:#fff;padding:9px 13px;border-radius:8px 8px 0 0">
+            <div style="font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;opacity:.8;margin-bottom:2px">🗂 Zona de Manejo</div>
+            <div style="font-size:14px;font-weight:700">${escHtml(p.zona_codigo)} — ${escHtml(p.zona_nome)}</div>
+            ${p.zoneamento && p.zoneamento !== p.zona_codigo ? `<div style="font-size:10px;opacity:.8;margin-top:1px">Identificador: ${escHtml(p.zoneamento)}</div>` : ''}
+          </div>
+          <div style="padding:10px 13px;display:flex;flex-direction:column;gap:8px">
+            <div style="display:flex;gap:10px">
+              <div style="flex:1;background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;padding:6px 8px">
+                <div style="font-size:9px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px">UC</div>
+                <div style="font-size:11px;font-weight:600;color:#111827">${escHtml(p.uc_nome)}</div>
+              </div>
+              ${ha ? `<div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;padding:6px 8px;text-align:center;flex-shrink:0">
+                <div style="font-size:9px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px">Área</div>
+                <div style="font-size:11px;font-weight:700;color:#111827">${ha} ha</div>
+              </div>` : ''}
+            </div>
+            ${meta.descricao ? `<div style="font-size:11px;color:#374151;line-height:1.5;padding:7px 9px;background:${cor}10;border-left:3px solid ${cor};border-radius:0 5px 5px 0">${escHtml(meta.descricao)}</div>` : ''}
+            ${atv ? `<div>
+              <div style="font-size:9px;font-weight:700;color:#059669;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">✅ Atividades Permitidas</div>
+              <ul style="margin:0;padding-left:14px;font-size:11px;color:#374151;line-height:1.5">${atv}</ul>
+            </div>` : ''}
+            ${rst ? `<div>
+              <div style="font-size:9px;font-weight:700;color:#dc2626;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">🚫 Restrições</div>
+              <ul style="margin:0;padding-left:14px;font-size:11px;color:#374151;line-height:1.5">${rst}</ul>
+            </div>` : ''}
+            ${meta.base_legal ? `<div style="font-size:10px;color:#6b7280;border-top:1px solid #e5e7eb;padding-top:7px;line-height:1.4">
+              <span style="font-weight:700">⚖ Base Legal:</span> ${escHtml(meta.base_legal)}
+            </div>` : ''}
+          </div>
+        </div>`, {className:'camada-popup-wrap', maxWidth:360});
       layer.on('mouseover', () => layer.setStyle({weight:2.5, fillOpacity: Math.min(_zonasOpacity + 0.2, 1)}));
       layer.on('mouseout',  () => layer.setStyle({weight:1.5, fillOpacity: _zonasOpacity}));
     }
