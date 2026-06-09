@@ -216,12 +216,19 @@ function renderResultado() {
   const docs = p.documentos || []
   const docsHtml = docs.length ? `
 <div class="doc-list">
-  ${docs.map(d => `
-  <div class="doc-item">
+  ${docs.map(d => {
+    const icone = d.mime_type?.includes('pdf') ? '📄' : d.mime_type?.includes('image') ? '🖼️' : '📎'
+    const tam   = d.tamanho_bytes ? ' · ' + fmtBytes(d.tamanho_bytes) : ''
+    const clk   = d.storage_path ? `onclick="abrirDoc('${esc(d.storage_path)}','${esc(d.nome_original)}')"` : ''
+    return `
+  <div class="doc-item${d.storage_path ? ' abrivel' : ''}" ${clk}>
+    <span style="font-size:16px;flex-shrink:0">${icone}</span>
     <span class="doc-tipo">${DOC_LABEL[d.tipo] || d.tipo}</span>
-    <span class="doc-nome">${esc(d.nome_original)}</span>
-    <span class="doc-data">${fmtData(d.criado_em)}</span>
-  </div>`).join('')}
+    <span class="doc-nome" title="${esc(d.nome_original)}">${esc(d.nome_original)}</span>
+    <span class="doc-data">${fmtData(d.criado_em)}${tam}</span>
+    ${d.storage_path ? '<span class="doc-seta">↗</span>' : ''}
+  </div>`
+  }).join('')}
 </div>` : '<p style="font-size:12px;color:#9CA3AF">Nenhum documento registrado.</p>'
 
   // Timeline
