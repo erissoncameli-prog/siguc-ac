@@ -1682,12 +1682,18 @@ function _atualizarLegendaMapa(){
   // Delimitação do Acre
   if(_acreAtivo) itens.push({ simbolo:'line', cor:_acreEstilo.cor, dash:_acreEstilo.dashArray!=='none', label:'Limite Estadual — Acre' });
 
-  // Ocorrências ativas
-  const sevAtivas = Array.from(document.querySelectorAll('[data-oc-sev]:checked')).map(e=>e.dataset.ocSev);
-  sevAtivas.forEach(s => {
-    const cor = OC_CORES[s]; if(!cor) return;
-    itens.push({ simbolo:'circle', cor, label:'Ocorrência — '+s.charAt(0).toUpperCase()+s.slice(1) });
-  });
+  // Ocorrências — só aparece na legenda se houver registros visíveis para a severidade
+  if(_todasOcorrencias && _todasOcorrencias.length){
+    const sevAtivas  = new Set(Array.from(document.querySelectorAll('[data-oc-sev]:checked')).map(e=>e.dataset.ocSev));
+    const tiposAtivos = new Set(Array.from(document.querySelectorAll('[data-oc-tipo]:checked')).map(e=>e.dataset.ocTipo));
+    ['critica','alta','media','baixa'].forEach(s => {
+      if(!sevAtivas.has(s)) return;
+      const temVisivel = _todasOcorrencias.some(o => o.severidade === s && tiposAtivos.has(o.tipo));
+      if(!temVisivel) return;
+      const cor = OC_CORES[s];
+      itens.push({ simbolo:'circle', cor, label:'Ocorrência — '+s.charAt(0).toUpperCase()+s.slice(1) });
+    });
+  }
 
   // Zonas de Manejo
   if(_zonasAtivo) itens.push({ simbolo:'rect', cor:'#7c3aed', opacidade:_zonasOpacity, dash:true, label:'Zonas de Manejo' });
