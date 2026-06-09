@@ -158,7 +158,7 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ error: "pesquisa_id obrigatorio" }), { status: 400, headers: CORS })
   }
 
-  const [pesqRes, cargosRes, equipeRes] = await Promise.all([
+  const [pesqRes, cargosRes, equipeRes, cfgRes] = await Promise.all([
     svc.from("pesquisas")
       .select(`*,
         uc:unidades_conservacao(nome),
@@ -170,6 +170,7 @@ Deno.serve(async (req) => {
     svc.from("pesquisa_equipe")
       .select("nome_completo, cpf, rg, funcao, titulacao, instituicao")
       .eq("pesquisa_id", pesquisa_id).order("criado_em"),
+    svc.from("config_sistema").select("dados").limit(1).single(),
   ])
 
   if (pesqRes.error || !pesqRes.data) {
