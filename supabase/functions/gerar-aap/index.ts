@@ -207,9 +207,34 @@ Deno.serve(async (req) => {
   const fontB  = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
   const fontI  = await pdfDoc.embedFont(StandardFonts.HelveticaOblique)
 
+  // ── Logos do config_sistema ───────────────────────────────────────────────
+  const cfg        = cfgRes.data?.dados ?? {}
+  const logoGovUrl = cfg.logos?.governo_url as string | undefined
+  const logoSecUrl = cfg.logos?.secretaria_url as string | undefined
+
+  let embLogoGov: any = null
+  let embLogoSec: any = null
+
+  await Promise.allSettled([
+    (async () => {
+      if (!logoGovUrl) return
+      try {
+        const r = await fetch(logoGovUrl)
+        embLogoGov = await pdfDoc.embedPng(await r.arrayBuffer())
+      } catch (_) { /* fallback para drawLogo */ }
+    })(),
+    (async () => {
+      if (!logoSecUrl) return
+      try {
+        const r = await fetch(logoSecUrl)
+        embLogoSec = await pdfDoc.embedPng(await r.arrayBuffer())
+      } catch (_) { /* fallback para drawLogo */ }
+    })(),
+  ])
+
   const HDR_H  = 72
-  const LOGO_W = 42
-  const LOGO_H = 42
+  const LOGO_W = 44
+  const LOGO_H = 44
 
   function addPage(): { pg: any; startY: number } {
     const pg     = pdfDoc.addPage([PG_W, PG_H])
@@ -218,9 +243,28 @@ Deno.serve(async (req) => {
     pg.drawRectangle({ x: 0, y: hdrBot, width: PG_W, height: HDR_H, color: C_BRANCO })
 
     const logoY  = hdrBot + (HDR_H - LOGO_H) / 2
-    drawLogo(pg, ML, logoY, LOGO_W, LOGO_H, "AC", "ESTADO DO ACRE", fontB, fontR, "escudo")
+
+    // Logo Governo do Estado
+    if (embLogoGov) {
+      const dims = embLogoGov.scale(1)
+      const scale = Math.min(LOGO_W / dims.width, LOGO_H / dims.height)
+      const dw = dims.width * scale, dh = dims.height * scale
+      pg.drawImage(embLogoGov, { x: ML + (LOGO_W - dw) / 2, y: logoY + (LOGO_H - dh) / 2, width: dw, height: dh })
+    } else {
+      drawLogo(pg, ML, logoY, LOGO_W, LOGO_H, "AC", "ESTADO DO ACRE", fontB, fontR, "escudo")
+    }
+
     const logo2X = ML + LOGO_W + 8
-    drawLogo(pg, logo2X, logoY, LOGO_W, LOGO_H, "SEMA", "MEIO AMBIENTE", fontB, fontR, "folha")
+
+    // Logo Secretaria
+    if (embLogoSec) {
+      const dims = embLogoSec.scale(1)
+      const scale = Math.min(LOGO_W / dims.width, LOGO_H / dims.height)
+      const dw = dims.width * scale, dh = dims.height * scale
+      pg.drawImage(embLogoSec, { x: logo2X + (LOGO_W - dw) / 2, y: logoY + (LOGO_H - dh) / 2, width: dw, height: dh })
+    } else {
+      drawLogo(pg, logo2X, logoY, LOGO_W, LOGO_H, "SEMA", "MEIO AMBIENTE", fontB, fontR, "folha")
+    }
 
     const divX = logo2X + LOGO_W + 10
     pg.drawLine({ start: { x: divX, y: logoY + 4 }, end: { x: divX, y: logoY + LOGO_H - 4 }, thickness: 0.8, color: C_BORDA })
