@@ -80,10 +80,13 @@ body { font-family:'DM Sans',sans-serif; background:var(--t1); min-height:100vh;
 
 /* Documentos */
 .doc-list { display:flex; flex-direction:column; gap:8px; }
-.doc-item { display:flex; align-items:center; gap:10px; padding:10px 14px; background:#F9FAFB; border-radius:8px; border:1px solid #F3F4F6; }
-.doc-tipo  { font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.04em; padding:2px 8px; border-radius:20px; background:#E5E7EB; color:#374151; }
-.doc-nome  { font-size:12px; color:#374151; flex:1; }
-.doc-data  { font-size:10px; color:#9CA3AF; }
+.doc-item { display:flex; align-items:center; gap:10px; padding:10px 14px; background:#F9FAFB; border-radius:8px; border:1px solid #F3F4F6; transition:background .12s; }
+.doc-item.abrivel { cursor:pointer; }
+.doc-item.abrivel:hover { background:#EFF6FF; border-color:#BAE6FD; }
+.doc-tipo  { font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.04em; padding:2px 8px; border-radius:20px; background:#E5E7EB; color:#374151; flex-shrink:0; }
+.doc-nome  { font-size:12px; color:#374151; flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.doc-data  { font-size:10px; color:#9CA3AF; flex-shrink:0; }
+.doc-seta  { font-size:13px; color:#93C5FD; flex-shrink:0; }
 
 /* Botões */
 .btn { padding:10px 22px; border-radius:var(--raio); font-size:13px; font-weight:700; cursor:pointer; border:none; font-family:inherit; }
