@@ -431,7 +431,9 @@ function renderCard(p) {
   const hasPendencia = alertas.length > 0
   const dotsHtml = ETAPAS.map((e,i) => `<div class="etapa-dot ${i < pos-1 ? 'feita' : i === pos-1 ? 'atual' : ''}" title="${e.label}"></div>`).join('')
   const alertasHtml = alertas.map(a => `<div class="pendencia-box ${a.tipo}"><div class="pendencia-icon">${a.icone}</div><div class="pendencia-txt"><div class="pendencia-titulo">${esc(a.titulo)}</div><div class="pendencia-desc">${a.desc}</div></div></div>`).join('')
-  const aapBtn = p.aap_numero ? `<a href="pesquisa-status.html?token=${encodeURIComponent(p.token_publico)}&aba=aap" class="btn-sm btn-sm-aap">📄 AAP</a>` : ''
+  const aapBtn = p.aap_numero
+    ? `<button class="btn-sm btn-sm-aap" onclick="baixarAAP('${esc(p.id)}','${esc(p.aap_pdf_path||'')}','${esc(p.aap_qr_token||'')}')">📄 AAP</button>`
+    : ''
   const periodos = []
   if (p.data_inicio_prevista) periodos.push(`Início: ${fmtData(p.data_inicio_prevista)}`)
   if (p.data_fim_prevista)    periodos.push(`Fim: ${fmtData(p.data_fim_prevista)}`)
