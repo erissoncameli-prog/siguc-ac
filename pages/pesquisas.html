@@ -777,11 +777,16 @@ async function verDetalhe(id) {
           const cls = i < etapaIdx ? 'etapa-done' : i === etapaIdx ? 'etapa-curr' : 'etapa-pend'
           const icon = i < etapaIdx ? '✓' : i === etapaIdx ? '●' : String(i+1)
           const h = hist?.find(h => h.etapa_nova === e.id)
+          const autor = h?.usuario?.nome_completo || (h && !h.usuario_id ? 'Pesquisador (portal)' : null)
           return `<div class="etapa-item">
             <div class="etapa-dot ${cls}">${icon}</div>
             <div style="flex:1">
               <span style="font-size:12px;font-weight:${i===etapaIdx?'800':'500'};color:${i<=etapaIdx?'#111827':'#9CA3AF'}">${e.label}</span>
-              ${h ? `<span style="font-size:10px;color:#9CA3AF;margin-left:6px">${formatData(h.criado_em)} · ${esc(h.usuario?.nome_completo||'Sistema')}</span>` : ''}
+              ${h ? `<div style="margin-top:2px">
+                <span style="font-size:10px;color:#9CA3AF">${formatData(h.criado_em)}</span>
+                ${autor ? `<span style="font-size:10px;color:#374151;margin-left:4px">· <strong>${esc(autor)}</strong></span>` : ''}
+                ${h.observacao ? `<div style="font-size:10px;color:#6B7280;margin-top:1px;font-style:italic">${esc(h.observacao)}</div>` : ''}
+              </div>` : ''}
             </div>
           </div>`
         }).join('')}
