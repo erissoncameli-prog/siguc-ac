@@ -235,10 +235,7 @@ async function validar() {
   }
 
   const { data, error } = await db
-    .from('v_aap_publica')
-    .select('*')
-    .eq('aap_qr_token', token)
-    .maybeSingle()
+    .rpc('buscar_aap_por_token', { p_token: token })
 
   if (error || !data) {
     renderErro('Documento não encontrado', 'O token informado não corresponde a nenhuma AAP emitida pelo SIGUC-AC. Verifique se o QR code foi lido corretamente.')
