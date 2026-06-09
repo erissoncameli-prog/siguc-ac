@@ -1199,6 +1199,55 @@ function _renderDropdown(id){
       Exibir limites municipais</label>
       <p style="font-size:11px;color:var(--cinza-500);margin:5px 0 0">22 municípios do Acre.</p>
     </div>
+    <div id="mun-opcoes" style="margin-top:12px;display:flex;flex-direction:column;gap:10px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div>
+          <label style="font-size:11px;color:var(--cinza-600);display:block;margin-bottom:3px">Cor da linha</label>
+          <input type="color" id="mun-cor-linha" value="#6366f1" oninput="_aplicarEstiloMun()"
+            style="width:100%;height:28px;border:1px solid var(--cinza-300);border-radius:6px;padding:2px;cursor:pointer">
+        </div>
+        <div>
+          <label style="font-size:11px;color:var(--cinza-600);display:block;margin-bottom:3px">Cor de preenchimento</label>
+          <input type="color" id="mun-cor-fill" value="#6366f1" oninput="_aplicarEstiloMun()"
+            style="width:100%;height:28px;border:1px solid var(--cinza-300);border-radius:6px;padding:2px;cursor:pointer">
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div>
+          <label style="font-size:11px;color:var(--cinza-600);display:block;margin-bottom:3px">Tracejado</label>
+          <select id="mun-dash" onchange="_aplicarEstiloMun()"
+            style="width:100%;height:28px;border:1px solid var(--cinza-300);border-radius:6px;font-size:11px;padding:0 6px;background:#fff">
+            <option value="">S&#xF3;lido &#x2500;&#x2500;&#x2500;</option>
+            <option value="4 6" selected>Tracejado - - -</option>
+            <option value="2 4">Pontilhado &middot; &middot; &middot;</option>
+            <option value="8 4">Tra&#xE7;o longo &#x2014;&#x2014;</option>
+            <option value="8 4 2 4">Tra&#xE7;o-ponto -&middot;-</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:11px;color:var(--cinza-600);display:block;margin-bottom:3px">Espessura</label>
+          <select id="mun-peso" onchange="_aplicarEstiloMun()"
+            style="width:100%;height:28px;border:1px solid var(--cinza-300);border-radius:6px;font-size:11px;padding:0 6px;background:#fff">
+            <option value="0.8">Fina (0.8)</option>
+            <option value="1.5" selected>Normal (1.5)</option>
+            <option value="2.5">Grossa (2.5)</option>
+            <option value="4">Muito grossa (4)</option>
+          </select>
+        </div>
+      </div>
+      <div>
+        <label style="font-size:11px;color:var(--cinza-600);display:block;margin-bottom:3px">
+          Opacidade do preenchimento
+          <span id="mun-fill-opacity-val" style="float:right;color:var(--cinza-500)">4%</span>
+        </label>
+        <input type="range" id="mun-fill-opacity" min="0" max="0.4" step="0.01" value="0.04" oninput="_aplicarEstiloMun()"
+          style="width:100%;accent-color:#6366f1">
+      </div>
+      <label style="display:flex;align-items:center;gap:8px;font-size:11px;cursor:pointer;font-weight:600">
+        <input type="checkbox" id="mun-nomes" style="accent-color:#6366f1;width:13px;height:13px" onchange="_aplicarEstiloMun()">
+        Exibir nomes dos munic&#xED;pios
+      </label>
+    </div>
   ` + foot;
   if(id==='acre') return hdr('🗺 Delimitação do Estado do Acre') + `
     <div style="display:flex;align-items:flex-start;gap:10px;padding:4px 0 10px">
@@ -2811,17 +2860,40 @@ async function _carregarMunicipios(){
   }catch(e){ return; }
   _renderizarMunicipios();
 }
+function _getMunEstilo(){
+  const cor   = document.getElementById('mun-cor-linha')?.value   || '#6366f1';
+  const fill  = document.getElementById('mun-cor-fill')?.value    || '#6366f1';
+  const dash  = document.getElementById('mun-dash')?.value        ?? '4 6';
+  const peso  = parseFloat(document.getElementById('mun-peso')?.value  || '1.5');
+  const fillOp= parseFloat(document.getElementById('mun-fill-opacity')?.value || '0.04');
+  return {color:cor, weight:peso, opacity:.8, fillColor:fill, fillOpacity:fillOp, dashArray:dash||null};
+}
 function _renderizarMunicipios(){
   if(_munLayer){mapaL.removeLayer(_munLayer);_munLayer=null;}
   if(!_munGeojson||!_munAtivo) return;
+  const mostrarNomes = document.getElementById('mun-nomes')?.checked || false;
   _munLayer=L.geoJSON(_munGeojson,{
-    style:{color:'#6366f1',weight:1.5,opacity:.6,fillColor:'#6366f1',fillOpacity:.04,dashArray:'4 6'},
+    style: _getMunEstilo(),
     onEachFeature:(f,layer)=>{
       const nome=f.properties?.name||f.properties?.nome||f.properties?.NM_MUN||'Município';
-      layer.bindTooltip(nome,{permanent:false,direction:'center',className:'subbacia-label'});
+      layer.bindTooltip(nome,{permanent:mostrarNomes,direction:'center',className:'subbacia-label'});
     }
   });
   _munLayer.addTo(mapaL);
+}
+function _aplicarEstiloMun(){
+  const op = document.getElementById('mun-fill-opacity');
+  const val = document.getElementById('mun-fill-opacity-val');
+  if(op && val) val.textContent = Math.round(parseFloat(op.value)*100) + '%';
+  if(!_munLayer) return;
+  _munLayer.setStyle(_getMunEstilo());
+  const mostrarNomes = document.getElementById('mun-nomes')?.checked || false;
+  _munLayer.eachLayer(layer=>{
+    const nome = layer.feature?.properties?.name || layer.feature?.properties?.nome || layer.feature?.properties?.NM_MUN || 'Município';
+    layer.unbindTooltip();
+    layer.bindTooltip(nome,{permanent:mostrarNomes,direction:'center',className:'subbacia-label'});
+    if(mostrarNomes) layer.openTooltip();
+  });
 }
 
 // ══════════════════════════════════════════════════════════════
