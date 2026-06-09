@@ -1744,7 +1744,7 @@ function _atualizarLegendaMapa(){
   if(_tiAtivo && _tiLayer) itens.push({ simbolo:'rect', cor:'#f59e0b', opacidade:(_tiOpacity||0.4), label:'Terras Indígenas' });
 
   // Municípios
-  if(_munAtivo) itens.push({ simbolo:'rect', cor:'#6366f1', opacidade:0, somente_borda:true, label:'Municípios' });
+  if(_munAtivo){ const _mcl=document.getElementById('mun-cor-linha')?.value||'#6366f1'; itens.push({ simbolo:'rect', cor:_mcl, opacidade:0, somente_borda:true, label:'Municípios' }); }
 
   // Delimitação do Acre
   if(_acreAtivo) itens.push({ simbolo:'line', cor:_acreEstilo.cor, dash:_acreEstilo.dashArray!=='none', label:'Limite Estadual — Acre' });
@@ -2894,6 +2894,7 @@ function _aplicarEstiloMun(){
     layer.bindTooltip(nome,{permanent:mostrarNomes,direction:'center',className:'subbacia-label'});
     if(mostrarNomes) layer.openTooltip();
   });
+  _atualizarLegendaMapa();
 }
 
 // ══════════════════════════════════════════════════════════════
