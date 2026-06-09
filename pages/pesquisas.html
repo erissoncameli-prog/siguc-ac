@@ -1280,6 +1280,15 @@ function _btnBaixarAAP() {
       onclick="comBotao(this, () => gerarPdfAAP('${esc(_detalhe.id)}'))">🔄 Reimprimir</button>`
 }
 
+// ── Ação do card AAP (clique no card verde) ───────────────────
+async function aapAcao(pesquisaId, pdfPath) {
+  if (pdfPath) {
+    await abrirDocumento(pdfPath, 'AAP.pdf')
+  } else {
+    await gerarPdfAAP(pesquisaId)
+  }
+}
+
 // ── Modal 6: Entrega da AAP ───────────────────────────────────
 
 function abrirModalEntregaAAP() {
