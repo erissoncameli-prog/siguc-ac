@@ -13,6 +13,33 @@
 <body>
 <div id="app"></div>
 
+<div class="modal-overlay" id="modal-reset-senha">
+  <div class="modal" style="max-width:400px">
+    <div class="modal-header">
+      <div class="modal-title">Redefinir Senha</div>
+      <button class="modal-close" onclick="fecharModalReset()">×</button>
+    </div>
+    <div class="modal-body">
+      <div style="font-size:13px;color:#6B7280;margin-bottom:16px">
+        Usuário: <strong id="reset-nome-usuario"></strong>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Nova Senha <span class="obrig">*</span></label>
+        <input class="form-control" id="reset-senha1" type="password" placeholder="Mínimo 6 caracteres">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Confirmar Nova Senha <span class="obrig">*</span></label>
+        <input class="form-control" id="reset-senha2" type="password" placeholder="Repita a nova senha">
+        <div class="form-hint">O usuário será obrigado a trocar a senha na próxima entrada.</div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="fecharModalReset()">Cancelar</button>
+      <button class="btn btn-primary" id="btn-reset" onclick="confirmarResetSenha()">Redefinir Senha</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="modal-usuario">
   <div class="modal">
     <div class="modal-header">
@@ -223,19 +250,46 @@ async function salvar() {
   finally { btn.disabled = false; btn.textContent = 'Salvar' }
 }
 
-async function redefinirSenha(id, nome) {
-  if (!confirm(`Redefinir a senha de "${nome}" para Sema@2025?\nO usuário será obrigado a trocar na próxima entrada.`)) return
+let _resetUsuarioId = null
+
+function redefinirSenha(id, nome) {
+  _resetUsuarioId = id
+  document.getElementById('reset-nome-usuario').textContent = nome
+  document.getElementById('reset-senha1').value = ''
+  document.getElementById('reset-senha2').value = ''
+  document.getElementById('modal-reset-senha').classList.add('aberto')
+  setTimeout(() => document.getElementById('reset-senha1').focus(), 100)
+}
+
+function fecharModalReset() {
+  document.getElementById('modal-reset-senha').classList.remove('aberto')
+  _resetUsuarioId = null
+}
+
+async function confirmarResetSenha() {
+  const s1 = document.getElementById('reset-senha1').value
+  const s2 = document.getElementById('reset-senha2').value
+  if (!s1 || s1.length < 6) { toast('A senha deve ter no mínimo 6 caracteres', 'error'); return }
+  if (s1 !== s2) { toast('As senhas não coincidem', 'error'); return }
+
+  const btn = document.getElementById('btn-reset')
+  btn.disabled = true; btn.textContent = 'Redefinindo...'
   try {
-    const { data: { session } } = await db.auth.getSession()
+    const session = sessionStorage.getItem('sb-atqtybcsvepdabsvgaly-auth-token')
+    const token = session ? JSON.parse(session)?.access_token : null
+    if (!token) throw new Error('Sessão expirada. Faça login novamente.')
+
     const resp = await fetch(`${SUPABASE_URL}/functions/v1/admin-reset-senha`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
-      body: JSON.stringify({ usuario_id: id })
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ usuario_id: _resetUsuarioId, nova_senha: s1 })
     })
     const json = await resp.json()
     if (!resp.ok) throw new Error(json.error || 'Erro ao redefinir senha')
-    toast(`Senha de ${nome} redefinida para Sema@2025`, 'success')
+    toast('Senha redefinida com sucesso. O usuário deverá trocá-la no próximo acesso.', 'success')
+    fecharModalReset()
   } catch(e) { toast(e.message, 'error') }
+  finally { btn.disabled = false; btn.textContent = 'Redefinir Senha' }
 }
 
 async function toggleAtivo(id, ativoAtual) {
