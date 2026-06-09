@@ -722,10 +722,21 @@ async function verDetalhe(id) {
 
     <!-- AAP -->
     ${_detalhe.aap_numero ? `
-    <div class="det-sec" style="background:#F0FDF4;border-radius:8px;padding:12px">
-      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px">
-        <div class="det-sec-title" style="color:#15803D;margin-bottom:0">Autorização de Acesso e Pesquisa (AAP)</div>
-        <div class="detalhe-aap-btn">${_btnBaixarAAP()}</div>
+    <div class="det-sec" data-aap-card
+      style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:10px;padding:14px;cursor:pointer;transition:background .15s"
+      onclick="aapAcao('${esc(_detalhe.id)}','${esc(_detalhe.aap_pdf_path||'')}')"
+      onmouseenter="this.style.background='#DCFCE7'"
+      onmouseleave="this.style.background='#F0FDF4'">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px">
+        <div class="det-sec-title" style="color:#15803D;margin-bottom:0">📋 Autorização de Acesso e Pesquisa (AAP)</div>
+        <div data-aap-actions style="display:flex;gap:6px;align-items:center">
+          ${_detalhe.aap_pdf_path
+            ? `<span style="font-size:11px;background:#DCFCE7;color:#166534;border:1px solid #86EFAC;border-radius:5px;padding:3px 8px;font-weight:600;pointer-events:none">📥 Baixar PDF</span>
+               <button class="btn-acao" style="font-size:11px;background:#DBEAFE;border:1px solid #93C5FD;color:#1E40AF;padding:4px 8px"
+                 onclick="event.stopPropagation();comBotao(this,()=>gerarPdfAAP('${esc(_detalhe.id)}'))">🔄 Reimprimir</button>`
+            : `<span style="font-size:11px;background:#FEF9C3;color:#854D0E;border:1px solid #FDE047;border-radius:5px;padding:3px 8px;font-weight:600;pointer-events:none">📄 Clique para gerar PDF</span>`
+          }
+        </div>
       </div>
       <div class="field-grid-2">
         <div>
@@ -738,9 +749,6 @@ async function verDetalhe(id) {
           <div class="det-row"><span class="det-key">Token QR</span><span style="font-family:monospace;font-size:10px">${esc(_detalhe.aap_qr_token||'—')}</span></div>
         </div>
       </div>
-      ${!_detalhe.aap_pdf_path ? `
-      <button class="btn-acao" style="margin-top:8px;font-size:11px;background:#ECFDF5;border:1px dashed #6EE7B7;color:#065F46"
-        onclick="comBotao(this, () => gerarPdfAAP('${_detalhe.id}'))">📄 Gerar PDF da AAP</button>` : ''}
     </div>` : ''}
 
     <!-- Sub-etapa de relatório -->
