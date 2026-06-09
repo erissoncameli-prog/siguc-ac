@@ -1311,7 +1311,7 @@ async function carregarCamadas(){
   const visPref = JSON.parse(localStorage.getItem('siguc_camadas_vis')||'{}');
   camadas = (data||[]).map(c => ({
     ...c,
-    visivel: visPref.hasOwnProperty(c.id) ? visPref[c.id] : c.visivel,
+    visivel: visPref.hasOwnProperty(c.id) ? visPref[c.id] : false,
     layer: null
   }));
   camadas.forEach(c => { if(c.visivel) _renderizarCamada(c); });
