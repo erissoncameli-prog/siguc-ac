@@ -1671,8 +1671,8 @@ function _atualizarLegendaMapa(){
     const filtradas = nomesAtivos.size ? feats.filter(f => nomesAtivos.has(f.properties.nome)) : feats;
     const temPI = filtradas.some(f => _ucGrupoId(f.properties?.grupo) === 'pi');
     const temUS = filtradas.some(f => _ucGrupoId(f.properties?.grupo) === 'us');
-    if(temPI) itens.push({ simbolo:'rect', cor:'#059669', opacidade:_ucOpacity, label:'UC — Proteção Integral' });
-    if(temUS) itens.push({ simbolo:'rect', cor:'#3b82f6', opacidade:_ucOpacity, label:'UC — Uso Sustentável' });
+    if(temPI) itens.push({ simbolo:'rect', cor:'#dc2626', opacidade:_ucOpacity, label:'UC — Proteção Integral' });
+    if(temUS) itens.push({ simbolo:'rect', cor:'#2563eb', opacidade:_ucOpacity, label:'UC — Uso Sustentável' });
   }
 
   // Terras Indígenas — usa _tiLayer para garantir que o GeoJSON já foi renderizado
