@@ -1260,10 +1260,12 @@ async function gerarPdfAAP(pesquisaId) {
     }
     toast('PDF da AAP gerado!', 'sucesso')
     window.open(json.url, '_blank')
-    // Atualiza estado local para mostrar botão de download
+    // Atualiza estado local e reabre modal com card atualizado
+    const p = _pesquisas.find(x => x.id === pesquisaId)
+    if (p) p.aap_pdf_path = json.filename
     if (_detalhe) _detalhe.aap_pdf_path = json.filename
-    const btnArea = document.querySelector('#modal-detalhe .detalhe-aap-btn')
-    if (btnArea) btnArea.innerHTML = _btnBaixarAAP()
+    fecharDetalhe()
+    await verDetalhe(pesquisaId)
   } catch (e) {
     toast('Erro ao gerar PDF: ' + e.message, 'erro')
   }
