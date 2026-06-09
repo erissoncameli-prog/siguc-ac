@@ -2298,10 +2298,10 @@ function _ucStatsAtualizar(filteredFeats){
     }
   }
 
-  // Filtros ativos (badges de esfera)
-  const esfFed = document.getElementById('uc-esfera-federal')?.checked??false;
-  const esfEst = document.getElementById('uc-esfera-estadual')?.checked??true;
-  const esfMun = document.getElementById('uc-esfera-municipal')?.checked??false;
+  // Filtros ativos (badges de esfera) — usa variáveis de estado, não o DOM
+  const esfFed = _ucEsfFed;
+  const esfEst = _ucEsfEst;
+  const esfMun = _ucEsfMun;
   const badgeCfg = {
     estadual:{label:'Estadual',bg:'#fefce8',co:'#854d0e',brd:'#fde68a'},
     federal:{label:'Federal',bg:'#eff6ff',co:'#1d4ed8',brd:'#bfdbfe'},
