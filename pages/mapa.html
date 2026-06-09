@@ -1187,9 +1187,53 @@ function _renderDropdown(id){
       Exibir Terras Indígenas</label>
       <p style="font-size:11px;color:var(--cinza-500);margin:5px 0 0">Fonte: FUNAI · GeoJSON oficial. Inclui TIs homologadas, declaradas e em estudo.</p>
     </div>
-    <div style="display:flex;align-items:center;gap:8px;margin-top:10px">
-      <span style="font-size:11px;color:var(--cinza-600);flex-shrink:0">Opacidade:</span>
-      <input type="range" id="ti-opacity" min="0" max="100" value="40" style="flex:1;accent-color:#d97706" oninput="tiAlterarOpacidade(this.value)">
+    <div id="ti-opcoes" style="margin-top:12px;display:flex;flex-direction:column;gap:10px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div>
+          <label style="font-size:11px;color:var(--cinza-600);display:block;margin-bottom:3px">Cor da linha</label>
+          <input type="color" id="ti-cor-linha" value="#d97706" oninput="_aplicarEstiloTI()"
+            style="width:100%;height:28px;border:1px solid var(--cinza-300);border-radius:6px;padding:2px;cursor:pointer">
+        </div>
+        <div>
+          <label style="font-size:11px;color:var(--cinza-600);display:block;margin-bottom:3px">Cor de preenchimento</label>
+          <input type="color" id="ti-cor-fill" value="#f59e0b" oninput="_aplicarEstiloTI()"
+            style="width:100%;height:28px;border:1px solid var(--cinza-300);border-radius:6px;padding:2px;cursor:pointer">
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div>
+          <label style="font-size:11px;color:var(--cinza-600);display:block;margin-bottom:3px">Tracejado</label>
+          <select id="ti-dash" onchange="_aplicarEstiloTI()"
+            style="width:100%;height:28px;border:1px solid var(--cinza-300);border-radius:6px;font-size:11px;padding:0 6px;background:#fff">
+            <option value="">S&#xF3;lido &#x2500;&#x2500;&#x2500;</option>
+            <option value="6 4" selected>Tracejado - - -</option>
+            <option value="2 4">Pontilhado &middot; &middot; &middot;</option>
+            <option value="8 4">Tra&#xE7;o longo &#x2014;&#x2014;</option>
+            <option value="8 4 2 4">Tra&#xE7;o-ponto -&middot;-</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:11px;color:var(--cinza-600);display:block;margin-bottom:3px">Espessura</label>
+          <select id="ti-peso" onchange="_aplicarEstiloTI()"
+            style="width:100%;height:28px;border:1px solid var(--cinza-300);border-radius:6px;font-size:11px;padding:0 6px;background:#fff">
+            <option value="0.8">Fina (0.8)</option>
+            <option value="2" selected>Normal (2)</option>
+            <option value="3">Grossa (3)</option>
+            <option value="4">Muito grossa (4)</option>
+          </select>
+        </div>
+      </div>
+      <div>
+        <label style="font-size:11px;color:var(--cinza-600);display:block;margin-bottom:3px">
+          Opacidade do preenchimento
+          <span id="ti-opacity-val" style="float:right;color:var(--cinza-500)">40%</span>
+        </label>
+        <input type="range" id="ti-opacity" min="0" max="100" value="40" style="width:100%;accent-color:#d97706" oninput="_aplicarEstiloTI()">
+      </div>
+      <label style="display:flex;align-items:center;gap:8px;font-size:11px;cursor:pointer;font-weight:600">
+        <input type="checkbox" id="ti-nomes" style="accent-color:#d97706;width:13px;height:13px" onchange="_aplicarEstiloTI()">
+        Exibir nomes das Terras Ind&#xED;genas
+      </label>
     </div>
     <div id="ti-stat" style="font-size:10px;color:var(--cinza-400);text-align:right;margin-top:6px"></div>
   ` + foot;
@@ -1741,7 +1785,7 @@ function _atualizarLegendaMapa(){
   }
 
   // Terras Indígenas — usa _tiLayer para garantir que o GeoJSON já foi renderizado
-  if(_tiAtivo && _tiLayer) itens.push({ simbolo:'rect', cor:'#f59e0b', opacidade:(_tiOpacity||0.4), label:'Terras Indígenas' });
+  if(_tiAtivo && _tiLayer){ const _tcl=document.getElementById('ti-cor-linha')?.value||'#d97706'; const _tcf=document.getElementById('ti-cor-fill')?.value||'#f59e0b'; itens.push({ simbolo:'rect', cor:_tcf, opacidade:(_tiOpacity||0.4), cor_borda:_tcl, label:'Terras Indígenas' }); }
 
   // Municípios
   if(_munAtivo){ const _mcl=document.getElementById('mun-cor-linha')?.value||'#6366f1'; itens.push({ simbolo:'rect', cor:_mcl, opacidade:0, somente_borda:true, label:'Municípios' }); }
@@ -2584,6 +2628,32 @@ async function toggleTI(ativo){
   else { _renderizarTI(); _ucStatsAtualizar(_ucsFeaturesVisiveis()); }
   _atualizarLegendaMapa();
 }
+function _getTIEstilo(){
+  const cor    = document.getElementById('ti-cor-linha')?.value  || '#d97706';
+  const fill   = document.getElementById('ti-cor-fill')?.value   || '#f59e0b';
+  const dash   = document.getElementById('ti-dash')?.value       ?? '6 4';
+  const peso   = parseFloat(document.getElementById('ti-peso')?.value   || '2');
+  const fillOp = parseFloat(document.getElementById('ti-opacity')?.value || '40') / 100;
+  return {color:cor, weight:peso, opacity:.9, fillColor:fill, fillOpacity:fillOp, dashArray:dash||null};
+}
+function _aplicarEstiloTI(){
+  const op  = document.getElementById('ti-opacity');
+  const val = document.getElementById('ti-opacity-val');
+  if(op && val) val.textContent = Math.round(parseFloat(op.value)) + '%';
+  if(_tiLayer){
+    _tiOpacity = parseFloat(op?.value||'40') / 100;
+    _tiLayer.setStyle(_getTIEstilo());
+    const mostrarNomes = document.getElementById('ti-nomes')?.checked || false;
+    _tiLayer.eachLayer(layer=>{
+      const p=layer.feature?.properties||{};
+      const nome=p.terrai_nom||p.nome||p.NAME||p.name||'Terra Indígena';
+      layer.unbindTooltip();
+      layer.bindTooltip(nome,{permanent:mostrarNomes,direction:'center',className:'subbacia-label'});
+      if(mostrarNomes) layer.openTooltip();
+    });
+  }
+  _atualizarLegendaMapa();
+}
 function tiAlterarOpacidade(v){ _tiOpacity=v/100; _renderizarTI(); }
 async function _carregarTI(){
   try{
@@ -2599,10 +2669,12 @@ async function _carregarTI(){
 function _renderizarTI(){
   if(_tiLayer){mapaL.removeLayer(_tiLayer);_tiLayer=null;}
   if(!_tiGeojson||!_tiAtivo) return;
+  const mostrarNomes = document.getElementById('ti-nomes')?.checked || false;
   _tiLayer=L.geoJSON(_tiGeojson,{
-    style:{color:'#d97706',weight:2,opacity:.9,fillColor:'#f59e0b',fillOpacity:_tiOpacity,dashArray:'6 4'},
+    style: _getTIEstilo(),
     onEachFeature:(f,layer)=>{
       const p=f.properties; const nome=p.terrai_nom||p.nome||p.NAME||p.name||'Terra Indígena';
+      layer.bindTooltip(nome,{permanent:mostrarNomes,direction:'center',className:'subbacia-label'});
       const etnia=p.etniaind||p.etnia||'';
       const ha=p.area_ha||p.areaha||p.AREAHA||'';
       layer.bindPopup(`<div class="camada-popup">
