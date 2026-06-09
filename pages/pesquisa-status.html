@@ -280,7 +280,7 @@ function renderResultado() {
   <div class="aap-box">
     <div style="font-size:11px;color:#A7F3D0;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Autorização de Acesso e Pesquisa</div>
     <div class="aap-num">${esc(p.aap_numero)}</div>
-    <div class="aap-sub">Assinado por ${esc(p.assinado_por || '—')}</div>
+    <div class="aap-sub">Autorizado por ${esc(p.aap_assinado_por || '—')}</div>
     ${p.aap_validade ? `<div class="aap-val">Válida até ${p.aap_validade}</div>` : ''}
   </div>` : ''}
 </div>
