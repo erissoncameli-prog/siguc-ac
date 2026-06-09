@@ -740,7 +740,7 @@ async function verDetalhe(id) {
       </div>
       ${!_detalhe.aap_pdf_path ? `
       <button class="btn-acao" style="margin-top:8px;font-size:11px;background:#ECFDF5;border:1px dashed #6EE7B7;color:#065F46"
-        onclick="gerarPdfAAP('${_detalhe.id}')">📄 Gerar PDF da AAP</button>` : ''}
+        onclick="comBotao(this, () => gerarPdfAAP('${_detalhe.id}'))">📄 Gerar PDF da AAP</button>` : ''}
     </div>` : ''}
 
     <!-- Sub-etapa de relatório -->
