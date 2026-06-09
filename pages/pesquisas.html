@@ -794,6 +794,7 @@ async function verDetalhe(id) {
       ${btEncerramento ? `<button class="btn-acao primary" onclick="abrirModalEncerramento()">🔒 Encerrar Processo</button>` : ''}
       ${btInad         ? `<button class="btn-acao danger" onclick="abrirModalInadimplencia()">⚠ Marcar Inadimplente</button>` : ''}
       ${_detalhe.inadimplente && _posicao && ['chefe_deuc','chefe_debio','diretor'].includes(_posicao.nivel) ? `<button class="btn-acao" onclick="comBotao(this, regularizar)">✓ Regularizar</button>` : ''}
+      ${_detalhe.aap_numero ? `<button class="btn-acao" style="background:#F0F9FF;border:1px solid #BAE6FD;color:#0369A1" onclick="comBotao(this, () => gerarPdfAAP('${_detalhe.id}'))">${_detalhe.aap_pdf_path ? '🔄 Reimprimir AAP' : '📄 Gerar PDF da AAP'}</button>` : ''}
     </div>
   </div>
 </div>
