@@ -1664,17 +1664,19 @@ function _atualizarLegendaMapa(){
   if(typeof CART === 'undefined') return;
   const itens = [];
 
-  // Unidades de Conservação
+  // Unidades de Conservação — usa apenas as features realmente visíveis (esfera + checkboxes)
   if(_ucAtivo && _ucGeojson){
-    const feats = _ucGeojson.features || [];
-    const temPI = feats.some(f => _ucGrupoId(f.properties?.grupo) === 'pi');
-    const temUS = feats.some(f => _ucGrupoId(f.properties?.grupo) === 'us');
+    const feats = _ucsFeaturesVisiveis();
+    const nomesAtivos = new Set(Array.from(document.querySelectorAll('[data-uc-nome]:checked')).map(e=>e.dataset.ucNome));
+    const filtradas = nomesAtivos.size ? feats.filter(f => nomesAtivos.has(f.properties.nome)) : feats;
+    const temPI = filtradas.some(f => _ucGrupoId(f.properties?.grupo) === 'pi');
+    const temUS = filtradas.some(f => _ucGrupoId(f.properties?.grupo) === 'us');
     if(temPI) itens.push({ simbolo:'rect', cor:'#059669', opacidade:_ucOpacity, label:'UC — Proteção Integral' });
     if(temUS) itens.push({ simbolo:'rect', cor:'#3b82f6', opacidade:_ucOpacity, label:'UC — Uso Sustentável' });
   }
 
-  // Terras Indígenas
-  if(_tiAtivo) itens.push({ simbolo:'rect', cor:'#f59e0b', opacidade:(_tiOpacity||0.4), label:'Terras Indígenas' });
+  // Terras Indígenas — usa _tiLayer para garantir que o GeoJSON já foi renderizado
+  if(_tiAtivo && _tiLayer) itens.push({ simbolo:'rect', cor:'#f59e0b', opacidade:(_tiOpacity||0.4), label:'Terras Indígenas' });
 
   // Municípios
   if(_munAtivo) itens.push({ simbolo:'rect', cor:'#6366f1', opacidade:0, somente_borda:true, label:'Municípios' });
@@ -1695,8 +1697,20 @@ function _atualizarLegendaMapa(){
     });
   }
 
-  // Zonas de Manejo
-  if(_zonasAtivo) itens.push({ simbolo:'rect', cor:'#7c3aed', opacidade:_zonasOpacity, dash:true, label:'Zonas de Manejo' });
+  // Zonas de Manejo — um item por tipo de zona marcado que tenha feições visíveis
+  if(_zonasAtivo && _zonasGeojson){
+    const tiposAtivos = new Set(Array.from(document.querySelectorAll('[data-zona-tipo]:checked')).map(e=>e.dataset.zonaTipo));
+    const featsVisiveis = (_zonasGeojson.features||[]).filter(f => {
+      const p = f.properties;
+      if(_zonasFiltroUC !== 'todas' && p.uc_nome !== _zonasFiltroUC) return false;
+      return tiposAtivos.has(p.zona_codigo);
+    });
+    Object.entries(ZONA_META).forEach(([cod, meta]) => {
+      if(!tiposAtivos.has(cod)) return;
+      if(!featsVisiveis.some(f => f.properties.zona_codigo === cod)) return;
+      itens.push({ simbolo:'rect', cor:meta.cor, opacidade:_zonasOpacity, dash:true, label:'Zona — '+meta.nome });
+    });
+  }
 
   // Alertas Ambientais
   if(_alertasAtivo && _alertasLayer) itens.push({ simbolo:'circle', cor:'#f97316', label:'Alertas Ambientais' });
