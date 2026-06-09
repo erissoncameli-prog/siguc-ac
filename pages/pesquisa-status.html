@@ -419,6 +419,18 @@ function fmtData(d) {
   if (!d) return '—'
   return new Date(d).toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' })
 }
+function fmtBytes(b) {
+  if (!b) return ''
+  if (b < 1024) return b + ' B'
+  if (b < 1048576) return Math.round(b/1024) + ' KB'
+  return (b/1048576).toFixed(1) + ' MB'
+}
+
+async function abrirDoc(path, nome) {
+  const { data, error } = await db.storage.from('pesquisa-documentos').createSignedUrl(path, 300)
+  if (error || !data?.signedUrl) { toastPub('Não foi possível abrir o documento', true); return }
+  window.open(data.signedUrl, '_blank')
+}
 
 function toastPub(msg, erro = false) {
   const el = document.getElementById('toast-pub')
