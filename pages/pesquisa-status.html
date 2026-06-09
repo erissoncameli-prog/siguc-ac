@@ -238,6 +238,7 @@ function renderResultado() {
     const feita  = i <= etapaIdx
     const atual  = i === etapaIdx
     const ultimo = i === ETAPAS_ORD.length - 1
+    const autor  = h?.usuario_nome || (h && !h.usuario_nome ? 'Pesquisador (portal)' : null)
     return `
 <div class="tl-item">
   <div class="tl-left">
@@ -246,7 +247,7 @@ function renderResultado() {
   </div>
   <div class="tl-content">
     <div class="tl-etapa ${feita ? '' : 'pend'}">${ETAPAS_LABEL[e]}</div>
-    ${h ? `<div class="tl-quando">${fmtData(h.criado_em)}</div>` : ''}
+    ${h ? `<div class="tl-quando">${fmtData(h.criado_em)}${autor ? ` · <strong>${esc(autor)}</strong>` : ''}</div>` : ''}
     ${h?.observacao ? `<div class="tl-obs">${esc(h.observacao)}</div>` : ''}
   </div>
 </div>`
