@@ -198,6 +198,15 @@
   .btn-filtros-mobile{display:flex;}
 }
 /* ── Painel Camadas ──────────────────────────────────────────── */
+.camada-grupo{border:1px solid var(--cinza-100);border-radius:8px;margin-bottom:6px;overflow:hidden;}
+.camada-grupo:last-child{margin-bottom:0;}
+.camada-grupo-header{display:flex;align-items:center;gap:6px;padding:5px 7px;background:var(--cinza-50);cursor:pointer;user-select:none;}
+.camada-grupo-header:hover{background:#f0fdf4;}
+.camada-grupo-sigla{font-size:9px;font-weight:700;color:#fff;background:#2D6A4F;border-radius:3px;padding:1px 5px;flex-shrink:0;}
+.camada-grupo-nome{font-size:11px;font-weight:600;color:var(--cinza-700);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.camada-grupo-chevron{font-size:10px;color:var(--cinza-400);flex-shrink:0;transition:transform .15s;}
+.camada-grupo-chevron.fechado{transform:rotate(-90deg);}
+.camada-grupo-body{border-top:1px solid var(--cinza-100);}
 .camada-row-outer{border-bottom:1px solid var(--cinza-100);}
 .camada-row-outer:last-child{border-bottom:none;}
 .camada-row{display:flex;align-items:center;gap:6px;padding:5px 2px;}
@@ -1349,7 +1358,35 @@ function renderCamadasHtml(){
     el.innerHTML = `<div style="font-size:11px;color:var(--cinza-400);padding:4px 0">${ehAdmin?'Nenhuma camada. Clique em ＋ para adicionar.':'Nenhuma camada disponível.'}</div>`;
     return;
   }
-  el.innerHTML = camadas.map(c => {
+
+  // Determina quais UCs estão visíveis no filtro da aba UC
+  const ucNomesVisiveis = _ucNomesVisiveis();
+
+  // Filtra camadas pelas UCs visíveis (null = mostrar todas)
+  const camadasVisiveis = ucNomesVisiveis === null
+    ? camadas
+    : camadas.filter(c => !c.unidades_conservacao || ucNomesVisiveis.has(c.unidades_conservacao.nome));
+
+  if(!camadasVisiveis.length){
+    el.innerHTML = `<div style="font-size:11px;color:var(--cinza-400);padding:4px 0">Nenhuma camada para as UCs selecionadas.</div>`;
+    return;
+  }
+
+  // Agrupa por UC — chave = uc_id ou '_geral'
+  const grupos = new Map();
+  camadasVisiveis.forEach(c => {
+    const key = c.uc_id || '_geral';
+    if(!grupos.has(key)) grupos.set(key, { uc: c.unidades_conservacao||null, camadas: [] });
+    grupos.get(key).camadas.push(c);
+  });
+
+  // Ordena grupos: UCs com nome em ordem alfabética, _geral por último
+  const gruposOrdenados = [...grupos.entries()].sort(([ka,a],[kb,b])=>{
+    if(ka==='_geral') return 1; if(kb==='_geral') return -1;
+    return (a.uc?.nome||'').localeCompare(b.uc?.nome||'');
+  });
+
+  function _renderCamadaRow(c){
     const sc=c.style_config||{}, fo=sc.fillOpacity!=null?sc.fillOpacity:0.22, sw=sc.strokeWidth!=null?sc.strokeWidth:2, sco=sc.strokeColor||c.cor;
     const hidden=new Set(sc.hiddenFeatures||[]), featFill=c.feature_colors||{}, featStroke=sc.featureStrokeColors||{};
     const allF=c.geojson?.features||[];
@@ -1400,16 +1437,35 @@ function renderCamadasHtml(){
           onchange="toggleCamada('${c.id}',this.checked)">
         <div style="width:12px;height:12px;border-radius:2px;background:${c.cor};flex-shrink:0"></div>
         <span style="font-size:12px;color:var(--cinza-700);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
-          title="${escHtml(c.nome)}${c.unidades_conservacao?' — '+c.unidades_conservacao.nome:''}">
-          ${escHtml(c.nome)}
-          ${c.unidades_conservacao?`<span style="font-size:10px;color:var(--cinza-400);display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(c.unidades_conservacao.sigla||c.unidades_conservacao.nome)}</span>`:''}
-        </span>
+          title="${escHtml(c.nome)}">${escHtml(c.nome)}</span>
         ${ehAdmin?`<button class="btn-camada-exp" title="Renomear camada" onclick="renomearCamada('${c.id}')">✏</button>`:''}
         ${ehAdmin?`<button id="btn-exp-${c.id}" class="btn-camada-exp" title="Configurar estilo" onclick="toggleExpandirCamada('${c.id}')">⚙</button>`:''}
         ${ehAdmin?`<button onclick="removerCamada('${c.id}')" title="Remover"
           style="font-size:11px;padding:1px 5px;border:1px solid #FCA5A5;border-radius:4px;background:#FEF2F2;color:#DC2626;cursor:pointer;flex-shrink:0">✕</button>`:''}
       </div>
       ${ehAdmin?`<div id="camada-expand-${c.id}" class="camada-expand-body" style="display:none">${featRowsHtml}${styleHtml}</div>`:''}
+    </div>`;
+  }
+
+  el.innerHTML = gruposOrdenados.map(([key, grupo]) => {
+    const uc = grupo.uc;
+    const sigla = uc?.sigla || (key==='_geral'?'—':uc?.nome?.substring(0,4)||'UC');
+    const nomeGrupo = uc?.nome || 'Camadas Gerais';
+    const grupoId = `cg-${key.replace(/[^a-z0-9]/gi,'_')}`;
+    const totalGrupo = grupo.camadas.length;
+    const ativasGrupo = grupo.camadas.filter(c=>c.visivel).length;
+    const todasAtivas = ativasGrupo === totalGrupo;
+    return `
+    <div class="camada-grupo">
+      <div class="camada-grupo-header" onclick="_toggleGrupoCamada('${grupoId}')">
+        <input type="checkbox" ${todasAtivas?'checked':''} style="accent-color:#2D6A4F;width:12px;height:12px;cursor:pointer;flex-shrink:0"
+          onclick="event.stopPropagation()" onchange="_toggleTodasCamadasGrupo('${grupoId}',this.checked)">
+        <span class="camada-grupo-sigla">${escHtml(sigla)}</span>
+        <span class="camada-grupo-nome" title="${escHtml(nomeGrupo)}">${escHtml(nomeGrupo)}</span>
+        <span style="font-size:9px;color:var(--cinza-400);flex-shrink:0">${ativasGrupo}/${totalGrupo}</span>
+        <span class="camada-grupo-chevron" id="${grupoId}-chv">▾</span>
+      </div>
+      <div class="camada-grupo-body" id="${grupoId}">${grupo.camadas.map(_renderCamadaRow).join('')}</div>
     </div>`;
   }).join('');
 }
@@ -1863,7 +1919,34 @@ async function toggleUC(ativo){
 }
 function ucToggleLabels(v){ _ucLabels=v; _renderizarUC(); }
 function ucAlterarOpacidade(v){ _ucOpacity=v/100; document.getElementById('uc-opacity-val').textContent=v+'%'; _renderizarUC(); }
-function filtrarUC(){ _renderizarUC(); _atualizarLegendaMapa(); }
+function filtrarUC(){ _renderizarUC(); _atualizarLegendaMapa(); renderCamadasHtml(); }
+
+// Retorna Set com nomes das UCs visíveis no filtro atual, ou null se nenhum filtro aplicado
+function _ucNomesVisiveis(){
+  const cbs = Array.from(document.querySelectorAll('[data-uc-nome]'));
+  if(!cbs.length) return null; // aba UC nunca aberta — mostra tudo
+  const checked = cbs.filter(cb => cb.closest('.uc-filtro-label')?.style.display !== 'none' && cb.checked);
+  const total   = cbs.filter(cb => cb.closest('.uc-filtro-label')?.style.display !== 'none');
+  if(checked.length === total.length) return null; // todas ativas = sem filtro
+  return new Set(checked.map(cb => cb.dataset.ucNome));
+}
+
+function _toggleGrupoCamada(grupoId){
+  const body = document.getElementById(grupoId);
+  const chv  = document.getElementById(grupoId+'-chv');
+  if(!body) return;
+  const aberto = body.style.display !== 'none';
+  body.style.display = aberto ? 'none' : '';
+  if(chv) chv.classList.toggle('fechado', aberto);
+}
+
+function _toggleTodasCamadasGrupo(grupoId, vis){
+  const body = document.getElementById(grupoId); if(!body) return;
+  body.querySelectorAll('[onchange^="toggleCamada"]').forEach(cb => {
+    const id = cb.getAttribute('onchange').match(/'([^']+)'/)?.[1];
+    if(id){ cb.checked = vis; toggleCamada(id, vis); }
+  });
+}
 
 let _ucDetalhes = {};
 async function _carregarUC(){
@@ -1929,6 +2012,7 @@ function toggleUCEsfera() {
   _ucEsfMun = document.getElementById('uc-esfera-municipal')?.checked ?? _ucEsfMun
   _renderizarUC()
   _atualizarLegendaMapa()
+  renderCamadasHtml()
 }
 
 function _alertaEmUCVisivel(lat, lng) {
