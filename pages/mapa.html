@@ -2388,18 +2388,22 @@ function _sincronizarEditor(){
 function _iniciarDragCard(cardId, handleId){
   const card=document.getElementById(cardId), handle=document.getElementById(handleId);
   if(!card||!handle) return;
+  // Impede que cliques e scroll no card se propaguem ao mapa Leaflet
+  if(typeof L !== 'undefined'){
+    L.DomEvent.disableClickPropagation(card);
+    L.DomEvent.disableScrollPropagation(card);
+  }
   let drag=false, sx=0, sy=0, ox=0, oy=0;
   handle.addEventListener('mousedown', e=>{
     if(e.target.closest('input,button,select,a')) return;
     drag=true;
     sx=e.clientX; sy=e.clientY;
-    // Posição atual relativa ao pai (offsetParent)
     ox=card.offsetLeft; oy=card.offsetTop;
-    // Garante que top/left estão definidos e bottom/right desligados
     card.style.left=ox+'px'; card.style.top=oy+'px';
     card.style.right='auto'; card.style.bottom='auto';
     card.style.cursor='grabbing';
     e.preventDefault();
+    e.stopPropagation();
   });
   document.addEventListener('mousemove', e=>{
     if(!drag) return;
