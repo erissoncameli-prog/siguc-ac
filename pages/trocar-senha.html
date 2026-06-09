@@ -37,10 +37,11 @@ body{font-family:'DM Sans',sans-serif;min-height:100vh;display:flex;align-items:
       <div style="font-size:10px;color:#9CA3AF">SEMA/AC</div>
     </div>
   </div>
-  <div class="titulo">Trocar Senha</div>
-  <div class="sub">Por segurança, defina uma nova senha para continuar.</div>
+  <div class="titulo" id="titulo">Trocar Senha</div>
+  <div class="sub" id="subtitulo">Por segurança, defina uma nova senha para continuar.</div>
   <div class="alerta alerta-erro" id="msg-erro"></div>
   <div class="alerta alerta-ok" id="msg-ok"></div>
+  <div class="form-group" id="bloco-senha-atual" style="display:none"><label class="form-label">Senha Atual</label><input class="form-input" type="password" id="senha-atual" placeholder="Sua senha atual"></div>
   <div class="form-group"><label class="form-label">Nova Senha</label><input class="form-input" type="password" id="senha1" placeholder="Mínimo 8 caracteres"></div>
   <div class="form-group"><label class="form-label">Confirmar Senha</label><input class="form-input" type="password" id="senha2"></div>
   <button class="btn" id="btn" onclick="trocar()">Salvar Nova Senha</button>
@@ -54,13 +55,33 @@ const db = createClient(SUPABASE_URL, SUPABASE_KEY, {
   auth: { storage: window.sessionStorage, persistSession: true, autoRefreshToken: true, detectSessionInUrl: false }
 })
 
+const voluntario = new URLSearchParams(location.search).has('voluntario')
+
+;(async function init() {
+  const { data: { session } } = await db.auth.getSession()
+  if (!session) { window.location.href = '../index.html'; return }
+  if (voluntario) {
+    document.getElementById('titulo').textContent = 'Alterar Senha'
+    document.getElementById('subtitulo').textContent = 'Digite sua senha atual e escolha uma nova senha.'
+    document.getElementById('bloco-senha-atual').style.display = ''
+  }
+})()
+
 async function trocar() {
   const s1 = document.getElementById('senha1').value
   const s2 = document.getElementById('senha2').value
   const erro = document.getElementById('msg-erro')
   const ok = document.getElementById('msg-ok')
   erro.style.display = 'none'; ok.style.display = 'none'
-  if (s1.length < 8) { erro.textContent = 'A senha deve ter pelo menos 8 caracteres.'; erro.style.display = 'block'; return }
+  if (voluntario) {
+    const senhaAtual = document.getElementById('senha-atual').value
+    if (!senhaAtual) { erro.textContent = 'Informe sua senha atual.'; erro.style.display = 'block'; return }
+    // Valida senha atual tentando re-autenticar
+    const { data: { user } } = await db.auth.getUser()
+    const { error: signInErr } = await db.auth.signInWithPassword({ email: user.email, password: senhaAtual })
+    if (signInErr) { erro.textContent = 'Senha atual incorreta.'; erro.style.display = 'block'; return }
+  }
+  if (s1.length < 8) { erro.textContent = 'A nova senha deve ter pelo menos 8 caracteres.'; erro.style.display = 'block'; return }
   if (s1 !== s2) { erro.textContent = 'As senhas não coincidem.'; erro.style.display = 'block'; return }
   const btn = document.getElementById('btn'); btn.disabled = true; btn.textContent = 'Salvando...'
   try {

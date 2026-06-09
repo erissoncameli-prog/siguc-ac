@@ -155,6 +155,7 @@ function renderTabela(lista) {
         <div style="display:flex;gap:4px">
           <button class="btn btn-xs btn-ghost" onclick='editarUsuario(${JSON.stringify(u)})'>Editar</button>
           <button class="btn btn-xs btn-ghost" onclick="toggleAtivo('${u.id}',${u.ativo})">${u.ativo?'Desativar':'Ativar'}</button>
+          ${appState.usuario?.perfil === 'super_admin' ? `<button class="btn btn-xs btn-ghost" onclick="redefinirSenha('${u.id}','${esc(u.nome_completo)}')" title="Redefinir senha para Sema@2025">Redefinir Senha</button>` : ''}
           <a class="btn btn-xs btn-ghost" href="historico-acessos.html?usuario_id=${u.id}&nome=${encodeURIComponent(u.nome_completo)}" title="Ver histórico de acessos">
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
           </a>
@@ -220,6 +221,21 @@ async function salvar() {
     fecharModal(); await carregar()
   } catch(e) { toast(e.message || 'Erro ao salvar', 'error') }
   finally { btn.disabled = false; btn.textContent = 'Salvar' }
+}
+
+async function redefinirSenha(id, nome) {
+  if (!confirm(`Redefinir a senha de "${nome}" para Sema@2025?\nO usuário será obrigado a trocar na próxima entrada.`)) return
+  try {
+    const { data: { session } } = await db.auth.getSession()
+    const resp = await fetch(`${SUPABASE_URL}/functions/v1/admin-reset-senha`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+      body: JSON.stringify({ usuario_id: id })
+    })
+    const json = await resp.json()
+    if (!resp.ok) throw new Error(json.error || 'Erro ao redefinir senha')
+    toast(`Senha de ${nome} redefinida para Sema@2025`, 'success')
+  } catch(e) { toast(e.message, 'error') }
 }
 
 async function toggleAtivo(id, ativoAtual) {
