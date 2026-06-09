@@ -1712,6 +1712,7 @@ function _atualizarLegendaMapa(){
   if(VEG_LAYERS.mapbiomas?.layer)  itens.push({ simbolo:'rect', cor:'#16a34a', opacidade:0.7, label:'MapBiomas Coleção 8' });
   if(VEG_LAYERS.prodes?.layer)     itens.push({ simbolo:'rect', cor:'#dc2626', opacidade:0.7, label:'PRODES — Desmatamento' });
   if(VEG_LAYERS.prodes_hist?.layer)itens.push({ simbolo:'rect', cor:'#b45309', opacidade:0.7, label:'PRODES — Acumulado' });
+  if(VEG_LAYERS.gibs?.layer){ const gibsSel = document.getElementById('gibs-camada'); const gibsLabel = gibsSel ? GIBS_CAMADAS.find(c=>c.id===gibsSel.value)?.label : null; itens.push({ simbolo:'rect', cor:'#6366f1', opacidade:0.7, label: gibsLabel ? 'GIBS — '+gibsLabel : 'GIBS — NASA Earthdata' }); }
 
   // Camadas personalizadas
   camadas.filter(c=>c.visivel).forEach(c => {
@@ -2566,6 +2567,7 @@ async function toggleZonas(ativo){
   _zonasAtivo = ativo;
   if(ativo && !_zonasGeojson) await _carregarZonas();
   else _renderizarZonas();
+  _atualizarLegendaMapa();
 }
 
 async function _carregarZonas(){
@@ -2771,6 +2773,7 @@ async function toggleCamadaCAR(el){
     document.getElementById('car-filtros-wrap').style.display='none';
     document.getElementById('car-count-badge').style.display='none';
     document.getElementById('car-legenda-inline').style.display='none';
+    _atualizarLegendaMapa();
     return;
   }
   if(!_ucGeojson) await _carregarUC();
@@ -3022,6 +3025,7 @@ function _aplicarCamadaCAR(){
     }
   }).addTo(mapaL);
   _atualizarBadgeCAR(visiveis);
+  _atualizarLegendaMapa();
 }
 
 function _atualizarBadgeCAR(visiveis){
