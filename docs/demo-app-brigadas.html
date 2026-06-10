@@ -3,256 +3,240 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SIGUC Brigadas — Protótipo (Clean & Arejado)</title>
+<title>SIGUC Brigadas — Protótipo (Vivo / Material 3 Expressive)</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 /* ════════════════════════════════════════════════════════════
-   SIGUC Brigadas — Protótipo v2 · "Clean & Arejado (premium)"
-   Claro, arejado, cards suaves, 1 acento vibrante, tipografia ampla.
-   Estende o design system (não altera variáveis core).
+   SIGUC Brigadas — Protótipo v3 · "Vivo" (Material 3 Expressive)
+   Blocos de cor cheios, formas ousadas, nav flutuante, tipografia
+   grande e legível. Estende o design system (não altera core).
    ════════════════════════════════════════════════════════════ */
 :root{
-  --primary:#12A66A;          /* verde vibrante (acento de ação) */
-  --primary-soft:#E4F6EE;
-  --ouro:#C9A84C;
+  --primary:#12A66A; --primary-d:#0C7A4D; --soft:#7BE0AE;
   --combate:#EF5B3C; --combate-bg:#FDECE7;
-  --prev:#12A66A;    --prev-bg:#E4F6EE;
-  --monit:#3B82C4;   --monit-bg:#E9F1FB;
-  --fauna:#D98A3D;   --fauna-bg:#FBF0E1;
-  --alerta:#E0A227;  --alerta-bg:#FBF2DC;
+  --prev:#12A66A;     --prev-bg:#E4F6EE;
+  --monit:#3B82C4;    --monit-bg:#E9F1FB;
+  --fauna:#D98A3D;    --fauna-bg:#FBF0E1;
+  --alerta:#E0A227;   --alerta-bg:#FBF2DC;
+  --ink-d:#0F1A13;
   --ui:'DM Sans',system-ui,sans-serif;
   --mono:'DM Mono',ui-monospace,monospace;
 }
 .app{
-  --bg:#F5F6F2; --surf:#FFFFFF; --surf2:#FBFBF8;
-  --ink:#16201B; --ink2:#5C675E; --ink3:#919A92;
-  --line:rgba(22,32,27,.07); --line2:rgba(22,32,27,.12);
-  --shadow:0 1px 2px rgba(22,32,27,.04), 0 8px 20px rgba(22,32,27,.05);
-  --shadow-lg:0 10px 34px rgba(22,32,27,.10);
+  --bg:#F6FAF6; --surf:#FFFFFF; --ink:#0F1A13; --ink2:#55615a; --ink3:#8b968d;
+  --line:rgba(15,26,19,.07);
+  --sh:0 1px 2px rgba(15,26,19,.04), 0 10px 22px rgba(15,26,19,.06);
 }
-.app.field{ /* alto contraste p/ sol forte */
-  --ink:#000; --ink2:#2c352e; --line2:rgba(0,0,0,.28);
-}
-.app.field .screen{font-size:107%}
+.app.field{--ink:#000; --ink2:#27302a; --line:rgba(0,0,0,.16)}
+.app.field .screen{font-size:108%}
 
 *{box-sizing:border-box;margin:0;padding:0}
-body{
-  font-family:var(--ui); color:#16201B; min-height:100vh;
-  display:flex; flex-direction:column; align-items:center; padding:30px 16px 60px;
-  background:#EAEDE6;
-  background-image:radial-gradient(1100px 520px at 50% -8%, #F4F7EE, transparent 60%);
-}
-.demo-head{text-align:center; max-width:600px; margin-bottom:8px}
-.demo-head .kicker{font-family:var(--mono); font-size:11px; letter-spacing:2px; text-transform:uppercase; color:#12A66A}
-.demo-head h1{font-weight:700; font-size:27px; margin:8px 0 6px; letter-spacing:-.5px; color:#16201B}
-.demo-head p{color:#5C675E; font-size:13px; line-height:1.6}
+body{font-family:var(--ui); color:#0F1A13; min-height:100vh; display:flex; flex-direction:column; align-items:center;
+  padding:30px 16px 60px; background:#E9EDE7; background-image:radial-gradient(1100px 520px at 50% -8%, #F2F8EE, transparent 60%)}
+.demo-head{text-align:center; max-width:600px}
+.demo-head .k{font-family:var(--mono); font-size:11px; letter-spacing:2px; text-transform:uppercase; color:#12A66A}
+.demo-head h1{font-weight:700; font-size:27px; letter-spacing:-.5px; margin:8px 0 6px}
+.demo-head p{color:#55615a; font-size:13px; line-height:1.6}
 .controls{display:flex; gap:9px; justify-content:center; margin:18px 0 24px}
-.ctl{font-family:var(--ui); font-weight:600; font-size:12px; border:1px solid rgba(22,32,27,.12); background:#fff; color:#3a463d;
-  padding:9px 15px; border-radius:999px; cursor:pointer; display:flex; align-items:center; gap:7px; transition:.15s; box-shadow:0 1px 2px rgba(22,32,27,.04)}
+.ctl{font-weight:600; font-size:12px; border:1px solid rgba(15,26,19,.12); background:#fff; color:#3a463d; padding:9px 15px;
+  border-radius:999px; cursor:pointer; display:flex; align-items:center; gap:7px; box-shadow:0 1px 2px rgba(15,26,19,.05); transition:.15s; font-family:var(--ui)}
 .ctl:hover{border-color:var(--primary); color:var(--primary)}
 .ctl.on{background:var(--primary); color:#fff; border-color:var(--primary)}
 .ctl svg{width:15px;height:15px}
 
-/* ════ moldura ════ */
-.phone{width:390px; max-width:95vw; height:810px; border-radius:46px; padding:11px;
-  background:#dfe2da; box-shadow:0 50px 100px rgba(22,32,27,.22), inset 0 0 0 1px rgba(255,255,255,.5);}
+.phone{width:392px; max-width:95vw; height:812px; border-radius:46px; padding:11px; background:#dfe2da;
+  box-shadow:0 50px 100px rgba(15,26,19,.22), inset 0 0 0 1px rgba(255,255,255,.5)}
 .app{width:100%;height:100%; border-radius:36px; overflow:hidden; background:var(--bg); color:var(--ink);
   position:relative; display:flex; flex-direction:column; font-family:var(--ui)}
-.notch{position:absolute; top:11px; left:50%; transform:translateX(-50%); width:120px; height:30px; background:#0c0c0c; border-radius:0 0 16px 16px; z-index:60}
+.notch{position:absolute; top:11px; left:50%; transform:translateX(-50%); width:118px;height:30px; background:#0c0c0c; border-radius:0 0 15px 15px; z-index:60}
 
-/* ════ topo ════ */
-.topbar{padding:46px 22px 14px; flex-shrink:0; display:flex; align-items:center; justify-content:space-between}
-.greet .hello{font-size:12.5px; color:var(--ink2); font-weight:500}
-.greet .uc{font-size:19px; font-weight:700; letter-spacing:-.3px; margin-top:1px}
-.greet .uc .pin{display:inline-flex; vertical-align:-2px; margin-right:4px; color:var(--primary)}
-.greet .uc .pin svg{width:15px;height:15px}
-.avatar{width:42px;height:42px;border-radius:50%; background:linear-gradient(135deg,#1fb87a,#0c7a4d); color:#fff; display:grid; place-items:center; font-weight:700; font-size:15px; box-shadow:var(--shadow)}
+/* topo */
+.topbar{padding:48px 22px 12px; display:flex; align-items:center; justify-content:space-between; flex-shrink:0}
+.greet .h{font-size:13px; color:var(--ink2); font-weight:600}
+.greet .uc{font-size:21px; font-weight:700; letter-spacing:-.5px; margin-top:1px; display:flex; align-items:center; gap:5px}
+.greet .uc svg{width:16px;height:16px;color:var(--primary)}
+.avatar{width:44px;height:44px;border-radius:15px; background:var(--primary); color:#fff; display:grid; place-items:center; font-weight:700; font-size:15px; box-shadow:0 8px 18px rgba(18,166,106,.36)}
 
-/* gps status pill */
-.gpspill{margin:0 22px 8px; display:flex; align-items:center; gap:10px; padding:11px 14px; background:var(--surf); border-radius:16px; box-shadow:var(--shadow); flex-shrink:0}
-.gpspill .ring{width:30px;height:30px;border-radius:50%; display:grid; place-items:center; background:var(--primary-soft); color:var(--primary); position:relative}
-.gpspill .ring::after{content:'';position:absolute;inset:-3px;border-radius:50%;border:2px solid var(--primary);opacity:.35;animation:rip 2s infinite}
-@keyframes rip{0%{transform:scale(.8);opacity:.5}100%{transform:scale(1.4);opacity:0}}
-.gpspill .ring svg{width:16px;height:16px}
-.gpspill .gtxt{flex:1}
-.gpspill .gtxt b{font-size:13px; font-weight:600}
-.gpspill .gtxt span{display:block; font-family:var(--mono); font-size:10.5px; color:var(--ink3); margin-top:1px}
-.gpspill .acc{font-family:var(--mono); font-size:12px; color:var(--primary); font-weight:500; background:var(--primary-soft); padding:4px 9px; border-radius:8px}
+.gps{margin:2px 22px 6px; display:flex; align-items:center; gap:11px; background:var(--ink-d); color:#fff; border-radius:20px; padding:13px 16px; flex-shrink:0; box-shadow:0 10px 24px rgba(15,26,19,.22)}
+.gps .r{width:30px;height:30px;border-radius:50%; background:rgba(123,224,174,.2); color:var(--soft); display:grid; place-items:center; position:relative}
+.gps .r::after{content:'';position:absolute;inset:-3px;border-radius:50%;border:2px solid var(--soft);opacity:.4;animation:rip 2s infinite}
+@keyframes rip{0%{transform:scale(.8);opacity:.5}100%{transform:scale(1.45);opacity:0}}
+.gps .r svg{width:16px;height:16px}
+.gps b{font-size:13.5px; font-weight:600}
+.gps .c{font-family:var(--mono); font-size:10.5px; color:#9fb0a4; margin-top:1px}
+.gps .acc{margin-left:auto; font-family:var(--mono); font-size:13px; color:var(--soft); font-weight:500}
 
-/* ════ telas ════ */
 .screens{flex:1; position:relative; overflow:hidden}
-.screen{position:absolute; inset:0; overflow-y:auto; padding:8px 22px 110px; display:none}
-.screen.active{display:block; animation:fade .28s cubic-bezier(.2,.7,.3,1)}
-@keyframes fade{from{opacity:0; transform:translateY(8px)}to{opacity:1;transform:none}}
+.screen{position:absolute; inset:0; overflow-y:auto; padding:10px 22px 130px; display:none}
+.screen.active{display:block; animation:spring .4s cubic-bezier(.2,.9,.25,1.05)}
+@keyframes spring{from{opacity:0; transform:translateY(14px) scale(.98)}to{opacity:1; transform:none}}
 .screen::-webkit-scrollbar{width:0}
 
-.eyebrow{font-size:12px; font-weight:600; color:var(--primary); margin:14px 0 2px}
-.h-title{font-size:25px; font-weight:700; letter-spacing:-.6px; line-height:1.12}
-.h-sub{color:var(--ink2); font-size:13.5px; margin-top:5px; margin-bottom:20px; line-height:1.5}
+.eyebrow{font-size:12px; font-weight:700; color:var(--primary); margin:14px 0 3px}
+.h-title{font-size:27px; font-weight:700; letter-spacing:-.7px; line-height:1.1}
+.h-sub{color:var(--ink2); font-size:13.5px; margin-top:6px; margin-bottom:22px; line-height:1.5}
 
-/* ── cartões de natureza ── */
-.nat{display:flex; align-items:center; gap:16px; padding:18px; border-radius:22px; background:var(--surf);
-  box-shadow:var(--shadow); cursor:pointer; width:100%; border:none; text-align:left; color:var(--ink);
-  margin-bottom:13px; transition:.18s cubic-bezier(.2,.7,.3,1); font-family:var(--ui)}
-.nat:hover{transform:translateY(-2px); box-shadow:var(--shadow-lg)}
-.nat:active{transform:scale(.99)}
-.nat-ic{width:54px;height:54px;border-radius:17px; display:grid; place-items:center; flex-shrink:0; background:var(--bg)}
-.nat-ic svg{width:27px;height:27px}
-.nat-tx{flex:1}
-.nat-tx .t{font-size:17.5px; font-weight:700; letter-spacing:-.3px}
-.nat-tx .d{font-size:12.5px; color:var(--ink2); margin-top:2px; line-height:1.4}
-.nat-go{width:32px;height:32px;border-radius:50%; background:var(--bg); display:grid; place-items:center; color:var(--ink3); flex-shrink:0}
-.nat-go svg{width:16px;height:16px}
+/* blocos de natureza (Material expressive) */
+.nat{display:flex; align-items:center; gap:16px; padding:20px 18px; border-radius:28px; margin-bottom:14px; color:#fff;
+  border:none; width:100%; text-align:left; cursor:pointer; font-family:var(--ui); transition:.2s cubic-bezier(.2,.9,.25,1.05)}
+.nat:hover{transform:translateY(-3px) scale(1.01)}
+.nat:active{transform:scale(.98)}
+.nat .i{width:54px;height:54px;border-radius:18px; background:rgba(255,255,255,.22); display:grid; place-items:center; flex-shrink:0}
+.nat .i svg{width:28px;height:28px}
+.nat .t{flex:1}
+.nat .t b{font-size:19px; font-weight:700; letter-spacing:-.4px}
+.nat .t s{display:block; font-size:12.5px; text-decoration:none; opacity:.92; margin-top:2px}
+.nat .go svg{width:22px;height:22px; opacity:.92}
+.nat.g{background:var(--primary); box-shadow:0 12px 26px rgba(18,166,106,.36)}
+.nat.f{background:var(--combate); box-shadow:0 12px 26px rgba(239,91,60,.32)}
+.nat.m{background:var(--monit); box-shadow:0 12px 26px rgba(59,130,196,.32)}
 
-/* ── seção / lista recentes ── */
-.sec{display:flex; align-items:center; justify-content:space-between; margin:26px 2px 12px}
-.sec h3{font-size:15px; font-weight:700; letter-spacing:-.2px}
-.sec a{font-size:12.5px; color:var(--primary); font-weight:600; text-decoration:none}
-.card{display:flex; gap:14px; align-items:center; padding:14px; border-radius:20px; background:var(--surf); box-shadow:var(--shadow); margin-bottom:11px}
-.thumb{width:52px;height:52px;border-radius:15px; flex-shrink:0; display:grid; place-items:center}
-.thumb svg{width:23px;height:23px}
-.cbody{flex:1; min-width:0}
-.cbody .ct{font-size:14.5px; font-weight:600; display:flex; align-items:center; gap:8px; letter-spacing:-.2px}
-.cbody .cc{font-size:12.5px; color:var(--ink2); margin-top:3px}
-.cbody .cm{font-family:var(--mono); font-size:10px; color:var(--ink3); margin-top:4px; letter-spacing:-.2px}
-.pill{font-size:10.5px; font-weight:600; padding:3px 9px; border-radius:999px; white-space:nowrap}
-.pill.ok{background:var(--prev-bg); color:#0c7a4d}
+/* seção + recentes */
+.sec{display:flex; align-items:center; justify-content:space-between; margin:28px 2px 14px}
+.sec h3{font-size:16px; font-weight:700; letter-spacing:-.3px}
+.sec a{font-size:12.5px; color:var(--primary); font-weight:700; text-decoration:none}
+.card{display:flex; gap:14px; align-items:center; padding:14px; border-radius:22px; background:var(--surf); box-shadow:var(--sh); margin-bottom:12px}
+.thumb{width:52px;height:52px;border-radius:16px; flex-shrink:0; display:grid; place-items:center}
+.thumb svg{width:24px;height:24px}
+.cb{flex:1; min-width:0}
+.cb .ct{font-size:14.5px; font-weight:700; display:flex; align-items:center; gap:8px; letter-spacing:-.2px}
+.cb .cc{font-size:12.5px; color:var(--ink2); margin-top:3px}
+.cb .cm{font-family:var(--mono); font-size:10px; color:var(--ink3); margin-top:4px}
+.pill{font-size:10.5px; font-weight:700; padding:3px 10px; border-radius:999px; white-space:nowrap}
+.pill.ok{background:var(--prev-bg); color:var(--primary-d)}
 .pill.wait{background:var(--alerta-bg); color:#9a6e10}
 .pill.send{background:var(--monit-bg); color:#2b6aa6}
 
-/* ── captura ── */
-.cam{border-radius:24px; overflow:hidden; position:relative; aspect-ratio:4/5; margin-bottom:16px; box-shadow:var(--shadow);
+/* captura */
+.cam{border-radius:28px; overflow:hidden; position:relative; aspect-ratio:4/5; margin-bottom:16px; box-shadow:var(--sh);
   background:linear-gradient(180deg, rgba(0,0,0,.05), rgba(0,0,0,.35)), radial-gradient(circle at 35% 30%, #5a8a63, #2f4f37 75%)}
 .cam .grid{position:absolute; inset:0; background-image:linear-gradient(rgba(255,255,255,.12) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.12) 1px,transparent 1px); background-size:33.3% 33.3%}
 .cam .xh{position:absolute; inset:0; display:grid; place-items:center; color:rgba(255,255,255,.7)}
 .cam .xh svg{width:60px;height:60px}
-.stamp{position:absolute; left:12px; right:12px; bottom:12px; background:rgba(255,255,255,.92); backdrop-filter:blur(6px);
-  border-radius:14px; padding:11px 13px; box-shadow:0 6px 18px rgba(0,0,0,.18)}
-.stamp .row1{font-family:var(--mono); font-size:11px; color:#16201B; font-weight:500}
-.stamp .row2{font-family:var(--mono); font-size:10px; color:#5C675E; margin-top:3px}
-.stamp .row3{display:flex; justify-content:space-between; align-items:center; margin-top:7px; padding-top:7px; border-top:1px solid rgba(22,32,27,.1)}
-.stamp .row3 .b{font-size:11px; font-weight:700; color:#16201B}
-.stamp .row3 .s{font-size:10px; font-weight:700; color:var(--primary); letter-spacing:1px}
-.lockbar{display:flex; align-items:center; gap:9px; padding:12px 15px; border-radius:15px; background:var(--primary-soft); color:#0c7a4d; font-weight:600; font-size:13px; margin-bottom:18px}
+.stamp{position:absolute; left:12px; right:12px; bottom:12px; background:rgba(255,255,255,.93); backdrop-filter:blur(6px); border-radius:18px; padding:12px 14px; box-shadow:0 6px 18px rgba(0,0,0,.2)}
+.stamp .r1{font-family:var(--mono); font-size:11px; color:#0F1A13; font-weight:500}
+.stamp .r2{font-family:var(--mono); font-size:10px; color:#55615a; margin-top:3px}
+.stamp .r3{display:flex; justify-content:space-between; align-items:center; margin-top:7px; padding-top:7px; border-top:1px solid rgba(15,26,19,.1)}
+.stamp .r3 .b{font-size:11px; font-weight:700}
+.stamp .r3 .s{font-size:10px; font-weight:700; color:var(--primary); letter-spacing:1px}
+.lockbar{display:flex; align-items:center; gap:10px; padding:13px 16px; border-radius:18px; background:var(--prev-bg); color:var(--primary-d); font-weight:700; font-size:13px; margin-bottom:20px}
 .lockbar svg{width:18px;height:18px}
 
-.frow{margin-bottom:18px}
-.frow label{font-size:12px; font-weight:600; color:var(--ink2); display:block; margin-bottom:9px}
+.frow{margin-bottom:20px}
+.frow label{font-size:12px; font-weight:700; color:var(--ink2); display:block; margin-bottom:10px}
 .chips{display:flex; flex-wrap:wrap; gap:9px}
-.chip{padding:10px 15px; border-radius:999px; background:var(--surf); box-shadow:var(--shadow); color:var(--ink); font-size:13px; font-weight:500; cursor:pointer; transition:.15s; border:1.5px solid transparent}
-.chip:hover{border-color:var(--line2)}
-.chip.sel{background:var(--primary); color:#fff; box-shadow:0 4px 12px rgba(18,166,106,.3)}
-.chip.fire.sel{background:var(--combate); box-shadow:0 4px 12px rgba(239,91,60,.3)}
-.inp{width:100%; background:var(--surf); border:none; box-shadow:var(--shadow); border-radius:15px; padding:14px; color:var(--ink); font-family:var(--ui); font-size:14px; resize:none}
+.chip{padding:11px 16px; border-radius:999px; background:var(--surf); box-shadow:var(--sh); color:var(--ink); font-size:13px; font-weight:600; cursor:pointer; transition:.18s cubic-bezier(.2,.9,.25,1.05); border:2px solid transparent}
+.chip:active{transform:scale(.95)}
+.chip.sel{background:var(--primary); color:#fff; box-shadow:0 6px 16px rgba(18,166,106,.34)}
+.chip.fire.sel{background:var(--combate); box-shadow:0 6px 16px rgba(239,91,60,.32)}
+.inp{width:100%; background:var(--surf); border:none; box-shadow:var(--sh); border-radius:18px; padding:15px; color:var(--ink); font-family:var(--ui); font-size:14px; resize:none}
 .inp::placeholder{color:var(--ink3)}
 
-.addon{display:flex; align-items:center; gap:13px; padding:15px; border-radius:18px; background:var(--fauna-bg); cursor:pointer; margin-bottom:18px}
-.addon .ic{width:44px;height:44px;border-radius:13px; display:grid; place-items:center; background:#fff; color:var(--fauna); box-shadow:0 2px 6px rgba(217,138,61,.18)}
-.addon .ic svg{width:23px;height:23px}
+.addon{display:flex; align-items:center; gap:14px; padding:16px; border-radius:22px; background:var(--fauna-bg); cursor:pointer; margin-bottom:20px}
+.addon .ic{width:46px;height:46px;border-radius:15px; display:grid; place-items:center; background:#fff; color:var(--fauna); box-shadow:0 3px 8px rgba(217,138,61,.22)}
+.addon .ic svg{width:24px;height:24px}
 .addon .tx{flex:1}
-.addon .tx b{font-size:14px; color:#8a5418}
+.addon .tx b{font-size:14.5px; color:#8a5418; font-weight:700}
 .addon .tx span{display:block; font-size:12px; color:#a9783f; margin-top:1px}
 .addon .go{color:var(--fauna)}
+.addon .go svg{width:20px;height:20px}
 
-.btn{display:flex; align-items:center; justify-content:center; gap:10px; width:100%; padding:17px; border-radius:18px; border:none;
-  font-family:var(--ui); font-weight:700; font-size:15px; cursor:pointer; transition:.15s; letter-spacing:-.2px}
-.btn:active{transform:scale(.985)}
-.btn.primary{background:var(--primary); color:#fff; box-shadow:0 8px 22px rgba(18,166,106,.32)}
-.btn.fire{background:var(--combate); color:#fff; box-shadow:0 8px 22px rgba(239,91,60,.3)}
-.btn.fauna{background:var(--fauna); color:#fff; box-shadow:0 8px 22px rgba(217,138,61,.3)}
+.btn{display:flex; align-items:center; justify-content:center; gap:10px; width:100%; padding:18px; border-radius:22px; border:none;
+  font-family:var(--ui); font-weight:700; font-size:15.5px; cursor:pointer; transition:.18s cubic-bezier(.2,.9,.25,1.05); letter-spacing:-.2px}
+.btn:active{transform:scale(.97)}
+.btn.primary{background:var(--primary); color:#fff; box-shadow:0 12px 26px rgba(18,166,106,.36)}
+.btn.fire{background:var(--combate); color:#fff; box-shadow:0 12px 26px rgba(239,91,60,.34)}
+.btn.fauna{background:var(--fauna); color:#fff; box-shadow:0 12px 26px rgba(217,138,61,.34)}
+.btn.ghost{background:var(--surf); color:var(--ink); box-shadow:var(--sh); margin-top:11px}
 .btn svg{width:20px;height:20px}
-.btn.ghost{background:var(--surf); color:var(--ink); box-shadow:var(--shadow); margin-top:11px}
 
-/* species card */
-.spec{display:flex; gap:13px; align-items:center; padding:13px; border-radius:18px; background:var(--fauna-bg); margin-top:10px}
-.spec .ph{width:50px;height:50px;border-radius:14px; background:#fff; display:grid; place-items:center; color:var(--fauna); flex-shrink:0; box-shadow:0 2px 6px rgba(217,138,61,.15)}
-.spec .ph svg{width:24px;height:24px}
+.spec{display:flex; gap:13px; align-items:center; padding:14px; border-radius:20px; background:var(--fauna-bg); margin-top:11px}
+.spec .ph{width:52px;height:52px;border-radius:16px; background:#fff; display:grid; place-items:center; color:var(--fauna); flex-shrink:0; box-shadow:0 3px 8px rgba(217,138,61,.2)}
+.spec .ph svg{width:25px;height:25px}
 .spec .si{flex:1}
-.spec .si .n{font-weight:700; font-size:13.5px; font-style:italic; display:flex; align-items:center; gap:7px}
-.spec .si .meta{font-family:var(--mono); font-size:10px; color:#a9783f; margin-top:3px; letter-spacing:-.2px}
+.spec .si .n{font-weight:700; font-size:14px; font-style:italic; display:flex; align-items:center; gap:8px}
+.spec .si .meta{font-family:var(--mono); font-size:10px; color:#a9783f; margin-top:3px}
 .spec .si .st{font-size:11.5px; color:#8a5418; margin-top:3px}
-.vu{font-style:normal; font-family:var(--mono); font-size:10px; font-weight:700; background:#fff; color:var(--fauna); padding:2px 7px; border-radius:7px}
+.vu{font-style:normal; font-family:var(--mono); font-size:10px; font-weight:700; background:#fff; color:var(--fauna); padding:2px 8px; border-radius:8px}
 
 /* tarefas */
-.task{padding:17px; border-radius:22px; background:var(--surf); box-shadow:var(--shadow); margin-bottom:14px}
-.task-h{display:flex; gap:14px; align-items:flex-start; margin-bottom:14px}
-.task-ic{width:50px;height:50px;border-radius:16px; display:grid; place-items:center; flex-shrink:0; background:var(--combate-bg); color:var(--combate)}
-.task-ic svg{width:25px;height:25px}
+.task{padding:18px; border-radius:26px; background:var(--surf); box-shadow:var(--sh); margin-bottom:14px}
+.task-h{display:flex; gap:14px; align-items:flex-start; margin-bottom:15px}
+.task-ic{width:52px;height:52px;border-radius:17px; display:grid; place-items:center; flex-shrink:0; background:var(--combate-bg); color:var(--combate)}
+.task-ic svg{width:26px;height:26px}
 .task-i{flex:1}
 .task-i .src{font-size:11px; font-weight:700; color:var(--combate); text-transform:uppercase; letter-spacing:.4px}
-.task-i .tt{font-size:17px; font-weight:700; letter-spacing:-.3px; margin-top:3px}
-.task-i .tm{font-family:var(--mono); font-size:10.5px; color:var(--ink3); margin-top:4px; letter-spacing:-.2px}
-.dist{text-align:center; flex-shrink:0}
-.dist .compass{width:46px;height:46px;border-radius:50%; background:var(--bg); display:grid;place-items:center; color:var(--primary)}
-.dist .compass svg{width:24px;height:24px}
+.task-i .tt{font-size:18px; font-weight:700; letter-spacing:-.4px; margin-top:3px}
+.task-i .tm{font-family:var(--mono); font-size:10.5px; color:var(--ink3); margin-top:4px}
+.compass{width:48px;height:48px;border-radius:50%; background:var(--bg); display:grid;place-items:center; color:var(--primary); flex-shrink:0}
+.compass svg{width:25px;height:25px}
 .verdict{display:flex; gap:9px}
-.vb{flex:1; padding:12px; border-radius:14px; background:var(--bg); border:none; color:var(--ink); font-family:var(--ui); font-weight:600; font-size:12px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px; transition:.15s}
+.vb{flex:1; padding:13px; border-radius:16px; background:var(--bg); border:none; color:var(--ink); font-family:var(--ui); font-weight:700; font-size:12px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px; transition:.15s}
+.vb:active{transform:scale(.95)}
 .vb svg{width:15px;height:15px}
-.vb.yes:hover{background:var(--prev-bg); color:#0c7a4d}
+.vb.yes:hover{background:var(--prev-bg); color:var(--primary-d)}
 .vb.no:hover{background:var(--combate-bg); color:var(--combate)}
 .vb.nl:hover{background:var(--alerta-bg); color:#9a6e10}
 
-/* fila / diagnóstico */
-.diag{padding:18px; border-radius:22px; background:var(--surf); box-shadow:var(--shadow); margin-bottom:18px}
-.diag h4{font-size:13px; font-weight:700; margin-bottom:14px; letter-spacing:-.2px}
-.drow{display:flex; align-items:center; justify-content:space-between; padding:10px 0; font-size:13px; border-top:1px solid var(--line)}
+/* fila */
+.diag{padding:19px; border-radius:26px; background:var(--surf); box-shadow:var(--sh); margin-bottom:18px}
+.diag h4{font-size:13.5px; font-weight:700; margin-bottom:15px}
+.drow{display:flex; align-items:center; justify-content:space-between; padding:11px 0; font-size:13px; border-top:1px solid var(--line)}
 .drow:first-of-type{border-top:none; padding-top:0}
-.drow .k{color:var(--ink2); display:flex; align-items:center; gap:9px}
+.drow .k{color:var(--ink2); display:flex; align-items:center; gap:9px; font-weight:500}
 .drow .k svg{width:16px;height:16px; color:var(--primary)}
 .drow .v{font-family:var(--mono); font-size:12px; font-weight:500}
 .drow .v.good{color:var(--primary)}
-.barwrap{margin:8px 0 2px}
-.bar{height:8px; border-radius:6px; background:var(--bg); overflow:hidden}
-.bar i{display:block; height:100%; width:46%; background:linear-gradient(90deg,var(--primary),#5fd3a4); border-radius:6px}
-.qitem{display:flex; align-items:center; gap:13px; padding:14px; border-radius:18px; background:var(--surf); box-shadow:var(--shadow); margin-bottom:10px}
-.qic{width:38px;height:38px;border-radius:12px; display:grid; place-items:center; flex-shrink:0}
-.qic.ok{background:var(--prev-bg); color:#0c7a4d}
+.barwrap{margin:9px 0 2px}
+.bar{height:9px; border-radius:6px; background:var(--bg); overflow:hidden}
+.bar i{display:block; height:100%; width:46%; background:linear-gradient(90deg,var(--primary),var(--soft)); border-radius:6px}
+.qitem{display:flex; align-items:center; gap:13px; padding:15px; border-radius:22px; background:var(--surf); box-shadow:var(--sh); margin-bottom:11px}
+.qic{width:40px;height:40px;border-radius:14px; display:grid; place-items:center; flex-shrink:0}
+.qic.ok{background:var(--prev-bg); color:var(--primary-d)}
 .qic.send{background:var(--monit-bg); color:#2b6aa6}
 .qic.wait{background:var(--alerta-bg); color:#9a6e10}
 .qic svg{width:18px;height:18px}
 .qb{flex:1}
-.qb .qt{font-size:13.5px; font-weight:600}
-.qb .qm{font-family:var(--mono); font-size:10px; color:var(--ink3); margin-top:3px; letter-spacing:-.2px}
-.qprog{width:58px; height:5px; border-radius:4px; background:var(--bg); overflow:hidden}
+.qb .qt{font-size:13.5px; font-weight:700}
+.qb .qm{font-family:var(--mono); font-size:10px; color:var(--ink3); margin-top:3px}
+.qprog{width:58px; height:6px; border-radius:4px; background:var(--bg); overflow:hidden}
 .qprog i{display:block; height:100%; background:var(--monit); border-radius:4px}
 
 /* mapa */
-.mapwrap{border-radius:24px; overflow:hidden; height:340px; position:relative; box-shadow:var(--shadow); margin-bottom:16px;
-  background:radial-gradient(circle at 42% 38%, #e7f3ea, #d5e7da 85%)}
+.mapwrap{border-radius:28px; overflow:hidden; height:350px; position:relative; box-shadow:var(--sh); margin-bottom:16px;
+  background:radial-gradient(circle at 42% 38%, #e7f3ea, #d3e6d8 85%)}
 .mapwrap .topo{position:absolute; inset:0; opacity:.6; background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='300' height='300'><g fill='none' stroke='%2312A66A' stroke-width='1.2' opacity='0.25'><circle cx='150' cy='150' r='34'/><circle cx='150' cy='150' r='70'/><circle cx='150' cy='150' r='108'/><circle cx='150' cy='150' r='150'/></g></svg>"); background-size:300px 300px}
-.pin{position:absolute; width:30px;height:30px; border-radius:50%; display:grid; place-items:center; color:#fff; transform:translate(-50%,-50%); box-shadow:0 4px 10px rgba(22,32,27,.25)}
-.pin svg{width:15px;height:15px}
-.youdot{position:absolute; left:48%; top:50%; transform:translate(-50%,-50%); width:18px;height:18px;border-radius:50%; background:var(--monit); border:3px solid #fff; box-shadow:0 0 0 6px rgba(59,130,196,.25)}
-.maptag{position:absolute; left:14px; top:14px; font-family:var(--mono); font-size:10px; color:#16201B; background:rgba(255,255,255,.85); padding:6px 10px; border-radius:10px; box-shadow:var(--shadow)}
+.pin{position:absolute; width:34px;height:34px; border-radius:50% 50% 50% 8px; display:grid; place-items:center; color:#fff; transform:translate(-50%,-50%) rotate(0); box-shadow:0 6px 14px rgba(15,26,19,.28)}
+.pin svg{width:16px;height:16px}
+.youdot{position:absolute; left:48%; top:50%; transform:translate(-50%,-50%); width:20px;height:20px;border-radius:50%; background:var(--monit); border:3px solid #fff; box-shadow:0 0 0 7px rgba(59,130,196,.22)}
+.maptag{position:absolute; left:14px; top:14px; font-family:var(--mono); font-size:10px; background:rgba(255,255,255,.9); padding:7px 11px; border-radius:12px; box-shadow:var(--sh)}
 .legend{display:flex; gap:8px; flex-wrap:wrap}
-.lg{display:flex; align-items:center; gap:7px; font-size:12px; color:var(--ink2); background:var(--surf); padding:8px 12px; border-radius:999px; box-shadow:var(--shadow)}
-.lg .d{width:9px;height:9px;border-radius:50%}
+.lg{display:flex; align-items:center; gap:7px; font-size:12px; font-weight:600; color:var(--ink2); background:var(--surf); padding:9px 13px; border-radius:999px; box-shadow:var(--sh)}
+.lg .d{width:10px;height:10px;border-radius:50%}
 
-/* tab bar */
-.tabbar{position:absolute; bottom:0; left:0; right:0; display:flex; padding:10px 12px 26px; gap:2px;
-  background:rgba(255,255,255,.86); backdrop-filter:blur(14px); border-top:1px solid var(--line); z-index:40}
-.tab{flex:1; display:flex; flex-direction:column; align-items:center; gap:5px; padding:7px 2px; cursor:pointer; color:var(--ink3); border:none; background:none; font-family:var(--ui); position:relative; transition:.15s}
-.tab svg{width:23px;height:23px}
-.tab span{font-size:10px; font-weight:600}
-.tab.active{color:var(--primary)}
-.tab .bdg{position:absolute; top:1px; left:50%; margin-left:6px; background:var(--combate); color:#fff; font-size:9px; font-weight:700; padding:1px 6px; border-radius:999px}
-.fab{position:absolute; bottom:86px; left:50%; transform:translateX(-50%); width:62px;height:62px; border-radius:50%; border:none; cursor:pointer; z-index:45;
-  background:var(--primary); color:#fff; display:grid; place-items:center; box-shadow:0 12px 28px rgba(18,166,106,.45), 0 0 0 5px var(--bg)}
-.fab svg{width:28px;height:28px}
+/* nav flutuante (pílula) */
+.navwrap{position:absolute; bottom:22px; left:0; right:0; display:flex; justify-content:center; z-index:45; pointer-events:none}
+.nav{display:flex; align-items:center; gap:6px; background:var(--ink-d); padding:9px 11px; border-radius:999px; box-shadow:0 16px 34px rgba(15,26,19,.4); pointer-events:auto}
+.nav button{width:48px;height:48px;border-radius:50%; display:grid; place-items:center; background:none; border:none; color:#9fb0a4; cursor:pointer; transition:.2s cubic-bezier(.2,.9,.25,1.05); position:relative}
+.nav button:active{transform:scale(.9)}
+.nav button.on{background:var(--primary); color:#fff}
+.nav button.plus{background:var(--soft); color:var(--ink-d)}
+.nav svg{width:22px;height:22px}
+.nav .bdg{position:absolute; top:4px; right:4px; width:9px;height:9px;border-radius:50%; background:var(--combate); border:2px solid var(--ink-d)}
 
 .hint{font-family:var(--mono); font-size:11px; color:#6c7a6f; text-align:center; margin-top:16px}
 .foot{max-width:560px; text-align:center; margin-top:8px; color:#7c897e; font-size:11.5px; line-height:1.6}
-.foot b{color:#5C675E}
+.foot b{color:#55615a}
 </style>
 </head>
 <body>
 
 <div class="demo-head">
-  <div class="kicker">SIGUC · SEMA-AC · DIMA</div>
-  <h1>SIGUC Brigadas — Protótipo v2</h1>
-  <p>Redesign <b style="color:#12A66A">Clean &amp; Arejado</b>: claro, com respiro, cards suaves, um acento verde vibrante e tipografia ampla. Navegue pelas naturezas e abas.</p>
+  <div class="k">SIGUC · SEMA-AC · DIMA</div>
+  <h1>SIGUC Brigadas — Protótipo v3</h1>
+  <p>Estilo <b style="color:#12A66A">Vivo (Material 3 Expressive)</b>: blocos de cor cheios, formas ousadas, nav flutuante e tipografia grande. Navegue pelas categorias e pela pílula inferior.</p>
 </div>
 
 <div class="controls">
@@ -263,76 +247,59 @@ body{
 </div>
 
 <div class="phone">
-  <div class="notch"></div>
   <div class="app" id="app">
+    <div class="notch"></div>
 
     <div class="topbar">
       <div class="greet">
-        <div class="hello">Bom dia, José 👋</div>
-        <div class="uc"><span class="pin"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 21s7-5.5 7-11a7 7 0 1 0-14 0c0 5.5 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/></svg></span>ARIE Japiim-Pentecoste</div>
+        <div class="h">Bom dia, José 👋</div>
+        <div class="uc"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 21s7-5.5 7-11a7 7 0 1 0-14 0c0 5.5 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>ARIE Japiim</div>
       </div>
       <div class="avatar">JS</div>
     </div>
 
-    <div class="gpspill">
-      <div class="ring"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></div>
-      <div class="gtxt"><b>GPS travado · Brigada Alfa</b><span>-7.615200, -72.894700</span></div>
+    <div class="gps">
+      <div class="r"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></div>
+      <div><b>GPS travado · Brigada Alfa</b><div class="c">-7.615200, -72.894700</div></div>
       <div class="acc">±4 m</div>
     </div>
 
     <div class="screens">
 
-      <!-- REGISTRAR -->
+      <!-- INÍCIO -->
       <section class="screen active" id="s-registrar">
         <div class="eyebrow">Novo registro</div>
-        <div class="h-title">O que vamos registrar?</div>
+        <div class="h-title">O que vamos<br>registrar?</div>
         <div class="h-sub">Toque numa categoria — localização e hora já estão sendo capturadas.</div>
 
-        <button class="nat" onclick="go('s-captura')">
-          <span class="nat-ic" style="background:var(--prev-bg); color:var(--prev)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg></span>
-          <span class="nat-tx"><span class="t">Prevenção</span><span class="d">Educação ambiental, limpeza, reconhecimento, plantio</span></span>
-          <span class="nat-go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 6l6 6-6 6"/></svg></span>
+        <button class="nat g" onclick="go('s-captura')">
+          <span class="i"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg></span>
+          <span class="t"><b>Prevenção</b><s>Educação, limpeza, plantio</s></span>
+          <span class="go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M9 6l6 6-6 6"/></svg></span>
         </button>
-
-        <button class="nat" onclick="go('s-captura')">
-          <span class="nat-ic" style="background:var(--combate-bg); color:var(--combate)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2c1 3-1 4-1 6 0 1 1 2 1 2s2-1 2-3c2 2 3 4 3 7a5 5 0 0 1-10 0c0-3 2-5 3-7 1 2 2 1 2-2z"/></svg></span>
-          <span class="nat-tx"><span class="t">Combate</span><span class="d">Combate ao fogo, rescaldo</span></span>
-          <span class="nat-go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 6l6 6-6 6"/></svg></span>
+        <button class="nat f" onclick="go('s-captura')">
+          <span class="i"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1"><path d="M12 2c1 3-1 4-1 6 0 1 1 2 1 2s2-1 2-3c2 2 3 4 3 7a5 5 0 0 1-10 0c0-3 2-5 3-7 1 2 2 1 2-2z"/></svg></span>
+          <span class="t"><b>Combate</b><s>Combate ao fogo, rescaldo</s></span>
+          <span class="go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M9 6l6 6-6 6"/></svg></span>
         </button>
-
-        <button class="nat" onclick="go('s-captura')">
-          <span class="nat-ic" style="background:var(--monit-bg); color:var(--monit)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg></span>
-          <span class="nat-tx"><span class="t">Monitoramento</span><span class="d">Queima controlada, vigilância</span></span>
-          <span class="nat-go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 6l6 6-6 6"/></svg></span>
+        <button class="nat m" onclick="go('s-captura')">
+          <span class="i"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg></span>
+          <span class="t"><b>Monitoramento</b><s>Queima controlada, vigilância</s></span>
+          <span class="go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M9 6l6 6-6 6"/></svg></span>
         </button>
 
         <div class="sec"><h3>Registros recentes</h3><a href="#" onclick="return false">Ver todos</a></div>
-
         <div class="card">
           <div class="thumb" style="background:var(--combate-bg); color:var(--combate)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 2c1 3-1 4-1 6 0 1 1 2 1 2s2-1 2-3c2 2 3 4 3 7a5 5 0 0 1-10 0c0-3 2-5 3-7 1 2 2 1 2-2z"/></svg></div>
-          <div class="cbody">
-            <div class="ct">Combate ao fogo <span class="pill send">enviando</span></div>
-            <div class="cc">CBMAC integrada · 1 animal resgatado</div>
-            <div class="cm">-72.8947, -7.6152 · 09:42 · ±4m</div>
-          </div>
+          <div class="cb"><div class="ct">Combate ao fogo <span class="pill send">enviando</span></div><div class="cc">CBMAC integrada · 1 animal resgatado</div><div class="cm">-72.8947, -7.6152 · 09:42 · ±4m</div></div>
         </div>
-
         <div class="card">
           <div class="thumb" style="background:var(--prev-bg); color:var(--prev)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
-          <div class="cbody">
-            <div class="ct">Educação ambiental <span class="pill ok">confirmado</span></div>
-            <div class="cc">40 pessoas alcançadas · escola rural</div>
-            <div class="cm">-73.0054, -7.5261 · ontem 15:10</div>
-          </div>
+          <div class="cb"><div class="ct">Educação ambiental <span class="pill ok">confirmado</span></div><div class="cc">40 pessoas alcançadas · escola rural</div><div class="cm">-73.0054, -7.5261 · ontem 15:10</div></div>
         </div>
-
         <div class="card">
           <div class="thumb" style="background:var(--fauna-bg); color:var(--fauna)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="6.5" cy="11" r="1.8"/><circle cx="11" cy="7.5" r="1.8"/><circle cx="16" cy="8.5" r="1.8"/><circle cx="18.5" cy="13" r="1.6"/><path d="M8 17c0-2.5 2-4 4.2-4s4.3 1.5 4.3 4c0 1.6-1.6 2.4-4.3 2.4S8 18.6 8 17z"/></svg></div>
-          <div class="cbody">
-            <div class="ct">Fauna — resgate <span class="pill wait">aguardando</span></div>
-            <div class="cc">Tamanduá-bandeira · encaminhado CETAS</div>
-            <div class="cm">condição: queimado · espécie ameaçada</div>
-          </div>
+          <div class="cb"><div class="ct">Fauna — resgate <span class="pill wait">aguardando</span></div><div class="cc">Tamanduá-bandeira · CETAS</div><div class="cm">condição: queimado · ameaçada</div></div>
         </div>
       </section>
 
@@ -341,53 +308,27 @@ body{
         <div class="eyebrow" style="color:var(--combate)">Combate › Fogo</div>
         <div class="h-title">Registrar combate</div>
         <div class="h-sub">Enquadre, confirme o GPS e capture.</div>
-
         <div class="cam">
           <div class="grid"></div>
           <div class="xh"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3"><circle cx="12" cy="12" r="9"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/><circle cx="12" cy="12" r="1.4" fill="currentColor"/></svg></div>
           <div class="stamp">
-            <div class="row1">-7.615200, -72.894700</div>
-            <div class="row2">ALT 218 m · ±4 m · 10/06/2026 09:48:31</div>
-            <div class="row3"><span class="b">ARIE Japiim · Brigada Alfa</span><span class="s">SIGUC</span></div>
+            <div class="r1">-7.615200, -72.894700</div>
+            <div class="r2">ALT 218 m · ±4 m · 10/06/2026 09:48:31</div>
+            <div class="r3"><span class="b">ARIE Japiim · Brigada Alfa</span><span class="s">SIGUC</span></div>
           </div>
         </div>
-
-        <div class="lockbar">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9 12l2 2 4-4"/></svg>
-          GPS travado · precisão ±4 m · captura liberada
-        </div>
-
-        <div class="frow">
-          <label>Atividade</label>
-          <div class="chips"><span class="chip fire sel">Fogo</span><span class="chip">Rescaldo</span></div>
-        </div>
-        <div class="frow">
-          <label>Operação</label>
-          <div class="chips"><span class="chip sel">Integrada CBMAC</span><span class="chip">Alerta CIGMA</span></div>
-        </div>
-        <div class="frow">
-          <label>Área estimada (ha)</label>
-          <input class="inp" value="2,5" style="font-family:var(--mono)">
-        </div>
-
+        <div class="lockbar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9 12l2 2 4-4"/></svg>GPS travado · ±4 m · captura liberada</div>
+        <div class="frow"><label>Atividade</label><div class="chips"><span class="chip fire sel">Fogo</span><span class="chip">Rescaldo</span></div></div>
+        <div class="frow"><label>Operação</label><div class="chips"><span class="chip sel">Integrada CBMAC</span><span class="chip">Alerta CIGMA</span></div></div>
+        <div class="frow"><label>Área estimada (ha)</label><input class="inp" value="2,5" style="font-family:var(--mono)"></div>
         <div class="addon" onclick="go('s-fauna')">
           <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="6.5" cy="11" r="1.8"/><circle cx="11" cy="7.5" r="1.8"/><circle cx="16" cy="8.5" r="1.8"/><circle cx="18.5" cy="13" r="1.6"/><path d="M8 17c0-2.5 2-4 4.2-4s4.3 1.5 4.3 4c0 1.6-1.6 2.4-4.3 2.4S8 18.6 8 17z"/></svg></span>
           <span class="tx"><b>+ Registrar fauna</b><span>Animal resgatado, ferido ou avistado</span></span>
-          <span class="go"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 6l6 6-6 6"/></svg></span>
+          <span class="go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 6l6 6-6 6"/></svg></span>
         </div>
-
-        <div class="frow">
-          <label>Observações</label>
-          <textarea class="inp" rows="2" placeholder="Toque para ditar ou escrever…"></textarea>
-        </div>
-
-        <button class="btn fire" onclick="captura(event)">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-          Capturar e salvar offline
-        </button>
-        <button class="btn ghost" onclick="go('s-registrar')">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg> Voltar
-        </button>
+        <div class="frow"><label>Observações</label><textarea class="inp" rows="2" placeholder="Toque para ditar ou escrever…"></textarea></div>
+        <button class="btn fire" onclick="captura(event)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>Capturar e salvar offline</button>
+        <button class="btn ghost" onclick="go('s-registrar')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>Voltar</button>
       </section>
 
       <!-- FAUNA -->
@@ -395,41 +336,17 @@ body{
         <div class="eyebrow" style="color:var(--fauna)">Detalhe de fauna</div>
         <div class="h-title">Animal encontrado</div>
         <div class="h-sub">Identifique pelo catálogo offline ou marque “não sei” + foto.</div>
-
-        <div class="frow">
-          <label>Classe</label>
-          <div class="chips"><span class="chip sel">Mamífero</span><span class="chip">Ave</span><span class="chip">Réptil</span><span class="chip">Anfíbio</span><span class="chip">Não sei</span></div>
-        </div>
-
-        <div class="frow">
-          <label>Espécie</label>
-          <input class="inp" value="Tamanduá-bandeira">
+        <div class="frow"><label>Classe</label><div class="chips"><span class="chip sel">Mamífero</span><span class="chip">Ave</span><span class="chip">Réptil</span><span class="chip">Anfíbio</span><span class="chip">Não sei</span></div></div>
+        <div class="frow"><label>Espécie</label><input class="inp" value="Tamanduá-bandeira">
           <div class="spec">
             <div class="ph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="6.5" cy="11" r="1.8"/><circle cx="11" cy="7.5" r="1.8"/><circle cx="16" cy="8.5" r="1.8"/><circle cx="18.5" cy="13" r="1.6"/><path d="M8 17c0-2.5 2-4 4.2-4s4.3 1.5 4.3 4c0 1.6-1.6 2.4-4.3 2.4S8 18.6 8 17z"/></svg></div>
-            <div class="si">
-              <div class="n">Myrmecophaga tridactyla <span class="vu">VU</span></div>
-              <div class="meta">MAMMALIA · PILOSA</div>
-              <div class="st">Vulnerável — MMA 148/2022 · IUCN</div>
-            </div>
+            <div class="si"><div class="n">Myrmecophaga tridactyla <span class="vu">VU</span></div><div class="meta">MAMMALIA · PILOSA</div><div class="st">Vulnerável — MMA 148/2022 · IUCN</div></div>
           </div>
         </div>
-
-        <div class="frow">
-          <label>Condição</label>
-          <div class="chips"><span class="chip">Íntegro</span><span class="chip">Ferido</span><span class="chip fire sel">Queimado</span><span class="chip">Óbito</span></div>
-        </div>
-        <div class="frow">
-          <label>Destinação</label>
-          <div class="chips"><span class="chip sel">Encaminhado CETAS</span><span class="chip">Solto no local</span><span class="chip">Em tratamento</span></div>
-        </div>
-        <div class="frow">
-          <label>Quantidade · Causa</label>
-          <div class="chips"><span class="chip sel" style="font-family:var(--mono)">1</span><span class="chip fire sel">Incêndio</span></div>
-        </div>
-
-        <button class="btn fauna" onclick="go('s-captura')">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg> Adicionar ao registro
-        </button>
+        <div class="frow"><label>Condição</label><div class="chips"><span class="chip">Íntegro</span><span class="chip">Ferido</span><span class="chip fire sel">Queimado</span><span class="chip">Óbito</span></div></div>
+        <div class="frow"><label>Destinação</label><div class="chips"><span class="chip sel">Encaminhado CETAS</span><span class="chip">Solto no local</span><span class="chip">Em tratamento</span></div></div>
+        <div class="frow"><label>Quantidade · Causa</label><div class="chips"><span class="chip sel" style="font-family:var(--mono)">1</span><span class="chip fire sel">Incêndio</span></div></div>
+        <button class="btn fauna" onclick="go('s-captura')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Adicionar ao registro</button>
       </section>
 
       <!-- TAREFAS -->
@@ -437,16 +354,11 @@ body{
         <div class="eyebrow" style="color:var(--combate)">CIGMA · acionamento</div>
         <div class="h-title">Focos a verificar</div>
         <div class="h-sub">Alertas de satélite atribuídos à sua brigada. A bússola guia até o ponto.</div>
-
         <div class="task">
           <div class="task-h">
             <div class="task-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2c1 3-1 4-1 6 0 1 1 2 1 2s2-1 2-3c2 2 3 4 3 7a5 5 0 0 1-10 0c0-3 2-5 3-7 1 2 2 1 2-2z"/></svg></div>
-            <div class="task-i">
-              <div class="src">FIRMS · VIIRS</div>
-              <div class="tt">Foco a 2,4 km</div>
-              <div class="tm">-72.8890, -7.6041 · 06:12 · conf. 87%</div>
-            </div>
-            <div class="dist"><div class="compass"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="transform:rotate(34deg)"><path d="M12 2l3.5 8L12 8.5 8.5 10z" fill="currentColor"/><circle cx="12" cy="14" r="8"/></svg></div></div>
+            <div class="task-i"><div class="src">FIRMS · VIIRS</div><div class="tt">Foco a 2,4 km</div><div class="tm">-72.8890, -7.6041 · 06:12 · conf. 87%</div></div>
+            <div class="compass"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="transform:rotate(34deg)"><path d="M12 2l3.5 8L12 8.5 8.5 10z" fill="currentColor"/><circle cx="12" cy="14" r="8"/></svg></div>
           </div>
           <div class="verdict">
             <button class="vb yes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Confirmado</button>
@@ -454,16 +366,11 @@ body{
             <button class="vb nl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg>Não achei</button>
           </div>
         </div>
-
         <div class="task">
           <div class="task-h">
             <div class="task-ic" style="background:var(--alerta-bg); color:#b07d12"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.3 3.8L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.8a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg></div>
-            <div class="task-i">
-              <div class="src" style="color:#b07d12">BDQueimadas · INPE</div>
-              <div class="tt">Foco a 6,1 km</div>
-              <div class="tm">-72.9201, -7.6440 · ontem 16:48</div>
-            </div>
-            <div class="dist"><div class="compass"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="transform:rotate(170deg)"><path d="M12 2l3.5 8L12 8.5 8.5 10z" fill="currentColor"/><circle cx="12" cy="14" r="8"/></svg></div></div>
+            <div class="task-i"><div class="src" style="color:#b07d12">BDQueimadas · INPE</div><div class="tt">Foco a 6,1 km</div><div class="tm">-72.9201, -7.6440 · ontem 16:48</div></div>
+            <div class="compass"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="transform:rotate(170deg)"><path d="M12 2l3.5 8L12 8.5 8.5 10z" fill="currentColor"/><circle cx="12" cy="14" r="8"/></svg></div>
           </div>
           <div class="verdict">
             <button class="vb yes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Confirmado</button>
@@ -478,7 +385,6 @@ body{
         <div class="eyebrow">Caixa de saída</div>
         <div class="h-title">Sincronização</div>
         <div class="h-sub">Nada é apagado antes do servidor confirmar.</div>
-
         <div class="diag">
           <h4>Diagnóstico do dispositivo</h4>
           <div class="drow"><span class="k"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Armazenamento persistente</span><span class="v good">Concedido</span></div>
@@ -487,28 +393,12 @@ body{
           <div class="drow"><span class="k"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Última sincronização</span><span class="v">há 3 h 12 min</span></div>
           <div class="drow"><span class="k"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-9-9c2.5 0 4.8 1 6.4 2.6L21 8"/><path d="M21 3v5h-5"/></svg>Backup local (7 dias)</span><span class="v good">Ativo</span></div>
         </div>
-
         <div class="sec"><h3>3 na fila</h3><a href="#" onclick="exportar();return false">Exportar backup</a></div>
-
-        <div class="qitem">
-          <div class="qic send"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-9-9c2.5 0 4.8 1 6.4 2.6L21 8"/><path d="M21 3v5h-5"/></svg></div>
-          <div class="qb"><div class="qt">Combate ao fogo</div><div class="qm">subindo foto 2/5 · retomável</div></div>
-          <div class="qprog"><i style="width:62%"></i></div>
-        </div>
-        <div class="qitem">
-          <div class="qic wait"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div>
-          <div class="qb"><div class="qt">Fauna — resgate</div><div class="qm">aguardando sinal · 4 fotos</div></div>
-        </div>
-        <div class="qitem">
-          <div class="qic wait"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div>
-          <div class="qb"><div class="qt">Educação ambiental</div><div class="qm">aguardando sinal · 80 pessoas</div></div>
-        </div>
-
+        <div class="qitem"><div class="qic send"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-9-9c2.5 0 4.8 1 6.4 2.6L21 8"/><path d="M21 3v5h-5"/></svg></div><div class="qb"><div class="qt">Combate ao fogo</div><div class="qm">subindo foto 2/5 · retomável</div></div><div class="qprog"><i style="width:62%"></i></div></div>
+        <div class="qitem"><div class="qic wait"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div><div class="qb"><div class="qt">Fauna — resgate</div><div class="qm">aguardando sinal · 4 fotos</div></div></div>
+        <div class="qitem"><div class="qic wait"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div><div class="qb"><div class="qt">Educação ambiental</div><div class="qm">aguardando sinal · 80 pessoas</div></div></div>
         <div class="sec"><h3>Confirmados</h3><span style="font-size:12px;color:var(--ink3)">backup 7 dias</span></div>
-        <div class="qitem">
-          <div class="qic ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg></div>
-          <div class="qb"><div class="qt">Limpeza de aceiro</div><div class="qm">no SIGUC · expira em 6 dias</div></div>
-        </div>
+        <div class="qitem"><div class="qic ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg></div><div class="qb"><div class="qt">Limpeza de aceiro</div><div class="qm">no SIGUC · expira em 6 dias</div></div></div>
       </section>
 
       <!-- MAPA -->
@@ -518,7 +408,7 @@ body{
         <div class="h-sub">Croqui simples offline — registros e focos por tipo.</div>
         <div class="mapwrap">
           <div class="topo"></div>
-          <div class="maptag">Você · -7.6152, -72.8947 · ±4m</div>
+          <div class="maptag mono">Você · -7.6152, -72.8947 · ±4m</div>
           <div class="youdot"></div>
           <div class="pin" style="background:var(--combate); left:58%; top:38%"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 2c1 3-1 4-1 6 0 1 1 2 1 2s2-1 2-3c2 2 3 4 3 7a5 5 0 0 1-10 0c0-3 2-5 3-7 1 2 2 1 2-2z"/></svg></div>
           <div class="pin" style="background:var(--prev); left:36%; top:60%"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
@@ -536,45 +426,30 @@ body{
 
     </div>
 
-    <button class="fab" onclick="go('s-captura')" title="Novo registro">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 5v14M5 12h14"/></svg>
-    </button>
-
-    <nav class="tabbar">
-      <button class="tab active" data-s="s-registrar" onclick="tab(this)">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg><span>Início</span>
-      </button>
-      <button class="tab" data-s="s-tarefas" onclick="tab(this)">
-        <span class="bdg">2</span>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2c1 3-1 4-1 6 0 1 1 2 1 2s2-1 2-3c2 2 3 4 3 7a5 5 0 0 1-10 0c0-3 2-5 3-7 1 2 2 1 2-2z"/></svg><span>Tarefas</span>
-      </button>
-      <button class="tab" style="opacity:0; pointer-events:none"><span>·</span></button>
-      <button class="tab" data-s="s-mapa" onclick="tab(this)">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 6v15l7-3 8 3 7-3V3l-7 3-8-3z"/><path d="M8 3v15M16 6v15"/></svg><span>Mapa</span>
-      </button>
-      <button class="tab" data-s="s-fila" onclick="tab(this)">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.5 5.1L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.5-6.9A2 2 0 0 0 16.8 4H7.2a2 2 0 0 0-1.7 1.1z"/></svg><span>Fila</span>
-      </button>
-    </nav>
+    <!-- nav flutuante -->
+    <div class="navwrap"><nav class="nav">
+      <button class="on" data-s="s-registrar" onclick="nav(this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></button>
+      <button data-s="s-tarefas" onclick="nav(this)"><span class="bdg"></span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2c1 3-1 4-1 6 0 1 1 2 1 2s2-1 2-3c2 2 3 4 3 7a5 5 0 0 1-10 0c0-3 2-5 3-7 1 2 2 1 2-2z"/></svg></button>
+      <button class="plus" data-s="s-captura" onclick="nav(this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 5v14M5 12h14"/></svg></button>
+      <button data-s="s-mapa" onclick="nav(this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 6v15l7-3 8 3 7-3V3l-7 3-8-3z"/><path d="M8 3v15M16 6v15"/></svg></button>
+      <button data-s="s-fila" onclick="nav(this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.5 5.1L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.5-6.9A2 2 0 0 0 16.8 4H7.2a2 2 0 0 0-1.7 1.1z"/></svg></button>
+    </nav></div>
 
   </div>
 </div>
 
-<div class="hint">Toque nas categorias, no “+” e nas abas. Teste o <b style="color:#5C675E">Field Mode</b> acima.</div>
-<div class="foot">Protótipo estático de demonstração (sem backend). Linguagem <b>Clean &amp; Arejado</b>. Fonte: DM Sans + DM Mono · ícones de traço (trocáveis por Phosphor/Lucide).</div>
+<div class="hint">Toque nas categorias, no “+” da pílula e nas abas. Teste o <b style="color:#55615a">Field Mode</b> acima.</div>
+<div class="foot">Protótipo estático (sem backend). Estilo <b>Vivo · Material 3 Expressive</b>. Fonte: DM Sans + DM Mono · ícones de traço (trocáveis por Phosphor/Lucide).</div>
 
 <script>
 function go(id){
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
   document.querySelector('.screens').scrollTop=0;
-  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.s===id));
+  document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('on', b.dataset.s===id && !b.classList.contains('plus')));
 }
-function tab(el){ go(el.dataset.s); }
-function toggleField(){
-  document.getElementById('app').classList.toggle('field');
-  document.getElementById('btnField').classList.toggle('on');
-}
+function nav(el){ go(el.dataset.s); }
+function toggleField(){ document.getElementById('app').classList.toggle('field'); document.getElementById('btnField').classList.toggle('on'); }
 function captura(e){
   const b=e.target.closest('.btn'); const o=b.innerHTML;
   b.classList.remove('fire'); b.classList.add('primary');

@@ -319,75 +319,74 @@ Problemas que o app elimina na origem: coords trocadas/W-S invertidos, decimal v
 datas malformadas, nomes de equipe digitados errado, coords copiadas de outra linha, espaços/lixo.
 Import do histórico 2025: **não agora** (script de limpeza fica para depois, se desejado).
 
-## 15. Direção de Design — "Instrumento de Campo"
+## 15. Direção de Design — "Vivo" (Material 3 Expressive)
 
 Objetivo: app **moderno, autoral e sem cara de IA**. Estende o design system existente
-(NÃO altera `--floresta/--verde-c/--ouro/--t1` nem Fraunces/DM Sans — só **acrescenta** tokens,
-o que requer alinhamento antes de codar).
+(NÃO altera `--floresta/--verde-c/--ouro/--t1` — só **acrescenta** tokens, o que requer
+alinhamento antes de codar). Direção escolhida após comparar 3 estilos (Fresco/Natureza/Vivo);
+protótipo de referência em `docs/demo-app-brigadas.html` e comparativo em `docs/demo-app-estilos.html`.
 
 ### 15.1 Conceito-norte
-**Instrumento de Campo**: o app parece um **equipamento de guarda-parque / GPS robusto**
-cruzado com a elegância institucional da SEMA — não um dashboard SaaS genérico.
-Princípios: dados como leitura de instrumento, identidade geográfica do Acre, robustez tátil,
-honestidade de estados (GPS/offline/sync), tipografia editorial para o toque humano.
+**Vivo** — baseado no **Material 3 Expressive** (Google, 2025): formas ousadas e arredondadas,
+**blocos de cor cheios** por categoria, navegação **flutuante** em pílula, tipografia grande e
+movimento por "mola". Prioriza **legibilidade e velocidade de uso no campo** (no estudo do M3,
+elementos-chave identificados ~4× mais rápido) — ideal para brigadistas, sol forte e baixa
+familiaridade digital. Mantém a alma SEMA pela paleta floresta/verde/ouro + cores funcionais.
 
 ### 15.2 Tema
-- **Automático**: segue claro/escuro do sistema do celular.
-  - Escuro = "operacional" (floresta quase preto, OLED-friendly, glare/noite).
-  - Claro = creme/floresta (unidade com o SIGUC web).
-- **Field Mode** (sob demanda): alto contraste, tipografia ampliada, alvos enormes
-  (uso com luva, sol forte). Toggle persistente por dispositivo.
+- **Claro** como padrão (fundo `#F6FAF6`, superfícies brancas) — arejado e de alto contraste.
+- **Field Mode** (sob demanda): contraste e tipografia ampliados para sol/luva. Toggle persistente.
+- (Tema escuro opcional pode vir depois; não é o foco.)
 
 ### 15.3 Tokens novos a acrescentar (precisa de alinhamento)
-- **Cores funcionais por natureza/tipo:**
-  - combate/fogo = brasa/âmbar-quente (ex.: `--brasa:#E2562B`)
-  - prevenção = verde do sistema (`--verde-c`)
-  - monitoramento = azul instrumento (ex.: `--instr-azul:#3A7CA5`)
-  - fauna = acento próprio (ex.: terracota/ocre distinto do ouro institucional)
-  - estados: ameaçada (destaque), queimado, óbito
-- **Tokens do tema escuro/operacional** (superfícies, contornos, texto sobre floresta).
-- **Fonte monospace** para dados de instrumento (coordenadas, precisão GPS, data/hora, IDs).
-  Sugestões: IBM Plex Mono / JetBrains Mono / Space Mono.
+- **Cores funcionais por natureza/tipo** (blocos cheios, texto branco):
+  - prevenção = verde primário `--primary:#12A66A`
+  - combate/fogo = coral `--combate:#EF5B3C`
+  - monitoramento = azul `--monit:#3B82C4`
+  - fauna = âmbar `--fauna:#D98A3D`
+  - alerta/CIGMA = `--alerta:#E0A227`; tons suaves (`*-bg`) p/ ícones e pílulas
+  - estados de fauna: ameaçada (destaque), queimado (coral), óbito
+- **Tinta escura** p/ a nav flutuante e o cartão de GPS (`--ink-d:#0F1A13`) + verde-claro `--soft:#7BE0AE`.
+- **Fonte:** `DM Sans` (UI, pesos 600/700 grandes) + `DM Mono` apenas em dados (coord/precisão/timestamp).
 
 ### 15.4 Linguagem visual
-- **Monospace** em todo "readout" (lat/lon, precisão em m, timestamp, código do registro)
-  → cara de aparelho, não de app genérico.
-- **Textura de curvas de nível topográficas** (relevo do Acre) sutil ao fundo; grade de
-  coordenadas e silhueta das UCs como motivo gráfico (assinatura de lugar, não decoração).
-- **Carimbo na foto** desenhado como documento oficial: coord + data/hora + UC + brigada,
-  com hierarquia tipográfica (não timestamp default de câmera).
-- **Cards de campo** com "espinha" lateral colorida por natureza (combate/prevenção/monitoramento),
-  cantos levemente suaves, estados de toque tácteis (pressed), sem sombra genérica.
-- **Fraunces** para títulos/momentos editoriais (institucional, humano); **DM Sans** na UI.
+- **Blocos de natureza** grandes, radius ~28px, cor cheia + ícone em quadrado translúcido + chevron;
+  sombra colorida da própria cor (não sombra cinza genérica).
+- **Formas ousadas e arredondadas**; chips em pílula; botões grandes e cheios.
+- **Cartão de GPS escuro** com anel pulsante e leitura de coordenadas em mono (instrumento, discreto).
+- **Carimbo na foto** como documento oficial: coord + data/hora + UC + brigada + selo SIGUC.
+- **DM Mono** só nos "readouts" (lat/lon, ±m, timestamp, IDs); o resto em DM Sans.
+- Textura de **curvas de nível** sutil no mapa/croqui (assinatura geográfica do Acre).
 
 ### 15.5 Ícones
 - **Set de linha curado** (Phosphor ou Lucide), **customizado** nas cores/peso do projeto.
-- **Zero emoji em produção** (emojis no md são só referência).
+- **Zero emoji em produção** (emojis no md/protótipo são só referência).
 - Cor do ícone segue a cor funcional do tipo.
 
-### 15.6 Interações-assinatura (diferenciais)
-- **Trava de GPS viva**: leitura de precisão em metros + animação de "lock"; o botão de captura
-  só "arma" com sinal bom (ou avisa explicitamente).
-- **Captura em 2 toques**, com confirmação por **háptico + som** (funciona com luva/sol).
-- **Sincronização como elemento de design**: fila tipo "caixa de saída" com pulso de status e
-  progresso real (pendente → enviando → confirmado); nunca um spinner genérico.
-- **Estados honestos** instrumentados: offline, armazenamento %, persistência concedida,
-  última sync — apresentados como leituras de painel.
-- **Motion com restrição**: micro-interações com significado (captura, lock, sync), nunca decorativas.
+### 15.6 Interações-assinatura (Material expressive)
+- **Movimento por mola** (spring) nas transições de tela e toques (escala leve no press).
+- **Nav flutuante em pílula** com botão central "+" (verde-claro) para captura rápida.
+- **Trava de GPS viva**: precisão em metros + anel pulsante; captura só "arma" com sinal bom.
+- **Captura em 2 toques** com confirmação **háptica** ("Salvo offline · na fila").
+- **Sincronização como elemento de design**: caixa de saída com estados e progresso real
+  (pendente → enviando → confirmado); nunca spinner genérico.
+- **Estados honestos**: offline, armazenamento %, persistência concedida, última sync.
 
 ### 15.7 Checklist "sem cara de IA" (guia de implementação)
-EVITAR: degradê roxo/índigo · glassmorphism em excesso · emoji como ícone · cards genéricos com
-sombra · layout centralizado com "blob" · fonte de sistema padrão · simetria sem intenção.
-BUSCAR: monospace para dados · ícones de traço próprios · textura topográfica do Acre · Field Mode
-alto contraste · estados-vazios/ilustração autorais · foto real · assimetria com propósito · grid consistente.
+EVITAR: degradê roxo/índigo · glassmorphism em excesso · emoji como ícone · cards cinza genéricos ·
+fonte de sistema padrão · simetria sem intenção.
+BUSCAR: blocos de cor com propósito (cor = natureza) · ícones de traço próprios · DM Mono nos dados ·
+nav flutuante · Field Mode · motion por mola com função · grid consistente e respiro.
 
 ### 15.8 Dois "universos" coerentes
-- **App de campo (brigadista)**: Instrumento de Campo, tema automático + Field Mode, mobile-first.
-- **SIGUC web (gestor/relatórios/validação)**: institucional/editorial (creme/floresta/ouro),
-  mapa-forward, mantendo o mesmo vocabulário visual (monospace nos dados, ícones, motivos do Acre).
+- **App de campo (brigadista)**: estilo **Vivo**, claro + Field Mode, nav flutuante, mobile-first.
+- **SIGUC web (gestor/relatórios/validação)**: mantém o mesmo vocabulário (cores funcionais, DM Mono
+  nos dados, ícones, motivos do Acre), porém em layout web/denso e mapa-forward.
 
 ### 15.9 Impacto na implementação
-- Criar `css/brigada.css` (tokens novos + temas + Field Mode) sem tocar nas variáveis core.
-- Carregar fonte monospace e o set de ícones (curado) junto ao app.
-- Componentes do PWA (captura, fila, fauna, tarefas) já nascem nesta linguagem.
-- Antes de codar tokens novos: **alinhar as cores funcionais e a monospace** com o responsável pelo design.
+- Criar `css/brigada.css` com os tokens "Vivo" (cores funcionais, soft/ink-d, sombras coloridas,
+  radius grandes) + Field Mode, **sem tocar nas variáveis core**.
+- Carregar `DM Sans` + `DM Mono` e o set de ícones (curado) junto ao app.
+- Componentes do PWA (captura, fila, fauna, tarefas, nav flutuante) já nascem nesta linguagem,
+  espelhando `docs/demo-app-brigadas.html`.
+- Antes de codar: **alinhar as cores funcionais** com o responsável pelo design.
