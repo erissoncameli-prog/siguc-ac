@@ -3,432 +3,369 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SIGUC Brigadas — Protótipo "Instrumento de Campo"</title>
+<title>SIGUC Brigadas — Protótipo (Clean & Arejado)</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=DM+Sans:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 /* ════════════════════════════════════════════════════════════
-   SIGUC Brigadas — Protótipo de demonstração
-   Linguagem: "Instrumento de Campo"
-   (estende o design system; tokens novos = sujeitos a alinhamento)
+   SIGUC Brigadas — Protótipo v2 · "Clean & Arejado (premium)"
+   Claro, arejado, cards suaves, 1 acento vibrante, tipografia ampla.
+   Estende o design system (não altera variáveis core).
    ════════════════════════════════════════════════════════════ */
 :root{
-  /* design system (núcleo — não alterar) */
-  --floresta:#0A1A0F; --verde-c:#52B788; --ouro:#C9A84C; --ouro-c:#F0CB6A; --t1:#F4EFE6;
-  /* tokens novos — funcionais por natureza/tipo */
-  --brasa:#E2562B;        /* combate / fogo */
-  --instr-azul:#3A7CA5;   /* monitoramento */
-  --fauna:#C77B4A;        /* fauna (terracota) */
-  --alerta:#E0A93B;
-  /* tipografia */
-  --display:'Fraunces',Georgia,serif;
+  --primary:#12A66A;          /* verde vibrante (acento de ação) */
+  --primary-soft:#E4F6EE;
+  --ouro:#C9A84C;
+  --combate:#EF5B3C; --combate-bg:#FDECE7;
+  --prev:#12A66A;    --prev-bg:#E4F6EE;
+  --monit:#3B82C4;   --monit-bg:#E9F1FB;
+  --fauna:#D98A3D;   --fauna-bg:#FBF0E1;
+  --alerta:#E0A227;  --alerta-bg:#FBF2DC;
   --ui:'DM Sans',system-ui,sans-serif;
-  --mono:'Space Mono','IBM Plex Mono',monospace;
+  --mono:'DM Mono',ui-monospace,monospace;
 }
-/* ── Tema operacional escuro (padrão do app de campo) ── */
 .app{
-  --bg:#07140C; --bg2:#0A1A0F;
-  --surf:#102216; --surf2:#15291B; --surf3:#1B3324;
-  --line:rgba(244,239,230,.10); --line2:rgba(244,239,230,.18);
-  --txt:#F4EFE6; --muted:#9DB1A2; --faint:#6C8275;
+  --bg:#F5F6F2; --surf:#FFFFFF; --surf2:#FBFBF8;
+  --ink:#16201B; --ink2:#5C675E; --ink3:#919A92;
+  --line:rgba(22,32,27,.07); --line2:rgba(22,32,27,.12);
+  --shadow:0 1px 2px rgba(22,32,27,.04), 0 8px 20px rgba(22,32,27,.05);
+  --shadow-lg:0 10px 34px rgba(22,32,27,.10);
 }
-/* ── Tema claro institucional ── */
-.app.light{
-  --bg:#EDE6D6; --bg2:#F4EFE6;
-  --surf:#FFFFFF; --surf2:#FBF7EF; --surf3:#F4EEE0;
-  --line:rgba(10,26,15,.10); --line2:rgba(10,26,15,.16);
-  --txt:#0A1A0F; --muted:#5C6B5F; --faint:#8A988C;
+.app.field{ /* alto contraste p/ sol forte */
+  --ink:#000; --ink2:#2c352e; --line2:rgba(0,0,0,.28);
 }
-/* ── Field Mode: alto contraste + escala ── */
-.app.field{
-  --txt:#FFFFFF; --muted:#D6E2D8; --line2:rgba(255,255,255,.4);
-  --surf:#0C1F13; --surf2:#123019;
-}
-.app.field .screen{font-size:108%;}
-.app.field .nat-btn{padding:26px 20px;}
+.app.field .screen{font-size:107%}
 
 *{box-sizing:border-box;margin:0;padding:0}
 body{
-  font-family:var(--ui);
-  background:#05100A;
-  color:#F4EFE6;
-  min-height:100vh;
-  display:flex; flex-direction:column; align-items:center;
-  padding:32px 16px 64px;
-  background-image:
-    radial-gradient(1200px 600px at 50% -10%, rgba(82,183,136,.10), transparent 60%);
+  font-family:var(--ui); color:#16201B; min-height:100vh;
+  display:flex; flex-direction:column; align-items:center; padding:30px 16px 60px;
+  background:#EAEDE6;
+  background-image:radial-gradient(1100px 520px at 50% -8%, #F4F7EE, transparent 60%);
 }
+.demo-head{text-align:center; max-width:600px; margin-bottom:8px}
+.demo-head .kicker{font-family:var(--mono); font-size:11px; letter-spacing:2px; text-transform:uppercase; color:#12A66A}
+.demo-head h1{font-weight:700; font-size:27px; margin:8px 0 6px; letter-spacing:-.5px; color:#16201B}
+.demo-head p{color:#5C675E; font-size:13px; line-height:1.6}
+.controls{display:flex; gap:9px; justify-content:center; margin:18px 0 24px}
+.ctl{font-family:var(--ui); font-weight:600; font-size:12px; border:1px solid rgba(22,32,27,.12); background:#fff; color:#3a463d;
+  padding:9px 15px; border-radius:999px; cursor:pointer; display:flex; align-items:center; gap:7px; transition:.15s; box-shadow:0 1px 2px rgba(22,32,27,.04)}
+.ctl:hover{border-color:var(--primary); color:var(--primary)}
+.ctl.on{background:var(--primary); color:#fff; border-color:var(--primary)}
+.ctl svg{width:15px;height:15px}
 
-/* ── Cabeçalho da demo ── */
-.demo-head{text-align:center; max-width:640px; margin-bottom:22px}
-.demo-head .kicker{font-family:var(--mono); font-size:11px; letter-spacing:3px; text-transform:uppercase; color:var(--ouro); opacity:.9}
-.demo-head h1{font-family:var(--display); font-weight:600; font-size:30px; margin:6px 0 8px; color:#F4EFE6}
-.demo-head p{color:#9DB1A2; font-size:13.5px; line-height:1.6}
+/* ════ moldura ════ */
+.phone{width:390px; max-width:95vw; height:810px; border-radius:46px; padding:11px;
+  background:#dfe2da; box-shadow:0 50px 100px rgba(22,32,27,.22), inset 0 0 0 1px rgba(255,255,255,.5);}
+.app{width:100%;height:100%; border-radius:36px; overflow:hidden; background:var(--bg); color:var(--ink);
+  position:relative; display:flex; flex-direction:column; font-family:var(--ui)}
+.notch{position:absolute; top:11px; left:50%; transform:translateX(-50%); width:120px; height:30px; background:#0c0c0c; border-radius:0 0 16px 16px; z-index:60}
 
-/* ── Controles globais da demo ── */
-.controls{display:flex; gap:8px; flex-wrap:wrap; justify-content:center; margin:18px 0 26px}
-.ctl{
-  font-family:var(--mono); font-size:11px; letter-spacing:.5px;
-  border:1px solid rgba(244,239,230,.18); background:rgba(244,239,230,.04);
-  color:#CBD8CD; padding:9px 13px; border-radius:9px; cursor:pointer; display:flex; align-items:center; gap:7px;
-  transition:.15s;
-}
-.ctl:hover{border-color:var(--verde-c); color:#F4EFE6}
-.ctl.on{background:var(--verde-c); color:#07140C; border-color:var(--verde-c)}
-.ctl svg{width:14px; height:14px}
+/* ════ topo ════ */
+.topbar{padding:46px 22px 14px; flex-shrink:0; display:flex; align-items:center; justify-content:space-between}
+.greet .hello{font-size:12.5px; color:var(--ink2); font-weight:500}
+.greet .uc{font-size:19px; font-weight:700; letter-spacing:-.3px; margin-top:1px}
+.greet .uc .pin{display:inline-flex; vertical-align:-2px; margin-right:4px; color:var(--primary)}
+.greet .uc .pin svg{width:15px;height:15px}
+.avatar{width:42px;height:42px;border-radius:50%; background:linear-gradient(135deg,#1fb87a,#0c7a4d); color:#fff; display:grid; place-items:center; font-weight:700; font-size:15px; box-shadow:var(--shadow)}
 
-/* ════════ MOLDURA DO CELULAR ════════ */
-.phone{
-  width:392px; max-width:96vw; height:812px;
-  border-radius:42px; padding:11px;
-  background:linear-gradient(160deg,#1a1a1a,#000);
-  box-shadow:0 40px 90px rgba(0,0,0,.6), 0 0 0 2px rgba(255,255,255,.04), inset 0 0 0 1px rgba(255,255,255,.05);
-  position:relative;
-}
-.app{
-  width:100%; height:100%; border-radius:32px; overflow:hidden;
-  background:var(--bg2); color:var(--txt);
-  position:relative; display:flex; flex-direction:column;
-  font-family:var(--ui);
-  /* textura de curvas de nível (assinatura geográfica do Acre) */
-  background-image:
-    radial-gradient(140% 90% at 50% 0%, var(--bg2), var(--bg)),
-    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='400' height='400'><g fill='none' stroke='%2352B788' stroke-width='1' opacity='0.05'><path d='M-20 80 C 80 40, 160 120, 260 70 S 440 60, 460 110'/><path d='M-20 140 C 90 100, 170 180, 270 130 S 450 120, 470 170'/><path d='M-20 210 C 70 170, 180 250, 280 200 S 440 190, 470 240'/><path d='M-20 290 C 100 250, 160 330, 290 280 S 450 270, 470 320'/><path d='M-20 360 C 80 320, 190 400, 300 350 S 440 340, 470 390'/></g></svg>");
-  background-size:cover, 400px 400px;
-}
-.notch{position:absolute; top:0; left:50%; transform:translateX(-50%); width:128px; height:26px; background:#000; border-radius:0 0 16px 16px; z-index:50}
+/* gps status pill */
+.gpspill{margin:0 22px 8px; display:flex; align-items:center; gap:10px; padding:11px 14px; background:var(--surf); border-radius:16px; box-shadow:var(--shadow); flex-shrink:0}
+.gpspill .ring{width:30px;height:30px;border-radius:50%; display:grid; place-items:center; background:var(--primary-soft); color:var(--primary); position:relative}
+.gpspill .ring::after{content:'';position:absolute;inset:-3px;border-radius:50%;border:2px solid var(--primary);opacity:.35;animation:rip 2s infinite}
+@keyframes rip{0%{transform:scale(.8);opacity:.5}100%{transform:scale(1.4);opacity:0}}
+.gpspill .ring svg{width:16px;height:16px}
+.gpspill .gtxt{flex:1}
+.gpspill .gtxt b{font-size:13px; font-weight:600}
+.gpspill .gtxt span{display:block; font-family:var(--mono); font-size:10.5px; color:var(--ink3); margin-top:1px}
+.gpspill .acc{font-family:var(--mono); font-size:12px; color:var(--primary); font-weight:500; background:var(--primary-soft); padding:4px 9px; border-radius:8px}
 
-/* ── Barra de status / instrumento (topo) ── */
-.statusbar{
-  display:flex; align-items:center; justify-content:space-between;
-  padding:14px 18px 10px; gap:10px; flex-shrink:0;
-  border-bottom:1px solid var(--line);
-  background:linear-gradient(180deg, rgba(0,0,0,.18), transparent);
-}
-.brigada-id{display:flex; flex-direction:column; gap:1px}
-.brigada-id .uc{font-family:var(--display); font-weight:600; font-size:15px; line-height:1.1}
-.brigada-id .meta{font-family:var(--mono); font-size:9.5px; letter-spacing:.5px; color:var(--muted)}
-.gps-chip{
-  display:flex; align-items:center; gap:7px; padding:6px 9px; border-radius:8px;
-  background:var(--surf); border:1px solid var(--line2); font-family:var(--mono); font-size:10px; color:var(--txt);
-}
-.gps-dot{width:8px; height:8px; border-radius:50%; background:var(--brasa); box-shadow:0 0 0 0 var(--brasa)}
-.gps-chip.lock .gps-dot{background:var(--verde-c); animation:pulse 2s infinite}
-@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(82,183,136,.5)}70%{box-shadow:0 0 0 7px rgba(82,183,136,0)}100%{box-shadow:0 0 0 0 rgba(82,183,136,0)}}
-
-/* offline + sync banner */
-.netbar{display:flex; align-items:center; gap:8px; padding:7px 18px; font-family:var(--mono); font-size:10px; letter-spacing:.4px;
-  background:var(--surf2); border-bottom:1px solid var(--line); color:var(--muted); flex-shrink:0}
-.netbar .sep{flex:1}
-.netbar b{color:var(--ouro-c); font-weight:700}
-
-/* ── Área de telas ── */
+/* ════ telas ════ */
 .screens{flex:1; position:relative; overflow:hidden}
-.screen{position:absolute; inset:0; overflow-y:auto; padding:18px 16px 96px; display:none; animation:fade .25s ease}
-.screen.active{display:block}
-@keyframes fade{from{opacity:0; transform:translateY(6px)}to{opacity:1; transform:none}}
+.screen{position:absolute; inset:0; overflow-y:auto; padding:8px 22px 110px; display:none}
+.screen.active{display:block; animation:fade .28s cubic-bezier(.2,.7,.3,1)}
+@keyframes fade{from{opacity:0; transform:translateY(8px)}to{opacity:1;transform:none}}
 .screen::-webkit-scrollbar{width:0}
 
-.eyebrow{font-family:var(--mono); font-size:10px; letter-spacing:2px; text-transform:uppercase; color:var(--muted); margin-bottom:4px}
-.h-title{font-family:var(--display); font-weight:600; font-size:23px; line-height:1.15; margin-bottom:3px}
-.h-sub{color:var(--muted); font-size:12.5px; margin-bottom:18px}
+.eyebrow{font-size:12px; font-weight:600; color:var(--primary); margin:14px 0 2px}
+.h-title{font-size:25px; font-weight:700; letter-spacing:-.6px; line-height:1.12}
+.h-sub{color:var(--ink2); font-size:13.5px; margin-top:5px; margin-bottom:20px; line-height:1.5}
 
-/* ── Botões de natureza (captura) ── */
-.nat-grid{display:flex; flex-direction:column; gap:12px; margin-bottom:22px}
-.nat-btn{
-  display:flex; align-items:center; gap:15px; padding:20px 18px; border-radius:16px;
-  background:var(--surf); border:1px solid var(--line2); cursor:pointer; position:relative; overflow:hidden;
-  text-align:left; width:100%; color:var(--txt); transition:.16s; font-family:var(--ui);
-}
-.nat-btn::before{content:''; position:absolute; left:0; top:0; bottom:0; width:5px; background:var(--c)}
-.nat-btn:hover{transform:translateX(2px); border-color:var(--c)}
-.nat-btn:active{transform:scale(.99)}
-.nat-ic{width:46px; height:46px; border-radius:12px; display:grid; place-items:center; flex-shrink:0;
-  background:color-mix(in srgb, var(--c) 18%, transparent); color:var(--c)}
-.nat-ic svg{width:26px; height:26px}
-.nat-txt{flex:1}
-.nat-txt .t{font-family:var(--display); font-weight:600; font-size:17px}
-.nat-txt .d{font-size:11.5px; color:var(--muted); margin-top:1px}
-.nat-arrow{color:var(--faint)}
+/* ── cartões de natureza ── */
+.nat{display:flex; align-items:center; gap:16px; padding:18px; border-radius:22px; background:var(--surf);
+  box-shadow:var(--shadow); cursor:pointer; width:100%; border:none; text-align:left; color:var(--ink);
+  margin-bottom:13px; transition:.18s cubic-bezier(.2,.7,.3,1); font-family:var(--ui)}
+.nat:hover{transform:translateY(-2px); box-shadow:var(--shadow-lg)}
+.nat:active{transform:scale(.99)}
+.nat-ic{width:54px;height:54px;border-radius:17px; display:grid; place-items:center; flex-shrink:0; background:var(--bg)}
+.nat-ic svg{width:27px;height:27px}
+.nat-tx{flex:1}
+.nat-tx .t{font-size:17.5px; font-weight:700; letter-spacing:-.3px}
+.nat-tx .d{font-size:12.5px; color:var(--ink2); margin-top:2px; line-height:1.4}
+.nat-go{width:32px;height:32px;border-radius:50%; background:var(--bg); display:grid; place-items:center; color:var(--ink3); flex-shrink:0}
+.nat-go svg{width:16px;height:16px}
 
-/* ── Lista de registros recentes ── */
-.section-label{font-family:var(--mono); font-size:10px; letter-spacing:1.5px; text-transform:uppercase; color:var(--faint); margin:6px 2px 10px; display:flex; align-items:center; gap:8px}
-.section-label .ln{flex:1; height:1px; background:var(--line)}
-.rec{display:flex; gap:12px; padding:13px; border-radius:13px; background:var(--surf); border:1px solid var(--line); margin-bottom:9px; position:relative; overflow:hidden}
-.rec::before{content:''; position:absolute; left:0; top:0; bottom:0; width:4px; background:var(--c)}
-.rec-thumb{width:50px; height:50px; border-radius:9px; flex-shrink:0; background:
-  linear-gradient(135deg, #2a3b2e, #16271b); display:grid; place-items:center; color:var(--faint); position:relative; overflow:hidden}
-.rec-thumb svg{width:20px;height:20px}
-.rec-body{flex:1; min-width:0}
-.rec-body .rt{font-weight:600; font-size:13.5px; display:flex; align-items:center; gap:6px}
-.rec-body .rm{font-family:var(--mono); font-size:9.5px; color:var(--muted); margin-top:3px; letter-spacing:.3px}
-.rec-body .rc{font-size:11.5px; color:var(--muted); margin-top:4px}
-.tag{font-family:var(--mono); font-size:8.5px; letter-spacing:.5px; padding:2px 6px; border-radius:5px; text-transform:uppercase; font-weight:700}
-.tag.ok{background:color-mix(in srgb,var(--verde-c) 20%,transparent); color:var(--verde-c)}
-.tag.wait{background:color-mix(in srgb,var(--alerta) 22%,transparent); color:var(--alerta)}
-.tag.send{background:color-mix(in srgb,var(--instr-azul) 24%,transparent); color:var(--instr-azul)}
+/* ── seção / lista recentes ── */
+.sec{display:flex; align-items:center; justify-content:space-between; margin:26px 2px 12px}
+.sec h3{font-size:15px; font-weight:700; letter-spacing:-.2px}
+.sec a{font-size:12.5px; color:var(--primary); font-weight:600; text-decoration:none}
+.card{display:flex; gap:14px; align-items:center; padding:14px; border-radius:20px; background:var(--surf); box-shadow:var(--shadow); margin-bottom:11px}
+.thumb{width:52px;height:52px;border-radius:15px; flex-shrink:0; display:grid; place-items:center}
+.thumb svg{width:23px;height:23px}
+.cbody{flex:1; min-width:0}
+.cbody .ct{font-size:14.5px; font-weight:600; display:flex; align-items:center; gap:8px; letter-spacing:-.2px}
+.cbody .cc{font-size:12.5px; color:var(--ink2); margin-top:3px}
+.cbody .cm{font-family:var(--mono); font-size:10px; color:var(--ink3); margin-top:4px; letter-spacing:-.2px}
+.pill{font-size:10.5px; font-weight:600; padding:3px 9px; border-radius:999px; white-space:nowrap}
+.pill.ok{background:var(--prev-bg); color:#0c7a4d}
+.pill.wait{background:var(--alerta-bg); color:#9a6e10}
+.pill.send{background:var(--monit-bg); color:#2b6aa6}
 
-/* ── Tela de captura ── */
-.cam{border-radius:18px; overflow:hidden; border:1px solid var(--line2); position:relative; aspect-ratio:4/5; margin-bottom:16px;
-  background:
-    linear-gradient(180deg, rgba(0,0,0,.1), rgba(0,0,0,.45)),
-    radial-gradient(circle at 30% 30%, #3a5a3f, #16271b 70%);}
-.cam .crosshair{position:absolute; inset:0; display:grid; place-items:center; pointer-events:none}
-.cam .crosshair svg{width:64px; height:64px; opacity:.5; color:#F4EFE6}
-.cam .grid-ln{position:absolute; inset:0; background-image:
-  linear-gradient(rgba(244,239,230,.10) 1px,transparent 1px),
-  linear-gradient(90deg, rgba(244,239,230,.10) 1px,transparent 1px);
-  background-size:33.33% 33.33%}
-/* carimbo oficial sobre a foto */
-.stamp{position:absolute; left:10px; bottom:10px; right:10px; padding:9px 11px; border-radius:9px;
-  background:rgba(7,20,12,.72); border:1px solid rgba(244,239,230,.18); backdrop-filter:blur(3px);
-  font-family:var(--mono); font-size:9.5px; line-height:1.55; color:#F4EFE6; letter-spacing:.3px}
-.stamp .sl{color:var(--verde-c)}
-.stamp .brand{display:flex; justify-content:space-between; align-items:center; margin-top:5px; padding-top:5px; border-top:1px solid rgba(244,239,230,.14)}
-.stamp .brand .b{font-family:var(--display); font-size:10px; color:var(--ouro-c); letter-spacing:0}
-.lockline{display:flex; align-items:center; gap:8px; font-family:var(--mono); font-size:10px; color:var(--verde-c); margin-bottom:14px; padding:9px 12px; border-radius:9px; background:color-mix(in srgb,var(--verde-c) 10%,transparent); border:1px solid color-mix(in srgb,var(--verde-c) 30%,transparent)}
-.lockline svg{width:14px;height:14px}
+/* ── captura ── */
+.cam{border-radius:24px; overflow:hidden; position:relative; aspect-ratio:4/5; margin-bottom:16px; box-shadow:var(--shadow);
+  background:linear-gradient(180deg, rgba(0,0,0,.05), rgba(0,0,0,.35)), radial-gradient(circle at 35% 30%, #5a8a63, #2f4f37 75%)}
+.cam .grid{position:absolute; inset:0; background-image:linear-gradient(rgba(255,255,255,.12) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.12) 1px,transparent 1px); background-size:33.3% 33.3%}
+.cam .xh{position:absolute; inset:0; display:grid; place-items:center; color:rgba(255,255,255,.7)}
+.cam .xh svg{width:60px;height:60px}
+.stamp{position:absolute; left:12px; right:12px; bottom:12px; background:rgba(255,255,255,.92); backdrop-filter:blur(6px);
+  border-radius:14px; padding:11px 13px; box-shadow:0 6px 18px rgba(0,0,0,.18)}
+.stamp .row1{font-family:var(--mono); font-size:11px; color:#16201B; font-weight:500}
+.stamp .row2{font-family:var(--mono); font-size:10px; color:#5C675E; margin-top:3px}
+.stamp .row3{display:flex; justify-content:space-between; align-items:center; margin-top:7px; padding-top:7px; border-top:1px solid rgba(22,32,27,.1)}
+.stamp .row3 .b{font-size:11px; font-weight:700; color:#16201B}
+.stamp .row3 .s{font-size:10px; font-weight:700; color:var(--primary); letter-spacing:1px}
+.lockbar{display:flex; align-items:center; gap:9px; padding:12px 15px; border-radius:15px; background:var(--primary-soft); color:#0c7a4d; font-weight:600; font-size:13px; margin-bottom:18px}
+.lockbar svg{width:18px;height:18px}
 
-.field-row{margin-bottom:14px}
-.field-row label{font-family:var(--mono); font-size:9.5px; letter-spacing:1px; text-transform:uppercase; color:var(--muted); display:block; margin-bottom:7px}
-.chips{display:flex; flex-wrap:wrap; gap:7px}
-.chip{padding:8px 12px; border-radius:9px; border:1px solid var(--line2); background:var(--surf); color:var(--txt); font-size:12px; cursor:pointer; transition:.14s}
-.chip:hover{border-color:var(--verde-c)}
-.chip.sel{background:var(--verde-c); color:#07140C; border-color:var(--verde-c); font-weight:600}
-.chip.fire.sel{background:var(--brasa); border-color:var(--brasa); color:#fff}
-.inp{width:100%; background:var(--surf); border:1px solid var(--line2); border-radius:10px; padding:12px; color:var(--txt); font-family:var(--ui); font-size:13px; resize:none}
-.inp::placeholder{color:var(--faint)}
+.frow{margin-bottom:18px}
+.frow label{font-size:12px; font-weight:600; color:var(--ink2); display:block; margin-bottom:9px}
+.chips{display:flex; flex-wrap:wrap; gap:9px}
+.chip{padding:10px 15px; border-radius:999px; background:var(--surf); box-shadow:var(--shadow); color:var(--ink); font-size:13px; font-weight:500; cursor:pointer; transition:.15s; border:1.5px solid transparent}
+.chip:hover{border-color:var(--line2)}
+.chip.sel{background:var(--primary); color:#fff; box-shadow:0 4px 12px rgba(18,166,106,.3)}
+.chip.fire.sel{background:var(--combate); box-shadow:0 4px 12px rgba(239,91,60,.3)}
+.inp{width:100%; background:var(--surf); border:none; box-shadow:var(--shadow); border-radius:15px; padding:14px; color:var(--ink); font-family:var(--ui); font-size:14px; resize:none}
+.inp::placeholder{color:var(--ink3)}
 
-.cap-btn{position:fixed; }
-.primary{display:flex; align-items:center; justify-content:center; gap:10px; width:100%; padding:16px; border-radius:14px;
-  background:var(--verde-c); color:#07140C; border:none; font-family:var(--ui); font-weight:700; font-size:15px; cursor:pointer; margin-top:6px; transition:.15s}
-.primary:active{transform:scale(.98)}
-.primary svg{width:20px;height:20px}
-.primary.amber{background:var(--brasa); color:#fff}
-.btn-row{display:flex; gap:10px}
-.ghost{flex:1; padding:14px; border-radius:13px; background:transparent; border:1px solid var(--line2); color:var(--txt); font-family:var(--ui); font-weight:600; font-size:13px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px}
-.ghost svg{width:17px;height:17px}
-
-/* faixa de adicionar fauna */
-.addon{display:flex; align-items:center; gap:11px; padding:13px; border-radius:12px; border:1px dashed var(--fauna);
-  background:color-mix(in srgb,var(--fauna) 8%,transparent); cursor:pointer; margin-bottom:16px}
-.addon .ic{width:38px;height:38px;border-radius:10px;display:grid;place-items:center;background:color-mix(in srgb,var(--fauna) 20%,transparent); color:var(--fauna)}
-.addon .ic svg{width:21px;height:21px}
+.addon{display:flex; align-items:center; gap:13px; padding:15px; border-radius:18px; background:var(--fauna-bg); cursor:pointer; margin-bottom:18px}
+.addon .ic{width:44px;height:44px;border-radius:13px; display:grid; place-items:center; background:#fff; color:var(--fauna); box-shadow:0 2px 6px rgba(217,138,61,.18)}
+.addon .ic svg{width:23px;height:23px}
 .addon .tx{flex:1}
-.addon .tx b{font-size:13px}
-.addon .tx span{display:block; font-size:11px; color:var(--muted); margin-top:1px}
+.addon .tx b{font-size:14px; color:#8a5418}
+.addon .tx span{display:block; font-size:12px; color:#a9783f; margin-top:1px}
+.addon .go{color:var(--fauna)}
 
-/* ── Tela tarefas/CIGMA ── */
-.task{padding:15px; border-radius:14px; background:var(--surf); border:1px solid var(--line2); margin-bottom:12px; position:relative; overflow:hidden}
-.task::before{content:''; position:absolute; left:0;top:0;bottom:0;width:5px; background:var(--brasa)}
-.task-head{display:flex; align-items:flex-start; gap:11px; margin-bottom:11px}
-.task-ic{width:42px;height:42px;border-radius:11px;display:grid;place-items:center;flex-shrink:0;background:color-mix(in srgb,var(--brasa) 18%,transparent); color:var(--brasa)}
-.task-ic svg{width:23px;height:23px}
-.task-head .ti{flex:1}
-.task-head .ti .src{font-family:var(--mono); font-size:9px; letter-spacing:1px; color:var(--brasa); text-transform:uppercase}
-.task-head .ti .tt{font-family:var(--display); font-weight:600; font-size:15px; margin-top:2px}
-.task-head .ti .tm{font-family:var(--mono); font-size:9.5px; color:var(--muted); margin-top:3px}
-.compass{width:38px;height:38px;border-radius:50%;border:1px solid var(--line2);display:grid;place-items:center;color:var(--verde-c);flex-shrink:0}
-.compass svg{width:20px;height:20px; transform:rotate(34deg)}
-.verdict{display:flex; gap:7px}
-.vb{flex:1; padding:9px; border-radius:9px; border:1px solid var(--line2); background:var(--surf2); color:var(--txt); font-size:11px; font-weight:600; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:5px; transition:.14s}
-.vb svg{width:14px;height:14px}
-.vb.yes:hover{border-color:var(--verde-c); color:var(--verde-c)}
-.vb.no:hover{border-color:var(--brasa); color:var(--brasa)}
-.vb.nl:hover{border-color:var(--alerta); color:var(--alerta)}
+.btn{display:flex; align-items:center; justify-content:center; gap:10px; width:100%; padding:17px; border-radius:18px; border:none;
+  font-family:var(--ui); font-weight:700; font-size:15px; cursor:pointer; transition:.15s; letter-spacing:-.2px}
+.btn:active{transform:scale(.985)}
+.btn.primary{background:var(--primary); color:#fff; box-shadow:0 8px 22px rgba(18,166,106,.32)}
+.btn.fire{background:var(--combate); color:#fff; box-shadow:0 8px 22px rgba(239,91,60,.3)}
+.btn.fauna{background:var(--fauna); color:#fff; box-shadow:0 8px 22px rgba(217,138,61,.3)}
+.btn svg{width:20px;height:20px}
+.btn.ghost{background:var(--surf); color:var(--ink); box-shadow:var(--shadow); margin-top:11px}
 
-/* ── Tela fila / diagnóstico ── */
-.diag{padding:15px; border-radius:14px; background:var(--surf); border:1px solid var(--line2); margin-bottom:16px}
-.diag h4{font-family:var(--mono); font-size:10px; letter-spacing:1.5px; text-transform:uppercase; color:var(--muted); margin-bottom:13px}
-.diag-row{display:flex; align-items:center; justify-content:space-between; padding:8px 0; border-top:1px solid var(--line); font-size:12.5px}
-.diag-row:first-of-type{border-top:none}
-.diag-row .k{color:var(--muted); display:flex; align-items:center; gap:8px}
-.diag-row .k svg{width:15px;height:15px; color:var(--verde-c)}
-.diag-row .v{font-family:var(--mono); font-size:11px; color:var(--txt)}
-.bar{height:7px; border-radius:5px; background:var(--surf3); overflow:hidden; margin-top:5px}
-.bar i{display:block; height:100%; width:46%; background:linear-gradient(90deg,var(--verde-c),var(--ouro-c)); border-radius:5px}
-.queue-item{display:flex; align-items:center; gap:12px; padding:12px; border-radius:12px; background:var(--surf); border:1px solid var(--line); margin-bottom:8px}
-.qi-ic{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;flex-shrink:0}
-.qi-ic.ok{background:color-mix(in srgb,var(--verde-c) 18%,transparent);color:var(--verde-c)}
-.qi-ic.send{background:color-mix(in srgb,var(--instr-azul) 20%,transparent);color:var(--instr-azul)}
-.qi-ic.wait{background:color-mix(in srgb,var(--alerta) 20%,transparent);color:var(--alerta)}
-.qi-ic svg{width:17px;height:17px}
-.qi-body{flex:1}
-.qi-body .qt{font-size:13px; font-weight:600}
-.qi-body .qm{font-family:var(--mono); font-size:9.5px; color:var(--muted); margin-top:2px}
-.qi-prog{width:54px; height:4px; border-radius:3px; background:var(--surf3); overflow:hidden}
-.qi-prog i{display:block; height:100%; background:var(--instr-azul)}
+/* species card */
+.spec{display:flex; gap:13px; align-items:center; padding:13px; border-radius:18px; background:var(--fauna-bg); margin-top:10px}
+.spec .ph{width:50px;height:50px;border-radius:14px; background:#fff; display:grid; place-items:center; color:var(--fauna); flex-shrink:0; box-shadow:0 2px 6px rgba(217,138,61,.15)}
+.spec .ph svg{width:24px;height:24px}
+.spec .si{flex:1}
+.spec .si .n{font-weight:700; font-size:13.5px; font-style:italic; display:flex; align-items:center; gap:7px}
+.spec .si .meta{font-family:var(--mono); font-size:10px; color:#a9783f; margin-top:3px; letter-spacing:-.2px}
+.spec .si .st{font-size:11.5px; color:#8a5418; margin-top:3px}
+.vu{font-style:normal; font-family:var(--mono); font-size:10px; font-weight:700; background:#fff; color:var(--fauna); padding:2px 7px; border-radius:7px}
 
-/* ── Tela mapa ── */
-.mapwrap{border-radius:16px; overflow:hidden; border:1px solid var(--line2); height:330px; position:relative; margin-bottom:16px;
-  background:radial-gradient(circle at 40% 35%, #18331f, #0a1a0f 80%)}
-.mapwrap .topo{position:absolute; inset:0; opacity:.5; background-image:
-  url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='300' height='300'><g fill='none' stroke='%2352B788' stroke-width='1' opacity='0.22'><circle cx='150' cy='150' r='30'/><circle cx='150' cy='150' r='62'/><circle cx='150' cy='150' r='96'/><circle cx='150' cy='150' r='132'/></g></svg>");
-  background-size:300px 300px}
-.pin{position:absolute; width:14px;height:14px; border-radius:50% 50% 50% 0; transform:rotate(-45deg); box-shadow:0 0 0 3px color-mix(in srgb,var(--c) 28%,transparent)}
-.legend{display:flex; gap:14px; flex-wrap:wrap; font-size:11px; color:var(--muted)}
-.legend span{display:flex; align-items:center; gap:6px}
-.dot{width:9px;height:9px;border-radius:50%}
+/* tarefas */
+.task{padding:17px; border-radius:22px; background:var(--surf); box-shadow:var(--shadow); margin-bottom:14px}
+.task-h{display:flex; gap:14px; align-items:flex-start; margin-bottom:14px}
+.task-ic{width:50px;height:50px;border-radius:16px; display:grid; place-items:center; flex-shrink:0; background:var(--combate-bg); color:var(--combate)}
+.task-ic svg{width:25px;height:25px}
+.task-i{flex:1}
+.task-i .src{font-size:11px; font-weight:700; color:var(--combate); text-transform:uppercase; letter-spacing:.4px}
+.task-i .tt{font-size:17px; font-weight:700; letter-spacing:-.3px; margin-top:3px}
+.task-i .tm{font-family:var(--mono); font-size:10.5px; color:var(--ink3); margin-top:4px; letter-spacing:-.2px}
+.dist{text-align:center; flex-shrink:0}
+.dist .compass{width:46px;height:46px;border-radius:50%; background:var(--bg); display:grid;place-items:center; color:var(--primary)}
+.dist .compass svg{width:24px;height:24px}
+.verdict{display:flex; gap:9px}
+.vb{flex:1; padding:12px; border-radius:14px; background:var(--bg); border:none; color:var(--ink); font-family:var(--ui); font-weight:600; font-size:12px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px; transition:.15s}
+.vb svg{width:15px;height:15px}
+.vb.yes:hover{background:var(--prev-bg); color:#0c7a4d}
+.vb.no:hover{background:var(--combate-bg); color:var(--combate)}
+.vb.nl:hover{background:var(--alerta-bg); color:#9a6e10}
 
-/* ── Tab bar inferior ── */
-.tabbar{position:absolute; bottom:0; left:0; right:0; display:flex; padding:9px 8px 22px;
-  background:linear-gradient(180deg, transparent, var(--bg) 22%); backdrop-filter:blur(8px);
-  border-top:1px solid var(--line); z-index:40}
-.tab{flex:1; display:flex; flex-direction:column; align-items:center; gap:4px; padding:6px 2px; cursor:pointer; color:var(--faint); transition:.14s; background:none; border:none; font-family:var(--ui)}
-.tab svg{width:22px;height:22px}
-.tab span{font-size:9.5px; font-weight:600; letter-spacing:.2px}
-.tab.active{color:var(--verde-c)}
-.tab .badge{position:absolute; top:2px; margin-left:18px; background:var(--brasa); color:#fff; font-family:var(--mono); font-size:8px; font-weight:700; padding:1px 5px; border-radius:8px}
+/* fila / diagnóstico */
+.diag{padding:18px; border-radius:22px; background:var(--surf); box-shadow:var(--shadow); margin-bottom:18px}
+.diag h4{font-size:13px; font-weight:700; margin-bottom:14px; letter-spacing:-.2px}
+.drow{display:flex; align-items:center; justify-content:space-between; padding:10px 0; font-size:13px; border-top:1px solid var(--line)}
+.drow:first-of-type{border-top:none; padding-top:0}
+.drow .k{color:var(--ink2); display:flex; align-items:center; gap:9px}
+.drow .k svg{width:16px;height:16px; color:var(--primary)}
+.drow .v{font-family:var(--mono); font-size:12px; font-weight:500}
+.drow .v.good{color:var(--primary)}
+.barwrap{margin:8px 0 2px}
+.bar{height:8px; border-radius:6px; background:var(--bg); overflow:hidden}
+.bar i{display:block; height:100%; width:46%; background:linear-gradient(90deg,var(--primary),#5fd3a4); border-radius:6px}
+.qitem{display:flex; align-items:center; gap:13px; padding:14px; border-radius:18px; background:var(--surf); box-shadow:var(--shadow); margin-bottom:10px}
+.qic{width:38px;height:38px;border-radius:12px; display:grid; place-items:center; flex-shrink:0}
+.qic.ok{background:var(--prev-bg); color:#0c7a4d}
+.qic.send{background:var(--monit-bg); color:#2b6aa6}
+.qic.wait{background:var(--alerta-bg); color:#9a6e10}
+.qic svg{width:18px;height:18px}
+.qb{flex:1}
+.qb .qt{font-size:13.5px; font-weight:600}
+.qb .qm{font-family:var(--mono); font-size:10px; color:var(--ink3); margin-top:3px; letter-spacing:-.2px}
+.qprog{width:58px; height:5px; border-radius:4px; background:var(--bg); overflow:hidden}
+.qprog i{display:block; height:100%; background:var(--monit); border-radius:4px}
 
-/* botão flutuante de captura */
-.fab{position:absolute; bottom:78px; right:18px; width:60px; height:60px; border-radius:50%; border:none; cursor:pointer; z-index:45;
-  background:var(--verde-c); color:#07140C; display:grid; place-items:center; box-shadow:0 12px 30px rgba(82,183,136,.4)}
+/* mapa */
+.mapwrap{border-radius:24px; overflow:hidden; height:340px; position:relative; box-shadow:var(--shadow); margin-bottom:16px;
+  background:radial-gradient(circle at 42% 38%, #e7f3ea, #d5e7da 85%)}
+.mapwrap .topo{position:absolute; inset:0; opacity:.6; background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='300' height='300'><g fill='none' stroke='%2312A66A' stroke-width='1.2' opacity='0.25'><circle cx='150' cy='150' r='34'/><circle cx='150' cy='150' r='70'/><circle cx='150' cy='150' r='108'/><circle cx='150' cy='150' r='150'/></g></svg>"); background-size:300px 300px}
+.pin{position:absolute; width:30px;height:30px; border-radius:50%; display:grid; place-items:center; color:#fff; transform:translate(-50%,-50%); box-shadow:0 4px 10px rgba(22,32,27,.25)}
+.pin svg{width:15px;height:15px}
+.youdot{position:absolute; left:48%; top:50%; transform:translate(-50%,-50%); width:18px;height:18px;border-radius:50%; background:var(--monit); border:3px solid #fff; box-shadow:0 0 0 6px rgba(59,130,196,.25)}
+.maptag{position:absolute; left:14px; top:14px; font-family:var(--mono); font-size:10px; color:#16201B; background:rgba(255,255,255,.85); padding:6px 10px; border-radius:10px; box-shadow:var(--shadow)}
+.legend{display:flex; gap:8px; flex-wrap:wrap}
+.lg{display:flex; align-items:center; gap:7px; font-size:12px; color:var(--ink2); background:var(--surf); padding:8px 12px; border-radius:999px; box-shadow:var(--shadow)}
+.lg .d{width:9px;height:9px;border-radius:50%}
+
+/* tab bar */
+.tabbar{position:absolute; bottom:0; left:0; right:0; display:flex; padding:10px 12px 26px; gap:2px;
+  background:rgba(255,255,255,.86); backdrop-filter:blur(14px); border-top:1px solid var(--line); z-index:40}
+.tab{flex:1; display:flex; flex-direction:column; align-items:center; gap:5px; padding:7px 2px; cursor:pointer; color:var(--ink3); border:none; background:none; font-family:var(--ui); position:relative; transition:.15s}
+.tab svg{width:23px;height:23px}
+.tab span{font-size:10px; font-weight:600}
+.tab.active{color:var(--primary)}
+.tab .bdg{position:absolute; top:1px; left:50%; margin-left:6px; background:var(--combate); color:#fff; font-size:9px; font-weight:700; padding:1px 6px; border-radius:999px}
+.fab{position:absolute; bottom:86px; left:50%; transform:translateX(-50%); width:62px;height:62px; border-radius:50%; border:none; cursor:pointer; z-index:45;
+  background:var(--primary); color:#fff; display:grid; place-items:center; box-shadow:0 12px 28px rgba(18,166,106,.45), 0 0 0 5px var(--bg)}
 .fab svg{width:28px;height:28px}
 
-.foot{max-width:560px; text-align:center; margin-top:30px; color:#5f6f63; font-size:11.5px; line-height:1.6; font-family:var(--mono)}
-.foot b{color:#9DB1A2}
-.hint{font-family:var(--mono); font-size:10px; color:#6C8275; text-align:center; margin-top:14px; letter-spacing:.5px}
+.hint{font-family:var(--mono); font-size:11px; color:#6c7a6f; text-align:center; margin-top:16px}
+.foot{max-width:560px; text-align:center; margin-top:8px; color:#7c897e; font-size:11.5px; line-height:1.6}
+.foot b{color:#5C675E}
 </style>
 </head>
 <body>
 
 <div class="demo-head">
   <div class="kicker">SIGUC · SEMA-AC · DIMA</div>
-  <h1>SIGUC Brigadas — Protótipo</h1>
-  <p>Demonstração da linguagem <b style="color:#C9A84C">"Instrumento de Campo"</b>: leituras em monospace, trava de GPS, textura topográfica do Acre, carimbo oficial na foto e ícones de traço (sem emoji). Navegue pelas abas e botões.</p>
+  <h1>SIGUC Brigadas — Protótipo v2</h1>
+  <p>Redesign <b style="color:#12A66A">Clean &amp; Arejado</b>: claro, com respiro, cards suaves, um acento verde vibrante e tipografia ampla. Navegue pelas naturezas e abas.</p>
 </div>
 
 <div class="controls">
-  <button class="ctl on" id="btnTheme" onclick="toggleTheme()">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.36 6.36l-.7-.7M6.34 6.34l-.7-.7m12.72 0l-.7.7M6.34 17.66l-.7.7"/><circle cx="12" cy="12" r="4"/></svg>
-    <span id="themeLbl">Tema: Escuro operacional</span>
-  </button>
   <button class="ctl" id="btnField" onclick="toggleField()">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M2 12h20"/><circle cx="12" cy="12" r="9"/></svg>
-    <span>Field Mode</span>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+    <span>Field Mode (sol)</span>
   </button>
 </div>
 
-<!-- ════════ CELULAR ════════ -->
 <div class="phone">
   <div class="notch"></div>
   <div class="app" id="app">
 
-    <!-- status / instrumento -->
-    <div class="statusbar">
-      <div class="brigada-id">
-        <div class="uc">ARIE Japiim-Pentecoste</div>
-        <div class="meta">BRIGADA ALFA · CHEFE J. SOUZA</div>
+    <div class="topbar">
+      <div class="greet">
+        <div class="hello">Bom dia, José 👋</div>
+        <div class="uc"><span class="pin"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 21s7-5.5 7-11a7 7 0 1 0-14 0c0 5.5 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/></svg></span>ARIE Japiim-Pentecoste</div>
       </div>
-      <div class="gps-chip lock" id="gps">
-        <span class="gps-dot"></span>
-        <span id="gpsTxt">±4 m</span>
-      </div>
+      <div class="avatar">JS</div>
     </div>
-    <div class="netbar">
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#9DB1A2" stroke-width="2"><path d="M5 12.55a11 11 0 0 1 14 0M8.5 16.1a6 6 0 0 1 7 0M2 8.82a15 15 0 0 1 20 0"/><line x1="12" y1="20" x2="12" y2="20"/></svg>
-      <span>OFFLINE — modo campo</span>
-      <span class="sep"></span>
-      <span><b>3</b> na fila</span>
+
+    <div class="gpspill">
+      <div class="ring"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></div>
+      <div class="gtxt"><b>GPS travado · Brigada Alfa</b><span>-7.615200, -72.894700</span></div>
+      <div class="acc">±4 m</div>
     </div>
 
     <div class="screens">
 
-      <!-- ── TELA: REGISTRAR ── -->
+      <!-- REGISTRAR -->
       <section class="screen active" id="s-registrar">
         <div class="eyebrow">Novo registro</div>
-        <div class="h-title">O que você vai registrar?</div>
-        <div class="h-sub">Toque na natureza — o GPS e a hora já estão sendo capturados.</div>
+        <div class="h-title">O que vamos registrar?</div>
+        <div class="h-sub">Toque numa categoria — localização e hora já estão sendo capturadas.</div>
 
-        <div class="nat-grid">
-          <button class="nat-btn" style="--c:var(--verde-c)" onclick="go('s-captura')">
-            <span class="nat-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg></span>
-            <span class="nat-txt"><span class="t">Prevenção</span><span class="d">Educação ambiental · limpeza · reconhecimento · plantio</span></span>
-            <span class="nat-arrow"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg></span>
-          </button>
+        <button class="nat" onclick="go('s-captura')">
+          <span class="nat-ic" style="background:var(--prev-bg); color:var(--prev)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg></span>
+          <span class="nat-tx"><span class="t">Prevenção</span><span class="d">Educação ambiental, limpeza, reconhecimento, plantio</span></span>
+          <span class="nat-go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 6l6 6-6 6"/></svg></span>
+        </button>
 
-          <button class="nat-btn" style="--c:var(--brasa)" onclick="go('s-captura')">
-            <span class="nat-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2c1 3-1 4-1 6 0 1 1 2 1 2s2-1 2-3c2 2 3 4 3 7a5 5 0 0 1-10 0c0-3 2-5 3-7 1 2 2 1 2-2z"/></svg></span>
-            <span class="nat-txt"><span class="t">Combate</span><span class="d">Combate ao fogo · rescaldo</span></span>
-            <span class="nat-arrow"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg></span>
-          </button>
+        <button class="nat" onclick="go('s-captura')">
+          <span class="nat-ic" style="background:var(--combate-bg); color:var(--combate)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2c1 3-1 4-1 6 0 1 1 2 1 2s2-1 2-3c2 2 3 4 3 7a5 5 0 0 1-10 0c0-3 2-5 3-7 1 2 2 1 2-2z"/></svg></span>
+          <span class="nat-tx"><span class="t">Combate</span><span class="d">Combate ao fogo, rescaldo</span></span>
+          <span class="nat-go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 6l6 6-6 6"/></svg></span>
+        </button>
 
-          <button class="nat-btn" style="--c:var(--instr-azul)" onclick="go('s-captura')">
-            <span class="nat-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg></span>
-            <span class="nat-txt"><span class="t">Monitoramento</span><span class="d">Queima controlada · vigilância</span></span>
-            <span class="nat-arrow"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg></span>
-          </button>
-        </div>
+        <button class="nat" onclick="go('s-captura')">
+          <span class="nat-ic" style="background:var(--monit-bg); color:var(--monit)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg></span>
+          <span class="nat-tx"><span class="t">Monitoramento</span><span class="d">Queima controlada, vigilância</span></span>
+          <span class="nat-go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 6l6 6-6 6"/></svg></span>
+        </button>
 
-        <div class="section-label">Registros recentes <span class="ln"></span></div>
+        <div class="sec"><h3>Registros recentes</h3><a href="#" onclick="return false">Ver todos</a></div>
 
-        <div class="rec" style="--c:var(--brasa)">
-          <div class="rec-thumb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 2c1 3-1 4-1 6 0 1 1 2 1 2s2-1 2-3c2 2 3 4 3 7a5 5 0 0 1-10 0c0-3 2-5 3-7 1 2 2 1 2-2z"/></svg></div>
-          <div class="rec-body">
-            <div class="rt">Combate ao fogo <span class="tag send">enviando</span></div>
-            <div class="rm">-72.8947, -7.6152 · 09:42 · ±4m</div>
-            <div class="rc">CBMAC integrada · 1 animal resgatado</div>
+        <div class="card">
+          <div class="thumb" style="background:var(--combate-bg); color:var(--combate)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 2c1 3-1 4-1 6 0 1 1 2 1 2s2-1 2-3c2 2 3 4 3 7a5 5 0 0 1-10 0c0-3 2-5 3-7 1 2 2 1 2-2z"/></svg></div>
+          <div class="cbody">
+            <div class="ct">Combate ao fogo <span class="pill send">enviando</span></div>
+            <div class="cc">CBMAC integrada · 1 animal resgatado</div>
+            <div class="cm">-72.8947, -7.6152 · 09:42 · ±4m</div>
           </div>
         </div>
 
-        <div class="rec" style="--c:var(--verde-c)">
-          <div class="rec-thumb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
-          <div class="rec-body">
-            <div class="rt">Educação ambiental <span class="tag ok">confirmado</span></div>
-            <div class="rm">-73.0054, -7.5261 · ontem 15:10</div>
-            <div class="rc">40 pessoas alcançadas · escola rural</div>
+        <div class="card">
+          <div class="thumb" style="background:var(--prev-bg); color:var(--prev)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+          <div class="cbody">
+            <div class="ct">Educação ambiental <span class="pill ok">confirmado</span></div>
+            <div class="cc">40 pessoas alcançadas · escola rural</div>
+            <div class="cm">-73.0054, -7.5261 · ontem 15:10</div>
           </div>
         </div>
 
-        <div class="rec" style="--c:var(--fauna)">
-          <div class="rec-thumb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="6.5" cy="11" r="1.8"/><circle cx="11" cy="7.5" r="1.8"/><circle cx="16" cy="8.5" r="1.8"/><circle cx="18.5" cy="13" r="1.6"/><path d="M8 17c0-2.5 2-4 4.2-4s4.3 1.5 4.3 4c0 1.6-1.6 2.4-4.3 2.4S8 18.6 8 17z"/></svg></div>
-          <div class="rec-body">
-            <div class="rt">Fauna — resgate <span class="tag wait">aguardando</span></div>
-            <div class="rm">Tamanduá-bandeira · condição: queimado</div>
-            <div class="rc">Encaminhado CETAS · espécie ameaçada</div>
+        <div class="card">
+          <div class="thumb" style="background:var(--fauna-bg); color:var(--fauna)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="6.5" cy="11" r="1.8"/><circle cx="11" cy="7.5" r="1.8"/><circle cx="16" cy="8.5" r="1.8"/><circle cx="18.5" cy="13" r="1.6"/><path d="M8 17c0-2.5 2-4 4.2-4s4.3 1.5 4.3 4c0 1.6-1.6 2.4-4.3 2.4S8 18.6 8 17z"/></svg></div>
+          <div class="cbody">
+            <div class="ct">Fauna — resgate <span class="pill wait">aguardando</span></div>
+            <div class="cc">Tamanduá-bandeira · encaminhado CETAS</div>
+            <div class="cm">condição: queimado · espécie ameaçada</div>
           </div>
         </div>
       </section>
 
-      <!-- ── TELA: CAPTURA ── -->
+      <!-- CAPTURA -->
       <section class="screen" id="s-captura">
-        <div class="eyebrow" style="color:var(--brasa)">Combate › Fogo</div>
+        <div class="eyebrow" style="color:var(--combate)">Combate › Fogo</div>
         <div class="h-title">Registrar combate</div>
         <div class="h-sub">Enquadre, confirme o GPS e capture.</div>
 
         <div class="cam">
-          <div class="grid-ln"></div>
-          <div class="crosshair"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="12" cy="12" r="9"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/></svg></div>
+          <div class="grid"></div>
+          <div class="xh"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3"><circle cx="12" cy="12" r="9"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/><circle cx="12" cy="12" r="1.4" fill="currentColor"/></svg></div>
           <div class="stamp">
-            <div><span class="sl">LAT</span> -7.615200&nbsp;&nbsp;<span class="sl">LON</span> -72.894700</div>
-            <div><span class="sl">ALT</span> 218 m&nbsp;&nbsp;<span class="sl">±</span> 4 m&nbsp;&nbsp;10/06/2026 09:48:31</div>
-            <div class="brand"><span>ARIE Japiim · Brigada Alfa</span><span class="b">SIGUC</span></div>
+            <div class="row1">-7.615200, -72.894700</div>
+            <div class="row2">ALT 218 m · ±4 m · 10/06/2026 09:48:31</div>
+            <div class="row3"><span class="b">ARIE Japiim · Brigada Alfa</span><span class="s">SIGUC</span></div>
           </div>
         </div>
 
-        <div class="lockline">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+        <div class="lockbar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9 12l2 2 4-4"/></svg>
           GPS travado · precisão ±4 m · captura liberada
         </div>
 
-        <div class="field-row">
+        <div class="frow">
           <label>Atividade</label>
-          <div class="chips">
-            <span class="chip fire sel">Fogo</span>
-            <span class="chip">Rescaldo</span>
-          </div>
+          <div class="chips"><span class="chip fire sel">Fogo</span><span class="chip">Rescaldo</span></div>
         </div>
-
-        <div class="field-row">
+        <div class="frow">
           <label>Operação</label>
-          <div class="chips">
-            <span class="chip sel">Integrada CBMAC</span>
-            <span class="chip">Alerta CIGMA</span>
-          </div>
+          <div class="chips"><span class="chip sel">Integrada CBMAC</span><span class="chip">Alerta CIGMA</span></div>
         </div>
-
-        <div class="field-row">
+        <div class="frow">
           <label>Área estimada (ha)</label>
           <input class="inp" value="2,5" style="font-family:var(--mono)">
         </div>
@@ -436,266 +373,216 @@ body{
         <div class="addon" onclick="go('s-fauna')">
           <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="6.5" cy="11" r="1.8"/><circle cx="11" cy="7.5" r="1.8"/><circle cx="16" cy="8.5" r="1.8"/><circle cx="18.5" cy="13" r="1.6"/><path d="M8 17c0-2.5 2-4 4.2-4s4.3 1.5 4.3 4c0 1.6-1.6 2.4-4.3 2.4S8 18.6 8 17z"/></svg></span>
           <span class="tx"><b>+ Registrar fauna</b><span>Animal resgatado, ferido ou avistado</span></span>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--fauna)" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg>
+          <span class="go"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 6l6 6-6 6"/></svg></span>
         </div>
 
-        <div class="field-row">
+        <div class="frow">
           <label>Observações</label>
           <textarea class="inp" rows="2" placeholder="Toque para ditar ou escrever…"></textarea>
         </div>
 
-        <button class="primary amber" onclick="captura()">
+        <button class="btn fire" onclick="captura(event)">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
           Capturar e salvar offline
         </button>
-        <div class="btn-row" style="margin-top:10px">
-          <button class="ghost" onclick="go('s-registrar')">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
-            Voltar
-          </button>
-        </div>
-      </section>
-
-      <!-- ── TELA: FAUNA ── -->
-      <section class="screen" id="s-fauna">
-        <div class="eyebrow" style="color:var(--fauna)">Detalhe de fauna</div>
-        <div class="h-title">Animal encontrado</div>
-        <div class="h-sub">Identifique pelo catálogo ou marque "não sei" + foto.</div>
-
-        <div class="field-row">
-          <label>Classe</label>
-          <div class="chips">
-            <span class="chip sel">Mamífero</span>
-            <span class="chip">Ave</span>
-            <span class="chip">Réptil</span>
-            <span class="chip">Anfíbio</span>
-            <span class="chip">Não sei</span>
-          </div>
-        </div>
-
-        <div class="field-row">
-          <label>Espécie (catálogo offline)</label>
-          <input class="inp" value="Tamanduá-bandeira — Myrmecophaga tridactyla">
-          <div class="rec" style="--c:var(--fauna); margin-top:8px">
-            <div class="rec-thumb" style="background:linear-gradient(135deg,#3a2a1e,#271a12)"><svg viewBox="0 0 24 24" fill="none" stroke="var(--fauna)" stroke-width="1.5"><circle cx="6.5" cy="11" r="1.8"/><circle cx="11" cy="7.5" r="1.8"/><circle cx="16" cy="8.5" r="1.8"/><circle cx="18.5" cy="13" r="1.6"/><path d="M8 17c0-2.5 2-4 4.2-4s4.3 1.5 4.3 4c0 1.6-1.6 2.4-4.3 2.4S8 18.6 8 17z"/></svg></div>
-            <div class="rec-body">
-              <div class="rt">Myrmecophaga tridactyla <span class="tag wait">VU</span></div>
-              <div class="rm">CLASSE MAMMALIA · ORDEM PILOSA</div>
-              <div class="rc">Vulnerável (MMA 148/2022 · IUCN)</div>
-            </div>
-          </div>
-        </div>
-
-        <div class="field-row">
-          <label>Condição</label>
-          <div class="chips">
-            <span class="chip">Íntegro</span>
-            <span class="chip">Ferido</span>
-            <span class="chip fire sel">Queimado</span>
-            <span class="chip">Óbito</span>
-          </div>
-        </div>
-
-        <div class="field-row">
-          <label>Destinação</label>
-          <div class="chips">
-            <span class="chip sel">Encaminhado CETAS</span>
-            <span class="chip">Solto no local</span>
-            <span class="chip">Em tratamento</span>
-          </div>
-        </div>
-
-        <div class="field-row">
-          <label>Quantidade · Causa aparente</label>
-          <div class="chips">
-            <span class="chip sel" style="font-family:var(--mono)">1</span>
-            <span class="chip fire sel">Incêndio</span>
-          </div>
-        </div>
-
-        <button class="primary" style="background:var(--fauna); color:#fff" onclick="go('s-captura')">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
-          Adicionar ao registro
+        <button class="btn ghost" onclick="go('s-registrar')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg> Voltar
         </button>
       </section>
 
-      <!-- ── TELA: TAREFAS / CIGMA ── -->
-      <section class="screen" id="s-tarefas">
-        <div class="eyebrow" style="color:var(--brasa)">CIGMA · acionamento</div>
-        <div class="h-title">Focos a verificar</div>
-        <div class="h-sub">Alertas de satélite atribuídos à sua brigada. O croqui guia até o ponto.</div>
+      <!-- FAUNA -->
+      <section class="screen" id="s-fauna">
+        <div class="eyebrow" style="color:var(--fauna)">Detalhe de fauna</div>
+        <div class="h-title">Animal encontrado</div>
+        <div class="h-sub">Identifique pelo catálogo offline ou marque “não sei” + foto.</div>
 
-        <div class="task">
-          <div class="task-head">
-            <span class="task-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2c1 3-1 4-1 6 0 1 1 2 1 2s2-1 2-3c2 2 3 4 3 7a5 5 0 0 1-10 0c0-3 2-5 3-7 1 2 2 1 2-2z"/></svg></span>
-            <div class="ti">
-              <div class="src">FIRMS · VIIRS — foco de calor</div>
-              <div class="tt">Foco a 2,4 km — NE</div>
-              <div class="tm">-72.8890, -7.6041 · detectado 06:12 · conf. 87%</div>
+        <div class="frow">
+          <label>Classe</label>
+          <div class="chips"><span class="chip sel">Mamífero</span><span class="chip">Ave</span><span class="chip">Réptil</span><span class="chip">Anfíbio</span><span class="chip">Não sei</span></div>
+        </div>
+
+        <div class="frow">
+          <label>Espécie</label>
+          <input class="inp" value="Tamanduá-bandeira">
+          <div class="spec">
+            <div class="ph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="6.5" cy="11" r="1.8"/><circle cx="11" cy="7.5" r="1.8"/><circle cx="16" cy="8.5" r="1.8"/><circle cx="18.5" cy="13" r="1.6"/><path d="M8 17c0-2.5 2-4 4.2-4s4.3 1.5 4.3 4c0 1.6-1.6 2.4-4.3 2.4S8 18.6 8 17z"/></svg></div>
+            <div class="si">
+              <div class="n">Myrmecophaga tridactyla <span class="vu">VU</span></div>
+              <div class="meta">MAMMALIA · PILOSA</div>
+              <div class="st">Vulnerável — MMA 148/2022 · IUCN</div>
             </div>
-            <div class="compass"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3 7-3-1-3 1z"/><circle cx="12" cy="14" r="8"/></svg></div>
-          </div>
-          <div class="verdict">
-            <button class="vb yes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Confirmado</button>
-            <button class="vb no"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>Falso +</button>
-            <button class="vb nl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg>Não localiz.</button>
           </div>
         </div>
 
-        <div class="task" style="--brasa:var(--alerta)">
-          <div class="task-head">
-            <span class="task-ic" style="background:color-mix(in srgb,var(--alerta) 18%,transparent); color:var(--alerta)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.3 3.8L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.8a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg></span>
-            <div class="ti">
-              <div class="src" style="color:var(--alerta)">BDQueimadas · INPE</div>
-              <div class="tt">Foco a 6,1 km — Sul</div>
-              <div class="tm">-72.9201, -7.6440 · detectado ontem 16:48</div>
+        <div class="frow">
+          <label>Condição</label>
+          <div class="chips"><span class="chip">Íntegro</span><span class="chip">Ferido</span><span class="chip fire sel">Queimado</span><span class="chip">Óbito</span></div>
+        </div>
+        <div class="frow">
+          <label>Destinação</label>
+          <div class="chips"><span class="chip sel">Encaminhado CETAS</span><span class="chip">Solto no local</span><span class="chip">Em tratamento</span></div>
+        </div>
+        <div class="frow">
+          <label>Quantidade · Causa</label>
+          <div class="chips"><span class="chip sel" style="font-family:var(--mono)">1</span><span class="chip fire sel">Incêndio</span></div>
+        </div>
+
+        <button class="btn fauna" onclick="go('s-captura')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg> Adicionar ao registro
+        </button>
+      </section>
+
+      <!-- TAREFAS -->
+      <section class="screen" id="s-tarefas">
+        <div class="eyebrow" style="color:var(--combate)">CIGMA · acionamento</div>
+        <div class="h-title">Focos a verificar</div>
+        <div class="h-sub">Alertas de satélite atribuídos à sua brigada. A bússola guia até o ponto.</div>
+
+        <div class="task">
+          <div class="task-h">
+            <div class="task-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2c1 3-1 4-1 6 0 1 1 2 1 2s2-1 2-3c2 2 3 4 3 7a5 5 0 0 1-10 0c0-3 2-5 3-7 1 2 2 1 2-2z"/></svg></div>
+            <div class="task-i">
+              <div class="src">FIRMS · VIIRS</div>
+              <div class="tt">Foco a 2,4 km</div>
+              <div class="tm">-72.8890, -7.6041 · 06:12 · conf. 87%</div>
             </div>
-            <div class="compass"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="transform:rotate(170deg)"><path d="M12 2l3 7-3-1-3 1z"/><circle cx="12" cy="14" r="8"/></svg></div>
+            <div class="dist"><div class="compass"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="transform:rotate(34deg)"><path d="M12 2l3.5 8L12 8.5 8.5 10z" fill="currentColor"/><circle cx="12" cy="14" r="8"/></svg></div></div>
           </div>
           <div class="verdict">
             <button class="vb yes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Confirmado</button>
             <button class="vb no"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>Falso +</button>
-            <button class="vb nl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg>Não localiz.</button>
+            <button class="vb nl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg>Não achei</button>
+          </div>
+        </div>
+
+        <div class="task">
+          <div class="task-h">
+            <div class="task-ic" style="background:var(--alerta-bg); color:#b07d12"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.3 3.8L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.8a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg></div>
+            <div class="task-i">
+              <div class="src" style="color:#b07d12">BDQueimadas · INPE</div>
+              <div class="tt">Foco a 6,1 km</div>
+              <div class="tm">-72.9201, -7.6440 · ontem 16:48</div>
+            </div>
+            <div class="dist"><div class="compass"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="transform:rotate(170deg)"><path d="M12 2l3.5 8L12 8.5 8.5 10z" fill="currentColor"/><circle cx="12" cy="14" r="8"/></svg></div></div>
+          </div>
+          <div class="verdict">
+            <button class="vb yes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Confirmado</button>
+            <button class="vb no"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>Falso +</button>
+            <button class="vb nl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg>Não achei</button>
           </div>
         </div>
       </section>
 
-      <!-- ── TELA: FILA / SYNC ── -->
+      <!-- FILA -->
       <section class="screen" id="s-fila">
         <div class="eyebrow">Caixa de saída</div>
-        <div class="h-title">Fila de sincronização</div>
+        <div class="h-title">Sincronização</div>
         <div class="h-sub">Nada é apagado antes do servidor confirmar.</div>
 
         <div class="diag">
           <h4>Diagnóstico do dispositivo</h4>
-          <div class="diag-row"><span class="k"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Armazenamento persistente</span><span class="v" style="color:var(--verde-c)">CONCEDIDO</span></div>
-          <div class="diag-row"><span class="k"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="18" height="10" rx="2"/><path d="M22 11v2"/></svg>Memória usada</span><span class="v">214 MB / 460 MB</span></div>
-          <div class="bar"><i></i></div>
-          <div class="diag-row" style="margin-top:8px"><span class="k"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Última sincronização</span><span class="v">há 3 h 12 min</span></div>
-          <div class="diag-row"><span class="k"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-9-9c2.5 0 4.8 1 6.4 2.6L21 8"/><path d="M21 3v5h-5"/></svg>Backup local (7 dias)</span><span class="v" style="color:var(--verde-c)">ATIVO</span></div>
+          <div class="drow"><span class="k"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Armazenamento persistente</span><span class="v good">Concedido</span></div>
+          <div class="drow"><span class="k"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="18" height="10" rx="3"/><path d="M22 11v2"/></svg>Memória usada</span><span class="v">214 / 460 MB</span></div>
+          <div class="barwrap"><div class="bar"><i></i></div></div>
+          <div class="drow"><span class="k"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Última sincronização</span><span class="v">há 3 h 12 min</span></div>
+          <div class="drow"><span class="k"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-9-9c2.5 0 4.8 1 6.4 2.6L21 8"/><path d="M21 3v5h-5"/></svg>Backup local (7 dias)</span><span class="v good">Ativo</span></div>
         </div>
 
-        <div class="section-label">3 registros na fila <span class="ln"></span></div>
+        <div class="sec"><h3>3 na fila</h3><a href="#" onclick="exportar();return false">Exportar backup</a></div>
 
-        <div class="queue-item">
-          <div class="qi-ic send"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-9-9c2.5 0 4.8 1 6.4 2.6L21 8"/><path d="M21 3v5h-5"/></svg></div>
-          <div class="qi-body"><div class="qt">Combate ao fogo</div><div class="qm">subindo foto 2/5 · TUS retomável</div></div>
-          <div class="qi-prog"><i style="width:62%"></i></div>
+        <div class="qitem">
+          <div class="qic send"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-9-9c2.5 0 4.8 1 6.4 2.6L21 8"/><path d="M21 3v5h-5"/></svg></div>
+          <div class="qb"><div class="qt">Combate ao fogo</div><div class="qm">subindo foto 2/5 · retomável</div></div>
+          <div class="qprog"><i style="width:62%"></i></div>
         </div>
-        <div class="queue-item">
-          <div class="qi-ic wait"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div>
-          <div class="qi-body"><div class="qt">Fauna — resgate</div><div class="qm">aguardando sinal · 4 fotos</div></div>
+        <div class="qitem">
+          <div class="qic wait"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div>
+          <div class="qb"><div class="qt">Fauna — resgate</div><div class="qm">aguardando sinal · 4 fotos</div></div>
         </div>
-        <div class="queue-item">
-          <div class="qi-ic wait"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div>
-          <div class="qi-body"><div class="qt">Educação ambiental</div><div class="qm">aguardando sinal · 80 pessoas</div></div>
-        </div>
-
-        <div class="section-label">Confirmados (backup local) <span class="ln"></span></div>
-        <div class="queue-item">
-          <div class="qi-ic ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg></div>
-          <div class="qi-body"><div class="qt">Limpeza de aceiro</div><div class="qm">no SIGUC · expira em 6 dias</div></div>
+        <div class="qitem">
+          <div class="qic wait"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div>
+          <div class="qb"><div class="qt">Educação ambiental</div><div class="qm">aguardando sinal · 80 pessoas</div></div>
         </div>
 
-        <div class="btn-row" style="margin-top:14px">
-          <button class="ghost" onclick="alert('Exportar pendentes (arquivo / WhatsApp) — rede de segurança offline')">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
-            Exportar backup
-          </button>
+        <div class="sec"><h3>Confirmados</h3><span style="font-size:12px;color:var(--ink3)">backup 7 dias</span></div>
+        <div class="qitem">
+          <div class="qic ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg></div>
+          <div class="qb"><div class="qt">Limpeza de aceiro</div><div class="qm">no SIGUC · expira em 6 dias</div></div>
         </div>
       </section>
 
-      <!-- ── TELA: MAPA ── -->
+      <!-- MAPA -->
       <section class="screen" id="s-mapa">
         <div class="eyebrow">Camada de campo</div>
         <div class="h-title">Mapa da brigada</div>
         <div class="h-sub">Croqui simples offline — registros e focos por tipo.</div>
-
         <div class="mapwrap">
           <div class="topo"></div>
-          <div class="pin" style="--c:var(--brasa); background:var(--brasa); left:52%; top:40%"></div>
-          <div class="pin" style="--c:var(--brasa); background:var(--brasa); left:38%; top:58%"></div>
-          <div class="pin" style="--c:var(--verde-c); background:var(--verde-c); left:64%; top:52%"></div>
-          <div class="pin" style="--c:var(--fauna); background:var(--fauna); left:46%; top:34%"></div>
-          <div class="pin" style="--c:var(--instr-azul); background:var(--instr-azul); left:30%; top:44%"></div>
-          <div class="pin" style="--c:var(--alerta); background:var(--alerta); left:58%; top:66%; box-shadow:0 0 0 3px color-mix(in srgb,var(--alerta) 28%,transparent)"></div>
-          <div style="position:absolute; left:12px; top:12px; font-family:var(--mono); font-size:9px; color:var(--verde-c); background:rgba(7,20,12,.6); padding:5px 8px; border-radius:7px; border:1px solid var(--line2)">VOCÊ · -7.6152, -72.8947 · ±4m</div>
+          <div class="maptag">Você · -7.6152, -72.8947 · ±4m</div>
+          <div class="youdot"></div>
+          <div class="pin" style="background:var(--combate); left:58%; top:38%"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 2c1 3-1 4-1 6 0 1 1 2 1 2s2-1 2-3c2 2 3 4 3 7a5 5 0 0 1-10 0c0-3 2-5 3-7 1 2 2 1 2-2z"/></svg></div>
+          <div class="pin" style="background:var(--prev); left:36%; top:60%"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+          <div class="pin" style="background:var(--fauna); left:62%; top:62%"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6.5" cy="11" r="1.8"/><circle cx="11" cy="7.5" r="1.8"/><circle cx="16" cy="8.5" r="1.8"/><circle cx="18.5" cy="13" r="1.6"/><path d="M8 17c0-2.5 2-4 4.2-4s4.3 1.5 4.3 4c0 1.6-1.6 2.4-4.3 2.4S8 18.6 8 17z"/></svg></div>
+          <div class="pin" style="background:var(--alerta); left:70%; top:30%"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M10.3 3.8L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.8a2 2 0 0 0-3.4 0z"/></svg></div>
         </div>
         <div class="legend">
-          <span><span class="dot" style="background:var(--brasa)"></span>Combate</span>
-          <span><span class="dot" style="background:var(--verde-c)"></span>Prevenção</span>
-          <span><span class="dot" style="background:var(--instr-azul)"></span>Monitoramento</span>
-          <span><span class="dot" style="background:var(--fauna)"></span>Fauna</span>
-          <span><span class="dot" style="background:var(--alerta)"></span>Foco CIGMA</span>
+          <span class="lg"><span class="d" style="background:var(--combate)"></span>Combate</span>
+          <span class="lg"><span class="d" style="background:var(--prev)"></span>Prevenção</span>
+          <span class="lg"><span class="d" style="background:var(--monit)"></span>Monitoramento</span>
+          <span class="lg"><span class="d" style="background:var(--fauna)"></span>Fauna</span>
+          <span class="lg"><span class="d" style="background:var(--alerta)"></span>Foco CIGMA</span>
         </div>
       </section>
 
     </div>
 
-    <!-- FAB -->
-    <button class="fab" onclick="go('s-registrar')" title="Novo registro">
+    <button class="fab" onclick="go('s-captura')" title="Novo registro">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 5v14M5 12h14"/></svg>
     </button>
 
-    <!-- tab bar -->
     <nav class="tabbar">
       <button class="tab active" data-s="s-registrar" onclick="tab(this)">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg>
-        <span>Registrar</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg><span>Início</span>
       </button>
-      <button class="tab" data-s="s-tarefas" onclick="tab(this)" style="position:relative">
-        <span class="badge">2</span>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2c1 3-1 4-1 6 0 1 1 2 1 2s2-1 2-3c2 2 3 4 3 7a5 5 0 0 1-10 0c0-3 2-5 3-7 1 2 2 1 2-2z"/></svg>
-        <span>Tarefas</span>
+      <button class="tab" data-s="s-tarefas" onclick="tab(this)">
+        <span class="bdg">2</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2c1 3-1 4-1 6 0 1 1 2 1 2s2-1 2-3c2 2 3 4 3 7a5 5 0 0 1-10 0c0-3 2-5 3-7 1 2 2 1 2-2z"/></svg><span>Tarefas</span>
       </button>
+      <button class="tab" style="opacity:0; pointer-events:none"><span>·</span></button>
       <button class="tab" data-s="s-mapa" onclick="tab(this)">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 6v15l7-3 8 3 7-3V3l-7 3-8-3z"/><path d="M8 3v15M16 6v15"/></svg>
-        <span>Mapa</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 6v15l7-3 8 3 7-3V3l-7 3-8-3z"/><path d="M8 3v15M16 6v15"/></svg><span>Mapa</span>
       </button>
       <button class="tab" data-s="s-fila" onclick="tab(this)">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>
-        <span>Fila</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.5 5.1L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.5-6.9A2 2 0 0 0 16.8 4H7.2a2 2 0 0 0-1.7 1.1z"/></svg><span>Fila</span>
       </button>
     </nav>
 
   </div>
 </div>
 
-<div class="hint">Dica: alterne <b style="color:#9DB1A2">Tema</b> e <b style="color:#9DB1A2">Field Mode</b> acima, e toque nas naturezas / abas.</div>
-<div class="foot">
-  Protótipo estático para demonstração — sem backend. Reflete a seção <b>15. Direção de Design</b> do
-  <b>docs/plano-brigadas.md</b>. Fontes: Fraunces · DM Sans · Space Mono. Ícones de traço (substituíveis por Phosphor/Lucide customizados).
-</div>
+<div class="hint">Toque nas categorias, no “+” e nas abas. Teste o <b style="color:#5C675E">Field Mode</b> acima.</div>
+<div class="foot">Protótipo estático de demonstração (sem backend). Linguagem <b>Clean &amp; Arejado</b>. Fonte: DM Sans + DM Mono · ícones de traço (trocáveis por Phosphor/Lucide).</div>
 
 <script>
-const app = document.getElementById('app');
 function go(id){
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
-  document.querySelector('.screens').scrollTop = 0;
-  // sincroniza tab ativa quando aplicável
+  document.querySelector('.screens').scrollTop=0;
   document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.s===id));
 }
 function tab(el){ go(el.dataset.s); }
-function toggleTheme(){
-  app.classList.toggle('light');
-  const light = app.classList.contains('light');
-  document.getElementById('themeLbl').textContent = 'Tema: ' + (light?'Claro institucional':'Escuro operacional');
-  document.getElementById('btnTheme').classList.toggle('on', !light);
-}
 function toggleField(){
-  app.classList.toggle('field');
-  document.getElementById('btnField').classList.toggle('on', app.classList.contains('field'));
+  document.getElementById('app').classList.toggle('field');
+  document.getElementById('btnField').classList.toggle('on');
 }
-function captura(){
-  // feedback de "salvo offline"
-  const b = event.target.closest('.primary');
-  const orig = b.innerHTML;
-  b.style.background = 'var(--verde-c)'; b.style.color='#07140C';
-  b.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg> Salvo offline · na fila';
-  if(navigator.vibrate) navigator.vibrate(40);
-  setTimeout(()=>{ b.innerHTML = orig; b.style.background=''; b.style.color=''; go('s-registrar'); }, 1300);
+function captura(e){
+  const b=e.target.closest('.btn'); const o=b.innerHTML;
+  b.classList.remove('fire'); b.classList.add('primary');
+  b.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg> Salvo offline · na fila';
+  if(navigator.vibrate)navigator.vibrate(40);
+  setTimeout(()=>{b.innerHTML=o; b.classList.add('fire'); b.classList.remove('primary'); go('s-registrar');},1300);
 }
+function exportar(){ alert('Exportar pendentes (arquivo / WhatsApp) — rede de segurança offline'); }
 </script>
 </body>
 </html>
