@@ -552,7 +552,7 @@ async function boot() {
   if (brigCached && pinSalvo) {
     App.brigadista = brigCached
     App.brigada    = await bOfflineGetConfig('brigada') || null
-    document.getElementById('lock-nome').textContent = brigCached.nome?.split(' ')[0] || 'Brigadista'
+    document.getElementById('lock-nome').textContent = brigCached.nome_completo?.split(' ')[0] || 'Brigadista'
     document.getElementById('lock-offline').hidden = false
     mostrarTela('tela-bloqueio', false)
     return
@@ -601,7 +601,7 @@ async function prosseguirAposAuth(session) {
   if (!pinSalvo) {
     mostrarTela('tela-config-pin', false)
   } else {
-    document.getElementById('lock-nome').textContent = brig.nome?.split(' ')[0] || 'Brigadista'
+    document.getElementById('lock-nome').textContent = brig.nome_completo?.split(' ')[0] || 'Brigadista'
     document.getElementById('lock-offline').hidden = true
     mostrarTela('tela-bloqueio', false)
   }
@@ -649,11 +649,12 @@ async function fazerLogin() {
 }
 
 async function buscarBrigadistaDoBanco(userId) {
-  const { data } = await db
+  const { data, error } = await db
     .from('brigadistas')
-    .select('id, nome, cpf, brigada_id, funcao, foto_url')
+    .select('id, nome_completo, cpf, brigada_id, funcao, foto_url')
     .eq('usuario_id', userId)
     .maybeSingle()
+  if (error) console.error('[buscarBrigadistaDoBanco]', error)
   return data
 }
 
@@ -826,7 +827,7 @@ async function encerrarSessaoAuditoria() {
 async function entrarHome() {
   document.getElementById('home-saudacao').textContent = saudacao()
   document.getElementById('home-nome').textContent =
-    App.brigadista?.nome?.split(' ').slice(0,2).join(' ') || 'Brigadista'
+    App.brigadista?.nome_completo?.split(' ').slice(0,2).join(' ') || 'Brigadista'
 
   mostrarTela('tela-home')
 
@@ -1074,10 +1075,10 @@ async function carregarFila() {
 // ════════════════════════════════════════════════════════════════
 async function carregarConfig() {
   const brig = App.brigadista
-  document.getElementById('config-nome-brig').textContent  = brig?.nome || '—'
+  document.getElementById('config-nome-brig').textContent  = brig?.nome_completo || '—'
   document.getElementById('config-brigada-nome').textContent = App.brigada?.nome || '—'
   document.getElementById('config-avatar').textContent =
-    (brig?.nome || 'B').charAt(0).toUpperCase()
+    (brig?.nome_completo || 'B').charAt(0).toUpperCase()
 
   const quota = await bOfflineQuota()
   if (quota) {
