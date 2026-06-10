@@ -188,9 +188,39 @@
         <textarea class="form-control" id="mbr-obs" rows="2"></textarea>
       </div>
     </div>
+    <div id="mbr-login-status" style="display:none;padding:8px 20px;font-size:12px;background:rgba(74,222,128,0.12);border-top:1px solid rgba(74,222,128,0.2);color:#166534">
+      ✓ Brigadista já possui acesso ao App de Campo
+    </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="fecharModalBrigadista()">Cancelar</button>
+      <button class="btn" id="mbr-btn-login" style="display:none;background:#F59E0B;color:#fff;border:none" onclick="abrirModalLoginBrig()">🔑 Gerar Login App</button>
       <button class="btn btn-primary" id="mbr-btn-salvar" onclick="salvarBrigadista()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal: Gerar Login ─────────────────────────────────── -->
+<div class="modal-overlay" id="modal-login-brig">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-header">
+      <div class="modal-title">Gerar Login — App de Campo</div>
+      <button class="modal-close" onclick="document.getElementById('modal-login-brig').classList.remove('aberto')">×</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:13px;color:#6B7280;margin-bottom:16px">
+        Crie as credenciais de acesso para <strong id="login-brig-nome"></strong> usar o App de Campo.
+      </p>
+      <div class="form-group"><label class="form-label">E-mail de acesso <span class="obrig">*</span></label>
+        <input class="form-control" id="login-brig-email" type="email" placeholder="email@exemplo.com">
+      </div>
+      <div class="form-group"><label class="form-label">Senha provisória <span class="obrig">*</span></label>
+        <input class="form-control" id="login-brig-senha" type="text" placeholder="Mínimo 6 caracteres">
+        <small style="color:#9CA3AF;font-size:11px">O brigadista deverá criar um PIN no primeiro acesso</small>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="document.getElementById('modal-login-brig').classList.remove('aberto')">Cancelar</button>
+      <button class="btn btn-primary" id="login-brig-btn" onclick="confirmarLoginBrig()">Criar Login</button>
     </div>
   </div>
 </div>
@@ -743,6 +773,11 @@ function abrirModalBrigadista(b = null) {
   document.getElementById('mbr-ch').value            = b?.carga_horaria_formacao || ''
   document.getElementById('mbr-cnh').value           = b?.cnh || ''
   document.getElementById('mbr-obs').value           = b?.observacoes || ''
+  // Botão Gerar Login — só aparece na edição de brigadista sem login
+  const temLogin = !!b?.usuario_id
+  document.getElementById('mbr-login-status').style.display = temLogin ? '' : 'none'
+  document.getElementById('mbr-btn-login').style.display    = (b && !temLogin) ? '' : 'none'
+
   document.getElementById('modal-brigadista').classList.add('aberto')
 }
 function fecharModalBrigadista() { document.getElementById('modal-brigadista').classList.remove('aberto'); _editId.brigadista = null }
@@ -778,6 +813,38 @@ function validarCPFInput(input) {
     erro.style.display = 'none'
     input.style.borderColor = ''
   }
+}
+
+function abrirModalLoginBrig() {
+  const b = _brigadistas.find(x => x.id === _editId.brigadista)
+  document.getElementById('login-brig-nome').textContent = b?.nome_completo || ''
+  document.getElementById('login-brig-email').value = b?.email || ''
+  document.getElementById('login-brig-senha').value = ''
+  document.getElementById('modal-login-brig').classList.add('aberto')
+}
+
+async function confirmarLoginBrig() {
+  const email = document.getElementById('login-brig-email').value.trim()
+  const senha = document.getElementById('login-brig-senha').value.trim()
+  if (!email || !senha) { toast('Preencha e-mail e senha provisória', 'error'); return }
+  if (senha.length < 6) { toast('Senha deve ter no mínimo 6 caracteres', 'error'); return }
+
+  const btn = document.getElementById('login-brig-btn')
+  btn.disabled = true; btn.textContent = 'Criando...'
+  try {
+    const { data: { session } } = await db.auth.getSession()
+    const resp = await fetch(`${SUPABASE_URL}/functions/v1/gerar-login-brigadista`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+      body: JSON.stringify({ brigadista_id: _editId.brigadista, email, senha_temp: senha })
+    })
+    const json = await resp.json()
+    if (!resp.ok) throw new Error(json.error || 'Erro ao criar login')
+    toast('Login criado com sucesso!', 'success')
+    document.getElementById('modal-login-brig').classList.remove('aberto')
+    await carregarDados()
+  } catch(e) { toast(e.message, 'error') }
+  finally { btn.disabled = false; btn.textContent = 'Criar Login' }
 }
 
 function atualizarObrigEmail() {
