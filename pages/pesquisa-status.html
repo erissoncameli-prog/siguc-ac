@@ -6,6 +6,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@700;800&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../js/env-loader.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 :root { --floresta:#0A1A0F; --verde-c:#52B788; --ouro-c:#F0CB6A; --t1:#F4EFE6; --borda:#E5E7EB; --raio:10px; }
@@ -141,10 +142,8 @@ body { font-family:'DM Sans',sans-serif; background:var(--t1); min-height:100vh;
 <div class="toast-pub" id="toast-pub"></div>
 
 <script>
-const SUPABASE_URL      = 'https://atqtybcsvepdabsvgaly.supabase.co'
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF0cXR5YmNzdmVwZGFic3ZnYWx5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0MjMzNzgsImV4cCI6MjA5NTk5OTM3OH0.hWx1AB2rK7xdco1Dgagm0XUOBPQbxZVE614SW4SKoLk'
 const { createClient } = supabase
-const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+let db
 
 const ETAPAS_LABEL = {
   submetida:'Submetida', triagem:'Triagem', analise_tecnica:'Análise Técnica',
@@ -165,8 +164,9 @@ const DOC_LABEL = {
 let _pesquisa = null
 let _arquivoComp = null
 
-// ── Auto-busca por token na URL ───────────────────────────────
-window.addEventListener('load', () => {
+// ── Inicialização: carrega env e auto-busca por token na URL ─────
+loadEnv().then(({ supabaseUrl, supabaseKey }) => {
+  db = createClient(supabaseUrl, supabaseKey)
   const token = new URLSearchParams(location.search).get('token')
   if (token) {
     document.getElementById('campo-token').value = token
