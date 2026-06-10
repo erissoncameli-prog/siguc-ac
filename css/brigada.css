@@ -98,6 +98,51 @@
 .pin-key.delete { font-size: 18px; }
 .pin-key.ok { background: var(--prim); }
 
+/* ── Tela de login do brigadista ────────────────────────── */
+.login-form {
+  width: 100%; max-width: 320px;
+  display: flex; flex-direction: column; gap: 12px;
+  margin-top: 8px;
+}
+.login-input {
+  width: 100%; padding: 14px 16px;
+  border-radius: 12px;
+  border: 1.5px solid rgba(255,255,255,.15);
+  background: rgba(255,255,255,.08);
+  color: #fff; font-size: 16px; font-family: var(--font-ui);
+  outline: none; box-sizing: border-box;
+  -webkit-appearance: none;
+}
+.login-input::placeholder { color: rgba(255,255,255,.4); }
+.login-input:focus { border-color: var(--prim); }
+.login-senha-wrap { position: relative; }
+.login-senha-wrap .login-input { padding-right: 48px; }
+.btn-toggle-senha {
+  position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+  background: none; border: none; cursor: pointer;
+  font-size: 18px; line-height: 1; padding: 4px; color: rgba(255,255,255,.5);
+}
+.btn-login-submit {
+  width: 100%; padding: 16px; border-radius: 12px; border: none;
+  background: var(--prim); color: #fff;
+  font-size: 17px; font-weight: 600; font-family: var(--font-ui);
+  cursor: pointer; letter-spacing: .5px; margin-top: 4px;
+  transition: opacity .15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.btn-login-submit:disabled { opacity: .6; cursor: not-allowed; }
+.lock-offline-badge {
+  font-size: 11px; color: rgba(255,200,0,.9);
+  background: rgba(255,200,0,.1); border-radius: 20px;
+  padding: 3px 10px; margin-bottom: 4px;
+}
+.lock-dica { font-size: 13px; color: rgba(255,255,255,.55); margin-bottom: 28px; }
+.lock-erro { font-size: 13px; color: #f87171; margin-top: 12px; }
+.btn-link {
+  background: none; border: none; color: rgba(255,255,255,.5);
+  font-size: 13px; cursor: pointer; margin-top: 16px; text-decoration: underline;
+}
+
 /* ── Cartão de GPS (escuro, instrumento) ────────────────── */
 .gps-card {
   background: var(--ink-d);
