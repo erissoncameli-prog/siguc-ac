@@ -1,0 +1,19 @@
+{
+  "name": "SIGUC Brigadas",
+  "short_name": "Brigadas",
+  "description": "Registro de campo para brigadas de prevenção e combate a incêndios — SEMA/AC",
+  "start_url": "/pages/brigada.html",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#F6FAF6",
+  "theme_color": "#12A66A",
+  "orientation": "portrait-primary",
+  "lang": "pt-BR",
+  "categories": ["government", "productivity"],
+  "icons": [
+    { "src": "/pwa/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/pwa/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ],
+  "screenshots": [],
+  "prefer_related_applications": false
+}

@@ -1,0 +1,406 @@
+/* ── SIGUC Brigadas — Design System "Vivo" ────────────────────
+   Estende (nunca altera) as variáveis core do design system.
+   Direção: Material 3 Expressive — blocos de cor cheios,
+   radius ousado, DM Mono nos dados, nav flutuante em pílula.
+   ─────────────────────────────────────────────────────────── */
+
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
+
+/* ── Tokens funcionais por natureza ──────────────────────── */
+:root {
+  --prim:        #12A66A;
+  --prim-bg:     rgba(18,166,106,.12);
+  --combate:     #EF5B3C;
+  --combate-bg:  rgba(239,91,60,.12);
+  --monit:       #3B82C4;
+  --monit-bg:    rgba(59,130,196,.12);
+  --fauna:       #D98A3D;
+  --fauna-bg:    rgba(217,138,61,.12);
+  --alerta:      #E0A227;
+  --alerta-bg:   rgba(224,162,39,.14);
+
+  /* Superfícies do app */
+  --app-bg:      #F6FAF6;
+  --surface:     #FFFFFF;
+  --ink-d:       #0F1A13;
+  --soft:        #7BE0AE;
+
+  /* Nav flutuante */
+  --nav-h:       64px;
+  --nav-bg:      var(--ink-d);
+  --nav-radius:  32px;
+
+  /* Tipografia */
+  --font-ui:     'DM Sans', sans-serif;
+  --font-mono:   'DM Mono', monospace;
+
+  /* Spring motion */
+  --spring:      cubic-bezier(.34,1.56,.64,1);
+  --ease-out:    cubic-bezier(.22,1,.36,1);
+}
+
+/* ── Reset mínimo para o PWA ────────────────────────────── */
+.brigada-app * { box-sizing: border-box; }
+.brigada-app {
+  font-family: var(--font-ui);
+  background: var(--app-bg);
+  min-height: 100dvh;
+  padding-bottom: calc(var(--nav-h) + 16px);
+  color: var(--ink-d);
+  overscroll-behavior: none;
+}
+
+/* ── Tela de bloqueio / login ───────────────────────────── */
+.lock-screen {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 24px;
+  background: var(--ink-d);
+  color: #fff;
+}
+.lock-logo {
+  font-family: 'Fraunces', Georgia, serif;
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--soft);
+  letter-spacing: -.02em;
+  margin-bottom: 4px;
+}
+.lock-sub { font-size: 12px; color: rgba(255,255,255,.5); letter-spacing: .06em; text-transform: uppercase; margin-bottom: 40px; }
+
+/* PIN keypad */
+.pin-display {
+  display: flex; gap: 12px; margin-bottom: 28px;
+}
+.pin-dot {
+  width: 14px; height: 14px; border-radius: 50%;
+  background: rgba(255,255,255,.25);
+  transition: background .15s var(--spring);
+}
+.pin-dot.filled { background: var(--soft); }
+
+.pin-keypad {
+  display: grid; grid-template-columns: repeat(3, 72px); gap: 12px;
+}
+.pin-key {
+  height: 72px; border-radius: 20px;
+  background: rgba(255,255,255,.08);
+  border: none; color: #fff;
+  font-family: var(--font-ui); font-size: 22px; font-weight: 600;
+  cursor: pointer;
+  transition: transform .12s var(--spring), background .1s;
+  -webkit-tap-highlight-color: transparent;
+}
+.pin-key:active { transform: scale(.92); background: rgba(255,255,255,.18); }
+.pin-key.delete { font-size: 18px; }
+.pin-key.ok { background: var(--prim); }
+
+/* ── Cartão de GPS (escuro, instrumento) ────────────────── */
+.gps-card {
+  background: var(--ink-d);
+  border-radius: 20px;
+  padding: 16px 20px;
+  margin: 0 16px 16px;
+  position: relative;
+  overflow: hidden;
+  color: #fff;
+}
+.gps-card-title {
+  font-size: 10px; text-transform: uppercase; letter-spacing: .1em;
+  color: rgba(255,255,255,.5); margin-bottom: 6px;
+}
+.gps-coords {
+  font-family: var(--font-mono); font-size: 13px;
+  color: var(--soft); line-height: 1.6;
+}
+.gps-accuracy {
+  font-family: var(--font-mono); font-size: 11px;
+  color: rgba(255,255,255,.4); margin-top: 4px;
+}
+.gps-ring {
+  position: absolute; right: -12px; top: -12px;
+  width: 80px; height: 80px; border-radius: 50%;
+  border: 3px solid var(--prim);
+  opacity: .3;
+  animation: pulse-ring 2s ease-out infinite;
+}
+.gps-ring-2 {
+  position: absolute; right: -24px; top: -24px;
+  width: 104px; height: 104px; border-radius: 50%;
+  border: 2px solid var(--prim);
+  opacity: .15;
+  animation: pulse-ring 2s ease-out infinite .5s;
+}
+.gps-acquiring { color: rgba(255,255,255,.5); font-size: 13px; animation: blink 1.2s step-end infinite; }
+@keyframes pulse-ring { 0% { transform: scale(.8); opacity: .4 } 100% { transform: scale(1.4); opacity: 0 } }
+@keyframes blink { 50% { opacity: 0 } }
+
+/* ── Blocos de natureza (home) ──────────────────────────── */
+.natureza-grid {
+  display: flex; flex-direction: column; gap: 12px;
+  padding: 0 16px;
+}
+.natureza-btn {
+  display: flex; align-items: center; gap: 16px;
+  padding: 20px 20px;
+  border-radius: 24px;
+  border: none; cursor: pointer; text-align: left;
+  transition: transform .18s var(--spring), box-shadow .18s;
+  -webkit-tap-highlight-color: transparent;
+}
+.natureza-btn:active { transform: scale(.97); }
+
+.natureza-btn.prevencao {
+  background: var(--prim);
+  box-shadow: 0 8px 24px rgba(18,166,106,.35);
+}
+.natureza-btn.combate {
+  background: var(--combate);
+  box-shadow: 0 8px 24px rgba(239,91,60,.35);
+}
+.natureza-btn.monitoramento {
+  background: var(--monit);
+  box-shadow: 0 8px 24px rgba(59,130,196,.35);
+}
+
+.natureza-icon {
+  width: 52px; height: 52px; border-radius: 14px;
+  background: rgba(255,255,255,.2);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.natureza-icon svg { width: 26px; height: 26px; stroke: #fff; }
+.natureza-label { flex: 1; }
+.natureza-label strong { display: block; font-size: 18px; font-weight: 700; color: #fff; }
+.natureza-label span { font-size: 12px; color: rgba(255,255,255,.75); }
+.natureza-chevron { color: rgba(255,255,255,.6); }
+
+/* ── Fila de sincronização (badge) ──────────────────────── */
+.fila-badge {
+  display: flex; align-items: center; gap: 8px;
+  margin: 0 16px 16px;
+  padding: 10px 16px;
+  border-radius: 14px;
+  font-size: 13px; font-weight: 500;
+}
+.fila-badge.pendente { background: var(--alerta-bg); color: var(--alerta); border: 1px solid rgba(224,162,39,.3); }
+.fila-badge.ok       { background: var(--prim-bg);   color: var(--prim);   border: 1px solid rgba(18,166,106,.2); }
+.fila-badge.offline  { background: var(--combate-bg); color: var(--combate); border: 1px solid rgba(239,91,60,.2); }
+
+/* ── Nav flutuante em pílula ────────────────────────────── */
+.nav-pill {
+  position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%);
+  background: var(--nav-bg);
+  border-radius: var(--nav-radius);
+  height: var(--nav-h);
+  padding: 0 12px;
+  display: flex; align-items: center; gap: 4px;
+  box-shadow: 0 8px 32px rgba(0,0,0,.4);
+  z-index: 1000;
+}
+.nav-item-pwa {
+  width: 48px; height: 48px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  border: none; background: transparent; cursor: pointer;
+  color: rgba(255,255,255,.5);
+  transition: background .15s, color .15s, transform .18s var(--spring);
+  -webkit-tap-highlight-color: transparent;
+}
+.nav-item-pwa.ativo { background: rgba(255,255,255,.12); color: #fff; }
+.nav-item-pwa:active { transform: scale(.9); }
+.nav-item-pwa svg { width: 22px; height: 22px; stroke: currentColor; }
+
+.nav-center-btn {
+  width: 56px; height: 56px; border-radius: 50%;
+  background: var(--soft);
+  display: flex; align-items: center; justify-content: center;
+  border: none; cursor: pointer;
+  color: var(--ink-d);
+  box-shadow: 0 4px 12px rgba(123,224,174,.5);
+  transition: transform .18s var(--spring), box-shadow .18s;
+  -webkit-tap-highlight-color: transparent;
+  margin: 0 4px;
+}
+.nav-center-btn:active { transform: scale(.9); box-shadow: 0 2px 6px rgba(123,224,174,.3); }
+.nav-center-btn svg { width: 26px; height: 26px; }
+
+/* ── Formulário de captura ──────────────────────────────── */
+.form-screen {
+  padding: 16px 16px 0;
+}
+.form-header {
+  display: flex; align-items: center; gap: 12px;
+  margin-bottom: 20px;
+}
+.form-back {
+  width: 40px; height: 40px; border-radius: 50%;
+  background: rgba(0,0,0,.06);
+  border: none; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  transition: background .12s;
+}
+.form-back:active { background: rgba(0,0,0,.12); }
+.form-natureza-pill {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 14px; border-radius: 20px;
+  font-size: 13px; font-weight: 600; color: #fff;
+}
+.form-natureza-pill.prevencao  { background: var(--prim); }
+.form-natureza-pill.combate    { background: var(--combate); }
+.form-natureza-pill.monitoramento { background: var(--monit); }
+
+.field-label {
+  font-size: 12px; font-weight: 600; color: #6B7280;
+  text-transform: uppercase; letter-spacing: .05em;
+  margin-bottom: 6px; display: block;
+}
+.field-input {
+  width: 100%; padding: 14px 16px;
+  border: 1.5px solid #E5E7EB; border-radius: 14px;
+  font-family: var(--font-ui); font-size: 15px;
+  background: var(--surface); outline: none;
+  transition: border-color .15s;
+  -webkit-appearance: none;
+}
+.field-input:focus { border-color: var(--prim); }
+.field-group { margin-bottom: 16px; }
+
+/* ── Fotos ───────────────────────────────────────────────── */
+.fotos-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+  margin-bottom: 16px;
+}
+.foto-thumb {
+  aspect-ratio: 1; border-radius: 12px; overflow: hidden;
+  background: #F3F4F6; position: relative; cursor: pointer;
+}
+.foto-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.foto-add {
+  aspect-ratio: 1; border-radius: 12px;
+  background: rgba(18,166,106,.08);
+  border: 2px dashed rgba(18,166,106,.4);
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 4px; cursor: pointer;
+  color: var(--prim); font-size: 11px; font-weight: 600;
+  transition: background .12s;
+}
+.foto-add:active { background: rgba(18,166,106,.15); }
+.foto-del {
+  position: absolute; top: 4px; right: 4px;
+  width: 22px; height: 22px; border-radius: 50%;
+  background: rgba(0,0,0,.6); color: #fff; border: none;
+  font-size: 14px; line-height: 1; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+
+/* ── Seletor de atividade ───────────────────────────────── */
+.ativ-grid {
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;
+  margin-bottom: 16px;
+}
+.ativ-chip {
+  padding: 12px; border-radius: 14px;
+  border: 2px solid transparent;
+  background: rgba(0,0,0,.04);
+  font-size: 13px; font-weight: 500; text-align: center;
+  cursor: pointer; transition: all .15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.ativ-chip.sel { border-color: var(--prim); background: var(--prim-bg); color: var(--prim); font-weight: 600; }
+.ativ-chip.sel.combate { border-color: var(--combate); background: var(--combate-bg); color: var(--combate); }
+.ativ-chip.sel.monit   { border-color: var(--monit);   background: var(--monit-bg);   color: var(--monit); }
+
+/* ── Fila / status ───────────────────────────────────────── */
+.fila-item {
+  padding: 14px 16px; border-radius: 16px;
+  background: var(--surface);
+  border: 1px solid #E5E7EB;
+  margin-bottom: 10px;
+}
+.fila-item-header { display: flex; justify-content: space-between; align-items: flex-start; }
+.fila-status-dot {
+  width: 8px; height: 8px; border-radius: 50%; margin-top: 5px; flex-shrink: 0;
+}
+.fila-status-dot.pendente { background: var(--alerta); }
+.fila-status-dot.enviando { background: var(--monit); animation: blink 1s step-end infinite; }
+.fila-status-dot.confirmado { background: var(--prim); }
+
+/* ── Campo diagnóstico ───────────────────────────────────── */
+.diag-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 10px 0; border-bottom: 1px solid #F3F4F6;
+  font-size: 13px;
+}
+.diag-val { font-family: var(--font-mono); font-size: 12px; color: var(--prim); }
+
+/* ── Botão principal ─────────────────────────────────────── */
+.btn-pwa {
+  width: 100%; padding: 16px;
+  border-radius: 16px; border: none;
+  font-family: var(--font-ui); font-size: 16px; font-weight: 700;
+  cursor: pointer;
+  transition: transform .15s var(--spring), box-shadow .15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.btn-pwa:active { transform: scale(.97); }
+.btn-pwa-primary { background: var(--prim); color: #fff; box-shadow: 0 4px 16px rgba(18,166,106,.3); }
+.btn-pwa-danger  { background: var(--combate); color: #fff; }
+.btn-pwa-ghost   { background: rgba(0,0,0,.06); color: var(--ink-d); }
+
+/* ── Screen transitions ──────────────────────────────────── */
+.screen { display: none; animation: fadeSlide .22s var(--ease-out); }
+.screen.ativo { display: block; }
+@keyframes fadeSlide { from { opacity: 0; transform: translateY(12px) } to { opacity: 1; transform: none } }
+
+/* ── Field Mode ──────────────────────────────────────────── */
+.field-mode { filter: contrast(1.12); }
+.field-mode .natureza-label strong { font-size: 22px; }
+.field-mode .btn-pwa { font-size: 18px; padding: 20px; }
+.field-mode .field-input { font-size: 17px; padding: 16px; }
+
+/* ── Fauna ───────────────────────────────────────────────── */
+.classe-grid {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
+  margin-bottom: 16px;
+}
+.classe-btn {
+  padding: 10px 4px; border-radius: 14px;
+  border: 2px solid transparent;
+  background: rgba(0,0,0,.04);
+  font-size: 11px; font-weight: 600; text-align: center;
+  cursor: pointer; transition: all .15s;
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+}
+.classe-btn svg { width: 22px; height: 22px; stroke: currentColor; }
+.classe-btn.sel { border-color: var(--fauna); background: var(--fauna-bg); color: var(--fauna); }
+
+.especie-result {
+  padding: 12px 14px; border-radius: 12px;
+  background: var(--surface); border: 1.5px solid #E5E7EB;
+  margin-bottom: 8px; cursor: pointer;
+  transition: border-color .12s;
+}
+.especie-result:active { border-color: var(--fauna); }
+.especie-result strong { display: block; font-size: 14px; }
+.especie-result small  { font-size: 11px; color: #9CA3AF; font-style: italic; }
+.ameacada-badge { font-size: 10px; background: var(--combate-bg); color: var(--combate); padding: 2px 6px; border-radius: 6px; margin-left: 6px; }
+
+/* ── Toast / feedback ───────────────────────────────────── */
+.pwa-toast {
+  position: fixed; bottom: calc(var(--nav-h) + 24px); left: 50%; transform: translateX(-50%);
+  background: var(--ink-d); color: #fff;
+  padding: 10px 20px; border-radius: 20px;
+  font-size: 13px; font-weight: 500;
+  box-shadow: 0 4px 16px rgba(0,0,0,.3);
+  opacity: 0; pointer-events: none;
+  transition: opacity .2s, transform .2s var(--spring);
+  white-space: nowrap; z-index: 2000;
+}
+.pwa-toast.show { opacity: 1; transform: translateX(-50%) translateY(-4px); }
+.pwa-toast.ok   { background: var(--prim); }
+.pwa-toast.err  { background: var(--combate); }
