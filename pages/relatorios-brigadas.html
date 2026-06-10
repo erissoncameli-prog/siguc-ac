@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>SIGUC-AC · Relatórios de Brigadas</title>
+<link rel="stylesheet" href="../css/global.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../js/observability.js"></script>
+<script src="../js/queryLogger.js"></script>
+<script src="../js/config.js"></script>
+<script src="../js/layout.js"></script>
+<style>
+/* ── Tokens de natureza ──────────────────────────────── */
+:root {
+  --nat-prev:#12A66A; --nat-comb:#EF5B3C; --nat-moni:#3B82C4;
+  --nat-prev-bg:rgba(18,166,106,.12); --nat-comb-bg:rgba(239,91,60,.12); --nat-moni-bg:rgba(59,130,196,.12);
+}
+
+/* ── Header de filtros ───────────────────────────────── */
+.rel-topbar { display:flex; gap:10px; flex-wrap:wrap; align-items:center;
+              background:var(--branco); border:1px solid var(--borda);
+              border-radius:var(--raio-lg); padding:14px 16px; margin-bottom:18px }
+.rel-topbar label { font-size:.78rem; font-weight:600; color:var(--cinza-500);
+                    text-transform:uppercase; letter-spacing:.05em }
+.rel-topbar select, .rel-topbar input[type=date] {
+  padding:6px 10px; border-radius:7px; border:1.5px solid var(--borda);
+  font-size:.84rem; background:var(--branco); font-family:inherit }
+.periodo-custom { display:flex; gap:6px; align-items:center }
+
+/* ── Tabs ────────────────────────────────────────────── */
+.rel-tabs { display:flex; gap:0; border-bottom:2px solid var(--borda); margin-bottom:18px }
+.rel-tab { padding:9px 20px; font-size:.85rem; font-weight:600; border:none;
+           background:transparent; cursor:pointer; color:var(--cinza-500);
+           border-bottom:2.5px solid transparent; margin-bottom:-2px; transition:.15s;
+           font-family:inherit }
+.rel-tab.ativo { color:var(--floresta); border-bottom-color:var(--verde-c) }
+.rel-tab:hover:not(.ativo) { color:var(--cinza-800) }
+
+/* ── Seção de nível ──────────────────────────────────── */
+.nivel-sel { display:flex; gap:10px; align-items:center; margin-bottom:16px; flex-wrap:wrap }
+.nivel-sel select { padding:7px 12px; border-radius:8px; border:1.5px solid var(--borda);
+                    font-size:.87rem; min-width:220px; font-family:inherit }
+
+/* ── Cards KPI de brigadas ───────────────────────────── */
+.kpi-row-brig { display:grid; grid-template-columns:repeat(auto-fill,minmax(130px,1fr));
+                gap:10px; margin-bottom:18px }
+.kpi-brig { background:var(--branco); border:1px solid var(--borda); border-radius:10px;
+            padding:12px 14px; border-top:3px solid var(--borda) }
+.kpi-brig.prev  { border-top-color:var(--nat-prev) }
+.kpi-brig.comb  { border-top-color:var(--nat-comb) }
+.kpi-brig.moni  { border-top-color:var(--nat-moni) }
+.kpi-brig.ok    { border-top-color:#059669 }
+.kpi-brig.warn  { border-top-color:#f59e0b }
+.kpi-brig.fauna { border-top-color:#7c3aed }
+.kpi-brig-n { font-size:1.7rem; font-weight:700; line-height:1.1;
+              color:var(--floresta); font-family:'Fraunces',Georgia,serif }
+.kpi-brig-l { font-size:.75rem; color:var(--cinza-500); margin-top:2px }
+
+/* ── Gráfico de barras CSS ───────────────────────────── */
+.chart-card { background:var(--branco); border:1px solid var(--borda);
+              border-radius:var(--raio-lg); padding:16px }
+.chart-title { font-size:.78rem; font-weight:700; color:var(--cinza-500);
+               text-transform:uppercase; letter-spacing:.06em; margin-bottom:12px }
+.bar-row { display:flex; align-items:center; gap:8px; margin-bottom:9px }
+.bar-label { font-size:.78rem; color:var(--cinza-700); min-width:140px; flex-shrink:0;
+             white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
+.bar-label.sm { min-width:90px }
+.bar-wrap { flex:1; height:8px; background:var(--cinza-100); border-radius:4px; overflow:hidden }
+.bar-fill { height:100%; border-radius:4px; transition:width .45s cubic-bezier(.4,0,.2,1) }
+.bar-val { font-size:.76rem; font-weight:600; color:var(--cinza-700); min-width:28px; text-align:right }
+.chart-empty { font-size:.82rem; color:var(--cinza-400); padding:8px 0 }
+
+/* ── Tabela de relatório ─────────────────────────────── */
+.rel-table { width:100%; border-collapse:collapse; font-size:.82rem }
+.rel-table th { padding:8px 10px; text-align:left; font-size:.72rem; font-weight:700;
+                color:var(--cinza-500); text-transform:uppercase; letter-spacing:.05em;
+                border-bottom:1.5px solid var(--borda) }
+.rel-table td { padding:9px 10px; border-bottom:1px solid var(--cinza-100);
+                color:var(--cinza-800) }
+.rel-table tr:last-child td { border-bottom:none }
+.rel-table tr:hover td { background:var(--cinza-50) }
+
+/* ── Chip de natureza ────────────────────────────────── */
+.nat-chip { display:inline-flex; align-items:center; gap:3px; padding:2px 8px;
+            border-radius:999px; font-size:.72rem; font-weight:600 }
+.nat-chip.prevencao   { background:var(--nat-prev-bg); color:var(--nat-prev) }
+.nat-chip.combate     { background:var(--nat-comb-bg); color:var(--nat-comb) }
+.nat-chip.monitoramento { background:var(--nat-moni-bg); color:var(--nat-moni) }
+
+/* ── Exportar ────────────────────────────────────────── */
+.btn-export { display:flex; align-items:center; gap:5px; padding:7px 14px;
+              border-radius:8px; border:1.5px solid var(--borda); background:var(--branco);
+              font-size:.82rem; font-weight:600; cursor:pointer; color:var(--cinza-700);
+              font-family:inherit; white-space:nowrap }
+.btn-export:hover { background:var(--cinza-50) }
+
+/* ── Loading skeleton ────────────────────────────────── */
+.skel { background:linear-gradient(90deg,#f3f4f6 25%,#e9eaec 50%,#f3f4f6 75%);
+        background-size:200% 100%; animation:skel .9s infinite; border-radius:6px; height:14px }
+@keyframes skel{ from{background-position:200% 0} to{background-position:-200% 0} }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+// ════════════════════════════════════════════════════════════════
+// Estado global
+// ════════════════════════════════════════════════════════════════
+let _usuario   = null
+let _registros = []   // vw_registros_validacao no período
+let _brigadas  = []   // brigadas
+let _brists    = []   // brigadistas
+let _tabAtiva  = 'estado'
+let _carregando = false
+
+// ── Labels ─────────────────────────────────────────────────────
+const NAT_LAB  = { prevencao:'Prevenção', combate:'Combate', monitoramento:'Monitoramento' }
+const NAT_COR  = { prevencao:'#12A66A',   combate:'#EF5B3C', monitoramento:'#3B82C4' }
+const NAT_EMO  = { prevencao:'🛡', combate:'🔥', monitoramento:'🔭' }
+const ATIV_LAB = {
+  fogo:'Combate a fogo', educacao_ambiental:'Educação ambiental',
+  limpeza:'Limpeza/aceiro', reconhecimento:'Reconhecimento',
+  plantio:'Plantio', primeiros_socorros:'Primeiros socorros',
+  queima_controlada:'Queima controlada', outro:'Outro',
+}
+const REGIONAL_LAB = {
+  baixo_acre:'Baixo Acre', purus:'Purus', jurua:'Juruá',
+  tarauaca_envira:'Tarauacá-Envira', alto_acre:'Alto Acre',
+}
+const STATUS_LAB = {
+  aguardando:'Aguardando', validado:'Validado',
+  requer_correcao:'Requer correção', rejeitado:'Rejeitado',
+}
+
+// ════════════════════════════════════════════════════════════════
+// Inicialização
+// ════════════════════════════════════════════════════════════════
+;(async function () {
+  _usuario = await carregarUsuario()
+  if (!_usuario) { window.location.href = '../index.html'; return }
+
+  const perfisPermitidos = ['biologo','tecnico','gestor','super_admin']
+  if (!perfisPermitidos.includes(_usuario.perfil)) {
+    document.getElementById('app').innerHTML =
+      gerarLayout('Relatórios de Brigadas','relatorios-brigadas') +
+      '<div class="page-content"><div class="alert alert-danger">Acesso restrito.</div></div>'
+    return
+  }
+
+  document.getElementById('app').innerHTML =
+    gerarLayout('Relatórios de Brigadas','relatorios-brigadas') + htmlPagina()
+
+  // Eventos de período
+  document.getElementById('sel-periodo').addEventListener('change', e => {
+    const custom = document.getElementById('periodo-custom')
+    custom.style.display = e.target.value === 'custom' ? 'flex' : 'none'
+    if (e.target.value !== 'custom') gerarRelatorio()
+  })
+  document.getElementById('btn-gerar').addEventListener('click', gerarRelatorio)
+  document.getElementById('btn-exportar').addEventListener('click', exportarCSV)
+
+  // Tabs
+  document.querySelectorAll('.rel-tab').forEach(t => {
+    t.addEventListener('click', () => {
+      document.querySelectorAll('.rel-tab').forEach(x => x.classList.remove('ativo'))
+      t.classList.add('ativo')
+      _tabAtiva = t.dataset.tab
+      renderTabAtiva()
+    })
+  })
+
+  // Filtros de nível regional / UC
+  document.getElementById('sel-regional').addEventListener('change', renderRegional)
+  document.getElementById('sel-uc').addEventListener('change', renderUC)
+
+  // Período padrão: mês atual
+  setPeriodoMes()
+  await gerarRelatorio()
+
+  if (window._sigucBar) _sigucBarCompleta()
+})()
+
+// ════════════════════════════════════════════════════════════════
+// HTML estático da página
+// ════════════════════════════════════════════════════════════════
+function htmlPagina() {
+  const hoje = new Date()
+  const m1   = new Date(hoje.getFullYear(), hoje.getMonth(), 1).toISOString().slice(0,10)
+  const m2   = hoje.toISOString().slice(0,10)
+
+  return `<div class="page-content">
+  <div class="page-header" style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px">
+    <div>
+      <h1 class="page-title">Relatórios de Brigadas</h1>
+      <p class="page-subtitle">Análise em 3 níveis: estado, regional e por unidade de conservação</p>
+    </div>
+    <button class="btn-export" id="btn-exportar">⬇ Exportar CSV</button>
+  </div>
+
+  <!-- Filtro de período -->
+  <div class="rel-topbar">
+    <div>
+      <label>Período</label>
+      <select id="sel-periodo" style="margin-left:8px">
+        <option value="mes">Mês atual</option>
+        <option value="30d">Últimos 30 dias</option>
+        <option value="90d">Últimos 90 dias</option>
+        <option value="ano">Este ano</option>
+        <option value="custom">Personalizado</option>
+      </select>
+    </div>
+    <div class="periodo-custom" id="periodo-custom" style="display:none">
+      <input type="date" id="periodo-ini" value="${m1}">
+      <span style="font-size:.8rem;color:var(--cinza-400)">até</span>
+      <input type="date" id="periodo-fim" value="${m2}">
+      <button class="btn btn-sm btn-primary" id="btn-gerar">Gerar</button>
+    </div>
+    <span id="periodo-label" style="font-size:.82rem;color:var(--cinza-500)"></span>
+  </div>
+
+  <!-- Tabs -->
+  <div class="rel-tabs">
+    <button class="rel-tab ativo" data-tab="estado">🗺 Estado do Acre</button>
+    <button class="rel-tab" data-tab="regional">📍 Por Regional</button>
+    <button class="rel-tab" data-tab="uc">🌳 Por UC</button>
+  </div>
+
+  <!-- Loading -->
+  <div id="rel-loading" hidden>
+    <div style="display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));margin-bottom:18px">
+      ${Array(6).fill('<div class="skel" style="height:70px;border-radius:10px"></div>').join('')}
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+      ${Array(4).fill('<div class="skel" style="height:180px;border-radius:12px"></div>').join('')}
+    </div>
+  </div>
+
+  <!-- Conteúdo das tabs -->
+  <div id="tab-estado"></div>
+
+  <div id="tab-regional" hidden>
+    <div class="nivel-sel">
+      <label style="font-size:.84rem;font-weight:600;color:var(--cinza-600)">Regional:</label>
+      <select id="sel-regional">
+        <option value="">Selecione a regional…</option>
+        ${Object.entries(REGIONAL_LAB).map(([v,l])=>`<option value="${v}">${l}</option>`).join('')}
+      </select>
+    </div>
+    <div id="conteudo-regional"></div>
+  </div>
+
+  <div id="tab-uc" hidden>
+    <div class="nivel-sel">
+      <label style="font-size:.84rem;font-weight:600;color:var(--cinza-600)">Unidade de Conservação:</label>
+      <select id="sel-uc"><option value="">Selecione a UC…</option></select>
+    </div>
+    <div id="conteudo-uc"></div>
+  </div>
+</div>`
+}
+
+// ════════════════════════════════════════════════════════════════
+// Período
+// ════════════════════════════════════════════════════════════════
+function setPeriodoMes() {
+  const hoje = new Date()
+  const ini  = new Date(hoje.getFullYear(), hoje.getMonth(), 1)
+  document.getElementById('periodo-ini').value = ini.toISOString().slice(0,10)
+  document.getElementById('periodo-fim').value = hoje.toISOString().slice(0,10)
+}
+
+function getPeriodo() {
+  const sel  = document.getElementById('sel-periodo').value
+  const hoje = new Date()
+  let ini, fim = hoje
+
+  if (sel === 'custom') {
+    return {
+      ini: document.getElementById('periodo-ini').value,
+      fim: document.getElementById('periodo-fim').value,
+    }
+  }
+  if (sel === 'mes')  ini = new Date(hoje.getFullYear(), hoje.getMonth(), 1)
+  if (sel === '30d')  ini = new Date(hoje - 30*86400*1000)
+  if (sel === '90d')  ini = new Date(hoje - 90*86400*1000)
+  if (sel === 'ano')  ini = new Date(hoje.getFullYear(), 0, 1)
+  return {
+    ini: ini.toISOString().slice(0,10),
+    fim: fim.toISOString().slice(0,10),
+  }
+}
+
+function exibirPeriodoLabel(ini, fim) {
+  const fmt = d => new Date(d+'T12:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'short',year:'numeric'})
+  document.getElementById('periodo-label').textContent = `${fmt(ini)} → ${fmt(fim)}`
+}
+
+// ════════════════════════════════════════════════════════════════
+// Carregamento de dados
+// ════════════════════════════════════════════════════════════════
+async function gerarRelatorio() {
+  if (_carregando) return
+  _carregando = true
+
+  const { ini, fim } = getPeriodo()
+  exibirPeriodoLabel(ini, fim)
+
+  document.getElementById('rel-loading').hidden = false
+  document.getElementById('tab-estado').innerHTML  = ''
+  document.getElementById('conteudo-regional').innerHTML = ''
+  document.getElementById('conteudo-uc').innerHTML = ''
+
+  const [regRes, brigRes, bristRes] = await Promise.all([
+    db.from('vw_registros_validacao')
+      .select('id,natureza,atividade,status_validacao,data_hora_evento,regional,uc_id,uc_nome,brigada_id,brigada_nome,brigadista_id,brigadista_nome,n_fauna,n_fauna_pendente,fotos_urls,area_estimada_ha,pessoas_alcancadas')
+      .gte('data_hora_evento', ini + 'T00:00:00')
+      .lte('data_hora_evento', fim + 'T23:59:59')
+      .order('data_hora_evento', { ascending: false })
+      .limit(5000),
+    db.from('brigadas').select('id,nome,regional,uc_id,ativa,num_brigadistas').eq('ativa', true),
+    db.from('brigadistas').select('id,nome_completo,brigada_id,status').eq('status','ativo'),
+  ])
+
+  _registros = regRes.data  || []
+  _brigadas  = brigRes.data || []
+  _brists    = bristRes.data || []
+
+  // Preenche dropdown de UCs
+  const ucs = {}
+  _registros.forEach(r => { if (r.uc_id && r.uc_nome) ucs[r.uc_id] = r.uc_nome })
+  _brigadas.forEach(b => { if (b.uc_id) ucs[b.uc_id] = ucs[b.uc_id] || b.nome })
+  const selUC = document.getElementById('sel-uc')
+  const ucAtual = selUC.value
+  selUC.innerHTML = '<option value="">Selecione a UC…</option>' +
+    Object.entries(ucs).sort((a,b)=>a[1].localeCompare(b[1]))
+      .map(([id,nome]) => `<option value="${id}" ${id===ucAtual?'selected':''}>${esc(nome)}</option>`)
+      .join('')
+
+  document.getElementById('rel-loading').hidden = true
+  _carregando = false
+
+  renderTabAtiva()
+}
+
+// ════════════════════════════════════════════════════════════════
+// Navegação entre tabs
+// ════════════════════════════════════════════════════════════════
+function renderTabAtiva() {
+  document.getElementById('tab-estado').hidden    = _tabAtiva !== 'estado'
+  document.getElementById('tab-regional').hidden  = _tabAtiva !== 'regional'
+  document.getElementById('tab-uc').hidden        = _tabAtiva !== 'uc'
+
+  if (_tabAtiva === 'estado')   renderEstado()
+  if (_tabAtiva === 'regional') renderRegional()
+  if (_tabAtiva === 'uc')       renderUC()
+}
+
+// ════════════════════════════════════════════════════════════════
+// TAB 1: ESTADO
+// ════════════════════════════════════════════════════════════════
+function renderEstado() {
+  const r = _registros
+  if (!r) return
+
+  const total   = r.length
+  const validado= r.filter(x=>x.status_validacao==='validado').length
+  const aguard  = r.filter(x=>x.status_validacao==='aguardando').length
+  const fauna   = r.reduce((s,x)=>s+(x.n_fauna||0), 0)
+  const area    = r.reduce((s,x)=>s+(Number(x.area_estimada_ha)||0), 0)
+  const pessoas = r.reduce((s,x)=>s+(x.pessoas_alcancadas||0), 0)
+
+  const pct = total ? Math.round(validado/total*100) : 0
+
+  const container = document.getElementById('tab-estado')
+  container.innerHTML = `
+    <!-- KPIs -->
+    <div class="kpi-row-brig">
+      <div class="kpi-brig"><div class="kpi-brig-n">${total}</div><div class="kpi-brig-l">Registros no período</div></div>
+      <div class="kpi-brig ok"><div class="kpi-brig-n">${validado}<span style="font-size:1rem"> (${pct}%)</span></div><div class="kpi-brig-l">Validados</div></div>
+      <div class="kpi-brig warn"><div class="kpi-brig-n">${aguard}</div><div class="kpi-brig-l">Aguardando validação</div></div>
+      <div class="kpi-brig fauna"><div class="kpi-brig-n">${fauna}</div><div class="kpi-brig-l">Fauna registrada</div></div>
+      <div class="kpi-brig"><div class="kpi-brig-n">${_brigadas.length}</div><div class="kpi-brig-l">Brigadas ativas</div></div>
+      <div class="kpi-brig"><div class="kpi-brig-n">${_brists.length}</div><div class="kpi-brig-l">Brigadistas ativos</div></div>
+      ${area > 0 ? `<div class="kpi-brig comb"><div class="kpi-brig-n">${formatNum(area,1)} ha</div><div class="kpi-brig-l">Área trabalhada</div></div>` : ''}
+      ${pessoas > 0 ? `<div class="kpi-brig moni"><div class="kpi-brig-n">${pessoas}</div><div class="kpi-brig-l">Pessoas alcançadas</div></div>` : ''}
+    </div>
+
+    <!-- Gráficos linha 1 -->
+    <div class="grid-2" style="gap:14px;margin-bottom:14px">
+      <div class="chart-card">${chartNatureza(r)}</div>
+      <div class="chart-card">${chartMensal(r)}</div>
+    </div>
+
+    <!-- Gráficos linha 2 -->
+    <div class="grid-2" style="gap:14px;margin-bottom:18px">
+      <div class="chart-card">${chartAtividade(r)}</div>
+      <div class="chart-card">${chartStatus(r)}</div>
+    </div>
+
+    <!-- Tabelas -->
+    <div class="grid-2" style="gap:14px;margin-bottom:14px">
+      <div class="card">
+        <div class="card-header"><div class="card-title">Top Brigadas</div></div>
+        <div class="card-body" style="padding:0 0 8px">
+          ${tabelaBrigadas(r, _brigadas)}
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><div class="card-title">Top Brigadistas</div></div>
+        <div class="card-body" style="padding:0 0 8px">
+          ${tabelaBrigadistas(r)}
+        </div>
+      </div>
+    </div>
+
+    <!-- Tabela por regional -->
+    <div class="card" style="margin-bottom:14px">
+      <div class="card-header"><div class="card-title">Resumo por Regional</div></div>
+      <div class="card-body" style="padding:0 0 8px;overflow-x:auto">
+        ${tabelaRegional(r)}
+      </div>
+    </div>
+  `
+}
+
+// ════════════════════════════════════════════════════════════════
+// TAB 2: REGIONAL
+// ════════════════════════════════════════════════════════════════
+function renderRegional() {
+  const regional = document.getElementById('sel-regional')?.value
+  const cont = document.getElementById('conteudo-regional')
+  if (!regional) { cont.innerHTML = ''; return }
+
+  const r   = _registros.filter(x => x.regional === regional)
+  const brig = _brigadas.filter(b => b.regional === regional)
+  const brist = _brists.filter(b => brig.some(br => br.id === b.brigada_id))
+
+  const total   = r.length
+  const validado= r.filter(x=>x.status_validacao==='validado').length
+  const fauna   = r.reduce((s,x)=>s+(x.n_fauna||0), 0)
+  const pct = total ? Math.round(validado/total*100) : 0
+
+  cont.innerHTML = `
+    <div class="kpi-row-brig">
+      <div class="kpi-brig"><div class="kpi-brig-n">${total}</div><div class="kpi-brig-l">Registros</div></div>
+      <div class="kpi-brig ok"><div class="kpi-brig-n">${validado} <span style="font-size:1rem">(${pct}%)</span></div><div class="kpi-brig-l">Validados</div></div>
+      <div class="kpi-brig fauna"><div class="kpi-brig-n">${fauna}</div><div class="kpi-brig-l">Fauna</div></div>
+      <div class="kpi-brig"><div class="kpi-brig-n">${brig.length}</div><div class="kpi-brig-l">Brigadas</div></div>
+      <div class="kpi-brig"><div class="kpi-brig-n">${brist.length}</div><div class="kpi-brig-l">Brigadistas</div></div>
+    </div>
+
+    <div class="grid-2" style="gap:14px;margin-bottom:18px">
+      <div class="chart-card">${chartNatureza(r)}</div>
+      <div class="chart-card">${chartAtividade(r)}</div>
+    </div>
+
+    ${total ? `
+    <div class="card" style="margin-bottom:14px">
+      <div class="card-header"><div class="card-title">Brigadas da Regional ${REGIONAL_LAB[regional]||regional}</div></div>
+      <div class="card-body" style="padding:0 0 8px;overflow-x:auto">
+        ${tabelaBrigadasDetalhe(r, brig, brist)}
+      </div>
+    </div>` : '<p style="color:var(--cinza-400);text-align:center;padding:2rem">Sem registros nesta regional no período selecionado.</p>'}
+  `
+}
+
+// ════════════════════════════════════════════════════════════════
+// TAB 3: UC
+// ════════════════════════════════════════════════════════════════
+function renderUC() {
+  const ucId = document.getElementById('sel-uc')?.value
+  const cont = document.getElementById('conteudo-uc')
+  if (!ucId) { cont.innerHTML = ''; return }
+
+  const r     = _registros.filter(x => x.uc_id === ucId)
+  const brig  = _brigadas.filter(b => b.uc_id === ucId)
+  const brist = _brists.filter(b => brig.some(br => br.id === b.brigada_id))
+  const ucNome = r[0]?.uc_nome || _brigadas.find(b=>b.uc_id===ucId)?.nome || '—'
+
+  const total    = r.length
+  const validado = r.filter(x=>x.status_validacao==='validado').length
+  const fauna    = r.reduce((s,x)=>s+(x.n_fauna||0), 0)
+  const area     = r.reduce((s,x)=>s+(Number(x.area_estimada_ha)||0), 0)
+  const pct = total ? Math.round(validado/total*100) : 0
+
+  cont.innerHTML = `
+    <div class="kpi-row-brig">
+      <div class="kpi-brig"><div class="kpi-brig-n">${total}</div><div class="kpi-brig-l">Registros</div></div>
+      <div class="kpi-brig ok"><div class="kpi-brig-n">${validado} <span style="font-size:1rem">(${pct}%)</span></div><div class="kpi-brig-l">Validados</div></div>
+      <div class="kpi-brig fauna"><div class="kpi-brig-n">${fauna}</div><div class="kpi-brig-l">Fauna</div></div>
+      ${area > 0 ? `<div class="kpi-brig comb"><div class="kpi-brig-n">${formatNum(area,1)} ha</div><div class="kpi-brig-l">Área trabalhada</div></div>` : ''}
+      <div class="kpi-brig"><div class="kpi-brig-n">${brig.length}</div><div class="kpi-brig-l">Brigadas</div></div>
+      <div class="kpi-brig"><div class="kpi-brig-n">${brist.length}</div><div class="kpi-brig-l">Brigadistas</div></div>
+    </div>
+
+    <div class="grid-2" style="gap:14px;margin-bottom:18px">
+      <div class="chart-card">${chartNatureza(r)}</div>
+      <div class="chart-card">${chartMensal(r)}</div>
+    </div>
+
+    ${total ? `
+    <div class="card" style="margin-bottom:14px">
+      <div class="card-header"><div class="card-title">Últimas Atividades — ${esc(ucNome)}</div></div>
+      <div class="card-body" style="padding:0 0 8px;overflow-x:auto">
+        ${tabelaAtividades(r.slice(0,20))}
+      </div>
+    </div>` : '<p style="color:var(--cinza-400);text-align:center;padding:2rem">Sem registros nesta UC no período selecionado.</p>'}
+  `
+}
+
+// ════════════════════════════════════════════════════════════════
+// Componentes de gráfico (CSS)
+// ════════════════════════════════════════════════════════════════
+function barChart(titulo, rows) {
+  // rows: [{label, n, cor, pct}]
+  if (!rows.length) return `<div class="chart-title">${titulo}</div><div class="chart-empty">Sem dados</div>`
+  const max = Math.max(...rows.map(r=>r.n), 1)
+  return `
+    <div class="chart-title">${titulo}</div>
+    ${rows.map(r=>`
+    <div class="bar-row">
+      <span class="bar-label">${r.label}</span>
+      <div class="bar-wrap"><div class="bar-fill" style="width:${Math.round(r.n/max*100)}%;background:${r.cor}"></div></div>
+      <span class="bar-val">${r.n}</span>
+    </div>`).join('')}`
+}
+
+function chartNatureza(rows) {
+  const cnt = agrupar(rows, 'natureza')
+  const data = Object.entries(cnt).sort((a,b)=>b[1]-a[1]).map(([k,n])=>({
+    label: (NAT_EMO[k]||'')+ ' ' + (NAT_LAB[k]||k), n, cor: NAT_COR[k]||'#6b7280'
+  }))
+  return barChart('Por natureza', data)
+}
+
+function chartAtividade(rows) {
+  const cnt = agrupar(rows, 'atividade')
+  const data = Object.entries(cnt).sort((a,b)=>b[1]-a[1]).slice(0,8).map(([k,n])=>({
+    label: ATIV_LAB[k]||k, n, cor:'#52B788'
+  }))
+  return barChart('Por atividade', data)
+}
+
+function chartStatus(rows) {
+  const cnt = agrupar(rows, 'status_validacao')
+  const cores = { aguardando:'#f59e0b', validado:'#059669', requer_correcao:'#e879f9', rejeitado:'#ef4444' }
+  const data  = Object.entries(cnt).sort((a,b)=>b[1]-a[1]).map(([k,n])=>({
+    label: STATUS_LAB[k]||k, n, cor: cores[k]||'#6b7280'
+  }))
+  return barChart('Status de validação', data)
+}
+
+function chartMensal(rows) {
+  const cnt = {}
+  rows.forEach(r => {
+    if (!r.data_hora_evento) return
+    const key = r.data_hora_evento.slice(0,7) // YYYY-MM
+    cnt[key] = (cnt[key]||0) + 1
+  })
+  // Últimos 12 meses preenchidos (mesmo zerados)
+  const meses = []
+  for (let i = 11; i >= 0; i--) {
+    const d = new Date()
+    d.setMonth(d.getMonth() - i, 1)
+    meses.push(d.toISOString().slice(0,7))
+  }
+  const data = meses.filter(m => cnt[m] != null || rows.length > 0).map(m => {
+    const [ano, mes] = m.split('-')
+    const label = new Date(Number(ano), Number(mes)-1, 1).toLocaleDateString('pt-BR',{month:'short',year:'2-digit'})
+    return { label, n: cnt[m]||0, cor:'#3B82C4' }
+  }).filter(r => rows.length < 10 || r.n > 0 || true).slice(-12)
+
+  return barChart('Evolução mensal', data.map(d => ({...d, label: `<span style="font-size:.72rem">${d.label}</span>`})))
+}
+
+// ════════════════════════════════════════════════════════════════
+// Tabelas
+// ════════════════════════════════════════════════════════════════
+function tabelaBrigadas(registros, brigadas) {
+  const cnt = agruparObj(registros, 'brigada_id')
+  const rows = Object.entries(cnt)
+    .map(([brigId, regs]) => {
+      const brig = brigadas.find(b=>b.id===brigId) || {}
+      const nFauna = regs.reduce((s,r)=>s+(r.n_fauna||0),0)
+      const pctVal = regs.length ? Math.round(regs.filter(r=>r.status_validacao==='validado').length/regs.length*100) : 0
+      return { nome: regs[0]?.brigada_nome || brig.nome || '—', n: regs.length, fauna: nFauna, pct: pctVal, regional: brig.regional }
+    })
+    .sort((a,b)=>b.n-a.n).slice(0,10)
+
+  if (!rows.length) return '<p class="chart-empty" style="padding:12px">Sem dados</p>'
+  return `<table class="rel-table">
+    <thead><tr>
+      <th>Brigada</th><th>Regional</th><th>Registros</th><th>Fauna</th><th>% Validado</th>
+    </tr></thead>
+    <tbody>${rows.map(r=>`<tr>
+      <td>${esc(r.nome)}</td>
+      <td>${r.regional ? (REGIONAL_LAB[r.regional]||r.regional) : '—'}</td>
+      <td><strong>${r.n}</strong></td>
+      <td>${r.fauna > 0 ? `🐾 ${r.fauna}` : '—'}</td>
+      <td>
+        <div style="display:flex;align-items:center;gap:6px">
+          <div class="bar-wrap" style="width:60px"><div class="bar-fill" style="width:${r.pct}%;background:${r.pct>70?'#059669':r.pct>40?'#f59e0b':'#ef4444'}"></div></div>
+          <span style="font-size:.76rem">${r.pct}%</span>
+        </div>
+      </td>
+    </tr>`).join('')}</tbody>
+  </table>`
+}
+
+function tabelaBrigadistas(registros) {
+  const cnt = agruparObj(registros, 'brigadista_id')
+  const rows = Object.entries(cnt)
+    .map(([id, regs]) => {
+      const ultima = regs[0]?.data_hora_evento
+      const fauna  = regs.reduce((s,r)=>s+(r.n_fauna||0),0)
+      const nats   = [...new Set(regs.map(r=>r.natureza).filter(Boolean))]
+      return { nome: regs[0]?.brigadista_nome || '—', n: regs.length, ultima, fauna, nats }
+    })
+    .sort((a,b)=>b.n-a.n).slice(0,10)
+
+  if (!rows.length) return '<p class="chart-empty" style="padding:12px">Sem dados</p>'
+  return `<table class="rel-table">
+    <thead><tr>
+      <th>Brigadista</th><th>Naturezas</th><th>Registros</th><th>Fauna</th><th>Última atividade</th>
+    </tr></thead>
+    <tbody>${rows.map(r=>`<tr>
+      <td>${esc(r.nome)}</td>
+      <td>${r.nats.map(n=>`<span class="nat-chip ${n}">${NAT_EMO[n]||''}</span>`).join(' ')}</td>
+      <td><strong>${r.n}</strong></td>
+      <td>${r.fauna > 0 ? `🐾 ${r.fauna}` : '—'}</td>
+      <td style="font-size:.78rem;color:var(--cinza-500)">${r.ultima ? new Date(r.ultima).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',year:'2-digit',timeZone:'America/Rio_Branco'}) : '—'}</td>
+    </tr>`).join('')}</tbody>
+  </table>`
+}
+
+function tabelaRegional(registros) {
+  const cnt = agruparObj(registros, 'regional')
+  const rows = Object.entries(REGIONAL_LAB).map(([k,lab]) => {
+    const regs = cnt[k] || []
+    const fauna = regs.reduce((s,r)=>s+(r.n_fauna||0),0)
+    const pct   = regs.length ? Math.round(regs.filter(r=>r.status_validacao==='validado').length/regs.length*100) : 0
+    return { regional: lab, n: regs.length, fauna, pct, key: k }
+  }).sort((a,b)=>b.n-a.n)
+
+  return `<table class="rel-table">
+    <thead><tr>
+      <th>Regional</th><th>Registros</th><th>Prevenção</th><th>Combate</th><th>Monitoramento</th><th>Fauna</th><th>% Valid.</th>
+    </tr></thead>
+    <tbody>${rows.map(r=>{
+      const regs = cnt[r.key]||[]
+      const prev = regs.filter(x=>x.natureza==='prevencao').length
+      const comb = regs.filter(x=>x.natureza==='combate').length
+      const moni = regs.filter(x=>x.natureza==='monitoramento').length
+      return `<tr>
+        <td><strong>${esc(r.regional)}</strong></td>
+        <td>${r.n||'—'}</td>
+        <td>${prev||'—'}</td>
+        <td>${comb||'—'}</td>
+        <td>${moni||'—'}</td>
+        <td>${r.fauna||'—'}</td>
+        <td>${r.n?r.pct+'%':'—'}</td>
+      </tr>`
+    }).join('')}</tbody>
+  </table>`
+}
+
+function tabelaBrigadasDetalhe(registros, brigadas, brists) {
+  if (!brigadas.length) return '<p class="chart-empty" style="padding:12px">Nenhuma brigada nesta regional.</p>'
+  const cnt = agruparObj(registros, 'brigada_id')
+
+  return `<table class="rel-table">
+    <thead><tr>
+      <th>Brigada</th><th>Brigadistas</th><th>Registros</th><th>Fauna</th><th>% Validado</th>
+    </tr></thead>
+    <tbody>${brigadas.map(b=>{
+      const regs = cnt[b.id]||[]
+      const nbr  = brists.filter(x=>x.brigada_id===b.id).length
+      const nfauna = regs.reduce((s,r)=>s+(r.n_fauna||0),0)
+      const pct = regs.length ? Math.round(regs.filter(r=>r.status_validacao==='validado').length/regs.length*100) : 0
+      return `<tr>
+        <td>${esc(b.nome)}</td>
+        <td>${nbr}</td>
+        <td>${regs.length||'—'}</td>
+        <td>${nfauna||'—'}</td>
+        <td>${regs.length?pct+'%':'—'}</td>
+      </tr>`
+    }).join('')}</tbody>
+  </table>`
+}
+
+function tabelaAtividades(rows) {
+  if (!rows.length) return '<p class="chart-empty" style="padding:12px">Sem atividades.</p>'
+  return `<table class="rel-table">
+    <thead><tr>
+      <th>Data</th><th>Natureza</th><th>Atividade</th><th>Brigadista</th><th>Fauna</th><th>Status</th>
+    </tr></thead>
+    <tbody>${rows.map(r=>{
+      const dt = r.data_hora_evento
+        ? new Date(r.data_hora_evento).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',year:'2-digit',timeZone:'America/Rio_Branco'})
+        : '—'
+      const statusCor = {aguardando:'#f59e0b',validado:'#059669',requer_correcao:'#e879f9',rejeitado:'#ef4444'}[r.status_validacao]||'#6b7280'
+      return `<tr>
+        <td style="font-size:.78rem;white-space:nowrap">${dt}</td>
+        <td><span class="nat-chip ${r.natureza}">${NAT_EMO[r.natureza]||''} ${NAT_LAB[r.natureza]||r.natureza}</span></td>
+        <td>${esc(ATIV_LAB[r.atividade]||r.atividade||'—')}</td>
+        <td style="font-size:.8rem">${esc(r.brigadista_nome||'—')}</td>
+        <td>${r.n_fauna > 0 ? `🐾 ${r.n_fauna}` : '—'}</td>
+        <td><span style="font-size:.72rem;font-weight:600;color:${statusCor}">${STATUS_LAB[r.status_validacao]||r.status_validacao}</span></td>
+      </tr>`
+    }).join('')}</tbody>
+  </table>`
+}
+
+// ════════════════════════════════════════════════════════════════
+// Exportar CSV
+// ════════════════════════════════════════════════════════════════
+function exportarCSV() {
+  const { ini, fim } = getPeriodo()
+  const cabecalho = ['Data','Natureza','Atividade','Status Validação','Brigadista','Brigada','UC','Regional','N Fauna','Área ha','Pessoas']
+  const linhas = _registros.map(r => [
+    r.data_hora_evento ? new Date(r.data_hora_evento).toLocaleDateString('pt-BR',{timeZone:'America/Rio_Branco'}) : '',
+    NAT_LAB[r.natureza]||r.natureza||'',
+    ATIV_LAB[r.atividade]||r.atividade||'',
+    STATUS_LAB[r.status_validacao]||r.status_validacao||'',
+    r.brigadista_nome||'',
+    r.brigada_nome||'',
+    r.uc_nome||'',
+    REGIONAL_LAB[r.regional]||r.regional||'',
+    r.n_fauna||0,
+    r.area_estimada_ha||'',
+    r.pessoas_alcancadas||'',
+  ].map(v => `"${String(v).replace(/"/g,'""')}"`).join(','))
+
+  const csv  = [cabecalho.join(','), ...linhas].join('\n')
+  const blob = new Blob(['﻿'+csv], { type:'text/csv;charset=utf-8' })
+  const url  = URL.createObjectURL(blob)
+  const a    = Object.assign(document.createElement('a'), {
+    href: url,
+    download: `brigadas-${ini}_${fim}.csv`,
+  })
+  a.click()
+  setTimeout(() => URL.revokeObjectURL(url), 3000)
+}
+
+// ════════════════════════════════════════════════════════════════
+// Utilidades
+// ════════════════════════════════════════════════════════════════
+function agrupar(arr, campo) {
+  const r = {}
+  arr.forEach(x => { const k = x[campo]; if (k) r[k] = (r[k]||0) + 1 })
+  return r
+}
+function agruparObj(arr, campo) {
+  const r = {}
+  arr.forEach(x => { const k = x[campo]; if (k) { if (!r[k]) r[k]=[]; r[k].push(x) } })
+  return r
+}
+</script>
+</body>
+</html>
