@@ -1,0 +1,810 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>SIGUC-AC · Validação de Campo</title>
+<link rel="stylesheet" href="../css/global.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../js/observability.js"></script>
+<script src="../js/queryLogger.js"></script>
+<script src="../js/config.js"></script>
+<script src="../js/layout.js"></script>
+<style>
+/* ── Tokens de natureza (inline — brigada.css não está no shell principal) */
+:root {
+  --nat-prev : #12A66A;
+  --nat-comb : #EF5B3C;
+  --nat-moni : #3B82C4;
+  --nat-prev-bg : rgba(18,166,106,.12);
+  --nat-comb-bg : rgba(239,91,60,.12);
+  --nat-moni-bg : rgba(59,130,196,.12);
+}
+
+/* ── KPIs ─────────────────────────────────────────── */
+.kpi-row { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:18px }
+.kpi-box { flex:1; min-width:130px; background:var(--card-bg,#fff);
+           border:1px solid var(--border,#e5e7eb); border-radius:10px;
+           padding:14px 16px; display:flex; flex-direction:column; gap:2px }
+.kpi-n   { font-size:1.8rem; font-weight:700; line-height:1; color:var(--floresta,#0A1A0F) }
+.kpi-l   { font-size:.78rem; color:var(--text-muted,#6b7280) }
+.kpi-n.alerta { color:#EF5B3C }
+.kpi-n.verde  { color:#12A66A }
+
+/* ── Filtros ──────────────────────────────────────── */
+.filtros-row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:16px }
+.tab-btn { padding:6px 16px; border-radius:999px; border:1.5px solid var(--border,#e5e7eb);
+           background:transparent; font-size:.83rem; cursor:pointer; font-weight:500;
+           color:var(--text-muted,#6b7280); white-space:nowrap; transition:.15s }
+.tab-btn.ativo { background:var(--floresta,#0A1A0F); color:#fff; border-color:var(--floresta,#0A1A0F) }
+.search-wrap { flex:1; min-width:200px; position:relative }
+.search-wrap input { width:100%; padding:7px 12px 7px 34px; border-radius:8px;
+                     border:1.5px solid var(--border,#e5e7eb); font-size:.85rem;
+                     background:var(--input-bg,#fff) }
+.search-wrap svg { position:absolute; left:10px; top:50%; transform:translateY(-50%);
+                   opacity:.45; pointer-events:none }
+
+/* ── Cards de registro ───────────────────────────── */
+#lista-registros { display:grid; gap:12px }
+
+.rc-card { background:var(--card-bg,#fff); border:1px solid var(--border,#e5e7eb);
+           border-radius:12px; padding:16px 18px; cursor:pointer;
+           transition:.15s; display:grid; grid-template-columns:1fr auto;
+           gap:8px; align-items:start }
+.rc-card:hover { border-color:var(--verde-c,#52B788); box-shadow:0 2px 8px rgba(0,0,0,.06) }
+
+.rc-top { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:6px }
+.nat-chip { display:inline-flex; align-items:center; gap:4px; padding:3px 10px;
+            border-radius:999px; font-size:.75rem; font-weight:600 }
+.nat-chip.prevencao   { background:var(--nat-prev-bg); color:var(--nat-prev) }
+.nat-chip.combate     { background:var(--nat-comb-bg); color:var(--nat-comb) }
+.nat-chip.monitoramento { background:var(--nat-moni-bg); color:var(--nat-moni) }
+
+.rc-titulo { font-size:.92rem; font-weight:600; color:var(--floresta,#0A1A0F) }
+.rc-meta   { font-size:.8rem; color:var(--text-muted,#6b7280); display:flex; gap:12px; flex-wrap:wrap; margin-top:4px }
+.rc-meta span { display:flex; align-items:center; gap:3px }
+
+.rc-badges { display:flex; gap:6px; flex-wrap:wrap; margin-top:8px }
+.badge-sm  { padding:2px 8px; border-radius:999px; font-size:.72rem; font-weight:600 }
+
+/* status validação */
+.badge-aguardando     { background:#fef3c7; color:#92400e }
+.badge-validado       { background:#d1fae5; color:#065f46 }
+.badge-requer_correcao { background:#fce7f3; color:#9d174d }
+.badge-rejeitado      { background:#fee2e2; color:#991b1b }
+
+/* fauna pendente */
+.badge-fauna-pend { background:rgba(59,130,196,.13); color:#1d4ed8 }
+.badge-fauna-ok   { background:rgba(18,166,106,.13); color:#065f46 }
+
+.rc-actions { display:flex; flex-direction:column; gap:6px; align-items:flex-end }
+.btn-ver { padding:6px 14px; border-radius:8px; font-size:.8rem; font-weight:600;
+           background:var(--floresta,#0A1A0F); color:#fff; border:none; cursor:pointer;
+           white-space:nowrap }
+.btn-ver:hover { opacity:.85 }
+
+/* ── Modal ───────────────────────────────────────── */
+#modal-detalhe .modal { max-width:780px; width:95vw }
+
+.modal-natureza-bar { height:4px; border-radius:4px 4px 0 0; margin:-1px -1px 0 -1px }
+.modal-natureza-bar.prevencao   { background:var(--nat-prev) }
+.modal-natureza-bar.combate     { background:var(--nat-comb) }
+.modal-natureza-bar.monitoramento { background:var(--nat-moni) }
+
+.detail-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px 24px;
+               margin-bottom:16px }
+@media(max-width:520px){ .detail-grid{ grid-template-columns:1fr } }
+
+.detail-field label { font-size:.73rem; color:var(--text-muted,#6b7280);
+                      font-weight:600; text-transform:uppercase; letter-spacing:.04em }
+.detail-field p     { margin:2px 0 0; font-size:.88rem; color:var(--floresta,#0A1A0F) }
+
+/* Fotos */
+.fotos-grid { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px }
+.foto-thumb-val { width:90px; height:68px; object-fit:cover; border-radius:7px;
+                  cursor:pointer; border:1.5px solid var(--border,#e5e7eb) }
+.foto-thumb-val:hover { border-color:var(--verde-c,#52B788) }
+
+/* Fauna list */
+.fauna-row { display:grid; grid-template-columns:auto 1fr auto;
+             gap:10px; align-items:center;
+             padding:10px 0; border-bottom:1px solid var(--border,#e5e7eb) }
+.fauna-row:last-child { border-bottom:none }
+.fauna-icon-val { font-size:1.4rem; line-height:1 }
+.fauna-det strong { font-size:.87rem; display:block }
+.fauna-det span   { font-size:.78rem; color:var(--text-muted,#6b7280) }
+.badge-conf   { background:#d1fae5; color:#065f46; padding:2px 9px;
+                border-radius:999px; font-size:.72rem; font-weight:600 }
+.badge-pend   { background:#fef3c7; color:#92400e; padding:2px 9px;
+                border-radius:999px; font-size:.72rem; font-weight:600 }
+
+/* Historico */
+.hist-timeline { display:flex; flex-direction:column; gap:0 }
+.hist-item { display:flex; gap:10px; padding:8px 0;
+             border-left:2px solid var(--border,#e5e7eb); padding-left:14px;
+             position:relative }
+.hist-item::before { content:''; position:absolute; left:-5px; top:14px;
+                     width:8px; height:8px; border-radius:50%;
+                     background:var(--verde-c,#52B788); border:2px solid #fff }
+.hist-data  { font-size:.74rem; color:var(--text-muted,#6b7280); white-space:nowrap }
+.hist-body  { flex:1 }
+.hist-body strong { font-size:.83rem; display:block }
+.hist-body span   { font-size:.78rem; color:var(--text-muted,#6b7280) }
+
+/* Ações do modal */
+.modal-acoes { display:flex; gap:8px; flex-wrap:wrap; padding-top:12px;
+               border-top:1px solid var(--border,#e5e7eb); margin-top:4px }
+.btn-validar    { background:#12A66A; color:#fff }
+.btn-correcao   { background:#f59e0b; color:#fff }
+.btn-rejeitar   { background:#EF5B3C; color:#fff }
+.btn-promover   { background:#3B82C4; color:#fff }
+.btn-acao { padding:8px 16px; border-radius:8px; font-size:.84rem; font-weight:600;
+            border:none; cursor:pointer }
+.btn-acao:hover { opacity:.88 }
+
+/* Motivo input (inline) */
+.motivo-wrap { margin:10px 0; display:none }
+.motivo-wrap.visivel { display:block }
+.motivo-wrap textarea { width:100%; padding:8px 10px; border-radius:8px;
+                        border:1.5px solid var(--border,#e5e7eb);
+                        font-size:.85rem; resize:vertical; min-height:60px }
+.veredito-row { display:flex; gap:8px; margin-bottom:6px }
+.veredito-btn { padding:4px 12px; border-radius:999px; font-size:.78rem; font-weight:600;
+                border:1.5px solid var(--border,#e5e7eb); background:transparent;
+                cursor:pointer; transition:.12s }
+.veredito-btn.sel { background:var(--floresta,#0A1A0F); color:#fff; border-color:var(--floresta,#0A1A0F) }
+
+/* Confirmar espécie modal inline */
+.confirmar-esp-wrap { background:var(--bg-light,#f9fafb); border-radius:8px;
+                      padding:10px 12px; margin-top:6px; display:none }
+.confirmar-esp-wrap.visivel { display:block }
+.confirmar-esp-wrap input { width:100%; padding:6px 10px; border-radius:7px;
+                            border:1.5px solid var(--border,#e5e7eb); font-size:.84rem }
+
+/* GPS link */
+.gps-link { font-size:.8rem; color:var(--verde-c,#52B788); text-decoration:none }
+.gps-link:hover { text-decoration:underline }
+
+/* Foto lightbox */
+#lightbox { position:fixed; inset:0; background:rgba(0,0,0,.88); z-index:9999;
+            display:flex; align-items:center; justify-content:center; cursor:zoom-out }
+#lightbox img { max-width:92vw; max-height:92vh; border-radius:6px; object-fit:contain }
+#lightbox.oculto { display:none }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<!-- ── Modal de detalhe/validação ──────────────────────────── -->
+<div class="modal-overlay" id="modal-detalhe" style="display:none">
+  <div class="modal" style="max-width:780px;padding-bottom:0">
+    <div class="modal-natureza-bar" id="modal-nat-bar"></div>
+    <div class="modal-header">
+      <div class="modal-title" id="modal-titulo-det">Registro de Campo</div>
+      <button class="modal-close" onclick="fecharDetalhe()">×</button>
+    </div>
+    <div class="modal-body" style="overflow-y:auto;max-height:72vh">
+
+      <!-- Cabeçalho resumido -->
+      <div id="modal-cabecalho"></div>
+
+      <!-- Grid de detalhes -->
+      <div class="detail-grid" id="modal-detail-grid"></div>
+
+      <!-- Fotos -->
+      <div id="modal-fotos-sec" hidden>
+        <p class="form-label" style="margin-bottom:6px">📷 Fotos</p>
+        <div class="fotos-grid" id="modal-fotos-grid"></div>
+      </div>
+
+      <!-- Fauna -->
+      <div id="modal-fauna-sec" hidden>
+        <p class="form-label" style="margin-bottom:6px">🐾 Fauna Registrada</p>
+        <div id="modal-fauna-lista"></div>
+      </div>
+
+      <!-- Histórico -->
+      <div id="modal-hist-sec" hidden>
+        <p class="form-label" style="margin:14px 0 6px">📋 Histórico</p>
+        <div class="hist-timeline" id="modal-hist"></div>
+      </div>
+
+      <!-- Ações -->
+      <div class="modal-acoes" id="modal-acoes">
+        <!-- preenchido via JS -->
+      </div>
+
+      <!-- Motivo / veredito -->
+      <div class="motivo-wrap" id="motivo-wrap">
+        <div class="veredito-row" id="veredito-row" style="display:none">
+          <span style="font-size:.78rem;font-weight:600;align-self:center">Veredito:</span>
+          <button class="veredito-btn" data-v="confirmado">Confirmado</button>
+          <button class="veredito-btn" data-v="falso_positivo">Falso positivo</button>
+          <button class="veredito-btn" data-v="nao_localizado">Não localizado</button>
+        </div>
+        <textarea id="motivo-txt" placeholder="Motivo / observação (obrigatório para correção/rejeição)"></textarea>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button class="btn-acao" id="btn-confirmar-acao" style="flex:1">Confirmar</button>
+          <button class="btn-acao" onclick="cancelarAcao()" style="background:var(--border,#e5e7eb);color:#111">Cancelar</button>
+        </div>
+      </div>
+
+      <!-- Modal promover a ocorrência -->
+      <div class="motivo-wrap" id="promover-wrap">
+        <p style="font-size:.82rem;margin-bottom:6px;font-weight:600">Nova Ocorrência</p>
+        <input id="promover-titulo" class="form-control" placeholder="Título da ocorrência *" style="margin-bottom:6px">
+        <select id="promover-sev" class="form-control" style="margin-bottom:8px">
+          <option value="baixa">Baixa</option>
+          <option value="media" selected>Média</option>
+          <option value="alta">Alta</option>
+          <option value="critica">Crítica</option>
+        </select>
+        <div style="display:flex;gap:8px">
+          <button class="btn-acao btn-promover" id="btn-confirmar-promover" style="flex:1">Criar Ocorrência</button>
+          <button class="btn-acao" onclick="cancelarAcao()" style="background:var(--border,#e5e7eb);color:#111">Cancelar</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Lightbox de foto -->
+<div id="lightbox" class="oculto" onclick="this.classList.add('oculto')">
+  <img id="lightbox-img" src="" alt="foto">
+</div>
+
+<script>
+// ════════════════════════════════════════════════════════════════
+// Estado
+// ════════════════════════════════════════════════════════════════
+let _usuario = null
+let _registros = []
+let _filtroStatus = 'aguardando'
+let _busca = ''
+let _detalheId = null
+let _faunaDetalhe = []
+let _acaoPendente = null  // 'validar'|'correcao'|'rejeitar'|'promover'
+
+// ── Cores / labels de referência ─────────────────────────────
+const NAT = {
+  prevencao:    { cor:'#12A66A', label:'Prevenção',    emoji:'🛡' },
+  combate:      { cor:'#EF5B3C', label:'Combate',      emoji:'🔥' },
+  monitoramento:{ cor:'#3B82C4', label:'Monitoramento', emoji:'🔭' },
+}
+const ATIV = {
+  fogo:'Combate a fogo', educacao_ambiental:'Educação ambiental',
+  limpeza:'Limpeza / aceiro', reconhecimento:'Reconhecimento',
+  plantio:'Plantio', primeiros_socorros:'Primeiros socorros',
+  queima_controlada:'Queima controlada', outro:'Outro',
+}
+const STATUS_VALID = {
+  aguardando:'Aguardando', validado:'Validado',
+  requer_correcao:'Requer correção', rejeitado:'Rejeitado',
+}
+const FAUNA_ICONE = {
+  mamifero:'🦌', ave:'🦜', reptil:'🦎', anfibio:'🐸',
+  peixe:'🐟', invertebrado:'🦋', nao_sei:'❓',
+}
+const CONDICAO = {
+  integro:'Íntegro', ferido:'Ferido', debilitado:'Debilitado',
+  queimado:'Queimado', obito:'Óbito',
+}
+const TIPO_EV = {
+  resgate:'Resgate', avistamento:'Avistamento', atropelamento:'Atropelamento',
+  apreensao:'Apreensão', encontrado_morto:'Encontrado morto',
+}
+const DESTIN = {
+  solto_no_local:'Solto no local', encaminhado_cetas:'Encam. CETAS',
+  obito:'Óbito', em_tratamento:'Em tratamento', outro:'Outro',
+}
+
+// ════════════════════════════════════════════════════════════════
+// Inicialização
+// ════════════════════════════════════════════════════════════════
+;(async function () {
+  _usuario = await carregarUsuario()
+  if (!_usuario) { window.location.href = '../index.html'; return }
+
+  const perfisPermitidos = ['biologo','tecnico','gestor','super_admin']
+  if (!perfisPermitidos.includes(_usuario.perfil)) {
+    document.getElementById('app').innerHTML =
+      gerarLayout('Validação de Campo', 'validacao-campo') +
+      '<div class="page-content"><div class="alert alert-danger">Acesso restrito.</div></div>'
+    return
+  }
+
+  document.getElementById('app').innerHTML =
+    gerarLayout('Validação de Campo', 'validacao-campo') + `
+<div class="page-content">
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Validação de Campo</h1>
+      <p class="page-subtitle">Registros das brigadas aguardando análise</p>
+    </div>
+  </div>
+
+  <!-- KPIs -->
+  <div class="kpi-row" id="kpi-row">
+    <div class="kpi-box"><span class="kpi-n alerta" id="kpi-aguardando">—</span><span class="kpi-l">Aguardando</span></div>
+    <div class="kpi-box"><span class="kpi-n alerta" id="kpi-correcao">—</span><span class="kpi-l">Requer correção</span></div>
+    <div class="kpi-box"><span class="kpi-n" id="kpi-fauna-pend">—</span><span class="kpi-l">Com fauna pendente</span></div>
+    <div class="kpi-box"><span class="kpi-n verde" id="kpi-validado">—</span><span class="kpi-l">Validados hoje</span></div>
+  </div>
+
+  <!-- Filtros -->
+  <div class="filtros-row">
+    <button class="tab-btn ativo" data-st="aguardando">Aguardando</button>
+    <button class="tab-btn" data-st="requer_correcao">Requer correção</button>
+    <button class="tab-btn" data-st="validado">Validados</button>
+    <button class="tab-btn" data-st="rejeitado">Rejeitados</button>
+    <button class="tab-btn" data-st="">Todos</button>
+    <div class="search-wrap">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      <input type="search" id="busca-input" placeholder="Brigadista, brigada, UC…">
+    </div>
+  </div>
+
+  <div id="lista-registros"></div>
+</div>`
+
+  // Eventos dos filtros
+  document.querySelectorAll('.tab-btn[data-st]').forEach(b => {
+    b.addEventListener('click', () => {
+      document.querySelectorAll('.tab-btn[data-st]').forEach(x => x.classList.remove('ativo'))
+      b.classList.add('ativo')
+      _filtroStatus = b.dataset.st
+      renderLista()
+    })
+  })
+  document.getElementById('busca-input').addEventListener('input', e => {
+    _busca = e.target.value.toLowerCase()
+    renderLista()
+  })
+
+  await carregarDados()
+  if (window._sigucBar) _sigucBarCompleta()
+})()
+
+// ════════════════════════════════════════════════════════════════
+// Dados
+// ════════════════════════════════════════════════════════════════
+async function carregarDados() {
+  const { data, error } = await db
+    .from('vw_registros_validacao')
+    .select('*')
+    .order('criado_em', { ascending: false })
+    .limit(400)
+
+  if (error) { toast('Erro ao carregar registros: ' + error.message, 'erro'); return }
+  _registros = data || []
+  renderKpis()
+  renderLista()
+}
+
+function renderKpis() {
+  const hoje = new Date().toISOString().slice(0,10)
+  const ag  = _registros.filter(r => r.status_validacao === 'aguardando').length
+  const cor = _registros.filter(r => r.status_validacao === 'requer_correcao').length
+  const fp  = _registros.filter(r => r.n_fauna_pendente > 0 && r.status_validacao !== 'rejeitado').length
+  const vhj = _registros.filter(r => r.status_validacao === 'validado' && r.validado_em?.startsWith(hoje)).length
+  document.getElementById('kpi-aguardando').textContent  = ag
+  document.getElementById('kpi-correcao').textContent    = cor
+  document.getElementById('kpi-fauna-pend').textContent  = fp
+  document.getElementById('kpi-validado').textContent    = vhj
+}
+
+function filtrados() {
+  return _registros.filter(r => {
+    if (_filtroStatus && r.status_validacao !== _filtroStatus) return false
+    if (_busca) {
+      const hay = [r.brigadista_nome, r.brigada_nome, r.uc_nome, r.atividade, r.natureza]
+        .filter(Boolean).join(' ').toLowerCase()
+      if (!hay.includes(_busca)) return false
+    }
+    return true
+  })
+}
+
+// ════════════════════════════════════════════════════════════════
+// Renderização
+// ════════════════════════════════════════════════════════════════
+function renderLista() {
+  const lista = document.getElementById('lista-registros')
+  if (!lista) return
+  const rows = filtrados()
+
+  if (!rows.length) {
+    lista.innerHTML = `<div style="text-align:center;padding:3rem;opacity:.5">
+      <div style="font-size:2rem">📭</div>
+      <p style="margin-top:8px">Nenhum registro neste filtro</p>
+    </div>`
+    return
+  }
+
+  lista.innerHTML = rows.map(r => {
+    const nat  = NAT[r.natureza] || { cor:'#888', label:r.natureza, emoji:'📋' }
+    const ativ = ATIV[r.atividade] || r.atividade || '—'
+    const dt   = r.data_hora_evento
+      ? new Date(r.data_hora_evento).toLocaleString('pt-BR', { timeZone:'America/Rio_Branco', day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' })
+      : '—'
+    const faunaBadge = r.n_fauna > 0
+      ? (r.n_fauna_pendente > 0
+          ? `<span class="badge-sm badge-fauna-pend">🐾 ${r.n_fauna_pendente} fauna pendente</span>`
+          : `<span class="badge-sm badge-fauna-ok">🐾 ${r.n_fauna} fauna confirmada</span>`)
+      : ''
+    const fotoBadge = (r.fotos_urls?.length > 0)
+      ? `<span class="badge-sm" style="background:#f3f4f6;color:#374151">📷 ${r.fotos_urls.length}</span>`
+      : ''
+
+    return `
+    <div class="rc-card" data-id="${r.id}" onclick="abrirDetalhe('${r.id}')">
+      <div>
+        <div class="rc-top">
+          <span class="nat-chip ${r.natureza}">${nat.emoji} ${nat.label}</span>
+          <span class="badge-sm badge-${r.status_validacao}">${STATUS_VALID[r.status_validacao] || r.status_validacao}</span>
+          ${r.n_fauna_pendente > 0 ? '<span class="badge-sm badge-fauna-pend">🐾 Fauna pendente</span>' : ''}
+        </div>
+        <div class="rc-titulo">${esc(ativ)} · ${esc(r.brigada_nome || '—')}</div>
+        <div class="rc-meta">
+          <span>👤 ${esc(r.brigadista_nome || '—')}</span>
+          ${r.uc_nome ? `<span>🌳 ${esc(r.uc_nome)}</span>` : ''}
+          <span>🕐 ${dt}</span>
+          ${r.lat ? `<span>📍 GPS</span>` : ''}
+        </div>
+        <div class="rc-badges">${faunaBadge}${fotoBadge}</div>
+      </div>
+      <div class="rc-actions">
+        <button class="btn-ver">Ver →</button>
+      </div>
+    </div>`
+  }).join('')
+}
+
+// ════════════════════════════════════════════════════════════════
+// Detalhe / Modal
+// ════════════════════════════════════════════════════════════════
+async function abrirDetalhe(id) {
+  _detalheId = id
+  _acaoPendente = null
+
+  const r = _registros.find(x => x.id === id)
+  if (!r) return
+
+  const nat = NAT[r.natureza] || { cor:'#888', label:r.natureza, emoji:'📋' }
+
+  // Barra colorida
+  const bar = document.getElementById('modal-nat-bar')
+  bar.className = 'modal-natureza-bar ' + (r.natureza || '')
+
+  document.getElementById('modal-titulo-det').textContent =
+    `${nat.emoji} ${nat.label} — ${ATIV[r.atividade] || r.atividade || ''}`
+
+  // Cabeçalho
+  const dt = r.data_hora_evento
+    ? new Date(r.data_hora_evento).toLocaleString('pt-BR',
+        { timeZone:'America/Rio_Branco', day:'2-digit', month:'2-digit', year:'numeric',
+          hour:'2-digit', minute:'2-digit' })
+    : '—'
+  document.getElementById('modal-cabecalho').innerHTML = `
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
+      <span class="badge-sm badge-${r.status_validacao}">${STATUS_VALID[r.status_validacao] || r.status_validacao}</span>
+      ${r.n_fauna_pendente > 0 ? '<span class="badge-sm badge-fauna-pend">🐾 Fauna pendente DEBIO</span>' : ''}
+      ${r.alerta_cigma ? '<span class="badge-sm" style="background:#fef3c7;color:#92400e">⚡ Alerta CIGMA</span>' : ''}
+      ${r.ocorrencia_id ? '<span class="badge-sm badge-validado">✓ Ocorrência criada</span>' : ''}
+    </div>
+    ${r.motivo_rejeicao ? `<div style="background:#fee2e2;border-radius:7px;padding:8px 12px;margin-bottom:12px;font-size:.83rem"><strong>Motivo:</strong> ${esc(r.motivo_rejeicao)}</div>` : ''}`
+
+  // Detail grid
+  const gpsHtml = r.lat
+    ? `<a class="gps-link" href="https://maps.google.com/?q=${r.lat},${r.lng}" target="_blank" rel="noopener">
+        ${r.lat.toFixed(5)}, ${r.lng.toFixed(5)} ↗
+        ${r.precisao_gps_m ? `<br><small>±${r.precisao_gps_m}m</small>` : ''}
+       </a>`
+    : '<span style="opacity:.5">Sem GPS</span>'
+
+  document.getElementById('modal-detail-grid').innerHTML = `
+    <div class="detail-field"><label>Brigadista</label><p>${esc(r.brigadista_nome || '—')}</p></div>
+    <div class="detail-field"><label>Brigada</label><p>${esc(r.brigada_nome || '—')}</p></div>
+    <div class="detail-field"><label>UC</label><p>${esc(r.uc_nome || '—')}</p></div>
+    <div class="detail-field"><label>Regional</label><p>${esc(r.regional || '—')}</p></div>
+    <div class="detail-field"><label>Data / Hora</label><p>${dt}</p></div>
+    <div class="detail-field"><label>Equipe</label><p>${esc(r.equipe || '—')}</p></div>
+    ${r.area_estimada_ha ? `<div class="detail-field"><label>Área estimada</label><p>${r.area_estimada_ha} ha</p></div>` : ''}
+    ${r.pessoas_alcancadas ? `<div class="detail-field"><label>Pessoas alcançadas</label><p>${r.pessoas_alcancadas}</p></div>` : ''}
+    <div class="detail-field" style="grid-column:1/-1"><label>GPS</label><p>${gpsHtml}</p></div>
+    ${r.descricao ? `<div class="detail-field" style="grid-column:1/-1"><label>Descrição</label><p>${esc(r.descricao)}</p></div>` : ''}
+    ${r.validado_por_nome ? `<div class="detail-field" style="grid-column:1/-1"><label>Validado por</label><p>${esc(r.validado_por_nome)} — ${r.validado_em ? new Date(r.validado_em).toLocaleString('pt-BR',{timeZone:'America/Rio_Branco'}) : ''}</p></div>` : ''}
+  `
+
+  // Fotos
+  const fotosSec = document.getElementById('modal-fotos-sec')
+  if (r.fotos_urls?.length) {
+    fotosSec.hidden = false
+    document.getElementById('modal-fotos-grid').innerHTML =
+      r.fotos_urls.map(u => `<img class="foto-thumb-val" src="${esc(u)}" alt="foto" onclick="abrirLightbox('${esc(u)}')">`).join('')
+  } else { fotosSec.hidden = true }
+
+  // Fauna
+  await carregarFaunaModal(r.id)
+
+  // Histórico
+  const hist = r.historico || []
+  const histSec = document.getElementById('modal-hist-sec')
+  if (hist.length) {
+    histSec.hidden = false
+    document.getElementById('modal-hist').innerHTML = hist.map(h => {
+      const labAcao = STATUS_VALID[h.acao] || h.acao || '—'
+      return `<div class="hist-item">
+        <div>
+          <div class="hist-data">${h.data ? h.data.replace('T',' ').slice(0,16) : '—'}</div>
+          <div class="hist-body">
+            <strong>${esc(h.usuario_nome || '—')} <span style="font-weight:400;opacity:.7">(${esc(h.perfil||'')})</span> → ${labAcao}</strong>
+            ${h.obs ? `<span>${esc(h.obs)}</span>` : ''}
+          </div>
+        </div>
+      </div>`
+    }).join('')
+  } else { histSec.hidden = true }
+
+  // Ações
+  renderAcoes(r)
+
+  // Esconde áreas inline
+  document.getElementById('motivo-wrap').classList.remove('visivel')
+  document.getElementById('promover-wrap').classList.remove('visivel')
+
+  document.getElementById('modal-detalhe').style.display = 'flex'
+}
+
+async function carregarFaunaModal(rcId) {
+  const sec = document.getElementById('modal-fauna-sec')
+  const lista = document.getElementById('modal-fauna-lista')
+
+  const { data, error } = await db
+    .from('registro_fauna')
+    .select(`
+      id, classe, quantidade, condicao, tipo_evento, causa_aparente,
+      destinacao, faixa_etaria, nome_popular, nome_cientifico,
+      identificacao_confirmada, identificado_por,
+      especie_id, observacoes,
+      especie:especie_id (nome_cientifico, status_conservacao, ameacada)
+    `)
+    .eq('registro_campo_id', rcId)
+
+  if (error || !data?.length) { sec.hidden = true; _faunaDetalhe = []; return }
+
+  _faunaDetalhe = data
+  sec.hidden = false
+
+  const podeConfirmar = ['biologo','gestor','super_admin'].includes(_usuario.perfil)
+
+  lista.innerHTML = data.map(f => {
+    const icon  = FAUNA_ICONE[f.classe] || '🐾'
+    const nome  = f.especie?.nome_cientifico || f.nome_cientifico || f.nome_popular || 'Não identificado'
+    const cond  = CONDICAO[f.condicao] || f.condicao
+    const tipo  = TIPO_EV[f.tipo_evento] || f.tipo_evento
+    const dest  = f.destinacao ? (DESTIN[f.destinacao] || f.destinacao) : ''
+    const ameac = f.especie?.ameacada ? '🔴 Ameaçada' : ''
+
+    return `
+    <div class="fauna-row" id="fauna-row-${f.id}">
+      <span class="fauna-icon-val">${icon}</span>
+      <div class="fauna-det">
+        <strong>${esc(nome)} ${f.quantidade > 1 ? '× '+f.quantidade : ''} ${ameac}</strong>
+        <span>${tipo} · ${cond}${dest ? ' · ' + dest : ''}${f.faixa_etaria && f.faixa_etaria !== 'indeterminada' ? ' · ' + f.faixa_etaria : ''}</span>
+        ${f.observacoes ? `<span style="display:block;margin-top:2px;font-style:italic">${esc(f.observacoes)}</span>` : ''}
+        <!-- Painel confirmar espécie (biologo) -->
+        <div class="confirmar-esp-wrap" id="cesp-${f.id}">
+          <p style="font-size:.78rem;font-weight:600;margin-bottom:6px">Confirmar / corrigir identificação</p>
+          <input id="cesp-nome-${f.id}" placeholder="Nome científico confirmado"
+                 value="${esc(f.especie?.nome_cientifico || f.nome_cientifico || '')}"
+                 style="margin-bottom:6px">
+          <input id="cesp-obs-${f.id}" placeholder="Observações taxonômicas (opcional)"
+                 value="${esc(f.observacoes || '')}">
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <button class="btn-acao btn-validar" style="flex:1;padding:6px"
+                    onclick="confirmarEspecie('${f.id}')">✓ Confirmar</button>
+            <button class="btn-acao" style="background:#e5e7eb;color:#111;padding:6px"
+                    onclick="document.getElementById('cesp-${f.id}').classList.remove('visivel')">Cancelar</button>
+          </div>
+        </div>
+      </div>
+      <div>
+        ${f.identificacao_confirmada
+          ? `<span class="badge-conf">✓ Confirmado</span>`
+          : `<span class="badge-pend">Pendente</span>`}
+        ${podeConfirmar && !f.identificacao_confirmada
+          ? `<br><button class="btn-ver" style="margin-top:6px;font-size:.75rem;padding:4px 10px"
+               onclick="toggleCesp('${f.id}',event)">Confirmar</button>`
+          : ''}
+      </div>
+    </div>`
+  }).join('')
+}
+
+function toggleCesp(rfId, ev) {
+  ev.stopPropagation()
+  const el = document.getElementById(`cesp-${rfId}`)
+  el?.classList.toggle('visivel')
+}
+
+async function confirmarEspecie(rfId) {
+  const nomeCient = document.getElementById(`cesp-nome-${rfId}`)?.value.trim() || null
+  const obs       = document.getElementById(`cesp-obs-${rfId}`)?.value.trim() || null
+
+  const { error } = await db.rpc('confirmar_fauna_especie', {
+    p_rf_id:           rfId,
+    p_nome_cientifico: nomeCient || null,
+    p_obs:             obs || null,
+  })
+
+  if (error) { toast('Erro: ' + error.message, 'erro'); return }
+
+  toast('Identificação confirmada', 'ok')
+  document.getElementById(`cesp-${rfId}`)?.classList.remove('visivel')
+  await carregarFaunaModal(_detalheId)
+  // Atualiza o registro no array local
+  const idx = _registros.findIndex(r => r.id === _detalheId)
+  if (idx >= 0) {
+    const fPend = _faunaDetalhe.filter(f => !f.identificacao_confirmada).length
+    _registros[idx].n_fauna_pendente = fPend
+    renderLista()
+    renderKpis()
+  }
+}
+
+// ════════════════════════════════════════════════════════════════
+// Ações de validação
+// ════════════════════════════════════════════════════════════════
+function renderAcoes(r) {
+  const cont = document.getElementById('modal-acoes')
+  const isBiologo = _usuario.perfil === 'biologo'
+  const podeRejeitar = ['gestor','super_admin','tecnico'].includes(_usuario.perfil)
+  const podePromover = ['gestor','super_admin','tecnico'].includes(_usuario.perfil)
+  const jaOcorrencia = !!r.ocorrencia_id
+
+  let html = ''
+
+  if (r.status_validacao !== 'validado') {
+    html += `<button class="btn-acao btn-validar" onclick="iniciarAcao('validar')">✓ Validar</button>`
+  }
+  if (r.status_validacao !== 'requer_correcao') {
+    html += `<button class="btn-acao btn-correcao" onclick="iniciarAcao('correcao')">↩ Requer correção</button>`
+  }
+  if (podeRejeitar && r.status_validacao !== 'rejeitado') {
+    html += `<button class="btn-acao btn-rejeitar" onclick="iniciarAcao('rejeitar')">✕ Rejeitar</button>`
+  }
+  if (podePromover && !jaOcorrencia && r.status_validacao === 'validado') {
+    html += `<button class="btn-acao btn-promover" onclick="iniciarAcao('promover')">🔔 Criar Ocorrência</button>`
+  }
+  if (jaOcorrencia) {
+    html += `<a class="btn-acao btn-promover" href="ocorrencias.html" style="text-decoration:none">🔗 Ver Ocorrência</a>`
+  }
+
+  cont.innerHTML = html || '<span style="opacity:.5;font-size:.84rem">Nenhuma ação disponível</span>'
+}
+
+function iniciarAcao(tipo) {
+  _acaoPendente = tipo
+  const mw = document.getElementById('motivo-wrap')
+  const pw = document.getElementById('promover-wrap')
+  const vr = document.getElementById('veredito-row')
+
+  mw.classList.remove('visivel')
+  pw.classList.remove('visivel')
+
+  if (tipo === 'promover') {
+    pw.classList.add('visivel')
+    document.getElementById('promover-titulo').focus()
+    return
+  }
+
+  mw.classList.add('visivel')
+  document.getElementById('motivo-txt').value = ''
+
+  // Veredito só aparece ao validar
+  vr.style.display = tipo === 'validar' ? 'flex' : 'none'
+  if (tipo === 'validar') {
+    document.querySelectorAll('.veredito-btn').forEach(b => b.classList.remove('sel'))
+  }
+
+  // Motivo obrigatório em correção e rejeição
+  const btnConf = document.getElementById('btn-confirmar-acao')
+  const labels = { validar:'Confirmar Validação', correcao:'Solicitar Correção', rejeitar:'Rejeitar Registro' }
+  btnConf.textContent = labels[tipo] || 'Confirmar'
+  btnConf.className = 'btn-acao ' + (tipo === 'validar' ? 'btn-validar' : tipo === 'rejeitar' ? 'btn-rejeitar' : 'btn-correcao')
+  btnConf.onclick = executarAcao
+}
+
+function cancelarAcao() {
+  _acaoPendente = null
+  document.getElementById('motivo-wrap').classList.remove('visivel')
+  document.getElementById('promover-wrap').classList.remove('visivel')
+}
+
+// Veredito selectionado
+document.querySelectorAll('.veredito-btn').forEach(b => {
+  b.addEventListener('click', () => {
+    document.querySelectorAll('.veredito-btn').forEach(x => x.classList.remove('sel'))
+    b.classList.add('sel')
+  })
+})
+
+async function executarAcao() {
+  if (!_acaoPendente || !_detalheId) return
+
+  const motivo   = document.getElementById('motivo-txt').value.trim()
+  const veresel  = document.querySelector('.veredito-btn.sel')?.dataset.v || null
+
+  const statusMap = { validar:'validado', correcao:'requer_correcao', rejeitar:'rejeitado' }
+  const novoStatus = statusMap[_acaoPendente]
+
+  if (!novoStatus) return
+  if (['correcao','rejeitar'].includes(_acaoPendente) && !motivo) {
+    toast('Informe o motivo', 'warn'); return
+  }
+
+  const { error } = await db.rpc('validar_registro_campo', {
+    p_id:       _detalheId,
+    p_status:   novoStatus,
+    p_motivo:   motivo || null,
+    p_veredito: veresel,
+  })
+
+  if (error) { toast('Erro: ' + error.message, 'erro'); return }
+
+  toast(STATUS_VALID[novoStatus] + ' com sucesso', 'ok')
+  fecharDetalhe()
+  await carregarDados()
+}
+
+async function confirmarPromover() {
+  const titulo = document.getElementById('promover-titulo').value.trim()
+  if (!titulo) { toast('Informe o título da ocorrência', 'warn'); return }
+  const sev = document.getElementById('promover-sev').value
+
+  const { error } = await db.rpc('promover_registro_a_ocorrencia', {
+    p_rc_id:      _detalheId,
+    p_titulo:     titulo,
+    p_severidade: sev,
+  })
+
+  if (error) { toast('Erro: ' + error.message, 'erro'); return }
+  toast('Ocorrência criada com sucesso', 'ok')
+  fecharDetalhe()
+  await carregarDados()
+}
+document.getElementById('btn-confirmar-promover')?.addEventListener('click', confirmarPromover)
+
+// ════════════════════════════════════════════════════════════════
+// Utilitários
+// ════════════════════════════════════════════════════════════════
+function fecharDetalhe() {
+  document.getElementById('modal-detalhe').style.display = 'none'
+  _detalheId = null
+  _acaoPendente = null
+}
+
+function abrirLightbox(url) {
+  document.getElementById('lightbox-img').src = url
+  document.getElementById('lightbox').classList.remove('oculto')
+}
+
+// Fecha modal clicando no overlay
+document.getElementById('modal-detalhe').addEventListener('click', function(e) {
+  if (e.target === this) fecharDetalhe()
+})
+
+// Tecla ESC
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    if (!document.getElementById('lightbox').classList.contains('oculto')) {
+      document.getElementById('lightbox').classList.add('oculto')
+    } else {
+      fecharDetalhe()
+    }
+  }
+})
+</script>
+</body>
+</html>
