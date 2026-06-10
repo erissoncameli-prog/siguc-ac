@@ -1642,11 +1642,10 @@ body {
 
 <div class="toast-pub" id="toast-pub"></div>
 
+<script src="../js/env-loader.js"></script>
 <script>
-const SUPABASE_URL      = 'https://atqtybcsvepdabsvgaly.supabase.co'
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF0cXR5YmNzdmVwZGFic3ZnYWx5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0MjMzNzgsImV4cCI6MjA5NTk5OTM3OH0.hWx1AB2rK7xdco1Dgagm0XUOBPQbxZVE614SW4SKoLk'
 const { createClient } = supabase
-const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+let db
 
 // ── Auth guard: exige conta de pesquisador ────────────────────
 let _pesquisadorConta = null
@@ -2166,7 +2165,10 @@ function aplicarMascaraCPF(el) {
 document.getElementById('p-cpf').addEventListener('input', function() { aplicarMascaraCPF(this) })
 document.getElementById('m-cpf').addEventListener('input', function() { aplicarMascaraCPF(this) })
 
-verificarAuthEIniciar()
+loadEnv().then(({ supabaseUrl, supabaseKey }) => {
+  db = createClient(supabaseUrl, supabaseKey)
+  verificarAuthEIniciar()
+})
 </script>
 </body>
 </html>
