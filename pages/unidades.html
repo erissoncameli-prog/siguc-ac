@@ -323,7 +323,19 @@
         <div class="form-group"><label class="form-label">Ato de Criação</label><input class="form-control" id="f-ato" placeholder="Decreto nº 12.345 de 01/01/2000"></div>
         <div class="form-group"><label class="form-label">Data de Criação</label><input class="form-control" id="f-data-criacao" type="date"></div>
       </div>
-      <div class="form-group"><label class="form-label">Municípios (separados por vírgula)</label><input class="form-control" id="f-municipios" placeholder="Rio Branco, Senador Guiomard"></div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Municípios (separados por vírgula)</label><input class="form-control" id="f-municipios" placeholder="Rio Branco, Senador Guiomard"></div>
+        <div class="form-group"><label class="form-label">Regional SEMA</label>
+          <select class="form-control" id="f-regional">
+            <option value="">Não definida</option>
+            <option value="baixo_acre">Baixo Acre</option>
+            <option value="purus">Purus</option>
+            <option value="jurua">Juruá</option>
+            <option value="tarauaca_envira">Tarauacá / Envira</option>
+            <option value="alto_acre">Alto Acre</option>
+          </select>
+        </div>
+      </div>
       <div class="form-group"><label class="form-label">Observações</label><textarea class="form-control" id="f-obs" rows="3"></textarea></div>
     </div>
     <div class="modal-footer">
@@ -613,6 +625,7 @@ function abrirModalUC(uc = null) {
   document.getElementById('f-ato').value = uc?.ato_criacao || ''
   document.getElementById('f-data-criacao').value = uc?.data_criacao || ''
   document.getElementById('f-municipios').value = uc?.municipios?.join(', ') || ''
+  document.getElementById('f-regional').value   = uc?.regional || ''
   document.getElementById('f-obs').value = uc?.observacoes || ''
   document.getElementById('modal-uc').classList.add('aberto')
 }
@@ -636,6 +649,7 @@ async function salvarUC() {
     ato_criacao: document.getElementById('f-ato').value.trim() || null,
     data_criacao: document.getElementById('f-data-criacao').value || null,
     municipios: muns.length ? muns : null,
+    regional:   document.getElementById('f-regional').value || null,
     observacoes: document.getElementById('f-obs').value.trim() || null,
   }
 
