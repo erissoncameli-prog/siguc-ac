@@ -52,6 +52,15 @@
 .camada-popup .cp-row{display:flex;gap:5px;font-size:11px;color:#374151;margin-bottom:3px;line-height:1.4;align-items:flex-start;}
 .camada-popup .cp-row strong{color:#111827;min-width:72px;flex-shrink:0;font-weight:600;}
 .camada-popup .cp-badge{display:inline-flex;align-items:center;gap:4px;border-radius:99px;padding:2px 9px;font-size:10px;font-weight:700;margin-top:5px;border:1px solid;}
+/* Carrossel de fotos no popup */
+.brig-carousel{position:relative;width:100%;height:140px;background:#111;border-radius:6px;overflow:hidden;margin-bottom:8px;}
+.brig-carousel img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .4s;}
+.brig-carousel img.ativo{opacity:1;}
+.brig-carousel .car-btn{position:absolute;top:50%;transform:translateY(-50%);background:rgba(0,0,0,.55);color:#fff;border:none;border-radius:50%;width:22px;height:22px;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:2;line-height:1;}
+.brig-carousel .car-prev{left:5px;}
+.brig-carousel .car-next{right:5px;}
+.brig-carousel .car-counter{position:absolute;bottom:4px;right:7px;font-size:9px;color:#fff;background:rgba(0,0,0,.5);border-radius:99px;padding:1px 6px;}
+.brig-ativ-icon{font-size:18px;margin-right:4px;vertical-align:middle;}
 /* CAR — Modal de configurações */
 #car-cfg-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:700;display:none;align-items:center;justify-content:center}
 #car-cfg-overlay.aberto{display:flex}
@@ -2084,15 +2093,58 @@ function renderAlertasMapa() {
 let _brigadasLayer = null, _brigadasMapa = [], _brigadasAtivo = false
 
 const _BRIG_NAT_COR  = { prevencao:'#12A66A', combate:'#EF5B3C', monitoramento:'#3B82C4' }
-const _BRIG_NAT_ICO  = { prevencao:'🛡', combate:'🔥', monitoramento:'🔭' }
+const _BRIG_NAT_ICO  = { prevencao:'🛡', combate:'🧯', monitoramento:'🔭' }
 const _BRIG_ATIV_LAB = {
   fogo:'Combate a fogo', educacao_ambiental:'Educação ambiental',
   limpeza:'Limpeza/aceiro', reconhecimento:'Reconhecimento',
   plantio:'Plantio', primeiros_socorros:'Primeiros socorros',
-  queima_controlada:'Queima controlada', outro:'Outro',
+  queima_controlada:'Queima controlada', fiscalizacao:'Fiscalização',
+  avaliacao_dano:'Avaliação de dano', outro:'Outro',
+}
+const _BRIG_ATIV_ICO = {
+  fogo:'🔥', educacao_ambiental:'📚', limpeza:'🌿',
+  reconhecimento:'🔭', plantio:'🌱', primeiros_socorros:'🩹',
+  queima_controlada:'🔆', fiscalizacao:'🚔', avaliacao_dano:'📋', outro:'📌',
 }
 const _BRIG_STATUS_LAB = { aguardando:'Aguardando', validado:'Validado',
   requer_correcao:'Requer correção', rejeitado:'Rejeitado' }
+
+let _carrosselTimers = {}
+
+function _iniciarCarrossel(popupEl) {
+  const car = popupEl.querySelector('.brig-carousel')
+  if (!car) return
+  const cid = car.dataset.cid
+  const imgs = car.querySelectorAll('img')
+  if (imgs.length < 2) return
+  let idx = 0
+  _pararCarrossel(cid)
+  _carrosselTimers[cid] = setInterval(() => {
+    imgs[idx].classList.remove('ativo')
+    idx = (idx + 1) % imgs.length
+    imgs[idx].classList.add('ativo')
+    const cnt = car.querySelector('.car-counter')
+    if (cnt) cnt.textContent = `${idx+1}/${imgs.length}`
+  }, 2000)
+}
+
+function _pararCarrossel(cid) {
+  if (_carrosselTimers[cid]) { clearInterval(_carrosselTimers[cid]); delete _carrosselTimers[cid] }
+}
+
+function _navCarrossel(btn, delta) {
+  const car = btn.closest('.brig-carousel')
+  const imgs = car.querySelectorAll('img')
+  const cid = car.dataset.cid
+  let idx = [...imgs].findIndex(i => i.classList.contains('ativo'))
+  imgs[idx].classList.remove('ativo')
+  idx = (idx + delta + imgs.length) % imgs.length
+  imgs[idx].classList.add('ativo')
+  const cnt = car.querySelector('.car-counter')
+  if (cnt) cnt.textContent = `${idx+1}/${imgs.length}`
+  _pararCarrossel(cid)
+  _iniciarCarrossel(car.closest('.camada-popup'))
+}
 
 async function toggleBrigadasMapa(ativo) {
   _brigadasAtivo = ativo
@@ -2130,15 +2182,28 @@ function renderBrigadasMapa() {
   _brigadasLayer = L.layerGroup()
   visiveis.forEach(r => {
     if (!r.lat || !r.lng) return
-    const cor   = _BRIG_NAT_COR[r.natureza]  ?? '#6b7280'
-    const ico   = _BRIG_NAT_ICO[r.natureza]  ?? '📋'
-    const ativ  = _BRIG_ATIV_LAB[r.atividade] ?? r.atividade ?? '—'
-    const slab  = _BRIG_STATUS_LAB[r.status_validacao] ?? r.status_validacao
-    const dt    = r.data_hora_evento
+    const cor      = _BRIG_NAT_COR[r.natureza]  ?? '#6b7280'
+    const natIco   = _BRIG_NAT_ICO[r.natureza]  ?? '📋'
+    const ativSlug = r.atividade ?? ''
+    const ativ     = _BRIG_ATIV_LAB[ativSlug] ?? ativSlug ?? '—'
+    const ativIco  = _BRIG_ATIV_ICO[ativSlug]  ?? '📋'
+    const slab     = _BRIG_STATUS_LAB[r.status_validacao] ?? r.status_validacao
+    const dt       = r.data_hora_evento
       ? new Date(r.data_hora_evento).toLocaleDateString('pt-BR', { timeZone:'America/Rio_Branco', day:'2-digit', month:'2-digit', year:'numeric' })
       : '—'
-    const fotosN = (r.fotos_urls || []).length
+    const fotos  = Array.isArray(r.fotos_urls) ? r.fotos_urls.filter(Boolean) : []
+    const fotosN = fotos.length
     const coordStr = `${Number(r.lat).toFixed(5)}, ${Number(r.lng).toFixed(5)}`
+    const cid = 'car-' + r.id
+
+    const carouselHtml = fotosN > 0 ? `
+      <div class="brig-carousel" data-cid="${cid}">
+        ${fotos.map((u,i) => `<img src="${escHtml(u)}" class="${i===0?'ativo':''}" alt="foto ${i+1}" loading="lazy">`).join('')}
+        ${fotosN > 1 ? `
+          <button class="car-btn car-prev" onclick="_navCarrossel(this,-1)">‹</button>
+          <button class="car-btn car-next" onclick="_navCarrossel(this,1)">›</button>
+          <span class="car-counter">1/${fotosN}</span>` : ''}
+      </div>` : ''
 
     const marker = L.circleMarker([r.lat, r.lng], {
       radius: 7, fillColor: cor, color: '#fff',
@@ -2146,15 +2211,15 @@ function renderBrigadasMapa() {
     })
 
     marker.bindPopup(`<div class="camada-popup">
-      <div class="cp-header" style="background:${cor}">${ico} Brigadas — ${r.natureza ? r.natureza.charAt(0).toUpperCase()+r.natureza.slice(1) : ''}</div>
+      <div class="cp-header" style="background:${cor}">${natIco} Brigadas — ${r.natureza ? r.natureza.charAt(0).toUpperCase()+r.natureza.slice(1) : ''}</div>
       <div class="cp-layer">
-        <div class="cp-row"><strong>Atividade</strong><span>${escHtml(ativ)}</span></div>
+        ${carouselHtml}
+        <div class="cp-row"><strong>Atividade</strong><span><span class="brig-ativ-icon">${ativIco}</span>${escHtml(ativ)}</span></div>
         <div class="cp-row"><strong>Brigadista</strong><span>${escHtml(r.brigadista_nome ?? '—')}</span></div>
         <div class="cp-row"><strong>Brigada</strong><span>${escHtml(r.brigada_nome ?? '—')}</span></div>
         ${r.uc_nome ? `<div class="cp-row"><strong>UC</strong><span>${escHtml(r.uc_nome)}</span></div>` : ''}
         <div class="cp-row"><strong>Data</strong><span>${dt}</span></div>
         ${r.n_fauna > 0 ? `<div class="cp-row"><strong>Fauna</strong><span>🐾 ${r.n_fauna} animal${r.n_fauna > 1 ? 'is' : ''}</span></div>` : ''}
-        ${fotosN > 0 ? `<div class="cp-row"><strong>Fotos</strong><span>📷 ${fotosN}</span></div>` : ''}
         <div style="margin-top:6px;display:flex;gap:5px;flex-wrap:wrap">
           <span class="cp-badge" style="background:${cor}22;border-color:${cor};color:${cor}">${escHtml(slab)}</span>
         </div>
@@ -2164,7 +2229,11 @@ function renderBrigadasMapa() {
           ✓ Abrir Validação de Campo
         </a>
       </div>
-    </div>`, { maxWidth: 260 }).addTo(_brigadasLayer)
+    </div>`, { maxWidth: 280 })
+
+    marker.on('popupopen',  e => _iniciarCarrossel(e.popup.getElement()))
+    marker.on('popupclose', () => _pararCarrossel(cid))
+    marker.addTo(_brigadasLayer)
   })
 
   _brigadasLayer.addTo(mapaL)
