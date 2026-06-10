@@ -191,14 +191,6 @@
       <label class="form-label">Atividade *</label>
       <select id="f-atividade" class="form-select">
         <option value="">Selecione…</option>
-        <option value="fogo">Combate a fogo</option>
-        <option value="educacao_ambiental">Educação ambiental</option>
-        <option value="limpeza">Limpeza / aceiro</option>
-        <option value="reconhecimento">Reconhecimento</option>
-        <option value="plantio">Plantio</option>
-        <option value="primeiros_socorros">Primeiros socorros</option>
-        <option value="queima_controlada">Queima controlada</option>
-        <option value="outro">Outro</option>
       </select>
     </div>
 
@@ -517,13 +509,14 @@ window.supabase = window.supabase || { createClient: () => null }
 // Estado global do app
 // ════════════════════════════════════════════════════════════════
 const App = {
-  brigadista: null,   // objeto brigadista do banco
-  brigada:    null,   // objeto brigada
+  brigadista: null,
+  brigada:    null,
   telasHistorico: [],
   naturezaAtual: null,
   faunaEditIdx: null,
-  pinSetupFase: 1,    // 1=digitar, 2=confirmar
+  pinSetupFase: 1,
   pinSetupPrimeiro: '',
+  catalogoAtividades: [],  // carregado do banco + cache offline
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -906,6 +899,52 @@ async function encerrarSessaoAuditoria() {
   } catch (_) {}
 }
 
+// ── Catálogo de atividades (banco + cache offline) ────────────
+async function carregarCatalogoAtividades() {
+  const CACHE_KEY = 'catalogo_atividades'
+  // Tenta banco (online)
+  if (db) {
+    try {
+      const { data } = await db
+        .from('atividades_campo_catalogo')
+        .select('slug, label, icone, naturezas, ordem')
+        .eq('ativo', true)
+        .order('ordem')
+      if (data?.length) {
+        App.catalogoAtividades = data
+        await bOfflineSalvarConfig(CACHE_KEY, data)
+        return
+      }
+    } catch(e) { console.warn('[catalogo] erro banco:', e.message) }
+  }
+  // Fallback: cache offline
+  const cached = await bOfflineGetConfig(CACHE_KEY)
+  if (cached?.length) { App.catalogoAtividades = cached; return }
+  // Fallback hardcoded (nunca deve chegar aqui)
+  App.catalogoAtividades = [
+    { slug:'fogo',               label:'Combate a fogo',    icone:'🔥', naturezas:['combate'] },
+    { slug:'limpeza',            label:'Limpeza / aceiro',  icone:'🌿', naturezas:['prevencao','combate'] },
+    { slug:'queima_controlada',  label:'Queima controlada', icone:'🔆', naturezas:['prevencao'] },
+    { slug:'plantio',            label:'Plantio',           icone:'🌱', naturezas:['prevencao'] },
+    { slug:'educacao_ambiental', label:'Educação ambiental',icone:'📚', naturezas:['prevencao','monitoramento'] },
+    { slug:'reconhecimento',     label:'Reconhecimento',    icone:'🔭', naturezas:['prevencao','monitoramento'] },
+    { slug:'primeiros_socorros', label:'Primeiros socorros',icone:'🩹', naturezas:['combate','monitoramento'] },
+    { slug:'outro',              label:'Outro',             icone:'📌', naturezas:['prevencao','combate','monitoramento'] },
+  ]
+}
+
+function popularSelectAtividade(natureza) {
+  const sel = document.getElementById('f-atividade')
+  sel.innerHTML = '<option value="">Selecione…</option>'
+  const filtradas = App.catalogoAtividades.filter(a => a.naturezas.includes(natureza))
+  filtradas.forEach(a => {
+    const opt = document.createElement('option')
+    opt.value = a.slug
+    opt.textContent = `${a.icone || ''} ${a.label}`.trim()
+    sel.appendChild(opt)
+  })
+}
+
 async function entrarHome() {
   document.getElementById('home-saudacao').textContent = saudacao()
   document.getElementById('home-nome').textContent =
@@ -922,6 +961,7 @@ async function entrarHome() {
     if (gps.acc <= 30) card.querySelector('.gps-ring').classList.add('fixado')
   })
 
+  await carregarCatalogoAtividades()
   await atualizarBadgeFila()
 
   bSyncOn('confirmado', atualizarBadgeFila)
@@ -956,6 +996,9 @@ function abrirFormulario(natureza) {
   header.className = `form-header nat-${natureza}`
   const labels = { prevencao: '🛡 Prevenção', combate: '🔥 Combate', monitoramento: '🔭 Monitoramento' }
   document.getElementById('form-natureza-label').textContent = labels[natureza] || natureza
+
+  // Popula atividades filtradas pela natureza selecionada
+  popularSelectAtividade(natureza)
 
   // Reset campos
   document.getElementById('f-atividade').value = ''

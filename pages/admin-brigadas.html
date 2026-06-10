@@ -13,6 +13,51 @@
 <body>
 <div id="app"></div>
 
+<!-- ── Modal: Atividade ──────────────────────────────────── -->
+<div class="modal-overlay" id="modal-atividade">
+  <div class="modal" style="max-width:500px">
+    <div class="modal-header">
+      <div class="modal-title" id="mat-titulo">Nova Atividade</div>
+      <button class="modal-close" onclick="fecharModal('atividade')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Ícone (emoji)</label>
+          <input class="form-control" id="mat-icone" placeholder="🔥" maxlength="4" style="font-size:1.4rem;text-align:center">
+        </div>
+        <div class="form-group"><label class="form-label">Ordem</label>
+          <input class="form-control" id="mat-ordem" type="number" min="1" max="99" value="99">
+        </div>
+      </div>
+      <div class="form-group"><label class="form-label">Nome da atividade <span class="obrig">*</span></label>
+        <input class="form-control" id="mat-label" placeholder="Ex: Patrulhamento preventivo">
+      </div>
+      <div class="form-group"><label class="form-label">Slug (identificador único) <span class="obrig">*</span></label>
+        <input class="form-control" id="mat-slug" placeholder="patrulhamento_preventivo"
+               pattern="[a-z0-9_]+" title="Apenas letras minúsculas, números e _">
+        <small class="form-hint">Sem espaços, sem acentos. Gerado automaticamente ao digitar o nome.</small>
+      </div>
+      <div class="form-group"><label class="form-label">Naturezas vinculadas <span class="obrig">*</span></label>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:4px">
+          <label style="display:flex;align-items:center;gap:6px;font-size:.88rem;cursor:pointer">
+            <input type="checkbox" id="mat-nat-prev" value="prevencao"> 🛡 Prevenção
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:.88rem;cursor:pointer">
+            <input type="checkbox" id="mat-nat-comb" value="combate"> 🔥 Combate
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:.88rem;cursor:pointer">
+            <input type="checkbox" id="mat-nat-moni" value="monitoramento"> 🔭 Monitoramento
+          </label>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="fecharModal('atividade')">Cancelar</button>
+      <button class="btn btn-primary" onclick="salvarAtividade()">Salvar</button>
+    </div>
+  </div>
+</div>
+
 <!-- ── Modal: Brigada ─────────────────────────────────────── -->
 <div class="modal-overlay" id="modal-brigada">
   <div class="modal" style="max-width:680px">
@@ -361,6 +406,7 @@ const LABEL_REGIONAL = {
         <div style="display:flex;gap:4px;padding:4px;background:rgba(0,0,0,.06);border-radius:10px;width:fit-content">
           <button class="tab-btn ativo" id="tab-brigadas"    onclick="mudarAba('brigadas')">Brigadas</button>
           <button class="tab-btn"       id="tab-brigadistas" onclick="mudarAba('brigadistas')">Brigadistas</button>
+          <button class="tab-btn"       id="tab-atividades"  onclick="mudarAba('atividades')">⚙ Atividades</button>
         </div>
       </div>
 
@@ -423,6 +469,23 @@ const LABEL_REGIONAL = {
           </table>
         </div></div></div>
       </div>
+
+      <!-- Aba Atividades -->
+      <div id="aba-atividades" style="display:none">
+        <div class="filter-bar" style="margin-bottom:12px">
+          <span style="font-size:.85rem;color:var(--cinza-600)">Gerencie as atividades exibidas no app de campo, por natureza.</span>
+          <button class="btn btn-primary" style="margin-left:auto" onclick="abrirModalAtividade()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Nova Atividade
+          </button>
+        </div>
+        <div class="card"><div class="table-wrap"><div class="table-scroll">
+          <table>
+            <thead><tr><th>Ícone</th><th>Atividade</th><th>Slug</th><th>Naturezas vinculadas</th><th>Ordem</th><th>Status</th><th>Ações</th></tr></thead>
+            <tbody id="tbody-ativ"></tbody>
+          </table>
+        </div></div></div>
+      </div>
     </div>` +
     '</div></div></div>'
 
@@ -476,10 +539,119 @@ async function carregarDados() {
 }
 
 function mudarAba(aba) {
-  ;['brigadas','brigadistas'].forEach(a => {
+  ;['brigadas','brigadistas','atividades'].forEach(a => {
     document.getElementById('aba-' + a).style.display = a === aba ? '' : 'none'
     document.getElementById('tab-' + a).classList.toggle('ativo', a === aba)
   })
+  if (aba === 'atividades') carregarAtividades()
+}
+
+// ════════════════════════════════════════════════════════════════
+// Catálogo de atividades
+// ════════════════════════════════════════════════════════════════
+let _atividades    = []
+let _ativEditId    = null
+const NAT_CHIP_ADM = {
+  prevencao:     '<span style="background:rgba(18,166,106,.15);color:#12A66A;padding:2px 8px;border-radius:999px;font-size:.72rem;font-weight:600">🛡 Prevenção</span>',
+  combate:       '<span style="background:rgba(239,91,60,.15);color:#EF5B3C;padding:2px 8px;border-radius:999px;font-size:.72rem;font-weight:600">🔥 Combate</span>',
+  monitoramento: '<span style="background:rgba(59,130,196,.15);color:#3B82C4;padding:2px 8px;border-radius:999px;font-size:.72rem;font-weight:600">🔭 Monitoramento</span>',
+}
+
+async function carregarAtividades() {
+  const { data, error } = await db
+    .from('atividades_campo_catalogo')
+    .select('*')
+    .order('ordem')
+  if (error) { toast('Erro ao carregar atividades', 'error'); return }
+  _atividades = data || []
+  renderAtividades()
+}
+
+function renderAtividades() {
+  const tbody = document.getElementById('tbody-ativ')
+  if (!tbody) return
+  if (!_atividades.length) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:2rem;color:#9CA3AF">Nenhuma atividade cadastrada</td></tr>'
+    return
+  }
+  tbody.innerHTML = _atividades.map(a => `
+    <tr>
+      <td style="font-size:1.3rem;text-align:center">${a.icone || '—'}</td>
+      <td><strong>${esc(a.label)}</strong></td>
+      <td><code style="font-size:.78rem;background:#f3f4f6;padding:2px 6px;border-radius:4px">${esc(a.slug)}</code></td>
+      <td style="display:flex;gap:4px;flex-wrap:wrap;padding-top:10px">${(a.naturezas||[]).map(n => NAT_CHIP_ADM[n]||n).join('')}</td>
+      <td style="text-align:center">${a.ordem}</td>
+      <td><span class="badge ${a.ativo ? 'badge-verde' : 'badge-cinza'}">${a.ativo ? 'Ativa' : 'Inativa'}</span></td>
+      <td>
+        <button class="btn btn-sm btn-secondary" onclick="editarAtividade('${a.id}')">Editar</button>
+        <button class="btn btn-sm ${a.ativo ? 'btn-danger' : 'btn-primary'}" style="margin-left:4px"
+                onclick="toggleAtividade('${a.id}',${!a.ativo})">${a.ativo ? 'Desativar' : 'Ativar'}</button>
+      </td>
+    </tr>`).join('')
+}
+
+function abrirModalAtividade(a = null) {
+  _ativEditId = a?.id || null
+  document.getElementById('mat-titulo').textContent = a ? 'Editar Atividade' : 'Nova Atividade'
+  document.getElementById('mat-icone').value  = a?.icone  || ''
+  document.getElementById('mat-label').value  = a?.label  || ''
+  document.getElementById('mat-slug').value   = a?.slug   || ''
+  document.getElementById('mat-ordem').value  = a?.ordem  || 99
+  ;['prev','comb','moni'].forEach(k => {
+    const map = { prev:'prevencao', comb:'combate', moni:'monitoramento' }
+    document.getElementById('mat-nat-' + k).checked = (a?.naturezas||[]).includes(map[k])
+  })
+  document.getElementById('modal-atividade').classList.add('aberto')
+
+  // Auto-slug ao digitar label (só em nova)
+  if (!a) {
+    document.getElementById('mat-label').oninput = e => {
+      document.getElementById('mat-slug').value = e.target.value
+        .toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'')
+        .replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'')
+    }
+  } else {
+    document.getElementById('mat-label').oninput = null
+  }
+}
+
+function editarAtividade(id) {
+  const a = _atividades.find(x => x.id === id)
+  if (a) abrirModalAtividade(a)
+}
+
+async function salvarAtividade() {
+  const label = document.getElementById('mat-label').value.trim()
+  const slug  = document.getElementById('mat-slug').value.trim()
+  if (!label || !slug) { toast('Preencha nome e slug', 'warn'); return }
+
+  const naturezas = ['prev','comb','moni']
+    .filter(k => document.getElementById('mat-nat-' + k).checked)
+    .map(k => ({ prev:'prevencao', comb:'combate', moni:'monitoramento' })[k])
+  if (!naturezas.length) { toast('Selecione ao menos uma natureza', 'warn'); return }
+
+  const payload = {
+    label, slug,
+    icone:    document.getElementById('mat-icone').value.trim() || null,
+    ordem:    parseInt(document.getElementById('mat-ordem').value) || 99,
+    naturezas,
+  }
+
+  const { error } = _ativEditId
+    ? await db.from('atividades_campo_catalogo').update(payload).eq('id', _ativEditId)
+    : await db.from('atividades_campo_catalogo').insert(payload)
+
+  if (error) { toast('Erro: ' + error.message, 'error'); return }
+  toast(_ativEditId ? 'Atividade atualizada' : 'Atividade criada', 'success')
+  fecharModal('atividade')
+  await carregarAtividades()
+}
+
+async function toggleAtividade(id, ativo) {
+  const { error } = await db.from('atividades_campo_catalogo').update({ ativo }).eq('id', id)
+  if (error) { toast('Erro: ' + error.message, 'error'); return }
+  toast(ativo ? 'Atividade ativada' : 'Atividade desativada', 'success')
+  await carregarAtividades()
 }
 
 // ── Render Brigadas ──────────────────────────────────────────
@@ -740,9 +912,10 @@ function abrirQR(brigId, brigNome) {
 // ── Helpers ───────────────────────────────────────────────────
 function fecharModal(tipo) {
   document.getElementById('modal-' + tipo).classList.remove('aberto')
-  if (tipo === 'brigada') _editId.brigada = null
+  if (tipo === 'brigada')    _editId.brigada = null
   if (tipo === 'brigadista') _editId.brigadista = null
-  if (tipo === 'login') _loginBrigadistaId = null
+  if (tipo === 'login')      _loginBrigadistaId = null
+  if (tipo === 'atividade')  _ativEditId = null
 }
 </script>
 
