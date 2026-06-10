@@ -644,8 +644,13 @@ function chartAtividade(rows, sfx='') {
     </div>`
 }
 function initChartAtividade(rows, sfx='') {
+  const ATIV_CORES = [
+    '#12A66A','#EF5B3C','#3B82C4','#C9A84C',
+    '#a855f7','#f59e0b','#0ea5e9','#ec4899',
+  ]
   const cnt = agrupar(rows, 'atividade')
   const sorted = Object.entries(cnt).sort((a,b)=>b[1]-a[1]).slice(0,8)
+  const cores = sorted.map((_, i) => ATIV_CORES[i % ATIV_CORES.length])
   initChart('chart-ativ'+sfx, {
     type: 'bar',
     data: {
@@ -653,8 +658,8 @@ function initChartAtividade(rows, sfx='') {
       datasets: [{
         label: 'Registros',
         data: sorted.map(([,n]) => n),
-        backgroundColor: 'rgba(82,183,136,.8)',
-        borderColor: '#52B788',
+        backgroundColor: cores.map(c => c + 'cc'),
+        borderColor: cores,
         borderWidth: 1.5,
         borderRadius: 5,
       }]
