@@ -408,6 +408,11 @@ function renderEstado() {
       <div class="chart-card">${chartRegional(r, '-e')}</div>
     </div>
 
+    <!-- Gráfico linha 4: Área trabalhada mensal + acumulado -->
+    ${area > 0 ? `<div style="margin-bottom:14px">
+      <div class="chart-card">${chartAreaAcumulada(r, '-e')}</div>
+    </div>` : ''}
+
     <!-- Tabelas -->
     <div class="grid-2" style="gap:14px;margin-bottom:14px">
       <div class="card">
@@ -434,12 +439,13 @@ function renderEstado() {
   `
 
   requestAnimationFrame(() => {
-    destroyCharts('chart-nat-e','chart-mensal-e','chart-ativ-e','chart-status-e','chart-regional-e')
+    destroyCharts('chart-nat-e','chart-mensal-e','chart-ativ-e','chart-status-e','chart-regional-e','chart-area-e')
     initChartNatureza(r, '-e')
     initChartMensal(r, '-e')
     initChartAtividade(r, '-e')
     initChartStatus(r, '-e')
     initChartRegional(r, '-e')
+    if (area > 0) initChartAreaAcumulada(r, '-e')
   })
 }
 
@@ -707,6 +713,108 @@ function initChartMensal(rows, sfx='') {
       scales: {
         y: { beginAtZero:true, ticks:{ precision:0 }, grid:{ color:'rgba(0,0,0,.05)' } },
         x: { grid:{ display:false }, ticks:{ maxRotation:35, font:{ size:10 } } }
+      }
+    }
+  })
+}
+
+// ── MISTO: Área Trabalhada Mensal + Acumulado ─────────────────
+function chartAreaAcumulada(rows, sfx='') {
+  return `<div class="chart-title">Área trabalhada por mês e acumulado (ha)</div>
+    <div class="chart-canvas-wrap" style="height:240px">
+      <canvas id="chart-area${sfx}"></canvas>
+    </div>`
+}
+function initChartAreaAcumulada(rows, sfx='') {
+  // Agrupa área por mês (YYYY-MM)
+  const mensal = {}
+  rows.forEach(r => {
+    if (!r.data_hora_evento || !r.area_estimada_ha) return
+    const key = r.data_hora_evento.slice(0,7)
+    mensal[key] = (mensal[key]||0) + Number(r.area_estimada_ha)
+  })
+
+  // Últimos 12 meses (mesmo que zerados)
+  const meses = []
+  for (let i = 11; i >= 0; i--) {
+    const d = new Date(); d.setMonth(d.getMonth()-i, 1)
+    meses.push(d.toISOString().slice(0,7))
+  }
+  // Filtra apenas meses com dados ou o intervalo real dos dados
+  const mesesComDados = meses.filter(m => mensal[m] != null)
+  const mesesUsados   = mesesComDados.length ? meses.filter(m =>
+    m >= mesesComDados[0] && m <= mesesComDados[mesesComDados.length-1]
+  ) : meses
+
+  const labels    = mesesUsados.map(m => {
+    const [a, mes] = m.split('-')
+    return new Date(+a, +mes-1, 1).toLocaleDateString('pt-BR',{month:'short',year:'2-digit'})
+  })
+  const areaMensal = mesesUsados.map(m => +(mensal[m]||0).toFixed(2))
+
+  // Acumulado (running sum)
+  let acc = 0
+  const areaAcum = areaMensal.map(v => +(acc += v).toFixed(2))
+
+  initChart('chart-area'+sfx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        {
+          type: 'bar',
+          label: 'Área mensal (ha)',
+          data: areaMensal,
+          backgroundColor: 'rgba(201,168,76,.75)',
+          borderColor: '#C9A84C',
+          borderWidth: 1.5,
+          borderRadius: 5,
+          yAxisID: 'y',
+          order: 2,
+        },
+        {
+          type: 'line',
+          label: 'Acumulado (ha)',
+          data: areaAcum,
+          borderColor: '#EF5B3C',
+          backgroundColor: 'rgba(239,91,60,.10)',
+          fill: true,
+          tension: 0.35,
+          pointRadius: 5,
+          pointBackgroundColor: '#EF5B3C',
+          pointBorderColor: '#fff',
+          pointBorderWidth: 2,
+          pointHoverRadius: 7,
+          yAxisID: 'yAcum',
+          order: 1,
+        },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode:'index', intersect:false },
+      plugins: {
+        legend: { position:'bottom', labels:{ boxWidth:11, padding:14 } },
+        tooltip: {
+          callbacks: {
+            label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y.toLocaleString('pt-BR',{minimumFractionDigits:1})} ha`
+          }
+        }
+      },
+      scales: {
+        x: { grid:{ display:false }, ticks:{ maxRotation:35, font:{ size:10 } } },
+        y: {
+          beginAtZero: true, position:'left',
+          title:{ display:true, text:'Mensal (ha)', font:{ size:10 }, color:'#C9A84C' },
+          ticks:{ color:'#C9A84C', font:{ size:10 } },
+          grid:{ color:'rgba(0,0,0,.05)' },
+        },
+        yAcum: {
+          beginAtZero: true, position:'right',
+          title:{ display:true, text:'Acumulado (ha)', font:{ size:10 }, color:'#EF5B3C' },
+          ticks:{ color:'#EF5B3C', font:{ size:10 } },
+          grid:{ drawOnChartArea:false },
+        },
       }
     }
   })
