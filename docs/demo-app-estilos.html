@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SIGUC Brigadas — Comparador de Estilos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Mono:wght@400;500&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'DM Sans',system-ui,sans-serif; background:#EAEDE6; color:#16201B; padding:34px 18px 70px;
+  background-image:radial-gradient(1200px 540px at 50% -8%, #F4F7EE, transparent 60%)}
+.head{text-align:center; max-width:680px; margin:0 auto 8px}
+.head .k{font-family:'DM Mono',monospace; font-size:11px; letter-spacing:2px; text-transform:uppercase; color:#12A66A}
+.head h1{font-size:28px; font-weight:700; letter-spacing:-.5px; margin:8px 0 6px}
+.head p{color:#5C675E; font-size:13.5px; line-height:1.6}
+.row{display:flex; gap:26px; justify-content:center; flex-wrap:wrap; margin-top:34px; align-items:flex-start}
+.col{width:312px}
+.cap{margin-top:16px; background:#fff; border-radius:18px; padding:15px 16px; box-shadow:0 1px 2px rgba(22,32,27,.05),0 8px 22px rgba(22,32,27,.06)}
+.cap .nm{font-size:16px; font-weight:700; display:flex; align-items:center; gap:8px}
+.cap .nm .dot{width:11px;height:11px;border-radius:50%}
+.cap .ds{font-size:12.5px; color:#5C675E; line-height:1.55; margin-top:6px}
+.cap .rf{font-family:'DM Mono',monospace; font-size:10.5px; color:#919A92; margin-top:8px}
+
+/* moldura */
+.phone{width:312px; height:640px; border-radius:38px; padding:9px; background:#dfe2da;
+  box-shadow:0 40px 80px rgba(22,32,27,.20), inset 0 0 0 1px rgba(255,255,255,.5)}
+.scr{width:100%;height:100%;border-radius:30px; overflow:hidden; position:relative; display:flex; flex-direction:column}
+.notch{position:absolute; top:9px; left:50%; transform:translateX(-50%); width:96px;height:24px; background:#0c0c0c; border-radius:0 0 13px 13px; z-index:60}
+.body{flex:1; overflow:hidden; padding:40px 18px 16px}
+.tabs{position:absolute; bottom:0; left:0; right:0; display:flex; padding:9px 12px 18px; z-index:30}
+.tabs button{flex:1; display:flex; flex-direction:column; align-items:center; gap:4px; background:none; border:none; cursor:pointer; font-family:inherit}
+.tabs svg{width:21px;height:21px}
+.tabs span{font-size:9px; font-weight:600}
+.ico{width:100%;height:100%}
+.mono{font-family:'DM Mono',monospace}
+
+/* ══════════ A · FRESCO ══════════ */
+.A .scr{background:#F5F6F2; color:#16201B}
+.A .greet .h{font-size:12.5px;color:#5C675E;font-weight:500}
+.A .greet .uc{font-size:18px;font-weight:700;letter-spacing:-.3px;margin-top:1px}
+.A .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+.A .av{width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,#1fb87a,#0c7a4d);color:#fff;display:grid;place-items:center;font-weight:700;font-size:13px}
+.A .gps{display:flex;align-items:center;gap:9px;background:#fff;border-radius:14px;padding:10px 12px;box-shadow:0 1px 2px rgba(22,32,27,.04),0 8px 18px rgba(22,32,27,.05);margin-bottom:16px}
+.A .gps .r{width:26px;height:26px;border-radius:50%;background:#E4F6EE;color:#12A66A;display:grid;place-items:center}
+.A .gps .r svg{width:14px;height:14px}
+.A .gps b{font-size:12px;font-weight:600}
+.A .gps .c{font-size:10px;color:#919A92}
+.A .gps .acc{margin-left:auto;font-family:'DM Mono';font-size:11px;color:#12A66A;background:#E4F6EE;padding:3px 8px;border-radius:7px}
+.A h2{font-size:19px;font-weight:700;letter-spacing:-.4px;margin-bottom:13px}
+.A .nat{display:flex;align-items:center;gap:13px;padding:14px;border-radius:18px;background:#fff;box-shadow:0 1px 2px rgba(22,32,27,.04),0 8px 18px rgba(22,32,27,.05);margin-bottom:10px}
+.A .nat .i{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;flex-shrink:0}
+.A .nat .i svg{width:23px;height:23px}
+.A .nat .t{flex:1}
+.A .nat .t b{font-size:15px;font-weight:700;letter-spacing:-.2px}
+.A .nat .t s{display:block;font-size:11.5px;color:#5C675E;text-decoration:none;margin-top:1px}
+.A .nat .go{color:#bcc4bd}
+.A .nat .go svg{width:16px;height:16px}
+
+/* ══════════ B · NATUREZA ══════════ */
+.B .scr{background:#F1EBDE;color:#1B2A20;font-family:'DM Sans'}
+.B .hero{height:232px;position:relative;padding:42px 20px 0;
+  background:
+    radial-gradient(120% 80% at 20% 0%, rgba(255,255,255,.18), transparent 50%),
+    linear-gradient(170deg,#15613a 0%, #0d3f25 55%, #08301c 100%);}
+.B .hero::after{content:'';position:absolute;inset:0;opacity:.4;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><g fill='none' stroke='%23C9A84C' stroke-width='1' opacity='0.3'><path d='M-10 60 C 40 30 90 80 140 50 S 230 40 250 70'/><path d='M-10 110 C 50 80 100 130 150 100 S 230 90 250 120'/><path d='M-10 160 C 40 130 110 180 160 150 S 230 140 250 170'/></g></svg>");background-size:200px 200px}
+.B .hero .g{position:relative;z-index:2;color:#F1EBDE}
+.B .hero .g .h{font-size:13px;opacity:.85;font-weight:500}
+.B .hero .g .uc{font-family:'Fraunces';font-weight:600;font-size:25px;line-height:1.1;margin-top:5px;letter-spacing:-.3px}
+.B .hero .g .uc .pin{color:#F0CB6A}
+.B .hero .chip{position:relative;z-index:2;display:inline-flex;align-items:center;gap:8px;margin-top:14px;
+  background:rgba(255,255,255,.16);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.25);
+  padding:8px 13px;border-radius:999px;color:#fff;font-family:'DM Mono';font-size:11px}
+.B .hero .chip .pl{width:7px;height:7px;border-radius:50%;background:#7BE0AE;box-shadow:0 0 0 0 #7BE0AE;animation:pl 2s infinite}
+@keyframes pl{0%{box-shadow:0 0 0 0 rgba(123,224,174,.6)}70%{box-shadow:0 0 0 6px rgba(123,224,174,0)}100%{box-shadow:0 0 0 0 rgba(123,224,174,0)}}
+.B .sheet{flex:1;margin-top:-26px;border-radius:26px 26px 0 0;background:#F1EBDE;position:relative;z-index:3;padding:22px 20px;box-shadow:0 -8px 24px rgba(0,0,0,.10)}
+.B .sheet h2{font-family:'Fraunces';font-weight:600;font-size:19px;letter-spacing:-.2px;margin-bottom:15px}
+.B .nat{display:flex;align-items:center;gap:14px;padding:13px 6px;border-bottom:1px solid rgba(27,42,32,.09)}
+.B .nat:last-child{border-bottom:none}
+.B .nat .i{width:46px;height:46px;border-radius:15px;display:grid;place-items:center;flex-shrink:0}
+.B .nat .i svg{width:23px;height:23px}
+.B .nat .t{flex:1}
+.B .nat .t b{font-family:'Fraunces';font-size:16px;font-weight:600}
+.B .nat .t s{display:block;font-size:11.5px;color:#6a766b;text-decoration:none;margin-top:1px}
+.B .nat .go{color:#C9A84C}
+.B .nat .go svg{width:17px;height:17px}
+
+/* ══════════ C · VIVO ══════════ */
+.C .scr{background:#F7FAF7;color:#0F1A13}
+.C .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+.C .top .h{font-size:13px;color:#55615a;font-weight:600}
+.C .top .uc{font-size:20px;font-weight:700;letter-spacing:-.4px;margin-top:1px}
+.C .av{width:42px;height:42px;border-radius:14px;background:#12A66A;color:#fff;display:grid;place-items:center;font-weight:700;font-size:14px;box-shadow:0 6px 14px rgba(18,166,106,.35)}
+.C .gps{display:flex;align-items:center;gap:9px;background:#0F1A13;color:#fff;border-radius:18px;padding:12px 15px;margin-bottom:20px}
+.C .gps .r{width:28px;height:28px;border-radius:50%;background:rgba(123,224,174,.22);color:#7BE0AE;display:grid;place-items:center}
+.C .gps .r svg{width:15px;height:15px}
+.C .gps b{font-size:13px;font-weight:600}
+.C .gps .c{font-size:10px;color:#9fb0a4}
+.C .gps .acc{margin-left:auto;font-family:'DM Mono';font-size:12px;color:#7BE0AE;font-weight:500}
+.C h2{font-size:21px;font-weight:700;letter-spacing:-.5px;margin-bottom:14px}
+.C .nat{display:flex;align-items:center;gap:15px;padding:19px 18px;border-radius:26px;margin-bottom:13px;color:#fff;position:relative;overflow:hidden}
+.C .nat .i{width:50px;height:50px;border-radius:16px;display:grid;place-items:center;flex-shrink:0;background:rgba(255,255,255,.22)}
+.C .nat .i svg{width:27px;height:27px}
+.C .nat .t{flex:1}
+.C .nat .t b{font-size:18px;font-weight:700;letter-spacing:-.3px}
+.C .nat .t s{display:block;font-size:12px;text-decoration:none;opacity:.9;margin-top:1px}
+.C .nat .go{opacity:.9}
+.C .nat .go svg{width:20px;height:20px}
+.C .nat.shadowg{box-shadow:0 10px 24px rgba(18,166,106,.34)}
+.C .nat.shadowf{box-shadow:0 10px 24px rgba(239,91,60,.30)}
+.C .nat.shadowm{box-shadow:0 10px 24px rgba(59,130,196,.30)}
+.C .tabs{background:none;padding-bottom:14px}
+.C .tabwrap{margin:0 auto;background:#0F1A13;border-radius:999px;display:flex;gap:4px;padding:7px 8px;box-shadow:0 12px 28px rgba(15,26,19,.35)}
+.C .tabwrap button{width:46px;height:46px;border-radius:50%;display:grid;place-items:center;background:none;border:none;color:#9fb0a4;cursor:pointer}
+.C .tabwrap button.on{background:#12A66A;color:#fff}
+.C .tabwrap svg{width:21px;height:21px}
+</style>
+</head>
+<body>
+
+<div class="head">
+  <div class="k">SIGUC · SEMA-AC · DIMA</div>
+  <h1>Comparador de estilos — mesma tela, 3 direções</h1>
+  <p>A tela <b>Início</b> do app do brigadista em três linguagens modernas distintas. Compare e me diga qual seguir (ou misturar). Todas evitam o visual genérico de IA.</p>
+</div>
+
+<div class="row">
+
+  <!-- ══════ A · FRESCO ══════ -->
+  <div class="col A">
+    <div class="phone"><div class="scr"><div class="notch"></div>
+      <div class="body">
+        <div class="top">
+          <div class="greet"><div class="h">Bom dia, José</div><div class="uc">ARIE Japiim</div></div>
+          <div class="av">JS</div>
+        </div>
+        <div class="gps">
+          <div class="r"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></div>
+          <div><b>GPS travado</b><div class="c mono">-7.6152, -72.8947</div></div>
+          <div class="acc">±4 m</div>
+        </div>
+        <h2>O que vamos registrar?</h2>
+        <div class="nat"><div class="i" style="background:#E4F6EE;color:#12A66A"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg></div><div class="t"><b>Prevenção</b><s>Educação, limpeza, plantio</s></div><div class="go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 6l6 6-6 6"/></svg></div></div>
+        <div class="nat"><div class="i" style="background:#FDECE7;color:#EF5B3C"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2c1 3-1 4-1 6 0 1 1 2 1 2s2-1 2-3c2 2 3 4 3 7a5 5 0 0 1-10 0c0-3 2-5 3-7 1 2 2 1 2-2z"/></svg></div><div class="t"><b>Combate</b><s>Combate ao fogo, rescaldo</s></div><div class="go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 6l6 6-6 6"/></svg></div></div>
+        <div class="nat"><div class="i" style="background:#E9F1FB;color:#3B82C4"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg></div><div class="t"><b>Monitoramento</b><s>Queima controlada, vigilância</s></div><div class="go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 6l6 6-6 6"/></svg></div></div>
+      </div>
+      <div class="tabs">
+        <button style="color:#12A66A"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><span>Início</span></button>
+        <button style="color:#bcc4bd"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2c1 3-1 4-1 6 0 1 1 2 1 2s2-1 2-3c2 2 3 4 3 7a5 5 0 0 1-10 0c0-3 2-5 3-7 1 2 2 1 2-2z"/></svg><span>Tarefas</span></button>
+        <button style="color:#bcc4bd"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 6v15l7-3 8 3 7-3V3l-7 3-8-3z"/></svg><span>Mapa</span></button>
+        <button style="color:#bcc4bd"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5.5 5.1L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.5-6.9A2 2 0 0 0 16.8 4H7.2a2 2 0 0 0-1.7 1.1z"/></svg><span>Fila</span></button>
+      </div>
+    </div></div>
+    <div class="cap">
+      <div class="nm"><span class="dot" style="background:#12A66A"></span>A · Fresco</div>
+      <div class="ds">Seu favorito refinado: claro, arejado, cards brancos suaves, um verde de ação. Sóbrio e premium.</div>
+      <div class="rf">ref: Linear · Things · iOS</div>
+    </div>
+  </div>
+
+  <!-- ══════ B · NATUREZA ══════ -->
+  <div class="col B">
+    <div class="phone"><div class="scr"><div class="notch"></div>
+      <div class="hero">
+        <div class="g">
+          <div class="h">Bom dia, José</div>
+          <div class="uc"><span class="pin">◆</span> ARIE Japiim-Pentecoste</div>
+        </div>
+        <div class="chip"><span class="pl"></span> GPS ±4m · -7.6152, -72.8947</div>
+      </div>
+      <div class="sheet">
+        <h2>O que vamos registrar?</h2>
+        <div class="nat"><div class="i" style="background:#E4F0E7;color:#15613a"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg></div><div class="t"><b>Prevenção</b><s>Educação, limpeza, plantio</s></div><div class="go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M9 6l6 6-6 6"/></svg></div></div>
+        <div class="nat"><div class="i" style="background:#F6E3D8;color:#C0492B"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2c1 3-1 4-1 6 0 1 1 2 1 2s2-1 2-3c2 2 3 4 3 7a5 5 0 0 1-10 0c0-3 2-5 3-7 1 2 2 1 2-2z"/></svg></div><div class="t"><b>Combate</b><s>Combate ao fogo, rescaldo</s></div><div class="go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M9 6l6 6-6 6"/></svg></div></div>
+        <div class="nat"><div class="i" style="background:#DFEAEF;color:#356a86"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg></div><div class="t"><b>Monitoramento</b><s>Queima controlada</s></div><div class="go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M9 6l6 6-6 6"/></svg></div></div>
+      </div>
+      <div class="tabs" style="background:#F1EBDE">
+        <button style="color:#15613a"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><span>Início</span></button>
+        <button style="color:#b3a98f"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2c1 3-1 4-1 6 0 1 1 2 1 2s2-1 2-3c2 2 3 4 3 7a5 5 0 0 1-10 0c0-3 2-5 3-7 1 2 2 1 2-2z"/></svg><span>Tarefas</span></button>
+        <button style="color:#b3a98f"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 6v15l7-3 8 3 7-3V3l-7 3-8-3z"/></svg><span>Mapa</span></button>
+        <button style="color:#b3a98f"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5.5 5.1L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.5-6.9A2 2 0 0 0 16.8 4H7.2a2 2 0 0 0-1.7 1.1z"/></svg><span>Fila</span></button>
+      </div>
+    </div></div>
+    <div class="cap">
+      <div class="nm"><span class="dot" style="background:#15613a"></span>B · Natureza</div>
+      <div class="ds">Editorial e imersivo: capa em floresta, título em Fraunces, ouro institucional, painel que sobe. Conecta com a UC.</div>
+      <div class="rf">ref: AllTrails · Gentler Streak</div>
+    </div>
+  </div>
+
+  <!-- ══════ C · VIVO ══════ -->
+  <div class="col C">
+    <div class="phone"><div class="scr"><div class="notch"></div>
+      <div class="body">
+        <div class="top">
+          <div><div class="h">Bom dia, José</div><div class="uc">ARIE Japiim</div></div>
+          <div class="av">JS</div>
+        </div>
+        <div class="gps">
+          <div class="r"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></div>
+          <div><b>GPS travado</b><div class="c mono">-7.6152, -72.8947</div></div>
+          <div class="acc">±4 m</div>
+        </div>
+        <h2>O que vamos registrar?</h2>
+        <div class="nat shadowg" style="background:#12A66A"><div class="i"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg></div><div class="t"><b>Prevenção</b><s>Educação, limpeza, plantio</s></div><div class="go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M9 6l6 6-6 6"/></svg></div></div>
+        <div class="nat shadowf" style="background:#EF5B3C"><div class="i"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 2c1 3-1 4-1 6 0 1 1 2 1 2s2-1 2-3c2 2 3 4 3 7a5 5 0 0 1-10 0c0-3 2-5 3-7 1 2 2 1 2-2z"/></svg></div><div class="t"><b>Combate</b><s>Combate ao fogo, rescaldo</s></div><div class="go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M9 6l6 6-6 6"/></svg></div></div>
+        <div class="nat shadowm" style="background:#3B82C4"><div class="i"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg></div><div class="t"><b>Monitoramento</b><s>Queima controlada</s></div><div class="go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M9 6l6 6-6 6"/></svg></div></div>
+      </div>
+      <div class="tabs">
+        <div class="tabwrap">
+          <button class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></button>
+          <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2c1 3-1 4-1 6 0 1 1 2 1 2s2-1 2-3c2 2 3 4 3 7a5 5 0 0 1-10 0c0-3 2-5 3-7 1 2 2 1 2-2z"/></svg></button>
+          <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg></button>
+          <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 6v15l7-3 8 3 7-3V3l-7 3-8-3z"/></svg></button>
+          <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5.5 5.1L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.5-6.9A2 2 0 0 0 16.8 4H7.2a2 2 0 0 0-1.7 1.1z"/></svg></button>
+        </div>
+      </div>
+    </div></div>
+    <div class="cap">
+      <div class="nm"><span class="dot" style="background:#EF5B3C"></span>C · Vivo</div>
+      <div class="ds">Material 3 Expressive: blocos de cor cheios, formas ousadas, nav flutuante. Máxima legibilidade e energia — ótimo p/ campo.</div>
+      <div class="rf">ref: Google Material 3 Expressive</div>
+    </div>
+  </div>
+
+</div>
+
+<div class="head" style="margin-top:40px">
+  <p style="font-size:12px;color:#7c897e">Mocks estáticos para comparação visual (sem backend). Fontes: DM Sans · DM Mono · Fraunces · ícones de traço.</p>
+</div>
+
+</body>
+</html>
