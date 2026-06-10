@@ -45,6 +45,19 @@ async function bCameraCapturar(videoEl, brigadista, gps) {
   })
 }
 
+// Captura sem adicionar ao array global — fauna usa sua própria lista
+async function bCameraCapturarPuro(videoEl, brigadista, gps) {
+  const canvas = document.createElement('canvas')
+  canvas.width  = videoEl.videoWidth  || 1280
+  canvas.height = videoEl.videoHeight || 720
+  const ctx = canvas.getContext('2d')
+  ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height)
+  bCameraAguaMarca(ctx, canvas.width, canvas.height, brigadista, gps)
+  return new Promise(resolve => {
+    canvas.toBlob(blob => resolve(blob), 'image/jpeg', 0.85)
+  })
+}
+
 // ── Marca d'água ──────────────────────────────────────────────
 function bCameraAguaMarca(ctx, w, h, brigadista, gps) {
   const linha1 = brigadista?.nome ?? 'Brigadista'

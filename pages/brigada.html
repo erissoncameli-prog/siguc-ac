@@ -353,6 +353,22 @@
       <textarea id="f-fauna-obs" class="form-textarea" rows="2" placeholder="Anilha, marcações, comportamento…"></textarea>
     </div>
 
+    <!-- Fotos do animal -->
+    <div class="form-section">
+      <div class="section-header">
+        <label class="form-label">Fotos do animal <span id="fauna-foto-count">(0/5)</span></label>
+        <button class="btn-sm btn-prim" id="btn-fauna-camera" type="button">📷 Câmera</button>
+      </div>
+      <div id="fauna-camera-wrap" hidden>
+        <video id="fauna-camera-video" autoplay playsinline muted class="camera-preview"></video>
+        <div class="camera-bar">
+          <button class="btn-capture" id="btn-fauna-capturar" aria-label="Capturar">⬤</button>
+          <button class="btn-sm" id="btn-fauna-fechar-camera">Fechar</button>
+        </div>
+      </div>
+      <div class="foto-grid" id="fauna-foto-grid"></div>
+    </div>
+
     <button class="btn-salvar btn-fauna-salvar" id="btn-fauna-confirmar">✓ Confirmar Animal</button>
   </div>
 </div>
@@ -1031,17 +1047,19 @@ async function capturarFoto() {
 function abrirFauna(idx = null) {
   App.faunaEditIdx = idx
 
-  // reset campos
-  document.getElementById('f-fauna-especie').value   = ''
+  // reset campos e fotos
+  document.getElementById('f-fauna-especie').value    = ''
   document.getElementById('f-fauna-especie-id').value = ''
-  document.getElementById('f-fauna-tipo').value      = ''
-  document.getElementById('f-fauna-condicao').value  = ''
-  document.getElementById('f-fauna-causa').value     = ''
+  document.getElementById('f-fauna-tipo').value       = ''
+  document.getElementById('f-fauna-condicao').value   = ''
+  document.getElementById('f-fauna-causa').value      = ''
   document.getElementById('f-fauna-destinacao').value = ''
-  document.getElementById('f-fauna-qtd').value       = '1'
-  document.getElementById('f-fauna-faixa').value     = 'indeterminada'
-  document.getElementById('f-fauna-obs').value       = ''
+  document.getElementById('f-fauna-qtd').value        = '1'
+  document.getElementById('f-fauna-faixa').value      = 'indeterminada'
+  document.getElementById('f-fauna-obs').value        = ''
   document.querySelectorAll('.classe-btn').forEach(b => b.classList.remove('ativo'))
+  bFaunaFotoLimpar()
+  renderFaunaFotos()
 
   if (idx !== null) {
     const f = bFaunaGetLista()[idx]
@@ -1055,15 +1073,66 @@ function preencherFauna(f) {
   document.querySelectorAll('.classe-btn').forEach(b => {
     b.classList.toggle('ativo', b.dataset.v === f.classe)
   })
-  document.getElementById('f-fauna-especie').value   = f.especie_nome_cientifico || f.nome_popular || ''
+  document.getElementById('f-fauna-especie').value    = f.especie_nome_cientifico || f.nome_popular || ''
   document.getElementById('f-fauna-especie-id').value = f.especie_id || ''
-  document.getElementById('f-fauna-tipo').value      = f.tipo_evento || ''
-  document.getElementById('f-fauna-condicao').value  = f.condicao || ''
-  document.getElementById('f-fauna-causa').value     = f.causa || ''
+  document.getElementById('f-fauna-tipo').value       = f.tipo_evento || ''
+  document.getElementById('f-fauna-condicao').value   = f.condicao || ''
+  document.getElementById('f-fauna-causa').value      = f.causa || ''
   document.getElementById('f-fauna-destinacao').value = f.destinacao || ''
-  document.getElementById('f-fauna-qtd').value       = f.quantidade || 1
-  document.getElementById('f-fauna-faixa').value     = f.faixa_etaria || 'indeterminada'
-  document.getElementById('f-fauna-obs').value       = f.observacoes || ''
+  document.getElementById('f-fauna-qtd').value        = f.quantidade || 1
+  document.getElementById('f-fauna-faixa').value      = f.faixa_etaria || 'indeterminada'
+  document.getElementById('f-fauna-obs').value        = f.observacoes || ''
+  // Restaura fotos existentes do animal
+  bFaunaFotoCarregar(f.fotos_blobs ?? [])
+  renderFaunaFotos()
+}
+
+// ── Câmera de fauna ──────────────────────────────────────────
+async function abrirFaunaCamera() {
+  if (bFaunaFotoGetLista().length >= 5) { toast('Máximo de 5 fotos por animal', 'warn'); return }
+  document.getElementById('fauna-camera-wrap').hidden = false
+  const ok = await bCameraAbrir(document.getElementById('fauna-camera-video'))
+  if (!ok) {
+    document.getElementById('fauna-camera-wrap').hidden = true
+    toast('Câmera não disponível', 'warn')
+  }
+}
+
+function fecharFaunaCamera() {
+  bCameraFechar()
+  document.getElementById('fauna-camera-wrap').hidden = true
+}
+
+async function capturarFaunaFoto() {
+  const blob = await bCameraCapturarPuro(
+    document.getElementById('fauna-camera-video'),
+    App.brigadista,
+    bGpsAtual()
+  )
+  if (!blob) return
+  if (!bFaunaFotoAdicionar(blob)) { toast('Máximo de 5 fotos por animal', 'warn'); return }
+  renderFaunaFotos()
+}
+
+function renderFaunaFotos() {
+  const grid  = document.getElementById('fauna-foto-grid')
+  const count = document.getElementById('fauna-foto-count')
+  const fotos = bFaunaFotoGetLista()
+  count.textContent = `(${fotos.length}/5)`
+  grid.innerHTML = ''
+  fotos.forEach((foto, i) => {
+    const isB64 = typeof foto === 'string'
+    const url   = isB64 ? foto : URL.createObjectURL(foto)
+    const wrap  = document.createElement('div')
+    wrap.className = 'foto-thumb'
+    wrap.innerHTML = `<img src="${url}" alt="foto ${i + 1}" loading="lazy"><button class="foto-del" data-i="${i}" aria-label="Remover">✕</button>`
+    wrap.querySelector('.foto-del').addEventListener('click', () => {
+      if (!isB64) URL.revokeObjectURL(url)
+      bFaunaFotoRemover(i)
+      renderFaunaFotos()
+    })
+    grid.appendChild(wrap)
+  })
 }
 
 function confirmarFauna() {
@@ -1073,18 +1142,21 @@ function confirmarFauna() {
 
   if (!tipo || !condicao) { toast('Tipo e Condição são obrigatórios', 'warn'); return }
 
+  fecharFaunaCamera()
+
   const item = {
-    classe:                classeAtiva?.dataset.v || 'nao_sei',
-    especie_id:            document.getElementById('f-fauna-especie-id').value || null,
+    classe:                  classeAtiva?.dataset.v || 'nao_sei',
+    especie_id:              document.getElementById('f-fauna-especie-id').value || null,
     especie_nome_cientifico: document.getElementById('f-fauna-especie').value || null,
-    nome_popular:          null,
-    tipo_evento:           tipo,
+    nome_popular:            null,
+    tipo_evento:             tipo,
     condicao,
-    causa:                 document.getElementById('f-fauna-causa').value || null,
-    destinacao:            document.getElementById('f-fauna-destinacao').value || null,
-    quantidade:            parseInt(document.getElementById('f-fauna-qtd').value, 10) || 1,
-    faixa_etaria:          document.getElementById('f-fauna-faixa').value || 'indeterminada',
-    observacoes:           document.getElementById('f-fauna-obs').value.trim() || null,
+    causa:                   document.getElementById('f-fauna-causa').value || null,
+    destinacao:              document.getElementById('f-fauna-destinacao').value || null,
+    quantidade:              parseInt(document.getElementById('f-fauna-qtd').value, 10) || 1,
+    faixa_etaria:            document.getElementById('f-fauna-faixa').value || 'indeterminada',
+    observacoes:             document.getElementById('f-fauna-obs').value.trim() || null,
+    fotos_blobs:             bFaunaFotoGetLista(),
   }
 
   if (App.faunaEditIdx !== null) {
@@ -1237,6 +1309,9 @@ document.addEventListener('DOMContentLoaded', () => {
     sel => { document.getElementById('f-fauna-especie-id').value = sel.especie_id || '' }
   )
   document.getElementById('btn-fauna-confirmar').addEventListener('click', confirmarFauna)
+  document.getElementById('btn-fauna-camera').addEventListener('click', abrirFaunaCamera)
+  document.getElementById('btn-fauna-fechar-camera').addEventListener('click', fecharFaunaCamera)
+  document.getElementById('btn-fauna-capturar').addEventListener('click', capturarFaunaFoto)
 
   // Fila
   document.getElementById('btn-sync-fila').addEventListener('click', () => {

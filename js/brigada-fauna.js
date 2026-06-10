@@ -2,7 +2,8 @@
 // Gerencia a lista de registros de fauna em memória antes de salvar
 
 let _faunaList = []       // fauna do registro atual em edição
-let _faunaEditIdx = null  // índice sendo editado (-1 = novo)
+let _faunaEditIdx = null  // índice sendo editado
+let _faunaFotos  = []     // fotos do animal em edição (Blobs ou base64)
 
 // ── Estado ────────────────────────────────────────────────────
 function bFaunaGetLista() { return [..._faunaList] }
@@ -10,9 +11,21 @@ function bFaunaGetLista() { return [..._faunaList] }
 function bFaunaLimpar() {
   _faunaList    = []
   _faunaEditIdx = null
+  _faunaFotos   = []
 }
 
 function bFaunaCarregar(lista) { _faunaList = lista ? [...lista] : [] }
+
+// ── Fotos do animal em edição ─────────────────────────────────
+function bFaunaFotoGetLista()        { return [..._faunaFotos] }
+function bFaunaFotoLimpar()          { _faunaFotos = [] }
+function bFaunaFotoCarregar(lista)   { _faunaFotos = lista ? [...lista] : [] }
+function bFaunaFotoAdicionar(foto)   {
+  if (_faunaFotos.length >= 5) return false
+  _faunaFotos.push(foto)
+  return true
+}
+function bFaunaFotoRemover(idx) { _faunaFotos.splice(idx, 1) }
 
 // ── CRUD em memória ───────────────────────────────────────────
 function bFaunaAdicionar(item) {
