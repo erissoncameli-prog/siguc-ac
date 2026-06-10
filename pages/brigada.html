@@ -54,8 +54,6 @@
     <span class="pin-dot" data-i="1"></span>
     <span class="pin-dot" data-i="2"></span>
     <span class="pin-dot" data-i="3"></span>
-    <span class="pin-dot" data-i="4"></span>
-    <span class="pin-dot" data-i="5"></span>
   </div>
   <div class="pin-keypad" id="pin-keypad">
     <button class="pin-key" data-v="1">1</button>
@@ -85,14 +83,12 @@
     <span class="lock-titulo">Criar PIN de Campo</span>
   </div>
   <p class="lock-subtitulo" id="pin-setup-nome" style="font-size:1rem;opacity:.75;margin-bottom:4px"></p>
-  <p class="lock-dica" id="pin-setup-dica">Escolha um PIN de 4 a 6 dígitos</p>
+  <p class="lock-dica" id="pin-setup-dica">Escolha um PIN de 4 dígitos</p>
   <div class="pin-display" id="pin-setup-display">
     <span class="pin-dot" data-i="0"></span>
     <span class="pin-dot" data-i="1"></span>
     <span class="pin-dot" data-i="2"></span>
     <span class="pin-dot" data-i="3"></span>
-    <span class="pin-dot" data-i="4"></span>
-    <span class="pin-dot" data-i="5"></span>
   </div>
   <div class="pin-keypad" id="pin-setup-keypad">
     <button class="pin-key" data-v="1">1</button>
@@ -709,7 +705,7 @@ function initPinKeypad(prefix, aoConfirmar) {
 
   keypad.querySelectorAll('.pin-key[data-v]').forEach(btn => {
     btn.addEventListener('click', () => {
-      if (_pinAtual.length < 6) {
+      if (_pinAtual.length < 4) {
         _pinAtual += btn.dataset.v
         atualizarPinDisplay(display, _pinAtual)
         if (_pinAtual.length >= 4) aoConfirmar()
@@ -762,10 +758,11 @@ function initPinSetupKeypad() {
 
   keypad.querySelectorAll('.pin-key[data-v]').forEach(btn => {
     btn.addEventListener('click', () => {
-      if (_pinSetupAtual.length < 6) {
+      if (_pinSetupAtual.length < 4) {
         _pinSetupAtual += btn.dataset.v
         atualizarPinDisplay(display, _pinSetupAtual)
         document.getElementById('pin-setup-erro').hidden = true
+        if (_pinSetupAtual.length === 4) confirmarPinSetup()
       }
     })
   })
@@ -777,7 +774,7 @@ function initPinSetupKeypad() {
   if (okBtn) okBtn.addEventListener('click', () => {
     if (_pinSetupAtual.length < 4) {
       document.getElementById('pin-setup-erro').hidden = false
-      document.getElementById('pin-setup-erro').textContent = 'PIN deve ter no mínimo 4 dígitos.'
+      document.getElementById('pin-setup-erro').textContent = 'Digite os 4 dígitos do PIN.'
       return
     }
     confirmarPinSetup()
