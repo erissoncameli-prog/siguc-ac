@@ -61,6 +61,13 @@
           <input class="form-control" id="mb-contrato" placeholder="Ex: 001/2026">
         </div>
       </div>
+      <div class="form-group" id="mb-chefe-wrap" style="display:none">
+        <label class="form-label">Chefe da Brigada</label>
+        <select class="form-control" id="mb-chefe">
+          <option value="">— Selecione o chefe —</option>
+        </select>
+        <small style="color:#9CA3AF;font-size:11px">Apenas brigadistas com função "Chefe de Brigada" aparecem aqui</small>
+      </div>
       <div class="grid-2">
         <div class="form-group"><label class="form-label">Coordenador</label>
           <input class="form-control" id="mb-coord-nome" placeholder="Nome do coordenador">
@@ -649,6 +656,26 @@ function abrirModalBrigada(b = null) {
   document.getElementById('mb-coord-contato').value   = b?.coordenador_contato || ''
   document.getElementById('mb-obs').value             = b?.observacoes || ''
   document.getElementById('mb-ativa').checked         = b ? b.ativa : true
+
+  // Chefe da brigada — só aparece ao editar (precisa ter brigadistas cadastrados)
+  const chefeWrap = document.getElementById('mb-chefe-wrap')
+  const chefeSelect = document.getElementById('mb-chefe')
+  if (b?.id) {
+    chefeWrap.style.display = ''
+    const chefes = _brigadistas.filter(br => br.brigada_id === b.id && br.funcao === 'chefe_brigada' && br.status === 'ativo')
+    chefeSelect.innerHTML = '<option value="">— Nenhum definido —</option>'
+    chefes.forEach(br => {
+      const o = document.createElement('option')
+      o.value = br.id
+      o.textContent = br.nome_completo
+      chefeSelect.appendChild(o)
+    })
+    chefeSelect.value = b?.chefe_id || ''
+    if (!chefes.length) chefeSelect.innerHTML = '<option value="">Nenhum brigadista com função Chefe cadastrado</option>'
+  } else {
+    chefeWrap.style.display = 'none'
+  }
+
   document.getElementById('modal-brigada').classList.add('aberto')
 }
 function fecharModalBrigada() { document.getElementById('modal-brigada').classList.remove('aberto'); _editId.brigada = null }
@@ -669,6 +696,7 @@ async function salvarBrigada() {
     coordenador_contato: document.getElementById('mb-coord-contato').value.trim() || null,
     observacoes:         document.getElementById('mb-obs').value.trim() || null,
     ativa:               document.getElementById('mb-ativa').checked,
+    chefe_id:            document.getElementById('mb-chefe').value || null,
   }
   const btn = document.getElementById('mb-btn-salvar')
   btn.disabled = true; btn.textContent = 'Salvando...'
@@ -738,14 +766,20 @@ async function salvarBrigadista() {
   const btn = document.getElementById('mbr-btn-salvar')
   btn.disabled = true; btn.textContent = 'Salvando...'
   try {
-    if (_editId.brigadista) {
-      const { error } = await db.from('brigadistas').update(payload).eq('id', _editId.brigadista)
+    let brigadistaId = _editId.brigadista
+    if (brigadistaId) {
+      const { error } = await db.from('brigadistas').update(payload).eq('id', brigadistaId)
       if (error) throw error
       toast('Brigadista atualizado!', 'success')
     } else {
-      const { error } = await db.from('brigadistas').insert(payload)
+      const { data, error } = await db.from('brigadistas').insert(payload).select('id').single()
       if (error) throw error
+      brigadistaId = data.id
       toast('Brigadista adicionado!', 'success')
+    }
+    // Se for chefe_brigada, atualiza brigadas.chefe_id automaticamente
+    if (payload.funcao === 'chefe_brigada' && payload.brigada_id && brigadistaId) {
+      await db.from('brigadas').update({ chefe_id: brigadistaId }).eq('id', payload.brigada_id)
     }
     fecharModalBrigadista(); await carregarDados()
   } catch(e) { toast(e.message || 'Erro ao salvar', 'error') }
