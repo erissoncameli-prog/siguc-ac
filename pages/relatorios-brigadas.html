@@ -9,6 +9,7 @@
 <script src="../js/queryLogger.js"></script>
 <script src="../js/config.js"></script>
 <script src="../js/layout.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <style>
 /* ── Tokens de natureza ──────────────────────────────── */
 :root {
@@ -98,6 +99,11 @@
 .skel { background:linear-gradient(90deg,#f3f4f6 25%,#e9eaec 50%,#f3f4f6 75%);
         background-size:200% 100%; animation:skel .9s infinite; border-radius:6px; height:14px }
 @keyframes skel{ from{background-position:200% 0} to{background-position:-200% 0} }
+
+/* ── Canvas charts ───────────────────────────────────── */
+.chart-canvas-wrap { position:relative; width:100% }
+.chart-grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px }
+@media(max-width:640px){ .chart-grid-2{ grid-template-columns:1fr } }
 </style>
 </head>
 <body>
@@ -385,16 +391,21 @@ function renderEstado() {
       ${pessoas > 0 ? `<div class="kpi-brig moni"><div class="kpi-brig-n">${pessoas}</div><div class="kpi-brig-l">Pessoas alcançadas</div></div>` : ''}
     </div>
 
-    <!-- Gráficos linha 1 -->
-    <div class="grid-2" style="gap:14px;margin-bottom:14px">
-      <div class="chart-card">${chartNatureza(r)}</div>
-      <div class="chart-card">${chartMensal(r)}</div>
+    <!-- Gráficos linha 1: Rosca + Linha -->
+    <div class="chart-grid-2">
+      <div class="chart-card">${chartNatureza(r, '-e')}</div>
+      <div class="chart-card">${chartMensal(r, '-e')}</div>
     </div>
 
-    <!-- Gráficos linha 2 -->
-    <div class="grid-2" style="gap:14px;margin-bottom:18px">
-      <div class="chart-card">${chartAtividade(r)}</div>
-      <div class="chart-card">${chartStatus(r)}</div>
+    <!-- Gráficos linha 2: Colunas + Pizza -->
+    <div class="chart-grid-2">
+      <div class="chart-card">${chartAtividade(r, '-e')}</div>
+      <div class="chart-card">${chartStatus(r, '-e')}</div>
+    </div>
+
+    <!-- Gráfico linha 3: Colunas empilhadas por regional -->
+    <div style="margin-bottom:14px">
+      <div class="chart-card">${chartRegional(r, '-e')}</div>
     </div>
 
     <!-- Tabelas -->
@@ -421,6 +432,15 @@ function renderEstado() {
       </div>
     </div>
   `
+
+  requestAnimationFrame(() => {
+    destroyCharts('chart-nat-e','chart-mensal-e','chart-ativ-e','chart-status-e','chart-regional-e')
+    initChartNatureza(r, '-e')
+    initChartMensal(r, '-e')
+    initChartAtividade(r, '-e')
+    initChartStatus(r, '-e')
+    initChartRegional(r, '-e')
+  })
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -449,9 +469,9 @@ function renderRegional() {
       <div class="kpi-brig"><div class="kpi-brig-n">${brist.length}</div><div class="kpi-brig-l">Brigadistas</div></div>
     </div>
 
-    <div class="grid-2" style="gap:14px;margin-bottom:18px">
-      <div class="chart-card">${chartNatureza(r)}</div>
-      <div class="chart-card">${chartAtividade(r)}</div>
+    <div class="chart-grid-2">
+      <div class="chart-card">${chartNatureza(r, '-r')}</div>
+      <div class="chart-card">${chartAtividade(r, '-r')}</div>
     </div>
 
     ${total ? `
@@ -462,6 +482,12 @@ function renderRegional() {
       </div>
     </div>` : '<p style="color:var(--cinza-400);text-align:center;padding:2rem">Sem registros nesta regional no período selecionado.</p>'}
   `
+
+  requestAnimationFrame(() => {
+    destroyCharts('chart-nat-r','chart-ativ-r')
+    initChartNatureza(r, '-r')
+    initChartAtividade(r, '-r')
+  })
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -493,9 +519,9 @@ function renderUC() {
       <div class="kpi-brig"><div class="kpi-brig-n">${brist.length}</div><div class="kpi-brig-l">Brigadistas</div></div>
     </div>
 
-    <div class="grid-2" style="gap:14px;margin-bottom:18px">
-      <div class="chart-card">${chartNatureza(r)}</div>
-      <div class="chart-card">${chartMensal(r)}</div>
+    <div class="chart-grid-2">
+      <div class="chart-card">${chartNatureza(r, '-u')}</div>
+      <div class="chart-card">${chartMensal(r, '-u')}</div>
     </div>
 
     ${total ? `
@@ -506,71 +532,214 @@ function renderUC() {
       </div>
     </div>` : '<p style="color:var(--cinza-400);text-align:center;padding:2rem">Sem registros nesta UC no período selecionado.</p>'}
   `
+
+  requestAnimationFrame(() => {
+    destroyCharts('chart-nat-u','chart-mensal-u')
+    initChartNatureza(r, '-u')
+    initChartMensal(r, '-u')
+  })
 }
 
 // ════════════════════════════════════════════════════════════════
-// Componentes de gráfico (CSS)
+// Gerenciamento de instâncias Chart.js
 // ════════════════════════════════════════════════════════════════
-function barChart(titulo, rows) {
-  // rows: [{label, n, cor, pct}]
-  if (!rows.length) return `<div class="chart-title">${titulo}</div><div class="chart-empty">Sem dados</div>`
-  const max = Math.max(...rows.map(r=>r.n), 1)
-  return `
-    <div class="chart-title">${titulo}</div>
-    ${rows.map(r=>`
-    <div class="bar-row">
-      <span class="bar-label">${r.label}</span>
-      <div class="bar-wrap"><div class="bar-fill" style="width:${Math.round(r.n/max*100)}%;background:${r.cor}"></div></div>
-      <span class="bar-val">${r.n}</span>
-    </div>`).join('')}`
+let _charts = {}
+
+function destroyCharts(...ids) {
+  const alvo = ids.length ? ids : Object.keys(_charts)
+  alvo.forEach(id => { if (_charts[id]) { _charts[id].destroy(); delete _charts[id] } })
 }
 
-function chartNatureza(rows) {
-  const cnt = agrupar(rows, 'natureza')
-  const data = Object.entries(cnt).sort((a,b)=>b[1]-a[1]).map(([k,n])=>({
-    label: (NAT_EMO[k]||'')+ ' ' + (NAT_LAB[k]||k), n, cor: NAT_COR[k]||'#6b7280'
-  }))
-  return barChart('Por natureza', data)
+function initChart(id, config) {
+  const canvas = document.getElementById(id)
+  if (!canvas) return
+  if (_charts[id]) _charts[id].destroy()
+  Chart.defaults.font.family = "'DM Sans', system-ui, sans-serif"
+  Chart.defaults.font.size   = 11
+  Chart.defaults.color       = '#6b7280'
+  _charts[id] = new Chart(canvas.getContext('2d'), config)
 }
 
-function chartAtividade(rows) {
+// ════════════════════════════════════════════════════════════════
+// HTML builders (retornam <canvas>) + funções de inicialização
+// ════════════════════════════════════════════════════════════════
+
+// ── ROSCA: Por Natureza ───────────────────────────────────────
+function chartNatureza(rows, sfx='') {
+  return `<div class="chart-title">Por natureza</div>
+    <div class="chart-canvas-wrap" style="height:210px">
+      <canvas id="chart-nat${sfx}"></canvas>
+    </div>`
+}
+function initChartNatureza(rows, sfx='') {
+  const cnt = { prevencao:0, combate:0, monitoramento:0 }
+  rows.forEach(r => { if (r.natureza in cnt) cnt[r.natureza]++ })
+  const total = rows.length || 1
+  initChart('chart-nat'+sfx, {
+    type: 'doughnut',
+    data: {
+      labels: ['🛡 Prevenção','🔥 Combate','🔭 Monitoramento'],
+      datasets: [{
+        data: [cnt.prevencao, cnt.combate, cnt.monitoramento],
+        backgroundColor: ['#12A66A','#EF5B3C','#3B82C4'],
+        borderWidth: 3, borderColor: '#fff', hoverOffset: 10,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, cutout: '62%',
+      plugins: {
+        legend: { position:'bottom', labels:{ boxWidth:11, padding:12 } },
+        tooltip: { callbacks: { label: ctx =>
+          ` ${ctx.label}: ${ctx.parsed} (${Math.round(ctx.parsed/total*100)}%)`
+        }}
+      }
+    }
+  })
+}
+
+// ── PIZZA: Status de Validação ────────────────────────────────
+function chartStatus(rows, sfx='') {
+  return `<div class="chart-title">Status de validação</div>
+    <div class="chart-canvas-wrap" style="height:210px">
+      <canvas id="chart-status${sfx}"></canvas>
+    </div>`
+}
+function initChartStatus(rows, sfx='') {
+  const cnt = { aguardando:0, validado:0, requer_correcao:0, rejeitado:0 }
+  rows.forEach(r => { if (r.status_validacao in cnt) cnt[r.status_validacao]++ })
+  const total = rows.length || 1
+  initChart('chart-status'+sfx, {
+    type: 'pie',
+    data: {
+      labels: ['Aguardando','Validado','Requer correção','Rejeitado'],
+      datasets: [{
+        data: [cnt.aguardando, cnt.validado, cnt.requer_correcao, cnt.rejeitado],
+        backgroundColor: ['#f59e0b','#059669','#a855f7','#ef4444'],
+        borderWidth: 3, borderColor: '#fff', hoverOffset: 8,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position:'bottom', labels:{ boxWidth:11, padding:12 } },
+        tooltip: { callbacks: { label: ctx =>
+          ` ${ctx.label}: ${ctx.parsed} (${Math.round(ctx.parsed/total*100)}%)`
+        }}
+      }
+    }
+  })
+}
+
+// ── COLUNAS: Por Atividade ────────────────────────────────────
+function chartAtividade(rows, sfx='') {
+  return `<div class="chart-title">Por atividade</div>
+    <div class="chart-canvas-wrap" style="height:210px">
+      <canvas id="chart-ativ${sfx}"></canvas>
+    </div>`
+}
+function initChartAtividade(rows, sfx='') {
   const cnt = agrupar(rows, 'atividade')
-  const data = Object.entries(cnt).sort((a,b)=>b[1]-a[1]).slice(0,8).map(([k,n])=>({
-    label: ATIV_LAB[k]||k, n, cor:'#52B788'
-  }))
-  return barChart('Por atividade', data)
+  const sorted = Object.entries(cnt).sort((a,b)=>b[1]-a[1]).slice(0,8)
+  initChart('chart-ativ'+sfx, {
+    type: 'bar',
+    data: {
+      labels: sorted.map(([k]) => ATIV_LAB[k]||k),
+      datasets: [{
+        label: 'Registros',
+        data: sorted.map(([,n]) => n),
+        backgroundColor: 'rgba(82,183,136,.8)',
+        borderColor: '#52B788',
+        borderWidth: 1.5,
+        borderRadius: 5,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display:false } },
+      scales: {
+        y: { beginAtZero:true, ticks:{ precision:0 }, grid:{ color:'rgba(0,0,0,.05)' } },
+        x: { grid:{ display:false }, ticks:{ maxRotation:35, font:{ size:10 } } }
+      }
+    }
+  })
 }
 
-function chartStatus(rows) {
-  const cnt = agrupar(rows, 'status_validacao')
-  const cores = { aguardando:'#f59e0b', validado:'#059669', requer_correcao:'#e879f9', rejeitado:'#ef4444' }
-  const data  = Object.entries(cnt).sort((a,b)=>b[1]-a[1]).map(([k,n])=>({
-    label: STATUS_LAB[k]||k, n, cor: cores[k]||'#6b7280'
-  }))
-  return barChart('Status de validação', data)
+// ── LINHA: Evolução Mensal ────────────────────────────────────
+function chartMensal(rows, sfx='') {
+  return `<div class="chart-title">Evolução mensal</div>
+    <div class="chart-canvas-wrap" style="height:210px">
+      <canvas id="chart-mensal${sfx}"></canvas>
+    </div>`
 }
-
-function chartMensal(rows) {
+function initChartMensal(rows, sfx='') {
   const cnt = {}
   rows.forEach(r => {
     if (!r.data_hora_evento) return
-    const key = r.data_hora_evento.slice(0,7) // YYYY-MM
+    const key = r.data_hora_evento.slice(0,7)
     cnt[key] = (cnt[key]||0) + 1
   })
-  // Últimos 12 meses preenchidos (mesmo zerados)
   const meses = []
   for (let i = 11; i >= 0; i--) {
-    const d = new Date()
-    d.setMonth(d.getMonth() - i, 1)
+    const d = new Date(); d.setMonth(d.getMonth()-i, 1)
     meses.push(d.toISOString().slice(0,7))
   }
-  const data = meses.filter(m => cnt[m] != null || rows.length > 0).map(m => {
-    const [ano, mes] = m.split('-')
-    const label = new Date(Number(ano), Number(mes)-1, 1).toLocaleDateString('pt-BR',{month:'short',year:'2-digit'})
-    return { label, n: cnt[m]||0, cor:'#3B82C4' }
-  }).filter(r => rows.length < 10 || r.n > 0 || true).slice(-12)
+  const labels = meses.map(m => {
+    const [a,mes] = m.split('-')
+    return new Date(+a, +mes-1, 1).toLocaleDateString('pt-BR',{month:'short',year:'2-digit'})
+  })
+  initChart('chart-mensal'+sfx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Registros',
+        data: meses.map(m => cnt[m]||0),
+        borderColor: '#3B82C4',
+        backgroundColor: 'rgba(59,130,196,.12)',
+        fill: true, tension: 0.35,
+        pointRadius: 4, pointBackgroundColor: '#3B82C4',
+        pointBorderColor: '#fff', pointBorderWidth: 2, pointHoverRadius: 6,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display:false } },
+      scales: {
+        y: { beginAtZero:true, ticks:{ precision:0 }, grid:{ color:'rgba(0,0,0,.05)' } },
+        x: { grid:{ display:false }, ticks:{ maxRotation:35, font:{ size:10 } } }
+      }
+    }
+  })
+}
 
-  return barChart('Evolução mensal', data.map(d => ({...d, label: `<span style="font-size:.72rem">${d.label}</span>`})))
+// ── COLUNAS EMPILHADAS: Por Regional × Natureza (Tab Estado) ──
+function chartRegional(rows, sfx='') {
+  return `<div class="chart-title">Registros por regional e natureza</div>
+    <div class="chart-canvas-wrap" style="height:210px">
+      <canvas id="chart-regional${sfx}"></canvas>
+    </div>`
+}
+function initChartRegional(rows, sfx='') {
+  const regs = Object.keys(REGIONAL_LAB)
+  initChart('chart-regional'+sfx, {
+    type: 'bar',
+    data: {
+      labels: regs.map(k => REGIONAL_LAB[k]),
+      datasets: [
+        { label:'🛡 Prevenção',     data: regs.map(k=>rows.filter(r=>r.regional===k&&r.natureza==='prevencao').length),    backgroundColor:'rgba(18,166,106,.8)',  borderColor:'#12A66A', borderWidth:1, borderRadius:3 },
+        { label:'🔥 Combate',       data: regs.map(k=>rows.filter(r=>r.regional===k&&r.natureza==='combate').length),      backgroundColor:'rgba(239,91,60,.8)',   borderColor:'#EF5B3C', borderWidth:1, borderRadius:3 },
+        { label:'🔭 Monitoramento', data: regs.map(k=>rows.filter(r=>r.regional===k&&r.natureza==='monitoramento').length),backgroundColor:'rgba(59,130,196,.8)',  borderColor:'#3B82C4', borderWidth:1, borderRadius:3 },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend:{ position:'bottom', labels:{ boxWidth:11, padding:12 } } },
+      scales: {
+        x: { stacked:true, grid:{ display:false }, ticks:{ font:{ size:10 } } },
+        y: { stacked:true, beginAtZero:true, ticks:{ precision:0 }, grid:{ color:'rgba(0,0,0,.05)' } }
+      }
+    }
+  })
 }
 
 // ════════════════════════════════════════════════════════════════
