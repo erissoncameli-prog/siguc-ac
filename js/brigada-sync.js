@@ -29,7 +29,11 @@ async function bSyncGarantirSessao() {
 
 // ── Ponto de entrada público ──────────────────────────────────
 async function bSyncRodar() {
-  if (_syncRunning || !db) return
+  if (_syncRunning) return
+  if (!db) {
+    bSyncEmitir('erro', { uuid: null, err: 'Supabase indisponível — verifique conexão e recarregue' })
+    return
+  }
 
   // Só renovar sessão quando online (sem rede não há como renovar)
   if (navigator.onLine) {
@@ -50,14 +54,20 @@ async function bSyncRodar() {
   _syncRunning = true
   try {
     await bSyncExecutar()
+  } catch (err) {
+    const msg = err?.message || String(err)
+    console.error('[brigada-sync] erro inesperado:', err)
+    bSyncEmitir('erro', { uuid: null, err: 'Erro interno: ' + msg })
   } finally {
     _syncRunning = false
   }
 }
 
 async function bSyncExecutar() {
-  // Recupera registros presos como 'enviando' por crash anterior
-  await bOfflineResetEnviando()
+  // Recupera registros presos como 'enviando' por crash anterior (não-fatal)
+  try { await bOfflineResetEnviando() } catch (e) {
+    console.warn('[brigada-sync] resetEnviando falhou:', e.message)
+  }
 
   const pendentes = await bOfflineListarPendentes()
   if (!pendentes.length) return

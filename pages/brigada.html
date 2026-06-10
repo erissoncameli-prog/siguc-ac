@@ -1407,6 +1407,11 @@ document.addEventListener('DOMContentLoaded', () => {
     })
 
     bSyncOn('sessao-expirada', ({ err }) => toast(err, 'warn'))
+
+    // Erros de infra (sem uuid = não é falha de registro individual)
+    bSyncOn('erro', ({ uuid, err }) => {
+      if (!uuid && err) toast(err, 'warn')
+    })
   })()
 
   // Online/offline
