@@ -1129,6 +1129,7 @@ async function carregarFila() {
       <div class="sync-info">
         <strong>${esc(r.atividade || '—')}</strong>
         <span>${formatData ? formatData(r.criado_em) : r.criado_em?.slice(0,10)}</span>
+        ${r.ultimo_erro ? `<span class="sync-erro-msg">⚠ ${esc(r.ultimo_erro)}</span>` : ''}
       </div>
       <span class="sync-status sync-${r.status}">${statusLabel[r.status] || r.status}</span>
     </div>
