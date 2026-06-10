@@ -744,6 +744,7 @@ function renderPagina(){
         <button class="mlb-tab" id="mlb-btn-uc"  onclick="toggleLayerBar('uc')">🌿 Unidades de Conservação <span class="mlb-badge" id="uc-count-badge" style="display:none">0</span></button>
         <button class="mlb-tab" id="mlb-btn-ti"  onclick="toggleLayerBar('ti')">🪶 Terras Indígenas <span class="mlb-badge" id="ti-count-badge" style="display:none">0</span></button>
         <button class="mlb-tab" id="mlb-btn-alertas" onclick="toggleLayerBar('alertas')">🔥 Alertas Ambientais <span class="mlb-badge" id="alertas-count-badge" style="display:none">0</span></button>
+        <button class="mlb-tab" id="mlb-btn-brigadas" onclick="toggleLayerBar('brigadas')">🧯 Brigadas de Campo <span class="mlb-badge" id="brigadas-count-badge" style="display:none">0</span></button>
         <button class="mlb-tab" id="mlb-btn-projetos" onclick="toggleLayerBar('projetos')">📐 Projetos de Análise <span class="mlb-badge" id="projetos-count-badge" style="display:none">0</span></button>
         <button class="mlb-tab" id="mlb-btn-mun" onclick="toggleLayerBar('mun')">🏙 Municípios</button>
         <button class="mlb-tab" id="mlb-btn-acre" onclick="toggleLayerBar('acre')">🗺 Delimitação do Acre</button>
@@ -1370,6 +1371,42 @@ function _renderDropdown(id){
       <a href="../pages/alertas-ambientais.html" style="font-size:11px;color:var(--verde-c);text-decoration:none;font-weight:600">→ Ver página completa de alertas</a>
     </div>
   ` + foot;
+  if(id==='brigadas') return hdr('🧯 Registros de Campo — Brigadas') + `
+    <div>
+      <label style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;cursor:pointer">
+        <input type="checkbox" id="brigadas-toggle" style="accent-color:#12A66A;width:14px;height:14px" onchange="toggleBrigadasMapa(this.checked)">
+        Exibir registros de campo no mapa
+      </label>
+      <p style="font-size:11px;color:var(--cinza-500);margin:5px 0 10px">Pontos GPS capturados pela PWA das brigadas. Somente registros com localização.</p>
+    </div>
+    <div id="brigadas-filtros-wrap" style="display:none;flex-direction:column;gap:10px">
+
+      <div>
+        <div style="font-size:10px;font-weight:700;color:var(--cinza-400);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">Natureza</div>
+        <div style="display:flex;flex-wrap:wrap;gap:5px">
+          ${[['prevencao','🛡 Prevenção','#12A66A'],['combate','🔥 Combate','#EF5B3C'],['monitoramento','🔭 Monitoramento','#3B82C4']].map(([v,l,c])=>`
+          <label style="display:flex;align-items:center;gap:4px;font-size:11px;cursor:pointer">
+            <input type="checkbox" checked data-brig-nat="${v}" style="accent-color:${c}" onchange="renderBrigadasMapa()">
+            <span style="color:${c};font-weight:600">${l}</span>
+          </label>`).join('')}
+        </div>
+      </div>
+
+      <div>
+        <div style="font-size:10px;font-weight:700;color:var(--cinza-400);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">Validação</div>
+        <div style="display:flex;flex-direction:column;gap:4px">
+          ${[['aguardando','⏳ Aguardando','#92400e'],['validado','✓ Validado','#065f46'],['requer_correcao','↩ Requer correção','#9d174d'],['rejeitado','✕ Rejeitado','#991b1b']].map(([v,l,c])=>`
+          <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer">
+            <input type="checkbox" ${v!=='rejeitado'?'checked':''} data-brig-status="${v}" style="accent-color:${c}" onchange="renderBrigadasMapa()">
+            <span style="color:${c}">${l}</span>
+          </label>`).join('')}
+        </div>
+      </div>
+
+      <div id="brigadas-mapa-stat" style="font-size:10px;color:var(--cinza-400)"></div>
+      <a href="../pages/validacao-campo.html" style="font-size:11px;color:var(--verde-c);text-decoration:none;font-weight:600">→ Abrir Validação de Campo</a>
+    </div>
+  ` + foot;
   if(id==='projetos') return hdr('📐 Projetos de Análise de Campo') + `
     <div style="display:flex;flex-direction:column;gap:10px">
       <p style="font-size:11px;color:var(--cinza-500);margin:0">Polígonos delimitados por técnicos vinculados a alertas ou criados independentemente.</p>
@@ -1824,6 +1861,16 @@ function _atualizarLegendaMapa(){
   // Alertas Ambientais
   if(_alertasAtivo && _alertasLayer) itens.push({ simbolo:'circle', cor:'#f97316', label:'Alertas Ambientais' });
 
+  // Brigadas de Campo
+  if(_brigadasAtivo && _brigadasMapa.length) {
+    [['prevencao','#12A66A','Brigadas — Prevenção'],['combate','#EF5B3C','Brigadas — Combate'],['monitoramento','#3B82C4','Brigadas — Monitoramento']].forEach(([nat,cor,label]) => {
+      if(_brigadasMapa.some(r => r.natureza === nat) &&
+         document.querySelector(`[data-brig-nat="${nat}"]`)?.checked) {
+        itens.push({ simbolo:'circle', cor, label });
+      }
+    });
+  }
+
   // Projetos de Análise
   if(_projetosLayer && _projetosLayer.getLayers?.().length)
     itens.push({ simbolo:'rect', cor:'#2563eb', opacidade:0.18, dash:true, label:'Projetos de Análise' });
@@ -2028,6 +2075,101 @@ function renderAlertasMapa() {
 
   const stat = document.getElementById('alertas-mapa-stat')
   if (stat) stat.textContent = `${visiveis.length} alertas exibidos`
+  _atualizarLegendaMapa()
+}
+
+// ══════════════════════════════════════════════════════════════
+// BRIGADAS DE CAMPO — registros_campo com GPS
+// ══════════════════════════════════════════════════════════════
+let _brigadasLayer = null, _brigadasMapa = [], _brigadasAtivo = false
+
+const _BRIG_NAT_COR  = { prevencao:'#12A66A', combate:'#EF5B3C', monitoramento:'#3B82C4' }
+const _BRIG_NAT_ICO  = { prevencao:'🛡', combate:'🔥', monitoramento:'🔭' }
+const _BRIG_ATIV_LAB = {
+  fogo:'Combate a fogo', educacao_ambiental:'Educação ambiental',
+  limpeza:'Limpeza/aceiro', reconhecimento:'Reconhecimento',
+  plantio:'Plantio', primeiros_socorros:'Primeiros socorros',
+  queima_controlada:'Queima controlada', outro:'Outro',
+}
+const _BRIG_STATUS_LAB = { aguardando:'Aguardando', validado:'Validado',
+  requer_correcao:'Requer correção', rejeitado:'Rejeitado' }
+
+async function toggleBrigadasMapa(ativo) {
+  _brigadasAtivo = ativo
+  const fw = document.getElementById('brigadas-filtros-wrap')
+  if (fw) fw.style.display = ativo ? 'flex' : 'none'
+
+  if (ativo && !_brigadasMapa.length) {
+    const { data } = await db
+      .from('vw_registros_validacao')
+      .select('id,natureza,atividade,status_validacao,data_hora_evento,lat,lng,brigadista_nome,brigada_nome,uc_nome,n_fauna,fotos_urls,descricao')
+      .not('lat', 'is', null)
+      .order('data_hora_evento', { ascending: false })
+      .limit(2000)
+    _brigadasMapa = data || []
+    const badge = document.getElementById('brigadas-count-badge')
+    if (badge) { badge.textContent = _brigadasMapa.length; badge.style.display = _brigadasMapa.length ? '' : 'none' }
+  }
+
+  if (_brigadasLayer) { mapaL.removeLayer(_brigadasLayer); _brigadasLayer = null }
+  if (!_brigadasAtivo || !_brigadasMapa.length) { _atualizarLegendaMapa(); return }
+  renderBrigadasMapa()
+}
+
+function renderBrigadasMapa() {
+  if (_brigadasLayer) { mapaL.removeLayer(_brigadasLayer); _brigadasLayer = null }
+  if (!_brigadasAtivo || !_brigadasMapa.length) return
+
+  const nats    = [...document.querySelectorAll('[data-brig-nat]')].filter(c=>c.checked).map(c=>c.dataset.brigNat)
+  const statuses= [...document.querySelectorAll('[data-brig-status]')].filter(c=>c.checked).map(c=>c.dataset.brigStatus)
+
+  const visiveis = _brigadasMapa.filter(r =>
+    nats.includes(r.natureza) && statuses.includes(r.status_validacao)
+  )
+
+  _brigadasLayer = L.layerGroup()
+  visiveis.forEach(r => {
+    if (!r.lat || !r.lng) return
+    const cor   = _BRIG_NAT_COR[r.natureza]  ?? '#6b7280'
+    const ico   = _BRIG_NAT_ICO[r.natureza]  ?? '📋'
+    const ativ  = _BRIG_ATIV_LAB[r.atividade] ?? r.atividade ?? '—'
+    const slab  = _BRIG_STATUS_LAB[r.status_validacao] ?? r.status_validacao
+    const dt    = r.data_hora_evento
+      ? new Date(r.data_hora_evento).toLocaleDateString('pt-BR', { timeZone:'America/Rio_Branco', day:'2-digit', month:'2-digit', year:'numeric' })
+      : '—'
+    const fotosN = (r.fotos_urls || []).length
+    const coordStr = `${Number(r.lat).toFixed(5)}, ${Number(r.lng).toFixed(5)}`
+
+    const marker = L.circleMarker([r.lat, r.lng], {
+      radius: 7, fillColor: cor, color: '#fff',
+      weight: 2, fillOpacity: 0.88
+    })
+
+    marker.bindPopup(`<div class="camada-popup">
+      <div class="cp-header" style="background:${cor}">${ico} Brigadas — ${r.natureza ? r.natureza.charAt(0).toUpperCase()+r.natureza.slice(1) : ''}</div>
+      <div class="cp-layer">
+        <div class="cp-row"><strong>Atividade</strong><span>${escHtml(ativ)}</span></div>
+        <div class="cp-row"><strong>Brigadista</strong><span>${escHtml(r.brigadista_nome ?? '—')}</span></div>
+        <div class="cp-row"><strong>Brigada</strong><span>${escHtml(r.brigada_nome ?? '—')}</span></div>
+        ${r.uc_nome ? `<div class="cp-row"><strong>UC</strong><span>${escHtml(r.uc_nome)}</span></div>` : ''}
+        <div class="cp-row"><strong>Data</strong><span>${dt}</span></div>
+        ${r.n_fauna > 0 ? `<div class="cp-row"><strong>Fauna</strong><span>🐾 ${r.n_fauna} animal${r.n_fauna > 1 ? 'is' : ''}</span></div>` : ''}
+        ${fotosN > 0 ? `<div class="cp-row"><strong>Fotos</strong><span>📷 ${fotosN}</span></div>` : ''}
+        <div style="margin-top:6px;display:flex;gap:5px;flex-wrap:wrap">
+          <span class="cp-badge" style="background:${cor}22;border-color:${cor};color:${cor}">${escHtml(slab)}</span>
+        </div>
+        <div style="margin-top:4px;font-size:10px;color:#9CA3AF">📍 ${coordStr}</div>
+        <a href="../pages/validacao-campo.html"
+          style="display:block;margin-top:8px;text-align:center;padding:6px 0;background:#1F4E2C;color:#fff;border-radius:6px;font-size:11px;font-weight:600;text-decoration:none;font-family:'DM Sans',sans-serif">
+          ✓ Abrir Validação de Campo
+        </a>
+      </div>
+    </div>`, { maxWidth: 260 }).addTo(_brigadasLayer)
+  })
+
+  _brigadasLayer.addTo(mapaL)
+  const stat = document.getElementById('brigadas-mapa-stat')
+  if (stat) stat.textContent = `${visiveis.length} registro${visiveis.length !== 1 ? 's' : ''} exibido${visiveis.length !== 1 ? 's' : ''}`
   _atualizarLegendaMapa()
 }
 
