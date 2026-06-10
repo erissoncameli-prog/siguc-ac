@@ -412,7 +412,7 @@
 .field-mode .field-input { font-size: 17px; padding: 16px; }
 
 /* ── Fauna ───────────────────────────────────────────────── */
-.classe-grid {
+.classe-fauna-grid {
   display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
   margin-bottom: 16px;
 }
