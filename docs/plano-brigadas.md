@@ -318,3 +318,76 @@ Regionais: Baixo Acre, Purus, Juruá, Tarauacá/Envira.
 Problemas que o app elimina na origem: coords trocadas/W-S invertidos, decimal vírgula×ponto,
 datas malformadas, nomes de equipe digitados errado, coords copiadas de outra linha, espaços/lixo.
 Import do histórico 2025: **não agora** (script de limpeza fica para depois, se desejado).
+
+## 15. Direção de Design — "Instrumento de Campo"
+
+Objetivo: app **moderno, autoral e sem cara de IA**. Estende o design system existente
+(NÃO altera `--floresta/--verde-c/--ouro/--t1` nem Fraunces/DM Sans — só **acrescenta** tokens,
+o que requer alinhamento antes de codar).
+
+### 15.1 Conceito-norte
+**Instrumento de Campo**: o app parece um **equipamento de guarda-parque / GPS robusto**
+cruzado com a elegância institucional da SEMA — não um dashboard SaaS genérico.
+Princípios: dados como leitura de instrumento, identidade geográfica do Acre, robustez tátil,
+honestidade de estados (GPS/offline/sync), tipografia editorial para o toque humano.
+
+### 15.2 Tema
+- **Automático**: segue claro/escuro do sistema do celular.
+  - Escuro = "operacional" (floresta quase preto, OLED-friendly, glare/noite).
+  - Claro = creme/floresta (unidade com o SIGUC web).
+- **Field Mode** (sob demanda): alto contraste, tipografia ampliada, alvos enormes
+  (uso com luva, sol forte). Toggle persistente por dispositivo.
+
+### 15.3 Tokens novos a acrescentar (precisa de alinhamento)
+- **Cores funcionais por natureza/tipo:**
+  - combate/fogo = brasa/âmbar-quente (ex.: `--brasa:#E2562B`)
+  - prevenção = verde do sistema (`--verde-c`)
+  - monitoramento = azul instrumento (ex.: `--instr-azul:#3A7CA5`)
+  - fauna = acento próprio (ex.: terracota/ocre distinto do ouro institucional)
+  - estados: ameaçada (destaque), queimado, óbito
+- **Tokens do tema escuro/operacional** (superfícies, contornos, texto sobre floresta).
+- **Fonte monospace** para dados de instrumento (coordenadas, precisão GPS, data/hora, IDs).
+  Sugestões: IBM Plex Mono / JetBrains Mono / Space Mono.
+
+### 15.4 Linguagem visual
+- **Monospace** em todo "readout" (lat/lon, precisão em m, timestamp, código do registro)
+  → cara de aparelho, não de app genérico.
+- **Textura de curvas de nível topográficas** (relevo do Acre) sutil ao fundo; grade de
+  coordenadas e silhueta das UCs como motivo gráfico (assinatura de lugar, não decoração).
+- **Carimbo na foto** desenhado como documento oficial: coord + data/hora + UC + brigada,
+  com hierarquia tipográfica (não timestamp default de câmera).
+- **Cards de campo** com "espinha" lateral colorida por natureza (combate/prevenção/monitoramento),
+  cantos levemente suaves, estados de toque tácteis (pressed), sem sombra genérica.
+- **Fraunces** para títulos/momentos editoriais (institucional, humano); **DM Sans** na UI.
+
+### 15.5 Ícones
+- **Set de linha curado** (Phosphor ou Lucide), **customizado** nas cores/peso do projeto.
+- **Zero emoji em produção** (emojis no md são só referência).
+- Cor do ícone segue a cor funcional do tipo.
+
+### 15.6 Interações-assinatura (diferenciais)
+- **Trava de GPS viva**: leitura de precisão em metros + animação de "lock"; o botão de captura
+  só "arma" com sinal bom (ou avisa explicitamente).
+- **Captura em 2 toques**, com confirmação por **háptico + som** (funciona com luva/sol).
+- **Sincronização como elemento de design**: fila tipo "caixa de saída" com pulso de status e
+  progresso real (pendente → enviando → confirmado); nunca um spinner genérico.
+- **Estados honestos** instrumentados: offline, armazenamento %, persistência concedida,
+  última sync — apresentados como leituras de painel.
+- **Motion com restrição**: micro-interações com significado (captura, lock, sync), nunca decorativas.
+
+### 15.7 Checklist "sem cara de IA" (guia de implementação)
+EVITAR: degradê roxo/índigo · glassmorphism em excesso · emoji como ícone · cards genéricos com
+sombra · layout centralizado com "blob" · fonte de sistema padrão · simetria sem intenção.
+BUSCAR: monospace para dados · ícones de traço próprios · textura topográfica do Acre · Field Mode
+alto contraste · estados-vazios/ilustração autorais · foto real · assimetria com propósito · grid consistente.
+
+### 15.8 Dois "universos" coerentes
+- **App de campo (brigadista)**: Instrumento de Campo, tema automático + Field Mode, mobile-first.
+- **SIGUC web (gestor/relatórios/validação)**: institucional/editorial (creme/floresta/ouro),
+  mapa-forward, mantendo o mesmo vocabulário visual (monospace nos dados, ícones, motivos do Acre).
+
+### 15.9 Impacto na implementação
+- Criar `css/brigada.css` (tokens novos + temas + Field Mode) sem tocar nas variáveis core.
+- Carregar fonte monospace e o set de ícones (curado) junto ao app.
+- Componentes do PWA (captura, fila, fauna, tarefas) já nascem nesta linguagem.
+- Antes de codar tokens novos: **alinhar as cores funcionais e a monospace** com o responsável pelo design.
