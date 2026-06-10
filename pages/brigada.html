@@ -700,7 +700,7 @@ function initPinKeypad(prefix, aoConfirmar) {
     btn.addEventListener('click', () => {
       if (_pinAtual.length < 6) {
         _pinAtual += btn.dataset.v
-        atualizarPinDisplay(display)
+        atualizarPinDisplay(display, _pinAtual)
         if (_pinAtual.length >= 4) aoConfirmar()
       }
     })
@@ -708,16 +708,16 @@ function initPinKeypad(prefix, aoConfirmar) {
 
   if (clearBtn) clearBtn.addEventListener('click', () => {
     _pinAtual = _pinAtual.slice(0, -1)
-    atualizarPinDisplay(display)
+    atualizarPinDisplay(display, _pinAtual)
   })
   if (okBtn) okBtn.addEventListener('click', () => {
     if (_pinAtual.length >= 4) aoConfirmar()
   })
 }
 
-function atualizarPinDisplay(displayEl) {
+function atualizarPinDisplay(displayEl, pinStr) {
   displayEl.querySelectorAll('.pin-dot').forEach((dot, i) => {
-    dot.classList.toggle('ativo', i < _pinAtual.length)
+    dot.classList.toggle('ativo', i < pinStr.length)
   })
 }
 
@@ -732,7 +732,7 @@ async function tentarDesbloquear() {
     document.getElementById('lock-erro').hidden = false
     document.getElementById('lock-erro').textContent = 'PIN incorreto. Tente novamente.'
     _pinAtual = ''
-    atualizarPinDisplay(document.getElementById('pin-display'))
+    atualizarPinDisplay(document.getElementById('pin-display'), _pinAtual)
   }
 }
 
@@ -753,7 +753,7 @@ function initPinSetupKeypad() {
     btn.addEventListener('click', () => {
       if (_pinSetupAtual.length < 6) {
         _pinSetupAtual += btn.dataset.v
-        atualizarPinDisplay(display)
+        atualizarPinDisplay(display, _pinSetupAtual)
         if (_pinSetupAtual.length >= 4) confirmarPinSetup()
       }
     })
@@ -761,7 +761,7 @@ function initPinSetupKeypad() {
 
   if (clearBtn) clearBtn.addEventListener('click', () => {
     _pinSetupAtual = _pinSetupAtual.slice(0, -1)
-    atualizarPinDisplay(display)
+    atualizarPinDisplay(display, _pinSetupAtual)
   })
   if (okBtn) okBtn.addEventListener('click', () => {
     if (_pinSetupAtual.length >= 4) confirmarPinSetup()
@@ -772,7 +772,7 @@ async function confirmarPinSetup() {
   if (_pinSetupFase === 1) {
     _pinSetupPrim = _pinSetupAtual
     _pinSetupAtual = ''
-    atualizarPinDisplay(document.getElementById('pin-setup-display'))
+    atualizarPinDisplay(document.getElementById('pin-setup-display'), _pinSetupAtual)
     document.getElementById('pin-setup-dica').textContent = 'Confirme seu PIN'
     _pinSetupFase = 2
     return
@@ -783,7 +783,7 @@ async function confirmarPinSetup() {
     document.getElementById('pin-setup-erro').textContent = 'PINs não coincidem. Tente novamente.'
     _pinSetupAtual = ''; _pinSetupPrim = ''; _pinSetupFase = 1
     document.getElementById('pin-setup-dica').textContent = 'Escolha um PIN de 4 a 6 dígitos'
-    atualizarPinDisplay(document.getElementById('pin-setup-display'))
+    atualizarPinDisplay(document.getElementById('pin-setup-display'), _pinSetupAtual)
     return
   }
 
