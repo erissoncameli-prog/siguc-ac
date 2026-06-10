@@ -98,6 +98,10 @@ async function bSyncUploadFotos(reg) {
   const fotos = reg.fotos_blobs ?? []
   if (!fotos.length) return []
 
+  // Garantir que a sessão está válida antes de qualquer upload
+  const { data: { session } } = await db.auth.getSession()
+  if (!session) throw new Error('Sessão expirada — faça login novamente para enviar fotos')
+
   const urls = []
   for (let i = 0; i < fotos.length; i++) {
     const item = fotos[i]
