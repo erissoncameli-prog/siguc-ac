@@ -457,10 +457,16 @@ async function carregarUCs() {
 async function carregarDados() {
   const [rb, rbr, rat, req] = await Promise.all([
     db.from('brigadas_resumo').select('*').order('uc_nome'),
-    db.from('brigadistas').select('*,brigadas(nome,uc_id,unidades_conservacao:uc_id(codigo))').order('nome_completo'),
+    db.from('brigadistas').select('*,brigadas(nome,uc_id)').order('nome_completo'),
     db.from('atividades_brigada').select('*,brigadas(nome)').order('data_inicio', { ascending: false }),
     db.from('equipamentos_brigada').select('*,brigadas(nome)').order('descricao'),
   ])
+
+  if (rb.error)  console.error('brigadas_resumo:', rb.error.message)
+  if (rbr.error) { toast('Erro ao carregar brigadistas: ' + rbr.error.message, 'error'); console.error(rbr.error) }
+  if (rat.error) console.error('atividades_brigada:', rat.error.message)
+  if (req.error) console.error('equipamentos_brigada:', req.error.message)
+
   _brigadas     = rb.data  || []
   _brigadistas  = rbr.data || []
   _atividades   = rat.data || []
