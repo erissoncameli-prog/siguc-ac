@@ -617,7 +617,7 @@ async function prosseguirAposAuth(session) {
   if (!pinSalvo) {
     const primeiroNome = brig.nome_completo?.split(' ')[0] || 'Brigadista'
     document.getElementById('pin-setup-nome').textContent = `Olá, ${primeiroNome}!`
-    document.getElementById('pin-setup-dica').textContent = 'Crie seu PIN de campo (4 a 6 dígitos)'
+    document.getElementById('pin-setup-dica').textContent = 'Escolha um PIN de 4 dígitos'
     toast('Login realizado! Configure seu PIN de acesso.', 'success')
     mostrarTela('tela-config-pin', false)
   } else {
@@ -729,17 +729,25 @@ function atualizarPinDisplay(displayEl, pinStr) {
 }
 
 async function tentarDesbloquear() {
-  const hash = await pinHash(_pinAtual, App.brigadista.id)
-  const hashSalvo = await bOfflineGetConfig('pin_hash')
-  if (hash === hashSalvo) {
-    _pinAtual = ''
-    atualizarPinDisplay(document.getElementById('pin-display'))
-    entrarHome()
-  } else {
+  try {
+    const hash = await pinHash(_pinAtual, App.brigadista.id)
+    const hashSalvo = await bOfflineGetConfig('pin_hash')
+    if (hash === hashSalvo) {
+      _pinAtual = ''
+      atualizarPinDisplay(document.getElementById('pin-display'), '')
+      entrarHome()
+    } else {
+      document.getElementById('lock-erro').hidden = false
+      document.getElementById('lock-erro').textContent = 'PIN incorreto. Tente novamente.'
+      _pinAtual = ''
+      atualizarPinDisplay(document.getElementById('pin-display'), '')
+    }
+  } catch (e) {
+    console.error('[tentarDesbloquear]', e)
     document.getElementById('lock-erro').hidden = false
-    document.getElementById('lock-erro').textContent = 'PIN incorreto. Tente novamente.'
+    document.getElementById('lock-erro').textContent = 'Erro ao verificar PIN. Tente novamente.'
     _pinAtual = ''
-    atualizarPinDisplay(document.getElementById('pin-display'), _pinAtual)
+    atualizarPinDisplay(document.getElementById('pin-display'), '')
   }
 }
 
@@ -782,28 +790,36 @@ function initPinSetupKeypad() {
 }
 
 async function confirmarPinSetup() {
-  if (_pinSetupFase === 1) {
-    _pinSetupPrim = _pinSetupAtual
-    _pinSetupAtual = ''
-    atualizarPinDisplay(document.getElementById('pin-setup-display'), _pinSetupAtual)
-    document.getElementById('pin-setup-dica').textContent = 'Confirme seu PIN'
-    _pinSetupFase = 2
-    return
-  }
+  try {
+    if (_pinSetupFase === 1) {
+      _pinSetupPrim = _pinSetupAtual
+      _pinSetupAtual = ''
+      atualizarPinDisplay(document.getElementById('pin-setup-display'), '')
+      document.getElementById('pin-setup-dica').textContent = 'Confirme seu PIN de 4 dígitos'
+      _pinSetupFase = 2
+      return
+    }
 
-  if (_pinSetupAtual !== _pinSetupPrim) {
-    document.getElementById('pin-setup-erro').hidden = false
-    document.getElementById('pin-setup-erro').textContent = 'PINs não coincidem. Tente novamente.'
+    if (_pinSetupAtual !== _pinSetupPrim) {
+      document.getElementById('pin-setup-erro').hidden = false
+      document.getElementById('pin-setup-erro').textContent = 'PINs não coincidem. Tente novamente.'
+      _pinSetupAtual = ''; _pinSetupPrim = ''; _pinSetupFase = 1
+      document.getElementById('pin-setup-dica').textContent = 'Escolha um PIN de 4 dígitos'
+      atualizarPinDisplay(document.getElementById('pin-setup-display'), '')
+      return
+    }
+
+    const hash = await pinHash(_pinSetupAtual, App.brigadista.id)
+    await bOfflineSetConfig('pin_hash', hash)
     _pinSetupAtual = ''; _pinSetupPrim = ''; _pinSetupFase = 1
-    document.getElementById('pin-setup-dica').textContent = 'Escolha um PIN de 4 a 6 dígitos'
-    atualizarPinDisplay(document.getElementById('pin-setup-display'), _pinSetupAtual)
-    return
+    entrarHome()
+  } catch (e) {
+    console.error('[confirmarPinSetup]', e)
+    document.getElementById('pin-setup-erro').hidden = false
+    document.getElementById('pin-setup-erro').textContent = 'Erro ao salvar PIN: ' + (e.message || 'tente novamente.')
+    _pinSetupAtual = ''; _pinSetupPrim = ''; _pinSetupFase = 1
+    atualizarPinDisplay(document.getElementById('pin-setup-display'), '')
   }
-
-  const hash = await pinHash(_pinSetupAtual, App.brigadista.id)
-  await bOfflineSetConfig('pin_hash', hash)
-  _pinSetupAtual = ''; _pinSetupPrim = ''; _pinSetupFase = 1
-  entrarHome()
 }
 
 // ════════════════════════════════════════════════════════════════
