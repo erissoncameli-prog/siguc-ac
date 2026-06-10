@@ -449,6 +449,19 @@
   </button>
 </nav>
 
+<!-- ══ BARRA DE PROGRESSO DE SYNC ═════════════════════════════ -->
+<div id="sync-progress" class="sync-progress-wrap" hidden>
+  <div class="sync-progress-inner">
+    <span class="sync-progress-spin">⟳</span>
+    <div class="sync-progress-info">
+      <span id="sync-pb-texto">Sincronizando…</span>
+      <div class="sync-pb-track">
+        <div class="sync-pb-fill" id="sync-pb-fill"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ── Scripts ─────────────────────────────────────────────── -->
 <script>
 // Stub de segurança: se o CDN não carregar (offline), config.js não quebra.
@@ -1263,6 +1276,47 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('login-erro').hidden = true
     mostrarTela('tela-login', false)
   })
+
+  // Barra de progresso de sincronização
+  ;(function () {
+    const wrap  = document.getElementById('sync-progress')
+    const fill  = document.getElementById('sync-pb-fill')
+    const texto = document.getElementById('sync-pb-texto')
+    let _timer  = null
+
+    function mostrarBarra(pct, msg) {
+      clearTimeout(_timer)
+      fill.style.width  = pct + '%'
+      texto.textContent = msg
+      wrap.hidden = false
+    }
+
+    function esconderBarra(delay = 3000) {
+      _timer = setTimeout(() => { wrap.hidden = true }, delay)
+    }
+
+    bSyncOn('sync-start', ({ total }) => {
+      mostrarBarra(0, `Sincronizando 0 / ${total}…`)
+    })
+
+    bSyncOn('sync-progresso', ({ ok, erros, total }) => {
+      const feitos = ok + erros
+      const pct = Math.round((feitos / total) * 100)
+      mostrarBarra(pct, `Sincronizando ${feitos} / ${total}…`)
+    })
+
+    bSyncOn('sync-fim', ({ ok, erros }) => {
+      if (erros === 0) {
+        mostrarBarra(100, `✓ ${ok} registro${ok !== 1 ? 's' : ''} enviado${ok !== 1 ? 's' : ''}`)
+        if (ok > 0) toast(`${ok} registro${ok !== 1 ? 's' : ''} sincronizado${ok !== 1 ? 's' : ''}!`, 'ok')
+      } else {
+        mostrarBarra(100, `${ok} enviado${ok !== 1 ? 's' : ''} · ${erros} com erro`)
+        toast(`${erros} registro(s) não puderam ser enviados`, 'warn')
+      }
+      esconderBarra(3000)
+      atualizarBadgeFila()
+    })
+  })()
 
   // Online/offline
   window.addEventListener('online', async () => {

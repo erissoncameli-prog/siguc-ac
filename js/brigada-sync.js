@@ -7,7 +7,7 @@ let _syncRunning = false
 
 // ── Ponto de entrada público ──────────────────────────────────
 async function bSyncRodar() {
-  if (_syncRunning) return
+  if (_syncRunning || !db) return
   _syncRunning = true
   try {
     await bSyncExecutar()
@@ -20,16 +20,22 @@ async function bSyncExecutar() {
   const pendentes = await bOfflineListarPendentes()
   if (!pendentes.length) return
 
+  let ok = 0, erros = 0
+  bSyncEmitir('sync-start', { total: pendentes.length })
+
   for (const reg of pendentes) {
-    await bSyncUm(reg)
+    const sucesso = await bSyncUm(reg)
+    if (sucesso) ok++; else erros++
+    bSyncEmitir('sync-progresso', { ok, erros, total: pendentes.length })
   }
 
   await bOfflinePurgar()
+  bSyncEmitir('sync-fim', { ok, erros, total: pendentes.length })
 }
 
 async function bSyncUm(reg) {
+  if (!db) return false
   await bOfflineMarcar(reg.uuid_cliente, 'enviando')
-  bSyncEmitir('progress', { uuid: reg.uuid_cliente, fase: 'inicio' })
 
   try {
     // Fase 1: upload de fotos
@@ -46,7 +52,6 @@ async function bSyncUm(reg) {
     // Fase 3: fauna (delete + reinsert)
     const fauna = await bOfflineFaunaDeRegistro(reg.uuid_cliente)
     if (fauna.length) {
-      // Recupera o id do registro recém inserido
       const { data: rc, error: errId } = await db
         .from('registros_campo')
         .select('id')
@@ -55,11 +60,7 @@ async function bSyncUm(reg) {
       if (errId) throw errId
 
       await db.from('registro_fauna').delete().eq('registro_campo_id', rc.id)
-      const faunaPayload = fauna.map(f => {
-        // eslint-disable-next-line no-unused-vars
-        const { id, registro_uuid, ...rest } = f
-        return { ...rest, registro_campo_id: rc.id }
-      })
+      const faunaPayload = fauna.map(f => bSyncMontarFaunaPayload(f, rc.id))
       const { error: errF } = await db.from('registro_fauna').insert(faunaPayload)
       if (errF) throw errF
     }
@@ -68,11 +69,14 @@ async function bSyncUm(reg) {
       sincronizado_em: new Date().toISOString(),
     })
     bSyncEmitir('confirmado', { uuid: reg.uuid_cliente })
+    return true
 
   } catch (err) {
-    console.warn('[brigada-sync] erro em', reg.uuid_cliente, err)
-    await bOfflineMarcar(reg.uuid_cliente, 'pendente', { ultimo_erro: String(err) })
-    bSyncEmitir('erro', { uuid: reg.uuid_cliente, err: String(err) })
+    const msg = err?.message ?? String(err)
+    console.warn('[brigada-sync] erro em', reg.uuid_cliente, msg)
+    await bOfflineMarcar(reg.uuid_cliente, 'pendente', { ultimo_erro: msg })
+    bSyncEmitir('erro', { uuid: reg.uuid_cliente, err: msg })
+    return false
   }
 }
 
@@ -84,7 +88,7 @@ async function bSyncUploadFotos(reg) {
   const urls = []
   for (let i = 0; i < blobs.length; i++) {
     const blob = blobs[i]
-    if (typeof blob === 'string') { urls.push(blob); continue } // já é URL
+    if (typeof blob === 'string') { urls.push(blob); continue }
 
     const ext  = blob.type?.includes('png') ? 'png' : 'jpg'
     const path = `${reg.uuid_cliente}/${i}.${ext}`
@@ -109,17 +113,50 @@ async function bSyncUploadFotos(reg) {
   return urls
 }
 
-// ── Monta payload sem campos internos do IndexedDB ────────────
+// ── Monta payload do registro de campo ───────────────────────
+// Mapeia os campos internos do IndexedDB para as colunas do banco.
 function bSyncMontarPayload(reg, fotosUrls) {
-  // eslint-disable-next-line no-unused-vars
-  const { fotos_blobs, criado_em, ultimo_erro, status, _fauna, ...rest } = reg
+  // Desestrutura e descarta campos internos + campos que precisam de conversão
+  const {
+    fotos_blobs, status, _fauna, ultimo_erro,
+    lat, lng,          // → localizacao (PostGIS)
+    n_equipe,          // → equipe (text)
+    area_ha,           // → area_estimada_ha
+    observacoes,       // → descricao
+    duracao_horas,     // sem coluna no banco
+    criado_em,         // → data_inicio + data_hora_evento
+    ...rest
+  } = reg
+
+  const ts = criado_em ?? new Date().toISOString()
+
   return {
     ...rest,
-    fotos_urls: fotosUrls,
-    // gps vem como { lat, lng } — converter para WKT Point
-    gps: reg.lat != null
-      ? `POINT(${reg.lng} ${reg.lat})`
-      : undefined,
+    fotos_urls:       fotosUrls.length ? fotosUrls : null,
+    localizacao:      (lat != null && lng != null)
+                        ? `SRID=4326;POINT(${lng} ${lat})`
+                        : null,
+    equipe:           n_equipe != null ? String(n_equipe) : null,
+    area_estimada_ha: area_ha  ?? null,
+    descricao:        observacoes ?? null,
+    data_inicio:      ts.slice(0, 10),
+    data_hora_evento: ts,
+  }
+}
+
+// ── Monta payload de fauna ────────────────────────────────────
+function bSyncMontarFaunaPayload(f, registroCampoId) {
+  const {
+    id, registro_uuid,
+    especie_nome_cientifico,  // → nome_cientifico
+    causa,                    // → causa_aparente
+    ...rest
+  } = f
+  return {
+    ...rest,
+    registro_campo_id: registroCampoId,
+    nome_cientifico:   especie_nome_cientifico ?? null,
+    causa_aparente:    causa ?? null,
   }
 }
 
