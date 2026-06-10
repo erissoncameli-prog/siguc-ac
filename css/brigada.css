@@ -6,6 +6,9 @@
 
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
 
+/* Garante que o atributo hidden funcione mesmo quando CSS define display */
+[hidden] { display: none !important; }
+
 /* ── Tokens funcionais por natureza ──────────────────────── */
 :root {
   --prim:        #12A66A;
