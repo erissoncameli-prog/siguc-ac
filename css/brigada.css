@@ -83,7 +83,7 @@
   background: rgba(255,255,255,.25);
   transition: background .15s var(--spring);
 }
-.pin-dot.filled { background: var(--soft); }
+.pin-dot.ativo { background: var(--soft); }
 
 .pin-keypad {
   display: grid; grid-template-columns: repeat(3, 72px); gap: 12px;
