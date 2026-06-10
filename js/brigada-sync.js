@@ -72,8 +72,9 @@ async function bSyncUm(reg) {
     return true
 
   } catch (err) {
-    const msg = [err?.message, err?.details, err?.hint, err?.code]
-      .filter(Boolean).join(' | ') || String(err)
+    const msg = [err?.message, err?.details, err?.hint, err?.code, err?.error]
+      .filter(Boolean).join(' | ')
+      || (err && typeof err === 'object' ? JSON.stringify(err) : String(err))
     console.warn('[brigada-sync] erro em', reg.uuid_cliente, err)
     await bOfflineMarcar(reg.uuid_cliente, 'pendente', { ultimo_erro: msg })
     bSyncEmitir('erro', { uuid: reg.uuid_cliente, err: msg })
@@ -95,16 +96,23 @@ async function bSyncUploadFotos(reg) {
     const path = `${reg.uuid_cliente}/${i}.${ext}`
 
     let ok = false
+    let lastStorageErr = null
     for (let t = 0; t <= SYNC_BACKOFF.length; t++) {
       const { error } = await db.storage
         .from('registros-campo')
         .upload(path, blob, { upsert: true, contentType: blob.type ?? 'image/jpeg' })
 
       if (!error) { ok = true; break }
+      lastStorageErr = error
       if (t < SYNC_BACKOFF.length) await bSyncSleep(SYNC_BACKOFF[t])
     }
 
-    if (!ok) throw new Error(`Falha no upload da foto ${i}`)
+    if (!ok) {
+      const detail = lastStorageErr
+        ? (lastStorageErr.message || lastStorageErr.error || JSON.stringify(lastStorageErr))
+        : 'sem detalhe'
+      throw new Error(`Falha no upload da foto ${i}: ${detail}`)
+    }
 
     const { data: { publicUrl } } = db.storage
       .from('registros-campo')
@@ -149,7 +157,7 @@ function bSyncMontarPayload(reg, fotosUrls) {
 // ── Monta payload de fauna ────────────────────────────────────
 function bSyncMontarFaunaPayload(f, registroCampoId) {
   const {
-    id, registro_uuid,
+    id, _id, registro_uuid,
     especie_nome_cientifico,  // → nome_cientifico
     causa,                    // → causa_aparente
     ...rest
