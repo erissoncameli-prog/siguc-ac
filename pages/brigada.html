@@ -765,7 +765,7 @@ function initPinSetupKeypad() {
       if (_pinSetupAtual.length < 6) {
         _pinSetupAtual += btn.dataset.v
         atualizarPinDisplay(display, _pinSetupAtual)
-        if (_pinSetupAtual.length >= 4) confirmarPinSetup()
+        document.getElementById('pin-setup-erro').hidden = true
       }
     })
   })
@@ -775,7 +775,12 @@ function initPinSetupKeypad() {
     atualizarPinDisplay(display, _pinSetupAtual)
   })
   if (okBtn) okBtn.addEventListener('click', () => {
-    if (_pinSetupAtual.length >= 4) confirmarPinSetup()
+    if (_pinSetupAtual.length < 4) {
+      document.getElementById('pin-setup-erro').hidden = false
+      document.getElementById('pin-setup-erro').textContent = 'PIN deve ter no mínimo 4 dígitos.'
+      return
+    }
+    confirmarPinSetup()
   })
 }
 
