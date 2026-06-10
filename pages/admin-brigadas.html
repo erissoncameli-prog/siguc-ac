@@ -149,6 +149,16 @@
     </div>
     <div class="modal-body">
 
+      <!-- Foto -->
+      <div class="brig-foto-wrap">
+        <div class="brig-foto-avatar" id="mbr-foto-preview">🧑</div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:4px">
+          <button type="button" class="brig-foto-btn" onclick="document.getElementById('mbr-foto-input').click()">📷 Selecionar foto</button>
+          <span class="brig-foto-remover" id="mbr-foto-remover" onclick="removerFotoBrigadista()">✕ Remover foto</span>
+        </div>
+        <input type="file" id="mbr-foto-input" accept="image/*" style="display:none" onchange="previewFotoBrigadista(this)">
+      </div>
+
       <!-- Identificação -->
       <div class="form-section-label">Identificação</div>
       <div class="grid-2">
@@ -772,6 +782,37 @@ async function salvarBrigada() {
   finally { btn.disabled = false; btn.textContent = 'Salvar' }
 }
 
+// ── Foto do Brigadista ───────────────────────────────────────
+let _mbrFotoFile = null
+let _mbrFotoUrlAtual = null
+
+function _setBrigFotoPreview(url) {
+  const wrap = document.getElementById('mbr-foto-preview')
+  const rem  = document.getElementById('mbr-foto-remover')
+  if (url) {
+    wrap.innerHTML = `<img src="${url}" alt="foto">`
+    rem.classList.add('visivel')
+  } else {
+    wrap.innerHTML = '🧑'
+    rem.classList.remove('visivel')
+  }
+}
+
+function previewFotoBrigadista(input) {
+  const file = input.files[0]
+  if (!file) return
+  if (file.size > 5 * 1024 * 1024) { toast('Foto deve ter no máximo 5 MB', 'error'); input.value = ''; return }
+  _mbrFotoFile = file
+  _setBrigFotoPreview(URL.createObjectURL(file))
+}
+
+function removerFotoBrigadista() {
+  _mbrFotoFile = null
+  _mbrFotoUrlAtual = null
+  document.getElementById('mbr-foto-input').value = ''
+  _setBrigFotoPreview(null)
+}
+
 // ── Modal Brigadista ─────────────────────────────────────────
 function abrirModalBrigadista(b = null) {
   _editId.brigadista = b?.id || null
@@ -806,6 +847,10 @@ function abrirModalBrigadista(b = null) {
   document.getElementById('mbr-ch').value               = b?.carga_horaria_formacao || ''
   document.getElementById('mbr-ultima-form').value      = b?.data_ultima_formacao || ''
   document.getElementById('mbr-obs').value              = b?.observacoes || ''
+  _mbrFotoFile     = null
+  _mbrFotoUrlAtual = b?.foto_url || null
+  document.getElementById('mbr-foto-input').value = ''
+  _setBrigFotoPreview(_mbrFotoUrlAtual)
   document.getElementById('modal-brigadista').classList.add('aberto')
 }
 
@@ -855,6 +900,21 @@ async function salvarBrigadista() {
   const btn = document.getElementById('mbr-btn')
   btn.disabled = true; btn.textContent = 'Salvando...'
   try {
+    // Upload de foto se houver arquivo novo selecionado
+    if (_mbrFotoFile) {
+      btn.textContent = 'Enviando foto...'
+      const ext  = _mbrFotoFile.name.split('.').pop().toLowerCase() || 'jpg'
+      const path = `${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`
+      const { error: upErr } = await db.storage.from('brigadistas').upload(path, _mbrFotoFile, { upsert: true })
+      if (upErr) throw upErr
+      const { data: urlData } = db.storage.from('brigadistas').getPublicUrl(path)
+      payload.foto_url = urlData.publicUrl
+      btn.textContent = 'Salvando...'
+    } else {
+      // mantém URL atual (null = remover, string = manter)
+      payload.foto_url = _mbrFotoUrlAtual
+    }
+
     const { error } = _editId.brigadista
       ? await db.from('brigadistas').update(payload).eq('id', _editId.brigadista)
       : await db.from('brigadistas').insert(payload)
@@ -934,6 +994,23 @@ function fecharModal(tipo) {
   padding: 8px 0 4px; border-bottom: 1px solid rgba(82,183,136,.2);
   margin-bottom: 12px;
 }
+/* Campo de foto do brigadista */
+.brig-foto-wrap { display:flex; flex-direction:column; align-items:center; gap:10px; margin-bottom:16px; }
+.brig-foto-avatar {
+  width:96px; height:96px; border-radius:50%; object-fit:cover;
+  border:3px solid var(--verde-c,#52B788); background:#f3f4f6;
+  display:flex; align-items:center; justify-content:center;
+  font-size:38px; overflow:hidden; flex-shrink:0;
+}
+.brig-foto-avatar img { width:100%; height:100%; object-fit:cover; border-radius:50%; }
+.brig-foto-btn {
+  font-size:12px; font-weight:600; color:var(--verde-c,#52B788);
+  background:rgba(82,183,136,.1); border:1px dashed var(--verde-c,#52B788);
+  border-radius:8px; padding:6px 14px; cursor:pointer; transition:background .15s;
+}
+.brig-foto-btn:hover { background:rgba(82,183,136,.2); }
+.brig-foto-remover { font-size:11px; color:#EF4444; cursor:pointer; display:none; }
+.brig-foto-remover.visivel { display:block; }
 </style>
 </body>
 </html>
