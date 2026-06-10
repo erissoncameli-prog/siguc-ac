@@ -456,6 +456,25 @@
 <!-- ── Scripts ─────────────────────────────────────────────── -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="/js/config.js"></script>
+<script>
+// ── Cliente Supabase ISOLADO para o App de Campo ──────────────
+// Usa localStorage + storageKey próprio para nunca sobrescrever
+// a sessionStorage do app principal SIGUC-AC.
+// Redefine a variável global `db` para todo o contexto desta página.
+;(function () {
+  const _brigDb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: {
+      storageKey:       'siguc-brigada-session',
+      storage:          window.localStorage,
+      persistSession:   true,
+      autoRefreshToken: true,
+      detectSessionInUrl: false,
+    },
+  });
+  // eslint-disable-next-line no-global-assign
+  db = _brigDb;
+})();
+</script>
 <script src="/js/brigada-offline.js"></script>
 <script src="/js/brigada-sync.js"></script>
 <script src="/js/brigada-captura.js"></script>
@@ -540,26 +559,14 @@ async function boot() {
   await bOfflineInit()
   bOfflinePersistir()
 
-  // 1. Sessão ainda ativa na aba (sessionStorage)
+  // 1. Sessão ativa no localStorage (persistida pelo cliente isolado)
   const { data: { session: sessaoAtiva } } = await db.auth.getSession()
   if (sessaoAtiva) {
-    await salvarTokensSessao(sessaoAtiva)
     await prosseguirAposAuth(sessaoAtiva)
     return
   }
 
-  // 2. Tenta restaurar sessão a partir dos tokens salvos no IndexedDB
-  const tokens = await bOfflineGetConfig('session_tokens')
-  if (tokens?.access_token && tokens?.refresh_token) {
-    const { data, error } = await db.auth.setSession(tokens)
-    if (!error && data?.session) {
-      await salvarTokensSessao(data.session)
-      await prosseguirAposAuth(data.session)
-      return
-    }
-  }
-
-  // 3. Sem sessão restaurável — verificar cache offline + PIN configurado
+  // 2. Sem sessão — verificar cache offline + PIN configurado (modo campo offline)
   const brigCached = await bOfflineGetConfig('brigadista')
   const pinSalvo   = await bOfflineGetConfig('pin_hash')
   if (brigCached && pinSalvo) {
@@ -571,7 +578,7 @@ async function boot() {
     return
   }
 
-  // 4. Sem cache — precisa fazer login
+  // 3. Sem cache — precisa fazer login
   mostrarTela('tela-login', false)
 }
 
@@ -624,13 +631,6 @@ async function prosseguirAposAuth(session) {
   }
 }
 
-async function salvarTokensSessao(session) {
-  await bOfflineSetConfig('session_tokens', {
-    access_token:  session.access_token,
-    refresh_token: session.refresh_token,
-  })
-}
-
 function mostrarErroLogin(msg) {
   const el = document.getElementById('login-erro')
   el.textContent = msg
@@ -654,7 +654,6 @@ async function fazerLogin() {
       mostrarErroLogin(error.status === 400 ? 'E-mail ou senha incorretos.' : 'Erro ao conectar. Tente novamente.')
       return
     }
-    await salvarTokensSessao(data.session)
     await prosseguirAposAuth(data.session)
   } catch (e) {
     console.error('[fazerLogin]', e)
@@ -1127,13 +1126,6 @@ document.addEventListener('DOMContentLoaded', () => {
     inp.type = inp.type === 'password' ? 'text' : 'password'
   })
 
-  // Mantém tokens atualizados após auto-refresh silencioso
-  db.auth.onAuthStateChange(async (event, session) => {
-    if ((event === 'TOKEN_REFRESHED' || event === 'SIGNED_IN') && session) {
-      await salvarTokensSessao(session)
-    }
-  })
-
   // PIN desbloqueio
   initPinKeypad('pin', tentarDesbloquear)
   document.getElementById('btn-pular-pin')?.addEventListener('click', entrarHome)
@@ -1226,7 +1218,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!confirm('Sair do app? Registros não enviados permanecem salvos.')) return
     bGpsParar()
     await encerrarSessaoAuditoria()
-    await bOfflineSetConfig('session_tokens', null)
     await bOfflineSetConfig('brigadista', null)
     await bOfflineSetConfig('brigada', null)
     await bOfflineSetConfig('pin_hash', null)
@@ -1239,17 +1230,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Online/offline
   window.addEventListener('online', async () => {
-    // Restaurar sessão expirada se tivermos tokens salvos
-    const { data: { session } } = await db.auth.getSession()
-    if (!session) {
-      const tokens = await bOfflineGetConfig('session_tokens')
-      if (tokens?.access_token && tokens?.refresh_token) {
-        const { data } = await db.auth.setSession(tokens).catch(() => ({ data: null }))
-        if (data?.session) await salvarTokensSessao(data.session)
-      }
-    }
     bSyncRodar()
-    toast('Conexão restabelecida — sincronizando…', 'ok')
+    toast('Conexão restabelecida — sincronizando…', 'info')
   })
 
   // Field mode restaurado
