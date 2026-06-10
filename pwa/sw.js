@@ -1,0 +1,92 @@
+// ── SIGUC Brigadas — Service Worker ───────────────────────────
+const CACHE = 'siguc-brigadas-v1'
+
+const APP_SHELL = [
+  '/pages/brigada.html',
+  '/css/brigada.css',
+  '/css/global.css',
+  '/js/config.js',
+  '/js/brigada-offline.js',
+  '/js/brigada-sync.js',
+  '/js/brigada-captura.js',
+  '/js/brigada-fauna.js',
+  'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2',
+]
+
+// ── Install: pré-cache do app shell ─────────────────────────
+self.addEventListener('install', ev => {
+  ev.waitUntil(
+    caches.open(CACHE)
+      .then(c => c.addAll(APP_SHELL))
+      .then(() => self.skipWaiting())
+  )
+})
+
+// ── Activate: remove caches antigos ─────────────────────────
+self.addEventListener('activate', ev => {
+  ev.waitUntil(
+    caches.keys()
+      .then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
+      .then(() => self.clients.claim())
+  )
+})
+
+// ── Fetch: cache-first para assets; network-first para API ───
+self.addEventListener('fetch', ev => {
+  const url = new URL(ev.request.url)
+
+  // Requisições Supabase (REST, Storage, Functions): network-first sem cache
+  if (url.hostname.endsWith('.supabase.co')) {
+    ev.respondWith(
+      fetch(ev.request).catch(() =>
+        new Response(JSON.stringify({ error: 'offline' }), {
+          status: 503,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      )
+    )
+    return
+  }
+
+  // App shell: cache-first, atualiza em background
+  ev.respondWith(
+    caches.match(ev.request).then(cached => {
+      const network = fetch(ev.request).then(resp => {
+        if (resp.ok && ev.request.method === 'GET') {
+          caches.open(CACHE).then(c => c.put(ev.request, resp.clone()))
+        }
+        return resp
+      })
+      return cached || network
+    })
+  )
+})
+
+// ── Background Sync: dispara sync nos clientes ───────────────
+self.addEventListener('sync', ev => {
+  if (ev.tag === 'sync-registros') {
+    ev.waitUntil(
+      self.clients.matchAll({ includeUncontrolled: true }).then(clients =>
+        clients.forEach(c => c.postMessage({ type: 'BACKGROUND_SYNC' }))
+      )
+    )
+  }
+})
+
+// ── Push (futuro: notificações de alertas CIGMA) ─────────────
+self.addEventListener('push', ev => {
+  const data = ev.data?.json() ?? {}
+  ev.waitUntil(
+    self.registration.showNotification(data.title ?? 'SIGUC Brigadas', {
+      body: data.body ?? '',
+      icon: '/pwa/icons/icon-192.png',
+      badge: '/pwa/icons/icon-192.png',
+      data: data.url ?? '/pages/brigada.html',
+    })
+  )
+})
+
+self.addEventListener('notificationclick', ev => {
+  ev.notification.close()
+  ev.waitUntil(self.clients.openWindow(ev.notification.data))
+})

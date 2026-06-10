@@ -1,0 +1,1063 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#12A66A">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>SIGUC Brigadas</title>
+  <link rel="manifest" href="/pwa/manifest.json">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&family=Fraunces:wght@700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/brigada.css">
+</head>
+<body>
+
+<!-- ══ TELA: BLOQUEIO ══════════════════════════════════════════ -->
+<div id="tela-bloqueio" class="tela ativa lock-screen" hidden>
+  <div class="lock-logo">
+    <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+      <circle cx="24" cy="24" r="24" fill="#12A66A"/>
+      <path d="M24 12c-3.3 0-6 2.7-6 6v2H16v16h16V20h-2v-2c0-3.3-2.7-6-6-6zm0 3c1.65 0 3 1.35 3 3v2h-6v-2c0-1.65 1.35-3 3-3zm0 9a2 2 0 0 1 0 4 2 2 0 0 1 0-4z" fill="#fff"/>
+    </svg>
+    <span class="lock-titulo">SIGUC Brigadas</span>
+  </div>
+  <p class="lock-subtitulo" id="lock-nome">Carregando…</p>
+  <p class="lock-dica">Digite seu PIN de campo</p>
+  <div class="pin-display" id="pin-display">
+    <span class="pin-dot" data-i="0"></span>
+    <span class="pin-dot" data-i="1"></span>
+    <span class="pin-dot" data-i="2"></span>
+    <span class="pin-dot" data-i="3"></span>
+    <span class="pin-dot" data-i="4"></span>
+    <span class="pin-dot" data-i="5"></span>
+  </div>
+  <div class="pin-keypad" id="pin-keypad">
+    <button class="pin-key" data-v="1">1</button>
+    <button class="pin-key" data-v="2">2</button>
+    <button class="pin-key" data-v="3">3</button>
+    <button class="pin-key" data-v="4">4</button>
+    <button class="pin-key" data-v="5">5</button>
+    <button class="pin-key" data-v="6">6</button>
+    <button class="pin-key" data-v="7">7</button>
+    <button class="pin-key" data-v="8">8</button>
+    <button class="pin-key" data-v="9">9</button>
+    <button class="pin-key pin-clear" id="pin-clear">⌫</button>
+    <button class="pin-key" data-v="0">0</button>
+    <button class="pin-key pin-ok" id="pin-ok">✓</button>
+  </div>
+  <button class="btn-link" id="btn-pular-pin" style="display:none">Configurar PIN depois</button>
+  <p class="lock-erro" id="lock-erro" hidden></p>
+</div>
+
+<!-- ══ TELA: CONFIGURAR PIN ════════════════════════════════════ -->
+<div id="tela-config-pin" class="tela lock-screen" hidden>
+  <div class="lock-logo">
+    <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+      <circle cx="24" cy="24" r="24" fill="#12A66A"/>
+      <path d="M24 12c-3.3 0-6 2.7-6 6v2H16v16h16V20h-2v-2c0-3.3-2.7-6-6-6zm0 3c1.65 0 3 1.35 3 3v2h-6v-2c0-1.65 1.35-3 3-3zm0 9a2 2 0 0 1 0 4 2 2 0 0 1 0-4z" fill="#fff"/>
+    </svg>
+    <span class="lock-titulo">Criar PIN de Campo</span>
+  </div>
+  <p class="lock-dica" id="pin-setup-dica">Escolha um PIN de 4 a 6 dígitos</p>
+  <div class="pin-display" id="pin-setup-display">
+    <span class="pin-dot" data-i="0"></span>
+    <span class="pin-dot" data-i="1"></span>
+    <span class="pin-dot" data-i="2"></span>
+    <span class="pin-dot" data-i="3"></span>
+    <span class="pin-dot" data-i="4"></span>
+    <span class="pin-dot" data-i="5"></span>
+  </div>
+  <div class="pin-keypad" id="pin-setup-keypad">
+    <button class="pin-key" data-v="1">1</button>
+    <button class="pin-key" data-v="2">2</button>
+    <button class="pin-key" data-v="3">3</button>
+    <button class="pin-key" data-v="4">4</button>
+    <button class="pin-key" data-v="5">5</button>
+    <button class="pin-key" data-v="6">6</button>
+    <button class="pin-key" data-v="7">7</button>
+    <button class="pin-key" data-v="8">8</button>
+    <button class="pin-key" data-v="9">9</button>
+    <button class="pin-key pin-clear" id="pin-setup-clear">⌫</button>
+    <button class="pin-key" data-v="0">0</button>
+    <button class="pin-key pin-ok" id="pin-setup-ok">✓</button>
+  </div>
+  <p class="lock-erro" id="pin-setup-erro" hidden></p>
+</div>
+
+<!-- ══ TELA: HOME ══════════════════════════════════════════════ -->
+<div id="tela-home" class="tela" hidden>
+  <header class="home-header">
+    <div>
+      <p class="home-saudacao" id="home-saudacao">Bom dia</p>
+      <h1 class="home-nome" id="home-nome">Brigadista</h1>
+    </div>
+    <button class="btn-icon" id="btn-sync-home" aria-label="Sincronizar" title="Sincronizar agora">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+    </button>
+  </header>
+
+  <div class="gps-card" id="gps-card">
+    <div class="gps-ring" id="gps-ring"></div>
+    <div class="gps-info">
+      <span class="gps-label">GPS</span>
+      <span class="gps-coords" id="gps-coords">Aguardando sinal…</span>
+      <span class="gps-acc" id="gps-acc"></span>
+    </div>
+    <div class="gps-status" id="gps-status">—</div>
+  </div>
+
+  <p class="home-instrucao">Selecione a natureza da atividade</p>
+
+  <div class="natureza-grid">
+    <button class="natureza-btn prevencao" data-nat="prevencao">
+      <span class="nat-icon">🛡</span>
+      <span class="nat-label">Prevenção</span>
+    </button>
+    <button class="natureza-btn combate" data-nat="combate">
+      <span class="nat-icon">🔥</span>
+      <span class="nat-label">Combate</span>
+    </button>
+    <button class="natureza-btn monitoramento" data-nat="monitoramento">
+      <span class="nat-icon">🔭</span>
+      <span class="nat-label">Monitoramento</span>
+    </button>
+  </div>
+
+  <div class="home-fila-card" id="home-fila-card" hidden>
+    <span class="fila-icone">⏳</span>
+    <div>
+      <strong id="home-fila-count">0 registros</strong>
+      <span> aguardando sincronização</span>
+    </div>
+    <button class="btn-link" id="btn-ver-fila">Ver fila →</button>
+  </div>
+</div>
+
+<!-- ══ TELA: FORMULÁRIO DE CAMPO ══════════════════════════════ -->
+<div id="tela-form" class="tela" hidden>
+  <header class="form-header" id="form-header">
+    <button class="btn-back" id="btn-back-form" aria-label="Voltar">‹</button>
+    <span class="form-natureza-label" id="form-natureza-label">Novo Registro</span>
+    <button class="btn-icon btn-danger" id="btn-descartar" aria-label="Descartar">✕</button>
+  </header>
+
+  <div class="form-body">
+    <!-- GPS -->
+    <div class="gps-card compact" id="form-gps-card">
+      <div class="gps-ring sm" id="form-gps-ring"></div>
+      <div class="gps-info">
+        <span class="gps-coords sm" id="form-gps-coords">Aguardando GPS…</span>
+        <span class="gps-acc" id="form-gps-acc"></span>
+      </div>
+    </div>
+
+    <!-- Campos principais -->
+    <div class="form-section">
+      <label class="form-label">Atividade *</label>
+      <select id="f-atividade" class="form-select">
+        <option value="">Selecione…</option>
+        <option value="fogo">Combate a fogo</option>
+        <option value="educacao_ambiental">Educação ambiental</option>
+        <option value="limpeza">Limpeza / aceiro</option>
+        <option value="reconhecimento">Reconhecimento</option>
+        <option value="plantio">Plantio</option>
+        <option value="primeiros_socorros">Primeiros socorros</option>
+        <option value="queima_controlada">Queima controlada</option>
+        <option value="outro">Outro</option>
+      </select>
+    </div>
+
+    <div class="form-section form-row">
+      <div class="form-group">
+        <label class="form-label">Equipe (nº) *</label>
+        <input type="number" id="f-equipe" class="form-input" min="1" max="200" value="1">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Duração (h)</label>
+        <input type="number" id="f-duracao" class="form-input" min="0" max="24" step="0.5" placeholder="0">
+      </div>
+    </div>
+
+    <div class="form-section">
+      <label class="form-label">Área afetada (ha)</label>
+      <input type="number" id="f-area" class="form-input" min="0" step="0.01" placeholder="0.00">
+    </div>
+
+    <div class="form-section">
+      <label class="form-label">Observações</label>
+      <textarea id="f-obs" class="form-textarea" rows="3" placeholder="Descreva a ocorrência, condições do local…"></textarea>
+    </div>
+
+    <!-- Câmera / Fotos -->
+    <div class="form-section">
+      <div class="section-header">
+        <label class="form-label">Fotos <span id="foto-count-label">(0/5)</span></label>
+        <button class="btn-sm btn-prim" id="btn-abrir-camera">📷 Câmera</button>
+      </div>
+      <div id="camera-wrap" hidden>
+        <video id="camera-video" autoplay playsinline muted class="camera-preview"></video>
+        <div class="camera-bar">
+          <button class="btn-capture" id="btn-capturar" aria-label="Capturar">⬤</button>
+          <button class="btn-sm" id="btn-fechar-camera">Fechar</button>
+        </div>
+      </div>
+      <div class="foto-grid" id="foto-grid"></div>
+    </div>
+
+    <!-- Fauna -->
+    <div class="form-section">
+      <div class="section-header">
+        <label class="form-label">Fauna registrada <span id="fauna-count-label">(0)</span></label>
+        <button class="btn-sm btn-fauna" id="btn-add-fauna">+ Animal</button>
+      </div>
+      <div id="fauna-lista"></div>
+    </div>
+
+    <button class="btn-salvar" id="btn-salvar">💾 Salvar Registro</button>
+  </div>
+</div>
+
+<!-- ══ TELA: FAUNA ════════════════════════════════════════════ -->
+<div id="tela-fauna" class="tela" hidden>
+  <header class="form-header fauna-header">
+    <button class="btn-back" id="btn-back-fauna" aria-label="Voltar">‹</button>
+    <span>Registrar Animal</span>
+    <span></span>
+  </header>
+
+  <div class="form-body">
+    <div class="form-section">
+      <label class="form-label">Classe</label>
+      <div class="classe-fauna-grid" id="classe-grid">
+        <button class="classe-btn" data-v="mamifero">🦌<br><small>Mamífero</small></button>
+        <button class="classe-btn" data-v="ave">🦜<br><small>Ave</small></button>
+        <button class="classe-btn" data-v="reptil">🦎<br><small>Réptil</small></button>
+        <button class="classe-btn" data-v="anfibio">🐸<br><small>Anfíbio</small></button>
+        <button class="classe-btn" data-v="peixe">🐟<br><small>Peixe</small></button>
+        <button class="classe-btn" data-v="invertebrado">🦋<br><small>Invert.</small></button>
+        <button class="classe-btn" data-v="nao_sei">❓<br><small>Não sei</small></button>
+      </div>
+    </div>
+
+    <div class="form-section" style="position:relative">
+      <label class="form-label">Espécie</label>
+      <input type="text" id="f-fauna-especie" class="form-input" placeholder="Nome científico ou popular…" autocomplete="off">
+      <ul id="f-fauna-especie-lista" class="autocomplete-lista"></ul>
+      <input type="hidden" id="f-fauna-especie-id">
+    </div>
+
+    <div class="form-section form-row">
+      <div class="form-group">
+        <label class="form-label">Tipo evento *</label>
+        <select id="f-fauna-tipo" class="form-select">
+          <option value="">Selecione…</option>
+          <option value="resgate">Resgate</option>
+          <option value="avistamento">Avistamento</option>
+          <option value="atropelamento">Atropelamento</option>
+          <option value="apreensao">Apreensão</option>
+          <option value="encontrado_morto">Encontrado morto</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Condição *</label>
+        <select id="f-fauna-condicao" class="form-select">
+          <option value="">Selecione…</option>
+          <option value="integro">Íntegro</option>
+          <option value="ferido">Ferido</option>
+          <option value="debilitado">Debilitado</option>
+          <option value="queimado">Queimado</option>
+          <option value="obito">Óbito</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="form-section form-row">
+      <div class="form-group">
+        <label class="form-label">Causa</label>
+        <select id="f-fauna-causa" class="form-select">
+          <option value="">—</option>
+          <option value="incendio">Incêndio</option>
+          <option value="atropelamento">Atropelamento</option>
+          <option value="fio_eletrico">Fio elétrico</option>
+          <option value="caca">Caça</option>
+          <option value="outro">Outro</option>
+          <option value="indeterminada">Indeterminada</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Destinação</label>
+        <select id="f-fauna-destinacao" class="form-select">
+          <option value="">—</option>
+          <option value="solto_no_local">Solto no local</option>
+          <option value="encaminhado_cetas">CETAS</option>
+          <option value="obito">Óbito</option>
+          <option value="em_tratamento">Em tratamento</option>
+          <option value="outro">Outro</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="form-section form-row">
+      <div class="form-group">
+        <label class="form-label">Quantidade</label>
+        <input type="number" id="f-fauna-qtd" class="form-input" min="1" value="1">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Faixa etária</label>
+        <select id="f-fauna-faixa" class="form-select">
+          <option value="indeterminada">Indeterminada</option>
+          <option value="filhote">Filhote</option>
+          <option value="jovem">Jovem</option>
+          <option value="adulto">Adulto</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <label class="form-label">Observações</label>
+      <textarea id="f-fauna-obs" class="form-textarea" rows="2" placeholder="Anilha, marcações, comportamento…"></textarea>
+    </div>
+
+    <button class="btn-salvar btn-fauna-salvar" id="btn-fauna-confirmar">✓ Confirmar Animal</button>
+  </div>
+</div>
+
+<!-- ══ TELA: FILA DE SINCRONIZAÇÃO ════════════════════════════ -->
+<div id="tela-fila" class="tela" hidden>
+  <header class="form-header">
+    <button class="btn-back" id="btn-back-fila" aria-label="Voltar">‹</button>
+    <span>Fila de Envio</span>
+    <button class="btn-icon" id="btn-sync-fila" aria-label="Sincronizar">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+    </button>
+  </header>
+
+  <div class="fila-stats" id="fila-stats">
+    <div class="fila-stat">
+      <span class="fila-stat-n" id="stat-pendentes">0</span>
+      <span>Pendentes</span>
+    </div>
+    <div class="fila-stat">
+      <span class="fila-stat-n" id="stat-enviando">0</span>
+      <span>Enviando</span>
+    </div>
+    <div class="fila-stat">
+      <span class="fila-stat-n" id="stat-confirmados">0</span>
+      <span>Confirmados</span>
+    </div>
+  </div>
+
+  <div id="fila-lista" class="sync-queue"></div>
+
+  <button class="btn-salvar" id="btn-exportar-json" style="background:var(--combate)">
+    📤 Exportar JSON (WhatsApp/Drive)
+  </button>
+</div>
+
+<!-- ══ TELA: CONFIGURAÇÕES ════════════════════════════════════ -->
+<div id="tela-config" class="tela" hidden>
+  <header class="form-header">
+    <button class="btn-back" id="btn-back-config" aria-label="Voltar">‹</button>
+    <span>Configurações</span>
+    <span></span>
+  </header>
+
+  <div class="form-body">
+    <div class="config-card" id="config-brigadista-card">
+      <div class="config-avatar" id="config-avatar">B</div>
+      <div>
+        <strong id="config-nome-brig">—</strong>
+        <p id="config-brigada-nome" style="margin:0;opacity:.7;font-size:.85rem">—</p>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <label class="form-label">Armazenamento</label>
+      <div class="quota-bar-wrap">
+        <div class="quota-bar"><div class="quota-fill" id="quota-fill"></div></div>
+        <span id="quota-texto">—</span>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <label class="form-label toggle-row">
+        Modo Campo (contraste alto)
+        <input type="checkbox" id="toggle-field-mode" role="switch">
+        <span class="toggle-thumb"></span>
+      </label>
+    </div>
+
+    <button class="btn-config-item" id="btn-alterar-pin">🔑 Alterar PIN de campo</button>
+    <button class="btn-config-item" id="btn-buscar-especies">🌿 Atualizar catálogo de espécies</button>
+    <button class="btn-config-item btn-danger" id="btn-sair">↩ Sair / Trocar conta</button>
+  </div>
+</div>
+
+<!-- ══ NAV PILL ════════════════════════════════════════════════ -->
+<nav class="pill-nav" id="pill-nav" hidden>
+  <button class="pill-btn" data-tela="tela-home" id="nav-home">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+    <span>Início</span>
+  </button>
+  <button class="pill-btn" data-nat-form id="nav-cam">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+    <span>Registrar</span>
+  </button>
+  <button class="pill-btn" data-tela="tela-fila" id="nav-fila">
+    <span class="pill-badge" id="nav-badge" hidden>0</span>
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+    <span>Fila</span>
+  </button>
+  <button class="pill-btn" data-tela="tela-config" id="nav-config">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
+    <span>Config</span>
+  </button>
+</nav>
+
+<!-- ── Scripts ─────────────────────────────────────────────── -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/js/config.js"></script>
+<script src="/js/brigada-offline.js"></script>
+<script src="/js/brigada-sync.js"></script>
+<script src="/js/brigada-captura.js"></script>
+<script src="/js/brigada-fauna.js"></script>
+<script>
+// ════════════════════════════════════════════════════════════════
+// Estado global do app
+// ════════════════════════════════════════════════════════════════
+const App = {
+  brigadista: null,   // objeto brigadista do banco
+  brigada:    null,   // objeto brigada
+  telasHistorico: [],
+  naturezaAtual: null,
+  faunaEditIdx: null,
+  pinSetupFase: 1,    // 1=digitar, 2=confirmar
+  pinSetupPrimeiro: '',
+}
+
+// ════════════════════════════════════════════════════════════════
+// Utilitários
+// ════════════════════════════════════════════════════════════════
+async function pinHash(pin, brigadistaId) {
+  const data = new TextEncoder().encode(pin + brigadistaId)
+  const buf  = await crypto.subtle.digest('SHA-256', data)
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('')
+}
+
+function saudacao() {
+  const h = new Date().getHours()
+  if (h < 12) return 'Bom dia'
+  if (h < 18) return 'Boa tarde'
+  return 'Boa noite'
+}
+
+function fmtCoords(g) {
+  if (!g) return 'Aguardando GPS…'
+  return `${g.lat.toFixed(5)}, ${g.lng.toFixed(5)}`
+}
+
+function fmtAcc(g) {
+  if (!g) return ''
+  return `±${Math.round(g.acc)}m`
+}
+
+// ════════════════════════════════════════════════════════════════
+// Navegação entre telas
+// ════════════════════════════════════════════════════════════════
+function mostrarTela(id, empurrar = true) {
+  document.querySelectorAll('.tela').forEach(t => t.hidden = true)
+  const tela = document.getElementById(id)
+  if (tela) tela.hidden = false
+
+  const temNav = !['tela-bloqueio', 'tela-config-pin'].includes(id)
+  document.getElementById('pill-nav').hidden = !temNav
+
+  if (empurrar && App.telasHistorico.at(-1) !== id) {
+    App.telasHistorico.push(id)
+  }
+
+  // highlight nav
+  document.querySelectorAll('.pill-btn').forEach(b => {
+    b.classList.toggle('ativa', b.dataset.tela === id)
+  })
+
+  if (id === 'tela-fila')  carregarFila()
+  if (id === 'tela-config') carregarConfig()
+}
+
+function voltarTela() {
+  App.telasHistorico.pop()
+  const ant = App.telasHistorico.at(-1) || 'tela-home'
+  mostrarTela(ant, false)
+}
+
+// ════════════════════════════════════════════════════════════════
+// Boot / autenticação
+// ════════════════════════════════════════════════════════════════
+async function boot() {
+  // Registrar SW
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/pwa/sw.js').catch(console.warn)
+  }
+  await bOfflineInit()
+  bOfflinePersistir()
+
+  // Verifica sessão Supabase
+  const { data: { session } } = await db.auth.getSession()
+  if (!session) { window.location.href = '/index.html'; return }
+
+  // Carrega brigadista do IndexedDB ou do banco
+  let brig = await bOfflineGetConfig('brigadista')
+  if (!brig) {
+    brig = await buscarBrigadistaDoBanco(session.user.id)
+    if (!brig) { window.location.href = '/index.html'; return }
+    await bOfflineSetConfig('brigadista', brig)
+  }
+  App.brigadista = brig
+
+  // Carrega brigada
+  let brigada = await bOfflineGetConfig('brigada')
+  if (!brigada && brig.brigada_id) {
+    brigada = await buscarBrigadaDoBanco(brig.brigada_id)
+    if (brigada) await bOfflineSetConfig('brigada', brigada)
+  }
+  App.brigada = brigada
+
+  // Seed de espécies (silencioso)
+  sincronizarEspecies()
+
+  // PIN?
+  const pinHash_ = await bOfflineGetConfig('pin_hash')
+  if (!pinHash_) {
+    mostrarTela('tela-config-pin', false)
+  } else {
+    document.getElementById('lock-nome').textContent = brig.nome?.split(' ')[0] || 'Brigadista'
+    mostrarTela('tela-bloqueio', false)
+  }
+}
+
+async function buscarBrigadistaDoBanco(userId) {
+  const { data } = await db
+    .from('brigadistas')
+    .select('id, nome, cpf, brigada_id, funcao, foto_url')
+    .eq('usuario_id', userId)
+    .maybeSingle()
+  return data
+}
+
+async function buscarBrigadaDoBanco(brigadaId) {
+  const { data } = await db
+    .from('brigadas')
+    .select('id, nome, regional, uc_id')
+    .eq('id', brigadaId)
+    .maybeSingle()
+  return data
+}
+
+async function sincronizarEspecies() {
+  if (!navigator.onLine) return
+  try {
+    const { data } = await db
+      .from('especies_fauna')
+      .select('id, nome_cientifico, nomes_populares, classe, status_conservacao, ameacada')
+      .limit(500)
+    if (data?.length) await bOfflineSalvarEspecies(data)
+  } catch { /* silencioso */ }
+}
+
+// ════════════════════════════════════════════════════════════════
+// PIN — Desbloqueio
+// ════════════════════════════════════════════════════════════════
+let _pinAtual = ''
+
+function initPinKeypad(prefix, aoConfirmar) {
+  const display   = document.getElementById(`${prefix}-display`) ||
+                    document.getElementById('pin-display')
+  const keypad    = document.getElementById(`${prefix}-keypad`) ||
+                    document.getElementById('pin-keypad')
+  const clearBtn  = document.getElementById(`${prefix}-clear`)
+  const okBtn     = document.getElementById(`${prefix}-ok`)
+
+  keypad.querySelectorAll('.pin-key[data-v]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (_pinAtual.length < 6) {
+        _pinAtual += btn.dataset.v
+        atualizarPinDisplay(display)
+        if (_pinAtual.length >= 4) aoConfirmar()
+      }
+    })
+  })
+
+  if (clearBtn) clearBtn.addEventListener('click', () => {
+    _pinAtual = _pinAtual.slice(0, -1)
+    atualizarPinDisplay(display)
+  })
+  if (okBtn) okBtn.addEventListener('click', () => {
+    if (_pinAtual.length >= 4) aoConfirmar()
+  })
+}
+
+function atualizarPinDisplay(displayEl) {
+  displayEl.querySelectorAll('.pin-dot').forEach((dot, i) => {
+    dot.classList.toggle('ativo', i < _pinAtual.length)
+  })
+}
+
+async function tentarDesbloquear() {
+  const hash = await pinHash(_pinAtual, App.brigadista.id)
+  const hashSalvo = await bOfflineGetConfig('pin_hash')
+  if (hash === hashSalvo) {
+    _pinAtual = ''
+    atualizarPinDisplay(document.getElementById('pin-display'))
+    entrarHome()
+  } else {
+    document.getElementById('lock-erro').hidden = false
+    document.getElementById('lock-erro').textContent = 'PIN incorreto. Tente novamente.'
+    _pinAtual = ''
+    atualizarPinDisplay(document.getElementById('pin-display'))
+  }
+}
+
+// ════════════════════════════════════════════════════════════════
+// PIN — Configuração
+// ════════════════════════════════════════════════════════════════
+let _pinSetupAtual = ''
+let _pinSetupFase  = 1
+let _pinSetupPrim  = ''
+
+function initPinSetupKeypad() {
+  const display  = document.getElementById('pin-setup-display')
+  const keypad   = document.getElementById('pin-setup-keypad')
+  const clearBtn = document.getElementById('pin-setup-clear')
+  const okBtn    = document.getElementById('pin-setup-ok')
+
+  keypad.querySelectorAll('.pin-key[data-v]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (_pinSetupAtual.length < 6) {
+        _pinSetupAtual += btn.dataset.v
+        atualizarPinDisplay(display)
+        if (_pinSetupAtual.length >= 4) confirmarPinSetup()
+      }
+    })
+  })
+
+  if (clearBtn) clearBtn.addEventListener('click', () => {
+    _pinSetupAtual = _pinSetupAtual.slice(0, -1)
+    atualizarPinDisplay(display)
+  })
+  if (okBtn) okBtn.addEventListener('click', () => {
+    if (_pinSetupAtual.length >= 4) confirmarPinSetup()
+  })
+}
+
+async function confirmarPinSetup() {
+  if (_pinSetupFase === 1) {
+    _pinSetupPrim = _pinSetupAtual
+    _pinSetupAtual = ''
+    atualizarPinDisplay(document.getElementById('pin-setup-display'))
+    document.getElementById('pin-setup-dica').textContent = 'Confirme seu PIN'
+    _pinSetupFase = 2
+    return
+  }
+
+  if (_pinSetupAtual !== _pinSetupPrim) {
+    document.getElementById('pin-setup-erro').hidden = false
+    document.getElementById('pin-setup-erro').textContent = 'PINs não coincidem. Tente novamente.'
+    _pinSetupAtual = ''; _pinSetupPrim = ''; _pinSetupFase = 1
+    document.getElementById('pin-setup-dica').textContent = 'Escolha um PIN de 4 a 6 dígitos'
+    atualizarPinDisplay(document.getElementById('pin-setup-display'))
+    return
+  }
+
+  const hash = await pinHash(_pinSetupAtual, App.brigadista.id)
+  await bOfflineSetConfig('pin_hash', hash)
+  _pinSetupAtual = ''; _pinSetupPrim = ''; _pinSetupFase = 1
+  entrarHome()
+}
+
+// ════════════════════════════════════════════════════════════════
+// Home
+// ════════════════════════════════════════════════════════════════
+async function entrarHome() {
+  document.getElementById('home-saudacao').textContent = saudacao()
+  document.getElementById('home-nome').textContent =
+    App.brigadista?.nome?.split(' ').slice(0,2).join(' ') || 'Brigadista'
+
+  mostrarTela('tela-home')
+
+  bGpsIniciar(gps => {
+    const card = document.getElementById('gps-card')
+    document.getElementById('gps-coords').textContent = fmtCoords(gps)
+    document.getElementById('gps-acc').textContent    = fmtAcc(gps)
+    document.getElementById('gps-status').textContent =
+      gps.acc <= 10 ? 'Excelente' : gps.acc <= 30 ? 'Bom' : gps.acc <= 60 ? 'Regular' : 'Fraco'
+    if (gps.acc <= 30) card.querySelector('.gps-ring').classList.add('fixado')
+  })
+
+  await atualizarBadgeFila()
+
+  bSyncOn('confirmado', atualizarBadgeFila)
+  bSyncOn('erro', atualizarBadgeFila)
+}
+
+async function atualizarBadgeFila() {
+  const n = await bSyncContarPendentes()
+  const badge = document.getElementById('nav-badge')
+  const card  = document.getElementById('home-fila-card')
+  const cnt   = document.getElementById('home-fila-count')
+
+  badge.textContent = n
+  badge.hidden = n === 0
+  card.hidden  = n === 0
+  if (n > 0) cnt.textContent = `${n} registro${n > 1 ? 's' : ''}`
+}
+
+// ════════════════════════════════════════════════════════════════
+// Formulário de campo
+// ════════════════════════════════════════════════════════════════
+function abrirFormulario(natureza) {
+  App.naturezaAtual = natureza
+  bFaunaLimpar()
+  bCapturaLimpar()
+
+  // Header colorido conforme natureza
+  const header = document.getElementById('form-header')
+  header.className = `form-header nat-${natureza}`
+  const labels = { prevencao: '🛡 Prevenção', combate: '🔥 Combate', monitoramento: '🔭 Monitoramento' }
+  document.getElementById('form-natureza-label').textContent = labels[natureza] || natureza
+
+  // Reset campos
+  document.getElementById('f-atividade').value = ''
+  document.getElementById('f-equipe').value    = '1'
+  document.getElementById('f-duracao').value   = ''
+  document.getElementById('f-area').value      = ''
+  document.getElementById('f-obs').value       = ''
+  document.getElementById('foto-grid').innerHTML = ''
+  document.getElementById('foto-count-label').textContent = '(0/5)'
+  document.getElementById('fauna-lista').innerHTML = ''
+  document.getElementById('fauna-count-label').textContent = '(0)'
+
+  // GPS no form
+  const gps = bGpsAtual()
+  document.getElementById('form-gps-coords').textContent = fmtCoords(gps)
+  document.getElementById('form-gps-acc').textContent    = fmtAcc(gps)
+
+  mostrarTela('tela-form')
+}
+
+async function salvarRegistro() {
+  const atividade = document.getElementById('f-atividade').value
+  const equipe    = parseInt(document.getElementById('f-equipe').value, 10)
+  if (!atividade) { toast('Selecione a atividade', 'warn'); return }
+  if (!equipe || equipe < 1) { toast('Informe o número de equipe', 'warn'); return }
+
+  const gps = bGpsAtual()
+  const registro = {
+    uuid_cliente: crypto.randomUUID(),
+    brigadista_id: App.brigadista?.id ?? null,
+    brigada_id:    App.brigada?.id    ?? null,
+    uc_id:         App.brigada?.uc_id ?? null,
+    regional:      App.brigada?.regional ?? null,
+    natureza:      App.naturezaAtual,
+    atividade,
+    n_equipe:      equipe,
+    duracao_horas: parseFloat(document.getElementById('f-duracao').value) || null,
+    area_ha:       parseFloat(document.getElementById('f-area').value) || null,
+    observacoes:   document.getElementById('f-obs').value.trim() || null,
+    lat:           gps?.lat ?? null,
+    lng:           gps?.lng ?? null,
+    fotos_blobs:   bCapturaGetFotos(),
+    _fauna:        bFaunaGetLista(),
+  }
+
+  try {
+    await bOfflineSalvar(registro)
+    bCameraFechar()
+    toast('Registro salvo! Será enviado quando houver conexão.', 'ok')
+    await atualizarBadgeFila()
+    bSyncRegistrarBackground()
+    // Tenta sincronizar imediatamente se online
+    if (navigator.onLine) bSyncRodar()
+    mostrarTela('tela-home')
+  } catch (err) {
+    toast('Erro ao salvar: ' + err.message, 'erro')
+  }
+}
+
+// ════════════════════════════════════════════════════════════════
+// Câmera
+// ════════════════════════════════════════════════════════════════
+async function abrirCamera() {
+  if (bCapturaGetFotos().length >= 5) { toast('Máximo de 5 fotos', 'warn'); return }
+  document.getElementById('camera-wrap').hidden = false
+  const ok = await bCameraAbrir(document.getElementById('camera-video'))
+  if (!ok) {
+    document.getElementById('camera-wrap').hidden = true
+    toast('Câmera não disponível neste dispositivo', 'warn')
+  }
+}
+
+function fecharCamera() {
+  bCameraFechar()
+  document.getElementById('camera-wrap').hidden = true
+}
+
+async function capturarFoto() {
+  const video = document.getElementById('camera-video')
+  const blob = await bCameraCapturar(video, App.brigadista, bGpsAtual())
+  if (!blob) { toast('Máximo de 5 fotos', 'warn'); return }
+  bCapturaMostrarGaleria(document.getElementById('foto-grid'))
+  document.getElementById('foto-count-label').textContent = `(${bCapturaGetFotos().length}/5)`
+}
+
+// ════════════════════════════════════════════════════════════════
+// Fauna
+// ════════════════════════════════════════════════════════════════
+function abrirFauna(idx = null) {
+  App.faunaEditIdx = idx
+
+  // reset campos
+  document.getElementById('f-fauna-especie').value   = ''
+  document.getElementById('f-fauna-especie-id').value = ''
+  document.getElementById('f-fauna-tipo').value      = ''
+  document.getElementById('f-fauna-condicao').value  = ''
+  document.getElementById('f-fauna-causa').value     = ''
+  document.getElementById('f-fauna-destinacao').value = ''
+  document.getElementById('f-fauna-qtd').value       = '1'
+  document.getElementById('f-fauna-faixa').value     = 'indeterminada'
+  document.getElementById('f-fauna-obs').value       = ''
+  document.querySelectorAll('.classe-btn').forEach(b => b.classList.remove('ativo'))
+
+  if (idx !== null) {
+    const f = bFaunaGetLista()[idx]
+    if (f) preencherFauna(f)
+  }
+
+  mostrarTela('tela-fauna')
+}
+
+function preencherFauna(f) {
+  document.querySelectorAll('.classe-btn').forEach(b => {
+    b.classList.toggle('ativo', b.dataset.v === f.classe)
+  })
+  document.getElementById('f-fauna-especie').value   = f.especie_nome_cientifico || f.nome_popular || ''
+  document.getElementById('f-fauna-especie-id').value = f.especie_id || ''
+  document.getElementById('f-fauna-tipo').value      = f.tipo_evento || ''
+  document.getElementById('f-fauna-condicao').value  = f.condicao || ''
+  document.getElementById('f-fauna-causa').value     = f.causa || ''
+  document.getElementById('f-fauna-destinacao').value = f.destinacao || ''
+  document.getElementById('f-fauna-qtd').value       = f.quantidade || 1
+  document.getElementById('f-fauna-faixa').value     = f.faixa_etaria || 'indeterminada'
+  document.getElementById('f-fauna-obs').value       = f.observacoes || ''
+}
+
+function confirmarFauna() {
+  const classeAtiva = document.querySelector('.classe-btn.ativo')
+  const tipo     = document.getElementById('f-fauna-tipo').value
+  const condicao = document.getElementById('f-fauna-condicao').value
+
+  if (!tipo || !condicao) { toast('Tipo e Condição são obrigatórios', 'warn'); return }
+
+  const item = {
+    classe:                classeAtiva?.dataset.v || 'nao_sei',
+    especie_id:            document.getElementById('f-fauna-especie-id').value || null,
+    especie_nome_cientifico: document.getElementById('f-fauna-especie').value || null,
+    nome_popular:          null,
+    tipo_evento:           tipo,
+    condicao,
+    causa:                 document.getElementById('f-fauna-causa').value || null,
+    destinacao:            document.getElementById('f-fauna-destinacao').value || null,
+    quantidade:            parseInt(document.getElementById('f-fauna-qtd').value, 10) || 1,
+    faixa_etaria:          document.getElementById('f-fauna-faixa').value || 'indeterminada',
+    observacoes:           document.getElementById('f-fauna-obs').value.trim() || null,
+  }
+
+  if (App.faunaEditIdx !== null) {
+    bFaunaAtualizar(App.faunaEditIdx, item)
+  } else {
+    bFaunaAdicionar(item)
+  }
+
+  const lista = document.getElementById('fauna-lista')
+  bFaunaRenderLista(lista,
+    i => abrirFauna(i),
+    () => {
+      document.getElementById('fauna-count-label').textContent = `(${bFaunaGetLista().length})`
+    }
+  )
+  document.getElementById('fauna-count-label').textContent = `(${bFaunaGetLista().length})`
+  mostrarTela('tela-form', false)
+}
+
+// ════════════════════════════════════════════════════════════════
+// Fila de sincronização
+// ════════════════════════════════════════════════════════════════
+async function carregarFila() {
+  const todos = await bOfflineListarTodos()
+  const stats = { pendente: 0, enviando: 0, confirmado: 0 }
+  todos.forEach(r => { if (stats[r.status] != null) stats[r.status]++ })
+
+  document.getElementById('stat-pendentes').textContent  = stats.pendente
+  document.getElementById('stat-enviando').textContent   = stats.enviando
+  document.getElementById('stat-confirmados').textContent = stats.confirmado
+
+  const cont = document.getElementById('fila-lista')
+  if (!todos.length) {
+    cont.innerHTML = '<p style="text-align:center;opacity:.6;padding:2rem">Nenhum registro</p>'
+    return
+  }
+
+  const icons = { prevencao:'🛡', combate:'🔥', monitoramento:'🔭' }
+  const statusLabel = { pendente:'Pendente', enviando:'Enviando…', confirmado:'Enviado' }
+  cont.innerHTML = todos.map(r => `
+    <div class="sync-item sync-${r.status}">
+      <span class="sync-icon">${icons[r.natureza] || '📋'}</span>
+      <div class="sync-info">
+        <strong>${esc(r.atividade || '—')}</strong>
+        <span>${formatData ? formatData(r.criado_em) : r.criado_em?.slice(0,10)}</span>
+      </div>
+      <span class="sync-status sync-${r.status}">${statusLabel[r.status] || r.status}</span>
+    </div>
+  `).join('')
+}
+
+// ════════════════════════════════════════════════════════════════
+// Configurações
+// ════════════════════════════════════════════════════════════════
+async function carregarConfig() {
+  const brig = App.brigadista
+  document.getElementById('config-nome-brig').textContent  = brig?.nome || '—'
+  document.getElementById('config-brigada-nome').textContent = App.brigada?.nome || '—'
+  document.getElementById('config-avatar').textContent =
+    (brig?.nome || 'B').charAt(0).toUpperCase()
+
+  const quota = await bOfflineQuota()
+  if (quota) {
+    const pct = quota.pct
+    document.getElementById('quota-fill').style.width = pct + '%'
+    const usadoMb = (quota.usado / 1024 / 1024).toFixed(1)
+    const totalMb = (quota.total / 1024 / 1024).toFixed(0)
+    document.getElementById('quota-texto').textContent = `${usadoMb} MB de ${totalMb} MB (${pct}%)`
+  }
+
+  const fm = document.getElementById('toggle-field-mode')
+  fm.checked = document.body.classList.contains('field-mode')
+}
+
+// ════════════════════════════════════════════════════════════════
+// Event Listeners
+// ════════════════════════════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', () => {
+  // PIN desbloqueio
+  initPinKeypad('pin', tentarDesbloquear)
+  document.getElementById('btn-pular-pin')?.addEventListener('click', entrarHome)
+
+  // PIN setup
+  initPinSetupKeypad()
+
+  // Natureza buttons
+  document.querySelectorAll('.natureza-btn').forEach(btn => {
+    btn.addEventListener('click', () => abrirFormulario(btn.dataset.nat))
+  })
+
+  // Nav pill
+  document.querySelectorAll('.pill-btn[data-tela]').forEach(btn => {
+    btn.addEventListener('click', () => mostrarTela(btn.dataset.tela))
+  })
+  document.getElementById('nav-cam')?.addEventListener('click', () => {
+    // Abre com natureza padrão monitoramento via home
+    mostrarTela('tela-home')
+  })
+
+  // Botões de voltar
+  document.getElementById('btn-back-form').addEventListener('click', () => {
+    bCameraFechar()
+    mostrarTela('tela-home')
+  })
+  document.getElementById('btn-descartar').addEventListener('click', () => {
+    if (confirm('Descartar este registro?')) { bCameraFechar(); mostrarTela('tela-home') }
+  })
+  document.getElementById('btn-back-fauna').addEventListener('click', () => mostrarTela('tela-form', false))
+  document.getElementById('btn-back-fila').addEventListener('click', () => mostrarTela('tela-home'))
+  document.getElementById('btn-back-config').addEventListener('click', () => mostrarTela('tela-home'))
+
+  // Home
+  document.getElementById('btn-sync-home').addEventListener('click', () => {
+    if (navigator.onLine) { bSyncRodar(); toast('Sincronizando…', 'info') }
+    else toast('Sem conexão — registro será enviado automaticamente', 'warn')
+  })
+  document.getElementById('btn-ver-fila').addEventListener('click', () => mostrarTela('tela-fila'))
+
+  // Formulário
+  document.getElementById('btn-abrir-camera').addEventListener('click', abrirCamera)
+  document.getElementById('btn-fechar-camera').addEventListener('click', fecharCamera)
+  document.getElementById('btn-capturar').addEventListener('click', capturarFoto)
+  document.getElementById('btn-add-fauna').addEventListener('click', () => abrirFauna(null))
+  document.getElementById('btn-salvar').addEventListener('click', salvarRegistro)
+
+  // Fauna
+  document.querySelectorAll('.classe-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.classe-btn').forEach(b => b.classList.remove('ativo'))
+      btn.classList.add('ativo')
+    })
+  })
+  bFaunaBindAutocompletar(
+    document.getElementById('f-fauna-especie'),
+    document.getElementById('f-fauna-especie-lista'),
+    sel => { document.getElementById('f-fauna-especie-id').value = sel.especie_id || '' }
+  )
+  document.getElementById('btn-fauna-confirmar').addEventListener('click', confirmarFauna)
+
+  // Fila
+  document.getElementById('btn-sync-fila').addEventListener('click', () => {
+    if (navigator.onLine) { bSyncRodar(); toast('Sincronizando…', 'info') }
+    else toast('Sem conexão', 'warn')
+  })
+  document.getElementById('btn-exportar-json').addEventListener('click', async () => {
+    const n = await bOfflineExportar()
+    if (n === null) toast('Sem registros pendentes', 'warn')
+    else toast(`${n} registro(s) exportado(s)`, 'ok')
+  })
+
+  // Config
+  document.getElementById('toggle-field-mode').addEventListener('change', ev => {
+    document.body.classList.toggle('field-mode', ev.target.checked)
+    bOfflineSetConfig('field_mode', ev.target.checked)
+  })
+  document.getElementById('btn-alterar-pin').addEventListener('click', () => {
+    _pinSetupFase = 1; _pinSetupPrim = ''; _pinSetupAtual = ''
+    document.getElementById('pin-setup-dica').textContent = 'Novo PIN (4-6 dígitos)'
+    mostrarTela('tela-config-pin')
+  })
+  document.getElementById('btn-buscar-especies').addEventListener('click', async () => {
+    if (!navigator.onLine) { toast('Sem conexão', 'warn'); return }
+    toast('Atualizando catálogo…', 'info')
+    await sincronizarEspecies()
+    toast('Catálogo atualizado', 'ok')
+  })
+  document.getElementById('btn-sair').addEventListener('click', async () => {
+    if (!confirm('Sair do app? Registros não enviados permanecem salvos.')) return
+    bGpsParar()
+    await db.auth.signOut()
+    window.location.href = '/index.html'
+  })
+
+  // Online/offline
+  window.addEventListener('online', () => {
+    bSyncRodar()
+    toast('Conexão restabelecida — sincronizando…', 'ok')
+  })
+
+  // Field mode restaurado
+  bOfflineGetConfig('field_mode').then(v => {
+    if (v) document.body.classList.add('field-mode')
+  })
+
+  boot()
+})
+</script>
+</body>
+</html>
