@@ -1393,6 +1393,17 @@ function _renderDropdown(id){
       </div>
 
       <div>
+        <div style="font-size:10px;font-weight:700;color:var(--cinza-400);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">Atividade</div>
+        <div style="display:flex;flex-direction:column;gap:3px">
+          ${[['fogo','🔥 Combate a fogo'],['educacao_ambiental','📚 Educação ambiental'],['limpeza','🪓 Limpeza / aceiro'],['reconhecimento','🔭 Reconhecimento'],['plantio','🌱 Plantio'],['primeiros_socorros','🚑 Primeiros socorros'],['queima_controlada','💨 Queima controlada'],['outro','📋 Outro']].map(([v,l])=>`
+          <label style="display:flex;align-items:center;gap:4px;font-size:11px;cursor:pointer">
+            <input type="checkbox" checked data-brig-ativ="${v}" style="accent-color:#12A66A" onchange="renderBrigadasMapa()">
+            ${l}
+          </label>`).join('')}
+        </div>
+      </div>
+
+      <div>
         <div style="font-size:10px;font-weight:700;color:var(--cinza-400);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">Validação</div>
         <div style="display:flex;flex-direction:column;gap:4px">
           ${[['aguardando','⏳ Aguardando','#92400e'],['validado','✓ Validado','#065f46'],['requer_correcao','↩ Requer correção','#9d174d'],['rejeitado','✕ Rejeitado','#991b1b']].map(([v,l,c])=>`
@@ -1403,7 +1414,25 @@ function _renderDropdown(id){
         </div>
       </div>
 
-      <div id="brigadas-mapa-stat" style="font-size:10px;color:var(--cinza-400)"></div>
+      <div>
+        <div style="font-size:10px;font-weight:700;color:var(--cinza-400);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">Período</div>
+        <div style="display:flex;flex-direction:column;gap:4px">
+          <div style="display:flex;align-items:center;gap:6px">
+            <span style="font-size:10px;color:var(--cinza-500);min-width:22px">De</span>
+            <input type="date" id="brig-data-de" style="flex:1;font-size:11px;padding:3px 6px;border:1px solid var(--borda);border-radius:4px;font-family:inherit;color:var(--cinza-700)" onchange="renderBrigadasMapa()">
+          </div>
+          <div style="display:flex;align-items:center;gap:6px">
+            <span style="font-size:10px;color:var(--cinza-500);min-width:22px">Até</span>
+            <input type="date" id="brig-data-ate" style="flex:1;font-size:11px;padding:3px 6px;border:1px solid var(--borda);border-radius:4px;font-family:inherit;color:var(--cinza-700)" onchange="renderBrigadasMapa()">
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+        <div id="brigadas-mapa-stat" style="font-size:10px;color:var(--cinza-400)"></div>
+        <button onclick="_brigadasMapa=[];toggleBrigadasMapa(true)"
+          style="font-size:10px;padding:3px 10px;background:#f3f4f6;border:1px solid var(--borda);border-radius:4px;cursor:pointer;font-family:inherit;color:var(--cinza-600);flex-shrink:0">↺ Atualizar</button>
+      </div>
       <a href="../pages/validacao-campo.html" style="font-size:11px;color:var(--verde-c);text-decoration:none;font-weight:600">→ Abrir Validação de Campo</a>
     </div>
   ` + foot;
@@ -2102,7 +2131,7 @@ async function toggleBrigadasMapa(ativo) {
   if (ativo && !_brigadasMapa.length) {
     const { data } = await db
       .from('vw_registros_validacao')
-      .select('id,natureza,atividade,status_validacao,data_hora_evento,lat,lng,brigadista_nome,brigada_nome,uc_nome,n_fauna,fotos_urls,descricao')
+      .select('id,natureza,atividade,status_validacao,data_hora_evento,lat,lng,brigadista_nome,brigada_nome,uc_nome,n_fauna,n_fauna_pendente,fotos_urls,descricao,equipe,area_estimada_ha,municipio,precisao_gps_m')
       .not('lat', 'is', null)
       .order('data_hora_evento', { ascending: false })
       .limit(2000)
@@ -2122,23 +2151,51 @@ function renderBrigadasMapa() {
 
   const nats    = [...document.querySelectorAll('[data-brig-nat]')].filter(c=>c.checked).map(c=>c.dataset.brigNat)
   const statuses= [...document.querySelectorAll('[data-brig-status]')].filter(c=>c.checked).map(c=>c.dataset.brigStatus)
+  const ativs   = [...document.querySelectorAll('[data-brig-ativ]')].filter(c=>c.checked).map(c=>c.dataset.brigAtiv)
+  const de      = document.getElementById('brig-data-de')?.value  || null
+  const ate     = document.getElementById('brig-data-ate')?.value || null
 
-  const visiveis = _brigadasMapa.filter(r =>
-    nats.includes(r.natureza) && statuses.includes(r.status_validacao)
-  )
+  const visiveis = _brigadasMapa.filter(r => {
+    if (!nats.includes(r.natureza)) return false
+    if (!statuses.includes(r.status_validacao)) return false
+    if (!ativs.includes(r.atividade ?? 'outro')) return false
+    if (de  && r.data_hora_evento && r.data_hora_evento.slice(0,10) < de)  return false
+    if (ate && r.data_hora_evento && r.data_hora_evento.slice(0,10) > ate) return false
+    return true
+  })
 
-  _brigadasLayer = L.layerGroup()
+  const _BRIG_STATUS_COR = {
+    aguardando:'#92400e', validado:'#065f46',
+    requer_correcao:'#9d174d', rejeitado:'#991b1b'
+  }
+
+  const useCluster = typeof L.markerClusterGroup === 'function'
+  _brigadasLayer = useCluster
+    ? L.markerClusterGroup({ maxClusterRadius: 40, disableClusteringAtZoom: 14 })
+    : L.layerGroup()
+
   visiveis.forEach(r => {
     if (!r.lat || !r.lng) return
     const cor   = _BRIG_NAT_COR[r.natureza]  ?? '#6b7280'
     const ico   = _BRIG_NAT_ICO[r.natureza]  ?? '📋'
     const ativ  = _BRIG_ATIV_LAB[r.atividade] ?? r.atividade ?? '—'
     const slab  = _BRIG_STATUS_LAB[r.status_validacao] ?? r.status_validacao
-    const dt    = r.data_hora_evento
-      ? new Date(r.data_hora_evento).toLocaleDateString('pt-BR', { timeZone:'America/Rio_Branco', day:'2-digit', month:'2-digit', year:'numeric' })
-      : '—'
-    const fotosN = (r.fotos_urls || []).length
+    const scor  = _BRIG_STATUS_COR[r.status_validacao] ?? '#6b7280'
+    const dtObj = r.data_hora_evento ? new Date(r.data_hora_evento) : null
+    const dtLoc = dtObj ? dtObj.toLocaleString('pt-BR', {
+      timeZone:'America/Rio_Branco', day:'2-digit', month:'2-digit',
+      year:'numeric', hour:'2-digit', minute:'2-digit'
+    }) : '—'
+    const fotos    = r.fotos_urls || []
     const coordStr = `${Number(r.lat).toFixed(5)}, ${Number(r.lng).toFixed(5)}`
+
+    const thumbsHtml = fotos.slice(0,3).map(u =>
+      `<a href="${escHtml(u)}" target="_blank" rel="noopener">
+        <img src="${escHtml(u)}" style="width:62px;height:48px;object-fit:cover;border-radius:4px;border:1px solid #e5e7eb">
+      </a>`
+    ).join('')
+    const fotosHtml = fotos.length
+      ? `<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:6px">${thumbsHtml}${fotos.length>3 ? `<div style="width:62px;height:48px;background:#f3f4f6;border-radius:4px;border:1px solid #e5e7eb;display:flex;align-items:center;justify-content:center;font-size:10px;color:#6b7280">+${fotos.length-3}</div>` : ''}</div>` : ''
 
     const marker = L.circleMarker([r.lat, r.lng], {
       radius: 7, fillColor: cor, color: '#fff',
@@ -2146,17 +2203,23 @@ function renderBrigadasMapa() {
     })
 
     marker.bindPopup(`<div class="camada-popup">
-      <div class="cp-header" style="background:${cor}">${ico} Brigadas — ${r.natureza ? r.natureza.charAt(0).toUpperCase()+r.natureza.slice(1) : ''}</div>
+      <div class="cp-header" style="background:${cor}">${ico} ${r.natureza ? r.natureza.charAt(0).toUpperCase()+r.natureza.slice(1) : 'Brigadas'}</div>
       <div class="cp-layer">
         <div class="cp-row"><strong>Atividade</strong><span>${escHtml(ativ)}</span></div>
         <div class="cp-row"><strong>Brigadista</strong><span>${escHtml(r.brigadista_nome ?? '—')}</span></div>
         <div class="cp-row"><strong>Brigada</strong><span>${escHtml(r.brigada_nome ?? '—')}</span></div>
-        ${r.uc_nome ? `<div class="cp-row"><strong>UC</strong><span>${escHtml(r.uc_nome)}</span></div>` : ''}
-        <div class="cp-row"><strong>Data</strong><span>${dt}</span></div>
-        ${r.n_fauna > 0 ? `<div class="cp-row"><strong>Fauna</strong><span>🐾 ${r.n_fauna} animal${r.n_fauna > 1 ? 'is' : ''}</span></div>` : ''}
-        ${fotosN > 0 ? `<div class="cp-row"><strong>Fotos</strong><span>📷 ${fotosN}</span></div>` : ''}
-        <div style="margin-top:6px;display:flex;gap:5px;flex-wrap:wrap">
-          <span class="cp-badge" style="background:${cor}22;border-color:${cor};color:${cor}">${escHtml(slab)}</span>
+        ${r.equipe    ? `<div class="cp-row"><strong>Equipe</strong><span>${escHtml(r.equipe)}</span></div>` : ''}
+        ${r.uc_nome   ? `<div class="cp-row"><strong>UC</strong><span>${escHtml(r.uc_nome)}</span></div>` : ''}
+        ${r.municipio ? `<div class="cp-row"><strong>Município</strong><span>${escHtml(r.municipio)}</span></div>` : ''}
+        <div class="cp-row"><strong>Data / hora</strong><span>${dtLoc}</span></div>
+        ${r.area_estimada_ha != null ? `<div class="cp-row"><strong>Área estimada</strong><span>${Number(r.area_estimada_ha).toLocaleString('pt-BR')} ha</span></div>` : ''}
+        ${r.n_fauna > 0 ? `<div class="cp-row"><strong>Fauna</strong><span>🐾 ${r.n_fauna} animal${r.n_fauna>1?'is':''}${r.n_fauna_pendente>0 ? ` <span style="color:#D97706">(${r.n_fauna_pendente} pendente${r.n_fauna_pendente>1?'s':''})</span>` : ''}</span></div>` : ''}
+        ${r.precisao_gps_m != null ? `<div class="cp-row"><strong>GPS precisão</strong><span>±${Number(r.precisao_gps_m).toFixed(0)} m</span></div>` : ''}
+        ${r.descricao ? `<div style="font-size:11px;color:#374151;margin-top:5px;line-height:1.4;border-top:1px solid #f3f4f6;padding-top:5px">${escHtml(r.descricao)}</div>` : ''}
+        ${fotosHtml}
+        <div style="margin-top:7px;display:flex;gap:5px;flex-wrap:wrap">
+          <span class="cp-badge" style="background:${cor}22;border-color:${cor};color:${cor}">${ico} ${r.natureza ?? ''}</span>
+          <span class="cp-badge" style="background:${scor}18;border-color:${scor};color:${scor}">${escHtml(slab)}</span>
         </div>
         <div style="margin-top:4px;font-size:10px;color:#9CA3AF">📍 ${coordStr}</div>
         <a href="../pages/validacao-campo.html"
@@ -2164,7 +2227,7 @@ function renderBrigadasMapa() {
           ✓ Abrir Validação de Campo
         </a>
       </div>
-    </div>`, { maxWidth: 260 }).addTo(_brigadasLayer)
+    </div>`, { maxWidth: 280 }).addTo(_brigadasLayer)
   })
 
   _brigadasLayer.addTo(mapaL)
