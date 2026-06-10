@@ -279,8 +279,8 @@ async function confirmarResetSenha() {
   const btn = document.getElementById('btn-reset')
   btn.disabled = true; btn.textContent = 'Redefinindo...'
   try {
-    const session = sessionStorage.getItem('sb-atqtybcsvepdabsvgaly-auth-token')
-    const token = session ? JSON.parse(session)?.access_token : null
+    const { data: { session } } = await db.auth.getSession()
+    const token = session?.access_token
     if (!token) throw new Error('Sessão expirada. Faça login novamente.')
 
     const resp = await fetch(`${SUPABASE_URL}/functions/v1/admin-reset-senha`, {

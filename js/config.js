@@ -1,6 +1,13 @@
 // ── SIGUC-AC · Configuração Supabase ─────────────────────────
-const SUPABASE_URL = 'https://atqtybcsvepdabsvgaly.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF0cXR5YmNzdmVwZGFic3ZnYWx5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0MjMzNzgsImV4cCI6MjA5NTk5OTM3OH0.hWx1AB2rK7xdco1Dgagm0XUOBPQbxZVE614SW4SKoLk';
+// Credenciais carregadas em runtime via /api/env — sem hardcode no fonte.
+
+// env-loader.js pode já estar disponível (carregado antes deste script).
+// Se não estiver, define um loader inline para garantir compatibilidade.
+if (typeof loadEnv !== 'function') {
+  window._sigucEnvPromise = window._sigucEnvPromise ||
+    fetch('/api/env').then(r => r.json()).catch(() => ({ supabaseUrl: '', supabaseKey: '' }));
+  window.loadEnv = () => window._sigucEnvPromise;
+}
 
 // Observabilidade — opcional (não carregada em todas as páginas)
 if (typeof Observability !== 'undefined') Observability.init();
@@ -21,13 +28,17 @@ if (typeof Observability !== 'undefined') Observability.init();
 })();
 
 const { createClient } = supabase;
-// sessionStorage: sessão encerra ao fechar o navegador (Regra de segurança)
-const _dbRaw = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-  auth: { storage: window.sessionStorage, persistSession: true, autoRefreshToken: true, detectSessionInUrl: false }
+
+let db;
+let SUPABASE_URL = ''; // exposto após env load — usado por Edge Function calls
+// _dbReady resolve assim que env estiver disponível e db inicializado
+const _dbReady = loadEnv().then(({ supabaseUrl, supabaseKey }) => {
+  SUPABASE_URL = supabaseUrl;
+  db = createInstrumentedDb(createClient(supabaseUrl, supabaseKey, {
+    // sessionStorage: sessão encerra ao fechar o navegador (Regra de segurança)
+    auth: { storage: window.sessionStorage, persistSession: true, autoRefreshToken: true, detectSessionInUrl: false }
+  }));
 });
-// let (não const): o app de campo Brigadas substitui por um cliente
-// isolado com sessão persistente protegida por PIN — ver pages/brigada.html
-let db = typeof createInstrumentedDb !== 'undefined' ? createInstrumentedDb(_dbRaw) : _dbRaw;
 
 // ── Estado global ─────────────────────────────────────────────
 const appState = { usuario: null, perfil: null };
@@ -112,6 +123,7 @@ function toast(msg, tipo = 'info') {
 }
 
 async function carregarUsuario() {
+  await _dbReady;
   const { data: { session } } = await db.auth.getSession();
   if (!session) return null;
   const { data: u } = await db.from('usuarios').select('*').eq('id', session.user.id).single();
