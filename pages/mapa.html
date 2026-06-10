@@ -2146,6 +2146,31 @@ function _navCarrossel(btn, delta) {
   _iniciarCarrossel(car.closest('.camada-popup'))
 }
 
+async function _carregarFaunaFotos(registroId, popupEl) {
+  const wrap = popupEl.querySelector(`#fauna-fotos-${registroId}`)
+  if (!wrap) return
+  wrap.innerHTML = '<span style="font-size:10px;color:#9CA3AF">Carregando fotos…</span>'
+  const { data } = await db
+    .from('registro_fauna')
+    .select('fotos_urls, nome_popular, classe, quantidade, condicao')
+    .eq('registro_campo_id', registroId)
+  if (!data || !data.length) { wrap.innerHTML = ''; return }
+  const todasFotos = data.flatMap(f => (f.fotos_urls || []).filter(Boolean))
+  if (!todasFotos.length) { wrap.innerHTML = ''; return }
+  const cid = 'fauna-' + registroId
+  const multi = todasFotos.length > 1
+  wrap.innerHTML = `
+    <div style="font-size:10px;font-weight:700;color:#2D6A4F;text-transform:uppercase;letter-spacing:.05em;margin:6px 0 4px;border-top:1px solid #e5e7eb;padding-top:6px">🐾 Fotos de Fauna</div>
+    <div class="brig-carousel" data-cid="${cid}" style="height:120px">
+      ${todasFotos.map((u,i) => `<img src="${escHtml(u)}" class="${i===0?'ativo':''}" alt="fauna ${i+1}" loading="lazy">`).join('')}
+      ${multi ? `
+        <button class="car-btn car-prev" onclick="_navCarrossel(this,-1)">‹</button>
+        <button class="car-btn car-next" onclick="_navCarrossel(this,1)">›</button>
+        <span class="car-counter">1/${todasFotos.length}</span>` : ''}
+    </div>`
+  if (multi) _iniciarCarrossel(wrap)
+}
+
 async function toggleBrigadasMapa(ativo) {
   _brigadasAtivo = ativo
   const fw = document.getElementById('brigadas-filtros-wrap')
@@ -2219,7 +2244,8 @@ function renderBrigadasMapa() {
         <div class="cp-row"><strong>Brigada</strong><span>${escHtml(r.brigada_nome ?? '—')}</span></div>
         ${r.uc_nome ? `<div class="cp-row"><strong>UC</strong><span>${escHtml(r.uc_nome)}</span></div>` : ''}
         <div class="cp-row"><strong>Data</strong><span>${dt}</span></div>
-        ${r.n_fauna > 0 ? `<div class="cp-row"><strong>Fauna</strong><span>🐾 ${r.n_fauna} animal${r.n_fauna > 1 ? 'is' : ''}</span></div>` : ''}
+        ${r.n_fauna > 0 ? `<div class="cp-row"><strong>Fauna</strong><span>🐾 ${r.n_fauna} animal${r.n_fauna > 1 ? 'is' : ''}</span></div>
+        <div id="fauna-fotos-${r.id}" style="margin-top:4px"></div>` : ''}
         <div style="margin-top:6px;display:flex;gap:5px;flex-wrap:wrap">
           <span class="cp-badge" style="background:${cor}22;border-color:${cor};color:${cor}">${escHtml(slab)}</span>
         </div>
@@ -2231,8 +2257,12 @@ function renderBrigadasMapa() {
       </div>
     </div>`, { maxWidth: 280 })
 
-    marker.on('popupopen',  e => _iniciarCarrossel(e.popup.getElement()))
-    marker.on('popupclose', () => _pararCarrossel(cid))
+    marker.on('popupopen',  e => {
+      const el = e.popup.getElement()
+      _iniciarCarrossel(el)
+      if (r.n_fauna > 0) _carregarFaunaFotos(r.id, el)
+    })
+    marker.on('popupclose', () => { _pararCarrossel(cid); _pararCarrossel('fauna-' + r.id) })
     marker.addTo(_brigadasLayer)
   })
 
