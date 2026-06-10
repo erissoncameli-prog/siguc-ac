@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>SIGUC-AC · Admin Brigadas</title>
+<link rel="stylesheet" href="../css/global.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../js/observability.js"></script>
+<script src="../js/queryLogger.js"></script>
+<script src="../js/config.js"></script>
+<script src="../js/layout.js"></script>
+</head>
+<body>
+<div id="app"></div>
+
+<!-- ── Modal: Brigada ─────────────────────────────────────── -->
+<div class="modal-overlay" id="modal-brigada">
+  <div class="modal" style="max-width:680px">
+    <div class="modal-header">
+      <div class="modal-title" id="mb-titulo">Nova Brigada</div>
+      <button class="modal-close" onclick="fecharModal('brigada')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Unidade de Conservação <span class="obrig">*</span></label>
+          <select class="form-control" id="mb-uc"><option value="">Selecione...</option></select>
+        </div>
+        <div class="form-group"><label class="form-label">Regional</label>
+          <select class="form-control" id="mb-regional">
+            <option value="">Selecione...</option>
+            <option value="baixo_acre">Baixo Acre</option>
+            <option value="purus">Purus</option>
+            <option value="jurua">Juruá</option>
+            <option value="tarauaca_envira">Tarauacá / Envira</option>
+            <option value="alto_acre">Alto Acre</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group"><label class="form-label">Nome da Brigada <span class="obrig">*</span></label>
+        <input class="form-control" id="mb-nome" placeholder="Ex: Brigada Alfa — RESEX Chico Mendes">
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Tipo <span class="obrig">*</span></label>
+          <select class="form-control" id="mb-tipo">
+            <option value="mista">Mista</option>
+            <option value="preventiva">Preventiva</option>
+            <option value="combate">Combate</option>
+          </select>
+        </div>
+        <div class="form-group"><label class="form-label">Fonte de Recurso</label>
+          <select class="form-control" id="mb-fonte">
+            <option value="prevfogo">PREVFOGO</option>
+            <option value="estadual">Estadual</option>
+            <option value="municipal">Municipal</option>
+            <option value="funbio">FUNBIO</option>
+            <option value="outro">Outro</option>
+          </select>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Início da Temporada</label>
+          <input class="form-control" id="mb-inicio" type="date">
+        </div>
+        <div class="form-group"><label class="form-label">Fim da Temporada</label>
+          <input class="form-control" id="mb-fim" type="date">
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Vagas Previstas</label>
+          <input class="form-control" id="mb-vagas" type="number" min="1" placeholder="Ex: 20">
+        </div>
+        <div class="form-group"><label class="form-label">Nº do Contrato</label>
+          <input class="form-control" id="mb-contrato" placeholder="Ex: 001/2026">
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Chefe da Brigada</label>
+          <select class="form-control" id="mb-chefe"><option value="">Selecione...</option></select>
+        </div>
+        <div class="form-group"><label class="form-label">Contato do Coordenador</label>
+          <input class="form-control" id="mb-coord-contato" placeholder="Telefone ou e-mail">
+        </div>
+      </div>
+      <div class="form-group"><label class="form-label">Observações</label>
+        <textarea class="form-control" id="mb-obs" rows="2"></textarea>
+      </div>
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+        <input type="checkbox" id="mb-ativa" checked style="width:16px;height:16px;cursor:pointer"> Brigada ativa
+      </label>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="fecharModal('brigada')">Cancelar</button>
+      <button class="btn btn-primary" id="mb-btn" onclick="salvarBrigada()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal: Brigadista (formulário completo) ────────────── -->
+<div class="modal-overlay" id="modal-brigadista">
+  <div class="modal" style="max-width:760px">
+    <div class="modal-header">
+      <div class="modal-title" id="mbr-titulo">Novo Brigadista</div>
+      <button class="modal-close" onclick="fecharModal('brigadista')">×</button>
+    </div>
+    <div class="modal-body">
+
+      <!-- Identificação -->
+      <div class="form-section-label">Identificação</div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Nome Completo <span class="obrig">*</span></label>
+          <input class="form-control" id="mbr-nome" placeholder="Nome completo">
+        </div>
+        <div class="form-group"><label class="form-label">CPF <span class="obrig">*</span></label>
+          <input class="form-control" id="mbr-cpf" placeholder="000.000.000-00" maxlength="14">
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">RG</label>
+          <input class="form-control" id="mbr-rg" placeholder="Número do RG">
+        </div>
+        <div class="form-group"><label class="form-label">Data de Nascimento</label>
+          <input class="form-control" id="mbr-nascimento" type="date">
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Sexo</label>
+          <select class="form-control" id="mbr-sexo">
+            <option value="">Não informado</option>
+            <option value="masculino">Masculino</option>
+            <option value="feminino">Feminino</option>
+            <option value="outro">Outro</option>
+          </select>
+        </div>
+        <div class="form-group"><label class="form-label">Tipo Sanguíneo</label>
+          <select class="form-control" id="mbr-sangue">
+            <option value="">Não informado</option>
+            <option value="A+">A+</option><option value="A-">A-</option>
+            <option value="B+">B+</option><option value="B-">B-</option>
+            <option value="AB+">AB+</option><option value="AB-">AB-</option>
+            <option value="O+">O+</option><option value="O-">O-</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group"><label class="form-label">Alergias / Condições de saúde relevantes</label>
+        <input class="form-control" id="mbr-alergias" placeholder="Ex: alérgico a picada de vespa, hipertenso...">
+      </div>
+
+      <!-- Contato -->
+      <div class="form-section-label" style="margin-top:12px">Contato</div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Telefone</label>
+          <input class="form-control" id="mbr-tel" placeholder="(68) 99999-9999">
+        </div>
+        <div class="form-group"><label class="form-label">E-mail</label>
+          <input class="form-control" id="mbr-email" type="email" placeholder="email@exemplo.com">
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Contato de Emergência</label>
+          <input class="form-control" id="mbr-emerg-nome" placeholder="Nome do contato">
+        </div>
+        <div class="form-group"><label class="form-label">Telefone de Emergência</label>
+          <input class="form-control" id="mbr-emerg-tel" placeholder="(68) 99999-9999">
+        </div>
+      </div>
+
+      <!-- Endereço -->
+      <div class="form-section-label" style="margin-top:12px">Endereço / Localidade</div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Comunidade / Ramal</label>
+          <input class="form-control" id="mbr-comunidade" placeholder="Ex: Comunidade São Francisco">
+        </div>
+        <div class="form-group"><label class="form-label">Município</label>
+          <input class="form-control" id="mbr-municipio" placeholder="Ex: Rio Branco">
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Logradouro</label>
+          <input class="form-control" id="mbr-logradouro" placeholder="Rua / Ramal / Estrada">
+        </div>
+        <div class="form-group"><label class="form-label">Número</label>
+          <input class="form-control" id="mbr-numero" placeholder="S/N">
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Bairro</label>
+          <input class="form-control" id="mbr-bairro" placeholder="Bairro">
+        </div>
+        <div class="form-group"><label class="form-label">CEP</label>
+          <input class="form-control" id="mbr-cep" placeholder="69900-000" maxlength="10">
+        </div>
+      </div>
+      <div class="form-group"><label class="form-label">Ponto de Referência</label>
+        <input class="form-control" id="mbr-ref" placeholder='Ex: "ramal do X, km 12, 2ª casa após a ponte"'>
+      </div>
+
+      <!-- Vínculo -->
+      <div class="form-section-label" style="margin-top:12px">Vínculo e Função</div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Brigada <span class="obrig">*</span></label>
+          <select class="form-control" id="mbr-brigada"><option value="">Selecione...</option></select>
+        </div>
+        <div class="form-group"><label class="form-label">Função <span class="obrig">*</span></label>
+          <select class="form-control" id="mbr-funcao">
+            <option value="brigadista">Brigadista</option>
+            <option value="chefe_brigada">Chefe de Brigada</option>
+            <option value="motorista">Motorista</option>
+            <option value="apoio_administrativo">Apoio Administrativo</option>
+            <option value="cozinheiro">Cozinheiro</option>
+          </select>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Tipo de Vínculo</label>
+          <select class="form-control" id="mbr-vinculo">
+            <option value="">Não informado</option>
+            <option value="voluntario">Voluntário</option>
+            <option value="contratado">Contratado</option>
+            <option value="convenio">Convênio</option>
+          </select>
+        </div>
+        <div class="form-group"><label class="form-label">Fonte de Recurso</label>
+          <select class="form-control" id="mbr-fonte">
+            <option value="prevfogo">PREVFOGO</option>
+            <option value="estadual">Estadual</option>
+            <option value="municipal">Municipal</option>
+            <option value="funbio">FUNBIO</option>
+            <option value="outro">Outro</option>
+          </select>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Início do Contrato <span class="obrig">*</span></label>
+          <input class="form-control" id="mbr-inicio" type="date">
+        </div>
+        <div class="form-group"><label class="form-label">Fim do Contrato</label>
+          <input class="form-control" id="mbr-fim" type="date">
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Status</label>
+          <select class="form-control" id="mbr-status">
+            <option value="ativo">Ativo</option>
+            <option value="afastado">Afastado</option>
+            <option value="suspenso">Suspenso</option>
+            <option value="encerrado">Encerrado</option>
+          </select>
+        </div>
+        <div class="form-group"><label class="form-label">CNH (se motorista)</label>
+          <input class="form-control" id="mbr-cnh" placeholder="Ex: AB" maxlength="5">
+        </div>
+      </div>
+
+      <!-- Formação -->
+      <div class="form-section-label" style="margin-top:12px">Formação</div>
+      <div class="grid-2">
+        <div class="form-group">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-top:28px">
+            <input type="checkbox" id="mbr-trein" style="width:16px;height:16px;cursor:pointer">
+            Treinamento básico concluído
+          </label>
+        </div>
+        <div class="form-group"><label class="form-label">Carga Horária (h)</label>
+          <input class="form-control" id="mbr-ch" type="number" min="0" placeholder="Ex: 80">
+        </div>
+      </div>
+      <div class="form-group"><label class="form-label">Última Formação</label>
+        <input class="form-control" id="mbr-ultima-form" type="date">
+      </div>
+      <div class="form-group"><label class="form-label">Observações</label>
+        <textarea class="form-control" id="mbr-obs" rows="2"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="fecharModal('brigadista')">Cancelar</button>
+      <button class="btn btn-primary" id="mbr-btn" onclick="salvarBrigadista()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal: Gerar Login ─────────────────────────────────── -->
+<div class="modal-overlay" id="modal-login">
+  <div class="modal" style="max-width:460px">
+    <div class="modal-header">
+      <div class="modal-title">Gerar Login do App</div>
+      <button class="modal-close" onclick="fecharModal('login')">×</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:13px;color:#6B7280;margin-bottom:16px">
+        Será criado um acesso no SIGUC Brigadas para
+        <strong id="login-nome-brig"></strong>. O brigadista deverá trocar
+        a senha provisória no primeiro acesso.
+      </p>
+      <div class="form-group"><label class="form-label">E-mail <span class="obrig">*</span></label>
+        <input class="form-control" id="login-email" type="email" placeholder="email@exemplo.com">
+      </div>
+      <div class="form-group"><label class="form-label">Senha Provisória <span class="obrig">*</span></label>
+        <input class="form-control" id="login-senha" type="text" placeholder="Mínimo 6 caracteres">
+        <span style="font-size:11px;color:#9CA3AF">Comunique a senha ao brigadista pessoalmente ou via WhatsApp seguro.</span>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="fecharModal('login')">Cancelar</button>
+      <button class="btn btn-primary" id="login-btn" onclick="confirmarLogin()">Criar Login</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal: QR Code ─────────────────────────────────────── -->
+<div class="modal-overlay" id="modal-qr">
+  <div class="modal" style="max-width:420px;text-align:center">
+    <div class="modal-header">
+      <div class="modal-title" id="qr-titulo">QR — Instalar App</div>
+      <button class="modal-close" onclick="fecharModal('qr')">×</button>
+    </div>
+    <div class="modal-body" style="display:flex;flex-direction:column;align-items:center;gap:16px">
+      <img id="qr-img" src="" alt="QR Code" style="width:220px;height:220px;border-radius:8px;border:1px solid #E5E7EB">
+      <div id="qr-link" style="font-size:12px;color:#6B7280;word-break:break-all;max-width:340px"></div>
+      <button class="btn btn-secondary" style="width:100%" onclick="window.print()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+        Imprimir
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── URL base do PWA (atualizar quando o app for publicado) ───
+const PWA_BASE_URL = 'https://brigada.siguc.ac.gov.br'
+
+// ── Estado ───────────────────────────────────────────────────
+let _ucs = [], _brigadas = [], _brigadistas = []
+let _editId = { brigada: null, brigadista: null }
+let _loginBrigadistaId = null
+
+const BADGE_TIPO  = { preventiva: 'badge-azul', combate: 'badge-erro', mista: 'badge-verde' }
+const BADGE_STATUS_BR = { ativo: 'badge-verde', afastado: 'badge-ouro', suspenso: 'badge-erro', encerrado: 'badge-cinza' }
+const LABEL_REGIONAL = {
+  baixo_acre: 'Baixo Acre', purus: 'Purus', jurua: 'Juruá',
+  tarauaca_envira: 'Tarauacá/Envira', alto_acre: 'Alto Acre',
+}
+
+;(async function () {
+  const usuario = await carregarUsuario()
+  if (!usuario) { window.location.href = '../index.html'; return }
+  if (!['super_admin','gestor'].includes(usuario.perfil)) {
+    window.location.href = '../pages/dashboard.html'; return
+  }
+
+  document.getElementById('app').innerHTML =
+    gerarLayout('Admin — Brigadas', 'admin-brigadas') +
+    `<div class="fade-in">
+      <div class="kpi-grid">
+        <div class="kpi-card verde"><div class="kpi-label">Brigadas Ativas</div><div class="kpi-valor" id="k-b">—</div></div>
+        <div class="kpi-card azul"><div class="kpi-label">Brigadistas Ativos</div><div class="kpi-valor" id="k-br">—</div></div>
+        <div class="kpi-card ouro"><div class="kpi-label">Com Login no App</div><div class="kpi-valor" id="k-login">—</div></div>
+        <div class="kpi-card erro"><div class="kpi-label">Sem Login no App</div><div class="kpi-valor" id="k-sem-login">—</div></div>
+      </div>
+
+      <div class="card" style="margin-bottom:16px">
+        <div style="display:flex;gap:4px;padding:4px;background:rgba(0,0,0,.06);border-radius:10px;width:fit-content">
+          <button class="tab-btn ativo" id="tab-brigadas"    onclick="mudarAba('brigadas')">Brigadas</button>
+          <button class="tab-btn"       id="tab-brigadistas" onclick="mudarAba('brigadistas')">Brigadistas</button>
+        </div>
+      </div>
+
+      <!-- Aba Brigadas -->
+      <div id="aba-brigadas">
+        <div class="filter-bar">
+          <input class="form-control search-input" id="busca-b" placeholder="Buscar brigada ou UC..." oninput="renderBrigadas()">
+          <select class="form-control" id="fil-regional" style="width:160px" onchange="renderBrigadas()">
+            <option value="">Regional</option>
+            <option value="baixo_acre">Baixo Acre</option>
+            <option value="purus">Purus</option>
+            <option value="jurua">Juruá</option>
+            <option value="tarauaca_envira">Tarauacá/Envira</option>
+            <option value="alto_acre">Alto Acre</option>
+          </select>
+          <select class="form-control" id="fil-ativa" style="width:110px" onchange="renderBrigadas()">
+            <option value="">Status</option>
+            <option value="true">Ativa</option>
+            <option value="false">Inativa</option>
+          </select>
+          <button class="btn btn-primary" onclick="abrirModalBrigada()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Nova Brigada
+          </button>
+        </div>
+        <div class="card"><div class="table-wrap"><div class="table-scroll">
+          <table>
+            <thead><tr><th>UC</th><th>Nome</th><th>Regional</th><th>Tipo</th><th>Chefe</th><th>Vagas</th><th>Ativos</th><th>Status</th><th>Ações</th></tr></thead>
+            <tbody id="tbody-b"></tbody>
+          </table>
+        </div></div></div>
+      </div>
+
+      <!-- Aba Brigadistas -->
+      <div id="aba-brigadistas" style="display:none">
+        <div class="filter-bar">
+          <input class="form-control search-input" id="busca-br" placeholder="Buscar por nome ou CPF..." oninput="renderBrigadistas()">
+          <select class="form-control" id="fil-brigada-br" style="width:200px" onchange="renderBrigadistas()">
+            <option value="">Todas as brigadas</option>
+          </select>
+          <select class="form-control" id="fil-login" style="width:130px" onchange="renderBrigadistas()">
+            <option value="">Login</option>
+            <option value="com">Com login</option>
+            <option value="sem">Sem login</option>
+          </select>
+          <select class="form-control" id="fil-status-br" style="width:110px" onchange="renderBrigadistas()">
+            <option value="ativo">Ativos</option>
+            <option value="">Todos</option>
+            <option value="encerrado">Encerrados</option>
+          </select>
+          <button class="btn btn-primary" onclick="abrirModalBrigadista()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Novo Brigadista
+          </button>
+        </div>
+        <div class="card"><div class="table-wrap"><div class="table-scroll">
+          <table>
+            <thead><tr><th>Nome</th><th>CPF</th><th>Brigada</th><th>Função</th><th>Vínculo</th><th>Período</th><th>Status</th><th>App</th><th>Ações</th></tr></thead>
+            <tbody id="tbody-br"></tbody>
+          </table>
+        </div></div></div>
+      </div>
+    </div>` +
+    '</div></div></div>'
+
+  carregarLogosSidebar()
+  await Promise.all([carregarUCs(), carregarDados()])
+})()
+
+async function carregarUCs() {
+  const { data } = await db.from('unidades_conservacao').select('id,nome,codigo').eq('ativo',true).order('codigo')
+  _ucs = data || []
+  const sel = document.getElementById('mb-uc')
+  if (sel) _ucs.forEach(u => { const o = new Option(`${u.codigo} — ${u.nome}`, u.id); sel.add(o) })
+}
+
+async function carregarDados() {
+  const [rb, rbr] = await Promise.all([
+    db.from('brigadas_resumo').select('*').order('uc_nome'),
+    db.from('brigadistas').select('id,nome_completo,cpf,brigada_id,funcao,status,usuario_id,tipo_vinculo,data_inicio,data_fim').order('nome_completo'),
+  ])
+  _brigadas    = rb.data  || []
+  _brigadistas = rbr.data || []
+
+  document.getElementById('k-b').textContent        = _brigadas.filter(b => b.ativa).length
+  document.getElementById('k-br').textContent       = _brigadistas.filter(b => b.status === 'ativo').length
+  document.getElementById('k-login').textContent    = _brigadistas.filter(b => b.usuario_id).length
+  document.getElementById('k-sem-login').textContent = _brigadistas.filter(b => b.status === 'ativo' && !b.usuario_id).length
+
+  // Popula selects de brigada nos filtros e modais
+  ;['fil-brigada-br','mbr-brigada','mb-chefe'].forEach(id => {
+    const sel = document.getElementById(id)
+    if (!sel) return
+    while (sel.options.length > 1) sel.remove(1)
+    if (id === 'mb-chefe') {
+      _brigadistas.filter(b => b.funcao === 'chefe_brigada' && b.status === 'ativo')
+        .forEach(b => sel.add(new Option(b.nome_completo, b.id)))
+    } else {
+      _brigadas.forEach(b => sel.add(new Option(b.nome, b.id)))
+    }
+  })
+
+  renderBrigadas()
+  renderBrigadistas()
+}
+
+function mudarAba(aba) {
+  ;['brigadas','brigadistas'].forEach(a => {
+    document.getElementById('aba-' + a).style.display = a === aba ? '' : 'none'
+    document.getElementById('tab-' + a).classList.toggle('ativo', a === aba)
+  })
+}
+
+// ── Render Brigadas ──────────────────────────────────────────
+function renderBrigadas() {
+  const q       = (document.getElementById('busca-b')?.value || '').toLowerCase()
+  const reg     = document.getElementById('fil-regional')?.value || ''
+  const ativa   = document.getElementById('fil-ativa')?.value
+  const lista   = _brigadas.filter(b =>
+    (!q || b.nome.toLowerCase().includes(q) || (b.uc_nome||'').toLowerCase().includes(q)) &&
+    (!reg || b.regional === reg) &&
+    (ativa === '' || ativa == null ? true : String(b.ativa) === ativa)
+  )
+  const tbody = document.getElementById('tbody-b')
+  if (!lista.length) { tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:32px;color:#9CA3AF">Nenhuma brigada encontrada</td></tr>'; return }
+  const chefeMap = Object.fromEntries(_brigadistas.map(b => [b.id, b.nome_completo]))
+  tbody.innerHTML = lista.map(b => {
+    const chefe = b.chefe_id ? (chefeMap[b.chefe_id] || '—') : '—'
+    return `<tr>
+      <td style="font-size:12px"><strong>${esc(b.uc_sigla||'—')}</strong></td>
+      <td><strong>${esc(b.nome)}</strong></td>
+      <td style="font-size:12px">${esc(LABEL_REGIONAL[b.regional] || '—')}</td>
+      <td><span class="badge ${BADGE_TIPO[b.tipo]||'badge-cinza'}">${esc(b.tipo)}</span></td>
+      <td style="font-size:12px">${esc(chefe)}</td>
+      <td class="mono" style="text-align:center">${b.vagas_previstas ?? '—'}</td>
+      <td class="mono" style="text-align:center">${b.brigadistas_ativos ?? 0}</td>
+      <td><span class="badge ${b.ativa ? 'badge-verde' : 'badge-cinza'}">${b.ativa ? 'Ativa' : 'Inativa'}</span></td>
+      <td style="display:flex;gap:6px">
+        <button class="btn btn-xs btn-ghost" onclick='abrirModalBrigada(${JSON.stringify(b)})'>Editar</button>
+        <button class="btn btn-xs btn-ghost" onclick='abrirQR("${b.id}","${esc(b.nome)}")' title="QR de instalação">QR</button>
+      </td>
+    </tr>`
+  }).join('')
+}
+
+// ── Render Brigadistas ───────────────────────────────────────
+function renderBrigadistas() {
+  const q      = (document.getElementById('busca-br')?.value || '').toLowerCase()
+  const brigId = document.getElementById('fil-brigada-br')?.value || ''
+  const login  = document.getElementById('fil-login')?.value || ''
+  const status = document.getElementById('fil-status-br')?.value
+  const lista  = _brigadistas.filter(b =>
+    (!q || b.nome_completo.toLowerCase().includes(q) || (b.cpf||'').includes(q)) &&
+    (!brigId || b.brigada_id === brigId) &&
+    (!login || (login === 'com' ? !!b.usuario_id : !b.usuario_id)) &&
+    (!status || b.status === status)
+  )
+  const tbody = document.getElementById('tbody-br')
+  if (!lista.length) { tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:32px;color:#9CA3AF">Nenhum brigadista encontrado</td></tr>'; return }
+  const brigNomeMap = Object.fromEntries(_brigadas.map(b => [b.id, b.nome]))
+  tbody.innerHTML = lista.map(b => {
+    const periodo = b.data_inicio ? `${formatData(b.data_inicio)}${b.data_fim ? ' – ' + formatData(b.data_fim) : ''}` : '—'
+    const brigNome = brigNomeMap[b.brigada_id] || '—'
+    const appBadge = b.usuario_id
+      ? '<span class="badge badge-verde" style="font-size:11px">Com login</span>'
+      : `<button class="btn btn-xs" style="background:#F59E0B;color:#fff;border:none" onclick='abrirModalLogin("${b.id}","${esc(b.nome_completo)}","")'>Gerar login</button>`
+    return `<tr>
+      <td><strong>${esc(b.nome_completo)}</strong></td>
+      <td class="mono" style="font-size:12px">${esc(b.cpf||'—')}</td>
+      <td style="font-size:12px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(brigNome)}</td>
+      <td style="font-size:12px">${esc((b.funcao||'').replace('_',' '))}</td>
+      <td style="font-size:12px">${esc(b.tipo_vinculo ? b.tipo_vinculo.charAt(0).toUpperCase() + b.tipo_vinculo.slice(1) : '—')}</td>
+      <td class="mono" style="font-size:12px;white-space:nowrap">${periodo}</td>
+      <td><span class="badge ${BADGE_STATUS_BR[b.status]||'badge-cinza'}">${esc(b.status)}</span></td>
+      <td>${appBadge}</td>
+      <td><button class="btn btn-xs btn-ghost" onclick="carregarEEditarBrigadista('${b.id}')">Editar</button></td>
+    </tr>`
+  }).join('')
+}
+
+// ── Modal Brigada ────────────────────────────────────────────
+function abrirModalBrigada(b = null) {
+  _editId.brigada = b?.id || null
+  document.getElementById('mb-titulo').textContent = b ? 'Editar Brigada' : 'Nova Brigada'
+  document.getElementById('mb-uc').value           = b?.uc_id || ''
+  document.getElementById('mb-regional').value     = b?.regional || ''
+  document.getElementById('mb-nome').value         = b?.nome || ''
+  document.getElementById('mb-tipo').value         = b?.tipo || 'mista'
+  document.getElementById('mb-fonte').value        = b?.fonte_recurso || 'prevfogo'
+  document.getElementById('mb-inicio').value       = b?.temporada_inicio || ''
+  document.getElementById('mb-fim').value          = b?.temporada_fim || ''
+  document.getElementById('mb-vagas').value        = b?.vagas_previstas || ''
+  document.getElementById('mb-contrato').value     = b?.numero_contrato || ''
+  document.getElementById('mb-chefe').value        = b?.chefe_id || ''
+  document.getElementById('mb-coord-contato').value = b?.coordenador_contato || ''
+  document.getElementById('mb-obs').value          = b?.observacoes || ''
+  document.getElementById('mb-ativa').checked      = b ? b.ativa : true
+  document.getElementById('modal-brigada').classList.add('aberto')
+}
+
+async function salvarBrigada() {
+  const uc_id = document.getElementById('mb-uc').value
+  const nome  = document.getElementById('mb-nome').value.trim()
+  if (!uc_id || !nome) { toast('Preencha UC e nome', 'error'); return }
+  const payload = {
+    uc_id, nome,
+    regional:          document.getElementById('mb-regional').value || null,
+    tipo:              document.getElementById('mb-tipo').value,
+    fonte_recurso:     document.getElementById('mb-fonte').value,
+    temporada_inicio:  document.getElementById('mb-inicio').value || null,
+    temporada_fim:     document.getElementById('mb-fim').value || null,
+    vagas_previstas:   parseInt(document.getElementById('mb-vagas').value) || null,
+    numero_contrato:   document.getElementById('mb-contrato').value.trim() || null,
+    chefe_id:          document.getElementById('mb-chefe').value || null,
+    coordenador_contato: document.getElementById('mb-coord-contato').value.trim() || null,
+    observacoes:       document.getElementById('mb-obs').value.trim() || null,
+    ativa:             document.getElementById('mb-ativa').checked,
+  }
+  const btn = document.getElementById('mb-btn')
+  btn.disabled = true; btn.textContent = 'Salvando...'
+  try {
+    const { error } = _editId.brigada
+      ? await db.from('brigadas').update(payload).eq('id', _editId.brigada)
+      : await db.from('brigadas').insert(payload)
+    if (error) throw error
+    toast(_editId.brigada ? 'Brigada atualizada!' : 'Brigada criada!', 'success')
+    fecharModal('brigada'); await carregarDados()
+  } catch(e) { toast(e.message || 'Erro ao salvar', 'error') }
+  finally { btn.disabled = false; btn.textContent = 'Salvar' }
+}
+
+// ── Modal Brigadista ─────────────────────────────────────────
+function abrirModalBrigadista(b = null) {
+  _editId.brigadista = b?.id || null
+  document.getElementById('mbr-titulo').textContent     = b ? 'Editar Brigadista' : 'Novo Brigadista'
+  document.getElementById('mbr-nome').value             = b?.nome_completo || ''
+  document.getElementById('mbr-cpf').value              = b?.cpf || ''
+  document.getElementById('mbr-rg').value               = b?.rg || ''
+  document.getElementById('mbr-nascimento').value       = b?.data_nascimento || ''
+  document.getElementById('mbr-sexo').value             = b?.sexo || ''
+  document.getElementById('mbr-sangue').value           = b?.tipo_sanguineo || ''
+  document.getElementById('mbr-alergias').value         = b?.alergias || ''
+  document.getElementById('mbr-tel').value              = b?.telefone || ''
+  document.getElementById('mbr-email').value            = b?.email || ''
+  document.getElementById('mbr-emerg-nome').value       = b?.contato_emergencia_nome || ''
+  document.getElementById('mbr-emerg-tel').value        = b?.contato_emergencia_telefone || ''
+  document.getElementById('mbr-comunidade').value       = b?.comunidade || ''
+  document.getElementById('mbr-municipio').value        = b?.municipio_residencia || ''
+  document.getElementById('mbr-logradouro').value       = b?.logradouro || ''
+  document.getElementById('mbr-numero').value           = b?.numero || ''
+  document.getElementById('mbr-bairro').value           = b?.bairro || ''
+  document.getElementById('mbr-cep').value              = b?.cep || ''
+  document.getElementById('mbr-ref').value              = b?.ponto_referencia || ''
+  document.getElementById('mbr-brigada').value          = b?.brigada_id || ''
+  document.getElementById('mbr-funcao').value           = b?.funcao || 'brigadista'
+  document.getElementById('mbr-vinculo').value          = b?.tipo_vinculo || ''
+  document.getElementById('mbr-fonte').value            = b?.fonte_recurso || 'prevfogo'
+  document.getElementById('mbr-inicio').value           = b?.data_inicio || ''
+  document.getElementById('mbr-fim').value              = b?.data_fim || ''
+  document.getElementById('mbr-status').value           = b?.status || 'ativo'
+  document.getElementById('mbr-cnh').value              = b?.cnh || ''
+  document.getElementById('mbr-trein').checked          = b?.treinamento_basico || false
+  document.getElementById('mbr-ch').value               = b?.carga_horaria_formacao || ''
+  document.getElementById('mbr-ultima-form').value      = b?.data_ultima_formacao || ''
+  document.getElementById('mbr-obs').value              = b?.observacoes || ''
+  document.getElementById('modal-brigadista').classList.add('aberto')
+}
+
+async function carregarEEditarBrigadista(id) {
+  const { data, error } = await db.from('brigadistas').select('*').eq('id', id).single()
+  if (error || !data) { toast('Erro ao carregar brigadista', 'error'); return }
+  abrirModalBrigadista(data)
+}
+
+async function salvarBrigadista() {
+  const brigada_id    = document.getElementById('mbr-brigada').value
+  const nome_completo = document.getElementById('mbr-nome').value.trim()
+  const cpf           = document.getElementById('mbr-cpf').value.trim()
+  const data_inicio   = document.getElementById('mbr-inicio').value
+  if (!brigada_id || !nome_completo || !cpf || !data_inicio) {
+    toast('Preencha brigada, nome, CPF e data de início', 'error'); return
+  }
+  const payload = {
+    brigada_id, nome_completo, cpf, data_inicio,
+    rg:                    document.getElementById('mbr-rg').value.trim() || null,
+    data_nascimento:       document.getElementById('mbr-nascimento').value || null,
+    sexo:                  document.getElementById('mbr-sexo').value || null,
+    tipo_sanguineo:        document.getElementById('mbr-sangue').value || null,
+    alergias:              document.getElementById('mbr-alergias').value.trim() || null,
+    telefone:              document.getElementById('mbr-tel').value.trim() || null,
+    email:                 document.getElementById('mbr-email').value.trim() || null,
+    contato_emergencia_nome:     document.getElementById('mbr-emerg-nome').value.trim() || null,
+    contato_emergencia_telefone: document.getElementById('mbr-emerg-tel').value.trim() || null,
+    comunidade:            document.getElementById('mbr-comunidade').value.trim() || null,
+    municipio_residencia:  document.getElementById('mbr-municipio').value.trim() || null,
+    logradouro:            document.getElementById('mbr-logradouro').value.trim() || null,
+    numero:                document.getElementById('mbr-numero').value.trim() || null,
+    bairro:                document.getElementById('mbr-bairro').value.trim() || null,
+    cep:                   document.getElementById('mbr-cep').value.trim() || null,
+    ponto_referencia:      document.getElementById('mbr-ref').value.trim() || null,
+    funcao:                document.getElementById('mbr-funcao').value,
+    tipo_vinculo:          document.getElementById('mbr-vinculo').value || null,
+    fonte_recurso:         document.getElementById('mbr-fonte').value,
+    data_fim:              document.getElementById('mbr-fim').value || null,
+    status:                document.getElementById('mbr-status').value,
+    cnh:                   document.getElementById('mbr-cnh').value.trim() || null,
+    treinamento_basico:    document.getElementById('mbr-trein').checked,
+    carga_horaria_formacao: parseInt(document.getElementById('mbr-ch').value) || null,
+    data_ultima_formacao:  document.getElementById('mbr-ultima-form').value || null,
+    observacoes:           document.getElementById('mbr-obs').value.trim() || null,
+  }
+  const btn = document.getElementById('mbr-btn')
+  btn.disabled = true; btn.textContent = 'Salvando...'
+  try {
+    const { error } = _editId.brigadista
+      ? await db.from('brigadistas').update(payload).eq('id', _editId.brigadista)
+      : await db.from('brigadistas').insert(payload)
+    if (error) throw error
+    toast(_editId.brigadista ? 'Brigadista atualizado!' : 'Brigadista cadastrado!', 'success')
+    fecharModal('brigadista'); await carregarDados()
+  } catch(e) { toast(e.message || 'Erro ao salvar', 'error') }
+  finally { btn.disabled = false; btn.textContent = 'Salvar' }
+}
+
+// ── Modal Gerar Login ────────────────────────────────────────
+function abrirModalLogin(id, nome, email) {
+  _loginBrigadistaId = id
+  document.getElementById('login-nome-brig').textContent = nome
+  document.getElementById('login-email').value = email || ''
+  document.getElementById('login-senha').value = ''
+  document.getElementById('modal-login').classList.add('aberto')
+}
+
+async function confirmarLogin() {
+  const email     = document.getElementById('login-email').value.trim()
+  const senha_temp = document.getElementById('login-senha').value
+  if (!email || !senha_temp) { toast('Preencha e-mail e senha provisória', 'error'); return }
+  const btn = document.getElementById('login-btn')
+  btn.disabled = true; btn.textContent = 'Criando...'
+  try {
+    const { data: { session } } = await db.auth.getSession()
+    const resp = await fetch(`${appState.supabaseUrl}/functions/v1/gerar-login-brigadista`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`,
+        'apikey': appState.supabaseAnonKey,
+      },
+      body: JSON.stringify({ brigadista_id: _loginBrigadistaId, email, senha_temp }),
+    })
+    const result = await resp.json()
+    if (!resp.ok) throw new Error(result.error || 'Erro ao criar login')
+    toast('Login criado! Brigadista deve trocar a senha no 1º acesso.', 'success')
+    fecharModal('login'); await carregarDados()
+  } catch(e) { toast(e.message || 'Erro ao criar login', 'error') }
+  finally { btn.disabled = false; btn.textContent = 'Criar Login' }
+}
+
+// ── Modal QR ─────────────────────────────────────────────────
+function abrirQR(brigId, brigNome) {
+  const url = `${PWA_BASE_URL}/instalar?brigada=${brigId}`
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(url)}&size=300x300&format=png&margin=10`
+  document.getElementById('qr-titulo').textContent = `QR — ${brigNome}`
+  document.getElementById('qr-img').src = qrUrl
+  document.getElementById('qr-link').textContent = url
+  document.getElementById('modal-qr').classList.add('aberto')
+}
+
+// ── Helpers ───────────────────────────────────────────────────
+function fecharModal(tipo) {
+  document.getElementById('modal-' + tipo).classList.remove('aberto')
+  if (tipo === 'brigada') _editId.brigada = null
+  if (tipo === 'brigadista') _editId.brigadista = null
+  if (tipo === 'login') _loginBrigadistaId = null
+}
+</script>
+
+<style>
+.tab-btn {
+  padding: 6px 18px; border: none; background: transparent;
+  border-radius: 7px; font-size: 13px; font-weight: 500;
+  color: var(--texto-secundario, #6B7280); cursor: pointer;
+  transition: background .15s, color .15s;
+}
+.tab-btn.ativo { background: white; color: var(--floresta, #0A1A0F); box-shadow: 0 1px 4px rgba(0,0,0,.12); }
+.tab-btn:hover:not(.ativo) { background: rgba(255,255,255,.5); }
+.form-section-label {
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .06em; color: var(--verde-c, #52B788);
+  padding: 8px 0 4px; border-bottom: 1px solid rgba(82,183,136,.2);
+  margin-bottom: 12px;
+}
+</style>
+</body>
+</html>
