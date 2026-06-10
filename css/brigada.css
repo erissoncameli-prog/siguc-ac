@@ -99,7 +99,7 @@
 }
 .pin-key:active { transform: scale(.92); background: rgba(255,255,255,.18); }
 .pin-key.delete { font-size: 18px; }
-.pin-key.ok { background: var(--prim); }
+.pin-key.ok, .pin-key.pin-ok { background: var(--prim); }
 
 /* ── Tela de login do brigadista ────────────────────────── */
 .login-form {
