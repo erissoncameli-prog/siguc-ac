@@ -58,6 +58,7 @@ function gerarLayout(tituloPagina, paginaAtiva) {
     'dashboard-executivo':      { svg: '<path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/>', cor: '#4ade80', bg: 'rgba(74,222,128,0.22)' },
     'netflora':                 { svg: '<path d="M12 2a10 10 0 0 1 10 10c0 4-2 7-5 9M12 2a10 10 0 0 0-10 10c0 4 2 7 5 9M12 2v20M2 12h20"/>', cor: '#86efac', bg: 'rgba(134,239,172,0.22)' },
     'brigadas':                 { svg: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/><line x1="12" y1="16" x2="12" y2="22"/><line x1="9" y1="19" x2="15" y2="19"/>', cor: '#f87171', bg: 'rgba(248,113,113,0.22)' },
+    'admin-brigadas':           { svg: '<circle cx="12" cy="8" r="4"/><path d="M6 20v-2a6 6 0 0 1 12 0v2"/><line x1="19" y1="11" x2="19" y2="17"/><line x1="16" y1="14" x2="22" y2="14"/>', cor: '#f87171', bg: 'rgba(248,113,113,0.18)' },
   };
 
   function renderPill(id, size) {
@@ -96,6 +97,7 @@ function gerarLayout(tituloPagina, paginaAtiva) {
       itens: [
         { id: 'usuarios',                  href: '../pages/usuarios.html',                  label: t('nav.usuarios') },
         { id: 'estrutura-organizacional', href: '../pages/estrutura-organizacional.html', label: 'Estrutura Org.' },
+        { id: 'admin-brigadas',            href: '../pages/admin-brigadas.html',            label: 'Admin Brigadas' },
         { id: 'configuracoes',             href: '../pages/configuracoes.html',             label: t('nav.configuracoes') },
       ]
     },
