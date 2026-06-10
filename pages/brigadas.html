@@ -123,7 +123,7 @@
         <div class="form-group"><label class="form-label">Telefone</label>
           <input class="form-control" id="mbr-tel" placeholder="(68) 99999-9999">
         </div>
-        <div class="form-group"><label class="form-label">E-mail</label>
+        <div class="form-group"><label class="form-label" id="mbr-email-label">E-mail</label>
           <input class="form-control" id="mbr-email" type="email" placeholder="brigadista@email.com">
         </div>
       </div>
@@ -132,7 +132,7 @@
       </div>
       <div class="grid-2">
         <div class="form-group"><label class="form-label">Função <span class="obrig">*</span></label>
-          <select class="form-control" id="mbr-funcao">
+          <select class="form-control" id="mbr-funcao" onchange="atualizarObrigEmail()">
             <option value="brigadista">Brigadista</option>
             <option value="chefe_brigada">Chefe de Brigada</option>
             <option value="motorista">Motorista</option>
@@ -728,6 +728,7 @@ function abrirModalBrigadista(b = null) {
   document.getElementById('mbr-email').value         = b?.email || ''
   document.getElementById('mbr-municipio').value     = b?.municipio_residencia || ''
   document.getElementById('mbr-funcao').value        = b?.funcao || 'brigadista'
+  atualizarObrigEmail()
   document.getElementById('mbr-fonte').value         = b?.fonte_recurso || 'rem'
   document.getElementById('mbr-status').value        = b?.status || 'ativo'
   document.getElementById('mbr-inicio').value        = b?.data_inicio || ''
@@ -740,12 +741,21 @@ function abrirModalBrigadista(b = null) {
 }
 function fecharModalBrigadista() { document.getElementById('modal-brigadista').classList.remove('aberto'); _editId.brigadista = null }
 
+function atualizarObrigEmail() {
+  const isChefe = document.getElementById('mbr-funcao').value === 'chefe_brigada'
+  document.getElementById('mbr-email-label').innerHTML =
+    isChefe ? 'E-mail <span class="obrig">*</span>' : 'E-mail'
+}
+
 async function salvarBrigadista() {
   const brigada_id   = document.getElementById('mbr-brigada').value
   const nome_completo = document.getElementById('mbr-nome').value.trim()
   const cpf          = document.getElementById('mbr-cpf').value.trim()
   const data_inicio  = document.getElementById('mbr-inicio').value
   if (!brigada_id || !nome_completo || !cpf || !data_inicio) { toast('Preencha brigada, nome, CPF e data de início', 'error'); return }
+  const funcaoVal = document.getElementById('mbr-funcao').value
+  const emailVal  = document.getElementById('mbr-email').value.trim()
+  if (funcaoVal === 'chefe_brigada' && !emailVal) { toast('E-mail é obrigatório para Chefe de Brigada', 'error'); document.getElementById('mbr-email').focus(); return }
   const payload = {
     brigada_id, nome_completo, cpf,
     rg:                    document.getElementById('mbr-rg').value.trim() || null,
