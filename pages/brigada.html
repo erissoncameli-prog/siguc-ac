@@ -450,15 +450,23 @@
 </nav>
 
 <!-- ── Scripts ─────────────────────────────────────────────── -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+// Stub de segurança: se o CDN não carregar (offline), config.js não quebra.
+// O CDN sobrescreve este objeto quando disponível.
+window.supabase = window.supabase || { createClient: () => null }
+</script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"
+        onerror="console.warn('[brigada] Supabase CDN indisponível — modo offline')"></script>
 <script src="/js/config.js"></script>
 <script>
 // ── Cliente Supabase ISOLADO para o App de Campo ──────────────
 // Usa localStorage + storageKey próprio para nunca sobrescrever
 // a sessionStorage do app principal SIGUC-AC.
-// Redefine a variável global `db` para todo o contexto desta página.
+// Se o CDN não carregou (offline), db permanece null e o boot
+// vai direto para o cache local (PIN + dados do brigadista).
 ;(function () {
-  const _brigDb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  if (!window.supabase || typeof window.supabase.createClient !== 'function') return
+  const _brigDb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     auth: {
       storageKey:       'siguc-brigada-session',
       storage:          window.localStorage,
@@ -467,8 +475,7 @@
       detectSessionInUrl: false,
     },
   });
-  // eslint-disable-next-line no-global-assign
-  db = _brigDb;
+  if (_brigDb) db = _brigDb;
 })();
 </script>
 <script src="/js/brigada-offline.js"></script>
@@ -555,14 +562,20 @@ async function boot() {
   await bOfflineInit()
   bOfflinePersistir()
 
-  // 1. Sessão ativa no localStorage (persistida pelo cliente isolado)
-  const { data: { session: sessaoAtiva } } = await db.auth.getSession()
-  if (sessaoAtiva) {
-    await prosseguirAposAuth(sessaoAtiva)
-    return
+  // 1. Sessão ativa — só verifica se Supabase está disponível (online)
+  if (db) {
+    try {
+      const { data: { session: sessaoAtiva } } = await db.auth.getSession()
+      if (sessaoAtiva) {
+        await prosseguirAposAuth(sessaoAtiva)
+        return
+      }
+    } catch (e) {
+      console.warn('[boot] Sessão indisponível:', e.message)
+    }
   }
 
-  // 2. Sem sessão — verificar cache offline + PIN configurado (modo campo offline)
+  // 2. Sem sessão ou offline — verificar cache + PIN (modo campo offline)
   const brigCached = await bOfflineGetConfig('brigadista')
   const pinSalvo   = await bOfflineGetConfig('pin_hash')
   if (brigCached && pinSalvo) {
@@ -574,7 +587,7 @@ async function boot() {
     return
   }
 
-  // 3. Sem cache — precisa fazer login
+  // 3. Sem cache — precisa fazer login online
   mostrarTela('tela-login', false)
 }
 
@@ -638,6 +651,11 @@ async function fazerLogin() {
   const senha  = document.getElementById('login-senha').value
   document.getElementById('login-erro').hidden = true
 
+  if (!db) {
+    mostrarErroLogin('Sem conexão. Conecte à internet para fazer o primeiro login.')
+    return
+  }
+
   if (!email || !senha) { mostrarErroLogin('Preencha e-mail e senha.'); return }
 
   const btn = document.getElementById('btn-fazer-login')
@@ -680,7 +698,7 @@ async function buscarBrigadaDoBanco(brigadaId) {
 }
 
 async function sincronizarEspecies() {
-  if (!navigator.onLine) return
+  if (!navigator.onLine || !db) return
   try {
     const { data } = await db
       .from('especies_fauna')

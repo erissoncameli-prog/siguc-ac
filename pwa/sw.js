@@ -13,12 +13,12 @@ const APP_SHELL = [
   'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2',
 ]
 
-// ── Install: pré-cache do app shell ─────────────────────────
+// ── Install: pré-cache do app shell (resiliente a falhas de CDN) ─
 self.addEventListener('install', ev => {
   ev.waitUntil(
-    caches.open(CACHE)
-      .then(c => c.addAll(APP_SHELL))
-      .then(() => self.skipWaiting())
+    caches.open(CACHE).then(c =>
+      Promise.allSettled(APP_SHELL.map(url => c.add(url)))
+    ).then(() => self.skipWaiting())
   )
 })
 
