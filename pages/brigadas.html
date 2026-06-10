@@ -116,9 +116,12 @@
         <div class="form-group"><label class="form-label">Telefone</label>
           <input class="form-control" id="mbr-tel" placeholder="(68) 99999-9999">
         </div>
-        <div class="form-group"><label class="form-label">Município de Residência</label>
-          <input class="form-control" id="mbr-municipio" placeholder="Ex: Rio Branco">
+        <div class="form-group"><label class="form-label">E-mail</label>
+          <input class="form-control" id="mbr-email" type="email" placeholder="brigadista@email.com">
         </div>
+      </div>
+      <div class="form-group"><label class="form-label">Município de Residência</label>
+        <input class="form-control" id="mbr-municipio" placeholder="Ex: Rio Branco">
       </div>
       <div class="grid-2">
         <div class="form-group"><label class="form-label">Função <span class="obrig">*</span></label>
@@ -132,6 +135,7 @@
         </div>
         <div class="form-group"><label class="form-label">Fonte de Recurso</label>
           <select class="form-control" id="mbr-fonte">
+            <option value="rem">REM</option>
             <option value="prevfogo">PREVFOGO</option>
             <option value="estadual">Estadual</option>
             <option value="municipal">Municipal</option>
@@ -693,9 +697,10 @@ function abrirModalBrigadista(b = null) {
   document.getElementById('mbr-rg').value            = b?.rg || ''
   document.getElementById('mbr-nascimento').value    = b?.data_nascimento || ''
   document.getElementById('mbr-tel').value           = b?.telefone || ''
+  document.getElementById('mbr-email').value         = b?.email || ''
   document.getElementById('mbr-municipio').value     = b?.municipio_residencia || ''
   document.getElementById('mbr-funcao').value        = b?.funcao || 'brigadista'
-  document.getElementById('mbr-fonte').value         = b?.fonte_recurso || 'prevfogo'
+  document.getElementById('mbr-fonte').value         = b?.fonte_recurso || 'rem'
   document.getElementById('mbr-status').value        = b?.status || 'ativo'
   document.getElementById('mbr-inicio').value        = b?.data_inicio || ''
   document.getElementById('mbr-fim').value           = b?.data_fim || ''
@@ -718,6 +723,7 @@ async function salvarBrigadista() {
     rg:                    document.getElementById('mbr-rg').value.trim() || null,
     data_nascimento:       document.getElementById('mbr-nascimento').value || null,
     telefone:              document.getElementById('mbr-tel').value.trim() || null,
+    email:                 document.getElementById('mbr-email').value.trim() || null,
     municipio_residencia:  document.getElementById('mbr-municipio').value.trim() || null,
     funcao:                document.getElementById('mbr-funcao').value,
     fonte_recurso:         document.getElementById('mbr-fonte').value,
