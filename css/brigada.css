@@ -699,7 +699,8 @@ body { margin: 0; }
   transition: background .12s; -webkit-tap-highlight-color: transparent;
 }
 .btn-config-item:active { background: #F9FAFB; }
-.btn-config-item.btn-danger { color: var(--combate); }
+.btn-config-item.btn-danger      { color: var(--combate); }
+.btn-config-item.btn-danger-soft { color: #D97706; }
 .quota-bar-wrap { display: flex; align-items: center; gap: 12px; }
 .quota-bar { flex: 1; height: 6px; border-radius: 3px; background: #E5E7EB; overflow: hidden; }
 .quota-fill { height: 100%; background: var(--prim); border-radius: 3px; transition: width .3s; }
