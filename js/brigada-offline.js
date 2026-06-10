@@ -99,11 +99,17 @@ function bOfflineBlobParaBase64(blob) {
 async function bOfflineSalvar(registro) {
   const db = await bOfflineInit()
 
-  // Converter Blobs para base64 antes de persistir
-  const fotosRaw = registro.fotos_blobs ?? []
-  const fotos64  = await Promise.all(
-    fotosRaw.map(b => (b instanceof Blob) ? bOfflineBlobParaBase64(b) : Promise.resolve(b))
-  )
+  // Converter Blobs para base64 antes de persistir (iOS Blob detachment fix)
+  const toBs64 = b => (b instanceof Blob) ? bOfflineBlobParaBase64(b) : Promise.resolve(b)
+
+  const fotos64 = await Promise.all((registro.fotos_blobs ?? []).map(toBs64))
+
+  // Converter fotos de fauna também
+  const faunaRaw = registro._fauna ?? []
+  const fauna64  = await Promise.all(faunaRaw.map(async f => {
+    const ff = await Promise.all((f.fotos_blobs ?? []).map(toBs64))
+    return { ...f, fotos_blobs: ff }
+  }))
 
   return new Promise((res, rej) => {
     const tx = db.transaction(['registros', 'fauna'], 'readwrite')
@@ -114,8 +120,6 @@ async function bOfflineSalvar(registro) {
       criado_em: new Date().toISOString(),
       fotos_blobs: fotos64,
     }
-
-    const fauna = registro._fauna ?? []
     delete payload._fauna
 
     const r1 = tx.objectStore('registros').put(payload)
@@ -129,7 +133,7 @@ async function bOfflineSalvar(registro) {
       if (c) { c.delete(); c.continue() }
     }
 
-    fauna.forEach(f => fStore.add({ ...f, registro_uuid: registro.uuid_cliente }))
+    fauna64.forEach(f => fStore.add({ ...f, registro_uuid: registro.uuid_cliente }))
 
     tx.oncomplete = () => res(payload)
     tx.onerror    = () => rej(tx.error)

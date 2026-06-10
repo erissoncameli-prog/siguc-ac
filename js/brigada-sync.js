@@ -92,7 +92,12 @@ async function bSyncUm(reg) {
       if (errId) throw errId
 
       await db.from('registro_fauna').delete().eq('registro_campo_id', rc.id)
-      const faunaPayload = fauna.map(f => bSyncMontarFaunaPayload(f, rc.id))
+      const faunaPayload = await Promise.all(
+        fauna.map(async (f, idx) => {
+          const fotosF = await bSyncUploadFotosFauna(f, reg.uuid_cliente, idx)
+          return bSyncMontarFaunaPayload(f, rc.id, fotosF)
+        })
+      )
       const { error: errF } = await db.from('registro_fauna').insert(faunaPayload)
       if (errF) throw errF
     }
@@ -204,10 +209,43 @@ function bSyncMontarPayload(reg, fotosUrls) {
   }
 }
 
+// ── Upload de fotos de fauna para Storage ─────────────────────
+async function bSyncUploadFotosFauna(f, registroUuid, faunaIdx) {
+  const fotos = f.fotos_blobs ?? []
+  if (!fotos.length) return []
+
+  const urls = []
+  for (let i = 0; i < fotos.length; i++) {
+    const item = fotos[i]
+    if (typeof item === 'string' && item.startsWith('http')) { urls.push(item); continue }
+
+    const blob = (typeof item === 'string') ? bSyncBase64ParaBlob(item) : item
+    const ext  = blob.type?.includes('png') ? 'png' : 'jpg'
+    const path = `${registroUuid}/fauna_${faunaIdx}_${i}.${ext}`
+
+    let ok = false, lastErr = null
+    for (let t = 0; t <= SYNC_BACKOFF.length; t++) {
+      const { error } = await db.storage
+        .from('registros-campo')
+        .upload(path, blob, { upsert: true, contentType: blob.type ?? 'image/jpeg' })
+      if (!error) { ok = true; break }
+      lastErr = error
+      if (t < SYNC_BACKOFF.length) await bSyncSleep(SYNC_BACKOFF[t])
+    }
+    if (!ok) {
+      const detail = lastErr ? (lastErr.message || lastErr.error || JSON.stringify(lastErr)) : 'sem detalhe'
+      throw new Error(`Falha no upload fauna ${faunaIdx}/${i}: ${detail}`)
+    }
+    const { data: { publicUrl } } = db.storage.from('registros-campo').getPublicUrl(path)
+    urls.push(publicUrl)
+  }
+  return urls
+}
+
 // ── Monta payload de fauna ────────────────────────────────────
-function bSyncMontarFaunaPayload(f, registroCampoId) {
+function bSyncMontarFaunaPayload(f, registroCampoId, fotosUrls = []) {
   const {
-    id, _id, registro_uuid,
+    id, _id, registro_uuid, fotos_blobs,
     especie_nome_cientifico,  // → nome_cientifico
     causa,                    // → causa_aparente
     ...rest
@@ -217,6 +255,7 @@ function bSyncMontarFaunaPayload(f, registroCampoId) {
     registro_campo_id: registroCampoId,
     nome_cientifico:   especie_nome_cientifico ?? null,
     causa_aparente:    causa ?? null,
+    fotos_urls:        fotosUrls.length ? fotosUrls : null,
   }
 }
 
