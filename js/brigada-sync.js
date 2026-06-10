@@ -5,9 +5,41 @@
 const SYNC_BACKOFF = [2000, 4000, 8000, 16000]
 let _syncRunning = false
 
+// ── Renovar sessão antes de sincronizar ───────────────────────
+// PWA no iOS suspende os timers de autoRefreshToken quando o app vai
+// para background. O token de 1h expira sem renovação automática.
+// Antes de cada sync online, verificamos e renovamos se necessário.
+async function bSyncGarantirSessao() {
+  try {
+    const { data: { session } } = await db.auth.getSession()
+    if (!session) return false
+
+    // Renovar se expirado ou expira nos próximos 5 min
+    const expiresAt = (session.expires_at ?? 0) * 1000
+    if (Date.now() > expiresAt - 5 * 60 * 1000) {
+      const { error } = await db.auth.refreshSession()
+      if (error) { console.warn('[brigada-sync] refresh falhou:', error.message); return false }
+    }
+    return true
+  } catch (e) {
+    console.warn('[brigada-sync] garantirSessao:', e.message)
+    return false
+  }
+}
+
 // ── Ponto de entrada público ──────────────────────────────────
 async function bSyncRodar() {
   if (_syncRunning || !db) return
+
+  // Só renovar sessão quando online (sem rede não há como renovar)
+  if (navigator.onLine) {
+    const sessaoOk = await bSyncGarantirSessao()
+    if (!sessaoOk) {
+      bSyncEmitir('erro', { uuid: null, err: 'Sessão expirada — abra o app e faça login novamente' })
+      return
+    }
+  }
+
   _syncRunning = true
   try {
     await bSyncExecutar()
@@ -97,10 +129,6 @@ function bSyncBase64ParaBlob(dataUrl) {
 async function bSyncUploadFotos(reg) {
   const fotos = reg.fotos_blobs ?? []
   if (!fotos.length) return []
-
-  // Garantir que a sessão está válida antes de qualquer upload
-  const { data: { session } } = await db.auth.getSession()
-  if (!session) throw new Error('Sessão expirada — faça login novamente para enviar fotos')
 
   const urls = []
   for (let i = 0; i < fotos.length; i++) {
