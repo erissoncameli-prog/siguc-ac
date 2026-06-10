@@ -563,11 +563,24 @@ async function boot() {
 }
 
 async function prosseguirAposAuth(session) {
+  // Verifica se o usuário tem perfil brigadista (evita admin entrando no app)
+  const { data: usuarioData } = await db
+    .from('usuarios')
+    .select('perfil, ativo')
+    .eq('id', session.user.id)
+    .maybeSingle()
+
+  if (usuarioData && usuarioData.perfil !== 'brigadista') {
+    mostrarErroLogin('Este acesso é exclusivo para brigadistas.')
+    mostrarTela('tela-login', false)
+    return
+  }
+
   let brig = await bOfflineGetConfig('brigadista')
   if (!brig) {
     brig = await buscarBrigadistaDoBanco(session.user.id)
     if (!brig) {
-      mostrarErroLogin('Seu usuário não está vinculado a nenhuma brigada ativa.')
+      mostrarErroLogin('Usuário não vinculado a nenhuma brigada ativa. Solicite ao gestor para gerar seu login.')
       mostrarTela('tela-login', false)
       return
     }
@@ -610,31 +623,29 @@ function mostrarErroLogin(msg) {
 async function fazerLogin() {
   const email = document.getElementById('login-email').value.trim()
   const senha  = document.getElementById('login-senha').value
-  const erro   = document.getElementById('login-erro')
-  erro.hidden  = true
+  document.getElementById('login-erro').hidden = true
 
-  if (!email || !senha) {
-    mostrarErroLogin('Preencha e-mail e senha.')
-    return
-  }
+  if (!email || !senha) { mostrarErroLogin('Preencha e-mail e senha.'); return }
 
   const btn = document.getElementById('btn-fazer-login')
   btn.disabled = true
   btn.textContent = 'Entrando…'
 
-  const { data, error } = await db.auth.signInWithPassword({ email, password: senha })
-
-  if (error) {
-    mostrarErroLogin(error.status === 400 ? 'E-mail ou senha incorretos.' : 'Erro ao conectar. Tente novamente.')
+  try {
+    const { data, error } = await db.auth.signInWithPassword({ email, password: senha })
+    if (error) {
+      mostrarErroLogin(error.status === 400 ? 'E-mail ou senha incorretos.' : 'Erro ao conectar. Tente novamente.')
+      return
+    }
+    await salvarTokensSessao(data.session)
+    await prosseguirAposAuth(data.session)
+  } catch (e) {
+    console.error('[fazerLogin]', e)
+    mostrarErroLogin('Erro inesperado: ' + (e.message || 'tente novamente.'))
+  } finally {
     btn.disabled = false
     btn.textContent = 'Entrar'
-    return
   }
-
-  await salvarTokensSessao(data.session)
-  await prosseguirAposAuth(data.session)
-  btn.disabled = false
-  btn.textContent = 'Entrar'
 }
 
 async function buscarBrigadistaDoBanco(userId) {
