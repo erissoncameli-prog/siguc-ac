@@ -997,6 +997,8 @@ async function salvarRegistro() {
     observacoes:   document.getElementById('f-obs').value.trim() || null,
     lat:           gps?.lat ?? null,
     lng:           gps?.lng ?? null,
+    acc:           gps?.acc ?? null,
+    alt:           gps?.alt ?? null,
     fotos_blobs:   bCapturaGetFotos(),
     _fauna:        bFaunaGetLista(),
   }
@@ -1403,6 +1405,8 @@ document.addEventListener('DOMContentLoaded', () => {
       esconderBarra(3000)
       atualizarBadgeFila()
     })
+
+    bSyncOn('sessao-expirada', ({ err }) => toast(err, 'warn'))
   })()
 
   // Online/offline

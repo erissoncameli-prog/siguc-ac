@@ -35,7 +35,14 @@ async function bSyncRodar() {
   if (navigator.onLine) {
     const sessaoOk = await bSyncGarantirSessao()
     if (!sessaoOk) {
-      bSyncEmitir('erro', { uuid: null, err: 'Sessão expirada — abra o app e faça login novamente' })
+      const msg = 'Sessão expirada — faça login novamente para sincronizar'
+      // Grava erro visível em cada registro pendente para o usuário saber o motivo
+      try {
+        const pendentes = await bOfflineListarPendentes()
+        await Promise.all(pendentes.map(r => bOfflineMarcar(r.uuid_cliente, 'pendente', { ultimo_erro: msg })))
+      } catch (_) {}
+      bSyncEmitir('sessao-expirada', { err: msg })
+      bSyncEmitir('erro', { uuid: null, err: msg })
       return
     }
   }
@@ -49,6 +56,9 @@ async function bSyncRodar() {
 }
 
 async function bSyncExecutar() {
+  // Recupera registros presos como 'enviando' por crash anterior
+  await bOfflineResetEnviando()
+
   const pendentes = await bOfflineListarPendentes()
   if (!pendentes.length) return
 
@@ -182,8 +192,10 @@ async function bSyncUploadFotos(reg) {
 function bSyncMontarPayload(reg, fotosUrls) {
   // Desestrutura e descarta campos internos + campos que precisam de conversão
   const {
-    fotos_blobs, status, _fauna, ultimo_erro,
+    fotos_blobs, status, _fauna, ultimo_erro, sincronizado_em,
     lat, lng,          // → localizacao (PostGIS)
+    acc,               // → precisao_gps_m
+    alt,               // → altitude_m
     n_equipe,          // → equipe (text)
     area_ha,           // → area_estimada_ha
     observacoes,       // → descricao
@@ -201,6 +213,8 @@ function bSyncMontarPayload(reg, fotosUrls) {
     localizacao:      (lat != null && lng != null)
                         ? { type: 'Point', coordinates: [lng, lat] }
                         : null,
+    precisao_gps_m:   acc != null ? acc : null,
+    altitude_m:       alt != null ? alt : null,
     equipe:           n_equipe != null ? String(n_equipe) : null,
     area_estimada_ha: area_ha  ?? null,
     descricao:        observacoes ?? null,

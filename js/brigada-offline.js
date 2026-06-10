@@ -211,6 +211,26 @@ async function bOfflinePurgar() {
   })
 }
 
+// ── Reset de 'enviando' → 'pendente' ─────────────────────────
+// Chamado no início de cada ciclo de sync para recuperar registros
+// que ficaram presos como 'enviando' se o app fechar durante a sync.
+async function bOfflineResetEnviando() {
+  const db = await bOfflineInit()
+  return new Promise((res, rej) => {
+    const tx    = db.transaction('registros', 'readwrite')
+    const store = tx.objectStore('registros')
+    const req   = store.index('status').openCursor(IDBKeyRange.only('enviando'))
+    req.onsuccess = ev => {
+      const c = ev.target.result
+      if (!c) return
+      store.put({ ...c.value, status: 'pendente', ultimo_erro: 'Sync interrompida — tentando novamente' })
+      c.continue()
+    }
+    tx.oncomplete = () => res()
+    tx.onerror    = () => rej(tx.error)
+  })
+}
+
 // ── Zera todos os registros e fauna (reset de fila) ──────────
 async function bOfflineZerarFila() {
   const db = await bOfflineInit()
