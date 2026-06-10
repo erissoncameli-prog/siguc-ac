@@ -72,8 +72,9 @@ async function bSyncUm(reg) {
     return true
 
   } catch (err) {
-    const msg = err?.message ?? String(err)
-    console.warn('[brigada-sync] erro em', reg.uuid_cliente, msg)
+    const msg = [err?.message, err?.details, err?.hint, err?.code]
+      .filter(Boolean).join(' | ') || String(err)
+    console.warn('[brigada-sync] erro em', reg.uuid_cliente, err)
     await bOfflineMarcar(reg.uuid_cliente, 'pendente', { ultimo_erro: msg })
     bSyncEmitir('erro', { uuid: reg.uuid_cliente, err: msg })
     return false
@@ -133,8 +134,9 @@ function bSyncMontarPayload(reg, fotosUrls) {
   return {
     ...rest,
     fotos_urls:       fotosUrls.length ? fotosUrls : null,
+    // Geometria enviada como GeoJSON; PostgREST converte via ST_GeomFromGeoJSON
     localizacao:      (lat != null && lng != null)
-                        ? `SRID=4326;POINT(${lng} ${lat})`
+                        ? { type: 'Point', coordinates: [lng, lat] }
                         : null,
     equipe:           n_equipe != null ? String(n_equipe) : null,
     area_estimada_ha: area_ha  ?? null,
