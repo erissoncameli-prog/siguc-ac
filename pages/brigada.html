@@ -424,6 +424,7 @@
 
     <button class="btn-config-item" id="btn-alterar-pin">🔑 Alterar PIN de campo</button>
     <button class="btn-config-item" id="btn-buscar-especies">🌿 Atualizar catálogo de espécies</button>
+    <button class="btn-config-item btn-danger-soft" id="btn-zerar-fila">🗑 Zerar fila de registros</button>
     <button class="btn-config-item btn-danger" id="btn-sair">↩ Sair / Trocar conta</button>
   </div>
 </div>
@@ -1263,6 +1264,16 @@ document.addEventListener('DOMContentLoaded', () => {
     toast('Atualizando catálogo…', 'info')
     await sincronizarEspecies()
     toast('Catálogo atualizado', 'ok')
+  })
+  document.getElementById('btn-zerar-fila').addEventListener('click', async () => {
+    const total = await bSyncContarPendentes()
+    const msg = total > 0
+      ? `Apagar ${total} registro${total !== 1 ? 's' : ''} pendente${total !== 1 ? 's' : ''}? Esta ação não pode ser desfeita.`
+      : 'Zerar toda a fila (incluindo confirmados)? Esta ação não pode ser desfeita.'
+    if (!confirm(msg)) return
+    await bOfflineZerarFila()
+    await atualizarBadgeFila()
+    toast('Fila zerada.', 'ok')
   })
   document.getElementById('btn-sair').addEventListener('click', async () => {
     if (!confirm('Sair do app? Registros não enviados permanecem salvos.')) return

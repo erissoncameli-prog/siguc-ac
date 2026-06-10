@@ -207,6 +207,18 @@ async function bOfflinePurgar() {
   })
 }
 
+// ── Zera todos os registros e fauna (reset de fila) ──────────
+async function bOfflineZerarFila() {
+  const db = await bOfflineInit()
+  return new Promise((res, rej) => {
+    const tx = db.transaction(['registros', 'fauna'], 'readwrite')
+    tx.objectStore('registros').clear()
+    tx.objectStore('fauna').clear()
+    tx.oncomplete = () => res()
+    tx.onerror    = () => rej(tx.error)
+  })
+}
+
 // ── Export manual (arquivo JSON para WhatsApp/Drive) ──────────
 async function bOfflineExportar() {
   const pendentes = await bOfflineListarPendentes()
