@@ -442,7 +442,11 @@ function renderLista() {
         <div class="rc-top">
           <span class="nat-chip ${r.natureza}">${nat.emoji} ${nat.label}</span>
           <span class="badge-sm badge-${r.status_validacao}">${STATUS_VALID[r.status_validacao] || r.status_validacao}</span>
-          ${r.n_fauna_pendente > 0 ? '<span class="badge-sm badge-fauna-pend">🐾 Fauna pendente</span>' : ''}
+          ${r.n_fauna_pendente > 0
+            ? `<span class="badge-sm badge-fauna-pend">🐾 ${r.n_fauna_pendente} fauna pendente</span>`
+            : r.n_fauna > 0
+              ? `<span class="badge-sm badge-fauna-ok">🐾 ${r.n_fauna} fauna validada</span>`
+              : ''}
         </div>
         <div class="rc-titulo">${esc(ativ)} · ${esc(r.brigada_nome || '—')}</div>
         <div class="rc-meta">
