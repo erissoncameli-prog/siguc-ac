@@ -57,6 +57,7 @@ function gerarLayout(tituloPagina, paginaAtiva) {
     'pesquisas':                { svg: '<path d="M9 2H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 2v20m0 0h10a2 2 0 0 0 2-2V8M9 22H5a2 2 0 0 1-2-2V8m0 0h18"/>', cor: '#38bdf8', bg: 'rgba(56,189,248,0.22)' },
     'dashboard-executivo':      { svg: '<path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/>', cor: '#4ade80', bg: 'rgba(74,222,128,0.22)' },
     'netflora':                 { svg: '<path d="M12 2a10 10 0 0 1 10 10c0 4-2 7-5 9M12 2a10 10 0 0 0-10 10c0 4 2 7 5 9M12 2v20M2 12h20"/>', cor: '#86efac', bg: 'rgba(134,239,172,0.22)' },
+    'brigadas':                 { svg: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/><line x1="12" y1="16" x2="12" y2="22"/><line x1="9" y1="19" x2="15" y2="19"/>', cor: '#f87171', bg: 'rgba(248,113,113,0.22)' },
   };
 
   function renderPill(id, size) {
@@ -83,6 +84,7 @@ function gerarLayout(tituloPagina, paginaAtiva) {
         { id: 'alertas-ambientais', href: '../pages/alertas-ambientais.html', label: 'Alertas Ambientais' },
         { id: 'painel-gestor',     href: '../pages/painel-gestor.html',     label: 'Painel do Gestor' },
         { id: 'pesquisas',         href: '../pages/pesquisas.html',         label: 'Pesquisas' },
+        { id: 'brigadas',           href: '../pages/brigadas.html',           label: 'Brigadas' },
         { id: 'ocorrencias',        href: '../pages/ocorrencias.html',        label: t('nav.ocorrencias') },
         { id: 'relatorios',    href: '../pages/relatorios.html',    label: t('nav.relatorios') },
         { id: 'equipe',        href: '../pages/equipe.html',        label: t('nav.equipe') },

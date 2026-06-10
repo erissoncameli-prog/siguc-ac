@@ -1,0 +1,862 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>SIGUC-AC · Brigadas</title>
+<link rel="stylesheet" href="../css/global.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../js/observability.js"></script>
+<script src="../js/queryLogger.js"></script>
+<script src="../js/config.js"></script>
+<script src="../js/layout.js"></script>
+</head>
+<body>
+<div id="app"></div>
+
+<!-- ── Modal: Brigada ─────────────────────────────────────── -->
+<div class="modal-overlay" id="modal-brigada">
+  <div class="modal" style="max-width:640px">
+    <div class="modal-header">
+      <div class="modal-title" id="mb-titulo">Nova Brigada</div>
+      <button class="modal-close" onclick="fecharModalBrigada()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label">Unidade de Conservação <span class="obrig">*</span></label>
+        <select class="form-control" id="mb-uc"><option value="">Selecione...</option></select>
+      </div>
+      <div class="form-group"><label class="form-label">Nome da Brigada <span class="obrig">*</span></label>
+        <input class="form-control" id="mb-nome" placeholder="Ex: Brigada RESEX Chico Mendes">
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Tipo <span class="obrig">*</span></label>
+          <select class="form-control" id="mb-tipo">
+            <option value="mista">Mista</option>
+            <option value="preventiva">Preventiva</option>
+            <option value="combate">Combate</option>
+          </select>
+        </div>
+        <div class="form-group"><label class="form-label">Fonte de Recurso</label>
+          <select class="form-control" id="mb-fonte">
+            <option value="prevfogo">PREVFOGO</option>
+            <option value="estadual">Estadual</option>
+            <option value="municipal">Municipal</option>
+            <option value="funbio">FUNBIO</option>
+            <option value="outro">Outro</option>
+          </select>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Início da Temporada</label>
+          <input class="form-control" id="mb-inicio" type="date">
+        </div>
+        <div class="form-group"><label class="form-label">Fim da Temporada</label>
+          <input class="form-control" id="mb-fim" type="date">
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Vagas Previstas</label>
+          <input class="form-control" id="mb-vagas" type="number" min="1" placeholder="Ex: 20">
+        </div>
+        <div class="form-group"><label class="form-label">Nº do Contrato</label>
+          <input class="form-control" id="mb-contrato" placeholder="Ex: 001/2026">
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Coordenador</label>
+          <input class="form-control" id="mb-coord-nome" placeholder="Nome do coordenador">
+        </div>
+        <div class="form-group"><label class="form-label">Contato do Coordenador</label>
+          <input class="form-control" id="mb-coord-contato" placeholder="Telefone ou e-mail">
+        </div>
+      </div>
+      <div class="form-group"><label class="form-label">Observações</label>
+        <textarea class="form-control" id="mb-obs" rows="2"></textarea>
+      </div>
+      <div class="form-group" id="mb-ativa-wrap">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+          <input type="checkbox" id="mb-ativa" checked style="width:16px;height:16px;cursor:pointer"> Brigada ativa
+        </label>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="fecharModalBrigada()">Cancelar</button>
+      <button class="btn btn-primary" id="mb-btn-salvar" onclick="salvarBrigada()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal: Brigadista ──────────────────────────────────── -->
+<div class="modal-overlay" id="modal-brigadista">
+  <div class="modal" style="max-width:680px">
+    <div class="modal-header">
+      <div class="modal-title" id="mbr-titulo">Novo Brigadista</div>
+      <button class="modal-close" onclick="fecharModalBrigadista()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label">Brigada <span class="obrig">*</span></label>
+        <select class="form-control" id="mbr-brigada"><option value="">Selecione...</option></select>
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Nome Completo <span class="obrig">*</span></label>
+          <input class="form-control" id="mbr-nome" placeholder="Nome do brigadista">
+        </div>
+        <div class="form-group"><label class="form-label">CPF <span class="obrig">*</span></label>
+          <input class="form-control" id="mbr-cpf" placeholder="000.000.000-00" maxlength="14">
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">RG</label>
+          <input class="form-control" id="mbr-rg" placeholder="Número do RG">
+        </div>
+        <div class="form-group"><label class="form-label">Data de Nascimento</label>
+          <input class="form-control" id="mbr-nascimento" type="date">
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Telefone</label>
+          <input class="form-control" id="mbr-tel" placeholder="(68) 99999-9999">
+        </div>
+        <div class="form-group"><label class="form-label">Município de Residência</label>
+          <input class="form-control" id="mbr-municipio" placeholder="Ex: Rio Branco">
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Função <span class="obrig">*</span></label>
+          <select class="form-control" id="mbr-funcao">
+            <option value="brigadista">Brigadista</option>
+            <option value="chefe_brigada">Chefe de Brigada</option>
+            <option value="motorista">Motorista</option>
+            <option value="apoio_administrativo">Apoio Administrativo</option>
+            <option value="cozinheiro">Cozinheiro</option>
+          </select>
+        </div>
+        <div class="form-group"><label class="form-label">Fonte de Recurso</label>
+          <select class="form-control" id="mbr-fonte">
+            <option value="prevfogo">PREVFOGO</option>
+            <option value="estadual">Estadual</option>
+            <option value="municipal">Municipal</option>
+            <option value="funbio">FUNBIO</option>
+            <option value="outro">Outro</option>
+          </select>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Início do Contrato <span class="obrig">*</span></label>
+          <input class="form-control" id="mbr-inicio" type="date">
+        </div>
+        <div class="form-group"><label class="form-label">Fim do Contrato</label>
+          <input class="form-control" id="mbr-fim" type="date">
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Status</label>
+          <select class="form-control" id="mbr-status">
+            <option value="ativo">Ativo</option>
+            <option value="afastado">Afastado</option>
+            <option value="suspenso">Suspenso</option>
+            <option value="encerrado">Encerrado</option>
+          </select>
+        </div>
+        <div class="form-group"><label class="form-label">CNH (se motorista)</label>
+          <input class="form-control" id="mbr-cnh" placeholder="Ex: AB" maxlength="5">
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-top:28px">
+            <input type="checkbox" id="mbr-trein" style="width:16px;height:16px;cursor:pointer"> Treinamento básico concluído
+          </label>
+        </div>
+        <div class="form-group"><label class="form-label">Carga Horária (h)</label>
+          <input class="form-control" id="mbr-ch" type="number" min="0" placeholder="Ex: 80">
+        </div>
+      </div>
+      <div class="form-group"><label class="form-label">Observações</label>
+        <textarea class="form-control" id="mbr-obs" rows="2"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="fecharModalBrigadista()">Cancelar</button>
+      <button class="btn btn-primary" id="mbr-btn-salvar" onclick="salvarBrigadista()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal: Atividade ───────────────────────────────────── -->
+<div class="modal-overlay" id="modal-atividade">
+  <div class="modal" style="max-width:640px">
+    <div class="modal-header">
+      <div class="modal-title" id="mat-titulo">Nova Atividade</div>
+      <button class="modal-close" onclick="fecharModalAtividade()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label">Brigada <span class="obrig">*</span></label>
+        <select class="form-control" id="mat-brigada"><option value="">Selecione...</option></select>
+      </div>
+      <div class="form-group"><label class="form-label">Tipo de Atividade <span class="obrig">*</span></label>
+        <select class="form-control" id="mat-tipo">
+          <option value="patrulha">Patrulha</option>
+          <option value="combate_incendio">Combate a Incêndio</option>
+          <option value="aceiro">Aceiro</option>
+          <option value="treinamento">Treinamento</option>
+          <option value="reuniao">Reunião</option>
+          <option value="manutencao_equipamento">Manutenção de Equipamento</option>
+          <option value="monitoramento">Monitoramento</option>
+          <option value="outro">Outro</option>
+        </select>
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Início <span class="obrig">*</span></label>
+          <input class="form-control" id="mat-inicio" type="datetime-local">
+        </div>
+        <div class="form-group"><label class="form-label">Fim</label>
+          <input class="form-control" id="mat-fim" type="datetime-local">
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Localidade</label>
+          <input class="form-control" id="mat-local" placeholder="Ex: Setor Norte, Trilha 3">
+        </div>
+        <div class="form-group"><label class="form-label">Brigadistas Envolvidos</label>
+          <input class="form-control" id="mat-num" type="number" min="1" placeholder="Nº de brigadistas">
+        </div>
+      </div>
+      <div class="form-group"><label class="form-label">Área Afetada/Trabalhada (ha)</label>
+        <input class="form-control" id="mat-area" type="number" step="0.01" placeholder="0,00">
+      </div>
+      <div class="form-group"><label class="form-label">Descrição <span class="obrig">*</span></label>
+        <textarea class="form-control" id="mat-desc" rows="3" placeholder="Descreva a atividade realizada..."></textarea>
+      </div>
+      <div class="form-group"><label class="form-label">Resultado / Observações</label>
+        <textarea class="form-control" id="mat-resultado" rows="2" placeholder="Resultado alcançado, intercorrências..."></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="fecharModalAtividade()">Cancelar</button>
+      <button class="btn btn-primary" id="mat-btn-salvar" onclick="salvarAtividade()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal: Equipamento ─────────────────────────────────── -->
+<div class="modal-overlay" id="modal-equipamento">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-header">
+      <div class="modal-title" id="meq-titulo">Novo Equipamento</div>
+      <button class="modal-close" onclick="fecharModalEquipamento()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label">Brigada <span class="obrig">*</span></label>
+        <select class="form-control" id="meq-brigada"><option value="">Selecione...</option></select>
+      </div>
+      <div class="form-group"><label class="form-label">Descrição <span class="obrig">*</span></label>
+        <input class="form-control" id="meq-desc" placeholder="Ex: Abafador, Bomba costal, Motosserra">
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Quantidade <span class="obrig">*</span></label>
+          <input class="form-control" id="meq-qtd" type="number" min="1" value="1">
+        </div>
+        <div class="form-group"><label class="form-label">Condição <span class="obrig">*</span></label>
+          <select class="form-control" id="meq-cond">
+            <option value="bom">Bom</option>
+            <option value="regular">Regular</option>
+            <option value="ruim">Ruim</option>
+            <option value="inoperante">Inoperante</option>
+          </select>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Nº de Série</label>
+          <input class="form-control" id="meq-serie" placeholder="Número de série">
+        </div>
+        <div class="form-group"><label class="form-label">Data de Aquisição</label>
+          <input class="form-control" id="meq-data-aq" type="date">
+        </div>
+      </div>
+      <div class="form-group"><label class="form-label">Valor de Aquisição (R$)</label>
+        <input class="form-control" id="meq-valor" type="number" step="0.01" placeholder="0,00">
+      </div>
+      <div class="form-group"><label class="form-label">Observações</label>
+        <textarea class="form-control" id="meq-obs" rows="2"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="fecharModalEquipamento()">Cancelar</button>
+      <button class="btn btn-primary" id="meq-btn-salvar" onclick="salvarEquipamento()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Estado global ───────────────────────────────────────────
+let _ucs = []
+let _brigadas = []
+let _brigadistas = []
+let _atividades = []
+let _equipamentos = []
+let _editId = { brigada: null, brigadista: null, atividade: null, equipamento: null }
+let _podeEditar = false
+let _abaAtiva = 'brigadas'
+
+// ── Badges ──────────────────────────────────────────────────
+const BADGE_TIPO_BRIGADA = { preventiva: 'badge-azul', combate: 'badge-erro', mista: 'badge-verde' }
+const BADGE_FUNCAO  = { chefe_brigada: 'badge-ouro', brigadista: 'badge-verde', motorista: 'badge-azul', apoio_administrativo: 'badge-cinza', cozinheiro: 'badge-cinza' }
+const BADGE_STATUS_BR = { ativo: 'badge-verde', afastado: 'badge-ouro', suspenso: 'badge-erro', encerrado: 'badge-cinza' }
+const BADGE_COND_EQ = { bom: 'badge-verde', regular: 'badge-ouro', ruim: 'badge-erro', inoperante: 'badge-cinza' }
+const LABEL_TIPO_AT = { patrulha: 'Patrulha', combate_incendio: 'Combate', aceiro: 'Aceiro', treinamento: 'Treinamento', reuniao: 'Reunião', manutencao_equipamento: 'Manutenção Equip.', monitoramento: 'Monitoramento', outro: 'Outro' }
+
+// ── Inicialização ───────────────────────────────────────────
+;(async function () {
+  const usuario = await carregarUsuario()
+  if (!usuario) { window.location.href = '../index.html'; return }
+  _podeEditar = ['super_admin','gestor','tecnico'].includes(usuario.perfil)
+
+  document.getElementById('app').innerHTML =
+    gerarLayout('Brigadas', 'brigadas') +
+    `<div class="fade-in">
+      <div class="kpi-grid">
+        <div class="kpi-card verde"><div class="kpi-label">Brigadas Ativas</div><div class="kpi-valor" id="k-brigadas">—</div></div>
+        <div class="kpi-card azul"><div class="kpi-label">Brigadistas Ativos</div><div class="kpi-valor" id="k-brigadistas">—</div></div>
+        <div class="kpi-card ouro"><div class="kpi-label">Atividades (30 dias)</div><div class="kpi-valor" id="k-ativ">—</div></div>
+        <div class="kpi-card"><div class="kpi-label">Equipamentos em Campo</div><div class="kpi-valor" id="k-equip">—</div></div>
+      </div>
+
+      <div class="card" style="margin-bottom:16px">
+        <div style="display:flex;gap:4px;padding:4px;background:rgba(0,0,0,.06);border-radius:10px;width:fit-content">
+          <button class="tab-btn ativo" id="tab-brigadas"    onclick="mudarAba('brigadas')">Brigadas</button>
+          <button class="tab-btn"       id="tab-brigadistas" onclick="mudarAba('brigadistas')">Brigadistas</button>
+          <button class="tab-btn"       id="tab-atividades"  onclick="mudarAba('atividades')">Atividades</button>
+          <button class="tab-btn"       id="tab-equipamentos" onclick="mudarAba('equipamentos')">Equipamentos</button>
+        </div>
+      </div>
+
+      <!-- Aba: Brigadas -->
+      <div id="aba-brigadas">
+        <div class="filter-bar">
+          <input class="form-control search-input" id="busca-brigadas" placeholder="Buscar brigada ou UC..." oninput="renderBrigadas()">
+          <select class="form-control" id="fil-tipo-b" style="width:140px" onchange="renderBrigadas()">
+            <option value="">Tipo</option>
+            <option value="preventiva">Preventiva</option>
+            <option value="combate">Combate</option>
+            <option value="mista">Mista</option>
+          </select>
+          <select class="form-control" id="fil-ativa" style="width:110px" onchange="renderBrigadas()">
+            <option value="">Status</option>
+            <option value="true">Ativa</option>
+            <option value="false">Inativa</option>
+          </select>
+          ${_podeEditar ? '<button class="btn btn-primary" onclick="abrirModalBrigada()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Nova Brigada</button>' : ''}
+        </div>
+        <div class="card"><div class="table-wrap"><div class="table-scroll">
+          <table>
+            <thead><tr><th>UC</th><th>Nome</th><th>Tipo</th><th>Fonte</th><th>Temporada</th><th>Brigadistas</th><th>Status</th>${_podeEditar?'<th>Ações</th>':''}</tr></thead>
+            <tbody id="tbody-brigadas"></tbody>
+          </table>
+        </div></div></div>
+      </div>
+
+      <!-- Aba: Brigadistas -->
+      <div id="aba-brigadistas" style="display:none">
+        <div class="filter-bar">
+          <input class="form-control search-input" id="busca-brigadistas" placeholder="Buscar por nome ou CPF..." oninput="renderBrigadistas()">
+          <select class="form-control" id="fil-brigada-br" style="width:200px" onchange="renderBrigadistas()">
+            <option value="">Todas as brigadas</option>
+          </select>
+          <select class="form-control" id="fil-funcao" style="width:160px" onchange="renderBrigadistas()">
+            <option value="">Função</option>
+            <option value="chefe_brigada">Chefe de Brigada</option>
+            <option value="brigadista">Brigadista</option>
+            <option value="motorista">Motorista</option>
+            <option value="apoio_administrativo">Apoio Adm.</option>
+          </select>
+          <select class="form-control" id="fil-status-br" style="width:110px" onchange="renderBrigadistas()">
+            <option value="ativo">Ativos</option>
+            <option value="">Todos</option>
+            <option value="afastado">Afastado</option>
+            <option value="encerrado">Encerrado</option>
+          </select>
+          ${_podeEditar ? '<button class="btn btn-primary" onclick="abrirModalBrigadista()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Novo Brigadista</button>' : ''}
+        </div>
+        <div class="card"><div class="table-wrap"><div class="table-scroll">
+          <table>
+            <thead><tr><th>Nome</th><th>CPF</th><th>Brigada</th><th>Função</th><th>Fonte</th><th>Período</th><th>Formação</th><th>Status</th>${_podeEditar?'<th>Ações</th>':''}</tr></thead>
+            <tbody id="tbody-brigadistas"></tbody>
+          </table>
+        </div></div></div>
+      </div>
+
+      <!-- Aba: Atividades -->
+      <div id="aba-atividades" style="display:none">
+        <div class="filter-bar">
+          <input class="form-control search-input" id="busca-ativ" placeholder="Buscar atividade..." oninput="renderAtividades()">
+          <select class="form-control" id="fil-brigada-at" style="width:200px" onchange="renderAtividades()">
+            <option value="">Todas as brigadas</option>
+          </select>
+          <select class="form-control" id="fil-tipo-at" style="width:160px" onchange="renderAtividades()">
+            <option value="">Tipo</option>
+            <option value="patrulha">Patrulha</option>
+            <option value="combate_incendio">Combate a Incêndio</option>
+            <option value="aceiro">Aceiro</option>
+            <option value="treinamento">Treinamento</option>
+            <option value="reuniao">Reunião</option>
+            <option value="manutencao_equipamento">Manutenção Equip.</option>
+            <option value="monitoramento">Monitoramento</option>
+          </select>
+          ${_podeEditar ? '<button class="btn btn-primary" onclick="abrirModalAtividade()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Registrar Atividade</button>' : ''}
+        </div>
+        <div class="card"><div class="table-wrap"><div class="table-scroll">
+          <table>
+            <thead><tr><th>Data</th><th>Brigada</th><th>Tipo</th><th>Localidade</th><th>Brigadistas</th><th>Área (ha)</th><th>Descrição</th>${_podeEditar?'<th>Ações</th>':''}</tr></thead>
+            <tbody id="tbody-atividades"></tbody>
+          </table>
+        </div></div></div>
+      </div>
+
+      <!-- Aba: Equipamentos -->
+      <div id="aba-equipamentos" style="display:none">
+        <div class="filter-bar">
+          <input class="form-control search-input" id="busca-eq" placeholder="Buscar equipamento..." oninput="renderEquipamentos()">
+          <select class="form-control" id="fil-brigada-eq" style="width:200px" onchange="renderEquipamentos()">
+            <option value="">Todas as brigadas</option>
+          </select>
+          <select class="form-control" id="fil-cond-eq" style="width:130px" onchange="renderEquipamentos()">
+            <option value="">Condição</option>
+            <option value="bom">Bom</option>
+            <option value="regular">Regular</option>
+            <option value="ruim">Ruim</option>
+            <option value="inoperante">Inoperante</option>
+          </select>
+          ${_podeEditar ? '<button class="btn btn-primary" onclick="abrirModalEquipamento()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Adicionar Equipamento</button>' : ''}
+        </div>
+        <div class="card"><div class="table-wrap"><div class="table-scroll">
+          <table>
+            <thead><tr><th>Brigada</th><th>Descrição</th><th>Qtd</th><th>Condição</th><th>Nº Série</th><th>Aquisição</th><th>Valor</th>${_podeEditar?'<th>Ações</th>':''}</tr></thead>
+            <tbody id="tbody-equipamentos"></tbody>
+          </table>
+        </div></div></div>
+      </div>
+    </div>` +
+    '</div></div></div>'
+
+  carregarLogosSidebar()
+  await Promise.all([carregarUCs(), carregarDados()])
+})()
+
+// ── Dados ────────────────────────────────────────────────────
+async function carregarUCs() {
+  const { data } = await db.from('unidades_conservacao').select('id,nome,codigo').eq('ativo',true).order('codigo')
+  _ucs = data || []
+  // Popula selects de UC
+  ;['mb-uc'].forEach(id => {
+    const sel = document.getElementById(id)
+    if (!sel) return
+    _ucs.forEach(u => { const o = document.createElement('option'); o.value = u.id; o.textContent = `${u.codigo} — ${u.nome}`; sel.appendChild(o) })
+  })
+}
+
+async function carregarDados() {
+  const [rb, rbr, rat, req] = await Promise.all([
+    db.from('brigadas_resumo').select('*').order('uc_nome'),
+    db.from('brigadistas').select('*,brigadas(nome,uc_id,unidades_conservacao:uc_id(codigo))').order('nome_completo'),
+    db.from('atividades_brigada').select('*,brigadas(nome)').order('data_inicio', { ascending: false }),
+    db.from('equipamentos_brigada').select('*,brigadas(nome)').order('descricao'),
+  ])
+  _brigadas     = rb.data  || []
+  _brigadistas  = rbr.data || []
+  _atividades   = rat.data || []
+  _equipamentos = req.data || []
+
+  // KPIs
+  const hoje = new Date(); const d30 = new Date(hoje); d30.setDate(d30.getDate()-30)
+  document.getElementById('k-brigadas').textContent    = _brigadas.filter(b => b.ativa).length
+  document.getElementById('k-brigadistas').textContent = _brigadistas.filter(b => b.status === 'ativo').length
+  document.getElementById('k-ativ').textContent        = _atividades.filter(a => new Date(a.data_inicio) >= d30).length
+  document.getElementById('k-equip').textContent       = _equipamentos.filter(e => e.condicao !== 'inoperante').reduce((s,e) => s + (e.quantidade||0), 0)
+
+  // Popula selects de filtro e modal
+  popularSelectsBrigada()
+
+  renderBrigadas()
+  renderBrigadistas()
+  renderAtividades()
+  renderEquipamentos()
+}
+
+function popularSelectsBrigada() {
+  const ids = ['fil-brigada-br','fil-brigada-at','fil-brigada-eq','mbr-brigada','mat-brigada','meq-brigada']
+  ids.forEach(id => {
+    const sel = document.getElementById(id)
+    if (!sel) return
+    // Mantém apenas a opção inicial
+    while (sel.options.length > 1) sel.remove(1)
+    _brigadas.forEach(b => {
+      const o = document.createElement('option'); o.value = b.id; o.textContent = b.nome; sel.appendChild(o)
+    })
+  })
+}
+
+// ── Abas ─────────────────────────────────────────────────────
+function mudarAba(aba) {
+  _abaAtiva = aba
+  ;['brigadas','brigadistas','atividades','equipamentos'].forEach(a => {
+    document.getElementById('aba-' + a).style.display = a === aba ? '' : 'none'
+    document.getElementById('tab-' + a).classList.toggle('ativo', a === aba)
+  })
+}
+
+// ── Render: Brigadas ─────────────────────────────────────────
+function renderBrigadas() {
+  const q    = (document.getElementById('busca-brigadas')?.value || '').toLowerCase()
+  const tipo = document.getElementById('fil-tipo-b')?.value || ''
+  const ativa = document.getElementById('fil-ativa')?.value
+  const pe = _podeEditar
+  const lista = _brigadas.filter(b =>
+    (!q || b.nome.toLowerCase().includes(q) || (b.uc_nome||'').toLowerCase().includes(q) || (b.uc_sigla||'').toLowerCase().includes(q)) &&
+    (!tipo || b.tipo === tipo) &&
+    (ativa === '' || ativa === undefined ? true : String(b.ativa) === ativa)
+  )
+  const tbody = document.getElementById('tbody-brigadas')
+  if (!lista.length) { tbody.innerHTML = `<tr><td colspan="${pe?8:7}" style="text-align:center;padding:32px;color:#9CA3AF">Nenhuma brigada encontrada</td></tr>`; return }
+  tbody.innerHTML = lista.map(b => {
+    const temp = (b.temporada_inicio && b.temporada_fim) ? `${formatData(b.temporada_inicio)} – ${formatData(b.temporada_fim)}` : (b.temporada_inicio ? formatData(b.temporada_inicio) : '—')
+    const ativos = b.brigadistas_ativos ?? '—'
+    const total  = b.brigadistas_total  ?? '—'
+    return `<tr>
+      <td style="font-size:12px"><strong>${esc(b.uc_sigla||'—')}</strong><br><span style="color:#9CA3AF;white-space:nowrap">${esc(b.uc_nome||'')}</span></td>
+      <td><strong>${esc(b.nome)}</strong>${b.coordenador_nome ? `<br><span style="font-size:11px;color:#9CA3AF">${esc(b.coordenador_nome)}</span>` : ''}</td>
+      <td><span class="badge ${BADGE_TIPO_BRIGADA[b.tipo]||'badge-cinza'}">${esc(b.tipo)}</span></td>
+      <td style="font-size:12px">${esc(b.fonte_recurso||'—').toUpperCase()}</td>
+      <td class="mono" style="font-size:12px;white-space:nowrap">${temp}</td>
+      <td class="mono">${ativos}<span style="color:#9CA3AF">/${total}</span></td>
+      <td><span class="badge ${b.ativa ? 'badge-verde' : 'badge-cinza'}">${b.ativa ? 'Ativa' : 'Inativa'}</span></td>
+      ${pe ? `<td><button class="btn btn-xs btn-ghost" onclick='abrirModalBrigada(${JSON.stringify(b)})'>Editar</button></td>` : ''}
+    </tr>`
+  }).join('')
+}
+
+// ── Render: Brigadistas ──────────────────────────────────────
+function renderBrigadistas() {
+  const q      = (document.getElementById('busca-brigadistas')?.value || '').toLowerCase()
+  const brigId = document.getElementById('fil-brigada-br')?.value || ''
+  const funcao = document.getElementById('fil-funcao')?.value || ''
+  const status = document.getElementById('fil-status-br')?.value
+  const pe = _podeEditar
+  const lista = _brigadistas.filter(b =>
+    (!q || b.nome_completo.toLowerCase().includes(q) || (b.cpf||'').includes(q)) &&
+    (!brigId || b.brigada_id === brigId) &&
+    (!funcao || b.funcao === funcao) &&
+    (!status || b.status === status)
+  )
+  const tbody = document.getElementById('tbody-brigadistas')
+  if (!lista.length) { tbody.innerHTML = `<tr><td colspan="${pe?9:8}" style="text-align:center;padding:32px;color:#9CA3AF">Nenhum brigadista encontrado</td></tr>`; return }
+  tbody.innerHTML = lista.map(b => {
+    const periodo = b.data_inicio ? `${formatData(b.data_inicio)}${b.data_fim ? ' – ' + formatData(b.data_fim) : ''}` : '—'
+    const brigNome = _brigadas.find(br => br.id === b.brigada_id)?.nome || '—'
+    return `<tr>
+      <td><strong>${esc(b.nome_completo)}</strong>${b.municipio_residencia ? `<br><span style="font-size:11px;color:#9CA3AF">${esc(b.municipio_residencia)}</span>` : ''}</td>
+      <td class="mono" style="font-size:12px">${esc(b.cpf||'—')}</td>
+      <td style="font-size:12px">${esc(brigNome)}</td>
+      <td><span class="badge ${BADGE_FUNCAO[b.funcao]||'badge-cinza'}" style="font-size:11px">${esc(b.funcao?.replace('_',' '))||'—'}</span></td>
+      <td style="font-size:12px">${esc((b.fonte_recurso||'').toUpperCase())}</td>
+      <td class="mono" style="font-size:12px;white-space:nowrap">${periodo}</td>
+      <td style="text-align:center">${b.treinamento_basico ? '<span class="badge badge-verde" style="font-size:11px">Sim</span>' : '<span style="color:#9CA3AF;font-size:12px">—</span>'}</td>
+      <td><span class="badge ${BADGE_STATUS_BR[b.status]||'badge-cinza'}">${esc(b.status)}</span></td>
+      ${pe ? `<td><button class="btn btn-xs btn-ghost" onclick='abrirModalBrigadista(${JSON.stringify(b)})'>Editar</button></td>` : ''}
+    </tr>`
+  }).join('')
+}
+
+// ── Render: Atividades ───────────────────────────────────────
+function renderAtividades() {
+  const q      = (document.getElementById('busca-ativ')?.value || '').toLowerCase()
+  const brigId = document.getElementById('fil-brigada-at')?.value || ''
+  const tipo   = document.getElementById('fil-tipo-at')?.value || ''
+  const pe = _podeEditar
+  const lista = _atividades.filter(a =>
+    (!q || a.descricao.toLowerCase().includes(q) || (a.localidade||'').toLowerCase().includes(q)) &&
+    (!brigId || a.brigada_id === brigId) &&
+    (!tipo || a.tipo === tipo)
+  )
+  const tbody = document.getElementById('tbody-atividades')
+  if (!lista.length) { tbody.innerHTML = `<tr><td colspan="${pe?8:7}" style="text-align:center;padding:32px;color:#9CA3AF">Nenhuma atividade encontrada</td></tr>`; return }
+  tbody.innerHTML = lista.map(a => {
+    const brigNome = _brigadas.find(b => b.id === a.brigada_id)?.nome || (a.brigadas?.nome || '—')
+    const dt = a.data_inicio ? new Date(a.data_inicio).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—'
+    return `<tr>
+      <td class="mono" style="font-size:12px;white-space:nowrap">${dt}</td>
+      <td style="font-size:12px">${esc(brigNome)}</td>
+      <td><span class="badge badge-azul" style="font-size:11px">${esc(LABEL_TIPO_AT[a.tipo]||a.tipo)}</span></td>
+      <td style="font-size:12px">${esc(a.localidade||'—')}</td>
+      <td class="mono" style="text-align:center">${a.num_brigadistas ?? '—'}</td>
+      <td class="mono">${a.area_afetada_ha ? formatNum(a.area_afetada_ha,1) : '—'}</td>
+      <td style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px">${esc(a.descricao)}</td>
+      ${pe ? `<td><button class="btn btn-xs btn-ghost" onclick='abrirModalAtividade(${JSON.stringify(a)})'>Editar</button></td>` : ''}
+    </tr>`
+  }).join('')
+}
+
+// ── Render: Equipamentos ─────────────────────────────────────
+function renderEquipamentos() {
+  const q      = (document.getElementById('busca-eq')?.value || '').toLowerCase()
+  const brigId = document.getElementById('fil-brigada-eq')?.value || ''
+  const cond   = document.getElementById('fil-cond-eq')?.value || ''
+  const pe = _podeEditar
+  const lista = _equipamentos.filter(e =>
+    (!q || e.descricao.toLowerCase().includes(q)) &&
+    (!brigId || e.brigada_id === brigId) &&
+    (!cond || e.condicao === cond)
+  )
+  const tbody = document.getElementById('tbody-equipamentos')
+  if (!lista.length) { tbody.innerHTML = `<tr><td colspan="${pe?8:7}" style="text-align:center;padding:32px;color:#9CA3AF">Nenhum equipamento encontrado</td></tr>`; return }
+  tbody.innerHTML = lista.map(e => {
+    const brigNome = _brigadas.find(b => b.id === e.brigada_id)?.nome || (e.brigadas?.nome || '—')
+    return `<tr>
+      <td style="font-size:12px">${esc(brigNome)}</td>
+      <td><strong>${esc(e.descricao)}</strong></td>
+      <td class="mono" style="text-align:center">${e.quantidade}</td>
+      <td><span class="badge ${BADGE_COND_EQ[e.condicao]||'badge-cinza'}">${esc(e.condicao)}</span></td>
+      <td class="mono" style="font-size:12px">${esc(e.numero_serie||'—')}</td>
+      <td class="mono" style="font-size:12px">${e.data_aquisicao ? formatData(e.data_aquisicao) : '—'}</td>
+      <td class="mono">${e.valor_aquisicao ? formatBRL(e.valor_aquisicao) : '—'}</td>
+      ${pe ? `<td><button class="btn btn-xs btn-ghost" onclick='abrirModalEquipamento(${JSON.stringify(e)})'>Editar</button></td>` : ''}
+    </tr>`
+  }).join('')
+}
+
+// ── Modal: Brigada ───────────────────────────────────────────
+function abrirModalBrigada(b = null) {
+  _editId.brigada = b?.id || null
+  document.getElementById('mb-titulo').textContent = b ? 'Editar Brigada' : 'Nova Brigada'
+  document.getElementById('mb-uc').value              = b?.uc_id || ''
+  document.getElementById('mb-nome').value            = b?.nome || ''
+  document.getElementById('mb-tipo').value            = b?.tipo || 'mista'
+  document.getElementById('mb-fonte').value           = b?.fonte_recurso || 'prevfogo'
+  document.getElementById('mb-inicio').value          = b?.temporada_inicio || ''
+  document.getElementById('mb-fim').value             = b?.temporada_fim || ''
+  document.getElementById('mb-vagas').value           = b?.vagas_previstas || ''
+  document.getElementById('mb-contrato').value        = b?.numero_contrato || ''
+  document.getElementById('mb-coord-nome').value      = b?.coordenador_nome || ''
+  document.getElementById('mb-coord-contato').value   = b?.coordenador_contato || ''
+  document.getElementById('mb-obs').value             = b?.observacoes || ''
+  document.getElementById('mb-ativa').checked         = b ? b.ativa : true
+  document.getElementById('modal-brigada').classList.add('aberto')
+}
+function fecharModalBrigada() { document.getElementById('modal-brigada').classList.remove('aberto'); _editId.brigada = null }
+
+async function salvarBrigada() {
+  const uc_id = document.getElementById('mb-uc').value
+  const nome  = document.getElementById('mb-nome').value.trim()
+  if (!uc_id || !nome) { toast('Preencha UC e nome da brigada', 'error'); return }
+  const payload = {
+    uc_id, nome,
+    tipo:                document.getElementById('mb-tipo').value,
+    fonte_recurso:       document.getElementById('mb-fonte').value,
+    temporada_inicio:    document.getElementById('mb-inicio').value || null,
+    temporada_fim:       document.getElementById('mb-fim').value || null,
+    vagas_previstas:     parseInt(document.getElementById('mb-vagas').value) || null,
+    numero_contrato:     document.getElementById('mb-contrato').value.trim() || null,
+    coordenador_nome:    document.getElementById('mb-coord-nome').value.trim() || null,
+    coordenador_contato: document.getElementById('mb-coord-contato').value.trim() || null,
+    observacoes:         document.getElementById('mb-obs').value.trim() || null,
+    ativa:               document.getElementById('mb-ativa').checked,
+  }
+  const btn = document.getElementById('mb-btn-salvar')
+  btn.disabled = true; btn.textContent = 'Salvando...'
+  try {
+    if (_editId.brigada) {
+      const { error } = await db.from('brigadas').update(payload).eq('id', _editId.brigada)
+      if (error) throw error
+      toast('Brigada atualizada!', 'success')
+    } else {
+      const { error } = await db.from('brigadas').insert(payload)
+      if (error) throw error
+      toast('Brigada criada!', 'success')
+    }
+    fecharModalBrigada(); await carregarDados()
+  } catch(e) { toast(e.message || 'Erro ao salvar', 'error') }
+  finally { btn.disabled = false; btn.textContent = 'Salvar' }
+}
+
+// ── Modal: Brigadista ────────────────────────────────────────
+function abrirModalBrigadista(b = null) {
+  _editId.brigadista = b?.id || null
+  document.getElementById('mbr-titulo').textContent  = b ? 'Editar Brigadista' : 'Novo Brigadista'
+  document.getElementById('mbr-brigada').value       = b?.brigada_id || ''
+  document.getElementById('mbr-nome').value          = b?.nome_completo || ''
+  document.getElementById('mbr-cpf').value           = b?.cpf || ''
+  document.getElementById('mbr-rg').value            = b?.rg || ''
+  document.getElementById('mbr-nascimento').value    = b?.data_nascimento || ''
+  document.getElementById('mbr-tel').value           = b?.telefone || ''
+  document.getElementById('mbr-municipio').value     = b?.municipio_residencia || ''
+  document.getElementById('mbr-funcao').value        = b?.funcao || 'brigadista'
+  document.getElementById('mbr-fonte').value         = b?.fonte_recurso || 'prevfogo'
+  document.getElementById('mbr-status').value        = b?.status || 'ativo'
+  document.getElementById('mbr-inicio').value        = b?.data_inicio || ''
+  document.getElementById('mbr-fim').value           = b?.data_fim || ''
+  document.getElementById('mbr-trein').checked       = b?.treinamento_basico || false
+  document.getElementById('mbr-ch').value            = b?.carga_horaria_formacao || ''
+  document.getElementById('mbr-cnh').value           = b?.cnh || ''
+  document.getElementById('mbr-obs').value           = b?.observacoes || ''
+  document.getElementById('modal-brigadista').classList.add('aberto')
+}
+function fecharModalBrigadista() { document.getElementById('modal-brigadista').classList.remove('aberto'); _editId.brigadista = null }
+
+async function salvarBrigadista() {
+  const brigada_id   = document.getElementById('mbr-brigada').value
+  const nome_completo = document.getElementById('mbr-nome').value.trim()
+  const cpf          = document.getElementById('mbr-cpf').value.trim()
+  const data_inicio  = document.getElementById('mbr-inicio').value
+  if (!brigada_id || !nome_completo || !cpf || !data_inicio) { toast('Preencha brigada, nome, CPF e data de início', 'error'); return }
+  const payload = {
+    brigada_id, nome_completo, cpf,
+    rg:                    document.getElementById('mbr-rg').value.trim() || null,
+    data_nascimento:       document.getElementById('mbr-nascimento').value || null,
+    telefone:              document.getElementById('mbr-tel').value.trim() || null,
+    municipio_residencia:  document.getElementById('mbr-municipio').value.trim() || null,
+    funcao:                document.getElementById('mbr-funcao').value,
+    fonte_recurso:         document.getElementById('mbr-fonte').value,
+    status:                document.getElementById('mbr-status').value,
+    data_inicio,
+    data_fim:              document.getElementById('mbr-fim').value || null,
+    treinamento_basico:    document.getElementById('mbr-trein').checked,
+    carga_horaria_formacao: parseInt(document.getElementById('mbr-ch').value) || null,
+    cnh:                   document.getElementById('mbr-cnh').value.trim() || null,
+    observacoes:           document.getElementById('mbr-obs').value.trim() || null,
+  }
+  const btn = document.getElementById('mbr-btn-salvar')
+  btn.disabled = true; btn.textContent = 'Salvando...'
+  try {
+    if (_editId.brigadista) {
+      const { error } = await db.from('brigadistas').update(payload).eq('id', _editId.brigadista)
+      if (error) throw error
+      toast('Brigadista atualizado!', 'success')
+    } else {
+      const { error } = await db.from('brigadistas').insert(payload)
+      if (error) throw error
+      toast('Brigadista adicionado!', 'success')
+    }
+    fecharModalBrigadista(); await carregarDados()
+  } catch(e) { toast(e.message || 'Erro ao salvar', 'error') }
+  finally { btn.disabled = false; btn.textContent = 'Salvar' }
+}
+
+// ── Modal: Atividade ─────────────────────────────────────────
+function abrirModalAtividade(a = null) {
+  _editId.atividade = a?.id || null
+  document.getElementById('mat-titulo').textContent = a ? 'Editar Atividade' : 'Nova Atividade'
+  document.getElementById('mat-brigada').value      = a?.brigada_id || ''
+  document.getElementById('mat-tipo').value         = a?.tipo || 'patrulha'
+  document.getElementById('mat-inicio').value       = a?.data_inicio ? a.data_inicio.slice(0,16) : ''
+  document.getElementById('mat-fim').value          = a?.data_fim ? a.data_fim.slice(0,16) : ''
+  document.getElementById('mat-local').value        = a?.localidade || ''
+  document.getElementById('mat-num').value          = a?.num_brigadistas || ''
+  document.getElementById('mat-area').value         = a?.area_afetada_ha || ''
+  document.getElementById('mat-desc').value         = a?.descricao || ''
+  document.getElementById('mat-resultado').value    = a?.resultado || ''
+  document.getElementById('modal-atividade').classList.add('aberto')
+}
+function fecharModalAtividade() { document.getElementById('modal-atividade').classList.remove('aberto'); _editId.atividade = null }
+
+async function salvarAtividade() {
+  const brigada_id  = document.getElementById('mat-brigada').value
+  const data_inicio = document.getElementById('mat-inicio').value
+  const descricao   = document.getElementById('mat-desc').value.trim()
+  if (!brigada_id || !data_inicio || !descricao) { toast('Preencha brigada, data de início e descrição', 'error'); return }
+  const brig = _brigadas.find(b => b.id === brigada_id)
+  const payload = {
+    brigada_id,
+    uc_id:          brig?.uc_id || null,
+    tipo:           document.getElementById('mat-tipo').value,
+    data_inicio:    new Date(data_inicio).toISOString(),
+    data_fim:       document.getElementById('mat-fim').value ? new Date(document.getElementById('mat-fim').value).toISOString() : null,
+    localidade:     document.getElementById('mat-local').value.trim() || null,
+    num_brigadistas: parseInt(document.getElementById('mat-num').value) || null,
+    area_afetada_ha: parseFloat(document.getElementById('mat-area').value) || null,
+    descricao,
+    resultado:      document.getElementById('mat-resultado').value.trim() || null,
+  }
+  const btn = document.getElementById('mat-btn-salvar')
+  btn.disabled = true; btn.textContent = 'Salvando...'
+  try {
+    if (_editId.atividade) {
+      const { error } = await db.from('atividades_brigada').update(payload).eq('id', _editId.atividade)
+      if (error) throw error
+      toast('Atividade atualizada!', 'success')
+    } else {
+      const { error } = await db.from('atividades_brigada').insert(payload)
+      if (error) throw error
+      toast('Atividade registrada!', 'success')
+    }
+    fecharModalAtividade(); await carregarDados()
+  } catch(e) { toast(e.message || 'Erro ao salvar', 'error') }
+  finally { btn.disabled = false; btn.textContent = 'Salvar' }
+}
+
+// ── Modal: Equipamento ───────────────────────────────────────
+function abrirModalEquipamento(e = null) {
+  _editId.equipamento = e?.id || null
+  document.getElementById('meq-titulo').textContent = e ? 'Editar Equipamento' : 'Novo Equipamento'
+  document.getElementById('meq-brigada').value      = e?.brigada_id || ''
+  document.getElementById('meq-desc').value         = e?.descricao || ''
+  document.getElementById('meq-qtd').value          = e?.quantidade ?? 1
+  document.getElementById('meq-cond').value         = e?.condicao || 'bom'
+  document.getElementById('meq-serie').value        = e?.numero_serie || ''
+  document.getElementById('meq-data-aq').value      = e?.data_aquisicao || ''
+  document.getElementById('meq-valor').value        = e?.valor_aquisicao || ''
+  document.getElementById('meq-obs').value          = e?.observacoes || ''
+  document.getElementById('modal-equipamento').classList.add('aberto')
+}
+function fecharModalEquipamento() { document.getElementById('modal-equipamento').classList.remove('aberto'); _editId.equipamento = null }
+
+async function salvarEquipamento() {
+  const brigada_id = document.getElementById('meq-brigada').value
+  const descricao  = document.getElementById('meq-desc').value.trim()
+  if (!brigada_id || !descricao) { toast('Preencha brigada e descrição', 'error'); return }
+  const payload = {
+    brigada_id, descricao,
+    quantidade:      parseInt(document.getElementById('meq-qtd').value) || 1,
+    condicao:        document.getElementById('meq-cond').value,
+    numero_serie:    document.getElementById('meq-serie').value.trim() || null,
+    data_aquisicao:  document.getElementById('meq-data-aq').value || null,
+    valor_aquisicao: parseFloat(document.getElementById('meq-valor').value) || null,
+    observacoes:     document.getElementById('meq-obs').value.trim() || null,
+  }
+  const btn = document.getElementById('meq-btn-salvar')
+  btn.disabled = true; btn.textContent = 'Salvando...'
+  try {
+    if (_editId.equipamento) {
+      const { error } = await db.from('equipamentos_brigada').update(payload).eq('id', _editId.equipamento)
+      if (error) throw error
+      toast('Equipamento atualizado!', 'success')
+    } else {
+      const { error } = await db.from('equipamentos_brigada').insert(payload)
+      if (error) throw error
+      toast('Equipamento adicionado!', 'success')
+    }
+    fecharModalEquipamento(); await carregarDados()
+  } catch(e) { toast(e.message || 'Erro ao salvar', 'error') }
+  finally { btn.disabled = false; btn.textContent = 'Salvar' }
+}
+</script>
+
+<style>
+.tab-btn {
+  padding: 6px 18px;
+  border: none;
+  background: transparent;
+  border-radius: 7px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--texto-secundario, #6B7280);
+  cursor: pointer;
+  transition: background .15s, color .15s;
+}
+.tab-btn.ativo {
+  background: white;
+  color: var(--floresta, #0A1A0F);
+  box-shadow: 0 1px 4px rgba(0,0,0,.12);
+}
+.tab-btn:hover:not(.ativo) { background: rgba(255,255,255,.5); }
+</style>
+</body>
+</html>
