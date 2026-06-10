@@ -12,7 +12,7 @@
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&family=Fraunces:wght@700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/brigada.css">
 </head>
-<body>
+<body class="brigada-app">
 
 <!-- ══ TELA: LOGIN ══════════════════════════════════════════════ -->
 <div id="tela-login" class="tela lock-screen" hidden>
@@ -137,16 +137,28 @@
 
   <div class="natureza-grid">
     <button class="natureza-btn prevencao" data-nat="prevencao">
-      <span class="nat-icon">🛡</span>
-      <span class="nat-label">Prevenção</span>
+      <div class="natureza-icon">🛡</div>
+      <div class="natureza-label">
+        <strong>Prevenção</strong>
+        <span>Aceiros, educação ambiental</span>
+      </div>
+      <span class="natureza-chevron">›</span>
     </button>
     <button class="natureza-btn combate" data-nat="combate">
-      <span class="nat-icon">🔥</span>
-      <span class="nat-label">Combate</span>
+      <div class="natureza-icon">🔥</div>
+      <div class="natureza-label">
+        <strong>Combate</strong>
+        <span>Extinção de incêndios</span>
+      </div>
+      <span class="natureza-chevron">›</span>
     </button>
     <button class="natureza-btn monitoramento" data-nat="monitoramento">
-      <span class="nat-icon">🔭</span>
-      <span class="nat-label">Monitoramento</span>
+      <div class="natureza-icon">🔭</div>
+      <div class="natureza-label">
+        <strong>Monitoramento</strong>
+        <span>Fauna, flora, ocorrências</span>
+      </div>
+      <span class="natureza-chevron">›</span>
     </button>
   </div>
 
