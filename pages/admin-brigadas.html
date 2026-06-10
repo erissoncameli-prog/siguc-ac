@@ -431,10 +431,18 @@ const LABEL_REGIONAL = {
 })()
 
 async function carregarUCs() {
-  const { data } = await db.from('unidades_conservacao').select('id,nome,codigo').eq('ativo',true).order('codigo')
+  const { data } = await db.from('unidades_conservacao').select('id,nome,codigo,regional').eq('ativo',true).order('codigo')
   _ucs = data || []
   const sel = document.getElementById('mb-uc')
-  if (sel) _ucs.forEach(u => { const o = new Option(`${u.codigo} — ${u.nome}`, u.id); sel.add(o) })
+  if (sel) {
+    _ucs.forEach(u => { const o = new Option(`${u.codigo} — ${u.nome}`, u.id); sel.add(o) })
+    // Auto-preenche regional quando UC é selecionada
+    sel.addEventListener('change', () => {
+      const uc = _ucs.find(u => u.id === sel.value)
+      const selReg = document.getElementById('mb-regional')
+      if (selReg && uc?.regional) selReg.value = uc.regional
+    })
+  }
 }
 
 async function carregarDados() {
