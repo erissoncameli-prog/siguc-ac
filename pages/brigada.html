@@ -680,6 +680,39 @@ async function confirmarPinSetup() {
 // ════════════════════════════════════════════════════════════════
 // Home
 // ════════════════════════════════════════════════════════════════
+async function iniciarSessaoAuditoria() {
+  try {
+    const gps = bGpsAtual()
+    const { data, error } = await db.rpc('brigadista_iniciar_sessao', {
+      p_dispositivo: navigator.userAgent.slice(0, 200),
+      p_app_versao:  '1.0',
+      p_lat: gps?.lat ?? null,
+      p_lng: gps?.lng ?? null,
+    })
+    if (!error && data) {
+      await bOfflineSetConfig('sessao_id', data)
+      App.sessaoId = data
+      // Ping a cada 5 minutos enquanto o app estiver aberto
+      App._pingInterval = setInterval(async () => {
+        const sid = await bOfflineGetConfig('sessao_id')
+        if (sid) db.rpc('brigadista_ping_sessao', { p_sessao_id: sid }).catch(() => {})
+      }, 5 * 60 * 1000)
+    }
+  } catch (_) {}
+}
+
+async function encerrarSessaoAuditoria() {
+  try {
+    clearInterval(App._pingInterval)
+    const sid = App.sessaoId || await bOfflineGetConfig('sessao_id')
+    if (sid) {
+      await db.rpc('brigadista_encerrar_sessao', { p_sessao_id: sid })
+      await bOfflineSetConfig('sessao_id', null)
+      App.sessaoId = null
+    }
+  } catch (_) {}
+}
+
 async function entrarHome() {
   document.getElementById('home-saudacao').textContent = saudacao()
   document.getElementById('home-nome').textContent =
@@ -700,6 +733,9 @@ async function entrarHome() {
 
   bSyncOn('confirmado', atualizarBadgeFila)
   bSyncOn('erro', atualizarBadgeFila)
+
+  // Inicia sessão de auditoria (falhas silenciosas — não bloqueiam o app)
+  if (!App.sessaoId) iniciarSessaoAuditoria()
 }
 
 async function atualizarBadgeFila() {
@@ -1041,6 +1077,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-sair').addEventListener('click', async () => {
     if (!confirm('Sair do app? Registros não enviados permanecem salvos.')) return
     bGpsParar()
+    await encerrarSessaoAuditoria()
     await db.auth.signOut()
     window.location.href = '/index.html'
   })
