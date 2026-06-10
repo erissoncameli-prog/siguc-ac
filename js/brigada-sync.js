@@ -67,6 +67,7 @@ async function bSyncUm(reg) {
 
     await bOfflineMarcar(reg.uuid_cliente, 'confirmado', {
       sincronizado_em: new Date().toISOString(),
+      ultimo_erro: null,
     })
     bSyncEmitir('confirmado', { uuid: reg.uuid_cliente })
     return true
@@ -82,15 +83,32 @@ async function bSyncUm(reg) {
   }
 }
 
+// base64 data-URL → Blob (usado pelo upload após recuperar do IndexedDB)
+function bSyncBase64ParaBlob(dataUrl) {
+  const [header, b64] = dataUrl.split(',')
+  const mime = header.match(/:(.*?);/)?.[1] ?? 'image/jpeg'
+  const bytes = atob(b64)
+  const arr = new Uint8Array(bytes.length)
+  for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i)
+  return new Blob([arr], { type: mime })
+}
+
 // ── Upload de fotos para Supabase Storage ─────────────────────
 async function bSyncUploadFotos(reg) {
-  const blobs = reg.fotos_blobs ?? []
-  if (!blobs.length) return []
+  const fotos = reg.fotos_blobs ?? []
+  if (!fotos.length) return []
 
   const urls = []
-  for (let i = 0; i < blobs.length; i++) {
-    const blob = blobs[i]
-    if (typeof blob === 'string') { urls.push(blob); continue }
+  for (let i = 0; i < fotos.length; i++) {
+    const item = fotos[i]
+
+    // URL remota já enviada anteriormente
+    if (typeof item === 'string' && item.startsWith('http')) { urls.push(item); continue }
+
+    // Converter base64 → Blob (novo formato) ou usar Blob direto (legado)
+    const blob = (typeof item === 'string')
+      ? bSyncBase64ParaBlob(item)
+      : item
 
     const ext  = blob.type?.includes('png') ? 'png' : 'jpg'
     const path = `${reg.uuid_cliente}/${i}.${ext}`
