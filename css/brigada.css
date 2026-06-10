@@ -764,6 +764,5 @@ body { margin: 0; }
 .sync-erro-msg {
   display: block; color: var(--combate);
   font-size: 11px; margin-top: 2px;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  max-width: 200px;
+  word-break: break-word;
 }
