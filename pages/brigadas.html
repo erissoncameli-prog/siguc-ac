@@ -108,7 +108,9 @@
           <input class="form-control" id="mbr-nome" placeholder="Nome do brigadista">
         </div>
         <div class="form-group"><label class="form-label">CPF <span class="obrig">*</span></label>
-          <input class="form-control" id="mbr-cpf" placeholder="000.000.000-00" maxlength="14">
+          <input class="form-control" id="mbr-cpf" placeholder="000.000.000-00" maxlength="14"
+                 oninput="mascaraCPF(this)" onblur="validarCPFInput(this)">
+          <small id="mbr-cpf-erro" style="color:#ef4444;font-size:11px;display:none">CPF inválido</small>
         </div>
       </div>
       <div class="grid-2">
@@ -721,7 +723,11 @@ function abrirModalBrigadista(b = null) {
   document.getElementById('mbr-titulo').textContent  = b ? 'Editar Brigadista' : 'Novo Brigadista'
   document.getElementById('mbr-brigada').value       = b?.brigada_id || ''
   document.getElementById('mbr-nome').value          = b?.nome_completo || ''
-  document.getElementById('mbr-cpf').value           = b?.cpf || ''
+  const cpfEl = document.getElementById('mbr-cpf')
+  cpfEl.value = b?.cpf || ''
+  if (b?.cpf) mascaraCPF(cpfEl)
+  document.getElementById('mbr-cpf-erro').style.display = 'none'
+  cpfEl.style.borderColor = ''
   document.getElementById('mbr-rg').value            = b?.rg || ''
   document.getElementById('mbr-nascimento').value    = b?.data_nascimento || ''
   document.getElementById('mbr-tel').value           = b?.telefone || ''
@@ -741,6 +747,39 @@ function abrirModalBrigadista(b = null) {
 }
 function fecharModalBrigadista() { document.getElementById('modal-brigadista').classList.remove('aberto'); _editId.brigadista = null }
 
+function mascaraCPF(input) {
+  let v = input.value.replace(/\D/g, '').slice(0, 11)
+  if (v.length > 9)      v = v.replace(/^(\d{3})(\d{3})(\d{3})(\d{0,2})/, '$1.$2.$3-$4')
+  else if (v.length > 6) v = v.replace(/^(\d{3})(\d{3})(\d{0,3})/, '$1.$2.$3')
+  else if (v.length > 3) v = v.replace(/^(\d{3})(\d{0,3})/, '$1.$2')
+  input.value = v
+  document.getElementById('mbr-cpf-erro').style.display = 'none'
+}
+
+function cpfValido(cpf) {
+  const n = cpf.replace(/\D/g, '')
+  if (n.length !== 11 || /^(\d)\1{10}$/.test(n)) return false
+  let s = 0
+  for (let i = 0; i < 9; i++) s += parseInt(n[i]) * (10 - i)
+  let r = (s * 10) % 11; if (r === 10 || r === 11) r = 0
+  if (r !== parseInt(n[9])) return false
+  s = 0
+  for (let i = 0; i < 10; i++) s += parseInt(n[i]) * (11 - i)
+  r = (s * 10) % 11; if (r === 10 || r === 11) r = 0
+  return r === parseInt(n[10])
+}
+
+function validarCPFInput(input) {
+  const erro = document.getElementById('mbr-cpf-erro')
+  if (input.value && !cpfValido(input.value)) {
+    erro.style.display = 'block'
+    input.style.borderColor = '#ef4444'
+  } else {
+    erro.style.display = 'none'
+    input.style.borderColor = ''
+  }
+}
+
 function atualizarObrigEmail() {
   const isChefe = document.getElementById('mbr-funcao').value === 'chefe_brigada'
   document.getElementById('mbr-email-label').innerHTML =
@@ -753,11 +792,12 @@ async function salvarBrigadista() {
   const cpf          = document.getElementById('mbr-cpf').value.trim()
   const data_inicio  = document.getElementById('mbr-inicio').value
   if (!brigada_id || !nome_completo || !cpf || !data_inicio) { toast('Preencha brigada, nome, CPF e data de início', 'error'); return }
+  if (!cpfValido(cpf)) { toast('CPF inválido', 'error'); document.getElementById('mbr-cpf').focus(); document.getElementById('mbr-cpf-erro').style.display = 'block'; return }
   const funcaoVal = document.getElementById('mbr-funcao').value
   const emailVal  = document.getElementById('mbr-email').value.trim()
   if (funcaoVal === 'chefe_brigada' && !emailVal) { toast('E-mail é obrigatório para Chefe de Brigada', 'error'); document.getElementById('mbr-email').focus(); return }
   const payload = {
-    brigada_id, nome_completo, cpf,
+    brigada_id, nome_completo, cpf: cpf.replace(/\D/g, ''),
     rg:                    document.getElementById('mbr-rg').value.trim() || null,
     data_nascimento:       document.getElementById('mbr-nascimento').value || null,
     telefone:              document.getElementById('mbr-tel').value.trim() || null,
