@@ -83,9 +83,28 @@ async function bOfflineSetConfig(chave, valor) {
   })
 }
 
+// ── Blob → base64 data-URL (compatível com IndexedDB no iOS) ─
+function bOfflineBlobParaBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload  = () => resolve(reader.result)
+    reader.onerror = reject
+    reader.readAsDataURL(blob)
+  })
+}
+
 // ── Salvar registro (escrita atômica) ─────────────────────────
+// Fotos salvas como base64 para evitar Blob detachment no iOS:
+// Blobs do IndexedDB ficam inválidos após o app ir para background.
 async function bOfflineSalvar(registro) {
   const db = await bOfflineInit()
+
+  // Converter Blobs para base64 antes de persistir
+  const fotosRaw = registro.fotos_blobs ?? []
+  const fotos64  = await Promise.all(
+    fotosRaw.map(b => (b instanceof Blob) ? bOfflineBlobParaBase64(b) : Promise.resolve(b))
+  )
+
   return new Promise((res, rej) => {
     const tx = db.transaction(['registros', 'fauna'], 'readwrite')
 
@@ -93,7 +112,7 @@ async function bOfflineSalvar(registro) {
       ...registro,
       status:    'pendente',
       criado_em: new Date().toISOString(),
-      fotos_blobs: registro.fotos_blobs ?? [],  // Blobs — IndexedDB suporta
+      fotos_blobs: fotos64,
     }
 
     const fauna = registro._fauna ?? []
