@@ -4,7 +4,7 @@
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://atqtybcsvepdabsvgaly.supabase.co';
 const SUPABASE_KEY = process.env.SUPABASE_ANON_KEY;
-const FIRMS_KEY    = '66690c20b8bf3f13bb21f8706e3a75d5';
+const FIRMS_KEY    = process.env.FIRMS_KEY;
 const FIRMS_BASE   = 'https://firms.modaps.eosdis.nasa.gov/api/area/csv';
 
 module.exports = async (req, res) => {
@@ -21,6 +21,13 @@ module.exports = async (req, res) => {
 
   const x0 = parseFloat(minLon), y0 = parseFloat(minLat);
   const x1 = parseFloat(maxLon), y1 = parseFloat(maxLat);
+
+  if (isNaN(x0) || isNaN(y0) || isNaN(x1) || isNaN(y1) ||
+      x0 < -180 || x1 > 180 || y0 < -90 || y1 > 90 ||
+      x0 >= x1 || y0 >= y1 || (x1 - x0) > 20 || (y1 - y0) > 20) {
+    res.status(400).json({ error: 'Coordenadas bbox inválidas' });
+    return;
+  }
 
   // ── 1. Histórico via RPC Supabase ─────────────────────────────────────
   let historico = [];

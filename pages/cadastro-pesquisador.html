@@ -331,7 +331,9 @@ async function cadastrar() {
     erroMsg('Preencha todos os campos obrigatórios (marcados com *).'); return
   }
   if (!/\S+@\S+\.\S+/.test(email)) { erroMsg('E-mail inválido.'); return }
-  if (senha.length < 8) { erroMsg('A senha deve ter pelo menos 8 caracteres.'); return }
+  if (senha.length < 8 || !/[A-Z]/.test(senha) || !/[a-z]/.test(senha) || !/\d/.test(senha)) {
+    erroMsg('A senha deve ter pelo menos 8 caracteres, incluindo maiúscula, minúscula e número.'); return
+  }
   if (senha !== senha2) { erroMsg('As senhas não coincidem.'); return }
   if (!validarCPF(cpf)) { erroMsg('CPF inválido — verifique os dígitos verificadores.'); return }
   if (tel && tel.replace(/\D/g,'').length < 7) { erroMsg('Telefone inválido — mínimo 7 dígitos.'); return }
@@ -343,10 +345,10 @@ async function cadastrar() {
       p_cpf: cpf.replace(/\D/g, '')
     })
     if (dup?.existe) {
-      const nome = dup.nome ? ` (${dup.nome})` : ''
+      const nomeEsc = dup.nome ? ` (${esc(dup.nome)})` : ''
       const msg = dup.motivo === 'email'
-        ? `Este e-mail já possui conta no portal${nome}. <a href="login-pesquisador.html" style="color:#991B1B;font-weight:700;text-decoration:underline">Faça login aqui →</a>`
-        : `Este CPF já está cadastrado no sistema${nome}. <a href="login-pesquisador.html" style="color:#991B1B;font-weight:700;text-decoration:underline">Acesse com sua conta →</a>`
+        ? `Este e-mail já possui conta no portal${nomeEsc}. <a href="login-pesquisador.html" style="color:#991B1B;font-weight:700;text-decoration:underline">Faça login aqui →</a>`
+        : `Este CPF já está cadastrado no sistema${nomeEsc}. <a href="login-pesquisador.html" style="color:#991B1B;font-weight:700;text-decoration:underline">Acesse com sua conta →</a>`
       erroMsg(msg); return
     }
   } catch(e) {}

@@ -129,11 +129,13 @@ async function carregarUCs() {
 }
 
 let _dados = []
+const _mapaOcorrencias = {}
 async function carregar() {
   const { data } = await db.from('ocorrencias')
     .select('*,unidades_conservacao(nome,codigo)')
     .order('data_ocorrencia', { ascending: false })
   _dados = data || []
+  _dados.forEach(o => { _mapaOcorrencias[o.id] = o })
 
   const hoje = new Date(); const d30 = new Date(hoje); d30.setDate(d30.getDate()-30)
   document.getElementById('k-crit').textContent = _dados.filter(o=>['critica','alta'].includes(o.severidade)&&o.status==='aberta').length
@@ -168,9 +170,11 @@ function renderTabela(lista) {
       <td class="mono">${formatData(o.data_ocorrencia)}</td>
       <td class="mono">${o.area_afetada_ha ? formatNum(o.area_afetada_ha,1) : '—'}</td>
       <td><span class="badge ${BADGE_STATUS_OC[o.status]||'badge-cinza'}">${esc(o.status)}</span></td>
-      ${pe ? `<td><button class="btn btn-xs btn-ghost" onclick='abrirModal(${JSON.stringify(o)})'>Editar</button></td>` : ''}
+      ${pe ? `<td><button class="btn btn-xs btn-ghost" data-id="${esc(o.id)}" onclick="abrirModalPorId(this.dataset.id)">Editar</button></td>` : ''}
     </tr>`).join('')
 }
+
+function abrirModalPorId(id) { abrirModal(_mapaOcorrencias[id] || null) }
 
 function abrirModal(oc = null) {
   ocEditId = oc?.id || null
