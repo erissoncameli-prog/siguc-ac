@@ -315,6 +315,13 @@ function bSyncEmitir(event, detail) {
 // ── Utilitário ────────────────────────────────────────────────
 function bSyncSleep(ms) { return new Promise(r => setTimeout(r, ms)) }
 
+// ── Forçar sincronização ─────────────────────────────────────
+// Reseta _syncRunning caso tenha ficado preso, depois dispara sync.
+async function bSyncForcar() {
+  _syncRunning = false
+  return bSyncRodar()
+}
+
 // ── Contagem de pendentes para badge ─────────────────────────
 async function bSyncContarPendentes() {
   const lista = await bOfflineListarPendentes()

@@ -160,11 +160,14 @@
 
   <div class="home-fila-card" id="home-fila-card" hidden>
     <span class="fila-icone">⏳</span>
-    <div>
+    <div style="flex:1">
       <strong id="home-fila-count">0 registros</strong>
       <span> aguardando sincronização</span>
     </div>
-    <button class="btn-link" id="btn-ver-fila">Ver fila →</button>
+    <div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px">
+      <button class="btn-link" id="btn-forcar-sync-home" style="font-size:13px;font-weight:700;opacity:1">Enviar →</button>
+      <button class="btn-link" id="btn-ver-fila" style="font-size:11px;opacity:.6">Ver fila</button>
+    </div>
   </div>
 </div>
 
@@ -400,6 +403,9 @@
 
   <div id="fila-lista" class="sync-queue"></div>
 
+  <button class="btn-salvar" id="btn-forcar-sync">
+    Enviar agora
+  </button>
   <button class="btn-salvar" id="btn-exportar-json" style="background:var(--combate)">
     📤 Exportar JSON (WhatsApp/Drive)
   </button>
@@ -1320,6 +1326,14 @@ document.addEventListener('DOMContentLoaded', () => {
     if (navigator.onLine) { bSyncRodar(); toast('Sincronizando…', 'info') }
     else toast('Sem conexão', 'warn')
   })
+  document.getElementById('btn-forcar-sync').addEventListener('click', () => {
+    if (!navigator.onLine) { toast('Sem conexão — registros serão enviados automaticamente', 'warn'); return }
+    bSyncForcar()
+  })
+  document.getElementById('btn-forcar-sync-home').addEventListener('click', () => {
+    if (!navigator.onLine) { toast('Sem conexão — registros serão enviados automaticamente', 'warn'); return }
+    bSyncForcar()
+  })
   document.getElementById('btn-exportar-json').addEventListener('click', async () => {
     const n = await bOfflineExportar()
     if (n === null) toast('Sem registros pendentes', 'warn')
@@ -1384,8 +1398,16 @@ document.addEventListener('DOMContentLoaded', () => {
       _timer = setTimeout(() => { wrap.hidden = true }, delay)
     }
 
+    function setBtnForcar(syncing) {
+      const btn = document.getElementById('btn-forcar-sync')
+      if (!btn) return
+      btn.disabled = syncing
+      btn.textContent = syncing ? 'Enviando…' : 'Enviar agora'
+    }
+
     bSyncOn('sync-start', ({ total }) => {
       mostrarBarra(0, `Sincronizando 0 / ${total}…`)
+      setBtnForcar(true)
     })
 
     bSyncOn('sync-progresso', ({ ok, erros, total }) => {
@@ -1404,13 +1426,17 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       esconderBarra(3000)
       atualizarBadgeFila()
+      setBtnForcar(false)
     })
 
     bSyncOn('sessao-expirada', ({ err }) => toast(err, 'warn'))
 
     // Erros de infra (sem uuid = não é falha de registro individual)
     bSyncOn('erro', ({ uuid, err }) => {
-      if (!uuid && err) toast(err, 'warn')
+      if (!uuid && err) {
+        toast(err, 'warn')
+        setBtnForcar(false)
+      }
     })
   })()
 
