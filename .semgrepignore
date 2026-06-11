@@ -1,0 +1,9 @@
+# Padrões básicos
+.git/
+node_modules/
+test-results/
+playwright-report/
+
+# Projeto nativo Android gerado pelo Capacitor — boilerplate da plataforma
+# (a MainActivity de launcher precisa de exported=true por exigência do Android 12+)
+app/android/
