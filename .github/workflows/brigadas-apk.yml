@@ -1,0 +1,98 @@
+# ── SIGUC Brigadas — build do APK Android (Capacitor) ─────────
+# Dispara:
+#   • manualmente (workflow_dispatch) → APK como artifact do run
+#   • tag brigadas-v* (ex.: brigadas-v1.0.0) → APK anexado a um Release
+#
+# Assinatura: configure os secrets ANDROID_KEYSTORE_B64,
+# ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS e ANDROID_KEY_PASSWORD
+# (ver docs/app-brigadas.md). Sem eles, o APK sai assinado com a
+# chave de debug do runner (instala, mas a assinatura muda a cada build).
+
+name: Brigadas APK
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'brigadas-v*'
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Instalar dependências
+        working-directory: app
+        run: npm ci
+
+      - name: Montar www/ e sincronizar Android
+        working-directory: app
+        run: |
+          node scripts/build-www.mjs
+          npx cap sync android
+
+      - name: Preparar keystore (se configurada)
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+        run: |
+          if [ -n "$KEYSTORE_B64" ]; then
+            echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/release.keystore"
+            echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/release.keystore" >> "$GITHUB_ENV"
+            echo "Keystore de release configurada."
+          else
+            echo "::warning::Secrets de assinatura ausentes — APK sairá com chave de debug."
+          fi
+
+      - name: Definir versão
+        run: |
+          REF="${GITHUB_REF_NAME}"
+          if [[ "$REF" == brigadas-v* ]]; then
+            echo "APP_VERSION_NAME=${REF#brigadas-v}" >> "$GITHUB_ENV"
+          else
+            echo "APP_VERSION_NAME=0.0.${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
+          fi
+          echo "APP_VERSION_CODE=${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
+
+      - name: Compilar APK (release)
+        working-directory: app/android
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon
+          cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/siguc-brigadas.apk"
+
+      - name: Publicar APK como artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: siguc-brigadas-apk
+          path: ${{ runner.temp }}/siguc-brigadas.apk
+          if-no-files-found: error
+
+      - name: Anexar ao Release (somente tags)
+        if: startsWith(github.ref, 'refs/tags/brigadas-v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --title "SIGUC Brigadas $APP_VERSION_NAME" \
+            --notes "APK do app de campo SIGUC Brigadas (versão $APP_VERSION_NAME, build $APP_VERSION_CODE)." \
+            "$RUNNER_TEMP/siguc-brigadas.apk" || \
+          gh release upload "$GITHUB_REF_NAME" "$RUNNER_TEMP/siguc-brigadas.apk" --clobber

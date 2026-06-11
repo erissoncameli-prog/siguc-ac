@@ -1,0 +1,10 @@
+# Dependências
+node_modules/
+
+# Build do shell web (gerado por scripts/build-www.mjs)
+www/
+
+# Artefatos copiados pelo `cap sync` (regenerados no CI)
+android/app/src/main/assets/public/
+android/app/src/main/assets/capacitor.config.json
+android/app/src/main/assets/capacitor.plugins.json

@@ -1,0 +1,12 @@
+{
+  "appId": "br.gov.ac.sema.siguc.brigadas",
+  "appName": "SIGUC Brigadas",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "https"
+  },
+  "android": {
+    "allowMixedContent": false,
+    "adjustMarginsForEdgeToEdge": "auto"
+  }
+}
