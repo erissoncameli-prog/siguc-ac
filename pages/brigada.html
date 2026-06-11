@@ -579,7 +579,8 @@ function voltarTela() {
 // Boot / autenticação
 // ════════════════════════════════════════════════════════════════
 async function boot() {
-  if ('serviceWorker' in navigator) {
+  // No app nativo (Capacitor) os arquivos já são locais — SW só na web
+  if ('serviceWorker' in navigator && !window.Capacitor) {
     navigator.serviceWorker.register('/pwa/sw.js').catch(console.warn)
   }
   await bOfflineInit()

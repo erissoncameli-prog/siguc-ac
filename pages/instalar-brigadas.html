@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#12A66A">
+  <title>Instalar — SIGUC Brigadas</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root { --verde:#12A66A; --verde-esc:#0C7A4D; --fundo:#F6FAF6; --texto:#16241B; --suave:#5B6E62; }
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family:'DM Sans',system-ui,sans-serif; background:var(--fundo); color:var(--texto); line-height:1.55; }
+    .topo { background:var(--verde); color:#fff; text-align:center; padding:40px 20px 32px; }
+    .topo svg { margin-bottom:12px; }
+    .topo h1 { font-size:1.7rem; font-weight:700; }
+    .topo p { opacity:.92; margin-top:6px; font-size:1.05rem; }
+    main { max-width:560px; margin:0 auto; padding:24px 20px 60px; }
+    .cartao { background:#fff; border:1px solid #E2EBE4; border-radius:16px; padding:24px 20px; margin-top:20px; }
+    .cartao h2 { font-size:1.2rem; margin-bottom:6px; display:flex; align-items:center; gap:8px; }
+    .cartao .sub { color:var(--suave); font-size:.95rem; margin-bottom:16px; }
+    .btn-baixar { display:block; text-align:center; background:var(--verde); color:#fff; text-decoration:none;
+      font-size:1.15rem; font-weight:700; padding:16px; border-radius:14px; margin:8px 0 18px; }
+    .btn-baixar:active { background:var(--verde-esc); }
+    ol { padding-left:0; list-style:none; counter-reset:passo; }
+    ol li { counter-increment:passo; display:flex; gap:12px; margin-bottom:14px; font-size:1.02rem; }
+    ol li::before { content:counter(passo); flex:0 0 28px; height:28px; background:#E7F5EE; color:var(--verde-esc);
+      font-weight:700; border-radius:50%; display:flex; align-items:center; justify-content:center; }
+    .nota { background:#FFF8E8; border:1px solid #EFDFB0; border-radius:12px; padding:12px 14px; font-size:.92rem; color:#6B5A22; margin-top:8px; }
+    .rodape { text-align:center; color:var(--suave); font-size:.85rem; margin-top:32px; }
+    .rodape a { color:var(--verde-esc); }
+    b { font-weight:600; }
+  </style>
+</head>
+<body>
+
+<header class="topo">
+  <svg width="56" height="56" viewBox="0 0 48 48" fill="none">
+    <circle cx="24" cy="24" r="24" fill="#fff" fill-opacity=".15"/>
+    <path d="M24 10c2 5-7 8.5-7 16a7 7 0 0 0 14 0c0-7-9-11-7-16z" fill="#fff"/>
+    <path d="M24 25c1 2.4-3 3.8-3 7a3 3 0 0 0 6 0c0-3.2-4-4.6-3-7z" fill="#12A66A"/>
+  </svg>
+  <h1>SIGUC Brigadas</h1>
+  <p>App de campo para registro de ocorrências — funciona sem internet</p>
+</header>
+
+<main>
+
+  <!-- ── ANDROID ──────────────────────────────────────────── -->
+  <section class="cartao">
+    <h2>📱 Celular Android</h2>
+    <p class="sub">Instale o aplicativo uma única vez. Depois é só tocar no ícone, como qualquer outro app.</p>
+
+    <a class="btn-baixar" href="https://github.com/erissoncameli-prog/siguc-ac/releases/latest/download/siguc-brigadas.apk">
+      ⬇&nbsp; Baixar o aplicativo
+    </a>
+
+    <ol>
+      <li><span>Toque no botão verde acima e aguarde o download terminar.</span></li>
+      <li><span>Abra o arquivo baixado (<b>siguc-brigadas.apk</b>) — ele aparece na barra de notificações ou na pasta <b>Downloads</b>.</span></li>
+      <li><span>Se o celular perguntar sobre <b>"fontes desconhecidas"</b>, toque em <b>Configurações → Permitir desta fonte</b> e volte.</span></li>
+      <li><span>Toque em <b>Instalar</b>. Pronto! O ícone <b>SIGUC Brigadas</b> aparece na tela inicial.</span></li>
+    </ol>
+
+    <p class="nota">⚠️ É normal o Android avisar sobre apps de fora da Play Store. Este aplicativo é
+    distribuído oficialmente pela SEMA-AC por este site.</p>
+  </section>
+
+  <!-- ── iPHONE ───────────────────────────────────────────── -->
+  <section class="cartao">
+    <h2>🍎 iPhone (iOS)</h2>
+    <p class="sub">No iPhone, o app é instalado direto pelo navegador Safari — sem loja de aplicativos.</p>
+
+    <ol>
+      <li><span>Abra <b>siguc-ac.vercel.app/pages/brigada.html</b> no <b>Safari</b> (tem que ser o Safari).</span></li>
+      <li><span>Toque no botão de <b>compartilhar</b> <span style="font-size:1.1em">⎋</span> (quadrado com seta para cima, na barra de baixo).</span></li>
+      <li><span>Role a lista e toque em <b>"Adicionar à Tela de Início"</b>.</span></li>
+      <li><span>Toque em <b>Adicionar</b>. Use o app <b>sempre pelo ícone</b> da tela inicial — nunca pelo Safari direto, para os dados ficarem protegidos.</span></li>
+    </ol>
+  </section>
+
+  <!-- ── PRIMEIRO USO ─────────────────────────────────────── -->
+  <section class="cartao">
+    <h2>✅ Primeiro uso (importante!)</h2>
+    <ol>
+      <li><span>Abra o app <b>uma vez com internet</b> e faça login com seu e-mail e senha de brigadista.</span></li>
+      <li><span>Crie seu <b>PIN de campo</b> de 4 dígitos.</span></li>
+      <li><span>A partir daí o app funciona <b>totalmente sem internet</b>: registre as ocorrências normalmente e, quando o celular pegar sinal, elas sincronizam sozinhas.</span></li>
+    </ol>
+  </section>
+
+  <p class="rodape">
+    SEMA-AC · Secretaria de Estado de Meio Ambiente do Acre<br>
+    Dúvidas? Procure o gestor da sua brigada ou a equipe DIMA.<br>
+    <a href="/pages/brigada.html">Abrir a versão web</a>
+  </p>
+</main>
+
+</body>
+</html>
