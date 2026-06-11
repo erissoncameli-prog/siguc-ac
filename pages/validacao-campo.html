@@ -566,7 +566,7 @@ async function carregarFaunaModal(rcId) {
       id, classe, quantidade, condicao, tipo_evento, causa_aparente,
       destinacao, faixa_etaria, nome_popular, nome_cientifico,
       identificacao_confirmada, identificado_por,
-      especie_id, observacoes,
+      especie_id, observacoes, fotos_urls,
       especie:especie_id (nome_cientifico, status_conservacao, ameacada)
     `)
     .eq('registro_campo_id', rcId)
@@ -593,6 +593,7 @@ async function carregarFaunaModal(rcId) {
         <strong>${esc(nome)} ${f.quantidade > 1 ? '× '+f.quantidade : ''} ${ameac}</strong>
         <span>${tipo} · ${cond}${dest ? ' · ' + dest : ''}${f.faixa_etaria && f.faixa_etaria !== 'indeterminada' ? ' · ' + f.faixa_etaria : ''}</span>
         ${f.observacoes ? `<span style="display:block;margin-top:2px;font-style:italic">${esc(f.observacoes)}</span>` : ''}
+        ${f.fotos_urls?.length ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">${f.fotos_urls.map(u => `<img src="${esc(u)}" style="width:62px;height:48px;object-fit:cover;border-radius:6px;cursor:pointer;border:1.5px solid #e5e7eb" onclick="abrirLightbox('${esc(u)}')" alt="foto fauna">`).join('')}</div>` : ''}
         <!-- Painel confirmar espécie (biologo) -->
         <div class="confirmar-esp-wrap" id="cesp-${f.id}">
           <p style="font-size:.78rem;font-weight:600;margin-bottom:6px">Confirmar / corrigir identificação</p>
