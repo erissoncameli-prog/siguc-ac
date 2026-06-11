@@ -12,6 +12,11 @@ name: Brigadas APK
 
 on:
   workflow_dispatch:
+    inputs:
+      versao:
+        description: 'Versão a publicar como Release (ex.: 1.0.0). Vazio = só artifact.'
+        required: false
+        default: ''
   push:
     tags:
       - 'brigadas-v*'
@@ -59,12 +64,19 @@ jobs:
           fi
 
       - name: Definir versão
+        env:
+          VERSAO_INPUT: ${{ inputs.versao }}
         run: |
           REF="${GITHUB_REF_NAME}"
           if [[ "$REF" == brigadas-v* ]]; then
             echo "APP_VERSION_NAME=${REF#brigadas-v}" >> "$GITHUB_ENV"
+            echo "PUBLICAR_RELEASE=true" >> "$GITHUB_ENV"
+          elif [ -n "$VERSAO_INPUT" ]; then
+            echo "APP_VERSION_NAME=$VERSAO_INPUT" >> "$GITHUB_ENV"
+            echo "PUBLICAR_RELEASE=true" >> "$GITHUB_ENV"
           else
             echo "APP_VERSION_NAME=0.0.${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
+            echo "PUBLICAR_RELEASE=false" >> "$GITHUB_ENV"
           fi
           echo "APP_VERSION_CODE=${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
 
@@ -86,13 +98,16 @@ jobs:
           path: ${{ runner.temp }}/siguc-brigadas.apk
           if-no-files-found: error
 
-      - name: Anexar ao Release (somente tags)
-        if: startsWith(github.ref, 'refs/tags/brigadas-v')
+      - name: Publicar Release (tag ou dispatch com versão)
+        if: env.PUBLICAR_RELEASE == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" \
+          TAG="brigadas-v$APP_VERSION_NAME"
+          # gh release create cria a tag no commit atual se ela não existir
+          gh release create "$TAG" \
+            --target "$GITHUB_SHA" \
             --title "SIGUC Brigadas $APP_VERSION_NAME" \
             --notes "APK do app de campo SIGUC Brigadas (versão $APP_VERSION_NAME, build $APP_VERSION_CODE)." \
             "$RUNNER_TEMP/siguc-brigadas.apk" || \
-          gh release upload "$GITHUB_REF_NAME" "$RUNNER_TEMP/siguc-brigadas.apk" --clobber
+          gh release upload "$TAG" "$RUNNER_TEMP/siguc-brigadas.apk" --clobber
