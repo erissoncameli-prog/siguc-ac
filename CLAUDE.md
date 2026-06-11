@@ -22,6 +22,9 @@ Sistema já tem login, sidebar, layout e páginas funcionando.
   municipios_acre.geojson, ti_acre.geojson
 - supabase/migrations/ → 001_initial.sql, 002_auditoria_acessos.sql
 - api/ → health.js, metrics.js
+- app/ → shell nativo Capacitor do Brigadas (APK Android gerado pelo
+  workflow brigadas-apk.yml a partir dos mesmos arquivos web;
+  ver docs/app-brigadas.md — alterações sempre nos arquivos web)
 
 ## Design system (nunca alterar variáveis sem alinhamento)
 --floresta:#0A1A0F | --verde-c:#52B788 | --ouro:#C9A84C | --ouro-c:#F0CB6A
