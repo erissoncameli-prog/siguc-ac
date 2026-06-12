@@ -626,16 +626,25 @@ window.supabase = window.supabase || { createClient: () => null }
 // vai direto para o cache local (PIN + dados do brigadista).
 ;(function () {
   if (!window.supabase || typeof window.supabase.createClient !== 'function') return
-  const _brigDb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    auth: {
-      storageKey:       'siguc-brigada-session',
-      storage:          window.localStorage,
-      persistSession:   true,
-      autoRefreshToken: true,
-      detectSessionInUrl: false,
-    },
-  });
-  if (_brigDb) db = _brigDb;
+  try {
+    const _brigDb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: {
+        storageKey:       'siguc-brigada-session',
+        storage:          window.localStorage,
+        persistSession:   true,
+        autoRefreshToken: true,
+        detectSessionInUrl: false,
+      },
+    });
+    if (_brigDb) {
+      db = _brigDb
+      console.info('[brigada] cliente isolado com sessão persistente ativo')
+    }
+  } catch (e) {
+    // Sem o cliente isolado o app cai na sessão por janela do sistema
+    // (perde a sessão ao fechar) — registrar alto para não passar batido
+    console.error('[brigada] cliente isolado FALHOU — usando sessão por janela:', e)
+  }
 })();
 </script>
 <script src="/js/brigada-offline.js"></script>

@@ -10,7 +10,9 @@ const { createClient } = supabase;
 const _dbRaw = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: { storage: window.sessionStorage, persistSession: true, autoRefreshToken: true, detectSessionInUrl: false }
 });
-const db = typeof createInstrumentedDb !== 'undefined' ? createInstrumentedDb(_dbRaw) : _dbRaw;
+// let (não const): o app de campo Brigadas substitui por um cliente
+// isolado com sessão persistente protegida por PIN — ver pages/brigada.html
+let db = typeof createInstrumentedDb !== 'undefined' ? createInstrumentedDb(_dbRaw) : _dbRaw;
 
 // ── Estado global ─────────────────────────────────────────────
 const appState = { usuario: null, perfil: null };
