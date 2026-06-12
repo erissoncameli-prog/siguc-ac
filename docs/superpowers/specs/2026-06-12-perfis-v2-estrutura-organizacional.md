@@ -267,10 +267,36 @@ Acrescenta após os 5 anteriores:
    e refatorar as policies para usá-la (substitui parte do 058).
 8. Frontend — layout.js dinâmico, helpers podeVer/podeEditar, grade em usuarios.html.
 
-## Decisões pendentes desta camada
+## Decisões travadas desta camada
 
-- Níveis: 3 (sem_acesso/visualizar/editar) ou 4 (+administrar)?
-- Override individual cobre também ESCOPO (super_admin dá UCs extras a alguém) ou
-  só NÍVEL nesta fase?
-- Default de uma aba recém-criada: nasce 'sem_acesso' para todos (exceto super_admin)
-  e o admin libera, ou herda um padrão por grupo?
+- **Níveis: 3** — sem_acesso / visualizar / editar. ('editar' = criar/alterar/excluir
+  dentro do escopo do usuário.)
+- **Override cobre NÍVEL + ESCOPO** — além do nível por módulo, super_admin pode
+  conceder UCs avulsas a um usuário (tabela `usuario_ucs_extras`), somadas às que vêm
+  do cargo. Ver abaixo.
+- **Aba nova herda padrão por grupo** — `modulos.grupo` define o default. Há uma tabela
+  `grupo_permissoes_padrao` (perfil × grupo × nível); módulo sem padrão próprio assume
+  o padrão do seu grupo. Assim, criar aba no grupo 'Gestão' já a deixa visível para
+  quem vê Gestão, sem configurar perfil a perfil.
+
+### `usuario_ucs_extras` — escopo individual concedido
+```
+usuario_id   uuid REFERENCES usuarios
+uc_id        uuid REFERENCES unidades_conservacao
+concedido_por uuid REFERENCES usuarios
+concedido_em timestamptz
+motivo       text
+PRIMARY KEY (usuario_id, uc_id)
+```
+A VIEW `usuario_ucs_visiveis` passa a unir: UCs do cargo + UCs de delegação +
+UCs em `usuario_ucs_extras`. Tela de Usuários ganha um seletor de "UCs adicionais".
+
+### Resolução de nível efetivo (com herança de grupo)
+```
+nivel_efetivo(usuario, modulo_chave) :=
+  super_admin                         -> 'editar' (bypass)
+  override em usuario_permissoes      -> usa o nível
+  padrão do perfil para o módulo      -> perfil_permissoes_padrao
+  padrão do perfil para o GRUPO       -> grupo_permissoes_padrao
+  senão                               -> 'sem_acesso'
+```
