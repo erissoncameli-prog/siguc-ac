@@ -1,7 +1,23 @@
 # Perfis v2 — Reestruturação ancorada no organograma SEMA-AC
 
-> Spec de design. Status: **decisões fechadas, pronto para implementação.**
+> Spec de design. Status: **Fase 1 (motor de permissão) em implementação.**
 > Data: 2026-06-12
+
+## Implementação — arquivos reais (atualiza a numeração provisória do spec)
+
+| Arquivo | Conteúdo | Status |
+|---|---|---|
+| `055_perfis_v2.sql` | Novos perfis no enum + nivel_hierarquico + coluna `perfil_origem` | ✅ criado |
+| `056_catalogo_modulos.sql` | Tabelas `modulos`, `grupo_permissoes_padrao`, `perfil_permissoes_padrao`, `usuario_permissoes`, `usuario_ucs_extras` + seed catálogo e padrões | ✅ criado |
+| `057_permissao_efetiva.sql` | `nivel_efetivo()`, `pode_ver/pode_editar`, `is_super_admin()`, VIEW `minhas_permissoes`, RLS do catálogo | ✅ criado |
+| `058_*` (futuro) | Refatorar RLS das tabelas de DADOS (monitoramento, ocorrências, etc.) para usar `pode_ver/pode_editar` + escopo de UC | ⏳ pendente |
+| `059_*` (futuro) | VIEW `usuario_ucs_visiveis` (cargo+delegação+extras) + trigger derivação cargo→perfil (dormente) | ⏳ pendente |
+| Frontend | layout.js dinâmico (via `minhas_permissoes`), `podeVer/podeEditar` em config.js, grade de permissões em usuarios.html | ⏳ pendente |
+
+> Importante: as migrations 055–057 só CRIAM o motor de permissão e suas próprias
+> tabelas/RLS. Elas NÃO alteram as policies das tabelas de dados existentes — ou
+> seja, o acesso atual do sistema continua igual até a migration 058. Isso é
+> proposital: ligar o motor sem risco de quebrar o que já funciona.
 
 ## Decisões travadas
 
