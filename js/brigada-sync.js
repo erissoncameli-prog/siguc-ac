@@ -8,41 +8,62 @@ let _syncRunning = false
 // ── Renovar sessão antes de sincronizar ───────────────────────
 // PWA no iOS suspende os timers de autoRefreshToken quando o app vai
 // para background. O token de 1h expira sem renovação automática.
-// Antes de cada sync online, verificamos e renovamos se necessário.
+// Retornos: 'ok' | 'sem_sessao' | 'refresh_falhou'
+// 'refresh_falhou' não aborta a sync: o refresh pode ter falhado por
+// rede e o token atual ainda pode estar válido — tentamos mesmo assim.
 async function bSyncGarantirSessao() {
   try {
     const { data: { session } } = await db.auth.getSession()
-    if (!session) return false
+    if (!session) return 'sem_sessao'
 
     // Renovar se expirado ou expira nos próximos 5 min
     const expiresAt = (session.expires_at ?? 0) * 1000
     if (Date.now() > expiresAt - 5 * 60 * 1000) {
       const { error } = await db.auth.refreshSession()
-      if (error) { console.warn('[brigada-sync] refresh falhou:', error.message); return false }
+      if (error) { console.warn('[brigada-sync] refresh falhou:', error.message); return 'refresh_falhou' }
     }
-    return true
+    return 'ok'
   } catch (e) {
     console.warn('[brigada-sync] garantirSessao:', e.message)
-    return false
+    return 'refresh_falhou'
   }
 }
 
+// ── Teste real de conectividade ───────────────────────────────
+// navigator.onLine e o evento 'online' NÃO são confiáveis na WebView
+// do app nativo (ficam obsoletos após ciclos de modo avião). A única
+// fonte de verdade é tentar alcançar o servidor.
+async function bSyncTemConexao() {
+  try {
+    const ctrl = new AbortController()
+    const t = setTimeout(() => ctrl.abort(), 4000)
+    const r = await fetch(`${SUPABASE_URL}/auth/v1/health`, { cache: 'no-store', signal: ctrl.signal })
+    clearTimeout(t)
+    // Qualquer resposta < 500 prova conectividade; o service worker da
+    // versão web responde 503 sintético quando offline.
+    return r.status < 500
+  } catch { return false }
+}
+
 // ── Ponto de entrada público ──────────────────────────────────
+// Retorna: 'ok' | 'vazio' | 'sem_conexao' | 'sem_sessao' | 'ocupado'
 async function bSyncRodar() {
-  if (_syncRunning || !db) return
-
-  // Só renovar sessão quando online (sem rede não há como renovar)
-  if (navigator.onLine) {
-    const sessaoOk = await bSyncGarantirSessao()
-    if (!sessaoOk) {
-      bSyncEmitir('erro', { uuid: null, err: 'Sessão expirada — abra o app e faça login novamente' })
-      return
-    }
-  }
-
+  if (_syncRunning || !db) return 'ocupado'
   _syncRunning = true
   try {
+    const pendentes = await bOfflineListarPendentes()
+    if (!pendentes.length) return 'vazio'
+
+    if (!await bSyncTemConexao()) return 'sem_conexao'
+
+    const sessao = await bSyncGarantirSessao()
+    if (sessao === 'sem_sessao') {
+      bSyncEmitir('erro', { uuid: null, err: 'Sessão expirada — abra o app e faça login novamente' })
+      return 'sem_sessao'
+    }
+
     await bSyncExecutar()
+    return 'ok'
   } finally {
     _syncRunning = false
   }
@@ -261,6 +282,10 @@ function bSyncMontarFaunaPayload(f, registroCampoId, fotosUrls = []) {
 
 // ── Background Sync via Service Worker ───────────────────────
 async function bSyncRegistrarBackground() {
+  // App nativo (Capacitor): sem service worker — o retry periódico do
+  // app cobre o reenvio. Sem este guard, navigator.serviceWorker.ready
+  // nunca resolve e a promise fica pendurada para sempre.
+  if (window.Capacitor) return false
   if (!('serviceWorker' in navigator) || !('SyncManager' in window)) return false
   try {
     const reg = await navigator.serviceWorker.ready
