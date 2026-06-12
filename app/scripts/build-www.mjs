@@ -23,9 +23,10 @@ for (const f of ['config.js', 'brigada-offline.js', 'brigada-sync.js', 'brigada-
   cpSync(join(RAIZ, 'js', f), join(WWW, 'js', f))
 }
 
-// ── Mascote (faixa institucional e telas de bloqueio) ─────────
+// ── Mascote (faixa institucional, telas de bloqueio e vídeo) ──
 mkdirSync(join(WWW, 'pwa/icons'), { recursive: true })
 cpSync(join(RAIZ, 'pwa/icons/mascote.png'), join(WWW, 'pwa/icons/mascote.png'))
+cpSync(join(RAIZ, 'pwa/mascote-video.mp4'), join(WWW, 'pwa/mascote-video.mp4'))
 
 // ── CSS (remove @import do Google Fonts — fontes são locais) ──
 let css = readFileSync(join(RAIZ, 'css', 'brigada.css'), 'utf8')
