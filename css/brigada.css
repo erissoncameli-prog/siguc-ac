@@ -732,7 +732,42 @@ body { margin: 0; }
   background: var(--prim); color: #fff;
   display: flex; align-items: center; justify-content: center;
   font-size: 22px; font-weight: 700; flex-shrink: 0;
+  position: relative; border: none; cursor: pointer; padding: 0;
+  background-size: cover; background-position: center;
+  font-family: var(--font-ui);
+  -webkit-tap-highlight-color: transparent;
 }
+.avatar-badge {
+  position: absolute; right: -4px; bottom: -4px;
+  width: 22px; height: 22px; border-radius: 50%;
+  background: var(--surface); border: 1px solid #DDE6DF;
+  font-size: 11px; line-height: 1;
+  display: flex; align-items: center; justify-content: center;
+}
+
+/* ── Meus Resultados ─────────────────────────────────────── */
+.dados-atualizado { font-size: 12px; color: #6B7280; text-align: center; margin: 0 0 12px; }
+.dados-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+.dados-kpi {
+  background: var(--surface); border: 1px solid #DDE6DF;
+  border-radius: 16px; padding: 14px 8px; text-align: center;
+}
+.dados-kpi strong { display: block; font-size: 26px; font-family: var(--font-mono); color: var(--ink-d); }
+.dados-kpi span { font-size: 11px; color: #6B7280; text-transform: uppercase; letter-spacing: .04em; }
+
+.barra-row { display: grid; grid-template-columns: 108px 1fr 36px; align-items: center; gap: 8px; margin-bottom: 8px; }
+.barra-row:last-child { margin-bottom: 0; }
+.barra-rotulo { font-size: 12.5px; color: var(--ink-d); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.barra-track { height: 12px; border-radius: 6px; background: #EDF3EE; overflow: hidden; }
+.barra-fill { height: 100%; border-radius: 6px; background: var(--prim); transition: width .5s var(--ease-out); }
+.barra-valor { font-family: var(--font-mono); font-size: 12.5px; text-align: right; color: var(--ink-d); }
+.chart-vazio { font-size: 13px; color: #9CA3AF; text-align: center; padding: 8px 0; margin: 0; }
+
+.chart-colunas { display: flex; align-items: flex-end; gap: 8px; height: 120px; padding-top: 4px; }
+.coluna-mes { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 4px; height: 100%; }
+.coluna-fill { width: 100%; max-width: 34px; border-radius: 6px 6px 0 0; background: var(--prim); }
+.coluna-rotulo { font-size: 10.5px; color: #6B7280; }
+.coluna-valor { font-family: var(--font-mono); font-size: 11px; color: var(--ink-d); }
 .btn-config-item {
   width: 100%; padding: 14px 16px; margin-bottom: 10px;
   background: #fff; border: 1px solid #E5E7EB; border-radius: 14px;
