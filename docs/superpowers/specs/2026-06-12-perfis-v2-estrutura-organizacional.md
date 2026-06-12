@@ -135,8 +135,11 @@ todas as UCs (camada GeoJSON pública), mas só editam os dados do seu escopo.
    ocorrencias, documentos, brigadas para respeitar escopo.
 5. `059_perfis_especiais.sql` — formalizar pesquisador_externo, brigadista,
    validador_brigada e validador_fauna; migrar o "biologo" do código para
-   validador_fauna. Validação de Campo passa a filtrar por tipo de pendência
-   (ocorrência de brigada → validador_brigada; fauna → validador_fauna).
+   validador_fauna.
+   - validador_brigada: fila = ocorrências reportadas pelas brigadas (Validação de Campo).
+   - validador_fauna: adicionar a monitoramento_registros os campos de validação por
+     especialista (requer_validacao_especialista, status_validacao, validado_por,
+     validado_em); RLS dá UPDATE desses campos ao validador_fauna em qualquer UC.
 6. Frontend — atualizar navGroups em js/layout.js (perfis por item) e
    pages/usuarios.html (novos perfis); atualizar i18n.perfis em js/config.js.
 
