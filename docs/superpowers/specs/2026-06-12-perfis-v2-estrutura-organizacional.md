@@ -1,0 +1,126 @@
+# Perfis v2 — Reestruturação ancorada no organograma SEMA-AC
+
+> Spec de design. Status: **decisões fechadas, pronto para implementação.**
+> Data: 2026-06-12
+
+## Decisões travadas
+
+| Decisão | Escolha |
+|---|---|
+| Escopo por UC | **Sim** — gestor_uc e tecnico veem/editam só a(s) UC(s) vinculada(s) |
+| Perfil x cargo | **Derivar do cargo** (módulo 003) automaticamente, fonte única de verdade |
+| Populações nesta rodada | Internos + pesquisadores externos + brigadistas/validador |
+| Secretário | **Só leitura + executivo** (não opera) |
+| Migração dos `gestor` atuais | Tem `usuarios.uc_id` → `gestor_uc`; sem → `chefe_departamento` |
+
+## Problema que estamos resolvendo
+
+Existem duas hierarquias paralelas que não se conversam:
+- `perfil_usuario` (5 papéis achatados) → controla permissão via RLS.
+- `nivel_hierarquico` (7 níveis em `cargos`) → apenas descritivo, ignorado nas permissões.
+
+Resultado: um gestor de 1 UC tem o mesmo poder que o chefe do DEUC. Pesquisadores
+externos e brigadistas (que já têm login próprio) não têm perfil formal.
+
+## Conjunto final de perfis
+
+| Perfil | Origem | Escopo | Observação |
+|---|---|---|---|
+| `super_admin` | manual | Global | TI/DIMA — configura o sistema |
+| `secretario` | cargo | Global | Executivo, só leitura + aprovação alto nível |
+| `diretor` | cargo | Global | Diretor DIMA — vê tudo, aprova |
+| `chefe_departamento` | cargo | Departamento (N UCs) | Chefe DEUC / Coord. CIGMA |
+| `gestor_uc` | cargo | 1 UC | Opera só a UC dele |
+| `tecnico` | cargo | UC ou global | Analista — lança dados de campo |
+| `financeiro` | manual | Global | Módulo financeiro/pesquisa |
+| `visualizador` | manual | Global | Só leitura |
+| `pesquisador_externo` | cargo/auto | Próprios projetos | Portal de pesquisa |
+| `brigadista` | função login | Própria brigada | App de campo |
+| `validador_campo` | manual | UCs designadas | Substitui o "biologo" fantasma do código |
+| ~~`gestor`~~ (legado) | — | — | Migra → chefe_departamento ou gestor_uc |
+
+## Derivação cargo → perfil
+
+```
+secretario          → secretario
+diretor             → diretor
+coordenador         → chefe_departamento
+chefe_deuc          → chefe_departamento
+gestor_uc           → gestor_uc        (+ escopo = cargos.uc_id)
+analista_uc         → tecnico          (+ escopo = cargos.uc_id)
+pesquisador_externo → pesquisador_externo
+```
+
+Fora da derivação (atribuídos à mão): super_admin, financeiro, visualizador,
+brigadista, validador_campo.
+
+Mecânica: trigger em `cargo_ocupacoes` e `delegacoes_temporarias` recalcula
+`usuarios.perfil` e o escopo quando titular/substituto entra ou sai.
+
+Escopo multi-UC: VIEW `usuario_ucs_visiveis` (usuário → UCs via cargos vigentes
++ delegações). RLS passa a checar `uc_id IN (SELECT ... FROM usuario_ucs_visiveis)`.
+
+## Matriz módulo × perfil
+
+Legenda: ✅ edita · 👁️ vê · 🔒 vê só do escopo (UC) · — sem acesso
+
+| Módulo | super_admin | secretario | diretor | chefe_depto | gestor_uc | tecnico | financeiro | visualiz. | pesq_ext | brigadista | validador |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| Dashboard / Mapa | ✅ | 👁️ | 👁️ | 👁️ | 🔒 | 🔒 | 👁️ | 👁️ | — | — | — |
+| Dashboard Executivo | ✅ | 👁️ | 👁️ | 👁️ | — | — | 👁️ | — | — | — | — |
+| Unidades (UCs) | ✅ | 👁️ | ✅ | ✅ | 🔒✅ | 🔒👁️ | 👁️ | 👁️ | — | — | — |
+| Monitoramento | ✅ | 👁️ | 👁️ | ✅ | 🔒✅ | 🔒✅ | 👁️ | 👁️ | — | — | — |
+| Netflora (inventário) | ✅ | 👁️ | 👁️ | ✅ | 🔒✅ | 🔒✅ | — | 👁️ | — | — | — |
+| Alertas Ambientais | ✅ | 👁️ | 👁️ | ✅ | 🔒✅ | 🔒👁️ | — | 👁️ | — | — | — |
+| Painel do Gestor (inbox) | ✅ | 👁️ | ✅ | ✅ | 🔒✅ | — | — | — | — | — | — |
+| Ocorrências | ✅ | 👁️ | ✅ | ✅ | 🔒✅ | 🔒✅ | — | 👁️ | — | — | — |
+| Pesquisas (gestão interna) | ✅ | 👁️ | ✅ | ✅ | 🔒👁️ | 🔒👁️ | 🔒✅* | — | — | — | — |
+| Relatórios | ✅ | 👁️ | 👁️ | 👁️ | 🔒 | 🔒 | 👁️ | 👁️ | — | — | — |
+| Equipe | ✅ | 👁️ | ✅ | ✅ | 🔒👁️ | — | — | 👁️ | — | — | — |
+| Documentos | ✅ | 👁️ | ✅ | ✅ | 🔒✅ | 🔒✅ | 👁️ | 👁️ | — | — | — |
+| Brigadas (gestão) | ✅ | 👁️ | 👁️ | ✅ | 🔒✅ | 🔒👁️ | — | — | — | — | — |
+| Validação de Campo | ✅ | — | — | ✅ | 🔒✅ | 🔒✅ | — | — | — | — | ✅ |
+| App de Campo (brigada) | ✅ | — | — | — | — | — | — | — | — | ✅ | — |
+| Relatórios Brigadas | ✅ | 👁️ | 👁️ | ✅ | 🔒 | 🔒 | — | — | — | — | 👁️ |
+| Admin: Usuários | ✅ | — | 👁️ | 👁️ | — | — | — | — | — | — | — |
+| Admin: Estrutura Org. | ✅ | 👁️ | ✅ | 👁️ | — | — | — | — | — | — | — |
+| Admin: Configurações | ✅ | — | — | — | — | — | — | — | — | — | — |
+| Admin: Histórico Acessos | ✅ | — | 👁️ | — | — | — | — | — | — | — | — |
+| Portal Pesquisador | — | — | — | — | — | — | — | — | ✅ próprios | — | — |
+
+\* financeiro: apenas sub-fluxo financeiro/inadimplência de pesquisa.
+
+Nuance de UX: no Mapa, gestor_uc continua vendo o contorno de todas as UCs
+(camada GeoJSON pública), mas só edita os dados da sua. O 🔒 vale para os dados.
+
+## Plano de migrations
+
+1. `055_perfis_v2.sql` — ALTER TYPE perfil_usuario ADD VALUE (novos perfis).
+   Atenção: ADD VALUE não pode ser usado na mesma transação — separar COMMIT.
+2. `056_escopo_uc.sql` — VIEW usuario_ucs_visiveis (SECURITY DEFINER / função estável
+   para evitar recursão de RLS, ver bug histórico em 050).
+3. `057_derivar_perfil_cargo.sql` — função + triggers cargo_ocupacoes / delegacoes.
+4. `058_rls_escopo.sql` — reescrever policies de unidades_conservacao, monitoramento_*,
+   ocorrencias, documentos, brigadas para respeitar escopo.
+5. `059_perfis_especiais.sql` — formalizar pesquisador_externo, brigadista,
+   validador_campo; migrar o "biologo" do código.
+6. Frontend — atualizar navGroups em js/layout.js (perfis por item) e
+   pages/usuarios.html (novos perfis); atualizar i18n.perfis em js/config.js.
+
+## Migração de dados (decisão travada)
+
+```sql
+-- gestor atual com UC vinculada → gestor_uc
+UPDATE usuarios SET perfil = 'gestor_uc'
+WHERE perfil = 'gestor' AND uc_id IS NOT NULL;
+-- gestor atual sem UC → chefe_departamento
+UPDATE usuarios SET perfil = 'chefe_departamento'
+WHERE perfil = 'gestor' AND uc_id IS NULL;
+```
+
+## Riscos
+
+- RLS recursiva (ver 050_fix_brigadistas_rls_recursion.sql) — VIEW de escopo precisa
+  de função estável/SECURITY DEFINER.
+- ALTER TYPE ADD VALUE fora de transação — pode exigir 2 migrations.
+- Pesquisadores e brigadistas têm fluxo de login próprio — não quebrar o existente.
