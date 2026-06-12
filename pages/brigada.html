@@ -132,8 +132,8 @@
   <!-- Faixa institucional: Governo + SEMA com o mascote sobreposto -->
   <div class="faixa-inst">
     <div class="faixa-logos">
-      <span class="faixa-logo-chip" id="faixa-logo-gov" hidden><img id="img-logo-gov" alt="Governo do Acre"></span>
-      <span class="faixa-logo-chip" id="faixa-logo-sec" hidden><img id="img-logo-sec" alt="SEMA-AC"></span>
+      <span class="faixa-logo-chip gov" hidden><img alt="Governo do Acre"></span>
+      <span class="faixa-logo-chip sec" hidden><img alt="SEMA-AC"></span>
     </div>
     <img class="faixa-mascote" src="/pwa/icons/mascote.png" alt="Brigadistas Comunitários — SEMA">
   </div>
@@ -733,6 +733,7 @@ async function boot() {
   }
   await bOfflineInit()
   bOfflinePersistir()
+  inserirFaixasInst()
   carregarLogosInstitucionais()
 
   // 1. Sessão ativa — só verifica se Supabase está disponível (online)
@@ -996,10 +997,10 @@ async function verificarConexao() {
 
 // ── Mascote: pulo de comemoração ao concluir sincronização ───
 function mascoteComemorar() {
-  const m = document.querySelector('.faixa-mascote')
-  if (!m) return
-  m.classList.add('comemora')
-  setTimeout(() => m.classList.remove('comemora'), 1400)
+  document.querySelectorAll('.faixa-mascote').forEach(m => {
+    m.classList.add('comemora')
+    setTimeout(() => m.classList.remove('comemora'), 1400)
+  })
 }
 
 // ── Vídeo do mascote (toque no mascote, login e pós-sync) ────
@@ -1027,15 +1028,33 @@ function mascoteVideoFechar() {
   document.getElementById('video-mascote-wrap').hidden = true
 }
 
+// ── Faixa institucional nas demais abas (mesma identidade da home) ─
+function inserirFaixasInst() {
+  const faixa = compacta => `
+    <div class="faixa-inst${compacta ? ' compacta' : ''}">
+      <div class="faixa-logos">
+        <span class="faixa-logo-chip gov" hidden><img alt="Governo do Acre"></span>
+        <span class="faixa-logo-chip sec" hidden><img alt="SEMA-AC"></span>
+      </div>
+      <img class="faixa-mascote" src="/pwa/icons/mascote.png" alt="Brigadistas Comunitários — SEMA">
+    </div>`
+  ;[['tela-fila', false], ['tela-dados', false], ['tela-config', false],
+    ['tela-form', true], ['tela-fauna', true]].forEach(([id, compacta]) => {
+    document.getElementById(id)?.insertAdjacentHTML('afterbegin', faixa(compacta))
+  })
+}
+
 // ── Logos institucionais (config do SIGUC, cacheadas p/ offline) ─
 function renderFaixaLogos(c) {
-  const aplicar = (chipId, imgId, dado) => {
+  const aplicar = (sel, dado) => {
     if (!dado) return
-    document.getElementById(imgId).src = dado
-    document.getElementById(chipId).hidden = false
+    document.querySelectorAll(sel).forEach(chip => {
+      chip.querySelector('img').src = dado
+      chip.hidden = false
+    })
   }
-  aplicar('faixa-logo-gov', 'img-logo-gov', c?.gov)
-  aplicar('faixa-logo-sec', 'img-logo-sec', c?.sec)
+  aplicar('.faixa-logo-chip.gov', c?.gov)
+  aplicar('.faixa-logo-chip.sec', c?.sec)
 }
 
 // Converte a logo colorida em versão branca (knockout) para a faixa
@@ -2207,7 +2226,10 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('config-avatar').addEventListener('click', alterarFotoBrigadista)
 
   // Vídeo do mascote
-  document.querySelector('.faixa-mascote').addEventListener('click', mascoteVideoTocar)
+  // Delegação: cobre os mascotes injetados em todas as abas
+  document.addEventListener('click', e => {
+    if (e.target.closest('.faixa-mascote')) mascoteVideoTocar()
+  })
   document.getElementById('video-mascote-wrap').addEventListener('click', mascoteVideoFechar)
   document.getElementById('btn-fechar-video').addEventListener('click', mascoteVideoFechar)
   document.getElementById('video-mascote').addEventListener('ended', mascoteVideoFechar)
