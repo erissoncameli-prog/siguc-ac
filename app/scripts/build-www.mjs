@@ -28,6 +28,10 @@ mkdirSync(join(WWW, 'pwa/icons'), { recursive: true })
 cpSync(join(RAIZ, 'pwa/icons/mascote.png'), join(WWW, 'pwa/icons/mascote.png'))
 cpSync(join(RAIZ, 'pwa/mascote-video.mp4'), join(WWW, 'pwa/mascote-video.mp4'))
 
+// ── Municípios do Acre (município no card de GPS, offline) ────
+mkdirSync(join(WWW, 'data'), { recursive: true })
+cpSync(join(RAIZ, 'data/municipios_acre.geojson'), join(WWW, 'data/municipios_acre.geojson'))
+
 // ── CSS (remove @import do Google Fonts — fontes são locais) ──
 let css = readFileSync(join(RAIZ, 'css', 'brigada.css'), 'utf8')
 css = css.replace(/@import url\('https:\/\/fonts\.googleapis\.com[^']*'\);?\n?/g, '')
