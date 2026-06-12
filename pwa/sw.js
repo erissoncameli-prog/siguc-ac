@@ -1,5 +1,5 @@
 // ── SIGUC Brigadas — Service Worker ───────────────────────────
-const CACHE = 'siguc-brigadas-v20'
+const CACHE = 'siguc-brigadas-v21'
 
 const APP_SHELL = [
   '/pages/brigada.html',
@@ -12,6 +12,12 @@ const APP_SHELL = [
   '/js/brigada-fauna.js',
   '/pwa/icons/mascote.png',
   '/data/municipios_acre.geojson',
+  '/pwa/icons/fauna/mamifero.png',
+  '/pwa/icons/fauna/ave.png',
+  '/pwa/icons/fauna/reptil.png',
+  '/pwa/icons/fauna/anfibio.png',
+  '/pwa/icons/fauna/peixe.png',
+  '/pwa/icons/fauna/invertebrado.png',
   'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2',
 ]
 
