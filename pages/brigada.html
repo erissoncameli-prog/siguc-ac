@@ -726,6 +726,14 @@ async function prosseguirAposAuth(session) {
   }
 }
 
+// ── Mascote: pulo de comemoração ao concluir sincronização ───
+function mascoteComemorar() {
+  const m = document.querySelector('.faixa-mascote')
+  if (!m) return
+  m.classList.add('comemora')
+  setTimeout(() => m.classList.remove('comemora'), 1400)
+}
+
 // ── Logos institucionais (config do SIGUC, cacheadas p/ offline) ─
 function renderFaixaLogos(c) {
   const aplicar = (chipId, imgId, dado) => {
@@ -1799,7 +1807,10 @@ document.addEventListener('DOMContentLoaded', () => {
     bSyncOn('sync-fim', ({ ok, erros }) => {
       if (erros === 0) {
         mostrarBarra(100, `✓ ${ok} registro${ok !== 1 ? 's' : ''} enviado${ok !== 1 ? 's' : ''}`)
-        if (ok > 0) toast(`${ok} registro${ok !== 1 ? 's' : ''} sincronizado${ok !== 1 ? 's' : ''}!`, 'ok')
+        if (ok > 0) {
+          toast(`${ok} registro${ok !== 1 ? 's' : ''} sincronizado${ok !== 1 ? 's' : ''}!`, 'ok')
+          mascoteComemorar()
+        }
       } else {
         mostrarBarra(100, `${ok} enviado${ok !== 1 ? 's' : ''} · ${erros} com erro`)
         toast(`${erros} registro(s) não puderam ser enviados`, 'warn')
