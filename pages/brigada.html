@@ -722,14 +722,15 @@ async function buscarBrigadaDoBanco(brigadaId) {
 }
 
 async function sincronizarEspecies() {
-  if (!navigator.onLine || !db) return
+  if (!db) return false
   try {
     const { data } = await db
       .from('especies_fauna')
       .select('id, nome_cientifico, nomes_populares, classe, status_conservacao, ameacada')
       .limit(500)
     if (data?.length) await bOfflineSalvarEspecies(data)
-  } catch { /* silencioso */ }
+    return !!data?.length
+  } catch { return false }
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -1051,8 +1052,9 @@ async function salvarRegistro() {
     toast('Registro salvo! Será enviado quando houver conexão.', 'ok')
     await atualizarBadgeFila()
     bSyncRegistrarBackground()
-    // Tenta sincronizar imediatamente se online
-    if (navigator.onLine) bSyncRodar()
+    // Tenta sincronizar já — a conectividade real é testada dentro de
+    // bSyncRodar (navigator.onLine não é confiável na WebView do app)
+    bSyncRodar()
     mostrarTela('tela-home')
   } catch (err) {
     toast('Erro ao salvar: ' + err.message, 'erro')
@@ -1327,9 +1329,11 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-back-config').addEventListener('click', () => mostrarTela('tela-home'))
 
   // Home
-  document.getElementById('btn-sync-home').addEventListener('click', () => {
-    if (navigator.onLine) { bSyncRodar(); toast('Sincronizando…', 'info') }
-    else toast('Sem conexão — registro será enviado automaticamente', 'warn')
+  document.getElementById('btn-sync-home').addEventListener('click', async () => {
+    toast('Sincronizando…', 'info')
+    const r = await bSyncRodar()
+    if (r === 'sem_conexao') toast('Sem conexão — será enviado automaticamente', 'warn')
+    if (r === 'vazio') toast('Nenhum registro pendente', 'info')
   })
   document.getElementById('btn-ver-fila').addEventListener('click', () => mostrarTela('tela-fila'))
 
@@ -1358,9 +1362,11 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-fauna-capturar').addEventListener('click', capturarFaunaFoto)
 
   // Fila
-  document.getElementById('btn-sync-fila').addEventListener('click', () => {
-    if (navigator.onLine) { bSyncRodar(); toast('Sincronizando…', 'info') }
-    else toast('Sem conexão', 'warn')
+  document.getElementById('btn-sync-fila').addEventListener('click', async () => {
+    toast('Sincronizando…', 'info')
+    const r = await bSyncRodar()
+    if (r === 'sem_conexao') toast('Sem conexão — será enviado automaticamente', 'warn')
+    if (r === 'vazio') toast('Nenhum registro pendente', 'info')
   })
   document.getElementById('btn-exportar-json').addEventListener('click', async () => {
     const n = await bOfflineExportar()
@@ -1379,10 +1385,9 @@ document.addEventListener('DOMContentLoaded', () => {
     mostrarTela('tela-config-pin')
   })
   document.getElementById('btn-buscar-especies').addEventListener('click', async () => {
-    if (!navigator.onLine) { toast('Sem conexão', 'warn'); return }
     toast('Atualizando catálogo…', 'info')
-    await sincronizarEspecies()
-    toast('Catálogo atualizado', 'ok')
+    const ok = await sincronizarEspecies()
+    toast(ok ? 'Catálogo atualizado' : 'Sem conexão — tente mais tarde', ok ? 'ok' : 'warn')
   })
   document.getElementById('btn-zerar-fila').addEventListener('click', async () => {
     const total = await bSyncContarPendentes()
@@ -1449,11 +1454,20 @@ document.addEventListener('DOMContentLoaded', () => {
     })
   })()
 
-  // Online/offline
+  // Online/offline — o evento 'online' funciona na web, mas NÃO é
+  // confiável na WebView do app nativo (não dispara após modo avião).
   window.addEventListener('online', async () => {
     bSyncRodar()
     toast('Conexão restabelecida — sincronizando…', 'info')
   })
+
+  // Rede de segurança (essencial no app nativo): reenvia pendentes ao
+  // voltar do background e a cada 45s. bSyncRodar sai barato e em
+  // silêncio quando a fila está vazia ou segue sem conexão real.
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) bSyncRodar()
+  })
+  setInterval(() => { bSyncRodar() }, 45000)
 
   // Field mode restaurado
   bOfflineGetConfig('field_mode').then(v => {
@@ -1461,6 +1475,9 @@ document.addEventListener('DOMContentLoaded', () => {
   })
 
   boot()
+
+  // Tentativa inicial: envia pendentes que sobraram da sessão anterior
+  bSyncRodar()
 })
 </script>
 </body>
