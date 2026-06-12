@@ -1889,29 +1889,39 @@ const COR_CLASSE = {
 async function carregarDados() {
   let stats = await bOfflineGetConfig('stats_cache_v2')
 
-  // Online: busca dados frescos do banco e atualiza o cache local
+  // Online: busca dados frescos do banco e atualiza o cache local.
+  // Sem sessão autenticada o RLS devolve lista vazia — não pode
+  // sobrescrever o cache, senão os resultados "somem" da tela
+  let sessaoExpirada = false
   if (db && App.brigadista?.id && await bSyncTemConexao()) {
-    try {
-      const [{ data: regs }, { data: fauna }] = await Promise.all([
-        db.from('registros_campo')
-          .select('natureza, atividade, data_hora_evento, area_estimada_ha, status_validacao')
-          .eq('brigadista_id', App.brigadista.id),
-        db.from('registro_fauna')
-          .select('classe, quantidade, registro_campo_id, registros_campo!inner(brigadista_id)')
-          .eq('registros_campo.brigadista_id', App.brigadista.id),
-      ])
-      if (regs) {
-        stats = { quando: new Date().toISOString(), regs, fauna: fauna || [] }
-        await bOfflineSetConfig('stats_cache_v2', stats)
-      }
-    } catch (e) { console.warn('[dados]', e) }
+    const { data: { session } } = await db.auth.getSession()
+    if (!session) {
+      sessaoExpirada = true
+    } else {
+      try {
+        const [{ data: regs }, { data: fauna }] = await Promise.all([
+          db.from('registros_campo')
+            .select('natureza, atividade, data_hora_evento, area_estimada_ha, status_validacao')
+            .eq('brigadista_id', App.brigadista.id),
+          db.from('registro_fauna')
+            .select('classe, quantidade, registro_campo_id, registros_campo!inner(brigadista_id)')
+            .eq('registros_campo.brigadista_id', App.brigadista.id),
+        ])
+        if (regs) {
+          stats = { quando: new Date().toISOString(), regs, fauna: fauna || [] }
+          await bOfflineSetConfig('stats_cache_v2', stats)
+        }
+      } catch (e) { console.warn('[dados]', e) }
+    }
   }
 
   const pendentes = await bOfflineListarPendentes()
   const infoEl    = document.getElementById('dados-atualizado')
 
   if (!stats) {
-    infoEl.textContent = 'Conecte-se à internet uma vez para carregar seus resultados'
+    infoEl.textContent = sessaoExpirada
+      ? 'Sessão expirada — saia e faça login novamente para carregar seus resultados'
+      : 'Conecte-se à internet uma vez para carregar seus resultados'
     ;['chart-natureza', 'chart-atividade', 'chart-fauna', 'chart-validacao', 'chart-fauna-cruzado'].forEach(id =>
       document.getElementById(id).innerHTML = '<p class="chart-vazio">Sem dados ainda</p>')
     document.getElementById('chart-meses').innerHTML = ''
@@ -1920,7 +1930,8 @@ async function carregarDados() {
 
   const regs  = stats.regs  || []
   const fauna = stats.fauna || []
-  const aviso = pendentes.length ? ` · ${pendentes.length} aguardando envio` : ''
+  const aviso = (pendentes.length ? ` · ${pendentes.length} aguardando envio` : '') +
+    (sessaoExpirada ? ' · sessão expirada, faça login para atualizar' : '')
   infoEl.textContent = `Atualizado em ${formatData ? formatData(stats.quando) : stats.quando.slice(0, 10)}${aviso}`
 
   // KPIs
