@@ -122,6 +122,51 @@ function bCapturaMostrarGaleria(containerEl) {
 function bCapturaGetFotos() { return [..._capturaFotos] }
 function bCapturaLimpar()   { _capturaFotos = [] }
 
+function bCapturaAdicionar(blob) {
+  if (_capturaFotos.length >= 5) return false
+  _capturaFotos.push(blob)
+  return true
+}
+
+// ── Câmera nativa (app Capacitor) ─────────────────────────────
+// No app instalado usamos a câmera nativa do Android (tela cheia,
+// flash, zoom, foco por toque) via @capacitor/camera. A marca d'água
+// é aplicada depois no canvas — mesmo pipeline da câmera web.
+function bCameraEhNativa() {
+  return !!(window.Capacitor?.isNativePlatform?.() && window.Capacitor?.Plugins?.Camera)
+}
+
+async function bCameraNativaCapturar(brigadista, gps) {
+  let foto
+  try {
+    foto = await window.Capacitor.Plugins.Camera.getPhoto({
+      source: 'CAMERA',
+      resultType: 'base64',
+      quality: 85,
+      width: 1920,
+      correctOrientation: true,
+      saveToGallery: false,
+    })
+  } catch { return null }   // brigadista cancelou ou negou permissão
+  if (!foto?.base64String) return null
+
+  const img = new Image()
+  await new Promise((res, rej) => {
+    img.onload = res
+    img.onerror = rej
+    img.src = `data:image/${foto.format ?? 'jpeg'};base64,${foto.base64String}`
+  })
+
+  const canvas = document.createElement('canvas')
+  canvas.width  = img.naturalWidth
+  canvas.height = img.naturalHeight
+  const ctx = canvas.getContext('2d')
+  ctx.drawImage(img, 0, 0)
+  bCameraAguaMarca(ctx, canvas.width, canvas.height, brigadista, gps)
+
+  return new Promise(resolve => canvas.toBlob(b => resolve(b), 'image/jpeg', 0.85))
+}
+
 // ── GPS ───────────────────────────────────────────────────────
 function bGpsIniciar(onAtualizar) {
   if (!('geolocation' in navigator)) return
