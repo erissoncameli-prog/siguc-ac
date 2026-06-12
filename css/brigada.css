@@ -543,8 +543,8 @@ body { margin: 0; }
   width: 100%; max-width: 132px; height: 38px;
   display: flex; align-items: center; justify-content: center;
 }
-#faixa-logo-gov { grid-column: 1; justify-self: start; max-width: 165px; height: 48px; }
-#faixa-logo-sec { grid-column: 3; justify-self: end; }
+.faixa-logo-chip.gov { grid-column: 1; justify-self: start; max-width: 165px; height: 48px; }
+.faixa-logo-chip.sec { grid-column: 3; justify-self: end; }
 .faixa-logo-chip img {
   width: 100%; height: 100%; object-fit: contain; display: block;
   filter: drop-shadow(0 1px 3px rgba(0,0,0,.3));
@@ -557,6 +557,14 @@ body { margin: 0; }
   border-radius: 50%;
   filter: drop-shadow(0 4px 10px rgba(10,26,15,.35));
 }
+
+/* Variante compacta: telas de tarefa (formulário/fauna) — mesma
+   identidade, ocupando menos espaço vertical */
+.faixa-inst.compacta { padding: calc(8px + env(safe-area-inset-top)) 16px 8px; margin-bottom: 32px; }
+.faixa-inst.compacta .faixa-logos { min-height: 32px; grid-template-columns: 1fr 64px 1fr; }
+.faixa-inst.compacta .faixa-logo-chip { height: 28px; max-width: 104px; }
+.faixa-inst.compacta .faixa-logo-chip.gov { height: 34px; max-width: 124px; }
+.faixa-inst.compacta .faixa-mascote { width: 58px; height: 58px; bottom: -26px; }
 
 /* Mascote nas telas de login/bloqueio/PIN */
 .lock-mascote { width: 84px; height: 84px; border-radius: 50%; }
@@ -1033,16 +1041,27 @@ body { margin: 0; }
 .combo-ponto { fill: #fff; stroke: var(--ink-d); stroke-width: 2; animation: ponto-surge .4s var(--spring) backwards; }
 .combo-ponto-valor { font-family: var(--font-mono); font-size: 8.5px; fill: var(--ink-d); text-anchor: middle; font-weight: 700; animation: ponto-surge .4s var(--spring) backwards; }
 @keyframes ponto-surge { from { opacity: 0; transform: scale(.3); } }
+/* Mesmo padrão de cartão dos botões da home (natureza-btn) */
 .btn-config-item {
-  width: 100%; padding: 14px 16px; margin-bottom: 10px;
-  background: #fff; border: 1px solid #E5E7EB; border-radius: 14px;
-  text-align: left; font-family: var(--font-ui); font-size: 15px;
+  width: 100%; padding: 17px 18px; margin-bottom: 10px;
+  background: #fff; border: 1px solid #E5E7EB; border-radius: 18px;
+  display: flex; align-items: center; gap: 12px;
+  text-align: left; font-family: var(--font-ui);
+  font-size: 15px; font-weight: 600;
   color: var(--ink-d); cursor: pointer;
-  transition: background .12s; -webkit-tap-highlight-color: transparent;
+  box-shadow: 0 1px 4px rgba(10,26,15,.05);
+  transition: transform .18s var(--spring), background .12s;
+  -webkit-tap-highlight-color: transparent;
 }
-.btn-config-item:active { background: #F9FAFB; }
-.btn-config-item.btn-danger      { color: var(--combate); }
-.btn-config-item.btn-danger-soft { color: #D97706; }
+.btn-config-item::after {
+  content: '›'; margin-left: auto;
+  color: #9CA3AF; font-size: 22px; line-height: 1;
+}
+.btn-config-item:active { background: #F9FAFB; transform: scale(.97); }
+.btn-config-item.btn-danger      { color: var(--combate); border-color: rgba(239,91,60,.35); }
+.btn-config-item.btn-danger::after      { color: var(--combate); }
+.btn-config-item.btn-danger-soft { color: #D97706; border-color: rgba(217,119,6,.3); }
+.btn-config-item.btn-danger-soft::after { color: #D97706; }
 .quota-bar-wrap { display: flex; align-items: center; gap: 12px; }
 .quota-bar { flex: 1; height: 6px; border-radius: 3px; background: #E5E7EB; overflow: hidden; }
 .quota-fill { height: 100%; background: var(--prim); border-radius: 3px; transition: width .3s; }
