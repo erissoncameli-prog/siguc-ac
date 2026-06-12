@@ -69,38 +69,51 @@ Mecânica: trigger em `cargo_ocupacoes` e `delegacoes_temporarias` recalcula
 Escopo multi-UC: VIEW `usuario_ucs_visiveis` (usuário → UCs via cargos vigentes
 + delegações). RLS passa a checar `uc_id IN (SELECT ... FROM usuario_ucs_visiveis)`.
 
-## Matriz módulo × perfil
+## Matriz módulo × perfil — perfis gerais (internos)
 
-Legenda: ✅ edita · 👁️ vê · 🔒 vê só do escopo (UC) · — sem acesso
+Legenda: ✅ edita · 👁️ vê · 🔒 vê só do escopo (UC/lotação) · — sem acesso
 
-| Módulo | super_admin | secretario | diretor | chefe_depto | gestor_uc | tecnico | financeiro | visualiz. | pesq_ext | brigadista | validador |
-|---|---|---|---|---|---|---|---|---|---|---|---|
-| Dashboard / Mapa | ✅ | 👁️ | 👁️ | 👁️ | 🔒 | 🔒 | 👁️ | 👁️ | — | — | — |
-| Dashboard Executivo | ✅ | 👁️ | 👁️ | 👁️ | — | — | 👁️ | — | — | — | — |
-| Unidades (UCs) | ✅ | 👁️ | ✅ | ✅ | 🔒✅ | 🔒👁️ | 👁️ | 👁️ | — | — | — |
-| Monitoramento | ✅ | 👁️ | 👁️ | ✅ | 🔒✅ | 🔒✅ | 👁️ | 👁️ | — | — | — |
-| Netflora (inventário) | ✅ | 👁️ | 👁️ | ✅ | 🔒✅ | 🔒✅ | — | 👁️ | — | — | — |
-| Alertas Ambientais | ✅ | 👁️ | 👁️ | ✅ | 🔒✅ | 🔒👁️ | — | 👁️ | — | — | — |
-| Painel do Gestor (inbox) | ✅ | 👁️ | ✅ | ✅ | 🔒✅ | — | — | — | — | — | — |
-| Ocorrências | ✅ | 👁️ | ✅ | ✅ | 🔒✅ | 🔒✅ | — | 👁️ | — | — | — |
-| Pesquisas (gestão interna) | ✅ | 👁️ | ✅ | ✅ | 🔒👁️ | 🔒👁️ | 🔒✅* | — | — | — | — |
-| Relatórios | ✅ | 👁️ | 👁️ | 👁️ | 🔒 | 🔒 | 👁️ | 👁️ | — | — | — |
-| Equipe | ✅ | 👁️ | ✅ | ✅ | 🔒👁️ | — | — | 👁️ | — | — | — |
-| Documentos | ✅ | 👁️ | ✅ | ✅ | 🔒✅ | 🔒✅ | 👁️ | 👁️ | — | — | — |
-| Brigadas (gestão) | ✅ | 👁️ | 👁️ | ✅ | 🔒✅ | 🔒👁️ | — | — | — | — | — |
-| Validação de Campo | ✅ | — | — | ✅ | 🔒✅ | 🔒✅ | — | — | — | — | ✅ |
-| App de Campo (brigada) | ✅ | — | — | — | — | — | — | — | — | ✅ | — |
-| Relatórios Brigadas | ✅ | 👁️ | 👁️ | ✅ | 🔒 | 🔒 | — | — | — | — | 👁️ |
-| Admin: Usuários | ✅ | — | 👁️ | 👁️ | — | — | — | — | — | — | — |
-| Admin: Estrutura Org. | ✅ | 👁️ | ✅ | 👁️ | — | — | — | — | — | — | — |
-| Admin: Configurações | ✅ | — | — | — | — | — | — | — | — | — | — |
-| Admin: Histórico Acessos | ✅ | — | 👁️ | — | — | — | — | — | — | — | — |
-| Portal Pesquisador | — | — | — | — | — | — | — | — | ✅ próprios | — | — |
+| Módulo | super_admin | secretario | diretor | chefe_depto | gestor_uc | tecnico | assist_admin | financeiro | visualiz. |
+|---|---|---|---|---|---|---|---|---|---|
+| Dashboard / Mapa | ✅ | 👁️ | 👁️ | 👁️ | 🔒 | 🔒 | 🔒 | 👁️ | 👁️ |
+| Dashboard Executivo | ✅ | 👁️ | 👁️ | 👁️ | — | — | — | 👁️ | — |
+| Unidades (UCs) | ✅ | 👁️ | ✅ | ✅ | 🔒✅ | 🔒👁️ | 🔒👁️ | 👁️ | 👁️ |
+| Monitoramento | ✅ | 👁️ | 👁️ | ✅ | 🔒✅ | 🔒✅ | 🔒✅ | 👁️ | 👁️ |
+| Netflora (inventário) | ✅ | 👁️ | 👁️ | ✅ | 🔒✅ | 🔒✅ | 🔒✅ | — | 👁️ |
+| Alertas Ambientais | ✅ | 👁️ | 👁️ | ✅ | 🔒✅ | 🔒👁️ | 🔒👁️ | — | 👁️ |
+| Painel do Gestor (inbox) | ✅ | 👁️ | ✅ | ✅ | 🔒✅ | — | — | — | — |
+| Ocorrências | ✅ | 👁️ | ✅ | ✅ | 🔒✅ | 🔒✅ | 🔒✅ | — | 👁️ |
+| Pesquisas (gestão interna) | ✅ | 👁️ | ✅ | ✅ | 🔒👁️ | 🔒👁️ | 🔒✅ | 🔒✅* | — |
+| Relatórios | ✅ | 👁️ | 👁️ | 👁️ | 🔒 | 🔒 | 🔒 | 👁️ | 👁️ |
+| Equipe | ✅ | 👁️ | ✅ | ✅ | 🔒👁️ | — | 🔒✅ | — | 👁️ |
+| Documentos | ✅ | 👁️ | ✅ | ✅ | 🔒✅ | 🔒✅ | 🔒✅ | 👁️ | 👁️ |
+| Brigadas (gestão) | ✅ | 👁️ | 👁️ | ✅ | 🔒✅ | 🔒👁️ | 🔒✅ | — | — |
+| Relatórios Brigadas | ✅ | 👁️ | 👁️ | ✅ | 🔒 | 🔒 | 🔒 | — | — |
+| Admin: Usuários | ✅ | — | 👁️ | 👁️ | — | — | — | — | — |
+| Admin: Estrutura Org. | ✅ | 👁️ | ✅ | 👁️ | — | — | — | — | — |
+| Admin: Configurações | ✅ | — | — | — | — | — | — | — | — |
+| Admin: Histórico Acessos | ✅ | — | 👁️ | — | — | — | — | — | — |
 
 \* financeiro: apenas sub-fluxo financeiro/inadimplência de pesquisa.
 
-Nuance de UX: no Mapa, gestor_uc continua vendo o contorno de todas as UCs
-(camada GeoJSON pública), mas só edita os dados da sua. O 🔒 vale para os dados.
+`assistente_admin` = operador de digitação com escopo na lotação: insere dados nos
+módulos operacionais do seu setor, mas não aprova, não valida e não acessa admin.
+
+Nuance de UX: no Mapa, gestor_uc/tecnico/assist_admin continuam vendo o contorno de
+todas as UCs (camada GeoJSON pública), mas só editam os dados do seu escopo.
+
+## Perfis especializados (acesso estreito)
+
+- **`pesquisador_externo`** — só o Portal do Pesquisador; edita/acompanha apenas os
+  próprios projetos. Sem acesso ao sistema interno.
+- **`brigadista`** — só o App de Campo (brigada.html); registra ocorrências/atividades
+  da própria brigada. Sem acesso ao painel web.
+- **`validador_brigada`** — módulo Validação de Campo restrito às **ocorrências
+  reportadas pelas brigadas** das UCs/brigadas designadas; vê Relatórios de Brigadas.
+  Valida/rejeita o reporte operacional.
+- **`validador_fauna`** (especialista/biólogo) — módulo Validação de Campo restrito aos
+  **registros de fauna que aguardam identificação**; escopo por **especialidade**, não
+  por UC (vê fauna pendente de qualquer UC). Confirma/corrige a espécie.
 
 ## Plano de migrations
 
