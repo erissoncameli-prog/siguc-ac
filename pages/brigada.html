@@ -531,6 +531,12 @@
   </div>
 </div>
 
+<!-- ══ OVERLAY: VÍDEO DO MASCOTE ══════════════════════════════ -->
+<div id="video-mascote-wrap" class="video-mascote-overlay" hidden>
+  <video id="video-mascote" src="/pwa/mascote-video.mp4" playsinline muted preload="none"></video>
+  <button class="camera-fechar" id="btn-fechar-video" aria-label="Fechar vídeo">✕</button>
+</div>
+
 <!-- ── Scripts ─────────────────────────────────────────────── -->
 <script>
 // Stub de segurança: se o CDN não carregar (offline), config.js não quebra.
@@ -732,6 +738,23 @@ function mascoteComemorar() {
   if (!m) return
   m.classList.add('comemora')
   setTimeout(() => m.classList.remove('comemora'), 1400)
+}
+
+// ── Vídeo do mascote (toque no mascote, login e pós-sync) ────
+function mascoteVideoTocar() {
+  const wrap = document.getElementById('video-mascote-wrap')
+  const vid  = document.getElementById('video-mascote')
+  if (!wrap || !vid) return
+  wrap.hidden = false
+  vid.currentTime = 0
+  // Autoplay exige muted; se o aparelho bloquear, fecha em silêncio
+  vid.play().catch(() => { wrap.hidden = true })
+}
+
+function mascoteVideoFechar() {
+  const vid = document.getElementById('video-mascote')
+  if (vid) vid.pause()
+  document.getElementById('video-mascote-wrap').hidden = true
 }
 
 // ── Logos institucionais (config do SIGUC, cacheadas p/ offline) ─
@@ -1093,6 +1116,7 @@ async function entrarHome() {
     App.brigadista?.nome_completo?.split(' ').slice(0,2).join(' ') || 'Brigadista'
 
   mostrarTela('tela-home')
+  mascoteVideoTocar()
 
   bGpsIniciar(gps => {
     const card = document.getElementById('gps-card')
@@ -1726,6 +1750,12 @@ document.addEventListener('DOMContentLoaded', () => {
   // Foto de perfil
   document.getElementById('config-avatar').addEventListener('click', alterarFotoBrigadista)
 
+  // Vídeo do mascote
+  document.querySelector('.faixa-mascote').addEventListener('click', mascoteVideoTocar)
+  document.getElementById('video-mascote-wrap').addEventListener('click', mascoteVideoFechar)
+  document.getElementById('btn-fechar-video').addEventListener('click', mascoteVideoFechar)
+  document.getElementById('video-mascote').addEventListener('ended', mascoteVideoFechar)
+
   // Home
   document.getElementById('btn-sync-home').addEventListener('click', async () => {
     toast('Sincronizando…', 'info')
@@ -1845,6 +1875,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (ok > 0) {
           toast(`${ok} registro${ok !== 1 ? 's' : ''} sincronizado${ok !== 1 ? 's' : ''}!`, 'ok')
           mascoteComemorar()
+          mascoteVideoTocar()
         }
       } else {
         mostrarBarra(100, `${ok} enviado${ok !== 1 ? 's' : ''} · ${erros} com erro`)
