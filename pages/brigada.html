@@ -141,6 +141,7 @@
     <div>
       <p class="home-saudacao" id="home-saudacao">Bom dia</p>
       <h1 class="home-nome" id="home-nome">Brigadista</h1>
+      <p id="home-brigada" style="margin:4px 0 0;font-size:12px;font-weight:600;color:var(--verde-c,#52B788);display:flex;align-items:center;gap:4px" hidden>🚒 <span id="home-brigada-nome"></span></p>
     </div>
     <button class="btn-icon" id="btn-sync-home" aria-label="Sincronizar" title="Sincronizar agora">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
@@ -1383,6 +1384,9 @@ async function entrarHome() {
   document.getElementById('home-saudacao').textContent = saudacao()
   document.getElementById('home-nome').textContent =
     App.brigadista?.nome_completo?.split(' ').slice(0,2).join(' ') || 'Brigadista'
+  const brigadaNome = App.brigada?.nome || ''
+  document.getElementById('home-brigada').hidden = !brigadaNome
+  document.getElementById('home-brigada-nome').textContent = brigadaNome
 
   mostrarTela('tela-home')
   mascoteVideoTocar()
