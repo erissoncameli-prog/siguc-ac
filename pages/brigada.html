@@ -121,12 +121,22 @@
 
   <div class="gps-card" id="gps-card">
     <div class="gps-ring" id="gps-ring"></div>
+    <div class="radar" aria-hidden="true">
+      <span class="radar-anel"></span>
+      <span class="radar-anel r2"></span>
+      <span class="radar-varredura"></span>
+      <span class="radar-ponto"></span>
+    </div>
     <div class="gps-info">
       <span class="gps-label">GPS</span>
       <span class="gps-coords" id="gps-coords">Aguardando sinal…</span>
+      <span class="gps-municipio" id="gps-municipio"></span>
       <span class="gps-acc" id="gps-acc"></span>
     </div>
-    <div class="gps-status" id="gps-status">—</div>
+    <div class="gps-lado">
+      <span class="conn-chip" id="conn-chip"><span class="conn-dot"></span><span id="conn-texto">…</span></span>
+      <div class="gps-status" id="gps-status">—</div>
+    </div>
   </div>
 
   <p class="home-instrucao">Selecione a natureza da atividade</p>
@@ -732,6 +742,73 @@ async function prosseguirAposAuth(session) {
   }
 }
 
+// ── Município por coordenada (GeoJSON dos municípios, offline) ─
+let _municipiosGeo = null
+let _ultMunicipioPos = null
+
+function dentroPoligono(x, y, anel) {
+  let dentro = false
+  for (let i = 0, j = anel.length - 1; i < anel.length; j = i++) {
+    const xi = anel[i][0], yi = anel[i][1], xj = anel[j][0], yj = anel[j][1]
+    if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) dentro = !dentro
+  }
+  return dentro
+}
+
+async function municipioPorCoord(lat, lng) {
+  try {
+    if (!_municipiosGeo) {
+      const r = await fetch('/data/municipios_acre.geojson')
+      if (!r.ok) return null
+      _municipiosGeo = await r.json()
+    }
+    for (const f of _municipiosGeo.features) {
+      const polys = f.geometry.type === 'Polygon' ? [f.geometry.coordinates] : f.geometry.coordinates
+      for (const poly of polys) {
+        if (!dentroPoligono(lng, lat, poly[0])) continue
+        // anéis internos são buracos
+        let dentro = true
+        for (let i = 1; i < poly.length; i++) {
+          if (dentroPoligono(lng, lat, poly[i])) { dentro = false; break }
+        }
+        if (dentro) return f.properties.nome
+      }
+    }
+  } catch (e) { console.warn('[municipio]', e) }
+  return null
+}
+
+function atualizarMunicipio(gps) {
+  // Recalcula só quando andou ~500m (ou na primeira leitura)
+  if (_ultMunicipioPos &&
+      Math.abs(gps.lat - _ultMunicipioPos.lat) + Math.abs(gps.lng - _ultMunicipioPos.lng) < 0.005) return
+  _ultMunicipioPos = { lat: gps.lat, lng: gps.lng }
+  municipioPorCoord(gps.lat, gps.lng).then(m => {
+    document.getElementById('gps-municipio').textContent = m ? `📍 ${m} — AC` : ''
+  })
+}
+
+// ── Monitor de conexão (probe real — navigator.onLine não é confiável) ─
+let _connEstado = null
+
+function aplicarEstadoConexao(online) {
+  if (online === _connEstado) return
+  const mudou = _connEstado !== null
+  _connEstado = online
+  const chip = document.getElementById('conn-chip')
+  document.getElementById('conn-texto').textContent = online ? 'Online' : 'Offline'
+  chip.classList.toggle('on', online)
+  chip.classList.toggle('off', !online)
+  if (mudou) {
+    toast(online ? 'Conexão restabelecida' : 'Sem conexão — registros ficam na fila', online ? 'ok' : 'warn')
+  }
+}
+
+async function verificarConexao() {
+  if (document.hidden) return
+  aplicarEstadoConexao(await bSyncTemConexao())
+}
+
 // ── Mascote: pulo de comemoração ao concluir sincronização ───
 function mascoteComemorar() {
   const m = document.querySelector('.faixa-mascote')
@@ -1125,6 +1202,7 @@ async function entrarHome() {
     document.getElementById('gps-status').textContent =
       gps.acc <= 10 ? 'Excelente' : gps.acc <= 30 ? 'Bom' : gps.acc <= 60 ? 'Regular' : 'Fraco'
     if (gps.acc <= 30) card.querySelector('.gps-ring').classList.add('fixado')
+    atualizarMunicipio(gps)
   })
 
   await carregarCatalogoAtividades()
@@ -1888,18 +1966,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Online/offline — o evento 'online' funciona na web, mas NÃO é
   // confiável na WebView do app nativo (não dispara após modo avião).
-  window.addEventListener('online', async () => {
-    bSyncRodar()
-    toast('Conexão restabelecida — sincronizando…', 'info')
-  })
+  // O monitor de conexão (probe real) cuida dos avisos ao usuário.
+  window.addEventListener('online',  () => { bSyncRodar(); verificarConexao() })
+  window.addEventListener('offline', verificarConexao)
 
   // Rede de segurança (essencial no app nativo): reenvia pendentes ao
   // voltar do background e a cada 45s. bSyncRodar sai barato e em
   // silêncio quando a fila está vazia ou segue sem conexão real.
   document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) bSyncRodar()
+    if (!document.hidden) { bSyncRodar(); verificarConexao() }
   })
   setInterval(() => { bSyncRodar() }, 45000)
+
+  // Chip Online/Offline do card de GPS
+  verificarConexao()
+  setInterval(verificarConexao, 30000)
 
   // Field mode restaurado
   bOfflineGetConfig('field_mode').then(v => {
