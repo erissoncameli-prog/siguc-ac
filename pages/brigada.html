@@ -51,6 +51,17 @@
   <p class="lock-erro" id="troca-erro" hidden></p>
 </div>
 
+<!-- ══ TELA: ESCOLHER BRIGADA (gestores) ═══════════════════════ -->
+<div id="tela-escolher-brigada" class="tela lock-screen" hidden>
+  <div class="lock-logo">
+    <img src="/pwa/icons/mascote.png" alt="" class="lock-mascote">
+    <span class="lock-titulo">Escolher Brigada</span>
+  </div>
+  <p class="lock-dica">Selecione a brigada à qual deseja se vincular.<br>Seus registros de campo serão associados a ela.</p>
+  <div id="lista-brigadas" style="display:flex;flex-direction:column;gap:10px;width:min(420px,88vw);max-height:46vh;overflow-y:auto;padding:4px"></div>
+  <p class="lock-erro" id="escolha-erro" hidden></p>
+</div>
+
 <!-- ══ TELA: BLOQUEIO ══════════════════════════════════════════ -->
 <div id="tela-bloqueio" class="tela ativa lock-screen" hidden>
   <div class="lock-logo">
@@ -537,6 +548,7 @@
       </label>
     </div>
 
+    <button class="btn-config-item" id="btn-trocar-brigada" hidden>🚒 Trocar de brigada</button>
     <button class="btn-config-item" id="btn-alterar-pin">🔑 Alterar PIN de campo</button>
     <button class="btn-config-item" id="btn-buscar-especies">🌿 Atualizar catálogo de espécies</button>
     <button class="btn-config-item btn-danger-soft" id="btn-zerar-fila">🗑 Zerar fila de registros</button>
@@ -677,7 +689,7 @@ function mostrarTela(id, empurrar = true) {
   const tela = document.getElementById(id)
   if (tela) tela.hidden = false
 
-  const temNav = !['tela-bloqueio', 'tela-config-pin', 'tela-login', 'tela-trocar-senha'].includes(id)
+  const temNav = !['tela-bloqueio', 'tela-config-pin', 'tela-login', 'tela-trocar-senha', 'tela-escolher-brigada'].includes(id)
   document.getElementById('pill-nav').hidden = !temNav
 
   if (empurrar && App.telasHistorico.at(-1) !== id) {
@@ -749,26 +761,37 @@ async function prosseguirAposAuth(session, jaAutenticou = false) {
     .eq('id', session.user.id)
     .maybeSingle()
 
-  if (usuarioData && usuarioData.perfil !== 'brigadista') {
-    mostrarErroLogin('Este acesso é exclusivo para brigadistas.')
+  const ehGestor = ['gestor', 'super_admin'].includes(usuarioData?.perfil)
+  if (usuarioData && usuarioData.perfil !== 'brigadista' && !ehGestor) {
+    mostrarErroLogin('Este acesso é exclusivo para brigadistas e gestores.')
     mostrarTela('tela-login', false)
     return
   }
 
   let brig = await bOfflineGetConfig('brigadista')
-  if (!brig) {
-    brig = await buscarBrigadistaDoBanco(session.user.id)
-    if (!brig) {
-      mostrarErroLogin('Usuário não vinculado a nenhuma brigada ativa. Solicite ao gestor para gerar seu login.')
-      mostrarTela('tela-login', false)
-      return
-    }
-    await bOfflineSetConfig('brigadista', brig)
+  if (!brig) brig = await buscarBrigadistaDoBanco(session.user.id)
+
+  // Gestores escolhem a brigada ao entrar (e sempre que relogam)
+  if (ehGestor && (jaAutenticou || !brig)) {
+    await abrirEscolhaBrigada(brig, usuarioData)
+    return
   }
+
+  if (!brig) {
+    mostrarErroLogin('Usuário não vinculado a nenhuma brigada ativa. Solicite ao gestor para gerar seu login.')
+    mostrarTela('tela-login', false)
+    return
+  }
+
+  await finalizarEntrada(brig, usuarioData, jaAutenticou)
+}
+
+async function finalizarEntrada(brig, usuarioData, jaAutenticou) {
+  await bOfflineSetConfig('brigadista', brig)
   App.brigadista = brig
 
   let brigada = await bOfflineGetConfig('brigada')
-  if (!brigada && brig.brigada_id) {
+  if (!brigada || (brig.brigada_id && brigada.id !== brig.brigada_id)) {
     brigada = await buscarBrigadaDoBanco(brig.brigada_id)
     if (brigada) await bOfflineSetConfig('brigada', brigada)
   }
@@ -786,6 +809,52 @@ async function prosseguirAposAuth(session, jaAutenticou = false) {
   }
 
   await continuarParaPin(brig, jaAutenticou)
+}
+
+// ── Escolha de brigada (gestores/super_admin) ────────────────
+let _escolhaCtx = null
+
+async function abrirEscolhaBrigada(brigAtual, usuarioData) {
+  _escolhaCtx = { usuarioData }
+  const lista = document.getElementById('lista-brigadas')
+  document.getElementById('escolha-erro').hidden = true
+  lista.innerHTML = '<p style="opacity:.7;text-align:center">Carregando brigadas…</p>'
+  mostrarTela('tela-escolher-brigada', false)
+
+  const { data: brigadas, error } = await db
+    .from('brigadas')
+    .select('id, nome, regional')
+    .eq('ativa', true)
+    .order('nome')
+  if (error || !brigadas?.length) {
+    lista.innerHTML = '<p style="opacity:.7;text-align:center">Nenhuma brigada ativa encontrada.</p>'
+    return
+  }
+
+  lista.innerHTML = brigadas.map(b => {
+    const atual = brigAtual?.brigada_id === b.id
+    return `<button class="btn-login-submit" style="width:100%;text-align:left;display:flex;justify-content:space-between;align-items:center;gap:8px${atual ? '' : ';opacity:.85'}"
+      onclick="escolherBrigada('${b.id}')">
+      <span>${esc(b.nome)}<small style="display:block;font-weight:400;opacity:.75">${esc((b.regional || '').replace(/_/g, ' '))}</small></span>
+      ${atual ? '<span style="font-size:11px;white-space:nowrap">✓ atual</span>' : ''}
+    </button>`
+  }).join('')
+}
+
+async function escolherBrigada(brigadaId) {
+  const erroEl = document.getElementById('escolha-erro')
+  erroEl.hidden = true
+  try {
+    const { data: brig, error } = await db.rpc('gestor_vincular_brigada', { p_brigada_id: brigadaId })
+    if (error) throw error
+    await bOfflineSetConfig('brigada', null) // força recarga da brigada nova
+    toast('Vinculado à brigada!', 'success')
+    await finalizarEntrada(brig, _escolhaCtx?.usuarioData, true)
+  } catch (e) {
+    console.error('[escolherBrigada]', e)
+    erroEl.textContent = 'Erro ao vincular: ' + (e.message || 'tente novamente.')
+    erroEl.hidden = false
+  }
 }
 
 async function continuarParaPin(brig, jaAutenticou = false) {
@@ -2023,6 +2092,9 @@ async function carregarConfig() {
 
   const fm = document.getElementById('toggle-field-mode')
   fm.checked = document.body.classList.contains('field-mode')
+
+  // Gestores podem trocar de brigada (somente online)
+  document.getElementById('btn-trocar-brigada').hidden = brig?.funcao !== 'gestor'
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -2040,6 +2112,15 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-toggle-senha').addEventListener('click', () => {
     const inp = document.getElementById('login-senha')
     inp.type = inp.type === 'password' ? 'text' : 'password'
+  })
+
+  // Trocar de brigada (gestores)
+  document.getElementById('btn-trocar-brigada').addEventListener('click', async () => {
+    if (!db || !await bSyncTemConexao()) {
+      toast('Sem conexão — conecte à internet para trocar de brigada', 'warn')
+      return
+    }
+    await abrirEscolhaBrigada(App.brigadista, null)
   })
 
   // Troca de senha obrigatória (1º acesso)
