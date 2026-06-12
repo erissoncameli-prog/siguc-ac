@@ -455,13 +455,34 @@
   display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
   margin-bottom: 16px;
 }
+.classe-fauna-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+/* 7º item ("Não sei") centralizado na última linha */
+.classe-btn[data-v="nao_sei"] { grid-column: 2; }
+
+.classe-ico {
+  width: 56px; height: 56px; border-radius: 50%;
+  background: rgba(0,0,0,.05);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 28px; line-height: 1; overflow: hidden;
+}
+.classe-ico img {
+  width: 100%; height: 100%;
+  object-fit: cover; border-radius: 50%; display: block;
+}
+.classe-btn.sel .classe-ico, .classe-btn.ativo .classe-ico {
+  box-shadow: 0 0 0 2px var(--fauna);
+}
+
 .classe-btn {
   padding: 10px 4px; border-radius: 14px;
   border: 2px solid transparent;
   background: rgba(0,0,0,.04);
   font-size: 11px; font-weight: 600; text-align: center;
   cursor: pointer; transition: all .15s;
-  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
 }
 .classe-btn svg { width: 22px; height: 22px; stroke: currentColor; }
 .classe-btn.sel { border-color: var(--fauna); background: var(--fauna-bg); color: var(--fauna); }
