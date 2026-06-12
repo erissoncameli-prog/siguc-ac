@@ -9,7 +9,8 @@ Sistema já tem login, sidebar, layout e páginas funcionando.
 - Frontend: HTML5 + JS Vanilla (sem framework)
 - Estilo: CSS puro com design system próprio
 - Banco: Supabase + PostGIS
-- Auth: Supabase Auth (sessionStorage)
+- Auth: Supabase Auth (sessionStorage; app Brigadas usa cliente isolado
+  com sessão persistente em localStorage, protegida por PIN)
 - Deploy: Vercel | Testes: Playwright
 
 ## Estrutura de pastas
