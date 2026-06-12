@@ -590,7 +590,10 @@ body { margin: 0; }
 /* Acessibilidade: respeita usuários sensíveis a movimento */
 @media (prefers-reduced-motion: reduce) {
   .faixa-mascote, .lock-mascote, .faixa-mascote.comemora, .radar-varredura,
-  .ico-escudo, .ico-chama, .ico-chama-nucleo, .ico-binoculo { animation: none; }
+  .ico-escudo, .ico-chama, .ico-chama-nucleo, .ico-binoculo,
+  .destaque, .coluna-fill, .pizza, .rosca-top, .chart-legenda .leg-top i,
+  .combo-col, .combo-linha, .combo-ponto, .combo-ponto-valor { animation: none; }
+  .combo-linha { stroke-dashoffset: 0; }
 }
 
 /* ── Vídeo do mascote (overlay em tela cheia) ─────────────── */
@@ -956,16 +959,80 @@ body { margin: 0; }
 .barra-row { display: grid; grid-template-columns: 108px 1fr 36px; align-items: center; gap: 8px; margin-bottom: 8px; }
 .barra-row:last-child { margin-bottom: 0; }
 .barra-rotulo { font-size: 12.5px; color: var(--ink-d); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.barra-track { height: 12px; border-radius: 6px; background: #EDF3EE; overflow: hidden; }
-.barra-fill { height: 100%; border-radius: 6px; background: var(--prim); transition: width .5s var(--ease-out); }
+.rotulo-top { font-weight: 700; }
+.barra-track { height: 14px; border-radius: 7px; background: #EDF3EE; overflow: hidden; }
+.barra-fill {
+  height: 100%; border-radius: 7px;
+  background: linear-gradient(90deg, var(--prim), #36C98B);
+  color: var(--prim);
+  transition: width .9s var(--ease-out);
+}
 .barra-valor { font-family: var(--font-mono); font-size: 12.5px; text-align: right; color: var(--ink-d); }
 .chart-vazio { font-size: 13px; color: #9CA3AF; text-align: center; padding: 8px 0; margin: 0; }
+.chart-nota { font-size: 11px; color: #6B7280; text-align: center; margin: 6px 0 0; }
+
+/* Destaque do campeão: brilho pulsante suave (3 ciclos e estabiliza) */
+@keyframes destaque-pulsa {
+  0%, 100% { filter: brightness(1)    drop-shadow(0 0 0 transparent); }
+  50%      { filter: brightness(1.18) drop-shadow(0 0 7px currentColor); }
+}
+.destaque { animation: destaque-pulsa 1.5s ease-in-out 3; }
 
 .chart-colunas { display: flex; align-items: flex-end; gap: 8px; height: 120px; padding-top: 4px; }
 .coluna-mes { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 4px; height: 100%; }
-.coluna-fill { width: 100%; max-width: 34px; border-radius: 6px 6px 0 0; background: var(--prim); }
+.coluna-fill {
+  width: 100%; max-width: 34px; border-radius: 6px 6px 0 0;
+  background: linear-gradient(180deg, #36C98B, var(--prim));
+  color: var(--prim);
+  transform-origin: bottom;
+  animation: coluna-cresce .7s var(--ease-out) backwards;
+}
+.coluna-fill.destaque { animation: coluna-cresce .7s var(--ease-out) backwards, destaque-pulsa 1.5s ease-in-out .8s 3; }
+@keyframes coluna-cresce { from { transform: scaleY(0); } }
 .coluna-rotulo { font-size: 10.5px; color: #6B7280; }
 .coluna-valor { font-family: var(--font-mono); font-size: 11px; color: var(--ink-d); }
+
+/* ── Rosca (donut SVG) e Pizza ────────────────────────────── */
+.rosca-flex { display: flex; align-items: center; gap: 16px; }
+.rosca { width: 138px; height: 138px; flex-shrink: 0; }
+.rosca-seg { transition: stroke-dasharray 1.1s var(--ease-out); }
+.rosca-top { animation: destaque-pulsa 1.5s ease-in-out 1.2s 3; }
+.rosca-total {
+  font-family: var(--font-mono); font-size: 8px; font-weight: 700;
+  fill: var(--ink-d); text-anchor: middle;
+}
+.rosca-sub { font-size: 3.2px; fill: #6B7280; text-anchor: middle; text-transform: uppercase; letter-spacing: .4px; }
+.pizza {
+  width: 132px; height: 132px; border-radius: 50%; flex-shrink: 0;
+  box-shadow: 0 4px 14px rgba(15,26,19,.18), inset 0 0 0 3px #fff;
+  animation: pizza-entra .85s var(--spring) backwards;
+}
+@keyframes pizza-entra {
+  from { transform: scale(.25) rotate(-150deg); opacity: 0; }
+}
+.chart-legenda { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.chart-legenda span { font-size: 12px; color: var(--ink-d); display: flex; align-items: center; gap: 6px; }
+.chart-legenda i { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+.chart-legenda .leg-top { font-weight: 700; }
+.chart-legenda .leg-top i { animation: destaque-pulsa 1.5s ease-in-out 1.2s 3; }
+
+/* ── Combo colunas + linha (fauna × ocorrências) ──────────── */
+.combo-chart { width: 100%; height: auto; }
+.combo-eixo { stroke: #DDE6DF; stroke-width: 1; }
+.combo-col { transform-origin: center bottom; transform-box: fill-box; animation: coluna-cresce .7s var(--ease-out) backwards; }
+.combo-col.destaque-svg { animation: coluna-cresce .7s var(--ease-out) backwards, destaque-pulsa 1.5s ease-in-out .9s 3; }
+.combo-valor { font-family: var(--font-mono); font-size: 9px; fill: var(--ink-d); text-anchor: middle; }
+.combo-rotulo { font-size: 9px; fill: #6B7280; text-anchor: middle; }
+.combo-linha {
+  fill: none; stroke: var(--ink-d); stroke-width: 2;
+  stroke-linecap: round; stroke-linejoin: round;
+  stroke-dasharray: 100; stroke-dashoffset: 100;
+  animation: linha-desenha 1.2s var(--ease-out) .45s forwards;
+}
+@keyframes linha-desenha { to { stroke-dashoffset: 0; } }
+.combo-ponto { fill: #fff; stroke: var(--ink-d); stroke-width: 2; animation: ponto-surge .4s var(--spring) backwards; }
+.combo-ponto-valor { font-family: var(--font-mono); font-size: 8.5px; fill: var(--ink-d); text-anchor: middle; font-weight: 700; animation: ponto-surge .4s var(--spring) backwards; }
+@keyframes ponto-surge { from { opacity: 0; transform: scale(.3); } }
 .btn-config-item {
   width: 100%; padding: 14px 16px; margin-bottom: 10px;
   background: #fff; border: 1px solid #E5E7EB; border-radius: 14px;
