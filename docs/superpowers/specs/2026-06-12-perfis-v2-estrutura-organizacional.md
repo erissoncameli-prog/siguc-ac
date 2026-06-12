@@ -262,10 +262,13 @@ Policies passam a consultar `nivel_efetivo(auth.uid(), '<chave>')`:
 
 Acrescenta após os 5 anteriores:
 6. `060_catalogo_modulos.sql` — enum nivel_acesso + tabelas modulos,
-   perfil_permissoes_padrao, usuario_permissoes + seed do catálogo e dos padrões.
-7. `061_permissao_efetiva_rls.sql` — função nivel_efetivo, VIEW minhas_permissoes,
-   e refatorar as policies para usá-la (substitui parte do 058).
-8. Frontend — layout.js dinâmico, helpers podeVer/podeEditar, grade em usuarios.html.
+   perfil_permissoes_padrao, grupo_permissoes_padrao, usuario_permissoes,
+   usuario_ucs_extras + seed do catálogo e dos padrões (a partir da matriz).
+7. `061_permissao_efetiva_rls.sql` — função nivel_efetivo (com herança de grupo),
+   VIEW minhas_permissoes, e refatorar as policies para usá-la (substitui parte do 058).
+   Atualizar usuario_ucs_visiveis para incluir usuario_ucs_extras.
+8. Frontend — layout.js dinâmico (sem perfis hardcoded), helpers podeVer/podeEditar,
+   grade de permissões + seletor de UCs adicionais em usuarios.html.
 
 ## Decisões travadas desta camada
 
