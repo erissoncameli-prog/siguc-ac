@@ -745,9 +745,33 @@ function renderFaixaLogos(c) {
   aplicar('faixa-logo-sec', 'img-logo-sec', c?.sec)
 }
 
+// Converte a logo colorida em versão branca (knockout) para a faixa
+// verde: fundo branco vira transparente e o desenho vira silhueta
+// branca com alpha proporcional à "tinta" do pixel.
+async function logoParaBranco(blob) {
+  const img = new Image()
+  const url = URL.createObjectURL(blob)
+  await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = url })
+  const c = document.createElement('canvas')
+  c.width = img.naturalWidth; c.height = img.naturalHeight
+  const ctx = c.getContext('2d')
+  ctx.drawImage(img, 0, 0)
+  const d = ctx.getImageData(0, 0, c.width, c.height)
+  const p = d.data
+  for (let i = 0; i < p.length; i += 4) {
+    const lum = (p[i] * 0.299 + p[i + 1] * 0.587 + p[i + 2] * 0.114) / 255
+    const tinta = (1 - lum) * (p[i + 3] / 255)
+    p[i] = p[i + 1] = p[i + 2] = 255
+    p[i + 3] = Math.round(255 * Math.min(1, tinta * 1.25))
+  }
+  ctx.putImageData(d, 0, 0)
+  URL.revokeObjectURL(url)
+  return new Promise(res => c.toBlob(b => res(b), 'image/png'))
+}
+
 async function carregarLogosInstitucionais() {
   try {
-    const cache = await bOfflineGetConfig('logos_cache')
+    const cache = await bOfflineGetConfig('logos_cache_v2')
     if (cache) renderFaixaLogos(cache)
 
     if (!db || !await bSyncTemConexao()) return
@@ -758,12 +782,23 @@ async function carregarLogosInstitucionais() {
     const baixar = async url => {
       if (!url) return null
       const r = await fetch(url)
-      if (!r.ok) return null
-      return await bOfflineBlobParaBase64(await r.blob())
+      return r.ok ? await r.blob() : null
     }
-    const novo = { gov: await baixar(logos.governo_url), sec: await baixar(logos.secretaria_url) }
+    // Se houver versão branca oficial na config, usa direto;
+    // senão baixa a colorida e gera o knockout branco no aparelho.
+    const preparar = async (urlBranca, urlColorida) => {
+      const oficial = await baixar(urlBranca)
+      if (oficial) return await bOfflineBlobParaBase64(oficial)
+      const colorida = await baixar(urlColorida)
+      if (!colorida) return null
+      return await bOfflineBlobParaBase64(await logoParaBranco(colorida))
+    }
+    const novo = {
+      gov: await preparar(logos.governo_branca_url,    logos.governo_url),
+      sec: await preparar(logos.secretaria_branca_url, logos.secretaria_url),
+    }
     if (novo.gov || novo.sec) {
-      await bOfflineSetConfig('logos_cache', novo)
+      await bOfflineSetConfig('logos_cache_v2', novo)
       renderFaixaLogos(novo)
     }
   } catch (e) { console.warn('[logos]', e) }
