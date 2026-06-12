@@ -117,8 +117,11 @@ todas as UCs (camada GeoJSON pública), mas só editam os dados do seu escopo.
 
 ## Plano de migrations
 
-1. `055_perfis_v2.sql` — ALTER TYPE perfil_usuario ADD VALUE (novos perfis).
-   Atenção: ADD VALUE não pode ser usado na mesma transação — separar COMMIT.
+1. `055_perfis_v2.sql` — ALTER TYPE perfil_usuario ADD VALUE (secretario, diretor,
+   chefe_departamento, gestor_uc, assistente_admin, pesquisador_externo, brigadista,
+   validador_brigada, validador_fauna) + ALTER TYPE nivel_hierarquico ADD VALUE
+   'assistente_administrativo'. Atenção: ADD VALUE não roda na mesma transação que o
+   uso — separar COMMIT (provável split em 055a/055b).
 2. `056_escopo_uc.sql` — VIEW usuario_ucs_visiveis (SECURITY DEFINER / função estável
    para evitar recursão de RLS, ver bug histórico em 050).
 3. `057_derivar_perfil_cargo.sql` — função + triggers cargo_ocupacoes / delegacoes.
