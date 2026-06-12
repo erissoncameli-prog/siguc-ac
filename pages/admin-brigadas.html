@@ -325,6 +325,17 @@
       <div class="form-group"><label class="form-label">Observações</label>
         <textarea class="form-control" id="mbr-obs" rows="2"></textarea>
       </div>
+
+      <!-- Acesso ao app (somente no cadastro) -->
+      <div id="mbr-acesso-wrap">
+        <div class="form-section-label" style="margin-top:12px">Acesso ao App</div>
+        <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer">
+          <input type="checkbox" id="mbr-criar-acesso" checked style="width:16px;height:16px;cursor:pointer;margin-top:2px">
+          <span>Criar acesso ao SIGUC Brigadas ao salvar
+            <span style="display:block;font-size:11px;color:#9CA3AF">Login pelo e-mail da ficha (ou CPF, se não tiver e-mail), com senha provisória gerada automaticamente e troca obrigatória no 1º acesso.</span>
+          </span>
+        </label>
+      </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="fecharModal('brigadista')">Cancelar</button>
@@ -346,17 +357,46 @@
         <strong id="login-nome-brig"></strong>. O brigadista deverá trocar
         a senha provisória no primeiro acesso.
       </p>
-      <div class="form-group"><label class="form-label">E-mail <span class="obrig">*</span></label>
-        <input class="form-control" id="login-email" type="email" placeholder="email@exemplo.com">
+      <div class="form-group"><label class="form-label">E-mail (opcional)</label>
+        <input class="form-control" id="login-email" type="email" placeholder="Em branco: usa o e-mail da ficha ou o CPF">
+        <span style="font-size:11px;color:#9CA3AF">Sem e-mail, o brigadista entra no app digitando o CPF.</span>
       </div>
-      <div class="form-group"><label class="form-label">Senha Provisória <span class="obrig">*</span></label>
-        <input class="form-control" id="login-senha" type="text" placeholder="Mínimo 6 caracteres">
+      <div class="form-group"><label class="form-label">Senha Provisória (opcional)</label>
+        <input class="form-control" id="login-senha" type="text" placeholder="Em branco: gerada automaticamente">
         <span style="font-size:11px;color:#9CA3AF">Comunique a senha ao brigadista pessoalmente ou via WhatsApp seguro.</span>
       </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="fecharModal('login')">Cancelar</button>
       <button class="btn btn-primary" id="login-btn" onclick="confirmarLogin()">Criar Login</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal: Credenciais Geradas ─────────────────────────────── -->
+<div class="modal-overlay" id="modal-credenciais">
+  <div class="modal" style="max-width:600px">
+    <div class="modal-header">
+      <div class="modal-title">Acessos Criados</div>
+      <button class="modal-close" onclick="fecharModal('credenciais')">×</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:13px;color:#B45309;background:rgba(245,158,11,.12);border-radius:8px;padding:10px 12px;margin-bottom:14px">
+        ⚠ Anote ou copie as senhas agora — por segurança, elas não poderão ser
+        consultadas depois. Repasse a cada brigadista pessoalmente ou via
+        WhatsApp seguro. A troca de senha é obrigatória no primeiro acesso.
+      </p>
+      <div class="table-wrap"><div class="table-scroll" style="max-height:320px">
+        <table>
+          <thead><tr><th>Brigadista</th><th>Login no app</th><th>Senha provisória</th></tr></thead>
+          <tbody id="cred-tbody"></tbody>
+        </table>
+      </div></div>
+      <div id="cred-erros" style="display:none;font-size:12px;color:#B91C1C;margin-top:12px"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="copiarCredenciais()">Copiar tudo</button>
+      <button class="btn btn-primary" onclick="fecharModal('credenciais')">Fechar</button>
     </div>
   </div>
 </div>
@@ -467,6 +507,9 @@ const LABEL_REGIONAL = {
             <option value="">Todos</option>
             <option value="encerrado">Encerrados</option>
           </select>
+          <button class="btn btn-secondary" onclick="gerarLoginsPendentes()" title="Cria acesso ao app para todos os brigadistas ativos sem login">
+            🔑 Gerar logins pendentes
+          </button>
           <button class="btn btn-primary" onclick="abrirModalBrigadista()">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             Novo Brigadista
@@ -851,6 +894,8 @@ function abrirModalBrigadista(b = null) {
   _mbrFotoUrlAtual = b?.foto_url || null
   document.getElementById('mbr-foto-input').value = ''
   _setBrigFotoPreview(_mbrFotoUrlAtual)
+  document.getElementById('mbr-acesso-wrap').style.display = b ? 'none' : ''
+  document.getElementById('mbr-criar-acesso').checked = true
   document.getElementById('modal-brigadista').classList.add('aberto')
 }
 
@@ -915,12 +960,25 @@ async function salvarBrigadista() {
       payload.foto_url = _mbrFotoUrlAtual
     }
 
-    const { error } = _editId.brigadista
-      ? await db.from('brigadistas').update(payload).eq('id', _editId.brigadista)
-      : await db.from('brigadistas').insert(payload)
+    const editando = _editId.brigadista
+    const criarAcesso = !editando && document.getElementById('mbr-criar-acesso').checked
+    const { data: salvo, error } = editando
+      ? await db.from('brigadistas').update(payload).eq('id', editando).select('id').single()
+      : await db.from('brigadistas').insert(payload).select('id').single()
     if (error) throw error
-    toast(_editId.brigadista ? 'Brigadista atualizado!' : 'Brigadista cadastrado!', 'success')
-    fecharModal('brigadista'); await carregarDados()
+    toast(editando ? 'Brigadista atualizado!' : 'Brigadista cadastrado!', 'success')
+    fecharModal('brigadista')
+
+    if (criarAcesso) {
+      btn.textContent = 'Criando acesso...'
+      try {
+        const cred = await chamarGerarLogin({ brigadista_id: salvo.id })
+        mostrarCredenciais([cred])
+      } catch(e) {
+        toast(`Brigadista salvo, mas o acesso ao app falhou: ${e.message}. Use o botão "Gerar login" na lista.`, 'error')
+      }
+    }
+    await carregarDados()
   } catch(e) { toast(e.message || 'Erro ao salvar', 'error') }
   finally { btn.disabled = false; btn.textContent = 'Salvar' }
 }
@@ -934,29 +992,80 @@ function abrirModalLogin(id, nome, email) {
   document.getElementById('modal-login').classList.add('aberto')
 }
 
+async function chamarGerarLogin(payload) {
+  const { data: { session } } = await db.auth.getSession()
+  if (!session?.access_token) throw new Error('Sessão expirada. Faça login novamente.')
+  const resp = await fetch(`${SUPABASE_URL}/functions/v1/gerar-login-brigadista`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${session.access_token}`,
+      'apikey': SUPABASE_ANON_KEY,
+    },
+    body: JSON.stringify(payload),
+  })
+  const result = await resp.json()
+  if (!resp.ok) throw new Error(result.error || 'Erro ao criar login')
+  return result
+}
+
 async function confirmarLogin() {
   const email     = document.getElementById('login-email').value.trim()
   const senha_temp = document.getElementById('login-senha').value
-  if (!email || !senha_temp) { toast('Preencha e-mail e senha provisória', 'error'); return }
+  if (senha_temp && senha_temp.length < 6) { toast('Senha provisória deve ter no mínimo 6 caracteres', 'error'); return }
   const btn = document.getElementById('login-btn')
   btn.disabled = true; btn.textContent = 'Criando...'
   try {
-    const { data: { session } } = await db.auth.getSession()
-    const resp = await fetch(`${appState.supabaseUrl}/functions/v1/gerar-login-brigadista`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${session.access_token}`,
-        'apikey': appState.supabaseAnonKey,
-      },
-      body: JSON.stringify({ brigadista_id: _loginBrigadistaId, email, senha_temp }),
+    const cred = await chamarGerarLogin({
+      brigadista_id: _loginBrigadistaId,
+      email: email || null,
+      senha_temp: senha_temp || null,
     })
-    const result = await resp.json()
-    if (!resp.ok) throw new Error(result.error || 'Erro ao criar login')
-    toast('Login criado! Brigadista deve trocar a senha no 1º acesso.', 'success')
-    fecharModal('login'); await carregarDados()
+    fecharModal('login')
+    mostrarCredenciais([cred])
+    await carregarDados()
   } catch(e) { toast(e.message || 'Erro ao criar login', 'error') }
   finally { btn.disabled = false; btn.textContent = 'Criar Login' }
+}
+
+async function gerarLoginsPendentes() {
+  const pendentes = _brigadistas.filter(b => b.status === 'ativo' && !b.usuario_id).length
+  if (!pendentes) { toast('Todos os brigadistas ativos já possuem login no app', 'success'); return }
+  if (!confirm(`Criar acesso ao app para ${pendentes} brigadista(s) ativo(s) sem login? As senhas provisórias serão geradas automaticamente.`)) return
+  try {
+    const result = await chamarGerarLogin({ lote: true })
+    mostrarCredenciais(result.resultados, result.erros)
+    await carregarDados()
+  } catch(e) { toast(e.message || 'Erro ao gerar logins', 'error') }
+}
+
+// ── Modal Credenciais ────────────────────────────────────────
+let _credTexto = ''
+
+function mostrarCredenciais(lista, erros = []) {
+  _credTexto = lista.map(r =>
+    `${r.nome} — login: ${r.login}${r.login_por_cpf ? ' (CPF)' : ''} — senha provisória: ${r.senha_temp}`
+  ).join('\n')
+  document.getElementById('cred-tbody').innerHTML = lista.length
+    ? lista.map(r => `<tr>
+        <td>${esc(r.nome)}</td>
+        <td>${esc(r.login)}${r.login_por_cpf ? ' <span class="badge badge-ouro" style="font-size:10px">CPF</span>' : ''}</td>
+        <td style="font-family:monospace;font-weight:600">${esc(r.senha_temp)}</td>
+      </tr>`).join('')
+    : '<tr><td colspan="3" style="color:#9CA3AF">Nenhum acesso criado.</td></tr>'
+  const errosEl = document.getElementById('cred-erros')
+  errosEl.style.display = erros.length ? '' : 'none'
+  errosEl.innerHTML = erros.length
+    ? '<strong>Não foi possível criar:</strong><br>' + erros.map(e => `${esc(e.nome)}: ${esc(e.erro)}`).join('<br>')
+    : ''
+  document.getElementById('modal-credenciais').classList.add('aberto')
+}
+
+async function copiarCredenciais() {
+  try {
+    await navigator.clipboard.writeText(_credTexto)
+    toast('Credenciais copiadas', 'success')
+  } catch { toast('Não foi possível copiar — anote manualmente', 'error') }
 }
 
 // ── Modal QR ─────────────────────────────────────────────────
