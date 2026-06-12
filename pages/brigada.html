@@ -221,11 +221,13 @@
         <label class="form-label">Fotos <span id="foto-count-label">(0/5)</span></label>
         <button class="btn-sm btn-prim" id="btn-abrir-camera">📷 Câmera</button>
       </div>
-      <div id="camera-wrap" hidden>
+      <div id="camera-wrap" class="camera-overlay" hidden>
         <video id="camera-video" autoplay playsinline muted class="camera-preview"></video>
+        <button class="camera-fechar" id="btn-fechar-camera" aria-label="Fechar câmera">✕</button>
         <div class="camera-bar">
+          <span class="camera-contador" id="camera-contador">0/5</span>
           <button class="btn-capture" id="btn-capturar" aria-label="Capturar">⬤</button>
-          <button class="btn-sm" id="btn-fechar-camera">Fechar</button>
+          <span></span>
         </div>
       </div>
       <div class="foto-grid" id="foto-grid"></div>
@@ -351,11 +353,13 @@
         <label class="form-label">Fotos do animal <span id="fauna-foto-count">(0/5)</span></label>
         <button class="btn-sm btn-prim" id="btn-fauna-camera" type="button">📷 Câmera</button>
       </div>
-      <div id="fauna-camera-wrap" hidden>
+      <div id="fauna-camera-wrap" class="camera-overlay" hidden>
         <video id="fauna-camera-video" autoplay playsinline muted class="camera-preview"></video>
+        <button class="camera-fechar" id="btn-fauna-fechar-camera" aria-label="Fechar câmera">✕</button>
         <div class="camera-bar">
+          <span class="camera-contador" id="fauna-camera-contador">0/5</span>
           <button class="btn-capture" id="btn-fauna-capturar" aria-label="Capturar">⬤</button>
-          <button class="btn-sm" id="btn-fauna-fechar-camera">Fechar</button>
+          <span></span>
         </div>
       </div>
       <div class="foto-grid" id="fauna-foto-grid"></div>
@@ -1072,6 +1076,19 @@ async function salvarRegistro() {
 // ════════════════════════════════════════════════════════════════
 async function abrirCamera() {
   if (bCapturaGetFotos().length >= 5) { toast('Máximo de 5 fotos', 'warn'); return }
+
+  // App nativo: câmera do próprio Android (tela cheia, flash, zoom)
+  if (bCameraEhNativa()) {
+    const blob = await bCameraNativaCapturar(App.brigadista, bGpsAtual())
+    if (blob && bCapturaAdicionar(blob)) {
+      bCapturaMostrarGaleria(document.getElementById('foto-grid'))
+      document.getElementById('foto-count-label').textContent = `(${bCapturaGetFotos().length}/5)`
+    }
+    return
+  }
+
+  // Web: overlay em tela cheia com a câmera do navegador
+  document.getElementById('camera-contador').textContent = `${bCapturaGetFotos().length}/5`
   document.getElementById('camera-wrap').hidden = false
   const ok = await bCameraAbrir(document.getElementById('camera-video'))
   if (!ok) {
@@ -1091,6 +1108,8 @@ async function capturarFoto() {
   if (!blob) { toast('Máximo de 5 fotos', 'warn'); return }
   bCapturaMostrarGaleria(document.getElementById('foto-grid'))
   document.getElementById('foto-count-label').textContent = `(${bCapturaGetFotos().length}/5)`
+  document.getElementById('camera-contador').textContent  = `${bCapturaGetFotos().length}/5`
+  if (bCapturaGetFotos().length >= 5) fecharCamera()
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -1142,6 +1161,18 @@ function preencherFauna(f) {
 // ── Câmera de fauna ──────────────────────────────────────────
 async function abrirFaunaCamera() {
   if (bFaunaFotoGetLista().length >= 5) { toast('Máximo de 5 fotos por animal', 'warn'); return }
+
+  // App nativo: câmera do próprio Android
+  if (bCameraEhNativa()) {
+    const blob = await bCameraNativaCapturar(App.brigadista, bGpsAtual())
+    if (blob) {
+      if (!bFaunaFotoAdicionar(blob)) { toast('Máximo de 5 fotos por animal', 'warn'); return }
+      renderFaunaFotos()
+    }
+    return
+  }
+
+  document.getElementById('fauna-camera-contador').textContent = `${bFaunaFotoGetLista().length}/5`
   document.getElementById('fauna-camera-wrap').hidden = false
   const ok = await bCameraAbrir(document.getElementById('fauna-camera-video'))
   if (!ok) {
@@ -1164,6 +1195,8 @@ async function capturarFaunaFoto() {
   if (!blob) return
   if (!bFaunaFotoAdicionar(blob)) { toast('Máximo de 5 fotos por animal', 'warn'); return }
   renderFaunaFotos()
+  document.getElementById('fauna-camera-contador').textContent = `${bFaunaFotoGetLista().length}/5`
+  if (bFaunaFotoGetLista().length >= 5) fecharFaunaCamera()
 }
 
 function renderFaunaFotos() {
