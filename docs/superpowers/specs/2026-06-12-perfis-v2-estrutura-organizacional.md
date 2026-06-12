@@ -12,6 +12,13 @@
 | Populações nesta rodada | Internos + pesquisadores externos + brigadistas/validador |
 | Secretário | **Só leitura + executivo** (não opera) |
 | Migração dos `gestor` atuais | Tem `usuarios.uc_id` → `gestor_uc`; sem → `chefe_departamento` |
+| Modelo de permissão | **RBAC + overrides individuais** — perfil é template; super_admin concede/retira acesso por usuário e por módulo (ver seção "Permissões dinâmicas") |
+| Catálogo de módulos | **Data-driven** — cada aba é linha em `modulos`; nova aba não exige código de permissão |
+
+> Atualização (2026-06-12, tarde): o sistema deve permitir ao super_admin conceder/
+> retirar acesso a QUALQUER usuário, em qualquer módulo, no nível Visualizar ou Editar,
+> de forma individual no cadastro. Os 13 perfis viram TEMPLATES (padrões), não gaiolas.
+> Ver seção "Permissões dinâmicas (v3)".
 
 ## Problema que estamos resolvendo
 
