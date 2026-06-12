@@ -434,6 +434,8 @@
     <button class="btn-config-item" id="btn-buscar-especies">🌿 Atualizar catálogo de espécies</button>
     <button class="btn-config-item btn-danger-soft" id="btn-zerar-fila">🗑 Zerar fila de registros</button>
     <button class="btn-config-item btn-danger" id="btn-sair">↩ Sair / Trocar conta</button>
+
+    <p id="app-versao" style="text-align:center;opacity:.55;font-size:.8rem;margin-top:14px"></p>
   </div>
 </div>
 
@@ -967,7 +969,11 @@ async function entrarHome() {
   await atualizarBadgeFila()
 
   bSyncOn('confirmado', atualizarBadgeFila)
-  bSyncOn('erro', atualizarBadgeFila)
+  bSyncOn('erro', d => {
+    atualizarBadgeFila()
+    // Erro global (ex.: sessão expirada) não aparece na fila — toast
+    if (d && d.uuid === null && d.err) toast(d.err, 'erro')
+  })
 
   // Inicia sessão de auditoria (falhas silenciosas — não bloqueiam o app)
   if (!App.sessaoId) iniciarSessaoAuditoria()
@@ -1473,6 +1479,10 @@ document.addEventListener('DOMContentLoaded', () => {
   bOfflineGetConfig('field_mode').then(v => {
     if (v) document.body.classList.add('field-mode')
   })
+
+  // Versão (BRIGADA_BUILD é estampado pelo build do app nativo)
+  document.getElementById('app-versao').textContent =
+    'SIGUC Brigadas · ' + (window.BRIGADA_BUILD || 'versão web')
 
   boot()
 

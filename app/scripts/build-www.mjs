@@ -65,6 +65,11 @@ for (const [padrao, sub] of rewrites) {
   }
   html = html.replace(padrao, sub)
 }
+
+// Carimbo de versão (exibido na tela Config do app)
+const versao = process.env.APP_VERSION_NAME ?? 'dev'
+html = html.replace('</head>', `<script>window.BRIGADA_BUILD='v${versao} (app)'</script>\n</head>`)
+
 writeFileSync(join(WWW, 'index.html'), html)
 
 // ── Sanidade ───────────────────────────────────────────────────
