@@ -519,7 +519,11 @@
     <button class="btn-config-item btn-danger-soft" id="btn-zerar-fila">🗑 Zerar fila de registros</button>
     <button class="btn-config-item btn-danger" id="btn-sair">↩ Sair / Trocar conta</button>
 
-    <p id="app-versao" style="text-align:center;opacity:.55;font-size:.8rem;margin-top:14px"></p>
+    <div class="app-creditos">
+      <p id="app-versao"></p>
+      <p>Desenvolvido por <strong>Erisson Cameli Santiago</strong></p>
+      <p id="app-copyright"></p>
+    </div>
   </div>
 </div>
 
@@ -2022,9 +2026,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (v) document.body.classList.add('field-mode')
   })
 
-  // Versão (BRIGADA_BUILD é estampado pelo build do app nativo)
+  // Versão (BRIGADA_BUILD é estampado pelo build do app nativo) e créditos
   document.getElementById('app-versao').textContent =
     'SIGUC Brigadas · ' + (window.BRIGADA_BUILD || 'versão web')
+  document.getElementById('app-copyright').textContent =
+    `© ${new Date().getFullYear()} · Todos os direitos reservados a Erisson Cameli Santiago`
 
   boot()
 
