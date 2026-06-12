@@ -22,8 +22,8 @@
   </div>
   <p class="lock-dica">App de Campo — Faça seu login</p>
   <div class="login-form">
-    <input type="email" id="login-email" class="login-input" placeholder="E-mail"
-      autocomplete="username" inputmode="email">
+    <input type="text" id="login-email" class="login-input" placeholder="E-mail ou CPF"
+      autocomplete="username">
     <div class="login-senha-wrap">
       <input type="password" id="login-senha" class="login-input" placeholder="Senha"
         autocomplete="current-password">
@@ -32,6 +32,23 @@
     <button id="btn-fazer-login" class="btn-login-submit">Entrar</button>
   </div>
   <p class="lock-erro" id="login-erro" hidden></p>
+</div>
+
+<!-- ══ TELA: TROCAR SENHA (1º acesso) ══════════════════════════ -->
+<div id="tela-trocar-senha" class="tela lock-screen" hidden>
+  <div class="lock-logo">
+    <img src="/pwa/icons/mascote.png" alt="" class="lock-mascote">
+    <span class="lock-titulo">Criar Nova Senha</span>
+  </div>
+  <p class="lock-dica">Você entrou com uma senha provisória.<br>Crie sua senha pessoal para continuar.</p>
+  <div class="login-form">
+    <input type="password" id="troca-senha1" class="login-input" placeholder="Nova senha (mín. 6 caracteres)"
+      autocomplete="new-password">
+    <input type="password" id="troca-senha2" class="login-input" placeholder="Repita a nova senha"
+      autocomplete="new-password">
+    <button id="btn-trocar-senha" class="btn-login-submit">Salvar e continuar</button>
+  </div>
+  <p class="lock-erro" id="troca-erro" hidden></p>
 </div>
 
 <!-- ══ TELA: BLOQUEIO ══════════════════════════════════════════ -->
@@ -660,7 +677,7 @@ function mostrarTela(id, empurrar = true) {
   const tela = document.getElementById(id)
   if (tela) tela.hidden = false
 
-  const temNav = !['tela-bloqueio', 'tela-config-pin', 'tela-login'].includes(id)
+  const temNav = !['tela-bloqueio', 'tela-config-pin', 'tela-login', 'tela-trocar-senha'].includes(id)
   document.getElementById('pill-nav').hidden = !temNav
 
   if (empurrar && App.telasHistorico.at(-1) !== id) {
@@ -724,11 +741,11 @@ async function boot() {
   mostrarTela('tela-login', false)
 }
 
-async function prosseguirAposAuth(session) {
+async function prosseguirAposAuth(session, jaAutenticou = false) {
   // Verifica se o usuário tem perfil brigadista (evita admin entrando no app)
   const { data: usuarioData } = await db
     .from('usuarios')
-    .select('perfil, ativo')
+    .select('perfil, ativo, deve_trocar_senha')
     .eq('id', session.user.id)
     .maybeSingle()
 
@@ -759,17 +776,74 @@ async function prosseguirAposAuth(session) {
 
   sincronizarEspecies()
 
-  const pinSalvo = await bOfflineGetConfig('pin_hash')
+  // Senha provisória (criada pelo gestor) — troca obrigatória antes de usar
+  if (usuarioData?.deve_trocar_senha) {
+    document.getElementById('troca-erro').hidden = true
+    document.getElementById('troca-senha1').value = ''
+    document.getElementById('troca-senha2').value = ''
+    mostrarTela('tela-trocar-senha', false)
+    return
+  }
+
+  await continuarParaPin(brig, jaAutenticou)
+}
+
+async function continuarParaPin(brig, jaAutenticou = false) {
+  let pinSalvo  = await bOfflineGetConfig('pin_hash')
+  const pinDono = await bOfflineGetConfig('pin_dono')
+
+  // Instalações antigas não guardavam o dono — o PIN existente é do usuário atual
+  if (pinSalvo && !pinDono) await bOfflineSetConfig('pin_dono', brig.id)
+
+  // PIN de outra pessoa neste aparelho: descarta e pede um novo
+  if (pinSalvo && pinDono && pinDono !== brig.id) {
+    await bOfflineSetConfig('pin_hash', null)
+    await bOfflineSetConfig('pin_dono', null)
+    pinSalvo = null
+  }
+
   if (!pinSalvo) {
     const primeiroNome = brig.nome_completo?.split(' ')[0] || 'Brigadista'
     document.getElementById('pin-setup-nome').textContent = `Olá, ${primeiroNome}!`
     document.getElementById('pin-setup-dica').textContent = 'Escolha um PIN de 4 dígitos'
     toast('Login realizado! Configure seu PIN de acesso.', 'success')
     mostrarTela('tela-config-pin', false)
+  } else if (jaAutenticou) {
+    // Acabou de entrar com a senha — não pede o PIN de novo
+    toast('Login realizado!', 'success')
+    entrarHome()
   } else {
     document.getElementById('lock-nome').textContent = brig.nome_completo?.split(' ')[0] || 'Brigadista'
     document.getElementById('lock-offline').hidden = true
     mostrarTela('tela-bloqueio', false)
+  }
+}
+
+async function confirmarTrocaSenha() {
+  const s1 = document.getElementById('troca-senha1').value
+  const s2 = document.getElementById('troca-senha2').value
+  const erroEl = document.getElementById('troca-erro')
+  erroEl.hidden = true
+
+  if (!s1 || s1.length < 6) { erroEl.textContent = 'A nova senha deve ter no mínimo 6 caracteres.'; erroEl.hidden = false; return }
+  if (s1 !== s2) { erroEl.textContent = 'As senhas não coincidem.'; erroEl.hidden = false; return }
+
+  const btn = document.getElementById('btn-trocar-senha')
+  btn.disabled = true
+  btn.textContent = 'Salvando…'
+  try {
+    const { error } = await db.auth.updateUser({ password: s1 })
+    if (error) throw error
+    const { data: { session } } = await db.auth.getSession()
+    if (session) await db.from('usuarios').update({ deve_trocar_senha: false }).eq('id', session.user.id)
+    toast('Senha alterada com sucesso!', 'success')
+    await continuarParaPin(App.brigadista, true)
+  } catch (e) {
+    erroEl.textContent = 'Erro ao trocar a senha: ' + (e.message || 'tente novamente.')
+    erroEl.hidden = false
+  } finally {
+    btn.disabled = false
+    btn.textContent = 'Salvar e continuar'
   }
 }
 
@@ -949,9 +1023,13 @@ function mostrarErroLogin(msg) {
   el.hidden = false
 }
 
+// Brigadistas sem e-mail entram pelo CPF: o login é convertido para o
+// e-mail técnico usado no cadastro (mesma regra da função gerar-login-brigadista)
+const DOMINIO_LOGIN_CPF = 'brigadistas.siguc.local'
+
 async function fazerLogin() {
-  const email = document.getElementById('login-email').value.trim()
-  const senha  = document.getElementById('login-senha').value
+  const login = document.getElementById('login-email').value.trim()
+  const senha = document.getElementById('login-senha').value
   document.getElementById('login-erro').hidden = true
 
   if (!db) {
@@ -959,7 +1037,12 @@ async function fazerLogin() {
     return
   }
 
-  if (!email || !senha) { mostrarErroLogin('Preencha e-mail e senha.'); return }
+  if (!login || !senha) { mostrarErroLogin('Preencha e-mail (ou CPF) e senha.'); return }
+
+  const digitos = login.replace(/\D/g, '')
+  const email = (!login.includes('@') && digitos.length === 11)
+    ? `${digitos}@${DOMINIO_LOGIN_CPF}`
+    : login
 
   const btn = document.getElementById('btn-fazer-login')
   btn.disabled = true
@@ -968,10 +1051,10 @@ async function fazerLogin() {
   try {
     const { data, error } = await db.auth.signInWithPassword({ email, password: senha })
     if (error) {
-      mostrarErroLogin(error.status === 400 ? 'E-mail ou senha incorretos.' : 'Erro ao conectar. Tente novamente.')
+      mostrarErroLogin(error.status === 400 ? 'Login ou senha incorretos.' : 'Erro ao conectar. Tente novamente.')
       return
     }
-    await prosseguirAposAuth(data.session)
+    await prosseguirAposAuth(data.session, true)
   } catch (e) {
     console.error('[fazerLogin]', e)
     mostrarErroLogin('Erro inesperado: ' + (e.message || 'tente novamente.'))
@@ -1133,6 +1216,7 @@ async function confirmarPinSetup() {
 
     const hash = await pinHash(_pinSetupAtual, App.brigadista.id)
     await bOfflineSetConfig('pin_hash', hash)
+    await bOfflineSetConfig('pin_dono', App.brigadista.id)
     _pinSetupAtual = ''; _pinSetupPrim = ''; _pinSetupFase = 1
     entrarHome()
   } catch (e) {
@@ -1958,6 +2042,15 @@ document.addEventListener('DOMContentLoaded', () => {
     inp.type = inp.type === 'password' ? 'text' : 'password'
   })
 
+  // Troca de senha obrigatória (1º acesso)
+  document.getElementById('btn-trocar-senha').addEventListener('click', confirmarTrocaSenha)
+  document.getElementById('troca-senha1').addEventListener('keydown', e => {
+    if (e.key === 'Enter') document.getElementById('troca-senha2').focus()
+  })
+  document.getElementById('troca-senha2').addEventListener('keydown', e => {
+    if (e.key === 'Enter') confirmarTrocaSenha()
+  })
+
   // PIN desbloqueio
   initPinKeypad('pin', tentarDesbloquear)
   document.getElementById('btn-pular-pin')?.addEventListener('click', entrarHome)
@@ -2079,12 +2172,13 @@ document.addEventListener('DOMContentLoaded', () => {
     toast('Fila zerada.', 'ok')
   })
   document.getElementById('btn-sair').addEventListener('click', async () => {
-    if (!confirm('Sair do app? Registros não enviados permanecem salvos.')) return
+    if (!confirm('Sair do app? Registros não enviados e seu PIN permanecem salvos neste aparelho.')) return
     bGpsParar()
     await encerrarSessaoAuditoria()
+    // PIN (pin_hash/pin_dono) é mantido: ao relogar, o mesmo brigadista
+    // não precisa recriá-lo — outra pessoa logando recebe um PIN novo
     await bOfflineSetConfig('brigadista', null)
     await bOfflineSetConfig('brigada', null)
-    await bOfflineSetConfig('pin_hash', null)
     await db.auth.signOut()
     App.brigadista = null
     App.brigada    = null
