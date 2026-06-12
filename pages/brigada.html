@@ -143,7 +143,12 @@
 
   <div class="natureza-grid">
     <button class="natureza-btn prevencao" data-nat="prevencao">
-      <div class="natureza-icon">🛡</div>
+      <div class="natureza-icon">
+        <svg viewBox="0 0 24 24" class="ico-escudo" aria-hidden="true">
+          <path d="M12 2l8 3.2V11c0 4.9-3.4 8.5-8 10.3C7.4 19.5 4 15.9 4 11V5.2L12 2z" fill="#fff"/>
+          <path d="M8.4 11.6l2.4 2.4 4.8-5" fill="none" stroke="#12A66A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
       <div class="natureza-label">
         <strong>Prevenção</strong>
         <span>Aceiros, educação ambiental</span>
@@ -151,7 +156,12 @@
       <span class="natureza-chevron">›</span>
     </button>
     <button class="natureza-btn combate" data-nat="combate">
-      <div class="natureza-icon">🔥</div>
+      <div class="natureza-icon">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path class="ico-chama" d="M12 2.2c2.4 5.4-7 8.6-7 14.2a7 7 0 0 0 14 0c0-5.6-9.4-8.8-7-14.2z" fill="#fff"/>
+          <path class="ico-chama-nucleo" d="M12 13.5c1.1 2.6-3.2 4-3.2 6.6a3.2 3.2 0 0 0 6.4 0c0-2.6-4.3-4-3.2-6.6z" fill="#EF5B3C"/>
+        </svg>
+      </div>
       <div class="natureza-label">
         <strong>Combate</strong>
         <span>Extinção de incêndios</span>
@@ -159,7 +169,17 @@
       <span class="natureza-chevron">›</span>
     </button>
     <button class="natureza-btn monitoramento" data-nat="monitoramento">
-      <div class="natureza-icon">🔭</div>
+      <div class="natureza-icon">
+        <svg viewBox="0 0 24 24" class="ico-binoculo" aria-hidden="true">
+          <rect x="5.7" y="6" width="2.6" height="6" rx="1.2" fill="#fff" opacity=".95"/>
+          <rect x="15.7" y="6" width="2.6" height="6" rx="1.2" fill="#fff" opacity=".95"/>
+          <rect x="10.6" y="9" width="2.8" height="4.4" rx="1.2" fill="#fff" opacity=".8"/>
+          <circle cx="7" cy="15.2" r="4.3" fill="#fff"/>
+          <circle cx="17" cy="15.2" r="4.3" fill="#fff"/>
+          <circle cx="7" cy="15.2" r="1.9" fill="#3B82C4"/>
+          <circle cx="17" cy="15.2" r="1.9" fill="#3B82C4"/>
+        </svg>
+      </div>
       <div class="natureza-label">
         <strong>Monitoramento</strong>
         <span>Fauna, flora, ocorrências</span>
@@ -543,8 +563,9 @@
 
 <!-- ══ OVERLAY: VÍDEO DO MASCOTE ══════════════════════════════ -->
 <div id="video-mascote-wrap" class="video-mascote-overlay" hidden>
-  <video id="video-mascote" src="/pwa/mascote-video.mp4" playsinline muted preload="none"></video>
+  <video id="video-mascote" src="/pwa/mascote-video.mp4" playsinline preload="none"></video>
   <button class="camera-fechar" id="btn-fechar-video" aria-label="Fechar vídeo">✕</button>
+  <button class="btn-som-video" id="btn-som-video" hidden>🔊 Ativar som</button>
 </div>
 
 <!-- ── Scripts ─────────────────────────────────────────────── -->
@@ -824,8 +845,16 @@ function mascoteVideoTocar() {
   if (!wrap || !vid) return
   wrap.hidden = false
   vid.currentTime = 0
-  // Autoplay exige muted; se o aparelho bloquear, fecha em silêncio
-  vid.play().catch(() => { wrap.hidden = true })
+  // Tenta com som; se a política de autoplay bloquear (web sem gesto),
+  // cai para mudo com botão de ativar o som. No app nativo a WebView
+  // permite autoplay com áudio.
+  vid.muted = false
+  document.getElementById('btn-som-video').hidden = true
+  vid.play().catch(() => {
+    vid.muted = true
+    document.getElementById('btn-som-video').hidden = false
+    vid.play().catch(() => { wrap.hidden = true })
+  })
 }
 
 function mascoteVideoFechar() {
@@ -1833,6 +1862,12 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('video-mascote-wrap').addEventListener('click', mascoteVideoFechar)
   document.getElementById('btn-fechar-video').addEventListener('click', mascoteVideoFechar)
   document.getElementById('video-mascote').addEventListener('ended', mascoteVideoFechar)
+  document.getElementById('btn-som-video').addEventListener('click', ev => {
+    ev.stopPropagation()   // não fechar o overlay
+    const vid = document.getElementById('video-mascote')
+    vid.muted = false
+    ev.currentTarget.hidden = true
+  })
 
   // Home
   document.getElementById('btn-sync-home').addEventListener('click', async () => {
