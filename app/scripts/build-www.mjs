@@ -28,6 +28,12 @@ mkdirSync(join(WWW, 'pwa/icons'), { recursive: true })
 cpSync(join(RAIZ, 'pwa/icons/mascote.png'), join(WWW, 'pwa/icons/mascote.png'))
 cpSync(join(RAIZ, 'pwa/mascote-video.mp4'), join(WWW, 'pwa/mascote-video.mp4'))
 
+// ── Figuras da fauna amazônica (seletor de classe) ────────────
+mkdirSync(join(WWW, 'pwa/icons/fauna'), { recursive: true })
+for (const f of ['mamifero', 'ave', 'reptil', 'anfibio', 'peixe', 'invertebrado']) {
+  cpSync(join(RAIZ, `pwa/icons/fauna/${f}.png`), join(WWW, `pwa/icons/fauna/${f}.png`))
+}
+
 // ── Municípios do Acre (município no card de GPS, offline) ────
 mkdirSync(join(WWW, 'data'), { recursive: true })
 cpSync(join(RAIZ, 'data/municipios_acre.geojson'), join(WWW, 'data/municipios_acre.geojson'))
