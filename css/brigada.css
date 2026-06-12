@@ -568,8 +568,12 @@ body { margin: 0; }
 
 /* Acessibilidade: respeita usuários sensíveis a movimento */
 @media (prefers-reduced-motion: reduce) {
+<<<<<<< HEAD
   .faixa-mascote, .lock-mascote, .faixa-mascote.comemora, .radar-varredura,
   .ico-escudo, .ico-chama, .ico-chama-nucleo, .ico-binoculo { animation: none; }
+=======
+  .faixa-mascote, .lock-mascote, .faixa-mascote.comemora, .radar-varredura { animation: none; }
+>>>>>>> origin/main
 }
 
 /* ── Vídeo do mascote (overlay em tela cheia) ─────────────── */
