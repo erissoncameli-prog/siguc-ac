@@ -32,12 +32,15 @@ externos e brigadistas (que já têm login próprio) não têm perfil formal.
 | `chefe_departamento` | cargo | Departamento (N UCs) | Chefe DEUC / Coord. CIGMA |
 | `gestor_uc` | cargo | 1 UC | Opera só a UC dele |
 | `tecnico` | cargo | UC ou global | Analista — lança dados de campo |
+| `assistente_admin` | cargo | Setor/lotação | Lotável em qualquer setor; opera o sistema inserindo dados |
 | `financeiro` | manual | Global | Módulo financeiro/pesquisa |
 | `visualizador` | manual | Global | Só leitura |
 | `pesquisador_externo` | cargo/auto | Próprios projetos | Portal de pesquisa |
 | `brigadista` | função login | Própria brigada | App de campo |
-| `validador_campo` | manual | UCs designadas | Substitui o "biologo" fantasma do código |
+| `validador_brigada` | manual | UCs/brigadas designadas | Valida ocorrências reportadas pelas brigadas |
+| `validador_fauna` | manual | Especialidade (global) | Especialista/biólogo — valida fauna identificada |
 | ~~`gestor`~~ (legado) | — | — | Migra → chefe_departamento ou gestor_uc |
+| ~~`validador_campo`~~ | — | — | Desmembrado em validador_brigada + validador_fauna |
 
 ## Derivação cargo → perfil
 
