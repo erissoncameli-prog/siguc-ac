@@ -401,6 +401,51 @@
   </button>
 </div>
 
+<!-- ══ TELA: MEUS RESULTADOS ══════════════════════════════════ -->
+<div id="tela-dados" class="tela" hidden>
+  <header class="form-header">
+    <button class="btn-back" id="btn-back-dados" aria-label="Voltar">‹</button>
+    <span>Meus Resultados</span>
+    <span></span>
+  </header>
+
+  <div class="form-body">
+    <p class="dados-atualizado" id="dados-atualizado">Carregando…</p>
+
+    <div class="dados-grid">
+      <div class="dados-kpi"><strong id="kpi-total">—</strong><span>Registros</span></div>
+      <div class="dados-kpi"><strong id="kpi-mes">—</strong><span>Neste mês</span></div>
+      <div class="dados-kpi"><strong id="kpi-area">—</strong><span>Área (ha)</span></div>
+      <div class="dados-kpi"><strong id="kpi-fauna">—</strong><span>Animais</span></div>
+    </div>
+
+    <div class="form-section">
+      <label class="form-label">Por natureza</label>
+      <div id="chart-natureza" class="chart-barras"></div>
+    </div>
+
+    <div class="form-section">
+      <label class="form-label">Registros por mês</label>
+      <div id="chart-meses" class="chart-colunas"></div>
+    </div>
+
+    <div class="form-section">
+      <label class="form-label">Atividades mais frequentes</label>
+      <div id="chart-atividade" class="chart-barras"></div>
+    </div>
+
+    <div class="form-section">
+      <label class="form-label">Fauna por classe</label>
+      <div id="chart-fauna" class="chart-barras"></div>
+    </div>
+
+    <div class="form-section">
+      <label class="form-label">Validação dos registros</label>
+      <div id="chart-validacao" class="chart-barras"></div>
+    </div>
+  </div>
+</div>
+
 <!-- ══ TELA: CONFIGURAÇÕES ════════════════════════════════════ -->
 <div id="tela-config" class="tela" hidden>
   <header class="form-header">
@@ -411,12 +456,17 @@
 
   <div class="form-body">
     <div class="config-card" id="config-brigadista-card">
-      <div class="config-avatar" id="config-avatar">B</div>
+      <button class="config-avatar" id="config-avatar" aria-label="Alterar foto de perfil">
+        <span id="avatar-letra">B</span>
+        <span class="avatar-badge" aria-hidden="true">📷</span>
+      </button>
       <div>
         <strong id="config-nome-brig">—</strong>
         <p id="config-brigada-nome" style="margin:0;opacity:.7;font-size:.85rem">—</p>
+        <p style="margin:2px 0 0;opacity:.55;font-size:.75rem">Toque na foto para alterar</p>
       </div>
     </div>
+    <input type="file" id="input-foto-perfil" accept="image/*" hidden>
 
     <div class="form-section">
       <label class="form-label">Armazenamento</label>
@@ -457,6 +507,10 @@
     <span class="pill-badge" id="nav-badge" hidden>0</span>
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
     <span>Fila</span>
+  </button>
+  <button class="pill-btn" data-tela="tela-dados" id="nav-dados">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+    <span>Dados</span>
   </button>
   <button class="pill-btn" data-tela="tela-config" id="nav-config">
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
@@ -573,6 +627,7 @@ function mostrarTela(id, empurrar = true) {
 
   if (id === 'tela-fila')  carregarFila()
   if (id === 'tela-config') carregarConfig()
+  if (id === 'tela-dados')  carregarDados()
 }
 
 function voltarTela() {
@@ -1295,14 +1350,235 @@ async function carregarFila() {
 }
 
 // ════════════════════════════════════════════════════════════════
+// Meus Resultados (estatísticas do brigadista)
+// ════════════════════════════════════════════════════════════════
+const ROTULO_NATUREZA = { prevencao: 'Prevenção', combate: 'Combate', monitoramento: 'Monitoramento' }
+const COR_NATUREZA    = { prevencao: 'var(--prim)', combate: 'var(--combate)', monitoramento: 'var(--monit)' }
+const ROTULO_VALIDACAO = {
+  aguardando: 'Aguardando', validado: 'Validado',
+  requer_correcao: 'Requer correção', rejeitado: 'Rejeitado',
+}
+const COR_VALIDACAO = {
+  aguardando: 'var(--alerta)', validado: 'var(--prim)',
+  requer_correcao: 'var(--fauna)', rejeitado: 'var(--combate)',
+}
+
+function rotuloBonito(v) {
+  const s = String(v || '—').replace(/_/g, ' ')
+  return s.charAt(0).toUpperCase() + s.slice(1)
+}
+
+function renderBarras(elId, pares) {
+  // pares: [[rótulo, valor, cor?]]
+  const el  = document.getElementById(elId)
+  const max = Math.max(...pares.map(p => p[1]), 1)
+  el.innerHTML = pares.length ? pares.map(([rot, val, cor]) => `
+    <div class="barra-row">
+      <span class="barra-rotulo">${esc(rot)}</span>
+      <div class="barra-track"><div class="barra-fill" style="width:${Math.round(val / max * 100)}%${cor ? `;background:${cor}` : ''}"></div></div>
+      <span class="barra-valor">${val}</span>
+    </div>`).join('') : '<p class="chart-vazio">Sem dados ainda</p>'
+}
+
+function renderColunas(elId, pares) {
+  // pares: [[rótulo, valor]]
+  const el  = document.getElementById(elId)
+  const max = Math.max(...pares.map(p => p[1]), 1)
+  el.innerHTML = pares.map(([rot, val]) => `
+    <div class="coluna-mes">
+      <span class="coluna-valor">${val || ''}</span>
+      <div class="coluna-fill" style="height:${Math.max(Math.round(val / max * 100), 2)}%"></div>
+      <span class="coluna-rotulo">${esc(rot)}</span>
+    </div>`).join('')
+}
+
+function contar(lista, chave) {
+  const m = {}
+  lista.forEach(r => { const k = r[chave] ?? '—'; m[k] = (m[k] || 0) + 1 })
+  return m
+}
+
+async function carregarDados() {
+  let stats = await bOfflineGetConfig('stats_cache')
+
+  // Online: busca dados frescos do banco e atualiza o cache local
+  if (db && App.brigadista?.id && await bSyncTemConexao()) {
+    try {
+      const [{ data: regs }, { data: fauna }] = await Promise.all([
+        db.from('registros_campo')
+          .select('natureza, atividade, data_hora_evento, area_estimada_ha, status_validacao')
+          .eq('brigadista_id', App.brigadista.id),
+        db.from('registro_fauna')
+          .select('classe, quantidade, registros_campo!inner(brigadista_id)')
+          .eq('registros_campo.brigadista_id', App.brigadista.id),
+      ])
+      if (regs) {
+        stats = { quando: new Date().toISOString(), regs, fauna: fauna || [] }
+        await bOfflineSetConfig('stats_cache', stats)
+      }
+    } catch (e) { console.warn('[dados]', e) }
+  }
+
+  const pendentes = await bOfflineListarPendentes()
+  const infoEl    = document.getElementById('dados-atualizado')
+
+  if (!stats) {
+    infoEl.textContent = 'Conecte-se à internet uma vez para carregar seus resultados'
+    ;['chart-natureza', 'chart-atividade', 'chart-fauna', 'chart-validacao'].forEach(id =>
+      document.getElementById(id).innerHTML = '<p class="chart-vazio">Sem dados ainda</p>')
+    document.getElementById('chart-meses').innerHTML = ''
+    return
+  }
+
+  const regs  = stats.regs  || []
+  const fauna = stats.fauna || []
+  const aviso = pendentes.length ? ` · ${pendentes.length} aguardando envio` : ''
+  infoEl.textContent = `Atualizado em ${formatData ? formatData(stats.quando) : stats.quando.slice(0, 10)}${aviso}`
+
+  // KPIs
+  const mesAtual = new Date().toISOString().slice(0, 7)
+  document.getElementById('kpi-total').textContent = regs.length
+  document.getElementById('kpi-mes').textContent   = regs.filter(r => (r.data_hora_evento || '').startsWith(mesAtual)).length
+  document.getElementById('kpi-area').textContent  =
+    regs.reduce((s, r) => s + (parseFloat(r.area_estimada_ha) || 0), 0).toFixed(1)
+  document.getElementById('kpi-fauna').textContent = fauna.reduce((s, f) => s + (f.quantidade || 1), 0)
+
+  // Por natureza
+  const porNat = contar(regs, 'natureza')
+  renderBarras('chart-natureza', Object.entries(porNat)
+    .sort((a, b) => b[1] - a[1])
+    .map(([k, v]) => [ROTULO_NATUREZA[k] || rotuloBonito(k), v, COR_NATUREZA[k]]))
+
+  // Últimos 6 meses
+  const meses = []
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - i)
+    const chave  = d.toISOString().slice(0, 7)
+    const rotulo = d.toLocaleString('pt-BR', { month: 'short' }).replace('.', '')
+    meses.push([rotulo, regs.filter(r => (r.data_hora_evento || '').startsWith(chave)).length])
+  }
+  renderColunas('chart-meses', meses)
+
+  // Top 5 atividades
+  renderBarras('chart-atividade', Object.entries(contar(regs, 'atividade'))
+    .sort((a, b) => b[1] - a[1]).slice(0, 5)
+    .map(([k, v]) => [rotuloBonito(k), v]))
+
+  // Fauna por classe (soma quantidades)
+  const porClasse = {}
+  fauna.forEach(f => { const k = f.classe ?? '—'; porClasse[k] = (porClasse[k] || 0) + (f.quantidade || 1) })
+  renderBarras('chart-fauna', Object.entries(porClasse)
+    .sort((a, b) => b[1] - a[1])
+    .map(([k, v]) => [k === 'nao_sei' ? 'Não identificado' : rotuloBonito(k), v, 'var(--fauna)']))
+
+  // Validação
+  renderBarras('chart-validacao', Object.entries(contar(regs, 'status_validacao'))
+    .sort((a, b) => b[1] - a[1])
+    .map(([k, v]) => [ROTULO_VALIDACAO[k] || rotuloBonito(k), v, COR_VALIDACAO[k]]))
+}
+
+// ════════════════════════════════════════════════════════════════
+// Foto de perfil do brigadista
+// ════════════════════════════════════════════════════════════════
+function renderAvatar() {
+  const av    = document.getElementById('config-avatar')
+  const letra = document.getElementById('avatar-letra')
+  const foto  = App.brigadista?.foto_url
+  if (foto) {
+    av.style.backgroundImage = `url("${foto.replace(/"/g, '')}")`
+    letra.hidden = true
+  } else {
+    av.style.backgroundImage = ''
+    letra.hidden = false
+  }
+}
+
+// Recorte quadrado central + redimensionamento (canvas)
+function fotoQuadrada(blob, tam) {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    const url = URL.createObjectURL(blob)
+    img.onload = () => {
+      const lado = Math.min(img.naturalWidth, img.naturalHeight)
+      const sx = (img.naturalWidth  - lado) / 2
+      const sy = (img.naturalHeight - lado) / 2
+      const c = document.createElement('canvas')
+      c.width = c.height = tam
+      c.getContext('2d').drawImage(img, sx, sy, lado, lado, 0, 0, tam, tam)
+      URL.revokeObjectURL(url)
+      c.toBlob(b => resolve(b), 'image/jpeg', 0.85)
+    }
+    img.onerror = reject
+    img.src = url
+  })
+}
+
+async function alterarFotoBrigadista() {
+  if (!App.brigadista?.id) return
+  if (!db || !await bSyncTemConexao()) {
+    toast('Sem conexão — tente alterar a foto quando houver internet', 'warn')
+    return
+  }
+
+  let blob = null
+  if (bCameraEhNativa()) {
+    try {
+      const foto = await window.Capacitor.Plugins.Camera.getPhoto({
+        source: 'PROMPT', resultType: 'base64', quality: 80, width: 800,
+        correctOrientation: true, saveToGallery: false,
+        promptLabelHeader: 'Foto de perfil',
+        promptLabelPhoto:  'Escolher da galeria',
+        promptLabelPicture: 'Tirar foto',
+      })
+      if (foto?.base64String) {
+        blob = bSyncBase64ParaBlob(`data:image/${foto.format ?? 'jpeg'};base64,${foto.base64String}`)
+      }
+    } catch { return }   // cancelou
+  } else {
+    blob = await new Promise(res => {
+      const inp = document.getElementById('input-foto-perfil')
+      inp.value = ''
+      inp.onchange = () => res(inp.files[0] || null)
+      inp.click()
+    })
+  }
+  if (!blob) return
+
+  toast('Enviando foto…', 'info')
+  try {
+    const quadrada = await fotoQuadrada(blob, 512)
+    const path = `${App.brigadista.id}/perfil.jpg`
+    const { error: upErr } = await db.storage.from('brigadistas')
+      .upload(path, quadrada, { upsert: true, contentType: 'image/jpeg' })
+    if (upErr) throw upErr
+
+    const { data: { publicUrl } } = db.storage.from('brigadistas').getPublicUrl(path)
+    const fotoUrl = `${publicUrl}?t=${Date.now()}`   // cache-bust no upsert
+
+    const { error: updErr } = await db.from('brigadistas')
+      .update({ foto_url: fotoUrl })
+      .eq('id', App.brigadista.id)
+    if (updErr) throw updErr
+
+    App.brigadista.foto_url = fotoUrl
+    await bOfflineSetConfig('brigadista', App.brigadista)
+    renderAvatar()
+    toast('Foto atualizada!', 'ok')
+  } catch (e) {
+    toast('Erro ao enviar foto: ' + (e.message || e), 'erro')
+  }
+}
+
+// ════════════════════════════════════════════════════════════════
 // Configurações
 // ════════════════════════════════════════════════════════════════
 async function carregarConfig() {
   const brig = App.brigadista
   document.getElementById('config-nome-brig').textContent  = brig?.nome_completo || '—'
   document.getElementById('config-brigada-nome').textContent = App.brigada?.nome || '—'
-  document.getElementById('config-avatar').textContent =
+  document.getElementById('avatar-letra').textContent =
     (brig?.nome_completo || 'B').charAt(0).toUpperCase()
+  renderAvatar()
 
   const quota = await bOfflineQuota()
   if (quota) {
@@ -1366,6 +1642,10 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-back-fauna').addEventListener('click', () => mostrarTela('tela-form', false))
   document.getElementById('btn-back-fila').addEventListener('click', () => mostrarTela('tela-home'))
   document.getElementById('btn-back-config').addEventListener('click', () => mostrarTela('tela-home'))
+  document.getElementById('btn-back-dados').addEventListener('click', () => mostrarTela('tela-home'))
+
+  // Foto de perfil
+  document.getElementById('config-avatar').addEventListener('click', alterarFotoBrigadista)
 
   // Home
   document.getElementById('btn-sync-home').addEventListener('click', async () => {
