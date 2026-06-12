@@ -45,17 +45,23 @@ externos e brigadistas (que já têm login próprio) não têm perfil formal.
 ## Derivação cargo → perfil
 
 ```
-secretario          → secretario
-diretor             → diretor
-coordenador         → chefe_departamento
-chefe_deuc          → chefe_departamento
-gestor_uc           → gestor_uc        (+ escopo = cargos.uc_id)
-analista_uc         → tecnico          (+ escopo = cargos.uc_id)
-pesquisador_externo → pesquisador_externo
+secretario               → secretario
+diretor                  → diretor
+coordenador              → chefe_departamento
+chefe_deuc               → chefe_departamento
+gestor_uc                → gestor_uc          (+ escopo = cargos.uc_id)
+analista_uc              → tecnico            (+ escopo = cargos.uc_id)
+assistente_administrativo→ assistente_admin   (+ escopo = unidade_org / uc da lotação)
+pesquisador_externo      → pesquisador_externo
 ```
 
+Requer novo valor no enum `nivel_hierarquico`: `assistente_administrativo`
+(abaixo de analista_uc). O assistente herda o escopo da unidade onde está lotado
+(cargos.unidade_org_id) — se a lotação estiver vinculada a uma UC, escopo = aquela UC;
+se for um departamento (DEUC/CIGMA), escopo = todas as UCs do departamento.
+
 Fora da derivação (atribuídos à mão): super_admin, financeiro, visualizador,
-brigadista, validador_campo.
+brigadista, validador_brigada, validador_fauna.
 
 Mecânica: trigger em `cargo_ocupacoes` e `delegacoes_temporarias` recalcula
 `usuarios.perfil` e o escopo quando titular/substituto entra ou sai.
