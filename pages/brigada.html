@@ -741,7 +741,7 @@ async function boot() {
   mostrarTela('tela-login', false)
 }
 
-async function prosseguirAposAuth(session) {
+async function prosseguirAposAuth(session, jaAutenticou = false) {
   // Verifica se o usuário tem perfil brigadista (evita admin entrando no app)
   const { data: usuarioData } = await db
     .from('usuarios')
@@ -785,17 +785,33 @@ async function prosseguirAposAuth(session) {
     return
   }
 
-  await continuarParaPin(brig)
+  await continuarParaPin(brig, jaAutenticou)
 }
 
-async function continuarParaPin(brig) {
-  const pinSalvo = await bOfflineGetConfig('pin_hash')
+async function continuarParaPin(brig, jaAutenticou = false) {
+  let pinSalvo  = await bOfflineGetConfig('pin_hash')
+  const pinDono = await bOfflineGetConfig('pin_dono')
+
+  // Instalações antigas não guardavam o dono — o PIN existente é do usuário atual
+  if (pinSalvo && !pinDono) await bOfflineSetConfig('pin_dono', brig.id)
+
+  // PIN de outra pessoa neste aparelho: descarta e pede um novo
+  if (pinSalvo && pinDono && pinDono !== brig.id) {
+    await bOfflineSetConfig('pin_hash', null)
+    await bOfflineSetConfig('pin_dono', null)
+    pinSalvo = null
+  }
+
   if (!pinSalvo) {
     const primeiroNome = brig.nome_completo?.split(' ')[0] || 'Brigadista'
     document.getElementById('pin-setup-nome').textContent = `Olá, ${primeiroNome}!`
     document.getElementById('pin-setup-dica').textContent = 'Escolha um PIN de 4 dígitos'
     toast('Login realizado! Configure seu PIN de acesso.', 'success')
     mostrarTela('tela-config-pin', false)
+  } else if (jaAutenticou) {
+    // Acabou de entrar com a senha — não pede o PIN de novo
+    toast('Login realizado!', 'success')
+    entrarHome()
   } else {
     document.getElementById('lock-nome').textContent = brig.nome_completo?.split(' ')[0] || 'Brigadista'
     document.getElementById('lock-offline').hidden = true
@@ -821,7 +837,7 @@ async function confirmarTrocaSenha() {
     const { data: { session } } = await db.auth.getSession()
     if (session) await db.from('usuarios').update({ deve_trocar_senha: false }).eq('id', session.user.id)
     toast('Senha alterada com sucesso!', 'success')
-    await continuarParaPin(App.brigadista)
+    await continuarParaPin(App.brigadista, true)
   } catch (e) {
     erroEl.textContent = 'Erro ao trocar a senha: ' + (e.message || 'tente novamente.')
     erroEl.hidden = false
@@ -1038,7 +1054,7 @@ async function fazerLogin() {
       mostrarErroLogin(error.status === 400 ? 'Login ou senha incorretos.' : 'Erro ao conectar. Tente novamente.')
       return
     }
-    await prosseguirAposAuth(data.session)
+    await prosseguirAposAuth(data.session, true)
   } catch (e) {
     console.error('[fazerLogin]', e)
     mostrarErroLogin('Erro inesperado: ' + (e.message || 'tente novamente.'))
@@ -1200,6 +1216,7 @@ async function confirmarPinSetup() {
 
     const hash = await pinHash(_pinSetupAtual, App.brigadista.id)
     await bOfflineSetConfig('pin_hash', hash)
+    await bOfflineSetConfig('pin_dono', App.brigadista.id)
     _pinSetupAtual = ''; _pinSetupPrim = ''; _pinSetupFase = 1
     entrarHome()
   } catch (e) {
@@ -2155,12 +2172,13 @@ document.addEventListener('DOMContentLoaded', () => {
     toast('Fila zerada.', 'ok')
   })
   document.getElementById('btn-sair').addEventListener('click', async () => {
-    if (!confirm('Sair do app? Registros não enviados permanecem salvos.')) return
+    if (!confirm('Sair do app? Registros não enviados e seu PIN permanecem salvos neste aparelho.')) return
     bGpsParar()
     await encerrarSessaoAuditoria()
+    // PIN (pin_hash/pin_dono) é mantido: ao relogar, o mesmo brigadista
+    // não precisa recriá-lo — outra pessoa logando recebe um PIN novo
     await bOfflineSetConfig('brigadista', null)
     await bOfflineSetConfig('brigada', null)
-    await bOfflineSetConfig('pin_hash', null)
     await db.auth.signOut()
     App.brigadista = null
     App.brigada    = null
