@@ -37,7 +37,14 @@ async function bSyncTemConexao() {
   try {
     const ctrl = new AbortController()
     const t = setTimeout(() => ctrl.abort(), 4000)
-    const r = await fetch(`${SUPABASE_URL}/auth/v1/health`, { cache: 'no-store', signal: ctrl.signal })
+    // REST com apikey: exatamente o mesmo caminho (gateway + CORS) que o
+    // tráfego real da sincronização usa — se isto responde, dá para enviar.
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/`, {
+      method: 'HEAD',
+      headers: { apikey: SUPABASE_ANON_KEY },
+      cache: 'no-store',
+      signal: ctrl.signal,
+    })
     clearTimeout(t)
     // Qualquer resposta < 500 prova conectividade; o service worker da
     // versão web responde 503 sintético quando offline.

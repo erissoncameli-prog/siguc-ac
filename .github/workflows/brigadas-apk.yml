@@ -45,6 +45,23 @@ jobs:
         working-directory: app
         run: npm ci
 
+      - name: Definir versão
+        env:
+          VERSAO_INPUT: ${{ inputs.versao }}
+        run: |
+          REF="${GITHUB_REF_NAME}"
+          if [[ "$REF" == brigadas-v* ]]; then
+            echo "APP_VERSION_NAME=${REF#brigadas-v}" >> "$GITHUB_ENV"
+            echo "PUBLICAR_RELEASE=true" >> "$GITHUB_ENV"
+          elif [ -n "$VERSAO_INPUT" ]; then
+            echo "APP_VERSION_NAME=$VERSAO_INPUT" >> "$GITHUB_ENV"
+            echo "PUBLICAR_RELEASE=true" >> "$GITHUB_ENV"
+          else
+            echo "APP_VERSION_NAME=0.0.${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
+            echo "PUBLICAR_RELEASE=false" >> "$GITHUB_ENV"
+          fi
+          echo "APP_VERSION_CODE=${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
+
       - name: Montar www/ e sincronizar Android
         working-directory: app
         run: |
@@ -62,23 +79,6 @@ jobs:
           else
             echo "::warning::Secrets de assinatura ausentes — APK sairá com chave de debug."
           fi
-
-      - name: Definir versão
-        env:
-          VERSAO_INPUT: ${{ inputs.versao }}
-        run: |
-          REF="${GITHUB_REF_NAME}"
-          if [[ "$REF" == brigadas-v* ]]; then
-            echo "APP_VERSION_NAME=${REF#brigadas-v}" >> "$GITHUB_ENV"
-            echo "PUBLICAR_RELEASE=true" >> "$GITHUB_ENV"
-          elif [ -n "$VERSAO_INPUT" ]; then
-            echo "APP_VERSION_NAME=$VERSAO_INPUT" >> "$GITHUB_ENV"
-            echo "PUBLICAR_RELEASE=true" >> "$GITHUB_ENV"
-          else
-            echo "APP_VERSION_NAME=0.0.${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
-            echo "PUBLICAR_RELEASE=false" >> "$GITHUB_ENV"
-          fi
-          echo "APP_VERSION_CODE=${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
 
       - name: Compilar APK (release)
         working-directory: app/android
