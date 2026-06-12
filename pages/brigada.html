@@ -92,6 +92,7 @@
     <button class="pin-key pin-ok" id="pin-ok">✓</button>
   </div>
   <button class="btn-link" id="btn-pular-pin" style="display:none">Configurar PIN depois</button>
+  <button class="btn-link" id="btn-esqueci-pin">Esqueci o PIN — entrar com senha</button>
   <p class="lock-erro" id="lock-erro" hidden></p>
 </div>
 
@@ -741,7 +742,8 @@ async function boot() {
   // 2. Sem sessão ou offline — verificar cache + PIN (modo campo offline)
   const brigCached = await bOfflineGetConfig('brigadista')
   const pinSalvo   = await bOfflineGetConfig('pin_hash')
-  if (brigCached && pinSalvo) {
+  const pinDono    = await bOfflineGetConfig('pin_dono')
+  if (brigCached && pinSalvo && pinDono === brigCached.id) {
     App.brigadista = brigCached
     App.brigada    = await bOfflineGetConfig('brigada') || null
     document.getElementById('lock-nome').textContent = brigCached.nome_completo?.split(' ')[0] || 'Brigadista'
@@ -862,11 +864,10 @@ async function continuarParaPin(brig, jaAutenticou = false) {
   let pinSalvo  = await bOfflineGetConfig('pin_hash')
   const pinDono = await bOfflineGetConfig('pin_dono')
 
-  // Instalações antigas não guardavam o dono — o PIN existente é do usuário atual
-  if (pinSalvo && !pinDono) await bOfflineSetConfig('pin_dono', brig.id)
-
-  // PIN de outra pessoa neste aparelho: descarta e pede um novo
-  if (pinSalvo && pinDono && pinDono !== brig.id) {
+  // PIN sem dono registrado (instalação antiga) ou de outra pessoa:
+  // descarta e pede um novo — o hash é atrelado ao id do dono original,
+  // então adotá-lo deixaria o desbloqueio impossível
+  if (pinSalvo && pinDono !== brig.id) {
     await bOfflineSetConfig('pin_hash', null)
     await bOfflineSetConfig('pin_dono', null)
     pinSalvo = null
@@ -2139,6 +2140,18 @@ document.addEventListener('DOMContentLoaded', () => {
   // PIN desbloqueio
   initPinKeypad('pin', tentarDesbloquear)
   document.getElementById('btn-pular-pin')?.addEventListener('click', entrarHome)
+  document.getElementById('btn-esqueci-pin')?.addEventListener('click', async () => {
+    if (!confirm('Descartar o PIN deste aparelho e entrar novamente com e-mail/CPF e senha? É necessário ter internet. Registros pendentes são preservados.')) return
+    await bOfflineSetConfig('pin_hash', null)
+    await bOfflineSetConfig('pin_dono', null)
+    await bOfflineSetConfig('brigadista', null)
+    await bOfflineSetConfig('brigada', null)
+    App.brigadista = null
+    App.brigada    = null
+    try { if (db) await db.auth.signOut() } catch {}
+    document.getElementById('login-erro').hidden = true
+    mostrarTela('tela-login', false)
+  })
 
   // PIN setup
   initPinSetupKeypad()
