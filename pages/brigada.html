@@ -17,10 +17,7 @@
 <!-- ══ TELA: LOGIN ══════════════════════════════════════════════ -->
 <div id="tela-login" class="tela lock-screen" hidden>
   <div class="lock-logo">
-    <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
-      <circle cx="24" cy="24" r="24" fill="#12A66A"/>
-      <path d="M24 12c-3.3 0-6 2.7-6 6v2H16v16h16V20h-2v-2c0-3.3-2.7-6-6-6zm0 3c1.65 0 3 1.35 3 3v2h-6v-2c0-1.65 1.35-3 3-3zm0 9a2 2 0 0 1 0 4 2 2 0 0 1 0-4z" fill="#fff"/>
-    </svg>
+    <img src="/pwa/icons/mascote.png" alt="" class="lock-mascote">
     <span class="lock-titulo">SIGUC Brigadas</span>
   </div>
   <p class="lock-dica">App de Campo — Faça seu login</p>
@@ -40,10 +37,7 @@
 <!-- ══ TELA: BLOQUEIO ══════════════════════════════════════════ -->
 <div id="tela-bloqueio" class="tela ativa lock-screen" hidden>
   <div class="lock-logo">
-    <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
-      <circle cx="24" cy="24" r="24" fill="#12A66A"/>
-      <path d="M24 12c-3.3 0-6 2.7-6 6v2H16v16h16V20h-2v-2c0-3.3-2.7-6-6-6zm0 3c1.65 0 3 1.35 3 3v2h-6v-2c0-1.65 1.35-3 3-3zm0 9a2 2 0 0 1 0 4 2 2 0 0 1 0-4z" fill="#fff"/>
-    </svg>
+    <img src="/pwa/icons/mascote.png" alt="" class="lock-mascote">
     <span class="lock-titulo">SIGUC Brigadas</span>
   </div>
   <p class="lock-subtitulo" id="lock-nome">Carregando…</p>
@@ -76,10 +70,7 @@
 <!-- ══ TELA: CONFIGURAR PIN ════════════════════════════════════ -->
 <div id="tela-config-pin" class="tela lock-screen" hidden>
   <div class="lock-logo">
-    <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
-      <circle cx="24" cy="24" r="24" fill="#12A66A"/>
-      <path d="M24 12c-3.3 0-6 2.7-6 6v2H16v16h16V20h-2v-2c0-3.3-2.7-6-6-6zm0 3c1.65 0 3 1.35 3 3v2h-6v-2c0-1.65 1.35-3 3-3zm0 9a2 2 0 0 1 0 4 2 2 0 0 1 0-4z" fill="#fff"/>
-    </svg>
+    <img src="/pwa/icons/mascote.png" alt="" class="lock-mascote">
     <span class="lock-titulo">Criar PIN de Campo</span>
   </div>
   <p class="lock-subtitulo" id="pin-setup-nome" style="font-size:1rem;opacity:.75;margin-bottom:4px"></p>
@@ -109,6 +100,15 @@
 
 <!-- ══ TELA: HOME ══════════════════════════════════════════════ -->
 <div id="tela-home" class="tela" hidden>
+  <!-- Faixa institucional: Governo + SEMA com o mascote sobreposto -->
+  <div class="faixa-inst">
+    <div class="faixa-logos">
+      <span class="faixa-logo-chip" id="faixa-logo-gov" hidden><img id="img-logo-gov" alt="Governo do Acre"></span>
+      <span class="faixa-logo-chip" id="faixa-logo-sec" hidden><img id="img-logo-sec" alt="SEMA-AC"></span>
+    </div>
+    <img class="faixa-mascote" src="/pwa/icons/mascote.png" alt="Brigadistas Comunitários — SEMA">
+  </div>
+
   <header class="home-header">
     <div>
       <p class="home-saudacao" id="home-saudacao">Bom dia</p>
@@ -646,6 +646,7 @@ async function boot() {
   }
   await bOfflineInit()
   bOfflinePersistir()
+  carregarLogosInstitucionais()
 
   // 1. Sessão ativa — só verifica se Supabase está disponível (online)
   if (db) {
@@ -723,6 +724,41 @@ async function prosseguirAposAuth(session) {
     document.getElementById('lock-offline').hidden = true
     mostrarTela('tela-bloqueio', false)
   }
+}
+
+// ── Logos institucionais (config do SIGUC, cacheadas p/ offline) ─
+function renderFaixaLogos(c) {
+  const aplicar = (chipId, imgId, dado) => {
+    if (!dado) return
+    document.getElementById(imgId).src = dado
+    document.getElementById(chipId).hidden = false
+  }
+  aplicar('faixa-logo-gov', 'img-logo-gov', c?.gov)
+  aplicar('faixa-logo-sec', 'img-logo-sec', c?.sec)
+}
+
+async function carregarLogosInstitucionais() {
+  try {
+    const cache = await bOfflineGetConfig('logos_cache')
+    if (cache) renderFaixaLogos(cache)
+
+    if (!db || !await bSyncTemConexao()) return
+    const { data } = await db.from('config_sistema').select('dados').eq('id', 1).single()
+    const logos = data?.dados?.logos
+    if (!logos) return
+
+    const baixar = async url => {
+      if (!url) return null
+      const r = await fetch(url)
+      if (!r.ok) return null
+      return await bOfflineBlobParaBase64(await r.blob())
+    }
+    const novo = { gov: await baixar(logos.governo_url), sec: await baixar(logos.secretaria_url) }
+    if (novo.gov || novo.sec) {
+      await bOfflineSetConfig('logos_cache', novo)
+      renderFaixaLogos(novo)
+    }
+  } catch (e) { console.warn('[logos]', e) }
 }
 
 function mostrarErroLogin(msg) {

@@ -1,5 +1,5 @@
 // ── SIGUC Brigadas — Service Worker ───────────────────────────
-const CACHE = 'siguc-brigadas-v11'
+const CACHE = 'siguc-brigadas-v12'
 
 const APP_SHELL = [
   '/pages/brigada.html',
@@ -10,6 +10,7 @@ const APP_SHELL = [
   '/js/brigada-sync.js',
   '/js/brigada-captura.js',
   '/js/brigada-fauna.js',
+  '/pwa/icons/mascote.png',
   'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2',
 ]
 
