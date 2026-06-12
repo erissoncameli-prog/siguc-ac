@@ -161,6 +161,31 @@ UPDATE usuarios SET perfil = 'chefe_departamento'
 WHERE perfil = 'gestor' AND uc_id IS NULL;
 ```
 
+## Estratégia anti-retrabalho (organograma incompleto)
+
+Problema: a derivação perfil←cargo pressupõe organograma pronto, que ainda não está.
+Solução: DESACOPLAR o motor de permissão do organograma.
+
+- Campo `usuarios.perfil_origem` ∈ {'manual','cargo'} (default 'manual').
+  - 'manual': super_admin define o perfil à mão (funciona sem organograma).
+  - 'cargo': trigger 057 deriva do cargo. O trigger SÓ age sobre origem='cargo'.
+  - Migração pessoa a pessoa manual→cargo conforme os cargos forem cadastrados.
+    Sem big bang, sem schema novo.
+- Motor de permissão (modulos, padrões, overrides, nivel_efetivo, RLS) NÃO depende
+  do organograma — só de perfil + overrides + escopo. Implementar primeiro.
+- Escopo via UNION em usuario_ucs_visiveis (cargo + delegação + usuario_ucs_extras):
+  dados parciais funcionam; o escopo de cargo se soma sozinho quando entrar.
+- Trigger de derivação 057 fica pronto porém DORMENTE (ninguém em origem='cargo'),
+  ligado pessoa a pessoa quando o organograma amadurecer.
+
+### Ordem de execução revisada (minimiza dependência do organograma)
+| Fase | Entrega | Depende do organograma? |
+|---|---|---|
+| 1 | 055 enums + 060 catálogo/padrões + 061 nivel_efetivo/RLS + frontend | Não |
+| 2 | perfil_origem + usuario_ucs_extras + grade no cadastro | Não |
+| 3 | 056 escopo (VIEW) + 057 derivação cargo→perfil (dormente) | Pronto, dorme |
+| 4 | Preencher organograma + migrar usuários manual→cargo aos poucos | Sim, não bloqueia |
+
 ## Riscos
 
 - RLS recursiva (ver 050_fix_brigadistas_rls_recursion.sql) — VIEW de escopo precisa
