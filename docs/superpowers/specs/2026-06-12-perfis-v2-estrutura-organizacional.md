@@ -167,3 +167,110 @@ WHERE perfil = 'gestor' AND uc_id IS NULL;
   de função estável/SECURITY DEFINER.
 - ALTER TYPE ADD VALUE fora de transação — pode exigir 2 migrations.
 - Pesquisadores e brigadistas têm fluxo de login próprio — não quebrar o existente.
+
+---
+
+# Permissões dinâmicas (v3)
+
+Camada por cima dos perfis. Perfil = template de partida; super_admin pode
+conceder/retirar acesso a qualquer usuário, por módulo, no nível Visualizar ou
+Editar, individualmente no cadastro. Catálogo de módulos é data-driven para a
+plataforma crescer sem mexer na lógica de permissão.
+
+## Duas dimensões ortogonais
+
+- **NÍVEL** (sem_acesso / visualizar / editar) → permissão dinâmica por usuário.
+- **ESCOPO** (quais UCs) → vem do organograma/cargo (seção anterior).
+
+A RLS cruza as duas: ex. "editar Monitoramento" (nível) "da UC X" (escopo).
+
+## Enum
+
+```
+CREATE TYPE nivel_acesso AS ENUM ('sem_acesso', 'visualizar', 'editar');
+```
+
+(Avaliar 4º nível 'administrar' para módulos de config — decisão pendente.)
+
+## Tabelas
+
+### `modulos` — catálogo data-driven (1 linha por aba)
+```
+id            uuid PK
+chave         text UNIQUE      -- 'monitoramento', 'ocorrencias', ...
+nome          text             -- rótulo do menu
+grupo         text             -- 'Principal' | 'Gestão' | 'Brigadas' | 'Administração'
+icone         text             -- chave do iconePills em layout.js
+rota          text             -- '../pages/monitoramento.html'
+ordem         int
+respeita_escopo_uc boolean      -- se filtra por usuario_ucs_visiveis
+ativo         boolean
+```
+Criar aba nova = INSERT aqui + defaults por perfil. Sem código de permissão.
+
+### `perfil_permissoes_padrao` — o template (a matriz vira dados)
+```
+perfil    perfil_usuario
+modulo_id uuid REFERENCES modulos
+nivel     nivel_acesso
+PRIMARY KEY (perfil, modulo_id)
+```
+Seed a partir da matriz deste spec.
+
+### `usuario_permissoes` — overrides individuais (concede/retira)
+```
+usuario_id   uuid REFERENCES usuarios
+modulo_id    uuid REFERENCES modulos
+nivel        nivel_acesso     -- vence o padrão do perfil
+concedido_por uuid REFERENCES usuarios
+concedido_em timestamptz
+motivo       text
+PRIMARY KEY (usuario_id, modulo_id)
+```
+Ausência de linha = herda o padrão do perfil. Presença = override explícito
+(inclusive 'sem_acesso' para REVOGAR algo que o perfil daria).
+
+## Permissão efetiva (fonte única)
+
+Função estável usada por RLS e frontend:
+```
+nivel_efetivo(usuario, modulo_chave) :=
+  super_admin            -> 'editar' (bypass)
+  override do usuário    -> usa usuario_permissoes.nivel
+  senão                  -> perfil_permissoes_padrao.nivel
+  senão                  -> 'sem_acesso'
+```
+VIEW `minhas_permissoes` (usuario corrente → nivel por modulo) para o frontend.
+
+## Frontend (deixa de hardcodar perfis)
+
+- `gerarLayout` busca `minhas_permissoes` e monta o menu só com módulos cujo
+  nível >= visualizar. Some o array `perfis:[...]` fixo do layout.js.
+- Helpers globais: `podeVer(chave)`, `podeEditar(chave)` em config.js — controlam
+  botões de editar/novo/excluir em cada página.
+- Tela de Usuários ganha uma GRADE de permissões: por módulo, seletor
+  [Herda do perfil ▾ | Sem acesso | Visualizar | Editar]. "Herda" = sem override.
+
+## RLS
+
+Policies passam a consultar `nivel_efetivo(auth.uid(), '<chave>')`:
+- SELECT exige >= 'visualizar'; INSERT/UPDATE/DELETE exige 'editar'.
+- Combinado com escopo: `AND (modulo não respeita escopo OR uc_id IN usuario_ucs_visiveis)`.
+- Função SECURITY DEFINER / STABLE para evitar recursão de RLS.
+
+## Impacto no plano de migrations
+
+Acrescenta após os 5 anteriores:
+6. `060_catalogo_modulos.sql` — enum nivel_acesso + tabelas modulos,
+   perfil_permissoes_padrao, usuario_permissoes + seed do catálogo e dos padrões.
+7. `061_permissao_efetiva_rls.sql` — função nivel_efetivo, VIEW minhas_permissoes,
+   e refatorar as policies para usá-la (substitui parte do 058).
+8. Frontend — layout.js dinâmico, helpers podeVer/podeEditar, grade em usuarios.html.
+
+## Decisões pendentes desta camada
+
+- Níveis: 3 (sem_acesso/visualizar/editar) ou 4 (+administrar)?
+- Override individual cobre também ESCOPO (super_admin dá UCs extras a alguém) ou
+  só NÍVEL nesta fase?
+- Default de uma aba recém-criada: nasce 'sem_acesso' para todos (exceto super_admin)
+  e o admin libera, ou herda um padrão por grupo?
