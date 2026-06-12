@@ -128,7 +128,9 @@ todas as UCs (camada GeoJSON pública), mas só editam os dados do seu escopo.
 4. `058_rls_escopo.sql` — reescrever policies de unidades_conservacao, monitoramento_*,
    ocorrencias, documentos, brigadas para respeitar escopo.
 5. `059_perfis_especiais.sql` — formalizar pesquisador_externo, brigadista,
-   validador_campo; migrar o "biologo" do código.
+   validador_brigada e validador_fauna; migrar o "biologo" do código para
+   validador_fauna. Validação de Campo passa a filtrar por tipo de pendência
+   (ocorrência de brigada → validador_brigada; fauna → validador_fauna).
 6. Frontend — atualizar navGroups em js/layout.js (perfis por item) e
    pages/usuarios.html (novos perfis); atualizar i18n.perfis em js/config.js.
 
