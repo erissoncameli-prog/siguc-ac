@@ -528,7 +528,9 @@ body { margin: 0; }
 
 /* ── Faixa institucional (Governo + SEMA + mascote) ──────── */
 .faixa-inst {
-  position: relative;
+  /* Fixa no topo durante a rolagem (sticky preserva o fluxo e o
+     posicionamento absoluto do mascote) */
+  position: sticky; top: 0; z-index: 800;
   background: linear-gradient(135deg, #0A1A0F 0%, #0E5A3C 60%, var(--prim) 130%);
   padding: calc(14px + env(safe-area-inset-top)) 16px 14px;
   margin-bottom: 46px;   /* espaço para o mascote sobreposto */
