@@ -465,6 +465,39 @@ body { margin: 0; }
   display: flex; align-items: flex-start; justify-content: space-between;
   padding: 20px 16px 8px;
 }
+
+/* ── Faixa institucional (Governo + SEMA + mascote) ──────── */
+.faixa-inst {
+  position: relative;
+  background: linear-gradient(135deg, #0A1A0F 0%, #0E5A3C 60%, var(--prim) 130%);
+  padding: calc(14px + env(safe-area-inset-top)) 16px 14px;
+  margin-bottom: 46px;   /* espaço para o mascote sobreposto */
+}
+.faixa-logos {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; min-height: 44px;
+  /* reserva o centro para o mascote */
+  padding: 0 52px;
+}
+.faixa-logo-chip {
+  background: rgba(255,255,255,.96);
+  border-radius: 12px;
+  padding: 6px 10px;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 1px 4px rgba(0,0,0,.18);
+}
+.faixa-logo-chip img { height: 30px; max-width: 104px; object-fit: contain; display: block; }
+.faixa-mascote {
+  position: absolute;
+  left: 50%; bottom: -40px;
+  transform: translateX(-50%);
+  width: 86px; height: 86px;
+  border-radius: 50%;
+  filter: drop-shadow(0 4px 10px rgba(10,26,15,.35));
+}
+
+/* Mascote nas telas de login/bloqueio/PIN */
+.lock-mascote { width: 84px; height: 84px; border-radius: 50%; }
 .home-saudacao { font-size: 13px; color: #6B7280; margin: 0 0 2px; }
 .home-nome {
   font-size: 28px; font-weight: 700; color: var(--ink-d);
