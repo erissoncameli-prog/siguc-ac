@@ -111,9 +111,15 @@ todas as UCs (camada GeoJSON pública), mas só editam os dados do seu escopo.
 - **`validador_brigada`** — módulo Validação de Campo restrito às **ocorrências
   reportadas pelas brigadas** das UCs/brigadas designadas; vê Relatórios de Brigadas.
   Valida/rejeita o reporte operacional.
-- **`validador_fauna`** (especialista/biólogo) — módulo Validação de Campo restrito aos
-  **registros de fauna que aguardam identificação**; escopo por **especialidade**, não
-  por UC (vê fauna pendente de qualquer UC). Confirma/corrige a espécie.
+- **`validador_fauna`** (especialista/biólogo) — valida os **registros de fauna do
+  módulo de Monitoramento/Biodiversidade** que aguardam identificação. Escopo
+  **global por especialidade**: vê fauna pendente de qualquer UC (há poucos
+  especialistas; escopo estadual). Confirma/corrige a espécie.
+
+  Estrutura necessária no Monitoramento: marcar registros de fauna que precisam de
+  validação (ex.: campo `requer_validacao_especialista` + `status_validacao`
+  pendente/confirmado/corrigido + `validado_por`/`validado_em`). A fila do
+  validador_fauna = registros de monitoramento de fauna com status pendente.
 
 ## Plano de migrations
 
