@@ -529,7 +529,7 @@ body { margin: 0; }
 
 /* Acessibilidade: respeita usuários sensíveis a movimento */
 @media (prefers-reduced-motion: reduce) {
-  .faixa-mascote, .lock-mascote, .faixa-mascote.comemora { animation: none; }
+  .faixa-mascote, .lock-mascote, .faixa-mascote.comemora, .radar-varredura { animation: none; }
 }
 
 /* ── Vídeo do mascote (overlay em tela cheia) ─────────────── */
@@ -569,7 +569,51 @@ body { margin: 0; }
 .natureza-chevron { color: rgba(255,255,255,.6); font-size: 22px; }
 
 /* ── GPS info ───────────────────────────────────────────── */
-.gps-info { flex: 1; }
+.gps-info { flex: 1; min-width: 0; }
+
+/* ── Radar animado do card de GPS ─────────────────────────── */
+#gps-card { display: flex; align-items: center; }
+.radar {
+  position: relative; width: 54px; height: 54px; flex-shrink: 0;
+  margin-right: 14px; border-radius: 50%;
+  border: 1.5px solid rgba(123,224,174,.35);
+  background: radial-gradient(circle, rgba(123,224,174,.12) 0 55%, rgba(123,224,174,.04) 100%);
+  overflow: hidden;
+}
+.radar-anel { position: absolute; inset: 26%; border: 1px solid rgba(123,224,174,.35); border-radius: 50%; }
+.radar-anel.r2 { inset: 9%; opacity: .55; }
+.radar-varredura {
+  position: absolute; inset: 0; border-radius: 50%;
+  background: conic-gradient(from 0deg, rgba(123,224,174,.6), rgba(123,224,174,.12) 65deg, transparent 95deg);
+  animation: radar-gira 2.8s linear infinite;
+}
+.radar-ponto {
+  position: absolute; left: 50%; top: 50%;
+  width: 5px; height: 5px; margin: -2.5px 0 0 -2.5px;
+  background: var(--soft); border-radius: 50%;
+  box-shadow: 0 0 6px var(--soft);
+}
+@keyframes radar-gira { to { transform: rotate(360deg); } }
+
+/* Município detectado pelo GPS (offline, GeoJSON local) */
+.gps-municipio {
+  display: block; font-size: 12.5px; font-weight: 600;
+  color: #fff; margin-top: 2px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* Chip de conexão Online/Offline */
+.gps-lado { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; flex-shrink: 0; }
+.conn-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: var(--font-mono); font-size: 10.5px;
+  padding: 4px 9px; border-radius: 999px;
+  background: rgba(255,255,255,.08); color: rgba(255,255,255,.75);
+}
+.conn-dot { width: 7px; height: 7px; border-radius: 50%; background: #9CA3AF; }
+.conn-chip.on  .conn-dot { background: var(--soft); box-shadow: 0 0 6px var(--soft); }
+.conn-chip.off .conn-dot { background: #F87171; box-shadow: 0 0 6px #F87171; }
+.conn-chip.off { color: #FCA5A5; }
 .gps-label {
   font-size: 10px; text-transform: uppercase; letter-spacing: .1em;
   color: rgba(255,255,255,.5); display: block; margin-bottom: 4px;
