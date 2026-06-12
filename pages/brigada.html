@@ -451,12 +451,18 @@
 
     <div class="form-section">
       <label class="form-label">Por natureza</label>
-      <div id="chart-natureza" class="chart-barras"></div>
+      <div id="chart-natureza"></div>
     </div>
 
     <div class="form-section">
       <label class="form-label">Registros por mês</label>
       <div id="chart-meses" class="chart-colunas"></div>
+    </div>
+
+    <div class="form-section">
+      <label class="form-label">Fauna × Ocorrências por classe</label>
+      <div id="chart-fauna-cruzado"></div>
+      <p class="chart-nota">Colunas: animais registrados · Linha: ocorrências com fauna</p>
     </div>
 
     <div class="form-section">
@@ -466,7 +472,7 @@
 
     <div class="form-section">
       <label class="form-label">Fauna por classe</label>
-      <div id="chart-fauna" class="chart-barras"></div>
+      <div id="chart-fauna"></div>
     </div>
 
     <div class="form-section">
@@ -1582,28 +1588,129 @@ function rotuloBonito(v) {
   return s.charAt(0).toUpperCase() + s.slice(1)
 }
 
+// Barras horizontais: crescem ao abrir; a maior ganha brilho pulsante
 function renderBarras(elId, pares) {
-  // pares: [[rótulo, valor, cor?]]
   const el  = document.getElementById(elId)
   const max = Math.max(...pares.map(p => p[1]), 1)
   el.innerHTML = pares.length ? pares.map(([rot, val, cor]) => `
     <div class="barra-row">
-      <span class="barra-rotulo">${esc(rot)}</span>
-      <div class="barra-track"><div class="barra-fill" style="width:${Math.round(val / max * 100)}%${cor ? `;background:${cor}` : ''}"></div></div>
+      <span class="barra-rotulo${val === max ? ' rotulo-top' : ''}">${esc(rot)}</span>
+      <div class="barra-track"><div class="barra-fill${val === max ? ' destaque' : ''}"
+        style="width:0${cor ? `;background:${cor};color:${cor}` : ''}"
+        data-w="${Math.round(val / max * 100)}%"></div></div>
       <span class="barra-valor">${val}</span>
     </div>`).join('') : '<p class="chart-vazio">Sem dados ainda</p>'
+  // dispara a animação de crescimento (transition na largura)
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    el.querySelectorAll('.barra-fill').forEach(b => { b.style.width = b.dataset.w })
+  }))
 }
 
+// Colunas verticais: sobem em cascata; a maior pulsa
 function renderColunas(elId, pares) {
-  // pares: [[rótulo, valor]]
   const el  = document.getElementById(elId)
   const max = Math.max(...pares.map(p => p[1]), 1)
-  el.innerHTML = pares.map(([rot, val]) => `
+  el.innerHTML = pares.map(([rot, val], i) => `
     <div class="coluna-mes">
       <span class="coluna-valor">${val || ''}</span>
-      <div class="coluna-fill" style="height:${Math.max(Math.round(val / max * 100), 2)}%"></div>
+      <div class="coluna-fill${val === max && val > 0 ? ' destaque' : ''}"
+        style="height:${Math.max(Math.round(val / max * 100), 2)}%;animation-delay:${i * 90}ms"></div>
       <span class="coluna-rotulo">${esc(rot)}</span>
     </div>`).join('')
+}
+
+// Rosca (donut SVG): fatias desenham ao abrir; a maior é mais grossa e pulsa
+function renderRosca(elId, fatias) {
+  const el = document.getElementById(elId)
+  const total = fatias.reduce((s, f) => s + f[1], 0)
+  if (!total) { el.innerHTML = '<p class="chart-vazio">Sem dados ainda</p>'; return }
+  const maxVal = Math.max(...fatias.map(f => f[1]))
+  let acc = 0
+  const segs = fatias.map(([rot, val, cor]) => {
+    const frac = val / total * 100
+    const s = { rot, val, cor, frac, off: acc, top: val === maxVal }
+    acc += frac
+    return s
+  })
+  el.innerHTML = `
+    <div class="rosca-flex">
+      <svg viewBox="0 0 42 42" class="rosca">
+        ${segs.map(s => `<circle class="rosca-seg${s.top ? ' rosca-top' : ''}" cx="21" cy="21" r="15.915"
+          fill="none" stroke="${s.cor}" stroke-width="${s.top ? 7.4 : 5.4}" stroke-linecap="butt"
+          stroke-dasharray="0 100" stroke-dashoffset="${25 - s.off}"
+          data-final="${s.frac} ${100 - s.frac}"></circle>`).join('')}
+        <text x="21" y="20.5" class="rosca-total">${total}</text>
+        <text x="21" y="26" class="rosca-sub">total</text>
+      </svg>
+      <div class="chart-legenda">
+        ${segs.map(s => `<span class="${s.top ? 'leg-top' : ''}"><i style="background:${s.cor}"></i>${esc(s.rot)} · <b>${s.val}</b> (${Math.round(s.frac)}%)</span>`).join('')}
+      </div>
+    </div>`
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    el.querySelectorAll('.rosca-seg').forEach(c => c.setAttribute('stroke-dasharray', c.dataset.final))
+  }))
+}
+
+// Pizza (conic-gradient): entra girando com mola; campeã pulsa na legenda
+function renderPizza(elId, fatias) {
+  const el = document.getElementById(elId)
+  const total = fatias.reduce((s, f) => s + f[1], 0)
+  if (!total) { el.innerHTML = '<p class="chart-vazio">Sem dados ainda</p>'; return }
+  const maxVal = Math.max(...fatias.map(f => f[1]))
+  let acc = 0
+  const stops = fatias.map(([rot, val, cor]) => {
+    const a = acc / total * 360, b = (acc + val) / total * 360
+    acc += val
+    return `${cor} ${a.toFixed(1)}deg ${b.toFixed(1)}deg`
+  }).join(', ')
+  el.innerHTML = `
+    <div class="rosca-flex">
+      <div class="pizza" style="background:conic-gradient(${stops})"></div>
+      <div class="chart-legenda">
+        ${fatias.map(([rot, val, cor]) => `<span class="${val === maxVal ? 'leg-top' : ''}"><i style="background:${cor}"></i>${esc(rot)} · <b>${val}</b> (${Math.round(val / total * 100)}%)</span>`).join('')}
+      </div>
+    </div>`
+}
+
+// Combo colunas + linha: animais por classe (colunas) × nº de
+// ocorrências com fauna daquela classe (linha, escala própria)
+function renderComboFauna(elId, dados) {
+  // dados: [{ rot, cor, animais, ocorr }]
+  const el = document.getElementById(elId)
+  if (!dados.length) { el.innerHTML = '<p class="chart-vazio">Sem dados ainda</p>'; return }
+  const W = 340, H = 170, baseY = 132, topo = 14
+  const maxA = Math.max(...dados.map(d => d.animais), 1)
+  const maxO = Math.max(...dados.map(d => d.ocorr), 1)
+  const slot = W / dados.length
+  const colW = Math.min(34, slot * 0.5)
+  const maxIdx = dados.findIndex(d => d.animais === maxA)
+
+  const colunas = dados.map((d, i) => {
+    const h = Math.max((d.animais / maxA) * (baseY - topo), 2)
+    const x = slot * i + (slot - colW) / 2
+    return `
+      <rect class="combo-col${i === maxIdx ? ' destaque-svg' : ''}" x="${x.toFixed(1)}" y="${(baseY - h).toFixed(1)}"
+        width="${colW}" height="${h.toFixed(1)}" rx="4" fill="${d.cor}" style="animation-delay:${i * 90}ms"/>
+      <text x="${(slot * i + slot / 2).toFixed(1)}" y="${(baseY - h - 4).toFixed(1)}" class="combo-valor">${d.animais || ''}</text>
+      <text x="${(slot * i + slot / 2).toFixed(1)}" y="${baseY + 12}" class="combo-rotulo">${esc(d.rot)}</text>`
+  }).join('')
+
+  const pontos = dados.map((d, i) => {
+    const x = slot * i + slot / 2
+    const y = baseY - (d.ocorr / maxO) * (baseY - topo) * 0.9
+    return { x, y, v: d.ocorr }
+  })
+  const poli = pontos.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')
+
+  el.innerHTML = `
+    <svg viewBox="0 0 ${W} ${H}" class="combo-chart">
+      <line x1="0" y1="${baseY}" x2="${W}" y2="${baseY}" class="combo-eixo"/>
+      ${colunas}
+      <polyline points="${poli}" class="combo-linha" pathLength="100"/>
+      ${pontos.map((p, i) => `
+        <circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3.4" class="combo-ponto" style="animation-delay:${500 + i * 90}ms"/>
+        <text x="${p.x.toFixed(1)}" y="${(p.y - 7).toFixed(1)}" class="combo-ponto-valor" style="animation-delay:${500 + i * 90}ms">${p.v}</text>`).join('')}
+    </svg>`
 }
 
 function contar(lista, chave) {
@@ -1612,8 +1719,17 @@ function contar(lista, chave) {
   return m
 }
 
+const ROTULO_CLASSE = {
+  mamifero: 'Mamífero', ave: 'Ave', reptil: 'Réptil', anfibio: 'Anfíbio',
+  peixe: 'Peixe', invertebrado: 'Invert.', nao_sei: '?',
+}
+const COR_CLASSE = {
+  mamifero: '#D98A3D', ave: '#EF5B3C', reptil: '#12A66A', anfibio: '#22C55E',
+  peixe: '#3B82C4', invertebrado: '#8B5CF6', nao_sei: '#9CA3AF',
+}
+
 async function carregarDados() {
-  let stats = await bOfflineGetConfig('stats_cache')
+  let stats = await bOfflineGetConfig('stats_cache_v2')
 
   // Online: busca dados frescos do banco e atualiza o cache local
   if (db && App.brigadista?.id && await bSyncTemConexao()) {
@@ -1623,12 +1739,12 @@ async function carregarDados() {
           .select('natureza, atividade, data_hora_evento, area_estimada_ha, status_validacao')
           .eq('brigadista_id', App.brigadista.id),
         db.from('registro_fauna')
-          .select('classe, quantidade, registros_campo!inner(brigadista_id)')
+          .select('classe, quantidade, registro_campo_id, registros_campo!inner(brigadista_id)')
           .eq('registros_campo.brigadista_id', App.brigadista.id),
       ])
       if (regs) {
         stats = { quando: new Date().toISOString(), regs, fauna: fauna || [] }
-        await bOfflineSetConfig('stats_cache', stats)
+        await bOfflineSetConfig('stats_cache_v2', stats)
       }
     } catch (e) { console.warn('[dados]', e) }
   }
@@ -1638,7 +1754,7 @@ async function carregarDados() {
 
   if (!stats) {
     infoEl.textContent = 'Conecte-se à internet uma vez para carregar seus resultados'
-    ;['chart-natureza', 'chart-atividade', 'chart-fauna', 'chart-validacao'].forEach(id =>
+    ;['chart-natureza', 'chart-atividade', 'chart-fauna', 'chart-validacao', 'chart-fauna-cruzado'].forEach(id =>
       document.getElementById(id).innerHTML = '<p class="chart-vazio">Sem dados ainda</p>')
     document.getElementById('chart-meses').innerHTML = ''
     return
@@ -1657,11 +1773,11 @@ async function carregarDados() {
     regs.reduce((s, r) => s + (parseFloat(r.area_estimada_ha) || 0), 0).toFixed(1)
   document.getElementById('kpi-fauna').textContent = fauna.reduce((s, f) => s + (f.quantidade || 1), 0)
 
-  // Por natureza
+  // Por natureza — rosca com total no centro
   const porNat = contar(regs, 'natureza')
-  renderBarras('chart-natureza', Object.entries(porNat)
+  renderRosca('chart-natureza', Object.entries(porNat)
     .sort((a, b) => b[1] - a[1])
-    .map(([k, v]) => [ROTULO_NATUREZA[k] || rotuloBonito(k), v, COR_NATUREZA[k]]))
+    .map(([k, v]) => [ROTULO_NATUREZA[k] || rotuloBonito(k), v, COR_NATUREZA[k] || '#8B5CF6']))
 
   // Últimos 6 meses
   const meses = []
@@ -1673,19 +1789,37 @@ async function carregarDados() {
   }
   renderColunas('chart-meses', meses)
 
-  // Top 5 atividades
+  // NOVO: combo colunas+linha — animais (colunas) × ocorrências com
+  // fauna (linha), por classe
+  const cruzado = {}
+  fauna.forEach(f => {
+    const k = f.classe ?? 'nao_sei'
+    if (!cruzado[k]) cruzado[k] = { animais: 0, ocorrs: new Set() }
+    cruzado[k].animais += f.quantidade || 1
+    if (f.registro_campo_id) cruzado[k].ocorrs.add(f.registro_campo_id)
+  })
+  renderComboFauna('chart-fauna-cruzado', Object.entries(cruzado)
+    .sort((a, b) => b[1].animais - a[1].animais)
+    .map(([k, v]) => ({
+      rot: ROTULO_CLASSE[k] || rotuloBonito(k),
+      cor: COR_CLASSE[k] || '#8B5CF6',
+      animais: v.animais,
+      ocorr: v.ocorrs.size,
+    })))
+
+  // Top 5 atividades — barras animadas
   renderBarras('chart-atividade', Object.entries(contar(regs, 'atividade'))
     .sort((a, b) => b[1] - a[1]).slice(0, 5)
     .map(([k, v]) => [rotuloBonito(k), v]))
 
-  // Fauna por classe (soma quantidades)
+  // Fauna por classe — pizza colorida (soma quantidades)
   const porClasse = {}
-  fauna.forEach(f => { const k = f.classe ?? '—'; porClasse[k] = (porClasse[k] || 0) + (f.quantidade || 1) })
-  renderBarras('chart-fauna', Object.entries(porClasse)
+  fauna.forEach(f => { const k = f.classe ?? 'nao_sei'; porClasse[k] = (porClasse[k] || 0) + (f.quantidade || 1) })
+  renderPizza('chart-fauna', Object.entries(porClasse)
     .sort((a, b) => b[1] - a[1])
-    .map(([k, v]) => [k === 'nao_sei' ? 'Não identificado' : rotuloBonito(k), v, 'var(--fauna)']))
+    .map(([k, v]) => [k === 'nao_sei' ? 'Não identificado' : (ROTULO_CLASSE[k] || rotuloBonito(k)), v, COR_CLASSE[k] || '#8B5CF6']))
 
-  // Validação
+  // Validação — barras coloridas animadas
   renderBarras('chart-validacao', Object.entries(contar(regs, 'status_validacao'))
     .sort((a, b) => b[1] - a[1])
     .map(([k, v]) => [ROTULO_VALIDACAO[k] || rotuloBonito(k), v, COR_VALIDACAO[k]]))
