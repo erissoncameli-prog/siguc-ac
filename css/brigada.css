@@ -215,12 +215,51 @@
 }
 
 .natureza-icon {
-  width: 52px; height: 52px; border-radius: 14px;
+  width: 58px; height: 58px; border-radius: 16px;
   background: rgba(255,255,255,.2);
   display: flex; align-items: center; justify-content: center;
   flex-shrink: 0;
 }
-.natureza-icon svg { width: 26px; height: 26px; stroke: #fff; }
+.natureza-icon svg { width: 38px; height: 38px; overflow: visible; }
+
+/* ── Ícones de natureza animados (SVG + CSS) ─────────────── */
+/* Escudo: pulso de proteção */
+.ico-escudo {
+  transform-origin: center;
+  animation: escudo-pulsa 2.8s ease-in-out infinite;
+}
+@keyframes escudo-pulsa {
+  0%, 100% { transform: scale(1);    filter: drop-shadow(0 0 0 rgba(255,255,255,0)); }
+  50%      { transform: scale(1.07); filter: drop-shadow(0 0 5px rgba(255,255,255,.55)); }
+}
+
+/* Chama: tremulação orgânica (corpo e núcleo em contrafase) */
+.ico-chama {
+  transform-origin: 50% 92%;
+  animation: chama-tremula 1.7s ease-in-out infinite;
+}
+.ico-chama-nucleo {
+  transform-origin: 50% 88%;
+  animation: chama-tremula 1.7s ease-in-out infinite reverse;
+}
+@keyframes chama-tremula {
+  0%, 100% { transform: scaleY(1)    skewX(0); }
+  25%      { transform: scaleY(1.08) skewX(2.5deg); }
+  50%      { transform: scaleY(.94)  skewX(-2deg); }
+  75%      { transform: scaleY(1.05) skewX(1.5deg); }
+}
+
+/* Binóculo: varredura lateral lenta */
+.ico-binoculo {
+  transform-origin: 50% 60%;
+  animation: binoculo-varre 4.2s ease-in-out infinite;
+}
+@keyframes binoculo-varre {
+  0%, 18%, 100% { transform: rotate(0); }
+  38%           { transform: rotate(-9deg); }
+  68%           { transform: rotate(9deg);  }
+  86%           { transform: rotate(0); }
+}
 .natureza-label { flex: 1; }
 .natureza-label strong { display: block; font-size: 18px; font-weight: 700; color: #fff; }
 .natureza-label span { font-size: 12px; color: rgba(255,255,255,.75); }
@@ -529,7 +568,8 @@ body { margin: 0; }
 
 /* Acessibilidade: respeita usuários sensíveis a movimento */
 @media (prefers-reduced-motion: reduce) {
-  .faixa-mascote, .lock-mascote, .faixa-mascote.comemora, .radar-varredura { animation: none; }
+  .faixa-mascote, .lock-mascote, .faixa-mascote.comemora, .radar-varredura,
+  .ico-escudo, .ico-chama, .ico-chama-nucleo, .ico-binoculo { animation: none; }
 }
 
 /* ── Vídeo do mascote (overlay em tela cheia) ─────────────── */
@@ -542,6 +582,15 @@ body { margin: 0; }
 .video-mascote-overlay video {
   width: 100%; max-height: 100%;
   border-radius: 0;
+}
+.btn-som-video {
+  position: absolute; bottom: calc(28px + env(safe-area-inset-bottom));
+  left: 50%; transform: translateX(-50%);
+  background: rgba(255,255,255,.92); color: var(--ink-d);
+  border: none; border-radius: 999px;
+  padding: 10px 18px; font-size: 14px; font-weight: 600;
+  font-family: var(--font-ui); cursor: pointer;
+  box-shadow: 0 2px 10px rgba(0,0,0,.3);
 }
 .home-saudacao { font-size: 13px; color: #6B7280; margin: 0 0 2px; }
 .home-nome {
