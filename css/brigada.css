@@ -48,7 +48,7 @@
   font-family: var(--font-ui);
   background: var(--app-bg);
   min-height: 100dvh;
-  padding-bottom: calc(var(--nav-h) + 16px);
+  padding-bottom: calc(var(--nav-h) + 28px + env(safe-area-inset-bottom, 0px));
   color: var(--ink-d);
   overscroll-behavior: none;
 }
@@ -715,7 +715,11 @@ body { margin: 0; }
 
 /* ── Nav flutuante (nomes reais do HTML) ────────────────── */
 .pill-nav {
-  position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%);
+  position: fixed;
+  /* acima da área de gestos do aparelho (safe area) */
+  bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  left: 50%; transform: translateX(-50%);
+  max-width: calc(100vw - 16px);
   background: var(--ink-d); border-radius: var(--nav-radius);
   height: var(--nav-h); padding: 0 12px;
   display: flex; align-items: center; gap: 4px;
@@ -745,6 +749,18 @@ body { margin: 0; }
   min-width: 16px; height: 16px; border-radius: 8px;
   background: var(--combate); color: #fff;
   font-size: 10px; font-weight: 700; text-align: center; line-height: 16px; padding: 0 4px;
+}
+
+/* Telas estreitas: encolhe a barra para caber sem cortar botões */
+@media (max-width: 380px) {
+  .pill-nav { padding: 0 6px; gap: 2px; }
+  .pill-btn { width: 48px; height: 48px; font-size: 8px; }
+  #nav-cam  { width: 52px; height: 52px; margin: 0 3px; }
+}
+@media (max-width: 330px) {
+  .pill-btn { width: 44px; height: 44px; }
+  .pill-btn > span { display: none; }   /* só ícones em telas muito pequenas */
+  #nav-cam  { width: 50px; height: 50px; }
 }
 
 /* ── Cabeçalho dos formulários ──────────────────────────── */
