@@ -136,6 +136,9 @@
   box-shadow: 0 1px 2px rgba(0,0,0,.22), inset 0 1px 0 rgba(255,255,255,.12);
 }
 .pin-key.delete { font-size: 18px; }
+/* Teclas de ação usam ícone SVG (bico) dimensionado em 1em → reduz um
+   pouco em relação aos números para equilíbrio visual */
+.pin-key.pin-clear, .pin-key.pin-ok { font-size: 23px; }
 .pin-key.pin-clear {
   background: transparent;
   border-color: rgba(255,255,255,.06);
