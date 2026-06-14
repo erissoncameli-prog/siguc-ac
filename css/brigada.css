@@ -945,6 +945,17 @@ body { margin: 0; }
 .sync-info strong { display: block; font-weight: 600; margin-bottom: 2px; }
 .sync-info span { color: #6B7280; font-size: 12px; }
 /* Brigada + Equipe como "chips" na tela inicial (ao lado do nome) */
+.home-id { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.home-id-texto { min-width: 0; }
+.home-avatar {
+  width: 72px; height: 72px; border-radius: 50%; flex-shrink: 0;
+  background-size: cover; background-position: center;
+  background-color: var(--prim, #12A66A);
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; font-weight: 700; font-size: 26px; line-height: 1;
+  border: 2px solid #fff; box-shadow: 0 3px 12px rgba(10,26,15,.20);
+  overflow: hidden;
+}
 .home-meta {
   display: flex; flex-wrap: wrap; align-items: center;
   gap: 8px; margin-top: 8px;

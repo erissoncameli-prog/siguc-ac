@@ -139,14 +139,17 @@
   </div>
 
   <header class="home-header">
-    <div>
-      <p class="home-saudacao" id="home-saudacao">Bom dia</p>
-      <h1 class="home-nome" id="home-nome">Brigadista</h1>
-      <div class="home-meta">
-        <span id="home-brigada" class="home-chip" hidden>🚒 <span id="home-brigada-nome"></span></span>
-        <span id="home-equipe-wrap" class="home-chip home-chip-equipe" hidden>
-          👥 <select id="home-equipe" class="home-equipe-select" aria-label="Equipe atual"></select>
-        </span>
+    <div class="home-id">
+      <div class="home-avatar" id="home-avatar"><span id="home-avatar-letra"></span></div>
+      <div class="home-id-texto">
+        <p class="home-saudacao" id="home-saudacao">Bom dia</p>
+        <h1 class="home-nome" id="home-nome">Brigadista</h1>
+        <div class="home-meta">
+          <span id="home-brigada" class="home-chip" hidden>🚒 <span id="home-brigada-nome"></span></span>
+          <span id="home-equipe-wrap" class="home-chip home-chip-equipe" hidden>
+            👥 <select id="home-equipe" class="home-equipe-select" aria-label="Equipe atual"></select>
+          </span>
+        </div>
       </div>
     </div>
     <button class="btn-icon" id="btn-sync-home" aria-label="Sincronizar" title="Sincronizar agora">
@@ -1484,6 +1487,7 @@ async function entrarHome() {
   const brigadaNome = App.brigada?.nome || ''
   document.getElementById('home-brigada').hidden = !brigadaNome
   document.getElementById('home-brigada-nome').textContent = brigadaNome
+  renderHomeAvatar()
   popularSelectEquipe()
 
   mostrarTela('tela-home')
@@ -2330,6 +2334,25 @@ function renderAvatar() {
   } else {
     av.style.backgroundImage = ''
     letra.hidden = false
+  }
+  renderHomeAvatar()
+}
+
+// Avatar do brigadista na tela inicial (foto ou iniciais)
+function renderHomeAvatar() {
+  const av    = document.getElementById('home-avatar')
+  const letra = document.getElementById('home-avatar-letra')
+  if (!av) return
+  const foto = App.brigadista?.foto_url
+  if (foto) {
+    av.style.backgroundImage = `url("${foto.replace(/"/g, '')}")`
+    if (letra) letra.hidden = true
+  } else {
+    av.style.backgroundImage = ''
+    if (letra) {
+      letra.hidden = false
+      letra.textContent = iniciais(App.brigadista?.nome_completo || 'B')
+    }
   }
 }
 
