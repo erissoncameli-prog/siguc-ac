@@ -856,7 +856,9 @@ body { margin: 0; }
    polegar, fechar no topo. No app nativo a câmera do Android é
    usada no lugar (bCameraEhNativa). */
 .camera-overlay {
-  position: fixed; inset: 0; z-index: 1200;
+  position: fixed; top: 0; left: 0; right: 0; z-index: 1200;
+  height: 100vh;      /* fallback */
+  height: 100dvh;     /* iOS: altura visível real, sem ficar atrás das barras */
   background: #000;
   display: flex; flex-direction: column;
 }
@@ -886,6 +888,11 @@ body { margin: 0; }
 }
 
 /* ── Grade de fotos ─────────────────────────────────────── */
+.foto-acoes { display: flex; gap: 8px; }
+.btn-galeria {
+  background: #fff; color: var(--prim, #12A66A);
+  border: 1px solid var(--prim, #12A66A);
+}
 .foto-grid {
   display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 8px;
 }

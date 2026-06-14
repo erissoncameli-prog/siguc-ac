@@ -45,6 +45,33 @@ async function bCameraCapturar(videoEl, brigadista, gps) {
   })
 }
 
+// Processa um arquivo de imagem (câmera nativa do SO via <input capture>
+// ou foto escolhida da galeria), redimensiona, aplica marca d'água e
+// devolve o Blob final — mesmo pipeline da câmera web.
+async function bCapturaProcessarArquivo(file, brigadista, gps) {
+  const dataUrl = await new Promise((res, rej) => {
+    const fr = new FileReader()
+    fr.onload  = () => res(fr.result)
+    fr.onerror = rej
+    fr.readAsDataURL(file)
+  })
+  const img = new Image()
+  await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = dataUrl })
+
+  const maxLado = 1920
+  let w = img.naturalWidth, h = img.naturalHeight
+  if (Math.max(w, h) > maxLado) {
+    const r = maxLado / Math.max(w, h)
+    w = Math.round(w * r); h = Math.round(h * r)
+  }
+  const canvas = document.createElement('canvas')
+  canvas.width = w; canvas.height = h
+  const ctx = canvas.getContext('2d')
+  ctx.drawImage(img, 0, 0, w, h)
+  bCameraAguaMarca(ctx, w, h, brigadista, gps)
+  return new Promise(res => canvas.toBlob(b => res(b), 'image/jpeg', 0.85))
+}
+
 // Captura sem adicionar ao array global — fauna usa sua própria lista
 async function bCameraCapturarPuro(videoEl, brigadista, gps) {
   const canvas = document.createElement('canvas')
@@ -136,11 +163,11 @@ function bCameraEhNativa() {
   return !!(window.Capacitor?.isNativePlatform?.() && window.Capacitor?.Plugins?.Camera)
 }
 
-async function bCameraNativaCapturar(brigadista, gps) {
+async function bCameraNativaCapturar(brigadista, gps, source = 'CAMERA') {
   let foto
   try {
     foto = await window.Capacitor.Plugins.Camera.getPhoto({
-      source: 'CAMERA',
+      source,                 // 'CAMERA' (câmera) ou 'PHOTOS' (galeria)
       resultType: 'base64',
       quality: 85,
       width: 1920,
