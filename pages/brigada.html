@@ -613,6 +613,21 @@
   </div>
 </div>
 
+<!-- ══ MENU: foto do brigadista ══════════════════════════════ -->
+<div id="avatar-menu" class="avatar-menu" hidden>
+  <div class="avatar-menu-card">
+    <button class="am-item" id="am-ver" type="button" data-icon="eye">Ver foto em tela cheia</button>
+    <button class="am-item" id="am-trocar" type="button" data-icon="camera">Trocar foto</button>
+    <button class="am-item am-cancel" id="am-cancel" type="button">Cancelar</button>
+  </div>
+</div>
+
+<!-- ══ VISUALIZADOR: foto em tela cheia ══════════════════════ -->
+<div id="foto-viewer" class="foto-viewer" hidden>
+  <button class="foto-viewer-fechar" id="foto-viewer-fechar" type="button" data-icon="x" aria-label="Fechar"></button>
+  <img id="foto-viewer-img" alt="Foto do brigadista">
+</div>
+
 <!-- ══ BANNER: atualização disponível ════════════════════════ -->
 <div id="update-banner" class="update-banner" hidden>
   <span data-icon="download">Nova versão disponível</span>
@@ -2487,6 +2502,25 @@ async function alterarFotoBrigadista() {
   }
 }
 
+// ── Menu / visualizador da foto do brigadista ─────────────────
+function abrirMenuFoto() {
+  // Sem foto: vai direto para trocar (não há o que visualizar)
+  if (!App.brigadista?.foto_url) { alterarFotoBrigadista(); return }
+  document.getElementById('avatar-menu').hidden = false
+}
+function fecharMenuFoto() { document.getElementById('avatar-menu').hidden = true }
+
+function abrirFotoViewer() {
+  const foto = App.brigadista?.foto_url
+  if (!foto) return
+  document.getElementById('foto-viewer-img').src = foto
+  document.getElementById('foto-viewer').hidden = false
+}
+function fecharFotoViewer() {
+  document.getElementById('foto-viewer').hidden = true
+  document.getElementById('foto-viewer-img').src = ''
+}
+
 // ════════════════════════════════════════════════════════════════
 // Configurações
 // ════════════════════════════════════════════════════════════════
@@ -2603,6 +2637,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Foto de perfil
   document.getElementById('config-avatar').addEventListener('click', alterarFotoBrigadista)
+
+  // Foto do brigadista na home: menu (ver em tela cheia / trocar)
+  document.getElementById('home-avatar').addEventListener('click', abrirMenuFoto)
+  document.getElementById('am-cancel').addEventListener('click', fecharMenuFoto)
+  document.getElementById('avatar-menu').addEventListener('click', e => { if (e.target.id === 'avatar-menu') fecharMenuFoto() })
+  document.getElementById('am-ver').addEventListener('click', () => { fecharMenuFoto(); abrirFotoViewer() })
+  document.getElementById('am-trocar').addEventListener('click', () => { fecharMenuFoto(); alterarFotoBrigadista() })
+  document.getElementById('foto-viewer-fechar').addEventListener('click', fecharFotoViewer)
+  document.getElementById('foto-viewer').addEventListener('click', e => { if (e.target.id === 'foto-viewer') fecharFotoViewer() })
 
   // Vídeo do mascote
   // Delegação: cobre os mascotes injetados em todas as abas
