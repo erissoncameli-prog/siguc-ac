@@ -1112,7 +1112,7 @@ async function copiarCredenciais() {
 
 // ── Modal QR ─────────────────────────────────────────────────
 function abrirQR(brigId, brigNome) {
-  const url = `${PWA_BASE_URL}/instalar?brigada=${brigId}`
+  const url = 'https://siguc-ac.vercel.app/pages/instalar-brigadas.html'
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(url)}&size=300x300&format=png&margin=10`
   document.getElementById('qr-titulo').textContent = `QR — ${brigNome}`
   document.getElementById('qr-img').src = qrUrl
