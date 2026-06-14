@@ -290,17 +290,13 @@
     <div class="form-section">
       <div class="section-header">
         <label class="form-label">Fotos <span id="foto-count-label">(0/5)</span></label>
-        <button class="btn-sm btn-prim" id="btn-abrir-camera">📷 Câmera</button>
-      </div>
-      <div id="camera-wrap" class="camera-overlay" hidden>
-        <video id="camera-video" autoplay playsinline muted class="camera-preview"></video>
-        <button class="camera-fechar" id="btn-fechar-camera" aria-label="Fechar câmera">✕</button>
-        <div class="camera-bar">
-          <span class="camera-contador" id="camera-contador">0/5</span>
-          <button class="btn-capture" id="btn-capturar" aria-label="Capturar">⬤</button>
-          <span></span>
+        <div class="foto-acoes">
+          <button class="btn-sm btn-prim" id="btn-abrir-camera" type="button">📷 Câmera</button>
+          <button class="btn-sm btn-galeria" id="btn-abrir-galeria" type="button">🖼 Galeria</button>
         </div>
       </div>
+      <input type="file" id="input-foto-camera" accept="image/*" capture="environment" hidden>
+      <input type="file" id="input-foto-galeria" accept="image/*" multiple hidden>
       <div class="foto-grid" id="foto-grid"></div>
     </div>
 
@@ -1627,42 +1623,48 @@ async function salvarRegistro() {
 // ════════════════════════════════════════════════════════════════
 // Câmera
 // ════════════════════════════════════════════════════════════════
-async function abrirCamera() {
-  if (bCapturaGetFotos().length >= 5) { toast('Máximo de 5 fotos', 'warn'); return }
-
-  // App nativo: câmera do próprio Android (tela cheia, flash, zoom)
-  if (bCameraEhNativa()) {
-    const blob = await bCameraNativaCapturar(App.brigadista, bGpsAtual())
-    if (blob && bCapturaAdicionar(blob)) {
-      bCapturaMostrarGaleria(document.getElementById('foto-grid'))
-      document.getElementById('foto-count-label').textContent = `(${bCapturaGetFotos().length}/5)`
-    }
-    return
-  }
-
-  // Web: overlay em tela cheia com a câmera do navegador
-  document.getElementById('camera-contador').textContent = `${bCapturaGetFotos().length}/5`
-  document.getElementById('camera-wrap').hidden = false
-  const ok = await bCameraAbrir(document.getElementById('camera-video'))
-  if (!ok) {
-    document.getElementById('camera-wrap').hidden = true
-    toast('Câmera não disponível neste dispositivo', 'warn')
-  }
-}
-
-function fecharCamera() {
-  bCameraFechar()
-  document.getElementById('camera-wrap').hidden = true
-}
-
-async function capturarFoto() {
-  const video = document.getElementById('camera-video')
-  const blob = await bCameraCapturar(video, App.brigadista, bGpsAtual())
-  if (!blob) { toast('Máximo de 5 fotos', 'warn'); return }
+function _atualizarGaleriaFotos() {
   bCapturaMostrarGaleria(document.getElementById('foto-grid'))
   document.getElementById('foto-count-label').textContent = `(${bCapturaGetFotos().length}/5)`
-  document.getElementById('camera-contador').textContent  = `${bCapturaGetFotos().length}/5`
-  if (bCapturaGetFotos().length >= 5) fecharCamera()
+}
+
+async function abrirCamera() {
+  if (bCapturaGetFotos().length >= 5) { toast('Máximo de 5 fotos', 'warn'); return }
+  // App nativo (Android): câmera nativa via plugin (tela cheia, flash, zoom)
+  if (bCameraEhNativa()) {
+    const blob = await bCameraNativaCapturar(App.brigadista, bGpsAtual(), 'CAMERA')
+    if (blob && bCapturaAdicionar(blob)) _atualizarGaleriaFotos()
+    return
+  }
+  // Web/iOS: abre a câmera nativa do sistema (input capture) — sem overlay
+  document.getElementById('input-foto-camera').click()
+}
+
+async function abrirGaleria() {
+  if (bCapturaGetFotos().length >= 5) { toast('Máximo de 5 fotos', 'warn'); return }
+  // App nativo: seletor de fotos do dispositivo
+  if (bCameraEhNativa()) {
+    const blob = await bCameraNativaCapturar(App.brigadista, bGpsAtual(), 'PHOTOS')
+    if (blob && bCapturaAdicionar(blob)) _atualizarGaleriaFotos()
+    return
+  }
+  document.getElementById('input-foto-galeria').click()
+}
+
+// Processa fotos vindas dos inputs (câmera do SO ou galeria) na web
+async function processarFotosArquivos(fileList) {
+  const files = Array.from(fileList || [])
+  if (!files.length) return
+  let adicionou = 0
+  for (const f of files) {
+    if (bCapturaGetFotos().length >= 5) { toast('Máximo de 5 fotos', 'warn'); break }
+    if (!f.type.startsWith('image/')) continue
+    try {
+      const blob = await bCapturaProcessarArquivo(f, App.brigadista, bGpsAtual())
+      if (blob && bCapturaAdicionar(blob)) adicionou++
+    } catch (e) { console.warn('[foto]', e) }
+  }
+  if (adicionou) _atualizarGaleriaFotos()
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -2543,8 +2545,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Formulário
   document.getElementById('btn-abrir-camera').addEventListener('click', abrirCamera)
-  document.getElementById('btn-fechar-camera').addEventListener('click', fecharCamera)
-  document.getElementById('btn-capturar').addEventListener('click', capturarFoto)
+  document.getElementById('btn-abrir-galeria').addEventListener('click', abrirGaleria)
+  document.getElementById('input-foto-camera').addEventListener('change', e => { processarFotosArquivos(e.target.files); e.target.value = '' })
+  document.getElementById('input-foto-galeria').addEventListener('change', e => { processarFotosArquivos(e.target.files); e.target.value = '' })
   document.getElementById('btn-add-fauna').addEventListener('click', () => abrirFauna(null))
   document.getElementById('btn-salvar').addEventListener('click', salvarRegistro)
 
