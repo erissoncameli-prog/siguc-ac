@@ -212,12 +212,11 @@ function bSyncMontarPayload(reg, fotosUrls) {
   const {
     fotos_blobs, status, _fauna, ultimo_erro,
     lat, lng,          // → localizacao (PostGIS)
-    n_equipe,          // → equipe (text)
+    n_equipe,          // legado: ignorado (equipe agora vem de equipe_id)
     area_ha,           // → area_estimada_ha
     observacoes,       // → descricao
-    duracao_horas,     // sem coluna no banco
     criado_em,         // → data_inicio + data_hora_evento
-    ...rest
+    ...rest            // inclui equipe_id e duracao_horas (colunas diretas)
   } = reg
 
   const ts = criado_em ?? new Date().toISOString()
@@ -229,7 +228,6 @@ function bSyncMontarPayload(reg, fotosUrls) {
     localizacao:      (lat != null && lng != null)
                         ? { type: 'Point', coordinates: [lng, lat] }
                         : null,
-    equipe:           n_equipe != null ? String(n_equipe) : null,
     area_estimada_ha: area_ha  ?? null,
     descricao:        observacoes ?? null,
     data_inicio:      ts.slice(0, 10),

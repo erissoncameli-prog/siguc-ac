@@ -256,8 +256,8 @@
 
     <div class="form-section form-row">
       <div class="form-group">
-        <label class="form-label">Equipe (nº) *</label>
-        <input type="number" id="f-equipe" class="form-input" min="1" max="200" value="1">
+        <label class="form-label">Equipe *</label>
+        <select id="f-equipe" class="form-input"></select>
       </div>
       <div class="form-group">
         <label class="form-label">Duração (h)</label>
@@ -756,6 +756,7 @@ async function boot() {
   if (brigCached && pinSalvo && pinDono === brigCached.id) {
     App.brigadista = brigCached
     App.brigada    = await bOfflineGetConfig('brigada') || null
+    App.equipes    = await bOfflineGetConfig('equipes') || []
     document.getElementById('lock-nome').textContent = brigCached.nome_completo?.split(' ')[0] || 'Brigadista'
     document.getElementById('lock-offline').hidden = false
     mostrarTela('tela-bloqueio', false)
@@ -809,6 +810,11 @@ async function finalizarEntrada(brig, usuarioData, jaAutenticou) {
     if (brigada) await bOfflineSetConfig('brigada', brigada)
   }
   App.brigada = brigada
+
+  // Equipes da brigada (atualiza online; cai para o cache se offline)
+  const eqs = await buscarEquipesDoBanco(brig.brigada_id)
+  if (eqs.length) { App.equipes = eqs; await bOfflineSetConfig('equipes', eqs) }
+  else App.equipes = await bOfflineGetConfig('equipes') || []
 
   sincronizarEspecies()
 
@@ -1166,7 +1172,7 @@ async function fazerLogin() {
 async function buscarBrigadistaDoBanco(userId) {
   const { data, error } = await db
     .from('brigadistas')
-    .select('id, nome_completo, cpf, brigada_id, funcao, foto_url')
+    .select('id, nome_completo, cpf, brigada_id, funcao, foto_url, equipe_id')
     .eq('usuario_id', userId)
     .maybeSingle()
   if (error) console.error('[buscarBrigadistaDoBanco]', error)
@@ -1180,6 +1186,18 @@ async function buscarBrigadaDoBanco(brigadaId) {
     .eq('id', brigadaId)
     .maybeSingle()
   return data
+}
+
+// Equipes (A/B/C) da brigada — cacheadas p/ uso offline no formulário
+async function buscarEquipesDoBanco(brigadaId) {
+  if (!brigadaId) return []
+  const { data } = await db
+    .from('equipes_brigada')
+    .select('id, nome, brigada_id, ativa')
+    .eq('brigada_id', brigadaId)
+    .eq('ativa', true)
+    .order('nome')
+  return data || []
 }
 
 async function sincronizarEspecies() {
@@ -1459,6 +1477,21 @@ async function atualizarBadgeFila() {
 // ════════════════════════════════════════════════════════════════
 // Formulário de campo
 // ════════════════════════════════════════════════════════════════
+// Popula o select de equipe com as equipes da brigada; pré-seleciona
+// a equipe do brigadista logado (pode ser trocada no registro).
+function popularSelectEquipe() {
+  const sel = document.getElementById('f-equipe')
+  const equipes = App.equipes || []
+  if (!equipes.length) {
+    sel.innerHTML = '<option value="">— sem equipe —</option>'
+    return
+  }
+  const minha = App.brigadista?.equipe_id || ''
+  sel.innerHTML = equipes
+    .map(e => `<option value="${e.id}"${e.id === minha ? ' selected' : ''}>Equipe ${esc(e.nome)}</option>`)
+    .join('')
+}
+
 function abrirFormulario(natureza) {
   App.naturezaAtual = natureza
   bFaunaLimpar()
@@ -1475,7 +1508,7 @@ function abrirFormulario(natureza) {
 
   // Reset campos
   document.getElementById('f-atividade').value = ''
-  document.getElementById('f-equipe').value    = '1'
+  popularSelectEquipe()
   document.getElementById('f-duracao').value   = ''
   document.getElementById('f-area').value      = ''
   document.getElementById('f-obs').value       = ''
@@ -1494,9 +1527,9 @@ function abrirFormulario(natureza) {
 
 async function salvarRegistro() {
   const atividade = document.getElementById('f-atividade').value
-  const equipe    = parseInt(document.getElementById('f-equipe').value, 10)
+  const equipe_id = document.getElementById('f-equipe').value || null
   if (!atividade) { toast('Selecione a atividade', 'warn'); return }
-  if (!equipe || equipe < 1) { toast('Informe o número de equipe', 'warn'); return }
+  if ((App.equipes || []).length && !equipe_id) { toast('Selecione a equipe', 'warn'); return }
 
   const gps = bGpsAtual()
   const registro = {
@@ -1507,7 +1540,7 @@ async function salvarRegistro() {
     regional:      App.brigada?.regional ?? null,
     natureza:      App.naturezaAtual,
     atividade,
-    n_equipe:      equipe,
+    equipe_id,
     duracao_horas: parseFloat(document.getElementById('f-duracao').value) || null,
     area_ha:       parseFloat(document.getElementById('f-area').value) || null,
     observacoes:   document.getElementById('f-obs').value.trim() || null,

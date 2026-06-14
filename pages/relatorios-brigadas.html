@@ -319,7 +319,7 @@ async function gerarRelatorio() {
 
   const [regRes, brigRes, bristRes] = await Promise.all([
     db.from('vw_registros_validacao')
-      .select('id,natureza,atividade,status_validacao,data_hora_evento,regional,uc_id,uc_nome,brigada_id,brigada_nome,brigadista_id,brigadista_nome,n_fauna,n_fauna_pendente,fotos_urls,area_estimada_ha,pessoas_alcancadas')
+      .select('id,natureza,atividade,status_validacao,data_hora_evento,regional,uc_id,uc_nome,brigada_id,brigada_nome,brigadista_id,brigadista_nome,equipe_id,equipe_nome,duracao_horas,n_fauna,n_fauna_pendente,n_fauna_resgatada,fotos_urls,area_estimada_ha,pessoas_alcancadas')
       .gte('data_hora_evento', ini + 'T00:00:00')
       .lte('data_hora_evento', fim + 'T23:59:59')
       .order('data_hora_evento', { ascending: false })
@@ -430,6 +430,14 @@ function renderEstado() {
       </div>
     </div>
 
+    <!-- Ranking de equipes -->
+    <div class="card" style="margin-bottom:14px">
+      <div class="card-header"><div class="card-title">🏆 Ranking de Equipes</div></div>
+      <div class="card-body" style="padding:0 0 8px">
+        ${tabelaEquipes()}
+      </div>
+    </div>
+
     <!-- Tabela por regional -->
     <div class="card" style="margin-bottom:14px">
       <div class="card-header"><div class="card-title">Resumo por Regional</div></div>
@@ -447,6 +455,9 @@ function renderEstado() {
     initChartStatus(r, '-e')
     initChartRegional(r, '-e')
     if (area > 0) initChartAreaAcumulada(r, '-e')
+    const selEq = document.getElementById('sel-equipe-metrica')
+    if (selEq) selEq.value = _equipeSort
+    renderTabelaEquipes()
   })
 }
 
@@ -859,6 +870,69 @@ function initChartRegional(rows, sfx='') {
 // ════════════════════════════════════════════════════════════════
 // Tabelas
 // ════════════════════════════════════════════════════════════════
+// ── Ranking de equipes (desempenho) ──────────────────────────
+let _equipeSort = 'n'   // n | area | fauna | horas
+const EQUIPE_METRICA_LAB = { n: 'registros', area: 'área (ha)', fauna: 'fauna resgatada', horas: 'horas' }
+
+function dadosEquipes(registros) {
+  const cnt = agruparObj((registros || []).filter(r => r.equipe_id), 'equipe_id')
+  return Object.entries(cnt).map(([id, regs]) => {
+    const r0 = regs[0] || {}
+    return {
+      id,
+      nome:    r0.equipe_nome ? `Equipe ${r0.equipe_nome}` : '—',
+      brigada: r0.brigada_nome || '—',
+      n:       regs.length,
+      area:    regs.reduce((s, r) => s + (Number(r.area_estimada_ha) || 0), 0),
+      fauna:   regs.reduce((s, r) => s + (Number(r.n_fauna_resgatada) || 0), 0),
+      horas:   regs.reduce((s, r) => s + (Number(r.duracao_horas) || 0), 0),
+    }
+  })
+}
+
+function renderTabelaEquipes() {
+  const cont = document.getElementById('tab-equipes-cont')
+  if (!cont) return
+  const rows = dadosEquipes(_registros).sort((a, b) => b[_equipeSort] - a[_equipeSort]).slice(0, 10)
+  if (!rows.length) {
+    cont.innerHTML = '<p class="chart-empty" style="padding:12px">Nenhuma equipe com registros no período</p>'
+    return
+  }
+  const on = m => _equipeSort === m ? ' style="font-weight:700;color:#0A1A0F"' : ''
+  cont.innerHTML = `<table class="rel-table">
+    <thead><tr>
+      <th>Equipe</th><th>Brigada</th>
+      <th${on('n')}>Registros</th>
+      <th${on('area')}>Área (ha)</th>
+      <th${on('fauna')}>Fauna resg.</th>
+      <th${on('horas')}>Horas</th>
+    </tr></thead>
+    <tbody>${rows.map((r, i) => `<tr>
+      <td>${i === 0 ? '🏆 ' : ''}<strong>${esc(r.nome)}</strong></td>
+      <td style="font-size:.82rem;color:var(--cinza-500)">${esc(r.brigada)}</td>
+      <td${on('n')}>${r.n}</td>
+      <td${on('area')}>${r.area > 0 ? formatNum(r.area, 1) : '—'}</td>
+      <td${on('fauna')}>${r.fauna > 0 ? `🐾 ${r.fauna}` : '—'}</td>
+      <td${on('horas')}>${r.horas > 0 ? formatNum(r.horas, 1) : '—'}</td>
+    </tr>`).join('')}</tbody>
+  </table>`
+}
+
+function tabelaEquipes() {
+  return `
+    <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;flex-wrap:wrap">
+      <span style="font-size:.82rem;color:var(--cinza-500)">Melhor desempenho por:</span>
+      <select id="sel-equipe-metrica" class="form-control" style="width:auto;min-width:170px"
+              onchange="_equipeSort=this.value;renderTabelaEquipes()">
+        <option value="n">Nº de registros</option>
+        <option value="area">Área trabalhada (ha)</option>
+        <option value="fauna">Fauna resgatada</option>
+        <option value="horas">Horas de trabalho</option>
+      </select>
+    </div>
+    <div id="tab-equipes-cont" style="overflow-x:auto"></div>`
+}
+
 function tabelaBrigadas(registros, brigadas) {
   const cnt = agruparObj(registros, 'brigada_id')
   const rows = Object.entries(cnt)

@@ -253,7 +253,7 @@
       <div class="form-section-label" style="margin-top:12px">Vínculo e Função</div>
       <div class="grid-2">
         <div class="form-group"><label class="form-label">Brigada <span class="obrig">*</span></label>
-          <select class="form-control" id="mbr-brigada"><option value="">Selecione...</option></select>
+          <select class="form-control" id="mbr-brigada" onchange="popularEquipeSelect(this.value)"><option value="">Selecione...</option></select>
         </div>
         <div class="form-group"><label class="form-label">Função <span class="obrig">*</span></label>
           <select class="form-control" id="mbr-funcao">
@@ -264,6 +264,12 @@
             <option value="cozinheiro">Cozinheiro</option>
           </select>
         </div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Equipe</label>
+          <select class="form-control" id="mbr-equipe"><option value="">— sem equipe —</option></select>
+        </div>
+        <div class="form-group"></div>
       </div>
       <div class="grid-2">
         <div class="form-group"><label class="form-label">Tipo de Vínculo</label>
@@ -424,7 +430,7 @@
 const PWA_BASE_URL = 'https://brigada.siguc.ac.gov.br'
 
 // ── Estado ───────────────────────────────────────────────────
-let _ucs = [], _brigadas = [], _brigadistas = []
+let _ucs = [], _brigadas = [], _brigadistas = [], _equipes = []
 let _editId = { brigada: null, brigadista: null }
 let _loginBrigadistaId = null
 
@@ -562,12 +568,14 @@ async function carregarUCs() {
 }
 
 async function carregarDados() {
-  const [rb, rbr] = await Promise.all([
+  const [rb, rbr, req] = await Promise.all([
     db.from('brigadas_resumo').select('*').order('uc_nome'),
-    db.from('brigadistas').select('id,nome_completo,cpf,brigada_id,funcao,status,usuario_id,tipo_vinculo,data_inicio,data_fim').order('nome_completo'),
+    db.from('brigadistas').select('id,nome_completo,cpf,brigada_id,funcao,status,usuario_id,tipo_vinculo,data_inicio,data_fim,equipe_id').order('nome_completo'),
+    db.from('equipes_brigada').select('id,brigada_id,nome,ativa').eq('ativa', true).order('nome'),
   ])
   _brigadas    = rb.data  || []
   _brigadistas = rbr.data || []
+  _equipes     = req.data || []
 
   document.getElementById('k-b').textContent        = _brigadas.filter(b => b.ativa).length
   document.getElementById('k-br').textContent       = _brigadistas.filter(b => b.status === 'ativo').length
@@ -856,6 +864,16 @@ function removerFotoBrigadista() {
   _setBrigFotoPreview(null)
 }
 
+// Preenche o select de equipe conforme a brigada escolhida
+function popularEquipeSelect(brigadaId, selecionada = '') {
+  const sel = document.getElementById('mbr-equipe')
+  if (!sel) return
+  const eqs = _equipes.filter(e => e.brigada_id === brigadaId)
+  sel.innerHTML = '<option value="">— sem equipe —</option>' +
+    eqs.map(e => `<option value="${e.id}">Equipe ${e.nome}</option>`).join('')
+  sel.value = selecionada || ''
+}
+
 // ── Modal Brigadista ─────────────────────────────────────────
 function abrirModalBrigadista(b = null) {
   _editId.brigadista = b?.id || null
@@ -879,6 +897,7 @@ function abrirModalBrigadista(b = null) {
   document.getElementById('mbr-cep').value              = b?.cep || ''
   document.getElementById('mbr-ref').value              = b?.ponto_referencia || ''
   document.getElementById('mbr-brigada').value          = b?.brigada_id || ''
+  popularEquipeSelect(b?.brigada_id || '', b?.equipe_id || '')
   document.getElementById('mbr-funcao').value           = b?.funcao || 'brigadista'
   document.getElementById('mbr-vinculo').value          = b?.tipo_vinculo || ''
   document.getElementById('mbr-fonte').value            = b?.fonte_recurso || 'prevfogo'
@@ -932,6 +951,7 @@ async function salvarBrigadista() {
     cep:                   document.getElementById('mbr-cep').value.trim() || null,
     ponto_referencia:      document.getElementById('mbr-ref').value.trim() || null,
     funcao:                document.getElementById('mbr-funcao').value,
+    equipe_id:             document.getElementById('mbr-equipe').value || null,
     tipo_vinculo:          document.getElementById('mbr-vinculo').value || null,
     fonte_recurso:         document.getElementById('mbr-fonte').value,
     data_fim:              document.getElementById('mbr-fim').value || null,
