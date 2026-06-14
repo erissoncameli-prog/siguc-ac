@@ -102,7 +102,7 @@
     </div>
     <div class="modal-body">
       <div class="form-group"><label class="form-label">Brigada <span class="obrig">*</span></label>
-        <select class="form-control" id="mbr-brigada"><option value="">Selecione...</option></select>
+        <select class="form-control" id="mbr-brigada" onchange="popularEquipeSelect(this.value)"><option value="">Selecione...</option></select>
       </div>
       <div class="grid-2">
         <div class="form-group"><label class="form-label">Nome Completo <span class="obrig">*</span></label>
@@ -142,6 +142,9 @@
             <option value="apoio_administrativo">Apoio Administrativo</option>
             <option value="cozinheiro">Cozinheiro</option>
           </select>
+        </div>
+        <div class="form-group"><label class="form-label">Equipe</label>
+          <select class="form-control" id="mbr-equipe"><option value="">— sem equipe —</option></select>
         </div>
         <div class="form-group"><label class="form-label">Fonte de Recurso</label>
           <select class="form-control" id="mbr-fonte">
@@ -338,6 +341,7 @@ let _brigadas = []
 let _brigadistas = []
 let _atividades = []
 let _equipamentos = []
+let _equipes = []
 let _editId = { brigada: null, brigadista: null, atividade: null, equipamento: null }
 let _podeEditar = false
 let _abaAtiva = 'brigadas'
@@ -499,11 +503,12 @@ async function carregarUCs() {
 }
 
 async function carregarDados() {
-  const [rb, rbr, rat, req] = await Promise.all([
+  const [rb, rbr, rat, req, reqEq] = await Promise.all([
     db.from('brigadas_resumo').select('*').order('uc_nome'),
     db.from('brigadistas').select('*,brigadas!brigadistas_brigada_id_fkey(nome,uc_id)').order('nome_completo'),
     db.from('atividades_brigada').select('*,brigadas(nome)').order('data_inicio', { ascending: false }),
     db.from('equipamentos_brigada').select('*,brigadas(nome)').order('descricao'),
+    db.from('equipes_brigada').select('id,brigada_id,nome,ativa').eq('ativa', true).order('nome'),
   ])
 
   if (rb.error)  console.error('brigadas_resumo:', rb.error.message)
@@ -515,6 +520,7 @@ async function carregarDados() {
   _brigadistas  = rbr.data || []
   _atividades   = rat.data || []
   _equipamentos = req.data || []
+  _equipes      = reqEq?.data || []
 
   // KPIs
   const hoje = new Date(); const d30 = new Date(hoje); d30.setDate(d30.getDate()-30)
@@ -748,11 +754,22 @@ async function salvarBrigada() {
   finally { btn.disabled = false; btn.textContent = 'Salvar' }
 }
 
+// Preenche o select de equipe conforme a brigada escolhida
+function popularEquipeSelect(brigadaId, selecionada = '') {
+  const sel = document.getElementById('mbr-equipe')
+  if (!sel) return
+  const eqs = _equipes.filter(e => e.brigada_id === brigadaId)
+  sel.innerHTML = '<option value="">— sem equipe —</option>' +
+    eqs.map(e => `<option value="${e.id}">Equipe ${e.nome}</option>`).join('')
+  sel.value = selecionada || ''
+}
+
 // ── Modal: Brigadista ────────────────────────────────────────
 function abrirModalBrigadista(b = null) {
   _editId.brigadista = b?.id || null
   document.getElementById('mbr-titulo').textContent  = b ? 'Editar Brigadista' : 'Novo Brigadista'
   document.getElementById('mbr-brigada').value       = b?.brigada_id || ''
+  popularEquipeSelect(b?.brigada_id || '', b?.equipe_id || '')
   document.getElementById('mbr-nome').value          = b?.nome_completo || ''
   const cpfEl = document.getElementById('mbr-cpf')
   cpfEl.value = b?.cpf || ''
@@ -872,6 +889,7 @@ async function salvarBrigadista() {
     email:                 document.getElementById('mbr-email').value.trim() || null,
     municipio_residencia:  document.getElementById('mbr-municipio').value.trim() || null,
     funcao:                document.getElementById('mbr-funcao').value,
+    equipe_id:             document.getElementById('mbr-equipe').value || null,
     fonte_recurso:         document.getElementById('mbr-fonte').value,
     status:                document.getElementById('mbr-status').value,
     data_inicio,
