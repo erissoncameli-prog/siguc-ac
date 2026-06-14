@@ -509,6 +509,34 @@
       <label class="form-label">Validação dos registros</label>
       <div id="chart-validacao" class="chart-barras"></div>
     </div>
+
+    <!-- ── Desempenho da brigada (equipe / brigada / individual) ── -->
+    <div class="form-section" style="border-top:2px solid var(--linha,#E5E7EB);padding-top:14px;margin-top:6px">
+      <label class="form-label">🏆 Desempenho da brigada</label>
+      <div class="dados-grid">
+        <div class="dados-kpi"><strong id="bri-n">—</strong><span>Registros</span></div>
+        <div class="dados-kpi"><strong id="bri-area">—</strong><span>Área (ha)</span></div>
+        <div class="dados-kpi"><strong id="bri-fauna">—</strong><span>Fauna resg.</span></div>
+        <div class="dados-kpi"><strong id="bri-horas">—</strong><span>Horas</span></div>
+      </div>
+      <select id="sel-desemp-metrica" class="form-input" style="margin-top:10px"
+              onchange="_desempMetrica=this.value;renderDesempenho()">
+        <option value="n">Ranquear por: Nº de registros</option>
+        <option value="area">Ranquear por: Área trabalhada (ha)</option>
+        <option value="fauna">Ranquear por: Fauna resgatada</option>
+        <option value="horas">Ranquear por: Horas de trabalho</option>
+      </select>
+    </div>
+
+    <div class="form-section">
+      <label class="form-label">Por equipe</label>
+      <div id="chart-equipes" class="chart-barras"></div>
+    </div>
+
+    <div class="form-section">
+      <label class="form-label">Por brigadista <span style="font-weight:400;color:#9CA3AF">(★ você)</span></label>
+      <div id="chart-brigadistas" class="chart-barras"></div>
+    </div>
   </div>
 </div>
 
@@ -2005,6 +2033,7 @@ const COR_CLASSE = {
 }
 
 async function carregarDados() {
+  carregarDesempenhoBrigada()   // desempenho por equipe/brigada/brigadista (independe do bloco individual)
   let stats = await bOfflineGetConfig('stats_cache_v2')
 
   // Online: busca dados frescos do banco e atualiza o cache local.
@@ -2050,7 +2079,9 @@ async function carregarDados() {
   const fauna = stats.fauna || []
   const aviso = (pendentes.length ? ` · ${pendentes.length} aguardando envio` : '') +
     (sessaoExpirada ? ' · sessão expirada, faça login para atualizar' : '')
-  infoEl.textContent = `Atualizado em ${formatData ? formatData(stats.quando) : stats.quando.slice(0, 10)}${aviso}`
+  const minhaEq = (App.equipes || []).find(e => e.id === App.brigadista?.equipe_id)
+  const eqTxt = minhaEq ? `Equipe ${minhaEq.nome} · ` : ''
+  infoEl.textContent = `${eqTxt}Atualizado em ${formatData ? formatData(stats.quando) : stats.quando.slice(0, 10)}${aviso}`
 
   // KPIs
   const mesAtual = new Date().toISOString().slice(0, 7)
@@ -2110,6 +2141,66 @@ async function carregarDados() {
   renderBarras('chart-validacao', Object.entries(contar(regs, 'status_validacao'))
     .sort((a, b) => b[1] - a[1])
     .map(([k, v]) => [ROTULO_VALIDACAO[k] || rotuloBonito(k), v, COR_VALIDACAO[k]]))
+}
+
+// ── Desempenho da brigada: equipe / brigada / brigadista ──────
+let _desempData = null
+let _desempMetrica = 'n'
+
+async function carregarDesempenhoBrigada() {
+  let cache = await bOfflineGetConfig('desemp_brigada_cache')
+  if (db && App.brigadista?.id && await bSyncTemConexao()) {
+    try {
+      const { data: { session } } = await db.auth.getSession()
+      if (session) {
+        const { data, error } = await db.rpc('app_desempenho_brigada', {})
+        if (!error && data && !data.erro) {
+          cache = { quando: new Date().toISOString(), ...data }
+          await bOfflineSetConfig('desemp_brigada_cache', cache)
+        }
+      }
+    } catch (e) { console.warn('[desemp]', e) }
+  }
+  _desempData = cache
+  renderDesempenho()
+}
+
+function renderDesempenho() {
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v }
+  const d = _desempData
+  const elEq = document.getElementById('chart-equipes')
+  const elBr = document.getElementById('chart-brigadistas')
+  if (!d || !d.brigada) {
+    set('bri-n', '—'); set('bri-area', '—'); set('bri-fauna', '—'); set('bri-horas', '—')
+    if (elEq) elEq.innerHTML = '<p class="chart-vazio">Sem dados ainda</p>'
+    if (elBr) elBr.innerHTML = '<p class="chart-vazio">Sem dados ainda</p>'
+    return
+  }
+  const b = d.brigada
+  set('bri-n', b.n ?? 0)
+  set('bri-area', (Number(b.area) || 0).toFixed(1))
+  set('bri-fauna', b.fauna ?? 0)
+  set('bri-horas', (Number(b.horas) || 0).toFixed(1))
+
+  const m   = _desempMetrica
+  const fmt = v => (m === 'area' || m === 'horas') ? Math.round(v * 10) / 10 : v
+  const val = x => fmt(Number(x[m]) || 0)
+
+  const eqs = (d.por_equipe || [])
+    .map(e => [`Equipe ${e.nome}`, val(e)])
+    .sort((a, b) => b[1] - a[1])
+  renderBarras('chart-equipes', eqs)
+
+  const meuId = App.brigadista?.id
+  const bris = (d.por_brigadista || [])
+    .map(x => [x.brigadista_id === meuId ? `★ ${primeiroNome(x.nome)}` : primeiroNome(x.nome), val(x)])
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 12)
+  renderBarras('chart-brigadistas', bris)
+}
+
+function primeiroNome(n) {
+  return String(n || '—').split(' ').slice(0, 2).join(' ')
 }
 
 // ════════════════════════════════════════════════════════════════

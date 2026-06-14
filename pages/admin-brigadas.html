@@ -541,7 +541,7 @@ const LABEL_REGIONAL = {
         </div>
         <div class="card"><div class="table-wrap"><div class="table-scroll">
           <table>
-            <thead><tr><th>Nome</th><th>CPF</th><th>Brigada</th><th>Função</th><th>Vínculo</th><th>Período</th><th>Status</th><th>App</th><th>Ações</th></tr></thead>
+            <thead><tr><th>Nome</th><th>CPF</th><th>Brigada</th><th>Função</th><th>Equipe</th><th>Vínculo</th><th>Período</th><th>Status</th><th>App</th><th>Ações</th></tr></thead>
             <tbody id="tbody-br"></tbody>
           </table>
         </div></div></div>
@@ -779,11 +779,13 @@ function renderBrigadistas() {
     (!status || b.status === status)
   )
   const tbody = document.getElementById('tbody-br')
-  if (!lista.length) { tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:32px;color:#9CA3AF">Nenhum brigadista encontrado</td></tr>'; return }
+  if (!lista.length) { tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:32px;color:#9CA3AF">Nenhum brigadista encontrado</td></tr>'; return }
   const brigNomeMap = Object.fromEntries(_brigadas.map(b => [b.id, b.nome]))
+  const eqNomeMap   = Object.fromEntries(_equipes.map(e => [e.id, e.nome]))
   tbody.innerHTML = lista.map(b => {
     const periodo = b.data_inicio ? `${formatData(b.data_inicio)}${b.data_fim ? ' – ' + formatData(b.data_fim) : ''}` : '—'
     const brigNome = brigNomeMap[b.brigada_id] || '—'
+    const eqNome   = b.equipe_id ? (eqNomeMap[b.equipe_id] || '—') : '—'
     const appBadge = b.usuario_id
       ? '<span class="badge badge-verde" style="font-size:11px">Com login</span>'
       : `<button class="btn btn-xs" style="background:#F59E0B;color:#fff;border:none" onclick='abrirModalLogin("${b.id}","${esc(b.nome_completo)}","")'>Gerar login</button>`
@@ -792,6 +794,7 @@ function renderBrigadistas() {
       <td class="mono" style="font-size:12px">${esc(b.cpf||'—')}</td>
       <td style="font-size:12px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(brigNome)}</td>
       <td style="font-size:12px">${esc((b.funcao||'').replace('_',' '))}</td>
+      <td style="font-size:12px">${eqNome !== '—' ? `<span class="badge badge-azul">${esc(eqNome)}</span>` : '—'}</td>
       <td style="font-size:12px">${esc(b.tipo_vinculo ? b.tipo_vinculo.charAt(0).toUpperCase() + b.tipo_vinculo.slice(1) : '—')}</td>
       <td class="mono" style="font-size:12px;white-space:nowrap">${periodo}</td>
       <td><span class="badge ${BADGE_STATUS_BR[b.status]||'badge-cinza'}">${esc(b.status)}</span></td>
