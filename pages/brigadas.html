@@ -427,7 +427,7 @@ const LABEL_TIPO_AT = { patrulha: 'Patrulha', combate_incendio: 'Combate', aceir
         </div>
         <div class="card"><div class="table-wrap"><div class="table-scroll">
           <table>
-            <thead><tr><th>Nome</th><th>CPF</th><th>Brigada</th><th>Função</th><th>Fonte</th><th>Período</th><th>Formação</th><th>Status</th>${_podeEditar?'<th>Ações</th>':''}</tr></thead>
+            <thead><tr><th>Nome</th><th>CPF</th><th>Brigada</th><th>Função</th><th>Equipe</th><th>Fonte</th><th>Período</th><th>Formação</th><th>Status</th>${_podeEditar?'<th>Ações</th>':''}</tr></thead>
             <tbody id="tbody-brigadistas"></tbody>
           </table>
         </div></div></div>
@@ -604,15 +604,18 @@ function renderBrigadistas() {
     (!status || b.status === status)
   )
   const tbody = document.getElementById('tbody-brigadistas')
-  if (!lista.length) { tbody.innerHTML = `<tr><td colspan="${pe?9:8}" style="text-align:center;padding:32px;color:#9CA3AF">Nenhum brigadista encontrado</td></tr>`; return }
+  if (!lista.length) { tbody.innerHTML = `<tr><td colspan="${pe?10:9}" style="text-align:center;padding:32px;color:#9CA3AF">Nenhum brigadista encontrado</td></tr>`; return }
+  const eqNomeMap = Object.fromEntries(_equipes.map(e => [e.id, e.nome]))
   tbody.innerHTML = lista.map(b => {
     const periodo = b.data_inicio ? `${formatData(b.data_inicio)}${b.data_fim ? ' – ' + formatData(b.data_fim) : ''}` : '—'
     const brigNome = _brigadas.find(br => br.id === b.brigada_id)?.nome || '—'
+    const eqNome = b.equipe_id ? (eqNomeMap[b.equipe_id] || '—') : '—'
     return `<tr>
       <td><strong>${esc(b.nome_completo)}</strong>${b.municipio_residencia ? `<br><span style="font-size:11px;color:#9CA3AF">${esc(b.municipio_residencia)}</span>` : ''}</td>
       <td class="mono" style="font-size:12px">${esc(b.cpf||'—')}</td>
       <td style="font-size:12px">${esc(brigNome)}</td>
       <td><span class="badge ${BADGE_FUNCAO[b.funcao]||'badge-cinza'}" style="font-size:11px">${esc(b.funcao?.replace('_',' '))||'—'}</span></td>
+      <td style="font-size:12px">${eqNome !== '—' ? `<span class="badge badge-azul">${esc(eqNome)}</span>` : '—'}</td>
       <td style="font-size:12px">${esc((b.fonte_recurso||'').toUpperCase())}</td>
       <td class="mono" style="font-size:12px;white-space:nowrap">${periodo}</td>
       <td style="text-align:center">${b.treinamento_basico ? '<span class="badge badge-verde" style="font-size:11px">Sim</span>' : '<span style="color:#9CA3AF;font-size:12px">—</span>'}</td>
