@@ -1749,6 +1749,35 @@ function bFormatDataHora(str) {
     d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
 }
 
+let _filaExpandida = false
+const FILA_LIMITE = 6
+
+function bRenderItemFila(r) {
+  const icons = { prevencao:'🛡', combate:'🔥', monitoramento:'🔭' }
+  const statusLabel = { pendente:'Pendente', enviando:'Enviando…', confirmado:'Enviado' }
+  const fotos    = r.fotos_blobs?.length || 0
+  const tamanho  = (r.fotos_blobs || []).reduce((s, f) => s + bTamanhoBase64(f), 0)
+  const metaFotos = fotos
+    ? `<span class="sync-meta-item">📷 ${fotos} ${fotos === 1 ? 'foto' : 'fotos'}</span>
+       <span class="sync-meta-item">${bFormatTamanho(tamanho)}</span>`
+    : '<span class="sync-meta-item">Sem fotos</span>'
+  const linhaEnvio = r.sincronizado_em
+    ? `<span>📤 Envio: ${bFormatDataHora(r.sincronizado_em)}</span>`
+    : ''
+  return `
+    <div class="sync-item sync-${r.status}">
+      <span class="sync-icon">${icons[r.natureza] || '📋'}</span>
+      <div class="sync-info">
+        <strong>${esc(r.atividade || '—')}</strong>
+        <span class="sync-meta">${metaFotos}</span>
+        <span>🕐 Ocorrência: ${bFormatDataHora(r.criado_em)}</span>
+        ${linhaEnvio}
+        ${r.ultimo_erro ? `<span class="sync-erro-msg">⚠ ${esc(r.ultimo_erro)}</span>` : ''}
+      </div>
+      <span class="sync-status sync-${r.status}">${statusLabel[r.status] || r.status}</span>
+    </div>`
+}
+
 async function carregarFila() {
   const todos = await bOfflineListarTodos()
   const stats = { pendente: 0, enviando: 0, confirmado: 0 }
@@ -1764,31 +1793,23 @@ async function carregarFila() {
     return
   }
 
-  const icons = { prevencao:'🛡', combate:'🔥', monitoramento:'🔭' }
-  const statusLabel = { pendente:'Pendente', enviando:'Enviando…', confirmado:'Enviado' }
-  cont.innerHTML = todos.map(r => {
-    const fotos    = r.fotos_blobs?.length || 0
-    const tamanho  = (r.fotos_blobs || []).reduce((s, f) => s + bTamanhoBase64(f), 0)
-    const metaFotos = fotos
-      ? `<span class="sync-meta-item">📷 ${fotos} ${fotos === 1 ? 'foto' : 'fotos'}</span>
-         <span class="sync-meta-item">${bFormatTamanho(tamanho)}</span>`
-      : '<span class="sync-meta-item">Sem fotos</span>'
-    const linhaEnvio = r.sincronizado_em
-      ? `<span>📤 Envio: ${bFormatDataHora(r.sincronizado_em)}</span>`
-      : ''
-    return `
-    <div class="sync-item sync-${r.status}">
-      <span class="sync-icon">${icons[r.natureza] || '📋'}</span>
-      <div class="sync-info">
-        <strong>${esc(r.atividade || '—')}</strong>
-        <span class="sync-meta">${metaFotos}</span>
-        <span>🕐 Ocorrência: ${bFormatDataHora(r.criado_em)}</span>
-        ${linhaEnvio}
-        ${r.ultimo_erro ? `<span class="sync-erro-msg">⚠ ${esc(r.ultimo_erro)}</span>` : ''}
-      </div>
-      <span class="sync-status sync-${r.status}">${statusLabel[r.status] || r.status}</span>
-    </div>`
-  }).join('')
+  // Lista ordenada do mais recente para o mais antigo: mostra só os 6 últimos
+  const visiveis  = _filaExpandida ? todos : todos.slice(0, FILA_LIMITE)
+  const restantes = todos.length - visiveis.length
+
+  let botao = ''
+  if (restantes > 0) {
+    botao = `<button type="button" class="btn-ver-mais" id="btn-ver-mais-fila">Ver mais ${restantes} registro${restantes !== 1 ? 's' : ''}</button>`
+  } else if (_filaExpandida && todos.length > FILA_LIMITE) {
+    botao = `<button type="button" class="btn-ver-mais" id="btn-ver-menos-fila">Ver menos</button>`
+  }
+
+  cont.innerHTML = visiveis.map(bRenderItemFila).join('') + botao
+
+  const btnMais = document.getElementById('btn-ver-mais-fila')
+  if (btnMais) btnMais.addEventListener('click', () => { _filaExpandida = true;  carregarFila() })
+  const btnMenos = document.getElementById('btn-ver-menos-fila')
+  if (btnMenos) btnMenos.addEventListener('click', () => { _filaExpandida = false; carregarFila() })
 }
 
 // ════════════════════════════════════════════════════════════════

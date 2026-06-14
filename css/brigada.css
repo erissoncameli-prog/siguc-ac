@@ -939,6 +939,14 @@ body { margin: 0; }
 .sync-info span { color: #6B7280; font-size: 12px; }
 .sync-meta { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 2px; }
 .sync-meta-item { color: #6B7280; font-size: 12px; }
+.btn-ver-mais {
+  display: block; width: 100%; margin: 4px 0 10px;
+  padding: 11px 14px; border-radius: 14px;
+  background: #fff; border: 1px solid #E5E7EB;
+  color: var(--prim); font-size: 14px; font-weight: 600;
+  font-family: inherit; cursor: pointer;
+}
+.btn-ver-mais:active { background: #F3F4F6; }
 .sync-status { font-size: 12px; font-weight: 600; }
 .sync-pendente { color: var(--alerta); }
 .sync-enviando { color: var(--monit); }
