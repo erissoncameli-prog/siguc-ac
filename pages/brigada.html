@@ -1725,6 +1725,30 @@ function confirmarFauna() {
 // ════════════════════════════════════════════════════════════════
 // Fila de sincronização
 // ════════════════════════════════════════════════════════════════
+// Tamanho aproximado (bytes) de uma foto em base64 / data URL
+function bTamanhoBase64(s) {
+  if (!s) return 0
+  const i = s.indexOf(',')
+  const b64 = i >= 0 ? s.slice(i + 1) : s
+  const padding = b64.endsWith('==') ? 2 : (b64.endsWith('=') ? 1 : 0)
+  return Math.floor(b64.length * 3 / 4) - padding
+}
+
+function bFormatTamanho(bytes) {
+  if (!bytes) return '0 KB'
+  const kb = bytes / 1024
+  if (kb < 1024) return Math.max(1, Math.round(kb)) + ' KB'
+  return (kb / 1024).toFixed(1) + ' MB'
+}
+
+function bFormatDataHora(str) {
+  if (!str) return '—'
+  const d = new Date(str)
+  if (isNaN(d)) return str.slice(0, 16).replace('T', ' ')
+  return d.toLocaleDateString('pt-BR') + ' ' +
+    d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+}
+
 async function carregarFila() {
   const todos = await bOfflineListarTodos()
   const stats = { pendente: 0, enviando: 0, confirmado: 0 }
@@ -1742,17 +1766,26 @@ async function carregarFila() {
 
   const icons = { prevencao:'🛡', combate:'🔥', monitoramento:'🔭' }
   const statusLabel = { pendente:'Pendente', enviando:'Enviando…', confirmado:'Enviado' }
-  cont.innerHTML = todos.map(r => `
+  cont.innerHTML = todos.map(r => {
+    const fotos    = r.fotos_blobs?.length || 0
+    const tamanho  = (r.fotos_blobs || []).reduce((s, f) => s + bTamanhoBase64(f), 0)
+    const dataHora = bFormatDataHora(r.sincronizado_em || r.criado_em)
+    const metaFotos = fotos
+      ? `<span class="sync-meta-item">📷 ${fotos} ${fotos === 1 ? 'foto' : 'fotos'}</span>
+         <span class="sync-meta-item">${bFormatTamanho(tamanho)}</span>`
+      : '<span class="sync-meta-item">Sem fotos</span>'
+    return `
     <div class="sync-item sync-${r.status}">
       <span class="sync-icon">${icons[r.natureza] || '📋'}</span>
       <div class="sync-info">
         <strong>${esc(r.atividade || '—')}</strong>
-        <span>${formatData ? formatData(r.criado_em) : r.criado_em?.slice(0,10)}</span>
+        <span class="sync-meta">${metaFotos}</span>
+        <span>🕐 ${dataHora}</span>
         ${r.ultimo_erro ? `<span class="sync-erro-msg">⚠ ${esc(r.ultimo_erro)}</span>` : ''}
       </div>
       <span class="sync-status sync-${r.status}">${statusLabel[r.status] || r.status}</span>
-    </div>
-  `).join('')
+    </div>`
+  }).join('')
 }
 
 // ════════════════════════════════════════════════════════════════
