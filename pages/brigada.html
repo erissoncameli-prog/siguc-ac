@@ -1769,18 +1769,21 @@ async function carregarFila() {
   cont.innerHTML = todos.map(r => {
     const fotos    = r.fotos_blobs?.length || 0
     const tamanho  = (r.fotos_blobs || []).reduce((s, f) => s + bTamanhoBase64(f), 0)
-    const dataHora = bFormatDataHora(r.sincronizado_em || r.criado_em)
     const metaFotos = fotos
       ? `<span class="sync-meta-item">📷 ${fotos} ${fotos === 1 ? 'foto' : 'fotos'}</span>
          <span class="sync-meta-item">${bFormatTamanho(tamanho)}</span>`
       : '<span class="sync-meta-item">Sem fotos</span>'
+    const linhaEnvio = r.sincronizado_em
+      ? `<span>📤 Envio: ${bFormatDataHora(r.sincronizado_em)}</span>`
+      : ''
     return `
     <div class="sync-item sync-${r.status}">
       <span class="sync-icon">${icons[r.natureza] || '📋'}</span>
       <div class="sync-info">
         <strong>${esc(r.atividade || '—')}</strong>
         <span class="sync-meta">${metaFotos}</span>
-        <span>🕐 ${dataHora}</span>
+        <span>🕐 Ocorrência: ${bFormatDataHora(r.criado_em)}</span>
+        ${linhaEnvio}
         ${r.ultimo_erro ? `<span class="sync-erro-msg">⚠ ${esc(r.ultimo_erro)}</span>` : ''}
       </div>
       <span class="sync-status sync-${r.status}">${statusLabel[r.status] || r.status}</span>
