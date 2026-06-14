@@ -40,18 +40,28 @@ automaticamente no próximo build.**
 
 ### Pelo GitHub Actions (recomendado — não precisa de Android Studio)
 
-- **Build de teste:** aba *Actions* → workflow **Brigadas APK** → *Run workflow*.
-  O APK fica nos *artifacts* do run.
-- **Release oficial:** criar uma tag `brigadas-vX.Y.Z`:
+O workflow **Brigadas APK** **sempre publica um Release** com o `.apk`
+anexado (link direto, sem ZIP e sem login) — tanto no disparo manual quanto
+por tag. O `.apk` também fica como *artifact* do run (para download interno).
+
+- **Disparo manual:** aba *Actions* → workflow **Brigadas APK** → *Run workflow*.
+  - Informe a **versão** no campo (ex.: `1.16.0`) → publica `brigadas-v1.16.0`.
+  - Deixe **vazio** → o workflow **auto-incrementa o patch** do último Release
+    (ex.: se o último é `1.16.0`, gera `1.16.1`).
+- **Por tag:** criar uma tag `brigadas-vX.Y.Z` também publica o Release:
 
   ```bash
   git tag brigadas-v1.0.0 && git push origin brigadas-v1.0.0
   ```
 
-  O workflow compila e anexa `siguc-brigadas.apk` ao Release. O link fixo
-  `https://github.com/erissoncameli-prog/siguc-ac/releases/latest/download/siguc-brigadas.apk`
-  passa a apontar para a versão nova — é esse link que a página
-  `/pages/instalar-brigadas.html` usa.
+O link fixo
+`https://github.com/erissoncameli-prog/siguc-ac/releases/latest/download/siguc-brigadas.apk`
+sempre aponta para a versão mais nova — é esse link que a página
+`/pages/instalar-brigadas.html` usa e que o app oferece na atualização.
+
+> ⚠️ Não dispare "só para testar" sem querer publicar: **todo disparo gera um
+> Release**. Para um build descartável, baixe o `.apk` pelo *artifact* do run
+> (mas a versão também terá sido publicada).
 
 ### Localmente (precisa de Android Studio / SDK)
 
@@ -96,7 +106,20 @@ cada build** — o Android obriga a desinstalar para atualizar. Para evitar isso
 
 ## Atualizações do app instalado
 
-Cada release deve ter `versionCode` maior que o anterior — o workflow usa o
-número do run do GitHub Actions automaticamente, então basta criar a tag nova.
-O brigadista baixa o APK novo pela mesma página e instala por cima (os dados
-locais são preservados).
+Cada release tem `versionCode` maior que o anterior — o workflow usa o número
+do run do GitHub Actions automaticamente, então cada build novo já é maior.
+
+Como o app detecta e oferece a atualização (lógica em `pages/brigada.html`):
+
+- **No APK (Capacitor):** ao abrir, checa a *GitHub Releases API* no máximo
+  **1×/dia**; se houver um `brigadas-vX.Y.Z` maior que a versão instalada,
+  mostra o **banner "Nova versão disponível"** (e um pontinho no item *Config*).
+  Em *Config → "Verificar atualização do app"* a checagem é imediata. Ao
+  aceitar, abre o `browser_download_url` do `.apk` (download direto).
+- **Na web/PWA (inclui iPhone):** a atualização vem pelo ciclo do service
+  worker (botão "Verificar atualização" chama `registration.update()`).
+
+O brigadista instala o `.apk` novo por cima do atual — os dados locais e a
+fila de envio são preservados. Para a detecção funcionar, **publique sempre
+como Release** (o updater e o link `/releases/latest/download` ignoram
+*artifacts* de run avulsos).
