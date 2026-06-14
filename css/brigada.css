@@ -54,6 +54,9 @@
 }
 
 /* ── Tela de bloqueio / login ───────────────────────────── */
+/* Fundo "floresta profunda" em camadas — estilo iOS: um brilho
+   suave atrás do logo, um realce verde embaixo e um gradiente
+   diagonal que dá profundidade sem parecer chapado. */
 .lock-screen {
   min-height: 100dvh;
   display: flex;
@@ -61,10 +64,29 @@
   align-items: center;
   justify-content: center;
   padding: 32px 24px;
-  background: var(--ink-d);
   color: #fff;
+  background:
+    radial-gradient(135% 78% at 50% -12%, rgba(82,183,136,.22), rgba(82,183,136,0) 55%),
+    radial-gradient(120% 65% at 85% 112%, rgba(18,166,106,.20), transparent 60%),
+    linear-gradient(168deg, #11362770 0%, transparent 55%),
+    linear-gradient(178deg, #0E2C20 0%, #0A2017 48%, #06120D 100%);
+  background-color: #07140E;
+  position: relative;
+  overflow: hidden;
 }
+/* Véu sutil nas bordas para concentrar o olhar no centro (vinheta) */
+.lock-screen::after {
+  content: '';
+  position: absolute; inset: 0; z-index: 0;
+  pointer-events: none;
+  background: radial-gradient(125% 95% at 50% 42%, transparent 58%, rgba(3,10,7,.55) 100%);
+}
+.lock-screen > * { position: relative; z-index: 1; }
+
 .lock-logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   font-family: 'Fraunces', Georgia, serif;
   font-size: 28px;
   font-weight: 700;
@@ -76,30 +98,61 @@
 
 /* PIN keypad */
 .pin-display {
-  display: flex; gap: 12px; margin-bottom: 28px;
+  display: flex; gap: 14px; margin-bottom: 30px;
 }
 .pin-dot {
-  width: 14px; height: 14px; border-radius: 50%;
-  background: rgba(255,255,255,.25);
-  transition: background .15s var(--spring);
+  width: 13px; height: 13px; border-radius: 50%;
+  background: transparent;
+  border: 1.5px solid rgba(255,255,255,.32);
+  transition: background .18s var(--spring), border-color .18s, box-shadow .18s, transform .18s var(--spring);
 }
-.pin-dot.ativo { background: var(--soft); }
+.pin-dot.ativo {
+  background: var(--soft);
+  border-color: var(--soft);
+  box-shadow: 0 0 14px rgba(123,224,174,.55);
+  transform: scale(1.06);
+}
 
 .pin-keypad {
-  display: grid; grid-template-columns: repeat(3, 72px); gap: 12px;
+  display: grid; grid-template-columns: repeat(3, 74px); gap: 14px;
 }
 .pin-key {
-  height: 72px; border-radius: 20px;
-  background: rgba(255,255,255,.08);
-  border: none; color: #fff;
-  font-family: var(--font-ui); font-size: 22px; font-weight: 600;
+  height: 74px; border-radius: 24px;
+  background: rgba(255,255,255,.055);
+  border: 1px solid rgba(255,255,255,.10);
+  color: #F2FBF6;
+  font-family: var(--font-ui); font-size: 27px; font-weight: 500;
+  letter-spacing: .01em;
   cursor: pointer;
-  transition: transform .12s var(--spring), background .1s;
+  backdrop-filter: blur(14px) saturate(1.15);
+  -webkit-backdrop-filter: blur(14px) saturate(1.15);
+  box-shadow: 0 1px 2px rgba(0,0,0,.22), inset 0 1px 0 rgba(255,255,255,.08);
+  transition: transform .14s var(--spring), background .15s, box-shadow .15s;
   -webkit-tap-highlight-color: transparent;
 }
-.pin-key:active { transform: scale(.92); background: rgba(255,255,255,.18); }
+.pin-key:active {
+  transform: scale(.93);
+  background: rgba(255,255,255,.16);
+  box-shadow: 0 1px 2px rgba(0,0,0,.22), inset 0 1px 0 rgba(255,255,255,.12);
+}
 .pin-key.delete { font-size: 18px; }
-.pin-key.ok, .pin-key.pin-ok { background: var(--prim); }
+.pin-key.pin-clear {
+  background: transparent;
+  border-color: rgba(255,255,255,.06);
+  color: rgba(255,255,255,.7);
+  box-shadow: none;
+}
+.pin-key.pin-clear:active { background: rgba(255,255,255,.08); }
+.pin-key.ok, .pin-key.pin-ok {
+  background: linear-gradient(180deg, #34CB89 0%, #12A66A 100%);
+  border-color: rgba(255,255,255,.20);
+  color: #06140D;
+  box-shadow: 0 6px 20px rgba(18,166,106,.42), inset 0 1px 0 rgba(255,255,255,.30);
+}
+.pin-key.pin-ok:active {
+  background: linear-gradient(180deg, #2FBE80 0%, #109A62 100%);
+  box-shadow: 0 3px 12px rgba(18,166,106,.42), inset 0 1px 0 rgba(255,255,255,.30);
+}
 
 /* ── Tela de login do brigadista ────────────────────────── */
 .login-form {
@@ -108,16 +161,24 @@
   margin-top: 8px;
 }
 .login-input {
-  width: 100%; padding: 14px 16px;
-  border-radius: 12px;
-  border: 1.5px solid rgba(255,255,255,.15);
-  background: rgba(255,255,255,.08);
+  width: 100%; padding: 15px 16px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(255,255,255,.07);
   color: #fff; font-size: 16px; font-family: var(--font-ui);
   outline: none; box-sizing: border-box;
+  backdrop-filter: blur(14px) saturate(1.15);
+  -webkit-backdrop-filter: blur(14px) saturate(1.15);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.06);
+  transition: border-color .18s, background .18s, box-shadow .18s;
   -webkit-appearance: none;
 }
 .login-input::placeholder { color: rgba(255,255,255,.4); }
-.login-input:focus { border-color: var(--prim); }
+.login-input:focus {
+  border-color: rgba(82,183,136,.65);
+  background: rgba(255,255,255,.10);
+  box-shadow: 0 0 0 4px rgba(82,183,136,.16);
+}
 .login-senha-wrap { position: relative; }
 .login-senha-wrap .login-input { padding-right: 48px; }
 .btn-toggle-senha {
@@ -126,13 +187,17 @@
   font-size: 18px; line-height: 1; padding: 4px; color: rgba(255,255,255,.5);
 }
 .btn-login-submit {
-  width: 100%; padding: 16px; border-radius: 12px; border: none;
-  background: var(--prim); color: #fff;
+  width: 100%; padding: 16px; border-radius: 14px;
+  border: 1px solid rgba(255,255,255,.18);
+  background: linear-gradient(180deg, #34CB89 0%, #12A66A 100%);
+  color: #06140D;
   font-size: 17px; font-weight: 600; font-family: var(--font-ui);
-  cursor: pointer; letter-spacing: .5px; margin-top: 4px;
-  transition: opacity .15s;
+  cursor: pointer; letter-spacing: .3px; margin-top: 4px;
+  box-shadow: 0 8px 22px rgba(18,166,106,.34), inset 0 1px 0 rgba(255,255,255,.28);
+  transition: transform .14s var(--spring), box-shadow .15s, opacity .15s;
   -webkit-tap-highlight-color: transparent;
 }
+.btn-login-submit:active { transform: scale(.985); box-shadow: 0 4px 14px rgba(18,166,106,.34), inset 0 1px 0 rgba(255,255,255,.28); }
 .btn-login-submit:disabled { opacity: .6; cursor: not-allowed; }
 .lock-offline-badge {
   font-size: 11px; color: rgba(255,200,0,.9);
