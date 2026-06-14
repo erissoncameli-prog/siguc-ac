@@ -807,6 +807,7 @@ async function boot() {
   await bOfflineInit()
   bOfflinePersistir()
   inserirFaixasInst()
+  aplicarMascoteCopa()      // mascote temático no período da Copa
   carregarLogosInstitucionais()
   checarAtualizacaoAuto()   // aviso de nova versão (banner + pontinho)
 
@@ -1121,6 +1122,27 @@ function inserirFaixasInst() {
   ;[['tela-fila', false], ['tela-dados', false], ['tela-config', false],
     ['tela-form', true], ['tela-fauna', true]].forEach(([id, compacta]) => {
     document.getElementById(id)?.insertAdjacentHTML('afterbegin', faixa(compacta))
+  })
+}
+
+// ── Modo Copa (mascote temático durante a Copa do Mundo FIFA 2026) ─
+const MODO_COPA       = { inicio: '2026-06-11', fim: '2026-07-19' }
+const MASCOTE_NORMAL  = '/pwa/icons/mascote.png'
+const MASCOTE_COPA    = '/pwa/icons/mascote-copa.png'
+
+function ehModoCopa() {
+  const hoje = new Date().toISOString().slice(0, 10)
+  return hoje >= MODO_COPA.inicio && hoje <= MODO_COPA.fim
+}
+
+// Troca o mascote pelo tema da Copa no período; se o PNG ainda não
+// existir, cai de volta para o mascote normal (sem imagem quebrada).
+function aplicarMascoteCopa() {
+  if (!ehModoCopa()) return
+  document.querySelectorAll('.faixa-mascote, .lock-mascote').forEach(img => {
+    img.onerror = () => { img.onerror = null; img.src = MASCOTE_NORMAL; img.classList.remove('copa') }
+    img.src = MASCOTE_COPA
+    img.classList.add('copa')
   })
 }
 
