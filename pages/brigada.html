@@ -2162,12 +2162,11 @@ async function carregarDados() {
 }
 
 // ── QR de instalação (compartilhar app sem mandar link) ───────
-const SITE_BASE_URL = 'https://siguc-ac.vercel.app'   // fallback p/ APK (origin não é http)
+const INSTALL_URL = 'https://siguc-ac.vercel.app/pages/instalar-brigadas.html'
 
 function abrirQRInstalacao() {
-  const base = location.protocol.startsWith('http') ? location.origin : SITE_BASE_URL
-  const url  = `${base}/pages/instalar-brigadas.html`
-  const qr   = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(url)}&size=320x320&format=png&margin=12`
+  const url = INSTALL_URL
+  const qr  = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(url)}&size=320x320&format=png&margin=12`
   document.getElementById('qr-overlay-img').src = qr
   document.getElementById('qr-overlay-link').textContent = url
   document.getElementById('qr-overlay').hidden = false
