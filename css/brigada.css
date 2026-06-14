@@ -512,11 +512,15 @@
 .screen.ativo { display: block; }
 @keyframes fadeSlide { from { opacity: 0; transform: translateY(12px) } to { opacity: 1; transform: none } }
 
-/* ── Field Mode ──────────────────────────────────────────── */
-/* Alto contraste só no conteúdo (telas). NÃO aplicar filter no body:
-   no iOS, filter cria containing-block e quebra o position:fixed da
-   barra inferior (ela passa a rolar com a página). */
-.field-mode .tela { filter: contrast(1.12); }
+/* ── Field Mode (alto contraste para uso sob sol) ────────── */
+/* IMPORTANTE: NÃO usar filter/transform/backdrop-filter aqui (nem em
+   ancestrais). No iOS Safari/WebKit, aplicar filter num elemento grande
+   que rola faz a barra inferior (position:fixed) "rolar" junto, por bug
+   de composição — mesmo a barra não sendo descendente da .tela. Por isso
+   o ganho de contraste é feito só com cor e peso de texto + tamanhos. */
+.field-mode .tela { color: #06120D; font-weight: 500; }
+.field-mode .tela .form-label,
+.field-mode .tela small { color: #1A2B20; }
 .field-mode .natureza-label strong { font-size: 22px; }
 .field-mode .btn-pwa { font-size: 18px; padding: 20px; }
 .field-mode .field-input { font-size: 17px; padding: 16px; }
