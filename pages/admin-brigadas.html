@@ -425,6 +425,24 @@
   </div>
 </div>
 
+<!-- ── Modal: Gerenciar Equipes ───────────────────────────── -->
+<div class="modal-overlay" id="modal-equipes">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-header">
+      <div class="modal-title" id="eq-titulo">Equipes</div>
+      <button class="modal-close" onclick="fecharModal('equipes')">×</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:12px;color:#6B7280;margin:0 0 12px">
+        Renomeie as equipes e defina o líder de cada uma. Brigadistas são
+        vinculados à equipe na edição de cada brigadista.
+      </p>
+      <div id="eq-lista"></div>
+      <button class="btn btn-secondary" style="width:100%;margin-top:10px" onclick="adicionarEquipe()">+ Adicionar equipe</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // ── URL base do PWA (atualizar quando o app for publicado) ───
 const PWA_BASE_URL = 'https://brigada.siguc.ac.gov.br'
@@ -571,7 +589,7 @@ async function carregarDados() {
   const [rb, rbr, req] = await Promise.all([
     db.from('brigadas_resumo').select('*').order('uc_nome'),
     db.from('brigadistas').select('id,nome_completo,cpf,brigada_id,funcao,status,usuario_id,tipo_vinculo,data_inicio,data_fim,equipe_id').order('nome_completo'),
-    db.from('equipes_brigada').select('id,brigada_id,nome,ativa').eq('ativa', true).order('nome'),
+    db.from('equipes_brigada').select('id,brigada_id,nome,ativa,lider_id').eq('ativa', true).order('nome'),
   ])
   _brigadas    = rb.data  || []
   _brigadistas = rbr.data || []
@@ -741,6 +759,7 @@ function renderBrigadas() {
       <td><span class="badge ${b.ativa ? 'badge-verde' : 'badge-cinza'}">${b.ativa ? 'Ativa' : 'Inativa'}</span></td>
       <td style="display:flex;gap:6px">
         <button class="btn btn-xs btn-ghost" onclick='abrirModalBrigada(${JSON.stringify(b)})'>Editar</button>
+        <button class="btn btn-xs btn-ghost" onclick='abrirModalEquipes("${b.id}","${esc(b.nome)}")' title="Gerenciar equipes">Equipes</button>
         <button class="btn btn-xs btn-ghost" onclick='abrirQR("${b.id}","${esc(b.nome)}")' title="QR de instalação">QR</button>
       </td>
     </tr>`
@@ -1096,6 +1115,72 @@ function abrirQR(brigId, brigNome) {
   document.getElementById('qr-img').src = qrUrl
   document.getElementById('qr-link').textContent = url
   document.getElementById('modal-qr').classList.add('aberto')
+}
+
+// ── Gestão de Equipes ─────────────────────────────────────────
+let _eqBrigadaId = null
+
+function abrirModalEquipes(brigadaId, brigadaNome) {
+  _eqBrigadaId = brigadaId
+  document.getElementById('eq-titulo').textContent = 'Equipes — ' + brigadaNome
+  renderEquipesModal()
+  document.getElementById('modal-equipes').classList.add('aberto')
+}
+
+function renderEquipesModal() {
+  const cont = document.getElementById('eq-lista')
+  const eqs = _equipes.filter(e => e.brigada_id === _eqBrigadaId)
+  const membros = _brigadistas.filter(b => b.brigada_id === _eqBrigadaId && b.status === 'ativo')
+  if (!eqs.length) {
+    cont.innerHTML = '<p style="font-size:13px;color:#9CA3AF;padding:8px 0">Nenhuma equipe cadastrada.</p>'
+    return
+  }
+  cont.innerHTML = eqs.map(e => {
+    const opts = '<option value="">— sem líder —</option>' +
+      membros.map(m => `<option value="${m.id}"${m.id === e.lider_id ? ' selected' : ''}>${esc(m.nome_completo)}</option>`).join('')
+    return `<div class="eq-row" data-id="${e.id}" style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+      <input class="form-control eq-nome" value="${esc(e.nome)}" style="width:96px" maxlength="40" placeholder="Nome">
+      <select class="form-control eq-lider" style="flex:1">${opts}</select>
+      <button class="btn btn-xs btn-primary" onclick="salvarEquipe('${e.id}')">Salvar</button>
+      <button class="btn btn-xs btn-ghost" onclick="excluirEquipe('${e.id}')" title="Excluir">🗑</button>
+    </div>`
+  }).join('')
+}
+
+async function salvarEquipe(id) {
+  const row = document.querySelector(`.eq-row[data-id="${id}"]`)
+  if (!row) return
+  const nome  = row.querySelector('.eq-nome').value.trim()
+  const lider = row.querySelector('.eq-lider').value || null
+  if (!nome) { toast('Informe o nome da equipe', 'error'); return }
+  const { error } = await db.from('equipes_brigada').update({ nome, lider_id: lider }).eq('id', id)
+  if (error) { toast('Erro ao salvar: ' + error.message, 'error'); return }
+  toast('Equipe atualizada', 'success')
+  await recarregarEquipes()
+}
+
+async function adicionarEquipe() {
+  const nome = prompt('Nome da nova equipe:', 'D')
+  if (!nome || !nome.trim()) return
+  const { error } = await db.from('equipes_brigada').insert({ brigada_id: _eqBrigadaId, nome: nome.trim() })
+  if (error) { toast('Erro ao criar: ' + error.message, 'error'); return }
+  toast('Equipe criada', 'success')
+  await recarregarEquipes()
+}
+
+async function excluirEquipe(id) {
+  if (!confirm('Excluir esta equipe? Brigadistas e registros vinculados ficarão sem equipe.')) return
+  const { error } = await db.from('equipes_brigada').delete().eq('id', id)
+  if (error) { toast('Erro ao excluir: ' + error.message, 'error'); return }
+  toast('Equipe excluída', 'success')
+  await recarregarEquipes()
+}
+
+async function recarregarEquipes() {
+  const { data } = await db.from('equipes_brigada')
+    .select('id,brigada_id,nome,ativa,lider_id').eq('ativa', true).order('nome')
+  _equipes = data || []
+  renderEquipesModal()
 }
 
 // ── Helpers ───────────────────────────────────────────────────
