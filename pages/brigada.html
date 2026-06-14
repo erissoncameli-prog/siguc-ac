@@ -142,10 +142,11 @@
     <div>
       <p class="home-saudacao" id="home-saudacao">Bom dia</p>
       <h1 class="home-nome" id="home-nome">Brigadista</h1>
-      <p id="home-brigada" style="margin:4px 0 0;font-size:12px;font-weight:600;color:var(--verde-c,#52B788);display:flex;align-items:center;gap:4px" hidden>🚒 <span id="home-brigada-nome"></span></p>
-      <div id="home-equipe-wrap" class="home-equipe-wrap" hidden>
-        <span>👥 Equipe</span>
-        <select id="home-equipe" aria-label="Equipe atual"></select>
+      <div class="home-meta">
+        <span id="home-brigada" class="home-chip" hidden>🚒 <span id="home-brigada-nome"></span></span>
+        <span id="home-equipe-wrap" class="home-chip home-chip-equipe" hidden>
+          👥 <select id="home-equipe" class="home-equipe-select" aria-label="Equipe atual"></select>
+        </span>
       </div>
     </div>
     <button class="btn-icon" id="btn-sync-home" aria-label="Sincronizar" title="Sincronizar agora">
