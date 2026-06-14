@@ -1,5 +1,5 @@
 // ── SIGUC Brigadas — Service Worker ───────────────────────────
-const CACHE = 'siguc-brigadas-v36'
+const CACHE = 'siguc-brigadas-v37'
 
 const APP_SHELL = [
   '/pages/brigada.html',
@@ -28,6 +28,11 @@ self.addEventListener('install', ev => {
       Promise.allSettled(APP_SHELL.map(url => c.add(url)))
     ).then(() => self.skipWaiting())
   )
+})
+
+// ── Mensagem do app: ativar nova versão imediatamente ───────
+self.addEventListener('message', ev => {
+  if (ev.data?.type === 'SKIP_WAITING') self.skipWaiting()
 })
 
 // ── Activate: remove caches antigos ─────────────────────────

@@ -153,7 +153,7 @@
       <div class="brig-foto-wrap">
         <div class="brig-foto-avatar" id="mbr-foto-preview">🧑</div>
         <div style="display:flex;flex-direction:column;align-items:center;gap:4px">
-          <button type="button" class="brig-foto-btn" onclick="document.getElementById('mbr-foto-input').click()">📷 Selecionar foto</button>
+          <button type="button" class="brig-foto-btn" data-icon="camera" onclick="document.getElementById('mbr-foto-input').click()">Selecionar foto</button>
           <span class="brig-foto-remover" id="mbr-foto-remover" onclick="removerFotoBrigadista()">✕ Remover foto</span>
         </div>
         <input type="file" id="mbr-foto-input" accept="image/*" style="display:none" onchange="previewFotoBrigadista(this)">
@@ -531,8 +531,8 @@ const LABEL_REGIONAL = {
             <option value="">Todos</option>
             <option value="encerrado">Encerrados</option>
           </select>
-          <button class="btn btn-secondary" onclick="gerarLoginsPendentes()" title="Cria acesso ao app para todos os brigadistas ativos sem login">
-            🔑 Gerar logins pendentes
+          <button class="btn btn-secondary" data-icon="key" onclick="gerarLoginsPendentes()" title="Cria acesso ao app para todos os brigadistas ativos sem login">
+            Gerar logins pendentes
           </button>
           <button class="btn btn-primary" onclick="abrirModalBrigadista()">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -1145,7 +1145,7 @@ function renderEquipesModal() {
       <input class="form-control eq-nome" value="${esc(e.nome)}" style="width:96px" maxlength="40" placeholder="Nome">
       <select class="form-control eq-lider" style="flex:1">${opts}</select>
       <button class="btn btn-xs btn-primary" onclick="salvarEquipe('${e.id}')">Salvar</button>
-      <button class="btn btn-xs btn-ghost" onclick="excluirEquipe('${e.id}')" title="Excluir">🗑</button>
+      <button class="btn btn-xs btn-ghost" onclick="excluirEquipe('${e.id}')" title="Excluir">${bico('trash')}</button>
     </div>`
   }).join('')
 }

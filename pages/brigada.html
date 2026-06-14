@@ -145,9 +145,9 @@
         <p class="home-saudacao" id="home-saudacao">Bom dia</p>
         <h1 class="home-nome" id="home-nome">Brigadista</h1>
         <div class="home-meta">
-          <span id="home-brigada" class="home-chip" hidden>🚒 <span id="home-brigada-nome"></span></span>
-          <span id="home-equipe-wrap" class="home-chip home-chip-equipe" hidden>
-            👥 <select id="home-equipe" class="home-equipe-select" aria-label="Equipe atual"></select>
+          <span id="home-brigada" class="home-chip" data-icon="truck" hidden><span id="home-brigada-nome"></span></span>
+          <span id="home-equipe-wrap" class="home-chip home-chip-equipe" data-icon="users" hidden>
+            <select id="home-equipe" class="home-equipe-select" aria-label="Equipe atual"></select>
           </span>
         </div>
       </div>
@@ -295,8 +295,8 @@
       <div class="section-header">
         <label class="form-label">Fotos <span id="foto-count-label">(0/5)</span></label>
         <div class="foto-acoes">
-          <button class="btn-sm btn-prim" id="btn-abrir-camera" type="button">📷 Câmera</button>
-          <button class="btn-sm btn-galeria" id="btn-abrir-galeria" type="button">🖼 Galeria</button>
+          <button class="btn-sm btn-prim" id="btn-abrir-camera" type="button" data-icon="camera">Câmera</button>
+          <button class="btn-sm btn-galeria" id="btn-abrir-galeria" type="button" data-icon="image">Galeria</button>
         </div>
       </div>
       <input type="file" id="input-foto-camera" accept="image/*" capture="environment" hidden>
@@ -422,7 +422,7 @@
     <div class="form-section">
       <div class="section-header">
         <label class="form-label">Fotos do animal <span id="fauna-foto-count">(0/5)</span></label>
-        <button class="btn-sm btn-prim" id="btn-fauna-camera" type="button">📷 Câmera</button>
+        <button class="btn-sm btn-prim" id="btn-fauna-camera" type="button" data-icon="camera">Câmera</button>
       </div>
       <div id="fauna-camera-wrap" class="camera-overlay" hidden>
         <video id="fauna-camera-video" autoplay playsinline muted class="camera-preview"></video>
@@ -467,8 +467,8 @@
 
   <div id="fila-lista" class="sync-queue"></div>
 
-  <button class="btn-salvar" id="btn-exportar-json" style="background:var(--combate)">
-    📤 Exportar JSON (WhatsApp/Drive)
+  <button class="btn-salvar" id="btn-exportar-json" style="background:var(--combate)" data-icon="share">
+    Exportar JSON (WhatsApp/Drive)
   </button>
 </div>
 
@@ -523,7 +523,7 @@
 
     <!-- ── Desempenho da brigada (equipe / brigada / individual) ── -->
     <div class="form-section" style="border-top:2px solid var(--linha,#E5E7EB);padding-top:14px;margin-top:6px">
-      <label class="form-label">🏆 Desempenho da brigada</label>
+      <label class="form-label" data-icon="award">Desempenho da brigada</label>
       <div class="dados-grid">
         <div class="dados-kpi"><strong id="bri-n">—</strong><span>Registros</span></div>
         <div class="dados-kpi"><strong id="bri-area">—</strong><span>Área (ha)</span></div>
@@ -563,7 +563,7 @@
     <div class="config-card" id="config-brigadista-card">
       <button class="config-avatar" id="config-avatar" aria-label="Alterar foto de perfil">
         <span id="avatar-letra">B</span>
-        <span class="avatar-badge" aria-hidden="true">📷</span>
+        <span class="avatar-badge" aria-hidden="true" data-icon="camera"></span>
       </button>
       <div>
         <strong id="config-nome-brig">—</strong>
@@ -589,13 +589,13 @@
       </label>
     </div>
 
-    <button class="btn-config-item" id="btn-trocar-brigada" hidden>🚒 Trocar de brigada</button>
-    <button class="btn-config-item" id="btn-alterar-pin">🔑 Alterar PIN de campo</button>
-    <button class="btn-config-item" id="btn-buscar-especies">🌿 Atualizar catálogo de espécies</button>
-    <button class="btn-config-item" id="btn-qr-instalar">📲 Instalar em outro aparelho (QR)</button>
-    <button class="btn-config-item" id="btn-verificar-update">⬆️ Verificar atualização do app</button>
-    <button class="btn-config-item btn-danger-soft" id="btn-zerar-fila">🗑 Zerar fila de registros</button>
-    <button class="btn-config-item btn-danger" id="btn-sair">↩ Sair / Trocar conta</button>
+    <button class="btn-config-item" id="btn-trocar-brigada" data-icon="truck" hidden>Trocar de brigada</button>
+    <button class="btn-config-item" id="btn-alterar-pin" data-icon="key">Alterar PIN de campo</button>
+    <button class="btn-config-item" id="btn-buscar-especies" data-icon="leaf">Atualizar catálogo de espécies</button>
+    <button class="btn-config-item" id="btn-qr-instalar" data-icon="qr">Instalar em outro aparelho (QR)</button>
+    <button class="btn-config-item" id="btn-verificar-update" data-icon="download">Verificar atualização do app</button>
+    <button class="btn-config-item btn-danger-soft" id="btn-zerar-fila" data-icon="trash">Zerar fila de registros</button>
+    <button class="btn-config-item btn-danger" id="btn-sair" data-icon="logout">Sair / Trocar conta</button>
 
     <div class="app-creditos">
       <p id="app-versao"></p>
@@ -608,12 +608,21 @@
 <!-- ══ OVERLAY: QR de instalação ══════════════════════════════ -->
 <div id="qr-overlay" class="qr-overlay" hidden>
   <div class="qr-card">
-    <h3>📲 Instalar em outro aparelho</h3>
+    <h3 data-icon="qr">Instalar em outro aparelho</h3>
     <p>Peça para a pessoa <strong>apontar a câmera</strong> do celular para o código abaixo. Ela cai direto nas instruções de instalação (Android e iPhone).</p>
     <img id="qr-overlay-img" alt="QR Code de instalação">
     <p class="qr-overlay-link" id="qr-overlay-link"></p>
     <p class="qr-overlay-nota">Precisa de internet para gerar o código.</p>
     <button class="btn-config-item" id="qr-overlay-fechar">Fechar</button>
+  </div>
+</div>
+
+<!-- ══ BANNER: atualização disponível ════════════════════════ -->
+<div id="update-banner" class="update-banner" hidden>
+  <span data-icon="download">Nova versão disponível</span>
+  <div class="update-banner-acoes">
+    <button id="btn-update-agora" class="ub-btn ub-btn-prim" type="button">Atualizar</button>
+    <button id="btn-update-depois" class="ub-btn" type="button">Depois</button>
   </div>
 </div>
 
@@ -788,6 +797,7 @@ async function boot() {
   bOfflinePersistir()
   inserirFaixasInst()
   carregarLogosInstitucionais()
+  checarAtualizacaoAuto()   // aviso de nova versão (banner + pontinho)
 
   // 1. Sessão ativa — só verifica se Supabase está disponível (online)
   if (db) {
@@ -1559,8 +1569,8 @@ function abrirFormulario(natureza) {
   // Header colorido conforme natureza
   const header = document.getElementById('form-header')
   header.className = `form-header nat-${natureza}`
-  const labels = { prevencao: '🛡 Prevenção', combate: '🔥 Combate', monitoramento: '🔭 Monitoramento' }
-  document.getElementById('form-natureza-label').textContent = labels[natureza] || natureza
+  const labels = { prevencao: `${bico('shield')} Prevenção`, combate: `${bico('flame')} Combate`, monitoramento: `${bico('binoculo')} Monitoramento` }
+  document.getElementById('form-natureza-label').innerHTML = labels[natureza] || esc(natureza)
 
   // Popula atividades filtradas pela natureza selecionada
   popularSelectAtividade(natureza)
@@ -1852,24 +1862,24 @@ let _filaExpandida = false
 const FILA_LIMITE = 6
 
 function bRenderItemFila(r) {
-  const icons = { prevencao:'🛡', combate:'🔥', monitoramento:'🔭' }
+  const icons = { prevencao: bico('shield'), combate: bico('flame'), monitoramento: bico('binoculo') }
   const statusLabel = { pendente:'Pendente', enviando:'Enviando…', confirmado:'Enviado' }
   const fotos    = r.fotos_blobs?.length || 0
   const tamanho  = (r.fotos_blobs || []).reduce((s, f) => s + bTamanhoBase64(f), 0)
   const metaFotos = fotos
-    ? `<span class="sync-meta-item">📷 ${fotos} ${fotos === 1 ? 'foto' : 'fotos'}</span>
+    ? `<span class="sync-meta-item">${bico('camera')} ${fotos} ${fotos === 1 ? 'foto' : 'fotos'}</span>
        <span class="sync-meta-item">${bFormatTamanho(tamanho)}</span>`
     : '<span class="sync-meta-item">Sem fotos</span>'
   const linhaEnvio = r.sincronizado_em
-    ? `<span>📤 Envio: ${bFormatDataHora(r.sincronizado_em)}</span>`
+    ? `<span>${bico('upload')} Envio: ${bFormatDataHora(r.sincronizado_em)}</span>`
     : ''
   return `
     <div class="sync-item sync-${r.status}">
-      <span class="sync-icon">${icons[r.natureza] || '📋'}</span>
+      <span class="sync-icon">${icons[r.natureza] || bico('clipboard')}</span>
       <div class="sync-info">
         <strong>${esc(r.atividade || '—')}</strong>
         <span class="sync-meta">${metaFotos}</span>
-        <span>🕐 Ocorrência: ${bFormatDataHora(r.criado_em)}</span>
+        <span>${bico('clock')} Ocorrência: ${bFormatDataHora(r.criado_em)}</span>
         ${linhaEnvio}
         ${r.ultimo_erro ? `<span class="sync-erro-msg">⚠ ${esc(r.ultimo_erro)}</span>` : ''}
       </div>
@@ -2261,6 +2271,62 @@ async function verificarUpdateWeb() {
   setTimeout(() => { if (!achou) toast('App já está atualizado', 'ok') }, 2500)
 }
 
+// ── Aviso automático de atualização (banner + pontinho) ───────
+let _swWaiting = null
+let _apkUpdateUrl = null
+
+function mostrarBannerUpdate() {
+  const b = document.getElementById('update-banner')
+  if (b) b.hidden = false
+  document.getElementById('nav-config')?.classList.add('tem-update')
+}
+
+function aplicarUpdate() {
+  if (window.Capacitor) {
+    if (_apkUpdateUrl) window.open(_apkUpdateUrl, '_blank')
+    return
+  }
+  if (_swWaiting) { try { _swWaiting.postMessage({ type: 'SKIP_WAITING' }) } catch (e) {} }
+  setTimeout(() => location.reload(), 300)
+}
+
+// Checagem silenciosa ao abrir o app
+async function checarAtualizacaoAuto() {
+  if (window.Capacitor) {
+    const ultima = await bOfflineGetConfig('update_check_ts')
+    if (ultima && Date.now() - ultima < 86400000) return   // 1×/dia
+    try {
+      const resp  = await fetch(`${GH_RELEASES_API}?per_page=5`, { headers: { Accept: 'application/vnd.github+json' } })
+      const lista = await resp.json()
+      const rel   = (lista || []).find(r => !r.draft && !r.prerelease && /^brigadas-v\d/.test(r.tag_name || ''))
+      await bOfflineSetConfig('update_check_ts', Date.now())
+      const atual = versaoAtualApp()
+      if (rel && atual && cmpVersao(rel.tag_name.replace('brigadas-v', ''), atual) > 0) {
+        _apkUpdateUrl = rel.assets?.find(a => a.name?.endsWith('.apk'))?.browser_download_url || rel.html_url
+        mostrarBannerUpdate()
+      }
+    } catch (e) { /* silencioso */ }
+    return
+  }
+  if (!('serviceWorker' in navigator)) return
+  try {
+    const reg = await navigator.serviceWorker.getRegistration()
+    if (!reg) return
+    if (reg.waiting) { _swWaiting = reg.waiting; mostrarBannerUpdate() }
+    reg.addEventListener('updatefound', () => {
+      const nw = reg.installing
+      if (!nw) return
+      nw.addEventListener('statechange', () => {
+        if (nw.state === 'installed' && navigator.serviceWorker.controller) {
+          _swWaiting = reg.waiting || nw
+          mostrarBannerUpdate()
+        }
+      })
+    })
+    reg.update().catch(() => {})
+  } catch (e) { /* silencioso */ }
+}
+
 // ── Desempenho da brigada: equipe / brigada / brigadista ──────
 let _desempData = null
 let _desempMetrica = 'n'
@@ -2539,6 +2605,12 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-back-fila').addEventListener('click', () => mostrarTela('tela-home'))
   document.getElementById('btn-back-config').addEventListener('click', () => mostrarTela('tela-home'))
   document.getElementById('btn-back-dados').addEventListener('click', () => mostrarTela('tela-home'))
+
+  // Banner de atualização
+  document.getElementById('btn-update-agora').addEventListener('click', aplicarUpdate)
+  document.getElementById('btn-update-depois').addEventListener('click', () => {
+    document.getElementById('update-banner').hidden = true
+  })
 
   // Foto de perfil
   document.getElementById('config-avatar').addEventListener('click', alterarFotoBrigadista)
