@@ -105,6 +105,12 @@ E) Dashboard Executivo por nível (UC / Diretoria / Secretaria)
 - Funções SQL com SECURITY DEFINER quando acessam auth.*
 - Commits em português, pequenos e descritivos
 - NUNCA expor SERVICE_ROLE_KEY no frontend
+- ÍCONES: nunca usar emoji em UI (botões, chips, navegação, marcadores
+  de lista). Padrão único = SVG de traço 24×24, fill none, stroke
+  currentColor, stroke-width 2, cantos arredondados (estilo Feather/
+  Lucide), registrado em js/config.js (BICON_PATHS). Em HTML estático
+  use data-icon="nome" (bIconsAplicar injeta); em JS use bico('nome').
+  Ícone novo = adicionar um path no MESMO estilo em BICON_PATHS.
 - APK Android (workflow brigadas-apk.yml): NÃO gerar novo APK a cada
   mudança. Só gerar quando o usuário pedir ou quando já houver acúmulo
   suficiente para valer a pena. Mudanças web/PWA podem ir à produção

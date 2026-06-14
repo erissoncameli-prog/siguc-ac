@@ -432,7 +432,7 @@ function renderEstado() {
 
     <!-- Ranking de equipes -->
     <div class="card" style="margin-bottom:14px">
-      <div class="card-header"><div class="card-title">🏆 Ranking de Equipes</div></div>
+      <div class="card-header"><div class="card-title">${bico('award')} Ranking de Equipes</div></div>
       <div class="card-body" style="padding:0 0 8px">
         ${tabelaEquipes()}
       </div>
@@ -908,7 +908,7 @@ function renderTabelaEquipes() {
       <th${on('horas')}>Horas</th>
     </tr></thead>
     <tbody>${rows.map((r, i) => `<tr>
-      <td>${i === 0 ? '🏆 ' : ''}<strong>${esc(r.nome)}</strong></td>
+      <td>${i === 0 ? bico('award') + ' ' : ''}<strong>${esc(r.nome)}</strong></td>
       <td style="font-size:.82rem;color:var(--cinza-500)">${esc(r.brigada)}</td>
       <td${on('n')}>${r.n}</td>
       <td${on('area')}>${r.area > 0 ? formatNum(r.area, 1) : '—'}</td>

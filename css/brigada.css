@@ -978,6 +978,32 @@ body { margin: 0; }
   background: rgba(82,183,136,.16); color: #0C7A4D;
   white-space: nowrap;
 }
+
+/* Banner de atualização disponível */
+.update-banner {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 2000;
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: calc(8px + env(safe-area-inset-top)) 14px 9px;
+  background: var(--prim, #12A66A); color: #fff;
+  font-size: 13px; font-weight: 700;
+  box-shadow: 0 2px 12px rgba(0,0,0,.22);
+}
+.update-banner[hidden] { display: none; }
+.update-banner > span { display: inline-flex; align-items: center; gap: 6px; }
+.update-banner-acoes { display: flex; gap: 8px; flex: none; }
+.ub-btn {
+  background: rgba(255,255,255,.22); color: #fff; border: 0;
+  border-radius: 9px; padding: 6px 12px; font: inherit; font-weight: 700; cursor: pointer;
+}
+.ub-btn-prim { background: #fff; color: var(--prim, #12A66A); }
+
+/* Pontinho de "atualização disponível" no ícone Config */
+.pill-btn.tem-update { position: relative; }
+.pill-btn.tem-update::after {
+  content: ''; position: absolute; top: 4px; right: calc(50% - 16px);
+  width: 9px; height: 9px; border-radius: 50%;
+  background: #EF4444; border: 2px solid #fff;
+}
 .home-chip-equipe {
   background: rgba(201,168,76,.18); color: #7A5E12;
   padding-right: 8px;
