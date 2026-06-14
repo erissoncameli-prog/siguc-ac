@@ -628,8 +628,8 @@ body { margin: 0; }
 }
 .home-saudacao { font-size: 13px; color: #6B7280; margin: 0 0 2px; }
 .home-nome {
-  font-size: 28px; font-weight: 700; color: var(--ink-d);
-  margin: 0; font-family: 'Fraunces', Georgia, serif; letter-spacing: -.02em;
+  font-size: 27px; font-weight: 700; color: var(--ink-d);
+  margin: 0; font-family: Arial, Helvetica, sans-serif; letter-spacing: -.01em;
 }
 .home-instrucao {
   font-size: 12px; font-weight: 600; color: #6B7280;
@@ -944,17 +944,31 @@ body { margin: 0; }
 .sync-info { flex: 1; font-size: 13px; }
 .sync-info strong { display: block; font-weight: 600; margin-bottom: 2px; }
 .sync-info span { color: #6B7280; font-size: 12px; }
-/* Seletor de equipe na tela inicial (ao lado do nome) */
-.home-equipe-wrap {
-  display: flex; align-items: center; gap: 6px;
-  margin: 6px 0 0; font-size: 12px; font-weight: 600;
-  color: var(--verde-c, #52B788);
+/* Brigada + Equipe como "chips" na tela inicial (ao lado do nome) */
+.home-meta {
+  display: flex; flex-wrap: wrap; align-items: center;
+  gap: 8px; margin-top: 8px;
 }
-.home-equipe-wrap select {
-  font: inherit; color: #16241B; background: #fff;
-  border: 1px solid #D7E3D9; border-radius: 8px;
-  padding: 3px 8px;
+.home-chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 5px 11px; border-radius: 999px;
+  font-size: 12.5px; font-weight: 700; line-height: 1;
+  background: rgba(82,183,136,.16); color: #0C7A4D;
+  white-space: nowrap;
 }
+.home-chip-equipe {
+  background: rgba(201,168,76,.18); color: #7A5E12;
+  padding-right: 8px;
+}
+.home-equipe-select {
+  appearance: none; -webkit-appearance: none;
+  border: 0; background: transparent;
+  font: inherit; color: inherit; cursor: pointer;
+  padding: 0 16px 0 0;
+  background-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2024%2024'%20fill='none'%20stroke='%237A5E12'%20stroke-width='3'%20stroke-linecap='round'%20stroke-linejoin='round'%3E%3Cpolyline%20points='6%209%2012%2015%2018%209'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right center; background-size: 11px;
+}
+.home-equipe-select:focus { outline: none; }
 
 /* Overlay do QR de instalação */
 .qr-overlay {
