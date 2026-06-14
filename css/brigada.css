@@ -445,7 +445,10 @@
 @keyframes fadeSlide { from { opacity: 0; transform: translateY(12px) } to { opacity: 1; transform: none } }
 
 /* ── Field Mode ──────────────────────────────────────────── */
-.field-mode { filter: contrast(1.12); }
+/* Alto contraste só no conteúdo (telas). NÃO aplicar filter no body:
+   no iOS, filter cria containing-block e quebra o position:fixed da
+   barra inferior (ela passa a rolar com a página). */
+.field-mode .tela { filter: contrast(1.12); }
 .field-mode .natureza-label strong { font-size: 22px; }
 .field-mode .btn-pwa { font-size: 18px; padding: 20px; }
 .field-mode .field-input { font-size: 17px; padding: 16px; }
@@ -964,7 +967,6 @@ body { margin: 0; }
     inset 0 1px 4px rgba(255, 255, 255, .55),  /* brilho de vidro no topo */
     inset 0 -3px 7px rgba(10, 90, 60, .25),    /* sombra inferior sutil */
     0 4px 14px rgba(10, 26, 15, .20);          /* profundidade */
-  -webkit-backdrop-filter: blur(1px); backdrop-filter: blur(1px);
   pointer-events: none;
 }
 .home-meta {

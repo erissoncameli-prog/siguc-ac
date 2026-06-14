@@ -422,17 +422,13 @@
     <div class="form-section">
       <div class="section-header">
         <label class="form-label">Fotos do animal <span id="fauna-foto-count">(0/5)</span></label>
-        <button class="btn-sm btn-prim" id="btn-fauna-camera" type="button" data-icon="camera">Câmera</button>
-      </div>
-      <div id="fauna-camera-wrap" class="camera-overlay" hidden>
-        <video id="fauna-camera-video" autoplay playsinline muted class="camera-preview"></video>
-        <button class="camera-fechar" id="btn-fauna-fechar-camera" aria-label="Fechar câmera">✕</button>
-        <div class="camera-bar">
-          <span class="camera-contador" id="fauna-camera-contador">0/5</span>
-          <button class="btn-capture" id="btn-fauna-capturar" aria-label="Capturar">⬤</button>
-          <span></span>
+        <div class="foto-acoes">
+          <button class="btn-sm btn-prim" id="btn-fauna-camera" type="button" data-icon="camera">Câmera</button>
+          <button class="btn-sm btn-galeria" id="btn-fauna-galeria" type="button" data-icon="image">Galeria</button>
         </div>
       </div>
+      <input type="file" id="input-fauna-camera" accept="image/*" capture="environment" hidden>
+      <input type="file" id="input-fauna-galeria" accept="image/*" multiple hidden>
       <div class="foto-grid" id="fauna-foto-grid"></div>
     </div>
 
@@ -1728,45 +1724,40 @@ function preencherFauna(f) {
   renderFaunaFotos()
 }
 
-// ── Câmera de fauna ──────────────────────────────────────────
+// ── Câmera de fauna (câmera nativa do SO via input + galeria) ──
 async function abrirFaunaCamera() {
   if (bFaunaFotoGetLista().length >= 5) { toast('Máximo de 5 fotos por animal', 'warn'); return }
-
-  // App nativo: câmera do próprio Android
   if (bCameraEhNativa()) {
-    const blob = await bCameraNativaCapturar(App.brigadista, bGpsAtual())
-    if (blob) {
-      if (!bFaunaFotoAdicionar(blob)) { toast('Máximo de 5 fotos por animal', 'warn'); return }
-      renderFaunaFotos()
-    }
+    const blob = await bCameraNativaCapturar(App.brigadista, bGpsAtual(), 'CAMERA')
+    if (blob && bFaunaFotoAdicionar(blob)) renderFaunaFotos()
     return
   }
+  document.getElementById('input-fauna-camera').click()
+}
 
-  document.getElementById('fauna-camera-contador').textContent = `${bFaunaFotoGetLista().length}/5`
-  document.getElementById('fauna-camera-wrap').hidden = false
-  const ok = await bCameraAbrir(document.getElementById('fauna-camera-video'))
-  if (!ok) {
-    document.getElementById('fauna-camera-wrap').hidden = true
-    toast('Câmera não disponível', 'warn')
+async function abrirFaunaGaleria() {
+  if (bFaunaFotoGetLista().length >= 5) { toast('Máximo de 5 fotos por animal', 'warn'); return }
+  if (bCameraEhNativa()) {
+    const blob = await bCameraNativaCapturar(App.brigadista, bGpsAtual(), 'PHOTOS')
+    if (blob && bFaunaFotoAdicionar(blob)) renderFaunaFotos()
+    return
   }
+  document.getElementById('input-fauna-galeria').click()
 }
 
-function fecharFaunaCamera() {
-  bCameraFechar()
-  document.getElementById('fauna-camera-wrap').hidden = true
-}
-
-async function capturarFaunaFoto() {
-  const blob = await bCameraCapturarPuro(
-    document.getElementById('fauna-camera-video'),
-    App.brigadista,
-    bGpsAtual()
-  )
-  if (!blob) return
-  if (!bFaunaFotoAdicionar(blob)) { toast('Máximo de 5 fotos por animal', 'warn'); return }
-  renderFaunaFotos()
-  document.getElementById('fauna-camera-contador').textContent = `${bFaunaFotoGetLista().length}/5`
-  if (bFaunaFotoGetLista().length >= 5) fecharFaunaCamera()
+async function processarFotosFaunaArquivos(fileList) {
+  const files = Array.from(fileList || [])
+  if (!files.length) return
+  let adicionou = 0
+  for (const f of files) {
+    if (bFaunaFotoGetLista().length >= 5) { toast('Máximo de 5 fotos por animal', 'warn'); break }
+    if (!f.type.startsWith('image/')) continue
+    try {
+      const blob = await bCapturaProcessarArquivo(f, App.brigadista, bGpsAtual())
+      if (blob && bFaunaFotoAdicionar(blob)) adicionou++
+    } catch (e) { console.warn('[foto fauna]', e) }
+  }
+  if (adicionou) renderFaunaFotos()
 }
 
 function renderFaunaFotos() {
@@ -1796,8 +1787,6 @@ function confirmarFauna() {
   const condicao = document.getElementById('f-fauna-condicao').value
 
   if (!tipo || !condicao) { toast('Tipo e Condição são obrigatórios', 'warn'); return }
-
-  fecharFaunaCamera()
 
   const item = {
     classe:                  classeAtiva?.dataset.v || 'nao_sei',
@@ -2661,8 +2650,9 @@ document.addEventListener('DOMContentLoaded', () => {
   )
   document.getElementById('btn-fauna-confirmar').addEventListener('click', confirmarFauna)
   document.getElementById('btn-fauna-camera').addEventListener('click', abrirFaunaCamera)
-  document.getElementById('btn-fauna-fechar-camera').addEventListener('click', fecharFaunaCamera)
-  document.getElementById('btn-fauna-capturar').addEventListener('click', capturarFaunaFoto)
+  document.getElementById('btn-fauna-galeria').addEventListener('click', abrirFaunaGaleria)
+  document.getElementById('input-fauna-camera').addEventListener('change', e => { processarFotosFaunaArquivos(e.target.files); e.target.value = '' })
+  document.getElementById('input-fauna-galeria').addEventListener('change', e => { processarFotosFaunaArquivos(e.target.files); e.target.value = '' })
 
   // Fila
   document.getElementById('btn-sync-fila').addEventListener('click', async () => {
