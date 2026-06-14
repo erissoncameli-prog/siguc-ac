@@ -1,7 +1,11 @@
 # ── SIGUC Brigadas — build do APK Android (Capacitor) ─────────
 # Dispara:
-#   • manualmente (workflow_dispatch) → APK como artifact do run
+#   • manualmente (workflow_dispatch) → SEMPRE publica um Release com o
+#     .apk anexado (link direto, sem ZIP, sem login). Informe a versão
+#     no input; se deixar vazio, auto-incrementa o patch do último Release.
 #   • tag brigadas-v* (ex.: brigadas-v1.0.0) → APK anexado a um Release
+#
+# (o .apk também é salvo como artifact do run, para download interno)
 #
 # Assinatura: configure os secrets ANDROID_KEYSTORE_B64,
 # ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS e ANDROID_KEY_PASSWORD
@@ -14,7 +18,7 @@ on:
   workflow_dispatch:
     inputs:
       versao:
-        description: 'Versão a publicar como Release (ex.: 1.0.0). Vazio = só artifact.'
+        description: 'Versão do Release (ex.: 1.16.0). Vazio = auto-incrementa o patch do último Release.'
         required: false
         default: ''
   push:
@@ -48,19 +52,31 @@ jobs:
       - name: Definir versão
         env:
           VERSAO_INPUT: ${{ inputs.versao }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           REF="${GITHUB_REF_NAME}"
           if [[ "$REF" == brigadas-v* ]]; then
-            echo "APP_VERSION_NAME=${REF#brigadas-v}" >> "$GITHUB_ENV"
-            echo "PUBLICAR_RELEASE=true" >> "$GITHUB_ENV"
+            # disparo por tag
+            VER="${REF#brigadas-v}"
           elif [ -n "$VERSAO_INPUT" ]; then
-            echo "APP_VERSION_NAME=$VERSAO_INPUT" >> "$GITHUB_ENV"
-            echo "PUBLICAR_RELEASE=true" >> "$GITHUB_ENV"
+            # versão informada no disparo manual
+            VER="$VERSAO_INPUT"
           else
-            echo "APP_VERSION_NAME=0.0.${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
-            echo "PUBLICAR_RELEASE=false" >> "$GITHUB_ENV"
+            # disparo manual sem versão → auto-incrementa o patch do último Release
+            ULTIMA=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 100 \
+                       --json tagName,isDraft,isPrerelease \
+                       --jq '.[] | select(.isDraft==false and .isPrerelease==false) | .tagName' \
+                     | grep -E '^brigadas-v[0-9]+\.[0-9]+\.[0-9]+$' \
+                     | sed 's/^brigadas-v//' | sort -V | tail -1)
+            [ -z "$ULTIMA" ] && ULTIMA="0.0.0"
+            IFS=. read -r MA MI PA <<< "$ULTIMA"
+            VER="$MA.$MI.$((PA + 1))"
           fi
+          echo "APP_VERSION_NAME=$VER" >> "$GITHUB_ENV"
+          # disparo manual e tag sempre publicam Release (link direto do .apk)
+          echo "PUBLICAR_RELEASE=true" >> "$GITHUB_ENV"
           echo "APP_VERSION_CODE=${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
+          echo "Versão definida: $VER (build ${GITHUB_RUN_NUMBER})"
 
       - name: Montar www/ e sincronizar Android
         working-directory: app
