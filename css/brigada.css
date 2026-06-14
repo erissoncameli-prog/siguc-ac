@@ -948,13 +948,24 @@ body { margin: 0; }
 .home-id { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .home-id-texto { min-width: 0; }
 .home-avatar {
+  position: relative;
   width: 72px; height: 72px; border-radius: 50%; flex-shrink: 0;
   background-size: cover; background-position: center;
   background-color: var(--prim, #12A66A);
   display: flex; align-items: center; justify-content: center;
   color: #fff; font-weight: 700; font-size: 26px; line-height: 1;
-  border: 2px solid #fff; box-shadow: 0 3px 12px rgba(10,26,15,.20);
-  overflow: hidden;
+}
+/* Borda verde translúcida estilo "liquid glass" */
+.home-avatar::after {
+  content: ''; position: absolute; inset: 0; border-radius: 50%;
+  border: 3px solid rgba(82, 183, 136, .55);
+  box-shadow:
+    0 0 0 4px rgba(82, 183, 136, .18),         /* halo externo translúcido */
+    inset 0 1px 4px rgba(255, 255, 255, .55),  /* brilho de vidro no topo */
+    inset 0 -3px 7px rgba(10, 90, 60, .25),    /* sombra inferior sutil */
+    0 4px 14px rgba(10, 26, 15, .20);          /* profundidade */
+  -webkit-backdrop-filter: blur(1px); backdrop-filter: blur(1px);
+  pointer-events: none;
 }
 .home-meta {
   display: flex; flex-wrap: wrap; align-items: center;
