@@ -143,6 +143,10 @@
       <p class="home-saudacao" id="home-saudacao">Bom dia</p>
       <h1 class="home-nome" id="home-nome">Brigadista</h1>
       <p id="home-brigada" style="margin:4px 0 0;font-size:12px;font-weight:600;color:var(--verde-c,#52B788);display:flex;align-items:center;gap:4px" hidden>🚒 <span id="home-brigada-nome"></span></p>
+      <div id="home-equipe-wrap" class="home-equipe-wrap" hidden>
+        <span>👥 Equipe</span>
+        <select id="home-equipe" aria-label="Equipe atual"></select>
+      </div>
     </div>
     <button class="btn-icon" id="btn-sync-home" aria-label="Sincronizar" title="Sincronizar agora">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
@@ -254,11 +258,7 @@
       </select>
     </div>
 
-    <div class="form-section form-row">
-      <div class="form-group">
-        <label class="form-label">Equipe *</label>
-        <select id="f-equipe" class="form-input"></select>
-      </div>
+    <div class="form-section">
       <div class="form-group">
         <label class="form-label">Duração (h)</label>
         <input type="number" id="f-duracao" class="form-input" min="0" max="24" step="0.5" placeholder="0">
@@ -581,6 +581,7 @@
     <button class="btn-config-item" id="btn-trocar-brigada" hidden>🚒 Trocar de brigada</button>
     <button class="btn-config-item" id="btn-alterar-pin">🔑 Alterar PIN de campo</button>
     <button class="btn-config-item" id="btn-buscar-especies">🌿 Atualizar catálogo de espécies</button>
+    <button class="btn-config-item" id="btn-qr-instalar">📲 Instalar em outro aparelho (QR)</button>
     <button class="btn-config-item" id="btn-verificar-update">⬆️ Verificar atualização do app</button>
     <button class="btn-config-item btn-danger-soft" id="btn-zerar-fila">🗑 Zerar fila de registros</button>
     <button class="btn-config-item btn-danger" id="btn-sair">↩ Sair / Trocar conta</button>
@@ -590,6 +591,18 @@
       <p>Desenvolvido por <strong>Erisson Cameli Santiago</strong></p>
       <p id="app-copyright"></p>
     </div>
+  </div>
+</div>
+
+<!-- ══ OVERLAY: QR de instalação ══════════════════════════════ -->
+<div id="qr-overlay" class="qr-overlay" hidden>
+  <div class="qr-card">
+    <h3>📲 Instalar em outro aparelho</h3>
+    <p>Peça para a pessoa <strong>apontar a câmera</strong> do celular para o código abaixo. Ela cai direto nas instruções de instalação (Android e iPhone).</p>
+    <img id="qr-overlay-img" alt="QR Code de instalação">
+    <p class="qr-overlay-link" id="qr-overlay-link"></p>
+    <p class="qr-overlay-nota">Precisa de internet para gerar o código.</p>
+    <button class="btn-config-item" id="qr-overlay-fechar">Fechar</button>
   </div>
 </div>
 
@@ -1463,6 +1476,7 @@ async function entrarHome() {
   const brigadaNome = App.brigada?.nome || ''
   document.getElementById('home-brigada').hidden = !brigadaNome
   document.getElementById('home-brigada-nome').textContent = brigadaNome
+  popularSelectEquipe()
 
   mostrarTela('tela-home')
   mascoteVideoTocar()
@@ -1506,15 +1520,19 @@ async function atualizarBadgeFila() {
 // ════════════════════════════════════════════════════════════════
 // Formulário de campo
 // ════════════════════════════════════════════════════════════════
-// Popula o select de equipe com as equipes da brigada; pré-seleciona
-// a equipe do brigadista logado (pode ser trocada no registro).
+// Popula o seletor de equipe na tela inicial; pré-seleciona a equipe
+// do brigadista logado (pode ser trocada e vale para os registros).
 function popularSelectEquipe() {
-  const sel = document.getElementById('f-equipe')
+  const sel  = document.getElementById('home-equipe')
+  const wrap = document.getElementById('home-equipe-wrap')
+  if (!sel) return
   const equipes = App.equipes || []
   if (!equipes.length) {
-    sel.innerHTML = '<option value="">— sem equipe —</option>'
+    sel.innerHTML = ''
+    if (wrap) wrap.hidden = true
     return
   }
+  if (wrap) wrap.hidden = false
   const minha = App.brigadista?.equipe_id || ''
   sel.innerHTML = equipes
     .map(e => `<option value="${e.id}"${e.id === minha ? ' selected' : ''}>Equipe ${esc(e.nome)}</option>`)
@@ -1537,7 +1555,6 @@ function abrirFormulario(natureza) {
 
   // Reset campos
   document.getElementById('f-atividade').value = ''
-  popularSelectEquipe()
   document.getElementById('f-duracao').value   = ''
   document.getElementById('f-area').value      = ''
   document.getElementById('f-obs').value       = ''
@@ -1556,9 +1573,9 @@ function abrirFormulario(natureza) {
 
 async function salvarRegistro() {
   const atividade = document.getElementById('f-atividade').value
-  const equipe_id = document.getElementById('f-equipe').value || null
+  const equipe_id = document.getElementById('home-equipe')?.value || null
   if (!atividade) { toast('Selecione a atividade', 'warn'); return }
-  if ((App.equipes || []).length && !equipe_id) { toast('Selecione a equipe', 'warn'); return }
+  if ((App.equipes || []).length && !equipe_id) { toast('Selecione a equipe na tela inicial', 'warn'); return }
 
   const gps = bGpsAtual()
   const registro = {
@@ -2144,6 +2161,18 @@ async function carregarDados() {
     .map(([k, v]) => [ROTULO_VALIDACAO[k] || rotuloBonito(k), v, COR_VALIDACAO[k]]))
 }
 
+// ── QR de instalação (compartilhar app sem mandar link) ───────
+const SITE_BASE_URL = 'https://siguc-ac.vercel.app'   // fallback p/ APK (origin não é http)
+
+function abrirQRInstalacao() {
+  const base = location.protocol.startsWith('http') ? location.origin : SITE_BASE_URL
+  const url  = `${base}/pages/instalar-brigadas.html`
+  const qr   = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(url)}&size=320x320&format=png&margin=12`
+  document.getElementById('qr-overlay-img').src = qr
+  document.getElementById('qr-overlay-link').textContent = url
+  document.getElementById('qr-overlay').hidden = false
+}
+
 // ── Verificar atualização do app ──────────────────────────────
 const GH_RELEASES_API = 'https://api.github.com/repos/erissoncameli-prog/siguc-ac/releases'
 
@@ -2553,6 +2582,10 @@ document.addEventListener('DOMContentLoaded', () => {
     toast(ok ? 'Catálogo atualizado' : 'Sem conexão — tente mais tarde', ok ? 'ok' : 'warn')
   })
   document.getElementById('btn-verificar-update').addEventListener('click', verificarAtualizacao)
+  document.getElementById('btn-qr-instalar').addEventListener('click', abrirQRInstalacao)
+  document.getElementById('qr-overlay-fechar').addEventListener('click', () => {
+    document.getElementById('qr-overlay').hidden = true
+  })
   document.getElementById('btn-zerar-fila').addEventListener('click', async () => {
     const total = await bSyncContarPendentes()
     const msg = total > 0
