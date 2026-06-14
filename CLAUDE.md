@@ -17,15 +17,23 @@ Sistema já tem login, sidebar, layout e páginas funcionando.
 - index.html → tela de login
 - pages/ → dashboard, mapa, unidades, monitoramento, ocorrencias,
   documentos, relatorios, equipe, usuarios, historico-acessos, trocar-senha
-- js/ → config.js, layout.js, mapa-cartografia.js, observability.js, queryLogger.js
-- css/ → sidebar.css
+  - App Brigadas: brigada.html (app de campo), brigadas.html e
+    admin-brigadas.html (gestão), relatorios-brigadas.html,
+    instalar-brigadas.html (página pública de instalação/atualização)
+- js/ → config.js, layout.js, mapa-cartografia.js, observability.js,
+  queryLogger.js; brigada-offline.js (IndexedDB), brigada-sync.js,
+  brigada-captura.js (câmera/GPS/marca d'água), brigada-fauna.js
+- css/ → sidebar.css, brigada.css (app de campo)
 - data/ → uc_acre.geojson, uc_zonas_acre.geojson, uc_detalhes.json,
   municipios_acre.geojson, ti_acre.geojson
-- supabase/migrations/ → 001_initial.sql, 002_auditoria_acessos.sql
+- pwa/ → sw.js (service worker; subir CACHE a cada mudança web),
+  manifest.json, icons/mascote.png, icons/mascote-copa.png, mascote-video.mp4
+- supabase/migrations/ → 001…060 (ver "Banco")
 - api/ → health.js, metrics.js
 - app/ → shell nativo Capacitor do Brigadas (APK Android gerado pelo
   workflow brigadas-apk.yml a partir dos mesmos arquivos web;
-  ver docs/app-brigadas.md — alterações sempre nos arquivos web)
+  build via app/scripts/build-www.mjs — ver docs/app-brigadas.md;
+  alterações sempre nos arquivos web)
 
 ## Design system (nunca alterar variáveis sem alinhamento)
 --floresta:#0A1A0F | --verde-c:#52B788 | --ouro:#C9A84C | --ouro-c:#F0CB6A
@@ -38,6 +46,23 @@ equipe_servidores. RLS em todas. Trigger touch_atualizado_em().
 
 002_auditoria_acessos.sql: auditoria_acessos, bloqueio após 5 tentativas,
 funções verificar_bloqueio() e registrar_tentativa_acesso().
+
+Brigadas/registros de campo (042–060). Principais:
+- 042–044: brigadas, brigadistas (funcao, status, foto_url, usuario_id…)
+- 045–046: registros_campo + registro_fauna + especies_fauna
+- 047/053: VIEW vw_registros_validacao (usada nos relatórios)
+- 049: auditoria/sessões do brigadista
+- 050: is_chefe_brigada() SECURITY DEFINER (evita recursão de RLS)
+- 058_equipes_brigada.sql: tabela equipes_brigada (A/B/C, lider_id),
+  brigadistas.equipe_id, registros_campo.equipe_id + duracao_horas;
+  trigger preenche registros_campo.equipe (texto) pelo equipe_id;
+  seed A/B/C por brigada + trigger ao criar brigada; view atualizada
+- 059_rpc_desempenho_brigada.sql: RPC app_desempenho_brigada(desde,ate)
+  SECURITY DEFINER → agregados da brigada do chamador (totais, por
+  equipe, por brigadista) sem expor linhas (usada na aba Dados do app)
+- 060_origem_acionamento.sql: enum origem_acionamento
+  (denuncia_193|informacao_populares|ronda_brigada|outro) +
+  registros_campo.origem_acionamento; view atualizada
 
 ## Enums do banco
 perfil_usuario: super_admin | gestor | tecnico | financeiro | visualizador
@@ -54,6 +79,7 @@ status_ocorrencia: aberta|em_atendimento|resolvida|arquivada
 db, appState.usuario, appState.perfil, t(), esc(), formatBRL(),
 formatNum(), formatData(), toast(), carregarUsuario(), iniciais(),
 BADGE_CATEGORIA, BADGE_SEVERIDADE, BADGE_STATUS_OC, BADGE_STATUS_UC
+Ícones: BICON_PATHS, bico('nome'), bIconsAplicar(root) (ver Regras).
 
 ## Estrutura organizacional SEMA-AC
 Separação CARGO (permanente) x OCUPANTE (substituível por portaria).
@@ -76,6 +102,36 @@ Unidades: SECRETARIA > DIMA > DEUC | CIGMA | JURÍDICO
 - Páginas: todas as listadas em pages/
 - Auditoria de acessos com bloqueio
 - GeoJSONs do Acre
+
+### App Brigadas (campo) — implementado
+- Offline-first (IndexedDB) + sync; login Supabase + PIN; câmera/GPS/
+  marca d'água; catálogo de espécies; auditoria de sessão.
+- Registro de ocorrência: atividade, "Como a brigada soube?"
+  (origem_acionamento), equipe, duração (horas, persistida), área,
+  fotos (até 5) e fauna.
+- Fotos: câmera nativa do SO (input capture) + galeria; no APK usa o
+  plugin Capacitor Camera (CAMERA/PHOTOS). Marca d'água sempre aplicada.
+- Equipes A/B/C: equipe é atributo do brigadista; no app o seletor fica
+  na tela inicial (ao lado do nome), pré-preenchido e trocável; gestão
+  (renomear/líder/criar/excluir) em admin-brigadas.html.
+- Tela inicial: foto do brigadista (avatar) com borda "liquid glass";
+  tocar → menu (ver em tela cheia / trocar foto por galeria ou câmera).
+  Nome em Arial; brigada e equipe como chips.
+- Fila de envio: tamanho do arquivo, nº de fotos, data/hora da ocorrência
+  e do envio; mostra os 6 últimos com "Ver mais".
+- Aba Dados: resultados individuais + desempenho da brigada (totais,
+  ranking por equipe e por brigadista) via RPC app_desempenho_brigada.
+- Relatórios (relatorios-brigadas.html): ranking de equipes por
+  registros/área/fauna resgatada/horas.
+- Config: QR de instalação (aponta para
+  siguc-ac.vercel.app/pages/instalar-brigadas.html), verificar
+  atualização, alterar PIN, catálogo, zerar fila, sair.
+- Atualização: aviso automático (banner + pontinho no Config). Web/PWA
+  via ciclo do service worker (handler SKIP_WAITING no sw.js); APK
+  compara com GitHub Releases (1×/dia) e oferece download do APK.
+- Modo Copa (sazonal): de 11/06 a 19/07/2026 troca o mascote por
+  icons/mascote-copa.png (fallback seguro p/ mascote.png) com brilho
+  dourado. Controlado em brigada.html (ehModoCopa/aplicarMascoteCopa).
 
 ### A implementar (ordem de prioridade)
 A) Estrutura Organizacional → 003_estrutura_organizacional.sql
