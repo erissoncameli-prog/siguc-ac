@@ -957,6 +957,7 @@ body { margin: 0; }
   background-color: var(--prim, #12A66A);
   display: flex; align-items: center; justify-content: center;
   color: #fff; font-weight: 700; font-size: 26px; line-height: 1;
+  cursor: pointer;
 }
 /* Borda verde translúcida estilo "liquid glass" */
 .home-avatar::after {
@@ -979,6 +980,44 @@ body { margin: 0; }
   font-size: 12.5px; font-weight: 700; line-height: 1;
   background: rgba(82,183,136,.16); color: #0C7A4D;
   white-space: nowrap;
+}
+
+/* Menu da foto do brigadista (ações) */
+.avatar-menu {
+  position: fixed; inset: 0; z-index: 2100;
+  background: rgba(10,26,15,.55);
+  display: flex; align-items: flex-end; justify-content: center;
+  padding: 16px calc(16px + env(safe-area-inset-left, 0)) calc(16px + env(safe-area-inset-bottom, 0));
+}
+.avatar-menu[hidden] { display: none; }
+.avatar-menu-card {
+  width: 100%; max-width: 420px;
+  background: #fff; border-radius: 16px; overflow: hidden;
+  box-shadow: 0 12px 40px rgba(0,0,0,.3);
+}
+.am-item {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  padding: 16px 18px; border: 0; background: #fff;
+  font: inherit; font-size: 15px; font-weight: 600; color: var(--ink-d);
+  cursor: pointer; text-align: left;
+  border-bottom: 1px solid #EEF1EE;
+}
+.am-item:active { background: #F3F6F3; }
+.am-cancel { color: #9CA3AF; font-weight: 700; justify-content: center; border-bottom: 0; }
+
+/* Visualizador de foto em tela cheia */
+.foto-viewer {
+  position: fixed; inset: 0; z-index: 2200;
+  background: rgba(0,0,0,.94);
+  display: flex; align-items: center; justify-content: center;
+}
+.foto-viewer[hidden] { display: none; }
+.foto-viewer img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.foto-viewer-fechar {
+  position: absolute; top: calc(14px + env(safe-area-inset-top)); right: 14px;
+  width: 44px; height: 44px; border-radius: 50%;
+  background: rgba(255,255,255,.18); color: #fff; border: 0;
+  font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center;
 }
 
 /* Banner de atualização disponível */
