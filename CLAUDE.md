@@ -105,6 +105,10 @@ E) Dashboard Executivo por nível (UC / Diretoria / Secretaria)
 - Funções SQL com SECURITY DEFINER quando acessam auth.*
 - Commits em português, pequenos e descritivos
 - NUNCA expor SERVICE_ROLE_KEY no frontend
+- APK Android (workflow brigadas-apk.yml): NÃO gerar novo APK a cada
+  mudança. Só gerar quando o usuário pedir ou quando já houver acúmulo
+  suficiente para valer a pena. Mudanças web/PWA podem ir à produção
+  normalmente (lembrar de subir a versão do cache em pwa/sw.js).
 
 ## Variáveis de ambiente
 SUPABASE_URL=https://atqtybcsvepdabsvgaly.supabase.co
