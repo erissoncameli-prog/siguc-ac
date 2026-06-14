@@ -611,6 +611,8 @@ body { margin: 0; }
 
 /* ── Vídeo do mascote (overlay em tela cheia) ─────────────── */
 .faixa-mascote { cursor: pointer; }
+/* Modo Copa: brilho dourado festivo no mascote (não altera o posicionamento) */
+.faixa-mascote.copa, .lock-mascote.copa { filter: drop-shadow(0 3px 9px rgba(201,168,76,.8)); }
 .video-mascote-overlay {
   position: fixed; inset: 0; z-index: 1300;
   background: rgba(6, 14, 9, .94);
