@@ -1,5 +1,5 @@
 // ── SIGUC Brigadas — Service Worker ───────────────────────────
-const CACHE = 'siguc-brigadas-v46'
+const CACHE = 'siguc-brigadas-v47'
 
 const APP_SHELL = [
   '/pages/brigada.html',
@@ -9,6 +9,7 @@ const APP_SHELL = [
   '/js/brigada-offline.js',
   '/js/brigada-sync.js',
   '/js/brigada-captura.js',
+  '/js/brigada-area.js',
   '/js/brigada-fauna.js',
   '/pwa/icons/mascote.png',
   '/pwa/icons/mascote-copa.png',
