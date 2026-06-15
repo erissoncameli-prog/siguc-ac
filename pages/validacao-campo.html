@@ -4,10 +4,16 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>SIGUC-AC · Validação de Campo</title>
 <link rel="stylesheet" href="../css/global.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css"/>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
 <script src="../js/observability.js"></script>
 <script src="../js/queryLogger.js"></script>
 <script src="../js/config.js"></script>
+<script src="../js/mapa-camadas.js"></script>
 <script src="../js/layout.js"></script>
 <style>
 /* ── Tokens de natureza (inline — brigada.css não está no shell principal) */
@@ -169,6 +175,23 @@
             display:flex; align-items:center; justify-content:center; cursor:zoom-out }
 #lightbox img { max-width:92vw; max-height:92vh; border-radius:6px; object-fit:contain }
 #lightbox.oculto { display:none }
+
+/* ── Mapa de validação ── */
+.val-map-head { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px }
+.val-map-tools { display:flex; flex-wrap:wrap; gap:8px; align-items:center }
+.val-map-chk { font-size:.78rem; display:flex; align-items:center; gap:5px; cursor:pointer }
+.val-map-sel { font-size:.78rem; padding:4px 6px; border:1px solid var(--border,#e5e7eb); border-radius:6px; background:#fff }
+.val-mapa { width:100%; height:320px; border-radius:10px; border:1px solid var(--border,#e5e7eb); overflow:hidden; background:#eaf0ea }
+.val-map-foot { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px; margin-top:8px }
+.val-evidencia { font-size:.8rem; font-weight:600; padding:4px 10px; border-radius:20px; background:#f3f4f6; color:#374151 }
+.val-evidencia.tem-fogo { background:#fee2e2; color:#991b1b }
+.val-evidencia.sem-fogo { background:#dcfce7; color:#166534 }
+.val-map-acoes { display:flex; gap:8px }
+.val-btn-edit { font-size:.78rem; font-weight:600; padding:6px 12px; border-radius:8px; cursor:pointer;
+                border:1px solid var(--verde-c,#52B788); background:#fff; color:#166534 }
+.val-btn-edit:hover { background:#f0fdf4 }
+.val-area-info { font-size:.8rem; color:#374151; margin:8px 0 0; min-height:1em }
+.val-area-info b { color:#166534 }
 </style>
 </head>
 <body>
@@ -189,6 +212,27 @@
 
       <!-- Grid de detalhes -->
       <div class="detail-grid" id="modal-detail-grid"></div>
+
+      <!-- Mapa de validação (satélite + focos diários + editar polígono) -->
+      <div id="modal-mapa-sec" hidden>
+        <div class="val-map-head">
+          <p class="form-label" style="margin:14px 0 6px">Área no satélite</p>
+          <div class="val-map-tools">
+            <label class="val-map-chk"><input type="checkbox" id="val-gibs-toggle"> Manchas/focos (NASA GIBS)</label>
+            <select id="val-gibs-camada" class="val-map-sel"></select>
+            <input type="date" id="val-gibs-data" class="val-map-sel" title="Data da imagem GIBS">
+          </div>
+        </div>
+        <div id="val-mapa" class="val-mapa"></div>
+        <div class="val-map-foot">
+          <span id="val-evidencia" class="val-evidencia">Cruzando focos…</span>
+          <span class="val-map-acoes">
+            <button type="button" class="val-btn-edit" id="val-btn-editar">Editar polígono</button>
+            <button type="button" class="val-btn-edit" id="val-btn-desfazer" hidden>Descartar edição</button>
+          </span>
+        </div>
+        <p class="val-area-info" id="val-area-info"></p>
+      </div>
 
       <!-- Fotos -->
       <div id="modal-fotos-sec" hidden>
@@ -558,6 +602,7 @@ async function abrirDetalhe(id) {
   document.getElementById('promover-wrap').classList.remove('visivel')
 
   document.getElementById('modal-detalhe').style.display = 'flex'
+  initMapaValidacao(r)
 }
 
 async function carregarFaunaModal(rcId) {
@@ -748,11 +793,15 @@ async function executarAcao() {
     toast('Informe o motivo', 'warn'); return
   }
 
+  // Polígono editado pelo técnico no mapa (satélite) → vira a geometria validada
+  const pGeom = (_valEdicaoAtiva && _valPolyLayer) ? _valPolyLayer.toGeoJSON().geometry : null
+
   const { error } = await db.rpc('validar_registro_campo', {
     p_id:       _detalheId,
     p_status:   novoStatus,
     p_motivo:   motivo || null,
     p_veredito: veresel,
+    p_geom:     pGeom,
   })
 
   if (error) { toast('Erro: ' + error.message, 'erro'); return }
@@ -785,9 +834,167 @@ document.getElementById('btn-confirmar-promover')?.addEventListener('click', con
 // ════════════════════════════════════════════════════════════════
 function fecharDetalhe() {
   document.getElementById('modal-detalhe').style.display = 'none'
+  _valDestruirMapa()
   _detalheId = null
   _acaoPendente = null
 }
+
+// ════════════════════════════════════════════════════════════════
+// Mapa de validação (satélite + focos diários GIBS + editar polígono)
+// ════════════════════════════════════════════════════════════════
+let _valMap = null, _valDrawn = null, _valPolyLayer = null
+let _valFocosLayer = null, _valGibsLayer = null
+let _valEdicaoAtiva = false, _valGeoCache = null
+
+function _valDestruirMapa() {
+  try { if (_valPolyLayer && _valPolyLayer.editing) _valPolyLayer.editing.disable() } catch (e) {}
+  if (_valMap) { _valMap.remove(); _valMap = null }
+  _valDrawn = _valPolyLayer = _valFocosLayer = _valGibsLayer = _valGeoCache = null
+  _valEdicaoAtiva = false
+  const dz = document.getElementById('val-btn-desfazer'); if (dz) dz.hidden = true
+}
+
+function _valPolyDeGeoJSON(poly) {
+  const anel = (poly.coordinates && poly.coordinates[0]) ? poly.coordinates[0] : []
+  const latlngs = anel.map(c => [c[1], c[0]])
+  if (latlngs.length > 1) {
+    const a = latlngs[0], b = latlngs[latlngs.length - 1]
+    if (a[0] === b[0] && a[1] === b[1]) latlngs.pop()
+  }
+  return L.polygon(latlngs, { color: '#12A66A', weight: 2, fillColor: '#12A66A', fillOpacity: .2 })
+}
+
+function _valMostrarAreaEdicao() {
+  if (!_valPolyLayer) return
+  let ha = null
+  try { ha = turf.area(_valPolyLayer.toGeoJSON()) / 10000 } catch (e) {}
+  const el = document.getElementById('val-area-info')
+  if (el && ha != null) el.innerHTML = `Área editada: <b>${ha.toFixed(2)} ha</b> (gravada ao validar)`
+}
+
+async function initMapaValidacao(r) {
+  const sec = document.getElementById('modal-mapa-sec')
+  if (typeof L === 'undefined' || typeof mapaBasemapSatelite !== 'function') { sec.hidden = true; return }
+  _valDestruirMapa()
+
+  const selCam = document.getElementById('val-gibs-camada')
+  if (selCam && !selCam.options.length) {
+    selCam.innerHTML = MAPA_GIBS_CAMADAS.map(c => `<option value="${c.id}">${c.label}</option>`).join('')
+    selCam.value = (MAPA_GIBS_CAMADAS.find(c => c.id.includes('Thermal')) || MAPA_GIBS_CAMADAS[0]).id
+  }
+  document.getElementById('val-gibs-data').value = mapaGibsDataSegura()
+  document.getElementById('val-gibs-toggle').checked = false
+  document.getElementById('val-area-info').innerHTML = ''
+  document.getElementById('val-btn-desfazer').hidden = true
+
+  let geo = null
+  try { const { data } = await db.rpc('registro_geojson', { p_id: r.id }); geo = data } catch (e) {}
+  _valGeoCache = geo
+
+  const pontoCoord = geo?.ponto?.coordinates || (r.lat != null ? [r.lng, r.lat] : null)
+  const poly = geo?.perimetro_validado || geo?.perimetro
+  if (!pontoCoord && !poly) { sec.hidden = true; return }
+  sec.hidden = false
+
+  const centro = pontoCoord ? [pontoCoord[1], pontoCoord[0]] : [-9.5, -70]
+  _valMap = L.map('val-mapa', { zoomControl: true }).setView(centro, 15)
+  mapaBasemapSatelite(L).addTo(_valMap)
+  _valDrawn = new L.FeatureGroup().addTo(_valMap)
+  setTimeout(() => { if (_valMap) _valMap.invalidateSize() }, 250)
+
+  if (pontoCoord) {
+    L.circleMarker([pontoCoord[1], pontoCoord[0]],
+      { radius: 6, color: '#0A1A0F', weight: 2, fillColor: '#C9A84C', fillOpacity: 1 })
+      .bindTooltip('Ponto do app (GPS)').addTo(_valMap)
+  }
+  if (poly) {
+    _valPolyLayer = _valPolyDeGeoJSON(poly).addTo(_valDrawn)
+    _valPolyLayer.on('edit', _valMostrarAreaEdicao)
+    try { _valMap.fitBounds(_valDrawn.getBounds().pad(0.4)) } catch (e) {}
+  }
+
+  document.getElementById('val-btn-editar').textContent = poly ? 'Editar polígono' : 'Desenhar polígono'
+  _atualizarAreaInfo(geo)
+  _valCarregarFocos(r.id)
+}
+
+function _atualizarAreaInfo(geo) {
+  const el = document.getElementById('val-area-info'); if (!el) return
+  const p = []
+  if (geo?.area_estimada_ha != null) p.push(`estimada ${geo.area_estimada_ha} ha`)
+  if (geo?.area_medida_ha != null)   p.push(`medida no app ${geo.area_medida_ha} ha`)
+  if (geo?.area_validada_ha != null) p.push(`<b>validada ${geo.area_validada_ha} ha</b>`)
+  el.innerHTML = p.length ? 'Área: ' + p.join(' · ') : ''
+}
+
+async function _valCarregarFocos(id) {
+  const ev = document.getElementById('val-evidencia')
+  if (ev) { ev.className = 'val-evidencia'; ev.textContent = 'Cruzando focos…' }
+  let res = null
+  try {
+    const { data } = await db.rpc('focos_proximos_registro', { p_registro_id: id, p_raio_m: 1000, p_dias: 10 })
+    res = data
+  } catch (e) {}
+  if (_valFocosLayer && _valMap) { _valMap.removeLayer(_valFocosLayer); _valFocosLayer = null }
+  const focos = res?.focos || []
+  if (focos.length && _valMap) {
+    _valFocosLayer = L.layerGroup()
+    focos.forEach(f => L.circleMarker([f.lat, f.lon],
+      { radius: 5, color: '#991b1b', weight: 1, fillColor: '#ef4444', fillOpacity: .85 })
+      .bindTooltip(`${f.fonte} · ${String(f.data || '').slice(0, 10)} · ${f.dist_m} m${f.frp ? ` · FRP ${f.frp}` : ''}`)
+      .addTo(_valFocosLayer))
+    _valFocosLayer.addTo(_valMap)
+  }
+  if (ev) {
+    const n = res?.total || 0
+    if (res?.sem_geom) { ev.className = 'val-evidencia'; ev.textContent = 'Sem geometria para cruzar focos' }
+    else if (n > 0)    { ev.className = 'val-evidencia tem-fogo'; ev.textContent = `${n} foco(s) de calor a ≤1 km (±10 dias)` }
+    else               { ev.className = 'val-evidencia sem-fogo'; ev.textContent = 'Nenhum foco a ≤1 km (±10 dias)' }
+  }
+}
+
+function _valToggleGibs() {
+  if (!_valMap) return
+  if (_valGibsLayer) { _valMap.removeLayer(_valGibsLayer); _valGibsLayer = null }
+  if (document.getElementById('val-gibs-toggle').checked) {
+    const cam = document.getElementById('val-gibs-camada').value
+    const dt  = document.getElementById('val-gibs-data').value || mapaGibsDataSegura()
+    _valGibsLayer = mapaGibsLayer(L, cam, dt, 75).addTo(_valMap)
+  }
+}
+
+function _valEditarPoligono() {
+  if (!_valMap) return
+  _valEdicaoAtiva = true
+  document.getElementById('val-btn-desfazer').hidden = false
+  if (_valPolyLayer && _valPolyLayer.editing) {
+    _valPolyLayer.editing.enable()
+    toast('Arraste os vértices para corrigir. Valide para gravar.', 'info')
+  } else {
+    const dh = new L.Draw.Polygon(_valMap, { shapeOptions: { color: '#12A66A', weight: 2 } })
+    dh.enable()
+    _valMap.once(L.Draw.Event.CREATED, (e) => {
+      _valPolyLayer = e.layer.addTo(_valDrawn)
+      _valPolyLayer.on('edit', _valMostrarAreaEdicao)
+      try { _valPolyLayer.editing.enable() } catch (er) {}
+      _valMostrarAreaEdicao()
+    })
+    toast('Toque para marcar os vértices; feche no primeiro ponto.', 'info')
+  }
+}
+
+function _valDesfazerEdicao() {
+  _valEdicaoAtiva = false
+  document.getElementById('val-btn-desfazer').hidden = true
+  const r = _registros.find(x => x.id === _detalheId)
+  if (r) initMapaValidacao(r)
+}
+
+document.getElementById('val-gibs-toggle').addEventListener('change', _valToggleGibs)
+document.getElementById('val-gibs-camada').addEventListener('change', () => { if (document.getElementById('val-gibs-toggle').checked) _valToggleGibs() })
+document.getElementById('val-gibs-data').addEventListener('change', () => { if (document.getElementById('val-gibs-toggle').checked) _valToggleGibs() })
+document.getElementById('val-btn-editar').addEventListener('click', _valEditarPoligono)
+document.getElementById('val-btn-desfazer').addEventListener('click', _valDesfazerEdicao)
 
 function abrirLightbox(url) {
   document.getElementById('lightbox-img').src = url
