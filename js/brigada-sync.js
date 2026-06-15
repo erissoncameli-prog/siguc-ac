@@ -214,9 +214,10 @@ function bSyncMontarPayload(reg, fotosUrls) {
     lat, lng,          // → localizacao (PostGIS)
     n_equipe,          // legado: ignorado (equipe agora vem de equipe_id)
     area_ha,           // → area_estimada_ha
+    perimetro_geojson, // → perimetro_geom (PostGIS); área recalculada por trigger
     observacoes,       // → descricao
     criado_em,         // → data_inicio + data_hora_evento
-    ...rest            // inclui equipe_id e duracao_horas (colunas diretas)
+    ...rest            // inclui equipe_id, duracao_horas, area_metodo, area_medida_ha
   } = reg
 
   const ts = criado_em ?? new Date().toISOString()
@@ -228,6 +229,7 @@ function bSyncMontarPayload(reg, fotosUrls) {
     localizacao:      (lat != null && lng != null)
                         ? { type: 'Point', coordinates: [lng, lat] }
                         : null,
+    perimetro_geom:   perimetro_geojson ?? null,
     area_estimada_ha: area_ha  ?? null,
     descricao:        observacoes ?? null,
     data_inicio:      ts.slice(0, 10),

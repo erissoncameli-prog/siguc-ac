@@ -282,7 +282,11 @@
 
     <div class="form-section">
       <label class="form-label">Área afetada (ha)</label>
-      <input type="number" id="f-area" class="form-input" min="0" step="0.01" placeholder="0.00">
+      <div class="area-row">
+        <input type="number" id="f-area" class="form-input" min="0" step="0.01" placeholder="0.00">
+        <button type="button" id="btn-medir-area" class="btn-medir" data-icon="map">Medir</button>
+      </div>
+      <p class="area-medida-info" id="area-medida-info" hidden></p>
     </div>
 
     <div class="form-section">
@@ -637,6 +641,42 @@
   </div>
 </div>
 
+<!-- ══ OVERLAY: medir área por GPS ════════════════════════════ -->
+<div id="medir-overlay" class="medir-overlay" hidden>
+  <div class="medir-card">
+    <div class="medir-head">
+      <strong>Medir área por GPS</strong>
+      <button class="medir-fechar" id="medir-fechar" type="button" data-icon="x" aria-label="Fechar"></button>
+    </div>
+
+    <div class="medir-modos">
+      <button type="button" class="medir-modo ativo" data-modo="vertices" id="medir-modo-vertices">Marcar vértices</button>
+      <button type="button" class="medir-modo" data-modo="perimetro" id="medir-modo-perimetro">Caminhar perímetro</button>
+    </div>
+    <p class="medir-dica" id="medir-dica">Vá até cada canto da área e toque em “Adicionar ponto”.</p>
+
+    <canvas id="medir-canvas" class="medir-canvas" width="320" height="190"></canvas>
+
+    <div class="medir-stats">
+      <div><strong id="medir-area">—</strong><span>Área</span></div>
+      <div><strong id="medir-perimetro">—</strong><span>Perímetro</span></div>
+      <div><strong id="medir-n">0</strong><span>Pontos</span></div>
+    </div>
+    <p class="medir-acc" id="medir-acc" hidden></p>
+
+    <div class="medir-acoes">
+      <button type="button" class="medir-btn medir-add" id="medir-add" data-icon="pin">Adicionar ponto</button>
+      <button type="button" class="medir-btn medir-walk" id="medir-walk" hidden>Iniciar caminhada</button>
+      <div class="medir-acoes-sec">
+        <button type="button" class="medir-btn-sec" id="medir-desfazer">Desfazer</button>
+        <button type="button" class="medir-btn-sec" id="medir-limpar">Limpar</button>
+      </div>
+    </div>
+
+    <button type="button" class="medir-confirmar" id="medir-confirmar" disabled>Usar esta área</button>
+  </div>
+</div>
+
 <!-- ══ NAV PILL ════════════════════════════════════════════════ -->
 <nav class="pill-nav" id="pill-nav" hidden>
   <button class="pill-btn" data-tela="tela-home" id="nav-home">
@@ -723,6 +763,7 @@ window.supabase = window.supabase || { createClient: () => null }
 <script src="/js/brigada-offline.js"></script>
 <script src="/js/brigada-sync.js"></script>
 <script src="/js/brigada-captura.js"></script>
+<script src="/js/brigada-area.js"></script>
 <script src="/js/brigada-fauna.js"></script>
 <script>
 // ════════════════════════════════════════════════════════════════
@@ -1614,6 +1655,8 @@ function abrirFormulario(natureza) {
   document.getElementById('f-duracao').value   = ''
   document.getElementById('f-area').value      = ''
   document.getElementById('f-obs').value       = ''
+  App._areaMedida = null
+  _mostrarAreaMedidaInfo()
   document.getElementById('foto-grid').innerHTML = ''
   document.getElementById('foto-count-label').textContent = '(0/5)'
   document.getElementById('fauna-lista').innerHTML = ''
@@ -1646,6 +1689,10 @@ async function salvarRegistro() {
     origem_acionamento: document.getElementById('f-origem').value || null,
     duracao_horas: parseFloat(document.getElementById('f-duracao').value) || null,
     area_ha:       parseFloat(document.getElementById('f-area').value) || null,
+    area_metodo:       App._areaMedida ? App._areaMedida.metodo
+                       : (parseFloat(document.getElementById('f-area').value) ? 'estimativa' : null),
+    area_medida_ha:    App._areaMedida ? Number(App._areaMedida.areaHa.toFixed(2)) : null,
+    perimetro_geojson: App._areaMedida ? App._areaMedida.geojson : null,
     observacoes:   document.getElementById('f-obs').value.trim() || null,
     lat:           gps?.lat ?? null,
     lng:           gps?.lng ?? null,
@@ -1666,6 +1713,83 @@ async function salvarRegistro() {
   } catch (err) {
     toast('Erro ao salvar: ' + err.message, 'erro')
   }
+}
+
+// ════════════════════════════════════════════════════════════════
+// Medição de área por GPS (estimativa continua disponível no campo)
+// ════════════════════════════════════════════════════════════════
+function abrirMedirArea() {
+  bAreaLimpar()
+  _medirSetModo('vertices')
+  _medirAtualizar()
+  document.getElementById('medir-overlay').hidden = false
+}
+function fecharMedirArea() {
+  bAreaPararPerimetro()
+  document.getElementById('medir-overlay').hidden = true
+}
+function _medirSetModo(m) {
+  bAreaSetModo(m)
+  document.querySelectorAll('.medir-modo').forEach(b => b.classList.toggle('ativo', b.dataset.modo === m))
+  const add  = document.getElementById('medir-add')
+  const walk = document.getElementById('medir-walk')
+  const dica = document.getElementById('medir-dica')
+  if (m === 'vertices') {
+    bAreaPararPerimetro()
+    add.hidden = false; walk.hidden = true
+    dica.textContent = 'Vá até cada canto da área e toque em “Adicionar ponto”.'
+  } else {
+    add.hidden = true; walk.hidden = false
+    dica.textContent = 'Toque em “Iniciar caminhada” e ande pela borda da área. Toque em “Parar” ao fechar a volta.'
+    _medirWalkLabel()
+  }
+}
+function _medirWalkLabel() {
+  document.getElementById('medir-walk').textContent = bAreaPerimetroAtivo() ? 'Parar caminhada' : 'Iniciar caminhada'
+}
+function _medirAtualizar(r) {
+  r = r || bAreaCalcular()
+  document.getElementById('medir-area').textContent      = bAreaFmtArea(r.areaHa)
+  document.getElementById('medir-perimetro').textContent = bAreaFmtDist(r.perimetroM)
+  document.getElementById('medir-n').textContent         = String(r.n)
+  bAreaDesenhar(document.getElementById('medir-canvas'))
+  document.getElementById('medir-confirmar').disabled = !r.completo
+  const acc = document.getElementById('medir-acc')
+  if (r.n && r.accPiorM && r.accPiorM > 15) {
+    acc.hidden = false
+    acc.textContent = `Precisão do GPS baixa (±${Math.round(r.accPiorM)} m) — os pontos podem variar.`
+  } else acc.hidden = true
+}
+async function _medirAddVertice() {
+  const btn = document.getElementById('medir-add')
+  const txt = btn.textContent
+  btn.disabled = true; btn.textContent = 'Lendo GPS…'
+  try { await bAreaAddVertice(); _medirAtualizar() }
+  catch (e) { toast('Não foi possível ler o GPS agora', 'warn') }
+  finally { btn.disabled = false; btn.textContent = txt }
+}
+function _medirToggleWalk() {
+  if (bAreaPerimetroAtivo()) bAreaPararPerimetro()
+  else if (!bAreaIniciarPerimetro(r => _medirAtualizar(r))) toast('GPS indisponível', 'warn')
+  _medirWalkLabel()
+}
+function _medirConfirmar() {
+  const r = bAreaCalcular()
+  if (!r.completo) return
+  App._areaMedida = { metodo: bAreaModo(), areaHa: r.areaHa, geojson: bAreaGeoJSON() }
+  document.getElementById('f-area').value = r.areaHa.toFixed(2)
+  _mostrarAreaMedidaInfo()
+  fecharMedirArea()
+  toast('Área medida aplicada', 'ok')
+}
+function _mostrarAreaMedidaInfo() {
+  const el = document.getElementById('area-medida-info')
+  if (!el) return
+  if (App._areaMedida) {
+    const m = App._areaMedida.metodo === 'vertices' ? 'vértices (GPS)' : 'perímetro (GPS)'
+    el.hidden = false
+    el.innerHTML = `${bico('pin')} Medida por ${m} · ${bAreaFmtArea(App._areaMedida.areaHa)}`
+  } else { el.hidden = true; el.textContent = '' }
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -2700,6 +2824,24 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('input-foto-galeria').addEventListener('change', e => { processarFotosArquivos(e.target.files); e.target.value = '' })
   document.getElementById('btn-add-fauna').addEventListener('click', () => abrirFauna(null))
   document.getElementById('btn-salvar').addEventListener('click', salvarRegistro)
+
+  // Medição de área por GPS
+  document.getElementById('btn-medir-area').addEventListener('click', abrirMedirArea)
+  document.getElementById('medir-fechar').addEventListener('click', fecharMedirArea)
+  document.getElementById('medir-modo-vertices').addEventListener('click', () => _medirSetModo('vertices'))
+  document.getElementById('medir-modo-perimetro').addEventListener('click', () => _medirSetModo('perimetro'))
+  document.getElementById('medir-add').addEventListener('click', _medirAddVertice)
+  document.getElementById('medir-walk').addEventListener('click', _medirToggleWalk)
+  document.getElementById('medir-desfazer').addEventListener('click', () => { bAreaDesfazer(); _medirAtualizar() })
+  document.getElementById('medir-limpar').addEventListener('click', () => { bAreaLimpar(); _medirAtualizar() })
+  document.getElementById('medir-confirmar').addEventListener('click', _medirConfirmar)
+  // Editar o campo manualmente descarta a medição GPS (deixa de bater com o polígono)
+  document.getElementById('f-area').addEventListener('input', () => {
+    if (App._areaMedida) {
+      const v = parseFloat(document.getElementById('f-area').value)
+      if (!(Math.abs(v - App._areaMedida.areaHa) < 0.005)) { App._areaMedida = null; _mostrarAreaMedidaInfo() }
+    }
+  })
 
   // Fauna
   document.querySelectorAll('.classe-btn').forEach(btn => {
