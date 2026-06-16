@@ -206,6 +206,50 @@
   .mapa-painel-wrap.mobile-aberto #mapa-scrollbar-outer{display:none;}
   .btn-filtros-mobile{display:flex;}
 }
+/* ── Modo Tela Cheia (imersivo) ─────────────────────────────── */
+.btn-mapa-fs{display:flex;align-items:center;gap:6px;padding:6px 13px;background:#fff;color:#1F4E2C;border:1px solid var(--borda);border-radius:7px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;flex-shrink:0;transition:all .15s;}
+.btn-mapa-fs:hover{background:var(--cinza-50);border-color:#1F4E2C;}
+.btn-mapa-fs .bico{font-size:14px;}
+/* Controle de tela cheia sobre o mapa (canto sup-esquerdo, abaixo do zoom) */
+.mapa-fs-leaflet a{display:flex!important;align-items:center;justify-content:center;font-size:18px;color:#1F4E2C;}
+.mapa-fs-leaflet a:hover{color:#143520;background:#f4f6f5;}
+/* Cluster de controles flutuantes — só aparece no imersivo */
+.mapa-fs-controls{display:none;}
+.mapa-painel-drawer-head{display:none;}
+body.mapa-imersivo{overflow:hidden;}
+.mapa-wrapper.imersivo{position:fixed;inset:0;z-index:2000;height:100vh;min-height:0;margin:0;padding:10px;gap:0;background:var(--floresta,#0A1A0F);animation:mapa-fs-in .28s ease;}
+@keyframes mapa-fs-in{from{opacity:.4}to{opacity:1}}
+.mapa-wrapper.imersivo .mapa-topbar{display:none;}
+.mapa-wrapper.imersivo .mapa-container{gap:0;}
+.mapa-wrapper.imersivo #mapa{border-radius:14px;}
+/* Barra de camadas → dock glass no topo-centro */
+.mapa-wrapper.imersivo .mapa-layerbar{position:absolute;top:14px;left:50%;transform:translateX(-50%);z-index:1200;max-width:calc(100vw - 540px);min-width:0;}
+.mapa-wrapper.imersivo .mlb-tabs{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;background:rgba(255,255,255,.72);-webkit-backdrop-filter:blur(14px) saturate(1.5);backdrop-filter:blur(14px) saturate(1.5);border:1px solid rgba(255,255,255,.6);box-shadow:0 10px 36px rgba(10,26,15,.30);border-radius:14px;padding:7px 9px;gap:5px;}
+.mapa-wrapper.imersivo .mlb-tabs::-webkit-scrollbar{display:none;}
+/* Cluster de ações flutuantes (topo-direita) */
+.mapa-wrapper.imersivo .mapa-fs-controls{display:flex;position:absolute;top:14px;right:14px;z-index:1250;gap:8px;}
+.mapa-fs-btn{display:flex;align-items:center;gap:6px;height:38px;padding:0 14px;background:rgba(255,255,255,.72);-webkit-backdrop-filter:blur(14px) saturate(1.5);backdrop-filter:blur(14px) saturate(1.5);border:1px solid rgba(255,255,255,.6);box-shadow:0 8px 28px rgba(10,26,15,.26);border-radius:11px;color:#1F4E2C;font-size:12px;font-weight:600;font-family:inherit;cursor:pointer;transition:all .16s;white-space:nowrap;}
+.mapa-fs-btn:hover{background:rgba(255,255,255,.94);transform:translateY(-1px);}
+.mapa-fs-btn.icon-only{width:38px;padding:0;justify-content:center;}
+.mapa-fs-btn .bico{font-size:17px;}
+.mapa-fs-btn.ativo{background:#1F4E2C;color:#fff;border-color:#1F4E2C;}
+.mapa-fs-btn.sair{background:rgba(31,78,44,.92);color:#fff;border-color:rgba(255,255,255,.25);}
+.mapa-fs-btn.sair:hover{background:#1F4E2C;}
+/* Painel de exibição → drawer deslizante pela direita */
+.mapa-wrapper.imersivo .mapa-painel-wrap{position:absolute;top:64px;right:14px;bottom:14px;width:300px;z-index:1200;display:flex;flex-direction:column;gap:0;background:rgba(255,255,255,.80);-webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);border:1px solid rgba(255,255,255,.6);box-shadow:0 14px 44px rgba(10,26,15,.34);border-radius:16px;padding:0;overflow:hidden;transform:translateX(calc(100% + 28px));opacity:0;transition:transform .32s cubic-bezier(.4,0,.2,1),opacity .2s;}
+.mapa-wrapper.imersivo .mapa-painel-wrap.drawer-aberto{transform:none;opacity:1;}
+.mapa-wrapper.imersivo .mapa-painel-drawer-head{display:flex;align-items:center;gap:4px;padding:12px 12px 10px 16px;border-bottom:1px solid rgba(10,26,15,.08);flex-shrink:0;}
+.mapa-painel-drawer-head .ttl{flex:1;font-size:12px;font-weight:700;color:#1F4E2C;text-transform:uppercase;letter-spacing:.06em;}
+.mapa-painel-drawer-head button{background:none;border:none;cursor:pointer;color:var(--cinza-500);display:flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:8px;font-size:16px;transition:all .14s;}
+.mapa-painel-drawer-head button:hover{background:rgba(10,26,15,.06);color:#1F4E2C;}
+.mapa-painel-drawer-head button.fixado{color:#1F4E2C;background:rgba(31,78,44,.12);}
+.mapa-wrapper.imersivo .mapa-painel{width:100%;flex:1;padding:10px 12px 14px;overflow-y:auto;}
+.mapa-wrapper.imersivo #mapa-scrollbar-outer{display:none;}
+@media(max-width:768px){
+  .mapa-wrapper.imersivo .mapa-layerbar{max-width:calc(100vw - 28px);left:14px;transform:none;top:12px;}
+  .mapa-wrapper.imersivo .mapa-fs-controls{top:auto;bottom:14px;right:14px;}
+  .mapa-wrapper.imersivo .mapa-painel-wrap{top:auto;left:14px;right:14px;width:auto;bottom:62px;max-height:60vh;}
+}
 /* ── Painel Camadas ──────────────────────────────────────────── */
 .camada-grupo{border:1px solid var(--cinza-100);border-radius:8px;margin-bottom:6px;overflow:hidden;}
 .camada-grupo:last-child{margin-bottom:0;}
@@ -738,6 +782,9 @@ function renderPagina(){
         <h2 style="margin:0;font-size:17px;font-weight:600;color:var(--cinza-900)">Mapa das Unidades de Conservação</h2>
         <p style="margin:2px 0 0;font-size:11px;color:var(--cinza-500)">Acre — SEMA/AC · ${new Date().getFullYear()} · SIRGAS 2000 / WGS 84</p>
       </div>
+      <button onclick="toggleTelaCheia()" class="btn-mapa-fs" title="Ver o mapa em tela cheia (tecla F)">
+        ${bico('maximize')} Tela cheia
+      </button>
       <button onclick="CART.imprimir('Mapa das Unidades de Conservação — Acre')"
         style="display:flex;align-items:center;gap:6px;padding:6px 13px;background:#1F4E2C;color:#fff;border:none;border-radius:7px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;flex-shrink:0"
         title="Imprimir / Exportar mapa com elementos cartográficos">
@@ -901,6 +948,11 @@ function renderPagina(){
 
       <!-- PAINEL FILTROS -->
       <div class="mapa-painel-wrap" id="mapa-painel-wrap">
+        <div class="mapa-painel-drawer-head">
+          <span class="ttl">Exibição</span>
+          <button id="btn-drawer-pin" onclick="toggleDrawerPin()" title="Fixar painel aberto">${bico('pin')}</button>
+          <button onclick="fecharDrawerExibicao(true)" title="Fechar painel">${bico('x')}</button>
+        </div>
         <div class="mapa-painel" id="mapa-painel">
 
           <!-- Ocorrências -->
@@ -974,6 +1026,13 @@ function renderPagina(){
         <div id="mapa-scrollbar-outer"><div id="mapa-scrollbar-thumb"></div></div>
       </div>
     </div>
+
+    <!-- Controles flutuantes (modo tela cheia) -->
+    <div class="mapa-fs-controls">
+      <button class="mapa-fs-btn" id="btn-fs-exibicao" onclick="toggleDrawerExibicao()" title="Exibição e filtros">${bico('sliders')} Exibição</button>
+      <button class="mapa-fs-btn icon-only" onclick="CART.imprimir('Mapa das Unidades de Conservação — Acre')" title="Imprimir / exportar">${bico('printer')}</button>
+      <button class="mapa-fs-btn sair" onclick="sairTelaCheia()" title="Sair da tela cheia (Esc)">${bico('minimize')} Sair</button>
+    </div>
   </div>
   <div class="mapa-backdrop" id="mapa-backdrop" onclick="fecharPainelMobile()"></div>
   <button class="btn-filtros-mobile" onclick="abrirPainelMobile()">
@@ -991,14 +1050,104 @@ function abrirPainelMobile(){ document.getElementById('mapa-painel-wrap').classL
 function fecharPainelMobile(){ document.getElementById('mapa-painel-wrap').classList.remove('mobile-aberto'); document.getElementById('mapa-backdrop').classList.remove('ativo'); }
 
 // ══════════════════════════════════════════════════════════════
+// MODO TELA CHEIA (imersivo) + drawer de exibição
+// ══════════════════════════════════════════════════════════════
+let _mapaImersivo = false, _drawerFixado = false;
+
+function toggleTelaCheia(){ _mapaImersivo ? sairTelaCheia() : entrarTelaCheia(); }
+
+// Controle de tela cheia diretamente sobre o mapa (canto sup-esquerdo)
+function _adicionarControleTelaCheia(){
+  const Ctrl = L.Control.extend({ options:{position:'topleft'}, onAdd(){
+    const div = L.DomUtil.create('div','leaflet-bar mapa-fs-leaflet');
+    const a = L.DomUtil.create('a','', div);
+    a.href = '#'; a.id = 'btn-fs-mapa'; a.title = 'Ver o mapa em tela cheia (tecla F)';
+    a.setAttribute('role','button'); a.setAttribute('aria-label','Tela cheia');
+    a.innerHTML = bico('maximize');
+    L.DomEvent.disableClickPropagation(div);
+    L.DomEvent.on(a, 'click', L.DomEvent.stop).on(a, 'click', () => toggleTelaCheia());
+    return div;
+  }});
+  mapaL.addControl(new Ctrl());
+}
+
+function _sincBotaoTelaCheia(){
+  const ic = _mapaImersivo ? 'minimize' : 'maximize';
+  const tt = _mapaImersivo ? 'Sair da tela cheia (Esc)' : 'Ver o mapa em tela cheia (tecla F)';
+  const m = document.getElementById('btn-fs-mapa');
+  if(m){ m.innerHTML = bico(ic); m.title = tt; }
+}
+
+function entrarTelaCheia(){
+  const wrap = document.querySelector('.mapa-wrapper');
+  if(!wrap || _mapaImersivo) return;
+  _mapaImersivo = true;
+  document.body.classList.add('mapa-imersivo');
+  wrap.classList.add('imersivo');
+  const el = document.documentElement;
+  if(el.requestFullscreen){ el.requestFullscreen().catch(()=>{}); }
+  _sincBotaoTelaCheia();
+  setTimeout(()=>{ try{ mapaL && mapaL.invalidateSize(); }catch(_){} }, 340);
+}
+
+function sairTelaCheia(){
+  const wrap = document.querySelector('.mapa-wrapper');
+  if(!wrap) return;
+  _mapaImersivo = false;
+  wrap.classList.remove('imersivo');
+  document.body.classList.remove('mapa-imersivo');
+  _drawerFixado = false; _sincDrawerPin();
+  _setDrawer(false);
+  if(document.fullscreenElement && document.exitFullscreen){ document.exitFullscreen().catch(()=>{}); }
+  _sincBotaoTelaCheia();
+  setTimeout(()=>{ try{ mapaL && mapaL.invalidateSize(); }catch(_){} }, 340);
+}
+
+function _setDrawer(open){
+  const d = document.querySelector('.mapa-painel-wrap'); if(!d) return;
+  d.classList.toggle('drawer-aberto', open);
+  document.getElementById('btn-fs-exibicao')?.classList.toggle('ativo', open);
+}
+function toggleDrawerExibicao(){
+  const d = document.querySelector('.mapa-painel-wrap'); if(!d) return;
+  _setDrawer(!d.classList.contains('drawer-aberto'));
+}
+function fecharDrawerExibicao(force){
+  if(_drawerFixado && !force) return;
+  if(force){ _drawerFixado = false; _sincDrawerPin(); }
+  _setDrawer(false);
+}
+function toggleDrawerPin(){ _drawerFixado = !_drawerFixado; _sincDrawerPin(); }
+function _sincDrawerPin(){
+  document.getElementById('btn-drawer-pin')?.classList.toggle('fixado', _drawerFixado);
+}
+function _autoHideDrawer(){ if(_mapaImersivo && !_drawerFixado) _setDrawer(false); }
+
+// Esc sai do modo; F alterna (fora de campos de texto)
+document.addEventListener('keydown', e => {
+  if(e.key === 'Escape' && _mapaImersivo){ sairTelaCheia(); return; }
+  if((e.key === 'f' || e.key === 'F') && !e.metaKey && !e.ctrlKey && !e.altKey){
+    const tag = (e.target && e.target.tagName || '').toLowerCase();
+    if(tag === 'input' || tag === 'textarea' || tag === 'select' || e.target?.isContentEditable) return;
+    e.preventDefault(); toggleTelaCheia();
+  }
+});
+// Sair do fullscreen nativo (Esc do navegador) também sai do imersivo
+document.addEventListener('fullscreenchange', () => {
+  if(!document.fullscreenElement && _mapaImersivo) sairTelaCheia();
+});
+
+// ══════════════════════════════════════════════════════════════
 // INICIAR MAPA
 // ══════════════════════════════════════════════════════════════
 function iniciarMapa(){
   mapaL = L.map('mapa',{ center:[-9.5,-70.0], zoom:7 });
+  mapaL.on('click', _autoHideDrawer);
   _aplicarBasemap('satelite');
   _adicionarRosaDosVentos();
   _adicionarMiniMapa();
   _adicionarControleBasemap();
+  _adicionarControleTelaCheia();
   clusters = L.markerClusterGroup({ maxClusterRadius:40, disableClusteringAtZoom:14 });
   mapaL.addLayer(clusters);
   mapaL.createPane('carPane'); mapaL.getPane('carPane').style.zIndex = 450;
