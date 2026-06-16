@@ -3582,10 +3582,10 @@ async function carregarDadosCAR(ucNome){
   setStatus(`⏳ Buscando imóveis CAR para <strong>${escHtml(ucNome)}</strong>...`);
 
   try{
-    // WFS 2.0.0 com layer específico do Acre (sicar:sicar_imoveis_ac)
-    const url0 = `${CAR_WFS_BASE}?service=WFS&version=2.0.0&request=GetFeature`
-               + `&typeNames=sicar:sicar_imoveis_ac&outputFormat=application/json`
-               + `&BBOX=${bbox}&count=${CAR_PAGE}&startindex=0`;
+    // WFS 1.1.0 — versão 2.0.0 está quebrada no servidor SICAR (NoClassDefFoundError)
+    const url0 = `${CAR_WFS_BASE}?service=WFS&version=1.1.0&request=GetFeature`
+               + `&typeName=sicar:sicar_imoveis_ac&outputFormat=application/json`
+               + `&BBOX=${bbox}&maxFeatures=${CAR_PAGE}&startIndex=0`;
 
     const res0 = await _carFetchJson(url0);
     const total = res0.numberMatched || res0.totalFeatures || (res0.features||[]).length;
@@ -3597,9 +3597,9 @@ async function carregarDadosCAR(ucNome){
       setStatus(`⏳ Carregando ${npages} páginas de imóveis CAR...`);
       const promises = [];
       for(let i=1; i<npages; i++){
-        const u = `${CAR_WFS_BASE}?service=WFS&version=2.0.0&request=GetFeature`
-                + `&typeNames=sicar:sicar_imoveis_ac&outputFormat=application/json`
-                + `&BBOX=${bbox}&count=${CAR_PAGE}&startindex=${i*CAR_PAGE}`;
+        const u = `${CAR_WFS_BASE}?service=WFS&version=1.1.0&request=GetFeature`
+                + `&typeName=sicar:sicar_imoveis_ac&outputFormat=application/json`
+                + `&BBOX=${bbox}&maxFeatures=${CAR_PAGE}&startIndex=${i*CAR_PAGE}`;
         promises.push(_carFetchJson(u));
       }
       const pages = await Promise.all(promises);
