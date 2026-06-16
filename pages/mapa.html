@@ -210,6 +210,9 @@
 .btn-mapa-fs{display:flex;align-items:center;gap:6px;padding:6px 13px;background:#fff;color:#1F4E2C;border:1px solid var(--borda);border-radius:7px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;flex-shrink:0;transition:all .15s;}
 .btn-mapa-fs:hover{background:var(--cinza-50);border-color:#1F4E2C;}
 .btn-mapa-fs .bico{font-size:14px;}
+/* Controle de tela cheia sobre o mapa (canto sup-esquerdo, abaixo do zoom) */
+.mapa-fs-leaflet a{display:flex!important;align-items:center;justify-content:center;font-size:18px;color:#1F4E2C;}
+.mapa-fs-leaflet a:hover{color:#143520;background:#f4f6f5;}
 /* Cluster de controles flutuantes — só aparece no imersivo */
 .mapa-fs-controls{display:none;}
 .mapa-painel-drawer-head{display:none;}
@@ -1053,6 +1056,28 @@ let _mapaImersivo = false, _drawerFixado = false;
 
 function toggleTelaCheia(){ _mapaImersivo ? sairTelaCheia() : entrarTelaCheia(); }
 
+// Controle de tela cheia diretamente sobre o mapa (canto sup-esquerdo)
+function _adicionarControleTelaCheia(){
+  const Ctrl = L.Control.extend({ options:{position:'topleft'}, onAdd(){
+    const div = L.DomUtil.create('div','leaflet-bar mapa-fs-leaflet');
+    const a = L.DomUtil.create('a','', div);
+    a.href = '#'; a.id = 'btn-fs-mapa'; a.title = 'Ver o mapa em tela cheia (tecla F)';
+    a.setAttribute('role','button'); a.setAttribute('aria-label','Tela cheia');
+    a.innerHTML = bico('maximize');
+    L.DomEvent.disableClickPropagation(div);
+    L.DomEvent.on(a, 'click', L.DomEvent.stop).on(a, 'click', () => toggleTelaCheia());
+    return div;
+  }});
+  mapaL.addControl(new Ctrl());
+}
+
+function _sincBotaoTelaCheia(){
+  const ic = _mapaImersivo ? 'minimize' : 'maximize';
+  const tt = _mapaImersivo ? 'Sair da tela cheia (Esc)' : 'Ver o mapa em tela cheia (tecla F)';
+  const m = document.getElementById('btn-fs-mapa');
+  if(m){ m.innerHTML = bico(ic); m.title = tt; }
+}
+
 function entrarTelaCheia(){
   const wrap = document.querySelector('.mapa-wrapper');
   if(!wrap || _mapaImersivo) return;
@@ -1061,6 +1086,7 @@ function entrarTelaCheia(){
   wrap.classList.add('imersivo');
   const el = document.documentElement;
   if(el.requestFullscreen){ el.requestFullscreen().catch(()=>{}); }
+  _sincBotaoTelaCheia();
   setTimeout(()=>{ try{ mapaL && mapaL.invalidateSize(); }catch(_){} }, 340);
 }
 
@@ -1073,6 +1099,7 @@ function sairTelaCheia(){
   _drawerFixado = false; _sincDrawerPin();
   _setDrawer(false);
   if(document.fullscreenElement && document.exitFullscreen){ document.exitFullscreen().catch(()=>{}); }
+  _sincBotaoTelaCheia();
   setTimeout(()=>{ try{ mapaL && mapaL.invalidateSize(); }catch(_){} }, 340);
 }
 
@@ -1120,6 +1147,7 @@ function iniciarMapa(){
   _adicionarRosaDosVentos();
   _adicionarMiniMapa();
   _adicionarControleBasemap();
+  _adicionarControleTelaCheia();
   clusters = L.markerClusterGroup({ maxClusterRadius:40, disableClusteringAtZoom:14 });
   mapaL.addLayer(clusters);
   mapaL.createPane('carPane'); mapaL.getPane('carPane').style.zIndex = 450;
