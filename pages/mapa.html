@@ -217,13 +217,16 @@
 .mapa-fs-controls{display:none;}
 .mapa-painel-drawer-head{display:none;}
 body.mapa-imersivo{overflow:hidden;}
+/* .page-body tem animation:forwards (transform), que vira bloco de contenção
+   p/ position:fixed. Neutraliza no imersivo p/ o wrapper cobrir a viewport. */
+body.mapa-imersivo .page-body{animation:none!important;transform:none!important;}
 .mapa-wrapper.imersivo{position:fixed;inset:0;z-index:2000;height:100vh;min-height:0;margin:0;padding:10px;gap:0;background:var(--floresta,#0A1A0F);animation:mapa-fs-in .28s ease;}
 @keyframes mapa-fs-in{from{opacity:.4}to{opacity:1}}
 .mapa-wrapper.imersivo .mapa-topbar{display:none;}
 .mapa-wrapper.imersivo .mapa-container{gap:0;}
 .mapa-wrapper.imersivo #mapa{border-radius:14px;}
 /* Barra de camadas → dock glass no topo-centro */
-.mapa-wrapper.imersivo .mapa-layerbar{position:absolute;top:14px;left:50%;transform:translateX(-50%);z-index:1200;max-width:calc(100vw - 540px);min-width:0;}
+.mapa-wrapper.imersivo .mapa-layerbar{position:absolute;top:14px;left:50%;transform:translateX(-50%);z-index:1200;max-width:calc(100vw - 600px);min-width:0;}
 .mapa-wrapper.imersivo .mlb-tabs{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;background:rgba(255,255,255,.72);-webkit-backdrop-filter:blur(14px) saturate(1.5);backdrop-filter:blur(14px) saturate(1.5);border:1px solid rgba(255,255,255,.6);box-shadow:0 10px 36px rgba(10,26,15,.30);border-radius:14px;padding:7px 9px;gap:5px;}
 .mapa-wrapper.imersivo .mlb-tabs::-webkit-scrollbar{display:none;}
 /* Cluster de ações flutuantes (topo-direita) */
