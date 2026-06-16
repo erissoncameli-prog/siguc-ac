@@ -1056,6 +1056,7 @@ function fecharPainelMobile(){ document.getElementById('mapa-painel-wrap').class
 // MODO TELA CHEIA (imersivo) + drawer de exibição
 // ══════════════════════════════════════════════════════════════
 let _mapaImersivo = false, _drawerFixado = false;
+let _fsOrigParent = null, _fsOrigNext = null;
 
 function toggleTelaCheia(){ _mapaImersivo ? sairTelaCheia() : entrarTelaCheia(); }
 
@@ -1086,11 +1087,18 @@ function entrarTelaCheia(){
   if(!wrap || _mapaImersivo) return;
   _mapaImersivo = true;
   document.body.classList.add('mapa-imersivo');
+  // Reparenta para o <body>: escapa de qualquer ancestral com transform/
+  // filter/animation que vire bloco de contenção do position:fixed.
+  _fsOrigParent = wrap.parentNode;
+  _fsOrigNext = wrap.nextSibling;
+  if(wrap.parentNode !== document.body) document.body.appendChild(wrap);
   wrap.classList.add('imersivo');
-  const el = document.documentElement;
-  if(el.requestFullscreen){ el.requestFullscreen().catch(()=>{}); }
+  // Fullscreen nativo no PRÓPRIO wrapper: vai p/ a top layer e cobre tudo,
+  // independentemente de stacking/containing block.
+  const reqFS = wrap.requestFullscreen || wrap.webkitRequestFullscreen;
+  if(reqFS){ try{ reqFS.call(wrap).catch(()=>{}); }catch(_){} }
   _sincBotaoTelaCheia();
-  setTimeout(()=>{ try{ mapaL && mapaL.invalidateSize(); }catch(_){} }, 340);
+  setTimeout(()=>{ try{ mapaL && mapaL.invalidateSize(); }catch(_){} }, 360);
 }
 
 function sairTelaCheia(){
@@ -1101,9 +1109,16 @@ function sairTelaCheia(){
   document.body.classList.remove('mapa-imersivo');
   _drawerFixado = false; _sincDrawerPin();
   _setDrawer(false);
-  if(document.fullscreenElement && document.exitFullscreen){ document.exitFullscreen().catch(()=>{}); }
+  const fsEl = document.fullscreenElement || document.webkitFullscreenElement;
+  if(fsEl && document.exitFullscreen){ document.exitFullscreen().catch(()=>{}); }
+  // Restaura a posição original do wrapper no DOM
+  if(_fsOrigParent){
+    if(_fsOrigNext && _fsOrigNext.parentNode === _fsOrigParent) _fsOrigParent.insertBefore(wrap, _fsOrigNext);
+    else _fsOrigParent.appendChild(wrap);
+    _fsOrigParent = null; _fsOrigNext = null;
+  }
   _sincBotaoTelaCheia();
-  setTimeout(()=>{ try{ mapaL && mapaL.invalidateSize(); }catch(_){} }, 340);
+  setTimeout(()=>{ try{ mapaL && mapaL.invalidateSize(); }catch(_){} }, 360);
 }
 
 function _setDrawer(open){
@@ -1136,9 +1151,12 @@ document.addEventListener('keydown', e => {
   }
 });
 // Sair do fullscreen nativo (Esc do navegador) também sai do imersivo
-document.addEventListener('fullscreenchange', () => {
-  if(!document.fullscreenElement && _mapaImersivo) sairTelaCheia();
-});
+function _onFsChange(){
+  const fsEl = document.fullscreenElement || document.webkitFullscreenElement;
+  if(!fsEl && _mapaImersivo) sairTelaCheia();
+}
+document.addEventListener('fullscreenchange', _onFsChange);
+document.addEventListener('webkitfullscreenchange', _onFsChange);
 
 // ══════════════════════════════════════════════════════════════
 // INICIAR MAPA
