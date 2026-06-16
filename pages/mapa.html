@@ -3057,7 +3057,7 @@ function _aplicarEstiloTI(){
     const mostrarNomes = document.getElementById('ti-nomes')?.checked || false;
     _tiLayer.eachLayer(layer=>{
       const p=layer.feature?.properties||{};
-      const nome=p.terrai_nom||p.nome||p.NAME||p.name||'Terra Indígena';
+      const nome=p.terrai_nome||p.terrai_nom||p.nome||p.NAME||p.name||'Terra Indígena';
       layer.unbindTooltip();
       layer.bindTooltip(nome,{permanent:mostrarNomes,direction:'center',className:'subbacia-label'});
       if(mostrarNomes) layer.openTooltip();
@@ -3084,10 +3084,12 @@ function _renderizarTI(){
   _tiLayer=L.geoJSON(_tiGeojson,{
     style: _getTIEstilo(),
     onEachFeature:(f,layer)=>{
-      const p=f.properties; const nome=p.terrai_nom||p.nome||p.NAME||p.name||'Terra Indígena';
+      const p=f.properties; const nome=p.terrai_nome||p.terrai_nom||p.nome||p.NAME||p.name||'Terra Indígena';
       layer.bindTooltip(nome,{permanent:mostrarNomes,direction:'center',className:'subbacia-label'});
-      const etnia=p.etniaind||p.etnia||'';
-      const ha=p.area_ha||p.areaha||p.AREAHA||'';
+      const etnia=p.etnia_nome||p.etniaind||p.etnia||'';
+      const ha=p.superficie_perimetro_ha||p.area_ha||p.areaha||p.AREAHA||'';
+      const mun=p.municipio_nome||'';
+      const modalidade=p.modalidade_ti||'';
       layer.bindPopup(`<div class="camada-popup">
         <div class="cp-header" style="background:#92400e">🪶 Terra Indígena</div>
         <div class="cp-layer">
@@ -3095,6 +3097,8 @@ function _renderizarTI(){
           ${etnia?`<div class="cp-row"><strong>Etnia</strong><span>${escHtml(etnia)}</span></div>`:''}
           ${ha?`<div class="cp-row"><strong>Área</strong><span>${Number(ha).toLocaleString('pt-BR',{maximumFractionDigits:0})} ha</span></div>`:''}
           ${p.fase_ti||p.fase?`<div class="cp-row"><strong>Fase</strong><span>${escHtml(p.fase_ti||p.fase)}</span></div>`:''}
+          ${modalidade?`<div class="cp-row"><strong>Modalidade</strong><span>${escHtml(modalidade)}</span></div>`:''}
+          ${mun?`<div class="cp-row"><strong>Município</strong><span>${escHtml(mun)}</span></div>`:''}
         </div>
       </div>`,{className:'camada-popup-wrap',maxWidth:280});
     }
