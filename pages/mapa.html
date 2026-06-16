@@ -43,6 +43,15 @@
 .mlb-close{background:none;border:none;cursor:pointer;font-size:14px;color:var(--cinza-400);padding:0 2px;line-height:1;}
 .mlb-close:hover{color:var(--cinza-700);}
 .mlb-dropdown-body{padding:10px 12px;display:flex;flex-direction:column;gap:8px;max-height:420px;overflow-y:auto;}
+/* Aba unificada — Áreas Territoriais (seções recolhíveis) */
+.areas-sec{border:1px solid var(--borda);border-radius:9px;overflow:hidden;}
+.areas-sec-head{width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 12px;background:var(--cinza-50);border:none;cursor:pointer;font-family:inherit;font-size:12px;font-weight:700;color:var(--cinza-700);transition:background .14s;}
+.areas-sec-head.uc{border-left:3px solid #1F4E2C;}
+.areas-sec-head.ti{border-left:3px solid #d97706;}
+.areas-sec-head:hover{background:var(--cinza-100);}
+.areas-sec-body{padding:12px;border-top:1px solid var(--borda);}
+.areas-chev{font-size:11px;color:var(--cinza-400);transition:transform .18s;}
+.areas-chev.areas-chev-col{transform:rotate(-90deg);}
 /* Popup */
 .mapa-popup{min-width:200px;max-width:280px;font-family:'DM Sans',sans-serif;}
 .camada-popup{font-family:'DM Sans',sans-serif;font-size:12px;color:#374151;}
@@ -800,8 +809,7 @@ function renderPagina(){
       <div class="mlb-tabs">
         <button class="mlb-tab" id="mlb-btn-veg" onclick="toggleLayerBar('veg')">🌿 Cobertura Vegetal</button>
         <button class="mlb-tab" id="mlb-btn-car" onclick="toggleLayerBar('car')">🏡 CAR — Imóveis Rurais <span class="mlb-badge" id="car-count-badge" style="display:none">0</span></button>
-        <button class="mlb-tab" id="mlb-btn-uc"  onclick="toggleLayerBar('uc')">🌿 Unidades de Conservação <span class="mlb-badge" id="uc-count-badge" style="display:none">0</span></button>
-        <button class="mlb-tab" id="mlb-btn-ti"  onclick="toggleLayerBar('ti')">🪶 Terras Indígenas <span class="mlb-badge" id="ti-count-badge" style="display:none">0</span></button>
+        <button class="mlb-tab" id="mlb-btn-areas" onclick="toggleLayerBar('areas')">🌿 Áreas Territoriais <span class="mlb-badge" id="uc-count-badge" title="Unidades de Conservação" style="display:none">0</span> <span class="mlb-badge" id="ti-count-badge" title="Terras Indígenas" style="display:none">0</span></button>
         <button class="mlb-tab" id="mlb-btn-alertas" onclick="toggleLayerBar('alertas')">🔥 Alertas Ambientais <span class="mlb-badge" id="alertas-count-badge" style="display:none">0</span></button>
         <button class="mlb-tab" id="mlb-btn-brigadas" onclick="toggleLayerBar('brigadas')">🧯 Brigadas Comunitárias <span class="mlb-badge" id="brigadas-count-badge" style="display:none">0</span></button>
         <button class="mlb-tab" id="mlb-btn-projetos" onclick="toggleLayerBar('projetos')">📐 Projetos de Análise <span class="mlb-badge" id="projetos-count-badge" style="display:none">0</span></button>
@@ -1049,6 +1057,13 @@ function toggleBloco(id){
   const el = document.getElementById(id); if(!el) return;
   el.style.display = el.style.display === 'none' ? '' : 'none';
 }
+// Acordeão das seções da aba Áreas Territoriais (com rotação do chevron)
+function toggleBlocoChevron(id, chevId){
+  const el = document.getElementById(id); if(!el) return;
+  const oculto = el.style.display === 'none';
+  el.style.display = oculto ? '' : 'none';
+  document.getElementById(chevId)?.classList.toggle('areas-chev-col', !oculto);
+}
 function abrirPainelMobile(){ document.getElementById('mapa-painel-wrap').classList.add('mobile-aberto'); document.getElementById('mapa-backdrop').classList.add('ativo'); }
 function fecharPainelMobile(){ document.getElementById('mapa-painel-wrap').classList.remove('mobile-aberto'); document.getElementById('mapa-backdrop').classList.remove('ativo'); }
 
@@ -1177,8 +1192,9 @@ function iniciarMapa(){
   _iniciarDragCard('uc-stats-card','uc-stats-card');
   // Elementos cartográficos obrigatórios
   CART.init(mapaL);
-  // Pré-renderizar painel UC no DOM (sem abrir visualmente) e carregar estaduais
-  document.getElementById('mlb-dropdown').innerHTML = _renderDropdown('uc');
+  // Pré-renderizar painel de Áreas Territoriais (UC+TI) no DOM (sem abrir
+  // visualmente) — garante que os controles de UC existam p/ toggleUC.
+  document.getElementById('mlb-dropdown').innerHTML = _renderDropdown('areas');
   toggleUC(true);
 }
 
@@ -1245,8 +1261,9 @@ function toggleLayerBar(id){
   document.querySelectorAll('.mlb-tab').forEach(t => t.classList.toggle('ativo', t.id==='mlb-btn-'+id));
   dd.innerHTML = _renderDropdown(id);
   dd.style.display = '';
-  // Ao abrir aba UC, sincroniza checkboxes com estado atual das variáveis
-  if(id === 'uc' && _ucGeojson) {
+  // Ao abrir a aba Áreas Territoriais, sincroniza os controles (UC e TI)
+  // com o estado atual mantido nas variáveis.
+  if((id === 'uc' || id === 'areas') && _ucGeojson) {
     const elFed = document.getElementById('uc-esfera-federal');
     const elEst = document.getElementById('uc-esfera-estadual');
     const elMun = document.getElementById('uc-esfera-municipal');
@@ -1257,6 +1274,11 @@ function toggleLayerBar(id){
     if(ctrl) ctrl.style.display = '';
     _ucConstruirPainel();
   }
+  if(id === 'areas'){
+    const tt = document.getElementById('ti-toggle');
+    if(tt) tt.checked = _tiAtivo;
+    _tiAplicarEstadoUI();
+  }
 }
 document.addEventListener('click', e => {
   const lb = document.getElementById('mapa-layerbar');
@@ -1266,6 +1288,27 @@ document.addEventListener('click', e => {
 function _renderDropdown(id){
   const hdr = (titulo) => `<div class="mlb-dropdown-header"><span class="mlb-dropdown-title">${titulo}</span><button class="mlb-close" onclick="toggleLayerBar('${id}')">✕</button></div><div class="mlb-dropdown-body">`;
   const foot = '</div>';
+  // Aba unificada: reaproveita os corpos de UC e TI (mesmos IDs/handlers)
+  // como duas seções recolhíveis, sem duplicar markup.
+  if(id==='areas'){
+    const corpo = s => s
+      .replace(/^[\s\S]*?<div class="mlb-dropdown-body">/, '')
+      .replace(/<\/div>\s*$/, '');
+    return hdr('🌿 Áreas Territoriais') + `
+      <div class="areas-sec">
+        <button type="button" class="areas-sec-head uc" onclick="toggleBlocoChevron('areas-sec-uc','areas-chev-uc')">
+          <span>🌿 Unidades de Conservação</span><span id="areas-chev-uc" class="areas-chev">▾</span>
+        </button>
+        <div id="areas-sec-uc" class="areas-sec-body">${corpo(_renderDropdown('uc'))}</div>
+      </div>
+      <div class="areas-sec">
+        <button type="button" class="areas-sec-head ti" onclick="toggleBlocoChevron('areas-sec-ti','areas-chev-ti')">
+          <span>🪶 Terras Indígenas</span><span id="areas-chev-ti" class="areas-chev areas-chev-col">▾</span>
+        </button>
+        <div id="areas-sec-ti" class="areas-sec-body" style="display:none">${corpo(_renderDropdown('ti'))}</div>
+      </div>
+    ` + foot;
+  }
   if(id==='veg') return hdr('🌿 Cobertura Vegetal & Desmatamento') + `
     ${_vegCard('mapbiomas','MapBiomas Coleção 8','Uso e cobertura do solo. Resolução 30m. Ano base 2023.','#16a34a')}
     ${_vegCard('prodes','PRODES — Desmatamento Anual','INPE/TerraBrasilis · Desmatamento incremental por ano.','#dc2626')}
@@ -3047,10 +3090,31 @@ function _getTIEstilo(){
   const fillOp = parseFloat(document.getElementById('ti-opacity')?.value || '40') / 100;
   return {color:cor, weight:peso, opacity:.9, fillColor:fill, fillOpacity:fillOp, dashArray:dash||null};
 }
+// Estado dos controles de estilo da TI, p/ restaurar ao reabrir a aba
+let _tiEstadoUI = null;
+function _tiCapturarEstadoUI(){
+  _tiEstadoUI = {
+    cor:     document.getElementById('ti-cor-linha')?.value ?? '#d97706',
+    fill:    document.getElementById('ti-cor-fill')?.value  ?? '#f59e0b',
+    dash:    document.getElementById('ti-dash')?.value      ?? '6 4',
+    peso:    document.getElementById('ti-peso')?.value      ?? '2',
+    opacity: document.getElementById('ti-opacity')?.value   ?? '40',
+    nomes:   document.getElementById('ti-nomes')?.checked   ?? false,
+  };
+}
+function _tiAplicarEstadoUI(){
+  if(!_tiEstadoUI) return;
+  const s = _tiEstadoUI, set = (id,prop,v)=>{ const e=document.getElementById(id); if(e) e[prop]=v; };
+  set('ti-cor-linha','value',s.cor); set('ti-cor-fill','value',s.fill);
+  set('ti-dash','value',s.dash); set('ti-peso','value',s.peso);
+  set('ti-opacity','value',s.opacity); set('ti-nomes','checked',s.nomes);
+  const v = document.getElementById('ti-opacity-val'); if(v) v.textContent = Math.round(parseFloat(s.opacity)) + '%';
+}
 function _aplicarEstiloTI(){
   const op  = document.getElementById('ti-opacity');
   const val = document.getElementById('ti-opacity-val');
   if(op && val) val.textContent = Math.round(parseFloat(op.value)) + '%';
+  _tiCapturarEstadoUI();
   if(_tiLayer){
     _tiOpacity = parseFloat(op?.value||'40') / 100;
     _tiLayer.setStyle(_getTIEstilo());
