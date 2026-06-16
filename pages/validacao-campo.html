@@ -182,6 +182,10 @@
 .val-map-chk { font-size:.78rem; display:flex; align-items:center; gap:5px; cursor:pointer }
 .val-map-sel { font-size:.78rem; padding:4px 6px; border:1px solid var(--border,#e5e7eb); border-radius:6px; background:#fff }
 .val-mapa { width:100%; height:320px; border-radius:10px; border:1px solid var(--border,#e5e7eb); overflow:hidden; background:#eaf0ea }
+/* Blindagem: garante que nenhuma regra global de imagem encolha os tiles do Leaflet */
+.val-mapa .leaflet-tile,
+.val-mapa img.leaflet-image-layer,
+.val-mapa .leaflet-marker-icon { max-width:none !important; max-height:none !important }
 .val-map-foot { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px; margin-top:8px }
 .val-evidencia { font-size:.8rem; font-weight:600; padding:4px 10px; border-radius:20px; background:#f3f4f6; color:#374151 }
 .val-evidencia.tem-fogo { background:#fee2e2; color:#991b1b }
@@ -897,10 +901,12 @@ async function initMapaValidacao(r) {
   sec.hidden = false
 
   const centro = pontoCoord ? [pontoCoord[1], pontoCoord[0]] : [-9.5, -70]
-  _valMap = L.map('val-mapa', { zoomControl: true }).setView(centro, 15)
+  _valMap = L.map('val-mapa', { zoomControl: true, zoomAnimation: false, fadeAnimation: false }).setView(centro, 15)
   mapaBasemapSatelite(L).addTo(_valMap)
   _valDrawn = new L.FeatureGroup().addTo(_valMap)
-  setTimeout(() => { if (_valMap) _valMap.invalidateSize() }, 250)
+  // Revalida o tamanho após o modal abrir (evita tela cinza/sumiço no zoom)
+  setTimeout(() => { if (_valMap) _valMap.invalidateSize() }, 120)
+  setTimeout(() => { if (_valMap) _valMap.invalidateSize() }, 400)
 
   if (pontoCoord) {
     L.circleMarker([pontoCoord[1], pontoCoord[0]],
