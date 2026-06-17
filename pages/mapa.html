@@ -203,6 +203,12 @@
 @keyframes arvoreCai{0%,45%{transform:translateX(-50%) rotate(0deg);}55%{transform:translateX(-50%) rotate(-7deg);}80%,93%{transform:translateX(-50%) rotate(74deg);}100%{transform:translateX(-50%) rotate(0deg);}}
 .deter-base{position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:8px;height:3px;border-radius:2px;}
 .deter-arvore.estatico svg{animation:none;transform:translateX(-50%);}
+/* ── Botão flutuante: Linha do Tempo ── */
+#tl-fab{position:absolute;top:12px;left:52px;z-index:600;display:flex;align-items:center;gap:6px;height:34px;padding:0 13px;background:rgba(255,255,255,.95);border:1px solid rgba(0,0,0,.12);border-radius:9px;box-shadow:0 4px 16px rgba(0,0,0,.25);color:#1F4E2C;font-size:12px;font-weight:600;font-family:'DM Sans',sans-serif;cursor:pointer;transition:all .15s;backdrop-filter:blur(4px);white-space:nowrap;}
+#tl-fab:hover{background:#fff;transform:translateY(-1px);border-color:#1F4E2C;}
+#tl-fab.ativo{background:#1F4E2C;color:#fff;border-color:#1F4E2C;}
+#tl-fab svg{flex-shrink:0;}
+@media(max-width:560px){#tl-fab span{display:none;}#tl-fab{padding:0 9px;}}
 /* ── Selo de auto-atualização ── */
 #auto-badge{position:absolute;top:12px;right:12px;z-index:600;display:flex;align-items:center;gap:9px;background:rgba(255,255,255,.93);border:1px solid rgba(0,0,0,.1);border-radius:10px;padding:6px 10px;box-shadow:0 4px 16px rgba(0,0,0,.25);backdrop-filter:blur(4px);font-size:11px;color:#374151;font-family:'DM Sans',sans-serif;}
 .auto-pulse{width:8px;height:8px;border-radius:50%;background:#16a34a;flex-shrink:0;box-shadow:0 0 0 0 rgba(22,163,74,.5);animation:autoPulse 2s infinite;}
@@ -858,7 +864,6 @@ function renderPagina(){
         <button class="mlb-tab" id="mlb-btn-areas" onclick="toggleLayerBar('areas')">🌿 Áreas Territoriais <span class="mlb-badge" id="uc-count-badge" title="Unidades de Conservação" style="display:none">0</span> <span class="mlb-badge" id="ti-count-badge" title="Terras Indígenas" style="display:none">0</span></button>
         <button class="mlb-tab" id="mlb-btn-alertas" onclick="toggleLayerBar('alertas')">🔥 Alertas e Focos <span class="mlb-badge" id="alertas-count-badge" style="display:none">0</span></button>
         <button class="mlb-tab" id="mlb-btn-brigadas" onclick="toggleLayerBar('brigadas')">🧯 Brigadas Comunitárias <span class="mlb-badge" id="brigadas-count-badge" style="display:none">0</span></button>
-        <button class="mlb-tab" id="mlb-btn-timeline" onclick="toggleTimeline()">🕑 Linha do Tempo</button>
         <button class="mlb-tab" id="mlb-btn-projetos" onclick="toggleLayerBar('projetos')">📐 Projetos de Análise <span class="mlb-badge" id="projetos-count-badge" style="display:none">0</span></button>
         <button class="mlb-tab" id="mlb-btn-mun" onclick="toggleLayerBar('mun')">🏙 Municípios</button>
         <button class="mlb-tab" id="mlb-btn-acre" onclick="toggleLayerBar('acre')">🗺 Delimitação do Acre</button>
@@ -869,6 +874,12 @@ function renderPagina(){
     <div class="mapa-container">
       <!-- MAPA -->
       <div id="mapa" style="position:relative">
+
+        <!-- Botão flutuante: Linha do Tempo -->
+        <button id="tl-fab" onclick="toggleTimeline()" title="Linha do tempo — focos e cobertura por data">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/></svg>
+          <span>Linha do Tempo</span>
+        </button>
 
         <!-- Selo de auto-atualização (aparece com Alertas e Focos ligado) -->
         <div id="auto-badge" style="display:none">
@@ -2849,7 +2860,7 @@ const _tlFocosCacheAno = {}
 function toggleTimeline() {
   _tlAberta = !_tlAberta
   document.getElementById('timeline-bar').style.display = _tlAberta ? 'block' : 'none'
-  document.getElementById('mlb-btn-timeline').classList.toggle('ativo', _tlAberta)
+  document.getElementById('tl-fab')?.classList.toggle('ativo', _tlAberta)
   if (_tlAberta) {
     // assume o controle: esconde camadas ao vivo
     if (_focosNrtLayer) { mapaL.removeLayer(_focosNrtLayer); _focosNrtLayer = null }
