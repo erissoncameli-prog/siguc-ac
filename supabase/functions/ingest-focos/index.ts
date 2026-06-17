@@ -46,14 +46,26 @@ async function buscarFIRMS(sensor: string): Promise<any[]> {
   return csvParaObjetos(await r.text())
 }
 
+// BDQueimadas (INPE) — CSV de Dados Abertos (focos diários do Brasil).
+// A API JSON antiga (queimadas.dgi.inpe.br/api/focos) foi descontinuada;
+// agora baixamos o CSV diário e filtramos estado=ACRE. Pega hoje e ontem
+// (o arquivo do dia pode ainda não existir/estar parcial).
 async function buscarBDQueimadas(): Promise<any[]> {
-  try {
-    const r = await fetch('https://queimadas.dgi.inpe.br/api/focos/?page_size=1000&estado=AC',
-      { signal: AbortSignal.timeout(20000) })
-    if (!r.ok) return []
-    const j = await r.json()
-    return j.results ?? j ?? []
-  } catch { return [] }
+  const BASE = 'https://dataserver-coids.inpe.br/queimadas/queimadas/focos/csv/diario/Brasil'
+  const out: any[] = []
+  for (const off of [0, 1]) {
+    const d = new Date(); d.setUTCDate(d.getUTCDate() - off)
+    const ymd = d.toISOString().slice(0, 10).replace(/-/g, '')
+    try {
+      const r = await fetch(`${BASE}/focos_diario_br_${ymd}.csv`, { signal: AbortSignal.timeout(30000) })
+      if (!r.ok) continue
+      for (const o of csvParaObjetos(await r.text())) {
+        if ((o.estado ?? '').toUpperCase() !== 'ACRE') continue
+        out.push(o)
+      }
+    } catch { /* best-effort */ }
+  }
+  return out
 }
 
 Deno.serve(async () => {
@@ -83,9 +95,14 @@ Deno.serve(async () => {
     for (const f of await buscarBDQueimadas()) {
       const lat = parseFloat(f.lat ?? f.latitude), lon = parseFloat(f.lon ?? f.longitude)
       if (!isFinite(lat) || !isFinite(lon)) continue
+      const dhRaw = f.data_hora_gmt ?? f.datahora
+      // CSV vem como "YYYY-MM-DD HH:MM:SS" em GMT → marca como UTC
+      const dataHora = dhRaw
+        ? (dhRaw.includes('T') || dhRaw.endsWith('Z') ? dhRaw : dhRaw.replace(' ', 'T') + 'Z')
+        : new Date().toISOString()
       linhas.push({
         lat, lon,
-        data_hora: f.data_hora_gmt ?? f.datahora ?? new Date().toISOString(),
+        data_hora: dataHora,
         satelite:  f.satelite ?? f.satellite ?? 'INPE',
         fonte:     'BDQUEIMADAS',
         frp:       f.frp ? parseFloat(f.frp) : null,

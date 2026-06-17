@@ -5,7 +5,10 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-const FIRMS_KEY        = Deno.env.get('FIRMS_MAP_KEY') ?? ''
+const FIRMS_KEY_ENV    = Deno.env.get('FIRMS_MAP_KEY') ?? ''
+// Mesma chave (já pública) usada em ingest-focos e /api/focos-proxy.js.
+// Fallback garante que FIRMS funcione mesmo sem o secret configurado.
+const FIRMS_KEY        = FIRMS_KEY_ENV || '66690c20b8bf3f13bb21f8706e3a75d5'
 const RESEND_KEY       = Deno.env.get('RESEND_API_KEY') ?? ''
 const SUPABASE_URL     = Deno.env.get('SUPABASE_URL') ?? ''
 const SUPABASE_SRK     = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -33,6 +36,38 @@ function severidadeAreaHa(ha: number): string {
 
 function hoje(): string {
   return new Date().toISOString().slice(0, 10)
+}
+
+function csvParaObjetos(csv: string): Record<string, string>[] {
+  const linhas = csv.trim().split('\n')
+  if (linhas.length < 2) return []
+  const cab = linhas[0].split(',').map(h => h.trim())
+  return linhas.slice(1).map(l => {
+    const v = l.split(',')
+    const o: Record<string, string> = {}
+    cab.forEach((h, i) => { o[h] = (v[i] ?? '').trim() })
+    return o
+  })
+}
+
+// BDQueimadas (INPE): CSV diário de focos do Brasil (estado=ACRE).
+// A API JSON antiga foi descontinuada (404).
+const BDQ_BASE = 'https://dataserver-coids.inpe.br/queimadas/queimadas/focos/csv/diario/Brasil'
+
+async function bdqFocosAcre(): Promise<any[]> {
+  const out: any[] = []
+  for (const off of [0, 1]) {
+    const d = new Date(); d.setUTCDate(d.getUTCDate() - off)
+    const ymd = d.toISOString().slice(0, 10).replace(/-/g, '')
+    try {
+      const r = await fetch(`${BDQ_BASE}/focos_diario_br_${ymd}.csv`, { signal: AbortSignal.timeout(30000) })
+      if (!r.ok) continue
+      for (const o of csvParaObjetos(await r.text())) {
+        if ((o.estado ?? '').toUpperCase() === 'ACRE') out.push(o)
+      }
+    } catch { /* best-effort */ }
+  }
+  return out
 }
 
 // ── Busca FIRMS (focos de calor) ────────────────────────────
@@ -69,15 +104,59 @@ async function buscarDETER(): Promise<any[]> {
 // ── Busca BDQueimadas (focos INPE) ──────────────────────────
 
 async function buscarBDQueimadas(): Promise<any[]> {
-  const url = `https://queimadas.dgi.inpe.br/api/focos/?page_size=500&estado=AC`
+  return await bdqFocosAcre()
+}
+
+// ── Diagnóstico das fontes (dry-run: testa sem inserir) ─────
+
+async function checarFIRMS() {
+  const url = `https://firms.modaps.eosdis.nasa.gov/api/area/csv/${FIRMS_KEY}/VIIRS_SNPP_NRT/${ACRE_BBOX}/1`
   try {
     const res = await fetch(url, { signal: AbortSignal.timeout(15000) })
-    if (!res.ok) return []
-    const json = await res.json()
-    return json.results ?? json ?? []
-  } catch {
-    return []
+    const txt = await res.text()
+    if (!res.ok) return { fonte: 'FIRMS', ok: false, http_status: res.status, registros: 0, erro: txt.slice(0, 200) }
+    const linhas = txt.trim().split('\n').filter(Boolean)
+    const n = Math.max(0, linhas.length - 1)
+    // FIRMS responde 200 mesmo com erro de chave (texto "Invalid MAP_KEY")
+    const suspeito = n === 0 && /invalid|error|key|exceed/i.test(linhas[0] ?? '')
+    return { fonte: 'FIRMS', ok: !suspeito, http_status: res.status, registros: n, erro: suspeito ? linhas[0] : null }
+  } catch (e) {
+    return { fonte: 'FIRMS', ok: false, http_status: 0, registros: 0, erro: String((e as Error).message ?? e) }
   }
+}
+
+async function checarDETER() {
+  const url = `https://terrabrasilis.dpi.inpe.br/geoserver/deter-amz/ows?` +
+    `service=WFS&version=1.0.0&request=GetFeature` +
+    `&typeName=deter-amz:deter_amz&outputFormat=application/json` +
+    `&BBOX=${ACRE_BBOX},EPSG:4326&maxFeatures=200`
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(20000) })
+    if (!res.ok) return { fonte: 'DETER', ok: false, http_status: res.status, registros: 0, erro: `HTTP ${res.status}` }
+    const json = await res.json()
+    return { fonte: 'DETER', ok: true, http_status: res.status, registros: json.features?.length ?? 0, erro: null }
+  } catch (e) {
+    return { fonte: 'DETER', ok: false, http_status: 0, registros: 0, erro: String((e as Error).message ?? e) }
+  }
+}
+
+async function checarBDQueimadas() {
+  // Testa o CSV diário mais recente (hoje, com fallback p/ ontem)
+  for (const off of [0, 1]) {
+    const d = new Date(); d.setUTCDate(d.getUTCDate() - off)
+    const ymd = d.toISOString().slice(0, 10).replace(/-/g, '')
+    const url = `${BDQ_BASE}/focos_diario_br_${ymd}.csv`
+    try {
+      const res = await fetch(url, { signal: AbortSignal.timeout(30000) })
+      if (!res.ok) { if (off === 1) return { fonte: 'BDQUEIMADAS', ok: false, http_status: res.status, registros: 0, erro: `HTTP ${res.status} (${ymd})` }; continue }
+      const objs = csvParaObjetos(await res.text())
+      const acre = objs.filter(o => (o.estado ?? '').toUpperCase() === 'ACRE').length
+      return { fonte: 'BDQUEIMADAS', ok: true, http_status: res.status, registros: acre, erro: null }
+    } catch (e) {
+      if (off === 1) return { fonte: 'BDQUEIMADAS', ok: false, http_status: 0, registros: 0, erro: String((e as Error).message ?? e) }
+    }
+  }
+  return { fonte: 'BDQUEIMADAS', ok: false, http_status: 0, registros: 0, erro: 'CSV diário indisponível' }
 }
 
 // ── Cruzar ponto com UCs via PostGIS ────────────────────────
@@ -317,6 +396,24 @@ Deno.serve(async (req) => {
     })
   }
 
+  // ── Modo diagnóstico (dry-run): testa as fontes SEM inserir nem enviar e-mail ──
+  let body: any = {}
+  try { body = await req.json() } catch { /* corpo vazio */ }
+  if (body?.check) {
+    const [firms, deter, bdqueimadas] = await Promise.all([
+      checarFIRMS(), checarDETER(), checarBDQueimadas(),
+    ])
+    return new Response(JSON.stringify({
+      ok: true,
+      modo: 'check',
+      firms_key_configurada: FIRMS_KEY_ENV !== '',
+      fontes: { firms, deter, bdqueimadas },
+      timestamp: new Date().toISOString(),
+    }), {
+      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+    })
+  }
+
   const inicio = Date.now()
   const erros: string[] = []
   let novos = 0
@@ -348,6 +445,7 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({
       ok: true,
       novos_alertas: novos,
+      firms_key_configurada: FIRMS_KEY_ENV !== '',
       erros,
       duracao_ms: duracao,
       timestamp: new Date().toISOString(),
