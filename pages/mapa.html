@@ -324,6 +324,7 @@ body.mapa-imersivo .page-body{animation:none!important;transform:none!important;
 <link rel="stylesheet" href="../css/relatorio-print.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
 <script src="https://unpkg.com/leaflet-minimap@3.6.1/dist/Control.MiniMap.min.js"></script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css"/>
 <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
@@ -811,6 +812,7 @@ function renderPagina(){
         <button class="mlb-tab" id="mlb-btn-car" onclick="toggleLayerBar('car')">🏡 CAR — Imóveis Rurais <span class="mlb-badge" id="car-count-badge" style="display:none">0</span></button>
         <button class="mlb-tab" id="mlb-btn-areas" onclick="toggleLayerBar('areas')">🌿 Áreas Territoriais <span class="mlb-badge" id="uc-count-badge" title="Unidades de Conservação" style="display:none">0</span> <span class="mlb-badge" id="ti-count-badge" title="Terras Indígenas" style="display:none">0</span></button>
         <button class="mlb-tab" id="mlb-btn-alertas" onclick="toggleLayerBar('alertas')">🔥 Alertas Ambientais <span class="mlb-badge" id="alertas-count-badge" style="display:none">0</span></button>
+        <button class="mlb-tab" id="mlb-btn-focos" onclick="toggleLayerBar('focos')">🛰 Focos em Tempo Real <span class="mlb-badge" id="focos-count-badge" style="display:none">0</span></button>
         <button class="mlb-tab" id="mlb-btn-brigadas" onclick="toggleLayerBar('brigadas')">🧯 Brigadas Comunitárias <span class="mlb-badge" id="brigadas-count-badge" style="display:none">0</span></button>
         <button class="mlb-tab" id="mlb-btn-projetos" onclick="toggleLayerBar('projetos')">📐 Projetos de Análise <span class="mlb-badge" id="projetos-count-badge" style="display:none">0</span></button>
         <button class="mlb-tab" id="mlb-btn-mun" onclick="toggleLayerBar('mun')">🏙 Municípios</button>
@@ -1280,6 +1282,33 @@ function toggleLayerBar(id){
     _tiAplicarEstadoUI();
     _tiAtualizarResumo();
   }
+  // Brigadas: restaura estado do toggle e dos seletores de exibição/peso
+  if(id === 'brigadas'){
+    const bt = document.getElementById('brigadas-toggle');
+    if(bt) bt.checked = _brigadasAtivo;
+    const fw = document.getElementById('brigadas-filtros-wrap');
+    if(fw) fw.style.display = _brigadasAtivo ? 'flex' : 'none';
+    const rm = document.querySelector(`[name="brig-modo"][value="${_brigModoExib}"]`);
+    if(rm) rm.checked = true;
+    const rp = document.querySelector(`[name="brig-peso"][value="${_brigPesoCalor}"]`);
+    if(rp) rp.checked = true;
+    const pw = document.getElementById('brig-peso-wrap');
+    if(pw) pw.style.display = (_brigModoExib === 'mancha' || _brigModoExib === 'ambos') ? 'block' : 'none';
+  }
+  // Focos em tempo real: restaura estado do toggle e do período
+  if(id === 'focos'){
+    const ft = document.getElementById('focos-toggle');
+    if(ft) ft.checked = _focosNrtAtivo;
+    const fw = document.getElementById('focos-filtros-wrap');
+    if(fw) fw.style.display = _focosNrtAtivo ? 'flex' : 'none';
+    const fd = document.getElementById('focos-dias');
+    if(fd) fd.value = String(_focosNrtDias);
+    if(_focosNrtAtivo){
+      const st = document.getElementById('focos-mapa-stat');
+      const n  = _focosNrtLayer ? _focosNrtLayer.getLayers().length : 0;
+      if(st) st.textContent = `${n} foco${n !== 1 ? 's' : ''} exibido${n !== 1 ? 's' : ''}`;
+    }
+  }
 }
 document.addEventListener('click', e => {
   const lb = document.getElementById('mapa-layerbar');
@@ -1601,6 +1630,40 @@ function _renderDropdown(id){
       <a href="../pages/alertas-ambientais.html" style="font-size:11px;color:var(--verde-c);text-decoration:none;font-weight:600">→ Ver página completa de alertas</a>
     </div>
   ` + foot;
+  if(id==='focos') return hdr('🛰 Focos de Calor — Tempo Real') + `
+    <div>
+      <label style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;cursor:pointer">
+        <input type="checkbox" id="focos-toggle" style="accent-color:#ea580c;width:14px;height:14px" onchange="toggleFocosMapa(this.checked)">
+        Exibir focos de calor no mapa
+      </label>
+      <p style="font-size:11px;color:var(--cinza-500);margin:5px 0 10px">Focos NRT (quase tempo real) detectados por satélite no Acre. Fonte: NASA FIRMS e INPE/BDQueimadas.</p>
+    </div>
+    <div id="focos-filtros-wrap" style="display:none;flex-direction:column;gap:10px">
+
+      <div>
+        <div style="font-size:10px;font-weight:700;color:var(--cinza-400);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">Fonte</div>
+        <div style="display:flex;flex-direction:column;gap:5px">
+          ${[['FIRMS','🛰 FIRMS / NASA','#7c3aed'],['BDQUEIMADAS','🔥 BDQueimadas / INPE','#ea580c']].map(([v,l,c])=>`
+          <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer">
+            <input type="checkbox" checked data-foco-fonte="${v}" style="accent-color:${c}" onchange="renderFocosMapa()">
+            <span style="color:${c};font-weight:600">${l}</span>
+          </label>`).join('')}
+        </div>
+      </div>
+
+      <div>
+        <div style="font-size:10px;font-weight:700;color:var(--cinza-400);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">Período</div>
+        <select id="focos-dias" onchange="recarregarFocosMapa()" style="width:100%;padding:6px 8px;font-size:11px;border:1px solid var(--borda);border-radius:6px;font-family:'DM Sans',sans-serif">
+          <option value="1">Últimas 24 h</option>
+          <option value="3" selected>Últimos 3 dias</option>
+          <option value="7">Últimos 7 dias</option>
+        </select>
+      </div>
+
+      <div id="focos-mapa-stat" style="font-size:10px;color:var(--cinza-400)"></div>
+      <a href="../pages/alertas-ambientais.html" style="font-size:11px;color:var(--verde-c);text-decoration:none;font-weight:600">→ Ver alertas ambientais completos</a>
+    </div>
+  ` + foot;
   if(id==='brigadas') return hdr('🧯 Registros de Campo — Brigadas') + `
     <div>
       <label style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;cursor:pointer">
@@ -1610,6 +1673,28 @@ function _renderDropdown(id){
       <p style="font-size:11px;color:var(--cinza-500);margin:5px 0 10px">Pontos GPS capturados pela PWA das brigadas. Somente registros com localização.</p>
     </div>
     <div id="brigadas-filtros-wrap" style="display:none;flex-direction:column;gap:10px">
+
+      <div>
+        <div style="font-size:10px;font-weight:700;color:var(--cinza-400);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">Exibição</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px">
+          ${[['pontos','Pontos'],['mancha','Mancha de calor'],['ambos','Ambos']].map(([v,l])=>`
+          <label style="display:flex;align-items:center;gap:4px;font-size:11px;cursor:pointer">
+            <input type="radio" name="brig-modo" value="${v}" ${v==='pontos'?'checked':''} style="accent-color:#1F4E2C" onchange="setBrigModoExib('${v}')">
+            <span style="font-weight:600;color:var(--cinza-600)">${l}</span>
+          </label>`).join('')}
+        </div>
+      </div>
+
+      <div id="brig-peso-wrap" style="display:none">
+        <div style="font-size:10px;font-weight:700;color:var(--cinza-400);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">Peso da mancha</div>
+        <div style="display:flex;flex-direction:column;gap:4px">
+          ${[['densidade','Densidade de registros','Onde houve mais atuações da brigada'],['esforco','Esforço (horas + área + fauna)','Onde houve maior esforço/impacto'],['natureza','Por natureza da ação','Combate pesa mais que monitoramento/prevenção']].map(([v,l,d])=>`
+          <label style="display:flex;align-items:flex-start;gap:6px;font-size:11px;cursor:pointer">
+            <input type="radio" name="brig-peso" value="${v}" ${v==='densidade'?'checked':''} style="accent-color:#1F4E2C;margin-top:2px" onchange="setBrigPesoCalor('${v}')">
+            <span><span style="color:var(--cinza-600);font-weight:600">${l}</span><br><span style="color:var(--cinza-400);font-size:10px">${d}</span></span>
+          </label>`).join('')}
+        </div>
+      </div>
 
       <div>
         <div style="font-size:10px;font-weight:700;color:var(--cinza-400);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">Natureza</div>
@@ -2093,9 +2178,25 @@ function _atualizarLegendaMapa(){
 
   // Brigadas de Campo
   if(_brigadasAtivo && _brigadasMapa.length) {
-    [['prevencao','#12A66A','Brigadas — Prevenção'],['combate','#EF5B3C','Brigadas — Combate'],['monitoramento','#3B82C4','Brigadas — Monitoramento']].forEach(([nat,cor,label]) => {
-      if(_brigadasMapa.some(r => r.natureza === nat) &&
-         document.querySelector(`[data-brig-nat="${nat}"]`)?.checked) {
+    if(_brigModoExib === 'pontos' || _brigModoExib === 'ambos') {
+      [['prevencao','#12A66A','Brigadas — Prevenção'],['combate','#EF5B3C','Brigadas — Combate'],['monitoramento','#3B82C4','Brigadas — Monitoramento']].forEach(([nat,cor,label]) => {
+        if(_brigadasMapa.some(r => r.natureza === nat) &&
+           document.querySelector(`[data-brig-nat="${nat}"]`)?.checked) {
+          itens.push({ simbolo:'circle', cor, label });
+        }
+      });
+    }
+    if(_brigModoExib === 'mancha' || _brigModoExib === 'ambos') {
+      const _pesoLab = { densidade:'densidade', esforco:'esforço', natureza:'natureza' }[_brigPesoCalor] || _brigPesoCalor;
+      itens.push({ simbolo:'rect', cor:'#EF8E3C', opacidade:0.7, label:'Mancha de calor — ações ('+_pesoLab+')' });
+    }
+  }
+
+  // Focos de Calor em Tempo Real
+  if(_focosNrtAtivo && _focosNrtLayer) {
+    [['FIRMS','#7c3aed','Focos — FIRMS/NASA'],['BDQUEIMADAS','#ea580c','Focos — BDQueimadas/INPE']].forEach(([f,cor,label]) => {
+      if(document.querySelector(`[data-foco-fonte="${f}"]`)?.checked &&
+         _focosNrtMapa.some(x => x.fonte === f)) {
         itens.push({ simbolo:'circle', cor, label });
       }
     });
@@ -2312,6 +2413,45 @@ function renderAlertasMapa() {
 // BRIGADAS DE CAMPO — registros_campo com GPS
 // ══════════════════════════════════════════════════════════════
 let _brigadasLayer = null, _brigadasMapa = [], _brigadasAtivo = false
+let _brigadasHeatLayer = null, _brigModoExib = 'pontos', _brigPesoCalor = 'densidade'
+
+// Gradiente da mancha de calor (verde → ouro → laranja → vermelho)
+const _BRIG_HEAT_GRAD = { 0.2:'#52B788', 0.45:'#C9A84C', 0.7:'#EF8E3C', 1.0:'#D7263D' }
+// Peso relativo por natureza da ação (combate pesa mais)
+const _BRIG_NAT_PESO  = { combate:1.0, monitoramento:0.6, prevencao:0.4 }
+
+function setBrigModoExib(modo) {
+  _brigModoExib = modo
+  const pw = document.getElementById('brig-peso-wrap')
+  if (pw) pw.style.display = (modo === 'mancha' || modo === 'ambos') ? 'block' : 'none'
+  renderBrigadasMapa()
+}
+
+function setBrigPesoCalor(peso) {
+  _brigPesoCalor = peso
+  renderBrigadasMapa()
+}
+
+// Score bruto de "esforço" de um registro: horas + área + fauna resgatada
+function _brigEsforco(r) {
+  const horas = Number(r.duracao_horas)     || 0
+  const area  = Number(r.area_estimada_ha)  || 0
+  const fauna = Number(r.n_fauna_resgatada) || 0
+  return horas + area * 0.5 + fauna * 2
+}
+
+// Constrói os pontos [lat,lng,peso] da mancha conforme o modo escolhido
+function _brigHeatPoints(visiveis) {
+  if (_brigPesoCalor === 'esforco') {
+    const maxE = Math.max(1, ...visiveis.map(_brigEsforco))
+    return visiveis.map(r => [r.lat, r.lng, 0.2 + 0.8 * (_brigEsforco(r) / maxE)])
+  }
+  if (_brigPesoCalor === 'natureza') {
+    return visiveis.map(r => [r.lat, r.lng, _BRIG_NAT_PESO[r.natureza] ?? 0.4])
+  }
+  // densidade: peso fixo — a sobreposição dos pontos gera a intensidade
+  return visiveis.map(r => [r.lat, r.lng, 0.6])
+}
 
 const _BRIG_NAT_COR  = { prevencao:'#12A66A', combate:'#EF5B3C', monitoramento:'#3B82C4' }
 const _BRIG_NAT_ICO  = { prevencao:'🛡', combate:'🧯', monitoramento:'🔭' }
@@ -2400,7 +2540,7 @@ async function toggleBrigadasMapa(ativo) {
   if (ativo && !_brigadasMapa.length) {
     const { data } = await db
       .from('vw_registros_validacao')
-      .select('id,natureza,atividade,status_validacao,data_hora_evento,lat,lng,brigadista_nome,brigada_nome,uc_nome,n_fauna,fotos_urls,descricao')
+      .select('id,natureza,atividade,status_validacao,data_hora_evento,lat,lng,brigadista_nome,brigada_nome,uc_nome,n_fauna,n_fauna_resgatada,duracao_horas,area_estimada_ha,fotos_urls,descricao')
       .not('lat', 'is', null)
       .order('data_hora_evento', { ascending: false })
       .limit(2000)
@@ -2409,22 +2549,33 @@ async function toggleBrigadasMapa(ativo) {
     if (badge) { badge.textContent = _brigadasMapa.length; badge.style.display = _brigadasMapa.length ? '' : 'none' }
   }
 
-  if (_brigadasLayer) { mapaL.removeLayer(_brigadasLayer); _brigadasLayer = null }
+  if (_brigadasLayer)     { mapaL.removeLayer(_brigadasLayer);     _brigadasLayer = null }
+  if (_brigadasHeatLayer) { mapaL.removeLayer(_brigadasHeatLayer); _brigadasHeatLayer = null }
   if (!_brigadasAtivo || !_brigadasMapa.length) { _atualizarLegendaMapa(); return }
   renderBrigadasMapa()
 }
 
 function renderBrigadasMapa() {
-  if (_brigadasLayer) { mapaL.removeLayer(_brigadasLayer); _brigadasLayer = null }
+  if (_brigadasLayer)     { mapaL.removeLayer(_brigadasLayer);     _brigadasLayer = null }
+  if (_brigadasHeatLayer) { mapaL.removeLayer(_brigadasHeatLayer); _brigadasHeatLayer = null }
   if (!_brigadasAtivo || !_brigadasMapa.length) return
 
   const nats    = [...document.querySelectorAll('[data-brig-nat]')].filter(c=>c.checked).map(c=>c.dataset.brigNat)
   const statuses= [...document.querySelectorAll('[data-brig-status]')].filter(c=>c.checked).map(c=>c.dataset.brigStatus)
 
   const visiveis = _brigadasMapa.filter(r =>
-    nats.includes(r.natureza) && statuses.includes(r.status_validacao)
+    r.lat && r.lng && nats.includes(r.natureza) && statuses.includes(r.status_validacao)
   )
 
+  // Mancha de calor (modo 'mancha' ou 'ambos')
+  if ((_brigModoExib === 'mancha' || _brigModoExib === 'ambos') && typeof L.heatLayer === 'function' && visiveis.length) {
+    _brigadasHeatLayer = L.heatLayer(_brigHeatPoints(visiveis), {
+      radius: 28, blur: 22, max: 1.0, minOpacity: 0.25, maxZoom: 13, gradient: _BRIG_HEAT_GRAD
+    }).addTo(mapaL)
+  }
+
+  // Pontos (modo 'pontos' ou 'ambos')
+  if (_brigModoExib === 'pontos' || _brigModoExib === 'ambos') {
   _brigadasLayer = L.layerGroup()
   visiveis.forEach(r => {
     if (!r.lat || !r.lng) return
@@ -2486,10 +2637,87 @@ function renderBrigadasMapa() {
     marker.on('popupclose', () => { _pararCarrossel(cid); _pararCarrossel('fauna-' + r.id) })
     marker.addTo(_brigadasLayer)
   })
-
   _brigadasLayer.addTo(mapaL)
+  }
+
   const stat = document.getElementById('brigadas-mapa-stat')
-  if (stat) stat.textContent = `${visiveis.length} registro${visiveis.length !== 1 ? 's' : ''} exibido${visiveis.length !== 1 ? 's' : ''}`
+  if (stat) {
+    const modoTxt = _brigModoExib === 'mancha' ? ' (mancha de calor)' : (_brigModoExib === 'ambos' ? ' (pontos + mancha)' : '')
+    stat.textContent = `${visiveis.length} registro${visiveis.length !== 1 ? 's' : ''} exibido${visiveis.length !== 1 ? 's' : ''}${modoTxt}`
+  }
+  _atualizarLegendaMapa()
+}
+
+// ══════════════════════════════════════════════════════════════
+// FOCOS DE CALOR EM TEMPO REAL — focos_calor (FIRMS + BDQueimadas)
+// ══════════════════════════════════════════════════════════════
+let _focosNrtLayer = null, _focosNrtMapa = [], _focosNrtAtivo = false, _focosNrtDias = 3
+
+const _FOCO_FONTE_COR = { FIRMS:'#7c3aed', BDQUEIMADAS:'#ea580c' }
+const _FOCO_FONTE_LAB = { FIRMS:'FIRMS / NASA', BDQUEIMADAS:'BDQueimadas / INPE' }
+
+async function _carregarFocos() {
+  const corte = new Date(Date.now() - _focosNrtDias * 86400000).toISOString()
+  const { data } = await db
+    .from('focos_calor')
+    .select('id,lat,lon,data_hora,satelite,fonte,frp,confianca')
+    .in('fonte', ['FIRMS', 'BDQUEIMADAS'])
+    .gte('data_hora', corte)
+    .order('data_hora', { ascending: false })
+    .limit(5000)
+  _focosNrtMapa = data || []
+  const badge = document.getElementById('focos-count-badge')
+  if (badge) { badge.textContent = _focosNrtMapa.length; badge.style.display = _focosNrtMapa.length ? '' : 'none' }
+}
+
+async function toggleFocosMapa(ativo) {
+  _focosNrtAtivo = ativo
+  const fw = document.getElementById('focos-filtros-wrap')
+  if (fw) fw.style.display = ativo ? 'flex' : 'none'
+  if (ativo && !_focosNrtMapa.length) await _carregarFocos()
+  if (_focosNrtLayer) { mapaL.removeLayer(_focosNrtLayer); _focosNrtLayer = null }
+  if (!_focosNrtAtivo) { _atualizarLegendaMapa(); return }
+  renderFocosMapa()
+}
+
+async function recarregarFocosMapa() {
+  _focosNrtDias = parseInt(document.getElementById('focos-dias')?.value || '3', 10)
+  if (!_focosNrtAtivo) return
+  await _carregarFocos()
+  renderFocosMapa()
+}
+
+function renderFocosMapa() {
+  if (_focosNrtLayer) { mapaL.removeLayer(_focosNrtLayer); _focosNrtLayer = null }
+  if (!_focosNrtAtivo || !_focosNrtMapa.length) { _atualizarLegendaMapa(); return }
+
+  const fontes = new Set([...document.querySelectorAll('[data-foco-fonte]')].filter(c=>c.checked).map(c=>c.dataset.focoFonte))
+  const visiveis = _focosNrtMapa.filter(f => fontes.has(f.fonte) && f.lat && f.lon)
+
+  _focosNrtLayer = L.layerGroup()
+  visiveis.forEach(f => {
+    const cor = _FOCO_FONTE_COR[f.fonte] ?? '#ea580c'
+    const dt  = f.data_hora
+      ? new Date(f.data_hora).toLocaleString('pt-BR', { timeZone:'America/Rio_Branco', day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' })
+      : '—'
+    L.circleMarker([f.lat, f.lon], {
+      radius: 5, fillColor: cor, color: '#fff', weight: 1, fillOpacity: 0.85
+    }).bindPopup(`<div class="camada-popup">
+      <div class="cp-header" style="background:${cor}">🔥 Foco de Calor</div>
+      <div class="cp-layer">
+        <div class="cp-row"><strong>Fonte</strong><span>${escHtml(_FOCO_FONTE_LAB[f.fonte] ?? f.fonte)}</span></div>
+        <div class="cp-row"><strong>Detecção</strong><span>${dt}</span></div>
+        ${f.satelite ? `<div class="cp-row"><strong>Satélite</strong><span>${escHtml(f.satelite)}</span></div>` : ''}
+        ${f.frp != null ? `<div class="cp-row"><strong>FRP</strong><span>${Number(f.frp).toLocaleString('pt-BR')} MW</span></div>` : ''}
+        ${f.confianca ? `<div class="cp-row"><strong>Confiança</strong><span>${escHtml(f.confianca)}</span></div>` : ''}
+        <div style="margin-top:4px;font-size:10px;color:#9CA3AF">📍 ${Number(f.lat).toFixed(5)}, ${Number(f.lon).toFixed(5)}</div>
+      </div>
+    </div>`, { maxWidth: 240 }).addTo(_focosNrtLayer)
+  })
+  _focosNrtLayer.addTo(mapaL)
+
+  const stat = document.getElementById('focos-mapa-stat')
+  if (stat) stat.textContent = `${visiveis.length} foco${visiveis.length !== 1 ? 's' : ''} exibido${visiveis.length !== 1 ? 's' : ''}`
   _atualizarLegendaMapa()
 }
 
