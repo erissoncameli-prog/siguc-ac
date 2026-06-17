@@ -178,6 +178,24 @@ SUPABASE_ANON_KEY=(pública, já em config.js)
 SUPABASE_SERVICE_ROLE_KEY=(somente Edge Functions, nunca no frontend)
 RESEND_API_KEY=(e-mail de alertas)
 
+## Notas de segurança / Advisors do Supabase
+- `rls_disabled_in_public` em `public.spatial_ref_sys`: FALSO-POSITIVO
+  CONHECIDO. Essa tabela é criada pela extensão PostGIS (catálogo
+  EPSG/projeções, ~8.500 linhas de dados de referência públicos); não
+  contém dado do projeto. NÃO dá para habilitar RLS nela pelo nosso
+  acesso (`postgres`): a tabela pertence a `supabase_admin` →
+  `ALTER TABLE … ENABLE ROW LEVEL SECURITY` falha com
+  "must be owner of table". Idem `REVOKE` das permissões do `anon`
+  (concedidas por `supabase_admin`, viram no-op). Não criar migration
+  para isso (falharia no apply). Ação correta: marcar como
+  reconhecido/Dismiss no Security Advisor do painel. Todas as tabelas
+  REAIS do sistema já têm RLS — o advisor confirma que só essa fica
+  sem RLS.
+- Risco residual: `anon`/`authenticated` têm INSERT/UPDATE/DELETE em
+  `spatial_ref_sys` (padrão do PostGIS). Só dá para travar via Supabase
+  Support (executam como owner). Texto pronto do ticket em
+  docs/seguranca-spatial-ref-sys.md.
+
 ## Próxima tarefa
 Módulo A — Estrutura Organizacional SEMA-AC
 Criar migration 003_estrutura_organizacional.sql + página admin de gestão de cargos
