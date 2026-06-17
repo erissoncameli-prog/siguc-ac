@@ -185,6 +185,23 @@
 .bmg-tile.ativo .bmg-label{color:#1F4E2C;font-weight:700;}
 /* Ocorrência marker */
 .oc-marker{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;color:#fff;box-shadow:0 2px 8px rgba(0,0,0,.4);border:2px solid rgba(255,255,255,.8);line-height:1;}
+/* ── Marcador de FOCO de calor (fogo + fumaça) ── */
+.foco-fogo{position:relative;width:24px;height:30px;}
+.foco-fogo svg{position:absolute;bottom:2px;left:50%;transform-origin:50% 100%;filter:drop-shadow(0 1px 2px rgba(0,0,0,.45));animation:fogoFlicker .45s ease-in-out infinite alternate;}
+@keyframes fogoFlicker{0%{transform:translateX(-50%) scale(1) rotate(-2.5deg);}100%{transform:translateX(-50%) scale(1.13) rotate(2.5deg);}}
+.foco-fumaca{position:absolute;bottom:20px;left:50%;width:5px;height:5px;border-radius:50%;background:rgba(120,120,120,.5);opacity:0;animation:fumacaSobe 2.4s linear infinite;}
+.foco-fumaca.f2{animation-delay:.8s;left:40%;}
+.foco-fumaca.f3{animation-delay:1.6s;left:60%;}
+@keyframes fumacaSobe{0%{opacity:0;transform:translate(-50%,0) scale(.5);}25%{opacity:.55;}100%{opacity:0;transform:translate(-50%,-20px) scale(1.7);}}
+.foco-dot{position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:7px;height:7px;border-radius:50%;border:1.5px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.35);}
+.foco-fogo.estatico svg{animation:none;transform:translateX(-50%);}
+.foco-fogo.estatico .foco-fumaca{display:none;}
+/* ── Marcador DETER (árvore sendo cortada/caindo) ── */
+.deter-arvore{position:relative;}
+.deter-arvore svg{position:absolute;bottom:3px;left:50%;transform-origin:50% 92%;filter:drop-shadow(0 1px 2px rgba(0,0,0,.45));animation:arvoreCai 4.5s ease-in-out infinite;}
+@keyframes arvoreCai{0%,45%{transform:translateX(-50%) rotate(0deg);}55%{transform:translateX(-50%) rotate(-7deg);}80%,93%{transform:translateX(-50%) rotate(74deg);}100%{transform:translateX(-50%) rotate(0deg);}}
+.deter-base{position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:8px;height:3px;border-radius:2px;}
+.deter-arvore.estatico svg{animation:none;transform:translateX(-50%);}
 /* Modal Projeto de Análise */
 .proj-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:700;display:flex;align-items:center;justify-content:center;padding:16px;}
 .proj-modal{background:#fff;border-radius:14px;width:100%;max-width:520px;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.35);overflow:hidden;}
@@ -2250,14 +2267,29 @@ const COR_ALERTA_TIPO = { queimada:'#DC2626', desmatamento:'#166534', degradacao
 const ICONE_ALERTA    = { queimada:'🔥', desmatamento:'🌳', degradacao:'🍂' }
 let _alertasLayer = null, _alertasMapa = [], _alertasAtivo = false
 
-function _alertaMarkerIcon(tipo, severidade) {
-  const emoji = ICONE_ALERTA[tipo]      ?? '⚠'
-  const cor   = COR_ALERTA_TIPO[tipo]   ?? '#6B7280'
+function _alertaMarkerIcon(tipo, severidade, animar = true) {
   const borda = COR_ALERTA[severidade]  ?? '#6B7280'
-  const sz    = severidade === 'critica' ? 32 : severidade === 'alta' ? 27 : 22
+  const sz    = severidade === 'critica' ? 30 : severidade === 'alta' ? 26 : 22
+  if (tipo === 'desmatamento') {
+    const w = Math.round(sz * 0.85), h = sz + 4
+    return L.divIcon({
+      className: '',
+      html: `<div class="deter-arvore${animar ? '' : ' estatico'}" style="width:${sz}px;height:${h}px;cursor:pointer">
+        <span class="deter-base" style="background:${borda}"></span>
+        <svg width="${w}" height="${Math.round(sz*0.95)}" viewBox="0 0 24 24">
+          <rect x="10.5" y="14" width="3" height="9" rx="1" fill="#8B5A2B"/>
+          <path d="M12 1.5 L19 12.5 H5 Z" fill="#166534"/>
+          <path d="M12 6 L17 14 H7 Z" fill="#2F9E5B"/>
+        </svg>
+      </div>`,
+      iconSize: [sz, h], iconAnchor: [sz/2, h], popupAnchor: [0, -h + 4]
+    })
+  }
+  // Fallback (degradação/outros): círculo simples, sem emoji
+  const cor = COR_ALERTA_TIPO[tipo] ?? '#6B7280'
   return L.divIcon({
     className: '',
-    html: `<div style="width:${sz}px;height:${sz}px;border-radius:50%;background:${cor};border:3px solid ${borda};display:flex;align-items:center;justify-content:center;font-size:${Math.round(sz*.55)}px;line-height:1;box-shadow:0 2px 6px rgba(0,0,0,.45);cursor:pointer">${emoji}</div>`,
+    html: `<div style="width:${sz}px;height:${sz}px;border-radius:50%;background:${cor};border:3px solid ${borda};box-shadow:0 2px 6px rgba(0,0,0,.45);cursor:pointer"></div>`,
     iconSize: [sz, sz], iconAnchor: [sz/2, sz/2], popupAnchor: [0, -sz/2 - 4]
   })
 }
@@ -2339,6 +2371,7 @@ function renderAlertasMapa() {
   })
 
   _alertasLayer = L.layerGroup()
+  const _animarDeter = visiveis.length <= 200  // desliga animação em volume alto
   visiveis.forEach(a => {
     if (!a.geom) return
     let lat, lng
@@ -2360,7 +2393,7 @@ function renderAlertasMapa() {
     const alertaKey   = `_alerta_${a.id}`
     window[alertaKey] = alertaModal
 
-    L.marker([lat, lng], { icon: _alertaMarkerIcon(a.tipo, a.severidade) })
+    L.marker([lat, lng], { icon: _alertaMarkerIcon(a.tipo, a.severidade, _animarDeter) })
     .bindPopup(`<div class="camada-popup">
       <div class="cp-header" style="background:${corTipo}">${icone} ${escHtml(a.tipo.charAt(0).toUpperCase()+a.tipo.slice(1))}</div>
       <div class="cp-layer">
@@ -2659,12 +2692,31 @@ async function recarregarFocosMapa() {
   renderFocosMapa()
 }
 
+// Ícone de foco de calor: chama com fumaça subindo (animado por CSS).
+// O ponto colorido na base indica a fonte (FIRMS roxo / BDQueimadas laranja).
+const _FOGO_SVG = `<svg width="20" height="22" viewBox="0 0 24 24">
+  <path fill="#F97316" stroke="#C2410C" stroke-width="0.8" d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>
+  <path fill="#FDE047" transform="translate(12 13.5) scale(0.52) translate(-12 -13)" d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>
+</svg>`
+function _focoFogoIcon(cor, animar = true) {
+  return L.divIcon({
+    className: '',
+    html: `<div class="foco-fogo${animar ? '' : ' estatico'}" style="cursor:pointer">
+      <span class="foco-fumaca"></span><span class="foco-fumaca f2"></span><span class="foco-fumaca f3"></span>
+      ${_FOGO_SVG}
+      <span class="foco-dot" style="background:${cor}"></span>
+    </div>`,
+    iconSize: [24, 30], iconAnchor: [12, 28], popupAnchor: [0, -26]
+  })
+}
+
 function renderFocosMapa() {
   if (_focosNrtLayer) { mapaL.removeLayer(_focosNrtLayer); _focosNrtLayer = null }
   if (!_focosNrtAtivo || !_focosNrtMapa.length) { _atualizarLegendaMapa(); return }
 
   const fontes = new Set([...document.querySelectorAll('[data-foco-fonte]')].filter(c=>c.checked).map(c=>c.dataset.focoFonte))
   const visiveis = _focosNrtMapa.filter(f => fontes.has(f.fonte) && f.lat && f.lon)
+  const _animarFogo = visiveis.length <= 200  // desliga animação em volume alto
 
   _focosNrtLayer = L.layerGroup()
   visiveis.forEach(f => {
@@ -2672,10 +2724,9 @@ function renderFocosMapa() {
     const dt  = f.data_hora
       ? new Date(f.data_hora).toLocaleString('pt-BR', { timeZone:'America/Rio_Branco', day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' })
       : '—'
-    L.circleMarker([f.lat, f.lon], {
-      radius: 5, fillColor: cor, color: '#fff', weight: 1, fillOpacity: 0.85
-    }).bindPopup(`<div class="camada-popup">
-      <div class="cp-header" style="background:${cor}">🔥 Foco de Calor</div>
+    L.marker([f.lat, f.lon], { icon: _focoFogoIcon(cor, _animarFogo) })
+    .bindPopup(`<div class="camada-popup">
+      <div class="cp-header" style="background:${cor}">Foco de Calor</div>
       <div class="cp-layer">
         <div class="cp-row"><strong>Fonte</strong><span>${escHtml(_FOCO_FONTE_LAB[f.fonte] ?? f.fonte)}</span></div>
         <div class="cp-row"><strong>Detecção</strong><span>${dt}</span></div>
