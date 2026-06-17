@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SIGUC-AC — Mockup: Linha do Tempo + Auto-atualização</title>
+<style>
+  :root{ --floresta:#0A1A0F; --verde-c:#52B788; --ouro:#C9A84C; --t1:#F4EFE6; --borda:#e5e7eb; }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'DM Sans',Arial,sans-serif;background:#0b1410;color:#111;}
+  .wrap{position:relative;width:100%;height:100vh;overflow:hidden;}
+  /* Mapa faux */
+  .mapa{position:absolute;inset:0;background:
+     radial-gradient(circle at 30% 40%, #1c3a25 0, #0e2016 45%, #0a160e 100%);}
+  .mapa::after{content:"Área do mapa (mockup)";position:absolute;top:14px;left:16px;color:#ffffff55;font-size:12px;letter-spacing:.05em;}
+  /* Focos faux */
+  .foco{position:absolute;width:22px;height:26px;transition:opacity .4s;}
+  .foco svg{position:absolute;bottom:2px;left:50%;transform-origin:50% 100%;animation:flick .45s ease-in-out infinite alternate;filter:drop-shadow(0 1px 2px #0007);}
+  @keyframes flick{0%{transform:translateX(-50%) scale(1) rotate(-2.5deg);}100%{transform:translateX(-50%) scale(1.13) rotate(2.5deg);}}
+  .foco .dot{position:absolute;bottom:-1px;left:50%;transform:translateX(-50%);width:9px;height:9px;border-radius:50%;border:2px solid #fff;}
+  .foco .halo{position:absolute;bottom:-1px;left:50%;transform:translateX(-50%);width:26px;height:26px;border-radius:50%;}
+  /* Selo auto-atualização */
+  .auto{position:absolute;top:14px;right:16px;display:flex;align-items:center;gap:9px;
+    background:rgba(255,255,255,.92);border:1px solid rgba(0,0,0,.1);border-radius:10px;
+    padding:7px 11px;box-shadow:0 4px 16px #0005;font-size:11px;color:#374151;backdrop-filter:blur(4px);}
+  .auto .pulse{width:8px;height:8px;border-radius:50%;background:#16a34a;box-shadow:0 0 0 0 #16a34a88;animation:pulse 2s infinite;}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 #16a34a88}70%{box-shadow:0 0 0 7px #16a34a00}100%{box-shadow:0 0 0 0 #16a34a00}}
+  .sw{position:relative;width:34px;height:18px;border-radius:10px;background:#16a34a;cursor:pointer;transition:.2s;flex-shrink:0;}
+  .sw.off{background:#cbd5e1;}
+  .sw::after{content:"";position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#fff;transition:.2s;}
+  .sw.off::after{left:18px;}
+  /* Barra da linha do tempo */
+  .tl{position:absolute;left:50%;bottom:18px;transform:translateX(-50%);width:min(880px,94vw);
+    background:rgba(255,255,255,.95);border:1px solid rgba(0,0,0,.1);border-radius:14px;
+    padding:12px 16px 14px;box-shadow:0 10px 36px #0007;backdrop-filter:blur(8px);}
+  .tl-top{display:flex;align-items:center;gap:12px;margin-bottom:10px;}
+  .modo{display:flex;background:#f1f5f3;border-radius:9px;padding:3px;gap:2px;}
+  .modo button{border:none;background:none;font:inherit;font-size:12px;font-weight:600;color:#6b7280;
+    padding:5px 14px;border-radius:7px;cursor:pointer;}
+  .modo button.on{background:#1F4E2C;color:#fff;}
+  .play{width:38px;height:38px;border-radius:50%;border:none;background:#1F4E2C;color:#fff;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .play:hover{background:#2d6a4f;}
+  .lbl{font-family:'Fraunces',Georgia,serif;font-size:22px;font-weight:700;color:#1F4E2C;min-width:120px;}
+  .lbl small{display:block;font-family:'DM Sans';font-size:10px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em;}
+  .vel{margin-left:auto;font-size:11px;color:#6b7280;display:flex;align-items:center;gap:6px;}
+  .vel select{font:inherit;font-size:11px;padding:3px 6px;border:1px solid var(--borda);border-radius:6px;}
+  input[type=range]{width:100%;accent-color:#1F4E2C;height:6px;}
+  .ticks{display:flex;justify-content:space-between;font-size:9px;color:#9ca3af;margin-top:3px;}
+  .camadas{display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;padding-top:10px;border-top:1px solid var(--borda);font-size:11px;color:#374151;}
+  .camadas label{display:flex;align-items:center;gap:5px;cursor:pointer;}
+  .sw-mini{width:30px;height:16px;border-radius:9px;background:#16a34a;position:relative;transition:.2s;}
+  .sw-mini.off{background:#cbd5e1;}
+  .sw-mini::after{content:"";position:absolute;top:2px;left:2px;width:12px;height:12px;border-radius:50%;background:#fff;transition:.2s;}
+  .sw-mini.off::after{left:16px;}
+  .nota{position:absolute;top:60px;right:16px;width:230px;background:rgba(255,255,255,.92);border-radius:10px;
+    padding:10px 12px;font-size:10.5px;color:#6b7280;line-height:1.5;box-shadow:0 4px 16px #0004;}
+  .nota b{color:#1F4E2C;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="mapa" id="mapa"></div>
+
+  <!-- Selo auto-atualização -->
+  <div class="auto">
+    <span class="pulse" id="pulse"></span>
+    <span id="auto-lbl">Atualizado agora · auto 5 min</span>
+    <span class="sw" id="auto-sw" onclick="toggleAuto()"></span>
+  </div>
+
+  <div class="nota">
+    <b>Mockup</b> — apenas para validar a aparência/UX. No mapa real os focos, PRODES, MapBiomas e satélite GIBS seguem a régua. MapBiomas por ano é best-effort (pode exigir token GEE).
+  </div>
+
+  <!-- Linha do tempo -->
+  <div class="tl">
+    <div class="tl-top">
+      <div class="modo">
+        <button class="on" id="m-anos" onclick="setModo('anos')">Anos</button>
+        <button id="m-dias" onclick="setModo('dias')">Dias</button>
+      </div>
+      <button class="play" id="play" onclick="togglePlay()" title="Reproduzir">
+        <svg id="play-ic" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 4 20 12 6 20 6 4"/></svg>
+      </button>
+      <div class="lbl"><small id="lbl-cap">Ano</small><span id="lbl-val">2024</span></div>
+      <div class="vel">Velocidade
+        <select id="vel"><option value="1200">Lenta</option><option value="700" selected>Média</option><option value="350">Rápida</option></select>
+      </div>
+    </div>
+    <input type="range" id="slider" min="0" max="24" value="23" oninput="onSlide()">
+    <div class="ticks" id="ticks"></div>
+    <div class="camadas">
+      <label><span class="sw-mini" id="c-focos" onclick="tog(this)"></span> Focos de calor</label>
+      <label><span class="sw-mini" id="c-prodes" onclick="tog(this)"></span> PRODES (ano)</label>
+      <label><span class="sw-mini off" id="c-mapbiomas" onclick="tog(this)"></span> MapBiomas (ano)</label>
+      <label><span class="sw-mini off" id="c-gibs" onclick="tog(this)"></span> GIBS satélite (dia)</label>
+    </div>
+  </div>
+</div>
+
+<script>
+const ANO_MIN=2000, ANO_MAX=2024;
+let modo='anos', playing=false, timer=null;
+
+function ticksFor(){
+  const t=document.getElementById('ticks');
+  if(modo==='anos'){ t.innerHTML=`<span>${ANO_MIN}</span><span>${Math.round((ANO_MIN+ANO_MAX)/2)}</span><span>${ANO_MAX}</span>`; }
+  else{ t.innerHTML=`<span>-30d</span><span>-15d</span><span>hoje</span>`; }
+}
+function setModo(m){
+  modo=m;
+  document.getElementById('m-anos').classList.toggle('on',m==='anos');
+  document.getElementById('m-dias').classList.toggle('on',m==='dias');
+  const s=document.getElementById('slider');
+  if(m==='anos'){ s.min=0; s.max=ANO_MAX-ANO_MIN; s.value=s.max; document.getElementById('lbl-cap').textContent='Ano'; }
+  else{ s.min=0; s.max=30; s.value=30; document.getElementById('lbl-cap').textContent='Data'; }
+  ticksFor(); onSlide();
+}
+function labelVal(){
+  const v=+document.getElementById('slider').value;
+  if(modo==='anos') return String(ANO_MIN+v);
+  const d=new Date(); d.setDate(d.getDate()-(30-v));
+  return d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric'});
+}
+function onSlide(){
+  document.getElementById('lbl-val').textContent=labelVal();
+  renderFocos();
+}
+function togglePlay(){
+  playing=!playing;
+  document.getElementById('play-ic').innerHTML = playing
+    ? '<rect x="6" y="5" width="4" height="14"/><rect x="14" y="5" width="4" height="14"/>'
+    : '<polygon points="6 4 20 12 6 20 6 4"/>';
+  if(playing) step(); else clearTimeout(timer);
+}
+function step(){
+  const s=document.getElementById('slider');
+  let v=+s.value+1; if(v>+s.max) v=+s.min;
+  s.value=v; onSlide();
+  timer=setTimeout(step, +document.getElementById('vel').value);
+}
+function toggleAuto(){
+  const sw=document.getElementById('auto-sw'); sw.classList.toggle('off');
+  const on=!sw.classList.contains('off');
+  document.getElementById('pulse').style.visibility=on?'visible':'hidden';
+  document.getElementById('auto-lbl').textContent=on?'Atualizado agora · auto 5 min':'Auto-atualização desligada';
+}
+function tog(el){ el.classList.toggle('off'); renderFocos(); }
+
+// Focos faux distribuídos; quantidade varia com o tempo p/ dar sensação de animação
+const FOGO=`<svg width="18" height="20" viewBox="0 0 24 24">
+  <path fill="#F97316" stroke="#C2410C" stroke-width=".8" d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>
+  <path fill="#FDE047" transform="translate(12 13.5) scale(.52) translate(-12 -13)" d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>`;
+let pts=[]; for(let i=0;i<60;i++){ pts.push({x:8+Math.random()*84, y:10+Math.random()*64, k:Math.random(), firms:Math.random()>0.5}); }
+function renderFocos(){
+  const m=document.getElementById('mapa');
+  m.querySelectorAll('.foco').forEach(e=>e.remove());
+  if(document.getElementById('c-focos').classList.contains('off')) return;
+  const v=+document.getElementById('slider').value, max=+document.getElementById('slider').max;
+  const frac=(v)/(max||1);
+  // mais focos conforme avança o tempo (ilustrativo)
+  const n=Math.round(8+frac*52);
+  pts.slice(0,n).forEach(p=>{
+    const cor=p.firms?'#7c3aed':'#ea580c';
+    const d=document.createElement('div'); d.className='foco';
+    d.style.left=p.x+'%'; d.style.top=p.y+'%';
+    d.innerHTML=`<span class="halo" style="background:radial-gradient(circle, ${cor}66 0%, ${cor}00 70%)"></span>${FOGO}<span class="dot" style="background:${cor};box-shadow:0 0 6px 1px ${cor}"></span>`;
+    m.appendChild(d);
+  });
+}
+setModo('anos');
+</script>
+</body>
+</html>
