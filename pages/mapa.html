@@ -811,8 +811,7 @@ function renderPagina(){
         <button class="mlb-tab" id="mlb-btn-veg" onclick="toggleLayerBar('veg')">🌿 Cobertura Vegetal</button>
         <button class="mlb-tab" id="mlb-btn-car" onclick="toggleLayerBar('car')">🏡 CAR — Imóveis Rurais <span class="mlb-badge" id="car-count-badge" style="display:none">0</span></button>
         <button class="mlb-tab" id="mlb-btn-areas" onclick="toggleLayerBar('areas')">🌿 Áreas Territoriais <span class="mlb-badge" id="uc-count-badge" title="Unidades de Conservação" style="display:none">0</span> <span class="mlb-badge" id="ti-count-badge" title="Terras Indígenas" style="display:none">0</span></button>
-        <button class="mlb-tab" id="mlb-btn-alertas" onclick="toggleLayerBar('alertas')">🔥 Alertas Ambientais <span class="mlb-badge" id="alertas-count-badge" style="display:none">0</span></button>
-        <button class="mlb-tab" id="mlb-btn-focos" onclick="toggleLayerBar('focos')">🛰 Focos em Tempo Real <span class="mlb-badge" id="focos-count-badge" style="display:none">0</span></button>
+        <button class="mlb-tab" id="mlb-btn-alertas" onclick="toggleLayerBar('alertas')">🔥 Alertas e Focos <span class="mlb-badge" id="alertas-count-badge" style="display:none">0</span></button>
         <button class="mlb-tab" id="mlb-btn-brigadas" onclick="toggleLayerBar('brigadas')">🧯 Brigadas Comunitárias <span class="mlb-badge" id="brigadas-count-badge" style="display:none">0</span></button>
         <button class="mlb-tab" id="mlb-btn-projetos" onclick="toggleLayerBar('projetos')">📐 Projetos de Análise <span class="mlb-badge" id="projetos-count-badge" style="display:none">0</span></button>
         <button class="mlb-tab" id="mlb-btn-mun" onclick="toggleLayerBar('mun')">🏙 Municípios</button>
@@ -1295,19 +1294,14 @@ function toggleLayerBar(id){
     const pw = document.getElementById('brig-peso-wrap');
     if(pw) pw.style.display = (_brigModoExib === 'mancha' || _brigModoExib === 'ambos') ? 'block' : 'none';
   }
-  // Focos em tempo real: restaura estado do toggle e do período
-  if(id === 'focos'){
-    const ft = document.getElementById('focos-toggle');
-    if(ft) ft.checked = _focosNrtAtivo;
-    const fw = document.getElementById('focos-filtros-wrap');
-    if(fw) fw.style.display = _focosNrtAtivo ? 'flex' : 'none';
+  // Alertas e Focos: restaura estado do toggle e do período dos focos
+  if(id === 'alertas'){
+    const at = document.getElementById('alertas-toggle');
+    if(at) at.checked = _alertasAtivo;
+    const fw = document.getElementById('alertas-filtros-wrap');
+    if(fw) fw.style.display = _alertasAtivo ? 'flex' : 'none';
     const fd = document.getElementById('focos-dias');
     if(fd) fd.value = String(_focosNrtDias);
-    if(_focosNrtAtivo){
-      const st = document.getElementById('focos-mapa-stat');
-      const n  = _focosNrtLayer ? _focosNrtLayer.getLayers().length : 0;
-      if(st) st.textContent = `${n} foco${n !== 1 ? 's' : ''} exibido${n !== 1 ? 's' : ''}`;
-    }
   }
 }
 document.addEventListener('click', e => {
@@ -1567,19 +1561,45 @@ function _renderDropdown(id){
     </div>
     <div style="font-size:10px;color:var(--cinza-400);margin-top:8px;text-align:center">O painel editor flutua sobre o mapa e pode ser arrastado</div>
   ` + foot;
-  if(id==='alertas') return hdr('🔥 Alertas Ambientais') + `
+  if(id==='alertas') return hdr('🔥 Alertas e Focos Ambientais') + `
     <div>
       <label style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;cursor:pointer">
         <input type="checkbox" id="alertas-toggle" style="accent-color:#f97316;width:14px;height:14px" onchange="toggleAlertasMapa(this.checked)">
-        Exibir alertas no mapa
+        Exibir alertas e focos no mapa
       </label>
-      <p style="font-size:11px;color:var(--cinza-500);margin:5px 0 10px">Focos de calor e desmatamento dos últimos 7 dias.</p>
+      <p style="font-size:11px;color:var(--cinza-500);margin:5px 0 10px">Desmatamento (DETER) + focos de calor em tempo real (FIRMS/NASA e BDQueimadas/INPE).</p>
     </div>
     <div id="alertas-filtros-wrap" style="display:none;flex-direction:column;gap:10px">
 
-      <!-- Severidade -->
+      <!-- Fonte -->
       <div>
-        <div style="font-size:10px;font-weight:700;color:var(--cinza-400);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">Severidade</div>
+        <div style="font-size:10px;font-weight:700;color:var(--cinza-400);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">Fonte</div>
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer">
+            <input type="checkbox" checked data-alerta-fonte="DETER" style="accent-color:#dc2626" onchange="renderAlertasMapa()">
+            <span style="color:#dc2626;font-weight:600">🌳 DETER / INPE <span style="color:var(--cinza-400);font-weight:400">— desmatamento</span></span>
+          </label>
+          ${[['FIRMS','🛰 FIRMS / NASA','#7c3aed'],['BDQUEIMADAS','🔥 BDQueimadas / INPE','#ea580c']].map(([v,l,c])=>`
+          <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer">
+            <input type="checkbox" checked data-foco-fonte="${v}" style="accent-color:${c}" onchange="renderFocosMapa()">
+            <span style="color:${c};font-weight:600">${l} <span style="color:var(--cinza-400);font-weight:400">— focos</span></span>
+          </label>`).join('')}
+        </div>
+      </div>
+
+      <!-- Período (focos) -->
+      <div>
+        <div style="font-size:10px;font-weight:700;color:var(--cinza-400);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">Período dos focos</div>
+        <select id="focos-dias" onchange="recarregarFocosMapa()" style="width:100%;padding:6px 8px;font-size:11px;border:1px solid var(--borda);border-radius:6px;font-family:'DM Sans',sans-serif">
+          <option value="1">Últimas 24 h</option>
+          <option value="3" selected>Últimos 3 dias</option>
+          <option value="7">Últimos 7 dias</option>
+        </select>
+      </div>
+
+      <!-- Severidade (DETER) -->
+      <div>
+        <div style="font-size:10px;font-weight:700;color:var(--cinza-400);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">Severidade (DETER)</div>
         <div style="display:flex;flex-wrap:wrap;gap:5px">
           ${['critica','alta','media','baixa'].map(s=>{
             const c={critica:'#DC2626',alta:'#F97316',media:'#F59E0B',baixa:'#059669'}[s]
@@ -1590,13 +1610,13 @@ function _renderDropdown(id){
         </div>
       </div>
 
-      <!-- Localização -->
+      <!-- Localização (DETER) -->
       <div>
-        <div style="font-size:10px;font-weight:700;color:var(--cinza-400);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">Localização</div>
+        <div style="font-size:10px;font-weight:700;color:var(--cinza-400);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">Localização (DETER)</div>
         <div style="display:flex;flex-direction:column;gap:4px">
           <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer">
             <input type="radio" name="alerta-loc" value="todos" checked style="accent-color:#52B788" onchange="renderAlertasMapa()">
-            <span>Todos os alertas</span>
+            <span>Todos</span>
           </label>
           <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer">
             <input type="radio" name="alerta-loc" value="em_uc" style="accent-color:#52B788" onchange="renderAlertasMapa()">
@@ -1609,59 +1629,9 @@ function _renderDropdown(id){
         </div>
       </div>
 
-      <!-- Fonte -->
-      <div>
-        <div style="font-size:10px;font-weight:700;color:var(--cinza-400);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">Fonte</div>
-        <div style="display:flex;flex-direction:column;gap:4px">
-          ${[
-            ['FIRMS',       '🛰 FIRMS / NASA',       '#7c3aed'],
-            ['DETER',       '🌳 DETER / INPE',       '#dc2626'],
-            ['BDQUEIMADAS', '🔥 BDQueimadas / INPE', '#ea580c'],
-            ['PRODES',      '📊 PRODES / INPE',      '#b45309'],
-          ].map(([f,label,c]) => `
-          <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer">
-            <input type="checkbox" checked data-alerta-fonte="${f}" style="accent-color:${c}" onchange="renderAlertasMapa()">
-            <span>${label}</span>
-          </label>`).join('')}
-        </div>
-      </div>
-
       <div id="alertas-mapa-stat" style="font-size:10px;color:var(--cinza-400)"></div>
-      <a href="../pages/alertas-ambientais.html" style="font-size:11px;color:var(--verde-c);text-decoration:none;font-weight:600">→ Ver página completa de alertas</a>
-    </div>
-  ` + foot;
-  if(id==='focos') return hdr('🛰 Focos de Calor — Tempo Real') + `
-    <div>
-      <label style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;cursor:pointer">
-        <input type="checkbox" id="focos-toggle" style="accent-color:#ea580c;width:14px;height:14px" onchange="toggleFocosMapa(this.checked)">
-        Exibir focos de calor no mapa
-      </label>
-      <p style="font-size:11px;color:var(--cinza-500);margin:5px 0 10px">Focos NRT (quase tempo real) detectados por satélite no Acre. Fonte: NASA FIRMS e INPE/BDQueimadas.</p>
-    </div>
-    <div id="focos-filtros-wrap" style="display:none;flex-direction:column;gap:10px">
-
-      <div>
-        <div style="font-size:10px;font-weight:700;color:var(--cinza-400);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">Fonte</div>
-        <div style="display:flex;flex-direction:column;gap:5px">
-          ${[['FIRMS','🛰 FIRMS / NASA','#7c3aed'],['BDQUEIMADAS','🔥 BDQueimadas / INPE','#ea580c']].map(([v,l,c])=>`
-          <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer">
-            <input type="checkbox" checked data-foco-fonte="${v}" style="accent-color:${c}" onchange="renderFocosMapa()">
-            <span style="color:${c};font-weight:600">${l}</span>
-          </label>`).join('')}
-        </div>
-      </div>
-
-      <div>
-        <div style="font-size:10px;font-weight:700;color:var(--cinza-400);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">Período</div>
-        <select id="focos-dias" onchange="recarregarFocosMapa()" style="width:100%;padding:6px 8px;font-size:11px;border:1px solid var(--borda);border-radius:6px;font-family:'DM Sans',sans-serif">
-          <option value="1">Últimas 24 h</option>
-          <option value="3" selected>Últimos 3 dias</option>
-          <option value="7">Últimos 7 dias</option>
-        </select>
-      </div>
-
       <div id="focos-mapa-stat" style="font-size:10px;color:var(--cinza-400)"></div>
-      <a href="../pages/alertas-ambientais.html" style="font-size:11px;color:var(--verde-c);text-decoration:none;font-weight:600">→ Ver alertas ambientais completos</a>
+      <a href="../pages/alertas-ambientais.html" style="font-size:11px;color:var(--verde-c);text-decoration:none;font-weight:600">→ Ver página completa de alertas</a>
     </div>
   ` + foot;
   if(id==='brigadas') return hdr('🧯 Registros de Campo — Brigadas') + `
@@ -2174,7 +2144,7 @@ function _atualizarLegendaMapa(){
   }
 
   // Alertas Ambientais
-  if(_alertasAtivo && _alertasLayer) itens.push({ simbolo:'circle', cor:'#f97316', label:'Alertas Ambientais' });
+  if(_alertasAtivo && _alertasLayer) itens.push({ simbolo:'circle', cor:'#dc2626', label:'DETER — Desmatamento' });
 
   // Brigadas de Campo
   if(_brigadasAtivo && _brigadasMapa.length) {
@@ -2295,13 +2265,20 @@ function _alertaMarkerIcon(tipo, severidade) {
 async function toggleAlertasMapa(ativo) {
   _alertasAtivo = ativo
   document.getElementById('alertas-filtros-wrap').style.display = ativo ? 'flex' : 'none'
+
+  // Focos (FIRMS/BDQueimadas) vêm de focos_calor (tempo real) — modelo híbrido.
+  _focosNrtAtivo = ativo
+  if (ativo && !_focosNrtMapa.length) await _carregarFocos()
+
   if (ativo && !_alertasMapa.length) {
     // Garante que o GeoJSON das UCs está carregado para o PIP
     if (!_ucGeojson) await _carregarUC()
     const corte = new Date(Date.now() - 7 * 86400000).toISOString()
+    // Só desmatamento/degradação (DETER/PRODES); focos vêm de focos_calor
     const { data } = await db.from('alertas_ambientais')
       .select('id,tipo,severidade,fonte,uc_id,uc_nome,area_ha,data_referencia,geom')
       .eq('ativo', true)
+      .neq('tipo', 'queimada')
       .gte('data_deteccao', corte)
       .limit(500)
     // Pré-calcula uc_nome via PIP para alertas sem UC no banco
@@ -2322,7 +2299,12 @@ async function toggleAlertasMapa(ativo) {
     const badge = document.getElementById('alertas-count-badge')
     if (badge) { badge.textContent = _alertasMapa.length; badge.style.display = _alertasMapa.length ? '' : 'none' }
   }
+
+  if (!ativo) {
+    if (_focosNrtLayer) { mapaL.removeLayer(_focosNrtLayer); _focosNrtLayer = null }
+  }
   renderAlertasMapa()
+  renderFocosMapa()
   _atualizarLegendaMapa()
 }
 
@@ -2668,16 +2650,6 @@ async function _carregarFocos() {
   _focosNrtMapa = data || []
   const badge = document.getElementById('focos-count-badge')
   if (badge) { badge.textContent = _focosNrtMapa.length; badge.style.display = _focosNrtMapa.length ? '' : 'none' }
-}
-
-async function toggleFocosMapa(ativo) {
-  _focosNrtAtivo = ativo
-  const fw = document.getElementById('focos-filtros-wrap')
-  if (fw) fw.style.display = ativo ? 'flex' : 'none'
-  if (ativo && !_focosNrtMapa.length) await _carregarFocos()
-  if (_focosNrtLayer) { mapaL.removeLayer(_focosNrtLayer); _focosNrtLayer = null }
-  if (!_focosNrtAtivo) { _atualizarLegendaMapa(); return }
-  renderFocosMapa()
 }
 
 async function recarregarFocosMapa() {
