@@ -3,10 +3,11 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "test":   "playwright test tests/smoke.test.js",
+    "test": "playwright test tests/smoke.test.js",
     "deploy": "bash scripts/deploy-with-rollback.sh"
   },
   "devDependencies": {
-    "@playwright/test": "^1.44.0"
+    "@playwright/test": "^1.44.0",
+    "pptxgenjs": "^4.0.1"
   }
 }
