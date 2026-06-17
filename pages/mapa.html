@@ -203,6 +203,33 @@
 @keyframes arvoreCai{0%,45%{transform:translateX(-50%) rotate(0deg);}55%{transform:translateX(-50%) rotate(-7deg);}80%,93%{transform:translateX(-50%) rotate(74deg);}100%{transform:translateX(-50%) rotate(0deg);}}
 .deter-base{position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:8px;height:3px;border-radius:2px;}
 .deter-arvore.estatico svg{animation:none;transform:translateX(-50%);}
+/* ── Selo de auto-atualização ── */
+#auto-badge{position:absolute;top:12px;right:12px;z-index:600;display:flex;align-items:center;gap:9px;background:rgba(255,255,255,.93);border:1px solid rgba(0,0,0,.1);border-radius:10px;padding:6px 10px;box-shadow:0 4px 16px rgba(0,0,0,.25);backdrop-filter:blur(4px);font-size:11px;color:#374151;font-family:'DM Sans',sans-serif;}
+.auto-pulse{width:8px;height:8px;border-radius:50%;background:#16a34a;flex-shrink:0;box-shadow:0 0 0 0 rgba(22,163,74,.5);animation:autoPulse 2s infinite;}
+@keyframes autoPulse{0%{box-shadow:0 0 0 0 rgba(22,163,74,.5)}70%{box-shadow:0 0 0 7px rgba(22,163,74,0)}100%{box-shadow:0 0 0 0 rgba(22,163,74,0)}}
+.auto-sw{position:relative;width:32px;height:17px;border-radius:9px;background:#16a34a;cursor:pointer;transition:.2s;flex-shrink:0;}
+.auto-sw.off{background:#cbd5e1;}
+.auto-sw::after{content:"";position:absolute;top:2px;left:2px;width:13px;height:13px;border-radius:50%;background:#fff;transition:.2s;}
+.auto-sw.off::after{left:17px;}
+/* ── Barra da linha do tempo ── */
+#timeline-bar{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);z-index:600;width:min(820px,92%);background:rgba(255,255,255,.96);border:1px solid rgba(0,0,0,.1);border-radius:14px;padding:11px 16px 12px;box-shadow:0 10px 36px rgba(10,26,15,.32);backdrop-filter:blur(8px);font-family:'DM Sans',sans-serif;}
+.tl-top{display:flex;align-items:center;gap:10px;margin-bottom:9px;}
+.tl-modo{display:flex;background:#f1f5f3;border-radius:9px;padding:3px;gap:2px;}
+.tl-modo button{border:none;background:none;font:inherit;font-size:12px;font-weight:600;color:#6b7280;padding:5px 13px;border-radius:7px;cursor:pointer;}
+.tl-modo button.on{background:#1F4E2C;color:#fff;}
+.tl-play{width:36px;height:36px;border-radius:50%;border:none;background:#1F4E2C;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.tl-play:hover{background:#2d6a4f;}
+.tl-lbl{display:flex;flex-direction:column;line-height:1.1;min-width:108px;}
+.tl-lbl span{font-family:'Fraunces',Georgia,serif;font-size:20px;font-weight:700;color:#1F4E2C;}
+.tl-lbl small{font-size:9px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em;}
+.tl-vel{margin-left:auto;font-size:11px;color:#6b7280;display:flex;align-items:center;gap:6px;}
+.tl-vel select{font:inherit;font-size:11px;padding:3px 6px;border:1px solid var(--borda);border-radius:6px;}
+.tl-close{border:none;background:#f1f5f3;color:#6b7280;width:26px;height:26px;border-radius:7px;cursor:pointer;font-size:13px;flex-shrink:0;}
+.tl-close:hover{background:#e5e7eb;}
+#timeline-bar input[type=range]{width:100%;accent-color:#1F4E2C;height:6px;}
+.tl-ticks{display:flex;justify-content:space-between;font-size:9px;color:#9ca3af;margin-top:3px;}
+.tl-stat{font-size:10px;color:#6b7280;margin-top:6px;min-height:13px;}
+@media(max-width:640px){.tl-vel{display:none;}.tl-lbl{min-width:84px;}.tl-lbl span{font-size:17px;}}
 /* Modal Projeto de Análise */
 .proj-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:700;display:flex;align-items:center;justify-content:center;padding:16px;}
 .proj-modal{background:#fff;border-radius:14px;width:100%;max-width:520px;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.35);overflow:hidden;}
@@ -831,6 +858,7 @@ function renderPagina(){
         <button class="mlb-tab" id="mlb-btn-areas" onclick="toggleLayerBar('areas')">🌿 Áreas Territoriais <span class="mlb-badge" id="uc-count-badge" title="Unidades de Conservação" style="display:none">0</span> <span class="mlb-badge" id="ti-count-badge" title="Terras Indígenas" style="display:none">0</span></button>
         <button class="mlb-tab" id="mlb-btn-alertas" onclick="toggleLayerBar('alertas')">🔥 Alertas e Focos <span class="mlb-badge" id="alertas-count-badge" style="display:none">0</span></button>
         <button class="mlb-tab" id="mlb-btn-brigadas" onclick="toggleLayerBar('brigadas')">🧯 Brigadas Comunitárias <span class="mlb-badge" id="brigadas-count-badge" style="display:none">0</span></button>
+        <button class="mlb-tab" id="mlb-btn-timeline" onclick="toggleTimeline()">🕑 Linha do Tempo</button>
         <button class="mlb-tab" id="mlb-btn-projetos" onclick="toggleLayerBar('projetos')">📐 Projetos de Análise <span class="mlb-badge" id="projetos-count-badge" style="display:none">0</span></button>
         <button class="mlb-tab" id="mlb-btn-mun" onclick="toggleLayerBar('mun')">🏙 Municípios</button>
         <button class="mlb-tab" id="mlb-btn-acre" onclick="toggleLayerBar('acre')">🗺 Delimitação do Acre</button>
@@ -841,6 +869,34 @@ function renderPagina(){
     <div class="mapa-container">
       <!-- MAPA -->
       <div id="mapa" style="position:relative">
+
+        <!-- Selo de auto-atualização (aparece com Alertas e Focos ligado) -->
+        <div id="auto-badge" style="display:none">
+          <span class="auto-pulse" id="auto-pulse"></span>
+          <span id="auto-lbl">Atualizado agora</span>
+          <span class="auto-sw" id="auto-sw" onclick="toggleAutoRefresh()" title="Auto-atualizar focos/alertas"></span>
+        </div>
+
+        <!-- Linha do tempo -->
+        <div id="timeline-bar" style="display:none">
+          <div class="tl-top">
+            <div class="tl-modo">
+              <button class="on" id="tl-m-anos" onclick="tlSetModo('anos')">Anos</button>
+              <button id="tl-m-dias" onclick="tlSetModo('dias')">Dias</button>
+            </div>
+            <button class="tl-play" id="tl-play" onclick="tlTogglePlay()" title="Reproduzir">
+              <svg id="tl-play-ic" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 4 20 12 6 20 6 4"/></svg>
+            </button>
+            <div class="tl-lbl"><small id="tl-cap">Ano</small><span id="tl-val">—</span></div>
+            <div class="tl-vel">Velocidade
+              <select id="tl-vel"><option value="1400">Lenta</option><option value="800" selected>Média</option><option value="400">Rápida</option></select>
+            </div>
+            <button class="tl-close" onclick="toggleTimeline()" title="Fechar linha do tempo">✕</button>
+          </div>
+          <input type="range" id="tl-slider" min="0" max="24" value="24" oninput="tlOnSlide()">
+          <div class="tl-ticks" id="tl-ticks"></div>
+          <div class="tl-stat" id="tl-stat"></div>
+        </div>
 
         <!-- Editor de delimitação do Acre -->
         <div id="acre-editor">
@@ -2301,48 +2357,45 @@ async function toggleAlertasMapa(ativo) {
 
   // Focos (FIRMS/BDQueimadas) vêm de focos_calor (tempo real) — modelo híbrido.
   _focosNrtAtivo = ativo
-  if (ativo && !_focosNrtMapa.length) await _carregarFocos()
-
-  if (ativo && !_alertasMapa.length) {
-    // Garante que o GeoJSON das UCs está carregado para o PIP
-    if (!_ucGeojson) await _carregarUC()
-    const corte = new Date(Date.now() - 7 * 86400000).toISOString()
-    // Só desmatamento/degradação (DETER/PRODES); focos vêm de focos_calor
-    const { data } = await db.from('alertas_ambientais')
-      .select('id,tipo,severidade,fonte,uc_id,uc_nome,area_ha,data_referencia,geom')
-      .eq('ativo', true)
-      .neq('tipo', 'queimada')
-      .gte('data_deteccao', corte)
-      .limit(500)
-    // Pré-calcula uc_nome via PIP para alertas sem UC no banco
-    _alertasMapa = (data || []).map(a => {
-      if (a.uc_nome) return a
-      try {
-        let lat, lng
-        if (typeof a.geom === 'object' && a.geom?.coordinates) {
-          lng = a.geom.coordinates[0]; lat = a.geom.coordinates[1]
-        } else {
-          const m = String(a.geom).match(/POINT\(([^ ]+) ([^ )]+)\)/)
-          if (m) { lng = parseFloat(m[1]); lat = parseFloat(m[2]) }
-        }
-        if (lat && lng) a = { ...a, uc_nome: _ucNomePorCoordenada(lat, lng) }
-      } catch {}
-      return a
-    })
-    const badge = document.getElementById('alertas-count-badge')
-    if (badge) { badge.textContent = _alertasMapa.length; badge.style.display = _alertasMapa.length ? '' : 'none' }
-  }
-
-  if (!ativo) {
+  if (ativo) {
+    if (!_focosNrtMapa.length) await _carregarFocos()
+    if (!_alertasMapa.length)  await _carregarAlertas()
+  } else {
     if (_focosNrtLayer) { mapaL.removeLayer(_focosNrtLayer); _focosNrtLayer = null }
   }
   renderAlertasMapa()
   renderFocosMapa()
+  _autoCtrl()
   _atualizarLegendaMapa()
+}
+
+// Carrega DETER/desmatamento (focos vêm separados de focos_calor)
+async function _carregarAlertas() {
+  if (!_ucGeojson) await _carregarUC()
+  const corte = new Date(Date.now() - 7 * 86400000).toISOString()
+  const { data } = await db.from('alertas_ambientais')
+    .select('id,tipo,severidade,fonte,uc_id,uc_nome,area_ha,data_referencia,geom')
+    .eq('ativo', true)
+    .neq('tipo', 'queimada')
+    .gte('data_deteccao', corte)
+    .limit(500)
+  _alertasMapa = (data || []).map(a => {
+    if (a.uc_nome) return a
+    try {
+      let lat, lng
+      if (typeof a.geom === 'object' && a.geom?.coordinates) { lng = a.geom.coordinates[0]; lat = a.geom.coordinates[1] }
+      else { const m = String(a.geom).match(/POINT\(([^ ]+) ([^ )]+)\)/); if (m) { lng = parseFloat(m[1]); lat = parseFloat(m[2]) } }
+      if (lat && lng) a = { ...a, uc_nome: _ucNomePorCoordenada(lat, lng) }
+    } catch {}
+    return a
+  })
+  const badge = document.getElementById('alertas-count-badge')
+  if (badge) { badge.textContent = _alertasMapa.length; badge.style.display = _alertasMapa.length ? '' : 'none' }
 }
 
 function renderAlertasMapa() {
   if (_alertasLayer) { mapaL.removeLayer(_alertasLayer); _alertasLayer = null }
+  if (_tlAberta) return  // linha do tempo assume o controle da exibição
   if (!_alertasAtivo || !_alertasMapa.length) return
 
   const sevs   = new Set([...document.querySelectorAll('[data-alerta-sev]:checked')].map(e => e.dataset.alertaSev))
@@ -2714,6 +2767,7 @@ function _focoFogoIcon(cor, animar = true) {
 
 function renderFocosMapa() {
   if (_focosNrtLayer) { mapaL.removeLayer(_focosNrtLayer); _focosNrtLayer = null }
+  if (_tlAberta) return  // linha do tempo assume o controle da exibição
   if (!_focosNrtAtivo || !_focosNrtMapa.length) { _atualizarLegendaMapa(); return }
 
   const fontes = new Set([...document.querySelectorAll('[data-foco-fonte]')].filter(c=>c.checked).map(c=>c.dataset.focoFonte))
@@ -2744,6 +2798,187 @@ function renderFocosMapa() {
   const stat = document.getElementById('focos-mapa-stat')
   if (stat) stat.textContent = `${visiveis.length} foco${visiveis.length !== 1 ? 's' : ''} exibido${visiveis.length !== 1 ? 's' : ''}`
   _atualizarLegendaMapa()
+}
+
+// ══════════════════════════════════════════════════════════════
+// AUTO-ATUALIZAÇÃO (focos/alertas ao vivo, a cada 5 min)
+// ══════════════════════════════════════════════════════════════
+let _autoOn = true, _autoTimer = null, _autoRelogio = null, _autoLast = Date.now()
+const AUTO_MS = 5 * 60 * 1000
+
+function _autoBadgeUpdate() {
+  const badge = document.getElementById('auto-badge')
+  if (!badge) return
+  badge.style.display = (_alertasAtivo && !_tlAberta) ? 'flex' : 'none'
+  document.getElementById('auto-sw')?.classList.toggle('off', !_autoOn)
+  const pulse = document.getElementById('auto-pulse'); if (pulse) pulse.style.visibility = _autoOn ? 'visible' : 'hidden'
+  const lbl = document.getElementById('auto-lbl')
+  if (lbl) {
+    if (!_autoOn) lbl.textContent = 'Auto-atualização desligada'
+    else { const min = Math.floor((Date.now() - _autoLast) / 60000); lbl.textContent = min < 1 ? 'Atualizado agora' : `Atualizado há ${min} min` }
+  }
+}
+function _autoCtrl() {
+  clearInterval(_autoTimer); _autoTimer = null
+  clearInterval(_autoRelogio); _autoRelogio = null
+  if (_alertasAtivo && !_tlAberta && _autoOn) {
+    _autoTimer   = setInterval(_autoTick, AUTO_MS)
+    _autoRelogio = setInterval(_autoBadgeUpdate, 30000)
+  }
+  _autoBadgeUpdate()
+}
+async function _autoTick() {
+  if (document.hidden || _tlAberta || !_alertasAtivo) return
+  await _carregarFocos()
+  await _carregarAlertas()
+  _autoLast = Date.now()
+  renderFocosMapa(); renderAlertasMapa()
+  _autoBadgeUpdate()
+}
+function toggleAutoRefresh() { _autoOn = !_autoOn; _autoCtrl() }
+document.addEventListener('visibilitychange', () => { if (!document.hidden) _autoBadgeUpdate() })
+
+// ══════════════════════════════════════════════════════════════
+// LINHA DO TEMPO — focos + cobertura por data (dias) / ano (anos)
+// ══════════════════════════════════════════════════════════════
+let _tlAberta = false, _tlModo = 'anos', _tlPlaying = false, _tlTimer = null, _tlDeb = null
+const TL_ANO_MIN = 2001, TL_ANO_MAX = 2024
+let _tlFocosLayer = null, _tlGibsLayer = null, _tlProdesLayer = null
+const _tlFocosCacheAno = {}
+
+function toggleTimeline() {
+  _tlAberta = !_tlAberta
+  document.getElementById('timeline-bar').style.display = _tlAberta ? 'block' : 'none'
+  document.getElementById('mlb-btn-timeline').classList.toggle('ativo', _tlAberta)
+  if (_tlAberta) {
+    // assume o controle: esconde camadas ao vivo
+    if (_focosNrtLayer) { mapaL.removeLayer(_focosNrtLayer); _focosNrtLayer = null }
+    if (_alertasLayer)  { mapaL.removeLayer(_alertasLayer);  _alertasLayer = null }
+    tlSetModo(_tlModo)
+  } else {
+    _tlStop(); _tlLimpar()
+    if (_alertasAtivo) { renderAlertasMapa(); renderFocosMapa() }
+  }
+  _autoCtrl()
+  _atualizarLegendaMapa()
+}
+
+function _tlLimpar() {
+  ;[_tlFocosLayer, _tlGibsLayer, _tlProdesLayer].forEach(l => { if (l) mapaL.removeLayer(l) })
+  _tlFocosLayer = _tlGibsLayer = _tlProdesLayer = null
+}
+
+function tlSetModo(m) {
+  _tlModo = m
+  document.getElementById('tl-m-anos').classList.toggle('on', m === 'anos')
+  document.getElementById('tl-m-dias').classList.toggle('on', m === 'dias')
+  const s = document.getElementById('tl-slider')
+  if (m === 'anos') {
+    s.min = 0; s.max = TL_ANO_MAX - TL_ANO_MIN; s.value = s.max
+    document.getElementById('tl-cap').textContent = 'Ano'
+    document.getElementById('tl-ticks').innerHTML = `<span>${TL_ANO_MIN}</span><span>${Math.round((TL_ANO_MIN + TL_ANO_MAX) / 2)}</span><span>${TL_ANO_MAX}</span>`
+  } else {
+    s.min = 0; s.max = 30; s.value = 30
+    document.getElementById('tl-cap').textContent = 'Data'
+    document.getElementById('tl-ticks').innerHTML = `<span>−30 dias</span><span>−15</span><span>hoje</span>`
+  }
+  tlOnSlide()
+}
+
+function tlOnSlide() {
+  const v = +document.getElementById('tl-slider').value
+  if (_tlModo === 'anos') {
+    document.getElementById('tl-val').textContent = TL_ANO_MIN + v
+  } else {
+    const d = new Date(); d.setDate(d.getDate() - (30 - v))
+    document.getElementById('tl-val').textContent = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+  }
+  clearTimeout(_tlDeb)
+  _tlDeb = setTimeout(() => {
+    if (_tlModo === 'anos') _tlRenderAno(TL_ANO_MIN + v)
+    else { const d = new Date(); d.setDate(d.getDate() - (30 - v)); _tlRenderDia(d.toISOString().slice(0, 10)) }
+  }, 180)
+}
+
+function _tlSetGibs(dateStr) {
+  if (_tlGibsLayer) { mapaL.removeLayer(_tlGibsLayer); _tlGibsLayer = null }
+  _tlGibsLayer = _gibsMake(100, dateStr, 'MODIS_Terra_CorrectedReflectance_TrueColor')
+  _tlGibsLayer.addTo(mapaL); _tlGibsLayer.setZIndex(140)
+}
+function _tlSetProdes(ano) {
+  if (_tlProdesLayer) { mapaL.removeLayer(_tlProdesLayer); _tlProdesLayer = null }
+  _tlProdesLayer = L.tileLayer.wms('https://terrabrasilis.dpi.inpe.br/geoserver/prodes-amazon-nb/wms', {
+    layers: 'prodes-amazon-nb:yearly_deforestation_biome', format: 'image/png', transparent: true,
+    version: '1.1.1', CQL_FILTER: `year=${ano}`, opacity: 0.85, attribution: 'PRODES/INPE',
+    maxZoom: 22, maxNativeZoom: 15
+  })
+  _tlProdesLayer.addTo(mapaL); _tlProdesLayer.setZIndex(160)
+}
+function _tlPlotFocos(items) {
+  if (_tlFocosLayer) { mapaL.removeLayer(_tlFocosLayer); _tlFocosLayer = null }
+  if (!items.length) return
+  const animar = items.length <= 200
+  _tlFocosLayer = L.layerGroup()
+  items.forEach(f => {
+    const dt = f.data_hora ? new Date(f.data_hora).toLocaleDateString('pt-BR', { timeZone: 'America/Rio_Branco' }) : '—'
+    L.marker([f.lat, f.lon], { icon: _focoFogoIcon(f.cor, animar) })
+      .bindPopup(`<div class="camada-popup">
+        <div class="cp-header" style="background:${f.cor}">Foco de Calor</div>
+        <div class="cp-layer">
+          ${f.satelite ? `<div class="cp-row"><strong>Satélite</strong><span>${escHtml(f.satelite)}</span></div>` : ''}
+          <div class="cp-row"><strong>Data</strong><span>${dt}</span></div>
+          ${f.frp != null ? `<div class="cp-row"><strong>FRP</strong><span>${Number(f.frp).toLocaleString('pt-BR')} MW</span></div>` : ''}
+          <div style="margin-top:4px;font-size:10px;color:#9CA3AF">📍 ${Number(f.lat).toFixed(5)}, ${Number(f.lon).toFixed(5)}</div>
+        </div>
+      </div>`, { maxWidth: 230 }).addTo(_tlFocosLayer)
+  })
+  _tlFocosLayer.addTo(mapaL)
+}
+
+async function _tlRenderAno(ano) {
+  _tlSetGibs(`${ano}-08-15`)   // satélite na época seca do ano
+  _tlSetProdes(ano)
+  let pts = _tlFocosCacheAno[ano]
+  if (!pts) {
+    const { data } = await db.from('focos_calor_ac').select('lat,lon,source,frp,acq_date').eq('ano', ano).limit(1000)
+    pts = data || []; _tlFocosCacheAno[ano] = pts
+  }
+  if (!_tlAberta || _tlModo !== 'anos') return
+  _tlPlotFocos(pts.map(p => ({
+    lat: p.lat, lon: p.lon, frp: p.frp, satelite: p.source, data_hora: p.acq_date,
+    cor: (p.source || '').includes('VIIRS') ? '#7c3aed' : '#ea580c'
+  })))
+  const st = document.getElementById('tl-stat')
+  if (st) st.textContent = `${pts.length}${pts.length >= 1000 ? '+ (amostra)' : ''} foco(s) em ${ano} · PRODES ${ano} · satélite NASA · MapBiomas por ano: requer token GEE (em breve)`
+  _atualizarLegendaMapa()
+}
+
+async function _tlRenderDia(ds) {
+  _tlSetGibs(ds)
+  if (_tlProdesLayer) { mapaL.removeLayer(_tlProdesLayer); _tlProdesLayer = null } // PRODES é anual
+  if (!_focosNrtMapa.length) await _carregarFocos()
+  const focos = _focosNrtMapa.filter(f => (f.data_hora || '').slice(0, 10) === ds && f.lat && f.lon)
+  _tlPlotFocos(focos.map(f => ({
+    lat: f.lat, lon: f.lon, frp: f.frp, satelite: f.satelite, data_hora: f.data_hora,
+    cor: _FOCO_FONTE_COR[f.fonte] || '#ea580c'
+  })))
+  const st = document.getElementById('tl-stat')
+  if (st) st.textContent = `${focos.length} foco(s) em ${ds} · satélite NASA do dia` + (focos.length === 0 ? ' (sem focos NRT nesta data)' : '')
+  _atualizarLegendaMapa()
+}
+
+function tlTogglePlay() { _tlPlaying = !_tlPlaying; _tlPlayIc(); if (_tlPlaying) _tlStep(); else _tlStop() }
+function _tlPlayIc() {
+  document.getElementById('tl-play-ic').innerHTML = _tlPlaying
+    ? '<rect x="6" y="5" width="4" height="14"/><rect x="14" y="5" width="4" height="14"/>'
+    : '<polygon points="6 4 20 12 6 20 6 4"/>'
+}
+function _tlStop() { _tlPlaying = false; if (_tlTimer) { clearTimeout(_tlTimer); _tlTimer = null } _tlPlayIc() }
+function _tlStep() {
+  const s = document.getElementById('tl-slider')
+  let v = +s.value + 1; if (v > +s.max) v = +s.min
+  s.value = v; tlOnSlide()
+  _tlTimer = setTimeout(_tlStep, +document.getElementById('tl-vel').value)
 }
 
 // ══════════════════════════════════════════════════════════════
