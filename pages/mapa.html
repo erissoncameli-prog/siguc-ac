@@ -193,7 +193,8 @@
 .foco-fumaca.f2{animation-delay:.8s;left:40%;}
 .foco-fumaca.f3{animation-delay:1.6s;left:60%;}
 @keyframes fumacaSobe{0%{opacity:0;transform:translate(-50%,0) scale(.5);}25%{opacity:.55;}100%{opacity:0;transform:translate(-50%,-20px) scale(1.7);}}
-.foco-dot{position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:7px;height:7px;border-radius:50%;border:1.5px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.35);}
+.foco-dot{position:absolute;bottom:-1px;left:50%;transform:translateX(-50%);width:10px;height:10px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.35);}
+.foco-halo{position:absolute;bottom:-1px;left:50%;transform:translateX(-50%);width:28px;height:28px;border-radius:50%;pointer-events:none;}
 .foco-fogo.estatico svg{animation:none;transform:translateX(-50%);}
 .foco-fogo.estatico .foco-fumaca{display:none;}
 /* ── Marcador DETER (árvore sendo cortada/caindo) ── */
@@ -2702,9 +2703,10 @@ function _focoFogoIcon(cor, animar = true) {
   return L.divIcon({
     className: '',
     html: `<div class="foco-fogo${animar ? '' : ' estatico'}" style="cursor:pointer">
+      <span class="foco-halo" style="background:radial-gradient(circle, ${cor}66 0%, ${cor}00 70%)"></span>
       <span class="foco-fumaca"></span><span class="foco-fumaca f2"></span><span class="foco-fumaca f3"></span>
       ${_FOGO_SVG}
-      <span class="foco-dot" style="background:${cor}"></span>
+      <span class="foco-dot" style="background:${cor};box-shadow:0 0 6px 1px ${cor},0 0 0 1px rgba(0,0,0,.35)"></span>
     </div>`,
     iconSize: [24, 30], iconAnchor: [12, 28], popupAnchor: [0, -26]
   })
