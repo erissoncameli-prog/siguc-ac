@@ -110,18 +110,62 @@
                   cursor:pointer; border:1.5px solid var(--border,#e5e7eb) }
 .foto-thumb-val:hover { border-color:var(--verde-c,#52B788) }
 
-/* Fauna list */
-.fauna-row { display:grid; grid-template-columns:auto 1fr auto;
-             gap:10px; align-items:center;
-             padding:10px 0; border-bottom:1px solid var(--border,#e5e7eb) }
-.fauna-row:last-child { border-bottom:none }
+/* ── Fauna cards ─────────────────────────────────────────────── */
+.fauna-card { border:1px solid var(--border,#e5e7eb); border-radius:10px;
+              margin-bottom:8px; overflow:hidden }
+.fauna-card:last-child { margin-bottom:0 }
+
+.fauna-card-head { display:grid; grid-template-columns:auto 1fr auto;
+                   gap:10px; align-items:center; padding:10px 14px;
+                   cursor:pointer; user-select:none; background:var(--card-bg,#fff);
+                   transition:.12s }
+.fauna-card-head:hover { background:var(--bg-light,#f9fafb) }
+.fauna-card-head.expandido { background:var(--bg-light,#f9fafb);
+                              border-bottom:1px solid var(--border,#e5e7eb) }
+
 .fauna-icon-val { font-size:1.4rem; line-height:1 }
 .fauna-det strong { font-size:.87rem; display:block }
 .fauna-det span   { font-size:.78rem; color:var(--text-muted,#6b7280) }
+
+.fauna-head-right { display:flex; flex-direction:column; align-items:flex-end; gap:4px }
+.fauna-chevron { font-size:.75rem; color:var(--text-muted,#6b7280); transition:.2s }
+.fauna-card-head.expandido .fauna-chevron { transform:rotate(180deg) }
+
 .badge-conf   { background:#d1fae5; color:#065f46; padding:2px 9px;
                 border-radius:999px; font-size:.72rem; font-weight:600 }
 .badge-pend   { background:#fef3c7; color:#92400e; padding:2px 9px;
                 border-radius:999px; font-size:.72rem; font-weight:600 }
+
+/* corpo expandido */
+.fauna-card-body { display:none; padding:14px; background:var(--bg-light,#f9fafb) }
+.fauna-card-body.aberto { display:block }
+
+/* fotos da fauna */
+.fauna-fotos-grid { display:flex; gap:7px; flex-wrap:wrap; margin-bottom:12px }
+.fauna-foto-thumb { width:82px; height:62px; object-fit:cover; border-radius:7px;
+                    cursor:pointer; border:1.5px solid var(--border,#e5e7eb) }
+.fauna-foto-thumb:hover { border-color:var(--verde-c,#52B788) }
+
+/* formulário de edição inline */
+.fauna-edit-form { background:#fff; border:1px solid var(--border,#e5e7eb);
+                   border-radius:8px; padding:12px 14px; margin-top:8px; display:none }
+.fauna-edit-form.aberto { display:block }
+.fauna-edit-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px 16px; margin-bottom:10px }
+@media(max-width:480px){ .fauna-edit-grid{ grid-template-columns:1fr } }
+.fauna-edit-grid label { font-size:.72rem; font-weight:600; color:var(--text-muted,#6b7280);
+                          text-transform:uppercase; letter-spacing:.04em; display:block; margin-bottom:2px }
+.fauna-edit-grid select,
+.fauna-edit-grid input,
+.fauna-edit-form  textarea { width:100%; padding:5px 9px; border-radius:7px;
+                              border:1.5px solid var(--border,#e5e7eb); font-size:.84rem;
+                              background:var(--input-bg,#fff) }
+.fauna-edit-form textarea { resize:vertical; min-height:52px }
+.fauna-edit-actions { display:flex; gap:8px; margin-top:8px; flex-wrap:wrap }
+.btn-fauna-salvar { background:#12A66A; color:#fff; padding:6px 16px; border-radius:8px;
+                    font-size:.82rem; font-weight:600; border:none; cursor:pointer }
+.btn-fauna-salvar:hover { opacity:.88 }
+.btn-fauna-cancelar { background:var(--border,#e5e7eb); color:#111; padding:6px 14px;
+                      border-radius:8px; font-size:.82rem; font-weight:600; border:none; cursor:pointer }
 
 /* Historico */
 .hist-timeline { display:flex; flex-direction:column; gap:0 }
@@ -610,16 +654,16 @@ async function abrirDetalhe(id) {
 }
 
 async function carregarFaunaModal(rcId) {
-  const sec = document.getElementById('modal-fauna-sec')
+  const sec   = document.getElementById('modal-fauna-sec')
   const lista = document.getElementById('modal-fauna-lista')
 
   const { data, error } = await db
     .from('registro_fauna')
     .select(`
       id, classe, quantidade, condicao, tipo_evento, causa_aparente,
-      destinacao, faixa_etaria, nome_popular, nome_cientifico,
-      identificacao_confirmada, identificado_por,
-      especie_id, observacoes,
+      destinacao, faixa_etaria, sexo, nome_popular, nome_cientifico,
+      identificacao_confirmada, identificado_por, ameacada,
+      especie_id, observacoes, fotos_urls,
       especie:especie_id (nome_cientifico, status_conservacao, ameacada)
     `)
     .eq('registro_campo_id', rcId)
@@ -629,6 +673,7 @@ async function carregarFaunaModal(rcId) {
   _faunaDetalhe = data
   sec.hidden = false
 
+  const podeEditar    = ['biologo','tecnico','gestor','super_admin'].includes(_usuario.perfil)
   const podeConfirmar = ['biologo','gestor','super_admin'].includes(_usuario.perfil)
 
   lista.innerHTML = data.map(f => {
@@ -637,72 +682,191 @@ async function carregarFaunaModal(rcId) {
     const cond  = CONDICAO[f.condicao] || f.condicao
     const tipo  = TIPO_EV[f.tipo_evento] || f.tipo_evento
     const dest  = f.destinacao ? (DESTIN[f.destinacao] || f.destinacao) : ''
-    const ameac = f.especie?.ameacada ? '🔴 Ameaçada' : ''
+    const ameac = (f.ameacada || f.especie?.ameacada) ? '<span style="color:#ef4444;font-size:.72rem;font-weight:600">● Ameaçada</span>' : ''
 
-    return `
-    <div class="fauna-row" id="fauna-row-${f.id}">
-      <span class="fauna-icon-val">${icon}</span>
-      <div class="fauna-det">
-        <strong>${esc(nome)} ${f.quantidade > 1 ? '× '+f.quantidade : ''} ${ameac}</strong>
-        <span>${tipo} · ${cond}${dest ? ' · ' + dest : ''}${f.faixa_etaria && f.faixa_etaria !== 'indeterminada' ? ' · ' + f.faixa_etaria : ''}</span>
-        ${f.observacoes ? `<span style="display:block;margin-top:2px;font-style:italic">${esc(f.observacoes)}</span>` : ''}
-        <!-- Painel confirmar espécie (biologo) -->
-        <div class="confirmar-esp-wrap" id="cesp-${f.id}">
-          <p style="font-size:.78rem;font-weight:600;margin-bottom:6px">Confirmar / corrigir identificação</p>
-          <input id="cesp-nome-${f.id}" placeholder="Nome científico confirmado"
-                 value="${esc(f.especie?.nome_cientifico || f.nome_cientifico || '')}"
-                 style="margin-bottom:6px">
-          <input id="cesp-obs-${f.id}" placeholder="Observações taxonômicas (opcional)"
-                 value="${esc(f.observacoes || '')}">
-          <div style="display:flex;gap:8px;margin-top:8px">
-            <button class="btn-acao btn-validar" style="flex:1;padding:6px"
-                    onclick="confirmarEspecie('${f.id}')">✓ Confirmar</button>
-            <button class="btn-acao" style="background:#e5e7eb;color:#111;padding:6px"
-                    onclick="document.getElementById('cesp-${f.id}').classList.remove('visivel')">Cancelar</button>
+    const fotosHtml = (f.fotos_urls?.length)
+      ? `<div class="fauna-fotos-grid">
+          ${f.fotos_urls.map(u => `<img class="fauna-foto-thumb" src="${esc(u)}" alt="foto fauna" onclick="abrirLightbox('${esc(u)}')">`).join('')}
+         </div>`
+      : ''
+
+    const editFormHtml = podeEditar ? `
+      <button class="btn-ver" style="font-size:.75rem;padding:4px 12px;margin-bottom:8px"
+              onclick="toggleFaunaEdit('${f.id}',event)">Editar dados</button>
+      <div class="fauna-edit-form" id="fedit-${f.id}">
+        <div class="fauna-edit-grid">
+          <div>
+            <label>Classe</label>
+            <select id="fedit-classe-${f.id}">
+              <option value="mamifero" ${f.classe==='mamifero'?'selected':''}>Mamífero</option>
+              <option value="ave" ${f.classe==='ave'?'selected':''}>Ave</option>
+              <option value="reptil" ${f.classe==='reptil'?'selected':''}>Réptil</option>
+              <option value="anfibio" ${f.classe==='anfibio'?'selected':''}>Anfíbio</option>
+              <option value="peixe" ${f.classe==='peixe'?'selected':''}>Peixe</option>
+              <option value="invertebrado" ${f.classe==='invertebrado'?'selected':''}>Invertebrado</option>
+              <option value="nao_sei" ${f.classe==='nao_sei'?'selected':''}>Não sei</option>
+            </select>
+          </div>
+          <div>
+            <label>Quantidade</label>
+            <input type="number" id="fedit-qtd-${f.id}" value="${f.quantidade || 1}" min="1">
+          </div>
+          <div>
+            <label>Nome popular</label>
+            <input type="text" id="fedit-popular-${f.id}" value="${esc(f.nome_popular || '')}">
+          </div>
+          <div>
+            <label>Nome científico</label>
+            <input type="text" id="fedit-cient-${f.id}" value="${esc(f.especie?.nome_cientifico || f.nome_cientifico || '')}">
+          </div>
+          <div>
+            <label>Condição</label>
+            <select id="fedit-cond-${f.id}">
+              <option value="integro" ${f.condicao==='integro'?'selected':''}>Íntegro</option>
+              <option value="ferido" ${f.condicao==='ferido'?'selected':''}>Ferido</option>
+              <option value="debilitado" ${f.condicao==='debilitado'?'selected':''}>Debilitado</option>
+              <option value="queimado" ${f.condicao==='queimado'?'selected':''}>Queimado</option>
+              <option value="obito" ${f.condicao==='obito'?'selected':''}>Óbito</option>
+            </select>
+          </div>
+          <div>
+            <label>Tipo de evento</label>
+            <select id="fedit-tipo-${f.id}">
+              <option value="resgate" ${f.tipo_evento==='resgate'?'selected':''}>Resgate</option>
+              <option value="avistamento" ${f.tipo_evento==='avistamento'?'selected':''}>Avistamento</option>
+              <option value="atropelamento" ${f.tipo_evento==='atropelamento'?'selected':''}>Atropelamento</option>
+              <option value="apreensao" ${f.tipo_evento==='apreensao'?'selected':''}>Apreensão</option>
+              <option value="encontrado_morto" ${f.tipo_evento==='encontrado_morto'?'selected':''}>Encontrado morto</option>
+            </select>
+          </div>
+          <div>
+            <label>Causa aparente</label>
+            <select id="fedit-causa-${f.id}">
+              <option value="" ${!f.causa_aparente?'selected':''}>—</option>
+              <option value="incendio" ${f.causa_aparente==='incendio'?'selected':''}>Incêndio</option>
+              <option value="atropelamento" ${f.causa_aparente==='atropelamento'?'selected':''}>Atropelamento</option>
+              <option value="fio_eletrico" ${f.causa_aparente==='fio_eletrico'?'selected':''}>Fio elétrico</option>
+              <option value="caca" ${f.causa_aparente==='caca'?'selected':''}>Caça</option>
+              <option value="outro" ${f.causa_aparente==='outro'?'selected':''}>Outro</option>
+              <option value="indeterminada" ${f.causa_aparente==='indeterminada'?'selected':''}>Indeterminada</option>
+            </select>
+          </div>
+          <div>
+            <label>Destinação</label>
+            <select id="fedit-dest-${f.id}">
+              <option value="" ${!f.destinacao?'selected':''}>—</option>
+              <option value="solto_no_local" ${f.destinacao==='solto_no_local'?'selected':''}>Solto no local</option>
+              <option value="encaminhado_cetas" ${f.destinacao==='encaminhado_cetas'?'selected':''}>Encam. CETAS</option>
+              <option value="obito" ${f.destinacao==='obito'?'selected':''}>Óbito</option>
+              <option value="em_tratamento" ${f.destinacao==='em_tratamento'?'selected':''}>Em tratamento</option>
+              <option value="outro" ${f.destinacao==='outro'?'selected':''}>Outro</option>
+            </select>
+          </div>
+          <div>
+            <label>Faixa etária</label>
+            <select id="fedit-faixa-${f.id}">
+              <option value="indeterminada" ${(f.faixa_etaria||'indeterminada')==='indeterminada'?'selected':''}>Indeterminada</option>
+              <option value="filhote" ${f.faixa_etaria==='filhote'?'selected':''}>Filhote</option>
+              <option value="jovem" ${f.faixa_etaria==='jovem'?'selected':''}>Jovem</option>
+              <option value="adulto" ${f.faixa_etaria==='adulto'?'selected':''}>Adulto</option>
+            </select>
+          </div>
+          <div>
+            <label>Sexo</label>
+            <select id="fedit-sexo-${f.id}">
+              <option value="indeterminado" ${(f.sexo||'indeterminado')==='indeterminado'?'selected':''}>Indeterminado</option>
+              <option value="macho" ${f.sexo==='macho'?'selected':''}>Macho</option>
+              <option value="femea" ${f.sexo==='femea'?'selected':''}>Fêmea</option>
+            </select>
+          </div>
+          <div style="grid-column:1/-1;display:flex;align-items:center;gap:8px">
+            <input type="checkbox" id="fedit-ameacada-${f.id}" ${(f.ameacada||f.especie?.ameacada)?'checked':''}>
+            <label for="fedit-ameacada-${f.id}" style="text-transform:none;letter-spacing:0;font-size:.84rem;font-weight:500;color:inherit;margin:0">Espécie ameaçada de extinção</label>
           </div>
         </div>
+        <label style="font-size:.72rem;font-weight:600;color:var(--text-muted,#6b7280);text-transform:uppercase;letter-spacing:.04em">Observações</label>
+        <textarea id="fedit-obs-${f.id}" style="margin-top:4px">${esc(f.observacoes || '')}</textarea>
+        <div class="fauna-edit-actions">
+          <button class="btn-fauna-salvar" onclick="salvarCorrecaoFauna('${f.id}')">Salvar correção</button>
+          ${podeConfirmar && !f.identificacao_confirmada
+            ? `<button class="btn-fauna-salvar" style="background:#3B82C4"
+                       onclick="salvarCorrecaoFauna('${f.id}', true)">Salvar e confirmar identificação</button>`
+            : ''}
+          <button class="btn-fauna-cancelar" onclick="toggleFaunaEdit('${f.id}',event)">Cancelar</button>
+        </div>
+      </div>` : ''
+
+    return `
+    <div class="fauna-card" id="fauna-card-${f.id}">
+      <div class="fauna-card-head" onclick="toggleFaunaCard('${f.id}')">
+        <span class="fauna-icon-val">${icon}</span>
+        <div class="fauna-det">
+          <strong>${esc(nome)} ${f.quantidade > 1 ? '× '+f.quantidade : ''}</strong>
+          <span>${tipo} · ${cond}${dest ? ' · '+dest : ''}${f.faixa_etaria && f.faixa_etaria !== 'indeterminada' ? ' · '+f.faixa_etaria : ''}</span>
+          ${(f.ameacada || f.especie?.ameacada) ? `<span style="display:block;margin-top:2px">${ameac}</span>` : ''}
+        </div>
+        <div class="fauna-head-right">
+          ${f.identificacao_confirmada
+            ? `<span class="badge-conf">✓ Confirmado</span>`
+            : `<span class="badge-pend">Pendente</span>`}
+          ${f.fotos_urls?.length ? `<span style="font-size:.72rem;color:var(--text-muted,#6b7280)">${f.fotos_urls.length} foto${f.fotos_urls.length>1?'s':''}</span>` : ''}
+          <span class="fauna-chevron">▼</span>
+        </div>
       </div>
-      <div>
-        ${f.identificacao_confirmada
-          ? `<span class="badge-conf">✓ Confirmado</span>`
-          : `<span class="badge-pend">Pendente</span>`}
-        ${podeConfirmar && !f.identificacao_confirmada
-          ? `<br><button class="btn-ver" style="margin-top:6px;font-size:.75rem;padding:4px 10px"
-               onclick="toggleCesp('${f.id}',event)">Confirmar</button>`
-          : ''}
+      <div class="fauna-card-body" id="fauna-body-${f.id}">
+        ${fotosHtml}
+        ${f.observacoes ? `<p style="font-size:.82rem;font-style:italic;color:var(--text-muted,#6b7280);margin-bottom:10px">${esc(f.observacoes)}</p>` : ''}
+        ${editFormHtml}
       </div>
     </div>`
   }).join('')
 }
 
-function toggleCesp(rfId, ev) {
-  ev.stopPropagation()
-  const el = document.getElementById(`cesp-${rfId}`)
-  el?.classList.toggle('visivel')
+function toggleFaunaCard(rfId) {
+  const head = document.querySelector(`#fauna-card-${rfId} .fauna-card-head`)
+  const body = document.getElementById(`fauna-body-${rfId}`)
+  head?.classList.toggle('expandido')
+  body?.classList.toggle('aberto')
 }
 
-async function confirmarEspecie(rfId) {
-  const nomeCient = document.getElementById(`cesp-nome-${rfId}`)?.value.trim() || null
-  const obs       = document.getElementById(`cesp-obs-${rfId}`)?.value.trim() || null
+function toggleFaunaEdit(rfId, ev) {
+  ev?.stopPropagation()
+  document.getElementById(`fedit-${rfId}`)?.classList.toggle('aberto')
+}
 
-  const { error } = await db.rpc('confirmar_fauna_especie', {
-    p_rf_id:           rfId,
-    p_nome_cientifico: nomeCient || null,
-    p_obs:             obs || null,
-  })
+async function salvarCorrecaoFauna(rfId, confirmar = false) {
+  const v = n => document.getElementById(`fedit-${n}-${rfId}`)?.value || null
+  const vb = n => document.getElementById(`fedit-${n}-${rfId}`)?.checked ?? false
 
-  if (error) { toast('Erro: ' + error.message, 'erro'); return }
+  const payload = {
+    classe:          v('classe'),
+    quantidade:      parseInt(document.getElementById(`fedit-qtd-${rfId}`)?.value || '1'),
+    nome_popular:    document.getElementById(`fedit-popular-${rfId}`)?.value.trim() || null,
+    nome_cientifico: document.getElementById(`fedit-cient-${rfId}`)?.value.trim() || null,
+    condicao:        v('cond'),
+    tipo_evento:     v('tipo'),
+    causa_aparente:  v('causa') || null,
+    destinacao:      v('dest') || null,
+    faixa_etaria:    v('faixa'),
+    sexo:            v('sexo'),
+    ameacada:        vb('ameacada'),
+    observacoes:     document.getElementById(`fedit-obs-${rfId}`)?.value.trim() || null,
+  }
 
-  toast('Identificação confirmada', 'ok')
-  document.getElementById(`cesp-${rfId}`)?.classList.remove('visivel')
+  if (confirmar) {
+    payload.identificacao_confirmada = true
+    payload.identificado_por = _usuario.id
+  }
+
+  const { error } = await db.from('registro_fauna').update(payload).eq('id', rfId)
+  if (error) { toast('Erro ao salvar: ' + error.message, 'erro'); return }
+
+  toast(confirmar ? 'Correção salva e identificação confirmada' : 'Correção salva', 'ok')
   await carregarFaunaModal(_detalheId)
-  // Atualiza o registro no array local
   const idx = _registros.findIndex(r => r.id === _detalheId)
   if (idx >= 0) {
-    const fPend = _faunaDetalhe.filter(f => !f.identificacao_confirmada).length
-    _registros[idx].n_fauna_pendente = fPend
-    renderLista()
-    renderKpis()
+    _registros[idx].n_fauna_pendente = _faunaDetalhe.filter(f => !f.identificacao_confirmada).length
+    renderLista(); renderKpis()
   }
 }
 
