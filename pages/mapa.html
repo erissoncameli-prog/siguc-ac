@@ -3765,7 +3765,9 @@ function _resetarEstiloGlobalCAR(){
 function _aplicarCamadaCAR(){
   if(_carLayer){ mapaL.removeLayer(_carLayer); _carLayer=null; }
   // Aplica filtro de status
-  const visiveis = _carFeatures.filter(f => _carStatusAtivos.has(_carStatusKey(f.properties?.condicao)));
+  const visiveis = _carFeatures
+    .filter(f => _carStatusAtivos.has(_carStatusKey(f.properties?.condicao)))
+    .sort((a, b) => (parseFloat(b.properties?.area) || 0) - (parseFloat(a.properties?.area) || 0));
   if(!visiveis.length){ _atualizarBadgeCAR(visiveis); return; }
   if(!_carRenderer) _carRenderer = L.canvas({pane:'carPane', padding:0.5});
   _carLayer = L.geoJSON({type:'FeatureCollection', features:visiveis},{
