@@ -29,8 +29,12 @@
 /* ── KPIs ─────────────────────────────────────────── */
 .kpi-row { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:18px }
 .kpi-box { flex:1; min-width:130px; background:var(--card-bg,#fff);
-           border:1px solid var(--border,#e5e7eb); border-radius:10px;
-           padding:14px 16px; display:flex; flex-direction:column; gap:2px }
+           border:1.5px solid var(--border,#e5e7eb); border-radius:10px;
+           padding:14px 16px; display:flex; flex-direction:column; gap:2px;
+           cursor:pointer; transition:.15s; user-select:none }
+.kpi-box:hover { border-color:var(--verde-c,#52B788); box-shadow:0 2px 8px rgba(0,0,0,.07) }
+.kpi-box.kpi-ativo { border-color:var(--floresta,#0A1A0F);
+                     box-shadow:0 0 0 3px rgba(10,26,15,.1) }
 .kpi-n   { font-size:1.8rem; font-weight:700; line-height:1; color:var(--floresta,#0A1A0F) }
 .kpi-l   { font-size:.78rem; color:var(--text-muted,#6b7280) }
 .kpi-n.alerta { color:#EF5B3C }
@@ -352,6 +356,7 @@
 let _usuario = null
 let _registros = []
 let _filtroStatus = 'aguardando'
+let _filtroKpi    = null   // 'aguardando'|'correcao'|'fauna_pend'|'validado_hoje'
 let _busca = ''
 let _detalheId = null
 let _faunaDetalhe = []
@@ -417,10 +422,10 @@ const DESTIN = {
 
   <!-- KPIs -->
   <div class="kpi-row" id="kpi-row">
-    <div class="kpi-box"><span class="kpi-n alerta" id="kpi-aguardando">—</span><span class="kpi-l">Aguardando</span></div>
-    <div class="kpi-box"><span class="kpi-n alerta" id="kpi-correcao">—</span><span class="kpi-l">Requer correção</span></div>
-    <div class="kpi-box"><span class="kpi-n" id="kpi-fauna-pend">—</span><span class="kpi-l">Com fauna pendente</span></div>
-    <div class="kpi-box"><span class="kpi-n verde" id="kpi-validado">—</span><span class="kpi-l">Validados hoje</span></div>
+    <div class="kpi-box" data-kpi="aguardando"><span class="kpi-n alerta" id="kpi-aguardando">—</span><span class="kpi-l">Aguardando</span></div>
+    <div class="kpi-box" data-kpi="correcao"><span class="kpi-n alerta" id="kpi-correcao">—</span><span class="kpi-l">Requer correção</span></div>
+    <div class="kpi-box" data-kpi="fauna_pend"><span class="kpi-n" id="kpi-fauna-pend">—</span><span class="kpi-l">Com fauna pendente</span></div>
+    <div class="kpi-box" data-kpi="validado_hoje"><span class="kpi-n verde" id="kpi-validado">—</span><span class="kpi-l">Validados hoje</span></div>
   </div>
 
   <!-- Filtros -->
@@ -439,12 +444,34 @@ const DESTIN = {
   <div id="lista-registros"></div>
 </div>`
 
-  // Eventos dos filtros
+  // Eventos dos filtros (tabs)
   document.querySelectorAll('.tab-btn[data-st]').forEach(b => {
     b.addEventListener('click', () => {
       document.querySelectorAll('.tab-btn[data-st]').forEach(x => x.classList.remove('ativo'))
       b.classList.add('ativo')
       _filtroStatus = b.dataset.st
+      _filtroKpi    = null
+      document.querySelectorAll('.kpi-box[data-kpi]').forEach(k => k.classList.remove('kpi-ativo'))
+      renderLista()
+    })
+  })
+
+  // Eventos dos KPI cards
+  document.querySelectorAll('.kpi-box[data-kpi]').forEach(k => {
+    k.addEventListener('click', () => {
+      const kpi = k.dataset.kpi
+      if (_filtroKpi === kpi) {
+        // segundo clique desfaz
+        _filtroKpi = null
+        k.classList.remove('kpi-ativo')
+      } else {
+        document.querySelectorAll('.kpi-box[data-kpi]').forEach(x => x.classList.remove('kpi-ativo'))
+        k.classList.add('kpi-ativo')
+        _filtroKpi = kpi
+        // desfaz seleção das tabs
+        document.querySelectorAll('.tab-btn[data-st]').forEach(x => x.classList.remove('ativo'))
+        _filtroStatus = ''
+      }
       renderLista()
     })
   })
@@ -486,8 +513,17 @@ function renderKpis() {
 }
 
 function filtrados() {
+  const hoje = new Date().toISOString().slice(0, 10)
   return _registros.filter(r => {
-    if (_filtroStatus && r.status_validacao !== _filtroStatus) return false
+    // filtro do KPI card tem prioridade sobre o filtro de tab
+    if (_filtroKpi) {
+      if (_filtroKpi === 'aguardando'    && r.status_validacao !== 'aguardando') return false
+      if (_filtroKpi === 'correcao'      && r.status_validacao !== 'requer_correcao') return false
+      if (_filtroKpi === 'fauna_pend'    && !(r.n_fauna_pendente > 0 && r.status_validacao !== 'rejeitado')) return false
+      if (_filtroKpi === 'validado_hoje' && !(r.status_validacao === 'validado' && r.validado_em?.startsWith(hoje))) return false
+    } else {
+      if (_filtroStatus && r.status_validacao !== _filtroStatus) return false
+    }
     if (_busca) {
       const hay = [r.brigadista_nome, r.brigada_nome, r.uc_nome, r.atividade, r.natureza]
         .filter(Boolean).join(' ').toLowerCase()
