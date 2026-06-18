@@ -1800,11 +1800,21 @@ function _atualizarGaleriaFotos() {
   document.getElementById('foto-count-label').textContent = `(${bCapturaGetFotos().length}/5)`
 }
 
+// Retorna brigada e equipe atuais para uso na marca d'água e EXIF
+function _getContextoFoto() {
+  const eqId = document.getElementById('home-equipe')?.value
+  const eq   = (App.equipes || []).find(e => e.id === eqId)
+  return {
+    brigada: App.brigada?.nome || '',
+    equipe:  eq?.nome || '',
+  }
+}
+
 async function abrirCamera() {
   if (bCapturaGetFotos().length >= 5) { toast('Máximo de 5 fotos', 'warn'); return }
   // App nativo (Android): câmera nativa via plugin (tela cheia, flash, zoom)
   if (bCameraEhNativa()) {
-    const blob = await bCameraNativaCapturar(App.brigadista, bGpsAtual(), 'CAMERA')
+    const blob = await bCameraNativaCapturar(App.brigadista, bGpsAtual(), 'CAMERA', _getContextoFoto())
     if (blob && bCapturaAdicionar(blob)) _atualizarGaleriaFotos()
     return
   }
@@ -1816,7 +1826,7 @@ async function abrirGaleria() {
   if (bCapturaGetFotos().length >= 5) { toast('Máximo de 5 fotos', 'warn'); return }
   // App nativo: seletor de fotos do dispositivo
   if (bCameraEhNativa()) {
-    const blob = await bCameraNativaCapturar(App.brigadista, bGpsAtual(), 'PHOTOS')
+    const blob = await bCameraNativaCapturar(App.brigadista, bGpsAtual(), 'PHOTOS', _getContextoFoto())
     if (blob && bCapturaAdicionar(blob)) _atualizarGaleriaFotos()
     return
   }
@@ -1828,11 +1838,12 @@ async function processarFotosArquivos(fileList) {
   const files = Array.from(fileList || [])
   if (!files.length) return
   let adicionou = 0
+  const ctx = _getContextoFoto()
   for (const f of files) {
     if (bCapturaGetFotos().length >= 5) { toast('Máximo de 5 fotos', 'warn'); break }
     if (!f.type.startsWith('image/')) continue
     try {
-      const blob = await bCapturaProcessarArquivo(f, App.brigadista, bGpsAtual())
+      const blob = await bCapturaProcessarArquivo(f, App.brigadista, bGpsAtual(), ctx)
       if (blob && bCapturaAdicionar(blob)) adicionou++
     } catch (e) { console.warn('[foto]', e) }
   }
@@ -1889,7 +1900,7 @@ function preencherFauna(f) {
 async function abrirFaunaCamera() {
   if (bFaunaFotoGetLista().length >= 5) { toast('Máximo de 5 fotos por animal', 'warn'); return }
   if (bCameraEhNativa()) {
-    const blob = await bCameraNativaCapturar(App.brigadista, bGpsAtual(), 'CAMERA')
+    const blob = await bCameraNativaCapturar(App.brigadista, bGpsAtual(), 'CAMERA', _getContextoFoto())
     if (blob && bFaunaFotoAdicionar(blob)) renderFaunaFotos()
     return
   }
@@ -1899,7 +1910,7 @@ async function abrirFaunaCamera() {
 async function abrirFaunaGaleria() {
   if (bFaunaFotoGetLista().length >= 5) { toast('Máximo de 5 fotos por animal', 'warn'); return }
   if (bCameraEhNativa()) {
-    const blob = await bCameraNativaCapturar(App.brigadista, bGpsAtual(), 'PHOTOS')
+    const blob = await bCameraNativaCapturar(App.brigadista, bGpsAtual(), 'PHOTOS', _getContextoFoto())
     if (blob && bFaunaFotoAdicionar(blob)) renderFaunaFotos()
     return
   }
@@ -1910,11 +1921,12 @@ async function processarFotosFaunaArquivos(fileList) {
   const files = Array.from(fileList || [])
   if (!files.length) return
   let adicionou = 0
+  const ctx = _getContextoFoto()
   for (const f of files) {
     if (bFaunaFotoGetLista().length >= 5) { toast('Máximo de 5 fotos por animal', 'warn'); break }
     if (!f.type.startsWith('image/')) continue
     try {
-      const blob = await bCapturaProcessarArquivo(f, App.brigadista, bGpsAtual())
+      const blob = await bCapturaProcessarArquivo(f, App.brigadista, bGpsAtual(), ctx)
       if (blob && bFaunaFotoAdicionar(blob)) adicionou++
     } catch (e) { console.warn('[foto fauna]', e) }
   }
