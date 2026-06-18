@@ -105,6 +105,42 @@
 .chart-canvas-wrap { position:relative; width:100% }
 .chart-grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px }
 @media(max-width:640px){ .chart-grid-2{ grid-template-columns:1fr } }
+
+/* ── Fauna tab ───────────────────────────────────────── */
+.fauna-kpi-row { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:18px }
+@media(max-width:640px){ .fauna-kpi-row{ grid-template-columns:repeat(2,1fr) } }
+
+.fkpi { border-radius:12px; padding:16px 18px; display:flex; flex-direction:column; gap:2px;
+        position:relative; overflow:hidden }
+.fkpi::before { content:''; position:absolute; top:0; right:0; width:64px; height:64px;
+                border-radius:50%; opacity:.08; transform:translate(20px,-20px) }
+.fkpi-total  { background:#0A1A0F; color:#fff }
+.fkpi-total::before  { background:#52B788 }
+.fkpi-resg   { background:#1e3a5f; color:#fff }
+.fkpi-resg::before   { background:#60a5fa }
+.fkpi-cetas  { background:#3d1f6e; color:#fff }
+.fkpi-cetas::before  { background:#c084fc }
+.fkpi-obito  { background:#3d1510; color:#fff }
+.fkpi-obito::before  { background:#f87171 }
+
+.fkpi-n { font-size:2rem; font-weight:700; line-height:1; font-family:'Fraunces',Georgia,serif;
+          letter-spacing:-.02em }
+.fkpi-l { font-size:.72rem; font-weight:500; opacity:.65; text-transform:uppercase;
+          letter-spacing:.06em; margin-top:4px }
+
+.fauna-grid-2x2 { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px }
+@media(max-width:680px){ .fauna-grid-2x2{ grid-template-columns:1fr } }
+
+.fauna-chart-card { background:#fff; border:1px solid #e5e7eb; border-radius:14px;
+                    padding:20px 20px 14px; box-shadow:0 1px 4px rgba(0,0,0,.04) }
+.fcc-header { display:flex; justify-content:space-between; align-items:flex-start;
+              margin-bottom:16px }
+.fcc-title { font-size:.82rem; font-weight:700; color:#0A1A0F; letter-spacing:-.01em }
+.fcc-sub { font-size:.72rem; color:#9ca3af; margin-top:2px }
+.fcc-badge { font-size:.7rem; font-weight:600; padding:3px 9px; border-radius:999px;
+             background:#f3f4f6; color:#374151 }
+.fauna-full-card { margin-bottom:14px }
+.fauna-full-card .fauna-chart-card { border-radius:14px }
 </style>
 </head>
 <body>
@@ -117,6 +153,7 @@ let _usuario   = null
 let _registros = []   // vw_registros_validacao no período
 let _brigadas  = []   // brigadas
 let _brists    = []   // brigadistas
+let _faunaData = []   // registro_fauna enriquecido com regional/brigada
 let _tabAtiva  = 'estado'
 let _carregando = false
 
@@ -230,6 +267,7 @@ function htmlPagina() {
     <button class="rel-tab ativo" data-tab="estado">🗺 Estado do Acre</button>
     <button class="rel-tab" data-tab="regional">📍 Por Regional</button>
     <button class="rel-tab" data-tab="uc">🌳 Por UC</button>
+    <button class="rel-tab" data-tab="fauna">🐾 Fauna</button>
   </div>
 
   <!-- Loading -->
@@ -263,6 +301,8 @@ function htmlPagina() {
     </div>
     <div id="conteudo-uc"></div>
   </div>
+
+  <div id="tab-fauna" hidden></div>
 </div>`
 }
 
@@ -317,7 +357,7 @@ async function gerarRelatorio() {
   document.getElementById('conteudo-regional').innerHTML = ''
   document.getElementById('conteudo-uc').innerHTML = ''
 
-  const [regRes, brigRes, bristRes] = await Promise.all([
+  const [regRes, brigRes, bristRes, faunaRes] = await Promise.all([
     db.from('vw_registros_validacao')
       .select('id,natureza,atividade,status_validacao,data_hora_evento,regional,uc_id,uc_nome,brigada_id,brigada_nome,brigadista_id,brigadista_nome,equipe_id,equipe_nome,duracao_horas,n_fauna,n_fauna_pendente,n_fauna_resgatada,fotos_urls,area_estimada_ha,pessoas_alcancadas')
       .gte('data_hora_evento', ini + 'T00:00:00')
@@ -326,11 +366,21 @@ async function gerarRelatorio() {
       .limit(5000),
     db.from('brigadas').select('id,nome,regional,uc_id,ativa,num_brigadistas').eq('ativa', true),
     db.from('brigadistas').select('id,nome_completo,brigada_id,status').eq('status','ativo'),
+    db.from('registro_fauna')
+      .select('classe,quantidade,tipo_evento,condicao,causa_aparente,destinacao,registro_campo_id,registros_campo!inner(regional,brigada_nome,data_hora_evento)')
+      .gte('registros_campo.data_hora_evento', ini + 'T00:00:00')
+      .lte('registros_campo.data_hora_evento', fim + 'T23:59:59')
+      .limit(3000),
   ])
 
   _registros = regRes.data  || []
   _brigadas  = brigRes.data || []
   _brists    = bristRes.data || []
+  _faunaData = (faunaRes.data || []).map(f => ({
+    ...f,
+    regional:     f.registros_campo?.regional,
+    brigada_nome: f.registros_campo?.brigada_nome,
+  }))
 
   // Preenche dropdown de UCs
   const ucs = {}
@@ -360,6 +410,9 @@ function renderTabAtiva() {
   if (_tabAtiva === 'estado')   renderEstado()
   if (_tabAtiva === 'regional') renderRegional()
   if (_tabAtiva === 'uc')       renderUC()
+  if (_tabAtiva === 'fauna')    renderFauna()
+
+  document.getElementById('tab-fauna').hidden = _tabAtiva !== 'fauna'
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -1066,6 +1119,333 @@ function tabelaAtividades(rows) {
       </tr>`
     }).join('')}</tbody>
   </table>`
+}
+
+// ════════════════════════════════════════════════════════════════
+// TAB 4: FAUNA
+// ════════════════════════════════════════════════════════════════
+const FAUNA_CLASSE_LAB  = { mamifero:'Mamífero', ave:'Ave', reptil:'Réptil',
+  anfibio:'Anfíbio', peixe:'Peixe', invertebrado:'Invertebrado', nao_sei:'Não id.' }
+const FAUNA_COND_LAB    = { integro:'Íntegro', ferido:'Ferido',
+  debilitado:'Debilitado', queimado:'Queimado', obito:'Óbito' }
+const FAUNA_TIPO_LAB    = { resgate:'Resgate', avistamento:'Avistamento',
+  atropelamento:'Atropelamento', apreensao:'Apreensão', encontrado_morto:'Enc. morto' }
+
+// Paleta consistente — não-AI: cores com personalidade, não gradientes pastéis
+const COR_CLASSE = {
+  mamifero:     '#7C3AED',
+  ave:          '#0EA5E9',
+  reptil:       '#10B981',
+  anfibio:      '#F59E0B',
+  peixe:        '#3B82F6',
+  invertebrado: '#EC4899',
+  nao_sei:      '#9CA3AF',
+}
+const COR_COND = {
+  integro:    '#059669',
+  ferido:     '#F59E0B',
+  debilitado: '#3B82C4',
+  queimado:   '#EF5B3C',
+  obito:      '#6B7280',
+}
+const COR_TIPO = {
+  resgate:        '#0A1A0F',
+  avistamento:    '#52B788',
+  atropelamento:  '#EF5B3C',
+  apreensao:      '#C9A84C',
+  encontrado_morto:'#6B7280',
+}
+
+function renderFauna() {
+  const f = _faunaData
+  const cont = document.getElementById('tab-fauna')
+
+  if (!f.length) {
+    cont.innerHTML = `<div style="text-align:center;padding:4rem 2rem;color:#9ca3af">
+      <div style="font-size:2.5rem;margin-bottom:12px">🐾</div>
+      <div style="font-size:.9rem;font-weight:600">Sem registros de fauna no período</div>
+      <div style="font-size:.8rem;margin-top:4px">Tente ampliar o intervalo de datas</div>
+    </div>`
+    return
+  }
+
+  const totalAnimais = f.reduce((s, x) => s + (x.quantidade || 1), 0)
+  const totalResg    = f.filter(x => x.tipo_evento === 'resgate').reduce((s, x) => s + (x.quantidade || 1), 0)
+  const totalCetas   = f.filter(x => x.destinacao === 'encaminhado_cetas').reduce((s, x) => s + (x.quantidade || 1), 0)
+  const totalObito   = f.filter(x => x.condicao === 'obito' || x.destinacao === 'obito').reduce((s, x) => s + (x.quantidade || 1), 0)
+
+  cont.innerHTML = `
+    <!-- KPIs -->
+    <div class="fauna-kpi-row">
+      <div class="fkpi fkpi-total">
+        <div class="fkpi-n">${totalAnimais}</div>
+        <div class="fkpi-l">Animais registrados</div>
+      </div>
+      <div class="fkpi fkpi-resg">
+        <div class="fkpi-n">${totalResg}</div>
+        <div class="fkpi-l">Resgatados</div>
+      </div>
+      <div class="fkpi fkpi-cetas">
+        <div class="fkpi-n">${totalCetas}</div>
+        <div class="fkpi-l">Enc. ao CETAS</div>
+      </div>
+      <div class="fkpi fkpi-obito">
+        <div class="fkpi-n">${totalObito}</div>
+        <div class="fkpi-l">Óbitos</div>
+      </div>
+    </div>
+
+    <!-- Grade 2×2 -->
+    <div class="fauna-grid-2x2">
+      <div class="fauna-chart-card">
+        <div class="fcc-header">
+          <div>
+            <div class="fcc-title">Composição por Classe</div>
+            <div class="fcc-sub">Distribuição taxonômica</div>
+          </div>
+          <span class="fcc-badge">${f.length} registros</span>
+        </div>
+        <div class="chart-canvas-wrap" style="height:220px">
+          <canvas id="chart-fauna-classe"></canvas>
+        </div>
+      </div>
+      <div class="fauna-chart-card">
+        <div class="fcc-header">
+          <div>
+            <div class="fcc-title">Condição dos Animais</div>
+            <div class="fcc-sub">Estado na chegada da brigada</div>
+          </div>
+        </div>
+        <div class="chart-canvas-wrap" style="height:220px">
+          <canvas id="chart-fauna-cond"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Incidência por Regional — full width -->
+    <div class="fauna-full-card">
+      <div class="fauna-chart-card">
+        <div class="fcc-header">
+          <div>
+            <div class="fcc-title">Incidência por Regional</div>
+            <div class="fcc-sub">Total de animais por tipo de evento</div>
+          </div>
+        </div>
+        <div class="chart-canvas-wrap" style="height:${Object.keys(REGIONAL_LAB).length * 52 + 40}px">
+          <canvas id="chart-fauna-regional"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Brigadas que mais resgatam — full width -->
+    <div class="fauna-full-card">
+      <div class="fauna-chart-card">
+        <div class="fcc-header">
+          <div>
+            <div class="fcc-title">Brigadas — Ranking de Resgates</div>
+            <div class="fcc-sub">Quantidade de animais resgatados por brigada</div>
+          </div>
+        </div>
+        <div class="chart-canvas-wrap" id="fauna-brigada-wrap" style="height:200px">
+          <canvas id="chart-fauna-brigada"></canvas>
+        </div>
+      </div>
+    </div>
+  `
+
+  requestAnimationFrame(() => {
+    destroyCharts('chart-fauna-classe','chart-fauna-cond','chart-fauna-regional','chart-fauna-brigada')
+    initFaunaClasse(f)
+    initFaunaCond(f)
+    initFaunaRegional(f)
+    initFaunaBrigada(f)
+  })
+}
+
+// ── Rosca: Por Classe ─────────────────────────────────────────
+function initFaunaClasse(f) {
+  const classes = Object.keys(FAUNA_CLASSE_LAB)
+  const qtd = classes.map(c => f.filter(x => x.classe === c).reduce((s, x) => s + (x.quantidade || 1), 0))
+  const ativos = classes.filter((_, i) => qtd[i] > 0)
+  const vals   = qtd.filter(v => v > 0)
+  const total  = vals.reduce((a, b) => a + b, 0) || 1
+
+  initChart('chart-fauna-classe', {
+    type: 'doughnut',
+    data: {
+      labels: ativos.map(c => FAUNA_CLASSE_LAB[c]),
+      datasets: [{
+        data: vals,
+        backgroundColor: ativos.map(c => COR_CLASSE[c]),
+        borderWidth: 3,
+        borderColor: '#fff',
+        hoverBorderWidth: 0,
+        hoverOffset: 8,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      cutout: '68%',
+      plugins: {
+        legend: {
+          position: 'right',
+          labels: { boxWidth: 10, boxHeight: 10, borderRadius: 3, useBorderRadius: true,
+                    padding: 12, font: { size: 11 } }
+        },
+        tooltip: {
+          backgroundColor: '#0A1A0F', padding: 10, cornerRadius: 8,
+          callbacks: {
+            label: ctx => `  ${ctx.label}: ${ctx.parsed} (${Math.round(ctx.parsed/total*100)}%)`
+          }
+        }
+      }
+    }
+  })
+}
+
+// ── Barras verticais: Condição ────────────────────────────────
+function initFaunaCond(f) {
+  const conds  = Object.keys(FAUNA_COND_LAB)
+  const vals   = conds.map(c => f.filter(x => x.condicao === c).reduce((s, x) => s + (x.quantidade || 1), 0))
+  const cores  = conds.map(c => COR_COND[c])
+
+  initChart('chart-fauna-cond', {
+    type: 'bar',
+    data: {
+      labels: conds.map(c => FAUNA_COND_LAB[c]),
+      datasets: [{
+        data: vals,
+        backgroundColor: cores.map(c => c + 'dd'),
+        borderColor: cores,
+        borderWidth: 0,
+        borderRadius: 8,
+        borderSkipped: false,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#0A1A0F', padding: 10, cornerRadius: 8,
+          callbacks: { label: ctx => `  ${ctx.parsed.y} animais` }
+        }
+      },
+      scales: {
+        x: { grid: { display: false }, border: { display: false },
+             ticks: { font: { size: 11 }, color: '#6b7280' } },
+        y: { beginAtZero: true, ticks: { precision: 0, color: '#9ca3af', font: { size: 10 } },
+             grid: { color: 'rgba(0,0,0,.05)' }, border: { display: false } }
+      }
+    }
+  })
+}
+
+// ── Barras horizontais empilhadas: Por Regional ───────────────
+function initFaunaRegional(f) {
+  const regs  = Object.keys(REGIONAL_LAB).filter(r => f.some(x => x.regional === r))
+  if (!regs.length) return
+
+  const tipos  = ['resgate','avistamento','atropelamento','apreensao','encontrado_morto']
+  const labels = regs.map(r => REGIONAL_LAB[r])
+
+  // Altura dinâmica pelo nº de regionais
+  const wrap = document.getElementById('chart-fauna-regional')?.parentElement
+  if (wrap) wrap.style.height = (regs.length * 52 + 60) + 'px'
+
+  initChart('chart-fauna-regional', {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: tipos.map(tp => ({
+        label: FAUNA_TIPO_LAB[tp],
+        data: regs.map(r =>
+          f.filter(x => x.regional === r && x.tipo_evento === tp)
+           .reduce((s, x) => s + (x.quantidade || 1), 0)
+        ),
+        backgroundColor: COR_TIPO[tp] + 'cc',
+        borderColor:     COR_TIPO[tp],
+        borderWidth: 0,
+        borderRadius: 4,
+        borderSkipped: false,
+      })).filter(ds => ds.data.some(v => v > 0))
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'bottom', labels: { boxWidth: 10, boxHeight: 10,
+                   borderRadius: 3, useBorderRadius: true, padding: 14, font: { size: 11 } } },
+        tooltip: {
+          backgroundColor: '#0A1A0F', padding: 10, cornerRadius: 8, mode: 'index',
+          callbacks: { label: ctx => ctx.parsed.x > 0 ? `  ${ctx.dataset.label}: ${ctx.parsed.x}` : null }
+        }
+      },
+      scales: {
+        x: { stacked: true, beginAtZero: true, grid: { color: 'rgba(0,0,0,.05)' },
+             border: { display: false }, ticks: { precision: 0, color: '#9ca3af', font: { size: 10 } } },
+        y: { stacked: true, grid: { display: false }, border: { display: false },
+             ticks: { color: '#374151', font: { size: 12, weight: '500' } } }
+      }
+    }
+  })
+}
+
+// ── Barras horizontais: Ranking de resgates por brigada ───────
+function initFaunaBrigada(f) {
+  const por = {}
+  f.filter(x => x.tipo_evento === 'resgate').forEach(x => {
+    const k = x.brigada_nome || '—'
+    por[k] = (por[k] || 0) + (x.quantidade || 1)
+  })
+
+  const sorted = Object.entries(por).sort((a, b) => b[1] - a[1]).slice(0, 10)
+  if (!sorted.length) return
+
+  // Altura dinâmica
+  const wrap = document.getElementById('fauna-brigada-wrap')
+  if (wrap) wrap.style.height = (sorted.length * 46 + 60) + 'px'
+
+  // Escala de cor: mais resgates → mais escuro
+  const max = sorted[0][1]
+  const cores = sorted.map(([, v]) => {
+    const t = v / max
+    const r = Math.round(10  + t * (82  - 10))
+    const g = Math.round(26  + t * (166 - 26))
+    const b = Math.round(15  + t * (106 - 15))
+    return `rgb(${r},${g},${b})`
+  })
+
+  initChart('chart-fauna-brigada', {
+    type: 'bar',
+    data: {
+      labels: sorted.map(([k]) => k),
+      datasets: [{
+        data: sorted.map(([, v]) => v),
+        backgroundColor: cores,
+        borderWidth: 0,
+        borderRadius: 6,
+        borderSkipped: false,
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#0A1A0F', padding: 10, cornerRadius: 8,
+          callbacks: { label: ctx => `  ${ctx.parsed.x} animais resgatados` }
+        }
+      },
+      scales: {
+        x: { beginAtZero: true, grid: { color: 'rgba(0,0,0,.05)' },
+             border: { display: false }, ticks: { precision: 0, color: '#9ca3af', font: { size: 10 } } },
+        y: { grid: { display: false }, border: { display: false },
+             ticks: { color: '#374151', font: { size: 12, weight: '500' } } }
+      }
+    }
+  })
 }
 
 // ════════════════════════════════════════════════════════════════
