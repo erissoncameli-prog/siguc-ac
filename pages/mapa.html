@@ -836,6 +836,9 @@ let mapaL = null, clusters = null;
 let camadas = [];
 let _ocLayer = null, _monitLayer = null;
 let _ucGeojson = null, _ucLayer = null, _ucAtivo = false, _ucLabels = true, _ucOpacity = 0.4;
+// Estilo global das bordas das UCs
+let _ucCorLinha = '', _ucDash = '', _ucPeso = 2;
+(()=>{ try{ const s=JSON.parse(localStorage.getItem('siguc_uc_estilo')||'null'); if(s){ _ucCorLinha=s.cor||''; _ucDash=s.dash||''; _ucPeso=parseFloat(s.peso)||2; } }catch(e){} })();
 // Estado das esferas — persiste mesmo quando o dropdown é trocado
 let _ucEsfEst = true, _ucEsfFed = false, _ucEsfMun = false;
 let _ucNomesAtivos = null; // null = todos visíveis
@@ -1455,6 +1458,7 @@ function toggleLayerBar(id){
     const ctrl = document.getElementById('uc-controles');
     if(ctrl) ctrl.style.display = '';
     _ucConstruirPainel();
+    _ucSincronizarControlesEstilo();
   }
   if(id === 'areas'){
     const tt = document.getElementById('ti-toggle');
@@ -1601,6 +1605,37 @@ function _renderDropdown(id){
       <label style="font-size:11px;cursor:pointer;display:flex;align-items:center;gap:4px"><input type="checkbox" id="uc-esfera-estadual" checked style="accent-color:#1F4E2C" onchange="toggleUCEsfera()"> Estadual</label>
       <label style="font-size:11px;cursor:pointer;display:flex;align-items:center;gap:4px"><input type="checkbox" id="uc-esfera-federal"   style="accent-color:#1F4E2C" onchange="toggleUCEsfera()"> Federal</label>
       <label style="font-size:11px;cursor:pointer;display:flex;align-items:center;gap:4px"><input type="checkbox" id="uc-esfera-municipal" style="accent-color:#1F4E2C" onchange="toggleUCEsfera()"> Municipal</label>
+    </div>
+    <div style="border-top:1px solid var(--cinza-100);margin:10px 0 6px;padding-top:10px">
+      <div style="font-size:10px;font-weight:700;color:var(--cinza-500);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px">Estilo das bordas</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+        <div>
+          <label style="font-size:11px;color:var(--cinza-600);display:block;margin-bottom:3px">Cor da borda</label>
+          <input type="color" id="uc-cor-linha" value="#1F4E2C" oninput="_aplicarEstiloUCGlobal()"
+            style="width:100%;height:28px;border:1px solid var(--cinza-300);border-radius:6px;padding:2px;cursor:pointer">
+        </div>
+        <div>
+          <label style="font-size:11px;color:var(--cinza-600);display:block;margin-bottom:3px">Espessura</label>
+          <select id="uc-peso" onchange="_aplicarEstiloUCGlobal()"
+            style="width:100%;height:28px;border:1px solid var(--cinza-300);border-radius:6px;font-size:11px;padding:0 6px;background:#fff">
+            <option value="0.8">Fina (0.8)</option>
+            <option value="2" selected>Normal (2)</option>
+            <option value="3">Grossa (3)</option>
+            <option value="4">Muito grossa (4)</option>
+          </select>
+        </div>
+      </div>
+      <div>
+        <label style="font-size:11px;color:var(--cinza-600);display:block;margin-bottom:3px">Tracejado</label>
+        <select id="uc-dash" onchange="_aplicarEstiloUCGlobal()"
+          style="width:100%;height:28px;border:1px solid var(--cinza-300);border-radius:6px;font-size:11px;padding:0 6px;background:#fff">
+          <option value="" selected>S&#xF3;lido &#x2500;&#x2500;&#x2500;</option>
+          <option value="6 4">Tracejado - - -</option>
+          <option value="2 4">Pontilhado &middot; &middot; &middot;</option>
+          <option value="8 4">Tra&#xE7;o longo &#x2014;&#x2014;</option>
+          <option value="8 4 2 4">Tra&#xE7;o-ponto -&middot;-</option>
+        </select>
+      </div>
     </div>
     <div id="uc-loading" style="display:none;align-items:center;gap:8px;font-size:11px;color:var(--cinza-500);padding:8px 0"><div class="spinner" style="width:14px;height:14px"></div> Carregando...</div>
     <div id="uc-controles" style="display:none">
@@ -3195,6 +3230,19 @@ async function toggleUC(ativo){
 }
 function ucToggleLabels(v){ _ucLabels=v; _renderizarUC(); }
 function ucAlterarOpacidade(v){ _ucOpacity=v/100; document.getElementById('uc-opacity-val').textContent=v+'%'; _renderizarUC(); }
+function _aplicarEstiloUCGlobal(){
+  _ucCorLinha = document.getElementById('uc-cor-linha')?.value || '';
+  _ucDash     = document.getElementById('uc-dash')?.value     || '';
+  _ucPeso     = parseFloat(document.getElementById('uc-peso')?.value) || 2;
+  try{ localStorage.setItem('siguc_uc_estilo', JSON.stringify({cor:_ucCorLinha,dash:_ucDash,peso:_ucPeso})); }catch(e){}
+  if(_ucLayer) _ucLayer.setStyle(f=>{ const cor=_ucCorNome(f.properties.nome,f.properties.cor); return {color:_ucCorLinha||cor,weight:_ucPeso,dashArray:_ucDash||null,opacity:.9,fillColor:cor,fillOpacity:_ucOpacity}; });
+  _atualizarLegendaMapa?.();
+}
+function _ucSincronizarControlesEstilo(){
+  const cl=document.getElementById('uc-cor-linha'); if(cl && _ucCorLinha) cl.value=_ucCorLinha;
+  const dp=document.getElementById('uc-dash');      if(dp) dp.value=_ucDash;
+  const ps=document.getElementById('uc-peso');      if(ps) ps.value=String(_ucPeso);
+}
 function filtrarUC(){ _renderizarUC(); _atualizarLegendaMapa(); renderCamadasHtml(); }
 
 // Retorna Set com nomes das UCs visíveis no filtro atual, ou null se nenhum filtro aplicado
@@ -3322,7 +3370,7 @@ function _renderizarUC(){
   const nomesAtivos=new Set(Array.from(document.querySelectorAll('[data-uc-nome]:checked')).map(e=>e.dataset.ucNome));
   let count=0;
   _ucLayer=L.geoJSON(_ucGeojson,{
-    style: f => { const p=f.properties; const cor=_ucCorNome(p.nome,p.cor); return {color:cor,weight:2,opacity:.9,fillColor:cor,fillOpacity:_ucOpacity}; },
+    style: f => { const p=f.properties; const cor=_ucCorNome(p.nome,p.cor); return {color:_ucCorLinha||cor,weight:_ucPeso,dashArray:_ucDash||null,opacity:.9,fillColor:cor,fillOpacity:_ucOpacity}; },
     filter: f => {
       const esf=(f.properties.esfera||'').toLowerCase();
       if(esf==='federal'&&!esfFed) return false;
