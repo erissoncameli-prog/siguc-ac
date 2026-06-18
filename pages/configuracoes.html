@@ -72,6 +72,54 @@
 
 /* Form footer */
 .form-footer{display:flex;justify-content:flex-end;gap:10px;padding:14px 18px;border-top:1px solid var(--borda);background:var(--cinza-50);border-radius:0 0 var(--raio) var(--raio)}
+
+/* ── Painel de Armazenamento ──────────────────────────────────────────── */
+.arm-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px}
+@media(max-width:640px){.arm-grid{grid-template-columns:1fr}}
+
+/* Card rosca */
+.arm-rosca-card{background:#fff;border:1px solid var(--borda);border-radius:var(--raio-lg);padding:20px;display:flex;gap:20px;align-items:flex-start}
+.arm-rosca-wrap{position:relative;flex-shrink:0}
+.arm-rosca-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none}
+.arm-rosca-used{font-family:'Fraunces',Georgia,serif;font-size:18px;font-weight:700;color:var(--floresta);line-height:1}
+.arm-rosca-lbl{font-size:9px;color:var(--cinza-400);text-transform:uppercase;letter-spacing:.06em;margin-top:3px}
+.arm-legenda{display:flex;flex-direction:column;gap:6px;flex:1;justify-content:center}
+.arm-leg-item{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--cinza-700)}
+.arm-leg-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.arm-leg-val{margin-left:auto;font-size:10px;font-weight:700;color:var(--cinza-500)}
+
+/* Card barras de quota */
+.arm-quota-card{background:#fff;border:1px solid var(--borda);border-radius:var(--raio-lg);padding:20px;display:flex;flex-direction:column;gap:18px;justify-content:center}
+.arm-quota-title{font-size:10px;font-weight:700;color:var(--cinza-500);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px}
+.arm-quota-bar-wrap{background:var(--cinza-100);border-radius:99px;height:10px;overflow:hidden}
+.arm-quota-bar{height:100%;border-radius:99px;transition:width .6s cubic-bezier(.4,0,.2,1)}
+.arm-quota-nums{display:flex;justify-content:space-between;font-size:10px;color:var(--cinza-500);margin-top:4px}
+.arm-quota-pct{font-weight:700}
+
+/* Lista de categorias */
+.arm-cat-list{display:flex;flex-direction:column;gap:0}
+.arm-cat-item{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--cinza-100)}
+.arm-cat-item:last-child{border-bottom:none}
+.arm-cat-dot{width:12px;height:12px;border-radius:50%;flex-shrink:0}
+.arm-cat-label{flex:1;font-size:12px;color:var(--cinza-700);font-weight:500}
+.arm-cat-bar-wrap{width:120px;background:var(--cinza-100);border-radius:99px;height:6px;flex-shrink:0}
+.arm-cat-bar{height:100%;border-radius:99px;transition:width .6s cubic-bezier(.4,0,.2,1)}
+.arm-cat-val{font-size:11px;font-weight:700;color:var(--cinza-600);width:56px;text-align:right;flex-shrink:0}
+@media(max-width:500px){.arm-cat-bar-wrap{display:none}}
+
+/* Lista de buckets storage */
+.arm-bucket-item{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--cinza-100)}
+.arm-bucket-item:last-child{border-bottom:none}
+.arm-bucket-ico{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+.arm-bucket-nome{flex:1;font-size:12px;font-weight:600;color:var(--cinza-700)}
+.arm-bucket-val{font-size:11px;color:var(--cinza-500);font-weight:700}
+
+/* Estado de carregamento */
+.arm-loading{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:48px;color:var(--cinza-400)}
+.arm-spinner{width:28px;height:28px;border:3px solid var(--cinza-100);border-top-color:var(--verde-c);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.arm-ts{font-size:10px;color:var(--cinza-400);text-align:right}
+.arm-section-title{font-size:10px;font-weight:700;color:var(--cinza-500);text-transform:uppercase;letter-spacing:.07em;margin:20px 0 10px}
 </style>
 </head>
 <body>
@@ -111,6 +159,7 @@ function renderCfg(cfg){
       <button class="cfg-tab"       onclick="trocarAba('logos',this)">🖼 Logos</button>
       <button class="cfg-tab"       onclick="trocarAba('hierarquia',this)">🏗 Hierarquia</button>
       <button class="cfg-tab"       onclick="trocarAba('relatorios',this)">📋 Relatórios</button>
+      <button class="cfg-tab"       onclick="trocarAba('armazenamento',this)" id="tab-armazenamento">☁ Armazenamento</button>
     </div>
 
     <!-- TAB: IDENTIDADE -->
@@ -198,6 +247,23 @@ function renderCfg(cfg){
       <button class="btn btn-secondary" onclick="renderCfg(_configSistemaCache)">Cancelar</button>
       <button class="btn btn-primary" onclick="salvarCfg()">💾 Salvar Configurações</button>
     </div>
+
+    <!-- TAB: ARMAZENAMENTO -->
+    <div id="pane-armazenamento" class="cfg-pane" style="padding:20px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+        <div>
+          <div style="font-size:13px;font-weight:700;color:var(--cinza-800)">Armazenamento na Nuvem</div>
+          <div style="font-size:11px;color:var(--cinza-400);margin-top:2px">Uso real de banco de dados e arquivos no Supabase</div>
+        </div>
+        <button class="btn btn-outline" style="font-size:11px;gap:5px;display:flex;align-items:center" onclick="carregarArmazenamento(true)">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+          Atualizar
+        </button>
+      </div>
+      <div id="arm-conteudo">
+        <div class="arm-loading"><div class="arm-spinner"></div><span style="font-size:12px">Consultando banco...</span></div>
+      </div>
+    </div>
   </div>
 
   <!-- Preview -->
@@ -266,6 +332,215 @@ function trocarAba(id, btn){
   document.querySelectorAll('.cfg-tab').forEach(t=>t.classList.remove('ativo'));
   document.getElementById('pane-'+id)?.classList.add('ativo');
   btn.classList.add('ativo');
+  if(id === 'armazenamento') carregarArmazenamento();
+}
+
+// ══════════════════════════════════════════════════════
+// PAINEL DE ARMAZENAMENTO NA NUVEM
+// ══════════════════════════════════════════════════════
+
+const _ARM_DB_LIMITE    = 500  * 1024 * 1024;  // 500 MB — plano free
+const _ARM_ST_LIMITE    = 1024 * 1024 * 1024;  // 1 GB  — plano free
+let   _armCache         = null;
+
+// Mapeamento de tabelas → categorias visuais
+const _ARM_GRUPOS = {
+  'UCs & Monitoramento':    { cor:'#1F4E2C', icone:'🌿', tabelas:['unidades_conservacao','monitoramento_indicadores','monitoramento_registros'] },
+  'Registros de Campo':     { cor:'#d97706', icone:'📸', tabelas:['registros_campo','registro_fauna','especies_fauna','atividades_catalogo'] },
+  'Brigadistas & Equipes':  { cor:'#2563eb', icone:'👥', tabelas:['brigadas','brigadistas','equipes_brigada'] },
+  'Alertas & Focos':        { cor:'#dc2626', icone:'🔥', tabelas:['alertas_ambientais','focos_calor','prodes_desmatamento'] },
+  'Documentos & Pesquisas': { cor:'#7c3aed', icone:'📄', tabelas:['documentos','pesquisas','pesquisa_equipe','pesquisa_condicionantes','aap_emissoes','despachos_pesquisa','dof_transportes','netflora_inventarios'] },
+  'Ocorrências & Projetos': { cor:'#f97316', icone:'🚨', tabelas:['ocorrencias','projetos_analise'] },
+  'Sistema & Auditoria':    { cor:'#64748b', icone:'⚙️',  tabelas:['usuarios','auditoria_acessos','config_sistema','preferencias_mapa','equipe_servidores','unidades_organizacionais','cargos','cargo_ocupacoes','cargo_historico','delegacoes_temporarias','painel_notificacoes'] },
+};
+
+const _ARM_BUCKET_NOMES = {
+  'brigadas-fotos':   { label:'Fotos de Campo',      icone:'📸', cor:'#d97706' },
+  'documentos':       { label:'Documentos',           icone:'📄', cor:'#7c3aed' },
+  'config-logos':     { label:'Logos do Sistema',     icone:'🖼',  cor:'#64748b' },
+  'pesquisa-docs':    { label:'Docs de Pesquisa',     icone:'🔬', cor:'#2563eb' },
+};
+
+async function carregarArmazenamento(forceRefresh = false){
+  if(_armCache && !forceRefresh){ _renderArmazenamento(_armCache); return; }
+  document.getElementById('arm-conteudo').innerHTML =
+    '<div class="arm-loading"><div class="arm-spinner"></div><span style="font-size:12px">Consultando banco de dados...</span></div>';
+  try{
+    const { data, error } = await db.rpc('get_armazenamento_resumo');
+    if(error) throw new Error(error.message);
+    _armCache = data;
+    _renderArmazenamento(data);
+  }catch(e){
+    document.getElementById('arm-conteudo').innerHTML =
+      `<div class="arm-loading"><span style="font-size:30px">⚠️</span><span style="font-size:12px;color:#dc2626">${e.message}</span></div>`;
+  }
+}
+
+function _formatBytes(b){
+  if(b == null || isNaN(b)) return '—';
+  if(b < 1024)              return b + ' B';
+  if(b < 1024*1024)         return (b/1024).toFixed(1) + ' KB';
+  if(b < 1024*1024*1024)    return (b/(1024*1024)).toFixed(1) + ' MB';
+  return (b/(1024*1024*1024)).toFixed(2) + ' GB';
+}
+
+function _pct(usado, limite){ return Math.min(100, Math.max(0, (usado/limite)*100)); }
+
+function _corBarra(pct){
+  if(pct >= 90) return '#dc2626';
+  if(pct >= 70) return '#f97316';
+  return '#1F4E2C';
+}
+
+function _desenharRosca(grupos, dbTotal){
+  const r = 54, cx = 70, cy = 70, sw = 20;
+  const circ = 2 * Math.PI * r;
+  // Inclui "disponível" como último segmento cinza
+  const disponivel = Math.max(0, _ARM_DB_LIMITE - dbTotal);
+  const grand = _ARM_DB_LIMITE;
+  let startAngle = -90;
+  let arcs = '';
+
+  const segmentos = grupos.map(g => ({ ...g, pct: grand > 0 ? g.valor / grand : 0 }));
+  segmentos.push({ cor:'#e5e7eb', pct: grand > 0 ? disponivel / grand : 1, label:'Disponível' });
+
+  for(const seg of segmentos){
+    if(seg.pct <= 0) continue;
+    const arcLen  = seg.pct * circ;
+    const gapLen  = circ - arcLen;
+    arcs += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none"
+      stroke="${seg.cor}" stroke-width="${sw}"
+      stroke-dasharray="${arcLen.toFixed(2)} ${gapLen.toFixed(2)}"
+      transform="rotate(${startAngle.toFixed(2)} ${cx} ${cy})"/>`;
+    startAngle += seg.pct * 360;
+  }
+
+  return `<svg width="140" height="140" viewBox="0 0 140 140" style="display:block">
+    <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#f1f5f9" stroke-width="${sw}"/>
+    ${arcs}
+  </svg>`;
+}
+
+function _renderArmazenamento(dados){
+  const tabelas = dados.tabelas || {};
+  const storage = dados.storage || {};
+  const ts      = dados.gerado_em ? new Date(dados.gerado_em).toLocaleString('pt-BR') : '';
+
+  // ── Calcular tamanho por grupo ──────────────────────────────────
+  const tabelasUsadas = new Set();
+  const grupos = Object.entries(_ARM_GRUPOS).map(([nome, cfg]) => {
+    const valor = cfg.tabelas.reduce((s, t) => { tabelasUsadas.add(t); return s + (tabelas[t] || 0); }, 0);
+    return { nome, valor, cor: cfg.cor, icone: cfg.icone };
+  }).filter(g => g.valor > 0).sort((a,b) => b.valor - a.valor);
+
+  // Tabelas sem grupo → adicionar em "Sistema"
+  const semGrupo = Object.entries(tabelas).filter(([t]) => !tabelasUsadas.has(t));
+  if(semGrupo.length){
+    const extra = semGrupo.reduce((s,[,v]) => s+v, 0);
+    const idx = grupos.findIndex(g => g.nome === 'Sistema & Auditoria');
+    if(idx >= 0) grupos[idx].valor += extra;
+    else grupos.push({ nome:'Sistema & Auditoria', valor:extra, cor:'#64748b', icone:'⚙️' });
+  }
+
+  const dbTotal = grupos.reduce((s,g) => s+g.valor, 0);
+  const stTotal = Object.values(storage).reduce((s,v) => s+v, 0);
+  const dbPct   = _pct(dbTotal, _ARM_DB_LIMITE);
+  const stPct   = _pct(stTotal, _ARM_ST_LIMITE);
+
+  // ── Legenda da rosca ────────────────────────────────────────────
+  const legendaHTML = grupos.slice(0,6).map(g => `
+    <div class="arm-leg-item">
+      <span class="arm-leg-dot" style="background:${g.cor}"></span>
+      <span>${g.icone} ${g.nome}</span>
+      <span class="arm-leg-val">${_formatBytes(g.valor)}</span>
+    </div>`).join('');
+
+  // ── Barras de cota (DB e Storage) ───────────────────────────────
+  const quotaHTML = `
+    <div>
+      <div class="arm-quota-title">Banco de Dados</div>
+      <div class="arm-quota-bar-wrap">
+        <div class="arm-quota-bar" style="width:${dbPct.toFixed(1)}%;background:${_corBarra(dbPct)}"></div>
+      </div>
+      <div class="arm-quota-nums">
+        <span>${_formatBytes(dbTotal)} usados</span>
+        <span class="arm-quota-pct" style="color:${_corBarra(dbPct)}">${dbPct.toFixed(1)}%</span>
+        <span>${_formatBytes(_ARM_DB_LIMITE)} limite</span>
+      </div>
+    </div>
+    <div>
+      <div class="arm-quota-title">Arquivos &amp; Fotos</div>
+      <div class="arm-quota-bar-wrap">
+        <div class="arm-quota-bar" style="width:${stPct.toFixed(1)}%;background:${_corBarra(stPct)}"></div>
+      </div>
+      <div class="arm-quota-nums">
+        <span>${_formatBytes(stTotal)} usados</span>
+        <span class="arm-quota-pct" style="color:${_corBarra(stPct)}">${stPct.toFixed(1)}%</span>
+        <span>${_formatBytes(_ARM_ST_LIMITE)} limite</span>
+      </div>
+    </div>
+    <div style="font-size:10px;color:var(--cinza-400);padding-top:4px;border-top:1px solid var(--cinza-100)">
+      Plano Free Supabase · 500 MB banco · 1 GB storage
+    </div>`;
+
+  // ── Lista de categorias do banco ─────────────────────────────────
+  const maxValor = grupos[0]?.valor || 1;
+  const catsHTML = grupos.map(g => `
+    <div class="arm-cat-item">
+      <span class="arm-cat-dot" style="background:${g.cor}"></span>
+      <span class="arm-cat-label">${g.icone} ${g.nome}</span>
+      <div class="arm-cat-bar-wrap">
+        <div class="arm-cat-bar" style="width:${_pct(g.valor, maxValor).toFixed(1)}%;background:${g.cor}"></div>
+      </div>
+      <span class="arm-cat-val">${_formatBytes(g.valor)}</span>
+    </div>`).join('');
+
+  // ── Buckets de storage ──────────────────────────────────────────
+  const bucketsHTML = Object.entries(storage).length === 0
+    ? '<div style="font-size:12px;color:var(--cinza-400);padding:12px 0;text-align:center">Nenhum arquivo no storage.</div>'
+    : Object.entries(storage).sort((a,b)=>b[1]-a[1]).map(([id, bytes]) => {
+        const info = _ARM_BUCKET_NOMES[id] || { label: id, icone:'📦', cor:'#64748b' };
+        const bpct = _pct(bytes, stTotal > 0 ? stTotal : 1);
+        return `
+        <div class="arm-bucket-item">
+          <div class="arm-bucket-ico" style="background:${info.cor}18">${info.icone}</div>
+          <div style="flex:1">
+            <div class="arm-bucket-nome">${info.label}</div>
+            <div style="font-size:10px;color:var(--cinza-400);margin-top:1px">${id}</div>
+          </div>
+          <div style="text-align:right">
+            <div class="arm-bucket-val">${_formatBytes(bytes)}</div>
+            <div style="font-size:10px;color:var(--cinza-400)">${bpct.toFixed(1)}% do storage</div>
+          </div>
+        </div>`;
+      }).join('');
+
+  document.getElementById('arm-conteudo').innerHTML = `
+    <div class="arm-grid">
+      <div class="arm-rosca-card">
+        <div class="arm-rosca-wrap">
+          ${_desenharRosca(grupos, dbTotal)}
+          <div class="arm-rosca-center">
+            <div class="arm-rosca-used">${_formatBytes(dbTotal)}</div>
+            <div class="arm-rosca-lbl">banco</div>
+          </div>
+        </div>
+        <div class="arm-legenda">${legendaHTML}</div>
+      </div>
+      <div class="arm-quota-card">${quotaHTML}</div>
+    </div>
+
+    <div class="arm-section-title">Banco de dados por categoria</div>
+    <div class="card" style="padding:0 16px;margin-bottom:20px">
+      <div class="arm-cat-list">${catsHTML || '<div style="padding:16px;text-align:center;font-size:12px;color:var(--cinza-400)">Nenhum dado encontrado.</div>'}</div>
+    </div>
+
+    <div class="arm-section-title">Arquivos no storage</div>
+    <div class="card" style="padding:0 16px;margin-bottom:8px">
+      ${bucketsHTML}
+    </div>
+
+    <div class="arm-ts">Última varredura: ${ts}</div>`;
 }
 
 async function _uploadLogo(tipo, input){
