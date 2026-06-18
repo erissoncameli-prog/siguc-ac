@@ -874,6 +874,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     vincularEventos();
     initScrollbarCustom();
     carregarLogosSidebar();
+    await _prefsCarregar(); // carrega preferências salvas na nuvem
     // Auto-abrir modal se vier de alertas-ambientais.html
     const _alertaProjetoId = new URLSearchParams(location.search).get('alerta_projeto')
     if (_alertaProjetoId) _abrirProjetoPorAlertaId(_alertaProjetoId)
@@ -2125,6 +2126,7 @@ function toggleCamada(id, vis){
   visPref[id] = vis;
   localStorage.setItem('siguc_camadas_vis', JSON.stringify(visPref));
   _atualizarLegendaMapa();
+  _prefsAgendarSalvamento();
 }
 
 function toggleExpandirCamada(id){
@@ -3229,7 +3231,7 @@ async function toggleUC(ativo){
   _atualizarLegendaMapa();
 }
 function ucToggleLabels(v){ _ucLabels=v; _renderizarUC(); }
-function ucAlterarOpacidade(v){ _ucOpacity=v/100; document.getElementById('uc-opacity-val').textContent=v+'%'; _renderizarUC(); }
+function ucAlterarOpacidade(v){ _ucOpacity=v/100; document.getElementById('uc-opacity-val').textContent=v+'%'; _renderizarUC(); _prefsAgendarSalvamento(); }
 function _aplicarEstiloUCGlobal(){
   _ucCorLinha = document.getElementById('uc-cor-linha')?.value || '';
   _ucDash     = document.getElementById('uc-dash')?.value     || '';
@@ -3237,6 +3239,7 @@ function _aplicarEstiloUCGlobal(){
   try{ localStorage.setItem('siguc_uc_estilo', JSON.stringify({cor:_ucCorLinha,dash:_ucDash,peso:_ucPeso})); }catch(e){}
   if(_ucLayer) _ucLayer.setStyle(f=>{ const cor=_ucCorNome(f.properties.nome,f.properties.cor); return {color:_ucCorLinha||cor,weight:_ucPeso,dashArray:_ucDash||null,opacity:.9,fillColor:cor,fillOpacity:_ucOpacity}; });
   _atualizarLegendaMapa?.();
+  _prefsAgendarSalvamento();
 }
 function _ucSincronizarControlesEstilo(){
   const cl=document.getElementById('uc-cor-linha'); if(cl && _ucCorLinha) cl.value=_ucCorLinha;
@@ -3615,7 +3618,7 @@ function _ucStatsAtualizar(filteredFeats){
 
 var _ucPickerEl=null, _ucPickerNome=null;
 function ucAbrirColorPicker(nome,el){
-  if(!_ucPickerEl){ _ucPickerEl=document.createElement('input'); _ucPickerEl.type='color'; _ucPickerEl.style.cssText='position:fixed;opacity:0;width:0;height:0;pointer-events:none'; document.body.appendChild(_ucPickerEl); _ucPickerEl.addEventListener('input',e=>{ if(_ucPickerNome){ _ucCoresLS[_ucPickerNome]=e.target.value; try{localStorage.setItem('siguc_uc_cores',JSON.stringify(_ucCoresLS));}catch(x){} const sw=document.querySelector('[data-ucsw="'+_ucPickerNome+'"]'); if(sw)sw.style.background=e.target.value; if(_ucLayer)_ucLayer.eachLayer(l=>{ if(l.feature?.properties?.nome===_ucPickerNome)l.setStyle({color:e.target.value,fillColor:e.target.value}); }); } }); }
+  if(!_ucPickerEl){ _ucPickerEl=document.createElement('input'); _ucPickerEl.type='color'; _ucPickerEl.style.cssText='position:fixed;opacity:0;width:0;height:0;pointer-events:none'; document.body.appendChild(_ucPickerEl); _ucPickerEl.addEventListener('input',e=>{ if(_ucPickerNome){ _ucCoresLS[_ucPickerNome]=e.target.value; try{localStorage.setItem('siguc_uc_cores',JSON.stringify(_ucCoresLS));}catch(x){} const sw=document.querySelector('[data-ucsw="'+_ucPickerNome+'"]'); if(sw)sw.style.background=e.target.value; if(_ucLayer)_ucLayer.eachLayer(l=>{ if(l.feature?.properties?.nome===_ucPickerNome)l.setStyle({color:e.target.value,fillColor:e.target.value}); }); _prefsAgendarSalvamento(); } }); }
   _ucPickerNome=nome; _ucPickerEl.value=(_ucCoresLS[nome]||'#059669'); _ucPickerEl.click();
 }
 
@@ -3736,6 +3739,7 @@ function acreAplicar(){
 
 function acreSalvar(){
   try{ localStorage.setItem('siguc_acre_estilo', JSON.stringify(_acreEstilo)); }catch(e){}
+  _prefsAgendarSalvamento();
   toast('Estilo da delimitação salvo!','success');
 }
 
@@ -3861,6 +3865,7 @@ function _iniciarDragLayerbar(){
   function fimDrag(){
     if(!drag) return; drag=false; handle.style.cursor='grab';
     try{ localStorage.setItem(LS, JSON.stringify({x:parseFloat(lb.style.left),y:parseFloat(lb.style.top)})); }catch(e){}
+    _prefsAgendarSalvamento();
   }
   document.addEventListener('mouseup', fimDrag);
   document.addEventListener('touchend', fimDrag);
@@ -3916,6 +3921,7 @@ function _iniciarDragTimeline(){
   function fimDrag(){
     if(!drag) return; drag=false; handle.style.cursor='grab';
     try{ localStorage.setItem(LS, JSON.stringify({x:parseFloat(tl.style.left),y:parseFloat(tl.style.top)})); }catch(e){}
+    _prefsAgendarSalvamento();
   }
   document.addEventListener('mouseup', fimDrag);
   document.addEventListener('touchend', fimDrag);
@@ -3981,6 +3987,7 @@ function _aplicarEstiloTI(){
   const val = document.getElementById('ti-opacity-val');
   if(op && val) val.textContent = Math.round(parseFloat(op.value)) + '%';
   _tiCapturarEstadoUI();
+  _prefsAgendarSalvamento();
   if(_tiLayer){
     _tiOpacity = parseFloat(op?.value||'40') / 100;
     _tiLayer.setStyle(_getTIEstilo());
@@ -5753,7 +5760,7 @@ function fecharDetalhesCAR(){
   if(saved&&saved>=280&&saved<=680) panel.style.width=saved+'px';
   handle.addEventListener('mousedown',e=>{ dragging=true; startX=e.clientX; startW=panel.offsetWidth; handle.classList.add('dragging'); e.preventDefault(); });
   document.addEventListener('mousemove',e=>{ if(!dragging) return; const w=Math.max(280,Math.min(680,startW-(e.clientX-startX))); panel.style.width=w+'px'; });
-  document.addEventListener('mouseup',()=>{ if(!dragging) return; dragging=false; handle.classList.remove('dragging'); localStorage.setItem(CAR_WIDTH_KEY,panel.offsetWidth); });
+  document.addEventListener('mouseup',()=>{ if(!dragging) return; dragging=false; handle.classList.remove('dragging'); localStorage.setItem(CAR_WIDTH_KEY,panel.offsetWidth); _prefsAgendarSalvamento(); });
 }());
 
 // ══════════════════════════════════════════════════════════════
@@ -6420,6 +6427,113 @@ function _mHtmlLegal(a, prod) {
       ℹ Análise automática e orientativa. Consultar assessoria jurídica da SEMA-AC para fins legais.
     </div>
   </div>`
+}
+
+// ══════════════════════════════════════════════════════════════
+// SYNC DE PREFERÊNCIAS DO MAPA POR USUÁRIO (Supabase)
+// Cada usuário tem suas configurações salvas na nuvem e
+// recuperadas em qualquer dispositivo ao fazer login.
+// ══════════════════════════════════════════════════════════════
+let _prefsSyncTimer = null;
+const _PREFS_TABLE  = 'preferencias_mapa';
+
+function _prefsCapturar(){
+  return {
+    uc_estilo:   { cor: _ucCorLinha, dash: _ucDash, peso: _ucPeso },
+    uc_opacity:  _ucOpacity,
+    uc_cores:    _ucCoresLS || {},
+    ti:          _tiEstadoUI || {},
+    acre:        _acreEstilo || {},
+    camadas_vis: (()=>{ try{ return JSON.parse(localStorage.getItem('siguc_camadas_vis')||'{}'); }catch(e){ return {}; } })(),
+    lb_pos:      (()=>{ try{ return JSON.parse(localStorage.getItem('siguc_lb_pos')||'null'); }catch(e){ return null; } })(),
+    tl_pos:      (()=>{ try{ return JSON.parse(localStorage.getItem('siguc_tl_pos')||'null'); }catch(e){ return null; } })(),
+    car_width:   (()=>{ const v=localStorage.getItem('siguc_car_panel_width'); return v?parseInt(v):null; })(),
+  };
+}
+
+function _prefsAplicar(dados){
+  if(!dados) return;
+
+  // UC estilo
+  if(dados.uc_estilo){
+    const s = dados.uc_estilo;
+    _ucCorLinha = s.cor || '';
+    _ucDash     = s.dash || '';
+    _ucPeso     = parseFloat(s.peso) || 2;
+    try{ localStorage.setItem('siguc_uc_estilo', JSON.stringify(s)); }catch(e){}
+  }
+  if(dados.uc_opacity != null){
+    _ucOpacity = parseFloat(dados.uc_opacity) || 0.4;
+  }
+  // Cores individuais das UCs
+  if(dados.uc_cores && Object.keys(dados.uc_cores).length){
+    _ucCoresLS = dados.uc_cores;
+    try{ localStorage.setItem('siguc_uc_cores', JSON.stringify(_ucCoresLS)); }catch(e){}
+  }
+  // TI
+  if(dados.ti && Object.keys(dados.ti).length){
+    _tiEstadoUI = dados.ti;
+    try{ localStorage.setItem('siguc_ti_estilo', JSON.stringify(dados.ti)); }catch(e){}
+  }
+  // Acre
+  if(dados.acre && Object.keys(dados.acre).length){
+    _acreEstilo = { ..._acreEstilo, ...dados.acre };
+    try{ localStorage.setItem('siguc_acre_estilo', JSON.stringify(_acreEstilo)); }catch(e){}
+  }
+  // Camadas visíveis
+  if(dados.camadas_vis && Object.keys(dados.camadas_vis).length){
+    try{ localStorage.setItem('siguc_camadas_vis', JSON.stringify(dados.camadas_vis)); }catch(e){}
+  }
+  // Posição da layerbar
+  if(dados.lb_pos){
+    try{ localStorage.setItem('siguc_lb_pos', JSON.stringify(dados.lb_pos)); }catch(e){}
+  }
+  // Posição da timeline
+  if(dados.tl_pos){
+    try{ localStorage.setItem('siguc_tl_pos', JSON.stringify(dados.tl_pos)); }catch(e){}
+  }
+  // Largura painel CAR
+  if(dados.car_width){
+    try{ localStorage.setItem('siguc_car_panel_width', String(dados.car_width)); }catch(e){}
+  }
+}
+
+async function _prefsCarregar(){
+  try{
+    const uid = appState.usuario?.id;
+    if(!uid) return;
+    const { data, error } = await db
+      .from(_PREFS_TABLE)
+      .select('dados')
+      .eq('usuario_id', uid)
+      .single();
+    if(error || !data?.dados) return;
+    _prefsAplicar(data.dados);
+    // Reaplicar visualmente se a camada UC já está carregada
+    if(_ucLayer) _ucLayer.setStyle(f=>{
+      const cor=_ucCorNome(f.properties.nome,f.properties.cor);
+      return {color:_ucCorLinha||cor,weight:_ucPeso,dashArray:_ucDash||null,opacity:.9,fillColor:cor,fillOpacity:_ucOpacity};
+    });
+    if(_tiLayer) _tiLayer.setStyle(_getTIEstilo());
+  }catch(e){ console.warn('[prefs] carregar:', e); }
+}
+
+async function _prefsFlush(){
+  try{
+    const uid = appState.usuario?.id;
+    if(!uid) return;
+    const dados = _prefsCapturar();
+    await db.from(_PREFS_TABLE).upsert(
+      { usuario_id: uid, dados, atualizado_em: new Date().toISOString() },
+      { onConflict: 'usuario_id' }
+    );
+  }catch(e){ console.warn('[prefs] salvar:', e); }
+}
+
+// Agenda salvamento com debounce de 4 s — evita spam de requisições
+function _prefsAgendarSalvamento(){
+  clearTimeout(_prefsSyncTimer);
+  _prefsSyncTimer = setTimeout(_prefsFlush, 4000);
 }
 </script>
 <div id="malerta-overlay" onclick="fecharAnaliseAlertaMapa()" style="display:none;position:fixed;inset:0;z-index:640;background:rgba(0,0,0,.2)"></div>
