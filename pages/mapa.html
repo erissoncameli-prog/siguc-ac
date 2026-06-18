@@ -185,6 +185,89 @@
 .bmg-tile.ativo .bmg-label{color:#1F4E2C;font-weight:700;}
 /* Ocorrência marker */
 .oc-marker{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;color:#fff;box-shadow:0 2px 8px rgba(0,0,0,.4);border:2px solid rgba(255,255,255,.8);line-height:1;}
+/* ── Marcador de FOCO de calor (fogo + fumaça) ── */
+.foco-fogo{position:relative;width:24px;height:30px;}
+.foco-fogo svg{position:absolute;bottom:2px;left:50%;transform-origin:50% 100%;filter:drop-shadow(0 1px 2px rgba(0,0,0,.45));animation:fogoFlicker .45s ease-in-out infinite alternate;}
+@keyframes fogoFlicker{0%{transform:translateX(-50%) scale(1) rotate(-2.5deg);}100%{transform:translateX(-50%) scale(1.13) rotate(2.5deg);}}
+.foco-fumaca{position:absolute;bottom:20px;left:50%;width:5px;height:5px;border-radius:50%;background:rgba(120,120,120,.5);opacity:0;animation:fumacaSobe 2.4s linear infinite;}
+.foco-fumaca.f2{animation-delay:.8s;left:40%;}
+.foco-fumaca.f3{animation-delay:1.6s;left:60%;}
+@keyframes fumacaSobe{0%{opacity:0;transform:translate(-50%,0) scale(.5);}25%{opacity:.55;}100%{opacity:0;transform:translate(-50%,-20px) scale(1.7);}}
+.foco-dot{position:absolute;bottom:-1px;left:50%;transform:translateX(-50%);width:10px;height:10px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.35);}
+.foco-halo{position:absolute;bottom:-1px;left:50%;transform:translateX(-50%);width:28px;height:28px;border-radius:50%;pointer-events:none;}
+.foco-fogo.estatico svg{animation:none;transform:translateX(-50%);}
+.foco-fogo.estatico .foco-fumaca{display:none;}
+/* ── Marcador DETER (árvore sendo cortada/caindo) ── */
+.deter-arvore{position:relative;}
+.deter-arvore svg{position:absolute;bottom:3px;left:50%;transform-origin:50% 92%;filter:drop-shadow(0 1px 2px rgba(0,0,0,.45));animation:arvoreCai 4.5s ease-in-out infinite;}
+@keyframes arvoreCai{0%,45%{transform:translateX(-50%) rotate(0deg);}55%{transform:translateX(-50%) rotate(-7deg);}80%,93%{transform:translateX(-50%) rotate(74deg);}100%{transform:translateX(-50%) rotate(0deg);}}
+.deter-base{position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:8px;height:3px;border-radius:2px;}
+.deter-arvore.estatico svg{animation:none;transform:translateX(-50%);}
+/* ── Botão flutuante: Linha do Tempo ── */
+#tl-fab{position:absolute;top:12px;left:52px;z-index:600;display:flex;align-items:center;gap:6px;height:34px;padding:0 13px;background:rgba(255,255,255,.95);border:1px solid rgba(0,0,0,.12);border-radius:9px;box-shadow:0 4px 16px rgba(0,0,0,.25);color:#1F4E2C;font-size:12px;font-weight:600;font-family:'DM Sans',sans-serif;cursor:pointer;transition:all .15s;backdrop-filter:blur(4px);white-space:nowrap;}
+#tl-fab:hover{background:#fff;transform:translateY(-1px);border-color:#1F4E2C;}
+#tl-fab.ativo{background:#1F4E2C;color:#fff;border-color:#1F4E2C;}
+#tl-fab svg{flex-shrink:0;}
+@media(max-width:560px){#tl-fab span{display:none;}#tl-fab{padding:0 9px;}}
+/* ── Selo de auto-atualização ── */
+#auto-badge{position:absolute;top:12px;right:12px;z-index:600;display:flex;align-items:center;gap:9px;background:rgba(255,255,255,.93);border:1px solid rgba(0,0,0,.1);border-radius:10px;padding:6px 10px;box-shadow:0 4px 16px rgba(0,0,0,.25);backdrop-filter:blur(4px);font-size:11px;color:#374151;font-family:'DM Sans',sans-serif;}
+.auto-pulse{width:8px;height:8px;border-radius:50%;background:#16a34a;flex-shrink:0;box-shadow:0 0 0 0 rgba(22,163,74,.5);animation:autoPulse 2s infinite;}
+@keyframes autoPulse{0%{box-shadow:0 0 0 0 rgba(22,163,74,.5)}70%{box-shadow:0 0 0 7px rgba(22,163,74,0)}100%{box-shadow:0 0 0 0 rgba(22,163,74,0)}}
+.auto-sw{position:relative;width:32px;height:17px;border-radius:9px;background:#16a34a;cursor:pointer;transition:.2s;flex-shrink:0;}
+.auto-sw.off{background:#cbd5e1;}
+.auto-sw::after{content:"";position:absolute;top:2px;left:2px;width:13px;height:13px;border-radius:50%;background:#fff;transition:.2s;}
+.auto-sw.off::after{left:17px;}
+/* ── Barra da linha do tempo ── */
+#timeline-bar{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);z-index:600;width:min(820px,92%);background:rgba(255,255,255,.96);border:1px solid rgba(0,0,0,.1);border-radius:14px;padding:11px 16px 12px;box-shadow:0 10px 36px rgba(10,26,15,.32);backdrop-filter:blur(8px);font-family:'DM Sans',sans-serif;}
+.tl-top{display:flex;align-items:center;gap:10px;margin-bottom:9px;}
+.tl-modo{display:flex;background:#f1f5f3;border-radius:9px;padding:3px;gap:2px;}
+.tl-modo button{border:none;background:none;font:inherit;font-size:12px;font-weight:600;color:#6b7280;padding:5px 13px;border-radius:7px;cursor:pointer;}
+.tl-modo button.on{background:#1F4E2C;color:#fff;}
+.tl-play{width:36px;height:36px;border-radius:50%;border:none;background:#1F4E2C;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.tl-play:hover{background:#2d6a4f;}
+.tl-lbl{display:flex;flex-direction:column;line-height:1.1;min-width:108px;}
+.tl-lbl span{font-family:'Fraunces',Georgia,serif;font-size:20px;font-weight:700;color:#1F4E2C;}
+.tl-lbl small{font-size:9px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em;}
+.tl-vel{margin-left:auto;font-size:11px;color:#6b7280;display:flex;align-items:center;gap:6px;}
+.tl-vel select{font:inherit;font-size:11px;padding:3px 6px;border:1px solid var(--borda);border-radius:6px;}
+.tl-close{border:none;background:#f1f5f3;color:#6b7280;width:26px;height:26px;border-radius:7px;cursor:pointer;font-size:13px;flex-shrink:0;}
+.tl-close:hover{background:#e5e7eb;}
+#timeline-bar input[type=range]{width:100%;accent-color:#1F4E2C;height:6px;}
+.tl-ticks{display:flex;justify-content:space-between;font-size:9px;color:#9ca3af;margin-top:3px;}
+.tl-stat{font-size:10px;color:#6b7280;margin-top:6px;min-height:13px;}
+/* Filtro Focos/Desmat/Ambos */
+.tl-filtro{display:flex;background:#f1f5f3;border-radius:9px;padding:3px;gap:2px;}
+.tl-filtro button{border:none;background:none;font:inherit;font-size:11px;font-weight:600;color:#6b7280;padding:5px 10px;border-radius:7px;cursor:pointer;white-space:nowrap;}
+.tl-filtro button.on{background:#fff;color:#1F4E2C;box-shadow:0 1px 3px rgba(0,0,0,.12);}
+/* Período (modo Dias) */
+.tl-periodo{display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-bottom:8px;font-size:11px;color:#6b7280;}
+.tl-per-lbl{font-weight:600;}
+.tl-periodo button{border:1px solid var(--borda);background:#fff;font:inherit;font-size:11px;font-weight:600;color:#374151;padding:4px 9px;border-radius:7px;cursor:pointer;}
+.tl-periodo button.on{background:#1F4E2C;color:#fff;border-color:#1F4E2C;}
+.tl-custom{display:flex;align-items:center;gap:4px;color:#9ca3af;}
+.tl-custom input{font:inherit;font-size:11px;padding:3px 5px;border:1px solid var(--borda);border-radius:6px;}
+@media(max-width:640px){.tl-vel{display:none;}.tl-lbl{min-width:84px;}.tl-lbl span{font-size:17px;}.tl-filtro button{padding:5px 7px;}}
+/* ── Painel grande de destaque (efeito 3D / vidro) ── */
+#tl-painel{position:absolute;top:14px;left:50%;transform:translateX(-50%);z-index:590;perspective:900px;pointer-events:none;}
+.tlp-card{display:flex;align-items:center;gap:22px;padding:14px 22px;border-radius:18px;
+  background:linear-gradient(135deg,rgba(10,26,15,.86),rgba(20,53,32,.72));
+  border:1px solid rgba(255,255,255,.18);color:#fff;
+  box-shadow:0 22px 48px rgba(0,0,0,.45),0 4px 12px rgba(0,0,0,.3),inset 0 1px 0 rgba(255,255,255,.18);
+  -webkit-backdrop-filter:blur(11px) saturate(1.4);backdrop-filter:blur(11px) saturate(1.4);
+  transform:rotateX(7deg);transform-style:preserve-3d;transition:transform .3s;}
+.tlp-data{display:flex;flex-direction:column;line-height:1.05;padding-right:18px;border-right:1px solid rgba(255,255,255,.18);transform:translateZ(14px);}
+.tlp-data span{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;opacity:.7;}
+.tlp-data strong{font-family:'Fraunces',Georgia,serif;font-size:30px;font-weight:700;color:#F0CB6A;}
+.tlp-metricas{display:flex;gap:20px;}
+.tlp-m{display:flex;align-items:center;gap:10px;transform:translateZ(22px);transition:opacity .2s;}
+.tlp-m.off{opacity:.28;}
+.tlp-ic{font-size:22px;filter:drop-shadow(0 2px 3px rgba(0,0,0,.4));}
+.tlp-num{font-family:'Fraunces',Georgia,serif;font-size:25px;font-weight:700;line-height:1;}
+.tlp-lbl{font-size:9.5px;text-transform:uppercase;letter-spacing:.06em;opacity:.78;margin-top:2px;}
+.tlp-desmat .tlp-num,#tlp-box-desmat .tlp-num{color:#ff9d76;}
+#tlp-box-area .tlp-num{color:#ffd9a8;}
+#tlp-box-focos .tlp-num{color:#ffb4a0;}
+@media(max-width:760px){#tl-painel{width:94%;}.tlp-card{gap:12px;padding:11px 14px;}.tlp-metricas{gap:12px;}.tlp-data strong{font-size:22px;}.tlp-num{font-size:19px;}.tlp-ic{font-size:18px;}}
 /* Modal Projeto de Análise */
 .proj-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:700;display:flex;align-items:center;justify-content:center;padding:16px;}
 .proj-modal{background:#fff;border-radius:14px;width:100%;max-width:520px;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.35);overflow:hidden;}
@@ -324,6 +407,7 @@ body.mapa-imersivo .page-body{animation:none!important;transform:none!important;
 <link rel="stylesheet" href="../css/relatorio-print.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
 <script src="https://unpkg.com/leaflet-minimap@3.6.1/dist/Control.MiniMap.min.js"></script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css"/>
 <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
@@ -810,7 +894,7 @@ function renderPagina(){
         <button class="mlb-tab" id="mlb-btn-veg" onclick="toggleLayerBar('veg')">🌿 Cobertura Vegetal</button>
         <button class="mlb-tab" id="mlb-btn-car" onclick="toggleLayerBar('car')">🏡 CAR — Imóveis Rurais <span class="mlb-badge" id="car-count-badge" style="display:none">0</span></button>
         <button class="mlb-tab" id="mlb-btn-areas" onclick="toggleLayerBar('areas')">🌿 Áreas Territoriais <span class="mlb-badge" id="uc-count-badge" title="Unidades de Conservação" style="display:none">0</span> <span class="mlb-badge" id="ti-count-badge" title="Terras Indígenas" style="display:none">0</span></button>
-        <button class="mlb-tab" id="mlb-btn-alertas" onclick="toggleLayerBar('alertas')">🔥 Alertas Ambientais <span class="mlb-badge" id="alertas-count-badge" style="display:none">0</span></button>
+        <button class="mlb-tab" id="mlb-btn-alertas" onclick="toggleLayerBar('alertas')">🔥 Alertas e Focos <span class="mlb-badge" id="alertas-count-badge" style="display:none">0</span></button>
         <button class="mlb-tab" id="mlb-btn-brigadas" onclick="toggleLayerBar('brigadas')">🧯 Brigadas Comunitárias <span class="mlb-badge" id="brigadas-count-badge" style="display:none">0</span></button>
         <button class="mlb-tab" id="mlb-btn-projetos" onclick="toggleLayerBar('projetos')">📐 Projetos de Análise <span class="mlb-badge" id="projetos-count-badge" style="display:none">0</span></button>
         <button class="mlb-tab" id="mlb-btn-mun" onclick="toggleLayerBar('mun')">🏙 Municípios</button>
@@ -822,6 +906,75 @@ function renderPagina(){
     <div class="mapa-container">
       <!-- MAPA -->
       <div id="mapa" style="position:relative">
+
+        <!-- Botão flutuante: Linha do Tempo -->
+        <button id="tl-fab" onclick="toggleTimeline()" title="Linha do tempo — focos e cobertura por data">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/></svg>
+          <span>Linha do Tempo</span>
+        </button>
+
+        <!-- Selo de auto-atualização (aparece com Alertas e Focos ligado) -->
+        <div id="auto-badge" style="display:none">
+          <span class="auto-pulse" id="auto-pulse"></span>
+          <span id="auto-lbl">Atualizado agora</span>
+          <span class="auto-sw" id="auto-sw" onclick="toggleAutoRefresh()" title="Auto-atualizar focos/alertas"></span>
+        </div>
+
+        <!-- Painel grande de destaque (indicadores da linha do tempo) -->
+        <div id="tl-painel" style="display:none">
+          <div class="tlp-card">
+            <div class="tlp-data"><span id="tlp-cap">Ano</span><strong id="tlp-val">—</strong></div>
+            <div class="tlp-metricas">
+              <div class="tlp-m" id="tlp-box-desmat">
+                <div class="tlp-ic">🌳</div>
+                <div><div class="tlp-num" id="tlp-desmat-n" data-v="0">—</div><div class="tlp-lbl">desmatamentos</div></div>
+              </div>
+              <div class="tlp-m" id="tlp-box-area">
+                <div class="tlp-ic">📐</div>
+                <div><div class="tlp-num" id="tlp-area-n" data-v="0">—</div><div class="tlp-lbl">hectares</div></div>
+              </div>
+              <div class="tlp-m" id="tlp-box-focos">
+                <div class="tlp-ic">🔥</div>
+                <div><div class="tlp-num" id="tlp-focos-n" data-v="0">—</div><div class="tlp-lbl">focos de calor</div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Linha do tempo -->
+        <div id="timeline-bar" style="display:none">
+          <div class="tl-top">
+            <div class="tl-modo">
+              <button class="on" id="tl-m-anos" onclick="tlSetModo('anos')">Anos</button>
+              <button id="tl-m-dias" onclick="tlSetModo('dias')">Dias</button>
+            </div>
+            <div class="tl-filtro">
+              <button class="on" id="tl-f-ambos" onclick="tlSetFiltro('ambos')">Ambos</button>
+              <button id="tl-f-focos" onclick="tlSetFiltro('focos')">🔥 Focos</button>
+              <button id="tl-f-desmat" onclick="tlSetFiltro('desmat')">🌳 Desmat.</button>
+            </div>
+            <button class="tl-play" id="tl-play" onclick="tlTogglePlay()" title="Reproduzir">
+              <svg id="tl-play-ic" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 4 20 12 6 20 6 4"/></svg>
+            </button>
+            <div class="tl-lbl"><small id="tl-cap">Ano</small><span id="tl-val">—</span></div>
+            <div class="tl-vel">Velocidade
+              <select id="tl-vel"><option value="1400">Lenta</option><option value="800" selected>Média</option><option value="400">Rápida</option></select>
+            </div>
+            <button class="tl-close" onclick="toggleTimeline()" title="Fechar linha do tempo">✕</button>
+          </div>
+          <div class="tl-periodo" id="tl-periodo" style="display:none">
+            <span class="tl-per-lbl">Período:</span>
+            <button data-dias="7"  onclick="tlSetDias(7)">7d</button>
+            <button data-dias="15" onclick="tlSetDias(15)">15d</button>
+            <button data-dias="30" class="on" onclick="tlSetDias(30)">30d</button>
+            <button data-dias="60" onclick="tlSetDias(60)">60d</button>
+            <button data-dias="90" onclick="tlSetDias(90)">90d</button>
+            <span class="tl-custom">ou <input type="date" id="tl-ini" onchange="tlCustomRange()"> a <input type="date" id="tl-fim" onchange="tlCustomRange()"></span>
+          </div>
+          <input type="range" id="tl-slider" min="0" max="23" value="23" oninput="tlOnSlide()">
+          <div class="tl-ticks" id="tl-ticks"></div>
+          <div class="tl-stat" id="tl-stat"></div>
+        </div>
 
         <!-- Editor de delimitação do Acre -->
         <div id="acre-editor">
@@ -1280,6 +1433,28 @@ function toggleLayerBar(id){
     _tiAplicarEstadoUI();
     _tiAtualizarResumo();
   }
+  // Brigadas: restaura estado do toggle e dos seletores de exibição/peso
+  if(id === 'brigadas'){
+    const bt = document.getElementById('brigadas-toggle');
+    if(bt) bt.checked = _brigadasAtivo;
+    const fw = document.getElementById('brigadas-filtros-wrap');
+    if(fw) fw.style.display = _brigadasAtivo ? 'flex' : 'none';
+    const rm = document.querySelector(`[name="brig-modo"][value="${_brigModoExib}"]`);
+    if(rm) rm.checked = true;
+    const rp = document.querySelector(`[name="brig-peso"][value="${_brigPesoCalor}"]`);
+    if(rp) rp.checked = true;
+    const pw = document.getElementById('brig-peso-wrap');
+    if(pw) pw.style.display = (_brigModoExib === 'mancha' || _brigModoExib === 'ambos') ? 'block' : 'none';
+  }
+  // Alertas e Focos: restaura estado do toggle e do período dos focos
+  if(id === 'alertas'){
+    const at = document.getElementById('alertas-toggle');
+    if(at) at.checked = _alertasAtivo;
+    const fw = document.getElementById('alertas-filtros-wrap');
+    if(fw) fw.style.display = _alertasAtivo ? 'flex' : 'none';
+    const fd = document.getElementById('focos-dias');
+    if(fd) fd.value = String(_focosNrtDias);
+  }
 }
 document.addEventListener('click', e => {
   const lb = document.getElementById('mapa-layerbar');
@@ -1538,19 +1713,45 @@ function _renderDropdown(id){
     </div>
     <div style="font-size:10px;color:var(--cinza-400);margin-top:8px;text-align:center">O painel editor flutua sobre o mapa e pode ser arrastado</div>
   ` + foot;
-  if(id==='alertas') return hdr('🔥 Alertas Ambientais') + `
+  if(id==='alertas') return hdr('🔥 Alertas e Focos Ambientais') + `
     <div>
       <label style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;cursor:pointer">
         <input type="checkbox" id="alertas-toggle" style="accent-color:#f97316;width:14px;height:14px" onchange="toggleAlertasMapa(this.checked)">
-        Exibir alertas no mapa
+        Exibir alertas e focos no mapa
       </label>
-      <p style="font-size:11px;color:var(--cinza-500);margin:5px 0 10px">Focos de calor e desmatamento dos últimos 7 dias.</p>
+      <p style="font-size:11px;color:var(--cinza-500);margin:5px 0 10px">Desmatamento (DETER) + focos de calor em tempo real (FIRMS/NASA e BDQueimadas/INPE).</p>
     </div>
     <div id="alertas-filtros-wrap" style="display:none;flex-direction:column;gap:10px">
 
-      <!-- Severidade -->
+      <!-- Fonte -->
       <div>
-        <div style="font-size:10px;font-weight:700;color:var(--cinza-400);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">Severidade</div>
+        <div style="font-size:10px;font-weight:700;color:var(--cinza-400);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">Fonte</div>
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer">
+            <input type="checkbox" checked data-alerta-fonte="DETER" style="accent-color:#dc2626" onchange="renderAlertasMapa()">
+            <span style="color:#dc2626;font-weight:600">🌳 DETER / INPE <span style="color:var(--cinza-400);font-weight:400">— desmatamento</span></span>
+          </label>
+          ${[['FIRMS','🛰 FIRMS / NASA','#7c3aed'],['BDQUEIMADAS','🔥 BDQueimadas / INPE','#ea580c']].map(([v,l,c])=>`
+          <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer">
+            <input type="checkbox" checked data-foco-fonte="${v}" style="accent-color:${c}" onchange="renderFocosMapa()">
+            <span style="color:${c};font-weight:600">${l} <span style="color:var(--cinza-400);font-weight:400">— focos</span></span>
+          </label>`).join('')}
+        </div>
+      </div>
+
+      <!-- Período (focos) -->
+      <div>
+        <div style="font-size:10px;font-weight:700;color:var(--cinza-400);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">Período dos focos</div>
+        <select id="focos-dias" onchange="recarregarFocosMapa()" style="width:100%;padding:6px 8px;font-size:11px;border:1px solid var(--borda);border-radius:6px;font-family:'DM Sans',sans-serif">
+          <option value="1">Últimas 24 h</option>
+          <option value="3" selected>Últimos 3 dias</option>
+          <option value="7">Últimos 7 dias</option>
+        </select>
+      </div>
+
+      <!-- Severidade (DETER) -->
+      <div>
+        <div style="font-size:10px;font-weight:700;color:var(--cinza-400);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">Severidade (DETER)</div>
         <div style="display:flex;flex-wrap:wrap;gap:5px">
           ${['critica','alta','media','baixa'].map(s=>{
             const c={critica:'#DC2626',alta:'#F97316',media:'#F59E0B',baixa:'#059669'}[s]
@@ -1561,13 +1762,13 @@ function _renderDropdown(id){
         </div>
       </div>
 
-      <!-- Localização -->
+      <!-- Localização (DETER) -->
       <div>
-        <div style="font-size:10px;font-weight:700;color:var(--cinza-400);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">Localização</div>
+        <div style="font-size:10px;font-weight:700;color:var(--cinza-400);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">Localização (DETER)</div>
         <div style="display:flex;flex-direction:column;gap:4px">
           <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer">
             <input type="radio" name="alerta-loc" value="todos" checked style="accent-color:#52B788" onchange="renderAlertasMapa()">
-            <span>Todos os alertas</span>
+            <span>Todos</span>
           </label>
           <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer">
             <input type="radio" name="alerta-loc" value="em_uc" style="accent-color:#52B788" onchange="renderAlertasMapa()">
@@ -1580,24 +1781,8 @@ function _renderDropdown(id){
         </div>
       </div>
 
-      <!-- Fonte -->
-      <div>
-        <div style="font-size:10px;font-weight:700;color:var(--cinza-400);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">Fonte</div>
-        <div style="display:flex;flex-direction:column;gap:4px">
-          ${[
-            ['FIRMS',       '🛰 FIRMS / NASA',       '#7c3aed'],
-            ['DETER',       '🌳 DETER / INPE',       '#dc2626'],
-            ['BDQUEIMADAS', '🔥 BDQueimadas / INPE', '#ea580c'],
-            ['PRODES',      '📊 PRODES / INPE',      '#b45309'],
-          ].map(([f,label,c]) => `
-          <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer">
-            <input type="checkbox" checked data-alerta-fonte="${f}" style="accent-color:${c}" onchange="renderAlertasMapa()">
-            <span>${label}</span>
-          </label>`).join('')}
-        </div>
-      </div>
-
       <div id="alertas-mapa-stat" style="font-size:10px;color:var(--cinza-400)"></div>
+      <div id="focos-mapa-stat" style="font-size:10px;color:var(--cinza-400)"></div>
       <a href="../pages/alertas-ambientais.html" style="font-size:11px;color:var(--verde-c);text-decoration:none;font-weight:600">→ Ver página completa de alertas</a>
     </div>
   ` + foot;
@@ -1610,6 +1795,28 @@ function _renderDropdown(id){
       <p style="font-size:11px;color:var(--cinza-500);margin:5px 0 10px">Pontos GPS capturados pela PWA das brigadas. Somente registros com localização.</p>
     </div>
     <div id="brigadas-filtros-wrap" style="display:none;flex-direction:column;gap:10px">
+
+      <div>
+        <div style="font-size:10px;font-weight:700;color:var(--cinza-400);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">Exibição</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px">
+          ${[['pontos','Pontos'],['mancha','Mancha de calor'],['ambos','Ambos']].map(([v,l])=>`
+          <label style="display:flex;align-items:center;gap:4px;font-size:11px;cursor:pointer">
+            <input type="radio" name="brig-modo" value="${v}" ${v==='pontos'?'checked':''} style="accent-color:#1F4E2C" onchange="setBrigModoExib('${v}')">
+            <span style="font-weight:600;color:var(--cinza-600)">${l}</span>
+          </label>`).join('')}
+        </div>
+      </div>
+
+      <div id="brig-peso-wrap" style="display:none">
+        <div style="font-size:10px;font-weight:700;color:var(--cinza-400);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">Peso da mancha</div>
+        <div style="display:flex;flex-direction:column;gap:4px">
+          ${[['densidade','Densidade de registros','Onde houve mais atuações da brigada'],['esforco','Esforço (horas + área + fauna)','Onde houve maior esforço/impacto'],['natureza','Por natureza da ação','Combate pesa mais que monitoramento/prevenção']].map(([v,l,d])=>`
+          <label style="display:flex;align-items:flex-start;gap:6px;font-size:11px;cursor:pointer">
+            <input type="radio" name="brig-peso" value="${v}" ${v==='densidade'?'checked':''} style="accent-color:#1F4E2C;margin-top:2px" onchange="setBrigPesoCalor('${v}')">
+            <span><span style="color:var(--cinza-600);font-weight:600">${l}</span><br><span style="color:var(--cinza-400);font-size:10px">${d}</span></span>
+          </label>`).join('')}
+        </div>
+      </div>
 
       <div>
         <div style="font-size:10px;font-weight:700;color:var(--cinza-400);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">Natureza</div>
@@ -2089,13 +2296,29 @@ function _atualizarLegendaMapa(){
   }
 
   // Alertas Ambientais
-  if(_alertasAtivo && _alertasLayer) itens.push({ simbolo:'circle', cor:'#f97316', label:'Alertas Ambientais' });
+  if(_alertasAtivo && _alertasLayer) itens.push({ simbolo:'circle', cor:'#dc2626', label:'DETER — Desmatamento' });
 
   // Brigadas de Campo
   if(_brigadasAtivo && _brigadasMapa.length) {
-    [['prevencao','#12A66A','Brigadas — Prevenção'],['combate','#EF5B3C','Brigadas — Combate'],['monitoramento','#3B82C4','Brigadas — Monitoramento']].forEach(([nat,cor,label]) => {
-      if(_brigadasMapa.some(r => r.natureza === nat) &&
-         document.querySelector(`[data-brig-nat="${nat}"]`)?.checked) {
+    if(_brigModoExib === 'pontos' || _brigModoExib === 'ambos') {
+      [['prevencao','#12A66A','Brigadas — Prevenção'],['combate','#EF5B3C','Brigadas — Combate'],['monitoramento','#3B82C4','Brigadas — Monitoramento']].forEach(([nat,cor,label]) => {
+        if(_brigadasMapa.some(r => r.natureza === nat) &&
+           document.querySelector(`[data-brig-nat="${nat}"]`)?.checked) {
+          itens.push({ simbolo:'circle', cor, label });
+        }
+      });
+    }
+    if(_brigModoExib === 'mancha' || _brigModoExib === 'ambos') {
+      const _pesoLab = { densidade:'densidade', esforco:'esforço', natureza:'natureza' }[_brigPesoCalor] || _brigPesoCalor;
+      itens.push({ simbolo:'rect', cor:'#EF8E3C', opacidade:0.7, label:'Mancha de calor — ações ('+_pesoLab+')' });
+    }
+  }
+
+  // Focos de Calor em Tempo Real
+  if(_focosNrtAtivo && _focosNrtLayer) {
+    [['FIRMS','#7c3aed','Focos — FIRMS/NASA'],['BDQUEIMADAS','#ea580c','Focos — BDQueimadas/INPE']].forEach(([f,cor,label]) => {
+      if(document.querySelector(`[data-foco-fonte="${f}"]`)?.checked &&
+         _focosNrtMapa.some(x => x.fonte === f)) {
         itens.push({ simbolo:'circle', cor, label });
       }
     });
@@ -2179,14 +2402,29 @@ const COR_ALERTA_TIPO = { queimada:'#DC2626', desmatamento:'#166534', degradacao
 const ICONE_ALERTA    = { queimada:'🔥', desmatamento:'🌳', degradacao:'🍂' }
 let _alertasLayer = null, _alertasMapa = [], _alertasAtivo = false
 
-function _alertaMarkerIcon(tipo, severidade) {
-  const emoji = ICONE_ALERTA[tipo]      ?? '⚠'
-  const cor   = COR_ALERTA_TIPO[tipo]   ?? '#6B7280'
+function _alertaMarkerIcon(tipo, severidade, animar = true) {
   const borda = COR_ALERTA[severidade]  ?? '#6B7280'
-  const sz    = severidade === 'critica' ? 32 : severidade === 'alta' ? 27 : 22
+  const sz    = severidade === 'critica' ? 30 : severidade === 'alta' ? 26 : 22
+  if (tipo === 'desmatamento') {
+    const w = Math.round(sz * 0.85), h = sz + 4
+    return L.divIcon({
+      className: '',
+      html: `<div class="deter-arvore${animar ? '' : ' estatico'}" style="width:${sz}px;height:${h}px;cursor:pointer">
+        <span class="deter-base" style="background:${borda}"></span>
+        <svg width="${w}" height="${Math.round(sz*0.95)}" viewBox="0 0 24 24">
+          <rect x="10.5" y="14" width="3" height="9" rx="1" fill="#8B5A2B"/>
+          <path d="M12 1.5 L19 12.5 H5 Z" fill="#166534"/>
+          <path d="M12 6 L17 14 H7 Z" fill="#2F9E5B"/>
+        </svg>
+      </div>`,
+      iconSize: [sz, h], iconAnchor: [sz/2, h], popupAnchor: [0, -h + 4]
+    })
+  }
+  // Fallback (degradação/outros): círculo simples, sem emoji
+  const cor = COR_ALERTA_TIPO[tipo] ?? '#6B7280'
   return L.divIcon({
     className: '',
-    html: `<div style="width:${sz}px;height:${sz}px;border-radius:50%;background:${cor};border:3px solid ${borda};display:flex;align-items:center;justify-content:center;font-size:${Math.round(sz*.55)}px;line-height:1;box-shadow:0 2px 6px rgba(0,0,0,.45);cursor:pointer">${emoji}</div>`,
+    html: `<div style="width:${sz}px;height:${sz}px;border-radius:50%;background:${cor};border:3px solid ${borda};box-shadow:0 2px 6px rgba(0,0,0,.45);cursor:pointer"></div>`,
     iconSize: [sz, sz], iconAnchor: [sz/2, sz/2], popupAnchor: [0, -sz/2 - 4]
   })
 }
@@ -2194,39 +2432,48 @@ function _alertaMarkerIcon(tipo, severidade) {
 async function toggleAlertasMapa(ativo) {
   _alertasAtivo = ativo
   document.getElementById('alertas-filtros-wrap').style.display = ativo ? 'flex' : 'none'
-  if (ativo && !_alertasMapa.length) {
-    // Garante que o GeoJSON das UCs está carregado para o PIP
-    if (!_ucGeojson) await _carregarUC()
-    const corte = new Date(Date.now() - 7 * 86400000).toISOString()
-    const { data } = await db.from('alertas_ambientais')
-      .select('id,tipo,severidade,fonte,uc_id,uc_nome,area_ha,data_referencia,geom')
-      .eq('ativo', true)
-      .gte('data_deteccao', corte)
-      .limit(500)
-    // Pré-calcula uc_nome via PIP para alertas sem UC no banco
-    _alertasMapa = (data || []).map(a => {
-      if (a.uc_nome) return a
-      try {
-        let lat, lng
-        if (typeof a.geom === 'object' && a.geom?.coordinates) {
-          lng = a.geom.coordinates[0]; lat = a.geom.coordinates[1]
-        } else {
-          const m = String(a.geom).match(/POINT\(([^ ]+) ([^ )]+)\)/)
-          if (m) { lng = parseFloat(m[1]); lat = parseFloat(m[2]) }
-        }
-        if (lat && lng) a = { ...a, uc_nome: _ucNomePorCoordenada(lat, lng) }
-      } catch {}
-      return a
-    })
-    const badge = document.getElementById('alertas-count-badge')
-    if (badge) { badge.textContent = _alertasMapa.length; badge.style.display = _alertasMapa.length ? '' : 'none' }
+
+  // Focos (FIRMS/BDQueimadas) vêm de focos_calor (tempo real) — modelo híbrido.
+  _focosNrtAtivo = ativo
+  if (ativo) {
+    if (!_focosNrtMapa.length) await _carregarFocos()
+    if (!_alertasMapa.length)  await _carregarAlertas()
+  } else {
+    if (_focosNrtLayer) { mapaL.removeLayer(_focosNrtLayer); _focosNrtLayer = null }
   }
   renderAlertasMapa()
+  renderFocosMapa()
+  _autoCtrl()
   _atualizarLegendaMapa()
+}
+
+// Carrega DETER/desmatamento (focos vêm separados de focos_calor)
+async function _carregarAlertas() {
+  if (!_ucGeojson) await _carregarUC()
+  const corte = new Date(Date.now() - 7 * 86400000).toISOString()
+  const { data } = await db.from('alertas_ambientais')
+    .select('id,tipo,severidade,fonte,uc_id,uc_nome,area_ha,data_referencia,geom')
+    .eq('ativo', true)
+    .neq('tipo', 'queimada')
+    .gte('data_deteccao', corte)
+    .limit(500)
+  _alertasMapa = (data || []).map(a => {
+    if (a.uc_nome) return a
+    try {
+      let lat, lng
+      if (typeof a.geom === 'object' && a.geom?.coordinates) { lng = a.geom.coordinates[0]; lat = a.geom.coordinates[1] }
+      else { const m = String(a.geom).match(/POINT\(([^ ]+) ([^ )]+)\)/); if (m) { lng = parseFloat(m[1]); lat = parseFloat(m[2]) } }
+      if (lat && lng) a = { ...a, uc_nome: _ucNomePorCoordenada(lat, lng) }
+    } catch {}
+    return a
+  })
+  const badge = document.getElementById('alertas-count-badge')
+  if (badge) { badge.textContent = _alertasMapa.length; badge.style.display = _alertasMapa.length ? '' : 'none' }
 }
 
 function renderAlertasMapa() {
   if (_alertasLayer) { mapaL.removeLayer(_alertasLayer); _alertasLayer = null }
+  if (_tlAberta) return  // linha do tempo assume o controle da exibição
   if (!_alertasAtivo || !_alertasMapa.length) return
 
   const sevs   = new Set([...document.querySelectorAll('[data-alerta-sev]:checked')].map(e => e.dataset.alertaSev))
@@ -2256,6 +2503,7 @@ function renderAlertasMapa() {
   })
 
   _alertasLayer = L.layerGroup()
+  const _animarDeter = visiveis.length <= 200  // desliga animação em volume alto
   visiveis.forEach(a => {
     if (!a.geom) return
     let lat, lng
@@ -2277,7 +2525,7 @@ function renderAlertasMapa() {
     const alertaKey   = `_alerta_${a.id}`
     window[alertaKey] = alertaModal
 
-    L.marker([lat, lng], { icon: _alertaMarkerIcon(a.tipo, a.severidade) })
+    L.marker([lat, lng], { icon: _alertaMarkerIcon(a.tipo, a.severidade, _animarDeter) })
     .bindPopup(`<div class="camada-popup">
       <div class="cp-header" style="background:${corTipo}">${icone} ${escHtml(a.tipo.charAt(0).toUpperCase()+a.tipo.slice(1))}</div>
       <div class="cp-layer">
@@ -2312,6 +2560,45 @@ function renderAlertasMapa() {
 // BRIGADAS DE CAMPO — registros_campo com GPS
 // ══════════════════════════════════════════════════════════════
 let _brigadasLayer = null, _brigadasMapa = [], _brigadasAtivo = false
+let _brigadasHeatLayer = null, _brigModoExib = 'pontos', _brigPesoCalor = 'densidade'
+
+// Gradiente da mancha de calor (verde → ouro → laranja → vermelho)
+const _BRIG_HEAT_GRAD = { 0.2:'#52B788', 0.45:'#C9A84C', 0.7:'#EF8E3C', 1.0:'#D7263D' }
+// Peso relativo por natureza da ação (combate pesa mais)
+const _BRIG_NAT_PESO  = { combate:1.0, monitoramento:0.6, prevencao:0.4 }
+
+function setBrigModoExib(modo) {
+  _brigModoExib = modo
+  const pw = document.getElementById('brig-peso-wrap')
+  if (pw) pw.style.display = (modo === 'mancha' || modo === 'ambos') ? 'block' : 'none'
+  renderBrigadasMapa()
+}
+
+function setBrigPesoCalor(peso) {
+  _brigPesoCalor = peso
+  renderBrigadasMapa()
+}
+
+// Score bruto de "esforço" de um registro: horas + área + fauna resgatada
+function _brigEsforco(r) {
+  const horas = Number(r.duracao_horas)     || 0
+  const area  = Number(r.area_estimada_ha)  || 0
+  const fauna = Number(r.n_fauna_resgatada) || 0
+  return horas + area * 0.5 + fauna * 2
+}
+
+// Constrói os pontos [lat,lng,peso] da mancha conforme o modo escolhido
+function _brigHeatPoints(visiveis) {
+  if (_brigPesoCalor === 'esforco') {
+    const maxE = Math.max(1, ...visiveis.map(_brigEsforco))
+    return visiveis.map(r => [r.lat, r.lng, 0.2 + 0.8 * (_brigEsforco(r) / maxE)])
+  }
+  if (_brigPesoCalor === 'natureza') {
+    return visiveis.map(r => [r.lat, r.lng, _BRIG_NAT_PESO[r.natureza] ?? 0.4])
+  }
+  // densidade: peso fixo — a sobreposição dos pontos gera a intensidade
+  return visiveis.map(r => [r.lat, r.lng, 0.6])
+}
 
 const _BRIG_NAT_COR  = { prevencao:'#12A66A', combate:'#EF5B3C', monitoramento:'#3B82C4' }
 const _BRIG_NAT_ICO  = { prevencao:'🛡', combate:'🧯', monitoramento:'🔭' }
@@ -2400,7 +2687,7 @@ async function toggleBrigadasMapa(ativo) {
   if (ativo && !_brigadasMapa.length) {
     const { data } = await db
       .from('vw_registros_validacao')
-      .select('id,natureza,atividade,status_validacao,data_hora_evento,lat,lng,brigadista_nome,brigada_nome,uc_nome,n_fauna,fotos_urls,descricao')
+      .select('id,natureza,atividade,status_validacao,data_hora_evento,lat,lng,brigadista_nome,brigada_nome,uc_nome,n_fauna,n_fauna_resgatada,duracao_horas,area_estimada_ha,fotos_urls,descricao')
       .not('lat', 'is', null)
       .order('data_hora_evento', { ascending: false })
       .limit(2000)
@@ -2409,22 +2696,33 @@ async function toggleBrigadasMapa(ativo) {
     if (badge) { badge.textContent = _brigadasMapa.length; badge.style.display = _brigadasMapa.length ? '' : 'none' }
   }
 
-  if (_brigadasLayer) { mapaL.removeLayer(_brigadasLayer); _brigadasLayer = null }
+  if (_brigadasLayer)     { mapaL.removeLayer(_brigadasLayer);     _brigadasLayer = null }
+  if (_brigadasHeatLayer) { mapaL.removeLayer(_brigadasHeatLayer); _brigadasHeatLayer = null }
   if (!_brigadasAtivo || !_brigadasMapa.length) { _atualizarLegendaMapa(); return }
   renderBrigadasMapa()
 }
 
 function renderBrigadasMapa() {
-  if (_brigadasLayer) { mapaL.removeLayer(_brigadasLayer); _brigadasLayer = null }
+  if (_brigadasLayer)     { mapaL.removeLayer(_brigadasLayer);     _brigadasLayer = null }
+  if (_brigadasHeatLayer) { mapaL.removeLayer(_brigadasHeatLayer); _brigadasHeatLayer = null }
   if (!_brigadasAtivo || !_brigadasMapa.length) return
 
   const nats    = [...document.querySelectorAll('[data-brig-nat]')].filter(c=>c.checked).map(c=>c.dataset.brigNat)
   const statuses= [...document.querySelectorAll('[data-brig-status]')].filter(c=>c.checked).map(c=>c.dataset.brigStatus)
 
   const visiveis = _brigadasMapa.filter(r =>
-    nats.includes(r.natureza) && statuses.includes(r.status_validacao)
+    r.lat && r.lng && nats.includes(r.natureza) && statuses.includes(r.status_validacao)
   )
 
+  // Mancha de calor (modo 'mancha' ou 'ambos')
+  if ((_brigModoExib === 'mancha' || _brigModoExib === 'ambos') && typeof L.heatLayer === 'function' && visiveis.length) {
+    _brigadasHeatLayer = L.heatLayer(_brigHeatPoints(visiveis), {
+      radius: 28, blur: 22, max: 1.0, minOpacity: 0.25, maxZoom: 13, gradient: _BRIG_HEAT_GRAD
+    }).addTo(mapaL)
+  }
+
+  // Pontos (modo 'pontos' ou 'ambos')
+  if (_brigModoExib === 'pontos' || _brigModoExib === 'ambos') {
   _brigadasLayer = L.layerGroup()
   visiveis.forEach(r => {
     if (!r.lat || !r.lng) return
@@ -2486,11 +2784,368 @@ function renderBrigadasMapa() {
     marker.on('popupclose', () => { _pararCarrossel(cid); _pararCarrossel('fauna-' + r.id) })
     marker.addTo(_brigadasLayer)
   })
-
   _brigadasLayer.addTo(mapaL)
+  }
+
   const stat = document.getElementById('brigadas-mapa-stat')
-  if (stat) stat.textContent = `${visiveis.length} registro${visiveis.length !== 1 ? 's' : ''} exibido${visiveis.length !== 1 ? 's' : ''}`
+  if (stat) {
+    const modoTxt = _brigModoExib === 'mancha' ? ' (mancha de calor)' : (_brigModoExib === 'ambos' ? ' (pontos + mancha)' : '')
+    stat.textContent = `${visiveis.length} registro${visiveis.length !== 1 ? 's' : ''} exibido${visiveis.length !== 1 ? 's' : ''}${modoTxt}`
+  }
   _atualizarLegendaMapa()
+}
+
+// ══════════════════════════════════════════════════════════════
+// FOCOS DE CALOR EM TEMPO REAL — focos_calor (FIRMS + BDQueimadas)
+// ══════════════════════════════════════════════════════════════
+let _focosNrtLayer = null, _focosNrtMapa = [], _focosNrtAtivo = false, _focosNrtDias = 3
+
+const _FOCO_FONTE_COR = { FIRMS:'#7c3aed', BDQUEIMADAS:'#ea580c' }
+const _FOCO_FONTE_LAB = { FIRMS:'FIRMS / NASA', BDQUEIMADAS:'BDQueimadas / INPE' }
+
+async function _carregarFocos() {
+  const corte = new Date(Date.now() - _focosNrtDias * 86400000).toISOString()
+  const { data } = await db
+    .from('focos_calor')
+    .select('id,lat,lon,data_hora,satelite,fonte,frp,confianca')
+    .in('fonte', ['FIRMS', 'BDQUEIMADAS'])
+    .gte('data_hora', corte)
+    .order('data_hora', { ascending: false })
+    .limit(5000)
+  _focosNrtMapa = data || []
+  const badge = document.getElementById('focos-count-badge')
+  if (badge) { badge.textContent = _focosNrtMapa.length; badge.style.display = _focosNrtMapa.length ? '' : 'none' }
+}
+
+async function recarregarFocosMapa() {
+  _focosNrtDias = parseInt(document.getElementById('focos-dias')?.value || '3', 10)
+  if (!_focosNrtAtivo) return
+  await _carregarFocos()
+  renderFocosMapa()
+}
+
+// Ícone de foco de calor: chama com fumaça subindo (animado por CSS).
+// O ponto colorido na base indica a fonte (FIRMS roxo / BDQueimadas laranja).
+const _FOGO_SVG = `<svg width="20" height="22" viewBox="0 0 24 24">
+  <path fill="#F97316" stroke="#C2410C" stroke-width="0.8" d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>
+  <path fill="#FDE047" transform="translate(12 13.5) scale(0.52) translate(-12 -13)" d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>
+</svg>`
+function _focoFogoIcon(cor, animar = true) {
+  return L.divIcon({
+    className: '',
+    html: `<div class="foco-fogo${animar ? '' : ' estatico'}" style="cursor:pointer">
+      <span class="foco-halo" style="background:radial-gradient(circle, ${cor}66 0%, ${cor}00 70%)"></span>
+      <span class="foco-fumaca"></span><span class="foco-fumaca f2"></span><span class="foco-fumaca f3"></span>
+      ${_FOGO_SVG}
+      <span class="foco-dot" style="background:${cor};box-shadow:0 0 6px 1px ${cor},0 0 0 1px rgba(0,0,0,.35)"></span>
+    </div>`,
+    iconSize: [24, 30], iconAnchor: [12, 28], popupAnchor: [0, -26]
+  })
+}
+
+function renderFocosMapa() {
+  if (_focosNrtLayer) { mapaL.removeLayer(_focosNrtLayer); _focosNrtLayer = null }
+  if (_tlAberta) return  // linha do tempo assume o controle da exibição
+  if (!_focosNrtAtivo || !_focosNrtMapa.length) { _atualizarLegendaMapa(); return }
+
+  const fontes = new Set([...document.querySelectorAll('[data-foco-fonte]')].filter(c=>c.checked).map(c=>c.dataset.focoFonte))
+  const visiveis = _focosNrtMapa.filter(f => fontes.has(f.fonte) && f.lat && f.lon)
+  const _animarFogo = visiveis.length <= 200  // desliga animação em volume alto
+
+  _focosNrtLayer = L.layerGroup()
+  visiveis.forEach(f => {
+    const cor = _FOCO_FONTE_COR[f.fonte] ?? '#ea580c'
+    const dt  = f.data_hora
+      ? new Date(f.data_hora).toLocaleString('pt-BR', { timeZone:'America/Rio_Branco', day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' })
+      : '—'
+    L.marker([f.lat, f.lon], { icon: _focoFogoIcon(cor, _animarFogo) })
+    .bindPopup(`<div class="camada-popup">
+      <div class="cp-header" style="background:${cor}">Foco de Calor</div>
+      <div class="cp-layer">
+        <div class="cp-row"><strong>Fonte</strong><span>${escHtml(_FOCO_FONTE_LAB[f.fonte] ?? f.fonte)}</span></div>
+        <div class="cp-row"><strong>Detecção</strong><span>${dt}</span></div>
+        ${f.satelite ? `<div class="cp-row"><strong>Satélite</strong><span>${escHtml(f.satelite)}</span></div>` : ''}
+        ${f.frp != null ? `<div class="cp-row"><strong>FRP</strong><span>${Number(f.frp).toLocaleString('pt-BR')} MW</span></div>` : ''}
+        ${f.confianca ? `<div class="cp-row"><strong>Confiança</strong><span>${escHtml(f.confianca)}</span></div>` : ''}
+        <div style="margin-top:4px;font-size:10px;color:#9CA3AF">📍 ${Number(f.lat).toFixed(5)}, ${Number(f.lon).toFixed(5)}</div>
+      </div>
+    </div>`, { maxWidth: 240 }).addTo(_focosNrtLayer)
+  })
+  _focosNrtLayer.addTo(mapaL)
+
+  const stat = document.getElementById('focos-mapa-stat')
+  if (stat) stat.textContent = `${visiveis.length} foco${visiveis.length !== 1 ? 's' : ''} exibido${visiveis.length !== 1 ? 's' : ''}`
+  _atualizarLegendaMapa()
+}
+
+// ══════════════════════════════════════════════════════════════
+// AUTO-ATUALIZAÇÃO (focos/alertas ao vivo, a cada 5 min)
+// ══════════════════════════════════════════════════════════════
+let _autoOn = true, _autoTimer = null, _autoRelogio = null, _autoLast = Date.now()
+const AUTO_MS = 5 * 60 * 1000
+
+function _autoBadgeUpdate() {
+  const badge = document.getElementById('auto-badge')
+  if (!badge) return
+  badge.style.display = (_alertasAtivo && !_tlAberta) ? 'flex' : 'none'
+  document.getElementById('auto-sw')?.classList.toggle('off', !_autoOn)
+  const pulse = document.getElementById('auto-pulse'); if (pulse) pulse.style.visibility = _autoOn ? 'visible' : 'hidden'
+  const lbl = document.getElementById('auto-lbl')
+  if (lbl) {
+    if (!_autoOn) lbl.textContent = 'Auto-atualização desligada'
+    else { const min = Math.floor((Date.now() - _autoLast) / 60000); lbl.textContent = min < 1 ? 'Atualizado agora' : `Atualizado há ${min} min` }
+  }
+}
+function _autoCtrl() {
+  clearInterval(_autoTimer); _autoTimer = null
+  clearInterval(_autoRelogio); _autoRelogio = null
+  if (_alertasAtivo && !_tlAberta && _autoOn) {
+    _autoTimer   = setInterval(_autoTick, AUTO_MS)
+    _autoRelogio = setInterval(_autoBadgeUpdate, 30000)
+  }
+  _autoBadgeUpdate()
+}
+async function _autoTick() {
+  if (document.hidden || _tlAberta || !_alertasAtivo) return
+  await _carregarFocos()
+  await _carregarAlertas()
+  _autoLast = Date.now()
+  renderFocosMapa(); renderAlertasMapa()
+  _autoBadgeUpdate()
+}
+function toggleAutoRefresh() { _autoOn = !_autoOn; _autoCtrl() }
+document.addEventListener('visibilitychange', () => { if (!document.hidden) _autoBadgeUpdate() })
+
+// ══════════════════════════════════════════════════════════════
+// LINHA DO TEMPO — focos + cobertura por data (dias) / ano (anos)
+// ══════════════════════════════════════════════════════════════
+let _tlAberta = false, _tlModo = 'anos', _tlPlaying = false, _tlTimer = null, _tlDeb = null
+let _tlFiltro = 'ambos', _tlDiasJanela = 30, _tlCustom = null
+const TL_ANO_MIN = 2001, TL_ANO_MAX = 2024
+let _tlFocosLayer = null, _tlGibsLayer = null, _tlProdesLayer = null, _tlDeterLayer = null
+const _tlFocosCacheAno = {}
+
+// Estatísticas oficiais por ano (Acre) — focos: focos_calor_ac; desmatamento: PRODES yearly (≥2008)
+const TL_FOCOS_ANO = {2001:1673,2002:10928,2003:17926,2004:11025,2005:35072,2006:12094,2007:14946,2008:10246,2009:5937,2010:16837,2011:5020,2012:39242,2013:35042,2014:32461,2015:49076,2016:68075,2017:48140,2018:56425,2019:62284,2020:71645,2021:85616,2022:102470,2023:64387,2024:96749}
+const TL_PRODES_ANO = {2008:{n:2701,ha:28873},2009:{n:1725,ha:16162},2010:{n:2671,ha:26537},2011:{n:3049,ha:29579},2012:{n:2573,ha:27054},2013:{n:2265,ha:20024},2014:{n:3759,ha:34859},2015:{n:2100,ha:22300},2016:{n:4655,ha:36631},2017:{n:2224,ha:24573},2018:{n:4558,ha:42659},2019:{n:5842,ha:70694},2020:{n:5510,ha:66081},2021:{n:6934,ha:89243},2022:{n:10643,ha:100586},2023:{n:5877,ha:46295},2024:{n:5699,ha:41135}}
+
+function toggleTimeline() {
+  _tlAberta = !_tlAberta
+  document.getElementById('timeline-bar').style.display = _tlAberta ? 'block' : 'none'
+  document.getElementById('tl-painel').style.display = _tlAberta ? 'block' : 'none'
+  document.getElementById('tl-fab')?.classList.toggle('ativo', _tlAberta)
+  if (_tlAberta) {
+    if (_focosNrtLayer) { mapaL.removeLayer(_focosNrtLayer); _focosNrtLayer = null }
+    if (_alertasLayer)  { mapaL.removeLayer(_alertasLayer);  _alertasLayer = null }
+    tlSetModo(_tlModo)
+  } else {
+    _tlStop(); _tlLimpar()
+    if (_alertasAtivo) { renderAlertasMapa(); renderFocosMapa() }
+  }
+  _autoCtrl()
+  _atualizarLegendaMapa()
+}
+
+function _tlLimpar() {
+  ;[_tlFocosLayer, _tlGibsLayer, _tlProdesLayer, _tlDeterLayer].forEach(l => { if (l) mapaL.removeLayer(l) })
+  _tlFocosLayer = _tlGibsLayer = _tlProdesLayer = _tlDeterLayer = null
+}
+
+const _mostraFocos  = () => _tlFiltro === 'ambos' || _tlFiltro === 'focos'
+const _mostraDesmat = () => _tlFiltro === 'ambos' || _tlFiltro === 'desmat'
+
+function tlSetFiltro(f) {
+  _tlFiltro = f
+  ;['ambos','focos','desmat'].forEach(x => document.getElementById('tl-f-'+x)?.classList.toggle('on', x === f))
+  tlOnSlide()
+}
+function tlSetDias(n) {
+  _tlDiasJanela = n; _tlCustom = null
+  document.querySelectorAll('.tl-periodo button[data-dias]').forEach(b => b.classList.toggle('on', +b.dataset.dias === n))
+  const i = document.getElementById('tl-ini'), f = document.getElementById('tl-fim'); if (i) i.value = ''; if (f) f.value = ''
+  if (_tlModo === 'dias') tlSetModo('dias')
+}
+function tlCustomRange() {
+  const ini = document.getElementById('tl-ini')?.value, fim = document.getElementById('tl-fim')?.value
+  if (!ini || !fim || ini > fim) return
+  _tlCustom = { ini, fim }
+  document.querySelectorAll('.tl-periodo button[data-dias]').forEach(b => b.classList.remove('on'))
+  tlSetModo('dias')
+}
+
+// Janela de dias selecionada (presets ou intervalo personalizado)
+function _tlDiasRange() {
+  if (_tlCustom) return { ini: new Date(_tlCustom.ini + 'T00:00:00'), fim: new Date(_tlCustom.fim + 'T00:00:00') }
+  const fim = new Date(); fim.setHours(0, 0, 0, 0)
+  const ini = new Date(fim); ini.setDate(ini.getDate() - _tlDiasJanela)
+  return { ini, fim }
+}
+function _tlDiasTotal() { const r = _tlDiasRange(); return Math.max(1, Math.round((r.fim - r.ini) / 86400000)) }
+function _tlDiaSel(v) { const d = new Date(_tlDiasRange().ini); d.setDate(d.getDate() + v); return d }
+
+function tlSetModo(m) {
+  _tlModo = m
+  document.getElementById('tl-m-anos').classList.toggle('on', m === 'anos')
+  document.getElementById('tl-m-dias').classList.toggle('on', m === 'dias')
+  document.getElementById('tl-periodo').style.display = m === 'dias' ? 'flex' : 'none'
+  const s = document.getElementById('tl-slider')
+  if (m === 'anos') {
+    s.min = 0; s.max = TL_ANO_MAX - TL_ANO_MIN; s.value = s.max
+    document.getElementById('tl-cap').textContent = 'Ano'
+    document.getElementById('tlp-cap').textContent = 'Ano'
+    document.getElementById('tl-ticks').innerHTML = `<span>${TL_ANO_MIN}</span><span>${Math.round((TL_ANO_MIN + TL_ANO_MAX) / 2)}</span><span>${TL_ANO_MAX}</span>`
+  } else {
+    const r = _tlDiasRange(), tot = _tlDiasTotal()
+    s.min = 0; s.max = tot; s.value = tot
+    document.getElementById('tl-cap').textContent = 'Data'
+    document.getElementById('tlp-cap').textContent = 'Data'
+    const fmt = d => d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+    const meio = new Date(r.ini); meio.setDate(meio.getDate() + Math.round(tot / 2))
+    document.getElementById('tl-ticks').innerHTML = `<span>${fmt(r.ini)}</span><span>${fmt(meio)}</span><span>${fmt(r.fim)}</span>`
+  }
+  tlOnSlide()
+}
+
+function tlOnSlide() {
+  const v = +document.getElementById('tl-slider').value
+  let label
+  if (_tlModo === 'anos') label = String(TL_ANO_MIN + v)
+  else label = _tlDiaSel(v).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+  document.getElementById('tl-val').textContent = label
+  document.getElementById('tlp-val').textContent = label
+  clearTimeout(_tlDeb)
+  _tlDeb = setTimeout(() => {
+    if (_tlModo === 'anos') _tlRenderAno(TL_ANO_MIN + v)
+    else _tlRenderDia(_tlDiaSel(v).toISOString().slice(0, 10))
+  }, 170)
+}
+
+function _tlSetGibs(dateStr) {
+  if (_tlGibsLayer) { mapaL.removeLayer(_tlGibsLayer); _tlGibsLayer = null }
+  _tlGibsLayer = _gibsMake(100, dateStr, 'MODIS_Terra_CorrectedReflectance_TrueColor')
+  _tlGibsLayer.addTo(mapaL); _tlGibsLayer.setZIndex(140)
+}
+function _tlSetProdes(ano) {
+  if (_tlProdesLayer) { mapaL.removeLayer(_tlProdesLayer); _tlProdesLayer = null }
+  if (!_mostraDesmat()) return
+  _tlProdesLayer = L.tileLayer.wms('https://terrabrasilis.dpi.inpe.br/geoserver/prodes-amazon-nb/wms', {
+    layers: 'prodes-amazon-nb:yearly_deforestation_biome', format: 'image/png', transparent: true,
+    version: '1.1.1', CQL_FILTER: `year=${ano}`, opacity: 0.85, attribution: 'PRODES/INPE',
+    maxZoom: 22, maxNativeZoom: 15
+  })
+  _tlProdesLayer.addTo(mapaL); _tlProdesLayer.setZIndex(160)
+}
+function _tlPlotFocos(items) {
+  if (_tlFocosLayer) { mapaL.removeLayer(_tlFocosLayer); _tlFocosLayer = null }
+  if (!items.length || !_mostraFocos()) return
+  const animar = items.length <= 200
+  _tlFocosLayer = L.layerGroup()
+  items.forEach(f => {
+    const dt = f.data_hora ? new Date(f.data_hora).toLocaleDateString('pt-BR', { timeZone: 'America/Rio_Branco' }) : '—'
+    L.marker([f.lat, f.lon], { icon: _focoFogoIcon(f.cor, animar) })
+      .bindPopup(`<div class="camada-popup">
+        <div class="cp-header" style="background:${f.cor}">Foco de Calor</div>
+        <div class="cp-layer">
+          ${f.satelite ? `<div class="cp-row"><strong>Satélite</strong><span>${escHtml(f.satelite)}</span></div>` : ''}
+          <div class="cp-row"><strong>Data</strong><span>${dt}</span></div>
+          ${f.frp != null ? `<div class="cp-row"><strong>FRP</strong><span>${Number(f.frp).toLocaleString('pt-BR')} MW</span></div>` : ''}
+          <div style="margin-top:4px;font-size:10px;color:#9CA3AF">📍 ${Number(f.lat).toFixed(5)}, ${Number(f.lon).toFixed(5)}</div>
+        </div>
+      </div>`, { maxWidth: 230 }).addTo(_tlFocosLayer)
+  })
+  _tlFocosLayer.addTo(mapaL)
+}
+function _tlPlotDeter(dia) {
+  if (_tlDeterLayer) { mapaL.removeLayer(_tlDeterLayer); _tlDeterLayer = null }
+  if (!_mostraDesmat()) return { n: 0, ha: 0 }
+  const lista = (_alertasMapa || []).filter(a => a.tipo === 'desmatamento' && (a.data_referencia || '') === dia)
+  let ha = 0
+  _tlDeterLayer = L.layerGroup()
+  lista.forEach(a => {
+    let lat, lng
+    if (typeof a.geom === 'object' && a.geom?.coordinates) { lng = a.geom.coordinates[0]; lat = a.geom.coordinates[1] }
+    else { const m = String(a.geom).match(/POINT\(([^ ]+) ([^ )]+)\)/); if (m) { lng = parseFloat(m[1]); lat = parseFloat(m[2]) } }
+    ha += Number(a.area_ha) || 0
+    if (lat && lng) L.marker([lat, lng], { icon: _alertaMarkerIcon('desmatamento', a.severidade, lista.length <= 200) }).addTo(_tlDeterLayer)
+  })
+  _tlDeterLayer.addTo(mapaL)
+  return { n: lista.length, ha: Math.round(ha) }
+}
+
+async function _tlRenderAno(ano) {
+  _tlSetGibs(`${ano}-08-15`)
+  _tlSetProdes(ano)
+  let pts = _tlFocosCacheAno[ano]
+  if (!pts && _mostraFocos()) {
+    const { data } = await db.from('focos_calor_ac').select('lat,lon,source,frp,acq_date').eq('ano', ano).limit(1000)
+    pts = data || []; _tlFocosCacheAno[ano] = pts
+  }
+  if (!_tlAberta || _tlModo !== 'anos') return
+  _tlPlotFocos((pts || []).map(p => ({
+    lat: p.lat, lon: p.lon, frp: p.frp, satelite: p.source, data_hora: p.acq_date,
+    cor: (p.source || '').includes('VIIRS') ? '#7c3aed' : '#ea580c'
+  })))
+  const pr = TL_PRODES_ANO[ano]
+  _tlPainel(pr ? pr.n : null, pr ? pr.ha : null, TL_FOCOS_ANO[ano] ?? null)
+  const st = document.getElementById('tl-stat')
+  if (st) st.textContent = (pr ? `` : `PRODES anual disponível a partir de 2008 · `) + `Satélite NASA ${ano} · MapBiomas por ano: requer token GEE (em breve)`
+  _atualizarLegendaMapa()
+}
+
+async function _tlRenderDia(ds) {
+  _tlSetGibs(ds)
+  if (_tlProdesLayer) { mapaL.removeLayer(_tlProdesLayer); _tlProdesLayer = null } // PRODES é anual
+  if (!_focosNrtMapa.length) await _carregarFocos()
+  if (_mostraDesmat() && !(_alertasMapa && _alertasMapa.length)) await _carregarAlertas()
+  if (!_tlAberta || _tlModo !== 'dias') return
+  const focos = _focosNrtMapa.filter(f => (f.data_hora || '').slice(0, 10) === ds && f.lat && f.lon)
+  _tlPlotFocos(focos.map(f => ({
+    lat: f.lat, lon: f.lon, frp: f.frp, satelite: f.satelite, data_hora: f.data_hora,
+    cor: _FOCO_FONTE_COR[f.fonte] || '#ea580c'
+  })))
+  const det = _tlPlotDeter(ds)
+  _tlPainel(det.n, det.ha, focos.length)
+  const st = document.getElementById('tl-stat')
+  if (st) st.textContent = `${focos.length} foco(s) e ${det.n} desmatamento(s) em ${ds} · satélite NASA do dia`
+    + (focos.length === 0 ? ' · sem focos NRT nesta data (histórico recente é curto)' : '')
+  _atualizarLegendaMapa()
+}
+
+// Atualiza o painel grande com contagem animada e respeita o filtro
+function _tlPainel(desmatN, areaHa, focosN) {
+  const boxD = document.getElementById('tlp-box-desmat'), boxA = document.getElementById('tlp-box-area'), boxF = document.getElementById('tlp-box-focos')
+  boxD.classList.toggle('off', !_mostraDesmat())
+  boxA.classList.toggle('off', !_mostraDesmat())
+  boxF.classList.toggle('off', !_mostraFocos())
+  _animNum(document.getElementById('tlp-desmat-n'), _mostraDesmat() ? desmatN : null)
+  _animNum(document.getElementById('tlp-area-n'),   _mostraDesmat() ? areaHa  : null)
+  _animNum(document.getElementById('tlp-focos-n'),  _mostraFocos()  ? focosN  : null)
+}
+function _animNum(el, alvo) {
+  if (!el) return
+  if (alvo == null) { el.textContent = '—'; el.dataset.v = '0'; return }
+  const ini = parseFloat(el.dataset.v || '0'), fim = Number(alvo), t0 = performance.now(), dur = 600
+  clearInterval(el._anim)
+  el._anim = setInterval(() => {
+    const p = Math.min(1, (performance.now() - t0) / dur)
+    const val = Math.round(ini + (fim - ini) * (1 - Math.pow(1 - p, 3)))
+    el.textContent = val.toLocaleString('pt-BR')
+    if (p >= 1) { clearInterval(el._anim); el.textContent = fim.toLocaleString('pt-BR'); el.dataset.v = String(fim) }
+  }, 30)
+}
+
+function tlTogglePlay() { _tlPlaying = !_tlPlaying; _tlPlayIc(); if (_tlPlaying) _tlStep(); else _tlStop() }
+function _tlPlayIc() {
+  document.getElementById('tl-play-ic').innerHTML = _tlPlaying
+    ? '<rect x="6" y="5" width="4" height="14"/><rect x="14" y="5" width="4" height="14"/>'
+    : '<polygon points="6 4 20 12 6 20 6 4"/>'
+}
+function _tlStop() { _tlPlaying = false; if (_tlTimer) { clearTimeout(_tlTimer); _tlTimer = null } _tlPlayIc() }
+function _tlStep() {
+  const s = document.getElementById('tl-slider')
+  let v = +s.value + 1; if (v > +s.max) v = +s.min
+  s.value = v; tlOnSlide()
+  _tlTimer = setTimeout(_tlStep, +document.getElementById('tl-vel').value)
 }
 
 // ══════════════════════════════════════════════════════════════

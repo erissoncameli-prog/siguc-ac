@@ -17,8 +17,17 @@ function mapaGibsDataSegura() {
   return d.toISOString().slice(0, 10);
 }
 
-// Base de satélite de alta resolução (ESRI World Imagery — sem chave).
+// Base de satélite de alta resolução. Usa a MESMA fonte do mapa.html
+// (Google Satellite), já comprovada no projeto. ESRI fica como fallback.
 function mapaBasemapSatelite(L) {
+  return L.tileLayer(
+    'https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
+    { maxZoom: 21, subdomains: ['mt0', 'mt1', 'mt2', 'mt3'], attribution: 'Google Satélite' }
+  );
+}
+
+// Fallback de satélite (ESRI World Imagery) — sem chave.
+function mapaBasemapSateliteEsri(L) {
   return L.tileLayer(
     'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
     { maxZoom: 21, maxNativeZoom: 19, attribution: 'ESRI World Imagery' }

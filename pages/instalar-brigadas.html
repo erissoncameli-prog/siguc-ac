@@ -29,6 +29,17 @@
     .rodape { text-align:center; color:var(--suave); font-size:.85rem; margin-top:32px; }
     .rodape a { color:var(--verde-esc); }
     b { font-weight:600; }
+    .copia-link { display:flex; align-items:center; gap:10px; width:100%; margin-top:10px;
+      background:#E7F5EE; border:1.5px dashed var(--verde); border-radius:12px; padding:13px 14px;
+      cursor:pointer; font-family:inherit; font-size:1rem; line-height:1.35; color:var(--verde-esc);
+      font-weight:600; text-align:left; transition:transform .12s, background .12s; -webkit-tap-highlight-color:transparent; }
+    .copia-link:active { transform:scale(.99); background:#D8EEE1; }
+    .copia-link .cl-url { flex:1; word-break:break-all; }
+    .copia-link .cl-ic { flex-shrink:0; display:flex; align-items:center; }
+    .copia-link .cl-ok { display:none; flex:1; }
+    .copia-link.ok { background:var(--verde); border-style:solid; border-color:var(--verde); color:#fff; }
+    .copia-link.ok .cl-url, .copia-link.ok .cl-ic { display:none; }
+    .copia-link.ok .cl-ok { display:block; }
   </style>
 </head>
 <body>
@@ -71,8 +82,16 @@
     <p class="sub">No iPhone, o app é instalado direto pelo navegador Safari — sem loja de aplicativos.</p>
 
     <ol>
-      <li><span>Abra <b>siguc-ac.vercel.app/pages/brigada.html</b> no <b>Safari</b> (tem que ser o Safari).</span></li>
-      <li><span>Toque no botão de <b>compartilhar</b> <span style="font-size:1.1em">⎋</span> (quadrado com seta para cima, na barra de baixo).</span></li>
+      <li><span>Toque no link abaixo para <b>copiar</b> e depois <b>cole na barra de endereços do Safari</b> (precisa ser o Safari):
+        <button type="button" class="copia-link" id="btn-copiar" onclick="copiarLink()" aria-label="Copiar o link do app">
+          <span class="cl-url" id="cl-url">siguc-ac.vercel.app/pages/brigada.html</span>
+          <span class="cl-ic" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+          </span>
+          <span class="cl-ok" id="cl-ok">✓ Link copiado! Agora cole no Safari</span>
+        </button>
+      </span></li>
+      <li><span>Com a página aberta no <b>Safari</b>, toque no botão de <b>compartilhar</b> <span style="font-size:1.1em">⎋</span> (quadrado com seta para cima, na barra de baixo).</span></li>
       <li><span>Role a lista e toque em <b>"Adicionar à Tela de Início"</b>.</span></li>
       <li><span>Toque em <b>Adicionar</b>. Use o app <b>sempre pelo ícone</b> da tela inicial — nunca pelo Safari direto, para os dados ficarem protegidos.</span></li>
     </ol>
@@ -115,6 +134,37 @@
     <a href="/pages/brigada.html">Abrir a versão web</a>
   </p>
 </main>
+
+<script>
+  var LINK_APP = 'https://siguc-ac.vercel.app/pages/brigada.html';
+  function _copiaOk() {
+    var btn = document.getElementById('btn-copiar');
+    if (!btn) return;
+    btn.classList.add('ok');
+    clearTimeout(btn._t);
+    btn._t = setTimeout(function () { btn.classList.remove('ok'); }, 2800);
+  }
+  function _copiaFallback(texto) {
+    var ta = document.createElement('textarea');
+    ta.value = texto; ta.setAttribute('readonly', '');
+    ta.style.position = 'absolute'; ta.style.left = '-9999px'; ta.style.fontSize = '16px';
+    document.body.appendChild(ta);
+    ta.select(); ta.setSelectionRange(0, texto.length);
+    var ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+    document.body.removeChild(ta);
+    return ok;
+  }
+  function copiarLink() {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(LINK_APP).then(_copiaOk, function () {
+        if (_copiaFallback(LINK_APP)) _copiaOk();
+      });
+    } else if (_copiaFallback(LINK_APP)) {
+      _copiaOk();
+    }
+  }
+</script>
 
 </body>
 </html>

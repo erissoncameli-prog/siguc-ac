@@ -155,10 +155,25 @@ async function _carregarUCGeojson() {
           <p style="margin:2px 0 0;font-size:11px;color:var(--cinza-500)">Focos de calor e desmatamento — FIRMS · DETER · BDQueimadas</p>
         </div>
         ${['super_admin','gestor'].includes(usuario.perfil) ? `
-        <button id="btn-disparar" class="btn btn-primary" onclick="dispararMonitoramento()">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-          Monitorar Agora
-        </button>` : ''}
+        <div style="display:flex;gap:8px">
+          <button id="btn-testar" class="btn btn-secondary" onclick="testarFontes()" title="Testa as APIs (FIRMS, DETER, BDQueimadas) sem gravar nada">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            Testar APIs
+          </button>
+          <button id="btn-disparar" class="btn btn-primary" onclick="dispararMonitoramento()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            Monitorar Agora
+          </button>
+        </div>` : ''}
+      </div>
+
+      <!-- Painel de diagnóstico das fontes -->
+      <div id="diag-panel" style="display:none;background:#fff;border:1px solid var(--borda);border-radius:10px;padding:12px 14px;flex-shrink:0">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <div style="font-size:12px;font-weight:700;color:var(--cinza-800)">Diagnóstico de Fontes</div>
+          <button onclick="document.getElementById('diag-panel').style.display='none'" style="border:none;background:none;cursor:pointer;color:var(--cinza-400);font-size:16px;line-height:1">✕</button>
+        </div>
+        <div id="diag-body" style="font-size:12px;color:var(--cinza-600)">Testando…</div>
       </div>
 
       <!-- KPIs -->
@@ -797,6 +812,80 @@ function _htmlLegalAlerta(a, prod) {
   </div>`
 }
 
+// ── Diagnóstico de Fontes: testa APIs (dry-run) + última coleta no banco ──
+async function testarFontes() {
+  const btn = document.getElementById('btn-testar')
+  const panel = document.getElementById('diag-panel')
+  const body = document.getElementById('diag-body')
+  panel.style.display = 'block'
+  body.innerHTML = 'Testando APIs (pode levar até 30s)…'
+  if (btn) { btn.disabled = true }
+
+  // Em paralelo: dry-run das APIs + última coleta gravada no banco
+  const [diag, coletas] = await Promise.all([
+    db.functions.invoke('monitorar-alertas', { method: 'POST', body: { check: true } }),
+    _ultimasColetas(),
+  ])
+
+  if (btn) { btn.disabled = false }
+
+  if (diag.error || !diag.data?.fontes) {
+    body.innerHTML = `<div style="color:#DC2626">Falha ao testar: ${esc(diag.error?.message ?? 'resposta inesperada')}</div>`
+    return
+  }
+  const f = diag.data.fontes
+  const linhas = [
+    ['🛰 FIRMS / NASA',       f.firms,       coletas.FIRMS,       'focos de calor'],
+    ['🌳 DETER / INPE',       f.deter,       coletas.DETER,       'desmatamento'],
+    ['🔥 BDQueimadas / INPE', f.bdqueimadas, coletas.BDQUEIMADAS, 'focos de calor'],
+  ]
+  const fmtData = d => d ? new Date(d).toLocaleString('pt-BR', { timeZone:'America/Rio_Branco', day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' }) : '—'
+  body.innerHTML = `
+    <div style="overflow-x:auto">
+    <table style="width:100%;border-collapse:collapse;font-size:11px">
+      <thead><tr style="text-align:left;color:#9CA3AF;text-transform:uppercase;font-size:9px;letter-spacing:.05em">
+        <th style="padding:5px 6px">Fonte</th><th style="padding:5px 6px">Status</th>
+        <th style="padding:5px 6px">HTTP</th><th style="padding:5px 6px">Registros agora</th>
+        <th style="padding:5px 6px">Última coleta no banco</th></tr></thead>
+      <tbody>
+      ${linhas.map(([nome, st, ult, tipo]) => {
+        const ok = st?.ok
+        const cor = ok ? '#059669' : '#DC2626'
+        const sigla = ok ? '🟢 OK' : '🔴 Falha'
+        const erro = !ok && st?.erro ? `<div style="color:#DC2626;font-size:10px;margin-top:2px">${esc(String(st.erro).slice(0,120))}</div>` : ''
+        return `<tr style="border-top:1px solid #f1f1f1">
+          <td style="padding:6px;font-weight:600">${nome}<div style="color:#9CA3AF;font-weight:400;font-size:10px">${tipo}</div></td>
+          <td style="padding:6px;color:${cor};font-weight:700">${sigla}${erro}</td>
+          <td style="padding:6px">${st?.http_status ?? '—'}</td>
+          <td style="padding:6px">${st?.registros ?? 0}</td>
+          <td style="padding:6px">${fmtData(ult)}</td>
+        </tr>`
+      }).join('')}
+      </tbody>
+    </table>
+    </div>
+    <div style="font-size:10px;color:#9CA3AF;margin-top:8px;line-height:1.5">
+      ${diag.data.firms_key_configurada ? '' : '⚠ FIRMS_MAP_KEY não está nos secrets (usando chave de fallback). '}
+      "Registros agora" = quantos a API retorna neste instante (0 é normal fora da seca). "Última coleta" = dado mais recente já gravado pelo cron. Teste em modo dry-run — não grava nem envia e-mail.
+    </div>`
+}
+
+// Última data de coleta por fonte (DETER em alertas_ambientais; FIRMS/BDQ em focos_calor)
+async function _ultimasColetas() {
+  const out = { FIRMS: null, DETER: null, BDQUEIMADAS: null }
+  try {
+    const [{ data: deter }, { data: firms }, { data: bdq }] = await Promise.all([
+      db.from('alertas_ambientais').select('data_deteccao').eq('fonte','DETER').order('data_deteccao',{ascending:false}).limit(1),
+      db.from('focos_calor').select('data_hora').eq('fonte','FIRMS').order('data_hora',{ascending:false}).limit(1),
+      db.from('focos_calor').select('data_hora').eq('fonte','BDQUEIMADAS').order('data_hora',{ascending:false}).limit(1),
+    ])
+    out.DETER       = deter?.[0]?.data_deteccao ?? null
+    out.FIRMS       = firms?.[0]?.data_hora ?? null
+    out.BDQUEIMADAS = bdq?.[0]?.data_hora ?? null
+  } catch (e) { console.warn('coletas', e) }
+  return out
+}
+
 async function dispararMonitoramento() {
   const btn = document.getElementById('btn-disparar')
   btn.disabled = true
@@ -807,9 +896,9 @@ async function dispararMonitoramento() {
     if (error) throw error
     if (data?.ok) {
       toast(`✅ ${data.novos_alertas} novos alertas detectados`, 'success')
-      // Avisar se FIRMS_MAP_KEY não está configurada
-      if (data.fontes?.firms_key_configurada === false) {
-        toast('⚠ FIRMS_MAP_KEY não configurada — focos de calor não foram buscados. Configure nos secrets da edge function no Supabase.', 'error')
+      // FIRMS usa chave de fallback se o secret não estiver configurado
+      if (data.firms_key_configurada === false) {
+        toast('ℹ FIRMS_MAP_KEY não está nos secrets — usando chave de fallback.', 'success')
       }
       if (data.erros?.length) {
         console.warn('[Monitoramento] Erros:', data.erros)
