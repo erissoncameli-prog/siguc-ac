@@ -902,11 +902,20 @@ async function initMapaValidacao(r) {
 
   const centro = pontoCoord ? [pontoCoord[1], pontoCoord[0]] : [-9.5, -70]
   _valMap = L.map('val-mapa', { zoomControl: true, zoomAnimation: false, fadeAnimation: false }).setView(centro, 15)
-  mapaBasemapSatelite(L).addTo(_valMap)
+  // Base de satélite + fallback automático para ESRI se a fonte falhar
+  const _base = mapaBasemapSatelite(L).addTo(_valMap)
+  let _baseTrocada = false
+  _base.on('tileerror', () => {
+    if (_baseTrocada || typeof mapaBasemapSateliteEsri !== 'function') return
+    _baseTrocada = true
+    try { _valMap.removeLayer(_base) } catch (e) {}
+    mapaBasemapSateliteEsri(L).addTo(_valMap)
+  })
   _valDrawn = new L.FeatureGroup().addTo(_valMap)
-  // Revalida o tamanho após o modal abrir (evita tela cinza/sumiço no zoom)
-  setTimeout(() => { if (_valMap) _valMap.invalidateSize() }, 120)
-  setTimeout(() => { if (_valMap) _valMap.invalidateSize() }, 400)
+  // Revalida o tamanho após o layout do modal assentar (evita tela em branco)
+  requestAnimationFrame(() => { if (_valMap) _valMap.invalidateSize() })
+  setTimeout(() => { if (_valMap) _valMap.invalidateSize() }, 200)
+  setTimeout(() => { if (_valMap) _valMap.invalidateSize() }, 500)
 
   if (pontoCoord) {
     L.circleMarker([pontoCoord[1], pontoCoord[0]],
