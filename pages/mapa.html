@@ -235,7 +235,39 @@
 #timeline-bar input[type=range]{width:100%;accent-color:#1F4E2C;height:6px;}
 .tl-ticks{display:flex;justify-content:space-between;font-size:9px;color:#9ca3af;margin-top:3px;}
 .tl-stat{font-size:10px;color:#6b7280;margin-top:6px;min-height:13px;}
-@media(max-width:640px){.tl-vel{display:none;}.tl-lbl{min-width:84px;}.tl-lbl span{font-size:17px;}}
+/* Filtro Focos/Desmat/Ambos */
+.tl-filtro{display:flex;background:#f1f5f3;border-radius:9px;padding:3px;gap:2px;}
+.tl-filtro button{border:none;background:none;font:inherit;font-size:11px;font-weight:600;color:#6b7280;padding:5px 10px;border-radius:7px;cursor:pointer;white-space:nowrap;}
+.tl-filtro button.on{background:#fff;color:#1F4E2C;box-shadow:0 1px 3px rgba(0,0,0,.12);}
+/* Período (modo Dias) */
+.tl-periodo{display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-bottom:8px;font-size:11px;color:#6b7280;}
+.tl-per-lbl{font-weight:600;}
+.tl-periodo button{border:1px solid var(--borda);background:#fff;font:inherit;font-size:11px;font-weight:600;color:#374151;padding:4px 9px;border-radius:7px;cursor:pointer;}
+.tl-periodo button.on{background:#1F4E2C;color:#fff;border-color:#1F4E2C;}
+.tl-custom{display:flex;align-items:center;gap:4px;color:#9ca3af;}
+.tl-custom input{font:inherit;font-size:11px;padding:3px 5px;border:1px solid var(--borda);border-radius:6px;}
+@media(max-width:640px){.tl-vel{display:none;}.tl-lbl{min-width:84px;}.tl-lbl span{font-size:17px;}.tl-filtro button{padding:5px 7px;}}
+/* ── Painel grande de destaque (efeito 3D / vidro) ── */
+#tl-painel{position:absolute;top:14px;left:50%;transform:translateX(-50%);z-index:590;perspective:900px;pointer-events:none;}
+.tlp-card{display:flex;align-items:center;gap:22px;padding:14px 22px;border-radius:18px;
+  background:linear-gradient(135deg,rgba(10,26,15,.86),rgba(20,53,32,.72));
+  border:1px solid rgba(255,255,255,.18);color:#fff;
+  box-shadow:0 22px 48px rgba(0,0,0,.45),0 4px 12px rgba(0,0,0,.3),inset 0 1px 0 rgba(255,255,255,.18);
+  -webkit-backdrop-filter:blur(11px) saturate(1.4);backdrop-filter:blur(11px) saturate(1.4);
+  transform:rotateX(7deg);transform-style:preserve-3d;transition:transform .3s;}
+.tlp-data{display:flex;flex-direction:column;line-height:1.05;padding-right:18px;border-right:1px solid rgba(255,255,255,.18);transform:translateZ(14px);}
+.tlp-data span{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;opacity:.7;}
+.tlp-data strong{font-family:'Fraunces',Georgia,serif;font-size:30px;font-weight:700;color:#F0CB6A;}
+.tlp-metricas{display:flex;gap:20px;}
+.tlp-m{display:flex;align-items:center;gap:10px;transform:translateZ(22px);transition:opacity .2s;}
+.tlp-m.off{opacity:.28;}
+.tlp-ic{font-size:22px;filter:drop-shadow(0 2px 3px rgba(0,0,0,.4));}
+.tlp-num{font-family:'Fraunces',Georgia,serif;font-size:25px;font-weight:700;line-height:1;}
+.tlp-lbl{font-size:9.5px;text-transform:uppercase;letter-spacing:.06em;opacity:.78;margin-top:2px;}
+.tlp-desmat .tlp-num,#tlp-box-desmat .tlp-num{color:#ff9d76;}
+#tlp-box-area .tlp-num{color:#ffd9a8;}
+#tlp-box-focos .tlp-num{color:#ffb4a0;}
+@media(max-width:760px){#tl-painel{width:94%;}.tlp-card{gap:12px;padding:11px 14px;}.tlp-metricas{gap:12px;}.tlp-data strong{font-size:22px;}.tlp-num{font-size:19px;}.tlp-ic{font-size:18px;}}
 /* Modal Projeto de Análise */
 .proj-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:700;display:flex;align-items:center;justify-content:center;padding:16px;}
 .proj-modal{background:#fff;border-radius:14px;width:100%;max-width:520px;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.35);overflow:hidden;}
@@ -888,12 +920,38 @@ function renderPagina(){
           <span class="auto-sw" id="auto-sw" onclick="toggleAutoRefresh()" title="Auto-atualizar focos/alertas"></span>
         </div>
 
+        <!-- Painel grande de destaque (indicadores da linha do tempo) -->
+        <div id="tl-painel" style="display:none">
+          <div class="tlp-card">
+            <div class="tlp-data"><span id="tlp-cap">Ano</span><strong id="tlp-val">—</strong></div>
+            <div class="tlp-metricas">
+              <div class="tlp-m" id="tlp-box-desmat">
+                <div class="tlp-ic">🌳</div>
+                <div><div class="tlp-num" id="tlp-desmat-n" data-v="0">—</div><div class="tlp-lbl">desmatamentos</div></div>
+              </div>
+              <div class="tlp-m" id="tlp-box-area">
+                <div class="tlp-ic">📐</div>
+                <div><div class="tlp-num" id="tlp-area-n" data-v="0">—</div><div class="tlp-lbl">hectares</div></div>
+              </div>
+              <div class="tlp-m" id="tlp-box-focos">
+                <div class="tlp-ic">🔥</div>
+                <div><div class="tlp-num" id="tlp-focos-n" data-v="0">—</div><div class="tlp-lbl">focos de calor</div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- Linha do tempo -->
         <div id="timeline-bar" style="display:none">
           <div class="tl-top">
             <div class="tl-modo">
               <button class="on" id="tl-m-anos" onclick="tlSetModo('anos')">Anos</button>
               <button id="tl-m-dias" onclick="tlSetModo('dias')">Dias</button>
+            </div>
+            <div class="tl-filtro">
+              <button class="on" id="tl-f-ambos" onclick="tlSetFiltro('ambos')">Ambos</button>
+              <button id="tl-f-focos" onclick="tlSetFiltro('focos')">🔥 Focos</button>
+              <button id="tl-f-desmat" onclick="tlSetFiltro('desmat')">🌳 Desmat.</button>
             </div>
             <button class="tl-play" id="tl-play" onclick="tlTogglePlay()" title="Reproduzir">
               <svg id="tl-play-ic" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 4 20 12 6 20 6 4"/></svg>
@@ -904,7 +962,16 @@ function renderPagina(){
             </div>
             <button class="tl-close" onclick="toggleTimeline()" title="Fechar linha do tempo">✕</button>
           </div>
-          <input type="range" id="tl-slider" min="0" max="24" value="24" oninput="tlOnSlide()">
+          <div class="tl-periodo" id="tl-periodo" style="display:none">
+            <span class="tl-per-lbl">Período:</span>
+            <button data-dias="7"  onclick="tlSetDias(7)">7d</button>
+            <button data-dias="15" onclick="tlSetDias(15)">15d</button>
+            <button data-dias="30" class="on" onclick="tlSetDias(30)">30d</button>
+            <button data-dias="60" onclick="tlSetDias(60)">60d</button>
+            <button data-dias="90" onclick="tlSetDias(90)">90d</button>
+            <span class="tl-custom">ou <input type="date" id="tl-ini" onchange="tlCustomRange()"> a <input type="date" id="tl-fim" onchange="tlCustomRange()"></span>
+          </div>
+          <input type="range" id="tl-slider" min="0" max="23" value="23" oninput="tlOnSlide()">
           <div class="tl-ticks" id="tl-ticks"></div>
           <div class="tl-stat" id="tl-stat"></div>
         </div>
@@ -2853,16 +2920,21 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) _aut
 // LINHA DO TEMPO — focos + cobertura por data (dias) / ano (anos)
 // ══════════════════════════════════════════════════════════════
 let _tlAberta = false, _tlModo = 'anos', _tlPlaying = false, _tlTimer = null, _tlDeb = null
+let _tlFiltro = 'ambos', _tlDiasJanela = 30, _tlCustom = null
 const TL_ANO_MIN = 2001, TL_ANO_MAX = 2024
-let _tlFocosLayer = null, _tlGibsLayer = null, _tlProdesLayer = null
+let _tlFocosLayer = null, _tlGibsLayer = null, _tlProdesLayer = null, _tlDeterLayer = null
 const _tlFocosCacheAno = {}
+
+// Estatísticas oficiais por ano (Acre) — focos: focos_calor_ac; desmatamento: PRODES yearly (≥2008)
+const TL_FOCOS_ANO = {2001:1673,2002:10928,2003:17926,2004:11025,2005:35072,2006:12094,2007:14946,2008:10246,2009:5937,2010:16837,2011:5020,2012:39242,2013:35042,2014:32461,2015:49076,2016:68075,2017:48140,2018:56425,2019:62284,2020:71645,2021:85616,2022:102470,2023:64387,2024:96749}
+const TL_PRODES_ANO = {2008:{n:2701,ha:28873},2009:{n:1725,ha:16162},2010:{n:2671,ha:26537},2011:{n:3049,ha:29579},2012:{n:2573,ha:27054},2013:{n:2265,ha:20024},2014:{n:3759,ha:34859},2015:{n:2100,ha:22300},2016:{n:4655,ha:36631},2017:{n:2224,ha:24573},2018:{n:4558,ha:42659},2019:{n:5842,ha:70694},2020:{n:5510,ha:66081},2021:{n:6934,ha:89243},2022:{n:10643,ha:100586},2023:{n:5877,ha:46295},2024:{n:5699,ha:41135}}
 
 function toggleTimeline() {
   _tlAberta = !_tlAberta
   document.getElementById('timeline-bar').style.display = _tlAberta ? 'block' : 'none'
+  document.getElementById('tl-painel').style.display = _tlAberta ? 'block' : 'none'
   document.getElementById('tl-fab')?.classList.toggle('ativo', _tlAberta)
   if (_tlAberta) {
-    // assume o controle: esconde camadas ao vivo
     if (_focosNrtLayer) { mapaL.removeLayer(_focosNrtLayer); _focosNrtLayer = null }
     if (_alertasLayer)  { mapaL.removeLayer(_alertasLayer);  _alertasLayer = null }
     tlSetModo(_tlModo)
@@ -2875,40 +2947,77 @@ function toggleTimeline() {
 }
 
 function _tlLimpar() {
-  ;[_tlFocosLayer, _tlGibsLayer, _tlProdesLayer].forEach(l => { if (l) mapaL.removeLayer(l) })
-  _tlFocosLayer = _tlGibsLayer = _tlProdesLayer = null
+  ;[_tlFocosLayer, _tlGibsLayer, _tlProdesLayer, _tlDeterLayer].forEach(l => { if (l) mapaL.removeLayer(l) })
+  _tlFocosLayer = _tlGibsLayer = _tlProdesLayer = _tlDeterLayer = null
 }
+
+const _mostraFocos  = () => _tlFiltro === 'ambos' || _tlFiltro === 'focos'
+const _mostraDesmat = () => _tlFiltro === 'ambos' || _tlFiltro === 'desmat'
+
+function tlSetFiltro(f) {
+  _tlFiltro = f
+  ;['ambos','focos','desmat'].forEach(x => document.getElementById('tl-f-'+x)?.classList.toggle('on', x === f))
+  tlOnSlide()
+}
+function tlSetDias(n) {
+  _tlDiasJanela = n; _tlCustom = null
+  document.querySelectorAll('.tl-periodo button[data-dias]').forEach(b => b.classList.toggle('on', +b.dataset.dias === n))
+  const i = document.getElementById('tl-ini'), f = document.getElementById('tl-fim'); if (i) i.value = ''; if (f) f.value = ''
+  if (_tlModo === 'dias') tlSetModo('dias')
+}
+function tlCustomRange() {
+  const ini = document.getElementById('tl-ini')?.value, fim = document.getElementById('tl-fim')?.value
+  if (!ini || !fim || ini > fim) return
+  _tlCustom = { ini, fim }
+  document.querySelectorAll('.tl-periodo button[data-dias]').forEach(b => b.classList.remove('on'))
+  tlSetModo('dias')
+}
+
+// Janela de dias selecionada (presets ou intervalo personalizado)
+function _tlDiasRange() {
+  if (_tlCustom) return { ini: new Date(_tlCustom.ini + 'T00:00:00'), fim: new Date(_tlCustom.fim + 'T00:00:00') }
+  const fim = new Date(); fim.setHours(0, 0, 0, 0)
+  const ini = new Date(fim); ini.setDate(ini.getDate() - _tlDiasJanela)
+  return { ini, fim }
+}
+function _tlDiasTotal() { const r = _tlDiasRange(); return Math.max(1, Math.round((r.fim - r.ini) / 86400000)) }
+function _tlDiaSel(v) { const d = new Date(_tlDiasRange().ini); d.setDate(d.getDate() + v); return d }
 
 function tlSetModo(m) {
   _tlModo = m
   document.getElementById('tl-m-anos').classList.toggle('on', m === 'anos')
   document.getElementById('tl-m-dias').classList.toggle('on', m === 'dias')
+  document.getElementById('tl-periodo').style.display = m === 'dias' ? 'flex' : 'none'
   const s = document.getElementById('tl-slider')
   if (m === 'anos') {
     s.min = 0; s.max = TL_ANO_MAX - TL_ANO_MIN; s.value = s.max
     document.getElementById('tl-cap').textContent = 'Ano'
+    document.getElementById('tlp-cap').textContent = 'Ano'
     document.getElementById('tl-ticks').innerHTML = `<span>${TL_ANO_MIN}</span><span>${Math.round((TL_ANO_MIN + TL_ANO_MAX) / 2)}</span><span>${TL_ANO_MAX}</span>`
   } else {
-    s.min = 0; s.max = 30; s.value = 30
+    const r = _tlDiasRange(), tot = _tlDiasTotal()
+    s.min = 0; s.max = tot; s.value = tot
     document.getElementById('tl-cap').textContent = 'Data'
-    document.getElementById('tl-ticks').innerHTML = `<span>−30 dias</span><span>−15</span><span>hoje</span>`
+    document.getElementById('tlp-cap').textContent = 'Data'
+    const fmt = d => d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+    const meio = new Date(r.ini); meio.setDate(meio.getDate() + Math.round(tot / 2))
+    document.getElementById('tl-ticks').innerHTML = `<span>${fmt(r.ini)}</span><span>${fmt(meio)}</span><span>${fmt(r.fim)}</span>`
   }
   tlOnSlide()
 }
 
 function tlOnSlide() {
   const v = +document.getElementById('tl-slider').value
-  if (_tlModo === 'anos') {
-    document.getElementById('tl-val').textContent = TL_ANO_MIN + v
-  } else {
-    const d = new Date(); d.setDate(d.getDate() - (30 - v))
-    document.getElementById('tl-val').textContent = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
-  }
+  let label
+  if (_tlModo === 'anos') label = String(TL_ANO_MIN + v)
+  else label = _tlDiaSel(v).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+  document.getElementById('tl-val').textContent = label
+  document.getElementById('tlp-val').textContent = label
   clearTimeout(_tlDeb)
   _tlDeb = setTimeout(() => {
     if (_tlModo === 'anos') _tlRenderAno(TL_ANO_MIN + v)
-    else { const d = new Date(); d.setDate(d.getDate() - (30 - v)); _tlRenderDia(d.toISOString().slice(0, 10)) }
-  }, 180)
+    else _tlRenderDia(_tlDiaSel(v).toISOString().slice(0, 10))
+  }, 170)
 }
 
 function _tlSetGibs(dateStr) {
@@ -2918,6 +3027,7 @@ function _tlSetGibs(dateStr) {
 }
 function _tlSetProdes(ano) {
   if (_tlProdesLayer) { mapaL.removeLayer(_tlProdesLayer); _tlProdesLayer = null }
+  if (!_mostraDesmat()) return
   _tlProdesLayer = L.tileLayer.wms('https://terrabrasilis.dpi.inpe.br/geoserver/prodes-amazon-nb/wms', {
     layers: 'prodes-amazon-nb:yearly_deforestation_biome', format: 'image/png', transparent: true,
     version: '1.1.1', CQL_FILTER: `year=${ano}`, opacity: 0.85, attribution: 'PRODES/INPE',
@@ -2927,7 +3037,7 @@ function _tlSetProdes(ano) {
 }
 function _tlPlotFocos(items) {
   if (_tlFocosLayer) { mapaL.removeLayer(_tlFocosLayer); _tlFocosLayer = null }
-  if (!items.length) return
+  if (!items.length || !_mostraFocos()) return
   const animar = items.length <= 200
   _tlFocosLayer = L.layerGroup()
   items.forEach(f => {
@@ -2945,22 +3055,40 @@ function _tlPlotFocos(items) {
   })
   _tlFocosLayer.addTo(mapaL)
 }
+function _tlPlotDeter(dia) {
+  if (_tlDeterLayer) { mapaL.removeLayer(_tlDeterLayer); _tlDeterLayer = null }
+  if (!_mostraDesmat()) return { n: 0, ha: 0 }
+  const lista = (_alertasMapa || []).filter(a => a.tipo === 'desmatamento' && (a.data_referencia || '') === dia)
+  let ha = 0
+  _tlDeterLayer = L.layerGroup()
+  lista.forEach(a => {
+    let lat, lng
+    if (typeof a.geom === 'object' && a.geom?.coordinates) { lng = a.geom.coordinates[0]; lat = a.geom.coordinates[1] }
+    else { const m = String(a.geom).match(/POINT\(([^ ]+) ([^ )]+)\)/); if (m) { lng = parseFloat(m[1]); lat = parseFloat(m[2]) } }
+    ha += Number(a.area_ha) || 0
+    if (lat && lng) L.marker([lat, lng], { icon: _alertaMarkerIcon('desmatamento', a.severidade, lista.length <= 200) }).addTo(_tlDeterLayer)
+  })
+  _tlDeterLayer.addTo(mapaL)
+  return { n: lista.length, ha: Math.round(ha) }
+}
 
 async function _tlRenderAno(ano) {
-  _tlSetGibs(`${ano}-08-15`)   // satélite na época seca do ano
+  _tlSetGibs(`${ano}-08-15`)
   _tlSetProdes(ano)
   let pts = _tlFocosCacheAno[ano]
-  if (!pts) {
+  if (!pts && _mostraFocos()) {
     const { data } = await db.from('focos_calor_ac').select('lat,lon,source,frp,acq_date').eq('ano', ano).limit(1000)
     pts = data || []; _tlFocosCacheAno[ano] = pts
   }
   if (!_tlAberta || _tlModo !== 'anos') return
-  _tlPlotFocos(pts.map(p => ({
+  _tlPlotFocos((pts || []).map(p => ({
     lat: p.lat, lon: p.lon, frp: p.frp, satelite: p.source, data_hora: p.acq_date,
     cor: (p.source || '').includes('VIIRS') ? '#7c3aed' : '#ea580c'
   })))
+  const pr = TL_PRODES_ANO[ano]
+  _tlPainel(pr ? pr.n : null, pr ? pr.ha : null, TL_FOCOS_ANO[ano] ?? null)
   const st = document.getElementById('tl-stat')
-  if (st) st.textContent = `${pts.length}${pts.length >= 1000 ? '+ (amostra)' : ''} foco(s) em ${ano} · PRODES ${ano} · satélite NASA · MapBiomas por ano: requer token GEE (em breve)`
+  if (st) st.textContent = (pr ? `` : `PRODES anual disponível a partir de 2008 · `) + `Satélite NASA ${ano} · MapBiomas por ano: requer token GEE (em breve)`
   _atualizarLegendaMapa()
 }
 
@@ -2968,14 +3096,42 @@ async function _tlRenderDia(ds) {
   _tlSetGibs(ds)
   if (_tlProdesLayer) { mapaL.removeLayer(_tlProdesLayer); _tlProdesLayer = null } // PRODES é anual
   if (!_focosNrtMapa.length) await _carregarFocos()
+  if (_mostraDesmat() && !(_alertasMapa && _alertasMapa.length)) await _carregarAlertas()
+  if (!_tlAberta || _tlModo !== 'dias') return
   const focos = _focosNrtMapa.filter(f => (f.data_hora || '').slice(0, 10) === ds && f.lat && f.lon)
   _tlPlotFocos(focos.map(f => ({
     lat: f.lat, lon: f.lon, frp: f.frp, satelite: f.satelite, data_hora: f.data_hora,
     cor: _FOCO_FONTE_COR[f.fonte] || '#ea580c'
   })))
+  const det = _tlPlotDeter(ds)
+  _tlPainel(det.n, det.ha, focos.length)
   const st = document.getElementById('tl-stat')
-  if (st) st.textContent = `${focos.length} foco(s) em ${ds} · satélite NASA do dia` + (focos.length === 0 ? ' (sem focos NRT nesta data)' : '')
+  if (st) st.textContent = `${focos.length} foco(s) e ${det.n} desmatamento(s) em ${ds} · satélite NASA do dia`
+    + (focos.length === 0 ? ' · sem focos NRT nesta data (histórico recente é curto)' : '')
   _atualizarLegendaMapa()
+}
+
+// Atualiza o painel grande com contagem animada e respeita o filtro
+function _tlPainel(desmatN, areaHa, focosN) {
+  const boxD = document.getElementById('tlp-box-desmat'), boxA = document.getElementById('tlp-box-area'), boxF = document.getElementById('tlp-box-focos')
+  boxD.classList.toggle('off', !_mostraDesmat())
+  boxA.classList.toggle('off', !_mostraDesmat())
+  boxF.classList.toggle('off', !_mostraFocos())
+  _animNum(document.getElementById('tlp-desmat-n'), _mostraDesmat() ? desmatN : null)
+  _animNum(document.getElementById('tlp-area-n'),   _mostraDesmat() ? areaHa  : null)
+  _animNum(document.getElementById('tlp-focos-n'),  _mostraFocos()  ? focosN  : null)
+}
+function _animNum(el, alvo) {
+  if (!el) return
+  if (alvo == null) { el.textContent = '—'; el.dataset.v = '0'; return }
+  const ini = parseFloat(el.dataset.v || '0'), fim = Number(alvo), t0 = performance.now(), dur = 600
+  clearInterval(el._anim)
+  el._anim = setInterval(() => {
+    const p = Math.min(1, (performance.now() - t0) / dur)
+    const val = Math.round(ini + (fim - ini) * (1 - Math.pow(1 - p, 3)))
+    el.textContent = val.toLocaleString('pt-BR')
+    if (p >= 1) { clearInterval(el._anim); el.textContent = fim.toLocaleString('pt-BR'); el.dataset.v = String(fim) }
+  }, 30)
 }
 
 function tlTogglePlay() { _tlPlaying = !_tlPlaying; _tlPlayIc(); if (_tlPlaying) _tlStep(); else _tlStop() }
