@@ -42,14 +42,14 @@
 .mlb-dropdown-title{font-size:11px;font-weight:700;color:var(--cinza-700);text-transform:uppercase;letter-spacing:.06em;}
 .mlb-close{background:none;border:none;cursor:pointer;font-size:14px;color:var(--cinza-400);padding:0 2px;line-height:1;}
 .mlb-close:hover{color:var(--cinza-700);}
-.mlb-dropdown-body{padding:10px 12px;display:flex;flex-direction:column;gap:8px;max-height:420px;overflow-y:auto;}
+.mlb-dropdown-body{padding:10px 12px;display:flex;flex-direction:column;gap:8px;max-height:min(560px,80vh);overflow-y:auto;}
 /* Aba unificada — Áreas Territoriais (seções recolhíveis) */
 .areas-sec{border:1px solid var(--borda);border-radius:9px;overflow:hidden;}
 .areas-sec-head{width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 12px;background:var(--cinza-50);border:none;cursor:pointer;font-family:inherit;font-size:12px;font-weight:700;color:var(--cinza-700);transition:background .14s;}
 .areas-sec-head.uc{border-left:3px solid #1F4E2C;}
 .areas-sec-head.ti{border-left:3px solid #d97706;}
 .areas-sec-head:hover{background:var(--cinza-100);}
-.areas-sec-body{padding:12px;border-top:1px solid var(--borda);max-height:300px;overflow-y:auto;}
+.areas-sec-body{padding:12px;border-top:1px solid var(--borda);max-height:420px;overflow-y:auto;}
 .areas-chev{font-size:11px;color:var(--cinza-400);transition:transform .18s;}
 .areas-chev.areas-chev-col{transform:rotate(-90deg);}
 /* Popup */
@@ -203,6 +203,17 @@
 @keyframes arvoreCai{0%,45%{transform:translateX(-50%) rotate(0deg);}55%{transform:translateX(-50%) rotate(-7deg);}80%,93%{transform:translateX(-50%) rotate(74deg);}100%{transform:translateX(-50%) rotate(0deg);}}
 .deter-base{position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:8px;height:3px;border-radius:2px;}
 .deter-arvore.estatico svg{animation:none;transform:translateX(-50%);}
+/* ── Drag handles e painéis móveis ── */
+.drag-grip{display:flex;align-items:center;padding:0 7px 0 4px;cursor:grab;color:var(--cinza-300);flex-shrink:0;user-select:none;transition:color .15s;}
+.drag-grip:hover{color:var(--cinza-500);}
+.drag-grip:active{cursor:grabbing;}
+.drag-grip svg{pointer-events:none;}
+#mapa-layerbar.lb-flutuante{position:fixed!important;transform:none!important;z-index:1400!important;background:rgba(255,255,255,.97);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-radius:12px;padding:5px 8px;box-shadow:0 6px 28px rgba(0,0,0,.22);border:1px solid rgba(0,0,0,.1);}
+#mapa-layerbar.lb-flutuante .mlb-tabs{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;}
+#mapa-layerbar.lb-flutuante .mlb-tabs::-webkit-scrollbar{display:none;}
+#tl-drag-handle{width:calc(100% + 32px);height:18px;margin:-11px -16px 3px;display:flex;align-items:center;justify-content:center;cursor:grab;color:var(--cinza-300);border-radius:14px 14px 0 0;user-select:none;transition:color .15s;background:transparent;}
+#tl-drag-handle:hover{color:var(--cinza-500);background:rgba(0,0,0,.02);}
+#tl-drag-handle:active{cursor:grabbing;}
 /* ── Botão flutuante: Linha do Tempo ── */
 #tl-fab{position:absolute;top:12px;left:52px;z-index:600;display:flex;align-items:center;gap:6px;height:34px;padding:0 13px;background:rgba(255,255,255,.95);border:1px solid rgba(0,0,0,.12);border-radius:9px;box-shadow:0 4px 16px rgba(0,0,0,.25);color:#1F4E2C;font-size:12px;font-weight:600;font-family:'DM Sans',sans-serif;cursor:pointer;transition:all .15s;backdrop-filter:blur(4px);white-space:nowrap;}
 #tl-fab:hover{background:#fff;transform:translateY(-1px);border-color:#1F4E2C;}
@@ -891,6 +902,7 @@ function renderPagina(){
     <!-- Barra de camadas -->
     <div class="mapa-layerbar" id="mapa-layerbar">
       <div class="mlb-tabs">
+        <div class="drag-grip" id="lb-drag-grip" title="Arrastar · duplo clique para redefinir posição"><svg width="10" height="14" viewBox="0 0 10 14" fill="currentColor"><circle cx="3" cy="2.5" r="1.3"/><circle cx="7" cy="2.5" r="1.3"/><circle cx="3" cy="7" r="1.3"/><circle cx="7" cy="7" r="1.3"/><circle cx="3" cy="11.5" r="1.3"/><circle cx="7" cy="11.5" r="1.3"/></svg></div>
         <button class="mlb-tab" id="mlb-btn-veg" onclick="toggleLayerBar('veg')">🌿 Cobertura Vegetal</button>
         <button class="mlb-tab" id="mlb-btn-car" onclick="toggleLayerBar('car')">🏡 CAR — Imóveis Rurais <span class="mlb-badge" id="car-count-badge" style="display:none">0</span></button>
         <button class="mlb-tab" id="mlb-btn-areas" onclick="toggleLayerBar('areas')">🌿 Áreas Territoriais <span class="mlb-badge" id="uc-count-badge" title="Unidades de Conservação" style="display:none">0</span> <span class="mlb-badge" id="ti-count-badge" title="Terras Indígenas" style="display:none">0</span></button>
@@ -943,6 +955,7 @@ function renderPagina(){
 
         <!-- Linha do tempo -->
         <div id="timeline-bar" style="display:none">
+          <div id="tl-drag-handle" title="Arrastar · duplo clique para redefinir posição"><svg width="28" height="10" viewBox="0 0 28 10" fill="currentColor"><circle cx="9" cy="3" r="1.3"/><circle cx="14" cy="3" r="1.3"/><circle cx="19" cy="3" r="1.3"/><circle cx="9" cy="7" r="1.3"/><circle cx="14" cy="7" r="1.3"/><circle cx="19" cy="7" r="1.3"/></svg></div>
           <div class="tl-top">
             <div class="tl-modo">
               <button class="on" id="tl-m-anos" onclick="tlSetModo('anos')">Anos</button>
@@ -1216,6 +1229,20 @@ function toggleBlocoChevron(id, chevId){
   const oculto = el.style.display === 'none';
   el.style.display = oculto ? '' : 'none';
   document.getElementById(chevId)?.classList.toggle('areas-chev-col', !oculto);
+  // Ao abrir uma seção, fecha a outra (acordeão)
+  if(oculto){
+    const par = {
+      'areas-sec-uc': {outro:'areas-sec-ti', chevOutro:'areas-chev-ti'},
+      'areas-sec-ti': {outro:'areas-sec-uc', chevOutro:'areas-chev-uc'}
+    }[id];
+    if(par){
+      const outroEl = document.getElementById(par.outro);
+      if(outroEl && outroEl.style.display !== 'none'){
+        outroEl.style.display = 'none';
+        document.getElementById(par.chevOutro)?.classList.add('areas-chev-col');
+      }
+    }
+  }
 }
 function abrirPainelMobile(){ document.getElementById('mapa-painel-wrap').classList.add('mobile-aberto'); document.getElementById('mapa-backdrop').classList.add('ativo'); }
 function fecharPainelMobile(){ document.getElementById('mapa-painel-wrap').classList.remove('mobile-aberto'); document.getElementById('mapa-backdrop').classList.remove('ativo'); }
@@ -1343,6 +1370,8 @@ function iniciarMapa(){
   requestAnimationFrame(() => mapaL.invalidateSize());
   mapaL.on('click', onMapaClick);
   _iniciarDragCard('uc-stats-card','uc-stats-card');
+  _iniciarDragLayerbar();
+  _iniciarDragTimeline();
   // Elementos cartográficos obrigatórios
   CART.init(mapaL);
   // Pré-renderizar painel de Áreas Territoriais (UC+TI) no DOM (sem abrir
@@ -3734,6 +3763,119 @@ function _iniciarDragEditor(){
     card.style.right='auto'; card.style.bottom='auto';
   });
   document.addEventListener('mouseup', () => { drag=false; card.style.cursor=''; });
+}
+
+// ─── Drag da barra de camadas ────────────────────────────────────────────────
+function _iniciarDragLayerbar(){
+  const lb = document.getElementById('mapa-layerbar');
+  const handle = document.getElementById('lb-drag-grip');
+  if(!lb || !handle) return;
+  const LS = 'siguc_lb_pos';
+  let drag=false, sx=0, sy=0, ox=0, oy=0;
+
+  function aplicarPos(x,y){
+    const maxX = window.innerWidth  - lb.offsetWidth;
+    const maxY = window.innerHeight - lb.offsetHeight;
+    lb.style.left = Math.max(0,Math.min(x,maxX))+'px';
+    lb.style.top  = Math.max(0,Math.min(y,maxY))+'px';
+  }
+
+  // Restaurar posição salva
+  try{
+    const s = JSON.parse(localStorage.getItem(LS)||'null');
+    if(s){ lb.classList.add('lb-flutuante'); lb.style.left=s.x+'px'; lb.style.top=s.y+'px'; }
+  }catch(e){}
+
+  handle.addEventListener('mousedown', e=>{
+    if(e.button!==0) return;
+    if(!lb.classList.contains('lb-flutuante')){
+      const r=lb.getBoundingClientRect();
+      lb.classList.add('lb-flutuante');
+      lb.style.left=r.left+'px'; lb.style.top=r.top+'px';
+    }
+    drag=true; sx=e.clientX; sy=e.clientY;
+    ox=parseFloat(lb.style.left)||0; oy=parseFloat(lb.style.top)||0;
+    handle.style.cursor='grabbing'; e.preventDefault(); e.stopPropagation();
+  });
+  // Touch
+  handle.addEventListener('touchstart', e=>{
+    const t=e.touches[0];
+    if(!lb.classList.contains('lb-flutuante')){
+      const r=lb.getBoundingClientRect(); lb.classList.add('lb-flutuante'); lb.style.left=r.left+'px'; lb.style.top=r.top+'px';
+    }
+    drag=true; sx=t.clientX; sy=t.clientY;
+    ox=parseFloat(lb.style.left)||0; oy=parseFloat(lb.style.top)||0; e.preventDefault();
+  },{passive:false});
+
+  document.addEventListener('mousemove', e=>{ if(!drag) return; aplicarPos(ox+(e.clientX-sx), oy+(e.clientY-sy)); });
+  document.addEventListener('touchmove', e=>{ if(!drag) return; const t=e.touches[0]; aplicarPos(ox+(t.clientX-sx), oy+(t.clientY-sy)); e.preventDefault(); },{passive:false});
+
+  function fimDrag(){
+    if(!drag) return; drag=false; handle.style.cursor='grab';
+    try{ localStorage.setItem(LS, JSON.stringify({x:parseFloat(lb.style.left),y:parseFloat(lb.style.top)})); }catch(e){}
+  }
+  document.addEventListener('mouseup', fimDrag);
+  document.addEventListener('touchend', fimDrag);
+
+  handle.addEventListener('dblclick', ()=>{
+    lb.classList.remove('lb-flutuante'); lb.style.left=''; lb.style.top='';
+    try{ localStorage.removeItem(LS); }catch(e){}
+  });
+}
+
+// ─── Drag da linha do tempo ───────────────────────────────────────────────────
+function _iniciarDragTimeline(){
+  const tl = document.getElementById('timeline-bar');
+  const handle = document.getElementById('tl-drag-handle');
+  if(!tl || !handle) return;
+  const LS = 'siguc_tl_pos';
+  let drag=false, sx=0, sy=0, ox=0, oy=0;
+
+  function getPar(){ return tl.offsetParent || document.getElementById('mapa') || document.body; }
+
+  function aplicarPos(x,y){
+    const par=getPar();
+    tl.style.left  = Math.max(0,Math.min(x, par.clientWidth -tl.offsetWidth ))+'px';
+    tl.style.top   = Math.max(0,Math.min(y, par.clientHeight-tl.offsetHeight))+'px';
+    tl.style.bottom='auto'; tl.style.transform='none';
+  }
+
+  function ancoramentoInicial(){
+    const r=tl.getBoundingClientRect(), pr=getPar().getBoundingClientRect();
+    ox=r.left-pr.left; oy=r.top-pr.top;
+    tl.style.left=ox+'px'; tl.style.top=oy+'px'; tl.style.bottom='auto'; tl.style.transform='none';
+  }
+
+  try{
+    const s=JSON.parse(localStorage.getItem(LS)||'null');
+    if(s){ tl.style.left=s.x+'px'; tl.style.top=s.y+'px'; tl.style.bottom='auto'; tl.style.transform='none'; }
+  }catch(e){}
+
+  handle.addEventListener('mousedown', e=>{
+    if(e.button!==0) return;
+    ancoramentoInicial(); drag=true; sx=e.clientX; sy=e.clientY;
+    ox=parseFloat(tl.style.left)||0; oy=parseFloat(tl.style.top)||0;
+    handle.style.cursor='grabbing'; e.preventDefault(); e.stopPropagation();
+  });
+  handle.addEventListener('touchstart', e=>{
+    const t=e.touches[0]; ancoramentoInicial(); drag=true; sx=t.clientX; sy=t.clientY;
+    ox=parseFloat(tl.style.left)||0; oy=parseFloat(tl.style.top)||0; e.preventDefault();
+  },{passive:false});
+
+  document.addEventListener('mousemove', e=>{ if(!drag) return; aplicarPos(ox+(e.clientX-sx), oy+(e.clientY-sy)); });
+  document.addEventListener('touchmove', e=>{ if(!drag) return; const t=e.touches[0]; aplicarPos(ox+(t.clientX-sx), oy+(t.clientY-sy)); e.preventDefault(); },{passive:false});
+
+  function fimDrag(){
+    if(!drag) return; drag=false; handle.style.cursor='grab';
+    try{ localStorage.setItem(LS, JSON.stringify({x:parseFloat(tl.style.left),y:parseFloat(tl.style.top)})); }catch(e){}
+  }
+  document.addEventListener('mouseup', fimDrag);
+  document.addEventListener('touchend', fimDrag);
+
+  handle.addEventListener('dblclick', ()=>{
+    tl.style.left='50%'; tl.style.top=''; tl.style.bottom='16px'; tl.style.transform='translateX(-50%)';
+    try{ localStorage.removeItem(LS); }catch(e){}
+  });
 }
 
 // ══════════════════════════════════════════════════════════════
