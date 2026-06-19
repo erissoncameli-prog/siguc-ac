@@ -410,7 +410,7 @@ async function carregarFauna(registros) {
   for (let i = 0; i < ids.length; i += CHUNK) {
     const fatia = ids.slice(i, i + CHUNK)
     const { data, error } = await db.from('registro_fauna')
-      .select('classe,quantidade,tipo_evento,condicao,causa_aparente,destinacao,registro_campo_id')
+      .select('classe,quantidade,tipo_evento,condicao,causa_aparente,destinacao,nome_popular,nome_cientifico,registro_campo_id')
       .in('registro_campo_id', fatia)
       .limit(5000)
     if (error) { console.error('[fauna] erro ao carregar', error); continue }
@@ -1276,14 +1276,30 @@ function renderFauna() {
         </div>
       </div>
     </div>
+
+    <!-- Espécies mais resgatadas — full width -->
+    <div class="fauna-full-card">
+      <div class="fauna-chart-card">
+        <div class="fcc-header">
+          <div>
+            <div class="fcc-title">Espécies Mais Resgatadas</div>
+            <div class="fcc-sub">Top 10 por nº de animais resgatados</div>
+          </div>
+        </div>
+        <div class="chart-canvas-wrap" id="fauna-especie-wrap" style="height:200px">
+          <canvas id="chart-fauna-especie"></canvas>
+        </div>
+      </div>
+    </div>
   `
 
   requestAnimationFrame(() => {
-    destroyCharts('chart-fauna-classe','chart-fauna-cond','chart-fauna-regional','chart-fauna-brigada')
+    destroyCharts('chart-fauna-classe','chart-fauna-cond','chart-fauna-regional','chart-fauna-brigada','chart-fauna-especie')
     initFaunaClasse(f)
     initFaunaCond(f)
     initFaunaRegional(f)
     initFaunaBrigada(f)
+    initFaunaEspecie(f)
   })
 }
 
@@ -1461,6 +1477,69 @@ function initFaunaBrigada(f) {
         tooltip: {
           backgroundColor: '#0A1A0F', padding: 10, cornerRadius: 8,
           callbacks: { label: ctx => `  ${ctx.parsed.x} animais resgatados` }
+        }
+      },
+      scales: {
+        x: { beginAtZero: true, grid: { color: 'rgba(0,0,0,.05)' },
+             border: { display: false }, ticks: { precision: 0, color: '#9ca3af', font: { size: 10 } } },
+        y: { grid: { display: false }, border: { display: false },
+             ticks: { color: '#374151', font: { size: 12, weight: '500' } } }
+      }
+    }
+  })
+}
+
+// ── Barras horizontais: Ranking de espécies mais resgatadas (top 10) ───
+function initFaunaEspecie(f) {
+  // Agrupa por espécie. Chave consistente = nome científico (campo mais
+  // preenchido); rótulo exibido prefere o nome popular quando houver.
+  const por = {}
+  f.filter(x => x.tipo_evento === 'resgate').forEach(x => {
+    const cient = (x.nome_cientifico || '').trim()
+    const pop   = (x.nome_popular || '').trim()
+    const key   = cient || pop || FAUNA_CLASSE_LAB[x.classe] || '—'
+    if (!por[key]) por[key] = { qtd: 0, label: pop || cient || FAUNA_CLASSE_LAB[x.classe] || '—' }
+    por[key].qtd += (x.quantidade || 1)
+    if (pop) por[key].label = pop
+  })
+
+  const sorted = Object.values(por).sort((a, b) => b.qtd - a.qtd).slice(0, 10)
+  if (!sorted.length) return
+
+  // Altura dinâmica
+  const wrap = document.getElementById('fauna-especie-wrap')
+  if (wrap) wrap.style.height = (sorted.length * 46 + 60) + 'px'
+
+  // Escala de cor violeta (tema fauna): mais resgates → mais escuro
+  const max = sorted[0].qtd
+  const cores = sorted.map(s => {
+    const t = s.qtd / max
+    const r = Math.round(221 - t * 145)
+    const g = Math.round(214 - t * 185)
+    const b = Math.round(254 - t * 105)
+    return `rgb(${r},${g},${b})`
+  })
+
+  initChart('chart-fauna-especie', {
+    type: 'bar',
+    data: {
+      labels: sorted.map(s => s.label),
+      datasets: [{
+        data: sorted.map(s => s.qtd),
+        backgroundColor: cores,
+        borderWidth: 0,
+        borderRadius: 6,
+        borderSkipped: false,
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#0A1A0F', padding: 10, cornerRadius: 8,
+          callbacks: { label: ctx => `  ${ctx.parsed.x} resgatado(s)` }
         }
       },
       scales: {
