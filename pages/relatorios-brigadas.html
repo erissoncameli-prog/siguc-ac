@@ -160,7 +160,8 @@ let _carregando = false
 // ── Labels ─────────────────────────────────────────────────────
 const NAT_LAB  = { prevencao:'Prevenção', combate:'Combate', monitoramento:'Monitoramento' }
 const NAT_COR  = { prevencao:'#12A66A',   combate:'#EF5B3C', monitoramento:'#3B82C4' }
-const NAT_EMO  = { prevencao:'🛡', combate:'🔥', monitoramento:'🔭' }
+const NAT_ICON = { prevencao:'shield', combate:'flame', monitoramento:'binoculo' }
+const natIco = n => bico(NAT_ICON[n] || '')
 const ATIV_LAB = {
   fogo:'Combate a fogo', educacao_ambiental:'Educação ambiental',
   limpeza:'Limpeza/aceiro', reconhecimento:'Reconhecimento',
@@ -238,7 +239,7 @@ function htmlPagina() {
       <h1 class="page-title">Relatórios de Brigadas</h1>
       <p class="page-subtitle">Análise em 3 níveis: estado, regional e por unidade de conservação</p>
     </div>
-    <button class="btn-export" id="btn-exportar">⬇ Exportar CSV</button>
+    <button class="btn-export" id="btn-exportar">${bico('download')} Exportar CSV</button>
   </div>
 
   <!-- Filtro de período -->
@@ -264,10 +265,10 @@ function htmlPagina() {
 
   <!-- Tabs -->
   <div class="rel-tabs">
-    <button class="rel-tab ativo" data-tab="estado">🗺 Estado do Acre</button>
-    <button class="rel-tab" data-tab="regional">📍 Por Regional</button>
-    <button class="rel-tab" data-tab="uc">🌳 Por UC</button>
-    <button class="rel-tab" data-tab="fauna">🐾 Fauna</button>
+    <button class="rel-tab ativo" data-tab="estado">${bico('map')} Estado do Acre</button>
+    <button class="rel-tab" data-tab="regional">${bico('pin')} Por Regional</button>
+    <button class="rel-tab" data-tab="uc">${bico('tree')} Por UC</button>
+    <button class="rel-tab" data-tab="fauna">${bico('paw')} Fauna</button>
   </div>
 
   <!-- Loading -->
@@ -649,7 +650,7 @@ function initChartNatureza(rows, sfx='') {
   initChart('chart-nat'+sfx, {
     type: 'doughnut',
     data: {
-      labels: ['🛡 Prevenção','🔥 Combate','🔭 Monitoramento'],
+      labels: ['Prevenção','Combate','Monitoramento'],
       datasets: [{
         data: [cnt.prevencao, cnt.combate, cnt.monitoramento],
         backgroundColor: ['#12A66A','#EF5B3C','#3B82C4'],
@@ -904,9 +905,9 @@ function initChartRegional(rows, sfx='') {
     data: {
       labels: regs.map(k => REGIONAL_LAB[k]),
       datasets: [
-        { label:'🛡 Prevenção',     data: regs.map(k=>rows.filter(r=>r.regional===k&&r.natureza==='prevencao').length),    backgroundColor:'rgba(18,166,106,.8)',  borderColor:'#12A66A', borderWidth:1, borderRadius:3 },
-        { label:'🔥 Combate',       data: regs.map(k=>rows.filter(r=>r.regional===k&&r.natureza==='combate').length),      backgroundColor:'rgba(239,91,60,.8)',   borderColor:'#EF5B3C', borderWidth:1, borderRadius:3 },
-        { label:'🔭 Monitoramento', data: regs.map(k=>rows.filter(r=>r.regional===k&&r.natureza==='monitoramento').length),backgroundColor:'rgba(59,130,196,.8)',  borderColor:'#3B82C4', borderWidth:1, borderRadius:3 },
+        { label:'Prevenção',     data: regs.map(k=>rows.filter(r=>r.regional===k&&r.natureza==='prevencao').length),    backgroundColor:'rgba(18,166,106,.8)',  borderColor:'#12A66A', borderWidth:1, borderRadius:3 },
+        { label:'Combate',       data: regs.map(k=>rows.filter(r=>r.regional===k&&r.natureza==='combate').length),      backgroundColor:'rgba(239,91,60,.8)',   borderColor:'#EF5B3C', borderWidth:1, borderRadius:3 },
+        { label:'Monitoramento', data: regs.map(k=>rows.filter(r=>r.regional===k&&r.natureza==='monitoramento').length),backgroundColor:'rgba(59,130,196,.8)',  borderColor:'#3B82C4', borderWidth:1, borderRadius:3 },
       ]
     },
     options: {
@@ -965,7 +966,7 @@ function renderTabelaEquipes() {
       <td style="font-size:.82rem;color:var(--cinza-500)">${esc(r.brigada)}</td>
       <td${on('n')}>${r.n}</td>
       <td${on('area')}>${r.area > 0 ? formatNum(r.area, 1) : '—'}</td>
-      <td${on('fauna')}>${r.fauna > 0 ? `🐾 ${r.fauna}` : '—'}</td>
+      <td${on('fauna')}>${r.fauna > 0 ? `${bico('paw')} ${r.fauna}` : '—'}</td>
       <td${on('horas')}>${r.horas > 0 ? formatNum(r.horas, 1) : '—'}</td>
     </tr>`).join('')}</tbody>
   </table>`
@@ -1006,7 +1007,7 @@ function tabelaBrigadas(registros, brigadas) {
       <td>${esc(r.nome)}</td>
       <td>${r.regional ? (REGIONAL_LAB[r.regional]||r.regional) : '—'}</td>
       <td><strong>${r.n}</strong></td>
-      <td>${r.fauna > 0 ? `🐾 ${r.fauna}` : '—'}</td>
+      <td>${r.fauna > 0 ? `${bico('paw')} ${r.fauna}` : '—'}</td>
       <td>
         <div style="display:flex;align-items:center;gap:6px">
           <div class="bar-wrap" style="width:60px"><div class="bar-fill" style="width:${r.pct}%;background:${r.pct>70?'#059669':r.pct>40?'#f59e0b':'#ef4444'}"></div></div>
@@ -1035,9 +1036,9 @@ function tabelaBrigadistas(registros) {
     </tr></thead>
     <tbody>${rows.map(r=>`<tr>
       <td>${esc(r.nome)}</td>
-      <td>${r.nats.map(n=>`<span class="nat-chip ${n}">${NAT_EMO[n]||''}</span>`).join(' ')}</td>
+      <td>${r.nats.map(n=>`<span class="nat-chip ${n}">${natIco(n)}</span>`).join(' ')}</td>
       <td><strong>${r.n}</strong></td>
-      <td>${r.fauna > 0 ? `🐾 ${r.fauna}` : '—'}</td>
+      <td>${r.fauna > 0 ? `${bico('paw')} ${r.fauna}` : '—'}</td>
       <td style="font-size:.78rem;color:var(--cinza-500)">${r.ultima ? new Date(r.ultima).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',year:'2-digit',timeZone:'America/Rio_Branco'}) : '—'}</td>
     </tr>`).join('')}</tbody>
   </table>`
@@ -1111,10 +1112,10 @@ function tabelaAtividades(rows) {
       const statusCor = {aguardando:'#f59e0b',validado:'#059669',requer_correcao:'#e879f9',rejeitado:'#ef4444'}[r.status_validacao]||'#6b7280'
       return `<tr>
         <td style="font-size:.78rem;white-space:nowrap">${dt}</td>
-        <td><span class="nat-chip ${r.natureza}">${NAT_EMO[r.natureza]||''} ${NAT_LAB[r.natureza]||r.natureza}</span></td>
+        <td><span class="nat-chip ${r.natureza}">${natIco(r.natureza)} ${NAT_LAB[r.natureza]||r.natureza}</span></td>
         <td>${esc(ATIV_LAB[r.atividade]||r.atividade||'—')}</td>
         <td style="font-size:.8rem">${esc(r.brigadista_nome||'—')}</td>
-        <td>${r.n_fauna > 0 ? `🐾 ${r.n_fauna}` : '—'}</td>
+        <td>${r.n_fauna > 0 ? `${bico('paw')} ${r.n_fauna}` : '—'}</td>
         <td><span style="font-size:.72rem;font-weight:600;color:${statusCor}">${STATUS_LAB[r.status_validacao]||r.status_validacao}</span></td>
       </tr>`
     }).join('')}</tbody>
@@ -1162,7 +1163,7 @@ function renderFauna() {
 
   if (!f.length) {
     cont.innerHTML = `<div style="text-align:center;padding:4rem 2rem;color:#9ca3af">
-      <div style="font-size:2.5rem;margin-bottom:12px">🐾</div>
+      <div style="font-size:2.5rem;margin-bottom:12px">${bico('paw')}</div>
       <div style="font-size:.9rem;font-weight:600">Sem registros de fauna no período</div>
       <div style="font-size:.8rem;margin-top:4px">Tente ampliar o intervalo de datas</div>
     </div>`
