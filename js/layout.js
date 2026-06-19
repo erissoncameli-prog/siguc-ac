@@ -52,6 +52,7 @@ function gerarLayout(tituloPagina, paginaAtiva) {
     usuarios:     { svg: '<circle cx="18" cy="15" r="3"/><circle cx="9" cy="7" r="4"/><path d="M10 15H6a4 4 0 0 0-4 4v2"/><path d="m21.7 16.4-.9-.3"/><path d="m15.2 13.9-.9-.3"/><path d="m16.6 18.7.3-.9"/><path d="m19.1 12.2.3-.9"/>', cor: '#e2e8f0', bg: 'rgba(226,232,240,0.15)' },
     configuracoes:          { svg: '<path d="M20 7h-9"/><path d="M14 17H5"/><circle cx="17" cy="17" r="3"/><circle cx="7" cy="7" r="3"/>', cor: '#94a3b8', bg: 'rgba(148,163,184,0.18)' },
     'estrutura-organizacional': { svg: '<rect x="2" y="7" width="6" height="4" rx="1"/><rect x="9" y="3" width="6" height="4" rx="1"/><rect x="9" y="11" width="6" height="4" rx="1"/><rect x="16" y="7" width="6" height="4" rx="1"/><path d="M5 11v2h14v-2"/><path d="M12 7V5"/>', cor: '#c4b5fd', bg: 'rgba(196,181,253,0.22)' },
+    'saude-sistema':            { svg: '<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>', cor: '#22d3ee', bg: 'rgba(34,211,238,0.22)' },
     'alertas-ambientais':       { svg: '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/>', cor: '#fb923c', bg: 'rgba(251,146,60,0.22)' },
     'painel-gestor':            { svg: '<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/><circle cx="18" cy="5" r="3" fill="currentColor"/>', cor: '#818cf8', bg: 'rgba(129,140,248,0.22)' },
     'pesquisas':                { svg: '<path d="M9 2H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 2v20m0 0h10a2 2 0 0 0 2-2V8M9 22H5a2 2 0 0 1-2-2V8m0 0h18"/>', cor: '#38bdf8', bg: 'rgba(56,189,248,0.22)' },
@@ -112,6 +113,7 @@ function gerarLayout(tituloPagina, paginaAtiva) {
         { id: 'usuarios',                 href: '../pages/usuarios.html',                 label: t('nav.usuarios') },
         { id: 'estrutura-organizacional', href: '../pages/estrutura-organizacional.html', label: 'Estrutura Org.' },
         { id: 'configuracoes',            href: '../pages/configuracoes.html',            label: t('nav.configuracoes') },
+        { id: 'saude-sistema',            href: '../pages/saude-sistema.html',            label: 'Saúde do Sistema' },
       ]
     },
   ];
