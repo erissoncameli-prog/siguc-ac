@@ -358,7 +358,7 @@ async function gerarRelatorio() {
   document.getElementById('conteudo-regional').innerHTML = ''
   document.getElementById('conteudo-uc').innerHTML = ''
 
-  const [regRes, brigRes, bristRes, faunaRes] = await Promise.all([
+  const [regRes, brigRes, bristRes] = await Promise.all([
     db.from('vw_registros_validacao')
       .select('id,natureza,atividade,status_validacao,data_hora_evento,regional,uc_id,uc_nome,brigada_id,brigada_nome,brigadista_id,brigadista_nome,equipe_id,equipe_nome,duracao_horas,n_fauna,n_fauna_pendente,n_fauna_resgatada,fotos_urls,area_estimada_ha,pessoas_alcancadas')
       .gte('data_hora_evento', ini + 'T00:00:00')
@@ -367,21 +367,16 @@ async function gerarRelatorio() {
       .limit(5000),
     db.from('brigadas').select('id,nome,regional,uc_id,ativa,num_brigadistas').eq('ativa', true),
     db.from('brigadistas').select('id,nome_completo,brigada_id,status').eq('status','ativo'),
-    db.from('registro_fauna')
-      .select('classe,quantidade,tipo_evento,condicao,causa_aparente,destinacao,registro_campo_id,registros_campo!inner(regional,brigada_nome,data_hora_evento)')
-      .gte('registros_campo.data_hora_evento', ini + 'T00:00:00')
-      .lte('registros_campo.data_hora_evento', fim + 'T23:59:59')
-      .limit(3000),
   ])
 
   _registros = regRes.data  || []
   _brigadas  = brigRes.data || []
   _brists    = bristRes.data || []
-  _faunaData = (faunaRes.data || []).map(f => ({
-    ...f,
-    regional:     f.registros_campo?.regional,
-    brigada_nome: f.registros_campo?.brigada_nome,
-  }))
+
+  // Fauna: busca pelos IDs dos registros já filtrados por período/RLS e
+  // enriquece regional/brigada a partir do próprio registro (evita filtro
+  // embutido do PostgREST, que não propaga de forma confiável)
+  _faunaData = await carregarFauna(_registros)
 
   // Preenche dropdown de UCs
   const ucs = {}
@@ -398,6 +393,35 @@ async function gerarRelatorio() {
   _carregando = false
 
   renderTabAtiva()
+}
+
+// Carrega registro_fauna pelos IDs dos registros do período e enriquece
+// com regional/brigada_nome do próprio registro (mapa em memória).
+async function carregarFauna(registros) {
+  const ids = registros.map(r => r.id).filter(Boolean)
+  if (!ids.length) return []
+
+  const regById = {}
+  registros.forEach(r => { regById[r.id] = r })
+
+  // Chunk para não estourar o tamanho da URL (filtro .in com muitos UUIDs)
+  const CHUNK = 150
+  const linhas = []
+  for (let i = 0; i < ids.length; i += CHUNK) {
+    const fatia = ids.slice(i, i + CHUNK)
+    const { data, error } = await db.from('registro_fauna')
+      .select('classe,quantidade,tipo_evento,condicao,causa_aparente,destinacao,registro_campo_id')
+      .in('registro_campo_id', fatia)
+      .limit(5000)
+    if (error) { console.error('[fauna] erro ao carregar', error); continue }
+    if (data) linhas.push(...data)
+  }
+
+  return linhas.map(f => ({
+    ...f,
+    regional:     regById[f.registro_campo_id]?.regional,
+    brigada_nome: regById[f.registro_campo_id]?.brigada_nome,
+  }))
 }
 
 // ════════════════════════════════════════════════════════════════
