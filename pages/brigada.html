@@ -1307,7 +1307,7 @@ async function fazerLogin() {
   const senha = document.getElementById('login-senha').value
   document.getElementById('login-erro').hidden = true
 
-  await _brigReady
+  try { await _brigReady } catch (e) { console.warn('[fazerLogin] env:', e.message) }
   if (!db) {
     mostrarErroLogin('Sem conexão. Conecte à internet para fazer o primeiro login.')
     return

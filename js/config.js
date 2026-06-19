@@ -37,7 +37,9 @@ const _dbReady = loadEnv().then(({ supabaseUrl, supabaseKey }) => {
   if (!supabaseUrl || !supabaseKey) return // env indisponível — db permanece null
   SUPABASE_URL = supabaseUrl;
   SUPABASE_ANON_KEY = supabaseKey;
-  db = createInstrumentedDb(createClient(supabaseUrl, supabaseKey, {
+  // createInstrumentedDb pode não estar disponível (ex: brigada.html não carrega queryLogger.js)
+  const wrap = typeof createInstrumentedDb === 'function' ? createInstrumentedDb : x => x;
+  db = wrap(createClient(supabaseUrl, supabaseKey, {
     // sessionStorage: sessão encerra ao fechar o navegador (Regra de segurança)
     auth: { storage: window.sessionStorage, persistSession: true, autoRefreshToken: true, detectSessionInUrl: false }
   }));
