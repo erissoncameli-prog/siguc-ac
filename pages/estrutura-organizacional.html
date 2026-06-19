@@ -82,44 +82,70 @@
 }
 .org-chevron.aberto { transform:rotate(90deg); }
 
-/* ── Banner de fluxo ──────────────────────────────────── */
-.fluxo-banner {
-  background: linear-gradient(135deg, rgba(10,26,15,.04), rgba(82,183,136,.08));
-  border: 1px solid rgba(82,183,136,.25);
-  border-radius: 12px;
-  padding: 16px 20px;
-  margin-bottom: 20px;
+/* ── Botão flutuante de ajuda ─────────────────────────── */
+.fab-ajuda {
+  position: fixed; bottom: 28px; right: 28px; z-index: 1100;
+  width: 48px; height: 48px; border-radius: 50%;
+  background: var(--verde-c); color: #fff; border: none; cursor: pointer;
+  box-shadow: 0 4px 16px rgba(82,183,136,.45);
+  display: flex; align-items: center; justify-content: center;
+  transition: transform .15s, box-shadow .15s;
 }
-.fluxo-titulo {
-  font-size: 11px; font-weight: 700; letter-spacing: .08em;
-  text-transform: uppercase; color: var(--verde-c); margin-bottom: 14px;
+.fab-ajuda:hover { transform: scale(1.08); box-shadow: 0 6px 22px rgba(82,183,136,.55); }
+.fab-ajuda svg { pointer-events: none; }
+
+.ajuda-painel {
+  position: fixed; bottom: 86px; right: 28px; z-index: 1100;
+  width: 340px; background: #fff;
+  border-radius: 14px; box-shadow: 0 8px 32px rgba(0,0,0,.16);
+  border: 1px solid #E5E7EB;
+  opacity: 0; pointer-events: none;
+  transform: translateY(10px) scale(.97);
+  transition: opacity .18s, transform .18s;
 }
-.fluxo-passos {
-  display: flex; align-items: flex-start; gap: 8px; flex-wrap: wrap;
+.ajuda-painel.aberto {
+  opacity: 1; pointer-events: auto; transform: translateY(0) scale(1);
 }
-.fluxo-passo {
-  display: flex; align-items: flex-start; gap: 10px;
-  flex: 1; min-width: 200px;
+.ajuda-painel-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid #F3F4F6;
 }
-.fluxo-num {
-  width: 24px; height: 24px; border-radius: 50%; flex-shrink: 0;
+.ajuda-painel-titulo {
+  font-size: 13px; font-weight: 700; color: #111827;
+  display: flex; align-items: center; gap: 7px;
+}
+.ajuda-painel-titulo svg { color: var(--verde-c); }
+.ajuda-fechar {
+  background: none; border: none; cursor: pointer;
+  color: #9CA3AF; font-size: 18px; line-height: 1; padding: 2px 4px;
+}
+.ajuda-fechar:hover { color: #374151; }
+.ajuda-passos { padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 14px; }
+.ajuda-passo { display: flex; gap: 12px; }
+.ajuda-num {
+  width: 22px; height: 22px; border-radius: 50%; flex-shrink: 0;
   background: var(--verde-c); color: #fff;
-  font-size: 12px; font-weight: 700;
+  font-size: 11px; font-weight: 700;
   display: flex; align-items: center; justify-content: center;
   margin-top: 1px;
 }
-.fluxo-passo-label {
-  font-size: 12px; font-weight: 700; color: #111827; margin-bottom: 3px;
+.ajuda-passo-label { font-size: 12px; font-weight: 700; color: #111827; margin-bottom: 3px; }
+.ajuda-passo-desc  { font-size: 12px; color: #6B7280; line-height: 1.55; }
+.ajuda-passo-desc a { color: var(--verde-c); font-weight: 600; }
+.ajuda-conector {
+  width: 2px; background: #E5E7EB; border-radius: 2px;
+  margin: 3px 0 3px 10px; height: 10px; flex-shrink: 0;
 }
-.fluxo-passo-desc {
-  font-size: 12px; color: #6B7280; line-height: 1.5;
+.ajuda-nota {
+  margin: 0 16px 16px;
+  background: #F0FDF4; border: 1px solid #BBF7D0;
+  border-radius: 8px; padding: 9px 12px;
+  font-size: 11px; color: #166534; line-height: 1.5;
+  display: flex; gap: 7px; align-items: flex-start;
 }
-.fluxo-seta {
-  font-size: 20px; color: #D1D5DB; padding-top: 2px; flex-shrink: 0;
-}
-.fluxo-link {
-  color: var(--verde-c); font-weight: 600; text-decoration: underline;
-}
+.ajuda-nota svg { flex-shrink: 0; margin-top: 1px; color: #16A34A; }
+
 /* ── Aviso inline modal ───────────────────────────────── */
 .aviso-inline {
   background: #FFF7ED; border: 1px solid #FED7AA;
@@ -290,7 +316,64 @@
   </div>
 </div>
 
+<!-- Botão flutuante de ajuda -->
+<button class="fab-ajuda" onclick="toggleAjuda()" title="Como funciona" aria-label="Ajuda">
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+</button>
+
+<div class="ajuda-painel" id="ajuda-painel">
+  <div class="ajuda-painel-header">
+    <div class="ajuda-painel-titulo">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      Como vincular um servidor a um cargo
+    </div>
+    <button class="ajuda-fechar" onclick="toggleAjuda()">×</button>
+  </div>
+
+  <div class="ajuda-passos">
+    <div class="ajuda-passo">
+      <div class="ajuda-num">1</div>
+      <div>
+        <div class="ajuda-passo-label">Crie a unidade organizacional</div>
+        <div class="ajuda-passo-desc">Acesse a aba <strong>Unidades</strong> e clique em <em>Nova Unidade</em>. Informe sigla, nome e tipo (divisão, departamento etc.). O cargo de chefia é criado automaticamente.</div>
+      </div>
+    </div>
+    <div class="ajuda-conector"></div>
+    <div class="ajuda-passo">
+      <div class="ajuda-num">2</div>
+      <div>
+        <div class="ajuda-passo-label">Cadastre o servidor como usuário</div>
+        <div class="ajuda-passo-desc">O servidor precisa ter um cadastro ativo no sistema antes de ser vinculado a um cargo. Acesse <a href="usuarios.html">Usuários</a> e registre-o caso ainda não esteja cadastrado.</div>
+      </div>
+    </div>
+    <div class="ajuda-conector"></div>
+    <div class="ajuda-passo">
+      <div class="ajuda-num">3</div>
+      <div>
+        <div class="ajuda-passo-label">Registre a ocupação do cargo</div>
+        <div class="ajuda-passo-desc">Na aba <strong>Cargos</strong>, localize o cargo desejado e clique em <em>Registrar ocup.</em> Selecione o servidor, informe a portaria de nomeação e a data de início.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="ajuda-nota">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+    Um servidor pode ocupar cargos em mais de uma unidade. Basta registrar múltiplas ocupações para o mesmo usuário.
+  </div>
+</div>
+
 <script>
+function toggleAjuda() {
+  document.getElementById('ajuda-painel').classList.toggle('aberto')
+}
+document.addEventListener('click', e => {
+  const painel = document.getElementById('ajuda-painel')
+  if (!painel) return
+  if (!painel.contains(e.target) && !e.target.closest('.fab-ajuda')) {
+    painel.classList.remove('aberto')
+  }
+})
+
 const NIVEL_LABEL = {
   secretario:'Secretário', diretor:'Diretor', coordenador:'Coordenador',
   chefe_deuc:'Chefe de Depto.', gestor_uc:'Gestor de UC',
@@ -319,36 +402,6 @@ let _perfilUsuario = ''
         <button class="tab-btn" onclick="ativarAba('cargos', this)">Cargos</button>
         <button class="tab-btn" onclick="ativarAba('delegacoes', this)">Delegações</button>
         <button class="tab-btn" onclick="ativarAba('unidades', this)">Unidades</button>
-      </div>
-
-      <!-- Banner: fluxo de trabalho -->
-      <div class="fluxo-banner">
-        <div class="fluxo-titulo">Como funciona</div>
-        <div class="fluxo-passos">
-          <div class="fluxo-passo">
-            <div class="fluxo-num">1</div>
-            <div class="fluxo-passo-corpo">
-              <div class="fluxo-passo-label">Criar unidade</div>
-              <div class="fluxo-passo-desc">Na aba <strong>Unidades</strong>, crie a divisão, departamento ou setor. O cargo de chefia é gerado automaticamente.</div>
-            </div>
-          </div>
-          <div class="fluxo-seta">›</div>
-          <div class="fluxo-passo">
-            <div class="fluxo-num">2</div>
-            <div class="fluxo-passo-corpo">
-              <div class="fluxo-passo-label">Cadastrar servidor como usuário</div>
-              <div class="fluxo-passo-desc">O servidor precisa ter um cadastro ativo no sistema. Acesse <a href="usuarios.html" class="fluxo-link">Usuários</a> para cadastrá-lo antes de prosseguir.</div>
-            </div>
-          </div>
-          <div class="fluxo-seta">›</div>
-          <div class="fluxo-passo">
-            <div class="fluxo-num">3</div>
-            <div class="fluxo-passo-corpo">
-              <div class="fluxo-passo-label">Registrar ocupação</div>
-              <div class="fluxo-passo-desc">Na aba <strong>Cargos</strong>, clique em <em>Registrar ocup.</em> no cargo desejado e vincule o servidor com a portaria de nomeação.</div>
-            </div>
-          </div>
-        </div>
       </div>
 
       <div id="tab-organograma" class="tab-panel ativo">
