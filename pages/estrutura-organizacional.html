@@ -137,62 +137,6 @@
   </div>
 </div>
 
-<!-- Modal: Novo Cargo -->
-<div class="modal-overlay" id="modal-cargo">
-  <div class="modal">
-    <div class="modal-header">
-      <div class="modal-title">Novo Cargo</div>
-      <button class="modal-close" onclick="fecharModalCargo()">×</button>
-    </div>
-    <div class="modal-body">
-      <div class="form-group">
-        <label class="form-label">Denominação <span class="obrig">*</span></label>
-        <input class="form-control" id="cargo-denominacao" placeholder="Ex: Chefe da Divisão de Bioeconomia">
-      </div>
-      <div class="grid-2">
-        <div class="form-group">
-          <label class="form-label">Tipo <span class="obrig">*</span></label>
-          <select class="form-control" id="cargo-tipo">
-            <option value="cargo_comissionado">Cargo Comissionado</option>
-            <option value="cargo_efetivo">Cargo Efetivo</option>
-            <option value="funcao_gratificada">Função Gratificada</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Nível Hierárquico <span class="obrig">*</span></label>
-          <select class="form-control" id="cargo-nivel">
-            <option value="secretario">Secretário</option>
-            <option value="diretor">Diretor</option>
-            <option value="coordenador">Coordenador</option>
-            <option value="chefe_deuc">Chefe DEUC</option>
-            <option value="gestor_uc" selected>Gestor UC</option>
-            <option value="analista_uc">Analista UC</option>
-            <option value="pesquisador_externo">Pesquisador Externo</option>
-          </select>
-        </div>
-      </div>
-      <div class="grid-2">
-        <div class="form-group">
-          <label class="form-label">Unidade <span class="obrig">*</span></label>
-          <select class="form-control" id="cargo-unidade"></select>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Símbolo</label>
-          <input class="form-control" id="cargo-simbolo" placeholder="Ex: DAS-3, FG-1">
-        </div>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Descrição</label>
-        <textarea class="form-control" id="cargo-descricao" rows="2" placeholder="Atribuições e responsabilidades (opcional)"></textarea>
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="fecharModalCargo()">Cancelar</button>
-      <button class="btn btn-primary" id="cargo-btn-salvar" onclick="salvarCargo()">Salvar</button>
-    </div>
-  </div>
-</div>
-
 <!-- Modal: Registrar Ocupação -->
 <div class="modal-overlay" id="modal-ocupacao">
   <div class="modal">
@@ -332,10 +276,6 @@ let _perfilUsuario = ''
         <div class="filter-bar">
           <input class="form-control search-input" id="busca-cargos" placeholder="Buscar cargo ou titular..." oninput="filtrarCargos()">
           ${['super_admin','gestor'].includes(usuario.perfil) ? `
-          <button class="btn btn-secondary" onclick="abrirModalCargo()">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-            Novo Cargo
-          </button>
           <button class="btn btn-primary" onclick="abrirModalOcupacao()">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             Registrar Ocupação
@@ -681,48 +621,6 @@ async function toggleUnidade(id, ativoAtual) {
   if (error) { toast(error.message, 'error'); return }
   toast(ativoAtual ? 'Unidade desativada' : 'Unidade reativada', 'success')
   await carregarDados()
-}
-
-// ── Modal Cargo ───────────────────────────────────────────
-
-function abrirModalCargo() {
-  document.getElementById('cargo-denominacao').value = ''
-  document.getElementById('cargo-tipo').value = 'cargo_comissionado'
-  document.getElementById('cargo-nivel').value = 'gestor_uc'
-  document.getElementById('cargo-simbolo').value = ''
-  document.getElementById('cargo-descricao').value = ''
-  const opts = _unidades.map(u =>
-    `<option value="${u.id}">${esc(u.sigla)} — ${esc(u.nome)}</option>`
-  ).join('')
-  document.getElementById('cargo-unidade').innerHTML = '<option value="">Selecione a unidade...</option>' + opts
-  document.getElementById('modal-cargo').classList.add('aberto')
-}
-
-function fecharModalCargo() {
-  document.getElementById('modal-cargo').classList.remove('aberto')
-}
-
-async function salvarCargo() {
-  const btn = document.getElementById('cargo-btn-salvar')
-  const denominacao    = document.getElementById('cargo-denominacao').value.trim()
-  const tipo           = document.getElementById('cargo-tipo').value
-  const nivel          = document.getElementById('cargo-nivel').value
-  const unidade_org_id = document.getElementById('cargo-unidade').value
-  const simbolo        = document.getElementById('cargo-simbolo').value.trim() || null
-  const descricao      = document.getElementById('cargo-descricao').value.trim() || null
-
-  if (!denominacao || !unidade_org_id) {
-    toast('Preencha denominação e unidade', 'error'); return
-  }
-  btn.disabled = true; btn.textContent = 'Salvando...'
-  try {
-    const { error } = await db.from('cargos').insert({ denominacao, tipo, nivel, unidade_org_id, simbolo, descricao, ativo: true })
-    if (error) throw error
-    toast('Cargo criado!', 'success')
-    fecharModalCargo()
-    await carregarDados()
-  } catch(e) { toast(e.message || 'Erro ao salvar', 'error') }
-  finally { btn.disabled = false; btn.textContent = 'Salvar' }
 }
 
 // ── Selects dos modais ────────────────────────────────────
