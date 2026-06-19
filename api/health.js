@@ -2,8 +2,11 @@
 // Vercel Serverless Function: GET /api/health
 // Retorna 200 (healthy), 207 (degraded) ou 503 (unhealthy).
 
-const SUPABASE_URL      = process.env.SUPABASE_URL;
-const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
+// Fallback igual aos proxies (focos-proxy/dof-proxy): se a Vercel não
+// tiver as env vars configuradas, usa os valores públicos (URL + chave
+// anon — a mesma já exposta em js/config.js). NUNCA usar service_role aqui.
+const SUPABASE_URL      = process.env.SUPABASE_URL      || 'https://atqtybcsvepdabsvgaly.supabase.co';
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF0cXR5YmNzdmVwZGFic3ZnYWx5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0MjMzNzgsImV4cCI6MjA5NTk5OTM3OH0.hWx1AB2rK7xdco1Dgagm0XUOBPQbxZVE614SW4SKoLk';
 const CHECK_TIMEOUT_MS  = 5000;
 const VERSION           = process.env.npm_package_version || '1.0.0';
 
