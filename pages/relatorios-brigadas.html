@@ -10,6 +10,7 @@
 <script src="../js/config.js"></script>
 <script src="../js/layout.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
 <style>
 /* ── Tokens de natureza ──────────────────────────────── */
 :root {
@@ -646,10 +647,36 @@ function destroyCharts(...ids) {
   alvo.forEach(id => { if (_charts[id]) { _charts[id].destroy(); delete _charts[id] } })
 }
 
+// Plugin datalabels (CDN): registra uma vez e o deixa DESLIGADO por padrão;
+// ligamos explicitamente só nos gráficos de fauna (não afeta as outras abas).
+let _dlInit = false
+function ensureDatalabels() {
+  if (_dlInit || typeof ChartDataLabels === 'undefined') return
+  Chart.register(ChartDataLabels)
+  Chart.defaults.set('plugins.datalabels', { display: false })
+  _dlInit = true
+}
+
+// Formatter "valor (%)" para datasets simples (% sobre o total do dataset)
+function dlValPct(value, ctx) {
+  if (!value) return ''
+  const arr   = ctx.chart.data.datasets[ctx.datasetIndex].data
+  const total = arr.reduce((a, b) => a + (Number(b) || 0), 0) || 1
+  return `${value} (${Math.round(value / total * 100)}%)`
+}
+// Formatter "valor (%)" para barras empilhadas (% dentro da linha/regional)
+function dlValPctStack(value, ctx) {
+  if (!value) return ''
+  const i     = ctx.dataIndex
+  const total = ctx.chart.data.datasets.reduce((a, ds) => a + (Number(ds.data[i]) || 0), 0) || 1
+  return `${value} (${Math.round(value / total * 100)}%)`
+}
+
 function initChart(id, config) {
   const canvas = document.getElementById(id)
   if (!canvas) return
   if (_charts[id]) _charts[id].destroy()
+  ensureDatalabels()
   Chart.defaults.font.family = "'DM Sans', system-ui, sans-serif"
   Chart.defaults.font.size   = 11
   Chart.defaults.color       = '#6b7280'
@@ -1365,11 +1392,17 @@ function initFaunaCond(f) {
     },
     options: {
       responsive: true, maintainAspectRatio: false,
+      layout: { padding: { top: 22 } },
       plugins: {
         legend: { display: false },
         tooltip: {
           backgroundColor: '#0A1A0F', padding: 10, cornerRadius: 8,
           callbacks: { label: ctx => `  ${ctx.parsed.y} animais` }
+        },
+        datalabels: {
+          display: true, formatter: dlValPct,
+          color: '#374151', anchor: 'end', align: 'end', offset: 2, clamp: true,
+          font: { size: 10, weight: '600' }
         }
       },
       scales: {
@@ -1420,6 +1453,16 @@ function initFaunaRegional(f) {
         tooltip: {
           backgroundColor: '#0A1A0F', padding: 10, cornerRadius: 8, mode: 'index',
           callbacks: { label: ctx => ctx.parsed.x > 0 ? `  ${ctx.dataset.label}: ${ctx.parsed.x}` : null }
+        },
+        datalabels: {
+          // valor + % da regional; só em segmentos largos o bastante (evita sobreposição)
+          display: ctx => {
+            const i = ctx.dataIndex, v = Number(ctx.dataset.data[i]) || 0
+            const tot = ctx.chart.data.datasets.reduce((a, ds) => a + (Number(ds.data[i]) || 0), 0) || 1
+            return v / tot >= 0.12
+          },
+          formatter: dlValPctStack, color: '#fff', align: 'center', anchor: 'center',
+          font: { size: 9, weight: '700' }, textStrokeColor: 'rgba(0,0,0,.35)', textStrokeWidth: 3
         }
       },
       scales: {
@@ -1477,10 +1520,15 @@ function initFaunaBrigada(f) {
         tooltip: {
           backgroundColor: '#0A1A0F', padding: 10, cornerRadius: 8,
           callbacks: { label: ctx => `  ${ctx.parsed.x} animais resgatados` }
+        },
+        datalabels: {
+          display: true, formatter: dlValPct,
+          color: '#374151', anchor: 'end', align: 'end', offset: 4, clamp: true,
+          font: { size: 10, weight: '600' }
         }
       },
       scales: {
-        x: { beginAtZero: true, grid: { color: 'rgba(0,0,0,.05)' },
+        x: { beginAtZero: true, grace: '18%', grid: { color: 'rgba(0,0,0,.05)' },
              border: { display: false }, ticks: { precision: 0, color: '#9ca3af', font: { size: 10 } } },
         y: { grid: { display: false }, border: { display: false },
              ticks: { color: '#374151', font: { size: 12, weight: '500' } } }
@@ -1540,10 +1588,15 @@ function initFaunaEspecie(f) {
         tooltip: {
           backgroundColor: '#0A1A0F', padding: 10, cornerRadius: 8,
           callbacks: { label: ctx => `  ${ctx.parsed.x} resgatado(s)` }
+        },
+        datalabels: {
+          display: true, formatter: dlValPct,
+          color: '#374151', anchor: 'end', align: 'end', offset: 4, clamp: true,
+          font: { size: 10, weight: '600' }
         }
       },
       scales: {
-        x: { beginAtZero: true, grid: { color: 'rgba(0,0,0,.05)' },
+        x: { beginAtZero: true, grace: '18%', grid: { color: 'rgba(0,0,0,.05)' },
              border: { display: false }, ticks: { precision: 0, color: '#9ca3af', font: { size: 10 } } },
         y: { grid: { display: false }, border: { display: false },
              ticks: { color: '#374151', font: { size: 12, weight: '500' } } }
