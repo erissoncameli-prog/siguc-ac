@@ -82,6 +82,54 @@
 }
 .org-chevron.aberto { transform:rotate(90deg); }
 
+/* ── Banner de fluxo ──────────────────────────────────── */
+.fluxo-banner {
+  background: linear-gradient(135deg, rgba(10,26,15,.04), rgba(82,183,136,.08));
+  border: 1px solid rgba(82,183,136,.25);
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin-bottom: 20px;
+}
+.fluxo-titulo {
+  font-size: 11px; font-weight: 700; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--verde-c); margin-bottom: 14px;
+}
+.fluxo-passos {
+  display: flex; align-items: flex-start; gap: 8px; flex-wrap: wrap;
+}
+.fluxo-passo {
+  display: flex; align-items: flex-start; gap: 10px;
+  flex: 1; min-width: 200px;
+}
+.fluxo-num {
+  width: 24px; height: 24px; border-radius: 50%; flex-shrink: 0;
+  background: var(--verde-c); color: #fff;
+  font-size: 12px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+  margin-top: 1px;
+}
+.fluxo-passo-label {
+  font-size: 12px; font-weight: 700; color: #111827; margin-bottom: 3px;
+}
+.fluxo-passo-desc {
+  font-size: 12px; color: #6B7280; line-height: 1.5;
+}
+.fluxo-seta {
+  font-size: 20px; color: #D1D5DB; padding-top: 2px; flex-shrink: 0;
+}
+.fluxo-link {
+  color: var(--verde-c); font-weight: 600; text-decoration: underline;
+}
+/* ── Aviso inline modal ───────────────────────────────── */
+.aviso-inline {
+  background: #FFF7ED; border: 1px solid #FED7AA;
+  border-radius: 8px; padding: 10px 14px;
+  font-size: 12px; color: #92400E; line-height: 1.5;
+  margin-bottom: 14px; display: flex; gap: 8px; align-items: flex-start;
+}
+.aviso-inline svg { flex-shrink: 0; margin-top: 1px; }
+.aviso-inline a { color: #92400E; font-weight: 700; text-decoration: underline; }
+
 /* ── Vazio ────────────────────────────────────────────── */
 .empty-state {
   text-align:center; padding:48px 24px; color:#9CA3AF;
@@ -145,6 +193,10 @@
       <button class="modal-close" onclick="fecharModalOcupacao()">×</button>
     </div>
     <div class="modal-body">
+      <div id="ocup-aviso-usuarios" class="aviso-inline" style="display:none">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <span>Nenhum servidor cadastrado no sistema. Para registrar uma ocupação, o servidor precisa ter um usuário ativo. <a href="usuarios.html">Cadastrar usuário →</a></span>
+      </div>
       <div class="form-group">
         <label class="form-label">Cargo <span class="obrig">*</span></label>
         <select class="form-control" id="ocup-cargo"></select>
@@ -152,6 +204,7 @@
       <div class="form-group">
         <label class="form-label">Servidor <span class="obrig">*</span></label>
         <select class="form-control" id="ocup-usuario"></select>
+        <div class="form-hint">Somente servidores com cadastro ativo no sistema aparecem aqui.</div>
       </div>
       <div class="grid-2">
         <div class="form-group">
@@ -266,6 +319,36 @@ let _perfilUsuario = ''
         <button class="tab-btn" onclick="ativarAba('cargos', this)">Cargos</button>
         <button class="tab-btn" onclick="ativarAba('delegacoes', this)">Delegações</button>
         <button class="tab-btn" onclick="ativarAba('unidades', this)">Unidades</button>
+      </div>
+
+      <!-- Banner: fluxo de trabalho -->
+      <div class="fluxo-banner">
+        <div class="fluxo-titulo">Como funciona</div>
+        <div class="fluxo-passos">
+          <div class="fluxo-passo">
+            <div class="fluxo-num">1</div>
+            <div class="fluxo-passo-corpo">
+              <div class="fluxo-passo-label">Criar unidade</div>
+              <div class="fluxo-passo-desc">Na aba <strong>Unidades</strong>, crie a divisão, departamento ou setor. O cargo de chefia é gerado automaticamente.</div>
+            </div>
+          </div>
+          <div class="fluxo-seta">›</div>
+          <div class="fluxo-passo">
+            <div class="fluxo-num">2</div>
+            <div class="fluxo-passo-corpo">
+              <div class="fluxo-passo-label">Cadastrar servidor como usuário</div>
+              <div class="fluxo-passo-desc">O servidor precisa ter um cadastro ativo no sistema. Acesse <a href="usuarios.html" class="fluxo-link">Usuários</a> para cadastrá-lo antes de prosseguir.</div>
+            </div>
+          </div>
+          <div class="fluxo-seta">›</div>
+          <div class="fluxo-passo">
+            <div class="fluxo-num">3</div>
+            <div class="fluxo-passo-corpo">
+              <div class="fluxo-passo-label">Registrar ocupação</div>
+              <div class="fluxo-passo-desc">Na aba <strong>Cargos</strong>, clique em <em>Registrar ocup.</em> no cargo desejado e vincule o servidor com a portaria de nomeação.</div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div id="tab-organograma" class="tab-panel ativo">
@@ -649,6 +732,7 @@ function abrirModalOcupacao(cargoId = null) {
   document.getElementById('ocup-fim').value = ''
   document.getElementById('ocup-portaria').value = ''
   document.getElementById('ocup-obs').value = ''
+  document.getElementById('ocup-aviso-usuarios').style.display = _usuarios.length ? 'none' : 'flex'
   document.getElementById('modal-ocupacao').classList.add('aberto')
 }
 
