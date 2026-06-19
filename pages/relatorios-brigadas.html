@@ -361,7 +361,7 @@ async function gerarRelatorio() {
 
   const [regRes, brigRes, bristRes] = await Promise.all([
     db.from('vw_registros_validacao')
-      .select('id,natureza,atividade,status_validacao,data_hora_evento,regional,uc_id,uc_nome,brigada_id,brigada_nome,brigadista_id,brigadista_nome,equipe_id,equipe_nome,duracao_horas,n_fauna,n_fauna_pendente,n_fauna_resgatada,fotos_urls,area_estimada_ha,pessoas_alcancadas')
+      .select('id,natureza,atividade,status_validacao,data_hora_evento,regional,uc_id,uc_nome,brigada_id,brigada_nome,brigadista_id,brigadista_nome,equipe_id,equipe_nome,duracao_horas,n_fauna,n_fauna_pendente,n_fauna_resgatada,fotos_urls,area_estimada_ha,pessoas_alcancadas,integrada_cbmac')
       .gte('data_hora_evento', ini + 'T00:00:00')
       .lte('data_hora_evento', fim + 'T23:59:59')
       .order('data_hora_evento', { ascending: false })
@@ -473,6 +473,8 @@ function renderEstado() {
   const fauna   = r.reduce((s,x)=>s+(x.n_fauna||0), 0)
   const area    = r.reduce((s,x)=>s+(Number(x.area_estimada_ha)||0), 0)
   const pessoas = r.reduce((s,x)=>s+(x.pessoas_alcancadas||0), 0)
+  const combate = r.filter(x=>x.natureza==='combate').length
+  const cbmac   = r.filter(x=>x.integrada_cbmac).length
 
   // Tempo das ocorrências (registros com duração informada)
   const comDur     = r.filter(x=>Number(x.duracao_horas)>0).map(x=>Number(x.duracao_horas))
@@ -497,6 +499,7 @@ function renderEstado() {
       ${horasTot > 0 ? `<div class="kpi-brig"><div class="kpi-brig-n">${formatNum(horasTot,1)} h</div><div class="kpi-brig-l">Horas trabalhadas</div></div>` : ''}
       ${comDur.length ? `<div class="kpi-brig"><div class="kpi-brig-n">${fmtHoras(tempoMedio)}</div><div class="kpi-brig-l">Tempo médio</div></div>` : ''}
       ${comDur.length ? `<div class="kpi-brig"><div class="kpi-brig-n">${fmtHoras(maisLonga)}</div><div class="kpi-brig-l">Ocorrência mais longa</div></div>` : ''}
+      ${cbmac > 0 ? `<div class="kpi-brig comb"><div class="kpi-brig-n">${cbmac}<span style="font-size:1rem"> / ${combate}</span></div><div class="kpi-brig-l">Combate com apoio CBMAC</div></div>` : ''}
     </div>
 
     <!-- Gráficos linha 1: Rosca + Linha -->
