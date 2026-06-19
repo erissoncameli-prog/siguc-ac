@@ -217,7 +217,7 @@ function bSyncMontarPayload(reg, fotosUrls) {
     perimetro_geojson, // → perimetro_geom (PostGIS); área recalculada por trigger
     observacoes,       // → descricao
     criado_em,         // → data_inicio + data_hora_evento
-    ...rest            // inclui equipe_id, duracao_horas, area_metodo, area_medida_ha
+    ...rest            // inclui equipe_id, duracao_horas, hora_inicio, hora_fim, area_metodo, area_medida_ha
   } = reg
 
   const ts = criado_em ?? new Date().toISOString()

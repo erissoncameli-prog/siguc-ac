@@ -474,6 +474,12 @@ function renderEstado() {
   const area    = r.reduce((s,x)=>s+(Number(x.area_estimada_ha)||0), 0)
   const pessoas = r.reduce((s,x)=>s+(x.pessoas_alcancadas||0), 0)
 
+  // Tempo das ocorrências (registros com duração informada)
+  const comDur     = r.filter(x=>Number(x.duracao_horas)>0).map(x=>Number(x.duracao_horas))
+  const horasTot   = comDur.reduce((s,h)=>s+h, 0)
+  const tempoMedio = comDur.length ? horasTot/comDur.length : 0
+  const maisLonga  = comDur.length ? Math.max(...comDur) : 0
+
   const pct = total ? Math.round(validado/total*100) : 0
 
   const container = document.getElementById('tab-estado')
@@ -488,6 +494,9 @@ function renderEstado() {
       <div class="kpi-brig"><div class="kpi-brig-n">${_brists.length}</div><div class="kpi-brig-l">Brigadistas ativos</div></div>
       ${area > 0 ? `<div class="kpi-brig comb"><div class="kpi-brig-n">${formatNum(area,1)} ha</div><div class="kpi-brig-l">Área trabalhada</div></div>` : ''}
       ${pessoas > 0 ? `<div class="kpi-brig moni"><div class="kpi-brig-n">${pessoas}</div><div class="kpi-brig-l">Pessoas alcançadas</div></div>` : ''}
+      ${horasTot > 0 ? `<div class="kpi-brig"><div class="kpi-brig-n">${formatNum(horasTot,1)} h</div><div class="kpi-brig-l">Horas trabalhadas</div></div>` : ''}
+      ${comDur.length ? `<div class="kpi-brig"><div class="kpi-brig-n">${fmtHoras(tempoMedio)}</div><div class="kpi-brig-l">Tempo médio</div></div>` : ''}
+      ${comDur.length ? `<div class="kpi-brig"><div class="kpi-brig-n">${fmtHoras(maisLonga)}</div><div class="kpi-brig-l">Ocorrência mais longa</div></div>` : ''}
     </div>
 
     <!-- Gráficos linha 1: Rosca + Linha -->
@@ -510,6 +519,12 @@ function renderEstado() {
     <!-- Gráfico linha 4: Área trabalhada mensal + acumulado -->
     ${area > 0 ? `<div style="margin-bottom:14px">
       <div class="chart-card">${chartAreaAcumulada(r, '-e')}</div>
+    </div>` : ''}
+
+    <!-- Gráfico linha 5: Tempo das ocorrências (médio por natureza + duração mensal) -->
+    ${comDur.length ? `<div class="chart-grid-2">
+      <div class="chart-card">${chartTempoNatureza(r, '-e')}</div>
+      <div class="chart-card">${chartTempoMensal(r, '-e')}</div>
     </div>` : ''}
 
     <!-- Tabelas -->
@@ -546,13 +561,14 @@ function renderEstado() {
   `
 
   requestAnimationFrame(() => {
-    destroyCharts('chart-nat-e','chart-mensal-e','chart-ativ-e','chart-status-e','chart-regional-e','chart-area-e')
+    destroyCharts('chart-nat-e','chart-mensal-e','chart-ativ-e','chart-status-e','chart-regional-e','chart-area-e','chart-tempo-nat-e','chart-tempo-mes-e')
     initChartNatureza(r, '-e')
     initChartMensal(r, '-e')
     initChartAtividade(r, '-e')
     initChartStatus(r, '-e')
     initChartRegional(r, '-e')
     if (area > 0) initChartAreaAcumulada(r, '-e')
+    if (comDur.length) { initChartTempoNatureza(r, '-e'); initChartTempoMensal(r, '-e') }
     const selEq = document.getElementById('sel-equipe-metrica')
     if (selEq) selEq.value = _equipeSort
     renderTabelaEquipes()
@@ -770,6 +786,107 @@ function initChartNatureza(rows, sfx='') {
         tooltip: { callbacks: { label: ctx =>
           ` ${ctx.label}: ${ctx.parsed} (${Math.round(ctx.parsed/total*100)}%)`
         }}
+      }
+    }
+  })
+}
+
+// ── Tempo: formata horas decimais como "2h 30min" ─────────────
+function fmtHoras(h) {
+  const min = Math.round((Number(h)||0) * 60)
+  const hh = Math.floor(min/60), mm = min%60
+  return hh && mm ? `${hh}h ${mm}min` : hh ? `${hh}h` : `${mm}min`
+}
+
+// ── BARRAS: Tempo médio por natureza (h) ──────────────────────
+function chartTempoNatureza(rows, sfx='') {
+  return `<div class="chart-title">Tempo médio por natureza (h)</div>
+    <div class="chart-canvas-wrap" style="height:210px">
+      <canvas id="chart-tempo-nat${sfx}"></canvas>
+    </div>`
+}
+function initChartTempoNatureza(rows, sfx='') {
+  const acc = { prevencao:{s:0,n:0}, combate:{s:0,n:0}, monitoramento:{s:0,n:0} }
+  rows.forEach(r => {
+    const h = Number(r.duracao_horas)
+    if (h > 0 && r.natureza in acc) { acc[r.natureza].s += h; acc[r.natureza].n++ }
+  })
+  const ks = ['prevencao','combate','monitoramento']
+  const med = ks.map(k => acc[k].n ? Math.round(acc[k].s/acc[k].n*10)/10 : 0)
+  const cores = ['#12A66A','#EF5B3C','#3B82C4']
+  initChart('chart-tempo-nat'+sfx, {
+    type: 'bar',
+    data: {
+      labels: ['Prevenção','Combate','Monitoramento'],
+      datasets: [{
+        label: 'Tempo médio (h)',
+        data: med,
+        backgroundColor: cores.map(c => c + 'cc'),
+        borderColor: cores, borderWidth: 1.5, borderRadius: 5,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display:false },
+        tooltip: { callbacks: { label: ctx => ` ${fmtHoras(ctx.parsed.y)}` } }
+      },
+      scales: {
+        y: { beginAtZero:true, grid:{ color:'rgba(0,0,0,.05)' } },
+        x: { grid:{ display:false }, ticks:{ font:{ size:10 } } }
+      }
+    }
+  })
+}
+
+// ── LINHA: Tempo médio mensal (h) ─────────────────────────────
+function chartTempoMensal(rows, sfx='') {
+  return `<div class="chart-title">Tempo médio mensal por ocorrência (h)</div>
+    <div class="chart-canvas-wrap" style="height:210px">
+      <canvas id="chart-tempo-mes${sfx}"></canvas>
+    </div>`
+}
+function initChartTempoMensal(rows, sfx='') {
+  const acc = {}
+  rows.forEach(r => {
+    const h = Number(r.duracao_horas)
+    if (!(h > 0) || !r.data_hora_evento) return
+    const key = r.data_hora_evento.slice(0,7)
+    if (!acc[key]) acc[key] = { s:0, n:0 }
+    acc[key].s += h; acc[key].n++
+  })
+  const meses = []
+  for (let i = 11; i >= 0; i--) {
+    const d = new Date(); d.setMonth(d.getMonth()-i, 1)
+    meses.push(d.toISOString().slice(0,7))
+  }
+  const labels = meses.map(m => {
+    const [a,mes] = m.split('-')
+    return new Date(+a, +mes-1, 1).toLocaleDateString('pt-BR',{month:'short',year:'2-digit'})
+  })
+  initChart('chart-tempo-mes'+sfx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Tempo médio (h)',
+        data: meses.map(m => acc[m] ? Math.round(acc[m].s/acc[m].n*10)/10 : 0),
+        borderColor: '#C9A84C',
+        backgroundColor: 'rgba(201,168,76,.14)',
+        fill: true, tension: 0.35,
+        pointRadius: 4, pointBackgroundColor: '#C9A84C',
+        pointBorderColor: '#fff', pointBorderWidth: 2, pointHoverRadius: 6,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display:false },
+        tooltip: { callbacks: { label: ctx => ` ${fmtHoras(ctx.parsed.y)}` } }
+      },
+      scales: {
+        y: { beginAtZero:true, grid:{ color:'rgba(0,0,0,.05)' } },
+        x: { grid:{ display:false }, ticks:{ maxRotation:35, font:{ size:10 } } }
       }
     }
   })

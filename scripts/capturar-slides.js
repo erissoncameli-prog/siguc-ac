@@ -89,7 +89,9 @@ async function showOnly(page, id) {
       <option value="denuncia_193" selected>Denúncia anônima / 193</option>
       <option value="informacao_populares">Informação de populares</option>
       <option value="ronda_brigada">Ronda da brigada</option>`;
-    document.getElementById('f-duracao').value = '3.5';
+    document.getElementById('f-hora-inicio').value = '08:00';
+    document.getElementById('f-hora-fim').value = '11:30';
+    if (typeof calcularDuracao === 'function') calcularDuracao();
     document.getElementById('f-area').value = '12.50';
     document.getElementById('f-obs').value = 'Incêndio em área de floresta próximo ao rio. Equipe utilizou abafadores e bombas costais.';
     document.getElementById('foto-count-label').textContent = '(2/5)';
