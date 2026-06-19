@@ -274,10 +274,18 @@
     </div>
 
     <div class="form-section">
-      <div class="form-group">
-        <label class="form-label">Duração (h)</label>
-        <input type="number" id="f-duracao" class="form-input" min="0" max="24" step="0.5" placeholder="0">
+      <label class="form-label">Horário da ocorrência</label>
+      <div class="hora-row">
+        <div class="hora-campo">
+          <span class="hora-rotulo">Início</span>
+          <input type="time" id="f-hora-inicio" class="form-input" onchange="calcularDuracao()">
+        </div>
+        <div class="hora-campo">
+          <span class="hora-rotulo">Término</span>
+          <input type="time" id="f-hora-fim" class="form-input" onchange="calcularDuracao()">
+        </div>
       </div>
+      <p class="duracao-calc" id="duracao-calc" data-icon="clock">Informe início e término</p>
     </div>
 
     <div class="form-section">
@@ -488,6 +496,22 @@
       <div class="dados-kpi"><strong id="kpi-mes">—</strong><span>Neste mês</span></div>
       <div class="dados-kpi"><strong id="kpi-area">—</strong><span>Área (ha)</span></div>
       <div class="dados-kpi"><strong id="kpi-fauna">—</strong><span>Animais</span></div>
+    </div>
+
+    <!-- ── Tempo das ocorrências ── -->
+    <div class="form-section">
+      <label class="form-label" data-icon="clock">Tempo das ocorrências</label>
+      <div class="dados-grid">
+        <div class="dados-kpi"><strong id="kpi-horas-tot">—</strong><span>Horas totais</span></div>
+        <div class="dados-kpi"><strong id="kpi-tempo-medio">—</strong><span>Tempo médio</span></div>
+        <div class="dados-kpi"><strong id="kpi-mais-longa">—</strong><span>Mais longa</span></div>
+        <div class="dados-kpi"><strong id="kpi-mais-curta">—</strong><span>Mais curta</span></div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <label class="form-label">Tempo médio por natureza (h)</label>
+      <div id="chart-tempo-natureza" class="chart-barras"></div>
     </div>
 
     <div class="form-section">
@@ -1652,7 +1676,11 @@ function abrirFormulario(natureza) {
   // Reset campos
   document.getElementById('f-atividade').value = ''
   document.getElementById('f-origem').value    = ''
-  document.getElementById('f-duracao').value   = ''
+  // Horário: início pré-preenchido com a hora atual; término em branco
+  document.getElementById('f-hora-inicio').value = horaAtualHHMM()
+  document.getElementById('f-hora-fim').value    = ''
+  App._duracaoHoras = null
+  calcularDuracao()
   document.getElementById('f-area').value      = ''
   document.getElementById('f-obs').value       = ''
   App._areaMedida = null
@@ -1668,6 +1696,38 @@ function abrirFormulario(natureza) {
   document.getElementById('form-gps-acc').textContent    = fmtAcc(gps)
 
   mostrarTela('tela-form')
+}
+
+// ── Horário / duração da ocorrência ──────────────────────────
+// Hora atual no formato HH:MM (para pré-preencher o início)
+function horaAtualHHMM() {
+  const d = new Date()
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
+
+// Calcula a duração a partir de início/término (trata virada de
+// meia-noite: se o fim for menor que o início, soma 24h). Guarda em
+// horas decimais em App._duracaoHoras e atualiza o texto exibido.
+function calcularDuracao() {
+  const ini = document.getElementById('f-hora-inicio').value
+  const fim = document.getElementById('f-hora-fim').value
+  const el  = document.getElementById('duracao-calc')
+  if (!ini || !fim) {
+    App._duracaoHoras = null
+    el.classList.add('vazio')
+    el.innerHTML = `${bico('clock')} Informe início e término`
+    return
+  }
+  const [hi, mi] = ini.split(':').map(Number)
+  const [hf, mf] = fim.split(':').map(Number)
+  let minutos = (hf * 60 + mf) - (hi * 60 + mi)
+  if (minutos < 0) minutos += 24 * 60   // ocorrência que cruza a meia-noite
+  App._duracaoHoras = Math.round((minutos / 60) * 10) / 10
+  const h = Math.floor(minutos / 60)
+  const m = minutos % 60
+  const txt = h && m ? `${h}h ${m}min` : h ? `${h}h` : `${m}min`
+  el.classList.remove('vazio')
+  el.innerHTML = `${bico('clock')} Duração: ${txt}`
 }
 
 async function salvarRegistro() {
@@ -1687,7 +1747,9 @@ async function salvarRegistro() {
     atividade,
     equipe_id,
     origem_acionamento: document.getElementById('f-origem').value || null,
-    duracao_horas: parseFloat(document.getElementById('f-duracao').value) || null,
+    hora_inicio:   document.getElementById('f-hora-inicio').value || null,
+    hora_fim:      document.getElementById('f-hora-fim').value || null,
+    duracao_horas: App._duracaoHoras ?? null,
     area_ha:       parseFloat(document.getElementById('f-area').value) || null,
     area_metodo:       App._areaMedida ? App._areaMedida.metodo
                        : (parseFloat(document.getElementById('f-area').value) ? 'estimativa' : null),
@@ -2242,6 +2304,13 @@ const COR_CLASSE = {
   peixe: '#3B82C4', invertebrado: '#8B5CF6', nao_sei: '#9CA3AF',
 }
 
+// Formata horas decimais como "2h 30min" / "45min" / "3h"
+function fmtHoras(h) {
+  const min = Math.round((Number(h) || 0) * 60)
+  const hh = Math.floor(min / 60), mm = min % 60
+  return hh && mm ? `${hh}h ${mm}min` : hh ? `${hh}h` : `${mm}min`
+}
+
 async function carregarDados() {
   carregarDesempenhoBrigada()   // desempenho por equipe/brigada/brigadista (independe do bloco individual)
   let stats = await bOfflineGetConfig('stats_cache_v2')
@@ -2258,7 +2327,7 @@ async function carregarDados() {
       try {
         const [{ data: regs }, { data: fauna }] = await Promise.all([
           db.from('registros_campo')
-            .select('natureza, atividade, data_hora_evento, area_estimada_ha, status_validacao')
+            .select('natureza, atividade, data_hora_evento, area_estimada_ha, status_validacao, duracao_horas')
             .eq('brigadista_id', App.brigadista.id),
           db.from('registro_fauna')
             .select('classe, quantidade, registro_campo_id, registros_campo!inner(brigadista_id)')
@@ -2279,9 +2348,11 @@ async function carregarDados() {
     infoEl.textContent = sessaoExpirada
       ? 'Sessão expirada — saia e faça login novamente para carregar seus resultados'
       : 'Conecte-se à internet uma vez para carregar seus resultados'
-    ;['chart-natureza', 'chart-atividade', 'chart-fauna', 'chart-validacao', 'chart-fauna-cruzado'].forEach(id =>
+    ;['chart-natureza', 'chart-atividade', 'chart-fauna', 'chart-validacao', 'chart-fauna-cruzado', 'chart-tempo-natureza'].forEach(id =>
       document.getElementById(id).innerHTML = '<p class="chart-vazio">Sem dados ainda</p>')
     document.getElementById('chart-meses').innerHTML = ''
+    ;['kpi-horas-tot', 'kpi-tempo-medio', 'kpi-mais-longa', 'kpi-mais-curta'].forEach(id =>
+      document.getElementById(id).textContent = '—')
     return
   }
 
@@ -2300,6 +2371,27 @@ async function carregarDados() {
   document.getElementById('kpi-area').textContent  =
     regs.reduce((s, r) => s + (parseFloat(r.area_estimada_ha) || 0), 0).toFixed(1)
   document.getElementById('kpi-fauna').textContent = fauna.reduce((s, f) => s + (f.quantidade || 1), 0)
+
+  // ── Tempo das ocorrências ──
+  const comDur = regs.filter(r => Number(r.duracao_horas) > 0).map(r => Number(r.duracao_horas))
+  const horasTot = comDur.reduce((s, h) => s + h, 0)
+  document.getElementById('kpi-horas-tot').textContent  = comDur.length ? fmtHoras(horasTot) : '—'
+  document.getElementById('kpi-tempo-medio').textContent = comDur.length ? fmtHoras(horasTot / comDur.length) : '—'
+  document.getElementById('kpi-mais-longa').textContent  = comDur.length ? fmtHoras(Math.max(...comDur)) : '—'
+  document.getElementById('kpi-mais-curta').textContent  = comDur.length ? fmtHoras(Math.min(...comDur)) : '—'
+
+  // Tempo médio por natureza — barras
+  const durNat = {}
+  regs.forEach(r => {
+    const h = Number(r.duracao_horas)
+    if (!(h > 0)) return
+    const k = r.natureza || 'outro'
+    if (!durNat[k]) durNat[k] = { soma: 0, n: 0 }
+    durNat[k].soma += h; durNat[k].n++
+  })
+  renderBarras('chart-tempo-natureza', Object.entries(durNat)
+    .map(([k, v]) => [ROTULO_NATUREZA[k] || rotuloBonito(k), Math.round(v.soma / v.n * 10) / 10, COR_NATUREZA[k] || '#8B5CF6'])
+    .sort((a, b) => b[1] - a[1]))
 
   // Por natureza — rosca com total no centro
   const porNat = contar(regs, 'natureza')
