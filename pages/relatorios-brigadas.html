@@ -683,6 +683,42 @@ function initChart(id, config) {
   _charts[id] = new Chart(canvas.getContext('2d'), config)
 }
 
+// Clareia/escurece uma cor hex (#rrggbb). f<0 escurece, f>0 clareia.
+function shadeCor(hex, f) {
+  const n = parseInt(String(hex).replace('#',''), 16)
+  let r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255
+  const aj = v => Math.max(0, Math.min(255, Math.round(v * (1 + f))))
+  return `rgb(${aj(r)},${aj(g)},${aj(b)})`
+}
+
+// Plugin pseudo-3D para rosca: desenha camadas escurecidas deslocadas
+// para baixo (extrusão), simulando profundidade. Inline = só na rosca
+// onde é declarado (não afeta os outros gráficos).
+const pseudo3DDoughnut = {
+  id: 'pseudo3d',
+  beforeDatasetsDraw(chart, _args, opts) {
+    const meta = chart.getDatasetMeta(0)
+    if (!meta || !meta.data || !meta.data.length) return
+    const depth = (opts && opts.depth) || 16
+    const ds = chart.data.datasets[0]
+    const ctx = chart.ctx
+    ctx.save()
+    for (let d = depth; d >= 1; d--) {
+      meta.data.forEach((arc, i) => {
+        const p = arc.getProps(['x','y','startAngle','endAngle','innerRadius','outerRadius'], false)
+        if (p.endAngle === p.startAngle) return
+        ctx.beginPath()
+        ctx.fillStyle = shadeCor(ds.backgroundColor[i] || '#888', -0.40)
+        ctx.arc(p.x, p.y + d, p.outerRadius, p.startAngle, p.endAngle)
+        ctx.arc(p.x, p.y + d, p.innerRadius, p.endAngle, p.startAngle, true)
+        ctx.closePath()
+        ctx.fill()
+      })
+    }
+    ctx.restore()
+  }
+}
+
 // ════════════════════════════════════════════════════════════════
 // HTML builders (retornam <canvas>) + funções de inicialização
 // ════════════════════════════════════════════════════════════════
@@ -1340,21 +1376,24 @@ function initFaunaClasse(f) {
 
   initChart('chart-fauna-classe', {
     type: 'doughnut',
+    plugins: [pseudo3DDoughnut],
     data: {
       labels: ativos.map(c => FAUNA_CLASSE_LAB[c]),
       datasets: [{
         data: vals,
         backgroundColor: ativos.map(c => COR_CLASSE[c]),
-        borderWidth: 3,
-        borderColor: '#fff',
+        borderWidth: 2,
+        borderColor: 'rgba(255,255,255,.85)',
         hoverBorderWidth: 0,
-        hoverOffset: 8,
+        hoverOffset: 10,
       }]
     },
     options: {
       responsive: true, maintainAspectRatio: false,
-      cutout: '68%',
+      cutout: '56%',
+      layout: { padding: { bottom: 20 } },
       plugins: {
+        pseudo3d: { depth: 16 },
         legend: {
           position: 'right',
           labels: { boxWidth: 10, boxHeight: 10, borderRadius: 3, useBorderRadius: true,
@@ -1365,6 +1404,17 @@ function initFaunaClasse(f) {
           callbacks: {
             label: ctx => `  ${ctx.label}: ${ctx.parsed} (${Math.round(ctx.parsed/total*100)}%)`
           }
+        },
+        datalabels: {
+          // % dentro de cada fatia (esconde fatias muito pequenas p/ não sobrepor)
+          display: ctx => {
+            const arr = ctx.chart.data.datasets[0].data
+            const tot = arr.reduce((a, b) => a + (Number(b) || 0), 0) || 1
+            return (Number(arr[ctx.dataIndex]) || 0) / tot >= 0.05
+          },
+          formatter: (v) => `${Math.round(v / total * 100)}%`,
+          color: '#fff', font: { size: 11, weight: '700' },
+          textStrokeColor: 'rgba(0,0,0,.35)', textStrokeWidth: 3
         }
       }
     }
