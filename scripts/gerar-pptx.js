@@ -509,8 +509,8 @@ pres.author = 'DIMA · SEMA-AC';
   const fields = [
     { n: '1', color: C.green,   label: 'GPS',                    text: 'A localização é capturada automaticamente — não precisa digitar' },
     { n: '2', color: C.gold,    label: 'Atividade',               text: 'Escolha a atividade específica que foi realizada' },
-    { n: '3', color: C.combate, label: 'Como a brigada soube?',   text: 'Denúncia 193, informação de populares, ronda da brigada…' },
-    { n: '4', color: C.monitor, label: 'Duração (horas)',         text: 'Quantas horas durou a atividade? (ex.: 3,5 = 3h30min)' },
+    { n: '3', color: C.combate, label: 'Acionada por?',           text: 'Denúncia 193, informação de populares, ronda da brigada…' },
+    { n: '4', color: C.monitor, label: 'Início e término',        text: 'Informe os horários — a duração é calculada automaticamente' },
     { n: '5', color: C.green,   label: 'Área (hectares)',         text: 'Estime a área ou use o botão "Medir" no mapa' },
     { n: '6', color: C.gold,    label: 'Observações',             text: 'Descreva o que aconteceu, as condições do local e o resultado' },
   ];

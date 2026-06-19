@@ -106,9 +106,11 @@ Unidades: SECRETARIA > DIMA > DEUC | CIGMA | JURÍDICO
 ### App Brigadas (campo) — implementado
 - Offline-first (IndexedDB) + sync; login Supabase + PIN; câmera/GPS/
   marca d'água; catálogo de espécies; auditoria de sessão.
-- Registro de ocorrência: atividade, "Como a brigada soube?"
-  (origem_acionamento), equipe, duração (horas, persistida), área,
-  fotos (até 5) e fauna.
+- Registro de ocorrência: atividade, "Acionada por?"
+  (origem_acionamento), equipe, horário (início/término →
+  duracao_horas calculada e persistida), apoio do CBMAC
+  (integrada_cbmac; só em natureza combate), área, fotos (até 5)
+  e fauna.
 - Fotos: câmera nativa do SO (input capture) + galeria; no APK usa o
   plugin Capacitor Camera (CAMERA/PHOTOS). Marca d'água sempre aplicada.
 - Equipes A/B/C: equipe é atributo do brigadista; no app o seletor fica

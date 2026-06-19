@@ -263,7 +263,7 @@
     </div>
 
     <div class="form-section">
-      <label class="form-label">Como a brigada soube?</label>
+      <label class="form-label">Acionada por?</label>
       <select id="f-origem" class="form-select">
         <option value="">Selecione…</option>
         <option value="denuncia_193">Denúncia anônima / 193</option>
@@ -271,6 +271,15 @@
         <option value="ronda_brigada">Ronda da brigada</option>
         <option value="outro">Outros</option>
       </select>
+    </div>
+
+    <!-- Apoio do CBMAC — só aparece em ocorrências de Combate -->
+    <div class="form-section" id="form-cbmac-section" hidden>
+      <label class="toggle-row">
+        <span class="form-label" style="margin:0">Apoio do CBMAC?</span>
+        <input type="checkbox" id="f-cbmac">
+        <span class="toggle-thumb"></span>
+      </label>
     </div>
 
     <div class="form-section">
@@ -1673,6 +1682,10 @@ function abrirFormulario(natureza) {
   // Popula atividades filtradas pela natureza selecionada
   popularSelectAtividade(natureza)
 
+  // Apoio do CBMAC: só faz sentido em ocorrências de combate
+  document.getElementById('form-cbmac-section').hidden = natureza !== 'combate'
+  document.getElementById('f-cbmac').checked = false
+
   // Reset campos
   document.getElementById('f-atividade').value = ''
   document.getElementById('f-origem').value    = ''
@@ -1747,6 +1760,7 @@ async function salvarRegistro() {
     atividade,
     equipe_id,
     origem_acionamento: document.getElementById('f-origem').value || null,
+    integrada_cbmac: App.naturezaAtual === 'combate' && document.getElementById('f-cbmac').checked,
     hora_inicio:   document.getElementById('f-hora-inicio').value || null,
     hora_fim:      document.getElementById('f-hora-fim').value || null,
     duracao_horas: App._duracaoHoras ?? null,

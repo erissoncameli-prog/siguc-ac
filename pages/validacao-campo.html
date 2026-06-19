@@ -622,6 +622,7 @@ async function abrirDetalhe(id) {
       <span class="badge-sm badge-${r.status_validacao}">${STATUS_VALID[r.status_validacao] || r.status_validacao}</span>
       ${r.n_fauna_pendente > 0 ? '<span class="badge-sm badge-fauna-pend">🐾 Fauna pendente DEBIO</span>' : ''}
       ${r.alerta_cigma ? '<span class="badge-sm" style="background:#fef3c7;color:#92400e">⚡ Alerta CIGMA</span>' : ''}
+      ${r.integrada_cbmac ? '<span class="badge-sm" style="background:#dbeafe;color:#1e40af">Apoio CBMAC</span>' : ''}
       ${r.ocorrencia_id ? '<span class="badge-sm badge-validado">✓ Ocorrência criada</span>' : ''}
     </div>
     ${r.motivo_rejeicao ? `<div style="background:#fee2e2;border-radius:7px;padding:8px 12px;margin-bottom:12px;font-size:.83rem"><strong>Motivo:</strong> ${esc(r.motivo_rejeicao)}</div>` : ''}`
