@@ -872,8 +872,8 @@ function voltarTela() {
 // Boot / autenticação
 // ════════════════════════════════════════════════════════════════
 async function boot() {
-  // Aguarda env + cliente isolado antes de qualquer operação de auth
-  await _brigReady
+  // Aguarda env + cliente isolado; captura falhas sem travar a tela
+  try { await _brigReady } catch (e) { console.warn('[boot] env indisponível:', e.message) }
   // No app nativo (Capacitor) os arquivos já são locais — SW só na web
   if ('serviceWorker' in navigator && !window.Capacitor) {
     navigator.serviceWorker.register('/pwa/sw.js').catch(console.warn)
