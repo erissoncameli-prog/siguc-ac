@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>SIGUC-AC · Saúde do Sistema</title>
+<!-- Esta página testa os endpoints de propósito (incl. requisições inválidas);
+     desliga o monitor global para não emitir avisos de falha falsos. -->
+<script>window.__API_MONITOR_OFF = true;</script>
 <link rel="stylesheet" href="../css/global.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="../js/observability.js"></script>
