@@ -1,5 +1,5 @@
 // ── SIGUC Brigadas — Service Worker ───────────────────────────
-const CACHE = 'siguc-brigadas-v69'
+const CACHE = 'siguc-brigadas-v70'
 
 const APP_SHELL = [
   '/pages/brigada.html',
@@ -50,8 +50,8 @@ self.addEventListener('activate', ev => {
 self.addEventListener('fetch', ev => {
   const url = new URL(ev.request.url)
 
-  // Requisições Supabase (REST, Storage, Functions): network-first sem cache
-  if (url.hostname.endsWith('.supabase.co')) {
+  // Requisições Supabase e config de ambiente: network-first sem cache
+  if (url.hostname.endsWith('.supabase.co') || url.pathname === '/api/env') {
     ev.respondWith(
       fetch(ev.request).catch(() =>
         new Response(JSON.stringify({ error: 'offline' }), {

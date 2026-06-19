@@ -34,6 +34,7 @@ let SUPABASE_URL = '';      // exposto após env load
 let SUPABASE_ANON_KEY = ''; // exposto após env load — brigada.html usa para cliente isolado
 // _dbReady resolve assim que env estiver disponível e db inicializado
 const _dbReady = loadEnv().then(({ supabaseUrl, supabaseKey }) => {
+  if (!supabaseUrl || !supabaseKey) return // env indisponível — db permanece null
   SUPABASE_URL = supabaseUrl;
   SUPABASE_ANON_KEY = supabaseKey;
   db = createInstrumentedDb(createClient(supabaseUrl, supabaseKey, {
