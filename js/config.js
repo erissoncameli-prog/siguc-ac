@@ -5,6 +5,21 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 // Observabilidade — opcional (não carregada em todas as páginas)
 if (typeof Observability !== 'undefined') Observability.init();
 
+// Monitor de APIs — avisa em qualquer tela quando uma API falha.
+// Carregado dinamicamente a partir do caminho deste próprio config.js,
+// para funcionar em todas as páginas sem editar uma por uma.
+;(function () {
+  try {
+    if (window.__API_MONITOR_OFF) return;
+    var cs = document.currentScript;
+    var base = (cs && cs.src) ? cs.src.replace(/config\.js(\?.*)?$/, '') : '../js/';
+    var s = document.createElement('script');
+    s.src = base + 'api-monitor.js';
+    s.async = true;
+    (document.head || document.documentElement).appendChild(s);
+  } catch (e) { /* silencioso: monitor é não-crítico */ }
+})();
+
 const { createClient } = supabase;
 // sessionStorage: sessão encerra ao fechar o navegador (Regra de segurança)
 const _dbRaw = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
