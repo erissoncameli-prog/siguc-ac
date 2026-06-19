@@ -177,6 +177,9 @@ function bIconsAplicar(root) {
   (root || document).querySelectorAll('[data-icon]:not([data-icon-done])').forEach(el => {
     const svg = bico(el.dataset.icon);
     if (!svg) return;
+    // svg é montado a partir de BICON_PATHS (constante interna) por uma chave
+    // de catálogo; não há HTML de origem externa/usuário aqui (XSS não aplicável).
+    // nosemgrep: typescript.react.security.audit.react-unsanitized-method.react-unsanitized-method
     el.insertAdjacentHTML('afterbegin', svg + (el.textContent.trim() ? ' ' : ''));
     el.setAttribute('data-icon-done', '');
   });
