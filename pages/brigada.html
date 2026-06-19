@@ -766,12 +766,12 @@ window.supabase = window.supabase || { createClient: () => null }
 <script src="/js/config.js"></script>
 <script>
 // ── Cliente Supabase ISOLADO para o App de Campo ──────────────
-// Usa localStorage + storageKey próprio para nunca sobrescrever
-// a sessionStorage do app principal SIGUC-AC.
-// Se o CDN não carregou (offline), db permanece null e o boot
-// vai direto para o cache local (PIN + dados do brigadista).
-;(function () {
+// Aguarda _dbReady (env carregado de /api/env) e então sobrescreve
+// db com um cliente que usa localStorage + storageKey próprio,
+// nunca tocando a sessionStorage do app principal SIGUC-AC.
+const _brigReady = _dbReady.then(function () {
   if (!window.supabase || typeof window.supabase.createClient !== 'function') return
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) return
   try {
     const _brigDb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       auth: {
@@ -787,11 +787,9 @@ window.supabase = window.supabase || { createClient: () => null }
       console.info('[brigada] cliente isolado com sessão persistente ativo')
     }
   } catch (e) {
-    // Sem o cliente isolado o app cai na sessão por janela do sistema
-    // (perde a sessão ao fechar) — registrar alto para não passar batido
     console.error('[brigada] cliente isolado FALHOU — usando sessão por janela:', e)
   }
-})();
+});
 </script>
 <script src="/js/brigada-offline.js"></script>
 <script src="/js/brigada-sync.js"></script>
@@ -874,6 +872,8 @@ function voltarTela() {
 // Boot / autenticação
 // ════════════════════════════════════════════════════════════════
 async function boot() {
+  // Aguarda env + cliente isolado antes de qualquer operação de auth
+  await _brigReady
   // No app nativo (Capacitor) os arquivos já são locais — SW só na web
   if ('serviceWorker' in navigator && !window.Capacitor) {
     navigator.serviceWorker.register('/pwa/sw.js').catch(console.warn)
@@ -1307,6 +1307,7 @@ async function fazerLogin() {
   const senha = document.getElementById('login-senha').value
   document.getElementById('login-erro').hidden = true
 
+  await _brigReady
   if (!db) {
     mostrarErroLogin('Sem conexão. Conecte à internet para fazer o primeiro login.')
     return
