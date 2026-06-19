@@ -1377,6 +1377,22 @@ body { margin: 0; }
   word-break: break-word;
 }
 
+/* ── Horário da ocorrência (início / término / duração) ───── */
+.hora-row { display: flex; gap: 10px; }
+.hora-campo { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+.hora-rotulo {
+  font-size: 11px; font-weight: 600; color: #6B7280;
+  text-transform: uppercase; letter-spacing: .04em;
+}
+.duracao-calc {
+  display: inline-flex; align-items: center; gap: 6px;
+  margin: 10px 0 0; padding: 8px 12px; border-radius: 12px;
+  background: rgba(82,183,136,.10); color: var(--prim);
+  font-size: 14px; font-weight: 600;
+}
+.duracao-calc.vazio { background: #F3F4F6; color: #9CA3AF; font-weight: 500; }
+.duracao-calc svg { width: 18px; height: 18px; flex: none; }
+
 /* ── Medição de área (campo + overlay GPS) ────────────────── */
 .area-row { display: flex; gap: 8px; align-items: stretch; }
 .area-row .form-input { flex: 1; }
