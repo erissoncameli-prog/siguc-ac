@@ -270,34 +270,61 @@ async function bSyncUploadFotosFauna(f, registroUuid, faunaIdx) {
   return urls
 }
 
-// ── Poll: busca status_validacao dos registros confirmados ───
-// Usa a RPC app_status_validacao (SECURITY DEFINER) para que o
-// brigadista só veja seus próprios registros.
-// Retorna número de registros cujo status mudou.
+// ── Poll: busca correções/rejeições pendentes no servidor ─────
+// Usa app_correcoes_pendentes() (SECURITY DEFINER, sem precisar de
+// UUIDs locais) — funciona mesmo após a fila ter sido zerada.
+// • Registros presentes no IndexedDB → atualiza status_validacao
+// • Registros ausentes (fila zerada) → reconstrói skeleton local
+// Retorna número de registros novos ou atualizados.
 async function bSyncPollValidacao() {
   if (!db) return 0
   try {
-    const todos = await bOfflineListarTodos()
-    const confirmados = todos.filter(r => r.status === 'confirmado' && r.uuid_cliente)
-    if (!confirmados.length) return 0
-
-    const uuids = confirmados.map(r => r.uuid_cliente)
-    const { data, error } = await db.rpc('app_status_validacao', { uuids })
+    const { data, error } = await db.rpc('app_correcoes_pendentes')
     if (error || !data) return 0
+
+    const todos    = await bOfflineListarTodos()
+    const localMap = Object.fromEntries(todos.map(r => [r.uuid_cliente, r]))
 
     let mudancas = 0
     for (const row of data) {
-      const local = confirmados.find(r => r.uuid_cliente === row.uuid_cliente)
-      if (!local) continue
-      if (local.status_validacao !== row.status_validacao ||
-          local.motivo_rejeicao  !== row.motivo_rejeicao) {
-        await bOfflineMarcar(row.uuid_cliente, 'confirmado', {
-          status_validacao: row.status_validacao,
-          motivo_rejeicao:  row.motivo_rejeicao ?? null,
+      const local = localMap[row.uuid_cliente]
+
+      if (local) {
+        // Registro existe: atualiza status e motivo se mudou
+        if (local.status_validacao !== row.status_validacao ||
+            local.motivo_rejeicao  !== row.motivo_rejeicao) {
+          await bOfflineMarcar(row.uuid_cliente, local.status, {
+            status_validacao: row.status_validacao,
+            motivo_rejeicao:  row.motivo_rejeicao ?? null,
+          })
+          mudancas++
+        }
+      } else {
+        // Registro não existe (fila zerada): reconstrói do servidor
+        await bOfflineRestaurar({
+          uuid_cliente:       row.uuid_cliente,
+          natureza:           row.natureza,
+          atividade:          row.atividade,
+          hora_inicio:        row.hora_inicio,
+          hora_fim:           row.hora_fim,
+          duracao_horas:      row.duracao_horas,
+          area_ha:            row.area_estimada_ha,
+          pessoas_alcancadas: row.pessoas_alcancadas,
+          observacoes:        row.descricao,
+          origem_acionamento: row.origem_acionamento,
+          integrada_cbmac:    row.integrada_cbmac,
+          criado_em:          row.data_hora_evento,
+          sincronizado_em:    row.sincronizado_em,
+          status:             'confirmado',
+          status_validacao:   row.status_validacao,
+          motivo_rejeicao:    row.motivo_rejeicao ?? null,
+          fotos_blobs:        [], // fotos não recuperáveis do Storage aqui
+          _reconstruido:      true,
         })
         mudancas++
       }
     }
+
     if (mudancas > 0) bSyncEmitir('validacao-atualizada', { mudancas })
     return mudancas
   } catch (e) {
