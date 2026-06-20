@@ -300,9 +300,17 @@ async function bSyncPollValidacao() {
           mudancas++
         }
       } else {
-        // Registro não existe (fila zerada): reconstrói do servidor
+        // Registro não existe (fila zerada): reconstrói do servidor.
+        // brigadista_id/brigada_id/uc_id são obrigatórios: sem eles o
+        // reenvio da correção (upsert) viola o WITH CHECK da política de
+        // INSERT (rc_brigadista_insert) → erro 42501.
         await bOfflineRestaurar({
           uuid_cliente:       row.uuid_cliente,
+          brigadista_id:      row.brigadista_id,
+          brigada_id:         row.brigada_id,
+          uc_id:              row.uc_id,
+          regional:           row.regional,
+          equipe_id:          row.equipe_id,
           natureza:           row.natureza,
           atividade:          row.atividade,
           hora_inicio:        row.hora_inicio,
@@ -322,6 +330,33 @@ async function bSyncPollValidacao() {
           _reconstruido:      true,
         })
         mudancas++
+      }
+    }
+
+    // Reconcilia o status_validacao dos registros locais já sincronizados.
+    // app_correcoes_pendentes() só devolve requer_correcao/rejeitado, então a
+    // transição para "validado" nunca chegava à fila — ficava presa em
+    // "aguardando". app_status_validacao(uuids) devolve o status atual de
+    // qualquer registro do brigadista, cobrindo validado/aguardando também.
+    const uuidsSync = todos
+      .filter(r => r.status === 'confirmado')
+      .map(r => r.uuid_cliente)
+    if (uuidsSync.length) {
+      const { data: stats, error: errStat } =
+        await db.rpc('app_status_validacao', { uuids: uuidsSync })
+      if (!errStat) {
+        for (const row of (stats || [])) {
+          const local = localMap[row.uuid_cliente]
+          if (local &&
+              (local.status_validacao !== row.status_validacao ||
+               local.motivo_rejeicao  !== (row.motivo_rejeicao ?? null))) {
+            await bOfflineMarcar(row.uuid_cliente, local.status, {
+              status_validacao: row.status_validacao,
+              motivo_rejeicao:  row.motivo_rejeicao ?? null,
+            })
+            mudancas++
+          }
+        }
       }
     }
 
