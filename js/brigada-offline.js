@@ -187,6 +187,20 @@ async function bOfflineMarcar(uuid_cliente, status, extra = {}) {
   })
 }
 
+// ── Restaura registro reconstruído do servidor ───────────────
+// Usado quando a fila foi zerada mas o banco ainda tem correções
+// pendentes. Faz put direto sem forçar status nem criado_em.
+async function bOfflineRestaurar(registro) {
+  const db = await bOfflineInit()
+  return new Promise((res, rej) => {
+    const tx  = db.transaction('registros', 'readwrite')
+    const req = tx.objectStore('registros').put(registro)
+    req.onerror   = () => rej(req.error)
+    tx.oncomplete = () => res()
+    tx.onerror    = () => rej(tx.error)
+  })
+}
+
 // ── Purga: remove confirmados com > 7 dias ────────────────────
 async function bOfflinePurgar() {
   const db     = await bOfflineInit()

@@ -2196,10 +2196,12 @@ function bRenderItemFila(r) {
   const statusLabel = { pendente:'Pendente', enviando:'Enviando…', confirmado:'Enviado' }
   const fotos    = r.fotos_blobs?.length || 0
   const tamanho  = (r.fotos_blobs || []).reduce((s, f) => s + bTamanhoBase64(f), 0)
-  const metaFotos = fotos
-    ? `<span class="sync-meta-item">${bico('camera')} ${fotos} ${fotos === 1 ? 'foto' : 'fotos'}</span>
-       <span class="sync-meta-item">${bFormatTamanho(tamanho)}</span>`
-    : '<span class="sync-meta-item">Sem fotos</span>'
+  const metaFotos = r._reconstruido
+    ? `<span class="sync-meta-item" style="color:var(--cinza-400)">${bico('cloud')} Restaurado do servidor</span>`
+    : fotos
+      ? `<span class="sync-meta-item">${bico('camera')} ${fotos} ${fotos === 1 ? 'foto' : 'fotos'}</span>
+         <span class="sync-meta-item">${bFormatTamanho(tamanho)}</span>`
+      : '<span class="sync-meta-item">Sem fotos</span>'
   const linhaEnvio = r.sincronizado_em
     ? `<span>${bico('upload')} Envio: ${bFormatDataHora(r.sincronizado_em)}</span>`
     : ''
@@ -3242,14 +3244,27 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('qr-overlay').hidden = true
   })
   document.getElementById('btn-zerar-fila').addEventListener('click', async () => {
-    const total = await bSyncContarPendentes()
-    const msg = total > 0
+    const todos   = await bOfflineListarTodos()
+    const total   = await bSyncContarPendentes()
+    const correc  = todos.filter(r => r.status === 'confirmado' &&
+      ['requer_correcao', 'rejeitado'].includes(r.status_validacao)).length
+
+    let msg = total > 0
       ? `Apagar ${total} registro${total !== 1 ? 's' : ''} pendente${total !== 1 ? 's' : ''}? Esta ação não pode ser desfeita.`
       : 'Zerar toda a fila (incluindo confirmados)? Esta ação não pode ser desfeita.'
+
+    if (correc > 0) {
+      msg = `⚠ Atenção: ${correc} registro${correc !== 1 ? 's precisam' : ' precisa'} de correção solicitada pelo gestor.\n\nSe zerar agora, o app buscará automaticamente esses registros no servidor quando você abrir a fila novamente.\n\n${msg}`
+    }
+
     if (!confirm(msg)) return
     await bOfflineZerarFila()
     await atualizarBadgeFila()
     toast('Fila zerada.', 'ok')
+    // Reconstrói imediatamente os registros com correções pendentes
+    bSyncPollValidacao().then(n => {
+      if (n > 0) { atualizarBadgeFila(); carregarFila() }
+    })
   })
   document.getElementById('btn-sair').addEventListener('click', async () => {
     if (!confirm('Sair do app? Registros não enviados e seu PIN permanecem salvos neste aparelho.')) return
