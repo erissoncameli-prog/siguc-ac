@@ -760,6 +760,8 @@
 // Stub de segurança: se o CDN não carregar (offline), config.js não quebra.
 // O CDN sobrescreve este objeto quando disponível.
 window.supabase = window.supabase || { createClient: () => null }
+// App de campo não usa o monitor de APIs — mensagens de falha são ruído para brigadistas
+window.__API_MONITOR_OFF = true
 </script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"
         onerror="console.warn('[brigada] Supabase CDN indisponível — modo offline')"></script>
@@ -1140,8 +1142,8 @@ function aplicarEstadoConexao(online) {
   document.getElementById('conn-texto').textContent = online ? 'Online' : 'Offline'
   chip.classList.toggle('on', online)
   chip.classList.toggle('off', !online)
-  if (mudou) {
-    toast(online ? 'Conexão restabelecida' : 'Sem conexão — registros ficam na fila', online ? 'ok' : 'warn')
+  if (mudou && online) {
+    toast('Conexão restabelecida', 'ok')
   }
 }
 
@@ -3080,6 +3082,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       esconderBarra(3000)
       atualizarBadgeFila()
+      carregarFila()
     })
   })()
 
