@@ -18,6 +18,11 @@ jobs:
         uses: supabase/setup-cli@v1
         with:
           version: latest
+        env:
+          # Autentica a resolução do "latest" release na API do GitHub
+          # (60 → 5000 req/h) para evitar a falha intermitente
+          # "Failed to resolve latest Supabase CLI release: rate limit exceeded".
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Deploy Edge Functions
         run: supabase functions deploy --project-ref atqtybcsvepdabsvgaly
