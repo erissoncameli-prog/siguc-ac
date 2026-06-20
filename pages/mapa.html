@@ -3712,14 +3712,29 @@ async function carregarDelimitacaoAcre(){
   try{ const s=localStorage.getItem('siguc_acre_estilo'); if(s) _acreEstilo={..._acreEstilo,...JSON.parse(s)}; }catch(e){}
   _sincronizarEditor();
 
+  // Usa arquivo local como fonte primária (rápido, sem dependência externa)
   try{
-    const r = await fetch('https://servicodados.ibge.gov.br/api/v3/malhas/estados/12?formato=application/vnd.geo+json&resolucao=2');
+    const r = await fetch('../data/acre_estado.geojson');
     if(!r.ok) throw new Error('HTTP '+r.status);
     _acreGeojson = await r.json();
   }catch(e){
-    // Fallback: tenta o GeoJSON local de municípios como approximação
-    if(!_munGeojson){ try{ const r2=await fetch('../data/municipios_acre.geojson'); _munGeojson=await r2.json(); }catch(e2){} }
-    _acreGeojson = _munGeojson;
+    // Fallback: API IBGE
+    try{
+      const r2 = await fetch('https://servicodados.ibge.gov.br/api/v3/malhas/estados/12?formato=application/vnd.geo+json&resolucao=2');
+      if(!r2.ok) throw new Error('HTTP '+r2.status);
+      _acreGeojson = await r2.json();
+    }catch(e2){
+      // Último recurso: dissolve municípios em polígono único (sem limites internos)
+      if(!_munGeojson){ try{ const r3=await fetch('../data/municipios_acre.geojson'); _munGeojson=await r3.json(); }catch(e3){} }
+      if(_munGeojson && typeof turf !== 'undefined'){
+        try{
+          const feats = _munGeojson.features;
+          let union = feats[0];
+          for(let i=1;i<feats.length;i++){ try{ union=turf.union(union,feats[i]); }catch(e4){} }
+          _acreGeojson = { type:'FeatureCollection', features:[union] };
+        }catch(e5){ _acreGeojson = null; }
+      }
+    }
   }
   _renderizarAcre();
   _iniciarDragEditor();
