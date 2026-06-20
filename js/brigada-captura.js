@@ -246,7 +246,7 @@ async function bCameraNativaCapturar(brigadista, gps, source = 'CAMERA', context
   canvas.height = img.naturalHeight
   const ctx = canvas.getContext('2d')
   ctx.drawImage(img, 0, 0)
-  bCameraAguaMarca(ctx, canvas.width, canvas.height, brigadista, gps, contexto)
+  await bCameraAguaMarca(ctx, canvas.width, canvas.height, brigadista, gps, contexto)
 
   return new Promise(resolve => canvas.toBlob(
     async b => resolve(await bInjetarExifGps(b, gps)),
