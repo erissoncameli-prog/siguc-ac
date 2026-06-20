@@ -17,6 +17,7 @@ permissions:
   contents: read
   pull-requests: write
   issues: write
+  id-token: write        # exigido pela claude-code-action@v1 (OIDC)
 
 jobs:
   revisao:

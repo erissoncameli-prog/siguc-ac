@@ -43,7 +43,8 @@ test('login com credenciais inválidas exibe erro', async ({ page }) => {
   await page.goto(`${BASE}/index.html`);
   await page.fill('input[type="email"]',    'invalido@teste.com');
   await page.fill('input[type="password"]', 'senhaerrada');
-  await page.click('button[type="submit"]');
+  // O login é via botão #btn-login (onclick), não um submit de formulário
+  await page.click('#btn-login');
   await page.waitForTimeout(2000);
   // Deve continuar na mesma página (não redireciona para dashboard)
   expect(page.url()).not.toContain('dashboard');
