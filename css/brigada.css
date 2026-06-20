@@ -1011,6 +1011,8 @@ body { margin: 0; }
 }
 .autocomplete-lista li:last-child { border-bottom: none; }
 .autocomplete-lista li:active { background: var(--prim-bg); }
+/* Nome científico discreto ao lado do popular */
+.autocomplete-lista .ac-cient { color: #6B7280; font-style: italic; font-size: 12px; }
 
 /* ── Fila de sincronização ──────────────────────────────── */
 .fila-stats {
