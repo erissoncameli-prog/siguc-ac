@@ -479,7 +479,7 @@ async function gerarRelatorio() {
 
   const [regRes, brigRes, bristRes] = await Promise.all([
     db.from('vw_registros_validacao')
-      .select('id,natureza,atividade,status_validacao,data_hora_evento,regional,uc_id,uc_nome,brigada_id,brigada_nome,brigadista_id,brigadista_nome,equipe_id,equipe_nome,duracao_horas,n_fauna,n_fauna_pendente,n_fauna_resgatada,fotos_urls,area_estimada_ha,pessoas_alcancadas,integrada_cbmac')
+      .select('id,codigo_ocorrencia,natureza,atividade,status_validacao,data_hora_evento,regional,uc_id,uc_nome,brigada_id,brigada_nome,brigadista_id,brigadista_nome,equipe_id,equipe_nome,duracao_horas,n_fauna,n_fauna_pendente,n_fauna_resgatada,fotos_urls,area_estimada_ha,pessoas_alcancadas,integrada_cbmac')
       .gte('data_hora_evento', ini + 'T00:00:00')
       .lte('data_hora_evento', fim + 'T23:59:59')
       .order('data_hora_evento', { ascending: false })
@@ -1449,7 +1449,7 @@ function tabelaAtividades(rows) {
   if (!rows.length) return '<p class="chart-empty" style="padding:12px">Sem atividades.</p>'
   return `<table class="rel-table">
     <thead><tr>
-      <th>Data</th><th>Natureza</th><th>Atividade</th><th>Brigadista</th><th>Fauna</th><th>Status</th><th></th>
+      <th>Código</th><th>Data</th><th>Natureza</th><th>Atividade</th><th>Brigadista</th><th>Fauna</th><th>Status</th><th></th>
     </tr></thead>
     <tbody>${rows.map(r=>{
       const dt = r.data_hora_evento
@@ -1457,6 +1457,7 @@ function tabelaAtividades(rows) {
         : '—'
       const statusCor = {aguardando:'#f59e0b',validado:'#059669',requer_correcao:'#e879f9',rejeitado:'#ef4444'}[r.status_validacao]||'#6b7280'
       return `<tr>
+        <td style="font-size:.74rem;white-space:nowrap;font-family:ui-monospace,Menlo,monospace;font-weight:600">${esc(r.codigo_ocorrencia||'—')}</td>
         <td style="font-size:.78rem;white-space:nowrap">${dt}</td>
         <td><span class="nat-chip ${r.natureza}">${natIco(r.natureza)} ${NAT_LAB[r.natureza]||r.natureza}</span></td>
         <td>${esc(ATIV_LAB[r.atividade]||r.atividade||'—')}</td>
@@ -2193,8 +2194,9 @@ function initFaunaEspecie(f) {
 // ════════════════════════════════════════════════════════════════
 function exportarCSV() {
   const { ini, fim } = getPeriodo()
-  const cabecalho = ['Data','Natureza','Atividade','Status Validação','Brigadista','Brigada','UC','Regional','N Fauna','Área ha','Pessoas']
+  const cabecalho = ['Código','Data','Natureza','Atividade','Status Validação','Brigadista','Brigada','UC','Regional','N Fauna','Área ha','Pessoas']
   const linhas = _registros.map(r => [
+    r.codigo_ocorrencia||'',
     r.data_hora_evento ? new Date(r.data_hora_evento).toLocaleDateString('pt-BR',{timeZone:'America/Rio_Branco'}) : '',
     NAT_LAB[r.natureza]||r.natureza||'',
     ATIV_LAB[r.atividade]||r.atividade||'',
