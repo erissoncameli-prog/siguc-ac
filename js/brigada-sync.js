@@ -210,7 +210,7 @@ async function bSyncUploadFotos(reg) {
 function bSyncMontarPayload(reg, fotosUrls) {
   // Desestrutura e descarta campos internos + campos que precisam de conversão
   const {
-    fotos_blobs, status, _fauna, ultimo_erro,
+    fotos_blobs, status, _fauna, ultimo_erro, _reconstruido,
     lat, lng,          // → localizacao (PostGIS)
     n_equipe,          // legado: ignorado (equipe agora vem de equipe_id)
     area_ha,           // → area_estimada_ha
