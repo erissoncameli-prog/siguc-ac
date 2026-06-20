@@ -2789,6 +2789,11 @@ function abrirQRInstalacao() {
 // ── Verificar atualização do app ──────────────────────────────
 const GH_RELEASES_API = 'https://api.github.com/repos/erissoncameli-prog/siguc-ac/releases'
 
+// Versão exibida no app web/PWA (incl. iOS "adicionar à tela inicial").
+// No APK nativo, build-www.mjs estampa window.BRIGADA_BUILD com a versão
+// do Release. Mantenha este número alinhado à versão da APK ao publicar.
+const APP_VERSAO_WEB = '1.17.0'
+
 function versaoAtualApp() {
   // BRIGADA_BUILD tem o formato 'v1.14.0 (app)' no APK nativo
   const m = String(window.BRIGADA_BUILD || '').match(/(\d+\.\d+\.\d+)/)
@@ -3451,9 +3456,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (v) document.body.classList.add('field-mode')
   })
 
-  // Versão (BRIGADA_BUILD é estampado pelo build do app nativo) e créditos
+  // Versão (BRIGADA_BUILD é estampado pelo build do app nativo) e créditos.
+  // No web/PWA cai para o número mantido em APP_VERSAO_WEB.
   document.getElementById('app-versao').textContent =
-    'SIGUC Brigadas · ' + (window.BRIGADA_BUILD || 'versão web')
+    'SIGUC Brigadas · ' + (window.BRIGADA_BUILD || `v${APP_VERSAO_WEB} (web)`)
   document.getElementById('app-copyright').textContent =
     `© ${new Date().getFullYear()} · Todos os direitos reservados a Erisson Cameli Santiago`
 
