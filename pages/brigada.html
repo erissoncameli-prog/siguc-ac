@@ -2238,16 +2238,23 @@ const REGIONAL_SIGLA = {
   tarauaca_envira: 'TEN', alto_acre: 'AAC',
 }
 
+// DDMMAA no fuso do Acre (America/Rio_Branco), igual ao servidor — evita
+// divergência de um dia no prefixo em ocorrências perto da meia-noite.
+function bDataAcreDDMMAA(d) {
+  const partes = new Intl.DateTimeFormat('pt-BR', {
+    timeZone: 'America/Rio_Branco',
+    day: '2-digit', month: '2-digit', year: '2-digit',
+  }).formatToParts(d).reduce((o, p) => (o[p.type] = p.value, o), {})
+  return `${partes.day}${partes.month}${partes.year}`
+}
+
 function bCodigoOcorrencia(r) {
   if (r?.codigo_ocorrencia) return r.codigo_ocorrencia
   const reg  = REGIONAL_SIGLA[r?.regional || App.brigada?.regional] || 'XXX'
   const bcod = App.brigada?.codigo
   const bb   = bcod != null ? String(bcod).padStart(2, '0') : '··'
   const d    = r?.criado_em ? new Date(r.criado_em) : new Date()
-  const ddmmaa = String(d.getDate()).padStart(2, '0')
-               + String(d.getMonth() + 1).padStart(2, '0')
-               + String(d.getFullYear()).slice(-2)
-  return `${reg}-${bb}-${ddmmaa}-···`
+  return `${reg}-${bb}-${bDataAcreDDMMAA(d)}-···`
 }
 
 function bRenderItemFila(r) {
