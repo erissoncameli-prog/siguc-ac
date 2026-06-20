@@ -1587,8 +1587,8 @@ function renderFauna() {
       <div class="fauna-chart-card">
         <div class="fcc-header">
           <div>
-            <div class="fcc-title">Espécies Mais Resgatadas</div>
-            <div class="fcc-sub">Top 10 por nº de animais resgatados</div>
+            <div class="fcc-title">Espécies Mais Registradas</div>
+            <div class="fcc-sub">Top 10 por nº de interações registradas</div>
           </div>
         </div>
         <div class="chart-canvas-wrap" id="fauna-especie-wrap" style="height:200px">
@@ -2049,14 +2049,15 @@ function initFaunaBrigada(f) {
   })
 }
 
-// ── Barras horizontais: Ranking de espécies mais resgatadas (top 10) ───
+// ── Barras horizontais: Ranking de espécies mais registradas (top 10) ───
 function initFaunaEspecie(f) {
   // Agrupa por espécie. Chave consistente = nome científico (campo mais
   // preenchido); rótulo exibido prefere o NOME POPULAR (do catálogo),
   // capitalizado, com fallback para o científico/classe.
+  // Inclui TODOS os tipos de evento (resgate, encontrado_morto, apreensão etc.)
   const capitaliza = s => s ? s.charAt(0).toUpperCase() + s.slice(1) : s
   const por = {}
-  f.filter(x => x.tipo_evento === 'resgate').forEach(x => {
+  f.forEach(x => {
     const cient = (x.nome_cientifico || '').trim()
     const pop   = (x.nome_popular_cat || x.nome_popular || '').trim()
     const key   = cient || pop || FAUNA_CLASSE_LAB[x.classe] || '—'
@@ -2073,7 +2074,7 @@ function initFaunaEspecie(f) {
   const wrap = document.getElementById('fauna-especie-wrap')
   if (wrap) wrap.style.height = (sorted.length * 46 + 60) + 'px'
 
-  // Escala de cor violeta (tema fauna): mais resgates → mais escuro
+  // Escala de cor violeta (tema fauna): mais registros → mais escuro
   const max = sorted[0].qtd
   const cores = sorted.map(s => {
     const t = s.qtd / max
@@ -2102,7 +2103,7 @@ function initFaunaEspecie(f) {
         legend: { display: false },
         tooltip: {
           backgroundColor: '#0A1A0F', padding: 10, cornerRadius: 8,
-          callbacks: { label: ctx => `  ${ctx.parsed.x} resgatado(s)` }
+          callbacks: { label: ctx => `  ${ctx.parsed.x} registro(s)` }
         },
         datalabels: {
           display: true, formatter: dlValPct,
