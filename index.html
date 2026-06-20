@@ -222,6 +222,7 @@ const _dbReady = loadEnv().then(({ supabaseUrl, supabaseKey }) => {
   db = createInstrumentedDb(createClient(supabaseUrl, supabaseKey, {
     auth: { storage: window.sessionStorage, persistSession: true, autoRefreshToken: true, detectSessionInUrl: false }
   }));
+  window.db = db; // expõe o cliente para RPCs públicas read-only (ex.: smoke tests)
 });
 
 let TOTAL = 5, slideAtual = 0, timer;
