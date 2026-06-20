@@ -61,6 +61,9 @@
            transition:.15s; display:grid; grid-template-columns:1fr auto;
            gap:8px; align-items:start }
 .rc-card:hover { border-color:var(--verde-c,#52B788); box-shadow:0 2px 8px rgba(0,0,0,.06) }
+/* Requer correção: destaque rosa/magenta para localizar rápido */
+.rc-card--correcao { border-left:4px solid #db2777; background:#fdf2f8 }
+.rc-card--correcao:hover { border-color:#db2777 }
 
 .rc-top { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:6px }
 .nat-chip { display:inline-flex; align-items:center; gap:4px; padding:3px 10px;
@@ -408,6 +411,26 @@ const DESTIN = {
   solto_no_local:'Solto no local', encaminhado_cetas:'Encam. CETAS',
   obito:'Óbito', em_tratamento:'Em tratamento', outro:'Outro',
 }
+const ORIGEM_LAB = {
+  denuncia_193:'Denúncia 193', informacao_populares:'Informação de populares',
+  ronda_brigada:'Ronda da brigada', outro:'Outro',
+}
+const AREA_METODO_LAB = {
+  estimativa:'estimativa', vertices:'vértices (GPS)', perimetro:'perímetro (caminhamento)',
+}
+// Duração em horas decimais → "Xh Ymin"
+function fmtDuracao(h) {
+  if (h == null) return null
+  const hh = Math.floor(h), mm = Math.round((h - hh) * 60)
+  return `${hh}h${mm ? ' ' + mm + 'min' : ''}`
+}
+// Data do histórico ("YYYY-MM-DDTHH:MM:SS", já no fuso do Acre) → "DD/MM/YYYY HH:MM"
+function fmtHistData(s) {
+  if (!s) return '—'
+  const [d, t] = String(s).split('T')
+  const [Y, M, D] = (d || '').split('-')
+  return `${D}/${M}/${Y} ${(t || '').slice(0, 5)}`
+}
 
 // ════════════════════════════════════════════════════════════════
 // Inicialização
@@ -579,7 +602,7 @@ function renderLista() {
       : ''
 
     return `
-    <div class="rc-card" data-id="${r.id}" onclick="abrirDetalhe('${r.id}')">
+    <div class="rc-card${r.status_validacao === 'requer_correcao' ? ' rc-card--correcao' : ''}" data-id="${r.id}" onclick="abrirDetalhe('${r.id}')">
       <div>
         <div class="rc-top">
           <span class="nat-chip ${r.natureza}">${nat.emoji} ${nat.label}</span>
@@ -651,14 +674,34 @@ async function abrirDetalhe(id) {
        </a>`
     : '<span style="opacity:.5">Sem GPS</span>'
 
+  // Horário (início–término) e duração
+  const horario = (r.hora_inicio || r.hora_fim)
+    ? `${(r.hora_inicio || '—').slice(0,5)} – ${(r.hora_fim || '—').slice(0,5)}`
+    : null
+  const duracao = fmtDuracao(r.duracao_horas)
+
+  // Área: estimada (com método) + medida no mapa + validada pelo técnico
+  const areaParts = []
+  if (r.area_estimada_ha != null)
+    areaParts.push(`${r.area_estimada_ha} ha${r.area_metodo ? ` (${AREA_METODO_LAB[r.area_metodo] || r.area_metodo})` : ''}`)
+  if (r.area_medida_ha != null && r.area_medida_ha !== r.area_estimada_ha)
+    areaParts.push(`medida: ${r.area_medida_ha} ha`)
+  if (r.area_validada_ha != null)
+    areaParts.push(`validada: ${r.area_validada_ha} ha`)
+
   document.getElementById('modal-detail-grid').innerHTML = `
     <div class="detail-field"><label>Brigadista</label><p>${esc(r.brigadista_nome || '—')}</p></div>
     <div class="detail-field"><label>Brigada</label><p>${esc(r.brigada_nome || '—')}</p></div>
     <div class="detail-field"><label>UC</label><p>${esc(r.uc_nome || '—')}</p></div>
     <div class="detail-field"><label>Regional</label><p>${esc(r.regional || '—')}</p></div>
+    ${r.municipio ? `<div class="detail-field"><label>Município</label><p>${esc(r.municipio)}</p></div>` : ''}
     <div class="detail-field"><label>Data / Hora</label><p>${dt}</p></div>
     <div class="detail-field"><label>Equipe</label><p>${esc(r.equipe || '—')}</p></div>
-    ${r.area_estimada_ha ? `<div class="detail-field"><label>Área estimada</label><p>${r.area_estimada_ha} ha</p></div>` : ''}
+    <div class="detail-field"><label>Acionada por</label><p>${esc(ORIGEM_LAB[r.origem_acionamento] || r.origem_acionamento || '—')}</p></div>
+    ${horario ? `<div class="detail-field"><label>Horário</label><p>${horario}</p></div>` : ''}
+    ${duracao ? `<div class="detail-field"><label>Duração</label><p>${duracao}</p></div>` : ''}
+    <div class="detail-field"><label>Apoio CBMAC</label><p>${r.integrada_cbmac ? 'Sim' : 'Não'}</p></div>
+    ${areaParts.length ? `<div class="detail-field"><label>Área</label><p>${areaParts.join(' · ')}</p></div>` : ''}
     ${r.pessoas_alcancadas ? `<div class="detail-field"><label>Pessoas alcançadas</label><p>${r.pessoas_alcancadas}</p></div>` : ''}
     <div class="detail-field" style="grid-column:1/-1"><label>GPS</label><p>${gpsHtml}</p></div>
     ${r.descricao ? `<div class="detail-field" style="grid-column:1/-1"><label>Descrição</label><p>${esc(r.descricao)}</p></div>` : ''}
@@ -682,12 +725,18 @@ async function abrirDetalhe(id) {
   if (hist.length) {
     histSec.hidden = false
     document.getElementById('modal-hist').innerHTML = hist.map(h => {
-      const labAcao = STATUS_VALID[h.acao] || h.acao || '—'
+      const labAcao = h.acao === 'corrigido'
+        ? 'Corrigido pelo brigadista'
+        : (STATUS_VALID[h.acao] || h.acao || '—')
+      const campos = (Array.isArray(h.campos) && h.campos.length)
+        ? `<span><strong>Campos corrigidos:</strong> ${esc(h.campos.join(', '))}</span>`
+        : ''
       return `<div class="hist-item">
         <div>
-          <div class="hist-data">${h.data ? h.data.replace('T',' ').slice(0,16) : '—'}</div>
+          <div class="hist-data">${fmtHistData(h.data)}</div>
           <div class="hist-body">
             <strong>${esc(h.usuario_nome || '—')} <span style="font-weight:400;opacity:.7">(${esc(h.perfil||'')})</span> → ${labAcao}</strong>
+            ${campos}
             ${h.obs ? `<span>${esc(h.obs)}</span>` : ''}
           </div>
         </div>

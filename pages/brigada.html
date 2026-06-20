@@ -2293,8 +2293,10 @@ function bRenderItemFila(r) {
   const codigoDef = !!r.codigo_ocorrencia
   const codigoHtml = `<span class="sync-codigo${codigoDef ? '' : ' sync-codigo-prov'}">${bico('hash')} ${esc(codigo)}</span>`
 
+  const precisaCorrecao = r.status === 'confirmado' && r.status_validacao === 'requer_correcao'
+
   return `
-    <div class="sync-item sync-${r.status}">
+    <div class="sync-item sync-${r.status}${precisaCorrecao ? ' sync-item--correcao' : ''}">
       <span class="sync-icon">${icons[r.natureza] || bico('clipboard')}</span>
       <div class="sync-info">
         ${codigoHtml}

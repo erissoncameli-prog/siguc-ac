@@ -1037,6 +1037,11 @@ body { margin: 0; }
   padding: 12px 14px; border-radius: 14px;
   background: #fff; border: 1px solid #E5E7EB; margin-bottom: 10px;
 }
+/* Requer correção: destaque rosa/magenta na fila */
+.sync-item--correcao {
+  border-left: 4px solid #db2777;
+  background: #fdf2f8;
+}
 .sync-icon { font-size: 20px; flex-shrink: 0; }
 .sync-info { flex: 1; font-size: 13px; }
 .sync-info strong { display: block; font-weight: 600; margin-bottom: 2px; }
