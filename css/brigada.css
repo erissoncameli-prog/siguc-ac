@@ -1033,6 +1033,18 @@ body { margin: 0; }
 .sync-info { flex: 1; font-size: 13px; }
 .sync-info strong { display: block; font-weight: 600; margin-bottom: 2px; }
 .sync-info span { color: #6B7280; font-size: 12px; }
+/* Código da ocorrência (chip monoespaçado) */
+.sync-codigo {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-family: 'DM Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px; font-weight: 600; letter-spacing: .3px;
+  color: var(--floresta, #0A1A0F);
+  background: rgba(201, 168, 76, .16);
+  padding: 1px 7px; border-radius: 6px; margin-bottom: 3px;
+}
+.sync-codigo svg { width: 13px; height: 13px; }
+/* Prefixo provisório (sequência ainda não atribuída pelo servidor) */
+.sync-codigo-prov { color: #6B7280; background: rgba(107, 114, 128, .14); }
 /* Brigada + Equipe como "chips" na tela inicial (ao lado do nome) */
 .home-id { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .home-id-texto { min-width: 0; }

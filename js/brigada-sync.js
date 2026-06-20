@@ -109,16 +109,18 @@ async function bSyncUm(reg) {
 
     if (errReg) throw errReg
 
+    // Recupera id + código gerado pelo servidor (trigger). O código só
+    // existe após o registro chegar ao banco; exibimos no app a partir daqui.
+    const { data: rc, error: errId } = await db
+      .from('registros_campo')
+      .select('id, codigo_ocorrencia')
+      .eq('uuid_cliente', reg.uuid_cliente)
+      .single()
+    if (errId) throw errId
+
     // Fase 3: fauna (delete + reinsert)
     const fauna = await bOfflineFaunaDeRegistro(reg.uuid_cliente)
     if (fauna.length) {
-      const { data: rc, error: errId } = await db
-        .from('registros_campo')
-        .select('id')
-        .eq('uuid_cliente', reg.uuid_cliente)
-        .single()
-      if (errId) throw errId
-
       await db.from('registro_fauna').delete().eq('registro_campo_id', rc.id)
       const faunaPayload = await Promise.all(
         fauna.map(async (f, idx) => {
@@ -133,6 +135,7 @@ async function bSyncUm(reg) {
     await bOfflineMarcar(reg.uuid_cliente, 'confirmado', {
       sincronizado_em: new Date().toISOString(),
       ultimo_erro: null,
+      codigo_ocorrencia: rc.codigo_ocorrencia ?? null,
     })
     bSyncEmitir('confirmado', { uuid: reg.uuid_cliente })
     return true
@@ -211,6 +214,7 @@ function bSyncMontarPayload(reg, fotosUrls) {
   // Desestrutura e descarta campos internos + campos que precisam de conversão
   const {
     fotos_blobs, status, _fauna, ultimo_erro, _reconstruido,
+    codigo_ocorrencia, // gerado/possuído pelo servidor — nunca reenviar
     lat, lng,          // → localizacao (PostGIS)
     n_equipe,          // legado: ignorado (equipe agora vem de equipe_id)
     area_ha,           // → area_estimada_ha
@@ -306,6 +310,7 @@ async function bSyncPollValidacao() {
         // INSERT (rc_brigadista_insert) → erro 42501.
         await bOfflineRestaurar({
           uuid_cliente:       row.uuid_cliente,
+          codigo_ocorrencia:  row.codigo_ocorrencia ?? null,
           brigadista_id:      row.brigadista_id,
           brigada_id:         row.brigada_id,
           uc_id:              row.uc_id,
@@ -349,10 +354,12 @@ async function bSyncPollValidacao() {
           const local = localMap[row.uuid_cliente]
           if (local &&
               (local.status_validacao !== row.status_validacao ||
-               local.motivo_rejeicao  !== (row.motivo_rejeicao ?? null))) {
+               local.motivo_rejeicao  !== (row.motivo_rejeicao ?? null) ||
+               (row.codigo_ocorrencia && local.codigo_ocorrencia !== row.codigo_ocorrencia))) {
             await bOfflineMarcar(row.uuid_cliente, local.status, {
               status_validacao: row.status_validacao,
               motivo_rejeicao:  row.motivo_rejeicao ?? null,
+              codigo_ocorrencia: row.codigo_ocorrencia ?? local.codigo_ocorrencia ?? null,
             })
             mudancas++
           }

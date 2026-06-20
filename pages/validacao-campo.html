@@ -69,6 +69,10 @@
 .nat-chip.combate     { background:var(--nat-comb-bg); color:var(--nat-comb) }
 .nat-chip.monitoramento { background:var(--nat-moni-bg); color:var(--nat-moni) }
 
+.rc-codigo { display:inline-block; font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+             font-size:.78rem; font-weight:700; letter-spacing:.4px; color:var(--floresta,#0A1A0F);
+             background:rgba(201,168,76,.16); padding:1px 7px; border-radius:6px; margin-bottom:3px }
+.rc-codigo-modal { font-size:.92rem; margin-bottom:10px }
 .rc-titulo { font-size:.92rem; font-weight:600; color:var(--floresta,#0A1A0F) }
 .rc-meta   { font-size:.8rem; color:var(--text-muted,#6b7280); display:flex; gap:12px; flex-wrap:wrap; margin-top:4px }
 .rc-meta span { display:flex; align-items:center; gap:3px }
@@ -437,7 +441,7 @@ const DESTIN = {
     <button class="tab-btn" data-st="">Todos</button>
     <div class="search-wrap">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-      <input type="search" id="busca-input" placeholder="Brigadista, brigada, UC…">
+      <input type="search" id="busca-input" placeholder="Código, brigadista, brigada, UC…">
     </div>
   </div>
 
@@ -525,7 +529,7 @@ function filtrados() {
       if (_filtroStatus && r.status_validacao !== _filtroStatus) return false
     }
     if (_busca) {
-      const hay = [r.brigadista_nome, r.brigada_nome, r.uc_nome, r.atividade, r.natureza]
+      const hay = [r.codigo_ocorrencia, r.brigadista_nome, r.brigada_nome, r.uc_nome, r.atividade, r.natureza]
         .filter(Boolean).join(' ').toLowerCase()
       if (!hay.includes(_busca)) return false
     }
@@ -576,6 +580,7 @@ function renderLista() {
               ? `<span class="badge-sm badge-fauna-ok">🐾 ${r.n_fauna} fauna validada</span>`
               : ''}
         </div>
+        ${r.codigo_ocorrencia ? `<div class="rc-codigo">${esc(r.codigo_ocorrencia)}</div>` : ''}
         <div class="rc-titulo">${esc(ativ)} · ${esc(r.brigada_nome || '—')}</div>
         <div class="rc-meta">
           <span>👤 ${esc(r.brigadista_nome || '—')}</span>
@@ -618,6 +623,7 @@ async function abrirDetalhe(id) {
           hour:'2-digit', minute:'2-digit' })
     : '—'
   document.getElementById('modal-cabecalho').innerHTML = `
+    ${r.codigo_ocorrencia ? `<div class="rc-codigo rc-codigo-modal">${esc(r.codigo_ocorrencia)}</div>` : ''}
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
       <span class="badge-sm badge-${r.status_validacao}">${STATUS_VALID[r.status_validacao] || r.status_validacao}</span>
       ${r.n_fauna_pendente > 0 ? '<span class="badge-sm badge-fauna-pend">🐾 Fauna pendente DEBIO</span>' : ''}
