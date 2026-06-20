@@ -300,9 +300,17 @@ async function bSyncPollValidacao() {
           mudancas++
         }
       } else {
-        // Registro não existe (fila zerada): reconstrói do servidor
+        // Registro não existe (fila zerada): reconstrói do servidor.
+        // brigadista_id/brigada_id/uc_id são obrigatórios: sem eles o
+        // reenvio da correção (upsert) viola o WITH CHECK da política de
+        // INSERT (rc_brigadista_insert) → erro 42501.
         await bOfflineRestaurar({
           uuid_cliente:       row.uuid_cliente,
+          brigadista_id:      row.brigadista_id,
+          brigada_id:         row.brigada_id,
+          uc_id:              row.uc_id,
+          regional:           row.regional,
+          equipe_id:          row.equipe_id,
           natureza:           row.natureza,
           atividade:          row.atividade,
           hora_inicio:        row.hora_inicio,
