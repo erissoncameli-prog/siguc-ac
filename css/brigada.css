@@ -1391,7 +1391,15 @@ body { margin: 0; }
 .btn-corrigir-fila svg { width: 13px; height: 13px; }
 .btn-corrigir-fila:hover { background: rgba(249,115,22,.22); }
 
-/* ── Overlay de correção: box de motivo ─────────────────────── */
+/* ── Tela de correção ────────────────────────────────────────── */
+.correcao-info-card {
+  background: var(--floresta); color: #c9f0d9;
+  border-radius: 12px; padding: 12px 16px; margin-bottom: 1rem;
+  font-size: .82rem;
+}
+.correcao-info-ativ { font-weight: 600; font-size: .88rem; color: #fff; }
+
+/* ── Box de motivo do gestor ─────────────────────────────────── */
 .correcao-motivo-box {
   display: flex; gap: 10px; align-items: flex-start;
   background: rgba(234,179,8,.1); border: 1px solid rgba(234,179,8,.3);

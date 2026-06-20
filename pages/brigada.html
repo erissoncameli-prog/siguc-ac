@@ -498,14 +498,20 @@
   </button>
 </div>
 
-<!-- ══ OVERLAY: CORREÇÃO DE REGISTRO ══════════════════════════ -->
-<div id="correcao-overlay" class="album-ov" hidden style="z-index:3000">
-  <div class="album-ov-head">
-    <button class="album-ov-close" id="correcao-fechar" title="Fechar">&#x2715;</button>
-    <div class="album-ov-titulo">Corrigir Registro</div>
-    <div style="font-size:.75rem;opacity:.7" id="correcao-subtitulo"></div>
-  </div>
-  <div class="album-ov-body" style="padding:1rem;overflow-y:auto">
+<!-- ══ TELA: CORREÇÃO DE REGISTRO ══════════════════════════════ -->
+<div id="tela-correcao" class="tela" hidden>
+  <header class="form-header">
+    <button class="btn-back" id="btn-back-correcao" aria-label="Voltar">‹</button>
+    <span>Corrigir Registro</span>
+    <span></span>
+  </header>
+
+  <div class="form-body">
+
+    <div class="correcao-info-card" id="correcao-info-card">
+      <span class="correcao-info-ativ" id="correcao-subtitulo"></span>
+    </div>
+
     <div class="correcao-motivo-box" id="correcao-motivo-box" hidden>
       <span data-icon="alert-triangle" style="color:var(--alerta)"></span>
       <div>
@@ -518,7 +524,7 @@
       <input type="hidden" id="correcao-uuid">
 
       <label class="campo-label">Observações / Descrição</label>
-      <textarea id="correcao-descricao" class="campo-input" rows="3" style="resize:vertical"></textarea>
+      <textarea id="correcao-descricao" class="campo-input" rows="4" style="resize:vertical"></textarea>
 
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem">
         <div>
@@ -532,10 +538,10 @@
       </div>
 
       <label class="campo-label">Área estimada (ha)</label>
-      <input type="number" id="correcao-area" class="campo-input" step="0.01" min="0">
+      <input type="number" id="correcao-area" class="campo-input" step="0.01" min="0" inputmode="decimal">
 
       <label class="campo-label">Pessoas alcançadas</label>
-      <input type="number" id="correcao-pessoas" class="campo-input" min="0" step="1">
+      <input type="number" id="correcao-pessoas" class="campo-input" min="0" step="1" inputmode="numeric">
 
       <label class="campo-label">Acionado por</label>
       <select id="correcao-origem" class="campo-input">
@@ -551,7 +557,7 @@
         Integrada com CBMAC
       </label>
 
-      <button type="submit" class="btn-salvar" style="margin-top:1.25rem" data-icon="send">
+      <button type="submit" class="btn-salvar" style="margin-top:1.5rem" data-icon="send">
         Enviar Correção
       </button>
     </form>
@@ -2282,13 +2288,12 @@ function abrirCorrecao(uuid, todos) {
   const reg = (todos || []).find(r => r.uuid_cliente === uuid)
   if (!reg) return
 
-  const ov = document.getElementById('correcao-overlay')
   document.getElementById('correcao-uuid').value = uuid
 
-  // Subtítulo: atividade + data
+  // Cabeçalho da tela
   const dt = reg.criado_em ? new Date(reg.criado_em).toLocaleDateString('pt-BR') : ''
   document.getElementById('correcao-subtitulo').textContent =
-    `${esc(reg.atividade || '')} · ${dt}`
+    [reg.atividade, dt].filter(Boolean).join(' · ')
 
   // Motivo do gestor
   const motivoBox = document.getElementById('correcao-motivo-box')
@@ -2304,25 +2309,20 @@ function abrirCorrecao(uuid, todos) {
   document.getElementById('correcao-descricao').value   = reg.observacoes || reg.descricao || ''
   document.getElementById('correcao-hora-inicio').value = reg.hora_inicio || ''
   document.getElementById('correcao-hora-fim').value    = reg.hora_fim    || ''
-  document.getElementById('correcao-area').value        = reg.area_ha     != null ? reg.area_ha : (reg.area_estimada_ha ?? '')
+  document.getElementById('correcao-area').value        = reg.area_ha != null ? reg.area_ha : (reg.area_estimada_ha ?? '')
   document.getElementById('correcao-pessoas').value     = reg.pessoas_alcancadas ?? ''
-
-  const selOrigem = document.getElementById('correcao-origem')
-  selOrigem.value = reg.origem_acionamento || ''
+  document.getElementById('correcao-origem').value      = reg.origem_acionamento || ''
 
   const cbmacLabel = document.getElementById('correcao-cbmac-label')
   cbmacLabel.hidden = reg.natureza !== 'combate'
   document.getElementById('correcao-cbmac').checked = !!reg.integrada_cbmac
 
-  bIconsAplicar(ov)
-  ov.removeAttribute('hidden')
-  document.body.style.overflow = 'hidden'
+  bIconsAplicar(document.getElementById('tela-correcao'))
+  mostrarTela('tela-correcao')
 }
 
 function fecharCorrecao() {
-  const ov = document.getElementById('correcao-overlay')
-  ov.setAttribute('hidden', '')
-  document.body.style.overflow = ''
+  mostrarTela('tela-fila')
 }
 
 async function submeterCorrecao(ev) {
@@ -3162,8 +3162,8 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-ver-fila').addEventListener('click', () => mostrarTela('tela-fila'))
   document.getElementById('btn-ver-correcoes').addEventListener('click', () => mostrarTela('tela-fila'))
 
-  // Overlay de correção
-  document.getElementById('correcao-fechar').addEventListener('click', fecharCorrecao)
+  // Tela de correção
+  document.getElementById('btn-back-correcao').addEventListener('click', fecharCorrecao)
   document.getElementById('correcao-form').addEventListener('submit', submeterCorrecao)
 
   // Formulário
