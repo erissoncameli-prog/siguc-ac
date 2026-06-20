@@ -59,10 +59,16 @@ module.exports = async (req, res) => {
       .filter(m => /^[a-z0-9_\-]{3,80}$/i.test(m.name))
       .sort((a, b) => b.data.localeCompare(a.data));
 
+    const temMosaicos = mosaicos.length > 0;
     res.status(200)
        .setHeader('Content-Type', 'application/json')
-       .setHeader('Cache-Control', 'public, max-age=21600, s-maxage=21600')  // 6h
-       .json({ disponivel: mosaicos.length > 0, recente: mosaicos[0] || null, mosaicos });
+       // Cache longo só quando há mosaicos; vazio cacheia pouco, para o mapa
+       // "acender" assim que o NICFI for ativado na conta (sem esperar 6h).
+       .setHeader('Cache-Control', temMosaicos
+         ? 'public, max-age=21600, s-maxage=21600'   // 6h
+         : 'public, max-age=120, s-maxage=120')      // 2min
+       .json({ disponivel: temMosaicos, recente: mosaicos[0] || null,
+               motivo: temMosaicos ? undefined : 'conta-sem-mosaicos', mosaicos });
   } catch(err){
     res.status(200)
        .setHeader('Cache-Control', 'public, max-age=120')
