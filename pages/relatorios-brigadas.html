@@ -533,6 +533,7 @@ async function carregarFauna(registros) {
       regional:         regById[f.registro_campo_id]?.regional,
       brigada_nome:     regById[f.registro_campo_id]?.brigada_nome,
       data_hora_evento: regById[f.registro_campo_id]?.data_hora_evento,
+      status_validacao: regById[f.registro_campo_id]?.status_validacao,
       nome_popular_cat: popResolvido,
     }
   })
@@ -1661,7 +1662,7 @@ function fecharAlbumOverlay() {
 }
 
 function renderAlbumFauna() {
-  _albumFotos = _faunaData.flatMap(f => {
+  _albumFotos = _faunaData.filter(f => f.status_validacao === 'validado').flatMap(f => {
     const urls = Array.isArray(f.fotos_urls) ? f.fotos_urls : []
     if (!urls.length) return []
     const especie    = f.nome_popular_cat || f.nome_popular || ''
