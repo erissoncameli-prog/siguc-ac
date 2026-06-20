@@ -211,6 +211,8 @@ function bSyncMontarPayload(reg, fotosUrls) {
   // Desestrutura e descarta campos internos + campos que precisam de conversão
   const {
     fotos_blobs, status, _fauna, ultimo_erro, _reconstruido,
+    // campos gerenciados pelo servidor — nunca enviados de volta
+    status_validacao, motivo_rejeicao, validado_por, validado_em, historico, sincronizado_em,
     lat, lng,          // → localizacao (PostGIS)
     n_equipe,          // legado: ignorado (equipe agora vem de equipe_id)
     area_ha,           // → area_estimada_ha
@@ -224,6 +226,10 @@ function bSyncMontarPayload(reg, fotosUrls) {
 
   return {
     ...rest,
+    // Garante brigadista_id mesmo em registros reconstruídos (fila zerada) sem esse FK
+    brigadista_id:    rest.brigadista_id ?? window.App?.brigadista?.id ?? null,
+    // Sempre sinaliza "aguardando validação" — satisfaz WITH CHECK da política RLS de UPDATE
+    status_validacao: 'aguardando',
     fotos_urls:       fotosUrls.length ? fotosUrls : null,
     // Geometria enviada como GeoJSON; PostgREST converte via ST_GeomFromGeoJSON
     localizacao:      (lat != null && lng != null)
@@ -290,9 +296,12 @@ async function bSyncPollValidacao() {
       const local = localMap[row.uuid_cliente]
 
       if (local) {
-        // Registro existe: atualiza status e motivo se mudou
-        if (local.status_validacao !== row.status_validacao ||
-            local.motivo_rejeicao  !== row.motivo_rejeicao) {
+        // Registro existe: atualiza status de validação do servidor somente se o
+        // registro local está confirmado (não está pendente de re-envio).
+        // Se estiver pendente, o brigadista já corrigiu — não reverter para requer_correcao.
+        if (local.status === 'confirmado' && (
+            local.status_validacao !== row.status_validacao ||
+            local.motivo_rejeicao  !== row.motivo_rejeicao)) {
           await bOfflineMarcar(row.uuid_cliente, local.status, {
             status_validacao: row.status_validacao,
             motivo_rejeicao:  row.motivo_rejeicao ?? null,
