@@ -370,10 +370,11 @@
     </div>
 
     <div class="form-section" style="position:relative">
-      <label class="form-label">Espécie</label>
-      <input type="text" id="f-fauna-especie" class="form-input" placeholder="Nome científico ou popular…" autocomplete="off">
+      <label class="form-label">Animal / espécie</label>
+      <input type="text" id="f-fauna-especie" class="form-input" placeholder="Digite o nome do animal/espécie" autocomplete="off">
       <ul id="f-fauna-especie-lista" class="autocomplete-lista"></ul>
       <input type="hidden" id="f-fauna-especie-id">
+      <input type="hidden" id="f-fauna-especie-cient">
     </div>
 
     <div class="form-section form-row">
@@ -2063,8 +2064,9 @@ function abrirFauna(idx = null) {
   App.faunaEditIdx = idx
 
   // reset campos e fotos
-  document.getElementById('f-fauna-especie').value    = ''
-  document.getElementById('f-fauna-especie-id').value = ''
+  document.getElementById('f-fauna-especie').value       = ''
+  document.getElementById('f-fauna-especie-id').value    = ''
+  document.getElementById('f-fauna-especie-cient').value = ''
   document.getElementById('f-fauna-tipo').value       = ''
   document.getElementById('f-fauna-condicao').value   = ''
   document.getElementById('f-fauna-causa').value      = ''
@@ -2088,8 +2090,9 @@ function preencherFauna(f) {
   document.querySelectorAll('.classe-btn').forEach(b => {
     b.classList.toggle('ativo', b.dataset.v === f.classe)
   })
-  document.getElementById('f-fauna-especie').value    = f.especie_nome_cientifico || f.nome_popular || ''
-  document.getElementById('f-fauna-especie-id').value = f.especie_id || ''
+  document.getElementById('f-fauna-especie').value       = f.nome_popular || f.especie_nome_cientifico || ''
+  document.getElementById('f-fauna-especie-id').value    = f.especie_id || ''
+  document.getElementById('f-fauna-especie-cient').value = f.especie_nome_cientifico || ''
   document.getElementById('f-fauna-tipo').value       = f.tipo_evento || ''
   document.getElementById('f-fauna-condicao').value   = f.condicao || ''
   document.getElementById('f-fauna-causa').value      = f.causa || ''
@@ -2170,8 +2173,8 @@ function confirmarFauna() {
   const item = {
     classe:                  classeAtiva?.dataset.v || 'nao_sei',
     especie_id:              document.getElementById('f-fauna-especie-id').value || null,
-    especie_nome_cientifico: document.getElementById('f-fauna-especie').value || null,
-    nome_popular:            null,
+    especie_nome_cientifico: document.getElementById('f-fauna-especie-cient').value || null,
+    nome_popular:            document.getElementById('f-fauna-especie').value.trim() || null,
     tipo_evento:             tipo,
     condicao,
     causa:                   document.getElementById('f-fauna-causa').value || null,
@@ -3289,7 +3292,10 @@ document.addEventListener('DOMContentLoaded', () => {
   bFaunaBindAutocompletar(
     document.getElementById('f-fauna-especie'),
     document.getElementById('f-fauna-especie-lista'),
-    sel => { document.getElementById('f-fauna-especie-id').value = sel.especie_id || '' }
+    sel => {
+      document.getElementById('f-fauna-especie-id').value    = sel?.especie_id || ''
+      document.getElementById('f-fauna-especie-cient').value = sel?.especie_nome_cientifico || ''
+    }
   )
   document.getElementById('btn-fauna-confirmar').addEventListener('click', confirmarFauna)
   document.getElementById('btn-fauna-camera').addEventListener('click', abrirFaunaCamera)

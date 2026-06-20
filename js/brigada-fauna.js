@@ -100,28 +100,40 @@ async function bFaunaBuscar(query) {
 }
 
 // ── Autocompletar espécie ─────────────────────────────────────
+// O campo é orientado ao brigadista: a lista mostra o NOME POPULAR em
+// destaque (científico discreto) e, ao escolher, o campo fica com o
+// nome popular. O científico/especie_id seguem nos bastidores (onSelect)
+// para o biólogo. Digitar de novo limpa o vínculo (vira texto livre).
 function bFaunaBindAutocompletar(inputEl, listaEl, onSelect) {
   let debounce = null
   inputEl.addEventListener('input', () => {
     clearTimeout(debounce)
+    // Texto editado manualmente → deixa de corresponder a uma espécie do
+    // catálogo; limpa o vínculo até que o usuário escolha de novo.
+    onSelect && onSelect(null)
     const q = inputEl.value.trim()
     if (q.length < 2) { listaEl.innerHTML = ''; return }
     debounce = setTimeout(async () => {
       const resultados = await bFaunaBuscar(q)
       listaEl.innerHTML = resultados.map(e => {
-        const pop = (e.nomes_populares || []).slice(0,2).join(', ')
-        return `<li data-id="${e.id}" data-nome="${esc(e.nome_cientifico)}" data-pop="${esc(pop)}" data-classe="${esc(e.classe || '')}">${esc(e.nome_cientifico)}${pop ? ' — ' + esc(pop) : ''}</li>`
+        const pop = (e.nomes_populares || [])[0] || ''
+        const principal = pop || e.nome_cientifico
+        const sec = pop ? e.nome_cientifico : ''
+        return `<li data-id="${e.id}" data-cient="${esc(e.nome_cientifico)}" data-pop="${esc(pop)}" data-classe="${esc(e.classe || '')}">`
+             + `<strong>${esc(principal)}</strong>${sec ? ` <span class="ac-cient">${esc(sec)}</span>` : ''}</li>`
       }).join('')
       listaEl.querySelectorAll('li').forEach(li => {
         li.addEventListener('click', () => {
+          const pop = li.dataset.pop
+          const nomeExibido = pop || li.dataset.cient
           onSelect && onSelect({
             especie_id: li.dataset.id,
-            especie_nome_cientifico: li.dataset.nome,
-            nome_popular: li.dataset.pop,
+            especie_nome_cientifico: li.dataset.cient,
+            nome_popular: nomeExibido,
             classe: li.dataset.classe,
           })
           listaEl.innerHTML = ''
-          inputEl.value = li.dataset.nome
+          inputEl.value = nomeExibido
         })
       })
     }, 280)
