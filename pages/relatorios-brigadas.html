@@ -143,32 +143,48 @@
 .fauna-full-card { margin-bottom:14px }
 .fauna-full-card .fauna-chart-card { border-radius:14px }
 
-/* ── Álbum de Fauna ──────────────────────────────────────────── */
-.album-section { margin-top:28px }
-.album-header { display:flex; align-items:baseline; gap:10px; margin-bottom:14px }
-.album-title { font-size:.9rem; font-weight:700; color:#0A1A0F;
-               font-family:'Fraunces',Georgia,serif; letter-spacing:-.01em }
-.album-count { font-size:.75rem; color:#9ca3af; font-weight:500 }
-.album-chips { display:flex; gap:7px; overflow-x:auto; padding-bottom:4px; margin-bottom:14px;
-               scrollbar-width:none }
+/* ── Botão Álbum de Fauna ────────────────────────────────────── */
+.btn-abrir-album { display:inline-flex; align-items:center; gap:10px;
+  padding:15px 32px; border-radius:16px; border:none; cursor:pointer;
+  background:linear-gradient(135deg,#0A1A0F 0%,#2D6A4F 100%); color:#fff;
+  font-size:.95rem; font-weight:700; letter-spacing:-.01em;
+  font-family:'Fraunces',Georgia,serif;
+  box-shadow:0 6px 24px rgba(10,26,15,.28); transition:transform .15s,box-shadow .15s }
+.btn-abrir-album:hover { transform:translateY(-2px); box-shadow:0 10px 32px rgba(10,26,15,.38) }
+.btn-abrir-album:active { transform:translateY(0) }
+
+/* ── Overlay do Álbum (tela cheia) ──────────────────────────── */
+.album-ov { position:fixed; inset:0; background:#f9fafb; z-index:8000;
+            display:flex; flex-direction:column; overflow:hidden }
+.album-ov-head { display:flex; align-items:center; gap:12px;
+                 padding:14px 18px; background:#0A1A0F; color:#fff; flex-shrink:0 }
+.album-ov-close { width:36px; height:36px; border-radius:50%; border:none;
+                  background:rgba(255,255,255,.15); color:#fff; font-size:20px;
+                  cursor:pointer; display:flex; align-items:center; justify-content:center;
+                  flex-shrink:0; transition:background .15s }
+.album-ov-close:hover { background:rgba(255,255,255,.3) }
+.album-ov-titulo { font-family:'Fraunces',Georgia,serif; font-size:1rem; font-weight:700; flex:1 }
+.album-ov-count { font-size:.75rem; color:rgba(255,255,255,.6) }
+.album-ov-body { flex:1; overflow-y:auto; padding:14px 16px }
+.album-chips { display:flex; gap:7px; overflow-x:auto; padding-bottom:6px; margin-bottom:14px;
+               scrollbar-width:none; -webkit-overflow-scrolling:touch }
 .album-chips::-webkit-scrollbar { display:none }
-.album-chip { padding:5px 13px; border-radius:999px; font-size:.76rem; font-weight:600;
+.album-chip { padding:6px 14px; border-radius:999px; font-size:.76rem; font-weight:600;
               border:1.5px solid #e5e7eb; background:#fff; color:#374151; cursor:pointer;
               white-space:nowrap; transition:all .15s; display:flex; align-items:center; gap:5px }
 .album-chip.ativo { background:#0A1A0F; color:#fff; border-color:#0A1A0F }
-.album-chip img { width:13px; height:13px; object-fit:contain;
-                  filter:grayscale(1); opacity:.6 }
+.album-chip img { width:13px; height:13px; object-fit:contain; filter:grayscale(1); opacity:.6 }
 .album-chip.ativo img { filter:brightness(0) invert(1); opacity:1 }
 .album-grupo { margin-bottom:22px }
-.album-grupo-header { font-size:.76rem; font-weight:700; color:#374151;
-                      margin-bottom:8px; display:flex; align-items:center; gap:6px;
+.album-grupo-header { font-size:.75rem; font-weight:700; color:#374151; margin-bottom:8px;
+                      display:flex; align-items:center; gap:6px;
                       text-transform:uppercase; letter-spacing:.05em }
 .album-grupo-count { font-size:.7rem; font-weight:500; color:#9ca3af;
                      background:#f3f4f6; border-radius:99px; padding:1px 8px }
 .album-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:3px }
 @media(max-width:480px){ .album-grid { grid-template-columns:repeat(2,1fr) } }
 .album-thumb { position:relative; aspect-ratio:1; overflow:hidden; cursor:pointer;
-               border-radius:3px; background:#f3f4f6 }
+               border-radius:3px; background:#e5e7eb }
 .album-thumb img { width:100%; height:100%; object-fit:cover; transition:transform .2s }
 .album-thumb:hover img { transform:scale(1.05) }
 .album-thumb-badge { position:absolute; bottom:4px; right:4px; width:20px; height:20px;
@@ -178,11 +194,26 @@
 .album-empty { text-align:center; padding:3rem 1rem; color:#9ca3af; font-size:.85rem;
                border:1.5px dashed #e5e7eb; border-radius:12px }
 
-/* ── Lightbox com flip de carta ─────────────────────────────── */
-.lb-overlay { position:fixed; inset:0; background:rgba(0,0,0,.94); z-index:9999;
-              display:flex; align-items:center; justify-content:center }
-.lb-img-wrap { position:relative; display:flex; align-items:center; justify-content:center }
-.lb-img-wrap img { max-width:86vw; max-height:72vh; object-fit:contain; display:block;
+/* ── Lightbox com flip de carta (acima do álbum) ────────────── */
+.lb-overlay { position:fixed; inset:0; background:rgba(0,0,0,.95); z-index:9000;
+              display:flex; flex-direction:column; align-items:center; justify-content:center }
+.lb-topbar { width:100%; display:flex; align-items:center; justify-content:space-between;
+             padding:12px 16px; flex-shrink:0 }
+.lb-counter { font-size:.74rem; color:rgba(255,255,255,.6); letter-spacing:.05em }
+.lb-close { width:40px; height:40px; border-radius:50%; border:2px solid rgba(255,255,255,.3);
+            background:rgba(255,255,255,.12); color:#fff; font-size:22px; cursor:pointer;
+            display:flex; align-items:center; justify-content:center; transition:background .15s;
+            flex-shrink:0 }
+.lb-close:hover { background:rgba(255,255,255,.3) }
+.lb-mid { flex:1; display:flex; align-items:center; justify-content:center;
+          gap:12px; width:100%; padding:0 8px; min-height:0 }
+.lb-nav { background:rgba(255,255,255,.1); border:none; color:#fff; font-size:30px;
+          width:44px; height:72px; border-radius:8px; cursor:pointer; flex-shrink:0;
+          display:flex; align-items:center; justify-content:center; transition:background .15s }
+.lb-nav:hover { background:rgba(255,255,255,.25) }
+.lb-nav:disabled { opacity:.2; cursor:default }
+.lb-img-wrap { flex:1; display:flex; align-items:center; justify-content:center; min-width:0 }
+.lb-img-wrap img { max-width:100%; max-height:62vh; object-fit:contain; display:block;
                    border-radius:8px; box-shadow:0 24px 80px rgba(0,0,0,.7);
                    user-select:none; -webkit-user-drag:none }
 .lb-img-wrap.flip-out { animation:lbFlipOut .2s ease-in forwards }
@@ -195,31 +226,14 @@
   from { transform:perspective(900px) rotateY(90deg); opacity:0 }
   to   { transform:perspective(900px) rotateY(0deg); opacity:1 }
 }
-.lb-close { position:fixed; top:16px; right:18px; background:rgba(255,255,255,.12);
-            border:none; color:#fff; font-size:22px; width:38px; height:38px;
-            border-radius:50%; cursor:pointer; z-index:10001;
-            display:flex; align-items:center; justify-content:center }
-.lb-close:hover { background:rgba(255,255,255,.25) }
-.lb-nav { position:fixed; top:50%; transform:translateY(-50%); background:rgba(255,255,255,.1);
-          border:none; color:#fff; font-size:30px; width:44px; height:72px;
-          border-radius:8px; cursor:pointer; z-index:10001;
-          display:flex; align-items:center; justify-content:center; transition:background .15s }
-.lb-nav:hover { background:rgba(255,255,255,.25) }
-.lb-nav:disabled { opacity:.2; cursor:default }
-.lb-prev { left:10px }
-.lb-next { right:10px }
-.lb-counter { position:fixed; top:18px; left:50%; transform:translateX(-50%);
-              font-size:.74rem; color:rgba(255,255,255,.6); letter-spacing:.05em;
-              pointer-events:none }
-.lb-meta { position:fixed; bottom:0; left:0; right:0;
-           background:linear-gradient(transparent, rgba(0,0,0,.75));
-           padding:32px 24px 20px; text-align:center; pointer-events:none }
-.lb-meta-nome { font-size:1rem; font-weight:700; color:#fff;
+.lb-meta { width:100%; padding:16px 24px 20px; text-align:center; flex-shrink:0;
+           background:linear-gradient(transparent,rgba(0,0,0,.6)); }
+.lb-meta-nome { font-size:.95rem; font-weight:700; color:#fff;
                 font-family:'Fraunces',Georgia,serif; margin-bottom:3px }
-.lb-meta-cient { font-size:.74rem; color:#a1a1aa; font-style:italic; margin-bottom:10px }
+.lb-meta-cient { font-size:.73rem; color:#a1a1aa; font-style:italic; margin-bottom:8px }
 .lb-meta-chips { display:flex; gap:6px; justify-content:center; flex-wrap:wrap }
 .lb-meta-chip { font-size:.69rem; padding:3px 10px; border-radius:999px;
-                background:rgba(255,255,255,.18); color:#fff; backdrop-filter:blur(4px) }
+                background:rgba(255,255,255,.18); color:#fff }
 </style>
 </head>
 <body>
@@ -1573,14 +1587,12 @@ function renderFauna() {
       </div>
     </div>
 
-    <!-- Álbum de fotos de fauna -->
-    <div class="album-section fauna-chart-card" id="album-fauna-section">
-      <div class="album-header">
-        <div class="album-title">Álbum de Fauna</div>
-        <div class="album-count" id="album-total"></div>
-      </div>
-      <div class="album-chips" id="album-chips"></div>
-      <div id="album-corpo"></div>
+    <!-- Botão de acesso ao álbum -->
+    <div style="margin-top:22px;text-align:center">
+      <button class="btn-abrir-album" onclick="abrirAlbumOverlay()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+        Álbum de Fauna
+      </button>
     </div>
   `
 
@@ -1591,7 +1603,6 @@ function renderFauna() {
     initFaunaRegional(f)
     initFaunaBrigada(f)
     initFaunaEspecie(f)
-    renderAlbumFauna()
   })
 }
 
@@ -1604,15 +1615,54 @@ const ALBUM_ICONE = {
   peixe:'/pwa/icons/fauna/peixe.png',       invertebrado:'/pwa/icons/fauna/invertebrado.png',
 }
 let _albumClasseFiltro = ''
-let _albumFotos = []   // flat: {url, classe, especie, cientifico, condicao, brigada, data}
+let _albumFotos = []
 let _lbIdx = 0
 
+// ── Overlay do álbum ──────────────────────────────────────────
+function albumGetOverlay() {
+  if (document.getElementById('album-overlay')) return
+  const el = document.createElement('div')
+  el.id = 'album-overlay'
+  el.className = 'album-ov'
+  el.setAttribute('hidden', '')
+  el.innerHTML = `
+    <div class="album-ov-head">
+      <button class="album-ov-close" id="album-ov-close" title="Fechar">&#x2715;</button>
+      <div class="album-ov-titulo">Álbum de Fauna</div>
+      <div class="album-ov-count" id="album-total"></div>
+    </div>
+    <div class="album-ov-body">
+      <div class="album-chips" id="album-chips"></div>
+      <div id="album-corpo"></div>
+    </div>
+  `
+  document.body.appendChild(el)
+  document.getElementById('album-ov-close').addEventListener('click', fecharAlbumOverlay)
+  document.addEventListener('keydown', e => {
+    if (!document.getElementById('album-overlay') || document.getElementById('album-overlay').hidden) return
+    if (e.key === 'Escape' && document.getElementById('lb-overlay')?.hidden !== false) fecharAlbumOverlay()
+  })
+}
+
+function abrirAlbumOverlay() {
+  albumGetOverlay()
+  _albumClasseFiltro = ''
+  renderAlbumFauna()
+  document.getElementById('album-overlay').removeAttribute('hidden')
+  document.body.style.overflow = 'hidden'
+}
+
+function fecharAlbumOverlay() {
+  const el = document.getElementById('album-overlay')
+  if (el) el.setAttribute('hidden', '')
+  document.body.style.overflow = ''
+}
+
 function renderAlbumFauna() {
-  // Achata todas as fotos de fauna com metadados
   _albumFotos = _faunaData.flatMap(f => {
     const urls = Array.isArray(f.fotos_urls) ? f.fotos_urls : []
     if (!urls.length) return []
-    const especie = f.nome_popular_cat || f.nome_popular || ''
+    const especie    = f.nome_popular_cat || f.nome_popular || ''
     const cientifico = f.nome_cientifico || ''
     const label = especie || cientifico || FAUNA_CLASSE_LAB[f.classe] || f.classe || '—'
     return urls.map(url => ({
@@ -1625,45 +1675,38 @@ function renderAlbumFauna() {
     }))
   })
 
-  // Chips de filtro por classe (apenas classes com fotos)
   const classesComFoto = [...new Set(_albumFotos.map(p => p.classe))]
   const chips = document.getElementById('album-chips')
   if (chips) {
-    chips.innerHTML = `<button class="album-chip${_albumClasseFiltro===''?' ativo':''}" data-c="">Todas</button>` +
+    chips.innerHTML =
+      `<button class="album-chip${_albumClasseFiltro===''?' ativo':''}" data-c="">Todas</button>` +
       classesComFoto.map(c =>
         `<button class="album-chip${_albumClasseFiltro===c?' ativo':''}" data-c="${c}">
           ${ALBUM_ICONE[c] ? `<img src="${ALBUM_ICONE[c]}" alt="">` : ''}
           ${FAUNA_CLASSE_LAB[c] || c}
         </button>`
       ).join('')
-    chips.querySelectorAll('.album-chip').forEach(btn => {
-      btn.addEventListener('click', () => {
-        _albumClasseFiltro = btn.dataset.c
-        renderAlbumFauna()
-      })
-    })
+    chips.querySelectorAll('.album-chip').forEach(btn =>
+      btn.addEventListener('click', () => { _albumClasseFiltro = btn.dataset.c; renderAlbumFauna() })
+    )
   }
 
-  const fotos = _albumClasseFiltro
-    ? _albumFotos.filter(p => p.classe === _albumClasseFiltro)
-    : _albumFotos
-
+  const fotos = _albumClasseFiltro ? _albumFotos.filter(p => p.classe === _albumClasseFiltro) : _albumFotos
   const total = document.getElementById('album-total')
-  if (total) total.textContent = fotos.length ? `${fotos.length} foto${fotos.length!==1?'s':''}` : ''
+  if (total) total.textContent = `${fotos.length} foto${fotos.length!==1?'s':''}`
 
   const corpo = document.getElementById('album-corpo')
   if (!corpo) return
-
   if (!fotos.length) {
     corpo.innerHTML = `<div class="album-empty">Nenhuma foto registrada neste período</div>`
     return
   }
 
-  // Agrupa por espécie/label
+  // Agrupa por espécie
   const grupos = {}
-  fotos.forEach((p, globalIdx) => {
-    if (!grupos[p.label]) grupos[p.label] = { label: p.label, classe: p.classe, fotos: [] }
-    grupos[p.label].fotos.push({ ...p, _globalIdx: globalIdx })
+  fotos.forEach((p, i) => {
+    if (!grupos[p.label]) grupos[p.label] = { label:p.label, classe:p.classe, fotos:[] }
+    grupos[p.label].fotos.push({ ...p, _fi: i })   // _fi = índice dentro de fotos[]
   })
 
   corpo.innerHTML = Object.values(grupos).map(g => `
@@ -1675,18 +1718,16 @@ function renderAlbumFauna() {
       </div>
       <div class="album-grid">
         ${g.fotos.map(p => `
-          <div class="album-thumb" data-idx="${p._globalIdx}">
+          <div class="album-thumb" data-fi="${p._fi}">
             <img src="${esc(p.url)}" alt="${esc(p.label)}" loading="lazy">
-            ${ALBUM_ICONE[p.classe] ? `<div class="album-thumb-badge"><img src="${ALBUM_ICONE[p.classe]}" alt=""></div>` : ''}
-          </div>
-        `).join('')}
+            ${ALBUM_ICONE[p.classe]?`<div class="album-thumb-badge"><img src="${ALBUM_ICONE[p.classe]}" alt=""></div>`:''}
+          </div>`).join('')}
       </div>
-    </div>
-  `).join('')
+    </div>`).join('')
 
-  corpo.querySelectorAll('.album-thumb').forEach(el => {
-    el.addEventListener('click', () => lbAbrir(parseInt(el.dataset.idx)))
-  })
+  corpo.querySelectorAll('.album-thumb').forEach(el =>
+    el.addEventListener('click', () => lbAbrir(parseInt(el.dataset.fi), fotos))
+  )
 }
 
 // ── Lightbox ──────────────────────────────────────────────────
@@ -1697,25 +1738,27 @@ function lbGetEl() {
   el.className = 'lb-overlay'
   el.setAttribute('hidden', '')
   el.innerHTML = `
-    <span class="lb-counter" id="lb-counter"></span>
-    <button class="lb-close" id="lb-close">×</button>
-    <button class="lb-nav lb-prev" id="lb-prev">&#8249;</button>
-    <div class="lb-img-wrap" id="lb-img-wrap"><img id="lb-img" src="" alt=""></div>
-    <button class="lb-nav lb-next" id="lb-next">&#8250;</button>
+    <div class="lb-topbar">
+      <span class="lb-counter" id="lb-counter"></span>
+      <button class="lb-close" id="lb-close" title="Fechar">&#x2715;</button>
+    </div>
+    <div class="lb-mid">
+      <button class="lb-nav lb-prev" id="lb-prev">&#8249;</button>
+      <div class="lb-img-wrap" id="lb-img-wrap"><img id="lb-img" src="" alt=""></div>
+      <button class="lb-nav lb-next" id="lb-next">&#8250;</button>
+    </div>
     <div class="lb-meta" id="lb-meta"></div>
   `
   document.body.appendChild(el)
   document.getElementById('lb-close').addEventListener('click', lbFechar)
   document.getElementById('lb-prev').addEventListener('click', () => lbNavegar(-1))
   document.getElementById('lb-next').addEventListener('click', () => lbNavegar(1))
-  el.addEventListener('click', e => { if (e.target === el) lbFechar() })
   document.addEventListener('keydown', e => {
     if (document.getElementById('lb-overlay')?.hidden) return
     if (e.key === 'ArrowLeft')  lbNavegar(-1)
     if (e.key === 'ArrowRight') lbNavegar(1)
     if (e.key === 'Escape')     lbFechar()
   })
-  // Swipe touch
   let _tx = 0
   el.addEventListener('touchstart', e => { _tx = e.touches[0].clientX }, { passive:true })
   el.addEventListener('touchend',   e => {
@@ -1724,27 +1767,15 @@ function lbGetEl() {
   }, { passive:true })
 }
 
-function lbAbrir(idx) {
+function lbAbrir(idx, fotos) {
   lbGetEl()
-  const fotos = _albumClasseFiltro ? _albumFotos.filter(p => p.classe === _albumClasseFiltro) : _albumFotos
-  // mapeia índice global para índice no array filtrado
-  const fotosFiltradas = fotos
-  _lbIdx = fotosFiltradas.findIndex((_, i) => {
-    // o idx é o índice em _albumFotos; precisamos do índice dentro de fotos filtradas
-    return false
-  })
-  // Simplifica: usa índice direto passado do thumb (já é índice em _albumFotos)
-  window._lbFotos = _albumClasseFiltro
-    ? _albumFotos.map((p, i) => ({ ...p, _gi: i })).filter(p => p.classe === _albumClasseFiltro)
-    : _albumFotos.map((p, i) => ({ ...p, _gi: i }))
-  const localIdx = window._lbFotos.findIndex(p => p._gi === idx)
-  _lbIdx = localIdx >= 0 ? localIdx : 0
+  window._lbFotos = fotos
+  _lbIdx = idx
   lbMostrar(false)
   document.getElementById('lb-overlay').removeAttribute('hidden')
-  document.body.style.overflow = 'hidden'
 }
 
-function lbMostrar(animacao = true) {
+function lbMostrar(animacao) {
   const fotos = window._lbFotos || []
   const p = fotos[_lbIdx]
   if (!p) return
@@ -1773,7 +1804,7 @@ function lbMostrar(animacao = true) {
   img.alt = p.label
   meta.innerHTML = `
     <div class="lb-meta-nome">${esc(p.label)}</div>
-    ${p.cientifico ? `<div class="lb-meta-cient">${esc(p.cientifico)}</div>` : ''}
+    ${p.cientifico?`<div class="lb-meta-cient">${esc(p.cientifico)}</div>`:''}
     <div class="lb-meta-chips">${chips}</div>
   `
   cnt.textContent = `${_lbIdx + 1} / ${fotos.length}`
@@ -1783,16 +1814,15 @@ function lbMostrar(animacao = true) {
 
 function lbNavegar(delta) {
   const fotos = window._lbFotos || []
-  const novoIdx = _lbIdx + delta
-  if (novoIdx < 0 || novoIdx >= fotos.length) return
-  _lbIdx = novoIdx
+  const n = _lbIdx + delta
+  if (n < 0 || n >= fotos.length) return
+  _lbIdx = n
   lbMostrar(true)
 }
 
 function lbFechar() {
   const el = document.getElementById('lb-overlay')
   if (el) el.setAttribute('hidden', '')
-  document.body.style.overflow = ''
 }
 
 // ── Rosca: Por Classe ─────────────────────────────────────────
