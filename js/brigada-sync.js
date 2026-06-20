@@ -333,6 +333,33 @@ async function bSyncPollValidacao() {
       }
     }
 
+    // Reconcilia o status_validacao dos registros locais já sincronizados.
+    // app_correcoes_pendentes() só devolve requer_correcao/rejeitado, então a
+    // transição para "validado" nunca chegava à fila — ficava presa em
+    // "aguardando". app_status_validacao(uuids) devolve o status atual de
+    // qualquer registro do brigadista, cobrindo validado/aguardando também.
+    const uuidsSync = todos
+      .filter(r => r.status === 'confirmado')
+      .map(r => r.uuid_cliente)
+    if (uuidsSync.length) {
+      const { data: stats, error: errStat } =
+        await db.rpc('app_status_validacao', { uuids: uuidsSync })
+      if (!errStat) {
+        for (const row of (stats || [])) {
+          const local = localMap[row.uuid_cliente]
+          if (local &&
+              (local.status_validacao !== row.status_validacao ||
+               local.motivo_rejeicao  !== (row.motivo_rejeicao ?? null))) {
+            await bOfflineMarcar(row.uuid_cliente, local.status, {
+              status_validacao: row.status_validacao,
+              motivo_rejeicao:  row.motivo_rejeicao ?? null,
+            })
+            mudancas++
+          }
+        }
+      }
+    }
+
     if (mudancas > 0) bSyncEmitir('validacao-atualizada', { mudancas })
     return mudancas
   } catch (e) {
