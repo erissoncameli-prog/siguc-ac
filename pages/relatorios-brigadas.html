@@ -142,6 +142,84 @@
              background:#f3f4f6; color:#374151 }
 .fauna-full-card { margin-bottom:14px }
 .fauna-full-card .fauna-chart-card { border-radius:14px }
+
+/* ── Álbum de Fauna ──────────────────────────────────────────── */
+.album-section { margin-top:28px }
+.album-header { display:flex; align-items:baseline; gap:10px; margin-bottom:14px }
+.album-title { font-size:.9rem; font-weight:700; color:#0A1A0F;
+               font-family:'Fraunces',Georgia,serif; letter-spacing:-.01em }
+.album-count { font-size:.75rem; color:#9ca3af; font-weight:500 }
+.album-chips { display:flex; gap:7px; overflow-x:auto; padding-bottom:4px; margin-bottom:14px;
+               scrollbar-width:none }
+.album-chips::-webkit-scrollbar { display:none }
+.album-chip { padding:5px 13px; border-radius:999px; font-size:.76rem; font-weight:600;
+              border:1.5px solid #e5e7eb; background:#fff; color:#374151; cursor:pointer;
+              white-space:nowrap; transition:all .15s; display:flex; align-items:center; gap:5px }
+.album-chip.ativo { background:#0A1A0F; color:#fff; border-color:#0A1A0F }
+.album-chip img { width:13px; height:13px; object-fit:contain;
+                  filter:grayscale(1); opacity:.6 }
+.album-chip.ativo img { filter:brightness(0) invert(1); opacity:1 }
+.album-grupo { margin-bottom:22px }
+.album-grupo-header { font-size:.76rem; font-weight:700; color:#374151;
+                      margin-bottom:8px; display:flex; align-items:center; gap:6px;
+                      text-transform:uppercase; letter-spacing:.05em }
+.album-grupo-count { font-size:.7rem; font-weight:500; color:#9ca3af;
+                     background:#f3f4f6; border-radius:99px; padding:1px 8px }
+.album-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:3px }
+@media(max-width:480px){ .album-grid { grid-template-columns:repeat(2,1fr) } }
+.album-thumb { position:relative; aspect-ratio:1; overflow:hidden; cursor:pointer;
+               border-radius:3px; background:#f3f4f6 }
+.album-thumb img { width:100%; height:100%; object-fit:cover; transition:transform .2s }
+.album-thumb:hover img { transform:scale(1.05) }
+.album-thumb-badge { position:absolute; bottom:4px; right:4px; width:20px; height:20px;
+                     background:rgba(0,0,0,.5); border-radius:50%;
+                     display:flex; align-items:center; justify-content:center }
+.album-thumb-badge img { width:12px; height:12px; filter:brightness(0) invert(1) }
+.album-empty { text-align:center; padding:3rem 1rem; color:#9ca3af; font-size:.85rem;
+               border:1.5px dashed #e5e7eb; border-radius:12px }
+
+/* ── Lightbox com flip de carta ─────────────────────────────── */
+.lb-overlay { position:fixed; inset:0; background:rgba(0,0,0,.94); z-index:9999;
+              display:flex; align-items:center; justify-content:center }
+.lb-img-wrap { position:relative; display:flex; align-items:center; justify-content:center }
+.lb-img-wrap img { max-width:86vw; max-height:72vh; object-fit:contain; display:block;
+                   border-radius:8px; box-shadow:0 24px 80px rgba(0,0,0,.7);
+                   user-select:none; -webkit-user-drag:none }
+.lb-img-wrap.flip-out { animation:lbFlipOut .2s ease-in forwards }
+.lb-img-wrap.flip-in  { animation:lbFlipIn  .2s ease-out forwards }
+@keyframes lbFlipOut {
+  from { transform:perspective(900px) rotateY(0deg); opacity:1 }
+  to   { transform:perspective(900px) rotateY(-90deg); opacity:0 }
+}
+@keyframes lbFlipIn {
+  from { transform:perspective(900px) rotateY(90deg); opacity:0 }
+  to   { transform:perspective(900px) rotateY(0deg); opacity:1 }
+}
+.lb-close { position:fixed; top:16px; right:18px; background:rgba(255,255,255,.12);
+            border:none; color:#fff; font-size:22px; width:38px; height:38px;
+            border-radius:50%; cursor:pointer; z-index:10001;
+            display:flex; align-items:center; justify-content:center }
+.lb-close:hover { background:rgba(255,255,255,.25) }
+.lb-nav { position:fixed; top:50%; transform:translateY(-50%); background:rgba(255,255,255,.1);
+          border:none; color:#fff; font-size:30px; width:44px; height:72px;
+          border-radius:8px; cursor:pointer; z-index:10001;
+          display:flex; align-items:center; justify-content:center; transition:background .15s }
+.lb-nav:hover { background:rgba(255,255,255,.25) }
+.lb-nav:disabled { opacity:.2; cursor:default }
+.lb-prev { left:10px }
+.lb-next { right:10px }
+.lb-counter { position:fixed; top:18px; left:50%; transform:translateX(-50%);
+              font-size:.74rem; color:rgba(255,255,255,.6); letter-spacing:.05em;
+              pointer-events:none }
+.lb-meta { position:fixed; bottom:0; left:0; right:0;
+           background:linear-gradient(transparent, rgba(0,0,0,.75));
+           padding:32px 24px 20px; text-align:center; pointer-events:none }
+.lb-meta-nome { font-size:1rem; font-weight:700; color:#fff;
+                font-family:'Fraunces',Georgia,serif; margin-bottom:3px }
+.lb-meta-cient { font-size:.74rem; color:#a1a1aa; font-style:italic; margin-bottom:10px }
+.lb-meta-chips { display:flex; gap:6px; justify-content:center; flex-wrap:wrap }
+.lb-meta-chip { font-size:.69rem; padding:3px 10px; border-radius:999px;
+                background:rgba(255,255,255,.18); color:#fff; backdrop-filter:blur(4px) }
 </style>
 </head>
 <body>
@@ -425,7 +503,7 @@ async function carregarFauna(registros) {
   for (let i = 0; i < ids.length; i += CHUNK) {
     const fatia = ids.slice(i, i + CHUNK)
     const { data, error } = await db.from('registro_fauna')
-      .select('classe,quantidade,tipo_evento,condicao,causa_aparente,destinacao,nome_popular,nome_cientifico,especie_id,registro_campo_id')
+      .select('classe,quantidade,tipo_evento,condicao,causa_aparente,destinacao,nome_popular,nome_cientifico,especie_id,registro_campo_id,fotos_urls')
       .in('registro_campo_id', fatia)
       .limit(5000)
     if (error) { console.error('[fauna] erro ao carregar', error); continue }
@@ -437,9 +515,10 @@ async function carregarFauna(registros) {
     const popResolvido = (f.nome_popular || '').trim() || popById[f.especie_id] || popByNc[nc.toLowerCase()] || null
     return {
       ...f,
-      regional:        regById[f.registro_campo_id]?.regional,
-      brigada_nome:    regById[f.registro_campo_id]?.brigada_nome,
-      nome_popular_cat: popResolvido,   // nome popular do catálogo (1º da lista)
+      regional:         regById[f.registro_campo_id]?.regional,
+      brigada_nome:     regById[f.registro_campo_id]?.brigada_nome,
+      data_hora_evento: regById[f.registro_campo_id]?.data_hora_evento,
+      nome_popular_cat: popResolvido,
     }
   })
 }
@@ -1493,6 +1572,16 @@ function renderFauna() {
         </div>
       </div>
     </div>
+
+    <!-- Álbum de fotos de fauna -->
+    <div class="album-section fauna-chart-card" id="album-fauna-section">
+      <div class="album-header">
+        <div class="album-title">Álbum de Fauna</div>
+        <div class="album-count" id="album-total"></div>
+      </div>
+      <div class="album-chips" id="album-chips"></div>
+      <div id="album-corpo"></div>
+    </div>
   `
 
   requestAnimationFrame(() => {
@@ -1502,7 +1591,208 @@ function renderFauna() {
     initFaunaRegional(f)
     initFaunaBrigada(f)
     initFaunaEspecie(f)
+    renderAlbumFauna()
   })
+}
+
+// ════════════════════════════════════════════════════════════════
+// Álbum inteligente de fotos de fauna
+// ════════════════════════════════════════════════════════════════
+const ALBUM_ICONE = {
+  mamifero:'/pwa/icons/fauna/mamifero.png', ave:'/pwa/icons/fauna/ave.png',
+  reptil:'/pwa/icons/fauna/reptil.png',     anfibio:'/pwa/icons/fauna/anfibio.png',
+  peixe:'/pwa/icons/fauna/peixe.png',       invertebrado:'/pwa/icons/fauna/invertebrado.png',
+}
+let _albumClasseFiltro = ''
+let _albumFotos = []   // flat: {url, classe, especie, cientifico, condicao, brigada, data}
+let _lbIdx = 0
+
+function renderAlbumFauna() {
+  // Achata todas as fotos de fauna com metadados
+  _albumFotos = _faunaData.flatMap(f => {
+    const urls = Array.isArray(f.fotos_urls) ? f.fotos_urls : []
+    if (!urls.length) return []
+    const especie = f.nome_popular_cat || f.nome_popular || ''
+    const cientifico = f.nome_cientifico || ''
+    const label = especie || cientifico || FAUNA_CLASSE_LAB[f.classe] || f.classe || '—'
+    return urls.map(url => ({
+      url, label, cientifico,
+      classe:   f.classe || 'nao_sei',
+      condicao: f.condicao,
+      tipo:     f.tipo_evento,
+      brigada:  f.brigada_nome || '',
+      data:     f.data_hora_evento ? new Date(f.data_hora_evento).toLocaleDateString('pt-BR') : '',
+    }))
+  })
+
+  // Chips de filtro por classe (apenas classes com fotos)
+  const classesComFoto = [...new Set(_albumFotos.map(p => p.classe))]
+  const chips = document.getElementById('album-chips')
+  if (chips) {
+    chips.innerHTML = `<button class="album-chip${_albumClasseFiltro===''?' ativo':''}" data-c="">Todas</button>` +
+      classesComFoto.map(c =>
+        `<button class="album-chip${_albumClasseFiltro===c?' ativo':''}" data-c="${c}">
+          ${ALBUM_ICONE[c] ? `<img src="${ALBUM_ICONE[c]}" alt="">` : ''}
+          ${FAUNA_CLASSE_LAB[c] || c}
+        </button>`
+      ).join('')
+    chips.querySelectorAll('.album-chip').forEach(btn => {
+      btn.addEventListener('click', () => {
+        _albumClasseFiltro = btn.dataset.c
+        renderAlbumFauna()
+      })
+    })
+  }
+
+  const fotos = _albumClasseFiltro
+    ? _albumFotos.filter(p => p.classe === _albumClasseFiltro)
+    : _albumFotos
+
+  const total = document.getElementById('album-total')
+  if (total) total.textContent = fotos.length ? `${fotos.length} foto${fotos.length!==1?'s':''}` : ''
+
+  const corpo = document.getElementById('album-corpo')
+  if (!corpo) return
+
+  if (!fotos.length) {
+    corpo.innerHTML = `<div class="album-empty">Nenhuma foto registrada neste período</div>`
+    return
+  }
+
+  // Agrupa por espécie/label
+  const grupos = {}
+  fotos.forEach((p, globalIdx) => {
+    if (!grupos[p.label]) grupos[p.label] = { label: p.label, classe: p.classe, fotos: [] }
+    grupos[p.label].fotos.push({ ...p, _globalIdx: globalIdx })
+  })
+
+  corpo.innerHTML = Object.values(grupos).map(g => `
+    <div class="album-grupo">
+      <div class="album-grupo-header">
+        ${ALBUM_ICONE[g.classe] ? `<img src="${ALBUM_ICONE[g.classe]}" style="width:14px;height:14px;object-fit:contain;opacity:.7" alt="">` : ''}
+        ${esc(g.label)}
+        <span class="album-grupo-count">${g.fotos.length}</span>
+      </div>
+      <div class="album-grid">
+        ${g.fotos.map(p => `
+          <div class="album-thumb" data-idx="${p._globalIdx}">
+            <img src="${esc(p.url)}" alt="${esc(p.label)}" loading="lazy">
+            ${ALBUM_ICONE[p.classe] ? `<div class="album-thumb-badge"><img src="${ALBUM_ICONE[p.classe]}" alt=""></div>` : ''}
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `).join('')
+
+  corpo.querySelectorAll('.album-thumb').forEach(el => {
+    el.addEventListener('click', () => lbAbrir(parseInt(el.dataset.idx)))
+  })
+}
+
+// ── Lightbox ──────────────────────────────────────────────────
+function lbGetEl() {
+  if (document.getElementById('lb-overlay')) return
+  const el = document.createElement('div')
+  el.id = 'lb-overlay'
+  el.className = 'lb-overlay'
+  el.setAttribute('hidden', '')
+  el.innerHTML = `
+    <span class="lb-counter" id="lb-counter"></span>
+    <button class="lb-close" id="lb-close">×</button>
+    <button class="lb-nav lb-prev" id="lb-prev">&#8249;</button>
+    <div class="lb-img-wrap" id="lb-img-wrap"><img id="lb-img" src="" alt=""></div>
+    <button class="lb-nav lb-next" id="lb-next">&#8250;</button>
+    <div class="lb-meta" id="lb-meta"></div>
+  `
+  document.body.appendChild(el)
+  document.getElementById('lb-close').addEventListener('click', lbFechar)
+  document.getElementById('lb-prev').addEventListener('click', () => lbNavegar(-1))
+  document.getElementById('lb-next').addEventListener('click', () => lbNavegar(1))
+  el.addEventListener('click', e => { if (e.target === el) lbFechar() })
+  document.addEventListener('keydown', e => {
+    if (document.getElementById('lb-overlay')?.hidden) return
+    if (e.key === 'ArrowLeft')  lbNavegar(-1)
+    if (e.key === 'ArrowRight') lbNavegar(1)
+    if (e.key === 'Escape')     lbFechar()
+  })
+  // Swipe touch
+  let _tx = 0
+  el.addEventListener('touchstart', e => { _tx = e.touches[0].clientX }, { passive:true })
+  el.addEventListener('touchend',   e => {
+    const dx = e.changedTouches[0].clientX - _tx
+    if (Math.abs(dx) > 40) lbNavegar(dx < 0 ? 1 : -1)
+  }, { passive:true })
+}
+
+function lbAbrir(idx) {
+  lbGetEl()
+  const fotos = _albumClasseFiltro ? _albumFotos.filter(p => p.classe === _albumClasseFiltro) : _albumFotos
+  // mapeia índice global para índice no array filtrado
+  const fotosFiltradas = fotos
+  _lbIdx = fotosFiltradas.findIndex((_, i) => {
+    // o idx é o índice em _albumFotos; precisamos do índice dentro de fotos filtradas
+    return false
+  })
+  // Simplifica: usa índice direto passado do thumb (já é índice em _albumFotos)
+  window._lbFotos = _albumClasseFiltro
+    ? _albumFotos.map((p, i) => ({ ...p, _gi: i })).filter(p => p.classe === _albumClasseFiltro)
+    : _albumFotos.map((p, i) => ({ ...p, _gi: i }))
+  const localIdx = window._lbFotos.findIndex(p => p._gi === idx)
+  _lbIdx = localIdx >= 0 ? localIdx : 0
+  lbMostrar(false)
+  document.getElementById('lb-overlay').removeAttribute('hidden')
+  document.body.style.overflow = 'hidden'
+}
+
+function lbMostrar(animacao = true) {
+  const fotos = window._lbFotos || []
+  const p = fotos[_lbIdx]
+  if (!p) return
+  const wrap = document.getElementById('lb-img-wrap')
+  const img  = document.getElementById('lb-img')
+  const meta = document.getElementById('lb-meta')
+  const cnt  = document.getElementById('lb-counter')
+  const chips = [
+    p.condicao ? (FAUNA_COND_LAB[p.condicao] || p.condicao) : null,
+    p.tipo     ? (FAUNA_TIPO_LAB[p.tipo]     || p.tipo)     : null,
+    p.brigada  || null,
+    p.data     || null,
+  ].filter(Boolean).map(t => `<span class="lb-meta-chip">${esc(t)}</span>`).join('')
+
+  if (animacao) {
+    wrap.classList.add('flip-out')
+    setTimeout(() => {
+      img.src = p.url
+      wrap.classList.remove('flip-out')
+      wrap.classList.add('flip-in')
+      setTimeout(() => wrap.classList.remove('flip-in'), 220)
+    }, 200)
+  } else {
+    img.src = p.url
+  }
+  img.alt = p.label
+  meta.innerHTML = `
+    <div class="lb-meta-nome">${esc(p.label)}</div>
+    ${p.cientifico ? `<div class="lb-meta-cient">${esc(p.cientifico)}</div>` : ''}
+    <div class="lb-meta-chips">${chips}</div>
+  `
+  cnt.textContent = `${_lbIdx + 1} / ${fotos.length}`
+  document.getElementById('lb-prev').disabled = _lbIdx === 0
+  document.getElementById('lb-next').disabled = _lbIdx === fotos.length - 1
+}
+
+function lbNavegar(delta) {
+  const fotos = window._lbFotos || []
+  const novoIdx = _lbIdx + delta
+  if (novoIdx < 0 || novoIdx >= fotos.length) return
+  _lbIdx = novoIdx
+  lbMostrar(true)
+}
+
+function lbFechar() {
+  const el = document.getElementById('lb-overlay')
+  if (el) el.setAttribute('hidden', '')
+  document.body.style.overflow = ''
 }
 
 // ── Rosca: Por Classe ─────────────────────────────────────────
