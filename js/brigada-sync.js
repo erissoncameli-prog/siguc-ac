@@ -303,6 +303,12 @@ async function bSyncPollValidacao() {
         // Registro não existe (fila zerada): reconstrói do servidor
         await bOfflineRestaurar({
           uuid_cliente:       row.uuid_cliente,
+          brigadista_id:      row.brigadista_id,
+          brigada_id:         row.brigada_id,
+          equipe_id:          row.equipe_id,
+          uc_id:              row.uc_id,
+          regional:           row.regional,
+          municipio:          row.municipio,
           natureza:           row.natureza,
           atividade:          row.atividade,
           hora_inicio:        row.hora_inicio,
@@ -318,7 +324,7 @@ async function bSyncPollValidacao() {
           status:             'confirmado',
           status_validacao:   row.status_validacao,
           motivo_rejeicao:    row.motivo_rejeicao ?? null,
-          fotos_blobs:        [], // fotos não recuperáveis do Storage aqui
+          fotos_blobs:        [],
           _reconstruido:      true,
         })
         mudancas++
