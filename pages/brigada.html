@@ -1462,7 +1462,7 @@ async function buscarBrigadistaDoBanco(userId) {
 async function buscarBrigadaDoBanco(brigadaId) {
   const { data } = await db
     .from('brigadas')
-    .select('id, nome, regional, uc_id')
+    .select('id, nome, regional, uc_id, codigo')
     .eq('id', brigadaId)
     .maybeSingle()
   return data
@@ -1909,7 +1909,7 @@ async function salvarRegistro() {
   try {
     await bOfflineSalvar(registro)
     bCameraFechar()
-    toast('Registro salvo! Será enviado quando houver conexão.', 'ok')
+    toast(`Ocorrência ${bCodigoOcorrencia(registro)} salva! Será enviada quando houver conexão.`, 'ok')
     await atualizarBadgeFila()
     bSyncRegistrarBackground()
     // Tenta sincronizar já — a conectividade real é testada dentro de
@@ -2229,6 +2229,27 @@ function bFormatDataHora(str) {
 let _filaExpandida = false
 const FILA_LIMITE = 6
 
+// ── Código da ocorrência ─────────────────────────────────────────
+// O código definitivo é gerado pelo servidor no envio (inclui a
+// sequência). Antes do envio, mostramos o prefixo previsível
+// REGIONAL-BRIGADA-DDMMAA-··· e a sequência entra ao sincronizar.
+const REGIONAL_SIGLA = {
+  baixo_acre: 'BAC', purus: 'PUR', jurua: 'JUR',
+  tarauaca_envira: 'TEN', alto_acre: 'AAC',
+}
+
+function bCodigoOcorrencia(r) {
+  if (r?.codigo_ocorrencia) return r.codigo_ocorrencia
+  const reg  = REGIONAL_SIGLA[r?.regional || App.brigada?.regional] || 'XXX'
+  const bcod = App.brigada?.codigo
+  const bb   = bcod != null ? String(bcod).padStart(2, '0') : '··'
+  const d    = r?.criado_em ? new Date(r.criado_em) : new Date()
+  const ddmmaa = String(d.getDate()).padStart(2, '0')
+               + String(d.getMonth() + 1).padStart(2, '0')
+               + String(d.getFullYear()).slice(-2)
+  return `${reg}-${bb}-${ddmmaa}-···`
+}
+
 function bRenderItemFila(r) {
   const icons = { prevencao: bico('shield'), combate: bico('flame'), monitoramento: bico('binoculo') }
   const statusLabel = { pendente:'Pendente', enviando:'Enviando…', confirmado:'Enviado' }
@@ -2258,10 +2279,15 @@ function bRenderItemFila(r) {
     }
   }
 
+  const codigo    = bCodigoOcorrencia(r)
+  const codigoDef = !!r.codigo_ocorrencia
+  const codigoHtml = `<span class="sync-codigo${codigoDef ? '' : ' sync-codigo-prov'}">${bico('hash')} ${esc(codigo)}</span>`
+
   return `
     <div class="sync-item sync-${r.status}">
       <span class="sync-icon">${icons[r.natureza] || bico('clipboard')}</span>
       <div class="sync-info">
+        ${codigoHtml}
         <strong>${esc(r.atividade || '—')}</strong>
         <span class="sync-meta">${metaFotos}</span>
         <span>${bico('clock')} Ocorrência: ${bFormatDataHora(r.criado_em)}</span>
