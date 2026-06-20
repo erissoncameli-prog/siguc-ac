@@ -123,6 +123,8 @@
 
 .pin-keypad {
   display: grid; grid-template-columns: repeat(3, 74px); gap: 14px;
+  /* Sem zoom de duplo-toque na área do teclado (iOS) */
+  touch-action: manipulation;
 }
 .pin-key {
   height: 74px; border-radius: 24px;
@@ -137,6 +139,10 @@
   box-shadow: 0 1px 2px rgba(0,0,0,.22), inset 0 1px 0 rgba(255,255,255,.08);
   transition: transform .14s var(--spring), background .15s, box-shadow .15s;
   -webkit-tap-highlight-color: transparent;
+  /* Elimina o atraso de ~300ms e o zoom de duplo-toque do iOS; o toque
+     é confirmado na hora. Não impede pinça para acessibilidade. */
+  touch-action: manipulation;
+  -webkit-user-select: none; user-select: none;
 }
 .pin-key:active {
   transform: scale(.93);
