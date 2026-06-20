@@ -138,44 +138,51 @@ async function bCameraAguaMarca(ctx, w, h, brigadista, gps, contexto = {}) {
   // Logos institucionais — canto inferior direito, discretas
   try {
     const logosCache = await bOfflineGetConfig('logos_cache_v2')
-    const srcs = [logosCache?.sec, logosCache?.gov].filter(Boolean)
-    if (srcs.length) {
-      const logoH = Math.max(36, Math.round(h * 0.065))
+    // [src, escala]: SEMA −40% (0.60), Acre −15% (0.85)
+    const entradas = [
+      [logosCache?.sec, 0.60],
+      [logosCache?.gov, 0.85],
+    ].filter(([src]) => src)
+    if (entradas.length) {
+      const logoHBase = Math.max(36, Math.round(h * 0.065))
       const logoGap = Math.round(w * 0.012)
       const logoPad = pad
 
       // carrega imagens em paralelo
-      const imgs = await Promise.all(srcs.map(src => new Promise(res => {
+      const imgs = await Promise.all(entradas.map(([src]) => new Promise(res => {
         const img = new Image()
         img.onload = () => res(img)
         img.onerror = () => res(null)
         img.src = src
       })))
 
-      // fundo semi-transparente sob as logos
+      // calcula dimensões individuais com escala por logo
       let totalW = 0
-      const dims = imgs.map(img => {
+      const logoHMax = logoHBase // altura do container = logo maior (gov, 0.85)
+      const dims = imgs.map((img, i) => {
         if (!img) return null
-        const ratio = img.naturalWidth / img.naturalHeight
-        const lw = Math.round(logoH * ratio)
+        const escala = entradas[i][1]
+        const lh = Math.round(logoHBase * escala)
+        const lw = Math.round(lh * (img.naturalWidth / img.naturalHeight))
         totalW += lw + logoGap
-        return { img, lw }
+        return { img, lw, lh }
       }).filter(Boolean)
-      totalW -= logoGap // remove gap extra do último
+      totalW -= logoGap
 
       const bgX = w - logoPad - totalW - logoPad
-      const bgY = h - logoPad - logoH - logoPad
+      const bgY = h - logoPad - logoHMax - logoPad
       ctx.fillStyle = 'rgba(0,0,0,0.30)'
       ctx.beginPath()
-      ctx.roundRect(bgX, bgY, totalW + logoPad * 2, logoH + logoPad * 1.2, 6)
+      ctx.roundRect(bgX, bgY, totalW + logoPad * 2, logoHMax + logoPad * 1.2, 6)
       ctx.fill()
 
-      // desenha logos da direita para esquerda
+      // desenha logos da direita para esquerda, alinhadas na base
       let xRight = w - logoPad * 2
-      for (const { img, lw } of [...dims].reverse()) {
+      for (const { img, lw, lh } of [...dims].reverse()) {
         xRight -= lw
+        const yLogo = bgY + logoPad * 0.6 + (logoHMax - lh) / 2 // centraliza verticalmente
         ctx.globalAlpha = 0.85
-        ctx.drawImage(img, xRight, bgY + Math.round(logoPad * 0.6), lw, logoH)
+        ctx.drawImage(img, xRight, yLogo, lw, lh)
         ctx.globalAlpha = 1
         xRight -= logoGap
       }
