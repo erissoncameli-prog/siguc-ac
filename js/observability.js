@@ -226,3 +226,6 @@ const Observability = (() => {
     _sendAlert,
   };
 })();
+
+// Expõe no escopo global (const de script clássico não vira propriedade de window)
+window.Observability = Observability;
