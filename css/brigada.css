@@ -796,6 +796,10 @@ body { margin: 0; }
   background: var(--alerta-bg); color: var(--alerta);
   border: 1px solid rgba(224,162,39,.3); font-size: 13px; font-weight: 500;
 }
+.home-correcao-card {
+  background: rgba(239,68,68,.08); color: #dc2626;
+  border-color: rgba(239,68,68,.25);
+}
 .fila-icone { font-size: 18px; flex-shrink: 0; }
 
 /* ── Nav flutuante (nomes reais do HTML) ────────────────── */
@@ -1376,6 +1380,26 @@ body { margin: 0; }
   font-size: 11px; margin-top: 2px;
   word-break: break-word;
 }
+
+/* ── Botão Corrigir na fila ──────────────────────────────────── */
+.btn-corrigir-fila {
+  display: inline-flex; align-items: center; gap: 5px;
+  margin-top: 6px; padding: 5px 12px; border-radius: 8px; border: none;
+  background: rgba(249,115,22,.12); color: #ea580c;
+  font-size: 11px; font-weight: 700; cursor: pointer; line-height: 1;
+}
+.btn-corrigir-fila svg { width: 13px; height: 13px; }
+.btn-corrigir-fila:hover { background: rgba(249,115,22,.22); }
+
+/* ── Overlay de correção: box de motivo ─────────────────────── */
+.correcao-motivo-box {
+  display: flex; gap: 10px; align-items: flex-start;
+  background: rgba(234,179,8,.1); border: 1px solid rgba(234,179,8,.3);
+  border-radius: 10px; padding: 12px; margin-bottom: 1rem;
+}
+.correcao-motivo-box svg { width: 18px; height: 18px; flex-shrink: 0; margin-top: 2px; }
+.correcao-motivo-box strong { font-size: .82rem; color: #92400e; }
+.correcao-motivo-box p { font-size: .82rem; color: #78350f; }
 
 /* ── Horário da ocorrência (início / término / duração) ───── */
 .hora-row { display: flex; gap: 10px; }

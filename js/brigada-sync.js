@@ -270,6 +270,42 @@ async function bSyncUploadFotosFauna(f, registroUuid, faunaIdx) {
   return urls
 }
 
+// ── Poll: busca status_validacao dos registros confirmados ───
+// Usa a RPC app_status_validacao (SECURITY DEFINER) para que o
+// brigadista só veja seus próprios registros.
+// Retorna número de registros cujo status mudou.
+async function bSyncPollValidacao() {
+  if (!db) return 0
+  try {
+    const todos = await bOfflineListarTodos()
+    const confirmados = todos.filter(r => r.status === 'confirmado' && r.uuid_cliente)
+    if (!confirmados.length) return 0
+
+    const uuids = confirmados.map(r => r.uuid_cliente)
+    const { data, error } = await db.rpc('app_status_validacao', { uuids })
+    if (error || !data) return 0
+
+    let mudancas = 0
+    for (const row of data) {
+      const local = confirmados.find(r => r.uuid_cliente === row.uuid_cliente)
+      if (!local) continue
+      if (local.status_validacao !== row.status_validacao ||
+          local.motivo_rejeicao  !== row.motivo_rejeicao) {
+        await bOfflineMarcar(row.uuid_cliente, 'confirmado', {
+          status_validacao: row.status_validacao,
+          motivo_rejeicao:  row.motivo_rejeicao ?? null,
+        })
+        mudancas++
+      }
+    }
+    if (mudancas > 0) bSyncEmitir('validacao-atualizada', { mudancas })
+    return mudancas
+  } catch (e) {
+    console.warn('[brigada-sync] pollValidacao:', e)
+    return 0
+  }
+}
+
 // ── Monta payload de fauna ────────────────────────────────────
 function bSyncMontarFaunaPayload(f, registroCampoId, fotosUrls = []) {
   const {
