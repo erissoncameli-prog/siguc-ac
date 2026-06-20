@@ -69,6 +69,10 @@
 .nat-chip.combate     { background:var(--nat-comb-bg); color:var(--nat-comb) }
 .nat-chip.monitoramento { background:var(--nat-moni-bg); color:var(--nat-moni) }
 
+.rc-codigo { display:inline-block; font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+             font-size:.78rem; font-weight:700; letter-spacing:.4px; color:var(--floresta,#0A1A0F);
+             background:rgba(201,168,76,.16); padding:1px 7px; border-radius:6px; margin-bottom:3px }
+.rc-codigo-modal { font-size:.92rem; margin-bottom:10px }
 .rc-titulo { font-size:.92rem; font-weight:600; color:var(--floresta,#0A1A0F) }
 .rc-meta   { font-size:.8rem; color:var(--text-muted,#6b7280); display:flex; gap:12px; flex-wrap:wrap; margin-top:4px }
 .rc-meta span { display:flex; align-items:center; gap:3px }
@@ -164,6 +168,16 @@
                               border:1.5px solid var(--border,#e5e7eb); font-size:.84rem;
                               background:var(--input-bg,#fff) }
 .fauna-edit-form textarea { resize:vertical; min-height:52px }
+/* Autocomplete de espécies no campo "Nome científico" */
+.fauna-ac-lista { list-style:none; margin:2px 0 0; padding:0; position:absolute; z-index:50;
+                  width:100%; max-height:190px; overflow-y:auto; background:#fff;
+                  border:1.5px solid var(--border,#e5e7eb); border-radius:9px;
+                  box-shadow:0 4px 16px rgba(0,0,0,.12) }
+.fauna-ac-lista li { padding:7px 11px; cursor:pointer; font-size:.82rem;
+                     border-bottom:1px solid #f3f4f6 }
+.fauna-ac-lista li:last-child { border-bottom:none }
+.fauna-ac-lista li:hover { background:var(--prim-bg,#f0f9f4) }
+.fauna-ac-lista .fauna-ac-pop { color:#6b7280; font-style:italic; font-size:.76rem }
 .fauna-edit-actions { display:flex; gap:8px; margin-top:8px; flex-wrap:wrap }
 .btn-fauna-salvar { background:#12A66A; color:#fff; padding:6px 16px; border-radius:8px;
                     font-size:.82rem; font-weight:600; border:none; cursor:pointer }
@@ -437,7 +451,7 @@ const DESTIN = {
     <button class="tab-btn" data-st="">Todos</button>
     <div class="search-wrap">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-      <input type="search" id="busca-input" placeholder="Brigadista, brigada, UC…">
+      <input type="search" id="busca-input" placeholder="Código, brigadista, brigada, UC…">
     </div>
   </div>
 
@@ -525,7 +539,7 @@ function filtrados() {
       if (_filtroStatus && r.status_validacao !== _filtroStatus) return false
     }
     if (_busca) {
-      const hay = [r.brigadista_nome, r.brigada_nome, r.uc_nome, r.atividade, r.natureza]
+      const hay = [r.codigo_ocorrencia, r.brigadista_nome, r.brigada_nome, r.uc_nome, r.atividade, r.natureza]
         .filter(Boolean).join(' ').toLowerCase()
       if (!hay.includes(_busca)) return false
     }
@@ -576,6 +590,7 @@ function renderLista() {
               ? `<span class="badge-sm badge-fauna-ok">🐾 ${r.n_fauna} fauna validada</span>`
               : ''}
         </div>
+        ${r.codigo_ocorrencia ? `<div class="rc-codigo">${esc(r.codigo_ocorrencia)}</div>` : ''}
         <div class="rc-titulo">${esc(ativ)} · ${esc(r.brigada_nome || '—')}</div>
         <div class="rc-meta">
           <span>👤 ${esc(r.brigadista_nome || '—')}</span>
@@ -618,6 +633,7 @@ async function abrirDetalhe(id) {
           hour:'2-digit', minute:'2-digit' })
     : '—'
   document.getElementById('modal-cabecalho').innerHTML = `
+    ${r.codigo_ocorrencia ? `<div class="rc-codigo rc-codigo-modal">${esc(r.codigo_ocorrencia)}</div>` : ''}
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
       <span class="badge-sm badge-${r.status_validacao}">${STATUS_VALID[r.status_validacao] || r.status_validacao}</span>
       ${r.n_fauna_pendente > 0 ? '<span class="badge-sm badge-fauna-pend">🐾 Fauna pendente DEBIO</span>' : ''}
@@ -752,9 +768,12 @@ async function carregarFaunaModal(rcId) {
             <label>Nome popular</label>
             <input type="text" id="fedit-popular-${f.id}" value="${esc(f.nome_popular || '')}">
           </div>
-          <div>
+          <div style="position:relative">
             <label>Nome científico</label>
-            <input type="text" id="fedit-cient-${f.id}" value="${esc(f.especie?.nome_cientifico || f.nome_cientifico || '')}">
+            <input type="text" id="fedit-cient-${f.id}" autocomplete="off"
+                   value="${esc(f.especie?.nome_cientifico || f.nome_cientifico || '')}">
+            <ul id="fedit-cient-lista-${f.id}" class="fauna-ac-lista"></ul>
+            <input type="hidden" id="fedit-especieid-${f.id}" value="${esc(f.especie_id || '')}">
           </div>
           <div>
             <label>Condição</label>
@@ -857,6 +876,69 @@ async function carregarFaunaModal(rcId) {
       </div>
     </div>`
   }).join('')
+
+  // Autocomplete de espécies no campo "Nome científico" (biólogo/técnico)
+  if (podeEditar) data.forEach(f => bindEspecieAutocomplete(f.id))
+}
+
+// ── Autocomplete de espécies (catálogo especies_fauna) ───────────
+// Anexa busca ao campo "Nome científico" de um animal. Ao escolher,
+// preenche científico, completa o popular (se vazio), marca "ameaçada"
+// do catálogo e vincula o especie_id (gravado em salvarCorrecaoFauna).
+function bindEspecieAutocomplete(rfId) {
+  const inputEl = document.getElementById(`fedit-cient-${rfId}`)
+  const listaEl = document.getElementById(`fedit-cient-lista-${rfId}`)
+  const idEl    = document.getElementById(`fedit-especieid-${rfId}`)
+  if (!inputEl || !listaEl) return
+
+  let debounce = null
+  inputEl.addEventListener('input', () => {
+    clearTimeout(debounce)
+    if (idEl) idEl.value = ''   // texto editado → desvincula até nova escolha
+    const q = inputEl.value.trim()
+    if (q.length < 2) { listaEl.innerHTML = ''; return }
+    debounce = setTimeout(async () => {
+      const resultados = await buscarEspeciesCatalogo(q)
+      listaEl.innerHTML = resultados.map(e => {
+        const pop = (e.nomes_populares || [])[0] || ''
+        return `<li data-id="${e.id}" data-cient="${esc(e.nome_cientifico)}" data-pop="${esc(pop)}"`
+             + ` data-classe="${esc(e.classe || '')}" data-ameacada="${e.ameacada ? '1' : ''}">`
+             + `<strong>${esc(e.nome_cientifico)}</strong>${pop ? ` <span class="fauna-ac-pop">${esc(pop)}</span>` : ''}</li>`
+      }).join('')
+      listaEl.querySelectorAll('li').forEach(li => {
+        li.addEventListener('click', () => {
+          inputEl.value = li.dataset.cient
+          if (idEl) idEl.value = li.dataset.id || ''
+          const popEl = document.getElementById(`fedit-popular-${rfId}`)
+          if (popEl && !popEl.value.trim() && li.dataset.pop) popEl.value = li.dataset.pop
+          const classeEl = document.getElementById(`fedit-classe-${rfId}`)
+          if (classeEl && li.dataset.classe) classeEl.value = li.dataset.classe
+          const ameacEl = document.getElementById(`fedit-ameacada-${rfId}`)
+          if (ameacEl && li.dataset.ameacada) ameacEl.checked = true
+          listaEl.innerHTML = ''
+        })
+      })
+    }, 280)
+  })
+  // Fecha a lista ao clicar fora
+  inputEl.addEventListener('blur', () => setTimeout(() => { listaEl.innerHTML = '' }, 180))
+}
+
+async function buscarEspeciesCatalogo(query) {
+  // Busca por nome científico (ilike) — ferramenta principal do biólogo.
+  // Vírgulas/aspas quebrariam o filtro PostgREST; sanitiza a entrada.
+  const q = query.replace(/[,()"%]/g, ' ').trim()
+  if (q.length < 2) return []
+  try {
+    const { data } = await db
+      .from('especies_fauna')
+      .select('id, nome_cientifico, nomes_populares, classe, ameacada')
+      .ilike('nome_cientifico', `%${q}%`)
+      .eq('ativo', true)
+      .order('nome_cientifico')
+      .limit(10)
+    return data || []
+  } catch { return [] }
 }
 
 function toggleFaunaCard(rfId) {
@@ -880,6 +962,7 @@ async function salvarCorrecaoFauna(rfId, confirmar = false) {
     quantidade:      parseInt(document.getElementById(`fedit-qtd-${rfId}`)?.value || '1'),
     nome_popular:    document.getElementById(`fedit-popular-${rfId}`)?.value.trim() || null,
     nome_cientifico: document.getElementById(`fedit-cient-${rfId}`)?.value.trim() || null,
+    especie_id:      document.getElementById(`fedit-especieid-${rfId}`)?.value || null,
     condicao:        v('cond'),
     tipo_evento:     v('tipo'),
     causa_aparente:  v('causa') || null,
