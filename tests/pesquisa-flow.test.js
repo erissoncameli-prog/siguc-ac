@@ -9,12 +9,16 @@
 const { test, expect } = require('@playwright/test');
 const BASE = process.env.TEST_BASE_URL || 'http://localhost:5500';
 
-// ── Portal público de submissão ───────────────────────────────────
-test('portal público carrega e mostra o formulário', async ({ page }) => {
+// ── Portal de submissão (agora exige conta de pesquisador) ────────
+// A submissão deixou de ser anônima: sem sessão, a página redireciona
+// para o login do pesquisador (login-pesquisador.html?next=pesquisa).
+test('submissão de pesquisa exige login de pesquisador', async ({ page }) => {
   await page.goto(`${BASE}/pages/pesquisa-publica.html`);
-  await expect(page.locator('#p-titulo')).toBeVisible();
-  await expect(page.locator('#p-resumo')).toBeVisible();
-  await expect(page.locator('#p-email')).toBeVisible();
+  await page.waitForTimeout(1500);
+  const url = page.url();
+  const exigeLogin = url.includes('login-pesquisador') ||
+    await page.locator('input[type="password"]').count() > 0;
+  expect(exigeLogin).toBeTruthy();
 });
 
 test('portal público valida campos obrigatórios (sem submeter)', async ({ page }) => {

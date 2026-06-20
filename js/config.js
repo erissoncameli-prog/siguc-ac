@@ -43,6 +43,7 @@ const _dbReady = loadEnv().then(({ supabaseUrl, supabaseKey }) => {
     // sessionStorage: sessão encerra ao fechar o navegador (Regra de segurança)
     auth: { storage: window.sessionStorage, persistSession: true, autoRefreshToken: true, detectSessionInUrl: false }
   }));
+  window.db = db; // expõe o cliente para RPCs públicas read-only (ex.: smoke tests)
 });
 
 // ── Estado global ─────────────────────────────────────────────

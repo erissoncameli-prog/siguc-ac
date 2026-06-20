@@ -212,7 +212,8 @@ let _uid         = null
 // ── Init ─────────────────────────────────────────────────────
 
 async function init() {
-  await carregarUsuario()
+  const usuario = await carregarUsuario()
+  if (!usuario) { window.location.href = '../index.html'; return }
   _uid = appState.usuario?.id
 
   // Resolver posição hierárquica do usuário logado
