@@ -40,6 +40,37 @@ function mapaBasemapRuas(L) {
     { maxZoom: 19, attribution: '© OpenStreetMap', subdomains: ['a', 'b', 'c'] });
 }
 
+// ── Planet / NICFI (mosaicos mensais ~4,77 m) ─────────────────────
+// Tiles passam pelo proxy /api/planet-tiles (chave protegida no servidor).
+// O nome do mosaico vem de mapaPlanetMosaicos(); nada de chave no front.
+
+// Lista os mosaicos disponíveis (mais recentes primeiro). Cacheia em memória
+// para não repetir a chamada a cada mapa. Retorna { disponivel, recente, mosaicos }.
+let _mapaPlanetCache = null;
+async function mapaPlanetMosaicos() {
+  if (_mapaPlanetCache) return _mapaPlanetCache;
+  try {
+    const r = await fetch('/api/planet-mosaics', { signal: AbortSignal.timeout(15000) });
+    _mapaPlanetCache = await r.json();
+  } catch (_) {
+    _mapaPlanetCache = { disponivel: false, motivo: 'rede', mosaicos: [] };
+  }
+  return _mapaPlanetCache;
+}
+
+// Camada de um mosaico Planet (nome ex.: planet_medres_visual_2026-05_mosaic).
+function mapaPlanetLayer(L, mosaico, opacidade) {
+  return L.tileLayer(
+    `/api/planet-tiles?z={z}&x={x}&y={y}&m=${encodeURIComponent(mosaico)}`,
+    {
+      attribution: 'Planet / NICFI',
+      opacity: (opacidade ?? 80) / 100,
+      maxZoom: 21, maxNativeZoom: 18,
+      errorTileUrl: 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==',
+    }
+  );
+}
+
 // Camada diária do GIBS (cor real ou focos), para uma data YYYY-MM-DD.
 function mapaGibsLayer(L, camadaId, data, opacidade) {
   const cfg = MAPA_GIBS_CAMADAS.find(c => c.id === camadaId) || MAPA_GIBS_CAMADAS[0];

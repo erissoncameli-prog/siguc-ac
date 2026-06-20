@@ -179,6 +179,8 @@ SUPABASE_URL=https://atqtybcsvepdabsvgaly.supabase.co
 SUPABASE_ANON_KEY=(pública, já em config.js)
 SUPABASE_SERVICE_ROLE_KEY=(somente Edge Functions, nunca no frontend)
 RESEND_API_KEY=(e-mail de alertas)
+PLANET_API_KEY=(Planet/NICFI Basemaps; só no servidor — usada pelos
+  proxies /api/planet-tiles e /api/planet-mosaics. Nunca no frontend)
 
 ## Próxima tarefa
 Módulo A — Estrutura Organizacional SEMA-AC

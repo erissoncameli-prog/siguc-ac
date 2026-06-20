@@ -290,6 +290,8 @@
             <label class="val-map-chk"><input type="checkbox" id="val-gibs-toggle"> Manchas/focos (NASA GIBS)</label>
             <select id="val-gibs-camada" class="val-map-sel"></select>
             <input type="date" id="val-gibs-data" class="val-map-sel" title="Data da imagem GIBS">
+            <label class="val-map-chk"><input type="checkbox" id="val-planet-toggle" onchange="_valTogglePlanet()"> Planet/NICFI (~4,77 m)</label>
+            <select id="val-planet-mosaico" class="val-map-sel" onchange="_valTogglePlanet()" title="Mês do mosaico Planet"></select>
           </div>
         </div>
         <div id="val-mapa" class="val-mapa"></div>
@@ -1200,13 +1202,13 @@ function fecharDetalhe() {
 // Mapa de validação (satélite + focos diários GIBS + editar polígono)
 // ════════════════════════════════════════════════════════════════
 let _valMap = null, _valDrawn = null, _valPolyLayer = null
-let _valFocosLayer = null, _valGibsLayer = null
+let _valFocosLayer = null, _valGibsLayer = null, _valPlanetLayer = null
 let _valEdicaoAtiva = false, _valGeoCache = null
 
 function _valDestruirMapa() {
   try { if (_valPolyLayer && _valPolyLayer.editing) _valPolyLayer.editing.disable() } catch (e) {}
   if (_valMap) { _valMap.remove(); _valMap = null }
-  _valDrawn = _valPolyLayer = _valFocosLayer = _valGibsLayer = _valGeoCache = null
+  _valDrawn = _valPolyLayer = _valFocosLayer = _valGibsLayer = _valPlanetLayer = _valGeoCache = null
   _valEdicaoAtiva = false
   const dz = document.getElementById('val-btn-desfazer'); if (dz) dz.hidden = true
 }
@@ -1241,6 +1243,8 @@ async function initMapaValidacao(r) {
   }
   document.getElementById('val-gibs-data').value = mapaGibsDataSegura()
   document.getElementById('val-gibs-toggle').checked = false
+  document.getElementById('val-planet-toggle').checked = false
+  _valPopularPlanet()
   document.getElementById('val-area-info').innerHTML = ''
   document.getElementById('val-btn-desfazer').hidden = true
 
@@ -1328,6 +1332,31 @@ function _valToggleGibs() {
     const cam = document.getElementById('val-gibs-camada').value
     const dt  = document.getElementById('val-gibs-data').value || mapaGibsDataSegura()
     _valGibsLayer = mapaGibsLayer(L, cam, dt, 75).addTo(_valMap)
+  }
+}
+
+// Preenche o seletor de mês Planet (uma vez) usando o proxy do servidor.
+async function _valPopularPlanet() {
+  const sel = document.getElementById('val-planet-mosaico')
+  const chk = document.getElementById('val-planet-toggle')
+  if (!sel || typeof mapaPlanetMosaicos !== 'function') return
+  const info = await mapaPlanetMosaicos()
+  if (!info.disponivel || !info.mosaicos.length) {
+    sel.innerHTML = '<option value="">indisponível</option>'
+    sel.disabled = true; if (chk) chk.disabled = true
+    return
+  }
+  sel.disabled = false; if (chk) chk.disabled = false
+  sel.innerHTML = info.mosaicos.map(m => `<option value="${m.name}">${m.label}</option>`).join('')
+}
+
+function _valTogglePlanet() {
+  if (!_valMap) return
+  if (_valPlanetLayer) { _valMap.removeLayer(_valPlanetLayer); _valPlanetLayer = null }
+  const sel = document.getElementById('val-planet-mosaico')
+  if (document.getElementById('val-planet-toggle').checked && sel?.value) {
+    _valPlanetLayer = mapaPlanetLayer(L, sel.value, 85).addTo(_valMap)
+    _valPlanetLayer.bringToFront()
   }
 }
 
