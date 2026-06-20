@@ -35,7 +35,7 @@ async function bCameraCapturar(videoEl, brigadista, gps, contexto = {}) {
   const ctx = canvas.getContext('2d')
   ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height)
 
-  bCameraAguaMarca(ctx, canvas.width, canvas.height, brigadista, gps, contexto)
+  await bCameraAguaMarca(ctx, canvas.width, canvas.height, brigadista, gps, contexto)
 
   return new Promise(resolve => {
     canvas.toBlob(async blob => {
@@ -69,7 +69,7 @@ async function bCapturaProcessarArquivo(file, brigadista, gps, contexto = {}) {
   canvas.width = w; canvas.height = h
   const ctx = canvas.getContext('2d')
   ctx.drawImage(img, 0, 0, w, h)
-  bCameraAguaMarca(ctx, w, h, brigadista, gps, contexto)
+  await bCameraAguaMarca(ctx, w, h, brigadista, gps, contexto)
   return new Promise(res => canvas.toBlob(
     async b => res(await bInjetarExifGps(b, gps)),
     'image/jpeg', 0.85
@@ -83,14 +83,14 @@ async function bCameraCapturarPuro(videoEl, brigadista, gps, contexto = {}) {
   canvas.height = videoEl.videoHeight || 720
   const ctx = canvas.getContext('2d')
   ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height)
-  bCameraAguaMarca(ctx, canvas.width, canvas.height, brigadista, gps, contexto)
+  await bCameraAguaMarca(ctx, canvas.width, canvas.height, brigadista, gps, contexto)
   return new Promise(resolve => {
     canvas.toBlob(async blob => resolve(await bInjetarExifGps(blob, gps)), 'image/jpeg', 0.85)
   })
 }
 
 // ── Marca d'água ──────────────────────────────────────────────
-function bCameraAguaMarca(ctx, w, h, brigadista, gps, contexto = {}) {
+async function bCameraAguaMarca(ctx, w, h, brigadista, gps, contexto = {}) {
   const linha1 = brigadista?.nome ?? 'Brigadista'
   const partes = []
   if (contexto.brigada) partes.push(contexto.brigada)
@@ -134,6 +134,53 @@ function bCameraAguaMarca(ctx, w, h, brigadista, gps, contexto = {}) {
   ctx.fill()
   ctx.fillStyle = '#7BE0AE'
   ctx.fillText(badge, w - bw - pad + pad, pad + fs)
+
+  // Logos institucionais — canto inferior direito, discretas
+  try {
+    const logosCache = await bOfflineGetConfig('logos_cache_v2')
+    const srcs = [logosCache?.sec, logosCache?.gov].filter(Boolean)
+    if (srcs.length) {
+      const logoH = Math.max(36, Math.round(h * 0.065))
+      const logoGap = Math.round(w * 0.012)
+      const logoPad = pad
+
+      // carrega imagens em paralelo
+      const imgs = await Promise.all(srcs.map(src => new Promise(res => {
+        const img = new Image()
+        img.onload = () => res(img)
+        img.onerror = () => res(null)
+        img.src = src
+      })))
+
+      // fundo semi-transparente sob as logos
+      let totalW = 0
+      const dims = imgs.map(img => {
+        if (!img) return null
+        const ratio = img.naturalWidth / img.naturalHeight
+        const lw = Math.round(logoH * ratio)
+        totalW += lw + logoGap
+        return { img, lw }
+      }).filter(Boolean)
+      totalW -= logoGap // remove gap extra do último
+
+      const bgX = w - logoPad - totalW - logoPad
+      const bgY = h - logoPad - logoH - logoPad
+      ctx.fillStyle = 'rgba(0,0,0,0.30)'
+      ctx.beginPath()
+      ctx.roundRect(bgX, bgY, totalW + logoPad * 2, logoH + logoPad * 1.2, 6)
+      ctx.fill()
+
+      // desenha logos da direita para esquerda
+      let xRight = w - logoPad * 2
+      for (const { img, lw } of [...dims].reverse()) {
+        xRight -= lw
+        ctx.globalAlpha = 0.85
+        ctx.drawImage(img, xRight, bgY + Math.round(logoPad * 0.6), lw, logoH)
+        ctx.globalAlpha = 1
+        xRight -= logoGap
+      }
+    }
+  } catch (_) { /* logos opcionais — não bloqueiam a captura */ }
 }
 
 // ── Galeria de preview ────────────────────────────────────────
