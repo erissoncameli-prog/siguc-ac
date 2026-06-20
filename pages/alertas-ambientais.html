@@ -11,6 +11,7 @@
 <script src="../js/config.js"></script>
 <script src="../js/layout.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="../js/mapa-camadas.js"></script>
 <style>
 .alerta-wrapper { display:flex; flex-direction:column; gap:12px; height:calc(100vh - 108px); min-height:500px; }
 .alerta-topbar  { display:flex; align-items:center; gap:8px; flex-wrap:wrap; flex-shrink:0; }
@@ -273,6 +274,46 @@ function iniciarMapa() {
       style: { color:'#52B788', weight:1.5, opacity:.7, fillColor:'#52B788', fillOpacity:.08 }
     }).addTo(_mapaL)
   }).catch(() => {})
+
+  _planetControl()
+}
+
+// Controle Planet/NICFI no mapa (camada de satélite ~4,77 m via proxy).
+let _alertaPlanetLayer = null
+function _planetControl() {
+  if (typeof mapaPlanetLayer !== 'function') return
+  const ctl = L.control({ position: 'topright' })
+  ctl.onAdd = function () {
+    const div = L.DomUtil.create('div', 'leaflet-bar')
+    div.style.cssText = 'background:#fff;padding:6px 8px;font:11px DM Sans,sans-serif;line-height:1.4'
+    div.innerHTML = `<label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-weight:600">
+        <input type="checkbox" id="alerta-planet-chk" disabled> Planet/NICFI</label>
+      <select id="alerta-planet-mosaico" style="margin-top:4px;width:100%;font:11px inherit" disabled></select>`
+    L.DomEvent.disableClickPropagation(div)
+    return div
+  }
+  ctl.addTo(_mapaL)
+  _planetPopular()
+}
+async function _planetPopular() {
+  const sel = document.getElementById('alerta-planet-mosaico')
+  const chk = document.getElementById('alerta-planet-chk')
+  if (!sel) return
+  const info = await mapaPlanetMosaicos()
+  if (!info.disponivel || !info.mosaicos.length) {
+    sel.innerHTML = '<option value="">indisponível</option>'; return
+  }
+  sel.innerHTML = info.mosaicos.map(m => `<option value="${m.name}">${m.label}</option>`).join('')
+  sel.disabled = false; chk.disabled = false
+  const aplicar = () => {
+    if (_alertaPlanetLayer) { _mapaL.removeLayer(_alertaPlanetLayer); _alertaPlanetLayer = null }
+    if (chk.checked && sel.value) {
+      _alertaPlanetLayer = mapaPlanetLayer(L, sel.value, 85).addTo(_mapaL)
+      _alertaPlanetLayer.bringToFront()
+    }
+  }
+  chk.onchange = aplicar
+  sel.onchange = aplicar
 }
 
 async function carregar() {
