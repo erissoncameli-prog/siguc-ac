@@ -55,6 +55,8 @@ test('pesquisas.html redireciona/bloqueia sem autenticação', async ({ page }) 
 // ── RPC pública read-only retorna vazio para token inexistente ─────
 test('RPC buscar_pesquisa_por_token com token falso retorna null', async ({ page }) => {
   await page.goto(`${BASE}/index.html`); // carrega supabase-js + config
+  // db é inicializado de forma assíncrona (após loadEnv); aguarda ficar pronto
+  await page.waitForFunction(() => typeof window.db !== 'undefined');
   const res = await page.evaluate(async () => {
     // db é exposto globalmente por js/config.js
     const r = await window.db.rpc('buscar_pesquisa_por_token', { p_token: 'nao-existe-000' });
