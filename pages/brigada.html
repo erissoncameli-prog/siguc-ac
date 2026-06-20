@@ -64,6 +64,10 @@
 
 <!-- ══ TELA: BLOQUEIO ══════════════════════════════════════════ -->
 <div id="tela-bloqueio" class="tela ativa lock-screen" hidden>
+  <div class="lock-faixa">
+    <span class="faixa-logo-chip gov" hidden><img alt="Governo do Acre"></span>
+    <span class="faixa-logo-chip sec" hidden><img alt="SEMA-AC"></span>
+  </div>
   <div class="lock-logo">
     <img src="/pwa/icons/mascote.png" alt="" class="lock-mascote">
     <span class="lock-titulo">SIGUC Brigadas</span>
@@ -94,10 +98,15 @@
   <button class="btn-link" id="btn-pular-pin" style="display:none">Configurar PIN depois</button>
   <button class="btn-link" id="btn-esqueci-pin">Esqueci o PIN — entrar com senha</button>
   <p class="lock-erro" id="lock-erro" hidden></p>
+  <img class="lock-cbmac" src="/pwa/icons/cbmac.jpg" alt="Corpo de Bombeiros Militar do Acre">
 </div>
 
 <!-- ══ TELA: CONFIGURAR PIN ════════════════════════════════════ -->
 <div id="tela-config-pin" class="tela lock-screen" hidden>
+  <div class="lock-faixa">
+    <span class="faixa-logo-chip gov" hidden><img alt="Governo do Acre"></span>
+    <span class="faixa-logo-chip sec" hidden><img alt="SEMA-AC"></span>
+  </div>
   <div class="lock-logo">
     <img src="/pwa/icons/mascote.png" alt="" class="lock-mascote">
     <span class="lock-titulo">Criar PIN de Campo</span>
@@ -125,6 +134,7 @@
     <button class="pin-key pin-ok" id="pin-setup-ok" data-icon="check" aria-label="Confirmar"></button>
   </div>
   <p class="lock-erro" id="pin-setup-erro" hidden></p>
+  <img class="lock-cbmac" src="/pwa/icons/cbmac.jpg" alt="Corpo de Bombeiros Militar do Acre">
 </div>
 
 <!-- ══ TELA: HOME ══════════════════════════════════════════════ -->

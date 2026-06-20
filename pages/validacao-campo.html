@@ -424,12 +424,25 @@ function fmtDuracao(h) {
   const hh = Math.floor(h), mm = Math.round((h - hh) * 60)
   return `${hh}h${mm ? ' ' + mm + 'min' : ''}`
 }
-// Data do histórico ("YYYY-MM-DDTHH:MM:SS", já no fuso do Acre) → "DD/MM/YYYY HH:MM"
+// Data do histórico → "DD/MM/YYYY HH:MM" no fuso do Acre.
+// Aceita ISO com fuso (UTC "…Z") e o formato antigo sem fuso (já em Acre).
 function fmtHistData(s) {
   if (!s) return '—'
-  const [d, t] = String(s).split('T')
+  s = String(s)
+  if (/(Z|[+-]\d\d:?\d\d)$/.test(s)) {
+    return new Date(s).toLocaleString('pt-BR', {
+      timeZone: 'America/Rio_Branco',
+      day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
+    })
+  }
+  const [d, t] = s.split('T')
   const [Y, M, D] = (d || '').split('-')
   return `${D}/${M}/${Y} ${(t || '').slice(0, 5)}`
+}
+// Rótulo da ação no histórico (schema unificado: tipo = novo status)
+const HIST_ACAO_LAB = {
+  requer_correcao: 'Requer correção', validado: 'Validado',
+  rejeitado: 'Rejeitado', aguardando: 'Reenviado para análise',
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -725,17 +738,24 @@ async function abrirDetalhe(id) {
   if (hist.length) {
     histSec.hidden = false
     document.getElementById('modal-hist').innerHTML = hist.map(h => {
-      const labAcao = h.acao === 'corrigido'
+      // acao 'correcao_enviada' (ou legado 'corrigido') = reenvio do brigadista
+      const ehCorrecao = h.acao === 'correcao_enviada' || h.acao === 'corrigido'
+      const labAcao = ehCorrecao
         ? 'Corrigido pelo brigadista'
-        : (STATUS_VALID[h.acao] || h.acao || '—')
+        : (HIST_ACAO_LAB[h.tipo] || STATUS_VALID[h.acao] || h.tipo || h.acao || '—')
+      const quem = h.usuario_nome
+        ? `${esc(h.usuario_nome)}${h.perfil ? ` <span style="font-weight:400;opacity:.7">(${esc(h.perfil)})</span>` : ''}`
+        : '<span style="opacity:.7">Usuário não identificado</span>'
       const campos = (Array.isArray(h.campos) && h.campos.length)
         ? `<span><strong>Campos corrigidos:</strong> ${esc(h.campos.join(', '))}</span>`
         : ''
+      const motivo = h.motivo ? `<span><strong>Motivo:</strong> ${esc(h.motivo)}</span>` : ''
       return `<div class="hist-item">
         <div>
-          <div class="hist-data">${fmtHistData(h.data)}</div>
+          <div class="hist-data">${fmtHistData(h.em || h.data)}</div>
           <div class="hist-body">
-            <strong>${esc(h.usuario_nome || '—')} <span style="font-weight:400;opacity:.7">(${esc(h.perfil||'')})</span> → ${labAcao}</strong>
+            <strong>${quem} → ${labAcao}</strong>
+            ${motivo}
             ${campos}
             ${h.obs ? `<span>${esc(h.obs)}</span>` : ''}
           </div>

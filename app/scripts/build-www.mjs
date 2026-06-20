@@ -27,6 +27,7 @@ for (const f of ['config.js', 'brigada-offline.js', 'brigada-sync.js', 'brigada-
 mkdirSync(join(WWW, 'pwa/icons'), { recursive: true })
 cpSync(join(RAIZ, 'pwa/icons/mascote.png'), join(WWW, 'pwa/icons/mascote.png'))
 cpSync(join(RAIZ, 'pwa/icons/mascote-copa.png'), join(WWW, 'pwa/icons/mascote-copa.png'))
+cpSync(join(RAIZ, 'pwa/icons/cbmac.jpg'), join(WWW, 'pwa/icons/cbmac.jpg'))
 cpSync(join(RAIZ, 'pwa/mascote-video.mp4'), join(WWW, 'pwa/mascote-video.mp4'))
 
 // ── Figuras da fauna amazônica (seletor de classe) ────────────
