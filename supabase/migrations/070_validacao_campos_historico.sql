@@ -66,15 +66,15 @@ BEGIN
   IF NEW.status_validacao = 'aguardando'
      AND OLD.status_validacao IN ('requer_correcao', 'rejeitado') THEN
 
-    IF NEW.atividade          IS DISTINCT FROM OLD.atividade          THEN _campos := _campos || 'Atividade'; END IF;
-    IF NEW.origem_acionamento IS DISTINCT FROM OLD.origem_acionamento THEN _campos := _campos || 'Acionada por'; END IF;
-    IF NEW.hora_inicio        IS DISTINCT FROM OLD.hora_inicio        THEN _campos := _campos || 'Hora início'; END IF;
-    IF NEW.hora_fim           IS DISTINCT FROM OLD.hora_fim           THEN _campos := _campos || 'Hora término'; END IF;
-    IF NEW.duracao_horas      IS DISTINCT FROM OLD.duracao_horas      THEN _campos := _campos || 'Duração'; END IF;
-    IF NEW.area_estimada_ha   IS DISTINCT FROM OLD.area_estimada_ha   THEN _campos := _campos || 'Área'; END IF;
-    IF NEW.pessoas_alcancadas IS DISTINCT FROM OLD.pessoas_alcancadas THEN _campos := _campos || 'Pessoas alcançadas'; END IF;
-    IF NEW.descricao          IS DISTINCT FROM OLD.descricao          THEN _campos := _campos || 'Descrição'; END IF;
-    IF NEW.integrada_cbmac    IS DISTINCT FROM OLD.integrada_cbmac    THEN _campos := _campos || 'Apoio CBMAC'; END IF;
+    IF NEW.atividade          IS DISTINCT FROM OLD.atividade          THEN _campos := array_append(_campos, 'Atividade'); END IF;
+    IF NEW.origem_acionamento IS DISTINCT FROM OLD.origem_acionamento THEN _campos := array_append(_campos, 'Acionada por'); END IF;
+    IF NEW.hora_inicio        IS DISTINCT FROM OLD.hora_inicio        THEN _campos := array_append(_campos, 'Hora início'); END IF;
+    IF NEW.hora_fim           IS DISTINCT FROM OLD.hora_fim           THEN _campos := array_append(_campos, 'Hora término'); END IF;
+    IF NEW.duracao_horas      IS DISTINCT FROM OLD.duracao_horas      THEN _campos := array_append(_campos, 'Duração'); END IF;
+    IF NEW.area_estimada_ha   IS DISTINCT FROM OLD.area_estimada_ha   THEN _campos := array_append(_campos, 'Área'); END IF;
+    IF NEW.pessoas_alcancadas IS DISTINCT FROM OLD.pessoas_alcancadas THEN _campos := array_append(_campos, 'Pessoas alcançadas'); END IF;
+    IF NEW.descricao          IS DISTINCT FROM OLD.descricao          THEN _campos := array_append(_campos, 'Descrição'); END IF;
+    IF NEW.integrada_cbmac    IS DISTINCT FROM OLD.integrada_cbmac    THEN _campos := array_append(_campos, 'Apoio CBMAC'); END IF;
 
     SELECT nome_completo INTO _nome FROM brigadistas WHERE id = NEW.brigadista_id;
 
