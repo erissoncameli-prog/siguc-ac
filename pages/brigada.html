@@ -967,7 +967,12 @@ function mostrarTela(id, empurrar = true) {
     b.classList.toggle('ativa', b.dataset.tela === id)
   })
 
-  if (id === 'tela-fila')  carregarFila()
+  if (id === 'tela-fila') {
+    carregarFila()
+    // Busca status de validação ao abrir a fila — pega pedidos de correção
+    // do gestor mesmo sem nada pendente para enviar (emite 'validacao-atualizada').
+    bSyncPollValidacao()
+  }
   if (id === 'tela-config') carregarConfig()
   if (id === 'tela-dados')  carregarDados()
 }
@@ -3445,9 +3450,11 @@ document.addEventListener('DOMContentLoaded', () => {
   // voltar do background e a cada 45s. bSyncRodar sai barato e em
   // silêncio quando a fila está vazia ou segue sem conexão real.
   document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) { bSyncRodar(); verificarConexao() }
+    if (!document.hidden) { bSyncRodar(); bSyncPollValidacao(); verificarConexao() }
   })
-  setInterval(() => { bSyncRodar() }, 45000)
+  // Reenvia pendentes e verifica status de validação (pedidos de correção
+  // do gestor) periodicamente, mesmo sem nada na fila para enviar.
+  setInterval(() => { bSyncRodar(); bSyncPollValidacao() }, 45000)
 
   // Chip Online/Offline do card de GPS
   verificarConexao()
