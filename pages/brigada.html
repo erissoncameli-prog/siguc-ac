@@ -234,6 +234,15 @@
     </div>
     <button class="btn-link" id="btn-ver-fila">Ver fila →</button>
   </div>
+
+  <div class="home-fila-card home-correcao-card" id="home-correcao-card" hidden>
+    <span class="fila-icone" style="color:var(--alerta)" data-icon="alert-triangle"></span>
+    <div>
+      <strong id="home-correcao-count">0 registros</strong>
+      <span id="home-correcao-label"> precisam de correção</span>
+    </div>
+    <button class="btn-link" id="btn-ver-correcoes">Ver →</button>
+  </div>
 </div>
 
 <!-- ══ TELA: FORMULÁRIO DE CAMPO ══════════════════════════════ -->
@@ -487,6 +496,66 @@
   <button class="btn-salvar" id="btn-exportar-json" style="background:var(--combate)" data-icon="share">
     Exportar JSON (WhatsApp/Drive)
   </button>
+</div>
+
+<!-- ══ OVERLAY: CORREÇÃO DE REGISTRO ══════════════════════════ -->
+<div id="correcao-overlay" class="album-ov" hidden style="z-index:3000">
+  <div class="album-ov-head">
+    <button class="album-ov-close" id="correcao-fechar" title="Fechar">&#x2715;</button>
+    <div class="album-ov-titulo">Corrigir Registro</div>
+    <div style="font-size:.75rem;opacity:.7" id="correcao-subtitulo"></div>
+  </div>
+  <div class="album-ov-body" style="padding:1rem;overflow-y:auto">
+    <div class="correcao-motivo-box" id="correcao-motivo-box" hidden>
+      <span data-icon="alert-triangle" style="color:var(--alerta)"></span>
+      <div>
+        <strong>Motivo da correção solicitada:</strong>
+        <p id="correcao-motivo-texto" style="margin:.25rem 0 0"></p>
+      </div>
+    </div>
+
+    <form id="correcao-form" autocomplete="off">
+      <input type="hidden" id="correcao-uuid">
+
+      <label class="campo-label">Observações / Descrição</label>
+      <textarea id="correcao-descricao" class="campo-input" rows="3" style="resize:vertical"></textarea>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem">
+        <div>
+          <label class="campo-label">Hora início</label>
+          <input type="time" id="correcao-hora-inicio" class="campo-input">
+        </div>
+        <div>
+          <label class="campo-label">Hora término</label>
+          <input type="time" id="correcao-hora-fim" class="campo-input">
+        </div>
+      </div>
+
+      <label class="campo-label">Área estimada (ha)</label>
+      <input type="number" id="correcao-area" class="campo-input" step="0.01" min="0">
+
+      <label class="campo-label">Pessoas alcançadas</label>
+      <input type="number" id="correcao-pessoas" class="campo-input" min="0" step="1">
+
+      <label class="campo-label">Acionado por</label>
+      <select id="correcao-origem" class="campo-input">
+        <option value="">— não informado —</option>
+        <option value="denuncia_193">Denúncia 193</option>
+        <option value="informacao_populares">Informação de populares</option>
+        <option value="ronda_brigada">Ronda da brigada</option>
+        <option value="outro">Outro</option>
+      </select>
+
+      <label class="campo-label" id="correcao-cbmac-label" hidden>
+        <input type="checkbox" id="correcao-cbmac" style="margin-right:.4rem">
+        Integrada com CBMAC
+      </label>
+
+      <button type="submit" class="btn-salvar" style="margin-top:1.25rem" data-icon="send">
+        Enviar Correção
+      </button>
+    </form>
+  </div>
 </div>
 
 <!-- ══ TELA: MEUS RESULTADOS ══════════════════════════════════ -->
@@ -1625,6 +1694,8 @@ async function entrarHome() {
 
   await carregarCatalogoAtividades()
   await atualizarBadgeFila()
+  // Poll silencioso: busca status de validação dos registros já enviados
+  bSyncPollValidacao().then(() => atualizarBadgeFila())
 
   bSyncOn('confirmado', atualizarBadgeFila)
   bSyncOn('erro', d => {
@@ -1647,6 +1718,24 @@ async function atualizarBadgeFila() {
   badge.hidden = n === 0
   card.hidden  = n === 0
   if (n > 0) cnt.textContent = `${n} registro${n > 1 ? 's' : ''}`
+
+  // Card de correções/rejeições pendentes
+  const todos = await bOfflineListarTodos()
+  const correc  = todos.filter(r => r.status === 'confirmado' && r.status_validacao === 'requer_correcao').length
+  const rejeit  = todos.filter(r => r.status === 'confirmado' && r.status_validacao === 'rejeitado').length
+  const totalAv = correc + rejeit
+  const cardCor = document.getElementById('home-correcao-card')
+  const cntCor  = document.getElementById('home-correcao-count')
+  const labCor  = document.getElementById('home-correcao-label')
+  if (cardCor) {
+    cardCor.hidden = totalAv === 0
+    if (totalAv > 0) {
+      cntCor.textContent = `${totalAv} registro${totalAv > 1 ? 's' : ''}`
+      if (correc > 0 && rejeit > 0) labCor.textContent = ' com aviso do gestor'
+      else if (correc > 0) labCor.textContent = ` ${correc > 1 ? 'precisam' : 'precisa'} de correção`
+      else labCor.textContent = ` ${rejeit > 1 ? 'foram rejeitados' : 'foi rejeitado'}`
+    }
+  }
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -2114,6 +2203,21 @@ function bRenderItemFila(r) {
   const linhaEnvio = r.sincronizado_em
     ? `<span>${bico('upload')} Envio: ${bFormatDataHora(r.sincronizado_em)}</span>`
     : ''
+
+  // Chip de validação (só para confirmados)
+  let validacaoHtml = ''
+  if (r.status === 'confirmado' && r.status_validacao) {
+    const vlabel = ROTULO_VALIDACAO[r.status_validacao] || r.status_validacao
+    const vcor   = COR_VALIDACAO[r.status_validacao] || '#6b7280'
+    validacaoHtml = `<span style="display:inline-block;margin-top:.3rem;font-size:.72rem;font-weight:600;color:${vcor};background:${vcor}18;padding:.15rem .5rem;border-radius:99px">${vlabel}</span>`
+    if (r.motivo_rejeicao) {
+      validacaoHtml += `<span class="sync-erro-msg" style="color:${vcor}">${bico('message-circle')} ${esc(r.motivo_rejeicao)}</span>`
+    }
+    if (r.status_validacao === 'requer_correcao') {
+      validacaoHtml += `<button type="button" class="btn-corrigir-fila" data-uuid="${esc(r.uuid_cliente)}">${bico('edit')} Corrigir</button>`
+    }
+  }
+
   return `
     <div class="sync-item sync-${r.status}">
       <span class="sync-icon">${icons[r.natureza] || bico('clipboard')}</span>
@@ -2123,6 +2227,7 @@ function bRenderItemFila(r) {
         <span>${bico('clock')} Ocorrência: ${bFormatDataHora(r.criado_em)}</span>
         ${linhaEnvio}
         ${r.ultimo_erro ? `<span class="sync-erro-msg">⚠ ${esc(r.ultimo_erro)}</span>` : ''}
+        ${validacaoHtml}
       </div>
       <span class="sync-status sync-${r.status}">${statusLabel[r.status] || r.status}</span>
     </div>`
@@ -2155,11 +2260,127 @@ async function carregarFila() {
   }
 
   cont.innerHTML = visiveis.map(bRenderItemFila).join('') + botao
+  bIconsAplicar(cont)
 
   const btnMais = document.getElementById('btn-ver-mais-fila')
   if (btnMais) btnMais.addEventListener('click', () => { _filaExpandida = true;  carregarFila() })
   const btnMenos = document.getElementById('btn-ver-menos-fila')
   if (btnMenos) btnMenos.addEventListener('click', () => { _filaExpandida = false; carregarFila() })
+
+  // Botões "Corrigir" dentro dos itens
+  cont.querySelectorAll('.btn-corrigir-fila').forEach(btn =>
+    btn.addEventListener('click', () => abrirCorrecao(btn.dataset.uuid, todos))
+  )
+}
+
+// ════════════════════════════════════════════════════════════════
+// Overlay de Correção de Registro
+// ════════════════════════════════════════════════════════════════
+function abrirCorrecao(uuid, todos) {
+  const reg = (todos || []).find(r => r.uuid_cliente === uuid)
+  if (!reg) return
+
+  const ov = document.getElementById('correcao-overlay')
+  document.getElementById('correcao-uuid').value = uuid
+
+  // Subtítulo: atividade + data
+  const dt = reg.criado_em ? new Date(reg.criado_em).toLocaleDateString('pt-BR') : ''
+  document.getElementById('correcao-subtitulo').textContent =
+    `${esc(reg.atividade || '')} · ${dt}`
+
+  // Motivo do gestor
+  const motivoBox = document.getElementById('correcao-motivo-box')
+  const motivoTxt = document.getElementById('correcao-motivo-texto')
+  if (reg.motivo_rejeicao) {
+    motivoTxt.textContent = reg.motivo_rejeicao
+    motivoBox.hidden = false
+  } else {
+    motivoBox.hidden = true
+  }
+
+  // Preenche campos editáveis
+  document.getElementById('correcao-descricao').value   = reg.observacoes || reg.descricao || ''
+  document.getElementById('correcao-hora-inicio').value = reg.hora_inicio || ''
+  document.getElementById('correcao-hora-fim').value    = reg.hora_fim    || ''
+  document.getElementById('correcao-area').value        = reg.area_ha     != null ? reg.area_ha : (reg.area_estimada_ha ?? '')
+  document.getElementById('correcao-pessoas').value     = reg.pessoas_alcancadas ?? ''
+
+  const selOrigem = document.getElementById('correcao-origem')
+  selOrigem.value = reg.origem_acionamento || ''
+
+  const cbmacLabel = document.getElementById('correcao-cbmac-label')
+  cbmacLabel.hidden = reg.natureza !== 'combate'
+  document.getElementById('correcao-cbmac').checked = !!reg.integrada_cbmac
+
+  bIconsAplicar(ov)
+  ov.removeAttribute('hidden')
+  document.body.style.overflow = 'hidden'
+}
+
+function fecharCorrecao() {
+  const ov = document.getElementById('correcao-overlay')
+  ov.setAttribute('hidden', '')
+  document.body.style.overflow = ''
+}
+
+async function submeterCorrecao(ev) {
+  ev.preventDefault()
+  const uuid = document.getElementById('correcao-uuid').value
+  if (!uuid) return
+
+  const todos = await bOfflineListarTodos()
+  const reg   = todos.find(r => r.uuid_cliente === uuid)
+  if (!reg) return
+
+  const horaInicio  = document.getElementById('correcao-hora-inicio').value || null
+  const horaFim     = document.getElementById('correcao-hora-fim').value    || null
+  let duracaoHoras  = reg.duracao_horas ?? null
+  if (horaInicio && horaFim) {
+    const [hi, mi] = horaInicio.split(':').map(Number)
+    const [hf, mf] = horaFim.split(':').map(Number)
+    const diff = (hf * 60 + mf) - (hi * 60 + mi)
+    if (diff > 0) duracaoHoras = parseFloat((diff / 60).toFixed(2))
+  }
+
+  // Campos corrigidos sobrescrevem os originais; status_validacao volta a aguardando
+  const corrigido = {
+    ...reg,
+    observacoes:          document.getElementById('correcao-descricao').value.trim() || null,
+    hora_inicio:          horaInicio,
+    hora_fim:             horaFim,
+    duracao_horas:        duracaoHoras,
+    area_ha:              parseFloat(document.getElementById('correcao-area').value) || null,
+    pessoas_alcancadas:   parseInt(document.getElementById('correcao-pessoas').value) || null,
+    origem_acionamento:   document.getElementById('correcao-origem').value || null,
+    integrada_cbmac:      document.getElementById('correcao-cbmac').checked,
+    status_validacao:     'aguardando',
+    motivo_rejeicao:      null,
+    // Garante que o sync vai sobrescrever os dados no banco
+    status:               'pendente',
+    sincronizado_em:      null,
+    ultimo_erro:          null,
+  }
+
+  await bOfflineMarcar(uuid, 'pendente', {
+    observacoes:        corrigido.observacoes,
+    hora_inicio:        corrigido.hora_inicio,
+    hora_fim:           corrigido.hora_fim,
+    duracao_horas:      corrigido.duracao_horas,
+    area_ha:            corrigido.area_ha,
+    pessoas_alcancadas: corrigido.pessoas_alcancadas,
+    origem_acionamento: corrigido.origem_acionamento,
+    integrada_cbmac:    corrigido.integrada_cbmac,
+    status_validacao:   'aguardando',
+    motivo_rejeicao:    null,
+    sincronizado_em:    null,
+    ultimo_erro:        null,
+  })
+
+  fecharCorrecao()
+  toast('Correção salva. Será enviada na próxima sincronização.', 'ok')
+  await atualizarBadgeFila()
+  await carregarFila()
+  bSyncRodar()
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -2937,6 +3158,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (r === 'vazio') toast('Nenhum registro pendente', 'info')
   })
   document.getElementById('btn-ver-fila').addEventListener('click', () => mostrarTela('tela-fila'))
+  document.getElementById('btn-ver-correcoes').addEventListener('click', () => mostrarTela('tela-fila'))
+
+  // Overlay de correção
+  document.getElementById('correcao-fechar').addEventListener('click', fecharCorrecao)
+  document.getElementById('correcao-form').addEventListener('submit', submeterCorrecao)
 
   // Formulário
   document.getElementById('btn-abrir-camera').addEventListener('click', abrirCamera)
@@ -3083,13 +3309,21 @@ document.addEventListener('DOMContentLoaded', () => {
       esconderBarra(3000)
       atualizarBadgeFila()
       carregarFila()
+      // Após sync, busca status de validação dos registros confirmados
+      bSyncPollValidacao().then(() => atualizarBadgeFila())
+    })
+
+    // Também atualiza ao receber evento de mudança de validação
+    bSyncOn('validacao-atualizada', () => {
+      atualizarBadgeFila()
+      if (document.getElementById('tela-fila') && !document.getElementById('tela-fila').hidden) carregarFila()
     })
   })()
 
   // Online/offline — o evento 'online' funciona na web, mas NÃO é
   // confiável na WebView do app nativo (não dispara após modo avião).
   // O monitor de conexão (probe real) cuida dos avisos ao usuário.
-  window.addEventListener('online',  () => { bSyncRodar(); verificarConexao() })
+  window.addEventListener('online',  () => { bSyncRodar(); bSyncPollValidacao().then(() => atualizarBadgeFila()); verificarConexao() })
   window.addEventListener('offline', verificarConexao)
 
   // Rede de segurança (essencial no app nativo): reenvia pendentes ao
