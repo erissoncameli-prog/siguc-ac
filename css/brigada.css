@@ -83,6 +83,29 @@
 }
 .lock-screen > * { position: relative; z-index: 1; }
 
+/* Faixa institucional (Governo + SEMA) no topo das telas de PIN */
+.lock-faixa {
+  position: absolute;
+  top: calc(16px + env(safe-area-inset-top));
+  left: 0; right: 0;
+  padding: 0 22px;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; z-index: 2;
+}
+.lock-faixa .faixa-logo-chip { width: auto; max-width: 150px; height: 42px; }
+.lock-faixa .faixa-logo-chip.gov { max-width: 168px; height: 46px; }
+.lock-faixa .faixa-logo-chip img { filter: drop-shadow(0 1px 3px rgba(0,0,0,.45)); }
+/* Brasão do CBMAC no canto inferior direito (recorte circular) */
+.lock-cbmac {
+  position: absolute;
+  right: 18px; bottom: calc(18px + env(safe-area-inset-bottom));
+  width: 50px; height: 50px;
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: 0 2px 10px rgba(0,0,0,.45);
+  z-index: 2;
+}
+
 .lock-logo {
   display: flex;
   align-items: center;
