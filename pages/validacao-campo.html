@@ -261,6 +261,65 @@
 .val-btn-edit:hover { background:#f0fdf4 }
 .val-area-info { font-size:.8rem; color:#374151; margin:8px 0 0; min-height:1em }
 .val-area-info b { color:#166534 }
+
+/* ── Incêndio Evitado ──────────────────────────────── */
+.aie-banner { display:flex; align-items:center; justify-content:space-between; margin:16px 0 6px }
+.aie-banner .form-label { margin:0 }
+.aie-total-pill {
+  display:inline-flex; align-items:center; gap:6px;
+  background:rgba(124,58,237,.10); color:#5b21b6;
+  border:1.5px solid rgba(124,58,237,.28); border-radius:999px;
+  padding:4px 14px; font-size:.82rem; font-weight:700; white-space:nowrap
+}
+.aie-total-pill b { font-size:1.05rem }
+.aie-hint { font-size:.78rem; color:var(--text-muted,#6b7280); margin:0 0 10px }
+.aie-lista { display:grid; gap:8px; margin-bottom:10px }
+.aie-item {
+  display:flex; align-items:flex-start; justify-content:space-between; gap:10px;
+  background:#f9f7ff; border:1px solid rgba(124,58,237,.2); border-radius:9px; padding:10px 12px
+}
+.aie-item-ha {
+  display:inline-block; background:rgba(124,58,237,.15); color:#5b21b6;
+  border-radius:6px; padding:2px 9px; font-size:.83rem; font-weight:700; margin-bottom:4px
+}
+.aie-item-desc { font-size:.82rem; color:#374151 }
+.aie-item-acoes { display:flex; flex-direction:column; gap:4px; flex-shrink:0 }
+.aie-item-acoes button {
+  padding:3px 10px; border-radius:6px; border:1.5px solid; font-size:.74rem;
+  font-weight:600; cursor:pointer; background:transparent; white-space:nowrap
+}
+.aie-item-acoes .btn-ed  { border-color:rgba(124,58,237,.4); color:#5b21b6 }
+.aie-item-acoes .btn-ed:hover  { background:rgba(124,58,237,.08) }
+.aie-item-acoes .btn-del { border-color:rgba(239,68,68,.35); color:#dc2626 }
+.aie-item-acoes .btn-del:hover { background:rgba(239,68,68,.07) }
+.aie-form-novo {
+  background:#f9f7ff; border:1.5px dashed rgba(124,58,237,.35);
+  border-radius:9px; padding:12px; margin-bottom:10px
+}
+.aie-form-titulo { font-size:.82rem; font-weight:700; color:#5b21b6; margin:0 0 8px }
+.aie-form-novo textarea {
+  width:100%; min-height:52px; resize:vertical; box-sizing:border-box;
+  border:1.5px solid rgba(124,58,237,.25); border-radius:7px;
+  padding:7px 10px; font-size:.83rem; font-family:inherit; margin-bottom:8px
+}
+.aie-preview-area { font-size:.82rem; color:#374151; margin:0 0 8px; min-height:1.2em }
+.aie-preview-area b { color:#5b21b6; font-size:.95rem }
+.aie-form-acoes { display:flex; gap:8px }
+.btn-aie-salvar {
+  flex:1; padding:7px 16px; border-radius:8px;
+  background:#5b21b6; color:#fff; border:none; font-size:.83rem; font-weight:600; cursor:pointer
+}
+.btn-aie-salvar:hover { background:#4c1d95 }
+.btn-aie-cancel {
+  padding:7px 14px; border-radius:8px; background:transparent; color:#6b7280;
+  border:1.5px solid var(--border,#e5e7eb); font-size:.83rem; cursor:pointer
+}
+.aie-btn-add {
+  width:100%; padding:8px; border-radius:8px;
+  border:1.5px dashed rgba(124,58,237,.4); background:transparent;
+  color:#5b21b6; font-size:.83rem; font-weight:600; cursor:pointer; transition:.15s
+}
+.aie-btn-add:hover { background:rgba(124,58,237,.06) }
 </style>
 </head>
 <body>
@@ -303,6 +362,28 @@
           </span>
         </div>
         <p class="val-area-info" id="val-area-info"></p>
+      </div>
+
+      <!-- Incêndio Evitado — polígonos de área protegida pela brigada -->
+      <div id="modal-aie-sec" hidden>
+        <div class="aie-banner">
+          <p class="form-label">Incêndio Evitado</p>
+          <span id="aie-total-pill" class="aie-total-pill" hidden></span>
+        </div>
+        <p class="aie-hint">Áreas que seriam atingidas sem a ação da brigada. Desenhadas no mapa acima pelo validador.</p>
+        <div id="aie-lista"></div>
+        <div id="aie-form-novo" class="aie-form-novo" hidden>
+          <p class="aie-form-titulo" id="aie-form-titulo">Nova área evitada</p>
+          <textarea id="aie-descricao" placeholder="Descrição (opcional — ex: margem leste do igarapé)"></textarea>
+          <p class="aie-preview-area" id="aie-preview-area"></p>
+          <div class="aie-form-acoes">
+            <button class="btn-aie-salvar" onclick="aie_salvar()">Salvar área</button>
+            <button class="btn-aie-cancel" onclick="aie_cancelarDesenho()">Cancelar</button>
+          </div>
+        </div>
+        <button class="aie-btn-add" id="aie-btn-add" onclick="aie_iniciarDesenho()">
+          + Adicionar área evitada
+        </button>
       </div>
 
       <!-- Fotos -->
@@ -775,6 +856,7 @@ async function abrirDetalhe(id) {
 
   document.getElementById('modal-detalhe').style.display = 'flex'
   initMapaValidacao(r)
+  aie_carregar(r.id)
 }
 
 async function carregarFaunaModal(rcId) {
@@ -1205,12 +1287,22 @@ let _valMap = null, _valDrawn = null, _valPolyLayer = null
 let _valFocosLayer = null, _valGibsLayer = null, _valPlanetLayer = null
 let _valEdicaoAtiva = false, _valGeoCache = null
 
+// Incêndio Evitado — estado
+let _aieAreasLayers = {}, _aieDrawHandler = null, _aieNovaLayer = null
+let _aieEditandoId  = null, _aieAreas = []
+
 function _valDestruirMapa() {
   try { if (_valPolyLayer && _valPolyLayer.editing) _valPolyLayer.editing.disable() } catch (e) {}
+  // Limpa áreas evitadas antes de destruir o mapa
+  aie_cancelarDesenho(true)
+  Object.values(_aieAreasLayers).forEach(l => { try { if (_valMap) _valMap.removeLayer(l) } catch(e) {} })
+  _aieAreasLayers = {}
+  _aieAreas = []
   if (_valMap) { _valMap.remove(); _valMap = null }
   _valDrawn = _valPolyLayer = _valFocosLayer = _valGibsLayer = _valPlanetLayer = _valGeoCache = null
   _valEdicaoAtiva = false
   const dz = document.getElementById('val-btn-desfazer'); if (dz) dz.hidden = true
+  const sec = document.getElementById('modal-aie-sec'); if (sec) sec.hidden = true
 }
 
 function _valPolyDeGeoJSON(poly) {
@@ -1402,6 +1494,190 @@ function abrirLightbox(url) {
 document.getElementById('modal-detalhe').addEventListener('click', function(e) {
   if (e.target === this) fecharDetalhe()
 })
+
+// ════════════════════════════════════════════════════════════════
+// Incêndio Evitado — áreas protegidas pela brigada
+// ════════════════════════════════════════════════════════════════
+
+function _aieRenderNoMapa(areas) {
+  if (!_valMap) return
+  Object.values(_aieAreasLayers).forEach(l => { try { _valMap.removeLayer(l) } catch(e) {} })
+  _aieAreasLayers = {}
+  areas.forEach(a => {
+    if (!a.geom) return
+    try {
+      const layer = L.geoJSON(a.geom, {
+        style: { color:'#7C3AED', weight:2, fillColor:'#7C3AED', fillOpacity:.13, dashArray:'7 4' }
+      }).bindTooltip(
+        `Área evitada: <b>${formatNum(Number(a.area_ha||0), 2)} ha</b>${a.descricao ? ' — ' + a.descricao : ''}`,
+        { sticky: true }
+      ).addTo(_valMap)
+      _aieAreasLayers[a.id] = layer
+    } catch(e) {}
+  })
+}
+
+function _aieRenderLista(areas) {
+  const lista = document.getElementById('aie-lista')
+  const pill  = document.getElementById('aie-total-pill')
+  const sec   = document.getElementById('modal-aie-sec')
+  if (!lista) return
+  if (sec) sec.hidden = false
+
+  const totalHa = areas.reduce((s, a) => s + Number(a.area_ha || 0), 0)
+  if (pill) {
+    if (totalHa > 0) {
+      pill.innerHTML = `<b>${formatNum(totalHa, 2)} ha</b> protegidos`
+      pill.hidden = false
+    } else {
+      pill.hidden = true
+    }
+  }
+
+  if (!areas.length) {
+    lista.innerHTML = '<p style="font-size:.8rem;color:var(--text-muted,#6b7280);margin:0 0 10px">Nenhuma área registrada ainda.</p>'
+    return
+  }
+
+  lista.innerHTML = areas.map(a => `
+    <div class="aie-item" id="aie-item-${a.id}">
+      <div>
+        <div class="aie-item-ha">${formatNum(Number(a.area_ha || 0), 2)} ha</div>
+        <div class="aie-item-desc">${a.descricao ? esc(a.descricao) : '<em style="opacity:.5">Sem descrição</em>'}</div>
+        ${a.criado_por_nome ? `<div style="font-size:.72rem;color:var(--text-muted,#6b7280);margin-top:3px">por ${esc(a.criado_por_nome)}</div>` : ''}
+      </div>
+      <div class="aie-item-acoes">
+        <button class="btn-ed"  onclick="aie_editarItem('${a.id}')">Editar</button>
+        <button class="btn-del" onclick="aie_excluirItem('${a.id}')">Excluir</button>
+      </div>
+    </div>
+  `).join('')
+}
+
+async function aie_carregar(registroId) {
+  const sec       = document.getElementById('modal-aie-sec')
+  const btnAdd    = document.getElementById('aie-btn-add')
+  const podeEditar = ['biologo','tecnico','gestor','super_admin'].includes(_usuario?.perfil)
+  if (!sec) return
+
+  const { data } = await db.rpc('listar_areas_evitadas', { p_registro_id: registroId })
+  _aieAreas = data || []
+  _aieRenderLista(_aieAreas)
+  if (btnAdd) btnAdd.hidden = !podeEditar
+
+  // Renderiza no mapa após ele estar pronto (initMapaValidacao usa até 500 ms)
+  setTimeout(() => _aieRenderNoMapa(_aieAreas), 650)
+}
+
+function aie_iniciarDesenho() {
+  if (!_valMap) { toast('Aguarde o mapa carregar antes de desenhar', 'warn'); return }
+  aie_cancelarDesenho()
+
+  _aieEditandoId = null
+  document.getElementById('aie-form-titulo').textContent = 'Nova área evitada'
+  document.getElementById('aie-form-novo').hidden = false
+  document.getElementById('aie-btn-add').hidden   = true
+  document.getElementById('aie-descricao').value  = ''
+  document.getElementById('aie-preview-area').innerHTML = ''
+
+  _aieDrawHandler = new L.Draw.Polygon(_valMap, {
+    shapeOptions: { color:'#7C3AED', weight:2, fillColor:'#7C3AED', fillOpacity:.13, dashArray:'7 4' }
+  })
+  _aieDrawHandler.enable()
+
+  _valMap.once(L.Draw.Event.CREATED, e => {
+    _aieNovaLayer = e.layer.addTo(_valMap)
+    _aieNovaLayer.on('edit', _aieAtualizarPreview)
+    try { _aieNovaLayer.editing.enable() } catch(er) {}
+    _aieAtualizarPreview()
+  })
+  toast('Marque os vértices da área protegida; feche no primeiro ponto.', 'info')
+}
+
+function _aieAtualizarPreview() {
+  if (!_aieNovaLayer) return
+  let ha = null
+  try { ha = turf.area(_aieNovaLayer.toGeoJSON()) / 10000 } catch(e) {}
+  const el = document.getElementById('aie-preview-area')
+  if (el && ha != null) el.innerHTML = `Área: <b>${formatNum(ha, 2)} ha</b>`
+}
+
+// silent=true: cancelamento interno sem manipular DOM (ex: destruição do mapa)
+function aie_cancelarDesenho(silent) {
+  if (_aieDrawHandler) { try { _aieDrawHandler.disable() } catch(e) {} _aieDrawHandler = null }
+  if (_aieNovaLayer)   { try { if (_valMap) _valMap.removeLayer(_aieNovaLayer) } catch(e) {} _aieNovaLayer = null }
+  _aieEditandoId = null
+  if (silent) return
+  const f = document.getElementById('aie-form-novo'); if (f) f.hidden = true
+  const b = document.getElementById('aie-btn-add');   if (b) b.hidden = false
+}
+
+async function aie_salvar() {
+  if (!_aieNovaLayer) { toast('Desenhe o polígono no mapa antes de salvar', 'warn'); return }
+  const geom      = _aieNovaLayer.toGeoJSON().geometry
+  const descricao = document.getElementById('aie-descricao').value.trim() || null
+
+  const { error } = await db.rpc('salvar_area_evitada', {
+    p_registro_id: _detalheId,
+    p_geom:        geom,
+    p_descricao:   descricao,
+    p_id:          _aieEditandoId || null,
+  })
+  if (error) { toast('Erro ao salvar: ' + error.message, 'erro'); return }
+  toast('Área evitada salva', 'ok')
+  aie_cancelarDesenho()
+  await aie_carregar(_detalheId)
+  _aieRenderNoMapa(_aieAreas)
+}
+
+async function aie_editarItem(id) {
+  const area = _aieAreas.find(a => a.id === id)
+  if (!area || !area.geom) return
+  if (!_valMap) { toast('Aguarde o mapa carregar para editar', 'warn'); return }
+  aie_cancelarDesenho()
+
+  // Remove a layer existente do mapa para editar
+  if (_aieAreasLayers[id]) {
+    try { _valMap.removeLayer(_aieAreasLayers[id]) } catch(e) {}
+    delete _aieAreasLayers[id]
+  }
+
+  _aieEditandoId = id
+  document.getElementById('aie-form-titulo').textContent = 'Editar área evitada'
+  document.getElementById('aie-form-novo').hidden = false
+  document.getElementById('aie-btn-add').hidden   = true
+  document.getElementById('aie-descricao').value  = area.descricao || ''
+
+  try {
+    const tmp = L.geoJSON(area.geom)
+    const layers = []
+    tmp.eachLayer(l => layers.push(l))
+    if (layers[0]) {
+      _aieNovaLayer = L.polygon(layers[0].getLatLngs(), {
+        color:'#7C3AED', weight:2, fillColor:'#7C3AED', fillOpacity:.13, dashArray:'7 4'
+      }).addTo(_valMap)
+      _aieNovaLayer.on('edit', _aieAtualizarPreview)
+      try { _aieNovaLayer.editing.enable() } catch(e) {}
+      _aieAtualizarPreview()
+      try { _valMap.fitBounds(_aieNovaLayer.getBounds().pad(0.3)) } catch(e) {}
+    }
+  } catch(e) {}
+
+  toast('Ajuste os vértices e clique em Salvar área.', 'info')
+}
+
+async function aie_excluirItem(id) {
+  if (!confirm('Excluir esta área evitada?')) return
+  const { error } = await db.rpc('excluir_area_evitada', { p_id: id })
+  if (error) { toast('Erro ao excluir: ' + error.message, 'erro'); return }
+  if (_aieAreasLayers[id]) {
+    try { if (_valMap) _valMap.removeLayer(_aieAreasLayers[id]) } catch(e) {}
+    delete _aieAreasLayers[id]
+  }
+  toast('Área removida', 'ok')
+  await aie_carregar(_detalheId)
+  _aieRenderNoMapa(_aieAreas)
+}
 
 // Tecla ESC
 document.addEventListener('keydown', e => {
