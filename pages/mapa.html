@@ -656,6 +656,14 @@ body.mapa-imersivo .page-body{animation:none!important;transform:none!important;
       Ver no SICAR ↗
     </a>
   </div>
+  <div style="padding:0 14px 8px;flex-shrink:0">
+    <button onclick="analisarMarcarTodosCAR()" id="btn-analisar-todos"
+      style="width:100%;display:flex;align-items:center;justify-content:center;gap:6px;padding:8px;background:#f0fdf4;border:1px solid #86efac;border-radius:var(--raio);font-size:12px;font-weight:600;color:#1F4E2C;cursor:pointer;font-family:inherit;transition:background .15s"
+      onmouseover="this.style.background='#dcfce7'" onmouseout="this.style.background='#f0fdf4'"
+      title="Roda diagnóstico e PRODES de todos os imóveis carregados e marca todos — para o relatório consolidado">
+      🔬 Analisar e marcar todos os carregados<span id="car-analisar-todos-n"></span>
+    </button>
+  </div>
   <div style="padding:0 14px 10px;flex-shrink:0">
     <button onclick="abrirModalRelatorio()"
       style="width:100%;display:flex;align-items:center;justify-content:center;gap:6px;padding:8px;background:#fff;border:1px solid var(--borda);border-radius:var(--raio);font-size:12px;font-weight:600;color:var(--cinza-700);cursor:pointer;font-family:inherit;transition:background .15s"
@@ -5210,6 +5218,11 @@ function _atualizarBadgeCAR(visiveis){
     });
   }
   _atualizarCfgStats();
+  _atualizarBtnAnalisarTodos();
+}
+function _atualizarBtnAnalisarTodos(){
+  const el = document.getElementById('car-analisar-todos-n');
+  if(el) el.textContent = _carFeatures?.length ? ` (${_carFeatures.length})` : '';
 }
 
 // ── Seleção ───────────────────────────────────────────────────────────────
@@ -6272,6 +6285,104 @@ function _atualizarBtnMarcar(){
   const btnHdr=document.getElementById('btn-car-pin-hdr');
   if(btnFoot){ btnFoot.textContent=marcado?'📌 Desmarcar':'📌 Marcar'; btnFoot.classList.toggle('btn-car-marcado',!!marcado); }
   if(btnHdr) btnHdr.style.background=marcado?'#7c3aed':'rgba(255,255,255,.15)';
+}
+
+// ── Análise em lote: diagnóstico + PRODES + marcar de todos os carregados ──
+// Popula _carDiagCache/_carProdesCache/_carFocosCache de cada imóvel e marca
+// todos, para que o relatório consolidado ("Todos os marcados") saia completo.
+let _analiseLoteCancel = false;
+
+async function analisarMarcarTodosCAR(){
+  const feats = (_carFeatures||[]).filter(f => f?.properties?.cod_imovel && f.geometry);
+  if(!feats.length){ toast('Nenhum imóvel CAR carregado para analisar.','warning'); return; }
+  if(feats.length > 30 && !confirm(
+      `Você vai analisar e marcar ${feats.length} imóveis.\n\n`+
+      `Isso faz consultas de PRODES e focos ao SICAR para cada um e pode levar alguns minutos. Continuar?`)){
+    return;
+  }
+  _analiseLoteCancel = false;
+  _abrirProgressoAnalise(feats.length);
+
+  const processados = [];
+  let concluidos = 0;
+  let idx = 0;
+  const CONC = 3; // imóveis em paralelo (PRODES é a parte de rede)
+
+  async function worker(){
+    while(idx < feats.length && !_analiseLoteCancel){
+      const f = feats[idx++];
+      try{
+        await _iniciarDiagnosticoCAR(f); // local (turf) → _carDiagCache
+        await _iniciarProdesCAR(f);      // rede → _carProdesCache + _carFocosCache
+      }catch(e){ /* falha de um imóvel não interrompe o lote */ }
+      processados.push(f);
+      concluidos++;
+      _atualizarProgressoAnalise(concluidos, feats.length);
+    }
+  }
+  await Promise.all(Array.from({length: Math.min(CONC, feats.length)}, worker));
+
+  // Marca todos os imóveis processados (upsert em lote)
+  if(processados.length) await _marcarTodosCAR(processados);
+
+  _fecharProgressoAnalise();
+  if(_analiseLoteCancel){
+    toast(`Análise interrompida em ${concluidos}/${feats.length}. Os processados já estão marcados.`,'warning');
+  }else{
+    toast(`${feats.length} imóveis analisados e marcados. Gere o relatório "Todos os marcados".`,'success');
+  }
+}
+
+async function _marcarTodosCAR(feats){
+  const agora = new Date().toISOString();
+  const novos = feats.filter(f => { const c=f.properties?.cod_imovel; return c && !_carMarcados.has(c); });
+  if(novos.length){
+    const payload = novos.map(f => { const p=f.properties||{}; return {
+      cod_imovel: p.cod_imovel,
+      area: parseFloat(p.area)||null,
+      municipio: p.municipio||null,
+      condicao: p.condicao||null,
+      atualizado_em: agora,
+    }; });
+    const { error } = await db.from('car_marcados').upsert(payload,{onConflict:'cod_imovel'});
+    if(error){ toast('Erro ao marcar imóveis: '+error.message,'error'); return; }
+    payload.forEach(r => _carMarcados.set(r.cod_imovel, r));
+  }
+  if(_carLayer) _aplicarCamadaCAR();
+  _atualizarContadorPins();
+  _atualizarBtnMarcar();
+  if(_carDetAba==='marcados') _renderCarDetBody();
+}
+
+function _abrirProgressoAnalise(total){
+  document.getElementById('analise-prog-overlay')?.remove();
+  const el = document.createElement('div');
+  el.id = 'analise-prog-overlay';
+  el.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;font-family:DM Sans,system-ui,sans-serif';
+  el.innerHTML = `<div style="background:#fff;border-radius:12px;width:360px;max-width:92vw;padding:20px;box-shadow:0 20px 60px rgba(0,0,0,.25)">
+    <h3 style="margin:0 0 4px;font-size:14px;color:#0A1A0F">🔬 Analisando imóveis CAR</h3>
+    <p style="margin:0 0 12px;font-size:12px;color:#6b7280">Rodando diagnóstico e PRODES de cada imóvel…</p>
+    <div style="height:10px;background:#e5e7eb;border-radius:5px;overflow:hidden">
+      <div id="analise-prog-bar" style="height:100%;width:0%;background:#2D6A4F;transition:width .2s"></div>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px">
+      <span id="analise-prog-txt" style="font-size:12px;color:#374151;font-weight:600">0 / ${total}</span>
+      <button onclick="_cancelarAnaliseLote()" style="font-size:12px;padding:5px 12px;border:1px solid #fca5a5;background:#fff;color:#dc2626;border-radius:6px;cursor:pointer">Cancelar</button>
+    </div>
+  </div>`;
+  document.body.appendChild(el);
+}
+function _atualizarProgressoAnalise(n, total){
+  const bar = document.getElementById('analise-prog-bar');
+  const txt = document.getElementById('analise-prog-txt');
+  if(bar) bar.style.width = (total ? Math.round(n/total*100) : 0)+'%';
+  if(txt) txt.textContent = `${n} / ${total}`;
+}
+function _fecharProgressoAnalise(){ document.getElementById('analise-prog-overlay')?.remove(); }
+function _cancelarAnaliseLote(){
+  _analiseLoteCancel = true;
+  const t = document.getElementById('analise-prog-txt');
+  if(t) t.textContent += ' (cancelando…)';
 }
 
 // ── Abrir / fechar painel ─────────────────────────────────────────────────
