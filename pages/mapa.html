@@ -73,6 +73,8 @@
 /* CAR — Modal de configurações */
 #car-cfg-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:700;display:none;align-items:center;justify-content:center}
 #car-cfg-overlay.aberto{display:flex}
+#car-consulta-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:701;display:none;align-items:center;justify-content:center}
+#car-consulta-overlay.aberto{display:flex}
 #car-cfg-modal{background:#fff;border-radius:14px;width:min(520px,94vw);max-height:85vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 16px 48px rgba(0,0,0,.32);font-family:'DM Sans',sans-serif}
 .car-cfg-header{background:linear-gradient(135deg,#1a3c2a,#2D6A4F);padding:14px 18px;display:flex;align-items:center;gap:10px;flex-shrink:0}
 .car-cfg-header h3{margin:0;font-size:14px;font-weight:700;color:#fff;flex:1}
@@ -573,6 +575,43 @@ body.mapa-imersivo .page-body{animation:none!important;transform:none!important;
     </div>
     <div class="car-cfg-footer">
       <button onclick="fecharCfgCAR()" class="btn btn-primary" style="flex:1;font-size:12px">✓ Fechar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal de Consulta CAR -->
+<div id="car-consulta-overlay" onclick="if(event.target===this)fecharConsultaCAR()">
+  <div style="background:#fff;border-radius:14px;width:min(780px,96vw);max-height:88vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 16px 48px rgba(0,0,0,.32);font-family:'DM Sans',sans-serif">
+    <div class="car-cfg-header">
+      <span style="font-size:20px">🔍</span>
+      <h3>Consultar Imóveis CAR</h3>
+      <button onclick="fecharConsultaCAR()" style="background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:50%;width:28px;height:28px;cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center">✕</button>
+    </div>
+    <div class="car-cfg-body">
+      <div class="car-cfg-section">
+        <div class="car-cfg-section-title">Buscar imóvel</div>
+        <input id="car-consulta-input" type="text" autocomplete="off"
+          placeholder="Nome, CPF/CNPJ ou número do CAR (AC-...)"
+          style="width:100%;font-size:13px;padding:9px 11px;border:1px solid var(--borda);border-radius:var(--raio);font-family:inherit;box-sizing:border-box"
+          oninput="_atualizarHintConsulta()" onkeydown="if(event.key==='Enter')executarConsultaCAR()">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:8px">
+          <span id="car-consulta-hint" style="font-size:11px;color:var(--cinza-500)"></span>
+          <button onclick="executarConsultaCAR()" class="btn btn-primary" style="font-size:12px;padding:7px 16px;white-space:nowrap">Buscar</button>
+        </div>
+        <p style="font-size:10px;color:var(--cinza-400);margin:8px 0 0;line-height:1.5">Nome e CPF/CNPJ consultam a planilha SICAR local (Acre) · Número do CAR consulta o SICAR (WFS). Os dados são cruzados quando possível.</p>
+      </div>
+      <div class="car-cfg-section" style="margin-bottom:0">
+        <div id="car-consulta-resultado" style="min-height:60px">
+          <div style="font-size:12px;color:var(--cinza-400);text-align:center;padding:18px 0">Digite um termo e clique em <strong>Buscar</strong>.</div>
+        </div>
+      </div>
+    </div>
+    <div class="car-cfg-footer" style="justify-content:space-between;align-items:center">
+      <span id="car-consulta-count" style="font-size:12px;color:var(--cinza-600);font-weight:600">0 selecionados</span>
+      <div style="display:flex;gap:8px">
+        <button onclick="fecharConsultaCAR()" class="btn btn-secondary" style="font-size:12px">Cancelar</button>
+        <button id="car-consulta-confirmar" onclick="confirmarConsultaCAR()" class="btn btn-primary" style="font-size:12px" disabled>Exibir no mapa</button>
+      </div>
     </div>
   </div>
 </div>
@@ -1647,6 +1686,10 @@ function _renderDropdown(id){
         <input type="checkbox" id="car-toggle" style="accent-color:#1F4E2C;width:14px;height:14px" onchange="toggleCamadaCAR(this)">
         Exibir imóveis CAR do Acre
       </label>
+      <button onclick="abrirConsultaCAR()" title="Consultar por nome, CPF/CNPJ ou número do CAR"
+        style="background:#eff6ff;border:1px solid #93c5fd;color:#1d4ed8;border-radius:var(--raio);padding:4px 9px;cursor:pointer;font-size:12px;font-weight:600;font-family:inherit;display:flex;align-items:center;gap:4px;white-space:nowrap">
+        🔍 Consultar
+      </button>
       <button onclick="abrirCfgCAR()" title="Configurações avançadas"
         style="background:#f0fdf4;border:1px solid #86efac;color:#1F4E2C;border-radius:var(--raio);padding:4px 9px;cursor:pointer;font-size:12px;font-weight:600;font-family:inherit;display:flex;align-items:center;gap:4px;white-space:nowrap">
         ⚙ Configurar
@@ -4839,6 +4882,231 @@ function abrirCfgCAR(){
 }
 function fecharCfgCAR(){
   document.getElementById('car-cfg-overlay').classList.remove('aberto');
+}
+
+// ── Consulta de imóveis CAR (nome / CPF-CNPJ / número do CAR) ──────────────
+// Híbrida: nome e CPF/CNPJ na planilha local (car_dados_locais); número do CAR
+// no WFS público do SICAR. Os dados são cruzados quando possível.
+let _consultaResultados = [];
+
+function abrirConsultaCAR(){
+  const inp = document.getElementById('car-consulta-input');
+  if(inp) inp.value = '';
+  _consultaResultados = [];
+  const res = document.getElementById('car-consulta-resultado');
+  if(res) res.innerHTML = '<div style="font-size:12px;color:var(--cinza-400);text-align:center;padding:18px 0">Digite um termo e clique em <strong>Buscar</strong>.</div>';
+  const hint = document.getElementById('car-consulta-hint'); if(hint) hint.textContent = '';
+  _atualizarSelecaoConsulta();
+  document.getElementById('car-consulta-overlay').classList.add('aberto');
+  setTimeout(()=>{ if(inp) inp.focus(); }, 50);
+}
+function fecharConsultaCAR(){
+  document.getElementById('car-consulta-overlay').classList.remove('aberto');
+}
+
+function _detectarTipoBuscaCAR(termo){
+  const t = (termo||'').trim();
+  const dig = t.replace(/\D/g,'');
+  // Número do CAR: prefixo de UF (ex.: AC-...) seguido de dígitos
+  if(/^[A-Za-z]{2}-?\d/.test(t)) return 'car';
+  if(dig.length === 11) return 'cpf';
+  if(dig.length === 14) return 'cnpj';
+  // String com hífens e bloco alfanumérico longo => provável código CAR
+  if(t.includes('-') && t.replace(/[^A-Za-z0-9]/g,'').length >= 12) return 'car';
+  return 'nome';
+}
+function _rotuloTipoBusca(tipo){
+  return { car:'Número do CAR (SICAR/WFS)', cpf:'CPF (planilha local)', cnpj:'CNPJ (planilha local)', nome:'Nome (planilha local)' }[tipo] || '';
+}
+function _atualizarHintConsulta(){
+  const t = document.getElementById('car-consulta-input')?.value || '';
+  const hint = document.getElementById('car-consulta-hint');
+  if(!hint) return;
+  if(t.trim().length < 3){ hint.textContent = t.trim() ? 'Digite ao menos 3 caracteres' : ''; return; }
+  hint.innerHTML = `Detectado: <strong>${_rotuloTipoBusca(_detectarTipoBuscaCAR(t))}</strong>`;
+}
+
+async function executarConsultaCAR(){
+  const res = document.getElementById('car-consulta-resultado');
+  const termo = (document.getElementById('car-consulta-input')?.value || '').trim();
+  if(termo.length < 3){ if(res) res.innerHTML = '<div style="font-size:12px;color:#dc2626;text-align:center;padding:14px 0">Digite ao menos 3 caracteres.</div>'; return; }
+  const tipo = _detectarTipoBuscaCAR(termo);
+  if(res) res.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;gap:8px;padding:18px 0;color:var(--cinza-500);font-size:12px"><div style="width:16px;height:16px;border:2px solid #e5e7eb;border-top-color:#2D6A4F;border-radius:50%;animation:spin .7s linear infinite"></div>Consultando…</div>';
+  try{
+    const rows = tipo === 'car'
+      ? await _consultaCARporCodigo(termo)
+      : await _consultaCARLocal(tipo, termo);
+    _consultaResultados = rows;
+    _renderTabelaConsulta(rows, tipo, termo);
+  }catch(err){
+    if(res) res.innerHTML = `<div style="font-size:12px;color:#dc2626;text-align:center;padding:14px 0">Erro na consulta: ${escHtml(String(err.message||err).substring(0,160))}</div>`;
+  }
+}
+
+// Busca por nome ou CPF/CNPJ na planilha local
+async function _consultaCARLocal(tipo, termo){
+  let q = db.from('car_dados_locais').select('*').limit(500);
+  if(tipo === 'cpf' || tipo === 'cnpj'){
+    const dig = termo.replace(/\D/g,'');
+    q = q.or(`cpf_cnpj.eq.${dig},cpf_cnpj.ilike.%${dig}%`);
+  }else{
+    const t = termo.replace(/[%,()]/g,' ').trim();
+    q = q.or(`nom_imovel.ilike.%${t}%,nome_compl.ilike.%${t}%`);
+  }
+  const { data, error } = await q;
+  if(error) throw new Error(error.message);
+  return (data||[]).filter(r=>r.cod_imovel).map(r=>({
+    cod: r.cod_imovel,
+    nome: r.nom_imovel || r.nome_compl || '—',
+    municipio: r.nom_munici || '—',
+    area: r.num_area_i != null ? Number(r.num_area_i) : null,
+    situacao: r.condicao_i || '—',
+    naPlanilha: true,
+    local: r,
+    wfsFeature: null,
+  }));
+}
+
+// Busca por número de CAR no WFS, cruzando com a planilha local
+async function _consultaCARporCodigo(termo){
+  const cod = termo.trim().toUpperCase();
+  const cql = cod.replace(/[^A-Z0-9-]/g,'').length >= 15 ? `cod_imovel='${cod}'` : `cod_imovel LIKE '%${cod}%'`;
+  const feats = await _fetchCARporCQL(cql, 200);
+  const rows = [];
+  for(const f of feats){
+    const c = f.properties?.cod_imovel; if(!c) continue;
+    const local = await _buscarDadosLocais(c);
+    rows.push({
+      cod: c,
+      nome: local?.nom_imovel || local?.nome_compl || '—',
+      municipio: local?.nom_munici || f.properties?.municipio || '—',
+      area: local?.num_area_i != null ? Number(local.num_area_i) : (parseFloat(f.properties?.area) || null),
+      situacao: local?.condicao_i || f.properties?.condicao || '—',
+      naPlanilha: !!local,
+      local: local || null,
+      wfsFeature: f,
+    });
+  }
+  return rows;
+}
+
+async function _fetchCARporCQL(cqlFilter, maxFeat = 1000){
+  const url = `${CAR_WFS_BASE}?service=WFS&version=1.1.0&request=GetFeature`
+            + `&typeName=sicar:sicar_imoveis_ac&outputFormat=application/json`
+            + `&maxFeatures=${maxFeat}&CQL_FILTER=${encodeURIComponent(cqlFilter)}`;
+  const res = await _carFetchJson(url);
+  return res.features || [];
+}
+
+// Busca geometrias de uma lista de códigos (em lotes) via CQL_FILTER IN (...)
+async function _fetchCARgeomsPorCodigos(codigos){
+  const out = [];
+  const lote = 60;
+  for(let i=0; i<codigos.length; i+=lote){
+    const grupo = codigos.slice(i, i+lote);
+    const inList = grupo.map(c=>`'${String(c).replace(/'/g,"''")}'`).join(',');
+    const feats = await _fetchCARporCQL(`cod_imovel IN (${inList})`, grupo.length);
+    out.push(...feats);
+  }
+  return out;
+}
+
+function _renderTabelaConsulta(rows, tipo, termo){
+  const res = document.getElementById('car-consulta-resultado');
+  if(!res) return;
+  if(!rows.length){
+    res.innerHTML = `<div style="font-size:12px;color:var(--cinza-500);text-align:center;padding:16px 0">Nenhum imóvel encontrado para <strong>${escHtml(termo)}</strong>.${tipo!=='car'?'<br><span style="font-size:11px;color:var(--cinza-400)">Nome e CPF/CNPJ são buscados na planilha SICAR local.</span>':''}</div>`;
+    _atualizarSelecaoConsulta();
+    return;
+  }
+  const f2 = n => n == null ? '—' : Number(n).toLocaleString('pt-BR',{maximumFractionDigits:2});
+  res.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+      <span style="font-size:11px;color:var(--cinza-600)"><strong>${rows.length}</strong> imóvel(is) encontrado(s)</span>
+      <label style="display:flex;align-items:center;gap:5px;font-size:11px;cursor:pointer;color:var(--cinza-600)">
+        <input type="checkbox" id="car-consulta-all" onchange="_toggleTodosConsulta(this.checked)" style="accent-color:#1F4E2C;width:13px;height:13px"> Marcar todos
+      </label>
+    </div>
+    <div style="max-height:340px;overflow:auto;border:1px solid var(--borda);border-radius:var(--raio)">
+      <table style="width:100%;border-collapse:collapse;font-size:11px">
+        <thead style="position:sticky;top:0;background:var(--cinza-50);z-index:1">
+          <tr style="text-align:left;color:var(--cinza-500)">
+            <th style="padding:7px 8px;width:28px"></th>
+            <th style="padding:7px 8px">Código CAR</th>
+            <th style="padding:7px 8px">Nome / Proprietário</th>
+            <th style="padding:7px 8px">Município</th>
+            <th style="padding:7px 8px;text-align:right">Área (ha)</th>
+            <th style="padding:7px 8px">Situação</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map((r,i)=>`
+          <tr style="border-top:1px solid var(--cinza-100)">
+            <td style="padding:6px 8px"><input type="checkbox" class="car-consulta-chk" data-i="${i}" onchange="_atualizarSelecaoConsulta()" style="accent-color:#1F4E2C;width:14px;height:14px"></td>
+            <td style="padding:6px 8px;font-family:monospace;font-size:10px;color:var(--cinza-600);word-break:break-all">${escHtml(r.cod)}</td>
+            <td style="padding:6px 8px">${escHtml(r.nome)}${!r.naPlanilha?'<br><span style="font-size:9px;color:#d97706">⚠ não consta na planilha local</span>':''}</td>
+            <td style="padding:6px 8px">${escHtml(r.municipio)}</td>
+            <td style="padding:6px 8px;text-align:right">${f2(r.area)}</td>
+            <td style="padding:6px 8px">${escHtml(r.situacao)}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
+  _atualizarSelecaoConsulta();
+}
+
+function _toggleTodosConsulta(checked){
+  document.querySelectorAll('.car-consulta-chk').forEach(cb=>{ cb.checked = checked; });
+  _atualizarSelecaoConsulta();
+}
+function _atualizarSelecaoConsulta(){
+  const total = document.querySelectorAll('.car-consulta-chk').length;
+  const n = document.querySelectorAll('.car-consulta-chk:checked').length;
+  const cnt = document.getElementById('car-consulta-count');
+  if(cnt) cnt.textContent = `${n} selecionado${n===1?'':'s'}`;
+  const btn = document.getElementById('car-consulta-confirmar');
+  if(btn) btn.disabled = n === 0;
+  const all = document.getElementById('car-consulta-all');
+  if(all) all.checked = total > 0 && n === total;
+}
+
+async function confirmarConsultaCAR(){
+  const checks = [...document.querySelectorAll('.car-consulta-chk:checked')];
+  if(!checks.length) return;
+  const btn = document.getElementById('car-consulta-confirmar');
+  const orig = btn ? btn.textContent : '';
+  if(btn){ btn.disabled = true; btn.textContent = 'Carregando…'; }
+  try{
+    const selecionados = checks.map(cb=>_consultaResultados[parseInt(cb.dataset.i,10)]).filter(Boolean);
+    if(!_ucGeojson) await _carregarUC();
+    // Geometrias: já temos para buscas por código; buscamos no WFS as demais
+    const comGeom = [], semGeom = [];
+    selecionados.forEach(r=>{ if(r.wfsFeature) comGeom.push(r.wfsFeature); else semGeom.push(r.cod); });
+    const buscadas = semGeom.length ? await _fetchCARgeomsPorCodigos(semGeom) : [];
+    const porCod = new Map();
+    [...comGeom, ...buscadas].forEach(f=>{ const c=f.properties?.cod_imovel; if(c && !porCod.has(c)) porCod.set(c,f); });
+    const features = [...porCod.values()];
+    // Semeia dados cadastrais locais para o painel de detalhe (cruzamento)
+    selecionados.forEach(r=>{ if(r.local) _carDadosLocais.set(r.cod, r.local); });
+    if(!features.length){ toast('Nenhuma geometria encontrada no SICAR para os imóveis selecionados.', 'error'); return; }
+    const semWfs = selecionados.filter(r=>!porCod.has(r.cod));
+    // Garante a camada CAR ativa, depois injeta as features da consulta
+    const toggle = document.getElementById('car-toggle');
+    if(toggle && !toggle.checked){ toggle.checked = true; await toggleCamadaCAR(toggle); }
+    _carFeatures = features;
+    _carUCAtual  = 'Consulta: ' + (document.getElementById('car-consulta-input')?.value || '').trim();
+    await _carregarMarcados();
+    _aplicarCamadaCAR();
+    if(mapaL && _carLayer){ try{ mapaL.fitBounds(_carLayer.getBounds(),{padding:[24,24]}); }catch(e){} }
+    fecharConsultaCAR();
+    let msg = `${features.length} imóvel(is) exibido(s) no mapa.`;
+    if(semWfs.length) msg += ` ${semWfs.length} sem geometria no SICAR.`;
+    toast(msg, semWfs.length ? 'warning' : 'success');
+  }catch(err){
+    toast('Erro ao carregar imóveis: ' + (err.message || err), 'error');
+  }finally{
+    if(btn){ btn.disabled = false; btn.textContent = orig; }
+  }
 }
 function _carModalUCChange(val){
   // Sincroniza com o select do painel e dispara carregamento
