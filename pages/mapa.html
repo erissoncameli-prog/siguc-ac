@@ -422,7 +422,16 @@ body.mapa-imersivo .page-body{animation:none!important;transform:none!important;
 <script src="https://unpkg.com/leaflet-minimap@3.6.1/dist/Control.MiniMap.min.js"></script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css"/>
 <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
+<!-- Turf.js (bundle UMD completo). Versão fixada + fallback de CDN: a tag
+     flutuante (@6) chegou a entregar um bundle parcial, deixando
+     turf.bbox/intersect/booleanIntersects indefinidos e quebrando o filtro
+     de CAR por UC, o diagnóstico e o PRODES. -->
+<script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js"></script>
+<script>
+  if(typeof turf==='undefined' || typeof turf.bbox!=='function'){
+    document.write('<scr'+'ipt src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"><\/scr'+'ipt>');
+  }
+</script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <script src="https://unpkg.com/shpjs@4.0.4/dist/shp.js"></script>
 <script src="../js/mapa-cartografia.js"></script>
@@ -4607,7 +4616,7 @@ async function carregarDadosCAR(ucNome){
     // Filtra por interseção com o polígono da UC (desativado se BBOX mode estiver ativo)
     // booleanIntersects inclui CARs que cruzam a fronteira da UC, ao contrário do centroide
     let dentro = features;
-    if(!_carBboxMode && ucFeat?.geometry && typeof turf !== 'undefined'){
+    if(!_carBboxMode && ucFeat?.geometry && typeof turf?.booleanIntersects === 'function'){
       dentro = features.filter(f => {
         if(!f.geometry) return false;
         try{ return turf.booleanIntersects(f, ucFeat); }catch(e){ return false; }
@@ -5086,6 +5095,8 @@ async function _iniciarDiagnosticoCAR(f){
 async function _calcularDiagnosticoCAR(f){
   const p=f.properties||{};
   if(!f.geometry) return {erro:'Geometria inválida para este imóvel.'};
+  if(typeof turf==='undefined' || typeof turf.bbox!=='function')
+    return {erro:'Biblioteca de cálculo espacial (Turf) indisponível. Recarregue a página.'};
   const carPoly = f;
   const carBbox=turf.bbox(carPoly);
 
@@ -5365,6 +5376,8 @@ function _classificarDesmatamentoCF(ano, asvList){
 
 async function _fetchProdesCAR(f){
   if(!f.geometry) return { erro: 'Geometria inválida para este imóvel.' };
+  if(typeof turf==='undefined' || typeof turf.bbox!=='function')
+    return { erro: 'Biblioteca de cálculo espacial (Turf) indisponível. Recarregue a página.' };
   const carPoly = f;
 
   const bb   = turf.bbox(carPoly);
