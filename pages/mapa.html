@@ -5085,8 +5085,8 @@ async function _iniciarDiagnosticoCAR(f){
 }
 async function _calcularDiagnosticoCAR(f){
   const p=f.properties||{};
-  let carPoly;
-  try{ carPoly=turf.feature(f.geometry); }catch(e){ return {erro:'Geometria inválida para este imóvel.'}; }
+  if(!f.geometry) return {erro:'Geometria inválida para este imóvel.'};
+  const carPoly = f;
   const carBbox=turf.bbox(carPoly);
 
   // Localiza camadas carregadas (UC geojson local é suficiente; outras camadas opcionais)
@@ -5100,7 +5100,7 @@ async function _calcularDiagnosticoCAR(f){
       try{
         const fb=turf.bbox(feat);
         if(fb[2]<carBbox[0]||fb[0]>carBbox[2]||fb[3]<carBbox[1]||fb[1]>carBbox[3]) continue;
-        const inter=turf.intersect(carPoly,turf.feature(feat.geometry));
+        const inter=turf.intersect(carPoly, feat);
         if(inter) total+=turf.area(inter);
       }catch(_){}
     }
@@ -5111,7 +5111,7 @@ async function _calcularDiagnosticoCAR(f){
     let n=0;
     for(const feat of feats){
       try{
-        if(turf.booleanPointInPolygon(turf.feature(feat.geometry),carPoly)) n++;
+        if(turf.booleanPointInPolygon(feat, carPoly)) n++;
       }catch(_){}
     }
     return n;
@@ -5119,7 +5119,7 @@ async function _calcularDiagnosticoCAR(f){
 
   const areaCAR=parseFloat(p.area)||turf.area(carPoly)/10000;
   // Sem camadas locais específicas, retorna métricas básicas
-  const emUC = ucFeat ? (() => { try{ return turf.booleanIntersects(carPoly,turf.feature(ucFeat.geometry)); }catch(_){ return false; } })() : false;
+  const emUC = ucFeat ? (() => { try{ return turf.booleanIntersects(carPoly, ucFeat); }catch(_){ return false; } })() : false;
   const areaUC = ucFeat ? intersectArea([ucFeat]) : 0;
   const pctUC  = areaCAR>0 ? areaUC/areaCAR*100 : 0;
 
@@ -5271,7 +5271,7 @@ async function _iniciarProdesCAR(f){
   try{
     // bbox com proteção contra geometria inválida
     let bb = null;
-    try{ bb = turf.bbox(turf.feature(f.geometry)); }catch(_){}
+    try{ if(f.geometry) bb = turf.bbox(f); }catch(_){}
 
     // allSettled → nunca rejeita; cada falha vira dado de erro
     const [prodesRes, focosRes] = await Promise.allSettled([
@@ -5364,9 +5364,8 @@ function _classificarDesmatamentoCF(ano, asvList){
 }
 
 async function _fetchProdesCAR(f){
-  let carPoly;
-  try{ carPoly = turf.feature(f.geometry); }
-  catch(e){ return { erro: 'Geometria inválida para este imóvel.' }; }
+  if(!f.geometry) return { erro: 'Geometria inválida para este imóvel.' };
+  const carPoly = f;
 
   const bb   = turf.bbox(carPoly);
   const bbox = [bb[0]-0.01, bb[1]-0.01, bb[2]+0.01, bb[3]+0.01];
@@ -5404,7 +5403,7 @@ async function _fetchProdesCAR(f){
       for(const feat of (features||[])){
         if(!feat.geometry) continue;
         try{
-          const inter = turf.intersect(carPoly, turf.feature(feat.geometry));
+          const inter = turf.intersect(carPoly, feat);
           if(!inter) continue;
           const ha  = turf.area(inter)/10000;
           if(ha < 0.01) continue;
@@ -5760,7 +5759,7 @@ function _toggleProdesCarLayer(tipo, ativo){
       const el=document.getElementById('prodes-toggle-focos'); if(el) el.checked=false; return;
     }
     let carPoly;
-    try{ carPoly = turf.feature(_carAbertoFeat?.geometry); }catch(_){}
+    if(_carAbertoFeat?.geometry) carPoly = _carAbertoFeat;
     const markers = [];
     for(const pt of pts){
       try{
