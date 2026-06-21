@@ -4465,14 +4465,25 @@ function _carProxyUrl(wfsUrl){
 async function _carFetchJson(wfsUrl){
   const res = await fetch(_carProxyUrl(wfsUrl));
   const text = await res.text();
+  // Resposta XML = erro OGC do servidor SICAR
   if(text.trim().startsWith('<')){
-    // Servidor retornou XML (erro OGC ou CORS) — extrai mensagem se possível
     const msg = text.match(/<ows:ExceptionText>([\s\S]*?)<\/ows:ExceptionText>/)?.[1]
               || text.match(/<ServiceException>([\s\S]*?)<\/ServiceException>/)?.[1]
               || `Servidor retornou XML (HTTP ${res.status})`;
     throw new Error(msg.trim().substring(0, 200));
   }
-  return JSON.parse(text);
+  // HTTP não-2xx = erro do proxy (ex: 502 timeout, 403, etc.)
+  if(!res.ok){
+    let detalhe = text.substring(0, 150);
+    try{ detalhe = JSON.parse(text)?.error || detalhe; }catch(e){}
+    throw new Error(`Proxy HTTP ${res.status}: ${detalhe}`);
+  }
+  const json = JSON.parse(text);
+  // Resposta JSON do proxy com campo "error" mas sem "features" = erro encapsulado
+  if(json.error && !json.features && json.type !== 'FeatureCollection'){
+    throw new Error(String(json.error).substring(0, 200));
+  }
+  return json;
 }
 
 let _carCacheUC = new Map(); // ucNome → features[]
@@ -4562,10 +4573,9 @@ async function carregarDadosCAR(ucNome){
 
   const ucFeat = (_ucGeojson?.features||[]).find(f=>f.properties?.nome===ucNome);
   const bboxArr = _bboxUCArr(ucNome);
-  // CRS:84 evita ambiguidade de ordem de eixo do EPSG:4326 no WFS 1.1.0 (sempre lon/lat)
   const bbox = bboxArr
-    ? `${bboxArr[0]},${bboxArr[1]},${bboxArr[2]},${bboxArr[3]},CRS:84`
-    : '-73.5,-11.2,-66.5,-7.1,CRS:84';
+    ? `${bboxArr[0]},${bboxArr[1]},${bboxArr[2]},${bboxArr[3]},EPSG:4326`
+    : '-73.5,-11.2,-66.5,-7.1,EPSG:4326';
 
   setStatus(`⏳ Buscando imóveis CAR para <strong>${escHtml(ucNome)}</strong>...`);
 
@@ -4603,7 +4613,7 @@ async function carregarDadosCAR(ucNome){
       });
     }
 
-    _carCacheUC.set(ucNome, dentro);
+    if(dentro.length) _carCacheUC.set(ucNome, dentro); // não cacheia resultado vazio
     _carFeatures = dentro;
     _carUCAtual  = ucNome;
     await _carregarMarcados();
@@ -4710,7 +4720,7 @@ async function carregarDadosCARMunicipio(munNome){
   if(!coords.length){ setStatus('⚠ Coordenadas inválidas'); return; }
 
   const lngs = coords.map(c=>c[0]), lats = coords.map(c=>c[1]);
-  const bbox = `${Math.min(...lngs)},${Math.min(...lats)},${Math.max(...lngs)},${Math.max(...lats)},CRS:84`;
+  const bbox = `${Math.min(...lngs)},${Math.min(...lats)},${Math.max(...lngs)},${Math.max(...lats)},EPSG:4326`;
 
   _carCarregando = true;
   setStatus(`⏳ Buscando imóveis CAR em <strong>${escHtml(munNome)}</strong>...`);
