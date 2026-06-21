@@ -9,7 +9,14 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
+<!-- Turf.js (bundle UMD completo): versão fixada + fallback de CDN; a tag
+     flutuante (@6) chegou a entregar bundle parcial sem turf.area/bbox. -->
+<script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js"></script>
+<script>
+  if(typeof turf==='undefined' || typeof turf.area!=='function'){
+    document.write('<scr'+'ipt src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"><\/scr'+'ipt>');
+  }
+</script>
 <script src="../js/observability.js"></script>
 <script src="../js/queryLogger.js"></script>
 <script src="../js/config.js"></script>
