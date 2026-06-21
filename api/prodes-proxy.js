@@ -10,7 +10,7 @@
 const WFS_BASE    = 'https://terrabrasilis.dpi.inpe.br/geoserver/wfs';
 const TYPE_ANUAL  = 'prodes-amazon-nb:yearly_deforestation_biome';
 const TYPE_HIST   = 'prodes-amazon-nb:accumulated_deforestation_2007_biome';
-const TIMEOUT_MS  = 30000;
+const TIMEOUT_MS  = 55000; // 55s — dentro do maxDuration de 60s configurado no Vercel
 const MAX_FEAT    = 2000;
 
 async function fetchWFS(typeName, bbox){

@@ -20,10 +20,15 @@
     }
   ],
   "functions": {
-    "api/health.js":       { "maxDuration": 10 },
-    "api/health/live.js":  { "maxDuration": 5  },
-    "api/metrics.js":      { "maxDuration": 5  },
-    "api/car-proxy.js":    { "maxDuration": 60 }
+    "api/health.js":         { "maxDuration": 10 },
+    "api/health/live.js":    { "maxDuration": 5  },
+    "api/metrics.js":        { "maxDuration": 5  },
+    "api/car-proxy.js":      { "maxDuration": 60 },
+    "api/prodes-proxy.js":   { "maxDuration": 60 },
+    "api/focos-proxy.js":    { "maxDuration": 30 },
+    "api/dof-proxy.js":      { "maxDuration": 30 },
+    "api/planet-tiles.js":   { "maxDuration": 30 },
+    "api/planet-mosaics.js": { "maxDuration": 30 }
   },
   "crons": [
     {
