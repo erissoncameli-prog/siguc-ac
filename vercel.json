@@ -22,7 +22,8 @@
   "functions": {
     "api/health.js":       { "maxDuration": 10 },
     "api/health/live.js":  { "maxDuration": 5  },
-    "api/metrics.js":      { "maxDuration": 5  }
+    "api/metrics.js":      { "maxDuration": 5  },
+    "api/car-proxy.js":    { "maxDuration": 60 }
   },
   "crons": [
     {
