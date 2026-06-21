@@ -126,6 +126,13 @@
 .rel-grid-esq  { transform: translate(2px, -50%); }
 .rel-grid-dir  { transform: translate(calc(-100% - 2px), -50%); }
 
+/* Bloco de assinatura do responsável técnico */
+.rel-assinatura { width: 60%; margin: 22px auto 10px; text-align: center; page-break-inside: avoid; break-inside: avoid; }
+.rel-assin-linha { border-top: 1px solid #374151; margin-bottom: 5px; }
+.rel-assin-nome { font-size: 10px; font-weight: 700; color: #0A1A0F; }
+.rel-assin-cargo { font-size: 8px; color: #4b5563; }
+.rel-assin-org { font-size: 8px; color: #6b7280; }
+
 /* Inset de localização (mini-mapa do Acre) */
 .rel-mapa-inset { position:absolute; top:6px; right:6px; width:96px; height:74px; background:#fff; border:1px solid #374151; border-radius:3px; box-shadow:0 1px 4px rgba(0,0,0,.25); z-index:800; padding:2px; overflow:hidden; }
 .rel-inset-tit { font-size:5.5px; font-weight:700; text-transform:uppercase; letter-spacing:.03em; color:#0A1A0F; text-align:center; line-height:1.3; }

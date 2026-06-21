@@ -241,6 +241,11 @@ function renderCfg(cfg){
         <div class="field"><label>Formato de protocolo</label><input id="f-proto" value="${esc(cfg.protocolo_formato||'SIGUC-{ANO}-{SEQ}')}"><div class="hint">Variáveis: {ANO}, {SEQ}</div></div>
         <div class="field"><label>Sequencial atual</label><input id="f-seq" type="number" min="0" value="${cfg.protocolo_seq||0}"><div class="hint">Próximo relatório: ${_proxProtocolo(cfg)}</div></div>
       </div>
+
+      <div style="font-size:13px;font-weight:700;color:var(--cinza-800);margin:20px 0 4px">Responsáveis Técnicos</div>
+      <div class="hint" style="margin-bottom:8px">Assinam o laudo CAR. Na geração do relatório você escolhe entre estes cadastros e o usuário logado.</div>
+      <div id="resp-tec-list">${(cfg.responsaveis_tecnicos||[]).map(_respRowHTML).join('')}</div>
+      <button type="button" class="btn btn-outline" style="font-size:11px;margin-top:6px" onclick="_addRespTec()">+ Adicionar responsável</button>
     </div>
 
     <div class="form-footer">
@@ -588,6 +593,29 @@ async function _removerLogo(tipo){
   toast('Logo removida.','info');
 }
 
+function _respRowHTML(r){
+  r = r || {};
+  return `<div class="resp-tec-row grid-2" style="gap:8px;margin-bottom:8px;border:1px solid var(--borda);border-radius:8px;padding:10px;position:relative">
+    <div class="field"><label>Nome</label><input class="rt-nome" value="${esc(r.nome||'')}"></div>
+    <div class="field"><label>Cargo / Função</label><input class="rt-cargo" value="${esc(r.cargo||'')}"></div>
+    <div class="field"><label>Registro (CREA/CAU/CTF-IBAMA/Matrícula)</label><input class="rt-registro" value="${esc(r.registro||'')}"></div>
+    <div class="field"><label>Órgão</label><input class="rt-orgao" value="${esc(r.orgao||'')}"></div>
+    <button type="button" title="Remover" onclick="this.closest('.resp-tec-row').remove()" style="position:absolute;top:6px;right:6px;background:#fff;border:1px solid #fca5a5;color:#dc2626;border-radius:4px;font-size:11px;padding:2px 7px;cursor:pointer">✕</button>
+  </div>`;
+}
+function _addRespTec(){
+  const list = document.getElementById('resp-tec-list');
+  if(list) list.insertAdjacentHTML('beforeend', _respRowHTML({}));
+}
+function _coletarResponsaveis(){
+  return [...document.querySelectorAll('.resp-tec-row')].map(row => ({
+    nome:     row.querySelector('.rt-nome')?.value.trim() || '',
+    cargo:    row.querySelector('.rt-cargo')?.value.trim() || '',
+    registro: row.querySelector('.rt-registro')?.value.trim() || '',
+    orgao:    row.querySelector('.rt-orgao')?.value.trim() || '',
+  })).filter(r => r.nome);
+}
+
 async function salvarCfg(){
   const v = id => document.getElementById(id)?.value?.trim()||'';
   const cfg = await getConfigSistema();
@@ -601,6 +629,7 @@ async function salvarCfg(){
     aviso_legal:  v('f-aviso'),
     protocolo_formato: v('f-proto'),
     protocolo_seq: parseInt(v('f-seq')||'0'),
+    responsaveis_tecnicos: _coletarResponsaveis(),
   };
   await _salvarDados(novas);
   toast('Configurações salvas com sucesso.','success');
