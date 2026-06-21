@@ -4608,10 +4608,9 @@ async function carregarDadosCAR(ucNome){
     // booleanIntersects inclui CARs que cruzam a fronteira da UC, ao contrário do centroide
     let dentro = features;
     if(!_carBboxMode && ucFeat?.geometry && typeof turf !== 'undefined'){
-      const ucFeatTurf = turf.feature(ucFeat.geometry);
       dentro = features.filter(f => {
         if(!f.geometry) return false;
-        try{ return turf.booleanIntersects(turf.feature(f.geometry), ucFeatTurf); }catch(e){ return false; }
+        try{ return turf.booleanIntersects(f, ucFeat); }catch(e){ return false; }
       });
     }
 
