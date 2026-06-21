@@ -1648,12 +1648,32 @@ function _renderDropdown(id){
         ⚙ Configurar
       </button>
     </div>
-    <p style="font-size:11px;color:var(--cinza-500);margin:0 0 10px">Dados públicos do SICAR. Carregamento por UC selecionada.</p>
+    <p style="font-size:11px;color:var(--cinza-500);margin:0 0 10px">Dados públicos do SICAR. Carregamento por UC ou município.</p>
     <div id="car-filtros-wrap" style="display:none;flex-direction:column;gap:8px">
-      <div>
+      <div style="display:flex;gap:4px">
+        <label style="display:flex;align-items:center;gap:5px;font-size:11px;cursor:pointer;background:var(--cinza-50);border:1px solid var(--borda);border-radius:var(--raio);padding:4px 8px;flex:1;justify-content:center">
+          <input type="radio" name="car-modo" value="uc" checked style="accent-color:#1F4E2C;width:12px;height:12px" onchange="carModoChange('uc')">
+          Por UC
+        </label>
+        <label style="display:flex;align-items:center;gap:5px;font-size:11px;cursor:pointer;background:var(--cinza-50);border:1px solid var(--borda);border-radius:var(--raio);padding:4px 8px;flex:1;justify-content:center">
+          <input type="radio" name="car-modo" value="municipio" style="accent-color:#1F4E2C;width:12px;height:12px" onchange="carModoChange('municipio')">
+          Por Município
+        </label>
+      </div>
+      <div id="car-wrap-uc">
         <label style="font-size:11px;font-weight:600;color:var(--cinza-600);display:block;margin-bottom:4px">Filtrar por UC:</label>
         <select id="car-sel-uc" style="width:100%;font-size:12px;padding:5px 8px;border:1px solid var(--borda);border-radius:var(--raio)" onchange="carregarDadosCAR(this.value)">
           <option value="todas">Selecione uma UC...</option>
+        </select>
+        <label style="display:flex;align-items:center;gap:5px;font-size:11px;margin-top:6px;cursor:pointer;color:var(--cinza-600)">
+          <input type="checkbox" id="car-bbox-mode" style="accent-color:#1F4E2C;width:12px;height:12px" onchange="carBboxModeChange(this.checked)">
+          Incluir CARs fora da UC (BBOX completa)
+        </label>
+      </div>
+      <div id="car-wrap-mun" style="display:none">
+        <label style="font-size:11px;font-weight:600;color:var(--cinza-600);display:block;margin-bottom:4px">Município:</label>
+        <select id="car-sel-municipio" style="width:100%;font-size:12px;padding:5px 8px;border:1px solid var(--borda);border-radius:var(--raio)" onchange="carregarDadosCARMunicipio(this.value)">
+          <option value="">Selecione um município...</option>
         </select>
       </div>
       <div style="font-size:11px;color:var(--cinza-500)" id="car-status-txt"></div>
@@ -4479,6 +4499,11 @@ async function toggleCamadaCAR(el){
   if(!_ucGeojson) await _carregarUC();
   _popularFiltroCarUC('car-sel-uc');
   document.getElementById('car-filtros-wrap').style.display='flex';
+  // Garante visibilidade correta dos wrappers conforme o modo atual
+  const wrapUC  = document.getElementById('car-wrap-uc');
+  const wrapMun = document.getElementById('car-wrap-mun');
+  if(wrapUC)  wrapUC.style.display  = _carModo === 'uc' ? '' : 'none';
+  if(wrapMun) wrapMun.style.display = _carModo === 'municipio' ? '' : 'none';
 }
 
 // Calcula BBOX [minX,minY,maxX,maxY] de uma UC
@@ -4522,9 +4547,10 @@ async function carregarDadosCAR(ucNome){
 
   const ucFeat = (_ucGeojson?.features||[]).find(f=>f.properties?.nome===ucNome);
   const bboxArr = _bboxUCArr(ucNome);
+  // CRS:84 evita ambiguidade de ordem de eixo do EPSG:4326 no WFS 1.1.0 (sempre lon/lat)
   const bbox = bboxArr
-    ? `${bboxArr[0]},${bboxArr[1]},${bboxArr[2]},${bboxArr[3]},EPSG:4326`
-    : '-73.5,-11.2,-66.5,-7.1,EPSG:4326';
+    ? `${bboxArr[0]},${bboxArr[1]},${bboxArr[2]},${bboxArr[3]},CRS:84`
+    : '-73.5,-11.2,-66.5,-7.1,CRS:84';
 
   setStatus(`⏳ Buscando imóveis CAR para <strong>${escHtml(ucNome)}</strong>...`);
 
@@ -4553,9 +4579,9 @@ async function carregarDadosCAR(ucNome){
       pages.forEach(p => features.push(...(p.features||[])));
     }
 
-    // Filtra: mantém só imóveis cujo centroide está dentro do polígono da UC
+    // Filtra por centroide dentro da UC (desativado se BBOX mode estiver ativo)
     let dentro = features;
-    if(ucFeat?.geometry && typeof turf !== 'undefined'){
+    if(!_carBboxMode && ucFeat?.geometry && typeof turf !== 'undefined'){
       dentro = features.filter(f => {
         if(!f.geometry) return false;
         try{ return turf.booleanPointInPolygon(turf.centroid(f), ucFeat); }catch(e){ return false; }
@@ -4572,7 +4598,142 @@ async function carregarDadosCAR(ucNome){
     const badge = document.getElementById('car-count-badge');
     if(badge){ badge.textContent=n; badge.style.display=n?'':'none'; }
     if(n>0 && mapaL){ try{ mapaL.fitBounds(_carLayer.getBounds(),{padding:[20,20]}); }catch(e){} }
-    if(!n) setStatus(`⚠ Nenhum imóvel CAR encontrado dentro de <strong>${escHtml(ucNome)}</strong>`);
+    if(!n){
+      const dica = _carBboxMode ? '' : ' <span style="color:var(--cinza-400)">(tente ativar "BBOX completa")</span>';
+      setStatus(`⚠ Nenhum imóvel CAR encontrado dentro de <strong>${escHtml(ucNome)}</strong>${dica}`);
+    }
+  }catch(err){
+    setStatus(`⚠ Erro ao carregar CAR: ${escHtml(err.message.substring(0,120))}`);
+  }finally{
+    _carCarregando = false;
+  }
+}
+
+// ── CAR por município ─────────────────────────────────────────────────────
+let _carModo = 'uc';     // 'uc' | 'municipio'
+let _carBboxMode = false; // false = centroide dentro da UC; true = BBOX completa
+let _municipiosGeojson = null;
+
+function carModoChange(modo){
+  _carModo = modo;
+  const wrapUC  = document.getElementById('car-wrap-uc');
+  const wrapMun = document.getElementById('car-wrap-mun');
+  if(wrapUC)  wrapUC.style.display  = modo === 'uc' ? '' : 'none';
+  if(wrapMun) wrapMun.style.display = modo === 'municipio' ? '' : 'none';
+  if(modo === 'municipio') _popularFiltroMunicipio();
+  // Limpa camada ao trocar modo
+  if(_carLayer){ mapaL.removeLayer(_carLayer); _carLayer = null; }
+  _carFeatures = [];
+  const sb = document.getElementById('car-status-txt');
+  if(sb) sb.innerHTML = '';
+  const badge = document.getElementById('car-count-badge');
+  if(badge) badge.style.display = 'none';
+  document.getElementById('car-legenda-inline').style.display = 'none';
+}
+
+function carBboxModeChange(checked){
+  _carBboxMode = checked;
+  const sel = document.getElementById('car-sel-uc');
+  const uc = sel?.value;
+  if(uc && uc !== 'todas') carregarDadosCAR(uc);
+}
+
+async function _popularFiltroMunicipio(){
+  const sel = document.getElementById('car-sel-municipio');
+  if(!sel) return;
+  if(!_municipiosGeojson){
+    try{
+      const r = await fetch('/data/municipios_acre.geojson');
+      _municipiosGeojson = await r.json();
+    }catch(e){ return; }
+  }
+  const nomes = (_municipiosGeojson.features||[])
+    .map(f => f.properties?.nome || '')
+    .filter(Boolean).sort();
+  sel.innerHTML = '<option value="">Selecione um município...</option>'
+    + nomes.map(n => `<option value="${escHtml(n)}">${escHtml(n)}</option>`).join('');
+}
+
+async function carregarDadosCARMunicipio(munNome){
+  if(!munNome) return;
+  if(_carCarregando) return;
+
+  const statusEl = document.getElementById('car-status-txt');
+  const setStatus = html => { if(statusEl) statusEl.innerHTML = html; };
+
+  const cacheKey = `mun_${munNome}`;
+  if(_carCacheUC.has(cacheKey)){
+    _carFeatures = _carCacheUC.get(cacheKey);
+    _carUCAtual  = cacheKey;
+    _aplicarCamadaCAR();
+    const n = _carFeatures.length;
+    setStatus(`✅ <strong>${n}</strong> imóvel(is) em ${escHtml(munNome)} (cache)`);
+    const badge = document.getElementById('car-count-badge');
+    if(badge){ badge.textContent = n; badge.style.display = n ? '' : 'none'; }
+    if(n && mapaL){ try{ mapaL.fitBounds(_carLayer.getBounds(),{padding:[20,20]}); }catch(e){} }
+    return;
+  }
+
+  if(!_municipiosGeojson){
+    try{
+      const r = await fetch('/data/municipios_acre.geojson');
+      _municipiosGeojson = await r.json();
+    }catch(e){ setStatus('⚠ Erro ao carregar municípios'); return; }
+  }
+
+  const munFeat = (_municipiosGeojson.features||[])
+    .find(f => (f.properties?.nome||'') === munNome);
+
+  if(!munFeat?.geometry){ setStatus(`⚠ Geometria não encontrada para ${escHtml(munNome)}`); return; }
+
+  const coords = [];
+  const extCoords = g => {
+    if(g.type==='MultiPolygon') g.coordinates.forEach(p=>p.forEach(r=>r.forEach(c=>coords.push(c))));
+    else if(g.type==='Polygon') g.coordinates.forEach(r=>r.forEach(c=>coords.push(c)));
+  };
+  extCoords(munFeat.geometry);
+  if(!coords.length){ setStatus('⚠ Coordenadas inválidas'); return; }
+
+  const lngs = coords.map(c=>c[0]), lats = coords.map(c=>c[1]);
+  const bbox = `${Math.min(...lngs)},${Math.min(...lats)},${Math.max(...lngs)},${Math.max(...lats)},CRS:84`;
+
+  _carCarregando = true;
+  setStatus(`⏳ Buscando imóveis CAR em <strong>${escHtml(munNome)}</strong>...`);
+
+  try{
+    const url0 = `${CAR_WFS_BASE}?service=WFS&version=1.1.0&request=GetFeature`
+               + `&typeName=sicar:sicar_imoveis_ac&outputFormat=application/json`
+               + `&BBOX=${bbox}&maxFeatures=${CAR_PAGE}&startIndex=0`;
+
+    const res0 = await _carFetchJson(url0);
+    const total = res0.numberMatched || res0.totalFeatures || (res0.features||[]).length;
+    const features = [...(res0.features||[])];
+
+    if(total > CAR_PAGE){
+      const npages = Math.ceil(total / CAR_PAGE);
+      setStatus(`⏳ Carregando ${npages} páginas de imóveis em ${escHtml(munNome)}...`);
+      const promises = [];
+      for(let i=1; i<npages; i++){
+        const u = `${CAR_WFS_BASE}?service=WFS&version=1.1.0&request=GetFeature`
+                + `&typeName=sicar:sicar_imoveis_ac&outputFormat=application/json`
+                + `&BBOX=${bbox}&maxFeatures=${CAR_PAGE}&startIndex=${i*CAR_PAGE}`;
+        promises.push(_carFetchJson(u));
+      }
+      const pages = await Promise.all(promises);
+      pages.forEach(p => features.push(...(p.features||[])));
+    }
+
+    _carCacheUC.set(cacheKey, features);
+    _carFeatures = features;
+    _carUCAtual  = cacheKey;
+    await _carregarMarcados();
+    _aplicarCamadaCAR();
+    const n = features.length;
+    setStatus(`✅ <strong>${n}</strong> imóvel(is) em ${escHtml(munNome)}`);
+    const badge = document.getElementById('car-count-badge');
+    if(badge){ badge.textContent = n; badge.style.display = n ? '' : 'none'; }
+    if(n && mapaL){ try{ mapaL.fitBounds(_carLayer.getBounds(),{padding:[20,20]}); }catch(e){} }
+    if(!n) setStatus(`⚠ Nenhum imóvel CAR encontrado em ${escHtml(munNome)}`);
   }catch(err){
     setStatus(`⚠ Erro ao carregar CAR: ${escHtml(err.message.substring(0,120))}`);
   }finally{

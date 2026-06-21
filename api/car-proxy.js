@@ -1,7 +1,7 @@
 // SIGUC-AC · Proxy CAR/SICAR — GET /api/car-proxy
 // Resolve CORS: o browser chama este endpoint, que chama o geoserver.car.gov.br server-side.
 
-const TIMEOUT_MS = 25000;
+const TIMEOUT_MS = 55000; // 55s — dentro do maxDuration de 60s configurado no Vercel
 
 const ALLOWED_HOSTS = [
   'geoserver.car.gov.br',
