@@ -157,6 +157,47 @@ const _LEG_DET = [
 
 let _relEscopo = 'atual';  // 'atual' | 'marcados'
 let _relModo   = 'detalhado'; // 'sintetico' | 'detalhado'
+let _relResponsavel = '__user__'; // '__user__' | índice na lista de responsáveis técnicos
+
+// Resolve o responsável técnico escolhido (config) ou o usuário logado
+function _resolverResponsavel(cab) {
+  const lista = cab?.responsaveis || [];
+  if (_relResponsavel !== '__user__' && lista.length) {
+    const r = lista[parseInt(_relResponsavel, 10)] || lista[0];
+    return { nome: r.nome || '', cargo: r.cargo || '', registro: r.registro || '', orgao: r.orgao || cab.siglaSecr || '', origem: 'tecnico' };
+  }
+  return {
+    nome: appState.usuario?.nome_completo || appState.usuario?.email || 'Usuário',
+    cargo: appState.perfil || '', registro: '', orgao: cab?.siglaSecr || '', origem: 'usuario',
+  };
+}
+function _relSetResp(v) { _relResponsavel = v; }
+async function _relPopularResponsaveis() {
+  const sel = document.getElementById('rel-resp-sel');
+  if (!sel) return;
+  let cab; try { cab = await getCabecalhoRelatorio(); } catch (_) { return; }
+  const u = appState.usuario?.nome_completo || appState.usuario?.email || 'Usuário';
+  const opts = [`<option value="__user__">Usuário logado — ${_relEsc(u)}</option>`];
+  (cab.responsaveis || []).forEach((r, i) => {
+    opts.push(`<option value="${i}">${_relEsc(r.nome)}${r.cargo ? ' — ' + _relEsc(r.cargo) : ''}</option>`);
+  });
+  sel.innerHTML = opts.join('');
+  // Padrão: primeiro responsável técnico cadastrado, se houver
+  _relResponsavel = (cab.responsaveis || []).length ? '0' : '__user__';
+  sel.value = _relResponsavel;
+}
+
+// Bloco de assinatura do responsável técnico
+function _htmlAssinatura(cab) {
+  const r = cab?.responsavel || {};
+  const linha2 = [r.cargo, r.registro].filter(Boolean).join(' · ');
+  return `<div class="rel-assinatura">
+    <div class="rel-assin-linha"></div>
+    <div class="rel-assin-nome">${_relEsc(r.nome || '—')}</div>
+    ${linha2 ? `<div class="rel-assin-cargo">${_relEsc(linha2)}</div>` : ''}
+    ${r.orgao ? `<div class="rel-assin-org">${_relEsc(r.orgao)}</div>` : ''}
+  </div>`;
+}
 
 // ── Abrir modal de seleção ─────────────────────────────────────────────────
 
@@ -214,6 +255,12 @@ function abrirModalRelatorio() {
           <p>Laudo técnico completo com gráficos, tabelas e narrativa jurídica.</p>
         </div>
       </div>
+      <hr class="rm-sep">
+      <div class="rm-label">Responsável técnico (assinatura)</div>
+      <select id="rel-resp-sel" onchange="_relSetResp(this.value)" style="width:100%;padding:8px 10px;border:1px solid #e5e7eb;border-radius:8px;font-size:12px;font-family:inherit;background:#fff">
+        <option value="__user__">Usuário logado</option>
+      </select>
+      <div style="font-size:10px;color:#9ca3af;margin-top:4px">Cadastre responsáveis em Configurações → Relatórios.</div>
     </div>
     <div class="rm-footer">
       <button class="btn btn-secondary" onclick="_fecharModalRelatorio()">Cancelar</button>
@@ -222,6 +269,7 @@ function abrirModalRelatorio() {
     </div>
   </div>`;
   document.body.appendChild(el);
+  _relPopularResponsaveis();
   } catch(err) {
     console.error('[Relatório] Erro ao abrir modal:', err);
     toast('Erro ao abrir relatório: ' + err.message, 'error');
@@ -525,6 +573,7 @@ function _htmlFolhaSintetica(d, cab, protocolo, idx, total, multi) {
         <div class="rel-narrativa" style="font-size:10px">${rec}</div>
         <div class="rel-refs"><strong>Base legal:</strong> Arts. 12/I · 26 · 38 · 61-A · 66 · 67 · 78-A — Lei nº 12.651/2012</div>
       </div>
+      ${_htmlAssinatura(cab)}
     </div>
     <div class="rel-pag-rodape">
       <span>${_relEsc(cab.secretaria)} · ${_relEsc(cab.siglaDiret)} · ${_relEsc(cab.siglaDep)}</span>
@@ -745,8 +794,10 @@ function _htmlFolhasDetalhadas(d, cab, protocolo, idx, total, multi) {
         </table>
       </div>
 
+      ${_htmlAssinatura(cab)}
+
       <div class="rel-aviso">
-        Documento gerado automaticamente pelo SIGUC-AC em ${data} por ${_relEsc(appState.usuario?.nome_completo||appState.usuario?.email||'Usuário')} (${_relEsc(appState.perfil||'—')}).<br>
+        Documento emitido pelo SIGUC-AC em ${data} · operado por ${_relEsc(appState.usuario?.nome_completo||appState.usuario?.email||'Usuário')} (${_relEsc(appState.perfil||'—')}).<br>
         ${_relEsc(cab.rodapeTxt||'')} As análises são baseadas em dados de sensoriamento remoto com margem de erro de 5–15%.<br>
         ${_relEsc(cab.secretaria)} · ${_relEsc(cab.siglaDiret)} · ${_relEsc(cab.siglaDep)} · ${_relEsc(cab.telefone)} · ${_relEsc(cab.email)} · ${_relEsc(cab.site)}
       </div>
@@ -929,6 +980,7 @@ async function _abrirPreviewRelatorio() {
     getCabecalhoRelatorio(),
     gerarProtocolo(),
   ]);
+  cab.responsavel = _resolverResponsavel(cab);
 
   const html = await _gerarHTMLRelatorio(dadosList, _relModo, cab, protocolo);
 
@@ -982,6 +1034,7 @@ async function _abrirNovaAba() {
     getCabecalhoRelatorio(),
     gerarProtocolo(),
   ]);
+  cab.responsavel = _resolverResponsavel(cab);
   const html = await _gerarHTMLRelatorio(dadosList, _relModo, cab, protocolo);
   const win = window.open('', '_blank');
   if (!win) { toast('Popup bloqueado — use o botão Imprimir.','warning'); return; }

@@ -33,6 +33,7 @@ async function getCabecalhoRelatorio() {
     logoSecr:     cfg.logos?.secretaria_url|| null,
     rodapeTxt:    cfg.rodape_texto || 'Documento gerado automaticamente pelo SIGUC-AC.',
     avisoLegal:   cfg.aviso_legal  || '',
+    responsaveis: Array.isArray(cfg.responsaveis_tecnicos) ? cfg.responsaveis_tecnicos : [],
   };
 }
 
