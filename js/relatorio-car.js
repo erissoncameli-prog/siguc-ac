@@ -10,6 +10,22 @@ const _relF1  = n => Number(n||0).toLocaleString('pt-BR',{maximumFractionDigits:
 const _relPct = (v,t) => t>0 ? _relF1(v/t*100) : '0,0';
 const _relData = () => new Date().toLocaleDateString('pt-BR');
 
+// Traduz códigos de situação do CAR (SICAR) para texto legível
+const _SICAR_STATUS = { AT: 'Ativo', PE: 'Pendente', SU: 'Suspenso', CA: 'Cancelado' };
+function _traduzStatusCAR(v) {
+  if (!v) return '—';
+  const k = String(v).trim().toUpperCase();
+  return _SICAR_STATUS[k] || String(v); // se já vier legível, mantém
+}
+// Formata data ISO (YYYY-MM-DD) ou qualquer data para pt-BR
+function _relDataBR(v) {
+  if (!v || v === '—') return '—';
+  const m = String(v).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return `${m[3]}/${m[2]}/${m[1]}`;
+  const d = new Date(v);
+  return isNaN(d.getTime()) ? String(v) : d.toLocaleDateString('pt-BR');
+}
+
 function _calcularEscalaLeaflet(zoom, lat) {
   const mPx = 156543.03392 * Math.cos((lat||0) * Math.PI / 180) / Math.pow(2, zoom||10);
   const raw  = Math.round(mPx * 96 / 0.0254);
@@ -245,11 +261,13 @@ function _relColetarImoveis() {
 // ── Monta dados de um imóvel (usa caches existentes) ─────────────────────
 
 async function _montarDadosRelatorio(feat) {
-  const p    = feat.properties || {};
-  const cod  = p.cod_imovel;
-  const local= _carDadosLocais?.get?.(cod) || {};
-  const pr   = _carProdesCache?.get?.(cod);
-  const diag = _carDiagCache?.get?.(cod);
+  const p       = feat.properties || {};
+  const cod     = p.cod_imovel;
+  const rawLocal= _carDadosLocais?.get?.(cod);   // null/undefined se fora da planilha
+  const local   = rawLocal || {};
+  const naPlanilha = !!rawLocal;
+  const pr      = _carProdesCache?.get?.(cod);
+  const diag    = _carDiagCache?.get?.(cod);
 
   // Geometria / bbox
   let carPoly, bbox;
@@ -259,34 +277,48 @@ async function _montarDadosRelatorio(feat) {
     bbox = [bb[0], bb[1], bb[2], bb[3]];
   } catch(e) { bbox = [-73,-11,-66,-7]; }
 
-  const areaCAR = parseFloat(p.area || local.num_area_i || 0) || (carPoly ? turf.area(carPoly)/10000 : 0);
+  // Área declarada — prioriza planilha SICAR, depois WFS, depois cálculo (ponto 1)
+  let areaCAR, area_fonte;
+  if (local.num_area_i != null && parseFloat(local.num_area_i) > 0) { areaCAR = parseFloat(local.num_area_i); area_fonte = 'SICAR (planilha)'; }
+  else if (parseFloat(p.area) > 0)                                  { areaCAR = parseFloat(p.area);          area_fonte = 'SICAR (WFS)'; }
+  else                                                             { areaCAR = carPoly ? turf.area(carPoly)/10000 : 0; area_fonte = 'Calculada (geometria)'; }
+
+  const numModulo = parseFloat(local.num_modulo || p.num_modulo || 0);
+  const pequenaProp = numModulo > 0 && numModulo <= 4;
+  const totalGeral  = pr?.totalGeral || 0;
+  const haConsol    = pr?.haConsolidado || 0;
 
   return {
     // Identificação
     cod_imovel:   cod,
+    naPlanilha,                                      // ponto 6
     nom_imovel:   local.nom_imovel  || p.nome || cod,
     nome_compl:   local.nome_compl  || '',
     cpf_cnpj:     local.cpf_cnpj    || p.cpf_cnpj || '—',
     nom_munici:   local.nom_munici  || p.municipio || '—',
-    ind_status:   local.ind_status  || p.condicao  || '—',
+    ind_status:   _traduzStatusCAR(local.ind_status || p.condicao),  // ponto 5
+    condicao_analise: local.condicao_i || '',        // condição de análise (legível)
     nome_class:   local.nome_class  || '—',
-    num_modulo:   parseFloat(local.num_modulo || p.num_modulo || 0),
-    dat_criaca:   local.dat_criaca  || '—',
+    num_modulo:   numModulo,
+    dat_criaca:   _relDataBR(local.dat_criaca),      // ponto 5
     area_ha:      areaCAR,
-    pequenaPropriedade: parseFloat(local.num_modulo||0) > 0 && parseFloat(local.num_modulo||0) <= 4,
+    area_fonte,                                      // ponto 1
+    pequenaPropriedade: pequenaProp,
+    rlArt67:      pequenaProp,                        // ponto 2
 
     // PRODES (pode não estar carregado)
-    totalGeral_ha:   pr?.totalGeral    || 0,
-    haConsolidado:   pr?.haConsolidado || 0,
+    totalGeral_ha:   totalGeral,
+    haConsolidado:   haConsol,
+    haPos2008:       Math.max(0, totalGeral - haConsol),  // ponto 3
     haAutorizado:    pr?.haAutorizado  || 0,
     haAVerificar:    (pr?.haAVerificar||0) + (pr?.haIrregular||0),
     anosAnual:       pr?.anosAnual     || [],
     porAno:          pr?.anual?.porAno || {},
     geojsonFeatAnual:pr?.anual?.geojsonFeatures || [],
     geojsonFeatHist: pr?.historico?.geojsonFeatures || [],
-    exigenciaRL:     pr?.exigenciaRL   || areaCAR * 0.8,
-    florestaReman:   pr?.florestaRemanescente || Math.max(0, areaCAR - (pr?.totalGeral||0)),
-    deficitRL:       pr?.deficitRL     || 0,
+    exigenciaRL:     pequenaProp ? 0 : (pr?.exigenciaRL || areaCAR * 0.8),  // ponto 2
+    florestaReman:   pr?.florestaRemanescente || Math.max(0, areaCAR - totalGeral),
+    deficitRL:       pequenaProp ? 0 : (pr?.deficitRL || 0),                // ponto 2
     asvList:         pr?.asvList       || [],
     asvBase:         pr?.asvBase       || false,
 
@@ -378,7 +410,7 @@ function _htmlFolhaCapa(imoveis, cab, protocolo, modo, mapaId) {
           <tr><th>#</th><th>Nome</th><th>Código CAR</th><th>Município</th><th>Área (ha)</th><th>SICAR</th></tr>
           ${imoveis.map((d,i)=>`<tr>
             <td>${i+1}</td>
-            <td>${_relEsc(d.nom_imovel)}</td>
+            <td>${_relEsc(d.nom_imovel)}${!d.naPlanilha?' <span style="color:#d97706;font-size:7px">⚠ fora da planilha</span>':''}</td>
             <td style="font-family:monospace;font-size:8px">${_relEsc(d.cod_imovel)}</td>
             <td>${_relEsc(d.nom_munici)}</td>
             <td>${_relF2(d.area_ha)}</td>
@@ -467,16 +499,16 @@ function _htmlFolhaSintetica(d, cab, protocolo, idx, total, multi) {
 
       <!-- KPIs -->
       <div class="rel-kpi-grid">
-        <div class="rel-kpi kpi-lrnj"><div class="kl">Área declarada</div><div class="kv">${_relF2(d.area_ha)}<span style="font-size:9px"> ha</span></div><div class="ks">Fonte: SICAR</div></div>
-        <div class="rel-kpi ${d.totalGeral_ha>0?'kpi-verm':'kpi-verde'}"><div class="kl">Desmatamento total</div><div class="kv">${_relF2(d.totalGeral_ha)}<span style="font-size:9px"> ha</span></div><div class="ks">PRODES/INPE · ${pctDesMat}%</div></div>
-        <div class="rel-kpi ${d.deficitRL>0?'kpi-verm':'kpi-verde'}"><div class="kl">Déficit Reserva Legal</div><div class="kv">${_relF2(d.deficitRL)}<span style="font-size:9px"> ha</span></div><div class="ks">Exig. 80% = ${_relF2(d.exigenciaRL)} ha</div></div>
+        <div class="rel-kpi kpi-lrnj"><div class="kl">Área declarada</div><div class="kv">${_relF2(d.area_ha)}<span style="font-size:9px"> ha</span></div><div class="ks">Fonte: ${_relEsc(d.area_fonte)}</div></div>
+        <div class="rel-kpi ${d.totalGeral_ha>0?'kpi-verm':'kpi-verde'}"><div class="kl">Supressão total detectada</div><div class="kv">${_relF2(d.totalGeral_ha)}<span style="font-size:9px"> ha</span></div><div class="ks">PRODES/INPE · ${pctDesMat}% · inclui consolidado</div></div>
+        <div class="rel-kpi ${d.rlArt67||d.deficitRL<=0?'kpi-verde':'kpi-verm'}"><div class="kl">Déficit Reserva Legal</div><div class="kv">${d.rlArt67?'N/A':_relF2(d.deficitRL)}<span style="font-size:9px">${d.rlArt67?'':' ha'}</span></div><div class="ks">${d.rlArt67?'Art. 67 — pequena propr.':'Exig. 80% = '+_relF2(d.exigenciaRL)+' ha'}</div></div>
         <div class="rel-kpi ${d.focosTotal>0?'kpi-lrnj':'kpi-verde'}"><div class="kl">Focos de calor</div><div class="kv">${d.focosTotal}</div><div class="ks">${d.focosMin&&d.focosMax?d.focosMin+'–'+d.focosMax:'—'}</div></div>
       </div>
       <!-- Conformidade -->
       <div class="rel-conf-grid">
         <div class="rel-conf conf-cons"><div class="cl">🟡 Consolidado pré-2008</div><div class="cv">${_relF2(d.haConsolidado)} ha</div><div class="cs">Art. 61-A CF · ${_relPct(d.haConsolidado,d.totalGeral_ha)}%</div></div>
         <div class="rel-conf conf-aut" ><div class="cl">✅ Autorizado (ASV)</div><div class="cv">${_relF2(d.haAutorizado)} ha</div><div class="cs">Arts. 26-27 CF · ${_relPct(d.haAutorizado,d.totalGeral_ha)}%</div></div>
-        <div class="rel-conf conf-il"  ><div class="cl">🔴 A verificar / Ilegal</div><div class="cv">${_relF2(d.haAVerificar)} ha</div><div class="cs">Art. 38 CF · ${_relPct(d.haAVerificar,d.totalGeral_ha)}%</div></div>
+        <div class="rel-conf conf-il"  ><div class="cl">${d.asvBase?'🔴 A verificar / Ilegal':'🟠 A verificar'}</div><div class="cv">${_relF2(d.haAVerificar)} ha</div><div class="cs">${d.asvBase?'Art. 38 CF':'Base ASV indisp.'} · ${_relPct(d.haAVerificar,d.totalGeral_ha)}%</div></div>
       </div>
 
       <!-- Mapas lado a lado -->
@@ -527,15 +559,15 @@ function _htmlFolhasDetalhadas(d, cab, protocolo, idx, total, multi) {
       </div>
 
       <div class="rel-kpi-grid">
-        <div class="rel-kpi kpi-lrnj"><div class="kl">Área declarada</div><div class="kv">${_relF2(d.area_ha)}<span style="font-size:9px"> ha</span></div><div class="ks">SICAR</div></div>
-        <div class="rel-kpi ${d.totalGeral_ha>0?'kpi-verm':'kpi-verde'}"><div class="kl">Desmatamento total</div><div class="kv">${_relF2(d.totalGeral_ha)}<span style="font-size:9px"> ha</span></div><div class="ks">PRODES/INPE · ${_relPct(d.totalGeral_ha,d.area_ha)}%</div></div>
-        <div class="rel-kpi ${d.deficitRL>0?'kpi-verm':'kpi-verde'}"><div class="kl">Déficit Reserva Legal</div><div class="kv">${_relF2(d.deficitRL)}<span style="font-size:9px"> ha</span></div><div class="ks">Exig. 80% = ${_relF2(d.exigenciaRL)} ha</div></div>
+        <div class="rel-kpi kpi-lrnj"><div class="kl">Área declarada</div><div class="kv">${_relF2(d.area_ha)}<span style="font-size:9px"> ha</span></div><div class="ks">${_relEsc(d.area_fonte)}</div></div>
+        <div class="rel-kpi ${d.totalGeral_ha>0?'kpi-verm':'kpi-verde'}"><div class="kl">Supressão total detectada</div><div class="kv">${_relF2(d.totalGeral_ha)}<span style="font-size:9px"> ha</span></div><div class="ks">PRODES/INPE · ${_relPct(d.totalGeral_ha,d.area_ha)}% · inclui consolidado</div></div>
+        <div class="rel-kpi ${d.rlArt67||d.deficitRL<=0?'kpi-verde':'kpi-verm'}"><div class="kl">Déficit Reserva Legal</div><div class="kv">${d.rlArt67?'N/A':_relF2(d.deficitRL)}<span style="font-size:9px">${d.rlArt67?'':' ha'}</span></div><div class="ks">${d.rlArt67?'Art. 67 — pequena propr.':'Exig. 80% = '+_relF2(d.exigenciaRL)+' ha'}</div></div>
         <div class="rel-kpi ${d.focosTotal>0?'kpi-lrnj':'kpi-verde'}"><div class="kl">Focos de calor</div><div class="kv">${d.focosTotal}</div><div class="ks">${d.focosMin&&d.focosMax?d.focosMin+'–'+d.focosMax:'—'}</div></div>
       </div>
       <div class="rel-conf-grid">
         <div class="rel-conf conf-cons"><div class="cl">🟡 Consolidado pré-2008</div><div class="cv">${_relF2(d.haConsolidado)} ha</div><div class="cs">Art. 61-A CF</div></div>
         <div class="rel-conf conf-aut"><div class="cl">✅ Autorizado (ASV)</div><div class="cv">${_relF2(d.haAutorizado)} ha</div><div class="cs">Arts. 26-27 CF</div></div>
-        <div class="rel-conf conf-il"><div class="cl">🔴 A verificar / Ilegal</div><div class="cv">${_relF2(d.haAVerificar)} ha</div><div class="cs">Art. 38 CF</div></div>
+        <div class="rel-conf conf-il"><div class="cl">${d.asvBase?'🔴 A verificar / Ilegal':'🟠 A verificar'}</div><div class="cv">${_relF2(d.haAVerificar)} ha</div><div class="cs">${d.asvBase?'Art. 38 CF':'Base ASV indisp.'}</div></div>
       </div>
 
       <div class="rel-secao">
@@ -546,11 +578,13 @@ function _htmlFolhasDetalhadas(d, cab, protocolo, idx, total, multi) {
           ${d.nome_compl?`<tr><td>Proprietário</td><td>${_relEsc(d.nome_compl)}</td></tr>`:''}
           <tr><td>CPF/CNPJ</td><td>${_relEsc(d.cpf_cnpj)}</td></tr>
           <tr><td>Município</td><td>${_relEsc(d.nom_munici)} — Acre</td></tr>
-          <tr><td>Área declarada</td><td>${_relF2(d.area_ha)} ha</td></tr>
+          <tr><td>Área declarada</td><td>${_relF2(d.area_ha)} ha <span style="color:#9ca3af">(${_relEsc(d.area_fonte)})</span></td></tr>
           <tr><td>Módulos fiscais</td><td>${d.num_modulo>0?_relF1(d.num_modulo)+' módulos'+(d.pequenaPropriedade?' (pequena propriedade — Art. 67 CF)':''):'—'}</td></tr>
           <tr><td>Situação CAR</td><td>${_relEsc(d.ind_status)}</td></tr>
+          ${d.condicao_analise?`<tr><td>Condição (análise)</td><td>${_relEsc(d.condicao_analise)}</td></tr>`:''}
           <tr><td>Classificação SICAR</td><td>${d.nome_class==='Vermelho'?'<strong style="color:#dc2626">🔴 Vermelho — Art. 78-A CF aplicável</strong>':_relEsc(d.nome_class)}</td></tr>
           ${d.dat_criaca&&d.dat_criaca!=='—'?`<tr><td>Data de cadastro</td><td>${_relEsc(d.dat_criaca)}</td></tr>`:''}
+          ${!d.naPlanilha?`<tr><td>Cadastro local</td><td><strong style="color:#d97706">⚠️ Imóvel não consta na planilha SICAR local — proprietário e CPF/CNPJ não disponíveis</strong></td></tr>`:''}
           ${d.emUC?`<tr><td>Sobreposição com UC</td><td><strong style="color:#d97706">⚠️ ${_relEsc(d.ucNome||'UC do Acre')} — ${_relF2(d.areaUC)} ha sobrepostos</strong></td></tr>`:''}
         </table>
       </div>
@@ -609,15 +643,17 @@ function _htmlFolhasDetalhadas(d, cab, protocolo, idx, total, multi) {
       <div class="rel-secao">
         <div class="rel-secao-titulo">3. Análise de Desmatamento — PRODES/INPE</div>
         ${d.prodesCarregado ? `
-        <div style="font-size:8px;color:#9ca3af;margin-bottom:6px">✅ autorizado · 🟠 irregular · 🔴 ilegal/a verificar · ⚠️ foco de calor no mesmo ano</div>
+        <div style="font-size:8px;color:#9ca3af;margin-bottom:6px">✅ autorizado · 🟠 irregular · 🔴 ${d.asvBase?'ilegal/a verificar':'a verificar'} · ⚠️ foco de calor no mesmo ano</div>
         <div class="rel-barras">${barrasProdes||'<div style="font-size:9px;color:#9ca3af">Nenhum polígono PRODES detectado.</div>'}</div>
         <table class="rel-table rel-table-sm" style="margin-top:8px">
           <tr><th>Categoria</th><th>Área (ha)</th><th>% da área</th><th>Base legal</th></tr>
-          <tr><td>Acumulado pré-2008</td><td>${_relF2(d.haConsolidado)}</td><td>${_relPct(d.haConsolidado,d.area_ha)}%</td><td>Art. 61-A CF</td></tr>
-          <tr><td>Autorizado (ASV)</td><td>${_relF2(d.haAutorizado)}</td><td>${_relPct(d.haAutorizado,d.area_ha)}%</td><td>Arts. 26-27 CF</td></tr>
-          <tr><td>A verificar / Ilegal</td><td>${_relF2(d.haAVerificar)}</td><td>${_relPct(d.haAVerificar,d.area_ha)}%</td><td>Art. 38 CF</td></tr>
-          <tr><td><strong>Total</strong></td><td><strong>${_relF2(d.totalGeral_ha)}</strong></td><td><strong>${_relPct(d.totalGeral_ha,d.area_ha)}%</strong></td><td>—</td></tr>
-        </table>`:`<div style="font-size:10px;color:#9ca3af;padding:8px 0">⚠️ Dados PRODES não carregados — acesse a aba 🌳 PRODES antes de gerar o relatório.</div>`}
+          <tr><td>Acumulado pré-2008 (consolidado)</td><td>${_relF2(d.haConsolidado)}</td><td>${_relPct(d.haConsolidado,d.area_ha)}%</td><td>Art. 61-A CF</td></tr>
+          <tr><td>Autorizado por ASV (pós-2008)</td><td>${_relF2(d.haAutorizado)}</td><td>${_relPct(d.haAutorizado,d.area_ha)}%</td><td>Arts. 26-27 CF</td></tr>
+          <tr><td>${d.asvBase?'A verificar / Ilegal (pós-2008)':'A verificar — sem base ASV (pós-2008)'}</td><td>${_relF2(d.haAVerificar)}</td><td>${_relPct(d.haAVerificar,d.area_ha)}%</td><td>${d.asvBase?'Art. 38 CF':'—'}</td></tr>
+          <tr style="background:#fafafa"><td><em>Subtotal pós-2008</em></td><td><em>${_relF2(d.haPos2008)}</em></td><td><em>${_relPct(d.haPos2008,d.area_ha)}%</em></td><td><em>Arts. 26-38 CF</em></td></tr>
+          <tr><td><strong>Supressão total detectada</strong></td><td><strong>${_relF2(d.totalGeral_ha)}</strong></td><td><strong>${_relPct(d.totalGeral_ha,d.area_ha)}%</strong></td><td>—</td></tr>
+        </table>
+        <div style="font-size:7px;color:#9ca3af;margin-top:3px">Obs.: a supressão total inclui a área consolidada pré-2008 (regularizável — Art. 61-A); somente a parcela pós-2008 sem ASV configura potencial infração.${d.asvBase?'':' Base de ASV (SINAFLOR) indisponível — parcela classificada como "a verificar".'}</div>`:`<div style="font-size:10px;color:#9ca3af;padding:8px 0">⚠️ Dados PRODES não carregados — acesse a aba 🌳 PRODES antes de gerar o relatório.</div>`}
       </div>
 
       <div class="rel-secao">
@@ -655,7 +691,7 @@ function _htmlFolhasDetalhadas(d, cab, protocolo, idx, total, multi) {
   // ── FOLHA 3: Reserva Legal + Narrativa + Conclusão ─────────────────────
   const narrativa = _gerarNarrativaJuridica(d);
   const rec       = _gerarRecomendacao(d);
-  const pctRL     = Math.min(100, d.florestaReman > 0 ? Math.round(d.florestaReman/d.exigenciaRL*100) : 0);
+  const pctRL     = (d.exigenciaRL > 0 && d.florestaReman > 0) ? Math.min(100, Math.round(d.florestaReman / d.exigenciaRL * 100)) : 0;
 
   const f3 = `
   <div class="rel-a4">
@@ -663,11 +699,19 @@ function _htmlFolhasDetalhadas(d, cab, protocolo, idx, total, multi) {
     <div class="rel-body">
       <div class="rel-secao">
         <div class="rel-secao-titulo">6. Reserva Legal — Art. 12, I · Lei 12.651/2012</div>
-        <div style="font-size:9px;color:#6b7280;margin-bottom:8px">Amazônia: exigência de 80% da área total cadastrada${d.pequenaPropriedade?' · Pequena propriedade (Art. 67 CF — regras diferenciadas)':''}</div>
+        ${d.rlArt67 ? `
+        <div style="font-size:9px;color:#6b7280;margin-bottom:8px">Pequena propriedade rural (${_relF1(d.num_modulo)} módulos fiscais ≤ 4). Pelo <strong>Art. 67 da Lei 12.651/2012</strong>, a Reserva Legal corresponde à vegetação nativa existente em 22/07/2008, <strong>sem exigência de recomposição</strong> — não se aplica o percentual de 80%.</div>
+        <table class="rel-table" style="margin-bottom:10px">
+          <tr><td>Área total declarada</td><td><strong>${_relF2(d.area_ha)} ha</strong></td></tr>
+          <tr><td>Supressão total detectada (PRODES)</td><td><strong style="color:#dc2626">${_relF2(d.totalGeral_ha)} ha</strong></td></tr>
+          <tr><td>Floresta remanescente (estimada)</td><td><strong style="color:#16a34a">${_relF2(d.florestaReman)} ha</strong></td></tr>
+          <tr><td>Exigência de recomposição</td><td><strong style="color:#16a34a">Não aplicável (Art. 67 CF)</strong></td></tr>
+        </table>` : `
+        <div style="font-size:9px;color:#6b7280;margin-bottom:8px">Amazônia: exigência de 80% da área total cadastrada (Art. 12, I).</div>
         <table class="rel-table" style="margin-bottom:10px">
           <tr><td>Área total declarada</td><td><strong>${_relF2(d.area_ha)} ha</strong></td></tr>
           <tr><td>Exigência de Reserva Legal (80%)</td><td><strong>${_relF2(d.exigenciaRL)} ha</strong></td></tr>
-          <tr><td>Desmatamento total detectado</td><td><strong style="color:#dc2626">${_relF2(d.totalGeral_ha)} ha</strong></td></tr>
+          <tr><td>Supressão total detectada</td><td><strong style="color:#dc2626">${_relF2(d.totalGeral_ha)} ha</strong></td></tr>
           <tr><td>Floresta remanescente (estimada)</td><td><strong style="color:#16a34a">${_relF2(d.florestaReman)} ha</strong></td></tr>
           <tr><td>Déficit de Reserva Legal</td><td><strong style="${d.deficitRL>0?'color:#dc2626':'color:#16a34a'}">${_relF2(d.deficitRL)} ha${d.deficitRL<=0?' (sem déficit)':''}</strong></td></tr>
         </table>
@@ -678,7 +722,7 @@ function _htmlFolhasDetalhadas(d, cab, protocolo, idx, total, multi) {
         <div style="display:flex;justify-content:space-between;font-size:7px;color:#9ca3af">
           <span>Remanescente: ${_relF2(d.florestaReman)} ha</span>
           ${d.deficitRL>0?`<span style="color:#dc2626">Déficit: ${_relF2(d.deficitRL)} ha</span>`:'<span style="color:#16a34a">✅ Sem déficit</span>'}
-        </div>
+        </div>`}
       </div>
 
       <div class="rel-secao">
@@ -692,10 +736,10 @@ function _htmlFolhasDetalhadas(d, cab, protocolo, idx, total, multi) {
       <div class="rel-secao">
         <div class="rel-secao-titulo">8. Conclusão e Recomendação</div>
         <table class="rel-table rel-table-sm">
-          <tr><th colspan="2" style="background:${d.haAVerificar>0?'#991b1b':d.deficitRL>0?'#92400e':'#166534'}">
-            ${d.haAVerificar>0?'Situação de Não Conformidade — Ação Recomendada':d.deficitRL>0?'Regularização Pendente':'Situação Regular'}
+          <tr><th colspan="2" style="background:${d.haAVerificar>0&&d.asvBase?'#991b1b':d.haAVerificar>0||d.deficitRL>0?'#92400e':'#166534'}">
+            ${d.haAVerificar>0&&d.asvBase?'Situação de Não Conformidade — Ação Recomendada':d.haAVerificar>0?'Pendente de Verificação — confirmar ASV (SINAFLOR)':d.deficitRL>0?'Regularização Pendente':'Situação Regular'}
           </th></tr>
-          <tr><td>Prioridade</td><td>${d.haAVerificar>0&&d.focosCorrelAnos.length?'🔴 Alta':'🟡 Média'}</td></tr>
+          <tr><td>Prioridade</td><td>${d.haAVerificar>0&&d.asvBase&&d.focosCorrelAnos.length?'🔴 Alta':d.haAVerificar>0?'🟡 Média':'🟢 Baixa'}</td></tr>
           <tr><td>Recomendação</td><td>${rec}</td></tr>
           ${d.nome_class==='Vermelho'?`<tr><td>Crédito rural</td><td>Art. 78-A CF: restrição aplicável até regularização</td></tr>`:''}
         </table>
@@ -733,12 +777,14 @@ function _gerarNarrativaJuridica(d) {
     : `Dos ${pos} suprimidos após 2008, nenhuma autorização de supressão (ASV) foi localizada na base local — situação a verificar junto ao IBAMA/SEMA-AC (Arts. 26-27, Lei 12.651/2012).`;
 
   let focoTxt = nFoc > 0
-    ? `Foram detectados <strong>${nFoc}</strong> focos de calor dentro do imóvel${d.focosMin?` entre ${d.focosMin} e ${d.focosMax}`:''}${nCorr>0?`, com <strong>correlação temporal em ${nCorr} ano(s)</strong> com polígonos de desmatamento PRODES — indício de incêndio associado a supressão ilegal`:'.'}`
+    ? `Foram detectados <strong>${nFoc}</strong> focos de calor dentro do imóvel${d.focosMin?` entre ${d.focosMin} e ${d.focosMax}`:''}${nCorr>0?`, com <strong>correlação temporal em ${nCorr} ano(s)</strong> com polígonos de desmatamento PRODES — indício de incêndio associado a supressão ${d.asvBase?'ilegal':'a verificar'}`:'.'}`
     : 'Não foram detectados focos de calor históricos dentro do imóvel na base atual.';
 
-  let rlTxt = d.deficitRL > 0
-    ? `O imóvel apresenta <strong>déficit estimado de Reserva Legal de ${_relF2(d.deficitRL)} ha</strong> (exigência: 80% = ${_relF2(d.exigenciaRL)} ha — Art. 12, I, CF${d.pequenaPropriedade?'; pequena propriedade — Art. 67 CF':''}).`
-    : `A cobertura remanescente estimada atende à exigência de Reserva Legal de 80% (Art. 12, I, CF${d.pequenaPropriedade?'; pequena propriedade — Art. 67 CF':''}).`;
+  let rlTxt = d.rlArt67
+    ? `Por se tratar de pequena propriedade rural (≤4 módulos fiscais), aplica-se o <strong>Art. 67 da Lei 12.651/2012</strong>: a Reserva Legal corresponde à vegetação nativa existente em 22/07/2008, sem exigência de recomposição.`
+    : d.deficitRL > 0
+      ? `O imóvel apresenta <strong>déficit estimado de Reserva Legal de ${_relF2(d.deficitRL)} ha</strong> (exigência: 80% = ${_relF2(d.exigenciaRL)} ha — Art. 12, I, CF).`
+      : `A cobertura remanescente estimada atende à exigência de Reserva Legal de 80% (Art. 12, I, CF).`;
 
   let sicarTxt = d.nome_class === 'Vermelho'
     ? `O imóvel está classificado como <strong>Vermelho</strong> no SICAR — <strong>Art. 78-A CF: restrição de crédito rural aplicável</strong>.`
@@ -751,7 +797,9 @@ function _gerarRecomendacao(d) {
   if (!d.prodesCarregado) return 'Carregar dados PRODES antes de gerar o relatório para análise completa.';
   if (d.totalGeral_ha === 0) return 'Imóvel sem registro de desmatamento no PRODES — manter monitoramento periódico.';
   if (d.haAVerificar > 0 && d.focosCorrelAnos.length > 0)
-    return `Instaurar procedimento administrativo — desmatamento ilegal correlacionado com focos de calor (Arts. 38 e 50 CF). Verificar necessidade de embargo e PRA (Arts. 59-68 CF)${d.nome_class==='Vermelho'?' · Restrição de crédito rural (Art. 78-A CF)':''}.`;
+    return d.asvBase
+      ? `Instaurar procedimento administrativo — desmatamento ilegal correlacionado com focos de calor (Arts. 38 e 50 CF). Verificar necessidade de embargo e PRA (Arts. 59-68 CF)${d.nome_class==='Vermelho'?' · Restrição de crédito rural (Art. 78-A CF)':''}.`
+      : `Priorizar verificação de ASV no SINAFLOR e fiscalização in loco — supressão pós-2008 correlacionada com focos de calor (a confirmar). Avaliar embargo/PRA (Arts. 59-68 CF)${d.nome_class==='Vermelho'?' · Art. 78-A CF':''}.`;
   if (d.haAVerificar > 0)
     return `Verificar ASVs vigentes no SINAFLOR${d.asvBase?'':' (base local vazia)'}. Desmatamento pós-2008 sem autorização configura infração (Art. 38 CF). Avaliar PRA (Arts. 59-68 CF).`;
   if (d.deficitRL > 0 && !d.pequenaPropriedade)
