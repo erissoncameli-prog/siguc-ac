@@ -422,16 +422,11 @@ body.mapa-imersivo .page-body{animation:none!important;transform:none!important;
 <script src="https://unpkg.com/leaflet-minimap@3.6.1/dist/Control.MiniMap.min.js"></script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css"/>
 <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
-<!-- Turf.js (bundle UMD completo). Versão fixada + fallback de CDN: a tag
-     flutuante (@6) chegou a entregar um bundle parcial, deixando
-     turf.bbox/intersect/booleanIntersects indefinidos e quebrando o filtro
-     de CAR por UC, o diagnóstico e o PRODES. -->
-<script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js"></script>
-<script>
-  if(typeof turf==='undefined' || typeof turf.bbox!=='function'){
-    document.write('<scr'+'ipt src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"><\/scr'+'ipt>');
-  }
-</script>
+<!-- Turf.js (bundle UMD completo) servido localmente. O CDN chegou a
+     entregar bundle parcial/ausente (turf.bbox/booleanIntersects
+     indefinidos), quebrando o filtro de CAR por UC, o diagnóstico e o
+     PRODES. Vendorizado em js/vendor para eliminar a dependência de CDN. -->
+<script src="../js/vendor/turf-6.5.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <script src="https://unpkg.com/shpjs@4.0.4/dist/shp.js"></script>
 <script src="../js/mapa-cartografia.js"></script>
