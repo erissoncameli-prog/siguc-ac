@@ -1947,6 +1947,21 @@ function _renderDropdown(id){
 
       <div id="alertas-mapa-stat" style="font-size:10px;color:var(--cinza-400)"></div>
       <div id="focos-mapa-stat" style="font-size:10px;color:var(--cinza-400)"></div>
+      ${['super_admin','gestor'].includes(appState.perfil) ? `
+      <div style="border-top:1px solid var(--cinza-100);padding-top:10px;margin-top:4px">
+        <button id="btn-testar-mapa" onclick="testarFontesMapaAPI()" style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:600;font-family:inherit;background:#f0fdf4;border:1px solid #86efac;color:#166534;border-radius:var(--raio);padding:5px 10px;cursor:pointer;width:100%">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          Testar APIs
+        </button>
+        <div id="diag-panel-mapa" style="display:none;background:#f9fafb;border:1px solid var(--borda);border-radius:8px;padding:10px;margin-top:8px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+            <span style="font-size:11px;font-weight:700;color:var(--cinza-800)">Diagnóstico de Fontes</span>
+            <button onclick="document.getElementById('diag-panel-mapa').style.display='none'" style="border:none;background:none;cursor:pointer;color:var(--cinza-400);font-size:14px;line-height:1">✕</button>
+          </div>
+          <div id="diag-body-mapa" style="font-size:11px;color:var(--cinza-600)">Testando…</div>
+        </div>
+      </div>
+      ` : ''}
       <a href="../pages/alertas-ambientais.html" style="font-size:11px;color:var(--verde-c);text-decoration:none;font-weight:600">→ Ver página completa de alertas</a>
     </div>
   ` + foot;
@@ -6790,6 +6805,77 @@ async function _prefsFlush(){
 function _prefsAgendarSalvamento(){
   clearTimeout(_prefsSyncTimer);
   _prefsSyncTimer = setTimeout(_prefsFlush, 4000);
+}
+
+// ── Diagnóstico de fontes de alertas (botão "Testar APIs" na aba Alertas) ──
+async function testarFontesMapaAPI(){
+  const btn   = document.getElementById('btn-testar-mapa');
+  const panel = document.getElementById('diag-panel-mapa');
+  const body  = document.getElementById('diag-body-mapa');
+  if(!panel || !body) return;
+  panel.style.display = 'block';
+  body.innerHTML = 'Testando APIs (pode levar até 30 s)…';
+  if(btn) btn.disabled = true;
+
+  const [diag, coletas] = await Promise.all([
+    db.functions.invoke('monitorar-alertas', { method: 'POST', body: { check: true } }),
+    _ultimasColetasMapaAPI(),
+  ]);
+
+  if(btn) btn.disabled = false;
+
+  if(diag.error || !diag.data?.fontes){
+    body.innerHTML = `<div style="color:#DC2626">Falha: ${escHtml(diag.error?.message ?? 'resposta inesperada')}</div>`;
+    return;
+  }
+  const f = diag.data.fontes;
+  const linhas = [
+    ['🛰 FIRMS / NASA',       f.firms,       coletas.FIRMS,       'focos de calor'],
+    ['🌳 DETER / INPE',       f.deter,       coletas.DETER,       'desmatamento'],
+    ['🔥 BDQueimadas / INPE', f.bdqueimadas, coletas.BDQUEIMADAS, 'focos'],
+  ];
+  const fmtData = d => d ? new Date(d).toLocaleString('pt-BR',{timeZone:'America/Rio_Branco',day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '—';
+  body.innerHTML = `
+    <div style="overflow-x:auto">
+    <table style="width:100%;border-collapse:collapse;font-size:10px">
+      <thead><tr style="text-align:left;color:#9CA3AF;text-transform:uppercase;font-size:9px;letter-spacing:.05em">
+        <th style="padding:4px 5px">Fonte</th><th style="padding:4px 5px">Status</th>
+        <th style="padding:4px 5px">Reg.</th><th style="padding:4px 5px">Última coleta</th>
+      </tr></thead>
+      <tbody>
+      ${linhas.map(([nome, st, ult, tipo]) => {
+        const ok  = st?.ok;
+        const cor = ok ? '#059669' : '#DC2626';
+        const err = !ok && st?.erro ? `<div style="color:#DC2626;font-size:9px">${escHtml(String(st.erro).slice(0,80))}</div>` : '';
+        return `<tr style="border-top:1px solid #f1f1f1">
+          <td style="padding:5px;font-weight:600">${nome}<div style="color:#9CA3AF;font-weight:400;font-size:9px">${tipo}</div></td>
+          <td style="padding:5px;color:${cor};font-weight:700">${ok ? '🟢 OK' : '🔴 Falha'}${err}</td>
+          <td style="padding:5px">${st?.registros ?? 0}</td>
+          <td style="padding:5px">${fmtData(ult)}</td>
+        </tr>`;
+      }).join('')}
+      </tbody>
+    </table>
+    </div>
+    <div style="font-size:9px;color:#9CA3AF;margin-top:6px">
+      Dry-run — não grava nem envia e-mail.
+      ${diag.data.firms_key_configurada === false ? ' ⚠ FIRMS_MAP_KEY não configurada (usando fallback).' : ''}
+    </div>`;
+}
+
+async function _ultimasColetasMapaAPI(){
+  const out = { FIRMS: null, DETER: null, BDQUEIMADAS: null };
+  try{
+    const [{ data: deter }, { data: firms }, { data: bdq }] = await Promise.all([
+      db.from('alertas_ambientais').select('data_deteccao').eq('fonte','DETER').order('data_deteccao',{ascending:false}).limit(1),
+      db.from('focos_calor').select('data_hora').eq('fonte','FIRMS').order('data_hora',{ascending:false}).limit(1),
+      db.from('focos_calor').select('data_hora').eq('fonte','BDQUEIMADAS').order('data_hora',{ascending:false}).limit(1),
+    ]);
+    out.DETER       = deter?.[0]?.data_deteccao ?? null;
+    out.FIRMS       = firms?.[0]?.data_hora     ?? null;
+    out.BDQUEIMADAS = bdq?.[0]?.data_hora       ?? null;
+  }catch(e){ console.warn('coletas-mapa', e); }
+  return out;
 }
 </script>
 <div id="malerta-overlay" onclick="fecharAnaliseAlertaMapa()" style="display:none;position:fixed;inset:0;z-index:640;background:rgba(0,0,0,.2)"></div>
