@@ -18,6 +18,125 @@ function _calcularEscalaLeaflet(zoom, lat) {
   return `1:${nearest.toLocaleString('pt-BR')}`;
 }
 
+// ── Cartografia ABNT/IBGE: UTM SIRGAS 2000, grid, norte, legenda, inset ────
+
+// Seta de norte cartográfica (Web Mercator é norte-acima, sem rotação)
+const _SETA_NORTE = `<svg viewBox="0 0 22 26" width="20" height="24" aria-label="Norte">
+  <polygon points="11,1 17,15 11,11 5,15" fill="#0A1A0F"/>
+  <polygon points="11,1 11,11 5,15" fill="#4b5563"/>
+  <text x="11" y="25" text-anchor="middle" font-size="8" font-weight="700" fill="#0A1A0F" font-family="Arial">N</text>
+</svg>`;
+
+const _utmZone   = lon => Math.floor((lon + 180) / 6) + 1;
+const _utmDef    = zone => `+proj=utm +zone=${zone} +south +ellps=GRS80 +towgs84=0,0,0 +units=m +no_defs`;
+const _epsgUTM   = zone => 31960 + zone; // SIRGAS 2000 / UTM Sul: 18S=31978, 19S=31979, 20S=31980
+const _temProj4  = () => typeof proj4 !== 'undefined';
+const _toUTM     = (lon, lat, zone) => proj4('EPSG:4326', _utmDef(zone), [lon, lat]);
+const _fromUTM   = (e, n, zone)     => proj4(_utmDef(zone), 'EPSG:4326', [e, n]);
+function _zonaImovel(d){ return _utmZone((d?.centroide && d.centroide[0]) || -69); }
+
+function _niceStep(span, alvo = 4) {
+  const raw = Math.max(span / alvo, 1);
+  const pot = Math.pow(10, Math.floor(Math.log10(raw)));
+  const n = raw / pot;
+  return (n < 1.5 ? 1 : n < 3 ? 2 : n < 7 ? 5 : 10) * pot;
+}
+
+// Desenha a quadrícula UTM (linhas + rótulos nas bordas) sobre um mapa Leaflet
+function _desenharGridUTM(map, zone) {
+  if (!_temProj4()) return null;
+  const grp = L.layerGroup().addTo(map);
+  const b = map.getBounds();
+  const cantos = [b.getSouthWest(), b.getNorthWest(), b.getNorthEast(), b.getSouthEast()]
+    .map(ll => _toUTM(ll.lng, ll.lat, zone));
+  const Es = cantos.map(c => c[0]), Ns = cantos.map(c => c[1]);
+  const minE = Math.min(...Es), maxE = Math.max(...Es);
+  const minN = Math.min(...Ns), maxN = Math.max(...Ns);
+  const step = Math.max(_niceStep(maxE - minE), _niceStep(maxN - minN));
+  const NS = 24; // amostras p/ acompanhar a curvatura no Web Mercator
+  const estilo = { color: '#475569', weight: 0.5, opacity: 0.65, interactive: false, dashArray: '3 4' };
+  const lbl = (latlng, txt, pos) => L.marker(latlng, {
+    interactive: false, keyboard: false,
+    icon: L.divIcon({ className: 'rel-grid-anchor', html: `<span class="rel-grid-lbl rel-grid-${pos}">${txt}</span>`, iconSize: [0, 0] })
+  }).addTo(grp);
+  const fmt = m => (m / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 0 });
+
+  // Linhas verticais (Easting constante)
+  for (let e = Math.ceil(minE / step) * step; e <= maxE; e += step) {
+    const pts = [];
+    for (let k = 0; k <= NS; k++) { const n = minN + (maxN - minN) * k / NS; const ll = _fromUTM(e, n, zone); pts.push([ll[1], ll[0]]); }
+    L.polyline(pts, estilo).addTo(grp);
+    lbl(pts[pts.length - 1], fmt(e), 'topo');
+    lbl(pts[0], fmt(e), 'base');
+  }
+  // Linhas horizontais (Northing constante)
+  for (let n = Math.ceil(minN / step) * step; n <= maxN; n += step) {
+    const pts = [];
+    for (let k = 0; k <= NS; k++) { const e = minE + (maxE - minE) * k / NS; const ll = _fromUTM(e, n, zone); pts.push([ll[1], ll[0]]); }
+    L.polyline(pts, estilo).addTo(grp);
+    lbl(pts[0], fmt(n), 'esq');
+    lbl(pts[pts.length - 1], fmt(n), 'dir');
+  }
+  return grp;
+}
+
+// Legenda com amostras de cor fiéis às camadas
+function _legendaHTML(camadas) {
+  return (camadas || []).map(c => {
+    let sw;
+    if (c.kind === 'line') sw = `<span class="rel-leg-sw" style="height:0;width:14px;border-bottom:2px ${c.dash ? 'dashed' : 'solid'} ${c.color}"></span>`;
+    else if (c.kind === 'point') sw = `<span class="rel-leg-sw" style="width:8px;height:8px;border-radius:50%;background:${c.color}"></span>`;
+    else sw = `<span class="rel-leg-sw" style="width:13px;height:9px;background:${c.color}55;border:1px solid ${c.color}"></span>`;
+    return `<span class="rel-leg-item">${sw}${_relEsc(c.label)}</span>`;
+  }).join('');
+}
+
+// Inset de localização: contorno do Acre (SVG) + ponto do imóvel
+let _acreOutline = null;
+async function _carregarAcreOutline() {
+  if (_acreOutline !== null) return _acreOutline;
+  try { const r = await fetch('/data/acre_estado.geojson'); _acreOutline = await r.json(); }
+  catch (e) { _acreOutline = false; }
+  return _acreOutline;
+}
+function _insetAcreSVG(centroide) {
+  const g = _acreOutline;
+  if (!g || !centroide) return '';
+  // bbox do Acre
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  const rings = [];
+  const coletar = geom => {
+    const polys = geom.type === 'MultiPolygon' ? geom.coordinates : geom.type === 'Polygon' ? [geom.coordinates] : [];
+    polys.forEach(poly => poly.forEach(ring => {
+      rings.push(ring);
+      ring.forEach(([x, y]) => { if (x < minX) minX = x; if (x > maxX) maxX = x; if (y < minY) minY = y; if (y > maxY) maxY = y; });
+    }));
+  };
+  (g.features || []).forEach(f => f.geometry && coletar(f.geometry));
+  if (!isFinite(minX)) return '';
+  const W = 116, H = 78, pad = 4;
+  const sx = (W - 2 * pad) / (maxX - minX), sy = (H - 2 * pad) / (maxY - minY);
+  const s = Math.min(sx, sy);
+  const px = x => pad + (x - minX) * s;
+  const py = y => H - pad - (y - minY) * s; // inverte Y
+  const polys = rings.map(ring => `<polygon points="${ring.map(([x, y]) => px(x).toFixed(1) + ',' + py(y).toFixed(1)).join(' ')}" fill="#dcfce7" stroke="#166534" stroke-width="0.7"/>`).join('');
+  const cx = px(centroide[0]), cy = py(centroide[1]);
+  return `<div class="rel-inset-tit">Localização no Acre</div>
+    <svg viewBox="0 0 ${W} ${H}" width="100%" height="100%">${polys}
+      <circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="3.2" fill="#dc2626" stroke="#fff" stroke-width="1"/>
+    </svg>`;
+}
+
+// Legendas fiéis às camadas efetivamente desenhadas em cada mapa
+const _LEG_LOC = [{ label: 'Imóvel (CAR)', color: '#dc2626', kind: 'fill' }];
+const _LEG_DET = [
+  { label: 'Limite do imóvel (CAR)', color: '#1F4E2C', kind: 'line', dash: true },
+  { label: 'Desmat. autorizado',     color: '#16a34a', kind: 'fill' },
+  { label: 'Desmat. irregular',      color: '#f97316', kind: 'fill' },
+  { label: 'Desmat. ilegal/a verificar', color: '#dc2626', kind: 'fill' },
+  { label: 'Acumulado pré-2008',     color: '#c2410c', kind: 'fill' },
+];
+
 // ── Estado do modal ───────────────────────────────────────────────────────
 
 let _relEscopo = 'atual';  // 'atual' | 'marcados'
@@ -193,17 +312,18 @@ async function _montarDadosRelatorio(feat) {
 
 // ── Gera HTML de um mapa ABNT ─────────────────────────────────────────────
 
-function _htmlMapaABNT({ id, titulo, altura, escala, ref, fonte, camadas }) {
+function _htmlMapaABNT({ id, titulo, altura, fonte, camadas, zona }) {
+  const z = zona || 19;
   return `
   <div class="rel-mapa-wrap">
     <div class="rel-mapa-titulo">${_relEsc(titulo)}</div>
-    <div id="${id}" class="rel-mapa-div" style="height:${altura||240}px"></div>
+    <div id="${id}" class="rel-mapa-div" data-zona="${z}" style="height:${altura||240}px"></div>
     <div class="rel-mapa-rodape">
-      <div class="rel-mapa-norte">🧭</div>
-      <div class="rel-mapa-info"><strong>Escala</strong>${escala||'1:50.000'}</div>
-      <div class="rel-mapa-info"><strong>Ref. Geodésica</strong>SIRGAS 2000<br>Proj. Geográfica</div>
-      <div class="rel-mapa-legenda">${(camadas||[]).map(c=>`<span>${c}</span>`).join('')}</div>
-      <div class="rel-mapa-fonte">${_relEsc(fonte||'')}<br>Emitido: ${_relData()}</div>
+      <div class="rel-mapa-norte">${_SETA_NORTE}</div>
+      <div class="rel-mapa-info"><strong>Escala</strong><span id="${id}__esc">—</span></div>
+      <div class="rel-mapa-info"><strong>Sist. de Referência</strong>SIRGAS 2000<br>UTM ${z}S · EPSG:${_epsgUTM(z)}</div>
+      <div class="rel-mapa-legenda">${_legendaHTML(camadas)}</div>
+      <div class="rel-mapa-fonte">${_relEsc(fonte||'')}<br>Quadrícula UTM (km) · Emitido: ${_relData()}</div>
     </div>
   </div>`;
 }
@@ -267,8 +387,8 @@ function _htmlFolhaCapa(imoveis, cab, protocolo, modo, mapaId) {
         </table>
       </div>
       ${_htmlMapaABNT({ id: mapaId, titulo:'Mapa de Localização Geral — Todos os Imóveis', altura:320,
-        escala:'1:500.000', ref:'SIRGAS 2000', fonte:'SICAR/SFB · IBGE · OpenStreetMap',
-        camadas:['▬ Limite dos imóveis (colorido por SICAR)','■ Área de estudo'] })}
+        zona:_zonaImovel(imoveis[0]), fonte:'SICAR/SFB · IBGE · OpenStreetMap',
+        camadas:[{label:'Limite dos imóveis (CAR)', color:'#dc2626', kind:'line'}] })}
     </div>
     <div class="rel-pag-rodape">
       <span>${_relEsc(cab.secretaria)} · ${_relEsc(cab.siglaDiret)} · ${_relEsc(cab.siglaDep)}</span>
@@ -362,11 +482,9 @@ function _htmlFolhaSintetica(d, cab, protocolo, idx, total, multi) {
       <!-- Mapas lado a lado -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
         ${_htmlMapaABNT({ id: mapLocId, titulo:'Mapa 1 — Localização Regional', altura:200,
-          escala:'1:1.500.000', fonte:'IBGE · OpenStreetMap · SICAR/SFB',
-          camadas:['▬ Imóvel CAR (vermelho)','■ Município destacado'] })}
+          zona:_zonaImovel(d), fonte:'IBGE · OpenStreetMap · SICAR/SFB', camadas:_LEG_LOC })}
         ${_htmlMapaABNT({ id: mapDetId, titulo:'Mapa 2 — Detalhe do Imóvel', altura:200,
-          escala:'calculada', fonte:'PRODES/INPE · FIRMS/NASA · SICAR/SFB',
-          camadas:['▬ Limite CAR','■ PRODES (colorido CF)','● Focos calor'] })}
+          zona:_zonaImovel(d), fonte:'PRODES/INPE · SICAR/SFB', camadas:_LEG_DET })}
       </div>
 
       <!-- Recomendação -->
@@ -440,8 +558,8 @@ function _htmlFolhasDetalhadas(d, cab, protocolo, idx, total, multi) {
       <div class="rel-secao">
         <div class="rel-secao-subtitulo">Mapa 1 — Localização Regional</div>
         ${_htmlMapaABNT({ id: mapLocId, titulo:'Mapa de Localização — Estado do Acre · '+d.nom_munici, altura:230,
-          escala:'1:1.500.000', fonte:'IBGE · OpenStreetMap · SICAR/SFB · Elaborado: SIGUC-AC/SEMA-AC',
-          camadas:['▬ Imóvel CAR (vermelho)','■ Município de '+d.nom_munici,'▬ Limite do Acre'] })}
+          zona:_zonaImovel(d), fonte:'IBGE · OpenStreetMap · SICAR/SFB · Elaborado: SIGUC-AC/SEMA-AC',
+          camadas:_LEG_LOC })}
       </div>
     </div>
     <div class="rel-pag-rodape">
@@ -484,9 +602,8 @@ function _htmlFolhasDetalhadas(d, cab, protocolo, idx, total, multi) {
     <div class="rel-body">
       <div class="rel-secao">
         <div class="rel-secao-subtitulo">Mapa 2 — Detalhe do Imóvel com Camadas Temáticas</div>
-        ${_htmlMapaABNT({ id: mapDetId, titulo:'Mapa Temático — PRODES · Focos de Calor · Imóvel CAR', altura:280,
-          escala:'calculada', fonte:'PRODES/INPE · FIRMS/NASA · BDQueimadas · SICAR/SFB · Elaborado: SIGUC-AC',
-          camadas:['▬ Limite CAR','■ PRODES Anual (✅ autorizado · 🟠 irreg. · 🔴 ilegal)','■ Acumulado Pré-2008','● Focos de Calor (laranja)'] })}
+        ${_htmlMapaABNT({ id: mapDetId, titulo:'Mapa Temático — Desmatamento PRODES · Imóvel CAR', altura:280,
+          zona:_zonaImovel(d), fonte:'PRODES/INPE · SICAR/SFB · Elaborado: SIGUC-AC', camadas:_LEG_DET })}
       </div>
 
       <div class="rel-secao">
@@ -649,6 +766,7 @@ function _gerarRecomendacao(d) {
 async function _inicializarMapasRelatorio(imoveis, multi) {
   const TILE = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
   const OSM_ATTR = '© OpenStreetMap';
+  await _carregarAcreOutline();
 
   // Helper: aguarda tiles carregarem
   const aguardarMapa = (m) => new Promise(resolve => {
@@ -657,6 +775,10 @@ async function _inicializarMapasRelatorio(imoveis, multi) {
     m.once('load', ok);
     setTimeout(ok, 4000); // fallback 4s
   });
+  const setEscala = (map, id) => {
+    const el = document.getElementById(id + '__esc');
+    if (el) { const c = map.getCenter(); el.textContent = _calcularEscalaLeaflet(map.getZoom(), c.lat); }
+  };
 
   const mapPromises = [];
 
@@ -677,30 +799,32 @@ async function _inicializarMapasRelatorio(imoveis, multi) {
       });
       mc.fitBounds([[bboxAll[1],bboxAll[0]],[bboxAll[3],bboxAll[2]]],{padding:[20,20]});
       L.control.scale({imperial:false,metric:true,position:'bottomleft'}).addTo(mc);
+      _desenharGridUTM(mc, _zonaImovel(imoveis[0]));
+      setEscala(mc, 'rel-mapa-consolidado');
       mapPromises.push(aguardarMapa(mc));
     }
   }
 
   for (const d of imoveis) {
     const codKey = d.cod_imovel.replace(/\W/g,'_');
+    const zona = _zonaImovel(d);
 
     // Mapa de localização
-    const elLoc = document.getElementById(`rel-mapa-loc-${codKey}`);
+    const locId = `rel-mapa-loc-${codKey}`;
+    const elLoc = document.getElementById(locId);
     if (elLoc) {
       const mLoc = L.map(elLoc,{zoomControl:false,attributionControl:false}).setView([-9.5,-70.5],6);
       L.tileLayer(TILE,{attribution:OSM_ATTR}).addTo(mLoc);
       try { L.geoJSON({type:'Feature',geometry:d.geometry},{style:{color:'#dc2626',weight:2,fillColor:'#dc2626',fillOpacity:.25}}).addTo(mLoc); } catch(_){}
       L.control.scale({imperial:false,metric:true,position:'bottomleft'}).addTo(mLoc);
-      // Atualizar escala no rodapé
-      mLoc.once('zoomend moveend', () => {
-        const el = elLoc.closest('.rel-mapa-wrap')?.querySelector('.rel-mapa-info');
-        if (el) { const c=mLoc.getCenter(); el.innerHTML=`<strong>Escala</strong>${_calcularEscalaLeaflet(mLoc.getZoom(),c.lat)}`; }
-      });
+      setEscala(mLoc, locId);
+      mLoc.on('zoomend moveend', () => setEscala(mLoc, locId));
       mapPromises.push(aguardarMapa(mLoc));
     }
 
-    // Mapa de detalhe
-    const elDet = document.getElementById(`rel-mapa-det-${codKey}`);
+    // Mapa de detalhe (mapa temático principal)
+    const detId = `rel-mapa-det-${codKey}`;
+    const elDet = document.getElementById(detId);
     if (elDet && d.bbox) {
       const mDet = L.map(elDet,{zoomControl:true,attributionControl:false});
       L.tileLayer(TILE,{attribution:OSM_ATTR}).addTo(mDet);
@@ -721,11 +845,21 @@ async function _inicializarMapasRelatorio(imoveis, multi) {
       }
       mDet.fitBounds([[d.bbox[1],d.bbox[0]],[d.bbox[3],d.bbox[2]]],{padding:[20,20]});
       L.control.scale({imperial:false,metric:true,position:'bottomleft'}).addTo(mDet);
-      // Escala dinâmica
-      mDet.once('zoomend moveend', () => {
-        const el = elDet.closest('.rel-mapa-wrap')?.querySelectorAll('.rel-mapa-info')[0];
-        if (el) { const c=mDet.getCenter(); el.innerHTML=`<strong>Escala</strong>${_calcularEscalaLeaflet(mDet.getZoom(),c.lat)}`; }
+      let gridGrp = _desenharGridUTM(mDet, zona);
+      setEscala(mDet, detId);
+      // Redesenha grid e escala ao interagir
+      mDet.on('zoomend moveend', () => {
+        setEscala(mDet, detId);
+        if (gridGrp) mDet.removeLayer(gridGrp);
+        gridGrp = _desenharGridUTM(mDet, zona);
       });
+      // Inset de localização no canto
+      if (_acreOutline) {
+        const ins = document.createElement('div');
+        ins.className = 'rel-mapa-inset';
+        ins.innerHTML = _insetAcreSVG(d.centroide);
+        elDet.appendChild(ins);
+      }
       mapPromises.push(aguardarMapa(mDet));
     }
   }
