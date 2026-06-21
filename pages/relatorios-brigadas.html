@@ -479,7 +479,7 @@ async function gerarRelatorio() {
 
   const [regRes, brigRes, bristRes] = await Promise.all([
     db.from('vw_registros_validacao')
-      .select('id,codigo_ocorrencia,natureza,atividade,status_validacao,data_hora_evento,regional,uc_id,uc_nome,brigada_id,brigada_nome,brigadista_id,brigadista_nome,equipe_id,equipe_nome,duracao_horas,n_fauna,n_fauna_pendente,n_fauna_resgatada,fotos_urls,area_estimada_ha,pessoas_alcancadas,integrada_cbmac')
+      .select('id,codigo_ocorrencia,natureza,atividade,status_validacao,data_hora_evento,regional,uc_id,uc_nome,brigada_id,brigada_nome,brigadista_id,brigadista_nome,equipe_id,equipe_nome,duracao_horas,n_fauna,n_fauna_pendente,n_fauna_resgatada,fotos_urls,area_estimada_ha,pessoas_alcancadas,integrada_cbmac,ha_evitados_total,n_areas_evitadas')
       .gte('data_hora_evento', ini + 'T00:00:00')
       .lte('data_hora_evento', fim + 'T23:59:59')
       .order('data_hora_evento', { ascending: false })
@@ -587,14 +587,15 @@ function renderEstado() {
   const r = _registros
   if (!r) return
 
-  const total   = r.length
-  const validado= r.filter(x=>x.status_validacao==='validado').length
-  const aguard  = r.filter(x=>x.status_validacao==='aguardando').length
-  const fauna   = r.reduce((s,x)=>s+(x.n_fauna||0), 0)
-  const area    = r.reduce((s,x)=>s+(Number(x.area_estimada_ha)||0), 0)
-  const pessoas = r.reduce((s,x)=>s+(x.pessoas_alcancadas||0), 0)
-  const combate = r.filter(x=>x.natureza==='combate').length
-  const cbmac   = r.filter(x=>x.integrada_cbmac).length
+  const total      = r.length
+  const validado   = r.filter(x=>x.status_validacao==='validado').length
+  const aguard     = r.filter(x=>x.status_validacao==='aguardando').length
+  const fauna      = r.reduce((s,x)=>s+(x.n_fauna||0), 0)
+  const area       = r.reduce((s,x)=>s+(Number(x.area_estimada_ha)||0), 0)
+  const haEvitados = r.reduce((s,x)=>s+(Number(x.ha_evitados_total)||0), 0)
+  const pessoas    = r.reduce((s,x)=>s+(x.pessoas_alcancadas||0), 0)
+  const combate    = r.filter(x=>x.natureza==='combate').length
+  const cbmac      = r.filter(x=>x.integrada_cbmac).length
 
   // Tempo das ocorrências (registros com duração informada)
   const comDur     = r.filter(x=>Number(x.duracao_horas)>0).map(x=>Number(x.duracao_horas))
@@ -615,6 +616,7 @@ function renderEstado() {
       <div class="kpi-brig"><div class="kpi-brig-n">${_brigadas.length}</div><div class="kpi-brig-l">Brigadas ativas</div></div>
       <div class="kpi-brig"><div class="kpi-brig-n">${_brists.length}</div><div class="kpi-brig-l">Brigadistas ativos</div></div>
       ${area > 0 ? `<div class="kpi-brig comb"><div class="kpi-brig-n">${formatNum(area,1)} ha</div><div class="kpi-brig-l">Área trabalhada</div></div>` : ''}
+      ${haEvitados > 0 ? `<div class="kpi-brig" style="border-top-color:#7C3AED"><div class="kpi-brig-n" style="color:#5b21b6">${formatNum(haEvitados,1)} ha</div><div class="kpi-brig-l" style="color:#5b21b6;font-weight:600">Incêndio evitado</div></div>` : ''}
       ${pessoas > 0 ? `<div class="kpi-brig moni"><div class="kpi-brig-n">${pessoas}</div><div class="kpi-brig-l">Pessoas alcançadas</div></div>` : ''}
       ${horasTot > 0 ? `<div class="kpi-brig"><div class="kpi-brig-n">${formatNum(horasTot,1)} h</div><div class="kpi-brig-l">Horas trabalhadas</div></div>` : ''}
       ${comDur.length ? `<div class="kpi-brig"><div class="kpi-brig-n">${fmtHoras(tempoMedio)}</div><div class="kpi-brig-l">Tempo médio</div></div>` : ''}
@@ -1337,23 +1339,26 @@ function tabelaBrigadas(registros, brigadas) {
   const cnt = agruparObj(registros, 'brigada_id')
   const rows = Object.entries(cnt)
     .map(([brigId, regs]) => {
-      const brig = brigadas.find(b=>b.id===brigId) || {}
-      const nFauna = regs.reduce((s,r)=>s+(r.n_fauna||0),0)
-      const pctVal = regs.length ? Math.round(regs.filter(r=>r.status_validacao==='validado').length/regs.length*100) : 0
-      return { nome: regs[0]?.brigada_nome || brig.nome || '—', n: regs.length, fauna: nFauna, pct: pctVal, regional: brig.regional }
+      const brig     = brigadas.find(b=>b.id===brigId) || {}
+      const nFauna   = regs.reduce((s,r)=>s+(r.n_fauna||0),0)
+      const haEvit   = regs.reduce((s,r)=>s+(Number(r.ha_evitados_total)||0),0)
+      const pctVal   = regs.length ? Math.round(regs.filter(r=>r.status_validacao==='validado').length/regs.length*100) : 0
+      return { nome: regs[0]?.brigada_nome || brig.nome || '—', n: regs.length, fauna: nFauna, haEvit, pct: pctVal, regional: brig.regional }
     })
     .sort((a,b)=>b.n-a.n).slice(0,10)
 
   if (!rows.length) return '<p class="chart-empty" style="padding:12px">Sem dados</p>'
   return `<table class="rel-table">
     <thead><tr>
-      <th>Brigada</th><th>Regional</th><th>Registros</th><th>Fauna</th><th>% Validado</th>
+      <th>Brigada</th><th>Regional</th><th>Registros</th><th>Fauna</th>
+      <th style="color:#5b21b6">Área evitada</th><th>% Validado</th>
     </tr></thead>
     <tbody>${rows.map(r=>`<tr>
       <td>${esc(r.nome)}</td>
       <td>${r.regional ? (REGIONAL_LAB[r.regional]||r.regional) : '—'}</td>
       <td><strong>${r.n}</strong></td>
       <td>${r.fauna > 0 ? `${bico('paw')} ${r.fauna}` : '—'}</td>
+      <td>${r.haEvit > 0 ? `<span style="color:#5b21b6;font-weight:700">${formatNum(r.haEvit,1)} ha</span>` : '—'}</td>
       <td>
         <div style="display:flex;align-items:center;gap:6px">
           <div class="bar-wrap" style="width:60px"><div class="bar-fill" style="width:${r.pct}%;background:${r.pct>70?'#059669':r.pct>40?'#f59e0b':'#ef4444'}"></div></div>
@@ -1393,15 +1398,17 @@ function tabelaBrigadistas(registros) {
 function tabelaRegional(registros) {
   const cnt = agruparObj(registros, 'regional')
   const rows = Object.entries(REGIONAL_LAB).map(([k,lab]) => {
-    const regs = cnt[k] || []
-    const fauna = regs.reduce((s,r)=>s+(r.n_fauna||0),0)
-    const pct   = regs.length ? Math.round(regs.filter(r=>r.status_validacao==='validado').length/regs.length*100) : 0
-    return { regional: lab, n: regs.length, fauna, pct, key: k }
+    const regs   = cnt[k] || []
+    const fauna  = regs.reduce((s,r)=>s+(r.n_fauna||0),0)
+    const haEvit = regs.reduce((s,r)=>s+(Number(r.ha_evitados_total)||0),0)
+    const pct    = regs.length ? Math.round(regs.filter(r=>r.status_validacao==='validado').length/regs.length*100) : 0
+    return { regional: lab, n: regs.length, fauna, haEvit, pct, key: k }
   }).sort((a,b)=>b.n-a.n)
 
   return `<table class="rel-table">
     <thead><tr>
-      <th>Regional</th><th>Registros</th><th>Prevenção</th><th>Combate</th><th>Monitoramento</th><th>Fauna</th><th>% Valid.</th>
+      <th>Regional</th><th>Registros</th><th>Prevenção</th><th>Combate</th><th>Monitoramento</th>
+      <th>Fauna</th><th style="color:#5b21b6">Área evitada</th><th>% Valid.</th>
     </tr></thead>
     <tbody>${rows.map(r=>{
       const regs = cnt[r.key]||[]
@@ -1415,6 +1422,7 @@ function tabelaRegional(registros) {
         <td>${comb||'—'}</td>
         <td>${moni||'—'}</td>
         <td>${r.fauna||'—'}</td>
+        <td>${r.haEvit > 0 ? `<span style="color:#5b21b6;font-weight:700">${formatNum(r.haEvit,1)} ha</span>` : '—'}</td>
         <td>${r.n?r.pct+'%':'—'}</td>
       </tr>`
     }).join('')}</tbody>
