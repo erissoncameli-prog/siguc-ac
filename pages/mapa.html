@@ -1667,7 +1667,7 @@ function _renderDropdown(id){
         </select>
         <label style="display:flex;align-items:center;gap:5px;font-size:11px;margin-top:6px;cursor:pointer;color:var(--cinza-600)">
           <input type="checkbox" id="car-bbox-mode" style="accent-color:#1F4E2C;width:12px;height:12px" onchange="carBboxModeChange(this.checked)">
-          Incluir CARs fora da UC (BBOX completa)
+          Ampliar para BBOX da UC (inclui entorno)
         </label>
       </div>
       <div id="car-wrap-mun" style="display:none">
@@ -4604,12 +4604,14 @@ async function carregarDadosCAR(ucNome){
       pages.forEach(p => features.push(...(p.features||[])));
     }
 
-    // Filtra por centroide dentro da UC (desativado se BBOX mode estiver ativo)
+    // Filtra por interseção com o polígono da UC (desativado se BBOX mode estiver ativo)
+    // booleanIntersects inclui CARs que cruzam a fronteira da UC, ao contrário do centroide
     let dentro = features;
     if(!_carBboxMode && ucFeat?.geometry && typeof turf !== 'undefined'){
+      const ucFeatTurf = turf.feature(ucFeat.geometry);
       dentro = features.filter(f => {
         if(!f.geometry) return false;
-        try{ return turf.booleanPointInPolygon(turf.centroid(f), ucFeat); }catch(e){ return false; }
+        try{ return turf.booleanIntersects(turf.feature(f.geometry), ucFeatTurf); }catch(e){ return false; }
       });
     }
 
@@ -4624,7 +4626,7 @@ async function carregarDadosCAR(ucNome){
     if(badge){ badge.textContent=n; badge.style.display=n?'':'none'; }
     if(n>0 && mapaL){ try{ mapaL.fitBounds(_carLayer.getBounds(),{padding:[20,20]}); }catch(e){} }
     if(!n){
-      const dica = _carBboxMode ? '' : ' <span style="color:var(--cinza-400)">(tente ativar "BBOX completa")</span>';
+      const dica = _carBboxMode ? '' : ' <span style="color:var(--cinza-400)">(tente "Ampliar para BBOX")</span>';
       setStatus(`⚠ Nenhum imóvel CAR encontrado dentro de <strong>${escHtml(ucNome)}</strong>${dica}`);
     }
   }catch(err){
