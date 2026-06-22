@@ -153,11 +153,158 @@ const _LEG_DET = [
   { label: 'Acumulado pré-2008',     color: '#c2410c', kind: 'fill' },
 ];
 
+// ── Motor de análise de camadas ───────────────────────────────────────────
+
+// Detecta tema jurídico pelo nome da camada (regex case/acento-insensível)
+function _temaCamada(nome) {
+  const n = (nome || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  if (/nascente/.test(n))                                 return 'nascente';
+  if (/curso|hidro|agua|rio|igarap|drenagem/.test(n))     return 'hidro';
+  if (/\bapp\b/.test(n))                                  return 'app';
+  if (/antropiz/.test(n))                                 return 'antropizado';
+  if (/vegetac|floresta/.test(n))                         return 'vegetacao';
+  return null;
+}
+
+// Alertas legais por tema
+const _ALERTAS_TEMA = {
+  nascente: 'APP de nascente (raio 50 m) — Art. 4º, IV, Lei 12.651/2012.',
+  hidro:    'APP de curso d\'água (margem variável 30–500 m) — Art. 4º, I, Lei 12.651/2012.',
+  app:      'Área de Preservação Permanente — Arts. 4º, 7º e 61-A, Lei 12.651/2012.',
+};
+
+// Retorna tipo geométrico predominante de uma FeatureCollection
+function _tipoGeomCamada(geojson) {
+  const feats = geojson?.features || [];
+  for (const f of feats) {
+    const t = f.geometry?.type || '';
+    if (t === 'Point' || t === 'MultiPoint')                    return 'ponto';
+    if (t === 'LineString' || t === 'MultiLineString')          return 'linha';
+    if (t === 'Polygon' || t === 'MultiPolygon')                return 'poligono';
+  }
+  return 'poligono';
+}
+
+/**
+ * Analisa camadas vetoriais contra um polígono de referência.
+ * @param {object} poligonoFeature  – Feature GeoJSON do recorte (CAR ou UC)
+ * @param {number} areaRefHa        – Área do recorte em ha
+ * @param {Array}  camadasSel       – Itens do array global `camadas` selecionados
+ * @returns {Array} [{nome, tipo, valor, unidade, pct, tema}]
+ */
+function _analisarCamadas(poligonoFeature, areaRefHa, camadasSel) {
+  if (typeof turf === 'undefined' || !poligonoFeature?.geometry) return [];
+  const resultados = [];
+  const carBbox = (() => { try { return turf.bbox(poligonoFeature); } catch (_) { return null; } })();
+  if (!carBbox) return [];
+
+  for (const cam of (camadasSel || [])) {
+    const gj = cam.geojson;
+    if (!gj?.features?.length) continue;
+    const tipo = _tipoGeomCamada(gj);
+    const tema = _temaCamada(cam.nome);
+    let valor = 0;
+
+    try {
+      if (tipo === 'ponto') {
+        // Contagem de pontos dentro do polígono
+        for (const f of gj.features) {
+          if (!f.geometry) continue;
+          const pts = f.geometry.type === 'MultiPoint' ? f.geometry.coordinates.map(c => turf.point(c)) : [f];
+          for (const pt of pts) {
+            try { if (turf.booleanPointInPolygon(pt, poligonoFeature)) valor++; } catch (_) {}
+          }
+        }
+      } else if (tipo === 'linha') {
+        // Comprimento de segmentos cujo midpoint está dentro do polígono
+        for (const f of gj.features) {
+          if (!f.geometry) continue;
+          const linhas = f.geometry.type === 'MultiLineString'
+            ? f.geometry.coordinates.map(c => turf.lineString(c))
+            : [f];
+          for (const linha of linhas) {
+            try {
+              // Verifica bbox rápido
+              const lb = turf.bbox(linha);
+              if (lb[2] < carBbox[0] || lb[0] > carBbox[2] || lb[3] < carBbox[1] || lb[1] > carBbox[3]) continue;
+              const parts = turf.lineSplit(linha, poligonoFeature);
+              for (const seg of (parts?.features || [])) {
+                try {
+                  const coords = seg.geometry?.coordinates || [];
+                  if (coords.length < 2) continue;
+                  const mid = coords[Math.floor(coords.length / 2)];
+                  if (turf.booleanPointInPolygon(turf.point(mid), poligonoFeature)) {
+                    valor += turf.length(seg, { units: 'kilometers' });
+                  }
+                } catch (_) {}
+              }
+            } catch (_) {}
+          }
+        }
+      } else {
+        // Polígono: interseção de área
+        for (const f of gj.features) {
+          if (!f.geometry) continue;
+          try {
+            const fb = turf.bbox(f);
+            if (fb[2] < carBbox[0] || fb[0] > carBbox[2] || fb[3] < carBbox[1] || fb[1] > carBbox[3]) continue;
+            const inter = turf.intersect(poligonoFeature, f);
+            if (inter) valor += turf.area(inter) / 10000;
+          } catch (_) {}
+        }
+      }
+    } catch (_) {}
+
+    const unidade = tipo === 'ponto' ? 'feições' : tipo === 'linha' ? 'km' : 'ha';
+    const pct     = (tipo !== 'ponto' && areaRefHa > 0) ? valor / areaRefHa * 100 : null;
+    resultados.push({ nome: cam.nome, cor: cam.cor || '#6b7280', tipo, valor, unidade, pct, tema });
+  }
+  return resultados;
+}
+
+// HTML da seção "Análise Ambiental por Camadas"
+function _htmlSecaoCamadas(analise, tituloSecao) {
+  if (!analise || !analise.length) return '';
+  const n = tituloSecao || '2. Análise Ambiental por Camadas';
+  const f2 = v => Number(v || 0).toLocaleString('pt-BR', { maximumFractionDigits: 2 });
+  const f1 = v => Number(v || 0).toLocaleString('pt-BR', { maximumFractionDigits: 1 });
+  const tipoLabel = t => t === 'ponto' ? 'Ponto' : t === 'linha' ? 'Linha' : 'Polígono';
+
+  const linhas = analise.map(r => {
+    const valStr = r.tipo === 'ponto' ? r.valor.toFixed(0) :
+                   r.tipo === 'linha' ? f2(r.valor) + ' km' :
+                                        f2(r.valor) + ' ha';
+    const pctStr = r.pct != null ? f1(r.pct) + '%' : '—';
+    return `<tr>
+      <td><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${_relEsc(r.cor)};margin-right:5px;vertical-align:middle"></span>${_relEsc(r.nome)}</td>
+      <td>${tipoLabel(r.tipo)}</td>
+      <td style="text-align:right">${valStr}</td>
+      <td style="text-align:right">${pctStr}</td>
+    </tr>`;
+  }).join('');
+
+  const alertas = [...new Set(analise.map(r => _ALERTAS_TEMA[r.tema]).filter(Boolean))];
+
+  return `
+  <div class="rel-secao">
+    <div class="rel-secao-titulo">${_relEsc(n)}</div>
+    <table class="rel-table rel-table-sm">
+      <tr><th>Camada</th><th>Tipo</th><th>No recorte</th><th>% da área</th></tr>
+      ${linhas}
+    </table>
+    ${alertas.length ? `
+    <div style="margin-top:8px;padding:8px 10px;background:#fffbeb;border-left:3px solid #f59e0b;border-radius:0 6px 6px 0;font-size:8px;color:#78350f">
+      <strong>Alertas legais:</strong><br>${alertas.map(a => '• ' + _relEsc(a)).join('<br>')}
+    </div>` : ''}
+  </div>`;
+}
+
 // ── Estado do modal ───────────────────────────────────────────────────────
 
-let _relEscopo = 'atual';  // 'atual' | 'marcados'
+let _relEscopo = 'atual';  // 'atual' | 'marcados' | 'uc'
 let _relModo   = 'detalhado'; // 'sintetico' | 'detalhado'
 let _relResponsavel = '__user__'; // '__user__' | índice na lista de responsáveis técnicos
+let _relCamadasSel = null; // null = todas visíveis; Set de ids selecionados
 
 // Resolve o responsável técnico escolhido (config) ou o usuário logado
 function _resolverResponsavel(cab) {
@@ -215,6 +362,29 @@ function abrirModalRelatorio() {
       _carAbertoFeat?.properties?.cod_imovel || _carAbertoCod
     );
 
+    // UC real = _carUCAtual existe e NÃO começa com "Consulta:"
+    const ucReal = _carUCAtual && !String(_carUCAtual).startsWith('Consulta:');
+
+    // Camadas com GeoJSON disponível
+    const camadasDisponiveis = (typeof camadas !== 'undefined' ? camadas : [])
+      .filter(c => c.geojson?.features?.length);
+
+    // HTML dos checkboxes de camadas
+    const htmlCamadas = camadasDisponiveis.length
+      ? camadasDisponiveis.map(c => {
+          const checked = (!_relCamadasSel || _relCamadasSel.has(c.id)) ? 'checked' : '';
+          const tipo = _tipoGeomCamada(c.geojson);
+          const icTipo = tipo === 'ponto' ? '●' : tipo === 'linha' ? '━' : '▪';
+          return `<label style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:12px;cursor:pointer">
+            <input type="checkbox" id="rel-cam-${c.id}" ${checked} onchange="_relToggleCamada(${c.id})"
+              style="accent-color:#52B788;width:14px;height:14px;cursor:pointer">
+            <span style="width:12px;height:12px;border-radius:2px;background:${_relEsc(c.cor||'#6b7280')};flex-shrink:0"></span>
+            <span>${_relEsc(c.nome)}</span>
+            <span style="margin-left:auto;font-size:10px;color:#9ca3af">${icTipo} ${tipo}</span>
+          </label>`;
+        }).join('')
+      : '<div style="font-size:11px;color:#9ca3af">Nenhuma camada vetorial carregada.</div>';
+
   // Remove modal anterior se existir
   document.getElementById('rel-modal-overlay')?.remove();
 
@@ -222,16 +392,16 @@ function abrirModalRelatorio() {
   el.id = 'rel-modal-overlay';
   el.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;';
   el.innerHTML = `
-  <div id="rel-modal" style="background:#fff;border-radius:12px;width:460px;max-width:95vw;box-shadow:0 20px 60px rgba(0,0,0,.25);overflow:hidden;font-family:'DM Sans',system-ui,sans-serif;">
-    <div class="rm-hdr" style="padding:16px 20px;background:linear-gradient(135deg,#0A1A0F,#1F4E2C);">
-      <h3 style="font-size:14px;font-weight:700;color:#fff;margin:0;">🖨️ Gerar Relatório do Imóvel</h3>
-      <p>${nomeImovel} · ${_relEsc(_carAbertoCod)}</p>
+  <div id="rel-modal" style="background:#fff;border-radius:12px;width:480px;max-width:95vw;max-height:92vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.25);font-family:'DM Sans',system-ui,sans-serif;">
+    <div class="rm-hdr" style="padding:16px 20px;background:linear-gradient(135deg,#0A1A0F,#1F4E2C);position:sticky;top:0;z-index:1">
+      <h3 style="font-size:14px;font-weight:700;color:#fff;margin:0;">Gerar Relatório</h3>
+      <p style="color:#86efac;font-size:11px;margin:2px 0 0">${nomeImovel} · ${_relEsc(_carAbertoCod)}</p>
     </div>
     <div class="rm-body">
       <div class="rm-label">Escopo do relatório</div>
       <div class="rm-opcao ativo" id="rel-esc-atual" onclick="_relSetEscopo('atual')">
         <span class="rm-ic">🏡</span>
-        <div class="rm-tx"><h4>Imóvel atual</h4><p>Relatório apenas para este imóvel.</p></div>
+        <div class="rm-tx"><h4>Imóvel atual</h4><p>Laudo apenas para este imóvel CAR.</p></div>
       </div>
       <div class="rm-opcao${nMarcados?'':' disabled'}" id="rel-esc-marc"
            style="${nMarcados?'':'opacity:.45;cursor:not-allowed'}"
@@ -239,20 +409,36 @@ function abrirModalRelatorio() {
         <span class="rm-ic">📌</span>
         <div class="rm-tx">
           <h4>Todos os imóveis marcados</h4>
-          <p>Relatório consolidado — cada imóvel vira uma seção com mapa de detalhe próprio.</p>
+          <p>Laudo consolidado — cada imóvel vira uma seção com mapa próprio.</p>
         </div>
         ${nMarcados?`<span class="rm-badge">${nMarcados} marcado${nMarcados>1?'s':''}</span>`:'<span class="rm-badge" style="background:#f3f4f6;color:#9ca3af;border-color:#e5e7eb">0 marcados</span>'}
       </div>
+      <div class="rm-opcao${ucReal?'':' disabled'}" id="rel-esc-uc"
+           style="${ucReal?'':'opacity:.45;cursor:not-allowed'}"
+           onclick="${ucReal?"_relSetEscopo('uc')":''}">
+        <span class="rm-ic">🌿</span>
+        <div class="rm-tx">
+          <h4>Toda a UC selecionada</h4>
+          <p>Laudo da unidade inteira — análise por camadas, imóveis sobrepostos e conclusão.</p>
+        </div>
+        ${ucReal?`<span class="rm-badge" style="background:#dcfce7;color:#166534;border-color:#86efac">${_relEsc(_carUCAtual||'')}</span>`:'<span class="rm-badge" style="background:#f3f4f6;color:#9ca3af;border-color:#e5e7eb">sem UC</span>'}
+      </div>
+      <hr class="rm-sep">
+      <div class="rm-label">Camadas para análise ambiental</div>
+      <div style="border:1px solid #e5e7eb;border-radius:8px;padding:8px 12px;max-height:140px;overflow-y:auto">
+        ${htmlCamadas}
+      </div>
+      <div style="font-size:10px;color:#9ca3af;margin-top:4px">Camadas marcadas são analisadas (interseção/contagem) no recorte do relatório.</div>
       <hr class="rm-sep">
       <div class="rm-label">Nível de detalhamento</div>
       <div class="rm-modos">
         <div class="rm-modo" id="rel-modo-sint" onclick="_relSetModo('sintetico')">
           <div class="rm-mi">📋</div><h4>Sintético</h4>
-          <p>1–2 páginas por imóvel. KPIs, mapas e conclusão. Ideal para despachos.</p>
+          <p>1–2 páginas por imóvel. KPIs, mapas e conclusão.</p>
         </div>
         <div class="rm-modo ativo" id="rel-modo-det" onclick="_relSetModo('detalhado')">
           <div class="rm-mi">📑</div><h4>Detalhado</h4>
-          <p>Laudo técnico completo com gráficos, tabelas e narrativa jurídica.</p>
+          <p>Laudo técnico completo com tabelas e narrativa jurídica.</p>
         </div>
       </div>
       <hr class="rm-sep">
@@ -262,10 +448,10 @@ function abrirModalRelatorio() {
       </select>
       <div style="font-size:10px;color:#9ca3af;margin-top:4px">Cadastre responsáveis em Configurações → Relatórios.</div>
     </div>
-    <div class="rm-footer">
+    <div class="rm-footer" style="position:sticky;bottom:0;background:#fff;border-top:1px solid #e5e7eb;padding:12px 20px;display:flex;gap:8px;justify-content:flex-end">
       <button class="btn btn-secondary" onclick="_fecharModalRelatorio()">Cancelar</button>
-      <button class="btn btn-outline"   onclick="_abrirPreviewRelatorio()">👁 Pré-visualizar</button>
-      <button class="btn btn-primary"   onclick="_imprimirRelatorio()">🖨️ Imprimir / PDF</button>
+      <button class="btn btn-outline"   onclick="_abrirPreviewRelatorio()">Pré-visualizar</button>
+      <button class="btn btn-primary"   onclick="_imprimirRelatorio()">Imprimir / PDF</button>
     </div>
   </div>`;
   document.body.appendChild(el);
@@ -284,6 +470,24 @@ function _relSetEscopo(v) {
   _relEscopo = v;
   document.getElementById('rel-esc-atual')?.classList.toggle('ativo', v==='atual');
   document.getElementById('rel-esc-marc')?.classList.toggle('ativo', v==='marcados');
+  document.getElementById('rel-esc-uc')?.classList.toggle('ativo', v==='uc');
+}
+
+function _relToggleCamada(id) {
+  if (!_relCamadasSel) {
+    // Inicializa com todas visíveis, depois desmarca a clicada
+    const todas = (typeof camadas !== 'undefined' ? camadas : []).filter(c => c.geojson?.features?.length).map(c => c.id);
+    _relCamadasSel = new Set(todas);
+  }
+  if (_relCamadasSel.has(id)) _relCamadasSel.delete(id); else _relCamadasSel.add(id);
+  const cb = document.getElementById('rel-cam-' + id);
+  if (cb) cb.checked = _relCamadasSel.has(id);
+}
+
+function _relCamadasSelecionadas() {
+  const todas = (typeof camadas !== 'undefined' ? camadas : []).filter(c => c.geojson?.features?.length);
+  if (!_relCamadasSel) return todas;
+  return todas.filter(c => _relCamadasSel.has(c.id));
 }
 
 function _relSetModo(v) {
@@ -382,6 +586,9 @@ async function _montarDadosRelatorio(feat) {
     ucNome:  _carUCAtual  || null,
     areaUC:  diag?.areaUC || 0,
 
+    // Análise de camadas vetoriais
+    camadasAnalise: _analisarCamadas(carPoly, areaCAR, _relCamadasSelecionadas()),
+
     // Geometria
     geometry: feat.geometry,
     bbox,
@@ -410,7 +617,13 @@ function _htmlMapaABNT({ id, titulo, altura, fonte, camadas, zona }) {
 
 // ── Gera HTML completo do relatório ──────────────────────────────────────
 
-async function _gerarHTMLRelatorio(imoveis, modo, cab, protocolo) {
+async function _gerarHTMLRelatorio(imoveis, modo, cab, protocolo, dadosUC) {
+  // Escopo UC — laudo da unidade inteira
+  if (dadosUC) {
+    const folhas = _htmlFolhasLaudoUC(dadosUC, cab, protocolo);
+    return `<div id="rel-print-root"><link rel="stylesheet" href="../css/relatorio-print.css">${folhas.join('\n')}</div>`;
+  }
+
   const folhas = [];
 
   // Mapa 0 (consolidado) se múltiplos imóveis
@@ -590,6 +803,15 @@ function _htmlFolhasDetalhadas(d, cab, protocolo, idx, total, multi) {
   const mapDetId = `rel-mapa-det-${d.cod_imovel.replace(/\W/g,'_')}`;
   const pag = (n) => `Pág. ${multi?idx+n:n}${total>1?' · Imóvel '+idx+'/'+total:''} · Prot. ${_relEsc(protocolo)}`;
 
+  // Legenda do Mapa 2 inclui as camadas do usuário
+  const legDet2 = [..._LEG_DET];
+  for (const r of (d.camadasAnalise || [])) {
+    if (r.valor > 0) {
+      const tipo = r.tipo === 'ponto' ? 'point' : r.tipo === 'linha' ? 'line' : 'fill';
+      legDet2.push({ label: r.nome, color: r.cor, kind: tipo });
+    }
+  }
+
   // ── FOLHA 1: Capa, identificação, mapa de localização ──────────────────
   const f1 = `
   <div class="rel-a4">
@@ -686,7 +908,7 @@ function _htmlFolhasDetalhadas(d, cab, protocolo, idx, total, multi) {
       <div class="rel-secao">
         <div class="rel-secao-subtitulo">Mapa 2 — Detalhe do Imóvel com Camadas Temáticas</div>
         ${_htmlMapaABNT({ id: mapDetId, titulo:'Mapa Temático — Desmatamento PRODES · Imóvel CAR', altura:280,
-          zona:_zonaImovel(d), fonte:'PRODES/INPE · SICAR/SFB · Elaborado: SIGUC-AC', camadas:_LEG_DET })}
+          zona:_zonaImovel(d), fonte:'PRODES/INPE · SICAR/SFB · Elaborado: SIGUC-AC', camadas:legDet2 })}
       </div>
 
       <div class="rel-secao">
@@ -730,6 +952,8 @@ function _htmlFolhasDetalhadas(d, cab, protocolo, idx, total, multi) {
         :`<div style="font-size:10px;color:#9ca3af;padding:8px 0">${d.asvBase?'Nenhuma ASV localizada para este imóvel.':'⚠️ Base SINAFLOR não carregada — verificar IBAMA/SEMA-AC.'}</div>`}
         <div style="font-size:7px;color:#9ca3af;margin-top:4px">Fonte: IBAMA Dados Abertos · Atualizado: ${_relData()}</div>
       </div>
+
+      ${_htmlSecaoCamadas(d.camadasAnalise, '2. Análise Ambiental por Camadas Vetoriais')}
     </div>
     <div class="rel-pag-rodape">
       <span>${_relEsc(cab.secretaria)} · ${_relEsc(cab.siglaDiret)} · ${_relEsc(cab.siglaDep)}</span>
@@ -860,9 +1084,223 @@ function _gerarRecomendacao(d) {
   return 'Regularização em andamento. Monitorar prazo de adesão ao PRA e recomposição de Reserva Legal.';
 }
 
+// ── Laudo de UC ───────────────────────────────────────────────────────────
+
+let _ucDetalhesCache = null;
+async function _carregarUCDetalhes() {
+  if (_ucDetalhesCache !== null) return _ucDetalhesCache;
+  try { const r = await fetch('/data/uc_detalhes.json'); _ucDetalhesCache = await r.json(); }
+  catch (_) { _ucDetalhesCache = {}; }
+  return _ucDetalhesCache;
+}
+
+async function _montarDadosLaudoUC(ucNome) {
+  const ucFeat = (_ucGeojson?.features || []).find(f => f.properties?.nome === ucNome);
+  if (!ucFeat) return null;
+
+  const p = ucFeat.properties || {};
+  const detalhes = await _carregarUCDetalhes();
+  const det = detalhes[ucNome] || {};
+
+  let areaHa = det.area_ha || 0;
+  if (!areaHa) { try { areaHa = turf.area(ucFeat) / 10000; } catch (_) {} }
+
+  let bbox;
+  try { const bb = turf.bbox(ucFeat); bbox = [bb[0], bb[1], bb[2], bb[3]]; }
+  catch (_) { bbox = [-73, -11, -66, -7]; }
+
+  let centroide = [-70, -9.5];
+  try { centroide = turf.centroid(ucFeat).geometry.coordinates; } catch (_) {}
+
+  const zona = _utmZone(centroide[0]);
+
+  // Análise das camadas vetoriais recortadas pela UC
+  const camadasAnalise = _analisarCamadas(ucFeat, areaHa, _relCamadasSelecionadas());
+
+  // CAR na UC: imóveis sobrepostos (usa _carFeatures se carregado para esta UC)
+  let nCarSobrep = 0, areaCarHa = 0;
+  const featsCar = (typeof _carFeatures !== 'undefined') ? _carFeatures : [];
+  for (const cf of featsCar) {
+    try {
+      if (turf.booleanIntersects(ucFeat, cf)) {
+        nCarSobrep++;
+        const inter = turf.intersect(ucFeat, cf);
+        if (inter) areaCarHa += turf.area(inter) / 10000;
+      }
+    } catch (_) {}
+  }
+  const pctCarUC = areaHa > 0 ? areaCarHa / areaHa * 100 : 0;
+
+  return {
+    ucNome,
+    nome_full:     det.nome_full || p.nome_full || p.nome || ucNome,
+    categoria:     p.categoria  || '—',
+    grupo:         p.grupo      || '—',
+    esfera:        det.esfera   || p.esfera   || '—',
+    municipios:    det.municipios || p.municipio || '—',
+    area_ha:       areaHa,
+    orgao_gestor:  det.orgao_gestor || '—',
+    plano_manejo:  det.plano_manejo || false,
+    conselho_gestor: det.conselho_gestor || false,
+    diploma:       det.conselho_portaria || det.plano_manejo_portaria || null,
+    camadasAnalise,
+    nCarSobrep,
+    areaCarHa,
+    pctCarUC,
+    carCarregado:  featsCar.length > 0,
+    ucFeat,
+    bbox,
+    centroide,
+    zona,
+  };
+}
+
+function _htmlFolhasLaudoUC(d, cab, protocolo) {
+  if (!d) return [];
+  const data = _relData();
+  const mapUCId = `rel-mapa-uc-${d.ucNome.replace(/\W/g,'_')}`;
+  const pag = n => `Pág. ${n} · Prot. ${_relEsc(protocolo)}`;
+
+  const legUC = [
+    { label: 'Limite da UC', color: '#0A1A0F', kind: 'line' },
+    ...(d.camadasAnalise || []).filter(r => r.valor > 0).map(r => ({
+      label: r.nome, color: r.cor,
+      kind: r.tipo === 'ponto' ? 'point' : r.tipo === 'linha' ? 'line' : 'fill',
+    })),
+  ];
+
+  // ── FOLHA A: Capa + Mapa da UC ──────────────────────────────────────────
+  const fA = `
+  <div class="rel-a4">
+    ${_htmlCabecalho(cab, protocolo, data)}
+    <div class="rel-body">
+      <div class="rel-titulo-bloco">
+        <div class="rel-tipo-label">Laudo de Unidade de Conservação</div>
+        <div class="rel-nome-imovel">${_relEsc(d.nome_full)}</div>
+        <div class="rel-cod-imovel">${_relEsc(d.categoria)} · ${_relEsc(d.esfera)} · ${_relEsc(d.municipios)}/AC · Bioma Amazônia</div>
+      </div>
+      <div class="rel-kpi-grid">
+        <div class="rel-kpi kpi-verde"><div class="kl">Área oficial</div><div class="kv">${_relF2(d.area_ha)}<span style="font-size:9px"> ha</span></div><div class="ks">${_relEsc(d.esfera)}</div></div>
+        <div class="rel-kpi kpi-lrnj"><div class="kl">CAR sobrepostos</div><div class="kv">${d.nCarSobrep}</div><div class="ks">${d.carCarregado?_relF2(d.areaCarHa)+' ha ('+_relF1(d.pctCarUC)+'%)':'CAR não carregado'}</div></div>
+        <div class="rel-kpi ${d.plano_manejo?'kpi-verde':'kpi-lrnj'}"><div class="kl">Plano de Manejo</div><div class="kv">${d.plano_manejo?'Sim':'Não'}</div><div class="ks">&nbsp;</div></div>
+        <div class="rel-kpi ${d.conselho_gestor?'kpi-verde':'kpi-lrnj'}"><div class="kl">Conselho Gestor</div><div class="kv">${d.conselho_gestor?'Sim':'Não'}</div><div class="ks">&nbsp;</div></div>
+      </div>
+      ${_htmlMapaABNT({ id: mapUCId, titulo:'Mapa de Localização da UC — '+_relEsc(d.ucNome), altura:300,
+        zona: d.zona, fonte:'SEMA-AC · IBGE · OpenStreetMap · Elaborado: SIGUC-AC', camadas: legUC })}
+    </div>
+    <div class="rel-pag-rodape">
+      <span>${_relEsc(cab.secretaria)} · ${_relEsc(cab.siglaDiret)} · ${_relEsc(cab.siglaDep)}</span>
+      <span>${pag(1)}</span>
+    </div>
+  </div>`;
+
+  // ── FOLHA B: Identificação + Camadas + CAR ────────────────────────────
+  const fB = `
+  <div class="rel-a4">
+    ${_htmlCabecalho(cab, protocolo, data, true)}
+    <div class="rel-body">
+      <div class="rel-secao">
+        <div class="rel-secao-titulo">1. Identificação da Unidade de Conservação</div>
+        <table class="rel-table">
+          <tr><td>Nome</td><td>${_relEsc(d.nome_full)}</td></tr>
+          <tr><td>Categoria</td><td>${_relEsc(d.categoria)}</td></tr>
+          <tr><td>Grupo</td><td>${_relEsc(d.grupo)}</td></tr>
+          <tr><td>Esfera administrativa</td><td>${_relEsc(d.esfera)}</td></tr>
+          <tr><td>Município(s)</td><td>${_relEsc(d.municipios)} — Acre</td></tr>
+          <tr><td>Área (ha)</td><td>${_relF2(d.area_ha)} ha</td></tr>
+          <tr><td>Órgão gestor</td><td>${_relEsc(d.orgao_gestor)}</td></tr>
+          <tr><td>Plano de Manejo</td><td>${d.plano_manejo?'Sim':'Não'}</td></tr>
+          <tr><td>Conselho Gestor</td><td>${d.conselho_gestor?'Sim':'Não'}</td></tr>
+          ${d.diploma?`<tr><td>Diploma legal (referência)</td><td>${_relEsc(d.diploma)}</td></tr>`:''}
+        </table>
+      </div>
+
+      ${_htmlSecaoCamadas(d.camadasAnalise, '2. Análise Ambiental por Camadas Vetoriais')}
+
+      <div class="rel-secao">
+        <div class="rel-secao-titulo">3. Imóveis CAR na UC</div>
+        ${d.carCarregado ? `
+        <table class="rel-table">
+          <tr><td>Imóveis sobrepostos à UC (SICAR)</td><td><strong>${d.nCarSobrep}</strong></td></tr>
+          <tr><td>Área total de CAR na UC</td><td><strong>${_relF2(d.areaCarHa)} ha</strong></td></tr>
+          <tr><td>% da UC ocupada por CAR</td><td><strong>${_relF1(d.pctCarUC)}%</strong></td></tr>
+        </table>
+        <div style="font-size:8px;color:#9ca3af;margin-top:4px">Calculado a partir de ${(typeof _carFeatures!=='undefined'?_carFeatures.length:0).toLocaleString('pt-BR')} imóveis CAR carregados para esta UC. Dados PRODES por imóvel: ver laudos individuais.</div>` :
+        '<div style="font-size:10px;color:#9ca3af;padding:8px 0">CAR não carregado para esta UC — selecione a UC e carregue os imóveis CAR para este diagnóstico.</div>'}
+      </div>
+    </div>
+    <div class="rel-pag-rodape">
+      <span>${_relEsc(cab.secretaria)} · ${_relEsc(cab.siglaDiret)} · ${_relEsc(cab.siglaDep)}</span>
+      <span>${pag(2)}</span>
+    </div>
+  </div>`;
+
+  // ── FOLHA C: Conclusão + Assinatura ──────────────────────────────────
+  const temCamadas = (d.camadasAnalise || []).some(r => r.valor > 0);
+  const temAPP = (d.camadasAnalise || []).some(r => r.tema === 'app' || r.tema === 'nascente' || r.tema === 'hidro');
+  const fC = `
+  <div class="rel-a4">
+    ${_htmlCabecalho(cab, protocolo, data, true)}
+    <div class="rel-body">
+      <div class="rel-secao">
+        <div class="rel-secao-titulo">4. Conclusão e Recomendações</div>
+        <div class="rel-narrativa">
+          A <strong>${_relEsc(d.nome_full)}</strong>, com ${_relF2(d.area_ha)} ha, é uma unidade de conservação de
+          ${_relEsc(d.grupo === 'protecao_integral' ? 'proteção integral' : 'uso sustentável')} da esfera ${_relEsc(d.esfera)},
+          categoria ${_relEsc(d.categoria)}, localizada em ${_relEsc(d.municipios)}, Estado do Acre.
+          ${d.nCarSobrep > 0 && d.carCarregado
+            ? `Foram identificados <strong>${d.nCarSobrep} imóveis CAR</strong> sobrepostos ao polígono da unidade, totalizando <strong>${_relF2(d.areaCarHa)} ha</strong> (${_relF1(d.pctCarUC)}% da UC), o que demanda atenção quanto à regularização fundiária (Lei 9.985/2000, Art. 42).`
+            : ''}
+          ${temCamadas
+            ? ' A análise das camadas vetoriais carregadas identificou elementos ambientais de relevância dentro do perímetro da UC (ver seção 2).'
+            : ''}
+          ${temAPP
+            ? ' Verificar a integridade das Áreas de Preservação Permanente identificadas (Arts. 4º e 7º, Lei 12.651/2012).'
+            : ''}
+          ${!d.plano_manejo ? ' A ausência de Plano de Manejo limita a gestão e o controle do uso.' : ''}
+          ${!d.conselho_gestor ? ' A ausência de Conselho Gestor limita a participação social na gestão.' : ''}
+        </div>
+        <div class="rel-refs"><strong>Base legal:</strong> Lei nº 9.985/2000 (SNUC) · Lei nº 12.651/2012 (Código Florestal) · Arts. 4º, 7º, 61-A (APP) · Art. 42 (regularização fundiária de UC)</div>
+      </div>
+
+      ${_htmlAssinatura(cab)}
+
+      <div class="rel-aviso">
+        Documento emitido pelo SIGUC-AC em ${data} · operado por ${_relEsc(appState.usuario?.nome_completo||appState.usuario?.email||'Usuário')} (${_relEsc(appState.perfil||'—')}).<br>
+        ${_relEsc(cab.rodapeTxt||'')} As análises são baseadas em dados de sensoriamento remoto e informações vetoriais com margem de erro de 5–15%.<br>
+        ${_relEsc(cab.secretaria)} · ${_relEsc(cab.siglaDiret)} · ${_relEsc(cab.siglaDep)} · ${_relEsc(cab.telefone)} · ${_relEsc(cab.email)}
+      </div>
+    </div>
+    <div class="rel-pag-rodape">
+      <span>${_relEsc(cab.secretaria)} · ${_relEsc(cab.siglaDiret)} · ${_relEsc(cab.siglaDep)}</span>
+      <span>${pag(3)}</span>
+    </div>
+  </div>`;
+
+  return [fA, fB, fC];
+}
+
 // ── Inicializar mapas Leaflet dentro do relatório ─────────────────────────
 
-async function _inicializarMapasRelatorio(imoveis, multi) {
+// Renderiza camadas vetoriais do usuário num mapa Leaflet (leve, sem tooltips)
+function _renderizarCamadasNoMapa(mapa, camadasSel) {
+  for (const cam of (camadasSel || [])) {
+    if (!cam.geojson?.features?.length) continue;
+    try {
+      const tipo = _tipoGeomCamada(cam.geojson);
+      L.geoJSON(cam.geojson, {
+        pointToLayer: tipo === 'ponto'
+          ? (_, ll) => L.circleMarker(ll, { radius: 4, color: cam.cor || '#6b7280', fillColor: cam.cor || '#6b7280', fillOpacity: 0.8, weight: 1 })
+          : undefined,
+        style: tipo !== 'ponto'
+          ? { color: cam.cor || '#6b7280', weight: tipo === 'linha' ? 1.5 : 1, fillColor: cam.cor || '#6b7280', fillOpacity: tipo === 'linha' ? 0 : 0.3 }
+          : undefined,
+      }).addTo(mapa);
+    } catch (_) {}
+  }
+}
+
+async function _inicializarMapasRelatorio(imoveis, multi, dadosUC) {
   const TILE = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
   const OSM_ATTR = '© OpenStreetMap';
   await _carregarAcreOutline();
@@ -880,6 +1318,39 @@ async function _inicializarMapasRelatorio(imoveis, multi) {
   };
 
   const mapPromises = [];
+  const camadasSel = _relCamadasSelecionadas();
+
+  // ── Mapa do Laudo de UC ──────────────────────────────────────────────────
+  if (dadosUC) {
+    const ucKey = dadosUC.ucNome.replace(/\W/g, '_');
+    const ucMapId = `rel-mapa-uc-${ucKey}`;
+    const elUC = document.getElementById(ucMapId);
+    if (elUC && dadosUC.ucFeat) {
+      const zona = dadosUC.zona;
+      const mUC = L.map(elUC, { zoomControl: true, attributionControl: false });
+      L.tileLayer(TILE, { attribution: OSM_ATTR }).addTo(mUC);
+      try { L.geoJSON(dadosUC.ucFeat, { style: { color: '#0A1A0F', weight: 2.5, fillOpacity: 0.08 } }).addTo(mUC); } catch (_) {}
+      _renderizarCamadasNoMapa(mUC, camadasSel);
+      try { mUC.fitBounds([[dadosUC.bbox[1], dadosUC.bbox[0]], [dadosUC.bbox[3], dadosUC.bbox[2]]], { padding: [20, 20] }); } catch (_) {}
+      L.control.scale({ imperial: false, metric: true, position: 'bottomleft' }).addTo(mUC);
+      let gridUC = _desenharGridUTM(mUC, zona);
+      setEscala(mUC, ucMapId);
+      mUC.on('zoomend moveend', () => {
+        setEscala(mUC, ucMapId);
+        if (gridUC) mUC.removeLayer(gridUC);
+        gridUC = _desenharGridUTM(mUC, zona);
+      });
+      if (_acreOutline) {
+        const ins = document.createElement('div');
+        ins.className = 'rel-mapa-inset';
+        ins.innerHTML = _insetAcreSVG(dadosUC.centroide);
+        elUC.appendChild(ins);
+      }
+      mapPromises.push(aguardarMapa(mUC));
+    }
+    await Promise.allSettled(mapPromises);
+    return;
+  }
 
   // Mapa consolidado
   if (multi) {
@@ -942,6 +1413,8 @@ async function _inicializarMapasRelatorio(imoveis, multi) {
           style:{fillColor:'#c2410c',fillOpacity:.4,color:'#c2410c',weight:1}
         }).addTo(mDet);
       }
+      // Camadas vetoriais do usuário
+      _renderizarCamadasNoMapa(mDet, camadasSel);
       mDet.fitBounds([[d.bbox[1],d.bbox[0]],[d.bbox[3],d.bbox[2]]],{padding:[20,20]});
       L.control.scale({imperial:false,metric:true,position:'bottomleft'}).addTo(mDet);
       let gridGrp = _desenharGridUTM(mDet, zona);
@@ -970,36 +1443,50 @@ async function _inicializarMapasRelatorio(imoveis, multi) {
 
 async function _abrirPreviewRelatorio() {
   _fecharModalRelatorio();
-  const imovelFeats = _relColetarImoveis();
-  if (!imovelFeats.length) { toast('Nenhum imóvel selecionado.','warning'); return; }
+  toast('Gerando relatório…', 'info');
 
-  toast('Gerando relatório…','info');
-
-  const [dadosList, cab, protocolo] = await Promise.all([
-    Promise.all(imovelFeats.map(_montarDadosRelatorio)),
-    getCabecalhoRelatorio(),
-    gerarProtocolo(),
-  ]);
+  const [cab, protocolo] = await Promise.all([getCabecalhoRelatorio(), gerarProtocolo()]);
   cab.responsavel = _resolverResponsavel(cab);
 
-  const html = await _gerarHTMLRelatorio(dadosList, _relModo, cab, protocolo);
+  let html, dadosList = [], dadosUC = null;
 
-  // Criar overlay
+  if (_relEscopo === 'uc') {
+    const ucNome = _carUCAtual;
+    if (!ucNome || ucNome.startsWith('Consulta:')) { toast('Nenhuma UC selecionada.', 'warning'); return; }
+    dadosUC = await _montarDadosLaudoUC(ucNome);
+    if (!dadosUC) { toast('Não foi possível montar o laudo da UC.', 'error'); return; }
+    html = await _gerarHTMLRelatorio([], _relModo, cab, protocolo, dadosUC);
+  } else {
+    const imovelFeats = _relColetarImoveis();
+    if (!imovelFeats.length) { toast('Nenhum imóvel selecionado.', 'warning'); return; }
+    dadosList = await Promise.all(imovelFeats.map(_montarDadosRelatorio));
+    html = await _gerarHTMLRelatorio(dadosList, _relModo, cab, protocolo, null);
+  }
+
+  const tituloBar = dadosUC
+    ? dadosUC.nome_full
+    : (dadosList[0]?.nom_imovel || 'Imóvel') + (dadosList.length > 1 ? ' + ' + (dadosList.length - 1) + ' imóveis' : '');
+  const modoBar = dadosUC ? 'LAUDO DE UC' : (_relModo === 'sintetico' ? 'SINTÉTICO' : 'DETALHADO');
+
   const overlay = document.createElement('div');
   overlay.id = 'rel-preview-overlay';
-  const nomeImovel = dadosList[0]?.nom_imovel || 'Imóvel';
   overlay.innerHTML = `
   <div id="rel-preview-toolbar">
-    <span class="rel-tb-titulo">📑 ${_relEsc(nomeImovel)}${dadosList.length>1?' + '+(dadosList.length-1)+' imóveis':''}</span>
-    <span class="rel-tb-modo">${_relModo==='sintetico'?'SINTÉTICO':'DETALHADO'}</span>
+    <span class="rel-tb-titulo">${_relEsc(tituloBar)}</span>
+    <span class="rel-tb-modo">${modoBar}</span>
     <button class="btn btn-outline" style="font-size:11px" onclick="document.getElementById('rel-preview-overlay').remove()">← Fechar</button>
     <button class="btn btn-outline" style="font-size:11px" onclick="_abrirNovaAba()">↗ Nova aba</button>
-    <button class="btn btn-primary" style="font-size:11px" onclick="_executarPrint()">🖨️ Imprimir / Salvar PDF</button>
+    <button class="btn btn-primary" style="font-size:11px" onclick="_executarPrint()">Imprimir / Salvar PDF</button>
   </div>
   <div id="rel-preview-area">${html}</div>`;
 
   document.body.appendChild(overlay);
-  await _inicializarMapasRelatorio(dadosList, dadosList.length > 1);
+
+  if (dadosUC) {
+    await _inicializarMapasRelatorio([], false, dadosUC);
+  } else {
+    await _inicializarMapasRelatorio(dadosList, dadosList.length > 1, null);
+  }
 }
 
 async function _imprimirRelatorio() {
@@ -1028,16 +1515,19 @@ async function _executarPrint() {
 }
 
 async function _abrirNovaAba() {
-  const imovelFeats = _relColetarImoveis();
-  const [dadosList, cab, protocolo] = await Promise.all([
-    Promise.all(imovelFeats.map(_montarDadosRelatorio)),
-    getCabecalhoRelatorio(),
-    gerarProtocolo(),
-  ]);
+  const [cab, protocolo] = await Promise.all([getCabecalhoRelatorio(), gerarProtocolo()]);
   cab.responsavel = _resolverResponsavel(cab);
-  const html = await _gerarHTMLRelatorio(dadosList, _relModo, cab, protocolo);
+  let html;
+  if (_relEscopo === 'uc') {
+    const d = await _montarDadosLaudoUC(_carUCAtual);
+    html = await _gerarHTMLRelatorio([], _relModo, cab, protocolo, d);
+  } else {
+    const imovelFeats = _relColetarImoveis();
+    const dadosList = await Promise.all(imovelFeats.map(_montarDadosRelatorio));
+    html = await _gerarHTMLRelatorio(dadosList, _relModo, cab, protocolo, null);
+  }
   const win = window.open('', '_blank');
-  if (!win) { toast('Popup bloqueado — use o botão Imprimir.','warning'); return; }
+  if (!win) { toast('Popup bloqueado — use o botão Imprimir.', 'warning'); return; }
   win.document.write(`<!DOCTYPE html><html lang="pt-BR"><head>
     <meta charset="UTF-8">
     <title>Relatório SIGUC-AC</title>
