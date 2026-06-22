@@ -1588,6 +1588,10 @@ function toggleLayerBar(id){
     if(rp) rp.checked = true;
     const pw = document.getElementById('brig-peso-wrap');
     if(pw) pw.style.display = (_brigModoExib === 'mancha' || _brigModoExib === 'ambos') ? 'block' : 'none';
+    const pq = document.getElementById('brig-poly-queimada');
+    if(pq) pq.checked = _brigPolyQueimadaAtivo;
+    const pe = document.getElementById('brig-poly-evitado');
+    if(pe) pe.checked = _brigPolyEvitadoAtivo;
   }
   // Alertas e Focos: restaura estado do toggle e do período dos focos
   if(id === 'alertas'){
@@ -2077,6 +2081,23 @@ function _renderDropdown(id){
         </div>
       </div>
 
+      <hr style="border:none;border-top:1px solid var(--cinza-100);margin:2px 0">
+      <div>
+        <div style="font-size:10px;font-weight:700;color:var(--cinza-400);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">Polígonos de campo</div>
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <label style="display:flex;align-items:flex-start;gap:6px;font-size:11px;cursor:pointer">
+            <input type="checkbox" id="brig-poly-queimada" style="accent-color:#EF5B3C;width:13px;height:13px;flex-shrink:0;margin-top:2px" onchange="toggleBrigPolyQueimada(this.checked)">
+            <span><span style="color:#EF5B3C;font-weight:600">Áreas de queimada</span><br>
+            <span style="color:var(--cinza-400);font-size:10px">Polígonos validados de combate a incêndio</span></span>
+          </label>
+          <label style="display:flex;align-items:flex-start;gap:6px;font-size:11px;cursor:pointer">
+            <input type="checkbox" id="brig-poly-evitado" style="accent-color:#7C3AED;width:13px;height:13px;flex-shrink:0;margin-top:2px" onchange="toggleBrigPolyEvitado(this.checked)">
+            <span><span style="color:#7C3AED;font-weight:600">Incêndio evitado</span><br>
+            <span style="color:var(--cinza-400);font-size:10px">Áreas protegidas pelas brigadas</span></span>
+          </label>
+        </div>
+      </div>
+
       <div id="brigadas-mapa-stat" style="font-size:10px;color:var(--cinza-400)"></div>
       <a href="../pages/validacao-campo.html" style="font-size:11px;color:var(--verde-c);text-decoration:none;font-weight:600">→ Abrir Validação de Campo</a>
     </div>
@@ -2550,6 +2571,10 @@ function _atualizarLegendaMapa(){
       const _pesoLab = { densidade:'densidade', esforco:'esforço', natureza:'natureza' }[_brigPesoCalor] || _brigPesoCalor;
       itens.push({ simbolo:'rect', cor:'#EF8E3C', opacidade:0.7, label:'Mancha de calor — ações ('+_pesoLab+')' });
     }
+    if(_brigPolyQueimadaAtivo && _brigPolyQueimadaLayer)
+      itens.push({ simbolo:'rect', cor:'#EF5B3C', opacidade:0.22, label:'Queimadas — polígonos validados' });
+    if(_brigPolyEvitadoAtivo && _brigPolyEvitadoLayer)
+      itens.push({ simbolo:'rect', cor:'#7C3AED', opacidade:0.13, dash:true, label:'Incêndio evitado — áreas protegidas' });
   }
 
   // Focos de Calor em Tempo Real
@@ -2801,6 +2826,10 @@ function renderAlertasMapa() {
 let _brigadasLayer = null, _brigadasMapa = [], _brigadasAtivo = false
 let _brigadasHeatLayer = null, _brigModoExib = 'pontos', _brigPesoCalor = 'densidade'
 
+// Camadas de polígonos de campo (queimadas + incêndio evitado)
+let _brigPolyQueimadaLayer = null, _brigPolyQueimadaAtivo = false
+let _brigPolyEvitadoLayer  = null, _brigPolyEvitadoAtivo  = false
+
 // Gradiente da mancha de calor (verde → ouro → laranja → vermelho)
 const _BRIG_HEAT_GRAD = { 0.2:'#52B788', 0.45:'#C9A84C', 0.7:'#EF8E3C', 1.0:'#D7263D' }
 // Peso relativo por natureza da ação (combate pesa mais)
@@ -2937,8 +2966,91 @@ async function toggleBrigadasMapa(ativo) {
 
   if (_brigadasLayer)     { mapaL.removeLayer(_brigadasLayer);     _brigadasLayer = null }
   if (_brigadasHeatLayer) { mapaL.removeLayer(_brigadasHeatLayer); _brigadasHeatLayer = null }
-  if (!_brigadasAtivo || !_brigadasMapa.length) { _atualizarLegendaMapa(); return }
+
+  // Remove camadas de polígonos quando brigadas são desativadas;
+  // reativa-as se os checkboxes estiverem marcados ao ligar novamente.
+  if (!ativo) {
+    if (_brigPolyQueimadaLayer) { mapaL.removeLayer(_brigPolyQueimadaLayer); _brigPolyQueimadaLayer = null }
+    if (_brigPolyEvitadoLayer)  { mapaL.removeLayer(_brigPolyEvitadoLayer);  _brigPolyEvitadoLayer  = null }
+    _atualizarLegendaMapa(); return
+  }
+
+  if (!_brigadasMapa.length) { _atualizarLegendaMapa(); return }
+  if (_brigPolyQueimadaAtivo && !_brigPolyQueimadaLayer) toggleBrigPolyQueimada(true)
+  if (_brigPolyEvitadoAtivo  && !_brigPolyEvitadoLayer)  toggleBrigPolyEvitado(true)
   renderBrigadasMapa()
+}
+
+// ──────────────────────────────────────────────────────────────
+// Polígonos de campo: áreas de queimada e incêndio evitado
+// ──────────────────────────────────────────────────────────────
+
+async function toggleBrigPolyQueimada(ativo) {
+  _brigPolyQueimadaAtivo = ativo
+  if (_brigPolyQueimadaLayer) { mapaL.removeLayer(_brigPolyQueimadaLayer); _brigPolyQueimadaLayer = null }
+  _atualizarLegendaMapa()
+  if (!ativo) return
+
+  const { data, error } = await db.rpc('rpc_queimadas_mapa')
+  if (error) { toast('Erro ao carregar polígonos de queimada', 'erro'); return }
+  if (!data?.length) { toast('Nenhum polígono de queimada validado encontrado', 'info'); return }
+
+  _brigPolyQueimadaLayer = L.layerGroup()
+  data.forEach(r => {
+    if (!r.geom) return
+    try {
+      const area = r.area_ha != null ? `${formatNum(Number(r.area_ha), 2)} ha` : '—'
+      const dt   = r.data_evento
+        ? new Date(r.data_evento + 'T12:00:00').toLocaleDateString('pt-BR')
+        : '—'
+      L.geoJSON(r.geom, {
+        style: { color:'#EF5B3C', weight:2, fillColor:'#EF5B3C', fillOpacity:.22 }
+      }).bindPopup(`<div class="camada-popup">
+        <div class="cp-header" style="background:#EF5B3C">Área de Queimada</div>
+        <div class="cp-layer">
+          ${r.uc_nome ? `<div class="cp-row"><strong>UC</strong><span>${escHtml(r.uc_nome)}${r.uc_sigla ? ` (${escHtml(r.uc_sigla)})` : ''}</span></div>` : ''}
+          ${r.brigada_nome ? `<div class="cp-row"><strong>Brigada</strong><span>${escHtml(r.brigada_nome)}</span></div>` : ''}
+          <div class="cp-row"><strong>Data</strong><span>${dt}</span></div>
+          <div class="cp-row"><strong>Área</strong><span>${area}</span></div>
+          ${r.atividade ? `<div class="cp-row"><strong>Atividade</strong><span>${escHtml(r.atividade)}</span></div>` : ''}
+        </div>
+      </div>`, { maxWidth:260 }).addTo(_brigPolyQueimadaLayer)
+    } catch(e) {}
+  })
+  _brigPolyQueimadaLayer.addTo(mapaL)
+  _atualizarLegendaMapa()
+}
+
+async function toggleBrigPolyEvitado(ativo) {
+  _brigPolyEvitadoAtivo = ativo
+  if (_brigPolyEvitadoLayer) { mapaL.removeLayer(_brigPolyEvitadoLayer); _brigPolyEvitadoLayer = null }
+  _atualizarLegendaMapa()
+  if (!ativo) return
+
+  const { data, error } = await db.rpc('rpc_evitados_mapa')
+  if (error) { toast('Erro ao carregar polígonos de incêndio evitado', 'erro'); return }
+  if (!data?.length) { toast('Nenhuma área de incêndio evitado registrada', 'info'); return }
+
+  _brigPolyEvitadoLayer = L.layerGroup()
+  data.forEach(a => {
+    if (!a.geom) return
+    try {
+      const area = a.area_ha != null ? `${formatNum(Number(a.area_ha), 2)} ha` : '—'
+      L.geoJSON(a.geom, {
+        style: { color:'#7C3AED', weight:2, fillColor:'#7C3AED', fillOpacity:.13, dashArray:'7 4' }
+      }).bindPopup(`<div class="camada-popup">
+        <div class="cp-header" style="background:#7C3AED">Incêndio Evitado</div>
+        <div class="cp-layer">
+          ${a.uc_nome ? `<div class="cp-row"><strong>UC</strong><span>${escHtml(a.uc_nome)}${a.uc_sigla ? ` (${escHtml(a.uc_sigla)})` : ''}</span></div>` : ''}
+          ${a.brigada_nome ? `<div class="cp-row"><strong>Brigada</strong><span>${escHtml(a.brigada_nome)}</span></div>` : ''}
+          <div class="cp-row"><strong>Área</strong><span>${area}</span></div>
+          ${a.descricao ? `<div class="cp-row"><strong>Descrição</strong><span>${escHtml(a.descricao)}</span></div>` : ''}
+        </div>
+      </div>`, { maxWidth:260 }).addTo(_brigPolyEvitadoLayer)
+    } catch(e) {}
+  })
+  _brigPolyEvitadoLayer.addTo(mapaL)
+  _atualizarLegendaMapa()
 }
 
 function renderBrigadasMapa() {

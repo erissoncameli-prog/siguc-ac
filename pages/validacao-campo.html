@@ -322,6 +322,86 @@
   color:#5b21b6; font-size:.83rem; font-weight:600; cursor:pointer; transition:.15s
 }
 .aie-btn-add:hover { background:rgba(124,58,237,.06) }
+
+/* ── Mapa em tela cheia ──────────────────────────────────────── */
+.val-mapa.val-fs {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  z-index: 9400 !important;
+  border-radius: 0 !important;
+  border: none !important;
+  max-width: none !important;
+  max-height: none !important;
+}
+/* Barra superior flutuante no fullscreen */
+#val-fs-barra {
+  position: fixed; top: 0; left: 0; right: 0; height: 46px;
+  background: rgba(10,26,15,.92); backdrop-filter: blur(8px);
+  display: none; align-items: center; gap: 8px; padding: 0 12px;
+  z-index: 9500;
+}
+#val-fs-barra.visivel { display: flex }
+.val-fs-sep { width: 1px; height: 20px; background: rgba(255,255,255,.2); flex-shrink:0 }
+.val-fs-tag { font-size: .72rem; font-weight: 700; color: rgba(255,255,255,.65);
+              text-transform: uppercase; letter-spacing: .07em; white-space:nowrap }
+#val-fs-barra .val-evidencia { font-size: .74rem; max-width: 260px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+.val-fs-btn { font-size: .78rem; font-weight: 600; padding: 5px 11px; border-radius: 7px;
+              cursor: pointer; border: 1px solid rgba(255,255,255,.25);
+              background: rgba(255,255,255,.12); color: #fff; white-space:nowrap }
+.val-fs-btn:hover { background: rgba(255,255,255,.22) }
+.val-fs-btn.ativo { background: #52B788; border-color: #52B788; color: #fff }
+.val-fs-close { margin-left: auto; font-size: .78rem; font-weight: 600; padding: 5px 12px;
+                border-radius: 7px; cursor: pointer; border: 1px solid rgba(255,255,255,.3);
+                background: rgba(239,91,60,.65); color: #fff; white-space:nowrap; flex-shrink:0 }
+.val-fs-close:hover { background: rgba(239,91,60,.9) }
+.btn-tela-cheia { display:flex; align-items:center; gap:5px; font-size: .78rem; font-weight: 600;
+                   padding: 5px 10px; border-radius: 7px; cursor: pointer;
+                   border: 1px solid var(--border,#e5e7eb); background: #fff;
+                   color: var(--cinza-600,#4b5563) }
+.btn-tela-cheia:hover { background: var(--cinza-50,#f9fafb) }
+/* Garante que no fullscreen o leaflet-draw toolbar fique acima do mapa */
+.val-mapa.val-fs .leaflet-top,
+.val-mapa.val-fs .leaflet-bottom { z-index: 9450 }
+
+/* ── Painel lateral de estilos (fullscreen) ──────────────────── */
+#val-estilo-painel {
+  position: fixed; top: 0; right: -272px; width: 264px; height: 100vh;
+  background: #fff; z-index: 9500; display: flex; flex-direction: column;
+  overflow-y: auto; scrollbar-width: thin;
+  border-left: 1px solid var(--border,#e5e7eb);
+  box-shadow: -4px 0 28px rgba(0,0,0,.18);
+  transition: right .22s cubic-bezier(.4,0,.2,1);
+}
+#val-estilo-painel.visivel { right: 0 }
+#val-fs-barra.painel-aberto { right: 264px }
+.val-estilo-header {
+  padding: 12px 14px 10px; border-bottom: 1px solid var(--border,#e5e7eb);
+  display: flex; align-items: center; justify-content: space-between; flex-shrink:0;
+  background: linear-gradient(135deg,#1a3c2a,#2D6A4F);
+}
+.val-estilo-header h4 { margin:0; font-size:.85rem; font-weight:700; color:#fff }
+.val-estilo-header button { background:rgba(255,255,255,.15); border:1px solid rgba(255,255,255,.3);
+                             color:#fff; font-size:14px; border-radius:6px; width:26px; height:26px;
+                             cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0 }
+.val-estilo-header button:hover { background:rgba(255,255,255,.28) }
+.val-estilo-sec { padding: 12px 14px; border-bottom: 1px solid var(--cinza-100,#f3f4f6) }
+.val-estilo-sec-title { font-size: .7rem; font-weight: 700; text-transform: uppercase;
+                         letter-spacing: .06em; margin: 0 0 10px; display:flex; align-items:center; gap:7px }
+.val-estilo-sec-swatch { width:10px; height:10px; border-radius:3px; flex-shrink:0 }
+.val-estilo-row { display: flex; align-items: center; gap: 6px; margin-bottom: 8px }
+.val-estilo-lbl { font-size: .74rem; color: var(--text-muted,#6b7280); flex: 1; min-width: 0 }
+.val-estilo-color { width: 34px; height: 24px; padding: 1px 2px; border: 1.5px solid var(--border,#e5e7eb);
+                     border-radius: 5px; cursor: pointer; background: transparent; flex-shrink:0 }
+.val-estilo-range { flex: 1; accent-color: #1F4E2C; cursor:pointer; min-width:0 }
+.val-estilo-val { font-size: .72rem; font-weight: 700; color: var(--floresta,#0A1A0F);
+                   min-width: 34px; text-align: right; flex-shrink:0 }
+.val-estilo-preview { display: flex; gap: 8px; margin-top: 10px; padding: 8px;
+                       border-radius: 8px; background: var(--cinza-50,#f9fafb); align-items:center }
+.val-preview-swatch { width: 52px; height: 20px; border-radius: 4px; flex-shrink:0; border:1.5px solid transparent }
+.val-preview-txt { font-size: .71rem; color: var(--text-muted,#6b7280) }
+.val-estilo-footer { padding: 12px 14px; flex-shrink:0 }
 </style>
 </head>
 <body>
@@ -353,6 +433,10 @@
             <input type="date" id="val-gibs-data" class="val-map-sel" title="Data da imagem GIBS">
             <label class="val-map-chk"><input type="checkbox" id="val-planet-toggle" onchange="_valTogglePlanet()"> Planet/NICFI (~4,77 m)</label>
             <select id="val-planet-mosaico" class="val-map-sel" onchange="_valTogglePlanet()" title="Mês do mosaico Planet"></select>
+            <button type="button" class="btn-tela-cheia" id="val-btn-fs" onclick="_valToggleFullscreen()" title="Ver mapa em tela cheia para facilitar a edição de polígonos">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+              Tela cheia
+            </button>
           </div>
         </div>
         <div id="val-mapa" class="val-mapa"></div>
@@ -1276,6 +1360,7 @@ document.getElementById('btn-confirmar-promover')?.addEventListener('click', con
 // Utilitários
 // ════════════════════════════════════════════════════════════════
 function fecharDetalhe() {
+  if (_valFsAtivo) _valToggleFullscreen(false)
   document.getElementById('modal-detalhe').style.display = 'none'
   _valDestruirMapa()
   _detalheId = null
@@ -1304,6 +1389,9 @@ function _valDestruirMapa() {
   _valDrawn = _valPolyLayer = _valFocosLayer = _valGibsLayer = _valPlanetLayer = _valGeoCache = null
   _valEdicaoAtiva = false
   const dz = document.getElementById('val-btn-desfazer'); if (dz) dz.hidden = true
+  _valSincronizarBotoesFS()
+  const fsEv  = document.getElementById('val-fs-evidencia'); if (fsEv)  { fsEv.style.display='none'; fsEv.textContent='' }
+  const fsSep = document.getElementById('val-fs-sep-ev');   if (fsSep) fsSep.style.display='none'
   const sec = document.getElementById('modal-aie-sec'); if (sec) sec.hidden = true
 }
 
@@ -1314,7 +1402,7 @@ function _valPolyDeGeoJSON(poly) {
     const a = latlngs[0], b = latlngs[latlngs.length - 1]
     if (a[0] === b[0] && a[1] === b[1]) latlngs.pop()
   }
-  return L.polygon(latlngs, { color: '#12A66A', weight: 2, fillColor: '#12A66A', fillOpacity: .2 })
+  return L.polygon(latlngs, _valEstiloQueimada)
 }
 
 function _valMostrarAreaEdicao() {
@@ -1379,7 +1467,9 @@ async function initMapaValidacao(r) {
     try { _valMap.fitBounds(_valDrawn.getBounds().pad(0.4)) } catch (e) {}
   }
 
-  document.getElementById('val-btn-editar').textContent = poly ? 'Editar polígono' : 'Desenhar polígono'
+  const _editLabel = poly ? 'Editar polígono' : 'Desenhar polígono'
+  document.getElementById('val-btn-editar').textContent = _editLabel
+  const fsEdit = document.getElementById('val-fs-btn-editar'); if (fsEdit) fsEdit.textContent = _editLabel
   _atualizarAreaInfo(geo)
   _valCarregarFocos(r.id)
 }
@@ -1416,6 +1506,11 @@ async function _valCarregarFocos(id) {
     if (res?.sem_geom) { ev.className = 'val-evidencia'; ev.textContent = 'Sem geometria para cruzar focos' }
     else if (n > 0)    { ev.className = 'val-evidencia tem-fogo'; ev.textContent = `${n} foco(s) de calor a ≤1 km (±10 dias)` }
     else               { ev.className = 'val-evidencia sem-fogo'; ev.textContent = 'Nenhum foco a ≤1 km (±10 dias)' }
+    // Espelha na barra fullscreen
+    const fsEv  = document.getElementById('val-fs-evidencia')
+    const fsSep = document.getElementById('val-fs-sep-ev')
+    if (fsEv)  { fsEv.className  = ev.className; fsEv.textContent = ev.textContent; fsEv.style.display = '' }
+    if (fsSep) fsSep.style.display = ''
   }
 }
 
@@ -1458,14 +1553,16 @@ function _valEditarPoligono() {
   if (!_valMap) return
   _valEdicaoAtiva = true
   document.getElementById('val-btn-desfazer').hidden = false
+  _valSincronizarBotoesFS()
   if (_valPolyLayer && _valPolyLayer.editing) {
     _valPolyLayer.editing.enable()
     toast('Arraste os vértices para corrigir. Valide para gravar.', 'info')
   } else {
-    const dh = new L.Draw.Polygon(_valMap, { shapeOptions: { color: '#12A66A', weight: 2 } })
+    const dh = new L.Draw.Polygon(_valMap, { shapeOptions: _valEstiloQueimada })
     dh.enable()
     _valMap.once(L.Draw.Event.CREATED, (e) => {
       _valPolyLayer = e.layer.addTo(_valDrawn)
+      _valPolyLayer.setStyle(_valEstiloQueimada)
       _valPolyLayer.on('edit', _valMostrarAreaEdicao)
       try { _valPolyLayer.editing.enable() } catch (er) {}
       _valMostrarAreaEdicao()
@@ -1477,6 +1574,7 @@ function _valEditarPoligono() {
 function _valDesfazerEdicao() {
   _valEdicaoAtiva = false
   document.getElementById('val-btn-desfazer').hidden = true
+  _valSincronizarBotoesFS()
   const r = _registros.find(x => x.id === _detalheId)
   if (r) initMapaValidacao(r)
 }
@@ -1509,7 +1607,7 @@ function _aieRenderNoMapa(areas) {
     if (!a.geom) return
     try {
       const layer = L.geoJSON(a.geom, {
-        style: { color:'#7C3AED', weight:2, fillColor:'#7C3AED', fillOpacity:.13, dashArray:'7 4' }
+        style: _valEstiloEvitado
       }).bindTooltip(
         `Área evitada: <b>${formatNum(Number(a.area_ha||0), 2)} ha</b>${a.descricao ? ' — ' + a.descricao : ''}`,
         { sticky: true }
@@ -1583,12 +1681,13 @@ function aie_iniciarDesenho() {
   document.getElementById('aie-preview-area').innerHTML = ''
 
   _aieDrawHandler = new L.Draw.Polygon(_valMap, {
-    shapeOptions: { color:'#7C3AED', weight:2, fillColor:'#7C3AED', fillOpacity:.13, dashArray:'7 4' }
+    shapeOptions: _valEstiloEvitado
   })
   _aieDrawHandler.enable()
 
   _valMap.once(L.Draw.Event.CREATED, e => {
     _aieNovaLayer = e.layer.addTo(_valMap)
+    _aieNovaLayer.setStyle(_valEstiloEvitado)
     _aieNovaLayer.on('edit', _aieAtualizarPreview)
     try { _aieNovaLayer.editing.enable() } catch(er) {}
     _aieAtualizarPreview()
@@ -1655,9 +1754,7 @@ async function aie_editarItem(id) {
     const layers = []
     tmp.eachLayer(l => layers.push(l))
     if (layers[0]) {
-      _aieNovaLayer = L.polygon(layers[0].getLatLngs(), {
-        color:'#7C3AED', weight:2, fillColor:'#7C3AED', fillOpacity:.13, dashArray:'7 4'
-      }).addTo(_valMap)
+      _aieNovaLayer = L.polygon(layers[0].getLatLngs(), _valEstiloEvitado).addTo(_valMap)
       _aieNovaLayer.on('edit', _aieAtualizarPreview)
       try { _aieNovaLayer.editing.enable() } catch(e) {}
       _aieAtualizarPreview()
@@ -1684,6 +1781,7 @@ async function aie_excluirItem(id) {
 // Tecla ESC
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
+    if (_valFsAtivo) { _valToggleFullscreen(false); return }
     if (!document.getElementById('lightbox').classList.contains('oculto')) {
       document.getElementById('lightbox').classList.add('oculto')
     } else {
@@ -1691,6 +1789,262 @@ document.addEventListener('keydown', e => {
     }
   }
 })
+
+// ════════════════════════════════════════════════════════════════
+// Tela cheia + editor de estilos de polígono
+// ════════════════════════════════════════════════════════════════
+
+let _valFsAtivo = false
+let _valEstiloQueimada = { color:'#12A66A', fillColor:'#12A66A', fillOpacity:.20, weight:2 }
+let _valEstiloEvitado  = { color:'#7C3AED', fillColor:'#7C3AED', fillOpacity:.13, weight:2, dashArray:'7 4' }
+
+function _valGetEstiloQueimada() {
+  return {
+    color:       document.getElementById('est-q-stroke')?.value  ?? _valEstiloQueimada.color,
+    fillColor:   document.getElementById('est-q-fill')?.value    ?? _valEstiloQueimada.fillColor,
+    fillOpacity: (parseInt(document.getElementById('est-q-opacity')?.value ?? '20', 10)) / 100,
+    weight:       parseInt(document.getElementById('est-q-weight')?.value  ?? '2',  10),
+  }
+}
+
+function _valGetEstiloEvitado() {
+  const dash = document.getElementById('est-aie-dash')?.checked ? '7 4' : ''
+  return {
+    color:       document.getElementById('est-aie-stroke')?.value  ?? _valEstiloEvitado.color,
+    fillColor:   document.getElementById('est-aie-fill')?.value    ?? _valEstiloEvitado.fillColor,
+    fillOpacity: (parseInt(document.getElementById('est-aie-opacity')?.value ?? '13', 10)) / 100,
+    weight:       parseInt(document.getElementById('est-aie-weight')?.value  ?? '2',  10),
+    dashArray:    dash,
+  }
+}
+
+function _valAplicarEstiloQueimada() {
+  _valEstiloQueimada = _valGetEstiloQueimada()
+  if (_valPolyLayer) { try { _valPolyLayer.setStyle(_valEstiloQueimada) } catch(e) {} }
+  _valAtualizarPreviewQ()
+}
+
+function _valAplicarEstiloEvitado() {
+  _valEstiloEvitado = _valGetEstiloEvitado()
+  Object.values(_aieAreasLayers).forEach(l => { try { l.setStyle(_valEstiloEvitado) } catch(e) {} })
+  if (_aieNovaLayer) { try { _aieNovaLayer.setStyle(_valEstiloEvitado) } catch(e) {} }
+  _valAtualizarPreviewAie()
+}
+
+function _valAtualizarPreviewQ() {
+  const s = _valEstiloQueimada
+  const p = document.getElementById('est-q-preview')
+  if (p) {
+    p.style.background     = s.fillColor
+    p.style.opacity        = String(Math.min(s.fillOpacity + 0.5, 1))
+    p.style.border         = `${s.weight}px solid ${s.color}`
+  }
+}
+
+function _valAtualizarPreviewAie() {
+  const s = _valEstiloEvitado
+  const p = document.getElementById('est-aie-preview')
+  if (p) {
+    p.style.background  = s.fillColor
+    p.style.opacity     = String(Math.min(s.fillOpacity + 0.5, 1))
+    p.style.border      = `${s.weight}px ${s.dashArray ? 'dashed' : 'solid'} ${s.color}`
+  }
+}
+
+function _valResetarEstilos() {
+  const qDef = { color:'#12A66A', fillColor:'#12A66A', fillOpacity:.20, weight:2 }
+  const aDef = { color:'#7C3AED', fillColor:'#7C3AED', fillOpacity:.13, weight:2, dashArray:'7 4' }
+  const setV = (id, v) => { const el = document.getElementById(id); if (el) el.value = v }
+  const setT = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v }
+  const setC = (id, v) => { const el = document.getElementById(id); if (el) el.checked = v }
+  setV('est-q-stroke', qDef.color); setV('est-q-fill', qDef.fillColor)
+  setV('est-q-opacity', '20'); setT('est-q-opacity-v', '20%')
+  setV('est-q-weight',  '2');  setT('est-q-weight-v',  '2px')
+  setV('est-aie-stroke', aDef.color); setV('est-aie-fill', aDef.fillColor)
+  setV('est-aie-opacity', '13'); setT('est-aie-opacity-v', '13%')
+  setV('est-aie-weight',  '2');  setT('est-aie-weight-v',  '2px')
+  setC('est-aie-dash', true)
+  _valEstiloQueimada = qDef; _valEstiloEvitado = aDef
+  _valAplicarEstiloQueimada(); _valAplicarEstiloEvitado()
+  toast('Estilos restaurados para o padrão', 'ok')
+}
+
+function _valTogglePainelEstilo(abrir) {
+  const p = document.getElementById('val-estilo-painel')
+  const b = document.getElementById('val-fs-barra')
+  const btn = document.getElementById('val-fs-btn-estilo')
+  if (!p) return
+  const vai = abrir !== undefined ? abrir : !p.classList.contains('visivel')
+  p.classList.toggle('visivel', vai)
+  if (b) b.classList.toggle('painel-aberto', vai)
+  if (btn) btn.classList.toggle('ativo', vai)
+  if (vai) { _valAtualizarPreviewQ(); _valAtualizarPreviewAie() }
+  if (_valMap) setTimeout(() => _valMap.invalidateSize(), 250)
+}
+
+function _valToggleFullscreen(forcar) {
+  const mapa = document.getElementById('val-mapa')
+  const barra = document.getElementById('val-fs-barra')
+  const btn   = document.getElementById('val-btn-fs')
+  if (!mapa) return
+
+  _valFsAtivo = forcar !== undefined ? Boolean(forcar) : !_valFsAtivo
+
+  mapa.classList.toggle('val-fs', _valFsAtivo)
+  if (barra) barra.classList.toggle('visivel', _valFsAtivo)
+
+  // Abre o painel de estilos automaticamente ao entrar em tela cheia
+  _valTogglePainelEstilo(_valFsAtivo)
+
+  // Sincroniza estado visual dos botões fullscreen com os normais
+  _valSincronizarBotoesFS()
+
+  if (btn) {
+    if (_valFsAtivo) {
+      btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"/></svg> Sair`
+    } else {
+      btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg> Tela cheia`
+    }
+  }
+
+  // Aguarda a transição CSS antes de recalcular o tamanho do mapa
+  setTimeout(() => {
+    if (_valMap) {
+      _valMap.invalidateSize()
+      if (_valPolyLayer) {
+        try { _valMap.fitBounds(_valPolyLayer.getBounds().pad(0.25)) } catch(e) {}
+      }
+    }
+  }, 60)
+}
+
+function _valSincronizarBotoesFS() {
+  const editandoHidden = document.getElementById('val-btn-desfazer')?.hidden ?? true
+  const fsDesfazer = document.getElementById('val-fs-btn-desfazer')
+  if (fsDesfazer) fsDesfazer.hidden = editandoHidden
+}
 </script>
+
+<!-- Barra flutuante de tela cheia -->
+<div id="val-fs-barra">
+  <span class="val-fs-tag">Validação de campo</span>
+  <div class="val-fs-sep"></div>
+  <span id="val-fs-evidencia" class="val-evidencia" style="display:none"></span>
+  <div class="val-fs-sep" id="val-fs-sep-ev" style="display:none"></div>
+  <button class="val-fs-btn" id="val-fs-btn-editar"
+    onclick="document.getElementById('val-btn-editar').click()">Editar polígono</button>
+  <button class="val-fs-btn" id="val-fs-btn-desfazer" hidden
+    onclick="document.getElementById('val-btn-desfazer').click()">Descartar edição</button>
+  <div class="val-fs-sep"></div>
+  <button class="val-fs-btn" id="val-fs-btn-estilo" onclick="_valTogglePainelEstilo()"
+    title="Editar cores e estilos dos polígonos">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg>
+    Estilos
+  </button>
+  <button class="val-fs-close" onclick="_valToggleFullscreen(false)">
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"/></svg>
+    Sair da tela cheia
+  </button>
+</div>
+
+<!-- Painel lateral de estilos dos polígonos -->
+<div id="val-estilo-painel">
+  <div class="val-estilo-header">
+    <h4>Estilos de polígono</h4>
+    <button onclick="_valTogglePainelEstilo(false)" title="Fechar painel">×</button>
+  </div>
+
+  <!-- Polígono de campo (queimada/combate) -->
+  <div class="val-estilo-sec">
+    <div class="val-estilo-sec-title">
+      <div class="val-estilo-sec-swatch" style="background:#12A66A"></div>
+      <span style="color:#12A66A">Polígono validado</span>
+    </div>
+    <div class="val-estilo-row">
+      <span class="val-estilo-lbl">Cor do contorno</span>
+      <input type="color" id="est-q-stroke" class="val-estilo-color" value="#12A66A"
+        oninput="_valAplicarEstiloQueimada()">
+    </div>
+    <div class="val-estilo-row">
+      <span class="val-estilo-lbl">Cor do preenchimento</span>
+      <input type="color" id="est-q-fill" class="val-estilo-color" value="#12A66A"
+        oninput="_valAplicarEstiloQueimada()">
+    </div>
+    <div style="margin-bottom:8px">
+      <div class="val-estilo-row" style="margin-bottom:3px">
+        <span class="val-estilo-lbl">Opacidade do fill</span>
+        <span class="val-estilo-val" id="est-q-opacity-v">20%</span>
+      </div>
+      <input type="range" id="est-q-opacity" class="val-estilo-range" min="0" max="100" value="20"
+        oninput="document.getElementById('est-q-opacity-v').textContent=this.value+'%';_valAplicarEstiloQueimada()">
+    </div>
+    <div style="margin-bottom:8px">
+      <div class="val-estilo-row" style="margin-bottom:3px">
+        <span class="val-estilo-lbl">Espessura da borda</span>
+        <span class="val-estilo-val" id="est-q-weight-v">2px</span>
+      </div>
+      <input type="range" id="est-q-weight" class="val-estilo-range" min="1" max="8" value="2"
+        oninput="document.getElementById('est-q-weight-v').textContent=this.value+'px';_valAplicarEstiloQueimada()">
+    </div>
+    <div class="val-estilo-preview">
+      <div class="val-preview-swatch" id="est-q-preview"
+        style="background:#12A66A;opacity:.7;border:2px solid #12A66A"></div>
+      <span class="val-preview-txt">Área de queimada / polígono validado</span>
+    </div>
+  </div>
+
+  <!-- Incêndio evitado -->
+  <div class="val-estilo-sec">
+    <div class="val-estilo-sec-title">
+      <div class="val-estilo-sec-swatch" style="background:#7C3AED"></div>
+      <span style="color:#7C3AED">Incêndio evitado</span>
+    </div>
+    <div class="val-estilo-row">
+      <span class="val-estilo-lbl">Cor do contorno</span>
+      <input type="color" id="est-aie-stroke" class="val-estilo-color" value="#7C3AED"
+        oninput="_valAplicarEstiloEvitado()">
+    </div>
+    <div class="val-estilo-row">
+      <span class="val-estilo-lbl">Cor do preenchimento</span>
+      <input type="color" id="est-aie-fill" class="val-estilo-color" value="#7C3AED"
+        oninput="_valAplicarEstiloEvitado()">
+    </div>
+    <div style="margin-bottom:8px">
+      <div class="val-estilo-row" style="margin-bottom:3px">
+        <span class="val-estilo-lbl">Opacidade do fill</span>
+        <span class="val-estilo-val" id="est-aie-opacity-v">13%</span>
+      </div>
+      <input type="range" id="est-aie-opacity" class="val-estilo-range" min="0" max="100" value="13"
+        oninput="document.getElementById('est-aie-opacity-v').textContent=this.value+'%';_valAplicarEstiloEvitado()">
+    </div>
+    <div style="margin-bottom:8px">
+      <div class="val-estilo-row" style="margin-bottom:3px">
+        <span class="val-estilo-lbl">Espessura da borda</span>
+        <span class="val-estilo-val" id="est-aie-weight-v">2px</span>
+      </div>
+      <input type="range" id="est-aie-weight" class="val-estilo-range" min="1" max="8" value="2"
+        oninput="document.getElementById('est-aie-weight-v').textContent=this.value+'px';_valAplicarEstiloEvitado()">
+    </div>
+    <div class="val-estilo-row">
+      <label style="display:flex;align-items:center;gap:6px;font-size:.75rem;cursor:pointer;color:var(--text-muted,#6b7280)">
+        <input type="checkbox" id="est-aie-dash" checked oninput="_valAplicarEstiloEvitado()">
+        Contorno tracejado
+      </label>
+    </div>
+    <div class="val-estilo-preview">
+      <div class="val-preview-swatch" id="est-aie-preview"
+        style="background:#7C3AED;opacity:.6;border:2px dashed #7C3AED"></div>
+      <span class="val-preview-txt">Área de incêndio evitado</span>
+    </div>
+  </div>
+
+  <div class="val-estilo-footer">
+    <button onclick="_valResetarEstilos()"
+      style="width:100%;padding:7px;border:1.5px solid var(--border,#e5e7eb);border-radius:8px;font-size:.79rem;font-weight:600;cursor:pointer;background:#fff;color:var(--cinza-600,#4b5563)">
+      Restaurar padrões
+    </button>
+  </div>
+</div>
+
 </body>
 </html>
