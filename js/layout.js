@@ -63,6 +63,10 @@ function gerarLayout(tituloPagina, paginaAtiva) {
     'admin-brigadas':           { svg: '<circle cx="12" cy="8" r="4"/><path d="M6 20v-2a6 6 0 0 1 12 0v2"/><line x1="19" y1="11" x2="19" y2="17"/><line x1="16" y1="14" x2="22" y2="14"/>', cor: '#f87171', bg: 'rgba(248,113,113,0.18)' },
     'validacao-campo':          { svg: '<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>', cor: '#4ade80', bg: 'rgba(74,222,128,0.22)' },
     'relatorios-brigadas':      { svg: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>', cor: '#f87171', bg: 'rgba(248,113,113,0.18)' },
+    'biomonitor-app':           { svg: '<circle cx="12" cy="10" r="3"/><path d="M12 2a8 8 0 0 1 8 8c0 5-8 12-8 12S4 15 4 10a8 8 0 0 1 8-8z"/>', cor: '#2A9D6F', bg: 'rgba(42,157,111,0.22)' },
+    'biomonitor-validacao':     { svg: '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>', cor: '#7ECEE8', bg: 'rgba(126,206,232,0.22)' },
+    'relatorios-biomonitor':    { svg: '<line x1="18" x2="18" y1="20" y2="10"/><line x1="12" x2="12" y1="20" y2="4"/><line x1="6" x2="6" y1="20" y2="14"/>', cor: '#1A6B8C', bg: 'rgba(26,107,140,0.22)' },
+    'admin-biomonitor':         { svg: '<path d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2z"/><circle cx="7" cy="7" r="1.5"/>', cor: '#1A6B8C', bg: 'rgba(26,107,140,0.18)' },
   };
 
   function renderPill(id, size) {
@@ -104,6 +108,17 @@ function gerarLayout(tituloPagina, paginaAtiva) {
         { id: 'relatorios-brigadas', href: '../pages/relatorios-brigadas.html', label: 'Relatórios' },
         { id: 'admin-brigadas',      href: '../pages/admin-brigadas.html',      label: 'Administrar',
           perfis: ['super_admin','gestor'] },
+      ]
+    },
+    {
+      label: 'Biomonitor',
+      itens: [
+        { id: 'biomonitor-app',        href: '../pages/biomonitor.html',           label: 'App de Campo', target: '_blank' },
+        { id: 'biomonitor-validacao',  href: '../pages/biomonitor-validacao.html', label: 'Validação de Ninhos',
+          perfis: ['gestor','tecnico','super_admin'] },
+        { id: 'relatorios-biomonitor', href: '../pages/relatorios-biomonitor.html',label: 'Relatórios' },
+        { id: 'admin-biomonitor',      href: '../pages/admin-biomonitor.html',     label: 'Administrar',
+          perfis: ['super_admin','gestor','tecnico'] },
       ]
     },
     {

@@ -1,0 +1,829 @@
+/* ── SIGUC Biomonitor — Design System "Rio" ────────────────────
+   Paleta: azul-rio + verde-água. Mesmo padrão estrutural do
+   brigada.css; tokens de cor distintos para não colidir.
+   ─────────────────────────────────────────────────────────── */
+
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
+
+[hidden] { display: none !important; }
+
+/* ── Tokens do app Biomonitor ──────────────────────────────── */
+:root {
+  --bio-prim:       #1A6B8C;    /* azul-rio profundo */
+  --bio-prim-bg:    rgba(26,107,140,.12);
+  --bio-verde:      #2A9D6F;    /* verde-água */
+  --bio-verde-bg:   rgba(42,157,111,.12);
+  --bio-ouro:       #C9A84C;    /* ovos/ninho */
+  --bio-ouro-bg:    rgba(201,168,76,.15);
+  --bio-alerta:     #D97706;
+  --bio-alerta-bg:  rgba(217,119,6,.13);
+  --bio-perigo:     #DC2626;
+  --bio-perigo-bg:  rgba(220,38,38,.10);
+
+  --bio-app-bg:     #F2F7FA;
+  --bio-surface:    #FFFFFF;
+  --bio-ink:        #0D1E27;
+  --bio-soft:       #7ECEE8;    /* ciano claro — realce dos chips */
+
+  --bio-nav-h:      64px;
+  --bio-nav-radius: 32px;
+
+  --font-ui:   'DM Sans', sans-serif;
+  --font-mono: 'DM Mono', monospace;
+
+  --spring:   cubic-bezier(.34,1.56,.64,1);
+  --ease-out: cubic-bezier(.22,1,.36,1);
+}
+
+/* ── Reset mínimo ──────────────────────────────────────────── */
+.bio-app * { box-sizing: border-box; }
+.bio-app {
+  font-family: var(--font-ui);
+  background: var(--bio-app-bg);
+  min-height: 100dvh;
+  padding-bottom: calc(var(--bio-nav-h) + 28px + env(safe-area-inset-bottom, 0px));
+  color: var(--bio-ink);
+  overscroll-behavior: none;
+}
+body { margin: 0; }
+
+/* ── Lock screen / Login ────────────────────────────────────── */
+.bio-lock {
+  min-height: 100dvh;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  padding: 32px 24px;
+  color: #fff;
+  background:
+    radial-gradient(135% 78% at 50% -12%, rgba(126,206,232,.22), rgba(126,206,232,0) 55%),
+    radial-gradient(120% 65% at 85% 112%, rgba(26,107,140,.25), transparent 60%),
+    linear-gradient(168deg, #102B3A70 0%, transparent 55%),
+    linear-gradient(178deg, #0D2030 0%, #091825 48%, #050F18 100%);
+  background-color: #060D14;
+  position: relative; overflow: hidden;
+}
+.bio-lock::after {
+  content: '';
+  position: absolute; inset: 0; z-index: 0; pointer-events: none;
+  background: radial-gradient(125% 95% at 50% 42%, transparent 58%, rgba(2,8,14,.55) 100%);
+}
+.bio-lock > * { position: relative; z-index: 1; }
+
+.bio-lock-logo {
+  display: flex; align-items: center; gap: 12px;
+  font-family: 'Fraunces', Georgia, serif;
+  font-size: 28px; font-weight: 700;
+  color: var(--bio-soft); letter-spacing: -.02em;
+  margin-bottom: 4px;
+}
+.bio-lock-mascote { width: 84px; height: 84px; border-radius: 50%; }
+@keyframes bio-lock-respira {
+  0%, 100% { transform: scale(1); }
+  50%       { transform: scale(1.04); }
+}
+.bio-lock-mascote { animation: bio-lock-respira 3.4s ease-in-out infinite; }
+
+.bio-lock-dica { font-size: 13px; color: rgba(255,255,255,.55); margin-bottom: 28px; text-align: center; }
+.bio-lock-erro { font-size: 13px; color: #f87171; margin-top: 12px; }
+.bio-btn-link {
+  background: none; border: none; color: rgba(255,255,255,.5);
+  font-size: 13px; cursor: pointer; margin-top: 16px; text-decoration: underline;
+  font-family: var(--font-ui);
+}
+.bio-lock-offline {
+  font-size: 11px; color: rgba(255,200,0,.9);
+  background: rgba(255,200,0,.1); border-radius: 20px;
+  padding: 3px 10px; margin-bottom: 4px;
+}
+
+/* ── Login form ─────────────────────────────────────────────── */
+.bio-login-form {
+  width: 100%; max-width: 320px;
+  display: flex; flex-direction: column; gap: 12px; margin-top: 8px;
+}
+.bio-login-input {
+  width: 100%; padding: 15px 16px; border-radius: 14px;
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(255,255,255,.07); color: #fff;
+  font-size: 16px; font-family: var(--font-ui); outline: none;
+  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  transition: border-color .18s, background .18s; -webkit-appearance: none;
+  box-sizing: border-box;
+}
+.bio-login-input::placeholder { color: rgba(255,255,255,.4); }
+.bio-login-input:focus { border-color: rgba(126,206,232,.65); background: rgba(255,255,255,.10); }
+.bio-senha-wrap { position: relative; }
+.bio-senha-wrap .bio-login-input { padding-right: 48px; }
+.bio-btn-toggle-senha {
+  position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+  background: none; border: none; cursor: pointer;
+  font-size: 18px; color: rgba(255,255,255,.5);
+}
+.bio-btn-login {
+  width: 100%; padding: 16px; border-radius: 14px;
+  border: 1px solid rgba(255,255,255,.18);
+  background: linear-gradient(180deg, #28A0C8 0%, #1A6B8C 100%);
+  color: #fff; font-size: 17px; font-weight: 600;
+  font-family: var(--font-ui); cursor: pointer;
+  box-shadow: 0 8px 22px rgba(26,107,140,.38), inset 0 1px 0 rgba(255,255,255,.28);
+  transition: transform .14s var(--spring), box-shadow .15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.bio-btn-login:active { transform: scale(.985); }
+.bio-btn-login:disabled { opacity: .6; cursor: not-allowed; }
+
+/* ── PIN keypad (idêntico ao brigadas, cor diferente) ────────── */
+.bio-pin-display { display: flex; gap: 14px; margin-bottom: 30px; }
+.bio-pin-dot {
+  width: 13px; height: 13px; border-radius: 50%;
+  background: transparent; border: 1.5px solid rgba(255,255,255,.32);
+  transition: background .18s var(--spring), border-color .18s, box-shadow .18s, transform .18s var(--spring);
+}
+.bio-pin-dot.ativo {
+  background: var(--bio-soft); border-color: var(--bio-soft);
+  box-shadow: 0 0 14px rgba(126,206,232,.55); transform: scale(1.06);
+}
+.bio-pin-keypad {
+  display: grid; grid-template-columns: repeat(3, 74px); gap: 14px;
+  touch-action: manipulation;
+}
+.bio-pin-key {
+  height: 74px; border-radius: 24px;
+  background: rgba(255,255,255,.055); border: 1px solid rgba(255,255,255,.10);
+  color: #F0F8FB; font-family: var(--font-ui); font-size: 27px; font-weight: 500;
+  cursor: pointer; backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  box-shadow: 0 1px 2px rgba(0,0,0,.22), inset 0 1px 0 rgba(255,255,255,.08);
+  transition: transform .14s var(--spring), background .15s;
+  -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+  -webkit-user-select: none; user-select: none;
+}
+.bio-pin-key:active { transform: scale(.93); background: rgba(255,255,255,.16); }
+.bio-pin-key.bio-pin-clear {
+  background: transparent; border-color: rgba(255,255,255,.06);
+  color: rgba(255,255,255,.7); box-shadow: none; font-size: 23px;
+}
+.bio-pin-key.bio-pin-clear:active { background: rgba(255,255,255,.08); }
+.bio-pin-key.bio-pin-ok {
+  background: linear-gradient(180deg, #28A0C8 0%, #1A6B8C 100%);
+  border-color: rgba(255,255,255,.20); color: #fff; font-size: 23px;
+  box-shadow: 0 6px 20px rgba(26,107,140,.42), inset 0 1px 0 rgba(255,255,255,.30);
+}
+.bio-pin-key.bio-pin-ok:active { background: linear-gradient(180deg, #22899E 0%, #145D78 100%); }
+
+/* ── Faixa institucional ─────────────────────────────────────── */
+.bio-faixa-inst {
+  position: sticky; top: 0; z-index: 800;
+  background: linear-gradient(135deg, #0A1E2F 0%, #0E4D6B 60%, var(--bio-prim) 130%);
+  padding: calc(14px + env(safe-area-inset-top)) 16px 14px;
+  margin-bottom: 46px;
+}
+.bio-faixa-logos {
+  display: grid; grid-template-columns: 1fr 96px 1fr;
+  align-items: center; min-height: 44px;
+}
+.bio-faixa-logo-chip {
+  width: 100%; max-width: 132px; height: 38px;
+  display: flex; align-items: center; justify-content: center;
+}
+.bio-faixa-logo-chip.gov { grid-column: 1; justify-self: start; max-width: 165px; height: 48px; }
+.bio-faixa-logo-chip.sec { grid-column: 3; justify-self: end; }
+.bio-faixa-logo-chip img { width: 100%; height: 100%; object-fit: contain; display: block; filter: drop-shadow(0 1px 3px rgba(0,0,0,.3)); }
+
+.bio-faixa-mascote {
+  position: absolute; left: 50%; bottom: -40px;
+  transform: translateX(-50%);
+  width: 86px; height: 86px; border-radius: 50%;
+  filter: drop-shadow(0 4px 10px rgba(6,14,22,.35));
+}
+@keyframes bio-mascote-respira {
+  0%, 100% { transform: translateX(-50%) translateY(0) scale(1); }
+  50%       { transform: translateX(-50%) translateY(-3px) scale(1.025); }
+}
+.bio-faixa-mascote { animation: bio-mascote-respira 3.4s ease-in-out infinite; }
+
+/* ── GPS card ────────────────────────────────────────────────── */
+.bio-gps-card {
+  background: var(--bio-ink); border-radius: 20px;
+  padding: 16px 20px; margin: 0 16px 16px;
+  position: relative; overflow: hidden; color: #fff;
+  display: flex; align-items: center; gap: 14px;
+}
+.bio-radar {
+  position: relative; width: 54px; height: 54px; flex-shrink: 0;
+  border-radius: 50%;
+  border: 1.5px solid rgba(126,206,232,.35);
+  background: radial-gradient(circle, rgba(126,206,232,.12) 0 55%, rgba(126,206,232,.04) 100%);
+  overflow: hidden;
+}
+.bio-radar-anel { position: absolute; inset: 26%; border: 1px solid rgba(126,206,232,.35); border-radius: 50%; }
+.bio-radar-anel.r2 { inset: 9%; opacity: .55; }
+.bio-radar-sweep {
+  position: absolute; inset: 0; border-radius: 50%;
+  background: conic-gradient(from 0deg, rgba(126,206,232,.6), rgba(126,206,232,.12) 65deg, transparent 95deg);
+  animation: bio-radar-gira 2.8s linear infinite;
+}
+.bio-radar-ponto {
+  position: absolute; left: 50%; top: 50%;
+  width: 5px; height: 5px; margin: -2.5px 0 0 -2.5px;
+  background: var(--bio-soft); border-radius: 50%;
+  box-shadow: 0 0 6px var(--bio-soft);
+}
+@keyframes bio-radar-gira { to { transform: rotate(360deg); } }
+
+.bio-gps-info { flex: 1; min-width: 0; }
+.bio-gps-label {
+  font-size: 10px; text-transform: uppercase; letter-spacing: .1em;
+  color: rgba(255,255,255,.5); display: block; margin-bottom: 4px;
+}
+.bio-gps-coords {
+  font-family: var(--font-mono); font-size: 13px; color: var(--bio-soft); line-height: 1.6;
+}
+.bio-gps-acc { font-family: var(--font-mono); font-size: 11px; color: rgba(255,255,255,.4); }
+.bio-gps-municipio {
+  display: block; font-size: 12.5px; font-weight: 600; color: #fff;
+  margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.bio-gps-lado { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; flex-shrink: 0; }
+.bio-conn-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: var(--font-mono); font-size: 10.5px;
+  padding: 4px 9px; border-radius: 999px;
+  background: rgba(255,255,255,.08); color: rgba(255,255,255,.75);
+}
+.bio-conn-dot { width: 7px; height: 7px; border-radius: 50%; background: #9CA3AF; }
+.bio-conn-chip.on  .bio-conn-dot { background: var(--bio-soft); box-shadow: 0 0 6px var(--bio-soft); }
+.bio-conn-chip.off .bio-conn-dot { background: #F87171; }
+.bio-conn-chip.off { color: #FCA5A5; }
+
+/* ── Home — header do monitor ───────────────────────────────── */
+.bio-home-header {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  padding: 20px 16px 8px;
+}
+.bio-home-id { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.bio-home-id-texto { min-width: 0; }
+.bio-home-saudacao { font-size: 13px; color: #6B7280; margin: 0 0 2px; }
+.bio-home-nome {
+  font-size: 27px; font-weight: 700; color: var(--bio-ink);
+  margin: 0; font-family: Arial, Helvetica, sans-serif; letter-spacing: -.01em;
+}
+.bio-home-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 8px; }
+.bio-home-chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 5px 11px; border-radius: 999px;
+  font-size: 12.5px; font-weight: 700; line-height: 1;
+  background: rgba(26,107,140,.14); color: #0E4B6B;
+  white-space: nowrap;
+}
+.bio-home-avatar {
+  position: relative;
+  width: 72px; height: 72px; border-radius: 50%; flex-shrink: 0;
+  background-color: var(--bio-prim);
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; font-weight: 700; font-size: 26px; line-height: 1;
+  background-size: cover; background-position: center;
+  cursor: pointer;
+}
+.bio-home-avatar::after {
+  content: ''; position: absolute; inset: 0; border-radius: 50%;
+  border: 3px solid rgba(126,206,232,.55);
+  box-shadow:
+    0 0 0 4px rgba(126,206,232,.18),
+    inset 0 1px 4px rgba(255,255,255,.55),
+    inset 0 -3px 7px rgba(6,22,40,.25),
+    0 4px 14px rgba(10,26,40,.20);
+  pointer-events: none;
+}
+
+.bio-btn-icon {
+  width: 40px; height: 40px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0,0,0,.06); border: none; cursor: pointer;
+  color: var(--bio-ink); flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+.bio-btn-icon:active { background: rgba(0,0,0,.12); }
+
+/* ── Seletor de praia ───────────────────────────────────────── */
+.bio-praia-seletor {
+  margin: 0 16px 12px; padding: 14px 16px;
+  background: var(--bio-surface); border-radius: 16px;
+  border: 1.5px solid #D0E4EF; cursor: pointer;
+  display: flex; align-items: center; gap: 10px;
+  transition: border-color .15s; -webkit-tap-highlight-color: transparent;
+}
+.bio-praia-seletor:active { border-color: var(--bio-prim); }
+.bio-praia-seletor-info { flex: 1; min-width: 0; }
+.bio-praia-seletor-label { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: #6B7280; font-weight: 600; }
+.bio-praia-seletor-nome { font-size: 16px; font-weight: 700; color: var(--bio-ink); margin-top: 2px; }
+.bio-praia-seletor-detalhe { font-size: 12px; color: #6B7280; margin-top: 1px; }
+.bio-praia-chevron { color: var(--bio-prim); font-size: 22px; flex-shrink: 0; }
+
+/* ── Grid de ações da home ──────────────────────────────────── */
+.bio-home-instrucao {
+  font-size: 12px; font-weight: 600; color: #6B7280;
+  text-transform: uppercase; letter-spacing: .06em;
+  padding: 4px 16px 12px; margin: 0;
+}
+.bio-acao-grid {
+  display: flex; flex-direction: column; gap: 12px; padding: 0 16px;
+}
+.bio-acao-btn {
+  display: flex; align-items: center; gap: 16px;
+  padding: 20px; border-radius: 24px; border: none; cursor: pointer;
+  text-align: left; transition: transform .18s var(--spring), box-shadow .18s;
+  -webkit-tap-highlight-color: transparent;
+}
+.bio-acao-btn:active { transform: scale(.97); }
+.bio-acao-btn.registrar {
+  background: var(--bio-prim);
+  box-shadow: 0 8px 24px rgba(26,107,140,.35);
+}
+.bio-acao-btn.abertos {
+  background: var(--bio-verde);
+  box-shadow: 0 8px 24px rgba(42,157,111,.32);
+}
+.bio-acao-btn.historico {
+  background: #4A6FA5;
+  box-shadow: 0 8px 24px rgba(74,111,165,.3);
+}
+.bio-acao-icon {
+  width: 58px; height: 58px; border-radius: 16px;
+  background: rgba(255,255,255,.2);
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.bio-acao-icon svg { width: 36px; height: 36px; }
+.bio-acao-label { flex: 1; }
+.bio-acao-label strong { display: block; font-size: 18px; font-weight: 700; color: #fff; }
+.bio-acao-label span { font-size: 12px; color: rgba(255,255,255,.78); }
+.bio-acao-chevron { color: rgba(255,255,255,.6); font-size: 22px; }
+
+/* ── Card de fila ─────────────────────────────────────────────  */
+.bio-fila-card {
+  display: flex; align-items: center; gap: 12px;
+  margin: 8px 16px 4px; padding: 12px 16px; border-radius: 14px;
+  background: var(--bio-alerta-bg); color: var(--bio-alerta);
+  border: 1px solid rgba(217,119,6,.3); font-size: 13px; font-weight: 500;
+}
+
+/* ── Nav flutuante ──────────────────────────────────────────── */
+.bio-pill-nav {
+  position: fixed;
+  bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  left: 50%; transform: translateX(-50%);
+  max-width: calc(100vw - 16px);
+  background: var(--bio-ink); border-radius: var(--bio-nav-radius);
+  height: var(--bio-nav-h); padding: 0 12px;
+  display: flex; align-items: center; gap: 4px;
+  box-shadow: 0 8px 32px rgba(0,0,0,.4); z-index: 1000;
+}
+.bio-pill-btn {
+  position: relative;
+  width: 52px; height: 52px; border-radius: 50%;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  border: none; background: transparent; cursor: pointer;
+  color: rgba(255,255,255,.45); gap: 2px;
+  transition: background .15s, color .15s, transform .18s var(--spring);
+  -webkit-tap-highlight-color: transparent;
+  font-family: var(--font-ui); font-size: 9px; font-weight: 500;
+}
+.bio-pill-btn svg { width: 22px; height: 22px; stroke: currentColor; }
+.bio-pill-btn.ativa { background: rgba(255,255,255,.12); color: #fff; }
+.bio-pill-btn:active { transform: scale(.9); }
+#bio-nav-cam {
+  width: 56px; height: 56px; border-radius: 50%;
+  background: var(--bio-soft); color: var(--bio-ink);
+  box-shadow: 0 4px 12px rgba(126,206,232,.5); margin: 0 6px;
+}
+#bio-nav-cam svg { stroke: var(--bio-ink); }
+.bio-pill-badge {
+  position: absolute; top: 2px; right: 2px;
+  min-width: 16px; height: 16px; border-radius: 8px;
+  background: var(--bio-perigo); color: #fff;
+  font-size: 10px; font-weight: 700; text-align: center; line-height: 16px; padding: 0 4px;
+}
+.bio-pill-btn.tem-update::after {
+  content: ''; position: absolute; top: 4px; right: calc(50% - 16px);
+  width: 9px; height: 9px; border-radius: 50%;
+  background: #EF4444; border: 2px solid #fff;
+}
+
+/* ── Cabeçalho de formulário ────────────────────────────────── */
+.bio-form-header {
+  display: flex; align-items: center; gap: 12px;
+  padding: 16px 16px 8px;
+}
+.bio-form-header > span { font-size: 17px; font-weight: 700; flex: 1; color: var(--bio-ink); }
+.bio-btn-back {
+  width: 40px; height: 40px; border-radius: 50%;
+  background: rgba(0,0,0,.06); border: none; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px; color: var(--bio-ink); line-height: 1;
+  flex-shrink: 0; -webkit-tap-highlight-color: transparent;
+}
+.bio-btn-back:active { background: rgba(0,0,0,.12); }
+
+/* ── Steps do formulário de ninho ───────────────────────────── */
+.bio-steps {
+  display: flex; align-items: center; gap: 0;
+  margin: 0 16px 16px; background: #E8F2F8;
+  border-radius: 14px; padding: 4px; overflow: hidden;
+}
+.bio-step-btn {
+  flex: 1; padding: 9px 6px; border: none; border-radius: 11px;
+  font-size: 11px; font-weight: 700; text-align: center; cursor: pointer;
+  background: transparent; color: #6B7280; transition: all .18s;
+  font-family: var(--font-ui); line-height: 1.3;
+  -webkit-tap-highlight-color: transparent;
+}
+.bio-step-btn.ativo { background: #fff; color: var(--bio-prim); box-shadow: 0 1px 4px rgba(0,0,0,.1); }
+.bio-step-btn.completo { color: var(--bio-verde); }
+.bio-step-num {
+  display: block; font-size: 16px; font-weight: 700; font-family: var(--font-mono);
+}
+
+/* ── Corpo dos formulários ──────────────────────────────────── */
+.bio-form-body { padding: 0 16px 16px; }
+.bio-form-section {
+  background: var(--bio-surface); border: 1px solid #D0E4EF;
+  border-radius: 16px; padding: 14px; margin-bottom: 14px;
+  box-shadow: 0 1px 3px rgba(13,30,39,.05);
+}
+.bio-form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.bio-section-header {
+  display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;
+}
+.bio-form-label {
+  font-size: 12px; font-weight: 600; color: #6B7280;
+  text-transform: uppercase; letter-spacing: .05em;
+  margin-bottom: 6px; display: block;
+}
+.bio-form-input, .bio-form-select, .bio-form-textarea {
+  width: 100%; padding: 14px 16px;
+  border: 1.5px solid #D0E4EF; border-radius: 14px;
+  font-family: var(--font-ui); font-size: 15px;
+  background: #fff; outline: none; color: var(--bio-ink);
+  transition: border-color .15s; -webkit-appearance: none;
+  box-sizing: border-box;
+}
+.bio-form-input:focus, .bio-form-select:focus, .bio-form-textarea:focus { border-color: var(--bio-prim); }
+.bio-form-textarea { resize: vertical; }
+
+/* ── Seletor de espécie (grade com chips) ───────────────────── */
+.bio-especie-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+}
+.bio-especie-chip {
+  padding: 10px 4px; border-radius: 14px;
+  border: 2px solid transparent; background: rgba(0,0,0,.04);
+  font-size: 10px; font-weight: 700; text-align: center; cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  transition: all .15s; -webkit-tap-highlight-color: transparent;
+  line-height: 1.3;
+}
+.bio-especie-chip .bio-esp-ico {
+  width: 48px; height: 48px; border-radius: 50%; overflow: hidden;
+  background: rgba(26,107,140,.08);
+  display: flex; align-items: center; justify-content: center;
+}
+.bio-especie-chip .bio-esp-ico svg { width: 28px; height: 28px; }
+.bio-especie-chip.sel {
+  border-color: var(--bio-prim); background: var(--bio-prim-bg); color: var(--bio-prim);
+}
+.bio-especie-chip.sel .bio-esp-ico { box-shadow: 0 0 0 2px var(--bio-prim); }
+
+/* Siglas das espécies nos chips */
+.bio-esp-sigla {
+  font-family: var(--font-mono); font-size: 14px; font-weight: 700;
+  color: var(--bio-prim);
+}
+
+/* ── Contadores numéricos (filhotes, ovos) ──────────────────── */
+.bio-counter-row { display: flex; align-items: center; gap: 10px; }
+.bio-counter-btn {
+  width: 40px; height: 40px; border-radius: 12px;
+  border: 1.5px solid #D0E4EF; background: #fff; cursor: pointer;
+  font-size: 22px; font-weight: 700; line-height: 1; color: var(--bio-ink);
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+.bio-counter-btn:active { background: #E8F2F8; }
+.bio-counter-val {
+  flex: 1; text-align: center;
+  font-family: var(--font-mono); font-size: 28px; font-weight: 700;
+  color: var(--bio-ink);
+}
+.bio-counter-label {
+  display: block; font-size: 10px; color: #9CA3AF;
+  text-transform: uppercase; letter-spacing: .05em; text-align: center; margin-top: 2px;
+}
+
+/* ── Predação — opções radio estilizadas ────────────────────── */
+.bio-pred-grid { display: flex; flex-direction: column; gap: 8px; }
+.bio-pred-opt {
+  display: flex; align-items: center; gap: 12px; padding: 12px 14px;
+  border-radius: 12px; border: 1.5px solid #D0E4EF;
+  background: #fff; cursor: pointer; transition: all .15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.bio-pred-opt.sel { border-color: var(--bio-prim); background: var(--bio-prim-bg); }
+.bio-pred-opt.sel.perigo { border-color: var(--bio-perigo); background: var(--bio-perigo-bg); }
+.bio-pred-radio {
+  width: 20px; height: 20px; border-radius: 50%;
+  border: 2px solid #D0E4EF; flex-shrink: 0; position: relative;
+  transition: border-color .15s;
+}
+.bio-pred-opt.sel .bio-pred-radio {
+  border-color: var(--bio-prim); background: var(--bio-prim);
+}
+.bio-pred-opt.sel.perigo .bio-pred-radio { border-color: var(--bio-perigo); background: var(--bio-perigo); }
+.bio-pred-radio::after {
+  content: ''; position: absolute;
+  width: 8px; height: 8px; border-radius: 50%;
+  background: #fff; top: 50%; left: 50%; transform: translate(-50%,-50%);
+  opacity: 0; transition: opacity .15s;
+}
+.bio-pred-opt.sel .bio-pred-radio::after { opacity: 1; }
+.bio-pred-texto strong { display: block; font-size: 14px; font-weight: 600; }
+.bio-pred-texto span { font-size: 12px; color: #6B7280; }
+
+/* ── Fotos ───────────────────────────────────────────────────── */
+.bio-foto-acoes { display: flex; gap: 8px; }
+.bio-foto-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 8px;
+}
+.bio-foto-grid img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 10px; }
+
+/* ── Botões ─────────────────────────────────────────────────── */
+.bio-btn-sm {
+  padding: 7px 14px; border-radius: 10px; border: none;
+  font-family: var(--font-ui); font-size: 13px; font-weight: 600;
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.bio-btn-sm.prim { background: var(--bio-prim); color: #fff; }
+.bio-btn-sm.ghost { background: rgba(0,0,0,.06); color: var(--bio-ink); }
+.bio-btn-sm.perigo { background: var(--bio-perigo); color: #fff; }
+
+.bio-btn-salvar {
+  width: 100%; padding: 18px; border-radius: 16px; border: none;
+  background: var(--bio-prim); color: #fff;
+  font-family: var(--font-ui); font-size: 17px; font-weight: 700;
+  cursor: pointer; margin-top: 8px;
+  box-shadow: 0 4px 16px rgba(26,107,140,.32);
+  transition: transform .15s var(--spring);
+  -webkit-tap-highlight-color: transparent;
+}
+.bio-btn-salvar:active { transform: scale(.97); }
+.bio-btn-salvar:disabled { opacity: .55; cursor: not-allowed; }
+
+/* ── Fila de sincronização ──────────────────────────────────── */
+.bio-fila-stats {
+  display: flex; margin: 0 16px 16px;
+  background: #fff; border-radius: 16px; border: 1px solid #D0E4EF; overflow: hidden;
+}
+.bio-fila-stat {
+  flex: 1; text-align: center; padding: 14px 8px;
+  border-right: 1px solid #D0E4EF; font-size: 12px; color: #6B7280;
+}
+.bio-fila-stat:last-child { border-right: none; }
+.bio-fila-stat-n { display: block; font-size: 24px; font-weight: 700; color: var(--bio-ink); font-family: var(--font-mono); }
+
+.bio-sync-queue { padding: 0 16px; }
+.bio-sync-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 14px; border-radius: 14px;
+  background: #fff; border: 1px solid #D0E4EF; margin-bottom: 10px;
+}
+.bio-sync-dot {
+  width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+}
+.bio-sync-dot.pendente { background: var(--bio-alerta); }
+.bio-sync-dot.enviando { background: var(--bio-prim); animation: bio-blink 1s step-end infinite; }
+.bio-sync-dot.confirmado { background: var(--bio-verde); }
+@keyframes bio-blink { 50% { opacity: 0; } }
+
+.bio-sync-info { flex: 1; font-size: 13px; }
+.bio-sync-info strong { display: block; font-weight: 600; margin-bottom: 2px; }
+.bio-sync-info span { color: #6B7280; font-size: 12px; }
+.bio-sync-tipo {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-family: var(--font-mono); font-size: 11px; font-weight: 600;
+  padding: 1px 7px; border-radius: 6px; margin-bottom: 3px;
+  background: var(--bio-prim-bg); color: var(--bio-prim);
+}
+.bio-sync-tipo.transf { background: var(--bio-ouro-bg); color: #7A5E12; }
+.bio-sync-tipo.eclosao { background: var(--bio-verde-bg); color: #175E3C; }
+
+/* ── KPIs (aba Dados) ────────────────────────────────────────── */
+.bio-dados-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+.bio-kpi {
+  background: var(--bio-surface); border: 1px solid #D0E4EF;
+  border-radius: 16px; padding: 14px 8px; text-align: center;
+}
+.bio-kpi strong { display: block; font-size: 26px; font-family: var(--font-mono); color: var(--bio-ink); }
+.bio-kpi span { font-size: 11px; color: #6B7280; text-transform: uppercase; letter-spacing: .04em; }
+
+.bio-barra-row { display: grid; grid-template-columns: 110px 1fr 36px; align-items: center; gap: 8px; margin-bottom: 8px; }
+.bio-barra-rotulo { font-size: 12.5px; color: var(--bio-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bio-barra-track { height: 14px; border-radius: 7px; background: #DDE9F0; overflow: hidden; }
+.bio-barra-fill {
+  height: 100%; border-radius: 7px;
+  background: linear-gradient(90deg, var(--bio-prim), #28A0C8);
+  transition: width .9s var(--ease-out);
+}
+.bio-barra-valor { font-family: var(--font-mono); font-size: 12.5px; text-align: right; color: var(--bio-ink); }
+
+/* ── Config ─────────────────────────────────────────────────── */
+.bio-config-card {
+  display: flex; align-items: center; gap: 14px;
+  padding: 16px; margin: 0 0 20px;
+  background: #fff; border-radius: 16px; border: 1px solid #D0E4EF;
+}
+.bio-config-avatar {
+  width: 52px; height: 52px; border-radius: 50%;
+  background: var(--bio-prim); color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px; font-weight: 700; flex-shrink: 0;
+  background-size: cover; background-position: center;
+  font-family: var(--font-ui); border: none; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.bio-btn-config-item {
+  width: 100%; padding: 17px 18px; margin-bottom: 10px;
+  background: #fff; border: 1px solid #D0E4EF; border-radius: 18px;
+  display: flex; align-items: center; gap: 12px;
+  text-align: left; font-family: var(--font-ui);
+  font-size: 15px; font-weight: 600; color: var(--bio-ink); cursor: pointer;
+  box-shadow: 0 1px 4px rgba(13,30,39,.05);
+  transition: transform .18s var(--spring), background .12s;
+  -webkit-tap-highlight-color: transparent;
+}
+.bio-btn-config-item::after { content: '›'; margin-left: auto; color: #9CA3AF; font-size: 22px; }
+.bio-btn-config-item:active { background: #F2F7FA; transform: scale(.97); }
+.bio-btn-config-item.perigo { color: var(--bio-perigo); border-color: rgba(220,38,38,.3); }
+.bio-btn-config-item.perigo::after { color: var(--bio-perigo); }
+
+/* ── Toast ───────────────────────────────────────────────────── */
+.bio-toast {
+  position: fixed; bottom: calc(var(--bio-nav-h) + 24px); left: 50%;
+  transform: translateX(-50%);
+  background: var(--bio-ink); color: #fff;
+  padding: 10px 20px; border-radius: 20px;
+  font-size: 13px; font-weight: 500;
+  box-shadow: 0 4px 16px rgba(0,0,0,.3);
+  opacity: 0; pointer-events: none;
+  transition: opacity .2s, transform .2s var(--spring);
+  white-space: nowrap; z-index: 2000;
+}
+.bio-toast.show { opacity: 1; transform: translateX(-50%) translateY(-4px); }
+.bio-toast.ok   { background: var(--bio-verde); }
+.bio-toast.err  { background: var(--bio-perigo); }
+
+/* ── Update banner ───────────────────────────────────────────── */
+.bio-update-banner {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 2000;
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: calc(8px + env(safe-area-inset-top)) 14px 9px;
+  background: var(--bio-prim); color: #fff;
+  font-size: 13px; font-weight: 700;
+  box-shadow: 0 2px 12px rgba(0,0,0,.22);
+}
+.bio-update-banner[hidden] { display: none; }
+.bio-ub-btn {
+  background: rgba(255,255,255,.22); color: #fff; border: 0;
+  border-radius: 9px; padding: 6px 12px; font: inherit; font-weight: 700; cursor: pointer;
+}
+.bio-ub-btn-prim { background: #fff; color: var(--bio-prim); }
+
+/* ── Avatar menu ──────────────────────────────────────────────── */
+.bio-avatar-menu {
+  position: fixed; inset: 0; z-index: 2100;
+  background: rgba(10,26,40,.55);
+  display: flex; align-items: flex-end; justify-content: center;
+  padding: 16px calc(16px + env(safe-area-inset-left, 0)) calc(16px + env(safe-area-inset-bottom, 0));
+}
+.bio-avatar-menu[hidden] { display: none; }
+.bio-avatar-menu-card {
+  width: 100%; max-width: 420px;
+  background: #fff; border-radius: 16px; overflow: hidden;
+  box-shadow: 0 12px 40px rgba(0,0,0,.3);
+}
+.bio-am-item {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  padding: 16px 18px; border: 0; background: #fff;
+  font: inherit; font-size: 15px; font-weight: 600; color: var(--bio-ink);
+  cursor: pointer; text-align: left; border-bottom: 1px solid #EEF4F8;
+}
+.bio-am-item:active { background: #F2F7FA; }
+.bio-am-cancel { color: #9CA3AF; font-weight: 700; justify-content: center; border-bottom: 0; }
+
+/* ── Modal bottom sheet (seleção de praia, etc.) ─────────────── */
+.bio-sheet {
+  position: fixed; inset: 0; z-index: 1900;
+  background: rgba(13,30,39,.65);
+  display: flex; align-items: flex-end; justify-content: center;
+}
+.bio-sheet[hidden] { display: none; }
+.bio-sheet-card {
+  background: #fff; width: 100%; max-width: 540px;
+  border-radius: 22px 22px 0 0;
+  padding: 8px 16px calc(16px + env(safe-area-inset-bottom, 0px));
+  max-height: 75dvh; overflow-y: auto;
+  animation: bio-sheet-sobe .25s var(--ease-out);
+}
+@keyframes bio-sheet-sobe { from { transform: translateY(20px); opacity: 0; } }
+.bio-sheet-handle {
+  width: 36px; height: 4px; border-radius: 2px;
+  background: #D0D5DD; margin: 10px auto 14px;
+}
+.bio-sheet-titulo { font-size: 16px; font-weight: 700; margin-bottom: 12px; }
+.bio-sheet-item {
+  display: flex; align-items: center; gap: 12px; padding: 12px 0;
+  border-bottom: 1px solid #EEF4F8; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.bio-sheet-item:last-child { border-bottom: none; }
+.bio-sheet-item:active { opacity: .7; }
+.bio-sheet-item-info strong { display: block; font-size: 15px; font-weight: 600; }
+.bio-sheet-item-info span { font-size: 12px; color: #6B7280; }
+.bio-sheet-item-cod {
+  font-family: var(--font-mono); font-size: 12px;
+  background: var(--bio-prim-bg); color: var(--bio-prim);
+  padding: 3px 8px; border-radius: 6px; flex-shrink: 0;
+}
+
+/* ── Lista de ninhos abertos ─────────────────────────────────── */
+.bio-ninho-card {
+  background: var(--bio-surface); border-radius: 16px;
+  border: 1px solid #D0E4EF; padding: 14px 16px; margin-bottom: 10px;
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+  transition: border-color .15s;
+}
+.bio-ninho-card:active { border-color: var(--bio-prim); }
+.bio-ninho-card-header { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.bio-ninho-num {
+  font-family: var(--font-mono); font-size: 16px; font-weight: 700; color: var(--bio-ink);
+}
+.bio-ninho-status {
+  font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 99px;
+  margin-left: auto;
+}
+.bio-ninho-status.encontrado { background: var(--bio-alerta-bg); color: #7A4800; }
+.bio-ninho-status.transferido { background: var(--bio-ouro-bg); color: #7A5E12; }
+.bio-ninho-status.eclodido { background: var(--bio-verde-bg); color: #175E3C; }
+.bio-ninho-status.perdido { background: var(--bio-perigo-bg); color: var(--bio-perigo); }
+.bio-ninho-card-meta { font-size: 12px; color: #6B7280; display: flex; gap: 12px; flex-wrap: wrap; }
+
+/* ── Foto viewer ─────────────────────────────────────────────── */
+.bio-foto-viewer {
+  position: fixed; inset: 0; z-index: 2200;
+  background: rgba(0,0,0,.94);
+  display: flex; align-items: center; justify-content: center;
+}
+.bio-foto-viewer[hidden] { display: none; }
+.bio-foto-viewer img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.bio-foto-viewer-fechar {
+  position: absolute; top: calc(14px + env(safe-area-inset-top)); right: 14px;
+  width: 44px; height: 44px; border-radius: 50%;
+  background: rgba(255,255,255,.18); color: #fff; border: 0;
+  font-size: 20px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+
+/* ── QR overlay (Config → Instalação) ───────────────────────── */
+.bio-qr-overlay {
+  position: fixed; inset: 0; z-index: 9998;
+  background: rgba(13,30,39,.75);
+  display: flex; align-items: center; justify-content: center; padding: 22px;
+}
+.bio-qr-overlay[hidden] { display: none; }
+.bio-qr-card {
+  background: #fff; border-radius: 18px; padding: 22px 20px;
+  max-width: 360px; width: 100%; text-align: center;
+}
+.bio-qr-card h3 { margin: 0 0 8px; font-size: 1.1rem; }
+.bio-qr-card p { font-size: .9rem; color: #5B6E62; margin: 0 0 12px; }
+.bio-qr-card img { width: 240px; height: 240px; border-radius: 10px; border: 1px solid #D0E4EF; }
+
+/* ── Acessibilidade ─────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .bio-faixa-mascote, .bio-lock-mascote,
+  .bio-radar-sweep { animation: none; }
+}
+
+/* ── Telas estreitas ─────────────────────────────────────────── */
+@media (max-width: 380px) {
+  .bio-pill-nav { padding: 0 6px; gap: 2px; }
+  .bio-pill-btn { width: 48px; height: 48px; font-size: 8px; }
+  #bio-nav-cam  { width: 52px; height: 52px; margin: 0 3px; }
+}
+@media (max-width: 330px) {
+  .bio-pill-btn { width: 44px; height: 44px; }
+  .bio-pill-btn > span { display: none; }
+  #bio-nav-cam  { width: 50px; height: 50px; }
+}
+
+/* ── Telas (visibilidade) ────────────────────────────────────── */
+.bio-tela { display: none; }
+.bio-tela.ativa { display: block; animation: bio-fadeSlide .22s var(--ease-out); }
+@keyframes bio-fadeSlide { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }

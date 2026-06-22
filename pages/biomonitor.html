@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#1A6B8C">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>SIGUC Biomonitor</title>
+  <link rel="manifest" href="/pwa/manifest-biomonitor.json">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&family=Fraunces:wght@700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/biomonitor.css">
+</head>
+<body class="bio-app">
+
+<!-- ══ TELA: LOGIN ══════════════════════════════════════════════ -->
+<div id="tela-login" class="bio-tela bio-lock">
+  <div class="bio-lock-logo">
+    <img src="/pwa/icons/mascote.png" alt="" class="bio-lock-mascote">
+    <span>SIGUC Biomonitor</span>
+  </div>
+  <p class="bio-lock-dica">Monitoramento de Quelônios — SEMA-AC<br>Faça login para continuar</p>
+  <div class="bio-login-form">
+    <input type="email" id="bio-login-email" class="bio-login-input"
+      placeholder="E-mail" autocomplete="username" inputmode="email">
+    <div class="bio-senha-wrap">
+      <input type="password" id="bio-login-senha" class="bio-login-input"
+        placeholder="Senha" autocomplete="current-password">
+      <button type="button" id="bio-btn-toggle-senha" class="bio-btn-toggle-senha" aria-label="Mostrar senha">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+        </svg>
+      </button>
+    </div>
+    <button id="bio-btn-login" class="bio-btn-login">Entrar</button>
+  </div>
+  <p class="bio-lock-erro" id="bio-login-erro" hidden></p>
+</div>
+
+<!-- ══ TELA: TROCAR SENHA (1º acesso) ════════════════════════════ -->
+<div id="tela-trocar-senha" class="bio-tela bio-lock">
+  <div class="bio-lock-logo">
+    <img src="/pwa/icons/mascote.png" alt="" class="bio-lock-mascote">
+    <span>Criar Nova Senha</span>
+  </div>
+  <p class="bio-lock-dica">Você entrou com uma senha provisória.<br>Crie sua senha pessoal para continuar.</p>
+  <div class="bio-login-form">
+    <input type="password" id="bio-troca-senha1" class="bio-login-input"
+      placeholder="Nova senha (mín. 6 caracteres)" autocomplete="new-password">
+    <input type="password" id="bio-troca-senha2" class="bio-login-input"
+      placeholder="Repita a nova senha" autocomplete="new-password">
+    <button id="bio-btn-trocar-senha" class="bio-btn-login">Salvar e continuar</button>
+  </div>
+  <p class="bio-lock-erro" id="bio-troca-erro" hidden></p>
+</div>
+
+<!-- ══ TELA: CONFIGURAR PIN ═══════════════════════════════════════ -->
+<div id="tela-config-pin" class="bio-tela bio-lock">
+  <div class="bio-lock-logo">
+    <img src="/pwa/icons/mascote.png" alt="" class="bio-lock-mascote">
+    <span>Criar PIN de Campo</span>
+  </div>
+  <p class="bio-lock-dica" id="bio-pin-setup-dica">Escolha um PIN de 4 dígitos</p>
+  <div class="bio-pin-display" id="pin-setup-display">
+    <span class="bio-pin-dot"></span>
+    <span class="bio-pin-dot"></span>
+    <span class="bio-pin-dot"></span>
+    <span class="bio-pin-dot"></span>
+  </div>
+  <div class="bio-pin-keypad" id="pin-setup-keypad">
+    <button class="bio-pin-key" data-v="1">1</button>
+    <button class="bio-pin-key" data-v="2">2</button>
+    <button class="bio-pin-key" data-v="3">3</button>
+    <button class="bio-pin-key" data-v="4">4</button>
+    <button class="bio-pin-key" data-v="5">5</button>
+    <button class="bio-pin-key" data-v="6">6</button>
+    <button class="bio-pin-key" data-v="7">7</button>
+    <button class="bio-pin-key" data-v="8">8</button>
+    <button class="bio-pin-key" data-v="9">9</button>
+    <button class="bio-pin-key bio-pin-clear" aria-label="Apagar">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z"/>
+        <line x1="18" y1="9" x2="12" y2="15"/><line x1="12" y1="9" x2="18" y2="15"/>
+      </svg>
+    </button>
+    <button class="bio-pin-key" data-v="0">0</button>
+    <button class="bio-pin-key bio-pin-ok" aria-label="Confirmar">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <polyline points="20 6 9 17 4 12"/>
+      </svg>
+    </button>
+  </div>
+  <p class="bio-lock-erro" id="pin-setup-erro" hidden></p>
+</div>
+
+<!-- ══ TELA: BLOQUEIO ════════════════════════════════════════════ -->
+<div id="tela-bloqueio" class="bio-tela bio-lock">
+  <div class="bio-lock-logo">
+    <img src="/pwa/icons/mascote.png" alt="" class="bio-lock-mascote">
+    <span>SIGUC Biomonitor</span>
+  </div>
+  <p style="font-size:17px;font-weight:700;color:var(--bio-soft);margin:0 0 4px" id="bio-lock-nome">Monitor</p>
+  <p class="bio-lock-dica">Digite seu PIN de campo</p>
+  <div class="bio-pin-display" id="pin-lock-display">
+    <span class="bio-pin-dot"></span>
+    <span class="bio-pin-dot"></span>
+    <span class="bio-pin-dot"></span>
+    <span class="bio-pin-dot"></span>
+  </div>
+  <div class="bio-pin-keypad" id="pin-lock-keypad">
+    <button class="bio-pin-key" data-v="1">1</button>
+    <button class="bio-pin-key" data-v="2">2</button>
+    <button class="bio-pin-key" data-v="3">3</button>
+    <button class="bio-pin-key" data-v="4">4</button>
+    <button class="bio-pin-key" data-v="5">5</button>
+    <button class="bio-pin-key" data-v="6">6</button>
+    <button class="bio-pin-key" data-v="7">7</button>
+    <button class="bio-pin-key" data-v="8">8</button>
+    <button class="bio-pin-key" data-v="9">9</button>
+    <button class="bio-pin-key bio-pin-clear" aria-label="Apagar">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z"/>
+        <line x1="18" y1="9" x2="12" y2="15"/><line x1="12" y1="9" x2="18" y2="15"/>
+      </svg>
+    </button>
+    <button class="bio-pin-key" data-v="0">0</button>
+    <button class="bio-pin-key bio-pin-ok" aria-label="Confirmar">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <polyline points="20 6 9 17 4 12"/>
+      </svg>
+    </button>
+  </div>
+  <p class="bio-lock-erro" id="bio-lock-erro" hidden></p>
+  <button class="bio-btn-link" id="bio-btn-esqueci-pin">Esqueci o PIN — entrar com senha</button>
+</div>
+
+<!-- ══ TELA: HOME ════════════════════════════════════════════════ -->
+<div id="tela-home" class="bio-tela">
+
+  <!-- Faixa institucional com mascote sobreposto -->
+  <div class="bio-faixa-inst">
+    <div class="bio-faixa-logos">
+      <span class="bio-faixa-logo-chip gov" hidden><img alt="Governo do Acre"></span>
+      <span class="bio-faixa-logo-chip sec" hidden><img alt="SEMA-AC"></span>
+    </div>
+    <img class="bio-faixa-mascote" src="/pwa/icons/mascote.png" alt="Biomonitor Quelônios">
+  </div>
+
+  <!-- Header: avatar + nome + sync -->
+  <header class="bio-home-header">
+    <div class="bio-home-id">
+      <div class="bio-home-avatar" id="bio-home-avatar">
+        <span id="bio-home-avatar-letra">M</span>
+      </div>
+      <div class="bio-home-id-texto">
+        <p class="bio-home-saudacao" id="bio-home-saudacao">Bom dia</p>
+        <h1 class="bio-home-nome" id="bio-home-nome">Monitor</h1>
+        <div class="bio-home-meta">
+          <span class="bio-home-chip" id="bio-home-grupo"></span>
+          <span class="bio-home-chip" id="bio-home-programa"></span>
+        </div>
+      </div>
+    </div>
+    <button class="bio-btn-icon" id="bio-btn-sync-home" aria-label="Sincronizar" title="Sincronizar">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M23 4v6h-6M1 20v-6h6"/>
+        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+      </svg>
+    </button>
+  </header>
+
+  <!-- GPS + conectividade -->
+  <div class="bio-gps-card">
+    <div class="bio-radar">
+      <span class="bio-radar-anel"></span>
+      <span class="bio-radar-anel r2"></span>
+      <span class="bio-radar-sweep"></span>
+      <span class="bio-radar-ponto"></span>
+    </div>
+    <div class="bio-gps-info">
+      <span class="bio-gps-label">GPS</span>
+      <span class="bio-gps-coords" id="bio-gps-coords">Aguardando sinal…</span>
+      <span class="bio-gps-acc" id="bio-gps-acc"></span>
+    </div>
+    <div class="bio-gps-lado">
+      <span class="bio-conn-chip" id="bio-conn-chip">
+        <span class="bio-conn-dot"></span>
+        <span id="bio-conn-texto">…</span>
+      </span>
+    </div>
+  </div>
+
+  <!-- Seletor de praia (toca para abrir sheet) -->
+  <div class="bio-praia-seletor" id="bio-praia-seletor" role="button" tabindex="0" aria-label="Selecionar praia">
+    <div class="bio-praia-seletor-info">
+      <div class="bio-praia-seletor-label">Praia monitorada</div>
+      <div class="bio-praia-seletor-nome" id="bio-praia-nome">Selecione uma praia…</div>
+      <div class="bio-praia-seletor-detalhe" id="bio-praia-detalhe"></div>
+    </div>
+    <span class="bio-praia-seletor-cod" id="bio-praia-cod"
+      style="font-family:var(--font-mono);font-size:11px;background:var(--bio-prim-bg);color:var(--bio-prim);padding:3px 8px;border-radius:6px;flex-shrink:0"></span>
+    <span class="bio-praia-chevron">›</span>
+  </div>
+
+  <!-- Botões de ação -->
+  <p class="bio-home-instrucao">O que deseja registrar?</p>
+  <div class="bio-acao-grid">
+
+    <button class="bio-acao-btn registrar" id="bio-btn-registrar" type="button">
+      <div class="bio-acao-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="12" y1="8" x2="12" y2="16"/>
+          <line x1="8" y1="12" x2="16" y2="12"/>
+        </svg>
+      </div>
+      <div class="bio-acao-label">
+        <strong>Novo Ninho</strong>
+        <span>Registrar encontro de ninho</span>
+      </div>
+      <span class="bio-acao-chevron">›</span>
+    </button>
+
+    <button class="bio-acao-btn abertos" id="bio-btn-abertos" type="button">
+      <div class="bio-acao-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+          <circle cx="12" cy="10" r="3"/>
+        </svg>
+      </div>
+      <div class="bio-acao-label">
+        <strong>Ninhos Abertos</strong>
+        <span>Transferência ou eclosão</span>
+      </div>
+      <span class="bio-acao-chevron">›</span>
+    </button>
+
+    <button class="bio-acao-btn historico" id="bio-btn-historico" type="button">
+      <div class="bio-acao-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/>
+          <polyline points="12 6 12 12 16 14"/>
+        </svg>
+      </div>
+      <div class="bio-acao-label">
+        <strong>Histórico</strong>
+        <span>Ver todos os ninhos da praia</span>
+      </div>
+      <span class="bio-acao-chevron">›</span>
+    </button>
+
+  </div>
+
+  <!-- Card de pendentes na fila -->
+  <div class="bio-fila-card" id="bio-fila-card" hidden>
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+    </svg>
+    <div>
+      <strong id="bio-fila-count">0 registros</strong>
+      <span> aguardando sincronização</span>
+    </div>
+  </div>
+
+</div>
+
+<!-- ══ TELA: FORMULÁRIO — NINHO ══════════════════════════════════ -->
+<div id="tela-form-ninho" class="bio-tela">
+  <header class="bio-form-header">
+    <button class="bio-btn-back" data-back="tela-home" aria-label="Voltar">‹</button>
+    <span>Novo Ninho</span>
+    <span></span>
+  </header>
+
+  <div class="bio-form-body">
+
+    <!-- Praia (contexto) -->
+    <div class="bio-form-section">
+      <span class="bio-form-label">Praia</span>
+      <p id="bio-form-praia-label" style="font-size:15px;font-weight:700;margin:4px 0 0;color:var(--bio-prim)">—</p>
+    </div>
+
+    <!-- GPS compacto -->
+    <div class="bio-form-section" style="display:flex;align-items:center;gap:12px">
+      <div class="bio-radar" style="width:40px;height:40px;flex-shrink:0">
+        <span class="bio-radar-anel"></span>
+        <span class="bio-radar-sweep"></span>
+        <span class="bio-radar-ponto"></span>
+      </div>
+      <div>
+        <span class="bio-form-label" style="margin-bottom:2px">Localização GPS</span>
+        <span class="bio-gps-coords" id="bio-form-gps-coords" style="font-size:12px;display:block">Aguardando GPS…</span>
+      </div>
+    </div>
+
+    <!-- Número do ninho -->
+    <div class="bio-form-section">
+      <label class="bio-form-label" for="bio-form-numero">N° do ninho / placa *</label>
+      <input type="text" id="bio-form-numero" class="bio-form-input"
+        placeholder="Ex: 001" autocomplete="off">
+    </div>
+
+    <!-- Data de encontro -->
+    <div class="bio-form-section">
+      <label class="bio-form-label" for="bio-form-data">Data de encontro *</label>
+      <input type="date" id="bio-form-data" class="bio-form-input">
+    </div>
+
+    <!-- Espécie -->
+    <div class="bio-form-section">
+      <span class="bio-form-label">Espécie *</span>
+      <div class="bio-especie-grid">
+        <button class="bio-especie-chip" data-esp="tracaja" type="button">
+          <div class="bio-esp-ico"><span class="bio-esp-sigla">TR</span></div>
+          Tracajá
+        </button>
+        <button class="bio-especie-chip" data-esp="tartaruga" type="button">
+          <div class="bio-esp-ico"><span class="bio-esp-sigla">TA</span></div>
+          Tartaruga
+        </button>
+        <button class="bio-especie-chip" data-esp="cabecudo" type="button">
+          <div class="bio-esp-ico"><span class="bio-esp-sigla">R</span></div>
+          Cabeçudo
+        </button>
+        <button class="bio-especie-chip" data-esp="pitiU" type="button">
+          <div class="bio-esp-ico"><span class="bio-esp-sigla">C</span></div>
+          Pitiú
+        </button>
+        <button class="bio-especie-chip" data-esp="mucua" type="button">
+          <div class="bio-esp-ico"><span class="bio-esp-sigla">M</span></div>
+          Muçuã
+        </button>
+        <button class="bio-especie-chip" data-esp="jabuti_pe_elefante" type="button">
+          <div class="bio-esp-ico"><span class="bio-esp-sigla">JP</span></div>
+          Jabuti
+        </button>
+        <button class="bio-especie-chip" data-esp="outro" type="button">
+          <div class="bio-esp-ico"><span class="bio-esp-sigla">?</span></div>
+          Outro
+        </button>
+      </div>
+    </div>
+
+    <!-- Fotos -->
+    <div class="bio-form-section">
+      <div class="bio-section-header">
+        <span class="bio-form-label">Fotos <span id="bio-form-foto-count">(0/3)</span></span>
+        <div class="bio-foto-acoes">
+          <button type="button" id="bio-form-btn-camera" class="bio-btn-sm prim">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px">
+              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+              <circle cx="12" cy="13" r="4"/>
+            </svg>Câmera
+          </button>
+        </div>
+      </div>
+      <input type="file" id="bio-form-input-foto" accept="image/*" capture="environment" hidden>
+      <div class="bio-foto-grid" id="bio-form-foto-grid"></div>
+    </div>
+
+    <!-- Observações -->
+    <div class="bio-form-section">
+      <label class="bio-form-label" for="bio-form-obs">Observações</label>
+      <textarea id="bio-form-obs" class="bio-form-textarea" rows="3"
+        placeholder="Condições do ninho, localização relativa…"></textarea>
+    </div>
+
+    <button type="button" id="bio-btn-salvar-ninho" class="bio-btn-salvar">Salvar Ninho</button>
+  </div>
+</div>
+
+<!-- ══ TELA: FORMULÁRIO — TRANSFERÊNCIA ═════════════════════════ -->
+<div id="tela-form-transf" class="bio-tela">
+  <header class="bio-form-header">
+    <button class="bio-btn-back" data-back="tela-abertos" aria-label="Voltar">‹</button>
+    <span>Transferência de Ninho</span>
+    <span></span>
+  </header>
+
+  <div class="bio-form-body">
+
+    <!-- Contexto do ninho -->
+    <div class="bio-form-section" style="background:var(--bio-ouro-bg);border-color:rgba(201,168,76,.4)">
+      <span class="bio-form-label">Ninho</span>
+      <p style="margin:4px 0 0;font-size:16px;font-weight:700;color:var(--bio-ink)">
+        N° <span id="bio-transf-ninho-num">—</span>
+        &nbsp;·&nbsp; <span id="bio-transf-especie"></span>
+      </p>
+    </div>
+
+    <div class="bio-form-section">
+      <label class="bio-form-label" for="bio-transf-data">Data da transferência *</label>
+      <input type="date" id="bio-transf-data" class="bio-form-input">
+    </div>
+
+    <div class="bio-form-section">
+      <label class="bio-form-label" for="bio-transf-ovos">Quantidade de ovos transferidos *</label>
+      <input type="number" id="bio-transf-ovos" class="bio-form-input"
+        min="0" inputmode="numeric" placeholder="0">
+    </div>
+
+    <div class="bio-form-section">
+      <label class="bio-form-label" for="bio-transf-local">Local de destino</label>
+      <input type="text" id="bio-transf-local" class="bio-form-input"
+        placeholder="Ex: Berçário 1, Praia Alternativa…" autocomplete="off">
+    </div>
+
+    <div class="bio-form-section">
+      <label class="bio-form-label" for="bio-transf-obs">Observações</label>
+      <textarea id="bio-transf-obs" class="bio-form-textarea" rows="3"
+        placeholder="Condições, motivo da transferência…"></textarea>
+    </div>
+
+    <button type="button" id="bio-btn-salvar-transf" class="bio-btn-salvar">Salvar Transferência</button>
+  </div>
+</div>
+
+<!-- ══ TELA: FORMULÁRIO — ECLOSÃO ═══════════════════════════════ -->
+<div id="tela-form-eclosao" class="bio-tela">
+  <header class="bio-form-header">
+    <button class="bio-btn-back" data-back="tela-abertos" aria-label="Voltar">‹</button>
+    <span>Registro de Eclosão</span>
+    <span></span>
+  </header>
+
+  <div class="bio-form-body">
+
+    <!-- Contexto do ninho -->
+    <div class="bio-form-section" style="background:var(--bio-verde-bg);border-color:rgba(42,157,111,.4)">
+      <span class="bio-form-label">Ninho</span>
+      <p style="margin:4px 0 0;font-size:16px;font-weight:700;color:var(--bio-ink)">
+        N° <span id="bio-ecl-ninho-num">—</span>
+        &nbsp;·&nbsp; <span id="bio-ecl-especie"></span>
+      </p>
+    </div>
+
+    <div class="bio-form-section">
+      <label class="bio-form-label" for="bio-ecl-data">Data de nascimento *</label>
+      <input type="date" id="bio-ecl-data" class="bio-form-input">
+    </div>
+
+    <!-- Filhotes vivos -->
+    <div class="bio-form-section">
+      <span class="bio-form-label">Filhotes vivos</span>
+      <div class="bio-counter-row">
+        <button type="button" id="bio-ecl-vivos-minus" class="bio-counter-btn">−</button>
+        <div style="flex:1;text-align:center">
+          <span class="bio-counter-val" id="bio-ecl-vivos">0</span>
+          <span class="bio-counter-label">Vivos</span>
+        </div>
+        <button type="button" id="bio-ecl-vivos-plus" class="bio-counter-btn">+</button>
+      </div>
+    </div>
+
+    <!-- Filhotes mortos -->
+    <div class="bio-form-section">
+      <span class="bio-form-label">Filhotes mortos</span>
+      <div class="bio-counter-row">
+        <button type="button" id="bio-ecl-mortos-minus" class="bio-counter-btn">−</button>
+        <div style="flex:1;text-align:center">
+          <span class="bio-counter-val" id="bio-ecl-mortos">0</span>
+          <span class="bio-counter-label">Mortos</span>
+        </div>
+        <button type="button" id="bio-ecl-mortos-plus" class="bio-counter-btn">+</button>
+      </div>
+    </div>
+
+    <!-- Ovos não nascidos -->
+    <div class="bio-form-section">
+      <span class="bio-form-label">Ovos não nascidos</span>
+      <div class="bio-counter-row">
+        <button type="button" id="bio-ecl-nao-nasc-minus" class="bio-counter-btn">−</button>
+        <div style="flex:1;text-align:center">
+          <span class="bio-counter-val" id="bio-ecl-nao-nasc">0</span>
+          <span class="bio-counter-label">Não nascidos</span>
+        </div>
+        <button type="button" id="bio-ecl-nao-nasc-plus" class="bio-counter-btn">+</button>
+      </div>
+    </div>
+
+    <!-- Predação -->
+    <div class="bio-form-section">
+      <span class="bio-form-label">Predação</span>
+      <div class="bio-pred-grid">
+        <div class="bio-pred-opt" data-pred="nenhuma">
+          <span class="bio-pred-radio"></span>
+          <div class="bio-pred-texto">
+            <strong>Nenhuma</strong>
+            <span>Sem indícios de predação</span>
+          </div>
+        </div>
+        <div class="bio-pred-opt" data-pred="por_pessoas">
+          <span class="bio-pred-radio"></span>
+          <div class="bio-pred-texto">
+            <strong>Por pessoas</strong>
+            <span>Coleta de ovos, pisoteio</span>
+          </div>
+        </div>
+        <div class="bio-pred-opt" data-pred="por_animais">
+          <span class="bio-pred-radio"></span>
+          <div class="bio-pred-texto">
+            <strong>Por animais</strong>
+            <span>Queixada, teiú, outros</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <button type="button" id="bio-btn-salvar-eclosao" class="bio-btn-salvar">Salvar Eclosão</button>
+  </div>
+</div>
+
+<!-- ══ TELA: NINHOS ABERTOS ══════════════════════════════════════ -->
+<div id="tela-abertos" class="bio-tela">
+  <header class="bio-form-header">
+    <button class="bio-btn-back" data-back="tela-home" aria-label="Voltar">‹</button>
+    <span>Ninhos Abertos</span>
+    <span></span>
+  </header>
+  <div class="bio-form-body">
+    <div id="bio-lista-abertos"></div>
+  </div>
+</div>
+
+<!-- ══ TELA: HISTÓRICO ═══════════════════════════════════════════ -->
+<div id="tela-historico" class="bio-tela">
+  <header class="bio-form-header">
+    <button class="bio-btn-back" data-back="tela-home" aria-label="Voltar">‹</button>
+    <span>Histórico de Ninhos</span>
+    <span></span>
+  </header>
+  <div class="bio-form-body">
+    <div id="bio-lista-historico"></div>
+  </div>
+</div>
+
+<!-- ══ TELA: FILA DE SINCRONIZAÇÃO ══════════════════════════════ -->
+<div id="tela-fila" class="bio-tela">
+  <header class="bio-form-header">
+    <button class="bio-btn-back" data-back="tela-home" aria-label="Voltar">‹</button>
+    <span>Fila de Envio</span>
+    <button class="bio-btn-icon" id="bio-btn-sync-fila" aria-label="Sincronizar">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M23 4v6h-6M1 20v-6h6"/>
+        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+      </svg>
+    </button>
+  </header>
+
+  <div class="bio-fila-stats">
+    <div class="bio-fila-stat">
+      <span class="bio-fila-stat-n" id="bio-fila-total">0</span>
+      <span>Total</span>
+    </div>
+    <div class="bio-fila-stat">
+      <span class="bio-fila-stat-n" id="bio-fila-pendentes">0</span>
+      <span>Pendentes</span>
+    </div>
+    <div class="bio-fila-stat">
+      <span class="bio-fila-stat-n" id="bio-fila-confirmados">0</span>
+      <span>Confirmados</span>
+    </div>
+  </div>
+
+  <div class="bio-sync-queue" id="bio-sync-queue"></div>
+</div>
+
+<!-- ══ TELA: DADOS ════════════════════════════════════════════════ -->
+<div id="tela-dados" class="bio-tela">
+  <header class="bio-form-header">
+    <button class="bio-btn-back" data-back="tela-home" aria-label="Voltar">‹</button>
+    <span>Meus Resultados</span>
+    <span></span>
+  </header>
+
+  <div class="bio-form-body">
+
+    <p style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#9CA3AF;margin:0 0 10px">Dados do servidor (grupo)</p>
+    <div class="bio-dados-grid">
+      <div class="bio-kpi">
+        <strong id="bio-kpi-ninhos">—</strong>
+        <span>Ninhos do grupo</span>
+      </div>
+      <div class="bio-kpi">
+        <strong id="bio-kpi-eclodidos">—</strong>
+        <span>Eclodidos</span>
+      </div>
+      <div class="bio-kpi">
+        <strong id="bio-kpi-filhotes">—</strong>
+        <span>Filhotes vivos</span>
+      </div>
+      <div class="bio-kpi">
+        <strong id="bio-kpi-taxa">—</strong>
+        <span>Taxa eclosão</span>
+      </div>
+    </div>
+
+    <p style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#9CA3AF;margin:14px 0 10px">Dados locais (offline)</p>
+    <div class="bio-dados-grid">
+      <div class="bio-kpi">
+        <strong id="bio-kpi-ninhos-local">—</strong>
+        <span>Ninhos (local)</span>
+      </div>
+      <div class="bio-kpi">
+        <strong id="bio-kpi-eclodidos-local">—</strong>
+        <span>Eclodidos (local)</span>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══ TELA: CONFIGURAÇÕES ════════════════════════════════════════ -->
+<div id="tela-config" class="bio-tela">
+  <header class="bio-form-header">
+    <button class="bio-btn-back" data-back="tela-home" aria-label="Voltar">‹</button>
+    <span>Configurações</span>
+    <span></span>
+  </header>
+
+  <div class="bio-form-body">
+
+    <!-- Card do monitor -->
+    <div class="bio-config-card">
+      <div class="bio-config-avatar" id="bio-config-avatar">M</div>
+      <div>
+        <strong id="bio-config-nome">—</strong>
+        <p id="bio-config-grupo" style="margin:2px 0 0;font-size:13px;opacity:.65">—</p>
+      </div>
+    </div>
+
+    <button class="bio-btn-config-item" id="bio-btn-alterar-pin" type="button">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+        <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+      </svg>
+      Alterar PIN de campo
+    </button>
+    <button class="bio-btn-config-item perigo" id="bio-btn-zerar-fila" type="button">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="3 6 5 6 21 6"/>
+        <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+        <path d="M10 11v6M14 11v6"/>
+      </svg>
+      Zerar fila de registros
+    </button>
+    <button class="bio-btn-config-item perigo" id="bio-btn-sair" type="button">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+        <polyline points="16 17 21 12 16 7"/>
+        <line x1="21" y1="12" x2="9" y2="12"/>
+      </svg>
+      Sair / Trocar conta
+    </button>
+
+    <p style="font-size:11px;color:#9CA3AF;text-align:center;margin-top:24px">
+      Biomonitor Quelônios v1.0<br>
+      SIGUC-AC — Desenvolvido por <strong>Erisson Cameli Santiago</strong>
+    </p>
+  </div>
+</div>
+
+<!-- ══ SHEET: Seleção de praia ══════════════════════════════════ -->
+<div id="bio-sheet-praias" class="bio-sheet" hidden>
+  <div class="bio-sheet-card">
+    <div class="bio-sheet-handle"></div>
+    <p class="bio-sheet-titulo">Selecionar Praia</p>
+    <div id="bio-sheet-praias-lista"></div>
+  </div>
+</div>
+
+<!-- ══ FOTO VIEWER ════════════════════════════════════════════════ -->
+<div id="bio-foto-viewer" class="bio-foto-viewer" hidden>
+  <button class="bio-foto-viewer-fechar" id="bio-foto-viewer-fechar" aria-label="Fechar">✕</button>
+  <img id="bio-foto-viewer-img" alt="Foto">
+</div>
+
+<!-- ══ UPDATE BANNER ═════════════════════════════════════════════ -->
+<div id="bio-update-banner" class="bio-update-banner" hidden>
+  <span>
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:6px">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+    </svg>
+    Nova versão disponível
+  </span>
+  <div>
+    <button id="bio-btn-update-agora" class="bio-ub-btn bio-ub-btn-prim" type="button">Atualizar</button>
+    <button id="bio-btn-update-depois" class="bio-ub-btn" type="button">Depois</button>
+  </div>
+</div>
+
+<!-- ══ TOAST ══════════════════════════════════════════════════════ -->
+<div id="bio-toast" class="bio-toast" role="status" aria-live="polite"></div>
+
+<!-- ══ NAV PILL ══════════════════════════════════════════════════ -->
+<nav class="bio-pill-nav" id="bio-pill-nav" hidden aria-label="Navegação principal">
+  <button class="bio-pill-btn" id="nav-home" aria-label="Início">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+      <polyline points="9 22 9 12 15 12 15 22"/>
+    </svg>
+    <span>Início</span>
+  </button>
+  <button class="bio-pill-btn" id="nav-abertos" aria-label="Abertos">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+      <circle cx="12" cy="10" r="3"/>
+    </svg>
+    <span>Abertos</span>
+  </button>
+
+  <!-- Botão central: novo ninho -->
+  <button class="bio-pill-btn" id="bio-nav-cam" aria-label="Novo ninho">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <circle cx="12" cy="12" r="10"/>
+      <line x1="12" y1="8" x2="12" y2="16"/>
+      <line x1="8" y1="12" x2="16" y2="12"/>
+    </svg>
+  </button>
+
+  <button class="bio-pill-btn" id="nav-fila" aria-label="Fila de envio">
+    <span class="bio-pill-badge" id="bio-nav-fila-badge" style="display:none">0</span>
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <line x1="8" y1="6" x2="21" y2="6"/>
+      <line x1="8" y1="12" x2="21" y2="12"/>
+      <line x1="8" y1="18" x2="21" y2="18"/>
+      <line x1="3" y1="6" x2="3.01" y2="6"/>
+      <line x1="3" y1="12" x2="3.01" y2="12"/>
+      <line x1="3" y1="18" x2="3.01" y2="18"/>
+    </svg>
+    <span>Fila</span>
+  </button>
+  <button class="bio-pill-btn" id="nav-dados" aria-label="Dados">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <line x1="18" y1="20" x2="18" y2="10"/>
+      <line x1="12" y1="20" x2="12" y2="4"/>
+      <line x1="6" y1="20" x2="6" y2="14"/>
+    </svg>
+    <span>Dados</span>
+  </button>
+  <button class="bio-pill-btn" id="nav-config" aria-label="Configurações">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <circle cx="12" cy="12" r="3"/>
+      <path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/>
+    </svg>
+    <span>Config</span>
+  </button>
+</nav>
+
+<!-- ── Scripts ───────────────────────────────────────────────── -->
+<script>
+// Stub: garante que config.js não quebre se o CDN estiver offline
+window.supabase = window.supabase || { createClient: () => null }
+// Biomonitor não usa o monitor de APIs do SIGUC principal
+window.__API_MONITOR_OFF = true
+</script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"
+        onerror="console.warn('[biomonitor] Supabase CDN indisponível — modo offline')"></script>
+<script src="/js/config.js"></script>
+<script>
+// ── Cliente Supabase ISOLADO para o Biomonitor ────────────────
+// Usa localStorage + storageKey próprio (nunca toca a sessionStorage do SIGUC principal).
+const _bioReady = _dbReady.then(function () {
+  if (!window.supabase || typeof window.supabase.createClient !== 'function') return
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) return
+  try {
+    window._bioDB_client = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: {
+        storageKey:         'siguc-biomonitor-session',
+        storage:            window.localStorage,
+        persistSession:     true,
+        autoRefreshToken:   true,
+        detectSessionInUrl: false,
+      },
+    })
+    console.info('[biomonitor] cliente isolado ativo')
+  } catch (e) {
+    console.error('[biomonitor] cliente isolado FALHOU:', e)
+  }
+})
+</script>
+<script src="/js/biomonitor-offline.js"></script>
+<script src="/js/biomonitor-sync.js"></script>
+<script src="/js/biomonitor-quelonios.js"></script>
+<script>
+// ── Listeners adicionais (pós-carregamento) ───────────────────
+
+// Botão de sync na tela de fila
+document.getElementById('bio-btn-sync-fila')?.addEventListener('click', () => {
+  bioSyncTudo({
+    monitorId:   BioApp.monitor?.id,
+    onConcluido: () => { bioCarregarTelaSincronizacao(); bioToast('Sincronizado!', 'ok') },
+    onErro:      () => bioToast('Falha na sincronização.', 'err'),
+  })
+})
+
+// Service Worker para PWA (atualização)
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/pwa/sw.js').then(reg => {
+    reg.addEventListener('updatefound', () => {
+      const nw = reg.installing
+      nw.addEventListener('statechange', () => {
+        if (nw.state === 'installed' && navigator.serviceWorker.controller) {
+          const banner = document.getElementById('bio-update-banner')
+          if (banner) banner.hidden = false
+          document.getElementById('bio-btn-update-agora')?.addEventListener('click', () => {
+            nw.postMessage({ type: 'SKIP_WAITING' })
+            location.reload()
+          })
+          document.getElementById('bio-btn-update-depois')?.addEventListener('click', () => {
+            if (banner) banner.hidden = true
+          })
+        }
+      })
+    })
+  })
+}
+</script>
+</body>
+</html>
