@@ -76,7 +76,7 @@ body { margin: 0; }
   color: var(--bio-soft); letter-spacing: -.02em;
   margin-bottom: 4px;
 }
-.bio-lock-mascote { width: 84px; height: 84px; border-radius: 50%; }
+.bio-lock-mascote { width: 84px; height: 84px; border-radius: 50%; object-fit: contain; }
 @keyframes bio-lock-respira {
   0%, 100% { transform: scale(1); }
   50%       { transform: scale(1.04); }
@@ -193,6 +193,7 @@ body { margin: 0; }
   position: absolute; left: 50%; bottom: -40px;
   transform: translateX(-50%);
   width: 86px; height: 86px; border-radius: 50%;
+  object-fit: contain;
   filter: drop-shadow(0 4px 10px rgba(6,14,22,.35));
 }
 @keyframes bio-mascote-respira {
