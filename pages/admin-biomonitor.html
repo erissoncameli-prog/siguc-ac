@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>SIGUC-AC · Admin Biomonitor</title>
+<link rel="stylesheet" href="../css/global.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../js/observability.js"></script>
+<script src="../js/queryLogger.js"></script>
+<script src="../js/config.js"></script>
+<script src="../js/layout.js"></script>
+</head>
+<body>
+<div id="app"></div>
+
+<!-- ── Modal: Grupo ─────────────────────────────────────── -->
+<div class="modal-overlay" id="modal-grupo">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-header">
+      <div class="modal-title" id="mg-titulo">Novo Grupo de Monitoramento</div>
+      <button class="modal-close" onclick="fecharModal('grupo')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Programa <span class="obrig">*</span></label>
+          <select class="form-control" id="mg-programa"><option value="">Selecione...</option></select>
+        </div>
+        <div class="form-group"><label class="form-label">Unidade de Conservação <span class="obrig">*</span></label>
+          <select class="form-control" id="mg-uc"><option value="">Selecione...</option></select>
+        </div>
+      </div>
+      <div class="form-group"><label class="form-label">Nome do grupo <span class="obrig">*</span></label>
+        <input class="form-control" id="mg-nome" placeholder="Ex: Equipe Quelônios RESEX Alto Juruá">
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Início da temporada</label>
+          <input class="form-control" id="mg-t-inicio" type="date">
+        </div>
+        <div class="form-group"><label class="form-label">Fim da temporada</label>
+          <input class="form-control" id="mg-t-fim" type="date">
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Coordenador técnico</label>
+          <input class="form-control" id="mg-coord-nome" placeholder="Nome do responsável SIGUC">
+        </div>
+        <div class="form-group"><label class="form-label">Contato</label>
+          <input class="form-control" id="mg-coord-contato" placeholder="E-mail ou telefone">
+        </div>
+      </div>
+      <div class="form-group"><label class="form-label">Observações</label>
+        <textarea class="form-control" id="mg-obs" rows="2"></textarea>
+      </div>
+      <div class="form-group" style="display:flex;align-items:center;gap:8px">
+        <input type="checkbox" id="mg-ativo" checked style="width:16px;height:16px">
+        <label for="mg-ativo" style="margin:0;cursor:pointer">Grupo ativo</label>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="fecharModal('grupo')">Cancelar</button>
+      <button class="btn btn-primary" onclick="salvarGrupo()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal: Monitor ───────────────────────────────────── -->
+<div class="modal-overlay" id="modal-monitor">
+  <div class="modal" style="max-width:640px">
+    <div class="modal-header">
+      <div class="modal-title" id="mm-titulo">Novo Monitor</div>
+      <button class="modal-close" onclick="fecharModal('monitor')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label">Grupo <span class="obrig">*</span></label>
+        <select class="form-control" id="mm-grupo"><option value="">Selecione...</option></select>
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Nome completo <span class="obrig">*</span></label>
+          <input class="form-control" id="mm-nome" placeholder="Nome completo">
+        </div>
+        <div class="form-group"><label class="form-label">CPF <span class="obrig">*</span></label>
+          <input class="form-control" id="mm-cpf" placeholder="000.000.000-00" maxlength="14">
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">RG</label>
+          <input class="form-control" id="mm-rg">
+        </div>
+        <div class="form-group"><label class="form-label">Data de Nascimento</label>
+          <input class="form-control" id="mm-nasc" type="date">
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Sexo</label>
+          <select class="form-control" id="mm-sexo">
+            <option value="">Não informado</option>
+            <option value="M">Masculino</option>
+            <option value="F">Feminino</option>
+            <option value="O">Outro</option>
+          </select>
+        </div>
+        <div class="form-group"><label class="form-label">Telefone</label>
+          <input class="form-control" id="mm-tel" placeholder="(68) 99999-0000">
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">E-mail</label>
+          <input class="form-control" id="mm-email" type="email" placeholder="monitor@email.com">
+        </div>
+        <div class="form-group"><label class="form-label">Município de residência</label>
+          <input class="form-control" id="mm-mun">
+        </div>
+      </div>
+      <div class="form-group"><label class="form-label">Comunidade</label>
+        <input class="form-control" id="mm-comunidade" placeholder="Comunidade ribeirinha de origem">
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Função <span class="obrig">*</span></label>
+          <select class="form-control" id="mm-funcao">
+            <option value="monitor">Monitor de Campo</option>
+            <option value="coordenador">Coordenador</option>
+            <option value="auxiliar">Auxiliar</option>
+          </select>
+        </div>
+        <div class="form-group"><label class="form-label">Status</label>
+          <select class="form-control" id="mm-status">
+            <option value="ativo">Ativo</option>
+            <option value="afastado">Afastado</option>
+            <option value="encerrado">Encerrado</option>
+          </select>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Data de início <span class="obrig">*</span></label>
+          <input class="form-control" id="mm-inicio" type="date">
+        </div>
+        <div class="form-group"><label class="form-label">Data de encerramento</label>
+          <input class="form-control" id="mm-fim" type="date">
+        </div>
+      </div>
+      <div class="form-group"><label class="form-label">Observações</label>
+        <textarea class="form-control" id="mm-obs" rows="2"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="fecharModal('monitor')">Cancelar</button>
+      <button class="btn btn-primary" onclick="salvarMonitor()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal: Login do Monitor ─────────────────────────── -->
+<div class="modal-overlay" id="modal-login">
+  <div class="modal" style="max-width:460px">
+    <div class="modal-header">
+      <div class="modal-title">Criar acesso ao app</div>
+      <button class="modal-close" onclick="fecharModal('login')">×</button>
+    </div>
+    <div class="modal-body">
+      <p style="margin:0 0 12px;color:var(--t2,#aaa);font-size:.9rem">
+        Monitor: <strong id="login-monitor-nome"></strong>
+      </p>
+      <div class="form-group"><label class="form-label">E-mail de acesso <span class="obrig">*</span></label>
+        <input class="form-control" id="login-email" type="email" placeholder="email do monitor">
+        <small class="form-hint">Se vazio, usa o e-mail da ficha do monitor.</small>
+      </div>
+      <div class="form-group"><label class="form-label">Senha provisória</label>
+        <input class="form-control" id="login-senha" type="text" placeholder="Gerada automaticamente se vazia">
+        <small class="form-hint">Mín. 6 caracteres. O monitor poderá trocar no primeiro acesso.</small>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="fecharModal('login')">Cancelar</button>
+      <button class="btn btn-primary" id="login-btn" onclick="confirmarLogin()">Criar Login</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal: Credenciais geradas ──────────────────────── -->
+<div class="modal-overlay" id="modal-cred">
+  <div class="modal" style="max-width:500px">
+    <div class="modal-header">
+      <div class="modal-title">Login criado</div>
+      <button class="modal-close" onclick="fecharModal('cred')">×</button>
+    </div>
+    <div class="modal-body">
+      <p style="color:var(--t2,#aaa);font-size:.88rem;margin-bottom:12px">
+        Anote ou copie as credenciais antes de fechar. A senha provisória não será exibida novamente.
+      </p>
+      <pre id="cred-texto" style="background:rgba(0,0,0,.3);border-radius:8px;padding:14px;font-size:.85rem;white-space:pre-wrap;word-break:break-all;margin:0"></pre>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="copiarCred()">Copiar</button>
+      <button class="btn btn-primary" onclick="fecharModal('cred')">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal: Praia ─────────────────────────────────────── -->
+<div class="modal-overlay" id="modal-praia">
+  <div class="modal" style="max-width:600px">
+    <div class="modal-header">
+      <div class="modal-title" id="mpr-titulo">Nova Praia</div>
+      <button class="modal-close" onclick="fecharModal('praia')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Código <span class="obrig">*</span></label>
+          <input class="form-control" id="mpr-codigo" placeholder="AC-RESEX-AJ-2025-001">
+        </div>
+        <div class="form-group"><label class="form-label">Nome <span class="obrig">*</span></label>
+          <input class="form-control" id="mpr-nome" placeholder="Ex: Praia do Pedral">
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Programa <span class="obrig">*</span></label>
+          <select class="form-control" id="mpr-programa"><option value="">Selecione...</option></select>
+        </div>
+        <div class="form-group"><label class="form-label">Unidade de Conservação <span class="obrig">*</span></label>
+          <select class="form-control" id="mpr-uc"><option value="">Selecione...</option></select>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Município</label>
+          <input class="form-control" id="mpr-mun">
+        </div>
+        <div class="form-group"><label class="form-label">Comunidade</label>
+          <input class="form-control" id="mpr-comunidade">
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Latitude (ponto de acesso)</label>
+          <input class="form-control" id="mpr-lat" type="number" step="any" placeholder="-9.2815">
+        </div>
+        <div class="form-group"><label class="form-label">Longitude</label>
+          <input class="form-control" id="mpr-lng" type="number" step="any" placeholder="-72.7954">
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Período início</label>
+          <input class="form-control" id="mpr-per-inicio" type="date">
+        </div>
+        <div class="form-group"><label class="form-label">Período fim</label>
+          <input class="form-control" id="mpr-per-fim" type="date">
+        </div>
+      </div>
+      <div class="form-group"><label class="form-label">Monitor responsável</label>
+        <select class="form-control" id="mpr-monitor"><option value="">Nenhum</option></select>
+      </div>
+      <div class="form-group"><label class="form-label">Observações</label>
+        <textarea class="form-control" id="mpr-obs" rows="2"></textarea>
+      </div>
+      <div class="form-group" style="display:flex;align-items:center;gap:8px">
+        <input type="checkbox" id="mpr-ativa" checked style="width:16px;height:16px">
+        <label for="mpr-ativa" style="margin:0;cursor:pointer">Praia ativa</label>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="fecharModal('praia')">Cancelar</button>
+      <button class="btn btn-primary" onclick="salvarPraia()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal: Temporada ─────────────────────────────────── -->
+<div class="modal-overlay" id="modal-temporada">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-header">
+      <div class="modal-title" id="mt-titulo">Nova Temporada</div>
+      <button class="modal-close" onclick="fecharModal('temporada')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Programa <span class="obrig">*</span></label>
+          <select class="form-control" id="mt-programa"><option value="">Selecione...</option></select>
+        </div>
+        <div class="form-group"><label class="form-label">Ano base <span class="obrig">*</span></label>
+          <input class="form-control" id="mt-ano" type="number" min="2020" max="2100" placeholder="2025">
+        </div>
+      </div>
+      <div class="form-group"><label class="form-label">Nome <span class="obrig">*</span></label>
+        <input class="form-control" id="mt-nome" placeholder="Ex: Quelônios 2025/2026">
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Data início <span class="obrig">*</span></label>
+          <input class="form-control" id="mt-inicio" type="date">
+        </div>
+        <div class="form-group"><label class="form-label">Data fim <span class="obrig">*</span></label>
+          <input class="form-control" id="mt-fim" type="date">
+        </div>
+      </div>
+      <div class="form-group"><label class="form-label">Status</label>
+        <select class="form-control" id="mt-status">
+          <option value="planejada">Planejada</option>
+          <option value="em_andamento">Em andamento</option>
+          <option value="encerrada">Encerrada</option>
+          <option value="arquivada">Arquivada</option>
+        </select>
+      </div>
+      <div class="form-group"><label class="form-label">Observações</label>
+        <textarea class="form-control" id="mt-obs" rows="2"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="fecharModal('temporada')">Cancelar</button>
+      <button class="btn btn-primary" onclick="salvarTemporada()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+;(async function () {
+  const usuario = await carregarUsuario()
+  if (!usuario) { window.location.href = '../index.html'; return }
+  if (!['super_admin','gestor','tecnico'].includes(usuario.perfil)) {
+    window.location.href = '../pages/dashboard.html'; return
+  }
+
+  // ── Render layout ─────────────────────────────────────────────
+  document.getElementById('app').innerHTML =
+    gerarLayout('Admin Biomonitor', 'admin-biomonitor') +
+    `<div class="fade-in">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:10px">
+        <h2 style="margin:0;font-size:1.25rem">Administração — Biomonitor</h2>
+        <div style="display:flex;gap:6px;background:rgba(255,255,255,.07);border-radius:10px;padding:4px">
+          <button class="tab-btn ativo" id="tab-grupos"     onclick="mudarAba('grupos')">Grupos</button>
+          <button class="tab-btn"       id="tab-monitores"  onclick="mudarAba('monitores')">Monitores</button>
+          <button class="tab-btn"       id="tab-praias"     onclick="mudarAba('praias')">Praias</button>
+          <button class="tab-btn"       id="tab-temporadas" onclick="mudarAba('temporadas')">Temporadas</button>
+        </div>
+      </div>
+
+      <!-- ABA: Grupos -->
+      <div id="aba-grupos">
+        <div class="filter-bar">
+          <input class="form-control search-input" id="busca-grupos" placeholder="Buscar grupo..." oninput="filtrarGrupos()">
+          <button class="btn btn-primary" onclick="abrirModalGrupo()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Novo Grupo
+          </button>
+        </div>
+        <div class="card"><div class="table-wrap"><div class="table-scroll">
+          <table><thead><tr>
+            <th>Grupo</th><th>UC</th><th>Programa</th><th>Monitores</th><th>Temporada</th><th>Status</th><th></th>
+          </tr></thead><tbody id="tbody-grupos"><tr><td colspan="7" class="empty-row">Carregando...</td></tr></tbody></table>
+        </div></div></div>
+      </div>
+
+      <!-- ABA: Monitores -->
+      <div id="aba-monitores" style="display:none">
+        <div class="filter-bar">
+          <input class="form-control search-input" id="busca-monitores" placeholder="Buscar monitor..." oninput="filtrarMonitores()">
+          <select class="form-control" id="fil-grupo-mon" style="width:200px" onchange="filtrarMonitores()">
+            <option value="">Todos os grupos</option>
+          </select>
+          <select class="form-control" id="fil-status-mon" style="width:140px" onchange="filtrarMonitores()">
+            <option value="">Todos os status</option>
+            <option value="ativo">Ativo</option>
+            <option value="afastado">Afastado</option>
+            <option value="encerrado">Encerrado</option>
+          </select>
+          <button class="btn btn-secondary" onclick="gerarLoginsPendentes()" title="Criar acesso para todos os monitores ativos sem login">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            Logins pendentes
+          </button>
+          <button class="btn btn-primary" onclick="abrirModalMonitor()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Novo Monitor
+          </button>
+        </div>
+        <div class="card"><div class="table-wrap"><div class="table-scroll">
+          <table><thead><tr>
+            <th>Nome</th><th>CPF</th><th>Grupo</th><th>Função</th><th>Status</th><th>Login app</th><th></th>
+          </tr></thead><tbody id="tbody-monitores"><tr><td colspan="7" class="empty-row">Carregando...</td></tr></tbody></table>
+        </div></div></div>
+      </div>
+
+      <!-- ABA: Praias -->
+      <div id="aba-praias" style="display:none">
+        <div class="filter-bar">
+          <input class="form-control search-input" id="busca-praias" placeholder="Buscar praia..." oninput="filtrarPraias()">
+          <select class="form-control" id="fil-prog-praia" style="width:200px" onchange="filtrarPraias()">
+            <option value="">Todos os programas</option>
+          </select>
+          <button class="btn btn-primary" onclick="abrirModalPraia()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Nova Praia
+          </button>
+        </div>
+        <div class="card"><div class="table-wrap"><div class="table-scroll">
+          <table><thead><tr>
+            <th>Código</th><th>Nome</th><th>UC</th><th>Programa</th><th>Comprimento</th><th>Área</th><th>Status</th><th></th>
+          </tr></thead><tbody id="tbody-praias"><tr><td colspan="8" class="empty-row">Carregando...</td></tr></tbody></table>
+        </div></div></div>
+      </div>
+
+      <!-- ABA: Temporadas -->
+      <div id="aba-temporadas" style="display:none">
+        <div class="filter-bar">
+          <input class="form-control search-input" id="busca-temporadas" placeholder="Buscar temporada..." oninput="filtrarTemporadas()">
+          <button class="btn btn-primary" onclick="abrirModalTemporada()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Nova Temporada
+          </button>
+        </div>
+        <div class="card"><div class="table-wrap"><div class="table-scroll">
+          <table><thead><tr>
+            <th>Nome</th><th>Programa</th><th>Ano base</th><th>Início</th><th>Fim</th><th>Status</th><th></th>
+          </tr></thead><tbody id="tbody-temporadas"><tr><td colspan="7" class="empty-row">Carregando...</td></tr></tbody></table>
+        </div></div></div>
+      </div>
+    </div>`
+
+  bIconsAplicar(document.getElementById('app'))
+  await carregarDados()
+
+  // ── Dados ─────────────────────────────────────────────────────
+  let _grupos = [], _monitores = [], _praias = [], _temporadas = [], _programas = [], _ucs = []
+  let _editGrupoId = null, _editMonitorId = null, _editPraiaId = null, _editTemporadaId = null
+  let _loginMonitorId = null
+
+  async function carregarDados() {
+    const [
+      { data: grupos },
+      { data: monitores },
+      { data: praias },
+      { data: temporadas },
+      { data: programas },
+      { data: ucs },
+    ] = await Promise.all([
+      db.from('grupos_biomonitor').select('*').order('nome'),
+      db.from('monitores_biodiversidade').select('id,nome_completo,cpf,funcao,status,usuario_id,grupo_id,email').order('nome_completo'),
+      db.from('vw_praias_biomonitor').select('*').order('nome'),
+      db.from('temporadas_biomonitor').select('*').order('ano_base', { ascending: false }),
+      db.from('programas_biomonitoramento').select('id,nome').order('nome'),
+      db.from('unidades_conservacao').select('id,nome,sigla').order('nome'),
+    ])
+    _grupos = grupos || []
+    _monitores = monitores || []
+    _praias = praias || []
+    _temporadas = temporadas || []
+    _programas = programas || []
+    _ucs = ucs || []
+    renderGrupos()
+    renderMonitores()
+    renderPraias()
+    renderTemporadas()
+    popularSelects()
+  }
+
+  function popularSelects() {
+    const progOpts = _programas.map(p => `<option value="${p.id}">${p.nome}</option>`).join('')
+    const ucOpts   = _ucs.map(u => `<option value="${u.id}">${u.nome} (${u.sigla})</option>`).join('')
+    const grupoOpts = _grupos.map(g => `<option value="${g.id}">${g.nome}</option>`).join('')
+    const monOpts  = _monitores.map(m => `<option value="${m.id}">${m.nome_completo}</option>`).join('')
+
+    ;['mg-programa','mt-programa','mpr-programa','fil-prog-praia'].forEach(id => {
+      const el = document.getElementById(id)
+      if (el) el.innerHTML = `<option value="">Selecione...</option>` + progOpts
+    })
+    ;['mg-uc','mpr-uc'].forEach(id => {
+      const el = document.getElementById(id)
+      if (el) el.innerHTML = `<option value="">Selecione...</option>` + ucOpts
+    })
+    const mmg = document.getElementById('mm-grupo')
+    if (mmg) mmg.innerHTML = `<option value="">Selecione...</option>` + grupoOpts
+
+    const filGrupo = document.getElementById('fil-grupo-mon')
+    if (filGrupo) filGrupo.innerHTML = `<option value="">Todos os grupos</option>` + grupoOpts
+
+    const mprMon = document.getElementById('mpr-monitor')
+    if (mprMon) mprMon.innerHTML = `<option value="">Nenhum</option>` + monOpts
+  }
+
+  // ── Renderizações ─────────────────────────────────────────────
+  function nomeGrupo(id) { return _grupos.find(g => g.id === id)?.nome || '—' }
+  function nomePrograma(id) { return _programas.find(p => p.id === id)?.nome || '—' }
+  function nomeUC(id) { return _ucs.find(u => u.id === id)?.nome || '—' }
+
+  function renderGrupos() {
+    const busca = document.getElementById('busca-grupos')?.value.toLowerCase() || ''
+    const lista = _grupos.filter(g =>
+      !busca || g.nome.toLowerCase().includes(busca) || nomeUC(g.uc_id).toLowerCase().includes(busca)
+    )
+    const tbody = document.getElementById('tbody-grupos')
+    if (!lista.length) { tbody.innerHTML = `<tr><td colspan="7" class="empty-row">Nenhum grupo encontrado.</td></tr>`; return }
+    const contGrupo = id => _monitores.filter(m => m.grupo_id === id && m.status === 'ativo').length
+    tbody.innerHTML = lista.map(g => `<tr>
+      <td><strong>${g.nome}</strong></td>
+      <td>${nomeUC(g.uc_id)}</td>
+      <td>${nomePrograma(g.programa_id)}</td>
+      <td style="text-align:center">${contGrupo(g.id)}</td>
+      <td>${g.temporada_inicio ? formatData(g.temporada_inicio) + ' – ' + formatData(g.temporada_fim) : '—'}</td>
+      <td><span class="badge ${g.ativo ? 'badge-success' : 'badge-neutral'}">${g.ativo ? 'Ativo' : 'Inativo'}</span></td>
+      <td><button class="btn btn-sm btn-secondary" onclick="editarGrupo('${g.id}')">Editar</button></td>
+    </tr>`).join('')
+  }
+
+  function renderMonitores() {
+    const busca  = document.getElementById('busca-monitores')?.value.toLowerCase() || ''
+    const grupo  = document.getElementById('fil-grupo-mon')?.value || ''
+    const status = document.getElementById('fil-status-mon')?.value || ''
+    const lista  = _monitores.filter(m =>
+      (!busca  || m.nome_completo.toLowerCase().includes(busca) || (m.cpf||'').includes(busca)) &&
+      (!grupo  || m.grupo_id === grupo) &&
+      (!status || m.status === status)
+    )
+    const tbody = document.getElementById('tbody-monitores')
+    if (!lista.length) { tbody.innerHTML = `<tr><td colspan="7" class="empty-row">Nenhum monitor encontrado.</td></tr>`; return }
+    const FUNC = { coordenador: 'Coordenador', monitor: 'Monitor de Campo', auxiliar: 'Auxiliar' }
+    const STATUS = { ativo: 'badge-success', afastado: 'badge-warn', encerrado: 'badge-neutral' }
+    tbody.innerHTML = lista.map(m => `<tr>
+      <td><strong>${m.nome_completo}</strong></td>
+      <td>${m.cpf || '—'}</td>
+      <td>${nomeGrupo(m.grupo_id)}</td>
+      <td>${FUNC[m.funcao] || m.funcao}</td>
+      <td><span class="badge ${STATUS[m.status] || 'badge-neutral'}">${m.status}</span></td>
+      <td>${m.usuario_id
+        ? '<span class="badge badge-success">Com login</span>'
+        : '<span class="badge badge-neutral">Sem login</span>'}</td>
+      <td style="display:flex;gap:4px">
+        <button class="btn btn-sm btn-secondary" onclick="editarMonitor('${m.id}')">Editar</button>
+        ${!m.usuario_id ? `<button class="btn btn-sm btn-primary" onclick="abrirModalLogin('${m.id}','${esc(m.nome_completo)}','${esc(m.email||'')}')">Login</button>` : ''}
+      </td>
+    </tr>`).join('')
+  }
+
+  function renderPraias() {
+    const busca  = document.getElementById('busca-praias')?.value.toLowerCase() || ''
+    const prog   = document.getElementById('fil-prog-praia')?.value || ''
+    const lista  = _praias.filter(p =>
+      (!busca || p.nome.toLowerCase().includes(busca) || (p.codigo||'').toLowerCase().includes(busca)) &&
+      (!prog  || p.programa_id === prog)
+    )
+    const tbody = document.getElementById('tbody-praias')
+    if (!lista.length) { tbody.innerHTML = `<tr><td colspan="8" class="empty-row">Nenhuma praia encontrada.</td></tr>`; return }
+    tbody.innerHTML = lista.map(p => `<tr>
+      <td><code style="font-size:.8rem">${p.codigo}</code></td>
+      <td><strong>${p.nome}</strong>${p.comunidade ? `<br><small style="color:var(--t2,#aaa)">${p.comunidade}</small>` : ''}</td>
+      <td>${p.uc_nome || nomeUC(p.uc_id)}</td>
+      <td>${p.programa_nome || '—'}</td>
+      <td>${p.comprimento_m ? formatNum(p.comprimento_m) + ' m' : '—'}</td>
+      <td>${p.area_ha ? formatNum(p.area_ha, 2) + ' ha' : '—'}</td>
+      <td><span class="badge ${p.ativa ? 'badge-success' : 'badge-neutral'}">${p.ativa ? 'Ativa' : 'Inativa'}</span></td>
+      <td><button class="btn btn-sm btn-secondary" onclick="editarPraia('${p.id}')">Editar</button></td>
+    </tr>`).join('')
+  }
+
+  function renderTemporadas() {
+    const busca = document.getElementById('busca-temporadas')?.value.toLowerCase() || ''
+    const lista = _temporadas.filter(t => !busca || t.nome.toLowerCase().includes(busca))
+    const tbody = document.getElementById('tbody-temporadas')
+    if (!lista.length) { tbody.innerHTML = `<tr><td colspan="7" class="empty-row">Nenhuma temporada encontrada.</td></tr>`; return }
+    const STATUS_CLR = { planejada: 'badge-neutral', em_andamento: 'badge-success', encerrada: 'badge-warn', arquivada: 'badge-neutral' }
+    const STATUS_LBL = { planejada: 'Planejada', em_andamento: 'Em andamento', encerrada: 'Encerrada', arquivada: 'Arquivada' }
+    tbody.innerHTML = lista.map(t => `<tr>
+      <td><strong>${t.nome}</strong></td>
+      <td>${nomePrograma(t.programa_id)}</td>
+      <td style="text-align:center">${t.ano_base}</td>
+      <td>${formatData(t.data_inicio)}</td>
+      <td>${formatData(t.data_fim)}</td>
+      <td><span class="badge ${STATUS_CLR[t.status] || 'badge-neutral'}">${STATUS_LBL[t.status] || t.status}</span></td>
+      <td><button class="btn btn-sm btn-secondary" onclick="editarTemporada('${t.id}')">Editar</button></td>
+    </tr>`).join('')
+  }
+
+  // ── Filtros ───────────────────────────────────────────────────
+  window.filtrarGrupos    = renderGrupos
+  window.filtrarMonitores = renderMonitores
+  window.filtrarPraias    = renderPraias
+  window.filtrarTemporadas = renderTemporadas
+
+  // ── Abas ──────────────────────────────────────────────────────
+  const _abas = ['grupos','monitores','praias','temporadas']
+  window.mudarAba = function(aba) {
+    _abas.forEach(a => {
+      document.getElementById('aba-' + a).style.display = a === aba ? '' : 'none'
+      document.getElementById('tab-' + a).classList.toggle('ativo', a === aba)
+    })
+  }
+
+  // ── Modais ────────────────────────────────────────────────────
+  window.fecharModal = id => document.getElementById('modal-' + id).classList.remove('aberto')
+
+  // GRUPOS
+  window.abrirModalGrupo = function(id) {
+    _editGrupoId = id || null
+    const g = id ? _grupos.find(x => x.id === id) : null
+    document.getElementById('mg-titulo').textContent = g ? 'Editar Grupo' : 'Novo Grupo de Monitoramento'
+    document.getElementById('mg-programa').value  = g?.programa_id || ''
+    document.getElementById('mg-uc').value         = g?.uc_id || ''
+    document.getElementById('mg-nome').value        = g?.nome || ''
+    document.getElementById('mg-t-inicio').value   = g?.temporada_inicio || ''
+    document.getElementById('mg-t-fim').value       = g?.temporada_fim || ''
+    document.getElementById('mg-coord-nome').value = g?.coordenador_nome || ''
+    document.getElementById('mg-coord-contato').value = g?.coordenador_contato || ''
+    document.getElementById('mg-obs').value         = g?.observacoes || ''
+    document.getElementById('mg-ativo').checked     = g ? g.ativo : true
+    document.getElementById('modal-grupo').classList.add('aberto')
+  }
+  window.editarGrupo = id => window.abrirModalGrupo(id)
+
+  window.salvarGrupo = async function() {
+    const payload = {
+      programa_id:        document.getElementById('mg-programa').value || null,
+      uc_id:              document.getElementById('mg-uc').value || null,
+      nome:               document.getElementById('mg-nome').value.trim(),
+      temporada_inicio:   document.getElementById('mg-t-inicio').value || null,
+      temporada_fim:      document.getElementById('mg-t-fim').value || null,
+      coordenador_nome:   document.getElementById('mg-coord-nome').value.trim() || null,
+      coordenador_contato:document.getElementById('mg-coord-contato').value.trim() || null,
+      observacoes:        document.getElementById('mg-obs').value.trim() || null,
+      ativo:              document.getElementById('mg-ativo').checked,
+    }
+    if (!payload.programa_id || !payload.uc_id || !payload.nome) { toast('Preencha programa, UC e nome.', 'error'); return }
+    const { error } = _editGrupoId
+      ? await db.from('grupos_biomonitor').update(payload).eq('id', _editGrupoId)
+      : await db.from('grupos_biomonitor').insert(payload)
+    if (error) { toast(error.message, 'error'); return }
+    toast(_editGrupoId ? 'Grupo atualizado.' : 'Grupo criado.', 'success')
+    fecharModal('grupo')
+    await carregarDados()
+  }
+
+  // MONITORES
+  window.abrirModalMonitor = function(id) {
+    _editMonitorId = id || null
+    const m = id ? _monitores.find(x => x.id === id) : null
+    document.getElementById('mm-titulo').textContent = m ? 'Editar Monitor' : 'Novo Monitor'
+    document.getElementById('mm-grupo').value    = m?.grupo_id || ''
+    document.getElementById('mm-nome').value     = m?.nome_completo || ''
+    document.getElementById('mm-cpf').value      = m?.cpf || ''
+    document.getElementById('mm-rg').value       = m?.rg || ''
+    document.getElementById('mm-nasc').value     = m?.data_nascimento || ''
+    document.getElementById('mm-sexo').value     = m?.sexo || ''
+    document.getElementById('mm-tel').value      = m?.telefone || ''
+    document.getElementById('mm-email').value    = m?.email || ''
+    document.getElementById('mm-mun').value      = m?.municipio_residencia || ''
+    document.getElementById('mm-comunidade').value = m?.comunidade || ''
+    document.getElementById('mm-funcao').value   = m?.funcao || 'monitor'
+    document.getElementById('mm-status').value   = m?.status || 'ativo'
+    document.getElementById('mm-inicio').value   = m?.data_inicio || ''
+    document.getElementById('mm-fim').value      = m?.data_fim || ''
+    document.getElementById('mm-obs').value      = m?.observacoes || ''
+    document.getElementById('modal-monitor').classList.add('aberto')
+  }
+  window.editarMonitor = id => window.abrirModalMonitor(id)
+
+  window.salvarMonitor = async function() {
+    const payload = {
+      grupo_id:           document.getElementById('mm-grupo').value || null,
+      nome_completo:      document.getElementById('mm-nome').value.trim(),
+      cpf:                document.getElementById('mm-cpf').value.trim(),
+      rg:                 document.getElementById('mm-rg').value.trim() || null,
+      data_nascimento:    document.getElementById('mm-nasc').value || null,
+      sexo:               document.getElementById('mm-sexo').value || null,
+      telefone:           document.getElementById('mm-tel').value.trim() || null,
+      email:              document.getElementById('mm-email').value.trim() || null,
+      municipio_residencia: document.getElementById('mm-mun').value.trim() || null,
+      comunidade:         document.getElementById('mm-comunidade').value.trim() || null,
+      funcao:             document.getElementById('mm-funcao').value,
+      status:             document.getElementById('mm-status').value,
+      data_inicio:        document.getElementById('mm-inicio').value || null,
+      data_fim:           document.getElementById('mm-fim').value || null,
+      observacoes:        document.getElementById('mm-obs').value.trim() || null,
+    }
+    if (!payload.grupo_id || !payload.nome_completo || !payload.cpf || !payload.data_inicio) {
+      toast('Preencha grupo, nome, CPF e data de início.', 'error'); return
+    }
+    const { error } = _editMonitorId
+      ? await db.from('monitores_biodiversidade').update(payload).eq('id', _editMonitorId)
+      : await db.from('monitores_biodiversidade').insert(payload)
+    if (error) { toast(error.message, 'error'); return }
+    toast(_editMonitorId ? 'Monitor atualizado.' : 'Monitor cadastrado.', 'success')
+    fecharModal('monitor')
+    await carregarDados()
+  }
+
+  // LOGIN DO MONITOR
+  window.abrirModalLogin = function(id, nome, email) {
+    _loginMonitorId = id
+    document.getElementById('login-monitor-nome').textContent = nome
+    document.getElementById('login-email').value  = email || ''
+    document.getElementById('login-senha').value  = ''
+    document.getElementById('modal-login').classList.add('aberto')
+  }
+
+  window.confirmarLogin = async function() {
+    const email = document.getElementById('login-email').value.trim()
+    const senha  = document.getElementById('login-senha').value
+    if (senha && senha.length < 6) { toast('Senha provisória deve ter no mínimo 6 caracteres.', 'error'); return }
+    const btn = document.getElementById('login-btn')
+    btn.disabled = true; btn.textContent = 'Criando...'
+    try {
+      const { data: { session } } = await db.auth.getSession()
+      const resp = await fetch(`${SUPABASE_URL}/functions/v1/gerar-login-monitor`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+          'apikey': SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({ monitor_id: _loginMonitorId, email: email || null, senha_temp: senha || null }),
+      })
+      const result = await resp.json()
+      if (!resp.ok) throw new Error(result.error || 'Erro ao criar login')
+      fecharModal('login')
+      document.getElementById('cred-texto').textContent =
+        `Monitor: ${result.nome}\nE-mail:  ${result.email}\nSenha:   ${result.senha_temp}`
+      document.getElementById('modal-cred').classList.add('aberto')
+      await carregarDados()
+    } catch(e) { toast(e.message || 'Erro ao criar login', 'error') }
+    finally { btn.disabled = false; btn.textContent = 'Criar Login' }
+  }
+
+  window.gerarLoginsPendentes = async function() {
+    const sem = _monitores.filter(m => m.status === 'ativo' && !m.usuario_id).length
+    if (!sem) { toast('Todos os monitores ativos já possuem login.', 'success'); return }
+    if (!confirm(`Criar acesso ao app para ${sem} monitor(es) ativo(s) sem login?`)) return
+    try {
+      const { data: { session } } = await db.auth.getSession()
+      const resp = await fetch(`${SUPABASE_URL}/functions/v1/gerar-login-monitor`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+          'apikey': SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({ lote: true }),
+      })
+      const result = await resp.json()
+      if (!resp.ok) throw new Error(result.error || 'Erro ao gerar logins')
+      const ok  = result.resultados?.length || 0
+      const err = result.erros?.length || 0
+      const txt = result.resultados?.map(r => `${r.nome}\n  E-mail: ${r.email}\n  Senha: ${r.senha_temp}`).join('\n\n') || ''
+      document.getElementById('cred-texto').textContent = txt + (err ? `\n\nErros (${err}):\n` + result.erros.map(e => `${e.nome}: ${e.erro}`).join('\n') : '')
+      document.getElementById('modal-cred').classList.add('aberto')
+      toast(`${ok} login(s) criado(s)${err ? `, ${err} erro(s).` : '.'}`, ok ? 'success' : 'error')
+      await carregarDados()
+    } catch(e) { toast(e.message || 'Erro ao gerar logins', 'error') }
+  }
+
+  window.copiarCred = function() {
+    navigator.clipboard?.writeText(document.getElementById('cred-texto').textContent)
+    toast('Copiado!', 'success')
+  }
+
+  // PRAIAS
+  window.abrirModalPraia = function(id) {
+    _editPraiaId = id || null
+    const p = id ? _praias.find(x => x.id === id) : null
+    document.getElementById('mpr-titulo').textContent = p ? 'Editar Praia' : 'Nova Praia'
+    document.getElementById('mpr-codigo').value     = p?.codigo || ''
+    document.getElementById('mpr-nome').value       = p?.nome || ''
+    document.getElementById('mpr-programa').value   = p?.programa_id || ''
+    document.getElementById('mpr-uc').value         = p?.uc_id || ''
+    document.getElementById('mpr-mun').value        = p?.municipio || ''
+    document.getElementById('mpr-comunidade').value = p?.comunidade || ''
+    document.getElementById('mpr-lat').value        = p?.lat || ''
+    document.getElementById('mpr-lng').value        = p?.lng || ''
+    document.getElementById('mpr-per-inicio').value = p?.periodo_inicio || ''
+    document.getElementById('mpr-per-fim').value    = p?.periodo_fim || ''
+    document.getElementById('mpr-monitor').value    = p?.monitor_responsavel_id || ''
+    document.getElementById('mpr-obs').value        = p?.observacoes || ''
+    document.getElementById('mpr-ativa').checked    = p ? p.ativa : true
+    document.getElementById('modal-praia').classList.add('aberto')
+  }
+  window.editarPraia = id => window.abrirModalPraia(id)
+
+  window.salvarPraia = async function() {
+    const lat = parseFloat(document.getElementById('mpr-lat').value)
+    const lng = parseFloat(document.getElementById('mpr-lng').value)
+    const payload = {
+      codigo:                 document.getElementById('mpr-codigo').value.trim(),
+      nome:                   document.getElementById('mpr-nome').value.trim(),
+      programa_id:            document.getElementById('mpr-programa').value || null,
+      uc_id:                  document.getElementById('mpr-uc').value || null,
+      municipio:              document.getElementById('mpr-mun').value.trim() || null,
+      comunidade:             document.getElementById('mpr-comunidade').value.trim() || null,
+      ponto_acesso:           (!isNaN(lat) && !isNaN(lng)) ? `POINT(${lng} ${lat})` : null,
+      periodo_inicio:         document.getElementById('mpr-per-inicio').value || null,
+      periodo_fim:            document.getElementById('mpr-per-fim').value || null,
+      monitor_responsavel_id: document.getElementById('mpr-monitor').value || null,
+      observacoes:            document.getElementById('mpr-obs').value.trim() || null,
+      ativa:                  document.getElementById('mpr-ativa').checked,
+    }
+    if (!payload.codigo || !payload.nome || !payload.programa_id || !payload.uc_id) {
+      toast('Preencha código, nome, programa e UC.', 'error'); return
+    }
+    const { error } = _editPraiaId
+      ? await db.from('praias_monitoramento').update(payload).eq('id', _editPraiaId)
+      : await db.from('praias_monitoramento').insert(payload)
+    if (error) { toast(error.message, 'error'); return }
+    toast(_editPraiaId ? 'Praia atualizada.' : 'Praia cadastrada.', 'success')
+    fecharModal('praia')
+    await carregarDados()
+  }
+
+  // TEMPORADAS
+  window.abrirModalTemporada = function(id) {
+    _editTemporadaId = id || null
+    const t = id ? _temporadas.find(x => x.id === id) : null
+    document.getElementById('mt-titulo').textContent = t ? 'Editar Temporada' : 'Nova Temporada'
+    document.getElementById('mt-programa').value = t?.programa_id || ''
+    document.getElementById('mt-nome').value     = t?.nome || ''
+    document.getElementById('mt-ano').value      = t?.ano_base || new Date().getFullYear()
+    document.getElementById('mt-inicio').value   = t?.data_inicio || ''
+    document.getElementById('mt-fim').value      = t?.data_fim || ''
+    document.getElementById('mt-status').value   = t?.status || 'planejada'
+    document.getElementById('mt-obs').value      = t?.observacoes || ''
+    document.getElementById('modal-temporada').classList.add('aberto')
+  }
+  window.editarTemporada = id => window.abrirModalTemporada(id)
+
+  window.salvarTemporada = async function() {
+    const payload = {
+      programa_id:  document.getElementById('mt-programa').value || null,
+      nome:         document.getElementById('mt-nome').value.trim(),
+      ano_base:     parseInt(document.getElementById('mt-ano').value),
+      data_inicio:  document.getElementById('mt-inicio').value || null,
+      data_fim:     document.getElementById('mt-fim').value || null,
+      status:       document.getElementById('mt-status').value,
+      observacoes:  document.getElementById('mt-obs').value.trim() || null,
+    }
+    if (!payload.programa_id || !payload.nome || !payload.data_inicio || !payload.data_fim) {
+      toast('Preencha programa, nome, data início e fim.', 'error'); return
+    }
+    const { error } = _editTemporadaId
+      ? await db.from('temporadas_biomonitor').update(payload).eq('id', _editTemporadaId)
+      : await db.from('temporadas_biomonitor').insert(payload)
+    if (error) { toast(error.message, 'error'); return }
+    toast(_editTemporadaId ? 'Temporada atualizada.' : 'Temporada criada.', 'success')
+    fecharModal('temporada')
+    await carregarDados()
+  }
+
+})()
+</script>
+<style>
+.tab-btn { background:transparent;border:none;padding:6px 14px;border-radius:7px;cursor:pointer;font-size:.88rem;color:var(--t1,#f4efe6);transition:all .15s }
+.tab-btn.ativo { background:white;color:var(--floresta,#0A1A0F);box-shadow:0 1px 4px rgba(0,0,0,.12) }
+.tab-btn:hover:not(.ativo) { background:rgba(255,255,255,.12) }
+</style>
+</body>
+</html>

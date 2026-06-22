@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>SIGUC-AC · Relatórios Biomonitor</title>
+<link rel="stylesheet" href="../css/global.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../js/observability.js"></script>
+<script src="../js/queryLogger.js"></script>
+<script src="../js/config.js"></script>
+<script src="../js/layout.js"></script>
+</head>
+<body>
+<div id="app"></div>
+<script>
+;(async function () {
+  const usuario = await carregarUsuario()
+  if (!usuario) { window.location.href = '../index.html'; return }
+
+  document.getElementById('app').innerHTML =
+    gerarLayout('Relatórios Biomonitor', 'relatorios-biomonitor') +
+    `<div class="fade-in">
+      <div class="filter-bar" style="margin-bottom:20px">
+        <select class="form-control" id="fil-temporada" style="width:220px" onchange="aplicarFiltros()">
+          <option value="">Todas as temporadas</option>
+        </select>
+        <select class="form-control" id="fil-programa" style="width:200px" onchange="aplicarFiltros()">
+          <option value="">Todos os programas</option>
+        </select>
+        <button class="btn btn-secondary" onclick="exportarCSV()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Exportar CSV
+        </button>
+      </div>
+
+      <!-- KPIs -->
+      <div id="kpi-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-bottom:24px"></div>
+
+      <!-- Tabs -->
+      <div style="display:flex;gap:6px;background:rgba(255,255,255,.07);border-radius:10px;padding:4px;width:fit-content;margin-bottom:16px">
+        <button class="tab-btn ativo" id="tab-praias"   onclick="mudarAba('praias')">Por Praia</button>
+        <button class="tab-btn"       id="tab-especies" onclick="mudarAba('especies')">Por Espécie</button>
+        <button class="tab-btn"       id="tab-monitores" onclick="mudarAba('monitores')">Por Monitor</button>
+      </div>
+
+      <!-- ABA: Praias -->
+      <div id="aba-praias">
+        <div class="card"><div class="table-wrap"><div class="table-scroll">
+          <table><thead><tr>
+            <th>Praia</th><th>UC</th>
+            <th style="text-align:center">Total ninhos</th>
+            <th style="text-align:center">Encontrados</th>
+            <th style="text-align:center">Eclodidos</th>
+            <th style="text-align:center">Filhotes vivos</th>
+            <th style="text-align:center">Taxa eclosão</th>
+            <th style="text-align:center">Predação</th>
+            <th style="text-align:center">Pendentes validação</th>
+          </tr></thead><tbody id="tbody-praias"><tr><td colspan="9" class="empty-row">Carregando...</td></tr></tbody></table>
+        </div></div></div>
+      </div>
+
+      <!-- ABA: Espécies -->
+      <div id="aba-especies" style="display:none">
+        <div class="card"><div class="table-wrap"><div class="table-scroll">
+          <table><thead><tr>
+            <th>Espécie</th>
+            <th style="text-align:center">Ninhos</th>
+            <th style="text-align:center">Eclodidos</th>
+            <th style="text-align:center">Filhotes vivos</th>
+            <th style="text-align:center">Taxa eclosão</th>
+          </tr></thead><tbody id="tbody-especies"><tr><td colspan="5" class="empty-row">Carregando...</td></tr></tbody></table>
+        </div></div></div>
+      </div>
+
+      <!-- ABA: Monitores -->
+      <div id="aba-monitores" style="display:none">
+        <div class="card"><div class="table-wrap"><div class="table-scroll">
+          <table><thead><tr>
+            <th>Monitor</th><th>Grupo</th>
+            <th style="text-align:center">Ninhos registrados</th>
+            <th style="text-align:center">Eclodidos</th>
+            <th style="text-align:center">Filhotes vivos</th>
+          </tr></thead><tbody id="tbody-monitores-rel"><tr><td colspan="5" class="empty-row">Carregando...</td></tr></tbody></table>
+        </div></div></div>
+      </div>
+    </div>`
+
+  bIconsAplicar(document.getElementById('app'))
+
+  let _praias = [], _ninhos = [], _temporadas = [], _programas = [], _grupos = [], _monitoresRel = []
+
+  // ── Carregar dados ─────────────────────────────────────────────
+  const [
+    { data: praias },
+    { data: ninhos },
+    { data: temporadas },
+    { data: programas },
+    { data: grupos },
+    { data: monitores },
+  ] = await Promise.all([
+    db.from('vw_praias_biomonitor').select('*'),
+    db.from('ninhos_quelonios').select('id,especie,status,grupo_id,monitor_id,filhotes_vivos:eclosoes_ninho(filhotes_vivos,filhotes_mortos,ovos_nao_nascidos)').limit(5000),
+    db.from('temporadas_biomonitor').select('id,nome').order('ano_base', { ascending: false }),
+    db.from('programas_biomonitoramento').select('id,nome'),
+    db.from('grupos_biomonitor').select('id,nome'),
+    db.from('monitores_biodiversidade').select('id,nome_completo,grupo_id'),
+  ])
+
+  _praias    = praias    || []
+  _ninhos    = ninhos    || []
+  _temporadas = temporadas || []
+  _programas  = programas  || []
+  _grupos     = grupos     || []
+  _monitoresRel = monitores || []
+
+  // Preenche filtros
+  document.getElementById('fil-temporada').innerHTML =
+    `<option value="">Todas as temporadas</option>` +
+    _temporadas.map(t => `<option value="${t.id}">${t.nome}</option>`).join('')
+  document.getElementById('fil-programa').innerHTML =
+    `<option value="">Todos os programas</option>` +
+    _programas.map(p => `<option value="${p.id}">${p.nome}</option>`).join('')
+
+  window.aplicarFiltros = function() {
+    const prog = document.getElementById('fil-programa').value
+
+    const praiasFil = prog ? _praias.filter(p => p.programa_id === prog) : _praias
+
+    renderKPIs(praiasFil)
+    renderPraias(praiasFil)
+    renderEspecies(praiasFil)
+    renderMonitoresRel(praiasFil)
+  }
+
+  // ── KPIs ──────────────────────────────────────────────────────
+  function renderKPIs(lista) {
+    const total   = lista.reduce((s,p) => s + (p.ninhos_total || 0), 0)
+    const eclod   = lista.reduce((s,p) => s + (p.ninhos_eclodidos || 0), 0)
+    const filhot  = lista.reduce((s,p) => s + (p.filhotes_vivos || 0), 0)
+    const perdid  = lista.reduce((s,p) => s + (p.ninhos_perdidos || 0), 0)
+    const pred    = lista.reduce((s,p) => s + (p.predacao_pessoas || 0) + (p.predacao_animais || 0), 0)
+    const pendVal = lista.reduce((s,p) => s + (p.ninhos_pendentes_validacao || 0), 0)
+    const taxaEcl = total > 0 ? Math.round((eclod / total) * 100) : 0
+
+    document.getElementById('kpi-grid').innerHTML = [
+      ['Total de ninhos',        total,    '#3b82f6'],
+      ['Eclodidos',              eclod,    '#10b981'],
+      ['Filhotes vivos',         filhot,   '#34d399'],
+      ['Perdidos / Predados',    perdid,   '#ef4444'],
+      ['Eventos de predação',    pred,     '#f59e0b'],
+      ['Taxa de eclosão',        taxaEcl + '%', '#6366f1'],
+      ['Pendentes validação',    pendVal,  '#8b5cf6'],
+    ].map(([l, v, c]) => `
+      <div style="background:rgba(255,255,255,.06);border-radius:10px;padding:14px;border-top:3px solid ${c}">
+        <div style="font-size:1.6rem;font-weight:700;color:${c}">${v}</div>
+        <div style="font-size:.77rem;color:var(--t2,#aaa);margin-top:2px">${l}</div>
+      </div>`).join('')
+  }
+
+  // ── Tabela por praia ─────────────────────────────────────────
+  function renderPraias(lista) {
+    const tbody = document.getElementById('tbody-praias')
+    if (!lista.length) { tbody.innerHTML = `<tr><td colspan="9" class="empty-row">Sem dados.</td></tr>`; return }
+    tbody.innerHTML = lista.map(p => {
+      const taxa = p.taxa_eclosao_pct != null ? p.taxa_eclosao_pct + '%' : '—'
+      const predTotal = (p.predacao_pessoas || 0) + (p.predacao_animais || 0)
+      return `<tr>
+        <td><strong>${p.nome}</strong>${p.comunidade ? `<br><small style="color:var(--t2,#aaa)">${p.comunidade}</small>` : ''}</td>
+        <td>${p.uc_nome || '—'}</td>
+        <td style="text-align:center">${p.ninhos_total || 0}</td>
+        <td style="text-align:center">${p.ninhos_encontrados || 0}</td>
+        <td style="text-align:center">${p.ninhos_eclodidos || 0}</td>
+        <td style="text-align:center">${p.filhotes_vivos || 0}</td>
+        <td style="text-align:center"><strong>${taxa}</strong></td>
+        <td style="text-align:center">${predTotal || 0}</td>
+        <td style="text-align:center">${p.ninhos_pendentes_validacao || 0}</td>
+      </tr>`
+    }).join('')
+  }
+
+  // ── Tabela por espécie ────────────────────────────────────────
+  const SPECIES_NOME = {
+    tracaja: 'Tracajá (Podocnemis unifilis)',
+    tartaruga: 'Tartaruga (P. expansa)',
+    cabecudo: 'Cabeçudo (P. sextuberculata)',
+    pitiU: 'Pitiú (P. erythrocephala)',
+    cupido: 'Cupido (P. cayennensis)',
+    jabuti_pe_elefante: 'Jabuti-pé-de-elefante',
+    jabuti_piranga: 'Jabuti-piranga',
+    mucua: 'Muçuã (Kinosternon scorpioides)',
+    outro: 'Outro',
+  }
+
+  function renderEspecies(praiasFil) {
+    const praiaIds = new Set(praiasFil.map(p => p.id))
+    // Agrega por espécie a partir da view de praias (campos por espécie)
+    const esp = {}
+    for (const p of praiasFil) {
+      const campos = [
+        ['tracaja', p.ninhos_tracaja], ['tartaruga', p.ninhos_tartaruga],
+        ['cabecudo', p.ninhos_cabecudo], ['pitiU', p.ninhos_pitiu],
+        ['cupido', p.ninhos_cupido],
+      ]
+      for (const [k, v] of campos) {
+        if (!esp[k]) esp[k] = { total: 0, eclodidos: 0, filhotes: 0 }
+        esp[k].total += (v || 0)
+      }
+    }
+    // Eclosões e filhotes requerem o join com ninhos individuais
+    // (vw_praias_biomonitor não detalha eclosão por espécie — exibimos totais da praia)
+    const tbody = document.getElementById('tbody-especies')
+    const linhas = Object.entries(esp).filter(([,v]) => v.total > 0).sort(([,a],[,b]) => b.total - a.total)
+    if (!linhas.length) { tbody.innerHTML = `<tr><td colspan="5" class="empty-row">Sem dados.</td></tr>`; return }
+    tbody.innerHTML = linhas.map(([k, v]) => `<tr>
+      <td>${SPECIES_NOME[k] || k}</td>
+      <td style="text-align:center"><strong>${v.total}</strong></td>
+      <td style="text-align:center">—</td>
+      <td style="text-align:center">—</td>
+      <td style="text-align:center">—</td>
+    </tr>`).join('')
+  }
+
+  // ── Tabela por monitor ────────────────────────────────────────
+  function renderMonitoresRel(praiasFil) {
+    const praiaIds = new Set(praiasFil.map(p => p.id))
+    // Agrega ninhos por monitor_id (da query de ninhos)
+    const agg = {}
+    // Ninhos não têm praia_id filtrado aqui — usamos grupo_id cross-reference
+    const gruposIds = new Set(_grupos.filter(g => praiasFil.some(p => p.uc_id === g.uc_id)).map(g => g.id))
+
+    for (const n of _ninhos) {
+      if (gruposIds.size > 0 && !gruposIds.has(n.grupo_id)) continue
+      if (!n.monitor_id) continue
+      if (!agg[n.monitor_id]) agg[n.monitor_id] = { ninhos: 0, eclodidos: 0, filhotes: 0 }
+      agg[n.monitor_id].ninhos++
+      if (n.status === 'eclodido') {
+        agg[n.monitor_id].eclodidos++
+        const ecl = Array.isArray(n.filhotes_vivos) ? n.filhotes_vivos[0] : n.filhotes_vivos
+        agg[n.monitor_id].filhotes += ecl?.filhotes_vivos || 0
+      }
+    }
+
+    const tbody = document.getElementById('tbody-monitores-rel')
+    const linhas = Object.entries(agg).sort(([,a],[,b]) => b.ninhos - a.ninhos)
+    if (!linhas.length) { tbody.innerHTML = `<tr><td colspan="5" class="empty-row">Sem dados.</td></tr>`; return }
+
+    tbody.innerHTML = linhas.map(([mid, v]) => {
+      const mon = _monitoresRel.find(m => m.id === mid)
+      const grp = _grupos.find(g => g.id === mon?.grupo_id)
+      return `<tr>
+        <td><strong>${mon?.nome_completo || '—'}</strong></td>
+        <td>${grp?.nome || '—'}</td>
+        <td style="text-align:center">${v.ninhos}</td>
+        <td style="text-align:center">${v.eclodidos}</td>
+        <td style="text-align:center">${v.filhotes}</td>
+      </tr>`
+    }).join('')
+  }
+
+  // ── Tabs ─────────────────────────────────────────────────────
+  const _abas = ['praias','especies','monitores']
+  window.mudarAba = function(aba) {
+    _abas.forEach(a => {
+      document.getElementById('aba-' + a).style.display = a === aba ? '' : 'none'
+      document.getElementById('tab-' + a).classList.toggle('ativo', a === aba)
+    })
+  }
+
+  // ── Exportar CSV ─────────────────────────────────────────────
+  window.exportarCSV = function() {
+    const prog = document.getElementById('fil-programa').value
+    const lista = prog ? _praias.filter(p => p.programa_id === prog) : _praias
+    const cab = 'Código,Nome,Município,UC,Programa,Ninhos Total,Eclodidos,Perdidos,Filhotes Vivos,Filhotes Mortos,Ovos não nascidos,Taxa eclosão (%),Predação pessoas,Predação animais,Pendentes validação'
+    const linhas = lista.map(p => [
+      p.codigo, p.nome, p.municipio, p.uc_nome, p.programa_nome,
+      p.ninhos_total, p.ninhos_eclodidos, p.ninhos_perdidos,
+      p.filhotes_vivos, p.filhotes_mortos, p.ovos_nao_nascidos,
+      p.taxa_eclosao_pct, p.predacao_pessoas, p.predacao_animais,
+      p.ninhos_pendentes_validacao,
+    ].map(v => `"${v ?? ''}"`).join(','))
+    const blob = new Blob([[cab, ...linhas].join('\n')], { type: 'text/csv' })
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob)
+    a.download = `biomonitor_praias_${new Date().toISOString().slice(0,10)}.csv`
+    a.click()
+  }
+
+  aplicarFiltros()
+})()
+</script>
+<style>
+.tab-btn { background:transparent;border:none;padding:6px 14px;border-radius:7px;cursor:pointer;font-size:.88rem;color:var(--t1,#f4efe6);transition:all .15s }
+.tab-btn.ativo { background:white;color:var(--floresta,#0A1A0F);box-shadow:0 1px 4px rgba(0,0,0,.12) }
+.tab-btn:hover:not(.ativo) { background:rgba(255,255,255,.12) }
+</style>
+</body>
+</html>
