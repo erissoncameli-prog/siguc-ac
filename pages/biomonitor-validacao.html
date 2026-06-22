@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>SIGUC-AC · Validação de Ninhos</title>
+<link rel="stylesheet" href="../css/global.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../js/observability.js"></script>
+<script src="../js/queryLogger.js"></script>
+<script src="../js/config.js"></script>
+<script src="../js/layout.js"></script>
+</head>
+<body>
+<div id="app"></div>
+
+<!-- ── Modal: Rejeitar / Em correção ───────────────────── -->
+<div class="modal-overlay" id="modal-rejeitar">
+  <div class="modal" style="max-width:460px">
+    <div class="modal-header">
+      <div class="modal-title" id="rej-titulo">Rejeitar ninho</div>
+      <button class="modal-close" onclick="fecharModalRejeitar()">×</button>
+    </div>
+    <div class="modal-body">
+      <p style="margin:0 0 12px;font-size:.9rem;color:var(--t2,#aaa)">
+        Ninho: <strong id="rej-numero"></strong>
+      </p>
+      <div class="form-group">
+        <label class="form-label">Motivo <span class="obrig">*</span></label>
+        <textarea class="form-control" id="rej-motivo" rows="3" placeholder="Descreva o motivo da rejeição ou da correção solicitada..."></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="fecharModalRejeitar()">Cancelar</button>
+      <button class="btn btn-primary" id="rej-btn" onclick="confirmarRejeicao()">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal: Fotos ────────────────────────────────────── -->
+<div class="modal-overlay" id="modal-fotos">
+  <div class="modal" style="max-width:700px">
+    <div class="modal-header">
+      <div class="modal-title">Fotos do ninho</div>
+      <button class="modal-close" onclick="document.getElementById('modal-fotos').classList.remove('aberto')">×</button>
+    </div>
+    <div class="modal-body">
+      <div id="fotos-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+;(async function () {
+  const usuario = await carregarUsuario()
+  if (!usuario) { window.location.href = '../index.html'; return }
+  if (!['super_admin','gestor','tecnico'].includes(usuario.perfil)) {
+    window.location.href = '../pages/dashboard.html'; return
+  }
+
+  document.getElementById('app').innerHTML =
+    gerarLayout('Validação de Ninhos', 'biomonitor-validacao') +
+    `<div class="fade-in">
+      <div class="filter-bar">
+        <input class="form-control search-input" id="busca" placeholder="Buscar ninho, monitor, praia..." oninput="renderLista()">
+        <select class="form-control" id="fil-praia" style="width:200px" onchange="renderLista()">
+          <option value="">Todas as praias</option>
+        </select>
+        <select class="form-control" id="fil-especie" style="width:160px" onchange="renderLista()">
+          <option value="">Todas as espécies</option>
+          <option value="tracaja">Tracajá</option>
+          <option value="tartaruga">Tartaruga</option>
+          <option value="cabecudo">Cabeçudo</option>
+          <option value="pitiU">Pitiú</option>
+          <option value="cupido">Cupido</option>
+          <option value="jabuti_pe_elefante">Jabuti-pé-elefante</option>
+          <option value="jabuti_piranga">Jabuti-piranga</option>
+          <option value="mucua">Muçuã</option>
+          <option value="outro">Outro</option>
+        </select>
+        <select class="form-control" id="fil-status" style="width:160px" onchange="renderLista()">
+          <option value="pendente">Pendentes</option>
+          <option value="">Todos</option>
+          <option value="validado">Validados</option>
+          <option value="rejeitado">Rejeitados</option>
+          <option value="em_correcao">Em correção</option>
+        </select>
+      </div>
+
+      <div id="stats-bar" style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap"></div>
+
+      <div id="lista-ninhos" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px">
+        <p style="color:var(--t2,#aaa)">Carregando...</p>
+      </div>
+    </div>`
+
+  bIconsAplicar(document.getElementById('app'))
+
+  let _ninhos = [], _rejeitar = null, _rejTipo = null
+
+  // ── Carregar dados ─────────────────────────────────────────────
+  async function carregarDados() {
+    const { data, error } = await db.from('vw_ninhos_validacao').select('*').order('criado_em', { ascending: false })
+    if (error) { toast(error.message, 'error'); return }
+    _ninhos = data || []
+    popularFiltros()
+    renderStats()
+    renderLista()
+  }
+
+  function popularFiltros() {
+    const praias = [...new Set(_ninhos.map(n => n.praia_nome).filter(Boolean))].sort()
+    const sel = document.getElementById('fil-praia')
+    sel.innerHTML = `<option value="">Todas as praias</option>` +
+      praias.map(p => `<option value="${p}">${p}</option>`).join('')
+  }
+
+  function renderStats() {
+    const stats = {
+      pendente:    _ninhos.filter(n => n.status_validacao === 'pendente').length,
+      validado:    _ninhos.filter(n => n.status_validacao === 'validado').length,
+      rejeitado:   _ninhos.filter(n => n.status_validacao === 'rejeitado').length,
+      em_correcao: _ninhos.filter(n => n.status_validacao === 'em_correcao').length,
+    }
+    document.getElementById('stats-bar').innerHTML = [
+      ['Pendentes',    stats.pendente,    '#f59e0b'],
+      ['Validados',    stats.validado,    '#10b981'],
+      ['Rejeitados',   stats.rejeitado,   '#ef4444'],
+      ['Em correção',  stats.em_correcao, '#6366f1'],
+    ].map(([l, v, c]) => `
+      <div style="background:rgba(255,255,255,.06);border-radius:10px;padding:10px 16px;min-width:110px;border-left:3px solid ${c}">
+        <div style="font-size:1.5rem;font-weight:700;color:${c}">${v}</div>
+        <div style="font-size:.78rem;color:var(--t2,#aaa)">${l}</div>
+      </div>`).join('')
+  }
+
+  window.renderLista = function() {
+    const busca   = document.getElementById('busca')?.value.toLowerCase() || ''
+    const praia   = document.getElementById('fil-praia')?.value || ''
+    const especie = document.getElementById('fil-especie')?.value || ''
+    const status  = document.getElementById('fil-status')?.value
+
+    const lista = _ninhos.filter(n =>
+      (!busca   || n.numero_ninho?.toLowerCase().includes(busca) ||
+                   n.monitor_nome?.toLowerCase().includes(busca) ||
+                   n.praia_nome?.toLowerCase().includes(busca)) &&
+      (!praia   || n.praia_nome === praia) &&
+      (!especie || n.especie === especie) &&
+      (status === undefined || status === '' || n.status_validacao === status)
+    )
+
+    const cont = document.getElementById('lista-ninhos')
+    if (!lista.length) { cont.innerHTML = `<p style="color:var(--t2,#aaa);grid-column:1/-1">Nenhum ninho encontrado com esses filtros.</p>`; return }
+
+    const SPECIES_NOME = {
+      tracaja: 'Tracajá', tartaruga: 'Tartaruga', cabecudo: 'Cabeçudo',
+      pitiU: 'Pitiú', cupido: 'Cupido', jabuti_pe_elefante: 'Jabuti-pé-de-elefante',
+      jabuti_piranga: 'Jabuti-piranga', mucua: 'Muçuã', outro: 'Outro'
+    }
+    const STATUS_CLR = { pendente:'#f59e0b', validado:'#10b981', rejeitado:'#ef4444', em_correcao:'#6366f1' }
+    const STATUS_LBL = { pendente:'Pendente', validado:'Validado', rejeitado:'Rejeitado', em_correcao:'Em correção' }
+    const NINHO_CLR  = { encontrado:'#3b82f6', transferido:'#8b5cf6', eclodido:'#10b981', perdido:'#ef4444' }
+
+    cont.innerHTML = lista.map(n => {
+      const sclr = STATUS_CLR[n.status_validacao] || '#888'
+      const nclr = NINHO_CLR[n.status] || '#888'
+      const temFotos = n.foto_urls?.length > 0
+      return `<div style="background:rgba(255,255,255,.06);border-radius:12px;padding:16px;border:1px solid rgba(255,255,255,.08)">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
+          <div>
+            <div style="font-weight:600;font-size:1rem">${n.numero_ninho}</div>
+            <div style="font-size:.83rem;color:var(--t2,#aaa)">${SPECIES_NOME[n.especie] || n.especie}</div>
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">
+            <span style="font-size:.75rem;padding:2px 8px;border-radius:6px;background:${nclr}22;color:${nclr};font-weight:600">${n.status}</span>
+            <span style="font-size:.75rem;padding:2px 8px;border-radius:6px;background:${sclr}22;color:${sclr};font-weight:600">${STATUS_LBL[n.status_validacao]}</span>
+          </div>
+        </div>
+
+        <div style="font-size:.83rem;color:var(--t2,#aaa);display:grid;gap:3px;margin-bottom:10px">
+          <div>Praia: <span style="color:var(--t1,#f4efe6)">${n.praia_nome || '—'}</span></div>
+          <div>Monitor: <span style="color:var(--t1,#f4efe6)">${n.monitor_nome || '—'}</span></div>
+          <div>Data: <span style="color:var(--t1,#f4efe6)">${formatData(n.data_encontro)}</span></div>
+          ${n.lat ? `<div>GPS: <span style="color:var(--t1,#f4efe6)">${Number(n.lat).toFixed(5)}, ${Number(n.lng).toFixed(5)}</span> ${n.precisao_gps_m ? `(±${n.precisao_gps_m}m)` : ''}</div>` : ''}
+        </div>
+
+        ${n.status === 'transferido' || n.data_transferencia ? `
+        <div style="background:rgba(139,92,246,.12);border-radius:8px;padding:8px 10px;margin-bottom:8px;font-size:.82rem">
+          <strong style="color:#8b5cf6">Transferência:</strong>
+          ${n.data_transferencia ? `${formatData(n.data_transferencia)} · ${n.qtd_ovos} ovos` : ''}
+          ${n.local_destino ? ` → ${n.local_destino}` : ''}
+        </div>` : ''}
+
+        ${n.status === 'eclodido' || n.data_nascimento ? `
+        <div style="background:rgba(16,185,129,.12);border-radius:8px;padding:8px 10px;margin-bottom:8px;font-size:.82rem">
+          <strong style="color:#10b981">Eclosão:</strong>
+          ${n.data_nascimento ? formatData(n.data_nascimento) : ''}
+          · Vivos: ${n.filhotes_vivos ?? 0}
+          · Mortos: ${n.filhotes_mortos ?? 0}
+          · Não nascidos: ${n.ovos_nao_nascidos ?? 0}
+          ${n.predacao && n.predacao !== 'nenhuma' ? `· Predação: ${n.predacao}` : ''}
+        </div>` : ''}
+
+        ${n.observacoes ? `<p style="font-size:.82rem;color:var(--t2,#aaa);margin:0 0 10px;font-style:italic">${n.observacoes}</p>` : ''}
+        ${n.motivo_rejeicao ? `<p style="font-size:.82rem;color:#ef4444;margin:0 0 10px">Motivo: ${n.motivo_rejeicao}</p>` : ''}
+
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,.06)">
+          ${temFotos ? `<button class="btn btn-sm btn-secondary" onclick='verFotos(${JSON.stringify(n.foto_urls)})'>Fotos (${n.foto_urls.length})</button>` : ''}
+          ${n.status_validacao !== 'validado'   ? `<button class="btn btn-sm btn-primary"   onclick="validar('${n.id}')">Validar</button>` : ''}
+          ${n.status_validacao !== 'rejeitado'  ? `<button class="btn btn-sm" style="background:#ef444433;color:#ef4444;border:none;border-radius:6px;padding:4px 10px;cursor:pointer" onclick="abrirRejeitar('${n.id}','${esc(n.numero_ninho)}','rejeitado')">Rejeitar</button>` : ''}
+          ${n.status_validacao !== 'em_correcao'? `<button class="btn btn-sm" style="background:#6366f133;color:#6366f1;border:none;border-radius:6px;padding:4px 10px;cursor:pointer" onclick="abrirRejeitar('${n.id}','${esc(n.numero_ninho)}','em_correcao')">Correção</button>` : ''}
+        </div>
+      </div>`
+    }).join('')
+  }
+
+  // ── Ações de validação ─────────────────────────────────────────
+  window.validar = async function(id) {
+    const { error } = await db.from('ninhos_quelonios').update({
+      status_validacao: 'validado',
+      validado_por: usuario.id,
+      validado_em:  new Date().toISOString(),
+      motivo_rejeicao: null,
+    }).eq('id', id)
+    if (error) { toast(error.message, 'error'); return }
+    toast('Ninho validado.', 'success')
+    await carregarDados()
+  }
+
+  window.abrirRejeitar = function(id, numero, tipo) {
+    _rejeitar = id
+    _rejTipo  = tipo
+    document.getElementById('rej-titulo').textContent = tipo === 'rejeitado' ? 'Rejeitar ninho' : 'Solicitar correção'
+    document.getElementById('rej-numero').textContent = numero
+    document.getElementById('rej-motivo').value = ''
+    document.getElementById('rej-btn').textContent = tipo === 'rejeitado' ? 'Rejeitar' : 'Solicitar correção'
+    document.getElementById('modal-rejeitar').classList.add('aberto')
+  }
+
+  window.fecharModalRejeitar = () => document.getElementById('modal-rejeitar').classList.remove('aberto')
+
+  window.confirmarRejeicao = async function() {
+    const motivo = document.getElementById('rej-motivo').value.trim()
+    if (!motivo) { toast('Informe o motivo.', 'error'); return }
+    const { error } = await db.from('ninhos_quelonios').update({
+      status_validacao: _rejTipo,
+      motivo_rejeicao:  motivo,
+      validado_por:     usuario.id,
+      validado_em:      new Date().toISOString(),
+    }).eq('id', _rejeitar)
+    if (error) { toast(error.message, 'error'); return }
+    toast(_rejTipo === 'rejeitado' ? 'Ninho rejeitado.' : 'Correção solicitada.', 'success')
+    fecharModalRejeitar()
+    await carregarDados()
+  }
+
+  window.verFotos = function(urls) {
+    document.getElementById('fotos-grid').innerHTML = urls.map(u =>
+      `<img src="${u}" style="width:100%;border-radius:8px;object-fit:cover;aspect-ratio:4/3" loading="lazy">`
+    ).join('')
+    document.getElementById('modal-fotos').classList.add('aberto')
+  }
+
+  await carregarDados()
+})()
+</script>
+</body>
+</html>
