@@ -26,6 +26,7 @@ const BioApp = {
   formTipo:     null,   // 'ninho' | 'transferencia' | 'eclosao'
   formNinhoAtualizar: null,  // ninho sendo atualizado
   // Filtros de aba
+  abertosStatusFiltro: null,      // null = todos; 'encontrado'|'transferido'|'eclodido'|'perdido'
   abertosFiltroPraia: undefined,  // undefined = usar praiaAtual; null = todas
   filaFiltroPraia:    undefined,  // undefined = todas; null = todas (explícito)
   // GPS proximidade
@@ -75,6 +76,17 @@ function bioMostrarTela(id) {
    ════════════════════════════════════════════════════════════ */
 async function bioIniciar() {
   await bioOfflinePersistir()
+
+  // Aguarda o cliente Supabase isolado ser criado (depende de /api/env)
+  if (typeof _bioReady !== 'undefined') await _bioReady
+
+  if (!window._bioDB_client) {
+    bioMostrarTela('tela-login')
+    bioIniciarTelaLogin()
+    const erroEl = document.getElementById('bio-login-erro')
+    if (erroEl) { erroEl.textContent = 'Sem conexão com o servidor. Verifique sua internet.'; erroEl.hidden = false }
+    return
+  }
 
   const { data: { session } } = await bioSupabase().auth.getSession()
 
@@ -563,6 +575,42 @@ async function bioVerificarPraiaProxima(lat, lng) {
 }
 
 /* ════════════════════════════════════════════════════════════
+   AUTO-NUMERAÇÃO
+   ════════════════════════════════════════════════════════════ */
+async function bioGerarNumeroNinho(praiaId, especie) {
+  const esp    = BIO_ESPECIES.find(e => e.id === especie)
+  const praias = await bioOfflineListarPraias()
+  const praia  = praias.find(p => p.id === praiaId)
+  const cod    = praia?.codigo ?? 'XX'
+  const sig    = esp?.sigla   ?? '?'
+  const prefix = `${cod}-${sig}-`
+
+  let maxSeq = 0
+  const todos = await bioOfflineListarNinhos({})
+  todos.forEach(n => {
+    if (n.numero_ninho?.startsWith(prefix)) {
+      const seq = parseInt(n.numero_ninho.slice(prefix.length)) || 0
+      if (seq > maxSeq) maxSeq = seq
+    }
+  })
+
+  if (navigator.onLine && window._bioDB_client) {
+    try {
+      const { data } = await bioSupabase()
+        .from('ninhos_quelonios')
+        .select('numero_ninho')
+        .like('numero_ninho', `${prefix}%`)
+      ;(data ?? []).forEach(n => {
+        const seq = parseInt(n.numero_ninho?.slice(prefix.length)) || 0
+        if (seq > maxSeq) maxSeq = seq
+      })
+    } catch (_) {}
+  }
+
+  return `${prefix}${String(maxSeq + 1).padStart(3, '0')}`
+}
+
+/* ════════════════════════════════════════════════════════════
    FORMULÁRIO — NINHO (Encontro)
    ════════════════════════════════════════════════════════════ */
 function bioAbrirFormNinho() {
@@ -846,11 +894,16 @@ async function bioAbrirTelaAbertos() {
 }
 
 async function bioCarregarAbertos() {
-  const filtroPraia = BioApp.abertosFiltroPraia
+  const filtroPraia  = BioApp.abertosFiltroPraia
+  const filtroStatus = BioApp.abertosStatusFiltro
   const estadoEl = document.getElementById('bio-abertos-estado')
   const listaEl  = document.getElementById('bio-lista-abertos')
   estadoEl.textContent = 'Carregando do servidor…'; estadoEl.hidden = false
   listaEl.innerHTML = ''
+
+  const estaAberto = n => filtroStatus
+    ? n.status === filtroStatus
+    : (n.status !== 'eclodido' && n.status !== 'perdido')
 
   let ninhos = []
 
@@ -860,8 +913,12 @@ async function bioCarregarAbertos() {
         .from('vw_ninhos_validacao')
         .select('id,uuid_cliente,numero_ninho,especie,data_encontro,status,status_validacao,motivo_rejeicao,qtd_ovos,ovos_integros,ovos_descartados,dist_rio_m,criado_em,praia_id,praia_nome,monitor_id,monitor_nome')
         .eq('grupo_id', BioApp.monitor.grupo_id)
-        .not('status', 'in', '(eclodido,perdido)')
         .order('numero_ninho', { ascending: false })
+      if (filtroStatus) {
+        q = q.eq('status', filtroStatus)
+      } else {
+        q = q.not('status', 'in', '(eclodido,perdido)')
+      }
       if (filtroPraia) q = q.eq('praia_id', filtroPraia.id)
       const { data, error } = await q
       if (error) throw error
@@ -871,7 +928,7 @@ async function bioCarregarAbertos() {
       const uuidsServ = new Set((data ?? []).map(n => n.uuid_cliente).filter(Boolean))
       const praias    = await bioOfflineListarPraias()
       const locaisSo  = localPend
-        .filter(n => !uuidsServ.has(n.uuid_cliente) && n.status !== 'eclodido' && n.status !== 'perdido')
+        .filter(n => !uuidsServ.has(n.uuid_cliente) && estaAberto(n))
         .map(n => {
           const pr = praias.find(p => p.id === n.praia_id)
           return { ...n, praia_nome: pr?.nome, monitor_nome: BioApp.monitor?.nome_completo, _local: true }
@@ -883,12 +940,12 @@ async function bioCarregarAbertos() {
       console.warn('[biomonitor abertos]', e)
       estadoEl.textContent = 'Sem conexão — exibindo dados locais'
       const localAll = await bioOfflineListarNinhos(filtroPraia ? { praiaId: filtroPraia.id } : {})
-      ninhos = localAll.filter(n => n.status !== 'eclodido' && n.status !== 'perdido')
+      ninhos = localAll.filter(estaAberto)
     }
   } else {
     estadoEl.textContent = 'Offline — exibindo dados locais'
     const localAll = await bioOfflineListarNinhos(filtroPraia ? { praiaId: filtroPraia.id } : {})
-    ninhos = localAll.filter(n => n.status !== 'eclodido' && n.status !== 'perdido')
+    ninhos = localAll.filter(estaAberto)
   }
 
   if (!ninhos.length) {
@@ -935,35 +992,65 @@ function bioMostrarGeoSugTab(tab) {
   }
 }
 
+function bioNinhoCardInner(n, opts = {}) {
+  const { mostrarAcoes = false } = opts
+  const esp    = BIO_ESPECIES.find(e => e.id === n.especie)
+  const status = n.status ?? 'encontrado'
+  const data   = n.data_encontro
+    ? new Date(n.data_encontro + 'T12:00').toLocaleDateString('pt-BR')
+    : '—'
+
+  const rejHtml = n.status_validacao === 'rejeitado'
+    ? `<div class="bio-nfc-rejeicao">Rejeitado: ${n.motivo_rejeicao ?? ''}</div>`
+    : ''
+
+  const ovosHtml = (n.qtd_ovos != null || n.ovos_integros != null || n.ovos_descartados != null) ? `
+    <div class="bio-nfc-ovos">
+      ${n.qtd_ovos         != null ? `<span>${n.qtd_ovos} ovos</span>` : ''}
+      ${n.ovos_integros    != null ? `<span>${n.ovos_integros} ínt.</span>` : ''}
+      ${n.ovos_descartados != null ? `<span>${n.ovos_descartados} desc.</span>` : ''}
+    </div>` : ''
+
+  const localChip = n._local
+    ? '<span class="bio-nfc-ev-chip" style="background:#a78bfa22;color:#7c3aed">pendente</span>'
+    : ''
+
+  const acoesHtml = mostrarAcoes ? `
+    <div class="bio-nfc-acoes">
+      ${status === 'encontrado' || status === 'transferido' ? `<button class="bio-btn-sm prim" data-acao="transferencia">+ Transferência</button>` : ''}
+      ${status !== 'eclodido' && status !== 'perdido' ? `<button class="bio-btn-sm ghost" data-acao="eclosao">Eclosão</button>` : ''}
+    </div>` : ''
+
+  return `
+    <div class="bio-nfc-header">
+      <span class="bio-nfc-num">#${n.numero_ninho ?? '—'}</span>
+      <span class="bio-nfc-status-badge ${status}">${bioLabels.status[status] ?? status}</span>
+    </div>
+    <div class="bio-nfc-especie">${esp ? `<strong>${esp.sigla}</strong> ${esp.nome}` : (n.especie ?? '—')}</div>
+    <div class="bio-nfc-row">
+      ${n.praia_nome ? `<span class="bio-nfc-praia">${n.praia_nome}</span>` : ''}
+      <span class="bio-nfc-data">${data}</span>
+    </div>
+    ${rejHtml}
+    ${ovosHtml}
+    ${localChip ? `<div class="bio-nfc-eventos">${localChip}</div>` : ''}
+    ${acoesHtml}
+  `
+}
+
 function bioRenderizarListaNinhos(containerId, ninhos, mostrarAcoes) {
   const el = document.getElementById(containerId)
   if (!el) return
+  el.innerHTML = ''
   if (!ninhos.length) {
     el.innerHTML = '<p style="text-align:center;color:#9CA3AF;padding:24px">Nenhum ninho encontrado.</p>'
     return
   }
-  el.innerHTML = ''
   ninhos.forEach(n => {
-    const esp    = BIO_ESPECIES.find(e => e.id === n.especie)
+    const status = n.status ?? 'encontrado'
     const card   = document.createElement('div')
-    card.className = 'bio-ninho-card'
-    card.innerHTML = `
-      <div class="bio-ninho-card-header">
-        <span class="bio-ninho-num">${n.numero_ninho}</span>
-        <span class="bio-ninho-status ${n.status}">${bioLabels.status[n.status] ?? n.status}</span>
-      </div>
-      <div class="bio-ninho-card-meta">
-        <span>${esp?.sigla ?? '?'} — ${esp?.nome ?? n.especie}</span>
-        <span>${new Date(n.data_encontro).toLocaleDateString('pt-BR')}</span>
-        ${n.status_validacao === 'rejeitado' ? '<span style="color:#dc2626">Rejeitado: ' + (n.motivo_rejeicao ?? '') + '</span>' : ''}
-      </div>
-      ${mostrarAcoes ? `
-        <div style="display:flex;gap:8px;margin-top:10px">
-          ${n.status === 'encontrado' || n.status === 'transferido' ? `<button class="bio-btn-sm prim" data-acao="transferencia">+ Transferência</button>` : ''}
-          ${n.status !== 'eclodido' && n.status !== 'perdido' ? `<button class="bio-btn-sm ghost" data-acao="eclosao">Registrar Eclosão</button>` : ''}
-        </div>` : ''}
-    `
-
+    card.className = `bio-nfc status-${status}`
+    card.innerHTML = bioNinhoCardInner(n, { mostrarAcoes })
     card.querySelectorAll('[data-acao]').forEach(btn => {
       btn.addEventListener('click', e => {
         e.stopPropagation()
@@ -971,7 +1058,6 @@ function bioRenderizarListaNinhos(containerId, ninhos, mostrarAcoes) {
         if (btn.dataset.acao === 'eclosao')       bioAbrirFormEclosao(n)
       })
     })
-
     el.appendChild(card)
   })
 }
@@ -1352,6 +1438,74 @@ document.addEventListener('DOMContentLoaded', async () => {
       document.querySelectorAll('.bio-especie-chip').forEach(c => c.classList.remove('sel'))
       chip.classList.add('sel')
     })
+    // Auto-numeração: preenche número ao selecionar espécie (só se campo vazio)
+    chip.addEventListener('click', async () => {
+      const campo = document.getElementById('bio-form-numero')
+      if (!campo || campo.value.trim()) return
+      const esp     = chip.dataset.esp
+      const praiaId = BioApp.praiaAtual?.id
+      if (!esp || !praiaId) return
+      try {
+        campo.value = await bioGerarNumeroNinho(praiaId, esp)
+      } catch (_) {}
+    })
+  })
+
+  // Filtros de status na aba Abertos
+  document.querySelectorAll('.bio-sfil-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.bio-sfil-btn').forEach(b => b.classList.remove('ativa'))
+      btn.classList.add('ativa')
+      BioApp.abertosStatusFiltro = btn.dataset.sfil || null
+      bioCarregarAbertos()
+    })
+  })
+
+  // Chips de método de distância (tracker / estimativa)
+  document.querySelectorAll('.bio-dist-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      document.querySelectorAll('.bio-dist-chip').forEach(c => c.classList.remove('ativo'))
+      chip.classList.add('ativo')
+      BioApp.distRioMetodo = chip.dataset.metodo
+      document.getElementById('bio-dist-medir-gps').style.display =
+        chip.dataset.metodo === 'tracker' ? '' : 'none'
+    })
+  })
+
+  // Botão "Marcar ponto do Rio" — captura GPS atual e calcula distância ao ninho
+  document.getElementById('bio-btn-marcar-rio')?.addEventListener('click', () => {
+    const btn  = document.getElementById('bio-btn-marcar-rio')
+    const txt  = document.getElementById('bio-btn-marcar-rio-txt')
+    const dica = document.getElementById('bio-dist-gps-dica')
+    txt.textContent = 'Capturando GPS…'
+    btn.disabled = true
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        const latRio = pos.coords.latitude
+        const lngRio = pos.coords.longitude
+        BioApp.distRioLatRio = latRio
+        BioApp.distRioLngRio = lngRio
+        const latNinho = BioApp.gpsLat
+        const lngNinho = BioApp.gpsLng
+        if (latNinho != null && lngNinho != null) {
+          const dist = bioHaversineM(latNinho, lngNinho, latRio, lngRio)
+          document.getElementById('bio-form-dist-rio').value = dist.toFixed(1)
+          txt.textContent = 'Rio marcado ✓'
+          dica.textContent = `Distância calculada: ${dist.toFixed(1)} m (precisão GPS: ±${Math.round(pos.coords.accuracy)} m)`
+        } else {
+          txt.textContent = 'Marcar ponto do Rio'
+          dica.textContent = 'GPS do ninho não disponível — insira a distância manualmente.'
+          document.getElementById('bio-form-dist-rio').focus()
+        }
+        btn.disabled = false
+      },
+      () => {
+        txt.textContent = 'Marcar ponto do Rio'
+        dica.textContent = 'Não foi possível obter GPS. Insira a distância manualmente.'
+        btn.disabled = false
+      },
+      { enableHighAccuracy: true, timeout: 15000 }
+    )
   })
 
   // Chips de método de distância (tracker / estimativa)
@@ -1428,5 +1582,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (campoBool) document.body.classList.add('field-mode')
 
   // Entrar
-  await bioIniciar()
+  try {
+    await bioIniciar()
+  } catch (err) {
+    console.error('[biomonitor] erro na inicialização:', err)
+    bioMostrarTela('tela-login')
+    bioIniciarTelaLogin()
+    const erroEl = document.getElementById('bio-login-erro')
+    if (erroEl) { erroEl.textContent = 'Erro ao iniciar o app. Recarregue a página.'; erroEl.hidden = false }
+  }
 })
