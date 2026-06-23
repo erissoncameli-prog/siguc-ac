@@ -67,21 +67,26 @@ async function bioSyncNinhos(monitorId, onProgresso) {
     }
 
     const payload = {
-      uuid_cliente:   ninho.uuid_cliente,
-      numero_ninho:   ninho.numero_ninho,
-      praia_id:       ninho.praia_id   || null,
-      uc_id:          ninho.uc_id      || null,
-      municipio:      ninho.municipio  || null,
-      especie:        ninho.especie,
-      data_encontro:  ninho.data_encontro,
-      foto_urls:      fotoUrls,
-      observacoes:    ninho.observacoes || null,
-      monitor_id:     monitorId,
-      grupo_id:       ninho.grupo_id   || null,
-      localizacao:    ninho.lat != null && ninho.lng != null
+      uuid_cliente:     ninho.uuid_cliente,
+      numero_ninho:     ninho.numero_ninho,
+      praia_id:         ninho.praia_id         || null,
+      uc_id:            ninho.uc_id            || null,
+      municipio:        ninho.municipio        || null,
+      especie:          ninho.especie,
+      data_encontro:    ninho.data_encontro,
+      foto_urls:        fotoUrls,
+      observacoes:      ninho.observacoes      || null,
+      monitor_id:       monitorId ?? ninho.monitor_id ?? null,
+      grupo_id:         ninho.grupo_id         || null,
+      localizacao:      ninho.lat != null && ninho.lng != null
         ? `POINT(${ninho.lng} ${ninho.lat})`
         : null,
-      precisao_gps_m: ninho.precisao_gps_m || null,
+      precisao_gps_m:   ninho.precisao_gps_m  || null,
+      qtd_ovos:         ninho.qtd_ovos         ?? null,
+      ovos_integros:    ninho.ovos_integros    ?? null,
+      ovos_descartados: ninho.ovos_descartados ?? null,
+      dist_rio_m:       ninho.dist_rio_m       ?? null,
+      dist_rio_metodo:  ninho.dist_rio_metodo  || null,
     }
 
     await bioOfflineAtualizarSync('ninhos', ninho.uuid_cliente, 'enviando')
@@ -122,7 +127,7 @@ async function bioSyncTransferencias(monitorId, onProgresso) {
       qtd_ovos:            t.qtd_ovos,
       local_destino:       t.local_destino     || null,
       observacoes:         t.observacoes       || null,
-      monitor_id:          monitorId,
+      monitor_id:          monitorId ?? t.monitor_id ?? null,
     }
 
     await bioOfflineAtualizarSync('transferencias', t.uuid_cliente, 'enviando')
@@ -170,7 +175,7 @@ async function bioSyncEclosoes(monitorId, onProgresso) {
       predacao:           e.predacao,
       foto_urls:          fotoUrls,
       observacoes:        e.observacoes || null,
-      monitor_id:         monitorId,
+      monitor_id:         monitorId ?? e.monitor_id ?? null,
     }
 
     await bioOfflineAtualizarSync('eclosoes', e.uuid_cliente, 'enviando')

@@ -726,44 +726,28 @@ function bioRenderizarListaNinhos(containerId, ninhos, mostrarAcoes) {
    FILA DE SINCRONIZAÇÃO
    ════════════════════════════════════════════════════════════ */
 async function bioCarregarTelaSincronizacao() {
-  const [ninhos, transfs, ecls] = await Promise.all([
-    bioOfflineListarNinhos(),
-    bioOfflineTransfPendentes(),
-    bioOfflineEclosoesPendentes(),
-  ])
-
-  const total = ninhos.length + transfs.length + ecls.length
-  document.getElementById('bio-fila-total').textContent      = total
-  document.getElementById('bio-fila-pendentes').textContent  = ninhos.filter(n => n.status_sync === 'pendente').length
-  document.getElementById('bio-fila-confirmados').textContent = ninhos.filter(n => n.status_sync === 'confirmado').length
-
-  const container = document.getElementById('bio-sync-queue')
-  container.innerHTML = ''
-
-  const tudo = [
-    ...ninhos.map(n => ({ ...n, _tipo: 'ninho' })),
-    ...transfs.map(t => ({ ...t, _tipo: 'transferencia' })),
-    ...ecls.map(e => ({ ...e, _tipo: 'eclosao' })),
-  ].sort((a, b) => b.criado_em.localeCompare(a.criado_em))
-
-  tudo.slice(0, 30).forEach(item => {
-    const div  = document.createElement('div')
-    div.className = 'bio-sync-item'
-    const tipo  = item._tipo
-    const tipoLabel = { ninho: 'Ninho', transferencia: 'Transferência', eclosao: 'Eclosão' }[tipo]
-    const num   = item.numero_ninho ?? item.ninho_numero ?? '—'
-    div.innerHTML = `
-      <div class="bio-sync-dot ${item.status_sync ?? 'pendente'}"></div>
-      <div class="bio-sync-info">
-        <span class="bio-sync-tipo ${tipo}">${tipoLabel}</span>
-        <strong>${num}</strong>
-        <span>${new Date(item.criado_em).toLocaleString('pt-BR')}</span>
-      </div>`
-    container.appendChild(div)
-  })
-
+  if (BioApp.filaFiltroPraia === undefined) BioApp.filaFiltroPraia = null
   bioMostrarTela('tela-fila')
+  bioAtualizarLabelFiltro('fila')
+  bioMostrarGeoSugTab('fila')
+  await bioCarregarFilaLocal()
 }
+
+async function bioCarregarFilaLocal() {
+  const filtroPraia = BioApp.filaFiltroPraia
+  const praias  = await bioOfflineListarPraias()
+  let ninhos    = await bioOfflineListarNinhos(filtroPraia ? { praiaId: filtroPraia.id } : {})
+
+  // Busca eventos vinculados para enriquecer o status exibido
+  let transfMap = {}, eclosMap = {}
+  try {
+    const [transfs, ecls] = await Promise.all([
+      bioOfflineTransfPendentes(),
+      bioOfflineEclosoesPendentes(),
+    ])
+    transfs.forEach(t => { transfMap[t.ninho_uuid] = (transfMap[t.ninho_uuid] ?? 0) + 1 })
+    ecls.forEach(e => { eclosMap[e.ninho_uuid] = true })
+  } catch (_) { /* stores not yet initialized */ }
 
 async function bioAtualizarBadgeFila() {
   const total = await bioOfflineContarPendentes()
@@ -905,7 +889,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Sincronização em background (listeners online/offline)
   bioSyncIniciarListeners({
-    monitorId:   null,  // preenchido após login
+    get monitorId() { return BioApp.monitor?.id ?? null },
     onConcluido: () => bioAtualizarBadgeFila(),
   })
 
