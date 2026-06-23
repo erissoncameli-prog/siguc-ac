@@ -294,20 +294,7 @@
       </div>
     </div>
 
-    <!-- Número do ninho -->
-    <div class="bio-form-section">
-      <label class="bio-form-label" for="bio-form-numero">N° do ninho / placa *</label>
-      <input type="text" id="bio-form-numero" class="bio-form-input"
-        placeholder="Ex: 001" autocomplete="off">
-    </div>
-
-    <!-- Data de encontro -->
-    <div class="bio-form-section">
-      <label class="bio-form-label" for="bio-form-data">Data de encontro *</label>
-      <input type="date" id="bio-form-data" class="bio-form-input">
-    </div>
-
-    <!-- Espécie -->
+    <!-- Espécie (vem antes para gerar o número) -->
     <div class="bio-form-section">
       <span class="bio-form-label">Espécie *</span>
       <div class="bio-especie-grid">
@@ -340,6 +327,20 @@
           Outro
         </button>
       </div>
+    </div>
+
+    <!-- Número do ninho (auto-gerado após espécie) -->
+    <div class="bio-form-section">
+      <label class="bio-form-label" for="bio-form-numero">N° do ninho</label>
+      <input type="text" id="bio-form-numero" class="bio-form-input"
+        placeholder="Auto (selecione a espécie acima)" autocomplete="off"
+        style="font-family:var(--font-mono,monospace);font-weight:700;letter-spacing:.04em">
+    </div>
+
+    <!-- Data de encontro -->
+    <div class="bio-form-section">
+      <label class="bio-form-label" for="bio-form-data">Data de encontro *</label>
+      <input type="date" id="bio-form-data" class="bio-form-input">
     </div>
 
     <!-- Fotos -->

@@ -432,13 +432,29 @@ function bioIniciarGPS() {
 /* ════════════════════════════════════════════════════════════
    FORMULÁRIO — NINHO (Encontro)
    ════════════════════════════════════════════════════════════ */
+// ── Geração automática de número do ninho ─────────────────────
+async function bioGerarNumeroNinho(praiaId, especie) {
+  if (!praiaId || !especie) return ''
+  const praia = await bioOfflineGetPraia(praiaId)
+  const cod   = (praia?.codigo ?? 'XX').toUpperCase()
+  const esp   = BIO_ESPECIES.find(e => e.id === especie)
+  const sig   = esp?.sigla ?? '?'
+  const todos = await bioOfflineListarNinhos({ praiaId })
+  const count = todos.filter(n => n.especie === especie).length + 1
+  return `${cod}-${sig}-${String(count).padStart(3, '0')}`
+}
+
 function bioAbrirFormNinho() {
   const praia = BioApp.praiaAtual
   document.getElementById('bio-form-praia-label').textContent = praia?.nome ?? '—'
   document.getElementById('bio-form-data').value = new Date().toISOString().slice(0, 10)
-  document.getElementById('bio-form-numero').value = ''
   document.getElementById('bio-form-obs').value   = ''
   document.getElementById('bio-form-foto-count').textContent = '(0/3)'
+
+  const numInput = document.getElementById('bio-form-numero')
+  numInput.value = ''
+  numInput.placeholder = 'Auto (selecione a espécie)'
+  numInput.dataset.autoGerado = '1'
 
   // Limpa seleção de espécie
   document.querySelectorAll('.bio-especie-chip').forEach(c => c.classList.remove('sel'))
@@ -475,9 +491,9 @@ async function bioSalvarNinho() {
   const obs     = document.getElementById('bio-form-obs').value.trim()
   const especie = document.querySelector('.bio-especie-chip.sel')?.dataset.esp
 
-  if (!numero)  { bioToast('Informe o número do ninho (placa).', 'err'); return }
-  if (!data)    { bioToast('Informe a data de encontro.', 'err'); return }
   if (!especie) { bioToast('Selecione a espécie.', 'err'); return }
+  if (!numero)  { bioToast('Número do ninho não gerado — selecione a espécie.', 'err'); return }
+  if (!data)    { bioToast('Informe a data de encontro.', 'err'); return }
 
   const ninho = {
     ...BioApp.formNinho,
@@ -1029,12 +1045,23 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('bio-btn-salvar-transf')?.addEventListener('click', bioSalvarTransf)
   document.getElementById('bio-btn-salvar-eclosao')?.addEventListener('click', bioSalvarEclosao)
 
-  // Chips de espécie
+  // Chips de espécie — seleciona e auto-numera o ninho
   document.querySelectorAll('.bio-especie-chip').forEach(chip => {
-    chip.addEventListener('click', () => {
+    chip.addEventListener('click', async () => {
       document.querySelectorAll('.bio-especie-chip').forEach(c => c.classList.remove('sel'))
       chip.classList.add('sel')
+
+      const numInput = document.getElementById('bio-form-numero')
+      if (numInput && 'autoGerado' in numInput.dataset) {
+        const num = await bioGerarNumeroNinho(BioApp.formNinho?.praia_id, chip.dataset.esp)
+        if (num) { numInput.value = num; numInput.dataset.autoGerado = num }
+      }
     })
+  })
+
+  // Se o monitor editar o campo manualmente, desativa o auto-preenchimento
+  document.getElementById('bio-form-numero')?.addEventListener('input', function () {
+    if (this.value !== this.dataset.autoGerado) delete this.dataset.autoGerado
   })
 
   // Sheet overlay fecha ao clicar fora
