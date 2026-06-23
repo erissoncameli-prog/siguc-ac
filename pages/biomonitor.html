@@ -191,6 +191,22 @@
     </div>
   </div>
 
+  <!-- Sugestão de praia por proximidade GPS -->
+  <div id="bio-praia-sugestao" class="bio-praia-sugestao" hidden>
+    <div class="bio-sugestao-info">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="flex-shrink:0;color:var(--bio-prim)">
+        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+        <circle cx="12" cy="10" r="3"/>
+      </svg>
+      <div>
+        <span class="bio-sugestao-label">Você está próximo de</span>
+        <span class="bio-sugestao-nome" id="bio-sugestao-nome">—</span>
+        <span class="bio-sugestao-dist" id="bio-sugestao-dist"></span>
+      </div>
+    </div>
+    <button class="bio-sugestao-btn" id="bio-btn-usar-sugestao" type="button">Usar</button>
+  </div>
+
   <!-- Seletor de praia (toca para abrir sheet) -->
   <div class="bio-praia-seletor" id="bio-praia-seletor" role="button" tabindex="0" aria-label="Selecionar praia">
     <div class="bio-praia-seletor-info">

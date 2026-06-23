@@ -306,6 +306,38 @@ body { margin: 0; }
 .bio-btn-icon:active { background: rgba(0,0,0,.12); }
 
 /* ── Seletor de praia ───────────────────────────────────────── */
+/* ── Sugestão de praia por GPS ──────────────────────────────── */
+.bio-praia-sugestao {
+  margin: 0 16px 10px; padding: 12px 14px;
+  background: rgba(26,107,140,.08); border: 1.5px solid rgba(26,107,140,.35);
+  border-radius: 14px; display: flex; align-items: center; gap: 10px;
+  animation: bio-slide-in .25s var(--spring);
+}
+.bio-sugestao-info { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }
+.bio-sugestao-label { display: block; font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--bio-prim); font-weight: 700; }
+.bio-sugestao-nome  { display: block; font-size: 14px; font-weight: 700; color: var(--bio-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bio-sugestao-dist  { display: inline-block; font-size: 11px; color: #6B7280; margin-top: 1px; }
+.bio-sugestao-btn {
+  flex-shrink: 0; background: var(--bio-prim); color: #fff;
+  border: none; border-radius: 10px; padding: 8px 16px;
+  font-family: var(--font-ui); font-size: 13px; font-weight: 700;
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+  transition: opacity .15s;
+}
+.bio-sugestao-btn:active { opacity: .8; }
+@keyframes bio-slide-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Distância na lista de praias ───────────────────────────── */
+.bio-sheet-dist {
+  flex-shrink: 0; font-size: 11px; font-weight: 600;
+  padding: 3px 8px; border-radius: 8px;
+  background: #E5EFF5; color: #4A6170;
+}
+.bio-sheet-dist.proxima { background: rgba(26,107,140,.12); color: var(--bio-prim); }
+
 .bio-praia-seletor {
   margin: 0 16px 12px; padding: 14px 16px;
   background: var(--bio-surface); border-radius: 16px;

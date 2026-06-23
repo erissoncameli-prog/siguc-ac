@@ -349,6 +349,14 @@ function bioIniciarListenersHome() {
   // Seletor de praia
   document.getElementById('bio-praia-seletor')?.addEventListener('click', bioAbrirSheetPraias)
 
+  document.getElementById('bio-btn-usar-sugestao')?.addEventListener('click', () => {
+    const chip = document.getElementById('bio-praia-sugestao')
+    const praia = chip?._praiaProxima
+    if (!praia) return
+    bioSelecionarPraia(praia)
+    chip.hidden = true
+  })
+
   // Botões de ação
   document.getElementById('bio-btn-registrar')?.addEventListener('click', () => {
     if (!BioApp.praiaAtual) { bioToast('Selecione uma praia primeiro.', 'err'); return }
@@ -387,19 +395,44 @@ async function bioAbrirSheetPraias() {
   const praias  = await bioOfflineListarPraias()
   const sheetEl = document.getElementById('bio-sheet-praias')
   const lista   = document.getElementById('bio-sheet-praias-lista')
+
+  // Calcula distâncias se GPS disponível
+  const temGPS = BioApp.gpsLat != null && BioApp.gpsLng != null
+  const comDist = praias.map(p => {
+    const dist = (temGPS && p.lat != null && p.lng != null)
+      ? bioHaversineM(BioApp.gpsLat, BioApp.gpsLng, p.lat, p.lng)
+      : null
+    return { ...p, _dist: dist }
+  })
+
+  // Ordena: com distância primeiro (mais próxima), depois as sem GPS
+  comDist.sort((a, b) => {
+    if (a._dist == null && b._dist == null) return 0
+    if (a._dist == null) return 1
+    if (b._dist == null) return -1
+    return a._dist - b._dist
+  })
+
   lista.innerHTML = ''
-  praias.forEach(p => {
+  comDist.forEach(p => {
     const item = document.createElement('div')
     item.className = 'bio-sheet-item'
+    const distBadge = p._dist != null
+      ? `<span class="bio-sheet-dist ${p._dist <= BIO_PROX_RAIO_M ? 'proxima' : ''}">${p._dist < 1000 ? Math.round(p._dist) + ' m' : (p._dist / 1000).toFixed(1) + ' km'}</span>`
+      : ''
     item.innerHTML = `
       <span class="bio-sheet-item-cod">${p.codigo}</span>
       <div class="bio-sheet-item-info">
         <strong>${p.nome}</strong>
         <span>${[p.comunidade, p.municipio].filter(Boolean).join(' — ')}</span>
-      </div>`
+      </div>
+      ${distBadge}`
     item.addEventListener('click', () => {
       bioSelecionarPraia(p)
       sheetEl.hidden = true
+      // Esconde sugestão se monitor escolheu manualmente
+      const chip = document.getElementById('bio-praia-sugestao')
+      if (chip) chip.hidden = true
     })
     lista.appendChild(item)
   })
@@ -409,6 +442,8 @@ async function bioAbrirSheetPraias() {
 /* ════════════════════════════════════════════════════════════
    GPS
    ════════════════════════════════════════════════════════════ */
+const BIO_PROX_RAIO_M = 500   // raio de sugestão de praia
+
 function bioIniciarGPS() {
   if (!navigator.geolocation) return
   navigator.geolocation.watchPosition(
@@ -420,10 +455,41 @@ function bioIniciarGPS() {
       const accEl    = document.getElementById('bio-gps-acc')
       if (coordsEl) coordsEl.textContent = `${BioApp.gpsLat.toFixed(5)}, ${BioApp.gpsLng.toFixed(5)}`
       if (accEl)    accEl.textContent    = `±${Math.round(pos.coords.accuracy)}m`
+      bioVerificarPraiaProxima(pos.coords.latitude, pos.coords.longitude)
     },
     () => {},
     { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000 }
   )
+}
+
+let _bioProxTimer = null
+async function bioVerificarPraiaProxima(lat, lng) {
+  // Debounce: só reavalia a cada 15 s para não bater em IndexedDB toda atualização de GPS
+  clearTimeout(_bioProxTimer)
+  _bioProxTimer = setTimeout(async () => {
+    const praias = await bioOfflineListarPraias()
+    let melhor = null, menorDist = Infinity
+    for (const p of praias) {
+      if (p.lat == null || p.lng == null) continue
+      const d = bioHaversineM(lat, lng, p.lat, p.lng)
+      if (d < menorDist) { menorDist = d; melhor = p }
+    }
+
+    const chip    = document.getElementById('bio-praia-sugestao')
+    const nomeEl  = document.getElementById('bio-sugestao-nome')
+    const distEl  = document.getElementById('bio-sugestao-dist')
+    if (!chip) return
+
+    if (melhor && menorDist <= BIO_PROX_RAIO_M && melhor.id !== BioApp.praiaAtual?.id) {
+      nomeEl.textContent = melhor.nome
+      distEl.textContent = `${Math.round(menorDist)} m`
+      chip.hidden = false
+      chip._praiaProxima = melhor
+    } else {
+      chip.hidden = true
+      chip._praiaProxima = null
+    }
+  }, 15000)
 }
 
 /* ════════════════════════════════════════════════════════════
