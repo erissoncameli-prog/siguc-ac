@@ -181,7 +181,16 @@
           <div>Monitor: <span style="color:var(--t1,#f4efe6)">${n.monitor_nome || '—'}</span></div>
           <div>Data: <span style="color:var(--t1,#f4efe6)">${formatData(n.data_encontro)}</span></div>
           ${n.lat ? `<div>GPS: <span style="color:var(--t1,#f4efe6)">${Number(n.lat).toFixed(5)}, ${Number(n.lng).toFixed(5)}</span> ${n.precisao_gps_m ? `(±${n.precisao_gps_m}m)` : ''}</div>` : ''}
+          ${n.dist_rio_m != null ? `<div>Dist. ao rio: <span style="color:var(--t1,#f4efe6)">${n.dist_rio_m} m</span> <span style="opacity:.6;font-size:.85em">(${n.dist_rio_metodo === 'tracker' ? 'GPS tracker' : 'estimativa'})</span></div>` : ''}
         </div>
+
+        ${(n.qtd_ovos != null || n.ovos_integros != null || n.ovos_descartados != null) ? `
+        <div style="background:rgba(201,168,76,.10);border-radius:8px;padding:8px 10px;margin-bottom:8px;font-size:.82rem;display:flex;gap:16px;flex-wrap:wrap">
+          <span><strong style="color:#C9A84C">Ovos</strong></span>
+          ${n.qtd_ovos        != null ? `<span>Total: <strong>${n.qtd_ovos}</strong></span>` : ''}
+          ${n.ovos_integros   != null ? `<span>Íntegros: <strong style="color:#4ade80">${n.ovos_integros}</strong></span>` : ''}
+          ${n.ovos_descartados != null ? `<span>Descartados: <strong style="color:#f87171">${n.ovos_descartados}</strong></span>` : ''}
+        </div>` : ''}
 
         ${n.status === 'transferido' || n.data_transferencia ? `
         <div style="background:rgba(139,92,246,.12);border-radius:8px;padding:8px 10px;margin-bottom:8px;font-size:.82rem">

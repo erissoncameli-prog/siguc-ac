@@ -836,10 +836,14 @@ async function bioCarregarTelaDados() {
 
 function bioRenderizarKPIs(dados) {
   const mapa = {
-    'bio-kpi-ninhos':      dados.grupo_ninhos,
-    'bio-kpi-eclodidos':   dados.eclodidos,
-    'bio-kpi-filhotes':    dados.filhotes_vivos,
-    'bio-kpi-taxa':        dados.taxa_eclosao_pct != null ? dados.taxa_eclosao_pct + '%' : '—',
+    'bio-kpi-ninhos':            dados.grupo_ninhos,
+    'bio-kpi-eclodidos':         dados.eclodidos,
+    'bio-kpi-filhotes':          dados.filhotes_vivos,
+    'bio-kpi-taxa':              dados.taxa_eclosao_pct != null ? dados.taxa_eclosao_pct + '%' : '—',
+    'bio-kpi-ovos-total':        dados.total_ovos_postura ?? '—',
+    'bio-kpi-ovos-integros':     dados.total_ovos_integros ?? '—',
+    'bio-kpi-ovos-descartados':  dados.total_ovos_descartados ?? '—',
+    'bio-kpi-dist-rio':          dados.dist_rio_media_m != null ? dados.dist_rio_media_m + ' m' : '—',
   }
   Object.entries(mapa).forEach(([id, val]) => {
     const el = document.getElementById(id)
