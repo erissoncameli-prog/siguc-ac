@@ -76,7 +76,7 @@ body { margin: 0; }
   color: var(--bio-soft); letter-spacing: -.02em;
   margin-bottom: 4px;
 }
-.bio-lock-mascote { width: 84px; height: 84px; border-radius: 50%; }
+.bio-lock-mascote { width: 84px; height: 84px; border-radius: 50%; object-fit: contain; }
 @keyframes bio-lock-respira {
   0%, 100% { transform: scale(1); }
   50%       { transform: scale(1.04); }
@@ -193,6 +193,7 @@ body { margin: 0; }
   position: absolute; left: 50%; bottom: -40px;
   transform: translateX(-50%);
   width: 86px; height: 86px; border-radius: 50%;
+  object-fit: contain;
   filter: drop-shadow(0 4px 10px rgba(6,14,22,.35));
 }
 @keyframes bio-mascote-respira {
@@ -305,6 +306,38 @@ body { margin: 0; }
 .bio-btn-icon:active { background: rgba(0,0,0,.12); }
 
 /* ── Seletor de praia ───────────────────────────────────────── */
+/* ── Sugestão de praia por GPS ──────────────────────────────── */
+.bio-praia-sugestao {
+  margin: 0 16px 10px; padding: 12px 14px;
+  background: rgba(26,107,140,.08); border: 1.5px solid rgba(26,107,140,.35);
+  border-radius: 14px; display: flex; align-items: center; gap: 10px;
+  animation: bio-slide-in .25s var(--spring);
+}
+.bio-sugestao-info { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }
+.bio-sugestao-label { display: block; font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--bio-prim); font-weight: 700; }
+.bio-sugestao-nome  { display: block; font-size: 14px; font-weight: 700; color: var(--bio-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bio-sugestao-dist  { display: inline-block; font-size: 11px; color: #6B7280; margin-top: 1px; }
+.bio-sugestao-btn {
+  flex-shrink: 0; background: var(--bio-prim); color: #fff;
+  border: none; border-radius: 10px; padding: 8px 16px;
+  font-family: var(--font-ui); font-size: 13px; font-weight: 700;
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+  transition: opacity .15s;
+}
+.bio-sugestao-btn:active { opacity: .8; }
+@keyframes bio-slide-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Distância na lista de praias ───────────────────────────── */
+.bio-sheet-dist {
+  flex-shrink: 0; font-size: 11px; font-weight: 600;
+  padding: 3px 8px; border-radius: 8px;
+  background: #E5EFF5; color: #4A6170;
+}
+.bio-sheet-dist.proxima { background: rgba(26,107,140,.12); color: var(--bio-prim); }
+
 .bio-praia-seletor {
   margin: 0 16px 12px; padding: 14px 16px;
   background: var(--bio-surface); border-radius: 16px;
@@ -564,6 +597,33 @@ body { margin: 0; }
 .bio-btn-sm.ghost { background: rgba(0,0,0,.06); color: var(--bio-ink); }
 .bio-btn-sm.perigo { background: var(--bio-perigo); color: #fff; }
 
+/* ── Ovos na postura ──────────────────────────────────────────── */
+.bio-ovos-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 6px;
+}
+.bio-ovos-campo { display: flex; flex-direction: column; gap: 4px; }
+.bio-ovos-label { font-size: 11px; color: var(--bio-muted); font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
+.bio-ovos-input { text-align: center; padding: 10px 6px; }
+
+/* ── Distância ao Rio ─────────────────────────────────────────── */
+.bio-dist-metodos { display: flex; gap: 8px; margin-top: 6px; }
+.bio-dist-chip {
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: 5px;
+  padding: 8px 10px; border-radius: 10px; border: 1.5px solid var(--bio-border);
+  background: transparent; color: var(--bio-muted); font-size: 13px; font-weight: 600;
+  cursor: pointer; transition: all .15s;
+}
+.bio-dist-chip.ativo {
+  border-color: var(--bio-prim); background: rgba(42,157,111,.12); color: var(--bio-prim);
+}
+.bio-dist-medir { margin-top: 10px; }
+.bio-dist-dica { font-size: 11px; color: var(--bio-muted); margin: 6px 0 0; line-height: 1.5; }
+.bio-dist-valor {
+  display: flex; align-items: center; gap: 8px; margin-top: 10px;
+}
+.bio-dist-valor .bio-form-input { flex: 1; }
+.bio-dist-unidade { font-size: 14px; font-weight: 700; color: var(--bio-muted); white-space: nowrap; }
+
 .bio-btn-salvar {
   width: 100%; padding: 18px; border-radius: 16px; border: none;
   background: var(--bio-prim); color: #fff;
@@ -588,7 +648,78 @@ body { margin: 0; }
 .bio-fila-stat:last-child { border-right: none; }
 .bio-fila-stat-n { display: block; font-size: 24px; font-weight: 700; color: var(--bio-ink); font-family: var(--font-mono); }
 
-.bio-sync-queue { padding: 0 16px; }
+/* ── Barra de filtro de praia nos tabs ──────────────────────── */
+.bio-tab-filtros { padding: 0 16px 10px; }
+.bio-mini-geo-sug {
+  display: flex; align-items: center; gap: 6px;
+  background: rgba(26,107,140,.08); border: 1px solid rgba(26,107,140,.25);
+  border-radius: 10px; padding: 7px 10px; margin-bottom: 7px;
+  font-size: 12px; color: var(--bio-prim); font-weight: 600;
+}
+.bio-mini-geo-btn {
+  margin-left: auto; background: var(--bio-prim); color: #fff;
+  border: none; border-radius: 7px; padding: 4px 10px;
+  font-size: 12px; font-weight: 700; cursor: pointer; flex-shrink: 0;
+}
+.bio-mini-praia-row { display: flex; gap: 8px; }
+.bio-mini-praia-btn {
+  flex: 1; display: flex; align-items: center; gap: 6px;
+  background: #fff; border: 1.5px solid #D0E4EF; border-radius: 12px;
+  padding: 9px 12px; font-size: 13px; font-weight: 600; color: var(--bio-ink);
+  cursor: pointer; -webkit-tap-highlight-color: transparent; text-align: left;
+  transition: border-color .15s;
+}
+.bio-mini-praia-btn:active { border-color: var(--bio-prim); }
+.bio-mini-todas-btn {
+  flex-shrink: 0; background: #F3F4F6; border: 1.5px solid #D0E4EF;
+  border-radius: 12px; padding: 9px 12px; font-size: 13px; font-weight: 600;
+  color: #6B7280; cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.bio-mini-todas-btn:active { background: #E5E7EB; }
+
+/* ── Cards ricos de ninho (aba Meus Ninhos) ─────────────────── */
+.bio-sync-queue { padding: 0 16px 24px; }
+.bio-nfc {
+  border-radius: 14px; background: #fff;
+  border: 1px solid #D0E4EF; border-left: 4px solid #D0E4EF;
+  padding: 13px 14px; margin-bottom: 10px;
+  transition: transform .15s;
+}
+.bio-nfc:active { transform: scale(.98); }
+.bio-nfc.status-encontrado  { border-left-color: var(--bio-prim); }
+.bio-nfc.status-transferido { border-left-color: #C9A84C; }
+.bio-nfc.status-eclodido    { border-left-color: var(--bio-verde); }
+.bio-nfc.status-perdido     { border-left-color: var(--bio-perigo); }
+.bio-nfc-header { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
+.bio-nfc-num { font-family: var(--font-mono); font-size: 13px; font-weight: 700; color: var(--bio-ink); }
+.bio-nfc-status-badge {
+  font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 6px; letter-spacing: .02em;
+}
+.bio-nfc-status-badge.encontrado  { background: rgba(26,107,140,.12); color: var(--bio-prim); }
+.bio-nfc-status-badge.transferido { background: rgba(201,168,76,.15);  color: #9B7A1E; }
+.bio-nfc-status-badge.eclodido    { background: rgba(82,183,136,.15);  color: #1E6B4A; }
+.bio-nfc-status-badge.perdido     { background: rgba(220,38,38,.1);    color: var(--bio-perigo); }
+.bio-nfc-sync-dot {
+  width: 8px; height: 8px; border-radius: 50%; margin-left: auto; flex-shrink: 0;
+}
+.bio-nfc-especie { font-size: 13px; color: var(--bio-ink); margin-bottom: 4px; }
+.bio-nfc-especie strong { font-weight: 700; }
+.bio-nfc-row { display: flex; justify-content: space-between; font-size: 12px; color: #6B7280; margin-bottom: 4px; }
+.bio-nfc-praia { font-weight: 600; color: #4A6170; }
+.bio-nfc-ovos { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 4px; }
+.bio-nfc-ovos span {
+  font-size: 11px; background: rgba(201,168,76,.12); color: #9B7A1E;
+  padding: 2px 7px; border-radius: 6px; font-weight: 600;
+}
+.bio-nfc-eventos { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 4px; }
+.bio-nfc-ev-chip {
+  font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 6px;
+}
+.bio-nfc-ev-chip.transf { background: rgba(26,107,140,.1); color: var(--bio-prim); }
+.bio-nfc-ev-chip.ecl { background: rgba(82,183,136,.15); color: #1E6B4A; }
+.bio-nfc-monitor { font-size: 11px; color: #9CA3AF; margin-top: 2px; }
+
+/* legacy (mantém compatibilidade com tela-fila antiga) */
 .bio-sync-item {
   display: flex; align-items: center; gap: 12px;
   padding: 12px 14px; border-radius: 14px;
@@ -662,6 +793,72 @@ body { margin: 0; }
 .bio-btn-config-item:active { background: #F2F7FA; transform: scale(.97); }
 .bio-btn-config-item.perigo { color: var(--bio-perigo); border-color: rgba(220,38,38,.3); }
 .bio-btn-config-item.perigo::after { color: var(--bio-perigo); }
+
+/* Quota de armazenamento */
+.bio-quota-wrap {
+  background: #fff; border: 1px solid #D0E4EF; border-radius: 14px;
+  padding: 12px 16px; margin-bottom: 12px;
+}
+.bio-quota-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 8px; font-size: 12px; font-weight: 600; color: #6B7280;
+}
+.bio-quota-bar {
+  height: 6px; background: #E5EFF5; border-radius: 3px; overflow: hidden;
+}
+.bio-quota-fill {
+  height: 100%; background: var(--bio-prim); border-radius: 3px;
+  width: 0; transition: width .6s var(--ease-out);
+}
+
+/* Toggle Modo Campo */
+.bio-config-toggle-row {
+  display: flex; align-items: center; justify-content: space-between;
+  background: #fff; border: 1px solid #D0E4EF; border-radius: 18px;
+  padding: 14px 18px; margin-bottom: 10px;
+  box-shadow: 0 1px 4px rgba(13,30,39,.05);
+}
+.bio-config-toggle-label { display: block; font-size: 15px; font-weight: 600; color: var(--bio-ink); }
+.bio-config-toggle-dica  { display: block; font-size: 12px; color: #9CA3AF; margin-top: 2px; }
+.bio-toggle-switch { position: relative; display: inline-flex; cursor: pointer; flex-shrink: 0; }
+.bio-toggle-switch input { opacity: 0; width: 0; height: 0; }
+.bio-toggle-knob {
+  width: 46px; height: 26px; background: #D1D5DB; border-radius: 13px;
+  transition: background .2s; position: relative;
+}
+.bio-toggle-knob::after {
+  content: ''; position: absolute; top: 3px; left: 3px;
+  width: 20px; height: 20px; border-radius: 50%; background: #fff;
+  box-shadow: 0 1px 3px rgba(0,0,0,.25); transition: transform .2s var(--spring);
+}
+.bio-toggle-switch input:checked ~ .bio-toggle-knob { background: var(--bio-prim); }
+.bio-toggle-switch input:checked ~ .bio-toggle-knob::after { transform: translateX(20px); }
+
+/* Modo Campo — alto contraste */
+body.field-mode .bio-form-body, body.field-mode .bio-tela { font-weight: 500; }
+body.field-mode .bio-campo-input, body.field-mode .bio-form-label { font-size: 17px; }
+body.field-mode .bio-btn-config-item { font-size: 17px; padding: 20px 18px; }
+body.field-mode .bio-home-nome { font-size: 26px; }
+
+/* QR Overlay */
+.bio-qr-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,.55);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 3000;
+}
+.bio-qr-overlay[hidden] { display: none; }
+.bio-qr-card {
+  background: #fff; border-radius: 20px; padding: 24px 20px 20px;
+  display: flex; flex-direction: column; align-items: center;
+  max-width: 280px; width: 90%; position: relative;
+  box-shadow: 0 8px 32px rgba(0,0,0,.25);
+}
+.bio-qr-fechar {
+  position: absolute; top: 12px; right: 12px;
+  background: #F3F4F6; border: none; border-radius: 50%;
+  width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
+  cursor: pointer; color: #6B7280;
+}
 
 /* ── Toast ───────────────────────────────────────────────────── */
 .bio-toast {

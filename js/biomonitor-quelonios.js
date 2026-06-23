@@ -1508,6 +1508,53 @@ document.addEventListener('DOMContentLoaded', async () => {
     )
   })
 
+  // Chips de método de distância (tracker / estimativa)
+  document.querySelectorAll('.bio-dist-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      document.querySelectorAll('.bio-dist-chip').forEach(c => c.classList.remove('ativo'))
+      chip.classList.add('ativo')
+      BioApp.distRioMetodo = chip.dataset.metodo
+      document.getElementById('bio-dist-medir-gps').style.display =
+        chip.dataset.metodo === 'tracker' ? '' : 'none'
+    })
+  })
+
+  // Botão "Marcar ponto do Rio" — captura GPS atual e calcula distância ao ninho
+  document.getElementById('bio-btn-marcar-rio')?.addEventListener('click', () => {
+    const btn  = document.getElementById('bio-btn-marcar-rio')
+    const txt  = document.getElementById('bio-btn-marcar-rio-txt')
+    const dica = document.getElementById('bio-dist-gps-dica')
+    txt.textContent = 'Capturando GPS…'
+    btn.disabled = true
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        const latRio = pos.coords.latitude
+        const lngRio = pos.coords.longitude
+        BioApp.distRioLatRio = latRio
+        BioApp.distRioLngRio = lngRio
+        const latNinho = BioApp.gpsLat
+        const lngNinho = BioApp.gpsLng
+        if (latNinho != null && lngNinho != null) {
+          const dist = bioHaversineM(latNinho, lngNinho, latRio, lngRio)
+          document.getElementById('bio-form-dist-rio').value = dist.toFixed(1)
+          txt.textContent = 'Rio marcado ✓'
+          dica.textContent = `Distância calculada: ${dist.toFixed(1)} m (precisão GPS: ±${Math.round(pos.coords.accuracy)} m)`
+        } else {
+          txt.textContent = 'Marcar ponto do Rio'
+          dica.textContent = 'GPS do ninho não disponível — insira a distância manualmente.'
+          document.getElementById('bio-form-dist-rio').focus()
+        }
+        btn.disabled = false
+      },
+      () => {
+        txt.textContent = 'Marcar ponto do Rio'
+        dica.textContent = 'Não foi possível obter GPS. Insira a distância manualmente.'
+        btn.disabled = false
+      },
+      { enableHighAccuracy: true, timeout: 15000 }
+    )
+  })
+
   // Sheet overlay fecha ao clicar fora
   document.getElementById('bio-sheet-praias')?.addEventListener('click', e => {
     if (e.target === e.currentTarget) e.currentTarget.hidden = true
