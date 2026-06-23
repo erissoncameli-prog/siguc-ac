@@ -49,13 +49,16 @@
           <table><thead><tr>
             <th>Praia</th><th>UC</th>
             <th style="text-align:center">Total ninhos</th>
-            <th style="text-align:center">Encontrados</th>
+            <th style="text-align:center">Ovos postura</th>
+            <th style="text-align:center">Íntegros</th>
+            <th style="text-align:center">Descartados</th>
+            <th style="text-align:center">Dist. rio (m)</th>
             <th style="text-align:center">Eclodidos</th>
             <th style="text-align:center">Filhotes vivos</th>
             <th style="text-align:center">Taxa eclosão</th>
             <th style="text-align:center">Predação</th>
             <th style="text-align:center">Pendentes validação</th>
-          </tr></thead><tbody id="tbody-praias"><tr><td colspan="9" class="empty-row">Carregando...</td></tr></tbody></table>
+          </tr></thead><tbody id="tbody-praias"><tr><td colspan="12" class="empty-row">Carregando...</td></tr></tbody></table>
         </div></div></div>
       </div>
 
@@ -134,22 +137,30 @@
 
   // ── KPIs ──────────────────────────────────────────────────────
   function renderKPIs(lista) {
-    const total   = lista.reduce((s,p) => s + (p.ninhos_total || 0), 0)
-    const eclod   = lista.reduce((s,p) => s + (p.ninhos_eclodidos || 0), 0)
-    const filhot  = lista.reduce((s,p) => s + (p.filhotes_vivos || 0), 0)
-    const perdid  = lista.reduce((s,p) => s + (p.ninhos_perdidos || 0), 0)
-    const pred    = lista.reduce((s,p) => s + (p.predacao_pessoas || 0) + (p.predacao_animais || 0), 0)
-    const pendVal = lista.reduce((s,p) => s + (p.ninhos_pendentes_validacao || 0), 0)
-    const taxaEcl = total > 0 ? Math.round((eclod / total) * 100) : 0
+    const total    = lista.reduce((s,p) => s + (p.ninhos_total || 0), 0)
+    const eclod    = lista.reduce((s,p) => s + (p.ninhos_eclodidos || 0), 0)
+    const filhot   = lista.reduce((s,p) => s + (p.filhotes_vivos || 0), 0)
+    const perdid   = lista.reduce((s,p) => s + (p.ninhos_perdidos || 0), 0)
+    const pred     = lista.reduce((s,p) => s + (p.predacao_pessoas || 0) + (p.predacao_animais || 0), 0)
+    const pendVal  = lista.reduce((s,p) => s + (p.ninhos_pendentes_validacao || 0), 0)
+    const taxaEcl  = total > 0 ? Math.round((eclod / total) * 100) : 0
+    const ovosPost = lista.reduce((s,p) => s + (p.ovos_postura_total || 0), 0)
+    const ovosInt  = lista.reduce((s,p) => s + (p.ovos_integros_total || 0), 0)
+    const ovosDes  = lista.reduce((s,p) => s + (p.ovos_descartados_total || 0), 0)
+    const distVals = lista.filter(p => p.dist_rio_media_m != null)
+    const distMedia = distVals.length ? Math.round(distVals.reduce((s,p) => s + Number(p.dist_rio_media_m), 0) / distVals.length) : null
 
     document.getElementById('kpi-grid').innerHTML = [
-      ['Total de ninhos',        total,    '#3b82f6'],
-      ['Eclodidos',              eclod,    '#10b981'],
-      ['Filhotes vivos',         filhot,   '#34d399'],
-      ['Perdidos / Predados',    perdid,   '#ef4444'],
-      ['Eventos de predação',    pred,     '#f59e0b'],
-      ['Taxa de eclosão',        taxaEcl + '%', '#6366f1'],
-      ['Pendentes validação',    pendVal,  '#8b5cf6'],
+      ['Total de ninhos',        total,              '#3b82f6'],
+      ['Ovos na postura',        ovosPost,           '#C9A84C'],
+      ['Ovos íntegros',          ovosInt,            '#4ade80'],
+      ['Ovos descartados',       ovosDes,            '#f87171'],
+      ['Eclodidos',              eclod,              '#10b981'],
+      ['Filhotes vivos',         filhot,             '#34d399'],
+      ['Perdidos / Predados',    perdid,             '#ef4444'],
+      ['Taxa de eclosão',        taxaEcl + '%',      '#6366f1'],
+      ['Dist. média ao rio',     distMedia != null ? distMedia + ' m' : '—', '#38bdf8'],
+      ['Pendentes validação',    pendVal,            '#8b5cf6'],
     ].map(([l, v, c]) => `
       <div style="background:rgba(255,255,255,.06);border-radius:10px;padding:14px;border-top:3px solid ${c}">
         <div style="font-size:1.6rem;font-weight:700;color:${c}">${v}</div>
@@ -160,7 +171,7 @@
   // ── Tabela por praia ─────────────────────────────────────────
   function renderPraias(lista) {
     const tbody = document.getElementById('tbody-praias')
-    if (!lista.length) { tbody.innerHTML = `<tr><td colspan="9" class="empty-row">Sem dados.</td></tr>`; return }
+    if (!lista.length) { tbody.innerHTML = `<tr><td colspan="12" class="empty-row">Sem dados.</td></tr>`; return }
     tbody.innerHTML = lista.map(p => {
       const taxa = p.taxa_eclosao_pct != null ? p.taxa_eclosao_pct + '%' : '—'
       const predTotal = (p.predacao_pessoas || 0) + (p.predacao_animais || 0)
@@ -168,7 +179,10 @@
         <td><strong>${p.nome}</strong>${p.comunidade ? `<br><small style="color:var(--t2,#aaa)">${p.comunidade}</small>` : ''}</td>
         <td>${p.uc_nome || '—'}</td>
         <td style="text-align:center">${p.ninhos_total || 0}</td>
-        <td style="text-align:center">${p.ninhos_encontrados || 0}</td>
+        <td style="text-align:center;color:#C9A84C">${p.ovos_postura_total || 0}</td>
+        <td style="text-align:center;color:#4ade80">${p.ovos_integros_total || 0}</td>
+        <td style="text-align:center;color:#f87171">${p.ovos_descartados_total || 0}</td>
+        <td style="text-align:center">${p.dist_rio_media_m != null ? p.dist_rio_media_m + ' m' : '—'}</td>
         <td style="text-align:center">${p.ninhos_eclodidos || 0}</td>
         <td style="text-align:center">${p.filhotes_vivos || 0}</td>
         <td style="text-align:center"><strong>${taxa}</strong></td>
@@ -270,10 +284,11 @@
   window.exportarCSV = function() {
     const prog = document.getElementById('fil-programa').value
     const lista = prog ? _praias.filter(p => p.programa_id === prog) : _praias
-    const cab = 'Código,Nome,Município,UC,Programa,Ninhos Total,Eclodidos,Perdidos,Filhotes Vivos,Filhotes Mortos,Ovos não nascidos,Taxa eclosão (%),Predação pessoas,Predação animais,Pendentes validação'
+    const cab = 'Código,Nome,Município,UC,Programa,Ninhos Total,Ovos Postura,Ovos Íntegros,Ovos Descartados,Dist. Média Rio (m),Eclodidos,Perdidos,Filhotes Vivos,Filhotes Mortos,Ovos não nascidos,Taxa eclosão (%),Predação pessoas,Predação animais,Pendentes validação'
     const linhas = lista.map(p => [
       p.codigo, p.nome, p.municipio, p.uc_nome, p.programa_nome,
-      p.ninhos_total, p.ninhos_eclodidos, p.ninhos_perdidos,
+      p.ninhos_total, p.ovos_postura_total, p.ovos_integros_total, p.ovos_descartados_total, p.dist_rio_media_m,
+      p.ninhos_eclodidos, p.ninhos_perdidos,
       p.filhotes_vivos, p.filhotes_mortos, p.ovos_nao_nascidos,
       p.taxa_eclosao_pct, p.predacao_pessoas, p.predacao_animais,
       p.ninhos_pendentes_validacao,
