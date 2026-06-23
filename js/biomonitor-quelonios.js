@@ -64,6 +64,18 @@ function bioMostrarTela(id) {
 async function bioIniciar() {
   await bioOfflinePersistir()
 
+  // Aguarda o cliente Supabase isolado ser criado (depende de /api/env)
+  if (typeof _bioReady !== 'undefined') await _bioReady
+
+  if (!window._bioDB_client) {
+    // CDN ou env indisponível — mostra login com aviso
+    bioMostrarTela('tela-login')
+    bioIniciarTelaLogin()
+    const erroEl = document.getElementById('bio-login-erro')
+    if (erroEl) { erroEl.textContent = 'Sem conexão com o servidor. Verifique sua internet.'; erroEl.hidden = false }
+    return
+  }
+
   const { data: { session } } = await bioSupabase().auth.getSession()
 
   if (!session) {
@@ -1081,5 +1093,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   })
 
   // Entrar
-  await bioIniciar()
+  try {
+    await bioIniciar()
+  } catch (err) {
+    console.error('[biomonitor] erro na inicialização:', err)
+    bioMostrarTela('tela-login')
+    bioIniciarTelaLogin()
+    const erroEl = document.getElementById('bio-login-erro')
+    if (erroEl) { erroEl.textContent = 'Erro ao iniciar o app. Recarregue a página.'; erroEl.hidden = false }
+  }
 })
