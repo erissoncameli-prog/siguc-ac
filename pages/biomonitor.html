@@ -8,7 +8,6 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>SIGUC Biomonitor</title>
   <link rel="manifest" href="/pwa/manifest-biomonitor.json">
-  <link rel="apple-touch-icon" href="/pwa/icons/icon-biomonitor-192.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&family=Fraunces:wght@700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/biomonitor.css">
@@ -18,7 +17,7 @@
 <!-- ══ TELA: LOGIN ══════════════════════════════════════════════ -->
 <div id="tela-login" class="bio-tela bio-lock">
   <div class="bio-lock-logo">
-    <img src="/pwa/icons/mascote.png" alt="" class="bio-lock-mascote">
+    <img src="/pwa/icons/biomonitor-logo.png" alt="" class="bio-lock-mascote">
     <span>SIGUC Biomonitor</span>
   </div>
   <p class="bio-lock-dica">Monitoramento de Quelônios — SEMA-AC<br>Faça login para continuar</p>
@@ -42,7 +41,7 @@
 <!-- ══ TELA: TROCAR SENHA (1º acesso) ════════════════════════════ -->
 <div id="tela-trocar-senha" class="bio-tela bio-lock">
   <div class="bio-lock-logo">
-    <img src="/pwa/icons/mascote.png" alt="" class="bio-lock-mascote">
+    <img src="/pwa/icons/biomonitor-logo.png" alt="" class="bio-lock-mascote">
     <span>Criar Nova Senha</span>
   </div>
   <p class="bio-lock-dica">Você entrou com uma senha provisória.<br>Crie sua senha pessoal para continuar.</p>
@@ -59,7 +58,7 @@
 <!-- ══ TELA: CONFIGURAR PIN ═══════════════════════════════════════ -->
 <div id="tela-config-pin" class="bio-tela bio-lock">
   <div class="bio-lock-logo">
-    <img src="/pwa/icons/mascote.png" alt="" class="bio-lock-mascote">
+    <img src="/pwa/icons/biomonitor-logo.png" alt="" class="bio-lock-mascote">
     <span>Criar PIN de Campo</span>
   </div>
   <p class="bio-lock-dica" id="bio-pin-setup-dica">Escolha um PIN de 4 dígitos</p>
@@ -98,7 +97,7 @@
 <!-- ══ TELA: BLOQUEIO ════════════════════════════════════════════ -->
 <div id="tela-bloqueio" class="bio-tela bio-lock">
   <div class="bio-lock-logo">
-    <img src="/pwa/icons/mascote.png" alt="" class="bio-lock-mascote">
+    <img src="/pwa/icons/biomonitor-logo.png" alt="" class="bio-lock-mascote">
     <span>SIGUC Biomonitor</span>
   </div>
   <p style="font-size:17px;font-weight:700;color:var(--bio-soft);margin:0 0 4px" id="bio-lock-nome">Monitor</p>
@@ -145,7 +144,7 @@
       <span class="bio-faixa-logo-chip gov" hidden><img alt="Governo do Acre"></span>
       <span class="bio-faixa-logo-chip sec" hidden><img alt="SEMA-AC"></span>
     </div>
-    <img class="bio-faixa-mascote" src="/pwa/icons/mascote.png" alt="Biomonitor Quelônios">
+    <img class="bio-faixa-mascote" src="/pwa/icons/biomonitor-logo.png" alt="Biomonitor Quelônios">
   </div>
 
   <!-- Header: avatar + nome + sync -->
@@ -190,6 +189,22 @@
         <span id="bio-conn-texto">…</span>
       </span>
     </div>
+  </div>
+
+  <!-- Sugestão de praia por proximidade GPS -->
+  <div id="bio-praia-sugestao" class="bio-praia-sugestao" hidden>
+    <div class="bio-sugestao-info">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="flex-shrink:0;color:var(--bio-prim)">
+        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+        <circle cx="12" cy="10" r="3"/>
+      </svg>
+      <div>
+        <span class="bio-sugestao-label">Você está próximo de</span>
+        <span class="bio-sugestao-nome" id="bio-sugestao-nome">—</span>
+        <span class="bio-sugestao-dist" id="bio-sugestao-dist"></span>
+      </div>
+    </div>
+    <button class="bio-sugestao-btn" id="bio-btn-usar-sugestao" type="button">Usar</button>
   </div>
 
   <!-- Seletor de praia (toca para abrir sheet) -->
@@ -295,7 +310,20 @@
       </div>
     </div>
 
-    <!-- Espécie (vem antes para gerar o número) -->
+    <!-- Número do ninho -->
+    <div class="bio-form-section">
+      <label class="bio-form-label" for="bio-form-numero">N° do ninho / placa *</label>
+      <input type="text" id="bio-form-numero" class="bio-form-input"
+        placeholder="Ex: 001" autocomplete="off">
+    </div>
+
+    <!-- Data de encontro -->
+    <div class="bio-form-section">
+      <label class="bio-form-label" for="bio-form-data">Data de encontro *</label>
+      <input type="date" id="bio-form-data" class="bio-form-input">
+    </div>
+
+    <!-- Espécie -->
     <div class="bio-form-section">
       <span class="bio-form-label">Espécie *</span>
       <div class="bio-especie-grid">
@@ -330,18 +358,53 @@
       </div>
     </div>
 
-    <!-- Número do ninho (auto-gerado após espécie) -->
+    <!-- Ovos na postura -->
     <div class="bio-form-section">
-      <label class="bio-form-label" for="bio-form-numero">N° do ninho</label>
-      <input type="text" id="bio-form-numero" class="bio-form-input"
-        placeholder="Auto (selecione a espécie acima)" autocomplete="off"
-        style="font-family:var(--font-mono,monospace);font-weight:700;letter-spacing:.04em">
+      <span class="bio-form-label">Ovos na postura</span>
+      <div class="bio-ovos-grid">
+        <div class="bio-ovos-campo">
+          <label class="bio-ovos-label" for="bio-form-qtd-ovos">Total</label>
+          <input type="number" id="bio-form-qtd-ovos" class="bio-form-input bio-ovos-input"
+            min="0" max="999" inputmode="numeric" placeholder="0">
+        </div>
+        <div class="bio-ovos-campo">
+          <label class="bio-ovos-label" for="bio-form-ovos-integros">Íntegros</label>
+          <input type="number" id="bio-form-ovos-integros" class="bio-form-input bio-ovos-input"
+            min="0" max="999" inputmode="numeric" placeholder="0">
+        </div>
+        <div class="bio-ovos-campo">
+          <label class="bio-ovos-label" for="bio-form-ovos-descartados">Descartados</label>
+          <input type="number" id="bio-form-ovos-descartados" class="bio-form-input bio-ovos-input"
+            min="0" max="999" inputmode="numeric" placeholder="0">
+        </div>
+      </div>
     </div>
 
-    <!-- Data de encontro -->
+    <!-- Distância ao Rio -->
     <div class="bio-form-section">
-      <label class="bio-form-label" for="bio-form-data">Data de encontro *</label>
-      <input type="date" id="bio-form-data" class="bio-form-input">
+      <span class="bio-form-label">Distância ao Rio</span>
+      <div class="bio-dist-metodos">
+        <button type="button" class="bio-dist-chip ativo" data-metodo="tracker">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+          GPS Tracker
+        </button>
+        <button type="button" class="bio-dist-chip" data-metodo="estimativa">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12h20M12 2l10 10-10 10"/></svg>
+          Estimativa
+        </button>
+      </div>
+      <div class="bio-dist-medir" id="bio-dist-medir-gps">
+        <button type="button" id="bio-btn-marcar-rio" class="bio-btn-sm" style="width:100%;justify-content:center">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:5px"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+          <span id="bio-btn-marcar-rio-txt">Marcar ponto do Rio</span>
+        </button>
+        <p class="bio-dist-dica" id="bio-dist-gps-dica">Vá até a margem do rio e toque o botão acima — o app calcula a distância automaticamente.</p>
+      </div>
+      <div class="bio-dist-valor">
+        <input type="number" id="bio-form-dist-rio" class="bio-form-input"
+          min="0" step="0.1" inputmode="decimal" placeholder="Ex: 15.5">
+        <span class="bio-dist-unidade">m</span>
+      </div>
     </div>
 
     <!-- Fotos -->
@@ -518,27 +581,41 @@
   <header class="bio-form-header">
     <button class="bio-btn-back" data-back="tela-home" aria-label="Voltar">‹</button>
     <span>Ninhos Abertos</span>
-    <button class="bio-btn-icon" id="bio-btn-reload-abertos" aria-label="Recarregar">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <button class="bio-btn-icon" id="bio-btn-reload-abertos" aria-label="Atualizar">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M23 4v6h-6M1 20v-6h6"/>
         <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
       </svg>
     </button>
   </header>
 
-  <!-- Filtro por status -->
-  <div class="bio-status-filtros">
-    <button class="bio-sfil-btn ativa" data-status="">Todos</button>
-    <button class="bio-sfil-btn" data-status="encontrado">Ativo</button>
-    <button class="bio-sfil-btn" data-status="transferido">Transferido</button>
-    <button class="bio-sfil-btn" data-status="eclodido">Eclodido</button>
-    <button class="bio-sfil-btn" data-status="perdido">Predado</button>
+  <!-- Filtro de praia -->
+  <div class="bio-tab-filtros">
+    <div id="bio-abertos-geo-sug" class="bio-mini-geo-sug" hidden>
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="flex-shrink:0"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+      <span id="bio-abertos-geo-nome">—</span>
+      <span id="bio-abertos-geo-dist" style="opacity:.7"></span>
+      <button class="bio-mini-geo-btn" id="bio-abertos-geo-usar" type="button">Filtrar</button>
+    </div>
+    <div class="bio-mini-praia-row">
+      <button class="bio-mini-praia-btn" id="bio-abertos-praia-btn" type="button">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+        <span id="bio-abertos-praia-label">Selecionar praia…</span>
+        <span style="margin-left:auto;opacity:.5">›</span>
+      </button>
+      <button class="bio-mini-todas-btn" id="bio-abertos-todas" type="button">Todas</button>
+    </div>
   </div>
 
-  <div id="bio-abertos-loading" hidden style="text-align:center;padding:24px;color:#9CA3AF">
-    Carregando do servidor…
+  <!-- Filtro de status -->
+  <div class="bio-status-filtros">
+    <button class="bio-sfil-btn ativa" data-sfil="" type="button">Todos</button>
+    <button class="bio-sfil-btn" data-sfil="encontrado" type="button">Encontrado</button>
+    <button class="bio-sfil-btn" data-sfil="transferido" type="button">Transferido</button>
   </div>
-  <div class="bio-form-body" style="padding-top:0">
+
+  <div class="bio-form-body">
+    <div id="bio-abertos-estado" style="text-align:center;color:#9CA3AF;padding:32px" hidden></div>
     <div id="bio-lista-abertos"></div>
   </div>
 </div>
@@ -555,11 +632,11 @@
   </div>
 </div>
 
-<!-- ══ TELA: FILA DE SINCRONIZAÇÃO ══════════════════════════════ -->
+<!-- ══ TELA: MEUS NINHOS (FILA LOCAL) ════════════════════════════ -->
 <div id="tela-fila" class="bio-tela">
   <header class="bio-form-header">
     <button class="bio-btn-back" data-back="tela-home" aria-label="Voltar">‹</button>
-    <span>Fila de Envio</span>
+    <span>Meus Ninhos</span>
     <button class="bio-btn-icon" id="bio-btn-sync-fila" aria-label="Sincronizar">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M23 4v6h-6M1 20v-6h6"/>
@@ -579,7 +656,25 @@
     </div>
     <div class="bio-fila-stat">
       <span class="bio-fila-stat-n" id="bio-fila-confirmados">0</span>
-      <span>Confirmados</span>
+      <span>Enviados</span>
+    </div>
+  </div>
+
+  <!-- Filtro de praia -->
+  <div class="bio-tab-filtros">
+    <div id="bio-fila-geo-sug" class="bio-mini-geo-sug" hidden>
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="flex-shrink:0"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+      <span id="bio-fila-geo-nome">—</span>
+      <span id="bio-fila-geo-dist" style="opacity:.7"></span>
+      <button class="bio-mini-geo-btn" id="bio-fila-geo-usar" type="button">Filtrar</button>
+    </div>
+    <div class="bio-mini-praia-row">
+      <button class="bio-mini-praia-btn" id="bio-fila-praia-btn" type="button">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+        <span id="bio-fila-praia-label">Todas as praias</span>
+        <span style="margin-left:auto;opacity:.5">›</span>
+      </button>
+      <button class="bio-mini-todas-btn" id="bio-fila-todas" type="button">Todas</button>
     </div>
   </div>
 
@@ -616,6 +711,26 @@
       </div>
     </div>
 
+    <p style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#9CA3AF;margin:14px 0 10px">Ovos na postura</p>
+    <div class="bio-dados-grid">
+      <div class="bio-kpi">
+        <strong id="bio-kpi-ovos-total">—</strong>
+        <span>Total de ovos</span>
+      </div>
+      <div class="bio-kpi">
+        <strong id="bio-kpi-ovos-integros" style="color:#4ade80">—</strong>
+        <span>Íntegros</span>
+      </div>
+      <div class="bio-kpi">
+        <strong id="bio-kpi-ovos-descartados" style="color:#f87171">—</strong>
+        <span>Descartados</span>
+      </div>
+      <div class="bio-kpi">
+        <strong id="bio-kpi-dist-rio">—</strong>
+        <span>Dist. média rio</span>
+      </div>
+    </div>
+
     <p style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#9CA3AF;margin:14px 0 10px">Dados locais (offline)</p>
     <div class="bio-dados-grid">
       <div class="bio-kpi">
@@ -641,13 +756,36 @@
 
   <div class="bio-form-body">
 
-    <!-- Card do monitor -->
-    <div class="bio-config-card">
+    <!-- Card do monitor (foto clicável) -->
+    <button class="bio-config-card" id="bio-config-avatar-btn" type="button" style="width:100%;text-align:left">
       <div class="bio-config-avatar" id="bio-config-avatar">M</div>
       <div>
         <strong id="bio-config-nome">—</strong>
         <p id="bio-config-grupo" style="margin:2px 0 0;font-size:13px;opacity:.65">—</p>
+        <p style="margin:4px 0 0;font-size:11px;color:var(--bio-prim)">Tocar para alterar foto</p>
       </div>
+    </button>
+    <input type="file" id="bio-input-foto-perfil" accept="image/*" hidden>
+
+    <!-- Armazenamento local -->
+    <div class="bio-quota-wrap">
+      <div class="bio-quota-header">
+        <span>Armazenamento local</span>
+        <span id="bio-quota-txt">—</span>
+      </div>
+      <div class="bio-quota-bar"><div class="bio-quota-fill" id="bio-quota-fill"></div></div>
+    </div>
+
+    <!-- Modo Campo -->
+    <div class="bio-config-toggle-row">
+      <div>
+        <span class="bio-config-toggle-label">Modo Campo</span>
+        <span class="bio-config-toggle-dica">Contraste alto para uso ao sol</span>
+      </div>
+      <label class="bio-toggle-switch" aria-label="Modo Campo">
+        <input type="checkbox" id="bio-toggle-campo" role="switch">
+        <span class="bio-toggle-knob"></span>
+      </label>
     </div>
 
     <button class="bio-btn-config-item" id="bio-btn-alterar-pin" type="button">
@@ -656,6 +794,30 @@
         <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
       </svg>
       Alterar PIN de campo
+    </button>
+    <button class="bio-btn-config-item" id="bio-btn-sincronizar-praias" type="button">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="23 4 23 10 17 10"/>
+        <polyline points="1 20 1 14 7 14"/>
+        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+      </svg>
+      Sincronizar praias
+    </button>
+    <button class="bio-btn-config-item" id="bio-btn-qr-instalar" type="button">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+        <rect x="3" y="14" width="7" height="7"/>
+        <path d="M14 14h.01M14 17h3M17 14h3M20 17v3M20 20h-3"/>
+      </svg>
+      QR de instalação
+    </button>
+    <button class="bio-btn-config-item" id="bio-btn-verificar-update" type="button">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+        <polyline points="7 10 12 15 17 10"/>
+        <line x1="12" y1="15" x2="12" y2="3"/>
+      </svg>
+      Verificar atualização
     </button>
     <button class="bio-btn-config-item perigo" id="bio-btn-zerar-fila" type="button">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -674,10 +836,26 @@
       Sair / Trocar conta
     </button>
 
-    <p style="font-size:11px;color:#9CA3AF;text-align:center;margin-top:24px">
-      Biomonitor Quelônios v1.0<br>
+    <p id="bio-app-versao" style="font-size:11px;color:#9CA3AF;text-align:center;margin-top:24px;margin-bottom:2px">
+      Biomonitor Quelônios v1.0
+    </p>
+    <p id="bio-app-copyright" style="font-size:11px;color:#9CA3AF;text-align:center;margin-top:0">
       SIGUC-AC — Desenvolvido por <strong>Erisson Cameli Santiago</strong>
     </p>
+  </div>
+</div>
+
+<!-- ══ QR OVERLAY ════════════════════════════════════════════════ -->
+<div id="bio-qr-overlay" class="bio-qr-overlay" hidden>
+  <div class="bio-qr-card">
+    <button class="bio-qr-fechar" id="bio-qr-fechar" aria-label="Fechar">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+      </svg>
+    </button>
+    <p style="font-weight:700;font-size:15px;margin:0 0 14px;color:var(--bio-ink)">Instalar Biomonitor</p>
+    <img id="bio-qr-img" src="" alt="QR Code" style="width:200px;height:200px;border-radius:12px">
+    <p id="bio-qr-link" style="font-size:11px;color:#9CA3AF;margin:10px 0 0;word-break:break-all;text-align:center"></p>
   </div>
 </div>
 

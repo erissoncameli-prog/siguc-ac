@@ -76,7 +76,7 @@ async function bioSyncNinhos(monitorId, onProgresso) {
       data_encontro:    ninho.data_encontro,
       foto_urls:        fotoUrls,
       observacoes:      ninho.observacoes      || null,
-      monitor_id:       monitorId ?? ninho.monitor_id ?? null,
+      monitor_id:       monitorId,
       grupo_id:         ninho.grupo_id         || null,
       localizacao:      ninho.lat != null && ninho.lng != null
         ? `POINT(${ninho.lng} ${ninho.lat})`
@@ -127,7 +127,7 @@ async function bioSyncTransferencias(monitorId, onProgresso) {
       qtd_ovos:            t.qtd_ovos,
       local_destino:       t.local_destino     || null,
       observacoes:         t.observacoes       || null,
-      monitor_id:          monitorId ?? t.monitor_id ?? null,
+      monitor_id:          monitorId,
     }
 
     await bioOfflineAtualizarSync('transferencias', t.uuid_cliente, 'enviando')
@@ -175,7 +175,7 @@ async function bioSyncEclosoes(monitorId, onProgresso) {
       predacao:           e.predacao,
       foto_urls:          fotoUrls,
       observacoes:        e.observacoes || null,
-      monitor_id:         monitorId ?? e.monitor_id ?? null,
+      monitor_id:         monitorId,
     }
 
     await bioOfflineAtualizarSync('eclosoes', e.uuid_cliente, 'enviando')
