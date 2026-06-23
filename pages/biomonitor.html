@@ -581,9 +581,34 @@
   <header class="bio-form-header">
     <button class="bio-btn-back" data-back="tela-home" aria-label="Voltar">‹</button>
     <span>Ninhos Abertos</span>
-    <span></span>
+    <button class="bio-btn-icon" id="bio-btn-reload-abertos" aria-label="Atualizar">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M23 4v6h-6M1 20v-6h6"/>
+        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+      </svg>
+    </button>
   </header>
+
+  <!-- Filtro de praia -->
+  <div class="bio-tab-filtros">
+    <div id="bio-abertos-geo-sug" class="bio-mini-geo-sug" hidden>
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="flex-shrink:0"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+      <span id="bio-abertos-geo-nome">—</span>
+      <span id="bio-abertos-geo-dist" style="opacity:.7"></span>
+      <button class="bio-mini-geo-btn" id="bio-abertos-geo-usar" type="button">Filtrar</button>
+    </div>
+    <div class="bio-mini-praia-row">
+      <button class="bio-mini-praia-btn" id="bio-abertos-praia-btn" type="button">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+        <span id="bio-abertos-praia-label">Selecionar praia…</span>
+        <span style="margin-left:auto;opacity:.5">›</span>
+      </button>
+      <button class="bio-mini-todas-btn" id="bio-abertos-todas" type="button">Todas</button>
+    </div>
+  </div>
+
   <div class="bio-form-body">
+    <div id="bio-abertos-estado" style="text-align:center;color:#9CA3AF;padding:32px" hidden></div>
     <div id="bio-lista-abertos"></div>
   </div>
 </div>
@@ -600,11 +625,11 @@
   </div>
 </div>
 
-<!-- ══ TELA: FILA DE SINCRONIZAÇÃO ══════════════════════════════ -->
+<!-- ══ TELA: MEUS NINHOS (FILA LOCAL) ════════════════════════════ -->
 <div id="tela-fila" class="bio-tela">
   <header class="bio-form-header">
     <button class="bio-btn-back" data-back="tela-home" aria-label="Voltar">‹</button>
-    <span>Fila de Envio</span>
+    <span>Meus Ninhos</span>
     <button class="bio-btn-icon" id="bio-btn-sync-fila" aria-label="Sincronizar">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M23 4v6h-6M1 20v-6h6"/>
@@ -624,7 +649,25 @@
     </div>
     <div class="bio-fila-stat">
       <span class="bio-fila-stat-n" id="bio-fila-confirmados">0</span>
-      <span>Confirmados</span>
+      <span>Enviados</span>
+    </div>
+  </div>
+
+  <!-- Filtro de praia -->
+  <div class="bio-tab-filtros">
+    <div id="bio-fila-geo-sug" class="bio-mini-geo-sug" hidden>
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="flex-shrink:0"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+      <span id="bio-fila-geo-nome">—</span>
+      <span id="bio-fila-geo-dist" style="opacity:.7"></span>
+      <button class="bio-mini-geo-btn" id="bio-fila-geo-usar" type="button">Filtrar</button>
+    </div>
+    <div class="bio-mini-praia-row">
+      <button class="bio-mini-praia-btn" id="bio-fila-praia-btn" type="button">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+        <span id="bio-fila-praia-label">Todas as praias</span>
+        <span style="margin-left:auto;opacity:.5">›</span>
+      </button>
+      <button class="bio-mini-todas-btn" id="bio-fila-todas" type="button">Todas</button>
     </div>
   </div>
 
