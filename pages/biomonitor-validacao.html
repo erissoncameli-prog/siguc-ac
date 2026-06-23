@@ -183,10 +183,18 @@
           ${n.lat ? `<div>GPS: <span style="color:var(--t1,#f4efe6)">${Number(n.lat).toFixed(5)}, ${Number(n.lng).toFixed(5)}</span> ${n.precisao_gps_m ? `(±${n.precisao_gps_m}m)` : ''}</div>` : ''}
         </div>
 
+        ${(n.ninho_qtd_ovos != null || n.ovos_integros != null || n.ovos_descartados != null || n.dist_rio_m != null) ? `
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">
+          ${n.ninho_qtd_ovos   != null ? `<span style="background:rgba(201,168,76,.18);color:#7A5E12;padding:3px 9px;border-radius:8px;font-size:.8rem;font-weight:600">${n.ninho_qtd_ovos} ovos</span>` : ''}
+          ${n.ovos_integros    != null ? `<span style="background:rgba(42,157,111,.14);color:#175E3C;padding:3px 9px;border-radius:8px;font-size:.8rem;font-weight:600">${n.ovos_integros} íntegros</span>` : ''}
+          ${n.ovos_descartados != null ? `<span style="background:rgba(220,38,38,.12);color:#dc2626;padding:3px 9px;border-radius:8px;font-size:.8rem;font-weight:600">${n.ovos_descartados} descartados</span>` : ''}
+          ${n.dist_rio_m       != null ? `<span style="background:rgba(26,107,140,.12);color:#1A6B8C;padding:3px 9px;border-radius:8px;font-size:.8rem;font-weight:600">${n.dist_rio_m}m do rio${n.dist_rio_metodo === 'gps_traker' ? ' (GPS)' : n.dist_rio_metodo === 'estimativa' ? ' (est.)' : ''}</span>` : ''}
+        </div>` : ''}
+
         ${n.status === 'transferido' || n.data_transferencia ? `
         <div style="background:rgba(139,92,246,.12);border-radius:8px;padding:8px 10px;margin-bottom:8px;font-size:.82rem">
           <strong style="color:#8b5cf6">Transferência:</strong>
-          ${n.data_transferencia ? `${formatData(n.data_transferencia)} · ${n.qtd_ovos} ovos` : ''}
+          ${n.data_transferencia ? `${formatData(n.data_transferencia)} · ${n.transf_qtd_ovos ?? '?'} ovos` : ''}
           ${n.local_destino ? ` → ${n.local_destino}` : ''}
         </div>` : ''}
 
