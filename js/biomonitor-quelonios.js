@@ -3,6 +3,14 @@
 // transferência, eclosão, fila de sync e aba Dados.
 // Depende de: biomonitor-offline.js, biomonitor-sync.js
 
+function bioHaversineM(lat1, lng1, lat2, lng2) {
+  const R = 6371000
+  const dLat = (lat2 - lat1) * Math.PI / 180
+  const dLng = (lng2 - lng1) * Math.PI / 180
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
+}
+
 /* ════════════════════════════════════════════════════════════
    ESTADO GLOBAL
    ════════════════════════════════════════════════════════════ */
@@ -432,6 +440,24 @@ function bioAbrirFormNinho() {
   // Limpa seleção de espécie
   document.querySelectorAll('.bio-especie-chip').forEach(c => c.classList.remove('sel'))
 
+  // Limpa campos de ovos
+  document.getElementById('bio-form-qtd-ovos').value        = ''
+  document.getElementById('bio-form-ovos-integros').value   = ''
+  document.getElementById('bio-form-ovos-descartados').value = ''
+
+  // Limpa distância ao rio
+  document.getElementById('bio-form-dist-rio').value = ''
+  document.getElementById('bio-btn-marcar-rio-txt').textContent = 'Marcar ponto do Rio'
+  document.getElementById('bio-dist-gps-dica').textContent =
+    'Vá até a margem do rio e toque o botão acima — o app calcula a distância automaticamente.'
+  BioApp.distRioMetodo = 'tracker'
+  BioApp.distRioLatRio = null
+  BioApp.distRioLngRio = null
+  document.querySelectorAll('.bio-dist-chip').forEach(c => {
+    c.classList.toggle('ativo', c.dataset.metodo === 'tracker')
+  })
+  document.getElementById('bio-dist-medir-gps').style.display = ''
+
   // Coords GPS
   bioAtualizarGpsForm()
 
@@ -468,17 +494,25 @@ async function bioSalvarNinho() {
   if (!data)    { bioToast('Informe a data de encontro.', 'err'); return }
   if (!especie) { bioToast('Selecione a espécie.', 'err'); return }
 
+  const parseNum = id => { const v = parseInt(document.getElementById(id).value); return isNaN(v) ? null : v }
+  const distVal  = parseFloat(document.getElementById('bio-form-dist-rio').value)
+
   const ninho = {
     ...BioApp.formNinho,
-    numero_ninho:  numero,
+    numero_ninho:     numero,
     especie,
-    data_encontro: data,
-    observacoes:   obs || null,
-    lat:           BioApp.gpsLat,
-    lng:           BioApp.gpsLng,
-    precisao_gps_m: BioApp.gpsPrecisao,
-    status:        'encontrado',
+    data_encontro:    data,
+    observacoes:      obs || null,
+    lat:              BioApp.gpsLat,
+    lng:              BioApp.gpsLng,
+    precisao_gps_m:   BioApp.gpsPrecisao,
+    status:           'encontrado',
     status_validacao: 'pendente',
+    qtd_ovos:         parseNum('bio-form-qtd-ovos'),
+    ovos_integros:    parseNum('bio-form-ovos-integros'),
+    ovos_descartados: parseNum('bio-form-ovos-descartados'),
+    dist_rio_m:       isNaN(distVal) ? null : distVal,
+    dist_rio_metodo:  document.getElementById('bio-form-dist-rio').value ? (BioApp.distRioMetodo ?? 'estimativa') : null,
   }
 
   await bioOfflineSalvarNinho(ninho)
@@ -891,6 +925,53 @@ document.addEventListener('DOMContentLoaded', async () => {
       document.querySelectorAll('.bio-especie-chip').forEach(c => c.classList.remove('sel'))
       chip.classList.add('sel')
     })
+  })
+
+  // Chips de método de distância (tracker / estimativa)
+  document.querySelectorAll('.bio-dist-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      document.querySelectorAll('.bio-dist-chip').forEach(c => c.classList.remove('ativo'))
+      chip.classList.add('ativo')
+      BioApp.distRioMetodo = chip.dataset.metodo
+      document.getElementById('bio-dist-medir-gps').style.display =
+        chip.dataset.metodo === 'tracker' ? '' : 'none'
+    })
+  })
+
+  // Botão "Marcar ponto do Rio" — captura GPS atual e calcula distância ao ninho
+  document.getElementById('bio-btn-marcar-rio')?.addEventListener('click', () => {
+    const btn  = document.getElementById('bio-btn-marcar-rio')
+    const txt  = document.getElementById('bio-btn-marcar-rio-txt')
+    const dica = document.getElementById('bio-dist-gps-dica')
+    txt.textContent = 'Capturando GPS…'
+    btn.disabled = true
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        const latRio = pos.coords.latitude
+        const lngRio = pos.coords.longitude
+        BioApp.distRioLatRio = latRio
+        BioApp.distRioLngRio = lngRio
+        const latNinho = BioApp.gpsLat
+        const lngNinho = BioApp.gpsLng
+        if (latNinho != null && lngNinho != null) {
+          const dist = bioHaversineM(latNinho, lngNinho, latRio, lngRio)
+          document.getElementById('bio-form-dist-rio').value = dist.toFixed(1)
+          txt.textContent = 'Rio marcado ✓'
+          dica.textContent = `Distância calculada: ${dist.toFixed(1)} m (precisão GPS: ±${Math.round(pos.coords.accuracy)} m)`
+        } else {
+          txt.textContent = 'Marcar ponto do Rio'
+          dica.textContent = 'GPS do ninho não disponível — insira a distância manualmente.'
+          document.getElementById('bio-form-dist-rio').focus()
+        }
+        btn.disabled = false
+      },
+      () => {
+        txt.textContent = 'Marcar ponto do Rio'
+        dica.textContent = 'Não foi possível obter GPS. Insira a distância manualmente.'
+        btn.disabled = false
+      },
+      { enableHighAccuracy: true, timeout: 15000 }
+    )
   })
 
   // Sheet overlay fecha ao clicar fora

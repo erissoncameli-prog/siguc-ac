@@ -342,6 +342,55 @@
       </div>
     </div>
 
+    <!-- Ovos na postura -->
+    <div class="bio-form-section">
+      <span class="bio-form-label">Ovos na postura</span>
+      <div class="bio-ovos-grid">
+        <div class="bio-ovos-campo">
+          <label class="bio-ovos-label" for="bio-form-qtd-ovos">Total</label>
+          <input type="number" id="bio-form-qtd-ovos" class="bio-form-input bio-ovos-input"
+            min="0" max="999" inputmode="numeric" placeholder="0">
+        </div>
+        <div class="bio-ovos-campo">
+          <label class="bio-ovos-label" for="bio-form-ovos-integros">Íntegros</label>
+          <input type="number" id="bio-form-ovos-integros" class="bio-form-input bio-ovos-input"
+            min="0" max="999" inputmode="numeric" placeholder="0">
+        </div>
+        <div class="bio-ovos-campo">
+          <label class="bio-ovos-label" for="bio-form-ovos-descartados">Descartados</label>
+          <input type="number" id="bio-form-ovos-descartados" class="bio-form-input bio-ovos-input"
+            min="0" max="999" inputmode="numeric" placeholder="0">
+        </div>
+      </div>
+    </div>
+
+    <!-- Distância ao Rio -->
+    <div class="bio-form-section">
+      <span class="bio-form-label">Distância ao Rio</span>
+      <div class="bio-dist-metodos">
+        <button type="button" class="bio-dist-chip ativo" data-metodo="tracker">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+          GPS Tracker
+        </button>
+        <button type="button" class="bio-dist-chip" data-metodo="estimativa">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12h20M12 2l10 10-10 10"/></svg>
+          Estimativa
+        </button>
+      </div>
+      <div class="bio-dist-medir" id="bio-dist-medir-gps">
+        <button type="button" id="bio-btn-marcar-rio" class="bio-btn-sm" style="width:100%;justify-content:center">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:5px"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+          <span id="bio-btn-marcar-rio-txt">Marcar ponto do Rio</span>
+        </button>
+        <p class="bio-dist-dica" id="bio-dist-gps-dica">Vá até a margem do rio e toque o botão acima — o app calcula a distância automaticamente.</p>
+      </div>
+      <div class="bio-dist-valor">
+        <input type="number" id="bio-form-dist-rio" class="bio-form-input"
+          min="0" step="0.1" inputmode="decimal" placeholder="Ex: 15.5">
+        <span class="bio-dist-unidade">m</span>
+      </div>
+    </div>
+
     <!-- Fotos -->
     <div class="bio-form-section">
       <div class="bio-section-header">
