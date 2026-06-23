@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#1A6B8C">
+  <title>Instalar — SIGUC Biomonitor</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root { --azul:#1A6B8C; --azul-esc:#145470; --fundo:#F4F9FB; --texto:#0D1E28; --suave:#4A6170; }
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family:'DM Sans',system-ui,sans-serif; background:var(--fundo); color:var(--texto); line-height:1.55; }
+    .topo { background:var(--azul); color:#fff; text-align:center; padding:40px 20px 32px; }
+    .topo img { width:64px; height:64px; border-radius:14px; margin-bottom:12px; object-fit:contain; }
+    .topo h1 { font-size:1.7rem; font-weight:700; }
+    .topo p { opacity:.92; margin-top:6px; font-size:1.05rem; }
+    main { max-width:560px; margin:0 auto; padding:24px 20px 60px; }
+    .cartao { background:#fff; border:1px solid #CCDDE6; border-radius:16px; padding:24px 20px; margin-top:20px; }
+    .cartao h2 { font-size:1.2rem; margin-bottom:6px; display:flex; align-items:center; gap:8px; }
+    .cartao .sub { color:var(--suave); font-size:.95rem; margin-bottom:16px; }
+    ol { padding-left:0; list-style:none; counter-reset:passo; }
+    ol li { counter-increment:passo; display:flex; gap:12px; margin-bottom:14px; font-size:1.02rem; }
+    ol li::before { content:counter(passo); flex:0 0 28px; height:28px; background:#DDEEF5; color:var(--azul-esc);
+      font-weight:700; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:.9rem; }
+    .nota { background:#FFF8E8; border:1px solid #EFDFB0; border-radius:12px; padding:12px 14px; font-size:.92rem; color:#6B5A22; margin-top:8px; }
+    .rodape { text-align:center; color:var(--suave); font-size:.85rem; margin-top:32px; }
+    .rodape a { color:var(--azul-esc); }
+    b { font-weight:600; }
+    .copia-link { display:flex; align-items:center; gap:10px; width:100%; margin-top:10px;
+      background:#DDEEF5; border:1.5px dashed var(--azul); border-radius:12px; padding:13px 14px;
+      cursor:pointer; font-family:inherit; font-size:1rem; line-height:1.35; color:var(--azul-esc);
+      font-weight:600; text-align:left; transition:transform .12s, background .12s; -webkit-tap-highlight-color:transparent; }
+    .copia-link:active { transform:scale(.99); background:#C4E0EE; }
+    .copia-link .cl-url { flex:1; word-break:break-all; }
+    .copia-link .cl-ic { flex-shrink:0; display:flex; align-items:center; }
+    .copia-link .cl-ok { display:none; flex:1; }
+    .copia-link.ok { background:var(--azul); border-style:solid; border-color:var(--azul); color:#fff; }
+    .copia-link.ok .cl-url, .copia-link.ok .cl-ic { display:none; }
+    .copia-link.ok .cl-ok { display:block; }
+  </style>
+</head>
+<body>
+
+<header class="topo">
+  <img src="/pwa/icons/biomonitor-logo.png" alt="Biomonitor">
+  <h1>SIGUC Biomonitor</h1>
+  <p>App de campo para monitoramento de quelônios — funciona sem internet</p>
+</header>
+
+<main>
+
+  <!-- ── iPHONE ───────────────────────────────────────────── -->
+  <section class="cartao">
+    <h2>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+      iPhone (iOS)
+    </h2>
+    <p class="sub">No iPhone, o app é instalado pelo Safari — sem precisar de loja de aplicativos.</p>
+
+    <ol>
+      <li><span>Toque no link abaixo para <b>copiar</b> e cole na barra de endereços do <b>Safari</b>:
+        <button type="button" class="copia-link" id="btn-copiar" onclick="copiarLink()" aria-label="Copiar o link do app">
+          <span class="cl-url" id="cl-url">siguc-ac.vercel.app/pages/biomonitor.html</span>
+          <span class="cl-ic" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+          </span>
+          <span class="cl-ok" id="cl-ok">Copiado! Cole no Safari</span>
+        </button>
+      </span></li>
+      <li><span>Com a página aberta no Safari, toque no botão de <b>compartilhar</b> (quadrado com seta, na barra de baixo).</span></li>
+      <li><span>Role a lista e toque em <b>"Adicionar à Tela de Início"</b>.</span></li>
+      <li><span>Toque em <b>Adicionar</b>. Use o app sempre pelo ícone — nunca pelo Safari — para os dados ficarem protegidos.</span></li>
+    </ol>
+  </section>
+
+  <!-- ── ANDROID ──────────────────────────────────────────── -->
+  <section class="cartao">
+    <h2>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+      Android (Chrome)
+    </h2>
+    <p class="sub">No Android, instale pelo Chrome como "app" para funcionar offline.</p>
+
+    <ol>
+      <li><span>Abra o Chrome e acesse:
+        <button type="button" class="copia-link" id="btn-copiar2" onclick="copiarLink2()" aria-label="Copiar link">
+          <span class="cl-url" id="cl-url2">siguc-ac.vercel.app/pages/biomonitor.html</span>
+          <span class="cl-ic" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+          </span>
+          <span class="cl-ok" id="cl-ok2">Copiado!</span>
+        </button>
+      </span></li>
+      <li><span>Toque nos <b>3 pontos</b> no canto superior direito do Chrome.</span></li>
+      <li><span>Toque em <b>"Adicionar à tela inicial"</b> ou <b>"Instalar app"</b>.</span></li>
+      <li><span>O ícone <b>Biomonitor</b> aparece na tela inicial — use sempre por ele.</span></li>
+    </ol>
+  </section>
+
+  <!-- ── PRIMEIRO USO ─────────────────────────────────────── -->
+  <section class="cartao">
+    <h2>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+      Primeiro uso (importante!)
+    </h2>
+    <ol>
+      <li><span>Abra o app <b>uma vez com internet</b> e faça login com e-mail e senha de monitor.</span></li>
+      <li><span>Crie seu <b>PIN de campo</b> de 4 dígitos — usado para desbloquear sem precisar do e-mail.</span></li>
+      <li><span>A partir daí o app funciona <b>totalmente sem internet</b>: registre os ninhos e eles sincronizam sozinhos quando o celular pegar sinal.</span></li>
+    </ol>
+  </section>
+
+  <!-- ── ATUALIZAR ─────────────────────────────────────────── -->
+  <section class="cartao">
+    <h2>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+      Como atualizar o app
+    </h2>
+    <p class="sub">As atualizações chegam automaticamente quando o celular está online.</p>
+    <ol>
+      <li><span>Abra o app e vá em <b>Configurações</b>.</span></li>
+      <li><span>Toque em <b>"Verificar atualização"</b> — o app recarrega com a versão mais recente.</span></li>
+      <li><span>Se nada mudar, feche o app e abra novamente.</span></li>
+    </ol>
+  </section>
+
+  <p class="rodape">
+    SEMA-AC · Secretaria de Estado de Meio Ambiente do Acre<br>
+    Dúvidas? Procure o coordenador do seu grupo ou a equipe DIMA.<br>
+    <a href="/pages/biomonitor.html">Abrir o app</a>
+  </p>
+</main>
+
+<script>
+  var LINK_APP = 'https://siguc-ac.vercel.app/pages/biomonitor.html'
+
+  function _copiaOk(btnId) {
+    var btn = document.getElementById(btnId)
+    if (!btn) return
+    btn.classList.add('ok')
+    clearTimeout(btn._t)
+    btn._t = setTimeout(function () { btn.classList.remove('ok') }, 2800)
+  }
+  function _copiaFallback(texto) {
+    var ta = document.createElement('textarea')
+    ta.value = texto; ta.setAttribute('readonly', '')
+    ta.style.position = 'absolute'; ta.style.left = '-9999px'; ta.style.fontSize = '16px'
+    document.body.appendChild(ta)
+    ta.select(); ta.setSelectionRange(0, texto.length)
+    var ok = false
+    try { ok = document.execCommand('copy') } catch (e) { ok = false }
+    document.body.removeChild(ta)
+    return ok
+  }
+  function copiarLink() {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(LINK_APP).then(function () { _copiaOk('btn-copiar') }).catch(function () {
+        if (_copiaFallback(LINK_APP)) _copiaOk('btn-copiar')
+      })
+    } else {
+      if (_copiaFallback(LINK_APP)) _copiaOk('btn-copiar')
+    }
+  }
+  function copiarLink2() {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(LINK_APP).then(function () { _copiaOk('btn-copiar2') }).catch(function () {
+        if (_copiaFallback(LINK_APP)) _copiaOk('btn-copiar2')
+      })
+    } else {
+      if (_copiaFallback(LINK_APP)) _copiaOk('btn-copiar2')
+    }
+  }
+</script>
+</body>
+</html>

@@ -690,13 +690,36 @@
 
   <div class="bio-form-body">
 
-    <!-- Card do monitor -->
-    <div class="bio-config-card">
+    <!-- Card do monitor (foto clicável) -->
+    <button class="bio-config-card" id="bio-config-avatar-btn" type="button" style="width:100%;text-align:left">
       <div class="bio-config-avatar" id="bio-config-avatar">M</div>
       <div>
         <strong id="bio-config-nome">—</strong>
         <p id="bio-config-grupo" style="margin:2px 0 0;font-size:13px;opacity:.65">—</p>
+        <p style="margin:4px 0 0;font-size:11px;color:var(--bio-prim)">Tocar para alterar foto</p>
       </div>
+    </button>
+    <input type="file" id="bio-input-foto-perfil" accept="image/*" hidden>
+
+    <!-- Armazenamento local -->
+    <div class="bio-quota-wrap">
+      <div class="bio-quota-header">
+        <span>Armazenamento local</span>
+        <span id="bio-quota-txt">—</span>
+      </div>
+      <div class="bio-quota-bar"><div class="bio-quota-fill" id="bio-quota-fill"></div></div>
+    </div>
+
+    <!-- Modo Campo -->
+    <div class="bio-config-toggle-row">
+      <div>
+        <span class="bio-config-toggle-label">Modo Campo</span>
+        <span class="bio-config-toggle-dica">Contraste alto para uso ao sol</span>
+      </div>
+      <label class="bio-toggle-switch" aria-label="Modo Campo">
+        <input type="checkbox" id="bio-toggle-campo" role="switch">
+        <span class="bio-toggle-knob"></span>
+      </label>
     </div>
 
     <button class="bio-btn-config-item" id="bio-btn-alterar-pin" type="button">
@@ -705,6 +728,30 @@
         <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
       </svg>
       Alterar PIN de campo
+    </button>
+    <button class="bio-btn-config-item" id="bio-btn-sincronizar-praias" type="button">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="23 4 23 10 17 10"/>
+        <polyline points="1 20 1 14 7 14"/>
+        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+      </svg>
+      Sincronizar praias
+    </button>
+    <button class="bio-btn-config-item" id="bio-btn-qr-instalar" type="button">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+        <rect x="3" y="14" width="7" height="7"/>
+        <path d="M14 14h.01M14 17h3M17 14h3M20 17v3M20 20h-3"/>
+      </svg>
+      QR de instalação
+    </button>
+    <button class="bio-btn-config-item" id="bio-btn-verificar-update" type="button">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+        <polyline points="7 10 12 15 17 10"/>
+        <line x1="12" y1="15" x2="12" y2="3"/>
+      </svg>
+      Verificar atualização
     </button>
     <button class="bio-btn-config-item perigo" id="bio-btn-zerar-fila" type="button">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -723,10 +770,26 @@
       Sair / Trocar conta
     </button>
 
-    <p style="font-size:11px;color:#9CA3AF;text-align:center;margin-top:24px">
-      Biomonitor Quelônios v1.0<br>
+    <p id="bio-app-versao" style="font-size:11px;color:#9CA3AF;text-align:center;margin-top:24px;margin-bottom:2px">
+      Biomonitor Quelônios v1.0
+    </p>
+    <p id="bio-app-copyright" style="font-size:11px;color:#9CA3AF;text-align:center;margin-top:0">
       SIGUC-AC — Desenvolvido por <strong>Erisson Cameli Santiago</strong>
     </p>
+  </div>
+</div>
+
+<!-- ══ QR OVERLAY ════════════════════════════════════════════════ -->
+<div id="bio-qr-overlay" class="bio-qr-overlay" hidden>
+  <div class="bio-qr-card">
+    <button class="bio-qr-fechar" id="bio-qr-fechar" aria-label="Fechar">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+      </svg>
+    </button>
+    <p style="font-weight:700;font-size:15px;margin:0 0 14px;color:var(--bio-ink)">Instalar Biomonitor</p>
+    <img id="bio-qr-img" src="" alt="QR Code" style="width:200px;height:200px;border-radius:12px">
+    <p id="bio-qr-link" style="font-size:11px;color:#9CA3AF;margin:10px 0 0;word-break:break-all;text-align:center"></p>
   </div>
 </div>
 

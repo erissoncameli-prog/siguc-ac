@@ -371,7 +371,7 @@ function bioIniciarListenersHome() {
   document.getElementById('nav-abertos')?.addEventListener('click', () => bioAbrirTelaAbertos())
   document.getElementById('nav-fila')?.addEventListener('click',    () => bioCarregarTelaSincronizacao())
   document.getElementById('nav-dados')?.addEventListener('click',   () => bioCarregarTelaDados())
-  document.getElementById('nav-config')?.addEventListener('click',  () => bioMostrarTela('tela-config'))
+  document.getElementById('nav-config')?.addEventListener('click',  () => { bioMostrarTela('tela-config'); bioCarregarConfig() })
 
   // Botão central nav = novo ninho
   document.getElementById('bio-nav-cam')?.addEventListener('click', () => {
@@ -854,12 +854,161 @@ function bioRenderizarKPIs(dados) {
 /* ════════════════════════════════════════════════════════════
    CONFIG
    ════════════════════════════════════════════════════════════ */
+const BIO_VERSAO = '1.1.0'
+const BIO_INSTALL_URL = 'https://siguc-ac.vercel.app/pages/instalar-biomonitor.html'
+
+async function bioQuotaArmazenamento() {
+  if (!navigator.storage?.estimate) return null
+  const e = await navigator.storage.estimate()
+  return {
+    usado: e.usage ?? 0,
+    total: e.quota ?? 0,
+    pct: e.quota ? Math.round((e.usage / e.quota) * 100) : 0,
+  }
+}
+
+function bioFotoQuadrada(blob, tam) {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    const url = URL.createObjectURL(blob)
+    img.onload = () => {
+      const lado = Math.min(img.naturalWidth, img.naturalHeight)
+      const sx = (img.naturalWidth  - lado) / 2
+      const sy = (img.naturalHeight - lado) / 2
+      const c = document.createElement('canvas')
+      c.width = c.height = tam
+      c.getContext('2d').drawImage(img, sx, sy, lado, lado, 0, 0, tam, tam)
+      URL.revokeObjectURL(url)
+      c.toBlob(b => resolve(b), 'image/jpeg', 0.85)
+    }
+    img.onerror = reject
+    img.src = url
+  })
+}
+
+async function bioAlterarFotoMonitor() {
+  const monitor = BioApp.monitor
+  if (!monitor?.id) return
+  if (!navigator.onLine) {
+    bioToast('Sem conexão — altere a foto quando houver internet', 'warn')
+    return
+  }
+  const blob = await new Promise(res => {
+    const inp = document.getElementById('bio-input-foto-perfil')
+    inp.value = ''
+    inp.onchange = () => res(inp.files[0] || null)
+    inp.click()
+  })
+  if (!blob) return
+
+  bioToast('Enviando foto…', 'info')
+  try {
+    const quadrada = await bioFotoQuadrada(blob, 512)
+    const path = `${monitor.id}/perfil.jpg`
+    const { error: upErr } = await bioSupabase().storage.from('biomonitor-fotos')
+      .upload(path, quadrada, { upsert: true, contentType: 'image/jpeg' })
+    if (upErr) throw upErr
+
+    const { data: { publicUrl } } = bioSupabase().storage.from('biomonitor-fotos').getPublicUrl(path)
+    const fotoUrl = `${publicUrl}?t=${Date.now()}`
+
+    const { error: updErr } = await bioSupabase()
+      .from('monitores_biodiversidade')
+      .update({ foto_url: fotoUrl })
+      .eq('id', monitor.id)
+    if (updErr) throw updErr
+
+    BioApp.monitor.foto_url = fotoUrl
+    await bioOfflineSetConfig('monitor', BioApp.monitor)
+    const avatarEl = document.getElementById('bio-config-avatar')
+    if (avatarEl) {
+      avatarEl.style.backgroundImage = `url(${fotoUrl})`
+      avatarEl.textContent = ''
+    }
+    bioToast('Foto atualizada!', 'ok')
+  } catch (e) {
+    bioToast('Erro ao enviar foto: ' + (e.message || e), 'err')
+  }
+}
+
+async function bioVerificarAtualizacao() {
+  if (!('serviceWorker' in navigator)) { location.reload(); return }
+  bioToast('Verificando atualização…', 'info')
+  const reg = await navigator.serviceWorker.getRegistration()
+  if (!reg) { location.reload(); return }
+  let achou = false
+  reg.addEventListener('updatefound', () => {
+    achou = true
+    const nw = reg.installing
+    if (!nw) return
+    nw.addEventListener('statechange', () => {
+      if (nw.state === 'installed') {
+        bioToast('Atualização encontrada — recarregando…', 'ok')
+        setTimeout(() => location.reload(), 900)
+      }
+    })
+  })
+  try { await reg.update() } catch (e) { console.warn('[bio-update]', e) }
+  setTimeout(() => { if (!achou) bioToast('App já está atualizado', 'ok') }, 2500)
+}
+
+function bioAbrirQRInstalacao() {
+  const qr = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(BIO_INSTALL_URL)}&size=320x320&format=png&margin=12`
+  const img  = document.getElementById('bio-qr-img')
+  const link = document.getElementById('bio-qr-link')
+  const ov   = document.getElementById('bio-qr-overlay')
+  if (img)  img.src = qr
+  if (link) link.textContent = BIO_INSTALL_URL
+  if (ov)   ov.hidden = false
+}
+
+async function bioSincronizarPraias() {
+  if (!navigator.onLine) { bioToast('Sem conexão.', 'err'); return }
+  bioToast('Sincronizando praias…', 'info')
+  try {
+    await bioSyncCachePraias(BioApp.monitor?.grupo_id)
+    await bioCarregarPraiasHome()
+    bioToast('Praias atualizadas!', 'ok')
+  } catch (e) {
+    bioToast('Erro ao sincronizar praias.', 'err')
+  }
+}
+
+async function bioCarregarConfig() {
+  // Quota
+  const quota = await bioQuotaArmazenamento()
+  if (quota) {
+    const fill = document.getElementById('bio-quota-fill')
+    const txt  = document.getElementById('bio-quota-txt')
+    if (fill) fill.style.width = quota.pct + '%'
+    if (txt) {
+      const usadoMb = (quota.usado / 1024 / 1024).toFixed(1)
+      const totalMb = (quota.total / 1024 / 1024).toFixed(0)
+      txt.textContent = `${usadoMb} MB / ${totalMb} MB`
+    }
+  }
+
+  // Modo Campo — restaura estado salvo
+  const campoCk = document.getElementById('bio-toggle-campo')
+  if (campoCk) campoCk.checked = document.body.classList.contains('field-mode')
+}
+
 function bioIniciarConfig() {
-  document.getElementById('bio-config-nome')?.textContent  // preenchido na home
+  document.getElementById('bio-config-avatar-btn')?.addEventListener('click', bioAlterarFotoMonitor)
+  document.getElementById('bio-input-foto-perfil')?.addEventListener('change', () => {})
+
+  document.getElementById('bio-toggle-campo')?.addEventListener('change', async ev => {
+    document.body.classList.toggle('field-mode', ev.target.checked)
+    await bioOfflineSetConfig('campo_field_mode', ev.target.checked)
+  })
+
   document.getElementById('bio-btn-alterar-pin')?.addEventListener('click', async () => {
     bioMostrarTela('tela-config-pin')
     bioIniciarTelaConfigPin()
   })
+  document.getElementById('bio-btn-sincronizar-praias')?.addEventListener('click', bioSincronizarPraias)
+  document.getElementById('bio-btn-qr-instalar')?.addEventListener('click', bioAbrirQRInstalacao)
+  document.getElementById('bio-btn-verificar-update')?.addEventListener('click', bioVerificarAtualizacao)
   document.getElementById('bio-btn-zerar-fila')?.addEventListener('click', async () => {
     if (!confirm('Zerar a fila apaga todos os registros locais não enviados. Continuar?')) return
     await bioOfflineZerarFila()
@@ -872,6 +1021,12 @@ function bioIniciarConfig() {
     await bioOfflineDelConfig('pin_hash')
     await bioOfflineDelConfig('monitor')
     bioMostrarTela('tela-login')
+  })
+  document.getElementById('bio-qr-fechar')?.addEventListener('click', () => {
+    document.getElementById('bio-qr-overlay').hidden = true
+  })
+  document.getElementById('bio-qr-overlay')?.addEventListener('click', e => {
+    if (e.target === e.currentTarget) e.currentTarget.hidden = true
   })
 }
 
@@ -993,6 +1148,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     monitorId:   null,  // preenchido após login
     onConcluido: () => bioAtualizarBadgeFila(),
   })
+
+  // Versão e créditos dinâmicos
+  const versaoEl = document.getElementById('bio-app-versao')
+  if (versaoEl) versaoEl.textContent = `Biomonitor Quelônios v${BIO_VERSAO}`
+  const copyEl = document.getElementById('bio-app-copyright')
+  if (copyEl) copyEl.innerHTML = 'SIGUC-AC — Desenvolvido por <strong>Erisson Cameli Santiago</strong>'
+
+  // Restaura Modo Campo salvo
+  const campoBool = await bioOfflineGetConfig('campo_field_mode')
+  if (campoBool) document.body.classList.add('field-mode')
 
   // Entrar
   await bioIniciar()

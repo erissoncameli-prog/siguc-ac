@@ -691,6 +691,72 @@ body { margin: 0; }
 .bio-btn-config-item.perigo { color: var(--bio-perigo); border-color: rgba(220,38,38,.3); }
 .bio-btn-config-item.perigo::after { color: var(--bio-perigo); }
 
+/* Quota de armazenamento */
+.bio-quota-wrap {
+  background: #fff; border: 1px solid #D0E4EF; border-radius: 14px;
+  padding: 12px 16px; margin-bottom: 12px;
+}
+.bio-quota-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 8px; font-size: 12px; font-weight: 600; color: #6B7280;
+}
+.bio-quota-bar {
+  height: 6px; background: #E5EFF5; border-radius: 3px; overflow: hidden;
+}
+.bio-quota-fill {
+  height: 100%; background: var(--bio-prim); border-radius: 3px;
+  width: 0; transition: width .6s var(--ease-out);
+}
+
+/* Toggle Modo Campo */
+.bio-config-toggle-row {
+  display: flex; align-items: center; justify-content: space-between;
+  background: #fff; border: 1px solid #D0E4EF; border-radius: 18px;
+  padding: 14px 18px; margin-bottom: 10px;
+  box-shadow: 0 1px 4px rgba(13,30,39,.05);
+}
+.bio-config-toggle-label { display: block; font-size: 15px; font-weight: 600; color: var(--bio-ink); }
+.bio-config-toggle-dica  { display: block; font-size: 12px; color: #9CA3AF; margin-top: 2px; }
+.bio-toggle-switch { position: relative; display: inline-flex; cursor: pointer; flex-shrink: 0; }
+.bio-toggle-switch input { opacity: 0; width: 0; height: 0; }
+.bio-toggle-knob {
+  width: 46px; height: 26px; background: #D1D5DB; border-radius: 13px;
+  transition: background .2s; position: relative;
+}
+.bio-toggle-knob::after {
+  content: ''; position: absolute; top: 3px; left: 3px;
+  width: 20px; height: 20px; border-radius: 50%; background: #fff;
+  box-shadow: 0 1px 3px rgba(0,0,0,.25); transition: transform .2s var(--spring);
+}
+.bio-toggle-switch input:checked ~ .bio-toggle-knob { background: var(--bio-prim); }
+.bio-toggle-switch input:checked ~ .bio-toggle-knob::after { transform: translateX(20px); }
+
+/* Modo Campo — alto contraste */
+body.field-mode .bio-form-body, body.field-mode .bio-tela { font-weight: 500; }
+body.field-mode .bio-campo-input, body.field-mode .bio-form-label { font-size: 17px; }
+body.field-mode .bio-btn-config-item { font-size: 17px; padding: 20px 18px; }
+body.field-mode .bio-home-nome { font-size: 26px; }
+
+/* QR Overlay */
+.bio-qr-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,.55);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 3000;
+}
+.bio-qr-overlay[hidden] { display: none; }
+.bio-qr-card {
+  background: #fff; border-radius: 20px; padding: 24px 20px 20px;
+  display: flex; flex-direction: column; align-items: center;
+  max-width: 280px; width: 90%; position: relative;
+  box-shadow: 0 8px 32px rgba(0,0,0,.25);
+}
+.bio-qr-fechar {
+  position: absolute; top: 12px; right: 12px;
+  background: #F3F4F6; border: none; border-radius: 50%;
+  width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
+  cursor: pointer; color: #6B7280;
+}
+
 /* ── Toast ───────────────────────────────────────────────────── */
 .bio-toast {
   position: fixed; bottom: calc(var(--bio-nav-h) + 24px); left: 50%;
