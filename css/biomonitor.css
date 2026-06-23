@@ -565,6 +565,33 @@ body { margin: 0; }
 .bio-btn-sm.ghost { background: rgba(0,0,0,.06); color: var(--bio-ink); }
 .bio-btn-sm.perigo { background: var(--bio-perigo); color: #fff; }
 
+/* ── Ovos na postura ──────────────────────────────────────────── */
+.bio-ovos-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 6px;
+}
+.bio-ovos-campo { display: flex; flex-direction: column; gap: 4px; }
+.bio-ovos-label { font-size: 11px; color: var(--bio-muted); font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
+.bio-ovos-input { text-align: center; padding: 10px 6px; }
+
+/* ── Distância ao Rio ─────────────────────────────────────────── */
+.bio-dist-metodos { display: flex; gap: 8px; margin-top: 6px; }
+.bio-dist-chip {
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: 5px;
+  padding: 8px 10px; border-radius: 10px; border: 1.5px solid var(--bio-border);
+  background: transparent; color: var(--bio-muted); font-size: 13px; font-weight: 600;
+  cursor: pointer; transition: all .15s;
+}
+.bio-dist-chip.ativo {
+  border-color: var(--bio-prim); background: rgba(42,157,111,.12); color: var(--bio-prim);
+}
+.bio-dist-medir { margin-top: 10px; }
+.bio-dist-dica { font-size: 11px; color: var(--bio-muted); margin: 6px 0 0; line-height: 1.5; }
+.bio-dist-valor {
+  display: flex; align-items: center; gap: 8px; margin-top: 10px;
+}
+.bio-dist-valor .bio-form-input { flex: 1; }
+.bio-dist-unidade { font-size: 14px; font-weight: 700; color: var(--bio-muted); white-space: nowrap; }
+
 .bio-btn-salvar {
   width: 100%; padding: 18px; border-radius: 16px; border: none;
   background: var(--bio-prim); color: #fff;
