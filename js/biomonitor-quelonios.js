@@ -17,6 +17,8 @@ const BioApp = {
   formNinho:    null,
   formTipo:     null,   // 'ninho' | 'transferencia' | 'eclosao'
   formNinhoAtualizar: null,  // ninho sendo atualizado
+  // Filtros de aba
+  abertosStatusFiltro: null,  // null = todos; 'encontrado'|'transferido'|'eclodido'|'perdido'
 }
 
 // Espécies de quelônios com sigla, nome e cor
@@ -350,6 +352,15 @@ function bioIniciarListenersHome() {
   })
   document.getElementById('bio-btn-abertos')?.addEventListener('click', bioAbrirTelaAbertos)
   document.getElementById('bio-btn-historico')?.addEventListener('click', bioAbrirTelaHistorico)
+  document.getElementById('bio-btn-reload-abertos')?.addEventListener('click', bioCarregarAbertos)
+  document.querySelectorAll('.bio-sfil-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.bio-sfil-btn').forEach(b => b.classList.remove('ativa'))
+      btn.classList.add('ativa')
+      BioApp.abertosStatusFiltro = btn.dataset.status || null
+      bioCarregarAbertos()
+    })
+  })
   document.getElementById('bio-btn-sync-home')?.addEventListener('click', () => {
     bioSyncTudo({
       monitorId:   BioApp.monitor?.id,
@@ -666,50 +677,123 @@ async function bioSalvarEclosao() {
 /* ════════════════════════════════════════════════════════════
    NINHOS ABERTOS / HISTÓRICO
    ════════════════════════════════════════════════════════════ */
+// ── Card interno reutilizável (Abertos + Fila) ─────────────────
+function bioNinhoCardInner(n, { praiaNome = '', showSync = false, syncOk = false,
+    transfCount = 0, hasEclosao = false, showAcoes = false } = {}) {
+  const esp   = BIO_ESPECIES.find(e => e.id === n.especie)
+  const st    = n.status ?? 'encontrado'
+  const praia = praiaNome || n.praia_nome || ''
+
+  const ovosHtml = (n.qtd_ovos != null || n.ovos_integros != null ||
+      n.ovos_descartados != null || n.dist_rio_m != null) ? `
+    <div class="bio-nfc-ovos">
+      ${n.qtd_ovos          != null ? `<span>${n.qtd_ovos} ovos</span>` : ''}
+      ${n.ovos_integros     != null ? `<span>${n.ovos_integros} íntegros</span>` : ''}
+      ${n.ovos_descartados  != null ? `<span>${n.ovos_descartados} desc.</span>` : ''}
+      ${n.dist_rio_m        != null ? `<span>${n.dist_rio_m}m do rio</span>` : ''}
+    </div>` : ''
+
+  const eventosHtml = (transfCount > 0 || hasEclosao) ? `
+    <div class="bio-nfc-eventos">
+      ${transfCount > 0 ? `<span class="bio-nfc-ev-chip transf">${transfCount} transf.</span>` : ''}
+      ${hasEclosao       ? `<span class="bio-nfc-ev-chip ecl">eclosão</span>` : ''}
+    </div>` : ''
+
+  const monitorNome = n.monitor_nome || BioApp.monitor?.nome_completo || ''
+
+  const acoesHtml = showAcoes ? `
+    <div class="bio-nfc-acoes">
+      ${st === 'encontrado' || st === 'transferido'
+        ? `<button class="bio-btn-sm prim" data-acao="transferencia">+ Transferência</button>` : ''}
+      ${st !== 'eclodido' && st !== 'perdido'
+        ? `<button class="bio-btn-sm ghost" data-acao="eclosao">Registrar Eclosão</button>` : ''}
+    </div>` : ''
+
+  const rejHtml = n.status_validacao === 'rejeitado'
+    ? `<div class="bio-nfc-rejeicao">Rejeitado: ${n.motivo_rejeicao ?? ''}</div>` : ''
+
+  return `
+    <div class="bio-nfc-header">
+      <span class="bio-nfc-num">#${n.numero_ninho ?? '—'}</span>
+      <span class="bio-nfc-status-badge ${st}">${bioLabels.status[st] ?? st}</span>
+      ${showSync
+        ? `<span class="bio-nfc-sync-dot" title="${syncOk ? 'Enviado' : 'Pendente'}"
+             style="background:${syncOk ? 'var(--bio-verde)' : '#F59E0B'}"></span>` : ''}
+    </div>
+    <div class="bio-nfc-especie">${esp
+      ? `<strong>${esp.sigla}</strong> ${esp.nome}` : (n.especie ?? '—')}</div>
+    <div class="bio-nfc-row">
+      ${praia ? `<span class="bio-nfc-praia">${praia}</span>` : ''}
+      <span class="bio-nfc-data">${
+        new Date(n.data_encontro ?? n.criado_em).toLocaleDateString('pt-BR')}</span>
+    </div>
+    ${ovosHtml}
+    ${eventosHtml}
+    ${monitorNome ? `<div class="bio-nfc-monitor">${monitorNome}</div>` : ''}
+    ${rejHtml}
+    ${acoesHtml}
+  `
+}
+
+// ── Ninhos Abertos (carrega do servidor + merge local) ─────────
 async function bioAbrirTelaAbertos() {
-  const praiaId = BioApp.praiaAtual?.id
-  let ninhos = await bioOfflineListarNinhos({ praiaId })
-  ninhos = ninhos.filter(n => n.status !== 'eclodido' && n.status !== 'perdido')
-  bioRenderizarListaNinhos('bio-lista-abertos', ninhos, true)
   bioMostrarTela('tela-abertos')
+  await bioCarregarAbertos()
 }
 
-async function bioAbrirTelaHistorico() {
-  const praiaId = BioApp.praiaAtual?.id
-  const ninhos  = await bioOfflineListarNinhos({ praiaId })
-  bioRenderizarListaNinhos('bio-lista-historico', ninhos, false)
-  bioMostrarTela('tela-historico')
-}
+async function bioCarregarAbertos() {
+  const cont = document.getElementById('bio-lista-abertos')
+  const loading = document.getElementById('bio-abertos-loading')
+  if (!cont) return
 
-function bioRenderizarListaNinhos(containerId, ninhos, mostrarAcoes) {
-  const el = document.getElementById(containerId)
-  if (!el) return
+  cont.innerHTML = ''
+  if (loading) loading.hidden = false
+
+  let ninhos = []
+
+  // Tenta carregar do servidor para visão cross-device
+  if (navigator.onLine && BioApp.monitor?.grupo_id) {
+    try {
+      const { data } = await bioSupabase()
+        .from('vw_ninhos_validacao')
+        .select('*')
+        .eq('grupo_id', BioApp.monitor.grupo_id)
+        .order('data_encontro', { ascending: false })
+      if (data) ninhos = data
+
+      // Merge: ninhos locais ainda não no servidor
+      const locais = await bioOfflineListarNinhos()
+      const idsServidor = new Set(ninhos.map(n => n.uuid_cliente))
+      for (const local of locais) {
+        if (!idsServidor.has(local.uuid_cliente)) {
+          const praias = await bioOfflineListarPraias()
+          const p = praias.find(x => x.id === local.praia_id)
+          ninhos.unshift({ ...local, praia_nome: p?.nome ?? '', _local: true })
+        }
+      }
+    } catch (_) {
+      ninhos = await _bioAbertosLocal()
+    }
+  } else {
+    ninhos = await _bioAbertosLocal()
+  }
+
+  if (loading) loading.hidden = true
+
+  // Aplica filtro de status
+  const sf = BioApp.abertosStatusFiltro
+  if (sf) ninhos = ninhos.filter(n => n.status === sf)
+
   if (!ninhos.length) {
-    el.innerHTML = '<p style="text-align:center;color:#9CA3AF;padding:24px">Nenhum ninho encontrado.</p>'
+    cont.innerHTML = '<p style="text-align:center;color:#9CA3AF;padding:32px 16px">Nenhum ninho encontrado.</p>'
     return
   }
-  el.innerHTML = ''
-  ninhos.forEach(n => {
-    const esp    = BIO_ESPECIES.find(e => e.id === n.especie)
-    const card   = document.createElement('div')
-    card.className = 'bio-ninho-card'
-    card.innerHTML = `
-      <div class="bio-ninho-card-header">
-        <span class="bio-ninho-num">${n.numero_ninho}</span>
-        <span class="bio-ninho-status ${n.status}">${bioLabels.status[n.status] ?? n.status}</span>
-      </div>
-      <div class="bio-ninho-card-meta">
-        <span>${esp?.sigla ?? '?'} — ${esp?.nome ?? n.especie}</span>
-        <span>${new Date(n.data_encontro).toLocaleDateString('pt-BR')}</span>
-        ${n.status_validacao === 'rejeitado' ? '<span style="color:#dc2626">Rejeitado: ' + (n.motivo_rejeicao ?? '') + '</span>' : ''}
-      </div>
-      ${mostrarAcoes ? `
-        <div style="display:flex;gap:8px;margin-top:10px">
-          ${n.status === 'encontrado' || n.status === 'transferido' ? `<button class="bio-btn-sm prim" data-acao="transferencia">+ Transferência</button>` : ''}
-          ${n.status !== 'eclodido' && n.status !== 'perdido' ? `<button class="bio-btn-sm ghost" data-acao="eclosao">Registrar Eclosão</button>` : ''}
-        </div>` : ''}
-    `
 
+  ninhos.forEach(n => {
+    const st  = n.status ?? 'encontrado'
+    const card = document.createElement('div')
+    card.className = `bio-nfc status-${st}`
+    card.innerHTML = bioNinhoCardInner(n, { showAcoes: true })
     card.querySelectorAll('[data-acao]').forEach(btn => {
       btn.addEventListener('click', e => {
         e.stopPropagation()
@@ -717,9 +801,39 @@ function bioRenderizarListaNinhos(containerId, ninhos, mostrarAcoes) {
         if (btn.dataset.acao === 'eclosao')       bioAbrirFormEclosao(n)
       })
     })
-
-    el.appendChild(card)
+    cont.appendChild(card)
   })
+}
+
+async function _bioAbertosLocal() {
+  const praias = await bioOfflineListarPraias()
+  const ninhos = await bioOfflineListarNinhos()
+  return ninhos.map(n => {
+    const p = praias.find(x => x.id === n.praia_id)
+    return { ...n, praia_nome: p?.nome ?? '', _local: true }
+  })
+}
+
+async function bioAbrirTelaHistorico() {
+  const praias = await bioOfflineListarPraias()
+  const ninhos = (await bioOfflineListarNinhos()).map(n => {
+    const p = praias.find(x => x.id === n.praia_id)
+    return { ...n, praia_nome: p?.nome ?? '' }
+  })
+  const cont = document.getElementById('bio-lista-historico')
+  if (!cont) return
+  if (!ninhos.length) {
+    cont.innerHTML = '<p style="text-align:center;color:#9CA3AF;padding:24px">Nenhum ninho encontrado.</p>'
+  } else {
+    cont.innerHTML = ''
+    ninhos.forEach(n => {
+      const card = document.createElement('div')
+      card.className = `bio-nfc status-${n.status ?? 'encontrado'}`
+      card.innerHTML = bioNinhoCardInner(n)
+      cont.appendChild(card)
+    })
+  }
+  bioMostrarTela('tela-historico')
 }
 
 /* ════════════════════════════════════════════════════════════
@@ -748,6 +862,52 @@ async function bioCarregarFilaLocal() {
     transfs.forEach(t => { transfMap[t.ninho_uuid] = (transfMap[t.ninho_uuid] ?? 0) + 1 })
     ecls.forEach(e => { eclosMap[e.ninho_uuid] = true })
   } catch (_) { /* stores not yet initialized */ }
+
+  // Stats
+  const pendentes   = ninhos.filter(n => n.status_sync === 'pendente').length
+  const confirmados = ninhos.filter(n => n.status_sync === 'confirmado').length
+  document.getElementById('bio-fila-total').textContent       = ninhos.length
+  document.getElementById('bio-fila-pendentes').textContent   = pendentes
+  document.getElementById('bio-fila-confirmados').textContent = confirmados
+
+  ninhos.sort((a, b) => {
+    const pa = a.status_sync === 'pendente' ? 0 : 1
+    const pb = b.status_sync === 'pendente' ? 0 : 1
+    if (pa !== pb) return pa - pb
+    return (b.criado_em ?? '').localeCompare(a.criado_em ?? '')
+  })
+
+  const container = document.getElementById('bio-sync-queue')
+  container.innerHTML = ''
+
+  if (!ninhos.length) {
+    container.innerHTML = '<p style="text-align:center;color:#9CA3AF;padding:32px 16px">Nenhum ninho registrado localmente.</p>'
+    return
+  }
+
+  ninhos.forEach(n => {
+    const praia   = praias.find(p => p.id === n.praia_id)
+    const syncOk  = n.status_sync === 'confirmado'
+    const card    = document.createElement('div')
+    card.className = `bio-nfc status-${n.status ?? 'encontrado'}`
+    card.innerHTML = bioNinhoCardInner(n, {
+      praiaNome:   praia?.nome,
+      showSync:    true,
+      syncOk,
+      transfCount: transfMap[n.uuid_cliente] ?? 0,
+      hasEclosao:  eclosMap[n.uuid_cliente] ?? false,
+      showAcoes:   true,
+    })
+    card.querySelectorAll('[data-acao]').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation()
+        if (btn.dataset.acao === 'transferencia') bioAbrirFormTransf(n)
+        if (btn.dataset.acao === 'eclosao')       bioAbrirFormEclosao(n)
+      })
+    })
+    container.appendChild(card)
+  })
+}
 
 async function bioAtualizarBadgeFila() {
   const total = await bioOfflineContarPendentes()

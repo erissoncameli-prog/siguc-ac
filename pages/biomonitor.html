@@ -516,9 +516,27 @@
   <header class="bio-form-header">
     <button class="bio-btn-back" data-back="tela-home" aria-label="Voltar">‹</button>
     <span>Ninhos Abertos</span>
-    <span></span>
+    <button class="bio-btn-icon" id="bio-btn-reload-abertos" aria-label="Recarregar">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M23 4v6h-6M1 20v-6h6"/>
+        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+      </svg>
+    </button>
   </header>
-  <div class="bio-form-body">
+
+  <!-- Filtro por status -->
+  <div class="bio-status-filtros">
+    <button class="bio-sfil-btn ativa" data-status="">Todos</button>
+    <button class="bio-sfil-btn" data-status="encontrado">Ativo</button>
+    <button class="bio-sfil-btn" data-status="transferido">Transferido</button>
+    <button class="bio-sfil-btn" data-status="eclodido">Eclodido</button>
+    <button class="bio-sfil-btn" data-status="perdido">Predado</button>
+  </div>
+
+  <div id="bio-abertos-loading" hidden style="text-align:center;padding:24px;color:#9CA3AF">
+    Carregando do servidor…
+  </div>
+  <div class="bio-form-body" style="padding-top:0">
     <div id="bio-lista-abertos"></div>
   </div>
 </div>

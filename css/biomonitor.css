@@ -827,3 +827,110 @@ body { margin: 0; }
 .bio-tela { display: none; }
 .bio-tela.ativa { display: block; animation: bio-fadeSlide .22s var(--ease-out); }
 @keyframes bio-fadeSlide { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+
+/* ── Filtro de status (Ninhos Abertos) ──────────────────────── */
+.bio-status-filtros {
+  display: flex; gap: 6px; padding: 10px 16px 0;
+  overflow-x: auto; -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.bio-status-filtros::-webkit-scrollbar { display: none; }
+.bio-sfil-btn {
+  flex-shrink: 0; border: 1.5px solid #D0E4EF;
+  background: var(--bio-surface); color: #6B7280;
+  font-family: var(--font-ui); font-size: 12px; font-weight: 600;
+  padding: 5px 13px; border-radius: 99px; cursor: pointer;
+  transition: background .13s, border-color .13s, color .13s;
+  -webkit-tap-highlight-color: transparent;
+}
+.bio-sfil-btn.ativa {
+  background: var(--bio-prim); border-color: var(--bio-prim); color: #fff;
+}
+
+/* ── Cards ricos (Ninhos Abertos + Fila) ────────────────────── */
+.bio-nfc {
+  background: var(--bio-surface);
+  border: 1px solid #D0E4EF;
+  border-left: 4px solid #D0E4EF;
+  border-radius: 14px;
+  padding: 13px 14px;
+  margin-bottom: 10px;
+}
+.bio-nfc.status-encontrado { border-left-color: #3B82F6; }
+.bio-nfc.status-transferido { border-left-color: var(--bio-ouro); }
+.bio-nfc.status-eclodido    { border-left-color: var(--bio-verde); }
+.bio-nfc.status-perdido     { border-left-color: var(--bio-perigo); }
+
+.bio-nfc-header {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 6px;
+}
+.bio-nfc-num {
+  font-family: var(--font-mono); font-size: 15px; font-weight: 700;
+}
+.bio-nfc-status-badge {
+  font-size: 11px; font-weight: 700; padding: 2px 9px; border-radius: 99px;
+  margin-left: auto;
+}
+.bio-nfc-status-badge.encontrado { background: #DBEAFE; color: #1D4ED8; }
+.bio-nfc-status-badge.transferido { background: var(--bio-ouro-bg); color: #7A5E12; }
+.bio-nfc-status-badge.eclodido   { background: var(--bio-verde-bg); color: #175E3C; }
+.bio-nfc-status-badge.perdido    { background: var(--bio-perigo-bg); color: var(--bio-perigo); }
+.bio-nfc-sync-dot {
+  width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0;
+}
+.bio-nfc-especie {
+  font-size: 13px; color: #374151; margin-bottom: 5px;
+}
+.bio-nfc-especie strong { color: var(--bio-prim); margin-right: 4px; }
+.bio-nfc-row {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 6px;
+}
+.bio-nfc-praia {
+  font-size: 12px; font-weight: 600; color: var(--bio-prim);
+  background: var(--bio-prim-bg); padding: 2px 8px; border-radius: 6px;
+}
+.bio-nfc-data { font-size: 12px; color: #9CA3AF; margin-left: auto; }
+.bio-nfc-ovos {
+  display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 6px;
+}
+.bio-nfc-ovos span {
+  font-size: 11px; background: var(--bio-ouro-bg); color: #7A5E12;
+  padding: 2px 7px; border-radius: 6px; font-weight: 500;
+}
+.bio-nfc-eventos {
+  display: flex; gap: 5px; margin-bottom: 6px;
+}
+.bio-nfc-ev-chip {
+  font-size: 11px; padding: 2px 8px; border-radius: 6px; font-weight: 600;
+}
+.bio-nfc-ev-chip.transf { background: rgba(139,92,246,.13); color: #6D28D9; }
+.bio-nfc-ev-chip.ecl    { background: var(--bio-verde-bg); color: #175E3C; }
+.bio-nfc-monitor {
+  font-size: 11px; color: #9CA3AF; margin-top: 4px;
+}
+.bio-nfc-rejeicao {
+  font-size: 11px; color: var(--bio-perigo); margin-top: 4px;
+  background: var(--bio-perigo-bg); padding: 4px 8px; border-radius: 6px;
+}
+.bio-nfc-acoes {
+  display: flex; gap: 8px; margin-top: 10px; padding-top: 10px;
+  border-top: 1px solid #EFF3F6;
+}
+
+/* Fila de envio — lista de cards */
+.bio-sync-queue { padding: 12px 16px; }
+
+/* Stats da fila */
+.bio-fila-stats {
+  display: flex; gap: 0; border-bottom: 1px solid #EFF3F6;
+}
+.bio-fila-stat {
+  flex: 1; text-align: center; padding: 12px 8px;
+  border-right: 1px solid #EFF3F6;
+  font-size: 11px; color: #6B7280; font-weight: 500;
+}
+.bio-fila-stat:last-child { border-right: 0; }
+.bio-fila-stat-n {
+  display: block; font-size: 22px; font-weight: 700; color: var(--bio-ink);
+  font-family: var(--font-mono);
+}
