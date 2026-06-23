@@ -25,6 +25,12 @@ const BioApp = {
   formNinho:    null,
   formTipo:     null,   // 'ninho' | 'transferencia' | 'eclosao'
   formNinhoAtualizar: null,  // ninho sendo atualizado
+  // Filtros de aba
+  abertosFiltroPraia: undefined,  // undefined = usar praiaAtual; null = todas
+  filaFiltroPraia:    undefined,  // undefined = todas; null = todas (explícito)
+  // GPS proximidade
+  _praiaProxima:      null,       // praia dentro de BIO_PROX_RAIO_M
+  _sheetPraiaOnSelect: null,      // callback temporário do sheet de praias
 }
 
 // Espécies de quelônios com sigla, nome e cor
@@ -381,6 +387,55 @@ function bioIniciarListenersHome() {
   document.getElementById('nav-dados')?.addEventListener('click',   () => bioCarregarTelaDados())
   document.getElementById('nav-config')?.addEventListener('click',  () => { bioMostrarTela('tela-config'); bioCarregarConfig() })
 
+  // ── Filtros da aba Abertos ──
+  document.getElementById('bio-btn-reload-abertos')?.addEventListener('click', bioCarregarAbertos)
+  document.getElementById('bio-abertos-praia-btn')?.addEventListener('click', () =>
+    bioAbrirSheetPraias(p => {
+      BioApp.abertosFiltroPraia = p
+      bioAtualizarLabelFiltro('abertos')
+      document.getElementById('bio-abertos-geo-sug').hidden = true
+      bioCarregarAbertos()
+    })
+  )
+  document.getElementById('bio-abertos-todas')?.addEventListener('click', () => {
+    BioApp.abertosFiltroPraia = null
+    bioAtualizarLabelFiltro('abertos')
+    document.getElementById('bio-abertos-geo-sug').hidden = true
+    bioCarregarAbertos()
+  })
+  document.getElementById('bio-abertos-geo-usar')?.addEventListener('click', () => {
+    const prox = BioApp._praiaProxima
+    if (!prox) return
+    BioApp.abertosFiltroPraia = prox
+    bioAtualizarLabelFiltro('abertos')
+    document.getElementById('bio-abertos-geo-sug').hidden = true
+    bioCarregarAbertos()
+  })
+
+  // ── Filtros da aba Fila/Meus Ninhos ──
+  document.getElementById('bio-fila-praia-btn')?.addEventListener('click', () =>
+    bioAbrirSheetPraias(p => {
+      BioApp.filaFiltroPraia = p
+      bioAtualizarLabelFiltro('fila')
+      document.getElementById('bio-fila-geo-sug').hidden = true
+      bioCarregarFilaLocal()
+    })
+  )
+  document.getElementById('bio-fila-todas')?.addEventListener('click', () => {
+    BioApp.filaFiltroPraia = null
+    bioAtualizarLabelFiltro('fila')
+    document.getElementById('bio-fila-geo-sug').hidden = true
+    bioCarregarFilaLocal()
+  })
+  document.getElementById('bio-fila-geo-usar')?.addEventListener('click', () => {
+    const prox = BioApp._praiaProxima
+    if (!prox) return
+    BioApp.filaFiltroPraia = prox
+    bioAtualizarLabelFiltro('fila')
+    document.getElementById('bio-fila-geo-sug').hidden = true
+    bioCarregarFilaLocal()
+  })
+
   // Botão central nav = novo ninho
   document.getElementById('bio-nav-cam')?.addEventListener('click', () => {
     if (!BioApp.praiaAtual) { bioToast('Selecione uma praia.', 'err'); return }
@@ -391,7 +446,9 @@ function bioIniciarListenersHome() {
 }
 
 // ── Sheet de seleção de praias ─────────────────────────────────
-async function bioAbrirSheetPraias() {
+// onSelect(praia): se fornecido, chama o callback; caso contrário seleciona globalmente
+async function bioAbrirSheetPraias(onSelect) {
+  BioApp._sheetPraiaOnSelect = onSelect ?? null
   const praias  = await bioOfflineListarPraias()
   const sheetEl = document.getElementById('bio-sheet-praias')
   const lista   = document.getElementById('bio-sheet-praias-lista')
@@ -428,11 +485,15 @@ async function bioAbrirSheetPraias() {
       </div>
       ${distBadge}`
     item.addEventListener('click', () => {
-      bioSelecionarPraia(p)
       sheetEl.hidden = true
-      // Esconde sugestão se monitor escolheu manualmente
-      const chip = document.getElementById('bio-praia-sugestao')
-      if (chip) chip.hidden = true
+      if (BioApp._sheetPraiaOnSelect) {
+        BioApp._sheetPraiaOnSelect(p)
+        BioApp._sheetPraiaOnSelect = null
+      } else {
+        bioSelecionarPraia(p)
+        const chip = document.getElementById('bio-praia-sugestao')
+        if (chip) chip.hidden = true
+      }
     })
     lista.appendChild(item)
   })
@@ -480,14 +541,23 @@ async function bioVerificarPraiaProxima(lat, lng) {
     const distEl  = document.getElementById('bio-sugestao-dist')
     if (!chip) return
 
-    if (melhor && menorDist <= BIO_PROX_RAIO_M && melhor.id !== BioApp.praiaAtual?.id) {
-      nomeEl.textContent = melhor.nome
-      distEl.textContent = `${Math.round(menorDist)} m`
-      chip.hidden = false
-      chip._praiaProxima = melhor
+    if (melhor && menorDist <= BIO_PROX_RAIO_M) {
+      BioApp._praiaProxima = { ...melhor, _dist: menorDist }
     } else {
-      chip.hidden = true
-      chip._praiaProxima = null
+      BioApp._praiaProxima = null
+    }
+
+    // Home chip
+    if (chip) {
+      if (melhor && menorDist <= BIO_PROX_RAIO_M && melhor.id !== BioApp.praiaAtual?.id) {
+        nomeEl.textContent = melhor.nome
+        distEl.textContent = `${Math.round(menorDist)} m`
+        chip.hidden = false
+        chip._praiaProxima = melhor
+      } else {
+        chip.hidden = true
+        chip._praiaProxima = null
+      }
     }
   }, 15000)
 }
@@ -767,11 +837,70 @@ async function bioSalvarEclosao() {
    NINHOS ABERTOS / HISTÓRICO
    ════════════════════════════════════════════════════════════ */
 async function bioAbrirTelaAbertos() {
-  const praiaId = BioApp.praiaAtual?.id
-  let ninhos = await bioOfflineListarNinhos({ praiaId })
-  ninhos = ninhos.filter(n => n.status !== 'eclodido' && n.status !== 'perdido')
-  bioRenderizarListaNinhos('bio-lista-abertos', ninhos, true)
+  // Inicializa filtro com a praia atual (se não definido ainda)
+  if (BioApp.abertosFiltroPraia === undefined) BioApp.abertosFiltroPraia = BioApp.praiaAtual ?? null
   bioMostrarTela('tela-abertos')
+  bioAtualizarLabelFiltro('abertos')
+  bioMostrarGeoSugTab('abertos')
+  await bioCarregarAbertos()
+}
+
+async function bioCarregarAbertos() {
+  const filtroPraia = BioApp.abertosFiltroPraia
+  const estadoEl = document.getElementById('bio-abertos-estado')
+  const listaEl  = document.getElementById('bio-lista-abertos')
+  estadoEl.textContent = 'Carregando do servidor…'; estadoEl.hidden = false
+  listaEl.innerHTML = ''
+
+  let ninhos = []
+
+  if (navigator.onLine && BioApp.monitor?.grupo_id) {
+    try {
+      let q = bioSupabase()
+        .from('vw_ninhos_validacao')
+        .select('id,uuid_cliente,numero_ninho,especie,data_encontro,status,status_validacao,motivo_rejeicao,qtd_ovos,ovos_integros,ovos_descartados,dist_rio_m,criado_em,praia_id,praia_nome,monitor_id,monitor_nome')
+        .eq('grupo_id', BioApp.monitor.grupo_id)
+        .not('status', 'in', '(eclodido,perdido)')
+        .order('numero_ninho', { ascending: false })
+      if (filtroPraia) q = q.eq('praia_id', filtroPraia.id)
+      const { data, error } = await q
+      if (error) throw error
+
+      // Mescla: inclui ninhos locais pendentes que ainda não chegaram no servidor
+      const localPend = await bioOfflineListarNinhos(filtroPraia ? { praiaId: filtroPraia.id } : {})
+      const uuidsServ = new Set((data ?? []).map(n => n.uuid_cliente).filter(Boolean))
+      const praias    = await bioOfflineListarPraias()
+      const locaisSo  = localPend
+        .filter(n => !uuidsServ.has(n.uuid_cliente) && n.status !== 'eclodido' && n.status !== 'perdido')
+        .map(n => {
+          const pr = praias.find(p => p.id === n.praia_id)
+          return { ...n, praia_nome: pr?.nome, monitor_nome: BioApp.monitor?.nome_completo, _local: true }
+        })
+
+      ninhos = [...locaisSo, ...(data ?? [])]
+      estadoEl.hidden = true
+    } catch (e) {
+      console.warn('[biomonitor abertos]', e)
+      estadoEl.textContent = 'Sem conexão — exibindo dados locais'
+      const localAll = await bioOfflineListarNinhos(filtroPraia ? { praiaId: filtroPraia.id } : {})
+      ninhos = localAll.filter(n => n.status !== 'eclodido' && n.status !== 'perdido')
+    }
+  } else {
+    estadoEl.textContent = 'Offline — exibindo dados locais'
+    const localAll = await bioOfflineListarNinhos(filtroPraia ? { praiaId: filtroPraia.id } : {})
+    ninhos = localAll.filter(n => n.status !== 'eclodido' && n.status !== 'perdido')
+  }
+
+  if (!ninhos.length) {
+    estadoEl.textContent = filtroPraia
+      ? `Nenhum ninho aberto em ${filtroPraia.nome}.`
+      : 'Nenhum ninho aberto encontrado.'
+    estadoEl.hidden = false
+  } else {
+    estadoEl.hidden = true
+  }
+
+  bioRenderizarListaNinhos('bio-lista-abertos', ninhos, true)
 }
 
 async function bioAbrirTelaHistorico() {
@@ -779,6 +908,31 @@ async function bioAbrirTelaHistorico() {
   const ninhos  = await bioOfflineListarNinhos({ praiaId })
   bioRenderizarListaNinhos('bio-lista-historico', ninhos, false)
   bioMostrarTela('tela-historico')
+}
+
+// ── Helpers de filtro de praia nos tabs ───────────────────────
+function bioAtualizarLabelFiltro(tab) {
+  const praia = tab === 'abertos' ? BioApp.abertosFiltroPraia : BioApp.filaFiltroPraia
+  const labelId = tab === 'abertos' ? 'bio-abertos-praia-label' : 'bio-fila-praia-label'
+  const el = document.getElementById(labelId)
+  if (el) el.textContent = praia ? praia.nome : 'Todas as praias'
+}
+
+function bioMostrarGeoSugTab(tab) {
+  const prox   = BioApp._praiaProxima
+  const filtro = tab === 'abertos' ? BioApp.abertosFiltroPraia : BioApp.filaFiltroPraia
+  const sugId  = `bio-${tab}-geo-sug`
+  const nomeId = `bio-${tab}-geo-nome`
+  const distId = `bio-${tab}-geo-dist`
+  const sug = document.getElementById(sugId)
+  if (!sug) return
+  if (prox && prox.id !== filtro?.id) {
+    document.getElementById(nomeId).textContent = prox.nome
+    document.getElementById(distId).textContent = `${Math.round(prox._dist)} m`
+    sug.hidden = false
+  } else {
+    sug.hidden = true
+  }
 }
 
 function bioRenderizarListaNinhos(containerId, ninhos, mostrarAcoes) {
@@ -823,46 +977,94 @@ function bioRenderizarListaNinhos(containerId, ninhos, mostrarAcoes) {
 }
 
 /* ════════════════════════════════════════════════════════════
-   FILA DE SINCRONIZAÇÃO
+   MEUS NINHOS (FILA LOCAL)
    ════════════════════════════════════════════════════════════ */
 async function bioCarregarTelaSincronizacao() {
-  const [ninhos, transfs, ecls] = await Promise.all([
-    bioOfflineListarNinhos(),
+  if (BioApp.filaFiltroPraia === undefined) BioApp.filaFiltroPraia = null
+  bioMostrarTela('tela-fila')
+  bioAtualizarLabelFiltro('fila')
+  bioMostrarGeoSugTab('fila')
+  await bioCarregarFilaLocal()
+}
+
+async function bioCarregarFilaLocal() {
+  const filtroPraia = BioApp.filaFiltroPraia
+  const praias  = await bioOfflineListarPraias()
+  let ninhos    = await bioOfflineListarNinhos(filtroPraia ? { praiaId: filtroPraia.id } : {})
+
+  // Busca eventos vinculados para enriquecer o status exibido
+  const [transfs, ecls] = await Promise.all([
     bioOfflineTransfPendentes(),
     bioOfflineEclosoesPendentes(),
   ])
+  const transfMap = {}
+  transfs.forEach(t => { transfMap[t.ninho_uuid] = (transfMap[t.ninho_uuid] ?? 0) + 1 })
+  const eclosMap = {}
+  ecls.forEach(e => { eclosMap[e.ninho_uuid] = true })
 
-  const total = ninhos.length + transfs.length + ecls.length
-  document.getElementById('bio-fila-total').textContent      = total
-  document.getElementById('bio-fila-pendentes').textContent  = ninhos.filter(n => n.status_sync === 'pendente').length
-  document.getElementById('bio-fila-confirmados').textContent = ninhos.filter(n => n.status_sync === 'confirmado').length
+  // Stats
+  const pendentes   = ninhos.filter(n => n.status_sync === 'pendente').length
+  const confirmados = ninhos.filter(n => n.status_sync === 'confirmado').length
+  document.getElementById('bio-fila-total').textContent      = ninhos.length
+  document.getElementById('bio-fila-pendentes').textContent  = pendentes
+  document.getElementById('bio-fila-confirmados').textContent = confirmados
+
+  // Ordena: pendentes primeiro, depois por data decrescente
+  ninhos.sort((a, b) => {
+    const pa = a.status_sync === 'pendente' ? 0 : 1
+    const pb = b.status_sync === 'pendente' ? 0 : 1
+    if (pa !== pb) return pa - pb
+    return (b.criado_em ?? '').localeCompare(a.criado_em ?? '')
+  })
 
   const container = document.getElementById('bio-sync-queue')
   container.innerHTML = ''
 
-  const tudo = [
-    ...ninhos.map(n => ({ ...n, _tipo: 'ninho' })),
-    ...transfs.map(t => ({ ...t, _tipo: 'transferencia' })),
-    ...ecls.map(e => ({ ...e, _tipo: 'eclosao' })),
-  ].sort((a, b) => b.criado_em.localeCompare(a.criado_em))
+  if (!ninhos.length) {
+    container.innerHTML = '<p style="text-align:center;color:#9CA3AF;padding:32px 16px">Nenhum ninho registrado localmente.</p>'
+    return
+  }
 
-  tudo.slice(0, 30).forEach(item => {
-    const div  = document.createElement('div')
-    div.className = 'bio-sync-item'
-    const tipo  = item._tipo
-    const tipoLabel = { ninho: 'Ninho', transferencia: 'Transferência', eclosao: 'Eclosão' }[tipo]
-    const num   = item.numero_ninho ?? item.ninho_numero ?? '—'
-    div.innerHTML = `
-      <div class="bio-sync-dot ${item.status_sync ?? 'pendente'}"></div>
-      <div class="bio-sync-info">
-        <span class="bio-sync-tipo ${tipo}">${tipoLabel}</span>
-        <strong>${num}</strong>
-        <span>${new Date(item.criado_em).toLocaleString('pt-BR')}</span>
-      </div>`
-    container.appendChild(div)
+  ninhos.forEach(n => {
+    const esp      = BIO_ESPECIES.find(e => e.id === n.especie)
+    const praia    = praias.find(p => p.id === n.praia_id)
+    const syncOk   = n.status_sync === 'confirmado'
+    const temEcl   = eclosMap[n.uuid_cliente]
+    const nTransf  = transfMap[n.uuid_cliente] ?? 0
+    const status   = n.status ?? 'encontrado'
+
+    const ovosHtml = (n.qtd_ovos != null || n.ovos_integros != null || n.ovos_descartados != null) ? `
+      <div class="bio-nfc-ovos">
+        ${n.qtd_ovos        != null ? `<span>${n.qtd_ovos} ovos</span>` : ''}
+        ${n.ovos_integros   != null ? `<span>${n.ovos_integros} íntegros</span>` : ''}
+        ${n.ovos_descartados != null ? `<span>${n.ovos_descartados} desc.</span>` : ''}
+      </div>` : ''
+
+    const eventosHtml = (nTransf > 0 || temEcl) ? `
+      <div class="bio-nfc-eventos">
+        ${nTransf > 0 ? `<span class="bio-nfc-ev-chip transf">${nTransf} transf.</span>` : ''}
+        ${temEcl       ? `<span class="bio-nfc-ev-chip ecl">eclosão</span>` : ''}
+      </div>` : ''
+
+    const card = document.createElement('div')
+    card.className = `bio-nfc status-${status}`
+    card.innerHTML = `
+      <div class="bio-nfc-header">
+        <span class="bio-nfc-num">#${n.numero_ninho ?? '—'}</span>
+        <span class="bio-nfc-status-badge ${status}">${bioLabels.status[status] ?? status}</span>
+        <span class="bio-nfc-sync-dot" title="${syncOk ? 'Enviado' : 'Pendente'}" style="background:${syncOk ? 'var(--bio-verde)' : '#F59E0B'}"></span>
+      </div>
+      <div class="bio-nfc-especie">${esp ? `<strong>${esp.sigla}</strong> ${esp.nome}` : (n.especie ?? '—')}</div>
+      <div class="bio-nfc-row">
+        <span class="bio-nfc-praia">${praia?.nome ?? '—'}</span>
+        <span class="bio-nfc-data">${new Date(n.data_encontro ?? n.criado_em).toLocaleDateString('pt-BR')}</span>
+      </div>
+      ${ovosHtml}
+      ${eventosHtml}
+      ${BioApp.monitor?.nome_completo ? `<div class="bio-nfc-monitor">${BioApp.monitor.nome_completo}</div>` : ''}
+    `
+    container.appendChild(card)
   })
-
-  bioMostrarTela('tela-fila')
 }
 
 async function bioAtualizarBadgeFila() {

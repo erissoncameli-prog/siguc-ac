@@ -648,7 +648,78 @@ body { margin: 0; }
 .bio-fila-stat:last-child { border-right: none; }
 .bio-fila-stat-n { display: block; font-size: 24px; font-weight: 700; color: var(--bio-ink); font-family: var(--font-mono); }
 
-.bio-sync-queue { padding: 0 16px; }
+/* ── Barra de filtro de praia nos tabs ──────────────────────── */
+.bio-tab-filtros { padding: 0 16px 10px; }
+.bio-mini-geo-sug {
+  display: flex; align-items: center; gap: 6px;
+  background: rgba(26,107,140,.08); border: 1px solid rgba(26,107,140,.25);
+  border-radius: 10px; padding: 7px 10px; margin-bottom: 7px;
+  font-size: 12px; color: var(--bio-prim); font-weight: 600;
+}
+.bio-mini-geo-btn {
+  margin-left: auto; background: var(--bio-prim); color: #fff;
+  border: none; border-radius: 7px; padding: 4px 10px;
+  font-size: 12px; font-weight: 700; cursor: pointer; flex-shrink: 0;
+}
+.bio-mini-praia-row { display: flex; gap: 8px; }
+.bio-mini-praia-btn {
+  flex: 1; display: flex; align-items: center; gap: 6px;
+  background: #fff; border: 1.5px solid #D0E4EF; border-radius: 12px;
+  padding: 9px 12px; font-size: 13px; font-weight: 600; color: var(--bio-ink);
+  cursor: pointer; -webkit-tap-highlight-color: transparent; text-align: left;
+  transition: border-color .15s;
+}
+.bio-mini-praia-btn:active { border-color: var(--bio-prim); }
+.bio-mini-todas-btn {
+  flex-shrink: 0; background: #F3F4F6; border: 1.5px solid #D0E4EF;
+  border-radius: 12px; padding: 9px 12px; font-size: 13px; font-weight: 600;
+  color: #6B7280; cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.bio-mini-todas-btn:active { background: #E5E7EB; }
+
+/* ── Cards ricos de ninho (aba Meus Ninhos) ─────────────────── */
+.bio-sync-queue { padding: 0 16px 24px; }
+.bio-nfc {
+  border-radius: 14px; background: #fff;
+  border: 1px solid #D0E4EF; border-left: 4px solid #D0E4EF;
+  padding: 13px 14px; margin-bottom: 10px;
+  transition: transform .15s;
+}
+.bio-nfc:active { transform: scale(.98); }
+.bio-nfc.status-encontrado  { border-left-color: var(--bio-prim); }
+.bio-nfc.status-transferido { border-left-color: #C9A84C; }
+.bio-nfc.status-eclodido    { border-left-color: var(--bio-verde); }
+.bio-nfc.status-perdido     { border-left-color: var(--bio-perigo); }
+.bio-nfc-header { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
+.bio-nfc-num { font-family: var(--font-mono); font-size: 13px; font-weight: 700; color: var(--bio-ink); }
+.bio-nfc-status-badge {
+  font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 6px; letter-spacing: .02em;
+}
+.bio-nfc-status-badge.encontrado  { background: rgba(26,107,140,.12); color: var(--bio-prim); }
+.bio-nfc-status-badge.transferido { background: rgba(201,168,76,.15);  color: #9B7A1E; }
+.bio-nfc-status-badge.eclodido    { background: rgba(82,183,136,.15);  color: #1E6B4A; }
+.bio-nfc-status-badge.perdido     { background: rgba(220,38,38,.1);    color: var(--bio-perigo); }
+.bio-nfc-sync-dot {
+  width: 8px; height: 8px; border-radius: 50%; margin-left: auto; flex-shrink: 0;
+}
+.bio-nfc-especie { font-size: 13px; color: var(--bio-ink); margin-bottom: 4px; }
+.bio-nfc-especie strong { font-weight: 700; }
+.bio-nfc-row { display: flex; justify-content: space-between; font-size: 12px; color: #6B7280; margin-bottom: 4px; }
+.bio-nfc-praia { font-weight: 600; color: #4A6170; }
+.bio-nfc-ovos { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 4px; }
+.bio-nfc-ovos span {
+  font-size: 11px; background: rgba(201,168,76,.12); color: #9B7A1E;
+  padding: 2px 7px; border-radius: 6px; font-weight: 600;
+}
+.bio-nfc-eventos { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 4px; }
+.bio-nfc-ev-chip {
+  font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 6px;
+}
+.bio-nfc-ev-chip.transf { background: rgba(26,107,140,.1); color: var(--bio-prim); }
+.bio-nfc-ev-chip.ecl { background: rgba(82,183,136,.15); color: #1E6B4A; }
+.bio-nfc-monitor { font-size: 11px; color: #9CA3AF; margin-top: 2px; }
+
+/* legacy (mantém compatibilidade com tela-fila antiga) */
 .bio-sync-item {
   display: flex; align-items: center; gap: 12px;
   padding: 12px 14px; border-radius: 14px;
