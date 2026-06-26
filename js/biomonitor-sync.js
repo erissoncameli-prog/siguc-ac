@@ -128,6 +128,8 @@ async function bioSyncTransferencias(monitorId, onProgresso) {
       ninho_id:            ninhoServId,
       data_transferencia:  t.data_transferencia,
       qtd_ovos:            t.qtd_ovos,
+      praia_destino_id:    t.praia_destino_id  || null,
+      motivo:              t.motivo            || null,
       local_destino:       t.local_destino     || null,
       observacoes:         t.observacoes       || null,
       monitor_id:          monitorId,
@@ -229,7 +231,7 @@ async function bioSyncCachePraias(grupoId) {
   const { data, error } = await bioSupabase()
     .from('praias_monitoramento')
     .select(`
-      id, codigo, sigla, nome, comunidade, municipio, ativa,
+      id, codigo, sigla, nome, comunidade, municipio, ativa, experimental,
       periodo_inicio, periodo_fim,
       ponto_acesso,
       programa_id,
