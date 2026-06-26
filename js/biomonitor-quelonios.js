@@ -660,6 +660,11 @@ function bioAbrirFormNinho() {
   document.getElementById('bio-form-ovos-integros').value   = ''
   document.getElementById('bio-form-ovos-descartados').value = ''
 
+  // Limpa condições do ninho
+  document.getElementById('bio-form-temperatura').value   = ''
+  document.getElementById('bio-form-umidade').value       = ''
+  document.getElementById('bio-form-profundidade').value  = ''
+
   // Limpa distância ao rio
   document.getElementById('bio-form-dist-rio').value = ''
   document.getElementById('bio-btn-marcar-rio-txt').textContent = 'Marcar ponto do Rio'
@@ -709,8 +714,9 @@ async function bioSalvarNinho() {
   if (!data)    { bioToast('Informe a data de encontro.', 'err'); return }
   if (!especie) { bioToast('Selecione a espécie.', 'err'); return }
 
-  const parseNum = id => { const v = parseInt(document.getElementById(id).value); return isNaN(v) ? null : v }
-  const distVal  = parseFloat(document.getElementById('bio-form-dist-rio').value)
+  const parseNum  = id => { const v = parseInt(document.getElementById(id).value);   return isNaN(v) ? null : v }
+  const parseNum2 = id => { const v = parseFloat(document.getElementById(id).value); return isNaN(v) ? null : v }
+  const distVal   = parseFloat(document.getElementById('bio-form-dist-rio').value)
 
   const ninho = {
     ...BioApp.formNinho,
@@ -728,6 +734,9 @@ async function bioSalvarNinho() {
     ovos_descartados: parseNum('bio-form-ovos-descartados'),
     dist_rio_m:       isNaN(distVal) ? null : distVal,
     dist_rio_metodo:  document.getElementById('bio-form-dist-rio').value ? (BioApp.distRioMetodo ?? 'estimativa') : null,
+    temperatura_c:    parseNum2('bio-form-temperatura'),
+    umidade_pct:      parseNum2('bio-form-umidade'),
+    profundidade_cm:  parseNum2('bio-form-profundidade'),
   }
 
   await bioOfflineSalvarNinho(ninho)
@@ -1042,6 +1051,13 @@ function bioNinhoCardInner(n, opts = {}) {
       ${n.ovos_descartados != null ? `<span>${n.ovos_descartados} desc.</span>` : ''}
     </div>` : ''
 
+  const condicoesHtml = (n.temperatura_c != null || n.umidade_pct != null || n.profundidade_cm != null) ? `
+    <div class="bio-nfc-ovos">
+      ${n.temperatura_c  != null ? `<span>${n.temperatura_c}°C</span>` : ''}
+      ${n.umidade_pct    != null ? `<span>${n.umidade_pct}% hum.</span>` : ''}
+      ${n.profundidade_cm != null ? `<span>${n.profundidade_cm} cm prof.</span>` : ''}
+    </div>` : ''
+
   const localChip = n._local
     ? '<span class="bio-nfc-ev-chip" style="background:#a78bfa22;color:#7c3aed">pendente</span>'
     : ''
@@ -1064,6 +1080,7 @@ function bioNinhoCardInner(n, opts = {}) {
     </div>
     ${rejHtml}
     ${ovosHtml}
+    ${condicoesHtml}
     ${localChip ? `<div class="bio-nfc-eventos">${localChip}</div>` : ''}
     ${acoesHtml}
   `
@@ -1228,7 +1245,10 @@ function bioRenderizarKPIs(dados) {
     'bio-kpi-ovos-total':        dados.total_ovos_postura ?? '—',
     'bio-kpi-ovos-integros':     dados.total_ovos_integros ?? '—',
     'bio-kpi-ovos-descartados':  dados.total_ovos_descartados ?? '—',
-    'bio-kpi-dist-rio':          dados.dist_rio_media_m != null ? dados.dist_rio_media_m + ' m' : '—',
+    'bio-kpi-dist-rio':          dados.dist_rio_media_m    != null ? dados.dist_rio_media_m    + ' m'  : '—',
+    'bio-kpi-temp-media':        dados.temp_media_c        != null ? dados.temp_media_c        + '°C'  : '—',
+    'bio-kpi-umidade-media':     dados.umidade_media_pct   != null ? dados.umidade_media_pct   + '%'   : '—',
+    'bio-kpi-prof-media':        dados.profundidade_media_cm != null ? dados.profundidade_media_cm + ' cm' : '—',
   }
   Object.entries(mapa).forEach(([id, val]) => {
     const el = document.getElementById(id)

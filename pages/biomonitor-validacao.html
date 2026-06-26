@@ -192,6 +192,14 @@
           ${n.ovos_descartados != null ? `<span>Descartados: <strong style="color:#f87171">${n.ovos_descartados}</strong></span>` : ''}
         </div>` : ''}
 
+        ${(n.temperatura_c != null || n.umidade_pct != null || n.profundidade_cm != null) ? `
+        <div style="background:rgba(82,183,136,.10);border-radius:8px;padding:8px 10px;margin-bottom:8px;font-size:.82rem;display:flex;gap:16px;flex-wrap:wrap">
+          <span><strong style="color:#52B788">Condições</strong></span>
+          ${n.temperatura_c   != null ? `<span>Temp.: <strong>${n.temperatura_c}°C</strong></span>` : ''}
+          ${n.umidade_pct     != null ? `<span>Umidade: <strong>${n.umidade_pct}%</strong></span>` : ''}
+          ${n.profundidade_cm != null ? `<span>Prof.: <strong>${n.profundidade_cm} cm</strong></span>` : ''}
+        </div>` : ''}
+
         ${n.status === 'transferido' || n.data_transferencia ? `
         <div style="background:rgba(139,92,246,.12);border-radius:8px;padding:8px 10px;margin-bottom:8px;font-size:.82rem">
           <strong style="color:#8b5cf6">Transferência:</strong>
