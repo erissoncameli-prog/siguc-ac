@@ -212,6 +212,10 @@
           <input class="form-control" id="mpr-nome" placeholder="Ex: Praia do Pedral">
         </div>
       </div>
+      <div class="form-group"><label class="form-label">Sigla curta</label>
+        <input class="form-control" id="mpr-sigla" placeholder="Ex: AQ, RD, PD — usada no número do ninho" maxlength="10">
+        <small class="form-hint">2–6 letras maiúsculas. Gera números como: <strong>AQ-TR-001</strong></small>
+      </div>
       <div class="grid-2">
         <div class="form-group"><label class="form-label">Programa <span class="obrig">*</span></label>
           <select class="form-control" id="mpr-programa"><option value="">Selecione...</option></select>
@@ -753,6 +757,7 @@
     document.getElementById('mpr-titulo').textContent = p ? 'Editar Praia' : 'Nova Praia'
     document.getElementById('mpr-codigo').value     = p?.codigo || ''
     document.getElementById('mpr-nome').value       = p?.nome || ''
+    document.getElementById('mpr-sigla').value      = p?.sigla || ''
     document.getElementById('mpr-programa').value   = p?.programa_id || ''
     document.getElementById('mpr-uc').value         = p?.uc_id || ''
     document.getElementById('mpr-mun').value        = p?.municipio || ''
@@ -774,6 +779,7 @@
     const payload = {
       codigo:                 document.getElementById('mpr-codigo').value.trim(),
       nome:                   document.getElementById('mpr-nome').value.trim(),
+      sigla:                  document.getElementById('mpr-sigla').value.trim().toUpperCase() || null,
       programa_id:            document.getElementById('mpr-programa').value || null,
       uc_id:                  document.getElementById('mpr-uc').value || null,
       municipio:              document.getElementById('mpr-mun').value.trim() || null,

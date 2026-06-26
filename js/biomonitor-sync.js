@@ -229,7 +229,7 @@ async function bioSyncCachePraias(grupoId) {
   const { data, error } = await bioSupabase()
     .from('praias_monitoramento')
     .select(`
-      id, codigo, nome, comunidade, municipio, ativa,
+      id, codigo, sigla, nome, comunidade, municipio, ativa,
       periodo_inicio, periodo_fim,
       ponto_acesso,
       programa_id,
