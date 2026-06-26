@@ -1032,7 +1032,25 @@ body.field-mode .bio-home-nome { font-size: 26px; }
 /* ── Telas (visibilidade) ────────────────────────────────────── */
 .bio-tela { display: none; }
 .bio-tela.ativa { display: block; animation: bio-fadeSlide .22s var(--ease-out); }
+/* .bio-lock usa flex para centralizar — sobrescreve o display:block acima */
+.bio-tela.ativa.bio-lock { display: flex; padding-bottom: 0; }
 @keyframes bio-fadeSlide { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+
+/* ── Faixa de logos institucionais na lock screen ────────────── */
+.bio-lock-faixa {
+  position: absolute;
+  top: calc(16px + env(safe-area-inset-top));
+  left: 0; right: 0;
+  padding: 0 22px;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; z-index: 2;
+}
+.bio-lock-faixa .bio-faixa-logo-chip { width: auto; max-width: 150px; height: 42px; }
+.bio-lock-faixa .bio-faixa-logo-chip.gov { max-width: 168px; height: 46px; }
+.bio-lock-faixa .bio-faixa-logo-chip img {
+  width: 100%; height: 100%; object-fit: contain;
+  filter: drop-shadow(0 1px 3px rgba(0,0,0,.45));
+}
 
 /* ── Filtro de status (Ninhos Abertos) ──────────────────────── */
 .bio-status-filtros {
