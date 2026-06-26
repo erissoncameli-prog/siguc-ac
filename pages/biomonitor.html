@@ -339,6 +339,15 @@
       <input type="date" id="bio-form-data" class="bio-form-input">
     </div>
 
+    <!-- Hora da desova (janela crítica) -->
+    <div class="bio-form-section">
+      <label class="bio-form-label" for="bio-form-hora-desova">Hora da desova (estimada)</label>
+      <input type="time" id="bio-form-hora-desova" class="bio-form-input">
+      <small style="display:block;margin-top:4px;opacity:.6;font-size:12px">
+        Base para a janela segura de transferência. Lembre: marque o topo do ovo a lápis e não o gire.
+      </small>
+    </div>
+
     <!-- Espécie -->
     <div class="bio-form-section">
       <span class="bio-form-label">Espécie *</span>
@@ -495,6 +504,12 @@
     <div class="bio-form-section">
       <label class="bio-form-label" for="bio-transf-data">Data da transferência *</label>
       <input type="date" id="bio-transf-data" class="bio-form-input">
+    </div>
+
+    <div class="bio-form-section">
+      <label class="bio-form-label" for="bio-transf-hora">Hora do reenterro</label>
+      <input type="time" id="bio-transf-hora" class="bio-form-input">
+      <div id="bio-transf-janela" style="display:none;margin-top:8px;padding:8px 12px;border-radius:8px;font-size:13px;font-weight:600"></div>
     </div>
 
     <div class="bio-form-section">
