@@ -74,11 +74,81 @@ function bioMostrarTela(id) {
 /* ════════════════════════════════════════════════════════════
    AUTH — LOGIN / PIN
    ════════════════════════════════════════════════════════════ */
+// ── Logos institucionais na lock screen ───────────────────────
+function renderBioLogos(c) {
+  const aplicar = (sel, dado) => {
+    if (!dado) return
+    document.querySelectorAll(sel).forEach(chip => {
+      chip.querySelector('img').src = dado
+      chip.hidden = false
+    })
+  }
+  aplicar('.bio-faixa-logo-chip.gov', c?.gov)
+  aplicar('.bio-faixa-logo-chip.sec', c?.sec)
+}
+
+async function bioBuscarLogos() {
+  try {
+    const cache = await bioOfflineGetConfig('bio_logos_cache_v1')
+    if (cache) renderBioLogos(cache)
+
+    if (!navigator.onLine) return
+    const { data } = await bioSupabase().from('config_sistema').select('dados').eq('id', 1).single()
+    const logos = data?.dados?.logos
+    if (!logos) return
+
+    const baixar = async url => {
+      if (!url) return null
+      try { const r = await fetch(url); return r.ok ? await r.blob() : null } catch { return null }
+    }
+    const blobParaBase64 = blob => new Promise((res, rej) => {
+      const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = rej; fr.readAsDataURL(blob)
+    })
+    const logoParaBranco = async blob => {
+      const img = new Image()
+      const bUrl = URL.createObjectURL(blob)
+      await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = bUrl })
+      const cv = document.createElement('canvas')
+      cv.width = img.naturalWidth; cv.height = img.naturalHeight
+      const ctx = cv.getContext('2d')
+      ctx.drawImage(img, 0, 0)
+      const d = ctx.getImageData(0, 0, cv.width, cv.height)
+      const p = d.data
+      for (let i = 0; i < p.length; i += 4) {
+        const lum = (p[i] * 0.299 + p[i + 1] * 0.587 + p[i + 2] * 0.114) / 255
+        const tinta = (1 - lum) * (p[i + 3] / 255)
+        p[i] = p[i + 1] = p[i + 2] = 255
+        p[i + 3] = Math.round(255 * Math.min(1, tinta * 1.25))
+      }
+      ctx.putImageData(d, 0, 0)
+      URL.revokeObjectURL(bUrl)
+      return new Promise(res => cv.toBlob(b => res(b), 'image/png'))
+    }
+    const preparar = async (urlBranca, urlColorida) => {
+      const oficial = await baixar(urlBranca)
+      if (oficial) return blobParaBase64(oficial)
+      const colorida = await baixar(urlColorida)
+      if (!colorida) return null
+      return blobParaBase64(await logoParaBranco(colorida))
+    }
+    const novo = {
+      gov: await preparar(logos.governo_branca_url,    logos.governo_url),
+      sec: await preparar(logos.secretaria_branca_url, logos.secretaria_url),
+    }
+    if (novo.gov || novo.sec) {
+      await bioOfflineSetConfig('bio_logos_cache_v1', novo)
+      renderBioLogos(novo)
+    }
+  } catch (e) { console.warn('[bio-logos]', e) }
+}
+
 async function bioIniciar() {
   await bioOfflinePersistir()
 
   // Aguarda o cliente Supabase isolado ser criado (depende de /api/env)
   if (typeof _bioReady !== 'undefined') await _bioReady
+
+  bioBuscarLogos()  // best-effort, não bloqueia o fluxo de login
 
   if (!window._bioDB_client) {
     bioMostrarTela('tela-login')
