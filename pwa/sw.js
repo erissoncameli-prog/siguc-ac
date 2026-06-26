@@ -1,5 +1,6 @@
 // ── SIGUC Brigadas — Service Worker ───────────────────────────
 const CACHE = 'siguc-brigadas-v104'
+>>>>>>> b6c67b4 (feat: campos de temperatura, umidade e profundidade no ninho)
 
 const APP_SHELL = [
   '/pages/brigada.html',
