@@ -87,6 +87,9 @@ async function bioSyncNinhos(monitorId, onProgresso) {
       ovos_descartados: ninho.ovos_descartados ?? null,
       dist_rio_m:       ninho.dist_rio_m       ?? null,
       dist_rio_metodo:  ninho.dist_rio_metodo  || null,
+      temperatura_c:    ninho.temperatura_c    ?? null,
+      umidade_pct:      ninho.umidade_pct      ?? null,
+      profundidade_cm:  ninho.profundidade_cm  ?? null,
     }
 
     await bioOfflineAtualizarSync('ninhos', ninho.uuid_cliente, 'enviando')
