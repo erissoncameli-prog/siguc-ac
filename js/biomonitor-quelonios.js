@@ -343,13 +343,17 @@ function bioAtualizarChipConexao() {
 }
 
 async function bioCarregarPraiasHome() {
-  // Busca do servidor (não bloqueia)
-  bioSyncCachePraias(BioApp.monitor?.grupo_id).catch(() => {})
+  // Atualiza o cache de praias (aguarda se online para garantir dados na 1ª abertura)
+  if (navigator.onLine) {
+    await bioSyncCachePraias(BioApp.monitor?.grupo_id).catch(() => {})
+  } else {
+    bioSyncCachePraias(BioApp.monitor?.grupo_id).catch(() => {})
+  }
 
   const praias = await bioOfflineListarPraias()
   if (!praias.length) return
 
-  // Se já tem praia salva, restaura
+  // Se já tem praia salva, restaura; senão usa a primeira da lista
   const praiaId = await bioOfflineGetConfig('praia_selecionada')
   const praia   = praias.find(p => p.id === praiaId) ?? praias[0]
   bioSelecionarPraia(praia)
@@ -464,6 +468,7 @@ async function bioAbrirSheetPraias(onSelect) {
   const praias  = await bioOfflineListarPraias()
   const sheetEl = document.getElementById('bio-sheet-praias')
   const lista   = document.getElementById('bio-sheet-praias-lista')
+  const busca   = document.getElementById('bio-sheet-praias-busca')
 
   // Calcula distâncias se GPS disponível
   const temGPS = BioApp.gpsLat != null && BioApp.gpsLng != null
@@ -474,7 +479,7 @@ async function bioAbrirSheetPraias(onSelect) {
     return { ...p, _dist: dist }
   })
 
-  // Ordena: com distância primeiro (mais próxima), depois as sem GPS
+  // Ordena: mais próxima primeiro; sem GPS mantém ordem alfabética
   comDist.sort((a, b) => {
     if (a._dist == null && b._dist == null) return 0
     if (a._dist == null) return 1
@@ -482,33 +487,59 @@ async function bioAbrirSheetPraias(onSelect) {
     return a._dist - b._dist
   })
 
-  lista.innerHTML = ''
-  comDist.forEach(p => {
-    const item = document.createElement('div')
-    item.className = 'bio-sheet-item'
-    const distBadge = p._dist != null
-      ? `<span class="bio-sheet-dist ${p._dist <= BIO_PROX_RAIO_M ? 'proxima' : ''}">${p._dist < 1000 ? Math.round(p._dist) + ' m' : (p._dist / 1000).toFixed(1) + ' km'}</span>`
-      : ''
-    item.innerHTML = `
-      <span class="bio-sheet-item-cod">${p.codigo}</span>
-      <div class="bio-sheet-item-info">
-        <strong>${p.nome}</strong>
-        <span>${[p.comunidade, p.municipio].filter(Boolean).join(' — ')}</span>
-      </div>
-      ${distBadge}`
-    item.addEventListener('click', () => {
-      sheetEl.hidden = true
-      if (BioApp._sheetPraiaOnSelect) {
-        BioApp._sheetPraiaOnSelect(p)
-        BioApp._sheetPraiaOnSelect = null
-      } else {
-        bioSelecionarPraia(p)
-        const chip = document.getElementById('bio-praia-sugestao')
-        if (chip) chip.hidden = true
-      }
+  function renderLista(filtro) {
+    const q = (filtro ?? '').trim().toLowerCase()
+    const filtradas = q
+      ? comDist.filter(p =>
+          p.nome.toLowerCase().includes(q) ||
+          p.codigo.toLowerCase().includes(q) ||
+          (p.comunidade ?? '').toLowerCase().includes(q))
+      : comDist
+
+    lista.innerHTML = ''
+    if (!filtradas.length) {
+      lista.innerHTML = `<p style="text-align:center;color:#9CA3AF;padding:24px 16px">${
+        q ? 'Nenhuma praia encontrada.' : 'Nenhuma praia disponível. Verifique a conexão.'
+      }</p>`
+      return
+    }
+
+    filtradas.forEach(p => {
+      const item = document.createElement('div')
+      item.className = 'bio-sheet-item'
+      const distBadge = p._dist != null
+        ? `<span class="bio-sheet-dist ${p._dist <= BIO_PROX_RAIO_M ? 'proxima' : ''}">${p._dist < 1000 ? Math.round(p._dist) + ' m' : (p._dist / 1000).toFixed(1) + ' km'}</span>`
+        : ''
+      item.innerHTML = `
+        <span class="bio-sheet-item-cod">${p.codigo}</span>
+        <div class="bio-sheet-item-info">
+          <strong>${p.nome}</strong>
+          <span>${[p.comunidade, p.municipio].filter(Boolean).join(' — ')}</span>
+        </div>
+        ${distBadge}`
+      item.addEventListener('click', () => {
+        sheetEl.hidden = true
+        if (busca) busca.value = ''
+        if (BioApp._sheetPraiaOnSelect) {
+          BioApp._sheetPraiaOnSelect(p)
+          BioApp._sheetPraiaOnSelect = null
+        } else {
+          bioSelecionarPraia(p)
+          const chip = document.getElementById('bio-praia-sugestao')
+          if (chip) chip.hidden = true
+        }
+      })
+      lista.appendChild(item)
     })
-    lista.appendChild(item)
-  })
+  }
+
+  if (busca) {
+    busca.value = ''
+    busca.oninput = () => renderLista(busca.value)
+    setTimeout(() => busca.focus(), 120)
+  }
+
+  renderLista('')
   sheetEl.hidden = false
 }
 
@@ -1555,9 +1586,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     )
   })
 
-  // Sheet overlay fecha ao clicar fora
+  // Sheet overlay fecha ao clicar fora (limpa busca)
   document.getElementById('bio-sheet-praias')?.addEventListener('click', e => {
-    if (e.target === e.currentTarget) e.currentTarget.hidden = true
+    if (e.target === e.currentTarget) {
+      e.currentTarget.hidden = true
+      const busca = document.getElementById('bio-sheet-praias-busca')
+      if (busca) busca.value = ''
+    }
   })
 
   // Foto viewer
