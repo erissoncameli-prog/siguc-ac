@@ -43,7 +43,7 @@ const BIO_ESPECIES = [
   { id: 'cupido',    sigla: 'CP',  nome: 'Cupido',             nome_cientifico: 'Podocnemis cayennensis' },
   { id: 'mucua',     sigla: 'M',   nome: 'Muçuã',              nome_cientifico: 'Kinosternon scorpioides' },
   { id: 'jabuti_pe_elefante', sigla: 'JP', nome: 'Jabuti',     nome_cientifico: 'Chelonoidis denticulatus' },
-  { id: 'outro',     sigla: '?',   nome: 'Outro / Não sei',    nome_cientifico: '' },
+  { id: 'outro',     sigla: 'OUT', nome: 'Outro / Não sei',    nome_cientifico: '' },
 ]
 
 /* ════════════════════════════════════════════════════════════
@@ -612,7 +612,7 @@ async function bioGerarNumeroNinho(praiaId, especie) {
   const esp    = BIO_ESPECIES.find(e => e.id === especie)
   const praias = await bioOfflineListarPraias()
   const praia  = praias.find(p => p.id === praiaId)
-  const cod    = praia?.codigo ?? 'XX'
+  const cod    = praia?.sigla ?? 'XX'
   const sig    = esp?.sigla   ?? '?'
   const prefix = `${cod}-${sig}-`
 
