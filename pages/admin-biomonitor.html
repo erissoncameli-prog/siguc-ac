@@ -258,6 +258,11 @@
         <input type="checkbox" id="mpr-ativa" checked style="width:16px;height:16px">
         <label for="mpr-ativa" style="margin:0;cursor:pointer">Praia ativa</label>
       </div>
+      <div class="form-group" style="display:flex;align-items:center;gap:8px">
+        <input type="checkbox" id="mpr-experimental" style="width:16px;height:16px">
+        <label for="mpr-experimental" style="margin:0;cursor:pointer">Praia experimental / berçário</label>
+        <small class="form-hint" style="margin-left:4px">Recebe ninhos transferidos de outras praias, além dos próprios.</small>
+      </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="fecharModal('praia')">Cancelar</button>
@@ -546,7 +551,7 @@
       <td>${p.programa_nome || '—'}</td>
       <td>${p.comprimento_m ? formatNum(p.comprimento_m) + ' m' : '—'}</td>
       <td>${p.area_ha ? formatNum(p.area_ha, 2) + ' ha' : '—'}</td>
-      <td><span class="badge ${p.ativa ? 'badge-success' : 'badge-neutral'}">${p.ativa ? 'Ativa' : 'Inativa'}</span></td>
+      <td><span class="badge ${p.ativa ? 'badge-success' : 'badge-neutral'}">${p.ativa ? 'Ativa' : 'Inativa'}</span>${p.experimental ? ` <span class="badge badge-warning" title="Recebe ninhos de outras praias">Experimental</span>` : ''}</td>
       <td><button class="btn btn-sm btn-secondary" onclick="editarPraia('${p.id}')">Editar</button></td>
     </tr>`).join('')
   }
@@ -769,6 +774,7 @@
     document.getElementById('mpr-monitor').value    = p?.monitor_responsavel_id || ''
     document.getElementById('mpr-obs').value        = p?.observacoes || ''
     document.getElementById('mpr-ativa').checked    = p ? p.ativa : true
+    document.getElementById('mpr-experimental').checked = p ? !!p.experimental : false
     document.getElementById('modal-praia').classList.add('aberto')
   }
   window.editarPraia = id => window.abrirModalPraia(id)
@@ -790,6 +796,7 @@
       monitor_responsavel_id: document.getElementById('mpr-monitor').value || null,
       observacoes:            document.getElementById('mpr-obs').value.trim() || null,
       ativa:                  document.getElementById('mpr-ativa').checked,
+      experimental:           document.getElementById('mpr-experimental').checked,
     }
     if (!payload.codigo || !payload.nome || !payload.programa_id || !payload.uc_id) {
       toast('Preencha código, nome, programa e UC.', 'error'); return
@@ -844,9 +851,9 @@
 })()
 </script>
 <style>
-.tab-btn { background:transparent;border:none;padding:6px 14px;border-radius:7px;cursor:pointer;font-size:.88rem;color:var(--t1,#f4efe6);transition:all .15s }
-.tab-btn.ativo { background:white;color:var(--floresta,#0A1A0F);box-shadow:0 1px 4px rgba(0,0,0,.12) }
-.tab-btn:hover:not(.ativo) { background:rgba(255,255,255,.12) }
+.tab-btn { background:transparent;border:none;padding:6px 14px;border-radius:7px;cursor:pointer;font-size:.88rem;font-weight:600;color:var(--floresta,#0A1A0F);opacity:.62;transition:all .15s }
+.tab-btn.ativo { background:white;color:var(--floresta,#0A1A0F);opacity:1;box-shadow:0 1px 4px rgba(0,0,0,.12) }
+.tab-btn:hover:not(.ativo) { background:rgba(10,26,15,.06);opacity:.9 }
 </style>
 </body>
 </html>

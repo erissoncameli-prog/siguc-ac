@@ -488,9 +488,32 @@
     </div>
 
     <div class="bio-form-section">
-      <label class="bio-form-label" for="bio-transf-local">Local de destino</label>
+      <label class="bio-form-label">Praia de destino *</label>
+      <button type="button" id="bio-transf-praia-btn" class="bio-form-input"
+        style="text-align:left;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:8px">
+        <span id="bio-transf-praia-nome" style="opacity:.6">Selecionar praia…</span>
+        <span aria-hidden="true" style="opacity:.5">›</span>
+      </button>
+      <input type="hidden" id="bio-transf-praia-id">
+    </div>
+
+    <div class="bio-form-section">
+      <label class="bio-form-label" for="bio-transf-motivo">Motivo da transferência</label>
+      <select id="bio-transf-motivo" class="bio-form-input">
+        <option value="">—</option>
+        <option value="risco_inundacao">Risco de inundação</option>
+        <option value="predacao">Predação</option>
+        <option value="erosao">Erosão</option>
+        <option value="concentracao_manejo">Concentração para manejo</option>
+        <option value="pesquisa">Pesquisa</option>
+        <option value="outro">Outro</option>
+      </select>
+    </div>
+
+    <div class="bio-form-section">
+      <label class="bio-form-label" for="bio-transf-local">Sub-local / berçário (opcional)</label>
       <input type="text" id="bio-transf-local" class="bio-form-input"
-        placeholder="Ex: Berçário 1, Praia Alternativa…" autocomplete="off">
+        placeholder="Ex: Berçário 1, quadra A…" autocomplete="off">
     </div>
 
     <div class="bio-form-section">

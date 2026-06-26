@@ -804,18 +804,39 @@ async function bioAbrirFormTransf(ninho) {
   document.getElementById('bio-transf-ovos').value            = ''
   document.getElementById('bio-transf-local').value           = ''
   document.getElementById('bio-transf-obs').value             = ''
+  document.getElementById('bio-transf-motivo').value          = ''
+  // Destino: limpa seleção anterior
+  BioApp.transfPraiaDestino = null
+  const nomeEl = document.getElementById('bio-transf-praia-nome')
+  nomeEl.textContent = 'Selecionar praia…'
+  nomeEl.style.opacity = '.6'
+  document.getElementById('bio-transf-praia-id').value = ''
   bioMostrarTela('tela-form-transf')
+}
+
+// Abre o sheet de praias para escolher o DESTINO da transferência
+function bioEscolherPraiaDestino() {
+  bioAbrirSheetPraias(praia => {
+    BioApp.transfPraiaDestino = praia
+    document.getElementById('bio-transf-praia-id').value = praia.id
+    const nomeEl = document.getElementById('bio-transf-praia-nome')
+    nomeEl.textContent = praia.experimental ? `${praia.nome} (experimental)` : praia.nome
+    nomeEl.style.opacity = '1'
+  })
 }
 
 async function bioSalvarTransf() {
   const ninho = BioApp.formNinhoAtualizar
-  const data  = document.getElementById('bio-transf-data').value
-  const ovos  = parseInt(document.getElementById('bio-transf-ovos').value)
-  const local = document.getElementById('bio-transf-local').value.trim()
-  const obs   = document.getElementById('bio-transf-obs').value.trim()
+  const data   = document.getElementById('bio-transf-data').value
+  const ovos   = parseInt(document.getElementById('bio-transf-ovos').value)
+  const local  = document.getElementById('bio-transf-local').value.trim()
+  const obs    = document.getElementById('bio-transf-obs').value.trim()
+  const motivo = document.getElementById('bio-transf-motivo').value || null
+  const destino = BioApp.transfPraiaDestino
 
   if (!data)           { bioToast('Informe a data da transferência.', 'err'); return }
   if (isNaN(ovos) || ovos < 0) { bioToast('Informe o número de ovos.', 'err'); return }
+  if (!destino)        { bioToast('Selecione a praia de destino.', 'err'); return }
 
   const transf = {
     uuid_cliente:       bioUuid(),
@@ -823,14 +844,17 @@ async function bioSalvarTransf() {
     ninho_numero:       ninho.numero_ninho,
     data_transferencia: data,
     qtd_ovos:           ovos,
+    praia_destino_id:   destino.id,
+    praia_destino_nome: destino.nome,
+    motivo:             motivo,
     local_destino:      local || null,
     observacoes:        obs || null,
     status_sync:        'pendente',
     criado_em:          new Date().toISOString(),
   }
 
-  // Atualiza status do ninho localmente
-  await bioOfflineSalvarNinho({ ...ninho, status: 'transferido' })
+  // Atualiza status e localização atual do ninho localmente
+  await bioOfflineSalvarNinho({ ...ninho, status: 'transferido', praia_atual_id: destino.id })
   await bioOfflineSalvarTransf(transf)
   await bioAtualizarBadgeFila()
 
@@ -1481,6 +1505,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Salvar botões
   document.getElementById('bio-btn-salvar-ninho')?.addEventListener('click', bioSalvarNinho)
   document.getElementById('bio-btn-salvar-transf')?.addEventListener('click', bioSalvarTransf)
+  document.getElementById('bio-transf-praia-btn')?.addEventListener('click', bioEscolherPraiaDestino)
   document.getElementById('bio-btn-salvar-eclosao')?.addEventListener('click', bioSalvarEclosao)
 
   // Chips de espécie
