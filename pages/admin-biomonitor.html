@@ -4,6 +4,10 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>SIGUC-AC · Admin Biomonitor</title>
 <link rel="stylesheet" href="../css/global.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="../js/observability.js"></script>
 <script src="../js/queryLogger.js"></script>
@@ -234,11 +238,20 @@
       </div>
       <div class="grid-2">
         <div class="form-group"><label class="form-label">Latitude (ponto de acesso)</label>
-          <input class="form-control" id="mpr-lat" type="number" step="any" placeholder="-9.2815">
+          <input class="form-control" id="mpr-lat" type="number" step="any" placeholder="-9.2815" oninput="praiaMapSyncMarker()">
         </div>
         <div class="form-group"><label class="form-label">Longitude</label>
-          <input class="form-control" id="mpr-lng" type="number" step="any" placeholder="-72.7954">
+          <input class="form-control" id="mpr-lng" type="number" step="any" placeholder="-72.7954" oninput="praiaMapSyncMarker()">
         </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Área da praia (polígono) e ponto de acesso</label>
+        <small class="form-hint" style="display:block;margin-bottom:6px">
+          Use a ferramenta de polígono (canto sup. esquerdo) para contornar a faixa de areia.
+          Comprimento e área são calculados automaticamente. Arraste o marcador para o ponto de acesso.
+        </small>
+        <div id="mpr-mapa" style="height:300px;border-radius:8px;overflow:hidden;border:1px solid var(--linha,#ddd)"></div>
+        <small class="form-hint" id="mpr-mapa-metrica" style="display:block;margin-top:6px"></small>
       </div>
       <div class="grid-2">
         <div class="form-group"><label class="form-label">Período início</label>
@@ -336,6 +349,7 @@
           <button class="tab-btn"       id="tab-monitores"  onclick="mudarAba('monitores')">Monitores</button>
           <button class="tab-btn"       id="tab-praias"     onclick="mudarAba('praias')">Praias</button>
           <button class="tab-btn"       id="tab-temporadas" onclick="mudarAba('temporadas')">Temporadas</button>
+          <button class="tab-btn"       id="tab-mapa"       onclick="mudarAba('mapa')">Mapa</button>
         </div>
       </div>
 
@@ -417,6 +431,23 @@
             <th>Nome</th><th>Programa</th><th>Ano base</th><th>Início</th><th>Fim</th><th>Status</th><th></th>
           </tr></thead><tbody id="tbody-temporadas"><tr><td colspan="7" class="empty-row">Carregando...</td></tr></tbody></table>
         </div></div></div>
+      </div>
+
+      <!-- ABA: Mapa -->
+      <div id="aba-mapa" style="display:none">
+        <div class="filter-bar" style="gap:12px;flex-wrap:wrap;align-items:center">
+          <select class="form-control" id="fil-prog-mapa" style="width:200px" onchange="renderMapaPraias()">
+            <option value="">Todos os programas</option>
+          </select>
+          <label style="display:flex;align-items:center;gap:6px;font-size:.85rem;cursor:pointer;user-select:none">
+            <input type="checkbox" id="fil-fluxo-mapa" checked onchange="renderMapaPraias()" style="width:15px;height:15px">
+            Fluxo de transferências
+          </label>
+          <span id="mapa-info" style="font-size:.8rem;color:var(--t2,#888)"></span>
+        </div>
+        <div class="card" style="padding:0;overflow:hidden">
+          <div id="mapa-praias" style="height:70vh;min-height:460px;width:100%"></div>
+        </div>
       </div>
     </div>`
 
@@ -581,16 +612,211 @@
   window.filtrarTemporadas = renderTemporadas
 
   // ── Abas ──────────────────────────────────────────────────────
-  const _abas = ['grupos','monitores','praias','temporadas']
+  const _abas = ['grupos','monitores','praias','temporadas','mapa']
   window.mudarAba = function(aba) {
     _abas.forEach(a => {
       document.getElementById('aba-' + a).style.display = a === aba ? '' : 'none'
       document.getElementById('tab-' + a).classList.toggle('ativo', a === aba)
     })
+    if (aba === 'mapa') ensureMapaPraias()
+  }
+
+  // ════════════════════════════════════════════════════════════
+  //  MAPAS (Leaflet) — modal de praia + aba Mapa
+  // ════════════════════════════════════════════════════════════
+  function _baseSatelite() {
+    return L.tileLayer('https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
+      maxZoom: 21, subdomains: ['mt0','mt1','mt2','mt3'], attribution: 'Imagens © Google'
+    })
+  }
+
+  // Anel externo (array de LatLng) de um layer de polígono
+  function _outerRing(layer) {
+    let ll = layer.getLatLngs()
+    while (Array.isArray(ll) && ll.length && Array.isArray(ll[0])) ll = ll[0]
+    return ll || []
+  }
+
+  // Anel -> EWKT MULTIPOLYGON (SRID 4326)
+  function _ringToWKT(ring) {
+    if (!ring.length) return null
+    const pts = ring.map(p => `${p.lng} ${p.lat}`)
+    if (pts[0] !== pts[pts.length - 1]) pts.push(pts[0]) // fecha o anel
+    if (pts.length < 4) return null
+    return `SRID=4326;MULTIPOLYGON(((${pts.join(', ')})))`
+  }
+
+  // ── Modal de praia: mapa de desenho ──────────────────────────
+  let _praiaMap = null, _praiaDrawn = null, _praiaMarker = null, _praiaAreaWKT = null
+
+  function _praiaAtualizarMetrica() {
+    const el = document.getElementById('mpr-mapa-metrica')
+    const layer = _praiaDrawn && _praiaDrawn.getLayers()[0]
+    if (!layer) { if (el) el.textContent = ''; _praiaAreaWKT = null; return }
+    const ring = _outerRing(layer)
+    _praiaAreaWKT = _ringToWKT(ring)
+    let txt = `${ring.length} vértices`
+    try {
+      if (typeof turf !== 'undefined' && turf.area) {
+        const ha = turf.area(layer.toGeoJSON()) / 10000
+        txt += ` · ~${ha.toFixed(2)} ha`
+      }
+    } catch(e) {}
+    if (el) el.textContent = 'Polígono: ' + txt + ' (valores finais calculados ao salvar)'
+  }
+
+  window.praiaMapSyncMarker = function() {
+    if (!_praiaMap || !_praiaMarker) return
+    const lat = parseFloat(document.getElementById('mpr-lat').value)
+    const lng = parseFloat(document.getElementById('mpr-lng').value)
+    if (!isNaN(lat) && !isNaN(lng)) { _praiaMarker.setLatLng([lat, lng]).addTo(_praiaMap) }
+  }
+
+  function initPraiaMap(areaGeojson, lat, lng) {
+    destroyPraiaMap()
+    const temPonto = !isNaN(lat) && !isNaN(lng)
+    const centro = temPonto ? [lat, lng] : [-9.0, -70.5]
+    _praiaMap = L.map('mpr-mapa', { center: centro, zoom: temPonto ? 14 : 6 })
+    _baseSatelite().addTo(_praiaMap)
+
+    _praiaDrawn = new L.FeatureGroup().addTo(_praiaMap)
+    _praiaMap.addControl(new L.Control.Draw({
+      position: 'topleft',
+      draw: { polygon: { allowIntersection: false, showArea: true },
+        marker: false, polyline: false, rectangle: false, circle: false, circlemarker: false },
+      edit: { featureGroup: _praiaDrawn, remove: true }
+    }))
+    _praiaMap.on(L.Draw.Event.CREATED, e => {
+      _praiaDrawn.clearLayers()        // um polígono por praia
+      _praiaDrawn.addLayer(e.layer)
+      _praiaAtualizarMetrica()
+    })
+    _praiaMap.on(L.Draw.Event.EDITED,  _praiaAtualizarMetrica)
+    _praiaMap.on(L.Draw.Event.DELETED, _praiaAtualizarMetrica)
+
+    _praiaAreaWKT = null
+    if (areaGeojson) {
+      try {
+        const gj = typeof areaGeojson === 'string' ? JSON.parse(areaGeojson) : areaGeojson
+        L.geoJSON(gj).eachLayer(l => _praiaDrawn.addLayer(l))
+        _praiaAtualizarMetrica()
+        const b = _praiaDrawn.getBounds(); if (b.isValid()) _praiaMap.fitBounds(b, { padding: [20,20] })
+      } catch(e) {}
+    }
+
+    _praiaMarker = L.marker(centro, { draggable: true })
+    if (temPonto) _praiaMarker.addTo(_praiaMap)
+    _praiaMarker.on('dragend', () => {
+      const p = _praiaMarker.getLatLng()
+      document.getElementById('mpr-lat').value = p.lat.toFixed(6)
+      document.getElementById('mpr-lng').value = p.lng.toFixed(6)
+    })
+
+    setTimeout(() => { if (_praiaMap) _praiaMap.invalidateSize() }, 200)
+  }
+
+  function destroyPraiaMap() {
+    if (_praiaMap) { _praiaMap.remove(); _praiaMap = null }
+    _praiaDrawn = null; _praiaMarker = null; _praiaAreaWKT = null
+    const el = document.getElementById('mpr-mapa-metrica'); if (el) el.textContent = ''
+  }
+
+  // ── Aba Mapa: visão geral das praias ─────────────────────────
+  let _mapaPraias = null, _mapaLayer = null, _mapaFluxoLayer = null, _mapaInit = false, _transfPraias = null
+
+  async function ensureMapaPraias() {
+    if (!_mapaInit) {
+      const sel = document.getElementById('fil-prog-mapa')
+      sel.innerHTML = '<option value="">Todos os programas</option>' +
+        _programas.map(p => `<option value="${p.id}">${esc(p.nome)}</option>`).join('')
+      _mapaPraias = L.map('mapa-praias', { center: [-9.0, -70.5], zoom: 6 })
+      _baseSatelite().addTo(_mapaPraias)
+      _mapaLayer = L.layerGroup().addTo(_mapaPraias)
+      _mapaFluxoLayer = L.layerGroup().addTo(_mapaPraias)
+      try {
+        const { data } = await db.from('vw_transferencias_praia').select('praia_origem_id,praia_destino_id')
+        _transfPraias = data || []
+      } catch(e) { _transfPraias = [] }
+      _mapaInit = true
+    }
+    setTimeout(() => { _mapaPraias.invalidateSize(); renderMapaPraias() }, 150)
+  }
+
+  function _popupPraia(p) {
+    const linha = (r, v) => `<div style="display:flex;justify-content:space-between;gap:14px"><span style="color:#777">${r}</span><strong>${v}</strong></div>`
+    const taxa = (p.taxa_eclosao_pct != null) ? p.taxa_eclosao_pct + '%' : '—'
+    return `<div style="min-width:212px;font-size:12.5px;line-height:1.5">
+      <div style="font-weight:700;font-size:14px;margin-bottom:2px">${esc(p.nome)}${p.experimental ? ' <span style="color:#9a6b00">· experimental</span>' : ''}</div>
+      <div style="color:#888;margin-bottom:6px">${esc(p.codigo || '')} · ${esc(p.uc_sigla || p.uc_nome || '')}</div>
+      ${linha('Comprimento', p.comprimento_m ? formatNum(p.comprimento_m)+' m' : '—')}
+      ${linha('Área', p.area_ha ? formatNum(p.area_ha,2)+' ha' : '—')}
+      ${linha('Ninhos (total)', p.ninhos_total ?? 0)}
+      ${linha('Próprios / Recebidos', (p.ninhos_proprios ?? 0)+' / '+(p.ninhos_recebidos ?? 0))}
+      ${linha('Incubando aqui', p.ninhos_incubando_aqui ?? 0)}
+      ${linha('Ovos (postura)', p.ovos_postura_total ?? 0)}
+      ${linha('Filhotes vivos', p.filhotes_vivos ?? 0)}
+      ${linha('Taxa de eclosão', taxa)}
+      <button class="btn btn-sm btn-secondary" style="margin-top:8px;width:100%" onclick="editarPraia('${p.id}')">Editar praia</button>
+    </div>`
+  }
+
+  window.renderMapaPraias = function() {
+    if (!_mapaPraias) return
+    const prog = document.getElementById('fil-prog-mapa').value
+    const verFluxo = document.getElementById('fil-fluxo-mapa').checked
+    _mapaLayer.clearLayers(); _mapaFluxoLayer.clearLayers()
+
+    const lista = _praias.filter(p => !prog || p.programa_id === prog)
+    const coordDe = {}
+    let bounds = null
+    const estende = b => { if (!b || !b.isValid()) return; bounds = bounds ? bounds.extend(b) : L.latLngBounds(b.getSouthWest(), b.getNorthEast()) }
+
+    lista.forEach(p => {
+      const corBorda = p.experimental ? '#C9A84C' : '#2E7D5B'
+      const corFill  = p.experimental ? '#F0CB6A' : '#52B788'
+      let centro = (p.lat != null && p.lng != null) ? L.latLng(p.lat, p.lng) : null
+
+      if (p.area_geojson) {
+        try {
+          const poly = L.geoJSON(JSON.parse(p.area_geojson), { style: { color: corBorda, weight: 2, fillColor: corFill, fillOpacity: .35 } })
+          poly.addTo(_mapaLayer); poly.bindPopup(_popupPraia(p))
+          const b = poly.getBounds(); estende(b); if (!centro && b.isValid()) centro = b.getCenter()
+        } catch(e) {}
+      }
+      if (centro) {
+        coordDe[p.id] = centro
+        L.circleMarker(centro, { radius: 7, color: corBorda, fillColor: corFill, fillOpacity: .9, weight: 2 })
+          .addTo(_mapaLayer).bindPopup(_popupPraia(p))
+        estende(L.latLngBounds(centro, centro))
+      }
+    })
+
+    if (verFluxo && _transfPraias) {
+      const pares = {}
+      _transfPraias.forEach(t => {
+        if (!t.praia_origem_id || !t.praia_destino_id || t.praia_origem_id === t.praia_destino_id) return
+        const k = t.praia_origem_id + '>' + t.praia_destino_id
+        pares[k] = (pares[k] || 0) + 1
+      })
+      Object.entries(pares).forEach(([k, n]) => {
+        const [o, d] = k.split('>')
+        if (coordDe[o] && coordDe[d]) {
+          L.polyline([coordDe[o], coordDe[d]], { color: '#C9A84C', weight: Math.min(1.5 + n, 6), opacity: .85, dashArray: '6 6' })
+            .addTo(_mapaFluxoLayer).bindTooltip(`${n} transferência(s)`)
+        }
+      })
+    }
+
+    document.getElementById('mapa-info').textContent =
+      `${lista.length} praia(s)` + (verFluxo ? ' · fluxos visíveis' : '')
+    if (bounds && bounds.isValid()) { try { _mapaPraias.fitBounds(bounds, { padding: [40,40], maxZoom: 14 }) } catch(e) {} }
   }
 
   // ── Modais ────────────────────────────────────────────────────
-  window.fecharModal = id => document.getElementById('modal-' + id).classList.remove('aberto')
+  window.fecharModal = id => {
+    document.getElementById('modal-' + id).classList.remove('aberto')
+    if (id === 'praia') destroyPraiaMap()
+  }
 
   // GRUPOS
   window.abrirModalGrupo = function(id) {
@@ -776,6 +1002,7 @@
     document.getElementById('mpr-ativa').checked    = p ? p.ativa : true
     document.getElementById('mpr-experimental').checked = p ? !!p.experimental : false
     document.getElementById('modal-praia').classList.add('aberto')
+    setTimeout(() => initPraiaMap(p?.area_geojson || null, parseFloat(p?.lat), parseFloat(p?.lng)), 60)
   }
   window.editarPraia = id => window.abrirModalPraia(id)
 
@@ -797,6 +1024,7 @@
       observacoes:            document.getElementById('mpr-obs').value.trim() || null,
       ativa:                  document.getElementById('mpr-ativa').checked,
       experimental:           document.getElementById('mpr-experimental').checked,
+      area_geom:              _praiaAreaWKT || null,
     }
     if (!payload.codigo || !payload.nome || !payload.programa_id || !payload.uc_id) {
       toast('Preencha código, nome, programa e UC.', 'error'); return
