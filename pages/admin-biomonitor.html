@@ -412,12 +412,13 @@
     </div>`
 
   bIconsAplicar(document.getElementById('app'))
-  await carregarDados()
 
   // ── Dados ─────────────────────────────────────────────────────
   let _grupos = [], _monitores = [], _praias = [], _temporadas = [], _programas = [], _ucs = []
   let _editGrupoId = null, _editMonitorId = null, _editPraiaId = null, _editTemporadaId = null
   let _loginMonitorId = null
+
+  await carregarDados()
 
   async function carregarDados() {
     const [
