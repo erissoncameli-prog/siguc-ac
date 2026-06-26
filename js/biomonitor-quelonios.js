@@ -718,6 +718,7 @@ function bioAbrirFormNinho() {
   const praia = BioApp.praiaAtual
   document.getElementById('bio-form-praia-label').textContent = praia?.nome ?? '—'
   document.getElementById('bio-form-data').value = new Date().toISOString().slice(0, 10)
+  document.getElementById('bio-form-hora-desova').value = ''
   document.getElementById('bio-form-numero').value = ''
   document.getElementById('bio-form-obs').value   = ''
   document.getElementById('bio-form-foto-count').textContent = '(0/3)'
@@ -793,6 +794,7 @@ async function bioSalvarNinho() {
     numero_ninho:     numero,
     especie,
     data_encontro:    data,
+    hora_desova:      document.getElementById('bio-form-hora-desova').value || null,
     observacoes:      obs || null,
     lat:              BioApp.gpsLat,
     lng:              BioApp.gpsLng,
@@ -881,6 +883,9 @@ async function bioAbrirFormTransf(ninho) {
   nomeEl.textContent = 'Selecionar praia…'
   nomeEl.style.opacity = '.6'
   document.getElementById('bio-transf-praia-id').value = ''
+  // Hora do reenterro: padrão = agora
+  document.getElementById('bio-transf-hora').value = new Date().toTimeString().slice(0, 5)
+  bioAtualizarSemaforoJanela()
   bioMostrarTela('tela-form-transf')
 }
 
@@ -895,6 +900,47 @@ function bioEscolherPraiaDestino() {
   })
 }
 
+// ── Janela crítica de translocação ────────────────────────────
+// Horas entre a desova (data_encontro + hora_desova) e o reenterro
+// (data + hora da transferência). 06:00 é a hora-âncora quando a
+// hora exata não foi registrada. Retorna null se faltar a data.
+function bioCalcularJanelaHoras(ninho, dataTransf, horaTransf) {
+  if (!ninho?.data_encontro || !dataTransf) return null
+  const hDesova = (ninho.hora_desova || '06:00').slice(0, 5)
+  const hReent  = (horaTransf || '06:00').slice(0, 5)
+  const desova   = new Date(`${ninho.data_encontro}T${hDesova}:00`)
+  const reenterro = new Date(`${dataTransf}T${hReent}:00`)
+  if (isNaN(desova) || isNaN(reenterro)) return null
+  return (reenterro - desova) / 3600000
+}
+
+function bioAtualizarSemaforoJanela() {
+  const el = document.getElementById('bio-transf-janela')
+  if (!el) return
+  const ninho = BioApp.formNinhoAtualizar
+  const dataT = document.getElementById('bio-transf-data').value
+  const horaT = document.getElementById('bio-transf-hora').value
+  const h = bioCalcularJanelaHoras(ninho, dataT, horaT)
+  if (h == null) { el.style.display = 'none'; return }
+
+  const estimada = !ninho?.hora_desova || !horaT
+  let bg, cor, txt
+  if (h < 0) {
+    bg = '#fdf4e3'; cor = '#9a6b00'; txt = 'Verifique as datas: o reenterro está antes da desova.'
+  } else if (h <= 6) {
+    bg = '#e6f4ec'; cor = '#1b7a4b'; txt = `Janela segura — ~${h.toFixed(1)} h desde a desova.`
+  } else if (h <= 12) {
+    bg = '#fdf4e3'; cor = '#9a6b00'; txt = `Atenção — ~${h.toFixed(1)} h. Transfira o quanto antes.`
+  } else {
+    bg = '#fbe9e9'; cor = '#b3261e'; txt = `Fora da janela segura (~${h.toFixed(1)} h) — risco de mortalidade do embrião.`
+  }
+  if (estimada && h >= 0) txt += ' (hora estimada — registre a hora da desova p/ maior precisão)'
+  el.style.background = bg
+  el.style.color = cor
+  el.textContent = txt
+  el.style.display = 'block'
+}
+
 async function bioSalvarTransf() {
   const ninho = BioApp.formNinhoAtualizar
   const data   = document.getElementById('bio-transf-data').value
@@ -902,17 +948,26 @@ async function bioSalvarTransf() {
   const local  = document.getElementById('bio-transf-local').value.trim()
   const obs    = document.getElementById('bio-transf-obs').value.trim()
   const motivo = document.getElementById('bio-transf-motivo').value || null
+  const hora   = document.getElementById('bio-transf-hora').value || null
   const destino = BioApp.transfPraiaDestino
 
   if (!data)           { bioToast('Informe a data da transferência.', 'err'); return }
   if (isNaN(ovos) || ovos < 0) { bioToast('Informe o número de ovos.', 'err'); return }
   if (!destino)        { bioToast('Selecione a praia de destino.', 'err'); return }
 
+  // Janela crítica: alerta (não bloqueia) se passou de 12 h desde a desova
+  const janela = bioCalcularJanelaHoras(ninho, data, hora)
+  if (janela != null && janela > 12) {
+    if (!confirm(`Esta transferência está ~${janela.toFixed(1)} h após a desova, fora da janela segura (~12 h). `
+      + `O embrião pode já estar aderido à casca e morrer com o manuseio.\n\nRegistrar mesmo assim?`)) return
+  }
+
   const transf = {
     uuid_cliente:       bioUuid(),
     ninho_uuid:         ninho.uuid_cliente,
     ninho_numero:       ninho.numero_ninho,
     data_transferencia: data,
+    hora_transferencia: hora,
     qtd_ovos:           ovos,
     praia_destino_id:   destino.id,
     praia_destino_nome: destino.nome,
@@ -1576,6 +1631,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('bio-btn-salvar-ninho')?.addEventListener('click', bioSalvarNinho)
   document.getElementById('bio-btn-salvar-transf')?.addEventListener('click', bioSalvarTransf)
   document.getElementById('bio-transf-praia-btn')?.addEventListener('click', bioEscolherPraiaDestino)
+  document.getElementById('bio-transf-data')?.addEventListener('input', bioAtualizarSemaforoJanela)
+  document.getElementById('bio-transf-hora')?.addEventListener('input', bioAtualizarSemaforoJanela)
   document.getElementById('bio-btn-salvar-eclosao')?.addEventListener('click', bioSalvarEclosao)
 
   // Chips de espécie
