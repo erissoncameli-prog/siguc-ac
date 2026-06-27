@@ -449,11 +449,15 @@ function bioAtualizarChipConexao() {
 }
 
 async function bioCarregarPraiasHome() {
-  // Atualiza o cache de praias (aguarda se online para garantir dados na 1ª abertura)
+  // Atualiza o cache de praias e berçários (aguarda se online para garantir dados na 1ª abertura)
   if (navigator.onLine) {
-    await bioSyncCachePraias(BioApp.monitor?.grupo_id).catch(() => {})
+    await Promise.all([
+      bioSyncCachePraias(BioApp.monitor?.grupo_id).catch(() => {}),
+      bioSyncCacheBercarios().catch(() => {}),
+    ])
   } else {
     bioSyncCachePraias(BioApp.monitor?.grupo_id).catch(() => {})
+    bioSyncCacheBercarios().catch(() => {})
   }
 
   const praias = await bioOfflineListarPraias()
