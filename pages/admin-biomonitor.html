@@ -224,9 +224,23 @@
         <div class="form-group"><label class="form-label">Programa <span class="obrig">*</span></label>
           <select class="form-control" id="mpr-programa"><option value="">Selecione...</option></select>
         </div>
-        <div class="form-group"><label class="form-label">Unidade de Conservação <span class="obrig">*</span></label>
-          <select class="form-control" id="mpr-uc"><option value="">Selecione...</option></select>
+        <div class="form-group"><label class="form-label">Tipo de área <span class="obrig">*</span></label>
+          <select class="form-control" id="mpr-tipo-localizacao" onchange="praiaToggleLocalizacao()">
+            <option value="dentro_uc">Dentro de UC</option>
+            <option value="terra_indigena">Terra Indígena</option>
+            <option value="area_municipal">Área Municipal</option>
+            <option value="margem_livre">Margem Livre</option>
+            <option value="outro">Outro</option>
+          </select>
         </div>
+      </div>
+      <div id="mpr-grupo-uc" class="form-group">
+        <label class="form-label">Unidade de Conservação <span class="obrig">*</span></label>
+        <select class="form-control" id="mpr-uc"><option value="">Selecione...</option></select>
+      </div>
+      <div id="mpr-grupo-ref" class="form-group" style="display:none">
+        <label class="form-label">Referência de localização <span class="obrig">*</span></label>
+        <input class="form-control" id="mpr-localizacao-ref" placeholder="Ex: Rio Juruá, km 120 — Comunidade Boa Vista">
       </div>
       <div class="grid-2">
         <div class="form-group"><label class="form-label">Município</label>
@@ -412,7 +426,7 @@
         </div>
         <div class="card"><div class="table-wrap"><div class="table-scroll">
           <table><thead><tr>
-            <th>Código</th><th>Nome</th><th>UC</th><th>Programa</th><th>Comprimento</th><th>Área</th><th>Status</th><th></th>
+            <th>Código</th><th>Nome</th><th>Localização</th><th>Programa</th><th>Comprimento</th><th>Área</th><th>Status</th><th></th>
           </tr></thead><tbody id="tbody-praias"><tr><td colspan="8" class="empty-row">Carregando...</td></tr></tbody></table>
         </div></div></div>
       </div>
@@ -578,7 +592,7 @@
     tbody.innerHTML = lista.map(p => `<tr>
       <td><code style="font-size:.8rem">${p.codigo}</code></td>
       <td><strong>${p.nome}</strong>${p.comunidade ? `<br><small style="color:var(--t2,#aaa)">${p.comunidade}</small>` : ''}</td>
-      <td>${p.uc_nome || nomeUC(p.uc_id)}</td>
+      <td>${p.area_display || p.uc_nome || nomeUC(p.uc_id) || '—'}</td>
       <td>${p.programa_nome || '—'}</td>
       <td>${p.comprimento_m ? formatNum(p.comprimento_m) + ' m' : '—'}</td>
       <td>${p.area_ha ? formatNum(p.area_ha, 2) + ' ha' : '—'}</td>
@@ -747,7 +761,7 @@
     const taxa = (p.taxa_eclosao_pct != null) ? p.taxa_eclosao_pct + '%' : '—'
     return `<div style="min-width:212px;font-size:12.5px;line-height:1.5">
       <div style="font-weight:700;font-size:14px;margin-bottom:2px">${esc(p.nome)}${p.experimental ? ' <span style="color:#9a6b00">· experimental</span>' : ''}</div>
-      <div style="color:#888;margin-bottom:6px">${esc(p.codigo || '')} · ${esc(p.uc_sigla || p.uc_nome || '')}</div>
+      <div style="color:#888;margin-bottom:6px">${esc(p.codigo || '')} · ${esc(p.uc_sigla || p.area_display || p.uc_nome || '')}</div>
       ${linha('Comprimento', p.comprimento_m ? formatNum(p.comprimento_m)+' m' : '—')}
       ${linha('Área', p.area_ha ? formatNum(p.area_ha,2)+' ha' : '—')}
       ${linha('Ninhos (total)', p.ninhos_total ?? 0)}
@@ -982,39 +996,54 @@
   }
 
   // PRAIAS
+  window.praiaToggleLocalizacao = function() {
+    const tipo = document.getElementById('mpr-tipo-localizacao').value
+    const dentroUC = tipo === 'dentro_uc'
+    document.getElementById('mpr-grupo-uc').style.display  = dentroUC ? '' : 'none'
+    document.getElementById('mpr-grupo-ref').style.display = dentroUC ? 'none' : ''
+    if (dentroUC) document.getElementById('mpr-localizacao-ref').value = ''
+    else          document.getElementById('mpr-uc').value = ''
+  }
+
   window.abrirModalPraia = function(id) {
     _editPraiaId = id || null
     const p = id ? _praias.find(x => x.id === id) : null
     document.getElementById('mpr-titulo').textContent = p ? 'Editar Praia' : 'Nova Praia'
-    document.getElementById('mpr-codigo').value     = p?.codigo || ''
-    document.getElementById('mpr-nome').value       = p?.nome || ''
-    document.getElementById('mpr-sigla').value      = p?.sigla || ''
-    document.getElementById('mpr-programa').value   = p?.programa_id || ''
-    document.getElementById('mpr-uc').value         = p?.uc_id || ''
-    document.getElementById('mpr-mun').value        = p?.municipio || ''
-    document.getElementById('mpr-comunidade').value = p?.comunidade || ''
-    document.getElementById('mpr-lat').value        = p?.lat || ''
-    document.getElementById('mpr-lng').value        = p?.lng || ''
-    document.getElementById('mpr-per-inicio').value = p?.periodo_inicio || ''
-    document.getElementById('mpr-per-fim').value    = p?.periodo_fim || ''
-    document.getElementById('mpr-monitor').value    = p?.monitor_responsavel_id || ''
-    document.getElementById('mpr-obs').value        = p?.observacoes || ''
-    document.getElementById('mpr-ativa').checked    = p ? p.ativa : true
-    document.getElementById('mpr-experimental').checked = p ? !!p.experimental : false
+    document.getElementById('mpr-codigo').value          = p?.codigo || ''
+    document.getElementById('mpr-nome').value            = p?.nome || ''
+    document.getElementById('mpr-sigla').value           = p?.sigla || ''
+    document.getElementById('mpr-programa').value        = p?.programa_id || ''
+    document.getElementById('mpr-tipo-localizacao').value = p?.tipo_localizacao || 'dentro_uc'
+    document.getElementById('mpr-uc').value              = p?.uc_id || ''
+    document.getElementById('mpr-localizacao-ref').value = p?.localizacao_referencia || ''
+    document.getElementById('mpr-mun').value             = p?.municipio || ''
+    document.getElementById('mpr-comunidade').value      = p?.comunidade || ''
+    document.getElementById('mpr-lat').value             = p?.lat || ''
+    document.getElementById('mpr-lng').value             = p?.lng || ''
+    document.getElementById('mpr-per-inicio').value      = p?.periodo_inicio || ''
+    document.getElementById('mpr-per-fim').value         = p?.periodo_fim || ''
+    document.getElementById('mpr-monitor').value         = p?.monitor_responsavel_id || ''
+    document.getElementById('mpr-obs').value             = p?.observacoes || ''
+    document.getElementById('mpr-ativa').checked         = p ? p.ativa : true
+    document.getElementById('mpr-experimental').checked  = p ? !!p.experimental : false
+    praiaToggleLocalizacao()
     document.getElementById('modal-praia').classList.add('aberto')
     setTimeout(() => initPraiaMap(p?.area_geojson || null, parseFloat(p?.lat), parseFloat(p?.lng)), 60)
   }
   window.editarPraia = id => window.abrirModalPraia(id)
 
   window.salvarPraia = async function() {
-    const lat = parseFloat(document.getElementById('mpr-lat').value)
-    const lng = parseFloat(document.getElementById('mpr-lng').value)
+    const lat  = parseFloat(document.getElementById('mpr-lat').value)
+    const lng  = parseFloat(document.getElementById('mpr-lng').value)
+    const tipo = document.getElementById('mpr-tipo-localizacao').value
     const payload = {
       codigo:                 document.getElementById('mpr-codigo').value.trim(),
       nome:                   document.getElementById('mpr-nome').value.trim(),
       sigla:                  document.getElementById('mpr-sigla').value.trim().toUpperCase() || null,
       programa_id:            document.getElementById('mpr-programa').value || null,
-      uc_id:                  document.getElementById('mpr-uc').value || null,
+      tipo_localizacao:       tipo,
+      uc_id:                  tipo === 'dentro_uc' ? (document.getElementById('mpr-uc').value || null) : null,
+      localizacao_referencia: tipo !== 'dentro_uc' ? (document.getElementById('mpr-localizacao-ref').value.trim() || null) : null,
       municipio:              document.getElementById('mpr-mun').value.trim() || null,
       comunidade:             document.getElementById('mpr-comunidade').value.trim() || null,
       ponto_acesso:           (!isNaN(lat) && !isNaN(lng)) ? `POINT(${lng} ${lat})` : null,
@@ -1026,8 +1055,14 @@
       experimental:           document.getElementById('mpr-experimental').checked,
       area_geom:              _praiaAreaWKT || null,
     }
-    if (!payload.codigo || !payload.nome || !payload.programa_id || !payload.uc_id) {
-      toast('Preencha código, nome, programa e UC.', 'error'); return
+    if (!payload.codigo || !payload.nome || !payload.programa_id) {
+      toast('Preencha código, nome e programa.', 'error'); return
+    }
+    if (tipo === 'dentro_uc' && !payload.uc_id) {
+      toast('Selecione a Unidade de Conservação.', 'error'); return
+    }
+    if (tipo !== 'dentro_uc' && !payload.localizacao_referencia) {
+      toast('Informe a referência de localização.', 'error'); return
     }
     const { error } = _editPraiaId
       ? await db.from('praias_monitoramento').update(payload).eq('id', _editPraiaId)
