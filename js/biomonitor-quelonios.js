@@ -843,7 +843,11 @@ async function bioVerificarPraiaProxima(lat, lng) {
 /* ════════════════════════════════════════════════════════════
    AUTO-NUMERAÇÃO
    ════════════════════════════════════════════════════════════ */
-async function bioGerarNumeroNinho(praiaId, especie) {
+// campo = 'numero_ninho' (placa de origem, na criação) | 'numero_atual'
+// (placa na praia de destino, na transferência). A sigla da praia já
+// fica embutida no prefixo, então varrer por prefixo equivale a varrer
+// só aquela praia.
+async function bioGerarNumeroNinho(praiaId, especie, campo = 'numero_ninho') {
   const esp    = BIO_ESPECIES.find(e => e.id === especie)
   const praias = await bioOfflineListarPraias()
   const praia  = praias.find(p => p.id === praiaId)
@@ -854,8 +858,9 @@ async function bioGerarNumeroNinho(praiaId, especie) {
   let maxSeq = 0
   const todos = await bioOfflineListarNinhos({})
   todos.forEach(n => {
-    if (n.numero_ninho?.startsWith(prefix)) {
-      const seq = parseInt(n.numero_ninho.slice(prefix.length)) || 0
+    const val = campo === 'numero_atual' ? (n.numero_atual ?? n.numero_ninho) : n.numero_ninho
+    if (val?.startsWith(prefix)) {
+      const seq = parseInt(val.slice(prefix.length)) || 0
       if (seq > maxSeq) maxSeq = seq
     }
   })
@@ -864,10 +869,10 @@ async function bioGerarNumeroNinho(praiaId, especie) {
     try {
       const { data } = await bioSupabase()
         .from('ninhos_quelonios')
-        .select('numero_ninho')
-        .like('numero_ninho', `${prefix}%`)
+        .select(campo)
+        .like(campo, `${prefix}%`)
       ;(data ?? []).forEach(n => {
-        const seq = parseInt(n.numero_ninho?.slice(prefix.length)) || 0
+        const seq = parseInt(n[campo]?.slice(prefix.length)) || 0
         if (seq > maxSeq) maxSeq = seq
       })
     } catch (_) {}
@@ -1052,6 +1057,7 @@ async function bioAbrirFormTransf(ninho) {
   document.getElementById('bio-transf-local').value           = ''
   document.getElementById('bio-transf-obs').value             = ''
   document.getElementById('bio-transf-motivo').value          = ''
+  document.getElementById('bio-transf-numero').value          = ''
   // Destino: limpa seleção anterior
   BioApp.transfPraiaDestino = null
   const nomeEl = document.getElementById('bio-transf-praia-nome')
@@ -1066,12 +1072,21 @@ async function bioAbrirFormTransf(ninho) {
 
 // Abre o sheet de praias para escolher o DESTINO da transferência
 function bioEscolherPraiaDestino() {
-  bioAbrirSheetPraias(praia => {
+  bioAbrirSheetPraias(async praia => {
     BioApp.transfPraiaDestino = praia
     document.getElementById('bio-transf-praia-id').value = praia.id
     const nomeEl = document.getElementById('bio-transf-praia-nome')
     nomeEl.textContent = praia.experimental ? `${praia.nome} (experimental)` : praia.nome
     nomeEl.style.opacity = '1'
+    // Sugere a placa do ninho NA PRAIA DE DESTINO (editável): a praia
+    // receptora pode já ter esse número ocupado, então geramos a próxima
+    // placa livre da sequência dela.
+    const inp   = document.getElementById('bio-transf-numero')
+    const ninho = BioApp.formNinhoAtualizar
+    if (inp && ninho) {
+      inp.value = '…'
+      inp.value = await bioGerarNumeroNinho(praia.id, ninho.especie, 'numero_atual')
+    }
   })
 }
 
@@ -1124,11 +1139,13 @@ async function bioSalvarTransf() {
   const obs    = document.getElementById('bio-transf-obs').value.trim()
   const motivo = document.getElementById('bio-transf-motivo').value || null
   const hora   = document.getElementById('bio-transf-hora').value || null
+  const numeroAtual = document.getElementById('bio-transf-numero').value.trim()
   const destino = BioApp.transfPraiaDestino
 
   if (!data)           { bioToast('Informe a data da transferência.', 'err'); return }
   if (isNaN(ovos) || ovos < 0) { bioToast('Informe o número de ovos.', 'err'); return }
   if (!destino)        { bioToast('Selecione a praia de destino.', 'err'); return }
+  if (!numeroAtual)    { bioToast('Informe o número do ninho no destino.', 'err'); return }
 
   // Janela crítica: alerta (não bloqueia) se passou de 12 h desde a desova
   const janela = bioCalcularJanelaHoras(ninho, data, hora)
@@ -1146,6 +1163,7 @@ async function bioSalvarTransf() {
     qtd_ovos:           ovos,
     praia_destino_id:   destino.id,
     praia_destino_nome: destino.nome,
+    numero_atual:       numeroAtual,
     motivo:             motivo,
     local_destino:      local || null,
     observacoes:        obs || null,
@@ -1153,8 +1171,14 @@ async function bioSalvarTransf() {
     criado_em:          new Date().toISOString(),
   }
 
-  // Atualiza status e localização atual do ninho localmente
-  await bioOfflineSalvarNinho({ ...ninho, status: 'transferido', praia_atual_id: destino.id })
+  // Atualiza status, localização atual e placa do ninho localmente
+  await bioOfflineSalvarNinho({
+    ...ninho,
+    status:           'transferido',
+    praia_atual_id:   destino.id,
+    praia_atual_nome: destino.nome,
+    numero_atual:     numeroAtual,
+  })
   await bioOfflineSalvarTransf(transf)
   await bioAtualizarBadgeFila()
 
@@ -1868,6 +1892,21 @@ async function bioAbrirTelaAbertos() {
   await bioCarregarAbertos()
 }
 
+// Preenche praia_nome (origem) e praia_atual_nome (onde incuba agora)
+// num ninho local, a partir da lista de praias. Mantém o que já vier.
+function bioMapNinhoPraias(n, praias) {
+  const praiaAtualId = n.praia_atual_id ?? n.praia_id
+  const orig = praias.find(p => p.id === n.praia_id)
+  const atual = praias.find(p => p.id === praiaAtualId)
+  return {
+    ...n,
+    praia_atual_id:   praiaAtualId,
+    praia_nome:       n.praia_nome       ?? orig?.nome,
+    praia_atual_nome: n.praia_atual_nome ?? atual?.nome ?? orig?.nome,
+    numero_atual:     n.numero_atual     ?? n.numero_ninho,
+  }
+}
+
 async function bioCarregarAbertos() {
   const filtroPraia  = BioApp.abertosFiltroPraia
   const filtroStatus = BioApp.abertosStatusFiltro
@@ -1886,41 +1925,41 @@ async function bioCarregarAbertos() {
     try {
       let q = bioSupabase()
         .from('vw_ninhos_validacao')
-        .select('id,uuid_cliente,numero_ninho,especie,data_encontro,status,status_validacao,motivo_rejeicao,qtd_ovos,ovos_integros,ovos_descartados,dist_rio_m,criado_em,praia_id,praia_nome,monitor_id,monitor_nome')
+        .select('id,uuid_cliente,numero_ninho,numero_atual,especie,data_encontro,status,status_validacao,motivo_rejeicao,qtd_ovos,ovos_integros,ovos_descartados,dist_rio_m,criado_em,praia_id,praia_nome,praia_atual_id,praia_atual_nome,monitor_id,monitor_nome')
         .eq('grupo_id', BioApp.monitor.grupo_id)
-        .order('numero_ninho', { ascending: false })
+        .order('numero_atual', { ascending: false })
       if (filtroStatus) {
         q = q.eq('status', filtroStatus)
       } else {
         q = q.not('status', 'in', '(eclodido,perdido)')
       }
-      if (filtroPraia) q = q.eq('praia_id', filtroPraia.id)
+      // Filtra pela praia onde o ninho está incubando AGORA (praia atual)
+      if (filtroPraia) q = q.eq('praia_atual_id', filtroPraia.id)
       const { data, error } = await q
       if (error) throw error
 
       // Mescla: inclui ninhos locais pendentes que ainda não chegaram no servidor
-      const localPend = await bioOfflineListarNinhos(filtroPraia ? { praiaId: filtroPraia.id } : {})
+      const localPend = await bioOfflineListarNinhos(filtroPraia ? { praiaAtualId: filtroPraia.id } : {})
       const uuidsServ = new Set((data ?? []).map(n => n.uuid_cliente).filter(Boolean))
       const praias    = await bioOfflineListarPraias()
       const locaisSo  = localPend
         .filter(n => !uuidsServ.has(n.uuid_cliente) && estaAberto(n))
-        .map(n => {
-          const pr = praias.find(p => p.id === n.praia_id)
-          return { ...n, praia_nome: pr?.nome, monitor_nome: BioApp.monitor?.nome_completo, _local: true }
-        })
+        .map(n => ({ ...bioMapNinhoPraias(n, praias), monitor_nome: BioApp.monitor?.nome_completo, _local: true }))
 
       ninhos = [...locaisSo, ...(data ?? [])]
       estadoEl.hidden = true
     } catch (e) {
       console.warn('[biomonitor abertos]', e)
       estadoEl.textContent = 'Sem conexão — exibindo dados locais'
-      const localAll = await bioOfflineListarNinhos(filtroPraia ? { praiaId: filtroPraia.id } : {})
-      ninhos = localAll.filter(estaAberto)
+      const praias   = await bioOfflineListarPraias()
+      const localAll = await bioOfflineListarNinhos(filtroPraia ? { praiaAtualId: filtroPraia.id } : {})
+      ninhos = localAll.filter(estaAberto).map(n => bioMapNinhoPraias(n, praias))
     }
   } else {
     estadoEl.textContent = 'Offline — exibindo dados locais'
-    const localAll = await bioOfflineListarNinhos(filtroPraia ? { praiaId: filtroPraia.id } : {})
-    ninhos = localAll.filter(estaAberto)
+    const praias   = await bioOfflineListarPraias()
+    const localAll = await bioOfflineListarNinhos(filtroPraia ? { praiaAtualId: filtroPraia.id } : {})
+    ninhos = localAll.filter(estaAberto).map(n => bioMapNinhoPraias(n, praias))
   }
 
   if (!ninhos.length) {
@@ -1997,6 +2036,16 @@ function bioNinhoCardInner(n, opts = {}) {
     ? '<span class="bio-nfc-ev-chip" style="background:#a78bfa22;color:#7c3aed">pendente</span>'
     : ''
 
+  // Número e praia ATUAIS (onde o ninho está incubando agora)
+  const numExib   = n.numero_atual ?? n.numero_ninho ?? '—'
+  const praiaExib = n.praia_atual_nome ?? n.praia_nome
+  const transferido =
+    (n.praia_atual_id && n.praia_id && n.praia_atual_id !== n.praia_id) ||
+    (n.numero_atual && n.numero_ninho && n.numero_atual !== n.numero_ninho)
+  const origemHtml = transferido
+    ? `<div class="bio-nfc-origem" style="font-size:11px;opacity:.65;margin-top:2px">origem: ${n.praia_nome ?? '—'}${n.numero_ninho ? ` · #${n.numero_ninho}` : ''}</div>`
+    : ''
+
   const acoesHtml = mostrarAcoes ? `
     <div class="bio-nfc-acoes">
       ${status === 'encontrado' || status === 'transferido' ? `<button class="bio-btn-sm prim" data-acao="transferencia">+ Transferência</button>` : ''}
@@ -2007,14 +2056,15 @@ function bioNinhoCardInner(n, opts = {}) {
 
   return `
     <div class="bio-nfc-header">
-      <span class="bio-nfc-num">#${n.numero_ninho ?? '—'}</span>
+      <span class="bio-nfc-num">#${numExib}</span>
       <span class="bio-nfc-status-badge ${status}">${bioLabels.status[status] ?? status}</span>
     </div>
     <div class="bio-nfc-especie">${esp ? `<strong>${esp.sigla}</strong> ${esp.nome}` : (n.especie ?? '—')}</div>
     <div class="bio-nfc-row">
-      ${n.praia_nome ? `<span class="bio-nfc-praia">${n.praia_nome}</span>` : ''}
+      ${praiaExib ? `<span class="bio-nfc-praia">${praiaExib}</span>` : ''}
       <span class="bio-nfc-data">${data}</span>
     </div>
+    ${origemHtml}
     ${rejHtml}
     ${ovosHtml}
     ${condicoesHtml}
@@ -2100,7 +2150,8 @@ async function bioCarregarFilaLocal() {
 
   ninhos.forEach(n => {
     const esp      = BIO_ESPECIES.find(e => e.id === n.especie)
-    const praia    = praias.find(p => p.id === n.praia_id)
+    const praia    = praias.find(p => p.id === (n.praia_atual_id ?? n.praia_id))
+    const numExib  = n.numero_atual ?? n.numero_ninho
     const syncOk   = n.status_sync === 'confirmado'
     const temEcl   = eclosMap[n.uuid_cliente]
     const nTransf  = transfMap[n.uuid_cliente] ?? 0
@@ -2123,7 +2174,7 @@ async function bioCarregarFilaLocal() {
     card.className = `bio-nfc status-${status}`
     card.innerHTML = `
       <div class="bio-nfc-header">
-        <span class="bio-nfc-num">#${n.numero_ninho ?? '—'}</span>
+        <span class="bio-nfc-num">#${numExib ?? '—'}</span>
         <span class="bio-nfc-status-badge ${status}">${bioLabels.status[status] ?? status}</span>
         <span class="bio-nfc-sync-dot" title="${syncOk ? 'Enviado' : 'Pendente'}" style="background:${syncOk ? 'var(--bio-verde)' : '#F59E0B'}"></span>
       </div>

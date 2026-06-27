@@ -221,6 +221,7 @@ A **pill nav** (barra flutuante) possui 5 botões:
 | Janela crítica (alerta) | `bio-transf-janela` | Info (semáforo) | — | Verde ≤ 6h · Amarelo 6–12h · Vermelho > 12h |
 | Quantidade de ovos | `bio-transf-ovos` | Número | Sim | 1 até qtd. da postura |
 | Praia de destino | `bio-transf-praia-btn` | Seletor (sheet) | Sim | Inclui praias experimentais |
+| N.º do ninho no destino | `bio-transf-numero` | Texto | Sim | Auto-sugerido pela sequência da praia de destino (`SIGLA_DEST-SIGLA_ESP-SEQ`) ao escolher a praia; editável. Grava em `ninho.numero_atual` |
 | Motivo | `bio-transf-motivo` | Select | Não | risco_inundacao / predacao / erosao / concentracao_manejo / pesquisa / outro |
 | Sub-local / berçário | `bio-transf-local` | Texto | Não | Ex.: "Berçário 1, quadra A" |
 | Observações | `bio-transf-obs` | Textarea | Não | Até 500 caracteres |
@@ -370,7 +371,8 @@ Tabela central do módulo. Representa um ninho desde o encontro até o destino f
 |--------|------|--------|-----------|
 | `id` | uuid | PK | Gerado pelo servidor |
 | `uuid_cliente` | uuid | UNIQUE NOT NULL | Gerado offline; chave de upsert |
-| `numero_ninho` | text | NOT NULL | Identificador de campo (ex.: ARJ-TA-001) |
+| `numero_ninho` | text | NOT NULL | Placa de ORIGEM (ex.: ARJ-TA-001). Identidade, IMUTÁVEL |
+| `numero_atual` | text | — | Placa na praia atual; muda a cada transferência (sequência do destino). Default = `numero_ninho` |
 | `praia_id` | uuid | NOT NULL | Praia onde desovou (IMUTÁVEL) |
 | `praia_atual_id` | uuid | — | Localização atual (muda com transferências) |
 | `especie` | enum | NOT NULL | Ver lista de espécies |
@@ -1039,7 +1041,8 @@ siguc-ac/
     ├── 088_bercarios.sql                 Tabela bercarios + FK no lote
     ├── 089_ocorrencias_bercario.sql      Eventos no berçário
     ├── 090_bio_dados_aba.sql             RPC bio_dados_aba
-    └── 091_bio_relatorio_rpc.sql         RPC bio_relatorio_completo
+    ├── 091_bio_relatorio_rpc.sql         RPC bio_relatorio_completo
+    └── 092_ninho_numero_atual.sql        numero_atual (placa na praia de destino)
 ```
 
 ---

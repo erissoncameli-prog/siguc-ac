@@ -131,6 +131,7 @@ async function bioSyncTransferencias(monitorId, onProgresso) {
       hora_transferencia:  t.hora_transferencia || null,
       qtd_ovos:            t.qtd_ovos,
       praia_destino_id:    t.praia_destino_id  || null,
+      numero_atual:        t.numero_atual      || null,
       motivo:              t.motivo            || null,
       local_destino:       t.local_destino     || null,
       observacoes:         t.observacoes       || null,
@@ -477,9 +478,9 @@ async function bioSyncPullNinhos(grupoId) {
   const { data, error } = await bioSupabase()
     .from('ninhos_quelonios')
     .select(`
-      id, uuid_cliente, numero_ninho, especie, data_encontro,
+      id, uuid_cliente, numero_ninho, numero_atual, especie, data_encontro,
       status, status_validacao, motivo_rejeicao,
-      foto_urls, observacoes, praia_id, uc_id, grupo_id, monitor_id,
+      foto_urls, observacoes, praia_id, praia_atual_id, uc_id, grupo_id, monitor_id,
       sincronizado_em, criado_em
     `)
     .eq('grupo_id', grupoId)
@@ -499,13 +500,19 @@ async function bioSyncPullNinhos(grupoId) {
         sincronizado_em: n.sincronizado_em ?? new Date().toISOString(),
       })
     } else {
-      // Atualiza status_validacao e status do ninho se mudou no servidor
-      if (local.status !== n.status || local.status_validacao !== n.status_validacao) {
+      // Atualiza status/validação e a localização atual (praia + placa)
+      // se mudou no servidor — ex.: transferência feita por outro monitor.
+      if (local.status !== n.status ||
+          local.status_validacao !== n.status_validacao ||
+          local.praia_atual_id !== n.praia_atual_id ||
+          local.numero_atual !== n.numero_atual) {
         await bioOfflineSalvarNinho({
           ...local,
           status:           n.status,
           status_validacao: n.status_validacao,
           motivo_rejeicao:  n.motivo_rejeicao,
+          praia_atual_id:   n.praia_atual_id ?? local.praia_atual_id,
+          numero_atual:     n.numero_atual   ?? local.numero_atual,
         })
       }
     }
