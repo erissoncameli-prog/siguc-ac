@@ -454,6 +454,7 @@ async function bioCarregarPraiasHome() {
     await Promise.all([
       bioSyncCachePraias(BioApp.monitor?.grupo_id).catch(() => {}),
       bioSyncCacheBercarios().catch(() => {}),
+      bioSyncPullNinhos(BioApp.monitor?.grupo_id).catch(() => {}),
     ])
   } else {
     bioSyncCachePraias(BioApp.monitor?.grupo_id).catch(() => {})
@@ -1160,10 +1161,11 @@ async function bioSalvarTransf() {
   const ninhoLocal = await bioOfflineGetNinho(ninho.uuid_cliente)
   await bioOfflineSalvarNinho({
     ...(ninhoLocal ?? ninho),
-    status:        'transferido',
-    praia_atual_id: destino.id,
-    server_id:     ninhoLocal?.server_id  ?? ninho.id  ?? null,
-    status_sync:   ninhoLocal?.status_sync ?? 'pendente',
+    status:           'transferido',
+    praia_atual_id:   destino.id,
+    praia_atual_nome: destino.nome,
+    server_id:        ninhoLocal?.server_id  ?? ninho.id  ?? null,
+    status_sync:      ninhoLocal?.status_sync ?? 'pendente',
   })
   await bioOfflineSalvarTransf(transf)
   await bioAtualizarBadgeFila()
@@ -2118,7 +2120,8 @@ async function bioCarregarFilaLocal() {
 
   ninhos.forEach(n => {
     const esp      = BIO_ESPECIES.find(e => e.id === n.especie)
-    const praia    = praias.find(p => p.id === n.praia_id)
+    const praiaAtual = praias.find(p => p.id === (n.praia_atual_id ?? n.praia_id))
+    const praiaOrig  = praias.find(p => p.id === n.praia_id)
     const syncOk   = n.status_sync === 'confirmado'
     const temEcl   = eclosMap[n.uuid_cliente]
     const nTransf  = transfMap[n.uuid_cliente] ?? 0
@@ -2147,7 +2150,10 @@ async function bioCarregarFilaLocal() {
       </div>
       <div class="bio-nfc-especie">${esp ? `<strong>${esp.sigla}</strong> ${esp.nome}` : (n.especie ?? '—')}</div>
       <div class="bio-nfc-row">
-        <span class="bio-nfc-praia">${praia?.nome ?? '—'}</span>
+        <span class="bio-nfc-praia">
+          ${praiaAtual?.nome ?? '—'}
+          ${praiaAtual?.id !== praiaOrig?.id && praiaOrig ? `<span class="bio-nfc-praia-orig">(orig: ${praiaOrig.nome})</span>` : ''}
+        </span>
         <span class="bio-nfc-data">${new Date(n.data_encontro ?? n.criado_em).toLocaleDateString('pt-BR')}</span>
       </div>
       ${ovosHtml}
