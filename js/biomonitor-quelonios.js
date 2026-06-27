@@ -2150,45 +2150,275 @@ async function bioAtualizarBadgeFila() {
 }
 
 /* ════════════════════════════════════════════════════════════
-   ABA DADOS
+   ABA DADOS — Chart.js + KPIs + taxas científicas
    ════════════════════════════════════════════════════════════ */
+
+let _bioCharts = {}
+
+function _bioDestruirCharts() {
+  Object.values(_bioCharts).forEach(c => { try { c.destroy() } catch (_) {} })
+  _bioCharts = {}
+}
+
+async function _bioCarregarChartJS() {
+  if (window.Chart) return window.Chart
+  return new Promise((res, rej) => {
+    const s = document.createElement('script')
+    s.src = 'https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js'
+    s.onload = () => res(window.Chart)
+    s.onerror = rej
+    document.head.appendChild(s)
+  })
+}
+
+function _bioSetText(id, val, suffix) {
+  const el = document.getElementById(id)
+  if (el) el.textContent = val != null ? val + (suffix || '') : '—'
+}
+
+function _bioSetRate(elId, barId, pct) {
+  const el  = document.getElementById(elId)
+  const bar = document.getElementById(barId)
+  if (el)  el.textContent    = pct != null ? pct + '%' : '—'
+  if (bar) bar.style.width   = pct != null ? Math.min(Math.max(pct, 0), 100) + '%' : '0%'
+}
+
+function _bioDonut(canvasId, labels, data, cores, Chart) {
+  const canvas = document.getElementById(canvasId)
+  if (!canvas) return
+  _bioCharts[canvasId]?.destroy()
+  _bioCharts[canvasId] = new Chart(canvas.getContext('2d'), {
+    type: 'doughnut',
+    data: { labels, datasets: [{ data, backgroundColor: cores, borderWidth: 2, borderColor: '#fff', hoverOffset: 8 }] },
+    options: {
+      cutout: '62%',
+      animation: { duration: 700 },
+      plugins: { legend: { position: 'bottom', labels: { font: { size: 11 }, padding: 12, usePointStyle: true } } }
+    }
+  })
+}
+
+function _bioBarsV(canvasId, labels, datasets, Chart) {
+  const canvas = document.getElementById(canvasId)
+  if (!canvas) return
+  _bioCharts[canvasId]?.destroy()
+  _bioCharts[canvasId] = new Chart(canvas.getContext('2d'), {
+    type: 'bar',
+    data: { labels, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      animation: { duration: 600 },
+      plugins: { legend: { display: datasets.length > 1, labels: { font: { size: 11 }, usePointStyle: true } } },
+      scales: {
+        x: { grid: { display: false }, ticks: { font: { size: 11 } } },
+        y: { grid: { color: 'rgba(0,0,0,.06)' }, ticks: { font: { size: 11 } }, beginAtZero: true }
+      }
+    }
+  })
+}
+
+function _bioBarsH(canvasId, labels, data, cor, Chart) {
+  const canvas = document.getElementById(canvasId)
+  if (!canvas) return
+  _bioCharts[canvasId]?.destroy()
+  _bioCharts[canvasId] = new Chart(canvas.getContext('2d'), {
+    type: 'bar',
+    data: { labels, datasets: [{ data, backgroundColor: cor, borderRadius: 4 }] },
+    options: {
+      indexAxis: 'y',
+      responsive: true, maintainAspectRatio: false,
+      animation: { duration: 600 },
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { color: 'rgba(0,0,0,.06)' }, ticks: { font: { size: 11 } }, beginAtZero: true },
+        y: { grid: { display: false }, ticks: { font: { size: 11 } } }
+      }
+    }
+  })
+}
+
+function _bioLinha(canvasId, labels, datasets, Chart) {
+  const canvas = document.getElementById(canvasId)
+  if (!canvas) return
+  _bioCharts[canvasId]?.destroy()
+  _bioCharts[canvasId] = new Chart(canvas.getContext('2d'), {
+    type: 'line',
+    data: { labels, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      animation: { duration: 600 },
+      plugins: { legend: { display: datasets.length > 1, labels: { font: { size: 11 }, usePointStyle: true } } },
+      scales: {
+        x: { grid: { display: false }, ticks: { font: { size: 11 } } },
+        y: { grid: { color: 'rgba(0,0,0,.06)' }, ticks: { font: { size: 11 } }, beginAtZero: true }
+      },
+      elements: { line: { tension: 0.35 }, point: { radius: 3, hoverRadius: 5 } }
+    }
+  })
+}
+
+function _bioRenderizarGraficos(d, Chart) {
+  // ── Desfecho dos ovos (rosca – Tab Taxas)
+  const df = d.desfecho_ovos || {}
+  _bioDonut('chart-desfecho',
+    ['Filhotes vivos', 'Filhotes mortos', 'Não nascidos', 'Descartados'],
+    [df.filhotes_vivos || 0, df.filhotes_mortos || 0, df.ovos_nao_nascidos || 0, df.ovos_descartados || 0],
+    ['#2A9D6F', '#DC2626', '#D97706', '#9CA3AF'],
+    Chart
+  )
+
+  // ── Status dos ninhos (rosca – Tab Ninhos)
+  const ps = d.por_status || {}
+  _bioDonut('chart-status',
+    ['Encontrado', 'Transferido', 'Eclodido', 'Perdido'],
+    [ps.encontrado || 0, ps.transferido || 0, ps.eclodido || 0, ps.perdido || 0],
+    ['#7ECEE8', '#C9A84C', '#2A9D6F', '#DC2626'],
+    Chart
+  )
+
+  // ── Ninhos por espécie (barras verticais – Tab Ninhos)
+  const esp = d.por_especie || []
+  if (esp.length) {
+    _bioBarsV('chart-especies',
+      esp.map(e => e.especie || '?'),
+      [{ data: esp.map(e => e.total || 0), backgroundColor: '#1A6B8C', borderRadius: 5, label: 'Ninhos' }],
+      Chart
+    )
+  }
+
+  // ── Ninhos por mês (linha – Tab Ninhos)
+  const mes = d.por_mes || []
+  if (mes.length) {
+    _bioLinha('chart-mensal',
+      mes.map(m => m.mes || ''),
+      [
+        { label: 'Ninhos',   data: mes.map(m => m.ninhos   || 0), borderColor: '#1A6B8C', backgroundColor: 'rgba(26,107,140,.12)', fill: true },
+        { label: 'Filhotes', data: mes.map(m => m.filhotes || 0), borderColor: '#2A9D6F', backgroundColor: 'rgba(42,157,111,.10)', fill: true }
+      ],
+      Chart
+    )
+  }
+
+  // ── Top praias (barras horizontais – Tab Ninhos)
+  const pr = d.top_praias || []
+  if (pr.length) {
+    const wrapPraias = document.getElementById('chart-praias')?.closest('.bio-chart-wrap')
+    if (wrapPraias) wrapPraias.style.height = (pr.length * 36 + 40) + 'px'
+    _bioBarsH('chart-praias',
+      pr.map(p => p.praia_nome || '?'),
+      pr.map(p => p.total || 0),
+      '#C9A84C',
+      Chart
+    )
+  }
+
+  // ── Destino dos filhotes (rosca – Tab Berçário)
+  _bioDonut('chart-destino',
+    ['Soltos direto ao rio', 'Via berçário'],
+    [d.solturas_direto_rio || 0, d.solturas_via_bercario || 0],
+    ['#1A6B8C', '#2A9D6F'],
+    Chart
+  )
+
+  // ── Ocorrências no berçário por tipo (barras – Tab Berçário)
+  const oc = d.ocorrencias_tipos || []
+  if (oc.length) {
+    _bioBarsV('chart-ocorrencias',
+      oc.map(o => o.tipo || '?'),
+      [{ data: oc.map(o => o.total || 0), backgroundColor: '#7ECEE8', borderRadius: 5, label: 'Ocorrências' }],
+      Chart
+    )
+  }
+
+  // ── Biometria ao longo do tempo (linha dupla – Tab Berçário)
+  const bio = d.biometria_serie || []
+  if (bio.length) {
+    _bioLinha('chart-biometria',
+      bio.map(b => b.data || ''),
+      [
+        { label: 'Comprimento (cm)', data: bio.map(b => b.comp_medio), borderColor: '#1A6B8C', backgroundColor: 'rgba(26,107,140,.08)', fill: false },
+        { label: 'Peso (g)',          data: bio.map(b => b.peso_medio),  borderColor: '#C9A84C', backgroundColor: 'rgba(201,168,76,.08)',  fill: false }
+      ],
+      Chart
+    )
+  }
+}
+
 async function bioCarregarTelaDados() {
   bioMostrarTela('tela-dados')
 
-  // Busca do servidor via RPC
-  if (navigator.onLine) {
-    try {
-      const { data } = await bioSupabase().rpc('bio_meus_dados')
-      if (data) bioRenderizarKPIs(data)
-    } catch (_) {}
+  // Wire tab switching (idempotente)
+  const tabsEl = document.querySelector('.bio-dados-tabs')
+  if (tabsEl && !tabsEl._wired) {
+    tabsEl._wired = true
+    tabsEl.addEventListener('click', e => {
+      const btn = e.target.closest('.bio-dados-tab')
+      if (!btn) return
+      tabsEl.querySelectorAll('.bio-dados-tab').forEach(b => b.classList.remove('ativa'))
+      btn.classList.add('ativa')
+      const tabId = btn.dataset.dtab
+      document.querySelectorAll('#tela-dados [id^="bio-dtab-"]').forEach(d => {
+        d.hidden = d.id !== 'bio-dtab-' + tabId && d.id !== 'bio-dtab-local'
+      })
+    })
   }
 
-  // Fallback local
+  // Dados locais (sempre disponíveis)
   const ninhos = await bioOfflineListarNinhos()
-  const totalLocal = ninhos.length
-  const eclodidosLocal = ninhos.filter(n => n.status === 'eclodido').length
-  document.getElementById('bio-kpi-ninhos-local').textContent    = totalLocal
-  document.getElementById('bio-kpi-eclodidos-local').textContent = eclodidosLocal
-}
+  _bioSetText('bio-kpi-ninhos-local', ninhos.length)
+  _bioSetText('bio-kpi-eclodidos-local', ninhos.filter(n => n.status === 'eclodido').length)
 
-function bioRenderizarKPIs(dados) {
-  const mapa = {
-    'bio-kpi-ninhos':            dados.grupo_ninhos,
-    'bio-kpi-eclodidos':         dados.eclodidos,
-    'bio-kpi-filhotes':          dados.filhotes_vivos,
-    'bio-kpi-taxa':              dados.taxa_eclosao_pct != null ? dados.taxa_eclosao_pct + '%' : '—',
-    'bio-kpi-ovos-total':        dados.total_ovos_postura ?? '—',
-    'bio-kpi-ovos-integros':     dados.total_ovos_integros ?? '—',
-    'bio-kpi-ovos-descartados':  dados.total_ovos_descartados ?? '—',
-    'bio-kpi-dist-rio':          dados.dist_rio_media_m    != null ? dados.dist_rio_media_m    + ' m'  : '—',
-    'bio-kpi-temp-media':        dados.temp_media_c        != null ? dados.temp_media_c        + '°C'  : '—',
-    'bio-kpi-umidade-media':     dados.umidade_media_pct   != null ? dados.umidade_media_pct   + '%'   : '—',
-    'bio-kpi-prof-media':        dados.profundidade_media_cm != null ? dados.profundidade_media_cm + ' cm' : '—',
+  const statusEl = document.getElementById('bio-dados-status')
+
+  if (!navigator.onLine) {
+    if (statusEl) statusEl.textContent = 'offline'
+    return
   }
-  Object.entries(mapa).forEach(([id, val]) => {
-    const el = document.getElementById(id)
-    if (el && val != null) el.textContent = val
-  })
+
+  if (statusEl) statusEl.textContent = 'carregando…'
+
+  try {
+    const { data, error } = await bioSupabase().rpc('bio_dados_aba')
+    if (error || !data) {
+      if (statusEl) statusEl.textContent = error ? 'erro' : 'sem dados'
+      return
+    }
+
+    if (statusEl) statusEl.textContent = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+
+    // KPIs — Tab Taxas
+    _bioSetText('bio-kpi-ninhos',    data.grupo_ninhos)
+    _bioSetText('bio-kpi-filhotes',  data.filhotes_vivos)
+    _bioSetText('bio-kpi-incubacao', data.incubacao_media_dias, ' d')
+
+    // KPIs — Tab Ninhos
+    const ps = data.por_status || {}
+    _bioSetText('bio-kpi2-eclodidos', ps.eclodido ?? data.eclodidos)
+    _bioSetText('bio-kpi2-perdidos',  ps.perdido)
+    _bioSetText('bio-kpi2-transf',    ps.transferido)
+
+    // KPIs — Tab Berçário
+    _bioSetText('bio-kpi-berc-entrada', data.bercario_total_entrada)
+    _bioSetText('bio-kpi-berc-soltado', data.bercario_total_soltado)
+    _bioSetText('bio-kpi-berc-mortos',  data.bercario_mortalidade)
+
+    // Taxas científicas
+    _bioSetRate('bio-r-eclosao',       'bio-rb-eclosao',       data.taxa_eclosao_pct)
+    _bioSetRate('bio-r-sucesso',       'bio-rb-sucesso',       data.taxa_sucesso_nidificacao_pct)
+    _bioSetRate('bio-r-fertilidade',   'bio-rb-fertilidade',   data.taxa_fertilidade_pct)
+    _bioSetRate('bio-r-eficiencia',    'bio-rb-eficiencia',    data.eficiencia_ninho_pct)
+    _bioSetRate('bio-r-predacao',      'bio-rb-predacao',      data.taxa_predacao_pct)
+    _bioSetRate('bio-r-transferencia', 'bio-rb-transferencia', data.taxa_transferencia_pct)
+    _bioSetRate('bio-r-sobrev-berc',   'bio-rb-sobrev-berc',   data.taxa_sobrevivencia_bercario_pct)
+    _bioSetRate('bio-r-mort-berc',     'bio-rb-mort-berc',     data.taxa_mortalidade_bercario_pct)
+
+    // Gráficos (carrega Chart.js lazily na primeira vez)
+    const Chart = await _bioCarregarChartJS()
+    _bioRenderizarGraficos(data, Chart)
+
+  } catch (err) {
+    if (statusEl) statusEl.textContent = 'erro ao carregar'
+  }
 }
 
 /* ════════════════════════════════════════════════════════════
