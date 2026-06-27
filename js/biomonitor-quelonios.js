@@ -1150,6 +1150,20 @@ async function bioAbrirFormTransf(ninho) {
   document.getElementById('bio-transf-especie').textContent   = BIO_ESPECIES.find(e => e.id === ninho.especie)?.nome ?? ninho.especie
   document.getElementById('bio-transf-data').value            = new Date().toISOString().slice(0, 10)
   document.getElementById('bio-transf-ovos').value            = ''
+  // Limite de ovos transferidos = íntegros encontrados (fallback: total).
+  // Não se pode transferir mais ovos do que foram encontrados no ninho.
+  const limiteOvos = ninho.ovos_integros ?? ninho.qtd_ovos ?? null
+  const ovosInp    = document.getElementById('bio-transf-ovos')
+  const ovosHint   = document.getElementById('bio-transf-ovos-hint')
+  if (limiteOvos != null) {
+    ovosInp.max = limiteOvos
+    const base = ninho.ovos_integros != null ? 'íntegros' : 'encontrados'
+    ovosHint.textContent = `Máximo ${limiteOvos} ovos (${base} no ninho).`
+    ovosHint.hidden = false
+  } else {
+    ovosInp.removeAttribute('max')
+    ovosHint.hidden = true
+  }
   document.getElementById('bio-transf-local').value           = ''
   document.getElementById('bio-transf-obs').value             = ''
   document.getElementById('bio-transf-motivo').value          = ''
@@ -1240,6 +1254,14 @@ async function bioSalvarTransf() {
 
   if (!data)           { bioToast('Informe a data da transferência.', 'err'); return }
   if (isNaN(ovos) || ovos < 0) { bioToast('Informe o número de ovos.', 'err'); return }
+  // Não pode transferir mais ovos do que os íntegros encontrados no ninho
+  // (fallback: total encontrado). Sem essa referência, não há como validar.
+  const limiteOvos = ninho?.ovos_integros ?? ninho?.qtd_ovos ?? null
+  if (limiteOvos != null && ovos > limiteOvos) {
+    const base = ninho?.ovos_integros != null ? 'íntegros' : 'encontrados'
+    bioToast(`Máximo ${limiteOvos} ovos (${base} no ninho). Não é possível transferir mais do que foi encontrado.`, 'err')
+    return
+  }
   if (!destino)        { bioToast('Selecione a praia de destino.', 'err'); return }
   if (!numeroAtual)    { bioToast('Informe o número do ninho no destino.', 'err'); return }
 
@@ -2162,7 +2184,7 @@ function bioNinhoCardInner(n, opts = {}) {
     (n.praia_atual_id && n.praia_id && n.praia_atual_id !== n.praia_id) ||
     (n.numero_atual && n.numero_ninho && n.numero_atual !== n.numero_ninho)
   const origemHtml = transferido
-    ? `<div class="bio-nfc-origem" style="font-size:11px;opacity:.65;margin-top:2px">origem: ${n.praia_nome ?? '—'}${n.numero_ninho ? ` · #${n.numero_ninho}` : ''}</div>`
+    ? `<div class="bio-nfc-origem" style="margin-top:5px;font-size:12px;font-weight:600;color:#7c3aed;background:#7c3aed14;border-radius:6px;padding:3px 8px;display:inline-block">Transferido de ${n.praia_nome ?? '—'}${n.numero_ninho ? ` · nº lá: ${n.numero_ninho}` : ''}</div>`
     : ''
 
   const acoesHtml = mostrarAcoes ? `

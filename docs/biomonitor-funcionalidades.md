@@ -219,7 +219,7 @@ A **pill nav** (barra flutuante) possui 5 botões:
 | Data da transferência | `bio-transf-data` | Data | Sim | Não pode ser anterior à data de encontro |
 | Hora do reenterro | `bio-transf-hora` | Hora | Não | Padrão 06:00 |
 | Janela crítica (alerta) | `bio-transf-janela` | Info (semáforo) | — | Verde ≤ 6h · Amarelo 6–12h · Vermelho > 12h |
-| Quantidade de ovos | `bio-transf-ovos` | Número | Sim | 1 até qtd. da postura |
+| Quantidade de ovos | `bio-transf-ovos` | Número | Sim | Bloqueado acima dos ovos íntegros encontrados (`ovos_integros`; fallback `qtd_ovos`). Mostra o máximo como dica |
 | Praia de destino | `bio-transf-praia-btn` | Seletor (sheet) | Sim | Inclui praias experimentais |
 | N.º do ninho no destino | `bio-transf-numero` | Texto | Sim | Auto-sugerido pela sequência da praia de destino (`SIGLA_DEST-SIGLA_ESP-SEQ`) ao escolher a praia; editável. Grava em `ninho.numero_atual` |
 | Motivo | `bio-transf-motivo` | Select | Não | risco_inundacao / predacao / erosao / concentracao_manejo / pesquisa / outro |
