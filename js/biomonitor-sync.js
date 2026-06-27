@@ -204,6 +204,53 @@ async function bioSyncEclosoes(monitorId, onProgresso) {
   return n
 }
 
+// ── Sincronizar visitas de acompanhamento pendentes ───────────
+async function bioSyncVisitas(monitorId, onProgresso) {
+  const pendentes = await bioOfflineVisitasPendentes()
+  let n = 0
+  for (const v of pendentes) {
+    onProgresso?.(`Visita do ninho ${v.ninho_numero ?? ''}…`)
+
+    const ninhoLocal  = await bioOfflineGetNinho(v.ninho_uuid)
+    const ninhoServId = ninhoLocal?.server_id
+    if (!ninhoServId) continue
+
+    const payload = {
+      uuid_cliente:            v.uuid_cliente,
+      ninho_id:                ninhoServId,
+      data_visita:             v.data_visita,
+      hora_visita:             v.hora_visita             || null,
+      status_ninho:            v.status_ninho,
+      temperatura_substrato_c: v.temperatura_substrato_c ?? null,
+      temperatura_ar_c:        v.temperatura_ar_c        ?? null,
+      umidade:                 v.umidade                 || null,
+      predacao_incubacao:      v.predacao_incubacao,
+      ovos_predados_n:         v.ovos_predados_n         ?? null,
+      sinal_alagamento:        v.sinal_alagamento        ?? false,
+      intervencao:             v.intervencao             || null,
+      observacoes:             v.observacoes             || null,
+      monitor_id:              monitorId,
+    }
+
+    await bioOfflineAtualizarSync('visitas', v.uuid_cliente, 'enviando')
+
+    const { data, error } = await bioSupabase()
+      .from('visitas_ninho')
+      .upsert(payload, { onConflict: 'uuid_cliente' })
+      .select('id')
+      .single()
+
+    if (error) {
+      await bioOfflineAtualizarSync('visitas', v.uuid_cliente, 'pendente')
+      throw error
+    }
+
+    await bioOfflineAtualizarSync('visitas', v.uuid_cliente, 'confirmado', data.id)
+    n++
+  }
+  return n
+}
+
 // ── Sincronização completa ────────────────────────────────────
 async function bioSyncTudo({ monitorId, onProgresso, onConcluido, onErro } = {}) {
   if (_bioSyncEmAndamento) return
@@ -216,8 +263,9 @@ async function bioSyncTudo({ monitorId, onProgresso, onConcluido, onErro } = {})
     const n = await bioSyncNinhos(monitorId, onProgresso)
     const t = await bioSyncTransferencias(monitorId, onProgresso)
     const e = await bioSyncEclosoes(monitorId, onProgresso)
+    const v = await bioSyncVisitas(monitorId, onProgresso)
     await bioOfflineLimparConfirmados()
-    onConcluido?.({ ninhos: n, transferencias: t, eclosoes: e })
+    onConcluido?.({ ninhos: n, transferencias: t, eclosoes: e, visitas: v })
   } catch (err) {
     onErro?.(err)
   } finally {
