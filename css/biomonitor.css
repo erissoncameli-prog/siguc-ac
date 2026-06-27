@@ -834,6 +834,24 @@ body { margin: 0; }
 .bio-toggle-switch input:checked ~ .bio-toggle-knob { background: var(--bio-prim); }
 .bio-toggle-switch input:checked ~ .bio-toggle-knob::after { transform: translateX(20px); }
 
+/* Config GPS — seção e chips de seleção */
+.bio-config-secao-titulo {
+  font-size: 11px; font-weight: 700; letter-spacing: .08em;
+  text-transform: uppercase; color: #9CA3AF; margin: 18px 0 6px 2px;
+}
+.bio-config-secao {
+  background: #fff; border: 1px solid #D0E4EF; border-radius: 18px;
+  padding: 14px 18px; margin-bottom: 10px;
+  box-shadow: 0 1px 4px rgba(13,30,39,.05);
+}
+.bio-chip-cfg-row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+.bio-chip-cfg {
+  padding: 5px 13px; border-radius: 20px; border: 1.5px solid #D0E4EF;
+  background: transparent; font-size: 13px; font-weight: 500; cursor: pointer;
+  color: #374151; transition: background .15s, border-color .15s, color .15s;
+}
+.bio-chip-cfg.ativo { background: var(--bio-prim); border-color: var(--bio-prim); color: #fff; }
+
 /* Modo Campo — alto contraste */
 body.field-mode .bio-form-body, body.field-mode .bio-tela { font-weight: 500; }
 body.field-mode .bio-campo-input, body.field-mode .bio-form-label { font-size: 17px; }

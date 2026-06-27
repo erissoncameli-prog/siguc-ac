@@ -332,6 +332,10 @@
       <div>
         <span class="bio-form-label" style="margin-bottom:2px">Localização GPS</span>
         <span class="bio-gps-coords" id="bio-form-gps-coords" style="font-size:12px;display:block">Aguardando GPS…</span>
+        <span id="bio-form-gps-progresso" style="display:none;font-size:12px;color:var(--bio-prim);font-weight:600"></span>
+        <div id="bio-form-gps-barra" style="display:none;height:3px;background:rgba(82,183,136,.2);border-radius:2px;margin-top:5px;overflow:hidden">
+          <div id="bio-form-gps-barra-fill" style="height:100%;background:var(--bio-prim);border-radius:2px;width:0;transition:width .3s ease"></div>
+        </div>
       </div>
     </div>
 
@@ -883,6 +887,25 @@
         <input type="checkbox" id="bio-toggle-campo" role="switch">
         <span class="bio-toggle-knob"></span>
       </label>
+    </div>
+
+    <!-- GPS -->
+    <p class="bio-config-secao-titulo">GPS</p>
+    <div class="bio-config-secao">
+      <span class="bio-config-toggle-label">Formato de coordenadas</span>
+      <div class="bio-chip-cfg-row" id="bio-cfg-formato-coords">
+        <button class="bio-chip-cfg ativo" data-val="decimal">Graus decimais</button>
+        <button class="bio-chip-cfg" data-val="dms">G° M' S"</button>
+      </div>
+    </div>
+    <div class="bio-config-secao">
+      <span class="bio-config-toggle-label">Precisão de captura</span>
+      <span class="bio-config-toggle-dica">Mais leituras = mais preciso, porém mais lento</span>
+      <div class="bio-chip-cfg-row" id="bio-cfg-gps-modo">
+        <button class="bio-chip-cfg ativo" data-val="padrao">Padrão</button>
+        <button class="bio-chip-cfg" data-val="alta">Alta · ~15s</button>
+        <button class="bio-chip-cfg" data-val="maxima">Máxima · ~40s</button>
+      </div>
     </div>
 
     <button class="bio-btn-config-item" id="bio-btn-alterar-pin" type="button">
