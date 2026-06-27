@@ -13,6 +13,38 @@
 <body>
 <div id="app"></div>
 
+<!-- ── Modal: Confirmar Senha (Zona de Perigo) ────────────── -->
+<div class="modal-overlay" id="modal-zerar">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-header" style="border-bottom-color:#FCA5A5">
+      <div class="modal-title" style="color:#B91C1C;display:flex;align-items:center;gap:8px">
+        <span data-icon="alert-triangle"></span>
+        Confirmar exclusão
+      </div>
+      <button class="modal-close" onclick="fecharModal('zerar')">×</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:13px;color:#7F1D1D;background:#FEF2F2;border:1px solid #FCA5A5;border-radius:8px;padding:10px 12px;margin-bottom:16px;line-height:1.5">
+        Esta ação apagará <strong>permanentemente</strong> todos os registros de campo,
+        fauna e fotos de todas as brigadas e <strong>não pode ser desfeita</strong>.
+      </p>
+      <div class="form-group">
+        <label class="form-label">Confirme sua senha para continuar</label>
+        <input class="form-control" id="zerar-senha" type="password"
+               placeholder="Sua senha de acesso ao SIGUC"
+               onkeydown="if(event.key==='Enter')confirmarSenhaEZerar()">
+        <span id="zerar-senha-erro" style="font-size:12px;color:#B91C1C;margin-top:4px;display:block"></span>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="fecharModal('zerar')">Cancelar</button>
+      <button class="btn btn-danger" id="zerar-btn-confirmar" onclick="confirmarSenhaEZerar()">
+        Confirmar e apagar
+      </button>
+    </div>
+  </div>
+</div>
+
 <!-- ── Modal: Atividade ──────────────────────────────────── -->
 <div class="modal-overlay" id="modal-atividade">
   <div class="modal" style="max-width:500px">
@@ -451,6 +483,7 @@ const PWA_BASE_URL = 'https://brigada.siguc.ac.gov.br'
 let _ucs = [], _brigadas = [], _brigadistas = [], _equipes = []
 let _editId = { brigada: null, brigadista: null }
 let _loginBrigadistaId = null
+let _usuario = null   // preenchido no boot; usado para reautenticação
 
 const BADGE_TIPO  = { preventiva: 'badge-azul', combate: 'badge-erro', mista: 'badge-verde' }
 const BADGE_STATUS_BR = { ativo: 'badge-verde', afastado: 'badge-ouro', suspenso: 'badge-erro', encerrado: 'badge-cinza' }
@@ -460,7 +493,8 @@ const LABEL_REGIONAL = {
 }
 
 ;(async function () {
-  const usuario = await carregarUsuario()
+  _usuario = await carregarUsuario()
+  const usuario = _usuario
   if (!usuario) { window.location.href = '../index.html'; return }
   if (!['super_admin','gestor'].includes(usuario.perfil)) {
     window.location.href = '../pages/dashboard.html'; return
@@ -481,7 +515,7 @@ const LABEL_REGIONAL = {
           <button class="tab-btn ativo" id="tab-brigadas"    onclick="mudarAba('brigadas')">Brigadas</button>
           <button class="tab-btn"       id="tab-brigadistas" onclick="mudarAba('brigadistas')">Brigadistas</button>
           <button class="tab-btn"       id="tab-atividades"  onclick="mudarAba('atividades')">⚙ Atividades</button>
-          <button class="tab-btn tab-perigo" id="tab-perigo" onclick="mudarAba('perigo')" title="Ações destrutivas irreversíveis" data-icon="alert-triangle">Zona de Perigo</button>
+          ${usuario.perfil === 'super_admin' ? `<button class="tab-btn tab-perigo" id="tab-perigo" onclick="mudarAba('perigo')" title="Ações destrutivas irreversíveis" data-icon="alert-triangle">Zona de Perigo</button>` : ''}
         </div>
       </div>
 
@@ -602,7 +636,7 @@ const LABEL_REGIONAL = {
 
   carregarLogosSidebar()
   await Promise.all([carregarUCs(), carregarDados()])
-  bIconsAplicar(document.getElementById('app'))
+  bIconsAplicar(document.body)
 })()
 
 async function carregarUCs() {
@@ -654,11 +688,13 @@ async function carregarDados() {
 
 function mudarAba(aba) {
   ;['brigadas','brigadistas','atividades','perigo'].forEach(a => {
-    document.getElementById('aba-' + a).style.display = a === aba ? '' : 'none'
-    document.getElementById('tab-' + a).classList.toggle('ativo', a === aba)
+    const abaEl = document.getElementById('aba-' + a)
+    const tabEl = document.getElementById('tab-' + a)
+    if (abaEl) abaEl.style.display = a === aba ? '' : 'none'
+    if (tabEl) tabEl.classList.toggle('ativo', a === aba)
   })
   if (aba === 'atividades') carregarAtividades()
-  if (aba === 'perigo')    carregarEstatisticasCampo()
+  if (aba === 'perigo')     carregarEstatisticasCampo()
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -691,20 +727,37 @@ async function carregarEstatisticasCampo() {
   document.getElementById('ps-fotos').textContent     = qtdFotos
 }
 
-async function zerarRegistrosCampo() {
-  const qtd = document.getElementById('ps-registros').textContent
-  const msg1 = `ATENÇÃO: esta ação apagará TODOS os registros de campo, fauna e fotos (${qtd} registros).\n\nEsta operação é IRREVERSÍVEL.\n\nDigite CONFIRMAR para prosseguir:`
-  const confirmacao = window.prompt(msg1)
-  if (confirmacao !== 'CONFIRMAR') {
-    toast('Operação cancelada', 'warn')
-    return
-  }
-  if (!window.confirm('Última confirmação: apagar permanentemente todos os registros de campo?')) return
+function zerarRegistrosCampo() {
+  document.getElementById('zerar-senha').value = ''
+  document.getElementById('zerar-senha-erro').textContent = ''
+  document.getElementById('modal-zerar').classList.add('aberto')
+  setTimeout(() => document.getElementById('zerar-senha').focus(), 120)
+}
 
-  const btn = document.querySelector('.perigo-acao .btn-danger')
-  if (btn) { btn.disabled = true; btn.textContent = 'Apagando…' }
+async function confirmarSenhaEZerar() {
+  const senha = document.getElementById('zerar-senha').value
+  const erroEl = document.getElementById('zerar-senha-erro')
+  erroEl.textContent = ''
+
+  if (!senha) { erroEl.textContent = 'Informe a senha.'; return }
+
+  const btn = document.getElementById('zerar-btn-confirmar')
+  btn.disabled = true; btn.textContent = 'Verificando…'
 
   try {
+    // Reautentica o super_admin para confirmar identidade
+    const email = _usuario?.email
+    if (!email) throw new Error('Sessão inválida. Faça login novamente.')
+
+    const { error: authErr } = await db.auth.signInWithPassword({ email, password: senha })
+    if (authErr) {
+      erroEl.textContent = 'Senha incorreta. Tente novamente.'
+      return
+    }
+
+    fecharModal('zerar')
+    btn.textContent = 'Apagando…'
+
     const { data, error } = await db.rpc('zerar_registros_campo')
     if (error) throw error
 
@@ -718,11 +771,8 @@ async function zerarRegistrosCampo() {
         return idx >= 0 ? url.slice(idx + marker.length) : null
       }).filter(Boolean)
 
-      if (paths.length) {
-        // Remove em lotes de 100
-        for (let i = 0; i < paths.length; i += 100) {
-          await db.storage.from('registros-campo').remove(paths.slice(i, i + 100))
-        }
+      for (let i = 0; i < paths.length; i += 100) {
+        await db.storage.from('registros-campo').remove(paths.slice(i, i + 100))
       }
     }
 
@@ -732,10 +782,9 @@ async function zerarRegistrosCampo() {
     )
     await carregarEstatisticasCampo()
   } catch(e) {
-    toast('Erro: ' + (e.message || 'falha desconhecida'), 'error')
+    erroEl.textContent = e.message || 'Falha ao processar.'
   } finally {
-    if (btn) { btn.disabled = false; btn.innerHTML = `<span data-icon="trash-2" style="display:inline-block;vertical-align:middle;margin-right:6px"></span>Zerar registros de campo` }
-    bIconsAplicar(document.querySelector('.perigo-acao'))
+    btn.disabled = false; btn.textContent = 'Confirmar e apagar'
   }
 }
 
@@ -1307,6 +1356,10 @@ function fecharModal(tipo) {
   if (tipo === 'brigadista') _editId.brigadista = null
   if (tipo === 'login')      _loginBrigadistaId = null
   if (tipo === 'atividade')  _ativEditId = null
+  if (tipo === 'zerar') {
+    document.getElementById('zerar-senha').value = ''
+    document.getElementById('zerar-senha-erro').textContent = ''
+  }
 }
 </script>
 
