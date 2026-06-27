@@ -123,6 +123,14 @@
                   cursor:pointer; border:1.5px solid var(--border,#e5e7eb) }
 .foto-thumb-val:hover { border-color:var(--verde-c,#52B788) }
 
+/* ── Participantes (educação ambiental) ──────────────────────── */
+.part-table { width:100%; border-collapse:collapse; font-size:.83rem; margin-bottom:16px }
+.part-table th, .part-table td { text-align:left; padding:7px 10px;
+                                 border-bottom:1px solid var(--border,#e5e7eb) }
+.part-table th { font-weight:600; color:var(--muted,#6b7280); font-size:.74rem;
+                 text-transform:uppercase; letter-spacing:.3px }
+.part-table tbody tr:last-child td { border-bottom:none }
+
 /* ── Fauna cards ─────────────────────────────────────────────── */
 .fauna-card { border:1px solid var(--border,#e5e7eb); border-radius:10px;
               margin-bottom:8px; overflow:hidden }
@@ -398,6 +406,18 @@
       <div id="modal-fauna-sec" hidden>
         <p class="form-label" style="margin-bottom:6px">🐾 Fauna Registrada</p>
         <div id="modal-fauna-lista"></div>
+      </div>
+
+      <!-- Lista de presença (educação ambiental) -->
+      <div id="modal-lista-presenca-sec" hidden>
+        <p class="form-label" style="margin-bottom:6px">Lista de presença</p>
+        <div id="modal-lista-presenca"></div>
+      </div>
+
+      <!-- Participantes (educação ambiental) -->
+      <div id="modal-participantes-sec" hidden>
+        <p class="form-label" style="margin-bottom:6px">Participantes <span id="modal-part-count"></span></p>
+        <div id="modal-participantes-lista"></div>
       </div>
 
       <!-- Histórico -->
@@ -817,6 +837,20 @@ async function abrirDetalhe(id) {
   // Fauna
   await carregarFaunaModal(r.id)
 
+  // Lista de presença (educação ambiental)
+  const lpSec = document.getElementById('modal-lista-presenca-sec')
+  if (r.lista_presenca_url) {
+    lpSec.hidden = false
+    const url   = r.lista_presenca_url
+    const ehPdf = /\.pdf(\?|$)/i.test(url)
+    document.getElementById('modal-lista-presenca').innerHTML = ehPdf
+      ? `<a class="btn-ver" href="${esc(url)}" target="_blank" rel="noopener">Abrir PDF da lista ↗</a>`
+      : `<img class="foto-thumb-val" src="${esc(url)}" alt="lista de presença" onclick="abrirLightbox('${esc(url)}')">`
+  } else { lpSec.hidden = true }
+
+  // Participantes (educação ambiental)
+  await carregarParticipantesModal(r.id)
+
   // Histórico
   const hist = r.historico || []
   const histSec = document.getElementById('modal-hist-sec')
@@ -859,6 +893,47 @@ async function abrirDetalhe(id) {
   document.getElementById('modal-detalhe').style.display = 'flex'
   initMapaValidacao(r)
   aie_carregar(r.id)
+}
+
+// ── Participantes (educação ambiental) ───────────────────────
+const SEXO_PART_LAB = { masculino: 'Masculino', feminino: 'Feminino', outro: 'Outro', nao_informado: 'Não informado' }
+
+function _fmtCpfPart(v) {
+  const s = (v == null ? '' : '' + v).replace(/\D/g, '')
+  return s.length === 11 ? s.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4') : (v || '—')
+}
+function _fmtDataNascPart(s) {
+  if (!s) return '—'
+  const [y, m, d] = s.split('-')
+  return (d && m && y) ? `${d}/${m}/${y}` : s
+}
+
+async function carregarParticipantesModal(rcId) {
+  const sec   = document.getElementById('modal-participantes-sec')
+  const lista = document.getElementById('modal-participantes-lista')
+
+  const { data, error } = await db
+    .from('registro_participantes')
+    .select('id, nome, cpf, data_nascimento, sexo')
+    .eq('registro_campo_id', rcId)
+    .order('criado_em')
+
+  if (error || !data?.length) { sec.hidden = true; return }
+  sec.hidden = false
+  document.getElementById('modal-part-count').textContent = `(${data.length})`
+
+  lista.innerHTML = `
+    <table class="part-table">
+      <thead><tr><th>Nome</th><th>CPF</th><th>Nascimento</th><th>Sexo</th></tr></thead>
+      <tbody>
+        ${data.map(p => `<tr>
+          <td>${esc(p.nome || '—')}</td>
+          <td>${esc(_fmtCpfPart(p.cpf))}</td>
+          <td>${esc(_fmtDataNascPart(p.data_nascimento))}</td>
+          <td>${esc(SEXO_PART_LAB[p.sexo] || '—')}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>`
 }
 
 async function carregarFaunaModal(rcId) {

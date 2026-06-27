@@ -479,7 +479,7 @@ async function gerarRelatorio() {
 
   const [regRes, brigRes, bristRes] = await Promise.all([
     db.from('vw_registros_validacao')
-      .select('id,codigo_ocorrencia,natureza,atividade,status_validacao,data_hora_evento,regional,uc_id,uc_nome,brigada_id,brigada_nome,brigadista_id,brigadista_nome,equipe_id,equipe_nome,duracao_horas,n_fauna,n_fauna_pendente,n_fauna_resgatada,fotos_urls,area_estimada_ha,pessoas_alcancadas,integrada_cbmac,ha_evitados_total,n_areas_evitadas')
+      .select('id,codigo_ocorrencia,natureza,atividade,status_validacao,data_hora_evento,regional,uc_id,uc_nome,brigada_id,brigada_nome,brigadista_id,brigadista_nome,equipe_id,equipe_nome,duracao_horas,n_fauna,n_fauna_pendente,n_fauna_resgatada,fotos_urls,area_estimada_ha,pessoas_alcancadas,n_participantes,integrada_cbmac,ha_evitados_total,n_areas_evitadas')
       .gte('data_hora_evento', ini + 'T00:00:00')
       .lte('data_hora_evento', fim + 'T23:59:59')
       .order('data_hora_evento', { ascending: false })
@@ -594,6 +594,7 @@ function renderEstado() {
   const area       = r.reduce((s,x)=>s+(Number(x.area_estimada_ha)||0), 0)
   const haEvitados = r.reduce((s,x)=>s+(Number(x.ha_evitados_total)||0), 0)
   const pessoas    = r.reduce((s,x)=>s+(x.pessoas_alcancadas||0), 0)
+  const participantes = r.reduce((s,x)=>s+(x.n_participantes||0), 0)
   const combate    = r.filter(x=>x.natureza==='combate').length
   const cbmac      = r.filter(x=>x.integrada_cbmac).length
 
@@ -618,6 +619,7 @@ function renderEstado() {
       ${area > 0 ? `<div class="kpi-brig comb"><div class="kpi-brig-n">${formatNum(area,1)} ha</div><div class="kpi-brig-l">Área trabalhada</div></div>` : ''}
       ${haEvitados > 0 ? `<div class="kpi-brig" style="border-top-color:#7C3AED"><div class="kpi-brig-n" style="color:#5b21b6">${formatNum(haEvitados,1)} ha</div><div class="kpi-brig-l" style="color:#5b21b6;font-weight:600">Incêndio evitado</div></div>` : ''}
       ${pessoas > 0 ? `<div class="kpi-brig moni"><div class="kpi-brig-n">${pessoas}</div><div class="kpi-brig-l">Pessoas alcançadas</div></div>` : ''}
+      ${participantes > 0 ? `<div class="kpi-brig moni"><div class="kpi-brig-n">${participantes}</div><div class="kpi-brig-l">Participantes cadastrados</div></div>` : ''}
       ${horasTot > 0 ? `<div class="kpi-brig"><div class="kpi-brig-n">${formatNum(horasTot,1)} h</div><div class="kpi-brig-l">Horas trabalhadas</div></div>` : ''}
       ${comDur.length ? `<div class="kpi-brig"><div class="kpi-brig-n">${fmtHoras(tempoMedio)}</div><div class="kpi-brig-l">Tempo médio</div></div>` : ''}
       ${comDur.length ? `<div class="kpi-brig"><div class="kpi-brig-n">${fmtHoras(maisLonga)}</div><div class="kpi-brig-l">Ocorrência mais longa</div></div>` : ''}
@@ -2202,7 +2204,7 @@ function initFaunaEspecie(f) {
 // ════════════════════════════════════════════════════════════════
 function exportarCSV() {
   const { ini, fim } = getPeriodo()
-  const cabecalho = ['Código','Data','Natureza','Atividade','Status Validação','Brigadista','Brigada','UC','Regional','N Fauna','Área ha','Pessoas']
+  const cabecalho = ['Código','Data','Natureza','Atividade','Status Validação','Brigadista','Brigada','UC','Regional','N Fauna','Área ha','Pessoas','Participantes']
   const linhas = _registros.map(r => [
     r.codigo_ocorrencia||'',
     r.data_hora_evento ? new Date(r.data_hora_evento).toLocaleDateString('pt-BR',{timeZone:'America/Rio_Branco'}) : '',
@@ -2216,6 +2218,7 @@ function exportarCSV() {
     r.n_fauna||0,
     r.area_estimada_ha||'',
     r.pessoas_alcancadas||'',
+    r.n_participantes||0,
   ].map(v => `"${String(v).replace(/"/g,'""')}"`).join(','))
 
   const csv  = [cabecalho.join(','), ...linhas].join('\n')

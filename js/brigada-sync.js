@@ -98,11 +98,12 @@ async function bSyncUm(reg) {
   await bOfflineMarcar(reg.uuid_cliente, 'enviando')
 
   try {
-    // Fase 1: upload de fotos
+    // Fase 1: upload de fotos + anexo da lista de presença
     const fotosUrls = await bSyncUploadFotos(reg)
+    const listaPresencaUrl = await bSyncUploadListaPresenca(reg)
 
     // Fase 2: upsert do registro principal
-    const payload = bSyncMontarPayload(reg, fotosUrls)
+    const payload = bSyncMontarPayload(reg, fotosUrls, listaPresencaUrl)
     const { error: errReg } = await db
       .from('registros_campo')
       .upsert(payload, { onConflict: 'uuid_cliente' })
@@ -130,6 +131,15 @@ async function bSyncUm(reg) {
       )
       const { error: errF } = await db.from('registro_fauna').insert(faunaPayload)
       if (errF) throw errF
+    }
+
+    // Fase 4: participantes da educação ambiental (delete + reinsert)
+    const participantes = await bOfflineParticipantesDeRegistro(reg.uuid_cliente)
+    if (participantes.length) {
+      await db.from('registro_participantes').delete().eq('registro_campo_id', rc.id)
+      const partPayload = participantes.map(p => bSyncMontarParticipantePayload(p, rc.id))
+      const { error: errP } = await db.from('registro_participantes').insert(partPayload)
+      if (errP) throw errP
     }
 
     await bOfflineMarcar(reg.uuid_cliente, 'confirmado', {
@@ -210,10 +220,11 @@ async function bSyncUploadFotos(reg) {
 
 // ── Monta payload do registro de campo ───────────────────────
 // Mapeia os campos internos do IndexedDB para as colunas do banco.
-function bSyncMontarPayload(reg, fotosUrls) {
+function bSyncMontarPayload(reg, fotosUrls, listaPresencaUrl = null) {
   // Desestrutura e descarta campos internos + campos que precisam de conversão
   const {
-    fotos_blobs, status, _fauna, ultimo_erro, _reconstruido,
+    fotos_blobs, status, _fauna, _participantes, ultimo_erro, _reconstruido,
+    lista_presenca_blob, // → lista_presenca_url (upload em separado)
     codigo_ocorrencia, // gerado/possuído pelo servidor — nunca reenviar
     lat, lng,          // → localizacao (PostGIS)
     n_equipe,          // legado: ignorado (equipe agora vem de equipe_id)
@@ -229,6 +240,7 @@ function bSyncMontarPayload(reg, fotosUrls) {
   return {
     ...rest,
     fotos_urls:       fotosUrls.length ? fotosUrls : null,
+    lista_presenca_url: listaPresencaUrl ?? null,
     // Geometria enviada como GeoJSON; PostgREST converte via ST_GeomFromGeoJSON
     localizacao:      (lat != null && lng != null)
                         ? { type: 'Point', coordinates: [lng, lat] }
@@ -238,6 +250,47 @@ function bSyncMontarPayload(reg, fotosUrls) {
     descricao:        observacoes ?? null,
     data_inicio:      ts.slice(0, 10),
     data_hora_evento: ts,
+  }
+}
+
+// ── Upload do anexo da lista de presença ──────────────────────
+// Documento (foto JPG/PNG ou PDF). Sem marca d'água — é a lista
+// assinada digitalizada. Retorna a URL pública ou null.
+async function bSyncUploadListaPresenca(reg) {
+  const item = reg.lista_presenca_blob
+  if (!item) return null
+
+  // URL remota já enviada anteriormente
+  if (typeof item === 'string' && item.startsWith('http')) return item
+
+  const blob = (typeof item === 'string') ? bSyncBase64ParaBlob(item) : item
+  const mime = blob.type || 'image/jpeg'
+  const ext  = mime.includes('pdf') ? 'pdf' : mime.includes('png') ? 'png' : 'jpg'
+  const path = `${reg.uuid_cliente}/lista_presenca.${ext}`
+
+  let ok = false, lastErr = null
+  for (let t = 0; t <= SYNC_BACKOFF.length; t++) {
+    const { error } = await db.storage
+      .from('registros-campo')
+      .upload(path, blob, { upsert: true, contentType: mime })
+    if (!error) { ok = true; break }
+    lastErr = error
+    if (t < SYNC_BACKOFF.length) await bSyncSleep(SYNC_BACKOFF[t])
+  }
+  if (!ok) {
+    const detail = lastErr ? (lastErr.message || lastErr.error || JSON.stringify(lastErr)) : 'sem detalhe'
+    throw new Error(`Falha no upload da lista de presença: ${detail}`)
+  }
+  const { data: { publicUrl } } = db.storage.from('registros-campo').getPublicUrl(path)
+  return publicUrl
+}
+
+// ── Monta payload de participante (educação ambiental) ────────
+function bSyncMontarParticipantePayload(p, registroCampoId) {
+  const { id, _id, registro_uuid, ...rest } = p
+  return {
+    ...rest,
+    registro_campo_id: registroCampoId,
   }
 }
 

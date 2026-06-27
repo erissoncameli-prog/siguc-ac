@@ -301,6 +301,33 @@
       </label>
     </div>
 
+    <!-- Educação ambiental — só aparece na atividade de educação ambiental -->
+    <div id="form-educacao-section" hidden>
+      <div class="form-section">
+        <div class="section-header">
+          <label class="form-label">Lista de presença</label>
+          <button class="btn-sm btn-galeria" id="btn-anexar-lista" type="button" data-icon="paperclip">Anexar</button>
+        </div>
+        <input type="file" id="input-lista-presenca" accept="image/*,application/pdf" hidden>
+        <div class="lista-presenca-preview" id="lista-presenca-preview"></div>
+        <p class="campo-dica">Foto ou PDF da lista assinada em campo.</p>
+      </div>
+
+      <div class="form-section">
+        <label class="form-label">Pessoas alcançadas</label>
+        <input type="number" id="f-pessoas" class="form-input" min="0" step="1" placeholder="0">
+        <p class="campo-dica">Total alcançado pela ação (pode ser maior que a lista nominal).</p>
+      </div>
+
+      <div class="form-section">
+        <div class="section-header">
+          <label class="form-label">Participantes <span id="part-count-label">(0)</span></label>
+          <button class="btn-sm btn-fauna" id="btn-add-participante" type="button">+ Participante</button>
+        </div>
+        <div id="participantes-lista"></div>
+      </div>
+    </div>
+
     <div class="form-section">
       <label class="form-label">Horário da ocorrência</label>
       <div class="hora-row">
@@ -474,6 +501,47 @@
     </div>
 
     <button class="btn-salvar btn-fauna-salvar" id="btn-fauna-confirmar">✓ Confirmar Animal</button>
+  </div>
+</div>
+
+<!-- ══ TELA: PARTICIPANTE (educação ambiental) ═══════════════ -->
+<div id="tela-participante" class="tela" hidden>
+  <header class="form-header">
+    <button class="btn-back" id="btn-back-participante" aria-label="Voltar">‹</button>
+    <span>Participante</span>
+    <span></span>
+  </header>
+
+  <div class="form-body">
+    <div class="form-section">
+      <label class="form-label">Nome completo *</label>
+      <input type="text" id="f-part-nome" class="form-input" placeholder="Nome do participante" autocomplete="off">
+    </div>
+
+    <div class="form-section">
+      <label class="form-label">CPF</label>
+      <input type="text" id="f-part-cpf" class="form-input" inputmode="numeric" placeholder="000.000.000-00" autocomplete="off" maxlength="14">
+      <p class="campo-erro" id="part-cpf-erro" hidden>CPF inválido — confira os números.</p>
+    </div>
+
+    <div class="form-section form-row">
+      <div class="form-group">
+        <label class="form-label">Data de nascimento</label>
+        <input type="date" id="f-part-nasc" class="form-input">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Sexo</label>
+        <select id="f-part-sexo" class="form-select">
+          <option value="">—</option>
+          <option value="masculino">Masculino</option>
+          <option value="feminino">Feminino</option>
+          <option value="outro">Outro</option>
+          <option value="nao_informado">Não informado</option>
+        </select>
+      </div>
+    </div>
+
+    <button class="btn-salvar btn-fauna-salvar" id="btn-part-confirmar">✓ Confirmar participante</button>
   </div>
 </div>
 
@@ -916,6 +984,7 @@ const _brigReady = _dbReady.then(function () {
 <script src="/js/brigada-captura.js"></script>
 <script src="/js/brigada-area.js"></script>
 <script src="/js/brigada-fauna.js"></script>
+<script src="/js/brigada-participantes.js"></script>
 <script>
 // ════════════════════════════════════════════════════════════════
 // Estado global do app
@@ -926,6 +995,8 @@ const App = {
   telasHistorico: [],
   naturezaAtual: null,
   faunaEditIdx: null,
+  participanteEditIdx: null,
+  _listaPresencaBlob: null,   // anexo da lista de presença (Blob foto/PDF)
   pinSetupFase: 1,
   pinSetupPrimeiro: '',
   catalogoAtividades: [],  // carregado do banco + cache offline
@@ -1817,7 +1888,9 @@ function popularSelectEquipe() {
 function abrirFormulario(natureza) {
   App.naturezaAtual = natureza
   bFaunaLimpar()
+  bPartLimpar()
   bCapturaLimpar()
+  App._listaPresencaBlob = null
 
   // Header colorido conforme natureza
   const header = document.getElementById('form-header')
@@ -1848,6 +1921,13 @@ function abrirFormulario(natureza) {
   document.getElementById('foto-count-label').textContent = '(0/5)'
   document.getElementById('fauna-lista').innerHTML = ''
   document.getElementById('fauna-count-label').textContent = '(0)'
+
+  // Educação ambiental: limpa anexo + participantes e oculta a seção
+  document.getElementById('f-pessoas').value = ''
+  document.getElementById('participantes-lista').innerHTML = ''
+  document.getElementById('part-count-label').textContent = '(0)'
+  renderListaPresenca()
+  atualizarSecaoEducacao()
 
   // GPS no form
   const gps = bGpsAtual()
@@ -1918,8 +1998,11 @@ async function salvarRegistro() {
     observacoes:   document.getElementById('f-obs').value.trim() || null,
     lat:           gps?.lat ?? null,
     lng:           gps?.lng ?? null,
+    pessoas_alcancadas: parseInt(document.getElementById('f-pessoas').value, 10) || null,
     fotos_blobs:   bCapturaGetFotos(),
+    lista_presenca_blob: App._listaPresencaBlob || null,
     _fauna:        bFaunaGetLista(),
+    _participantes: bPartGetLista(),
   }
 
   try {
@@ -2215,6 +2298,117 @@ function confirmarFauna() {
   )
   document.getElementById('fauna-count-label').textContent = `(${bFaunaGetLista().length})`
   mostrarTela('tela-form', false)
+}
+
+// ════════════════════════════════════════════════════════════════
+// Educação ambiental — lista de presença + participantes
+// ════════════════════════════════════════════════════════════════
+// Mostra a seção só quando a atividade é educação ambiental.
+function atualizarSecaoEducacao() {
+  const ehEducacao = document.getElementById('f-atividade').value === 'educacao_ambiental'
+  document.getElementById('form-educacao-section').hidden = !ehEducacao
+}
+
+// ── Anexo da lista de presença (foto/PDF) ─────────────────────
+function processarAnexoLista(file) {
+  if (!file) return
+  const okTipo = file.type.startsWith('image/') || file.type === 'application/pdf'
+  if (!okTipo) { toast('Anexe uma imagem ou PDF', 'warn'); return }
+  if (file.size > 15 * 1024 * 1024) { toast('Arquivo muito grande (máx. 15 MB)', 'warn'); return }
+  App._listaPresencaBlob = file
+  renderListaPresenca()
+}
+
+function renderListaPresenca() {
+  const cont = document.getElementById('lista-presenca-preview')
+  const blob = App._listaPresencaBlob
+  if (!blob) { cont.innerHTML = ''; return }
+
+  const ehPdf = blob.type === 'application/pdf'
+  const nome  = blob.name || (ehPdf ? 'lista-presenca.pdf' : 'lista-presenca.jpg')
+  const tam   = blob.size ? `${(blob.size / 1024).toFixed(0)} KB` : ''
+  const thumb = ehPdf
+    ? `<span class="lista-presenca-ico" data-icon="clipboard"></span>`
+    : `<img src="${URL.createObjectURL(blob)}" alt="Lista de presença" loading="lazy">`
+
+  cont.innerHTML = `
+    <div class="lista-presenca-item">
+      ${thumb}
+      <div class="lista-presenca-meta">
+        <strong>${esc(nome)}</strong>
+        <span>${esc(tam)}</span>
+      </div>
+      <button class="foto-del" id="btn-rem-lista" aria-label="Remover anexo">✕</button>
+    </div>`
+  bIconsAplicar(cont)
+  document.getElementById('btn-rem-lista').addEventListener('click', () => {
+    App._listaPresencaBlob = null
+    renderListaPresenca()
+  })
+}
+
+// ── Tela do participante ──────────────────────────────────────
+function abrirParticipante(idx = null) {
+  App.participanteEditIdx = idx
+  document.getElementById('part-cpf-erro').hidden = true
+
+  if (idx === null) {
+    document.getElementById('f-part-nome').value = ''
+    document.getElementById('f-part-cpf').value  = ''
+    document.getElementById('f-part-nasc').value = ''
+    document.getElementById('f-part-sexo').value = ''
+  } else {
+    const p = bPartGetLista()[idx]
+    document.getElementById('f-part-nome').value = p?.nome || ''
+    document.getElementById('f-part-cpf').value  = p?.cpf ? bPartCpfMascara(p.cpf) : ''
+    document.getElementById('f-part-nasc').value = p?.data_nascimento || ''
+    document.getElementById('f-part-sexo').value = p?.sexo || ''
+  }
+  mostrarTela('tela-participante')
+}
+
+function confirmarParticipante() {
+  const nome = document.getElementById('f-part-nome').value.trim()
+  const cpfRaw = document.getElementById('f-part-cpf').value
+
+  if (!nome) { toast('Informe o nome do participante', 'warn'); return }
+  if (!bPartCpfValido(cpfRaw)) {
+    document.getElementById('part-cpf-erro').hidden = false
+    toast('CPF inválido', 'warn')
+    return
+  }
+
+  const item = {
+    nome,
+    cpf:             bPartCpfDigitos(cpfRaw) || null,
+    data_nascimento: document.getElementById('f-part-nasc').value || null,
+    sexo:            document.getElementById('f-part-sexo').value || null,
+  }
+
+  if (App.participanteEditIdx !== null) bPartAtualizar(App.participanteEditIdx, item)
+  else                                  bPartAdicionar(item)
+
+  renderParticipantesLista()
+  mostrarTela('tela-form', false)
+}
+
+function renderParticipantesLista() {
+  bPartRenderLista(
+    document.getElementById('participantes-lista'),
+    i => abrirParticipante(i),
+    () => atualizarContagemParticipantes()
+  )
+  atualizarContagemParticipantes()
+}
+
+// Atualiza o contador e sugere o total de pessoas alcançadas
+// (mantém o valor digitado se o brigadista já o ajustou para mais).
+function atualizarContagemParticipantes() {
+  const n = bPartGetLista().length
+  document.getElementById('part-count-label').textContent = `(${n})`
+  const campo = document.getElementById('f-pessoas')
+  const atual = parseInt(campo.value, 10) || 0
+  if (n > atual) campo.value = n
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -3324,6 +3518,15 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-fauna-galeria').addEventListener('click', abrirFaunaGaleria)
   document.getElementById('input-fauna-camera').addEventListener('change', e => { processarFotosFaunaArquivos(e.target.files); e.target.value = '' })
   document.getElementById('input-fauna-galeria').addEventListener('change', e => { processarFotosFaunaArquivos(e.target.files); e.target.value = '' })
+
+  // Educação ambiental
+  document.getElementById('f-atividade').addEventListener('change', atualizarSecaoEducacao)
+  document.getElementById('btn-anexar-lista').addEventListener('click', () => document.getElementById('input-lista-presenca').click())
+  document.getElementById('input-lista-presenca').addEventListener('change', e => { processarAnexoLista(e.target.files[0]); e.target.value = '' })
+  document.getElementById('btn-add-participante').addEventListener('click', () => abrirParticipante(null))
+  document.getElementById('btn-back-participante').addEventListener('click', () => mostrarTela('tela-form', false))
+  document.getElementById('btn-part-confirmar').addEventListener('click', confirmarParticipante)
+  bPartCpfBindMascara(document.getElementById('f-part-cpf'))
 
   // Fila
   document.getElementById('btn-sync-fila').addEventListener('click', async () => {

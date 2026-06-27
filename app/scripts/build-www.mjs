@@ -19,7 +19,7 @@ mkdirSync(join(WWW, 'js'),           { recursive: true })
 mkdirSync(join(WWW, 'vendor/fonts'), { recursive: true })
 
 // ── JS compartilhado (idêntico ao site) ───────────────────────
-for (const f of ['config.js', 'brigada-offline.js', 'brigada-sync.js', 'brigada-captura.js', 'brigada-fauna.js']) {
+for (const f of ['config.js', 'brigada-offline.js', 'brigada-sync.js', 'brigada-captura.js', 'brigada-fauna.js', 'brigada-participantes.js']) {
   cpSync(join(RAIZ, 'js', f), join(WWW, 'js', f))
 }
 
