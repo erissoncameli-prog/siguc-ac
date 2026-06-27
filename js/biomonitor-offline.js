@@ -172,16 +172,18 @@ async function bioOfflineGetNinho(uuid) {
   })
 }
 
-async function bioOfflineListarNinhos({ praiaId, status, statusSync } = {}) {
+async function bioOfflineListarNinhos({ praiaId, praiaAtualId, status, statusSync } = {}) {
   const db = await bioOfflineInit()
   return new Promise((res, rej) => {
     const tx  = db.transaction('ninhos', 'readonly')
     const req = tx.objectStore('ninhos').getAll()
     req.onsuccess = () => {
       let lista = req.result
-      if (praiaId)    lista = lista.filter(n => n.praia_id === praiaId)
-      if (status)     lista = lista.filter(n => n.status === status)
-      if (statusSync) lista = lista.filter(n => n.status_sync === statusSync)
+      if (praiaId)      lista = lista.filter(n => n.praia_id === praiaId)
+      // praia onde incuba agora (com fallback p/ origem em registros antigos)
+      if (praiaAtualId) lista = lista.filter(n => (n.praia_atual_id ?? n.praia_id) === praiaAtualId)
+      if (status)       lista = lista.filter(n => n.status === status)
+      if (statusSync)   lista = lista.filter(n => n.status_sync === statusSync)
       lista.sort((a, b) => b.criado_em.localeCompare(a.criado_em))
       res(lista)
     }
