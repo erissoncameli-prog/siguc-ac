@@ -1064,6 +1064,9 @@
     if (tipo !== 'dentro_uc' && !payload.localizacao_referencia) {
       toast('Informe a referência de localização.', 'error'); return
     }
+    if (!payload.area_geom) {
+      if (!confirm('Esta praia não tem polígono cadastrado. O alerta de perímetro não funcionará no app de campo. Continuar assim mesmo?')) return
+    }
     const { error } = _editPraiaId
       ? await db.from('praias_monitoramento').update(payload).eq('id', _editPraiaId)
       : await db.from('praias_monitoramento').insert(payload)

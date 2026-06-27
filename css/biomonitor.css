@@ -1180,3 +1180,15 @@ body.field-mode .bio-home-nome { font-size: 26px; }
   display: block; font-size: 22px; font-weight: 700; color: var(--bio-ink);
   font-family: var(--font-mono);
 }
+
+/* Aviso de perímetro no formulário de ninho */
+.bio-aviso-perimetro {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--bio-alerta-bg);
+  border: 1px solid var(--bio-alerta);
+  border-radius: 10px;
+  padding: 10px 14px;
+  color: var(--bio-alerta);
+  font-size: 13px; font-weight: 600;
+  margin: 0 16px 4px;
+}

@@ -236,6 +236,7 @@ async function bioSyncCachePraias(grupoId) {
       id, codigo, sigla, nome, comunidade, municipio, ativa, experimental,
       periodo_inicio, periodo_fim,
       ponto_acesso,
+      area_geom,
       programa_id,
       uc_id
     `)
@@ -254,7 +255,7 @@ async function bioSyncCachePraias(grupoId) {
         lat = p.ponto_acesso.coordinates[1]
       }
     }
-    return { ...p, lat, lng }
+    return { ...p, lat, lng, area_geojson: p.area_geom || null }
   })
 
   await bioOfflineSalvarPraias(praias)

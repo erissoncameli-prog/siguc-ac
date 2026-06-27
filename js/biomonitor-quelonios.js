@@ -11,6 +11,30 @@ function bioHaversineM(lat1, lng1, lat2, lng2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
 }
 
+function _bioRingContains(ring, x, y) {
+  let inside = false
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const xi = ring[i][0], yi = ring[i][1]
+    const xj = ring[j][0], yj = ring[j][1]
+    if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) inside = !inside
+  }
+  return inside
+}
+
+// Returns true (dentro), false (fora) ou null (sem polígono)
+function bioPointInPolygon(lat, lng, geom) {
+  if (!geom) return null
+  try {
+    const g = typeof geom === 'string' ? JSON.parse(geom) : geom
+    if (g.type === 'Polygon') return _bioRingContains(g.coordinates[0], lng, lat)
+    if (g.type === 'MultiPolygon') {
+      for (const poly of g.coordinates) { if (_bioRingContains(poly[0], lng, lat)) return true }
+      return false
+    }
+  } catch { /* geom inválida */ }
+  return null
+}
+
 /* ════════════════════════════════════════════════════════════
    ESTADO GLOBAL
    ════════════════════════════════════════════════════════════ */
@@ -723,6 +747,7 @@ function _bioIniciarCapturaGps(n, intervaloMs) {
       coordsEl.style.display = ''
       coordsEl.textContent   = `${bioFormatarCoords(lat, lng)}  ±${Math.round(precisao_m)}m`
     }
+    bioVerificarPerimetroNinho()
   })
   .catch(() => {
     if (progressoEl) progressoEl.style.display = 'none'
@@ -744,10 +769,27 @@ function bioIniciarGPS() {
       if (coordsEl) coordsEl.textContent = bioFormatarCoords(BioApp.gpsLat, BioApp.gpsLng)
       if (accEl)    accEl.textContent    = `±${Math.round(pos.coords.accuracy)}m`
       bioVerificarPraiaProxima(pos.coords.latitude, pos.coords.longitude)
+      clearTimeout(_bioPerimTimer)
+      _bioPerimTimer = setTimeout(bioVerificarPerimetroNinho, 5000)
     },
     () => {},
     { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000 }
   )
+}
+
+let _bioPerimTimer = null
+async function bioVerificarPerimetroNinho() {
+  const aviso = document.getElementById('bio-form-perimetro-aviso')
+  if (!aviso) return
+  const praiaId = BioApp.formNinho?.praia_id
+  if (!praiaId) { aviso.hidden = true; return }
+  const lat = BioApp.formGpsCapturado?.lat ?? BioApp.gpsLat
+  const lng = BioApp.formGpsCapturado?.lng ?? BioApp.gpsLng
+  if (lat == null || lng == null) { aviso.hidden = true; return }
+  const praias = await bioOfflineListarPraias()
+  const praia  = praias.find(p => p.id === praiaId)
+  if (!praia?.area_geojson) { aviso.hidden = true; return }
+  aviso.hidden = bioPointInPolygon(lat, lng, praia.area_geojson) !== false
 }
 
 let _bioProxTimer = null
@@ -832,6 +874,7 @@ window.bioTrocarPraiaNoForm = function() {
   bioAbrirSheetPraias(praia => {
     BioApp.formNinho.praia_id = praia.id
     document.getElementById('bio-form-praia-label').textContent = praia.nome
+    bioVerificarPerimetroNinho()
   })
 }
 
@@ -885,6 +928,7 @@ function bioAbrirFormNinho() {
   BioApp.formGpsCapturado = null
 
   bioMostrarTela('tela-form-ninho')
+  bioVerificarPerimetroNinho()
 
   const modo = BioApp.cfgGpsModo ?? 'padrao'
   if (modo === 'alta')   _bioIniciarCapturaGps(5,  3000)
