@@ -22,9 +22,10 @@ const BioApp = {
   gpsPrecisao:  null,
   sessaoId:     null,
   // Formulário em edição
-  formNinho:    null,
-  formTipo:     null,   // 'ninho' | 'transferencia' | 'eclosao'
-  formNinhoAtualizar: null,  // ninho sendo atualizado
+  formNinho:        null,
+  formTipo:         null,   // 'ninho' | 'transferencia' | 'eclosao'
+  formNinhoAtualizar: null, // ninho sendo atualizado
+  formGpsCapturado: null,   // {lat, lng, precisao_m} da média; null = usa leitura em tempo real
   // Filtros de aba
   abertosStatusFiltro: null,      // null = todos; 'encontrado'|'transferido'|'eclodido'|'perdido'
   abertosFiltroPraia: undefined,  // undefined = usar praiaAtual; null = todas
@@ -32,6 +33,9 @@ const BioApp = {
   // GPS proximidade
   _praiaProxima:      null,       // praia dentro de BIO_PROX_RAIO_M
   _sheetPraiaOnSelect: null,      // callback temporário do sheet de praias
+  // Configurações de GPS (carregadas do IndexedDB na init)
+  cfgFormatoCoords: 'decimal',    // 'decimal' | 'dms'
+  cfgGpsModo:       'padrao',     // 'padrao' | 'alta' | 'maxima'
 }
 
 // Espécies de quelônios com sigla, nome e cor
@@ -618,6 +622,110 @@ async function bioAbrirSheetPraias(onSelect) {
    ════════════════════════════════════════════════════════════ */
 const BIO_PROX_RAIO_M = 500   // raio de sugestão de praia
 
+/* ════════════════════════════════════════════════════════════
+   GPS — FORMATAÇÃO E PRECISÃO
+   ════════════════════════════════════════════════════════════ */
+
+function _bioDDtoDMS(dd, isLat) {
+  const abs  = Math.abs(dd)
+  const grau = Math.floor(abs)
+  const minF = (abs - grau) * 60
+  const min  = Math.floor(minF)
+  const seg  = (minF - min) * 60
+  const dir  = isLat ? (dd >= 0 ? 'N' : 'S') : (dd >= 0 ? 'L' : 'O')
+  return `${grau}° ${min}' ${seg.toFixed(2)}" ${dir}`
+}
+
+function bioFormatarCoords(lat, lng) {
+  if (lat == null || lng == null) return 'Aguardando GPS…'
+  if (BioApp.cfgFormatoCoords === 'dms') {
+    return `${_bioDDtoDMS(lat, true)}  ${_bioDDtoDMS(lng, false)}`
+  }
+  return `${lat.toFixed(6)}, ${lng.toFixed(6)}`
+}
+
+function _bioMediana(arr) {
+  const s = [...arr].sort((a, b) => a - b)
+  const m = Math.floor(s.length / 2)
+  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2
+}
+
+function _bioDesvioPadrao(arr) {
+  const med = arr.reduce((s, v) => s + v, 0) / arr.length
+  return Math.sqrt(arr.reduce((s, v) => s + (v - med) ** 2, 0) / arr.length)
+}
+
+// Coleta N leituras GPS com intervalo fixo, filtra outliers e retorna a média.
+// onProgresso(atual, total) é chamado a cada leitura coletada.
+function bioCapturarPosicaoMedia(nLeituras, intervaloMs, onProgresso) {
+  return new Promise((resolve, reject) => {
+    const leituras = []
+
+    function proxima() {
+      navigator.geolocation.getCurrentPosition(
+        pos => {
+          leituras.push({ lat: pos.coords.latitude, lng: pos.coords.longitude, acc: pos.coords.accuracy })
+          onProgresso?.(leituras.length, nLeituras)
+          if (leituras.length >= nLeituras) {
+            const lats = leituras.map(l => l.lat)
+            const lngs = leituras.map(l => l.lng)
+            const medLat = _bioMediana(lats)
+            const medLng = _bioMediana(lngs)
+            const stdLat = _bioDesvioPadrao(lats) || 9999
+            const stdLng = _bioDesvioPadrao(lngs) || 9999
+            const filtradas = leituras.filter(l =>
+              Math.abs(l.lat - medLat) <= 2 * stdLat &&
+              Math.abs(l.lng - medLng) <= 2 * stdLng
+            )
+            const base = filtradas.length >= 2 ? filtradas : leituras
+            resolve({
+              lat:        base.reduce((s, l) => s + l.lat, 0) / base.length,
+              lng:        base.reduce((s, l) => s + l.lng, 0) / base.length,
+              precisao_m: Math.min(...base.map(l => l.acc)),
+            })
+          } else {
+            setTimeout(proxima, intervaloMs)
+          }
+        },
+        err => reject(err),
+        { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
+      )
+    }
+    proxima()
+  })
+}
+
+function _bioIniciarCapturaGps(n, intervaloMs) {
+  const coordsEl    = document.getElementById('bio-form-gps-coords')
+  const progressoEl = document.getElementById('bio-form-gps-progresso')
+  const barraEl     = document.getElementById('bio-form-gps-barra')
+  const barraFill   = document.getElementById('bio-form-gps-barra-fill')
+
+  if (coordsEl)    coordsEl.style.display    = 'none'
+  if (progressoEl) { progressoEl.style.display = ''; progressoEl.textContent = `Coletando 0/${n}…` }
+  if (barraEl)     { barraEl.style.display = ''; if (barraFill) barraFill.style.width = '0%' }
+
+  bioCapturarPosicaoMedia(n, intervaloMs, (atual, total) => {
+    if (progressoEl) progressoEl.textContent  = `Coletando ${atual}/${total}…`
+    if (barraFill)   barraFill.style.width     = `${(atual / total) * 100}%`
+  })
+  .then(({ lat, lng, precisao_m }) => {
+    BioApp.formGpsCapturado = { lat, lng, precisao_m }
+    if (progressoEl) progressoEl.style.display = 'none'
+    if (barraEl)     barraEl.style.display     = 'none'
+    if (coordsEl) {
+      coordsEl.style.display = ''
+      coordsEl.textContent   = `${bioFormatarCoords(lat, lng)}  ±${Math.round(precisao_m)}m`
+    }
+  })
+  .catch(() => {
+    if (progressoEl) progressoEl.style.display = 'none'
+    if (barraEl)     barraEl.style.display     = 'none'
+    if (coordsEl)    coordsEl.style.display    = ''
+    bioToast('Não foi possível coletar média GPS. Usando leitura atual.', 'warn')
+  })
+}
+
 function bioIniciarGPS() {
   if (!navigator.geolocation) return
   navigator.geolocation.watchPosition(
@@ -627,7 +735,7 @@ function bioIniciarGPS() {
       BioApp.gpsPrecisao = pos.coords.accuracy
       const coordsEl = document.getElementById('bio-gps-coords')
       const accEl    = document.getElementById('bio-gps-acc')
-      if (coordsEl) coordsEl.textContent = `${BioApp.gpsLat.toFixed(5)}, ${BioApp.gpsLng.toFixed(5)}`
+      if (coordsEl) coordsEl.textContent = bioFormatarCoords(BioApp.gpsLat, BioApp.gpsLng)
       if (accEl)    accEl.textContent    = `±${Math.round(pos.coords.accuracy)}m`
       bioVerificarPraiaProxima(pos.coords.latitude, pos.coords.longitude)
     },
@@ -768,18 +876,19 @@ function bioAbrirFormNinho() {
     status_sync:  'pendente',
     criado_em:    new Date().toISOString(),
   }
+  BioApp.formGpsCapturado = null
 
   bioMostrarTela('tela-form-ninho')
+
+  const modo = BioApp.cfgGpsModo ?? 'padrao'
+  if (modo === 'alta')   _bioIniciarCapturaGps(5,  3000)
+  if (modo === 'maxima') _bioIniciarCapturaGps(10, 4000)
 }
 
 function bioAtualizarGpsForm() {
   const el = document.getElementById('bio-form-gps-coords')
-  if (!el) return
-  if (BioApp.gpsLat != null) {
-    el.textContent = `${BioApp.gpsLat.toFixed(5)}, ${BioApp.gpsLng.toFixed(5)}`
-  } else {
-    el.textContent = 'Aguardando GPS…'
-  }
+  if (!el || el.style.display === 'none') return  // durante captura de média, não sobrescreve
+  el.textContent = bioFormatarCoords(BioApp.gpsLat, BioApp.gpsLng)
 }
 
 async function bioSalvarNinho() {
@@ -803,9 +912,9 @@ async function bioSalvarNinho() {
     data_encontro:    data,
     hora_desova:      document.getElementById('bio-form-hora-desova').value || null,
     observacoes:      obs || null,
-    lat:              BioApp.gpsLat,
-    lng:              BioApp.gpsLng,
-    precisao_gps_m:   BioApp.gpsPrecisao,
+    lat:              BioApp.formGpsCapturado?.lat       ?? BioApp.gpsLat,
+    lng:              BioApp.formGpsCapturado?.lng       ?? BioApp.gpsLng,
+    precisao_gps_m:   BioApp.formGpsCapturado?.precisao_m ?? BioApp.gpsPrecisao,
     status:           'encontrado',
     status_validacao: 'pendente',
     qtd_ovos:         parseNum('bio-form-qtd-ovos'),
@@ -1554,6 +1663,27 @@ async function bioCarregarConfig() {
   if (campoCk) campoCk.checked = document.body.classList.contains('field-mode')
 }
 
+async function bioCarregarConfigGPS() {
+  BioApp.cfgFormatoCoords = await bioOfflineGetConfig('gps_formato_coords') ?? 'decimal'
+  BioApp.cfgGpsModo       = await bioOfflineGetConfig('gps_modo')           ?? 'padrao'
+
+  function ativarChips(grupoId, valorAtual, chaveConfig, appProp) {
+    document.querySelectorAll(`#${grupoId} .bio-chip-cfg`).forEach(btn => {
+      btn.classList.toggle('ativo', btn.dataset.val === valorAtual)
+      btn.addEventListener('click', async () => {
+        BioApp[appProp] = btn.dataset.val
+        await bioOfflineSetConfig(chaveConfig, btn.dataset.val)
+        document.querySelectorAll(`#${grupoId} .bio-chip-cfg`).forEach(b =>
+          b.classList.toggle('ativo', b === btn)
+        )
+      })
+    })
+  }
+
+  ativarChips('bio-cfg-formato-coords', BioApp.cfgFormatoCoords, 'gps_formato_coords', 'cfgFormatoCoords')
+  ativarChips('bio-cfg-gps-modo',       BioApp.cfgGpsModo,       'gps_modo',           'cfgGpsModo')
+}
+
 function bioIniciarConfig() {
   document.getElementById('bio-config-avatar-btn')?.addEventListener('click', bioAlterarFotoMonitor)
   document.getElementById('bio-input-foto-perfil')?.addEventListener('change', () => {})
@@ -1625,6 +1755,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   bioIniciarFotosForm()
   bioIniciarContadores()
   bioIniciarConfig()
+  bioCarregarConfigGPS()
 
   // Back buttons
   document.querySelectorAll('[data-back]').forEach(btn => {
