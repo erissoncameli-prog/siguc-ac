@@ -1285,73 +1285,196 @@
 <div id="tela-dados" class="bio-tela">
   <header class="bio-form-header">
     <button class="bio-btn-back" data-back="tela-home" aria-label="Voltar">‹</button>
-    <span>Meus Resultados</span>
-    <span></span>
+    <span>Resultados</span>
+    <span id="bio-dados-status" style="font-size:11px;color:#9CA3AF"></span>
   </header>
 
-  <div class="bio-form-body">
+  <!-- Tab navigation -->
+  <div class="bio-dados-tabs">
+    <button class="bio-dados-tab ativa" data-dtab="taxas">Taxas</button>
+    <button class="bio-dados-tab" data-dtab="ninhos">Ninhos</button>
+    <button class="bio-dados-tab" data-dtab="bercario">Berçário</button>
+  </div>
 
-    <p style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#9CA3AF;margin:0 0 10px">Dados do servidor (grupo)</p>
-    <div class="bio-dados-grid">
-      <div class="bio-kpi">
-        <strong id="bio-kpi-ninhos">—</strong>
-        <span>Ninhos do grupo</span>
+  <div class="bio-form-body" style="padding-top:8px">
+
+    <!-- ── TAB: TAXAS ─────────────────────────────────────────── -->
+    <div id="bio-dtab-taxas">
+
+      <!-- KPIs topo -->
+      <div class="bio-dados-kpi-row">
+        <div class="bio-kpi2">
+          <strong id="bio-kpi-ninhos">—</strong><span>Ninhos grupo</span>
+        </div>
+        <div class="bio-kpi2">
+          <strong id="bio-kpi-filhotes">—</strong><span>Filhotes vivos</span>
+        </div>
+        <div class="bio-kpi2">
+          <strong id="bio-kpi-incubacao">—</strong><span>Dias incubação</span>
+        </div>
       </div>
-      <div class="bio-kpi">
-        <strong id="bio-kpi-eclodidos">—</strong>
-        <span>Eclodidos</span>
+
+      <!-- Rate cards -->
+      <div class="bio-rate-list">
+        <div class="bio-rate-card">
+          <div class="bio-rate-top">
+            <span class="bio-rate-label">Taxa de Eclosão</span>
+            <span class="bio-rate-val" id="bio-r-eclosao">—</span>
+          </div>
+          <div class="bio-rate-bar"><div class="bio-rate-fill" id="bio-rb-eclosao" style="background:var(--bio-verde)"></div></div>
+          <span class="bio-rate-desc">Filhotes vivos / total de ovos com desfecho</span>
+        </div>
+        <div class="bio-rate-card">
+          <div class="bio-rate-top">
+            <span class="bio-rate-label">Sucesso de Nidificação</span>
+            <span class="bio-rate-val" id="bio-r-sucesso">—</span>
+          </div>
+          <div class="bio-rate-bar"><div class="bio-rate-fill" id="bio-rb-sucesso" style="background:var(--bio-prim)"></div></div>
+          <span class="bio-rate-desc">Ninhos eclodidos / ninhos totais monitorados</span>
+        </div>
+        <div class="bio-rate-card">
+          <div class="bio-rate-top">
+            <span class="bio-rate-label">Fertilidade</span>
+            <span class="bio-rate-val" id="bio-r-fertilidade">—</span>
+          </div>
+          <div class="bio-rate-bar"><div class="bio-rate-fill" id="bio-rb-fertilidade" style="background:var(--bio-ouro)"></div></div>
+          <span class="bio-rate-desc">Ovos íntegros / ovos totais na postura</span>
+        </div>
+        <div class="bio-rate-card">
+          <div class="bio-rate-top">
+            <span class="bio-rate-label">Eficiência do Ninho</span>
+            <span class="bio-rate-val" id="bio-r-eficiencia">—</span>
+          </div>
+          <div class="bio-rate-bar"><div class="bio-rate-fill" id="bio-rb-eficiencia" style="background:#7ECEE8"></div></div>
+          <span class="bio-rate-desc">Filhotes vivos / ovos íntegros registrados</span>
+        </div>
+        <div class="bio-rate-card">
+          <div class="bio-rate-top">
+            <span class="bio-rate-label">Taxa de Predação</span>
+            <span class="bio-rate-val" id="bio-r-predacao" style="color:var(--bio-perigo)">—</span>
+          </div>
+          <div class="bio-rate-bar"><div class="bio-rate-fill" id="bio-rb-predacao" style="background:var(--bio-perigo)"></div></div>
+          <span class="bio-rate-desc">Ninhos perdidos / ninhos totais monitorados</span>
+        </div>
+        <div class="bio-rate-card">
+          <div class="bio-rate-top">
+            <span class="bio-rate-label">Taxa de Transferência</span>
+            <span class="bio-rate-val" id="bio-r-transferencia">—</span>
+          </div>
+          <div class="bio-rate-bar"><div class="bio-rate-fill" id="bio-rb-transferencia" style="background:var(--bio-alerta)"></div></div>
+          <span class="bio-rate-desc">Ninhos transferidos para local seguro</span>
+        </div>
+        <div class="bio-rate-card">
+          <div class="bio-rate-top">
+            <span class="bio-rate-label">Sobrevivência no Berçário</span>
+            <span class="bio-rate-val" id="bio-r-sobrev-berc" style="color:var(--bio-verde)">—</span>
+          </div>
+          <div class="bio-rate-bar"><div class="bio-rate-fill" id="bio-rb-sobrev-berc" style="background:var(--bio-verde)"></div></div>
+          <span class="bio-rate-desc">Filhotes soltados / filhotes entrados no berçário</span>
+        </div>
+        <div class="bio-rate-card">
+          <div class="bio-rate-top">
+            <span class="bio-rate-label">Mortalidade no Berçário</span>
+            <span class="bio-rate-val" id="bio-r-mort-berc" style="color:var(--bio-perigo)">—</span>
+          </div>
+          <div class="bio-rate-bar"><div class="bio-rate-fill" id="bio-rb-mort-berc" style="background:var(--bio-perigo)"></div></div>
+          <span class="bio-rate-desc">Mortes registradas / total entrado no berçário</span>
+        </div>
       </div>
-      <div class="bio-kpi">
-        <strong id="bio-kpi-filhotes">—</strong>
-        <span>Filhotes vivos</span>
+
+      <!-- Rosca: desfecho dos ovos -->
+      <div class="bio-chart-card">
+        <p class="bio-chart-title">Desfecho dos Ovos</p>
+        <div class="bio-chart-wrap"><canvas id="chart-desfecho"></canvas></div>
       </div>
-      <div class="bio-kpi">
-        <strong id="bio-kpi-taxa">—</strong>
-        <span>Taxa eclosão</span>
-      </div>
+
     </div>
 
-    <p style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#9CA3AF;margin:14px 0 10px">Ovos na postura</p>
-    <div class="bio-dados-grid">
-      <div class="bio-kpi">
-        <strong id="bio-kpi-ovos-total">—</strong>
-        <span>Total de ovos</span>
+    <!-- ── TAB: NINHOS ────────────────────────────────────────── -->
+    <div id="bio-dtab-ninhos" hidden>
+
+      <!-- KPIs topo -->
+      <div class="bio-dados-kpi-row">
+        <div class="bio-kpi2">
+          <strong id="bio-kpi2-eclodidos">—</strong><span>Eclodidos</span>
+        </div>
+        <div class="bio-kpi2">
+          <strong id="bio-kpi2-perdidos">—</strong><span>Perdidos</span>
+        </div>
+        <div class="bio-kpi2">
+          <strong id="bio-kpi2-transf">—</strong><span>Transferidos</span>
+        </div>
       </div>
-      <div class="bio-kpi">
-        <strong id="bio-kpi-ovos-integros" style="color:#4ade80">—</strong>
-        <span>Íntegros</span>
+
+      <!-- Rosca: status -->
+      <div class="bio-chart-card">
+        <p class="bio-chart-title">Status dos Ninhos</p>
+        <div class="bio-chart-wrap"><canvas id="chart-status"></canvas></div>
       </div>
-      <div class="bio-kpi">
-        <strong id="bio-kpi-ovos-descartados" style="color:#f87171">—</strong>
-        <span>Descartados</span>
+
+      <!-- Barras: ninhos por espécie -->
+      <div class="bio-chart-card">
+        <p class="bio-chart-title">Ninhos por Espécie</p>
+        <div class="bio-chart-wrap"><canvas id="chart-especies"></canvas></div>
       </div>
-      <div class="bio-kpi">
-        <strong id="bio-kpi-dist-rio">—</strong>
-        <span>Dist. média rio</span>
+
+      <!-- Linha: evolução mensal -->
+      <div class="bio-chart-card">
+        <p class="bio-chart-title">Ninhos por Mês</p>
+        <div class="bio-chart-wrap" style="height:200px"><canvas id="chart-mensal"></canvas></div>
       </div>
-      <div class="bio-kpi">
-        <strong id="bio-kpi-temp-media">—</strong>
-        <span>Temp. média (°C)</span>
+
+      <!-- Barras horizontais: top praias -->
+      <div class="bio-chart-card">
+        <p class="bio-chart-title">Top Praias</p>
+        <div class="bio-chart-wrap"><canvas id="chart-praias"></canvas></div>
       </div>
-      <div class="bio-kpi">
-        <strong id="bio-kpi-umidade-media">—</strong>
-        <span>Umidade média (%)</span>
-      </div>
-      <div class="bio-kpi">
-        <strong id="bio-kpi-prof-media">—</strong>
-        <span>Prof. média (cm)</span>
-      </div>
+
     </div>
 
-    <p style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#9CA3AF;margin:14px 0 10px">Dados locais (offline)</p>
-    <div class="bio-dados-grid">
-      <div class="bio-kpi">
-        <strong id="bio-kpi-ninhos-local">—</strong>
-        <span>Ninhos (local)</span>
+    <!-- ── TAB: BERÇÁRIO ──────────────────────────────────────── -->
+    <div id="bio-dtab-bercario" hidden>
+
+      <!-- KPIs berçário -->
+      <div class="bio-dados-kpi-row">
+        <div class="bio-kpi2">
+          <strong id="bio-kpi-berc-entrada">—</strong><span>Entrados</span>
+        </div>
+        <div class="bio-kpi2">
+          <strong id="bio-kpi-berc-soltado">—</strong><span>Soltados</span>
+        </div>
+        <div class="bio-kpi2">
+          <strong id="bio-kpi-berc-mortos" style="color:var(--bio-perigo)">—</strong><span>Mortos</span>
+        </div>
       </div>
-      <div class="bio-kpi">
-        <strong id="bio-kpi-eclodidos-local">—</strong>
-        <span>Eclodidos (local)</span>
+
+      <!-- Rosca: destino dos filhotes -->
+      <div class="bio-chart-card">
+        <p class="bio-chart-title">Destino dos Filhotes</p>
+        <div class="bio-chart-wrap"><canvas id="chart-destino"></canvas></div>
+      </div>
+
+      <!-- Barras: ocorrências por tipo -->
+      <div class="bio-chart-card">
+        <p class="bio-chart-title">Ocorrências no Berçário</p>
+        <div class="bio-chart-wrap"><canvas id="chart-ocorrencias"></canvas></div>
+      </div>
+
+      <!-- Linha: biometria -->
+      <div class="bio-chart-card">
+        <p class="bio-chart-title">Biometria ao Longo do Tempo</p>
+        <p style="font-size:11px;color:#9CA3AF;margin:-4px 0 8px">Comprimento (cm) e peso médio (g)</p>
+        <div class="bio-chart-wrap" style="height:200px"><canvas id="chart-biometria"></canvas></div>
+      </div>
+
+    </div>
+
+    <!-- dados locais (fallback sempre visível no tab taxas) -->
+    <div id="bio-dtab-local" style="margin-top:4px">
+      <p style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#9CA3AF;margin:12px 0 8px">Dados locais (offline)</p>
+      <div class="bio-dados-kpi-row">
+        <div class="bio-kpi2"><strong id="bio-kpi-ninhos-local">—</strong><span>Ninhos</span></div>
+        <div class="bio-kpi2"><strong id="bio-kpi-eclodidos-local">—</strong><span>Eclodidos</span></div>
       </div>
     </div>
 
