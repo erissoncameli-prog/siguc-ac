@@ -1274,3 +1274,101 @@ body.field-mode .bio-home-nome { font-size: 26px; }
   cursor: pointer;
 }
 .bio-berc-card-btn:active { opacity: .85; }
+
+/* ── Botão seletor de formulário (nursery/praia) ── */
+.bio-form-select-btn {
+  width: 100%; display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 14px;
+  background: var(--bio-card); border: 1.5px solid var(--bio-border);
+  border-radius: 12px;
+  font-size: 14px; font-weight: 500; color: var(--bio-ink);
+  cursor: pointer; text-align: left;
+}
+.bio-form-select-btn:active { background: #f0f4f8; }
+
+/* ── Seletor de berçário — cards ── */
+.bio-berc-sel-card {
+  display: flex; align-items: center; gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--bio-border);
+  cursor: pointer; background: var(--bio-card);
+}
+.bio-berc-sel-card:active { background: #e8f5f0; }
+.bio-berc-sel-info { flex: 1; }
+.bio-berc-sel-nome { font-size: 15px; font-weight: 700; color: var(--bio-ink); }
+.bio-berc-sel-meta { font-size: 12px; color: var(--bio-ink2); margin-top: 2px; }
+.bio-berc-sel-cap  { font-size: 12px; color: var(--bio-prim); font-weight: 600; }
+
+/* ── Detalhe do lote ── */
+.bio-det-lote-header {
+  background: var(--bio-prim-bg); border-bottom: 1px solid rgba(26,107,140,.2);
+  padding: 14px 16px 12px;
+}
+.bio-det-lote-row {
+  display: flex; align-items: baseline; gap: 6px; margin-bottom: 6px;
+}
+.bio-det-lote-row .bio-form-label { margin: 0; min-width: 60px; }
+.bio-det-lote-row strong { font-size: 14px; }
+.bio-det-lote-stats {
+  display: flex; gap: 16px; margin-top: 10px;
+}
+.bio-det-stat {
+  text-align: center; background: white;
+  border-radius: 10px; padding: 8px 16px; flex: 1;
+}
+.bio-det-stat-n {
+  display: block; font-size: 24px; font-weight: 700;
+  color: var(--bio-prim); font-family: var(--font-mono, monospace);
+}
+.bio-det-stat span:last-child { font-size: 11px; color: var(--bio-ink2); }
+
+/* ── Timeline de ocorrências ── */
+.bio-tl-vazio {
+  text-align: center; color: #9CA3AF; font-size: 13px;
+  padding: 24px 0; border: 1.5px dashed #E5E7EB;
+  border-radius: 12px; margin-top: 4px;
+}
+.bio-tl-item {
+  display: flex; gap: 12px; padding-bottom: 16px; position: relative;
+}
+.bio-tl-item:not(:last-child)::before {
+  content: ''; position: absolute; left: 17px; top: 36px;
+  bottom: 0; width: 2px; background: var(--bio-border);
+}
+.bio-tl-icone {
+  width: 34px; height: 34px; flex-shrink: 0;
+  border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  background: var(--bio-prim-bg); color: var(--bio-prim);
+}
+.bio-tl-icone svg { width: 16px; height: 16px; }
+.bio-tl-body { flex: 1; padding-top: 4px; }
+.bio-tl-tipo { font-size: 13px; font-weight: 700; color: var(--bio-ink); }
+.bio-tl-data { font-size: 11px; color: var(--bio-ink2); margin-bottom: 4px; }
+.bio-tl-detalhe { font-size: 12px; color: var(--bio-ink2); line-height: 1.5; }
+
+/* ── Tipo de ocorrência chips (horizontal scroll) ── */
+.bio-oc-tipo-grid {
+  display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px;
+  scrollbar-width: none;
+}
+.bio-oc-tipo-grid::-webkit-scrollbar { display: none; }
+.bio-oc-chip {
+  flex-shrink: 0; padding: 7px 14px;
+  background: var(--bio-bg2); border: 1.5px solid var(--bio-border);
+  border-radius: 20px; font-size: 13px; font-weight: 600;
+  color: var(--bio-ink); cursor: pointer; white-space: nowrap;
+  transition: background .12s, border-color .12s, color .12s;
+}
+.bio-oc-chip.ativo {
+  background: var(--bio-prim); border-color: var(--bio-prim); color: #fff;
+}
+
+/* ── Grupos de berçário na lista de lotes ── */
+.bio-berc-grupo-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 16px 6px;
+  font-size: 13px; font-weight: 700; color: var(--bio-ink2);
+  text-transform: uppercase; letter-spacing: .04em;
+  border-bottom: 1px solid var(--bio-border);
+}
+.bio-berc-grupo-stats { font-size: 11px; font-weight: 500; color: var(--bio-prim); }

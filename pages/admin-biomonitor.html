@@ -364,6 +364,7 @@
           <button class="tab-btn"       id="tab-praias"     onclick="mudarAba('praias')">Praias</button>
           <button class="tab-btn"       id="tab-temporadas" onclick="mudarAba('temporadas')">Temporadas</button>
           <button class="tab-btn"       id="tab-mapa"       onclick="mudarAba('mapa')">Mapa</button>
+          <button class="tab-btn"       id="tab-bercarios"  onclick="mudarAba('bercarios')">Berçários</button>
         </div>
       </div>
 
@@ -463,14 +464,34 @@
           <div id="mapa-praias" style="height:70vh;min-height:460px;width:100%"></div>
         </div>
       </div>
+
+      <!-- ABA: Berçários -->
+      <div id="aba-bercarios" style="display:none">
+        <div class="filter-bar">
+          <input class="form-control search-input" id="busca-bercarios" placeholder="Buscar berçário..." oninput="filtrarBercarios()">
+          <select class="form-control" id="fil-uc-berc" style="width:200px" onchange="filtrarBercarios()">
+            <option value="">Todas as UCs</option>
+          </select>
+          <button class="btn btn-primary" onclick="abrirModalBercario()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Novo Berçário
+          </button>
+        </div>
+        <div class="card"><div class="table-wrap"><div class="table-scroll">
+          <table><thead><tr>
+            <th>Nome</th><th>Tipo</th><th>Capacidade</th><th>Localização</th><th>Responsável</th><th>Status</th><th></th>
+          </tr></thead><tbody id="tbody-bercarios"><tr><td colspan="7" class="empty-row">Carregando...</td></tr></tbody></table>
+        </div></div></div>
+      </div>
     </div>`
 
   bIconsAplicar(document.getElementById('app'))
 
   // ── Dados ─────────────────────────────────────────────────────
-  let _grupos = [], _monitores = [], _praias = [], _temporadas = [], _programas = [], _ucs = []
+  let _grupos = [], _monitores = [], _praias = [], _temporadas = [], _programas = [], _ucs = [], _bercarios = []
   let _editGrupoId = null, _editMonitorId = null, _editPraiaId = null, _editTemporadaId = null
   let _loginMonitorId = null
+  let _editBercarioId = null
 
   await carregarDados()
 
@@ -482,6 +503,7 @@
       { data: temporadas },
       { data: programas },
       { data: ucs },
+      { data: bercarios },
     ] = await Promise.all([
       db.from('grupos_biomonitor').select('*').order('nome'),
       db.from('monitores_biodiversidade').select('id,nome_completo,cpf,funcao,status,usuario_id,grupo_id,email').order('nome_completo'),
@@ -489,6 +511,7 @@
       db.from('temporadas_biomonitor').select('*').order('ano_base', { ascending: false }),
       db.from('programas_biomonitoramento').select('id,nome').order('nome'),
       db.from('unidades_conservacao').select('id,nome,sigla').order('nome'),
+      db.from('bercarios').select('*').order('nome'),
     ])
     _grupos = grupos || []
     _monitores = monitores || []
@@ -496,10 +519,12 @@
     _temporadas = temporadas || []
     _programas = programas || []
     _ucs = ucs || []
+    _bercarios = bercarios || []
     renderGrupos()
     renderMonitores()
     renderPraias()
     renderTemporadas()
+    filtrarBercarios()
     popularSelects()
   }
 
@@ -517,6 +542,10 @@
       const el = document.getElementById(id)
       if (el) el.innerHTML = `<option value="">Selecione...</option>` + ucOpts
     })
+    ;['mb-uc', 'fil-uc-berc'].forEach(id => {
+      const el = document.getElementById(id)
+      if (el) el.innerHTML = `<option value="">Nenhuma (fora de UC)</option>` + ucOpts
+    })
     const mmg = document.getElementById('mm-grupo')
     if (mmg) mmg.innerHTML = `<option value="">Selecione...</option>` + grupoOpts
 
@@ -525,6 +554,9 @@
 
     const mprMon = document.getElementById('mpr-monitor')
     if (mprMon) mprMon.innerHTML = `<option value="">Nenhum</option>` + monOpts
+
+    const mbResp = document.getElementById('mb-resp')
+    if (mbResp) mbResp.innerHTML = `<option value="">Nenhum</option>` + monOpts
   }
 
   // ── Renderizações ─────────────────────────────────────────────
@@ -626,7 +658,7 @@
   window.filtrarTemporadas = renderTemporadas
 
   // ── Abas ──────────────────────────────────────────────────────
-  const _abas = ['grupos','monitores','praias','temporadas','mapa']
+  const _abas = ['grupos','monitores','praias','temporadas','mapa','bercarios']
   window.mudarAba = function(aba) {
     _abas.forEach(a => {
       document.getElementById('aba-' + a).style.display = a === aba ? '' : 'none'
@@ -1114,8 +1146,142 @@
     await carregarDados()
   }
 
+  // ── Berçários ─────────────────────────────────────────────
+  window.filtrarBercarios = filtrarBercarios
+  function filtrarBercarios() {
+    const q   = (document.getElementById('busca-bercarios')?.value ?? '').toLowerCase()
+    const uc  = document.getElementById('fil-uc-berc')?.value ?? ''
+    const fil = _bercarios.filter(b =>
+      (!q  || b.nome.toLowerCase().includes(q)) &&
+      (!uc || b.uc_id === uc)
+    )
+    renderBercarios(fil)
+  }
+
+  function renderBercarios(lista) {
+    const tb = document.getElementById('tbody-bercarios')
+    if (!tb) return
+    if (!lista.length) { tb.innerHTML = `<tr><td colspan="7" class="empty-row">Nenhum berçário encontrado.</td></tr>`; return }
+    const TIPO_LABEL = { tanque_fibra: 'Tanque fibra', piscina_alvenaria: 'Piscina alvenaria', viveiro: 'Viveiro', outro: 'Outro' }
+    tb.innerHTML = lista.map(b => {
+      const uc   = _ucs.find(u => u.id === b.uc_id)
+      const resp = _monitores.find(m => m.id === b.responsavel_id)
+      return `<tr>
+        <td><strong>${b.nome}</strong></td>
+        <td>${TIPO_LABEL[b.tipo] ?? b.tipo}</td>
+        <td>${b.capacidade_max ?? '—'}</td>
+        <td style="max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${b.localizacao_descricao ?? (uc ? uc.nome : '—')}</td>
+        <td>${resp ? resp.nome_completo : '—'}</td>
+        <td><span class="badge ${b.status ? 'badge-success' : 'badge-secondary'}">${b.status ? 'Ativo' : 'Inativo'}</span></td>
+        <td style="white-space:nowrap">
+          <button class="btn btn-sm btn-secondary" onclick="editarBercario('${b.id}')">Editar</button>
+        </td>
+      </tr>`
+    }).join('')
+  }
+
+  window.abrirModalBercario = function() {
+    _editBercarioId = null
+    document.getElementById('mb-titulo').textContent = 'Novo Berçário'
+    ;['mb-nome','mb-local','mb-obs'].forEach(id => { const el = document.getElementById(id); if (el) el.value = '' })
+    document.getElementById('mb-tipo').value = 'tanque_fibra'
+    document.getElementById('mb-cap').value  = ''
+    document.getElementById('mb-uc').value   = ''
+    document.getElementById('mb-resp').value = ''
+    document.getElementById('mb-ativo').checked = true
+    abrirModal('bercario')
+  }
+
+  window.editarBercario = function(id) {
+    const b = _bercarios.find(x => x.id === id)
+    if (!b) return
+    _editBercarioId = id
+    document.getElementById('mb-titulo').textContent = 'Editar Berçário'
+    document.getElementById('mb-nome').value  = b.nome  ?? ''
+    document.getElementById('mb-tipo').value  = b.tipo  ?? 'tanque_fibra'
+    document.getElementById('mb-cap').value   = b.capacidade_max ?? ''
+    document.getElementById('mb-uc').value    = b.uc_id ?? ''
+    document.getElementById('mb-resp').value  = b.responsavel_id ?? ''
+    document.getElementById('mb-local').value = b.localizacao_descricao ?? ''
+    document.getElementById('mb-obs').value   = b.observacoes ?? ''
+    document.getElementById('mb-ativo').checked = b.status
+    abrirModal('bercario')
+  }
+
+  window.salvarBercario = async function() {
+    const nome = document.getElementById('mb-nome').value.trim()
+    if (!nome) { alert('Informe o nome do berçário.'); return }
+    const payload = {
+      nome,
+      tipo:                  document.getElementById('mb-tipo').value,
+      capacidade_max:        parseInt(document.getElementById('mb-cap').value) || null,
+      uc_id:                 document.getElementById('mb-uc').value   || null,
+      responsavel_id:        document.getElementById('mb-resp').value || null,
+      localizacao_descricao: document.getElementById('mb-local').value.trim() || null,
+      observacoes:           document.getElementById('mb-obs').value.trim() || null,
+      status:                document.getElementById('mb-ativo').checked,
+      atualizado_em:         new Date().toISOString(),
+    }
+    const { error } = _editBercarioId
+      ? await db.from('bercarios').update(payload).eq('id', _editBercarioId)
+      : await db.from('bercarios').insert(payload)
+    if (error) { alert('Erro ao salvar: ' + error.message); return }
+    fecharModal('bercario')
+    await carregarDados()
+  }
+
 })()
 </script>
+<!-- ── Modal: Berçário ─────────────────────────────────────── -->
+<div class="modal-overlay" id="modal-bercario">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-header">
+      <div class="modal-title" id="mb-titulo">Novo Berçário</div>
+      <button class="modal-close" onclick="fecharModal('bercario')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Nome <span class="obrig">*</span></label>
+          <input class="form-control" id="mb-nome" placeholder="Ex: Berçário 1, Tanque A…">
+        </div>
+        <div class="form-group"><label class="form-label">Tipo <span class="obrig">*</span></label>
+          <select class="form-control" id="mb-tipo">
+            <option value="tanque_fibra">Tanque de fibra</option>
+            <option value="piscina_alvenaria">Piscina de alvenaria</option>
+            <option value="viveiro">Viveiro</option>
+            <option value="outro">Outro</option>
+          </select>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Capacidade máxima</label>
+          <input class="form-control" id="mb-cap" type="number" min="1" placeholder="Nº de filhotes">
+        </div>
+        <div class="form-group"><label class="form-label">Unidade de Conservação</label>
+          <select class="form-control" id="mb-uc"><option value="">Nenhuma (fora de UC)</option></select>
+        </div>
+      </div>
+      <div class="form-group"><label class="form-label">Localização / Endereço</label>
+        <input class="form-control" id="mb-local" placeholder="Descrição do local…">
+      </div>
+      <div class="form-group"><label class="form-label">Responsável</label>
+        <select class="form-control" id="mb-resp"><option value="">Nenhum</option></select>
+      </div>
+      <div class="form-group"><label class="form-label">Observações</label>
+        <textarea class="form-control" id="mb-obs" rows="2"></textarea>
+      </div>
+      <div class="form-group" style="display:flex;align-items:center;gap:8px">
+        <input type="checkbox" id="mb-ativo" checked style="width:16px;height:16px">
+        <label for="mb-ativo" style="margin:0;cursor:pointer">Berçário ativo</label>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="fecharModal('bercario')">Cancelar</button>
+      <button class="btn btn-primary" onclick="salvarBercario()">Salvar</button>
+    </div>
+  </div>
+</div>
+
 <style>
 .tab-btn { background:transparent;border:none;padding:6px 14px;border-radius:7px;cursor:pointer;font-size:.88rem;font-weight:600;color:var(--floresta,#0A1A0F);opacity:.62;transition:all .15s }
 .tab-btn.ativo { background:white;color:var(--floresta,#0A1A0F);opacity:1;box-shadow:0 1px 4px rgba(0,0,0,.12) }
