@@ -423,11 +423,12 @@ async function bioEntrarNaHome() {
 
   // Fila
   await bioAtualizarBadgeFila()
+  await bioAtualizarCardCorrecao()
 
   // Sync automático
   bioSyncTudo({
     monitorId:   monitor.id,
-    onConcluido: () => bioAtualizarBadgeFila(),
+    onConcluido: () => { bioAtualizarBadgeFila(); bioAtualizarCardCorrecao() },
     onErro:      (e) => console.warn('biomonitor sync:', e),
   })
 
@@ -497,6 +498,7 @@ function bioIniciarListenersHome() {
     bioAbrirFormNinho()
   })
   document.getElementById('bio-btn-abertos')?.addEventListener('click', bioAbrirTelaAbertos)
+  document.getElementById('bio-correcao-card')?.addEventListener('click', bioAbrirCorrecoes)
   document.getElementById('bio-btn-historico')?.addEventListener('click', bioAbrirTelaHistorico)
   document.getElementById('bio-btn-sync-home')?.addEventListener('click', () => {
     bioSyncTudo({
@@ -893,6 +895,11 @@ window.bioTrocarPraiaNoForm = function() {
 }
 
 function bioAbrirFormNinho() {
+  BioApp.editandoNinho = null
+  document.getElementById('bio-form-ninho-titulo').textContent = 'Novo Ninho'
+  document.getElementById('bio-btn-salvar-ninho').textContent  = 'Salvar Ninho'
+  const cbox = document.getElementById('bio-form-correcao-box')
+  if (cbox) cbox.hidden = true
   const praia = BioApp.praiaAtual
   document.getElementById('bio-form-praia-label').textContent = praia?.nome ?? '—'
   document.getElementById('bio-form-data').value = new Date().toISOString().slice(0, 10)
@@ -949,6 +956,86 @@ function bioAbrirFormNinho() {
   if (modo === 'maxima') _bioIniciarCapturaGps(10, 4000)
 }
 
+// Abre o formulário de ninho em modo CORREÇÃO: pré-preenche os dados do
+// ninho que o gestor devolveu (status_validacao = em_correcao) para o
+// monitor ajustar e reenviar. Ao salvar volta para 'pendente'.
+function bioAbrirCorrecaoNinho(ninho) {
+  BioApp.editandoNinho = ninho
+  document.getElementById('bio-form-ninho-titulo').textContent = 'Corrigir Ninho'
+  document.getElementById('bio-btn-salvar-ninho').textContent  = 'Reenviar correção'
+
+  const cbox = document.getElementById('bio-form-correcao-box')
+  const cmsg = document.getElementById('bio-form-correcao-motivo')
+  if (cbox) cbox.hidden = false
+  if (cmsg) cmsg.textContent = ninho.motivo_rejeicao || 'Sem motivo informado.'
+
+  document.getElementById('bio-form-praia-label').textContent = ninho.praia_nome ?? '—'
+  document.getElementById('bio-form-data').value         = ninho.data_encontro ?? ''
+  document.getElementById('bio-form-hora-desova').value  = ninho.hora_desova ?? ''
+  document.getElementById('bio-form-numero').value       = ninho.numero_ninho ?? ''
+  document.getElementById('bio-form-obs').value          = ninho.observacoes ?? ''
+
+  // Espécie
+  document.querySelectorAll('.bio-especie-chip').forEach(c =>
+    c.classList.toggle('sel', c.dataset.esp === ninho.especie))
+
+  // Ovos
+  document.getElementById('bio-form-qtd-ovos').value        = ninho.qtd_ovos        ?? ''
+  document.getElementById('bio-form-ovos-integros').value   = ninho.ovos_integros   ?? ''
+  document.getElementById('bio-form-ovos-descartados').value = ninho.ovos_descartados ?? ''
+
+  // Condições
+  document.getElementById('bio-form-temperatura').value   = ninho.temperatura_c   ?? ''
+  document.getElementById('bio-form-umidade').value       = ninho.umidade_pct      ?? ''
+  document.getElementById('bio-form-profundidade').value  = ninho.profundidade_cm  ?? ''
+
+  // Distância ao rio
+  document.getElementById('bio-form-dist-rio').value = ninho.dist_rio_m ?? ''
+  BioApp.distRioMetodo = ninho.dist_rio_metodo ?? 'tracker'
+  BioApp.distRioLatRio = null
+  BioApp.distRioLngRio = null
+  document.querySelectorAll('.bio-dist-chip').forEach(c =>
+    c.classList.toggle('ativo', c.dataset.metodo === BioApp.distRioMetodo))
+  document.getElementById('bio-dist-medir-gps').style.display = ''
+  document.getElementById('bio-btn-marcar-rio-txt').textContent = 'Marcar ponto do Rio'
+
+  // Estado do form preservando identidade do ninho
+  BioApp.formNinho = {
+    uuid_cliente:  ninho.uuid_cliente,
+    server_id:     ninho.server_id ?? ninho.id ?? null,
+    praia_id:      ninho.praia_id ?? null,
+    praia_atual_id: ninho.praia_atual_id ?? null,
+    numero_atual:  ninho.numero_atual ?? null,
+    uc_id:         ninho.uc_id ?? BioApp.monitor?.uc_id ?? null,
+    grupo_id:      ninho.grupo_id ?? BioApp.monitor?.grupo_id ?? null,
+    status:        ninho.status ?? 'encontrado',
+    foto_urls:     Array.isArray(ninho.foto_urls) ? [...ninho.foto_urls] : [],
+    criado_em:     ninho.criado_em ?? new Date().toISOString(),
+  }
+  // GPS já capturado do ninho
+  BioApp.formGpsCapturado = (ninho.lat != null && ninho.lng != null)
+    ? { lat: ninho.lat, lng: ninho.lng, precisao_m: ninho.precisao_gps_m ?? null }
+    : null
+  document.getElementById('bio-form-gps-coords').textContent =
+    bioFormatarCoords(ninho.lat, ninho.lng)
+
+  // Atualiza miniatura de fotos
+  document.getElementById('bio-form-foto-count').textContent =
+    `(${BioApp.formNinho.foto_urls.length}/3)`
+
+  bioMostrarTela('tela-form-ninho')
+  if (typeof bioIniciarFotosForm === 'function') {
+    const grid = document.getElementById('bio-form-foto-grid')
+    if (grid) {
+      grid.innerHTML = ''
+      BioApp.formNinho.foto_urls.forEach(url => {
+        const img = document.createElement('img'); img.src = url; grid.appendChild(img)
+      })
+    }
+  }
+  bioVerificarPerimetroNinho()
+}
+
 function bioAtualizarGpsForm() {
   const el = document.getElementById('bio-form-gps-coords')
   if (!el || el.style.display === 'none') return  // durante captura de média, não sobrescreve
@@ -969,6 +1056,8 @@ async function bioSalvarNinho() {
   const parseNum2 = id => { const v = parseFloat(document.getElementById(id).value); return isNaN(v) ? null : v }
   const distVal   = parseFloat(document.getElementById('bio-form-dist-rio').value)
 
+  const editando = BioApp.editandoNinho
+
   const ninho = {
     ...BioApp.formNinho,
     numero_ninho:     numero,
@@ -979,8 +1068,13 @@ async function bioSalvarNinho() {
     lat:              BioApp.formGpsCapturado?.lat       ?? BioApp.gpsLat,
     lng:              BioApp.formGpsCapturado?.lng       ?? BioApp.gpsLng,
     precisao_gps_m:   BioApp.formGpsCapturado?.precisao_m ?? BioApp.gpsPrecisao,
-    status:           'encontrado',
+    // No reenvio de correção preserva o status do ciclo (encontrado/
+    // transferido) e devolve a validação para 'pendente', limpando o motivo.
+    status:           editando ? (BioApp.formNinho.status ?? 'encontrado') : 'encontrado',
     status_validacao: 'pendente',
+    motivo_rejeicao:  null,
+    reenvio_correcao: editando ? true : (BioApp.formNinho.reenvio_correcao ?? false),
+    status_sync:      'pendente',
     qtd_ovos:         parseNum('bio-form-qtd-ovos'),
     ovos_integros:    parseNum('bio-form-ovos-integros'),
     ovos_descartados: parseNum('bio-form-ovos-descartados'),
@@ -993,14 +1087,16 @@ async function bioSalvarNinho() {
 
   await bioOfflineSalvarNinho(ninho)
   await bioAtualizarBadgeFila()
+  await bioAtualizarCardCorrecao()
 
   // Tenta sync imediato
   bioSyncTudo({
     monitorId:   BioApp.monitor?.id,
-    onConcluido: () => bioAtualizarBadgeFila(),
+    onConcluido: () => { bioAtualizarBadgeFila(); bioAtualizarCardCorrecao() },
   })
 
-  bioToast('Ninho registrado!', 'ok')
+  bioToast(editando ? 'Correção reenviada!' : 'Ninho registrado!', 'ok')
+  BioApp.editandoNinho = null
   bioMostrarTela('tela-home')
 }
 
@@ -1884,8 +1980,20 @@ function bioIniciarFormVisita() {
    NINHOS ABERTOS / HISTÓRICO
    ════════════════════════════════════════════════════════════ */
 async function bioAbrirTelaAbertos() {
+  BioApp.abertosSoCorrecao = false
   // Inicializa filtro com a praia atual (se não definido ainda)
   if (BioApp.abertosFiltroPraia === undefined) BioApp.abertosFiltroPraia = BioApp.praiaAtual ?? null
+  bioMostrarTela('tela-abertos')
+  bioAtualizarLabelFiltro('abertos')
+  bioMostrarGeoSugTab('abertos')
+  await bioCarregarAbertos()
+}
+
+// Abre a lista filtrando apenas os ninhos devolvidos para correção
+// (todas as praias), a partir do card da home.
+async function bioAbrirCorrecoes() {
+  BioApp.abertosFiltroPraia = null
+  BioApp.abertosSoCorrecao  = true
   bioMostrarTela('tela-abertos')
   bioAtualizarLabelFiltro('abertos')
   bioMostrarGeoSugTab('abertos')
@@ -1925,7 +2033,7 @@ async function bioCarregarAbertos() {
     try {
       let q = bioSupabase()
         .from('vw_ninhos_validacao')
-        .select('id,uuid_cliente,numero_ninho,numero_atual,especie,data_encontro,status,status_validacao,motivo_rejeicao,qtd_ovos,ovos_integros,ovos_descartados,dist_rio_m,criado_em,praia_id,praia_nome,praia_atual_id,praia_atual_nome,monitor_id,monitor_nome')
+        .select('id,uuid_cliente,numero_ninho,numero_atual,especie,data_encontro,hora_desova,status,status_validacao,motivo_rejeicao,qtd_ovos,ovos_integros,ovos_descartados,dist_rio_m,dist_rio_metodo,temperatura_c,umidade_pct,profundidade_cm,observacoes,foto_urls,lat,lng,precisao_gps_m,criado_em,praia_id,praia_nome,praia_atual_id,praia_atual_nome,monitor_id,monitor_nome')
         .eq('grupo_id', BioApp.monitor.grupo_id)
         .order('numero_atual', { ascending: false })
       if (filtroStatus) {
@@ -1962,10 +2070,17 @@ async function bioCarregarAbertos() {
     ninhos = localAll.filter(estaAberto).map(n => bioMapNinhoPraias(n, praias))
   }
 
+  // Card "precisam de correção": restringe aos devolvidos pelo gestor
+  if (BioApp.abertosSoCorrecao) {
+    ninhos = ninhos.filter(n => n.status_validacao === 'em_correcao')
+  }
+
   if (!ninhos.length) {
-    estadoEl.textContent = filtroPraia
-      ? `Nenhum ninho aberto em ${filtroPraia.nome}.`
-      : 'Nenhum ninho aberto encontrado.'
+    estadoEl.textContent = BioApp.abertosSoCorrecao
+      ? 'Nenhum ninho aguardando correção.'
+      : filtroPraia
+        ? `Nenhum ninho aberto em ${filtroPraia.nome}.`
+        : 'Nenhum ninho aberto encontrado.'
     estadoEl.hidden = false
   } else {
     estadoEl.hidden = true
@@ -2018,6 +2133,10 @@ function bioNinhoCardInner(n, opts = {}) {
     ? `<div class="bio-nfc-rejeicao">Rejeitado: ${n.motivo_rejeicao ?? ''}</div>`
     : ''
 
+  const corrHtml = n.status_validacao === 'em_correcao'
+    ? `<div class="bio-nfc-rejeicao" style="background:#eef2ff;color:#4338ca">Correção solicitada: ${n.motivo_rejeicao ?? ''}</div>`
+    : ''
+
   const ovosHtml = (n.qtd_ovos != null || n.ovos_integros != null || n.ovos_descartados != null) ? `
     <div class="bio-nfc-ovos">
       ${n.qtd_ovos         != null ? `<span>${n.qtd_ovos} ovos</span>` : ''}
@@ -2048,6 +2167,7 @@ function bioNinhoCardInner(n, opts = {}) {
 
   const acoesHtml = mostrarAcoes ? `
     <div class="bio-nfc-acoes">
+      ${n.status_validacao === 'em_correcao' ? `<button class="bio-btn-sm prim" data-acao="corrigir">Corrigir</button>` : ''}
       ${status === 'encontrado' || status === 'transferido' ? `<button class="bio-btn-sm prim" data-acao="transferencia">+ Transferência</button>` : ''}
       ${status !== 'eclodido' && status !== 'perdido' ? `<button class="bio-btn-sm ghost" data-acao="eclosao">Eclosão</button>` : ''}
       ${status === 'eclodido' ? `<button class="bio-btn-sm prim" data-acao="soltar">Soltar</button>` : ''}
@@ -2066,6 +2186,7 @@ function bioNinhoCardInner(n, opts = {}) {
     </div>
     ${origemHtml}
     ${rejHtml}
+    ${corrHtml}
     ${ovosHtml}
     ${condicoesHtml}
     ${localChip ? `<div class="bio-nfc-eventos">${localChip}</div>` : ''}
@@ -2089,6 +2210,7 @@ function bioRenderizarListaNinhos(containerId, ninhos, mostrarAcoes) {
     card.querySelectorAll('[data-acao]').forEach(btn => {
       btn.addEventListener('click', e => {
         e.stopPropagation()
+        if (btn.dataset.acao === 'corrigir')      bioAbrirCorrecaoNinho(n)
         if (btn.dataset.acao === 'transferencia') bioAbrirFormTransf(n)
         if (btn.dataset.acao === 'eclosao')       bioAbrirFormEclosao(n)
         if (btn.dataset.acao === 'visita')        bioAbrirFormVisita(n)
@@ -2202,6 +2324,21 @@ async function bioAtualizarBadgeFila() {
   const count = document.getElementById('bio-fila-count')
   if (card) card.hidden = total === 0
   if (count) count.textContent = `${total} registro${total !== 1 ? 's' : ''}`
+}
+
+// Card na home: ninhos devolvidos pelo gestor para correção.
+async function bioAtualizarCardCorrecao() {
+  const card  = document.getElementById('bio-correcao-card')
+  const count = document.getElementById('bio-correcao-count')
+  if (!card) return
+  let n = 0
+  try {
+    const todos = await bioOfflineListarNinhos({})
+    n = todos.filter(x => x.status_validacao === 'em_correcao'
+      && x.status !== 'eclodido' && x.status !== 'perdido').length
+  } catch (_) {}
+  card.hidden = n === 0
+  if (count) count.textContent = `${n} ninho${n !== 1 ? 's' : ''}`
 }
 
 /* ════════════════════════════════════════════════════════════
