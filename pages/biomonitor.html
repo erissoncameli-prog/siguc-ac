@@ -872,6 +872,21 @@
   </div>
 </div>
 
+<!-- ══ TELA: SELETOR DE BERÇÁRIO ═════════════════════════════ -->
+<div id="tela-seletor-bercario" class="bio-tela">
+  <header class="bio-form-header">
+    <button class="bio-btn-back" id="bio-sel-berc-back" aria-label="Voltar">‹</button>
+    <span>Escolher Berçário</span>
+    <span></span>
+  </header>
+  <div class="bio-form-body">
+    <div id="bio-lista-bercarios-sel" style="padding-top:8px"></div>
+    <p id="bio-bercarios-vazio" style="text-align:center;color:#9CA3AF;padding:32px" hidden>
+      Nenhum berçário cadastrado. Solicite ao administrador.
+    </p>
+  </div>
+</div>
+
 <!-- ══ TELA: ENTRADA NO BERÇÁRIO ════════════════════════════════ -->
 <div id="tela-form-entrada-bercario" class="bio-tela">
   <header class="bio-form-header">
@@ -890,9 +905,11 @@
     </div>
 
     <div class="bio-form-section">
-      <label class="bio-form-label" for="bio-berc-nome">Berçário / Tanque *</label>
-      <input type="text" id="bio-berc-nome" class="bio-form-input"
-        placeholder="Ex: Berçário 1, Tanque A…" autocomplete="off">
+      <span class="bio-form-label">Berçário *</span>
+      <button type="button" id="bio-berc-nome-btn" class="bio-form-select-btn">
+        <span id="bio-berc-nome-txt">Selecionar berçário…</span>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
     </div>
 
     <div class="bio-form-section">
@@ -1032,6 +1049,130 @@
   <div class="bio-form-body">
     <div id="bio-bercarios-estado" style="text-align:center;color:#9CA3AF;padding:32px" hidden></div>
     <div id="bio-lista-lotes"></div>
+  </div>
+</div>
+
+<!-- ══ TELA: DETALHE DO LOTE ══════════════════════════════════ -->
+<div id="tela-detalhe-lote" class="bio-tela">
+  <header class="bio-form-header">
+    <button class="bio-btn-back" data-back="tela-bercarios" aria-label="Voltar">‹</button>
+    <span>Lote em Berçário</span>
+    <span></span>
+  </header>
+  <div class="bio-form-body">
+    <div class="bio-det-lote-header">
+      <div class="bio-det-lote-row">
+        <span class="bio-form-label">Ninho</span>
+        <strong>N° <span id="bio-det-ninho-num">—</span> · <span id="bio-det-especie"></span></strong>
+      </div>
+      <div class="bio-det-lote-row">
+        <span class="bio-form-label">Berçário</span>
+        <strong id="bio-det-bercario">—</strong>
+      </div>
+      <div class="bio-det-lote-stats">
+        <div class="bio-det-stat">
+          <span class="bio-det-stat-n" id="bio-det-qtd">—</span>
+          <span>Filhotes</span>
+        </div>
+        <div class="bio-det-stat">
+          <span class="bio-det-stat-n" id="bio-det-dias">—</span>
+          <span>Dias</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:10px;padding:0 16px 16px">
+      <button type="button" id="bio-btn-nova-ocorrencia" class="bio-btn-sm prim" style="flex:1">
+        + Ocorrência
+      </button>
+      <button type="button" id="bio-btn-soltar-lote" class="bio-btn-sm prim" style="flex:1;background:var(--bio-verde)">
+        Registrar Soltura
+      </button>
+    </div>
+
+    <div style="padding:0 16px;margin-bottom:8px">
+      <span class="bio-form-label">Histórico de ocorrências</span>
+    </div>
+    <div id="bio-det-timeline" style="padding:0 16px"></div>
+  </div>
+</div>
+
+<!-- ══ TELA: FORMULÁRIO DE OCORRÊNCIA ════════════════════════ -->
+<div id="tela-form-ocorrencia" class="bio-tela">
+  <header class="bio-form-header">
+    <button class="bio-btn-back" id="bio-oc-back" aria-label="Voltar">‹</button>
+    <span>Nova Ocorrência</span>
+    <span></span>
+  </header>
+  <div class="bio-form-body">
+
+    <div class="bio-form-section">
+      <span class="bio-form-label">Tipo *</span>
+      <div class="bio-oc-tipo-grid" id="bio-oc-tipo-grid">
+        <button type="button" class="bio-oc-chip ativo" data-tipo="alimentacao">Alimentação</button>
+        <button type="button" class="bio-oc-chip" data-tipo="biometria">Biometria</button>
+        <button type="button" class="bio-oc-chip" data-tipo="mortalidade">Mortalidade</button>
+        <button type="button" class="bio-oc-chip" data-tipo="doenca">Doença</button>
+        <button type="button" class="bio-oc-chip" data-tipo="tratamento">Tratamento</button>
+        <button type="button" class="bio-oc-chip" data-tipo="observacao">Observação</button>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0">
+      <div class="bio-form-section">
+        <label class="bio-form-label" for="bio-oc-data">Data *</label>
+        <input type="date" id="bio-oc-data" class="bio-form-input">
+      </div>
+      <div class="bio-form-section">
+        <label class="bio-form-label" for="bio-oc-hora">Hora</label>
+        <input type="time" id="bio-oc-hora" class="bio-form-input">
+      </div>
+    </div>
+
+    <div id="bio-oc-sec-biometria" hidden>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0">
+        <div class="bio-form-section">
+          <label class="bio-form-label" for="bio-oc-comp">Comp. médio (cm)</label>
+          <input type="number" id="bio-oc-comp" class="bio-form-input" step="0.1" min="0" placeholder="0.0">
+        </div>
+        <div class="bio-form-section">
+          <label class="bio-form-label" for="bio-oc-peso">Peso médio (g)</label>
+          <input type="number" id="bio-oc-peso" class="bio-form-input" step="0.1" min="0" placeholder="0.0">
+        </div>
+        <div class="bio-form-section">
+          <label class="bio-form-label" for="bio-oc-amostrados">Amostrados</label>
+          <input type="number" id="bio-oc-amostrados" class="bio-form-input" step="1" min="0" placeholder="0">
+        </div>
+      </div>
+    </div>
+
+    <div id="bio-oc-sec-mortalidade" hidden>
+      <div class="bio-form-section">
+        <span class="bio-form-label">Quantidade afetada</span>
+        <div class="bio-counter-row">
+          <button type="button" id="bio-oc-aff-minus" class="bio-counter-btn">−</button>
+          <div style="flex:1;text-align:center">
+            <span class="bio-counter-val" id="bio-oc-afetados">0</span>
+            <span class="bio-counter-label">filhotes</span>
+          </div>
+          <button type="button" id="bio-oc-aff-plus" class="bio-counter-btn">+</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="bio-oc-sec-causa" hidden>
+      <div class="bio-form-section">
+        <label class="bio-form-label" for="bio-oc-causa">Causa</label>
+        <input type="text" id="bio-oc-causa" class="bio-form-input" placeholder="Descreva a causa…" autocomplete="off">
+      </div>
+    </div>
+
+    <div id="bio-oc-sec-descricao" class="bio-form-section">
+      <label class="bio-form-label" for="bio-oc-descricao" id="bio-oc-desc-label">Descrição / Observações</label>
+      <textarea id="bio-oc-descricao" class="bio-form-textarea" rows="3" placeholder="Descreva…"></textarea>
+    </div>
+
+    <button type="button" id="bio-btn-salvar-ocorrencia" class="bio-btn-salvar">Salvar Ocorrência</button>
   </div>
 </div>
 

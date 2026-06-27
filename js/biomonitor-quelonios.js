@@ -1261,8 +1261,8 @@ function bioAbrirFormEntradaBercario() {
   document.getElementById('bio-berc-ninho-num').textContent = ninho.numero_ninho
   document.getElementById('bio-berc-especie').textContent   = BIO_ESPECIES.find(e => e.id === ninho.especie)?.nome ?? ninho.especie
   BioApp.formBercarioSelecionado = null
-  const btn = document.getElementById('bio-berc-nome-btn')
-  if (btn) btn.textContent = 'Selecionar berçário…'
+  const nomeSpan = document.getElementById('bio-berc-nome-txt')
+  if (nomeSpan) nomeSpan.textContent = 'Selecionar berçário…'
   document.getElementById('bio-berc-data').value  = new Date().toISOString().slice(0, 10)
   document.getElementById('bio-berc-hora').value  = new Date().toTimeString().slice(0, 5)
   document.getElementById('bio-berc-obs').value   = ''
@@ -1411,38 +1411,231 @@ async function bioCarregarBercarios() {
   const lotes = await bioOfflineLotesAtivos()
 
   if (!lotes.length) {
-    if (estadoEl) estadoEl.textContent = 'Nenhum lote em berçário no momento.'
+    if (estadoEl) { estadoEl.textContent = 'Nenhum lote em berçário no momento.'; estadoEl.hidden = false }
     return
   }
   if (estadoEl) estadoEl.hidden = true
 
-  const praias = await bioOfflineListarPraias()
+  // Agrupa por bercario_id (ou 'sem-bercario')
+  const grupos = {}
   lotes.forEach(l => {
-    const card = document.createElement('div')
-    card.className = 'bio-nfc'
-    const espNome  = BIO_ESPECIES.find(e => e.id === l.especie)?.nome ?? l.especie ?? '—'
-    const diasStr  = _bioDiasDesde(l.data_entrada)
-    card.innerHTML = `
-      <div class="bio-nfc-header">
-        <span class="bio-nfc-num">${l.bercario_nome}</span>
-        <span class="bio-nfc-status-badge encontrado">${diasStr}</span>
-      </div>
-      <div class="bio-nfc-especie">${espNome} · Ninho <strong>#${l.ninho_numero ?? '—'}</strong></div>
-      <div class="bio-nfc-row">
-        <span style="font-size:12px"><strong>${l.qtd_entrada}</strong> filhotes</span>
-        <span class="bio-nfc-data">Entrada: ${_bioFormatarData(l.data_entrada)}</span>
-      </div>
-      <div class="bio-nfc-acoes">
-        <button class="bio-btn-sm prim" data-acao="soltar-lote">Soltar agora</button>
+    const chave = l.bercario_id ?? 'sem-bercario'
+    if (!grupos[chave]) grupos[chave] = { nome: l.bercario_nome ?? 'Berçário não identificado', lotes: [] }
+    grupos[chave].lotes.push(l)
+  })
+
+  Object.values(grupos).forEach(grupo => {
+    const totalFilhotes = grupo.lotes.reduce((s, l) => s + (l.qtd_entrada || 0), 0)
+
+    const header = document.createElement('div')
+    header.className = 'bio-berc-grupo-header'
+    header.innerHTML = `
+      <span>${grupo.nome}</span>
+      <span class="bio-berc-grupo-stats">${grupo.lotes.length} lote${grupo.lotes.length !== 1 ? 's' : ''} · ${totalFilhotes} filhotes</span>
+    `
+    listaEl.appendChild(header)
+
+    grupo.lotes.forEach(l => {
+      const card = document.createElement('div')
+      card.className = 'bio-nfc'
+      const espNome = BIO_ESPECIES.find(e => e.id === l.especie)?.nome ?? l.especie ?? '—'
+      const diasStr = _bioDiasDesde(l.data_entrada)
+      card.innerHTML = `
+        <div class="bio-nfc-header">
+          <span class="bio-nfc-num">Ninho #${l.ninho_numero ?? '—'}</span>
+          <span class="bio-nfc-status-badge encontrado">${diasStr}</span>
+        </div>
+        <div class="bio-nfc-especie">${espNome}</div>
+        <div class="bio-nfc-row">
+          <span style="font-size:12px"><strong>${l.qtd_entrada}</strong> filhotes</span>
+          <span class="bio-nfc-data">Entrada: ${_bioFormatarData(l.data_entrada)}</span>
+        </div>
+        <div class="bio-nfc-acoes">
+          <button class="bio-btn-sm prim" data-acao="detalhe-lote">Ver detalhe</button>
+          <button class="bio-btn-sm prim" data-acao="soltar-lote">Soltar</button>
+        </div>
+      `
+      card.querySelector('[data-acao="detalhe-lote"]')?.addEventListener('click', () => {
+        bioAbrirTelaDetalheLote(l)
+      })
+      card.querySelector('[data-acao="soltar-lote"]')?.addEventListener('click', async () => {
+        const ninho = await bioOfflineGetNinho(l.ninho_uuid)
+        if (!ninho) { bioToast('Ninho não encontrado no cache.', 'err'); return }
+        bioAbrirFormSoltura({ ninho, filhotesVivos: l.qtd_entrada, lote: l })
+      })
+      listaEl.appendChild(card)
+    })
+  })
+}
+
+async function bioAbrirSeletorBercario(callback) {
+  const lista = await bioOfflineListarBercarios()
+  const selEl  = document.getElementById('bio-lista-bercarios-sel')
+  const vazioEl = document.getElementById('bio-bercarios-vazio')
+  if (selEl) selEl.innerHTML = ''
+
+  if (!lista.length) {
+    if (vazioEl)  vazioEl.hidden = false
+    if (selEl)    selEl.hidden   = true
+  } else {
+    if (vazioEl)  vazioEl.hidden = true
+    if (selEl) {
+      selEl.hidden = false
+      const TIPO_LABEL = { tanque_fibra: 'Tanque de fibra', piscina_alvenaria: 'Piscina de alvenaria', viveiro: 'Viveiro', outro: 'Outro' }
+      lista.forEach(b => {
+        const card = document.createElement('div')
+        card.className = 'bio-berc-sel-card'
+        card.innerHTML = `
+          <div class="bio-berc-sel-info">
+            <div class="bio-berc-sel-nome">${b.nome}</div>
+            <div class="bio-berc-sel-meta">${TIPO_LABEL[b.tipo] ?? b.tipo}</div>
+          </div>
+          ${b.capacidade_max ? `<span class="bio-berc-sel-cap">Máx. ${b.capacidade_max}</span>` : ''}
+        `
+        card.addEventListener('click', () => {
+          callback(b)
+        })
+        selEl.appendChild(card)
+      })
+    }
+  }
+
+  document.getElementById('bio-sel-berc-back')?.addEventListener('click', () => {
+    bioMostrarTela('tela-form-entrada-bercario')
+  }, { once: true })
+
+  bioMostrarTela('tela-seletor-bercario')
+}
+
+function bioAbrirTelaDetalheLote(lote) {
+  BioApp.loteAtual = lote
+  const espNome = BIO_ESPECIES.find(e => e.id === lote.especie)?.nome ?? lote.especie ?? '—'
+  const diasNum = Math.floor((Date.now() - new Date(lote.data_entrada)) / 86400000)
+
+  const el = id => document.getElementById(id)
+  if (el('bio-det-ninho-num'))  el('bio-det-ninho-num').textContent  = lote.ninho_numero ?? '—'
+  if (el('bio-det-especie'))    el('bio-det-especie').textContent    = espNome
+  if (el('bio-det-bercario'))   el('bio-det-bercario').textContent   = lote.bercario_nome ?? '—'
+  if (el('bio-det-qtd'))        el('bio-det-qtd').textContent        = lote.qtd_entrada ?? '—'
+  if (el('bio-det-dias'))       el('bio-det-dias').textContent       = diasNum >= 0 ? diasNum : '—'
+
+  bioCarregarTimelineLote(lote)
+  bioMostrarTela('tela-detalhe-lote')
+}
+
+async function bioCarregarTimelineLote(lote) {
+  const timelineEl = document.getElementById('bio-det-timeline')
+  if (!timelineEl) return
+
+  const ocorrencias = await bioOfflineOcorrenciasDoLote(lote.uuid_cliente)
+
+  if (!ocorrencias.length) {
+    timelineEl.innerHTML = `<div class="bio-tl-vazio">Nenhuma ocorrência registrada.</div>`
+    return
+  }
+
+  const TIPO_ICONE = {
+    alimentacao: `<path d="M18 8h1a4 4 0 0 1 0 8h-1M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8zM6 1v3M10 1v3M14 1v3"/>`,
+    biometria:   `<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>`,
+    mortalidade: `<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><line x1="9" y1="12" x2="15" y2="12"/>`,
+    doenca:      `<path d="M8 2h8l4 4v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/>`,
+    tratamento:  `<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>`,
+    observacao:  `<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>`,
+  }
+  const TIPO_NOME = { alimentacao: 'Alimentação', biometria: 'Biometria', mortalidade: 'Mortalidade', doenca: 'Doença', tratamento: 'Tratamento', observacao: 'Observação' }
+
+  timelineEl.innerHTML = ocorrencias.map(oc => {
+    const icone = TIPO_ICONE[oc.tipo] ?? TIPO_ICONE.observacao
+    const detalhes = []
+    if (oc.comprimento_medio_cm != null) detalhes.push(`Comp.: ${oc.comprimento_medio_cm} cm`)
+    if (oc.peso_medio_g != null)         detalhes.push(`Peso: ${oc.peso_medio_g} g`)
+    if (oc.n_amostrados != null)         detalhes.push(`Amostrados: ${oc.n_amostrados}`)
+    if (oc.qtd_afetados != null)         detalhes.push(`Afetados: ${oc.qtd_afetados}`)
+    if (oc.causa)                        detalhes.push(`Causa: ${oc.causa}`)
+    if (oc.descricao)                    detalhes.push(oc.descricao)
+    const dataFmt = _bioFormatarData(oc.data_ocorrencia) + (oc.hora_ocorrencia ? ` às ${oc.hora_ocorrencia}` : '')
+    return `
+      <div class="bio-tl-item">
+        <div class="bio-tl-icone">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${icone}</svg>
+        </div>
+        <div class="bio-tl-body">
+          <div class="bio-tl-tipo">${TIPO_NOME[oc.tipo] ?? oc.tipo}</div>
+          <div class="bio-tl-data">${dataFmt}</div>
+          ${detalhes.length ? `<div class="bio-tl-detalhe">${detalhes.join(' · ')}</div>` : ''}
+        </div>
       </div>
     `
-    card.querySelector('[data-acao="soltar-lote"]')?.addEventListener('click', async () => {
-      const ninho = await bioOfflineGetNinho(l.ninho_uuid)
-      if (!ninho) { bioToast('Ninho não encontrado no cache.', 'err'); return }
-      bioAbrirFormSoltura({ ninho, filhotesVivos: l.qtd_entrada, lote: l })
-    })
-    listaEl.appendChild(card)
+  }).join('')
+}
+
+function bioAbrirFormOcorrencia(lote) {
+  BioApp.loteAtual = lote
+  document.getElementById('bio-oc-data').value = new Date().toISOString().slice(0, 10)
+  document.getElementById('bio-oc-hora').value = new Date().toTimeString().slice(0, 5)
+  document.getElementById('bio-oc-comp').value = ''
+  document.getElementById('bio-oc-peso').value = ''
+  document.getElementById('bio-oc-amostrados').value = ''
+  document.getElementById('bio-oc-causa').value = ''
+  document.getElementById('bio-oc-descricao').value = ''
+  document.getElementById('bio-oc-afetados').textContent = '0'
+
+  document.querySelectorAll('#bio-oc-tipo-grid .bio-oc-chip').forEach((chip, i) => {
+    chip.classList.toggle('ativo', i === 0)
   })
+  bioAtualizarCamposOcorrencia('alimentacao')
+  bioMostrarTela('tela-form-ocorrencia')
+}
+
+function bioAtualizarCamposOcorrencia(tipo) {
+  const show = id => { const el = document.getElementById(id); if (el) el.hidden = false }
+  const hide = id => { const el = document.getElementById(id); if (el) el.hidden = true  }
+
+  hide('bio-oc-sec-biometria')
+  hide('bio-oc-sec-mortalidade')
+  hide('bio-oc-sec-causa')
+
+  if (tipo === 'biometria') {
+    show('bio-oc-sec-biometria')
+    show('bio-oc-sec-descricao')
+  } else if (tipo === 'mortalidade' || tipo === 'doenca') {
+    show('bio-oc-sec-mortalidade')
+    show('bio-oc-sec-causa')
+    show('bio-oc-sec-descricao')
+  } else {
+    show('bio-oc-sec-descricao')
+  }
+}
+
+async function bioSalvarOcorrencia() {
+  const lote = BioApp.loteAtual
+  if (!lote) return
+
+  const tipoChip = document.querySelector('#bio-oc-tipo-grid .bio-oc-chip.ativo')
+  const tipo = tipoChip?.dataset.tipo ?? 'observacao'
+  const data = document.getElementById('bio-oc-data').value
+  if (!data) { bioToast('Informe a data da ocorrência.', 'err'); return }
+
+  const oc = {
+    uuid_cliente:         bioUuid(),
+    lote_uuid:            lote.uuid_cliente,
+    tipo,
+    data_ocorrencia:      data,
+    hora_ocorrencia:      document.getElementById('bio-oc-hora').value  || null,
+    comprimento_medio_cm: parseFloat(document.getElementById('bio-oc-comp').value)         || null,
+    peso_medio_g:         parseFloat(document.getElementById('bio-oc-peso').value)         || null,
+    n_amostrados:         parseInt(document.getElementById('bio-oc-amostrados').value)     || null,
+    qtd_afetados:         parseInt(document.getElementById('bio-oc-afetados').textContent) || null,
+    causa:                document.getElementById('bio-oc-causa').value.trim()             || null,
+    descricao:            document.getElementById('bio-oc-descricao').value.trim()         || null,
+    status_sync:          'pendente',
+    criado_em:            new Date().toISOString(),
+  }
+
+  await bioOfflineSalvarOcorrencia(oc)
+  bioSyncTudo({ monitorId: BioApp.monitor?.id, onConcluido: () => bioAtualizarBadgeFila() })
+  bioToast('Ocorrência registrada!', 'ok')
+  bioAbrirTelaDetalheLote(lote)
 }
 
 function _bioDiasDesde(dataStr) {
@@ -1464,10 +1657,11 @@ async function bioAtualizarBadgeBercario() {
   const badge  = document.getElementById('bio-bercarios-badge')
   const label  = document.getElementById('bio-bercarios-label')
   const count  = lotes.length
+  const totalFilhotes = lotes.reduce((s, l) => s + (l.qtd_entrada || 0), 0)
   if (badge)  { badge.textContent = count; badge.hidden = count === 0 }
   if (label)  label.textContent = count > 0
-    ? `${count} lote${count > 1 ? 's' : ''} aguardando soltura`
-    : 'Lotes de filhotes em berçário'
+    ? `${count} lote${count > 1 ? 's' : ''} · ${totalFilhotes} filhotes`
+    : 'Filhotes em berçário'
 }
 
 function bioIniciarPosEclosao() {
@@ -1478,6 +1672,16 @@ function bioIniciarPosEclosao() {
     bioAbrirFormSoltura({ ninho, filhotesVivos })
   })
   document.getElementById('bio-dest-bercario')?.addEventListener('click', bioAbrirFormEntradaBercario)
+
+  // Seletor de berçário no form de entrada
+  document.getElementById('bio-berc-nome-btn')?.addEventListener('click', () => {
+    bioAbrirSeletorBercario(b => {
+      BioApp.formBercarioSelecionado = b
+      const nomeSpan = document.getElementById('bio-berc-nome-txt')
+      if (nomeSpan) nomeSpan.textContent = b.nome
+      bioMostrarTela('tela-form-entrada-bercario')
+    })
+  })
 
   // Contadores berçário
   const bercQtdEl = document.getElementById('bio-berc-qtd')
@@ -1491,6 +1695,39 @@ function bioIniciarPosEclosao() {
   document.getElementById('bio-sol-qtd-minus')?.addEventListener('click',  () => { solQtdEl.textContent  = Math.max(0, parseInt(solQtdEl.textContent)  - 1) })
   document.getElementById('bio-sol-mort-plus')?.addEventListener('click',  () => { solMortEl.textContent = parseInt(solMortEl.textContent) + 1 })
   document.getElementById('bio-sol-mort-minus')?.addEventListener('click', () => { solMortEl.textContent = Math.max(0, parseInt(solMortEl.textContent) - 1) })
+
+  // Contador afetados (ocorrência)
+  const ocAffEl = document.getElementById('bio-oc-afetados')
+  document.getElementById('bio-oc-aff-plus')?.addEventListener('click',  () => { if (ocAffEl) ocAffEl.textContent = parseInt(ocAffEl.textContent) + 1 })
+  document.getElementById('bio-oc-aff-minus')?.addEventListener('click', () => { if (ocAffEl) ocAffEl.textContent = Math.max(0, parseInt(ocAffEl.textContent) - 1) })
+
+  // Chips de tipo de ocorrência
+  document.getElementById('bio-oc-tipo-grid')?.addEventListener('click', e => {
+    const chip = e.target.closest('.bio-oc-chip')
+    if (!chip) return
+    document.querySelectorAll('#bio-oc-tipo-grid .bio-oc-chip').forEach(c => c.classList.remove('ativo'))
+    chip.classList.add('ativo')
+    bioAtualizarCamposOcorrencia(chip.dataset.tipo)
+  })
+
+  // Detalhe do lote: botões de ação
+  document.getElementById('bio-btn-nova-ocorrencia')?.addEventListener('click', () => {
+    if (BioApp.loteAtual) bioAbrirFormOcorrencia(BioApp.loteAtual)
+  })
+  document.getElementById('bio-btn-salvar-ocorrencia')?.addEventListener('click', bioSalvarOcorrencia)
+  document.getElementById('bio-btn-soltar-lote')?.addEventListener('click', async () => {
+    const lote = BioApp.loteAtual
+    if (!lote) return
+    const ninho = await bioOfflineGetNinho(lote.ninho_uuid)
+    if (!ninho) { bioToast('Ninho não encontrado no cache.', 'err'); return }
+    bioAbrirFormSoltura({ ninho, filhotesVivos: lote.qtd_entrada, lote })
+  })
+
+  // Voltar da tela de ocorrência para detalhe
+  document.getElementById('bio-oc-back')?.addEventListener('click', () => {
+    if (BioApp.loteAtual) bioAbrirTelaDetalheLote(BioApp.loteAtual)
+    else bioMostrarTela('tela-bercarios')
+  })
 
   // Botão salvar
   document.getElementById('bio-btn-salvar-entrada-bercario')?.addEventListener('click', bioSalvarEntradaBercario)
