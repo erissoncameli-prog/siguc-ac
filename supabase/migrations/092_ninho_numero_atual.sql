@@ -28,52 +28,13 @@ UPDATE ninhos_quelonios
    SET numero_atual = numero_ninho
  WHERE numero_atual IS NULL;
 
--- ── 2. Renumera os ninhos JÁ transferidos ────────────────────
--- Ninhos que já estão numa praia diferente da origem recebem agora
--- uma placa da sequência do destino (sigla_destino-sigla_especie-NNN),
--- continuando após o maior número já usado pelos ninhos próprios do
--- destino para a mesma espécie.
-WITH esp(especie, sig) AS (
-  VALUES
-    ('tracaja','TR'), ('tartaruga','TA'), ('cabecudo','R'),
-    ('pitiU','C'), ('cupido','CP'), ('mucua','M'),
-    ('jabuti_pe_elefante','JP'), ('jabuti_piranga','JP'), ('outro','OUT')
-),
-transf AS (
-  SELECT n.id, n.especie, n.data_encontro, n.criado_em,
-         n.praia_atual_id,
-         COALESCE(p.sigla, 'XX') AS dest_sigla,
-         COALESCE(e.sig, 'XX')   AS esp_sig
-    FROM ninhos_quelonios n
-    JOIN praias_monitoramento p ON p.id = n.praia_atual_id
-    LEFT JOIN esp e ON e.especie = n.especie::text
-   WHERE n.praia_atual_id IS DISTINCT FROM n.praia_id
-),
-base AS (
-  -- maior sufixo já usado no destino pelos ninhos PRÓPRIOS de lá
-  SELECT t.praia_atual_id, t.especie,
-         COALESCE(MAX((regexp_replace(x.numero_atual, '^.*-', ''))::int), 0) AS base_seq
-    FROM transf t
-    JOIN ninhos_quelonios x
-      ON x.praia_atual_id = t.praia_atual_id
-     AND x.especie        = t.especie
-     AND x.praia_atual_id IS NOT DISTINCT FROM x.praia_id
-     AND x.numero_atual ~ ('^' || t.dest_sigla || '-' || t.esp_sig || '-[0-9]+$')
-   GROUP BY t.praia_atual_id, t.especie
-),
-seq AS (
-  SELECT t.id, t.dest_sigla, t.esp_sig,
-         COALESCE(b.base_seq, 0)
-           + ROW_NUMBER() OVER (PARTITION BY t.praia_atual_id, t.especie
-                                ORDER BY t.data_encontro, t.criado_em) AS novo_seq
-    FROM transf t
-    LEFT JOIN base b
-      ON b.praia_atual_id = t.praia_atual_id AND b.especie = t.especie
-)
-UPDATE ninhos_quelonios n
-   SET numero_atual = s.dest_sigla || '-' || s.esp_sig || '-' || lpad(s.novo_seq::text, 3, '0')
-  FROM seq s
- WHERE s.id = n.id;
+-- ── 2. Ninhos JÁ transferidos (antes desta feature) ──────────
+-- Mantêm a placa de origem em numero_atual (backfill acima). Não são
+-- renumerados em massa de propósito: a placa de destino é decidida no
+-- ato da transferência (campo editável no app) e renumerar dados
+-- antigos exigiria siglas de praia únicas — o que nem sempre é o caso.
+-- Para reatribuir a placa de um ninho já transferido, refaça a
+-- transferência no app (agora há o campo "Nº do ninho no destino").
 
 CREATE INDEX IF NOT EXISTS idx_ninhos_numero_atual
   ON ninhos_quelonios (praia_atual_id, numero_atual);
@@ -133,6 +94,7 @@ SELECT
   n.numero_atual,
   n.especie,
   n.data_encontro,
+  n.hora_desova,
   n.status,
   n.status_validacao,
   n.motivo_rejeicao,
