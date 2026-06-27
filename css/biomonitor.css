@@ -852,6 +852,16 @@ body { margin: 0; }
 }
 .bio-chip-cfg.ativo { background: var(--bio-prim); border-color: var(--bio-prim); color: #fff; }
 
+/* Chips de seleção no formulário de visita */
+.bio-chip-sel-grid { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.bio-chip-sel {
+  padding: 6px 14px; border-radius: 20px; border: 1.5px solid #D0E4EF;
+  background: transparent; font-size: 13px; font-weight: 500; cursor: pointer;
+  color: #374151; transition: background .15s, border-color .15s, color .15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.bio-chip-sel.ativo { background: var(--bio-prim); border-color: var(--bio-prim); color: #fff; }
+
 /* Modo Campo — alto contraste */
 body.field-mode .bio-form-body, body.field-mode .bio-tela { font-weight: 500; }
 body.field-mode .bio-campo-input, body.field-mode .bio-form-label { font-size: 17px; }

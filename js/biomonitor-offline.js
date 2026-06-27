@@ -9,7 +9,7 @@
 // Confirmados retidos 7 dias; pendentes nunca apagados.
 
 const BIO_DB_NAME    = 'siguc_biomonitor_v1'
-const BIO_DB_VERSION = 1
+const BIO_DB_VERSION = 2
 let _bioDB = null
 
 // ── Inicialização ──────────────────────────────────────────────
@@ -49,6 +49,12 @@ function bioOfflineInit() {
 
       if (!db.objectStoreNames.contains('config')) {
         db.createObjectStore('config')
+      }
+
+      if (!db.objectStoreNames.contains('visitas')) {
+        const v = db.createObjectStore('visitas', { keyPath: 'uuid_cliente' })
+        v.createIndex('ninho_uuid',  'ninho_uuid')
+        v.createIndex('status_sync', 'status_sync')
       }
     }
 
@@ -235,14 +241,52 @@ async function bioOfflineEclosoesPendentes() {
   })
 }
 
+// ── Visitas de acompanhamento ─────────────────────────────────
+async function bioOfflineSalvarVisita(visita) {
+  const db = await bioOfflineInit()
+  return new Promise((res, rej) => {
+    const tx  = db.transaction('visitas', 'readwrite')
+    const req = tx.objectStore('visitas').put(visita)
+    req.onsuccess = () => res()
+    req.onerror   = () => rej(req.error)
+  })
+}
+
+async function bioOfflineVisitasDoNinho(ninhoUuid) {
+  const db = await bioOfflineInit()
+  return new Promise((res, rej) => {
+    const tx  = db.transaction('visitas', 'readonly')
+    const idx = tx.objectStore('visitas').index('ninho_uuid')
+    const req = idx.getAll(ninhoUuid)
+    req.onsuccess = () => {
+      const lista = req.result
+      lista.sort((a, b) => b.data_visita.localeCompare(a.data_visita))
+      res(lista)
+    }
+    req.onerror = () => rej(req.error)
+  })
+}
+
+async function bioOfflineVisitasPendentes() {
+  const db = await bioOfflineInit()
+  return new Promise((res, rej) => {
+    const tx  = db.transaction('visitas', 'readonly')
+    const idx = tx.objectStore('visitas').index('status_sync')
+    const req = idx.getAll('pendente')
+    req.onsuccess = () => res(req.result)
+    req.onerror   = () => rej(req.error)
+  })
+}
+
 // ── Contagem de itens pendentes ────────────────────────────────
 async function bioOfflineContarPendentes() {
-  const [n, t, e] = await Promise.all([
+  const [n, t, e, v] = await Promise.all([
     bioOfflineNinhosPendentes(),
     bioOfflineTransfPendentes(),
     bioOfflineEclosoesPendentes(),
+    bioOfflineVisitasPendentes(),
   ])
-  return n.length + t.length + e.length
+  return n.length + t.length + e.length + v.length
 }
 
 // ── Atualizar status_sync de um item ──────────────────────────
@@ -269,7 +313,7 @@ async function bioOfflineAtualizarSync(store, uuid, novoStatus, serverId) {
 async function bioOfflineLimparConfirmados() {
   const db     = await bioOfflineInit()
   const limite = new Date(Date.now() - 7 * 86400 * 1000).toISOString()
-  const stores = ['ninhos', 'transferencias', 'eclosoes']
+  const stores = ['ninhos', 'transferencias', 'eclosoes', 'visitas']
   let removidos = 0
 
   for (const nome of stores) {
@@ -338,7 +382,7 @@ async function bioOfflineTemPin() {
 // ── Zerar fila (suporte à Config → Zerar fila) ────────────────
 async function bioOfflineZerarFila() {
   const db     = await bioOfflineInit()
-  const stores = ['ninhos', 'transferencias', 'eclosoes']
+  const stores = ['ninhos', 'transferencias', 'eclosoes', 'visitas']
   for (const nome of stores) {
     await new Promise((res, rej) => {
       const tx  = db.transaction(nome, 'readwrite')

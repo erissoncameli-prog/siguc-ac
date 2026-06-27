@@ -1237,6 +1237,119 @@ async function bioSalvarEclosao() {
 }
 
 /* ════════════════════════════════════════════════════════════
+   FORMULÁRIO — VISITA DE ACOMPANHAMENTO
+   ════════════════════════════════════════════════════════════ */
+async function bioAbrirFormVisita(ninho) {
+  BioApp.formNinhoAtualizar = ninho
+  document.getElementById('bio-vis-ninho-num').textContent = ninho.numero_ninho
+  document.getElementById('bio-vis-especie').textContent   = BIO_ESPECIES.find(e => e.id === ninho.especie)?.nome ?? ninho.especie
+  document.getElementById('bio-vis-data').value            = new Date().toISOString().slice(0, 10)
+  document.getElementById('bio-vis-hora').value            = new Date().toTimeString().slice(0, 5)
+  document.getElementById('bio-vis-temp-sub').value        = ''
+  document.getElementById('bio-vis-temp-ar').value         = ''
+  document.getElementById('bio-vis-intervencao').value     = ''
+  document.getElementById('bio-vis-obs').value             = ''
+  document.getElementById('bio-vis-alagamento').checked    = false
+  bioSetContador('bio-vis-ovos-pred', 0)
+  document.getElementById('bio-vis-ovos-pred-wrap').style.display = 'none'
+
+  // Status: íntegro por padrão
+  document.querySelectorAll('#bio-vis-status-grid .bio-chip-sel').forEach(c => {
+    c.classList.toggle('ativo', c.dataset.val === 'integro')
+  })
+
+  // Umidade: sem seleção
+  document.querySelectorAll('#bio-vis-umidade-grid .bio-chip-sel').forEach(c => {
+    c.classList.toggle('ativo', c.dataset.val === '')
+  })
+
+  // Predação: nenhuma
+  document.querySelectorAll('#bio-vis-pred-grid .bio-pred-opt').forEach(o => {
+    o.classList.remove('sel', 'perigo')
+    if (o.dataset.pred === 'nenhuma') o.classList.add('sel')
+  })
+
+  bioMostrarTela('tela-form-visita')
+}
+
+async function bioSalvarVisita() {
+  const ninho = BioApp.formNinhoAtualizar
+  const data  = document.getElementById('bio-vis-data').value
+  const hora  = document.getElementById('bio-vis-hora').value || null
+
+  if (!data) { bioToast('Informe a data da visita.', 'err'); return }
+
+  const statusNinho  = document.querySelector('#bio-vis-status-grid .bio-chip-sel.ativo')?.dataset.val ?? 'integro'
+  const umidade      = document.querySelector('#bio-vis-umidade-grid .bio-chip-sel.ativo')?.dataset.val || null
+  const predacao     = document.querySelector('#bio-vis-pred-grid .bio-pred-opt.sel')?.dataset.pred    ?? 'nenhuma'
+  const ovosPredados = predacao !== 'nenhuma'
+    ? (parseInt(document.getElementById('bio-vis-ovos-pred').textContent) || 0)
+    : null
+
+  const visita = {
+    uuid_cliente:            bioUuid(),
+    ninho_uuid:              ninho.uuid_cliente,
+    ninho_numero:            ninho.numero_ninho,
+    data_visita:             data,
+    hora_visita:             hora,
+    status_ninho:            statusNinho,
+    temperatura_substrato_c: parseFloat(document.getElementById('bio-vis-temp-sub').value) || null,
+    temperatura_ar_c:        parseFloat(document.getElementById('bio-vis-temp-ar').value)  || null,
+    umidade,
+    predacao_incubacao:      predacao,
+    ovos_predados_n:         ovosPredados,
+    sinal_alagamento:        document.getElementById('bio-vis-alagamento').checked,
+    intervencao:             document.getElementById('bio-vis-intervencao').value.trim() || null,
+    observacoes:             document.getElementById('bio-vis-obs').value.trim()         || null,
+    status_sync:             'pendente',
+    criado_em:               new Date().toISOString(),
+  }
+
+  await bioOfflineSalvarVisita(visita)
+  await bioAtualizarBadgeFila()
+
+  bioSyncTudo({ monitorId: BioApp.monitor?.id, onConcluido: () => bioAtualizarBadgeFila() })
+  bioToast('Visita registrada!', 'ok')
+  bioMostrarTela('tela-abertos')
+}
+
+function bioIniciarFormVisita() {
+  // Chip de status
+  document.querySelectorAll('#bio-vis-status-grid .bio-chip-sel').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#bio-vis-status-grid .bio-chip-sel').forEach(b => b.classList.remove('ativo'))
+      btn.classList.add('ativo')
+    })
+  })
+
+  // Chip de umidade
+  document.querySelectorAll('#bio-vis-umidade-grid .bio-chip-sel').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#bio-vis-umidade-grid .bio-chip-sel').forEach(b => b.classList.remove('ativo'))
+      btn.classList.add('ativo')
+    })
+  })
+
+  // Predação + toggle de ovos predados
+  document.querySelectorAll('#bio-vis-pred-grid .bio-pred-opt').forEach(opt => {
+    opt.addEventListener('click', () => {
+      document.querySelectorAll('#bio-vis-pred-grid .bio-pred-opt').forEach(o => o.classList.remove('sel', 'perigo'))
+      opt.classList.add('sel')
+      if (opt.dataset.pred !== 'nenhuma') opt.classList.add('perigo')
+      const wrap = document.getElementById('bio-vis-ovos-pred-wrap')
+      if (wrap) wrap.style.display = opt.dataset.pred !== 'nenhuma' ? '' : 'none'
+    })
+  })
+
+  // Contador de ovos predados
+  const valEl  = document.getElementById('bio-vis-ovos-pred')
+  document.getElementById('bio-vis-ovos-plus')?.addEventListener('click',  () => { valEl.textContent = parseInt(valEl.textContent) + 1 })
+  document.getElementById('bio-vis-ovos-minus')?.addEventListener('click', () => { valEl.textContent = Math.max(0, parseInt(valEl.textContent) - 1) })
+
+  document.getElementById('bio-btn-salvar-visita')?.addEventListener('click', bioSalvarVisita)
+}
+
+/* ════════════════════════════════════════════════════════════
    NINHOS ABERTOS / HISTÓRICO
    ════════════════════════════════════════════════════════════ */
 async function bioAbrirTelaAbertos() {
@@ -1381,6 +1494,7 @@ function bioNinhoCardInner(n, opts = {}) {
     <div class="bio-nfc-acoes">
       ${status === 'encontrado' || status === 'transferido' ? `<button class="bio-btn-sm prim" data-acao="transferencia">+ Transferência</button>` : ''}
       ${status !== 'eclodido' && status !== 'perdido' ? `<button class="bio-btn-sm ghost" data-acao="eclosao">Eclosão</button>` : ''}
+      ${status !== 'perdido' ? `<button class="bio-btn-sm ghost" data-acao="visita">Visita</button>` : ''}
     </div>` : ''
 
   return `
@@ -1419,6 +1533,7 @@ function bioRenderizarListaNinhos(containerId, ninhos, mostrarAcoes) {
         e.stopPropagation()
         if (btn.dataset.acao === 'transferencia') bioAbrirFormTransf(n)
         if (btn.dataset.acao === 'eclosao')       bioAbrirFormEclosao(n)
+        if (btn.dataset.acao === 'visita')        bioAbrirFormVisita(n)
       })
     })
     el.appendChild(card)
@@ -1804,6 +1919,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   bioIniciarTelaTrocarSenha()
   bioIniciarFotosForm()
   bioIniciarContadores()
+  bioIniciarFormVisita()
   bioIniciarConfig()
   bioCarregarConfigGPS()
 

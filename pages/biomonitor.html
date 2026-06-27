@@ -671,6 +671,139 @@
   </div>
 </div>
 
+<!-- ══ TELA: FORMULÁRIO — VISITA DE ACOMPANHAMENTO ═══════════════ -->
+<div id="tela-form-visita" class="bio-tela">
+  <header class="bio-form-header">
+    <button class="bio-btn-back" data-back="tela-abertos" aria-label="Voltar">‹</button>
+    <span>Visita de Acompanhamento</span>
+    <span></span>
+  </header>
+
+  <div class="bio-form-body">
+
+    <!-- Contexto do ninho -->
+    <div class="bio-form-section" style="background:var(--bio-prim-bg);border-color:rgba(26,107,140,.35)">
+      <span class="bio-form-label">Ninho</span>
+      <p style="margin:4px 0 0;font-size:16px;font-weight:700;color:var(--bio-ink)">
+        N° <span id="bio-vis-ninho-num">—</span>
+        &nbsp;·&nbsp; <span id="bio-vis-especie"></span>
+      </p>
+    </div>
+
+    <div class="bio-form-section">
+      <label class="bio-form-label" for="bio-vis-data">Data da visita *</label>
+      <input type="date" id="bio-vis-data" class="bio-form-input">
+    </div>
+
+    <div class="bio-form-section">
+      <label class="bio-form-label" for="bio-vis-hora">Hora da visita</label>
+      <input type="time" id="bio-vis-hora" class="bio-form-input">
+    </div>
+
+    <!-- Status do ninho -->
+    <div class="bio-form-section">
+      <span class="bio-form-label">Status do ninho *</span>
+      <div class="bio-chip-sel-grid" id="bio-vis-status-grid">
+        <button type="button" class="bio-chip-sel ativo" data-val="integro">Íntegro</button>
+        <button type="button" class="bio-chip-sel" data-val="perturbado">Perturbado</button>
+        <button type="button" class="bio-chip-sel" data-val="parcial_predado">Parc. predado</button>
+        <button type="button" class="bio-chip-sel" data-val="destruido">Destruído</button>
+        <button type="button" class="bio-chip-sel" data-val="alagado">Alagado</button>
+      </div>
+    </div>
+
+    <!-- Temperatura -->
+    <div class="bio-form-section">
+      <span class="bio-form-label">Temperatura</span>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div>
+          <label class="bio-form-label" style="font-size:11px;opacity:.7" for="bio-vis-temp-sub">Substrato (°C)</label>
+          <input type="number" id="bio-vis-temp-sub" class="bio-form-input"
+            min="20" max="50" step="0.1" inputmode="decimal" placeholder="—">
+        </div>
+        <div>
+          <label class="bio-form-label" style="font-size:11px;opacity:.7" for="bio-vis-temp-ar">Ar (°C)</label>
+          <input type="number" id="bio-vis-temp-ar" class="bio-form-input"
+            min="10" max="50" step="0.1" inputmode="decimal" placeholder="—">
+        </div>
+      </div>
+      <small style="display:block;margin-top:4px;opacity:.55;font-size:11px">Temperatura do substrato medida na profundidade dos ovos (~60 cm)</small>
+    </div>
+
+    <!-- Umidade -->
+    <div class="bio-form-section">
+      <span class="bio-form-label">Umidade do substrato</span>
+      <div class="bio-chip-sel-grid" id="bio-vis-umidade-grid">
+        <button type="button" class="bio-chip-sel" data-val="">—</button>
+        <button type="button" class="bio-chip-sel" data-val="seco">Seco</button>
+        <button type="button" class="bio-chip-sel" data-val="umido">Úmido</button>
+        <button type="button" class="bio-chip-sel" data-val="encharcado">Encharcado</button>
+      </div>
+    </div>
+
+    <!-- Predação durante incubação -->
+    <div class="bio-form-section">
+      <span class="bio-form-label">Predação durante incubação</span>
+      <small style="display:block;margin-bottom:8px;opacity:.55;font-size:11px">Predação de ovos — diferente da predação de filhotes na eclosão</small>
+      <div class="bio-pred-grid" id="bio-vis-pred-grid">
+        <div class="bio-pred-opt sel" data-pred="nenhuma">
+          <span class="bio-pred-radio"></span>
+          <div class="bio-pred-texto"><strong>Nenhuma</strong><span>Sem evidências</span></div>
+        </div>
+        <div class="bio-pred-opt" data-pred="por_animais">
+          <span class="bio-pred-radio"></span>
+          <div class="bio-pred-texto"><strong>Por animais</strong><span>Teiú, queixada, outros</span></div>
+        </div>
+        <div class="bio-pred-opt" data-pred="por_pessoas">
+          <span class="bio-pred-radio"></span>
+          <div class="bio-pred-texto"><strong>Por pessoas</strong><span>Coleta, pisoteio</span></div>
+        </div>
+        <div class="bio-pred-opt" data-pred="desconhecida">
+          <span class="bio-pred-radio"></span>
+          <div class="bio-pred-texto"><strong>Desconhecida</strong><span>Causa não identificada</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Ovos predados (visível só se houve predação) -->
+    <div class="bio-form-section" id="bio-vis-ovos-pred-wrap" style="display:none">
+      <span class="bio-form-label">Ovos predados</span>
+      <div class="bio-counter-row">
+        <button type="button" id="bio-vis-ovos-minus" class="bio-counter-btn">−</button>
+        <div style="flex:1;text-align:center">
+          <span class="bio-counter-val" id="bio-vis-ovos-pred">0</span>
+          <span class="bio-counter-label">Ovos</span>
+        </div>
+        <button type="button" id="bio-vis-ovos-plus" class="bio-counter-btn">+</button>
+      </div>
+    </div>
+
+    <!-- Sinal de alagamento -->
+    <div class="bio-form-section" style="display:flex;align-items:center;gap:12px">
+      <input type="checkbox" id="bio-vis-alagamento" style="width:20px;height:20px;accent-color:var(--bio-prim);flex-shrink:0">
+      <label for="bio-vis-alagamento" style="cursor:pointer;font-size:14px;font-weight:500">
+        Sinal de alagamento
+        <span style="display:block;font-size:12px;font-weight:400;opacity:.6">Nível d'água atingiu ou ameaça o ninho</span>
+      </label>
+    </div>
+
+    <!-- Intervenção -->
+    <div class="bio-form-section">
+      <label class="bio-form-label" for="bio-vis-intervencao">Intervenção realizada</label>
+      <input type="text" id="bio-vis-intervencao" class="bio-form-input"
+        placeholder="Ex: reparo de estaca, remoção de água…" autocomplete="off">
+    </div>
+
+    <div class="bio-form-section">
+      <label class="bio-form-label" for="bio-vis-obs">Observações</label>
+      <textarea id="bio-vis-obs" class="bio-form-textarea" rows="3"
+        placeholder="Condições gerais do ninho, fauna observada…"></textarea>
+    </div>
+
+    <button type="button" id="bio-btn-salvar-visita" class="bio-btn-salvar">Salvar Visita</button>
+  </div>
+</div>
+
 <!-- ══ TELA: NINHOS ABERTOS ══════════════════════════════════════ -->
 <div id="tela-abertos" class="bio-tela">
   <header class="bio-form-header">
