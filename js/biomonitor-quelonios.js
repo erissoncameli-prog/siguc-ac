@@ -60,6 +60,8 @@ const BioApp = {
   // Configurações de GPS (carregadas do IndexedDB na init)
   cfgFormatoCoords: 'decimal',    // 'decimal' | 'dms'
   cfgGpsModo:       'padrao',     // 'padrao' | 'alta' | 'maxima'
+  formBercarioSelecionado: null,  // { id, nome, capacidade_max } selecionado no picker
+  loteAtual: null,                // lote em detalhe/ocorrência
 }
 
 // Espécies de quelônios com sigla, nome e cor
@@ -1258,7 +1260,9 @@ function bioAbrirFormEntradaBercario() {
   if (!ninho) return
   document.getElementById('bio-berc-ninho-num').textContent = ninho.numero_ninho
   document.getElementById('bio-berc-especie').textContent   = BIO_ESPECIES.find(e => e.id === ninho.especie)?.nome ?? ninho.especie
-  document.getElementById('bio-berc-nome').value  = ''
+  BioApp.formBercarioSelecionado = null
+  const btn = document.getElementById('bio-berc-nome-btn')
+  if (btn) btn.textContent = 'Selecionar berçário…'
   document.getElementById('bio-berc-data').value  = new Date().toISOString().slice(0, 10)
   document.getElementById('bio-berc-hora').value  = new Date().toTimeString().slice(0, 5)
   document.getElementById('bio-berc-obs').value   = ''
@@ -1269,11 +1273,11 @@ function bioAbrirFormEntradaBercario() {
 async function bioSalvarEntradaBercario() {
   const { ninho } = BioApp.formDestinoCtx ?? {}
   if (!ninho) return
-  const nome = document.getElementById('bio-berc-nome').value.trim()
+  const berc = BioApp.formBercarioSelecionado
   const data = document.getElementById('bio-berc-data').value
   const qtd  = parseInt(document.getElementById('bio-berc-qtd').textContent) || 0
 
-  if (!nome) { bioToast('Informe o nome do berçário/tanque.', 'err'); return }
+  if (!berc) { bioToast('Selecione um berçário.', 'err'); return }
   if (!data) { bioToast('Informe a data de entrada.', 'err'); return }
   if (qtd <= 0) { bioToast('Quantidade deve ser maior que zero.', 'err'); return }
 
@@ -1282,7 +1286,8 @@ async function bioSalvarEntradaBercario() {
     ninho_uuid:    ninho.uuid_cliente,
     ninho_numero:  ninho.numero_ninho,
     especie:       ninho.especie,
-    bercario_nome: nome,
+    bercario_id:   berc.id,
+    bercario_nome: berc.nome,
     data_entrada:  data,
     hora_entrada:  document.getElementById('bio-berc-hora').value || null,
     qtd_entrada:   qtd,

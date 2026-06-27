@@ -265,6 +265,7 @@ async function bioSyncLotes(monitorId, onProgresso) {
     const payload = {
       uuid_cliente:  l.uuid_cliente,
       ninho_id:      ninhoServId,
+      bercario_id:   l.bercario_id   || null,
       bercario_nome: l.bercario_nome,
       data_entrada:  l.data_entrada,
       hora_entrada:  l.hora_entrada  || null,
@@ -348,6 +349,52 @@ async function bioSyncSolturas(monitorId, onProgresso) {
   return n
 }
 
+// ── Sincronizar ocorrências de berçário pendentes ─────────────
+async function bioSyncOcorrencias(monitorId, onProgresso) {
+  const pendentes = await bioOfflineOcorrenciasPendentes()
+  let n = 0
+  for (const oc of pendentes) {
+    onProgresso?.(`Ocorrência berçário…`)
+
+    const loteLocal = await bioOfflineGetLote(oc.lote_uuid)
+    const loteServId = loteLocal?.server_id
+    if (!loteServId) continue
+
+    const payload = {
+      uuid_cliente:         oc.uuid_cliente,
+      lote_id:              loteServId,
+      tipo:                 oc.tipo,
+      data_ocorrencia:      oc.data_ocorrencia,
+      hora_ocorrencia:      oc.hora_ocorrencia      || null,
+      comprimento_medio_cm: oc.comprimento_medio_cm ?? null,
+      peso_medio_g:         oc.peso_medio_g         ?? null,
+      n_amostrados:         oc.n_amostrados         ?? null,
+      qtd_afetados:         oc.qtd_afetados         ?? null,
+      causa:                oc.causa                || null,
+      descricao:            oc.descricao            || null,
+      monitor_id:           monitorId,
+      sincronizado_em:      new Date().toISOString(),
+    }
+
+    await bioOfflineAtualizarSync('ocorrencias', oc.uuid_cliente, 'enviando')
+
+    const { data, error } = await bioSupabase()
+      .from('ocorrencias_bercario')
+      .upsert(payload, { onConflict: 'uuid_cliente' })
+      .select('id')
+      .single()
+
+    if (error) {
+      await bioOfflineAtualizarSync('ocorrencias', oc.uuid_cliente, 'pendente')
+      throw error
+    }
+
+    await bioOfflineAtualizarSync('ocorrencias', oc.uuid_cliente, 'confirmado', data.id)
+    n++
+  }
+  return n
+}
+
 // ── Sincronização completa ────────────────────────────────────
 async function bioSyncTudo({ monitorId, onProgresso, onConcluido, onErro } = {}) {
   if (_bioSyncEmAndamento) return
@@ -357,20 +404,34 @@ async function bioSyncTudo({ monitorId, onProgresso, onConcluido, onErro } = {})
   _bioSyncAbortCtrl   = new AbortController()
 
   try {
-    const n = await bioSyncNinhos(monitorId, onProgresso)
-    const t = await bioSyncTransferencias(monitorId, onProgresso)
-    const e = await bioSyncEclosoes(monitorId, onProgresso)
-    const v = await bioSyncVisitas(monitorId, onProgresso)
-    const l = await bioSyncLotes(monitorId, onProgresso)
-    const s = await bioSyncSolturas(monitorId, onProgresso)
+    const n  = await bioSyncNinhos(monitorId, onProgresso)
+    const t  = await bioSyncTransferencias(monitorId, onProgresso)
+    const e  = await bioSyncEclosoes(monitorId, onProgresso)
+    const v  = await bioSyncVisitas(monitorId, onProgresso)
+    const l  = await bioSyncLotes(monitorId, onProgresso)
+    const s  = await bioSyncSolturas(monitorId, onProgresso)
+    const oc = await bioSyncOcorrencias(monitorId, onProgresso)
     await bioOfflineLimparConfirmados()
-    onConcluido?.({ ninhos: n, transferencias: t, eclosoes: e, visitas: v, lotes: l, solturas: s })
+    onConcluido?.({ ninhos: n, transferencias: t, eclosoes: e, visitas: v, lotes: l, solturas: s, ocorrencias: oc })
   } catch (err) {
     onErro?.(err)
   } finally {
     _bioSyncEmAndamento = false
     _bioSyncAbortCtrl   = null
   }
+}
+
+// ── Cache de berçários do servidor ───────────────────────────
+async function bioSyncCacheBercarios() {
+  if (!navigator.onLine) return
+
+  const { data, error } = await bioSupabase()
+    .from('bercarios')
+    .select('id,nome,tipo,capacidade_max,localizacao_descricao,uc_id,status')
+    .eq('status', true)
+
+  if (error || !data) return
+  await bioOfflineSalvarBercarios(data)
 }
 
 // ── Cache de praias do servidor ───────────────────────────────
