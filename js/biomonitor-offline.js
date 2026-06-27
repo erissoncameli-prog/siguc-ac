@@ -9,7 +9,7 @@
 // Confirmados retidos 7 dias; pendentes nunca apagados.
 
 const BIO_DB_NAME    = 'siguc_biomonitor_v1'
-const BIO_DB_VERSION = 4
+const BIO_DB_VERSION = 5
 let _bioDB = null
 
 // ── Inicialização ──────────────────────────────────────────────
@@ -80,6 +80,12 @@ function bioOfflineInit() {
         const oc = db.createObjectStore('ocorrencias', { keyPath: 'uuid_cliente' })
         oc.createIndex('lote_uuid',   'lote_uuid')
         oc.createIndex('status_sync', 'status_sync')
+      }
+
+      if (!db.objectStoreNames.contains('descartes')) {
+        const d = db.createObjectStore('descartes', { keyPath: 'uuid_cliente' })
+        d.createIndex('ninho_uuid',  'ninho_uuid')
+        d.createIndex('status_sync', 'status_sync')
       }
     }
 
@@ -305,6 +311,57 @@ async function bioOfflineVisitasPendentes() {
   })
 }
 
+// ── Descartes de ovos (com motivo) ────────────────────────────
+async function bioOfflineSalvarDescarte(descarte) {
+  const db = await bioOfflineInit()
+  return new Promise((res, rej) => {
+    const tx  = db.transaction('descartes', 'readwrite')
+    const req = tx.objectStore('descartes').put(descarte)
+    req.onsuccess = () => res()
+    req.onerror   = () => rej(req.error)
+  })
+}
+
+async function bioOfflineDescartesDoNinho(ninhoUuid, etapa) {
+  const db = await bioOfflineInit()
+  return new Promise((res, rej) => {
+    const tx  = db.transaction('descartes', 'readonly')
+    const idx = tx.objectStore('descartes').index('ninho_uuid')
+    const req = idx.getAll(ninhoUuid)
+    req.onsuccess = () => {
+      let lista = req.result ?? []
+      if (etapa) lista = lista.filter(d => d.etapa === etapa)
+      res(lista)
+    }
+    req.onerror = () => rej(req.error)
+  })
+}
+
+async function bioOfflineDescartesPendentes() {
+  const db = await bioOfflineInit()
+  return new Promise((res, rej) => {
+    const tx  = db.transaction('descartes', 'readonly')
+    const idx = tx.objectStore('descartes').index('status_sync')
+    const req = idx.getAll('pendente')
+    req.onsuccess = () => res(req.result)
+    req.onerror   = () => rej(req.error)
+  })
+}
+
+// Remove os descartes locais de um ninho numa etapa (usado ao reeditar:
+// apaga o conjunto antigo antes de regravar o novo).
+async function bioOfflineRemoverDescartesDoNinho(ninhoUuid, etapa) {
+  const lista = await bioOfflineDescartesDoNinho(ninhoUuid, etapa)
+  const db = await bioOfflineInit()
+  return new Promise((res, rej) => {
+    const tx = db.transaction('descartes', 'readwrite')
+    const st = tx.objectStore('descartes')
+    lista.forEach(d => st.delete(d.uuid_cliente))
+    tx.oncomplete = () => res()
+    tx.onerror    = () => rej(tx.error)
+  })
+}
+
 // ── Lotes em berçário ─────────────────────────────────────────
 async function bioOfflineSalvarLote(lote) {
   const db = await bioOfflineInit()
@@ -481,7 +538,7 @@ async function bioOfflineAtualizarSync(store, uuid, novoStatus, serverId) {
 async function bioOfflineLimparConfirmados() {
   const db     = await bioOfflineInit()
   const limite = new Date(Date.now() - 7 * 86400 * 1000).toISOString()
-  const stores = ['ninhos', 'transferencias', 'eclosoes', 'visitas', 'lotes', 'solturas', 'ocorrencias']
+  const stores = ['ninhos', 'transferencias', 'eclosoes', 'visitas', 'lotes', 'solturas', 'ocorrencias', 'descartes']
   let removidos = 0
 
   for (const nome of stores) {
@@ -550,7 +607,7 @@ async function bioOfflineTemPin() {
 // ── Zerar fila (suporte à Config → Zerar fila) ────────────────
 async function bioOfflineZerarFila() {
   const db     = await bioOfflineInit()
-  const stores = ['ninhos', 'transferencias', 'eclosoes', 'visitas', 'lotes', 'solturas', 'ocorrencias']
+  const stores = ['ninhos', 'transferencias', 'eclosoes', 'visitas', 'lotes', 'solturas', 'ocorrencias', 'descartes']
   for (const nome of stores) {
     await new Promise((res, rej) => {
       const tx  = db.transaction(nome, 'readwrite')

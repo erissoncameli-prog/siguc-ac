@@ -1048,8 +1048,19 @@ siguc-ac/
     ├── 089_ocorrencias_bercario.sql      Eventos no berçário
     ├── 090_bio_dados_aba.sql             RPC bio_dados_aba
     ├── 091_bio_relatorio_rpc.sql         RPC bio_relatorio_completo
-    └── 092_ninho_numero_atual.sql        numero_atual (placa na praia de destino)
+    ├── 092_ninho_numero_atual.sql        numero_atual (placa na praia de destino)
+    └── 093_descartes_ovos.sql            eventos de descarte de ovos por causa
 ```
+
+### Descarte de ovos por causa (093)
+
+Cada ovo descartado no registro do ninho vira um evento em `descartes_ovos`
+(`qtd`, `motivo` = natural/predacao/humana, `etapa`, `data_descarte`). No app,
+ao informar ovos descartados, a quebra por causa é obrigatória e a soma deve
+bater com o total. O sync reconcilia os eventos do ninho no servidor
+(apaga + reinsere) a cada salvamento/correção. Estatística por causa via
+`vw_descartes_ovos`; a quebra por ninho aparece em `vw_ninhos_validacao`
+(`descartados_natural/predacao/humana`) e na página de relatórios.
 
 ---
 

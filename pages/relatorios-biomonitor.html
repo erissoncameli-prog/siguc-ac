@@ -198,6 +198,7 @@
   // ── Estado global ───────────────────────────────────────────────
   let _dados = null
   let _charts = {}
+  let _descAgg = { natural:0, predacao:0, humana:0, total:0 }
   let _chartJsCarregado = false
 
   async function carregarChartJS() {
@@ -235,6 +236,19 @@
     }
 
     _dados = data
+
+    // Descartes de ovos por causa (consulta direta à view)
+    let qd = db.from('vw_descartes_ovos').select('motivo,qtd')
+    const tmp = sel('fil-temporada').value; if (tmp) qd = qd.eq('temporada_id', tmp)
+    const prr = sel('fil-praia').value;     if (prr) qd = qd.eq('praia_id', prr)
+    const { data: descRows } = await qd
+    _descAgg = { natural:0, predacao:0, humana:0, total:0 }
+    ;(descRows || []).forEach(r => {
+      const q = r.qtd || 0
+      if (r.motivo in _descAgg) _descAgg[r.motivo] += q
+      _descAgg.total += q
+    })
+
     await carregarChartJS()
     renderTudo(data, el)
   }
@@ -244,6 +258,7 @@
     const k = d.kpis || {}
     el.innerHTML = `
       ${htmlSecGeral(k)}
+      ${htmlSecDescartes(_descAgg)}
       ${htmlSecTaxas(k)}
       ${htmlSecFenologia()}
       ${htmlSecEspecies(d.por_especie || [])}
@@ -298,6 +313,19 @@
   function espCor(e) { return ESP_COR[e] || '#9CA3AF' }
 
   // ── Seção: Visão Geral ───────────────────────────────────────────
+  function htmlSecDescartes(a) {
+    const pctOf = n => a.total ? Math.round(100 * n / a.total) : 0
+    return `<div class="rel-sec" id="sec-descartes">
+      <div class="rel-sec-title">Descarte de ovos por causa</div>
+      <div class="rel-kpi-grid">
+        ${kpiCard('Total descartado', v(a.total),    '#ef4444')}
+        ${kpiCard('Causa natural',    `${a.natural} (${pctOf(a.natural)}%)`,   '#38bdf8')}
+        ${kpiCard('Predação',         `${a.predacao} (${pctOf(a.predacao)}%)`, '#fb923c')}
+        ${kpiCard('Ação humana',      `${a.humana} (${pctOf(a.humana)}%)`,     '#a78bfa')}
+      </div>
+    </div>`
+  }
+
   function htmlSecGeral(k) {
     return `<div class="rel-sec" id="sec-geral">
       <div class="rel-sec-title">Visão Geral</div>
