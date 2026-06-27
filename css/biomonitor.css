@@ -1202,3 +1202,75 @@ body.field-mode .bio-home-nome { font-size: 26px; }
   font-size: 13px; font-weight: 600;
   margin: 0 16px 4px;
 }
+
+/* Botão berçário no grid de ações da home */
+.bio-acao-btn.bercario { background: #e8f5f0; }
+.bio-acao-btn.bercario .bio-acao-icon { color: var(--bio-prim); }
+
+/* Badge de contagem sobre ícone */
+.bio-badge-count {
+  position: absolute; top: -4px; right: -6px;
+  min-width: 18px; height: 18px; padding: 0 4px;
+  background: var(--bio-prim);
+  color: #fff;
+  border-radius: 9px;
+  font-size: 10px; font-weight: 700;
+  line-height: 18px; text-align: center;
+  pointer-events: none;
+}
+
+/* Tela destino filhotes */
+.bio-destino-info {
+  text-align: center; padding: 20px 24px 8px;
+}
+.bio-destino-info h3 { font-size: 17px; font-weight: 700; color: var(--bio-ink); margin: 0 0 4px; }
+.bio-destino-info p  { font-size: 14px; color: var(--bio-ink2); margin: 0; }
+
+.bio-destino-grid {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 14px; padding: 16px;
+}
+.bio-destino-card {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 10px; padding: 20px 12px;
+  background: var(--bio-card);
+  border: 2px solid var(--bio-border);
+  border-radius: 16px;
+  cursor: pointer;
+  transition: border-color .15s, background .15s;
+  text-align: center;
+}
+.bio-destino-card:active { background: #e8f5f0; border-color: var(--bio-prim); }
+.bio-destino-icone {
+  width: 52px; height: 52px;
+  display: flex; align-items: center; justify-content: center;
+  background: #e8f5f0; border-radius: 14px;
+  color: var(--bio-prim);
+}
+.bio-destino-icone svg { width: 28px; height: 28px; }
+.bio-destino-titulo { font-size: 15px; font-weight: 700; color: var(--bio-ink); }
+.bio-destino-subtitulo { font-size: 12px; color: var(--bio-ink2); line-height: 1.4; }
+
+/* Cards de berçário */
+.bio-berc-card {
+  background: var(--bio-card);
+  border: 1px solid var(--bio-border);
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin: 0 16px 10px;
+}
+.bio-berc-card-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 8px;
+}
+.bio-berc-card-nome { font-size: 15px; font-weight: 700; color: var(--bio-ink); }
+.bio-berc-card-ninho { font-size: 12px; color: var(--bio-ink2); }
+.bio-berc-card-info  { font-size: 13px; color: var(--bio-ink2); margin-bottom: 10px; }
+.bio-berc-card-btn {
+  width: 100%; padding: 10px;
+  background: var(--bio-prim); color: #fff;
+  border: none; border-radius: 10px;
+  font-size: 14px; font-weight: 600;
+  cursor: pointer;
+}
+.bio-berc-card-btn:active { opacity: .85; }

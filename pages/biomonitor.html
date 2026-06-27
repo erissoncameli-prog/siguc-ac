@@ -282,6 +282,23 @@
       <span class="bio-acao-chevron">›</span>
     </button>
 
+    <button class="bio-acao-btn bercario" id="bio-btn-bercarios" type="button">
+      <div class="bio-acao-icon" style="position:relative">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="2" y="7" width="20" height="13" rx="2"/>
+          <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/>
+          <line x1="12" y1="12" x2="12" y2="16"/>
+          <line x1="10" y1="14" x2="14" y2="14"/>
+        </svg>
+        <span id="bio-bercarios-badge" class="bio-badge-count" hidden>0</span>
+      </div>
+      <div class="bio-acao-label">
+        <strong>Berçário</strong>
+        <span id="bio-bercarios-label">Lotes de filhotes em berçário</span>
+      </div>
+      <span class="bio-acao-chevron">›</span>
+    </button>
+
   </div>
 
   <!-- Card de pendentes na fila -->
@@ -801,6 +818,220 @@
     </div>
 
     <button type="button" id="bio-btn-salvar-visita" class="bio-btn-salvar">Salvar Visita</button>
+  </div>
+</div>
+
+<!-- ══ TELA: DESTINO DOS FILHOTES ════════════════════════════════ -->
+<div id="tela-destino-filhotes" class="bio-tela">
+  <header class="bio-form-header">
+    <button class="bio-btn-back" data-back="tela-home" aria-label="Voltar">‹</button>
+    <span>Destino dos Filhotes</span>
+    <span></span>
+  </header>
+  <div class="bio-form-body">
+
+    <div class="bio-form-section" style="background:var(--bio-verde-bg);border-color:rgba(42,157,111,.4)">
+      <span class="bio-form-label">Ninho</span>
+      <p style="margin:4px 0 0;font-size:16px;font-weight:700;color:var(--bio-ink)">
+        N° <span id="bio-dest-ninho-num">—</span>
+        &nbsp;·&nbsp; <span id="bio-dest-especie"></span>
+      </p>
+      <p style="margin:6px 0 0;font-size:13px;color:var(--bio-verde);font-weight:600">
+        <span id="bio-dest-filhotes">0</span> filhotes vivos registrados
+      </p>
+    </div>
+
+    <p style="text-align:center;font-size:14px;color:#6B7280;margin:4px 0 16px">Para onde vão os filhotes?</p>
+
+    <div class="bio-destino-grid">
+      <button type="button" id="bio-dest-rio" class="bio-destino-card">
+        <div class="bio-destino-icone">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <path d="M2 12s3-4 10-4 10 4 10 4-3 4-10 4-10-4-10-4z"/>
+            <path d="M12 2 C8 6 4 8 2 12 C4 16 8 18 12 22 C16 18 20 16 22 12 C20 8 16 6 12 2z" stroke-dasharray="3 3" opacity=".4"/>
+          </svg>
+        </div>
+        <strong>Soltar no Rio</strong>
+        <span>Liberação direta agora</span>
+      </button>
+
+      <button type="button" id="bio-dest-bercario" class="bio-destino-card">
+        <div class="bio-destino-icone">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <rect x="2" y="7" width="20" height="13" rx="2"/>
+            <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/>
+            <line x1="12" y1="12" x2="12" y2="16"/>
+            <line x1="10" y1="14" x2="14" y2="14"/>
+          </svg>
+        </div>
+        <strong>Levar ao Berçário</strong>
+        <span>Guardar para soltura posterior</span>
+      </button>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══ TELA: ENTRADA NO BERÇÁRIO ════════════════════════════════ -->
+<div id="tela-form-entrada-bercario" class="bio-tela">
+  <header class="bio-form-header">
+    <button class="bio-btn-back" data-back="tela-destino-filhotes" aria-label="Voltar">‹</button>
+    <span>Entrada no Berçário</span>
+    <span></span>
+  </header>
+  <div class="bio-form-body">
+
+    <div class="bio-form-section" style="background:var(--bio-prim-bg);border-color:rgba(26,107,140,.35)">
+      <span class="bio-form-label">Ninho</span>
+      <p style="margin:4px 0 0;font-size:16px;font-weight:700">
+        N° <span id="bio-berc-ninho-num">—</span>
+        &nbsp;·&nbsp; <span id="bio-berc-especie"></span>
+      </p>
+    </div>
+
+    <div class="bio-form-section">
+      <label class="bio-form-label" for="bio-berc-nome">Berçário / Tanque *</label>
+      <input type="text" id="bio-berc-nome" class="bio-form-input"
+        placeholder="Ex: Berçário 1, Tanque A…" autocomplete="off">
+    </div>
+
+    <div class="bio-form-section">
+      <label class="bio-form-label" for="bio-berc-data">Data de entrada *</label>
+      <input type="date" id="bio-berc-data" class="bio-form-input">
+    </div>
+
+    <div class="bio-form-section">
+      <label class="bio-form-label" for="bio-berc-hora">Hora de entrada</label>
+      <input type="time" id="bio-berc-hora" class="bio-form-input">
+    </div>
+
+    <div class="bio-form-section">
+      <span class="bio-form-label">Quantidade de filhotes *</span>
+      <div class="bio-counter-row">
+        <button type="button" id="bio-berc-qtd-minus" class="bio-counter-btn">−</button>
+        <div style="flex:1;text-align:center">
+          <span class="bio-counter-val" id="bio-berc-qtd">0</span>
+          <span class="bio-counter-label">Filhotes</span>
+        </div>
+        <button type="button" id="bio-berc-qtd-plus" class="bio-counter-btn">+</button>
+      </div>
+    </div>
+
+    <div class="bio-form-section">
+      <label class="bio-form-label" for="bio-berc-obs">Observações</label>
+      <textarea id="bio-berc-obs" class="bio-form-textarea" rows="2"
+        placeholder="Condições dos filhotes, procedimento…"></textarea>
+    </div>
+
+    <button type="button" id="bio-btn-salvar-entrada-bercario" class="bio-btn-salvar">Registrar Entrada</button>
+  </div>
+</div>
+
+<!-- ══ TELA: SOLTURA DE FILHOTES ════════════════════════════════ -->
+<div id="tela-form-soltura" class="bio-tela">
+  <header class="bio-form-header">
+    <button class="bio-btn-back" id="bio-soltura-back" aria-label="Voltar">‹</button>
+    <span id="bio-soltura-titulo">Soltura de Filhotes</span>
+    <span></span>
+  </header>
+  <div class="bio-form-body">
+
+    <div class="bio-form-section" id="bio-soltura-ctx" style="background:var(--bio-verde-bg);border-color:rgba(42,157,111,.4)">
+      <span class="bio-form-label">Ninho</span>
+      <p style="margin:4px 0 0;font-size:16px;font-weight:700">
+        N° <span id="bio-sol-ninho-num">—</span>
+        &nbsp;·&nbsp; <span id="bio-sol-especie"></span>
+      </p>
+      <p id="bio-sol-bercario-info" style="margin:4px 0 0;font-size:12px;opacity:.7" hidden></p>
+    </div>
+
+    <div class="bio-form-section">
+      <label class="bio-form-label" for="bio-sol-data">Data da soltura *</label>
+      <input type="date" id="bio-sol-data" class="bio-form-input">
+    </div>
+
+    <div class="bio-form-section">
+      <label class="bio-form-label" for="bio-sol-hora">Hora da soltura</label>
+      <input type="time" id="bio-sol-hora" class="bio-form-input">
+      <small style="display:block;margin-top:4px;opacity:.55;font-size:11px">Prefira ao amanhecer para reduzir predação</small>
+    </div>
+
+    <div class="bio-form-section">
+      <span class="bio-form-label">Filhotes soltados *</span>
+      <div class="bio-counter-row">
+        <button type="button" id="bio-sol-qtd-minus" class="bio-counter-btn">−</button>
+        <div style="flex:1;text-align:center">
+          <span class="bio-counter-val" id="bio-sol-qtd">0</span>
+          <span class="bio-counter-label">Soltados</span>
+        </div>
+        <button type="button" id="bio-sol-qtd-plus" class="bio-counter-btn">+</button>
+      </div>
+    </div>
+
+    <div class="bio-form-section">
+      <span class="bio-form-label">Mortalidade <span id="bio-sol-mort-label" style="font-weight:400;opacity:.7">(pós-eclosão)</span></span>
+      <div class="bio-counter-row">
+        <button type="button" id="bio-sol-mort-minus" class="bio-counter-btn">−</button>
+        <div style="flex:1;text-align:center">
+          <span class="bio-counter-val" id="bio-sol-mort">0</span>
+          <span class="bio-counter-label">Mortos</span>
+        </div>
+        <button type="button" id="bio-sol-mort-plus" class="bio-counter-btn">+</button>
+      </div>
+    </div>
+
+    <!-- GPS do ponto de soltura -->
+    <div class="bio-form-section" style="display:flex;align-items:center;gap:12px">
+      <div class="bio-radar" style="width:40px;height:40px;flex-shrink:0">
+        <span class="bio-radar-anel"></span>
+        <span class="bio-radar-sweep"></span>
+        <span class="bio-radar-ponto"></span>
+      </div>
+      <div>
+        <span class="bio-form-label" style="margin-bottom:2px">Ponto de soltura (GPS)</span>
+        <span class="bio-gps-coords" id="bio-sol-gps-coords" style="font-size:12px;display:block">Aguardando GPS…</span>
+      </div>
+    </div>
+
+    <div class="bio-form-section">
+      <label class="bio-form-label" for="bio-sol-local">Local de soltura</label>
+      <input type="text" id="bio-sol-local" class="bio-form-input"
+        placeholder="Ex: Margem esq. Rio Juruá, km 42…" autocomplete="off">
+    </div>
+
+    <div class="bio-form-section" style="display:flex;align-items:center;gap:12px">
+      <input type="checkbox" id="bio-sol-predacao" style="width:20px;height:20px;accent-color:var(--bio-perigo);flex-shrink:0">
+      <label for="bio-sol-predacao" style="cursor:pointer;font-size:14px;font-weight:500">
+        Houve predação durante a soltura
+        <span style="display:block;font-size:12px;font-weight:400;opacity:.6">Jacaré, ave de rapina, etc.</span>
+      </label>
+    </div>
+
+    <div class="bio-form-section">
+      <label class="bio-form-label" for="bio-sol-obs">Observações</label>
+      <textarea id="bio-sol-obs" class="bio-form-textarea" rows="2"
+        placeholder="Comportamento dos filhotes, condições do local…"></textarea>
+    </div>
+
+    <button type="button" id="bio-btn-salvar-soltura" class="bio-btn-salvar">Confirmar Soltura</button>
+  </div>
+</div>
+
+<!-- ══ TELA: BERÇÁRIOS — LOTES ATIVOS ═══════════════════════════ -->
+<div id="tela-bercarios" class="bio-tela">
+  <header class="bio-form-header">
+    <button class="bio-btn-back" data-back="tela-home" aria-label="Voltar">‹</button>
+    <span>Berçário</span>
+    <button class="bio-btn-icon" id="bio-btn-reload-bercarios" aria-label="Atualizar">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M23 4v6h-6M1 20v-6h6"/>
+        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+      </svg>
+    </button>
+  </header>
+  <div class="bio-form-body">
+    <div id="bio-bercarios-estado" style="text-align:center;color:#9CA3AF;padding:32px" hidden></div>
+    <div id="bio-lista-lotes"></div>
   </div>
 </div>
 

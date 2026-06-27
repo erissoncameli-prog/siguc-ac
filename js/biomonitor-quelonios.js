@@ -764,10 +764,13 @@ function bioIniciarGPS() {
       BioApp.gpsLat      = pos.coords.latitude
       BioApp.gpsLng      = pos.coords.longitude
       BioApp.gpsPrecisao = pos.coords.accuracy
-      const coordsEl = document.getElementById('bio-gps-coords')
-      const accEl    = document.getElementById('bio-gps-acc')
-      if (coordsEl) coordsEl.textContent = bioFormatarCoords(BioApp.gpsLat, BioApp.gpsLng)
-      if (accEl)    accEl.textContent    = `±${Math.round(pos.coords.accuracy)}m`
+      const coordsEl    = document.getElementById('bio-gps-coords')
+      const accEl       = document.getElementById('bio-gps-acc')
+      const solCoordsEl = document.getElementById('bio-sol-gps-coords')
+      const formatted   = bioFormatarCoords(BioApp.gpsLat, BioApp.gpsLng)
+      if (coordsEl)    coordsEl.textContent    = formatted
+      if (accEl)       accEl.textContent       = `±${Math.round(pos.coords.accuracy)}m`
+      if (solCoordsEl) solCoordsEl.textContent = formatted
       bioVerificarPraiaProxima(pos.coords.latitude, pos.coords.longitude)
       clearTimeout(_bioPerimTimer)
       _bioPerimTimer = setTimeout(bioVerificarPerimetroNinho, 5000)
@@ -1233,7 +1236,265 @@ async function bioSalvarEclosao() {
 
   bioSyncTudo({ monitorId: BioApp.monitor?.id, onConcluido: () => bioAtualizarBadgeFila() })
   bioToast('Eclosão registrada!', 'ok')
+  bioAbrirTelaDestino({ ...ninho, status: 'eclodido' }, vivos)
+}
+
+/* ════════════════════════════════════════════════════════════
+   DESTINO PÓS-ECLOSÃO
+   ════════════════════════════════════════════════════════════ */
+function bioAbrirTelaDestino(ninho, filhotesVivos) {
+  BioApp.formDestinoCtx = { ninho, filhotesVivos: filhotesVivos ?? 0 }
+  document.getElementById('bio-dest-ninho-num').textContent = ninho.numero_ninho
+  document.getElementById('bio-dest-especie').textContent   = BIO_ESPECIES.find(e => e.id === ninho.especie)?.nome ?? ninho.especie
+  document.getElementById('bio-dest-filhotes').textContent  = filhotesVivos ?? 0
+  bioMostrarTela('tela-destino-filhotes')
+}
+
+/* ════════════════════════════════════════════════════════════
+   FORMULÁRIO — ENTRADA NO BERÇÁRIO
+   ════════════════════════════════════════════════════════════ */
+function bioAbrirFormEntradaBercario() {
+  const { ninho, filhotesVivos } = BioApp.formDestinoCtx ?? {}
+  if (!ninho) return
+  document.getElementById('bio-berc-ninho-num').textContent = ninho.numero_ninho
+  document.getElementById('bio-berc-especie').textContent   = BIO_ESPECIES.find(e => e.id === ninho.especie)?.nome ?? ninho.especie
+  document.getElementById('bio-berc-nome').value  = ''
+  document.getElementById('bio-berc-data').value  = new Date().toISOString().slice(0, 10)
+  document.getElementById('bio-berc-hora').value  = new Date().toTimeString().slice(0, 5)
+  document.getElementById('bio-berc-obs').value   = ''
+  bioSetContador('bio-berc-qtd', filhotesVivos ?? 0)
+  bioMostrarTela('tela-form-entrada-bercario')
+}
+
+async function bioSalvarEntradaBercario() {
+  const { ninho } = BioApp.formDestinoCtx ?? {}
+  if (!ninho) return
+  const nome = document.getElementById('bio-berc-nome').value.trim()
+  const data = document.getElementById('bio-berc-data').value
+  const qtd  = parseInt(document.getElementById('bio-berc-qtd').textContent) || 0
+
+  if (!nome) { bioToast('Informe o nome do berçário/tanque.', 'err'); return }
+  if (!data) { bioToast('Informe a data de entrada.', 'err'); return }
+  if (qtd <= 0) { bioToast('Quantidade deve ser maior que zero.', 'err'); return }
+
+  const lote = {
+    uuid_cliente:  bioUuid(),
+    ninho_uuid:    ninho.uuid_cliente,
+    ninho_numero:  ninho.numero_ninho,
+    especie:       ninho.especie,
+    bercario_nome: nome,
+    data_entrada:  data,
+    hora_entrada:  document.getElementById('bio-berc-hora').value || null,
+    qtd_entrada:   qtd,
+    status:        'ativo',
+    observacoes:   document.getElementById('bio-berc-obs').value.trim() || null,
+    status_sync:   'pendente',
+    criado_em:     new Date().toISOString(),
+  }
+
+  await bioOfflineSalvarLote(lote)
+  await bioAtualizarBadgeFila()
+  await bioAtualizarBadgeBercario()
+
+  bioSyncTudo({ monitorId: BioApp.monitor?.id, onConcluido: () => bioAtualizarBadgeFila() })
+  bioToast('Entrada no berçário registrada!', 'ok')
   bioMostrarTela('tela-home')
+}
+
+/* ════════════════════════════════════════════════════════════
+   FORMULÁRIO — SOLTURA DE FILHOTES
+   ════════════════════════════════════════════════════════════ */
+// ctx: { ninho, filhotesVivos, lote? }
+// Se lote presente → via_bercario = true; back vai para tela-bercarios
+function bioAbrirFormSoltura(ctx) {
+  BioApp.formSolturaCtx = ctx
+  const { ninho, filhotesVivos, lote } = ctx
+
+  document.getElementById('bio-sol-ninho-num').textContent = ninho.numero_ninho
+  document.getElementById('bio-sol-especie').textContent   = BIO_ESPECIES.find(e => e.id === ninho.especie)?.nome ?? ninho.especie
+  document.getElementById('bio-sol-data').value            = new Date().toISOString().slice(0, 10)
+  document.getElementById('bio-sol-hora').value            = new Date().toTimeString().slice(0, 5)
+  document.getElementById('bio-sol-local').value           = ''
+  document.getElementById('bio-sol-obs').value             = ''
+  document.getElementById('bio-sol-predacao').checked      = false
+  bioSetContador('bio-sol-qtd',  filhotesVivos ?? 0)
+  bioSetContador('bio-sol-mort', 0)
+
+  const infoEl    = document.getElementById('bio-sol-bercario-info')
+  const mortLabel = document.getElementById('bio-sol-mort-label')
+  const tituloEl  = document.getElementById('bio-soltura-titulo')
+  const backBtn   = document.getElementById('bio-soltura-back')
+
+  if (lote) {
+    infoEl.textContent = `Berçário: ${lote.bercario_nome} · Entrada: ${lote.qtd_entrada} filhotes`
+    infoEl.hidden      = false
+    mortLabel.textContent = '(no berçário)'
+    tituloEl.textContent  = 'Soltura do Berçário'
+    backBtn.dataset.back  = 'tela-bercarios'
+  } else {
+    infoEl.hidden         = true
+    mortLabel.textContent = '(pós-eclosão)'
+    tituloEl.textContent  = 'Soltura de Filhotes'
+    backBtn.dataset.back  = 'tela-destino-filhotes'
+  }
+
+  // GPS
+  const coordsEl = document.getElementById('bio-sol-gps-coords')
+  if (coordsEl) coordsEl.textContent = bioFormatarCoords(BioApp.gpsLat, BioApp.gpsLng)
+
+  bioMostrarTela('tela-form-soltura')
+}
+
+async function bioSalvarSoltura() {
+  const { ninho, lote } = BioApp.formSolturaCtx ?? {}
+  if (!ninho) return
+
+  const data = document.getElementById('bio-sol-data').value
+  const qtd  = parseInt(document.getElementById('bio-sol-qtd').textContent)  || 0
+  const mort = parseInt(document.getElementById('bio-sol-mort').textContent) || 0
+
+  if (!data)    { bioToast('Informe a data da soltura.', 'err'); return }
+  if (qtd <= 0) { bioToast('Informe a quantidade soltada.', 'err'); return }
+
+  const sol = {
+    uuid_cliente:    bioUuid(),
+    ninho_uuid:      ninho.uuid_cliente,
+    ninho_numero:    ninho.numero_ninho,
+    lote_uuid:       lote?.uuid_cliente ?? null,
+    via_bercario:    !!lote,
+    data_soltura:    data,
+    hora_soltura:    document.getElementById('bio-sol-hora').value || null,
+    qtd_soltada:     qtd,
+    mortalidade:     mort,
+    lat:             BioApp.gpsLat,
+    lng:             BioApp.gpsLng,
+    local_descricao: document.getElementById('bio-sol-local').value.trim() || null,
+    predacao_soltura: document.getElementById('bio-sol-predacao').checked,
+    observacoes:     document.getElementById('bio-sol-obs').value.trim() || null,
+    status_sync:     'pendente',
+    criado_em:       new Date().toISOString(),
+  }
+
+  // Marca lote como soltado se aplicável
+  if (lote) {
+    await bioOfflineSalvarLote({ ...lote, status: 'soltado' })
+  }
+
+  await bioOfflineSalvarSoltura(sol)
+  await bioAtualizarBadgeFila()
+  await bioAtualizarBadgeBercario()
+
+  bioSyncTudo({ monitorId: BioApp.monitor?.id, onConcluido: () => bioAtualizarBadgeFila() })
+  bioToast('Soltura registrada!', 'ok')
+  bioMostrarTela('tela-home')
+}
+
+/* ════════════════════════════════════════════════════════════
+   TELA BERÇÁRIOS — LOTES ATIVOS
+   ════════════════════════════════════════════════════════════ */
+async function bioAbrirTelaBercarios() {
+  bioMostrarTela('tela-bercarios')
+  await bioCarregarBercarios()
+}
+
+async function bioCarregarBercarios() {
+  const estadoEl = document.getElementById('bio-bercarios-estado')
+  const listaEl  = document.getElementById('bio-lista-lotes')
+  if (estadoEl) { estadoEl.textContent = 'Carregando…'; estadoEl.hidden = false }
+  if (listaEl)  listaEl.innerHTML = ''
+
+  const lotes = await bioOfflineLotesAtivos()
+
+  if (!lotes.length) {
+    if (estadoEl) estadoEl.textContent = 'Nenhum lote em berçário no momento.'
+    return
+  }
+  if (estadoEl) estadoEl.hidden = true
+
+  const praias = await bioOfflineListarPraias()
+  lotes.forEach(l => {
+    const card = document.createElement('div')
+    card.className = 'bio-nfc'
+    const espNome  = BIO_ESPECIES.find(e => e.id === l.especie)?.nome ?? l.especie ?? '—'
+    const diasStr  = _bioDiasDesde(l.data_entrada)
+    card.innerHTML = `
+      <div class="bio-nfc-header">
+        <span class="bio-nfc-num">${l.bercario_nome}</span>
+        <span class="bio-nfc-status-badge encontrado">${diasStr}</span>
+      </div>
+      <div class="bio-nfc-especie">${espNome} · Ninho <strong>#${l.ninho_numero ?? '—'}</strong></div>
+      <div class="bio-nfc-row">
+        <span style="font-size:12px"><strong>${l.qtd_entrada}</strong> filhotes</span>
+        <span class="bio-nfc-data">Entrada: ${_bioFormatarData(l.data_entrada)}</span>
+      </div>
+      <div class="bio-nfc-acoes">
+        <button class="bio-btn-sm prim" data-acao="soltar-lote">Soltar agora</button>
+      </div>
+    `
+    card.querySelector('[data-acao="soltar-lote"]')?.addEventListener('click', async () => {
+      const ninho = await bioOfflineGetNinho(l.ninho_uuid)
+      if (!ninho) { bioToast('Ninho não encontrado no cache.', 'err'); return }
+      bioAbrirFormSoltura({ ninho, filhotesVivos: l.qtd_entrada, lote: l })
+    })
+    listaEl.appendChild(card)
+  })
+}
+
+function _bioDiasDesde(dataStr) {
+  if (!dataStr) return '—'
+  const dias = Math.floor((Date.now() - new Date(dataStr)) / 86400000)
+  if (dias === 0) return 'Hoje'
+  if (dias === 1) return '1 dia'
+  return `${dias} dias`
+}
+
+function _bioFormatarData(dataStr) {
+  if (!dataStr) return '—'
+  const [y, m, d] = dataStr.split('-')
+  return `${d}/${m}/${y}`
+}
+
+async function bioAtualizarBadgeBercario() {
+  const lotes  = await bioOfflineLotesAtivos()
+  const badge  = document.getElementById('bio-bercarios-badge')
+  const label  = document.getElementById('bio-bercarios-label')
+  const count  = lotes.length
+  if (badge)  { badge.textContent = count; badge.hidden = count === 0 }
+  if (label)  label.textContent = count > 0
+    ? `${count} lote${count > 1 ? 's' : ''} aguardando soltura`
+    : 'Lotes de filhotes em berçário'
+}
+
+function bioIniciarPosEclosao() {
+  // Destino: botões de escolha
+  document.getElementById('bio-dest-rio')?.addEventListener('click', () => {
+    const { ninho, filhotesVivos } = BioApp.formDestinoCtx ?? {}
+    if (!ninho) return
+    bioAbrirFormSoltura({ ninho, filhotesVivos })
+  })
+  document.getElementById('bio-dest-bercario')?.addEventListener('click', bioAbrirFormEntradaBercario)
+
+  // Contadores berçário
+  const bercQtdEl = document.getElementById('bio-berc-qtd')
+  document.getElementById('bio-berc-qtd-plus')?.addEventListener('click',  () => { bercQtdEl.textContent = parseInt(bercQtdEl.textContent) + 1 })
+  document.getElementById('bio-berc-qtd-minus')?.addEventListener('click', () => { bercQtdEl.textContent = Math.max(0, parseInt(bercQtdEl.textContent) - 1) })
+
+  // Contadores soltura
+  const solQtdEl  = document.getElementById('bio-sol-qtd')
+  const solMortEl = document.getElementById('bio-sol-mort')
+  document.getElementById('bio-sol-qtd-plus')?.addEventListener('click',   () => { solQtdEl.textContent  = parseInt(solQtdEl.textContent)  + 1 })
+  document.getElementById('bio-sol-qtd-minus')?.addEventListener('click',  () => { solQtdEl.textContent  = Math.max(0, parseInt(solQtdEl.textContent)  - 1) })
+  document.getElementById('bio-sol-mort-plus')?.addEventListener('click',  () => { solMortEl.textContent = parseInt(solMortEl.textContent) + 1 })
+  document.getElementById('bio-sol-mort-minus')?.addEventListener('click', () => { solMortEl.textContent = Math.max(0, parseInt(solMortEl.textContent) - 1) })
+
+  // Botão salvar
+  document.getElementById('bio-btn-salvar-entrada-bercario')?.addEventListener('click', bioSalvarEntradaBercario)
+  document.getElementById('bio-btn-salvar-soltura')?.addEventListener('click',           bioSalvarSoltura)
+  document.getElementById('bio-btn-reload-bercarios')?.addEventListener('click',         bioCarregarBercarios)
+  document.getElementById('bio-btn-bercarios')?.addEventListener('click',                bioAbrirTelaBercarios)
+
+  // GPS em tempo real na tela de soltura
+  // (reutiliza o watchPosition já ativo; atualiza coordsEl no próximo tick de GPS)
 }
 
 /* ════════════════════════════════════════════════════════════
@@ -1494,6 +1755,7 @@ function bioNinhoCardInner(n, opts = {}) {
     <div class="bio-nfc-acoes">
       ${status === 'encontrado' || status === 'transferido' ? `<button class="bio-btn-sm prim" data-acao="transferencia">+ Transferência</button>` : ''}
       ${status !== 'eclodido' && status !== 'perdido' ? `<button class="bio-btn-sm ghost" data-acao="eclosao">Eclosão</button>` : ''}
+      ${status === 'eclodido' ? `<button class="bio-btn-sm prim" data-acao="soltar">Soltar</button>` : ''}
       ${status !== 'perdido' ? `<button class="bio-btn-sm ghost" data-acao="visita">Visita</button>` : ''}
     </div>` : ''
 
@@ -1534,6 +1796,7 @@ function bioRenderizarListaNinhos(containerId, ninhos, mostrarAcoes) {
         if (btn.dataset.acao === 'transferencia') bioAbrirFormTransf(n)
         if (btn.dataset.acao === 'eclosao')       bioAbrirFormEclosao(n)
         if (btn.dataset.acao === 'visita')        bioAbrirFormVisita(n)
+        if (btn.dataset.acao === 'soltar')        bioAbrirTelaDestino(n, null)
       })
     })
     el.appendChild(card)
@@ -1920,6 +2183,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   bioIniciarFotosForm()
   bioIniciarContadores()
   bioIniciarFormVisita()
+  bioIniciarPosEclosao()
   bioIniciarConfig()
   bioCarregarConfigGPS()
 

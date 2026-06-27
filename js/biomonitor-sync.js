@@ -251,6 +251,103 @@ async function bioSyncVisitas(monitorId, onProgresso) {
   return n
 }
 
+// ── Sincronizar lotes em berçário pendentes ───────────────────
+async function bioSyncLotes(monitorId, onProgresso) {
+  const pendentes = await bioOfflineLotesPendentes()
+  let n = 0
+  for (const l of pendentes) {
+    onProgresso?.(`Lote berçário — ninho ${l.ninho_numero ?? ''}…`)
+
+    const ninhoLocal  = await bioOfflineGetNinho(l.ninho_uuid)
+    const ninhoServId = ninhoLocal?.server_id
+    if (!ninhoServId) continue
+
+    const payload = {
+      uuid_cliente:  l.uuid_cliente,
+      ninho_id:      ninhoServId,
+      bercario_nome: l.bercario_nome,
+      data_entrada:  l.data_entrada,
+      hora_entrada:  l.hora_entrada  || null,
+      qtd_entrada:   l.qtd_entrada,
+      status:        l.status,
+      observacoes:   l.observacoes   || null,
+      monitor_id:    monitorId,
+    }
+
+    await bioOfflineAtualizarSync('lotes', l.uuid_cliente, 'enviando')
+
+    const { data, error } = await bioSupabase()
+      .from('lotes_bercario')
+      .upsert(payload, { onConflict: 'uuid_cliente' })
+      .select('id')
+      .single()
+
+    if (error) {
+      await bioOfflineAtualizarSync('lotes', l.uuid_cliente, 'pendente')
+      throw error
+    }
+
+    await bioOfflineAtualizarSync('lotes', l.uuid_cliente, 'confirmado', data.id)
+    n++
+  }
+  return n
+}
+
+// ── Sincronizar solturas de filhotes pendentes ────────────────
+async function bioSyncSolturas(monitorId, onProgresso) {
+  const pendentes = await bioOfflineSolturasPendentes()
+  let n = 0
+  for (const s of pendentes) {
+    onProgresso?.(`Soltura — ninho ${s.ninho_numero ?? ''}…`)
+
+    const ninhoLocal  = await bioOfflineGetNinho(s.ninho_uuid)
+    const ninhoServId = ninhoLocal?.server_id
+    if (!ninhoServId) continue
+
+    let loteServId = null
+    if (s.via_bercario && s.lote_uuid) {
+      const loteLocal = await bioOfflineGetLote(s.lote_uuid)
+      loteServId = loteLocal?.server_id ?? null
+      if (!loteServId) continue  // lote ainda não sincronizado
+    }
+
+    const payload = {
+      uuid_cliente:     s.uuid_cliente,
+      ninho_id:         ninhoServId,
+      lote_bercario_id: loteServId,
+      via_bercario:     s.via_bercario,
+      data_soltura:     s.data_soltura,
+      hora_soltura:     s.hora_soltura     || null,
+      qtd_soltada:      s.qtd_soltada,
+      mortalidade:      s.mortalidade      ?? 0,
+      ponto_soltura:    s.lat != null && s.lng != null
+        ? `POINT(${s.lng} ${s.lat})`
+        : null,
+      local_descricao:  s.local_descricao  || null,
+      predacao_soltura: s.predacao_soltura ?? false,
+      observacoes:      s.observacoes      || null,
+      monitor_id:       monitorId,
+    }
+
+    await bioOfflineAtualizarSync('solturas', s.uuid_cliente, 'enviando')
+
+    const { data, error } = await bioSupabase()
+      .from('solturas_filhotes')
+      .upsert(payload, { onConflict: 'uuid_cliente' })
+      .select('id')
+      .single()
+
+    if (error) {
+      await bioOfflineAtualizarSync('solturas', s.uuid_cliente, 'pendente')
+      throw error
+    }
+
+    await bioOfflineAtualizarSync('solturas', s.uuid_cliente, 'confirmado', data.id)
+    n++
+  }
+  return n
+}
+
 // ── Sincronização completa ────────────────────────────────────
 async function bioSyncTudo({ monitorId, onProgresso, onConcluido, onErro } = {}) {
   if (_bioSyncEmAndamento) return
@@ -264,8 +361,10 @@ async function bioSyncTudo({ monitorId, onProgresso, onConcluido, onErro } = {})
     const t = await bioSyncTransferencias(monitorId, onProgresso)
     const e = await bioSyncEclosoes(monitorId, onProgresso)
     const v = await bioSyncVisitas(monitorId, onProgresso)
+    const l = await bioSyncLotes(monitorId, onProgresso)
+    const s = await bioSyncSolturas(monitorId, onProgresso)
     await bioOfflineLimparConfirmados()
-    onConcluido?.({ ninhos: n, transferencias: t, eclosoes: e, visitas: v })
+    onConcluido?.({ ninhos: n, transferencias: t, eclosoes: e, visitas: v, lotes: l, solturas: s })
   } catch (err) {
     onErro?.(err)
   } finally {
