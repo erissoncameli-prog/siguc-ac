@@ -69,10 +69,16 @@ function bioMostrarTela(id) {
   const navId = mapa[id]
   if (navId) document.getElementById(navId)?.classList.add('ativa')
 
-  // Oculta nav em telas de autenticação
+  // Oculta nav e faixa em telas de autenticação
   const lockTelas = ['tela-login', 'tela-trocar-senha', 'tela-config-pin', 'tela-bloqueio']
-  const nav = document.getElementById('bio-pill-nav')
-  if (nav) nav.hidden = lockTelas.includes(id)
+  const nav   = document.getElementById('bio-pill-nav')
+  const faixa = document.getElementById('bio-faixa-global')
+  if (nav)   nav.hidden   = lockTelas.includes(id)
+  if (faixa) {
+    faixa.hidden = lockTelas.includes(id)
+    const mascote = faixa.querySelector('.bio-faixa-mascote')
+    if (mascote) mascote.hidden = id !== 'tela-home'
+  }
 }
 
 /* ════════════════════════════════════════════════════════════

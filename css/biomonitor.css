@@ -27,6 +27,7 @@
 
   --bio-nav-h:      64px;
   --bio-nav-radius: 32px;
+  --bio-faixa-h:    calc(72px + env(safe-area-inset-top, 0px));
 
   --font-ui:   'DM Sans', sans-serif;
   --font-mono: 'DM Mono', monospace;
@@ -172,10 +173,9 @@ body { margin: 0; }
 
 /* ── Faixa institucional ─────────────────────────────────────── */
 .bio-faixa-inst {
-  position: sticky; top: 0; z-index: 800;
+  position: fixed; top: 0; left: 0; right: 0; z-index: 800;
   background: linear-gradient(135deg, #0A1E2F 0%, #0E4D6B 60%, var(--bio-prim) 130%);
   padding: calc(14px + env(safe-area-inset-top)) 16px 14px;
-  margin-bottom: 46px;
 }
 .bio-faixa-logos {
   display: grid; grid-template-columns: 1fr 96px 1fr;
@@ -1050,6 +1050,10 @@ body.field-mode .bio-home-nome { font-size: 26px; }
 /* ── Telas (visibilidade) ────────────────────────────────────── */
 .bio-tela { display: none; }
 .bio-tela.ativa { display: block; animation: bio-fadeSlide .22s var(--ease-out); }
+/* Telas de app: afasta o conteúdo da faixa fixa */
+.bio-tela.ativa:not(.bio-lock) { padding-top: var(--bio-faixa-h); }
+/* Home: espaço extra para o mascote que sai 40 px abaixo da faixa */
+#tela-home.ativa { padding-top: calc(var(--bio-faixa-h) + 46px); }
 /* .bio-lock usa flex para centralizar — sobrescreve o display:block acima */
 .bio-tela.ativa.bio-lock { display: flex; padding-bottom: 0; }
 @keyframes bio-fadeSlide { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
