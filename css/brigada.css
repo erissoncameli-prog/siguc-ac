@@ -1043,6 +1043,32 @@ body { margin: 0; }
 /* Nome científico discreto ao lado do popular */
 .autocomplete-lista .ac-cient { color: #6B7280; font-style: italic; font-size: 12px; }
 
+/* ── Educação ambiental: dicas, erro e lista de presença ──── */
+.campo-dica { margin: 6px 2px 0; font-size: 12px; color: #6B7280; }
+.campo-erro { margin: 6px 2px 0; font-size: 12px; color: #db2777; font-weight: 600; }
+
+.lista-presenca-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 12px; border-radius: 12px;
+  background: #fff; border: 1px solid #E5E7EB; margin-top: 8px;
+}
+.lista-presenca-item img,
+.lista-presenca-ico {
+  width: 46px; height: 46px; flex-shrink: 0;
+  border-radius: 10px; object-fit: cover;
+}
+.lista-presenca-ico {
+  display: flex; align-items: center; justify-content: center;
+  background: var(--prim-bg, #E7F5EE); color: var(--floresta, #0A1A0F);
+  font-size: 22px;
+}
+.lista-presenca-meta { flex: 1; min-width: 0; font-size: 13px; }
+.lista-presenca-meta strong {
+  display: block; font-weight: 600; margin-bottom: 2px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.lista-presenca-meta span { color: #6B7280; font-size: 12px; }
+
 /* ── Fila de sincronização ──────────────────────────────── */
 .fila-stats {
   display: flex; margin: 0 16px 16px;

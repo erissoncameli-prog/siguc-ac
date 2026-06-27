@@ -3,7 +3,7 @@
 // Confirmados retidos 7 dias como backup; pendentes nunca apagados.
 
 const DB_NAME    = 'siguc_brigadas_v1'
-const DB_VERSION = 1
+const DB_VERSION = 2
 let _db = null
 
 // ── Inicialização ─────────────────────────────────────────────
@@ -26,6 +26,12 @@ function bOfflineInit() {
       if (!db.objectStoreNames.contains('fauna')) {
         const f = db.createObjectStore('fauna', { keyPath: 'id', autoIncrement: true })
         f.createIndex('registro_uuid', 'registro_uuid')
+      }
+
+      // Participantes da educação ambiental (ligados ao registro pai)
+      if (!db.objectStoreNames.contains('participantes')) {
+        const p = db.createObjectStore('participantes', { keyPath: 'id', autoIncrement: true })
+        p.createIndex('registro_uuid', 'registro_uuid')
       }
 
       // Catálogo offline de espécies (JSON cacheado)
@@ -104,6 +110,11 @@ async function bOfflineSalvar(registro) {
 
   const fotos64 = await Promise.all((registro.fotos_blobs ?? []).map(toBs64))
 
+  // Anexo da lista de presença (foto/PDF) → base64 durável
+  const listaPresenca64 = registro.lista_presenca_blob
+    ? await toBs64(registro.lista_presenca_blob)
+    : null
+
   // Converter fotos de fauna também
   const faunaRaw = registro._fauna ?? []
   const fauna64  = await Promise.all(faunaRaw.map(async f => {
@@ -111,29 +122,44 @@ async function bOfflineSalvar(registro) {
     return { ...f, fotos_blobs: ff }
   }))
 
+  // Participantes da educação ambiental (sem mídia; cópia simples)
+  const participantesRaw = registro._participantes ?? []
+
   return new Promise((res, rej) => {
-    const tx = db.transaction(['registros', 'fauna'], 'readwrite')
+    const tx = db.transaction(['registros', 'fauna', 'participantes'], 'readwrite')
 
     const payload = {
       ...registro,
       status:    'pendente',
       criado_em: new Date().toISOString(),
       fotos_blobs: fotos64,
+      lista_presenca_blob: listaPresenca64,
     }
     delete payload._fauna
+    delete payload._participantes
 
     const r1 = tx.objectStore('registros').put(payload)
 
     // Fauna: remove entradas antigas do mesmo uuid_cliente e reinsere
     const fStore = tx.objectStore('fauna')
-    const idx    = fStore.index('registro_uuid')
-    const cursor = idx.openCursor(IDBKeyRange.only(registro.uuid_cliente))
-    cursor.onsuccess = ev => {
+    const fCursor = fStore.index('registro_uuid').openCursor(IDBKeyRange.only(registro.uuid_cliente))
+    fCursor.onsuccess = ev => {
       const c = ev.target.result
       if (c) { c.delete(); c.continue() }
     }
-
     fauna64.forEach(f => fStore.add({ ...f, registro_uuid: registro.uuid_cliente }))
+
+    // Participantes: mesmo padrão (limpa e reinsere)
+    const pStore = tx.objectStore('participantes')
+    const pCursor = pStore.index('registro_uuid').openCursor(IDBKeyRange.only(registro.uuid_cliente))
+    pCursor.onsuccess = ev => {
+      const c = ev.target.result
+      if (c) { c.delete(); c.continue() }
+    }
+    participantesRaw.forEach(p => {
+      const { _id, ...rest } = p
+      pStore.add({ ...rest, registro_uuid: registro.uuid_cliente })
+    })
 
     tx.oncomplete = () => res(payload)
     tx.onerror    = () => rej(tx.error)
@@ -166,6 +192,16 @@ async function bOfflineFaunaDeRegistro(uuid_cliente) {
   return new Promise((res, rej) => {
     const tx  = db.transaction('fauna', 'readonly')
     const req = tx.objectStore('fauna').index('registro_uuid').getAll(uuid_cliente)
+    req.onsuccess = () => res(req.result)
+    req.onerror   = () => rej(req.error)
+  })
+}
+
+async function bOfflineParticipantesDeRegistro(uuid_cliente) {
+  const db = await bOfflineInit()
+  return new Promise((res, rej) => {
+    const tx  = db.transaction('participantes', 'readonly')
+    const req = tx.objectStore('participantes').index('registro_uuid').getAll(uuid_cliente)
     req.onsuccess = () => res(req.result)
     req.onerror   = () => rej(req.error)
   })
@@ -206,7 +242,7 @@ async function bOfflinePurgar() {
   const db     = await bOfflineInit()
   const limite = new Date(Date.now() - 7 * 86400 * 1000).toISOString()
   return new Promise((res, rej) => {
-    const tx  = db.transaction(['registros', 'fauna'], 'readwrite')
+    const tx  = db.transaction(['registros', 'fauna', 'participantes'], 'readwrite')
     const req = tx.objectStore('registros').index('status').openCursor(IDBKeyRange.only('confirmado'))
     req.onsuccess = ev => {
       const c = ev.target.result
@@ -216,6 +252,9 @@ async function bOfflinePurgar() {
         c.delete()
         tx.objectStore('fauna').index('registro_uuid').openCursor(IDBKeyRange.only(uuid)).onsuccess = fc => {
           const fc2 = fc.target.result; if (fc2) { fc2.delete(); fc2.continue() }
+        }
+        tx.objectStore('participantes').index('registro_uuid').openCursor(IDBKeyRange.only(uuid)).onsuccess = pc => {
+          const pc2 = pc.target.result; if (pc2) { pc2.delete(); pc2.continue() }
         }
       }
       c.continue()
@@ -229,9 +268,10 @@ async function bOfflinePurgar() {
 async function bOfflineZerarFila() {
   const db = await bOfflineInit()
   return new Promise((res, rej) => {
-    const tx = db.transaction(['registros', 'fauna'], 'readwrite')
+    const tx = db.transaction(['registros', 'fauna', 'participantes'], 'readwrite')
     tx.objectStore('registros').clear()
     tx.objectStore('fauna').clear()
+    tx.objectStore('participantes').clear()
     tx.oncomplete = () => res()
     tx.onerror    = () => rej(tx.error)
   })
