@@ -930,7 +930,13 @@ Exemplo: `ARJ-TA-047` (praia Ariquemes, tracajá, ninho 47)
 
 ### 14.5 Validação científica
 
-Ninhos têm `status_validacao` (pendente / validado / rejeitado) com `motivo_rejeicao` opcional. Validação por gestor ou técnico na interface de gestão do SIGUC.
+Ninhos têm `status_validacao` (pendente / validado / rejeitado / em_correcao) com `motivo_rejeicao` opcional. Validação por gestor ou técnico em `biomonitor-validacao.html` (filtro abre em "Todos" para não esconder os devolvidos).
+
+**Ciclo de correção (app de campo):** quando o gestor marca `em_correcao`, o app de campo:
+- baixa a mudança no sync (`bioSyncPullNinhos`, agora chamado dentro de `bioSyncTudo`);
+- mostra um card "X ninhos precisam de correção" na home (`bio-correcao-card`) que abre a lista filtrada;
+- exibe o motivo no card do ninho + botão **Corrigir**, que abre o formulário pré-preenchido;
+- ao reenviar, o ninho volta a `status_validacao = 'pendente'` (motivo limpo) e re-sincroniza.
 
 ### 14.6 Lote de berçário — controle de status
 

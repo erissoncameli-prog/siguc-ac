@@ -301,6 +301,18 @@
 
   </div>
 
+  <!-- Card: ninhos devolvidos para correção -->
+  <div class="bio-fila-card" id="bio-correcao-card" hidden
+       style="background:#eef2ff;color:#4338ca;cursor:pointer">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-15-6.7L3 13"/>
+    </svg>
+    <div>
+      <strong id="bio-correcao-count">0 ninhos</strong>
+      <span> precisam de correção</span>
+    </div>
+  </div>
+
   <!-- Card de pendentes na fila -->
   <div class="bio-fila-card" id="bio-fila-card" hidden>
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -318,11 +330,19 @@
 <div id="tela-form-ninho" class="bio-tela">
   <header class="bio-form-header">
     <button class="bio-btn-back" data-back="tela-home" aria-label="Voltar">‹</button>
-    <span>Novo Ninho</span>
+    <span id="bio-form-ninho-titulo">Novo Ninho</span>
     <span></span>
   </header>
 
   <div class="bio-form-body">
+
+    <!-- Motivo da correção solicitada (só no modo correção) -->
+    <div class="bio-form-section" id="bio-form-correcao-box" hidden>
+      <div style="background:#eef2ff;border-left:4px solid #6366f1;border-radius:8px;padding:10px 12px">
+        <strong style="font-size:.82rem;color:#4338ca">Correção solicitada pelo gestor:</strong>
+        <p id="bio-form-correcao-motivo" style="margin:.25rem 0 0;font-size:.82rem;color:#3730a3"></p>
+      </div>
+    </div>
 
     <!-- Praia (selecionável) -->
     <div class="bio-form-section">

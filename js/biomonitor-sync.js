@@ -69,6 +69,11 @@ async function bioSyncNinhos(monitorId, onProgresso) {
     const payload = {
       uuid_cliente:     ninho.uuid_cliente,
       numero_ninho:     ninho.numero_ninho,
+      // Só ninhos pendentes de envio chegam aqui (novo ou reenvio de
+      // correção): em ambos a validação é 'pendente' e sem motivo. Enviar
+      // garante que o reenvio devolva o ninho à fila do gestor.
+      status_validacao: ninho.status_validacao || 'pendente',
+      motivo_rejeicao:  ninho.motivo_rejeicao  ?? null,
       praia_id:         ninho.praia_id         || null,
       uc_id:            ninho.uc_id            || null,
       municipio:        ninho.municipio        || null,
@@ -412,6 +417,10 @@ async function bioSyncTudo({ monitorId, onProgresso, onConcluido, onErro } = {})
     const l  = await bioSyncLotes(monitorId, onProgresso)
     const s  = await bioSyncSolturas(monitorId, onProgresso)
     const oc = await bioSyncOcorrencias(monitorId, onProgresso)
+    // Pull: traz de volta mudanças do servidor (ex.: validação/correção
+    // feita pelo gestor) para o IndexedDB.
+    const grupoId = (typeof BioApp !== 'undefined' && BioApp.monitor?.grupo_id) || null
+    if (grupoId) { try { await bioSyncPullNinhos(grupoId) } catch (_) {} }
     await bioOfflineLimparConfirmados()
     onConcluido?.({ ninhos: n, transferencias: t, eclosoes: e, visitas: v, lotes: l, solturas: s, ocorrencias: oc })
   } catch (err) {
