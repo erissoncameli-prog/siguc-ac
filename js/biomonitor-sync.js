@@ -479,7 +479,7 @@ async function bioSyncPullNinhos(grupoId) {
     .select(`
       id, uuid_cliente, numero_ninho, especie, data_encontro,
       status, status_validacao, motivo_rejeicao,
-      foto_urls, observacoes, praia_id, uc_id, grupo_id, monitor_id,
+      foto_urls, observacoes, praia_id, praia_atual_id, uc_id, grupo_id, monitor_id,
       sincronizado_em, criado_em
     `)
     .eq('grupo_id', grupoId)
@@ -499,13 +499,18 @@ async function bioSyncPullNinhos(grupoId) {
         sincronizado_em: n.sincronizado_em ?? new Date().toISOString(),
       })
     } else {
-      // Atualiza status_validacao e status do ninho se mudou no servidor
-      if (local.status !== n.status || local.status_validacao !== n.status_validacao) {
+      // Atualiza campos que podem ter mudado no servidor após transferência/validação
+      if (
+        local.status           !== n.status           ||
+        local.status_validacao !== n.status_validacao ||
+        local.praia_atual_id   !== n.praia_atual_id
+      ) {
         await bioOfflineSalvarNinho({
           ...local,
           status:           n.status,
           status_validacao: n.status_validacao,
           motivo_rejeicao:  n.motivo_rejeicao,
+          praia_atual_id:   n.praia_atual_id,
         })
       }
     }
