@@ -13,6 +13,38 @@
 <body>
 <div id="app"></div>
 
+<!-- ── Modal: Confirmar Senha (Zona de Perigo) ────────────── -->
+<div class="modal-overlay" id="modal-zerar">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-header" style="border-bottom-color:#FCA5A5">
+      <div class="modal-title" style="color:#B91C1C;display:flex;align-items:center;gap:8px">
+        <span data-icon="alert-triangle"></span>
+        Confirmar exclusão
+      </div>
+      <button class="modal-close" onclick="fecharModal('zerar')">×</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:13px;color:#7F1D1D;background:#FEF2F2;border:1px solid #FCA5A5;border-radius:8px;padding:10px 12px;margin-bottom:16px;line-height:1.5">
+        Esta ação apagará <strong>permanentemente</strong> todos os registros de campo,
+        fauna e fotos de todas as brigadas e <strong>não pode ser desfeita</strong>.
+      </p>
+      <div class="form-group">
+        <label class="form-label">Confirme sua senha para continuar</label>
+        <input class="form-control" id="zerar-senha" type="password"
+               placeholder="Sua senha de acesso ao SIGUC"
+               onkeydown="if(event.key==='Enter')confirmarSenhaEZerar()">
+        <span id="zerar-senha-erro" style="font-size:12px;color:#B91C1C;margin-top:4px;display:block"></span>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="fecharModal('zerar')">Cancelar</button>
+      <button class="btn btn-danger" id="zerar-btn-confirmar" onclick="confirmarSenhaEZerar()">
+        Confirmar e apagar
+      </button>
+    </div>
+  </div>
+</div>
+
 <!-- ── Modal: Atividade ──────────────────────────────────── -->
 <div class="modal-overlay" id="modal-atividade">
   <div class="modal" style="max-width:500px">
@@ -451,6 +483,7 @@ const PWA_BASE_URL = 'https://brigada.siguc.ac.gov.br'
 let _ucs = [], _brigadas = [], _brigadistas = [], _equipes = []
 let _editId = { brigada: null, brigadista: null }
 let _loginBrigadistaId = null
+let _usuario = null   // preenchido no boot; usado para reautenticação
 
 const BADGE_TIPO  = { preventiva: 'badge-azul', combate: 'badge-erro', mista: 'badge-verde' }
 const BADGE_STATUS_BR = { ativo: 'badge-verde', afastado: 'badge-ouro', suspenso: 'badge-erro', encerrado: 'badge-cinza' }
@@ -460,7 +493,8 @@ const LABEL_REGIONAL = {
 }
 
 ;(async function () {
-  const usuario = await carregarUsuario()
+  _usuario = await carregarUsuario()
+  const usuario = _usuario
   if (!usuario) { window.location.href = '../index.html'; return }
   if (!['super_admin','gestor'].includes(usuario.perfil)) {
     window.location.href = '../pages/dashboard.html'; return
@@ -481,6 +515,7 @@ const LABEL_REGIONAL = {
           <button class="tab-btn ativo" id="tab-brigadas"    onclick="mudarAba('brigadas')">Brigadas</button>
           <button class="tab-btn"       id="tab-brigadistas" onclick="mudarAba('brigadistas')">Brigadistas</button>
           <button class="tab-btn"       id="tab-atividades"  onclick="mudarAba('atividades')">⚙ Atividades</button>
+          ${usuario.perfil === 'super_admin' ? `<button class="tab-btn tab-perigo" id="tab-perigo" onclick="mudarAba('perigo')" title="Ações destrutivas irreversíveis" data-icon="alert-triangle">Zona de Perigo</button>` : ''}
         </div>
       </div>
 
@@ -547,6 +582,39 @@ const LABEL_REGIONAL = {
         </div></div></div>
       </div>
 
+      <!-- Aba Zona de Perigo -->
+      <div id="aba-perigo" style="display:none">
+        <div class="card perigo-card">
+          <div class="perigo-header">
+            <span data-icon="alert-triangle" class="perigo-icon"></span>
+            <div>
+              <div class="perigo-titulo">Zona de Perigo</div>
+              <div class="perigo-sub">Ações irreversíveis — leia com atenção antes de prosseguir.</div>
+            </div>
+          </div>
+
+          <!-- Estatísticas atuais -->
+          <div id="perigo-stats" class="perigo-stats-wrap">
+            <div class="perigo-stat"><span class="perigo-stat-val" id="ps-registros">—</span><span class="perigo-stat-label">Registros de campo</span></div>
+            <div class="perigo-stat"><span class="perigo-stat-val" id="ps-fauna">—</span><span class="perigo-stat-label">Registros de fauna</span></div>
+            <div class="perigo-stat"><span class="perigo-stat-val" id="ps-fotos">—</span><span class="perigo-stat-label">Fotos no Storage</span></div>
+          </div>
+          <button class="btn btn-secondary" style="margin-bottom:20px;font-size:12px" onclick="carregarEstatisticasCampo()">Atualizar contagens</button>
+
+          <!-- Ação: Zerar registros de campo -->
+          <div class="perigo-acao">
+            <div class="perigo-acao-info">
+              <strong>Apagar todos os registros de campo</strong>
+              <p>Remove permanentemente todos os registros de campo, fauna e fotos de todas as brigadas. Esta ação <strong>não pode ser desfeita</strong>. Use apenas para limpar dados de testes antes da operação real.</p>
+            </div>
+            <button class="btn btn-danger" style="white-space:nowrap" onclick="zerarRegistrosCampo()">
+              <span data-icon="trash-2" style="display:inline-block;vertical-align:middle;margin-right:6px"></span>
+              Zerar registros de campo
+            </button>
+          </div>
+        </div>
+      </div>
+
       <!-- Aba Atividades -->
       <div id="aba-atividades" style="display:none">
         <div class="filter-bar" style="margin-bottom:12px">
@@ -568,6 +636,7 @@ const LABEL_REGIONAL = {
 
   carregarLogosSidebar()
   await Promise.all([carregarUCs(), carregarDados()])
+  bIconsAplicar(document.body)
 })()
 
 async function carregarUCs() {
@@ -618,11 +687,105 @@ async function carregarDados() {
 }
 
 function mudarAba(aba) {
-  ;['brigadas','brigadistas','atividades'].forEach(a => {
-    document.getElementById('aba-' + a).style.display = a === aba ? '' : 'none'
-    document.getElementById('tab-' + a).classList.toggle('ativo', a === aba)
+  ;['brigadas','brigadistas','atividades','perigo'].forEach(a => {
+    const abaEl = document.getElementById('aba-' + a)
+    const tabEl = document.getElementById('tab-' + a)
+    if (abaEl) abaEl.style.display = a === aba ? '' : 'none'
+    if (tabEl) tabEl.classList.toggle('ativo', a === aba)
   })
   if (aba === 'atividades') carregarAtividades()
+  if (aba === 'perigo')     carregarEstatisticasCampo()
+}
+
+// ════════════════════════════════════════════════════════════════
+// Zona de Perigo
+// ════════════════════════════════════════════════════════════════
+
+async function carregarEstatisticasCampo() {
+  document.getElementById('ps-registros').textContent = '…'
+  document.getElementById('ps-fauna').textContent     = '…'
+  document.getElementById('ps-fotos').textContent     = '…'
+
+  const [rReg, rFauna] = await Promise.all([
+    db.from('registros_campo').select('id, fotos_urls', { count: 'exact', head: false }),
+    db.from('registro_fauna').select('id, fotos_urls', { count: 'exact', head: false }),
+  ])
+
+  const qtdRegistros = rReg.count ?? (rReg.data?.length ?? 0)
+  const qtdFauna     = rFauna.count ?? (rFauna.data?.length ?? 0)
+
+  let qtdFotos = 0
+  if (rReg.data) {
+    rReg.data.forEach(r => { if (r.fotos_urls?.length) qtdFotos += r.fotos_urls.length })
+  }
+  if (rFauna.data) {
+    rFauna.data.forEach(r => { if (r.fotos_urls?.length) qtdFotos += r.fotos_urls.length })
+  }
+
+  document.getElementById('ps-registros').textContent = qtdRegistros
+  document.getElementById('ps-fauna').textContent     = qtdFauna
+  document.getElementById('ps-fotos').textContent     = qtdFotos
+}
+
+function zerarRegistrosCampo() {
+  document.getElementById('zerar-senha').value = ''
+  document.getElementById('zerar-senha-erro').textContent = ''
+  document.getElementById('modal-zerar').classList.add('aberto')
+  setTimeout(() => document.getElementById('zerar-senha').focus(), 120)
+}
+
+async function confirmarSenhaEZerar() {
+  const senha = document.getElementById('zerar-senha').value
+  const erroEl = document.getElementById('zerar-senha-erro')
+  erroEl.textContent = ''
+
+  if (!senha) { erroEl.textContent = 'Informe a senha.'; return }
+
+  const btn = document.getElementById('zerar-btn-confirmar')
+  btn.disabled = true; btn.textContent = 'Verificando…'
+
+  try {
+    // Reautentica o super_admin para confirmar identidade
+    const email = _usuario?.email
+    if (!email) throw new Error('Sessão inválida. Faça login novamente.')
+
+    const { error: authErr } = await db.auth.signInWithPassword({ email, password: senha })
+    if (authErr) {
+      erroEl.textContent = 'Senha incorreta. Tente novamente.'
+      return
+    }
+
+    fecharModal('zerar')
+    btn.textContent = 'Apagando…'
+
+    const { data, error } = await db.rpc('zerar_registros_campo')
+    if (error) throw error
+
+    const { registros_deletados, fauna_deletada, fotos_paths } = data
+
+    // Tenta remover arquivos do Storage (melhor esforço)
+    if (fotos_paths?.length) {
+      const paths = fotos_paths.map(url => {
+        const marker = '/registros-campo/'
+        const idx = url.indexOf(marker)
+        return idx >= 0 ? url.slice(idx + marker.length) : null
+      }).filter(Boolean)
+
+      for (let i = 0; i < paths.length; i += 100) {
+        await db.storage.from('registros-campo').remove(paths.slice(i, i + 100))
+      }
+    }
+
+    toast(
+      `Concluído — ${registros_deletados} registro(s), ${fauna_deletada} fauna, ${fotos_paths?.length ?? 0} foto(s) apagados.`,
+      'success'
+    )
+    await carregarEstatisticasCampo()
+  } catch(e) {
+    erroEl.textContent = e.message || 'Falha ao processar.'
+  } finally {
+    btn.disabled = false; btn.textContent = 'Confirmar e apagar'
+  }
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -1193,6 +1356,10 @@ function fecharModal(tipo) {
   if (tipo === 'brigadista') _editId.brigadista = null
   if (tipo === 'login')      _loginBrigadistaId = null
   if (tipo === 'atividade')  _ativEditId = null
+  if (tipo === 'zerar') {
+    document.getElementById('zerar-senha').value = ''
+    document.getElementById('zerar-senha-erro').textContent = ''
+  }
 }
 </script>
 
@@ -1228,6 +1395,34 @@ function fecharModal(tipo) {
 .brig-foto-btn:hover { background:rgba(82,183,136,.2); }
 .brig-foto-remover { font-size:11px; color:#EF4444; cursor:pointer; display:none; }
 .brig-foto-remover.visivel { display:block; }
+
+/* ── Zona de Perigo ─────────────────────────────────────────── */
+.tab-perigo { color: #B91C1C !important; }
+.tab-perigo.ativo { color: #B91C1C !important; background: #FEF2F2 !important; }
+.tab-perigo:hover:not(.ativo) { background: rgba(185,28,28,.08) !important; }
+.perigo-card { border: 2px solid #FCA5A5; background: #FFF5F5; }
+.perigo-header { display:flex; align-items:flex-start; gap:14px; margin-bottom:20px; }
+.perigo-icon { color: #B91C1C; flex-shrink:0; }
+.perigo-titulo { font-size:1rem; font-weight:700; color:#B91C1C; margin-bottom:2px; }
+.perigo-sub { font-size:.82rem; color:#7F1D1D; }
+.perigo-stats-wrap {
+  display:flex; gap:12px; flex-wrap:wrap; margin-bottom:12px;
+}
+.perigo-stat {
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  padding:10px 20px; background:#fff; border:1px solid #FCA5A5; border-radius:10px;
+  min-width:100px;
+}
+.perigo-stat-val { font-size:1.5rem; font-weight:700; color:#B91C1C; }
+.perigo-stat-label { font-size:.72rem; color:#6B7280; margin-top:2px; }
+.perigo-acao {
+  display:flex; align-items:flex-start; gap:16px; flex-wrap:wrap;
+  background:#fff; border:1px solid #FCA5A5; border-radius:10px;
+  padding:16px 18px; margin-top:4px;
+}
+.perigo-acao-info { flex:1; min-width:220px; }
+.perigo-acao-info p { font-size:.82rem; color:#6B7280; margin:.4rem 0 0; }
+.btn-danger:disabled { opacity:.6; cursor:not-allowed; }
 </style>
 </body>
 </html>
