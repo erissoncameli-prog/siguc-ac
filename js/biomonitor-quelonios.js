@@ -1886,7 +1886,7 @@ async function bioCarregarAbertos() {
     try {
       let q = bioSupabase()
         .from('vw_ninhos_validacao')
-        .select('id,uuid_cliente,numero_ninho,especie,data_encontro,status,status_validacao,motivo_rejeicao,qtd_ovos,ovos_integros,ovos_descartados,dist_rio_m,criado_em,praia_id,praia_nome,monitor_id,monitor_nome')
+        .select('id,uuid_cliente,numero_ninho,especie,data_encontro,status,status_validacao,motivo_rejeicao,qtd_ovos,ovos_integros,ovos_descartados,dist_rio_m,criado_em,praia_id,praia_nome,praia_atual_id,praia_atual_nome,monitor_id,monitor_nome')
         .eq('grupo_id', BioApp.monitor.grupo_id)
         .order('numero_ninho', { ascending: false })
       if (filtroStatus) {
@@ -1894,12 +1894,12 @@ async function bioCarregarAbertos() {
       } else {
         q = q.not('status', 'in', '(eclodido,perdido)')
       }
-      if (filtroPraia) q = q.eq('praia_id', filtroPraia.id)
+      if (filtroPraia) q = q.eq('praia_atual_id', filtroPraia.id)
       const { data, error } = await q
       if (error) throw error
 
       // Mescla: inclui ninhos locais pendentes que ainda não chegaram no servidor
-      const localPend = await bioOfflineListarNinhos(filtroPraia ? { praiaId: filtroPraia.id } : {})
+      const localPend = await bioOfflineListarNinhos(filtroPraia ? { praiaAtualId: filtroPraia.id } : {})
       const uuidsServ = new Set((data ?? []).map(n => n.uuid_cliente).filter(Boolean))
       const praias    = await bioOfflineListarPraias()
       const locaisSo  = localPend
@@ -2012,7 +2012,9 @@ function bioNinhoCardInner(n, opts = {}) {
     </div>
     <div class="bio-nfc-especie">${esp ? `<strong>${esp.sigla}</strong> ${esp.nome}` : (n.especie ?? '—')}</div>
     <div class="bio-nfc-row">
-      ${n.praia_nome ? `<span class="bio-nfc-praia">${n.praia_nome}</span>` : ''}
+      ${n.praia_atual_nome && n.praia_atual_id !== n.praia_id
+        ? `<span class="bio-nfc-praia">${n.praia_atual_nome} <span class="bio-nfc-praia-orig">(orig: ${n.praia_nome})</span></span>`
+        : n.praia_nome ? `<span class="bio-nfc-praia">${n.praia_nome}</span>` : ''}
       <span class="bio-nfc-data">${data}</span>
     </div>
     ${rejHtml}

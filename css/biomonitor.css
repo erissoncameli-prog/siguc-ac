@@ -706,6 +706,7 @@ body { margin: 0; }
 .bio-nfc-especie strong { font-weight: 700; }
 .bio-nfc-row { display: flex; justify-content: space-between; font-size: 12px; color: #6B7280; margin-bottom: 4px; }
 .bio-nfc-praia { font-weight: 600; color: #4A6170; }
+.bio-nfc-praia-orig { font-weight: 400; color: #9CA3AF; }
 .bio-nfc-ovos { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 4px; }
 .bio-nfc-ovos span {
   font-size: 11px; background: rgba(201,168,76,.12); color: #9B7A1E;
@@ -1145,6 +1146,7 @@ body.field-mode .bio-home-nome { font-size: 26px; }
   font-size: 12px; font-weight: 600; color: var(--bio-prim);
   background: var(--bio-prim-bg); padding: 2px 8px; border-radius: 6px;
 }
+.bio-nfc-praia .bio-nfc-praia-orig { font-weight: 400; color: #9CA3AF; }
 .bio-nfc-data { font-size: 12px; color: #9CA3AF; margin-left: auto; }
 .bio-nfc-ovos {
   display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 6px;
