@@ -9,6 +9,105 @@
 <script src="../js/queryLogger.js"></script>
 <script src="../js/config.js"></script>
 <script src="../js/layout.js"></script>
+<style>
+/* ── Relatório Biomonitor ── */
+.rel-filtros {
+  display:flex; flex-wrap:wrap; gap:10px; align-items:flex-end;
+  background:rgba(255,255,255,.05); border-radius:12px;
+  padding:14px 16px; margin-bottom:20px; border:1px solid rgba(255,255,255,.08);
+}
+.rel-filtros label { display:flex; flex-direction:column; gap:4px; font-size:12px; color:var(--t2,#aaa); }
+.rel-filtros select { background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.12); color:var(--t1,#f4efe6); border-radius:8px; padding:7px 10px; font-size:13px; min-width:160px; }
+.rel-nav {
+  display:flex; gap:6px; flex-wrap:wrap; margin-bottom:20px;
+}
+.rel-nav a {
+  padding:6px 14px; border-radius:20px; font-size:12px; font-weight:600;
+  background:rgba(255,255,255,.07); color:var(--t1,#f4efe6); text-decoration:none;
+  border:1px solid rgba(255,255,255,.1); transition:all .15s;
+}
+.rel-nav a:hover { background:rgba(201,168,76,.2); border-color:var(--ouro,#C9A84C); color:var(--ouro,#C9A84C); }
+
+/* KPIs */
+.rel-kpi-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(145px,1fr)); gap:10px; margin-bottom:14px; }
+.rel-kpi {
+  background:rgba(255,255,255,.06); border-radius:10px; padding:13px 14px;
+  border-top:3px solid var(--kpi-cor,#3b82f6);
+}
+.rel-kpi-val { font-size:1.55rem; font-weight:700; color:var(--kpi-cor,#3b82f6); line-height:1; }
+.rel-kpi-lbl { font-size:11px; color:var(--t2,#aaa); margin-top:3px; line-height:1.2; }
+
+/* Taxas */
+.rel-taxa-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:10px; margin-bottom:20px; }
+.rel-taxa-card {
+  background:rgba(255,255,255,.05); border-radius:10px; padding:12px 14px 10px;
+  border:1px solid rgba(255,255,255,.08);
+}
+.rel-taxa-top { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:6px; }
+.rel-taxa-lbl { font-size:12px; font-weight:600; color:var(--t1,#f4efe6); }
+.rel-taxa-val { font-size:18px; font-weight:700; font-family:monospace; }
+.rel-taxa-bar { height:4px; background:rgba(255,255,255,.12); border-radius:2px; overflow:hidden; margin-bottom:5px; }
+.rel-taxa-fill { height:100%; border-radius:2px; width:0; transition:width .7s ease; }
+.rel-taxa-desc { font-size:10px; color:var(--t2,#aaa); }
+
+/* Seções */
+.rel-sec { margin-bottom:28px; scroll-margin-top:70px; }
+.rel-sec-title {
+  font-size:.95rem; font-weight:700; letter-spacing:.04em;
+  text-transform:uppercase; color:var(--ouro,#C9A84C);
+  display:flex; align-items:center; gap:10px; margin-bottom:12px;
+}
+.rel-sec-title::after { content:''; flex:1; height:1px; background:rgba(255,255,255,.08); }
+
+/* Gráficos */
+.rel-charts-row { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px; }
+.rel-charts-row.triple { grid-template-columns:1fr 1fr 1fr; }
+@media (max-width:900px) {
+  .rel-charts-row, .rel-charts-row.triple { grid-template-columns:1fr; }
+}
+.rel-chart-card { background:rgba(255,255,255,.05); border-radius:12px; padding:14px 16px; border:1px solid rgba(255,255,255,.08); }
+.rel-chart-title { font-size:12px; font-weight:700; color:var(--t1,#f4efe6); margin:0 0 10px; }
+.rel-chart-sub { font-size:10px; color:var(--t2,#aaa); margin:-6px 0 8px; }
+.rel-chart-wrap { position:relative; height:220px; }
+.rel-chart-wrap.tall { height:280px; }
+.rel-chart-wrap.short { height:160px; }
+
+/* Berçário KPIs */
+.berc-kpi-row { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:14px; }
+@media (max-width:700px) { .berc-kpi-row { grid-template-columns:repeat(2,1fr); } }
+
+/* Tabelas */
+.rel-table-wrap { background:rgba(255,255,255,.04); border-radius:10px; overflow:hidden; border:1px solid rgba(255,255,255,.07); }
+.rel-table { width:100%; border-collapse:collapse; font-size:12px; }
+.rel-table thead th {
+  background:rgba(255,255,255,.07); padding:8px 10px; text-align:left;
+  font-weight:700; color:var(--t2,#aaa); white-space:nowrap; font-size:11px;
+  text-transform:uppercase; letter-spacing:.04em;
+}
+.rel-table tbody td { padding:7px 10px; border-top:1px solid rgba(255,255,255,.05); color:var(--t1,#f4efe6); }
+.rel-table tbody tr:hover td { background:rgba(255,255,255,.04); }
+.rel-table td.num { text-align:right; font-family:monospace; }
+.rel-table td.rate { text-align:right; font-weight:700; font-family:monospace; }
+.badge-esp {
+  display:inline-flex; align-items:center; justify-content:center;
+  width:26px; height:26px; border-radius:6px; font-size:10px; font-weight:700;
+  background:rgba(201,168,76,.2); color:var(--ouro,#C9A84C); margin-right:6px;
+}
+
+/* Status no carregamento */
+.rel-loading { text-align:center; padding:48px; color:var(--t2,#aaa); font-size:.9rem; }
+
+/* Impressão */
+@media print {
+  .rel-filtros, .rel-nav, .sidebar, #sidebar-wrapper, .page-header { display:none !important; }
+  body { background:#fff !important; color:#111 !important; }
+  .rel-kpi, .rel-taxa-card, .rel-chart-card, .rel-table-wrap { background:#f9f9f9 !important; border:1px solid #ddd !important; }
+  .rel-kpi-val, .rel-taxa-val { color:#1a6b8c !important; }
+  .rel-sec-title { color:#c9a84c !important; }
+  .rel-table thead th { background:#eee !important; color:#555 !important; }
+  .page-content { margin-left:0 !important; padding:16px !important; }
+}
+</style>
 </head>
 <body>
 <div id="app"></div>
@@ -20,292 +119,682 @@
   document.getElementById('app').innerHTML =
     gerarLayout('Relatórios Biomonitor', 'relatorios-biomonitor') +
     `<div class="fade-in">
-      <div class="filter-bar" style="margin-bottom:20px">
-        <select class="form-control" id="fil-temporada" style="width:220px" onchange="aplicarFiltros()">
-          <option value="">Todas as temporadas</option>
-        </select>
-        <select class="form-control" id="fil-programa" style="width:200px" onchange="aplicarFiltros()">
-          <option value="">Todos os programas</option>
-        </select>
-        <button class="btn btn-secondary" onclick="exportarCSV()">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          Exportar CSV
-        </button>
+
+      <!-- Filtros -->
+      <div class="rel-filtros">
+        <label>Temporada
+          <select id="fil-temporada"><option value="">Todas as temporadas</option></select>
+        </label>
+        <label>Programa
+          <select id="fil-programa"><option value="">Todos os programas</option></select>
+        </label>
+        <label>Unidade de Conservação
+          <select id="fil-uc"><option value="">Todas as UCs</option></select>
+        </label>
+        <label>Praia
+          <select id="fil-praia"><option value="">Todas as praias</option></select>
+        </label>
+        <div style="display:flex;gap:8px;align-items:flex-end;margin-top:2px">
+          <button class="btn btn-primary" onclick="aplicar()" style="padding:8px 18px">Aplicar</button>
+          <button class="btn btn-secondary" onclick="window.print()" style="padding:8px 14px" title="Imprimir / Salvar PDF">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+            Imprimir
+          </button>
+          <button class="btn btn-secondary" onclick="exportarCSV()" style="padding:8px 14px">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            CSV
+          </button>
+        </div>
       </div>
 
-      <!-- KPIs -->
-      <div id="kpi-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-bottom:24px"></div>
-
-      <!-- Tabs -->
-      <div style="display:flex;gap:6px;background:rgba(255,255,255,.07);border-radius:10px;padding:4px;width:fit-content;margin-bottom:16px">
-        <button class="tab-btn ativo" id="tab-praias"   onclick="mudarAba('praias')">Por Praia</button>
-        <button class="tab-btn"       id="tab-especies" onclick="mudarAba('especies')">Por Espécie</button>
-        <button class="tab-btn"       id="tab-monitores" onclick="mudarAba('monitores')">Por Monitor</button>
+      <!-- Âncoras de navegação rápida -->
+      <div class="rel-nav">
+        <a href="#sec-geral">Visão Geral</a>
+        <a href="#sec-taxas">Taxas Científicas</a>
+        <a href="#sec-fenologia">Fenologia</a>
+        <a href="#sec-especies">Por Espécie</a>
+        <a href="#sec-locais">Por Praia / UC</a>
+        <a href="#sec-bercario">Berçário</a>
+        <a href="#sec-monitores">Monitores</a>
       </div>
 
-      <!-- ABA: Praias -->
-      <div id="aba-praias">
-        <div class="card"><div class="table-wrap"><div class="table-scroll">
-          <table><thead><tr>
-            <th>Praia</th><th>UC</th>
-            <th style="text-align:center">Total ninhos</th>
-            <th style="text-align:center">Ovos postura</th>
-            <th style="text-align:center">Íntegros</th>
-            <th style="text-align:center">Descartados</th>
-            <th style="text-align:center">Dist. rio (m)</th>
-            <th style="text-align:center">Eclodidos</th>
-            <th style="text-align:center">Filhotes vivos</th>
-            <th style="text-align:center">Taxa eclosão</th>
-            <th style="text-align:center">Predação</th>
-            <th style="text-align:center">Pendentes validação</th>
-          </tr></thead><tbody id="tbody-praias"><tr><td colspan="12" class="empty-row">Carregando...</td></tr></tbody></table>
-        </div></div></div>
-      </div>
-
-      <!-- ABA: Espécies -->
-      <div id="aba-especies" style="display:none">
-        <div class="card"><div class="table-wrap"><div class="table-scroll">
-          <table><thead><tr>
-            <th>Espécie</th>
-            <th style="text-align:center">Ninhos</th>
-            <th style="text-align:center">Eclodidos</th>
-            <th style="text-align:center">Filhotes vivos</th>
-            <th style="text-align:center">Taxa eclosão</th>
-          </tr></thead><tbody id="tbody-especies"><tr><td colspan="5" class="empty-row">Carregando...</td></tr></tbody></table>
-        </div></div></div>
-      </div>
-
-      <!-- ABA: Monitores -->
-      <div id="aba-monitores" style="display:none">
-        <div class="card"><div class="table-wrap"><div class="table-scroll">
-          <table><thead><tr>
-            <th>Monitor</th><th>Grupo</th>
-            <th style="text-align:center">Ninhos registrados</th>
-            <th style="text-align:center">Eclodidos</th>
-            <th style="text-align:center">Filhotes vivos</th>
-          </tr></thead><tbody id="tbody-monitores-rel"><tr><td colspan="5" class="empty-row">Carregando...</td></tr></tbody></table>
-        </div></div></div>
+      <!-- Área de conteúdo -->
+      <div id="rel-conteudo">
+        <div class="rel-loading">Aplicar filtros para carregar o relatório…</div>
       </div>
     </div>`
 
   bIconsAplicar(document.getElementById('app'))
 
-  let _praias = [], _ninhos = [], _temporadas = [], _programas = [], _grupos = [], _monitoresRel = []
-
-  // ── Carregar dados ─────────────────────────────────────────────
+  // ── Carrega filtros ─────────────────────────────────────────────
+  let _praias_todas = []
   const [
-    { data: praias },
-    { data: ninhos },
     { data: temporadas },
     { data: programas },
-    { data: grupos },
-    { data: monitores },
+    { data: ucs },
+    { data: praias },
   ] = await Promise.all([
-    db.from('vw_praias_biomonitor').select('*'),
-    db.from('ninhos_quelonios').select('id,especie,status,grupo_id,monitor_id,filhotes_vivos:eclosoes_ninho(filhotes_vivos,filhotes_mortos,ovos_nao_nascidos)').limit(5000),
     db.from('temporadas_biomonitor').select('id,nome').order('ano_base', { ascending: false }),
-    db.from('programas_biomonitoramento').select('id,nome'),
-    db.from('grupos_biomonitor').select('id,nome'),
-    db.from('monitores_biodiversidade').select('id,nome_completo,grupo_id'),
+    db.from('programas_biomonitoramento').select('id,nome').eq('ativo', true),
+    db.from('unidades_conservacao').select('id,nome,sigla').order('nome'),
+    db.from('praias_monitoramento').select('id,nome,uc_id').eq('ativa', true).order('nome'),
   ])
 
-  _praias    = praias    || []
-  _ninhos    = ninhos    || []
-  _temporadas = temporadas || []
-  _programas  = programas  || []
-  _grupos     = grupos     || []
-  _monitoresRel = monitores || []
+  _praias_todas = praias || []
 
-  // Preenche filtros
-  document.getElementById('fil-temporada').innerHTML =
-    `<option value="">Todas as temporadas</option>` +
-    _temporadas.map(t => `<option value="${t.id}">${t.nome}</option>`).join('')
-  document.getElementById('fil-programa').innerHTML =
-    `<option value="">Todos os programas</option>` +
-    _programas.map(p => `<option value="${p.id}">${p.nome}</option>`).join('')
+  const sel = id => document.getElementById(id)
+  ;(temporadas || []).forEach(t => sel('fil-temporada').insertAdjacentHTML('beforeend', `<option value="${t.id}">${t.nome}</option>`))
+  ;(programas  || []).forEach(p => sel('fil-programa').insertAdjacentHTML('beforeend', `<option value="${p.id}">${p.nome}</option>`))
+  ;(ucs        || []).forEach(u => sel('fil-uc').insertAdjacentHTML('beforeend', `<option value="${u.id}">${u.sigla || ''} ${u.nome}</option>`))
 
-  window.aplicarFiltros = function() {
-    const prog = document.getElementById('fil-programa').value
+  // Praias cascateiam pela UC selecionada
+  sel('fil-uc').addEventListener('change', () => {
+    const ucId = sel('fil-uc').value
+    sel('fil-praia').innerHTML = '<option value="">Todas as praias</option>'
+    _praias_todas.filter(p => !ucId || p.uc_id === ucId)
+      .forEach(p => sel('fil-praia').insertAdjacentHTML('beforeend', `<option value="${p.id}">${p.nome}</option>`))
+  })
 
-    const praiasFil = prog ? _praias.filter(p => p.programa_id === prog) : _praias
+  // ── Estado global ───────────────────────────────────────────────
+  let _dados = null
+  let _charts = {}
+  let _chartJsCarregado = false
 
-    renderKPIs(praiasFil)
-    renderPraias(praiasFil)
-    renderEspecies(praiasFil)
-    renderMonitoresRel(praiasFil)
+  async function carregarChartJS() {
+    if (_chartJsCarregado) return
+    await new Promise((res, rej) => {
+      const s = document.createElement('script')
+      s.src = 'https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js'
+      s.onload = res; s.onerror = rej
+      document.head.appendChild(s)
+    })
+    _chartJsCarregado = true
   }
 
-  // ── KPIs ──────────────────────────────────────────────────────
-  function renderKPIs(lista) {
-    const total    = lista.reduce((s,p) => s + (p.ninhos_total || 0), 0)
-    const eclod    = lista.reduce((s,p) => s + (p.ninhos_eclodidos || 0), 0)
-    const filhot   = lista.reduce((s,p) => s + (p.filhotes_vivos || 0), 0)
-    const perdid   = lista.reduce((s,p) => s + (p.ninhos_perdidos || 0), 0)
-    const pred     = lista.reduce((s,p) => s + (p.predacao_pessoas || 0) + (p.predacao_animais || 0), 0)
-    const pendVal  = lista.reduce((s,p) => s + (p.ninhos_pendentes_validacao || 0), 0)
-    const taxaEcl  = total > 0 ? Math.round((eclod / total) * 100) : 0
-    const ovosPost = lista.reduce((s,p) => s + (p.ovos_postura_total || 0), 0)
-    const ovosInt  = lista.reduce((s,p) => s + (p.ovos_integros_total || 0), 0)
-    const ovosDes  = lista.reduce((s,p) => s + (p.ovos_descartados_total || 0), 0)
-    const distVals = lista.filter(p => p.dist_rio_media_m != null)
-    const distMedia = distVals.length ? Math.round(distVals.reduce((s,p) => s + Number(p.dist_rio_media_m), 0) / distVals.length) : null
-
-    document.getElementById('kpi-grid').innerHTML = [
-      ['Total de ninhos',        total,              '#3b82f6'],
-      ['Ovos na postura',        ovosPost,           '#C9A84C'],
-      ['Ovos íntegros',          ovosInt,            '#4ade80'],
-      ['Ovos descartados',       ovosDes,            '#f87171'],
-      ['Eclodidos',              eclod,              '#10b981'],
-      ['Filhotes vivos',         filhot,             '#34d399'],
-      ['Perdidos / Predados',    perdid,             '#ef4444'],
-      ['Taxa de eclosão',        taxaEcl + '%',      '#6366f1'],
-      ['Dist. média ao rio',     distMedia != null ? distMedia + ' m' : '—', '#38bdf8'],
-      ['Pendentes validação',    pendVal,            '#8b5cf6'],
-    ].map(([l, v, c]) => `
-      <div style="background:rgba(255,255,255,.06);border-radius:10px;padding:14px;border-top:3px solid ${c}">
-        <div style="font-size:1.6rem;font-weight:700;color:${c}">${v}</div>
-        <div style="font-size:.77rem;color:var(--t2,#aaa);margin-top:2px">${l}</div>
-      </div>`).join('')
+  function destruirCharts() {
+    Object.values(_charts).forEach(c => { try { c.destroy() } catch(_) {} })
+    _charts = {}
   }
 
-  // ── Tabela por praia ─────────────────────────────────────────
-  function renderPraias(lista) {
-    const tbody = document.getElementById('tbody-praias')
-    if (!lista.length) { tbody.innerHTML = `<tr><td colspan="12" class="empty-row">Sem dados.</td></tr>`; return }
-    tbody.innerHTML = lista.map(p => {
-      const taxa = p.taxa_eclosao_pct != null ? p.taxa_eclosao_pct + '%' : '—'
-      const predTotal = (p.predacao_pessoas || 0) + (p.predacao_animais || 0)
-      return `<tr>
-        <td><strong>${p.nome}</strong>${p.comunidade ? `<br><small style="color:var(--t2,#aaa)">${p.comunidade}</small>` : ''}</td>
-        <td>${p.uc_nome || '—'}</td>
-        <td style="text-align:center">${p.ninhos_total || 0}</td>
-        <td style="text-align:center;color:#C9A84C">${p.ovos_postura_total || 0}</td>
-        <td style="text-align:center;color:#4ade80">${p.ovos_integros_total || 0}</td>
-        <td style="text-align:center;color:#f87171">${p.ovos_descartados_total || 0}</td>
-        <td style="text-align:center">${p.dist_rio_media_m != null ? p.dist_rio_media_m + ' m' : '—'}</td>
-        <td style="text-align:center">${p.ninhos_eclodidos || 0}</td>
-        <td style="text-align:center">${p.filhotes_vivos || 0}</td>
-        <td style="text-align:center"><strong>${taxa}</strong></td>
-        <td style="text-align:center">${predTotal || 0}</td>
-        <td style="text-align:center">${p.ninhos_pendentes_validacao || 0}</td>
-      </tr>`
-    }).join('')
-  }
+  // ── Aplicar filtros → chamar RPC ────────────────────────────────
+  window.aplicar = async function() {
+    const el = document.getElementById('rel-conteudo')
+    el.innerHTML = '<div class="rel-loading">Carregando dados…</div>'
+    destruirCharts()
 
-  // ── Tabela por espécie ────────────────────────────────────────
-  const SPECIES_NOME = {
-    tracaja: 'Tracajá (Podocnemis unifilis)',
-    tartaruga: 'Tartaruga (P. expansa)',
-    cabecudo: 'Cabeçudo (P. sextuberculata)',
-    pitiU: 'Pitiú (P. erythrocephala)',
-    cupido: 'Cupido (P. cayennensis)',
-    jabuti_pe_elefante: 'Jabuti-pé-de-elefante',
-    jabuti_piranga: 'Jabuti-piranga',
-    mucua: 'Muçuã (Kinosternon scorpioides)',
-    outro: 'Outro',
-  }
+    const { data, error } = await db.rpc('bio_relatorio_completo', {
+      p_temporada_id: sel('fil-temporada').value || null,
+      p_programa_id:  sel('fil-programa').value  || null,
+      p_uc_id:        sel('fil-uc').value        || null,
+      p_praia_id:     sel('fil-praia').value     || null,
+    })
 
-  function renderEspecies(praiasFil) {
-    const praiaIds = new Set(praiasFil.map(p => p.id))
-    // Agrega por espécie a partir da view de praias (campos por espécie)
-    const esp = {}
-    for (const p of praiasFil) {
-      const campos = [
-        ['tracaja', p.ninhos_tracaja], ['tartaruga', p.ninhos_tartaruga],
-        ['cabecudo', p.ninhos_cabecudo], ['pitiU', p.ninhos_pitiu],
-        ['cupido', p.ninhos_cupido],
-      ]
-      for (const [k, v] of campos) {
-        if (!esp[k]) esp[k] = { total: 0, eclodidos: 0, filhotes: 0 }
-        esp[k].total += (v || 0)
-      }
+    if (error || !data) {
+      el.innerHTML = `<div class="rel-loading">Sem dados para os filtros selecionados.</div>`
+      return
     }
-    // Eclosões e filhotes requerem o join com ninhos individuais
-    // (vw_praias_biomonitor não detalha eclosão por espécie — exibimos totais da praia)
-    const tbody = document.getElementById('tbody-especies')
-    const linhas = Object.entries(esp).filter(([,v]) => v.total > 0).sort(([,a],[,b]) => b.total - a.total)
-    if (!linhas.length) { tbody.innerHTML = `<tr><td colspan="5" class="empty-row">Sem dados.</td></tr>`; return }
-    tbody.innerHTML = linhas.map(([k, v]) => `<tr>
-      <td>${SPECIES_NOME[k] || k}</td>
-      <td style="text-align:center"><strong>${v.total}</strong></td>
-      <td style="text-align:center">—</td>
-      <td style="text-align:center">—</td>
-      <td style="text-align:center">—</td>
+
+    _dados = data
+    await carregarChartJS()
+    renderTudo(data, el)
+  }
+
+  // ── Renderização principal ──────────────────────────────────────
+  function renderTudo(d, el) {
+    const k = d.kpis || {}
+    el.innerHTML = `
+      ${htmlSecGeral(k)}
+      ${htmlSecTaxas(k)}
+      ${htmlSecFenologia()}
+      ${htmlSecEspecies(d.por_especie || [])}
+      ${htmlSecLocais()}
+      ${htmlSecBercario(k)}
+      ${htmlSecMonitores(d.por_monitor || [])}
+    `
+    // Renderiza todos os gráficos
+    grafFenologia(d.por_mes || [], d.por_ano || [])
+    grafDesfecho(k)
+    grafStatus(k)
+    grafEspeciesBar(d.por_especie || [])
+    grafEspeciesRadar(d.por_especie || [])
+    grafPraiasH(d.por_praia || [])
+    grafUCsH(d.por_uc || [])
+    grafBiometria(d.biometria_serie || [])
+    grafOcorrencias(d.ocorrencias_tipos || [])
+    grafMonitores(d.por_monitor || [])
+    renderTabelaPraias(d.por_praia || [])
+    renderTabelaUCs(d.por_uc || [])
+  }
+
+  // ── Utilitários de renderização ─────────────────────────────────
+  function v(val, suf) { return val != null ? val + (suf || '') : '—' }
+  function pct(val) { return val != null ? val + '%' : '—' }
+  function kpiCard(lbl, val, cor) {
+    return `<div class="rel-kpi" style="--kpi-cor:${cor}"><div class="rel-kpi-val">${val}</div><div class="rel-kpi-lbl">${lbl}</div></div>`
+  }
+  function taxaCard(lbl, elId, pctVal, cor, desc) {
+    return `
+      <div class="rel-taxa-card">
+        <div class="rel-taxa-top">
+          <span class="rel-taxa-lbl">${lbl}</span>
+          <span class="rel-taxa-val" id="${elId}" style="color:${cor}">${pct(pctVal)}</span>
+        </div>
+        <div class="rel-taxa-bar"><div class="rel-taxa-fill" id="${elId}-bar" style="background:${cor};width:${Math.min(pctVal || 0, 100)}%"></div></div>
+        <span class="rel-taxa-desc">${desc}</span>
+      </div>`
+  }
+
+  const ESP_LABEL = {
+    tracaja:'Tracajá', tartaruga:'Tartaruga', cabecudo:'Cabeçudo',
+    pitiU:'Pitiú', cupido:'Cupido', jabuti_pe_elefante:'Jabuti',
+    jabuti_piranga:'Jabuti-piranga', mucua:'Muçuã', outro:'Outro'
+  }
+  const ESP_COR = {
+    tracaja:'#2A9D6F', tartaruga:'#1A6B8C', cabecudo:'#C9A84C',
+    pitiU:'#7ECEE8', cupido:'#D97706', jabuti_pe_elefante:'#6366f1',
+    jabuti_piranga:'#8b5cf6', mucua:'#ec4899', outro:'#9CA3AF'
+  }
+  function espLabel(e) { return ESP_LABEL[e] || e }
+  function espCor(e) { return ESP_COR[e] || '#9CA3AF' }
+
+  // ── Seção: Visão Geral ───────────────────────────────────────────
+  function htmlSecGeral(k) {
+    return `<div class="rel-sec" id="sec-geral">
+      <div class="rel-sec-title">Visão Geral</div>
+      <div class="rel-kpi-grid">
+        ${kpiCard('Total de ninhos',     v(k.total_ninhos),         '#3b82f6')}
+        ${kpiCard('Ovos na postura',     v(k.total_ovos_postura),   '#C9A84C')}
+        ${kpiCard('Ovos íntegros',       v(k.total_ovos_integros),  '#4ade80')}
+        ${kpiCard('Filhotes vivos',      v(k.total_filhotes_vivos), '#34d399')}
+        ${kpiCard('Filhotes mortos',     v(k.total_filhotes_mortos),'#f87171')}
+        ${kpiCard('Média ovos/postura',  v(k.media_ovos_postura),   '#e5e7eb')}
+        ${kpiCard('Dist. média ao rio',  v(k.dist_rio_media_m,'m'), '#38bdf8')}
+        ${kpiCard('Temp. média substrato',v(k.temp_media_c,'°C'),   '#fb923c')}
+        ${kpiCard('Umidade média',       v(k.umidade_media_pct,'%'),'#a78bfa')}
+        ${kpiCard('Profundidade média',  v(k.profundidade_media_cm,'cm'),'#94a3b8')}
+        ${kpiCard('Eclodidos',           v(k.eclodidos),            '#10b981')}
+        ${kpiCard('Perdidos / Predados', v(k.perdidos),             '#ef4444')}
+      </div>
+      <div class="rel-charts-row">
+        <div class="rel-chart-card"><p class="rel-chart-title">Status dos Ninhos</p><div class="rel-chart-wrap short"><canvas id="graf-status"></canvas></div></div>
+        <div class="rel-chart-card"><p class="rel-chart-title">Desfecho dos Ovos</p><div class="rel-chart-wrap short"><canvas id="graf-desfecho"></canvas></div></div>
+      </div>
+    </div>`
+  }
+
+  // ── Seção: Taxas Científicas ─────────────────────────────────────
+  function htmlSecTaxas(k) {
+    return `<div class="rel-sec" id="sec-taxas">
+      <div class="rel-sec-title">Taxas Científicas (Protocolo PQRA / TAMAR / ICMBio)</div>
+      <div class="rel-taxa-grid">
+        ${taxaCard('Taxa de Eclosão',k.taxa_eclosao_pct+'—',k.taxa_eclosao_pct,'#2A9D6F','Filhotes vivos / (vivos + mortos + não nascidos)')}
+        ${taxaCard('Sucesso de Nidificação',k.taxa_sucesso_nidificacao_pct+'—',k.taxa_sucesso_nidificacao_pct,'#1A6B8C','Ninhos eclodidos / total de ninhos monitorados')}
+        ${taxaCard('Taxa de Fertilidade',k.taxa_fertilidade_pct+'—',k.taxa_fertilidade_pct,'#C9A84C','Ovos íntegros / ovos totais na postura')}
+        ${taxaCard('Eficiência do Ninho',k.eficiencia_ninho_pct+'—',k.eficiencia_ninho_pct,'#7ECEE8','Filhotes vivos / ovos íntegros registrados')}
+        ${taxaCard('Taxa de Predação',k.taxa_predacao_pct+'—',k.taxa_predacao_pct,'#ef4444','Ninhos perdidos / total de ninhos (perda total)')}
+        ${taxaCard('Taxa de Transferência',k.taxa_transferencia_pct+'—',k.taxa_transferencia_pct,'#D97706','Ninhos transferidos para local mais seguro')}
+        ${taxaCard('Sobrevivência em Berçário',k.taxa_sobrevivencia_bercario_pct+'—',k.taxa_sobrevivencia_bercario_pct,'#2A9D6F','Filhotes soltados / filhotes que entraram no berçário')}
+        ${taxaCard('Mortalidade em Berçário',k.taxa_mortalidade_bercario_pct+'—',k.taxa_mortalidade_bercario_pct,'#ef4444','Mortes no berçário / filhotes que entraram')}
+      </div>
+      <div style="font-size:11px;color:var(--t2,#aaa);margin-top:-8px;margin-bottom:12px">
+        Período de incubação médio: <strong style="color:var(--t1,#f4efe6)">${v(k.incubacao_media_dias,' dias')}</strong>
+        &nbsp;·&nbsp; Predação por pessoas: <strong>${v(k.predacao_pessoas)}</strong>
+        &nbsp;·&nbsp; Por animais: <strong>${v(k.predacao_animais)}</strong>
+      </div>
+    </div>`
+  }
+
+  // ── Seção: Fenologia ─────────────────────────────────────────────
+  function htmlSecFenologia() {
+    return `<div class="rel-sec" id="sec-fenologia">
+      <div class="rel-sec-title">Fenologia — Atividade Reprodutiva</div>
+      <div class="rel-chart-card">
+        <p class="rel-chart-title">Ninhos e Filhotes por Mês</p>
+        <p class="rel-chart-sub">Curva de atividade reprodutiva ao longo da(s) temporada(s)</p>
+        <div class="rel-chart-wrap tall"><canvas id="graf-fenologia"></canvas></div>
+      </div>
+      <div class="rel-chart-card" style="margin-top:12px">
+        <p class="rel-chart-title">Tendência Interanual</p>
+        <p class="rel-chart-sub">Número de ninhos por ano — indicador de tendência populacional</p>
+        <div class="rel-chart-wrap short"><canvas id="graf-anos"></canvas></div>
+      </div>
+    </div>`
+  }
+
+  // ── Seção: Por Espécie ───────────────────────────────────────────
+  function htmlSecEspecies(esp) {
+    const tbody = esp.map((e,i) => `<tr>
+      <td><span class="badge-esp" style="background:${espCor(e.especie)}22;color:${espCor(e.especie)}">${i+1}</span>${espLabel(e.especie)}</td>
+      <td class="num"><em style="font-size:10px;color:#9CA3AF">${e.especie}</em></td>
+      <td class="num">${v(e.total)}</td>
+      <td class="num">${v(e.eclodidos)}</td>
+      <td class="num">${v(e.perdidos)}</td>
+      <td class="num">${v(e.filhotes_vivos)}</td>
+      <td class="num">${v(e.media_ovos_postura)}</td>
+      <td class="rate" style="color:${(e.taxa_eclosao_pct||0)>=75?'#4ade80':'#f87171'}">${pct(e.taxa_eclosao_pct)}</td>
+      <td class="rate">${pct(e.eficiencia_pct)}</td>
+      <td class="num">${v(e.incubacao_media_dias,' d')}</td>
+      <td class="num">${v(e.dist_rio_media_m,' m')}</td>
+      <td class="num">${v(e.temp_media_c,'°C')}</td>
+    </tr>`).join('')
+
+    return `<div class="rel-sec" id="sec-especies">
+      <div class="rel-sec-title">Análise por Espécie</div>
+      <div class="rel-charts-row">
+        <div class="rel-chart-card"><p class="rel-chart-title">Ninhos por Espécie</p><div class="rel-chart-wrap"><canvas id="graf-esp-bar"></canvas></div></div>
+        <div class="rel-chart-card">
+          <p class="rel-chart-title">Perfil Multidimensional por Espécie</p>
+          <p class="rel-chart-sub">Radar — taxa eclosão · eficiência · incubação relativa · média ovos (escala 0–100)</p>
+          <div class="rel-chart-wrap"><canvas id="graf-esp-radar"></canvas></div>
+        </div>
+      </div>
+      <div class="rel-table-wrap">
+        <table class="rel-table">
+          <thead><tr>
+            <th>Espécie</th><th>Nome científico</th>
+            <th style="text-align:right">Ninhos</th><th style="text-align:right">Eclodidos</th>
+            <th style="text-align:right">Perdidos</th><th style="text-align:right">Filhotes vivos</th>
+            <th style="text-align:right">Média ovos</th><th style="text-align:right">Taxa eclosão</th>
+            <th style="text-align:right">Eficiência</th><th style="text-align:right">Incubação</th>
+            <th style="text-align:right">Dist. rio</th><th style="text-align:right">Temp.</th>
+          </tr></thead>
+          <tbody>${tbody || '<tr><td colspan="12" style="text-align:center;padding:20px;color:#9CA3AF">Sem dados</td></tr>'}</tbody>
+        </table>
+      </div>
+    </div>`
+  }
+
+  // ── Seção: Por Praia / UC ─────────────────────────────────────────
+  function htmlSecLocais() {
+    return `<div class="rel-sec" id="sec-locais">
+      <div class="rel-sec-title">Por Praia e Unidade de Conservação</div>
+      <div class="rel-charts-row">
+        <div class="rel-chart-card"><p class="rel-chart-title">Top Praias — Total de Ninhos</p><div class="rel-chart-wrap tall" id="wrap-praias-h"><canvas id="graf-praias-h"></canvas></div></div>
+        <div class="rel-chart-card"><p class="rel-chart-title">Ninhos por UC</p><div class="rel-chart-wrap" id="wrap-ucs-h"><canvas id="graf-ucs-h"></canvas></div></div>
+      </div>
+      <p style="font-size:12px;font-weight:700;color:var(--t2,#aaa);text-transform:uppercase;letter-spacing:.04em;margin:4px 0 8px">Praias</p>
+      <div class="rel-table-wrap" style="margin-bottom:14px"><table class="rel-table"><thead><tr>
+        <th>Praia</th><th>UC</th>
+        <th style="text-align:right">Ninhos</th><th style="text-align:right">Eclodidos</th>
+        <th style="text-align:right">Perdidos</th><th style="text-align:right">Filhotes</th>
+        <th style="text-align:right">Taxa eclosão</th><th style="text-align:right">Média ovos</th>
+        <th style="text-align:right">Dist. rio</th>
+        <th style="text-align:right">Ninhos/km</th>
+        <th style="text-align:right">Predação</th>
+      </tr></thead><tbody id="tbody-praias"></tbody></table></div>
+      <p style="font-size:12px;font-weight:700;color:var(--t2,#aaa);text-transform:uppercase;letter-spacing:.04em;margin:4px 0 8px">Unidades de Conservação</p>
+      <div class="rel-table-wrap"><table class="rel-table"><thead><tr>
+        <th>UC</th><th>Sigla</th>
+        <th style="text-align:right">Ninhos</th><th style="text-align:right">Eclodidos</th>
+        <th style="text-align:right">Perdidos</th><th style="text-align:right">Filhotes</th>
+        <th style="text-align:right">Taxa eclosão</th><th style="text-align:right">Média ovos</th>
+      </tr></thead><tbody id="tbody-ucs"></tbody></table></div>
+    </div>`
+  }
+
+  // ── Seção: Berçário ────────────────────────────────────────────────
+  function htmlSecBercario(k) {
+    return `<div class="rel-sec" id="sec-bercario">
+      <div class="rel-sec-title">Gestão de Berçário</div>
+      <div class="berc-kpi-row">
+        ${kpiCard('Lotes cadastrados',  v(k.bercario_total_lotes),   '#3b82f6')}
+        ${kpiCard('Filhotes entrados',  v(k.bercario_total_entrada), '#C9A84C')}
+        ${kpiCard('Filhotes soltados',  v(k.bercario_total_soltado), '#2A9D6F')}
+        ${kpiCard('Mortalidade',        v(k.bercario_mortalidade),   '#ef4444')}
+      </div>
+      <div class="rel-charts-row triple">
+        <div class="rel-chart-card"><p class="rel-chart-title">Destino dos Filhotes</p><div class="rel-chart-wrap short"><canvas id="graf-destino"></canvas></div></div>
+        <div class="rel-chart-card"><p class="rel-chart-title">Ocorrências no Berçário</p><div class="rel-chart-wrap short"><canvas id="graf-oc"></canvas></div></div>
+        <div class="rel-chart-card"><p class="rel-chart-title">Curva de Crescimento</p><p class="rel-chart-sub">Comprimento (cm) e peso médio (g) por biometria</p><div class="rel-chart-wrap short"><canvas id="graf-biometria"></canvas></div></div>
+      </div>
+    </div>`
+  }
+
+  // ── Seção: Monitores ─────────────────────────────────────────────
+  function htmlSecMonitores(mon) {
+    const tbody = mon.map((m,i) => `<tr>
+      <td><span class="badge-esp" style="background:rgba(59,130,246,.15);color:#3b82f6">${i+1}</span>${m.monitor_nome || '—'}</td>
+      <td style="color:var(--t2,#aaa)">${m.grupo_nome || '—'}</td>
+      <td class="num">${v(m.ninhos)}</td>
+      <td class="num">${v(m.eclodidos)}</td>
+      <td class="num">${v(m.filhotes_vivos)}</td>
+      <td class="rate" style="color:${(m.taxa_eclosao_pct||0)>=75?'#4ade80':'#f87171'}">${pct(m.taxa_eclosao_pct)}</td>
+    </tr>`).join('')
+
+    return `<div class="rel-sec" id="sec-monitores">
+      <div class="rel-sec-title">Desempenho por Monitor</div>
+      <div class="rel-chart-card" style="margin-bottom:12px">
+        <p class="rel-chart-title">Ninhos Registrados por Monitor (top 15)</p>
+        <div class="rel-chart-wrap" id="wrap-mon" style="height:${Math.max(160, Math.min(mon.length,15)*28+40)}px"><canvas id="graf-monitores"></canvas></div>
+      </div>
+      <div class="rel-table-wrap">
+        <table class="rel-table"><thead><tr>
+          <th>Monitor</th><th>Grupo</th>
+          <th style="text-align:right">Ninhos</th><th style="text-align:right">Eclodidos</th>
+          <th style="text-align:right">Filhotes vivos</th><th style="text-align:right">Taxa eclosão</th>
+        </tr></thead>
+        <tbody>${tbody || '<tr><td colspan="6" style="text-align:center;padding:20px;color:#9CA3AF">Sem dados</td></tr>'}</tbody>
+        </table>
+      </div>
+    </div>`
+  }
+
+  // ── Renderiza tabelas ────────────────────────────────────────────
+  function renderTabelaPraias(praias) {
+    const tb = document.getElementById('tbody-praias')
+    if (!tb) return
+    if (!praias.length) { tb.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:20px;color:#9CA3AF">Sem dados</td></tr>'; return }
+    tb.innerHTML = praias.map(p => `<tr>
+      <td><strong>${p.praia_nome || '—'}</strong>${p.praia_codigo ? `<br><small style="color:#9CA3AF">${p.praia_codigo}</small>` : ''}</td>
+      <td>${p.uc_sigla ? `<abbr title="${p.uc_nome}">${p.uc_sigla}</abbr>` : p.uc_nome || '—'}</td>
+      <td class="num">${v(p.ninhos_total)}</td>
+      <td class="num">${v(p.eclodidos)}</td>
+      <td class="num">${v(p.perdidos)}</td>
+      <td class="num">${v(p.filhotes_vivos)}</td>
+      <td class="rate" style="color:${(p.taxa_eclosao_pct||0)>=75?'#4ade80':'#f87171'}">${pct(p.taxa_eclosao_pct)}</td>
+      <td class="num">${v(p.media_ovos)}</td>
+      <td class="num">${v(p.dist_rio_media_m,' m')}</td>
+      <td class="num" style="${p.densidade_ninhos_km?'color:#C9A84C;font-weight:700':''}">${p.densidade_ninhos_km != null ? p.densidade_ninhos_km + '/km' : '—'}</td>
+      <td class="num">${v(p.com_predacao)}</td>
     </tr>`).join('')
   }
 
-  // ── Tabela por monitor ────────────────────────────────────────
-  function renderMonitoresRel(praiasFil) {
-    const praiaIds = new Set(praiasFil.map(p => p.id))
-    // Agrega ninhos por monitor_id (da query de ninhos)
-    const agg = {}
-    // Ninhos não têm praia_id filtrado aqui — usamos grupo_id cross-reference
-    const gruposIds = new Set(_grupos.filter(g => praiasFil.some(p => p.uc_id === g.uc_id)).map(g => g.id))
-
-    for (const n of _ninhos) {
-      if (gruposIds.size > 0 && !gruposIds.has(n.grupo_id)) continue
-      if (!n.monitor_id) continue
-      if (!agg[n.monitor_id]) agg[n.monitor_id] = { ninhos: 0, eclodidos: 0, filhotes: 0 }
-      agg[n.monitor_id].ninhos++
-      if (n.status === 'eclodido') {
-        agg[n.monitor_id].eclodidos++
-        const ecl = Array.isArray(n.filhotes_vivos) ? n.filhotes_vivos[0] : n.filhotes_vivos
-        agg[n.monitor_id].filhotes += ecl?.filhotes_vivos || 0
-      }
-    }
-
-    const tbody = document.getElementById('tbody-monitores-rel')
-    const linhas = Object.entries(agg).sort(([,a],[,b]) => b.ninhos - a.ninhos)
-    if (!linhas.length) { tbody.innerHTML = `<tr><td colspan="5" class="empty-row">Sem dados.</td></tr>`; return }
-
-    tbody.innerHTML = linhas.map(([mid, v]) => {
-      const mon = _monitoresRel.find(m => m.id === mid)
-      const grp = _grupos.find(g => g.id === mon?.grupo_id)
-      return `<tr>
-        <td><strong>${mon?.nome_completo || '—'}</strong></td>
-        <td>${grp?.nome || '—'}</td>
-        <td style="text-align:center">${v.ninhos}</td>
-        <td style="text-align:center">${v.eclodidos}</td>
-        <td style="text-align:center">${v.filhotes}</td>
-      </tr>`
-    }).join('')
+  function renderTabelaUCs(ucs) {
+    const tb = document.getElementById('tbody-ucs')
+    if (!tb) return
+    if (!ucs.length) { tb.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:20px;color:#9CA3AF">Sem dados</td></tr>'; return }
+    tb.innerHTML = ucs.map(u => `<tr>
+      <td><strong>${u.uc_nome || '—'}</strong></td>
+      <td>${u.uc_sigla || '—'}</td>
+      <td class="num">${v(u.ninhos_total)}</td>
+      <td class="num">${v(u.eclodidos)}</td>
+      <td class="num">${v(u.perdidos)}</td>
+      <td class="num">${v(u.filhotes_vivos)}</td>
+      <td class="rate" style="color:${(u.taxa_eclosao_pct||0)>=75?'#4ade80':'#f87171'}">${pct(u.taxa_eclosao_pct)}</td>
+      <td class="num">${v(u.media_ovos)}</td>
+    </tr>`).join('')
   }
 
-  // ── Tabs ─────────────────────────────────────────────────────
-  const _abas = ['praias','especies','monitores']
-  window.mudarAba = function(aba) {
-    _abas.forEach(a => {
-      document.getElementById('aba-' + a).style.display = a === aba ? '' : 'none'
-      document.getElementById('tab-' + a).classList.toggle('ativo', a === aba)
+  // ── Gráficos ─────────────────────────────────────────────────────
+  function mkChart(id, cfg) {
+    const el = document.getElementById(id)
+    if (!el) return
+    _charts[id]?.destroy()
+    _charts[id] = new Chart(el.getContext('2d'), cfg)
+  }
+
+  const gridColor = 'rgba(255,255,255,.07)'
+  const tickFont  = { size: 11, family: 'DM Sans, sans-serif' }
+  const legendOpts = { labels: { color:'rgba(255,255,255,.7)', font: tickFont, usePointStyle:true, padding:12 } }
+
+  function grafFenologia(mes, anos) {
+    if (!mes.length) return
+    mkChart('graf-fenologia', {
+      type: 'line',
+      data: {
+        labels: mes.map(m => m.mes),
+        datasets: [
+          { label:'Ninhos encontrados', data: mes.map(m => m.ninhos), borderColor:'#1A6B8C', backgroundColor:'rgba(26,107,140,.15)', fill:true, tension:.3, yAxisID:'y' },
+          { label:'Filhotes vivos',    data: mes.map(m => m.filhotes), borderColor:'#2A9D6F', backgroundColor:'rgba(42,157,111,.1)', fill:true, tension:.3, yAxisID:'y' },
+          { label:'Média ovos/postura',data: mes.map(m => m.media_ovos), borderColor:'#C9A84C', borderDash:[4,3], tension:.3, yAxisID:'y2', pointRadius:2 }
+        ]
+      },
+      options: {
+        responsive:true, maintainAspectRatio:false, animation:{duration:600},
+        plugins:{ legend: legendOpts },
+        scales:{
+          x:{ grid:{color:gridColor}, ticks:{color:'rgba(255,255,255,.5)', font:tickFont} },
+          y:{ grid:{color:gridColor}, ticks:{color:'rgba(255,255,255,.5)', font:tickFont}, beginAtZero:true, title:{display:true,text:'Ninhos / Filhotes',color:'rgba(255,255,255,.4)',font:{size:10}} },
+          y2:{ position:'right', grid:{display:false}, ticks:{color:'rgba(201,168,76,.6)', font:tickFont}, beginAtZero:true, title:{display:true,text:'Média ovos',color:'rgba(201,168,76,.4)',font:{size:10}} }
+        },
+        elements:{ point:{radius:3,hoverRadius:5} }
+      }
+    })
+
+    if (!anos.length) return
+    mkChart('graf-anos', {
+      type: 'bar',
+      data: {
+        labels: anos.map(a => a.ano),
+        datasets: [
+          { label:'Ninhos', data: anos.map(a => a.ninhos), backgroundColor:'#1A6B8C', borderRadius:5 },
+          { label:'Filhotes', data: anos.map(a => a.filhotes), backgroundColor:'#2A9D6F', borderRadius:5 }
+        ]
+      },
+      options: {
+        responsive:true, maintainAspectRatio:false, animation:{duration:500},
+        plugins:{ legend:legendOpts },
+        scales:{
+          x:{ grid:{display:false}, ticks:{color:'rgba(255,255,255,.5)', font:tickFont} },
+          y:{ grid:{color:gridColor}, ticks:{color:'rgba(255,255,255,.5)', font:tickFont}, beginAtZero:true }
+        }
+      }
     })
   }
 
-  // ── Exportar CSV ─────────────────────────────────────────────
-  window.exportarCSV = function() {
-    const prog = document.getElementById('fil-programa').value
-    const lista = prog ? _praias.filter(p => p.programa_id === prog) : _praias
-    const cab = 'Código,Nome,Município,UC,Programa,Ninhos Total,Ovos Postura,Ovos Íntegros,Ovos Descartados,Dist. Média Rio (m),Eclodidos,Perdidos,Filhotes Vivos,Filhotes Mortos,Ovos não nascidos,Taxa eclosão (%),Predação pessoas,Predação animais,Pendentes validação'
-    const linhas = lista.map(p => [
-      p.codigo, p.nome, p.municipio, p.uc_nome, p.programa_nome,
-      p.ninhos_total, p.ovos_postura_total, p.ovos_integros_total, p.ovos_descartados_total, p.dist_rio_media_m,
-      p.ninhos_eclodidos, p.ninhos_perdidos,
-      p.filhotes_vivos, p.filhotes_mortos, p.ovos_nao_nascidos,
-      p.taxa_eclosao_pct, p.predacao_pessoas, p.predacao_animais,
-      p.ninhos_pendentes_validacao,
-    ].map(v => `"${v ?? ''}"`).join(','))
-    const blob = new Blob([[cab, ...linhas].join('\n')], { type: 'text/csv' })
-    const a = document.createElement('a'); a.href = URL.createObjectURL(blob)
-    a.download = `biomonitor_praias_${new Date().toISOString().slice(0,10)}.csv`
-    a.click()
+  function grafDesfecho(k) {
+    mkChart('graf-desfecho', {
+      type:'doughnut',
+      data:{
+        labels:['Filhotes vivos','Filhotes mortos','Ovos não nascidos','Descartados'],
+        datasets:[{ data:[k.total_filhotes_vivos||0,k.total_filhotes_mortos||0,k.total_ovos_nao_nascidos||0,k.total_ovos_descartados||0],
+          backgroundColor:['#2A9D6F','#ef4444','#D97706','#6b7280'], borderWidth:2, borderColor:'rgba(0,0,0,.3)', hoverOffset:8 }]
+      },
+      options:{ cutout:'60%', plugins:{ legend:{...legendOpts, position:'bottom'} }, animation:{duration:600} }
+    })
   }
 
-  aplicarFiltros()
+  function grafStatus(k) {
+    mkChart('graf-status', {
+      type:'doughnut',
+      data:{
+        labels:['Encontrado','Transferido','Eclodido','Perdido'],
+        datasets:[{ data:[k.pendentes||0, k.transferidos||0, k.eclodidos||0, k.perdidos||0],
+          backgroundColor:['#7ECEE8','#C9A84C','#2A9D6F','#ef4444'], borderWidth:2, borderColor:'rgba(0,0,0,.3)', hoverOffset:8 }]
+      },
+      options:{ cutout:'60%', plugins:{ legend:{...legendOpts, position:'bottom'} }, animation:{duration:600} }
+    })
+  }
+
+  function grafEspeciesBar(esp) {
+    if (!esp.length) return
+    mkChart('graf-esp-bar', {
+      type:'bar',
+      data:{
+        labels: esp.map(e => espLabel(e.especie)),
+        datasets:[
+          { label:'Total ninhos', data:esp.map(e => e.total), backgroundColor: esp.map(e => espCor(e.especie)+'99'), borderColor: esp.map(e => espCor(e.especie)), borderWidth:1.5, borderRadius:5 },
+          { label:'Eclodidos',   data:esp.map(e => e.eclodidos), backgroundColor: esp.map(e => espCor(e.especie)+'55'), borderRadius:5 }
+        ]
+      },
+      options:{
+        responsive:true, maintainAspectRatio:false, animation:{duration:600},
+        plugins:{ legend:legendOpts },
+        scales:{
+          x:{ grid:{display:false}, ticks:{color:'rgba(255,255,255,.5)', font:tickFont} },
+          y:{ grid:{color:gridColor}, ticks:{color:'rgba(255,255,255,.5)', font:tickFont}, beginAtZero:true }
+        }
+      }
+    })
+  }
+
+  function grafEspeciesRadar(esp) {
+    if (esp.length < 2) return
+    const datasets = esp.slice(0,5).map(e => ({
+      label: espLabel(e.especie),
+      data: [
+        e.taxa_eclosao_pct || 0,
+        e.eficiencia_pct   || 0,
+        Math.min((e.media_ovos_postura || 0), 100),
+        e.incubacao_media_dias ? Math.min(100, e.incubacao_media_dias) : 0,
+        100 - (e.perdidos / Math.max(e.total,1)) * 100
+      ],
+      borderColor: espCor(e.especie),
+      backgroundColor: espCor(e.especie) + '22',
+      pointBackgroundColor: espCor(e.especie),
+      borderWidth: 1.5
+    }))
+    mkChart('graf-esp-radar', {
+      type:'radar',
+      data:{
+        labels:['Taxa Eclosão (%)','Eficiência do Ninho','Méd. Ovos (≤100)','Incubação rel.','Sem predação (%)'],
+        datasets
+      },
+      options:{
+        responsive:true, maintainAspectRatio:false, animation:{duration:600},
+        plugins:{ legend:legendOpts },
+        scales:{ r:{ min:0, max:100, grid:{color:gridColor}, angleLines:{color:gridColor},
+          ticks:{color:'rgba(255,255,255,.4)', font:{size:9}, backdropColor:'transparent'} } }
+      }
+    })
+  }
+
+  function grafBarsH(canvasId, labels, data, cor) {
+    if (!labels.length) return
+    const wrap = document.getElementById('wrap-'+canvasId.replace('graf-','').replace('-h',''))
+    mkChart(canvasId, {
+      type:'bar',
+      data:{ labels, datasets:[{ data, backgroundColor: Array.isArray(cor)?cor:cor, borderRadius:3 }] },
+      options:{
+        indexAxis:'y', responsive:true, maintainAspectRatio:false, animation:{duration:600},
+        plugins:{ legend:{display:false} },
+        scales:{
+          x:{ grid:{color:gridColor}, ticks:{color:'rgba(255,255,255,.5)', font:tickFont}, beginAtZero:true },
+          y:{ grid:{display:false}, ticks:{color:'rgba(255,255,255,.5)', font:tickFont} }
+        }
+      }
+    })
+  }
+
+  function grafPraiasH(praias) {
+    const top = praias.slice(0,10)
+    const wrap = document.getElementById('wrap-praias-h')
+    if (wrap) wrap.style.height = (top.length * 30 + 40) + 'px'
+    grafBarsH('graf-praias-h', top.map(p => p.praia_nome || '?'), top.map(p => p.ninhos_total),
+      top.map(p => p.taxa_eclosao_pct >= 75 ? '#2A9D6F99' : '#1A6B8C99'))
+  }
+
+  function grafUCsH(ucs) {
+    const wrap = document.getElementById('wrap-ucs-h')
+    if (wrap) wrap.style.height = (ucs.length * 32 + 40) + 'px'
+    grafBarsH('graf-ucs-h', ucs.map(u => u.uc_sigla || u.uc_nome || '?'), ucs.map(u => u.ninhos_total), '#C9A84C99')
+  }
+
+  function grafBiometria(serie) {
+    if (!serie.length) return
+    mkChart('graf-biometria', {
+      type:'line',
+      data:{
+        labels: serie.map(s => s.data),
+        datasets:[
+          { label:'Comprimento (cm)', data:serie.map(s => s.comp_medio), borderColor:'#1A6B8C', borderWidth:2, tension:.35, pointRadius:3, yAxisID:'y' },
+          { label:'Peso médio (g)',   data:serie.map(s => s.peso_medio), borderColor:'#C9A84C', borderWidth:2, tension:.35, pointRadius:3, yAxisID:'y2' }
+        ]
+      },
+      options:{
+        responsive:true, maintainAspectRatio:false, animation:{duration:600},
+        plugins:{ legend:legendOpts },
+        scales:{
+          x:{ grid:{display:false}, ticks:{color:'rgba(255,255,255,.5)', font:tickFont} },
+          y:{ grid:{color:gridColor}, ticks:{color:'rgba(255,255,255,.5)', font:tickFont}, beginAtZero:true, title:{display:true,text:'cm',color:'rgba(255,255,255,.3)',font:{size:9}} },
+          y2:{ position:'right', grid:{display:false}, ticks:{color:'rgba(201,168,76,.5)', font:tickFont}, beginAtZero:true, title:{display:true,text:'g',color:'rgba(201,168,76,.3)',font:{size:9}} }
+        }
+      }
+    })
+  }
+
+  function grafOcorrencias(oc) {
+    if (!oc.length) return
+    const TIPOS = { alimentacao:'Alimentação', biometria:'Biometria', mortalidade:'Mortalidade', doenca:'Doença', tratamento:'Tratamento', observacao:'Observação' }
+    const CORES = { alimentacao:'#2A9D6F', biometria:'#1A6B8C', mortalidade:'#ef4444', doenca:'#f97316', tratamento:'#7ECEE8', observacao:'#9CA3AF' }
+    mkChart('graf-oc', {
+      type:'bar',
+      data:{
+        labels: oc.map(o => TIPOS[o.tipo] || o.tipo),
+        datasets:[{ data:oc.map(o => o.total), backgroundColor: oc.map(o => CORES[o.tipo]||'#9CA3AF'), borderRadius:4 }]
+      },
+      options:{
+        responsive:true, maintainAspectRatio:false, animation:{duration:500},
+        plugins:{ legend:{display:false} },
+        scales:{
+          x:{ grid:{display:false}, ticks:{color:'rgba(255,255,255,.5)', font:tickFont} },
+          y:{ grid:{color:gridColor}, ticks:{color:'rgba(255,255,255,.5)', font:tickFont}, beginAtZero:true }
+        }
+      }
+    })
+  }
+
+  function grafDestino(k) {
+    mkChart('graf-destino', {
+      type:'doughnut',
+      data:{
+        labels:['Soltura direta ao rio','Via berçário'],
+        datasets:[{ data:[k.solturas_direto_rio||0, k.solturas_via_bercario||0],
+          backgroundColor:['#1A6B8C','#2A9D6F'], borderWidth:2, borderColor:'rgba(0,0,0,.3)', hoverOffset:8 }]
+      },
+      options:{ cutout:'60%', plugins:{ legend:{...legendOpts, position:'bottom'} }, animation:{duration:600} }
+    })
+  }
+
+  function grafMonitores(mon) {
+    const top = mon.slice(0,15)
+    if (!top.length) return
+    const wrap = document.getElementById('wrap-mon')
+    if (wrap) wrap.style.height = (top.length * 28 + 40) + 'px'
+    mkChart('graf-monitores', {
+      type:'bar',
+      data:{
+        labels: top.map(m => m.monitor_nome || '?'),
+        datasets:[
+          { label:'Ninhos',   data:top.map(m => m.ninhos),       backgroundColor:'#1A6B8C99', borderRadius:3 },
+          { label:'Eclodidos',data:top.map(m => m.eclodidos),    backgroundColor:'#2A9D6F99', borderRadius:3 }
+        ]
+      },
+      options:{
+        indexAxis:'y', responsive:true, maintainAspectRatio:false, animation:{duration:600},
+        plugins:{ legend:legendOpts },
+        scales:{
+          x:{ grid:{color:gridColor}, ticks:{color:'rgba(255,255,255,.5)', font:tickFont}, beginAtZero:true },
+          y:{ grid:{display:false}, ticks:{color:'rgba(255,255,255,.5)', font:tickFont, maxRotation:0} }
+        }
+      }
+    })
+  }
+
+  // Override para incluir destino no berçário (precisa do 'k')
+  const _origRenderTudo = renderTudo
+  renderTudo = function(d, el) {
+    _origRenderTudo(d, el)
+    // grafDestino precisa de k, chamado aqui após renderização do berçário
+    grafDestino(d.kpis || {})
+  }
+
+  // ── Exportar CSV ─────────────────────────────────────────────────
+  window.exportarCSV = function() {
+    if (!_dados) { alert('Aplique os filtros primeiro.'); return }
+    const d = _dados
+    const praias = d.por_praia || []
+    const header = 'Praia,Código,UC,Ninhos,Eclodidos,Perdidos,Filhotes Vivos,Taxa Eclosão (%),Média Ovos,Dist. Rio (m),Ninhos/km'
+    const rows = praias.map(p => [
+      p.praia_nome, p.praia_codigo, p.uc_nome, p.ninhos_total, p.eclodidos, p.perdidos,
+      p.filhotes_vivos, p.taxa_eclosao_pct, p.media_ovos, p.dist_rio_media_m, p.densidade_ninhos_km
+    ].map(v => `"${v??''}"`).join(','))
+
+    const esp = d.por_especie || []
+    const headerEsp = '\n\nEspécie,Nome científico,Ninhos,Eclodidos,Perdidos,Filhotes,Média ovos,Taxa eclosão (%),Eficiência (%),Incubação (dias)'
+    const rowsEsp = esp.map(e => [
+      espLabel(e.especie), e.especie, e.total, e.eclodidos, e.perdidos,
+      e.filhotes_vivos, e.media_ovos_postura, e.taxa_eclosao_pct, e.eficiencia_pct, e.incubacao_media_dias
+    ].map(v => `"${v??''}"`).join(','))
+
+    const csv = [header, ...rows, headerEsp, ...rowsEsp].join('\n')
+    const blob = new Blob(['﻿'+csv], { type:'text/csv;charset=utf-8' })
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    a.download = `biomonitor_relatorio_${new Date().toISOString().slice(0,10)}.csv`
+    a.click()
+  }
 })()
 </script>
-<style>
-.tab-btn { background:transparent;border:none;padding:6px 14px;border-radius:7px;cursor:pointer;font-size:.88rem;color:var(--t1,#f4efe6);transition:all .15s }
-.tab-btn.ativo { background:white;color:var(--floresta,#0A1A0F);box-shadow:0 1px 4px rgba(0,0,0,.12) }
-.tab-btn:hover:not(.ativo) { background:rgba(255,255,255,.12) }
-</style>
 </body>
 </html>
