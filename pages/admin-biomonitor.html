@@ -365,6 +365,7 @@
           <button class="tab-btn"       id="tab-temporadas" onclick="mudarAba('temporadas')">Temporadas</button>
           <button class="tab-btn"       id="tab-mapa"       onclick="mudarAba('mapa')">Mapa</button>
           <button class="tab-btn"       id="tab-bercarios"  onclick="mudarAba('bercarios')">Berçários</button>
+          <button class="tab-btn"       id="tab-alertas"    onclick="mudarAba('alertas')">Alertas</button>
         </div>
       </div>
 
@@ -481,6 +482,52 @@
           <table><thead><tr>
             <th>Nome</th><th>Tipo</th><th>Capacidade</th><th>Localização</th><th>Responsável</th><th>Status</th><th></th>
           </tr></thead><tbody id="tbody-bercarios"><tr><td colspan="7" class="empty-row">Carregando...</td></tr></tbody></table>
+        </div></div></div>
+      </div>
+
+      <!-- ABA: Alertas de incubação (quelônios) -->
+      <div id="aba-alertas" style="display:none">
+        <p style="margin:0 0 14px;font-size:.85rem;color:var(--t2,#888);max-width:760px">
+          Alertas gerados automaticamente quando temperatura, umidade, alagamento, predação ou a razão sexual
+          da praia saem da faixa ideal para os quelônios amazônicos. Cada alerta traz a providência recomendada.
+          Os limiares são científicos e podem ser ajustados abaixo.
+        </p>
+
+        <div class="filter-bar">
+          <select class="form-control" id="fil-sev-alq" style="width:160px" onchange="renderAlertas()">
+            <option value="">Todas as severidades</option>
+            <option value="critica">Crítica</option>
+            <option value="alta">Alta</option>
+            <option value="media">Média</option>
+            <option value="baixa">Baixa</option>
+          </select>
+          <select class="form-control" id="fil-status-alq" style="width:160px" onchange="renderAlertas()">
+            <option value="abertos" selected>Abertos + cientes</option>
+            <option value="aberto">Apenas abertos</option>
+            <option value="ciente">Cientes</option>
+            <option value="resolvido">Resolvidos</option>
+            <option value="descartado">Descartados</option>
+            <option value="">Todos</option>
+          </select>
+          <button class="btn btn-secondary" onclick="recarregarAlertas()">Atualizar</button>
+        </div>
+        <div class="card"><div class="table-wrap"><div class="table-scroll">
+          <table><thead><tr>
+            <th>Severidade</th><th>Faixa</th><th>Alerta</th><th>Praia / Grupo</th><th>Providência</th><th>Quando</th><th>Status</th><th></th>
+          </tr></thead><tbody id="tbody-alertas"><tr><td colspan="8" class="empty-row">Carregando...</td></tr></tbody></table>
+        </div></div></div>
+
+        <h3 style="margin:24px 0 8px;font-size:1rem">Limiares científicos (editáveis)</h3>
+        <p style="margin:0 0 12px;font-size:.82rem;color:var(--t2,#888);max-width:760px">
+          Temperaturas em °C; umidade em %; distância ao rio em m. <strong>Pivotal</strong> = razão sexual 1:1
+          (acima → fêmeas, abaixo → machos). <strong>Crítico</strong> = calor extremo (feminização total + mortalidade).
+        </p>
+        <div class="card"><div class="table-wrap"><div class="table-scroll">
+          <table><thead><tr>
+            <th>Espécie</th><th>Letal&nbsp;frio&nbsp;&lt;</th><th>Machos&nbsp;até</th><th>Pivotal</th>
+            <th>Fêmeas&nbsp;≥</th><th>Crítico&nbsp;≥</th><th>Umid.&nbsp;mín</th><th>Umid.&nbsp;máx</th>
+            <th>Dist.rio&nbsp;mín</th><th>Incub.&nbsp;dias</th><th>Friagem&nbsp;ar&nbsp;&lt;</th><th></th>
+          </tr></thead><tbody id="tbody-limiares"><tr><td colspan="12" class="empty-row">Carregando...</td></tr></tbody></table>
         </div></div></div>
       </div>
     </div>`
@@ -658,13 +705,109 @@
   window.filtrarTemporadas = renderTemporadas
 
   // ── Abas ──────────────────────────────────────────────────────
-  const _abas = ['grupos','monitores','praias','temporadas','mapa','bercarios']
+  const _abas = ['grupos','monitores','praias','temporadas','mapa','bercarios','alertas']
   window.mudarAba = function(aba) {
     _abas.forEach(a => {
       document.getElementById('aba-' + a).style.display = a === aba ? '' : 'none'
       document.getElementById('tab-' + a).classList.toggle('ativo', a === aba)
     })
     if (aba === 'mapa') ensureMapaPraias()
+    if (aba === 'alertas') ensureAlertas()
+  }
+
+  // ════════════════════════════════════════════════════════════
+  //  ABA ALERTAS — alertas de incubação + limiares editáveis
+  // ════════════════════════════════════════════════════════════
+  let _alertas = [], _limiares = [], _alertasCarregado = false
+  const SEV_ALQ = { critica:['Crítica','#ef4444'], alta:['Alta','#f59e0b'], media:['Média','#eab308'], baixa:['Baixa','#3b82f6'] }
+  const STATUS_ALQ = { aberto:['Aberto','#f59e0b'], ciente:['Ciente','#3b82f6'], resolvido:['Resolvido','#10b981'], descartado:['Descartado','#888'] }
+
+  async function ensureAlertas() {
+    if (_alertasCarregado) return
+    _alertasCarregado = true
+    await recarregarAlertas()
+  }
+
+  window.recarregarAlertas = async function() {
+    const [{ data: al }, { data: lim }] = await Promise.all([
+      db.from('vw_alertas_quelonios').select('*').order('criado_em', { ascending: false }).limit(500),
+      db.from('parametros_incubacao_quelonios').select('*').order('especie', { nullsFirst: true }),
+    ])
+    _alertas = al || []
+    _limiares = lim || []
+    renderAlertas()
+    renderLimiares()
+  }
+
+  window.renderAlertas = function() {
+    const sev = document.getElementById('fil-sev-alq')?.value || ''
+    const st  = document.getElementById('fil-status-alq')?.value
+    const lista = _alertas.filter(a =>
+      (!sev || a.severidade === sev) &&
+      (st === '' || st === undefined ? true :
+       st === 'abertos' ? ['aberto','ciente'].includes(a.status) : a.status === st)
+    )
+    const tb = document.getElementById('tbody-alertas')
+    if (!lista.length) { tb.innerHTML = '<tr><td colspan="8" class="empty-row">Nenhum alerta.</td></tr>'; return }
+    tb.innerHTML = lista.map(a => {
+      const [sl, sc] = SEV_ALQ[a.severidade] || [a.severidade, '#888']
+      const [stl, stc] = STATUS_ALQ[a.status] || [a.status, '#888']
+      const aberto = ['aberto','ciente'].includes(a.status)
+      const local = [a.praia_nome, a.grupo_nome].filter(Boolean).join(' · ') || '—'
+      return `<tr>
+        <td><span class="badge" style="background:${sc}22;color:${sc}">${sl}</span></td>
+        <td style="white-space:nowrap">${esc(a.faixa)}</td>
+        <td style="max-width:240px">${esc(a.titulo)}</td>
+        <td style="font-size:.82rem">${esc(local)}</td>
+        <td style="max-width:260px;font-size:.8rem;color:var(--t2,#888)">${esc(a.providencia || '')}</td>
+        <td style="white-space:nowrap;font-size:.82rem">${formatData(a.criado_em)}</td>
+        <td><span style="color:${stc};font-weight:600;font-size:.82rem">${stl}</span></td>
+        <td style="white-space:nowrap;text-align:right">
+          ${a.status === 'aberto' ? `<button class="btn btn-sm btn-secondary" onclick="tratarAlerta('${a.id}','ciente')">Ciente</button>` : ''}
+          ${aberto ? `<button class="btn btn-sm btn-primary" onclick="tratarAlerta('${a.id}','resolvido')">Resolver</button>` : ''}
+          ${aberto ? `<button class="btn btn-sm" style="background:#88888822;border:none;border-radius:6px;padding:4px 10px;cursor:pointer" onclick="tratarAlerta('${a.id}','descartado')">Descartar</button>` : ''}
+        </td>
+      </tr>`
+    }).join('')
+  }
+
+  window.tratarAlerta = async function(id, status) {
+    const { error } = await db.rpc('quelonio_tratar_alerta', { p_alerta_id: id, p_status: status })
+    if (error) { toast(error.message, 'error'); return }
+    toast('Alerta atualizado.', 'success')
+    await recarregarAlertas()
+  }
+
+  const LIM_NOME = {
+    tartaruga:'Tartaruga', tracaja:'Tracajá', cabecudo:'Cabeçudo', pitiU:'Pitiú',
+    cupido:'Cupido', jabuti_pe_elefante:'Jabuti-pé-elefante', jabuti_piranga:'Jabuti-piranga', mucua:'Muçuã', outro:'Outro'
+  }
+  const LIM_CAMPOS = ['temp_letal_min','temp_macho_max','temp_pivotal','temp_femea_min','temp_critico_max','umidade_min_pct','umidade_max_pct','dist_rio_min_m','incubacao_dias_max','friagem_temp_ar_min']
+
+  function renderLimiares() {
+    const tb = document.getElementById('tbody-limiares')
+    if (!_limiares.length) { tb.innerHTML = '<tr><td colspan="12" class="empty-row">Sem limiares cadastrados.</td></tr>'; return }
+    tb.innerHTML = _limiares.map(p => {
+      const nome = p.especie ? (LIM_NOME[p.especie] || p.especie) : 'Padrão (todas)'
+      const inp = c => `<input type="number" step="any" value="${p[c] ?? ''}" id="lim-${p.id}-${c}" style="width:64px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:6px;padding:4px 6px;color:inherit;font-size:.82rem">`
+      return `<tr>
+        <td style="white-space:nowrap;font-weight:600">${nome}</td>
+        ${LIM_CAMPOS.map(c => `<td>${inp(c)}</td>`).join('')}
+        <td><button class="btn btn-sm btn-primary" onclick="salvarLimiar('${p.id}')">Salvar</button></td>
+      </tr>`
+    }).join('')
+  }
+
+  window.salvarLimiar = async function(id) {
+    const payload = {}
+    for (const c of LIM_CAMPOS) {
+      const v = document.getElementById(`lim-${id}-${c}`)?.value
+      payload[c] = v === '' || v == null ? null : Number(v)
+    }
+    const { error } = await db.from('parametros_incubacao_quelonios').update(payload).eq('id', id)
+    if (error) { toast(error.message, 'error'); return }
+    toast('Limiares atualizados.', 'success')
+    await recarregarAlertas()
   }
 
   // ════════════════════════════════════════════════════════════
