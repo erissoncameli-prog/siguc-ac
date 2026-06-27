@@ -461,6 +461,32 @@
       </div>
     </div>
 
+    <!-- Motivo do descarte (aparece quando há ovos descartados) -->
+    <div class="bio-form-section" id="bio-form-descarte-box" hidden>
+      <span class="bio-form-label">Motivo do descarte *</span>
+      <div style="font-size:12px;opacity:.7;margin-bottom:6px">
+        Distribua os <strong id="bio-form-descarte-total">0</strong> ovos descartados por causa — a soma deve bater com o total.
+      </div>
+      <div class="bio-ovos-grid">
+        <div class="bio-ovos-campo">
+          <label class="bio-ovos-label" for="bio-form-desc-natural">Natural</label>
+          <input type="number" id="bio-form-desc-natural" class="bio-form-input bio-ovos-input"
+            min="0" max="999" inputmode="numeric" placeholder="0">
+        </div>
+        <div class="bio-ovos-campo">
+          <label class="bio-ovos-label" for="bio-form-desc-predacao">Predação</label>
+          <input type="number" id="bio-form-desc-predacao" class="bio-form-input bio-ovos-input"
+            min="0" max="999" inputmode="numeric" placeholder="0">
+        </div>
+        <div class="bio-ovos-campo">
+          <label class="bio-ovos-label" for="bio-form-desc-humana">Humana</label>
+          <input type="number" id="bio-form-desc-humana" class="bio-form-input bio-ovos-input"
+            min="0" max="999" inputmode="numeric" placeholder="0">
+        </div>
+      </div>
+      <div id="bio-form-descarte-aviso" style="font-size:12px;margin-top:6px;color:#b3261e" hidden></div>
+    </div>
+
     <!-- Distância ao Rio -->
     <div class="bio-form-section">
       <span class="bio-form-label">Distância ao Rio</span>

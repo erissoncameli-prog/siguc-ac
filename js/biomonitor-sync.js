@@ -112,9 +112,41 @@ async function bioSyncNinhos(monitorId, onProgresso) {
     }
 
     await bioOfflineAtualizarSync('ninhos', ninho.uuid_cliente, 'confirmado', data.id)
+
+    // Reconcilia os eventos de descarte de ovos do ninho no servidor.
+    if (ninho.descartes_dirty) {
+      try { await bioSyncReconciliarDescartes(ninho.uuid_cliente, data.id, monitorId) } catch (_) {}
+    }
     n++
   }
   return n
+}
+
+// Reconcilia os descartes (etapa registro) de um ninho: apaga os do
+// servidor e reinsere o conjunto local — garante consistência mesmo
+// quando o monitor edita e remove causas no reenvio de correção.
+async function bioSyncReconciliarDescartes(ninhoUuid, ninhoServId, monitorId) {
+  await bioSupabase()
+    .from('descartes_ovos')
+    .delete()
+    .eq('ninho_id', ninhoServId)
+    .eq('etapa', 'registro')
+
+  const locais = await bioOfflineDescartesDoNinho(ninhoUuid, 'registro')
+  for (const d of locais) {
+    const { error } = await bioSupabase()
+      .from('descartes_ovos')
+      .upsert({
+        uuid_cliente:  d.uuid_cliente,
+        ninho_id:      ninhoServId,
+        qtd:           d.qtd,
+        motivo:        d.motivo,
+        etapa:         'registro',
+        data_descarte: d.data_descarte,
+        monitor_id:    monitorId,
+      }, { onConflict: 'uuid_cliente' })
+    if (!error) await bioOfflineAtualizarSync('descartes', d.uuid_cliente, 'confirmado')
+  }
 }
 
 // ── Sincronizar transferências pendentes ──────────────────────

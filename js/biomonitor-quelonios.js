@@ -915,6 +915,10 @@ function bioAbrirFormNinho() {
   document.getElementById('bio-form-qtd-ovos').value        = ''
   document.getElementById('bio-form-ovos-integros').value   = ''
   document.getElementById('bio-form-ovos-descartados').value = ''
+  document.getElementById('bio-form-desc-natural').value    = ''
+  document.getElementById('bio-form-desc-predacao').value   = ''
+  document.getElementById('bio-form-desc-humana').value     = ''
+  bioAtualizarDescarteBox()
 
   // Limpa condições do ninho
   document.getElementById('bio-form-temperatura').value   = ''
@@ -983,6 +987,11 @@ function bioAbrirCorrecaoNinho(ninho) {
   document.getElementById('bio-form-qtd-ovos').value        = ninho.qtd_ovos        ?? ''
   document.getElementById('bio-form-ovos-integros').value   = ninho.ovos_integros   ?? ''
   document.getElementById('bio-form-ovos-descartados').value = ninho.ovos_descartados ?? ''
+  // Quebra do descarte por causa (vem da view)
+  document.getElementById('bio-form-desc-natural').value  = ninho.descartados_natural  || ''
+  document.getElementById('bio-form-desc-predacao').value = ninho.descartados_predacao || ''
+  document.getElementById('bio-form-desc-humana').value   = ninho.descartados_humana   || ''
+  bioAtualizarDescarteBox()
 
   // Condições
   document.getElementById('bio-form-temperatura').value   = ninho.temperatura_c   ?? ''
@@ -1042,6 +1051,27 @@ function bioAtualizarGpsForm() {
   el.textContent = bioFormatarCoords(BioApp.gpsLat, BioApp.gpsLng)
 }
 
+// Mostra/oculta a quebra do descarte por causa e valida a soma.
+function bioAtualizarDescarteBox() {
+  const box   = document.getElementById('bio-form-descarte-box')
+  const aviso = document.getElementById('bio-form-descarte-aviso')
+  if (!box) return
+  const total = parseInt(document.getElementById('bio-form-ovos-descartados').value) || 0
+  if (total <= 0) { box.hidden = true; if (aviso) aviso.hidden = true; return }
+  box.hidden = false
+  document.getElementById('bio-form-descarte-total').textContent = total
+  const soma = ['bio-form-desc-natural', 'bio-form-desc-predacao', 'bio-form-desc-humana']
+    .reduce((s, id) => s + (parseInt(document.getElementById(id).value) || 0), 0)
+  if (aviso) {
+    if (soma !== total) {
+      aviso.textContent = `A soma das causas (${soma}) deve ser igual a ${total}.`
+      aviso.hidden = false
+    } else {
+      aviso.hidden = true
+    }
+  }
+}
+
 async function bioSalvarNinho() {
   const numero  = document.getElementById('bio-form-numero').value.trim()
   const data    = document.getElementById('bio-form-data').value
@@ -1051,6 +1081,17 @@ async function bioSalvarNinho() {
   if (!numero)  { bioToast('Informe o número do ninho (placa).', 'err'); return }
   if (!data)    { bioToast('Informe a data de encontro.', 'err'); return }
   if (!especie) { bioToast('Selecione a espécie.', 'err'); return }
+
+  // Descarte de ovos: se houver descartados, a quebra por causa é
+  // obrigatória e a soma tem que bater com o total.
+  const descTotal = parseInt(document.getElementById('bio-form-ovos-descartados').value) || 0
+  const descNat   = parseInt(document.getElementById('bio-form-desc-natural').value)  || 0
+  const descPred  = parseInt(document.getElementById('bio-form-desc-predacao').value) || 0
+  const descHum   = parseInt(document.getElementById('bio-form-desc-humana').value)   || 0
+  if (descTotal > 0 && (descNat + descPred + descHum) !== descTotal) {
+    bioToast(`Informe o motivo dos descartes: a soma das causas (${descNat + descPred + descHum}) deve ser igual a ${descTotal}.`, 'err')
+    return
+  }
 
   const parseNum  = id => { const v = parseInt(document.getElementById(id).value);   return isNaN(v) ? null : v }
   const parseNum2 = id => { const v = parseFloat(document.getElementById(id).value); return isNaN(v) ? null : v }
@@ -1075,6 +1116,7 @@ async function bioSalvarNinho() {
     motivo_rejeicao:  null,
     reenvio_correcao: editando ? true : (BioApp.formNinho.reenvio_correcao ?? false),
     status_sync:      'pendente',
+    descartes_dirty:  true,   // sinaliza o sync a reconciliar os eventos de descarte
     qtd_ovos:         parseNum('bio-form-qtd-ovos'),
     ovos_integros:    parseNum('bio-form-ovos-integros'),
     ovos_descartados: parseNum('bio-form-ovos-descartados'),
@@ -1086,6 +1128,24 @@ async function bioSalvarNinho() {
   }
 
   await bioOfflineSalvarNinho(ninho)
+
+  // Regrava os eventos de descarte (etapa registro): apaga os antigos e
+  // recria pelos valores atuais. O sync reconcilia no servidor.
+  await bioOfflineRemoverDescartesDoNinho(ninho.uuid_cliente, 'registro')
+  for (const [motivo, qtd] of [['natural', descNat], ['predacao', descPred], ['humana', descHum]]) {
+    if (qtd > 0) {
+      await bioOfflineSalvarDescarte({
+        uuid_cliente:  bioUuid(),
+        ninho_uuid:    ninho.uuid_cliente,
+        qtd, motivo,
+        etapa:         'registro',
+        data_descarte: data,
+        status_sync:   'pendente',
+        criado_em:     new Date().toISOString(),
+      })
+    }
+  }
+
   await bioAtualizarBadgeFila()
   await bioAtualizarCardCorrecao()
 
@@ -2055,7 +2115,7 @@ async function bioCarregarAbertos() {
     try {
       let q = bioSupabase()
         .from('vw_ninhos_validacao')
-        .select('id,uuid_cliente,numero_ninho,numero_atual,especie,data_encontro,hora_desova,status,status_validacao,motivo_rejeicao,qtd_ovos,ovos_integros,ovos_descartados,dist_rio_m,dist_rio_metodo,temperatura_c,umidade_pct,profundidade_cm,observacoes,foto_urls,lat,lng,precisao_gps_m,criado_em,praia_id,praia_nome,praia_atual_id,praia_atual_nome,monitor_id,monitor_nome')
+        .select('id,uuid_cliente,numero_ninho,numero_atual,especie,data_encontro,hora_desova,status,status_validacao,motivo_rejeicao,qtd_ovos,ovos_integros,ovos_descartados,descartados_natural,descartados_predacao,descartados_humana,dist_rio_m,dist_rio_metodo,temperatura_c,umidade_pct,profundidade_cm,observacoes,foto_urls,lat,lng,precisao_gps_m,criado_em,praia_id,praia_nome,praia_atual_id,praia_atual_nome,monitor_id,monitor_nome')
         .eq('grupo_id', BioApp.monitor.grupo_id)
         .order('numero_atual', { ascending: false })
       if (filtroStatus) {
@@ -2888,6 +2948,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('bio-transf-data')?.addEventListener('input', bioAtualizarSemaforoJanela)
   document.getElementById('bio-transf-hora')?.addEventListener('input', bioAtualizarSemaforoJanela)
   document.getElementById('bio-btn-salvar-eclosao')?.addEventListener('click', bioSalvarEclosao)
+
+  // Descarte de ovos: mostra a quebra por causa quando há descartados
+  ;['bio-form-ovos-descartados','bio-form-desc-natural','bio-form-desc-predacao','bio-form-desc-humana']
+    .forEach(id => document.getElementById(id)?.addEventListener('input', bioAtualizarDescarteBox))
 
   // Chips de espécie
   document.querySelectorAll('.bio-especie-chip').forEach(chip => {
