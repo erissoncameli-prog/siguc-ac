@@ -307,10 +307,19 @@
 
   <div class="bio-form-body">
 
-    <!-- Praia (contexto) -->
+    <!-- Praia (selecionável) -->
     <div class="bio-form-section">
       <span class="bio-form-label">Praia</span>
-      <p id="bio-form-praia-label" style="font-size:15px;font-weight:700;margin:4px 0 0;color:var(--bio-prim)">—</p>
+      <button id="bio-form-praia-btn" onclick="bioTrocarPraiaNoForm()"
+        style="display:flex;align-items:center;justify-content:space-between;gap:8px;
+               width:100%;background:var(--bio-surf,#1a2e1f);border:1.5px solid var(--bio-linha,#2a3f2f);
+               border-radius:10px;padding:10px 12px;cursor:pointer;text-align:left;margin-top:4px">
+        <span id="bio-form-praia-label" style="font-size:15px;font-weight:700;color:var(--bio-prim)">—</span>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;opacity:.6">
+          <polyline points="6 9 12 15 18 9"/>
+        </svg>
+      </button>
     </div>
 
     <!-- GPS compacto -->

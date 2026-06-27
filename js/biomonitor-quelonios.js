@@ -714,6 +714,13 @@ async function bioGerarNumeroNinho(praiaId, especie) {
 /* ════════════════════════════════════════════════════════════
    FORMULÁRIO — NINHO (Encontro)
    ════════════════════════════════════════════════════════════ */
+window.bioTrocarPraiaNoForm = function() {
+  bioAbrirSheetPraias(praia => {
+    BioApp.formNinho.praia_id = praia.id
+    document.getElementById('bio-form-praia-label').textContent = praia.nome
+  })
+}
+
 function bioAbrirFormNinho() {
   const praia = BioApp.praiaAtual
   document.getElementById('bio-form-praia-label').textContent = praia?.nome ?? '—'
