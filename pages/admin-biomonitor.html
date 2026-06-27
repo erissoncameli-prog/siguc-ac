@@ -859,6 +859,9 @@
   }
 
   // ── Modais ────────────────────────────────────────────────────
+  window.abrirModal = id => {
+    document.getElementById('modal-' + id).classList.add('aberto')
+  }
   window.fecharModal = id => {
     document.getElementById('modal-' + id).classList.remove('aberto')
     if (id === 'praia') destroyPraiaMap()
