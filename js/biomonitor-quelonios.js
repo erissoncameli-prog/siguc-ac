@@ -1153,8 +1153,18 @@ async function bioSalvarTransf() {
     criado_em:          new Date().toISOString(),
   }
 
-  // Atualiza status e localização atual do ninho localmente
-  await bioOfflineSalvarNinho({ ...ninho, status: 'transferido', praia_atual_id: destino.id })
+  // Atualiza status e localização atual do ninho localmente.
+  // Preserva server_id e status_sync do registro existente no IndexedDB — quando
+  // o ninho foi carregado da view do servidor (não do cache offline), o objeto `ninho`
+  // não traz esses campos, o que bloquearia a sync da transferência.
+  const ninhoLocal = await bioOfflineGetNinho(ninho.uuid_cliente)
+  await bioOfflineSalvarNinho({
+    ...(ninhoLocal ?? ninho),
+    status:        'transferido',
+    praia_atual_id: destino.id,
+    server_id:     ninhoLocal?.server_id  ?? ninho.id  ?? null,
+    status_sync:   ninhoLocal?.status_sync ?? 'pendente',
+  })
   await bioOfflineSalvarTransf(transf)
   await bioAtualizarBadgeFila()
 
@@ -1236,7 +1246,13 @@ async function bioSalvarEclosao() {
     criado_em:         new Date().toISOString(),
   }
 
-  await bioOfflineSalvarNinho({ ...ninho, status: 'eclodido' })
+  const ninhoLocalEcl = await bioOfflineGetNinho(ninho.uuid_cliente)
+  await bioOfflineSalvarNinho({
+    ...(ninhoLocalEcl ?? ninho),
+    status:     'eclodido',
+    server_id:  ninhoLocalEcl?.server_id  ?? ninho.id  ?? null,
+    status_sync: ninhoLocalEcl?.status_sync ?? 'pendente',
+  })
   await bioOfflineSalvarEclosao(ecl)
   await bioAtualizarBadgeFila()
 

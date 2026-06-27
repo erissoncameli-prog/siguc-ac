@@ -499,11 +499,15 @@ async function bioSyncPullNinhos(grupoId) {
         sincronizado_em: n.sincronizado_em ?? new Date().toISOString(),
       })
     } else {
-      // Atualiza campos que podem ter mudado no servidor após transferência/validação
+      // Atualiza campos que podem ter mudado no servidor após transferência/validação.
+      // Sempre reconstrói server_id quando ausente — garante que transferências/eclosões
+      // pendentes vinculadas a este ninho consigam sincronizar.
+      const semServerId = !local.server_id
       if (
         local.status           !== n.status           ||
         local.status_validacao !== n.status_validacao ||
-        local.praia_atual_id   !== n.praia_atual_id
+        local.praia_atual_id   !== n.praia_atual_id   ||
+        semServerId
       ) {
         await bioOfflineSalvarNinho({
           ...local,
@@ -511,6 +515,10 @@ async function bioSyncPullNinhos(grupoId) {
           status_validacao: n.status_validacao,
           motivo_rejeicao:  n.motivo_rejeicao,
           praia_atual_id:   n.praia_atual_id,
+          // Se o ninho já está no servidor mas server_id estava ausente localmente,
+          // recupera o ID e marca como confirmado para evitar re-upsert desnecessário.
+          server_id:   local.server_id ?? n.id,
+          status_sync: semServerId ? 'confirmado' : local.status_sync,
         })
       }
     }
