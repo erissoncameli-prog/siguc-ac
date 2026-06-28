@@ -2920,9 +2920,15 @@ async function bioCarregarTelaDados() {
 const BIO_VERSAO = '1.2.0'
 const BIO_INSTALL_URL = 'https://siguc-ac.vercel.app/pages/instalar-biomonitor.html'
 
-// Número real do build = cache ativo do service worker (sobe a cada deploy).
-// Reflete a versão de fato instalada no aparelho, sem manutenção manual.
+// Número real do build = versão declarada no sw.js do servidor (sempre atual).
+// Fallback: maior cache instalado no aparelho.
 async function bioVersaoBuild() {
+  try {
+    const r = await fetch('/pwa/sw.js', { cache: 'no-store' })
+    const txt = await r.text()
+    const m = txt.match(/siguc-brigadas-v(\d+)/)
+    if (m) return 'v' + m[1]
+  } catch (_) {}
   try {
     if (!('caches' in window)) return null
     const keys = await caches.keys()
