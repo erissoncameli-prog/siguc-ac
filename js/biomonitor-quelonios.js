@@ -1443,6 +1443,7 @@ async function bioSalvarTransf() {
   // Atualiza status, localização atual e placa do ninho localmente
   await bioOfflineSalvarNinho({
     ...ninho,
+    server_id:        ninho.server_id ?? ninho.id ?? null,
     status:           'transferido',
     praia_atual_id:   destino.id,
     praia_atual_nome: destino.nome,
@@ -1529,7 +1530,7 @@ async function bioSalvarEclosao() {
     criado_em:         new Date().toISOString(),
   }
 
-  await bioOfflineSalvarNinho({ ...ninho, status: 'eclodido' })
+  await bioOfflineSalvarNinho({ ...ninho, server_id: ninho.server_id ?? ninho.id ?? null, status: 'eclodido' })
   await bioOfflineSalvarEclosao(ecl)
   await bioAtualizarBadgeFila()
 
@@ -2211,7 +2212,7 @@ async function bioCarregarAbertos() {
 
   const estaAberto = n => filtroStatus
     ? n.status === filtroStatus
-    : (n.status !== 'eclodido' && n.status !== 'perdido')
+    : n.status !== 'perdido'
 
   let ninhos = []
 
@@ -2219,13 +2220,13 @@ async function bioCarregarAbertos() {
     try {
       let q = bioSupabase()
         .from('vw_ninhos_validacao')
-        .select('id,uuid_cliente,numero_ninho,numero_atual,especie,data_encontro,hora_desova,status,status_validacao,motivo_rejeicao,qtd_ovos,ovos_integros,ovos_descartados,descartados_natural,descartados_predacao,descartados_humana,dist_rio_m,dist_rio_metodo,temperatura_c,umidade_pct,profundidade_cm,observacoes,foto_urls,lat,lng,precisao_gps_m,criado_em,praia_id,praia_nome,praia_atual_id,praia_atual_nome,monitor_id,monitor_nome')
+        .select('id,uuid_cliente,numero_ninho,numero_atual,especie,data_encontro,hora_desova,status,status_validacao,motivo_rejeicao,qtd_ovos,ovos_integros,ovos_descartados,descartados_natural,descartados_predacao,descartados_humana,dist_rio_m,dist_rio_metodo,temperatura_c,umidade_pct,profundidade_cm,observacoes,foto_urls,lat,lng,precisao_gps_m,criado_em,praia_id,praia_nome,praia_atual_id,praia_atual_nome,monitor_id,monitor_nome,data_nascimento,filhotes_vivos,filhotes_mortos,ovos_nao_nascidos')
         .eq('grupo_id', BioApp.monitor.grupo_id)
         .order('numero_atual', { ascending: false })
       if (filtroStatus) {
         q = q.eq('status', filtroStatus)
       } else {
-        q = q.not('status', 'in', '(eclodido,perdido)')
+        q = q.neq('status', 'perdido')
       }
       // Filtra pela praia onde o ninho está incubando AGORA (praia atual)
       if (filtroPraia) q = q.eq('praia_atual_id', filtroPraia.id)
@@ -2337,6 +2338,15 @@ function bioNinhoCardInner(n, opts = {}) {
       ${n.profundidade_cm != null ? `<span>${n.profundidade_cm} cm prof.</span>` : ''}
     </div>` : ''
 
+  // Resumo da eclosão (quando o ninho já eclodiu)
+  const eclosaoHtml = (n.status === 'eclodido' && (n.filhotes_vivos != null || n.filhotes_mortos != null || n.data_nascimento)) ? `
+    <div class="bio-nfc-ovos">
+      <span style="background:rgba(82,183,136,.18);color:#1E6B4A">Eclosão${n.data_nascimento ? ' ' + new Date(n.data_nascimento + 'T12:00').toLocaleDateString('pt-BR') : ''}</span>
+      ${n.filhotes_vivos    != null ? `<span style="background:rgba(82,183,136,.12);color:#1E6B4A">${n.filhotes_vivos} vivos</span>` : ''}
+      ${n.filhotes_mortos             ? `<span style="background:rgba(220,38,38,.1);color:#DC2626">${n.filhotes_mortos} mortos</span>` : ''}
+      ${n.ovos_nao_nascidos           ? `<span style="background:rgba(127,127,127,.12);color:#6B7280">${n.ovos_nao_nascidos} não nasc.</span>` : ''}
+    </div>` : ''
+
   const localChip = n._local
     ? '<span class="bio-nfc-ev-chip" style="background:#a78bfa22;color:#7c3aed">pendente</span>'
     : ''
@@ -2375,6 +2385,7 @@ function bioNinhoCardInner(n, opts = {}) {
     ${corrHtml}
     ${ovosHtml}
     ${condicoesHtml}
+    ${eclosaoHtml}
     ${localChip ? `<div class="bio-nfc-eventos">${localChip}</div>` : ''}
     ${acoesHtml}
   `
