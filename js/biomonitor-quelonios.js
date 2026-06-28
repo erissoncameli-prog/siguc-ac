@@ -2683,6 +2683,28 @@ async function bioCarregarTelaDados() {
     })
   }
 
+  // Seletor de temporada (default: atual). Popula 1x quando online.
+  const selTemp = document.getElementById('bio-dados-temporada')
+  if (selTemp && !selTemp._wired) {
+    selTemp._wired = true
+    selTemp.addEventListener('change', () => bioCarregarTelaDados())
+  }
+  if (selTemp && !selTemp.dataset.populado && navigator.onLine) {
+    try {
+      const prog = BioApp.temporadaAtual?.programa_id
+      let q = bioSupabase().from('temporadas_biomonitor').select('id,nome,ano_base,is_atual').order('ano_base', { ascending: false })
+      if (prog) q = q.eq('programa_id', prog)
+      const { data: temps } = await q
+      if (temps?.length) {
+        const atualId = BioApp.temporadaAtual?.id
+        selTemp.innerHTML = temps.map(t =>
+          `<option value="${t.id}"${(t.is_atual || t.id === atualId) ? ' selected' : ''}>${t.nome || ('Temporada ' + t.ano_base)}</option>`).join('')
+        selTemp.dataset.populado = '1'
+      }
+    } catch (_) {}
+  }
+  const _tempDados = selTemp?.value || BioApp.temporadaAtual?.id || null
+
   // Dados locais (sempre disponíveis)
   const ninhos = await bioOfflineListarNinhos()
   _bioSetText('bio-kpi-ninhos-local', ninhos.length)
@@ -2698,7 +2720,7 @@ async function bioCarregarTelaDados() {
   if (statusEl) statusEl.textContent = 'carregando…'
 
   try {
-    const { data, error } = await bioSupabase().rpc('bio_dados_aba')
+    const { data, error } = await bioSupabase().rpc('bio_dados_aba', { p_temporada_id: _tempDados })
     if (error || !data) {
       if (statusEl) statusEl.textContent = error ? 'erro' : 'sem dados'
       return
