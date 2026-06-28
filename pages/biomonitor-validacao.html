@@ -203,6 +203,11 @@
           }).join('')}
         </div>` : ''}
 
+        ${n.alerta_campo ? `
+        <div title="${esc((n.alerta_campo.faixas||[]).map(f=>f.f).join(', '))}" style="display:inline-flex;align-items:center;gap:5px;background:rgba(245,158,11,.14);color:#f59e0b;border-radius:6px;padding:3px 8px;font-size:.74rem;font-weight:600;margin-bottom:10px">
+          ⚠ Alerta reconhecido em campo${n.alerta_campo.severidade_max ? ` (${esc(n.alerta_campo.severidade_max)})` : ''}
+        </div>` : ''}
+
         <div style="font-size:.83rem;color:var(--t2,#aaa);display:grid;gap:3px;margin-bottom:10px">
           <div>Praia: <span style="color:var(--t1,#f4efe6)">${n.praia_nome || '—'}</span></div>
           <div>Monitor: <span style="color:var(--t1,#f4efe6)">${n.monitor_nome || '—'}</span></div>
