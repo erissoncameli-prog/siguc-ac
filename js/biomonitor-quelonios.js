@@ -3012,22 +3012,46 @@ async function bioAlterarFotoMonitor() {
 async function bioVerificarAtualizacao() {
   if (!('serviceWorker' in navigator)) { location.reload(); return }
   bioToast('Verificando atualização…', 'info')
+
   const reg = await navigator.serviceWorker.getRegistration()
   if (!reg) { location.reload(); return }
+
+  // SW já instalado em waiting → atualização pronta, só precisa ativar
+  if (reg.waiting) {
+    bioToast('Atualização disponível — aplicando…', 'ok')
+    reg.waiting.postMessage({ type: 'SKIP_WAITING' })
+    navigator.serviceWorker.addEventListener('controllerchange', () => location.reload())
+    return
+  }
+
+  // Busca nova versão no servidor
   let achou = false
   reg.addEventListener('updatefound', () => {
     achou = true
     const nw = reg.installing
     if (!nw) return
     nw.addEventListener('statechange', () => {
-      if (nw.state === 'installed') {
-        bioToast('Atualização encontrada — recarregando…', 'ok')
-        setTimeout(() => location.reload(), 900)
+      if (nw.state === 'installed' && navigator.serviceWorker.controller) {
+        // Nova versão baixada e pronta
+        bioToast('Atualização baixada — aplicando…', 'ok')
+        nw.postMessage({ type: 'SKIP_WAITING' })
+        navigator.serviceWorker.addEventListener('controllerchange', () => location.reload())
+      } else if (nw.state === 'installed') {
+        // Primeira instalação (sem SW anterior) — reload normal
+        location.reload()
       }
     })
   })
+
   try { await reg.update() } catch (e) { console.warn('[bio-update]', e) }
-  setTimeout(() => { if (!achou) bioToast('App já está atualizado', 'ok') }, 2500)
+
+  // Se em 4 s nenhum updatefound → versão instalada é a mais recente
+  setTimeout(() => {
+    if (!achou) {
+      const buildAtual = document.getElementById('bio-app-versao')?.textContent ?? ''
+      bioToast(`Tudo certo — ${buildAtual.trim() || 'app atualizado'}`, 'ok')
+    }
+  }, 4000)
 }
 
 function bioAbrirQRInstalacao() {
@@ -3339,11 +3363,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     onConcluido: () => bioAtualizarBadgeFila(),
   })
 
-  // Versão e créditos dinâmicos (inclui o build real do service worker)
+  // Versão exibida = número do cache do service worker (sobe automaticamente
+  // a cada deploy, sem manutenção manual). Fallback: constante BIO_VERSAO.
   const versaoEl = document.getElementById('bio-app-versao')
   if (versaoEl) {
     const build = await bioVersaoBuild()
-    versaoEl.textContent = `Biomonitor Quelônios v${BIO_VERSAO}` + (build ? ` · build ${build}` : '')
+    versaoEl.textContent = build
+      ? `Biomonitor Quelônios · ${build}`
+      : `Biomonitor Quelônios v${BIO_VERSAO}`
   }
   const copyEl = document.getElementById('bio-app-copyright')
   if (copyEl) copyEl.innerHTML = 'SIGUC-AC — Desenvolvido por <strong>Erisson Cameli Santiago</strong>'
