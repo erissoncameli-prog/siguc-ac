@@ -96,6 +96,7 @@ async function bioSyncNinhos(monitorId, onProgresso) {
       temperatura_c:    ninho.temperatura_c    ?? null,
       umidade_pct:      ninho.umidade_pct      ?? null,
       profundidade_cm:  ninho.profundidade_cm  ?? null,
+      alerta_campo:     ninho.alerta_campo     ?? null,
     }
 
     await bioOfflineAtualizarSync('ninhos', ninho.uuid_cliente, 'enviando')
@@ -267,6 +268,7 @@ async function bioSyncVisitas(monitorId, onProgresso) {
       sinal_alagamento:        v.sinal_alagamento        ?? false,
       intervencao:             v.intervencao             || null,
       observacoes:             v.observacoes             || null,
+      alerta_campo:            v.alerta_campo            ?? null,
       monitor_id:              monitorId,
     }
 

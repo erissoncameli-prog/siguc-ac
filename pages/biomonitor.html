@@ -534,6 +534,7 @@
             min="0" step="0.1" inputmode="decimal" placeholder="—">
         </div>
       </div>
+      <div class="bio-alertas-wrap" id="bio-form-alertas"></div>
     </div>
 
     <!-- Fotos -->
@@ -859,6 +860,11 @@
         Sinal de alagamento
         <span style="display:block;font-size:12px;font-weight:400;opacity:.6">Nível d'água atingiu ou ameaça o ninho</span>
       </label>
+    </div>
+
+    <!-- Alertas científicos de incubação (avaliados ao vivo, offline) -->
+    <div class="bio-form-section" style="padding-top:0">
+      <div class="bio-alertas-wrap" id="bio-vis-alertas"></div>
     </div>
 
     <!-- Intervenção -->
@@ -1793,6 +1799,7 @@ const _bioReady = _dbReady.then(function () {
 </script>
 <script src="/js/biomonitor-offline.js"></script>
 <script src="/js/biomonitor-sync.js"></script>
+<script src="/js/biomonitor-alertas.js"></script>
 <script src="/js/biomonitor-quelonios.js"></script>
 <script>
 // ── Listeners adicionais (pós-carregamento) ───────────────────

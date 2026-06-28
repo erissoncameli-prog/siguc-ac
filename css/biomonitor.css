@@ -1456,3 +1456,28 @@ body.field-mode .bio-home-nome { font-size: 26px; }
   position: relative; height: 180px;
 }
 .bio-chart-wrap canvas { max-width: 100%; }
+
+/* ── Alertas científicos de incubação (campo) ─────────────────── */
+.bio-alertas-wrap { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.bio-alerta-card {
+  border-radius: 12px; padding: 10px 12px; border-left: 4px solid;
+  font-size: 13px; line-height: 1.42; animation: bioAlertaIn .18s ease;
+}
+@keyframes bioAlertaIn { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: none; } }
+.bio-alerta-card.sev-verde  { background: var(--bio-verde-bg);  border-color: var(--bio-verde); }
+.bio-alerta-card.sev-ouro   { background: var(--bio-ouro-bg);   border-color: var(--bio-ouro); }
+.bio-alerta-card.sev-alerta { background: var(--bio-alerta-bg); border-color: var(--bio-alerta); }
+.bio-alerta-card.sev-perigo { background: var(--bio-perigo-bg); border-color: var(--bio-perigo); }
+.bio-alerta-faixa { font-weight: 700; margin-bottom: 2px; }
+.bio-alerta-card.sev-verde  .bio-alerta-faixa { color: var(--bio-verde); }
+.bio-alerta-card.sev-ouro   .bio-alerta-faixa { color: #9A7B1F; }
+.bio-alerta-card.sev-alerta .bio-alerta-faixa { color: var(--bio-alerta); }
+.bio-alerta-card.sev-perigo .bio-alerta-faixa { color: var(--bio-perigo); }
+.bio-alerta-exp  { opacity: .85; }
+.bio-alerta-prov { margin-top: 5px; }
+.bio-alerta-cta {
+  margin-top: 9px; width: 100%; background: var(--bio-perigo); color: #fff;
+  border: none; border-radius: 10px; padding: 10px 14px; font-weight: 700;
+  font-size: 13px; cursor: pointer;
+}
+.bio-alerta-cta:active { filter: brightness(.92); }
