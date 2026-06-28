@@ -456,11 +456,16 @@ async function bioCarregarPraiasHome() {
       bioSyncCachePraias(BioApp.monitor?.grupo_id).catch(() => {}),
       bioSyncCacheBercarios().catch(() => {}),
       (typeof bioSyncCacheParametros === 'function' ? bioSyncCacheParametros() : Promise.resolve()).catch(() => {}),
+      (typeof bioSyncCacheTemporada === 'function' ? bioSyncCacheTemporada(BioApp.monitor?.grupo_id) : Promise.resolve()).catch(() => {}),
     ])
   } else {
     bioSyncCachePraias(BioApp.monitor?.grupo_id).catch(() => {})
     bioSyncCacheBercarios().catch(() => {})
   }
+
+  // Temporada atual (cacheada) → usada na numeração e exibida na home
+  BioApp.temporadaAtual = await bioOfflineGetConfig('temporada_atual')
+  bioRenderTemporadaChip()
 
   const praias = await bioOfflineListarPraias()
   if (!praias.length) return
@@ -469,6 +474,18 @@ async function bioCarregarPraiasHome() {
   const praiaId = await bioOfflineGetConfig('praia_selecionada')
   const praia   = praias.find(p => p.id === praiaId) ?? praias[0]
   bioSelecionarPraia(praia)
+}
+
+function bioRenderTemporadaChip() {
+  const chip = document.getElementById('bio-temporada-chip')
+  if (!chip) return
+  const t = BioApp.temporadaAtual
+  if (t && (t.nome || t.ano_base)) {
+    chip.textContent = t.ano_base ? `Temporada ${t.ano_base}` : t.nome
+    chip.hidden = false
+  } else {
+    chip.hidden = true
+  }
 }
 
 function bioSelecionarPraia(praia) {
@@ -856,7 +873,9 @@ async function bioGerarNumeroNinho(praiaId, especie, campo = 'numero_ninho') {
   const praia  = praias.find(p => p.id === praiaId)
   const cod    = praia?.sigla ?? 'XX'
   const sig    = esp?.sigla   ?? '?'
-  const prefix = `${cod}-${sig}-`
+  // Numeração reinicia por temporada: inclui o ano-base da temporada atual
+  const ano    = BioApp.temporadaAtual?.ano_base ?? new Date().getFullYear()
+  const prefix = `${cod}-${sig}-${ano}-`
 
   let maxSeq = 0
   const todos = await bioOfflineListarNinhos({})
@@ -1137,6 +1156,8 @@ async function bioSalvarNinho() {
     umidade_pct:      parseNum2('bio-form-umidade'),
     profundidade_cm:  parseNum2('bio-form-profundidade'),
     alerta_campo:     _alertaCampoNinho,
+    // Carimba a temporada atual (preserva a existente em edição)
+    temporada_id:     BioApp.formNinho?.temporada_id ?? BioApp.temporadaAtual?.id ?? null,
   }
 
   await bioOfflineSalvarNinho(ninho)

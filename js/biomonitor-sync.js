@@ -97,6 +97,7 @@ async function bioSyncNinhos(monitorId, onProgresso) {
       umidade_pct:      ninho.umidade_pct      ?? null,
       profundidade_cm:  ninho.profundidade_cm  ?? null,
       alerta_campo:     ninho.alerta_campo     ?? null,
+      temporada_id:     ninho.temporada_id     ?? null,
     }
 
     await bioOfflineAtualizarSync('ninhos', ninho.uuid_cliente, 'enviando')
@@ -476,6 +477,19 @@ async function bioSyncCacheBercarios() {
 
   if (error || !data) return
   await bioOfflineSalvarBercarios(data)
+}
+
+// ── Cache da temporada atual (do programa do grupo) ───────────
+async function bioSyncCacheTemporada(grupoId) {
+  if (!navigator.onLine || !grupoId) return
+  const { data: g } = await bioSupabase()
+    .from('grupos_biomonitor').select('programa_id').eq('id', grupoId).maybeSingle()
+  if (!g?.programa_id) return
+  const { data: t } = await bioSupabase()
+    .from('temporadas_biomonitor')
+    .select('id,nome,ano_base,data_inicio,data_fim,programa_id,is_atual')
+    .eq('programa_id', g.programa_id).eq('is_atual', true).maybeSingle()
+  if (t) await bioOfflineSetConfig('temporada_atual', t)
 }
 
 // ── Cache de praias do servidor ───────────────────────────────

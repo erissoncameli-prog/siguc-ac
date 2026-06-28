@@ -1484,3 +1484,10 @@ body.field-mode .bio-home-nome { font-size: 26px; }
   font-size: 13px; cursor: pointer;
 }
 .bio-alerta-cta:active { filter: brightness(.92); }
+
+/* ── Chip da temporada atual (home) ───────────────────────────── */
+.bio-temporada-chip {
+  display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 999px;
+  font-size: 10px; font-weight: 700; letter-spacing: .02em; vertical-align: middle;
+  background: var(--bio-verde-bg); color: var(--bio-verde);
+}
