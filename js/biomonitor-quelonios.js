@@ -946,7 +946,20 @@ window.bioTrocarPraiaNoForm = function() {
     BioApp.formNinho.praia_id = praia.id
     document.getElementById('bio-form-praia-label').textContent = praia.nome
     bioVerificarPerimetroNinho()
+    bioAtualizarNumeroNinhoAuto()
   })
+}
+
+// (Re)gera o número do ninho automaticamente (praia + espécie + temporada),
+// exceto quando o usuário optou por editar manualmente.
+async function bioAtualizarNumeroNinhoAuto() {
+  if (BioApp.numeroManual) return
+  const campo = document.getElementById('bio-form-numero')
+  if (!campo) return
+  const esp     = document.querySelector('.bio-especie-chip.sel')?.dataset.esp
+  const praiaId = BioApp.formNinho?.praia_id ?? BioApp.praiaAtual?.id
+  if (!esp || !praiaId) return
+  try { campo.value = await bioGerarNumeroNinho(praiaId, esp) } catch (_) {}
 }
 
 function bioAbrirFormNinho() {
@@ -959,7 +972,12 @@ function bioAbrirFormNinho() {
   document.getElementById('bio-form-praia-label').textContent = praia?.nome ?? '—'
   document.getElementById('bio-form-data').value = new Date().toISOString().slice(0, 10)
   document.getElementById('bio-form-hora-desova').value = ''
-  document.getElementById('bio-form-numero').value = ''
+  // Número do ninho em modo automático (gerado ao escolher a espécie)
+  BioApp.numeroManual = false
+  const _numEl = document.getElementById('bio-form-numero')
+  _numEl.value = ''
+  _numEl.readOnly = true
+  _numEl.placeholder = 'Escolha a espécie…'
   document.getElementById('bio-form-obs').value   = ''
   document.getElementById('bio-form-foto-count').textContent = '(0/3)'
 
@@ -1033,7 +1051,11 @@ function bioAbrirCorrecaoNinho(ninho) {
   document.getElementById('bio-form-praia-label').textContent = ninho.praia_nome ?? '—'
   document.getElementById('bio-form-data').value         = ninho.data_encontro ?? ''
   document.getElementById('bio-form-hora-desova').value  = ninho.hora_desova ?? ''
-  document.getElementById('bio-form-numero').value       = ninho.numero_ninho ?? ''
+  // Edição/correção: mantém o número já atribuído (não regenerar)
+  BioApp.numeroManual = true
+  const _numEdit = document.getElementById('bio-form-numero')
+  _numEdit.value    = ninho.numero_ninho ?? ''
+  _numEdit.readOnly = true
   document.getElementById('bio-form-obs').value          = ninho.observacoes ?? ''
 
   // Espécie
@@ -3068,17 +3090,15 @@ document.addEventListener('DOMContentLoaded', async () => {
       document.querySelectorAll('.bio-especie-chip').forEach(c => c.classList.remove('sel'))
       chip.classList.add('sel')
     })
-    // Auto-numeração: preenche número ao selecionar espécie (só se campo vazio)
-    chip.addEventListener('click', async () => {
-      const campo = document.getElementById('bio-form-numero')
-      if (!campo || campo.value.trim()) return
-      const esp     = chip.dataset.esp
-      const praiaId = BioApp.praiaAtual?.id
-      if (!esp || !praiaId) return
-      try {
-        campo.value = await bioGerarNumeroNinho(praiaId, esp)
-      } catch (_) {}
-    })
+    // Auto-numeração: (re)gera o número ao escolher/trocar a espécie
+    chip.addEventListener('click', () => { bioAtualizarNumeroNinhoAuto() })
+  })
+
+  // Botão "Editar" → libera a edição manual do número do ninho
+  document.getElementById('bio-form-numero-edit')?.addEventListener('click', () => {
+    BioApp.numeroManual = true
+    const campo = document.getElementById('bio-form-numero')
+    if (campo) { campo.readOnly = false; campo.focus() }
   })
 
   // Filtros de status na aba Abertos
