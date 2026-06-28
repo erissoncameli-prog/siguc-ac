@@ -29,15 +29,26 @@
         <div class="form-group"><label class="form-label">Programa <span class="obrig">*</span></label>
           <select class="form-control" id="mg-programa"><option value="">Selecione...</option></select>
         </div>
-        <div class="form-group"><label class="form-label">Unidade de Conservação</label>
-          <select class="form-control" id="mg-uc"><option value="">Fora de UC (sem unidade)</option></select>
+        <div class="form-group"><label class="form-label">Tipo de área <span class="obrig">*</span></label>
+          <select class="form-control" id="mg-tipo-localizacao" onchange="grupoToggleLocalizacao()">
+            <option value="dentro_uc">Dentro de UC</option>
+            <option value="terra_indigena">Terra Indígena</option>
+            <option value="area_municipal">Área Municipal</option>
+            <option value="margem_livre">Margem Livre</option>
+            <option value="outro">Outro</option>
+          </select>
         </div>
+      </div>
+      <div id="mg-grupo-uc" class="form-group">
+        <label class="form-label">Unidade de Conservação <span class="obrig">*</span></label>
+        <select class="form-control" id="mg-uc"><option value="">Selecione...</option></select>
+      </div>
+      <div id="mg-grupo-ref" class="form-group" style="display:none">
+        <label class="form-label">Referência de localização <span class="obrig">*</span></label>
+        <input class="form-control" id="mg-local" placeholder="Ex: Rio Juruá, km 120 — Comunidade Boa Vista">
       </div>
       <div class="form-group"><label class="form-label">Nome do grupo <span class="obrig">*</span></label>
         <input class="form-control" id="mg-nome" placeholder="Ex: Equipe Quelônios RESEX Alto Juruá">
-      </div>
-      <div class="form-group"><label class="form-label">Local / área monitorada <small style="opacity:.6">(quando fora de UC)</small></label>
-        <input class="form-control" id="mg-local" placeholder="Ex: Rio Juruá — comunidade São Pedro; TI Kampa do Rio Amônea">
       </div>
       <div class="grid-2">
         <div class="form-group"><label class="form-label">Início da temporada</label>
@@ -611,12 +622,10 @@
       const el = document.getElementById(id)
       if (el) el.innerHTML = `<option value="">Selecione...</option>` + progOpts
     })
-    ;['mpr-uc'].forEach(id => {
+    ;['mg-uc','mpr-uc'].forEach(id => {
       const el = document.getElementById(id)
       if (el) el.innerHTML = `<option value="">Selecione...</option>` + ucOpts
     })
-    const mguc = document.getElementById('mg-uc')
-    if (mguc) mguc.innerHTML = `<option value="">Fora de UC (sem unidade)</option>` + ucOpts
     ;['mb-uc', 'fil-uc-berc'].forEach(id => {
       const el = document.getElementById(id)
       if (el) el.innerHTML = `<option value="">Nenhuma (fora de UC)</option>` + ucOpts
@@ -638,8 +647,13 @@
   function nomeGrupo(id) { return _grupos.find(g => g.id === id)?.nome || '—' }
   function nomePrograma(id) { return _programas.find(p => p.id === id)?.nome || '—' }
   function nomeUC(id) { return _ucs.find(u => u.id === id)?.nome || '—' }
-  // Local do grupo: UC quando houver; senão a área livre ou "Fora de UC"
-  function localGrupo(g) { return g.uc_id ? nomeUC(g.uc_id) : (g.local_descricao || 'Fora de UC') }
+  // Local do grupo: UC quando "dentro_uc"; senão a referência livre ou o rótulo do tipo
+  const TIPO_AREA_LBL = { terra_indigena:'Terra Indígena', area_municipal:'Área Municipal', margem_livre:'Margem Livre', outro:'Outro' }
+  function localGrupo(g) {
+    if (g.tipo_localizacao && g.tipo_localizacao !== 'dentro_uc')
+      return g.localizacao_referencia || TIPO_AREA_LBL[g.tipo_localizacao] || 'Fora de UC'
+    return nomeUC(g.uc_id)
+  }
 
   function renderGrupos() {
     const busca = document.getElementById('busca-grupos')?.value.toLowerCase() || ''
@@ -651,7 +665,7 @@
     const contGrupo = id => _monitores.filter(m => m.grupo_id === id && m.status === 'ativo').length
     tbody.innerHTML = lista.map(g => `<tr>
       <td><strong>${esc(g.nome)}</strong></td>
-      <td>${esc(localGrupo(g))}${!g.uc_id ? ' <span class="badge badge-neutral" style="font-size:.65rem">fora de UC</span>' : ''}</td>
+      <td>${esc(localGrupo(g))}${(g.tipo_localizacao && g.tipo_localizacao !== 'dentro_uc') ? ' <span class="badge badge-neutral" style="font-size:.65rem">fora de UC</span>' : ''}</td>
       <td>${nomePrograma(g.programa_id)}</td>
       <td style="text-align:center">${contGrupo(g.id)}</td>
       <td>${g.temporada_inicio ? formatData(g.temporada_inicio) + ' – ' + formatData(g.temporada_fim) : '—'}</td>
@@ -1053,7 +1067,9 @@
     document.getElementById('mg-programa').value  = g?.programa_id || ''
     document.getElementById('mg-uc').value         = g?.uc_id || ''
     document.getElementById('mg-nome').value        = g?.nome || ''
-    document.getElementById('mg-local').value       = g?.local_descricao || ''
+    document.getElementById('mg-tipo-localizacao').value = g?.tipo_localizacao || 'dentro_uc'
+    document.getElementById('mg-local').value       = g?.localizacao_referencia || ''
+    grupoToggleLocalizacao()
     document.getElementById('mg-t-inicio').value   = g?.temporada_inicio || ''
     document.getElementById('mg-t-fim').value       = g?.temporada_fim || ''
     document.getElementById('mg-coord-nome').value = g?.coordenador_nome || ''
@@ -1064,11 +1080,22 @@
   }
   window.editarGrupo = id => window.abrirModalGrupo(id)
 
+  // Alterna UC x referência livre conforme o tipo de área (igual à praia)
+  window.grupoToggleLocalizacao = function() {
+    const dentroUC = document.getElementById('mg-tipo-localizacao').value === 'dentro_uc'
+    document.getElementById('mg-grupo-uc').style.display  = dentroUC ? '' : 'none'
+    document.getElementById('mg-grupo-ref').style.display = dentroUC ? 'none' : ''
+    if (dentroUC) document.getElementById('mg-local').value = ''
+    else          document.getElementById('mg-uc').value = ''
+  }
+
   window.salvarGrupo = async function() {
+    const tipo = document.getElementById('mg-tipo-localizacao').value
     const payload = {
       programa_id:        document.getElementById('mg-programa').value || null,
-      uc_id:              document.getElementById('mg-uc').value || null,
-      local_descricao:    document.getElementById('mg-local').value.trim() || null,
+      tipo_localizacao:   tipo,
+      uc_id:              tipo === 'dentro_uc' ? (document.getElementById('mg-uc').value || null) : null,
+      localizacao_referencia: tipo !== 'dentro_uc' ? (document.getElementById('mg-local').value.trim() || null) : null,
       nome:               document.getElementById('mg-nome').value.trim(),
       temporada_inicio:   document.getElementById('mg-t-inicio').value || null,
       temporada_fim:      document.getElementById('mg-t-fim').value || null,
@@ -1078,6 +1105,8 @@
       ativo:              document.getElementById('mg-ativo').checked,
     }
     if (!payload.programa_id || !payload.nome) { toast('Preencha programa e nome.', 'error'); return }
+    if (tipo === 'dentro_uc' && !payload.uc_id) { toast('Selecione a Unidade de Conservação.', 'error'); return }
+    if (tipo !== 'dentro_uc' && !payload.localizacao_referencia) { toast('Informe a referência de localização.', 'error'); return }
     const { error } = _editGrupoId
       ? await db.from('grupos_biomonitor').update(payload).eq('id', _editGrupoId)
       : await db.from('grupos_biomonitor').insert(payload)
