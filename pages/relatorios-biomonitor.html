@@ -174,7 +174,7 @@
     { data: ucs },
     { data: praias },
   ] = await Promise.all([
-    db.from('temporadas_biomonitor').select('id,nome').order('ano_base', { ascending: false }),
+    db.from('temporadas_biomonitor').select('id,nome,is_atual').order('ano_base', { ascending: false }),
     db.from('programas_biomonitoramento').select('id,nome').eq('ativo', true),
     db.from('unidades_conservacao').select('id,nome,sigla').order('nome'),
     db.from('praias_monitoramento').select('id,nome,uc_id').eq('ativa', true).order('nome'),
@@ -183,7 +183,7 @@
   _praias_todas = praias || []
 
   const sel = id => document.getElementById(id)
-  ;(temporadas || []).forEach(t => sel('fil-temporada').insertAdjacentHTML('beforeend', `<option value="${t.id}">${t.nome}</option>`))
+  ;(temporadas || []).forEach(t => sel('fil-temporada').insertAdjacentHTML('beforeend', `<option value="${t.id}"${t.is_atual ? ' selected' : ''}>${t.nome}</option>`))
   ;(programas  || []).forEach(p => sel('fil-programa').insertAdjacentHTML('beforeend', `<option value="${p.id}">${p.nome}</option>`))
   ;(ucs        || []).forEach(u => sel('fil-uc').insertAdjacentHTML('beforeend', `<option value="${u.id}">${u.sigla || ''} ${u.nome}</option>`))
 
