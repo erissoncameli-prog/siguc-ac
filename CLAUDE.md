@@ -154,7 +154,25 @@ D) Gestão de Pesquisa (13 etapas)
 
 E) Dashboard Executivo por nível (UC / Diretoria / Secretaria)
 
+## Versionamento (OBRIGATÓRIO — vale para TODA sessão)
+- A versão de referência do app é o cache do service worker em
+  `pwa/sw.js`: `const CACHE = 'siguc-brigadas-vN'`.
+- A CADA implementação concluída, ANTES do commit/deploy, INCREMENTAR
+  a versão: ler o número atual de `CACHE` em `pwa/sw.js` e subir em 1
+  (vN → vN+1). Ex.: `siguc-brigadas-v114` → `siguc-brigadas-v115`.
+- Isso invalida o cache do service worker e garante que os aparelhos
+  (web/PWA e app de campo) recebam a versão nova. Sem isso, os usuários
+  continuam vendo a versão antiga.
+- Obrigatório sempre que a entrega tocar arquivos web (HTML/JS/CSS/PWA).
+  Entregas só de banco/migrations (sem arquivos web) dispensam o
+  incremento — na dúvida, incremente.
+- Mencionar a nova versão no commit (ex.: "sw.js: cache vN → vN+1").
+- Esta regra é permanente e deve ser seguida em todas as sessões, sem
+  precisar ser solicitada novamente.
+
 ## Regras de desenvolvimento
+- VERSIONAMENTO: a cada implementação concluída, subir a versão do cache
+  em `pwa/sw.js` (vN → vN+1) — ver seção "Versionamento" acima.
 - Manter design system — nunca alterar variáveis CSS sem alinhamento
 - Novos JS em js/ seguindo padrão do projeto
 - Novas páginas em pages/ com gerarLayout() obrigatório
