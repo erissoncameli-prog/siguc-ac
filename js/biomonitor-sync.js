@@ -184,6 +184,11 @@ async function bioSyncTransferencias(monitorId, onProgresso) {
     const ninhoServId = await bioResolverNinhoServId(t.ninho_uuid)
     if (!ninhoServId) continue  // ninho ainda não no banco; tenta no próximo sync
 
+    let fotoUrls = t.foto_urls ?? []
+    if (fotoUrls.some(f => f.startsWith('data:'))) {
+      fotoUrls = await bioSyncUploadFotos(fotoUrls, `transferencias/${t.uuid_cliente}`)
+    }
+
     const payload = {
       uuid_cliente:        t.uuid_cliente,
       ninho_id:            ninhoServId,
@@ -195,6 +200,7 @@ async function bioSyncTransferencias(monitorId, onProgresso) {
       motivo:              t.motivo            || null,
       local_destino:       t.local_destino     || null,
       observacoes:         t.observacoes       || null,
+      foto_urls:           fotoUrls,
       monitor_id:          monitorId,
     }
 
@@ -274,6 +280,11 @@ async function bioSyncVisitas(monitorId, onProgresso) {
     const ninhoServId = await bioResolverNinhoServId(v.ninho_uuid)
     if (!ninhoServId) continue
 
+    let fotoUrls = v.foto_urls ?? []
+    if (fotoUrls.some(f => f.startsWith('data:'))) {
+      fotoUrls = await bioSyncUploadFotos(fotoUrls, `visitas/${v.uuid_cliente}`)
+    }
+
     const payload = {
       uuid_cliente:            v.uuid_cliente,
       ninho_id:                ninhoServId,
@@ -288,6 +299,7 @@ async function bioSyncVisitas(monitorId, onProgresso) {
       sinal_alagamento:        v.sinal_alagamento        ?? false,
       intervencao:             v.intervencao             || null,
       observacoes:             v.observacoes             || null,
+      foto_urls:               fotoUrls,
       alerta_campo:            v.alerta_campo            ?? null,
       monitor_id:              monitorId,
     }
@@ -370,6 +382,11 @@ async function bioSyncSolturas(monitorId, onProgresso) {
       if (!loteServId) continue  // lote ainda não sincronizado
     }
 
+    let fotoUrlsSol = s.foto_urls ?? []
+    if (fotoUrlsSol.some(f => f.startsWith('data:'))) {
+      fotoUrlsSol = await bioSyncUploadFotos(fotoUrlsSol, `solturas/${s.uuid_cliente}`)
+    }
+
     const payload = {
       uuid_cliente:     s.uuid_cliente,
       ninho_id:         ninhoServId,
@@ -385,6 +402,7 @@ async function bioSyncSolturas(monitorId, onProgresso) {
       local_descricao:  s.local_descricao  || null,
       predacao_soltura: s.predacao_soltura ?? false,
       observacoes:      s.observacoes      || null,
+      foto_urls:        fotoUrlsSol,
       monitor_id:       monitorId,
     }
 
@@ -418,6 +436,11 @@ async function bioSyncOcorrencias(monitorId, onProgresso) {
     const loteServId = loteLocal?.server_id
     if (!loteServId) continue
 
+    let fotoUrlsOc = oc.foto_urls ?? []
+    if (fotoUrlsOc.some(f => f.startsWith('data:'))) {
+      fotoUrlsOc = await bioSyncUploadFotos(fotoUrlsOc, `ocorrencias-bercario/${oc.uuid_cliente}`)
+    }
+
     const payload = {
       uuid_cliente:         oc.uuid_cliente,
       lote_id:              loteServId,
@@ -430,6 +453,7 @@ async function bioSyncOcorrencias(monitorId, onProgresso) {
       qtd_afetados:         oc.qtd_afetados         ?? null,
       causa:                oc.causa                || null,
       descricao:            oc.descricao            || null,
+      foto_urls:            fotoUrlsOc,
       monitor_id:           monitorId,
       sincronizado_em:      new Date().toISOString(),
     }

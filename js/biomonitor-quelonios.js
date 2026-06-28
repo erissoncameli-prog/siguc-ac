@@ -1251,22 +1251,29 @@ async function bioSalvarNinho() {
   bioRenderPraiaMeta(BioApp.praiaAtual)
 }
 
-// ── Fotos no formulário de ninho ──────────────────────────────
-function bioIniciarFotosForm() {
-  const grid   = document.getElementById('bio-form-foto-grid')
-  const btnCam = document.getElementById('bio-form-btn-camera')
-  const inp    = document.getElementById('bio-form-input-foto')
+// ── Captura de fotos com marca d'água (genérico) ──────────────
+// cfg: { prefixo, max, getState, setFotos }
+// Wires up câmera button + file input + grid de preview para qualquer form.
+// Se brigada-captura.js estiver carregado, aplica watermark automaticamente.
+function bioIniciarFotosGenerica({ prefixo, max, getState, setFotos }) {
+  const grid    = document.getElementById(`bio-${prefixo}-foto-grid`)
+  const btnCam  = document.getElementById(`bio-${prefixo}-btn-camera`)
+  const inp     = document.getElementById(`bio-${prefixo}-input-foto`)
+  const countEl = document.getElementById(`bio-${prefixo}-foto-count`)
+  if (!grid || !btnCam || !inp || !countEl) return null
 
   function atualizarGrid() {
-    const fotos = BioApp.formNinho?.foto_urls ?? []
-    document.getElementById('bio-form-foto-count').textContent = `(${fotos.length}/3)`
+    const fotos = getState() ?? []
+    countEl.textContent = `(${fotos.length}/${max})`
     grid.innerHTML = ''
     fotos.forEach((url, i) => {
       const img = document.createElement('img')
       img.src = url
       img.addEventListener('click', () => {
         if (confirm('Remover esta foto?')) {
-          BioApp.formNinho.foto_urls.splice(i, 1)
+          const f = getState()
+          f.splice(i, 1)
+          setFotos(f)
           atualizarGrid()
         }
       })
@@ -1274,21 +1281,58 @@ function bioIniciarFotosForm() {
     })
   }
 
-  btnCam?.addEventListener('click', () => inp?.click())
-  inp?.addEventListener('change', async () => {
-    const fotos = BioApp.formNinho?.foto_urls ?? []
+  btnCam.addEventListener('click', () => inp.click())
+  inp.addEventListener('change', async () => {
+    const fotos = getState() ?? []
+    const monitor = BioApp.monitor
+    const gps = typeof bGpsAtual === 'function' ? bGpsAtual() : null
     for (const file of Array.from(inp.files ?? [])) {
-      if (fotos.length >= 3) break
-      const url = await new Promise(res => {
-        const reader = new FileReader()
-        reader.onload = e => res(e.target.result)
-        reader.readAsDataURL(file)
-      })
-      fotos.push(url)
+      if (fotos.length >= max) break
+      let dataUrl
+      if (typeof bCapturaProcessarArquivo === 'function') {
+        try {
+          const blob = await bCapturaProcessarArquivo(
+            file,
+            { nome: monitor?.nome_completo ?? 'Monitor' },
+            gps,
+            { brigada: monitor?.grupo_nome ?? null }
+          )
+          dataUrl = await new Promise(res => {
+            const r = new FileReader()
+            r.onload = e => res(e.target.result)
+            r.readAsDataURL(blob)
+          })
+        } catch {
+          dataUrl = await new Promise(res => {
+            const r = new FileReader()
+            r.onload = e => res(e.target.result)
+            r.readAsDataURL(file)
+          })
+        }
+      } else {
+        dataUrl = await new Promise(res => {
+          const r = new FileReader()
+          r.onload = e => res(e.target.result)
+          r.readAsDataURL(file)
+        })
+      }
+      fotos.push(dataUrl)
     }
-    if (BioApp.formNinho) BioApp.formNinho.foto_urls = fotos
+    setFotos(fotos)
     atualizarGrid()
     inp.value = ''
+  })
+
+  return { atualizarGrid }
+}
+
+// ── Fotos no formulário de ninho ──────────────────────────────
+function bioIniciarFotosForm() {
+  bioIniciarFotosGenerica({
+    prefixo:  'form',
+    max:      3,
+    getState: () => BioApp.formNinho?.foto_urls ?? [],
+    setFotos: f  => { if (BioApp.formNinho) BioApp.formNinho.foto_urls = f },
   })
 }
 
@@ -1319,6 +1363,12 @@ async function bioAbrirFormTransf(ninho) {
   document.getElementById('bio-transf-obs').value             = ''
   document.getElementById('bio-transf-motivo').value          = ''
   document.getElementById('bio-transf-numero').value          = ''
+  // Fotos
+  BioApp._fotosTransf = []
+  const _trCount = document.getElementById('bio-transf-foto-count')
+  const _trGrid  = document.getElementById('bio-transf-foto-grid')
+  if (_trCount) _trCount.textContent = '(0/3)'
+  if (_trGrid)  _trGrid.innerHTML = ''
   // Destino: limpa seleção anterior
   BioApp.transfPraiaDestino = null
   const nomeEl = document.getElementById('bio-transf-praia-nome')
@@ -1436,6 +1486,7 @@ async function bioSalvarTransf() {
     motivo:             motivo,
     local_destino:      local || null,
     observacoes:        obs || null,
+    foto_urls:          BioApp._fotosTransf?.length ? [...BioApp._fotosTransf] : [],
     status_sync:        'pendente',
     criado_em:          new Date().toISOString(),
   }
@@ -1465,6 +1516,13 @@ async function bioAbrirFormEclosao(ninho) {
   document.getElementById('bio-ecl-ninho-num').textContent  = ninho.numero_ninho
   document.getElementById('bio-ecl-especie').textContent    = BIO_ESPECIES.find(e => e.id === ninho.especie)?.nome ?? ninho.especie
   document.getElementById('bio-ecl-data').value             = new Date().toISOString().slice(0, 10)
+
+  // Fotos
+  BioApp._fotosEcl = []
+  const _eclCount = document.getElementById('bio-ecl-foto-count')
+  const _eclGrid  = document.getElementById('bio-ecl-foto-grid')
+  if (_eclCount) _eclCount.textContent = '(0/3)'
+  if (_eclGrid)  _eclGrid.innerHTML = ''
 
   // Contadores
   bioSetContador('bio-ecl-vivos',    0)
@@ -1525,7 +1583,7 @@ async function bioSalvarEclosao() {
     filhotes_mortos:   mortos,
     ovos_nao_nascidos: naoNascidos,
     predacao,
-    foto_urls:         [],
+    foto_urls:         BioApp._fotosEcl?.length ? [...BioApp._fotosEcl] : [],
     status_sync:       'pendente',
     criado_em:         new Date().toISOString(),
   }
@@ -1645,6 +1703,13 @@ function bioAbrirFormSoltura(ctx) {
   const coordsEl = document.getElementById('bio-sol-gps-coords')
   if (coordsEl) coordsEl.textContent = bioFormatarCoords(BioApp.gpsLat, BioApp.gpsLng)
 
+  // Fotos
+  BioApp._fotosSol = []
+  const _solCount = document.getElementById('bio-sol-foto-count')
+  const _solGrid  = document.getElementById('bio-sol-foto-grid')
+  if (_solCount) _solCount.textContent = '(0/3)'
+  if (_solGrid)  _solGrid.innerHTML = ''
+
   bioMostrarTela('tela-form-soltura')
 }
 
@@ -1674,6 +1739,7 @@ async function bioSalvarSoltura() {
     local_descricao: document.getElementById('bio-sol-local').value.trim() || null,
     predacao_soltura: document.getElementById('bio-sol-predacao').checked,
     observacoes:     document.getElementById('bio-sol-obs').value.trim() || null,
+    foto_urls:       BioApp._fotosSol?.length ? [...BioApp._fotosSol] : [],
     status_sync:     'pendente',
     criado_em:       new Date().toISOString(),
   }
@@ -1878,6 +1944,13 @@ function bioAbrirFormOcorrencia(lote) {
   document.getElementById('bio-oc-descricao').value = ''
   document.getElementById('bio-oc-afetados').textContent = '0'
 
+  // Fotos
+  BioApp._fotosOc = []
+  const _ocCount = document.getElementById('bio-oc-foto-count')
+  const _ocGrid  = document.getElementById('bio-oc-foto-grid')
+  if (_ocCount) _ocCount.textContent = '(0/2)'
+  if (_ocGrid)  _ocGrid.innerHTML = ''
+
   document.querySelectorAll('#bio-oc-tipo-grid .bio-oc-chip').forEach((chip, i) => {
     chip.classList.toggle('ativo', i === 0)
   })
@@ -1926,6 +1999,7 @@ async function bioSalvarOcorrencia() {
     qtd_afetados:         parseInt(document.getElementById('bio-oc-afetados').textContent) || null,
     causa:                document.getElementById('bio-oc-causa').value.trim()             || null,
     descricao:            document.getElementById('bio-oc-descricao').value.trim()         || null,
+    foto_urls:            BioApp._fotosOc?.length ? [...BioApp._fotosOc] : [],
     status_sync:          'pendente',
     criado_em:            new Date().toISOString(),
   }
@@ -2074,6 +2148,13 @@ async function bioAbrirFormVisita(ninho) {
   if (_alVis) _alVis.innerHTML = ''
   if (typeof bioAtualizarAlertasVisita === 'function') bioAtualizarAlertasVisita()
 
+  // Fotos
+  BioApp._fotosVis = []
+  const _visCount = document.getElementById('bio-vis-foto-count')
+  const _visGrid  = document.getElementById('bio-vis-foto-grid')
+  if (_visCount) _visCount.textContent = '(0/3)'
+  if (_visGrid)  _visGrid.innerHTML = ''
+
   bioMostrarTela('tela-form-visita')
 }
 
@@ -2114,6 +2195,7 @@ async function bioSalvarVisita() {
     sinal_alagamento:        document.getElementById('bio-vis-alagamento').checked,
     intervencao:             document.getElementById('bio-vis-intervencao').value.trim() || null,
     observacoes:             document.getElementById('bio-vis-obs').value.trim()         || null,
+    foto_urls:               BioApp._fotosVis?.length ? [...BioApp._fotosVis] : [],
     alerta_campo:            _alertaCampoVisita,
     status_sync:             'pendente',
     criado_em:               new Date().toISOString(),
@@ -3079,6 +3161,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Inicializa sub-componentes
   bioIniciarTelaTrocarSenha()
   bioIniciarFotosForm()
+  // Fotos com marca d'água nos demais formulários
+  bioIniciarFotosGenerica({ prefixo:'ecl',   max:3, getState:() => BioApp._fotosEcl ?? [],   setFotos:f => { BioApp._fotosEcl = f } })
+  bioIniciarFotosGenerica({ prefixo:'vis',   max:3, getState:() => BioApp._fotosVis ?? [],   setFotos:f => { BioApp._fotosVis = f } })
+  bioIniciarFotosGenerica({ prefixo:'transf',max:3, getState:() => BioApp._fotosTransf ?? [],setFotos:f => { BioApp._fotosTransf = f } })
+  bioIniciarFotosGenerica({ prefixo:'sol',   max:3, getState:() => BioApp._fotosSol ?? [],   setFotos:f => { BioApp._fotosSol = f } })
+  bioIniciarFotosGenerica({ prefixo:'oc',    max:2, getState:() => BioApp._fotosOc ?? [],    setFotos:f => { BioApp._fotosOc = f } })
   bioIniciarContadores()
   bioIniciarFormVisita()
   bioIniciarPosEclosao()

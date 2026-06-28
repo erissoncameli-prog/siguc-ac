@@ -652,6 +652,23 @@
         placeholder="Condições, motivo da transferência…"></textarea>
     </div>
 
+    <!-- Fotos -->
+    <div class="bio-form-section">
+      <div class="bio-section-header">
+        <span class="bio-form-label">Fotos <span id="bio-transf-foto-count">(0/3)</span></span>
+        <div class="bio-foto-acoes">
+          <button type="button" id="bio-transf-btn-camera" class="bio-btn-sm prim">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px">
+              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+              <circle cx="12" cy="13" r="4"/>
+            </svg>Câmera
+          </button>
+        </div>
+      </div>
+      <input type="file" id="bio-transf-input-foto" accept="image/*" capture="environment" hidden>
+      <div class="bio-foto-grid" id="bio-transf-foto-grid"></div>
+    </div>
+
     <button type="button" id="bio-btn-salvar-transf" class="bio-btn-salvar">Salvar Transferência</button>
   </div>
 </div>
@@ -745,6 +762,23 @@
           </div>
         </div>
       </div>
+    </div>
+
+    <!-- Fotos -->
+    <div class="bio-form-section">
+      <div class="bio-section-header">
+        <span class="bio-form-label">Fotos <span id="bio-ecl-foto-count">(0/3)</span></span>
+        <div class="bio-foto-acoes">
+          <button type="button" id="bio-ecl-btn-camera" class="bio-btn-sm prim">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px">
+              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+              <circle cx="12" cy="13" r="4"/>
+            </svg>Câmera
+          </button>
+        </div>
+      </div>
+      <input type="file" id="bio-ecl-input-foto" accept="image/*" capture="environment" hidden>
+      <div class="bio-foto-grid" id="bio-ecl-foto-grid"></div>
     </div>
 
     <button type="button" id="bio-btn-salvar-eclosao" class="bio-btn-salvar">Salvar Eclosão</button>
@@ -883,6 +917,23 @@
       <label class="bio-form-label" for="bio-vis-obs">Observações</label>
       <textarea id="bio-vis-obs" class="bio-form-textarea" rows="3"
         placeholder="Condições gerais do ninho, fauna observada…"></textarea>
+    </div>
+
+    <!-- Fotos -->
+    <div class="bio-form-section">
+      <div class="bio-section-header">
+        <span class="bio-form-label">Fotos <span id="bio-vis-foto-count">(0/3)</span></span>
+        <div class="bio-foto-acoes">
+          <button type="button" id="bio-vis-btn-camera" class="bio-btn-sm prim">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px">
+              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+              <circle cx="12" cy="13" r="4"/>
+            </svg>Câmera
+          </button>
+        </div>
+      </div>
+      <input type="file" id="bio-vis-input-foto" accept="image/*" capture="environment" hidden>
+      <div class="bio-foto-grid" id="bio-vis-foto-grid"></div>
     </div>
 
     <button type="button" id="bio-btn-salvar-visita" class="bio-btn-salvar">Salvar Visita</button>
@@ -1098,6 +1149,23 @@
         placeholder="Comportamento dos filhotes, condições do local…"></textarea>
     </div>
 
+    <!-- Fotos -->
+    <div class="bio-form-section">
+      <div class="bio-section-header">
+        <span class="bio-form-label">Fotos <span id="bio-sol-foto-count">(0/3)</span></span>
+        <div class="bio-foto-acoes">
+          <button type="button" id="bio-sol-btn-camera" class="bio-btn-sm prim">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px">
+              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+              <circle cx="12" cy="13" r="4"/>
+            </svg>Câmera
+          </button>
+        </div>
+      </div>
+      <input type="file" id="bio-sol-input-foto" accept="image/*" capture="environment" hidden>
+      <div class="bio-foto-grid" id="bio-sol-foto-grid"></div>
+    </div>
+
     <button type="button" id="bio-btn-salvar-soltura" class="bio-btn-salvar">Confirmar Soltura</button>
   </div>
 </div>
@@ -1238,6 +1306,23 @@
     <div id="bio-oc-sec-descricao" class="bio-form-section">
       <label class="bio-form-label" for="bio-oc-descricao" id="bio-oc-desc-label">Descrição / Observações</label>
       <textarea id="bio-oc-descricao" class="bio-form-textarea" rows="3" placeholder="Descreva…"></textarea>
+    </div>
+
+    <!-- Fotos -->
+    <div class="bio-form-section">
+      <div class="bio-section-header">
+        <span class="bio-form-label">Fotos <span id="bio-oc-foto-count">(0/2)</span></span>
+        <div class="bio-foto-acoes">
+          <button type="button" id="bio-oc-btn-camera" class="bio-btn-sm prim">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px">
+              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+              <circle cx="12" cy="13" r="4"/>
+            </svg>Câmera
+          </button>
+        </div>
+      </div>
+      <input type="file" id="bio-oc-input-foto" accept="image/*" capture="environment" hidden>
+      <div class="bio-foto-grid" id="bio-oc-foto-grid"></div>
     </div>
 
     <button type="button" id="bio-btn-salvar-ocorrencia" class="bio-btn-salvar">Salvar Ocorrência</button>
@@ -1812,6 +1897,7 @@ const _bioReady = _dbReady.then(function () {
 <script src="/js/biomonitor-offline.js"></script>
 <script src="/js/biomonitor-sync.js"></script>
 <script src="/js/biomonitor-alertas.js"></script>
+<script src="/js/brigada-captura.js"></script>
 <script src="/js/biomonitor-quelonios.js"></script>
 <script>
 // ── Listeners adicionais (pós-carregamento) ───────────────────
