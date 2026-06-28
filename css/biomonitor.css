@@ -1204,8 +1204,11 @@ body.field-mode .bio-home-nome { font-size: 26px; }
 }
 
 /* Botão berçário no grid de ações da home */
-.bio-acao-btn.bercario { background: #e8f5f0; }
-.bio-acao-btn.bercario .bio-acao-icon { color: var(--bio-prim); }
+.bio-acao-btn.bercario {
+  background: #15805C;
+  box-shadow: 0 8px 24px rgba(21,128,92,.32);
+}
+.bio-acao-btn.bercario .bio-acao-icon { color: #fff; }
 
 /* Badge de contagem sobre ícone */
 .bio-badge-count {
