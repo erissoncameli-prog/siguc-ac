@@ -455,6 +455,7 @@ async function bioCarregarPraiasHome() {
     await Promise.all([
       bioSyncCachePraias(BioApp.monitor?.grupo_id).catch(() => {}),
       bioSyncCacheBercarios().catch(() => {}),
+      (typeof bioSyncCacheParametros === 'function' ? bioSyncCacheParametros() : Promise.resolve()).catch(() => {}),
     ])
   } else {
     bioSyncCachePraias(BioApp.monitor?.grupo_id).catch(() => {})
@@ -924,6 +925,8 @@ function bioAbrirFormNinho() {
   document.getElementById('bio-form-temperatura').value   = ''
   document.getElementById('bio-form-umidade').value       = ''
   document.getElementById('bio-form-profundidade').value  = ''
+  const _alNinho = document.getElementById('bio-form-alertas')
+  if (_alNinho) _alNinho.innerHTML = ''
 
   // Limpa distância ao rio
   document.getElementById('bio-form-dist-rio').value = ''
@@ -1082,6 +1085,14 @@ async function bioSalvarNinho() {
   if (!data)    { bioToast('Informe a data de encontro.', 'err'); return }
   if (!especie) { bioToast('Selecione a espécie.', 'err'); return }
 
+  // Alertas científicos: confirmação consciente se houver faixa crítica
+  let _alertaCampoNinho = null
+  if (typeof bioAvaliarQuelonio === 'function') {
+    const _al = bioAvaliarQuelonio(bioAlertaContextoNinho())
+    if (!bioConfirmarCriticos(_al)) return
+    _alertaCampoNinho = bioAlertaSnapshot(_al)
+  }
+
   // Descarte de ovos: se houver descartados, a quebra por causa é
   // obrigatória e a soma tem que bater com o total.
   const descTotal = parseInt(document.getElementById('bio-form-ovos-descartados').value) || 0
@@ -1125,6 +1136,7 @@ async function bioSalvarNinho() {
     temperatura_c:    parseNum2('bio-form-temperatura'),
     umidade_pct:      parseNum2('bio-form-umidade'),
     profundidade_cm:  parseNum2('bio-form-profundidade'),
+    alerta_campo:     _alertaCampoNinho,
   }
 
   await bioOfflineSalvarNinho(ninho)
@@ -1978,6 +1990,10 @@ async function bioAbrirFormVisita(ninho) {
     if (o.dataset.pred === 'nenhuma') o.classList.add('sel')
   })
 
+  const _alVis = document.getElementById('bio-vis-alertas')
+  if (_alVis) _alVis.innerHTML = ''
+  if (typeof bioAtualizarAlertasVisita === 'function') bioAtualizarAlertasVisita()
+
   bioMostrarTela('tela-form-visita')
 }
 
@@ -1987,6 +2003,14 @@ async function bioSalvarVisita() {
   const hora  = document.getElementById('bio-vis-hora').value || null
 
   if (!data) { bioToast('Informe a data da visita.', 'err'); return }
+
+  // Alertas científicos: confirmação consciente se houver faixa crítica
+  let _alertaCampoVisita = null
+  if (typeof bioAvaliarQuelonio === 'function') {
+    const _al = bioAvaliarQuelonio(bioAlertaContextoVisita())
+    if (!bioConfirmarCriticos(_al)) return
+    _alertaCampoVisita = bioAlertaSnapshot(_al)
+  }
 
   const statusNinho  = document.querySelector('#bio-vis-status-grid .bio-chip-sel.ativo')?.dataset.val ?? 'integro'
   const umidade      = document.querySelector('#bio-vis-umidade-grid .bio-chip-sel.ativo')?.dataset.val || null
@@ -2010,6 +2034,7 @@ async function bioSalvarVisita() {
     sinal_alagamento:        document.getElementById('bio-vis-alagamento').checked,
     intervencao:             document.getElementById('bio-vis-intervencao').value.trim() || null,
     observacoes:             document.getElementById('bio-vis-obs').value.trim()         || null,
+    alerta_campo:            _alertaCampoVisita,
     status_sync:             'pendente',
     criado_em:               new Date().toISOString(),
   }
@@ -2932,6 +2957,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   bioIniciarPosEclosao()
   bioIniciarConfig()
   bioCarregarConfigGPS()
+
+  // Alertas científicos de incubação (avaliação ao vivo, offline)
+  if (typeof bioCarregarLimiaresCache === 'function') bioCarregarLimiaresCache()
+  if (typeof bioIniciarAlertasNinho  === 'function') bioIniciarAlertasNinho()
+  if (typeof bioIniciarAlertasVisita === 'function') bioIniciarAlertasVisita()
 
   // Back buttons
   document.querySelectorAll('[data-back]').forEach(btn => {
