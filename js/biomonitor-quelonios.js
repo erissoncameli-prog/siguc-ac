@@ -465,6 +465,7 @@ async function bioCarregarPraiasHome() {
 
   // Temporada atual (cacheada) → usada na numeração e exibida na home
   BioApp.temporadaAtual = await bioOfflineGetConfig('temporada_atual')
+  BioApp.temporadaMetas = (await bioOfflineGetConfig('temporada_praias_meta')) || {}
   bioRenderTemporadaChip()
 
   const praias = await bioOfflineListarPraias()
@@ -494,6 +495,40 @@ function bioSelecionarPraia(praia) {
   document.getElementById('bio-praia-nome').textContent    = praia.nome
   document.getElementById('bio-praia-cod').textContent     = praia.codigo
   document.getElementById('bio-praia-detalhe').textContent = [praia.comunidade, praia.municipio].filter(Boolean).join(' — ')
+  bioRenderPraiaMeta(praia)
+}
+
+// Ninho pertence à temporada t? (por temporada_id; fallback por data)
+function bioNinhoNaTemporada(n, t) {
+  if (!t) return true
+  if (n.temporada_id && t.id) return n.temporada_id === t.id
+  const d = n.data_encontro
+  if (!d || !t.data_inicio || !t.data_fim) return true
+  return d >= t.data_inicio && d <= t.data_fim
+}
+
+// Progresso "X/Y ninhos nesta temporada" no seletor de praia (offline)
+async function bioRenderPraiaMeta(praia) {
+  const el = document.getElementById('bio-praia-meta')
+  if (!el) return
+  if (!praia) { el.hidden = true; return }
+  const t = BioApp.temporadaAtual
+  let count = 0
+  try {
+    const ninhos = await bioOfflineListarNinhos()
+    count = ninhos.filter(n => n.praia_id === praia.id && bioNinhoNaTemporada(n, t)).length
+  } catch (_) {}
+  const meta = BioApp.temporadaMetas?.[praia.id]
+  if (meta != null && meta > 0) {
+    const pct = Math.min(100, Math.round(100 * count / meta))
+    el.classList.toggle('atingida', count >= meta)
+    el.innerHTML = `<span>${count}/${meta} ninhos nesta temporada${count >= meta ? ' ✓' : ''}</span>` +
+      `<div class="bio-praia-meta-bar"><div style="width:${pct}%"></div></div>`
+  } else {
+    el.classList.remove('atingida')
+    el.innerHTML = `<span>${count} ninho${count === 1 ? '' : 's'} nesta temporada</span>`
+  }
+  el.hidden = false
 }
 
 function bioIniciarListenersHome() {
@@ -1191,6 +1226,7 @@ async function bioSalvarNinho() {
   bioToast(editando ? 'Correção reenviada!' : 'Ninho registrado!', 'ok')
   BioApp.editandoNinho = null
   bioMostrarTela('tela-home')
+  bioRenderPraiaMeta(BioApp.praiaAtual)
 }
 
 // ── Fotos no formulário de ninho ──────────────────────────────
