@@ -336,10 +336,33 @@
       <div class="form-group"><label class="form-label">Observações</label>
         <textarea class="form-control" id="mt-obs" rows="2"></textarea>
       </div>
+      <div class="form-group" id="mt-novas-opcoes" style="background:rgba(82,183,136,.08);border-radius:10px;padding:10px 12px">
+        <div style="font-size:.82rem;color:var(--t2,#888);margin-bottom:6px">Nova temporada — reinício do ciclo</div>
+        <label style="display:flex;gap:8px;align-items:center;font-size:.9rem;cursor:pointer"><input type="checkbox" id="mt-clonar" checked> Clonar as praias participantes da temporada anterior</label>
+        <label style="display:flex;gap:8px;align-items:center;font-size:.9rem;margin-top:6px;cursor:pointer"><input type="checkbox" id="mt-ativar"> Ativar agora (encerra e <strong>congela</strong> a temporada atual)</label>
+      </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="fecharModal('temporada')">Cancelar</button>
       <button class="btn btn-primary" onclick="salvarTemporada()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal: Praias da Temporada ───────────────────────── -->
+<div class="modal-overlay" id="modal-temp-praias">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-header">
+      <div class="modal-title">Praias da Temporada — <span id="mtp-nome"></span></div>
+      <button class="modal-close" onclick="fecharModal('temp-praias')">×</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:.82rem;color:var(--t2,#888);margin:0 0 10px">Marque as praias que participam desta temporada e defina a meta de ninhos (opcional). As praias são as mesmas; a configuração é por temporada.</p>
+      <div id="mtp-lista"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="fecharModal('temp-praias')">Cancelar</button>
+      <button class="btn btn-primary" onclick="salvarTempPraias()">Salvar</button>
     </div>
   </div>
 </div>
@@ -688,13 +711,18 @@
     const STATUS_CLR = { planejada: 'badge-neutral', em_andamento: 'badge-success', encerrada: 'badge-warn', arquivada: 'badge-neutral' }
     const STATUS_LBL = { planejada: 'Planejada', em_andamento: 'Em andamento', encerrada: 'Encerrada', arquivada: 'Arquivada' }
     tbody.innerHTML = lista.map(t => `<tr>
-      <td><strong>${t.nome}</strong></td>
+      <td><strong>${esc(t.nome)}</strong>${t.is_atual ? ' <span class="badge badge-success">ATUAL</span>' : ''}</td>
       <td>${nomePrograma(t.programa_id)}</td>
       <td style="text-align:center">${t.ano_base}</td>
       <td>${formatData(t.data_inicio)}</td>
       <td>${formatData(t.data_fim)}</td>
       <td><span class="badge ${STATUS_CLR[t.status] || 'badge-neutral'}">${STATUS_LBL[t.status] || t.status}</span></td>
-      <td><button class="btn btn-sm btn-secondary" onclick="editarTemporada('${t.id}')">Editar</button></td>
+      <td style="white-space:nowrap;text-align:right">
+        <button class="btn btn-sm btn-secondary" onclick="gerenciarPraiasTemporada('${t.id}')">Praias</button>
+        ${!t.is_atual && t.status !== 'arquivada' ? `<button class="btn btn-sm btn-primary" onclick="ativarTemporada('${t.id}','${esc(t.nome)}')">Ativar</button>` : ''}
+        ${t.status === 'em_andamento' ? `<button class="btn btn-sm" style="background:#f59e0b22;color:#b45309;border:none;border-radius:6px;padding:4px 10px;cursor:pointer" onclick="encerrarTemporada('${t.id}','${esc(t.nome)}')">Encerrar</button>` : ''}
+        <button class="btn btn-sm btn-secondary" onclick="editarTemporada('${t.id}')">Editar</button>
+      </td>
     </tr>`).join('')
   }
 
@@ -1266,30 +1294,103 @@
     document.getElementById('mt-fim').value      = t?.data_fim || ''
     document.getElementById('mt-status').value   = t?.status || 'planejada'
     document.getElementById('mt-obs').value      = t?.observacoes || ''
+    // Opções de "nova temporada" só aparecem ao criar; status só ao editar
+    const novas = document.getElementById('mt-novas-opcoes')
+    if (novas) novas.style.display = t ? 'none' : ''
+    const stGrp = document.getElementById('mt-status')?.closest('.form-group')
+    if (stGrp) stGrp.style.display = t ? '' : 'none'
+    if (!t) { document.getElementById('mt-clonar').checked = true; document.getElementById('mt-ativar').checked = false }
     document.getElementById('modal-temporada').classList.add('aberto')
   }
   window.editarTemporada = id => window.abrirModalTemporada(id)
 
   window.salvarTemporada = async function() {
-    const payload = {
-      programa_id:  document.getElementById('mt-programa').value || null,
-      nome:         document.getElementById('mt-nome').value.trim(),
-      ano_base:     parseInt(document.getElementById('mt-ano').value),
-      data_inicio:  document.getElementById('mt-inicio').value || null,
-      data_fim:     document.getElementById('mt-fim').value || null,
-      status:       document.getElementById('mt-status').value,
-      observacoes:  document.getElementById('mt-obs').value.trim() || null,
-    }
-    if (!payload.programa_id || !payload.nome || !payload.data_inicio || !payload.data_fim) {
+    const programa_id = document.getElementById('mt-programa').value || null
+    const nome        = document.getElementById('mt-nome').value.trim()
+    const ano_base    = parseInt(document.getElementById('mt-ano').value)
+    const data_inicio = document.getElementById('mt-inicio').value || null
+    const data_fim    = document.getElementById('mt-fim').value || null
+    const observacoes = document.getElementById('mt-obs').value.trim() || null
+    if (!programa_id || !nome || !data_inicio || !data_fim) {
       toast('Preencha programa, nome, data início e fim.', 'error'); return
     }
-    const { error } = _editTemporadaId
-      ? await db.from('temporadas_biomonitor').update(payload).eq('id', _editTemporadaId)
-      : await db.from('temporadas_biomonitor').insert(payload)
-    if (error) { toast(error.message, 'error'); return }
-    toast(_editTemporadaId ? 'Temporada atualizada.' : 'Temporada criada.', 'success')
+
+    if (_editTemporadaId) {
+      const { error } = await db.from('temporadas_biomonitor')
+        .update({ programa_id, nome, ano_base, data_inicio, data_fim,
+                  status: document.getElementById('mt-status').value, observacoes })
+        .eq('id', _editTemporadaId)
+      if (error) { toast(error.message, 'error'); return }
+      toast('Temporada atualizada.', 'success')
+    } else {
+      // Nova temporada via RPC: reinicia o ciclo, clona praias e (opcional) ativa
+      const ativar = document.getElementById('mt-ativar')?.checked || false
+      const clonar = document.getElementById('mt-clonar')?.checked || false
+      const { data: novaId, error } = await db.rpc('gerar_nova_temporada', {
+        p_programa_id: programa_id, p_nome: nome, p_ano_base: ano_base,
+        p_data_inicio: data_inicio, p_data_fim: data_fim, p_clonar_de: null, p_ativar: ativar,
+      })
+      if (error) { toast(error.message, 'error'); return }
+      // Sem clonar: limpa as praias semeadas para o gestor escolher na mão
+      if (!clonar && novaId) await db.from('temporada_praias').delete().eq('temporada_id', novaId)
+      if (observacoes && novaId) await db.from('temporadas_biomonitor').update({ observacoes }).eq('id', novaId)
+      toast(ativar ? 'Temporada criada e ativada.' : 'Temporada criada.', 'success')
+    }
     fecharModal('temporada')
     await carregarDados()
+  }
+
+  // ── Ativar / Encerrar temporada (RPCs) ────────────────────────
+  window.ativarTemporada = async function(id, nome) {
+    if (!confirm(`Ativar "${nome}"?\n\nA temporada atual será encerrada e CONGELADA (não aceita novos ninhos). Os dados dela ficam preservados e consultáveis.`)) return
+    const { error } = await db.rpc('ativar_temporada', { p_temporada_id: id })
+    if (error) { toast(error.message, 'error'); return }
+    toast('Temporada ativada.', 'success'); await carregarDados()
+  }
+  window.encerrarTemporada = async function(id, nome) {
+    if (!confirm(`Encerrar "${nome}"?\n\nEla deixa de aceitar novos ninhos (congelada). Dados preservados.`)) return
+    const { error } = await db.rpc('encerrar_temporada', { p_temporada_id: id, p_arquivar: false })
+    if (error) { toast(error.message, 'error'); return }
+    toast('Temporada encerrada.', 'success'); await carregarDados()
+  }
+
+  // ── Praias participantes por temporada ────────────────────────
+  let _mtpTemporadaId = null
+  window.gerenciarPraiasTemporada = async function(temporadaId) {
+    const t = _temporadas.find(x => x.id === temporadaId); if (!t) return
+    _mtpTemporadaId = temporadaId
+    document.getElementById('mtp-nome').textContent = t.nome
+    let praiasPrograma = _praias.filter(p => p.programa_id === t.programa_id)
+    if (!praiasPrograma.length) praiasPrograma = _praias
+    const { data: tp } = await db.from('temporada_praias')
+      .select('praia_id,meta_ninhos').eq('temporada_id', temporadaId)
+    const mapa = {}; (tp || []).forEach(r => mapa[r.praia_id] = r)
+    document.getElementById('mtp-lista').innerHTML = praiasPrograma.map(p => `
+      <div style="display:flex;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid rgba(127,127,127,.15)">
+        <input type="checkbox" class="mtp-chk" data-praia="${p.id}" ${mapa[p.id] ? 'checked' : ''} style="width:18px;height:18px;flex-shrink:0">
+        <div style="flex:1"><strong>${esc(p.nome)}</strong> <span style="color:var(--t2,#888);font-size:.8rem">${esc(p.sigla || p.codigo || '')}</span></div>
+        <input type="number" min="0" placeholder="meta" data-meta="${p.id}" value="${mapa[p.id]?.meta_ninhos ?? ''}"
+          style="width:84px;background:rgba(127,127,127,.08);border:1px solid rgba(127,127,127,.25);border-radius:6px;padding:5px 7px;color:inherit;font-size:.82rem">
+      </div>`).join('')
+    document.getElementById('modal-temp-praias').classList.add('aberto')
+  }
+  window.salvarTempPraias = async function() {
+    const chks = [...document.querySelectorAll('.mtp-chk')]
+    const participar = chks.filter(c => c.checked).map(c => c.dataset.praia)
+    const remover    = chks.filter(c => !c.checked).map(c => c.dataset.praia)
+    for (const praiaId of participar) {
+      const meta = document.querySelector(`[data-meta="${praiaId}"]`)?.value
+      const { error } = await db.from('temporada_praias').upsert({
+        temporada_id: _mtpTemporadaId, praia_id: praiaId, ativa: true,
+        meta_ninhos: meta ? parseInt(meta) : null,
+      }, { onConflict: 'temporada_id,praia_id' })
+      if (error) { toast(error.message, 'error'); return }
+    }
+    if (remover.length) {
+      await db.from('temporada_praias').delete().eq('temporada_id', _mtpTemporadaId).in('praia_id', remover)
+    }
+    toast('Praias da temporada atualizadas.', 'success')
+    fecharModal('temp-praias')
   }
 
   // ── Berçários ─────────────────────────────────────────────
