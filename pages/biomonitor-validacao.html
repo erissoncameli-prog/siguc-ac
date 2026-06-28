@@ -84,6 +84,9 @@
           <option value="rejeitado">Rejeitados</option>
           <option value="em_correcao">Em correção</option>
         </select>
+        <select class="form-control" id="fil-temporada" style="width:180px" onchange="renderLista()">
+          <option value="">Todas as temporadas</option>
+        </select>
       </div>
 
       <div id="stats-bar" style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap"></div>
@@ -125,6 +128,17 @@
     const sel = document.getElementById('fil-praia')
     sel.innerHTML = `<option value="">Todas as praias</option>` +
       praias.map(p => `<option value="${p}">${p}</option>`).join('')
+
+    // Temporadas: default na atual (uma vez)
+    const selT = document.getElementById('fil-temporada')
+    if (selT && !selT._init) {
+      const temps = [...new Map(_ninhos.filter(n => n.temporada_id).map(n => [n.temporada_id, n])).values()]
+        .sort((a, b) => (b.temporada_ano || 0) - (a.temporada_ano || 0))
+      const atual = temps.find(n => n.temporada_atual)
+      selT.innerHTML = `<option value="">Todas as temporadas</option>` +
+        temps.map(n => `<option value="${n.temporada_id}"${atual && n.temporada_id === atual.temporada_id ? ' selected' : ''}>${esc(n.temporada_nome || ('Temporada ' + n.temporada_ano))}</option>`).join('')
+      if (temps.length) selT._init = true
+    }
   }
 
   function renderStats() {
@@ -151,6 +165,7 @@
     const praia   = document.getElementById('fil-praia')?.value || ''
     const especie = document.getElementById('fil-especie')?.value || ''
     const status  = document.getElementById('fil-status')?.value
+    const temp    = document.getElementById('fil-temporada')?.value || ''
 
     const lista = _ninhos.filter(n =>
       (!busca   || n.numero_ninho?.toLowerCase().includes(busca) ||
@@ -158,6 +173,7 @@
                    n.praia_nome?.toLowerCase().includes(busca)) &&
       (!praia   || n.praia_nome === praia) &&
       (!especie || n.especie === especie) &&
+      (!temp    || n.temporada_id === temp) &&
       (status === undefined || status === '' || n.status_validacao === status)
     )
 
