@@ -386,8 +386,12 @@
     <!-- Número do ninho -->
     <div class="bio-form-section">
       <label class="bio-form-label" for="bio-form-numero">N° do ninho / placa *</label>
-      <input type="text" id="bio-form-numero" class="bio-form-input"
-        placeholder="Ex: 001" autocomplete="off">
+      <div style="display:flex;gap:8px;align-items:center">
+        <input type="text" id="bio-form-numero" class="bio-form-input"
+          placeholder="Escolha a espécie…" autocomplete="off" readonly>
+        <button type="button" id="bio-form-numero-edit" class="bio-btn-sm" style="flex-shrink:0">Editar</button>
+      </div>
+      <small style="display:block;margin-top:4px;opacity:.6;font-size:12px">Gerado automaticamente pela praia, espécie e temporada.</small>
     </div>
 
     <!-- Data de encontro -->
