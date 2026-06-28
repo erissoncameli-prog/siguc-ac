@@ -2824,8 +2824,23 @@ async function bioCarregarTelaDados() {
 /* ════════════════════════════════════════════════════════════
    CONFIG
    ════════════════════════════════════════════════════════════ */
-const BIO_VERSAO = '1.1.0'
+const BIO_VERSAO = '1.2.0'
 const BIO_INSTALL_URL = 'https://siguc-ac.vercel.app/pages/instalar-biomonitor.html'
+
+// Número real do build = cache ativo do service worker (sobe a cada deploy).
+// Reflete a versão de fato instalada no aparelho, sem manutenção manual.
+async function bioVersaoBuild() {
+  try {
+    if (!('caches' in window)) return null
+    const keys = await caches.keys()
+    const vers = keys
+      .map(k => (k.match(/siguc-brigadas-v(\d+)/) || [])[1])
+      .filter(Boolean)
+      .map(Number)
+    if (vers.length) return 'v' + Math.max(...vers)
+  } catch (_) {}
+  return null
+}
 
 async function bioQuotaArmazenamento() {
   if (!navigator.storage?.estimate) return null
@@ -3225,9 +3240,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     onConcluido: () => bioAtualizarBadgeFila(),
   })
 
-  // Versão e créditos dinâmicos
+  // Versão e créditos dinâmicos (inclui o build real do service worker)
   const versaoEl = document.getElementById('bio-app-versao')
-  if (versaoEl) versaoEl.textContent = `Biomonitor Quelônios v${BIO_VERSAO}`
+  if (versaoEl) {
+    const build = await bioVersaoBuild()
+    versaoEl.textContent = `Biomonitor Quelônios v${BIO_VERSAO}` + (build ? ` · build ${build}` : '')
+  }
   const copyEl = document.getElementById('bio-app-copyright')
   if (copyEl) copyEl.innerHTML = 'SIGUC-AC — Desenvolvido por <strong>Erisson Cameli Santiago</strong>'
 
