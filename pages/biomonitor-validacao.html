@@ -95,16 +95,29 @@
 
   bIconsAplicar(document.getElementById('app'))
 
-  let _ninhos = [], _rejeitar = null, _rejTipo = null
+  let _ninhos = [], _rejeitar = null, _rejTipo = null, _alertasPorNinho = {}
 
   // ── Carregar dados ─────────────────────────────────────────────
   async function carregarDados() {
     const { data, error } = await db.from('vw_ninhos_validacao').select('*').order('criado_em', { ascending: false })
     if (error) { toast(error.message, 'error'); return }
     _ninhos = data || []
+    await carregarAlertas()
     popularFiltros()
     renderStats()
     renderLista()
+  }
+
+  // Alertas científicos de incubação (migration 093), agrupados por ninho
+  async function carregarAlertas() {
+    _alertasPorNinho = {}
+    const { data } = await db.from('vw_alertas_quelonios')
+      .select('id,ninho_id,parametro,faixa,severidade,titulo,providencia,status')
+      .in('status', ['aberto', 'ciente'])
+      .not('ninho_id', 'is', null)
+    ;(data || []).forEach(a => {
+      (_alertasPorNinho[a.ninho_id] = _alertasPorNinho[a.ninho_id] || []).push(a)
+    })
   }
 
   function popularFiltros() {
@@ -164,7 +177,10 @@
       const sclr = STATUS_CLR[n.status_validacao] || '#888'
       const nclr = NINHO_CLR[n.status] || '#888'
       const temFotos = n.foto_urls?.length > 0
-      return `<div style="background:rgba(255,255,255,.06);border-radius:12px;padding:16px;border:1px solid rgba(255,255,255,.08)">
+      const alertas = _alertasPorNinho[n.id] || []
+      const borda = alertas.some(a => a.severidade === 'critica') ? '#ef4444'
+                  : alertas.length ? '#f59e0b' : 'rgba(255,255,255,.08)'
+      return `<div style="background:rgba(255,255,255,.06);border-radius:12px;padding:16px;border:1px solid ${borda}">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
           <div>
             <div style="font-weight:600;font-size:1rem">${n.numero_ninho}</div>
@@ -175,6 +191,22 @@
             <span style="font-size:.75rem;padding:2px 8px;border-radius:6px;background:${sclr}22;color:${sclr};font-weight:600">${STATUS_LBL[n.status_validacao]}</span>
           </div>
         </div>
+
+        ${alertas.length ? `
+        <div style="display:flex;flex-direction:column;gap:5px;margin-bottom:10px">
+          ${alertas.map(a => {
+            const c = a.severidade === 'critica' ? '#ef4444' : a.severidade === 'alta' ? '#f59e0b' : '#eab308'
+            return `<div title="${esc(a.providencia || '')}" style="background:${c}1a;border-left:3px solid ${c};border-radius:6px;padding:6px 9px;font-size:.78rem">
+              <strong style="color:${c}">${esc(a.faixa)}</strong>
+              <span style="color:var(--t2,#aaa)"> — ${esc(a.titulo)}</span>
+            </div>`
+          }).join('')}
+        </div>` : ''}
+
+        ${n.alerta_campo ? `
+        <div title="${esc((n.alerta_campo.faixas||[]).map(f=>f.f).join(', '))}" style="display:inline-flex;align-items:center;gap:5px;background:rgba(245,158,11,.14);color:#f59e0b;border-radius:6px;padding:3px 8px;font-size:.74rem;font-weight:600;margin-bottom:10px">
+          ⚠ Alerta reconhecido em campo${n.alerta_campo.severidade_max ? ` (${esc(n.alerta_campo.severidade_max)})` : ''}
+        </div>` : ''}
 
         <div style="font-size:.83rem;color:var(--t2,#aaa);display:grid;gap:3px;margin-bottom:10px">
           <div>Praia: <span style="color:var(--t1,#f4efe6)">${n.praia_nome || '—'}</span></div>
