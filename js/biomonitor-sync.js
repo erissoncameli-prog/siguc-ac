@@ -151,6 +151,28 @@ async function bioSyncReconciliarDescartes(ninhoUuid, ninhoServId, monitorId) {
   }
 }
 
+// Resolve o id do ninho no servidor de forma robusta:
+// server_id local → id (herdado da view do servidor) → busca no banco
+// por uuid_cliente. Persiste o server_id no registro local para os
+// próximos syncs. Evita que filhos (transferência/eclosão/visita…)
+// fiquem presos em "pendente" quando o server_id foi perdido.
+async function bioResolverNinhoServId(ninhoUuid) {
+  if (!ninhoUuid) return null
+  const local = await bioOfflineGetNinho(ninhoUuid)
+  let servId  = local?.server_id ?? local?.id ?? null
+  if (!servId && navigator.onLine) {
+    try {
+      const { data } = await bioSupabase()
+        .from('ninhos_quelonios').select('id').eq('uuid_cliente', ninhoUuid).maybeSingle()
+      servId = data?.id ?? null
+    } catch (_) {}
+  }
+  if (servId && local && local.server_id !== servId) {
+    try { await bioOfflineAtualizarSync('ninhos', ninhoUuid, local.status_sync || 'confirmado', servId) } catch (_) {}
+  }
+  return servId
+}
+
 // ── Sincronizar transferências pendentes ──────────────────────
 async function bioSyncTransferencias(monitorId, onProgresso) {
   const pendentes = await bioOfflineTransfPendentes()
@@ -158,10 +180,9 @@ async function bioSyncTransferencias(monitorId, onProgresso) {
   for (const t of pendentes) {
     onProgresso?.(`Transferência do ninho ${t.ninho_numero ?? ''}…`)
 
-    // Resolve o server_id do ninho pai
-    const ninhoLocal = await bioOfflineGetNinho(t.ninho_uuid)
-    const ninhoServId = ninhoLocal?.server_id
-    if (!ninhoServId) continue  // ninho ainda não sincronizado; tenta depois
+    // Resolve o id do ninho no servidor (robusto)
+    const ninhoServId = await bioResolverNinhoServId(t.ninho_uuid)
+    if (!ninhoServId) continue  // ninho ainda não no banco; tenta no próximo sync
 
     const payload = {
       uuid_cliente:        t.uuid_cliente,
@@ -203,8 +224,7 @@ async function bioSyncEclosoes(monitorId, onProgresso) {
   for (const e of pendentes) {
     onProgresso?.(`Eclosão do ninho ${e.ninho_numero ?? ''}…`)
 
-    const ninhoLocal  = await bioOfflineGetNinho(e.ninho_uuid)
-    const ninhoServId = ninhoLocal?.server_id
+    const ninhoServId = await bioResolverNinhoServId(e.ninho_uuid)
     if (!ninhoServId) continue
 
     let fotoUrls = e.foto_urls ?? []
@@ -251,8 +271,7 @@ async function bioSyncVisitas(monitorId, onProgresso) {
   for (const v of pendentes) {
     onProgresso?.(`Visita do ninho ${v.ninho_numero ?? ''}…`)
 
-    const ninhoLocal  = await bioOfflineGetNinho(v.ninho_uuid)
-    const ninhoServId = ninhoLocal?.server_id
+    const ninhoServId = await bioResolverNinhoServId(v.ninho_uuid)
     if (!ninhoServId) continue
 
     const payload = {
@@ -299,8 +318,7 @@ async function bioSyncLotes(monitorId, onProgresso) {
   for (const l of pendentes) {
     onProgresso?.(`Lote berçário — ninho ${l.ninho_numero ?? ''}…`)
 
-    const ninhoLocal  = await bioOfflineGetNinho(l.ninho_uuid)
-    const ninhoServId = ninhoLocal?.server_id
+    const ninhoServId = await bioResolverNinhoServId(l.ninho_uuid)
     if (!ninhoServId) continue
 
     const payload = {
@@ -342,8 +360,7 @@ async function bioSyncSolturas(monitorId, onProgresso) {
   for (const s of pendentes) {
     onProgresso?.(`Soltura — ninho ${s.ninho_numero ?? ''}…`)
 
-    const ninhoLocal  = await bioOfflineGetNinho(s.ninho_uuid)
-    const ninhoServId = ninhoLocal?.server_id
+    const ninhoServId = await bioResolverNinhoServId(s.ninho_uuid)
     if (!ninhoServId) continue
 
     let loteServId = null
