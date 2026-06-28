@@ -489,7 +489,15 @@ async function bioSyncCacheTemporada(grupoId) {
     .from('temporadas_biomonitor')
     .select('id,nome,ano_base,data_inicio,data_fim,programa_id,is_atual')
     .eq('programa_id', g.programa_id).eq('is_atual', true).maybeSingle()
-  if (t) await bioOfflineSetConfig('temporada_atual', t)
+  if (t) {
+    await bioOfflineSetConfig('temporada_atual', t)
+    // Metas de ninhos por praia (da temporada atual) — para mostrar no campo
+    const { data: tp } = await bioSupabase()
+      .from('temporada_praias').select('praia_id,meta_ninhos').eq('temporada_id', t.id)
+    const metas = {}
+    ;(tp || []).forEach(r => { if (r.meta_ninhos != null) metas[r.praia_id] = r.meta_ninhos })
+    await bioOfflineSetConfig('temporada_praias_meta', metas)
+  }
 }
 
 // ── Cache de praias do servidor ───────────────────────────────
