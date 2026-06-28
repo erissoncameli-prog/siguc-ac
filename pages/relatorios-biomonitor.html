@@ -199,6 +199,7 @@
   let _dados = null
   let _charts = {}
   let _descAgg = { natural:0, predacao:0, humana:0, total:0 }
+  let _metasPraia = []
   let _chartJsCarregado = false
 
   async function carregarChartJS() {
@@ -249,6 +250,14 @@
       _descAgg.total += q
     })
 
+    // Metas por praia (só faz sentido com uma temporada específica)
+    _metasPraia = []
+    if (tmp) {
+      const { data: metas } = await db.from('vw_temporada_praias')
+        .select('praia_id,praia_nome,meta_ninhos,ativa').eq('temporada_id', tmp)
+      _metasPraia = (metas || []).filter(m => m.ativa !== false && m.meta_ninhos != null && m.meta_ninhos > 0)
+    }
+
     await carregarChartJS()
     renderTudo(data, el)
   }
@@ -262,6 +271,7 @@
       ${htmlSecTaxas(k)}
       ${htmlSecFenologia()}
       ${htmlSecEspecies(d.por_especie || [])}
+      ${htmlSecMetas(d.por_praia || [])}
       ${htmlSecLocais()}
       ${htmlSecBercario(k)}
       ${htmlSecMonitores(d.por_monitor || [])}
@@ -433,6 +443,35 @@
   }
 
   // ── Seção: Por Praia / UC ─────────────────────────────────────────
+  function htmlSecMetas(porPraia) {
+    if (!_metasPraia.length) return ''
+    const reg = {}; (porPraia || []).forEach(p => { reg[p.praia_id] = p.ninhos_total || 0 })
+    const linhas = _metasPraia
+      .slice()
+      .sort((a, b) => (reg[b.praia_id] || 0) / (b.meta_ninhos || 1) - (reg[a.praia_id] || 0) / (a.meta_ninhos || 1))
+      .map(m => {
+        const feito = reg[m.praia_id] || 0
+        const meta  = m.meta_ninhos
+        const pct   = Math.min(100, Math.round(100 * feito / meta))
+        const atingiu = feito >= meta
+        const cor   = atingiu ? '#2A9D6F' : pct >= 60 ? '#C9A84C' : '#1A6B8C'
+        return `<div style="margin-bottom:12px">
+          <div style="display:flex;justify-content:space-between;align-items:center;font-size:.88rem;margin-bottom:4px">
+            <span>${esc(m.praia_nome || '—')}${atingiu ? ' <span style="color:#2A9D6F">✓</span>' : ''}</span>
+            <span style="color:var(--t2,#aaa)"><strong style="color:${cor}">${feito}</strong> / ${meta} ninhos · ${pct}%</span>
+          </div>
+          <div style="height:10px;border-radius:6px;background:rgba(127,127,127,.16);overflow:hidden">
+            <div style="height:100%;width:${pct}%;background:${cor};border-radius:6px;transition:width .4s"></div>
+          </div>
+        </div>`
+      }).join('')
+    return `<div class="rel-sec" id="sec-metas">
+      <div class="rel-sec-title">Metas por praia — temporada</div>
+      <p class="rel-chart-sub" style="margin:-2px 0 12px">Ninhos registrados frente à meta definida para cada praia nesta temporada.</p>
+      ${linhas}
+    </div>`
+  }
+
   function htmlSecLocais() {
     return `<div class="rel-sec" id="sec-locais">
       <div class="rel-sec-title">Por Praia e Unidade de Conservação</div>
