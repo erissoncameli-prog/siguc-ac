@@ -1491,3 +1491,9 @@ body.field-mode .bio-home-nome { font-size: 26px; }
   font-size: 10px; font-weight: 700; letter-spacing: .02em; vertical-align: middle;
   background: var(--bio-verde-bg); color: var(--bio-verde);
 }
+
+/* ── Progresso da meta de ninhos por praia (home) ─────────────── */
+.bio-praia-meta { margin-top: 5px; font-size: 11px; color: var(--bio-verde); font-weight: 600; }
+.bio-praia-meta-bar { height: 5px; border-radius: 4px; background: rgba(127,127,127,.18); overflow: hidden; margin-top: 3px; max-width: 200px; }
+.bio-praia-meta-bar > div { height: 100%; background: var(--bio-verde); border-radius: 4px; transition: width .4s; }
+.bio-praia-meta.atingida { color: var(--bio-verde); }
