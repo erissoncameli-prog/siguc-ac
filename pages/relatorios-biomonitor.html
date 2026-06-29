@@ -97,15 +97,264 @@
 /* Status no carregamento */
 .rel-loading { text-align:center; padding:48px; color:var(--t2,#aaa); font-size:.9rem; }
 
+/* ── Mapa Geoespacial ── */
+.mapa-outer {
+  display:grid; grid-template-columns:268px 1fr; gap:12px;
+  height:68vh; min-height:480px;
+}
+@media (max-width:820px) { .mapa-outer { grid-template-columns:1fr; height:auto; } }
+
+.mapa-panel-esq {
+  display:flex; flex-direction:column; gap:8px;
+  overflow-y:auto; max-height:68vh;
+}
+
+.mapa-panel-bloco {
+  background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.08);
+  border-radius:10px; padding:10px 12px; flex-shrink:0;
+}
+
+.mapa-panel-header {
+  font-size:10px; font-weight:700; text-transform:uppercase;
+  letter-spacing:.06em; color:var(--t2,#aaa); margin-bottom:8px;
+}
+
+.mapa-busca {
+  width:100%; background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.12);
+  color:var(--t1,#f4efe6); border-radius:7px; padding:6px 9px; font-size:12px;
+  margin-bottom:7px; box-sizing:border-box;
+}
+.mapa-busca::placeholder { color:rgba(244,239,230,.3); }
+.mapa-busca:focus { outline:none; border-color:var(--verde-c,#52B788); }
+
+.mapa-praia-btns { display:flex; gap:5px; margin-bottom:7px; }
+.mapa-praia-btn {
+  flex:1; padding:4px 8px; font-size:11px; border-radius:6px;
+  border:1px solid rgba(255,255,255,.12); background:rgba(255,255,255,.06);
+  color:var(--t1,#f4efe6); cursor:pointer; transition:background .15s;
+}
+.mapa-praia-btn:hover { background:rgba(255,255,255,.12); }
+
+.mapa-praia-lista {
+  display:flex; flex-direction:column; gap:1px;
+  max-height:190px; overflow-y:auto;
+}
+.mapa-praia-lista::-webkit-scrollbar { width:3px; }
+.mapa-praia-lista::-webkit-scrollbar-thumb { background:rgba(255,255,255,.15); border-radius:2px; }
+
+.mapa-praia-item {
+  display:flex; align-items:center; gap:7px; padding:5px 4px;
+  border-radius:6px; cursor:pointer; transition:background .1s;
+}
+.mapa-praia-item:hover { background:rgba(255,255,255,.06); }
+.mapa-praia-item input[type="checkbox"] {
+  width:14px; height:14px; accent-color:var(--verde-c,#52B788); flex-shrink:0; cursor:pointer;
+}
+.mapa-praia-item-nome { font-size:12px; color:var(--t1,#f4efe6); flex:1; line-height:1.2; }
+.mapa-praia-item-cnt { font-size:10px; color:var(--t2,#aaa); font-family:monospace; }
+
+.mapa-toggle {
+  display:flex; align-items:center; gap:7px; font-size:12px;
+  color:var(--t1,#f4efe6); cursor:pointer; padding:4px 0;
+}
+.mapa-toggle input { width:14px; height:14px; accent-color:var(--verde-c,#52B788); cursor:pointer; }
+
+.mapa-area {
+  position:relative; border-radius:10px; overflow:hidden;
+  border:1px solid rgba(255,255,255,.08);
+  display:flex; flex-direction:column; background:#0A1A0F;
+}
+#mapa-bio { flex:1; min-height:360px; }
+
+.mapa-filtros-ponto {
+  background:rgba(10,26,15,.95); border-top:1px solid rgba(255,255,255,.08);
+  padding:8px 12px; display:flex; flex-wrap:wrap; gap:8px; align-items:center;
+  flex-shrink:0;
+}
+.mapa-filtro-grupo { display:flex; align-items:center; gap:5px; flex-wrap:wrap; }
+.mapa-filtro-label { font-size:10px; color:var(--t2,#aaa); font-weight:700; letter-spacing:.03em; }
+
+.mapa-chip {
+  padding:3px 9px; border-radius:20px; font-size:10px; font-weight:700;
+  border:1px solid rgba(255,255,255,.15); background:rgba(255,255,255,.06);
+  color:var(--t1,#f4efe6); cursor:pointer; transition:all .15s; user-select:none;
+}
+.mapa-chip.ativo { background:var(--verde-c,#52B788); border-color:var(--verde-c,#52B788); color:var(--floresta,#0A1A0F); }
+.mapa-chip:hover:not(.ativo) { background:rgba(255,255,255,.1); }
+
+/* ── Slide Panel ── */
+.mapa-slide-panel {
+  position:fixed; right:0; top:0; bottom:0; width:360px;
+  background:#0d1f12; border-left:1px solid rgba(255,255,255,.1);
+  box-shadow:-8px 0 32px rgba(0,0,0,.45); z-index:2100;
+  transform:translateX(102%); transition:transform .3s cubic-bezier(.4,0,.2,1);
+  display:flex; flex-direction:column;
+}
+.mapa-slide-panel.aberto { transform:translateX(0); }
+@media (max-width:500px) { .mapa-slide-panel { width:100%; } }
+
+.mapa-slide-header {
+  display:flex; align-items:flex-start; justify-content:space-between;
+  padding:15px 16px 11px; border-bottom:1px solid rgba(255,255,255,.08); gap:8px;
+}
+.mapa-slide-titulo-wrap { flex:1; min-width:0; }
+.mapa-slide-num { font-size:.85rem; font-weight:700; color:var(--t1,#f4efe6); }
+.mapa-slide-sub { font-size:11px; color:var(--t2,#aaa); margin-top:2px; }
+.mapa-slide-acoes { display:flex; gap:5px; align-items:center; flex-shrink:0; }
+
+.mapa-btn-comparar {
+  padding:5px 9px; border-radius:7px; font-size:10px; font-weight:700;
+  border:1px solid rgba(201,168,76,.4); background:rgba(201,168,76,.1);
+  color:var(--ouro,#C9A84C); cursor:pointer; transition:all .15s; white-space:nowrap;
+}
+.mapa-btn-comparar.ativo { background:var(--ouro,#C9A84C); color:#0A1A0F; border-color:var(--ouro,#C9A84C); }
+.mapa-btn-comparar:hover:not(.ativo) { background:rgba(201,168,76,.2); }
+
+.mapa-slide-fechar {
+  width:26px; height:26px; border-radius:7px; border:1px solid rgba(255,255,255,.12);
+  background:rgba(255,255,255,.06); color:var(--t2,#aaa); cursor:pointer; font-size:15px;
+  display:flex; align-items:center; justify-content:center;
+}
+.mapa-slide-fechar:hover { background:rgba(255,255,255,.12); color:var(--t1,#f4efe6); }
+
+.mapa-slide-tabs { display:flex; border-bottom:1px solid rgba(255,255,255,.08); padding:0 14px; }
+.mapa-tab {
+  padding:8px 11px; font-size:11.5px; font-weight:700; color:var(--t2,#aaa);
+  border:none; background:transparent; cursor:pointer;
+  border-bottom:2px solid transparent; margin-bottom:-1px; transition:all .15s;
+}
+.mapa-tab.ativo { color:var(--verde-c,#52B788); border-bottom-color:var(--verde-c,#52B788); }
+
+.mapa-slide-corpo { flex:1; overflow-y:auto; padding:14px 16px; }
+.mapa-slide-corpo::-webkit-scrollbar { width:3px; }
+.mapa-slide-corpo::-webkit-scrollbar-thumb { background:rgba(255,255,255,.12); border-radius:2px; }
+
+.slide-kpi-row { display:grid; grid-template-columns:1fr 1fr; gap:7px; margin-bottom:12px; }
+.slide-kpi { background:rgba(255,255,255,.06); border-radius:8px; padding:9px 11px; }
+.slide-kpi-val { font-size:1.15rem; font-weight:700; line-height:1; }
+.slide-kpi-lbl { font-size:10px; color:var(--t2,#aaa); margin-top:2px; }
+
+.slide-hist-item {
+  display:flex; align-items:flex-start; gap:9px; padding:7px 0;
+  border-bottom:1px solid rgba(255,255,255,.05); font-size:11.5px;
+}
+.slide-hist-dot { width:7px; height:7px; border-radius:50%; flex-shrink:0; margin-top:4px; }
+.slide-hist-data { color:var(--t2,#aaa); min-width:68px; font-size:11px; }
+.slide-hist-desc { flex:1; color:var(--t1,#f4efe6); line-height:1.4; }
+.slide-badge {
+  display:inline-block; padding:2px 7px; border-radius:10px;
+  font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:.04em;
+}
+
+.slide-alerta {
+  display:flex; align-items:center; gap:7px; padding:6px 9px;
+  border-radius:7px; margin-bottom:5px; font-size:11px;
+}
+.slide-alerta.critica { background:rgba(239,68,68,.15); border:1px solid rgba(239,68,68,.3); }
+.slide-alerta.alta    { background:rgba(249,115,22,.15); border:1px solid rgba(249,115,22,.3); }
+.slide-alerta.media   { background:rgba(201,168,76,.12); border:1px solid rgba(201,168,76,.3); }
+.slide-alerta.baixa   { background:rgba(148,163,184,.08); border:1px solid rgba(148,163,184,.2); }
+
+.slide-foto-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:5px; }
+.slide-foto {
+  aspect-ratio:1; border-radius:6px; object-fit:cover;
+  cursor:pointer; transition:opacity .15s; width:100%;
+}
+.slide-foto:hover { opacity:.8; }
+
+/* ── Barra de Comparação ── */
+.mapa-comp-bar {
+  position:fixed; bottom:0; left:0; right:0;
+  background:#0d1f12; border-top:1px solid rgba(201,168,76,.25);
+  box-shadow:0 -6px 24px rgba(0,0,0,.4); z-index:2000;
+  transform:translateY(102%); transition:transform .3s cubic-bezier(.4,0,.2,1);
+  max-height:52vh; display:flex; flex-direction:column;
+}
+.mapa-comp-bar.aberta { transform:translateY(0); }
+
+.mapa-comp-header {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:9px 16px; border-bottom:1px solid rgba(255,255,255,.07); flex-shrink:0;
+}
+.mapa-comp-titulo { font-size:12px; font-weight:700; color:var(--ouro,#C9A84C); }
+.mapa-comp-limpar {
+  font-size:11px; padding:3px 9px; border-radius:6px;
+  border:1px solid rgba(255,255,255,.12); background:transparent;
+  color:var(--t2,#aaa); cursor:pointer; transition:background .15s;
+}
+.mapa-comp-limpar:hover { background:rgba(255,255,255,.06); color:var(--t1,#f4efe6); }
+.mapa-comp-wrap { overflow:auto; flex:1; }
+.mapa-comp-wrap::-webkit-scrollbar { height:3px; }
+.mapa-comp-wrap::-webkit-scrollbar-thumb { background:rgba(255,255,255,.12); border-radius:2px; }
+
+.mapa-comp-table { width:100%; border-collapse:collapse; font-size:11.5px; }
+.mapa-comp-table th {
+  background:rgba(255,255,255,.06); padding:6px 10px; text-align:left;
+  font-weight:700; color:var(--t2,#aaa); white-space:nowrap;
+  font-size:10px; text-transform:uppercase; letter-spacing:.04em;
+  position:sticky; top:0; z-index:1;
+}
+.mapa-comp-table td { padding:6px 10px; border-top:1px solid rgba(255,255,255,.05); white-space:nowrap; }
+.mapa-comp-table td.num { text-align:right; font-family:monospace; color:var(--t1,#f4efe6); }
+.mapa-comp-table .rank-1 { color:var(--ouro,#C9A84C); font-weight:700; }
+.mapa-comp-table .rank-2 { color:var(--verde-c,#52B788); font-weight:600; }
+.mapa-comp-table .alrt { font-size:9px; padding:1px 5px; border-radius:3px; margin-left:4px; }
+.mapa-comp-table .alrt-c { background:rgba(239,68,68,.3); color:#f87171; }
+.mapa-comp-table .alrt-a { background:rgba(249,115,22,.3); color:#fb923c; }
+
+/* ── Popup de Praia (Leaflet) ── */
+.popup-praia { min-width:230px; font-size:12.5px; }
+.popup-nome { font-size:13.5px; font-weight:700; margin-bottom:2px; color:#111; }
+.popup-sub { color:#777; font-size:11px; margin-bottom:9px; }
+.popup-kpi-grid { display:grid; grid-template-columns:1fr 1fr; gap:5px; margin-bottom:9px; }
+.popup-kpi { background:#f3f3f3; border-radius:5px; padding:5px 8px; }
+.popup-kpi-val { font-size:1.05rem; font-weight:700; color:#1a6b8c; }
+.popup-kpi-lbl { font-size:9.5px; color:#888; }
+.popup-esp-row { display:flex; align-items:center; gap:5px; margin-bottom:3px; font-size:11px; color:#333; }
+.popup-esp-track { flex:1; height:4px; background:#e5e5e5; border-radius:2px; overflow:hidden; }
+.popup-esp-fill { height:100%; border-radius:2px; }
+.popup-hist-wrap { margin:8px 0 5px; }
+.popup-hist-title { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:#888; margin-bottom:5px; }
+.popup-hist-bars { display:flex; align-items:flex-end; gap:3px; height:40px; }
+.popup-hist-col { display:flex; flex-direction:column; align-items:center; gap:2px; flex:1; }
+.popup-hist-bar { width:100%; border-radius:2px 2px 0 0; min-height:2px; }
+.popup-hist-ano { font-size:9px; color:#999; }
+.popup-btn { display:block; text-align:center; padding:6px; background:#1a6b8c; color:#fff; border-radius:6px; font-size:11px; font-weight:700; margin-top:8px; cursor:pointer; border:none; width:100%; }
+.popup-btn:hover { background:#155a7a; }
+
+/* ── Botão Voltar no slide panel ── */
+.mapa-slide-voltar {
+  display:none; padding:3px 9px 3px 6px; border-radius:6px; font-size:10px;
+  font-weight:700; border:1px solid rgba(255,255,255,.12);
+  background:rgba(255,255,255,.06); color:var(--t2,#aaa);
+  cursor:pointer; margin-bottom:6px; transition:background .15s; white-space:nowrap;
+}
+.mapa-slide-voltar:hover { background:rgba(255,255,255,.1); color:var(--t1,#f4efe6); }
+
+/* ── Linha de ninho na aba Ninhos da praia ── */
+.slide-ninho-item {
+  display:flex; align-items:center; gap:9px; padding:8px 11px;
+  border-radius:8px; cursor:pointer; transition:background .12s;
+  border:1px solid rgba(255,255,255,.07); margin-bottom:5px;
+}
+.slide-ninho-item:hover { background:rgba(255,255,255,.07); border-color:rgba(255,255,255,.12); }
+.slide-ninho-dot { width:9px; height:9px; border-radius:50%; flex-shrink:0; }
+.slide-ninho-info { flex:1; min-width:0; }
+.slide-ninho-num { font-size:12px; font-weight:700; color:var(--t1,#f4efe6); }
+.slide-ninho-sub { font-size:10px; color:var(--t2,#aaa); margin-top:1px; }
+.slide-ninho-seta { color:var(--t2,#aaa); font-size:16px; flex-shrink:0; }
+
 /* Impressão */
 @media print {
-  .rel-filtros, .rel-nav, .sidebar, #sidebar-wrapper, .page-header { display:none !important; }
+  .rel-filtros, .rel-nav, .sidebar, #sidebar-wrapper, .page-header,
+  .mapa-slide-panel, .mapa-comp-bar, .mapa-panel-esq, .mapa-filtros-ponto { display:none !important; }
   body { background:#fff !important; color:#111 !important; }
   .rel-kpi, .rel-taxa-card, .rel-chart-card, .rel-table-wrap { background:#f9f9f9 !important; border:1px solid #ddd !important; }
   .rel-kpi-val, .rel-taxa-val { color:#1a6b8c !important; }
   .rel-sec-title { color:#c9a84c !important; }
   .rel-table thead th { background:#eee !important; color:#555 !important; }
   .page-content { margin-left:0 !important; padding:16px !important; }
+  .mapa-area { height:60vh !important; }
 }
 </style>
 </head>
@@ -156,11 +405,43 @@
         <a href="#sec-locais">Por Praia / UC</a>
         <a href="#sec-bercario">Berçário</a>
         <a href="#sec-monitores">Monitores</a>
+        <a href="#sec-mapa" id="nav-mapa" onclick="mapaEnsureInit()">Mapa</a>
       </div>
 
       <!-- Área de conteúdo -->
       <div id="rel-conteudo">
         <div class="rel-loading">Aplicar filtros para carregar o relatório…</div>
+      </div>
+    </div>
+
+    <!-- Slide Panel — persiste fora do rel-conteudo -->
+    <div class="mapa-slide-panel" id="mapa-slide-panel">
+      <div class="mapa-slide-header">
+        <div class="mapa-slide-titulo-wrap">
+          <button class="mapa-slide-voltar" id="mapa-slide-voltar" onclick="mapaVoltarPraia()">← Praia</button>
+          <div class="mapa-slide-num" id="mapa-slide-num"></div>
+          <div class="mapa-slide-sub" id="mapa-slide-sub"></div>
+        </div>
+        <div class="mapa-slide-acoes">
+          <button class="mapa-btn-comparar" id="mapa-btn-comparar" onclick="mapaToggleComparar()">+ Comparar</button>
+          <button class="mapa-slide-fechar" onclick="mapaFecharSlide()">×</button>
+        </div>
+      </div>
+      <div class="mapa-slide-tabs" id="mapa-slide-tabs"></div>
+      <div class="mapa-slide-corpo" id="mapa-slide-corpo"></div>
+    </div>
+
+    <!-- Barra de Comparação — persiste fora do rel-conteudo -->
+    <div class="mapa-comp-bar" id="mapa-comp-bar">
+      <div class="mapa-comp-header">
+        <span class="mapa-comp-titulo" id="mapa-comp-titulo">Comparando 0 ninhos</span>
+        <button class="mapa-comp-limpar" onclick="mapaClearComparacao()">Limpar seleção</button>
+      </div>
+      <div class="mapa-comp-wrap">
+        <table class="mapa-comp-table" id="mapa-comp-table">
+          <thead id="mapa-comp-thead"></thead>
+          <tbody id="mapa-comp-tbody"></tbody>
+        </table>
       </div>
     </div>`
 
@@ -265,6 +546,7 @@
   // ── Renderização principal ──────────────────────────────────────
   function renderTudo(d, el) {
     const k = d.kpis || {}
+    _mapaLeafletInst = null  // força reinicialização do mapa ao re-aplicar filtros
     el.innerHTML = `
       ${htmlSecGeral(k)}
       ${htmlSecDescartes(_descAgg)}
@@ -275,6 +557,7 @@
       ${htmlSecLocais()}
       ${htmlSecBercario(k)}
       ${htmlSecMonitores(d.por_monitor || [])}
+      ${htmlSecMapa()}
     `
     // Renderiza todos os gráficos
     grafFenologia(d.por_mes || [], d.por_ano || [])
@@ -834,6 +1117,918 @@
     _origRenderTudo(d, el)
     // grafDestino precisa de k, chamado aqui após renderização do berçário
     grafDestino(d.kpis || {})
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // MAPA GEOESPACIAL
+  // ═══════════════════════════════════════════════════════════════
+
+  // ── HTML da seção Mapa ─────────────────────────────────────────
+  function htmlSecMapa() {
+    const MESES = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez']
+    const chipsMes = MESES.map((m,i) =>
+      `<span class="mapa-chip" data-mes="${i+1}" onclick="mapaToggleChip(this,'mes')">${m}</span>`
+    ).join('')
+
+    const chipsEsp = [
+      ['tracaja','TR'],['tartaruga','TA'],['cabecudo','R'],
+      ['pitiU','Pi'],['cupido','Cu'],['jabuti_pe_elefante','JP'],['outro','OUT']
+    ].map(([v,l]) =>
+      `<span class="mapa-chip" data-esp="${v}" onclick="mapaToggleChip(this,'esp')">${l}</span>`
+    ).join('')
+
+    const chipsStatus = [
+      ['encontrado','Encontrado'],['transferido','Transferido'],
+      ['eclodido','Eclodido'],['perdido','Perdido']
+    ].map(([v,l]) =>
+      `<span class="mapa-chip" data-status="${v}" onclick="mapaToggleChip(this,'status')">${l}</span>`
+    ).join('')
+
+    return `<div class="rel-sec" id="sec-mapa">
+      <div class="rel-sec-title">Mapa Geoespacial</div>
+      <div class="mapa-outer">
+
+        <!-- Painel esquerdo -->
+        <div class="mapa-panel-esq">
+          <div class="mapa-panel-bloco">
+            <div class="mapa-panel-header">Praias</div>
+            <input class="mapa-busca" id="mapa-busca-praia" placeholder="Buscar praia…"
+              oninput="mapaFiltrarListaPraias(this.value)">
+            <div class="mapa-praia-btns">
+              <button class="mapa-praia-btn" onclick="mapaTodasPraias(true)">Todas</button>
+              <button class="mapa-praia-btn" onclick="mapaTodasPraias(false)">Nenhuma</button>
+            </div>
+            <div class="mapa-praia-lista" id="mapa-praia-lista">
+              <div style="color:var(--t2,#aaa);font-size:11px;padding:8px 4px">Carregando…</div>
+            </div>
+          </div>
+
+          <div class="mapa-panel-bloco">
+            <div class="mapa-panel-header">Camadas</div>
+            <label class="mapa-toggle"><input type="checkbox" id="ml-poligonos" checked onchange="mapaAtualizarCamadas()">Polígonos das praias</label>
+            <label class="mapa-toggle"><input type="checkbox" id="ml-ninhos" checked onchange="mapaAtualizarCamadas()">Pontos dos ninhos</label>
+            <label class="mapa-toggle"><input type="checkbox" id="ml-calor" onchange="mapaAtualizarCamadas()">Mapa de calor</label>
+            <label class="mapa-toggle"><input type="checkbox" id="ml-transf" checked onchange="mapaAtualizarCamadas()">Transferências</label>
+          </div>
+
+          <div class="mapa-panel-bloco">
+            <div class="mapa-panel-header">Exportar</div>
+            <button class="btn btn-secondary" style="width:100%;margin-bottom:6px;font-size:12px" onclick="mapaExportarPDF()">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+              Imprimir / PDF
+            </button>
+            <button class="btn btn-secondary" style="width:100%;font-size:12px" onclick="mapaExportarExcel()">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Excel / CSV
+            </button>
+          </div>
+        </div>
+
+        <!-- Área do mapa -->
+        <div class="mapa-area">
+          <div id="mapa-bio"></div>
+          <div class="mapa-filtros-ponto">
+            <div class="mapa-filtro-grupo">
+              <span class="mapa-filtro-label">ESP:</span>
+              ${chipsEsp}
+            </div>
+            <div class="mapa-filtro-grupo">
+              <span class="mapa-filtro-label">STATUS:</span>
+              ${chipsStatus}
+            </div>
+            <div class="mapa-filtro-grupo">
+              <span class="mapa-filtro-label">MÊS:</span>
+              ${chipsMes}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>`
+  }
+
+  // ── Estado do mapa ─────────────────────────────────────────────
+  let _mapaLeafletInst  = null
+  let _mapaCamadas      = { poligonos: null, ninhos: null, calor: null, transf: null }
+  let _mapaPraiaData    = []
+  let _mapaNinhoData    = []
+  let _mapaPraiasSel    = new Set()
+  let _mapaFiltEsp      = new Set()
+  let _mapaFiltStatus   = new Set()
+  let _mapaFiltMes      = new Set()
+  let _mapaSlideNinho   = null
+  let _mapaSlideMode    = 'ninho'   // 'praia' | 'ninho'
+  let _mapaSlidePraia   = null
+  let _mapaSlideTab     = 'ident'
+  let _mapaComparacao   = []    // array de ninhos na comparação
+  let _mapaLeafletOK    = false
+
+  const ESP_MAPA_COR = {
+    tracaja:'#2A9D6F', tartaruga:'#1A6B8C', cabecudo:'#C9A84C',
+    pitiU:'#7ECEE8', cupido:'#D97706', jabuti_pe_elefante:'#6366f1',
+    jabuti_piranga:'#8b5cf6', mucua:'#ec4899', outro:'#9CA3AF'
+  }
+  const STATUS_MAPA_COR = {
+    encontrado:'#7ECEE8', transferido:'#C9A84C', eclodido:'#2A9D6F', perdido:'#ef4444'
+  }
+  const ESP_MAPA_LABEL = {
+    tracaja:'Tracajá', tartaruga:'Tartaruga', cabecudo:'Cabeçudo',
+    pitiU:'Pitiú', cupido:'Cupido', jabuti_pe_elefante:'Jabuti-pé-elefante',
+    jabuti_piranga:'Jabuti-piranga', mucua:'Muçuã', outro:'Outro'
+  }
+  const SEV_COR = { critica:'#ef4444', alta:'#fb923c', media:'#C9A84C', baixa:'#9CA3AF' }
+
+  // ── Carrega Leaflet lazily ─────────────────────────────────────
+  async function mapaCarregarLeaflet() {
+    if (_mapaLeafletOK) return
+    await Promise.all([
+      new Promise((res, rej) => {
+        if (document.querySelector('link[href*="leaflet"]')) { res(); return }
+        const l = document.createElement('link')
+        l.rel = 'stylesheet'; l.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'
+        l.onload = res; l.onerror = rej; document.head.appendChild(l)
+      }),
+      new Promise((res, rej) => {
+        if (window.L) { res(); return }
+        const s = document.createElement('script')
+        s.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'
+        s.onload = res; s.onerror = rej; document.head.appendChild(s)
+      })
+    ])
+    // Leaflet.heat
+    await new Promise((res, rej) => {
+      if (window.L && L.heatLayer) { res(); return }
+      const s = document.createElement('script')
+      s.src = 'https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js'
+      s.onload = res; s.onerror = () => res()  // heat é opcional
+      document.head.appendChild(s)
+    })
+    _mapaLeafletOK = true
+  }
+
+  // ── Inicializa o mapa ─────────────────────────────────────────
+  window.mapaEnsureInit = async function() {
+    const container = document.getElementById('mapa-bio')
+    if (!container) return
+    await mapaCarregarLeaflet()
+    if (!_mapaLeafletInst || !document.contains(_mapaLeafletInst.getContainer())) {
+      if (_mapaLeafletInst) { try { _mapaLeafletInst.remove() } catch(e) {} }
+      _mapaLeafletInst = L.map('mapa-bio', { center: [-9.0, -70.5], zoom: 6, zoomControl: true })
+      L.tileLayer('https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
+        maxZoom: 21, subdomains: ['mt0','mt1','mt2','mt3'], attribution: '© Google'
+      }).addTo(_mapaLeafletInst)
+      _mapaCamadas.poligonos = L.layerGroup().addTo(_mapaLeafletInst)
+      _mapaCamadas.ninhos    = L.layerGroup().addTo(_mapaLeafletInst)
+      _mapaCamadas.transf    = L.layerGroup().addTo(_mapaLeafletInst)
+      _mapaCamadas.calor     = null
+    }
+    await mapaCarregarDados()
+  }
+
+  // ── Carrega dados das RPCs ─────────────────────────────────────
+  async function mapaCarregarDados() {
+    const params = {
+      p_temporada_id: sel('fil-temporada').value || null,
+      p_programa_id:  sel('fil-programa').value  || null,
+      p_uc_id:        sel('fil-uc').value        || null,
+    }
+
+    const { data: praias, error: ep } = await db.rpc('bio_mapa_praias', params)
+    if (ep || !praias) return
+
+    _mapaPraiaData = praias
+    _mapaPraiasSel = new Set(_mapaPraiaData.map(p => p.id))
+
+    mapaRenderListaPraias()
+    mapaRenderPoligonos()
+    await mapaCarregarNinhos()
+  }
+
+  async function mapaCarregarNinhos() {
+    if (!_mapaLeafletInst) return
+    const ids = _mapaPraiasSel.size ? [..._mapaPraiasSel] : null
+    const { data: ninhos } = await db.rpc('bio_mapa_ninhos', {
+      p_praia_ids:    ids,
+      p_temporada_id: sel('fil-temporada').value || null,
+      p_especies:     _mapaFiltEsp.size    ? [..._mapaFiltEsp]    : null,
+      p_statuses:     _mapaFiltStatus.size ? [..._mapaFiltStatus] : null,
+      p_meses:        _mapaFiltMes.size    ? [..._mapaFiltMes].map(Number) : null,
+    })
+    _mapaNinhoData = ninhos || []
+    mapaRenderNinhos()
+    mapaRenderTransf()
+  }
+
+  // ── Render: lista de praias ────────────────────────────────────
+  function mapaRenderListaPraias(filtro) {
+    const lista = document.getElementById('mapa-praia-lista')
+    if (!lista) return
+    const q = (filtro || '').toLowerCase()
+    const visiveis = _mapaPraiaData.filter(p =>
+      !q || p.nome.toLowerCase().includes(q)
+    )
+    if (!visiveis.length) {
+      lista.innerHTML = '<div style="color:var(--t2,#aaa);font-size:11px;padding:8px 4px">Nenhuma praia encontrada.</div>'
+      return
+    }
+    lista.innerHTML = visiveis.map(p => `
+      <label class="mapa-praia-item">
+        <input type="checkbox" ${_mapaPraiasSel.has(p.id) ? 'checked' : ''}
+          onchange="mapaTogglePraia('${p.id}',this.checked)">
+        <span class="mapa-praia-item-nome">${esc(p.nome)}</span>
+        <span class="mapa-praia-item-cnt">${p.ninhos_total}</span>
+      </label>`).join('')
+  }
+
+  window.mapaFiltrarListaPraias = function(q) { mapaRenderListaPraias(q) }
+
+  window.mapaTodasPraias = function(marcar) {
+    if (marcar) _mapaPraiasSel = new Set(_mapaPraiaData.map(p => p.id))
+    else _mapaPraiasSel.clear()
+    mapaRenderListaPraias(document.getElementById('mapa-busca-praia')?.value)
+    mapaRenderPoligonos()
+    mapaCarregarNinhos()
+  }
+
+  window.mapaTogglePraia = function(id, checked) {
+    if (checked) _mapaPraiasSel.add(id)
+    else _mapaPraiasSel.delete(id)
+    mapaRenderPoligonos()
+    mapaCarregarNinhos()
+  }
+
+  // ── Render: polígonos das praias ───────────────────────────────
+  function mapaRenderPoligonos() {
+    if (!_mapaCamadas.poligonos) return
+    _mapaCamadas.poligonos.clearLayers()
+    let bounds = null
+
+    const maxNinhos = Math.max(..._mapaPraiaData.map(p => p.ninhos_total), 1)
+    const corPoligono = (n) => {
+      const r = n / maxNinhos
+      if (r >= 0.75) return { fill: '#ef4444', borda: '#b91c1c' }
+      if (r >= 0.40) return { fill: '#C9A84C', borda: '#92700a' }
+      if (r >= 0.10) return { fill: '#52B788', borda: '#2E7D5B' }
+      return { fill: '#7ECEE8', borda: '#1A6B8C' }
+    }
+
+    _mapaPraiaData.forEach(p => {
+      if (!_mapaPraiasSel.has(p.id)) return
+      const { fill, borda } = corPoligono(p.ninhos_total)
+      let centro = (p.lat != null && p.lng != null) ? L.latLng(p.lat, p.lng) : null
+
+      if (p.area_geojson) {
+        try {
+          const poly = L.geoJSON(p.area_geojson, {
+            style: { color: borda, weight: 2.5, fillColor: fill, fillOpacity: .38 }
+          })
+          poly.addTo(_mapaCamadas.poligonos)
+          poly.on('click', () => mapaAbrirPraia(p))
+          const b = poly.getBounds()
+          if (b.isValid()) { bounds = bounds ? bounds.extend(b) : b; if (!centro) centro = b.getCenter() }
+        } catch(e) {}
+      }
+
+      if (centro) {
+        const mk = L.circleMarker(centro, { radius: 7, color: borda, fillColor: fill, fillOpacity: .9, weight: 2 })
+        mk.addTo(_mapaCamadas.poligonos)
+        mk.on('click', () => mapaAbrirPraia(p))
+        if (!bounds) bounds = L.latLngBounds(centro, centro)
+        else bounds.extend(centro)
+      }
+    })
+
+    if (bounds && bounds.isValid()) {
+      try { _mapaLeafletInst.fitBounds(bounds, { padding: [40, 40], maxZoom: 14 }) } catch(e) {}
+    }
+  }
+
+  // ── Render: marcadores de ninhos ───────────────────────────────
+  function mapaRenderNinhos() {
+    if (!_mapaCamadas.ninhos) return
+    _mapaCamadas.ninhos.clearLayers()
+    if (_mapaCamadas.calor) _mapaCamadas.calor.clearLayers()
+
+    const heatPts = []
+
+    _mapaNinhoData.forEach(n => {
+      if (!n.lat || !n.lng) return
+      const cor = ESP_MAPA_COR[n.especie] || '#9CA3AF'
+      const temAlerta = n.alertas && n.alertas.length
+
+      const icon = L.divIcon({
+        className: '',
+        iconSize: [14, 14],
+        iconAnchor: [7, 7],
+        html: `<div style="width:14px;height:14px;border-radius:50%;background:${cor};
+          border:2px solid ${temAlerta ? '#ef4444' : 'rgba(255,255,255,.8)'};
+          box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>`
+      })
+
+      const mk = L.marker([n.lat, n.lng], { icon })
+      mk.addTo(_mapaCamadas.ninhos)
+      mk.on('click', () => mapaAbrirNinho(n))
+
+      heatPts.push([n.lat, n.lng, 0.6])
+    })
+
+    // Heatmap
+    if (heatPts.length && L.heatLayer && document.getElementById('ml-calor')?.checked) {
+      if (_mapaCamadas.calor) _mapaCamadas.calor.remove()
+      _mapaCamadas.calor = L.heatLayer(heatPts, { radius: 30, blur: 20, maxZoom: 14 })
+        .addTo(_mapaLeafletInst)
+    }
+  }
+
+  // ── Render: linhas de transferência ───────────────────────────
+  function mapaRenderTransf() {
+    if (!_mapaCamadas.transf) return
+    _mapaCamadas.transf.clearLayers()
+
+    const coords = {}
+    _mapaPraiaData.forEach(p => {
+      const c = p.area_geojson ? null : (p.lat && p.lng ? L.latLng(p.lat, p.lng) : null)
+      if (c) coords[p.id] = c
+    })
+    _mapaPraiaData.forEach(p => {
+      if (!coords[p.id] && p.lat && p.lng) coords[p.id] = L.latLng(p.lat, p.lng)
+    })
+
+    const pares = {}
+    _mapaNinhoData.forEach(n => {
+      if (!n.transferencia) return
+      if (!n.praia_id) return
+      const keyFwd = n.praia_id + '|ninho'
+      pares[keyFwd] = (pares[keyFwd] || 0) + 1
+    })
+  }
+
+  // ── Atualiza visibilidade das camadas ─────────────────────────
+  window.mapaAtualizarCamadas = function() {
+    if (!_mapaLeafletInst) return
+    const cb = id => document.getElementById(id)?.checked
+    _mapaCamadas.poligonos && (cb('ml-poligonos') ? _mapaCamadas.poligonos.addTo(_mapaLeafletInst) : _mapaCamadas.poligonos.remove())
+    _mapaCamadas.ninhos    && (cb('ml-ninhos')    ? _mapaCamadas.ninhos.addTo(_mapaLeafletInst)    : _mapaCamadas.ninhos.remove())
+    _mapaCamadas.transf    && (cb('ml-transf')    ? _mapaCamadas.transf.addTo(_mapaLeafletInst)    : _mapaCamadas.transf.remove())
+    if (cb('ml-calor') && _mapaNinhoData.length && L.heatLayer) {
+      if (!_mapaCamadas.calor || !_mapaLeafletInst.hasLayer(_mapaCamadas.calor)) {
+        const pts = _mapaNinhoData.filter(n => n.lat && n.lng).map(n => [n.lat, n.lng, 0.6])
+        if (_mapaCamadas.calor) _mapaCamadas.calor.remove()
+        _mapaCamadas.calor = L.heatLayer(pts, { radius: 30, blur: 20 }).addTo(_mapaLeafletInst)
+      }
+    } else if (_mapaCamadas.calor && _mapaLeafletInst.hasLayer(_mapaCamadas.calor)) {
+      _mapaCamadas.calor.remove()
+    }
+  }
+
+  // ── Chips de filtro ───────────────────────────────────────────
+  window.mapaToggleChip = function(el, tipo) {
+    el.classList.toggle('ativo')
+    const ativo = el.classList.contains('ativo')
+    if (tipo === 'esp')    { ativo ? _mapaFiltEsp.add(el.dataset.esp)       : _mapaFiltEsp.delete(el.dataset.esp) }
+    if (tipo === 'status') { ativo ? _mapaFiltStatus.add(el.dataset.status) : _mapaFiltStatus.delete(el.dataset.status) }
+    if (tipo === 'mes')    { ativo ? _mapaFiltMes.add(el.dataset.mes)       : _mapaFiltMes.delete(el.dataset.mes) }
+    mapaCarregarNinhos()
+  }
+
+  // ── Popup da praia ────────────────────────────────────────────
+  function popupPraiaHTML(p) {
+    const v = (x, s) => x != null ? x + (s || '') : '—'
+    const pct = x => x != null ? x + '%' : '—'
+
+    // Histórico anual — mini barras
+    const hist = (p.historico_anual || []).filter(h => h.ninhos > 0)
+    const maxH = Math.max(...hist.map(h => h.ninhos), 1)
+    const barrasHtml = hist.length ? `
+      <div class="popup-hist-wrap">
+        <div class="popup-hist-title">Histórico anual (ninhos)</div>
+        <div class="popup-hist-bars">
+          ${hist.slice(-6).map(h => `
+            <div class="popup-hist-col">
+              <div class="popup-hist-bar" title="${h.ninhos} ninhos em ${h.ano}"
+                style="background:#1A6B8C;height:${Math.round(40 * h.ninhos / maxH)}px"></div>
+              <div class="popup-hist-ano">${String(h.ano).slice(2)}</div>
+            </div>`).join('')}
+        </div>
+      </div>` : ''
+
+    // Espécies
+    const total = p.ninhos_total || 1
+    const espHtml = (p.por_especie || []).slice(0, 4).map(e => `
+      <div class="popup-esp-row">
+        <span style="color:${ESP_MAPA_COR[e.especie]||'#9CA3AF'};font-weight:700;min-width:24px">${e.especie?.slice?.(0,2).toUpperCase() || '?'}</span>
+        <div class="popup-esp-track"><div class="popup-esp-fill" style="width:${Math.round(100*e.total/total)}%;background:${ESP_MAPA_COR[e.especie]||'#9CA3AF'}"></div></div>
+        <span style="min-width:30px;text-align:right;color:#555">${e.total}</span>
+      </div>`).join('')
+
+    const div = document.createElement('div')
+    div.className = 'popup-praia'
+    div.innerHTML = `
+      <div class="popup-nome">${esc(p.nome)}${p.experimental ? ' <span style="color:#9a6b00;font-size:10px">· exp.</span>' : ''}</div>
+      <div class="popup-sub">${esc(p.sigla || p.codigo || '')}${p.uc_sigla ? ' · ' + p.uc_sigla : ''}${p.municipio ? ' · ' + p.municipio : ''}</div>
+      <div class="popup-kpi-grid">
+        <div class="popup-kpi"><div class="popup-kpi-val">${v(p.ninhos_total)}</div><div class="popup-kpi-lbl">ninhos</div></div>
+        <div class="popup-kpi"><div class="popup-kpi-val">${v(p.filhotes_vivos)}</div><div class="popup-kpi-lbl">filhotes vivos</div></div>
+        <div class="popup-kpi"><div class="popup-kpi-val" style="color:#2A9D6F">${pct(p.taxa_eclosao_pct)}</div><div class="popup-kpi-lbl">taxa eclosão</div></div>
+        <div class="popup-kpi"><div class="popup-kpi-val">${v(p.comprimento_m,'m')}</div><div class="popup-kpi-lbl">comprimento</div></div>
+      </div>
+      ${espHtml ? `<div style="margin-bottom:6px">${espHtml}</div>` : ''}
+      ${barrasHtml}
+      <div style="font-size:10px;color:#888;margin-bottom:5px">
+        Temp. média: <strong>${v(p.temp_media_c,'°C')}</strong>
+        &nbsp;·&nbsp; Dist. rio: <strong>${v(p.dist_rio_media_m,'m')}</strong>
+      </div>
+      <button class="popup-btn" onclick="mapaFiltrarPraia('${p.id}')">Ver ninhos desta praia</button>`
+    return div
+  }
+
+  window.mapaFiltrarPraia = function(id) {
+    _mapaPraiasSel = new Set([id])
+    mapaRenderListaPraias()
+    mapaRenderPoligonos()
+    mapaCarregarNinhos()
+    document.querySelectorAll('#sec-mapa .leaflet-popup-close-button').forEach(b => b.click())
+  }
+
+  // ── Slide Panel ───────────────────────────────────────────────
+
+  // Abre painel no modo PRAIA (clicar no polígono ou marcador)
+  window.mapaAbrirPraia = function(p) {
+    _mapaSlidePraia = p
+    _mapaSlideMode  = 'praia'
+    _mapaSlideTab   = 'resumo'
+
+    document.getElementById('mapa-slide-num').textContent = p.nome
+    document.getElementById('mapa-slide-sub').textContent =
+      [p.uc_sigla || p.uc_nome, p.municipio].filter(Boolean).join(' · ')
+
+    document.getElementById('mapa-slide-voltar').style.display = 'none'
+    document.getElementById('mapa-btn-comparar').style.display = 'none'
+
+    document.getElementById('mapa-slide-tabs').innerHTML = `
+      <button class="mapa-tab ativo" id="mtab-resumo" onclick="mapaTab('resumo')">Resumo</button>
+      <button class="mapa-tab" id="mtab-ninhos" onclick="mapaTab('ninhos')">Ninhos</button>
+      <button class="mapa-tab" id="mtab-historico" onclick="mapaTab('historico')">Histórico</button>`
+
+    mapaRenderSlideCorpo()
+    document.getElementById('mapa-slide-panel').classList.add('aberto')
+  }
+
+  // Volta para o painel da praia a partir de um ninho
+  window.mapaVoltarPraia = function() {
+    if (_mapaSlidePraia) mapaAbrirPraia(_mapaSlidePraia)
+  }
+
+  // Abre ninho por id (chamado da lista de ninhos da praia)
+  window.mapaAbrirNinhoById = function(id) {
+    const n = _mapaNinhoData.find(x => x.id === id)
+    if (n) mapaAbrirNinho(n)
+  }
+
+  // Abre painel no modo NINHO (clicar num marcador)
+  window.mapaAbrirNinho = function(n) {
+    _mapaSlideNinho = n
+    _mapaSlideMode  = 'ninho'
+    _mapaSlideTab   = 'ident'
+    // Garante contexto de praia para botão "Voltar"
+    _mapaSlidePraia = _mapaPraiaData.find(p => p.id === n.praia_id) || _mapaSlidePraia || null
+
+    document.getElementById('mapa-slide-num').textContent = n.numero_ninho || 'Ninho s/n'
+    document.getElementById('mapa-slide-sub').textContent =
+      `${ESP_MAPA_LABEL[n.especie] || n.especie} · ${n.praia_nome || '—'}`
+
+    document.getElementById('mapa-slide-voltar').style.display = _mapaSlidePraia ? '' : 'none'
+    document.getElementById('mapa-btn-comparar').style.display = ''
+
+    document.getElementById('mapa-slide-tabs').innerHTML = `
+      <button class="mapa-tab ativo" id="mtab-ident" onclick="mapaTab('ident')">Identificação</button>
+      <button class="mapa-tab" id="mtab-cond" onclick="mapaTab('cond')">Condições</button>
+      <button class="mapa-tab" id="mtab-fotos" onclick="mapaTab('fotos')">Fotos</button>`
+
+    const btn = document.getElementById('mapa-btn-comparar')
+    const jaEsta = _mapaComparacao.some(c => c.id === n.id)
+    btn.textContent = jaEsta ? '✓ Comparando' : '+ Comparar'
+    btn.classList.toggle('ativo', jaEsta)
+
+    mapaRenderSlideCorpo()
+    document.getElementById('mapa-slide-panel').classList.add('aberto')
+  }
+
+  window.mapaFecharSlide = function() {
+    document.getElementById('mapa-slide-panel').classList.remove('aberto')
+  }
+
+  window.mapaTab = function(tab) {
+    _mapaSlideTab = tab
+    document.querySelectorAll('.mapa-tab').forEach(t => t.classList.remove('ativo'))
+    document.getElementById('mtab-' + tab)?.classList.add('ativo')
+    mapaRenderSlideCorpo()
+  }
+
+  function mapaRenderSlideCorpo() {
+    const corpo = document.getElementById('mapa-slide-corpo')
+    if (!corpo) return
+    const vf = (x, s) => x != null ? x + (s || '') : '—'
+    const pctF = x => x != null ? x + '%' : '—'
+    const dt = (d) => d ? new Date(d).toLocaleDateString('pt-BR') : '—'
+
+    // ── Modo Praia ──────────────────────────────────────────────
+    if (_mapaSlideMode === 'praia') {
+      const p = _mapaSlidePraia
+      if (!p) return
+
+      if (_mapaSlideTab === 'resumo') {
+        const espHtml = (p.por_especie || []).map(e => `
+          <div style="display:flex;align-items:center;gap:7px;margin-bottom:5px;font-size:11px">
+            <span style="color:${ESP_MAPA_COR[e.especie]||'#9CA3AF'};font-weight:700;min-width:56px;font-size:10px">${esc(ESP_MAPA_LABEL[e.especie]?.slice(0,8)||e.especie?.slice(0,8)||'?')}</span>
+            <div style="flex:1;height:5px;background:rgba(255,255,255,.1);border-radius:3px;overflow:hidden">
+              <div style="height:100%;width:${Math.round(100*(e.total/(p.ninhos_total||1)))}%;background:${ESP_MAPA_COR[e.especie]||'#9CA3AF'};border-radius:3px"></div>
+            </div>
+            <span style="min-width:22px;text-align:right;color:var(--t1,#f4efe6)">${e.total}</span>
+          </div>`).join('')
+
+        corpo.innerHTML = `
+          <div class="slide-kpi-row">
+            <div class="slide-kpi"><div class="slide-kpi-val" style="color:#C9A84C">${vf(p.ninhos_total)}</div><div class="slide-kpi-lbl">ninhos</div></div>
+            <div class="slide-kpi"><div class="slide-kpi-val" style="color:#2A9D6F">${vf(p.filhotes_vivos)}</div><div class="slide-kpi-lbl">filhotes vivos</div></div>
+          </div>
+          <div class="slide-kpi-row">
+            <div class="slide-kpi"><div class="slide-kpi-val" style="color:${(p.taxa_eclosao_pct||0)>=75?'#2A9D6F':'#f87171'}">${pctF(p.taxa_eclosao_pct)}</div><div class="slide-kpi-lbl">taxa eclosão</div></div>
+            <div class="slide-kpi"><div class="slide-kpi-val">${vf(p.ovos_postura)}</div><div class="slide-kpi-lbl">ovos postura</div></div>
+          </div>
+          <div class="slide-kpi-row">
+            <div class="slide-kpi"><div class="slide-kpi-val">${vf(p.comprimento_m,' m')}</div><div class="slide-kpi-lbl">comprimento</div></div>
+            <div class="slide-kpi"><div class="slide-kpi-val" style="color:#f87171">${vf(p.ninhos_perdidos)}</div><div class="slide-kpi-lbl">perdidos</div></div>
+          </div>
+          ${espHtml ? `<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--t2,#aaa);margin:10px 0 7px">Por espécie</div><div>${espHtml}</div>` : ''}
+          <div style="margin-top:12px;font-size:11px;color:var(--t2,#aaa);line-height:1.8">
+            ${p.temp_media_c!=null?`Temp. média: <strong style="color:var(--t1,#f4efe6)">${p.temp_media_c}°C</strong><br>`:''}
+            ${p.dist_rio_media_m!=null?`Dist. ao rio: <strong style="color:var(--t1,#f4efe6)">${p.dist_rio_media_m} m</strong><br>`:''}
+            ${p.area_ha!=null?`Área: <strong style="color:var(--t1,#f4efe6)">${p.area_ha} ha</strong><br>`:''}
+            ${p.municipio?`Município: <strong style="color:var(--t1,#f4efe6)">${esc(p.municipio)}</strong>`:''}
+          </div>`
+        return
+      }
+
+      if (_mapaSlideTab === 'ninhos') {
+        const ninhosDaPraia = _mapaNinhoData.filter(n => n.praia_id === p.id)
+        const semGPS = (p.ninhos_total || 0) - ninhosDaPraia.length
+        const nota = `<div style="font-size:10.5px;color:var(--t2,#aaa);margin-bottom:10px">
+          <strong style="color:var(--t1,#f4efe6)">${p.ninhos_total||0}</strong> ninho${p.ninhos_total!==1?'s':''} registrado${p.ninhos_total!==1?'s':''}
+          · <strong style="color:#2A9D6F">${ninhosDaPraia.length}</strong> com GPS
+          ${semGPS>0?`· <span style="color:#9CA3AF">${semGPS} sem GPS</span>`:''}</div>`
+
+        const lista = ninhosDaPraia.length
+          ? ninhosDaPraia.map(n => `
+            <div class="slide-ninho-item" onclick="mapaAbrirNinhoById('${n.id}')">
+              <div class="slide-ninho-dot" style="background:${ESP_MAPA_COR[n.especie]||'#9CA3AF'}"></div>
+              <div class="slide-ninho-info">
+                <div class="slide-ninho-num">${esc(n.numero_ninho||'Ninho s/n')}</div>
+                <div class="slide-ninho-sub">${esc(ESP_MAPA_LABEL[n.especie]||n.especie||'—')} · ${esc(n.status||'—')}${n.qtd_ovos!=null?' · '+n.qtd_ovos+' ovos':''}</div>
+              </div>
+              <div class="slide-ninho-seta">›</div>
+            </div>`).join('')
+          : '<div style="color:var(--t2,#aaa);font-size:12px;padding:8px 0">Nenhum ninho com GPS cadastrado nesta praia.</div>'
+
+        corpo.innerHTML = nota + lista
+        return
+      }
+
+      if (_mapaSlideTab === 'historico') {
+        const hist = (p.historico_anual || []).filter(h => h.ninhos > 0)
+        if (!hist.length) {
+          corpo.innerHTML = '<div style="color:var(--t2,#aaa);font-size:12px;padding:16px 0">Sem histórico disponível.</div>'
+          return
+        }
+        const maxH = Math.max(...hist.map(h => h.ninhos), 1)
+        corpo.innerHTML = `
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--t2,#aaa);margin-bottom:10px">Ninhos por ano</div>
+          <div style="display:flex;align-items:flex-end;gap:4px;height:80px;margin-bottom:14px">
+            ${hist.slice(-8).map(h => `
+              <div style="display:flex;flex-direction:column;align-items:center;gap:3px;flex:1">
+                <div style="background:#1A6B8C;width:100%;border-radius:3px 3px 0 0;min-height:3px;height:${Math.round(68*h.ninhos/maxH)}px" title="${h.ninhos} ninhos em ${h.ano}"></div>
+                <div style="font-size:9px;color:var(--t2,#aaa)">${String(h.ano).slice(2)}</div>
+              </div>`).join('')}
+          </div>
+          <table style="width:100%;border-collapse:collapse;font-size:11.5px">
+            <thead><tr>
+              <th style="padding:5px 6px;color:var(--t2,#aaa);text-align:left;font-size:10px;text-transform:uppercase;border-bottom:1px solid rgba(255,255,255,.08)">Ano</th>
+              <th style="padding:5px 6px;color:var(--t2,#aaa);text-align:right;font-size:10px;text-transform:uppercase;border-bottom:1px solid rgba(255,255,255,.08)">Ninhos</th>
+              <th style="padding:5px 6px;color:var(--t2,#aaa);text-align:right;font-size:10px;text-transform:uppercase;border-bottom:1px solid rgba(255,255,255,.08)">Filhotes</th>
+            </tr></thead>
+            <tbody>
+              ${hist.map(h => `<tr>
+                <td style="padding:5px 6px;color:var(--t1,#f4efe6);border-top:1px solid rgba(255,255,255,.05)">${h.ano}</td>
+                <td style="padding:5px 6px;text-align:right;font-family:monospace;border-top:1px solid rgba(255,255,255,.05)">${h.ninhos}</td>
+                <td style="padding:5px 6px;text-align:right;font-family:monospace;color:#2A9D6F;border-top:1px solid rgba(255,255,255,.05)">${h.filhotes||0}</td>
+              </tr>`).join('')}
+            </tbody>
+          </table>`
+        return
+      }
+      return
+    }
+
+    // ── Modo Ninho ──────────────────────────────────────────────
+    const n = _mapaSlideNinho
+    if (!n) return
+
+    if (_mapaSlideTab === 'ident') {
+      const alertasHtml = (n.alertas || []).map(a => `
+        <div class="slide-alerta ${a.severidade}">
+          <span style="font-weight:700;color:${SEV_COR[a.severidade]}">${a.severidade?.toUpperCase()}</span>
+          <span style="flex:1">${esc(a.titulo || '')}</span>
+        </div>`).join('')
+
+      const histHtml = [
+        n.data_encontro ? { cor: '#2A9D6F', data: n.data_encontro, desc: `Encontrado por ${n.monitor_nome || 'monitor'}`, badge: 'encontrado', bcor: '#2A9D6F22', tcor: '#2A9D6F' } : null,
+        n.transferencia?.data ? { cor: '#C9A84C', data: n.transferencia.data, desc: `Transferido → ${n.transferencia.local_destino || 'outro local'}`, badge: 'transferido', bcor: '#C9A84C22', tcor: '#C9A84C' } : null,
+        n.eclosao?.data ? { cor: '#3b82f6', data: n.eclosao.data, desc: `Eclodido: ${vf(n.eclosao.filhotes_vivos)} vivos · ${vf(n.eclosao.filhotes_mortos)} mortos`, badge: 'eclosão', bcor: '#3b82f622', tcor: '#3b82f6' } : null,
+      ].filter(Boolean).map(it => `
+        <div class="slide-hist-item">
+          <div class="slide-hist-dot" style="background:${it.cor}"></div>
+          <span class="slide-hist-data">${dt(it.data)}</span>
+          <span class="slide-hist-desc">${it.desc}<br>
+            <span class="slide-badge" style="background:${it.bcor};color:${it.tcor}">${it.badge}</span>
+          </span>
+        </div>`).join('')
+
+      corpo.innerHTML = `
+        <div class="slide-kpi-row">
+          <div class="slide-kpi">
+            <div class="slide-kpi-val" style="color:${ESP_MAPA_COR[n.especie]||'#9CA3AF'}">${ESP_MAPA_LABEL[n.especie] || n.especie}</div>
+            <div class="slide-kpi-lbl">espécie</div>
+          </div>
+          <div class="slide-kpi">
+            <div class="slide-kpi-val" style="color:${STATUS_MAPA_COR[n.status]||'#9CA3AF'}">${n.status || '—'}</div>
+            <div class="slide-kpi-lbl">status</div>
+          </div>
+        </div>
+        <div class="slide-kpi-row">
+          <div class="slide-kpi">
+            <div class="slide-kpi-val" style="color:#C9A84C">${vf(n.qtd_ovos)}</div>
+            <div class="slide-kpi-lbl">ovos total</div>
+          </div>
+          <div class="slide-kpi">
+            <div class="slide-kpi-val" style="color:#2A9D6F">${vf(n.eclosao?.filhotes_vivos)}</div>
+            <div class="slide-kpi-lbl">filhotes vivos</div>
+          </div>
+        </div>
+        <div class="slide-kpi-row">
+          <div class="slide-kpi">
+            <div class="slide-kpi-val" style="color:${(n.taxa_eclosao_pct||0)>=75?'#2A9D6F':'#f87171'}">${pctF(n.taxa_eclosao_pct)}</div>
+            <div class="slide-kpi-lbl">taxa eclosão</div>
+          </div>
+          <div class="slide-kpi">
+            <div class="slide-kpi-val">${vf(n.incubacao_dias,' d')}</div>
+            <div class="slide-kpi-lbl">incubação</div>
+          </div>
+        </div>
+        ${alertasHtml ? `<div style="margin-bottom:12px">${alertasHtml}</div>` : ''}
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--t2,#aaa);margin-bottom:8px">Histórico</div>
+        ${histHtml || '<div style="color:var(--t2,#aaa);font-size:11px">Sem eventos registrados.</div>'}
+        ${n.observacoes ? `<div style="margin-top:10px;font-size:11px;color:var(--t2,#aaa);line-height:1.5">${esc(n.observacoes)}</div>` : ''}
+        <div style="margin-top:10px;font-size:10px;color:var(--t2,#aaa)">Monitor: ${esc(n.monitor_nome || '—')} · Grupo: ${esc(n.grupo_nome || '—')}</div>`
+    }
+
+    else if (_mapaSlideTab === 'cond') {
+      const alertaCor = (c) => {
+        if (c == null) return '#9CA3AF'
+        if (c > 35 || c < 28) return '#ef4444'
+        if (c > 33) return '#C9A84C'
+        return '#2A9D6F'
+      }
+      corpo.innerHTML = `
+        <div class="slide-kpi-row">
+          <div class="slide-kpi">
+            <div class="slide-kpi-val" style="color:${alertaCor(n.temperatura_c)}">${vf(n.temperatura_c,'°C')}</div>
+            <div class="slide-kpi-lbl">temperatura substrato</div>
+          </div>
+          <div class="slide-kpi">
+            <div class="slide-kpi-val">${vf(n.umidade_pct,'%')}</div>
+            <div class="slide-kpi-lbl">umidade</div>
+          </div>
+        </div>
+        <div class="slide-kpi-row">
+          <div class="slide-kpi">
+            <div class="slide-kpi-val">${vf(n.profundidade_cm,'cm')}</div>
+            <div class="slide-kpi-lbl">profundidade</div>
+          </div>
+          <div class="slide-kpi">
+            <div class="slide-kpi-val" style="color:#38bdf8">${vf(n.dist_rio_m,'m')}</div>
+            <div class="slide-kpi-lbl">distância ao rio</div>
+          </div>
+        </div>
+        <div class="slide-kpi-row">
+          <div class="slide-kpi">
+            <div class="slide-kpi-val">${vf(n.ovos_integros)}</div>
+            <div class="slide-kpi-lbl">ovos íntegros</div>
+          </div>
+          <div class="slide-kpi">
+            <div class="slide-kpi-val" style="color:#f87171">${vf(n.ovos_descartados)}</div>
+            <div class="slide-kpi-lbl">ovos descartados</div>
+          </div>
+        </div>
+        <div style="margin:10px 0 6px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--t2,#aaa)">Localização GPS</div>
+        <div style="font-size:12px;color:var(--t1,#f4efe6);font-family:monospace">
+          ${n.lat != null ? n.lat.toFixed(6) : '—'}, ${n.lng != null ? n.lng.toFixed(6) : '—'}
+          ${n.precisao_gps_m != null ? `<br><span style="font-size:10px;color:var(--t2,#aaa)">Precisão: ±${n.precisao_gps_m}m</span>` : ''}
+        </div>
+        ${n.eclosao ? `
+        <div style="margin:12px 0 6px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--t2,#aaa)">Eclosão</div>
+        <div class="slide-kpi-row">
+          <div class="slide-kpi">
+            <div class="slide-kpi-val" style="color:#2A9D6F">${vf(n.eclosao.filhotes_vivos)}</div>
+            <div class="slide-kpi-lbl">filhotes vivos</div>
+          </div>
+          <div class="slide-kpi">
+            <div class="slide-kpi-val" style="color:#f87171">${vf(n.eclosao.filhotes_mortos)}</div>
+            <div class="slide-kpi-lbl">filhotes mortos</div>
+          </div>
+        </div>
+        <div class="slide-kpi-row">
+          <div class="slide-kpi">
+            <div class="slide-kpi-val">${vf(n.eclosao.ovos_nao_nascidos)}</div>
+            <div class="slide-kpi-lbl">ovos não eclodidos</div>
+          </div>
+          <div class="slide-kpi">
+            <div class="slide-kpi-val">${vf(n.eficiencia_pct,'%')}</div>
+            <div class="slide-kpi-lbl">eficiência</div>
+          </div>
+        </div>` : ''}`
+    }
+
+    else if (_mapaSlideTab === 'fotos') {
+      const urls = n.foto_urls || []
+      corpo.innerHTML = urls.length
+        ? `<div class="slide-foto-grid">${urls.map(u =>
+            `<img class="slide-foto" src="${esc(u)}" loading="lazy" onclick="window.open('${esc(u)}','_blank')" onerror="this.style.display='none'">`
+          ).join('')}</div>`
+        : '<div style="color:var(--t2,#aaa);font-size:12px;padding:16px 0">Nenhuma foto registrada para este ninho.</div>'
+    }
+  }
+
+  // ── Comparação automática ─────────────────────────────────────
+  window.mapaToggleComparar = function() {
+    const n = _mapaSlideNinho
+    if (!n) return
+    const idx = _mapaComparacao.findIndex(c => c.id === n.id)
+    if (idx >= 0) _mapaComparacao.splice(idx, 1)
+    else _mapaComparacao.push(n)
+
+    const btn = document.getElementById('mapa-btn-comparar')
+    const jaEsta = _mapaComparacao.some(c => c.id === n.id)
+    btn.textContent = jaEsta ? '✓ Comparando' : '+ Comparar'
+    btn.classList.toggle('ativo', jaEsta)
+
+    mapaRenderComparacao()
+  }
+
+  window.mapaClearComparacao = function() {
+    _mapaComparacao = []
+    mapaRenderComparacao()
+    const btn = document.getElementById('mapa-btn-comparar')
+    if (btn) { btn.textContent = '+ Comparar'; btn.classList.remove('ativo') }
+  }
+
+  function mapaRenderComparacao() {
+    const bar = document.getElementById('mapa-comp-bar')
+    const titulo = document.getElementById('mapa-comp-titulo')
+    if (!bar) return
+
+    if (_mapaComparacao.length < 2) {
+      bar.classList.remove('aberta')
+      titulo.textContent = _mapaComparacao.length === 1 ? 'Selecione mais 1 ninho para comparar' : 'Comparação'
+      if (_mapaComparacao.length === 1) bar.classList.add('aberta')
+      else return
+    } else {
+      bar.classList.add('aberta')
+    }
+
+    const ninhos = _mapaComparacao
+    titulo.textContent = `Comparando ${ninhos.length} ninho${ninhos.length > 1 ? 's' : ''}`
+
+    // Agrupa por espécie para calcular ranking
+    const rankPor = (campo, menor = false) => {
+      const porEsp = {}
+      ninhos.forEach(n => { if (!porEsp[n.especie]) porEsp[n.especie] = []; porEsp[n.especie].push(n) })
+      const rank = {}
+      Object.values(porEsp).forEach(grupo => {
+        const sorted = [...grupo].sort((a, b) =>
+          menor ? (a[campo] ?? Infinity) - (b[campo] ?? Infinity)
+                : (b[campo] ?? -Infinity) - (a[campo] ?? -Infinity)
+        )
+        sorted.forEach((n, i) => { rank[n.id] = rank[n.id] || {}; rank[n.id][campo] = i + 1 })
+      })
+      return rank
+    }
+
+    const rOvos    = rankPor('qtd_ovos')
+    const rInteg   = rankPor('ovos_integros')
+    const rFilh    = rankPor('eclosao_filhotes')  // will compute
+    const rTaxa    = rankPor('taxa_eclosao_pct')
+    const rTemp    = rankPor('temperatura_c', true)
+    const rDist    = rankPor('dist_rio_m', true)
+    const rEfic    = rankPor('eficiencia_pct')
+
+    ninhos.forEach(n => { n.eclosao_filhotes = n.eclosao?.filhotes_vivos ?? null })
+    const rFilhotes = rankPor('eclosao_filhotes')
+
+    const rCell = (val, rankObj, ninho, suf, menor) => {
+      const r = rankObj[ninho.id]?.[Object.keys(rankObj[ninho.id]||{})[0]]
+      const vStr = val != null ? val + (suf || '') : '—'
+      if (val == null) return `<td class="num">${vStr}</td>`
+      const cls = r === 1 ? 'rank-1' : r === 2 ? 'rank-2' : ''
+      const rBadge = r ? `<sup style="font-size:9px;opacity:.6"> #${r}</sup>` : ''
+      return `<td class="num ${cls}">${vStr}${rBadge}</td>`
+    }
+
+    const thead = document.getElementById('mapa-comp-thead')
+    const tbody = document.getElementById('mapa-comp-tbody')
+    if (!thead || !tbody) return
+
+    thead.innerHTML = `<tr>
+      <th style="min-width:110px">Campo</th>
+      ${ninhos.map(n => `<th style="min-width:110px">${esc(n.numero_ninho || 'Ninho')}<br><span style="font-weight:400;text-transform:none;color:#9CA3AF;font-size:9px">${esc(n.praia_nome||'')} · ${ESP_MAPA_LABEL[n.especie]||n.especie}</span></th>`).join('')}
+    </tr>`
+
+    const rows = [
+      { label: 'Espécie',          fn: n => ESP_MAPA_LABEL[n.especie] || n.especie, style: (n) => `color:${ESP_MAPA_COR[n.especie]||'#9CA3AF'};font-weight:700` },
+      { label: 'Data encontro',    fn: n => n.data_encontro ? new Date(n.data_encontro).toLocaleDateString('pt-BR') : '—' },
+      { label: 'Status',           fn: n => n.status || '—', style: n => `color:${STATUS_MAPA_COR[n.status]||'#9CA3AF'}` },
+      { label: 'Ovos total',       fn: n => n.qtd_ovos, suf: '', rank: rOvos, campo: 'qtd_ovos' },
+      { label: 'Ovos íntegros',    fn: n => n.ovos_integros, rank: rInteg, campo: 'ovos_integros' },
+      { label: 'Filhotes vivos',   fn: n => n.eclosao?.filhotes_vivos, rank: rFilhotes, campo: 'eclosao_filhotes' },
+      { label: 'Taxa eclosão',     fn: n => n.taxa_eclosao_pct, suf: '%', rank: rTaxa, campo: 'taxa_eclosao_pct' },
+      { label: 'Eficiência',       fn: n => n.eficiencia_pct, suf: '%', rank: rEfic, campo: 'eficiencia_pct' },
+      { label: 'Incubação',        fn: n => n.incubacao_dias, suf: ' d' },
+      { label: 'Temperatura',      fn: n => n.temperatura_c, suf: '°C', rank: rTemp, campo: 'temperatura_c' },
+      { label: 'Umidade',          fn: n => n.umidade_pct, suf: '%' },
+      { label: 'Distância ao rio', fn: n => n.dist_rio_m, suf: ' m', rank: rDist, campo: 'dist_rio_m' },
+      { label: 'Ovos descartados', fn: n => n.ovos_descartados },
+      { label: 'Alertas ativos',   fn: n => (n.alertas||[]).length || '—' },
+    ]
+
+    tbody.innerHTML = rows.map(row => {
+      const cells = ninhos.map(n => {
+        const val = row.fn(n)
+        if (row.rank && row.campo) {
+          const r = row.rank[n.id]
+          const allRanks = Object.values(row.rank[n.id] || {})
+          const rank = allRanks[0]
+          const cls = rank === 1 ? 'rank-1' : rank === 2 ? 'rank-2' : ''
+          const str = val != null ? val + (row.suf || '') : '—'
+          const badge = rank && val != null ? `<sup style="font-size:9px;opacity:.5"> #${rank}</sup>` : ''
+          return `<td class="num ${cls}">${str}${badge}</td>`
+        }
+        const str = typeof val === 'number' ? val + (row.suf || '') : (val ?? '—')
+        const stl = row.style ? ` style="${row.style(n)}"` : ''
+        return `<td class="num"${stl}>${str}</td>`
+      }).join('')
+      return `<tr><td style="color:var(--t2,#aaa);font-size:10.5px;white-space:nowrap">${row.label}</td>${cells}</tr>`
+    }).join('')
+  }
+
+  // ── Exportar PDF (mapa) ────────────────────────────────────────
+  window.mapaExportarPDF = function() { window.print() }
+
+  // ── Exportar Excel/CSV do mapa ────────────────────────────────
+  window.mapaExportarExcel = function() {
+    if (!_mapaPraiaData.length && !_mapaNinhoData.length) {
+      alert('Carregue o mapa primeiro.'); return
+    }
+
+    // Planilha 1: Praias
+    const hPraias = 'Praia,Sigla,UC,Município,Ninhos,Encontrados,Transferidos,Eclodidos,Perdidos,Ovos,Íntegros,Filhotes Vivos,Filhotes Mortos,Taxa Eclosão (%),Dist. Rio Média (m),Temp Média (°C),Comprimento (m),Área (ha)'
+    const rPraias = _mapaPraiaData.filter(p => _mapaPraiasSel.has(p.id)).map(p => [
+      p.nome, p.sigla, p.uc_nome, p.municipio,
+      p.ninhos_total, p.ninhos_encontrados, p.ninhos_transferidos, p.ninhos_eclodidos, p.ninhos_perdidos,
+      p.ovos_postura, p.ovos_integros, p.filhotes_vivos, p.filhotes_mortos, p.taxa_eclosao_pct,
+      p.dist_rio_media_m, p.temp_media_c, p.comprimento_m, p.area_ha
+    ].map(x => `"${x ?? ''}"`).join(','))
+
+    // Planilha 2: Ninhos
+    const hNinhos = 'Ninho,Espécie,Praia,UC,Monitor,Data Encontro,Status,Lat,Lng,Ovos,Íntegros,Descartados,Filhotes Vivos,Filhotes Mortos,Taxa Eclosão (%),Eficiência (%),Incubação (dias),Temperatura (°C),Umidade (%),Dist. Rio (m),Profundidade (cm),Data Eclosão,Predação,Alertas'
+    const rNinhos = _mapaNinhoData.map(n => [
+      n.numero_ninho, n.especie, n.praia_nome, n.uc_nome, n.monitor_nome,
+      n.data_encontro, n.status, n.lat, n.lng,
+      n.qtd_ovos, n.ovos_integros, n.ovos_descartados,
+      n.eclosao?.filhotes_vivos, n.eclosao?.filhotes_mortos,
+      n.taxa_eclosao_pct, n.eficiencia_pct, n.incubacao_dias,
+      n.temperatura_c, n.umidade_pct, n.dist_rio_m, n.profundidade_cm,
+      n.eclosao?.data, n.eclosao?.predacao,
+      (n.alertas||[]).map(a => a.titulo).join('; ')
+    ].map(x => `"${x ?? ''}"`).join(','))
+
+    const csv = [
+      '=== PRAIAS ===', hPraias, ...rPraias,
+      '', '=== NINHOS ===', hNinhos, ...rNinhos
+    ].join('\n')
+
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' })
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    a.download = `biomonitor_mapa_${new Date().toISOString().slice(0,10)}.csv`
+    a.click()
   }
 
   // ── Exportar CSV ─────────────────────────────────────────────────
