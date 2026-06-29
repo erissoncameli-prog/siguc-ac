@@ -322,6 +322,28 @@
 .popup-btn { display:block; text-align:center; padding:6px; background:#1a6b8c; color:#fff; border-radius:6px; font-size:11px; font-weight:700; margin-top:8px; cursor:pointer; border:none; width:100%; }
 .popup-btn:hover { background:#155a7a; }
 
+/* ── Botão Voltar no slide panel ── */
+.mapa-slide-voltar {
+  display:none; padding:3px 9px 3px 6px; border-radius:6px; font-size:10px;
+  font-weight:700; border:1px solid rgba(255,255,255,.12);
+  background:rgba(255,255,255,.06); color:var(--t2,#aaa);
+  cursor:pointer; margin-bottom:6px; transition:background .15s; white-space:nowrap;
+}
+.mapa-slide-voltar:hover { background:rgba(255,255,255,.1); color:var(--t1,#f4efe6); }
+
+/* ── Linha de ninho na aba Ninhos da praia ── */
+.slide-ninho-item {
+  display:flex; align-items:center; gap:9px; padding:8px 11px;
+  border-radius:8px; cursor:pointer; transition:background .12s;
+  border:1px solid rgba(255,255,255,.07); margin-bottom:5px;
+}
+.slide-ninho-item:hover { background:rgba(255,255,255,.07); border-color:rgba(255,255,255,.12); }
+.slide-ninho-dot { width:9px; height:9px; border-radius:50%; flex-shrink:0; }
+.slide-ninho-info { flex:1; min-width:0; }
+.slide-ninho-num { font-size:12px; font-weight:700; color:var(--t1,#f4efe6); }
+.slide-ninho-sub { font-size:10px; color:var(--t2,#aaa); margin-top:1px; }
+.slide-ninho-seta { color:var(--t2,#aaa); font-size:16px; flex-shrink:0; }
+
 /* Impressão */
 @media print {
   .rel-filtros, .rel-nav, .sidebar, #sidebar-wrapper, .page-header,
@@ -396,6 +418,7 @@
     <div class="mapa-slide-panel" id="mapa-slide-panel">
       <div class="mapa-slide-header">
         <div class="mapa-slide-titulo-wrap">
+          <button class="mapa-slide-voltar" id="mapa-slide-voltar" onclick="mapaVoltarPraia()">← Praia</button>
           <div class="mapa-slide-num" id="mapa-slide-num"></div>
           <div class="mapa-slide-sub" id="mapa-slide-sub"></div>
         </div>
@@ -404,11 +427,7 @@
           <button class="mapa-slide-fechar" onclick="mapaFecharSlide()">×</button>
         </div>
       </div>
-      <div class="mapa-slide-tabs">
-        <button class="mapa-tab ativo" id="mtab-ident" onclick="mapaTab('ident')">Identificação</button>
-        <button class="mapa-tab" id="mtab-cond" onclick="mapaTab('cond')">Condições</button>
-        <button class="mapa-tab" id="mtab-fotos" onclick="mapaTab('fotos')">Fotos</button>
-      </div>
+      <div class="mapa-slide-tabs" id="mapa-slide-tabs"></div>
       <div class="mapa-slide-corpo" id="mapa-slide-corpo"></div>
     </div>
 
@@ -1197,6 +1216,8 @@
   let _mapaFiltStatus   = new Set()
   let _mapaFiltMes      = new Set()
   let _mapaSlideNinho   = null
+  let _mapaSlideMode    = 'ninho'   // 'praia' | 'ninho'
+  let _mapaSlidePraia   = null
   let _mapaSlideTab     = 'ident'
   let _mapaComparacao   = []    // array de ninhos na comparação
   let _mapaLeafletOK    = false
@@ -1361,7 +1382,7 @@
             style: { color: borda, weight: 2.5, fillColor: fill, fillOpacity: .38 }
           })
           poly.addTo(_mapaCamadas.poligonos)
-          poly.bindPopup(() => popupPraiaHTML(p), { maxWidth: 280 })
+          poly.on('click', () => mapaAbrirPraia(p))
           const b = poly.getBounds()
           if (b.isValid()) { bounds = bounds ? bounds.extend(b) : b; if (!centro) centro = b.getCenter() }
         } catch(e) {}
@@ -1370,7 +1391,7 @@
       if (centro) {
         const mk = L.circleMarker(centro, { radius: 7, color: borda, fillColor: fill, fillOpacity: .9, weight: 2 })
         mk.addTo(_mapaCamadas.poligonos)
-        mk.bindPopup(() => popupPraiaHTML(p), { maxWidth: 280 })
+        mk.on('click', () => mapaAbrirPraia(p))
         if (!bounds) bounds = L.latLngBounds(centro, centro)
         else bounds.extend(centro)
       }
@@ -1529,17 +1550,66 @@
   }
 
   // ── Slide Panel ───────────────────────────────────────────────
+
+  // Abre painel no modo PRAIA (clicar no polígono ou marcador)
+  window.mapaAbrirPraia = function(p) {
+    _mapaSlidePraia = p
+    _mapaSlideMode  = 'praia'
+    _mapaSlideTab   = 'resumo'
+
+    document.getElementById('mapa-slide-num').textContent = p.nome
+    document.getElementById('mapa-slide-sub').textContent =
+      [p.uc_sigla || p.uc_nome, p.municipio].filter(Boolean).join(' · ')
+
+    document.getElementById('mapa-slide-voltar').style.display = 'none'
+    document.getElementById('mapa-btn-comparar').style.display = 'none'
+
+    document.getElementById('mapa-slide-tabs').innerHTML = `
+      <button class="mapa-tab ativo" id="mtab-resumo" onclick="mapaTab('resumo')">Resumo</button>
+      <button class="mapa-tab" id="mtab-ninhos" onclick="mapaTab('ninhos')">Ninhos</button>
+      <button class="mapa-tab" id="mtab-historico" onclick="mapaTab('historico')">Histórico</button>`
+
+    mapaRenderSlideCorpo()
+    document.getElementById('mapa-slide-panel').classList.add('aberto')
+  }
+
+  // Volta para o painel da praia a partir de um ninho
+  window.mapaVoltarPraia = function() {
+    if (_mapaSlidePraia) mapaAbrirPraia(_mapaSlidePraia)
+  }
+
+  // Abre ninho por id (chamado da lista de ninhos da praia)
+  window.mapaAbrirNinhoById = function(id) {
+    const n = _mapaNinhoData.find(x => x.id === id)
+    if (n) mapaAbrirNinho(n)
+  }
+
+  // Abre painel no modo NINHO (clicar num marcador)
   window.mapaAbrirNinho = function(n) {
     _mapaSlideNinho = n
-    _mapaSlideTab = 'ident'
+    _mapaSlideMode  = 'ninho'
+    _mapaSlideTab   = 'ident'
+    // Garante contexto de praia para botão "Voltar"
+    _mapaSlidePraia = _mapaPraiaData.find(p => p.id === n.praia_id) || _mapaSlidePraia || null
+
     document.getElementById('mapa-slide-num').textContent = n.numero_ninho || 'Ninho s/n'
     document.getElementById('mapa-slide-sub').textContent =
       `${ESP_MAPA_LABEL[n.especie] || n.especie} · ${n.praia_nome || '—'}`
-    mapaRenderSlideCorpo()
+
+    document.getElementById('mapa-slide-voltar').style.display = _mapaSlidePraia ? '' : 'none'
+    document.getElementById('mapa-btn-comparar').style.display = ''
+
+    document.getElementById('mapa-slide-tabs').innerHTML = `
+      <button class="mapa-tab ativo" id="mtab-ident" onclick="mapaTab('ident')">Identificação</button>
+      <button class="mapa-tab" id="mtab-cond" onclick="mapaTab('cond')">Condições</button>
+      <button class="mapa-tab" id="mtab-fotos" onclick="mapaTab('fotos')">Fotos</button>`
+
     const btn = document.getElementById('mapa-btn-comparar')
     const jaEsta = _mapaComparacao.some(c => c.id === n.id)
     btn.textContent = jaEsta ? '✓ Comparando' : '+ Comparar'
     btn.classList.toggle('ativo', jaEsta)
+
+    mapaRenderSlideCorpo()
     document.getElementById('mapa-slide-panel').classList.add('aberto')
   }
 
@@ -1555,12 +1625,112 @@
   }
 
   function mapaRenderSlideCorpo() {
-    const n = _mapaSlideNinho
     const corpo = document.getElementById('mapa-slide-corpo')
-    if (!n || !corpo) return
+    if (!corpo) return
     const vf = (x, s) => x != null ? x + (s || '') : '—'
     const pctF = x => x != null ? x + '%' : '—'
     const dt = (d) => d ? new Date(d).toLocaleDateString('pt-BR') : '—'
+
+    // ── Modo Praia ──────────────────────────────────────────────
+    if (_mapaSlideMode === 'praia') {
+      const p = _mapaSlidePraia
+      if (!p) return
+
+      if (_mapaSlideTab === 'resumo') {
+        const espHtml = (p.por_especie || []).map(e => `
+          <div style="display:flex;align-items:center;gap:7px;margin-bottom:5px;font-size:11px">
+            <span style="color:${ESP_MAPA_COR[e.especie]||'#9CA3AF'};font-weight:700;min-width:56px;font-size:10px">${esc(ESP_MAPA_LABEL[e.especie]?.slice(0,8)||e.especie?.slice(0,8)||'?')}</span>
+            <div style="flex:1;height:5px;background:rgba(255,255,255,.1);border-radius:3px;overflow:hidden">
+              <div style="height:100%;width:${Math.round(100*(e.total/(p.ninhos_total||1)))}%;background:${ESP_MAPA_COR[e.especie]||'#9CA3AF'};border-radius:3px"></div>
+            </div>
+            <span style="min-width:22px;text-align:right;color:var(--t1,#f4efe6)">${e.total}</span>
+          </div>`).join('')
+
+        corpo.innerHTML = `
+          <div class="slide-kpi-row">
+            <div class="slide-kpi"><div class="slide-kpi-val" style="color:#C9A84C">${vf(p.ninhos_total)}</div><div class="slide-kpi-lbl">ninhos</div></div>
+            <div class="slide-kpi"><div class="slide-kpi-val" style="color:#2A9D6F">${vf(p.filhotes_vivos)}</div><div class="slide-kpi-lbl">filhotes vivos</div></div>
+          </div>
+          <div class="slide-kpi-row">
+            <div class="slide-kpi"><div class="slide-kpi-val" style="color:${(p.taxa_eclosao_pct||0)>=75?'#2A9D6F':'#f87171'}">${pctF(p.taxa_eclosao_pct)}</div><div class="slide-kpi-lbl">taxa eclosão</div></div>
+            <div class="slide-kpi"><div class="slide-kpi-val">${vf(p.ovos_postura)}</div><div class="slide-kpi-lbl">ovos postura</div></div>
+          </div>
+          <div class="slide-kpi-row">
+            <div class="slide-kpi"><div class="slide-kpi-val">${vf(p.comprimento_m,' m')}</div><div class="slide-kpi-lbl">comprimento</div></div>
+            <div class="slide-kpi"><div class="slide-kpi-val" style="color:#f87171">${vf(p.ninhos_perdidos)}</div><div class="slide-kpi-lbl">perdidos</div></div>
+          </div>
+          ${espHtml ? `<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--t2,#aaa);margin:10px 0 7px">Por espécie</div><div>${espHtml}</div>` : ''}
+          <div style="margin-top:12px;font-size:11px;color:var(--t2,#aaa);line-height:1.8">
+            ${p.temp_media_c!=null?`Temp. média: <strong style="color:var(--t1,#f4efe6)">${p.temp_media_c}°C</strong><br>`:''}
+            ${p.dist_rio_media_m!=null?`Dist. ao rio: <strong style="color:var(--t1,#f4efe6)">${p.dist_rio_media_m} m</strong><br>`:''}
+            ${p.area_ha!=null?`Área: <strong style="color:var(--t1,#f4efe6)">${p.area_ha} ha</strong><br>`:''}
+            ${p.municipio?`Município: <strong style="color:var(--t1,#f4efe6)">${esc(p.municipio)}</strong>`:''}
+          </div>`
+        return
+      }
+
+      if (_mapaSlideTab === 'ninhos') {
+        const ninhosDaPraia = _mapaNinhoData.filter(n => n.praia_id === p.id)
+        const semGPS = (p.ninhos_total || 0) - ninhosDaPraia.length
+        const nota = `<div style="font-size:10.5px;color:var(--t2,#aaa);margin-bottom:10px">
+          <strong style="color:var(--t1,#f4efe6)">${p.ninhos_total||0}</strong> ninho${p.ninhos_total!==1?'s':''} registrado${p.ninhos_total!==1?'s':''}
+          · <strong style="color:#2A9D6F">${ninhosDaPraia.length}</strong> com GPS
+          ${semGPS>0?`· <span style="color:#9CA3AF">${semGPS} sem GPS</span>`:''}</div>`
+
+        const lista = ninhosDaPraia.length
+          ? ninhosDaPraia.map(n => `
+            <div class="slide-ninho-item" onclick="mapaAbrirNinhoById('${n.id}')">
+              <div class="slide-ninho-dot" style="background:${ESP_MAPA_COR[n.especie]||'#9CA3AF'}"></div>
+              <div class="slide-ninho-info">
+                <div class="slide-ninho-num">${esc(n.numero_ninho||'Ninho s/n')}</div>
+                <div class="slide-ninho-sub">${esc(ESP_MAPA_LABEL[n.especie]||n.especie||'—')} · ${esc(n.status||'—')}${n.qtd_ovos!=null?' · '+n.qtd_ovos+' ovos':''}</div>
+              </div>
+              <div class="slide-ninho-seta">›</div>
+            </div>`).join('')
+          : '<div style="color:var(--t2,#aaa);font-size:12px;padding:8px 0">Nenhum ninho com GPS cadastrado nesta praia.</div>'
+
+        corpo.innerHTML = nota + lista
+        return
+      }
+
+      if (_mapaSlideTab === 'historico') {
+        const hist = (p.historico_anual || []).filter(h => h.ninhos > 0)
+        if (!hist.length) {
+          corpo.innerHTML = '<div style="color:var(--t2,#aaa);font-size:12px;padding:16px 0">Sem histórico disponível.</div>'
+          return
+        }
+        const maxH = Math.max(...hist.map(h => h.ninhos), 1)
+        corpo.innerHTML = `
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--t2,#aaa);margin-bottom:10px">Ninhos por ano</div>
+          <div style="display:flex;align-items:flex-end;gap:4px;height:80px;margin-bottom:14px">
+            ${hist.slice(-8).map(h => `
+              <div style="display:flex;flex-direction:column;align-items:center;gap:3px;flex:1">
+                <div style="background:#1A6B8C;width:100%;border-radius:3px 3px 0 0;min-height:3px;height:${Math.round(68*h.ninhos/maxH)}px" title="${h.ninhos} ninhos em ${h.ano}"></div>
+                <div style="font-size:9px;color:var(--t2,#aaa)">${String(h.ano).slice(2)}</div>
+              </div>`).join('')}
+          </div>
+          <table style="width:100%;border-collapse:collapse;font-size:11.5px">
+            <thead><tr>
+              <th style="padding:5px 6px;color:var(--t2,#aaa);text-align:left;font-size:10px;text-transform:uppercase;border-bottom:1px solid rgba(255,255,255,.08)">Ano</th>
+              <th style="padding:5px 6px;color:var(--t2,#aaa);text-align:right;font-size:10px;text-transform:uppercase;border-bottom:1px solid rgba(255,255,255,.08)">Ninhos</th>
+              <th style="padding:5px 6px;color:var(--t2,#aaa);text-align:right;font-size:10px;text-transform:uppercase;border-bottom:1px solid rgba(255,255,255,.08)">Filhotes</th>
+            </tr></thead>
+            <tbody>
+              ${hist.map(h => `<tr>
+                <td style="padding:5px 6px;color:var(--t1,#f4efe6);border-top:1px solid rgba(255,255,255,.05)">${h.ano}</td>
+                <td style="padding:5px 6px;text-align:right;font-family:monospace;border-top:1px solid rgba(255,255,255,.05)">${h.ninhos}</td>
+                <td style="padding:5px 6px;text-align:right;font-family:monospace;color:#2A9D6F;border-top:1px solid rgba(255,255,255,.05)">${h.filhotes||0}</td>
+              </tr>`).join('')}
+            </tbody>
+          </table>`
+        return
+      }
+      return
+    }
+
+    // ── Modo Ninho ──────────────────────────────────────────────
+    const n = _mapaSlideNinho
+    if (!n) return
 
     if (_mapaSlideTab === 'ident') {
       const alertasHtml = (n.alertas || []).map(a => `
