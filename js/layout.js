@@ -294,3 +294,15 @@ const SessionGuard = {
     window.location.href = '../index.html?motivo=inatividade';
   }
 };
+
+// ── Auto-reload quando nova versão do SW ativa ─────────────────
+;(function () {
+  if (!('serviceWorker' in navigator)) return
+  let _jaRecarregou = false
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (_jaRecarregou) return
+    _jaRecarregou = true
+    if (typeof toast === 'function') toast('Nova versão disponível — recarregando…', 'info')
+    setTimeout(() => window.location.reload(), 1200)
+  })
+})()
