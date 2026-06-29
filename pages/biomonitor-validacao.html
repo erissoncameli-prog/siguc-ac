@@ -36,6 +36,42 @@
   </div>
 </div>
 
+<!-- ── Modal: GPS ─────────────────────────────────────── -->
+<div class="modal-overlay" id="modal-gps">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-header">
+      <div class="modal-title">Adicionar coordenadas GPS</div>
+      <button class="modal-close" onclick="fecharModalGPS()">×</button>
+    </div>
+    <div class="modal-body">
+      <p style="margin:0 0 14px;font-size:.9rem;color:var(--t2,#aaa)">
+        Ninho: <strong id="gps-numero"></strong>
+      </p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+        <div class="form-group" style="margin:0">
+          <label class="form-label">Latitude <span class="obrig">*</span></label>
+          <input class="form-control" id="gps-lat" type="number" step="0.00001" min="-90" max="90" placeholder="-9.97560">
+        </div>
+        <div class="form-group" style="margin:0">
+          <label class="form-label">Longitude <span class="obrig">*</span></label>
+          <input class="form-control" id="gps-lng" type="number" step="0.00001" min="-180" max="180" placeholder="-67.80890">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Precisão GPS (m) <span style="opacity:.5;font-weight:400">opcional</span></label>
+        <input class="form-control" id="gps-precisao" type="number" step="0.1" min="0" placeholder="Ex.: 5.2">
+      </div>
+      <p style="font-size:.78rem;color:var(--t2,#aaa);margin:4px 0 0">
+        Use coordenadas em graus decimais (WGS 84). Negativo para Sul / Oeste.
+      </p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="fecharModalGPS()">Cancelar</button>
+      <button class="btn btn-primary" onclick="salvarGPS()">Salvar coordenadas</button>
+    </div>
+  </div>
+</div>
+
 <!-- ── Modal: Fotos ────────────────────────────────────── -->
 <div class="modal-overlay" id="modal-fotos">
   <div class="modal" style="max-width:700px">
@@ -98,7 +134,7 @@
 
   bIconsAplicar(document.getElementById('app'))
 
-  let _ninhos = [], _rejeitar = null, _rejTipo = null, _alertasPorNinho = {}
+  let _ninhos = [], _rejeitar = null, _rejTipo = null, _alertasPorNinho = {}, _gpsNinhoId = null
 
   // ── Carregar dados ─────────────────────────────────────────────
   async function carregarDados() {
@@ -228,7 +264,9 @@
           <div>Praia: <span style="color:var(--t1,#f4efe6)">${n.praia_nome || '—'}</span></div>
           <div>Monitor: <span style="color:var(--t1,#f4efe6)">${n.monitor_nome || '—'}</span></div>
           <div>Data: <span style="color:var(--t1,#f4efe6)">${formatData(n.data_encontro)}</span></div>
-          ${n.lat ? `<div>GPS: <span style="color:var(--t1,#f4efe6)">${Number(n.lat).toFixed(5)}, ${Number(n.lng).toFixed(5)}</span> ${n.precisao_gps_m ? `(±${n.precisao_gps_m}m)` : ''}</div>` : ''}
+          ${n.lat
+            ? `<div>GPS: <span style="color:var(--t1,#f4efe6)">${Number(n.lat).toFixed(5)}, ${Number(n.lng).toFixed(5)}</span> ${n.precisao_gps_m ? `(±${n.precisao_gps_m}m)` : ''}</div>`
+            : `<div style="color:#f59e0b;font-size:.78rem">Sem GPS — não aparece no mapa</div>`}
           ${n.dist_rio_m != null ? `<div>Dist. ao rio: <span style="color:var(--t1,#f4efe6)">${n.dist_rio_m} m</span> <span style="opacity:.6;font-size:.85em">(${n.dist_rio_metodo === 'tracker' ? 'GPS tracker' : 'estimativa'})</span></div>` : ''}
         </div>
 
@@ -270,6 +308,7 @@
 
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,.06)">
           ${temFotos ? `<button class="btn btn-sm btn-secondary" onclick='verFotos(${JSON.stringify(n.foto_urls)})'>Fotos (${n.foto_urls.length})</button>` : ''}
+          ${!n.lat ? `<button class="btn btn-sm" style="background:rgba(245,158,11,.15);color:#f59e0b;border:1px solid rgba(245,158,11,.3);border-radius:6px;padding:4px 10px;cursor:pointer" onclick="abrirModalGPS('${n.id}','${esc(n.numero_ninho)}')">+ GPS</button>` : ''}
           ${n.status_validacao !== 'validado'   ? `<button class="btn btn-sm btn-primary"   onclick="validar('${n.id}')">Validar</button>` : ''}
           ${n.status_validacao !== 'rejeitado'  ? `<button class="btn btn-sm" style="background:#ef444433;color:#ef4444;border:none;border-radius:6px;padding:4px 10px;cursor:pointer" onclick="abrirRejeitar('${n.id}','${esc(n.numero_ninho)}','rejeitado')">Rejeitar</button>` : ''}
           ${n.status_validacao !== 'em_correcao'? `<button class="btn btn-sm" style="background:#6366f133;color:#6366f1;border:none;border-radius:6px;padding:4px 10px;cursor:pointer" onclick="abrirRejeitar('${n.id}','${esc(n.numero_ninho)}','em_correcao')">Correção</button>` : ''}
@@ -323,6 +362,35 @@
       `<img src="${u}" style="width:100%;border-radius:8px;object-fit:cover;aspect-ratio:4/3" loading="lazy">`
     ).join('')
     document.getElementById('modal-fotos').classList.add('aberto')
+  }
+
+  window.abrirModalGPS = function(id, numero) {
+    _gpsNinhoId = id
+    document.getElementById('gps-numero').textContent = numero
+    document.getElementById('gps-lat').value = ''
+    document.getElementById('gps-lng').value = ''
+    document.getElementById('gps-precisao').value = ''
+    document.getElementById('modal-gps').classList.add('aberto')
+  }
+
+  window.fecharModalGPS = () => document.getElementById('modal-gps').classList.remove('aberto')
+
+  window.salvarGPS = async function() {
+    const lat = parseFloat(document.getElementById('gps-lat').value)
+    const lng = parseFloat(document.getElementById('gps-lng').value)
+    const prec = document.getElementById('gps-precisao').value.trim()
+
+    if (isNaN(lat) || lat < -90 || lat > 90)  { toast('Latitude inválida (−90 a 90).', 'error'); return }
+    if (isNaN(lng) || lng < -180 || lng > 180) { toast('Longitude inválida (−180 a 180).', 'error'); return }
+
+    const update = { localizacao: `POINT(${lng} ${lat})` }
+    if (prec !== '') update.precisao_gps_m = parseFloat(prec)
+
+    const { error } = await db.from('ninhos_quelonios').update(update).eq('id', _gpsNinhoId)
+    if (error) { toast(error.message, 'error'); return }
+    toast('Coordenadas salvas. O ninho agora aparecerá no mapa.', 'success')
+    fecharModalGPS()
+    await carregarDados()
   }
 
   await carregarDados()
