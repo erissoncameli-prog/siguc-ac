@@ -1186,6 +1186,16 @@ async function bioSalvarNinho() {
 
   const editando = BioApp.editandoNinho
 
+  // Avisa se não há GPS — não bloqueia, mas exige confirmação consciente
+  const _temGPS = (BioApp.formGpsCapturado?.lat ?? BioApp.gpsLat) != null
+  if (!_temGPS && !editando) {
+    if (!confirm(
+      'GPS não disponível\n\n' +
+      'Este ninho será salvo SEM localização no mapa.\n\n' +
+      'Aguarde o sinal GPS travar e tente novamente, ou toque em OK para continuar sem GPS.'
+    )) return
+  }
+
   const ninho = {
     ...BioApp.formNinho,
     numero_ninho:     numero,
