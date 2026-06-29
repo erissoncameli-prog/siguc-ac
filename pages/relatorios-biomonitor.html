@@ -10,6 +10,14 @@
 <script src="../js/config.js"></script>
 <script src="../js/layout.js"></script>
 <style>
+/* ── Tema escuro — sobrescreve global.css (light) ── */
+:root { --t1:#F4EFE6; --t2:#9CA3AF; }
+body  { background:#0F1B12 !important; color:#F4EFE6; }
+.page-body { background:#0F1B12; }
+.topbar { background:rgba(10,26,15,.97) !important; border-color:rgba(255,255,255,.08) !important; box-shadow:none !important; }
+.topbar-title, .topbar-breadcrumb span { color:#F4EFE6 !important; }
+.topbar-breadcrumb span:last-child { color:var(--verde-c,#52B788) !important; }
+
 /* ── Relatório Biomonitor ── */
 .rel-filtros {
   display:flex; flex-wrap:wrap; gap:10px; align-items:flex-end;
