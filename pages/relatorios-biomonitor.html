@@ -662,8 +662,8 @@
         ${taxaCard('Sobrevivência em Berçário',k.taxa_sobrevivencia_bercario_pct+'—',k.taxa_sobrevivencia_bercario_pct,'#2A9D6F','Filhotes soltados / filhotes que entraram no berçário')}
         ${taxaCard('Mortalidade em Berçário',k.taxa_mortalidade_bercario_pct+'—',k.taxa_mortalidade_bercario_pct,'#ef4444','Mortes no berçário / filhotes que entraram')}
       </div>
-      <div style="font-size:11px;color:var(--t2,#aaa);margin-top:-8px;margin-bottom:12px">
-        Período de incubação médio: <strong style="color:var(--t1,#f4efe6)">${v(k.incubacao_media_dias,' dias')}</strong>
+      <div style="font-size:11px;color:#6B7280;margin-top:-8px;margin-bottom:12px">
+        Período de incubação médio: <strong style="color:#111827">${v(k.incubacao_media_dias,' dias')}</strong>
         &nbsp;·&nbsp; Predação por pessoas: <strong>${v(k.predacao_pessoas)}</strong>
         &nbsp;·&nbsp; Por animais: <strong>${v(k.predacao_animais)}</strong>
       </div>
@@ -746,7 +746,7 @@
         return `<div style="margin-bottom:12px">
           <div style="display:flex;justify-content:space-between;align-items:center;font-size:.88rem;margin-bottom:4px">
             <span>${esc(m.praia_nome || '—')}${atingiu ? ' <span style="color:#2A9D6F">✓</span>' : ''}</span>
-            <span style="color:var(--t2,#aaa)"><strong style="color:${cor}">${feito}</strong> / ${meta} ninhos · ${pct}%</span>
+            <span style="color:#6B7280"><strong style="color:${cor}">${feito}</strong> / ${meta} ninhos · ${pct}%</span>
           </div>
           <div style="height:10px;border-radius:6px;background:rgba(127,127,127,.16);overflow:hidden">
             <div style="height:100%;width:${pct}%;background:${cor};border-radius:6px;transition:width .4s"></div>
@@ -767,7 +767,7 @@
         <div class="rel-chart-card"><p class="rel-chart-title">Top Praias — Total de Ninhos</p><div class="rel-chart-wrap tall" id="wrap-praias-h"><canvas id="graf-praias-h"></canvas></div></div>
         <div class="rel-chart-card"><p class="rel-chart-title">Ninhos por UC</p><div class="rel-chart-wrap" id="wrap-ucs-h"><canvas id="graf-ucs-h"></canvas></div></div>
       </div>
-      <p style="font-size:12px;font-weight:700;color:var(--t2,#aaa);text-transform:uppercase;letter-spacing:.04em;margin:4px 0 8px">Praias</p>
+      <p style="font-size:12px;font-weight:700;color:#6B7280;text-transform:uppercase;letter-spacing:.04em;margin:4px 0 8px">Praias</p>
       <div class="rel-table-wrap" style="margin-bottom:14px"><table class="rel-table"><thead><tr>
         <th>Praia</th><th>UC</th>
         <th style="text-align:right">Ninhos</th><th style="text-align:right">Eclodidos</th>
@@ -777,7 +777,7 @@
         <th style="text-align:right">Ninhos/km</th>
         <th style="text-align:right">Predação</th>
       </tr></thead><tbody id="tbody-praias"></tbody></table></div>
-      <p style="font-size:12px;font-weight:700;color:var(--t2,#aaa);text-transform:uppercase;letter-spacing:.04em;margin:4px 0 8px">Unidades de Conservação</p>
+      <p style="font-size:12px;font-weight:700;color:#6B7280;text-transform:uppercase;letter-spacing:.04em;margin:4px 0 8px">Unidades de Conservação</p>
       <div class="rel-table-wrap"><table class="rel-table"><thead><tr>
         <th>UC</th><th>Sigla</th>
         <th style="text-align:right">Ninhos</th><th style="text-align:right">Eclodidos</th>
@@ -809,7 +809,7 @@
   function htmlSecMonitores(mon) {
     const tbody = mon.map((m,i) => `<tr>
       <td><span class="badge-esp" style="background:rgba(59,130,246,.15);color:#3b82f6">${i+1}</span>${m.monitor_nome || '—'}</td>
-      <td style="color:var(--t2,#aaa)">${m.grupo_nome || '—'}</td>
+      <td style="color:#6B7280">${m.grupo_nome || '—'}</td>
       <td class="num">${v(m.ninhos)}</td>
       <td class="num">${v(m.eclodidos)}</td>
       <td class="num">${v(m.filhotes_vivos)}</td>
@@ -878,7 +878,7 @@
     _charts[id] = new Chart(el.getContext('2d'), cfg)
   }
 
-  const gridColor = 'rgba(255,255,255,.07)'
+  const gridColor = 'rgba(0,0,0,.06)'
   const tickFont  = { size: 11, family: 'DM Sans, sans-serif' }
   const legendOpts = { labels: { color:'rgba(255,255,255,.7)', font: tickFont, usePointStyle:true, padding:12 } }
 
@@ -1164,7 +1164,7 @@
               <button class="mapa-praia-btn" onclick="mapaTodasPraias(false)">Nenhuma</button>
             </div>
             <div class="mapa-praia-lista" id="mapa-praia-lista">
-              <div style="color:var(--t2,#aaa);font-size:11px;padding:8px 4px">Carregando…</div>
+              <div style="color:#6B7280;font-size:11px;padding:8px 4px">Carregando…</div>
             </div>
           </div>
 
@@ -1332,7 +1332,7 @@
       !q || p.nome.toLowerCase().includes(q)
     )
     if (!visiveis.length) {
-      lista.innerHTML = '<div style="color:var(--t2,#aaa);font-size:11px;padding:8px 4px">Nenhuma praia encontrada.</div>'
+      lista.innerHTML = '<div style="color:#6B7280;font-size:11px;padding:8px 4px">Nenhuma praia encontrada.</div>'
       return
     }
     lista.innerHTML = visiveis.map(p => `
@@ -1645,10 +1645,10 @@
         const espHtml = (p.por_especie || []).map(e => `
           <div style="display:flex;align-items:center;gap:7px;margin-bottom:5px;font-size:11px">
             <span style="color:${ESP_MAPA_COR[e.especie]||'#9CA3AF'};font-weight:700;min-width:56px;font-size:10px">${esc(ESP_MAPA_LABEL[e.especie]?.slice(0,8)||e.especie?.slice(0,8)||'?')}</span>
-            <div style="flex:1;height:5px;background:rgba(255,255,255,.1);border-radius:3px;overflow:hidden">
+            <div style="flex:1;height:5px;background:#E5E7EB;border-radius:3px;overflow:hidden">
               <div style="height:100%;width:${Math.round(100*(e.total/(p.ninhos_total||1)))}%;background:${ESP_MAPA_COR[e.especie]||'#9CA3AF'};border-radius:3px"></div>
             </div>
-            <span style="min-width:22px;text-align:right;color:var(--t1,#f4efe6)">${e.total}</span>
+            <span style="min-width:22px;text-align:right;color:#111827">${e.total}</span>
           </div>`).join('')
 
         corpo.innerHTML = `
@@ -1664,12 +1664,12 @@
             <div class="slide-kpi"><div class="slide-kpi-val">${vf(p.comprimento_m,' m')}</div><div class="slide-kpi-lbl">comprimento</div></div>
             <div class="slide-kpi"><div class="slide-kpi-val" style="color:#f87171">${vf(p.ninhos_perdidos)}</div><div class="slide-kpi-lbl">perdidos</div></div>
           </div>
-          ${espHtml ? `<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--t2,#aaa);margin:10px 0 7px">Por espécie</div><div>${espHtml}</div>` : ''}
-          <div style="margin-top:12px;font-size:11px;color:var(--t2,#aaa);line-height:1.8">
-            ${p.temp_media_c!=null?`Temp. média: <strong style="color:var(--t1,#f4efe6)">${p.temp_media_c}°C</strong><br>`:''}
-            ${p.dist_rio_media_m!=null?`Dist. ao rio: <strong style="color:var(--t1,#f4efe6)">${p.dist_rio_media_m} m</strong><br>`:''}
-            ${p.area_ha!=null?`Área: <strong style="color:var(--t1,#f4efe6)">${p.area_ha} ha</strong><br>`:''}
-            ${p.municipio?`Município: <strong style="color:var(--t1,#f4efe6)">${esc(p.municipio)}</strong>`:''}
+          ${espHtml ? `<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#6B7280;margin:10px 0 7px">Por espécie</div><div>${espHtml}</div>` : ''}
+          <div style="margin-top:12px;font-size:11px;color:#6B7280;line-height:1.8">
+            ${p.temp_media_c!=null?`Temp. média: <strong style="color:#111827">${p.temp_media_c}°C</strong><br>`:''}
+            ${p.dist_rio_media_m!=null?`Dist. ao rio: <strong style="color:#111827">${p.dist_rio_media_m} m</strong><br>`:''}
+            ${p.area_ha!=null?`Área: <strong style="color:#111827">${p.area_ha} ha</strong><br>`:''}
+            ${p.municipio?`Município: <strong style="color:#111827">${esc(p.municipio)}</strong>`:''}
           </div>`
         return
       }
@@ -1677,8 +1677,8 @@
       if (_mapaSlideTab === 'ninhos') {
         const ninhosDaPraia = _mapaNinhoData.filter(n => n.praia_id === p.id)
         const semGPS = (p.ninhos_total || 0) - ninhosDaPraia.length
-        const nota = `<div style="font-size:10.5px;color:var(--t2,#aaa);margin-bottom:10px">
-          <strong style="color:var(--t1,#f4efe6)">${p.ninhos_total||0}</strong> ninho${p.ninhos_total!==1?'s':''} registrado${p.ninhos_total!==1?'s':''}
+        const nota = `<div style="font-size:10.5px;color:#6B7280;margin-bottom:10px">
+          <strong style="color:#111827">${p.ninhos_total||0}</strong> ninho${p.ninhos_total!==1?'s':''} registrado${p.ninhos_total!==1?'s':''}
           · <strong style="color:#2A9D6F">${ninhosDaPraia.length}</strong> com GPS
           ${semGPS>0?`· <span style="color:#9CA3AF">${semGPS} sem GPS</span>`:''}</div>`
 
@@ -1692,7 +1692,7 @@
               </div>
               <div class="slide-ninho-seta">›</div>
             </div>`).join('')
-          : '<div style="color:var(--t2,#aaa);font-size:12px;padding:8px 0">Nenhum ninho com GPS cadastrado nesta praia.</div>'
+          : '<div style="color:#6B7280;font-size:12px;padding:8px 0">Nenhum ninho com GPS cadastrado nesta praia.</div>'
 
         corpo.innerHTML = nota + lista
         return
@@ -1701,30 +1701,30 @@
       if (_mapaSlideTab === 'historico') {
         const hist = (p.historico_anual || []).filter(h => h.ninhos > 0)
         if (!hist.length) {
-          corpo.innerHTML = '<div style="color:var(--t2,#aaa);font-size:12px;padding:16px 0">Sem histórico disponível.</div>'
+          corpo.innerHTML = '<div style="color:#6B7280;font-size:12px;padding:16px 0">Sem histórico disponível.</div>'
           return
         }
         const maxH = Math.max(...hist.map(h => h.ninhos), 1)
         corpo.innerHTML = `
-          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--t2,#aaa);margin-bottom:10px">Ninhos por ano</div>
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#6B7280;margin-bottom:10px">Ninhos por ano</div>
           <div style="display:flex;align-items:flex-end;gap:4px;height:80px;margin-bottom:14px">
             ${hist.slice(-8).map(h => `
               <div style="display:flex;flex-direction:column;align-items:center;gap:3px;flex:1">
                 <div style="background:#1A6B8C;width:100%;border-radius:3px 3px 0 0;min-height:3px;height:${Math.round(68*h.ninhos/maxH)}px" title="${h.ninhos} ninhos em ${h.ano}"></div>
-                <div style="font-size:9px;color:var(--t2,#aaa)">${String(h.ano).slice(2)}</div>
+                <div style="font-size:9px;color:#6B7280">${String(h.ano).slice(2)}</div>
               </div>`).join('')}
           </div>
           <table style="width:100%;border-collapse:collapse;font-size:11.5px">
             <thead><tr>
-              <th style="padding:5px 6px;color:var(--t2,#aaa);text-align:left;font-size:10px;text-transform:uppercase;border-bottom:1px solid rgba(255,255,255,.08)">Ano</th>
-              <th style="padding:5px 6px;color:var(--t2,#aaa);text-align:right;font-size:10px;text-transform:uppercase;border-bottom:1px solid rgba(255,255,255,.08)">Ninhos</th>
-              <th style="padding:5px 6px;color:var(--t2,#aaa);text-align:right;font-size:10px;text-transform:uppercase;border-bottom:1px solid rgba(255,255,255,.08)">Filhotes</th>
+              <th style="padding:5px 6px;color:#6B7280;text-align:left;font-size:10px;text-transform:uppercase;border-bottom:1px solid #E5E7EB">Ano</th>
+              <th style="padding:5px 6px;color:#6B7280;text-align:right;font-size:10px;text-transform:uppercase;border-bottom:1px solid #E5E7EB">Ninhos</th>
+              <th style="padding:5px 6px;color:#6B7280;text-align:right;font-size:10px;text-transform:uppercase;border-bottom:1px solid #E5E7EB">Filhotes</th>
             </tr></thead>
             <tbody>
               ${hist.map(h => `<tr>
-                <td style="padding:5px 6px;color:var(--t1,#f4efe6);border-top:1px solid rgba(255,255,255,.05)">${h.ano}</td>
-                <td style="padding:5px 6px;text-align:right;font-family:monospace;border-top:1px solid rgba(255,255,255,.05)">${h.ninhos}</td>
-                <td style="padding:5px 6px;text-align:right;font-family:monospace;color:#2A9D6F;border-top:1px solid rgba(255,255,255,.05)">${h.filhotes||0}</td>
+                <td style="padding:5px 6px;color:#111827;border-top:1px solid #E5E7EB">${h.ano}</td>
+                <td style="padding:5px 6px;text-align:right;font-family:monospace;border-top:1px solid #E5E7EB">${h.ninhos}</td>
+                <td style="padding:5px 6px;text-align:right;font-family:monospace;color:#2A9D6F;border-top:1px solid #E5E7EB">${h.filhotes||0}</td>
               </tr>`).join('')}
             </tbody>
           </table>`
@@ -1789,10 +1789,10 @@
           </div>
         </div>
         ${alertasHtml ? `<div style="margin-bottom:12px">${alertasHtml}</div>` : ''}
-        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--t2,#aaa);margin-bottom:8px">Histórico</div>
-        ${histHtml || '<div style="color:var(--t2,#aaa);font-size:11px">Sem eventos registrados.</div>'}
-        ${n.observacoes ? `<div style="margin-top:10px;font-size:11px;color:var(--t2,#aaa);line-height:1.5">${esc(n.observacoes)}</div>` : ''}
-        <div style="margin-top:10px;font-size:10px;color:var(--t2,#aaa)">Monitor: ${esc(n.monitor_nome || '—')} · Grupo: ${esc(n.grupo_nome || '—')}</div>`
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#6B7280;margin-bottom:8px">Histórico</div>
+        ${histHtml || '<div style="color:#6B7280;font-size:11px">Sem eventos registrados.</div>'}
+        ${n.observacoes ? `<div style="margin-top:10px;font-size:11px;color:#6B7280;line-height:1.5">${esc(n.observacoes)}</div>` : ''}
+        <div style="margin-top:10px;font-size:10px;color:#6B7280">Monitor: ${esc(n.monitor_nome || '—')} · Grupo: ${esc(n.grupo_nome || '—')}</div>`
     }
 
     else if (_mapaSlideTab === 'cond') {
@@ -1833,13 +1833,13 @@
             <div class="slide-kpi-lbl">ovos descartados</div>
           </div>
         </div>
-        <div style="margin:10px 0 6px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--t2,#aaa)">Localização GPS</div>
-        <div style="font-size:12px;color:var(--t1,#f4efe6);font-family:monospace">
+        <div style="margin:10px 0 6px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#6B7280">Localização GPS</div>
+        <div style="font-size:12px;color:#111827;font-family:monospace">
           ${n.lat != null ? n.lat.toFixed(6) : '—'}, ${n.lng != null ? n.lng.toFixed(6) : '—'}
-          ${n.precisao_gps_m != null ? `<br><span style="font-size:10px;color:var(--t2,#aaa)">Precisão: ±${n.precisao_gps_m}m</span>` : ''}
+          ${n.precisao_gps_m != null ? `<br><span style="font-size:10px;color:#6B7280">Precisão: ±${n.precisao_gps_m}m</span>` : ''}
         </div>
         ${n.eclosao ? `
-        <div style="margin:12px 0 6px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--t2,#aaa)">Eclosão</div>
+        <div style="margin:12px 0 6px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#6B7280">Eclosão</div>
         <div class="slide-kpi-row">
           <div class="slide-kpi">
             <div class="slide-kpi-val" style="color:#2A9D6F">${vf(n.eclosao.filhotes_vivos)}</div>
@@ -1868,7 +1868,7 @@
         ? `<div class="slide-foto-grid">${urls.map(u =>
             `<img class="slide-foto" src="${esc(u)}" loading="lazy" onclick="window.open('${esc(u)}','_blank')" onerror="this.style.display='none'">`
           ).join('')}</div>`
-        : '<div style="color:var(--t2,#aaa);font-size:12px;padding:16px 0">Nenhuma foto registrada para este ninho.</div>'
+        : '<div style="color:#6B7280;font-size:12px;padding:16px 0">Nenhuma foto registrada para este ninho.</div>'
     }
   }
 
@@ -1989,7 +1989,7 @@
         const stl = row.style ? ` style="${row.style(n)}"` : ''
         return `<td class="num"${stl}>${str}</td>`
       }).join('')
-      return `<tr><td style="color:var(--t2,#aaa);font-size:10.5px;white-space:nowrap">${row.label}</td>${cells}</tr>`
+      return `<tr><td style="color:#6B7280;font-size:10.5px;white-space:nowrap">${row.label}</td>${cells}</tr>`
     }).join('')
   }
 
