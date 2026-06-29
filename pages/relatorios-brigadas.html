@@ -205,6 +205,12 @@
 .btn-validar-reg:hover { color:var(--verde-c); background:rgba(82,183,136,.1) }
 .btn-validar-reg svg { width:16px; height:16px }
 
+/* ── Botão lista de presença (EA) ────────────────────────────── */
+.btn-ea-presenca { background:none; border:none; cursor:pointer; color:var(--cinza-400);
+  padding:4px; border-radius:6px; line-height:0; transition:color .15s,background .15s }
+.btn-ea-presenca:hover { color:var(--nat-moni); background:rgba(59,130,196,.1) }
+.btn-ea-presenca svg { width:16px; height:16px }
+
 /* ── Modal de validação ──────────────────────────────────────── */
 .val-modal-bg { position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:8000;
   display:flex; align-items:center; justify-content:center; padding:1rem }
@@ -275,6 +281,11 @@ let _brists    = []   // brigadistas
 let _faunaData = []   // registro_fauna enriquecido com regional/brigada
 let _tabAtiva  = 'estado'
 let _carregando = false
+
+// Estado EA — carregado separadamente (todo o histórico, sem filtro de período)
+let _eaRegistros     = null   // null = não carregado
+let _eaParticipantes = []
+let _eaCarregando    = false
 
 // ── Labels ─────────────────────────────────────────────────────
 const NAT_LAB  = { prevencao:'Prevenção', combate:'Combate', monitoramento:'Monitoramento' }
@@ -388,6 +399,7 @@ function htmlPagina() {
     <button class="rel-tab" data-tab="regional">${bico('pin')} Por Regional</button>
     <button class="rel-tab" data-tab="uc">${bico('tree')} Por UC</button>
     <button class="rel-tab" data-tab="fauna">${bico('paw')} Fauna</button>
+    <button class="rel-tab" data-tab="ea">${bico('users')} Ed. Ambiental</button>
   </div>
 
   <!-- Loading -->
@@ -423,6 +435,7 @@ function htmlPagina() {
   </div>
 
   <div id="tab-fauna" hidden></div>
+  <div id="tab-ea" hidden></div>
 </div>`
 }
 
@@ -576,8 +589,10 @@ function renderTabAtiva() {
   if (_tabAtiva === 'regional') renderRegional()
   if (_tabAtiva === 'uc')       renderUC()
   if (_tabAtiva === 'fauna')    renderFauna()
+  if (_tabAtiva === 'ea')       renderEA()
 
   document.getElementById('tab-fauna').hidden = _tabAtiva !== 'fauna'
+  document.getElementById('tab-ea').hidden    = _tabAtiva !== 'ea'
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -2200,6 +2215,572 @@ function initFaunaEspecie(f) {
 }
 
 // ════════════════════════════════════════════════════════════════
+// TAB 5: EDUCAÇÃO AMBIENTAL
+// ════════════════════════════════════════════════════════════════
+
+async function carregarEA() {
+  if (_eaCarregando) return
+  _eaCarregando = true
+
+  const { data: regs, error } = await db.from('vw_registros_validacao')
+    .select('id,codigo_ocorrencia,natureza,atividade,status_validacao,data_hora_evento,regional,uc_id,uc_nome,brigada_id,brigada_nome,brigadista_id,brigadista_nome,equipe_id,equipe,equipe_nome,duracao_horas,pessoas_alcancadas,n_participantes,lista_presenca_url')
+    .eq('atividade', 'educacao_ambiental')
+    .order('data_hora_evento', { ascending: false })
+    .limit(5000)
+
+  if (error) { console.error('[EA] erro ao carregar registros', error); _eaCarregando = false; return }
+  _eaRegistros = regs || []
+
+  const ids = _eaRegistros.map(r => r.id).filter(Boolean)
+  _eaParticipantes = []
+  if (ids.length) {
+    const CHUNK = 150
+    for (let i = 0; i < ids.length; i += CHUNK) {
+      const { data: p } = await db.from('registro_participantes')
+        .select('id,registro_campo_id,nome,cpf,data_nascimento,sexo')
+        .in('registro_campo_id', ids.slice(i, i + CHUNK))
+        .limit(5000)
+      if (p) _eaParticipantes.push(...p)
+    }
+  }
+
+  _eaCarregando = false
+  if (_tabAtiva === 'ea') renderEA()
+}
+
+function filtrarRegistrosEA(ano, mes, uc) {
+  return (_eaRegistros || []).filter(r => {
+    if (!r.data_hora_evento) return true
+    const dt = new Date(r.data_hora_evento)
+    if (ano && String(dt.getFullYear()) !== ano) return false
+    if (mes && String(dt.getMonth() + 1).padStart(2, '0') !== mes) return false
+    if (uc  && r.uc_id !== uc) return false
+    return true
+  })
+}
+
+function filtrarParticipantesEA(regs) {
+  const ids = new Set(regs.map(r => r.id))
+  return _eaParticipantes.filter(p => ids.has(p.registro_campo_id))
+}
+
+function faixaEtaria(dataNasc) {
+  if (!dataNasc) return 'Não informado'
+  const nasc = new Date(dataNasc + 'T12:00:00')
+  if (isNaN(nasc)) return 'Não informado'
+  const hoje = new Date()
+  let idade = hoje.getFullYear() - nasc.getFullYear()
+  if (hoje.getMonth() < nasc.getMonth() ||
+      (hoje.getMonth() === nasc.getMonth() && hoje.getDate() < nasc.getDate())) idade--
+  if (idade < 0 || idade > 150) return 'Não informado'
+  if (idade <= 12) return '≤ 12 anos'
+  if (idade <= 17) return '13–17 anos'
+  if (idade <= 30) return '18–30 anos'
+  if (idade <= 50) return '31–50 anos'
+  return '51+ anos'
+}
+
+function onEAFiltro() { renderEA() }
+
+function renderEA() {
+  const cont = document.getElementById('tab-ea')
+
+  if (_eaRegistros === null) {
+    if (!_eaCarregando) carregarEA()
+    cont.innerHTML = `
+      <div style="display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));margin-bottom:18px">
+        ${Array(6).fill('<div class="skel" style="height:70px;border-radius:10px"></div>').join('')}
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+        ${Array(4).fill('<div class="skel" style="height:180px;border-radius:12px"></div>').join('')}
+      </div>`
+    return
+  }
+
+  const anoAtual = document.getElementById('ea-sel-ano')?.value || ''
+  const mesAtual = document.getElementById('ea-sel-mes')?.value || ''
+  const ucAtual  = document.getElementById('ea-sel-uc')?.value  || ''
+
+  const regs    = filtrarRegistrosEA(anoAtual, mesAtual, ucAtual)
+  const regById = Object.fromEntries(regs.map(r => [r.id, r]))
+  const parts   = filtrarParticipantesEA(regs)
+
+  const totalAcoes   = regs.length
+  const totalPessoas = regs.reduce((s, r) => s + (r.pessoas_alcancadas || 0), 0)
+  const totalParts   = parts.length
+  const ucsSet       = new Set(regs.filter(r => r.uc_id).map(r => r.uc_id))
+  const regsSet      = new Set(regs.filter(r => r.regional).map(r => r.regional))
+  const totalHoras   = regs.reduce((s, r) => s + (Number(r.duracao_horas) || 0), 0)
+
+  const anos  = [...new Set((_eaRegistros || []).map(r => r.data_hora_evento?.slice(0, 4)).filter(Boolean))].sort().reverse()
+  const eaUCs = {}
+  ;(_eaRegistros || []).forEach(r => { if (r.uc_id && r.uc_nome) eaUCs[r.uc_id] = r.uc_nome })
+  const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
+
+  const secFiltros = `
+    <div class="rel-topbar" style="margin-bottom:18px;justify-content:space-between;flex-wrap:wrap;gap:8px">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <label>Ano:</label>
+        <select id="ea-sel-ano" onchange="onEAFiltro()">
+          <option value="">Todos</option>
+          ${anos.map(a => `<option value="${a}"${a === anoAtual ? ' selected' : ''}>${a}</option>`).join('')}
+        </select>
+        <label>Mês:</label>
+        <select id="ea-sel-mes" onchange="onEAFiltro()">
+          <option value="">Todos</option>
+          ${MESES.map((l, i) => {
+            const m = String(i + 1).padStart(2, '0')
+            return `<option value="${m}"${m === mesAtual ? ' selected' : ''}>${l}</option>`
+          }).join('')}
+        </select>
+        <label>UC:</label>
+        <select id="ea-sel-uc" onchange="onEAFiltro()">
+          <option value="">Todas</option>
+          ${Object.entries(eaUCs).sort((a, b) => a[1].localeCompare(b[1]))
+            .map(([id, nome]) => `<option value="${id}"${id === ucAtual ? ' selected' : ''}>${esc(nome)}</option>`).join('')}
+        </select>
+      </div>
+      <button class="btn-export" onclick="exportarEAParticipantes()">${bico('download')} Exportar Participantes CSV</button>
+    </div>`
+
+  const secKPIs = `
+    <div class="kpi-row-brig" style="margin-bottom:18px">
+      <div class="kpi-brig moni"><div class="kpi-brig-n">${totalAcoes}</div><div class="kpi-brig-l">Ações de EA</div></div>
+      <div class="kpi-brig moni"><div class="kpi-brig-n">${totalPessoas}</div><div class="kpi-brig-l">Pessoas alcançadas</div></div>
+      <div class="kpi-brig ok"><div class="kpi-brig-n">${totalParts}</div><div class="kpi-brig-l">Participantes cadastrados</div></div>
+      <div class="kpi-brig"><div class="kpi-brig-n">${ucsSet.size}</div><div class="kpi-brig-l">UCs beneficiadas</div></div>
+      <div class="kpi-brig"><div class="kpi-brig-n">${regsSet.size}</div><div class="kpi-brig-l">Regionais cobertas</div></div>
+      ${totalHoras > 0 ? `<div class="kpi-brig prev"><div class="kpi-brig-n">${formatNum(totalHoras, 1)} h</div><div class="kpi-brig-l">Horas de atividade</div></div>` : ''}
+    </div>`
+
+  let secConteudo
+  if (totalAcoes === 0) {
+    secConteudo = `<div style="text-align:center;padding:3rem 1rem;color:#9ca3af;border:1.5px dashed #e5e7eb;border-radius:12px;margin-bottom:14px">
+      <div style="font-size:.9rem;font-weight:600;margin-bottom:4px">Nenhuma ação de EA no período selecionado</div>
+      <div style="font-size:.8rem">Ajuste os filtros acima para ampliar a busca</div>
+    </div>`
+  } else {
+    secConteudo = `
+      <div style="margin-bottom:14px">
+        <div class="chart-card">
+          <div class="chart-title">Evolução mensal — Ações e participantes</div>
+          <div class="chart-canvas-wrap" style="height:240px"><canvas id="chart-ea-mensal"></canvas></div>
+        </div>
+      </div>
+      <div class="chart-grid-2" style="margin-bottom:14px">
+        <div class="chart-card">
+          <div class="chart-title">Sexo dos participantes</div>
+          <div class="chart-canvas-wrap" style="height:210px"><canvas id="chart-ea-sexo"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title">Faixa etária dos participantes</div>
+          <div class="chart-canvas-wrap" style="height:210px"><canvas id="chart-ea-faixa"></canvas></div>
+        </div>
+      </div>
+      <div class="chart-grid-2" style="margin-bottom:14px">
+        <div class="chart-card">
+          <div class="chart-title">Participantes por regional</div>
+          <div class="chart-canvas-wrap" style="height:210px"><canvas id="chart-ea-regional"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title">Top UCs por participantes</div>
+          <div class="chart-canvas-wrap" id="ea-uc-wrap" style="height:210px"><canvas id="chart-ea-uc"></canvas></div>
+        </div>
+      </div>
+      <div class="card" style="margin-bottom:14px">
+        <div class="card-header"><div class="card-title">${bico('list')} Ocorrências de Educação Ambiental</div></div>
+        <div class="card-body" style="padding:0 0 8px;overflow-x:auto">
+          ${tabelaOcorrenciasEA(regs)}
+        </div>
+      </div>
+      <div class="card" style="margin-bottom:14px">
+        <div class="card-header" style="display:flex;align-items:center;justify-content:space-between">
+          <div class="card-title">${bico('users')} Participantes Cadastrados</div>
+          <span style="font-size:.8rem;color:var(--cinza-400)">${totalParts} participante${totalParts !== 1 ? 's' : ''}</span>
+        </div>
+        <div class="card-body" style="padding:0 0 8px;overflow-x:auto">
+          ${tabelaParticipantesEA(parts, regById)}
+        </div>
+      </div>`
+  }
+
+  cont.innerHTML = secFiltros + secKPIs + secConteudo
+
+  if (totalAcoes === 0) return
+
+  requestAnimationFrame(() => {
+    destroyCharts('chart-ea-mensal', 'chart-ea-sexo', 'chart-ea-faixa', 'chart-ea-regional', 'chart-ea-uc')
+    initChartEAMensal(regs, parts)
+    initChartEASexo(parts)
+    initChartEAFaixa(parts)
+    initChartEARegional(regs, parts)
+    initChartEAUC(regs, parts, regById)
+  })
+}
+
+// ── Linha dupla: Ações + Participantes por mês ────────────────
+function initChartEAMensal(regs, parts) {
+  const regById = Object.fromEntries(regs.map(r => [r.id, r]))
+  const mesesRegs = regs.filter(r => r.data_hora_evento).map(r => r.data_hora_evento.slice(0, 7))
+  if (!mesesRegs.length) return
+
+  // Janela: do primeiro mês com EA até hoje
+  const primeiro = [...mesesRegs].sort()[0]
+  const atual    = new Date().toISOString().slice(0, 7)
+  const todos    = []
+  let cur        = new Date(primeiro + '-01T12:00:00')
+  const fim      = new Date(atual + '-01T12:00:00')
+  while (cur <= fim) {
+    todos.push(cur.toISOString().slice(0, 7))
+    cur = new Date(cur.getFullYear(), cur.getMonth() + 1, 1)
+  }
+
+  const labels       = todos.map(m => {
+    const [a, mes] = m.split('-')
+    return new Date(+a, +mes - 1, 1).toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' })
+  })
+  const acoesPorMes  = {}
+  regs.forEach(r => {
+    if (!r.data_hora_evento) return
+    const k = r.data_hora_evento.slice(0, 7)
+    acoesPorMes[k] = (acoesPorMes[k] || 0) + 1
+  })
+  const partsPorMes  = {}
+  parts.forEach(p => {
+    const r = regById[p.registro_campo_id]
+    if (!r?.data_hora_evento) return
+    const k = r.data_hora_evento.slice(0, 7)
+    partsPorMes[k] = (partsPorMes[k] || 0) + 1
+  })
+
+  initChart('chart-ea-mensal', {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Ações',
+          data: todos.map(m => acoesPorMes[m] || 0),
+          borderColor: '#12A66A', backgroundColor: 'rgba(18,166,106,.12)',
+          fill: true, tension: 0.35, yAxisID: 'y',
+          pointRadius: 4, pointBackgroundColor: '#12A66A',
+          pointBorderColor: '#fff', pointBorderWidth: 2, pointHoverRadius: 6,
+        },
+        {
+          label: 'Participantes',
+          data: todos.map(m => partsPorMes[m] || 0),
+          borderColor: '#3B82C4', backgroundColor: 'rgba(59,130,196,.12)',
+          fill: true, tension: 0.35, yAxisID: 'yParts',
+          pointRadius: 4, pointBackgroundColor: '#3B82C4',
+          pointBorderColor: '#fff', pointBorderWidth: 2, pointHoverRadius: 6,
+        },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { position: 'bottom', labels: { boxWidth: 11, padding: 12 } } },
+      scales: {
+        y:      { beginAtZero: true, position: 'left',  ticks: { precision: 0, color: '#12A66A', font: { size: 10 } }, grid: { color: 'rgba(0,0,0,.05)' } },
+        yParts: { beginAtZero: true, position: 'right', ticks: { precision: 0, color: '#3B82C4', font: { size: 10 } }, grid: { drawOnChartArea: false } },
+        x: { grid: { display: false }, ticks: { maxRotation: 35, font: { size: 10 } } }
+      }
+    }
+  })
+}
+
+// ── Rosca: Sexo dos participantes ─────────────────────────────
+function initChartEASexo(parts) {
+  const cnt  = { masculino: 0, feminino: 0, outro: 0, nao_informado: 0 }
+  parts.forEach(p => {
+    const k = p.sexo && cnt[p.sexo] !== undefined ? p.sexo : 'nao_informado'
+    cnt[k]++
+  })
+  const total = Object.values(cnt).reduce((a, b) => a + b, 0) || 1
+  initChart('chart-ea-sexo', {
+    type: 'doughnut',
+    data: {
+      labels: ['Masculino', 'Feminino', 'Outro', 'Não informado'],
+      datasets: [{
+        data: [cnt.masculino, cnt.feminino, cnt.outro, cnt.nao_informado],
+        backgroundColor: ['#3B82C4', '#EC4899', '#F59E0B', '#9CA3AF'],
+        borderWidth: 3, borderColor: '#fff', hoverOffset: 10,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, cutout: '62%',
+      plugins: {
+        legend: { position: 'bottom', labels: { boxWidth: 11, padding: 12 } },
+        tooltip: { callbacks: { label: ctx =>
+          ` ${ctx.label}: ${ctx.parsed} (${Math.round(ctx.parsed / total * 100)}%)`
+        }}
+      }
+    }
+  })
+}
+
+// ── Barras: Faixa etária ──────────────────────────────────────
+const EA_FAIXAS     = ['≤ 12 anos', '13–17 anos', '18–30 anos', '31–50 anos', '51+ anos', 'Não informado']
+const EA_FAIXAS_COR = ['#7C3AED', '#3B82C4', '#12A66A', '#C9A84C', '#EF5B3C', '#9CA3AF']
+
+function initChartEAFaixa(parts) {
+  const cnt = {}
+  EA_FAIXAS.forEach(f => { cnt[f] = 0 })
+  parts.forEach(p => { const f = faixaEtaria(p.data_nascimento); cnt[f] = (cnt[f] || 0) + 1 })
+  const vals  = EA_FAIXAS.map(f => cnt[f] || 0)
+  const total = vals.reduce((a, b) => a + b, 0) || 1
+  initChart('chart-ea-faixa', {
+    type: 'bar',
+    data: {
+      labels: EA_FAIXAS,
+      datasets: [{
+        label: 'Participantes',
+        data: vals,
+        backgroundColor: EA_FAIXAS_COR.map(c => c + 'cc'),
+        borderColor: EA_FAIXAS_COR,
+        borderWidth: 1.5, borderRadius: 5,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => ` ${ctx.parsed.y} (${Math.round(ctx.parsed.y / total * 100)}%)` } }
+      },
+      scales: {
+        y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: 'rgba(0,0,0,.05)' } },
+        x: { grid: { display: false }, ticks: { font: { size: 10 } } }
+      }
+    }
+  })
+}
+
+// ── Barras horiz.: Participantes por regional ─────────────────
+function initChartEARegional(regs, parts) {
+  const regById = Object.fromEntries(regs.map(r => [r.id, r]))
+  const cnt = {}
+  parts.forEach(p => {
+    const r = regById[p.registro_campo_id]
+    const reg = r?.regional || 'desconhecido'
+    cnt[reg] = (cnt[reg] || 0) + 1
+  })
+  if (!Object.keys(cnt).length) return
+
+  const sorted = Object.entries(cnt).sort((a, b) => b[1] - a[1])
+  const labels = sorted.map(([k]) => REGIONAL_LAB[k] || k)
+  const vals   = sorted.map(([, v]) => v)
+  const max    = Math.max(...vals, 1)
+  const cores  = vals.map(v => {
+    const t = v / max
+    return `rgb(${Math.round(10 + t * 72)},${Math.round(26 + t * 140)},${Math.round(15 + t * 91)})`
+  })
+
+  initChart('chart-ea-regional', {
+    type: 'bar',
+    data: { labels, datasets: [{ data: vals, backgroundColor: cores, borderWidth: 0, borderRadius: 6, borderSkipped: false }] },
+    options: {
+      indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => ` ${ctx.parsed.x} participante${ctx.parsed.x !== 1 ? 's' : ''}` } },
+        datalabels: { display: true, formatter: dlValPct, color: '#374151', anchor: 'end', align: 'end', offset: 4, clamp: true, font: { size: 10, weight: '600' } }
+      },
+      scales: {
+        x: { beginAtZero: true, grace: '18%', grid: { color: 'rgba(0,0,0,.05)' }, border: { display: false }, ticks: { precision: 0, color: '#9ca3af', font: { size: 10 } } },
+        y: { grid: { display: false }, border: { display: false }, ticks: { color: '#374151', font: { size: 12, weight: '500' } } }
+      }
+    }
+  })
+}
+
+// ── Barras horiz.: Top UCs por participantes ──────────────────
+function initChartEAUC(regs, parts, regById) {
+  const cnt = {}
+  parts.forEach(p => {
+    const r = regById[p.registro_campo_id]
+    if (!r) return
+    const k = r.uc_id || 'sem_uc'
+    if (!cnt[k]) cnt[k] = { nome: r.uc_nome || 'Sem UC', n: 0 }
+    cnt[k].n++
+  })
+  const sorted = Object.values(cnt).sort((a, b) => b.n - a.n).slice(0, 10)
+  if (!sorted.length) return
+
+  const max   = sorted[0].n
+  const cores = sorted.map(x => {
+    const t = x.n / max
+    return `rgb(${Math.round(10 + t * 72)},${Math.round(26 + t * 140)},${Math.round(15 + t * 91)})`
+  })
+
+  const wrap = document.getElementById('ea-uc-wrap')
+  if (wrap) wrap.style.height = (sorted.length * 46 + 60) + 'px'
+
+  initChart('chart-ea-uc', {
+    type: 'bar',
+    data: { labels: sorted.map(x => x.nome), datasets: [{ data: sorted.map(x => x.n), backgroundColor: cores, borderWidth: 0, borderRadius: 6, borderSkipped: false }] },
+    options: {
+      indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => ` ${ctx.parsed.x} participante${ctx.parsed.x !== 1 ? 's' : ''}` } },
+        datalabels: { display: true, formatter: dlValPct, color: '#374151', anchor: 'end', align: 'end', offset: 4, clamp: true, font: { size: 10, weight: '600' } }
+      },
+      scales: {
+        x: { beginAtZero: true, grace: '18%', grid: { color: 'rgba(0,0,0,.05)' }, border: { display: false }, ticks: { precision: 0, color: '#9ca3af', font: { size: 10 } } },
+        y: { grid: { display: false }, border: { display: false }, ticks: { color: '#374151', font: { size: 12, weight: '500' } } }
+      }
+    }
+  })
+}
+
+// ── Tabela: Ocorrências EA ────────────────────────────────────
+function tabelaOcorrenciasEA(regs) {
+  if (!regs.length) return '<p class="chart-empty" style="padding:12px">Nenhuma ação de EA registrada no período.</p>'
+  return `<table class="rel-table">
+    <thead><tr>
+      <th>Código</th><th>Data</th><th>Brigada</th><th>Equipe</th><th>UC</th><th>Regional</th>
+      <th>Brigadista</th><th>Alcançados</th><th>Participantes</th><th>Duração</th><th>Status</th><th></th>
+    </tr></thead>
+    <tbody>${regs.map(r => {
+      const dt = r.data_hora_evento
+        ? new Date(r.data_hora_evento).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', timeZone: 'America/Rio_Branco' })
+        : '—'
+      const statusCor = { aguardando: '#f59e0b', validado: '#059669', requer_correcao: '#e879f9', rejeitado: '#ef4444' }[r.status_validacao] || '#6b7280'
+      return `<tr>
+        <td style="font-size:.74rem;white-space:nowrap;font-family:ui-monospace,Menlo,monospace;font-weight:600">${esc(r.codigo_ocorrencia || '—')}</td>
+        <td style="font-size:.78rem;white-space:nowrap">${dt}</td>
+        <td style="font-size:.8rem">${esc(r.brigada_nome || '—')}</td>
+        <td style="font-size:.78rem;color:var(--cinza-500)">${esc(r.equipe_nome || r.equipe || '—')}</td>
+        <td style="font-size:.78rem">${esc(r.uc_nome || '—')}</td>
+        <td style="font-size:.78rem">${REGIONAL_LAB[r.regional] || r.regional || '—'}</td>
+        <td style="font-size:.8rem">${esc(r.brigadista_nome || '—')}</td>
+        <td style="text-align:center">${r.pessoas_alcancadas || '—'}</td>
+        <td style="text-align:center"><strong>${r.n_participantes || 0}</strong></td>
+        <td style="font-size:.78rem;white-space:nowrap">${r.duracao_horas > 0 ? fmtHoras(r.duracao_horas) : '—'}</td>
+        <td><span style="font-size:.72rem;font-weight:600;color:${statusCor}">${STATUS_LAB[r.status_validacao] || r.status_validacao}</span></td>
+        <td>${r.lista_presenca_url ? `<button class="btn-ea-presenca" data-url="${esc(r.lista_presenca_url)}" title="Ver lista de presença">${bico('file-text')}</button>` : ''}</td>
+      </tr>`
+    }).join('')}</tbody>
+  </table>`
+}
+
+// ── Tabela: Participantes (detalhada, CPF completo) ───────────
+function tabelaParticipantesEA(parts, regById) {
+  if (!parts.length) return '<p class="chart-empty" style="padding:12px">Nenhum participante cadastrado no período.</p>'
+  const SEXO_LAB = { masculino: 'Masculino', feminino: 'Feminino', outro: 'Outro', nao_informado: 'Não informado' }
+  return `<table class="rel-table">
+    <thead><tr>
+      <th>Nome</th><th>CPF</th><th>Sexo</th><th>Faixa Etária</th>
+      <th>UC</th><th>Regional</th><th>Brigada</th><th>Data</th>
+    </tr></thead>
+    <tbody>${parts.map(p => {
+      const r   = regById[p.registro_campo_id] || {}
+      const dt  = r.data_hora_evento
+        ? new Date(r.data_hora_evento).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', timeZone: 'America/Rio_Branco' })
+        : '—'
+      const cpf = p.cpf
+        ? (p.cpf.replace(/\D/g, '').replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, '$1.$2.$3-$4') || p.cpf)
+        : '—'
+      return `<tr>
+        <td>${esc(p.nome)}</td>
+        <td style="font-family:ui-monospace,Menlo,monospace;font-size:.79rem">${cpf}</td>
+        <td>${SEXO_LAB[p.sexo] || '—'}</td>
+        <td style="font-size:.78rem">${faixaEtaria(p.data_nascimento)}</td>
+        <td style="font-size:.78rem">${esc(r.uc_nome || '—')}</td>
+        <td style="font-size:.78rem">${REGIONAL_LAB[r.regional] || r.regional || '—'}</td>
+        <td style="font-size:.78rem">${esc(r.brigada_nome || '—')}</td>
+        <td style="font-size:.78rem;white-space:nowrap">${dt}</td>
+      </tr>`
+    }).join('')}</tbody>
+  </table>`
+}
+
+// ── Exportar CSV dedicado para participantes de EA ────────────
+function exportarEAParticipantes() {
+  const anoAtual = document.getElementById('ea-sel-ano')?.value || ''
+  const mesAtual = document.getElementById('ea-sel-mes')?.value || ''
+  const ucAtual  = document.getElementById('ea-sel-uc')?.value  || ''
+  const regs     = filtrarRegistrosEA(anoAtual, mesAtual, ucAtual)
+  const regById  = Object.fromEntries(regs.map(r => [r.id, r]))
+  const parts    = filtrarParticipantesEA(regs)
+
+  const SEXO_LAB = { masculino: 'Masculino', feminino: 'Feminino', outro: 'Outro', nao_informado: 'Não informado' }
+  const cabecalho = ['Código','Data','Brigada','Equipe','UC','Regional','Status Validação',
+                     'Nome Participante','CPF','Data Nascimento','Sexo','Faixa Etária']
+  const linhas = parts.map(p => {
+    const r      = regById[p.registro_campo_id] || {}
+    const dt     = r.data_hora_evento
+      ? new Date(r.data_hora_evento).toLocaleDateString('pt-BR', { timeZone: 'America/Rio_Branco' }) : ''
+    const dtNasc = p.data_nascimento
+      ? new Date(p.data_nascimento + 'T12:00:00').toLocaleDateString('pt-BR') : ''
+    const cpf    = p.cpf
+      ? (p.cpf.replace(/\D/g, '').replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, '$1.$2.$3-$4') || p.cpf) : ''
+    return [
+      r.codigo_ocorrencia || '', dt,
+      r.brigada_nome || '', r.equipe_nome || r.equipe || '',
+      r.uc_nome || '', REGIONAL_LAB[r.regional] || r.regional || '',
+      STATUS_LAB[r.status_validacao] || r.status_validacao || '',
+      p.nome || '', cpf, dtNasc,
+      SEXO_LAB[p.sexo] || '',
+      faixaEtaria(p.data_nascimento),
+    ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')
+  })
+
+  const csv  = [cabecalho.join(','), ...linhas].join('\n')
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' })
+  const url  = URL.createObjectURL(blob)
+  const a    = Object.assign(document.createElement('a'), {
+    href: url, download: `ea-participantes-${new Date().toISOString().slice(0, 10)}.csv`,
+  })
+  a.click()
+  setTimeout(() => URL.revokeObjectURL(url), 3000)
+}
+
+// ── Modal: Lista de Presença ──────────────────────────────────
+function abrirPresencaModal(url) {
+  let modal = document.getElementById('ea-presenca-modal')
+  if (!modal) {
+    modal = document.createElement('div')
+    modal.id = 'ea-presenca-modal'
+    modal.className = 'val-modal-bg'
+    modal.setAttribute('hidden', '')
+    modal.innerHTML = `
+      <div class="val-modal" style="max-width:720px;width:95vw">
+        <div class="val-modal-header">
+          <span>Lista de Presença</span>
+          <button class="val-modal-close" onclick="fecharPresencaModal()">&#x2715;</button>
+        </div>
+        <div id="ea-presenca-conteudo" style="max-height:70vh;overflow:auto;background:#f3f4f6;min-height:200px"></div>
+        <div class="val-modal-footer">
+          <button class="btn-sec" onclick="fecharPresencaModal()">Fechar</button>
+          <a id="ea-presenca-dl" href="#" target="_blank" rel="noopener" class="btn-prim"
+             style="text-decoration:none;display:inline-flex;align-items:center;gap:5px">
+            ${bico('download')} Abrir original
+          </a>
+        </div>
+      </div>`
+    modal.addEventListener('click', e => { if (e.target === modal) fecharPresencaModal() })
+    document.body.appendChild(modal)
+  }
+
+  document.getElementById('ea-presenca-dl').href = url
+  const cont  = document.getElementById('ea-presenca-conteudo')
+  const isPDF = /\.pdf($|\?)/i.test(url) || /content-type.*pdf/i.test(url)
+  cont.innerHTML = isPDF
+    ? `<iframe src="${esc(url)}" style="width:100%;height:65vh;border:none;display:block"></iframe>`
+    : `<img src="${esc(url)}" alt="Lista de presença" style="width:100%;height:auto;display:block">`
+
+  modal.removeAttribute('hidden')
+  document.body.style.overflow = 'hidden'
+}
+
+function fecharPresencaModal() {
+  const modal = document.getElementById('ea-presenca-modal')
+  if (modal) modal.setAttribute('hidden', '')
+  document.body.style.overflow = ''
+}
+
+// ════════════════════════════════════════════════════════════════
 // Exportar CSV
 // ════════════════════════════════════════════════════════════════
 function exportarCSV() {
@@ -2249,6 +2830,10 @@ function agruparObj(arr, campo) {
 document.addEventListener('click', ev => {
   const btn = ev.target.closest('.btn-validar-reg')
   if (btn) { ev.stopPropagation(); abrirModalValidacao(btn) }
+})
+document.addEventListener('click', ev => {
+  const btn = ev.target.closest('.btn-ea-presenca')
+  if (btn) { ev.stopPropagation(); abrirPresencaModal(btn.dataset.url) }
 })
 document.getElementById('vm-status').addEventListener('change', function() {
   document.getElementById('vm-motivo-wrap').hidden = !['requer_correcao','rejeitado'].includes(this.value)
