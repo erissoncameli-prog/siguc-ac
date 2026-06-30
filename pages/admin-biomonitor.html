@@ -27,7 +27,7 @@
     <div class="modal-body">
       <div class="grid-2">
         <div class="form-group"><label class="form-label">Programa <span class="obrig">*</span></label>
-          <select class="form-control" id="mg-programa"><option value="">Selecione...</option></select>
+          <select class="form-control" id="mg-programa" onchange="atualizarPeriodoGrupo()"><option value="">Selecione...</option></select>
         </div>
         <div class="form-group"><label class="form-label">Tipo de área <span class="obrig">*</span></label>
           <select class="form-control" id="mg-tipo-localizacao" onchange="grupoToggleLocalizacao()">
@@ -50,12 +50,10 @@
       <div class="form-group"><label class="form-label">Nome do grupo <span class="obrig">*</span></label>
         <input class="form-control" id="mg-nome" placeholder="Ex: Equipe Quelônios RESEX Alto Juruá">
       </div>
-      <div class="grid-2">
-        <div class="form-group"><label class="form-label">Início da temporada</label>
-          <input class="form-control" id="mg-t-inicio" type="date">
-        </div>
-        <div class="form-group"><label class="form-label">Fim da temporada</label>
-          <input class="form-control" id="mg-t-fim" type="date">
+      <div class="form-group">
+        <label class="form-label">Período de atuação</label>
+        <div id="mg-periodo-info" style="background:var(--cinza-50);border:1px solid var(--borda);border-radius:8px;padding:9px 11px;font-size:13px;color:var(--cinza-800)">
+          Segue a <strong>temporada ativa</strong> do programa.
         </div>
       </div>
       <div class="grid-2">
@@ -281,12 +279,10 @@
         <div id="mpr-mapa" style="height:300px;border-radius:8px;overflow:hidden;border:1px solid var(--linha,#ddd)"></div>
         <small class="form-hint" id="mpr-mapa-metrica" style="display:block;margin-top:6px"></small>
       </div>
-      <div class="grid-2">
-        <div class="form-group"><label class="form-label">Período início</label>
-          <input class="form-control" id="mpr-per-inicio" type="date">
-        </div>
-        <div class="form-group"><label class="form-label">Período fim</label>
-          <input class="form-control" id="mpr-per-fim" type="date">
+      <div class="form-group">
+        <label class="form-label">Período de monitoramento</label>
+        <div id="mpr-periodo-info" style="background:var(--cinza-50);border:1px solid var(--borda);border-radius:8px;padding:9px 11px;font-size:13px;color:var(--cinza-800)">
+          Definido por <strong>temporada</strong> — configure em <strong>Temporadas → Configurar praias</strong> (período e meta por ano).
         </div>
       </div>
       <div class="form-group"><label class="form-label">Monitor responsável</label>
@@ -668,7 +664,7 @@
       <td>${esc(localGrupo(g))}${(g.tipo_localizacao && g.tipo_localizacao !== 'dentro_uc') ? ' <span class="badge badge-neutral" style="font-size:.65rem">fora de UC</span>' : ''}</td>
       <td>${nomePrograma(g.programa_id)}</td>
       <td style="text-align:center">${contGrupo(g.id)}</td>
-      <td>${g.temporada_inicio ? formatData(g.temporada_inicio) + ' – ' + formatData(g.temporada_fim) : '—'}</td>
+      <td>${periodoTemporadaTxt(g.programa_id)}</td>
       <td><span class="badge ${g.ativo ? 'badge-success' : 'badge-neutral'}">${g.ativo ? 'Ativo' : 'Inativo'}</span></td>
       <td><button class="btn btn-sm btn-secondary" onclick="editarGrupo('${g.id}')">Editar</button></td>
     </tr>`).join('')
@@ -1059,6 +1055,37 @@
     if (id === 'praia') destroyPraiaMap()
   }
 
+  // Temporada ativa de um programa (is_atual; senão a de maior ano_base)
+  function temporadaAtivaPrograma(programaId) {
+    if (!programaId) return null
+    return _temporadas.find(t => t.programa_id === programaId && t.is_atual)
+      || _temporadas.filter(t => t.programa_id === programaId)
+           .sort((a, b) => (b.ano_base || 0) - (a.ano_base || 0))[0]
+      || null
+  }
+  // Texto do período de uma temporada de programa (para grupos/praias)
+  function periodoTemporadaTxt(programaId) {
+    const t = temporadaAtivaPrograma(programaId)
+    if (!t) return '—'
+    const di = t.data_inicio ? formatData(t.data_inicio) : '—'
+    const df = t.data_fim ? formatData(t.data_fim) : '—'
+    return `${di} – ${df}`
+  }
+  // Atualiza a caixa de período no modal de grupo conforme o programa
+  window.atualizarPeriodoGrupo = function() {
+    const box = document.getElementById('mg-periodo-info')
+    if (!box) return
+    const programaId = document.getElementById('mg-programa').value || ''
+    const t = temporadaAtivaPrograma(programaId)
+    if (!programaId) {
+      box.innerHTML = 'Selecione o programa — o período segue a <strong>temporada ativa</strong>.'
+    } else if (!t) {
+      box.innerHTML = 'Nenhuma temporada cadastrada para este programa. Cadastre uma temporada na aba <strong>Temporadas</strong>.'
+    } else {
+      box.innerHTML = `Segue a temporada <strong>${esc(t.nome)}</strong> · ${periodoTemporadaTxt(programaId)}`
+    }
+  }
+
   // GRUPOS
   window.abrirModalGrupo = function(id) {
     _editGrupoId = id || null
@@ -1070,8 +1097,7 @@
     document.getElementById('mg-tipo-localizacao').value = g?.tipo_localizacao || 'dentro_uc'
     document.getElementById('mg-local').value       = g?.localizacao_referencia || ''
     grupoToggleLocalizacao()
-    document.getElementById('mg-t-inicio').value   = g?.temporada_inicio || ''
-    document.getElementById('mg-t-fim').value       = g?.temporada_fim || ''
+    atualizarPeriodoGrupo()
     document.getElementById('mg-coord-nome').value = g?.coordenador_nome || ''
     document.getElementById('mg-coord-contato').value = g?.coordenador_contato || ''
     document.getElementById('mg-obs').value         = g?.observacoes || ''
@@ -1097,8 +1123,6 @@
       uc_id:              tipo === 'dentro_uc' ? (document.getElementById('mg-uc').value || null) : null,
       localizacao_referencia: tipo !== 'dentro_uc' ? (document.getElementById('mg-local').value.trim() || null) : null,
       nome:               document.getElementById('mg-nome').value.trim(),
-      temporada_inicio:   document.getElementById('mg-t-inicio').value || null,
-      temporada_fim:      document.getElementById('mg-t-fim').value || null,
       coordenador_nome:   document.getElementById('mg-coord-nome').value.trim() || null,
       coordenador_contato:document.getElementById('mg-coord-contato').value.trim() || null,
       observacoes:        document.getElementById('mg-obs').value.trim() || null,
@@ -1264,8 +1288,6 @@
     document.getElementById('mpr-comunidade').value      = p?.comunidade || ''
     document.getElementById('mpr-lat').value             = p?.lat || ''
     document.getElementById('mpr-lng').value             = p?.lng || ''
-    document.getElementById('mpr-per-inicio').value      = p?.periodo_inicio || ''
-    document.getElementById('mpr-per-fim').value         = p?.periodo_fim || ''
     document.getElementById('mpr-monitor').value         = p?.monitor_responsavel_id || ''
     document.getElementById('mpr-obs').value             = p?.observacoes || ''
     document.getElementById('mpr-ativa').checked         = p ? p.ativa : true
@@ -1291,8 +1313,6 @@
       municipio:              document.getElementById('mpr-mun').value.trim() || null,
       comunidade:             document.getElementById('mpr-comunidade').value.trim() || null,
       ponto_acesso:           (!isNaN(lat) && !isNaN(lng)) ? `POINT(${lng} ${lat})` : null,
-      periodo_inicio:         document.getElementById('mpr-per-inicio').value || null,
-      periodo_fim:            document.getElementById('mpr-per-fim').value || null,
       monitor_responsavel_id: document.getElementById('mpr-monitor').value || null,
       observacoes:            document.getElementById('mpr-obs').value.trim() || null,
       ativa:                  document.getElementById('mpr-ativa').checked,
