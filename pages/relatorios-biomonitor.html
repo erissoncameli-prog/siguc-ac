@@ -382,7 +382,17 @@
         <label>Programa
           <select id="fil-programa"><option value="">Todos os programas</option></select>
         </label>
-        <label>Unidade de Conservação
+        <label>Localização
+          <select id="fil-localizacao">
+            <option value="">Todas as localizações</option>
+            <option value="dentro_uc">Dentro de UC</option>
+            <option value="margem_livre">Margem Livre</option>
+            <option value="terra_indigena">Terra Indígena</option>
+            <option value="area_municipal">Área Municipal</option>
+            <option value="outro">Outro</option>
+          </select>
+        </label>
+        <label id="fil-uc-wrap" style="display:none">Unidade de Conservação
           <select id="fil-uc"><option value="">Todas as UCs</option></select>
         </label>
         <label>Praia
@@ -463,7 +473,7 @@
     db.from('temporadas_biomonitor').select('id,nome,is_atual').order('ano_base', { ascending: false }),
     db.from('programas_biomonitoramento').select('id,nome').eq('ativo', true),
     db.from('unidades_conservacao').select('id,nome,sigla').order('nome'),
-    db.from('praias_monitoramento').select('id,nome,uc_id').eq('ativa', true).order('nome'),
+    db.from('praias_monitoramento').select('id,nome,uc_id,tipo_localizacao').eq('ativa', true).order('nome'),
   ])
 
   _praias_todas = praias || []
@@ -473,13 +483,26 @@
   ;(programas  || []).forEach(p => sel('fil-programa').insertAdjacentHTML('beforeend', `<option value="${p.id}">${p.nome}</option>`))
   ;(ucs        || []).forEach(u => sel('fil-uc').insertAdjacentHTML('beforeend', `<option value="${u.id}">${u.sigla || ''} ${u.nome}</option>`))
 
-  // Praias cascateiam pela UC selecionada
-  sel('fil-uc').addEventListener('change', () => {
+  // Praias cascateiam pela Localização + UC selecionadas
+  function popularPraias() {
+    const loc  = sel('fil-localizacao').value
     const ucId = sel('fil-uc').value
     sel('fil-praia').innerHTML = '<option value="">Todas as praias</option>'
-    _praias_todas.filter(p => !ucId || p.uc_id === ucId)
+    _praias_todas
+      .filter(p => (!loc || p.tipo_localizacao === loc) && (!ucId || p.uc_id === ucId))
       .forEach(p => sel('fil-praia').insertAdjacentHTML('beforeend', `<option value="${p.id}">${p.nome}</option>`))
+  }
+  popularPraias()
+
+  // Localização é o pré-filtro: só mostra o seletor de UC quando "Dentro de UC"
+  sel('fil-localizacao').addEventListener('change', () => {
+    const dentroUC = sel('fil-localizacao').value === 'dentro_uc'
+    sel('fil-uc-wrap').style.display = dentroUC ? '' : 'none'
+    if (!dentroUC) sel('fil-uc').value = ''
+    popularPraias()
   })
+
+  sel('fil-uc').addEventListener('change', popularPraias)
 
   // ── Estado global ───────────────────────────────────────────────
   let _dados = null
@@ -511,10 +534,11 @@
     destruirCharts()
 
     const { data, error } = await db.rpc('bio_relatorio_completo', {
-      p_temporada_id: sel('fil-temporada').value || null,
-      p_programa_id:  sel('fil-programa').value  || null,
-      p_uc_id:        sel('fil-uc').value        || null,
-      p_praia_id:     sel('fil-praia').value     || null,
+      p_temporada_id:     sel('fil-temporada').value    || null,
+      p_programa_id:      sel('fil-programa').value     || null,
+      p_uc_id:            sel('fil-uc').value           || null,
+      p_praia_id:         sel('fil-praia').value        || null,
+      p_tipo_localizacao: sel('fil-localizacao').value  || null,
     })
 
     if (error || !data) {
