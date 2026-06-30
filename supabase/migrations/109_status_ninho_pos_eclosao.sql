@@ -20,9 +20,9 @@ BEGIN
 END;
 $$;
 
-DROP TRIGGER IF EXISTS trg_soltura_status ON solturas_quelonios;
+DROP TRIGGER IF EXISTS trg_soltura_status ON solturas_filhotes;
 CREATE TRIGGER trg_soltura_status
-  AFTER INSERT ON solturas_quelonios
+  AFTER INSERT ON solturas_filhotes
   FOR EACH ROW EXECUTE FUNCTION trg_soltura_atualizar_status_ninho();
 
 -- Trigger: ao inserir lote em berçário, atualiza ninho para 'em_bercario'
@@ -57,7 +57,7 @@ BEGIN
 END;
 $$;
 
-DROP TRIGGER IF EXISTS trg_soltura_bercario_status ON solturas_quelonios;
+DROP TRIGGER IF EXISTS trg_soltura_bercario_status ON solturas_filhotes;
 CREATE TRIGGER trg_soltura_bercario_status
-  AFTER INSERT ON solturas_quelonios
+  AFTER INSERT ON solturas_filhotes
   FOR EACH ROW EXECUTE FUNCTION trg_soltura_bercario_atualizar_status_ninho();
