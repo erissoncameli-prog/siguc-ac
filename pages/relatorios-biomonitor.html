@@ -880,7 +880,7 @@
 
   const gridColor = 'rgba(0,0,0,.06)'
   const tickFont  = { size: 11, family: 'DM Sans, sans-serif' }
-  const legendOpts = { labels: { color:'rgba(255,255,255,.7)', font: tickFont, usePointStyle:true, padding:12 } }
+  const legendOpts = { labels: { color:'#374151', font: tickFont, usePointStyle:true, padding:12 } }
 
   function grafFenologia(mes, anos) {
     if (!mes.length) return
@@ -898,8 +898,8 @@
         responsive:true, maintainAspectRatio:false, animation:{duration:600},
         plugins:{ legend: legendOpts },
         scales:{
-          x:{ grid:{color:gridColor}, ticks:{color:'rgba(255,255,255,.5)', font:tickFont} },
-          y:{ grid:{color:gridColor}, ticks:{color:'rgba(255,255,255,.5)', font:tickFont}, beginAtZero:true, title:{display:true,text:'Ninhos / Filhotes',color:'rgba(255,255,255,.4)',font:{size:10}} },
+          x:{ grid:{color:gridColor}, ticks:{color:'#6B7280', font:tickFont} },
+          y:{ grid:{color:gridColor}, ticks:{color:'#6B7280', font:tickFont}, beginAtZero:true, title:{display:true,text:'Ninhos / Filhotes',color:'#9CA3AF',font:{size:10}} },
           y2:{ position:'right', grid:{display:false}, ticks:{color:'rgba(201,168,76,.6)', font:tickFont}, beginAtZero:true, title:{display:true,text:'Média ovos',color:'rgba(201,168,76,.4)',font:{size:10}} }
         },
         elements:{ point:{radius:3,hoverRadius:5} }
@@ -920,8 +920,8 @@
         responsive:true, maintainAspectRatio:false, animation:{duration:500},
         plugins:{ legend:legendOpts },
         scales:{
-          x:{ grid:{display:false}, ticks:{color:'rgba(255,255,255,.5)', font:tickFont} },
-          y:{ grid:{color:gridColor}, ticks:{color:'rgba(255,255,255,.5)', font:tickFont}, beginAtZero:true }
+          x:{ grid:{display:false}, ticks:{color:'#6B7280', font:tickFont} },
+          y:{ grid:{color:gridColor}, ticks:{color:'#6B7280', font:tickFont}, beginAtZero:true }
         }
       }
     })
@@ -966,8 +966,8 @@
         responsive:true, maintainAspectRatio:false, animation:{duration:600},
         plugins:{ legend:legendOpts },
         scales:{
-          x:{ grid:{display:false}, ticks:{color:'rgba(255,255,255,.5)', font:tickFont} },
-          y:{ grid:{color:gridColor}, ticks:{color:'rgba(255,255,255,.5)', font:tickFont}, beginAtZero:true }
+          x:{ grid:{display:false}, ticks:{color:'#6B7280', font:tickFont} },
+          y:{ grid:{color:gridColor}, ticks:{color:'#6B7280', font:tickFont}, beginAtZero:true }
         }
       }
     })
@@ -999,7 +999,7 @@
         responsive:true, maintainAspectRatio:false, animation:{duration:600},
         plugins:{ legend:legendOpts },
         scales:{ r:{ min:0, max:100, grid:{color:gridColor}, angleLines:{color:gridColor},
-          ticks:{color:'rgba(255,255,255,.4)', font:{size:9}, backdropColor:'transparent'} } }
+          ticks:{color:'#9CA3AF', font:{size:9}, backdropColor:'transparent'} } }
       }
     })
   }
@@ -1014,8 +1014,8 @@
         indexAxis:'y', responsive:true, maintainAspectRatio:false, animation:{duration:600},
         plugins:{ legend:{display:false} },
         scales:{
-          x:{ grid:{color:gridColor}, ticks:{color:'rgba(255,255,255,.5)', font:tickFont}, beginAtZero:true },
-          y:{ grid:{display:false}, ticks:{color:'rgba(255,255,255,.5)', font:tickFont} }
+          x:{ grid:{color:gridColor}, ticks:{color:'#6B7280', font:tickFont}, beginAtZero:true },
+          y:{ grid:{display:false}, ticks:{color:'#6B7280', font:tickFont} }
         }
       }
     })
@@ -1050,8 +1050,8 @@
         responsive:true, maintainAspectRatio:false, animation:{duration:600},
         plugins:{ legend:legendOpts },
         scales:{
-          x:{ grid:{display:false}, ticks:{color:'rgba(255,255,255,.5)', font:tickFont} },
-          y:{ grid:{color:gridColor}, ticks:{color:'rgba(255,255,255,.5)', font:tickFont}, beginAtZero:true, title:{display:true,text:'cm',color:'rgba(255,255,255,.3)',font:{size:9}} },
+          x:{ grid:{display:false}, ticks:{color:'#6B7280', font:tickFont} },
+          y:{ grid:{color:gridColor}, ticks:{color:'#6B7280', font:tickFont}, beginAtZero:true, title:{display:true,text:'cm',color:'#9CA3AF',font:{size:9}} },
           y2:{ position:'right', grid:{display:false}, ticks:{color:'rgba(201,168,76,.5)', font:tickFont}, beginAtZero:true, title:{display:true,text:'g',color:'rgba(201,168,76,.3)',font:{size:9}} }
         }
       }
@@ -1072,8 +1072,8 @@
         responsive:true, maintainAspectRatio:false, animation:{duration:500},
         plugins:{ legend:{display:false} },
         scales:{
-          x:{ grid:{display:false}, ticks:{color:'rgba(255,255,255,.5)', font:tickFont} },
-          y:{ grid:{color:gridColor}, ticks:{color:'rgba(255,255,255,.5)', font:tickFont}, beginAtZero:true }
+          x:{ grid:{display:false}, ticks:{color:'#6B7280', font:tickFont} },
+          y:{ grid:{color:gridColor}, ticks:{color:'#6B7280', font:tickFont}, beginAtZero:true }
         }
       }
     })
@@ -1109,8 +1109,8 @@
         indexAxis:'y', responsive:true, maintainAspectRatio:false, animation:{duration:600},
         plugins:{ legend:legendOpts },
         scales:{
-          x:{ grid:{color:gridColor}, ticks:{color:'rgba(255,255,255,.5)', font:tickFont}, beginAtZero:true },
-          y:{ grid:{display:false}, ticks:{color:'rgba(255,255,255,.5)', font:tickFont, maxRotation:0} }
+          x:{ grid:{color:gridColor}, ticks:{color:'#6B7280', font:tickFont}, beginAtZero:true },
+          y:{ grid:{display:false}, ticks:{color:'#6B7280', font:tickFont, maxRotation:0} }
         }
       }
     })
@@ -1274,6 +1274,14 @@
   window.mapaEnsureInit = async function() {
     const container = document.getElementById('mapa-bio')
     if (!container) return
+    // O painel lateral e a barra de comparação usam position:fixed e
+    // precisam se referenciar à viewport. Reanexa ambos no <body> para
+    // não ficarem presos a um ancestral com transform (ex.: .page-body),
+    // o que faria a barra abrir fora da área visível durante a rolagem.
+    ;['mapa-slide-panel', 'mapa-comp-bar'].forEach(id => {
+      const el = document.getElementById(id)
+      if (el && el.parentElement !== document.body) document.body.appendChild(el)
+    })
     await mapaCarregarLeaflet()
     if (!_mapaLeafletInst || !document.contains(_mapaLeafletInst.getContainer())) {
       if (_mapaLeafletInst) { try { _mapaLeafletInst.remove() } catch(e) {} }
