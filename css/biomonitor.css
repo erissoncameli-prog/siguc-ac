@@ -546,6 +546,13 @@ body { margin: 0; }
   font-family: var(--font-mono); font-size: 28px; font-weight: 700;
   color: var(--bio-ink);
 }
+input.bio-counter-val {
+  border: none; background: transparent; outline: none;
+  -webkit-appearance: none; -moz-appearance: textfield; appearance: none;
+  padding: 0; cursor: text; width: 100%;
+}
+input.bio-counter-val::-webkit-outer-spin-button,
+input.bio-counter-val::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .bio-counter-label {
   display: block; font-size: 10px; color: #9CA3AF;
   text-transform: uppercase; letter-spacing: .05em; text-align: center; margin-top: 2px;
