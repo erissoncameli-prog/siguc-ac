@@ -630,6 +630,8 @@
       <div class="rel-kpi-grid">
         ${kpiCard('Total de ninhos',     v(k.total_ninhos),         '#3b82f6')}
         ${kpiCard('Ovos na postura',     v(k.total_ovos_postura),   '#C9A84C')}
+        ${kpiCard('Ovos predados',       v(k.total_ovos_predados),  '#ef4444')}
+        ${kpiCard('Ovos viáveis',        v(k.total_ovos_viaveis),   '#2A9D6F')}
         ${kpiCard('Ovos íntegros',       v(k.total_ovos_integros),  '#4ade80')}
         ${kpiCard('Filhotes vivos',      v(k.total_filhotes_vivos), '#34d399')}
         ${kpiCard('Filhotes mortos',     v(k.total_filhotes_mortos),'#f87171')}
@@ -1669,6 +1671,10 @@
             <div class="slide-kpi"><div class="slide-kpi-val">${vf(p.ovos_postura)}</div><div class="slide-kpi-lbl">ovos postura</div></div>
           </div>
           <div class="slide-kpi-row">
+            <div class="slide-kpi"><div class="slide-kpi-val" style="color:#2A9D6F">${vf(p.ovos_viaveis)}</div><div class="slide-kpi-lbl">ovos viáveis</div></div>
+            <div class="slide-kpi"><div class="slide-kpi-val" style="color:#f87171">${vf(p.ovos_predados)}</div><div class="slide-kpi-lbl">ovos predados</div></div>
+          </div>
+          <div class="slide-kpi-row">
             <div class="slide-kpi"><div class="slide-kpi-val">${vf(p.comprimento_m,' m')}</div><div class="slide-kpi-lbl">comprimento</div></div>
             <div class="slide-kpi"><div class="slide-kpi-val" style="color:#f87171">${vf(p.ninhos_perdidos)}</div><div class="slide-kpi-lbl">perdidos</div></div>
           </div>
@@ -1779,11 +1785,21 @@
         <div class="slide-kpi-row">
           <div class="slide-kpi">
             <div class="slide-kpi-val" style="color:#C9A84C">${vf(n.qtd_ovos)}</div>
-            <div class="slide-kpi-lbl">ovos total</div>
+            <div class="slide-kpi-lbl">ovos (postura)</div>
           </div>
           <div class="slide-kpi">
             <div class="slide-kpi-val" style="color:#2A9D6F">${vf(n.eclosao?.filhotes_vivos)}</div>
             <div class="slide-kpi-lbl">filhotes vivos</div>
+          </div>
+        </div>
+        <div class="slide-kpi-row">
+          <div class="slide-kpi">
+            <div class="slide-kpi-val" style="color:#2A9D6F">${vf(n.ovos_viaveis)}</div>
+            <div class="slide-kpi-lbl">ovos viáveis</div>
+          </div>
+          <div class="slide-kpi">
+            <div class="slide-kpi-val" style="color:#f87171">${vf(n.ovos_predados)}</div>
+            <div class="slide-kpi-lbl">ovos predados</div>
           </div>
         </div>
         <div class="slide-kpi-row">
