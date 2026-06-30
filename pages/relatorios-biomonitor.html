@@ -1274,6 +1274,14 @@
   window.mapaEnsureInit = async function() {
     const container = document.getElementById('mapa-bio')
     if (!container) return
+    // O painel lateral e a barra de comparação usam position:fixed e
+    // precisam se referenciar à viewport. Reanexa ambos no <body> para
+    // não ficarem presos a um ancestral com transform (ex.: .page-body),
+    // o que faria a barra abrir fora da área visível durante a rolagem.
+    ;['mapa-slide-panel', 'mapa-comp-bar'].forEach(id => {
+      const el = document.getElementById(id)
+      if (el && el.parentElement !== document.body) document.body.appendChild(el)
+    })
     await mapaCarregarLeaflet()
     if (!_mapaLeafletInst || !document.contains(_mapaLeafletInst.getContainer())) {
       if (_mapaLeafletInst) { try { _mapaLeafletInst.remove() } catch(e) {} }

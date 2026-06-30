@@ -13,10 +13,14 @@
 body.siguc-saindo { opacity: 0.5; transition: opacity 0.17s ease; pointer-events: none; }
 
 @keyframes siguc-entrada {
-  from { opacity: 0; transform: translateY(9px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
-.page-body { animation: siguc-entrada 0.28s ease forwards; }
+/* Anima só opacity: animar transform deixaria um transform retido no
+   .page-body (mesmo translateY(0)), criando um containing block que
+   prende elementos position:fixed filhos (ex.: a barra lateral do mapa)
+   ao .page-body em vez da viewport. */
+.page-body { animation: siguc-entrada 0.28s ease both; }
 
 .sidebar::after {
   content: ''; position: absolute; bottom: 80px; left: -30px;
