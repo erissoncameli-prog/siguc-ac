@@ -697,6 +697,8 @@ input.bio-counter-val::-webkit-inner-spin-button { -webkit-appearance: none; mar
 .bio-nfc.status-transferido { border-left-color: #C9A84C; }
 .bio-nfc.status-eclodido    { border-left-color: var(--bio-verde); }
 .bio-nfc.status-perdido     { border-left-color: var(--bio-perigo); }
+.bio-nfc.status-em_bercario { border-left-color: #7C3AED; }
+.bio-nfc.status-soltado     { border-left-color: #0891B2; }
 .bio-nfc-header { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
 .bio-nfc-num { font-family: var(--font-mono); font-size: 13px; font-weight: 700; color: var(--bio-ink); }
 .bio-nfc-status-badge {
@@ -706,6 +708,8 @@ input.bio-counter-val::-webkit-inner-spin-button { -webkit-appearance: none; mar
 .bio-nfc-status-badge.transferido { background: rgba(201,168,76,.15);  color: #9B7A1E; }
 .bio-nfc-status-badge.eclodido    { background: rgba(82,183,136,.15);  color: #1E6B4A; }
 .bio-nfc-status-badge.perdido     { background: rgba(220,38,38,.1);    color: var(--bio-perigo); }
+.bio-nfc-status-badge.em_bercario { background: rgba(124,58,237,.12); color: #5B21B6; }
+.bio-nfc-status-badge.soltado     { background: rgba(8,145,178,.12);  color: #0E7490; }
 .bio-nfc-sync-dot {
   width: 8px; height: 8px; border-radius: 50%; margin-left: auto; flex-shrink: 0;
 }
@@ -1119,10 +1123,12 @@ body.field-mode .bio-home-nome { font-size: 26px; }
   padding: 13px 14px;
   margin-bottom: 10px;
 }
-.bio-nfc.status-encontrado { border-left-color: #3B82F6; }
+.bio-nfc.status-encontrado  { border-left-color: #3B82F6; }
 .bio-nfc.status-transferido { border-left-color: var(--bio-ouro); }
 .bio-nfc.status-eclodido    { border-left-color: var(--bio-verde); }
 .bio-nfc.status-perdido     { border-left-color: var(--bio-perigo); }
+.bio-nfc.status-em_bercario { border-left-color: #7C3AED; }
+.bio-nfc.status-soltado     { border-left-color: #0891B2; }
 
 .bio-nfc-header {
   display: flex; align-items: center; gap: 8px; margin-bottom: 6px;
@@ -1134,10 +1140,12 @@ body.field-mode .bio-home-nome { font-size: 26px; }
   font-size: 11px; font-weight: 700; padding: 2px 9px; border-radius: 99px;
   margin-left: auto;
 }
-.bio-nfc-status-badge.encontrado { background: #DBEAFE; color: #1D4ED8; }
+.bio-nfc-status-badge.encontrado  { background: #DBEAFE; color: #1D4ED8; }
 .bio-nfc-status-badge.transferido { background: var(--bio-ouro-bg); color: #7A5E12; }
-.bio-nfc-status-badge.eclodido   { background: var(--bio-verde-bg); color: #175E3C; }
-.bio-nfc-status-badge.perdido    { background: var(--bio-perigo-bg); color: var(--bio-perigo); }
+.bio-nfc-status-badge.eclodido    { background: var(--bio-verde-bg); color: #175E3C; }
+.bio-nfc-status-badge.perdido     { background: var(--bio-perigo-bg); color: var(--bio-perigo); }
+.bio-nfc-status-badge.em_bercario { background: rgba(124,58,237,.12); color: #5B21B6; }
+.bio-nfc-status-badge.soltado     { background: rgba(8,145,178,.12);  color: #0E7490; }
 .bio-nfc-sync-dot {
   width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0;
 }

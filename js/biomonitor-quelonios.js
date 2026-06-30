@@ -1664,6 +1664,10 @@ async function bioSalvarEntradaBercario() {
     criado_em:     new Date().toISOString(),
   }
 
+  const { ninho: ninhoBerc } = BioApp.formDestinoCtx ?? {}
+  if (ninhoBerc) {
+    await bioOfflineSalvarNinho({ ...ninhoBerc, status: 'em_bercario', status_sync: 'pendente' })
+  }
   await bioOfflineSalvarLote(lote)
   await bioAtualizarBadgeFila()
   await bioAtualizarBadgeBercario()
@@ -1755,9 +1759,13 @@ async function bioSalvarSoltura() {
     criado_em:       new Date().toISOString(),
   }
 
-  // Marca lote como soltado se aplicável
+  // Marca lote como soltado se aplicável e avança status do ninho
   if (lote) {
     await bioOfflineSalvarLote({ ...lote, status: 'soltado' })
+    await bioOfflineSalvarNinho({ ...ninho, status: 'soltado', status_sync: 'pendente' })
+  } else {
+    // Soltura direta no rio — marca ninho como soltado
+    await bioOfflineSalvarNinho({ ...ninho, status: 'soltado', status_sync: 'pendente' })
   }
 
   await bioOfflineSalvarSoltura(sol)
@@ -2140,8 +2148,6 @@ async function bioAbrirFormVisita(ninho) {
   document.getElementById('bio-vis-intervencao').value     = ''
   document.getElementById('bio-vis-obs').value             = ''
   document.getElementById('bio-vis-alagamento').checked    = false
-  bioSetContador('bio-vis-ovos-pred', 0)
-  document.getElementById('bio-vis-ovos-pred-wrap').style.display = 'none'
 
   // Status: íntegro por padrão
   document.querySelectorAll('#bio-vis-status-grid .bio-chip-sel').forEach(c => {
@@ -2151,12 +2157,6 @@ async function bioAbrirFormVisita(ninho) {
   // Umidade: sem seleção
   document.querySelectorAll('#bio-vis-umidade-grid .bio-chip-sel').forEach(c => {
     c.classList.toggle('ativo', c.dataset.val === '')
-  })
-
-  // Predação: nenhuma
-  document.querySelectorAll('#bio-vis-pred-grid .bio-pred-opt').forEach(o => {
-    o.classList.remove('sel', 'perigo')
-    if (o.dataset.pred === 'nenhuma') o.classList.add('sel')
   })
 
   const _alVis = document.getElementById('bio-vis-alertas')
@@ -2188,12 +2188,8 @@ async function bioSalvarVisita() {
     _alertaCampoVisita = bioAlertaSnapshot(_al)
   }
 
-  const statusNinho  = document.querySelector('#bio-vis-status-grid .bio-chip-sel.ativo')?.dataset.val ?? 'integro'
-  const umidade      = document.querySelector('#bio-vis-umidade-grid .bio-chip-sel.ativo')?.dataset.val || null
-  const predacao     = document.querySelector('#bio-vis-pred-grid .bio-pred-opt.sel')?.dataset.pred    ?? 'nenhuma'
-  const ovosPredados = predacao !== 'nenhuma'
-    ? (parseInt(document.getElementById('bio-vis-ovos-pred').value) || 0)
-    : null
+  const statusNinho = document.querySelector('#bio-vis-status-grid .bio-chip-sel.ativo')?.dataset.val ?? 'integro'
+  const umidade     = document.querySelector('#bio-vis-umidade-grid .bio-chip-sel.ativo')?.dataset.val || null
 
   const visita = {
     uuid_cliente:            bioUuid(),
@@ -2205,8 +2201,8 @@ async function bioSalvarVisita() {
     temperatura_substrato_c: parseFloat(document.getElementById('bio-vis-temp-sub').value) || null,
     temperatura_ar_c:        parseFloat(document.getElementById('bio-vis-temp-ar').value)  || null,
     umidade,
-    predacao_incubacao:      predacao,
-    ovos_predados_n:         ovosPredados,
+    predacao_incubacao:      null,
+    ovos_predados_n:         null,
     sinal_alagamento:        document.getElementById('bio-vis-alagamento').checked,
     intervencao:             document.getElementById('bio-vis-intervencao').value.trim() || null,
     observacoes:             document.getElementById('bio-vis-obs').value.trim()         || null,
@@ -2240,23 +2236,6 @@ function bioIniciarFormVisita() {
       btn.classList.add('ativo')
     })
   })
-
-  // Predação + toggle de ovos predados
-  document.querySelectorAll('#bio-vis-pred-grid .bio-pred-opt').forEach(opt => {
-    opt.addEventListener('click', () => {
-      document.querySelectorAll('#bio-vis-pred-grid .bio-pred-opt').forEach(o => o.classList.remove('sel', 'perigo'))
-      opt.classList.add('sel')
-      if (opt.dataset.pred !== 'nenhuma') opt.classList.add('perigo')
-      const wrap = document.getElementById('bio-vis-ovos-pred-wrap')
-      if (wrap) wrap.style.display = opt.dataset.pred !== 'nenhuma' ? '' : 'none'
-    })
-  })
-
-  // Contador de ovos predados
-  const valEl  = document.getElementById('bio-vis-ovos-pred')
-  document.getElementById('bio-vis-ovos-plus')?.addEventListener('click',  () => { valEl.value = parseInt(valEl.value || 0) + 1 })
-  document.getElementById('bio-vis-ovos-minus')?.addEventListener('click', () => { valEl.value = Math.max(0, parseInt(valEl.value || 0) - 1) })
-  valEl?.addEventListener('blur', () => { let v = parseInt(valEl.value); if (isNaN(v) || v < 0) v = 0; valEl.value = v })
 
   document.getElementById('bio-btn-salvar-visita')?.addEventListener('click', bioSalvarVisita)
 }
@@ -2463,7 +2442,7 @@ function bioNinhoCardInner(n, opts = {}) {
     <div class="bio-nfc-acoes">
       ${n.status_validacao === 'em_correcao' ? `<button class="bio-btn-sm prim" data-acao="corrigir">Corrigir</button>` : ''}
       ${status === 'encontrado' || status === 'transferido' ? `<button class="bio-btn-sm prim" data-acao="transferencia">+ Transferência</button>` : ''}
-      ${status !== 'eclodido' && status !== 'perdido' ? `<button class="bio-btn-sm ghost" data-acao="eclosao">Eclosão</button>` : ''}
+      ${['encontrado', 'transferido'].includes(status) ? `<button class="bio-btn-sm ghost" data-acao="eclosao">Eclosão</button>` : ''}
       ${status === 'eclodido' ? `<button class="bio-btn-sm prim" data-acao="soltar">Soltar</button>` : ''}
       ${status !== 'perdido' ? `<button class="bio-btn-sm ghost" data-acao="visita">Visita</button>` : ''}
     </div>` : ''
@@ -3197,6 +3176,8 @@ const bioLabels = {
     transferido: 'Transferido',
     eclodido:    'Eclodido',
     perdido:     'Perdido',
+    em_bercario: 'Em berçário',
+    soltado:     'Soltado',
   },
 }
 
