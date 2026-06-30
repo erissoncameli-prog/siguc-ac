@@ -728,6 +728,37 @@ input.bio-counter-val::-webkit-inner-spin-button { -webkit-appearance: none; mar
 }
 .bio-nfc-ev-chip.transf { background: rgba(26,107,140,.1); color: var(--bio-prim); }
 .bio-nfc-ev-chip.ecl { background: rgba(82,183,136,.15); color: #1E6B4A; }
+.bio-nfc-hist-toggle {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 12px; font-weight: 600; color: #4A6170;
+  background: none; border: none; padding: 7px 0 3px; cursor: pointer;
+  width: 100%; text-align: left;
+}
+.bio-nfc-hist-toggle svg { transition: transform .2s ease; flex-shrink: 0; }
+.bio-nfc-hist-toggle.aberto svg { transform: rotate(90deg); }
+.bio-nfc-hist {
+  display: none; flex-direction: column;
+  padding: 4px 0 4px 14px;
+  border-left: 2px solid #D0E4EF; margin: 0 0 4px 3px;
+}
+.bio-nfc-hist.vis { display: flex; }
+.bio-nfc-hist-ev {
+  display: flex; align-items: flex-start; gap: 8px; padding: 3px 0;
+}
+.bio-nfc-hist-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  flex-shrink: 0; margin-top: 4px;
+}
+.bio-nfc-hist-ev.ev-transf  .bio-nfc-hist-dot { background: #7C3AED; }
+.bio-nfc-hist-ev.ev-visita  .bio-nfc-hist-dot { background: #6B7280; }
+.bio-nfc-hist-ev.ev-eclosao .bio-nfc-hist-dot { background: #2A9D6F; }
+.bio-nfc-hist-ev.ev-bercario .bio-nfc-hist-dot { background: #5B21B6; }
+.bio-nfc-hist-ev.ev-soltura .bio-nfc-hist-dot { background: #0891B2; }
+.bio-nfc-hist-data {
+  font-size: 11px; color: #9CA3AF; font-family: var(--font-mono);
+  flex-shrink: 0; padding-top: 2px; min-width: 32px;
+}
+.bio-nfc-hist-txt { font-size: 12px; color: #374151; line-height: 1.4; flex: 1; }
 .bio-nfc-monitor { font-size: 11px; color: #9CA3AF; margin-top: 2px; }
 
 /* legacy (mantém compatibilidade com tela-fila antiga) */
@@ -1176,6 +1207,37 @@ body.field-mode .bio-home-nome { font-size: 26px; }
 }
 .bio-nfc-ev-chip.transf { background: rgba(139,92,246,.13); color: #6D28D9; }
 .bio-nfc-ev-chip.ecl    { background: var(--bio-verde-bg); color: #175E3C; }
+.bio-nfc-hist-toggle {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 12px; font-weight: 600; color: #4A6170;
+  background: none; border: none; padding: 7px 0 3px; cursor: pointer;
+  width: 100%; text-align: left;
+}
+.bio-nfc-hist-toggle svg { transition: transform .2s ease; flex-shrink: 0; }
+.bio-nfc-hist-toggle.aberto svg { transform: rotate(90deg); }
+.bio-nfc-hist {
+  display: none; flex-direction: column;
+  padding: 4px 0 4px 14px;
+  border-left: 2px solid #D0E4EF; margin: 0 0 4px 3px;
+}
+.bio-nfc-hist.vis { display: flex; }
+.bio-nfc-hist-ev {
+  display: flex; align-items: flex-start; gap: 8px; padding: 3px 0;
+}
+.bio-nfc-hist-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  flex-shrink: 0; margin-top: 4px;
+}
+.bio-nfc-hist-ev.ev-transf  .bio-nfc-hist-dot { background: #7C3AED; }
+.bio-nfc-hist-ev.ev-visita  .bio-nfc-hist-dot { background: #6B7280; }
+.bio-nfc-hist-ev.ev-eclosao .bio-nfc-hist-dot { background: #2A9D6F; }
+.bio-nfc-hist-ev.ev-bercario .bio-nfc-hist-dot { background: #5B21B6; }
+.bio-nfc-hist-ev.ev-soltura .bio-nfc-hist-dot { background: #0891B2; }
+.bio-nfc-hist-data {
+  font-size: 11px; color: #9CA3AF; font-family: var(--font-mono);
+  flex-shrink: 0; padding-top: 2px; min-width: 32px;
+}
+.bio-nfc-hist-txt { font-size: 12px; color: #374151; line-height: 1.4; flex: 1; }
 .bio-nfc-monitor {
   font-size: 11px; color: #9CA3AF; margin-top: 4px;
 }

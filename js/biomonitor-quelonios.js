@@ -2279,6 +2279,97 @@ function bioMapNinhoPraias(n, praias) {
   }
 }
 
+async function bioCarregarEventosNinhos(ninhos) {
+  const VISITA_STATUS = {
+    integro: 'íntegro', perturbado: 'perturbado',
+    parcial_predado: 'parc. predado', destruido: 'destruído', alagado: 'alagado',
+  }
+  const mapa = {}
+  ninhos.forEach(n => { mapa[n.uuid_cliente] = [] })
+
+  // Eclosão derivada dos campos já carregados no ninho
+  ninhos.forEach(n => {
+    if (!n.data_nascimento) return
+    mapa[n.uuid_cliente].push({
+      tipo: 'eclosao', data: n.data_nascimento,
+      txt: ['Eclosão',
+        n.filhotes_vivos   != null ? `${n.filhotes_vivos} vivos`      : null,
+        n.filhotes_mortos          ? `${n.filhotes_mortos} mortos`     : null,
+        n.ovos_nao_nascidos        ? `${n.ovos_nao_nascidos} não nasc.`: null,
+      ].filter(Boolean).join(' · '),
+    })
+  })
+
+  if (!navigator.onLine) {
+    ninhos.forEach(n => { n._eventos = mapa[n.uuid_cliente] ?? [] })
+    return
+  }
+
+  const idMap = {}
+  ninhos.forEach(n => { if (n.id) idMap[n.id] = n.uuid_cliente })
+  const serverIds = Object.keys(idMap)
+  if (!serverIds.length) {
+    ninhos.forEach(n => { n._eventos = mapa[n.uuid_cliente] ?? [] })
+    return
+  }
+
+  try {
+    const sb = bioSupabase()
+    const [rTransf, rVisita, rLote, rSol] = await Promise.all([
+      sb.from('vw_transferencias_praia')
+        .select('ninho_id,data_transferencia,praia_destino_nome,local_destino')
+        .in('ninho_id', serverIds),
+      sb.from('visitas_ninho')
+        .select('ninho_id,data_visita,status_ninho,temperatura_substrato_c,temperatura_ar_c')
+        .in('ninho_id', serverIds),
+      sb.from('lotes_bercario')
+        .select('ninho_id,data_entrada,qtd_entrada,bercario_nome')
+        .in('ninho_id', serverIds),
+      sb.from('solturas_filhotes')
+        .select('ninho_id,data_soltura,qtd_soltada,mortalidade,via_bercario,local_descricao')
+        .in('ninho_id', serverIds),
+    ])
+
+    const pushRows = (res, tipo, fn) => {
+      ;(res.data ?? []).forEach(r => {
+        const uuid = idMap[r.ninho_id]
+        if (uuid && mapa[uuid]) mapa[uuid].push({ tipo, ...fn(r) })
+      })
+    }
+
+    pushRows(rTransf, 'transf', r => ({
+      data: r.data_transferencia,
+      txt: `Transferido${r.praia_destino_nome ? ' → ' + r.praia_destino_nome
+        : r.local_destino ? ' → ' + r.local_destino : ''}`,
+    }))
+    pushRows(rVisita, 'visita', r => ({
+      data: r.data_visita,
+      txt: ['Visita',
+        r.status_ninho ? VISITA_STATUS[r.status_ninho] : null,
+        r.temperatura_substrato_c != null ? `${r.temperatura_substrato_c}°C`
+          : r.temperatura_ar_c != null ? `${r.temperatura_ar_c}°C` : null,
+      ].filter(Boolean).join(' · '),
+    }))
+    pushRows(rLote, 'bercario', r => ({
+      data: r.data_entrada,
+      txt: `Berçário · ${r.qtd_entrada} filh.${r.bercario_nome ? ' → ' + r.bercario_nome : ''}`,
+    }))
+    pushRows(rSol, 'soltura', r => ({
+      data: r.data_soltura,
+      txt: [`Soltura · ${r.qtd_soltada} filh.`,
+        r.mortalidade ? `${r.mortalidade} mort.` : null,
+        r.via_bercario ? '(via berçário)' : null,
+        r.local_descricao || null,
+      ].filter(Boolean).join(' · '),
+    }))
+  } catch (e) {
+    console.warn('[biomonitor eventos]', e)
+  }
+
+  Object.values(mapa).forEach(evs => evs.sort((a, b) => (a.data ?? '') < (b.data ?? '') ? -1 : 1))
+  ninhos.forEach(n => { n._eventos = mapa[n.uuid_cliente] ?? [] })
+}
+
 async function bioCarregarAbertos() {
   const filtroPraia  = BioApp.abertosFiltroPraia
   const filtroStatus = BioApp.abertosStatusFiltro
@@ -2350,6 +2441,7 @@ async function bioCarregarAbertos() {
     estadoEl.hidden = true
   }
 
+  await bioCarregarEventosNinhos(ninhos)
   bioRenderizarListaNinhos('bio-lista-abertos', ninhos, true)
 }
 
@@ -2447,6 +2539,22 @@ function bioNinhoCardInner(n, opts = {}) {
       ${status !== 'perdido' ? `<button class="bio-btn-sm ghost" data-acao="visita">Visita</button>` : ''}
     </div>` : ''
 
+  const evs = Array.isArray(n._eventos) ? n._eventos : []
+  const histHtml = evs.length ? (() => {
+    const fd = iso => new Date(iso + 'T12:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+    const rows = evs.map(ev => `
+      <div class="bio-nfc-hist-ev ev-${ev.tipo}">
+        <div class="bio-nfc-hist-dot"></div>
+        <span class="bio-nfc-hist-data">${fd(ev.data)}</span>
+        <span class="bio-nfc-hist-txt">${esc(ev.txt)}</span>
+      </div>`).join('')
+    return `<button class="bio-nfc-hist-toggle" data-nh-toggle>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+      ${evs.length} evento${evs.length !== 1 ? 's' : ''}
+    </button>
+    <div class="bio-nfc-hist" data-nh-hist>${rows}</div>`
+  })() : ''
+
   return `
     <div class="bio-nfc-header">
       <span class="bio-nfc-num">#${numExib}</span>
@@ -2463,6 +2571,7 @@ function bioNinhoCardInner(n, opts = {}) {
     ${ovosHtml}
     ${condicoesHtml}
     ${eclosaoHtml}
+    ${histHtml}
     ${localChip ? `<div class="bio-nfc-eventos">${localChip}</div>` : ''}
     ${acoesHtml}
   `
@@ -2489,6 +2598,15 @@ function bioRenderizarListaNinhos(containerId, ninhos, mostrarAcoes) {
         if (btn.dataset.acao === 'eclosao')       bioAbrirFormEclosao(n)
         if (btn.dataset.acao === 'visita')        bioAbrirFormVisita(n)
         if (btn.dataset.acao === 'soltar')        bioAbrirTelaDestino(n, null)
+      })
+    })
+    card.querySelectorAll('[data-nh-toggle]').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation()
+        const hist = card.querySelector('[data-nh-hist]')
+        if (!hist) return
+        const vis = hist.classList.toggle('vis')
+        btn.classList.toggle('aberto', vis)
       })
     })
     el.appendChild(card)
