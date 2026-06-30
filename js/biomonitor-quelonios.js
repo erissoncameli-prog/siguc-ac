@@ -1548,7 +1548,7 @@ async function bioAbrirFormEclosao(ninho) {
 
 function bioSetContador(id, val) {
   const el = document.getElementById(id)
-  if (el) el.textContent = val
+  if (el) el.value = val
 }
 
 function bioIniciarContadores() {
@@ -1560,8 +1560,9 @@ function bioIniciarContadores() {
     const valEl  = document.getElementById(idValor)
     const plusEl = document.getElementById(`${idValor}-plus`)
     const minEl  = document.getElementById(`${idValor}-minus`)
-    plusEl?.addEventListener('click',  () => { const v = parseInt(valEl.textContent) + 1; valEl.textContent = v })
-    minEl?.addEventListener('click',   () => { const v = Math.max(min, parseInt(valEl.textContent) - 1); valEl.textContent = v })
+    plusEl?.addEventListener('click',  () => { valEl.value = parseInt(valEl.value || 0) + 1 })
+    minEl?.addEventListener('click',   () => { valEl.value = Math.max(min, parseInt(valEl.value || 0) - 1) })
+    valEl?.addEventListener('blur',    () => { let v = parseInt(valEl.value); if (isNaN(v) || v < min) v = min; valEl.value = v })
   })
 
   // Predação
@@ -1577,9 +1578,9 @@ function bioIniciarContadores() {
 async function bioSalvarEclosao() {
   const ninho       = BioApp.formNinhoAtualizar
   const data        = document.getElementById('bio-ecl-data').value
-  const vivos       = parseInt(document.getElementById('bio-ecl-vivos').textContent)    || 0
-  const mortos      = parseInt(document.getElementById('bio-ecl-mortos').textContent)   || 0
-  const naoNascidos = parseInt(document.getElementById('bio-ecl-nao-nasc').textContent) || 0
+  const vivos       = parseInt(document.getElementById('bio-ecl-vivos').value)    || 0
+  const mortos      = parseInt(document.getElementById('bio-ecl-mortos').value)   || 0
+  const naoNascidos = parseInt(document.getElementById('bio-ecl-nao-nasc').value) || 0
   const predacao    = document.querySelector('.bio-pred-opt.sel')?.dataset.pred ?? 'nenhuma'
 
   if (!data)  { bioToast('Informe a data de nascimento.', 'err'); return }
@@ -1641,7 +1642,7 @@ async function bioSalvarEntradaBercario() {
   if (!ninho) return
   const berc = BioApp.formBercarioSelecionado
   const data = document.getElementById('bio-berc-data').value
-  const qtd  = parseInt(document.getElementById('bio-berc-qtd').textContent) || 0
+  const qtd  = parseInt(document.getElementById('bio-berc-qtd').value) || 0
 
   if (!berc) { bioToast('Selecione um berçário.', 'err'); return }
   if (!data) { bioToast('Informe a data de entrada.', 'err'); return }
@@ -1663,6 +1664,10 @@ async function bioSalvarEntradaBercario() {
     criado_em:     new Date().toISOString(),
   }
 
+  const { ninho: ninhoBerc } = BioApp.formDestinoCtx ?? {}
+  if (ninhoBerc) {
+    await bioOfflineSalvarNinho({ ...ninhoBerc, status: 'em_bercario', status_sync: 'pendente' })
+  }
   await bioOfflineSalvarLote(lote)
   await bioAtualizarBadgeFila()
   await bioAtualizarBadgeBercario()
@@ -1728,8 +1733,8 @@ async function bioSalvarSoltura() {
   if (!ninho) return
 
   const data = document.getElementById('bio-sol-data').value
-  const qtd  = parseInt(document.getElementById('bio-sol-qtd').textContent)  || 0
-  const mort = parseInt(document.getElementById('bio-sol-mort').textContent) || 0
+  const qtd  = parseInt(document.getElementById('bio-sol-qtd').value)  || 0
+  const mort = parseInt(document.getElementById('bio-sol-mort').value) || 0
 
   if (!data)    { bioToast('Informe a data da soltura.', 'err'); return }
   if (qtd <= 0) { bioToast('Informe a quantidade soltada.', 'err'); return }
@@ -1754,9 +1759,13 @@ async function bioSalvarSoltura() {
     criado_em:       new Date().toISOString(),
   }
 
-  // Marca lote como soltado se aplicável
+  // Marca lote como soltado se aplicável e avança status do ninho
   if (lote) {
     await bioOfflineSalvarLote({ ...lote, status: 'soltado' })
+    await bioOfflineSalvarNinho({ ...ninho, status: 'soltado', status_sync: 'pendente' })
+  } else {
+    // Soltura direta no rio — marca ninho como soltado
+    await bioOfflineSalvarNinho({ ...ninho, status: 'soltado', status_sync: 'pendente' })
   }
 
   await bioOfflineSalvarSoltura(sol)
@@ -1952,7 +1961,7 @@ function bioAbrirFormOcorrencia(lote) {
   document.getElementById('bio-oc-amostrados').value = ''
   document.getElementById('bio-oc-causa').value = ''
   document.getElementById('bio-oc-descricao').value = ''
-  document.getElementById('bio-oc-afetados').textContent = '0'
+  document.getElementById('bio-oc-afetados').value = 0
 
   // Fotos
   BioApp._fotosOc = []
@@ -2006,7 +2015,7 @@ async function bioSalvarOcorrencia() {
     comprimento_medio_cm: parseFloat(document.getElementById('bio-oc-comp').value)         || null,
     peso_medio_g:         parseFloat(document.getElementById('bio-oc-peso').value)         || null,
     n_amostrados:         parseInt(document.getElementById('bio-oc-amostrados').value)     || null,
-    qtd_afetados:         parseInt(document.getElementById('bio-oc-afetados').textContent) || null,
+    qtd_afetados:         parseInt(document.getElementById('bio-oc-afetados').value) || null,
     causa:                document.getElementById('bio-oc-causa').value.trim()             || null,
     descricao:            document.getElementById('bio-oc-descricao').value.trim()         || null,
     foto_urls:            BioApp._fotosOc?.length ? [...BioApp._fotosOc] : [],
@@ -2067,21 +2076,25 @@ function bioIniciarPosEclosao() {
 
   // Contadores berçário
   const bercQtdEl = document.getElementById('bio-berc-qtd')
-  document.getElementById('bio-berc-qtd-plus')?.addEventListener('click',  () => { bercQtdEl.textContent = parseInt(bercQtdEl.textContent) + 1 })
-  document.getElementById('bio-berc-qtd-minus')?.addEventListener('click', () => { bercQtdEl.textContent = Math.max(0, parseInt(bercQtdEl.textContent) - 1) })
+  document.getElementById('bio-berc-qtd-plus')?.addEventListener('click',  () => { bercQtdEl.value = parseInt(bercQtdEl.value || 0) + 1 })
+  document.getElementById('bio-berc-qtd-minus')?.addEventListener('click', () => { bercQtdEl.value = Math.max(0, parseInt(bercQtdEl.value || 0) - 1) })
+  bercQtdEl?.addEventListener('blur', () => { let v = parseInt(bercQtdEl.value); if (isNaN(v) || v < 0) v = 0; bercQtdEl.value = v })
 
   // Contadores soltura
   const solQtdEl  = document.getElementById('bio-sol-qtd')
   const solMortEl = document.getElementById('bio-sol-mort')
-  document.getElementById('bio-sol-qtd-plus')?.addEventListener('click',   () => { solQtdEl.textContent  = parseInt(solQtdEl.textContent)  + 1 })
-  document.getElementById('bio-sol-qtd-minus')?.addEventListener('click',  () => { solQtdEl.textContent  = Math.max(0, parseInt(solQtdEl.textContent)  - 1) })
-  document.getElementById('bio-sol-mort-plus')?.addEventListener('click',  () => { solMortEl.textContent = parseInt(solMortEl.textContent) + 1 })
-  document.getElementById('bio-sol-mort-minus')?.addEventListener('click', () => { solMortEl.textContent = Math.max(0, parseInt(solMortEl.textContent) - 1) })
+  document.getElementById('bio-sol-qtd-plus')?.addEventListener('click',   () => { solQtdEl.value  = parseInt(solQtdEl.value  || 0) + 1 })
+  document.getElementById('bio-sol-qtd-minus')?.addEventListener('click',  () => { solQtdEl.value  = Math.max(0, parseInt(solQtdEl.value  || 0) - 1) })
+  document.getElementById('bio-sol-mort-plus')?.addEventListener('click',  () => { solMortEl.value = parseInt(solMortEl.value || 0) + 1 })
+  document.getElementById('bio-sol-mort-minus')?.addEventListener('click', () => { solMortEl.value = Math.max(0, parseInt(solMortEl.value || 0) - 1) })
+  solQtdEl?.addEventListener('blur',  () => { let v = parseInt(solQtdEl.value);  if (isNaN(v) || v < 0) v = 0; solQtdEl.value  = v })
+  solMortEl?.addEventListener('blur', () => { let v = parseInt(solMortEl.value); if (isNaN(v) || v < 0) v = 0; solMortEl.value = v })
 
   // Contador afetados (ocorrência)
   const ocAffEl = document.getElementById('bio-oc-afetados')
-  document.getElementById('bio-oc-aff-plus')?.addEventListener('click',  () => { if (ocAffEl) ocAffEl.textContent = parseInt(ocAffEl.textContent) + 1 })
-  document.getElementById('bio-oc-aff-minus')?.addEventListener('click', () => { if (ocAffEl) ocAffEl.textContent = Math.max(0, parseInt(ocAffEl.textContent) - 1) })
+  document.getElementById('bio-oc-aff-plus')?.addEventListener('click',  () => { if (ocAffEl) ocAffEl.value = parseInt(ocAffEl.value || 0) + 1 })
+  document.getElementById('bio-oc-aff-minus')?.addEventListener('click', () => { if (ocAffEl) ocAffEl.value = Math.max(0, parseInt(ocAffEl.value || 0) - 1) })
+  ocAffEl?.addEventListener('blur', () => { let v = parseInt(ocAffEl.value); if (isNaN(v) || v < 0) v = 0; ocAffEl.value = v })
 
   // Chips de tipo de ocorrência
   document.getElementById('bio-oc-tipo-grid')?.addEventListener('click', e => {
@@ -2135,8 +2148,6 @@ async function bioAbrirFormVisita(ninho) {
   document.getElementById('bio-vis-intervencao').value     = ''
   document.getElementById('bio-vis-obs').value             = ''
   document.getElementById('bio-vis-alagamento').checked    = false
-  bioSetContador('bio-vis-ovos-pred', 0)
-  document.getElementById('bio-vis-ovos-pred-wrap').style.display = 'none'
 
   // Status: íntegro por padrão
   document.querySelectorAll('#bio-vis-status-grid .bio-chip-sel').forEach(c => {
@@ -2146,12 +2157,6 @@ async function bioAbrirFormVisita(ninho) {
   // Umidade: sem seleção
   document.querySelectorAll('#bio-vis-umidade-grid .bio-chip-sel').forEach(c => {
     c.classList.toggle('ativo', c.dataset.val === '')
-  })
-
-  // Predação: nenhuma
-  document.querySelectorAll('#bio-vis-pred-grid .bio-pred-opt').forEach(o => {
-    o.classList.remove('sel', 'perigo')
-    if (o.dataset.pred === 'nenhuma') o.classList.add('sel')
   })
 
   const _alVis = document.getElementById('bio-vis-alertas')
@@ -2183,12 +2188,8 @@ async function bioSalvarVisita() {
     _alertaCampoVisita = bioAlertaSnapshot(_al)
   }
 
-  const statusNinho  = document.querySelector('#bio-vis-status-grid .bio-chip-sel.ativo')?.dataset.val ?? 'integro'
-  const umidade      = document.querySelector('#bio-vis-umidade-grid .bio-chip-sel.ativo')?.dataset.val || null
-  const predacao     = document.querySelector('#bio-vis-pred-grid .bio-pred-opt.sel')?.dataset.pred    ?? 'nenhuma'
-  const ovosPredados = predacao !== 'nenhuma'
-    ? (parseInt(document.getElementById('bio-vis-ovos-pred').textContent) || 0)
-    : null
+  const statusNinho = document.querySelector('#bio-vis-status-grid .bio-chip-sel.ativo')?.dataset.val ?? 'integro'
+  const umidade     = document.querySelector('#bio-vis-umidade-grid .bio-chip-sel.ativo')?.dataset.val || null
 
   const visita = {
     uuid_cliente:            bioUuid(),
@@ -2200,8 +2201,8 @@ async function bioSalvarVisita() {
     temperatura_substrato_c: parseFloat(document.getElementById('bio-vis-temp-sub').value) || null,
     temperatura_ar_c:        parseFloat(document.getElementById('bio-vis-temp-ar').value)  || null,
     umidade,
-    predacao_incubacao:      predacao,
-    ovos_predados_n:         ovosPredados,
+    predacao_incubacao:      null,
+    ovos_predados_n:         null,
     sinal_alagamento:        document.getElementById('bio-vis-alagamento').checked,
     intervencao:             document.getElementById('bio-vis-intervencao').value.trim() || null,
     observacoes:             document.getElementById('bio-vis-obs').value.trim()         || null,
@@ -2235,22 +2236,6 @@ function bioIniciarFormVisita() {
       btn.classList.add('ativo')
     })
   })
-
-  // Predação + toggle de ovos predados
-  document.querySelectorAll('#bio-vis-pred-grid .bio-pred-opt').forEach(opt => {
-    opt.addEventListener('click', () => {
-      document.querySelectorAll('#bio-vis-pred-grid .bio-pred-opt').forEach(o => o.classList.remove('sel', 'perigo'))
-      opt.classList.add('sel')
-      if (opt.dataset.pred !== 'nenhuma') opt.classList.add('perigo')
-      const wrap = document.getElementById('bio-vis-ovos-pred-wrap')
-      if (wrap) wrap.style.display = opt.dataset.pred !== 'nenhuma' ? '' : 'none'
-    })
-  })
-
-  // Contador de ovos predados
-  const valEl  = document.getElementById('bio-vis-ovos-pred')
-  document.getElementById('bio-vis-ovos-plus')?.addEventListener('click',  () => { valEl.textContent = parseInt(valEl.textContent) + 1 })
-  document.getElementById('bio-vis-ovos-minus')?.addEventListener('click', () => { valEl.textContent = Math.max(0, parseInt(valEl.textContent) - 1) })
 
   document.getElementById('bio-btn-salvar-visita')?.addEventListener('click', bioSalvarVisita)
 }
@@ -2292,6 +2277,97 @@ function bioMapNinhoPraias(n, praias) {
     praia_atual_nome: n.praia_atual_nome ?? atual?.nome ?? orig?.nome,
     numero_atual:     n.numero_atual     ?? n.numero_ninho,
   }
+}
+
+async function bioCarregarEventosNinhos(ninhos) {
+  const VISITA_STATUS = {
+    integro: 'íntegro', perturbado: 'perturbado',
+    parcial_predado: 'parc. predado', destruido: 'destruído', alagado: 'alagado',
+  }
+  const mapa = {}
+  ninhos.forEach(n => { mapa[n.uuid_cliente] = [] })
+
+  // Eclosão derivada dos campos já carregados no ninho
+  ninhos.forEach(n => {
+    if (!n.data_nascimento) return
+    mapa[n.uuid_cliente].push({
+      tipo: 'eclosao', data: n.data_nascimento,
+      txt: ['Eclosão',
+        n.filhotes_vivos   != null ? `${n.filhotes_vivos} vivos`      : null,
+        n.filhotes_mortos          ? `${n.filhotes_mortos} mortos`     : null,
+        n.ovos_nao_nascidos        ? `${n.ovos_nao_nascidos} não nasc.`: null,
+      ].filter(Boolean).join(' · '),
+    })
+  })
+
+  if (!navigator.onLine) {
+    ninhos.forEach(n => { n._eventos = mapa[n.uuid_cliente] ?? [] })
+    return
+  }
+
+  const idMap = {}
+  ninhos.forEach(n => { if (n.id) idMap[n.id] = n.uuid_cliente })
+  const serverIds = Object.keys(idMap)
+  if (!serverIds.length) {
+    ninhos.forEach(n => { n._eventos = mapa[n.uuid_cliente] ?? [] })
+    return
+  }
+
+  try {
+    const sb = bioSupabase()
+    const [rTransf, rVisita, rLote, rSol] = await Promise.all([
+      sb.from('vw_transferencias_praia')
+        .select('ninho_id,data_transferencia,praia_destino_nome,local_destino')
+        .in('ninho_id', serverIds),
+      sb.from('visitas_ninho')
+        .select('ninho_id,data_visita,status_ninho,temperatura_substrato_c,temperatura_ar_c')
+        .in('ninho_id', serverIds),
+      sb.from('lotes_bercario')
+        .select('ninho_id,data_entrada,qtd_entrada,bercario_nome')
+        .in('ninho_id', serverIds),
+      sb.from('solturas_filhotes')
+        .select('ninho_id,data_soltura,qtd_soltada,mortalidade,via_bercario,local_descricao')
+        .in('ninho_id', serverIds),
+    ])
+
+    const pushRows = (res, tipo, fn) => {
+      ;(res.data ?? []).forEach(r => {
+        const uuid = idMap[r.ninho_id]
+        if (uuid && mapa[uuid]) mapa[uuid].push({ tipo, ...fn(r) })
+      })
+    }
+
+    pushRows(rTransf, 'transf', r => ({
+      data: r.data_transferencia,
+      txt: `Transferido${r.praia_destino_nome ? ' → ' + r.praia_destino_nome
+        : r.local_destino ? ' → ' + r.local_destino : ''}`,
+    }))
+    pushRows(rVisita, 'visita', r => ({
+      data: r.data_visita,
+      txt: ['Visita',
+        r.status_ninho ? VISITA_STATUS[r.status_ninho] : null,
+        r.temperatura_substrato_c != null ? `${r.temperatura_substrato_c}°C`
+          : r.temperatura_ar_c != null ? `${r.temperatura_ar_c}°C` : null,
+      ].filter(Boolean).join(' · '),
+    }))
+    pushRows(rLote, 'bercario', r => ({
+      data: r.data_entrada,
+      txt: `Berçário · ${r.qtd_entrada} filh.${r.bercario_nome ? ' → ' + r.bercario_nome : ''}`,
+    }))
+    pushRows(rSol, 'soltura', r => ({
+      data: r.data_soltura,
+      txt: [`Soltura · ${r.qtd_soltada} filh.`,
+        r.mortalidade ? `${r.mortalidade} mort.` : null,
+        r.via_bercario ? '(via berçário)' : null,
+        r.local_descricao || null,
+      ].filter(Boolean).join(' · '),
+    }))
+  } catch (e) {
+    console.warn('[biomonitor eventos]', e)
+  }
+
+  Object.values(mapa).forEach(evs => evs.sort((a, b) => (a.data ?? '') < (b.data ?? '') ? -1 : 1))
+  ninhos.forEach(n => { n._eventos = mapa[n.uuid_cliente] ?? [] })
 }
 
 async function bioCarregarAbertos() {
@@ -2365,6 +2441,7 @@ async function bioCarregarAbertos() {
     estadoEl.hidden = true
   }
 
+  await bioCarregarEventosNinhos(ninhos)
   bioRenderizarListaNinhos('bio-lista-abertos', ninhos, true)
 }
 
@@ -2457,10 +2534,26 @@ function bioNinhoCardInner(n, opts = {}) {
     <div class="bio-nfc-acoes">
       ${n.status_validacao === 'em_correcao' ? `<button class="bio-btn-sm prim" data-acao="corrigir">Corrigir</button>` : ''}
       ${status === 'encontrado' || status === 'transferido' ? `<button class="bio-btn-sm prim" data-acao="transferencia">+ Transferência</button>` : ''}
-      ${status !== 'eclodido' && status !== 'perdido' ? `<button class="bio-btn-sm ghost" data-acao="eclosao">Eclosão</button>` : ''}
+      ${['encontrado', 'transferido'].includes(status) ? `<button class="bio-btn-sm ghost" data-acao="eclosao">Eclosão</button>` : ''}
       ${status === 'eclodido' ? `<button class="bio-btn-sm prim" data-acao="soltar">Soltar</button>` : ''}
       ${status !== 'perdido' ? `<button class="bio-btn-sm ghost" data-acao="visita">Visita</button>` : ''}
     </div>` : ''
+
+  const evs = Array.isArray(n._eventos) ? n._eventos : []
+  const histHtml = evs.length ? (() => {
+    const fd = iso => new Date(iso + 'T12:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+    const rows = evs.map(ev => `
+      <div class="bio-nfc-hist-ev ev-${ev.tipo}">
+        <div class="bio-nfc-hist-dot"></div>
+        <span class="bio-nfc-hist-data">${fd(ev.data)}</span>
+        <span class="bio-nfc-hist-txt">${esc(ev.txt)}</span>
+      </div>`).join('')
+    return `<button class="bio-nfc-hist-toggle" data-nh-toggle>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+      ${evs.length} evento${evs.length !== 1 ? 's' : ''}
+    </button>
+    <div class="bio-nfc-hist" data-nh-hist>${rows}</div>`
+  })() : ''
 
   return `
     <div class="bio-nfc-header">
@@ -2478,6 +2571,7 @@ function bioNinhoCardInner(n, opts = {}) {
     ${ovosHtml}
     ${condicoesHtml}
     ${eclosaoHtml}
+    ${histHtml}
     ${localChip ? `<div class="bio-nfc-eventos">${localChip}</div>` : ''}
     ${acoesHtml}
   `
@@ -2504,6 +2598,15 @@ function bioRenderizarListaNinhos(containerId, ninhos, mostrarAcoes) {
         if (btn.dataset.acao === 'eclosao')       bioAbrirFormEclosao(n)
         if (btn.dataset.acao === 'visita')        bioAbrirFormVisita(n)
         if (btn.dataset.acao === 'soltar')        bioAbrirTelaDestino(n, null)
+      })
+    })
+    card.querySelectorAll('[data-nh-toggle]').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation()
+        const hist = card.querySelector('[data-nh-hist]')
+        if (!hist) return
+        const vis = hist.classList.toggle('vis')
+        btn.classList.toggle('aberto', vis)
       })
     })
     el.appendChild(card)
@@ -3191,6 +3294,8 @@ const bioLabels = {
     transferido: 'Transferido',
     eclodido:    'Eclodido',
     perdido:     'Perdido',
+    em_bercario: 'Em berçário',
+    soltado:     'Soltado',
   },
 }
 
