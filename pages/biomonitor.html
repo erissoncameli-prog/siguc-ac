@@ -703,7 +703,7 @@
       <div class="bio-counter-row">
         <button type="button" id="bio-ecl-vivos-minus" class="bio-counter-btn">−</button>
         <div style="flex:1;text-align:center">
-          <span class="bio-counter-val" id="bio-ecl-vivos">0</span>
+          <input type="number" inputmode="numeric" class="bio-counter-val" id="bio-ecl-vivos" value="0" min="0">
           <span class="bio-counter-label">Vivos</span>
         </div>
         <button type="button" id="bio-ecl-vivos-plus" class="bio-counter-btn">+</button>
@@ -716,7 +716,7 @@
       <div class="bio-counter-row">
         <button type="button" id="bio-ecl-mortos-minus" class="bio-counter-btn">−</button>
         <div style="flex:1;text-align:center">
-          <span class="bio-counter-val" id="bio-ecl-mortos">0</span>
+          <input type="number" inputmode="numeric" class="bio-counter-val" id="bio-ecl-mortos" value="0" min="0">
           <span class="bio-counter-label">Mortos</span>
         </div>
         <button type="button" id="bio-ecl-mortos-plus" class="bio-counter-btn">+</button>
@@ -729,7 +729,7 @@
       <div class="bio-counter-row">
         <button type="button" id="bio-ecl-nao-nasc-minus" class="bio-counter-btn">−</button>
         <div style="flex:1;text-align:center">
-          <span class="bio-counter-val" id="bio-ecl-nao-nasc">0</span>
+          <input type="number" inputmode="numeric" class="bio-counter-val" id="bio-ecl-nao-nasc" value="0" min="0">
           <span class="bio-counter-label">Não nascidos</span>
         </div>
         <button type="button" id="bio-ecl-nao-nasc-plus" class="bio-counter-btn">+</button>
@@ -852,43 +852,6 @@
         <button type="button" class="bio-chip-sel" data-val="seco">Seco</button>
         <button type="button" class="bio-chip-sel" data-val="umido">Úmido</button>
         <button type="button" class="bio-chip-sel" data-val="encharcado">Encharcado</button>
-      </div>
-    </div>
-
-    <!-- Predação durante incubação -->
-    <div class="bio-form-section">
-      <span class="bio-form-label">Predação durante incubação</span>
-      <small style="display:block;margin-bottom:8px;opacity:.55;font-size:11px">Predação de ovos — diferente da predação de filhotes na eclosão</small>
-      <div class="bio-pred-grid" id="bio-vis-pred-grid">
-        <div class="bio-pred-opt sel" data-pred="nenhuma">
-          <span class="bio-pred-radio"></span>
-          <div class="bio-pred-texto"><strong>Nenhuma</strong><span>Sem evidências</span></div>
-        </div>
-        <div class="bio-pred-opt" data-pred="por_animais">
-          <span class="bio-pred-radio"></span>
-          <div class="bio-pred-texto"><strong>Por animais</strong><span>Teiú, queixada, outros</span></div>
-        </div>
-        <div class="bio-pred-opt" data-pred="por_pessoas">
-          <span class="bio-pred-radio"></span>
-          <div class="bio-pred-texto"><strong>Por pessoas</strong><span>Coleta, pisoteio</span></div>
-        </div>
-        <div class="bio-pred-opt" data-pred="desconhecida">
-          <span class="bio-pred-radio"></span>
-          <div class="bio-pred-texto"><strong>Desconhecida</strong><span>Causa não identificada</span></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Ovos predados (visível só se houve predação) -->
-    <div class="bio-form-section" id="bio-vis-ovos-pred-wrap" style="display:none">
-      <span class="bio-form-label">Ovos predados</span>
-      <div class="bio-counter-row">
-        <button type="button" id="bio-vis-ovos-minus" class="bio-counter-btn">−</button>
-        <div style="flex:1;text-align:center">
-          <span class="bio-counter-val" id="bio-vis-ovos-pred">0</span>
-          <span class="bio-counter-label">Ovos</span>
-        </div>
-        <button type="button" id="bio-vis-ovos-plus" class="bio-counter-btn">+</button>
       </div>
     </div>
 
@@ -1046,7 +1009,7 @@
       <div class="bio-counter-row">
         <button type="button" id="bio-berc-qtd-minus" class="bio-counter-btn">−</button>
         <div style="flex:1;text-align:center">
-          <span class="bio-counter-val" id="bio-berc-qtd">0</span>
+          <input type="number" inputmode="numeric" class="bio-counter-val" id="bio-berc-qtd" value="0" min="0">
           <span class="bio-counter-label">Filhotes</span>
         </div>
         <button type="button" id="bio-berc-qtd-plus" class="bio-counter-btn">+</button>
@@ -1097,7 +1060,7 @@
       <div class="bio-counter-row">
         <button type="button" id="bio-sol-qtd-minus" class="bio-counter-btn">−</button>
         <div style="flex:1;text-align:center">
-          <span class="bio-counter-val" id="bio-sol-qtd">0</span>
+          <input type="number" inputmode="numeric" class="bio-counter-val" id="bio-sol-qtd" value="0" min="0">
           <span class="bio-counter-label">Soltados</span>
         </div>
         <button type="button" id="bio-sol-qtd-plus" class="bio-counter-btn">+</button>
@@ -1109,7 +1072,7 @@
       <div class="bio-counter-row">
         <button type="button" id="bio-sol-mort-minus" class="bio-counter-btn">−</button>
         <div style="flex:1;text-align:center">
-          <span class="bio-counter-val" id="bio-sol-mort">0</span>
+          <input type="number" inputmode="numeric" class="bio-counter-val" id="bio-sol-mort" value="0" min="0">
           <span class="bio-counter-label">Mortos</span>
         </div>
         <button type="button" id="bio-sol-mort-plus" class="bio-counter-btn">+</button>
@@ -1288,7 +1251,7 @@
         <div class="bio-counter-row">
           <button type="button" id="bio-oc-aff-minus" class="bio-counter-btn">−</button>
           <div style="flex:1;text-align:center">
-            <span class="bio-counter-val" id="bio-oc-afetados">0</span>
+            <input type="number" inputmode="numeric" class="bio-counter-val" id="bio-oc-afetados" value="0" min="0">
             <span class="bio-counter-label">filhotes</span>
           </div>
           <button type="button" id="bio-oc-aff-plus" class="bio-counter-btn">+</button>

@@ -546,6 +546,13 @@ body { margin: 0; }
   font-family: var(--font-mono); font-size: 28px; font-weight: 700;
   color: var(--bio-ink);
 }
+input.bio-counter-val {
+  border: none; background: transparent; outline: none;
+  -webkit-appearance: none; -moz-appearance: textfield; appearance: none;
+  padding: 0; cursor: text; width: 100%;
+}
+input.bio-counter-val::-webkit-outer-spin-button,
+input.bio-counter-val::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .bio-counter-label {
   display: block; font-size: 10px; color: #9CA3AF;
   text-transform: uppercase; letter-spacing: .05em; text-align: center; margin-top: 2px;
@@ -690,6 +697,8 @@ body { margin: 0; }
 .bio-nfc.status-transferido { border-left-color: #C9A84C; }
 .bio-nfc.status-eclodido    { border-left-color: var(--bio-verde); }
 .bio-nfc.status-perdido     { border-left-color: var(--bio-perigo); }
+.bio-nfc.status-em_bercario { border-left-color: #7C3AED; }
+.bio-nfc.status-soltado     { border-left-color: #0891B2; }
 .bio-nfc-header { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
 .bio-nfc-num { font-family: var(--font-mono); font-size: 13px; font-weight: 700; color: var(--bio-ink); }
 .bio-nfc-status-badge {
@@ -699,6 +708,8 @@ body { margin: 0; }
 .bio-nfc-status-badge.transferido { background: rgba(201,168,76,.15);  color: #9B7A1E; }
 .bio-nfc-status-badge.eclodido    { background: rgba(82,183,136,.15);  color: #1E6B4A; }
 .bio-nfc-status-badge.perdido     { background: rgba(220,38,38,.1);    color: var(--bio-perigo); }
+.bio-nfc-status-badge.em_bercario { background: rgba(124,58,237,.12); color: #5B21B6; }
+.bio-nfc-status-badge.soltado     { background: rgba(8,145,178,.12);  color: #0E7490; }
 .bio-nfc-sync-dot {
   width: 8px; height: 8px; border-radius: 50%; margin-left: auto; flex-shrink: 0;
 }
@@ -717,6 +728,37 @@ body { margin: 0; }
 }
 .bio-nfc-ev-chip.transf { background: rgba(26,107,140,.1); color: var(--bio-prim); }
 .bio-nfc-ev-chip.ecl { background: rgba(82,183,136,.15); color: #1E6B4A; }
+.bio-nfc-hist-toggle {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 12px; font-weight: 600; color: #4A6170;
+  background: none; border: none; padding: 7px 0 3px; cursor: pointer;
+  width: 100%; text-align: left;
+}
+.bio-nfc-hist-toggle svg { transition: transform .2s ease; flex-shrink: 0; }
+.bio-nfc-hist-toggle.aberto svg { transform: rotate(90deg); }
+.bio-nfc-hist {
+  display: none; flex-direction: column;
+  padding: 4px 0 4px 14px;
+  border-left: 2px solid #D0E4EF; margin: 0 0 4px 3px;
+}
+.bio-nfc-hist.vis { display: flex; }
+.bio-nfc-hist-ev {
+  display: flex; align-items: flex-start; gap: 8px; padding: 3px 0;
+}
+.bio-nfc-hist-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  flex-shrink: 0; margin-top: 4px;
+}
+.bio-nfc-hist-ev.ev-transf  .bio-nfc-hist-dot { background: #7C3AED; }
+.bio-nfc-hist-ev.ev-visita  .bio-nfc-hist-dot { background: #6B7280; }
+.bio-nfc-hist-ev.ev-eclosao .bio-nfc-hist-dot { background: #2A9D6F; }
+.bio-nfc-hist-ev.ev-bercario .bio-nfc-hist-dot { background: #5B21B6; }
+.bio-nfc-hist-ev.ev-soltura .bio-nfc-hist-dot { background: #0891B2; }
+.bio-nfc-hist-data {
+  font-size: 11px; color: #9CA3AF; font-family: var(--font-mono);
+  flex-shrink: 0; padding-top: 2px; min-width: 32px;
+}
+.bio-nfc-hist-txt { font-size: 12px; color: #374151; line-height: 1.4; flex: 1; }
 .bio-nfc-monitor { font-size: 11px; color: #9CA3AF; margin-top: 2px; }
 
 /* legacy (mantém compatibilidade com tela-fila antiga) */
@@ -1112,10 +1154,12 @@ body.field-mode .bio-home-nome { font-size: 26px; }
   padding: 13px 14px;
   margin-bottom: 10px;
 }
-.bio-nfc.status-encontrado { border-left-color: #3B82F6; }
+.bio-nfc.status-encontrado  { border-left-color: #3B82F6; }
 .bio-nfc.status-transferido { border-left-color: var(--bio-ouro); }
 .bio-nfc.status-eclodido    { border-left-color: var(--bio-verde); }
 .bio-nfc.status-perdido     { border-left-color: var(--bio-perigo); }
+.bio-nfc.status-em_bercario { border-left-color: #7C3AED; }
+.bio-nfc.status-soltado     { border-left-color: #0891B2; }
 
 .bio-nfc-header {
   display: flex; align-items: center; gap: 8px; margin-bottom: 6px;
@@ -1127,10 +1171,12 @@ body.field-mode .bio-home-nome { font-size: 26px; }
   font-size: 11px; font-weight: 700; padding: 2px 9px; border-radius: 99px;
   margin-left: auto;
 }
-.bio-nfc-status-badge.encontrado { background: #DBEAFE; color: #1D4ED8; }
+.bio-nfc-status-badge.encontrado  { background: #DBEAFE; color: #1D4ED8; }
 .bio-nfc-status-badge.transferido { background: var(--bio-ouro-bg); color: #7A5E12; }
-.bio-nfc-status-badge.eclodido   { background: var(--bio-verde-bg); color: #175E3C; }
-.bio-nfc-status-badge.perdido    { background: var(--bio-perigo-bg); color: var(--bio-perigo); }
+.bio-nfc-status-badge.eclodido    { background: var(--bio-verde-bg); color: #175E3C; }
+.bio-nfc-status-badge.perdido     { background: var(--bio-perigo-bg); color: var(--bio-perigo); }
+.bio-nfc-status-badge.em_bercario { background: rgba(124,58,237,.12); color: #5B21B6; }
+.bio-nfc-status-badge.soltado     { background: rgba(8,145,178,.12);  color: #0E7490; }
 .bio-nfc-sync-dot {
   width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0;
 }
@@ -1161,6 +1207,37 @@ body.field-mode .bio-home-nome { font-size: 26px; }
 }
 .bio-nfc-ev-chip.transf { background: rgba(139,92,246,.13); color: #6D28D9; }
 .bio-nfc-ev-chip.ecl    { background: var(--bio-verde-bg); color: #175E3C; }
+.bio-nfc-hist-toggle {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 12px; font-weight: 600; color: #4A6170;
+  background: none; border: none; padding: 7px 0 3px; cursor: pointer;
+  width: 100%; text-align: left;
+}
+.bio-nfc-hist-toggle svg { transition: transform .2s ease; flex-shrink: 0; }
+.bio-nfc-hist-toggle.aberto svg { transform: rotate(90deg); }
+.bio-nfc-hist {
+  display: none; flex-direction: column;
+  padding: 4px 0 4px 14px;
+  border-left: 2px solid #D0E4EF; margin: 0 0 4px 3px;
+}
+.bio-nfc-hist.vis { display: flex; }
+.bio-nfc-hist-ev {
+  display: flex; align-items: flex-start; gap: 8px; padding: 3px 0;
+}
+.bio-nfc-hist-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  flex-shrink: 0; margin-top: 4px;
+}
+.bio-nfc-hist-ev.ev-transf  .bio-nfc-hist-dot { background: #7C3AED; }
+.bio-nfc-hist-ev.ev-visita  .bio-nfc-hist-dot { background: #6B7280; }
+.bio-nfc-hist-ev.ev-eclosao .bio-nfc-hist-dot { background: #2A9D6F; }
+.bio-nfc-hist-ev.ev-bercario .bio-nfc-hist-dot { background: #5B21B6; }
+.bio-nfc-hist-ev.ev-soltura .bio-nfc-hist-dot { background: #0891B2; }
+.bio-nfc-hist-data {
+  font-size: 11px; color: #9CA3AF; font-family: var(--font-mono);
+  flex-shrink: 0; padding-top: 2px; min-width: 32px;
+}
+.bio-nfc-hist-txt { font-size: 12px; color: #374151; line-height: 1.4; flex: 1; }
 .bio-nfc-monitor {
   font-size: 11px; color: #9CA3AF; margin-top: 4px;
 }
