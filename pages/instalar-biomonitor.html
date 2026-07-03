@@ -37,6 +37,13 @@
     .copia-link.ok { background:var(--azul); border-style:solid; border-color:var(--azul); color:#fff; }
     .copia-link.ok .cl-url, .copia-link.ok .cl-ic { display:none; }
     .copia-link.ok .cl-ok { display:block; }
+    .btn-baixar { display:flex; align-items:center; justify-content:center; gap:10px; width:100%;
+      background:var(--azul); color:#fff; border:none; border-radius:12px; padding:16px 14px;
+      font-family:inherit; font-size:1.1rem; font-weight:700; text-decoration:none; margin-bottom:16px;
+      transition:transform .12s, background .12s; -webkit-tap-highlight-color:transparent; }
+    .btn-baixar:active { transform:scale(.99); background:var(--azul-esc); }
+    .rec { display:inline-block; background:#DDEEF5; color:var(--azul-esc); font-size:.72rem; font-weight:700;
+      padding:2px 8px; border-radius:20px; margin-left:6px; vertical-align:middle; }
   </style>
 </head>
 <body>
@@ -48,6 +55,29 @@
 </header>
 
 <main>
+
+  <!-- ── ANDROID (APK) ────────────────────────────────────── -->
+  <section class="cartao">
+    <h2>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+      Android (aplicativo)<span class="rec">Recomendado</span>
+    </h2>
+    <p class="sub">Instale o app uma única vez. Depois é só tocar no ícone — funciona sem internet, como qualquer outro aplicativo.</p>
+
+    <a class="btn-baixar" href="https://github.com/erissoncameli-prog/siguc-ac/releases/latest/download/siguc-biomonitor.apk">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Baixar o aplicativo
+    </a>
+
+    <ol>
+      <li><span>Toque no botão acima e aguarde o download terminar.</span></li>
+      <li><span>Abra o arquivo baixado (<b>siguc-biomonitor.apk</b>) — aparece na barra de notificações ou na pasta <b>Downloads</b>.</span></li>
+      <li><span>Se o celular avisar sobre <b>"fontes desconhecidas"</b>, toque em <b>Configurações → Permitir desta fonte</b> e volte.</span></li>
+      <li><span>Toque em <b>Instalar</b>. O ícone <b>SIGUC Biomonitor</b> aparece na tela inicial.</span></li>
+    </ol>
+
+    <p class="nota">É normal o Android avisar sobre apps de fora da Play Store. Este aplicativo é distribuído oficialmente pela SEMA-AC por este site.</p>
+  </section>
 
   <!-- ── iPHONE ───────────────────────────────────────────── -->
   <section class="cartao">
@@ -77,9 +107,9 @@
   <section class="cartao">
     <h2>
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
-      Android (Chrome)
+      Android (Chrome) — alternativa
     </h2>
-    <p class="sub">No Android, instale pelo Chrome como "app" para funcionar offline.</p>
+    <p class="sub">Sem instalar o APK, dá para usar pelo Chrome como "app". O aplicativo acima é mais confiável para uso offline prolongado.</p>
 
     <ol>
       <li><span>Abra o Chrome e acesse:
@@ -119,9 +149,10 @@
     <p class="sub">As atualizações chegam automaticamente quando o celular está online.</p>
     <ol>
       <li><span>Abra o app e vá em <b>Configurações</b>.</span></li>
-      <li><span>Toque em <b>"Verificar atualização"</b> — o app recarrega com a versão mais recente.</span></li>
-      <li><span>Se nada mudar, feche o app e abra novamente.</span></li>
+      <li><span>Toque em <b>"Verificar atualização"</b>.</span></li>
+      <li><span>No <b>aplicativo Android</b>, se houver versão nova ele oferece o download do novo <b>siguc-biomonitor.apk</b> — instale por cima; seus dados e a fila são preservados. Na versão Chrome/iPhone, o app recarrega sozinho.</span></li>
     </ol>
+    <p class="nota">No aplicativo Android você também pode baixar a versão mais recente a qualquer momento pelo botão <b>"Baixar o aplicativo"</b> no topo desta página.</p>
   </section>
 
   <p class="rodape">

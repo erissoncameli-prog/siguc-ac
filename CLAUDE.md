@@ -34,6 +34,11 @@ Sistema já tem login, sidebar, layout e páginas funcionando.
   workflow brigadas-apk.yml a partir dos mesmos arquivos web;
   build via app/scripts/build-www.mjs — ver docs/app-brigadas.md;
   alterações sempre nos arquivos web)
+- app-biomonitor/ → shell nativo Capacitor do Biomonitor (APK Android
+  gerado pelo workflow biomonitor-apk.yml a partir de pages/biomonitor.html
+  + js/biomonitor-*.js; appId br.gov.ac.sema.siguc.biomonitor — convive com
+  o Brigadas; build via app-biomonitor/scripts/build-www.mjs —
+  ver docs/app-biomonitor.md; alterações sempre nos arquivos web)
 
 ## Design system (nunca alterar variáveis sem alinhamento)
 --floresta:#0A1A0F | --verde-c:#52B788 | --ouro:#C9A84C | --ouro-c:#F0CB6A
@@ -187,10 +192,10 @@ E) Dashboard Executivo por nível (UC / Diretoria / Secretaria)
   Lucide), registrado em js/config.js (BICON_PATHS). Em HTML estático
   use data-icon="nome" (bIconsAplicar injeta); em JS use bico('nome').
   Ícone novo = adicionar um path no MESMO estilo em BICON_PATHS.
-- APK Android (workflow brigadas-apk.yml): NÃO gerar novo APK a cada
-  mudança. Só gerar quando o usuário pedir ou quando já houver acúmulo
-  suficiente para valer a pena. Mudanças web/PWA podem ir à produção
-  normalmente (lembrar de subir a versão do cache em pwa/sw.js).
+- APK Android (workflows brigadas-apk.yml e biomonitor-apk.yml): NÃO gerar
+  novo APK a cada mudança. Só gerar quando o usuário pedir ou quando já
+  houver acúmulo suficiente para valer a pena. Mudanças web/PWA podem ir à
+  produção normalmente (lembrar de subir a versão do cache em pwa/sw.js).
 
 ## Variáveis de ambiente
 SUPABASE_URL=https://atqtybcsvepdabsvgaly.supabase.co
