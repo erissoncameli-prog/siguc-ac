@@ -412,36 +412,9 @@
     <!-- Espécie -->
     <div class="bio-form-section">
       <span class="bio-form-label">Espécie *</span>
-      <div class="bio-especie-grid">
-        <button class="bio-especie-chip" data-esp="tracaja" type="button">
-          <div class="bio-esp-ico"><span class="bio-esp-sigla">TR</span></div>
-          Tracajá
-        </button>
-        <button class="bio-especie-chip" data-esp="tartaruga" type="button">
-          <div class="bio-esp-ico"><span class="bio-esp-sigla">TA</span></div>
-          Tartaruga
-        </button>
-        <button class="bio-especie-chip" data-esp="cabecudo" type="button">
-          <div class="bio-esp-ico"><span class="bio-esp-sigla">R</span></div>
-          Cabeçudo
-        </button>
-        <button class="bio-especie-chip" data-esp="pitiU" type="button">
-          <div class="bio-esp-ico"><span class="bio-esp-sigla">C</span></div>
-          Pitiú
-        </button>
-        <button class="bio-especie-chip" data-esp="mucua" type="button">
-          <div class="bio-esp-ico"><span class="bio-esp-sigla">M</span></div>
-          Muçuã
-        </button>
-        <button class="bio-especie-chip" data-esp="jabuti_pe_elefante" type="button">
-          <div class="bio-esp-ico"><span class="bio-esp-sigla">JP</span></div>
-          Jabuti
-        </button>
-        <button class="bio-especie-chip" data-esp="outro" type="button">
-          <div class="bio-esp-ico"><span class="bio-esp-sigla">?</span></div>
-          Outro
-        </button>
-      </div>
+      <div class="bio-especie-grid" id="bio-especie-grid"></div>
+      <!-- Chips renderizados por bioCarregarEspecies() a partir do
+           catálogo (tabela especies_quelonio_catalogo) -->
     </div>
 
     <!-- Ovos na postura -->

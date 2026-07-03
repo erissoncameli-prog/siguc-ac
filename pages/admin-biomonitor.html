@@ -359,6 +359,40 @@
   </div>
 </div>
 
+<!-- ── Modal: Espécie de Quelônio ───────────────────────── -->
+<div class="modal-overlay" id="modal-especie">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-header">
+      <div class="modal-title" id="me-titulo">Nova Espécie</div>
+      <button class="modal-close" onclick="fecharModal('especie')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Sigla na placa</label>
+          <input class="form-control" id="me-sigla" placeholder="TR" maxlength="4" style="text-transform:uppercase">
+        </div>
+        <div class="form-group"><label class="form-label">Ordem de exibição</label>
+          <input class="form-control" id="me-ordem" type="number" min="1" max="99" value="99">
+        </div>
+      </div>
+      <div class="form-group"><label class="form-label">Nome popular <span class="obrig">*</span></label>
+        <input class="form-control" id="me-nome-popular" placeholder="Ex: Tracajá">
+      </div>
+      <div class="form-group"><label class="form-label">Nome científico</label>
+        <input class="form-control" id="me-nome-cientifico" placeholder="Ex: Podocnemis unifilis">
+      </div>
+      <div class="form-group" id="me-codigo-box"><label class="form-label">Código (banco) <span class="obrig">*</span></label>
+        <input class="form-control" id="me-codigo" placeholder="ex: tracaja">
+        <small class="form-hint">Precisa já existir como valor do tipo <code>especie_quelonio</code> no banco (adicionado via migration) e ainda não estar cadastrado aqui.</small>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="fecharModal('especie')">Cancelar</button>
+      <button class="btn btn-primary" onclick="salvarEspecieQuelonio()">Salvar</button>
+    </div>
+  </div>
+</div>
+
 <!-- ── Modal: Praias da Temporada ───────────────────────── -->
 <div class="modal-overlay" id="modal-temp-praias">
   <div class="modal" style="max-width:560px">
@@ -396,6 +430,7 @@
           <button class="tab-btn"       id="tab-monitores"  onclick="mudarAba('monitores')">Monitores</button>
           <button class="tab-btn"       id="tab-praias"     onclick="mudarAba('praias')">Praias</button>
           <button class="tab-btn"       id="tab-temporadas" onclick="mudarAba('temporadas')">Temporadas</button>
+          <button class="tab-btn"       id="tab-especies"   onclick="mudarAba('especies')">Espécies</button>
           <button class="tab-btn"       id="tab-mapa"       onclick="mudarAba('mapa')">Mapa</button>
           <button class="tab-btn"       id="tab-bercarios"  onclick="mudarAba('bercarios')">Berçários</button>
           <button class="tab-btn"       id="tab-alertas"    onclick="mudarAba('alertas')">Alertas</button>
@@ -479,6 +514,22 @@
           <table><thead><tr>
             <th>Nome</th><th>Programa</th><th>Ano base</th><th>Início</th><th>Fim</th><th>Status</th><th></th>
           </tr></thead><tbody id="tbody-temporadas"><tr><td colspan="7" class="empty-row">Carregando...</td></tr></tbody></table>
+        </div></div></div>
+      </div>
+
+      <!-- ABA: Espécies -->
+      <div id="aba-especies" style="display:none">
+        <div class="filter-bar">
+          <span style="font-size:.85rem;color:var(--cinza-600,#6b7280)">Controla as espécies de quelônio disponíveis para seleção ao registrar um ninho no app. Desative espécies que não ocorrem na região em vez de excluí-las — ninhos já registrados continuam com o histórico.</span>
+          <button class="btn btn-primary" style="margin-left:auto" onclick="abrirModalEspecieQuelonio()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Nova Espécie
+          </button>
+        </div>
+        <div class="card"><div class="table-wrap"><div class="table-scroll">
+          <table><thead><tr>
+            <th>Ordem</th><th>Sigla</th><th>Nome popular</th><th>Nome científico</th><th>Status</th><th></th>
+          </tr></thead><tbody id="tbody-especies"><tr><td colspan="6" class="empty-row">Carregando...</td></tr></tbody></table>
         </div></div></div>
       </div>
 
@@ -750,7 +801,7 @@
   window.filtrarTemporadas = renderTemporadas
 
   // ── Abas ──────────────────────────────────────────────────────
-  const _abas = ['grupos','monitores','praias','temporadas','mapa','bercarios','alertas']
+  const _abas = ['grupos','monitores','praias','temporadas','especies','mapa','bercarios','alertas']
   window.mudarAba = function(aba) {
     _abas.forEach(a => {
       document.getElementById('aba-' + a).style.display = a === aba ? '' : 'none'
@@ -758,6 +809,96 @@
     })
     if (aba === 'mapa') ensureMapaPraias()
     if (aba === 'alertas') ensureAlertas()
+    if (aba === 'especies') ensureEspecies()
+  }
+
+  // ════════════════════════════════════════════════════════════
+  //  ABA ESPÉCIES — catálogo editável de especies_quelonio_catalogo
+  // ════════════════════════════════════════════════════════════
+  let _especies = [], _especiesCarregado = false, _editEspecieId = null
+
+  async function ensureEspecies() {
+    if (_especiesCarregado) return
+    _especiesCarregado = true
+    await carregarEspecies()
+  }
+
+  window.carregarEspecies = async function() {
+    const { data, error } = await db
+      .from('especies_quelonio_catalogo')
+      .select('*')
+      .order('ordem')
+    if (error) { toast('Erro ao carregar espécies: ' + error.message, 'error'); return }
+    _especies = data || []
+    renderEspecies()
+  }
+
+  function renderEspecies() {
+    const tbody = document.getElementById('tbody-especies')
+    if (!_especies.length) { tbody.innerHTML = '<tr><td colspan="6" class="empty-row">Nenhuma espécie cadastrada.</td></tr>'; return }
+    tbody.innerHTML = _especies.map(e => `
+      <tr>
+        <td style="text-align:center">${e.ordem}</td>
+        <td><code style="font-size:.78rem;background:#f3f4f6;padding:2px 6px;border-radius:4px">${esc(e.sigla_placa || '—')}</code></td>
+        <td><strong>${esc(e.nome_popular)}</strong></td>
+        <td><em style="color:var(--t2,#888)">${esc(e.nome_cientifico || '—')}</em></td>
+        <td><span class="badge ${e.ativo ? 'badge-success' : 'badge-neutral'}">${e.ativo ? 'Ativa' : 'Inativa'}</span></td>
+        <td style="display:flex;gap:4px">
+          <button class="btn btn-sm btn-secondary" onclick="editarEspecie('${e.id}')">Editar</button>
+          <button class="btn btn-sm ${e.ativo ? 'btn-danger' : 'btn-primary'}" onclick="toggleEspecie('${e.id}',${!e.ativo})">${e.ativo ? 'Desativar' : 'Ativar'}</button>
+        </td>
+      </tr>`).join('')
+  }
+
+  window.abrirModalEspecieQuelonio = function(e = null) {
+    _editEspecieId = e?.id || null
+    document.getElementById('me-titulo').textContent = e ? 'Editar Espécie' : 'Nova Espécie'
+    document.getElementById('me-sigla').value = e?.sigla_placa || ''
+    document.getElementById('me-ordem').value = e?.ordem || 99
+    document.getElementById('me-nome-popular').value = e?.nome_popular || ''
+    document.getElementById('me-nome-cientifico').value = e?.nome_cientifico || ''
+    document.getElementById('me-codigo').value = e?.codigo || ''
+    document.getElementById('me-codigo').disabled = !!e
+    document.getElementById('me-codigo-box').style.display = e ? 'none' : ''
+    document.getElementById('modal-especie').classList.add('aberto')
+  }
+
+  window.editarEspecie = id => {
+    const e = _especies.find(x => x.id === id)
+    if (e) window.abrirModalEspecieQuelonio(e)
+  }
+
+  window.salvarEspecieQuelonio = async function() {
+    const nomePopular = document.getElementById('me-nome-popular').value.trim()
+    if (!nomePopular) { toast('Preencha o nome popular', 'warn'); return }
+
+    const payload = {
+      nome_popular:    nomePopular,
+      nome_cientifico: document.getElementById('me-nome-cientifico').value.trim() || null,
+      sigla_placa:     document.getElementById('me-sigla').value.trim().toUpperCase() || null,
+      ordem:           parseInt(document.getElementById('me-ordem').value) || 99,
+    }
+
+    let error
+    if (_editEspecieId) {
+      ;({ error } = await db.from('especies_quelonio_catalogo').update(payload).eq('id', _editEspecieId))
+    } else {
+      const codigo = document.getElementById('me-codigo').value.trim()
+      if (!codigo) { toast('Preencha o código', 'warn'); return }
+      ;({ error } = await db.from('especies_quelonio_catalogo').insert({ ...payload, codigo }))
+    }
+
+    if (error) { toast('Erro: ' + error.message, 'error'); return }
+    toast(_editEspecieId ? 'Espécie atualizada' : 'Espécie criada', 'success')
+    fecharModal('especie')
+    await carregarEspecies()
+  }
+
+  window.toggleEspecie = async function(id, ativo) {
+    const { error } = await db.from('especies_quelonio_catalogo').update({ ativo }).eq('id', id)
+    if (error) { toast('Erro: ' + error.message, 'error'); return }
+    toast(ativo ? 'Espécie ativada' : 'Espécie desativada', 'success')
+    await carregarEspecies()
   }
 
   // ════════════════════════════════════════════════════════════
