@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">SIGUC Biomonitor</string>
+    <string name="title_activity_main">SIGUC Biomonitor</string>
+    <string name="package_name">br.gov.ac.sema.siguc.biomonitor</string>
+    <string name="custom_url_scheme">br.gov.ac.sema.siguc.biomonitor</string>
+</resources>

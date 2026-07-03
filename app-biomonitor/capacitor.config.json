@@ -1,0 +1,12 @@
+{
+  "appId": "br.gov.ac.sema.siguc.biomonitor",
+  "appName": "SIGUC Biomonitor",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "https"
+  },
+  "android": {
+    "allowMixedContent": false,
+    "adjustMarginsForEdgeToEdge": "auto"
+  }
+}
