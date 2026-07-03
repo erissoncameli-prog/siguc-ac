@@ -3068,10 +3068,13 @@ async function bioCarregarTelaDados() {
    ════════════════════════════════════════════════════════════ */
 const BIO_VERSAO = '1.2.0'
 const BIO_INSTALL_URL = 'https://siguc-ac.vercel.app/pages/instalar-biomonitor.html'
+const BIO_GH_RELEASES = 'https://api.github.com/repos/erissoncameli-prog/siguc-ac/releases'
 
-// Número real do build = versão declarada no sw.js do servidor (sempre atual).
+// Número real do build. No APK (Capacitor) = carimbo window.BIO_BUILD do build
+// nativo. Na web = versão declarada no sw.js do servidor (sempre atual).
 // Fallback: maior cache instalado no aparelho.
 async function bioVersaoBuild() {
+  if (window.BIO_BUILD) return window.BIO_BUILD
   try {
     const r = await fetch('/pwa/sw.js', { cache: 'no-store' })
     const txt = await r.text()
@@ -3164,7 +3167,46 @@ async function bioAlterarFotoMonitor() {
   }
 }
 
+function bioCmpVersao(a, b) {
+  const pa = String(a).split('.').map(Number), pb = String(b).split('.').map(Number)
+  for (let i = 0; i < 3; i++) {
+    if ((pa[i] || 0) > (pb[i] || 0)) return 1
+    if ((pa[i] || 0) < (pb[i] || 0)) return -1
+  }
+  return 0
+}
+
+function bioVersaoNumApp() {
+  const m = String(window.BIO_BUILD || '').match(/(\d+\.\d+\.\d+)/)
+  return m ? m[1] : null
+}
+
+// APK (Capacitor): compara com o último Release biomonitor-v* e oferece o .apk
+async function bioVerificarUpdateAndroid() {
+  bioToast('Verificando atualização…', 'info')
+  const atual = bioVersaoNumApp()
+  try {
+    const resp = await fetch(`${BIO_GH_RELEASES}?per_page=10`, { headers: { Accept: 'application/vnd.github+json' } })
+    const lista = await resp.json()
+    const rel = (lista || []).find(r => !r.draft && !r.prerelease && /^biomonitor-v\d/.test(r.tag_name || ''))
+    if (!rel) { bioToast('Não foi possível verificar agora', 'warn'); return }
+    const ultima = rel.tag_name.replace('biomonitor-v', '')
+    if (atual && bioCmpVersao(ultima, atual) > 0) {
+      const apk = rel.assets?.find(a => a.name?.endsWith('.apk'))?.browser_download_url || rel.html_url
+      if (confirm(`Nova versão ${ultima} disponível.\nVocê está na ${atual}.\n\nBaixar agora?`)) {
+        window.open(apk, '_blank')
+      }
+    } else {
+      bioToast(`Você já está na versão mais recente (${atual || ultima})`, 'ok')
+    }
+  } catch (e) {
+    console.warn('[bio-update]', e)
+    bioToast('Sem conexão para verificar', 'warn')
+  }
+}
+
 async function bioVerificarAtualizacao() {
+  if (window.Capacitor) return bioVerificarUpdateAndroid()
   if (!('serviceWorker' in navigator)) { location.reload(); return }
   bioToast('Verificando atualização…', 'info')
 
