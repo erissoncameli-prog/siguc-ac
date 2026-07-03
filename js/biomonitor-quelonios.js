@@ -64,17 +64,53 @@ const BioApp = {
   loteAtual: null,                // lote em detalhe/ocorrência
 }
 
-// Espécies de quelônios com sigla, nome e cor
-const BIO_ESPECIES = [
+// Espécies de quelônios (sigla, nome, científico). Vem do catálogo
+// editável (tabela especies_quelonio_catalogo, aba "Espécies" em
+// admin-biomonitor.html) — este array só serve de fallback caso o
+// app abra offline antes de ter cache local salvo.
+let BIO_ESPECIES = [
   { id: 'tracaja',   sigla: 'TR',  nome: 'Tracajá',            nome_cientifico: 'Podocnemis unifilis' },
   { id: 'tartaruga', sigla: 'TA',  nome: 'Tartaruga',          nome_cientifico: 'Podocnemis expansa' },
   { id: 'cabecudo',  sigla: 'R',   nome: 'Cabeçudo',           nome_cientifico: 'Podocnemis sextuberculata' },
-  { id: 'pitiU',     sigla: 'C',   nome: 'Pitiú/Cupido',       nome_cientifico: 'Podocnemis erythrocephala' },
-  { id: 'cupido',    sigla: 'CP',  nome: 'Cupido',             nome_cientifico: 'Podocnemis cayennensis' },
-  { id: 'mucua',     sigla: 'M',   nome: 'Muçuã',              nome_cientifico: 'Kinosternon scorpioides' },
-  { id: 'jabuti_pe_elefante', sigla: 'JP', nome: 'Jabuti',     nome_cientifico: 'Chelonoidis denticulatus' },
-  { id: 'outro',     sigla: 'OUT', nome: 'Outro / Não sei',    nome_cientifico: '' },
+  { id: 'pitiU',     sigla: 'C',   nome: 'Pitiú',              nome_cientifico: 'Podocnemis erythrocephala' },
+  { id: 'mucua',     sigla: 'MU',  nome: 'Muçuã',              nome_cientifico: 'Kinosternon scorpioides' },
+  { id: 'jabuti_pe_elefante', sigla: 'JE', nome: 'Jabuti-pé-de-elefante', nome_cientifico: 'Chelonoidis denticulatus' },
+  { id: 'jabuti_piranga',     sigla: 'JP', nome: 'Jabuti-piranga',       nome_cientifico: 'Chelonoidis carbonarius' },
+  { id: 'outro',     sigla: 'OU',  nome: 'Outro',              nome_cientifico: '' },
 ]
+
+// ── Catálogo de espécies (editável) ──────────────────────────
+async function bioCarregarEspecies() {
+  try {
+    const { data, error } = await bioSupabase()
+      .from('especies_quelonio_catalogo')
+      .select('codigo,nome_popular,nome_cientifico,sigla_placa,ordem')
+      .eq('ativo', true)
+      .order('ordem')
+    if (error) throw error
+    if (data?.length) {
+      BIO_ESPECIES = data.map(e => ({
+        id: e.codigo, sigla: e.sigla_placa || '?', nome: e.nome_popular, nome_cientifico: e.nome_cientifico || '',
+      }))
+      await bioOfflineSetConfig('especies_quelonio_catalogo', BIO_ESPECIES)
+    }
+  } catch {
+    const cache = await bioOfflineGetConfig('especies_quelonio_catalogo').catch(() => null)
+    if (cache?.length) BIO_ESPECIES = cache
+  }
+  bioRenderEspecieChips()
+}
+
+function bioRenderEspecieChips() {
+  const grid = document.getElementById('bio-especie-grid')
+  if (!grid) return
+  const selecionada = grid.querySelector('.bio-especie-chip.sel')?.dataset.esp
+  grid.innerHTML = BIO_ESPECIES.map(e => `
+    <button class="bio-especie-chip${e.id === selecionada ? ' sel' : ''}" data-esp="${e.id}" type="button">
+      <div class="bio-esp-ico"><span class="bio-esp-sigla">${esc(e.sigla)}</span></div>
+      ${esc(e.nome)}
+    </button>`).join('')
+}
 
 /* ════════════════════════════════════════════════════════════
    TELAS
@@ -3343,15 +3379,17 @@ document.addEventListener('DOMContentLoaded', async () => {
   ;['bio-form-ovos-descartados','bio-form-desc-natural','bio-form-desc-predacao','bio-form-desc-humana']
     .forEach(id => document.getElementById(id)?.addEventListener('input', bioAtualizarDescarteBox))
 
-  // Chips de espécie
-  document.querySelectorAll('.bio-especie-chip').forEach(chip => {
-    chip.addEventListener('click', () => {
-      document.querySelectorAll('.bio-especie-chip').forEach(c => c.classList.remove('sel'))
-      chip.classList.add('sel')
-    })
+  // Chips de espécie — delegado no container pois os chips são
+  // renderizados dinamicamente pelo catálogo (bioCarregarEspecies)
+  document.getElementById('bio-especie-grid')?.addEventListener('click', e => {
+    const chip = e.target.closest('.bio-especie-chip')
+    if (!chip) return
+    document.querySelectorAll('.bio-especie-chip').forEach(c => c.classList.remove('sel'))
+    chip.classList.add('sel')
     // Auto-numeração: (re)gera o número ao escolher/trocar a espécie
-    chip.addEventListener('click', () => { bioAtualizarNumeroNinhoAuto() })
+    bioAtualizarNumeroNinhoAuto()
   })
+  bioCarregarEspecies()
 
   // Botão "Editar" → libera a edição manual do número do ninho
   document.getElementById('bio-form-numero-edit')?.addEventListener('click', () => {
