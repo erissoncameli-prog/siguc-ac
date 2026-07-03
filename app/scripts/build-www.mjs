@@ -4,10 +4,20 @@
 //   1. Supabase JS embarcado (sem CDN — funciona offline desde o 1º uso)
 //   2. Fontes DM Sans / DM Mono / Fraunces embarcadas (sem Google Fonts)
 //   3. Sem manifest PWA (o shell nativo substitui o service worker)
+//   4. Credenciais Supabase embarcadas — no APK a WebView roda em
+//      https://localhost e /api/env NÃO existe (é função serverless da
+//      Vercel). Sem isso, config.js não obtém URL/anon key, `db` fica
+//      null e o login mostra "Sem conexão" mesmo online. São valores
+//      PÚBLICOS (anon key), os mesmos já servidos ao navegador.
 
 import { cpSync, mkdirSync, rmSync, readFileSync, writeFileSync, existsSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+
+// Env Supabase para embarcar (override por variável de ambiente no CI;
+// fallback = valores públicos já presentes em vercel.json / config.js).
+const SUPABASE_URL      = process.env.SUPABASE_URL      || 'https://atqtybcsvepdabsvgaly.supabase.co'
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF0cXR5YmNzdmVwZGFic3ZnYWx5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0MjMzNzgsImV4cCI6MjA5NTk5OTM3OH0.hWx1AB2rK7xdco1Dgagm0XUOBPQbxZVE614SW4SKoLk'
 
 const APP  = dirname(dirname(fileURLToPath(import.meta.url)))   // app/
 const RAIZ = dirname(APP)                                        // raiz do repo
@@ -83,9 +93,16 @@ for (const [padrao, sub] of rewrites) {
   html = html.replace(padrao, sub)
 }
 
+// Env Supabase embarcado: pré-resolve _sigucEnvPromise ANTES de config.js
+// (scripts do <head> rodam antes dos do <body>), evitando o fetch('/api/env')
+// que falha na WebView do APK (https://localhost, sem serverless).
+const envInject =
+  `<script>window._sigucEnvPromise=Promise.resolve(` +
+  `{supabaseUrl:${JSON.stringify(SUPABASE_URL)},supabaseKey:${JSON.stringify(SUPABASE_ANON_KEY)}});</script>`
+
 // Carimbo de versão (exibido na tela Config do app)
 const versao = process.env.APP_VERSION_NAME ?? 'dev'
-html = html.replace('</head>', `<script>window.BRIGADA_BUILD='v${versao} (app)'</script>\n</head>`)
+html = html.replace('</head>', `${envInject}\n<script>window.BRIGADA_BUILD='v${versao} (app)'</script>\n</head>`)
 
 writeFileSync(join(WWW, 'index.html'), html)
 
@@ -93,8 +110,13 @@ writeFileSync(join(WWW, 'index.html'), html)
 for (const f of ['index.html', 'vendor/supabase.js', 'vendor/fonts.css', 'css/brigada.css', 'js/config.js']) {
   if (!existsSync(join(WWW, f))) { console.error(`ERRO: faltando www/${f}`); process.exit(1) }
 }
-if (/cdn\.jsdelivr|fonts\.googleapis/.test(readFileSync(join(WWW, 'index.html'), 'utf8'))) {
+const idxFinal = readFileSync(join(WWW, 'index.html'), 'utf8')
+if (/cdn\.jsdelivr|fonts\.googleapis/.test(idxFinal)) {
   console.error('ERRO: index.html ainda referencia CDN externo')
   process.exit(1)
 }
-console.log('www/ montado com sucesso (offline-first, sem CDN).')
+if (!idxFinal.includes('_sigucEnvPromise') || !idxFinal.includes(SUPABASE_URL)) {
+  console.error('ERRO: credenciais Supabase não foram embarcadas no index.html')
+  process.exit(1)
+}
+console.log('www/ montado com sucesso (offline-first, sem CDN, env embarcado).')
