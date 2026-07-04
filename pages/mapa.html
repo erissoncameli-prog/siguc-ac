@@ -1588,6 +1588,17 @@ function toggleLayerBar(id){
     if(rp) rp.checked = true;
     const pw = document.getElementById('brig-peso-wrap');
     if(pw) pw.style.display = (_brigModoExib === 'mancha' || _brigModoExib === 'ambos') ? 'block' : 'none';
+    // Área evitada: restaura toggle, filtros e valores salvos
+    const aieT = document.getElementById('aiemapa-toggle');
+    if(aieT) aieT.checked = _aieMapaAtivo;
+    const aieF = document.getElementById('aiemapa-filtros');
+    if(aieF) aieF.style.display = _aieMapaAtivo ? 'flex' : 'none';
+    if(_aieMapaAtivo){
+      _aieMapaPopularUCs().then(() => {
+        const i = document.getElementById('aiemapa-ini'), f = document.getElementById('aiemapa-fim'), u = document.getElementById('aiemapa-uc');
+        if(i) i.value = _aieMapaIni; if(f) f.value = _aieMapaFim; if(u) u.value = _aieMapaUcSel;
+      });
+    }
   }
   // Alertas e Focos: restaura estado do toggle e do período dos focos
   if(id === 'alertas'){
@@ -2080,6 +2091,35 @@ function _renderDropdown(id){
       <div id="brigadas-mapa-stat" style="font-size:10px;color:var(--cinza-400)"></div>
       <a href="../pages/validacao-campo.html" style="font-size:11px;color:var(--verde-c);text-decoration:none;font-weight:600">→ Abrir Validação de Campo</a>
     </div>
+
+    <div style="border-top:1px solid var(--borda);margin-top:8px;padding-top:10px">
+      <label style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;cursor:pointer">
+        <input type="checkbox" id="aiemapa-toggle" style="accent-color:#7C3AED;width:14px;height:14px" onchange="toggleAreasEvitadasMapa(this.checked)">
+        Área evitada (incêndio/queimada evitada)
+      </label>
+      <p style="font-size:11px;color:var(--cinza-500);margin:5px 0 10px">Polígonos de área protegida pela ação da brigada, desenhados/sugeridos na Validação de Campo.</p>
+      <div id="aiemapa-filtros" style="display:none;flex-direction:column;gap:10px">
+        <div>
+          <div style="font-size:10px;font-weight:700;color:var(--cinza-400);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">Período (data do evento)</div>
+          <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:6px">
+            ${[['ano','Este ano'],['12m','Últimos 12m'],['tudo','Tudo']].map(([v,l])=>`
+            <button type="button" onclick="aieMapaPreset('${v}')" style="border:1px solid var(--borda);background:#fff;font:inherit;font-size:10px;font-weight:600;color:#374151;padding:3px 9px;border-radius:6px;cursor:pointer">${l}</button>`).join('')}
+          </div>
+          <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--cinza-600)">
+            <input type="date" id="aiemapa-ini" onchange="carregarAreasEvitadasMapa()" style="flex:1;min-width:0;font-size:11px;padding:3px 5px;border:1px solid var(--borda);border-radius:6px;font-family:inherit">
+            <span>a</span>
+            <input type="date" id="aiemapa-fim" onchange="carregarAreasEvitadasMapa()" style="flex:1;min-width:0;font-size:11px;padding:3px 5px;border:1px solid var(--borda);border-radius:6px;font-family:inherit">
+          </div>
+        </div>
+        <div>
+          <div style="font-size:10px;font-weight:700;color:var(--cinza-400);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">Unidade de Conservação</div>
+          <select id="aiemapa-uc" onchange="carregarAreasEvitadasMapa()" style="width:100%;font-size:11px;padding:4px 6px;border:1px solid var(--borda);border-radius:6px;font-family:inherit">
+            <option value="">Todas as UCs</option>
+          </select>
+        </div>
+        <div id="aiemapa-stat" style="font-size:10px;color:var(--cinza-400)"></div>
+      </div>
+    </div>
   ` + foot;
   if(id==='projetos') return hdr('📐 Projetos de Análise de Campo') + `
     <div style="display:flex;flex-direction:column;gap:10px">
@@ -2552,6 +2592,11 @@ function _atualizarLegendaMapa(){
     }
   }
 
+  // Área evitada (incêndio/queimada evitada)
+  if(_aieMapaAtivo && _aieMapaLayer) {
+    itens.push({ simbolo:'rect', cor:'#7C3AED', opacidade:0.35, label:'Área evitada (queimada)' });
+  }
+
   // Focos de Calor em Tempo Real
   if(_focosNrtAtivo && _focosNrtLayer) {
     [['FIRMS','#7c3aed','Focos — FIRMS/NASA'],['BDQUEIMADAS','#ea580c','Focos — BDQueimadas/INPE']].forEach(([f,cor,label]) => {
@@ -2801,6 +2846,10 @@ function renderAlertasMapa() {
 let _brigadasLayer = null, _brigadasMapa = [], _brigadasAtivo = false
 let _brigadasHeatLayer = null, _brigModoExib = 'pontos', _brigPesoCalor = 'densidade'
 
+// Área evitada (incêndio/queimada evitada) — camada da aba Brigadas
+let _aieMapaLayer = null, _aieMapaAtivo = false, _aieMapaDados = [], _aieMapaUCs = null
+let _aieMapaIni = '', _aieMapaFim = '', _aieMapaUcSel = ''
+
 // Gradiente da mancha de calor (verde → ouro → laranja → vermelho)
 const _BRIG_HEAT_GRAD = { 0.2:'#52B788', 0.45:'#C9A84C', 0.7:'#EF8E3C', 1.0:'#D7263D' }
 // Peso relativo por natureza da ação (combate pesa mais)
@@ -2916,6 +2965,106 @@ async function _carregarFaunaFotos(registroId, popupEl) {
         <span class="car-counter">1/${todasFotos.length}</span>` : ''}
     </div>`
   if (multi) _iniciarCarrossel(wrap)
+}
+
+// ── Área evitada (incêndio/queimada evitada) no mapa ────────────────
+async function _aieMapaPopularUCs() {
+  const sel = document.getElementById('aiemapa-uc'); if (!sel) return
+  if (!_aieMapaUCs) {
+    try {
+      const { data } = await db.from('unidades_conservacao').select('id,nome,sigla').order('nome')
+      _aieMapaUCs = data || []
+    } catch (e) { _aieMapaUCs = [] }
+  }
+  const atual = sel.value
+  sel.length = 1   // mantém apenas "Todas as UCs"
+  _aieMapaUCs.forEach(u => {
+    const o = document.createElement('option')
+    o.value = u.id
+    o.textContent = u.sigla ? `${u.sigla} — ${u.nome}` : u.nome
+    sel.appendChild(o)
+  })
+  sel.value = atual || _aieMapaUcSel || ''
+}
+
+async function toggleAreasEvitadasMapa(ativo) {
+  _aieMapaAtivo = ativo
+  const fw = document.getElementById('aiemapa-filtros')
+  if (fw) fw.style.display = ativo ? 'flex' : 'none'
+  if (ativo) {
+    await _aieMapaPopularUCs()
+    const i = document.getElementById('aiemapa-ini'), f = document.getElementById('aiemapa-fim'), u = document.getElementById('aiemapa-uc')
+    if (i) i.value = _aieMapaIni; if (f) f.value = _aieMapaFim; if (u) u.value = _aieMapaUcSel
+    await carregarAreasEvitadasMapa()
+  } else {
+    if (_aieMapaLayer) { mapaL.removeLayer(_aieMapaLayer); _aieMapaLayer = null }
+    _atualizarLegendaMapa()
+  }
+}
+
+function aieMapaPreset(qual) {
+  const ini = document.getElementById('aiemapa-ini'), fim = document.getElementById('aiemapa-fim')
+  if (!ini || !fim) return
+  const hoje = new Date()
+  const fmt = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  if (qual === 'tudo') { ini.value = ''; fim.value = '' }
+  else if (qual === 'ano') { ini.value = fmt(new Date(hoje.getFullYear(), 0, 1)); fim.value = fmt(hoje) }
+  else if (qual === '12m') { const d = new Date(hoje); d.setFullYear(d.getFullYear() - 1); ini.value = fmt(d); fim.value = fmt(hoje) }
+  carregarAreasEvitadasMapa()
+}
+
+async function carregarAreasEvitadasMapa() {
+  if (!_aieMapaAtivo) return
+  _aieMapaIni   = document.getElementById('aiemapa-ini')?.value || ''
+  _aieMapaFim   = document.getElementById('aiemapa-fim')?.value || ''
+  _aieMapaUcSel = document.getElementById('aiemapa-uc')?.value || ''
+  let data = null
+  try {
+    const r = await db.rpc('areas_evitadas_mapa', {
+      p_uc_id:    _aieMapaUcSel || null,
+      p_data_ini: _aieMapaIni   || null,
+      p_data_fim: _aieMapaFim   || null,
+    })
+    if (r.error) throw r.error
+    data = r.data
+  } catch (e) { console.warn('áreas evitadas mapa:', e.message || e) }
+  _aieMapaDados = data || []
+  renderAreasEvitadasMapa()
+}
+
+function renderAreasEvitadasMapa() {
+  if (_aieMapaLayer) { mapaL.removeLayer(_aieMapaLayer); _aieMapaLayer = null }
+  if (!_aieMapaAtivo) { _atualizarLegendaMapa(); return }
+  const feats = _aieMapaDados.filter(a => a.geom)
+  _aieMapaLayer = L.layerGroup()
+  let totalHa = 0
+  feats.forEach(a => {
+    totalHa += Number(a.area_ha || 0)
+    try {
+      const dt = a.data_hora_evento
+        ? new Date(a.data_hora_evento).toLocaleDateString('pt-BR', { timeZone: 'America/Rio_Branco' }) : '—'
+      const metLab = { manual: 'Manual', sugerido: 'Sugerido', sugerido_ajustado: 'Sugerido + ajuste' }[a.metodo] || a.metodo || 'manual'
+      L.geoJSON(a.geom, {
+        style: { color: '#7C3AED', weight: 2, fillColor: '#7C3AED', fillOpacity: .18, dashArray: '6 4' }
+      }).bindPopup(
+        `<div class="camada-popup"><div class="cp-header">Área evitada</div><div class="cp-layer">`
+        + `<div class="cp-row"><strong>Área</strong> ${formatNum(Number(a.area_ha || 0), 2)} ha</div>`
+        + `<div class="cp-row"><strong>UC</strong> ${escHtml(a.uc_nome || '—')}</div>`
+        + `<div class="cp-row"><strong>Brigada</strong> ${escHtml(a.brigada_nome || '—')}</div>`
+        + `<div class="cp-row"><strong>Data</strong> ${dt}</div>`
+        + `<div class="cp-row"><strong>Método</strong> ${escHtml(metLab)}</div>`
+        + (a.descricao ? `<div class="cp-row"><strong>Obs</strong> ${escHtml(a.descricao)}</div>` : '')
+        + `</div></div>`,
+        { className: 'camada-popup-wrap' }
+      ).addTo(_aieMapaLayer)
+    } catch (e) {}
+  })
+  _aieMapaLayer.addTo(mapaL)
+  const stat = document.getElementById('aiemapa-stat')
+  if (stat) stat.textContent = feats.length
+    ? `${formatNum(totalHa, 2)} ha evitados · ${feats.length} área(s)`
+    : 'Nenhuma área no filtro atual.'
+  _atualizarLegendaMapa()
 }
 
 async function toggleBrigadasMapa(ativo) {
