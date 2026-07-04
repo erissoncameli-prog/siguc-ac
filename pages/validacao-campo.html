@@ -330,6 +330,39 @@
   color:#5b21b6; font-size:.83rem; font-weight:600; cursor:pointer; transition:.15s
 }
 .aie-btn-add:hover { background:rgba(124,58,237,.06) }
+.aie-btn-sugerir {
+  width:100%; padding:9px; border-radius:8px; border:none;
+  display:inline-flex; align-items:center; justify-content:center; gap:7px;
+  background:#5b21b6; color:#fff; font-size:.85rem; font-weight:700;
+  cursor:pointer; transition:.15s
+}
+.aie-btn-sugerir:hover { background:#4c1d95 }
+.aie-btn-sugerir:disabled { opacity:.6; cursor:progress }
+.aie-btn-sugerir .aie-ic svg { width:17px; height:17px; vertical-align:middle }
+.aie-memoria {
+  font-size:.75rem; color:#5b21b6; background:rgba(124,58,237,.07);
+  border-radius:7px; padding:7px 10px; margin:0 0 8px; line-height:1.45
+}
+.aie-item-metodo {
+  display:inline-block; font-size:.66rem; font-weight:700; text-transform:uppercase;
+  letter-spacing:.03em; border-radius:5px; padding:1px 6px; margin-left:6px; vertical-align:middle
+}
+.aie-item-metodo.m-sugerido        { background:#ede9fe; color:#5b21b6 }
+.aie-item-metodo.m-sugerido_ajustado{ background:#e0f2fe; color:#075985 }
+.aie-fauna {
+  margin-top:14px; border:1px solid rgba(16,166,106,.25);
+  border-radius:10px; padding:12px 14px; background:#f6fdf9
+}
+.aie-fauna h4 { margin:0 0 8px; font-size:.85rem; color:#166534; font-weight:700 }
+.aie-fauna-row { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:8px }
+.aie-fauna-chip {
+  background:#fff; border:1px solid rgba(16,166,106,.3); border-radius:8px;
+  padding:5px 10px; font-size:.78rem; color:#374151
+}
+.aie-fauna-chip b { color:#166534 }
+.aie-fauna-est { font-size:.78rem; color:#374151; margin:6px 0 0; line-height:1.5 }
+.aie-fauna-est b { color:#166534 }
+.aie-fauna-fonte { font-size:.7rem; color:var(--text-muted,#6b7280); margin:6px 0 0; font-style:italic }
 </style>
 </head>
 <body>
@@ -380,10 +413,11 @@
           <p class="form-label">Incêndio Evitado</p>
           <span id="aie-total-pill" class="aie-total-pill" hidden></span>
         </div>
-        <p class="aie-hint">Áreas que seriam atingidas sem a ação da brigada. Desenhadas no mapa acima pelo validador.</p>
+        <p class="aie-hint">Áreas que seriam atingidas sem a ação da brigada. Sugira automaticamente (motor empírico) e ajuste, ou desenhe no mapa acima.</p>
         <div id="aie-lista"></div>
         <div id="aie-form-novo" class="aie-form-novo" hidden>
           <p class="aie-form-titulo" id="aie-form-titulo">Nova área evitada</p>
+          <p class="aie-memoria" id="aie-memoria" hidden></p>
           <textarea id="aie-descricao" placeholder="Descrição (opcional — ex: margem leste do igarapé)"></textarea>
           <p class="aie-preview-area" id="aie-preview-area"></p>
           <div class="aie-form-acoes">
@@ -391,9 +425,17 @@
             <button class="btn-aie-cancel" onclick="aie_cancelarDesenho()">Cancelar</button>
           </div>
         </div>
-        <button class="aie-btn-add" id="aie-btn-add" onclick="aie_iniciarDesenho()">
-          + Adicionar área evitada
-        </button>
+        <div id="aie-acoes-add" style="display:grid;gap:8px">
+          <button class="aie-btn-sugerir" id="aie-btn-sugerir" onclick="aie_sugerir()">
+            <span data-icon="sparkles" class="aie-ic"></span> Sugerir automaticamente
+          </button>
+          <button class="aie-btn-add" id="aie-btn-add" onclick="aie_iniciarDesenho()">
+            + Desenhar manualmente
+          </button>
+        </div>
+
+        <!-- Impacto sobre a fauna (observado + estimado) -->
+        <div id="aie-fauna" class="aie-fauna" hidden></div>
       </div>
 
       <!-- Fotos -->
@@ -1367,6 +1409,7 @@ let _valEdicaoAtiva = false, _valGeoCache = null
 // Incêndio Evitado — estado
 let _aieAreasLayers = {}, _aieDrawHandler = null, _aieNovaLayer = null
 let _aieEditandoId  = null, _aieAreas = []
+let _aieMetodo = 'manual', _aieMemoria = null
 
 function _valDestruirMapa() {
   try { if (_valPolyLayer && _valPolyLayer.editing) _valPolyLayer.editing.disable() } catch (e) {}
@@ -1616,10 +1659,15 @@ function _aieRenderLista(areas) {
     return
   }
 
+  const rotuloMetodo = { sugerido: 'Sugerido', sugerido_ajustado: 'Sugerido + ajuste' }
   lista.innerHTML = areas.map(a => `
     <div class="aie-item" id="aie-item-${a.id}">
       <div>
-        <div class="aie-item-ha">${formatNum(Number(a.area_ha || 0), 2)} ha</div>
+        <div class="aie-item-ha">${formatNum(Number(a.area_ha || 0), 2)} ha${
+          a.metodo && a.metodo !== 'manual'
+            ? `<span class="aie-item-metodo m-${a.metodo}">${rotuloMetodo[a.metodo] || a.metodo}</span>`
+            : ''
+        }</div>
         <div class="aie-item-desc">${a.descricao ? esc(a.descricao) : '<em style="opacity:.5">Sem descrição</em>'}</div>
         ${a.criado_por_nome ? `<div style="font-size:.72rem;color:var(--text-muted,#6b7280);margin-top:3px">por ${esc(a.criado_por_nome)}</div>` : ''}
       </div>
@@ -1633,17 +1681,74 @@ function _aieRenderLista(areas) {
 
 async function aie_carregar(registroId) {
   const sec       = document.getElementById('modal-aie-sec')
-  const btnAdd    = document.getElementById('aie-btn-add')
+  const acoes     = document.getElementById('aie-acoes-add')
   const podeEditar = ['biologo','tecnico','gestor','super_admin'].includes(_usuario?.perfil)
   if (!sec) return
 
   const { data } = await db.rpc('listar_areas_evitadas', { p_registro_id: registroId })
   _aieAreas = data || []
   _aieRenderLista(_aieAreas)
-  if (btnAdd) btnAdd.hidden = !podeEditar
+  if (acoes) acoes.hidden = !podeEditar
 
   // Renderiza no mapa após ele estar pronto (initMapaValidacao usa até 500 ms)
   setTimeout(() => _aieRenderNoMapa(_aieAreas), 650)
+
+  aie_carregarFauna(registroId)
+}
+
+// Impacto sobre a fauna — observado (registros reais) + estimado (faixa por
+// densidade de referência × total de hectares evitados).
+async function aie_carregarFauna(registroId) {
+  const box = document.getElementById('aie-fauna')
+  if (!box) return
+  const totalHa = _aieAreas.reduce((s, a) => s + Number(a.area_ha || 0), 0)
+
+  let imp = null
+  try {
+    const { data } = await db.rpc('impacto_fauna_evitado', {
+      p_registro_id: registroId, p_area_ha: Number(totalHa.toFixed(2))
+    })
+    imp = data
+  } catch (e) {}
+  if (!imp) { box.hidden = true; return }
+
+  const o = imp.observado || {}
+  const e = imp.estimado  || {}
+  const temObs = (o.total_individuos || 0) > 0
+  const temEst = totalHa > 0 && (e.total_max || 0) > 0
+  if (!temObs && !temEst) { box.hidden = true; return }
+
+  let html = '<h4>Impacto sobre a fauna</h4>'
+
+  if (temObs) {
+    html += '<div class="aie-fauna-row">'
+      + `<span class="aie-fauna-chip"><b>${formatNum(o.total_individuos, 0)}</b> indivíduos registrados</span>`
+      + `<span class="aie-fauna-chip"><b>${formatNum(o.n_especies || 0, 0)}</b> espécies</span>`
+      + (o.n_ameacadas  ? `<span class="aie-fauna-chip"><b>${formatNum(o.n_ameacadas, 0)}</b> ameaçadas</span>` : '')
+      + (o.n_resgatados ? `<span class="aie-fauna-chip"><b>${formatNum(o.n_resgatados, 0)}</b> resgatados</span>` : '')
+      + '</div>'
+  } else {
+    html += '<p class="aie-fauna-est" style="opacity:.7">Nenhuma fauna registrada nesta ocorrência.</p>'
+  }
+
+  if (temEst) {
+    const grupos = (e.por_grupo || [])
+      .filter(g => Number(g.ind_max) > 0)
+      .map(g => `${GRUPO_FAUNA_PT[g.grupo] || g.grupo}: ${formatNum(g.ind_min, 0)}–${formatNum(g.ind_max, 0)}`)
+      .join(' · ')
+    html += `<p class="aie-fauna-est">Estimativa para <b>${formatNum(totalHa, 2)} ha</b> de habitat preservado: `
+      + `<b>${formatNum(e.total_min, 0)}–${formatNum(e.total_max, 0)}</b> indivíduos potencialmente protegidos`
+      + (grupos ? `<br><span style="opacity:.85">${grupos}</span>` : '') + '</p>'
+    html += `<p class="aie-fauna-fonte">${esc(e.fonte || '')}</p>`
+  }
+
+  box.innerHTML = html
+  box.hidden = false
+}
+
+const GRUPO_FAUNA_PT = {
+  ave: 'Aves', mamifero: 'Mamíferos', reptil: 'Répteis',
+  anfibio: 'Anfíbios', peixe: 'Peixes', invertebrado: 'Invertebrados', nao_sei: 'Outros'
 }
 
 function aie_iniciarDesenho() {
@@ -1651,9 +1756,12 @@ function aie_iniciarDesenho() {
   aie_cancelarDesenho()
 
   _aieEditandoId = null
+  _aieMetodo = 'manual'
+  _aieMemoria = null
   document.getElementById('aie-form-titulo').textContent = 'Nova área evitada'
   document.getElementById('aie-form-novo').hidden = false
-  document.getElementById('aie-btn-add').hidden   = true
+  document.getElementById('aie-acoes-add').hidden = true
+  const _mem = document.getElementById('aie-memoria'); if (_mem) _mem.hidden = true
   document.getElementById('aie-descricao').value  = ''
   document.getElementById('aie-preview-area').innerHTML = ''
 
@@ -1664,11 +1772,115 @@ function aie_iniciarDesenho() {
 
   _valMap.once(L.Draw.Event.CREATED, e => {
     _aieNovaLayer = e.layer.addTo(_valMap)
-    _aieNovaLayer.on('edit', _aieAtualizarPreview)
+    _aieNovaLayer.on('edit', _aieOnEdit)
     try { _aieNovaLayer.editing.enable() } catch(er) {}
     _aieAtualizarPreview()
   })
   toast('Marque os vértices da área protegida; feche no primeiro ponto.', 'info')
+}
+
+// Busca vento (direção/velocidade) do dia do evento no Open-Meteo (público,
+// sem chave). Melhor esforço — falha em silêncio e o modelo cai para círculo.
+async function _aieBuscarVento(lat, lng, dataHoraISO) {
+  try {
+    const d = new Date(dataHoraISO)
+    if (isNaN(d)) return null
+    const dia = d.toISOString().slice(0, 10)
+    const url = 'https://archive-api.open-meteo.com/v1/archive'
+      + `?latitude=${lat}&longitude=${lng}`
+      + `&start_date=${dia}&end_date=${dia}`
+      + '&hourly=wind_speed_10m,wind_direction_10m&timezone=auto'
+    const resp = await fetch(url)
+    if (!resp.ok) return null
+    const j = await resp.json()
+    const horas = j?.hourly?.time || []
+    if (!horas.length) return null
+    // Índice da hora mais próxima do evento (comparando 'YYYY-MM-DDTHH').
+    const alvo = dataHoraISO.slice(0, 13)
+    let idx = horas.findIndex(h => h.slice(0, 13) === alvo)
+    if (idx < 0) idx = Math.min(12, horas.length - 1)  // meio-dia como fallback
+    const dir = j.hourly.wind_direction_10m?.[idx]
+    const vel = j.hourly.wind_speed_10m?.[idx]
+    if (dir == null || vel == null) return null
+    return { dir: Number(dir), kmh: Number(vel) }
+  } catch (e) { return null }
+}
+
+async function aie_sugerir() {
+  if (!_valMap) { toast('Aguarde o mapa carregar para sugerir a área', 'warn'); return }
+  const btn = document.getElementById('aie-btn-sugerir')
+  if (btn) { btn.disabled = true }
+  aie_cancelarDesenho()
+
+  const r = _registros.find(x => x.id === _detalheId)
+
+  // Vento do dia (best-effort) para deformar a sugestão a favor do vento.
+  let vento = null
+  if (r && r.lat != null && r.lng != null && r.data_hora_evento) {
+    vento = await _aieBuscarVento(r.lat, r.lng, r.data_hora_evento)
+  }
+
+  let res = null
+  try {
+    const { data, error } = await db.rpc('sugerir_area_evitada', {
+      p_registro_id:     _detalheId,
+      p_vento_dir_graus: vento ? vento.dir : null,
+      p_vento_kmh:       vento ? vento.kmh : null,
+    })
+    if (error) throw error
+    res = data
+  } catch (e) {
+    if (btn) btn.disabled = false
+    toast('Não foi possível sugerir: ' + (e.message || e), 'erro')
+    return
+  }
+
+  if (btn) btn.disabled = false
+
+  if (!res || res.erro) {
+    toast(res?.msg || 'Sem geometria suficiente para sugerir a área.', 'warn')
+    return
+  }
+
+  // Monta o polígono sugerido como camada editável (mesmo fluxo do manual).
+  let latlngs = null
+  try {
+    const tmp = L.geoJSON(res.geom)
+    tmp.eachLayer(l => { if (!latlngs) latlngs = l.getLatLngs() })
+  } catch (e) {}
+  if (!latlngs) { toast('Falha ao desenhar a sugestão no mapa.', 'erro'); return }
+
+  _aieEditandoId = null
+  _aieMetodo  = 'sugerido'
+  _aieMemoria = res.memoria || null
+
+  document.getElementById('aie-form-titulo').textContent = 'Área sugerida (revise e ajuste)'
+  document.getElementById('aie-form-novo').hidden = false
+  document.getElementById('aie-acoes-add').hidden = true
+  document.getElementById('aie-descricao').value  = 'Sugestão automática (motor empírico)'
+
+  const m   = res.memoria || {}
+  const mem = document.getElementById('aie-memoria')
+  if (mem) {
+    mem.innerHTML =
+      `Raio estimado <b>${formatNum(Number(res.raio_m || 0), 0)} m</b>`
+      + ` · ${esc(m.fonte_raio || '')}`
+      + (m.anisotropico
+          ? ` · alongada a favor do vento (${formatNum(Number(m.vento_kmh || 0), 0)} km/h)`
+          : ' · sem vento (círculo)')
+      + '. Revise os vértices antes de salvar.'
+    mem.hidden = false
+  }
+
+  _aieNovaLayer = L.polygon(latlngs, {
+    color:'#7C3AED', weight:2, fillColor:'#7C3AED', fillOpacity:.13, dashArray:'7 4'
+  }).addTo(_valMap)
+  _aieNovaLayer.on('edit', _aieOnEdit)
+  try { _aieNovaLayer.editing.enable() } catch (e) {}
+  _aieAtualizarPreview()
+  try { _valMap.fitBounds(_aieNovaLayer.getBounds().pad(0.3)) } catch (e) {}
+
+  toast('Área sugerida no mapa. Ajuste os vértices e salve.', 'ok')
 }
 
 function _aieAtualizarPreview() {
@@ -1679,14 +1891,24 @@ function _aieAtualizarPreview() {
   if (el && ha != null) el.innerHTML = `Área: <b>${formatNum(ha, 2)} ha</b>`
 }
 
+// Editar vértices de um polígono sugerido pelo motor passa o método a
+// "sugerido_ajustado" (mantém rastreabilidade de que houve toque humano).
+function _aieOnEdit() {
+  if (_aieMetodo === 'sugerido') _aieMetodo = 'sugerido_ajustado'
+  _aieAtualizarPreview()
+}
+
 // silent=true: cancelamento interno sem manipular DOM (ex: destruição do mapa)
 function aie_cancelarDesenho(silent) {
   if (_aieDrawHandler) { try { _aieDrawHandler.disable() } catch(e) {} _aieDrawHandler = null }
   if (_aieNovaLayer)   { try { if (_valMap) _valMap.removeLayer(_aieNovaLayer) } catch(e) {} _aieNovaLayer = null }
   _aieEditandoId = null
+  _aieMetodo = 'manual'
+  _aieMemoria = null
   if (silent) return
   const f = document.getElementById('aie-form-novo'); if (f) f.hidden = true
-  const b = document.getElementById('aie-btn-add');   if (b) b.hidden = false
+  const a = document.getElementById('aie-acoes-add'); if (a) a.hidden = false
+  const m = document.getElementById('aie-memoria');   if (m) m.hidden = true
 }
 
 async function aie_salvar() {
@@ -1699,6 +1921,8 @@ async function aie_salvar() {
     p_geom:        geom,
     p_descricao:   descricao,
     p_id:          _aieEditandoId || null,
+    p_metodo:      _aieMetodo || 'manual',
+    p_memoria:     _aieMemoria || null,
   })
   if (error) { toast('Erro ao salvar: ' + error.message, 'erro'); return }
   toast('Área evitada salva', 'ok')
@@ -1720,9 +1944,12 @@ async function aie_editarItem(id) {
   }
 
   _aieEditandoId = id
+  _aieMetodo = area.metodo || 'manual'
+  _aieMemoria = null   // não sobrescreve a memória original ao apenas reeditar
   document.getElementById('aie-form-titulo').textContent = 'Editar área evitada'
   document.getElementById('aie-form-novo').hidden = false
-  document.getElementById('aie-btn-add').hidden   = true
+  document.getElementById('aie-acoes-add').hidden = true
+  const _memEd = document.getElementById('aie-memoria'); if (_memEd) _memEd.hidden = true
   document.getElementById('aie-descricao').value  = area.descricao || ''
 
   try {
@@ -1733,7 +1960,7 @@ async function aie_editarItem(id) {
       _aieNovaLayer = L.polygon(layers[0].getLatLngs(), {
         color:'#7C3AED', weight:2, fillColor:'#7C3AED', fillOpacity:.13, dashArray:'7 4'
       }).addTo(_valMap)
-      _aieNovaLayer.on('edit', _aieAtualizarPreview)
+      _aieNovaLayer.on('edit', _aieOnEdit)
       try { _aieNovaLayer.editing.enable() } catch(e) {}
       _aieAtualizarPreview()
       try { _valMap.fitBounds(_aieNovaLayer.getBounds().pad(0.3)) } catch(e) {}
