@@ -273,7 +273,17 @@
 .val-btn-edit { font-size:.78rem; font-weight:600; padding:6px 12px; border-radius:8px; cursor:pointer;
                 border:1px solid var(--verde-c,#52B788); background:#fff; color:#166534 }
 .val-btn-edit:hover { background:#f0fdf4 }
+.val-btn-edit svg { width:15px; height:15px; vertical-align:-.15em }
 .val-area-info { font-size:.8rem; color:#374151; margin:8px 0 0; min-height:1em }
+/* Tela cheia: a seção do mapa ocupa toda a viewport, com camadas/edição */
+#modal-mapa-sec.val-map-fs {
+  position:fixed; inset:0; z-index:5000; margin:0; padding:12px 14px;
+  background:var(--t1,#F4EFE6); display:flex; flex-direction:column; gap:8px; overflow:auto
+}
+#modal-mapa-sec.val-map-fs .val-map-head { flex:0 0 auto; margin:0 }
+#modal-mapa-sec.val-map-fs .val-mapa { flex:1 1 auto; height:auto; min-height:0 }
+#modal-mapa-sec.val-map-fs .val-map-foot,
+#modal-mapa-sec.val-map-fs .val-area-info { flex:0 0 auto }
 .val-area-info b { color:#166534 }
 
 /* ── Incêndio Evitado ──────────────────────────────── */
@@ -404,6 +414,9 @@
         <div class="val-map-foot">
           <span id="val-evidencia" class="val-evidencia">Cruzando focos…</span>
           <span class="val-map-acoes">
+            <button type="button" class="val-btn-edit" id="val-btn-fullscreen" onclick="_valToggleFullscreen()" title="Ver o mapa em tela cheia">
+              <span data-icon="maximize"></span> Tela cheia
+            </button>
             <button type="button" class="val-btn-edit" id="val-btn-editar">Editar polígono</button>
             <button type="button" class="val-btn-edit" id="val-btn-desfazer" hidden>Descartar edição</button>
           </span>
@@ -1416,8 +1429,27 @@ let _aieEditandoId  = null, _aieAreas = []
 let _aieMetodo = 'manual', _aieMemoria = null
 let _aieHidroLayer = null, _aieCombLayer = null
 
+// Tela cheia do mapa de validação
+let _valFsAtivo = false
+function _valEscFs(e) { if (e.key === 'Escape' && _valFsAtivo) _valToggleFullscreen(false) }
+function _valToggleFullscreen(forcar) {
+  const sec = document.getElementById('modal-mapa-sec')
+  if (!sec) return
+  const ativar = (typeof forcar === 'boolean') ? forcar : !sec.classList.contains('val-map-fs')
+  sec.classList.toggle('val-map-fs', ativar)
+  _valFsAtivo = ativar
+  const btn = document.getElementById('val-btn-fullscreen')
+  if (btn) btn.innerHTML = (ativar ? bico('minimize') : bico('maximize'))
+    + ' ' + (ativar ? 'Restaurar' : 'Tela cheia')
+  if (ativar) document.addEventListener('keydown', _valEscFs)
+  else document.removeEventListener('keydown', _valEscFs)
+  // Revalida o tamanho do mapa após a transição de layout
+  for (const t of [0, 60, 220]) setTimeout(() => { if (_valMap) _valMap.invalidateSize() }, t)
+}
+
 function _valDestruirMapa() {
   try { if (_valPolyLayer && _valPolyLayer.editing) _valPolyLayer.editing.disable() } catch (e) {}
+  if (_valFsAtivo) _valToggleFullscreen(false)   // sai da tela cheia ao fechar
   // Limpa áreas evitadas antes de destruir o mapa
   aie_cancelarDesenho(true)
   Object.values(_aieAreasLayers).forEach(l => { try { if (_valMap) _valMap.removeLayer(l) } catch(e) {} })
