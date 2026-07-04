@@ -1410,6 +1410,7 @@ let _valEdicaoAtiva = false, _valGeoCache = null
 let _aieAreasLayers = {}, _aieDrawHandler = null, _aieNovaLayer = null
 let _aieEditandoId  = null, _aieAreas = []
 let _aieMetodo = 'manual', _aieMemoria = null
+let _aieHidroLayer = null
 
 function _valDestruirMapa() {
   try { if (_valPolyLayer && _valPolyLayer.editing) _valPolyLayer.editing.disable() } catch (e) {}
@@ -1418,6 +1419,7 @@ function _valDestruirMapa() {
   Object.values(_aieAreasLayers).forEach(l => { try { if (_valMap) _valMap.removeLayer(l) } catch(e) {} })
   _aieAreasLayers = {}
   _aieAreas = []
+  _aieRenderHidro(null)
   if (_valMap) { _valMap.remove(); _valMap = null }
   _valDrawn = _valPolyLayer = _valFocosLayer = _valGibsLayer = _valPlanetLayer = _valGeoCache = null
   _valEdicaoAtiva = false
@@ -1837,6 +1839,68 @@ async function _aieBuscarTopografia(lat, lng) {
   } catch (e) { return null }
 }
 
+// Busca a hidrografia local (rios + corpos d'água) no OpenStreetMap via
+// Overpass, num raio ao redor do ponto. Devolve { geojson, n } — GeoJSON
+// GeometryCollection (linhas de curso d'água + polígonos d'água) para o
+// motor usar como aceiro. Best-effort com timeout; falha em silêncio.
+async function _aieBuscarHidrografia(lat, lng, raioM) {
+  try {
+    const meiaLat = (raioM || 6000) / 111320
+    const meiaLng = (raioM || 6000) / (111320 * Math.cos(lat * Math.PI / 180))
+    const S = lat - meiaLat, N = lat + meiaLat
+    const W = lng - meiaLng, E = lng + meiaLng
+    const bbox = `${S},${W},${N},${E}`
+    const ql = `[out:json][timeout:20];(`
+      + `way["waterway"~"^(river|riverbank|canal)$"](${bbox});`
+      + `way["natural"="water"](${bbox});`
+      + `);out geom;`
+    const ctrl = new AbortController()
+    const to = setTimeout(() => ctrl.abort(), 22000)
+    const resp = await fetch('https://overpass-api.de/api/interpreter', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: 'data=' + encodeURIComponent(ql),
+      signal: ctrl.signal,
+    })
+    clearTimeout(to)
+    if (!resp.ok) return null
+    const j = await resp.json()
+    const els = (j?.elements || []).filter(el => el.type === 'way' && Array.isArray(el.geometry))
+    if (!els.length) return null
+
+    const geometries = []
+    for (const el of els.slice(0, 400)) {
+      const coords = el.geometry.map(g => [g.lon, g.lat])
+      if (coords.length < 2) continue
+      const tags = el.tags || {}
+      const ehPoligono = (tags.natural === 'water' || tags.waterway === 'riverbank')
+      const fechado = coords.length >= 4
+        && coords[0][0] === coords[coords.length - 1][0]
+        && coords[0][1] === coords[coords.length - 1][1]
+      if (ehPoligono && fechado) {
+        geometries.push({ type: 'Polygon', coordinates: [coords] })
+      } else {
+        geometries.push({ type: 'LineString', coordinates: coords })
+      }
+    }
+    if (!geometries.length) return null
+    return { geojson: { type: 'GeometryCollection', geometries }, n: geometries.length }
+  } catch (e) { return null }
+}
+
+// Desenha a hidrografia usada como aceiro (azul), para o validador ver
+// por que a área foi cortada. Passar null/undefined remove a camada.
+function _aieRenderHidro(hidro) {
+  if (_aieHidroLayer && _valMap) { try { _valMap.removeLayer(_aieHidroLayer) } catch (e) {} }
+  _aieHidroLayer = null
+  if (!hidro || !hidro.geojson || !_valMap) return
+  try {
+    _aieHidroLayer = L.geoJSON(hidro.geojson, {
+      style: { color: '#2563EB', weight: 2, opacity: .75, fillColor: '#3B82F6', fillOpacity: .18 }
+    }).addTo(_valMap)
+  } catch (e) { _aieHidroLayer = null }
+}
+
 async function aie_sugerir() {
   if (!_valMap) { toast('Aguarde o mapa carregar para sugerir a área', 'warn'); return }
   const btn = document.getElementById('aie-btn-sugerir')
@@ -1845,15 +1909,17 @@ async function aie_sugerir() {
 
   const r = _registros.find(x => x.id === _detalheId)
 
-  // Vento do dia + topografia (best-effort, em paralelo) para deformar a
-  // sugestão a favor do vento e morro acima.
-  let vento = null, topo = null
+  // Vento + topografia + hidrografia (best-effort, em paralelo) para
+  // deformar a sugestão a favor do vento/morro acima e cortá-la nos rios.
+  let vento = null, topo = null, hidro = null
   if (r && r.lat != null && r.lng != null) {
-    [vento, topo] = await Promise.all([
+    [vento, topo, hidro] = await Promise.all([
       r.data_hora_evento ? _aieBuscarVento(r.lat, r.lng, r.data_hora_evento) : Promise.resolve(null),
       _aieBuscarTopografia(r.lat, r.lng),
+      _aieBuscarHidrografia(r.lat, r.lng, 6000),
     ])
   }
+  _aieRenderHidro(hidro)
 
   let res = null
   try {
@@ -1863,6 +1929,7 @@ async function aie_sugerir() {
       p_vento_kmh:       vento ? vento.kmh : null,
       p_slope_pct:       topo  ? topo.slopePct : null,
       p_aspect_graus:    topo  ? topo.aspect : null,
+      p_hidro:           hidro ? hidro.geojson : null,
     })
     if (error) throw error
     res = data
@@ -1902,13 +1969,20 @@ async function aie_sugerir() {
     const forcas = []
     if (m.usou_vento) forcas.push(`vento ${formatNum(Number(m.vento_kmh || 0), 0)} km/h`)
     if (m.usou_relevo) forcas.push(`relevo ${formatNum(Number(m.slope_pct || 0), 0)}% (morro acima)`)
-    mem.innerHTML =
+    let txt =
       `Raio estimado <b>${formatNum(Number(res.raio_m || 0), 0)} m</b>`
       + ` · ${esc(m.fonte_raio || '')}`
       + (forcas.length
           ? ` · alongada por ${forcas.join(' + ')}`
           : ' · círculo (sem vento nem declive)')
-      + '. Revise os vértices antes de salvar.'
+    if (m.usou_hidro) {
+      const preHa = Number(m.area_pre_hidro || 0)
+      const cortou = preHa > Number(res.area_ha || 0) + 0.01
+      txt += ` · cortada por hidrografia (${formatNum(Number(m.n_hidro || 0), 0)} cursos d'água`
+        + (cortou ? `, de ${formatNum(preHa, 0)} para ${formatNum(Number(res.area_ha || 0), 0)} ha` : '')
+        + ')'
+    }
+    mem.innerHTML = txt + '. Revise os vértices antes de salvar.'
     mem.hidden = false
   }
 
@@ -1942,6 +2016,7 @@ function _aieOnEdit() {
 function aie_cancelarDesenho(silent) {
   if (_aieDrawHandler) { try { _aieDrawHandler.disable() } catch(e) {} _aieDrawHandler = null }
   if (_aieNovaLayer)   { try { if (_valMap) _valMap.removeLayer(_aieNovaLayer) } catch(e) {} _aieNovaLayer = null }
+  _aieRenderHidro(null)
   _aieEditandoId = null
   _aieMetodo = 'manual'
   _aieMemoria = null
