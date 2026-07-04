@@ -793,10 +793,18 @@ function _reaplicarTiles(){
 // ══════════════════════════════════════════════════════════════
 // WMS — Cobertura Vegetal
 // ══════════════════════════════════════════════════════════════
+// Hidrografia IBGE — endpoint e camadas WMS (BC250). Centralizados para
+// ajuste fácil caso o GeoServer mude os nomes (ver GetCapabilities do IBGE).
+const HIDRO_WMS_URL    = 'https://geoservicos.ibge.gov.br/geoserver/ows';
+const HIDRO_WMS_LAYERS = 'CCAR:BC250_Massa_Dagua_A,CCAR:BC250_Trecho_Drenagem_L';
+
 const VEG_LAYERS = {
   mapbiomas: { layer:null, make(op){ return L.tileLayer('https://storage.googleapis.com/mapbiomas-public/brasil/collection-8/lclu/coverage/{z}/{x}/{y}.png',{attribution:'MapBiomas Coleção 8',opacity:op/100,maxZoom:22,maxNativeZoom:12}); } },
   prodes:    { layer:null, make(op){ return L.tileLayer.wms('https://terrabrasilis.dpi.inpe.br/geoserver/prodes-amazon-nb/wms',{layers:'prodes-amazon-nb:yearly_deforestation_biome',format:'image/png',transparent:true,version:'1.1.1',attribution:'PRODES/INPE',opacity:op/100,maxZoom:22,maxNativeZoom:15}); } },
   prodes_hist:{ layer:null, make(op){ return L.tileLayer.wms('https://terrabrasilis.dpi.inpe.br/geoserver/prodes-amazon-nb/wms',{layers:'prodes-amazon-nb:accumulated_deforestation_2007_biome',format:'image/png',transparent:true,version:'1.1.1',attribution:'PRODES/INPE Acumulado',opacity:op/100,maxZoom:22,maxNativeZoom:15}); } },
+  // Hidrografia oficial IBGE (BC250, GeoServer CCAR). Renderiza como imagem
+  // (img-src https: já liberado). Se o nome da camada mudar, ajuste HIDRO_WMS_*.
+  hidrografia:{ layer:null, make(op){ return L.tileLayer.wms(HIDRO_WMS_URL,{layers:HIDRO_WMS_LAYERS,format:'image/png',transparent:true,version:'1.1.1',attribution:'Hidrografia · IBGE (BC250)',opacity:op/100,maxZoom:22,maxNativeZoom:16,errorTileUrl:'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw=='}); } },
   gibs: { layer:null, make(op, data, camada){ return L.tileLayer(
     `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/${camada}/default/${data}/GoogleMapsCompatible/{z}/{y}/{x}.jpg`,
     {attribution:'NASA GIBS / Earthdata',opacity:op/100,maxZoom:9,maxNativeZoom:9}); }
@@ -1643,6 +1651,7 @@ function _renderDropdown(id){
     ${_vegCard('mapbiomas','MapBiomas Coleção 8','Uso e cobertura do solo. Resolução 30m. Ano base 2023.','#16a34a')}
     ${_vegCard('prodes','PRODES — Desmatamento Anual','INPE/TerraBrasilis · Desmatamento incremental por ano.','#dc2626')}
     ${_vegCard('prodes_hist','PRODES — Desmatamento Acumulado','INPE · Desmatamento acumulado até 2008.','#d97706')}
+    ${_vegCard('hidrografia','Hidrografia — IBGE (BC250)','Rios e massas d\'água. IBGE · Base Cartográfica 1:250.000.','#2563eb')}
     <div style="border:1px solid #fed7aa;border-radius:var(--raio);padding:10px 12px;background:#fff7ed">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
         <div style="width:14px;height:14px;border-radius:3px;background:#f97316;flex-shrink:0"></div>
@@ -2618,6 +2627,7 @@ function _atualizarLegendaMapa(){
   if(VEG_LAYERS.mapbiomas?.layer)  itens.push({ simbolo:'rect', cor:'#16a34a', opacidade:0.7, label:'MapBiomas Coleção 8' });
   if(VEG_LAYERS.prodes?.layer)     itens.push({ simbolo:'rect', cor:'#dc2626', opacidade:0.7, label:'PRODES — Desmatamento' });
   if(VEG_LAYERS.prodes_hist?.layer)itens.push({ simbolo:'rect', cor:'#b45309', opacidade:0.7, label:'PRODES — Acumulado' });
+  if(VEG_LAYERS.hidrografia?.layer)itens.push({ simbolo:'rect', cor:'#2563eb', opacidade:0.7, label:'Hidrografia — IBGE (rios/água)' });
   if(VEG_LAYERS.gibs?.layer){ const gibsSel = document.getElementById('gibs-camada'); const gibsLabel = gibsSel ? GIBS_CAMADAS.find(c=>c.id===gibsSel.value)?.label : null; itens.push({ simbolo:'rect', cor:'#6366f1', opacidade:0.7, label: gibsLabel ? 'GIBS — '+gibsLabel : 'GIBS — NASA Earthdata' }); }
   if(VEG_LAYERS.planet?.layer){ const pm = _planetMosaicos?.mosaicos?.find(m=>m.name===_planetMosaicoSel); itens.push({ simbolo:'rect', cor:'#2563eb', opacidade:0.7, label: 'Planet/NICFI — ' + (pm ? pm.label : 'mosaico') }); }
 
