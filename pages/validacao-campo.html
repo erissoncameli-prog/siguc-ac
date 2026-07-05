@@ -1917,8 +1917,16 @@ async function _aieBuscarHidrografia(lat, lng, raioM) {
 
     const geometries = []
     let nAgua = 0, nEstradas = 0
-    for (const el of els.slice(0, 600)) {
-      const coords = el.geometry.map(g => [g.lon, g.lat])
+    const r6 = v => Math.round(v * 1e6) / 1e6      // ~0,1 m — encolhe o payload
+    for (const el of els.slice(0, 150)) {           // limita para o corpo da RPC não estourar
+      let coords = el.geometry.map(g => [r6(g.lon), r6(g.lat)])
+      // Afina vias muito detalhadas (mantém no máx. ~40 vértices)
+      if (coords.length > 40) {
+        const passo = Math.ceil(coords.length / 40)
+        const fim = coords[coords.length - 1]
+        coords = coords.filter((_, i) => i % passo === 0)
+        if (coords[coords.length - 1] !== fim) coords.push(fim)
+      }
       if (coords.length < 2) continue
       const tags = el.tags || {}
       if (tags.highway) nEstradas++; else nAgua++
@@ -2049,8 +2057,9 @@ async function _aieBuscarCombustivel(lat, lng) {
         const on = i < outW && nf[j * outW + i]
         if (on && run < 0) run = i
         else if (!on && run >= 0) {
-          const xA = minX + run * cw, xB = minX + i * cw
-          const yT = maxY - j * ch,   yB = maxY - (j + 1) * ch
+          const r6 = v => Math.round(v * 1e6) / 1e6
+          const xA = r6(minX + run * cw), xB = r6(minX + i * cw)
+          const yT = r6(maxY - j * ch),   yB = r6(maxY - (j + 1) * ch)
           geometries.push({ type: 'Polygon',
             coordinates: [[[xA, yT], [xB, yT], [xB, yB], [xA, yB], [xA, yT]]] })
           run = -1
@@ -2109,23 +2118,35 @@ async function aie_sugerir() {
   _aieRenderCombustivel(comb)
   _aieRenderHidro(hidro)
 
-  let res = null
-  try {
-    const { data, error } = await db.rpc('sugerir_area_evitada', {
-      p_registro_id:     _detalheId,
-      p_vento_dir_graus: vento ? vento.dir : null,
-      p_vento_kmh:       vento ? vento.kmh : null,
-      p_slope_pct:       topo  ? topo.slopePct : null,
-      p_aspect_graus:    topo  ? topo.aspect : null,
-      p_hidro:           hidro ? hidro.geojson : null,
-      p_combustivel:     comb  ? comb.geojson : null,
-    })
+  const _rpcSug = async p => {
+    const { data, error } = await db.rpc('sugerir_area_evitada', p)
     if (error) throw error
-    res = data
-  } catch (e) {
-    if (btn) btn.disabled = false
-    toast('Não foi possível sugerir: ' + (e.message || e), 'erro')
-    return
+    return data
+  }
+  const _forcas = {
+    p_registro_id:     _detalheId,
+    p_vento_dir_graus: vento ? vento.dir : null,
+    p_vento_kmh:       vento ? vento.kmh : null,
+    p_slope_pct:       topo  ? topo.slopePct : null,
+    p_aspect_graus:    topo  ? topo.aspect : null,
+  }
+
+  let res = null, _semRecortes = false
+  try {
+    res = await _rpcSug({ ..._forcas, p_hidro: hidro ? hidro.geojson : null, p_combustivel: comb ? comb.geojson : null })
+  } catch (e1) {
+    // Recortes (hidrografia/combustível) podem gerar payload grande e a
+    // chamada falhar — repete só com o geométrico, garantindo a sugestão.
+    try {
+      res = await _rpcSug(_forcas)
+      _semRecortes = true
+      _aieRenderHidro(null); _aieRenderCombustivel(null)
+      toast('Recortes não aplicados (dados extensos) — contorno aproximado, ajuste manual.', 'warn')
+    } catch (e2) {
+      if (btn) btn.disabled = false
+      toast('Não foi possível sugerir: ' + (e2.message || e2), 'erro')
+      return
+    }
   }
 
   if (btn) btn.disabled = false
@@ -2173,10 +2194,11 @@ async function aie_sugerir() {
       : (vento ? chip('Vento', 'na', 'calmo') : chip('Vento', 'off', 'sem dado'))
     const chipRelevo = relevoOk ? chip('Relevo', 'ok')
       : (topo ? chip('Relevo', 'na', `plano ${formatNum(Number(topo.slopePct || 0), 0)}%`) : chip('Relevo', 'off', 'não carregou'))
-    const chipBarreiras = hidroOk
-      ? chip('Barreiras', 'ok', `${hidro.nAgua || 0} água · ${hidro.nEstradas || 0} estradas`)
+    const chipBarreiras = _semRecortes ? chip('Barreiras', 'off', 'não enviado (dados extensos)')
+      : hidroOk ? chip('Barreiras', 'ok', `${hidro.nAgua || 0} água · ${hidro.nEstradas || 0} estradas`)
       : (hidro ? chip('Barreiras', 'na', 'sem barreira no raio') : chip('Barreiras', 'off', 'não carregou'))
-    const chipComb = combOk ? chip('Combustível', 'ok')
+    const chipComb = _semRecortes ? chip('Combustível', 'off', 'não enviado (dados extensos)')
+      : combOk ? chip('Combustível', 'ok')
       : (combCarregou ? chip('Combustível', 'na', 'nada a cortar') : chip('Combustível', 'off', 'não carregou'))
 
     const fatores = chipVento + chipRelevo + chipBarreiras + chipComb
