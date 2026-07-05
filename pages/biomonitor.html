@@ -1598,10 +1598,14 @@
 
     <!-- ── TAB: PRAIAS (dashboard por praia) ────────────────────── -->
     <div id="bio-dtab-praias" hidden>
-      <div style="display:flex;gap:8px;margin-bottom:10px">
-        <select id="bio-dash-especie" class="bio-form-input" style="font-size:13px;height:38px">
-          <option value="">Todas as espécies</option>
-        </select>
+      <div class="bio-dash-filtros">
+        <select id="bio-dash-especie"   class="bio-form-input"><option value="">Todas as espécies</option></select>
+        <select id="bio-dash-uc"        class="bio-form-input"><option value="">Todas as UCs</option></select>
+        <select id="bio-dash-municipio" class="bio-form-input"><option value="">Todos os municípios</option></select>
+        <select id="bio-dash-comunidade" class="bio-form-input"><option value="">Todas as comunidades</option></select>
+        <label class="bio-dash-per">De <input type="date" id="bio-dash-data-inicio" class="bio-form-input"></label>
+        <label class="bio-dash-per">Até <input type="date" id="bio-dash-data-fim" class="bio-form-input"></label>
+        <button type="button" id="bio-dash-limpar" class="bio-btn-sm ghost">Limpar filtros</button>
       </div>
       <div id="bio-dash-praias"></div>
       <p id="bio-dash-vazio" style="font-size:13px;color:#9CA3AF;text-align:center;padding:16px" hidden>

@@ -3288,29 +3288,79 @@ async function bioRenderPainelEclosao(temporadaId) {
 /* ════════════════════════════════════════════════════════════
    DASHBOARD POR PRAIA (seção 4) — bio_dashboard_praias
    ════════════════════════════════════════════════════════════ */
+// Popula os selects de UC/município/comunidade a partir das praias
+// retornadas (1x). Preserva a opção já escolhida.
+function bioPopularFiltrosDashboard(praias) {
+  const preenche = (id, pares, rotuloTodos) => {
+    const el = document.getElementById(id)
+    if (!el || el.dataset.populado) return
+    const vistos = new Map()
+    pares.forEach(([v, txt]) => { if (v != null && v !== '' && !vistos.has(v)) vistos.set(v, txt ?? v) })
+    if (!vistos.size) return
+    const atual = el.value
+    el.innerHTML = `<option value="">${rotuloTodos}</option>` +
+      [...vistos].sort((a, b) => String(a[1]).localeCompare(String(b[1]), 'pt-BR'))
+        .map(([v, txt]) => `<option value="${esc(v)}">${esc(txt)}</option>`).join('')
+    if (atual) el.value = atual
+    el.dataset.populado = '1'
+  }
+  preenche('bio-dash-uc',        praias.map(p => [p.uc_id, p.uc_nome]),        'Todas as UCs')
+  preenche('bio-dash-municipio', praias.map(p => [p.municipio, p.municipio]), 'Todos os municípios')
+  preenche('bio-dash-comunidade',praias.map(p => [p.comunidade, p.comunidade]),'Todas as comunidades')
+}
+
 async function bioRenderDashboardPraias(temporadaId) {
-  // Popula o seletor de espécie 1x
-  const selEsp = document.getElementById('bio-dash-especie')
+  const $ = id => document.getElementById(id)
+  const tempAtual = () => document.getElementById('bio-dados-temporada')?.value || BioApp.temporadaAtual?.id || null
+
+  // Espécie: opções fixas do catálogo (1x)
+  const selEsp = $('bio-dash-especie')
   if (selEsp && !selEsp.dataset.populado) {
     selEsp.innerHTML = '<option value="">Todas as espécies</option>' +
       BIO_ESPECIES.filter(e => e.id !== 'outro').map(e => `<option value="${e.id}">${esc(e.nome)}</option>`).join('')
     selEsp.dataset.populado = '1'
-    selEsp.addEventListener('change', () => bioRenderDashboardPraias(
-      document.getElementById('bio-dados-temporada')?.value || BioApp.temporadaAtual?.id || null))
   }
-  const especie = selEsp?.value || null
+
+  // Liga os controles de filtro (1x) — qualquer mudança recarrega
+  const wireEl = $('bio-dash-praias')
+  if (wireEl && !wireEl.dataset.wired) {
+    wireEl.dataset.wired = '1'
+    ;['bio-dash-especie','bio-dash-uc','bio-dash-municipio','bio-dash-comunidade',
+      'bio-dash-data-inicio','bio-dash-data-fim'].forEach(id =>
+      $(id)?.addEventListener('change', () => bioRenderDashboardPraias(tempAtual())))
+    $('bio-dash-limpar')?.addEventListener('click', () => {
+      ['bio-dash-especie','bio-dash-uc','bio-dash-municipio','bio-dash-comunidade',
+       'bio-dash-data-inicio','bio-dash-data-fim'].forEach(id => { const el = $(id); if (el) el.value = '' })
+      bioRenderDashboardPraias(tempAtual())
+    })
+  }
+
+  const filtros = {
+    p_temporada_id: temporadaId || null,
+    p_especie:      selEsp?.value || null,
+    p_uc_id:        $('bio-dash-uc')?.value || null,
+    p_municipio:    $('bio-dash-municipio')?.value || null,
+    p_comunidade:   $('bio-dash-comunidade')?.value || null,
+    p_data_inicio:  $('bio-dash-data-inicio')?.value || null,
+    p_data_fim:     $('bio-dash-data-fim')?.value || null,
+  }
 
   let praias
   try {
-    const r = await bioSupabase().rpc('bio_dashboard_praias', {
-      p_temporada_id: temporadaId || null, p_especie: especie,
-    })
+    const r = await bioSupabase().rpc('bio_dashboard_praias', filtros)
     if (r.error) throw r.error
     praias = r.data
   } catch { return }
 
-  const wrap  = document.getElementById('bio-dash-praias')
-  const vazio = document.getElementById('bio-dash-vazio')
+  // Popula UC/município/comunidade 1x, a partir de um retorno SEM filtros
+  // (mantém as opções estáveis mesmo depois de filtrar). Só na 1ª carga
+  // sem nenhum filtro aplicado além da temporada.
+  const semFiltros = !filtros.p_especie && !filtros.p_uc_id && !filtros.p_municipio
+    && !filtros.p_comunidade && !filtros.p_data_inicio && !filtros.p_data_fim
+  if (semFiltros && Array.isArray(praias)) bioPopularFiltrosDashboard(praias)
+
+  const wrap  = $('bio-dash-praias')
+  const vazio = $('bio-dash-vazio')
   if (!Array.isArray(praias) || !praias.length) {
     if (wrap) wrap.innerHTML = ''
     if (vazio) vazio.hidden = false

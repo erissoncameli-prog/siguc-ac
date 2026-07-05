@@ -1633,3 +1633,12 @@ body.field-mode .bio-home-nome { font-size: 26px; }
   border-radius: 8px; padding: 6px 2px; }
 .bio-dash-stat b { display: block; font-size: 17px; line-height: 1.1; }
 .bio-dash-stat span { font-size: 10px; color: #9CA3AF; }
+
+/* ── Filtros do dashboard por praia ──────────────────────────── */
+.bio-dash-filtros { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.bio-dash-filtros > .bio-form-input,
+.bio-dash-filtros > .bio-dash-per { flex: 1 1 45%; min-width: 130px; }
+.bio-dash-filtros .bio-form-input { font-size: 13px; height: 38px; }
+.bio-dash-per { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #6B7280; }
+.bio-dash-per input { flex: 1; }
+.bio-dash-filtros #bio-dash-limpar { flex: 1 1 100%; }
