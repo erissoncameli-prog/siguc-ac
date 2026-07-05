@@ -1827,12 +1827,12 @@ async function _aieBuscarVento(lat, lng, dataHoraISO) {
     let url
     if (idade >= 0 && idade <= 90) {
       // forecast cobre o passado recente (past_days) — resolve eventos novos
-      url = '/api/meteo?service=forecast'
+      url = '/api/geo?svc=meteo&service=forecast'
         + `&latitude=${lat}&longitude=${lng}`
         + `&past_days=${Math.min(92, idade + 2)}&forecast_days=1`
         + '&hourly=wind_speed_10m,wind_direction_10m&timezone=auto'
     } else {
-      url = '/api/meteo?service=archive'
+      url = '/api/geo?svc=meteo&service=archive'
         + `&latitude=${lat}&longitude=${lng}`
         + `&start_date=${dia}&end_date=${dia}`
         + '&hourly=wind_speed_10m,wind_direction_10m&timezone=auto'
@@ -1865,7 +1865,7 @@ async function _aieBuscarTopografia(lat, lng) {
     // Ordem: centro, Norte, Sul, Leste, Oeste
     const lats = [lat, lat + dLat, lat - dLat, lat, lat]
     const lngs = [lng, lng, lng, lng + dLng, lng - dLng]
-    const url = '/api/meteo?service=elevation'
+    const url = '/api/geo?svc=meteo&service=elevation'
       + `&latitude=${lats.join(',')}&longitude=${lngs.join(',')}`
     const resp = await fetch(url)
     if (!resp.ok) return null
@@ -1903,7 +1903,7 @@ async function _aieBuscarHidrografia(lat, lng, raioM) {
       + `);out geom;`
     const ctrl = new AbortController()
     const to = setTimeout(() => ctrl.abort(), 32000)
-    const resp = await fetch('/api/overpass', {
+    const resp = await fetch('/api/geo?svc=overpass', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: 'data=' + encodeURIComponent(ql),
@@ -1951,7 +1951,7 @@ async function _aieBuscarHidrografia(lat, lng, raioM) {
 // pela paleta oficial e devolve as áreas NÃO-flamáveis (água, urbano,
 // mineração, solo exposto, praia, rochoso) para subtrair da cápsula.
 // Tiles em Web Mercator (XYZ), zoom nativo 12 (~38 m/px).
-const MAPBIOMAS_TILE = (z, x, y) => `/api/mapbiomas-tile?z=${z}&x=${x}&y=${y}&c=8`
+const MAPBIOMAS_TILE = (z, x, y) => `/api/geo?svc=tile&z=${z}&x=${x}&y=${y}&c=8`
 const MAPBIOMAS_Z = 12
 // Paleta [r,g,b,flamável?] — classes não-flamáveis marcadas false.
 const MAPBIOMAS_PALETA = [
