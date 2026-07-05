@@ -850,6 +850,51 @@
       </label>
     </div>
 
+    <!-- Danos aos ovos nesta visita (perda parcial) -->
+    <div class="bio-form-section" id="bio-vis-danos-wrap" hidden>
+      <span class="bio-form-label">Ovos danificados nesta visita</span>
+      <p id="bio-vis-viavel-info" class="bio-vis-viavel"></p>
+      <div class="bio-vis-danos-grid">
+        <label>Predação
+          <input type="number" id="bio-vis-perda-predacao" class="bio-form-input" min="0" step="1" inputmode="numeric" placeholder="0">
+        </label>
+        <label id="bio-vis-predacao-tipo-wrap" hidden>Tipo de predação
+          <select id="bio-vis-predacao-tipo" class="bio-form-input">
+            <option value="desconhecida">Desconhecido</option>
+            <option value="por_animais">Por animais</option>
+            <option value="por_pessoas">Por pessoas</option>
+          </select>
+        </label>
+        <label>Alagamento
+          <input type="number" id="bio-vis-perda-alagamento" class="bio-form-input" min="0" step="1" inputmode="numeric" placeholder="0">
+        </label>
+        <label>Erosão / apodrecimento
+          <input type="number" id="bio-vis-perda-erosao" class="bio-form-input" min="0" step="1" inputmode="numeric" placeholder="0">
+        </label>
+        <label>Dano humano
+          <input type="number" id="bio-vis-perda-humana" class="bio-form-input" min="0" step="1" inputmode="numeric" placeholder="0">
+        </label>
+      </div>
+      <div id="bio-vis-danos-aviso" style="display:none;margin-top:8px;padding:8px 12px;border-radius:8px;font-size:13px;font-weight:600;background:#fbe9e9;color:#b3261e"></div>
+    </div>
+
+    <!-- Destruição total do ninho -->
+    <div class="bio-form-section" id="bio-vis-destruicao-wrap" hidden>
+      <div class="bio-vis-destruicao-box">
+        <b>Destruição total do ninho.</b>
+        <span id="bio-vis-destruicao-info"></span>
+        <label style="display:block;margin-top:8px">Causa principal
+          <select id="bio-vis-causa-destruicao" class="bio-form-input">
+            <option value="predacao">Predação</option>
+            <option value="alagamento">Alagamento</option>
+            <option value="erosao">Erosão / apodrecimento</option>
+            <option value="humana">Dano humano</option>
+            <option value="outro">Outro</option>
+          </select>
+        </label>
+      </div>
+    </div>
+
     <!-- Alertas científicos de incubação (avaliados ao vivo, offline) -->
     <div class="bio-form-section" style="padding-top:0">
       <div class="bio-alertas-wrap" id="bio-vis-alertas"></div>
