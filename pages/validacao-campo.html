@@ -1814,17 +1814,29 @@ function aie_iniciarDesenho() {
   toast('Marque os vértices da área protegida; feche no primeiro ponto.', 'info')
 }
 
-// Busca vento (direção/velocidade) do dia do evento no Open-Meteo (público,
-// sem chave). Melhor esforço — falha em silêncio e o modelo cai para círculo.
+// Busca vento (direção/velocidade) do dia do evento no Open-Meteo, via proxy
+// da mesma origem (/api/meteo). Datas recentes (≤90 dias) vêm da API forecast
+// (que cobre o passado próximo); mais antigas, do arquivo histórico. Melhor
+// esforço — falha em silêncio e o modelo cai para círculo.
 async function _aieBuscarVento(lat, lng, dataHoraISO) {
   try {
     const d = new Date(dataHoraISO)
     if (isNaN(d)) return null
     const dia = d.toISOString().slice(0, 10)
-    const url = 'https://archive-api.open-meteo.com/v1/archive'
-      + `?latitude=${lat}&longitude=${lng}`
-      + `&start_date=${dia}&end_date=${dia}`
-      + '&hourly=wind_speed_10m,wind_direction_10m&timezone=auto'
+    const idade = Math.floor((Date.now() - d.getTime()) / 86400000)  // dias
+    let url
+    if (idade >= 0 && idade <= 90) {
+      // forecast cobre o passado recente (past_days) — resolve eventos novos
+      url = '/api/meteo?service=forecast'
+        + `&latitude=${lat}&longitude=${lng}`
+        + `&past_days=${Math.min(92, idade + 2)}&forecast_days=1`
+        + '&hourly=wind_speed_10m,wind_direction_10m&timezone=auto'
+    } else {
+      url = '/api/meteo?service=archive'
+        + `&latitude=${lat}&longitude=${lng}`
+        + `&start_date=${dia}&end_date=${dia}`
+        + '&hourly=wind_speed_10m,wind_direction_10m&timezone=auto'
+    }
     const resp = await fetch(url)
     if (!resp.ok) return null
     const j = await resp.json()
@@ -1833,7 +1845,8 @@ async function _aieBuscarVento(lat, lng, dataHoraISO) {
     // Índice da hora mais próxima do evento (comparando 'YYYY-MM-DDTHH').
     const alvo = dataHoraISO.slice(0, 13)
     let idx = horas.findIndex(h => h.slice(0, 13) === alvo)
-    if (idx < 0) idx = Math.min(12, horas.length - 1)  // meio-dia como fallback
+    if (idx < 0) idx = horas.findIndex(h => h.slice(0, 10) === dia)  // 1ª hora do dia
+    if (idx < 0) idx = Math.min(12, horas.length - 1)
     const dir = j.hourly.wind_direction_10m?.[idx]
     const vel = j.hourly.wind_speed_10m?.[idx]
     if (dir == null || vel == null) return null
@@ -1852,8 +1865,8 @@ async function _aieBuscarTopografia(lat, lng) {
     // Ordem: centro, Norte, Sul, Leste, Oeste
     const lats = [lat, lat + dLat, lat - dLat, lat, lat]
     const lngs = [lng, lng, lng, lng + dLng, lng - dLng]
-    const url = 'https://api.open-meteo.com/v1/elevation'
-      + `?latitude=${lats.join(',')}&longitude=${lngs.join(',')}`
+    const url = '/api/meteo?service=elevation'
+      + `&latitude=${lats.join(',')}&longitude=${lngs.join(',')}`
     const resp = await fetch(url)
     if (!resp.ok) return null
     const j = await resp.json()
@@ -1889,8 +1902,8 @@ async function _aieBuscarHidrografia(lat, lng, raioM) {
       + `way["highway"~"^(motorway|trunk|primary|secondary|tertiary|unclassified|residential|service|track|road)$"](${bbox});`
       + `);out geom;`
     const ctrl = new AbortController()
-    const to = setTimeout(() => ctrl.abort(), 27000)
-    const resp = await fetch('https://overpass-api.de/api/interpreter', {
+    const to = setTimeout(() => ctrl.abort(), 32000)
+    const resp = await fetch('/api/overpass', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: 'data=' + encodeURIComponent(ql),
@@ -2153,15 +2166,21 @@ async function aie_sugerir() {
     const hidroOk  = !!m.usou_hidro
     const combOk   = !!m.usou_combustivel
     const combCarregou = !!(comb && comb.ok)
-    const hidroDet = hidro ? `${hidro.nAgua || 0} água · ${hidro.nEstradas || 0} estradas` : 'nada encontrado'
-    const raioFall = !!m.raio_fallback
 
-    const fatores =
-        chip('Vento',       ventoOk  ? 'ok' : 'off')
-      + chip('Relevo',      relevoOk ? 'ok' : 'off')
-      + chip('Barreiras',   hidroOk  ? 'ok' : 'off', hidroDet)
-      + chip('Combustível', combOk   ? 'ok' : (combCarregou ? 'na' : 'off'),
-             combCarregou && !combOk ? 'nada a cortar' : (comb ? '' : 'não carregou'))
+    // Distingue "aplicado" (ok) de "não aplicável" (na: plano/calmo/sem
+    // barreira no raio) de "não carregou" (off: a fonte externa falhou).
+    const chipVento = ventoOk ? chip('Vento', 'ok')
+      : (vento ? chip('Vento', 'na', 'calmo') : chip('Vento', 'off', 'sem dado'))
+    const chipRelevo = relevoOk ? chip('Relevo', 'ok')
+      : (topo ? chip('Relevo', 'na', `plano ${formatNum(Number(topo.slopePct || 0), 0)}%`) : chip('Relevo', 'off', 'não carregou'))
+    const chipBarreiras = hidroOk
+      ? chip('Barreiras', 'ok', `${hidro.nAgua || 0} água · ${hidro.nEstradas || 0} estradas`)
+      : (hidro ? chip('Barreiras', 'na', 'sem barreira no raio') : chip('Barreiras', 'off', 'não carregou'))
+    const chipComb = combOk ? chip('Combustível', 'ok')
+      : (combCarregou ? chip('Combustível', 'na', 'nada a cortar') : chip('Combustível', 'off', 'não carregou'))
+
+    const fatores = chipVento + chipRelevo + chipBarreiras + chipComb
+    const raioFall = !!m.raio_fallback
 
     let txt = `<div style="margin-bottom:5px"><b>Raio ${formatNum(Number(res.raio_m || 0), 0)} m</b>`
       + (raioFall

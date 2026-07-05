@@ -1,5 +1,5 @@
 // ── SIGUC Brigadas — Service Worker ───────────────────────────
-const CACHE = 'siguc-brigadas-v153'
+const CACHE = 'siguc-brigadas-v154'
 
 const APP_SHELL = [
   '/pages/brigada.html',
@@ -52,8 +52,11 @@ self.addEventListener('activate', ev => {
 self.addEventListener('fetch', ev => {
   const url = new URL(ev.request.url)
 
-  // Requisições Supabase e config de ambiente: network-first sem cache
-  if (url.hostname.endsWith('.supabase.co') || url.pathname === '/api/env') {
+  // Supabase, config de ambiente e chamadas dinâmicas de API (ex.: POST
+  // /api/overpass): network-first sem cache. Tiles GET de /api/ seguem no
+  // fluxo cache-first abaixo (bom para /api/mapbiomas-tile e /api/meteo).
+  if (url.hostname.endsWith('.supabase.co') || url.pathname === '/api/env'
+      || (url.pathname.startsWith('/api/') && ev.request.method !== 'GET')) {
     ev.respondWith(
       fetch(ev.request).catch(() =>
         new Response(JSON.stringify({ error: 'offline' }), {
