@@ -3222,6 +3222,10 @@ async function bioCarregarTelaDados() {
     _bioSetRate('bio-r-sobrev-berc',   'bio-rb-sobrev-berc',   data.taxa_sobrevivencia_bercario_pct)
     _bioSetRate('bio-r-mort-berc',     'bio-rb-mort-berc',     data.taxa_mortalidade_bercario_pct)
 
+    // Painéis de eclosão e dashboard por praia (RPCs próprias)
+    bioRenderPainelEclosao(_tempDados)
+    bioRenderDashboardPraias(_tempDados)
+
     // Gráficos (carrega Chart.js lazily na primeira vez)
     const Chart = await _bioCarregarChartJS()
     _bioRenderizarGraficos(data, Chart)
@@ -3229,6 +3233,115 @@ async function bioCarregarTelaDados() {
   } catch (err) {
     if (statusEl) statusEl.textContent = 'erro ao carregar'
   }
+}
+
+/* ════════════════════════════════════════════════════════════
+   PAINEL DE ECLOSÃO (seção 3) — bio_monitoramento_eclosao
+   ════════════════════════════════════════════════════════════ */
+async function bioRenderPainelEclosao(temporadaId) {
+  let data
+  try {
+    const r = await bioSupabase().rpc('bio_monitoramento_eclosao', { p_temporada_id: temporadaId || null })
+    if (r.error) throw r.error
+    data = r.data
+  } catch { return }
+  const vazio = document.getElementById('bio-ecl-vazio')
+  if (!data) { if (vazio) vazio.hidden = false; return }
+
+  const c = data.contadores || {}
+  _bioSetText('bio-ecl-kpi-hoje',      c.hoje ?? 0)
+  _bioSetText('bio-ecl-kpi-proximos',  c.proximos_7d ?? 0)
+  _bioSetText('bio-ecl-kpi-atrasados', c.atrasados ?? 0)
+  if (vazio) vazio.hidden = (c.em_incubacao ?? 0) > 0
+
+  const nomeEsp = cod => BIO_ESPECIES.find(e => e.id === cod)?.nome ?? cod
+  const item = (n, cls) => `
+    <div class="bio-ecl-item ${cls}">
+      <span class="bio-ecl-num">#${esc(n.numero ?? '—')}</span>
+      <span class="bio-ecl-meta">${esc(nomeEsp(n.especie))}${n.praia ? ' · ' + esc(n.praia) : ''}</span>
+      <span class="bio-ecl-sit">${esc(n.situacao ?? '')}</span>
+    </div>`
+  const secao = (titulo, arr, cls) => (arr && arr.length)
+    ? `<p class="bio-ecl-sec">${titulo} (${arr.length})</p>` + arr.map(n => item(n, cls)).join('')
+    : ''
+  const listas = document.getElementById('bio-ecl-listas')
+  if (listas) {
+    listas.innerHTML =
+      secao('Atrasados', data.atrasados, 'atrasado') +
+      secao('Próximos', data.proximos, 'atencao') ||
+      '<p style="font-size:13px;color:#9CA3AF;padding:8px 0">Nenhuma eclosão prevista para os próximos dias.</p>'
+  }
+
+  const esps = data.por_especie || []
+  const espEl = document.getElementById('bio-ecl-especies')
+  if (espEl) {
+    espEl.innerHTML = esps.length ? esps.map(s => `
+      <div class="bio-ecl-esp-row">
+        <span>${esc(nomeEsp(s.especie))}</span>
+        <span>prev. ${s.incubacao_prevista_media ?? '—'} d · real ${s.incubacao_real_media ?? '—'} d
+          ${s.taxa_sucesso_pct != null ? `· ${s.taxa_sucesso_pct}% sucesso` : ''}</span>
+      </div>`).join('')
+      : '<span style="color:#9CA3AF">Sem eclosões registradas ainda.</span>'
+  }
+}
+
+/* ════════════════════════════════════════════════════════════
+   DASHBOARD POR PRAIA (seção 4) — bio_dashboard_praias
+   ════════════════════════════════════════════════════════════ */
+async function bioRenderDashboardPraias(temporadaId) {
+  // Popula o seletor de espécie 1x
+  const selEsp = document.getElementById('bio-dash-especie')
+  if (selEsp && !selEsp.dataset.populado) {
+    selEsp.innerHTML = '<option value="">Todas as espécies</option>' +
+      BIO_ESPECIES.filter(e => e.id !== 'outro').map(e => `<option value="${e.id}">${esc(e.nome)}</option>`).join('')
+    selEsp.dataset.populado = '1'
+    selEsp.addEventListener('change', () => bioRenderDashboardPraias(
+      document.getElementById('bio-dados-temporada')?.value || BioApp.temporadaAtual?.id || null))
+  }
+  const especie = selEsp?.value || null
+
+  let praias
+  try {
+    const r = await bioSupabase().rpc('bio_dashboard_praias', {
+      p_temporada_id: temporadaId || null, p_especie: especie,
+    })
+    if (r.error) throw r.error
+    praias = r.data
+  } catch { return }
+
+  const wrap  = document.getElementById('bio-dash-praias')
+  const vazio = document.getElementById('bio-dash-vazio')
+  if (!Array.isArray(praias) || !praias.length) {
+    if (wrap) wrap.innerHTML = ''
+    if (vazio) vazio.hidden = false
+    return
+  }
+  if (vazio) vazio.hidden = true
+
+  const card = p => {
+    const stat = (v, lbl, cor) => `<div class="bio-dash-stat"><b${cor ? ` style="color:${cor}"` : ''}>${v ?? 0}</b><span>${lbl}</span></div>`
+    return `
+      <div class="bio-dash-card">
+        <div class="bio-dash-head">
+          <b>${esc(p.praia)}</b>${p.experimental ? ' <span class="bio-dash-tag">exp.</span>' : ''}
+          <span class="bio-dash-sucesso">${p.sucesso_pct != null ? p.sucesso_pct + '% sucesso' : '—'}</span>
+        </div>
+        <div class="bio-dash-grid">
+          ${stat(p.total, 'Total')}
+          ${stat(p.ativos, 'Ativos', '#1a6b8c')}
+          ${stat(p.transferidos, 'Transf.')}
+          ${stat(p.eclodidos, 'Eclodidos', '#1E6B4A')}
+          ${stat(p.proximos_eclosao, 'Próx. ecl.', '#9a6b00')}
+          ${stat(p.perdidos, 'Perdidos', '#b3261e')}
+          ${stat(p.predados, 'Predados', '#b3261e')}
+          ${stat(p.inundados, 'Inundados', '#b3261e')}
+          ${stat(p.falha_eclosao, 'Falha ecl.', '#b3261e')}
+          ${stat(p.filhotes_produzidos, 'Filhotes', '#1E6B4A')}
+          ${stat(p.ovos_monitorados, 'Ovos')}
+        </div>
+      </div>`
+  }
+  if (wrap) wrap.innerHTML = praias.map(card).join('')
 }
 
 /* ════════════════════════════════════════════════════════════

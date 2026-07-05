@@ -1402,6 +1402,8 @@
   <div class="bio-dados-tabs">
     <button class="bio-dados-tab ativa" data-dtab="taxas">Taxas</button>
     <button class="bio-dados-tab" data-dtab="ninhos">Ninhos</button>
+    <button class="bio-dados-tab" data-dtab="eclosao">Eclosão</button>
+    <button class="bio-dados-tab" data-dtab="praias">Praias</button>
     <button class="bio-dados-tab" data-dtab="bercario">Berçário</button>
   </div>
 
@@ -1576,6 +1578,34 @@
         <div class="bio-chart-wrap" style="height:200px"><canvas id="chart-biometria"></canvas></div>
       </div>
 
+    </div>
+
+    <!-- ── TAB: ECLOSÃO (monitoramento da previsão) ─────────────── -->
+    <div id="bio-dtab-eclosao" hidden>
+      <div class="bio-dados-kpi-row">
+        <div class="bio-kpi2"><strong id="bio-ecl-kpi-hoje" style="color:var(--bio-prim)">—</strong><span>Eclosão hoje</span></div>
+        <div class="bio-kpi2"><strong id="bio-ecl-kpi-proximos" style="color:#9a6b00">—</strong><span>Próximos 7 d</span></div>
+        <div class="bio-kpi2"><strong id="bio-ecl-kpi-atrasados" style="color:var(--bio-perigo)">—</strong><span>Atrasados</span></div>
+      </div>
+      <div id="bio-ecl-listas"></div>
+      <div class="bio-chart-card" style="margin-top:10px">
+        <p class="bio-chart-title">Previsto × Real por espécie</p>
+        <div id="bio-ecl-especies" style="font-size:13px"></div>
+      </div>
+      <p id="bio-ecl-vazio" style="font-size:13px;color:#9CA3AF;text-align:center;padding:16px" hidden>
+        Sem ninhos em incubação nesta temporada.</p>
+    </div>
+
+    <!-- ── TAB: PRAIAS (dashboard por praia) ────────────────────── -->
+    <div id="bio-dtab-praias" hidden>
+      <div style="display:flex;gap:8px;margin-bottom:10px">
+        <select id="bio-dash-especie" class="bio-form-input" style="font-size:13px;height:38px">
+          <option value="">Todas as espécies</option>
+        </select>
+      </div>
+      <div id="bio-dash-praias"></div>
+      <p id="bio-dash-vazio" style="font-size:13px;color:#9CA3AF;text-align:center;padding:16px" hidden>
+        Nenhuma praia com ninhos para os filtros.</p>
     </div>
 
     <!-- dados locais (fallback sempre visível no tab taxas) -->
