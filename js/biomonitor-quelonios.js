@@ -2344,10 +2344,17 @@ async function bioAbrirFormVisita(ninho) {
   document.getElementById('bio-vis-obs').value             = ''
   document.getElementById('bio-vis-alagamento').checked    = false
 
+  // Danos aos ovos: zera os campos por causa e a causa de destruição
+  ;['bio-vis-perda-predacao','bio-vis-perda-alagamento','bio-vis-perda-erosao','bio-vis-perda-humana']
+    .forEach(id => { const el = document.getElementById(id); if (el) el.value = '' })
+  const _pt = document.getElementById('bio-vis-predacao-tipo'); if (_pt) _pt.value = 'desconhecida'
+  const _cd = document.getElementById('bio-vis-causa-destruicao'); if (_cd) _cd.value = 'predacao'
+
   // Status: íntegro por padrão
   document.querySelectorAll('#bio-vis-status-grid .bio-chip-sel').forEach(c => {
     c.classList.toggle('ativo', c.dataset.val === 'integro')
   })
+  bioAtualizarDanosVisita()
 
   // Umidade: sem seleção
   document.querySelectorAll('#bio-vis-umidade-grid .bio-chip-sel').forEach(c => {
@@ -2368,6 +2375,66 @@ async function bioAbrirFormVisita(ninho) {
   bioMostrarTela('tela-form-visita')
 }
 
+/* ════════════════════════════════════════════════════════════
+   DANOS AOS OVOS NA VISITA
+   ════════════════════════════════════════════════════════════ */
+// Ovos viáveis = postura − todas as baixas conhecidas do ninho.
+function bioOvosViaveisNinho(n) {
+  if (!n || n.qtd_ovos == null) return null
+  const perdas = (n.descartados_natural || 0) + (n.descartados_predacao || 0) + (n.descartados_humana || 0)
+  return Math.max(n.qtd_ovos - perdas, 0)
+}
+
+// Mostra/oculta os blocos de dano conforme o status; calcula o viável,
+// limita os campos e valida a soma.
+function bioAtualizarDanosVisita() {
+  const status  = document.querySelector('#bio-vis-status-grid .bio-chip-sel.ativo')?.dataset.val ?? 'integro'
+  const ninho   = BioApp.formNinhoAtualizar
+  const viavel  = bioOvosViaveisNinho(ninho)
+  const danos   = document.getElementById('bio-vis-danos-wrap')
+  const destr   = document.getElementById('bio-vis-destruicao-wrap')
+  const comDano = ['perturbado', 'parcial_predado', 'alagado'].includes(status)
+
+  if (destr) destr.hidden = status !== 'destruido'
+  if (danos) danos.hidden = !comDano
+
+  if (status === 'destruido') {
+    const info = document.getElementById('bio-vis-destruicao-info')
+    if (info) info.textContent = viavel != null
+      ? `Os ${viavel} ovo(s) viável(is) restantes serão baixados e o ninho marcado como perdido.`
+      : 'Os ovos viáveis restantes serão baixados e o ninho marcado como perdido.'
+    return
+  }
+  if (!comDano) return
+
+  const info = document.getElementById('bio-vis-viavel-info')
+  if (info) info.innerHTML = viavel != null
+    ? `Ovos viáveis agora: <b>${viavel}</b>. Não é possível perder mais do que isso.`
+    : 'Informe quantos ovos foram perdidos por causa.'
+
+  const ids = ['bio-vis-perda-predacao','bio-vis-perda-alagamento','bio-vis-perda-erosao','bio-vis-perda-humana']
+  let soma = 0
+  ids.forEach(id => {
+    const el = document.getElementById(id)
+    if (!el) return
+    if (viavel != null) el.max = viavel
+    soma += parseInt(el.value) || 0
+  })
+  // Subtipo de predação só quando há predação
+  const pTipo = document.getElementById('bio-vis-predacao-tipo-wrap')
+  if (pTipo) pTipo.hidden = (parseInt(document.getElementById('bio-vis-perda-predacao')?.value) || 0) <= 0
+
+  const aviso = document.getElementById('bio-vis-danos-aviso')
+  if (aviso) {
+    if (viavel != null && soma > viavel) {
+      aviso.style.display = 'block'
+      aviso.textContent = `A soma das perdas (${soma}) passa dos ${viavel} ovos viáveis. Ajuste os valores.`
+    } else {
+      aviso.style.display = 'none'
+    }
+  }
+}
+
 async function bioSalvarVisita() {
   const ninho = BioApp.formNinhoAtualizar
   const data  = document.getElementById('bio-vis-data').value
@@ -2386,6 +2453,27 @@ async function bioSalvarVisita() {
   const statusNinho = document.querySelector('#bio-vis-status-grid .bio-chip-sel.ativo')?.dataset.val ?? 'integro'
   const umidade     = document.querySelector('#bio-vis-umidade-grid .bio-chip-sel.ativo')?.dataset.val || null
 
+  // ── Danos aos ovos ──────────────────────────────────────────
+  const _intVal = id => Math.max(parseInt(document.getElementById(id)?.value) || 0, 0)
+  const viavel  = bioOvosViaveisNinho(ninho)
+  const destruido = statusNinho === 'destruido'
+
+  let perdaPred = 0, perdaAlag = 0, perdaEros = 0, perdaHum = 0, causaDestr = null, predTipo = null
+  if (destruido) {
+    causaDestr = document.getElementById('bio-vis-causa-destruicao')?.value || 'outro'
+    if (!confirm(`Destruição total: os ${viavel ?? ''} ovo(s) viável(is) restantes serão baixados e o ninho marcado como PERDIDO. Confirmar?`)) return
+  } else {
+    perdaPred = _intVal('bio-vis-perda-predacao')
+    perdaAlag = _intVal('bio-vis-perda-alagamento')
+    perdaEros = _intVal('bio-vis-perda-erosao')
+    perdaHum  = _intVal('bio-vis-perda-humana')
+    const soma = perdaPred + perdaAlag + perdaEros + perdaHum
+    if (viavel != null && soma > viavel) {
+      bioToast(`A soma das perdas (${soma}) passa dos ${viavel} ovos viáveis.`, 'err'); return
+    }
+    if (perdaPred > 0) predTipo = document.getElementById('bio-vis-predacao-tipo')?.value || 'desconhecida'
+  }
+
   const visita = {
     uuid_cliente:            bioUuid(),
     ninho_uuid:              ninho.uuid_cliente,
@@ -2396,8 +2484,12 @@ async function bioSalvarVisita() {
     temperatura_substrato_c: parseFloat(document.getElementById('bio-vis-temp-sub').value) || null,
     temperatura_ar_c:        parseFloat(document.getElementById('bio-vis-temp-ar').value)  || null,
     umidade,
-    predacao_incubacao:      null,
-    ovos_predados_n:         null,
+    predacao_incubacao:      predTipo,
+    ovos_predados_n:         perdaPred || null,
+    ovos_perdidos_alagamento: perdaAlag || null,
+    ovos_perdidos_erosao:    perdaEros || null,
+    ovos_perdidos_humana:    perdaHum  || null,
+    causa_destruicao:        causaDestr,
     sinal_alagamento:        document.getElementById('bio-vis-alagamento').checked,
     intervencao:             document.getElementById('bio-vis-intervencao').value.trim() || null,
     observacoes:             document.getElementById('bio-vis-obs').value.trim()         || null,
@@ -2408,6 +2500,13 @@ async function bioSalvarVisita() {
   }
 
   await bioOfflineSalvarVisita(visita)
+  // Destruição total: reflete localmente o ninho como perdido (o trigger
+  // faz o mesmo no servidor ao sincronizar).
+  if (destruido) {
+    await bioOfflineSalvarNinho({
+      ...ninho, server_id: ninho.server_id ?? ninho.id ?? null, status: 'perdido',
+    }).catch(() => {})
+  }
   await bioAtualizarBadgeFila()
 
   bioSyncTudo({ monitorId: BioApp.monitor?.id, onConcluido: () => bioAtualizarBadgeFila() })
@@ -2421,8 +2520,13 @@ function bioIniciarFormVisita() {
     btn.addEventListener('click', () => {
       document.querySelectorAll('#bio-vis-status-grid .bio-chip-sel').forEach(b => b.classList.remove('ativo'))
       btn.classList.add('ativo')
+      bioAtualizarDanosVisita()
     })
   })
+
+  // Campos de dano aos ovos → revalida viável/soma ao vivo
+  ;['bio-vis-perda-predacao','bio-vis-perda-alagamento','bio-vis-perda-erosao','bio-vis-perda-humana']
+    .forEach(id => document.getElementById(id)?.addEventListener('input', bioAtualizarDanosVisita))
 
   // Chip de umidade
   document.querySelectorAll('#bio-vis-umidade-grid .bio-chip-sel').forEach(btn => {
@@ -2497,14 +2601,19 @@ async function bioCarregarEventosNinhos(ninhos) {
 
   // Builder de evento de visita — server e registro local têm os mesmos
   // campos (data_visita, status_ninho, temperaturas).
-  const evVisita = r => ({
-    tipo: 'visita', data: r.data_visita,
-    txt: ['Visita',
-      r.status_ninho ? VISITA_STATUS[r.status_ninho] : null,
-      r.temperatura_substrato_c != null ? `${r.temperatura_substrato_c}°C`
-        : r.temperatura_ar_c != null ? `${r.temperatura_ar_c}°C` : null,
-    ].filter(Boolean).join(' · '),
-  })
+  const evVisita = r => {
+    const perda = (r.ovos_predados_n || 0) + (r.ovos_perdidos_alagamento || 0)
+      + (r.ovos_perdidos_erosao || 0) + (r.ovos_perdidos_humana || 0)
+    return {
+      tipo: 'visita', data: r.data_visita,
+      txt: ['Visita',
+        r.status_ninho ? VISITA_STATUS[r.status_ninho] : null,
+        perda > 0 ? `−${perda} ovos` : null,
+        r.temperatura_substrato_c != null ? `${r.temperatura_substrato_c}°C`
+          : r.temperatura_ar_c != null ? `${r.temperatura_ar_c}°C` : null,
+      ].filter(Boolean).join(' · '),
+    }
+  }
 
   // Mescla as visitas locais (IndexedDB) no histórico, para que apareçam
   // mesmo offline ou antes de sincronizar. `somentePendentes` evita
@@ -2541,7 +2650,7 @@ async function bioCarregarEventosNinhos(ninhos) {
         .select('ninho_id,data_transferencia,praia_destino_nome,local_destino')
         .in('ninho_id', serverIds),
       sb.from('visitas_ninho')
-        .select('ninho_id,data_visita,status_ninho,temperatura_substrato_c,temperatura_ar_c')
+        .select('ninho_id,data_visita,status_ninho,temperatura_substrato_c,temperatura_ar_c,ovos_predados_n,ovos_perdidos_alagamento,ovos_perdidos_erosao,ovos_perdidos_humana')
         .in('ninho_id', serverIds),
       sb.from('lotes_bercario')
         .select('ninho_id,data_entrada,qtd_entrada,bercario_nome')
@@ -2711,11 +2820,15 @@ function bioNinhoCardInner(n, opts = {}) {
     ? `<div class="bio-nfc-rejeicao" style="background:#eef2ff;color:#4338ca">Correção solicitada: ${n.motivo_rejeicao ?? ''}</div>`
     : ''
 
+  // Ovos viáveis = postura − todas as baixas (registro/visita/eclosão)
+  const _perdas   = (n.descartados_natural || 0) + (n.descartados_predacao || 0) + (n.descartados_humana || 0)
+  const _viaveis  = n.qtd_ovos != null ? Math.max(n.qtd_ovos - _perdas, 0) : null
   const ovosHtml = (n.qtd_ovos != null || n.ovos_integros != null || n.ovos_descartados != null) ? `
     <div class="bio-nfc-ovos">
       ${n.qtd_ovos         != null ? `<span>${n.qtd_ovos} ovos</span>` : ''}
       ${n.ovos_integros    != null ? `<span>${n.ovos_integros} ínt.</span>` : ''}
       ${n.ovos_descartados != null ? `<span>${n.ovos_descartados} desc.</span>` : ''}
+      ${(_viaveis != null && _perdas > 0) ? `<span style="background:rgba(82,183,136,.18);color:#1E6B4A">${_viaveis} viáveis</span>` : ''}
     </div>` : ''
 
   const condicoesHtml = (n.temperatura_c != null || n.umidade_pct != null || n.profundidade_cm != null) ? `

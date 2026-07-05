@@ -1642,3 +1642,14 @@ body.field-mode .bio-home-nome { font-size: 26px; }
 .bio-dash-per { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #6B7280; }
 .bio-dash-per input { flex: 1; }
 .bio-dash-filtros #bio-dash-limpar { flex: 1 1 100%; }
+
+/* ── Danos aos ovos na visita ────────────────────────────────── */
+.bio-vis-viavel { font-size: 13px; color: #6B7280; margin: 2px 0 8px; }
+.bio-vis-viavel b { color: #1E6B4A; }
+.bio-vis-danos-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.bio-vis-danos-grid label { font-size: 12px; font-weight: 600; color: #6B7280;
+  display: flex; flex-direction: column; gap: 4px; }
+.bio-vis-danos-grid .bio-form-input { height: 40px; }
+.bio-vis-destruicao-box { border: 1px solid rgba(220,38,38,.35); background: rgba(220,38,38,.06);
+  border-radius: 12px; padding: 12px; font-size: 13.5px; line-height: 1.5; }
+.bio-vis-destruicao-box label { font-size: 12px; font-weight: 600; color: #6B7280; }
