@@ -2495,7 +2495,33 @@ async function bioCarregarEventosNinhos(ninhos) {
     })
   })
 
+  // Builder de evento de visita — server e registro local têm os mesmos
+  // campos (data_visita, status_ninho, temperaturas).
+  const evVisita = r => ({
+    tipo: 'visita', data: r.data_visita,
+    txt: ['Visita',
+      r.status_ninho ? VISITA_STATUS[r.status_ninho] : null,
+      r.temperatura_substrato_c != null ? `${r.temperatura_substrato_c}°C`
+        : r.temperatura_ar_c != null ? `${r.temperatura_ar_c}°C` : null,
+    ].filter(Boolean).join(' · '),
+  })
+
+  // Mescla as visitas locais (IndexedDB) no histórico, para que apareçam
+  // mesmo offline ou antes de sincronizar. `somentePendentes` evita
+  // duplicar as que já subiram e voltam do servidor.
+  const mesclarVisitasLocais = async (somentePendentes) => {
+    for (const n of ninhos) {
+      const arr = mapa[n.uuid_cliente]; if (!arr) continue
+      const locais = await bioOfflineVisitasDoNinho(n.uuid_cliente).catch(() => [])
+      locais
+        .filter(v => !somentePendentes || v.status_sync !== 'confirmado')
+        .forEach(v => arr.push(evVisita(v)))
+    }
+  }
+
   if (!navigator.onLine) {
+    await mesclarVisitasLocais(false)   // offline: todas as visitas locais
+    Object.values(mapa).forEach(evs => evs.sort((a, b) => (a.data ?? '') < (b.data ?? '') ? -1 : 1))
     ninhos.forEach(n => { n._eventos = mapa[n.uuid_cliente] ?? [] })
     return
   }
@@ -2537,14 +2563,7 @@ async function bioCarregarEventosNinhos(ninhos) {
       txt: `Transferido${r.praia_destino_nome ? ' → ' + r.praia_destino_nome
         : r.local_destino ? ' → ' + r.local_destino : ''}`,
     }))
-    pushRows(rVisita, 'visita', r => ({
-      data: r.data_visita,
-      txt: ['Visita',
-        r.status_ninho ? VISITA_STATUS[r.status_ninho] : null,
-        r.temperatura_substrato_c != null ? `${r.temperatura_substrato_c}°C`
-          : r.temperatura_ar_c != null ? `${r.temperatura_ar_c}°C` : null,
-      ].filter(Boolean).join(' · '),
-    }))
+    pushRows(rVisita, 'visita', evVisita)
     pushRows(rLote, 'bercario', r => ({
       data: r.data_entrada,
       txt: `Berçário · ${r.qtd_entrada} filh.${r.bercario_nome ? ' → ' + r.bercario_nome : ''}`,
@@ -2560,6 +2579,10 @@ async function bioCarregarEventosNinhos(ninhos) {
   } catch (e) {
     console.warn('[biomonitor eventos]', e)
   }
+
+  // Visitas locais ainda não sincronizadas (recém-registradas) — para
+  // aparecerem no histórico imediatamente, sem esperar o sync.
+  await mesclarVisitasLocais(true)
 
   Object.values(mapa).forEach(evs => evs.sort((a, b) => (a.data ?? '') < (b.data ?? '') ? -1 : 1))
   ninhos.forEach(n => { n._eventos = mapa[n.uuid_cliente] ?? [] })
