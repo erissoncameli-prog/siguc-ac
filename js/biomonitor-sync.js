@@ -214,6 +214,13 @@ async function bioSyncTransferencias(monitorId, onProgresso) {
 
     if (error) {
       await bioOfflineAtualizarSync('transferencias', t.uuid_cliente, 'pendente')
+      // Número duplicado no destino (guard de integridade, mig. 119): é uma
+      // rejeição não-recuperável por reenvio. Não aborta a fila inteira —
+      // registra o aviso e segue para as próximas transferências.
+      if (error.code === '23505' || /ocupado/i.test(error.message || '')) {
+        try { bioToast?.(`Transferência do ninho ${t.ninho_numero ?? ''}: número já ocupado no destino.`, 'err') } catch (_) {}
+        continue
+      }
       throw error
     }
 

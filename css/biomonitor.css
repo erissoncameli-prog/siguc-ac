@@ -1574,3 +1574,71 @@ body.field-mode .bio-home-nome { font-size: 26px; }
 .bio-praia-meta-bar { height: 5px; border-radius: 4px; background: rgba(127,127,127,.18); overflow: hidden; margin-top: 3px; max-width: 200px; }
 .bio-praia-meta-bar > div { height: 100%; background: var(--bio-verde); border-radius: 4px; transition: width .4s; }
 .bio-praia-meta.atingida { color: var(--bio-verde); }
+
+/* ── Ocupação da praia de destino (transferência inteligente) ── */
+.bio-ocupacao-card {
+  border: 1px solid rgba(127,127,127,.22); border-radius: 12px;
+  padding: 10px 12px; background: rgba(26,107,140,.04);
+}
+.bio-ocupacao-resumo { font-size: 13px; line-height: 1.5; }
+.bio-ocupacao-lista {
+  display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px;
+  max-height: 132px; overflow-y: auto;
+}
+.bio-ocupacao-chip {
+  font-size: 12px; font-weight: 700; padding: 3px 8px; border-radius: 8px;
+  background: rgba(127,127,127,.14); color: inherit; white-space: nowrap;
+}
+
+/* ── Previsão de eclosão nos cards de ninho ──────────────────── */
+.bio-nfc-previsao {
+  display: flex; align-items: center; gap: 7px; margin-top: 6px;
+  font-size: 12.5px; font-weight: 600; padding: 5px 9px; border-radius: 8px;
+  background: rgba(127,127,127,.1); color: #6B7280;
+}
+.bio-nfc-previsao .bio-nfc-prev-ico {
+  width: 9px; height: 9px; border-radius: 50%; background: currentColor; flex: none;
+}
+.bio-nfc-previsao.faixa-normal   { background: rgba(82,183,136,.14);  color: #1E6B4A; }
+.bio-nfc-previsao.faixa-atencao  { background: rgba(201,168,76,.18);  color: #9a6b00; }
+.bio-nfc-previsao.faixa-hoje     { background: rgba(26,107,140,.16);  color: #1a6b8c; }
+.bio-nfc-previsao.faixa-atrasado { background: rgba(220,38,38,.12);   color: #b3261e; }
+
+/* ── Painel de eclosão (aba Dados › Eclosão) ─────────────────── */
+.bio-ecl-sec { font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .05em; color: #9CA3AF; margin: 12px 0 6px; }
+.bio-ecl-item { display: grid; grid-template-columns: auto 1fr auto; gap: 8px;
+  align-items: center; padding: 7px 10px; border-radius: 9px; margin-bottom: 5px;
+  background: rgba(127,127,127,.08); font-size: 13px; }
+.bio-ecl-item.atrasado { background: rgba(220,38,38,.1); }
+.bio-ecl-item.atencao  { background: rgba(201,168,76,.14); }
+.bio-ecl-num { font-weight: 700; }
+.bio-ecl-meta { color: #6B7280; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bio-ecl-sit { font-weight: 600; font-size: 12px; white-space: nowrap; }
+.bio-ecl-esp-row { display: flex; justify-content: space-between; gap: 10px;
+  padding: 5px 0; border-bottom: 1px solid rgba(127,127,127,.12); }
+.bio-ecl-esp-row:last-child { border-bottom: 0; }
+.bio-ecl-esp-row > span:last-child { color: #6B7280; text-align: right; }
+
+/* ── Dashboard por praia (aba Dados › Praias) ────────────────── */
+.bio-dash-card { border: 1px solid rgba(127,127,127,.18); border-radius: 12px;
+  padding: 12px; margin-bottom: 10px; }
+.bio-dash-head { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; }
+.bio-dash-head > b { font-size: 15px; }
+.bio-dash-tag { font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 6px;
+  background: rgba(26,107,140,.14); color: #1a6b8c; }
+.bio-dash-sucesso { margin-left: auto; font-size: 12px; font-weight: 700; color: #1E6B4A; }
+.bio-dash-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.bio-dash-stat { text-align: center; background: rgba(127,127,127,.06);
+  border-radius: 8px; padding: 6px 2px; }
+.bio-dash-stat b { display: block; font-size: 17px; line-height: 1.1; }
+.bio-dash-stat span { font-size: 10px; color: #9CA3AF; }
+
+/* ── Filtros do dashboard por praia ──────────────────────────── */
+.bio-dash-filtros { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.bio-dash-filtros > .bio-form-input,
+.bio-dash-filtros > .bio-dash-per { flex: 1 1 45%; min-width: 130px; }
+.bio-dash-filtros .bio-form-input { font-size: 13px; height: 38px; }
+.bio-dash-per { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #6B7280; }
+.bio-dash-per input { flex: 1; }
+.bio-dash-filtros #bio-dash-limpar { flex: 1 1 100%; }

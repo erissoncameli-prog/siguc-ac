@@ -591,10 +591,22 @@
       <input type="hidden" id="bio-transf-praia-id">
     </div>
 
+    <div class="bio-form-section" id="bio-transf-ocupacao-wrap" hidden>
+      <div class="bio-ocupacao-card">
+        <div id="bio-transf-ocupacao-resumo" class="bio-ocupacao-resumo"></div>
+        <input type="search" id="bio-transf-ocupacao-busca" class="bio-form-input"
+          placeholder="Buscar número ocupado…" autocomplete="off"
+          style="margin:8px 0 6px;height:36px;font-size:13px">
+        <div id="bio-transf-ocupacao-lista" class="bio-ocupacao-lista"></div>
+      </div>
+    </div>
+
     <div class="bio-form-section">
       <label class="bio-form-label" for="bio-transf-numero">Nº do ninho no destino *</label>
       <input type="text" id="bio-transf-numero" class="bio-form-input"
         placeholder="Escolha a praia para gerar o número" autocomplete="off">
+      <div id="bio-transf-numero-alerta"
+        style="display:none;margin-top:6px;padding:8px 12px;border-radius:8px;font-size:13px;font-weight:600;background:#fbe9e9;color:#b3261e"></div>
       <div style="font-size:12px;opacity:.7;margin-top:4px">
         A praia de destino pode já ter esse número ocupado — o app sugere a
         próxima placa livre dela. Ajuste para bater com a placa física.
@@ -1390,6 +1402,8 @@
   <div class="bio-dados-tabs">
     <button class="bio-dados-tab ativa" data-dtab="taxas">Taxas</button>
     <button class="bio-dados-tab" data-dtab="ninhos">Ninhos</button>
+    <button class="bio-dados-tab" data-dtab="eclosao">Eclosão</button>
+    <button class="bio-dados-tab" data-dtab="praias">Praias</button>
     <button class="bio-dados-tab" data-dtab="bercario">Berçário</button>
   </div>
 
@@ -1564,6 +1578,38 @@
         <div class="bio-chart-wrap" style="height:200px"><canvas id="chart-biometria"></canvas></div>
       </div>
 
+    </div>
+
+    <!-- ── TAB: ECLOSÃO (monitoramento da previsão) ─────────────── -->
+    <div id="bio-dtab-eclosao" hidden>
+      <div class="bio-dados-kpi-row">
+        <div class="bio-kpi2"><strong id="bio-ecl-kpi-hoje" style="color:var(--bio-prim)">—</strong><span>Eclosão hoje</span></div>
+        <div class="bio-kpi2"><strong id="bio-ecl-kpi-proximos" style="color:#9a6b00">—</strong><span>Próximos 7 d</span></div>
+        <div class="bio-kpi2"><strong id="bio-ecl-kpi-atrasados" style="color:var(--bio-perigo)">—</strong><span>Atrasados</span></div>
+      </div>
+      <div id="bio-ecl-listas"></div>
+      <div class="bio-chart-card" style="margin-top:10px">
+        <p class="bio-chart-title">Previsto × Real por espécie</p>
+        <div id="bio-ecl-especies" style="font-size:13px"></div>
+      </div>
+      <p id="bio-ecl-vazio" style="font-size:13px;color:#9CA3AF;text-align:center;padding:16px" hidden>
+        Sem ninhos em incubação nesta temporada.</p>
+    </div>
+
+    <!-- ── TAB: PRAIAS (dashboard por praia) ────────────────────── -->
+    <div id="bio-dtab-praias" hidden>
+      <div class="bio-dash-filtros">
+        <select id="bio-dash-especie"   class="bio-form-input"><option value="">Todas as espécies</option></select>
+        <select id="bio-dash-uc"        class="bio-form-input"><option value="">Todas as UCs</option></select>
+        <select id="bio-dash-municipio" class="bio-form-input"><option value="">Todos os municípios</option></select>
+        <select id="bio-dash-comunidade" class="bio-form-input"><option value="">Todas as comunidades</option></select>
+        <label class="bio-dash-per">De <input type="date" id="bio-dash-data-inicio" class="bio-form-input"></label>
+        <label class="bio-dash-per">Até <input type="date" id="bio-dash-data-fim" class="bio-form-input"></label>
+        <button type="button" id="bio-dash-limpar" class="bio-btn-sm ghost">Limpar filtros</button>
+      </div>
+      <div id="bio-dash-praias"></div>
+      <p id="bio-dash-vazio" style="font-size:13px;color:#9CA3AF;text-align:center;padding:16px" hidden>
+        Nenhuma praia com ninhos para os filtros.</p>
     </div>
 
     <!-- dados locais (fallback sempre visível no tab taxas) -->
