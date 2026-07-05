@@ -62,6 +62,8 @@ const BioApp = {
   cfgGpsModo:       'padrao',     // 'padrao' | 'alta' | 'maxima'
   formBercarioSelecionado: null,  // { id, nome, capacidade_max } selecionado no picker
   loteAtual: null,                // lote em detalhe/ocorrência
+  transfPraiaDestino: null,       // praia de destino selecionada na transferência
+  transfOcupacao: null,           // { ocupados[], seq_min, seq_max, proximo_livre, parcial }
 }
 
 // Espécies de quelônios (sigla, nome, científico). Vem do catálogo
@@ -69,14 +71,14 @@ const BioApp = {
 // admin-biomonitor.html) — este array só serve de fallback caso o
 // app abra offline antes de ter cache local salvo.
 let BIO_ESPECIES = [
-  { id: 'tracaja',   sigla: 'TR',  nome: 'Tracajá',            nome_cientifico: 'Podocnemis unifilis' },
-  { id: 'tartaruga', sigla: 'TA',  nome: 'Tartaruga',          nome_cientifico: 'Podocnemis expansa' },
-  { id: 'cabecudo',  sigla: 'R',   nome: 'Cabeçudo',           nome_cientifico: 'Podocnemis sextuberculata' },
-  { id: 'pitiU',     sigla: 'C',   nome: 'Pitiú',              nome_cientifico: 'Podocnemis erythrocephala' },
-  { id: 'mucua',     sigla: 'MU',  nome: 'Muçuã',              nome_cientifico: 'Kinosternon scorpioides' },
-  { id: 'jabuti_pe_elefante', sigla: 'JE', nome: 'Jabuti-pé-de-elefante', nome_cientifico: 'Chelonoidis denticulatus' },
-  { id: 'jabuti_piranga',     sigla: 'JP', nome: 'Jabuti-piranga',       nome_cientifico: 'Chelonoidis carbonarius' },
-  { id: 'outro',     sigla: 'OU',  nome: 'Outro',              nome_cientifico: '' },
+  { id: 'tracaja',   sigla: 'TR',  nome: 'Tracajá',            nome_cientifico: 'Podocnemis unifilis',       incubacao_dias: 68 },
+  { id: 'tartaruga', sigla: 'TA',  nome: 'Tartaruga',          nome_cientifico: 'Podocnemis expansa',        incubacao_dias: 55 },
+  { id: 'cabecudo',  sigla: 'R',   nome: 'Cabeçudo',           nome_cientifico: 'Podocnemis sextuberculata', incubacao_dias: 52 },
+  { id: 'pitiU',     sigla: 'C',   nome: 'Pitiú',              nome_cientifico: 'Podocnemis erythrocephala', incubacao_dias: 70 },
+  { id: 'mucua',     sigla: 'MU',  nome: 'Muçuã',              nome_cientifico: 'Kinosternon scorpioides',   incubacao_dias: 135 },
+  { id: 'jabuti_pe_elefante', sigla: 'JE', nome: 'Jabuti-pé-de-elefante', nome_cientifico: 'Chelonoidis denticulatus', incubacao_dias: 140 },
+  { id: 'jabuti_piranga',     sigla: 'JP', nome: 'Jabuti-piranga',       nome_cientifico: 'Chelonoidis carbonarius',  incubacao_dias: 140 },
+  { id: 'outro',     sigla: 'OU',  nome: 'Outro',              nome_cientifico: '',                          incubacao_dias: 65 },
 ]
 
 // ── Catálogo de espécies (editável) ──────────────────────────
@@ -84,13 +86,14 @@ async function bioCarregarEspecies() {
   try {
     const { data, error } = await bioSupabase()
       .from('especies_quelonio_catalogo')
-      .select('codigo,nome_popular,nome_cientifico,sigla_placa,ordem')
+      .select('codigo,nome_popular,nome_cientifico,sigla_placa,ordem,incubacao_dias_media')
       .eq('ativo', true)
       .order('ordem')
     if (error) throw error
     if (data?.length) {
       BIO_ESPECIES = data.map(e => ({
         id: e.codigo, sigla: e.sigla_placa || '?', nome: e.nome_popular, nome_cientifico: e.nome_cientifico || '',
+        incubacao_dias: e.incubacao_dias_media ?? 65,
       }))
       await bioOfflineSetConfig('especies_quelonio_catalogo', BIO_ESPECIES)
     }
@@ -1417,10 +1420,12 @@ async function bioAbrirFormTransf(ninho) {
   if (_trGrid)  _trGrid.innerHTML = ''
   // Destino: limpa seleção anterior
   BioApp.transfPraiaDestino = null
+  BioApp.transfOcupacao = null
   const nomeEl = document.getElementById('bio-transf-praia-nome')
   nomeEl.textContent = 'Selecionar praia…'
   nomeEl.style.opacity = '.6'
   document.getElementById('bio-transf-praia-id').value = ''
+  bioResetOcupacaoPainel()
   // Hora do reenterro: padrão = agora
   document.getElementById('bio-transf-hora').value = new Date().toTimeString().slice(0, 5)
   bioAtualizarSemaforoJanela()
@@ -1435,16 +1440,159 @@ function bioEscolherPraiaDestino() {
     const nomeEl = document.getElementById('bio-transf-praia-nome')
     nomeEl.textContent = praia.experimental ? `${praia.nome} (experimental)` : praia.nome
     nomeEl.style.opacity = '1'
-    // Sugere a placa do ninho NA PRAIA DE DESTINO (editável): a praia
-    // receptora pode já ter esse número ocupado, então geramos a próxima
-    // placa livre da sequência dela.
+
     const inp   = document.getElementById('bio-transf-numero')
     const ninho = BioApp.formNinhoAtualizar
-    if (inp && ninho) {
-      inp.value = '…'
-      inp.value = await bioGerarNumeroNinho(praia.id, ninho.especie, 'numero_atual')
-    }
+    if (inp) inp.value = '…'
+
+    // Inteligência na transferência: consulta os ninhos já cadastrados na
+    // praia de destino para a temporada/espécie, mostra ocupados, intervalo
+    // e sugere o próximo número livre (pré-preenchido, editável).
+    const oc = await bioCarregarOcupacaoDestino(praia, ninho?.especie)
+    BioApp.transfOcupacao = oc
+    bioRenderOcupacaoPainel(oc)
+    if (inp) inp.value = oc?.proximo_livre
+      ?? await bioGerarNumeroNinho(praia.id, ninho.especie, 'numero_atual')
+    bioValidarNumeroDestino()
   })
+}
+
+/* ════════════════════════════════════════════════════════════
+   OCUPAÇÃO DA PRAIA DE DESTINO (inteligência na transferência)
+   ════════════════════════════════════════════════════════════ */
+// Devolve { ocupados:[{numero_atual, seq, especie, status}], seq_min,
+// seq_max, proximo_livre, parcial }. Online usa a RPC bio_ninhos_ocupados
+// (enxerga berçários de outros grupos); offline cai para o IndexedDB local.
+async function bioCarregarOcupacaoDestino(praia, especie) {
+  const temporadaId = BioApp.temporadaAtual?.id ?? null
+  // Online: fonte de verdade (destino costuma ser de outro grupo)
+  if (navigator.onLine && window._bioDB_client) {
+    try {
+      const { data, error } = await bioSupabase().rpc('bio_ninhos_ocupados', {
+        p_praia_id: praia.id, p_temporada_id: temporadaId, p_especie: especie ?? null,
+      })
+      if (!error && data) return { ...data, parcial: false }
+    } catch { /* cai para offline */ }
+  }
+  // Offline: só enxerga ninhos do próprio grupo → lista parcial
+  const locais = await bioOfflineListarNinhos({ praiaAtualId: praia.id })
+  const ocupados = locais
+    .filter(n => (!especie || n.especie === especie)
+      && !['perdido', 'soltado'].includes(n.status)
+      && (!temporadaId || (n.temporada_id ?? temporadaId) === temporadaId))
+    .map(n => {
+      const num = n.numero_atual ?? n.numero_ninho ?? ''
+      const seq = parseInt((num.split('-').pop()) || '', 10)
+      return { ninho_id: n.server_id ?? n.id ?? null, numero_atual: num,
+        seq: Number.isFinite(seq) ? seq : null, especie: n.especie, status: n.status }
+    })
+    .sort((a, b) => (a.seq ?? 1e9) - (b.seq ?? 1e9))
+  const seqs = ocupados.map(o => o.seq).filter(Number.isFinite)
+  return {
+    ocupados,
+    seq_min: seqs.length ? Math.min(...seqs) : null,
+    seq_max: seqs.length ? Math.max(...seqs) : null,
+    proximo_livre: await bioGerarNumeroNinho(praia.id, especie, 'numero_atual'),
+    parcial: true,
+  }
+}
+
+/* ════════════════════════════════════════════════════════════
+   PREVISÃO DE ECLOSÃO (por espécie)
+   ════════════════════════════════════════════════════════════ */
+// Usa a data prevista armazenada (vw_ninhos_validacao) quando existe;
+// senão calcula localmente com data_encontro + incubação da espécie
+// (offline-safe). Devolve { dataTxt, dias, faixa, texto } ou null.
+function bioPrevisaoEclosao(n) {
+  if (!n?.data_encontro) return null
+  let prevista = n.data_prevista_eclosao
+  if (!prevista) {
+    const esp  = BIO_ESPECIES.find(e => e.id === n.especie)
+    const dias = n.incubacao_dias_previstos ?? esp?.incubacao_dias ?? 65
+    const d = new Date(n.data_encontro + 'T12:00')
+    if (isNaN(d)) return null
+    d.setDate(d.getDate() + dias)
+    prevista = d.toISOString().slice(0, 10)
+  }
+  const hoje = new Date(); hoje.setHours(12, 0, 0, 0)
+  const alvo = new Date(prevista + 'T12:00')
+  if (isNaN(alvo)) return null
+  const dias = Math.round((alvo - hoje) / 86400000)
+  let faixa, texto
+  if (dias < 0)       { faixa = 'atrasado'; texto = `atrasada há ${-dias} dia(s)` }
+  else if (dias === 0){ faixa = 'hoje';     texto = 'prevista para hoje' }
+  else if (dias <= 7) { faixa = 'atencao';  texto = `faltam ${dias} dia(s)` }
+  else                { faixa = 'normal';   texto = `faltam ${dias} dias` }
+  return { dataTxt: alvo.toLocaleDateString('pt-BR'), dias, faixa, texto }
+}
+
+function bioResetOcupacaoPainel() {
+  const wrap = document.getElementById('bio-transf-ocupacao-wrap')
+  if (wrap) wrap.hidden = true
+  const alerta = document.getElementById('bio-transf-numero-alerta')
+  if (alerta) alerta.style.display = 'none'
+  const busca = document.getElementById('bio-transf-ocupacao-busca')
+  if (busca) busca.value = ''
+}
+
+function bioRenderOcupacaoPainel(oc, filtro = '') {
+  const wrap = document.getElementById('bio-transf-ocupacao-wrap')
+  if (!wrap || !oc) return
+  wrap.hidden = false
+  const total = oc.total ?? oc.ocupados?.length ?? 0
+  const intervalo = (oc.seq_min != null && oc.seq_max != null)
+    ? `${String(oc.seq_min).padStart(3, '0')}–${String(oc.seq_max).padStart(3, '0')}`
+    : '—'
+  const resumo = document.getElementById('bio-transf-ocupacao-resumo')
+  if (resumo) {
+    resumo.innerHTML =
+      `<b>${total}</b> ninho(s) na praia · intervalo <b>${intervalo}</b>` +
+      (oc.proximo_livre ? ` · próximo livre <b>${esc(oc.proximo_livre)}</b>` : '') +
+      (oc.parcial ? ` <span style="color:#9a6b00">(lista parcial — offline)</span>` : '')
+  }
+  const q = (filtro || '').trim().toLowerCase()
+  const lista = (oc.ocupados || []).filter(o =>
+    !q || String(o.numero_atual).toLowerCase().includes(q) || String(o.seq ?? '').includes(q))
+  const listaEl = document.getElementById('bio-transf-ocupacao-lista')
+  if (listaEl) {
+    listaEl.innerHTML = lista.length
+      ? lista.map(o => `<span class="bio-ocupacao-chip" title="${esc(o.status || '')}">${esc(o.numero_atual)}</span>`).join('')
+      : `<span style="opacity:.6;font-size:13px">Nenhum ninho ${q ? 'encontrado' : 'nesta praia ainda'}.</span>`
+  }
+}
+
+// Retorna o número ocupado que colide com `num`, ou null se estiver livre.
+function bioNumeroOcupado(num) {
+  const alvo = (num || '').trim()
+  if (!alvo || !BioApp.transfOcupacao?.ocupados) return null
+  const ninho = BioApp.formNinhoAtualizar
+  const hit = BioApp.transfOcupacao.ocupados.find(o =>
+    o.numero_atual === alvo && o.ninho_id !== (ninho?.server_id ?? ninho?.id))
+  return hit ? hit.numero_atual : null
+}
+
+// Valida em tempo real o número digitado; sinaliza duplicidade e oferece
+// o próximo livre com 1 clique.
+function bioValidarNumeroDestino() {
+  const alerta = document.getElementById('bio-transf-numero-alerta')
+  const inp    = document.getElementById('bio-transf-numero')
+  if (!alerta || !inp) return
+  const ocupado = bioNumeroOcupado(inp.value)
+  if (ocupado) {
+    const livre = BioApp.transfOcupacao?.proximo_livre
+    alerta.style.display = 'block'
+    alerta.innerHTML =
+      `Número <b>${esc(ocupado)}</b> já está em uso nesta praia.` +
+      (livre ? ` <button type="button" id="bio-transf-usar-livre" class="bio-btn-sm prim" style="margin-left:6px">Usar ${esc(livre)}</button>` : '')
+    document.getElementById('bio-transf-usar-livre')?.addEventListener('click', () => {
+      inp.value = livre
+      bioValidarNumeroDestino()
+    })
+    inp.style.borderColor = '#b3261e'
+  } else {
+    alerta.style.display = 'none'
+    inp.style.borderColor = ''
+  }
 }
 
 // ── Janela crítica de translocação ────────────────────────────
@@ -1511,6 +1659,17 @@ async function bioSalvarTransf() {
   }
   if (!destino)        { bioToast('Selecione a praia de destino.', 'err'); return }
   if (!numeroAtual)    { bioToast('Informe o número do ninho no destino.', 'err'); return }
+
+  // Validação inteligente: número já ocupado no destino → bloqueia e
+  // sugere o próximo livre (o botão de aceite fica no alerta inline).
+  const ocupado = bioNumeroOcupado(numeroAtual)
+  if (ocupado) {
+    bioValidarNumeroDestino()
+    const livre = BioApp.transfOcupacao?.proximo_livre
+    bioToast(`Número ${ocupado} já está em uso na praia de destino.` +
+      (livre ? ` Sugerido: ${livre}.` : ''), 'err')
+    return
+  }
 
   // Janela crítica: alerta (não bloqueia) se passou de 12 h desde a desova
   const janela = bioCalcularJanelaHoras(ninho, data, hora)
@@ -2424,7 +2583,7 @@ async function bioCarregarAbertos() {
     try {
       let q = bioSupabase()
         .from('vw_ninhos_validacao')
-        .select('id,uuid_cliente,numero_ninho,numero_atual,especie,data_encontro,hora_desova,status,status_validacao,motivo_rejeicao,qtd_ovos,ovos_integros,ovos_descartados,descartados_natural,descartados_predacao,descartados_humana,dist_rio_m,dist_rio_metodo,temperatura_c,umidade_pct,profundidade_cm,observacoes,foto_urls,lat,lng,precisao_gps_m,criado_em,praia_id,praia_nome,praia_atual_id,praia_atual_nome,monitor_id,monitor_nome,data_nascimento,filhotes_vivos,filhotes_mortos,ovos_nao_nascidos')
+        .select('id,uuid_cliente,numero_ninho,numero_atual,especie,data_encontro,hora_desova,status,status_validacao,motivo_rejeicao,qtd_ovos,ovos_integros,ovos_descartados,descartados_natural,descartados_predacao,descartados_humana,dist_rio_m,dist_rio_metodo,temperatura_c,umidade_pct,profundidade_cm,observacoes,foto_urls,lat,lng,precisao_gps_m,criado_em,praia_id,praia_nome,praia_atual_id,praia_atual_nome,monitor_id,monitor_nome,data_nascimento,filhotes_vivos,filhotes_mortos,ovos_nao_nascidos,incubacao_dias_previstos,data_prevista_eclosao,dias_para_eclosao')
         .eq('grupo_id', BioApp.monitor.grupo_id)
         .order('numero_atual', { ascending: false })
       if (filtroStatus) {
@@ -2544,6 +2703,14 @@ function bioNinhoCardInner(n, opts = {}) {
     </div>` : ''
 
   // Resumo da eclosão (quando o ninho já eclodiu)
+  // Previsão de eclosão — só para ninhos ainda em incubação
+  const prev = ['encontrado', 'transferido'].includes(n.status) ? bioPrevisaoEclosao(n) : null
+  const previsaoHtml = prev ? `
+    <div class="bio-nfc-previsao faixa-${prev.faixa}">
+      <span class="bio-nfc-prev-ico" aria-hidden="true"></span>
+      <span><b>Eclosão prevista:</b> ${prev.dataTxt} · ${esc(prev.texto)}</span>
+    </div>` : ''
+
   const eclosaoHtml = (n.status === 'eclodido' && (n.filhotes_vivos != null || n.filhotes_mortos != null || n.data_nascimento)) ? `
     <div class="bio-nfc-ovos">
       <span style="background:rgba(82,183,136,.18);color:#1E6B4A">Eclosão${n.data_nascimento ? ' ' + new Date(n.data_nascimento + 'T12:00').toLocaleDateString('pt-BR') : ''}</span>
@@ -2606,6 +2773,7 @@ function bioNinhoCardInner(n, opts = {}) {
     ${corrHtml}
     ${ovosHtml}
     ${condicoesHtml}
+    ${previsaoHtml}
     ${eclosaoHtml}
     ${histHtml}
     ${localChip ? `<div class="bio-nfc-eventos">${localChip}</div>` : ''}
@@ -3415,6 +3583,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('bio-transf-praia-btn')?.addEventListener('click', bioEscolherPraiaDestino)
   document.getElementById('bio-transf-data')?.addEventListener('input', bioAtualizarSemaforoJanela)
   document.getElementById('bio-transf-hora')?.addEventListener('input', bioAtualizarSemaforoJanela)
+  document.getElementById('bio-transf-numero')?.addEventListener('input', bioValidarNumeroDestino)
+  document.getElementById('bio-transf-ocupacao-busca')?.addEventListener('input', (e) =>
+    bioRenderOcupacaoPainel(BioApp.transfOcupacao, e.target.value))
   document.getElementById('bio-btn-salvar-eclosao')?.addEventListener('click', bioSalvarEclosao)
 
   // Descarte de ovos: mostra a quebra por causa quando há descartados

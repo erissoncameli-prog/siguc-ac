@@ -591,10 +591,22 @@
       <input type="hidden" id="bio-transf-praia-id">
     </div>
 
+    <div class="bio-form-section" id="bio-transf-ocupacao-wrap" hidden>
+      <div class="bio-ocupacao-card">
+        <div id="bio-transf-ocupacao-resumo" class="bio-ocupacao-resumo"></div>
+        <input type="search" id="bio-transf-ocupacao-busca" class="bio-form-input"
+          placeholder="Buscar número ocupado…" autocomplete="off"
+          style="margin:8px 0 6px;height:36px;font-size:13px">
+        <div id="bio-transf-ocupacao-lista" class="bio-ocupacao-lista"></div>
+      </div>
+    </div>
+
     <div class="bio-form-section">
       <label class="bio-form-label" for="bio-transf-numero">Nº do ninho no destino *</label>
       <input type="text" id="bio-transf-numero" class="bio-form-input"
         placeholder="Escolha a praia para gerar o número" autocomplete="off">
+      <div id="bio-transf-numero-alerta"
+        style="display:none;margin-top:6px;padding:8px 12px;border-radius:8px;font-size:13px;font-weight:600;background:#fbe9e9;color:#b3261e"></div>
       <div style="font-size:12px;opacity:.7;margin-top:4px">
         A praia de destino pode já ter esse número ocupado — o app sugere a
         próxima placa livre dela. Ajuste para bater com a placa física.
