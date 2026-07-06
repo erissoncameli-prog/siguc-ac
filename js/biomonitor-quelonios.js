@@ -2606,9 +2606,10 @@ async function bioCarregarEventosNinhos(ninhos) {
       + (r.ovos_perdidos_erosao || 0) + (r.ovos_perdidos_humana || 0)
     return {
       tipo: 'visita', data: r.data_visita,
+      delta: perda,                                   // ovos perdidos nesta visita
+      destruido: r.status_ninho === 'destruido',      // baixa total dos viáveis
       txt: ['Visita',
         r.status_ninho ? VISITA_STATUS[r.status_ninho] : null,
-        perda > 0 ? `−${perda} ovos` : null,
         r.temperatura_substrato_c != null ? `${r.temperatura_substrato_c}°C`
           : r.temperatura_ar_c != null ? `${r.temperatura_ar_c}°C` : null,
       ].filter(Boolean).join(' · '),
@@ -2693,8 +2694,42 @@ async function bioCarregarEventosNinhos(ninhos) {
   // aparecerem no histórico imediatamente, sem esperar o sync.
   await mesclarVisitasLocais(true)
 
-  Object.values(mapa).forEach(evs => evs.sort((a, b) => (a.data ?? '') < (b.data ?? '') ? -1 : 1))
-  ninhos.forEach(n => { n._eventos = mapa[n.uuid_cliente] ?? [] })
+  bioFinalizarHistorico(ninhos, mapa)
+}
+
+// Fecha o histórico de cada ninho: ancora a LOCALIZAÇÃO (postura) no
+// topo, ordena por data e calcula o saldo de OVOS VIÁVEIS após cada
+// evento — a base viva para as ocorrências seguintes.
+function bioFinalizarHistorico(ninhos, mapa) {
+  ninhos.forEach(n => {
+    const evs = mapa[n.uuid_cliente] || []
+    if (n.data_encontro && n.qtd_ovos != null) {
+      const registro = n.ovos_descartados || 0
+      evs.push({
+        tipo: 'localizacao', data: n.data_encontro, registro,
+        txt: `Localização · ${n.qtd_ovos} ovos na postura`
+          + (registro > 0 ? ` · ${registro} descartados no registro` : ''),
+      })
+    }
+    evs.sort((a, b) => {
+      if (a.tipo === 'localizacao' && b.tipo !== 'localizacao') return -1
+      if (b.tipo === 'localizacao' && a.tipo !== 'localizacao') return 1
+      return (a.data ?? '') < (b.data ?? '') ? -1 : 1
+    })
+    // Saldo de viáveis após cada evento
+    let saldo = n.qtd_ovos != null ? n.qtd_ovos : null
+    evs.forEach(ev => {
+      if (ev.tipo === 'localizacao') {
+        saldo = n.qtd_ovos != null ? Math.max(n.qtd_ovos - (ev.registro || 0), 0) : null
+      } else if (ev.destruido && saldo != null) {
+        ev.delta = saldo; saldo = 0
+      } else if (ev.delta > 0 && saldo != null) {
+        saldo = Math.max(saldo - ev.delta, 0)
+      }
+      ev.saldo = saldo
+    })
+    n._eventos = evs
+  })
 }
 
 async function bioCarregarAbertos() {
@@ -2881,12 +2916,19 @@ function bioNinhoCardInner(n, opts = {}) {
   const evs = Array.isArray(n._eventos) ? n._eventos : []
   const histHtml = evs.length ? (() => {
     const fd = iso => new Date(iso + 'T12:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
-    const rows = evs.map(ev => `
-      <div class="bio-nfc-hist-ev ev-${ev.tipo}">
+    const rows = evs.map(ev => {
+      const cls   = ev.destruido ? 'destruido' : ev.tipo
+      const delta = ev.delta > 0 ? `<span class="bio-nfc-hist-delta">−${ev.delta}</span>` : ''
+      const saldo = ev.saldo != null
+        ? `<span class="bio-nfc-hist-saldo">${ev.saldo}<i>viáveis</i></span>` : ''
+      return `
+      <div class="bio-nfc-hist-ev ev-${cls}">
         <div class="bio-nfc-hist-dot"></div>
         <span class="bio-nfc-hist-data">${fd(ev.data)}</span>
-        <span class="bio-nfc-hist-txt">${esc(ev.txt)}</span>
-      </div>`).join('')
+        <span class="bio-nfc-hist-txt">${esc(ev.txt)}${delta}</span>
+        ${saldo}
+      </div>`
+    }).join('')
     return `<button class="bio-nfc-hist-toggle" data-nh-toggle>
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
       ${evs.length} evento${evs.length !== 1 ? 's' : ''}

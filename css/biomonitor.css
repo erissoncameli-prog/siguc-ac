@@ -1653,3 +1653,20 @@ body.field-mode .bio-home-nome { font-size: 26px; }
 .bio-vis-destruicao-box { border: 1px solid rgba(220,38,38,.35); background: rgba(220,38,38,.06);
   border-radius: 12px; padding: 12px; font-size: 13.5px; line-height: 1.5; }
 .bio-vis-destruicao-box label { font-size: 12px; font-weight: 600; color: #6B7280; }
+
+/* ── Histórico do ninho: saldo de viáveis + âncora de localização ── */
+.bio-nfc-hist-ev.ev-localizacao .bio-nfc-hist-dot {
+  background: var(--bio-ouro, #C9A84C); box-shadow: 0 0 0 3px rgba(201,168,76,.25);
+}
+.bio-nfc-hist-ev.ev-destruido .bio-nfc-hist-dot { background: #B3261E; }
+.bio-nfc-hist-txt .bio-nfc-hist-delta {
+  color: #B3261E; font-weight: 700; margin-left: 6px; white-space: nowrap;
+  font-family: var(--font-mono);
+}
+.bio-nfc-hist-saldo {
+  flex-shrink: 0; text-align: right; font-family: var(--font-mono);
+  font-size: 12px; font-weight: 600; color: #1E6B4A; line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+}
+.bio-nfc-hist-saldo i { display: block; font-style: normal; font-size: 9px;
+  letter-spacing: .06em; text-transform: uppercase; color: #9CA3AF; font-weight: 500; }
