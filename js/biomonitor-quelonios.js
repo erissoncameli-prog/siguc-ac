@@ -1738,6 +1738,22 @@ async function bioAbrirFormEclosao(ninho) {
   document.querySelectorAll('.bio-pred-opt').forEach(o => o.classList.remove('sel'))
   document.querySelector('.bio-pred-opt[data-pred="nenhuma"]')?.classList.add('sel')
 
+  // Ovos viáveis do ninho (postura − baixas nas visitas): referência
+  // para o total de filhotes/ovos não nascidos informado.
+  const viavEl = document.getElementById('bio-ecl-viaveis')
+  if (viavEl) {
+    const viaveis = bioOvosViaveisNinho(ninho)
+    BioApp._eclViaveis = viaveis
+    if (viaveis != null) {
+      const perdas = (ninho.descartados_natural || 0) + (ninho.descartados_predacao || 0) + (ninho.descartados_humana || 0)
+      viavEl.innerHTML = `Ovos viáveis do ninho: <b>${viaveis}</b>`
+        + (perdas > 0 ? ` <span style="opacity:.75">(postura ${ninho.qtd_ovos} − ${perdas} baixados)</span>` : '')
+      viavEl.hidden = false
+    } else {
+      viavEl.hidden = true
+    }
+  }
+
   bioMostrarTela('tela-form-eclosao')
 }
 
@@ -1779,6 +1795,17 @@ async function bioSalvarEclosao() {
   const predacao    = document.querySelector('.bio-pred-opt.sel')?.dataset.pred ?? 'nenhuma'
 
   if (!data)  { bioToast('Informe a data de nascimento.', 'err'); return }
+
+  // Alerta de consistência: o total apurado (filhotes vivos + mortos +
+  // ovos não nascidos) não deveria superar os ovos viáveis do ninho
+  // (postura − baixas das visitas).
+  const viaveis = BioApp._eclViaveis ?? bioOvosViaveisNinho(ninho)
+  const totalApurado = vivos + mortos + naoNascidos
+  if (viaveis != null && totalApurado > viaveis) {
+    const msg = `O total informado (${totalApurado}: ${vivos} vivos + ${mortos} mortos + ${naoNascidos} não nasc.) `
+      + `supera os ${viaveis} ovos viáveis do ninho.\n\nConfirmar assim mesmo?`
+    if (!confirm(msg)) return
+  }
 
   const ecl = {
     uuid_cliente:      bioUuid(),
