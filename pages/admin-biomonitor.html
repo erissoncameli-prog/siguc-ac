@@ -1129,6 +1129,7 @@
       ${linha('Próprios / Recebidos', (p.ninhos_proprios ?? 0)+' / '+(p.ninhos_recebidos ?? 0))}
       ${linha('Incubando aqui', p.ninhos_incubando_aqui ?? 0)}
       ${linha('Ovos (postura)', p.ovos_postura_total ?? 0)}
+      ${linha('Ovos viáveis', (p.ovos_viaveis_total ?? 0) + ((p.ovos_perdidos_total ?? 0) > 0 ? ` <span style="color:#b3261e">(−${p.ovos_perdidos_total})</span>` : ''))}
       ${linha('Filhotes vivos', p.filhotes_vivos ?? 0)}
       ${linha('Taxa de eclosão', taxa)}
       <button class="btn btn-sm btn-secondary" style="margin-top:8px;width:100%" onclick="editarPraia('${p.id}')">Editar praia</button>
