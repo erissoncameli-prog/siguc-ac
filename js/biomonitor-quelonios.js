@@ -3595,8 +3595,16 @@ async function bioRenderDashboardPraias(temporadaId) {
           ${stat(p.inundados, 'Inundados', '#b3261e')}
           ${stat(p.falha_eclosao, 'Falha ecl.', '#b3261e')}
           ${stat(p.filhotes_produzidos, 'Filhotes', '#1E6B4A')}
-          ${stat(p.ovos_monitorados, 'Ovos')}
+          ${stat(p.ovos_monitorados, 'Postura')}
+          ${stat(p.ovos_viaveis, 'Viáveis', '#1E6B4A')}
+          ${stat(p.ovos_perdidos, 'Perdidos', '#b3261e')}
         </div>
+        ${(p.ovos_perdidos > 0) ? `<div class="bio-dash-perdas">Perdas: ${[
+          p.perdas_predacao   ? `${p.perdas_predacao} predação`     : null,
+          p.perdas_alagamento ? `${p.perdas_alagamento} alagamento` : null,
+          p.perdas_erosao     ? `${p.perdas_erosao} erosão`         : null,
+          p.perdas_humana     ? `${p.perdas_humana} humano`         : null,
+        ].filter(Boolean).join(' · ') || '—'}</div>` : ''}
       </div>`
   }
   if (wrap) wrap.innerHTML = praias.map(card).join('')
