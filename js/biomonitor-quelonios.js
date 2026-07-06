@@ -3039,8 +3039,34 @@ async function bioCarregarFilaLocal() {
   const container = document.getElementById('bio-sync-queue')
   container.innerHTML = ''
 
+  // Registros que falharam no envio (3+ tentativas) — de qualquer tipo.
+  const erros = await bioOfflineTodosComErro().catch(() => [])
+  if (erros.length) {
+    const box = document.createElement('div')
+    box.className = 'bio-sync-erros'
+    box.innerHTML = `
+      <div class="bio-sync-erros-head">
+        <b>${erros.length} registro(s) não enviado(s)</b>
+        <button type="button" id="bio-sync-retry" class="bio-btn-sm prim">Tentar de novo</button>
+      </div>
+      ${erros.map(er => `
+        <div class="bio-sync-erro-item">
+          <span class="bio-sync-erro-tipo">${er.tipo}${er.item.ninho_numero ? ' · ' + esc(er.item.ninho_numero) : (er.item.numero_ninho ? ' · ' + esc(er.item.numero_ninho) : '')}</span>
+          <span class="bio-sync-erro-msg">${esc(er.item.sync_erro || 'falha no envio')}</span>
+        </div>`).join('')}`
+    container.appendChild(box)
+    box.querySelector('#bio-sync-retry')?.addEventListener('click', async () => {
+      const btn = box.querySelector('#bio-sync-retry')
+      if (btn) { btn.disabled = true; btn.textContent = 'Reenviando…' }
+      await bioOfflineReenfileirarErros()
+      bioSyncTudo({ monitorId: BioApp.monitor?.id, onConcluido: async () => {
+        await bioAtualizarBadgeFila(); await bioCarregarFilaLocal()
+      } })
+    })
+  }
+
   if (!ninhos.length) {
-    container.innerHTML = '<p style="text-align:center;color:#9CA3AF;padding:32px 16px">Nenhum ninho registrado localmente.</p>'
+    if (!erros.length) container.innerHTML = '<p style="text-align:center;color:#9CA3AF;padding:32px 16px">Nenhum ninho registrado localmente.</p>'
     return
   }
 
@@ -3049,6 +3075,9 @@ async function bioCarregarFilaLocal() {
     const praia    = praias.find(p => p.id === (n.praia_atual_id ?? n.praia_id))
     const numExib  = n.numero_atual ?? n.numero_ninho
     const syncOk   = n.status_sync === 'confirmado'
+    const syncErro = n.status_sync === 'erro'
+    const dotCor   = syncOk ? 'var(--bio-verde)' : syncErro ? '#DC2626' : '#F59E0B'
+    const dotTit   = syncOk ? 'Enviado' : syncErro ? ('Não enviado: ' + (n.sync_erro || 'erro')) : 'Pendente'
     const temEcl   = eclosMap[n.uuid_cliente]
     const nTransf  = transfMap[n.uuid_cliente] ?? 0
     const status   = n.status ?? 'encontrado'
@@ -3072,8 +3101,9 @@ async function bioCarregarFilaLocal() {
       <div class="bio-nfc-header">
         <span class="bio-nfc-num">#${numExib ?? '—'}</span>
         <span class="bio-nfc-status-badge ${status}">${bioLabels.status[status] ?? status}</span>
-        <span class="bio-nfc-sync-dot" title="${syncOk ? 'Enviado' : 'Pendente'}" style="background:${syncOk ? 'var(--bio-verde)' : '#F59E0B'}"></span>
+        <span class="bio-nfc-sync-dot" title="${esc(dotTit)}" style="background:${dotCor}"></span>
       </div>
+      ${syncErro ? `<div class="bio-nfc-sync-erro">${esc(n.sync_erro || 'falha no envio')}</div>` : ''}
       <div class="bio-nfc-especie">${esp ? `<strong>${esp.sigla}</strong> ${esp.nome}` : (n.especie ?? '—')}</div>
       <div class="bio-nfc-row">
         <span class="bio-nfc-praia">${praia?.nome ?? '—'}</span>

@@ -1670,3 +1670,15 @@ body.field-mode .bio-home-nome { font-size: 26px; }
 }
 .bio-nfc-hist-saldo i { display: block; font-style: normal; font-size: 9px;
   letter-spacing: .06em; text-transform: uppercase; color: #9CA3AF; font-weight: 500; }
+
+/* ── Fila de sync: registros com erro ────────────────────────── */
+.bio-sync-erros {
+  border: 1px solid rgba(220,38,38,.35); background: rgba(220,38,38,.06);
+  border-radius: 12px; padding: 12px; margin-bottom: 14px;
+}
+.bio-sync-erros-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+.bio-sync-erros-head b { color: #B3261E; font-size: 14px; }
+.bio-sync-erro-item { display: flex; flex-direction: column; gap: 1px; padding: 6px 0; border-top: 1px dashed rgba(220,38,38,.2); }
+.bio-sync-erro-tipo { font-size: 12.5px; font-weight: 700; }
+.bio-sync-erro-msg  { font-size: 11.5px; color: #9a3b2b; font-family: var(--font-mono); word-break: break-word; }
+.bio-nfc-sync-erro  { font-size: 11px; color: #B3261E; margin-top: 4px; font-weight: 600; }
