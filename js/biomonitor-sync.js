@@ -62,9 +62,11 @@ async function bioSyncNinhos(monitorId, onProgresso) {
 
     // Upload das fotos antes do upsert
     let fotoUrls = ninho.foto_urls ?? []
-    if (fotoUrls.some(f => f.startsWith('data:'))) {
-      fotoUrls = await bioSyncUploadFotos(fotoUrls, `ninhos/${ninho.uuid_cliente}`)
-    }
+    try {
+      if (fotoUrls.some(f => f.startsWith('data:'))) {
+        fotoUrls = await bioSyncUploadFotos(fotoUrls, `ninhos/${ninho.uuid_cliente}`)
+      }
+    } catch (e) { await bioOfflineMarcarErroSync('ninhos', ninho.uuid_cliente, 'fotos: ' + (e.message || e)); continue }
 
     const payload = {
       uuid_cliente:     ninho.uuid_cliente,
@@ -98,6 +100,7 @@ async function bioSyncNinhos(monitorId, onProgresso) {
       profundidade_cm:  ninho.profundidade_cm  ?? null,
       alerta_campo:     ninho.alerta_campo     ?? null,
       temporada_id:     ninho.temporada_id     ?? null,
+      sincronizado_em:  new Date().toISOString(),
     }
 
     await bioOfflineAtualizarSync('ninhos', ninho.uuid_cliente, 'enviando')
@@ -109,8 +112,8 @@ async function bioSyncNinhos(monitorId, onProgresso) {
       .single()
 
     if (error) {
-      await bioOfflineAtualizarSync('ninhos', ninho.uuid_cliente, 'pendente')
-      throw error
+      await bioOfflineMarcarErroSync('ninhos', ninho.uuid_cliente, error.message)
+      continue
     }
 
     await bioOfflineAtualizarSync('ninhos', ninho.uuid_cliente, 'confirmado', data.id)
@@ -185,9 +188,11 @@ async function bioSyncTransferencias(monitorId, onProgresso) {
     if (!ninhoServId) continue  // ninho ainda não no banco; tenta no próximo sync
 
     let fotoUrls = t.foto_urls ?? []
-    if (fotoUrls.some(f => f.startsWith('data:'))) {
-      fotoUrls = await bioSyncUploadFotos(fotoUrls, `transferencias/${t.uuid_cliente}`)
-    }
+    try {
+      if (fotoUrls.some(f => f.startsWith('data:'))) {
+        fotoUrls = await bioSyncUploadFotos(fotoUrls, `transferencias/${t.uuid_cliente}`)
+      }
+    } catch (e) { await bioOfflineMarcarErroSync('transferencias', t.uuid_cliente, 'fotos: ' + (e.message || e)); continue }
 
     const payload = {
       uuid_cliente:        t.uuid_cliente,
@@ -202,6 +207,7 @@ async function bioSyncTransferencias(monitorId, onProgresso) {
       observacoes:         t.observacoes       || null,
       foto_urls:           fotoUrls,
       monitor_id:          monitorId,
+      sincronizado_em:     new Date().toISOString(),
     }
 
     await bioOfflineAtualizarSync('transferencias', t.uuid_cliente, 'enviando')
@@ -213,15 +219,14 @@ async function bioSyncTransferencias(monitorId, onProgresso) {
       .single()
 
     if (error) {
-      await bioOfflineAtualizarSync('transferencias', t.uuid_cliente, 'pendente')
-      // Número duplicado no destino (guard de integridade, mig. 119): é uma
-      // rejeição não-recuperável por reenvio. Não aborta a fila inteira —
-      // registra o aviso e segue para as próximas transferências.
+      // Número duplicado no destino (guard de integridade, mig. 119) é
+      // rejeição definitiva — avisa. Demais erros: marca e segue (nunca
+      // aborta a fila).
       if (error.code === '23505' || /ocupado/i.test(error.message || '')) {
         try { bioToast?.(`Transferência do ninho ${t.ninho_numero ?? ''}: número já ocupado no destino.`, 'err') } catch (_) {}
-        continue
       }
-      throw error
+      await bioOfflineMarcarErroSync('transferencias', t.uuid_cliente, error.message)
+      continue
     }
 
     await bioOfflineAtualizarSync('transferencias', t.uuid_cliente, 'confirmado', data.id)
@@ -241,9 +246,11 @@ async function bioSyncEclosoes(monitorId, onProgresso) {
     if (!ninhoServId) continue
 
     let fotoUrls = e.foto_urls ?? []
-    if (fotoUrls.some(f => f.startsWith('data:'))) {
-      fotoUrls = await bioSyncUploadFotos(fotoUrls, `eclosoes/${e.uuid_cliente}`)
-    }
+    try {
+      if (fotoUrls.some(f => f.startsWith('data:'))) {
+        fotoUrls = await bioSyncUploadFotos(fotoUrls, `eclosoes/${e.uuid_cliente}`)
+      }
+    } catch (er) { await bioOfflineMarcarErroSync('eclosoes', e.uuid_cliente, 'fotos: ' + (er.message || er)); continue }
 
     const payload = {
       uuid_cliente:       e.uuid_cliente,
@@ -256,6 +263,7 @@ async function bioSyncEclosoes(monitorId, onProgresso) {
       foto_urls:          fotoUrls,
       observacoes:        e.observacoes || null,
       monitor_id:         monitorId,
+      sincronizado_em:    new Date().toISOString(),
     }
 
     await bioOfflineAtualizarSync('eclosoes', e.uuid_cliente, 'enviando')
@@ -267,8 +275,8 @@ async function bioSyncEclosoes(monitorId, onProgresso) {
       .single()
 
     if (error) {
-      await bioOfflineAtualizarSync('eclosoes', e.uuid_cliente, 'pendente')
-      throw error
+      await bioOfflineMarcarErroSync('eclosoes', e.uuid_cliente, error.message)
+      continue
     }
 
     await bioOfflineAtualizarSync('eclosoes', e.uuid_cliente, 'confirmado', data.id)
@@ -288,9 +296,11 @@ async function bioSyncVisitas(monitorId, onProgresso) {
     if (!ninhoServId) continue
 
     let fotoUrls = v.foto_urls ?? []
-    if (fotoUrls.some(f => f.startsWith('data:'))) {
-      fotoUrls = await bioSyncUploadFotos(fotoUrls, `visitas/${v.uuid_cliente}`)
-    }
+    try {
+      if (fotoUrls.some(f => f.startsWith('data:'))) {
+        fotoUrls = await bioSyncUploadFotos(fotoUrls, `visitas/${v.uuid_cliente}`)
+      }
+    } catch (e) { await bioOfflineMarcarErroSync('visitas', v.uuid_cliente, 'fotos: ' + (e.message || e)); continue }
 
     const payload = {
       uuid_cliente:            v.uuid_cliente,
@@ -313,6 +323,7 @@ async function bioSyncVisitas(monitorId, onProgresso) {
       foto_urls:               fotoUrls,
       alerta_campo:            v.alerta_campo            ?? null,
       monitor_id:              monitorId,
+      sincronizado_em:         new Date().toISOString(),
     }
 
     await bioOfflineAtualizarSync('visitas', v.uuid_cliente, 'enviando')
@@ -324,8 +335,8 @@ async function bioSyncVisitas(monitorId, onProgresso) {
       .single()
 
     if (error) {
-      await bioOfflineAtualizarSync('visitas', v.uuid_cliente, 'pendente')
-      throw error
+      await bioOfflineMarcarErroSync('visitas', v.uuid_cliente, error.message)
+      continue
     }
 
     await bioOfflineAtualizarSync('visitas', v.uuid_cliente, 'confirmado', data.id)
@@ -355,6 +366,7 @@ async function bioSyncLotes(monitorId, onProgresso) {
       status:        l.status,
       observacoes:   l.observacoes   || null,
       monitor_id:    monitorId,
+      sincronizado_em: new Date().toISOString(),
     }
 
     await bioOfflineAtualizarSync('lotes', l.uuid_cliente, 'enviando')
@@ -366,8 +378,8 @@ async function bioSyncLotes(monitorId, onProgresso) {
       .single()
 
     if (error) {
-      await bioOfflineAtualizarSync('lotes', l.uuid_cliente, 'pendente')
-      throw error
+      await bioOfflineMarcarErroSync('lotes', l.uuid_cliente, error.message)
+      continue
     }
 
     await bioOfflineAtualizarSync('lotes', l.uuid_cliente, 'confirmado', data.id)
@@ -394,9 +406,11 @@ async function bioSyncSolturas(monitorId, onProgresso) {
     }
 
     let fotoUrlsSol = s.foto_urls ?? []
-    if (fotoUrlsSol.some(f => f.startsWith('data:'))) {
-      fotoUrlsSol = await bioSyncUploadFotos(fotoUrlsSol, `solturas/${s.uuid_cliente}`)
-    }
+    try {
+      if (fotoUrlsSol.some(f => f.startsWith('data:'))) {
+        fotoUrlsSol = await bioSyncUploadFotos(fotoUrlsSol, `solturas/${s.uuid_cliente}`)
+      }
+    } catch (e) { await bioOfflineMarcarErroSync('solturas', s.uuid_cliente, 'fotos: ' + (e.message || e)); continue }
 
     const payload = {
       uuid_cliente:     s.uuid_cliente,
@@ -415,6 +429,7 @@ async function bioSyncSolturas(monitorId, onProgresso) {
       observacoes:      s.observacoes      || null,
       foto_urls:        fotoUrlsSol,
       monitor_id:       monitorId,
+      sincronizado_em:  new Date().toISOString(),
     }
 
     await bioOfflineAtualizarSync('solturas', s.uuid_cliente, 'enviando')
@@ -426,8 +441,8 @@ async function bioSyncSolturas(monitorId, onProgresso) {
       .single()
 
     if (error) {
-      await bioOfflineAtualizarSync('solturas', s.uuid_cliente, 'pendente')
-      throw error
+      await bioOfflineMarcarErroSync('solturas', s.uuid_cliente, error.message)
+      continue
     }
 
     await bioOfflineAtualizarSync('solturas', s.uuid_cliente, 'confirmado', data.id)
@@ -448,9 +463,11 @@ async function bioSyncOcorrencias(monitorId, onProgresso) {
     if (!loteServId) continue
 
     let fotoUrlsOc = oc.foto_urls ?? []
-    if (fotoUrlsOc.some(f => f.startsWith('data:'))) {
-      fotoUrlsOc = await bioSyncUploadFotos(fotoUrlsOc, `ocorrencias-bercario/${oc.uuid_cliente}`)
-    }
+    try {
+      if (fotoUrlsOc.some(f => f.startsWith('data:'))) {
+        fotoUrlsOc = await bioSyncUploadFotos(fotoUrlsOc, `ocorrencias-bercario/${oc.uuid_cliente}`)
+      }
+    } catch (e) { await bioOfflineMarcarErroSync('ocorrencias', oc.uuid_cliente, 'fotos: ' + (e.message || e)); continue }
 
     const payload = {
       uuid_cliente:         oc.uuid_cliente,
@@ -478,8 +495,8 @@ async function bioSyncOcorrencias(monitorId, onProgresso) {
       .single()
 
     if (error) {
-      await bioOfflineAtualizarSync('ocorrencias', oc.uuid_cliente, 'pendente')
-      throw error
+      await bioOfflineMarcarErroSync('ocorrencias', oc.uuid_cliente, error.message)
+      continue
     }
 
     await bioOfflineAtualizarSync('ocorrencias', oc.uuid_cliente, 'confirmado', data.id)
@@ -497,13 +514,17 @@ async function bioSyncTudo({ monitorId, onProgresso, onConcluido, onErro } = {})
   _bioSyncAbortCtrl   = new AbortController()
 
   try {
-    const n  = await bioSyncNinhos(monitorId, onProgresso)
-    const t  = await bioSyncTransferencias(monitorId, onProgresso)
-    const e  = await bioSyncEclosoes(monitorId, onProgresso)
-    const v  = await bioSyncVisitas(monitorId, onProgresso)
-    const l  = await bioSyncLotes(monitorId, onProgresso)
-    const s  = await bioSyncSolturas(monitorId, onProgresso)
-    const oc = await bioSyncOcorrencias(monitorId, onProgresso)
+    // Cada categoria é isolada: uma falha inesperada numa não aborta as
+    // seguintes (ninhos → filhos). A resiliência por registro fica dentro
+    // de cada função (marca 'erro' e segue).
+    const cat = async fn => { try { return await fn(monitorId, onProgresso) } catch (e) { console.warn('[sync]', fn.name, e); return 0 } }
+    const n  = await cat(bioSyncNinhos)
+    const t  = await cat(bioSyncTransferencias)
+    const e  = await cat(bioSyncEclosoes)
+    const v  = await cat(bioSyncVisitas)
+    const l  = await cat(bioSyncLotes)
+    const s  = await cat(bioSyncSolturas)
+    const oc = await cat(bioSyncOcorrencias)
     // Pull: traz de volta mudanças do servidor (ex.: validação/correção
     // feita pelo gestor) para o IndexedDB.
     const grupoId = (typeof BioApp !== 'undefined' && BioApp.monitor?.grupo_id) || null

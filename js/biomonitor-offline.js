@@ -511,7 +511,39 @@ async function bioOfflineContarPendentes() {
     bioOfflineSolturasPendentes(),
     bioOfflineOcorrenciasPendentes(),
   ])
-  return n.length + t.length + e.length + v.length + l.length + s.length + oc.length
+  const erros = await bioOfflineTodosComErro()
+  return n.length + t.length + e.length + v.length + l.length + s.length + oc.length + erros.length
+}
+
+// Stores com fila de sync (label amigável do tipo de registro)
+const _BIO_STORES_SYNC = {
+  ninhos: 'Ninho', transferencias: 'Transferência', eclosoes: 'Eclosão',
+  visitas: 'Visita', lotes: 'Berçário', solturas: 'Soltura', ocorrencias: 'Ocorrência',
+}
+
+// Varre todos os stores e devolve os registros marcados como 'erro'
+// (falharam 3+ vezes), com o tipo e o motivo — para a tela de Fila.
+async function bioOfflineTodosComErro() {
+  const db = await bioOfflineInit()
+  const out = []
+  for (const store of Object.keys(_BIO_STORES_SYNC)) {
+    if (!db.objectStoreNames.contains(store)) continue
+    const items = await new Promise((res) => {
+      const tx  = db.transaction(store, 'readonly')
+      const req = tx.objectStore(store).getAll()
+      req.onsuccess = () => res((req.result || []).filter(x => x.status_sync === 'erro'))
+      req.onerror   = () => res([])
+    })
+    items.forEach(it => out.push({ store, tipo: _BIO_STORES_SYNC[store], item: it }))
+  }
+  return out
+}
+
+// Reenfileira todos os registros em 'erro' (volta a 'pendente').
+async function bioOfflineReenfileirarErros() {
+  const erros = await bioOfflineTodosComErro()
+  for (const { store, item } of erros) await bioOfflineReenfileirar(store, item.uuid_cliente)
+  return erros.length
 }
 
 // ── Atualizar status_sync de um item ──────────────────────────
@@ -526,11 +558,59 @@ async function bioOfflineAtualizarSync(store, uuid, novoStatus, serverId) {
       if (!item) { res(); return }
       item.status_sync   = novoStatus
       if (serverId) item.server_id = serverId
-      if (novoStatus === 'confirmado') item.sincronizado_em = new Date().toISOString()
+      if (novoStatus === 'confirmado') {
+        item.sincronizado_em = new Date().toISOString()
+        item.sync_erro = null            // limpa erro anterior ao confirmar
+        item.sync_tentativas = 0
+      }
       st.put(item)
       tx.oncomplete = () => res()
     }
     req.onerror = () => rej(req.error)
+  })
+}
+
+// Marca um registro que falhou no envio: guarda o motivo e conta as
+// tentativas. Após 3 falhas vira 'erro' (para de tentar sozinho e fica
+// visível na fila com o motivo + "tentar de novo"); antes disso volta a
+// 'pendente' e o sync tenta de novo (recupera falha passageira). NUNCA
+// lança — o chamador segue para o próximo registro.
+async function bioOfflineMarcarErroSync(store, uuid, motivo) {
+  const db = await bioOfflineInit()
+  return new Promise((res) => {
+    const tx  = db.transaction(store, 'readwrite')
+    const st  = tx.objectStore(store)
+    const req = st.get(uuid)
+    req.onsuccess = () => {
+      const item = req.result
+      if (!item) { res(); return }
+      item.sync_tentativas = (item.sync_tentativas || 0) + 1
+      item.sync_erro       = String(motivo || 'falha no envio').slice(0, 300)
+      item.status_sync     = item.sync_tentativas >= 3 ? 'erro' : 'pendente'
+      st.put(item)
+      tx.oncomplete = () => res()
+    }
+    req.onerror = () => res()
+  })
+}
+
+// Reenfileira um registro em 'erro' (botão "tentar de novo"): volta a
+// 'pendente' e zera o contador de tentativas.
+async function bioOfflineReenfileirar(store, uuid) {
+  const db = await bioOfflineInit()
+  return new Promise((res) => {
+    const tx  = db.transaction(store, 'readwrite')
+    const st  = tx.objectStore(store)
+    const req = st.get(uuid)
+    req.onsuccess = () => {
+      const item = req.result
+      if (!item) { res(); return }
+      item.status_sync = 'pendente'
+      item.sync_tentativas = 0
+      st.put(item)
+      tx.oncomplete = () => res()
+    }
+    req.onerror = () => res()
   })
 }
 
