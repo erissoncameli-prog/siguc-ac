@@ -3430,6 +3430,14 @@ async function bioCarregarTelaDados() {
     _bioSetRate('bio-r-sobrev-berc',   'bio-rb-sobrev-berc',   data.taxa_sobrevivencia_bercario_pct)
     _bioSetRate('bio-r-mort-berc',     'bio-rb-mort-berc',     data.taxa_mortalidade_bercario_pct)
 
+    // Ovos viáveis/perdidos (base canônica) nos KPIs
+    bioSupabase().rpc('bio_ovos_resumo', { p_temporada_id: _tempDados || null }).then(({ data: ov }) => {
+      if (!ov) return
+      _bioSetText('bio-kpi-ovos-postura',  ov.postura)
+      _bioSetText('bio-kpi-ovos-viaveis',  ov.viaveis)
+      _bioSetText('bio-kpi-ovos-perdidos', ov.perdidos)
+    }).catch(() => {})
+
     // Painéis de eclosão e dashboard por praia (RPCs próprias)
     bioRenderPainelEclosao(_tempDados)
     bioRenderDashboardPraias(_tempDados)
@@ -3481,15 +3489,22 @@ async function bioRenderPainelEclosao(temporadaId) {
   }
 
   const esps = data.por_especie || []
+  const ov   = data.ovos || {}
   const espEl = document.getElementById('bio-ecl-especies')
   if (espEl) {
-    espEl.innerHTML = esps.length ? esps.map(s => `
+    const totais = (ov.postura != null) ? `
+      <div class="bio-ecl-esp-row" style="font-weight:700">
+        <span>Ovos (postura ${ov.postura ?? 0})</span>
+        <span><b style="color:#1E6B4A">${ov.viaveis ?? 0} viáveis</b>${ov.perdidos ? ` · <b style="color:#b3261e">${ov.perdidos} perdidos</b>` : ''}</span>
+      </div>` : ''
+    espEl.innerHTML = totais + (esps.length ? esps.map(s => `
       <div class="bio-ecl-esp-row">
         <span>${esc(nomeEsp(s.especie))}</span>
         <span>prev. ${s.incubacao_prevista_media ?? '—'} d · real ${s.incubacao_real_media ?? '—'} d
-          ${s.taxa_sucesso_pct != null ? `· ${s.taxa_sucesso_pct}% sucesso` : ''}</span>
+          ${s.taxa_sucesso_pct != null ? `· ${s.taxa_sucesso_pct}% sucesso` : ''}
+          ${s.ovos_viaveis != null ? `· ${s.ovos_viaveis} viáveis` : ''}</span>
       </div>`).join('')
-      : '<span style="color:#9CA3AF">Sem eclosões registradas ainda.</span>'
+      : (totais ? '' : '<span style="color:#9CA3AF">Sem eclosões registradas ainda.</span>'))
   }
 }
 
