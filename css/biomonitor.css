@@ -1682,3 +1682,7 @@ body.field-mode .bio-home-nome { font-size: 26px; }
 .bio-sync-erro-tipo { font-size: 12.5px; font-weight: 700; }
 .bio-sync-erro-msg  { font-size: 11.5px; color: #9a3b2b; font-family: var(--font-mono); word-break: break-word; }
 .bio-nfc-sync-erro  { font-size: 11px; color: #B3261E; margin-top: 4px; font-weight: 600; }
+
+/* ── Dashboard Praias: linha de perdas por causa ─────────────── */
+.bio-dash-perdas { margin-top: 8px; font-size: 11.5px; color: #b3261e;
+  border-top: 1px dashed rgba(179,38,30,.25); padding-top: 6px; }
