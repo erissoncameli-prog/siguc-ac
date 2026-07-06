@@ -311,7 +311,7 @@ async function bioSyncVisitas(monitorId, onProgresso) {
       temperatura_substrato_c: v.temperatura_substrato_c ?? null,
       temperatura_ar_c:        v.temperatura_ar_c        ?? null,
       umidade:                 v.umidade                 || null,
-      predacao_incubacao:      v.predacao_incubacao      ?? null,
+      predacao_incubacao:      v.predacao_incubacao      ?? 'nenhuma',
       ovos_predados_n:         v.ovos_predados_n         ?? null,
       ovos_perdidos_alagamento: v.ovos_perdidos_alagamento ?? null,
       ovos_perdidos_erosao:    v.ovos_perdidos_erosao    ?? null,
