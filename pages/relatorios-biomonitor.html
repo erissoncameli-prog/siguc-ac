@@ -30,6 +30,58 @@
 }
 .rel-nav a:hover { background:var(--verde-bg); border-color:var(--verde-claro); color:var(--verde); }
 
+/* ── Abas principais (Painel | Detalhado | Mapa) ── */
+.rel-tabs { display:flex; gap:4px; margin-bottom:18px; border-bottom:2px solid var(--borda); }
+.rel-tab {
+  font-size:14px; font-weight:700; color:var(--cinza-500);
+  padding:9px 18px 11px; border:0; background:none; cursor:pointer;
+  border-bottom:3px solid transparent; margin-bottom:-2px; transition:color .15s;
+}
+.rel-tab:hover { color:var(--cinza-800); }
+.rel-tab.ativo { color:var(--verde); border-bottom-color:var(--ouro); }
+.rel-tab-pane[hidden] { display:none; }
+
+/* ── Painel do gestor ── */
+.painel-kpis { display:grid; grid-template-columns:repeat(5,1fr); gap:10px; margin-bottom:16px; }
+@media (max-width:820px) { .painel-kpis { grid-template-columns:repeat(2,1fr); } }
+.painel-kpi {
+  background:var(--branco); border-radius:var(--raio-lg); padding:13px 14px;
+  border-top:3px solid var(--kpi-cor,#3b82f6);
+  border-left:1px solid var(--borda); border-right:1px solid var(--borda); border-bottom:1px solid var(--borda);
+  box-shadow:var(--sombra);
+}
+.painel-kpi-val { font-size:1.6rem; font-weight:700; color:var(--kpi-cor,#3b82f6); line-height:1; font-family:monospace; }
+.painel-kpi-lbl { font-size:11px; color:var(--cinza-500); margin-top:5px; line-height:1.2; }
+.painel-kpi-sub { font-size:10px; color:var(--cinza-400); margin-top:2px; line-height:1.25; }
+
+.painel-grid { display:grid; grid-template-columns:1.1fr 1fr; gap:14px; margin-bottom:16px; }
+@media (max-width:820px) { .painel-grid { grid-template-columns:1fr; } }
+.painel-card { background:var(--branco); border-radius:var(--raio-lg); padding:15px 16px; border:1px solid var(--borda); box-shadow:var(--sombra); }
+.painel-card h3 { margin:0 0 2px; font-size:14px; font-weight:700; color:var(--cinza-900); }
+.painel-card .cap { font-size:11px; color:var(--cinza-500); margin:0 0 12px; }
+
+.painel-alertas { display:flex; flex-direction:column; gap:7px; }
+.painel-alert {
+  display:grid; grid-template-columns:6px 1fr auto; gap:10px; align-items:center;
+  padding:9px 11px; border-radius:9px; border:1px solid var(--borda);
+}
+.painel-alert .pa-sev { align-self:stretch; border-radius:3px; }
+.painel-alert .pa-t { font-size:12.5px; font-weight:700; color:var(--cinza-900); line-height:1.3; }
+.painel-alert .pa-d { font-size:11px; color:var(--cinza-500); margin-top:1px; line-height:1.3; }
+.painel-alert .pa-tag {
+  font-size:9.5px; font-weight:700; text-transform:uppercase; letter-spacing:.04em;
+  padding:2px 8px; border-radius:999px; white-space:nowrap;
+}
+.painel-alert.crit { background:#FEF2F2; border-color:#FECACA; }
+.painel-alert.crit .pa-sev { background:#DC2626; } .painel-alert.crit .pa-tag { background:#DC2626; color:#fff; }
+.painel-alert.alta { background:#FFF7ED; border-color:#FED7AA; }
+.painel-alert.alta .pa-sev { background:#EA580C; } .painel-alert.alta .pa-tag { background:#EA580C; color:#fff; }
+.painel-alert.ok { background:var(--verde-bg); border-color:var(--verde-claro); }
+.painel-alert.ok .pa-sev { background:#2A9D6F; } .painel-alert.ok .pa-tag { background:#2A9D6F; color:#fff; }
+
+.painel-charts { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+@media (max-width:820px) { .painel-charts { grid-template-columns:1fr; } }
+
 /* KPIs */
 .rel-kpi-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(145px,1fr)); gap:10px; margin-bottom:14px; }
 .rel-kpi {
@@ -351,7 +403,7 @@
 
 /* Impressão */
 @media print {
-  .rel-filtros, .rel-nav, .sidebar, #sidebar-wrapper, .page-header,
+  .rel-filtros, .rel-nav, .rel-tabs, .sidebar, #sidebar-wrapper, .page-header,
   .mapa-slide-panel, .mapa-comp-bar, .mapa-panel-esq, .mapa-filtros-ponto { display:none !important; }
   body { background:#fff !important; color:#111 !important; }
   .rel-kpi, .rel-taxa-card, .rel-chart-card, .rel-table-wrap { background:#f9f9f9 !important; border:1px solid #ddd !important; }
@@ -411,21 +463,38 @@
         </div>
       </div>
 
-      <!-- Âncoras de navegação rápida -->
-      <div class="rel-nav">
-        <a href="#sec-geral">Visão Geral</a>
-        <a href="#sec-taxas">Taxas Científicas</a>
-        <a href="#sec-fenologia">Fenologia</a>
-        <a href="#sec-especies">Por Espécie</a>
-        <a href="#sec-locais">Por Praia / UC</a>
-        <a href="#sec-bercario">Berçário</a>
-        <a href="#sec-monitores">Monitores</a>
-        <a href="#sec-mapa" id="nav-mapa" onclick="mapaEnsureInit()">Mapa</a>
+      <!-- Abas principais -->
+      <div class="rel-tabs">
+        <button class="rel-tab ativo" id="tab-btn-painel" onclick="relTab('painel')">Painel</button>
+        <button class="rel-tab" id="tab-btn-detalhado" onclick="relTab('detalhado')">Detalhado</button>
+        <button class="rel-tab" id="tab-btn-mapa" onclick="relTab('mapa')">Mapa</button>
       </div>
 
-      <!-- Área de conteúdo -->
-      <div id="rel-conteudo">
-        <div class="rel-loading">Aplicar filtros para carregar o relatório…</div>
+      <!-- Aba: Painel -->
+      <div id="painel-conteudo" class="rel-tab-pane">
+        <div class="rel-loading">Aplicar filtros para carregar o painel…</div>
+      </div>
+
+      <!-- Aba: Detalhado -->
+      <div id="detalhado-conteudo" class="rel-tab-pane" hidden>
+        <!-- Âncoras de navegação rápida -->
+        <div class="rel-nav">
+          <a href="#sec-geral">Visão Geral</a>
+          <a href="#sec-taxas">Taxas Científicas</a>
+          <a href="#sec-fenologia">Fenologia</a>
+          <a href="#sec-especies">Por Espécie</a>
+          <a href="#sec-locais">Por Praia / UC</a>
+          <a href="#sec-bercario">Berçário</a>
+          <a href="#sec-monitores">Monitores</a>
+        </div>
+        <div id="rel-conteudo">
+          <div class="rel-loading">Aplicar filtros para carregar o relatório…</div>
+        </div>
+      </div>
+
+      <!-- Aba: Mapa -->
+      <div id="mapa-conteudo" class="rel-tab-pane" hidden>
+        <div class="rel-loading">Aplicar filtros e abrir esta aba para carregar o mapa…</div>
       </div>
     </div>
 
@@ -511,6 +580,39 @@
   let _metasPraia = []
   let _chartJsCarregado = false
 
+  // ── Estado das abas + dados do Painel ───────────────────────────
+  let _tabAtual       = 'painel'
+  let _graphed        = { painel:false, detalhado:false }
+  let _painelPraias   = []
+  let _painelPrevisao = []
+
+  // Carrega os dados extras do Painel (ovos por causa/praia + previsão de
+  // eclosão). bio_dashboard_praias respeita temporada/UC/praia; a previsão
+  // filtra temporada no servidor e UC/praia no cliente.
+  async function carregarPainelDados() {
+    const tmp  = sel('fil-temporada').value || null
+    const ucId = sel('fil-uc').value        || null
+    const prr  = sel('fil-praia').value     || null
+
+    const { data: dp } = await db.rpc('bio_dashboard_praias', {
+      p_temporada_id: tmp, p_uc_id: ucId, p_praia_id: prr,
+    })
+    _painelPraias = Array.isArray(dp) ? dp : []
+
+    let qp = db.from('vw_ninhos_previsao_eclosao')
+      .select('dias_para_eclosao,faixa_risco,situacao,especie,numero_atual,numero_ninho,praia_atual_nome,status,praia_id,praia_atual_id')
+    if (tmp) qp = qp.eq('temporada_id', tmp)
+    const { data: pv } = await qp
+    let rows = pv || []
+    if (prr) {
+      rows = rows.filter(r => r.praia_id === prr || r.praia_atual_id === prr)
+    } else if (ucId) {
+      const ucPraias = new Set(_praias_todas.filter(p => p.uc_id === ucId).map(p => p.id))
+      rows = rows.filter(r => ucPraias.has(r.praia_id) || ucPraias.has(r.praia_atual_id))
+    }
+    _painelPrevisao = rows.filter(r => r.faixa_risco && !['inativo','sem_previsao'].includes(r.faixa_risco))
+  }
+
   async function carregarChartJS() {
     if (_chartJsCarregado) return
     await new Promise((res, rej) => {
@@ -530,6 +632,8 @@
   // ── Aplicar filtros → chamar RPC ────────────────────────────────
   window.aplicar = async function() {
     const el = document.getElementById('rel-conteudo')
+    const elPainel = document.getElementById('painel-conteudo')
+    elPainel.innerHTML = '<div class="rel-loading">Carregando dados…</div>'
     el.innerHTML = '<div class="rel-loading">Carregando dados…</div>'
     destruirCharts()
 
@@ -542,6 +646,7 @@
     })
 
     if (error || !data) {
+      elPainel.innerHTML = `<div class="rel-loading">Sem dados para os filtros selecionados.</div>`
       el.innerHTML = `<div class="rel-loading">Sem dados para os filtros selecionados.</div>`
       return
     }
@@ -569,7 +674,29 @@
     }
 
     await carregarChartJS()
+    await carregarPainelDados()
+
+    // Monta o HTML das três abas (sem desenhar gráficos ainda) e ativa a
+    // aba corrente — os gráficos de cada aba são desenhados só quando ela
+    // fica visível (evita canvas de tamanho zero no Chart.js).
     renderTudo(data, el)
+    renderPainel(data)
+    _graphed = { painel:false, detalhado:false }
+    mostrarTab(_tabAtual)
+  }
+
+  // ── Abas ─────────────────────────────────────────────────────────
+  window.relTab = function(nome) { _tabAtual = nome; mostrarTab(nome) }
+
+  function mostrarTab(nome) {
+    ;['painel','detalhado','mapa'].forEach(t => {
+      const pane = document.getElementById(t + '-conteudo')
+      if (pane) pane.hidden = (t !== nome)
+      document.getElementById('tab-btn-' + t)?.classList.toggle('ativo', t === nome)
+    })
+    if (nome === 'painel'    && _dados && !_graphed.painel)    { desenharPainel(_dados);    _graphed.painel = true }
+    if (nome === 'detalhado' && _dados && !_graphed.detalhado) { desenharDetalhado(_dados); _graphed.detalhado = true }
+    if (nome === 'mapa') mapaEnsureInit()
   }
 
   // ── Renderização principal ──────────────────────────────────────
@@ -586,9 +713,14 @@
       ${htmlSecLocais()}
       ${htmlSecBercario(k)}
       ${htmlSecMonitores(d.por_monitor || [])}
-      ${htmlSecMapa()}
     `
-    // Renderiza todos os gráficos
+    document.getElementById('mapa-conteudo').innerHTML = htmlSecMapa()
+  }
+
+  // Desenha os gráficos e tabelas da aba Detalhado (chamado só quando a
+  // aba fica visível, para o Chart.js medir o canvas corretamente).
+  function desenharDetalhado(d) {
+    const k = d.kpis || {}
     grafFenologia(d.por_mes || [], d.por_ano || [])
     grafDesfecho(k)
     grafStatus(k)
@@ -599,6 +731,7 @@
     grafBiometria(d.biometria_serie || [])
     grafOcorrencias(d.ocorrencias_tipos || [])
     grafMonitores(d.por_monitor || [])
+    grafDestino(k)
     renderTabelaPraias(d.por_praia || [])
     renderTabelaUCs(d.por_uc || [])
   }
@@ -637,6 +770,18 @@
   // ── Seção: Visão Geral ───────────────────────────────────────────
   function htmlSecDescartes(a) {
     const pctOf = n => a.total ? Math.round(100 * n / a.total) : 0
+    // Causa fina (predação/alagamento/erosão/humana) agregada das praias.
+    const f = painelAgregados().perdas
+    const totF = f.predacao + f.alagamento + f.erosao + f.humana
+    const pctF = n => totF ? Math.round(100 * n / totF) : 0
+    const finaHtml = totF ? `
+      <p class="rel-chart-sub" style="margin:6px 0 8px">Perdas por causa fina (baixadas nas visitas/registro)</p>
+      <div class="rel-kpi-grid">
+        ${kpiCard('Predação',   `${f.predacao} (${pctF(f.predacao)}%)`,     '#ef4444')}
+        ${kpiCard('Alagamento', `${f.alagamento} (${pctF(f.alagamento)}%)`, '#1A6B8C')}
+        ${kpiCard('Erosão',     `${f.erosao} (${pctF(f.erosao)}%)`,         '#C9A84C')}
+        ${kpiCard('Ação humana',`${f.humana} (${pctF(f.humana)}%)`,         '#7B57B0')}
+      </div>` : ''
     return `<div class="rel-sec" id="sec-descartes">
       <div class="rel-sec-title">Descarte de ovos por causa</div>
       <div class="rel-kpi-grid">
@@ -645,6 +790,7 @@
         ${kpiCard('Predação',         `${a.predacao} (${pctOf(a.predacao)}%)`, '#fb923c')}
         ${kpiCard('Ação humana',      `${a.humana} (${pctOf(a.humana)}%)`,     '#a78bfa')}
       </div>
+      ${finaHtml}
     </div>`
   }
 
@@ -1142,12 +1288,200 @@
     })
   }
 
-  // Override para incluir destino no berçário (precisa do 'k')
-  const _origRenderTudo = renderTudo
-  renderTudo = function(d, el) {
-    _origRenderTudo(d, el)
-    // grafDestino precisa de k, chamado aqui após renderização do berçário
-    grafDestino(d.kpis || {})
+  // ═══════════════════════════════════════════════════════════════
+  // PAINEL DO GESTOR
+  // ═══════════════════════════════════════════════════════════════
+
+  // Agrega perdas por causa fina + totais de ovos das praias do Painel.
+  function painelAgregados() {
+    const P = _painelPraias || []
+    const soma = f => P.reduce((s, x) => s + (x[f] || 0), 0)
+    return {
+      perdas: {
+        predacao:   soma('perdas_predacao'),
+        alagamento: soma('perdas_alagamento'),
+        erosao:     soma('perdas_erosao'),
+        humana:     soma('perdas_humana'),
+      },
+      inundados:     soma('inundados'),
+      predados:      soma('predados'),
+      falha_eclosao: soma('falha_eclosao'),
+    }
+  }
+
+  // Monta a lista consolidada de alertas ativos (críticos primeiro).
+  function painelAlertas(ag) {
+    const atrasados = _painelPrevisao.filter(r => r.faixa_risco === 'atrasado').length
+    const hoje      = _painelPrevisao.filter(r => r.faixa_risco === 'hoje').length
+    const A = []
+    if (atrasados)         A.push({ sev:'crit', tag:'Crítico', t:`${atrasados} ninho(s) com eclosão atrasada`, d:'Passaram do máximo de incubação sem nascimento — verificar em campo' })
+    if (ag.inundados)      A.push({ sev:'alta', tag:'Alto',    t:`${ag.inundados} ninho(s) com alagamento`,     d:'Alagamento ou sinal de inundação registrado nas visitas' })
+    if (ag.predados)       A.push({ sev:'alta', tag:'Alto',    t:`${ag.predados} ninho(s) com predação`,        d:'Predação registrada na incubação ou em visita' })
+    if (hoje)              A.push({ sev:'alta', tag:'Alto',    t:`${hoje} ninho(s) com eclosão prevista para hoje`, d:'Acompanhar nascimento e destino dos filhotes' })
+    if (ag.falha_eclosao)  A.push({ sev:'alta', tag:'Alto',    t:`${ag.falha_eclosao} ninho(s) com falha de eclosão`, d:'Eclosão registrada com 0 filhotes vivos' })
+    return A
+  }
+
+  // Buckets de previsão para o painel "Eclosão — próximos 7 dias".
+  function painelEclosao() {
+    const dias = r => r.dias_para_eclosao
+    return [
+      { chave:'atraso', cor:'#ef4444', tag:'Atraso', lbl:'Atrasados',       rows:_painelPrevisao.filter(r => r.faixa_risco === 'atrasado') },
+      { chave:'hoje',   cor:'#2A9D6F', tag:'Hoje',   lbl:'Hoje',            rows:_painelPrevisao.filter(r => r.faixa_risco === 'hoje') },
+      { chave:'d13',    cor:'#1A6B8C', tag:'Próx.',  lbl:'Em 1–3 dias',     rows:_painelPrevisao.filter(r => dias(r) >= 1 && dias(r) <= 3) },
+      { chave:'d47',    cor:'#C9A84C', tag:'Semana', lbl:'Em 4–7 dias',     rows:_painelPrevisao.filter(r => dias(r) >= 4 && dias(r) <= 7) },
+    ].filter(b => b.rows.length)
+  }
+
+  function painelKpi(lbl, val, cor, sub) {
+    return `<div class="painel-kpi" style="--kpi-cor:${cor}">
+      <div class="painel-kpi-val">${val}</div>
+      <div class="painel-kpi-lbl">${lbl}</div>
+      ${sub ? `<div class="painel-kpi-sub">${sub}</div>` : ''}
+    </div>`
+  }
+
+  function renderPainel(d) {
+    const k  = d.kpis || {}
+    const ag = painelAgregados()
+    const alertas = painelAlertas(ag)
+    const nCrit = alertas.filter(a => a.sev === 'crit').length
+    const nAlta = alertas.filter(a => a.sev === 'alta').length
+    const baixados = Math.max((k.total_ovos_postura || 0) - (k.total_ovos_viaveis || 0), 0)
+
+    // KPIs
+    const kpis = `<div class="painel-kpis">
+      ${painelKpi('Ninhos monitorados', v(k.total_ninhos), '#2A9D6F', `${k.pendentes||0} encontrados · ${k.transferidos||0} transferidos`)}
+      ${painelKpi('Ovos viáveis', v(k.total_ovos_viaveis), '#1E6B4A', `postura ${formatNum(k.total_ovos_postura||0)} − ${formatNum(baixados)} baixados`)}
+      ${painelKpi('Filhotes vivos', v(k.total_filhotes_vivos), '#C9A84C', `${v(k.bercario_total_soltado)} soltos via berçário`)}
+      ${painelKpi('Sucesso de nidificação', pct(k.taxa_sucesso_nidificacao_pct), '#1A6B8C', 'ninhos eclodidos ÷ monitorados')}
+      ${painelKpi('Alertas ativos', String(alertas.length), alertas.length ? (nCrit ? '#DC2626' : '#EA580C') : '#2A9D6F', `${nCrit} crítico(s) · ${nAlta} alto(s)`)}
+    </div>`
+
+    // Alertas
+    const alertasHtml = alertas.length
+      ? alertas.map(a => `<div class="painel-alert ${a.sev}">
+          <div class="pa-sev"></div>
+          <div><div class="pa-t">${a.t}</div><div class="pa-d">${a.d}</div></div>
+          <span class="pa-tag">${a.tag}</span>
+        </div>`).join('')
+      : `<div class="painel-alert ok"><div class="pa-sev"></div>
+          <div><div class="pa-t">Nenhum alerta ativo</div><div class="pa-d">Nenhuma eclosão atrasada, alagamento ou predação pendente nos filtros atuais</div></div>
+          <span class="pa-tag">OK</span></div>`
+
+    // Eclosão — próximos 7 dias
+    const buckets = painelEclosao()
+    const eclHtml = buckets.length
+      ? buckets.map(b => {
+          const espCnt = {}
+          b.rows.forEach(r => { const e = espLabel(r.especie); espCnt[e] = (espCnt[e]||0)+1 })
+          const det = Object.entries(espCnt).map(([e,n]) => `${e} (${n})`).join(' · ')
+          return `<div class="painel-alert">
+            <div class="pa-sev" style="background:${b.cor}"></div>
+            <div><div class="pa-t">${b.lbl} — ${b.rows.length} ninho(s)</div><div class="pa-d">${det || '—'}</div></div>
+            <span class="pa-tag" style="background:${b.cor};color:#fff">${b.tag}</span>
+          </div>`
+        }).join('')
+      : `<div class="painel-alert"><div class="pa-sev" style="background:#9CA3AF"></div>
+          <div><div class="pa-t">Sem eclosões previstas para os próximos 7 dias</div><div class="pa-d">Nenhum ninho em incubação com previsão nesta janela</div></div>
+          <span class="pa-tag" style="background:#9CA3AF;color:#fff">—</span></div>`
+
+    document.getElementById('painel-conteudo').innerHTML = `
+      ${kpis}
+      <div class="painel-grid">
+        <div class="painel-card">
+          <h3>Alertas ativos</h3>
+          <p class="cap">Consolidado — críticos primeiro, ordenados por severidade.</p>
+          <div class="painel-alertas">${alertasHtml}</div>
+        </div>
+        <div class="painel-card">
+          <h3>Eclosão — próximos 7 dias</h3>
+          <p class="cap">Previsão por espécie (data de encontro + incubação média).</p>
+          <div class="painel-alertas">${eclHtml}</div>
+        </div>
+      </div>
+      <div class="painel-charts">
+        <div class="painel-card"><h3>Desfecho dos ninhos</h3><p class="cap">Distribuição por status.</p><div class="rel-chart-wrap"><canvas id="graf-p-desfecho"></canvas></div></div>
+        <div class="painel-card"><h3>Perdas de ovos por causa</h3><p class="cap">Ovos baixados nas visitas/registro · por temporada/UC/praia.</p><div class="rel-chart-wrap"><canvas id="graf-p-perdas"></canvas></div></div>
+        <div class="painel-card"><h3>Fenologia da temporada</h3><p class="cap">Ninhos encontrados e filhotes vivos por mês.</p><div class="rel-chart-wrap"><canvas id="graf-p-fenologia"></canvas></div></div>
+        <div class="painel-card"><h3>Ovos por praia (top 8)</h3><p class="cap">Postura × viáveis × perdidos · por temporada/UC/praia.</p><div class="rel-chart-wrap tall"><canvas id="graf-p-ovospraia"></canvas></div></div>
+      </div>`
+  }
+
+  function desenharPainel(d) {
+    const k  = d.kpis || {}
+    const ag = painelAgregados()
+
+    // Rosca — desfecho dos ninhos
+    mkChart('graf-p-desfecho', {
+      type:'doughnut',
+      data:{
+        labels:['Eclodido','Transferido','Encontrado','Perdido'],
+        datasets:[{ data:[k.eclodidos||0, k.transferidos||0, k.pendentes||0, k.perdidos||0],
+          backgroundColor:['#2A9D6F','#1A6B8C','#C9A84C','#ef4444'], borderWidth:2, borderColor:'rgba(0,0,0,.15)', hoverOffset:8 }]
+      },
+      options:{ cutout:'58%', responsive:true, maintainAspectRatio:false, plugins:{ legend:{...legendOpts, position:'right'} }, animation:{duration:600} }
+    })
+
+    // Pizza — perdas por causa fina
+    const pv = [ag.perdas.predacao, ag.perdas.alagamento, ag.perdas.erosao, ag.perdas.humana]
+    const totPerdas = pv.reduce((s,x)=>s+x,0)
+    const elPerdas = document.getElementById('graf-p-perdas')
+    if (!totPerdas && elPerdas) {
+      elPerdas.closest('.rel-chart-wrap').innerHTML = '<div class="rel-loading" style="padding:40px 10px">Nenhuma perda de ovos registrada nos filtros atuais.</div>'
+    } else {
+      mkChart('graf-p-perdas', {
+        type:'pie',
+        data:{
+          labels:['Predação','Alagamento','Erosão','Ação humana'],
+          datasets:[{ data:pv, backgroundColor:['#ef4444','#1A6B8C','#C9A84C','#7B57B0'], borderWidth:2, borderColor:'rgba(0,0,0,.15)', hoverOffset:8 }]
+        },
+        options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{...legendOpts, position:'right'} }, animation:{duration:600} }
+      })
+    }
+
+    // Linha — fenologia
+    const mes = d.por_mes || []
+    if (mes.length) {
+      mkChart('graf-p-fenologia', {
+        type:'line',
+        data:{
+          labels: mes.map(m => m.mes),
+          datasets:[
+            { label:'Ninhos encontrados', data:mes.map(m => m.ninhos), borderColor:'#1A6B8C', backgroundColor:'rgba(26,107,140,.14)', fill:true, tension:.3, pointRadius:3 },
+            { label:'Filhotes vivos',    data:mes.map(m => m.filhotes), borderColor:'#2A9D6F', backgroundColor:'rgba(42,157,111,.1)', fill:true, tension:.3, pointRadius:3 },
+          ]
+        },
+        options:{
+          responsive:true, maintainAspectRatio:false, animation:{duration:600},
+          plugins:{ legend:legendOpts },
+          scales:{ x:{ grid:{color:gridColor}, ticks:{color:'#6B7280', font:tickFont} },
+            y:{ grid:{color:gridColor}, ticks:{color:'#6B7280', font:tickFont}, beginAtZero:true } }
+        }
+      })
+    }
+
+    // Colunas — ovos por praia (top 8 por postura)
+    const praias = (_painelPraias || []).slice().sort((a,b)=>(b.ovos_monitorados||0)-(a.ovos_monitorados||0)).slice(0,8)
+    if (praias.length) {
+      mkChart('graf-p-ovospraia', {
+        type:'bar',
+        data:{
+          labels: praias.map(p => p.sigla || p.praia || '?'),
+          datasets:[
+            { label:'Postura',  data:praias.map(p => p.ovos_monitorados||0), backgroundColor:'#C9A84C99', borderColor:'#C9A84C', borderWidth:1, borderRadius:4 },
+            { label:'Viáveis',  data:praias.map(p => p.ovos_viaveis||0),     backgroundColor:'#2A9D6F99', borderColor:'#2A9D6F', borderWidth:1, borderRadius:4 },
+            { label:'Perdidos', data:praias.map(p => p.ovos_perdidos||0),    backgroundColor:'#ef444499', borderColor:'#ef4444', borderWidth:1, borderRadius:4 },
+          ]
+        },
+        options:{
+          responsive:true, maintainAspectRatio:false, animation:{duration:600},
+          plugins:{ legend:legendOpts },
+          scales:{ x:{ grid:{display:false}, ticks:{color:'#6B7280', font:tickFont} },
+            y:{ grid:{color:gridColor}, ticks:{color:'#6B7280', font:tickFont}, beginAtZero:true } }
+        }
+      })
+    }
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -1321,6 +1655,9 @@
       _mapaCamadas.calor     = null
     }
     await mapaCarregarDados()
+    // A aba Mapa fica oculta até ser aberta; ao exibir, o Leaflet precisa
+    // recalcular o tamanho do container para os tiles preencherem a área.
+    setTimeout(() => { try { _mapaLeafletInst && _mapaLeafletInst.invalidateSize() } catch(e) {} }, 160)
   }
 
   // ── Carrega dados das RPCs ─────────────────────────────────────
