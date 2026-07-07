@@ -74,14 +74,55 @@ for (const [padrao, sub] of rewrites) {
 const versao = process.env.APP_VERSION_NAME ?? 'dev'
 html = html.replace('</head>', `<script>window.BIO_BUILD='v${versao} (app)'</script>\n</head>`)
 
+// ── Credenciais Supabase embarcadas no build (login offline-first) ──
+// O app nativo roda em https://localhost e não alcança o /api/env do próprio
+// bundle; buscar em runtime na produção se mostrou frágil (a WebView pode
+// bloquear a chamada cross-origin, deixando o login travado em "Entrando…").
+// Aqui buscamos a config pública (URL + anon key) UMA vez, no build — o runner
+// tem internet — e embarcamos como window.__SIGUC_ENV, lido por config.js.
+// São credenciais públicas (as mesmas servidas a qualquer visitante do site).
+async function obterEnvPublico () {
+  const fontes = [
+    process.env.SIGUC_ENV_URL,                    // override opcional
+    process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY
+      ? { supabaseUrl: process.env.SUPABASE_URL, supabaseKey: process.env.SUPABASE_ANON_KEY }
+      : null,
+    'https://siguc-ac.vercel.app/api/env',
+  ].filter(Boolean)
+  for (const fonte of fontes) {
+    try {
+      if (typeof fonte === 'object') return fonte
+      const r = await fetch(fonte)
+      if (!r.ok) continue
+      const cfg = await r.json()
+      if (cfg && cfg.supabaseUrl && cfg.supabaseKey) return cfg
+    } catch { /* tenta a próxima fonte */ }
+  }
+  return null
+}
+
+const env = await obterEnvPublico()
+if (!env) {
+  console.error('ERRO: não foi possível obter as credenciais públicas do Supabase (/api/env).')
+  console.error('      APK abortado para não gerar um build que abre "offline" no login.')
+  process.exit(1)
+}
+const envJson = JSON.stringify({ supabaseUrl: env.supabaseUrl, supabaseKey: env.supabaseKey })
+html = html.replace('</head>', `<script>window.__SIGUC_ENV=${envJson}</script>\n</head>`)
+
 writeFileSync(join(WWW, 'index.html'), html)
 
 // ── Sanidade ───────────────────────────────────────────────────
 for (const f of ['index.html', 'vendor/supabase.js', 'vendor/fonts.css', 'css/biomonitor.css', 'js/config.js', 'js/biomonitor-quelonios.js', 'pwa/icons/biomonitor-logo.png']) {
   if (!existsSync(join(WWW, f))) { console.error(`ERRO: faltando www/${f}`); process.exit(1) }
 }
-if (/cdn\.jsdelivr|fonts\.googleapis/.test(readFileSync(join(WWW, 'index.html'), 'utf8'))) {
+const indexFinal = readFileSync(join(WWW, 'index.html'), 'utf8')
+if (/cdn\.jsdelivr|fonts\.googleapis/.test(indexFinal)) {
   console.error('ERRO: index.html ainda referencia CDN externo')
   process.exit(1)
 }
-console.log('www/ (biomonitor) montado com sucesso (offline-first, sem CDN).')
+if (!/window\.__SIGUC_ENV=\{.*supabaseUrl.*supabaseKey/.test(indexFinal)) {
+  console.error('ERRO: credenciais do Supabase não foram embarcadas no index.html')
+  process.exit(1)
+}
+console.log('www/ (biomonitor) montado com sucesso (offline-first, sem CDN, com login embarcado).')

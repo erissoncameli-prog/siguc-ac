@@ -16,22 +16,27 @@ if (typeof loadEnv !== 'function') {
   } catch (e) { /* location indisponível — mantém caminho relativo */ }
   var _envCacheKey = 'siguc-env-cache-v1';
   window._sigucEnvPromise = window._sigucEnvPromise ||
-    fetch(_envBase + '/api/env')
-      .then(function (r) { if (!r.ok) throw new Error('env ' + r.status); return r.json(); })
-      .then(function (cfg) {
-        // Cacheia p/ funcionar offline após o 1º acesso (creds são públicas).
-        if (cfg && cfg.supabaseUrl && cfg.supabaseKey) {
-          try { localStorage.setItem(_envCacheKey, JSON.stringify(cfg)); } catch (e) {}
-        }
-        return cfg;
-      })
-      .catch(function () {
-        try {
-          var c = localStorage.getItem(_envCacheKey);
-          if (c) return JSON.parse(c);
-        } catch (e) {}
-        return { supabaseUrl: '', supabaseKey: '' };
-      });
+    // 1º: credenciais embarcadas no build do app nativo (window.__SIGUC_ENV).
+    // São públicas (URL + anon key) e permitem login sem NENHUMA chamada de
+    // rede — o caminho mais confiável dentro da WebView do Capacitor.
+    ((window.__SIGUC_ENV && window.__SIGUC_ENV.supabaseUrl && window.__SIGUC_ENV.supabaseKey)
+      ? Promise.resolve(window.__SIGUC_ENV)
+      : fetch(_envBase + '/api/env')
+        .then(function (r) { if (!r.ok) throw new Error('env ' + r.status); return r.json(); })
+        .then(function (cfg) {
+          // Cacheia p/ funcionar offline após o 1º acesso (creds são públicas).
+          if (cfg && cfg.supabaseUrl && cfg.supabaseKey) {
+            try { localStorage.setItem(_envCacheKey, JSON.stringify(cfg)); } catch (e) {}
+          }
+          return cfg;
+        })
+        .catch(function () {
+          try {
+            var c = localStorage.getItem(_envCacheKey);
+            if (c) return JSON.parse(c);
+          } catch (e) {}
+          return { supabaseUrl: '', supabaseKey: '' };
+        }));
   window.loadEnv = () => window._sigucEnvPromise;
 }
 
