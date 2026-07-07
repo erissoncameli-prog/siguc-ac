@@ -4,8 +4,34 @@
 // env-loader.js pode já estar disponível (carregado antes deste script).
 // Se não estiver, define um loader inline para garantir compatibilidade.
 if (typeof loadEnv !== 'function') {
+  // No app nativo (Capacitor) a WebView roda em https://localhost e o bundle
+  // não inclui /api/env — sem isto o app fica "offline" e o login trava.
+  // Nesses casos busca a configuração pública (URL + anon key) na produção.
+  var _envBase = '';
+  try {
+    if (window.Capacitor || location.protocol === 'capacitor:' ||
+        location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
+      _envBase = 'https://siguc-ac.vercel.app';
+    }
+  } catch (e) { /* location indisponível — mantém caminho relativo */ }
+  var _envCacheKey = 'siguc-env-cache-v1';
   window._sigucEnvPromise = window._sigucEnvPromise ||
-    fetch('/api/env').then(r => r.json()).catch(() => ({ supabaseUrl: '', supabaseKey: '' }));
+    fetch(_envBase + '/api/env')
+      .then(function (r) { if (!r.ok) throw new Error('env ' + r.status); return r.json(); })
+      .then(function (cfg) {
+        // Cacheia p/ funcionar offline após o 1º acesso (creds são públicas).
+        if (cfg && cfg.supabaseUrl && cfg.supabaseKey) {
+          try { localStorage.setItem(_envCacheKey, JSON.stringify(cfg)); } catch (e) {}
+        }
+        return cfg;
+      })
+      .catch(function () {
+        try {
+          var c = localStorage.getItem(_envCacheKey);
+          if (c) return JSON.parse(c);
+        } catch (e) {}
+        return { supabaseUrl: '', supabaseKey: '' };
+      });
   window.loadEnv = () => window._sigucEnvPromise;
 }
 
