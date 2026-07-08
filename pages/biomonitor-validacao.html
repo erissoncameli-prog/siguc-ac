@@ -120,6 +120,15 @@
           <option value="rejeitado">Rejeitados</option>
           <option value="em_correcao">Em correção</option>
         </select>
+        <select class="form-control" id="fil-status-ninho" style="width:170px" onchange="renderLista()">
+          <option value="">Status do ninho: todos</option>
+          <option value="encontrado">Encontrado</option>
+          <option value="transferido">Transferido</option>
+          <option value="eclodido">Eclodido</option>
+          <option value="em_bercario">Em berçário</option>
+          <option value="soltado">Soltado</option>
+          <option value="perdido">Perdido</option>
+        </select>
         <select class="form-control" id="fil-temporada" style="width:180px" onchange="renderLista()">
           <option value="">Todas as temporadas</option>
         </select>
@@ -135,6 +144,16 @@
   bIconsAplicar(document.getElementById('app'))
 
   let _ninhos = [], _rejeitar = null, _rejTipo = null, _alertasPorNinho = {}, _gpsNinhoId = null
+
+  const SPECIES_NOME = {
+    tracaja: 'Tracajá', tartaruga: 'Tartaruga', cabecudo: 'Cabeçudo',
+    pitiU: 'Pitiú', cupido: 'Cupido', jabuti_pe_elefante: 'Jabuti-pé-de-elefante',
+    jabuti_piranga: 'Jabuti-piranga', mucua: 'Muçuã', outro: 'Outro'
+  }
+  const STATUS_CLR = { pendente:'#f59e0b', validado:'#10b981', rejeitado:'#ef4444', em_correcao:'#6366f1' }
+  const STATUS_LBL = { pendente:'Pendente', validado:'Validado', rejeitado:'Rejeitado', em_correcao:'Em correção' }
+  const NINHO_CLR = { encontrado:'#3b82f6', transferido:'#8b5cf6', eclodido:'#10b981', em_bercario:'#eab308', soltado:'#06b6d4', perdido:'#ef4444' }
+  const NINHO_LBL = { encontrado:'Encontrado', transferido:'Transferido', eclodido:'Eclodido', em_bercario:'Em berçário', soltado:'Soltado', perdido:'Perdido' }
 
   // ── Carregar dados ─────────────────────────────────────────────
   async function carregarDados() {
@@ -184,46 +203,54 @@
       rejeitado:   _ninhos.filter(n => n.status_validacao === 'rejeitado').length,
       em_correcao: _ninhos.filter(n => n.status_validacao === 'em_correcao').length,
     }
-    document.getElementById('stats-bar').innerHTML = [
+    const porStatusNinho = Object.keys(NINHO_LBL).reduce((acc, s) => {
+      acc[s] = _ninhos.filter(n => n.status === s).length
+      return acc
+    }, {})
+
+    const kpi = (l, v, c) => `
+      <div style="background:var(--branco);border-radius:10px;padding:10px 16px;min-width:110px;border-left:3px solid ${c};border-top:1px solid var(--borda);border-right:1px solid var(--borda);border-bottom:1px solid var(--borda);box-shadow:var(--sombra)">
+        <div style="font-size:1.5rem;font-weight:700;color:${c}">${v}</div>
+        <div style="font-size:.78rem;color:var(--cinza-500)">${l}</div>
+      </div>`
+
+    const kpisValidacao = [
       ['Pendentes',    stats.pendente,    '#f59e0b'],
       ['Validados',    stats.validado,    '#10b981'],
       ['Rejeitados',   stats.rejeitado,   '#ef4444'],
       ['Em correção',  stats.em_correcao, '#6366f1'],
-    ].map(([l, v, c]) => `
-      <div style="background:var(--branco);border-radius:10px;padding:10px 16px;min-width:110px;border-left:3px solid ${c};border-top:1px solid var(--borda);border-right:1px solid var(--borda);border-bottom:1px solid var(--borda);box-shadow:var(--sombra)">
-        <div style="font-size:1.5rem;font-weight:700;color:${c}">${v}</div>
-        <div style="font-size:.78rem;color:var(--cinza-500)">${l}</div>
-      </div>`).join('')
+    ].map(([l, v, c]) => kpi(l, v, c)).join('')
+
+    const kpisNinho = Object.keys(NINHO_LBL)
+      .map(s => kpi(NINHO_LBL[s], porStatusNinho[s], NINHO_CLR[s]))
+      .join('')
+
+    document.getElementById('stats-bar').innerHTML = kpisValidacao +
+      `<div style="width:1px;align-self:stretch;background:var(--borda);margin:0 2px"></div>` +
+      kpisNinho
   }
 
   window.renderLista = function() {
-    const busca   = document.getElementById('busca')?.value.toLowerCase() || ''
-    const praia   = document.getElementById('fil-praia')?.value || ''
-    const especie = document.getElementById('fil-especie')?.value || ''
-    const status  = document.getElementById('fil-status')?.value
-    const temp    = document.getElementById('fil-temporada')?.value || ''
+    const busca      = document.getElementById('busca')?.value.toLowerCase() || ''
+    const praia      = document.getElementById('fil-praia')?.value || ''
+    const especie    = document.getElementById('fil-especie')?.value || ''
+    const status     = document.getElementById('fil-status')?.value
+    const statusNinho = document.getElementById('fil-status-ninho')?.value || ''
+    const temp       = document.getElementById('fil-temporada')?.value || ''
 
     const lista = _ninhos.filter(n =>
-      (!busca   || n.numero_ninho?.toLowerCase().includes(busca) ||
-                   n.monitor_nome?.toLowerCase().includes(busca) ||
-                   n.praia_nome?.toLowerCase().includes(busca)) &&
-      (!praia   || n.praia_nome === praia) &&
-      (!especie || n.especie === especie) &&
-      (!temp    || n.temporada_id === temp) &&
+      (!busca       || n.numero_ninho?.toLowerCase().includes(busca) ||
+                       n.monitor_nome?.toLowerCase().includes(busca) ||
+                       n.praia_nome?.toLowerCase().includes(busca)) &&
+      (!praia       || n.praia_nome === praia) &&
+      (!especie     || n.especie === especie) &&
+      (!temp        || n.temporada_id === temp) &&
+      (!statusNinho || n.status === statusNinho) &&
       (status === undefined || status === '' || n.status_validacao === status)
     )
 
     const cont = document.getElementById('lista-ninhos')
     if (!lista.length) { cont.innerHTML = `<p style="color:var(--cinza-500);grid-column:1/-1">Nenhum ninho encontrado com esses filtros.</p>`; return }
-
-    const SPECIES_NOME = {
-      tracaja: 'Tracajá', tartaruga: 'Tartaruga', cabecudo: 'Cabeçudo',
-      pitiU: 'Pitiú', cupido: 'Cupido', jabuti_pe_elefante: 'Jabuti-pé-de-elefante',
-      jabuti_piranga: 'Jabuti-piranga', mucua: 'Muçuã', outro: 'Outro'
-    }
-    const STATUS_CLR = { pendente:'#f59e0b', validado:'#10b981', rejeitado:'#ef4444', em_correcao:'#6366f1' }
-    const STATUS_LBL = { pendente:'Pendente', validado:'Validado', rejeitado:'Rejeitado', em_correcao:'Em correção' }
-    const NINHO_CLR  = { encontrado:'#3b82f6', transferido:'#8b5cf6', eclodido:'#10b981', perdido:'#ef4444' }
 
     cont.innerHTML = lista.map(n => {
       const sclr = STATUS_CLR[n.status_validacao] || '#888'
@@ -239,7 +266,7 @@
             <div style="font-size:.83rem;color:var(--cinza-500)">${SPECIES_NOME[n.especie] || n.especie}</div>
           </div>
           <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">
-            <span style="font-size:.75rem;padding:2px 8px;border-radius:6px;background:${nclr}22;color:${nclr};font-weight:600">${n.status}</span>
+            <span style="font-size:.75rem;padding:2px 8px;border-radius:6px;background:${nclr}22;color:${nclr};font-weight:600">${NINHO_LBL[n.status] || n.status}</span>
             <span style="font-size:.75rem;padding:2px 8px;border-radius:6px;background:${sclr}22;color:${sclr};font-weight:600">${STATUS_LBL[n.status_validacao]}</span>
           </div>
         </div>
