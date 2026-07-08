@@ -101,7 +101,6 @@ function gerarLayout(tituloPagina, paginaAtiva) {
     {
       label: 'Brigadas de Incêndio',
       itens: [
-        { id: 'brigadas',            href: '../pages/brigadas.html',            label: 'Brigadas' },
         { id: 'brigada-app',         href: '../pages/brigada.html',             label: 'App de Campo', target: '_blank' },
         { id: 'validacao-campo',     href: '../pages/validacao-campo.html',     label: 'Validação de Campo',
           perfis: ['gestor','tecnico','super_admin','biologo'] },

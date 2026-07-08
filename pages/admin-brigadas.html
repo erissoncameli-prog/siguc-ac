@@ -475,18 +475,127 @@
   </div>
 </div>
 
+<!-- ── Modal: Diário de Atividades ─────────────────────────── -->
+<div class="modal-overlay" id="modal-diario">
+  <div class="modal" style="max-width:640px">
+    <div class="modal-header">
+      <div class="modal-title" id="md-titulo">Nova Atividade</div>
+      <button class="modal-close" onclick="fecharModal('diario')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label">Brigada <span class="obrig">*</span></label>
+        <select class="form-control" id="md-brigada"><option value="">Selecione...</option></select>
+      </div>
+      <div class="form-group"><label class="form-label">Tipo de Atividade <span class="obrig">*</span></label>
+        <select class="form-control" id="md-tipo">
+          <option value="patrulha">Patrulha</option>
+          <option value="combate_incendio">Combate a Incêndio</option>
+          <option value="aceiro">Aceiro</option>
+          <option value="treinamento">Treinamento</option>
+          <option value="reuniao">Reunião</option>
+          <option value="manutencao_equipamento">Manutenção de Equipamento</option>
+          <option value="monitoramento">Monitoramento</option>
+          <option value="outro">Outro</option>
+        </select>
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Início <span class="obrig">*</span></label>
+          <input class="form-control" id="md-inicio" type="datetime-local">
+        </div>
+        <div class="form-group"><label class="form-label">Fim</label>
+          <input class="form-control" id="md-fim" type="datetime-local">
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Localidade</label>
+          <input class="form-control" id="md-local" placeholder="Ex: Setor Norte, Trilha 3">
+        </div>
+        <div class="form-group"><label class="form-label">Brigadistas Envolvidos</label>
+          <input class="form-control" id="md-num" type="number" min="1" placeholder="Nº de brigadistas">
+        </div>
+      </div>
+      <div class="form-group"><label class="form-label">Área Afetada/Trabalhada (ha)</label>
+        <input class="form-control" id="md-area" type="number" step="0.01" placeholder="0,00">
+      </div>
+      <div class="form-group"><label class="form-label">Descrição <span class="obrig">*</span></label>
+        <textarea class="form-control" id="md-desc" rows="3" placeholder="Descreva a atividade realizada..."></textarea>
+      </div>
+      <div class="form-group"><label class="form-label">Resultado / Observações</label>
+        <textarea class="form-control" id="md-resultado" rows="2" placeholder="Resultado alcançado, intercorrências..."></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="fecharModal('diario')">Cancelar</button>
+      <button class="btn btn-primary" id="md-btn" onclick="salvarDiario()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal: Equipamento ─────────────────────────────────── -->
+<div class="modal-overlay" id="modal-equipamento">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-header">
+      <div class="modal-title" id="meq-titulo">Novo Equipamento</div>
+      <button class="modal-close" onclick="fecharModal('equipamento')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label">Brigada <span class="obrig">*</span></label>
+        <select class="form-control" id="meq-brigada"><option value="">Selecione...</option></select>
+      </div>
+      <div class="form-group"><label class="form-label">Descrição <span class="obrig">*</span></label>
+        <input class="form-control" id="meq-desc" placeholder="Ex: Abafador, Bomba costal, Motosserra">
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Quantidade <span class="obrig">*</span></label>
+          <input class="form-control" id="meq-qtd" type="number" min="1" value="1">
+        </div>
+        <div class="form-group"><label class="form-label">Condição <span class="obrig">*</span></label>
+          <select class="form-control" id="meq-cond">
+            <option value="bom">Bom</option>
+            <option value="regular">Regular</option>
+            <option value="ruim">Ruim</option>
+            <option value="inoperante">Inoperante</option>
+          </select>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Nº de Série</label>
+          <input class="form-control" id="meq-serie" placeholder="Número de série">
+        </div>
+        <div class="form-group"><label class="form-label">Data de Aquisição</label>
+          <input class="form-control" id="meq-data-aq" type="date">
+        </div>
+      </div>
+      <div class="form-group"><label class="form-label">Valor de Aquisição (R$)</label>
+        <input class="form-control" id="meq-valor" type="number" step="0.01" placeholder="0,00">
+      </div>
+      <div class="form-group"><label class="form-label">Observações</label>
+        <textarea class="form-control" id="meq-obs" rows="2"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="fecharModal('equipamento')">Cancelar</button>
+      <button class="btn btn-primary" id="meq-btn" onclick="salvarEquipamento()">Salvar</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // ── URL base do PWA (atualizar quando o app for publicado) ───
 const PWA_BASE_URL = 'https://brigada.siguc.ac.gov.br'
 
 // ── Estado ───────────────────────────────────────────────────
 let _ucs = [], _brigadas = [], _brigadistas = [], _equipes = []
-let _editId = { brigada: null, brigadista: null }
+let _diarioAtividades = [], _equipamentos = []
+let _editId = { brigada: null, brigadista: null, equipamento: null }
+let _editIdDiario = null
 let _loginBrigadistaId = null
 let _usuario = null   // preenchido no boot; usado para reautenticação
 
 const BADGE_TIPO  = { preventiva: 'badge-azul', combate: 'badge-erro', mista: 'badge-verde' }
 const BADGE_STATUS_BR = { ativo: 'badge-verde', afastado: 'badge-ouro', suspenso: 'badge-erro', encerrado: 'badge-cinza' }
+const BADGE_COND_EQ = { bom: 'badge-verde', regular: 'badge-ouro', ruim: 'badge-erro', inoperante: 'badge-cinza' }
+const LABEL_TIPO_DIARIO = { patrulha: 'Patrulha', combate_incendio: 'Combate', aceiro: 'Aceiro', treinamento: 'Treinamento', reuniao: 'Reunião', manutencao_equipamento: 'Manutenção Equip.', monitoramento: 'Monitoramento', outro: 'Outro' }
 const LABEL_REGIONAL = {
   baixo_acre: 'Baixo Acre', purus: 'Purus', jurua: 'Juruá',
   tarauaca_envira: 'Tarauacá/Envira', alto_acre: 'Alto Acre',
@@ -514,7 +623,9 @@ const LABEL_REGIONAL = {
         <div style="display:flex;gap:4px;padding:4px;background:rgba(0,0,0,.06);border-radius:10px;width:fit-content">
           <button class="tab-btn ativo" id="tab-brigadas"    onclick="mudarAba('brigadas')">Brigadas</button>
           <button class="tab-btn"       id="tab-brigadistas" onclick="mudarAba('brigadistas')">Brigadistas</button>
-          <button class="tab-btn"       id="tab-atividades"  onclick="mudarAba('atividades')">⚙ Atividades</button>
+          <button class="tab-btn"       id="tab-diario"      onclick="mudarAba('diario')">Diário de Atividades</button>
+          <button class="tab-btn"       id="tab-equipamentos" onclick="mudarAba('equipamentos')">Equipamentos</button>
+          <button class="tab-btn"       id="tab-atividades"  onclick="mudarAba('atividades')">Catálogo de Atividades</button>
           ${usuario.perfil === 'super_admin' ? `<button class="tab-btn tab-perigo" id="tab-perigo" onclick="mudarAba('perigo')" title="Ações destrutivas irreversíveis" data-icon="alert-triangle">Zona de Perigo</button>` : ''}
         </div>
       </div>
@@ -615,7 +726,64 @@ const LABEL_REGIONAL = {
         </div>
       </div>
 
-      <!-- Aba Atividades -->
+      <!-- Aba Diário de Atividades -->
+      <div id="aba-diario" style="display:none">
+        <div class="filter-bar">
+          <input class="form-control search-input" id="busca-diario" placeholder="Buscar atividade..." oninput="renderDiarioAtividades()">
+          <select class="form-control" id="fil-brigada-diario" style="width:200px" onchange="renderDiarioAtividades()">
+            <option value="">Todas as brigadas</option>
+          </select>
+          <select class="form-control" id="fil-tipo-diario" style="width:160px" onchange="renderDiarioAtividades()">
+            <option value="">Tipo</option>
+            <option value="patrulha">Patrulha</option>
+            <option value="combate_incendio">Combate a Incêndio</option>
+            <option value="aceiro">Aceiro</option>
+            <option value="treinamento">Treinamento</option>
+            <option value="reuniao">Reunião</option>
+            <option value="manutencao_equipamento">Manutenção Equip.</option>
+            <option value="monitoramento">Monitoramento</option>
+          </select>
+          <button class="btn btn-primary" onclick="abrirModalDiario()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Registrar Atividade
+          </button>
+        </div>
+        <div class="card"><div class="table-wrap"><div class="table-scroll">
+          <table>
+            <thead><tr><th>Data</th><th>Brigada</th><th>Tipo</th><th>Localidade</th><th>Brigadistas</th><th>Área (ha)</th><th>Descrição</th><th>Ações</th></tr></thead>
+            <tbody id="tbody-diario"></tbody>
+          </table>
+        </div></div></div>
+      </div>
+
+      <!-- Aba Equipamentos -->
+      <div id="aba-equipamentos" style="display:none">
+        <div class="filter-bar">
+          <input class="form-control search-input" id="busca-eq" placeholder="Buscar equipamento..." oninput="renderEquipamentos()">
+          <select class="form-control" id="fil-brigada-eq" style="width:200px" onchange="renderEquipamentos()">
+            <option value="">Todas as brigadas</option>
+          </select>
+          <select class="form-control" id="fil-cond-eq" style="width:130px" onchange="renderEquipamentos()">
+            <option value="">Condição</option>
+            <option value="bom">Bom</option>
+            <option value="regular">Regular</option>
+            <option value="ruim">Ruim</option>
+            <option value="inoperante">Inoperante</option>
+          </select>
+          <button class="btn btn-primary" onclick="abrirModalEquipamento()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Adicionar Equipamento
+          </button>
+        </div>
+        <div class="card"><div class="table-wrap"><div class="table-scroll">
+          <table>
+            <thead><tr><th>Brigada</th><th>Descrição</th><th>Qtd</th><th>Condição</th><th>Nº Série</th><th>Aquisição</th><th>Valor</th><th>Ações</th></tr></thead>
+            <tbody id="tbody-equipamentos"></tbody>
+          </table>
+        </div></div></div>
+      </div>
+
+      <!-- Aba Catálogo de Atividades -->
       <div id="aba-atividades" style="display:none">
         <div class="filter-bar" style="margin-bottom:12px">
           <span style="font-size:.85rem;color:var(--cinza-600)">Gerencie as atividades exibidas no app de campo, por natureza.</span>
@@ -655,14 +823,18 @@ async function carregarUCs() {
 }
 
 async function carregarDados() {
-  const [rb, rbr, req] = await Promise.all([
+  const [rb, rbr, req, rdiario, reqp] = await Promise.all([
     db.from('brigadas_resumo').select('*').order('uc_nome'),
     db.from('brigadistas').select('id,nome_completo,cpf,brigada_id,funcao,status,usuario_id,tipo_vinculo,data_inicio,data_fim,equipe_id').order('nome_completo'),
     db.from('equipes_brigada').select('id,brigada_id,nome,ativa,lider_id').eq('ativa', true).order('nome'),
+    db.from('atividades_brigada').select('*,brigadas(nome)').order('data_inicio', { ascending: false }),
+    db.from('equipamentos_brigada').select('*,brigadas(nome)').order('descricao'),
   ])
   _brigadas    = rb.data  || []
   _brigadistas = rbr.data || []
   _equipes     = req.data || []
+  _diarioAtividades = rdiario.data || []
+  _equipamentos      = reqp.data || []
 
   document.getElementById('k-b').textContent        = _brigadas.filter(b => b.ativa).length
   document.getElementById('k-br').textContent       = _brigadistas.filter(b => b.status === 'ativo').length
@@ -670,7 +842,7 @@ async function carregarDados() {
   document.getElementById('k-sem-login').textContent = _brigadistas.filter(b => b.status === 'ativo' && !b.usuario_id).length
 
   // Popula selects de brigada nos filtros e modais
-  ;['fil-brigada-br','mbr-brigada','mb-chefe'].forEach(id => {
+  ;['fil-brigada-br','mbr-brigada','mb-chefe','fil-brigada-diario','md-brigada','fil-brigada-eq','meq-brigada'].forEach(id => {
     const sel = document.getElementById(id)
     if (!sel) return
     while (sel.options.length > 1) sel.remove(1)
@@ -684,10 +856,12 @@ async function carregarDados() {
 
   renderBrigadas()
   renderBrigadistas()
+  renderDiarioAtividades()
+  renderEquipamentos()
 }
 
 function mudarAba(aba) {
-  ;['brigadas','brigadistas','atividades','perigo'].forEach(a => {
+  ;['brigadas','brigadistas','diario','equipamentos','atividades','perigo'].forEach(a => {
     const abaEl = document.getElementById('aba-' + a)
     const tabEl = document.getElementById('tab-' + a)
     if (abaEl) abaEl.style.display = a === aba ? '' : 'none'
@@ -1349,13 +1523,164 @@ async function recarregarEquipes() {
   renderEquipesModal()
 }
 
+// ════════════════════════════════════════════════════════════════
+// Diário de Atividades (log administrativo — atividades_brigada)
+// ════════════════════════════════════════════════════════════════
+function renderDiarioAtividades() {
+  const q      = (document.getElementById('busca-diario')?.value || '').toLowerCase()
+  const brigId = document.getElementById('fil-brigada-diario')?.value || ''
+  const tipo   = document.getElementById('fil-tipo-diario')?.value || ''
+  const lista = _diarioAtividades.filter(a =>
+    (!q || a.descricao.toLowerCase().includes(q) || (a.localidade||'').toLowerCase().includes(q)) &&
+    (!brigId || a.brigada_id === brigId) &&
+    (!tipo || a.tipo === tipo)
+  )
+  const tbody = document.getElementById('tbody-diario')
+  if (!tbody) return
+  if (!lista.length) { tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:32px;color:#9CA3AF">Nenhuma atividade encontrada</td></tr>'; return }
+  const brigNomeMap = Object.fromEntries(_brigadas.map(b => [b.id, b.nome]))
+  tbody.innerHTML = lista.map(a => {
+    const brigNome = brigNomeMap[a.brigada_id] || (a.brigadas?.nome || '—')
+    const dt = a.data_inicio ? new Date(a.data_inicio).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—'
+    return `<tr>
+      <td class="mono" style="font-size:12px;white-space:nowrap">${dt}</td>
+      <td style="font-size:12px">${esc(brigNome)}</td>
+      <td><span class="badge badge-azul" style="font-size:11px">${esc(LABEL_TIPO_DIARIO[a.tipo]||a.tipo)}</span></td>
+      <td style="font-size:12px">${esc(a.localidade||'—')}</td>
+      <td class="mono" style="text-align:center">${a.num_brigadistas ?? '—'}</td>
+      <td class="mono">${a.area_afetada_ha ? formatNum(a.area_afetada_ha,1) : '—'}</td>
+      <td style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px">${esc(a.descricao)}</td>
+      <td><button class="btn btn-xs btn-ghost" onclick='abrirModalDiario(${JSON.stringify(a)})'>Editar</button></td>
+    </tr>`
+  }).join('')
+}
+
+function abrirModalDiario(a = null) {
+  _editIdDiario = a?.id || null
+  document.getElementById('md-titulo').textContent   = a ? 'Editar Atividade' : 'Nova Atividade'
+  document.getElementById('md-brigada').value        = a?.brigada_id || ''
+  document.getElementById('md-tipo').value           = a?.tipo || 'patrulha'
+  document.getElementById('md-inicio').value         = a?.data_inicio ? a.data_inicio.slice(0,16) : ''
+  document.getElementById('md-fim').value            = a?.data_fim ? a.data_fim.slice(0,16) : ''
+  document.getElementById('md-local').value          = a?.localidade || ''
+  document.getElementById('md-num').value            = a?.num_brigadistas || ''
+  document.getElementById('md-area').value           = a?.area_afetada_ha || ''
+  document.getElementById('md-desc').value           = a?.descricao || ''
+  document.getElementById('md-resultado').value      = a?.resultado || ''
+  document.getElementById('modal-diario').classList.add('aberto')
+}
+
+async function salvarDiario() {
+  const brigada_id  = document.getElementById('md-brigada').value
+  const data_inicio = document.getElementById('md-inicio').value
+  const descricao   = document.getElementById('md-desc').value.trim()
+  if (!brigada_id || !data_inicio || !descricao) { toast('Preencha brigada, data de início e descrição', 'error'); return }
+  const brig = _brigadas.find(b => b.id === brigada_id)
+  const payload = {
+    brigada_id,
+    uc_id:           brig?.uc_id || null,
+    tipo:            document.getElementById('md-tipo').value,
+    data_inicio:     new Date(data_inicio).toISOString(),
+    data_fim:        document.getElementById('md-fim').value ? new Date(document.getElementById('md-fim').value).toISOString() : null,
+    localidade:      document.getElementById('md-local').value.trim() || null,
+    num_brigadistas: parseInt(document.getElementById('md-num').value) || null,
+    area_afetada_ha: parseFloat(document.getElementById('md-area').value) || null,
+    descricao,
+    resultado:       document.getElementById('md-resultado').value.trim() || null,
+  }
+  const btn = document.getElementById('md-btn')
+  btn.disabled = true; btn.textContent = 'Salvando...'
+  try {
+    const { error } = _editIdDiario
+      ? await db.from('atividades_brigada').update(payload).eq('id', _editIdDiario)
+      : await db.from('atividades_brigada').insert(payload)
+    if (error) throw error
+    toast(_editIdDiario ? 'Atividade atualizada!' : 'Atividade registrada!', 'success')
+    fecharModal('diario'); await carregarDados()
+  } catch(e) { toast(e.message || 'Erro ao salvar', 'error') }
+  finally { btn.disabled = false; btn.textContent = 'Salvar' }
+}
+
+// ════════════════════════════════════════════════════════════════
+// Equipamentos
+// ════════════════════════════════════════════════════════════════
+function renderEquipamentos() {
+  const q      = (document.getElementById('busca-eq')?.value || '').toLowerCase()
+  const brigId = document.getElementById('fil-brigada-eq')?.value || ''
+  const cond   = document.getElementById('fil-cond-eq')?.value || ''
+  const lista = _equipamentos.filter(e =>
+    (!q || e.descricao.toLowerCase().includes(q)) &&
+    (!brigId || e.brigada_id === brigId) &&
+    (!cond || e.condicao === cond)
+  )
+  const tbody = document.getElementById('tbody-equipamentos')
+  if (!tbody) return
+  if (!lista.length) { tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:32px;color:#9CA3AF">Nenhum equipamento encontrado</td></tr>'; return }
+  const brigNomeMap = Object.fromEntries(_brigadas.map(b => [b.id, b.nome]))
+  tbody.innerHTML = lista.map(e => {
+    const brigNome = brigNomeMap[e.brigada_id] || (e.brigadas?.nome || '—')
+    return `<tr>
+      <td style="font-size:12px">${esc(brigNome)}</td>
+      <td><strong>${esc(e.descricao)}</strong></td>
+      <td class="mono" style="text-align:center">${e.quantidade}</td>
+      <td><span class="badge ${BADGE_COND_EQ[e.condicao]||'badge-cinza'}">${esc(e.condicao)}</span></td>
+      <td class="mono" style="font-size:12px">${esc(e.numero_serie||'—')}</td>
+      <td class="mono" style="font-size:12px">${e.data_aquisicao ? formatData(e.data_aquisicao) : '—'}</td>
+      <td class="mono">${e.valor_aquisicao ? formatBRL(e.valor_aquisicao) : '—'}</td>
+      <td><button class="btn btn-xs btn-ghost" onclick='abrirModalEquipamento(${JSON.stringify(e)})'>Editar</button></td>
+    </tr>`
+  }).join('')
+}
+
+function abrirModalEquipamento(e = null) {
+  _editId.equipamento = e?.id || null
+  document.getElementById('meq-titulo').textContent = e ? 'Editar Equipamento' : 'Novo Equipamento'
+  document.getElementById('meq-brigada').value       = e?.brigada_id || ''
+  document.getElementById('meq-desc').value          = e?.descricao || ''
+  document.getElementById('meq-qtd').value           = e?.quantidade ?? 1
+  document.getElementById('meq-cond').value          = e?.condicao || 'bom'
+  document.getElementById('meq-serie').value         = e?.numero_serie || ''
+  document.getElementById('meq-data-aq').value       = e?.data_aquisicao || ''
+  document.getElementById('meq-valor').value         = e?.valor_aquisicao || ''
+  document.getElementById('meq-obs').value           = e?.observacoes || ''
+  document.getElementById('modal-equipamento').classList.add('aberto')
+}
+
+async function salvarEquipamento() {
+  const brigada_id = document.getElementById('meq-brigada').value
+  const descricao  = document.getElementById('meq-desc').value.trim()
+  if (!brigada_id || !descricao) { toast('Preencha brigada e descrição', 'error'); return }
+  const payload = {
+    brigada_id, descricao,
+    quantidade:      parseInt(document.getElementById('meq-qtd').value) || 1,
+    condicao:        document.getElementById('meq-cond').value,
+    numero_serie:    document.getElementById('meq-serie').value.trim() || null,
+    data_aquisicao:  document.getElementById('meq-data-aq').value || null,
+    valor_aquisicao: parseFloat(document.getElementById('meq-valor').value) || null,
+    observacoes:     document.getElementById('meq-obs').value.trim() || null,
+  }
+  const btn = document.getElementById('meq-btn')
+  btn.disabled = true; btn.textContent = 'Salvando...'
+  try {
+    const { error } = _editId.equipamento
+      ? await db.from('equipamentos_brigada').update(payload).eq('id', _editId.equipamento)
+      : await db.from('equipamentos_brigada').insert(payload)
+    if (error) throw error
+    toast(_editId.equipamento ? 'Equipamento atualizado!' : 'Equipamento adicionado!', 'success')
+    fecharModal('equipamento'); await carregarDados()
+  } catch(e) { toast(e.message || 'Erro ao salvar', 'error') }
+  finally { btn.disabled = false; btn.textContent = 'Salvar' }
+}
+
 // ── Helpers ───────────────────────────────────────────────────
 function fecharModal(tipo) {
   document.getElementById('modal-' + tipo).classList.remove('aberto')
-  if (tipo === 'brigada')    _editId.brigada = null
-  if (tipo === 'brigadista') _editId.brigadista = null
-  if (tipo === 'login')      _loginBrigadistaId = null
-  if (tipo === 'atividade')  _ativEditId = null
+  if (tipo === 'brigada')      _editId.brigada = null
+  if (tipo === 'brigadista')   _editId.brigadista = null
+  if (tipo === 'equipamento')  _editId.equipamento = null
+  if (tipo === 'diario')       _editIdDiario = null
+  if (tipo === 'login')        _loginBrigadistaId = null
+  if (tipo === 'atividade')    _ativEditId = null
   if (tipo === 'zerar') {
     document.getElementById('zerar-senha').value = ''
     document.getElementById('zerar-senha-erro').textContent = ''
