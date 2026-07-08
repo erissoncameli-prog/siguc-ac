@@ -317,9 +317,25 @@ function bioIniciarTelaTrocarSenha() {
     if (s1.length < 6) { erroEl.textContent = 'A senha deve ter pelo menos 6 caracteres.'; erroEl.hidden = false; return }
     if (s1 !== s2)     { erroEl.textContent = 'As senhas não conferem.'; erroEl.hidden = false; return }
 
-    const { error } = await bioSupabase().auth.updateUser({ password: s1 })
-    if (error) { erroEl.textContent = 'Erro ao salvar senha. Tente novamente.'; erroEl.hidden = false; return }
+    const btn = document.getElementById('bio-btn-trocar-senha')
+    const btnTextoOriginal = btn.textContent
+    btn.disabled = true; btn.textContent = 'Salvando…'
 
+    const { error } = await bioSupabase().auth.updateUser({ password: s1 })
+    if (error) {
+      btn.disabled = false; btn.textContent = btnTextoOriginal
+      erroEl.textContent = error.message || 'Erro ao salvar senha. Tente novamente.'; erroEl.hidden = false
+      return
+    }
+
+    if (BioApp.monitor?.id) {
+      await bioSupabase().from('monitores_biodiversidade')
+        .update({ deve_trocar_senha: false })
+        .eq('id', BioApp.monitor.id)
+      BioApp.monitor.deve_trocar_senha = false
+    }
+
+    btn.disabled = false; btn.textContent = btnTextoOriginal
     await bioMostrarTelaPostLogin()
   })
 }
