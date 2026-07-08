@@ -21,7 +21,7 @@
       <button class="modal-close" onclick="fecharModalRejeitar()">×</button>
     </div>
     <div class="modal-body">
-      <p style="margin:0 0 12px;font-size:.9rem;color:var(--t2,#aaa)">
+      <p style="margin:0 0 12px;font-size:.9rem;color:var(--cinza-500)">
         Ninho: <strong id="rej-numero"></strong>
       </p>
       <div class="form-group">
@@ -44,7 +44,7 @@
       <button class="modal-close" onclick="fecharModalGPS()">×</button>
     </div>
     <div class="modal-body">
-      <p style="margin:0 0 14px;font-size:.9rem;color:var(--t2,#aaa)">
+      <p style="margin:0 0 14px;font-size:.9rem;color:var(--cinza-500)">
         Ninho: <strong id="gps-numero"></strong>
       </p>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
@@ -61,7 +61,7 @@
         <label class="form-label">Precisão GPS (m) <span style="opacity:.5;font-weight:400">opcional</span></label>
         <input class="form-control" id="gps-precisao" type="number" step="0.1" min="0" placeholder="Ex.: 5.2">
       </div>
-      <p style="font-size:.78rem;color:var(--t2,#aaa);margin:4px 0 0">
+      <p style="font-size:.78rem;color:var(--cinza-500);margin:4px 0 0">
         Use coordenadas em graus decimais (WGS 84). Negativo para Sul / Oeste.
       </p>
     </div>
@@ -128,7 +128,7 @@
       <div id="stats-bar" style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap"></div>
 
       <div id="lista-ninhos" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px">
-        <p style="color:var(--t2,#aaa)">Carregando...</p>
+        <p style="color:var(--cinza-500)">Carregando...</p>
       </div>
     </div>`
 
@@ -190,9 +190,9 @@
       ['Rejeitados',   stats.rejeitado,   '#ef4444'],
       ['Em correção',  stats.em_correcao, '#6366f1'],
     ].map(([l, v, c]) => `
-      <div style="background:rgba(255,255,255,.06);border-radius:10px;padding:10px 16px;min-width:110px;border-left:3px solid ${c}">
+      <div style="background:var(--branco);border-radius:10px;padding:10px 16px;min-width:110px;border-left:3px solid ${c};border-top:1px solid var(--borda);border-right:1px solid var(--borda);border-bottom:1px solid var(--borda);box-shadow:var(--sombra)">
         <div style="font-size:1.5rem;font-weight:700;color:${c}">${v}</div>
-        <div style="font-size:.78rem;color:var(--t2,#aaa)">${l}</div>
+        <div style="font-size:.78rem;color:var(--cinza-500)">${l}</div>
       </div>`).join('')
   }
 
@@ -214,7 +214,7 @@
     )
 
     const cont = document.getElementById('lista-ninhos')
-    if (!lista.length) { cont.innerHTML = `<p style="color:var(--t2,#aaa);grid-column:1/-1">Nenhum ninho encontrado com esses filtros.</p>`; return }
+    if (!lista.length) { cont.innerHTML = `<p style="color:var(--cinza-500);grid-column:1/-1">Nenhum ninho encontrado com esses filtros.</p>`; return }
 
     const SPECIES_NOME = {
       tracaja: 'Tracajá', tartaruga: 'Tartaruga', cabecudo: 'Cabeçudo',
@@ -231,12 +231,12 @@
       const temFotos = n.foto_urls?.length > 0
       const alertas = _alertasPorNinho[n.id] || []
       const borda = alertas.some(a => a.severidade === 'critica') ? '#ef4444'
-                  : alertas.length ? '#f59e0b' : 'rgba(255,255,255,.08)'
-      return `<div style="background:rgba(255,255,255,.06);border-radius:12px;padding:16px;border:1px solid ${borda}">
+                  : alertas.length ? '#f59e0b' : 'var(--borda)'
+      return `<div style="background:var(--branco);border-radius:12px;padding:16px;border:1px solid ${borda};box-shadow:var(--sombra)">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
           <div>
-            <div style="font-weight:600;font-size:1rem">${n.numero_ninho}</div>
-            <div style="font-size:.83rem;color:var(--t2,#aaa)">${SPECIES_NOME[n.especie] || n.especie}</div>
+            <div style="font-weight:600;font-size:1rem;color:var(--cinza-900)">${n.numero_ninho}</div>
+            <div style="font-size:.83rem;color:var(--cinza-500)">${SPECIES_NOME[n.especie] || n.especie}</div>
           </div>
           <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">
             <span style="font-size:.75rem;padding:2px 8px;border-radius:6px;background:${nclr}22;color:${nclr};font-weight:600">${n.status}</span>
@@ -250,7 +250,7 @@
             const c = a.severidade === 'critica' ? '#ef4444' : a.severidade === 'alta' ? '#f59e0b' : '#eab308'
             return `<div title="${esc(a.providencia || '')}" style="background:${c}1a;border-left:3px solid ${c};border-radius:6px;padding:6px 9px;font-size:.78rem">
               <strong style="color:${c}">${esc(a.faixa)}</strong>
-              <span style="color:var(--t2,#aaa)"> — ${esc(a.titulo)}</span>
+              <span style="color:var(--cinza-500)"> — ${esc(a.titulo)}</span>
             </div>`
           }).join('')}
         </div>` : ''}
@@ -260,14 +260,14 @@
           ⚠ Alerta reconhecido em campo${n.alerta_campo.severidade_max ? ` (${esc(n.alerta_campo.severidade_max)})` : ''}
         </div>` : ''}
 
-        <div style="font-size:.83rem;color:var(--t2,#aaa);display:grid;gap:3px;margin-bottom:10px">
-          <div>Praia: <span style="color:var(--t1,#f4efe6)">${n.praia_nome || '—'}</span></div>
-          <div>Monitor: <span style="color:var(--t1,#f4efe6)">${n.monitor_nome || '—'}</span></div>
-          <div>Data: <span style="color:var(--t1,#f4efe6)">${formatData(n.data_encontro)}</span></div>
+        <div style="font-size:.83rem;color:var(--cinza-500);display:grid;gap:3px;margin-bottom:10px">
+          <div>Praia: <span style="color:var(--cinza-900)">${n.praia_nome || '—'}</span></div>
+          <div>Monitor: <span style="color:var(--cinza-900)">${n.monitor_nome || '—'}</span></div>
+          <div>Data: <span style="color:var(--cinza-900)">${formatData(n.data_encontro)}</span></div>
           ${n.lat
-            ? `<div>GPS: <span style="color:var(--t1,#f4efe6)">${Number(n.lat).toFixed(5)}, ${Number(n.lng).toFixed(5)}</span> ${n.precisao_gps_m ? `(±${n.precisao_gps_m}m)` : ''}</div>`
+            ? `<div>GPS: <span style="color:var(--cinza-900)">${Number(n.lat).toFixed(5)}, ${Number(n.lng).toFixed(5)}</span> ${n.precisao_gps_m ? `(±${n.precisao_gps_m}m)` : ''}</div>`
             : `<div style="color:#f59e0b;font-size:.78rem">Sem GPS — não aparece no mapa</div>`}
-          ${n.dist_rio_m != null ? `<div>Dist. ao rio: <span style="color:var(--t1,#f4efe6)">${n.dist_rio_m} m</span> <span style="opacity:.6;font-size:.85em">(${n.dist_rio_metodo === 'tracker' ? 'GPS tracker' : 'estimativa'})</span></div>` : ''}
+          ${n.dist_rio_m != null ? `<div>Dist. ao rio: <span style="color:var(--cinza-900)">${n.dist_rio_m} m</span> <span style="opacity:.6;font-size:.85em">(${n.dist_rio_metodo === 'tracker' ? 'GPS tracker' : 'estimativa'})</span></div>` : ''}
         </div>
 
         ${(n.qtd_ovos != null || n.ovos_integros != null || n.ovos_descartados != null) ? `
@@ -303,10 +303,10 @@
           ${n.predacao && n.predacao !== 'nenhuma' ? `· Predação: ${n.predacao}` : ''}
         </div>` : ''}
 
-        ${n.observacoes ? `<p style="font-size:.82rem;color:var(--t2,#aaa);margin:0 0 10px;font-style:italic">${n.observacoes}</p>` : ''}
+        ${n.observacoes ? `<p style="font-size:.82rem;color:var(--cinza-500);margin:0 0 10px;font-style:italic">${n.observacoes}</p>` : ''}
         ${n.motivo_rejeicao ? `<p style="font-size:.82rem;color:#ef4444;margin:0 0 10px">Motivo: ${n.motivo_rejeicao}</p>` : ''}
 
-        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,.06)">
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px solid var(--borda)">
           ${temFotos ? `<button class="btn btn-sm btn-secondary" onclick='verFotos(${JSON.stringify(n.foto_urls)})'>Fotos (${n.foto_urls.length})</button>` : ''}
           ${!n.lat ? `<button class="btn btn-sm" style="background:rgba(245,158,11,.15);color:#f59e0b;border:1px solid rgba(245,158,11,.3);border-radius:6px;padding:4px 10px;cursor:pointer" onclick="abrirModalGPS('${n.id}','${esc(n.numero_ninho)}')">+ GPS</button>` : ''}
           ${n.status_validacao !== 'validado'   ? `<button class="btn btn-sm btn-primary"   onclick="validar('${n.id}')">Validar</button>` : ''}
