@@ -999,6 +999,7 @@ async function bioGerarNumeroNinho(praiaId, especie, campo = 'numero_ninho') {
 window.bioTrocarPraiaNoForm = function() {
   bioAbrirSheetPraias(praia => {
     BioApp.formNinho.praia_id = praia.id
+    BioApp.formNinho.uc_id    = praia.uc_id ?? null
     document.getElementById('bio-form-praia-label').textContent = praia.nome
     bioVerificarPerimetroNinho()
     bioAtualizarNumeroNinhoAuto()
@@ -1074,7 +1075,7 @@ function bioAbrirFormNinho() {
   BioApp.formNinho = {
     uuid_cliente: bioUuid(),
     praia_id:     praia?.id ?? null,
-    uc_id:        BioApp.monitor?.uc_id ?? null,
+    uc_id:        praia?.uc_id ?? null,
     grupo_id:     BioApp.monitor?.grupo_id ?? null,
     foto_urls:    [],
     status_sync:  'pendente',
@@ -1149,7 +1150,7 @@ function bioAbrirCorrecaoNinho(ninho) {
     praia_id:      ninho.praia_id ?? null,
     praia_atual_id: ninho.praia_atual_id ?? null,
     numero_atual:  ninho.numero_atual ?? null,
-    uc_id:         ninho.uc_id ?? BioApp.monitor?.uc_id ?? null,
+    uc_id:         ninho.uc_id ?? null,
     grupo_id:      ninho.grupo_id ?? BioApp.monitor?.grupo_id ?? null,
     status:        ninho.status ?? 'encontrado',
     foto_urls:     Array.isArray(ninho.foto_urls) ? [...ninho.foto_urls] : [],
@@ -1241,6 +1242,11 @@ async function bioSalvarNinho() {
 
   const editando = BioApp.editandoNinho
 
+  // uc_id sempre derivado da praia selecionada no formulário (nunca da UC
+  // de lotação do monitor) — evita gravar um uc_id de outra UC quando o
+  // monitor registra em praia fora de sua UC de referência.
+  const _praiaDoNinho = (await bioOfflineGetPraia(BioApp.formNinho.praia_id)) ?? BioApp.praiaAtual
+
   // Avisa se não há GPS — não bloqueia, mas exige confirmação consciente
   const _temGPS = (BioApp.formGpsCapturado?.lat ?? BioApp.gpsLat) != null
   if (!_temGPS && !editando) {
@@ -1253,6 +1259,7 @@ async function bioSalvarNinho() {
 
   const ninho = {
     ...BioApp.formNinho,
+    uc_id:            _praiaDoNinho?.uc_id ?? null,
     numero_ninho:     numero,
     especie,
     data_encontro:    data,
