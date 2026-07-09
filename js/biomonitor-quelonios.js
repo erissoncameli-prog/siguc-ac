@@ -1925,14 +1925,26 @@ async function bioSalvarEntradaBercario() {
   bioMostrarTela('tela-home')
 }
 
+// Mortes canônicas de um lote: individual (se rastreado) senão ocorrências
+// agregadas de mortalidade — mesma regra do vw_lotes_bercario_mortalidade
+// no banco, aplicada aqui localmente para funcionar offline.
+async function bioMortesCanonicasDoLote(lote) {
+  const individuos = await bioOfflineIndividuosDoLote(lote.uuid_cliente)
+  if (individuos.length) return individuos.filter(i => i.status === 'morto').length
+  const ocorrencias = await bioOfflineOcorrenciasDoLote(lote.uuid_cliente)
+  return ocorrencias
+    .filter(o => o.tipo === 'mortalidade')
+    .reduce((soma, o) => soma + (o.qtd_afetados || 0), 0)
+}
+
 /* ════════════════════════════════════════════════════════════
    FORMULÁRIO — SOLTURA DE FILHOTES
    ════════════════════════════════════════════════════════════ */
-// ctx: { ninho, filhotesVivos, lote? }
+// ctx: { ninho, filhotesVivos, lote?, mortesIniciais? }
 // Se lote presente → via_bercario = true; back vai para tela-bercarios
 function bioAbrirFormSoltura(ctx) {
   BioApp.formSolturaCtx = ctx
-  const { ninho, filhotesVivos, lote } = ctx
+  const { ninho, filhotesVivos, lote, mortesIniciais } = ctx
 
   document.getElementById('bio-sol-ninho-num').textContent = ninho.numero_ninho
   document.getElementById('bio-sol-especie').textContent   = BIO_ESPECIES.find(e => e.id === ninho.especie)?.nome ?? ninho.especie
@@ -1942,7 +1954,7 @@ function bioAbrirFormSoltura(ctx) {
   document.getElementById('bio-sol-obs').value             = ''
   document.getElementById('bio-sol-predacao').checked      = false
   bioSetContador('bio-sol-qtd',  filhotesVivos ?? 0)
-  bioSetContador('bio-sol-mort', 0)
+  bioSetContador('bio-sol-mort', mortesIniciais ?? 0)
 
   const infoEl    = document.getElementById('bio-sol-bercario-info')
   const mortLabel = document.getElementById('bio-sol-mort-label')
@@ -1950,7 +1962,8 @@ function bioAbrirFormSoltura(ctx) {
   const backBtn   = document.getElementById('bio-soltura-back')
 
   if (lote) {
-    infoEl.textContent = `Berçário: ${lote.bercario_nome} · Entrada: ${lote.qtd_entrada} filhotes`
+    infoEl.textContent = `Berçário: ${lote.bercario_nome} · Entrada: ${lote.qtd_entrada}`
+      + (mortesIniciais ? ` · Mortes já registradas: ${mortesIniciais}` : '')
     infoEl.hidden      = false
     mortLabel.textContent = '(no berçário)'
     tituloEl.textContent  = 'Soltura do Berçário'
