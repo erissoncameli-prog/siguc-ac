@@ -2163,6 +2163,17 @@ function bioAbrirTelaDetalheLote(lote) {
   if (el('bio-det-qtd'))        el('bio-det-qtd').textContent        = lote.qtd_entrada ?? '—'
   if (el('bio-det-dias'))       el('bio-det-dias').textContent       = diasNum >= 0 ? diasNum : '—'
 
+  bioMortesCanonicasDoLote(lote).then(mortes => {
+    const wrap = el('bio-det-vivos-wrap')
+    if (!wrap) return
+    if (mortes > 0) {
+      wrap.hidden = false
+      if (el('bio-det-vivos')) el('bio-det-vivos').textContent = Math.max((lote.qtd_entrada || 0) - mortes, 0)
+    } else {
+      wrap.hidden = true
+    }
+  })
+
   bioCarregarTimelineLote(lote)
   bioRenderizarFilhotesDoLote(lote)
   bioMostrarTela('tela-detalhe-lote')
