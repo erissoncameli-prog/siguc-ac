@@ -1909,11 +1909,19 @@ async function bioSalvarEntradaBercario() {
     await bioOfflineSalvarNinho({ ...ninhoBerc, status: 'em_bercario', status_sync: 'pendente' })
   }
   await bioOfflineSalvarLote(lote)
+
+  const individual = document.getElementById('bio-berc-individual')?.checked
+  if (individual) {
+    await bioOfflineGerarIndividuosDoLote(lote.uuid_cliente, qtd, BioApp.monitor?.id)
+  }
+
   await bioAtualizarBadgeFila()
   await bioAtualizarBadgeBercario()
 
   bioSyncTudo({ monitorId: BioApp.monitor?.id, onConcluido: () => bioAtualizarBadgeFila() })
-  bioToast('Entrada no berçário registrada!', 'ok')
+  bioToast(individual
+    ? `Entrada registrada com ${qtd} filhotes numerados!`
+    : 'Entrada no berçário registrada!', 'ok')
   bioMostrarTela('tela-home')
 }
 
