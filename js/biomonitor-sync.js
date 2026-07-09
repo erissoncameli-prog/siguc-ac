@@ -607,14 +607,16 @@ async function bioSyncTudo({ monitorId, onProgresso, onConcluido, onErro } = {})
     const e  = await cat(bioSyncEclosoes)
     const v  = await cat(bioSyncVisitas)
     const l  = await cat(bioSyncLotes)
+    const ind = await cat(bioSyncIndividuos)
     const s  = await cat(bioSyncSolturas)
     const oc = await cat(bioSyncOcorrencias)
+    const bi = await cat(bioSyncBiometriasInd)
     // Pull: traz de volta mudanças do servidor (ex.: validação/correção
     // feita pelo gestor) para o IndexedDB.
     const grupoId = (typeof BioApp !== 'undefined' && BioApp.monitor?.grupo_id) || null
     if (grupoId) { try { await bioSyncPullNinhos(grupoId) } catch (_) {} }
     await bioOfflineLimparConfirmados()
-    onConcluido?.({ ninhos: n, transferencias: t, eclosoes: e, visitas: v, lotes: l, solturas: s, ocorrencias: oc })
+    onConcluido?.({ ninhos: n, transferencias: t, eclosoes: e, visitas: v, lotes: l, individuos: ind, solturas: s, ocorrencias: oc, biometrias: bi })
   } catch (err) {
     onErro?.(err)
   } finally {
