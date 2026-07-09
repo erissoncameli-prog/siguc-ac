@@ -315,7 +315,10 @@
           ${n.qtd_ovos        != null ? `<span>Total: <strong>${n.qtd_ovos}</strong></span>` : ''}
           ${n.ovos_integros   != null ? `<span>Íntegros: <strong style="color:#4ade80">${n.ovos_integros}</strong></span>` : ''}
           ${n.ovos_descartados != null ? `<span>Descartados: <strong style="color:#f87171">${n.ovos_descartados}</strong></span>` : ''}
+          ${(n.ovos_viaveis != null && n.ovos_perdidos_total > 0) ? `<span>Viáveis: <strong style="color:#52B788">${n.ovos_viaveis}</strong></span>` : ''}
         </div>` : ''}
+
+        ${bioTimelineHtml(n._eventos)}
 
         ${(n.temperatura_c != null || n.umidade_pct != null || n.profundidade_cm != null) ? `
         <div style="background:rgba(82,183,136,.10);border-radius:8px;padding:8px 10px;margin-bottom:8px;font-size:.82rem;display:flex;gap:16px;flex-wrap:wrap">
