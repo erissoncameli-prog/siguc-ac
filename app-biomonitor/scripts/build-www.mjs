@@ -8,19 +8,35 @@
 import { cpSync, mkdirSync, rmSync, readFileSync, writeFileSync, existsSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { transformSync } from 'esbuild'
 
 const APP  = dirname(dirname(fileURLToPath(import.meta.url)))   // app-biomonitor/
 const RAIZ = dirname(APP)                                        // raiz do repo
 const WWW  = join(APP, 'www')
+
+// ── Transpila JS para rodar em WebViews antigas (aparelhos de campo) ──
+// O app suporta Android 7+ (minSdk 24), cujo "Android System WebView" pode
+// estar em versões antigas (Chrome ~58–84) se o usuário nunca o atualizou.
+// A lib @supabase/supabase-js moderna usa sintaxe ES2020/ES2021 (?. ?? ||= &&=)
+// e QUEBRA ao ser carregada nessas WebViews: o parse falha, window.supabase
+// fica como stub e o login trava mostrando "Sem conexão". Baixamos toda a
+// sintaxe para ES2017 (Chrome 58+) — inclui a lib e o nosso próprio JS, que
+// também usa ?. e ?? — para o app abrir e logar nesses aparelhos.
+const ALVO_JS = 'es2017'
+function copiarJsTranspilado (src, dest) {
+  const code = readFileSync(src, 'utf8')
+  const out  = transformSync(code, { target: ALVO_JS, loader: 'js', legalComments: 'none' }).code
+  writeFileSync(dest, out)
+}
 
 rmSync(WWW, { recursive: true, force: true })
 mkdirSync(join(WWW, 'css'),          { recursive: true })
 mkdirSync(join(WWW, 'js'),           { recursive: true })
 mkdirSync(join(WWW, 'vendor/fonts'), { recursive: true })
 
-// ── JS compartilhado (idêntico ao site) ───────────────────────
+// ── JS compartilhado (transpilado para ES2017) ────────────────
 for (const f of ['config.js', 'biomonitor-offline.js', 'biomonitor-sync.js', 'biomonitor-alertas.js', 'brigada-captura.js', 'biomonitor-timeline.js', 'biomonitor-quelonios.js']) {
-  cpSync(join(RAIZ, 'js', f), join(WWW, 'js', f))
+  copiarJsTranspilado(join(RAIZ, 'js', f), join(WWW, 'js', f))
 }
 
 // ── Logo do Biomonitor (telas de login/bloqueio) ──────────────
@@ -32,8 +48,8 @@ let css = readFileSync(join(RAIZ, 'css', 'biomonitor.css'), 'utf8')
 css = css.replace(/@import url\('https:\/\/fonts\.googleapis\.com[^']*'\);?\n?/g, '')
 writeFileSync(join(WWW, 'css', 'biomonitor.css'), css)
 
-// ── Vendor: Supabase UMD + fontes ──────────────────────────────
-cpSync(join(APP, 'node_modules/@supabase/supabase-js/dist/umd/supabase.js'), join(WWW, 'vendor/supabase.js'))
+// ── Vendor: Supabase UMD (transpilado para ES2017) + fontes ────
+copiarJsTranspilado(join(APP, 'node_modules/@supabase/supabase-js/dist/umd/supabase.js'), join(WWW, 'vendor/supabase.js'))
 
 const FONTES = [
   ['@fontsource/dm-sans',  'dm-sans',  'DM Sans',  [400, 500, 600, 700]],
@@ -125,4 +141,16 @@ if (!/window\.__SIGUC_ENV=\{.*supabaseUrl.*supabaseKey/.test(indexFinal)) {
   console.error('ERRO: credenciais do Supabase não foram embarcadas no index.html')
   process.exit(1)
 }
-console.log('www/ (biomonitor) montado com sucesso (offline-first, sem CDN, com login embarcado).')
+// Garante que a transpilação removeu os operadores ES2021 (||= &&= ??=) que
+// quebravam o supabase.js em WebViews < 85. São sinais confiáveis (não
+// aparecem em strings do app), então servem de trava contra regressão do
+// alvo de transpilação. O esbuild também baixa ?. e ?? (ES2020) no mesmo passo.
+for (const f of ['vendor/supabase.js', 'js/config.js', 'js/biomonitor-quelonios.js', 'js/biomonitor-sync.js', 'js/biomonitor-offline.js', 'js/biomonitor-alertas.js', 'js/brigada-captura.js', 'js/biomonitor-timeline.js']) {
+  const js = readFileSync(join(WWW, f), 'utf8')
+  const proibidos = js.match(/\|\|=|&&=|\?\?=/g)
+  if (proibidos) {
+    console.error(`ERRO: ${f} ainda contém operadores ES2021 após transpilar (${[...new Set(proibidos)].join(' ')}) — quebraria em WebView antiga`)
+    process.exit(1)
+  }
+}
+console.log(`www/ (biomonitor) montado com sucesso (offline-first, sem CDN, login embarcado, JS transpilado p/ ${ALVO_JS}).`)
