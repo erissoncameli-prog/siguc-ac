@@ -2621,43 +2621,14 @@ function bioMapNinhoPraias(n, praias) {
   }
 }
 
+// Monta o histórico de cada ninho (postura → transferência(s) → visitas →
+// berçário → soltura → eclosão), ordenado por data+hora, com saldo de
+// ovos viáveis — via js/biomonitor-timeline.js (compartilhado com a
+// página de validação). Aqui só mescla as visitas locais (IndexedDB),
+// pendentes de sync ou registradas offline.
 async function bioCarregarEventosNinhos(ninhos) {
-  const VISITA_STATUS = {
-    integro: 'íntegro', perturbado: 'perturbado',
-    parcial_predado: 'parc. predado', destruido: 'destruído', alagado: 'alagado',
-  }
   const mapa = {}
   ninhos.forEach(n => { mapa[n.uuid_cliente] = [] })
-
-  // Eclosão derivada dos campos já carregados no ninho
-  ninhos.forEach(n => {
-    if (!n.data_nascimento) return
-    mapa[n.uuid_cliente].push({
-      tipo: 'eclosao', data: n.data_nascimento,
-      txt: ['Eclosão',
-        n.filhotes_vivos   != null ? `${n.filhotes_vivos} vivos`      : null,
-        n.filhotes_mortos          ? `${n.filhotes_mortos} mortos`     : null,
-        n.ovos_nao_nascidos        ? `${n.ovos_nao_nascidos} não nasc.`: null,
-      ].filter(Boolean).join(' · '),
-    })
-  })
-
-  // Builder de evento de visita — server e registro local têm os mesmos
-  // campos (data_visita, status_ninho, temperaturas).
-  const evVisita = r => {
-    const perda = (r.ovos_predados_n || 0) + (r.ovos_perdidos_alagamento || 0)
-      + (r.ovos_perdidos_erosao || 0) + (r.ovos_perdidos_humana || 0)
-    return {
-      tipo: 'visita', data: r.data_visita,
-      delta: perda,                                   // ovos perdidos nesta visita
-      destruido: r.status_ninho === 'destruido',      // baixa total dos viáveis
-      txt: ['Visita',
-        r.status_ninho ? VISITA_STATUS[r.status_ninho] : null,
-        r.temperatura_substrato_c != null ? `${r.temperatura_substrato_c}°C`
-          : r.temperatura_ar_c != null ? `${r.temperatura_ar_c}°C` : null,
-      ].filter(Boolean).join(' · '),
-    }
-  }
 
   // Mescla as visitas locais (IndexedDB) no histórico, para que apareçam
   // mesmo offline ou antes de sincronizar. `somentePendentes` evita
@@ -2668,111 +2639,24 @@ async function bioCarregarEventosNinhos(ninhos) {
       const locais = await bioOfflineVisitasDoNinho(n.uuid_cliente).catch(() => [])
       locais
         .filter(v => !somentePendentes || v.status_sync !== 'confirmado')
-        .forEach(v => arr.push(evVisita(v)))
+        .forEach(v => arr.push(bioEventoVisita(v)))
     }
   }
 
   if (!navigator.onLine) {
     await mesclarVisitasLocais(false)   // offline: todas as visitas locais
-    Object.values(mapa).forEach(evs => evs.sort((a, b) => (a.data ?? '') < (b.data ?? '') ? -1 : 1))
-    ninhos.forEach(n => { n._eventos = mapa[n.uuid_cliente] ?? [] })
+    ninhos.forEach(n => { n._eventos = bioMontarHistoricoNinho(n, mapa[n.uuid_cliente]) })
     return
   }
 
-  const idMap = {}
-  ninhos.forEach(n => { if (n.id) idMap[n.id] = n.uuid_cliente })
-  const serverIds = Object.keys(idMap)
-  if (!serverIds.length) {
-    ninhos.forEach(n => { n._eventos = mapa[n.uuid_cliente] ?? [] })
-    return
-  }
-
-  try {
-    const sb = bioSupabase()
-    const [rTransf, rVisita, rLote, rSol] = await Promise.all([
-      sb.from('vw_transferencias_praia')
-        .select('ninho_id,data_transferencia,praia_destino_nome,local_destino')
-        .in('ninho_id', serverIds),
-      sb.from('visitas_ninho')
-        .select('ninho_id,data_visita,status_ninho,temperatura_substrato_c,temperatura_ar_c,ovos_predados_n,ovos_perdidos_alagamento,ovos_perdidos_erosao,ovos_perdidos_humana')
-        .in('ninho_id', serverIds),
-      sb.from('lotes_bercario')
-        .select('ninho_id,data_entrada,qtd_entrada,bercario_nome')
-        .in('ninho_id', serverIds),
-      sb.from('solturas_filhotes')
-        .select('ninho_id,data_soltura,qtd_soltada,mortalidade,via_bercario,local_descricao')
-        .in('ninho_id', serverIds),
-    ])
-
-    const pushRows = (res, tipo, fn) => {
-      ;(res.data ?? []).forEach(r => {
-        const uuid = idMap[r.ninho_id]
-        if (uuid && mapa[uuid]) mapa[uuid].push({ tipo, ...fn(r) })
-      })
-    }
-
-    pushRows(rTransf, 'transf', r => ({
-      data: r.data_transferencia,
-      txt: `Transferido${r.praia_destino_nome ? ' → ' + r.praia_destino_nome
-        : r.local_destino ? ' → ' + r.local_destino : ''}`,
-    }))
-    pushRows(rVisita, 'visita', evVisita)
-    pushRows(rLote, 'bercario', r => ({
-      data: r.data_entrada,
-      txt: `Berçário · ${r.qtd_entrada} filh.${r.bercario_nome ? ' → ' + r.bercario_nome : ''}`,
-    }))
-    pushRows(rSol, 'soltura', r => ({
-      data: r.data_soltura,
-      txt: [`Soltura · ${r.qtd_soltada} filh.`,
-        r.mortalidade ? `${r.mortalidade} mort.` : null,
-        r.via_bercario ? '(via berçário)' : null,
-        r.local_descricao || null,
-      ].filter(Boolean).join(' · '),
-    }))
-  } catch (e) {
-    console.warn('[biomonitor eventos]', e)
-  }
+  const mapaServidor = await bioBuscarEventosServidor(bioSupabase(), ninhos)
+  Object.keys(mapaServidor).forEach(uuid => { mapa[uuid].push(...mapaServidor[uuid]) })
 
   // Visitas locais ainda não sincronizadas (recém-registradas) — para
   // aparecerem no histórico imediatamente, sem esperar o sync.
   await mesclarVisitasLocais(true)
 
-  bioFinalizarHistorico(ninhos, mapa)
-}
-
-// Fecha o histórico de cada ninho: ancora a LOCALIZAÇÃO (postura) no
-// topo, ordena por data e calcula o saldo de OVOS VIÁVEIS após cada
-// evento — a base viva para as ocorrências seguintes.
-function bioFinalizarHistorico(ninhos, mapa) {
-  ninhos.forEach(n => {
-    const evs = mapa[n.uuid_cliente] || []
-    if (n.data_encontro && n.qtd_ovos != null) {
-      const registro = n.ovos_descartados || 0
-      evs.push({
-        tipo: 'localizacao', data: n.data_encontro, registro,
-        txt: `Localização · ${n.qtd_ovos} ovos na postura`
-          + (registro > 0 ? ` · ${registro} descartados no registro` : ''),
-      })
-    }
-    evs.sort((a, b) => {
-      if (a.tipo === 'localizacao' && b.tipo !== 'localizacao') return -1
-      if (b.tipo === 'localizacao' && a.tipo !== 'localizacao') return 1
-      return (a.data ?? '') < (b.data ?? '') ? -1 : 1
-    })
-    // Saldo de viáveis após cada evento
-    let saldo = n.qtd_ovos != null ? n.qtd_ovos : null
-    evs.forEach(ev => {
-      if (ev.tipo === 'localizacao') {
-        saldo = n.qtd_ovos != null ? Math.max(n.qtd_ovos - (ev.registro || 0), 0) : null
-      } else if (ev.destruido && saldo != null) {
-        ev.delta = saldo; saldo = 0
-      } else if (ev.delta > 0 && saldo != null) {
-        saldo = Math.max(saldo - ev.delta, 0)
-      }
-      ev.saldo = saldo
-    })
-    n._eventos = evs
-  })
+  ninhos.forEach(n => { n._eventos = bioMontarHistoricoNinho(n, mapa[n.uuid_cliente]) })
 }
 
 async function bioCarregarAbertos() {
