@@ -513,9 +513,115 @@ async function bioOfflineOcorrenciasPendentes() {
   })
 }
 
+// ── Filhotes individuais do berçário ───────────────────────────
+async function bioOfflineSalvarIndividuo(ind) {
+  const db = await bioOfflineInit()
+  return new Promise((res, rej) => {
+    const tx  = db.transaction('individuos', 'readwrite')
+    const req = tx.objectStore('individuos').put(ind)
+    req.onsuccess = () => res()
+    req.onerror   = () => rej(req.error)
+  })
+}
+
+// Gera e salva N indivíduos numerados 1..qtd para um lote recém-criado.
+async function bioOfflineGerarIndividuosDoLote(loteUuid, qtd, monitorId) {
+  const db = await bioOfflineInit()
+  return new Promise((res, rej) => {
+    const tx = db.transaction('individuos', 'readwrite')
+    const st = tx.objectStore('individuos')
+    for (let numero = 1; numero <= qtd; numero++) {
+      st.put({
+        uuid_cliente: bioUuid(),
+        lote_uuid:    loteUuid,
+        numero,
+        status:       'ativo',
+        monitor_id:   monitorId,
+        status_sync:  'pendente',
+        criado_em:    new Date().toISOString(),
+      })
+    }
+    tx.oncomplete = () => res()
+    tx.onerror    = () => rej(tx.error)
+  })
+}
+
+async function bioOfflineGetIndividuo(uuid) {
+  const db = await bioOfflineInit()
+  return new Promise((res, rej) => {
+    const tx  = db.transaction('individuos', 'readonly')
+    const req = tx.objectStore('individuos').get(uuid)
+    req.onsuccess = () => res(req.result ?? null)
+    req.onerror   = () => rej(req.error)
+  })
+}
+
+async function bioOfflineIndividuosDoLote(loteUuid) {
+  const db = await bioOfflineInit()
+  return new Promise((res, rej) => {
+    const tx  = db.transaction('individuos', 'readonly')
+    const idx = tx.objectStore('individuos').index('lote_uuid')
+    const req = idx.getAll(loteUuid)
+    req.onsuccess = () => {
+      const lista = req.result
+      lista.sort((a, b) => a.numero - b.numero)
+      res(lista)
+    }
+    req.onerror = () => rej(req.error)
+  })
+}
+
+async function bioOfflineIndividuosPendentes() {
+  const db = await bioOfflineInit()
+  return new Promise((res, rej) => {
+    const tx  = db.transaction('individuos', 'readonly')
+    const idx = tx.objectStore('individuos').index('status_sync')
+    const req = idx.getAll('pendente')
+    req.onsuccess = () => res(req.result)
+    req.onerror   = () => rej(req.error)
+  })
+}
+
+// ── Biometria individual ───────────────────────────────────────
+async function bioOfflineSalvarBiometriaInd(b) {
+  const db = await bioOfflineInit()
+  return new Promise((res, rej) => {
+    const tx  = db.transaction('biometrias_ind', 'readwrite')
+    const req = tx.objectStore('biometrias_ind').put(b)
+    req.onsuccess = () => res()
+    req.onerror   = () => rej(req.error)
+  })
+}
+
+async function bioOfflineBiometriasDoIndividuo(individuoUuid) {
+  const db = await bioOfflineInit()
+  return new Promise((res, rej) => {
+    const tx  = db.transaction('biometrias_ind', 'readonly')
+    const idx = tx.objectStore('biometrias_ind').index('individuo_uuid')
+    const req = idx.getAll(individuoUuid)
+    req.onsuccess = () => {
+      const lista = req.result
+      lista.sort((a, b) => (b.data_medicao + (b.hora_medicao || '')).localeCompare(a.data_medicao + (a.hora_medicao || '')))
+      res(lista)
+    }
+    req.onerror = () => rej(req.error)
+  })
+}
+
+async function bioOfflineBiometriasIndPendentes() {
+  const db = await bioOfflineInit()
+  return new Promise((res, rej) => {
+    const tx  = db.transaction('biometrias_ind', 'readonly')
+    const idx = tx.objectStore('biometrias_ind').index('status_sync')
+    const req = idx.getAll('pendente')
+    req.onsuccess = () => res(req.result)
+    req.onerror   = () => rej(req.error)
+  })
+}
+
 // ── Contagem de itens pendentes ────────────────────────────────
 async function bioOfflineContarPendentes() {
-  const [n, t, e, v, l, s, oc] = await Promise.all([
+  const [n, t, e, v, l, s, oc, ind, bi] = await Promise.all([
     bioOfflineNinhosPendentes(),
     bioOfflineTransfPendentes(),
     bioOfflineEclosoesPendentes(),
@@ -523,15 +629,19 @@ async function bioOfflineContarPendentes() {
     bioOfflineLotesPendentes(),
     bioOfflineSolturasPendentes(),
     bioOfflineOcorrenciasPendentes(),
+    bioOfflineIndividuosPendentes(),
+    bioOfflineBiometriasIndPendentes(),
   ])
   const erros = await bioOfflineTodosComErro()
-  return n.length + t.length + e.length + v.length + l.length + s.length + oc.length + erros.length
+  return n.length + t.length + e.length + v.length + l.length + s.length + oc.length
+    + ind.length + bi.length + erros.length
 }
 
 // Stores com fila de sync (label amigável do tipo de registro)
 const _BIO_STORES_SYNC = {
   ninhos: 'Ninho', transferencias: 'Transferência', eclosoes: 'Eclosão',
   visitas: 'Visita', lotes: 'Berçário', solturas: 'Soltura', ocorrencias: 'Ocorrência',
+  individuos: 'Filhote', biometrias_ind: 'Biometria individual',
 }
 
 // Varre todos os stores e devolve os registros marcados como 'erro'
