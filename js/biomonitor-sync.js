@@ -505,6 +505,90 @@ async function bioSyncOcorrencias(monitorId, onProgresso) {
   return n
 }
 
+// ── Sincronizar filhotes individuais do berçário pendentes ────
+async function bioSyncIndividuos(monitorId, onProgresso) {
+  const pendentes = await bioOfflineIndividuosPendentes()
+  let n = 0
+  for (const ind of pendentes) {
+    onProgresso?.(`Filhote #${ind.numero}…`)
+
+    const loteLocal  = await bioOfflineGetLote(ind.lote_uuid)
+    const loteServId = loteLocal?.server_id
+    if (!loteServId) continue  // lote ainda não sincronizado; tenta no próximo sync
+
+    const payload = {
+      uuid_cliente:  ind.uuid_cliente,
+      lote_id:       loteServId,
+      numero:        ind.numero,
+      status:        ind.status || 'ativo',
+      data_obito:    ind.data_obito    || null,
+      causa_obito:   ind.causa_obito   || null,
+      observacoes:   ind.observacoes   || null,
+      monitor_id:    monitorId,
+      sincronizado_em: new Date().toISOString(),
+    }
+
+    await bioOfflineAtualizarSync('individuos', ind.uuid_cliente, 'enviando')
+
+    const { data, error } = await bioSupabase()
+      .from('filhotes_bercario')
+      .upsert(payload, { onConflict: 'uuid_cliente' })
+      .select('id')
+      .single()
+
+    if (error) {
+      await bioOfflineMarcarErroSync('individuos', ind.uuid_cliente, error.message)
+      continue
+    }
+
+    await bioOfflineAtualizarSync('individuos', ind.uuid_cliente, 'confirmado', data.id)
+    n++
+  }
+  return n
+}
+
+// ── Sincronizar biometrias individuais pendentes ──────────────
+async function bioSyncBiometriasInd(monitorId, onProgresso) {
+  const pendentes = await bioOfflineBiometriasIndPendentes()
+  let n = 0
+  for (const b of pendentes) {
+    onProgresso?.(`Biometria individual…`)
+
+    const indLocal  = await bioOfflineGetIndividuo(b.individuo_uuid)
+    const indServId = indLocal?.server_id
+    if (!indServId) continue  // indivíduo ainda não sincronizado; tenta no próximo sync
+
+    const payload = {
+      uuid_cliente:    b.uuid_cliente,
+      individuo_id:    indServId,
+      data_medicao:    b.data_medicao,
+      hora_medicao:    b.hora_medicao   || null,
+      comprimento_cm:  b.comprimento_cm ?? null,
+      peso_g:          b.peso_g         ?? null,
+      observacoes:     b.observacoes    || null,
+      monitor_id:      monitorId,
+      sincronizado_em: new Date().toISOString(),
+    }
+
+    await bioOfflineAtualizarSync('biometrias_ind', b.uuid_cliente, 'enviando')
+
+    const { data, error } = await bioSupabase()
+      .from('biometrias_individuais')
+      .upsert(payload, { onConflict: 'uuid_cliente' })
+      .select('id')
+      .single()
+
+    if (error) {
+      await bioOfflineMarcarErroSync('biometrias_ind', b.uuid_cliente, error.message)
+      continue
+    }
+
+    await bioOfflineAtualizarSync('biometrias_ind', b.uuid_cliente, 'confirmado', data.id)
+    n++
+  }
+  return n
+}
+
 // ── Sincronização completa ────────────────────────────────────
 async function bioSyncTudo({ monitorId, onProgresso, onConcluido, onErro } = {}) {
   if (_bioSyncEmAndamento) return
