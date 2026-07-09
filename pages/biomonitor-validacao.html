@@ -163,9 +163,19 @@
     if (error) { toast(error.message, 'error'); return }
     _ninhos = data || []
     await carregarAlertas()
+    await montarTimelines()
     popularFiltros()
     renderStats()
     renderLista()
+  }
+
+  // Ocorrências de cada ninho (postura → transferência(s) → visitas →
+  // berçário → soltura → eclosão), ordenadas por data+hora, com saldo de
+  // ovos viáveis — via js/biomonitor-timeline.js (compartilhado com o
+  // app de campo).
+  async function montarTimelines() {
+    const mapa = await bioBuscarEventosServidor(db, _ninhos)
+    _ninhos.forEach(n => { n._eventos = bioMontarHistoricoNinho(n, mapa[n.uuid_cliente]) })
   }
 
   // Alertas científicos de incubação (migration 093), agrupados por ninho
