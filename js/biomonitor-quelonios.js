@@ -1871,6 +1871,8 @@ function bioAbrirFormEntradaBercario() {
   document.getElementById('bio-berc-data').value  = new Date().toISOString().slice(0, 10)
   document.getElementById('bio-berc-hora').value  = new Date().toTimeString().slice(0, 5)
   document.getElementById('bio-berc-obs').value   = ''
+  const _indCk = document.getElementById('bio-berc-individual')
+  if (_indCk) _indCk.checked = false
   bioSetContador('bio-berc-qtd', filhotesVivos ?? 0)
   bioMostrarTela('tela-form-entrada-bercario')
 }
