@@ -370,7 +370,7 @@ BEGIN
       format('%s visitas com ar abaixo de %s °C nos últimos dias — frente fria sobre os ninhos.',
              r.visitas_frias, pa.friagem_temp_ar_min),
       pa.prov_friagem, pa.referencia, r.temp_min, NULL,
-      NULL, NULL, r.praia_id, r.uc_id, NULL, NULL,
+      NULL, NULL, r.praia_id, r.uc_id, r.grupo_id, NULL, NULL,
       'praia:'||r.praia_id||':friagem:'||to_char(CURRENT_DATE,'IYYY-IW'), true);
     v_total := v_total + 1;
   END LOOP;
