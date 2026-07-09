@@ -2840,28 +2840,7 @@ function bioNinhoCardInner(n, opts = {}) {
       ${status !== 'perdido' ? `<button class="bio-btn-sm ghost" data-acao="visita">Visita</button>` : ''}
     </div>` : ''
 
-  const evs = Array.isArray(n._eventos) ? n._eventos : []
-  const histHtml = evs.length ? (() => {
-    const fd = iso => new Date(iso + 'T12:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
-    const rows = evs.map(ev => {
-      const cls   = ev.destruido ? 'destruido' : ev.tipo
-      const delta = ev.delta > 0 ? `<span class="bio-nfc-hist-delta">−${ev.delta}</span>` : ''
-      const saldo = ev.saldo != null
-        ? `<span class="bio-nfc-hist-saldo">${ev.saldo}<i>viáveis</i></span>` : ''
-      return `
-      <div class="bio-nfc-hist-ev ev-${cls}">
-        <div class="bio-nfc-hist-dot"></div>
-        <span class="bio-nfc-hist-data">${fd(ev.data)}</span>
-        <span class="bio-nfc-hist-txt">${esc(ev.txt)}${delta}</span>
-        ${saldo}
-      </div>`
-    }).join('')
-    return `<button class="bio-nfc-hist-toggle" data-nh-toggle>
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
-      ${evs.length} evento${evs.length !== 1 ? 's' : ''}
-    </button>
-    <div class="bio-nfc-hist" data-nh-hist>${rows}</div>`
-  })() : ''
+  const histHtml = bioTimelineHtml(n._eventos)
 
   return `
     <div class="bio-nfc-header">
