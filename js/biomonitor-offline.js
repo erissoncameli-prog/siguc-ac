@@ -87,6 +87,19 @@ function bioOfflineInit() {
         d.createIndex('ninho_uuid',  'ninho_uuid')
         d.createIndex('status_sync', 'status_sync')
       }
+
+      if (!db.objectStoreNames.contains('individuos')) {
+        const i = db.createObjectStore('individuos', { keyPath: 'uuid_cliente' })
+        i.createIndex('lote_uuid',   'lote_uuid')
+        i.createIndex('status_sync', 'status_sync')
+        i.createIndex('status',      'status')
+      }
+
+      if (!db.objectStoreNames.contains('biometrias_ind')) {
+        const bi = db.createObjectStore('biometrias_ind', { keyPath: 'uuid_cliente' })
+        bi.createIndex('individuo_uuid', 'individuo_uuid')
+        bi.createIndex('status_sync',    'status_sync')
+      }
     }
 
     req.onsuccess = ev => { _bioDB = ev.target.result; resolve(_bioDB) }
