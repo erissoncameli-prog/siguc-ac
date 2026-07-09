@@ -2550,7 +2550,12 @@ function bioIniciarPosEclosao() {
     if (!lote) return
     const ninho = await bioOfflineGetNinho(lote.ninho_uuid)
     if (!ninho) { bioToast('Ninho não encontrado no cache.', 'err'); return }
-    bioAbrirFormSoltura({ ninho, filhotesVivos: lote.qtd_entrada, lote })
+    const mortes = await bioMortesCanonicasDoLote(lote)
+    bioAbrirFormSoltura({
+      ninho, lote,
+      filhotesVivos: Math.max(lote.qtd_entrada - mortes, 0),
+      mortesIniciais: mortes,
+    })
   })
 
   // Voltar da tela de ocorrência para detalhe
