@@ -77,7 +77,7 @@ html = html.replace('</head>', `<script>window.BIO_BUILD='v${versao} (app)'</scr
 writeFileSync(join(WWW, 'index.html'), html)
 
 // ── Sanidade ───────────────────────────────────────────────────
-for (const f of ['index.html', 'vendor/supabase.js', 'vendor/fonts.css', 'css/biomonitor.css', 'js/config.js', 'js/biomonitor-quelonios.js', 'pwa/icons/biomonitor-logo.png']) {
+for (const f of ['index.html', 'vendor/supabase.js', 'vendor/fonts.css', 'css/biomonitor.css', 'js/config.js', 'js/biomonitor-timeline.js', 'js/biomonitor-quelonios.js', 'pwa/icons/biomonitor-logo.png']) {
   if (!existsSync(join(WWW, f))) { console.error(`ERRO: faltando www/${f}`); process.exit(1) }
 }
 if (/cdn\.jsdelivr|fonts\.googleapis/.test(readFileSync(join(WWW, 'index.html'), 'utf8'))) {
