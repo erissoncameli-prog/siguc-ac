@@ -1443,6 +1443,21 @@ body.field-mode .bio-home-nome { font-size: 26px; }
   background: var(--bio-prim); border-color: var(--bio-prim); color: #fff;
 }
 
+/* ── Filhotes individuais (detalhe do lote) ── */
+.bio-filhotes-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 8px;
+}
+.bio-filhote-chip {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 8px 4px; border-radius: 10px; cursor: pointer;
+  background: var(--bio-bg2); border: 1.5px solid var(--bio-border);
+  transition: border-color .12s;
+}
+.bio-filhote-chip:active { border-color: var(--bio-prim); }
+.bio-filhote-chip.morto  { opacity: .5; }
+.bio-filhote-num  { font-family: var(--font-mono); font-size: 14px; font-weight: 700; color: var(--bio-ink); }
+.bio-filhote-bio  { font-size: 10px; color: var(--bio-ink2); text-align: center; line-height: 1.3; }
+
 /* ── Grupos de berçário na lista de lotes ── */
 .bio-berc-grupo-header {
   display: flex; align-items: center; justify-content: space-between;
