@@ -2151,7 +2151,181 @@ function bioAbrirTelaDetalheLote(lote) {
   if (el('bio-det-dias'))       el('bio-det-dias').textContent       = diasNum >= 0 ? diasNum : '—'
 
   bioCarregarTimelineLote(lote)
+  bioRenderizarFilhotesDoLote(lote)
   bioMostrarTela('tela-detalhe-lote')
+}
+
+// ── Filhotes individuais do lote ──────────────────────────────
+async function bioRenderizarFilhotesDoLote(lote) {
+  const sec  = document.getElementById('bio-det-filhotes-sec')
+  const grid = document.getElementById('bio-det-filhotes-lista')
+  const btnSeq = document.getElementById('bio-btn-biometria-seq')
+  if (!sec || !grid) return
+
+  const individuos = await bioOfflineIndividuosDoLote(lote.uuid_cliente)
+  if (!individuos.length) { sec.hidden = true; return }
+  sec.hidden = false
+
+  const ativos = individuos.filter(i => i.status === 'ativo')
+  if (btnSeq) btnSeq.hidden = ativos.length === 0
+
+  // Última biometria de cada indivíduo (para exibir no chip)
+  const ultimas = await Promise.all(
+    individuos.map(i => bioOfflineBiometriasDoIndividuo(i.uuid_cliente))
+  )
+
+  grid.innerHTML = individuos.map((ind, i) => {
+    const ult = ultimas[i][0]
+    const bioTxt = ult
+      ? [ult.comprimento_cm != null ? `${ult.comprimento_cm}cm` : null,
+         ult.peso_g != null ? `${ult.peso_g}g` : null].filter(Boolean).join(' · ')
+      : 'sem biometria'
+    return `
+      <div class="bio-filhote-chip${ind.status === 'morto' ? ' morto' : ''}" data-individuo-uuid="${ind.uuid_cliente}">
+        <span class="bio-filhote-num">#${ind.numero}</span>
+        <span class="bio-filhote-bio">${ind.status === 'morto' ? 'óbito' : bioTxt}</span>
+      </div>`
+  }).join('')
+}
+
+function bioAbrirTelaDetalheIndividuo(individuo) {
+  BioApp.individuoAtual = individuo
+  const el = id => document.getElementById(id)
+  if (el('bio-ind-numero')) el('bio-ind-numero').textContent = individuo.numero
+  if (el('bio-ind-status')) el('bio-ind-status').textContent = individuo.status === 'morto' ? 'Morto' : 'Ativo'
+
+  const obitoRow = el('bio-ind-obito-row')
+  const btnObito = el('bio-btn-obito-individuo')
+  if (individuo.status === 'morto') {
+    if (obitoRow) { obitoRow.hidden = false; el('bio-ind-obito').textContent = _bioFormatarData(individuo.data_obito) }
+    if (btnObito) btnObito.hidden = true
+  } else {
+    if (obitoRow) obitoRow.hidden = true
+    if (btnObito) btnObito.hidden = false
+  }
+
+  bioCarregarTimelineIndividuo(individuo)
+  bioMostrarTela('tela-detalhe-individuo')
+}
+
+async function bioCarregarTimelineIndividuo(individuo) {
+  const timelineEl = document.getElementById('bio-ind-timeline')
+  if (!timelineEl) return
+
+  const medicoes = await bioOfflineBiometriasDoIndividuo(individuo.uuid_cliente)
+  if (!medicoes.length) {
+    timelineEl.innerHTML = `<div class="bio-tl-vazio">Nenhuma biometria registrada.</div>`
+    return
+  }
+
+  timelineEl.innerHTML = medicoes.map(m => {
+    const detalhes = [
+      m.comprimento_cm != null ? `Comp.: ${m.comprimento_cm} cm` : null,
+      m.peso_g != null ? `Peso: ${m.peso_g} g` : null,
+      m.observacoes || null,
+    ].filter(Boolean).join(' · ')
+    const dataFmt = _bioFormatarData(m.data_medicao) + (m.hora_medicao ? ` às ${m.hora_medicao}` : '')
+    return `
+      <div class="bio-tl-item">
+        <div class="bio-tl-icone">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        </div>
+        <div class="bio-tl-body">
+          <div class="bio-tl-tipo">Biometria</div>
+          <div class="bio-tl-data">${dataFmt}</div>
+          ${detalhes ? `<div class="bio-tl-detalhe">${detalhes}</div>` : ''}
+        </div>
+      </div>`
+  }).join('')
+}
+
+async function bioMarcarObitoIndividuo(individuo) {
+  const atualizado = {
+    ...individuo,
+    status: 'morto',
+    data_obito: new Date().toISOString().slice(0, 10),
+    status_sync: 'pendente',
+  }
+  await bioOfflineSalvarIndividuo(atualizado)
+  BioApp.individuoAtual = atualizado
+  bioSyncTudo({ monitorId: BioApp.monitor?.id, onConcluido: () => bioAtualizarBadgeFila() })
+  bioToast(`Óbito registrado — filhote #${individuo.numero}.`, 'ok')
+  bioAbrirTelaDetalheIndividuo(atualizado)
+}
+
+// ── Biometria individual (modo único ou sequencial) ───────────
+function bioAbrirFormBiometriaInd(individuo, opts = {}) {
+  BioApp.individuoAtual = individuo
+  BioApp._bioSeqOpts = opts
+  const el = id => document.getElementById(id)
+  if (el('bio-bio-ind-numero')) el('bio-bio-ind-numero').textContent = individuo.numero
+  if (el('bio-bio-ind-comp'))   el('bio-bio-ind-comp').value = ''
+  if (el('bio-bio-ind-peso'))   el('bio-bio-ind-peso').value = ''
+  if (el('bio-bio-ind-obs'))    el('bio-bio-ind-obs').value  = ''
+  if (el('bio-bio-ind-data'))   el('bio-bio-ind-data').value = new Date().toISOString().slice(0, 10)
+  if (el('bio-bio-ind-hora'))   el('bio-bio-ind-hora').value = new Date().toTimeString().slice(0, 5)
+
+  const progEl = el('bio-bio-ind-progresso')
+  const pularBtn = el('bio-btn-pular-biometria-ind')
+  if (opts.sequencial) {
+    if (progEl) { progEl.hidden = false; progEl.textContent = `Filhote ${opts.indexAtual + 1} de ${opts.total}` }
+    if (pularBtn) pularBtn.hidden = false
+  } else {
+    if (progEl) progEl.hidden = true
+    if (pularBtn) pularBtn.hidden = true
+  }
+
+  bioMostrarTela('tela-biometria-individual')
+}
+
+// Ninhada de indivíduos ainda por medir na sequência atual
+function bioAvancarSequenciaBiometria() {
+  const opts = BioApp._bioSeqOpts
+  if (!opts?.sequencial) { bioAbrirTelaDetalheIndividuo(BioApp.individuoAtual); return }
+
+  const proximoIndex = opts.indexAtual + 1
+  if (proximoIndex >= opts.fila.length) {
+    bioToast(`Sequência concluída! ${opts.fila.length} filhote(s) medido(s)/revisado(s).`, 'ok')
+    bioAbrirTelaDetalheLote(BioApp.loteAtual)
+    return
+  }
+  bioAbrirFormBiometriaInd(opts.fila[proximoIndex], { ...opts, indexAtual: proximoIndex })
+}
+
+async function bioIniciarBiometriaSequencial(lote) {
+  const individuos = await bioOfflineIndividuosDoLote(lote.uuid_cliente)
+  const ativos = individuos.filter(i => i.status === 'ativo')
+  if (!ativos.length) { bioToast('Nenhum filhote ativo neste lote.', 'err'); return }
+  bioAbrirFormBiometriaInd(ativos[0], { sequencial: true, indexAtual: 0, total: ativos.length, fila: ativos })
+}
+
+async function bioSalvarBiometriaInd() {
+  const individuo = BioApp.individuoAtual
+  if (!individuo) return
+
+  const data = document.getElementById('bio-bio-ind-data').value
+  if (!data) { bioToast('Informe a data da biometria.', 'err'); return }
+
+  const comp = parseFloat(document.getElementById('bio-bio-ind-comp').value) || null
+  const peso = parseFloat(document.getElementById('bio-bio-ind-peso').value) || null
+  if (comp == null && peso == null) { bioToast('Informe ao menos comprimento ou peso.', 'err'); return }
+
+  const b = {
+    uuid_cliente:    bioUuid(),
+    individuo_uuid:  individuo.uuid_cliente,
+    data_medicao:    data,
+    hora_medicao:    document.getElementById('bio-bio-ind-hora').value || null,
+    comprimento_cm:  comp,
+    peso_g:          peso,
+    observacoes:     document.getElementById('bio-bio-ind-obs').value.trim() || null,
+    status_sync:     'pendente',
+    criado_em:       new Date().toISOString(),
+  }
+
+  await bioOfflineSalvarBiometriaInd(b)
+  bioSyncTudo({ monitorId: BioApp.monitor?.id, onConcluido: () => bioAtualizarBadgeFila() })
+  bioToast(`Biometria salva — filhote #${individuo.numero}.`, 'ok')
+  bioAvancarSequenciaBiometria()
 }
 
 async function bioCarregarTimelineLote(lote) {
