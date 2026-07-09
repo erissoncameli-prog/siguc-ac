@@ -9,7 +9,7 @@
 // Confirmados retidos 7 dias; pendentes nunca apagados.
 
 const BIO_DB_NAME    = 'siguc_biomonitor_v1'
-const BIO_DB_VERSION = 5
+const BIO_DB_VERSION = 6
 let _bioDB = null
 
 // ── Inicialização ──────────────────────────────────────────────
