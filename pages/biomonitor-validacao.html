@@ -370,6 +370,8 @@
           ${(n.ovos_viaveis != null && n.ovos_perdidos_total > 0) ? `<span>Viáveis: <strong style="color:#52B788">${n.ovos_viaveis}</strong></span>` : ''}
         </div>` : ''}
 
+        ${donutOvosHtml(n)}
+
         ${bioTimelineHtml(n._eventos)}
 
         ${(n.temperatura_c != null || n.umidade_pct != null || n.profundidade_cm != null) ? `
