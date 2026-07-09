@@ -2546,6 +2546,39 @@ function bioIniciarPosEclosao() {
     else bioMostrarTela('tela-bercarios')
   })
 
+  // Filhotes individuais: abrir detalhe ao tocar num chip
+  document.getElementById('bio-det-filhotes-lista')?.addEventListener('click', async e => {
+    const chip = e.target.closest('.bio-filhote-chip')
+    if (!chip) return
+    const individuo = await bioOfflineGetIndividuo(chip.dataset.individuoUuid)
+    if (individuo) bioAbrirTelaDetalheIndividuo(individuo)
+  })
+  document.getElementById('bio-btn-biometria-seq')?.addEventListener('click', () => {
+    if (BioApp.loteAtual) bioIniciarBiometriaSequencial(BioApp.loteAtual)
+  })
+
+  // Detalhe do indivíduo
+  document.getElementById('bio-ind-back')?.addEventListener('click', () => {
+    if (BioApp.loteAtual) bioAbrirTelaDetalheLote(BioApp.loteAtual)
+    else bioMostrarTela('tela-bercarios')
+  })
+  document.getElementById('bio-btn-nova-biometria-ind')?.addEventListener('click', () => {
+    if (BioApp.individuoAtual) bioAbrirFormBiometriaInd(BioApp.individuoAtual, { sequencial: false })
+  })
+  document.getElementById('bio-btn-obito-individuo')?.addEventListener('click', () => {
+    const ind = BioApp.individuoAtual
+    if (ind && confirm(`Confirma o óbito do filhote #${ind.numero}?`)) bioMarcarObitoIndividuo(ind)
+  })
+
+  // Biometria individual
+  document.getElementById('bio-bio-ind-back')?.addEventListener('click', () => {
+    const opts = BioApp._bioSeqOpts
+    if (opts?.sequencial) { if (BioApp.loteAtual) bioAbrirTelaDetalheLote(BioApp.loteAtual) }
+    else if (BioApp.individuoAtual) bioAbrirTelaDetalheIndividuo(BioApp.individuoAtual)
+  })
+  document.getElementById('bio-btn-salvar-biometria-ind')?.addEventListener('click', bioSalvarBiometriaInd)
+  document.getElementById('bio-btn-pular-biometria-ind')?.addEventListener('click', bioAvancarSequenciaBiometria)
+
   // Botão salvar
   document.getElementById('bio-btn-salvar-entrada-bercario')?.addEventListener('click', bioSalvarEntradaBercario)
   document.getElementById('bio-btn-salvar-soltura')?.addEventListener('click',           bioSalvarSoltura)
