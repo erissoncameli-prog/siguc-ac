@@ -19,7 +19,7 @@ mkdirSync(join(WWW, 'js'),           { recursive: true })
 mkdirSync(join(WWW, 'vendor/fonts'), { recursive: true })
 
 // ── JS compartilhado (idêntico ao site) ───────────────────────
-for (const f of ['config.js', 'biomonitor-offline.js', 'biomonitor-sync.js', 'biomonitor-alertas.js', 'brigada-captura.js', 'biomonitor-quelonios.js']) {
+for (const f of ['config.js', 'biomonitor-offline.js', 'biomonitor-sync.js', 'biomonitor-alertas.js', 'brigada-captura.js', 'biomonitor-timeline.js', 'biomonitor-quelonios.js']) {
   cpSync(join(RAIZ, 'js', f), join(WWW, 'js', f))
 }
 
