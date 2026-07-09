@@ -741,7 +741,7 @@ async function bioOfflineReenfileirar(store, uuid) {
 async function bioOfflineLimparConfirmados() {
   const db     = await bioOfflineInit()
   const limite = new Date(Date.now() - 7 * 86400 * 1000).toISOString()
-  const stores = ['ninhos', 'transferencias', 'eclosoes', 'visitas', 'lotes', 'solturas', 'ocorrencias', 'descartes']
+  const stores = ['ninhos', 'transferencias', 'eclosoes', 'visitas', 'lotes', 'solturas', 'ocorrencias', 'descartes', 'individuos', 'biometrias_ind']
   let removidos = 0
 
   for (const nome of stores) {
@@ -810,7 +810,7 @@ async function bioOfflineTemPin() {
 // ── Zerar fila (suporte à Config → Zerar fila) ────────────────
 async function bioOfflineZerarFila() {
   const db     = await bioOfflineInit()
-  const stores = ['ninhos', 'transferencias', 'eclosoes', 'visitas', 'lotes', 'solturas', 'ocorrencias', 'descartes']
+  const stores = ['ninhos', 'transferencias', 'eclosoes', 'visitas', 'lotes', 'solturas', 'ocorrencias', 'descartes', 'individuos', 'biometrias_ind']
   for (const nome of stores) {
     await new Promise((res, rej) => {
       const tx  = db.transaction(nome, 'readwrite')
