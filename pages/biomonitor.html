@@ -1230,10 +1230,104 @@
       </button>
     </div>
 
+    <div id="bio-det-filhotes-sec" hidden>
+      <div style="padding:0 16px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:8px">
+        <span class="bio-form-label">Filhotes individuais</span>
+        <button type="button" id="bio-btn-biometria-seq" class="bio-btn-sm prim">Biometria em sequência</button>
+      </div>
+      <div id="bio-det-filhotes-lista" class="bio-filhotes-grid" style="padding:0 16px 16px"></div>
+    </div>
+
     <div style="padding:0 16px;margin-bottom:8px">
       <span class="bio-form-label">Histórico de ocorrências</span>
     </div>
     <div id="bio-det-timeline" style="padding:0 16px"></div>
+  </div>
+</div>
+
+<!-- ══ TELA: DETALHE DO INDIVÍDUO (FILHOTE) ═══════════════════ -->
+<div id="tela-detalhe-individuo" class="bio-tela">
+  <header class="bio-form-header">
+    <button class="bio-btn-back" id="bio-ind-back" aria-label="Voltar">‹</button>
+    <span>Filhote #<span id="bio-ind-numero">—</span></span>
+    <span></span>
+  </header>
+  <div class="bio-form-body">
+    <div class="bio-det-lote-header">
+      <div class="bio-det-lote-row">
+        <span class="bio-form-label">Status</span>
+        <strong id="bio-ind-status">—</strong>
+      </div>
+      <div class="bio-det-lote-row" id="bio-ind-obito-row" hidden>
+        <span class="bio-form-label">Óbito</span>
+        <strong id="bio-ind-obito">—</strong>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:10px;padding:0 16px 16px">
+      <button type="button" id="bio-btn-nova-biometria-ind" class="bio-btn-sm prim" style="flex:1">
+        + Biometria
+      </button>
+      <button type="button" id="bio-btn-obito-individuo" class="bio-btn-sm" style="flex:1;background:var(--bio-perigo);color:#fff">
+        Marcar óbito
+      </button>
+    </div>
+
+    <div style="padding:0 16px;margin-bottom:8px">
+      <span class="bio-form-label">Histórico de biometria</span>
+    </div>
+    <div id="bio-ind-timeline" style="padding:0 16px"></div>
+  </div>
+</div>
+
+<!-- ══ TELA: BIOMETRIA INDIVIDUAL ═══════════════════════════════ -->
+<div id="tela-biometria-individual" class="bio-tela">
+  <header class="bio-form-header">
+    <button class="bio-btn-back" id="bio-bio-ind-back" aria-label="Voltar">‹</button>
+    <span id="bio-bio-ind-titulo">Biometria — Filhote</span>
+    <span></span>
+  </header>
+  <div class="bio-form-body">
+
+    <div class="bio-form-section" style="background:var(--bio-prim-bg);border-color:rgba(26,107,140,.35)">
+      <span class="bio-form-label">Filhote</span>
+      <p style="margin:4px 0 0;font-size:16px;font-weight:700">
+        #<span id="bio-bio-ind-numero">—</span>
+      </p>
+      <p id="bio-bio-ind-progresso" style="margin:4px 0 0;font-size:12px;opacity:.7" hidden></p>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0">
+      <div class="bio-form-section">
+        <label class="bio-form-label" for="bio-bio-ind-comp">Comprimento (cm)</label>
+        <input type="number" id="bio-bio-ind-comp" class="bio-form-input" step="0.1" min="0" placeholder="0.0">
+      </div>
+      <div class="bio-form-section">
+        <label class="bio-form-label" for="bio-bio-ind-peso">Peso (g)</label>
+        <input type="number" id="bio-bio-ind-peso" class="bio-form-input" step="0.1" min="0" placeholder="0.0">
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0">
+      <div class="bio-form-section">
+        <label class="bio-form-label" for="bio-bio-ind-data">Data *</label>
+        <input type="date" id="bio-bio-ind-data" class="bio-form-input">
+      </div>
+      <div class="bio-form-section">
+        <label class="bio-form-label" for="bio-bio-ind-hora">Hora</label>
+        <input type="time" id="bio-bio-ind-hora" class="bio-form-input">
+      </div>
+    </div>
+
+    <div class="bio-form-section">
+      <label class="bio-form-label" for="bio-bio-ind-obs">Observações</label>
+      <textarea id="bio-bio-ind-obs" class="bio-form-textarea" rows="2" placeholder="Observações…"></textarea>
+    </div>
+
+    <button type="button" id="bio-btn-salvar-biometria-ind" class="bio-btn-salvar">Salvar</button>
+    <button type="button" id="bio-btn-pular-biometria-ind" class="bio-btn-sm" style="width:100%;margin-top:8px;background:transparent;border:1.5px solid var(--bio-border)" hidden>
+      Pular este filhote
+    </button>
   </div>
 </div>
 
