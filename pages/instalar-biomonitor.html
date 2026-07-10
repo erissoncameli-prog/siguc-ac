@@ -64,7 +64,7 @@
     </h2>
     <p class="sub">Instale o app uma única vez. Depois é só tocar no ícone — funciona sem internet, como qualquer outro aplicativo.</p>
 
-    <a class="btn-baixar" id="btn-apk" href="https://github.com/erissoncameli-prog/siguc-ac/releases/download/biomonitor-v1.1.0/siguc-biomonitor.apk">
+    <a class="btn-baixar" id="btn-apk" href="/api/biomonitor-apk-latest">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
       Baixar o aplicativo
     </a>
@@ -201,32 +201,6 @@
       if (_copiaFallback(LINK_APP)) _copiaOk('btn-copiar2')
     }
   }
-
-  // ── Link do APK sempre = último Release do BIOMONITOR ──────────
-  // Não usa releases/latest (que é o Release mais recente do repositório
-  // inteiro e quebraria se saísse um APK novo do Brigadas). Consulta a API
-  // do GitHub e escolhe o Release não-rascunho mais recente cujo tag começa
-  // com "biomonitor-v". O href já vem apontando para uma versão fixa como
-  // fallback, caso a API esteja indisponível/limitada.
-  ;(function () {
-    var btn = document.getElementById('btn-apk')
-    if (!btn || !window.fetch) return
-    fetch('https://api.github.com/repos/erissoncameli-prog/siguc-ac/releases?per_page=30', {
-      headers: { 'Accept': 'application/vnd.github+json' }
-    })
-      .then(function (r) { if (!r.ok) throw new Error('gh ' + r.status); return r.json() })
-      .then(function (rels) {
-        if (!Array.isArray(rels)) return
-        var rel = rels.find(function (x) {
-          return x && !x.draft && !x.prerelease &&
-                 typeof x.tag_name === 'string' && x.tag_name.indexOf('biomonitor-v') === 0
-        })
-        if (!rel || !Array.isArray(rel.assets)) return
-        var apk = rel.assets.find(function (a) { return a && a.name === 'siguc-biomonitor.apk' })
-        if (apk && apk.browser_download_url) btn.href = apk.browser_download_url
-      })
-      .catch(function () { /* mantém o fallback fixo do href */ })
-  })()
 </script>
 </body>
 </html>
