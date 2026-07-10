@@ -245,7 +245,8 @@ function bioTimelineHtml(evs) {
   <div class="bio-nfc-hist" data-nh-hist>${rows}</div>`
 }
 
-// Liga os toggles "N eventos" de todos os cards dentro de `container`.
+// Liga os toggles "N eventos" e os botões "Detalhes" de todos os cards
+// dentro de `container`.
 function bioLigarTogglesHistorico(container) {
   container.querySelectorAll('[data-nh-toggle]').forEach(btn => {
     if (btn._nhLigado) return
@@ -257,6 +258,14 @@ function bioLigarTogglesHistorico(container) {
       if (!hist) return
       const vis = hist.classList.toggle('vis')
       btn.classList.toggle('aberto', vis)
+    })
+  })
+  container.querySelectorAll('[data-nh-detalhe]').forEach(btn => {
+    if (btn._nhLigado) return
+    btn._nhLigado = true
+    btn.addEventListener('click', e => {
+      e.stopPropagation()
+      bioAbrirDetalhesVisita(btn.dataset.nhDetalhe)
     })
   })
 }
