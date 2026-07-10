@@ -1904,6 +1904,21 @@ async function bioSalvarEntradaBercario() {
   if (!data) { bioToast('Informe a data de entrada.', 'err'); return }
   if (qtd <= 0) { bioToast('Quantidade deve ser maior que zero.', 'err'); return }
 
+  // Guarda final: reconfirma que o berçário não mudou de espécie entre a
+  // seleção e o salvar (ex.: outro monitor sincronizou nesse intervalo).
+  const especieAtual = bioBercarioEspecieAtual(berc.id, await bioOfflineLotesAtivos())
+  if (especieAtual && ninho.especie && especieAtual !== ninho.especie) {
+    const espNome = BIO_ESPECIES.find(e => e.id === especieAtual)?.nome ?? especieAtual
+    alert(`Este berçário já está em uso com a espécie "${espNome}".\nNão é possível misturar espécies diferentes ali.\n\nEscolha outro berçário.`)
+    bioAbrirSeletorBercario(b => {
+      BioApp.formBercarioSelecionado = b
+      const nomeSpan = document.getElementById('bio-berc-nome-txt')
+      if (nomeSpan) nomeSpan.textContent = b.nome
+      bioMostrarTela('tela-form-entrada-bercario')
+    }, ninho.especie)
+    return
+  }
+
   const lote = {
     uuid_cliente:  bioUuid(),
     ninho_uuid:    ninho.uuid_cliente,
@@ -2057,40 +2072,91 @@ async function bioSalvarSoltura() {
 /* ════════════════════════════════════════════════════════════
    TELA BERÇÁRIOS — LOTES ATIVOS
    ════════════════════════════════════════════════════════════ */
+// Cor fixa por berçário (deriva do id — mesma cor sempre, diferencia
+// visualmente cada berçário na lista sem precisar de cadastro extra).
+const BIO_BERC_PALETA = ['#1A6B8C', '#C9A84C', '#7C3AED', '#0891B2', '#DC6803', '#2A9D6F', '#BE185D', '#4338CA']
+function bioBercarioCor(bercarioId) {
+  if (!bercarioId) return '#6B7280'
+  let h = 0
+  for (let i = 0; i < bercarioId.length; i++) h = (h * 31 + bercarioId.charCodeAt(i)) >>> 0
+  return BIO_BERC_PALETA[h % BIO_BERC_PALETA.length]
+}
+
+// Espécie que atualmente ocupa um berçário (regra: 1 espécie por vez,
+// enquanto houver lote ativo; libera quando todos forem soltos).
+function bioBercarioEspecieAtual(bercarioId, lotesAtivos) {
+  const lote = lotesAtivos.find(l => l.bercario_id === bercarioId && l.especie)
+  return lote ? lote.especie : null
+}
+
 async function bioAbrirTelaBercarios() {
   bioMostrarTela('tela-bercarios')
+  BioApp.bercarioFiltro = ''
   await bioCarregarBercarios()
 }
 
 async function bioCarregarBercarios() {
   const estadoEl = document.getElementById('bio-bercarios-estado')
   const listaEl  = document.getElementById('bio-lista-lotes')
+  const chipsEl  = document.getElementById('bio-berc-chips')
   if (estadoEl) { estadoEl.textContent = 'Carregando…'; estadoEl.hidden = false }
   if (listaEl)  listaEl.innerHTML = ''
 
   const lotes = await bioOfflineLotesAtivos()
 
   if (!lotes.length) {
+    if (chipsEl) chipsEl.innerHTML = ''
     if (estadoEl) { estadoEl.textContent = 'Nenhum lote em berçário no momento.'; estadoEl.hidden = false }
     return
   }
-  if (estadoEl) estadoEl.hidden = true
 
   // Agrupa por bercario_id (ou 'sem-bercario')
   const grupos = {}
   lotes.forEach(l => {
     const chave = l.bercario_id ?? 'sem-bercario'
-    if (!grupos[chave]) grupos[chave] = { nome: l.bercario_nome ?? 'Berçário não identificado', lotes: [] }
+    if (!grupos[chave]) grupos[chave] = { id: l.bercario_id, nome: l.bercario_nome ?? 'Berçário não identificado', lotes: [] }
     grupos[chave].lotes.push(l)
   })
 
-  Object.values(grupos).forEach(grupo => {
+  // Chips: "Todos" + um por berçário com lote ativo
+  if (chipsEl) {
+    const filtro = BioApp.bercarioFiltro || ''
+    chipsEl.innerHTML = [
+      `<button type="button" class="bio-oc-chip${!filtro ? ' ativo' : ''}" data-filtro="">Todos</button>`,
+      ...Object.values(grupos).map(g => `
+        <button type="button" class="bio-oc-chip${filtro === g.nome ? ' ativo' : ''}" data-filtro="${esc(g.nome)}">${esc(g.nome)}</button>
+      `),
+    ].join('')
+    chipsEl.querySelectorAll('[data-filtro]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        BioApp.bercarioFiltro = btn.dataset.filtro
+        const buscaEl = document.getElementById('bio-berc-busca')
+        if (buscaEl) buscaEl.value = btn.dataset.filtro
+        bioCarregarBercarios()
+      })
+    })
+  }
+
+  const termo = (BioApp.bercarioFiltro || '').trim().toLowerCase()
+  const gruposVisiveis = Object.values(grupos).filter(g => !termo || g.nome.toLowerCase().includes(termo))
+
+  if (!gruposVisiveis.length) {
+    if (estadoEl) { estadoEl.textContent = 'Nenhum berçário encontrado para essa busca.'; estadoEl.hidden = false }
+    return
+  }
+  if (estadoEl) estadoEl.hidden = true
+
+  gruposVisiveis.forEach(grupo => {
     const totalFilhotes = grupo.lotes.reduce((s, l) => s + (l.qtd_entrada || 0), 0)
+    const especieAtual = bioBercarioEspecieAtual(grupo.id, lotes)
+    const espLabel = especieAtual ? (BIO_ESPECIES.find(e => e.id === especieAtual)?.nome ?? especieAtual) : null
 
     const header = document.createElement('div')
     header.className = 'bio-berc-grupo-header'
+    header.style.borderLeft = `4px solid ${bioBercarioCor(grupo.id)}`
+    header.style.paddingLeft = '12px'
     header.innerHTML = `
-      <span>${grupo.nome}</span>
+      <span>${grupo.nome}${espLabel ? ` <span class="bio-berc-grupo-especie">${espLabel}</span>` : ''}</span>
       <span class="bio-berc-grupo-stats">${grupo.lotes.length} lote${grupo.lotes.length !== 1 ? 's' : ''} · ${totalFilhotes} filhotes</span>
     `
     listaEl.appendChild(header)
@@ -2128,8 +2194,11 @@ async function bioCarregarBercarios() {
   })
 }
 
-async function bioAbrirSeletorBercario(callback) {
+// especieNova: espécie do ninho sendo registrado. Berçários já ocupados
+// com espécie diferente aparecem desabilitados — 1 espécie por vez.
+async function bioAbrirSeletorBercario(callback, especieNova) {
   const lista = await bioOfflineListarBercarios()
+  const lotesAtivos = await bioOfflineLotesAtivos()
   const selEl  = document.getElementById('bio-lista-bercarios-sel')
   const vazioEl = document.getElementById('bio-bercarios-vazio')
   if (selEl) selEl.innerHTML = ''
@@ -2143,16 +2212,23 @@ async function bioAbrirSeletorBercario(callback) {
       selEl.hidden = false
       const TIPO_LABEL = { tanque_fibra: 'Tanque de fibra', piscina_alvenaria: 'Piscina de alvenaria', viveiro: 'Viveiro', outro: 'Outro' }
       lista.forEach(b => {
+        const especieAtual = bioBercarioEspecieAtual(b.id, lotesAtivos)
+        const bloqueado = !!(especieAtual && especieNova && especieAtual !== especieNova)
+        const espNome = especieAtual ? (BIO_ESPECIES.find(e => e.id === especieAtual)?.nome ?? especieAtual) : null
         const card = document.createElement('div')
-        card.className = 'bio-berc-sel-card'
+        card.className = 'bio-berc-sel-card' + (bloqueado ? ' bloqueado' : '')
         card.innerHTML = `
           <div class="bio-berc-sel-info">
             <div class="bio-berc-sel-nome">${b.nome}</div>
-            <div class="bio-berc-sel-meta">${TIPO_LABEL[b.tipo] ?? b.tipo}</div>
+            <div class="bio-berc-sel-meta">${TIPO_LABEL[b.tipo] ?? b.tipo}${espNome ? ` · ${bloqueado ? 'Ocupado com' : 'Em uso —'} ${espNome}` : ''}</div>
           </div>
           ${b.capacidade_max ? `<span class="bio-berc-sel-cap">Máx. ${b.capacidade_max}</span>` : ''}
         `
         card.addEventListener('click', () => {
+          if (bloqueado) {
+            bioToast(`Berçário ocupado com ${espNome} — solte esses filhotes antes ou escolha outro berçário.`, 'err')
+            return
+          }
           callback(b)
         })
         selEl.appendChild(card)
@@ -2533,7 +2609,7 @@ function bioIniciarPosEclosao() {
       const nomeSpan = document.getElementById('bio-berc-nome-txt')
       if (nomeSpan) nomeSpan.textContent = b.nome
       bioMostrarTela('tela-form-entrada-bercario')
-    })
+    }, BioApp.formDestinoCtx?.ninho?.especie)
   })
 
   // Contadores berçário
@@ -2629,6 +2705,10 @@ function bioIniciarPosEclosao() {
   document.getElementById('bio-btn-salvar-soltura')?.addEventListener('click',           bioSalvarSoltura)
   document.getElementById('bio-btn-reload-bercarios')?.addEventListener('click',         bioCarregarBercarios)
   document.getElementById('bio-btn-bercarios')?.addEventListener('click',                bioAbrirTelaBercarios)
+  document.getElementById('bio-berc-busca')?.addEventListener('input', e => {
+    BioApp.bercarioFiltro = e.target.value
+    bioCarregarBercarios()
+  })
 
   // GPS em tempo real na tela de soltura
   // (reutiliza o watchPosition já ativo; atualiza coordsEl no próximo tick de GPS)
