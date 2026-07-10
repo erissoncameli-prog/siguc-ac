@@ -1968,42 +1968,75 @@ async function bioMortesCanonicasDoLote(lote) {
     .reduce((soma, o) => soma + (o.qtd_afetados || 0), 0)
 }
 
+// Vivos atuais de cada lote ATIVO de um berçário (entrada - mortes
+// canônicas), e o total somado — usado no card do berçário e na
+// soltura em bloco.
+async function bioVivosPorLoteDoBercario(bercarioId) {
+  const lotes = (await bioOfflineLotesDoBercario(bercarioId)).filter(l => l.status === 'ativo')
+  const comVivos = await Promise.all(lotes.map(async l => ({
+    ...l, vivos: Math.max((l.qtd_entrada || 0) - await bioMortesCanonicasDoLote(l), 0),
+  })))
+  return { lotes: comVivos, total: comVivos.reduce((s, l) => s + l.vivos, 0) }
+}
+
 /* ════════════════════════════════════════════════════════════
    FORMULÁRIO — SOLTURA DE FILHOTES
    ════════════════════════════════════════════════════════════ */
-// ctx: { ninho, filhotesVivos, lote?, mortesIniciais? }
-// Se lote presente → via_bercario = true; back vai para tela-bercarios
+// Dois modos:
+//  - direto (pós-eclosão, sem berçário): ctx = { ninho, filhotesVivos, mortesIniciais? }
+//  - berçário (soltura em bloco, todos os lotes ativos de uma vez):
+//    ctx = { bercario: {id, nome}, especie, lotesComVivos, totalVivos }
+//    A quantidade vem pronta (soma dos vivos de cada lote) — não é
+//    editável, porque os animais estão misturados no tanque e a
+//    mortalidade já é rastreada por outros meios (individual/ocorrência).
 function bioAbrirFormSoltura(ctx) {
   BioApp.formSolturaCtx = ctx
-  const { ninho, filhotesVivos, lote, mortesIniciais } = ctx
+  const { ninho, filhotesVivos, mortesIniciais, bercario, especie, lotesComVivos, totalVivos } = ctx
 
-  document.getElementById('bio-sol-ninho-num').textContent = ninho.numero_ninho
-  document.getElementById('bio-sol-especie').textContent   = BIO_ESPECIES.find(e => e.id === ninho.especie)?.nome ?? ninho.especie
-  document.getElementById('bio-sol-data').value            = new Date().toISOString().slice(0, 10)
-  document.getElementById('bio-sol-hora').value            = new Date().toTimeString().slice(0, 5)
-  document.getElementById('bio-sol-local').value           = ''
-  document.getElementById('bio-sol-obs').value             = ''
-  document.getElementById('bio-sol-predacao').checked      = false
-  bioSetContador('bio-sol-qtd',  filhotesVivos ?? 0)
-  bioSetContador('bio-sol-mort', mortesIniciais ?? 0)
+  const infoEl      = document.getElementById('bio-sol-bercario-info')
+  const ctxLabelEl  = document.getElementById('bio-sol-ctx-label')
+  const numPrefixEl = document.getElementById('bio-sol-num-prefix')
+  const mortSecEl   = document.getElementById('bio-sol-mort-sec')
+  const qtdInput    = document.getElementById('bio-sol-qtd')
+  const qtdMinus    = document.getElementById('bio-sol-qtd-minus')
+  const qtdPlus     = document.getElementById('bio-sol-qtd-plus')
+  const tituloEl    = document.getElementById('bio-soltura-titulo')
+  const backBtn     = document.getElementById('bio-soltura-back')
 
-  const infoEl    = document.getElementById('bio-sol-bercario-info')
-  const mortLabel = document.getElementById('bio-sol-mort-label')
-  const tituloEl  = document.getElementById('bio-soltura-titulo')
-  const backBtn   = document.getElementById('bio-soltura-back')
+  document.getElementById('bio-sol-data').value       = new Date().toISOString().slice(0, 10)
+  document.getElementById('bio-sol-hora').value       = new Date().toTimeString().slice(0, 5)
+  document.getElementById('bio-sol-local').value      = ''
+  document.getElementById('bio-sol-obs').value        = ''
+  document.getElementById('bio-sol-predacao').checked = false
 
-  if (lote) {
-    infoEl.textContent = `Berçário: ${lote.bercario_nome} · Entrada: ${lote.qtd_entrada}`
-      + (mortesIniciais ? ` · Mortes já registradas: ${mortesIniciais}` : '')
-    infoEl.hidden      = false
-    mortLabel.textContent = '(no berçário)'
-    tituloEl.textContent  = 'Soltura do Berçário'
-    backBtn.dataset.back  = 'tela-bercarios'
+  if (bercario) {
+    if (ctxLabelEl)  ctxLabelEl.textContent = 'Berçário'
+    if (numPrefixEl) numPrefixEl.hidden     = true
+    document.getElementById('bio-sol-ninho-num').textContent = bercario.nome
+    document.getElementById('bio-sol-especie').textContent   = BIO_ESPECIES.find(e => e.id === especie)?.nome ?? especie ?? ''
+    infoEl.textContent = `${lotesComVivos.length} lote${lotesComVivos.length !== 1 ? 's' : ''} · ${totalVivos} filhotes vivos`
+    infoEl.hidden = false
+    if (mortSecEl) mortSecEl.hidden = true
+    bioSetContador('bio-sol-qtd', totalVivos)
+    if (qtdInput) qtdInput.readOnly = true
+    qtdMinus?.setAttribute('disabled', 'disabled')
+    qtdPlus?.setAttribute('disabled', 'disabled')
+    tituloEl.textContent = 'Soltura do Berçário'
+    backBtn.dataset.back = 'tela-bercarios'
   } else {
-    infoEl.hidden         = true
-    mortLabel.textContent = '(pós-eclosão)'
-    tituloEl.textContent  = 'Soltura de Filhotes'
-    backBtn.dataset.back  = 'tela-destino-filhotes'
+    if (ctxLabelEl)  ctxLabelEl.textContent = 'Ninho'
+    if (numPrefixEl) numPrefixEl.hidden     = false
+    document.getElementById('bio-sol-ninho-num').textContent = ninho.numero_ninho
+    document.getElementById('bio-sol-especie').textContent   = BIO_ESPECIES.find(e => e.id === ninho.especie)?.nome ?? ninho.especie
+    infoEl.hidden = true
+    if (mortSecEl) mortSecEl.hidden = false
+    bioSetContador('bio-sol-qtd', filhotesVivos ?? 0)
+    bioSetContador('bio-sol-mort', mortesIniciais ?? 0)
+    if (qtdInput) qtdInput.readOnly = false
+    qtdMinus?.removeAttribute('disabled')
+    qtdPlus?.removeAttribute('disabled')
+    tituloEl.textContent = 'Soltura de Filhotes'
+    backBtn.dataset.back = 'tela-destino-filhotes'
   }
 
   // GPS
@@ -2020,46 +2053,105 @@ function bioAbrirFormSoltura(ctx) {
   bioMostrarTela('tela-form-soltura')
 }
 
-async function bioSalvarSoltura() {
-  const { ninho, lote } = BioApp.formSolturaCtx ?? {}
-  if (!ninho) return
+// Abre a soltura em bloco de TODO o berçário — soma os lotes ativos e
+// pré-calcula quantos filhotes saem de cada um (vivos = entrada - mortes).
+async function bioAbrirSolturaBercario(bercarioId, nome) {
+  const { lotes, total } = await bioVivosPorLoteDoBercario(bercarioId)
+  if (!lotes.length) { bioToast('Nenhum lote ativo neste berçário.', 'err'); return }
+  if (total <= 0) { bioToast('Nenhum filhote vivo para soltar neste berçário.', 'err'); return }
+  bioAbrirFormSoltura({
+    bercario: { id: bercarioId, nome },
+    especie: lotes[0]?.especie,
+    lotesComVivos: lotes,
+    totalVivos: total,
+  })
+}
 
-  const data = document.getElementById('bio-sol-data').value
+async function bioSalvarSoltura() {
+  const ctx = BioApp.formSolturaCtx ?? {}
+  const { ninho, bercario } = ctx
+  if (!ninho && !bercario) return
+
+  const data     = document.getElementById('bio-sol-data').value
+  const hora     = document.getElementById('bio-sol-hora').value || null
+  const local    = document.getElementById('bio-sol-local').value.trim() || null
+  const predacao = document.getElementById('bio-sol-predacao').checked
+  const obs      = document.getElementById('bio-sol-obs').value.trim() || null
+  const fotos    = BioApp._fotosSol?.length ? [...BioApp._fotosSol] : []
+
+  if (!data) { bioToast('Informe a data da soltura.', 'err'); return }
+
+  if (bercario) {
+    const lotes = ctx.lotesComVivos || []
+    for (const lote of lotes) {
+      if (lote.vivos <= 0) continue
+      const sol = {
+        uuid_cliente:    bioUuid(),
+        ninho_uuid:      lote.ninho_uuid,
+        ninho_numero:    lote.ninho_numero,
+        lote_uuid:       lote.uuid_cliente,
+        via_bercario:    true,
+        data_soltura:    data,
+        hora_soltura:    hora,
+        qtd_soltada:     lote.vivos,
+        mortalidade:     0,
+        lat:             BioApp.gpsLat,
+        lng:             BioApp.gpsLng,
+        local_descricao: local,
+        predacao_soltura: predacao,
+        observacoes:     obs,
+        foto_urls:       fotos,
+        status_sync:     'pendente',
+        criado_em:       new Date().toISOString(),
+      }
+      await bioOfflineSalvarSoltura(sol)
+      await bioOfflineSalvarLote({ ...lote, status: 'soltado' })
+
+      const ninhoLote = await bioOfflineGetNinho(lote.ninho_uuid)
+      if (ninhoLote) await bioOfflineSalvarNinho({ ...ninhoLote, status: 'soltado', status_sync: 'pendente' })
+
+      const individuos = await bioOfflineIndividuosDoLote(lote.uuid_cliente)
+      for (const ind of individuos) {
+        if (ind.status !== 'ativo') continue
+        await bioOfflineSalvarIndividuo({ ...ind, status: 'soltado', status_sync: 'pendente' })
+      }
+    }
+
+    await bioAtualizarBadgeFila()
+    await bioAtualizarBadgeBercario()
+    bioSyncTudo({ monitorId: BioApp.monitor?.id, onConcluido: () => bioAtualizarBadgeFila() })
+    bioToast('Berçário solto com sucesso!', 'ok')
+    bioMostrarTela('tela-bercarios')
+    await bioCarregarBercarios()
+    return
+  }
+
+  // Modo direto: soltura pós-eclosão, sem passar pelo berçário
   const qtd  = parseInt(document.getElementById('bio-sol-qtd').value)  || 0
   const mort = parseInt(document.getElementById('bio-sol-mort').value) || 0
-
-  if (!data)    { bioToast('Informe a data da soltura.', 'err'); return }
   if (qtd <= 0) { bioToast('Informe a quantidade soltada.', 'err'); return }
 
   const sol = {
     uuid_cliente:    bioUuid(),
     ninho_uuid:      ninho.uuid_cliente,
     ninho_numero:    ninho.numero_ninho,
-    lote_uuid:       lote?.uuid_cliente ?? null,
-    via_bercario:    !!lote,
+    lote_uuid:       null,
+    via_bercario:    false,
     data_soltura:    data,
-    hora_soltura:    document.getElementById('bio-sol-hora').value || null,
+    hora_soltura:    hora,
     qtd_soltada:     qtd,
     mortalidade:     mort,
     lat:             BioApp.gpsLat,
     lng:             BioApp.gpsLng,
-    local_descricao: document.getElementById('bio-sol-local').value.trim() || null,
-    predacao_soltura: document.getElementById('bio-sol-predacao').checked,
-    observacoes:     document.getElementById('bio-sol-obs').value.trim() || null,
-    foto_urls:       BioApp._fotosSol?.length ? [...BioApp._fotosSol] : [],
+    local_descricao: local,
+    predacao_soltura: predacao,
+    observacoes:     obs,
+    foto_urls:       fotos,
     status_sync:     'pendente',
     criado_em:       new Date().toISOString(),
   }
 
-  // Marca lote como soltado se aplicável e avança status do ninho
-  if (lote) {
-    await bioOfflineSalvarLote({ ...lote, status: 'soltado' })
-    await bioOfflineSalvarNinho({ ...ninho, status: 'soltado', status_sync: 'pendente' })
-  } else {
-    // Soltura direta no rio — marca ninho como soltado
-    await bioOfflineSalvarNinho({ ...ninho, status: 'soltado', status_sync: 'pendente' })
-  }
-
+  await bioOfflineSalvarNinho({ ...ninho, status: 'soltado', status_sync: 'pendente' })
   await bioOfflineSalvarSoltura(sol)
   await bioAtualizarBadgeFila()
   await bioAtualizarBadgeBercario()
@@ -2146,6 +2238,10 @@ async function bioCarregarBercarios() {
   }
   if (estadoEl) estadoEl.hidden = true
 
+  // Um card por BERÇÁRIO (não mais um por lote/ninho) — os filhotes se
+  // misturam fisicamente no tanque assim que dividem o mesmo berçário,
+  // então não faz mais sentido navegar por ninho na lista. O histórico
+  // de quais ninhos entraram fica dentro do detalhe do berçário.
   gruposVisiveis.forEach(grupo => {
     const totalFilhotes = grupo.lotes.reduce((s, l) => s + (l.qtd_entrada || 0), 0)
     const especieAtual = bioBercarioEspecieAtual(grupo.id, lotes)
@@ -2161,36 +2257,21 @@ async function bioCarregarBercarios() {
     `
     listaEl.appendChild(header)
 
-    grupo.lotes.forEach(l => {
-      const card = document.createElement('div')
-      card.className = 'bio-nfc'
-      const espNome = BIO_ESPECIES.find(e => e.id === l.especie)?.nome ?? l.especie ?? '—'
-      const diasStr = _bioDiasDesde(l.data_entrada)
-      card.innerHTML = `
-        <div class="bio-nfc-header">
-          <span class="bio-nfc-num">Ninho #${l.ninho_numero ?? '—'}</span>
-          <span class="bio-nfc-status-badge encontrado">${diasStr}</span>
-        </div>
-        <div class="bio-nfc-especie">${espNome}</div>
-        <div class="bio-nfc-row">
-          <span style="font-size:12px"><strong>${l.qtd_entrada}</strong> filhotes</span>
-          <span class="bio-nfc-data">Entrada: ${_bioFormatarData(l.data_entrada)}</span>
-        </div>
-        <div class="bio-nfc-acoes">
-          <button class="bio-btn-sm prim" data-acao="detalhe-lote">Ver detalhe</button>
-          <button class="bio-btn-sm prim" data-acao="soltar-lote">Soltar</button>
-        </div>
-      `
-      card.querySelector('[data-acao="detalhe-lote"]')?.addEventListener('click', () => {
-        bioAbrirTelaDetalheLote(l)
-      })
-      card.querySelector('[data-acao="soltar-lote"]')?.addEventListener('click', async () => {
-        const ninho = await bioOfflineGetNinho(l.ninho_uuid)
-        if (!ninho) { bioToast('Ninho não encontrado no cache.', 'err'); return }
-        bioAbrirFormSoltura({ ninho, filhotesVivos: l.qtd_entrada, lote: l })
-      })
-      listaEl.appendChild(card)
+    const card = document.createElement('div')
+    card.className = 'bio-nfc'
+    card.innerHTML = `
+      <div class="bio-nfc-acoes" style="margin-top:0">
+        <button class="bio-btn-sm prim" data-acao="ver-bercario">Ver berçário</button>
+        <button class="bio-btn-sm prim" data-acao="soltar-bercario" style="background:var(--bio-verde)">Soltar berçário</button>
+      </div>
+    `
+    card.querySelector('[data-acao="ver-bercario"]')?.addEventListener('click', () => {
+      bioAbrirDetalheBercario(grupo)
     })
+    card.querySelector('[data-acao="soltar-bercario"]')?.addEventListener('click', () => {
+      bioAbrirSolturaBercario(grupo.id, grupo.nome)
+    })
+    listaEl.appendChild(card)
   })
 }
 
@@ -2243,42 +2324,53 @@ async function bioAbrirSeletorBercario(callback, especieNova) {
   bioMostrarTela('tela-seletor-bercario')
 }
 
-function bioAbrirTelaDetalheLote(lote) {
-  BioApp.loteAtual = lote
-  const espNome = BIO_ESPECIES.find(e => e.id === lote.especie)?.nome ?? lote.especie ?? '—'
-  const diasNum = Math.floor((Date.now() - new Date(lote.data_entrada)) / 86400000)
-
+// grupo: { id, nome, lotes } — todos os lotes ATIVOS daquele berçário
+// físico (vindo de bioCarregarBercarios). Os filhotes se misturam no
+// tanque, então o detalhe é do BERÇÁRIO inteiro, não de um lote/ninho
+// isolado — a grade de filhotes agrupa todos os lotes que já passaram
+// por ali (bioOfflineIndividuosDoBercario), e o "histórico de ninhos"
+// abaixo mantém a rastreabilidade de quem veio de onde.
+async function bioAbrirDetalheBercario(grupo) {
+  BioApp.bercarioAtual = grupo
   const el = id => document.getElementById(id)
-  if (el('bio-det-ninho-num'))  el('bio-det-ninho-num').textContent  = lote.ninho_numero ?? '—'
-  if (el('bio-det-especie'))    el('bio-det-especie').textContent    = espNome
-  if (el('bio-det-bercario'))   el('bio-det-bercario').textContent   = lote.bercario_nome ?? '—'
-  if (el('bio-det-qtd'))        el('bio-det-qtd').textContent        = lote.qtd_entrada ?? '—'
-  if (el('bio-det-dias'))       el('bio-det-dias').textContent       = diasNum >= 0 ? diasNum : '—'
 
-  bioMortesCanonicasDoLote(lote).then(mortes => {
-    const wrap = el('bio-det-vivos-wrap')
-    if (!wrap) return
-    if (mortes > 0) {
+  const todosLotes = await bioOfflineLotesDoBercario(grupo.id)
+  const especieAtual = bioBercarioEspecieAtual(grupo.id, grupo.lotes)
+  const espNome = especieAtual ? (BIO_ESPECIES.find(e => e.id === especieAtual)?.nome ?? especieAtual) : '—'
+  const totalEntrada = grupo.lotes.reduce((s, l) => s + (l.qtd_entrada || 0), 0)
+
+  if (el('bio-det-ninho-num'))  el('bio-det-ninho-num').textContent  = grupo.nome
+  if (el('bio-det-especie'))    el('bio-det-especie').textContent    = espNome
+  if (el('bio-det-bercario'))   el('bio-det-bercario').textContent   = `${grupo.lotes.length} lote${grupo.lotes.length !== 1 ? 's' : ''} ativo${grupo.lotes.length !== 1 ? 's' : ''}`
+  if (el('bio-det-qtd'))        el('bio-det-qtd').textContent        = totalEntrada
+  if (el('bio-det-dias'))       el('bio-det-dias').textContent       = todosLotes.length
+
+  const mortesPorLote = await Promise.all(grupo.lotes.map(l => bioMortesCanonicasDoLote(l)))
+  const mortesTotal = mortesPorLote.reduce((s, m) => s + m, 0)
+  const wrap = el('bio-det-vivos-wrap')
+  if (wrap) {
+    if (mortesTotal > 0) {
       wrap.hidden = false
-      if (el('bio-det-vivos')) el('bio-det-vivos').textContent = Math.max((lote.qtd_entrada || 0) - mortes, 0)
+      if (el('bio-det-vivos')) el('bio-det-vivos').textContent = Math.max(totalEntrada - mortesTotal, 0)
     } else {
       wrap.hidden = true
     }
-  })
+  }
 
-  bioCarregarTimelineLote(lote)
-  bioRenderizarFilhotesDoLote(lote)
+  bioCarregarTimelineBercario(grupo.id)
+  bioRenderizarFilhotesDoBercario(grupo.id)
+  bioRenderizarHistoricoNinhos(todosLotes)
   bioMostrarTela('tela-detalhe-lote')
 }
 
-// ── Filhotes individuais do lote ──────────────────────────────
-async function bioRenderizarFilhotesDoLote(lote) {
+// ── Filhotes individuais do berçário (pool único, não por ninho) ──
+async function bioRenderizarFilhotesDoBercario(bercarioId) {
   const sec  = document.getElementById('bio-det-filhotes-sec')
   const grid = document.getElementById('bio-det-filhotes-lista')
   const btnSeq = document.getElementById('bio-btn-biometria-seq')
   if (!sec || !grid) return
 
-  const individuos = await bioOfflineIndividuosDoLote(lote.uuid_cliente)
+  const individuos = await bioOfflineIndividuosDoBercario(bercarioId)
   if (!individuos.length) { sec.hidden = true; return }
   sec.hidden = false
 
@@ -2290,16 +2382,40 @@ async function bioRenderizarFilhotesDoLote(lote) {
     individuos.map(i => bioOfflineBiometriasDoIndividuo(i.uuid_cliente))
   )
 
+  const STATUS_LABEL = { morto: 'óbito', soltado: 'solto' }
   grid.innerHTML = individuos.map((ind, i) => {
     const ult = ultimas[i][0]
     const bioTxt = ult
       ? [ult.comprimento_cm != null ? `${ult.comprimento_cm}cm` : null,
          ult.peso_g != null ? `${ult.peso_g}g` : null].filter(Boolean).join(' · ')
       : 'sem biometria'
+    const classeExtra = ind.status !== 'ativo' ? ` ${ind.status}` : ''
     return `
-      <div class="bio-filhote-chip${ind.status === 'morto' ? ' morto' : ''}" data-individuo-uuid="${ind.uuid_cliente}">
+      <div class="bio-filhote-chip${classeExtra}" data-individuo-uuid="${ind.uuid_cliente}">
         <span class="bio-filhote-num">#${ind.numero}</span>
-        <span class="bio-filhote-bio">${ind.status === 'morto' ? 'óbito' : bioTxt}</span>
+        <span class="bio-filhote-bio">${STATUS_LABEL[ind.status] ?? bioTxt}</span>
+      </div>`
+  }).join('')
+}
+
+// ── Histórico de ninhos que já passaram por este berçário ─────
+function bioRenderizarHistoricoNinhos(lotes) {
+  const wrap = document.getElementById('bio-det-historico-ninhos')
+  const lista = document.getElementById('bio-det-historico-lista')
+  if (!wrap || !lista) return
+  if (!lotes.length) { wrap.hidden = true; return }
+  wrap.hidden = false
+
+  const STATUS_LBL = { ativo: 'No berçário', soltado: 'Solto', cancelado: 'Cancelado' }
+  lista.innerHTML = lotes.map(l => {
+    const espNome = BIO_ESPECIES.find(e => e.id === l.especie)?.nome ?? l.especie ?? '—'
+    return `
+      <div class="bio-hist-ninho-item">
+        <div>
+          <strong>Ninho #${l.ninho_numero ?? '—'}</strong> · ${espNome}
+          <div class="bio-hist-ninho-meta">Entrada: ${_bioFormatarData(l.data_entrada)} · ${l.qtd_entrada} filhotes</div>
+        </div>
+        <span class="bio-nfc-status-badge ${l.status === 'ativo' ? 'em_bercario' : l.status === 'soltado' ? 'soltado' : ''}">${STATUS_LBL[l.status] ?? l.status}</span>
       </div>`
   }).join('')
 }
@@ -2307,8 +2423,9 @@ async function bioRenderizarFilhotesDoLote(lote) {
 function bioAbrirTelaDetalheIndividuo(individuo) {
   BioApp.individuoAtual = individuo
   const el = id => document.getElementById(id)
+  const STATUS_LBL = { ativo: 'Ativo', morto: 'Morto', soltado: 'Solto' }
   if (el('bio-ind-numero')) el('bio-ind-numero').textContent = individuo.numero
-  if (el('bio-ind-status')) el('bio-ind-status').textContent = individuo.status === 'morto' ? 'Morto' : 'Ativo'
+  if (el('bio-ind-status')) el('bio-ind-status').textContent = STATUS_LBL[individuo.status] ?? individuo.status
 
   const obitoRow = el('bio-ind-obito-row')
   const btnObito = el('bio-btn-obito-individuo')
@@ -2317,7 +2434,7 @@ function bioAbrirTelaDetalheIndividuo(individuo) {
     if (btnObito) btnObito.hidden = true
   } else {
     if (obitoRow) obitoRow.hidden = true
-    if (btnObito) btnObito.hidden = false
+    if (btnObito) btnObito.hidden = individuo.status === 'soltado'
   }
 
   bioCarregarTimelineIndividuo(individuo)
@@ -2402,16 +2519,16 @@ function bioAvancarSequenciaBiometria() {
   const proximoIndex = opts.indexAtual + 1
   if (proximoIndex >= opts.fila.length) {
     bioToast(`Sequência concluída! ${opts.fila.length} filhote(s) medido(s)/revisado(s).`, 'ok')
-    bioAbrirTelaDetalheLote(BioApp.loteAtual)
+    if (BioApp.bercarioAtual) bioAbrirDetalheBercario(BioApp.bercarioAtual)
     return
   }
   bioAbrirFormBiometriaInd(opts.fila[proximoIndex], { ...opts, indexAtual: proximoIndex })
 }
 
-async function bioIniciarBiometriaSequencial(lote) {
-  const individuos = await bioOfflineIndividuosDoLote(lote.uuid_cliente)
+async function bioIniciarBiometriaSequencial(bercarioId) {
+  const individuos = await bioOfflineIndividuosDoBercario(bercarioId)
   const ativos = individuos.filter(i => i.status === 'ativo')
-  if (!ativos.length) { bioToast('Nenhum filhote ativo neste lote.', 'err'); return }
+  if (!ativos.length) { bioToast('Nenhum filhote ativo neste berçário.', 'err'); return }
   bioAbrirFormBiometriaInd(ativos[0], { sequencial: true, indexAtual: 0, total: ativos.length, fila: ativos })
 }
 
@@ -2444,11 +2561,13 @@ async function bioSalvarBiometriaInd() {
   bioAvancarSequenciaBiometria()
 }
 
-async function bioCarregarTimelineLote(lote) {
+async function bioCarregarTimelineBercario(bercarioId) {
   const timelineEl = document.getElementById('bio-det-timeline')
   if (!timelineEl) return
 
-  const ocorrencias = await bioOfflineOcorrenciasDoLote(lote.uuid_cliente)
+  const lotes = await bioOfflineLotesDoBercario(bercarioId)
+  const porLote = await Promise.all(lotes.map(l => bioOfflineOcorrenciasDoLote(l.uuid_cliente)))
+  const ocorrencias = porLote.flat().sort((a, b) => (b.criado_em ?? '').localeCompare(a.criado_em ?? ''))
 
   if (!ocorrencias.length) {
     timelineEl.innerHTML = `<div class="bio-tl-vazio">Nenhuma ocorrência registrada.</div>`
@@ -2564,7 +2683,15 @@ async function bioSalvarOcorrencia() {
   await bioOfflineSalvarOcorrencia(oc)
   bioSyncTudo({ monitorId: BioApp.monitor?.id, onConcluido: () => bioAtualizarBadgeFila() })
   bioToast('Ocorrência registrada!', 'ok')
-  bioAbrirTelaDetalheLote(lote)
+  if (BioApp.bercarioAtual) bioAbrirDetalheBercario(BioApp.bercarioAtual)
+}
+
+// Lote ativo mais recente do berçário — usado como destino padrão de
+// uma nova ocorrência (ocorrencias_bercario exige um lote específico).
+function _bioLoteParaOcorrencia(bercarioAtual) {
+  const ativos = (bercarioAtual?.lotes || []).filter(l => l.status === 'ativo')
+  if (!ativos.length) return null
+  return ativos.reduce((mais, l) => (l.data_entrada > mais.data_entrada ? l : mais), ativos[0])
 }
 
 function _bioDiasDesde(dataStr) {
@@ -2643,27 +2770,22 @@ function bioIniciarPosEclosao() {
     bioAtualizarCamposOcorrencia(chip.dataset.tipo)
   })
 
-  // Detalhe do lote: botões de ação
+  // Detalhe do berçário: botões de ação
   document.getElementById('bio-btn-nova-ocorrencia')?.addEventListener('click', () => {
-    if (BioApp.loteAtual) bioAbrirFormOcorrencia(BioApp.loteAtual)
+    const lote = _bioLoteParaOcorrencia(BioApp.bercarioAtual)
+    if (!lote) { bioToast('Nenhum lote ativo neste berçário.', 'err'); return }
+    bioAbrirFormOcorrencia(lote)
   })
   document.getElementById('bio-btn-salvar-ocorrencia')?.addEventListener('click', bioSalvarOcorrencia)
-  document.getElementById('bio-btn-soltar-lote')?.addEventListener('click', async () => {
-    const lote = BioApp.loteAtual
-    if (!lote) return
-    const ninho = await bioOfflineGetNinho(lote.ninho_uuid)
-    if (!ninho) { bioToast('Ninho não encontrado no cache.', 'err'); return }
-    const mortes = await bioMortesCanonicasDoLote(lote)
-    bioAbrirFormSoltura({
-      ninho, lote,
-      filhotesVivos: Math.max(lote.qtd_entrada - mortes, 0),
-      mortesIniciais: mortes,
-    })
+  document.getElementById('bio-btn-soltar-lote')?.addEventListener('click', () => {
+    const berc = BioApp.bercarioAtual
+    if (!berc) return
+    bioAbrirSolturaBercario(berc.id, berc.nome)
   })
 
   // Voltar da tela de ocorrência para detalhe
   document.getElementById('bio-oc-back')?.addEventListener('click', () => {
-    if (BioApp.loteAtual) bioAbrirTelaDetalheLote(BioApp.loteAtual)
+    if (BioApp.bercarioAtual) bioAbrirDetalheBercario(BioApp.bercarioAtual)
     else bioMostrarTela('tela-bercarios')
   })
 
@@ -2675,12 +2797,12 @@ function bioIniciarPosEclosao() {
     if (individuo) bioAbrirTelaDetalheIndividuo(individuo)
   })
   document.getElementById('bio-btn-biometria-seq')?.addEventListener('click', () => {
-    if (BioApp.loteAtual) bioIniciarBiometriaSequencial(BioApp.loteAtual)
+    if (BioApp.bercarioAtual) bioIniciarBiometriaSequencial(BioApp.bercarioAtual.id)
   })
 
   // Detalhe do indivíduo
   document.getElementById('bio-ind-back')?.addEventListener('click', () => {
-    if (BioApp.loteAtual) bioAbrirTelaDetalheLote(BioApp.loteAtual)
+    if (BioApp.bercarioAtual) bioAbrirDetalheBercario(BioApp.bercarioAtual)
     else bioMostrarTela('tela-bercarios')
   })
   document.getElementById('bio-btn-nova-biometria-ind')?.addEventListener('click', () => {
@@ -2694,7 +2816,7 @@ function bioIniciarPosEclosao() {
   // Biometria individual
   document.getElementById('bio-bio-ind-back')?.addEventListener('click', () => {
     const opts = BioApp._bioSeqOpts
-    if (opts?.sequencial) { if (BioApp.loteAtual) bioAbrirTelaDetalheLote(BioApp.loteAtual) }
+    if (opts?.sequencial) { if (BioApp.bercarioAtual) bioAbrirDetalheBercario(BioApp.bercarioAtual) }
     else if (BioApp.individuoAtual) bioAbrirTelaDetalheIndividuo(BioApp.individuoAtual)
   })
   document.getElementById('bio-btn-salvar-biometria-ind')?.addEventListener('click', bioSalvarBiometriaInd)

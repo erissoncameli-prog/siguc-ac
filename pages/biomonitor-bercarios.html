@@ -317,7 +317,7 @@
         </tr></thead><tbody>
           ${_detAtual.individuos.map(f => `<tr>
             <td>${f.numero}</td>
-            <td><span class="badge ${f.status === 'ativo' ? 'badge-verde' : 'badge-erro'}">${f.status === 'ativo' ? 'Ativo' : 'Morto'}</span></td>
+            <td><span class="badge ${f.status === 'ativo' ? 'badge-verde' : f.status === 'soltado' ? 'badge-blue' : 'badge-erro'}">${{ativo:'Ativo',soltado:'Solto',morto:'Morto'}[f.status] || f.status}</span></td>
             <td>${f.ultima_data_medicao ? formatData(f.ultima_data_medicao) : '—'}</td>
             <td>${f.ultimo_comprimento_cm != null ? f.ultimo_comprimento_cm + ' cm' : '—'}</td>
             <td>${f.ultimo_peso_g != null ? f.ultimo_peso_g + ' g' : '—'}</td>

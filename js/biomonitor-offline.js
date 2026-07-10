@@ -582,6 +582,31 @@ async function bioOfflineIndividuosPendentes() {
   })
 }
 
+// Todos os lotes (qualquer status) de um berçário físico — usado para
+// o "histórico de ninhos" e para agregados no detalhe do berçário.
+async function bioOfflineLotesDoBercario(bercarioId) {
+  const db = await bioOfflineInit()
+  return new Promise((res, rej) => {
+    const tx  = db.transaction('lotes', 'readonly')
+    const req = tx.objectStore('lotes').getAll()
+    req.onsuccess = () => {
+      const lista = req.result.filter(l => l.bercario_id === bercarioId)
+      lista.sort((a, b) => a.data_entrada.localeCompare(b.data_entrada))
+      res(lista)
+    }
+    req.onerror = () => rej(req.error)
+  })
+}
+
+// Filhotes de TODOS os lotes de um berçário, num só pool numerado —
+// os animais se misturam fisicamente no tanque, não são mais
+// manejados separados por ninho de origem.
+async function bioOfflineIndividuosDoBercario(bercarioId) {
+  const lotes = await bioOfflineLotesDoBercario(bercarioId)
+  const porLote = await Promise.all(lotes.map(l => bioOfflineIndividuosDoLote(l.uuid_cliente)))
+  return porLote.flat().sort((a, b) => a.numero - b.numero)
+}
+
 // ── Biometria individual ───────────────────────────────────────
 async function bioOfflineSalvarBiometriaInd(b) {
   const db = await bioOfflineInit()
