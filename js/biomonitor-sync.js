@@ -761,7 +761,7 @@ async function bioSyncPullLotes(grupoId) {
   const { data, error } = await bioSupabase()
     .from('lotes_bercario')
     .select(`
-      id, uuid_cliente, bercario_id, bercario_nome, data_entrada, hora_entrada,
+      id, uuid_cliente, bercario_id, bercario_nome, temporada_id, data_entrada, hora_entrada,
       qtd_entrada, status, observacoes, monitor_id, criado_em, sincronizado_em,
       ninho:ninhos_quelonios(uuid_cliente, numero_ninho, especie)
     `)
@@ -779,6 +779,7 @@ async function bioSyncPullLotes(grupoId) {
       especie:       l.ninho?.especie      ?? null,
       bercario_id:   l.bercario_id,
       bercario_nome: l.bercario_nome,
+      temporada_id:  l.temporada_id ?? null,
       data_entrada:  l.data_entrada,
       hora_entrada:  l.hora_entrada,
       qtd_entrada:   l.qtd_entrada,
