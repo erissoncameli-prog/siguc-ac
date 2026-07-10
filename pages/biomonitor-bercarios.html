@@ -17,6 +17,10 @@
 .berc-bar-track { width:100%;height:8px;border-radius:99px;background:rgba(0,0,0,.06);overflow:hidden }
 .berc-bar-fill { height:100%;border-radius:99px;transition:width .2s }
 .det-lote-card { background:rgba(0,0,0,.02);border-radius:10px;padding:12px 14px;border:1px solid var(--borda) }
+.ind-chart-card { background:var(--branco);border-radius:10px;padding:14px 16px;border:1px solid var(--borda) }
+.ind-chart-title { font-size:.85rem;font-weight:700;color:var(--cinza-900);margin:0 0 4px }
+.ind-chart-sub { font-size:.72rem;color:var(--cinza-500);margin:0 0 10px }
+.ind-chart-wrap { position:relative;height:200px }
 </style>
 </head>
 <body>
@@ -27,7 +31,7 @@
   <div class="modal" style="max-width:820px;width:94vw">
     <div class="modal-header">
       <div class="modal-title" id="det-titulo">Berçário</div>
-      <button class="modal-close" onclick="document.getElementById('modal-bercario').classList.remove('aberto')">×</button>
+      <button class="modal-close" onclick="fecharModalBercario()">×</button>
     </div>
     <div class="modal-body">
       <div style="display:flex;gap:6px;background:rgba(0,0,0,.04);border-radius:10px;padding:4px;margin-bottom:14px;flex-wrap:wrap">
@@ -35,6 +39,7 @@
         <button class="berc-tab-btn"       id="dtab-historico"   onclick="renderAbaDetalhe('historico')">Histórico</button>
         <button class="berc-tab-btn"       id="dtab-ocorrencias" onclick="renderAbaDetalhe('ocorrencias')">Ocorrências</button>
         <button class="berc-tab-btn"       id="dtab-individuos"  onclick="renderAbaDetalhe('individuos')">Indivíduos</button>
+        <button class="berc-tab-btn"       id="dtab-indicadores" onclick="renderAbaDetalhe('indicadores')">Indicadores</button>
         <button class="berc-tab-btn"       id="dtab-alertas"     onclick="renderAbaDetalhe('alertas')">Alertas</button>
       </div>
       <div id="detalhe-conteudo" style="display:flex;flex-direction:column;gap:10px;max-height:56vh;overflow-y:auto">
@@ -83,7 +88,7 @@
 
   bIconsAplicar(document.getElementById('app'))
 
-  let _bercarios = [], _detAtual = null
+  let _bercarios = [], _detAtual = null, _chartJsCarregado = false, _detCharts = {}
 
   const TIPO_LBL = { tanque_fibra:'Tanque de fibra', piscina_alvenaria:'Piscina de alvenaria', viveiro:'Viveiro', outro:'Outro' }
   const STATUS_LOTE_LBL = { ativo:'Ativo', soltado:'Soltado', cancelado:'Cancelado' }
@@ -322,6 +327,11 @@
       return
     }
 
+    if (tab === 'indicadores') {
+      renderIndicadores()
+      return
+    }
+
     if (tab === 'alertas') {
       cont.innerHTML = _detAtual.alertas.length ? _detAtual.alertas.map(a => {
         const c = SEV_CLR[a.severidade] || '#6b7280'
@@ -344,6 +354,137 @@
       }).join('') : `<p style="color:var(--cinza-500)">Nenhum alerta para este berçário.</p>`
       return
     }
+  }
+
+  async function carregarChartJS() {
+    if (_chartJsCarregado || window.Chart) { _chartJsCarregado = true; return }
+    await new Promise((res, rej) => {
+      const s = document.createElement('script')
+      s.src = 'https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js'
+      s.onload = res; s.onerror = rej
+      document.head.appendChild(s)
+    })
+    _chartJsCarregado = true
+  }
+
+  async function renderIndicadores() {
+    const cont = document.getElementById('detalhe-conteudo')
+    cont.innerHTML = `<p style="color:var(--cinza-500)">Carregando gráficos...</p>`
+    await carregarChartJS()
+    if (!_detAtual) return
+
+    // Curva de crescimento: agrupa ocorrências de biometria por data (média, caso
+    // haja mais de uma amostragem no mesmo dia) — mesmo critério do biometria_serie
+    // agregado usado em relatorios-biomonitor.html.
+    const porData = {}
+    _detAtual.ocorrencias.filter(o => o.tipo === 'biometria').forEach(o => {
+      const d = o.data_ocorrencia
+      if (!porData[d]) porData[d] = { comp: [], peso: [] }
+      if (o.comprimento_medio_cm != null) porData[d].comp.push(o.comprimento_medio_cm)
+      if (o.peso_medio_g != null) porData[d].peso.push(o.peso_medio_g)
+    })
+    const media = arr => arr.length ? Math.round((arr.reduce((s, v) => s + v, 0) / arr.length) * 10) / 10 : null
+    const biometria = Object.keys(porData).sort().map(d => ({
+      data: d, comp: media(porData[d].comp), peso: media(porData[d].peso),
+    }))
+
+    const lotesMort = _detAtual.lotes.filter(l => l.qtd_entrada > 0)
+      .sort((a, b) => (b.mortes / b.qtd_entrada) - (a.mortes / a.qtd_entrada))
+
+    const ocTipos = {}
+    _detAtual.ocorrencias.forEach(o => { ocTipos[o.tipo] = (ocTipos[o.tipo] || 0) + 1 })
+    const ocEntries = Object.entries(ocTipos)
+
+    cont.innerHTML = `
+      <div class="ind-chart-card">
+        <p class="ind-chart-title">Curva de crescimento</p>
+        <p class="ind-chart-sub">Comprimento (cm) e peso médio (g) por biometria registrada</p>
+        ${biometria.length ? `<div class="ind-chart-wrap"><canvas id="ind-canvas-crescimento"></canvas></div>` : `<p style="color:var(--cinza-500);font-size:.85rem">Sem biometria registrada ainda.</p>`}
+      </div>
+      <div class="ind-chart-card">
+        <p class="ind-chart-title">Mortalidade por lote</p>
+        <p class="ind-chart-sub">% de filhotes que não sobreviveram, por lote (ativos + histórico)</p>
+        ${lotesMort.length ? `<div class="ind-chart-wrap"><canvas id="ind-canvas-mortalidade"></canvas></div>` : `<p style="color:var(--cinza-500);font-size:.85rem">Sem lotes registrados ainda.</p>`}
+      </div>
+      <div class="ind-chart-card">
+        <p class="ind-chart-title">Ocorrências por tipo</p>
+        ${ocEntries.length ? `<div class="ind-chart-wrap"><canvas id="ind-canvas-ocorrencias"></canvas></div>` : `<p style="color:var(--cinza-500);font-size:.85rem">Nenhuma ocorrência registrada ainda.</p>`}
+      </div>`
+
+    const legendOpts = { labels: { color: '#374151', usePointStyle: true, padding: 12, font: { size: 11 } } }
+    const gridColor = 'rgba(0,0,0,.06)'
+
+    if (biometria.length) {
+      _detCharts['ind-canvas-crescimento']?.destroy()
+      _detCharts['ind-canvas-crescimento'] = new Chart(document.getElementById('ind-canvas-crescimento').getContext('2d'), {
+        type: 'line',
+        data: {
+          labels: biometria.map(b => formatData(b.data)),
+          datasets: [
+            { label: 'Comprimento (cm)', data: biometria.map(b => b.comp), borderColor: '#1A6B8C', backgroundColor: '#1A6B8C', borderWidth: 2, tension: .35, pointRadius: 3, yAxisID: 'y' },
+            { label: 'Peso médio (g)', data: biometria.map(b => b.peso), borderColor: '#C9A84C', backgroundColor: '#C9A84C', borderWidth: 2, tension: .35, pointRadius: 3, yAxisID: 'y2' },
+          ]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: legendOpts },
+          scales: {
+            x: { grid: { display: false }, ticks: { font: { size: 10 } } },
+            y: { grid: { color: gridColor }, beginAtZero: true, title: { display: true, text: 'cm', font: { size: 9 } } },
+            y2: { position: 'right', grid: { display: false }, beginAtZero: true, title: { display: true, text: 'g', font: { size: 9 } } },
+          }
+        }
+      })
+    }
+
+    if (lotesMort.length) {
+      _detCharts['ind-canvas-mortalidade']?.destroy()
+      _detCharts['ind-canvas-mortalidade'] = new Chart(document.getElementById('ind-canvas-mortalidade').getContext('2d'), {
+        type: 'bar',
+        data: {
+          labels: lotesMort.map(l => l.numero_ninho ? 'Ninho ' + l.numero_ninho : 'Lote s/ ninho'),
+          datasets: [{
+            label: 'Mortalidade (%)',
+            data: lotesMort.map(l => Math.round((l.mortes / l.qtd_entrada) * 1000) / 10),
+            backgroundColor: lotesMort.map(l => corMortalidade((l.mortes / l.qtd_entrada) * 100)),
+            borderRadius: 4,
+          }]
+        },
+        options: {
+          indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { beginAtZero: true, grid: { color: gridColor }, title: { display: true, text: '%', font: { size: 9 } } },
+            y: { grid: { display: false }, ticks: { font: { size: 10 } } },
+          }
+        }
+      })
+    }
+
+    if (ocEntries.length) {
+      _detCharts['ind-canvas-ocorrencias']?.destroy()
+      _detCharts['ind-canvas-ocorrencias'] = new Chart(document.getElementById('ind-canvas-ocorrencias').getContext('2d'), {
+        type: 'bar',
+        data: {
+          labels: ocEntries.map(([t]) => TIPO_OC_LBL[t] || t),
+          datasets: [{ data: ocEntries.map(([, v]) => v), backgroundColor: ocEntries.map(([t]) => TIPO_OC_CLR[t] || '#6b7280'), borderRadius: 4 }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { grid: { display: false }, ticks: { font: { size: 10 } } },
+            y: { beginAtZero: true, grid: { color: gridColor }, ticks: { precision: 0 } },
+          }
+        }
+      })
+    }
+  }
+
+  window.fecharModalBercario = function() {
+    Object.values(_detCharts).forEach(c => c?.destroy())
+    _detCharts = {}
+    document.getElementById('modal-bercario').classList.remove('aberto')
   }
 
   window.tratarAlertaBercario = async function(alertaId, status) {
