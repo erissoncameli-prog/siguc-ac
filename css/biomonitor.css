@@ -1404,6 +1404,14 @@ body.field-mode .bio-home-nome { font-size: 26px; }
 }
 .bio-det-stat span:last-child { font-size: 11px; color: var(--bio-ink2); }
 
+/* ── Histórico de ninhos que passaram pelo berçário ── */
+.bio-hist-ninho-item {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 10px 12px; border: 1.5px solid var(--bio-border); border-radius: 10px;
+  margin-bottom: 8px; font-size: 13px; color: var(--bio-ink);
+}
+.bio-hist-ninho-meta { font-size: 11px; color: var(--bio-ink2); margin-top: 2px; }
+
 /* ── Timeline de ocorrências ── */
 .bio-tl-vazio {
   text-align: center; color: #9CA3AF; font-size: 13px;
@@ -1456,7 +1464,8 @@ body.field-mode .bio-home-nome { font-size: 26px; }
   transition: border-color .12s;
 }
 .bio-filhote-chip:active { border-color: var(--bio-prim); }
-.bio-filhote-chip.morto  { opacity: .5; }
+.bio-filhote-chip.morto   { opacity: .5; }
+.bio-filhote-chip.soltado { opacity: .6; border-color: #0891B2; }
 .bio-filhote-num  { font-family: var(--font-mono); font-size: 14px; font-weight: 700; color: var(--bio-ink); }
 .bio-filhote-bio  { font-size: 10px; color: var(--bio-ink2); text-align: center; line-height: 1.3; }
 

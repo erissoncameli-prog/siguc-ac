@@ -1077,9 +1077,9 @@
   <div class="bio-form-body">
 
     <div class="bio-form-section" id="bio-soltura-ctx" style="background:var(--bio-verde-bg);border-color:rgba(42,157,111,.4)">
-      <span class="bio-form-label">Ninho</span>
+      <span class="bio-form-label" id="bio-sol-ctx-label">Ninho</span>
       <p style="margin:4px 0 0;font-size:16px;font-weight:700">
-        N° <span id="bio-sol-ninho-num">—</span>
+        <span id="bio-sol-num-prefix">N° </span><span id="bio-sol-ninho-num">—</span>
         &nbsp;·&nbsp; <span id="bio-sol-especie"></span>
       </p>
       <p id="bio-sol-bercario-info" style="margin:4px 0 0;font-size:12px;opacity:.7" hidden></p>
@@ -1108,7 +1108,7 @@
       </div>
     </div>
 
-    <div class="bio-form-section">
+    <div class="bio-form-section" id="bio-sol-mort-sec">
       <span class="bio-form-label">Mortalidade <span id="bio-sol-mort-label" style="font-weight:400;opacity:.7">(pós-eclosão)</span></span>
       <div class="bio-counter-row">
         <button type="button" id="bio-sol-mort-minus" class="bio-counter-btn">−</button>
@@ -1200,17 +1200,21 @@
 <div id="tela-detalhe-lote" class="bio-tela">
   <header class="bio-form-header">
     <button class="bio-btn-back" data-back="tela-bercarios" aria-label="Voltar">‹</button>
-    <span>Lote em Berçário</span>
+    <span>Berçário</span>
     <span></span>
   </header>
   <div class="bio-form-body">
     <div class="bio-det-lote-header">
       <div class="bio-det-lote-row">
-        <span class="bio-form-label">Ninho</span>
-        <strong>N° <span id="bio-det-ninho-num">—</span> · <span id="bio-det-especie"></span></strong>
+        <span class="bio-form-label">Berçário</span>
+        <strong id="bio-det-ninho-num">—</strong>
       </div>
       <div class="bio-det-lote-row">
-        <span class="bio-form-label">Berçário</span>
+        <span class="bio-form-label">Espécie atual</span>
+        <strong id="bio-det-especie"></strong>
+      </div>
+      <div class="bio-det-lote-row">
+        <span class="bio-form-label">Situação</span>
         <strong id="bio-det-bercario">—</strong>
       </div>
       <div class="bio-det-lote-stats">
@@ -1224,7 +1228,7 @@
         </div>
         <div class="bio-det-stat">
           <span class="bio-det-stat-n" id="bio-det-dias">—</span>
-          <span>Dias</span>
+          <span>Ninhos</span>
         </div>
       </div>
     </div>
@@ -1234,7 +1238,7 @@
         + Ocorrência
       </button>
       <button type="button" id="bio-btn-soltar-lote" class="bio-btn-sm prim" style="flex:1;background:var(--bio-verde)">
-        Registrar Soltura
+        Soltar Berçário
       </button>
     </div>
 
@@ -1244,6 +1248,13 @@
         <button type="button" id="bio-btn-biometria-seq" class="bio-btn-sm prim">Biometria em sequência</button>
       </div>
       <div id="bio-det-filhotes-lista" class="bio-filhotes-grid" style="padding:0 16px 16px"></div>
+    </div>
+
+    <div id="bio-det-historico-ninhos" hidden>
+      <div style="padding:0 16px;margin-bottom:8px">
+        <span class="bio-form-label">Histórico de ninhos</span>
+      </div>
+      <div id="bio-det-historico-lista" style="padding:0 16px 16px"></div>
     </div>
 
     <div style="padding:0 16px;margin-bottom:8px">
