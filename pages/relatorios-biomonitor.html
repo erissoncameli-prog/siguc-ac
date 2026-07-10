@@ -579,6 +579,8 @@
   let _descAgg = { natural:0, predacao:0, humana:0, total:0 }
   let _metasPraia = []
   let _chartJsCarregado = false
+  let _bercMortalidade = []
+  let _bercCrescimento = []
 
   // ── Estado das abas + dados do Painel ───────────────────────────
   let _tabAtual       = 'painel'
@@ -611,6 +613,77 @@
       rows = rows.filter(r => ucPraias.has(r.praia_id) || ucPraias.has(r.praia_atual_id))
     }
     _painelPrevisao = rows.filter(r => r.faixa_risco && !['inativo','sem_previsao'].includes(r.faixa_risco))
+  }
+
+  // Mortalidade e curva de crescimento por berçário físico — a RPC
+  // bio_relatorio_completo agrega todos os berçários juntos, então essas
+  // comparações são montadas no client a partir da view canônica
+  // vw_lotes_bercario_mortalidade (mortalidade) e de ocorrencias_bercario
+  // tipo=biometria (crescimento), respeitando os filtros de temporada/UC.
+  async function carregarDadosBercarios() {
+    const tmp  = sel('fil-temporada').value || null
+    const ucId = sel('fil-uc').value        || null
+
+    const { data: mortRaw } = await db.from('vw_lotes_bercario_mortalidade')
+      .select('bercario_id,bercario_nome,bercario_uc_id,qtd_entrada,mortes,temporada_id')
+    let mort = (mortRaw || []).filter(m => m.bercario_id)
+    if (tmp)  mort = mort.filter(m => m.temporada_id === tmp)
+    if (ucId) mort = mort.filter(m => m.bercario_uc_id === ucId)
+
+    const porBercMort = {}
+    mort.forEach(m => {
+      const key = m.bercario_id
+      if (!porBercMort[key]) porBercMort[key] = { nome: m.bercario_nome, entrada: 0, mortes: 0 }
+      porBercMort[key].entrada += m.qtd_entrada || 0
+      porBercMort[key].mortes  += m.mortes || 0
+    })
+    _bercMortalidade = Object.values(porBercMort)
+      .filter(b => b.entrada > 0)
+      .map(b => ({ nome: b.nome, pct: Math.round((b.mortes / b.entrada) * 1000) / 10, entrada: b.entrada }))
+      .sort((a, b) => b.pct - a.pct)
+
+    const { data: lotesRaw } = await db.from('lotes_bercario')
+      .select('id,bercario_id,bercarios(nome,uc_id),ninhos_quelonios(temporada_id)')
+    let lotes = (lotesRaw || []).filter(l => l.bercario_id)
+    if (tmp)  lotes = lotes.filter(l => l.ninhos_quelonios?.temporada_id === tmp)
+    if (ucId) lotes = lotes.filter(l => l.bercarios?.uc_id === ucId)
+
+    const nomePorLote = {}
+    lotes.forEach(l => { nomePorLote[l.id] = l.bercarios?.nome || '—' })
+    const loteIds = lotes.map(l => l.id)
+
+    let biometriaRaw = []
+    if (loteIds.length) {
+      const { data } = await db.from('ocorrencias_bercario')
+        .select('lote_id,data_ocorrencia,comprimento_medio_cm')
+        .eq('tipo', 'biometria')
+        .in('lote_id', loteIds)
+      biometriaRaw = data || []
+    }
+
+    const porBercData = {}
+    biometriaRaw.forEach(o => {
+      if (o.comprimento_medio_cm == null) return
+      const nome = nomePorLote[o.lote_id]
+      if (!nome) return
+      porBercData[nome] = porBercData[nome] || {}
+      const d = o.data_ocorrencia
+      ;(porBercData[nome][d] = porBercData[nome][d] || []).push(o.comprimento_medio_cm)
+    })
+
+    const rankEntrada = {}
+    Object.values(porBercMort).forEach(b => { rankEntrada[b.nome] = b.entrada })
+
+    _bercCrescimento = Object.entries(porBercData)
+      .map(([nome, porData]) => ({
+        nome,
+        pontos: Object.keys(porData).sort().map(d => ({
+          data: d,
+          comp: Math.round((porData[d].reduce((s, v) => s + v, 0) / porData[d].length) * 10) / 10,
+        })),
+      }))
+      .sort((a, b) => (rankEntrada[b.nome] || 0) - (rankEntrada[a.nome] || 0))
+      .slice(0, 8)
   }
 
   async function carregarChartJS() {
@@ -675,6 +748,7 @@
 
     await carregarChartJS()
     await carregarPainelDados()
+    await carregarDadosBercarios()
 
     // Monta o HTML das três abas (sem desenhar gráficos ainda) e ativa a
     // aba corrente — os gráficos de cada aba são desenhados só quando ela
@@ -732,6 +806,8 @@
     grafOcorrencias(d.ocorrencias_tipos || [])
     grafMonitores(d.por_monitor || [])
     grafDestino(k)
+    grafBercMortalidade(_bercMortalidade)
+    grafBercCrescimento(_bercCrescimento)
     renderTabelaPraias(d.por_praia || [])
     renderTabelaUCs(d.por_uc || [])
   }
@@ -973,6 +1049,18 @@
         <div class="rel-chart-card"><p class="rel-chart-title">Destino dos Filhotes</p><div class="rel-chart-wrap short"><canvas id="graf-destino"></canvas></div></div>
         <div class="rel-chart-card"><p class="rel-chart-title">Ocorrências no Berçário</p><div class="rel-chart-wrap short"><canvas id="graf-oc"></canvas></div></div>
         <div class="rel-chart-card"><p class="rel-chart-title">Curva de Crescimento</p><p class="rel-chart-sub">Comprimento (cm) e peso médio (g) por biometria</p><div class="rel-chart-wrap short"><canvas id="graf-biometria"></canvas></div></div>
+      </div>
+      <div class="rel-charts-row">
+        <div class="rel-chart-card">
+          <p class="rel-chart-title">Mortalidade por Berçário</p>
+          <p class="rel-chart-sub">% de filhotes não sobreviventes, comparando os berçários físicos</p>
+          ${_bercMortalidade.length ? `<div class="rel-chart-wrap"><canvas id="graf-berc-mortalidade"></canvas></div>` : `<p style="color:var(--cinza-500);font-size:.8rem;padding:20px 0;text-align:center">Sem dados de mortalidade para os filtros selecionados.</p>`}
+        </div>
+        <div class="rel-chart-card">
+          <p class="rel-chart-title">Curva de Crescimento por Berçário</p>
+          <p class="rel-chart-sub">Comprimento médio (cm) ao longo do tempo (top 8 por nº de filhotes)</p>
+          ${_bercCrescimento.length ? `<div class="rel-chart-wrap"><canvas id="graf-berc-crescimento"></canvas></div>` : `<p style="color:var(--cinza-500);font-size:.8rem;padding:20px 0;text-align:center">Sem biometria registrada para os filtros selecionados.</p>`}
+        </div>
       </div>
     </div>`
   }
@@ -1225,6 +1313,58 @@
           x:{ grid:{display:false}, ticks:{color:'#6B7280', font:tickFont} },
           y:{ grid:{color:gridColor}, ticks:{color:'#6B7280', font:tickFont}, beginAtZero:true, title:{display:true,text:'cm',color:'#9CA3AF',font:{size:9}} },
           y2:{ position:'right', grid:{display:false}, ticks:{color:'rgba(201,168,76,.5)', font:tickFont}, beginAtZero:true, title:{display:true,text:'g',color:'rgba(201,168,76,.3)',font:{size:9}} }
+        }
+      }
+    })
+  }
+
+  function grafBercMortalidade(lista) {
+    if (!lista.length) return
+    mkChart('graf-berc-mortalidade', {
+      type:'bar',
+      data:{
+        labels: lista.map(b => b.nome),
+        datasets:[{
+          label:'Mortalidade (%)',
+          data: lista.map(b => b.pct),
+          backgroundColor: lista.map(b => b.pct >= 30 ? '#DC2626' : b.pct >= 15 ? '#D97706' : b.pct >= 5 ? '#eab308' : '#2A9D6F'),
+          borderRadius:4
+        }]
+      },
+      options:{
+        indexAxis:'y', responsive:true, maintainAspectRatio:false, animation:{duration:500},
+        plugins:{ legend:{display:false} },
+        scales:{
+          x:{ beginAtZero:true, grid:{color:gridColor}, ticks:{color:'#6B7280', font:tickFont}, title:{display:true,text:'%',color:'#9CA3AF',font:{size:9}} },
+          y:{ grid:{display:false}, ticks:{color:'#6B7280', font:tickFont} }
+        }
+      }
+    })
+  }
+
+  const BERC_CORES = ['#1A6B8C','#2A9D6F','#C9A84C','#7ECEE8','#D97706','#8b5cf6','#ec4899','#6366f1']
+
+  function grafBercCrescimento(series) {
+    if (!series.length) return
+    const datas = [...new Set(series.flatMap(s => s.pontos.map(p => p.data)))].sort()
+    mkChart('graf-berc-crescimento', {
+      type:'line',
+      data:{
+        labels: datas,
+        datasets: series.map((s, i) => ({
+          label: s.nome,
+          data: datas.map(d => s.pontos.find(p => p.data === d)?.comp ?? null),
+          borderColor: BERC_CORES[i % BERC_CORES.length],
+          backgroundColor: BERC_CORES[i % BERC_CORES.length],
+          borderWidth:2, tension:.35, pointRadius:3, spanGaps:true
+        }))
+      },
+      options:{
+        responsive:true, maintainAspectRatio:false, animation:{duration:600},
+        plugins:{ legend:legendOpts },
+        scales:{
+          x:{ grid:{display:false}, ticks:{color:'#6B7280', font:tickFont} },
+          y:{ grid:{color:gridColor}, ticks:{color:'#6B7280', font:tickFont}, beginAtZero:true, title:{display:true,text:'Comprimento (cm)',color:'#9CA3AF',font:{size:9}} }
         }
       }
     })
