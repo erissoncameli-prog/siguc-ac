@@ -621,6 +621,10 @@ async function bioSyncTudo({ monitorId, onProgresso, onConcluido, onErro } = {})
       try { await bioSyncPullLotes(grupoId) } catch (_) {}
       try { await bioSyncPullIndividuos(grupoId) } catch (_) {}
       try { await bioSyncPullBiometriasInd(grupoId) } catch (_) {}
+      // Histórico completo (soltura + ocorrências) — visível para toda a
+      // equipe desde a 140_solturas_ocorrencias_compartilhadas.
+      try { await bioSyncPullSolturas(grupoId) } catch (_) {}
+      try { await bioSyncPullOcorrencias(grupoId) } catch (_) {}
     }
     await bioOfflineLimparConfirmados()
     onConcluido?.({ ninhos: n, transferencias: t, eclosoes: e, visitas: v, lotes: l, individuos: ind, solturas: s, ocorrencias: oc, biometrias: bi })
@@ -859,6 +863,91 @@ async function bioSyncPullBiometriasInd(grupoId) {
       status_sync:    'confirmado',
       criado_em:      b.criado_em,
       sincronizado_em: b.sincronizado_em ?? new Date().toISOString(),
+    })
+  }
+}
+
+// ── Pull: solturas do grupo (histórico de entrada até soltura,
+//    visível para toda a equipe — 140_solturas_ocorrencias_compartilhadas) ──
+async function bioSyncPullSolturas(grupoId) {
+  if (!navigator.onLine) return
+
+  const { data, error } = await bioSupabase()
+    .from('solturas_filhotes')
+    .select(`
+      id, uuid_cliente, data_soltura, hora_soltura, qtd_soltada, mortalidade,
+      local_descricao, predacao_soltura, observacoes, foto_urls, via_bercario,
+      monitor_id, criado_em, sincronizado_em,
+      ninho:ninhos_quelonios(uuid_cliente, numero_ninho),
+      lote:lotes_bercario(uuid_cliente)
+    `)
+    .eq('grupo_id', grupoId)
+    .order('data_soltura', { ascending: false })
+    .limit(200)
+
+  if (error || !data) return
+
+  for (const s of data) {
+    await bioOfflineSalvarSoltura({
+      uuid_cliente:     s.uuid_cliente,
+      ninho_uuid:       s.ninho?.uuid_cliente ?? null,
+      ninho_numero:     s.ninho?.numero_ninho ?? null,
+      lote_uuid:        s.lote?.uuid_cliente ?? null,
+      via_bercario:     s.via_bercario,
+      data_soltura:     s.data_soltura,
+      hora_soltura:     s.hora_soltura,
+      qtd_soltada:      s.qtd_soltada,
+      mortalidade:      s.mortalidade,
+      local_descricao:  s.local_descricao,
+      predacao_soltura: s.predacao_soltura,
+      observacoes:      s.observacoes,
+      foto_urls:        s.foto_urls ?? [],
+      server_id:        s.id,
+      status_sync:      'confirmado',
+      criado_em:        s.criado_em,
+      sincronizado_em:  s.sincronizado_em ?? new Date().toISOString(),
+    })
+  }
+}
+
+// ── Pull: ocorrências de berçário do grupo (alimentação/mortalidade/
+//    biometria/etc — visível para toda a equipe) ─────────────────
+async function bioSyncPullOcorrencias(grupoId) {
+  if (!navigator.onLine) return
+
+  const { data, error } = await bioSupabase()
+    .from('ocorrencias_bercario')
+    .select(`
+      id, uuid_cliente, tipo, data_ocorrencia, hora_ocorrencia,
+      comprimento_medio_cm, peso_medio_g, n_amostrados, qtd_afetados, causa,
+      descricao, foto_urls, monitor_id, criado_em, sincronizado_em,
+      lote:lotes_bercario(uuid_cliente)
+    `)
+    .eq('grupo_id', grupoId)
+    .order('data_ocorrencia', { ascending: false })
+    .limit(500)
+
+  if (error || !data) return
+
+  for (const oc of data) {
+    if (!oc.lote?.uuid_cliente) continue
+    await bioOfflineSalvarOcorrencia({
+      uuid_cliente:         oc.uuid_cliente,
+      lote_uuid:            oc.lote.uuid_cliente,
+      tipo:                 oc.tipo,
+      data_ocorrencia:      oc.data_ocorrencia,
+      hora_ocorrencia:      oc.hora_ocorrencia,
+      comprimento_medio_cm: oc.comprimento_medio_cm,
+      peso_medio_g:         oc.peso_medio_g,
+      n_amostrados:         oc.n_amostrados,
+      qtd_afetados:         oc.qtd_afetados,
+      causa:                oc.causa,
+      descricao:            oc.descricao,
+      foto_urls:            oc.foto_urls ?? [],
+      server_id:            oc.id,
+      status_sync:          'confirmado',
+      criado_em:            oc.criado_em,
+      sincronizado_em:      oc.sincronizado_em ?? new Date().toISOString(),
     })
   }
 }

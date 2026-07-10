@@ -49,6 +49,19 @@
   </div>
 </div>
 
+<!-- ── Modal: Fotos ────────────────────────────────────── -->
+<div class="modal-overlay" id="modal-fotos">
+  <div class="modal" style="max-width:700px">
+    <div class="modal-header">
+      <div class="modal-title">Fotos</div>
+      <button class="modal-close" onclick="document.getElementById('modal-fotos').classList.remove('aberto')">×</button>
+    </div>
+    <div class="modal-body">
+      <div id="fotos-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px"></div>
+    </div>
+  </div>
+</div>
+
 <script>
 ;(async function () {
   const usuario = await carregarUsuario()
@@ -232,15 +245,24 @@
     const lotes = lotesRaw || []
     const loteIds = lotes.map(l => l.id)
 
-    let vlm = [], solturas = [], ocorrencias = [], individuos = []
+    let vlm = [], solturas = [], ocorrencias = [], individuos = [], biometriasInd = []
     if (loteIds.length) {
       const [r1, r2, r3, r4] = await Promise.all([
         db.from('vw_lotes_bercario_mortalidade').select('lote_id,mortes,vivos_atual').in('lote_id', loteIds),
-        db.from('solturas_filhotes').select('lote_bercario_id,data_soltura,qtd_soltada,mortalidade').in('lote_bercario_id', loteIds),
+        db.from('solturas_filhotes').select('lote_bercario_id,data_soltura,hora_soltura,qtd_soltada,mortalidade,local_descricao,predacao_soltura,observacoes,foto_urls').in('lote_bercario_id', loteIds),
         db.from('ocorrencias_bercario').select('*').in('lote_id', loteIds).order('data_ocorrencia', { ascending: false }),
         db.from('vw_filhotes_bercario').select('*').in('lote_id', loteIds).order('numero'),
       ])
       vlm = r1.data || []; solturas = r2.data || []; ocorrencias = r3.data || []; individuos = r4.data || []
+
+      // Biometria individual (132) — a curva de crescimento precisa das
+      // medições ao longo do tempo, não só a última (vw_filhotes_bercario).
+      const individuoIds = individuos.map(i => i.id)
+      if (individuoIds.length) {
+        const { data } = await db.from('biometrias_individuais')
+          .select('data_medicao,comprimento_cm,peso_g').in('individuo_id', individuoIds)
+        biometriasInd = data || []
+      }
     }
 
     const { data: alertas } = await db.from('vw_alertas_quelonios').select('*').eq('bercario_id', id).order('criado_em', { ascending: false })
@@ -257,10 +279,13 @@
         vivos_atual: mort?.vivos_atual ?? (l.qtd_entrada - (mort?.mortes ?? 0)),
         qtd_soltada: solturasLote.reduce((s, x) => s + (x.qtd_soltada || 0), 0),
         data_soltura: solturasLote.map(x => x.data_soltura).sort().pop(),
+        // Histórico completo da soltura — desde a entrada até a soltura,
+        // com local/predação/observações/fotos (não só o agregado acima).
+        solturas: solturasLote,
       }
     })
 
-    _detAtual = { bercario: berc, lotes: lotesEnriquecidos, ocorrencias: ocorrencias || [], individuos: individuos || [], alertas: alertas || [] }
+    _detAtual = { bercario: berc, lotes: lotesEnriquecidos, ocorrencias: ocorrencias || [], individuos: individuos || [], biometriasInd, alertas: alertas || [] }
     renderAbaDetalhe(tabInicial || 'ativos')
   }
 
@@ -285,9 +310,19 @@
           <div style="font-size:.83rem;color:var(--cinza-500);display:grid;gap:3px;margin:8px 0">
             <div>Entrada: ${formatData(l.data_entrada)} · ${l.qtd_entrada} filhotes</div>
             <div>Vivos atual: <strong style="color:#2A9D6F">${l.vivos_atual}</strong> · Mortes: <strong style="color:#DC2626">${l.mortes}</strong></div>
-            ${l.status === 'soltado' ? `<div>Soltura: ${l.data_soltura ? formatData(l.data_soltura) : '—'} · ${l.qtd_soltada} soltos</div>` : ''}
           </div>
-          ${l.observacoes ? `<p style="font-size:.8rem;font-style:italic;color:var(--cinza-500);margin:0">${esc(l.observacoes)}</p>` : ''}
+          ${l.observacoes ? `<p style="font-size:.8rem;font-style:italic;color:var(--cinza-500);margin:0 0 8px">${esc(l.observacoes)}</p>` : ''}
+          ${(l.solturas || []).map((s, i) => `
+            <div style="background:rgba(0,0,0,.02);border-radius:8px;padding:10px 12px;margin-top:6px">
+              <div style="font-size:.83rem;font-weight:600;color:var(--cinza-900)">
+                Soltura: ${s.data_soltura ? formatData(s.data_soltura) : '—'}${s.hora_soltura ? ' às ' + s.hora_soltura : ''}
+              </div>
+              <div style="font-size:.8rem;color:var(--cinza-500);margin-top:2px">
+                ${s.qtd_soltada ?? 0} filhotes soltos${s.mortalidade ? ' · ' + s.mortalidade + ' mortes' : ''}${s.predacao_soltura ? ' · predação observada' : ''}${s.local_descricao ? ' · ' + esc(s.local_descricao) : ''}
+              </div>
+              ${s.observacoes ? `<div style="font-size:.8rem;font-style:italic;color:var(--cinza-500);margin-top:4px">${esc(s.observacoes)}</div>` : ''}
+              ${s.foto_urls?.length ? `<button class="btn btn-sm btn-secondary" style="margin-top:6px" onclick="verFotosSoltura('${l.id}',${i})">Ver ${s.foto_urls.length} foto${s.foto_urls.length !== 1 ? 's' : ''}</button>` : ''}
+            </div>`).join('')}
         </div>`).join('') : `<p style="color:var(--cinza-500)">Nenhum lote ${tab === 'ativos' ? 'ativo' : 'no histórico'}.</p>`
       return
     }
@@ -307,6 +342,7 @@
           </div>
           ${o.causa ? `<div style="font-size:.82rem;color:var(--cinza-500);margin-top:4px">Causa: ${esc(o.causa)}</div>` : ''}
           ${o.descricao ? `<p style="font-size:.82rem;color:var(--cinza-500);font-style:italic;margin:6px 0 0">${esc(o.descricao)}</p>` : ''}
+          ${o.foto_urls?.length ? `<button class="btn btn-sm btn-secondary" style="margin-top:6px" onclick="verFotosOcorrencia('${o.id}')">Ver ${o.foto_urls.length} foto${o.foto_urls.length !== 1 ? 's' : ''}</button>` : ''}
         </div>`).join('') : `<p style="color:var(--cinza-500)">Nenhuma ocorrência registrada.</p>`
       return
     }
@@ -374,16 +410,20 @@
     await carregarChartJS()
     if (!_detAtual) return
 
-    // Curva de crescimento: agrupa ocorrências de biometria por data (média, caso
-    // haja mais de uma amostragem no mesmo dia) — mesmo critério do biometria_serie
-    // agregado usado em relatorios-biomonitor.html.
+    // Curva de crescimento: une amostragem agregada (ocorrencias_bercario tipo
+    // biometria) e medição individual (biometrias_individuais, 132) por data
+    // (média, caso haja mais de uma medição no mesmo dia) — mesmo critério do
+    // biometria_serie da RPC bio_dados_aba usada no app de campo.
     const porData = {}
-    _detAtual.ocorrencias.filter(o => o.tipo === 'biometria').forEach(o => {
-      const d = o.data_ocorrencia
+    const acumula = (d, comp, peso) => {
+      if (!d) return
       if (!porData[d]) porData[d] = { comp: [], peso: [] }
-      if (o.comprimento_medio_cm != null) porData[d].comp.push(o.comprimento_medio_cm)
-      if (o.peso_medio_g != null) porData[d].peso.push(o.peso_medio_g)
-    })
+      if (comp != null) porData[d].comp.push(comp)
+      if (peso != null) porData[d].peso.push(peso)
+    }
+    _detAtual.ocorrencias.filter(o => o.tipo === 'biometria')
+      .forEach(o => acumula(o.data_ocorrencia, o.comprimento_medio_cm, o.peso_medio_g))
+    _detAtual.biometriasInd.forEach(b => acumula(b.data_medicao, b.comprimento_cm, b.peso_g))
     const media = arr => arr.length ? Math.round((arr.reduce((s, v) => s + v, 0) / arr.length) * 10) / 10 : null
     const biometria = Object.keys(porData).sort().map(d => ({
       data: d, comp: media(porData[d].comp), peso: media(porData[d].peso),
@@ -396,7 +436,19 @@
     _detAtual.ocorrencias.forEach(o => { ocTipos[o.tipo] = (ocTipos[o.tipo] || 0) + 1 })
     const ocEntries = Object.entries(ocTipos)
 
+    // Desfecho: o que aconteceu com os filhotes desde a entrada até agora —
+    // soltos / ainda no berçário / mortos.
+    const totalEntrada = _detAtual.lotes.reduce((s, l) => s + (l.qtd_entrada || 0), 0)
+    const totalMortos  = _detAtual.lotes.reduce((s, l) => s + (l.mortes || 0), 0)
+    const totalSoltos  = _detAtual.lotes.reduce((s, l) => s + (l.qtd_soltada || 0), 0)
+    const totalAtivos  = Math.max(totalEntrada - totalMortos - totalSoltos, 0)
+
     cont.innerHTML = `
+      <div class="ind-chart-card">
+        <p class="ind-chart-title">Desfecho dos filhotes</p>
+        <p class="ind-chart-sub">O que aconteceu desde a entrada até agora (${totalEntrada} no total)</p>
+        ${totalEntrada ? `<div class="ind-chart-wrap"><canvas id="ind-canvas-desfecho"></canvas></div>` : `<p style="color:var(--cinza-500);font-size:.85rem">Sem entrada registrada ainda.</p>`}
+      </div>
       <div class="ind-chart-card">
         <p class="ind-chart-title">Curva de crescimento</p>
         <p class="ind-chart-sub">Comprimento (cm) e peso médio (g) por biometria registrada</p>
@@ -414,6 +466,18 @@
 
     const legendOpts = { labels: { color: '#374151', usePointStyle: true, padding: 12, font: { size: 11 } } }
     const gridColor = 'rgba(0,0,0,.06)'
+
+    if (totalEntrada) {
+      _detCharts['ind-canvas-desfecho']?.destroy()
+      _detCharts['ind-canvas-desfecho'] = new Chart(document.getElementById('ind-canvas-desfecho').getContext('2d'), {
+        type: 'doughnut',
+        data: {
+          labels: ['Soltos', 'No berçário', 'Mortos'],
+          datasets: [{ data: [totalSoltos, totalAtivos, totalMortos], backgroundColor: ['#2A9D6F', '#1A6B8C', '#DC2626'], borderWidth: 2, borderColor: '#fff', hoverOffset: 8 }],
+        },
+        options: { cutout: '62%', plugins: { legend: legendOpts } },
+      })
+    }
 
     if (biometria.length) {
       _detCharts['ind-canvas-crescimento']?.destroy()
@@ -495,6 +559,23 @@
     const bercId = _detAtual?.bercario?.id
     await carregarDados()
     if (bercId) await abrirDetalhe(bercId, 'alertas')
+  }
+
+  window.verFotos = function(urls) {
+    document.getElementById('fotos-grid').innerHTML = urls.map(u =>
+      `<img src="${u}" style="width:100%;border-radius:8px;object-fit:cover;aspect-ratio:4/3;cursor:pointer" loading="lazy" onclick="window.open('${u}','_blank')">`
+    ).join('')
+    document.getElementById('modal-fotos').classList.add('aberto')
+  }
+
+  window.verFotosSoltura = function(loteId, idx) {
+    const soltura = _detAtual?.lotes.find(l => l.id === loteId)?.solturas?.[idx]
+    if (soltura?.foto_urls?.length) verFotos(soltura.foto_urls)
+  }
+
+  window.verFotosOcorrencia = function(ocorrenciaId) {
+    const oc = _detAtual?.ocorrencias.find(o => o.id === ocorrenciaId)
+    if (oc?.foto_urls?.length) verFotos(oc.foto_urls)
   }
 
   await carregarDados()
