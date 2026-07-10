@@ -1484,6 +1484,12 @@ body.field-mode .bio-home-nome { font-size: 26px; }
   border-radius: 10px; font-size: 10px; font-weight: 600;
   text-transform: none; letter-spacing: normal;
 }
+.bio-berc-grupo-temporada-antiga {
+  display: inline-block; margin-left: 6px; padding: 2px 8px;
+  background: #FEF3C7; color: #92400E;
+  border-radius: 10px; font-size: 10px; font-weight: 600;
+  text-transform: none; letter-spacing: normal;
+}
 
 /* ── Aba Dados: navegação por tabs ── */
 .bio-dados-tabs {
