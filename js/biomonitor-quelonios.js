@@ -288,7 +288,23 @@ function bioIniciarTelaLogin() {
     const btn = document.getElementById('bio-btn-login')
     btn.disabled = true; btn.textContent = 'Entrando…'
 
-    const { error } = await bioSupabase().auth.signInWithPassword({ email, password: senha })
+    if (!window._bioDB_client) {
+      btn.disabled = false; btn.textContent = 'Entrar'
+      erroEl.textContent = 'Sem conexão com o servidor. Verifique sua internet e tente novamente.'
+      erroEl.hidden = false
+      return
+    }
+
+    let error
+    try {
+      ({ error } = await bioSupabase().auth.signInWithPassword({ email, password: senha }))
+    } catch (e) {
+      console.error('[biomonitor] falha no login:', e)
+      btn.disabled = false; btn.textContent = 'Entrar'
+      erroEl.textContent = 'Não foi possível conectar. Verifique sua internet e tente novamente.'
+      erroEl.hidden = false
+      return
+    }
     btn.disabled = false; btn.textContent = 'Entrar'
 
     if (error) { erroEl.textContent = 'E-mail ou senha incorretos.'; erroEl.hidden = false; return }
