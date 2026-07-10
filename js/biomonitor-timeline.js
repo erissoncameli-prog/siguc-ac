@@ -223,11 +223,18 @@ function bioTimelineHtml(evs) {
     const delta = ev.delta > 0 ? `<span class="bio-nfc-hist-delta">−${ev.delta}</span>` : ''
     const saldo = ev.saldo != null
       ? `<span class="bio-nfc-hist-saldo">${ev.saldo}<i>viáveis</i></span>` : ''
+    let detBtn = ''
+    if (ev.tipo === 'visita' && ev.detalhe) {
+      const id = ++_bioDetVisSeq
+      BioDetalhesVisita[id] = ev.detalhe
+      detBtn = `<button class="bio-nfc-hist-det" data-nh-detalhe="${id}" type="button">Detalhes</button>`
+    }
     return `
     <div class="bio-nfc-hist-ev ev-${cls}">
       <div class="bio-nfc-hist-dot"></div>
       <span class="bio-nfc-hist-data">${fd(ev.data)}</span>
       <span class="bio-nfc-hist-txt">${esc(ev.txt)}${delta}</span>
+      ${detBtn}
       ${saldo}
     </div>`
   }).join('')
