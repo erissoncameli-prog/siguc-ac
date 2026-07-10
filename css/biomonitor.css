@@ -1374,6 +1374,8 @@ body.field-mode .bio-home-nome { font-size: 26px; }
   cursor: pointer; background: var(--bio-card);
 }
 .bio-berc-sel-card:active { background: #e8f5f0; }
+.bio-berc-sel-card.bloqueado { cursor: not-allowed; opacity: .55; }
+.bio-berc-sel-card.bloqueado:active { background: var(--bio-card); }
 .bio-berc-sel-info { flex: 1; }
 .bio-berc-sel-nome { font-size: 15px; font-weight: 700; color: var(--bio-ink); }
 .bio-berc-sel-meta { font-size: 12px; color: var(--bio-ink2); margin-top: 2px; }
@@ -1467,6 +1469,12 @@ body.field-mode .bio-home-nome { font-size: 26px; }
   border-bottom: 1px solid var(--bio-border);
 }
 .bio-berc-grupo-stats { font-size: 11px; font-weight: 500; color: var(--bio-prim); }
+.bio-berc-grupo-especie {
+  display: inline-block; margin-left: 6px; padding: 2px 8px;
+  background: var(--bio-prim-bg); color: var(--bio-prim);
+  border-radius: 10px; font-size: 10px; font-weight: 600;
+  text-transform: none; letter-spacing: normal;
+}
 
 /* ── Aba Dados: navegação por tabs ── */
 .bio-dados-tabs {
