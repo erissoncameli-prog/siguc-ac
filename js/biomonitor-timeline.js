@@ -76,11 +76,11 @@ function bioAbrirDetalhesVisita(id) {
     ? `<div><span>${esc(l)}</span><strong>${esc(String(v))}</strong></div>` : ''
 
   const perdas = [
-    r.ovos_predados_n > 0 ? `Predação${r.predacao_incubacao ? ' (' + (BIO_VISITA_PREDACAO_LBL[r.predacao_incubacao] || r.predacao_incubacao) + ')' : ''}: ${r.ovos_predados_n}` : null,
-    r.ovos_perdidos_alagamento > 0 ? `Alagamento: ${r.ovos_perdidos_alagamento}` : null,
-    r.ovos_perdidos_erosao > 0 ? `Erosão/apodrecimento: ${r.ovos_perdidos_erosao}` : null,
-    r.ovos_perdidos_humana > 0 ? `Dano humano: ${r.ovos_perdidos_humana}` : null,
-  ].filter(Boolean)
+    r.ovos_predados_n > 0 ? linha(`Predação${r.predacao_incubacao ? ' (' + (BIO_VISITA_PREDACAO_LBL[r.predacao_incubacao] || r.predacao_incubacao) + ')' : ''}`, r.ovos_predados_n) : '',
+    r.ovos_perdidos_alagamento > 0 ? linha('Alagamento', r.ovos_perdidos_alagamento) : '',
+    r.ovos_perdidos_erosao > 0 ? linha('Erosão/apodrecimento', r.ovos_perdidos_erosao) : '',
+    r.ovos_perdidos_humana > 0 ? linha('Dano humano', r.ovos_perdidos_humana) : '',
+  ].join('')
 
   const corpo = [
     linha('Data', fd(r.data_visita) + (r.hora_visita ? ` · ${r.hora_visita.slice(0, 5)}` : '')),
@@ -90,7 +90,7 @@ function bioAbrirDetalhesVisita(id) {
     linha('Umidade', r.umidade),
     r.status_ninho === 'destruido'
       ? linha('Causa da destruição', r.causa_destruicao ? (BIO_VISITA_CAUSA_LBL[r.causa_destruicao] || r.causa_destruicao) : null)
-      : perdas.map(p => linha(...p.split(': '))).join(''),
+      : perdas,
     linha('Sinal de alagamento', r.sinal_alagamento ? 'Sim' : null),
     linha('Intervenção realizada', r.intervencao),
   ].filter(Boolean).join('')
