@@ -119,7 +119,7 @@ async function bioBuscarEventosServidor(sb, ninhos) {
         .select('ninho_id,data_transferencia,hora_transferencia,praia_destino_nome,local_destino')
         .in('ninho_id', serverIds),
       sb.from('visitas_ninho')
-        .select('ninho_id,data_visita,hora_visita,status_ninho,temperatura_substrato_c,temperatura_ar_c,ovos_predados_n,ovos_perdidos_alagamento,ovos_perdidos_erosao,ovos_perdidos_humana')
+        .select('ninho_id,data_visita,hora_visita,status_ninho,temperatura_substrato_c,temperatura_ar_c,umidade,predacao_incubacao,ovos_predados_n,ovos_perdidos_alagamento,ovos_perdidos_erosao,ovos_perdidos_humana,causa_destruicao,sinal_alagamento,intervencao,observacoes')
         .in('ninho_id', serverIds),
       sb.from('lotes_bercario')
         .select('ninho_id,data_entrada,hora_entrada,qtd_entrada,bercario_nome')
