@@ -2384,6 +2384,7 @@ async function bioAbrirDetalheBercario(grupo) {
   bioCarregarTimelineBercario(grupo.id, grupo.temporadaId)
   bioRenderizarFilhotesDoBercario(grupo.id, grupo.temporadaId)
   bioRenderizarHistoricoNinhos(todosLotes)
+  bioRenderizarSolturasDoBercario(grupo.id, grupo.temporadaId)
   bioMostrarTela('tela-detalhe-lote')
 }
 
@@ -2440,6 +2441,58 @@ function bioRenderizarHistoricoNinhos(lotes) {
           <div class="bio-hist-ninho-meta">Entrada: ${_bioFormatarData(l.data_entrada)} · ${l.qtd_entrada} filhotes</div>
         </div>
         <span class="bio-nfc-status-badge ${l.status === 'ativo' ? 'em_bercario' : l.status === 'soltado' ? 'soltado' : ''}">${STATUS_LBL[l.status] ?? l.status}</span>
+      </div>`
+  }).join('')
+}
+
+// ── Visualizador de foto em tela cheia (histórico: ocorrências/soltura) ──
+function bioAbrirFotoTelaCheia(url) {
+  const viewer = document.getElementById('bio-foto-viewer')
+  const img    = document.getElementById('bio-foto-viewer-img')
+  if (!viewer || !img || !url) return
+  img.src = url
+  viewer.hidden = false
+}
+
+function bioFecharFotoTelaCheia() {
+  const viewer = document.getElementById('bio-foto-viewer')
+  if (viewer) viewer.hidden = true
+}
+
+// Grade de miniaturas clicáveis (abre bioAbrirFotoTelaCheia ao tocar) —
+// usada no histórico de ocorrências e de soltura.
+function _bioFotosGridHtml(fotoUrls) {
+  if (!fotoUrls?.length) return ''
+  return `<div class="bio-foto-grid">${
+    fotoUrls.map(u => `<img class="bio-foto-clicavel" src="${u}" data-foto-url="${u}" loading="lazy">`).join('')
+  }</div>`
+}
+
+// ── Histórico de soltura do berçário (data, quantidade, local,
+//    predação, observações e fotos) — desde a entrada até a soltura.
+async function bioRenderizarSolturasDoBercario(bercarioId, temporadaId) {
+  const wrap  = document.getElementById('bio-det-solturas-sec')
+  const lista = document.getElementById('bio-det-solturas-lista')
+  if (!wrap || !lista) return
+
+  const solturas = await bioOfflineSolturasDoBercario(bercarioId, temporadaId)
+  if (!solturas.length) { wrap.hidden = true; return }
+  wrap.hidden = false
+
+  lista.innerHTML = solturas.map(s => {
+    const dataFmt = _bioFormatarData(s.data_soltura) + (s.hora_soltura ? ` às ${s.hora_soltura}` : '')
+    const meta = [
+      `${s.qtd_soltada ?? 0} filhotes soltos`,
+      s.mortalidade ? `${s.mortalidade} mortes` : null,
+      s.predacao_soltura ? 'predação observada' : null,
+      s.local_descricao || null,
+    ].filter(Boolean).join(' · ')
+    return `
+      <div class="bio-sol-hist-item">
+        <strong>${dataFmt}</strong>
+        <div class="bio-sol-hist-meta">${esc(meta)}</div>
+        ${s.observacoes ? `<div class="bio-sol-hist-obs">${esc(s.observacoes)}</div>` : ''}
+        ${_bioFotosGridHtml(s.foto_urls)}
       </div>`
   }).join('')
 }
@@ -2627,6 +2680,7 @@ async function bioCarregarTimelineBercario(bercarioId, temporadaId) {
           <div class="bio-tl-tipo">${TIPO_NOME[oc.tipo] ?? oc.tipo}</div>
           <div class="bio-tl-data">${dataFmt}</div>
           ${detalhes.length ? `<div class="bio-tl-detalhe">${detalhes.join(' · ')}</div>` : ''}
+          ${_bioFotosGridHtml(oc.foto_urls)}
         </div>
       </div>
     `
@@ -2823,6 +2877,16 @@ function bioIniciarPosEclosao() {
   })
   document.getElementById('bio-btn-biometria-seq')?.addEventListener('click', () => {
     if (BioApp.bercarioAtual) bioIniciarBiometriaSequencial(BioApp.bercarioAtual.id, BioApp.bercarioAtual.temporadaId)
+  })
+
+  // Fotos do histórico (ocorrências/soltura): tocar abre em tela cheia
+  document.getElementById('tela-detalhe-lote')?.addEventListener('click', e => {
+    const foto = e.target.closest('.bio-foto-clicavel')
+    if (foto) bioAbrirFotoTelaCheia(foto.dataset.fotoUrl)
+  })
+  document.getElementById('bio-foto-viewer-fechar')?.addEventListener('click', bioFecharFotoTelaCheia)
+  document.getElementById('bio-foto-viewer')?.addEventListener('click', e => {
+    if (e.target.id === 'bio-foto-viewer') bioFecharFotoTelaCheia()
   })
 
   // Detalhe do indivíduo
