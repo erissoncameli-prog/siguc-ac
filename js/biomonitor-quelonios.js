@@ -392,8 +392,12 @@ function bioIniciarTelaBloqueio() {
     }
   })
 
-  document.getElementById('bio-btn-esqueci-pin')?.addEventListener('click', () => {
-    bioSupabase().auth.signOut()
+  document.getElementById('bio-btn-esqueci-pin')?.addEventListener('click', async () => {
+    if (!confirm('Descartar o PIN deste aparelho e entrar novamente com e-mail e senha? É necessário ter internet.')) return
+    await bioOfflineDelConfig('pin_hash')
+    await bioOfflineDelConfig('monitor')
+    BioApp.monitor = null
+    try { await bioSupabase().auth.signOut() } catch {}
     bioMostrarTela('tela-login')
   })
 }
