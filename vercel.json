@@ -29,7 +29,8 @@
     "api/dof-proxy.js":      { "maxDuration": 30 },
     "api/planet-tiles.js":   { "maxDuration": 30 },
     "api/planet-mosaics.js": { "maxDuration": 30 },
-    "api/geo.js":            { "maxDuration": 30 }
+    "api/geo.js":            { "maxDuration": 30 },
+    "api/biomonitor-apk-latest.js": { "maxDuration": 15 }
   },
   "crons": [
     {
