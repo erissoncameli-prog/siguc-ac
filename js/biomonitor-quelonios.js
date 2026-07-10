@@ -1906,7 +1906,8 @@ async function bioSalvarEntradaBercario() {
 
   // Guarda final: reconfirma que o berçário não mudou de espécie entre a
   // seleção e o salvar (ex.: outro monitor sincronizou nesse intervalo).
-  const especieAtual = bioBercarioEspecieAtual(berc.id, await bioOfflineLotesAtivos())
+  const temporadaNinho = ninho.temporada_id ?? BioApp.temporadaAtual?.id ?? null
+  const especieAtual = bioBercarioEspecieAtual(berc.id, await bioOfflineLotesAtivos(), temporadaNinho)
   if (especieAtual && ninho.especie && especieAtual !== ninho.especie) {
     const espNome = BIO_ESPECIES.find(e => e.id === especieAtual)?.nome ?? especieAtual
     alert(`Este berçário já está em uso com a espécie "${espNome}".\nNão é possível misturar espécies diferentes ali.\n\nEscolha outro berçário.`)
@@ -1915,7 +1916,7 @@ async function bioSalvarEntradaBercario() {
       const nomeSpan = document.getElementById('bio-berc-nome-txt')
       if (nomeSpan) nomeSpan.textContent = b.nome
       bioMostrarTela('tela-form-entrada-bercario')
-    }, ninho.especie)
+    }, ninho.especie, temporadaNinho)
     return
   }
 
@@ -1926,6 +1927,7 @@ async function bioSalvarEntradaBercario() {
     especie:       ninho.especie,
     bercario_id:   berc.id,
     bercario_nome: berc.nome,
+    temporada_id:  ninho.temporada_id ?? BioApp.temporadaAtual?.id ?? null,
     data_entrada:  data,
     hora_entrada:  document.getElementById('bio-berc-hora').value || null,
     qtd_entrada:   qtd,
@@ -1971,8 +1973,8 @@ async function bioMortesCanonicasDoLote(lote) {
 // Vivos atuais de cada lote ATIVO de um berçário (entrada - mortes
 // canônicas), e o total somado — usado no card do berçário e na
 // soltura em bloco.
-async function bioVivosPorLoteDoBercario(bercarioId) {
-  const lotes = (await bioOfflineLotesDoBercario(bercarioId)).filter(l => l.status === 'ativo')
+async function bioVivosPorLoteDoBercario(bercarioId, temporadaId) {
+  const lotes = (await bioOfflineLotesDoBercario(bercarioId, temporadaId)).filter(l => l.status === 'ativo')
   const comVivos = await Promise.all(lotes.map(async l => ({
     ...l, vivos: Math.max((l.qtd_entrada || 0) - await bioMortesCanonicasDoLote(l), 0),
   })))
@@ -2055,8 +2057,8 @@ function bioAbrirFormSoltura(ctx) {
 
 // Abre a soltura em bloco de TODO o berçário — soma os lotes ativos e
 // pré-calcula quantos filhotes saem de cada um (vivos = entrada - mortes).
-async function bioAbrirSolturaBercario(bercarioId, nome) {
-  const { lotes, total } = await bioVivosPorLoteDoBercario(bercarioId)
+async function bioAbrirSolturaBercario(bercarioId, nome, temporadaId) {
+  const { lotes, total } = await bioVivosPorLoteDoBercario(bercarioId, temporadaId)
   if (!lotes.length) { bioToast('Nenhum lote ativo neste berçário.', 'err'); return }
   if (total <= 0) { bioToast('Nenhum filhote vivo para soltar neste berçário.', 'err'); return }
   bioAbrirFormSoltura({
@@ -2176,9 +2178,15 @@ function bioBercarioCor(bercarioId) {
 
 // Espécie que atualmente ocupa um berçário (regra: 1 espécie por vez,
 // enquanto houver lote ativo; libera quando todos forem soltos).
-function bioBercarioEspecieAtual(bercarioId, lotesAtivos) {
-  const lote = lotesAtivos.find(l => l.bercario_id === bercarioId && l.especie)
-  return lote ? lote.especie : null
+// temporadaId opcional: quando informado (mesmo null), só considera
+// lotes da mesma temporada — um lote esquecido ativo de uma temporada
+// anterior não deve travar a espécie da temporada nova.
+function bioBercarioEspecieAtual(bercarioId, lotesAtivos, temporadaId) {
+  let doTanque = lotesAtivos.filter(l => l.bercario_id === bercarioId && l.especie)
+  if (temporadaId !== undefined) {
+    doTanque = doTanque.filter(l => (l.temporada_id ?? null) === (temporadaId ?? null))
+  }
+  return doTanque[0]?.especie ?? null
 }
 
 async function bioAbrirTelaBercarios() {
@@ -2202,11 +2210,15 @@ async function bioCarregarBercarios() {
     return
   }
 
-  // Agrupa por bercario_id (ou 'sem-bercario')
+  // Agrupa por (bercario_id, temporada_id) — o berçário é uma estrutura
+  // física reaproveitada ano após ano; um lote esquecido ativo de uma
+  // temporada anterior aparece como um grupo À PARTE (flagado), sem se
+  // misturar com a ocupação da temporada atual.
   const grupos = {}
   lotes.forEach(l => {
-    const chave = l.bercario_id ?? 'sem-bercario'
-    if (!grupos[chave]) grupos[chave] = { id: l.bercario_id, nome: l.bercario_nome ?? 'Berçário não identificado', lotes: [] }
+    const temporadaId = l.temporada_id ?? null
+    const chave = `${l.bercario_id ?? 'sem-bercario'}:${temporadaId ?? 'sem-temporada'}`
+    if (!grupos[chave]) grupos[chave] = { id: l.bercario_id, temporadaId, nome: l.bercario_nome ?? 'Berçário não identificado', lotes: [] }
     grupos[chave].lotes.push(l)
   })
 
@@ -2242,17 +2254,19 @@ async function bioCarregarBercarios() {
   // misturam fisicamente no tanque assim que dividem o mesmo berçário,
   // então não faz mais sentido navegar por ninho na lista. O histórico
   // de quais ninhos entraram fica dentro do detalhe do berçário.
+  const temporadaAtualId = BioApp.temporadaAtual?.id ?? null
   gruposVisiveis.forEach(grupo => {
     const totalFilhotes = grupo.lotes.reduce((s, l) => s + (l.qtd_entrada || 0), 0)
-    const especieAtual = bioBercarioEspecieAtual(grupo.id, lotes)
+    const especieAtual = bioBercarioEspecieAtual(grupo.id, grupo.lotes)
     const espLabel = especieAtual ? (BIO_ESPECIES.find(e => e.id === especieAtual)?.nome ?? especieAtual) : null
+    const temporadaAnterior = grupo.temporadaId != null && grupo.temporadaId !== temporadaAtualId
 
     const header = document.createElement('div')
     header.className = 'bio-berc-grupo-header'
     header.style.borderLeft = `4px solid ${bioBercarioCor(grupo.id)}`
     header.style.paddingLeft = '12px'
     header.innerHTML = `
-      <span>${grupo.nome}${espLabel ? ` <span class="bio-berc-grupo-especie">${espLabel}</span>` : ''}</span>
+      <span>${grupo.nome}${espLabel ? ` <span class="bio-berc-grupo-especie">${espLabel}</span>` : ''}${temporadaAnterior ? ` <span class="bio-berc-grupo-temporada-antiga">Temporada anterior</span>` : ''}</span>
       <span class="bio-berc-grupo-stats">${grupo.lotes.length} lote${grupo.lotes.length !== 1 ? 's' : ''} · ${totalFilhotes} filhotes</span>
     `
     listaEl.appendChild(header)
@@ -2269,15 +2283,17 @@ async function bioCarregarBercarios() {
       bioAbrirDetalheBercario(grupo)
     })
     card.querySelector('[data-acao="soltar-bercario"]')?.addEventListener('click', () => {
-      bioAbrirSolturaBercario(grupo.id, grupo.nome)
+      bioAbrirSolturaBercario(grupo.id, grupo.nome, grupo.temporadaId)
     })
     listaEl.appendChild(card)
   })
 }
 
 // especieNova: espécie do ninho sendo registrado. Berçários já ocupados
-// com espécie diferente aparecem desabilitados — 1 espécie por vez.
-async function bioAbrirSeletorBercario(callback, especieNova) {
+// com espécie diferente NA MESMA TEMPORADA aparecem desabilitados — 1
+// espécie por vez; um lote esquecido ativo de temporada anterior não conta.
+async function bioAbrirSeletorBercario(callback, especieNova, temporadaId) {
+  const temporadaAtual = temporadaId ?? BioApp.temporadaAtual?.id ?? null
   const lista = await bioOfflineListarBercarios()
   const lotesAtivos = await bioOfflineLotesAtivos()
   const selEl  = document.getElementById('bio-lista-bercarios-sel')
@@ -2293,7 +2309,7 @@ async function bioAbrirSeletorBercario(callback, especieNova) {
       selEl.hidden = false
       const TIPO_LABEL = { tanque_fibra: 'Tanque de fibra', piscina_alvenaria: 'Piscina de alvenaria', viveiro: 'Viveiro', outro: 'Outro' }
       lista.forEach(b => {
-        const especieAtual = bioBercarioEspecieAtual(b.id, lotesAtivos)
+        const especieAtual = bioBercarioEspecieAtual(b.id, lotesAtivos, temporadaAtual)
         const bloqueado = !!(especieAtual && especieNova && especieAtual !== especieNova)
         const espNome = especieAtual ? (BIO_ESPECIES.find(e => e.id === especieAtual)?.nome ?? especieAtual) : null
         const card = document.createElement('div')
@@ -2324,17 +2340,19 @@ async function bioAbrirSeletorBercario(callback, especieNova) {
   bioMostrarTela('tela-seletor-bercario')
 }
 
-// grupo: { id, nome, lotes } — todos os lotes ATIVOS daquele berçário
-// físico (vindo de bioCarregarBercarios). Os filhotes se misturam no
-// tanque, então o detalhe é do BERÇÁRIO inteiro, não de um lote/ninho
-// isolado — a grade de filhotes agrupa todos os lotes que já passaram
-// por ali (bioOfflineIndividuosDoBercario), e o "histórico de ninhos"
-// abaixo mantém a rastreabilidade de quem veio de onde.
+// grupo: { id, temporadaId, nome, lotes } — todos os lotes ATIVOS
+// daquele berçário físico NAQUELA TEMPORADA (vindo de
+// bioCarregarBercarios). Os filhotes se misturam no tanque, então o
+// detalhe é do BERÇÁRIO inteiro (na temporada do grupo), não de um
+// lote/ninho isolado — a grade de filhotes agrupa todos os lotes que
+// já passaram por ali NA MESMA TEMPORADA (bioOfflineIndividuosDoBercario),
+// e o "histórico de ninhos" abaixo mantém a rastreabilidade de quem
+// veio de onde, sem misturar com temporadas anteriores.
 async function bioAbrirDetalheBercario(grupo) {
   BioApp.bercarioAtual = grupo
   const el = id => document.getElementById(id)
 
-  const todosLotes = await bioOfflineLotesDoBercario(grupo.id)
+  const todosLotes = await bioOfflineLotesDoBercario(grupo.id, grupo.temporadaId)
   const especieAtual = bioBercarioEspecieAtual(grupo.id, grupo.lotes)
   const espNome = especieAtual ? (BIO_ESPECIES.find(e => e.id === especieAtual)?.nome ?? especieAtual) : '—'
   const totalEntrada = grupo.lotes.reduce((s, l) => s + (l.qtd_entrada || 0), 0)
@@ -2357,20 +2375,20 @@ async function bioAbrirDetalheBercario(grupo) {
     }
   }
 
-  bioCarregarTimelineBercario(grupo.id)
-  bioRenderizarFilhotesDoBercario(grupo.id)
+  bioCarregarTimelineBercario(grupo.id, grupo.temporadaId)
+  bioRenderizarFilhotesDoBercario(grupo.id, grupo.temporadaId)
   bioRenderizarHistoricoNinhos(todosLotes)
   bioMostrarTela('tela-detalhe-lote')
 }
 
 // ── Filhotes individuais do berçário (pool único, não por ninho) ──
-async function bioRenderizarFilhotesDoBercario(bercarioId) {
+async function bioRenderizarFilhotesDoBercario(bercarioId, temporadaId) {
   const sec  = document.getElementById('bio-det-filhotes-sec')
   const grid = document.getElementById('bio-det-filhotes-lista')
   const btnSeq = document.getElementById('bio-btn-biometria-seq')
   if (!sec || !grid) return
 
-  const individuos = await bioOfflineIndividuosDoBercario(bercarioId)
+  const individuos = await bioOfflineIndividuosDoBercario(bercarioId, temporadaId)
   if (!individuos.length) { sec.hidden = true; return }
   sec.hidden = false
 
@@ -2525,8 +2543,8 @@ function bioAvancarSequenciaBiometria() {
   bioAbrirFormBiometriaInd(opts.fila[proximoIndex], { ...opts, indexAtual: proximoIndex })
 }
 
-async function bioIniciarBiometriaSequencial(bercarioId) {
-  const individuos = await bioOfflineIndividuosDoBercario(bercarioId)
+async function bioIniciarBiometriaSequencial(bercarioId, temporadaId) {
+  const individuos = await bioOfflineIndividuosDoBercario(bercarioId, temporadaId)
   const ativos = individuos.filter(i => i.status === 'ativo')
   if (!ativos.length) { bioToast('Nenhum filhote ativo neste berçário.', 'err'); return }
   bioAbrirFormBiometriaInd(ativos[0], { sequencial: true, indexAtual: 0, total: ativos.length, fila: ativos })
@@ -2561,11 +2579,11 @@ async function bioSalvarBiometriaInd() {
   bioAvancarSequenciaBiometria()
 }
 
-async function bioCarregarTimelineBercario(bercarioId) {
+async function bioCarregarTimelineBercario(bercarioId, temporadaId) {
   const timelineEl = document.getElementById('bio-det-timeline')
   if (!timelineEl) return
 
-  const lotes = await bioOfflineLotesDoBercario(bercarioId)
+  const lotes = await bioOfflineLotesDoBercario(bercarioId, temporadaId)
   const porLote = await Promise.all(lotes.map(l => bioOfflineOcorrenciasDoLote(l.uuid_cliente)))
   const ocorrencias = porLote.flat().sort((a, b) => (b.criado_em ?? '').localeCompare(a.criado_em ?? ''))
 
@@ -2731,12 +2749,13 @@ function bioIniciarPosEclosao() {
 
   // Seletor de berçário no form de entrada
   document.getElementById('bio-berc-nome-btn')?.addEventListener('click', () => {
+    const _ninhoDest = BioApp.formDestinoCtx?.ninho
     bioAbrirSeletorBercario(b => {
       BioApp.formBercarioSelecionado = b
       const nomeSpan = document.getElementById('bio-berc-nome-txt')
       if (nomeSpan) nomeSpan.textContent = b.nome
       bioMostrarTela('tela-form-entrada-bercario')
-    }, BioApp.formDestinoCtx?.ninho?.especie)
+    }, _ninhoDest?.especie, _ninhoDest?.temporada_id ?? BioApp.temporadaAtual?.id ?? null)
   })
 
   // Contadores berçário
@@ -2780,7 +2799,7 @@ function bioIniciarPosEclosao() {
   document.getElementById('bio-btn-soltar-lote')?.addEventListener('click', () => {
     const berc = BioApp.bercarioAtual
     if (!berc) return
-    bioAbrirSolturaBercario(berc.id, berc.nome)
+    bioAbrirSolturaBercario(berc.id, berc.nome, berc.temporadaId)
   })
 
   // Voltar da tela de ocorrência para detalhe
@@ -2797,7 +2816,7 @@ function bioIniciarPosEclosao() {
     if (individuo) bioAbrirTelaDetalheIndividuo(individuo)
   })
   document.getElementById('bio-btn-biometria-seq')?.addEventListener('click', () => {
-    if (BioApp.bercarioAtual) bioIniciarBiometriaSequencial(BioApp.bercarioAtual.id)
+    if (BioApp.bercarioAtual) bioIniciarBiometriaSequencial(BioApp.bercarioAtual.id, BioApp.bercarioAtual.temporadaId)
   })
 
   // Detalhe do indivíduo

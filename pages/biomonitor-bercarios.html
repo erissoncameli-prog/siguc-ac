@@ -225,7 +225,7 @@
     document.getElementById('modal-bercario').classList.add('aberto')
 
     const { data: lotesRaw } = await db.from('lotes_bercario')
-      .select('id,ninho_id,data_entrada,hora_entrada,qtd_entrada,status,observacoes,criado_em,ninhos_quelonios(numero_ninho,especie)')
+      .select('id,ninho_id,data_entrada,hora_entrada,qtd_entrada,status,observacoes,criado_em,temporada_id,ninhos_quelonios(numero_ninho,especie),temporadas_biomonitor(nome)')
       .eq('bercario_id', id)
       .order('data_entrada', { ascending: false })
 
@@ -252,6 +252,7 @@
         ...l,
         numero_ninho: l.ninhos_quelonios?.numero_ninho,
         especie: l.ninhos_quelonios?.especie,
+        temporada_nome: l.temporadas_biomonitor?.nome ?? null,
         mortes: mort?.mortes ?? 0,
         vivos_atual: mort?.vivos_atual ?? (l.qtd_entrada - (mort?.mortes ?? 0)),
         qtd_soltada: solturasLote.reduce((s, x) => s + (x.qtd_soltada || 0), 0),
@@ -277,7 +278,7 @@
           <div style="display:flex;justify-content:space-between;align-items:flex-start">
             <div>
               <strong>${l.numero_ninho ? 'Ninho ' + esc(l.numero_ninho) : 'Ninho não vinculado'}</strong>
-              <div style="font-size:.8rem;color:var(--cinza-500)">${SPECIES_NOME[l.especie] || l.especie || ''}</div>
+              <div style="font-size:.8rem;color:var(--cinza-500)">${SPECIES_NOME[l.especie] || l.especie || ''}${l.temporada_nome ? ' · ' + esc(l.temporada_nome) : ''}</div>
             </div>
             <span class="badge ${l.status === 'ativo' ? 'badge-verde' : l.status === 'soltado' ? 'badge-blue' : 'badge-cinza'}">${STATUS_LOTE_LBL[l.status] || l.status}</span>
           </div>
