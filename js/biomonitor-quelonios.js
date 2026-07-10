@@ -369,7 +369,22 @@ async function bioMostrarTelaPostLogin() {
 
 // ── Configurar PIN ─────────────────────────────────────────────
 function bioIniciarTelaConfigPin() {
+  let primeiroPin = null
+  const dicaEl = document.getElementById('bio-pin-setup-dica')
+  const erroEl = document.getElementById('pin-setup-erro')
+
   bioIniciarKeypad('pin-setup', async (pin) => {
+    if (!primeiroPin) {
+      primeiroPin = pin
+      if (dicaEl) dicaEl.textContent = 'Confirme seu PIN de 4 dígitos'
+      return
+    }
+    if (pin !== primeiroPin) {
+      if (erroEl) { erroEl.textContent = 'PINs não coincidem. Tente novamente.'; erroEl.hidden = false }
+      primeiroPin = null
+      if (dicaEl) dicaEl.textContent = 'Escolha um PIN de 4 dígitos'
+      return
+    }
     await bioOfflineSetPin(pin)
     await bioEntrarNaHome()
   })
