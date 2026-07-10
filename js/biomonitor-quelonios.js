@@ -2550,6 +2550,8 @@ async function bioCarregarTimelineIndividuo(individuo) {
   timelineEl.innerHTML = medicoes.map(m => {
     const detalhes = [
       m.comprimento_cm != null ? `Comp.: ${m.comprimento_cm} cm` : null,
+      m.largura_carapaca_cm != null ? `Larg. carapaça: ${m.largura_carapaca_cm} cm` : null,
+      m.comprimento_plastrao_cm != null ? `Compr. plastrão: ${m.comprimento_plastrao_cm} cm` : null,
       m.peso_g != null ? `Peso: ${m.peso_g} g` : null,
       m.observacoes || null,
     ].filter(Boolean).join(' · ')
@@ -2588,8 +2590,10 @@ function bioAbrirFormBiometriaInd(individuo, opts = {}) {
   BioApp._bioSeqOpts = opts
   const el = id => document.getElementById(id)
   if (el('bio-bio-ind-numero')) el('bio-bio-ind-numero').textContent = individuo.numero
-  if (el('bio-bio-ind-comp'))   el('bio-bio-ind-comp').value = ''
-  if (el('bio-bio-ind-peso'))   el('bio-bio-ind-peso').value = ''
+  if (el('bio-bio-ind-comp'))     el('bio-bio-ind-comp').value = ''
+  if (el('bio-bio-ind-largura'))  el('bio-bio-ind-largura').value = ''
+  if (el('bio-bio-ind-plastrao')) el('bio-bio-ind-plastrao').value = ''
+  if (el('bio-bio-ind-peso'))     el('bio-bio-ind-peso').value = ''
   if (el('bio-bio-ind-obs'))    el('bio-bio-ind-obs').value  = ''
   if (el('bio-bio-ind-data'))   el('bio-bio-ind-data').value = new Date().toISOString().slice(0, 10)
   if (el('bio-bio-ind-hora'))   el('bio-bio-ind-hora').value = new Date().toTimeString().slice(0, 5)
@@ -2635,20 +2639,26 @@ async function bioSalvarBiometriaInd() {
   const data = document.getElementById('bio-bio-ind-data').value
   if (!data) { bioToast('Informe a data da biometria.', 'err'); return }
 
-  const comp = parseFloat(document.getElementById('bio-bio-ind-comp').value) || null
-  const peso = parseFloat(document.getElementById('bio-bio-ind-peso').value) || null
-  if (comp == null && peso == null) { bioToast('Informe ao menos comprimento ou peso.', 'err'); return }
+  const comp     = parseFloat(document.getElementById('bio-bio-ind-comp').value) || null
+  const largura  = parseFloat(document.getElementById('bio-bio-ind-largura').value) || null
+  const plastrao = parseFloat(document.getElementById('bio-bio-ind-plastrao').value) || null
+  const peso     = parseFloat(document.getElementById('bio-bio-ind-peso').value) || null
+  if (comp == null && largura == null && plastrao == null && peso == null) {
+    bioToast('Informe ao menos uma medida.', 'err'); return
+  }
 
   const b = {
-    uuid_cliente:    bioUuid(),
-    individuo_uuid:  individuo.uuid_cliente,
-    data_medicao:    data,
-    hora_medicao:    document.getElementById('bio-bio-ind-hora').value || null,
-    comprimento_cm:  comp,
-    peso_g:          peso,
-    observacoes:     document.getElementById('bio-bio-ind-obs').value.trim() || null,
-    status_sync:     'pendente',
-    criado_em:       new Date().toISOString(),
+    uuid_cliente:           bioUuid(),
+    individuo_uuid:         individuo.uuid_cliente,
+    data_medicao:           data,
+    hora_medicao:           document.getElementById('bio-bio-ind-hora').value || null,
+    comprimento_cm:         comp,
+    largura_carapaca_cm:    largura,
+    comprimento_plastrao_cm: plastrao,
+    peso_g:                 peso,
+    observacoes:            document.getElementById('bio-bio-ind-obs').value.trim() || null,
+    status_sync:            'pendente',
+    criado_em:              new Date().toISOString(),
   }
 
   await bioOfflineSalvarBiometriaInd(b)

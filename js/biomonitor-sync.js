@@ -559,13 +559,15 @@ async function bioSyncBiometriasInd(monitorId, onProgresso) {
     if (!indServId) continue  // indivíduo ainda não sincronizado; tenta no próximo sync
 
     const payload = {
-      uuid_cliente:    b.uuid_cliente,
-      individuo_id:    indServId,
-      data_medicao:    b.data_medicao,
-      hora_medicao:    b.hora_medicao   || null,
-      comprimento_cm:  b.comprimento_cm ?? null,
-      peso_g:          b.peso_g         ?? null,
-      observacoes:     b.observacoes    || null,
+      uuid_cliente:            b.uuid_cliente,
+      individuo_id:            indServId,
+      data_medicao:            b.data_medicao,
+      hora_medicao:            b.hora_medicao            || null,
+      comprimento_cm:          b.comprimento_cm          ?? null,
+      largura_carapaca_cm:     b.largura_carapaca_cm     ?? null,
+      comprimento_plastrao_cm: b.comprimento_plastrao_cm ?? null,
+      peso_g:                  b.peso_g                  ?? null,
+      observacoes:             b.observacoes             || null,
       monitor_id:      monitorId,
       sincronizado_em: new Date().toISOString(),
     }
@@ -839,7 +841,8 @@ async function bioSyncPullBiometriasInd(grupoId) {
   const { data, error } = await bioSupabase()
     .from('biometrias_individuais')
     .select(`
-      id, uuid_cliente, data_medicao, hora_medicao, comprimento_cm, peso_g,
+      id, uuid_cliente, data_medicao, hora_medicao, comprimento_cm,
+      largura_carapaca_cm, comprimento_plastrao_cm, peso_g,
       observacoes, monitor_id, criado_em, sincronizado_em,
       individuo:filhotes_bercario!inner(uuid_cliente, grupo_id)
     `)
@@ -852,13 +855,15 @@ async function bioSyncPullBiometriasInd(grupoId) {
   for (const b of data) {
     if (!b.individuo?.uuid_cliente) continue
     await bioOfflineSalvarBiometriaInd({
-      uuid_cliente:   b.uuid_cliente,
-      individuo_uuid: b.individuo.uuid_cliente,
-      data_medicao:   b.data_medicao,
-      hora_medicao:   b.hora_medicao,
-      comprimento_cm: b.comprimento_cm,
-      peso_g:         b.peso_g,
-      observacoes:    b.observacoes,
+      uuid_cliente:            b.uuid_cliente,
+      individuo_uuid:          b.individuo.uuid_cliente,
+      data_medicao:            b.data_medicao,
+      hora_medicao:            b.hora_medicao,
+      comprimento_cm:          b.comprimento_cm,
+      largura_carapaca_cm:     b.largura_carapaca_cm,
+      comprimento_plastrao_cm: b.comprimento_plastrao_cm,
+      peso_g:                  b.peso_g,
+      observacoes:             b.observacoes,
       server_id:      b.id,
       status_sync:    'confirmado',
       criado_em:      b.criado_em,
