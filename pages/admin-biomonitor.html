@@ -262,6 +262,9 @@
           <input class="form-control" id="mpr-comunidade">
         </div>
       </div>
+      <div class="form-group"><label class="form-label">Rio</label>
+        <input class="form-control" id="mpr-rio" placeholder="Ex: Rio Juruá">
+      </div>
       <div class="grid-2">
         <div class="form-group"><label class="form-label">Latitude (ponto de acesso)</label>
           <input class="form-control" id="mpr-lat" type="number" step="any" placeholder="-9.2815" oninput="praiaMapSyncMarker()">
@@ -761,7 +764,7 @@
     if (!lista.length) { tbody.innerHTML = `<tr><td colspan="8" class="empty-row">Nenhuma praia encontrada.</td></tr>`; return }
     tbody.innerHTML = lista.map(p => `<tr>
       <td><code style="font-size:.8rem">${p.codigo}</code></td>
-      <td><strong>${p.nome}</strong>${p.comunidade ? `<br><small style="color:var(--t2,#aaa)">${p.comunidade}</small>` : ''}</td>
+      <td><strong>${p.nome}</strong>${p.comunidade || p.rio ? `<br><small style="color:var(--t2,#aaa)">${[p.comunidade, p.rio].filter(Boolean).join(' · ')}</small>` : ''}</td>
       <td>${p.area_display || p.uc_nome || nomeUC(p.uc_id) || '—'}</td>
       <td>${p.programa_nome || '—'}</td>
       <td>${p.comprimento_m ? formatNum(p.comprimento_m) + ' m' : '—'}</td>
@@ -1428,6 +1431,7 @@
     document.getElementById('mpr-localizacao-ref').value = p?.localizacao_referencia || ''
     document.getElementById('mpr-mun').value             = p?.municipio || ''
     document.getElementById('mpr-comunidade').value      = p?.comunidade || ''
+    document.getElementById('mpr-rio').value             = p?.rio || ''
     document.getElementById('mpr-lat').value             = p?.lat || ''
     document.getElementById('mpr-lng').value             = p?.lng || ''
     document.getElementById('mpr-monitor').value         = p?.monitor_responsavel_id || ''
@@ -1454,6 +1458,7 @@
       localizacao_referencia: tipo !== 'dentro_uc' ? (document.getElementById('mpr-localizacao-ref').value.trim() || null) : null,
       municipio:              document.getElementById('mpr-mun').value.trim() || null,
       comunidade:             document.getElementById('mpr-comunidade').value.trim() || null,
+      rio:                    document.getElementById('mpr-rio').value.trim() || null,
       ponto_acesso:           (!isNaN(lat) && !isNaN(lng)) ? `POINT(${lng} ${lat})` : null,
       monitor_responsavel_id: document.getElementById('mpr-monitor').value || null,
       observacoes:            document.getElementById('mpr-obs').value.trim() || null,
