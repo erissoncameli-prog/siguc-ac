@@ -31,7 +31,72 @@ function bioEventoVisita(r) {
       r.temperatura_substrato_c != null ? `${r.temperatura_substrato_c}°C`
         : r.temperatura_ar_c != null ? `${r.temperatura_ar_c}°C` : null,
     ].filter(Boolean).join(' · '),
+    detalhe: r,                                     // registro bruto p/ botão "Detalhes"
   }
+}
+
+// Registro (id incremental → registro bruto da visita) consultado pelo
+// botão "Detalhes" — evita colocar JSON inline no HTML dos cards.
+const BioDetalhesVisita = {}
+let _bioDetVisSeq = 0
+
+const BIO_VISITA_PREDACAO_LBL = {
+  por_animais: 'por animais', por_pessoas: 'por pessoas', desconhecida: 'desconhecida',
+}
+const BIO_VISITA_CAUSA_LBL = {
+  predacao: 'predação', alagamento: 'alagamento', erosao: 'erosão/apodrecimento',
+  humana: 'humana', outro: 'outra',
+}
+
+// Abre (criando se preciso) o modal com os dados completos de uma visita.
+function bioAbrirDetalhesVisita(id) {
+  const r = BioDetalhesVisita[id]
+  if (!r) return
+
+  let ov = document.getElementById('bio-detvis-overlay')
+  if (!ov) {
+    ov = document.createElement('div')
+    ov.id = 'bio-detvis-overlay'
+    ov.className = 'bio-detvis-overlay'
+    ov.innerHTML = `
+      <div class="bio-detvis-card" onclick="event.stopPropagation()">
+        <div class="bio-detvis-head">
+          <strong>Detalhes da visita</strong>
+          <button type="button" class="bio-detvis-fechar" aria-label="Fechar">&times;</button>
+        </div>
+        <div class="bio-detvis-corpo" id="bio-detvis-corpo"></div>
+      </div>`
+    ov.addEventListener('click', () => ov.remove())
+    ov.querySelector('.bio-detvis-fechar').addEventListener('click', () => ov.remove())
+    document.body.appendChild(ov)
+  }
+
+  const fd = iso => iso ? new Date(iso + 'T12:00').toLocaleDateString('pt-BR') : '—'
+  const linha = (l, v) => v != null && v !== ''
+    ? `<div><span>${esc(l)}</span><strong>${esc(String(v))}</strong></div>` : ''
+
+  const perdas = [
+    r.ovos_predados_n > 0 ? `Predação${r.predacao_incubacao ? ' (' + (BIO_VISITA_PREDACAO_LBL[r.predacao_incubacao] || r.predacao_incubacao) + ')' : ''}: ${r.ovos_predados_n}` : null,
+    r.ovos_perdidos_alagamento > 0 ? `Alagamento: ${r.ovos_perdidos_alagamento}` : null,
+    r.ovos_perdidos_erosao > 0 ? `Erosão/apodrecimento: ${r.ovos_perdidos_erosao}` : null,
+    r.ovos_perdidos_humana > 0 ? `Dano humano: ${r.ovos_perdidos_humana}` : null,
+  ].filter(Boolean)
+
+  const corpo = [
+    linha('Data', fd(r.data_visita) + (r.hora_visita ? ` · ${r.hora_visita.slice(0, 5)}` : '')),
+    linha('Status', r.status_ninho ? (BIO_VISITA_STATUS_LBL[r.status_ninho] || r.status_ninho) : null),
+    linha('Temp. substrato', r.temperatura_substrato_c != null ? `${r.temperatura_substrato_c}°C` : null),
+    linha('Temp. ar', r.temperatura_ar_c != null ? `${r.temperatura_ar_c}°C` : null),
+    linha('Umidade', r.umidade),
+    r.status_ninho === 'destruido'
+      ? linha('Causa da destruição', r.causa_destruicao ? (BIO_VISITA_CAUSA_LBL[r.causa_destruicao] || r.causa_destruicao) : null)
+      : perdas.map(p => linha(...p.split(': '))).join(''),
+    linha('Sinal de alagamento', r.sinal_alagamento ? 'Sim' : null),
+    linha('Intervenção realizada', r.intervencao),
+  ].filter(Boolean).join('')
+
+  document.getElementById('bio-detvis-corpo').innerHTML = corpo
+    + (r.observacoes ? `<div class="bio-detvis-obs">${esc(r.observacoes)}</div>` : '')
 }
 
 // Busca no servidor os eventos (transferência, visita, berçário, soltura)
