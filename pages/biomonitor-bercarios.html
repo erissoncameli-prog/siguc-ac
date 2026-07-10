@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>SIGUC-AC · Berçários</title>
+<link rel="stylesheet" href="../css/global.css">
+<link rel="stylesheet" href="../css/biomonitor.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../js/observability.js"></script>
+<script src="../js/queryLogger.js"></script>
+<script src="../js/config.js"></script>
+<script src="../js/layout.js"></script>
+<style>
+.berc-tab-btn { background:transparent;border:none;padding:6px 14px;border-radius:7px;cursor:pointer;font-size:.85rem;font-weight:600;color:var(--bio-prim,#1A6B8C);opacity:.6;transition:all .15s }
+.berc-tab-btn.ativo { background:white;color:var(--bio-prim,#1A6B8C);opacity:1;box-shadow:0 1px 4px rgba(0,0,0,.12) }
+.berc-card { background:var(--branco);border-radius:12px;padding:16px;border:1px solid var(--borda);box-shadow:var(--sombra);display:flex;flex-direction:column;gap:10px }
+.berc-bar-track { width:100%;height:8px;border-radius:99px;background:rgba(0,0,0,.06);overflow:hidden }
+.berc-bar-fill { height:100%;border-radius:99px;transition:width .2s }
+.det-lote-card { background:rgba(0,0,0,.02);border-radius:10px;padding:12px 14px;border:1px solid var(--borda) }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<!-- ── Modal: Detalhe do berçário ─────────────────────────── -->
+<div class="modal-overlay" id="modal-bercario">
+  <div class="modal" style="max-width:820px;width:94vw">
+    <div class="modal-header">
+      <div class="modal-title" id="det-titulo">Berçário</div>
+      <button class="modal-close" onclick="document.getElementById('modal-bercario').classList.remove('aberto')">×</button>
+    </div>
+    <div class="modal-body">
+      <div style="display:flex;gap:6px;background:rgba(0,0,0,.04);border-radius:10px;padding:4px;margin-bottom:14px;flex-wrap:wrap">
+        <button class="berc-tab-btn ativo" id="dtab-ativos"      onclick="renderAbaDetalhe('ativos')">Lotes ativos</button>
+        <button class="berc-tab-btn"       id="dtab-historico"   onclick="renderAbaDetalhe('historico')">Histórico</button>
+        <button class="berc-tab-btn"       id="dtab-ocorrencias" onclick="renderAbaDetalhe('ocorrencias')">Ocorrências</button>
+        <button class="berc-tab-btn"       id="dtab-individuos"  onclick="renderAbaDetalhe('individuos')">Indivíduos</button>
+        <button class="berc-tab-btn"       id="dtab-alertas"     onclick="renderAbaDetalhe('alertas')">Alertas</button>
+      </div>
+      <div id="detalhe-conteudo" style="display:flex;flex-direction:column;gap:10px;max-height:56vh;overflow-y:auto">
+        <p style="color:var(--cinza-500)">Carregando...</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+;(async function () {
+  const usuario = await carregarUsuario()
+  if (!usuario) { window.location.href = '../index.html'; return }
+  if (!['super_admin','gestor','tecnico'].includes(usuario.perfil)) {
+    window.location.href = '../pages/dashboard.html'; return
+  }
+
+  document.getElementById('app').innerHTML =
+    gerarLayout('Berçários', 'biomonitor-bercarios') +
+    `<div class="fade-in">
+      <div class="filter-bar">
+        <input class="form-control search-input" id="busca" placeholder="Buscar berçário..." oninput="renderGrid()">
+        <select class="form-control" id="fil-uc" style="width:200px" onchange="renderGrid()">
+          <option value="">Todas as UCs</option>
+        </select>
+        <select class="form-control" id="fil-tipo" style="width:180px" onchange="renderGrid()">
+          <option value="">Todos os tipos</option>
+          <option value="tanque_fibra">Tanque de fibra</option>
+          <option value="piscina_alvenaria">Piscina de alvenaria</option>
+          <option value="viveiro">Viveiro</option>
+          <option value="outro">Outro</option>
+        </select>
+        <select class="form-control" id="fil-status" style="width:150px" onchange="renderGrid()">
+          <option value="">Todos os status</option>
+          <option value="true">Ativos</option>
+          <option value="false">Inativos</option>
+        </select>
+      </div>
+
+      <div id="stats-bar" style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap"></div>
+
+      <div id="grid-bercarios" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px">
+        <p style="color:var(--cinza-500)">Carregando...</p>
+      </div>
+    </div>`
+
+  bIconsAplicar(document.getElementById('app'))
+
+  let _bercarios = [], _detAtual = null
+
+  const TIPO_LBL = { tanque_fibra:'Tanque de fibra', piscina_alvenaria:'Piscina de alvenaria', viveiro:'Viveiro', outro:'Outro' }
+  const STATUS_LOTE_LBL = { ativo:'Ativo', soltado:'Soltado', cancelado:'Cancelado' }
+  const SEV_CLR = { critica:'#DC2626', alta:'#D97706', media:'#eab308', baixa:'#3b82f6' }
+  const SEV_LBL = { critica:'Crítica', alta:'Alta', media:'Média', baixa:'Baixa' }
+  const TIPO_OC_LBL = { alimentacao:'Alimentação', biometria:'Biometria', mortalidade:'Mortalidade', doenca:'Doença', tratamento:'Tratamento', observacao:'Observação' }
+  const TIPO_OC_CLR = { alimentacao:'#2A9D6F', biometria:'#1A6B8C', mortalidade:'#DC2626', doenca:'#D97706', tratamento:'#7B57B0', observacao:'#6b7280' }
+  const SPECIES_NOME = {
+    tracaja: 'Tracajá', tartaruga: 'Tartaruga', cabecudo: 'Cabeçudo',
+    pitiU: 'Pitiú', cupido: 'Cupido', jabuti_pe_elefante: 'Jabuti-pé-de-elefante',
+    jabuti_piranga: 'Jabuti-piranga', mucua: 'Muçuã', outro: 'Outro'
+  }
+
+  function corMortalidade(pct) {
+    if (pct == null) return '#6b7280'
+    if (pct >= 30) return '#DC2626'
+    if (pct >= 15) return '#D97706'
+    if (pct >= 5)  return '#eab308'
+    return '#2A9D6F'
+  }
+  function corOcupacao(pct) {
+    if (pct >= 90) return '#DC2626'
+    if (pct >= 70) return '#D97706'
+    return '#2A9D6F'
+  }
+
+  // ── Carregar dados ─────────────────────────────────────────────
+  async function carregarDados() {
+    const { data, error } = await db.from('vw_bercarios_resumo').select('*').order('nome')
+    if (error) { toast(error.message, 'error'); return }
+    _bercarios = data || []
+    popularFiltros()
+    renderStats()
+    renderGrid()
+  }
+
+  function popularFiltros() {
+    const ucs = [...new Map(_bercarios.filter(b => b.uc_id).map(b => [b.uc_id, b.uc_nome])).entries()]
+      .sort((a, b) => (a[1] || '').localeCompare(b[1] || ''))
+    const sel = document.getElementById('fil-uc')
+    const atual = sel.value
+    sel.innerHTML = `<option value="">Todas as UCs</option>` +
+      ucs.map(([id, nome]) => `<option value="${id}">${esc(nome)}</option>`).join('')
+    sel.value = atual
+  }
+
+  function renderStats() {
+    const ativos = _bercarios.filter(b => b.status)
+    const vivos = _bercarios.reduce((s, b) => s + (b.filhotes_vivos_atual || 0), 0)
+    const capacidade = _bercarios.reduce((s, b) => s + (b.capacidade_max || 0), 0)
+    const lotesAtivos = _bercarios.reduce((s, b) => s + (b.lotes_ativos || 0), 0)
+    const entradaTotal = _bercarios.reduce((s, b) => s + (b.total_entrada_historico || 0), 0)
+    const mortesTotal = _bercarios.reduce((s, b) => s + (b.total_mortes_historico || 0), 0)
+    const alertasAbertos = _bercarios.reduce((s, b) => s + (b.alertas_abertos || 0), 0)
+    const mortalidadePct = entradaTotal ? Math.round((mortesTotal / entradaTotal) * 1000) / 10 : null
+
+    const kpi = (l, v, c) => `
+      <div style="background:var(--branco);border-radius:10px;padding:10px 16px;min-width:130px;border-left:3px solid ${c};border-top:1px solid var(--borda);border-right:1px solid var(--borda);border-bottom:1px solid var(--borda);box-shadow:var(--sombra)">
+        <div style="font-size:1.5rem;font-weight:700;color:${c}">${v}</div>
+        <div style="font-size:.78rem;color:var(--cinza-500)">${l}</div>
+      </div>`
+
+    document.getElementById('stats-bar').innerHTML = [
+      kpi('Berçários ativos', ativos.length, '#1A6B8C'),
+      kpi('Ocupação atual', `${vivos}${capacidade ? ' / ' + capacidade : ''}`, corOcupacao(capacidade ? (vivos / capacidade) * 100 : 0)),
+      kpi('Lotes ativos', lotesAtivos, '#2A9D6F'),
+      kpi('Mortalidade histórica', mortalidadePct != null ? mortalidadePct + '%' : '—', corMortalidade(mortalidadePct)),
+      kpi('Alertas abertos', alertasAbertos, alertasAbertos ? '#DC2626' : '#6b7280'),
+    ].join('')
+  }
+
+  window.renderGrid = function() {
+    const busca  = document.getElementById('busca')?.value.toLowerCase() || ''
+    const uc     = document.getElementById('fil-uc')?.value || ''
+    const tipo   = document.getElementById('fil-tipo')?.value || ''
+    const status = document.getElementById('fil-status')?.value
+
+    const lista = _bercarios.filter(b =>
+      (!busca  || b.nome?.toLowerCase().includes(busca) || b.uc_nome?.toLowerCase().includes(busca)) &&
+      (!uc     || b.uc_id === uc) &&
+      (!tipo   || b.tipo === tipo) &&
+      (status === undefined || status === '' || String(b.status) === status)
+    )
+
+    const cont = document.getElementById('grid-bercarios')
+    if (!lista.length) { cont.innerHTML = `<p style="color:var(--cinza-500);grid-column:1/-1">Nenhum berçário encontrado com esses filtros.</p>`; return }
+
+    cont.innerHTML = lista.map(b => {
+      const ocupPct = b.capacidade_max ? Math.min(100, Math.round((b.filhotes_vivos_atual / b.capacidade_max) * 100)) : null
+      const sevClr = b.maior_severidade ? SEV_CLR[b.maior_severidade] : null
+      return `<div class="berc-card">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+          <div>
+            <div style="font-weight:600;font-size:1rem;color:var(--cinza-900)">${esc(b.nome)}</div>
+            <div style="font-size:.8rem;color:var(--cinza-500)">${TIPO_LBL[b.tipo] || b.tipo} ${b.uc_sigla ? '· ' + esc(b.uc_sigla) : ''}</div>
+          </div>
+          <span class="badge ${b.status ? 'badge-verde' : 'badge-cinza'}">${b.status ? 'Ativo' : 'Inativo'}</span>
+        </div>
+
+        ${b.responsavel_nome ? `<div style="font-size:.82rem;color:var(--cinza-500)">Responsável: <span style="color:var(--cinza-900)">${esc(b.responsavel_nome)}</span></div>` : ''}
+
+        <div>
+          <div style="display:flex;justify-content:space-between;font-size:.78rem;color:var(--cinza-500);margin-bottom:4px">
+            <span>Ocupação</span>
+            <span>${b.filhotes_vivos_atual || 0}${b.capacidade_max ? ' / ' + b.capacidade_max : ' (sem capacidade definida)'}</span>
+          </div>
+          <div class="berc-bar-track"><div class="berc-bar-fill" style="width:${ocupPct ?? 0}%;background:${corOcupacao(ocupPct ?? 0)}"></div></div>
+        </div>
+
+        <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:.82rem;color:var(--cinza-500)">
+          <span>Lotes ativos: <strong style="color:var(--cinza-900)">${b.lotes_ativos || 0}</strong></span>
+          <span>Mortalidade: <strong style="color:${corMortalidade(b.taxa_mortalidade_pct)}">${b.taxa_mortalidade_pct != null ? b.taxa_mortalidade_pct + '%' : '—'}</strong></span>
+        </div>
+
+        ${b.alertas_abertos ? `
+        <button onclick="abrirDetalhe('${b.id}','alertas')" style="text-align:left;background:${sevClr}1a;border:1px solid ${sevClr}44;border-radius:8px;padding:7px 10px;font-size:.78rem;cursor:pointer;color:${sevClr};font-weight:600">
+          ${b.alertas_abertos} alerta${b.alertas_abertos > 1 ? 's' : ''} em aberto ${b.maior_severidade ? '· ' + SEV_LBL[b.maior_severidade] : ''}
+        </button>` : ''}
+
+        <div style="margin-top:4px;padding-top:8px;border-top:1px solid var(--borda)">
+          <button class="btn btn-sm btn-secondary" onclick="abrirDetalhe('${b.id}','ativos')" style="width:100%">Ver detalhes</button>
+        </div>
+      </div>`
+    }).join('')
+  }
+
+  // ── Detalhe do berçário ──────────────────────────────────────────
+  window.abrirDetalhe = async function(id, tabInicial) {
+    const berc = _bercarios.find(b => b.id === id)
+    if (!berc) return
+
+    document.getElementById('det-titulo').textContent = berc.nome
+    document.getElementById('detalhe-conteudo').innerHTML = `<p style="color:var(--cinza-500)">Carregando...</p>`
+    document.getElementById('modal-bercario').classList.add('aberto')
+
+    const { data: lotesRaw } = await db.from('lotes_bercario')
+      .select('id,ninho_id,data_entrada,hora_entrada,qtd_entrada,status,observacoes,criado_em,ninhos_quelonios(numero_ninho,especie)')
+      .eq('bercario_id', id)
+      .order('data_entrada', { ascending: false })
+
+    const lotes = lotesRaw || []
+    const loteIds = lotes.map(l => l.id)
+
+    let vlm = [], solturas = [], ocorrencias = [], individuos = []
+    if (loteIds.length) {
+      const [r1, r2, r3, r4] = await Promise.all([
+        db.from('vw_lotes_bercario_mortalidade').select('lote_id,mortes,vivos_atual').in('lote_id', loteIds),
+        db.from('solturas_filhotes').select('lote_bercario_id,data_soltura,qtd_soltada,mortalidade').in('lote_bercario_id', loteIds),
+        db.from('ocorrencias_bercario').select('*').in('lote_id', loteIds).order('data_ocorrencia', { ascending: false }),
+        db.from('vw_filhotes_bercario').select('*').in('lote_id', loteIds).order('numero'),
+      ])
+      vlm = r1.data || []; solturas = r2.data || []; ocorrencias = r3.data || []; individuos = r4.data || []
+    }
+
+    const { data: alertas } = await db.from('vw_alertas_quelonios').select('*').eq('bercario_id', id).order('criado_em', { ascending: false })
+
+    const lotesEnriquecidos = lotes.map(l => {
+      const mort = vlm.find(v => v.lote_id === l.id)
+      const solturasLote = solturas.filter(s => s.lote_bercario_id === l.id)
+      return {
+        ...l,
+        numero_ninho: l.ninhos_quelonios?.numero_ninho,
+        especie: l.ninhos_quelonios?.especie,
+        mortes: mort?.mortes ?? 0,
+        vivos_atual: mort?.vivos_atual ?? (l.qtd_entrada - (mort?.mortes ?? 0)),
+        qtd_soltada: solturasLote.reduce((s, x) => s + (x.qtd_soltada || 0), 0),
+        data_soltura: solturasLote.map(x => x.data_soltura).sort().pop(),
+      }
+    })
+
+    _detAtual = { bercario: berc, lotes: lotesEnriquecidos, ocorrencias: ocorrencias || [], individuos: individuos || [], alertas: alertas || [] }
+    renderAbaDetalhe(tabInicial || 'ativos')
+  }
+
+  window.renderAbaDetalhe = function(tab) {
+    document.querySelectorAll('.berc-tab-btn').forEach(btn => btn.classList.remove('ativo'))
+    document.getElementById('dtab-' + tab)?.classList.add('ativo')
+
+    if (!_detAtual) return
+    const cont = document.getElementById('detalhe-conteudo')
+
+    if (tab === 'ativos' || tab === 'historico') {
+      const lista = _detAtual.lotes.filter(l => tab === 'ativos' ? l.status === 'ativo' : l.status !== 'ativo')
+      cont.innerHTML = lista.length ? lista.map(l => `
+        <div class="det-lote-card">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start">
+            <div>
+              <strong>${l.numero_ninho ? 'Ninho ' + esc(l.numero_ninho) : 'Ninho não vinculado'}</strong>
+              <div style="font-size:.8rem;color:var(--cinza-500)">${SPECIES_NOME[l.especie] || l.especie || ''}</div>
+            </div>
+            <span class="badge ${l.status === 'ativo' ? 'badge-verde' : l.status === 'soltado' ? 'badge-blue' : 'badge-cinza'}">${STATUS_LOTE_LBL[l.status] || l.status}</span>
+          </div>
+          <div style="font-size:.83rem;color:var(--cinza-500);display:grid;gap:3px;margin:8px 0">
+            <div>Entrada: ${formatData(l.data_entrada)} · ${l.qtd_entrada} filhotes</div>
+            <div>Vivos atual: <strong style="color:#2A9D6F">${l.vivos_atual}</strong> · Mortes: <strong style="color:#DC2626">${l.mortes}</strong></div>
+            ${l.status === 'soltado' ? `<div>Soltura: ${l.data_soltura ? formatData(l.data_soltura) : '—'} · ${l.qtd_soltada} soltos</div>` : ''}
+          </div>
+          ${l.observacoes ? `<p style="font-size:.8rem;font-style:italic;color:var(--cinza-500);margin:0">${esc(l.observacoes)}</p>` : ''}
+        </div>`).join('') : `<p style="color:var(--cinza-500)">Nenhum lote ${tab === 'ativos' ? 'ativo' : 'no histórico'}.</p>`
+      return
+    }
+
+    if (tab === 'ocorrencias') {
+      cont.innerHTML = _detAtual.ocorrencias.length ? _detAtual.ocorrencias.map(o => `
+        <div class="det-lote-card">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <span class="badge" style="background:${TIPO_OC_CLR[o.tipo]}22;color:${TIPO_OC_CLR[o.tipo]}">${TIPO_OC_LBL[o.tipo] || o.tipo}</span>
+            <span style="font-size:.78rem;color:var(--cinza-500)">${formatData(o.data_ocorrencia)}</span>
+          </div>
+          <div style="font-size:.83rem;color:var(--cinza-900);display:flex;gap:14px;flex-wrap:wrap">
+            ${o.comprimento_medio_cm != null ? `<span>Comprimento médio: <strong>${o.comprimento_medio_cm} cm</strong></span>` : ''}
+            ${o.peso_medio_g != null ? `<span>Peso médio: <strong>${o.peso_medio_g} g</strong></span>` : ''}
+            ${o.n_amostrados != null ? `<span>Amostrados: <strong>${o.n_amostrados}</strong></span>` : ''}
+            ${o.qtd_afetados ? `<span>Afetados: <strong style="color:#DC2626">${o.qtd_afetados}</strong></span>` : ''}
+          </div>
+          ${o.causa ? `<div style="font-size:.82rem;color:var(--cinza-500);margin-top:4px">Causa: ${esc(o.causa)}</div>` : ''}
+          ${o.descricao ? `<p style="font-size:.82rem;color:var(--cinza-500);font-style:italic;margin:6px 0 0">${esc(o.descricao)}</p>` : ''}
+        </div>`).join('') : `<p style="color:var(--cinza-500)">Nenhuma ocorrência registrada.</p>`
+      return
+    }
+
+    if (tab === 'individuos') {
+      cont.innerHTML = _detAtual.individuos.length ? `
+        <div class="table-wrap"><div class="table-scroll"><table><thead><tr>
+          <th>Nº</th><th>Status</th><th>Última medição</th><th>Compr.</th><th>Peso</th><th>Total med.</th>
+        </tr></thead><tbody>
+          ${_detAtual.individuos.map(f => `<tr>
+            <td>${f.numero}</td>
+            <td><span class="badge ${f.status === 'ativo' ? 'badge-verde' : 'badge-erro'}">${f.status === 'ativo' ? 'Ativo' : 'Morto'}</span></td>
+            <td>${f.ultima_data_medicao ? formatData(f.ultima_data_medicao) : '—'}</td>
+            <td>${f.ultimo_comprimento_cm != null ? f.ultimo_comprimento_cm + ' cm' : '—'}</td>
+            <td>${f.ultimo_peso_g != null ? f.ultimo_peso_g + ' g' : '—'}</td>
+            <td>${f.total_medicoes || 0}</td>
+          </tr>`).join('')}
+        </tbody></table></div></div>` : `<p style="color:var(--cinza-500)">Nenhum indivíduo rastreado neste berçário.</p>`
+      return
+    }
+
+    if (tab === 'alertas') {
+      cont.innerHTML = _detAtual.alertas.length ? _detAtual.alertas.map(a => {
+        const c = SEV_CLR[a.severidade] || '#6b7280'
+        return `<div class="det-lote-card" style="border-left:3px solid ${c}">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+            <div>
+              <span class="badge" style="background:${c}22;color:${c}">${SEV_LBL[a.severidade] || a.severidade}</span>
+              <div style="font-weight:600;margin-top:6px">${esc(a.titulo)}</div>
+              <div style="font-size:.83rem;color:var(--cinza-500);margin-top:2px">${esc(a.mensagem)}</div>
+              ${a.providencia ? `<div style="font-size:.8rem;color:var(--cinza-500);margin-top:4px"><strong>Providência:</strong> ${esc(a.providencia)}</div>` : ''}
+            </div>
+            <span class="badge ${a.status === 'aberto' ? 'badge-erro' : a.status === 'ciente' ? 'badge-ouro' : 'badge-cinza'}">${a.status}</span>
+          </div>
+          ${a.status === 'aberto' || a.status === 'ciente' ? `
+          <div style="display:flex;gap:6px;margin-top:10px">
+            ${a.status === 'aberto' ? `<button class="btn btn-sm btn-secondary" onclick="tratarAlertaBercario('${a.id}','ciente')">Marcar ciente</button>` : ''}
+            <button class="btn btn-sm btn-primary" onclick="tratarAlertaBercario('${a.id}','resolvido')">Resolver</button>
+          </div>` : ''}
+        </div>`
+      }).join('') : `<p style="color:var(--cinza-500)">Nenhum alerta para este berçário.</p>`
+      return
+    }
+  }
+
+  window.tratarAlertaBercario = async function(alertaId, status) {
+    const { error } = await db.rpc('quelonio_tratar_alerta', { p_alerta_id: alertaId, p_status: status })
+    if (error) { toast(error.message, 'error'); return }
+    toast('Alerta atualizado.', 'success')
+    const bercId = _detAtual?.bercario?.id
+    await carregarDados()
+    if (bercId) await abrirDetalhe(bercId, 'alertas')
+  }
+
+  await carregarDados()
+})()
+</script>
+</body>
+</html>
