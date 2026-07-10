@@ -448,6 +448,25 @@ async function bioOfflineSolturasPendentes() {
   })
 }
 
+async function bioOfflineSolturasDoLote(loteUuid) {
+  const db = await bioOfflineInit()
+  return new Promise((res, rej) => {
+    const tx  = db.transaction('solturas', 'readonly')
+    const idx = tx.objectStore('solturas').index('lote_uuid')
+    const req = idx.getAll(loteUuid)
+    req.onsuccess = () => res(req.result)
+    req.onerror   = () => rej(req.error)
+  })
+}
+
+// Todas as solturas dos lotes de um berçário (na temporada informada)
+// — histórico completo de quando/quanto/onde os filhotes foram soltos.
+async function bioOfflineSolturasDoBercario(bercarioId, temporadaId) {
+  const lotes = await bioOfflineLotesDoBercario(bercarioId, temporadaId)
+  const porLote = await Promise.all(lotes.map(l => bioOfflineSolturasDoLote(l.uuid_cliente)))
+  return porLote.flat().sort((a, b) => (b.data_soltura ?? '').localeCompare(a.data_soltura ?? ''))
+}
+
 // ── Berçários (cache do servidor) ─────────────────────────────
 async function bioOfflineSalvarBercarios(lista) {
   const db = await bioOfflineInit()
