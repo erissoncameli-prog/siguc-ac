@@ -3378,11 +3378,13 @@ function bioNinhoCardInner(n, opts = {}) {
   // coluna — cai no cálculo a partir dos descartes já mesclados.
   const _perdas   = (n.descartados_natural || 0) + (n.descartados_predacao || 0) + (n.descartados_humana || 0)
   const _viaveis  = n.ovos_viaveis ?? (n.qtd_ovos != null ? Math.max(n.qtd_ovos - _perdas, 0) : null)
+  const _perdidoTotal = n.ovos_perdidos_total ?? _perdas
   const ovosHtml = (n.qtd_ovos != null || n.ovos_integros != null || n.ovos_descartados != null) ? `
     <div class="bio-nfc-ovos">
       ${n.qtd_ovos         != null ? `<span>${n.qtd_ovos} ovos</span>` : ''}
-      ${n.ovos_integros    != null ? `<span>${n.ovos_integros} ínt.</span>` : ''}
-      ${n.ovos_descartados != null ? `<span>${n.ovos_descartados} desc.</span>` : ''}
+      ${n.ovos_integros    != null ? `<span>${n.ovos_integros} ínt. na postura</span>` : ''}
+      ${n.ovos_descartados != null ? `<span>${n.ovos_descartados} desc. na postura</span>` : ''}
+      ${_perdidoTotal > 0 ? `<span style="background:rgba(248,113,113,.18);color:#B91C1C">${_perdidoTotal} perdidos depois</span>` : ''}
       ${(_viaveis != null && (n.ovos_perdidos_total > 0 || _perdas > 0)) ? `<span style="background:rgba(82,183,136,.18);color:#1E6B4A">${_viaveis} viáveis</span>` : ''}
     </div>` : ''
 
