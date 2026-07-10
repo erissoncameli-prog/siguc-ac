@@ -3490,6 +3490,12 @@ function bioRenderizarListaNinhos(containerId, ninhos, mostrarAcoes) {
         btn.classList.toggle('aberto', vis)
       })
     })
+    card.querySelectorAll('[data-nh-detalhe]').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation()
+        bioAbrirDetalhesVisita(btn.dataset.nhDetalhe)
+      })
+    })
     el.appendChild(card)
   })
 }
