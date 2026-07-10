@@ -2192,6 +2192,10 @@ function bioBercarioEspecieAtual(bercarioId, lotesAtivos, temporadaId) {
 async function bioAbrirTelaBercarios() {
   bioMostrarTela('tela-bercarios')
   BioApp.bercarioFiltro = ''
+  BioApp.bercarioStatusFiltro = 'ativo'
+  document.querySelectorAll('#bio-berc-status-toggle .bio-oc-chip').forEach(btn => {
+    btn.classList.toggle('ativo', btn.dataset.status === 'ativo')
+  })
   await bioCarregarBercarios()
 }
 
@@ -2202,11 +2206,13 @@ async function bioCarregarBercarios() {
   if (estadoEl) { estadoEl.textContent = 'Carregando…'; estadoEl.hidden = false }
   if (listaEl)  listaEl.innerHTML = ''
 
-  const lotes = await bioOfflineLotesAtivos()
+  const statusFiltro = BioApp.bercarioStatusFiltro || 'ativo'
+  const lotes = await bioOfflineLotesPorStatus(statusFiltro)
 
   if (!lotes.length) {
     if (chipsEl) chipsEl.innerHTML = ''
-    if (estadoEl) { estadoEl.textContent = 'Nenhum lote em berçário no momento.'; estadoEl.hidden = false }
+    const msgVazio = statusFiltro === 'soltado' ? 'Nenhum berçário solto encontrado.' : 'Nenhum lote em berçário no momento.'
+    if (estadoEl) { estadoEl.textContent = msgVazio; estadoEl.hidden = false }
     return
   }
 
@@ -2276,7 +2282,7 @@ async function bioCarregarBercarios() {
     card.innerHTML = `
       <div class="bio-nfc-acoes" style="margin-top:0">
         <button class="bio-btn-sm prim" data-acao="ver-bercario">Ver berçário</button>
-        <button class="bio-btn-sm prim" data-acao="soltar-bercario" style="background:var(--bio-verde)">Soltar berçário</button>
+        ${statusFiltro === 'soltado' ? '' : `<button class="bio-btn-sm prim" data-acao="soltar-bercario" style="background:var(--bio-verde)">Soltar berçário</button>`}
       </div>
     `
     card.querySelector('[data-acao="ver-bercario"]')?.addEventListener('click', () => {
@@ -2848,6 +2854,14 @@ function bioIniciarPosEclosao() {
   document.getElementById('bio-btn-bercarios')?.addEventListener('click',                bioAbrirTelaBercarios)
   document.getElementById('bio-berc-busca')?.addEventListener('input', e => {
     BioApp.bercarioFiltro = e.target.value
+    bioCarregarBercarios()
+  })
+  document.getElementById('bio-berc-status-toggle')?.addEventListener('click', e => {
+    const btn = e.target.closest('[data-status]')
+    if (!btn) return
+    document.querySelectorAll('#bio-berc-status-toggle .bio-oc-chip').forEach(b => b.classList.remove('ativo'))
+    btn.classList.add('ativo')
+    BioApp.bercarioStatusFiltro = btn.dataset.status
     bioCarregarBercarios()
   })
 

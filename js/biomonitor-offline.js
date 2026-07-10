@@ -396,12 +396,12 @@ async function bioOfflineGetLote(uuid) {
   })
 }
 
-async function bioOfflineLotesAtivos() {
+async function bioOfflineLotesPorStatus(status) {
   const db = await bioOfflineInit()
   return new Promise((res, rej) => {
     const tx  = db.transaction('lotes', 'readonly')
     const idx = tx.objectStore('lotes').index('status')
-    const req = idx.getAll('ativo')
+    const req = idx.getAll(status)
     req.onsuccess = () => {
       const lista = req.result
       lista.sort((a, b) => b.data_entrada.localeCompare(a.data_entrada))
@@ -409,6 +409,10 @@ async function bioOfflineLotesAtivos() {
     }
     req.onerror = () => rej(req.error)
   })
+}
+
+async function bioOfflineLotesAtivos() {
+  return bioOfflineLotesPorStatus('ativo')
 }
 
 async function bioOfflineLotesPendentes() {
