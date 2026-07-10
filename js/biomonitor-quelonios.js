@@ -3402,7 +3402,7 @@ function bioNinhoCardInner(n, opts = {}) {
       <span><b>Eclosão prevista:</b> ${prev.dataTxt} · ${esc(prev.texto)}</span>
     </div>` : ''
 
-  const eclosaoHtml = (n.status === 'eclodido' && (n.filhotes_vivos != null || n.filhotes_mortos != null || n.data_nascimento)) ? `
+  const eclosaoHtml = (['eclodido', 'em_bercario', 'soltado'].includes(n.status) && (n.filhotes_vivos != null || n.filhotes_mortos != null || n.data_nascimento)) ? `
     <div class="bio-nfc-ovos">
       <span style="background:rgba(82,183,136,.18);color:#1E6B4A">Eclosão${n.data_nascimento ? ' ' + new Date(n.data_nascimento + 'T12:00').toLocaleDateString('pt-BR') : ''}</span>
       ${n.filhotes_vivos    != null ? `<span style="background:rgba(82,183,136,.12);color:#1E6B4A">${n.filhotes_vivos} vivos</span>` : ''}
@@ -3762,12 +3762,13 @@ function _bioRenderizarGraficos(d, Chart) {
     Chart
   )
 
-  // ── Status dos ninhos (rosca – Tab Ninhos)
+  // ── Status dos ninhos (rosca – Tab Ninhos) — inclui os status
+  // pós-eclosão (em berçário / soltado), senão o ninho some da rosca
   const ps = d.por_status || {}
   _bioDonut('chart-status',
-    ['Encontrado', 'Transferido', 'Eclodido', 'Perdido'],
-    [ps.encontrado || 0, ps.transferido || 0, ps.eclodido || 0, ps.perdido || 0],
-    ['#7ECEE8', '#C9A84C', '#2A9D6F', '#DC2626'],
+    ['Encontrado', 'Transferido', 'Eclodido', 'Em berçário', 'Soltado', 'Perdido'],
+    [ps.encontrado || 0, ps.transferido || 0, ps.eclodido || 0, ps.em_bercario || 0, ps.soltado || 0, ps.perdido || 0],
+    ['#7ECEE8', '#C9A84C', '#2A9D6F', '#8B5CF6', '#1A6B8C', '#DC2626'],
     Chart
   )
 
@@ -3883,7 +3884,7 @@ async function bioCarregarTelaDados() {
   // Dados locais (sempre disponíveis)
   const ninhos = await bioOfflineListarNinhos()
   _bioSetText('bio-kpi-ninhos-local', ninhos.length)
-  _bioSetText('bio-kpi-eclodidos-local', ninhos.filter(n => n.status === 'eclodido').length)
+  _bioSetText('bio-kpi-eclodidos-local', ninhos.filter(n => ['eclodido', 'em_bercario', 'soltado'].includes(n.status)).length)
 
   const statusEl = document.getElementById('bio-dados-status')
 
@@ -3908,9 +3909,10 @@ async function bioCarregarTelaDados() {
     _bioSetText('bio-kpi-filhotes',  data.filhotes_vivos)
     _bioSetText('bio-kpi-incubacao', data.incubacao_media_dias, ' d')
 
-    // KPIs — Tab Ninhos
+    // KPIs — Tab Ninhos ("Eclodidos" = pós-eclosão: eclodido +
+    // em berçário + soltado, agregado no servidor)
     const ps = data.por_status || {}
-    _bioSetText('bio-kpi2-eclodidos', ps.eclodido ?? data.eclodidos)
+    _bioSetText('bio-kpi2-eclodidos', data.eclodidos ?? ps.eclodido)
     _bioSetText('bio-kpi2-perdidos',  ps.perdido)
     _bioSetText('bio-kpi2-transf',    ps.transferido)
 
