@@ -614,7 +614,14 @@ async function bioSyncTudo({ monitorId, onProgresso, onConcluido, onErro } = {})
     // Pull: traz de volta mudanças do servidor (ex.: validação/correção
     // feita pelo gestor) para o IndexedDB.
     const grupoId = (typeof BioApp !== 'undefined' && BioApp.monitor?.grupo_id) || null
-    if (grupoId) { try { await bioSyncPullNinhos(grupoId) } catch (_) {} }
+    if (grupoId) {
+      try { await bioSyncPullNinhos(grupoId) } catch (_) {}
+      // Berçário é compartilhado pela equipe — traz lotes/filhotes/biometrias
+      // de outros monitores do mesmo grupo para o IndexedDB local.
+      try { await bioSyncPullLotes(grupoId) } catch (_) {}
+      try { await bioSyncPullIndividuos(grupoId) } catch (_) {}
+      try { await bioSyncPullBiometriasInd(grupoId) } catch (_) {}
+    }
     await bioOfflineLimparConfirmados()
     onConcluido?.({ ninhos: n, transferencias: t, eclosoes: e, visitas: v, lotes: l, individuos: ind, solturas: s, ocorrencias: oc, biometrias: bi })
   } catch (err) {
@@ -743,6 +750,116 @@ async function bioSyncPullNinhos(grupoId) {
   }
 
   await bioOfflineSetConfig('ninhos_ultima_sync', new Date().toISOString())
+}
+
+// ── Pull: busca lotes de berçário do GRUPO (equipe) inteiro ───
+// Berçário é físico e compartilhado — sem isso, cada aparelho só via os
+// lotes que ele mesmo criou, nunca os de outro monitor da mesma equipe.
+async function bioSyncPullLotes(grupoId) {
+  if (!navigator.onLine) return
+
+  const { data, error } = await bioSupabase()
+    .from('lotes_bercario')
+    .select(`
+      id, uuid_cliente, bercario_id, bercario_nome, data_entrada, hora_entrada,
+      qtd_entrada, status, observacoes, monitor_id, criado_em, sincronizado_em,
+      ninho:ninhos_quelonios(uuid_cliente, numero_ninho, especie)
+    `)
+    .eq('grupo_id', grupoId)
+    .order('data_entrada', { ascending: false })
+    .limit(200)
+
+  if (error || !data) return
+
+  for (const l of data) {
+    await bioOfflineSalvarLote({
+      uuid_cliente:  l.uuid_cliente,
+      ninho_uuid:    l.ninho?.uuid_cliente ?? null,
+      ninho_numero:  l.ninho?.numero_ninho ?? null,
+      especie:       l.ninho?.especie      ?? null,
+      bercario_id:   l.bercario_id,
+      bercario_nome: l.bercario_nome,
+      data_entrada:  l.data_entrada,
+      hora_entrada:  l.hora_entrada,
+      qtd_entrada:   l.qtd_entrada,
+      status:        l.status,
+      observacoes:   l.observacoes,
+      server_id:     l.id,
+      status_sync:   'confirmado',
+      criado_em:     l.criado_em,
+      sincronizado_em: l.sincronizado_em ?? new Date().toISOString(),
+    })
+  }
+}
+
+// ── Pull: filhotes individuais dos lotes do grupo ─────────────
+async function bioSyncPullIndividuos(grupoId) {
+  if (!navigator.onLine) return
+
+  const { data, error } = await bioSupabase()
+    .from('filhotes_bercario')
+    .select(`
+      id, uuid_cliente, numero, status, data_obito, causa_obito, observacoes,
+      monitor_id, criado_em, sincronizado_em,
+      lote:lotes_bercario!inner(uuid_cliente, grupo_id)
+    `)
+    .eq('lote.grupo_id', grupoId)
+    .order('numero')
+    .limit(2000)
+
+  if (error || !data) return
+
+  for (const ind of data) {
+    if (!ind.lote?.uuid_cliente) continue
+    await bioOfflineSalvarIndividuo({
+      uuid_cliente: ind.uuid_cliente,
+      lote_uuid:    ind.lote.uuid_cliente,
+      numero:       ind.numero,
+      status:       ind.status,
+      data_obito:   ind.data_obito,
+      causa_obito:  ind.causa_obito,
+      observacoes:  ind.observacoes,
+      server_id:    ind.id,
+      status_sync:  'confirmado',
+      criado_em:    ind.criado_em,
+      sincronizado_em: ind.sincronizado_em ?? new Date().toISOString(),
+    })
+  }
+}
+
+// ── Pull: biometrias individuais dos filhotes do grupo ────────
+async function bioSyncPullBiometriasInd(grupoId) {
+  if (!navigator.onLine) return
+
+  const { data, error } = await bioSupabase()
+    .from('biometrias_individuais')
+    .select(`
+      id, uuid_cliente, data_medicao, hora_medicao, comprimento_cm, peso_g,
+      observacoes, monitor_id, criado_em, sincronizado_em,
+      individuo:filhotes_bercario!inner(uuid_cliente, grupo_id)
+    `)
+    .eq('individuo.grupo_id', grupoId)
+    .order('data_medicao', { ascending: false })
+    .limit(2000)
+
+  if (error || !data) return
+
+  for (const b of data) {
+    if (!b.individuo?.uuid_cliente) continue
+    await bioOfflineSalvarBiometriaInd({
+      uuid_cliente:   b.uuid_cliente,
+      individuo_uuid: b.individuo.uuid_cliente,
+      data_medicao:   b.data_medicao,
+      hora_medicao:   b.hora_medicao,
+      comprimento_cm: b.comprimento_cm,
+      peso_g:         b.peso_g,
+      observacoes:    b.observacoes,
+      server_id:      b.id,
+      status_sync:    'confirmado',
+      criado_em:      b.criado_em,
+      sincronizado_em: b.sincronizado_em ?? new Date().toISOString(),
+    })
+  }
 }
 
 // ── Online/offline listeners ──────────────────────────────────
