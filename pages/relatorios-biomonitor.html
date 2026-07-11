@@ -860,13 +860,18 @@
       </div>` : ''
     return `<div class="rel-sec" id="sec-descartes">
       <div class="rel-sec-title">Descarte de ovos por causa</div>
-      <div class="rel-kpi-grid">
-        ${kpiCard('Total descartado', v(a.total),    '#ef4444')}
-        ${kpiCard('Causa natural',    `${a.natural} (${pctOf(a.natural)}%)`,   '#38bdf8')}
-        ${kpiCard('Predação',         `${a.predacao} (${pctOf(a.predacao)}%)`, '#fb923c')}
-        ${kpiCard('Ação humana',      `${a.humana} (${pctOf(a.humana)}%)`,     '#a78bfa')}
+      <div class="painel-grid">
+        <div>
+          <div class="rel-kpi-grid">
+            ${kpiCard('Total descartado', v(a.total),    '#ef4444')}
+            ${kpiCard('Causa natural',    `${a.natural} (${pctOf(a.natural)}%)`,   '#38bdf8')}
+            ${kpiCard('Predação',         `${a.predacao} (${pctOf(a.predacao)}%)`, '#fb923c')}
+            ${kpiCard('Ação humana',      `${a.humana} (${pctOf(a.humana)}%)`,     '#a78bfa')}
+          </div>
+          ${finaHtml}
+        </div>
+        <div class="rel-chart-card"><p class="rel-chart-title">Perdas por causa</p><div class="rel-chart-wrap" id="wrap-desc-causa"><canvas id="graf-desc-causa"></canvas></div></div>
       </div>
-      ${finaHtml}
     </div>`
   }
 
