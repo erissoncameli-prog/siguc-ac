@@ -576,7 +576,8 @@
   // ── Estado global ───────────────────────────────────────────────
   let _dados = null
   let _charts = {}
-  let _descAgg = { natural:0, predacao:0, humana:0, total:0 }
+  let _descAgg = { natural:0, predacao:0, humana:0, total:0,
+    porCausa: { predacao:0, alagamento:0, erosao:0, humana:0, natural:0 } }
   let _metasPraia = []
   let _chartJsCarregado = false
   let _bercMortalidade = []
@@ -726,16 +727,22 @@
 
     _dados = data
 
-    // Descartes de ovos por causa (consulta direta à view)
-    let qd = db.from('vw_descartes_ovos').select('motivo,qtd')
+    // Descartes de ovos por causa (consulta direta à view). Traz `causa`
+    // (fina) além de `motivo` (grossa) — perdas naturais lançadas na
+    // postura (etapa registro) não têm causa fina e viram um balde
+    // próprio "Natural (postura)" no gráfico de colunas, em vez de sumir.
+    let qd = db.from('vw_descartes_ovos').select('motivo,causa,qtd')
     const tmp = sel('fil-temporada').value; if (tmp) qd = qd.eq('temporada_id', tmp)
     const prr = sel('fil-praia').value;     if (prr) qd = qd.eq('praia_id', prr)
     const { data: descRows } = await qd
-    _descAgg = { natural:0, predacao:0, humana:0, total:0 }
+    _descAgg = { natural:0, predacao:0, humana:0, total:0,
+      porCausa: { predacao:0, alagamento:0, erosao:0, humana:0, natural:0 } }
     ;(descRows || []).forEach(r => {
       const q = r.qtd || 0
       if (r.motivo in _descAgg) _descAgg[r.motivo] += q
       _descAgg.total += q
+      const causa = ['predacao','alagamento','erosao','humana'].includes(r.causa) ? r.causa : 'natural'
+      _descAgg.porCausa[causa] += q
     })
 
     // Metas por praia (só faz sentido com uma temporada específica)
@@ -798,6 +805,7 @@
     grafFenologia(d.por_mes || [], d.por_ano || [])
     grafDesfecho(k)
     grafStatus(k)
+    grafDescartesCausa()
     grafEspeciesBar(d.por_especie || [])
     grafEspeciesRadar(d.por_especie || [])
     grafPraiasH(d.por_praia || [])
@@ -846,27 +854,34 @@
   // ── Seção: Visão Geral ───────────────────────────────────────────
   function htmlSecDescartes(a) {
     const pctOf = n => a.total ? Math.round(100 * n / a.total) : 0
-    // Causa fina (predação/alagamento/erosão/humana) agregada das praias.
-    const f = painelAgregados().perdas
-    const totF = f.predacao + f.alagamento + f.erosao + f.humana
+    // Causa fina (predação/alagamento/erosão/humana/natural) — inclui
+    // perdas naturais lançadas direto na postura, não só nas visitas.
+    const f = a.porCausa
+    const totF = f.predacao + f.alagamento + f.erosao + f.humana + f.natural
     const pctF = n => totF ? Math.round(100 * n / totF) : 0
     const finaHtml = totF ? `
-      <p class="rel-chart-sub" style="margin:6px 0 8px">Perdas por causa fina (baixadas nas visitas/registro)</p>
+      <p class="rel-chart-sub" style="margin:6px 0 8px">Perdas por causa fina (postura, visitas e registro)</p>
       <div class="rel-kpi-grid">
-        ${kpiCard('Predação',   `${f.predacao} (${pctF(f.predacao)}%)`,     '#ef4444')}
-        ${kpiCard('Alagamento', `${f.alagamento} (${pctF(f.alagamento)}%)`, '#1A6B8C')}
-        ${kpiCard('Erosão',     `${f.erosao} (${pctF(f.erosao)}%)`,         '#C9A84C')}
-        ${kpiCard('Ação humana',`${f.humana} (${pctF(f.humana)}%)`,         '#7B57B0')}
+        ${kpiCard('Predação',         `${f.predacao} (${pctF(f.predacao)}%)`,     '#ef4444')}
+        ${kpiCard('Alagamento',       `${f.alagamento} (${pctF(f.alagamento)}%)`, '#1A6B8C')}
+        ${kpiCard('Erosão',           `${f.erosao} (${pctF(f.erosao)}%)`,         '#C9A84C')}
+        ${kpiCard('Ação humana',      `${f.humana} (${pctF(f.humana)}%)`,         '#7B57B0')}
+        ${kpiCard('Natural (postura)',`${f.natural} (${pctF(f.natural)}%)`,       '#38bdf8')}
       </div>` : ''
     return `<div class="rel-sec" id="sec-descartes">
       <div class="rel-sec-title">Descarte de ovos por causa</div>
-      <div class="rel-kpi-grid">
-        ${kpiCard('Total descartado', v(a.total),    '#ef4444')}
-        ${kpiCard('Causa natural',    `${a.natural} (${pctOf(a.natural)}%)`,   '#38bdf8')}
-        ${kpiCard('Predação',         `${a.predacao} (${pctOf(a.predacao)}%)`, '#fb923c')}
-        ${kpiCard('Ação humana',      `${a.humana} (${pctOf(a.humana)}%)`,     '#a78bfa')}
+      <div class="painel-grid">
+        <div>
+          <div class="rel-kpi-grid">
+            ${kpiCard('Total descartado', v(a.total),    '#ef4444')}
+            ${kpiCard('Causa natural',    `${a.natural} (${pctOf(a.natural)}%)`,   '#38bdf8')}
+            ${kpiCard('Predação',         `${a.predacao} (${pctOf(a.predacao)}%)`, '#fb923c')}
+            ${kpiCard('Ação humana',      `${a.humana} (${pctOf(a.humana)}%)`,     '#a78bfa')}
+          </div>
+          ${finaHtml}
+        </div>
+        <div class="rel-chart-card"><p class="rel-chart-title">Perdas por causa</p><div class="rel-chart-wrap" id="wrap-desc-causa"><canvas id="graf-desc-causa"></canvas></div></div>
       </div>
-      ${finaHtml}
     </div>`
   }
 
@@ -890,8 +905,8 @@
         ${kpiCard('Perdidos / Predados', v(k.perdidos),             '#ef4444')}
       </div>
       <div class="rel-charts-row">
-        <div class="rel-chart-card"><p class="rel-chart-title">Status dos Ninhos</p><div class="rel-chart-wrap short"><canvas id="graf-status"></canvas></div></div>
-        <div class="rel-chart-card"><p class="rel-chart-title">Desfecho dos Ovos</p><div class="rel-chart-wrap short"><canvas id="graf-desfecho"></canvas></div></div>
+        <div class="rel-chart-card"><p class="rel-chart-title">Status dos Ninhos</p><div class="rel-chart-wrap"><canvas id="graf-status"></canvas></div></div>
+        <div class="rel-chart-card"><p class="rel-chart-title">Desfecho dos Ovos</p><div class="rel-chart-wrap"><canvas id="graf-desfecho"></canvas></div></div>
       </div>
     </div>`
   }
@@ -1131,11 +1146,46 @@
   }
 
   // ── Gráficos ─────────────────────────────────────────────────────
+  // Tooltip fixo por clique — em telas touch o hover é impreciso demais
+  // pra acertar uma fatia/coluna fina. Clicar mostra o tooltip "preso"
+  // no ponto; clicar fora dele esconde.
+  function attachClickTooltip(chart) {
+    chart.canvas.onclick = evt => {
+      const pts = chart.getElementsAtEventForMode(evt, 'nearest', { intersect: true }, true)
+      if (!pts.length) {
+        chart.setActiveElements([])
+        chart.tooltip?.setActiveElements([], { x: 0, y: 0 })
+        chart.update()
+        return
+      }
+      const active = pts.map(p => ({ datasetIndex: p.datasetIndex, index: p.index }))
+      chart.setActiveElements(active)
+      chart.tooltip?.setActiveElements(active, { x: evt.offsetX, y: evt.offsetY })
+      chart.update()
+    }
+  }
+
   function mkChart(id, cfg) {
     const el = document.getElementById(id)
     if (!el) return
     _charts[id]?.destroy()
+    cfg.options = cfg.options || {}
+    cfg.options.plugins = cfg.options.plugins || {}
+    // Tooltip padrão com % do total, só quando o gráfico não define o seu.
+    if (!cfg.options.plugins.tooltip && (cfg.type === 'doughnut' || cfg.type === 'pie')) {
+      cfg.options.plugins.tooltip = {
+        callbacks: {
+          label(ctx) {
+            const total = (ctx.dataset.data || []).reduce((s, x) => s + (x || 0), 0)
+            const val = ctx.parsed
+            const p = total ? Math.round(100 * val / total) : 0
+            return `${ctx.label}: ${val} (${p}%)`
+          }
+        }
+      }
+    }
     _charts[id] = new Chart(el.getContext('2d'), cfg)
+    attachClickTooltip(_charts[id])
   }
 
   const gridColor = 'rgba(0,0,0,.06)'
@@ -1193,9 +1243,9 @@
       data:{
         labels:['Filhotes vivos','Filhotes mortos','Ovos não nascidos','Descartados'],
         datasets:[{ data:[k.total_filhotes_vivos||0,k.total_filhotes_mortos||0,k.total_ovos_nao_nascidos||0,k.total_ovos_descartados||0],
-          backgroundColor:['#2A9D6F','#ef4444','#D97706','#6b7280'], borderWidth:2, borderColor:'rgba(0,0,0,.3)', hoverOffset:8 }]
+          backgroundColor:['#2A9D6F','#ef4444','#D97706','#6b7280'], borderWidth:2, borderColor:'rgba(0,0,0,.15)', hoverOffset:8 }]
       },
-      options:{ cutout:'60%', plugins:{ legend:{...legendOpts, position:'bottom'} }, animation:{duration:600} }
+      options:{ cutout:'58%', responsive:true, maintainAspectRatio:false, plugins:{ legend:{...legendOpts, position:'right'} }, animation:{duration:600} }
     })
   }
 
@@ -1205,9 +1255,35 @@
       data:{
         labels:['Encontrado','Transferido','Eclodido','Em berçário','Soltado','Perdido'],
         datasets:[{ data:[k.pendentes||0, k.transferidos||0, k.eclodidos_status||0, k.em_bercario||0, k.soltados||0, k.perdidos||0],
-          backgroundColor:['#7ECEE8','#C9A84C','#2A9D6F','#8b5cf6','#1A6B8C','#ef4444'], borderWidth:2, borderColor:'rgba(0,0,0,.3)', hoverOffset:8 }]
+          backgroundColor:['#7ECEE8','#C9A84C','#2A9D6F','#8b5cf6','#1A6B8C','#ef4444'], borderWidth:2, borderColor:'rgba(0,0,0,.15)', hoverOffset:8 }]
       },
-      options:{ cutout:'60%', plugins:{ legend:{...legendOpts, position:'bottom'} }, animation:{duration:600} }
+      options:{ cutout:'58%', responsive:true, maintainAspectRatio:false, plugins:{ legend:{...legendOpts, position:'right'} }, animation:{duration:600} }
+    })
+  }
+
+  function grafDescartesCausa() {
+    const f = _descAgg.porCausa
+    const dados = [f.predacao, f.alagamento, f.erosao, f.humana, f.natural]
+    const wrap = document.getElementById('wrap-desc-causa')
+    if (!dados.some(x => x > 0)) {
+      if (wrap) wrap.innerHTML = '<div class="rel-loading" style="padding:40px 10px">Nenhuma perda de ovos registrada nos filtros atuais.</div>'
+      return
+    }
+    if (wrap && !document.getElementById('graf-desc-causa')) wrap.innerHTML = '<canvas id="graf-desc-causa"></canvas>'
+    mkChart('graf-desc-causa', {
+      type:'bar',
+      data:{
+        labels:['Predação','Alagamento','Erosão','Ação humana','Natural (postura)'],
+        datasets:[{ data:dados, backgroundColor:['#ef4444','#1A6B8C','#C9A84C','#7B57B0','#38bdf8'], borderRadius:5 }]
+      },
+      options:{
+        responsive:true, maintainAspectRatio:false, animation:{duration:600},
+        plugins:{ legend:{ display:false } },
+        scales:{
+          x:{ grid:{display:false}, ticks:{color:'#6B7280', font:tickFont} },
+          y:{ grid:{color:gridColor}, ticks:{color:'#6B7280', font:tickFont}, beginAtZero:true }
+        }
+      }
     })
   }
 

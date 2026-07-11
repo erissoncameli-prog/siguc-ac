@@ -1491,6 +1491,9 @@ body.field-mode .bio-home-nome { font-size: 26px; }
 .bio-filhote-chip.morto   { opacity: .5; }
 .bio-filhote-chip.soltado { opacity: .6; border-color: #0891B2; }
 .bio-filhote-num  { font-family: var(--font-mono); font-size: 14px; font-weight: 700; color: var(--bio-ink); }
+.bio-filhote-num.num-vivo  { color: #2A9D6F; }
+.bio-filhote-num.num-morto { color: #DC2626; }
+.bio-filhote-num.num-doente { color: #7C3AED; }
 .bio-filhote-bio  { font-size: 10px; color: var(--bio-ink2); text-align: center; line-height: 1.3; }
 
 /* ── Grupos de berçário na lista de lotes ── */
@@ -1732,6 +1735,41 @@ body.field-mode .bio-home-nome { font-size: 26px; }
 }
 .bio-nfc-hist-saldo i { display: block; font-style: normal; font-size: 9px;
   letter-spacing: .06em; text-transform: uppercase; color: #9CA3AF; font-weight: 500; }
+
+/* ── Botão "Detalhes" da visita + modal ──────────────────────── */
+.bio-nfc-hist-det {
+  flex-shrink: 0; border: 1px solid #D0E4EF; background: #fff; color: var(--bio-prim);
+  font-family: var(--font-ui); font-size: 10.5px; font-weight: 600;
+  padding: 2px 8px; border-radius: 99px; cursor: pointer; margin-top: 1px;
+  -webkit-tap-highlight-color: transparent;
+}
+.bio-nfc-hist-det:active { background: var(--bio-prim-bg); }
+.bio-detvis-overlay {
+  position: fixed; inset: 0; z-index: 3000;
+  background: rgba(13,30,39,.65);
+  display: flex; align-items: center; justify-content: center; padding: 18px;
+}
+.bio-detvis-card {
+  background: #fff; border-radius: 16px; padding: 18px 20px;
+  max-width: 420px; width: 100%; max-height: 82vh; overflow-y: auto;
+}
+.bio-detvis-head {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 10px; margin-bottom: 12px;
+}
+.bio-detvis-head strong { font-size: 15px; color: var(--bio-ink, #0D1E27); }
+.bio-detvis-fechar {
+  border: 0; background: none; font-size: 22px; line-height: 1; cursor: pointer;
+  color: #6B7280; flex-shrink: 0;
+}
+.bio-detvis-corpo { display: grid; gap: 7px; font-size: 13.5px; color: #374151; }
+.bio-detvis-corpo > div { display: flex; justify-content: space-between; gap: 12px; }
+.bio-detvis-corpo span { color: #6B7280; }
+.bio-detvis-corpo strong { text-align: right; }
+.bio-detvis-obs {
+  margin-top: 4px; padding-top: 10px; border-top: 1px solid #EEF4F8;
+  font-size: 13px; color: #374151; font-style: italic; white-space: pre-wrap;
+}
 
 /* ── Fila de sync: registros com erro ────────────────────────── */
 .bio-sync-erros {

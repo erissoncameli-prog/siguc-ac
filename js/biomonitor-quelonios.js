@@ -2126,7 +2126,7 @@ async function bioSalvarSoltura() {
         criado_em:       new Date().toISOString(),
       }
       await bioOfflineSalvarSoltura(sol)
-      await bioOfflineSalvarLote({ ...lote, status: 'soltado' })
+      await bioOfflineSalvarLote({ ...lote, status: 'soltado', status_sync: 'pendente' })
 
       const ninhoLote = await bioOfflineGetNinho(lote.ninho_uuid)
       if (ninhoLote) await bioOfflineSalvarNinho({ ...ninhoLote, status: 'soltado', status_sync: 'pendente' })
@@ -2434,10 +2434,11 @@ async function bioRenderizarFilhotesDoBercario(bercarioId, temporadaId) {
          ult.peso_g != null ? `${ult.peso_g}g` : null].filter(Boolean).join(' · ')
       : 'sem biometria'
     const classeExtra = ind.status !== 'ativo' ? ` ${ind.status}` : ''
+    const classeCor = ind.status === 'morto' ? ' num-morto' : ind.doente ? ' num-doente' : ' num-vivo'
     return `
       <div class="bio-filhote-chip${classeExtra}" data-individuo-uuid="${ind.uuid_cliente}">
-        <span class="bio-filhote-num">#${ind.numero}</span>
-        <span class="bio-filhote-bio">${STATUS_LABEL[ind.status] ?? bioTxt}</span>
+        <span class="bio-filhote-num${classeCor}">#${ind.numero}</span>
+        <span class="bio-filhote-bio">${ind.doente && ind.status === 'ativo' ? 'doente' : STATUS_LABEL[ind.status] ?? bioTxt}</span>
       </div>`
   }).join('')
 }
@@ -2533,6 +2534,13 @@ function bioAbrirTelaDetalheIndividuo(individuo) {
     if (btnObito) btnObito.hidden = individuo.status === 'soltado'
   }
 
+  if (el('bio-ind-doenca')) el('bio-ind-doenca').textContent = individuo.doente ? 'Sim' : 'Não'
+  const btnDoenca = el('bio-btn-doenca-individuo')
+  if (btnDoenca) {
+    btnDoenca.hidden = individuo.status !== 'ativo'
+    btnDoenca.textContent = individuo.doente ? 'Remover doença' : 'Marcar doente'
+  }
+
   bioCarregarTimelineIndividuo(individuo)
   bioMostrarTela('tela-detalhe-individuo')
 }
@@ -2581,6 +2589,21 @@ async function bioMarcarObitoIndividuo(individuo) {
   BioApp.individuoAtual = atualizado
   bioSyncTudo({ monitorId: BioApp.monitor?.id, onConcluido: () => bioAtualizarBadgeFila() })
   bioToast(`Óbito registrado — filhote #${individuo.numero}.`, 'ok')
+  bioAbrirTelaDetalheIndividuo(atualizado)
+}
+
+async function bioAlternarDoencaIndividuo(individuo) {
+  const atualizado = {
+    ...individuo,
+    doente: !individuo.doente,
+    status_sync: 'pendente',
+  }
+  await bioOfflineSalvarIndividuo(atualizado)
+  BioApp.individuoAtual = atualizado
+  bioSyncTudo({ monitorId: BioApp.monitor?.id, onConcluido: () => bioAtualizarBadgeFila() })
+  bioToast(atualizado.doente
+    ? `Filhote #${individuo.numero} marcado como doente.`
+    : `Doença removida do filhote #${individuo.numero}.`, 'ok')
   bioAbrirTelaDetalheIndividuo(atualizado)
 }
 
@@ -2779,7 +2802,7 @@ async function bioSalvarOcorrencia() {
     comprimento_medio_cm: parseFloat(document.getElementById('bio-oc-comp').value)         || null,
     peso_medio_g:         parseFloat(document.getElementById('bio-oc-peso').value)         || null,
     n_amostrados:         parseInt(document.getElementById('bio-oc-amostrados').value)     || null,
-    qtd_afetados:         parseInt(document.getElementById('bio-oc-afetados').value) || null,
+    qtd_afetados:         parseInt(document.getElementById('bio-oc-afetados').value) || 0,
     causa:                document.getElementById('bio-oc-causa').value.trim()             || null,
     descricao:            document.getElementById('bio-oc-descricao').value.trim()         || null,
     foto_urls:            BioApp._fotosOc?.length ? [...BioApp._fotosOc] : [],
@@ -2929,6 +2952,10 @@ function bioIniciarPosEclosao() {
   document.getElementById('bio-btn-obito-individuo')?.addEventListener('click', () => {
     const ind = BioApp.individuoAtual
     if (ind && confirm(`Confirma o óbito do filhote #${ind.numero}?`)) bioMarcarObitoIndividuo(ind)
+  })
+  document.getElementById('bio-btn-doenca-individuo')?.addEventListener('click', () => {
+    const ind = BioApp.individuoAtual
+    if (ind) bioAlternarDoencaIndividuo(ind)
   })
 
   // Biometria individual
@@ -3383,11 +3410,13 @@ function bioNinhoCardInner(n, opts = {}) {
   // coluna — cai no cálculo a partir dos descartes já mesclados.
   const _perdas   = (n.descartados_natural || 0) + (n.descartados_predacao || 0) + (n.descartados_humana || 0)
   const _viaveis  = n.ovos_viaveis ?? (n.qtd_ovos != null ? Math.max(n.qtd_ovos - _perdas, 0) : null)
+  const _perdidoTotal = n.ovos_perdidos_total ?? _perdas
   const ovosHtml = (n.qtd_ovos != null || n.ovos_integros != null || n.ovos_descartados != null) ? `
     <div class="bio-nfc-ovos">
       ${n.qtd_ovos         != null ? `<span>${n.qtd_ovos} ovos</span>` : ''}
-      ${n.ovos_integros    != null ? `<span>${n.ovos_integros} ínt.</span>` : ''}
-      ${n.ovos_descartados != null ? `<span>${n.ovos_descartados} desc.</span>` : ''}
+      ${n.ovos_integros    != null ? `<span>${n.ovos_integros} ínt. na postura</span>` : ''}
+      ${n.ovos_descartados != null ? `<span>${n.ovos_descartados} desc. na postura</span>` : ''}
+      ${_perdidoTotal > 0 ? `<span style="background:rgba(248,113,113,.18);color:#B91C1C">${_perdidoTotal} perdidos depois</span>` : ''}
       ${(_viaveis != null && (n.ovos_perdidos_total > 0 || _perdas > 0)) ? `<span style="background:rgba(82,183,136,.18);color:#1E6B4A">${_viaveis} viáveis</span>` : ''}
     </div>` : ''
 
@@ -3515,6 +3544,12 @@ function bioRenderizarListaNinhos(containerId, ninhos, mostrarAcoes) {
         if (!hist) return
         const vis = hist.classList.toggle('vis')
         btn.classList.toggle('aberto', vis)
+      })
+    })
+    card.querySelectorAll('[data-nh-detalhe]').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation()
+        bioAbrirDetalhesVisita(btn.dataset.nhDetalhe)
       })
     })
     el.appendChild(card)

@@ -31,7 +31,72 @@ function bioEventoVisita(r) {
       r.temperatura_substrato_c != null ? `${r.temperatura_substrato_c}°C`
         : r.temperatura_ar_c != null ? `${r.temperatura_ar_c}°C` : null,
     ].filter(Boolean).join(' · '),
+    detalhe: r,                                     // registro bruto p/ botão "Detalhes"
   }
+}
+
+// Registro (id incremental → registro bruto da visita) consultado pelo
+// botão "Detalhes" — evita colocar JSON inline no HTML dos cards.
+const BioDetalhesVisita = {}
+let _bioDetVisSeq = 0
+
+const BIO_VISITA_PREDACAO_LBL = {
+  por_animais: 'por animais', por_pessoas: 'por pessoas', desconhecida: 'desconhecida',
+}
+const BIO_VISITA_CAUSA_LBL = {
+  predacao: 'predação', alagamento: 'alagamento', erosao: 'erosão/apodrecimento',
+  humana: 'humana', outro: 'outra',
+}
+
+// Abre (criando se preciso) o modal com os dados completos de uma visita.
+function bioAbrirDetalhesVisita(id) {
+  const r = BioDetalhesVisita[id]
+  if (!r) return
+
+  let ov = document.getElementById('bio-detvis-overlay')
+  if (!ov) {
+    ov = document.createElement('div')
+    ov.id = 'bio-detvis-overlay'
+    ov.className = 'bio-detvis-overlay'
+    ov.innerHTML = `
+      <div class="bio-detvis-card" onclick="event.stopPropagation()">
+        <div class="bio-detvis-head">
+          <strong>Detalhes da visita</strong>
+          <button type="button" class="bio-detvis-fechar" aria-label="Fechar">&times;</button>
+        </div>
+        <div class="bio-detvis-corpo" id="bio-detvis-corpo"></div>
+      </div>`
+    ov.addEventListener('click', () => ov.remove())
+    ov.querySelector('.bio-detvis-fechar').addEventListener('click', () => ov.remove())
+    document.body.appendChild(ov)
+  }
+
+  const fd = iso => iso ? new Date(iso + 'T12:00').toLocaleDateString('pt-BR') : '—'
+  const linha = (l, v) => v != null && v !== ''
+    ? `<div><span>${esc(l)}</span><strong>${esc(String(v))}</strong></div>` : ''
+
+  const perdas = [
+    r.ovos_predados_n > 0 ? linha(`Predação${r.predacao_incubacao ? ' (' + (BIO_VISITA_PREDACAO_LBL[r.predacao_incubacao] || r.predacao_incubacao) + ')' : ''}`, r.ovos_predados_n) : '',
+    r.ovos_perdidos_alagamento > 0 ? linha('Alagamento', r.ovos_perdidos_alagamento) : '',
+    r.ovos_perdidos_erosao > 0 ? linha('Erosão/apodrecimento', r.ovos_perdidos_erosao) : '',
+    r.ovos_perdidos_humana > 0 ? linha('Dano humano', r.ovos_perdidos_humana) : '',
+  ].join('')
+
+  const corpo = [
+    linha('Data', fd(r.data_visita) + (r.hora_visita ? ` · ${r.hora_visita.slice(0, 5)}` : '')),
+    linha('Status', r.status_ninho ? (BIO_VISITA_STATUS_LBL[r.status_ninho] || r.status_ninho) : null),
+    linha('Temp. substrato', r.temperatura_substrato_c != null ? `${r.temperatura_substrato_c}°C` : null),
+    linha('Temp. ar', r.temperatura_ar_c != null ? `${r.temperatura_ar_c}°C` : null),
+    linha('Umidade', r.umidade),
+    r.status_ninho === 'destruido'
+      ? linha('Causa da destruição', r.causa_destruicao ? (BIO_VISITA_CAUSA_LBL[r.causa_destruicao] || r.causa_destruicao) : null)
+      : perdas,
+    linha('Sinal de alagamento', r.sinal_alagamento ? 'Sim' : null),
+    linha('Intervenção realizada', r.intervencao),
+  ].filter(Boolean).join('')
+
+  document.getElementById('bio-detvis-corpo').innerHTML = corpo
+    + (r.observacoes ? `<div class="bio-detvis-obs">${esc(r.observacoes)}</div>` : '')
 }
 
 // Busca no servidor os eventos (transferência, visita, berçário, soltura)
@@ -54,7 +119,7 @@ async function bioBuscarEventosServidor(sb, ninhos) {
         .select('ninho_id,data_transferencia,hora_transferencia,praia_destino_nome,local_destino')
         .in('ninho_id', serverIds),
       sb.from('visitas_ninho')
-        .select('ninho_id,data_visita,hora_visita,status_ninho,temperatura_substrato_c,temperatura_ar_c,ovos_predados_n,ovos_perdidos_alagamento,ovos_perdidos_erosao,ovos_perdidos_humana')
+        .select('ninho_id,data_visita,hora_visita,status_ninho,temperatura_substrato_c,temperatura_ar_c,umidade,predacao_incubacao,ovos_predados_n,ovos_perdidos_alagamento,ovos_perdidos_erosao,ovos_perdidos_humana,causa_destruicao,sinal_alagamento,intervencao,observacoes')
         .in('ninho_id', serverIds),
       sb.from('lotes_bercario')
         .select('ninho_id,data_entrada,hora_entrada,qtd_entrada,bercario_nome')
@@ -159,11 +224,18 @@ function bioTimelineHtml(evs) {
     const delta = ev.delta > 0 ? `<span class="bio-nfc-hist-delta">−${ev.delta}</span>` : ''
     const saldo = ev.saldo != null
       ? `<span class="bio-nfc-hist-saldo">${ev.saldo}<i>viáveis</i></span>` : ''
+    let detBtn = ''
+    if (ev.tipo === 'visita' && ev.detalhe) {
+      const id = ++_bioDetVisSeq
+      BioDetalhesVisita[id] = ev.detalhe
+      detBtn = `<button class="bio-nfc-hist-det" data-nh-detalhe="${id}" type="button">Detalhes</button>`
+    }
     return `
     <div class="bio-nfc-hist-ev ev-${cls}">
       <div class="bio-nfc-hist-dot"></div>
       <span class="bio-nfc-hist-data">${fd(ev.data)}</span>
       <span class="bio-nfc-hist-txt">${esc(ev.txt)}${delta}</span>
+      ${detBtn}
       ${saldo}
     </div>`
   }).join('')
@@ -174,7 +246,8 @@ function bioTimelineHtml(evs) {
   <div class="bio-nfc-hist" data-nh-hist>${rows}</div>`
 }
 
-// Liga os toggles "N eventos" de todos os cards dentro de `container`.
+// Liga os toggles "N eventos" e os botões "Detalhes" de todos os cards
+// dentro de `container`.
 function bioLigarTogglesHistorico(container) {
   container.querySelectorAll('[data-nh-toggle]').forEach(btn => {
     if (btn._nhLigado) return
@@ -186,6 +259,14 @@ function bioLigarTogglesHistorico(container) {
       if (!hist) return
       const vis = hist.classList.toggle('vis')
       btn.classList.toggle('aberto', vis)
+    })
+  })
+  container.querySelectorAll('[data-nh-detalhe]').forEach(btn => {
+    if (btn._nhLigado) return
+    btn._nhLigado = true
+    btn.addEventListener('click', e => {
+      e.stopPropagation()
+      bioAbrirDetalhesVisita(btn.dataset.nhDetalhe)
     })
   })
 }
