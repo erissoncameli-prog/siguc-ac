@@ -816,6 +816,13 @@
     grafDestino(k)
     grafBercMortalidade(_bercMortalidade)
     grafBercCrescimento(_bercCrescimento)
+    grafSoltosEspecie(d.bercario_soltos_por_especie || [], 'graf-soltos-esp')
+    grafTaxaSoltura(d.taxa_soltura_por_bercario || [], 'graf-taxa-solt-berc', t => t.bercario_nome || '—')
+    grafTaxaSoltura(d.taxa_soltura_por_especie || [], 'graf-taxa-solt-esp', t => espLabel(t.especie))
+    grafCrescEspecie(d.crescimento_por_especie || [], 'graf-cresc-comp', 'comp_medio', 'cm')
+    grafCrescEspecie(d.crescimento_por_especie || [], 'graf-cresc-peso', 'peso_medio', 'g')
+    grafGanhoBerc(d.ganho_por_bercario || [], 'graf-ganho-comp', 'delta_comp', 'n_comp', 'cm')
+    grafGanhoBerc(d.ganho_por_bercario || [], 'graf-ganho-peso', 'delta_peso', 'n_peso', 'g')
     renderTabelaPraias(d.por_praia || [])
     renderTabelaUCs(d.por_uc || [])
   }
@@ -1077,8 +1084,57 @@
           ${_bercCrescimento.length ? `<div class="rel-chart-wrap"><canvas id="graf-berc-crescimento"></canvas></div>` : `<p style="color:var(--cinza-500);font-size:.8rem;padding:20px 0;text-align:center">Sem biometria registrada para os filtros selecionados.</p>`}
         </div>
       </div>
+
+      <!-- ── Soltura e crescimento POR ESPÉCIE ─────────────────── -->
+      <div style="margin:18px 0 10px;font-weight:600;font-size:.95rem;color:var(--floresta,#0A1A0F)">Soltura e crescimento por espécie</div>
+      <div class="rel-charts-row triple">
+        <div class="rel-chart-card">
+          <p class="rel-chart-title">Filhotes Soltos por Espécie</p>
+          <p class="rel-chart-sub">Via berçário e direto no rio</p>
+          ${_arr('bercario_soltos_por_especie') ? `<div class="rel-chart-wrap short"><canvas id="graf-soltos-esp"></canvas></div>` : _vazio('Nenhuma soltura registrada.')}
+        </div>
+        <div class="rel-chart-card">
+          <p class="rel-chart-title">Taxa de Soltura por Berçário</p>
+          <p class="rel-chart-sub">Soltos ÷ entrados (%) · cor = espécie</p>
+          ${_arr('taxa_soltura_por_bercario') ? `<div class="rel-chart-wrap short"><canvas id="graf-taxa-solt-berc"></canvas></div>` : _vazio('Nenhum lote em berçário.')}
+        </div>
+        <div class="rel-chart-card">
+          <p class="rel-chart-title">Taxa de Soltura por Espécie</p>
+          <p class="rel-chart-sub">Consolidada de todos os berçários (%)</p>
+          ${_arr('taxa_soltura_por_especie') ? `<div class="rel-chart-wrap short"><canvas id="graf-taxa-solt-esp"></canvas></div>` : _vazio('Nenhum lote em berçário.')}
+        </div>
+      </div>
+      <div class="rel-charts-row">
+        <div class="rel-chart-card">
+          <p class="rel-chart-title">Crescimento — Comprimento por Espécie</p>
+          <p class="rel-chart-sub">Comprimento médio (cm) ao longo do tempo</p>
+          ${_arr('crescimento_por_especie') ? `<div class="rel-chart-wrap"><canvas id="graf-cresc-comp"></canvas></div>` : _vazio('Sem biometria registrada.')}
+        </div>
+        <div class="rel-chart-card">
+          <p class="rel-chart-title">Crescimento — Peso por Espécie</p>
+          <p class="rel-chart-sub">Peso médio (g) ao longo do tempo</p>
+          ${_arr('crescimento_por_especie') ? `<div class="rel-chart-wrap"><canvas id="graf-cresc-peso"></canvas></div>` : _vazio('Sem biometria registrada.')}
+        </div>
+      </div>
+      <div class="rel-charts-row">
+        <div class="rel-chart-card">
+          <p class="rel-chart-title">Ganho de Comprimento por Berçário</p>
+          <p class="rel-chart-sub">Δ comprimento (cm), média por filhote · cor = espécie</p>
+          ${_ganho('n_comp') ? `<div class="rel-chart-wrap"><canvas id="graf-ganho-comp"></canvas></div>` : _vazio('Faça 2+ medições do mesmo filhote para ver o ganho.')}
+        </div>
+        <div class="rel-chart-card">
+          <p class="rel-chart-title">Ganho de Peso por Berçário</p>
+          <p class="rel-chart-sub">Δ peso (g), média por filhote · cor = espécie</p>
+          ${_ganho('n_peso') ? `<div class="rel-chart-wrap"><canvas id="graf-ganho-peso"></canvas></div>` : _vazio('Faça 2+ medições do mesmo filhote para ver o ganho.')}
+        </div>
+      </div>
     </div>`
   }
+
+  // Helpers de estado vazio para os gráficos por espécie (leem _dados).
+  function _arr(chave) { return (_dados && Array.isArray(_dados[chave]) && _dados[chave].length) }
+  function _ganho(campo) { return (_dados?.ganho_por_bercario || []).some(g => (g[campo] || 0) > 0) }
+  function _vazio(msg) { return `<p style="color:var(--cinza-500);font-size:.8rem;padding:20px 0;text-align:center">${msg}</p>` }
 
   // ── Seção: Monitores ─────────────────────────────────────────────
   function htmlSecMonitores(mon) {
@@ -1446,6 +1502,108 @@
     })
   }
 
+  // ── Soltura e crescimento por espécie (web: painel + detalhado) ──
+  function grafSoltosEspecie(arr, canvasId) {
+    if (!arr || !arr.length) return
+    mkChart(canvasId || 'graf-soltos-esp', {
+      type:'bar',
+      data:{
+        labels: arr.map(s => espLabel(s.especie)),
+        datasets:[
+          { label:'Via berçário', data: arr.map(s => s.via_bercario || 0), backgroundColor:'#2A9D6F', borderRadius:4 },
+          { label:'Direto no rio', data: arr.map(s => s.direto_rio || 0), backgroundColor:'#1A6B8C', borderRadius:4 },
+        ]
+      },
+      options:{
+        indexAxis:'y', responsive:true, maintainAspectRatio:false, animation:{duration:600},
+        plugins:{ legend:{...legendOpts, position:'bottom'} },
+        scales:{
+          x:{ stacked:true, beginAtZero:true, grid:{color:gridColor}, ticks:{color:'#6B7280', font:tickFont} },
+          y:{ stacked:true, grid:{display:false}, ticks:{color:'#6B7280', font:tickFont} }
+        }
+      }
+    })
+  }
+
+  // Barra horizontal de taxa (%) colorida por espécie. `rotulo` escolhe
+  // o label do eixo (nome do berçário ou da espécie).
+  function grafTaxaSoltura(arr, canvasId, rotulo) {
+    if (!arr || !arr.length) return
+    mkChart(canvasId, {
+      type:'bar',
+      data:{
+        labels: arr.map(rotulo),
+        datasets:[{ data: arr.map(t => t.taxa_pct || 0), backgroundColor: arr.map(t => espCor(t.especie)), borderRadius:4 }]
+      },
+      options:{
+        indexAxis:'y', responsive:true, maintainAspectRatio:false, animation:{duration:500},
+        plugins:{ legend:{display:false}, tooltip:{ callbacks:{ label(ctx){
+          const t = arr[ctx.dataIndex]
+          return ` ${espLabel(t.especie)}: ${t.taxa_pct ?? 0}% (${t.soltos}/${t.entrada})`
+        } } } },
+        scales:{
+          x:{ beginAtZero:true, suggestedMax:100, grid:{color:gridColor}, ticks:{color:'#6B7280', font:tickFont}, title:{display:true,text:'%',color:'#9CA3AF',font:{size:9}} },
+          y:{ grid:{display:false}, ticks:{color:'#6B7280', font:tickFont} }
+        }
+      }
+    })
+  }
+
+  // Curva de crescimento: uma linha por espécie num eixo X de datas
+  // compartilhado (comp_medio ou peso_medio). Escalas cm e g nunca
+  // dividem o mesmo eixo — por isso comprimento e peso são gráficos
+  // separados.
+  function grafCrescEspecie(arr, canvasId, campo, unidade) {
+    const pts = (arr || []).filter(s => s[campo] != null)
+    if (!pts.length) return
+    const datas = [...new Set(pts.map(s => s.data))].sort()
+    const especies = [...new Set(pts.map(s => s.especie))]
+    mkChart(canvasId, {
+      type:'line',
+      data:{
+        labels: datas,
+        datasets: especies.map(esp => ({
+          label: espLabel(esp),
+          data: datas.map(dt => pts.find(s => s.especie === esp && s.data === dt)?.[campo] ?? null),
+          borderColor: espCor(esp), backgroundColor: espCor(esp),
+          borderWidth:2, tension:.35, pointRadius:3, spanGaps:true
+        }))
+      },
+      options:{
+        responsive:true, maintainAspectRatio:false, animation:{duration:600},
+        plugins:{ legend:legendOpts },
+        scales:{
+          x:{ grid:{display:false}, ticks:{color:'#6B7280', font:tickFont} },
+          y:{ grid:{color:gridColor}, ticks:{color:'#6B7280', font:tickFont}, beginAtZero:true, title:{display:true,text:unidade,color:'#9CA3AF',font:{size:9}} }
+        }
+      }
+    })
+  }
+
+  // Barra horizontal de ganho (Δ) por berçário, colorida por espécie.
+  function grafGanhoBerc(arr, canvasId, campo, campoN, unidade) {
+    const rows = (arr || []).filter(g => g[campo] != null && (g[campoN] || 0) > 0)
+    if (!rows.length) return
+    mkChart(canvasId, {
+      type:'bar',
+      data:{
+        labels: rows.map(g => g.bercario_nome || '—'),
+        datasets:[{ data: rows.map(g => g[campo]), backgroundColor: rows.map(g => espCor(g.especie)), borderRadius:4 }]
+      },
+      options:{
+        indexAxis:'y', responsive:true, maintainAspectRatio:false, animation:{duration:500},
+        plugins:{ legend:{display:false}, tooltip:{ callbacks:{ label(ctx){
+          const g = rows[ctx.dataIndex]
+          return ` ${espLabel(g.especie)}: +${g[campo]} ${unidade} (${g[campoN]} filhote${g[campoN] !== 1 ? 's' : ''})`
+        } } } },
+        scales:{
+          x:{ beginAtZero:true, grid:{color:gridColor}, ticks:{color:'#6B7280', font:tickFont}, title:{display:true,text:unidade,color:'#9CA3AF',font:{size:9}} },
+          y:{ grid:{display:false}, ticks:{color:'#6B7280', font:tickFont} }
+        }
+      }
+    })
+  }
+
   function grafOcorrencias(oc) {
     if (!oc.length) return
     const TIPOS = { alimentacao:'Alimentação', biometria:'Biometria', mortalidade:'Mortalidade', doenca:'Doença', tratamento:'Tratamento', observacao:'Observação' }
@@ -1621,6 +1779,8 @@
         <div class="painel-card"><h3>Perdas de ovos por causa</h3><p class="cap">Ovos baixados nas visitas/registro · por temporada/UC/praia.</p><div class="rel-chart-wrap"><canvas id="graf-p-perdas"></canvas></div></div>
         <div class="painel-card"><h3>Fenologia da temporada</h3><p class="cap">Ninhos encontrados e filhotes vivos por mês.</p><div class="rel-chart-wrap"><canvas id="graf-p-fenologia"></canvas></div></div>
         <div class="painel-card"><h3>Ovos por praia (top 8)</h3><p class="cap">Postura × viáveis × perdidos · por temporada/UC/praia.</p><div class="rel-chart-wrap tall"><canvas id="graf-p-ovospraia"></canvas></div></div>
+        <div class="painel-card"><h3>Taxa de soltura por espécie</h3><p class="cap">Filhotes soltos ÷ entrados no berçário (%).</p>${_arr('taxa_soltura_por_especie') ? `<div class="rel-chart-wrap"><canvas id="graf-p-taxa-solt"></canvas></div>` : _vazio('Nenhum lote em berçário nos filtros atuais.')}</div>
+        <div class="painel-card"><h3>Crescimento por espécie</h3><p class="cap">Comprimento médio (cm) dos filhotes no berçário ao longo do tempo.</p>${_arr('crescimento_por_especie') ? `<div class="rel-chart-wrap"><canvas id="graf-p-cresc"></canvas></div>` : _vazio('Sem biometria registrada nos filtros atuais.')}</div>
       </div>`
   }
 
@@ -1698,6 +1858,10 @@
         }
       })
     }
+
+    // Berçário por espécie — taxa de soltura e crescimento (comprimento)
+    grafTaxaSoltura(d.taxa_soltura_por_especie || [], 'graf-p-taxa-solt', t => espLabel(t.especie))
+    grafCrescEspecie(d.crescimento_por_especie || [], 'graf-p-cresc', 'comp_medio', 'cm')
   }
 
   // ═══════════════════════════════════════════════════════════════
