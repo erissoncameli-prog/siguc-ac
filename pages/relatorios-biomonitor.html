@@ -1253,9 +1253,9 @@
     mkChart('graf-status', {
       type:'doughnut',
       data:{
-        labels:['Encontrado','Transferido','Eclodido','Perdido'],
-        datasets:[{ data:[k.pendentes||0, k.transferidos||0, k.eclodidos||0, k.perdidos||0],
-          backgroundColor:['#7ECEE8','#C9A84C','#2A9D6F','#ef4444'], borderWidth:2, borderColor:'rgba(0,0,0,.15)', hoverOffset:8 }]
+        labels:['Encontrado','Transferido','Eclodido','Em berçário','Soltado','Perdido'],
+        datasets:[{ data:[k.pendentes||0, k.transferidos||0, k.eclodidos_status||0, k.em_bercario||0, k.soltados||0, k.perdidos||0],
+          backgroundColor:['#7ECEE8','#C9A84C','#2A9D6F','#8b5cf6','#1A6B8C','#ef4444'], borderWidth:2, borderColor:'rgba(0,0,0,.15)', hoverOffset:8 }]
       },
       options:{ cutout:'58%', responsive:true, maintainAspectRatio:false, plugins:{ legend:{...legendOpts, position:'right'} }, animation:{duration:600} }
     })
@@ -1632,9 +1632,9 @@
     mkChart('graf-p-desfecho', {
       type:'doughnut',
       data:{
-        labels:['Eclodido','Transferido','Encontrado','Perdido'],
-        datasets:[{ data:[k.eclodidos||0, k.transferidos||0, k.pendentes||0, k.perdidos||0],
-          backgroundColor:['#2A9D6F','#1A6B8C','#C9A84C','#ef4444'], borderWidth:2, borderColor:'rgba(0,0,0,.15)', hoverOffset:8 }]
+        labels:['Eclodido','Em berçário','Soltado','Transferido','Encontrado','Perdido'],
+        datasets:[{ data:[k.eclodidos_status||0, k.em_bercario||0, k.soltados||0, k.transferidos||0, k.pendentes||0, k.perdidos||0],
+          backgroundColor:['#2A9D6F','#8b5cf6','#7ECEE8','#1A6B8C','#C9A84C','#ef4444'], borderWidth:2, borderColor:'rgba(0,0,0,.15)', hoverOffset:8 }]
       },
       options:{ cutout:'58%', responsive:true, maintainAspectRatio:false, plugins:{ legend:{...legendOpts, position:'right'} }, animation:{duration:600} }
     })
@@ -1720,7 +1720,8 @@
 
     const chipsStatus = [
       ['encontrado','Encontrado'],['transferido','Transferido'],
-      ['eclodido','Eclodido'],['perdido','Perdido']
+      ['eclodido','Eclodido'],['em_bercario','Em berçário'],
+      ['soltado','Soltado'],['perdido','Perdido']
     ].map(([v,l]) =>
       `<span class="mapa-chip" data-status="${v}" onclick="mapaToggleChip(this,'status')">${l}</span>`
     ).join('')
@@ -1809,7 +1810,8 @@
     jabuti_piranga:'#8b5cf6', mucua:'#ec4899', outro:'#9CA3AF'
   }
   const STATUS_MAPA_COR = {
-    encontrado:'#7ECEE8', transferido:'#C9A84C', eclodido:'#2A9D6F', perdido:'#ef4444'
+    encontrado:'#7ECEE8', transferido:'#C9A84C', eclodido:'#2A9D6F',
+    em_bercario:'#8b5cf6', soltado:'#1A6B8C', perdido:'#ef4444'
   }
   const ESP_MAPA_LABEL = {
     tracaja:'Tracajá', tartaruga:'Tartaruga', cabecudo:'Cabeçudo',
