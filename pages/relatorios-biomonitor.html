@@ -1228,9 +1228,9 @@
       data:{
         labels:['Filhotes vivos','Filhotes mortos','Ovos não nascidos','Descartados'],
         datasets:[{ data:[k.total_filhotes_vivos||0,k.total_filhotes_mortos||0,k.total_ovos_nao_nascidos||0,k.total_ovos_descartados||0],
-          backgroundColor:['#2A9D6F','#ef4444','#D97706','#6b7280'], borderWidth:2, borderColor:'rgba(0,0,0,.3)', hoverOffset:8 }]
+          backgroundColor:['#2A9D6F','#ef4444','#D97706','#6b7280'], borderWidth:2, borderColor:'rgba(0,0,0,.15)', hoverOffset:8 }]
       },
-      options:{ cutout:'60%', plugins:{ legend:{...legendOpts, position:'bottom'} }, animation:{duration:600} }
+      options:{ cutout:'58%', responsive:true, maintainAspectRatio:false, plugins:{ legend:{...legendOpts, position:'right'} }, animation:{duration:600} }
     })
   }
 
@@ -1240,9 +1240,9 @@
       data:{
         labels:['Encontrado','Transferido','Eclodido','Perdido'],
         datasets:[{ data:[k.pendentes||0, k.transferidos||0, k.eclodidos||0, k.perdidos||0],
-          backgroundColor:['#7ECEE8','#C9A84C','#2A9D6F','#ef4444'], borderWidth:2, borderColor:'rgba(0,0,0,.3)', hoverOffset:8 }]
+          backgroundColor:['#7ECEE8','#C9A84C','#2A9D6F','#ef4444'], borderWidth:2, borderColor:'rgba(0,0,0,.15)', hoverOffset:8 }]
       },
-      options:{ cutout:'60%', plugins:{ legend:{...legendOpts, position:'bottom'} }, animation:{duration:600} }
+      options:{ cutout:'58%', responsive:true, maintainAspectRatio:false, plugins:{ legend:{...legendOpts, position:'right'} }, animation:{duration:600} }
     })
   }
 
