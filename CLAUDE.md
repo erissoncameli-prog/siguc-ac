@@ -40,6 +40,17 @@ Sistema já tem login, sidebar, layout e páginas funcionando.
   o Brigadas; build via app-biomonitor/scripts/build-www.mjs —
   ver docs/app-biomonitor.md; alterações sempre nos arquivos web)
 
+## Biomonitor — notas técnicas
+- praias_monitoramento.grupo_id (152): vínculo explícito praia → grupo
+  de monitoramento (antes só indireto via monitor_responsavel_id).
+  Base das métricas "por grupo" (nº de praias, área, extensão).
+- "Extensão monitorada" (km) = soma do comprimento_m das praias ativas
+  do grupo — mesmo critério já usado em "ninhos/km" nos relatórios.
+  É uma aproximação (faixa de praia, não o curso real do rio).
+  Medir o curso real exigiria importar uma base de hidrografia do
+  Acre (não temos isso em data/ hoje) — pendente, sem fonte de dados
+  disponível neste ambiente (rede bloqueada por política de proxy).
+
 ## Design system (nunca alterar variáveis sem alinhamento)
 --floresta:#0A1A0F | --verde-c:#52B788 | --ouro:#C9A84C | --ouro-c:#F0CB6A
 --t1:#F4EFE6 | Fontes: Fraunces (títulos) + DM Sans (UI)

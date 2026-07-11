@@ -288,8 +288,14 @@
           Definido por <strong>temporada</strong> — configure em <strong>Temporadas → Configurar praias</strong> (período e meta por ano).
         </div>
       </div>
-      <div class="form-group"><label class="form-label">Monitor responsável</label>
-        <select class="form-control" id="mpr-monitor"><option value="">Nenhum</option></select>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Grupo de monitoramento</label>
+          <select class="form-control" id="mpr-grupo"><option value="">Nenhum</option></select>
+          <small class="form-hint">Usado para consolidar nº de praias, área e extensão monitorada por grupo.</small>
+        </div>
+        <div class="form-group"><label class="form-label">Monitor responsável</label>
+          <select class="form-control" id="mpr-monitor"><option value="">Nenhum</option></select>
+        </div>
       </div>
       <div class="form-group"><label class="form-label">Observações</label>
         <textarea class="form-control" id="mpr-obs" rows="2"></textarea>
@@ -487,6 +493,11 @@
 
       <!-- ABA: Praias -->
       <div id="aba-praias" style="display:none">
+        <div class="kpi-grid" id="kpi-praias">
+          <div class="kpi-card"><div class="kpi-label">Praias ativas</div><div class="kpi-valor" id="kpi-pr-total">—</div><div class="kpi-sub">Cadastradas no sistema</div></div>
+          <div class="kpi-card ouro"><div class="kpi-label">Área total</div><div class="kpi-valor" id="kpi-pr-area">—</div><div class="kpi-sub">m² de faixa de praia</div></div>
+          <div class="kpi-card azul"><div class="kpi-label">Extensão monitorada</div><div class="kpi-valor" id="kpi-pr-km">—</div><div class="kpi-sub">Soma do comprimento das praias ativas</div></div>
+        </div>
         <div class="filter-bar">
           <input class="form-control search-input" id="busca-praias" placeholder="Buscar praia..." oninput="filtrarPraias()">
           <select class="form-control" id="fil-prog-praia" style="width:200px" onchange="filtrarPraias()">
@@ -501,6 +512,18 @@
           <table><thead><tr>
             <th>Código</th><th>Nome</th><th>Localização</th><th>Programa</th><th>Comprimento</th><th>Área</th><th>Status</th><th></th>
           </tr></thead><tbody id="tbody-praias"><tr><td colspan="8" class="empty-row">Carregando...</td></tr></tbody></table>
+        </div></div></div>
+
+        <h3 style="margin:24px 0 8px;font-size:1rem">Por grupo de monitoramento</h3>
+        <p style="margin:0 0 12px;font-size:.82rem;color:var(--t2,#888);max-width:760px">
+          Nº de praias, área e extensão monitorada (soma do comprimento das praias ativas) somados por grupo.
+          Praias sem grupo definido aparecem à parte.
+        </p>
+        <div class="card"><div class="table-wrap"><div class="table-scroll">
+          <table><thead><tr>
+            <th>Grupo</th><th>UC</th><th style="text-align:right">Praias ativas</th>
+            <th style="text-align:right">Área (m²)</th><th style="text-align:right">Extensão (km)</th>
+          </tr></thead><tbody id="tbody-praias-grupo"><tr><td colspan="5" class="empty-row">Carregando...</td></tr></tbody></table>
         </div></div></div>
       </div>
 
@@ -686,6 +709,9 @@
     const filGrupo = document.getElementById('fil-grupo-mon')
     if (filGrupo) filGrupo.innerHTML = `<option value="">Todos os grupos</option>` + grupoOpts
 
+    const mprGrupo = document.getElementById('mpr-grupo')
+    if (mprGrupo) mprGrupo.innerHTML = `<option value="">Nenhum</option>` + grupoOpts
+
     const mprMon = document.getElementById('mpr-monitor')
     if (mprMon) mprMon.innerHTML = `<option value="">Nenhum</option>` + monOpts
 
@@ -753,7 +779,42 @@
     </tr>`).join('')
   }
 
+  function renderPraiasResumo() {
+    const ativas = _praias.filter(p => p.ativa)
+    const areaM2Total = ativas.reduce((s, p) => s + (p.area_m2 || 0), 0)
+    const extM = ativas.reduce((s, p) => s + (p.comprimento_m || 0), 0)
+    const elTotal = document.getElementById('kpi-pr-total')
+    const elArea  = document.getElementById('kpi-pr-area')
+    const elKm    = document.getElementById('kpi-pr-km')
+    if (elTotal) elTotal.textContent = String(ativas.length)
+    if (elArea)  elArea.textContent  = formatNum(areaM2Total, 0)
+    if (elKm)    elKm.textContent    = formatNum(extM / 1000, 2) + ' km'
+
+    const porGrupo = {}
+    ativas.forEach(p => {
+      const key = p.grupo_id || '__sem_grupo__'
+      if (!porGrupo[key]) porGrupo[key] = { nome: p.grupo_nome || 'Sem grupo definido', uc: p.uc_nome, praias: 0, areaM2: 0, extM: 0 }
+      porGrupo[key].praias++
+      porGrupo[key].areaM2 += p.area_m2 || 0
+      porGrupo[key].extM   += p.comprimento_m || 0
+    })
+    const linhas = Object.values(porGrupo).sort((a, b) => b.extM - a.extM)
+    const tbodyG = document.getElementById('tbody-praias-grupo')
+    if (tbodyG) {
+      tbodyG.innerHTML = linhas.length
+        ? linhas.map(g => `<tr>
+            <td><strong>${esc(g.nome)}</strong></td>
+            <td>${esc(g.uc || '—')}</td>
+            <td style="text-align:right">${g.praias}</td>
+            <td style="text-align:right">${formatNum(g.areaM2, 0)}</td>
+            <td style="text-align:right">${formatNum(g.extM / 1000, 2)}</td>
+          </tr>`).join('')
+        : `<tr><td colspan="5" class="empty-row">Nenhuma praia ativa cadastrada.</td></tr>`
+    }
+  }
+
   function renderPraias() {
+    renderPraiasResumo()
     const busca  = document.getElementById('busca-praias')?.value.toLowerCase() || ''
     const prog   = document.getElementById('fil-prog-praia')?.value || ''
     const lista  = _praias.filter(p =>
@@ -1434,6 +1495,7 @@
     document.getElementById('mpr-rio').value             = p?.rio || ''
     document.getElementById('mpr-lat').value             = p?.lat || ''
     document.getElementById('mpr-lng').value             = p?.lng || ''
+    document.getElementById('mpr-grupo').value           = p?.grupo_id || ''
     document.getElementById('mpr-monitor').value         = p?.monitor_responsavel_id || ''
     document.getElementById('mpr-obs').value             = p?.observacoes || ''
     document.getElementById('mpr-ativa').checked         = p ? p.ativa : true
@@ -1460,6 +1522,7 @@
       comunidade:             document.getElementById('mpr-comunidade').value.trim() || null,
       rio:                    document.getElementById('mpr-rio').value.trim() || null,
       ponto_acesso:           (!isNaN(lat) && !isNaN(lng)) ? `POINT(${lng} ${lat})` : null,
+      grupo_id:               document.getElementById('mpr-grupo').value || null,
       monitor_responsavel_id: document.getElementById('mpr-monitor').value || null,
       observacoes:            document.getElementById('mpr-obs').value.trim() || null,
       ativa:                  document.getElementById('mpr-ativa').checked,
