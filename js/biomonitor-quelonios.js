@@ -3623,6 +3623,7 @@ function bioNinhoCardInner(n, opts = {}) {
       ${['encontrado', 'transferido'].includes(status) ? `<button class="bio-btn-sm ghost" data-acao="eclosao">Eclosão</button>` : ''}
       ${status === 'eclodido' ? `<button class="bio-btn-sm prim" data-acao="soltar">Soltar</button>` : ''}
       ${status !== 'perdido' ? `<button class="bio-btn-sm ghost" data-acao="visita">Visita</button>` : ''}
+      <button class="bio-btn-sm ghost" data-acao="pdf" ${navigator.onLine ? '' : 'disabled title="Requer conexão"'}>Gerar PDF</button>
     </div>` : ''
 
   const histHtml = bioTimelineHtml(n._eventos)
@@ -3672,6 +3673,7 @@ function bioRenderizarListaNinhos(containerId, ninhos, mostrarAcoes) {
         if (btn.dataset.acao === 'eclosao')       bioAbrirFormEclosao(n)
         if (btn.dataset.acao === 'visita')        bioAbrirFormVisita(n)
         if (btn.dataset.acao === 'soltar')        bioAbrirTelaDestino(n, null)
+        if (btn.dataset.acao === 'pdf')           bioGerarPDFCampo(n)
       })
     })
     card.querySelectorAll('[data-nh-toggle]').forEach(btn => {
