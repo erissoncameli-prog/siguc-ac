@@ -2467,6 +2467,11 @@ async function bioAbrirDetalheBercario(grupo) {
   if (el('bio-det-qtd'))        el('bio-det-qtd').textContent        = totalEntrada
   if (el('bio-det-dias'))       el('bio-det-dias').textContent       = todosLotes.length
 
+  // "Soltar Berçário" só faz sentido enquanto houver lote ativo — um
+  // berçário já totalmente solto não tem mais nada pra soltar.
+  const btnSoltar = el('bio-btn-soltar-lote')
+  if (btnSoltar) btnSoltar.hidden = !todosLotes.some(l => l.status === 'ativo')
+
   const mortesPorLote = await Promise.all(grupo.lotes.map(l => bioMortesCanonicasDoLote(l)))
   const mortesTotal = mortesPorLote.reduce((s, m) => s + m, 0)
   const wrap = el('bio-det-vivos-wrap')
