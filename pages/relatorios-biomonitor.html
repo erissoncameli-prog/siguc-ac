@@ -542,7 +542,7 @@
     db.from('temporadas_biomonitor').select('id,nome,is_atual').order('ano_base', { ascending: false }),
     db.from('programas_biomonitoramento').select('id,nome').eq('ativo', true),
     db.from('unidades_conservacao').select('id,nome,sigla').order('nome'),
-    db.from('praias_monitoramento').select('id,nome,uc_id,tipo_localizacao').eq('ativa', true).order('nome'),
+    db.from('vw_praias_biomonitor').select('id,nome,uc_id,uc_nome,tipo_localizacao,grupo_id,grupo_nome,area_m2,comprimento_m').eq('ativa', true).order('nome'),
   ])
 
   _praias_todas = praias || []
@@ -1707,6 +1707,22 @@
     ].filter(b => b.rows.length)
   }
 
+  // Praias, área e extensão monitorada (soma do comprimento das praias
+  // ativas) somadas por grupo de monitoramento — respeita o filtro de UC.
+  function painelPraiasPorGrupo() {
+    const ucId = sel('fil-uc').value
+    const base = ucId ? _praias_todas.filter(p => p.uc_id === ucId) : _praias_todas
+    const porGrupo = {}
+    base.forEach(p => {
+      const key = p.grupo_id || '__sem_grupo__'
+      if (!porGrupo[key]) porGrupo[key] = { nome: p.grupo_nome || 'Sem grupo definido', uc: p.uc_nome, praias: 0, areaM2: 0, extM: 0 }
+      porGrupo[key].praias++
+      porGrupo[key].areaM2 += p.area_m2 || 0
+      porGrupo[key].extM   += p.comprimento_m || 0
+    })
+    return Object.values(porGrupo).sort((a, b) => b.extM - a.extM)
+  }
+
   function painelKpi(lbl, val, cor, sub) {
     return `<div class="painel-kpi" style="--kpi-cor:${cor}">
       <div class="painel-kpi-val">${val}</div>
@@ -1760,6 +1776,25 @@
           <div><div class="pa-t">Sem eclosões previstas para os próximos 7 dias</div><div class="pa-d">Nenhum ninho em incubação com previsão nesta janela</div></div>
           <span class="pa-tag" style="background:#9CA3AF;color:#fff">—</span></div>`
 
+    // Praias por grupo de monitoramento
+    const gruposPraia = painelPraiasPorGrupo()
+    const praiasGrupoHtml = gruposPraia.length
+      ? `<div class="rel-table-wrap"><table class="rel-table"><thead><tr>
+          <th>Grupo</th><th>UC</th>
+          <th style="text-align:right">Praias ativas</th>
+          <th style="text-align:right">Área (m²)</th>
+          <th style="text-align:right">Extensão (km)</th>
+        </tr></thead><tbody>
+          ${gruposPraia.map(g => `<tr>
+            <td><strong>${esc(g.nome)}</strong></td>
+            <td>${esc(g.uc || '—')}</td>
+            <td style="text-align:right">${g.praias}</td>
+            <td style="text-align:right">${formatNum(g.areaM2, 0)}</td>
+            <td style="text-align:right">${formatNum(g.extM / 1000, 2)}</td>
+          </tr>`).join('')}
+        </tbody></table></div>`
+      : _vazio('Nenhuma praia ativa nos filtros atuais.')
+
     document.getElementById('painel-conteudo').innerHTML = `
       ${kpis}
       <div class="painel-grid">
@@ -1773,6 +1808,11 @@
           <p class="cap">Previsão por espécie (data de encontro + incubação média).</p>
           <div class="painel-alertas">${eclHtml}</div>
         </div>
+      </div>
+      <div class="painel-card" style="margin-bottom:16px">
+        <h3>Praias por grupo de monitoramento</h3>
+        <p class="cap">Nº de praias, área e extensão monitorada (soma do comprimento das praias ativas) · respeita o filtro de UC.</p>
+        ${praiasGrupoHtml}
       </div>
       <div class="painel-charts">
         <div class="painel-card"><h3>Desfecho dos ninhos</h3><p class="cap">Distribuição por status.</p><div class="rel-chart-wrap"><canvas id="graf-p-desfecho"></canvas></div></div>
