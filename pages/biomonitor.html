@@ -1765,6 +1765,9 @@
           <strong id="bio-kpi-berc-soltado">—</strong><span>Soltados</span>
         </div>
         <div class="bio-kpi2">
+          <strong id="bio-kpi-berc-taxasolt" style="color:var(--bio-prim)">—</strong><span>Taxa soltura</span>
+        </div>
+        <div class="bio-kpi2">
           <strong id="bio-kpi-berc-mortos" style="color:var(--bio-perigo)">—</strong><span>Mortos</span>
         </div>
       </div>
@@ -1775,17 +1778,59 @@
         <div class="bio-chart-wrap"><canvas id="chart-destino"></canvas></div>
       </div>
 
+      <!-- Barras empilhadas: filhotes soltos por espécie -->
+      <div class="bio-chart-card" id="card-soltos-esp">
+        <p class="bio-chart-title">Filhotes Soltos por Espécie</p>
+        <p style="font-size:11px;color:#9CA3AF;margin:-4px 0 8px">Via berçário e direto no rio</p>
+        <div class="bio-chart-wrap"><canvas id="chart-soltos-esp"></canvas></div>
+      </div>
+
+      <!-- Barras horizontais: taxa de soltura por berçário -->
+      <div class="bio-chart-card" id="card-taxa-solt-berc">
+        <p class="bio-chart-title">Taxa de Soltura por Berçário</p>
+        <p style="font-size:11px;color:#9CA3AF;margin:-4px 0 8px">Soltos ÷ entrados (%) · cor = espécie</p>
+        <div class="bio-chart-wrap"><canvas id="chart-taxa-solt-berc"></canvas></div>
+      </div>
+
+      <!-- Barras horizontais: taxa de soltura por espécie -->
+      <div class="bio-chart-card" id="card-taxa-solt-esp">
+        <p class="bio-chart-title">Taxa de Soltura por Espécie</p>
+        <p style="font-size:11px;color:#9CA3AF;margin:-4px 0 8px">Consolidada de todos os berçários (%)</p>
+        <div class="bio-chart-wrap"><canvas id="chart-taxa-solt-esp"></canvas></div>
+      </div>
+
+      <!-- Linha: crescimento em comprimento por espécie -->
+      <div class="bio-chart-card" id="card-cresc-comp">
+        <p class="bio-chart-title">Crescimento — Comprimento por Espécie</p>
+        <p style="font-size:11px;color:#9CA3AF;margin:-4px 0 8px">Comprimento médio (cm) ao longo do tempo</p>
+        <div class="bio-chart-wrap" style="height:200px"><canvas id="chart-cresc-comp"></canvas></div>
+      </div>
+
+      <!-- Linha: crescimento em peso por espécie -->
+      <div class="bio-chart-card" id="card-cresc-peso">
+        <p class="bio-chart-title">Crescimento — Peso por Espécie</p>
+        <p style="font-size:11px;color:#9CA3AF;margin:-4px 0 8px">Peso médio (g) ao longo do tempo</p>
+        <div class="bio-chart-wrap" style="height:200px"><canvas id="chart-cresc-peso"></canvas></div>
+      </div>
+
+      <!-- Barras: ganho de comprimento por berçário -->
+      <div class="bio-chart-card" id="card-ganho-comp">
+        <p class="bio-chart-title">Ganho de Comprimento por Berçário</p>
+        <p style="font-size:11px;color:#9CA3AF;margin:-4px 0 8px">Δ comprimento (cm), média por filhote · cor = espécie</p>
+        <div class="bio-chart-wrap"><canvas id="chart-ganho-comp"></canvas></div>
+      </div>
+
+      <!-- Barras: ganho de peso por berçário -->
+      <div class="bio-chart-card" id="card-ganho-peso">
+        <p class="bio-chart-title">Ganho de Peso por Berçário</p>
+        <p style="font-size:11px;color:#9CA3AF;margin:-4px 0 8px">Δ peso (g), média por filhote · cor = espécie</p>
+        <div class="bio-chart-wrap"><canvas id="chart-ganho-peso"></canvas></div>
+      </div>
+
       <!-- Barras: ocorrências por tipo -->
       <div class="bio-chart-card">
         <p class="bio-chart-title">Ocorrências no Berçário</p>
         <div class="bio-chart-wrap"><canvas id="chart-ocorrencias"></canvas></div>
-      </div>
-
-      <!-- Linha: biometria -->
-      <div class="bio-chart-card">
-        <p class="bio-chart-title">Biometria ao Longo do Tempo</p>
-        <p style="font-size:11px;color:#9CA3AF;margin:-4px 0 8px">Comprimento (cm) e peso médio (g)</p>
-        <div class="bio-chart-wrap" style="height:200px"><canvas id="chart-biometria"></canvas></div>
       </div>
 
     </div>

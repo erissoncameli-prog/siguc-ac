@@ -3740,6 +3740,64 @@ function _bioSetRate(elId, barId, pct) {
   if (bar) bar.style.width   = pct != null ? Math.min(Math.max(pct, 0), 100) + '%' : '0%'
 }
 
+// Cores categóricas por espécie (mesma identidade da página web de
+// relatórios — cor segue a espécie, ordem fixa, nunca cíclica).
+const BIO_ESP_COR = {
+  tracaja: '#2A9D6F', tartaruga: '#1A6B8C', cabecudo: '#C9A84C',
+  pitiU: '#7ECEE8', cupido: '#D97706', mucua: '#EC4899',
+  jabuti_pe_elefante: '#6366F1', jabuti_piranga: '#8B5CF6', outro: '#9CA3AF',
+}
+const bioEspCor  = id => BIO_ESP_COR[id] || '#9CA3AF'
+const bioEspNome = id => (BIO_ESPECIES.find(e => e.id === id)?.nome) || id || '—'
+
+// Estado vazio de um card de gráfico: esconde o canvas e mostra a msg.
+// Retorna true quando vazio (para o chamador dar early-return).
+function _bioChartVazio(cardId, vazio, msg) {
+  const card = document.getElementById(cardId)
+  if (!card) return vazio
+  const wrap = card.querySelector('.bio-chart-wrap')
+  let v = card.querySelector('.bio-chart-vazio')
+  if (vazio) {
+    if (wrap) wrap.style.display = 'none'
+    if (!v) {
+      v = document.createElement('p')
+      v.className = 'bio-chart-vazio'
+      v.style.cssText = 'font-size:12px;color:#9CA3AF;text-align:center;padding:24px 8px;margin:0'
+      card.appendChild(v)
+    }
+    v.textContent = msg
+    v.hidden = false
+  } else {
+    if (wrap) wrap.style.display = ''
+    if (v) v.hidden = true
+  }
+  return vazio
+}
+
+// Barra horizontal com cor por barra (cada categoria tem sua própria cor).
+function _bioBarsHCor(canvasId, labels, data, cores, Chart, opts = {}) {
+  const canvas = document.getElementById(canvasId)
+  if (!canvas) return
+  _bioCharts[canvasId]?.destroy()
+  _bioCharts[canvasId] = new Chart(canvas.getContext('2d'), {
+    type: 'bar',
+    data: { labels, datasets: [{ data, backgroundColor: cores, borderRadius: 4 }] },
+    options: {
+      indexAxis: 'y',
+      responsive: true, maintainAspectRatio: false,
+      animation: { duration: 600 },
+      plugins: {
+        legend: { display: false },
+        tooltip: opts.tooltip || {},
+      },
+      scales: {
+        x: { grid: { color: 'rgba(0,0,0,.06)' }, ticks: { font: { size: 11 } }, beginAtZero: true, suggestedMax: opts.max },
+        y: { grid: { display: false }, ticks: { font: { size: 11 } } }
+      }
+    }
+  })
+}
+
 function _bioDonut(canvasId, labels, data, cores, Chart) {
   const canvas = document.getElementById(canvasId)
   if (!canvas) return
@@ -3888,18 +3946,133 @@ function _bioRenderizarGraficos(d, Chart) {
     )
   }
 
-  // ── Biometria ao longo do tempo (linha dupla – Tab Berçário)
-  const bio = d.biometria_serie || []
-  if (bio.length) {
-    _bioLinha('chart-biometria',
-      bio.map(b => b.data || ''),
-      [
-        { label: 'Comprimento (cm)', data: bio.map(b => b.comp_medio), borderColor: '#1A6B8C', backgroundColor: 'rgba(26,107,140,.08)', fill: false },
-        { label: 'Peso (g)',          data: bio.map(b => b.peso_medio),  borderColor: '#C9A84C', backgroundColor: 'rgba(201,168,76,.08)',  fill: false }
-      ],
-      Chart
+  // ── Berçário: soltura e crescimento por espécie ───────────────
+  _bioRenderizarBercario(d, Chart)
+}
+
+// Gráficos da aba Berçário que distinguem a espécie: soltos por espécie,
+// taxa de soltura (por berçário e por espécie), curvas de crescimento
+// (comprimento e peso) e ganho por berçário. Cada um com estado vazio.
+function _bioRenderizarBercario(d, Chart) {
+  // KPI: taxa de soltura geral (soltados ÷ entrados) — reusa a taxa canônica
+  _bioSetText('bio-kpi-berc-taxasolt',
+    d.taxa_sobrevivencia_bercario_pct != null ? d.taxa_sobrevivencia_bercario_pct : null,
+    d.taxa_sobrevivencia_bercario_pct != null ? '%' : '')
+
+  // ── Filhotes soltos por espécie (barra horizontal empilhada) ──
+  const se = d.bercario_soltos_por_especie || []
+  if (!_bioChartVazio('card-soltos-esp', !se.length, 'Nenhuma soltura registrada nesta temporada.')) {
+    const canvas = document.getElementById('chart-soltos-esp')
+    if (canvas) {
+      _bioCharts['chart-soltos-esp']?.destroy()
+      _bioCharts['chart-soltos-esp'] = new Chart(canvas.getContext('2d'), {
+        type: 'bar',
+        data: {
+          labels: se.map(s => bioEspNome(s.especie)),
+          datasets: [
+            { label: 'Via berçário', data: se.map(s => s.via_bercario || 0), backgroundColor: '#2A9D6F', borderRadius: 4 },
+            { label: 'Direto no rio', data: se.map(s => s.direto_rio || 0), backgroundColor: '#1A6B8C', borderRadius: 4 },
+          ]
+        },
+        options: {
+          indexAxis: 'y', responsive: true, maintainAspectRatio: false, animation: { duration: 600 },
+          plugins: { legend: { position: 'bottom', labels: { font: { size: 11 }, usePointStyle: true } } },
+          scales: {
+            x: { stacked: true, grid: { color: 'rgba(0,0,0,.06)' }, ticks: { font: { size: 11 } }, beginAtZero: true },
+            y: { stacked: true, grid: { display: false }, ticks: { font: { size: 11 } } }
+          }
+        }
+      })
+    }
+  }
+
+  // ── Taxa de soltura por berçário (h-bar colorida por espécie) ──
+  const tb = d.taxa_soltura_por_bercario || []
+  if (!_bioChartVazio('card-taxa-solt-berc', !tb.length, 'Nenhum lote em berçário nesta temporada.')) {
+    _bioBarsHCor('chart-taxa-solt-berc',
+      tb.map(t => t.bercario_nome || '—'),
+      tb.map(t => t.taxa_pct || 0),
+      tb.map(t => bioEspCor(t.especie)),
+      Chart,
+      { max: 100, tooltip: { callbacks: { label: c => {
+        const t = tb[c.dataIndex]
+        return ` ${bioEspNome(t.especie)}: ${t.taxa_pct ?? 0}% (${t.soltos}/${t.entrada})`
+      } } } }
     )
   }
+
+  // ── Taxa de soltura por espécie (h-bar colorida por espécie) ──
+  const te = d.taxa_soltura_por_especie || []
+  if (!_bioChartVazio('card-taxa-solt-esp', !te.length, 'Nenhum lote em berçário nesta temporada.')) {
+    _bioBarsHCor('chart-taxa-solt-esp',
+      te.map(t => bioEspNome(t.especie)),
+      te.map(t => t.taxa_pct || 0),
+      te.map(t => bioEspCor(t.especie)),
+      Chart,
+      { max: 100, tooltip: { callbacks: { label: c => {
+        const t = te[c.dataIndex]
+        return ` ${t.taxa_pct ?? 0}% (${t.soltos}/${t.entrada})`
+      } } } }
+    )
+  }
+
+  // ── Curvas de crescimento por espécie (comprimento e peso) ────
+  const cr = d.crescimento_por_especie || []
+  _bioRenderCrescimento('card-cresc-comp', 'chart-cresc-comp', cr, 'comp_medio', Chart)
+  _bioRenderCrescimento('card-cresc-peso', 'chart-cresc-peso', cr, 'peso_medio', Chart)
+
+  // ── Ganho por berçário (Δ comprimento e Δ peso) ───────────────
+  const gb = d.ganho_por_bercario || []
+  const gbComp = gb.filter(g => g.delta_comp != null && g.n_comp > 0)
+  const gbPeso = gb.filter(g => g.delta_peso != null && g.n_peso > 0)
+  if (!_bioChartVazio('card-ganho-comp', !gbComp.length, 'Faça 2+ medições do mesmo filhote para ver o ganho.')) {
+    _bioBarsHCor('chart-ganho-comp',
+      gbComp.map(g => g.bercario_nome || '—'),
+      gbComp.map(g => g.delta_comp),
+      gbComp.map(g => bioEspCor(g.especie)),
+      Chart,
+      { tooltip: { callbacks: { label: c => {
+        const g = gbComp[c.dataIndex]
+        return ` ${bioEspNome(g.especie)}: +${g.delta_comp} cm (${g.n_comp} filhote${g.n_comp !== 1 ? 's' : ''})`
+      } } } }
+    )
+  }
+  if (!_bioChartVazio('card-ganho-peso', !gbPeso.length, 'Faça 2+ medições do mesmo filhote para ver o ganho.')) {
+    _bioBarsHCor('chart-ganho-peso',
+      gbPeso.map(g => g.bercario_nome || '—'),
+      gbPeso.map(g => g.delta_peso),
+      gbPeso.map(g => bioEspCor(g.especie)),
+      Chart,
+      { tooltip: { callbacks: { label: c => {
+        const g = gbPeso[c.dataIndex]
+        return ` ${bioEspNome(g.especie)}: +${g.delta_peso} g (${g.n_peso} filhote${g.n_peso !== 1 ? 's' : ''})`
+      } } } }
+    )
+  }
+}
+
+// Curva de crescimento: uma linha por espécie, alinhada num eixo X de
+// datas compartilhado (spanGaps preenche as datas sem medição da espécie).
+function _bioRenderCrescimento(cardId, canvasId, serie, campo, Chart) {
+  const pts = (serie || []).filter(s => s[campo] != null)
+  if (_bioChartVazio(cardId, !pts.length, 'Sem medições de biometria nesta temporada.')) return
+  const datas = [...new Set(pts.map(s => s.data))].sort()
+  const especies = [...new Set(pts.map(s => s.especie))]
+  const datasets = especies.map(esp => {
+    const cor = bioEspCor(esp)
+    return {
+      label: bioEspNome(esp),
+      data: datas.map(dt => {
+        const p = pts.find(s => s.especie === esp && s.data === dt)
+        return p ? p[campo] : null
+      }),
+      borderColor: cor,
+      backgroundColor: cor + '22',
+      spanGaps: true,
+      fill: false,
+    }
+  })
+  _bioLinha(canvasId, datas.map(dt => dt.slice(5)), datasets, Chart)
 }
 
 async function bioCarregarTelaDados() {
