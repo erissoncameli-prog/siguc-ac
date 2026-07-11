@@ -1252,6 +1252,32 @@
     })
   }
 
+  function grafDescartesCausa() {
+    const f = painelAgregados().perdas
+    const dados = [f.predacao, f.alagamento, f.erosao, f.humana]
+    const wrap = document.getElementById('wrap-desc-causa')
+    if (!dados.some(x => x > 0)) {
+      if (wrap) wrap.innerHTML = '<div class="rel-loading" style="padding:40px 10px">Nenhuma perda de ovos registrada nos filtros atuais.</div>'
+      return
+    }
+    if (wrap && !document.getElementById('graf-desc-causa')) wrap.innerHTML = '<canvas id="graf-desc-causa"></canvas>'
+    mkChart('graf-desc-causa', {
+      type:'bar',
+      data:{
+        labels:['Predação','Alagamento','Erosão','Ação humana'],
+        datasets:[{ data:dados, backgroundColor:['#ef4444','#1A6B8C','#C9A84C','#7B57B0'], borderRadius:5 }]
+      },
+      options:{
+        responsive:true, maintainAspectRatio:false, animation:{duration:600},
+        plugins:{ legend:{ display:false } },
+        scales:{
+          x:{ grid:{display:false}, ticks:{color:'#6B7280', font:tickFont} },
+          y:{ grid:{color:gridColor}, ticks:{color:'#6B7280', font:tickFont}, beginAtZero:true }
+        }
+      }
+    })
+  }
+
   function grafEspeciesBar(esp) {
     if (!esp.length) return
     mkChart('graf-esp-bar', {
