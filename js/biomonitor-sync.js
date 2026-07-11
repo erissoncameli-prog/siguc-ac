@@ -482,7 +482,7 @@ async function bioSyncOcorrencias(monitorId, onProgresso) {
       comprimento_medio_cm: oc.comprimento_medio_cm ?? null,
       peso_medio_g:         oc.peso_medio_g         ?? null,
       n_amostrados:         oc.n_amostrados         ?? null,
-      qtd_afetados:         oc.qtd_afetados         ?? null,
+      qtd_afetados:         oc.qtd_afetados         ?? 0,
       causa:                oc.causa                || null,
       descricao:            oc.descricao            || null,
       foto_urls:            fotoUrlsOc,
@@ -525,6 +525,7 @@ async function bioSyncIndividuos(monitorId, onProgresso) {
       lote_id:       loteServId,
       numero:        ind.numero,
       status:        ind.status || 'ativo',
+      doente:        ind.doente        ?? false,
       data_obito:    ind.data_obito    || null,
       causa_obito:   ind.causa_obito   || null,
       observacoes:   ind.observacoes   || null,
@@ -810,7 +811,7 @@ async function bioSyncPullIndividuos(grupoId) {
   const { data, error } = await bioSupabase()
     .from('filhotes_bercario')
     .select(`
-      id, uuid_cliente, numero, status, data_obito, causa_obito, observacoes,
+      id, uuid_cliente, numero, status, doente, data_obito, causa_obito, observacoes,
       monitor_id, criado_em, sincronizado_em,
       lote:lotes_bercario!inner(uuid_cliente, grupo_id)
     `)
@@ -827,6 +828,7 @@ async function bioSyncPullIndividuos(grupoId) {
       lote_uuid:    ind.lote.uuid_cliente,
       numero:       ind.numero,
       status:       ind.status,
+      doente:       ind.doente,
       data_obito:   ind.data_obito,
       causa_obito:  ind.causa_obito,
       observacoes:  ind.observacoes,

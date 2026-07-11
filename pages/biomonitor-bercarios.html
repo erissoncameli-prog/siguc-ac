@@ -353,8 +353,8 @@
           <th>Nº</th><th>Status</th><th>Última medição</th><th>Compr.</th><th>Larg. carapaça</th><th>Compr. plastrão</th><th>Peso</th><th>Total med.</th>
         </tr></thead><tbody>
           ${_detAtual.individuos.map(f => `<tr>
-            <td>${f.numero}</td>
-            <td><span class="badge ${f.status === 'ativo' ? 'badge-verde' : f.status === 'soltado' ? 'badge-blue' : 'badge-erro'}">${{ativo:'Ativo',soltado:'Solto',morto:'Morto'}[f.status] || f.status}</span></td>
+            <td style="font-weight:700;color:${f.status === 'morto' ? '#DC2626' : f.doente ? '#7C3AED' : '#2A9D6F'}">${f.numero}</td>
+            <td><span class="badge ${f.status === 'ativo' ? 'badge-verde' : f.status === 'soltado' ? 'badge-blue' : 'badge-erro'}">${{ativo:'Ativo',soltado:'Solto',morto:'Morto'}[f.status] || f.status}</span>${f.doente ? ` <span class="badge" style="background:#7C3AED22;color:#7C3AED">Doente</span>` : ''}</td>
             <td>${f.ultima_data_medicao ? formatData(f.ultima_data_medicao) : '—'}</td>
             <td>${f.ultimo_comprimento_cm != null ? f.ultimo_comprimento_cm + ' cm' : '—'}</td>
             <td>${f.ultimo_largura_carapaca_cm != null ? f.ultimo_largura_carapaca_cm + ' cm' : '—'}</td>
