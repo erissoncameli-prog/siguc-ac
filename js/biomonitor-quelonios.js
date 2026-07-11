@@ -2281,8 +2281,40 @@ async function bioCarregarBercarios() {
   // então não faz mais sentido navegar por ninho na lista. O histórico
   // de quais ninhos entraram fica dentro do detalhe do berçário.
   const temporadaAtualId = BioApp.temporadaAtual?.id ?? null
-  gruposVisiveis.forEach(grupo => {
-    const totalFilhotes = grupo.lotes.reduce((s, l) => s + (l.qtd_entrada || 0), 0)
+
+  // Estatísticas por grupo (vivos/mortos/soltos, datas, ocupação,
+  // doentes) — tudo offline, calculado em paralelo antes de montar os
+  // cards, para alimentar a rosca e os detalhes de cada um.
+  const statsPorGrupo = await Promise.all(gruposVisiveis.map(async grupo => {
+    const totalEntrada = grupo.lotes.reduce((s, l) => s + (l.qtd_entrada || 0), 0)
+    const mortes = (await Promise.all(grupo.lotes.map(l => bioMortesCanonicasDoLote(l))))
+      .reduce((s, m) => s + m, 0)
+    const datasEntrada = [...new Set(grupo.lotes.map(l => l.data_entrada).filter(Boolean))].sort()
+
+    let soltos = 0, datasSoltura = []
+    if (statusFiltro === 'soltado' && grupo.id) {
+      const solturas = await bioOfflineSolturasDoBercario(grupo.id, grupo.temporadaId)
+      soltos = solturas.reduce((s, x) => s + (x.qtd_soltada || 0), 0)
+      datasSoltura = [...new Set(solturas.map(x => x.data_soltura).filter(Boolean))].sort()
+    }
+
+    const bercario   = grupo.id ? await bioOfflineGetBercario(grupo.id) : null
+    const individuos = grupo.id ? await bioOfflineIndividuosDoBercario(grupo.id, grupo.temporadaId) : []
+    const doentes    = individuos.filter(i => i.doente && i.status === 'ativo').length
+
+    return { grupo, totalEntrada, mortes, datasEntrada, soltos, datasSoltura, bercario, doentes }
+  }))
+
+  const _bercFmtIntervalo = datas => {
+    if (!datas.length) return '—'
+    if (datas.length === 1) return _bioFormatarData(datas[0])
+    return `${_bioFormatarData(datas[0])} – ${_bioFormatarData(datas[datas.length - 1])}`
+  }
+
+  let _precisaChart = false
+
+  statsPorGrupo.forEach(st => {
+    const { grupo, totalEntrada, mortes, datasEntrada, soltos, datasSoltura, bercario, doentes } = st
     const especieAtual = bioBercarioEspecieAtual(grupo.id, grupo.lotes)
     const espLabel = especieAtual ? (BIO_ESPECIES.find(e => e.id === especieAtual)?.nome ?? especieAtual) : null
     const temporadaAnterior = grupo.temporadaId != null && grupo.temporadaId !== temporadaAtualId
@@ -2293,14 +2325,45 @@ async function bioCarregarBercarios() {
     header.style.paddingLeft = '12px'
     header.innerHTML = `
       <span>${grupo.nome}${espLabel ? ` <span class="bio-berc-grupo-especie">${espLabel}</span>` : ''}${temporadaAnterior ? ` <span class="bio-berc-grupo-temporada-antiga">Temporada anterior</span>` : ''}</span>
-      <span class="bio-berc-grupo-stats">${grupo.lotes.length} lote${grupo.lotes.length !== 1 ? 's' : ''} · ${totalFilhotes} filhotes</span>
+      <span class="bio-berc-grupo-stats">${grupo.lotes.length} lote${grupo.lotes.length !== 1 ? 's' : ''} · ${totalEntrada} filhotes</span>
     `
     listaEl.appendChild(header)
+
+    const mortalidadePct = totalEntrada ? Math.round((mortes / totalEntrada) * 1000) / 10 : null
+    const donutId = `berc-donut-${grupo.id ?? 'x'}-${grupo.temporadaId ?? 'x'}`
+    const temDados = totalEntrada > 0
+
+    let linhasStats
+    if (statusFiltro === 'soltado') {
+      const vivosNoTanque = Math.max(totalEntrada - mortes - soltos, 0)
+      linhasStats = `
+        <div>Soltura: <strong>${_bercFmtIntervalo(datasSoltura)}</strong></div>
+        <div>Soltos: <strong style="color:#0891B2">${soltos}</strong> · Mortos: <strong style="color:var(--bio-perigo)">${mortes}</strong>${vivosNoTanque ? ` · Ainda no tanque: <strong>${vivosNoTanque}</strong>` : ''}</div>
+        <div class="bio-berc-stat-mortalidade">Mortalidade: ${mortalidadePct != null ? mortalidadePct + '%' : '—'}</div>
+      `
+    } else {
+      const vivos = Math.max(totalEntrada - mortes, 0)
+      const ocupacaoTxt = bercario?.capacidade_max ? ` · Ocupação: ${vivos}/${bercario.capacidade_max}` : ''
+      linhasStats = `
+        <div>Entrada: <strong>${_bercFmtIntervalo(datasEntrada)}</strong></div>
+        <div>Vivos: <strong style="color:var(--bio-verde)">${vivos}</strong> · Mortos: <strong style="color:var(--bio-perigo)">${mortes}</strong>${ocupacaoTxt}</div>
+        <div class="bio-berc-stat-mortalidade">Mortalidade: ${mortalidadePct != null ? mortalidadePct + '%' : '—'}</div>
+        ${doentes ? `<span class="bio-berc-doente-badge">${doentes} doente${doentes !== 1 ? 's' : ''}</span>` : ''}
+      `
+    }
+
+    if (temDados) _precisaChart = true
 
     const card = document.createElement('div')
     card.className = 'bio-nfc'
     card.innerHTML = `
-      <div class="bio-nfc-acoes" style="margin-top:0">
+      <div class="bio-berc-card-body">
+        <div class="bio-berc-donut-wrap">
+          ${temDados ? `<canvas id="${donutId}"></canvas>` : `<div class="bio-berc-donut-vazio">—</div>`}
+        </div>
+        <div class="bio-berc-stats">${linhasStats}</div>
+      </div>
+      <div class="bio-nfc-acoes">
         <button class="bio-btn-sm prim" data-acao="ver-bercario">Ver berçário</button>
         ${statusFiltro === 'soltado' ? '' : `<button class="bio-btn-sm prim" data-acao="soltar-bercario" style="background:var(--bio-verde)">Soltar berçário</button>`}
       </div>
@@ -2312,7 +2375,22 @@ async function bioCarregarBercarios() {
       bioAbrirSolturaBercario(grupo.id, grupo.nome, grupo.temporadaId)
     })
     listaEl.appendChild(card)
+
+    if (temDados) {
+      card.dataset.donutId = donutId
+      card.dataset.donutDados = statusFiltro === 'soltado'
+        ? JSON.stringify({ labels: ['Soltos', 'Mortos'], data: [soltos, mortes], cores: ['#0891B2', '#DC2626'] })
+        : JSON.stringify({ labels: ['Vivos', 'Mortos'], data: [Math.max(totalEntrada - mortes, 0), mortes], cores: ['#2A9D6F', '#DC2626'] })
+    }
   })
+
+  if (_precisaChart) {
+    const Chart = await _bioCarregarChartJS()
+    listaEl.querySelectorAll('[data-donut-id]').forEach(card => {
+      const { labels, data, cores } = JSON.parse(card.dataset.donutDados)
+      _bioDonutMini(card.dataset.donutId, labels, data, cores, Chart)
+    })
+  }
 }
 
 // especieNova: espécie do ninho sendo registrado. Berçários já ocupados
@@ -3864,6 +3942,28 @@ function _bioDonut(canvasId, labels, data, cores, Chart) {
       animation: { duration: 700 },
       plugins: { legend: { position: 'bottom', labels: { font: { size: 11 }, padding: 12, usePointStyle: true } } }
     }
+  })
+}
+
+// Rosca pequena sem legenda (card de berçário na lista) — as cores já
+// são explicadas pelos números coloridos no texto ao lado, então a
+// legenda do Chart.js só ocuparia espaço à toa num card compacto.
+function _bioDonutMini(canvasId, labels, data, cores, Chart) {
+  const canvas = document.getElementById(canvasId)
+  if (!canvas) return
+  _bioCharts[canvasId]?.destroy()
+  _bioCharts[canvasId] = new Chart(canvas.getContext('2d'), {
+    type: 'doughnut',
+    data: { labels, datasets: [{ data, backgroundColor: cores, borderWidth: 2, borderColor: '#fff' }] },
+    options: {
+      cutout: '64%',
+      animation: { duration: 500 },
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => `${ctx.label}: ${ctx.formattedValue}` } },
+      },
+    },
   })
 }
 
