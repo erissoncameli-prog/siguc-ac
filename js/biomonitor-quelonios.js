@@ -3257,8 +3257,11 @@ async function bioCarregarAbertos() {
   estadoEl.textContent = 'Carregando do servidor…'; estadoEl.hidden = false
   listaEl.innerHTML = ''
 
+  // "Eclodido" agrega os status pós-eclosão — depois da eclosão o ninho
+  // avança para em_bercario/soltado e sumia do filtro
+  const POS_ECLOSAO = ['eclodido', 'em_bercario', 'soltado']
   const estaAberto = n => filtroStatus
-    ? n.status === filtroStatus
+    ? (filtroStatus === 'eclodido' ? POS_ECLOSAO.includes(n.status) : n.status === filtroStatus)
     : n.status !== 'perdido'
 
   let ninhos = []
@@ -3270,7 +3273,9 @@ async function bioCarregarAbertos() {
         .select('id,uuid_cliente,numero_ninho,numero_atual,especie,data_encontro,hora_desova,status,status_validacao,motivo_rejeicao,qtd_ovos,ovos_integros,ovos_descartados,descartados_natural,descartados_predacao,descartados_humana,ovos_viaveis,ovos_perdidos_total,dist_rio_m,dist_rio_metodo,temperatura_c,umidade_pct,profundidade_cm,observacoes,foto_urls,lat,lng,precisao_gps_m,criado_em,praia_id,praia_nome,praia_atual_id,praia_atual_nome,monitor_id,monitor_nome,data_nascimento,filhotes_vivos,filhotes_mortos,ovos_nao_nascidos,incubacao_dias_previstos,data_prevista_eclosao,dias_para_eclosao')
         .eq('grupo_id', BioApp.monitor.grupo_id)
         .order('numero_atual', { ascending: false })
-      if (filtroStatus) {
+      if (filtroStatus === 'eclodido') {
+        q = q.in('status', POS_ECLOSAO)
+      } else if (filtroStatus) {
         q = q.eq('status', filtroStatus)
       } else {
         q = q.neq('status', 'perdido')
@@ -3410,6 +3415,27 @@ function bioNinhoCardInner(n, opts = {}) {
       ${n.ovos_nao_nascidos           ? `<span style="background:rgba(127,127,127,.12);color:#6B7280">${n.ovos_nao_nascidos} não nasc.</span>` : ''}
     </div>` : ''
 
+  // Destino dos filhotes (pós-eclosão): berçário ou rio, derivado do
+  // status + eventos do servidor (lote de berçário / soltura via_bercario)
+  let destinoHtml = ''
+  if (['eclodido', 'em_bercario', 'soltado'].includes(status)) {
+    const evs = n._eventos || []
+    const foiBercario = status === 'em_bercario' || evs.some(ev => ev.tipo === 'bercario')
+    const soltoDireto = evs.some(ev => ev.tipo === 'soltura' && ev.via_bercario === false)
+    let txt, cor, bg
+    if (status === 'em_bercario') {
+      txt = 'Filhotes no berçário';  cor = '#7c3aed'; bg = '#7c3aed14'
+    } else if (status === 'soltado') {
+      txt = foiBercario ? 'Berçário → soltos no rio'
+          : soltoDireto ? 'Soltos direto no rio'
+          : 'Filhotes soltos no rio'
+      cor = '#1A6B8C'; bg = '#1A6B8C14'
+    } else {
+      txt = 'Aguardando destino dos filhotes'; cor = '#B45309'; bg = '#D9770614'
+    }
+    destinoHtml = `<div style="margin-top:5px;font-size:12px;font-weight:600;color:${cor};background:${bg};border-radius:6px;padding:3px 8px;display:inline-block">${txt}</div>`
+  }
+
   const localChip = n._local
     ? '<span class="bio-nfc-ev-chip" style="background:#a78bfa22;color:#7c3aed">pendente</span>'
     : ''
@@ -3452,6 +3478,7 @@ function bioNinhoCardInner(n, opts = {}) {
     ${condicoesHtml}
     ${previsaoHtml}
     ${eclosaoHtml}
+    ${destinoHtml}
     ${histHtml}
     ${localChip ? `<div class="bio-nfc-eventos">${localChip}</div>` : ''}
     ${acoesHtml}
