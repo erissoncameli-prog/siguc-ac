@@ -1391,12 +1391,12 @@
 <div id="tela-form-ocorrencia" class="bio-tela">
   <header class="bio-form-header">
     <button class="bio-btn-back" id="bio-oc-back" aria-label="Voltar">‹</button>
-    <span>Nova Ocorrência</span>
+    <span id="bio-form-ocorrencia-titulo">Nova Ocorrência</span>
     <span></span>
   </header>
   <div class="bio-form-body">
 
-    <div class="bio-form-section">
+    <div class="bio-form-section" id="bio-oc-tipo-secao">
       <span class="bio-form-label">Tipo *</span>
       <div class="bio-oc-tipo-grid" id="bio-oc-tipo-grid">
         <button type="button" class="bio-oc-chip ativo" data-tipo="alimentacao">Alimentação</button>
@@ -1406,6 +1406,10 @@
         <button type="button" class="bio-oc-chip" data-tipo="tratamento">Tratamento</button>
         <button type="button" class="bio-oc-chip" data-tipo="observacao">Observação</button>
       </div>
+    </div>
+    <div class="bio-form-section" id="bio-oc-tipo-fixo-wrap" hidden>
+      <span class="bio-form-label">Tipo</span>
+      <div style="font-weight:600;color:var(--bio-ink,#1f2937)" id="bio-oc-tipo-fixo-txt"></div>
     </div>
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:0">

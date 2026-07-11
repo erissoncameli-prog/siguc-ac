@@ -62,6 +62,7 @@ const BioApp = {
   cfgGpsModo:       'padrao',     // 'padrao' | 'alta' | 'maxima'
   formBercarioSelecionado: null,  // { id, nome, capacidade_max } selecionado no picker
   loteAtual: null,                // lote em detalhe/ocorrência
+  ocorrenciaIndividuoCtx: null,   // { individuo, tipo } quando a ocorrência vem de marcar doente/óbito
   transfPraiaDestino: null,       // praia de destino selecionada na transferência
   transfOcupacao: null,           // { ocupados[], seq_min, seq_max, proximo_livre, parcial }
 }
@@ -2578,20 +2579,9 @@ async function bioCarregarTimelineIndividuo(individuo) {
   }).join('')
 }
 
-async function bioMarcarObitoIndividuo(individuo) {
-  const atualizado = {
-    ...individuo,
-    status: 'morto',
-    data_obito: new Date().toISOString().slice(0, 10),
-    status_sync: 'pendente',
-  }
-  await bioOfflineSalvarIndividuo(atualizado)
-  BioApp.individuoAtual = atualizado
-  bioSyncTudo({ monitorId: BioApp.monitor?.id, onConcluido: () => bioAtualizarBadgeFila() })
-  bioToast(`Óbito registrado — filhote #${individuo.numero}.`, 'ok')
-  bioAbrirTelaDetalheIndividuo(atualizado)
-}
-
+// Remover a marcação de doente é só voltar ao normal — não abre o
+// formulário de ocorrência (marcar doente/óbito é que abre, ver
+// bioAbrirFormOcorrenciaIndividuo).
 async function bioAlternarDoencaIndividuo(individuo) {
   const atualizado = {
     ...individuo,
@@ -2601,9 +2591,7 @@ async function bioAlternarDoencaIndividuo(individuo) {
   await bioOfflineSalvarIndividuo(atualizado)
   BioApp.individuoAtual = atualizado
   bioSyncTudo({ monitorId: BioApp.monitor?.id, onConcluido: () => bioAtualizarBadgeFila() })
-  bioToast(atualizado.doente
-    ? `Filhote #${individuo.numero} marcado como doente.`
-    : `Doença removida do filhote #${individuo.numero}.`, 'ok')
+  bioToast('Doença removida do filhote #' + individuo.numero + '.', 'ok')
   bioAbrirTelaDetalheIndividuo(atualizado)
 }
 
@@ -2741,14 +2729,22 @@ async function bioCarregarTimelineBercario(bercarioId, temporadaId) {
 
 function bioAbrirFormOcorrencia(lote) {
   BioApp.loteAtual = lote
+  BioApp.ocorrenciaIndividuoCtx = null
+  document.getElementById('bio-form-ocorrencia-titulo').textContent = 'Nova Ocorrência'
+  document.getElementById('bio-oc-tipo-secao').hidden = false
+  document.getElementById('bio-oc-tipo-fixo-wrap').hidden = true
+  document.getElementById('bio-oc-aff-minus').hidden = false
+  document.getElementById('bio-oc-aff-plus').hidden = false
   document.getElementById('bio-oc-data').value = new Date().toISOString().slice(0, 10)
   document.getElementById('bio-oc-hora').value = new Date().toTimeString().slice(0, 5)
   document.getElementById('bio-oc-comp').value = ''
   document.getElementById('bio-oc-peso').value = ''
   document.getElementById('bio-oc-amostrados').value = ''
   document.getElementById('bio-oc-causa').value = ''
+  document.getElementById('bio-oc-causa').placeholder = 'Descreva a causa…'
   document.getElementById('bio-oc-descricao').value = ''
   document.getElementById('bio-oc-afetados').value = 0
+  document.getElementById('bio-oc-afetados').readOnly = false
 
   // Fotos
   BioApp._fotosOc = []
@@ -2762,6 +2758,36 @@ function bioAbrirFormOcorrencia(lote) {
   })
   bioAtualizarCamposOcorrencia('alimentacao')
   bioMostrarTela('tela-form-ocorrencia')
+}
+
+// Abre o mesmo formulário de ocorrência, travado no tipo doença/mortalidade
+// e vinculado a um filhote específico — usado por "Marcar doente" e
+// "Marcar óbito" na tela do indivíduo, para registrar o histórico de
+// verdade (causa, data, hora) em vez de só trocar um status.
+const BIO_OC_TIPO_NOME_FIXO = { doenca: 'Doença', mortalidade: 'Mortalidade' }
+
+async function bioAbrirFormOcorrenciaIndividuo(individuo, tipo) {
+  const lote = await bioOfflineGetLote(individuo.lote_uuid)
+  if (!lote) { bioToast('Lote do filhote não encontrado.', 'err'); return }
+
+  bioAbrirFormOcorrencia(lote)
+  BioApp.ocorrenciaIndividuoCtx = { individuo, tipo }
+
+  document.getElementById('bio-form-ocorrencia-titulo').textContent =
+    tipo === 'doenca' ? 'Registrar Doença' : 'Registrar Óbito'
+  document.getElementById('bio-oc-tipo-secao').hidden = true
+  document.getElementById('bio-oc-tipo-fixo-wrap').hidden = false
+  document.getElementById('bio-oc-tipo-fixo-txt').textContent = BIO_OC_TIPO_NOME_FIXO[tipo] ?? tipo
+  bioAtualizarCamposOcorrencia(tipo)
+
+  document.getElementById('bio-oc-afetados').value = 1
+  document.getElementById('bio-oc-afetados').readOnly = true
+  document.getElementById('bio-oc-aff-minus').hidden = true
+  document.getElementById('bio-oc-aff-plus').hidden = true
+
+  document.getElementById('bio-oc-descricao').value = `Filhote #${individuo.numero}`
+  document.getElementById('bio-oc-causa').placeholder =
+    tipo === 'doenca' ? 'Sintomas / causa da doença…' : 'Causa do óbito…'
 }
 
 function bioAtualizarCamposOcorrencia(tipo) {
@@ -2788,22 +2814,26 @@ async function bioSalvarOcorrencia() {
   const lote = BioApp.loteAtual
   if (!lote) return
 
-  const tipoChip = document.querySelector('#bio-oc-tipo-grid .bio-oc-chip.ativo')
-  const tipo = tipoChip?.dataset.tipo ?? 'observacao'
+  const ctx  = BioApp.ocorrenciaIndividuoCtx
+  const tipo = ctx ? ctx.tipo : (document.querySelector('#bio-oc-tipo-grid .bio-oc-chip.ativo')?.dataset.tipo ?? 'observacao')
   const data = document.getElementById('bio-oc-data').value
   if (!data) { bioToast('Informe a data da ocorrência.', 'err'); return }
+
+  const causa = document.getElementById('bio-oc-causa').value.trim() || null
+  if (ctx && !causa) { bioToast('Informe a causa.', 'err'); return }
 
   const oc = {
     uuid_cliente:         bioUuid(),
     lote_uuid:            lote.uuid_cliente,
+    individuo_uuid:       ctx?.individuo.uuid_cliente ?? null,
     tipo,
     data_ocorrencia:      data,
     hora_ocorrencia:      document.getElementById('bio-oc-hora').value  || null,
     comprimento_medio_cm: parseFloat(document.getElementById('bio-oc-comp').value)         || null,
     peso_medio_g:         parseFloat(document.getElementById('bio-oc-peso').value)         || null,
     n_amostrados:         parseInt(document.getElementById('bio-oc-amostrados').value)     || null,
-    qtd_afetados:         parseInt(document.getElementById('bio-oc-afetados').value) || 0,
-    causa:                document.getElementById('bio-oc-causa').value.trim()             || null,
+    qtd_afetados:         ctx ? 1 : (parseInt(document.getElementById('bio-oc-afetados').value) || 0),
+    causa,
     descricao:            document.getElementById('bio-oc-descricao').value.trim()         || null,
     foto_urls:            BioApp._fotosOc?.length ? [...BioApp._fotosOc] : [],
     status_sync:          'pendente',
@@ -2811,9 +2841,24 @@ async function bioSalvarOcorrencia() {
   }
 
   await bioOfflineSalvarOcorrencia(oc)
+
+  if (ctx) {
+    const atualizado = ctx.tipo === 'doenca'
+      ? { ...ctx.individuo, doente: true, status_sync: 'pendente' }
+      : { ...ctx.individuo, status: 'morto', data_obito: data, causa_obito: causa, status_sync: 'pendente' }
+    await bioOfflineSalvarIndividuo(atualizado)
+  }
+
   bioSyncTudo({ monitorId: BioApp.monitor?.id, onConcluido: () => bioAtualizarBadgeFila() })
   bioToast('Ocorrência registrada!', 'ok')
-  if (BioApp.bercarioAtual) bioAbrirDetalheBercario(BioApp.bercarioAtual)
+
+  if (ctx) {
+    BioApp.ocorrenciaIndividuoCtx = null
+    const indAtualizado = await bioOfflineGetIndividuo(ctx.individuo.uuid_cliente)
+    bioAbrirTelaDetalheIndividuo(indAtualizado)
+  } else if (BioApp.bercarioAtual) {
+    bioAbrirDetalheBercario(BioApp.bercarioAtual)
+  }
 }
 
 // Lote ativo mais recente do berçário — usado como destino padrão de
@@ -2914,8 +2959,15 @@ function bioIniciarPosEclosao() {
     bioAbrirSolturaBercario(berc.id, berc.nome, berc.temporadaId)
   })
 
-  // Voltar da tela de ocorrência para detalhe
+  // Voltar da tela de ocorrência para detalhe (do lote, ou do indivíduo
+  // quando veio de "Marcar doente"/"Marcar óbito")
   document.getElementById('bio-oc-back')?.addEventListener('click', () => {
+    if (BioApp.ocorrenciaIndividuoCtx) {
+      const individuo = BioApp.ocorrenciaIndividuoCtx.individuo
+      BioApp.ocorrenciaIndividuoCtx = null
+      bioAbrirTelaDetalheIndividuo(individuo)
+      return
+    }
     if (BioApp.bercarioAtual) bioAbrirDetalheBercario(BioApp.bercarioAtual)
     else bioMostrarTela('tela-bercarios')
   })
@@ -2951,11 +3003,13 @@ function bioIniciarPosEclosao() {
   })
   document.getElementById('bio-btn-obito-individuo')?.addEventListener('click', () => {
     const ind = BioApp.individuoAtual
-    if (ind && confirm(`Confirma o óbito do filhote #${ind.numero}?`)) bioMarcarObitoIndividuo(ind)
+    if (ind) bioAbrirFormOcorrenciaIndividuo(ind, 'mortalidade')
   })
   document.getElementById('bio-btn-doenca-individuo')?.addEventListener('click', () => {
     const ind = BioApp.individuoAtual
-    if (ind) bioAlternarDoencaIndividuo(ind)
+    if (!ind) return
+    if (ind.doente) { bioAlternarDoencaIndividuo(ind); return }
+    bioAbrirFormOcorrenciaIndividuo(ind, 'doenca')
   })
 
   // Biometria individual
