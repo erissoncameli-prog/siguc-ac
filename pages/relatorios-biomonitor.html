@@ -1131,11 +1131,46 @@
   }
 
   // ── Gráficos ─────────────────────────────────────────────────────
+  // Tooltip fixo por clique — em telas touch o hover é impreciso demais
+  // pra acertar uma fatia/coluna fina. Clicar mostra o tooltip "preso"
+  // no ponto; clicar fora dele esconde.
+  function attachClickTooltip(chart) {
+    chart.canvas.onclick = evt => {
+      const pts = chart.getElementsAtEventForMode(evt, 'nearest', { intersect: true }, true)
+      if (!pts.length) {
+        chart.setActiveElements([])
+        chart.tooltip?.setActiveElements([], { x: 0, y: 0 })
+        chart.update()
+        return
+      }
+      const active = pts.map(p => ({ datasetIndex: p.datasetIndex, index: p.index }))
+      chart.setActiveElements(active)
+      chart.tooltip?.setActiveElements(active, { x: evt.offsetX, y: evt.offsetY })
+      chart.update()
+    }
+  }
+
   function mkChart(id, cfg) {
     const el = document.getElementById(id)
     if (!el) return
     _charts[id]?.destroy()
+    cfg.options = cfg.options || {}
+    cfg.options.plugins = cfg.options.plugins || {}
+    // Tooltip padrão com % do total, só quando o gráfico não define o seu.
+    if (!cfg.options.plugins.tooltip && (cfg.type === 'doughnut' || cfg.type === 'pie')) {
+      cfg.options.plugins.tooltip = {
+        callbacks: {
+          label(ctx) {
+            const total = (ctx.dataset.data || []).reduce((s, x) => s + (x || 0), 0)
+            const val = ctx.parsed
+            const p = total ? Math.round(100 * val / total) : 0
+            return `${ctx.label}: ${val} (${p}%)`
+          }
+        }
+      }
+    }
     _charts[id] = new Chart(el.getContext('2d'), cfg)
+    attachClickTooltip(_charts[id])
   }
 
   const gridColor = 'rgba(0,0,0,.06)'
