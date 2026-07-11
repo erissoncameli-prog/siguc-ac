@@ -2126,7 +2126,7 @@ async function bioSalvarSoltura() {
         criado_em:       new Date().toISOString(),
       }
       await bioOfflineSalvarSoltura(sol)
-      await bioOfflineSalvarLote({ ...lote, status: 'soltado' })
+      await bioOfflineSalvarLote({ ...lote, status: 'soltado', status_sync: 'pendente' })
 
       const ninhoLote = await bioOfflineGetNinho(lote.ninho_uuid)
       if (ninhoLote) await bioOfflineSalvarNinho({ ...ninhoLote, status: 'soltado', status_sync: 'pendente' })
@@ -2779,7 +2779,7 @@ async function bioSalvarOcorrencia() {
     comprimento_medio_cm: parseFloat(document.getElementById('bio-oc-comp').value)         || null,
     peso_medio_g:         parseFloat(document.getElementById('bio-oc-peso').value)         || null,
     n_amostrados:         parseInt(document.getElementById('bio-oc-amostrados').value)     || null,
-    qtd_afetados:         parseInt(document.getElementById('bio-oc-afetados').value) || null,
+    qtd_afetados:         parseInt(document.getElementById('bio-oc-afetados').value) || 0,
     causa:                document.getElementById('bio-oc-causa').value.trim()             || null,
     descricao:            document.getElementById('bio-oc-descricao').value.trim()         || null,
     foto_urls:            BioApp._fotosOc?.length ? [...BioApp._fotosOc] : [],
