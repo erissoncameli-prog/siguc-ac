@@ -1262,8 +1262,8 @@
   }
 
   function grafDescartesCausa() {
-    const f = painelAgregados().perdas
-    const dados = [f.predacao, f.alagamento, f.erosao, f.humana]
+    const f = _descAgg.porCausa
+    const dados = [f.predacao, f.alagamento, f.erosao, f.humana, f.natural]
     const wrap = document.getElementById('wrap-desc-causa')
     if (!dados.some(x => x > 0)) {
       if (wrap) wrap.innerHTML = '<div class="rel-loading" style="padding:40px 10px">Nenhuma perda de ovos registrada nos filtros atuais.</div>'
@@ -1273,8 +1273,8 @@
     mkChart('graf-desc-causa', {
       type:'bar',
       data:{
-        labels:['Predação','Alagamento','Erosão','Ação humana'],
-        datasets:[{ data:dados, backgroundColor:['#ef4444','#1A6B8C','#C9A84C','#7B57B0'], borderRadius:5 }]
+        labels:['Predação','Alagamento','Erosão','Ação humana','Natural (postura)'],
+        datasets:[{ data:dados, backgroundColor:['#ef4444','#1A6B8C','#C9A84C','#7B57B0','#38bdf8'], borderRadius:5 }]
       },
       options:{
         responsive:true, maintainAspectRatio:false, animation:{duration:600},
