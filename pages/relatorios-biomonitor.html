@@ -727,16 +727,22 @@
 
     _dados = data
 
-    // Descartes de ovos por causa (consulta direta à view)
-    let qd = db.from('vw_descartes_ovos').select('motivo,qtd')
+    // Descartes de ovos por causa (consulta direta à view). Traz `causa`
+    // (fina) além de `motivo` (grossa) — perdas naturais lançadas na
+    // postura (etapa registro) não têm causa fina e viram um balde
+    // próprio "Natural (postura)" no gráfico de colunas, em vez de sumir.
+    let qd = db.from('vw_descartes_ovos').select('motivo,causa,qtd')
     const tmp = sel('fil-temporada').value; if (tmp) qd = qd.eq('temporada_id', tmp)
     const prr = sel('fil-praia').value;     if (prr) qd = qd.eq('praia_id', prr)
     const { data: descRows } = await qd
-    _descAgg = { natural:0, predacao:0, humana:0, total:0 }
+    _descAgg = { natural:0, predacao:0, humana:0, total:0,
+      porCausa: { predacao:0, alagamento:0, erosao:0, humana:0, natural:0 } }
     ;(descRows || []).forEach(r => {
       const q = r.qtd || 0
       if (r.motivo in _descAgg) _descAgg[r.motivo] += q
       _descAgg.total += q
+      const causa = ['predacao','alagamento','erosao','humana'].includes(r.causa) ? r.causa : 'natural'
+      _descAgg.porCausa[causa] += q
     })
 
     // Metas por praia (só faz sentido com uma temporada específica)
