@@ -854,17 +854,19 @@
   // ── Seção: Visão Geral ───────────────────────────────────────────
   function htmlSecDescartes(a) {
     const pctOf = n => a.total ? Math.round(100 * n / a.total) : 0
-    // Causa fina (predação/alagamento/erosão/humana) agregada das praias.
-    const f = painelAgregados().perdas
-    const totF = f.predacao + f.alagamento + f.erosao + f.humana
+    // Causa fina (predação/alagamento/erosão/humana/natural) — inclui
+    // perdas naturais lançadas direto na postura, não só nas visitas.
+    const f = a.porCausa
+    const totF = f.predacao + f.alagamento + f.erosao + f.humana + f.natural
     const pctF = n => totF ? Math.round(100 * n / totF) : 0
     const finaHtml = totF ? `
-      <p class="rel-chart-sub" style="margin:6px 0 8px">Perdas por causa fina (baixadas nas visitas/registro)</p>
+      <p class="rel-chart-sub" style="margin:6px 0 8px">Perdas por causa fina (postura, visitas e registro)</p>
       <div class="rel-kpi-grid">
-        ${kpiCard('Predação',   `${f.predacao} (${pctF(f.predacao)}%)`,     '#ef4444')}
-        ${kpiCard('Alagamento', `${f.alagamento} (${pctF(f.alagamento)}%)`, '#1A6B8C')}
-        ${kpiCard('Erosão',     `${f.erosao} (${pctF(f.erosao)}%)`,         '#C9A84C')}
-        ${kpiCard('Ação humana',`${f.humana} (${pctF(f.humana)}%)`,         '#7B57B0')}
+        ${kpiCard('Predação',         `${f.predacao} (${pctF(f.predacao)}%)`,     '#ef4444')}
+        ${kpiCard('Alagamento',       `${f.alagamento} (${pctF(f.alagamento)}%)`, '#1A6B8C')}
+        ${kpiCard('Erosão',           `${f.erosao} (${pctF(f.erosao)}%)`,         '#C9A84C')}
+        ${kpiCard('Ação humana',      `${f.humana} (${pctF(f.humana)}%)`,         '#7B57B0')}
+        ${kpiCard('Natural (postura)',`${f.natural} (${pctF(f.natural)}%)`,       '#38bdf8')}
       </div>` : ''
     return `<div class="rel-sec" id="sec-descartes">
       <div class="rel-sec-title">Descarte de ovos por causa</div>
