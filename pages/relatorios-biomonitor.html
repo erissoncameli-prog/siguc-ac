@@ -4,11 +4,15 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>SIGUC-AC · Relatórios Biomonitor</title>
 <link rel="stylesheet" href="../css/global.css">
+<link rel="stylesheet" href="../css/relatorio-print.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="../js/observability.js"></script>
 <script src="../js/queryLogger.js"></script>
 <script src="../js/config.js"></script>
+<script src="../js/config-sistema.js"></script>
 <script src="../js/layout.js"></script>
+<script src="../js/biomonitor-timeline.js"></script>
+<script src="../js/biomonitor-relatorio-ninho.js"></script>
 <style>
 /* ── Relatório Biomonitor ── */
 .rel-filtros {
@@ -468,6 +472,7 @@
         <button class="rel-tab ativo" id="tab-btn-painel" onclick="relTab('painel')">Painel</button>
         <button class="rel-tab" id="tab-btn-detalhado" onclick="relTab('detalhado')">Detalhado</button>
         <button class="rel-tab" id="tab-btn-mapa" onclick="relTab('mapa')">Mapa</button>
+        <button class="rel-tab" id="tab-btn-fichas" onclick="relTab('fichas')">Fichas de Ninho</button>
       </div>
 
       <!-- Aba: Painel -->
@@ -495,6 +500,20 @@
       <!-- Aba: Mapa -->
       <div id="mapa-conteudo" class="rel-tab-pane" hidden>
         <div class="rel-loading">Aplicar filtros e abrir esta aba para carregar o mapa…</div>
+      </div>
+
+      <!-- Aba: Fichas de Ninho -->
+      <div id="fichas-conteudo" class="rel-tab-pane" hidden>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--cinza-500);cursor:pointer">
+            <input type="checkbox" id="fichas-marcar-todos" onchange="fichasMarcarTodos(this.checked)">
+            Selecionar todos os ninhos listados
+          </label>
+          <button class="btn btn-primary" id="fichas-gerar-btn" onclick="fichasGerarPDF()" disabled>Gerar PDF (0 selecionados)</button>
+        </div>
+        <div id="fichas-lista" style="display:flex;flex-direction:column;gap:8px">
+          <p style="color:var(--cinza-500)">Aplique os filtros acima e abra esta aba para listar os ninhos.</p>
+        </div>
       </div>
     </div>
 
@@ -770,7 +789,7 @@
   window.relTab = function(nome) { _tabAtual = nome; mostrarTab(nome) }
 
   function mostrarTab(nome) {
-    ;['painel','detalhado','mapa'].forEach(t => {
+    ;['painel','detalhado','mapa','fichas'].forEach(t => {
       const pane = document.getElementById(t + '-conteudo')
       if (pane) pane.hidden = (t !== nome)
       document.getElementById('tab-btn-' + t)?.classList.toggle('ativo', t === nome)
@@ -778,6 +797,82 @@
     if (nome === 'painel'    && _dados && !_graphed.painel)    { desenharPainel(_dados);    _graphed.painel = true }
     if (nome === 'detalhado' && _dados && !_graphed.detalhado) { desenharDetalhado(_dados); _graphed.detalhado = true }
     if (nome === 'mapa') mapaEnsureInit()
+    if (nome === 'fichas') fichasCarregar()
+  }
+
+  // ── Aba: Fichas de Ninho ─────────────────────────────────────────
+  // Reaproveita os mesmos filtros do topo (temporada/UC/praia/localização)
+  // para listar os ninhos e permitir gerar a ficha PDF individual ou em
+  // lote (ex.: "todos os ninhos da praia") via js/biomonitor-relatorio-ninho.js.
+  let _fichasNinhos = []
+
+  function praiaIdsFiltradas() {
+    const loc  = sel('fil-localizacao').value
+    const ucId = sel('fil-uc').value
+    const prr  = sel('fil-praia').value
+    if (prr) return [prr]
+    if (!loc && !ucId) return null
+    return _praias_todas
+      .filter(p => (!loc || p.tipo_localizacao === loc) && (!ucId || p.uc_id === ucId))
+      .map(p => p.id)
+  }
+
+  async function fichasCarregar() {
+    const cont = document.getElementById('fichas-lista')
+    cont.innerHTML = '<p style="color:var(--cinza-500)">Carregando...</p>'
+
+    const tmp = sel('fil-temporada').value || null
+    let q = db.from('vw_ninhos_validacao')
+      .select('id,numero_ninho,especie,praia_nome,praia_atual_nome,praia_id,praia_atual_id,status,status_validacao,data_encontro,monitor_nome')
+      .order('numero_ninho')
+    if (tmp) q = q.eq('temporada_id', tmp)
+    const { data, error } = await q
+    if (error) { toast(error.message, 'error'); return }
+
+    const praiaIds = praiaIdsFiltradas()
+    _fichasNinhos = praiaIds
+      ? (data || []).filter(n => praiaIds.includes(n.praia_id) || praiaIds.includes(n.praia_atual_id))
+      : (data || [])
+
+    document.getElementById('fichas-marcar-todos').checked = false
+    renderFichasLista()
+  }
+
+  function renderFichasLista() {
+    const cont = document.getElementById('fichas-lista')
+    if (!_fichasNinhos.length) {
+      cont.innerHTML = '<p style="color:var(--cinza-500)">Nenhum ninho encontrado com esses filtros.</p>'
+      fichasAtualizarSelecao()
+      return
+    }
+    cont.innerHTML = _fichasNinhos.map(n => `
+      <label style="display:flex;align-items:center;gap:10px;background:var(--branco);border:1px solid var(--borda);border-radius:8px;padding:10px 12px;cursor:pointer;box-shadow:var(--sombra)">
+        <input type="checkbox" class="fichas-check" value="${n.id}" onchange="fichasAtualizarSelecao()">
+        <div style="flex:1;min-width:0">
+          <strong>${esc(n.numero_ninho)}</strong>
+          <span style="color:var(--cinza-500);font-size:12px"> · ${esc(n.especie)} · ${esc(n.praia_atual_nome || n.praia_nome || '—')}</span>
+        </div>
+        <span style="font-size:11px;color:var(--cinza-500)">${formatData(n.data_encontro)}</span>
+        <button type="button" class="btn btn-sm btn-secondary" onclick="event.preventDefault();bioAbrirRelatorioNinho(db,'${n.id}')">Gerar PDF</button>
+      </label>`).join('')
+    fichasAtualizarSelecao()
+  }
+
+  window.fichasMarcarTodos = function(checked) {
+    document.querySelectorAll('.fichas-check').forEach(cb => { cb.checked = checked })
+    fichasAtualizarSelecao()
+  }
+
+  window.fichasAtualizarSelecao = function() {
+    const n = document.querySelectorAll('.fichas-check:checked').length
+    const btn = document.getElementById('fichas-gerar-btn')
+    btn.textContent = `Gerar PDF (${n} selecionado${n !== 1 ? 's' : ''})`
+    btn.disabled = n === 0
+  }
+
+  window.fichasGerarPDF = async function() {
+    const ids = [...document.querySelectorAll('.fichas-check:checked')].map(cb => cb.value)
+    await bioAbrirRelatorioNinhos(db, ids)
   }
 
   // ── Renderização principal ──────────────────────────────────────
