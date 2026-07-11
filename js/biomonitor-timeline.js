@@ -83,6 +83,7 @@ async function bioBuscarEventosServidor(sb, ninhos) {
     }))
     pushRows(rSol, 'soltura', r => ({
       data: r.data_soltura, hora: r.hora_soltura,
+      via_bercario: r.via_bercario,
       txt: [`Soltura · ${r.qtd_soltada} filh.`,
         r.mortalidade ? `${r.mortalidade} mort.` : null,
         r.via_bercario ? '(via berçário)' : null,
