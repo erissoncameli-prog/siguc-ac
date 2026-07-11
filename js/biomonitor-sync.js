@@ -85,7 +85,11 @@ async function bioSyncNinhos(monitorId, onProgresso) {
       foto_urls:        fotoUrls,
       observacoes:      ninho.observacoes      || null,
       monitor_id:       monitorId,
-      grupo_id:         ninho.grupo_id         || null,
+      // Registro local antigo pode não ter grupo — cai para o grupo do
+      // monitor logado; nulo o trigger do servidor deriva do monitor_id
+      grupo_id:         ninho.grupo_id
+        || (typeof BioApp !== 'undefined' ? BioApp.monitor?.grupo_id : null)
+        || null,
       localizacao:      ninho.lat != null && ninho.lng != null
         ? `POINT(${ninho.lng} ${ninho.lat})`
         : null,
