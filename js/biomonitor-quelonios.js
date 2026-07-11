@@ -2434,10 +2434,11 @@ async function bioRenderizarFilhotesDoBercario(bercarioId, temporadaId) {
          ult.peso_g != null ? `${ult.peso_g}g` : null].filter(Boolean).join(' · ')
       : 'sem biometria'
     const classeExtra = ind.status !== 'ativo' ? ` ${ind.status}` : ''
+    const classeCor = ind.status === 'morto' ? ' num-morto' : ind.doente ? ' num-doente' : ' num-vivo'
     return `
       <div class="bio-filhote-chip${classeExtra}" data-individuo-uuid="${ind.uuid_cliente}">
-        <span class="bio-filhote-num">#${ind.numero}</span>
-        <span class="bio-filhote-bio">${STATUS_LABEL[ind.status] ?? bioTxt}</span>
+        <span class="bio-filhote-num${classeCor}">#${ind.numero}</span>
+        <span class="bio-filhote-bio">${ind.doente && ind.status === 'ativo' ? 'doente' : STATUS_LABEL[ind.status] ?? bioTxt}</span>
       </div>`
   }).join('')
 }
@@ -2533,6 +2534,13 @@ function bioAbrirTelaDetalheIndividuo(individuo) {
     if (btnObito) btnObito.hidden = individuo.status === 'soltado'
   }
 
+  if (el('bio-ind-doenca')) el('bio-ind-doenca').textContent = individuo.doente ? 'Sim' : 'Não'
+  const btnDoenca = el('bio-btn-doenca-individuo')
+  if (btnDoenca) {
+    btnDoenca.hidden = individuo.status !== 'ativo'
+    btnDoenca.textContent = individuo.doente ? 'Remover doença' : 'Marcar doente'
+  }
+
   bioCarregarTimelineIndividuo(individuo)
   bioMostrarTela('tela-detalhe-individuo')
 }
@@ -2581,6 +2589,21 @@ async function bioMarcarObitoIndividuo(individuo) {
   BioApp.individuoAtual = atualizado
   bioSyncTudo({ monitorId: BioApp.monitor?.id, onConcluido: () => bioAtualizarBadgeFila() })
   bioToast(`Óbito registrado — filhote #${individuo.numero}.`, 'ok')
+  bioAbrirTelaDetalheIndividuo(atualizado)
+}
+
+async function bioAlternarDoencaIndividuo(individuo) {
+  const atualizado = {
+    ...individuo,
+    doente: !individuo.doente,
+    status_sync: 'pendente',
+  }
+  await bioOfflineSalvarIndividuo(atualizado)
+  BioApp.individuoAtual = atualizado
+  bioSyncTudo({ monitorId: BioApp.monitor?.id, onConcluido: () => bioAtualizarBadgeFila() })
+  bioToast(atualizado.doente
+    ? `Filhote #${individuo.numero} marcado como doente.`
+    : `Doença removida do filhote #${individuo.numero}.`, 'ok')
   bioAbrirTelaDetalheIndividuo(atualizado)
 }
 
@@ -2929,6 +2952,10 @@ function bioIniciarPosEclosao() {
   document.getElementById('bio-btn-obito-individuo')?.addEventListener('click', () => {
     const ind = BioApp.individuoAtual
     if (ind && confirm(`Confirma o óbito do filhote #${ind.numero}?`)) bioMarcarObitoIndividuo(ind)
+  })
+  document.getElementById('bio-btn-doenca-individuo')?.addEventListener('click', () => {
+    const ind = BioApp.individuoAtual
+    if (ind) bioAlternarDoencaIndividuo(ind)
   })
 
   // Biometria individual
