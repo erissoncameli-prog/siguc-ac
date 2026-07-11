@@ -466,6 +466,13 @@ async function bioSyncOcorrencias(monitorId, onProgresso) {
     const loteServId = loteLocal?.server_id
     if (!loteServId) continue
 
+    let individuoServId = null
+    if (oc.individuo_uuid) {
+      const indLocal = await bioOfflineGetIndividuo(oc.individuo_uuid)
+      individuoServId = indLocal?.server_id ?? null
+      if (!individuoServId) continue  // indivíduo ainda não sincronizado
+    }
+
     let fotoUrlsOc = oc.foto_urls ?? []
     try {
       if (fotoUrlsOc.some(f => f.startsWith('data:'))) {
@@ -476,6 +483,7 @@ async function bioSyncOcorrencias(monitorId, onProgresso) {
     const payload = {
       uuid_cliente:         oc.uuid_cliente,
       lote_id:              loteServId,
+      individuo_id:         individuoServId,
       tipo:                 oc.tipo,
       data_ocorrencia:      oc.data_ocorrencia,
       hora_ocorrencia:      oc.hora_ocorrencia      || null,
@@ -932,7 +940,8 @@ async function bioSyncPullOcorrencias(grupoId) {
       id, uuid_cliente, tipo, data_ocorrencia, hora_ocorrencia,
       comprimento_medio_cm, peso_medio_g, n_amostrados, qtd_afetados, causa,
       descricao, foto_urls, monitor_id, criado_em, sincronizado_em,
-      lote:lotes_bercario(uuid_cliente)
+      lote:lotes_bercario(uuid_cliente),
+      individuo:filhotes_bercario(uuid_cliente)
     `)
     .eq('grupo_id', grupoId)
     .order('data_ocorrencia', { ascending: false })
@@ -945,6 +954,7 @@ async function bioSyncPullOcorrencias(grupoId) {
     await bioOfflineSalvarOcorrencia({
       uuid_cliente:         oc.uuid_cliente,
       lote_uuid:            oc.lote.uuid_cliente,
+      individuo_uuid:       oc.individuo?.uuid_cliente ?? null,
       tipo:                 oc.tipo,
       data_ocorrencia:      oc.data_ocorrencia,
       hora_ocorrencia:      oc.hora_ocorrencia,
