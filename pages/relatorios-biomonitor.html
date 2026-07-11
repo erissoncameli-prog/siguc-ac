@@ -576,7 +576,8 @@
   // ── Estado global ───────────────────────────────────────────────
   let _dados = null
   let _charts = {}
-  let _descAgg = { natural:0, predacao:0, humana:0, total:0 }
+  let _descAgg = { natural:0, predacao:0, humana:0, total:0,
+    porCausa: { predacao:0, alagamento:0, erosao:0, humana:0, natural:0 } }
   let _metasPraia = []
   let _chartJsCarregado = false
   let _bercMortalidade = []
