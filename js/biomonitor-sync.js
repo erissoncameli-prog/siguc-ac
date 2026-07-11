@@ -478,7 +478,7 @@ async function bioSyncOcorrencias(monitorId, onProgresso) {
       comprimento_medio_cm: oc.comprimento_medio_cm ?? null,
       peso_medio_g:         oc.peso_medio_g         ?? null,
       n_amostrados:         oc.n_amostrados         ?? null,
-      qtd_afetados:         oc.qtd_afetados         ?? null,
+      qtd_afetados:         oc.qtd_afetados         ?? 0,
       causa:                oc.causa                || null,
       descricao:            oc.descricao            || null,
       foto_urls:            fotoUrlsOc,
