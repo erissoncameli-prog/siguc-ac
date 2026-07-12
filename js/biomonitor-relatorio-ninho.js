@@ -28,6 +28,10 @@ const BIOREL_TIPO_OCORR = {
   doenca: 'Doença', tratamento: 'Tratamento', observacao: 'Observação',
 }
 
+// Nome da plataforma mostrado no canto superior direito do cabeçalho — o
+// nome/apps do sistema ainda podem mudar; troque só aqui quando acontecer.
+const BIOREL_NOME_PLATAFORMA = 'Biomonitor'
+
 const _biorelHora = h => h ? String(h).slice(0, 5) : ''
 
 // ── Coleta de dados (servidor) ──────────────────────────────────────
@@ -122,7 +126,7 @@ function _biorelCabecalho(cab, protocolo, data) {
       <div class="sec">${esc(cab.secretaria)} — ${esc(cab.siglaSecr)}</div>
       <div class="dir">${esc(cab.diretoria)} · ${esc(cab.departamento)} · Biomonitoramento</div>
     </div>
-    <div class="rel-meta">SIGUC-AC<br>Emitido: ${data}<br>Prot. nº ${esc(protocolo)}</div>
+    <div class="rel-meta">${esc(BIOREL_NOME_PLATAFORMA)}<br>Emitido: ${data}<br>Prot. nº ${esc(protocolo)}</div>
   </div>`
 }
 
@@ -454,6 +458,12 @@ async function bioAbrirRelatorioNinhos(db, ninhoIds) {
       nome: appState.usuario?.nome_completo || appState.usuario?.email || 'Usuário',
       cargo: appState.perfil || '', registro: '', orgao: cab.siglaSecr,
     }
+    // Biomonitor é vinculado ao Departamento de Biodiversidade, não ao DEUC
+    // (config_sistema.departamento é global e compartilhado com o relatório
+    // CAR — sobrescrever só aqui, depois de resolvido, evita mudar o CAR).
+    cab.departamento = 'Departamento de Biodiversidade'
+    cab.siglaDep = 'DEBIO'
+    cab.gestao = '' // período de gestão não aparece na ficha do Biomonitor
     ninhos = await bioColetarDadosRelatorioNinhos(db, ninhoIds)
   } catch (e) {
     toast('Erro ao gerar ficha: ' + e.message, 'error')
