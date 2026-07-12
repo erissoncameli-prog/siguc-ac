@@ -92,6 +92,11 @@ window.acAplicar = async function (filtros) {
     const capaEl = document.getElementById('ac-capa')
     if (capaEl && typeof getCabecalhoRelatorio === 'function') {
       const cab = await getCabecalhoRelatorio()
+      // Biomonitor é vinculado ao Departamento de Biodiversidade, não ao DEUC
+      // (config_sistema.departamento é global e compartilhado com o relatório
+      // CAR — sobrescrever só aqui, depois de resolvido, evita mudar o CAR).
+      cab.departamento = 'Departamento de Biodiversidade'
+      cab.siglaDep = 'DEBIO'
       capaEl.innerHTML = acCapa(ana, cab)
     }
   } catch (_) { /* capa é opcional — não bloqueia o relatório */ }
@@ -178,7 +183,7 @@ function acCapa(ana, cab) {
       <div class="l1">${esc(cab.governo || 'Governo do Estado do Acre')}${gestao}</div>
       <div class="l2">${esc(cab.secretaria || 'Secretaria de Estado do Meio Ambiente do Acre')} — ${esc(cab.siglaSecr || 'SEMA-AC')}</div>
       <div class="l3">${esc(cab.diretoria || 'Diretoria de Meio Ambiente')} (${esc(cab.siglaDiret || 'DIMA')})</div>
-      ${cab.departamento ? `<div class="l3">${esc(cab.departamento)} (${esc(cab.siglaDep || 'DEUC')})</div>` : ''}
+      ${cab.departamento ? `<div class="l3">${esc(cab.departamento)} (${esc(cab.siglaDep || 'DEBIO')})</div>` : ''}
     </div>
     <div class="ac-capa-mid">
       <div class="ac-capa-tipo">Relatório Científico</div>
