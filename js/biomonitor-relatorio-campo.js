@@ -12,7 +12,7 @@ const BIOCAMPO_CAB_PADRAO = {
   governo: 'Governo do Estado do Acre', gestao: '',
   secretaria: 'Secretaria de Estado do Meio Ambiente do Acre', siglaSecr: 'SEMA-AC',
   diretoria: 'Diretoria de Meio Ambiente', siglaDiret: 'DIMA',
-  departamento: 'Departamento de Unidades de Conservação', siglaDep: 'DEUC',
+  departamento: 'Departamento de Biodiversidade', siglaDep: 'DEBIO',
   logoGoverno: null, logoSecr: null,
 }
 

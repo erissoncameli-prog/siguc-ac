@@ -454,6 +454,11 @@ async function bioAbrirRelatorioNinhos(db, ninhoIds) {
       nome: appState.usuario?.nome_completo || appState.usuario?.email || 'Usuário',
       cargo: appState.perfil || '', registro: '', orgao: cab.siglaSecr,
     }
+    // Biomonitor é vinculado ao Departamento de Biodiversidade, não ao DEUC
+    // (config_sistema.departamento é global e compartilhado com o relatório
+    // CAR — sobrescrever só aqui, depois de resolvido, evita mudar o CAR).
+    cab.departamento = 'Departamento de Biodiversidade'
+    cab.siglaDep = 'DEBIO'
     ninhos = await bioColetarDadosRelatorioNinhos(db, ninhoIds)
   } catch (e) {
     toast('Erro ao gerar ficha: ' + e.message, 'error')
