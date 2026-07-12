@@ -4,7 +4,6 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>SIGUC-AC · Dossiê Científico da Temporada</title>
 <link rel="stylesheet" href="../css/global.css">
-<link rel="stylesheet" href="../css/relatorio-print.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="../js/observability.js"></script>
 <script src="../js/queryLogger.js"></script>
@@ -130,9 +129,21 @@
 .ac-metodo .ac-prosa { font-size:12.5px; }
 
 @media print {
+  @page { size:A4 portrait; margin:12mm; }
+  /* Esconde a moldura do app — imprime só o dossiê */
+  .sidebar, .sidebar-overlay, .topbar, .mobile-menu-btn,
+  .sidebar-footer, #siguc-progress-bar,
   .ac-filtros, .no-print { display:none !important; }
-  .ac-sec { break-inside:avoid; }
-  .ac-chart-wrap { break-inside:avoid; }
+  /* Neutraliza o layout de app para o conteúdo fluir na folha */
+  html, body { background:#fff !important; }
+  .app-layout, .main-content, .page-body, #app { display:block !important;
+    margin:0 !important; padding:0 !important; width:auto !important;
+    max-width:none !important; height:auto !important; overflow:visible !important; }
+  .ac-doc-head, .ac-sec, .ac-chart-wrap, .ac-fase-card, .ac-esp-card,
+  .ac-rec, .ac-table { break-inside:avoid; }
+  .ac-chart-wrap { height:220px; }
+  /* Garante as cores dos cards/gráficos na impressão */
+  * { -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important; }
 }
 </style>
 </head>
