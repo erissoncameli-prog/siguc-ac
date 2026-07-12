@@ -78,6 +78,19 @@ async function bioCompartilharArquivo(blob, filename, titulo) {
   bioToast('PDF baixado — envie manualmente pelo WhatsApp ou e-mail.', '')
 }
 
+// Logos institucionais (mesmas de config_sistema.dados.logos usadas na tela
+// de login do app — aqui a variante colorida normal, para fundo branco).
+async function _biocampoBuscarLogos() {
+  try {
+    const { data } = await bioSupabase().from('config_sistema').select('dados').eq('id', 1).single()
+    const logos = data?.dados?.logos
+    return { logoGoverno: logos?.governo_url || null, logoSecr: logos?.secretaria_url || null }
+  } catch (e) {
+    console.warn('[biomonitor] logos institucionais indisponíveis para o PDF:', e)
+    return { logoGoverno: null, logoSecr: null }
+  }
+}
+
 // ── Ponto de entrada: botão "Gerar PDF" no card do ninho ────────────
 async function bioGerarPDFCampo(n) {
   if (!navigator.onLine) { bioToast('Requer conexão para gerar o PDF.', 'err'); return }
@@ -85,12 +98,16 @@ async function bioGerarPDFCampo(n) {
 
   let container
   try {
-    const ninhos = await bioColetarDadosRelatorioNinhos(bioSupabase(), [n.id], { modo: 'resumido' })
+    const [ninhos, logos] = await Promise.all([
+      bioColetarDadosRelatorioNinhos(bioSupabase(), [n.id], { modo: 'resumido' }),
+      _biocampoBuscarLogos(),
+    ])
     if (!ninhos.length) { bioToast('Ninho não encontrado.', 'err'); return }
     const ninho = ninhos[0]
 
     const cab = {
       ...BIOCAMPO_CAB_PADRAO,
+      ...logos,
       responsavel: { nome: BioApp.monitor?.nome_completo || 'Monitor de campo', orgao: 'SEMA-AC' },
     }
     const protocolo = 'CAMPO-' + new Date().toISOString().slice(0, 10).replace(/-/g, '')
