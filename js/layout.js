@@ -120,7 +120,7 @@ function gerarLayout(tituloPagina, paginaAtiva) {
         { id: 'biomonitor-bercarios',  href: '../pages/biomonitor-bercarios.html', label: 'Berçários',
           perfis: ['gestor','tecnico','super_admin'] },
         { id: 'relatorios-biomonitor', href: '../pages/relatorios-biomonitor.html',label: 'Relatórios' },
-        { id: 'analise-cientifica-biomonitor', href: '../pages/analise-cientifica-biomonitor.html', label: 'Dossiê Científico',
+        { id: 'analise-cientifica-biomonitor', href: '../pages/analise-cientifica-biomonitor.html', label: 'Relatório Científico',
           perfis: ['gestor','tecnico','super_admin'] },
         { id: 'admin-biomonitor',      href: '../pages/admin-biomonitor.html',     label: 'Administrar',
           perfis: ['super_admin','gestor','tecnico'] },
