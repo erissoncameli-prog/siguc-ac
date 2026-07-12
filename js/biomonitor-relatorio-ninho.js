@@ -36,7 +36,12 @@ const _biorelHora = h => h ? String(h).slice(0, 5) : ''
 // falta para a ficha: fotos da eclosão, lotes de berçário com ocorrências,
 // filhotes individuais e todas as suas biometrias, e a soltura (direta ou
 // do lote).
-async function bioColetarDadosRelatorioNinhos(db, ninhoIds) {
+// `opts.modo`: 'completo' (padrão, web — inclui fotos e biometria individual
+// por filhote) ou 'resumido' (app de campo — pula fotos da eclosão e a
+// biometria individual, mantendo identificação, timeline e destino dos
+// filhotes em contagens agregadas; menos consultas, ficha mais leve/rápida).
+async function bioColetarDadosRelatorioNinhos(db, ninhoIds, opts = {}) {
+  const modo = opts.modo === 'resumido' ? 'resumido' : 'completo'
   const { data: ninhos, error } = await db.from('vw_ninhos_validacao')
     .select('*').in('id', ninhoIds).order('numero_ninho')
   if (error) throw error
@@ -45,7 +50,9 @@ async function bioColetarDadosRelatorioNinhos(db, ninhoIds) {
   const mapaEventos = await bioBuscarEventosServidor(db, ninhos)
 
   const [{ data: eclosoes }, { data: lotes }] = await Promise.all([
-    db.from('eclosoes_ninho').select('ninho_id,foto_urls,observacoes').in('ninho_id', ninhoIds),
+    modo === 'completo'
+      ? db.from('eclosoes_ninho').select('ninho_id,foto_urls,observacoes').in('ninho_id', ninhoIds)
+      : Promise.resolve({ data: [] }),
     db.from('lotes_bercario')
       .select('id,ninho_id,bercario_nome,data_entrada,hora_entrada,qtd_entrada,status,observacoes')
       .in('ninho_id', ninhoIds).order('data_entrada'),
@@ -68,7 +75,7 @@ async function bioColetarDadosRelatorioNinhos(db, ninhoIds) {
       .in('ninho_id', ninhoIds),
   ])
 
-  const filhoteIds = (filhotes || []).map(f => f.id)
+  const filhoteIds = modo === 'completo' ? (filhotes || []).map(f => f.id) : []
   const { data: biometrias } = filhoteIds.length
     ? await db.from('biometrias_individuais')
         .select('individuo_id,data_medicao,hora_medicao,comprimento_cm,peso_g,largura_carapaca_cm,comprimento_plastrao_cm,observacoes')
@@ -271,7 +278,23 @@ function _biorelSolturaTxt(s) {
   ].filter(Boolean).join(' · ')
 }
 
-function _biorelDestinoFilhotes(n) {
+// Resumo agregado dos filhotes de um lote (usado no modo 'resumido' — app
+// de campo — no lugar da tabela filhote-a-filhote com biometrias).
+function _biorelFilhotesResumoTxt(filhotes) {
+  const ativos  = filhotes.filter(f => f.status === 'ativo').length
+  const mortos  = filhotes.filter(f => f.status === 'morto').length
+  const soltos  = filhotes.filter(f => f.status === 'soltado').length
+  const doentes = filhotes.filter(f => f.doente).length
+  return [
+    `${filhotes.length} filhote(s) numerados`,
+    ativos ? `${ativos} ativo(s)` : null,
+    soltos ? `${soltos} já soltos` : null,
+    mortos ? `${mortos} óbito(s)` : null,
+    doentes ? `${doentes} doente(s)` : null,
+  ].filter(Boolean).join(' · ')
+}
+
+function _biorelDestinoFilhotes(n, modo = 'completo') {
   const partes = []
 
   if (n._lotes?.length) {
@@ -300,7 +323,7 @@ function _biorelDestinoFilhotes(n) {
           </tr>`).join('')}
         </table>` : ''}
 
-        ${l.filhotes.length ? `
+        ${l.filhotes.length ? (modo === 'completo' ? `
         <div class="rel-secao-subtitulo">Filhotes individuais (${l.filhotes.length})</div>
         <table class="rel-table rel-table-sm">
           <tr><th>Nº</th><th>Status</th><th>Doente</th><th>Óbito</th><th>Biometrias registradas</th></tr>
@@ -313,7 +336,9 @@ function _biorelDestinoFilhotes(n) {
               ? f.biometrias.map(b => `${formatData(b.data_medicao)}: ${esc(_biorelBiometriaTxt(b))}`).join('<br>')
               : '—'}</td>
           </tr>`).join('')}
-        </table>` : ''}
+        </table>` : `
+        <div class="rel-secao-subtitulo">Filhotes individuais</div>
+        <p style="font-size:10px;color:#374151">${esc(_biorelFilhotesResumoTxt(l.filhotes))}</p>`) : ''}
 
         ${l.soltura ? `
         <div class="rel-secao-subtitulo">Soltura do lote</div>
@@ -368,21 +393,21 @@ function _biorelFotos(n) {
 }
 
 // ── Monta uma folha (.rel-a4) por ninho ──────────────────────────────
-function _biorelFolhaNinho(n, cab, protocolo, data, idx, total) {
+function _biorelFolhaNinho(n, cab, protocolo, data, idx, total, modo = 'completo') {
   return `
   <div class="rel-a4">
     ${_biorelCabecalho(cab, protocolo, data)}
     <div class="rel-body">
       <div class="rel-titulo-bloco">
-        <div class="rel-tipo-label">Ficha de Monitoramento de Ninho — Biomonitor</div>
+        <div class="rel-tipo-label">Ficha de Monitoramento de Ninho — Biomonitor${modo === 'resumido' ? ' (campo)' : ''}</div>
         <div class="rel-nome-imovel">${esc(n.numero_ninho)}</div>
         <div class="rel-cod-imovel">${esc(BIOREL_ESPECIE[n.especie] || n.especie)} · ${esc(n.praia_atual_nome || n.praia_nome || '—')}${n.uc_nome ? ' · ' + esc(n.uc_nome) : ''}</div>
       </div>
       ${_biorelIdentificacao(n)}
       ${_biorelTimeline(n)}
-      ${_biorelDestinoFilhotes(n)}
+      ${_biorelDestinoFilhotes(n, modo)}
       ${n.observacoes ? `<div class="rel-secao"><div class="rel-secao-titulo">Observações</div><p style="font-size:10px;color:#374151;font-style:italic">${esc(n.observacoes)}</p></div>` : ''}
-      ${_biorelFotos(n)}
+      ${modo === 'completo' ? _biorelFotos(n) : ''}
       ${_biorelAssinatura(cab)}
     </div>
     ${_biorelRodape(cab, protocolo, `Ninho ${idx}/${total}`)}
@@ -390,11 +415,11 @@ function _biorelFolhaNinho(n, cab, protocolo, data, idx, total) {
 }
 
 // ── Geração completa (1..N ninhos) ───────────────────────────────────
-async function _biorelGerarHTML(ninhos, cab, protocolo) {
+async function _biorelGerarHTML(ninhos, cab, protocolo, modo = 'completo') {
   const data = new Date().toLocaleDateString('pt-BR')
   const folhas = []
   if (ninhos.length > 1) folhas.push(_biorelFolhaCapa(ninhos, cab, protocolo, data))
-  ninhos.forEach((n, i) => folhas.push(_biorelFolhaNinho(n, cab, protocolo, data, i + 1, ninhos.length)))
+  ninhos.forEach((n, i) => folhas.push(_biorelFolhaNinho(n, cab, protocolo, data, i + 1, ninhos.length, modo)))
   return `<div id="rel-print-root"><link rel="stylesheet" href="../css/relatorio-print.css">${folhas.join('\n')}</div>`
 }
 

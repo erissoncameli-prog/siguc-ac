@@ -35,7 +35,7 @@ mkdirSync(join(WWW, 'js'),           { recursive: true })
 mkdirSync(join(WWW, 'vendor/fonts'), { recursive: true })
 
 // ── JS compartilhado (transpilado para ES2017) ────────────────
-for (const f of ['config.js', 'biomonitor-offline.js', 'biomonitor-sync.js', 'biomonitor-alertas.js', 'brigada-captura.js', 'biomonitor-timeline.js', 'biomonitor-quelonios.js']) {
+for (const f of ['config.js', 'biomonitor-offline.js', 'biomonitor-sync.js', 'biomonitor-alertas.js', 'brigada-captura.js', 'biomonitor-timeline.js', 'biomonitor-relatorio-ninho.js', 'biomonitor-relatorio-campo.js', 'biomonitor-quelonios.js']) {
   copiarJsTranspilado(join(RAIZ, 'js', f), join(WWW, 'js', f))
 }
 
@@ -47,6 +47,10 @@ cpSync(join(RAIZ, 'pwa/icons/biomonitor-logo.png'), join(WWW, 'pwa/icons/biomoni
 let css = readFileSync(join(RAIZ, 'css', 'biomonitor.css'), 'utf8')
 css = css.replace(/@import url\('https:\/\/fonts\.googleapis\.com[^']*'\);?\n?/g, '')
 writeFileSync(join(WWW, 'css', 'biomonitor.css'), css)
+
+// Ficha de ninho (usada pelo botão "Gerar PDF" em Ninhos abertos) — sem
+// @import externo, cópia direta.
+cpSync(join(RAIZ, 'css', 'relatorio-print.css'), join(WWW, 'css', 'relatorio-print.css'))
 
 // ── Vendor: Supabase UMD (transpilado para ES2017) + fontes ────
 copiarJsTranspilado(join(APP, 'node_modules/@supabase/supabase-js/dist/umd/supabase.js'), join(WWW, 'vendor/supabase.js'))
@@ -129,7 +133,7 @@ html = html.replace('</head>', `<script>window.__SIGUC_ENV=${envJson}</script>\n
 writeFileSync(join(WWW, 'index.html'), html)
 
 // ── Sanidade ───────────────────────────────────────────────────
-for (const f of ['index.html', 'vendor/supabase.js', 'vendor/fonts.css', 'css/biomonitor.css', 'js/config.js', 'js/biomonitor-timeline.js', 'js/biomonitor-quelonios.js', 'pwa/icons/biomonitor-logo.png']) {
+for (const f of ['index.html', 'vendor/supabase.js', 'vendor/fonts.css', 'css/biomonitor.css', 'css/relatorio-print.css', 'js/config.js', 'js/biomonitor-timeline.js', 'js/biomonitor-relatorio-ninho.js', 'js/biomonitor-relatorio-campo.js', 'js/biomonitor-quelonios.js', 'pwa/icons/biomonitor-logo.png']) {
   if (!existsSync(join(WWW, f))) { console.error(`ERRO: faltando www/${f}`); process.exit(1) }
 }
 const indexFinal = readFileSync(join(WWW, 'index.html'), 'utf8')
@@ -145,7 +149,7 @@ if (!/window\.__SIGUC_ENV=\{.*supabaseUrl.*supabaseKey/.test(indexFinal)) {
 // quebravam o supabase.js em WebViews < 85. São sinais confiáveis (não
 // aparecem em strings do app), então servem de trava contra regressão do
 // alvo de transpilação. O esbuild também baixa ?. e ?? (ES2020) no mesmo passo.
-for (const f of ['vendor/supabase.js', 'js/config.js', 'js/biomonitor-quelonios.js', 'js/biomonitor-sync.js', 'js/biomonitor-offline.js', 'js/biomonitor-alertas.js', 'js/brigada-captura.js', 'js/biomonitor-timeline.js']) {
+for (const f of ['vendor/supabase.js', 'js/config.js', 'js/biomonitor-quelonios.js', 'js/biomonitor-sync.js', 'js/biomonitor-offline.js', 'js/biomonitor-alertas.js', 'js/brigada-captura.js', 'js/biomonitor-timeline.js', 'js/biomonitor-relatorio-ninho.js', 'js/biomonitor-relatorio-campo.js']) {
   const js = readFileSync(join(WWW, f), 'utf8')
   const proibidos = js.match(/\|\|=|&&=|\?\?=/g)
   if (proibidos) {
