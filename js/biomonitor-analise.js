@@ -83,6 +83,15 @@ window.acAplicar = async function (filtros) {
 
   await acCarregarChartJS()
 
+  // Capa institucional (só aparece na impressão/PDF)
+  try {
+    const capaEl = document.getElementById('ac-capa')
+    if (capaEl && typeof getCabecalhoRelatorio === 'function') {
+      const cab = await getCabecalhoRelatorio()
+      capaEl.innerHTML = acCapa(ana, cab)
+    }
+  } catch (_) { /* capa é opcional — não bloqueia o dossiê */ }
+
   el.innerHTML = [
     acCabecalho(ana, filtros),
     acSecSumario(kpis, ana, dados),
@@ -132,6 +141,46 @@ function acCabecalho(ana, filtros) {
       <em>referência</em> = literatura citada ao final.
     </p>
   </header>`
+}
+
+// Capa institucional para impressão (ABNT-like). Usa dados de
+// config_sistema (getCabecalhoRelatorio) — logos, hierarquia, contato.
+function acCapa(ana, cab) {
+  cab = cab || {}
+  const t = ana.temporada
+  const hoje = new Date().toLocaleDateString('pt-BR')
+  const nome = t ? esc(t.nome) : 'Todas as temporadas'
+  const janela = (t && t.data_inicio) ? `${acData(t.data_inicio)} a ${acData(t.data_fim)}` : '—'
+  const faseAtual = (t && t.fase_atual) ? (AC_FASE_ATUAL_LBL[t.fase_atual] || t.fase_atual) : '—'
+  const ref = `BIO-QUEL/${(t && t.ano_base) || new Date().getFullYear()}`
+  const img = (url, alt) => url ? `<img src="${esc(url)}" alt="${esc(alt)}" onerror="this.style.display='none'">` : ''
+  const gestao = cab.gestao ? ` · Gestão ${esc(cab.gestao)}` : ''
+  const contato = [cab.telefone, cab.email, cab.site].filter(Boolean).map(esc).join(' · ')
+  return `
+    <div class="ac-capa-logos">${img(cab.logoGoverno, 'Governo do Acre')}${img(cab.logoSecr, 'SEMA-AC')}</div>
+    <div class="ac-capa-hier">
+      <div class="l1">${esc(cab.governo || 'Governo do Estado do Acre')}${gestao}</div>
+      <div class="l2">${esc(cab.secretaria || 'Secretaria de Estado do Meio Ambiente do Acre')} — ${esc(cab.siglaSecr || 'SEMA-AC')}</div>
+      <div class="l3">${esc(cab.diretoria || 'Diretoria de Meio Ambiente')} (${esc(cab.siglaDiret || 'DIMA')})</div>
+      ${cab.departamento ? `<div class="l3">${esc(cab.departamento)} (${esc(cab.siglaDep || 'DEUC')})</div>` : ''}
+    </div>
+    <div class="ac-capa-mid">
+      <div class="ac-capa-tipo">Dossiê Científico</div>
+      <h1 class="ac-capa-titulo">Dossiê Científico da Temporada</h1>
+      <div class="ac-capa-sub">Biomonitoramento de Quelônios Amazônicos</div>
+      <div class="ac-capa-temp">${nome}</div>
+      <table class="ac-capa-meta">
+        <tr><td>Período da temporada</td><td>${janela}</td></tr>
+        <tr><td>Momento do monitoramento</td><td>${faseAtual}</td></tr>
+        <tr><td>Emitido em</td><td>${hoje}</td></tr>
+        <tr><td>Referência</td><td>${ref}</td></tr>
+      </table>
+    </div>
+    <div class="ac-capa-rodape">
+      <div>${esc(cab.secretaria || 'SEMA-AC')}${cab.endereco ? ' — ' + esc(cab.endereco) : ''}</div>
+      ${contato ? `<div>${contato}</div>` : ''}
+      ${cab.avisoLegal ? `<div class="ac-capa-aviso">${esc(cab.avisoLegal)}</div>` : ''}
+    </div>`
 }
 
 function acData(d) {
