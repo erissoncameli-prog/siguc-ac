@@ -68,9 +68,10 @@ window.acAplicar = async function (filtros) {
     p_praia_id:     filtros.praia     || null,
   }
 
-  const [rRel, rAna] = await Promise.all([
+  const [rRel, rAna, rDet] = await Promise.all([
     db.rpc('bio_relatorio_completo', { ...params, p_tipo_localizacao: filtros.localizacao || null }),
     db.rpc('bio_analise_cientifica', { ...params, p_ref_date: null }),
+    db.rpc('bio_analise_detalhada', params),
   ])
 
   if (rRel.error && rAna.error) {
@@ -79,6 +80,7 @@ window.acAplicar = async function (filtros) {
   }
   const dados = rRel.data || {}
   const ana = rAna.data || {}
+  const det = rDet.data || {}
   const kpis = dados.kpis || {}
 
   await acCarregarChartJS()
@@ -98,12 +100,17 @@ window.acAplicar = async function (filtros) {
     acSecFase(ana),
     acSecFenologia(dados, ana),
     acSecEspecies(dados),
+    acSecOvos(det),
+    acSecEclosao(det),
+    acSecPerdas(det),
+    acSecTempos(det),
+    acSecCrescimento(det, dados),
     acSecTemperatura(ana),
     acSecClima(ana, kpis),
     acSecInteranual(dados),
-    acSecPerspectivas(kpis, ana, dados),
+    acSecPerspectivas(kpis, ana, dados, det),
     acSecFundamentacao(dados),
-    acSecMetodologia(kpis, ana),
+    acSecMetodologia(kpis, ana, det),
   ].join('')
 
   if (typeof bIconsAplicar === 'function') bIconsAplicar(el)
@@ -111,6 +118,11 @@ window.acAplicar = async function (filtros) {
   // Gráficos — depois do DOM montado
   acChartFenologia(dados, ana)
   acChartFase(ana)
+  acChartOvos(det)
+  acChartEclosao(det)
+  acChartPerdas(det)
+  acChartTempos(det)
+  acChartCrescimento(det)
   acChartTemperatura(ana)
   acChartInteranual(dados)
   acChartClima(ana)
@@ -329,11 +341,156 @@ function acSecEspecies(dados) {
   </section>`
 }
 
-// ── 5 · Temperatura & determinação sexual (TSD) ─────────────────
+function acMini(txt) {
+  return `<div class="ac-mini-title">${esc(txt)}</div>`
+}
+
+// ── 5 · Biologia dos ovos ───────────────────────────────────────
+function acSecOvos(det) {
+  const o = (det && det.ovos) || {}
+  const causas = o.descartes_por_causa || []
+  return `<section class="ac-sec">
+    ${acSecTitle('05', 'Biologia dos ovos', 'Postura, fertilidade e destino dos ovos')}
+    <p class="ac-prosa">A postura dos quelônios amazônicos varia com a espécie e o tamanho da fêmea — de ~4 ovos no muçuã a ~90 na tartaruga-da-Amazônia. A <strong>fertilidade</strong> (ovos íntegros ÷ postura) mede o potencial reprodutivo da coorte, e o <strong>descarte</strong> de ovos (natural, por predação ou por ação humana) reduz a base viável antes mesmo da incubação.</p>
+    <div class="ac-kpis">
+      <div class="ac-kpi" style="--c:#1A6B8C"><div class="ac-kpi-v">${acFmt(o.total_postura)}</div><div class="ac-kpi-l">Ovos na postura</div></div>
+      <div class="ac-kpi" style="--c:#2A9D6F"><div class="ac-kpi-v">${acFmt(o.total_integros)}</div><div class="ac-kpi-l">Ovos íntegros</div></div>
+      <div class="ac-kpi" style="--c:#C9A84C"><div class="ac-kpi-v">${acPct(o.taxa_fertilidade_pct)}</div><div class="ac-kpi-l">Fertilidade</div></div>
+      <div class="ac-kpi" style="--c:#D97706"><div class="ac-kpi-v">${o.media_postura != null ? o.media_postura : '—'}</div><div class="ac-kpi-l">Média de ovos/ninho</div></div>
+    </div>
+    ${causas.length ? `${acMini('Descartes de ovos por causa')}
+      <div class="ac-chart-wrap"><canvas id="ac-cv-ovos" height="150"></canvas></div>`
+      : `<div class="ac-flag ac-flag-info">Sem descartes de ovos registrados por causa nos filtros atuais.</div>`}
+  </section>`
+}
+
+// ── 6 · Eclosão & mortalidade embrionária ───────────────────────
+function acSecEclosao(det) {
+  const e = (det && det.eclosao) || {}
+  const total = acN(e.vivos) + acN(e.mortos) + acN(e.nao_nascidos)
+  return `<section class="ac-sec">
+    ${acSecTitle('06', 'Eclosão & mortalidade embrionária', 'Desfecho dos ovos incubados')}
+    <p class="ac-prosa">Na abertura do ninho, os ovos se resolvem em <strong>filhotes vivos</strong>, <strong>filhotes mortos</strong> ou <strong>ovos não nascidos</strong> (embriões que não completaram o desenvolvimento). A mortalidade embrionária tem causas ambientais e sanitárias: temperatura fora da faixa ótima, <strong>alagamento</strong> dos ninhos e infecções fúngicas — a <strong>fusariose</strong> (<em>Fusarium keratoplasticum</em>) já foi documentada em cascas de <em>P. unifilis</em>, e o alagamento e o reuso de substrato/moldura em berçários favorecem o fungo <span class="ac-cite">[ref.]</span>.</p>
+    <div class="ac-kpis">
+      <div class="ac-kpi" style="--c:#2A9D6F"><div class="ac-kpi-v">${acFmt(e.vivos)}</div><div class="ac-kpi-l">Filhotes vivos</div></div>
+      <div class="ac-kpi" style="--c:#DC2626"><div class="ac-kpi-v">${acFmt(e.mortos)}</div><div class="ac-kpi-l">Filhotes mortos</div></div>
+      <div class="ac-kpi" style="--c:#9CA3AF"><div class="ac-kpi-v">${acFmt(e.nao_nascidos)}</div><div class="ac-kpi-l">Ovos não nascidos</div></div>
+      <div class="ac-kpi" style="--c:#2A9D6F"><div class="ac-kpi-v">${acPct(e.taxa_eclosao_pct)}</div><div class="ac-kpi-l">Taxa de eclosão</div></div>
+      <div class="ac-kpi" style="--c:#D97706"><div class="ac-kpi-v">${acPct(e.taxa_mortalidade_embrionaria_pct)}</div><div class="ac-kpi-l">Mortalidade embrionária</div></div>
+    </div>
+    ${total > 0 ? `<div class="ac-chart-wrap" style="height:240px"><canvas id="ac-cv-ecl"></canvas></div>`
+      : `<div class="ac-flag">Sem eclosões registradas nos filtros atuais.</div>`}
+  </section>`
+}
+
+// ── 7 · Perdas & predação ───────────────────────────────────────
+function acSecPerdas(det) {
+  const p = (det && det.perdas) || {}
+  const pf = (det && det.predacao_fases) || {}
+  const inc = pf.incubacao || {}, ec = pf.eclosao || {}, so = pf.soltura || {}
+  const totalPerdas = acN(p.ovos_alagamento) + acN(p.ovos_erosao) + acN(p.ovos_humana) + acN(p.ovos_predacao)
+  return `<section class="ac-sec">
+    ${acSecTitle('07', 'Perdas & predação', 'Onde e como a coorte é perdida ao longo do ciclo')}
+    <p class="ac-prosa">As perdas concentram-se em três frentes: <strong>hidrológicas</strong> (alagamento e erosão, ligadas ao pulso de inundação), <strong>humanas</strong> (coleta) e <strong>predação</strong> por animais. A predação atua em todas as fases — incubação, eclosão e soltura — e é a principal justificativa do manejo (transferência de ninhos e berçário) para elevar o recrutamento.</p>
+    <div class="ac-kpis">
+      <div class="ac-kpi" style="--c:#1A6B8C"><div class="ac-kpi-v">${acFmt(p.ovos_alagamento)}</div><div class="ac-kpi-l">Ovos perdidos — alagamento</div></div>
+      <div class="ac-kpi" style="--c:#C9A84C"><div class="ac-kpi-v">${acFmt(p.ovos_erosao)}</div><div class="ac-kpi-l">Ovos perdidos — erosão</div></div>
+      <div class="ac-kpi" style="--c:#DC2626"><div class="ac-kpi-v">${acFmt(p.ovos_humana)}</div><div class="ac-kpi-l">Ovos perdidos — humana</div></div>
+      <div class="ac-kpi" style="--c:#D97706"><div class="ac-kpi-v">${acFmt(p.ovos_predacao)}</div><div class="ac-kpi-l">Ovos predados</div></div>
+      <div class="ac-kpi" style="--c:#9CA3AF"><div class="ac-kpi-v">${acFmt(p.ninhos_perdidos)}</div><div class="ac-kpi-l">Ninhos perdidos</div></div>
+    </div>
+    ${totalPerdas > 0 ? `${acMini('Ovos perdidos por causa')}<div class="ac-chart-wrap"><canvas id="ac-cv-perdas" height="140"></canvas></div>` : ''}
+    ${acMini('Predação por fase do ciclo (nº de registros)')}
+    <table class="ac-table"><thead><tr><th>Fase</th><th class="num">Por animais</th><th class="num">Por pessoas</th><th class="num">Outro/descon.</th></tr></thead>
+      <tbody>
+        <tr><td>Incubação (visitas)</td><td class="num">${acFmt(inc.animais)}</td><td class="num">${acFmt(inc.pessoas)}</td><td class="num">${acFmt(inc.desconhecida)}</td></tr>
+        <tr><td>Eclosão</td><td class="num">${acFmt(ec.por_animais)}</td><td class="num">${acFmt(ec.por_pessoas)}</td><td class="num">—</td></tr>
+        <tr><td>Soltura</td><td class="num">${acFmt(so.com)} com predação</td><td class="num">—</td><td class="num">${acFmt(so.sem)} sem</td></tr>
+      </tbody></table>
+  </section>`
+}
+
+// ── 8 · Tempos do ciclo (incubação e berçário) ──────────────────
+function acSecTempos(det) {
+  const inc = (det && det.incubacao) || {}
+  const berc = (det && det.bercario_tempo) || {}
+  const ref = (window.BIO_CONTEXTO || {}).incubacao_ref_dias || [55, 70]
+  const nInc = acN(inc.n), nBerc = acN(berc.n)
+  const desvio = inc.desvio_medio_dias
+  return `<section class="ac-sec">
+    ${acSecTitle('08', 'Tempos do ciclo', 'Incubação (observado × previsto) e permanência em berçário')}
+    <p class="ac-prosa">A <strong>duração da incubação</strong> nos quelônios de rio depende diretamente da temperatura — a faixa típica é de <strong>${ref[0]}–${ref[1]} dias</strong>; temperaturas mais altas encurtam o desenvolvimento (e feminizam a coorte, ver seção de TSD). O <strong>tempo em berçário</strong> (headstarting) prolonga a proteção até um tamanho de soltura mais seguro, com o custo de manejo e de risco sanitário em cativeiro.</p>
+    <div class="ac-kpis">
+      <div class="ac-kpi" style="--c:#1A6B8C"><div class="ac-kpi-v">${inc.media_dias != null ? inc.media_dias + ' d' : '—'}</div><div class="ac-kpi-l">Incubação média observada (N=${acFmt(nInc)})</div></div>
+      <div class="ac-kpi" style="--c:#7ECEE8"><div class="ac-kpi-v">${ref[0]}–${ref[1]} d</div><div class="ac-kpi-l">Faixa de referência (lit.)</div></div>
+      <div class="ac-kpi" style="--c:${desvio != null && Math.abs(desvio) > 5 ? '#D97706' : '#2A9D6F'}"><div class="ac-kpi-v">${desvio != null ? (desvio > 0 ? '+' : '') + desvio + ' d' : '—'}</div><div class="ac-kpi-l">Desvio observado × previsto</div></div>
+      <div class="ac-kpi" style="--c:#2A9D6F"><div class="ac-kpi-v">${berc.media_dias != null ? berc.media_dias + ' d' : '—'}</div><div class="ac-kpi-l">Permanência média em berçário (N=${acFmt(nBerc)})</div></div>
+    </div>
+    ${nInc > 0 ? `${acMini('Incubação por ninho — observado × previsto (dias)')}<div class="ac-chart-wrap"><canvas id="ac-cv-incub" height="150"></canvas></div>`
+      : `<div class="ac-flag ac-flag-info">Ainda sem ninhos com eclosão datada para a curva de incubação.</div>`}
+    ${nInc > 0 && inc.media_dias != null && (inc.media_dias < ref[0] || inc.media_dias > ref[1]) ? `<div class="ac-flag">A incubação média observada (${inc.media_dias} d) está fora da faixa de referência (${ref[0]}–${ref[1]} d) — verificar datas de encontro/nascimento e condições térmicas dos ninhos.</div>` : ''}
+  </section>`
+}
+
+// ── 9 · Crescimento em berçário ─────────────────────────────────
+function acSecCrescimento(det) {
+  const c = (det && det.crescimento) || {}
+  const ctx = window.BIO_CONTEXTO || {}
+  const nb = acN(c.n_biometrias)
+  const idealMin = (ctx.tamanho_soltura_ideal_cm || [5, 7])[0]
+  const idealMax = (ctx.tamanho_soltura_ideal_cm || [5, 7])[1]
+  const fundamentacao = `<p class="ac-prosa">O crescimento de filhotes de Podocnemídeos é rápido no primeiro ano — podem <strong>dobrar o tamanho de casco</strong> nesse período — e segue um modelo de <strong>von Bertalanffy</strong> (crescimento acelerado no início, desacelerando com a idade) <span class="ac-cite">[ref.]</span>. O <strong>headstarting</strong> visa soltar filhotes maiores e menos vulneráveis: na literatura, filhotes criados em berçário atingiram ~${ctx.headstart_casco_mm || 62.7} mm de casco contra ~${ctx.soltura_direta_casco_mm || 36.3} mm da soltura direta. A <strong>faixa-alvo de tamanho de soltura</strong> adotada como referência é <strong>${idealMin}–${idealMax} cm</strong> de casco.</p>`
+
+  if (nb === 0) {
+    return `<section class="ac-sec">
+      ${acSecTitle('09', 'Crescimento em berçário', 'Taxa de crescimento, idade × tamanho e tamanho de soltura')}
+      ${fundamentacao}
+      <div class="ac-flag ac-flag-warn"><strong>Aguardando dados de biometria.</strong> Não há medições de comprimento/peso registradas no berçário. Esta seção — curva de crescimento no tempo e por idade, taxa de crescimento por lote e tamanho na soltura vs. faixa ideal — passa a ser calculada automaticamente assim que os monitores registrarem <em>ocorrências do tipo biometria</em> no app de campo. Recomendação: padronizar uma biometria por lote a cada 15–30 dias.</div>
+      ${acMini('Régua de referência (literatura)')}
+      <table class="ac-table"><tbody>
+        <tr><td>Crescimento esperado no 1º ano</td><td>dobra o tamanho de casco</td></tr>
+        <tr><td>Ganho anual de referência</td><td>~${ctx.crescimento_ref_mm_ano || 56.8} mm de casco/ano</td></tr>
+        <tr><td>Casco na soltura — headstarting</td><td>~${ctx.headstart_casco_mm || 62.7} mm</td></tr>
+        <tr><td>Casco na soltura — soltura direta</td><td>~${ctx.soltura_direta_casco_mm || 36.3} mm</td></tr>
+        <tr><td>Faixa-alvo de soltura (referência)</td><td>${idealMin}–${idealMax} cm de casco</td></tr>
+      </tbody></table>
+    </section>`
+  }
+
+  const taxa = c.taxa_por_lote || []
+  const tam = c.tamanho_soltura || []
+  const linhasTaxa = taxa.map(t => `<tr>
+    <td>${esc(t.bercario_nome || '—')}</td><td>${esc(AC_ESP_LABEL[t.especie] || t.especie || '—')}</td>
+    <td class="num">${t.dias}</td><td class="num">${t.mm_dia != null ? t.mm_dia + ' mm/d' : '—'}</td>
+    <td class="num">${t.g_dia != null ? t.g_dia + ' g/d' : '—'}</td></tr>`).join('')
+  const linhasTam = tam.map(t => {
+    const c2 = acN(t.comp_ultimo)
+    const dentro = c2 >= idealMin && c2 <= idealMax
+    return `<tr><td>${esc(t.bercario_nome || '—')}</td><td>${esc(AC_ESP_LABEL[t.especie] || t.especie || '—')}</td>
+      <td class="num">${t.comp_ultimo != null ? t.comp_ultimo + ' cm' : '—'}</td>
+      <td class="num">${t.idade_ultimo != null ? t.idade_ultimo + ' d' : '—'}</td>
+      <td><span class="ac-tend" style="--c:${dentro ? '#2A9D6F' : '#D97706'}">${dentro ? 'na faixa ideal' : 'abaixo da faixa'}</span></td></tr>`
+  }).join('')
+
+  return `<section class="ac-sec">
+    ${acSecTitle('09', 'Crescimento em berçário', 'Taxa de crescimento, idade × tamanho e tamanho de soltura')}
+    ${fundamentacao}
+    ${acMini('Crescimento por idade (comprimento × dias desde a eclosão)')}
+    <div class="ac-chart-wrap" style="height:220px"><canvas id="ac-cv-cresc"></canvas></div>
+    ${linhasTaxa ? `${acMini('Taxa de crescimento por lote')}
+      <table class="ac-table"><thead><tr><th>Berçário</th><th>Espécie</th><th class="num">Intervalo</th><th class="num">Comprimento</th><th class="num">Peso</th></tr></thead>
+      <tbody>${linhasTaxa}</tbody></table>` : ''}
+    ${linhasTam ? `${acMini('Tamanho na soltura vs. faixa ideal (' + idealMin + '–' + idealMax + ' cm)')}
+      <table class="ac-table"><thead><tr><th>Berçário</th><th>Espécie</th><th class="num">Casco (últ. biometria)</th><th class="num">Idade</th><th>Leitura</th></tr></thead>
+      <tbody>${linhasTam}</tbody></table>` : ''}
+  </section>`
+}
+
+// ── 10 · Temperatura & determinação sexual (TSD) ────────────────
 function acSecTemperatura(ana) {
   const tp = ana.temperatura || {}
   const n = acN(tp.n_amostras)
-  if (!n) return `<section class="ac-sec">${acSecTitle('05', 'Temperatura & razão sexual (TSD)')}
+  if (!n) return `<section class="ac-sec">${acSecTitle('10', 'Temperatura & razão sexual (TSD)')}
     <p class="ac-prosa">A determinação sexual dos quelônios do gênero <em>Podocnemis</em> depende da temperatura de incubação (TSD): temperaturas mais altas produzem fêmeas; mais baixas, machos. O período termossensível ocorre no terço final da incubação.</p>
     <div class="ac-flag">Sem medições de temperatura de substrato suficientes para a leitura de razão sexual. Reforçar o registro de temperatura nas visitas.</div></section>`
 
@@ -352,7 +509,7 @@ function acSecTemperatura(ana) {
   }).join('')
 
   return `<section class="ac-sec">
-    ${acSecTitle('05', 'Temperatura & razão sexual (TSD)', 'Eixo direto de mudanças climáticas sobre a estrutura populacional')}
+    ${acSecTitle('10', 'Temperatura & razão sexual (TSD)', 'Eixo direto de mudanças climáticas sobre a estrutura populacional')}
     <p class="ac-prosa">A razão sexual da coorte é definida pela temperatura no <strong>terço final da incubação</strong> (TSD Ia): acima da temperatura pivotal predominam fêmeas; abaixo, machos. O aquecimento tende a <strong>feminizar</strong> as coortes, e em <em>P. sextuberculata</em> a faixa de transição estreita (~1,2 °C) deixa pouca margem. A leitura abaixo é <strong>qualitativa</strong> — usa a temperatura média observada, não a do período termossensível.</p>
     <div class="ac-temp-grid">
       <div class="ac-chart-wrap"><canvas id="ac-cv-temp" height="160"></canvas></div>
@@ -376,7 +533,7 @@ function acSecClima(ana, kpis) {
   const alag = acN(c.ninhos_alagados)
   const ovosAlag = acN(c.ovos_perdidos_alagamento)
   return `<section class="ac-sec">
-    ${acSecTitle('06', 'Mudanças climáticas & pulso de inundação', 'Risco hidrológico e térmico sobre o recrutamento')}
+    ${acSecTitle('11', 'Mudanças climáticas & pulso de inundação', 'Risco hidrológico e térmico sobre o recrutamento')}
     <div class="ac-clima-obs">
       <div class="ac-kpi" style="--c:${alag ? '#DC2626' : '#2A9D6F'}"><div class="ac-kpi-v">${acFmt(alag)}</div><div class="ac-kpi-l">Ninhos com sinal de alagamento (obs.)</div></div>
       <div class="ac-kpi" style="--c:#D97706"><div class="ac-kpi-v">${acFmt(ovosAlag)}</div><div class="ac-kpi-l">Ovos perdidos por alagamento (obs.)</div></div>
@@ -393,7 +550,7 @@ function acSecInteranual(dados) {
   const anos = dados.por_ano || []
   const multi = anos.length >= 2
   return `<section class="ac-sec">
-    ${acSecTitle('07', 'Comparação interanual & tendências', 'Linha de base sendo construída a cada temporada')}
+    ${acSecTitle('12', 'Comparação interanual & tendências', 'Linha de base sendo construída a cada temporada')}
     ${multi
       ? `<p class="ac-prosa">A série abaixo compara ninhos, filhotes e taxa de eclosão entre os anos monitorados. Tendências estatísticas robustas exigem várias temporadas; leia as variações como sinais, não como conclusões.</p>
          <div class="ac-chart-wrap"><canvas id="ac-cv-inter" height="150"></canvas></div>`
@@ -401,14 +558,16 @@ function acSecInteranual(dados) {
   </section>`
 }
 
-// ── 8 · Perspectivas & recomendações de manejo ──────────────────
-function acSecPerspectivas(kpis, ana, dados) {
+// ── 13 · Perspectivas & recomendações de manejo ─────────────────
+function acSecPerspectivas(kpis, ana, dados, det) {
   const recs = []
   const t = ana.temporada
   const fase = t && t.fase_atual
   const alag = acN((ana.clima || {}).ninhos_alagados)
   const taxaEcl = kpis.taxa_eclosao_pct
   const tempN = acN((ana.temperatura || {}).n_amostras)
+  const nBio = acN(((det || {}).crescimento || {}).n_biometrias)
+  const mortEmbr = ((det || {}).eclosao || {}).taxa_mortalidade_embrionaria_pct
 
   if (fase === 'inicio' || fase === 'pre')
     recs.push(['Fase de postura', 'Priorizar o esforço de busca e marcação de ninhos nas praias de maior densidade histórica; registrar hora de desova para viabilizar a janela crítica de transferência.'])
@@ -422,34 +581,40 @@ function acSecPerspectivas(kpis, ana, dados) {
     recs.push(['Dado de temperatura', 'Reforçar a medição de temperatura de substrato nas visitas — é o insumo do eixo TSD/razão sexual e hoje está escasso.'])
   if (taxaEcl != null && taxaEcl < 60)
     recs.push(['Taxa de eclosão baixa', `Eclosão observada em ${acPct(taxaEcl)} — investigar causas (predação, alagamento, temperatura, manejo) por praia.`])
+  if (nBio === 0)
+    recs.push(['Biometria de berçário', 'Iniciar o registro de biometria (comprimento/peso) dos lotes no app — sem ele não há curva de crescimento, idade × tamanho nem leitura de tamanho ideal de soltura. Sugestão: 1 biometria por lote a cada 15–30 dias.'])
+  if (mortEmbr != null && mortEmbr > 20)
+    recs.push(['Mortalidade embrionária', `Mortalidade embrionária em ${acPct(mortEmbr)} — avaliar condições de incubação/berçário (temperatura, alagamento, higiene do substrato) para conter perdas por fungo/manejo.`])
   recs.push(['Consolidação da série', 'Manter a validação científica dos ninhos em dia para que a comparação interanual ganhe robustez nas próximas temporadas.'])
 
   return `<section class="ac-sec">
-    ${acSecTitle('08', 'Perspectivas & recomendações de manejo')}
+    ${acSecTitle('13', 'Perspectivas & recomendações de manejo')}
     <div class="ac-recs">${recs.map(([t, d]) => `<div class="ac-rec"><div class="ac-rec-t">${esc(t)}</div><div class="ac-rec-d">${esc(d)}</div></div>`).join('')}</div>
   </section>`
 }
 
-// ── 9 · Fundamentação e fontes ──────────────────────────────────
+// ── 14 · Fundamentação e fontes ──────────────────────────────────
 function acSecFundamentacao(dados) {
   const espUsadas = new Set((dados.por_especie || []).map(e => e.especie))
   const refIds = new Set()
   espUsadas.forEach(k => ((window.BIO_ESPECIES_REF[k] || {}).refs || []).forEach(r => refIds.add(r)))
-  ;['tsd_expansa', 'clima_pulso', 'alagamento', 'pqa', 'javaes'].forEach(r => refIds.add(r))
+  ;['tsd_expansa', 'clima_pulso', 'alagamento', 'pqa', 'javaes',
+    'crescimento_vb', 'headstart', 'fusariose', 'falha_reprodutiva'].forEach(r => refIds.add(r))
   return `<section class="ac-sec">
-    ${acSecTitle('09', 'Fundamentação & fontes')}
+    ${acSecTitle('14', 'Fundamentação & fontes')}
     <ul class="ac-refs">${window.bioReferenciasHTML(Array.from(refIds))}</ul>
   </section>`
 }
 
-// ── 10 · Metodologia & limitações ───────────────────────────────
-function acSecMetodologia(kpis, ana) {
+// ── 15 · Metodologia & limitações ───────────────────────────────
+function acSecMetodologia(kpis, ana, det) {
   const total = acN(kpis.total_ninhos)
+  const nBio = acN(((det || {}).crescimento || {}).n_biometrias)
   return `<section class="ac-sec ac-metodo">
-    ${acSecTitle('10', 'Metodologia & limitações')}
+    ${acSecTitle('15', 'Metodologia & limitações')}
     <p class="ac-prosa"><strong>Fonte dos dados observados:</strong> registros de campo do Biomonitor (ninhos, visitas, eclosões, transferências, berçário) validados no sistema. <strong>Recorte por fase:</strong> a temporada é dividida em terços iguais da janela [início, fim]; cada ninho é classificado pela data de encontro/postura.</p>
-    <p class="ac-prosa"><strong>Taxas (protocolo PQRA/TAMAR/ICMBio):</strong> eclosão = vivos ÷ (vivos + mortos + não nascidos); sucesso de nidificação = ninhos eclodidos ÷ total; fertilidade = ovos íntegros ÷ postura; eficiência = vivos ÷ ovos íntegros; incubação = média de (nascimento − encontro).</p>
-    <div class="ac-flag ac-flag-info"><strong>Limitações:</strong> N amostral atual = ${acFmt(total)} ninho(s). A leitura de razão sexual (TSD) usa a temperatura média observada, não a do período termossensível, e é apenas indicativa. Comparações interanuais e correlações climáticas ganham significância com mais temporadas e com a integração de dados fluviométricos externos.</p></div>
+    <p class="ac-prosa"><strong>Taxas e métricas:</strong> eclosão = vivos ÷ (vivos + mortos + não nascidos); mortalidade embrionária = (mortos + não nascidos) ÷ total incubado; fertilidade = ovos íntegros ÷ postura; incubação = (nascimento − encontro); permanência em berçário = (soltura − entrada); taxa de crescimento = Δcomprimento ÷ Δdias entre a primeira e a última biometria do lote; idade do filhote = data da biometria − data de nascimento.</p>
+    <div class="ac-flag ac-flag-info"><strong>Limitações:</strong> N amostral atual = ${acFmt(total)} ninho(s)${nBio === 0 ? '; <strong>0 biometrias</strong> — as análises de crescimento, idade × tamanho e tamanho de soltura ainda dependem do início do registro de biometria no campo' : ''}. A leitura de razão sexual (TSD) usa a temperatura média observada, não a do período termossensível, e é apenas indicativa. A quebra de descartes por causa (evento) pode não coincidir com o total de ovos descartados por ninho, que é reconciliado na sincronização. Comparações interanuais e correlações climáticas ganham significância com mais temporadas e com a integração de dados fluviométricos externos.</p></div>
   </section>`
 }
 
@@ -551,6 +716,84 @@ function acChartClima(ana) {
     ] },
     options: { responsive: true, maintainAspectRatio: false,
       scales: { y: { grid: { color: AC_GRID }, title: { display: true, text: '°C' } }, x: { grid: { display: false } } },
+      plugins: { legend: { position: 'bottom' } } },
+  })
+}
+
+function acChartOvos(det) {
+  const c = (((det || {}).ovos) || {}).descartes_por_causa || []
+  if (!c.length) return
+  const cor = { natural: '#2A9D6F', predacao: '#D97706', humana: '#DC2626' }
+  acMkChart('ac-cv-ovos', {
+    type: 'bar',
+    data: { labels: c.map(x => x.causa), datasets: [{ label: 'Ovos descartados', data: c.map(x => acN(x.qtd)), backgroundColor: c.map(x => cor[x.causa] || '#9CA3AF') }] },
+    options: { responsive: true, maintainAspectRatio: false,
+      scales: { y: { beginAtZero: true, grid: { color: AC_GRID }, ticks: { precision: 0 } }, x: { grid: { display: false } } },
+      plugins: { legend: { display: false } } },
+  })
+}
+
+function acChartEclosao(det) {
+  const e = (det || {}).eclosao || {}
+  const vals = [acN(e.vivos), acN(e.mortos), acN(e.nao_nascidos)]
+  if (vals.reduce((a, b) => a + b, 0) === 0) return
+  acMkChart('ac-cv-ecl', {
+    type: 'doughnut',
+    data: { labels: ['Filhotes vivos', 'Filhotes mortos', 'Ovos não nascidos'], datasets: [{ data: vals, backgroundColor: ['#2A9D6F', '#DC2626', '#9CA3AF'] }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } },
+  })
+}
+
+function acChartPerdas(det) {
+  const p = (det || {}).perdas || {}
+  const vals = [acN(p.ovos_alagamento), acN(p.ovos_erosao), acN(p.ovos_humana), acN(p.ovos_predacao)]
+  if (vals.reduce((a, b) => a + b, 0) === 0) return
+  acMkChart('ac-cv-perdas', {
+    type: 'bar',
+    data: { labels: ['Alagamento', 'Erosão', 'Humana', 'Predação'], datasets: [{ label: 'Ovos perdidos', data: vals, backgroundColor: ['#1A6B8C', '#C9A84C', '#DC2626', '#D97706'] }] },
+    options: { responsive: true, maintainAspectRatio: false,
+      scales: { y: { beginAtZero: true, grid: { color: AC_GRID }, ticks: { precision: 0 } }, x: { grid: { display: false } } },
+      plugins: { legend: { display: false } } },
+  })
+}
+
+function acChartTempos(det) {
+  const s = ((det || {}).incubacao || {}).serie || []
+  if (!s.length) return
+  acMkChart('ac-cv-incub', {
+    type: 'bar',
+    data: { labels: s.map(x => x.numero_ninho || '—'), datasets: [
+      { label: 'Observado (d)', data: s.map(x => acN(x.dias_obs)), backgroundColor: '#1A6B8C' },
+      { label: 'Previsto (d)', data: s.map(x => x.dias_prev != null ? acN(x.dias_prev) : null), backgroundColor: '#7ECEE8' },
+    ] },
+    options: { responsive: true, maintainAspectRatio: false,
+      scales: { y: { beginAtZero: true, grid: { color: AC_GRID }, title: { display: true, text: 'dias' } }, x: { grid: { display: false } } },
+      plugins: { legend: { position: 'bottom' } } },
+  })
+}
+
+function acChartCrescimento(det) {
+  const s = ((det || {}).crescimento || {}).serie || []
+  if (!s.length) return
+  const grupos = {}
+  s.forEach(p => {
+    if (p.idade_dias == null || p.comp == null) return
+    ;(grupos[p.especie] = grupos[p.especie] || []).push({ x: acN(p.idade_dias), y: acN(p.comp) })
+  })
+  const ds = Object.keys(grupos).map(k => ({
+    label: AC_ESP_LABEL[k] || k,
+    data: grupos[k].sort((a, b) => a.x - b.x),
+    borderColor: AC_ESP_COR[k] || '#1A6B8C',
+    backgroundColor: AC_ESP_COR[k] || '#1A6B8C',
+    showLine: true, tension: .3,
+  }))
+  if (!ds.length) return
+  acMkChart('ac-cv-cresc', {
+    type: 'scatter',
+    data: { datasets: ds },
+    options: { responsive: true, maintainAspectRatio: false,
+      scales: { x: { title: { display: true, text: 'idade (dias desde a eclosão)' }, grid: { color: AC_GRID } },
+        y: { title: { display: true, text: 'comprimento (cm)' }, grid: { color: AC_GRID } } },
       plugins: { legend: { position: 'bottom' } } },
   })
 }
