@@ -67,6 +67,7 @@ function gerarLayout(tituloPagina, paginaAtiva) {
     'biomonitor-validacao':     { svg: '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>', cor: '#7ECEE8', bg: 'rgba(126,206,232,0.22)' },
     'biomonitor-bercarios':     { svg: '<rect x="2" y="7" width="20" height="13" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/>', cor: '#2A9D6F', bg: 'rgba(42,157,111,0.18)' },
     'relatorios-biomonitor':    { svg: '<line x1="18" x2="18" y1="20" y2="10"/><line x1="12" x2="12" y1="20" y2="4"/><line x1="6" x2="6" y1="20" y2="14"/>', cor: '#1A6B8C', bg: 'rgba(26,107,140,0.22)' },
+    'analise-cientifica-biomonitor': { svg: '<path d="M9 2v6l-4 8a2 2 0 0 0 2 3h10a2 2 0 0 0 2-3l-4-8V2"/><path d="M8 2h8"/><path d="M7 16h10"/>', cor: '#C9A84C', bg: 'rgba(201,168,76,0.22)' },
     'admin-biomonitor':         { svg: '<path d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2z"/><circle cx="7" cy="7" r="1.5"/>', cor: '#1A6B8C', bg: 'rgba(26,107,140,0.18)' },
   };
 
@@ -119,6 +120,8 @@ function gerarLayout(tituloPagina, paginaAtiva) {
         { id: 'biomonitor-bercarios',  href: '../pages/biomonitor-bercarios.html', label: 'Berçários',
           perfis: ['gestor','tecnico','super_admin'] },
         { id: 'relatorios-biomonitor', href: '../pages/relatorios-biomonitor.html',label: 'Relatórios' },
+        { id: 'analise-cientifica-biomonitor', href: '../pages/analise-cientifica-biomonitor.html', label: 'Dossiê Científico',
+          perfis: ['gestor','tecnico','super_admin'] },
         { id: 'admin-biomonitor',      href: '../pages/admin-biomonitor.html',     label: 'Administrar',
           perfis: ['super_admin','gestor','tecnico'] },
       ]

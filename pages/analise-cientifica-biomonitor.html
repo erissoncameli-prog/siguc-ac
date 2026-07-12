@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>SIGUC-AC · Dossiê Científico da Temporada</title>
+<link rel="stylesheet" href="../css/global.css">
+<link rel="stylesheet" href="../css/relatorio-print.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../js/observability.js"></script>
+<script src="../js/queryLogger.js"></script>
+<script src="../js/config.js"></script>
+<script src="../js/config-sistema.js"></script>
+<script src="../js/layout.js"></script>
+<script src="../js/biomonitor-fundamentacao.js"></script>
+<script src="../js/biomonitor-analise.js"></script>
+<style>
+/* ── Dossiê Científico da Temporada ── */
+.ac-filtros {
+  display:flex; flex-wrap:wrap; gap:10px; align-items:flex-end;
+  background:var(--branco); border-radius:var(--raio-lg);
+  padding:14px 16px; margin-bottom:20px; border:1px solid var(--borda);
+  box-shadow:var(--sombra);
+}
+.ac-filtros label { display:flex; flex-direction:column; gap:4px; font-size:12px; color:var(--cinza-500); }
+.ac-filtros select { background:var(--branco); border:1px solid var(--borda-forte); color:var(--cinza-900); border-radius:var(--raio); padding:7px 10px; font-size:13px; min-width:160px; }
+
+.ac-loading { padding:60px 20px; text-align:center; color:var(--cinza-500); font-size:14px; }
+
+/* Cabeçalho do documento */
+.ac-doc-head { border-bottom:2px solid var(--ouro,#C9A84C); padding-bottom:16px; margin-bottom:26px; }
+.ac-doc-brand { font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--cinza-500); font-weight:700; }
+.ac-doc-title { font-size:1.9rem; margin:6px 0 10px; color:var(--cinza-900); font-family:'Fraunces',Georgia,serif; }
+.ac-doc-meta { display:flex; flex-wrap:wrap; gap:6px 22px; font-size:12.5px; color:var(--cinza-700); }
+.ac-doc-meta strong { color:var(--cinza-900); }
+.ac-doc-nota { margin:12px 0 0; font-size:12px; color:var(--cinza-600); line-height:1.5; max-width:70ch; }
+
+/* Seções */
+.ac-sec { margin-bottom:34px; scroll-margin-top:70px; }
+.ac-sec-head { display:flex; align-items:flex-start; gap:12px; margin-bottom:14px; }
+.ac-sec-num { flex:0 0 auto; width:30px; height:30px; border-radius:8px; background:var(--verde,#2A9D6F); color:#fff;
+  display:grid; place-items:center; font-weight:700; font-size:13px; font-family:monospace; }
+.ac-sec-title { font-size:1.15rem; margin:0; color:var(--cinza-900); font-family:'Fraunces',Georgia,serif; }
+.ac-sec-sub { margin:2px 0 0; font-size:12px; color:var(--cinza-500); }
+
+.ac-prosa { font-size:13.5px; line-height:1.7; color:var(--cinza-800); max-width:74ch; margin:10px 0; }
+.ac-prosa strong { color:var(--cinza-900); }
+.ac-cite { color:var(--cinza-400); font-size:11px; }
+.ac-fine { font-size:11px; color:var(--cinza-500); margin:6px 0 0; }
+
+/* Flags / avisos */
+.ac-flag { background:#FFF7ED; border:1px solid #FED7AA; color:#9A3412; border-radius:10px; padding:10px 13px; font-size:12.5px; line-height:1.5; margin:10px 0; }
+.ac-flag-warn { background:#FEF3C7; border-color:#FCD34D; color:#92400E; }
+.ac-flag-info { background:#EFF6FF; border-color:#BFDBFE; color:#1E40AF; }
+
+/* KPIs */
+.ac-kpis { display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:10px; margin:14px 0; }
+.ac-kpi { background:var(--branco); border-radius:var(--raio-lg); padding:13px 14px; border:1px solid var(--borda); border-top:3px solid var(--c,#1A6B8C); box-shadow:var(--sombra); }
+.ac-kpi-v { font-size:1.5rem; font-weight:700; color:var(--c,#1A6B8C); line-height:1; font-family:monospace; }
+.ac-kpi-l { font-size:11px; color:var(--cinza-500); margin-top:5px; line-height:1.25; }
+
+/* Fase da temporada */
+.ac-fase-linha { position:relative; height:12px; background:var(--cinza-200,#e5e7eb); border-radius:6px; margin:20px 0 4px; }
+.ac-fase-prog { position:absolute; left:0; top:0; bottom:0; background:linear-gradient(90deg,#2A9D6F,#C9A84C,#1A6B8C); border-radius:6px; max-width:100%; }
+.ac-fase-marco { position:absolute; top:-18px; transform:translateX(-50%); font-size:10px; color:var(--cinza-500); }
+.ac-fase-marco::after { content:''; position:absolute; left:50%; top:16px; width:1px; height:12px; background:var(--cinza-400,#9ca3af); }
+.ac-fase-hoje { position:absolute; top:12px; transform:translateX(-50%); color:#DC2626; font-size:12px; }
+.ac-fase-datas { display:flex; justify-content:space-between; font-size:10.5px; color:var(--cinza-500); margin-top:12px; font-family:monospace; }
+.ac-fase-cards { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin:18px 0; }
+@media (max-width:720px){ .ac-fase-cards { grid-template-columns:1fr; } }
+.ac-fase-card { background:var(--branco); border:1px solid var(--borda); border-left:4px solid var(--c); border-radius:var(--raio-lg); padding:13px 15px; box-shadow:var(--sombra); }
+.ac-fase-card.atual { box-shadow:0 0 0 2px var(--c); }
+.ac-fase-top { display:flex; justify-content:space-between; align-items:center; }
+.ac-fase-lbl { font-weight:700; color:var(--cinza-900); font-size:14px; }
+.ac-fase-badge { font-size:9px; font-weight:800; background:var(--c); color:#fff; padding:2px 7px; border-radius:999px; letter-spacing:.05em; }
+.ac-fase-sub { font-size:11px; color:var(--cinza-500); margin:2px 0 10px; }
+.ac-fase-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:8px; }
+.ac-fase-grid > div { display:flex; flex-direction:column; }
+.ac-fase-grid b { font-size:1.1rem; color:var(--cinza-900); font-family:monospace; }
+.ac-fase-grid span { font-size:10px; color:var(--cinza-500); }
+
+/* Espécies */
+.ac-esp-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:14px; }
+.ac-esp-card { background:var(--branco); border:1px solid var(--borda); border-top:3px solid var(--c); border-radius:var(--raio-lg); padding:14px 16px; box-shadow:var(--sombra); }
+.ac-esp-head { display:flex; flex-direction:column; margin-bottom:10px; }
+.ac-esp-nome { font-weight:700; font-size:15px; color:var(--cinza-900); }
+.ac-esp-sci { font-style:italic; font-size:12px; color:var(--cinza-500); }
+.ac-esp-obs { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; padding:10px 0; border-bottom:1px dashed var(--borda); }
+.ac-esp-obs > div { display:flex; flex-direction:column; }
+.ac-esp-obs b { font-size:15px; color:var(--cinza-900); font-family:monospace; }
+.ac-esp-obs span { font-size:9.5px; color:var(--cinza-500); line-height:1.2; }
+.ac-esp-ref { margin-top:10px; }
+.ac-ref-tag { display:inline-block; font-size:9px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:var(--cinza-500); background:var(--cinza-100,#f3f4f6); padding:2px 8px; border-radius:999px; margin-bottom:7px; }
+.ac-esp-ref ul { margin:0; padding-left:16px; font-size:12px; color:var(--cinza-700); line-height:1.7; }
+.ac-esp-ref b { color:var(--cinza-900); }
+.ac-esp-nota { font-size:11.5px; color:var(--cinza-600); line-height:1.5; margin:8px 0 0; }
+
+/* Temperatura / TSD */
+.ac-temp-grid { display:grid; grid-template-columns:1.6fr 1fr; gap:14px; align-items:center; margin:14px 0; }
+@media (max-width:720px){ .ac-temp-grid { grid-template-columns:1fr; } }
+.ac-temp-stats { display:flex; flex-direction:column; gap:10px; }
+.ac-temp-stat { background:var(--branco); border:1px solid var(--borda); border-radius:var(--raio-lg); padding:12px 14px; box-shadow:var(--sombra); }
+.ac-temp-stat b { display:block; font-size:1.4rem; color:var(--cinza-900); font-family:monospace; }
+.ac-temp-stat span { font-size:11px; color:var(--cinza-500); }
+.ac-tend { font-size:11px; font-weight:700; color:var(--c); background:color-mix(in srgb, var(--c) 12%, transparent); padding:2px 9px; border-radius:999px; }
+
+/* Clima */
+.ac-clima-obs { display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:10px; margin:12px 0; }
+
+/* Interanual + gráficos */
+.ac-chart-wrap { background:var(--branco); border:1px solid var(--borda); border-radius:var(--raio-lg); padding:14px; box-shadow:var(--sombra); margin:12px 0; position:relative; height:200px; }
+.ac-chart-wrap canvas { max-height:100%; }
+
+/* Tabelas */
+.ac-table { width:100%; border-collapse:collapse; font-size:12.5px; margin:12px 0; background:var(--branco); border-radius:var(--raio-lg); overflow:hidden; box-shadow:var(--sombra); }
+.ac-table th, .ac-table td { padding:8px 12px; text-align:left; border-bottom:1px solid var(--borda); }
+.ac-table th { background:var(--cinza-50,#f9fafb); font-size:11px; text-transform:uppercase; letter-spacing:.03em; color:var(--cinza-600); }
+.ac-table td.num, .ac-table th.num { text-align:right; font-family:monospace; }
+
+/* Recomendações */
+.ac-recs { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:12px; }
+.ac-rec { background:var(--branco); border:1px solid var(--borda); border-left:4px solid var(--verde,#2A9D6F); border-radius:var(--raio-lg); padding:12px 15px; box-shadow:var(--sombra); }
+.ac-rec-t { font-weight:700; font-size:13px; color:var(--cinza-900); margin-bottom:4px; }
+.ac-rec-d { font-size:12px; color:var(--cinza-700); line-height:1.5; }
+
+/* Referências */
+.ac-refs { list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:8px; }
+.ac-ref { display:flex; gap:10px; font-size:12px; color:var(--cinza-700); line-height:1.5; }
+.ac-ref-n { flex:0 0 auto; width:22px; height:22px; border-radius:6px; background:var(--cinza-100,#f3f4f6); color:var(--cinza-600); display:grid; place-items:center; font-size:11px; font-weight:700; font-family:monospace; }
+.ac-ref-txt a { color:var(--bio-prim,#1A6B8C); word-break:break-all; font-size:11px; }
+.ac-metodo .ac-prosa { font-size:12.5px; }
+
+@media print {
+  .ac-filtros, .no-print { display:none !important; }
+  .ac-sec { break-inside:avoid; }
+  .ac-chart-wrap { break-inside:avoid; }
+}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+;(async function () {
+  const usuario = await carregarUsuario()
+  if (!usuario) { window.location.href = '../index.html'; return }
+
+  document.getElementById('app').innerHTML =
+    gerarLayout('Dossiê Científico', 'analise-cientifica-biomonitor') +
+    `<div class="fade-in">
+      <div class="ac-filtros no-print">
+        <label>Temporada
+          <select id="acf-temporada"><option value="">Temporada corrente</option></select>
+        </label>
+        <label>Programa
+          <select id="acf-programa"><option value="">Todos os programas</option></select>
+        </label>
+        <label>Localização
+          <select id="acf-localizacao">
+            <option value="">Todas as localizações</option>
+            <option value="dentro_uc">Dentro de UC</option>
+            <option value="margem_livre">Margem Livre</option>
+            <option value="terra_indigena">Terra Indígena</option>
+            <option value="area_municipal">Área Municipal</option>
+            <option value="outro">Outro</option>
+          </select>
+        </label>
+        <label id="acf-uc-wrap" style="display:none">Unidade de Conservação
+          <select id="acf-uc"><option value="">Todas as UCs</option></select>
+        </label>
+        <label>Praia
+          <select id="acf-praia"><option value="">Todas as praias</option></select>
+        </label>
+        <div style="display:flex;gap:8px;align-items:flex-end;margin-top:2px">
+          <button class="btn btn-primary" id="acf-aplicar" style="padding:8px 18px">Gerar dossiê</button>
+          <button class="btn btn-secondary" onclick="window.print()" style="padding:8px 14px" title="Imprimir / Salvar PDF">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+            Imprimir
+          </button>
+        </div>
+      </div>
+      <div id="ac-conteudo"><div class="ac-loading">Escolha os filtros e clique em <strong>Gerar dossiê</strong>.</div></div>
+    </div>`
+
+  if (typeof bIconsAplicar === 'function') bIconsAplicar(document.getElementById('app'))
+
+  const sel = id => document.getElementById(id)
+  let _praias = []
+
+  const [{ data: temporadas }, { data: programas }, { data: ucs }, { data: praias }] = await Promise.all([
+    db.from('temporadas_biomonitor').select('id,nome,is_atual').order('ano_base', { ascending: false }),
+    db.from('programas_biomonitoramento').select('id,nome').eq('ativo', true),
+    db.from('unidades_conservacao').select('id,nome,sigla').order('nome'),
+    db.from('praias_monitoramento').select('id,nome,uc_id,tipo_localizacao').eq('ativa', true).order('nome'),
+  ])
+  _praias = praias || []
+
+  ;(temporadas || []).forEach(t => sel('acf-temporada').insertAdjacentHTML('beforeend', `<option value="${t.id}"${t.is_atual ? ' selected' : ''}>${esc(t.nome)}</option>`))
+  ;(programas || []).forEach(p => sel('acf-programa').insertAdjacentHTML('beforeend', `<option value="${p.id}">${esc(p.nome)}</option>`))
+  ;(ucs || []).forEach(u => sel('acf-uc').insertAdjacentHTML('beforeend', `<option value="${u.id}">${esc((u.sigla || '') + ' ' + u.nome)}</option>`))
+
+  function popularPraias() {
+    const loc = sel('acf-localizacao').value
+    const ucId = sel('acf-uc').value
+    sel('acf-praia').innerHTML = '<option value="">Todas as praias</option>'
+    _praias.filter(p => (!loc || p.tipo_localizacao === loc) && (!ucId || p.uc_id === ucId))
+      .forEach(p => sel('acf-praia').insertAdjacentHTML('beforeend', `<option value="${p.id}">${esc(p.nome)}</option>`))
+  }
+  popularPraias()
+
+  sel('acf-localizacao').addEventListener('change', () => {
+    const dentroUC = sel('acf-localizacao').value === 'dentro_uc'
+    sel('acf-uc-wrap').style.display = dentroUC ? '' : 'none'
+    if (!dentroUC) sel('acf-uc').value = ''
+    popularPraias()
+  })
+  sel('acf-uc').addEventListener('change', popularPraias)
+
+  function filtros() {
+    return {
+      temporada: sel('acf-temporada').value || null,
+      programa: sel('acf-programa').value || null,
+      uc: sel('acf-uc').value || null,
+      praia: sel('acf-praia').value || null,
+      localizacao: sel('acf-localizacao').value || null,
+    }
+  }
+  sel('acf-aplicar').addEventListener('click', () => window.acAplicar(filtros()))
+
+  // Gera automaticamente na abertura (temporada corrente pré-selecionada)
+  window.acAplicar(filtros())
+})()
+</script>
+</body>
+</html>
