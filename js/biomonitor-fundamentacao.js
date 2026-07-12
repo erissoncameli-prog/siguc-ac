@@ -1,6 +1,6 @@
 // ── SIGUC-AC · Biomonitor — Fundamentação científica ───────────
 // Camada de REFERÊNCIA (literatura + programa federal) usada pelo
-// Dossiê Científico da Temporada (pages/analise-cientifica-biomonitor.html
+// Relatório Científico da Temporada (pages/analise-cientifica-biomonitor.html
 // via js/biomonitor-analise.js). É dado externo, sempre rotulado como
 // "referência" e citado — nunca se confunde com o dado observado no
 // sistema. Manter os valores auditáveis: cada faixa aponta uma fonte
@@ -154,7 +154,7 @@ const BIO_TSD_FAIXAS = [
 ]
 
 // Referências citadas (numeradas ao renderizar). URLs de fontes reais
-// consultadas na elaboração do dossiê.
+// consultadas na elaboração do relatório.
 const BIO_REFERENCIAS = {
   tsd_expansa: {
     autores: 'Valenzuela, N. et al.',

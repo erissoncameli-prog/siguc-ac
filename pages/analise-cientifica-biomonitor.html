@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>SIGUC-AC · Dossiê Científico da Temporada</title>
+<title>SIGUC-AC · Relatório Científico da Temporada</title>
 <link rel="stylesheet" href="../css/global.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="../js/observability.js"></script>
@@ -14,7 +14,7 @@
 <script src="../js/biomonitor-fundamentacao.js"></script>
 <script src="../js/biomonitor-analise.js"></script>
 <style>
-/* ── Dossiê Científico da Temporada ── */
+/* ── Relatório Científico da Temporada ── */
 .ac-filtros {
   display:flex; flex-wrap:wrap; gap:10px; align-items:flex-end;
   background:var(--branco); border-radius:var(--raio-lg);
@@ -135,14 +135,14 @@
 @media print {
   @page {
     size:A4 portrait; margin:16mm 14mm 15mm;
-    @top-center  { content:"SEMA-AC · DIMA · Biomonitor Quelônios — Dossiê Científico da Temporada"; font-size:8px; color:#6B7280; }
+    @top-center  { content:"SEMA-AC · DIMA · Biomonitor Quelônios — Relatório Científico da Temporada"; font-size:8px; color:#6B7280; }
     @bottom-left { content:"Governo do Estado do Acre · SIGUC-AC"; font-size:8px; color:#9CA3AF; }
     @bottom-right{ content:"Página " counter(page) " de " counter(pages); font-size:8px; color:#6B7280; }
   }
   /* Capa sem cabeçalho corrido */
   @page:first { @top-center { content:""; } }
 
-  /* Esconde a moldura do app — imprime só o dossiê */
+  /* Esconde a moldura do app — imprime só o relatório */
   .sidebar, .sidebar-overlay, .topbar, .mobile-menu-btn,
   .sidebar-footer, #siguc-progress-bar,
   .ac-filtros, .no-print, .ac-doc-head { display:none !important; }
@@ -189,7 +189,7 @@
   if (!usuario) { window.location.href = '../index.html'; return }
 
   document.getElementById('app').innerHTML =
-    gerarLayout('Dossiê Científico', 'analise-cientifica-biomonitor') +
+    gerarLayout('Relatório Científico', 'analise-cientifica-biomonitor') +
     `<div class="fade-in">
       <div class="ac-filtros no-print">
         <label>Temporada
@@ -215,7 +215,7 @@
           <select id="acf-praia"><option value="">Todas as praias</option></select>
         </label>
         <div style="display:flex;gap:8px;align-items:flex-end;margin-top:2px">
-          <button class="btn btn-primary" id="acf-aplicar" style="padding:8px 18px">Gerar dossiê</button>
+          <button class="btn btn-primary" id="acf-aplicar" style="padding:8px 18px">Gerar relatório</button>
           <button class="btn btn-secondary" onclick="window.print()" style="padding:8px 14px" title="Imprimir / Salvar PDF">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
             Imprimir
@@ -223,7 +223,7 @@
         </div>
       </div>
       <div id="ac-capa"></div>
-      <div id="ac-conteudo"><div class="ac-loading">Escolha os filtros e clique em <strong>Gerar dossiê</strong>.</div></div>
+      <div id="ac-conteudo"><div class="ac-loading">Escolha os filtros e clique em <strong>Gerar relatório</strong>.</div></div>
     </div>`
 
   if (typeof bIconsAplicar === 'function') bIconsAplicar(document.getElementById('app'))
