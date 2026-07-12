@@ -119,6 +119,7 @@ async function bioGerarPDFCampo(n) {
     container.style.cssText = 'position:fixed;left:-9999px;top:0;background:#fff'
     container.innerHTML = html
     document.body.appendChild(container)
+    _biorelDesenharGraficos(ninhos)
 
     const imgs = [...container.querySelectorAll('img')]
     if (imgs.length) {

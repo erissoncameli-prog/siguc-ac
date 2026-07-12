@@ -28,6 +28,18 @@ const BIOREL_TIPO_OCORR = {
   doenca: 'Doença', tratamento: 'Tratamento', observacao: 'Observação',
 }
 
+// Mesmas cores/rótulos do gráfico de rosca já usado em biomonitor-validacao.html
+// (aba de aprovação de ninhos) — reaproveitados aqui para o desfecho dos ovos
+// ficar visualmente consistente entre as duas telas.
+const BIOREL_DONUT_COR = {
+  vivos: '#2A9D6F', mortos: '#9CA3AF', predados: '#ef4444',
+  natural: '#1A6B8C', humana: '#7B57B0', viaveis: '#C9A84C',
+}
+const BIOREL_DONUT_LBL = {
+  vivos: 'Vivos', mortos: 'Mortos/não-nasc.', predados: 'Predados',
+  natural: 'Perdidos (natural)', humana: 'Perdidos (humano)', viaveis: 'Viáveis (incubando)',
+}
+
 // Nome da plataforma mostrado no canto superior direito do cabeçalho — o
 // nome/apps do sistema ainda podem mudar; troque só aqui quando acontecer.
 const BIOREL_NOME_PLATAFORMA = 'Biomonitor'
@@ -226,6 +238,47 @@ function _biorelIdentificacao(n) {
       <tr><th>Perdas — natural</th><th>Perdas — predação</th><th>Perdas — humana</th></tr>
       <tr><td>${n.descartados_natural || 0}</td><td>${n.descartados_predacao || 0}</td><td>${n.descartados_humana || 0}</td></tr>
     </table>` : ''}
+  </div>
+  ${_biorelSecaoDonut(n)}`
+}
+
+// Segmentos do desfecho dos ovos — mesma lógica de donutOvosHtml em
+// biomonitor-validacao.html (vivos/mortos só depois de eclodir; viáveis só antes).
+function _biorelDonutSegmentos(n) {
+  if (n.qtd_ovos == null) return []
+  const eclodiu = !!n.data_nascimento
+  return [
+    ['vivos',    eclodiu ? (n.filhotes_vivos || 0) : 0],
+    ['mortos',   eclodiu ? ((n.filhotes_mortos || 0) + (n.ovos_nao_nascidos || 0)) : 0],
+    ['predados', n.descartados_predacao || 0],
+    ['natural',  n.descartados_natural || 0],
+    ['humana',   n.descartados_humana || 0],
+    ['viaveis',  !eclodiu ? (n.ovos_viaveis || 0) : 0],
+  ].filter(([, v]) => v > 0)
+}
+
+// Gráfico de rosca (canvas, não conic-gradient) — o app de campo captura a
+// ficha via html2canvas, que não renderiza conic-gradient de forma confiável;
+// um <canvas> já desenhado é copiado como bitmap e funciona nos dois casos
+// (impressão web e PDF do app). Desenho real acontece em _biorelDesenharGraficos,
+// depois que este HTML já está no DOM.
+function _biorelSecaoDonut(n) {
+  const segs = _biorelDonutSegmentos(n)
+  const total = segs.reduce((s, [, v]) => s + v, 0)
+  if (!total) return ''
+  const legenda = segs.map(([k, v]) => `
+    <div style="display:flex;align-items:center;gap:6px;font-size:9px">
+      <span style="width:9px;height:9px;border-radius:50%;background:${BIOREL_DONUT_COR[k]};flex-shrink:0"></span>
+      <span style="color:#4b5563">${esc(BIOREL_DONUT_LBL[k])}</span>
+      <strong style="margin-left:auto">${v}</strong>
+    </div>`).join('')
+  return `
+  <div class="rel-secao">
+    <div class="rel-secao-titulo">Desfecho dos Ovos</div>
+    <div style="display:flex;gap:16px;align-items:center">
+      <canvas id="rel-donut-${n.id}" width="140" height="140" style="width:70px;height:70px;flex-shrink:0"></canvas>
+      <div style="flex:1;display:grid;gap:4px">${legenda}</div>
+    </div>
   </div>`
 }
 
@@ -245,6 +298,41 @@ function _biorelTimeline(n) {
         <td>${ev.saldo != null ? ev.saldo : '—'}</td>
       </tr>`).join('')}
     </table>
+  </div>`
+}
+
+// Pontos ordenados por data de uma métrica de biometria por amostragem
+// (ocorrencias_bercario tipo='biometria') — usado tanto para montar o HTML
+// (rótulos/condição de existir) quanto para desenhar depois.
+function _biorelPontosCrescimento(ocorrencias, campo) {
+  return (ocorrencias || [])
+    .filter(o => o.tipo === 'biometria' && o[campo] != null)
+    .slice()
+    .sort((a, b) => (a.data_ocorrencia || '').localeCompare(b.data_ocorrencia || ''))
+    .map(o => ({ v: o[campo], label: formatData(o.data_ocorrencia).slice(0, 5) }))
+}
+
+// Gráficos de crescimento (comprimento) e peso do lote, a partir das
+// amostragens já registradas em "Ocorrências no berçário" — comprimento e
+// peso NUNCA no mesmo eixo (escalas muito diferentes), mesmo padrão já usado
+// em relatorios-biomonitor.html. Desenho real em _biorelDesenharGraficos.
+function _biorelSecaoCrescimento(l) {
+  const pontosComp = _biorelPontosCrescimento(l.ocorrencias, 'comprimento_medio_cm')
+  const pontosPeso = _biorelPontosCrescimento(l.ocorrencias, 'peso_medio_g')
+  if (pontosComp.length < 2 && pontosPeso.length < 2) return ''
+  return `
+  <div class="rel-secao-subtitulo">Crescimento (biometria por amostragem)</div>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:6px">
+    ${pontosComp.length >= 2 ? `
+    <div style="flex:1;min-width:180px">
+      <div style="font-size:8px;color:#6b7280;margin-bottom:2px;text-transform:uppercase;letter-spacing:.04em">Comprimento médio (cm)</div>
+      <canvas id="rel-graf-compr-${l.id}" width="360" height="140" style="width:100%;height:70px"></canvas>
+    </div>` : ''}
+    ${pontosPeso.length >= 2 ? `
+    <div style="flex:1;min-width:180px">
+      <div style="font-size:8px;color:#6b7280;margin-bottom:2px;text-transform:uppercase;letter-spacing:.04em">Peso médio (g)</div>
+      <canvas id="rel-graf-peso-${l.id}" width="360" height="140" style="width:100%;height:70px"></canvas>
+    </div>` : ''}
   </div>`
 }
 
@@ -326,6 +414,7 @@ function _biorelDestinoFilhotes(n, modo = 'completo') {
             <td>${esc(_biorelOcorrenciaTxt(o))}</td>
           </tr>`).join('')}
         </table>` : ''}
+        ${_biorelSecaoCrescimento(l)}
 
         ${l.filhotes.length ? (modo === 'completo' ? `
         <div class="rel-secao-subtitulo">Filhotes individuais (${l.filhotes.length})</div>
@@ -394,6 +483,117 @@ function _biorelFotos(n) {
       ${fotos.map(u => `<img src="${esc(u)}" style="width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:4px;border:1px solid #e5e7eb">`).join('')}
     </div>
   </div>`
+}
+
+// ── Desenho dos gráficos (canvas 2D, chamado depois do HTML já estar no DOM) ──
+// Canvas — em vez de CSS conic-gradient ou SVG — porque o app de campo captura
+// a ficha com html2canvas para gerar o PDF; um <canvas> já pintado é copiado
+// como bitmap de forma confiável nos dois destinos (impressão web e PDF do
+// app), diferente de gradientes/SVG complexos.
+function _biorelDesenharDonut(canvasId, segs, total) {
+  const cv = document.getElementById(canvasId)
+  if (!cv || !total) return
+  const ctx = cv.getContext('2d')
+  const W = cv.width, H = cv.height
+  const cx = W / 2, cy = H / 2
+  const rOut = Math.min(W, H) / 2 - 4
+  const rIn = rOut * 0.6
+  const gap = 0.035 // rad — equivalente ao "surface gap" entre segmentos
+
+  ctx.clearRect(0, 0, W, H)
+  let ang = -Math.PI / 2
+  segs.forEach(([k, v]) => {
+    const frac = v / total
+    const a0 = ang + gap / 2
+    const a1 = ang + frac * Math.PI * 2 - gap / 2
+    if (a1 > a0) {
+      ctx.beginPath()
+      ctx.arc(cx, cy, rOut, a0, a1)
+      ctx.arc(cx, cy, rIn, a1, a0, true)
+      ctx.closePath()
+      ctx.fillStyle = BIOREL_DONUT_COR[k]
+      ctx.fill()
+    }
+    ang += frac * Math.PI * 2
+  })
+
+  ctx.fillStyle = '#111827'
+  ctx.font = 'bold 30px DM Sans, Arial, sans-serif'
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.fillText(String(total), cx, cy)
+}
+
+// Linha de tendência simples: 1 série, eixo único, ponto final com anel
+// branco (surface ring) e valor rotulado direto na ponta (mark specs do
+// skill de dataviz: linha 2px, marcador ≥8px, rótulo no fim, nunca dual-axis).
+function _biorelDesenharLinha(canvasId, pontos, cor, sufixo) {
+  const cv = document.getElementById(canvasId)
+  if (!cv || pontos.length < 2) return
+  const ctx = cv.getContext('2d')
+  const W = cv.width, H = cv.height
+  const padL = 8, padR = 50, padT = 16, padB = 20
+  const vals = pontos.map(p => p.v)
+  const min = Math.min(...vals), max = Math.max(...vals)
+  const faixa = (max - min) || 1
+  const x = i => padL + (i / (pontos.length - 1)) * (W - padL - padR)
+  const y = v => padT + (1 - (v - min) / faixa) * (H - padT - padB)
+
+  ctx.clearRect(0, 0, W, H)
+
+  ctx.strokeStyle = '#e5e7eb'
+  ctx.lineWidth = 1
+  ctx.beginPath()
+  ctx.moveTo(padL, H - padB)
+  ctx.lineTo(W - padR, H - padB)
+  ctx.stroke()
+
+  ctx.strokeStyle = cor
+  ctx.lineWidth = 3
+  ctx.lineJoin = 'round'
+  ctx.lineCap = 'round'
+  ctx.beginPath()
+  pontos.forEach((p, i) => {
+    const px = x(i), py = y(p.v)
+    i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py)
+  })
+  ctx.stroke()
+
+  const last = pontos[pontos.length - 1]
+  const lx = x(pontos.length - 1), ly = y(last.v)
+  ctx.beginPath(); ctx.arc(lx, ly, 6, 0, Math.PI * 2); ctx.fillStyle = '#fff'; ctx.fill()
+  ctx.beginPath(); ctx.arc(lx, ly, 4, 0, Math.PI * 2); ctx.fillStyle = cor; ctx.fill()
+
+  ctx.fillStyle = '#111827'
+  ctx.font = 'bold 14px DM Sans, Arial, sans-serif'
+  ctx.textAlign = 'left'
+  ctx.textBaseline = 'middle'
+  ctx.fillText(`${last.v}${sufixo}`, lx + 8, ly)
+
+  ctx.fillStyle = '#9ca3af'
+  ctx.font = '10px DM Sans, Arial, sans-serif'
+  ctx.textAlign = 'left'
+  ctx.fillText(pontos[0].label, padL, H - 4)
+  ctx.textAlign = 'right'
+  ctx.fillText(last.label, W - padR, H - 4)
+}
+
+// Chamar depois que o HTML da ficha já está no DOM (preview web ou container
+// off-screen do app de campo) e antes de imprimir/capturar — os canvases só
+// existem como elementos vazios até aqui.
+function _biorelDesenharGraficos(ninhos) {
+  ninhos.forEach(n => {
+    const segs = _biorelDonutSegmentos(n)
+    const total = segs.reduce((s, [, v]) => s + v, 0)
+    _biorelDesenharDonut(`rel-donut-${n.id}`, segs, total)
+
+    ;(n._lotes || []).forEach(l => {
+      const pontosComp = _biorelPontosCrescimento(l.ocorrencias, 'comprimento_medio_cm')
+      const pontosPeso = _biorelPontosCrescimento(l.ocorrencias, 'peso_medio_g')
+      _biorelDesenharLinha(`rel-graf-compr-${l.id}`, pontosComp, '#52B788', ' cm')
+      _biorelDesenharLinha(`rel-graf-peso-${l.id}`, pontosPeso, '#C9A84C', ' g')
+    })
+  })
 }
 
 // ── Monta uma folha (.rel-a4) por ninho ──────────────────────────────
@@ -486,6 +686,7 @@ async function bioAbrirRelatorioNinhos(db, ninhoIds) {
   </div>
   <div id="rel-preview-area">${html}</div>`
   document.body.appendChild(overlay)
+  _biorelDesenharGraficos(ninhos)
 }
 
 async function bioAbrirRelatorioNinho(db, ninhoId) {
