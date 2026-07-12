@@ -1,12 +1,12 @@
 // ── SIGUC Biomonitor — PDF de campo (app) + compartilhar ───────────
 // Gera a ficha resumida de UM ninho (modo 'resumido' de
 // js/biomonitor-relatorio-ninho.js — sem fotos, sem biometria individual
-// por filhote) e entrega um PDF de verdade (não window.print()) para
-// compartilhar direto por WhatsApp/e-mail a partir do card de "Ninhos
-// abertos". Exige conexão (mesmo padrão de degradação do resto do app).
+// por filhote) usando o mesmo motor jsPDF do relatório web (bioMontarPdfNinhos)
+// e entrega o PDF pra compartilhar direto por WhatsApp/e-mail a partir do
+// card de "Ninhos abertos". Exige conexão (mesmo padrão de degradação do
+// resto do app).
 // Depende de: bioSupabase(), bioToast() (biomonitor-quelonios.js/sync.js);
-// bioColetarDadosRelatorioNinhos(), _biorelGerarHTML() (biomonitor-relatorio-ninho.js);
-// html2pdf.js carregado sob demanda via CDN.
+// bioColetarDadosRelatorioNinhos(), bioMontarPdfNinhos() (biomonitor-relatorio-ninho.js).
 
 const BIOCAMPO_CAB_PADRAO = {
   governo: 'Governo do Estado do Acre', gestao: '',
@@ -14,21 +14,6 @@ const BIOCAMPO_CAB_PADRAO = {
   diretoria: 'Diretoria de Meio Ambiente', siglaDiret: 'DIMA',
   departamento: 'Departamento de Biodiversidade', siglaDep: 'DEBIO',
   logoGoverno: null, logoSecr: null,
-}
-
-// ── html2pdf.js sob demanda (só quando o botão é usado) ─────────────
-let _biocampoHtml2pdfPromise = null
-function _biocampoCarregarHtml2pdf() {
-  if (window.html2pdf) return Promise.resolve()
-  if (_biocampoHtml2pdfPromise) return _biocampoHtml2pdfPromise
-  _biocampoHtml2pdfPromise = new Promise((resolve, reject) => {
-    const s = document.createElement('script')
-    s.src = 'https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.2/dist/html2pdf.bundle.min.js'
-    s.onload = resolve
-    s.onerror = () => reject(new Error('Não foi possível carregar o gerador de PDF — verifique a conexão.'))
-    document.head.appendChild(s)
-  })
-  return _biocampoHtml2pdfPromise
 }
 
 function _biocampoBlobParaBase64(blob) {
@@ -96,7 +81,6 @@ async function bioGerarPDFCampo(n) {
   if (!navigator.onLine) { bioToast('Requer conexão para gerar o PDF.', 'err'); return }
   bioToast('Gerando PDF…', '')
 
-  let container
   try {
     const [ninhos, logos] = await Promise.all([
       bioColetarDadosRelatorioNinhos(bioSupabase(), [n.id], { modo: 'resumido' }),
@@ -111,41 +95,13 @@ async function bioGerarPDFCampo(n) {
       responsavel: { nome: BioApp.monitor?.nome_completo || 'Monitor de campo', orgao: 'SEMA-AC' },
     }
     const protocolo = 'CAMPO-' + new Date().toISOString().slice(0, 10).replace(/-/g, '')
-    const html = await _biorelGerarHTML(ninhos, cab, protocolo, 'resumido')
+    const pdf = await bioMontarPdfNinhos(ninhos, cab, protocolo, 'resumido')
 
-    // Renderiza fora da tela (mesmas classes/estilos rel-a4 já usados no
-    // preview de impressão da web) para o html2canvas capturar.
-    container = document.createElement('div')
-    container.style.cssText = 'position:fixed;left:-9999px;top:0;background:#fff'
-    container.innerHTML = html
-    document.body.appendChild(container)
-    _biorelDesenharGraficos(ninhos)
-
-    const imgs = [...container.querySelectorAll('img')]
-    if (imgs.length) {
-      await Promise.allSettled(imgs.map(img =>
-        img.complete ? Promise.resolve() :
-        new Promise(r => { img.onload = r; img.onerror = r; setTimeout(r, 5000) })
-      ))
-    }
-
-    await _biocampoCarregarHtml2pdf()
-
-    const folha = container.querySelector('.rel-a4')
     const filename = `ficha-ninho-${String(ninho.numero_ninho || ninho.id).replace(/[^\w-]+/g, '-')}.pdf`
-    const blob = await window.html2pdf().set({
-      margin: 0,
-      filename,
-      image: { type: 'jpeg', quality: 0.92 },
-      html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-    }).from(folha).outputPdf('blob')
-
+    const blob = pdf.output('blob')
     await bioCompartilharArquivo(blob, filename, `Ficha do ninho ${ninho.numero_ninho}`)
   } catch (e) {
     console.error('[biomonitor] gerar PDF de campo:', e)
     bioToast('Erro ao gerar PDF: ' + e.message, 'err')
-  } finally {
-    container?.remove()
   }
 }
