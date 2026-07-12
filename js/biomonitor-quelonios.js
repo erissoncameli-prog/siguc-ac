@@ -1356,7 +1356,14 @@ async function bioSalvarNinho() {
 // cfg: { prefixo, max, getState, setFotos }
 // Wires up câmera button + file input + grid de preview para qualquer form.
 // Se brigada-captura.js estiver carregado, aplica watermark automaticamente.
-function bioIniciarFotosGenerica({ prefixo, max, getState, setFotos }) {
+// Nome da praia do ninho em edição/contexto atual, para a marca d'água.
+function bioNomePraiaDoNinhoAtual() {
+  const ninho = BioApp.formNinhoAtualizar
+  const nome = ninho?.praia_atual_nome ?? ninho?.praia_nome
+  return nome ? `Praia: ${nome}` : null
+}
+
+function bioIniciarFotosGenerica({ prefixo, max, getState, setFotos, getContexto }) {
   const grid    = document.getElementById(`bio-${prefixo}-foto-grid`)
   const btnCam  = document.getElementById(`bio-${prefixo}-btn-camera`)
   const inp     = document.getElementById(`bio-${prefixo}-input-foto`)
@@ -1387,6 +1394,8 @@ function bioIniciarFotosGenerica({ prefixo, max, getState, setFotos }) {
     const fotos = getState() ?? []
     const monitor = BioApp.monitor
     const gps = typeof bGpsAtual === 'function' ? bGpsAtual() : null
+    const logos = await bioOfflineGetConfig('bio_logos_cache_v1').catch(() => null)
+    const ctxExtra = typeof getContexto === 'function' ? (getContexto() ?? {}) : {}
     for (const file of Array.from(inp.files ?? [])) {
       if (fotos.length >= max) break
       let dataUrl
@@ -1396,7 +1405,12 @@ function bioIniciarFotosGenerica({ prefixo, max, getState, setFotos }) {
             file,
             { nome: monitor?.nome_completo ?? 'Monitor' },
             gps,
-            { brigada: monitor?.grupo_nome ?? null }
+            {
+              brigada: monitor?.grupo_nome ?? null,
+              tipoOcorrencia: ctxExtra.tipoOcorrencia ?? null,
+              local: ctxExtra.local ?? null,
+              logos,
+            }
           )
           dataUrl = await new Promise(res => {
             const r = new FileReader()
@@ -1434,6 +1448,10 @@ function bioIniciarFotosForm() {
     max:      3,
     getState: () => BioApp.formNinho?.foto_urls ?? [],
     setFotos: f  => { if (BioApp.formNinho) BioApp.formNinho.foto_urls = f },
+    getContexto: () => ({
+      tipoOcorrencia: 'Encontro de Ninho',
+      local: BioApp.praiaAtual?.nome ? `Praia: ${BioApp.praiaAtual.nome}` : null,
+    }),
   })
 }
 
@@ -4844,11 +4862,58 @@ document.addEventListener('DOMContentLoaded', async () => {
   bioIniciarTelaTrocarSenha()
   bioIniciarFotosForm()
   // Fotos com marca d'água nos demais formulários
-  bioIniciarFotosGenerica({ prefixo:'ecl',   max:3, getState:() => BioApp._fotosEcl ?? [],   setFotos:f => { BioApp._fotosEcl = f } })
-  bioIniciarFotosGenerica({ prefixo:'vis',   max:3, getState:() => BioApp._fotosVis ?? [],   setFotos:f => { BioApp._fotosVis = f } })
-  bioIniciarFotosGenerica({ prefixo:'transf',max:3, getState:() => BioApp._fotosTransf ?? [],setFotos:f => { BioApp._fotosTransf = f } })
-  bioIniciarFotosGenerica({ prefixo:'sol',   max:3, getState:() => BioApp._fotosSol ?? [],   setFotos:f => { BioApp._fotosSol = f } })
-  bioIniciarFotosGenerica({ prefixo:'oc',    max:2, getState:() => BioApp._fotosOc ?? [],    setFotos:f => { BioApp._fotosOc = f } })
+  bioIniciarFotosGenerica({
+    prefixo: 'ecl', max: 3,
+    getState: () => BioApp._fotosEcl ?? [], setFotos: f => { BioApp._fotosEcl = f },
+    getContexto: () => ({
+      tipoOcorrencia: 'Eclosão',
+      local: bioNomePraiaDoNinhoAtual(),
+    }),
+  })
+  bioIniciarFotosGenerica({
+    prefixo: 'vis', max: 3,
+    getState: () => BioApp._fotosVis ?? [], setFotos: f => { BioApp._fotosVis = f },
+    getContexto: () => ({
+      tipoOcorrencia: 'Visita de Monitoramento',
+      local: bioNomePraiaDoNinhoAtual(),
+    }),
+  })
+  bioIniciarFotosGenerica({
+    prefixo: 'transf', max: 3,
+    getState: () => BioApp._fotosTransf ?? [], setFotos: f => { BioApp._fotosTransf = f },
+    getContexto: () => {
+      const origem  = BioApp.formNinhoAtualizar?.praia_nome
+      const destino = document.getElementById('bio-transf-praia-nome')?.textContent?.trim()
+      const subLocal = document.getElementById('bio-transf-local')?.value?.trim()
+      const partes = []
+      if (origem) partes.push(`Praia: ${origem}`)
+      if (destino && destino !== 'Selecionar praia…') partes.push(`→ ${destino}`)
+      if (subLocal) partes.push(subLocal)
+      return { tipoOcorrencia: 'Transferência de Ninho', local: partes.length ? partes.join(' ') : null }
+    },
+  })
+  bioIniciarFotosGenerica({
+    prefixo: 'sol', max: 3,
+    getState: () => BioApp._fotosSol ?? [], setFotos: f => { BioApp._fotosSol = f },
+    getContexto: () => {
+      const ctx = BioApp.formSolturaCtx
+      if (ctx?.bercario) return { tipoOcorrencia: 'Soltura de Filhotes', local: `Berçário: ${ctx.bercario.nome}` }
+      const local = document.getElementById('bio-sol-local')?.value?.trim()
+      return { tipoOcorrencia: 'Soltura de Filhotes', local: local || bioNomePraiaDoNinhoAtual() }
+    },
+  })
+  bioIniciarFotosGenerica({
+    prefixo: 'oc', max: 2,
+    getState: () => BioApp._fotosOc ?? [], setFotos: f => { BioApp._fotosOc = f },
+    getContexto: () => {
+      const chip = document.querySelector('#bio-oc-tipo-grid .bio-oc-chip.ativo')
+      const tipoTxt = chip?.textContent?.trim()
+      return {
+        tipoOcorrencia: tipoTxt ? `Berçário · ${tipoTxt}` : 'Ocorrência de Berçário',
+        local: BioApp.loteAtual?.bercario_nome ? `Berçário: ${BioApp.loteAtual.bercario_nome}` : null,
+      }
+    },
+  })
   bioIniciarContadores()
   bioIniciarFormVisita()
   bioIniciarPosEclosao()
