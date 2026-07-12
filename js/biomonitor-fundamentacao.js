@@ -204,6 +204,30 @@ const BIO_REFERENCIAS = {
     fonte: 'SciELO / Brazilian Journal of Biology',
     url: 'http://www.scielo.br/j/bjb/a/sftPCp6tRNPPrXCQCfgvWzq/?lang=en',
   },
+  crescimento_vb: {
+    autores: 'Estimativa de idade/tamanho por taxa de crescimento (Podocnemididae)',
+    titulo: 'Using growth rates to estimate the minimum age and size — aplicação da equação de von Bertalanffy',
+    fonte: 'Journal of Zoo and Aquarium Research (JZAR)',
+    url: 'https://jzar.org/jzar/article/download/432/376',
+  },
+  headstart: {
+    autores: 'Demografia e manejo de Podocnemis',
+    titulo: 'A Demographic Study of the Arrau Turtle (Podocnemis expansa) — crescimento e recrutamento (headstarting)',
+    fonte: 'ResearchGate',
+    url: 'https://www.researchgate.net/publication/232685236',
+  },
+  fusariose: {
+    autores: 'Sarmiento-Ramírez, J.M. et al.',
+    titulo: 'Beyond Sea Turtles: Fusarium keratoplasticum in Eggshells of Podocnemis unifilis, a Threatened Amazonian Freshwater Turtle',
+    fonte: 'Journal of Fungi (MDPI) / PMC',
+    url: 'https://pmc.ncbi.nlm.nih.gov/articles/PMC8470610/',
+  },
+  falha_reprodutiva: {
+    autores: 'Lavigne, B. et al.',
+    titulo: 'Understanding early reproductive failure in turtles and tortoises',
+    fonte: 'Animal Conservation (Wiley)',
+    url: 'https://zslpublications.onlinelibrary.wiley.com/doi/10.1111/acv.12986',
+  },
 }
 
 // Fatos-âncora do contexto regional/programático (camada de referência).
@@ -213,6 +237,13 @@ const BIO_CONTEXTO = {
   flood_mortalidade_unifilis: '10–100% dos ovos conforme a duração do alagamento',
   flood_limiar_nivel_m: 1.5,             // +1,5 m já reduz exposição abaixo do mínimo em 50% da área
   exposicao_minima_dias: 55,             // dias acima d'água exigidos para incubação/eclosão
+  incubacao_ref_dias: [55, 70],          // faixa típica de incubação (Podocnemis de rio)
+  // Crescimento / headstarting (camada de referência):
+  crescimento_dobra_1ano: true,          // filhotes podem dobrar o tamanho de casco no 1º ano
+  headstart_casco_mm: 62.7,              // casco médio de filhotes headstarted na soltura (lit.)
+  soltura_direta_casco_mm: 36.3,         // casco médio de filhotes de soltura direta (lit.)
+  tamanho_soltura_ideal_cm: [5.0, 7.0],  // faixa-alvo de casco p/ soltura pós-headstarting (ref.)
+  crescimento_ref_mm_ano: 56.8,          // ganho anual de casco de referência (Podocnemididae)
 }
 
 // Leitura QUALITATIVA da razão sexual da coorte a partir da temperatura
