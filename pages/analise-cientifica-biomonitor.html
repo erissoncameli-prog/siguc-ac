@@ -10,6 +10,7 @@
 <script src="../js/config.js"></script>
 <script src="../js/config-sistema.js"></script>
 <script src="../js/layout.js"></script>
+<script src="../js/config-sistema.js"></script>
 <script src="../js/biomonitor-fundamentacao.js"></script>
 <script src="../js/biomonitor-analise.js"></script>
 <style>
@@ -128,22 +129,55 @@
 .ac-ref-txt a { color:var(--bio-prim,#1A6B8C); word-break:break-all; font-size:11px; }
 .ac-metodo .ac-prosa { font-size:12.5px; }
 
+/* ── Capa institucional (só na impressão) ── */
+#ac-capa { display:none; }
+
 @media print {
-  @page { size:A4 portrait; margin:12mm; }
+  @page {
+    size:A4 portrait; margin:16mm 14mm 15mm;
+    @top-center  { content:"SEMA-AC · DIMA · Biomonitor Quelônios — Dossiê Científico da Temporada"; font-size:8px; color:#6B7280; }
+    @bottom-left { content:"Governo do Estado do Acre · SIGUC-AC"; font-size:8px; color:#9CA3AF; }
+    @bottom-right{ content:"Página " counter(page) " de " counter(pages); font-size:8px; color:#6B7280; }
+  }
+  /* Capa sem cabeçalho corrido */
+  @page:first { @top-center { content:""; } }
+
   /* Esconde a moldura do app — imprime só o dossiê */
   .sidebar, .sidebar-overlay, .topbar, .mobile-menu-btn,
   .sidebar-footer, #siguc-progress-bar,
-  .ac-filtros, .no-print { display:none !important; }
+  .ac-filtros, .no-print, .ac-doc-head { display:none !important; }
   /* Neutraliza o layout de app para o conteúdo fluir na folha */
   html, body { background:#fff !important; }
   .app-layout, .main-content, .page-body, #app { display:block !important;
     margin:0 !important; padding:0 !important; width:auto !important;
     max-width:none !important; height:auto !important; overflow:visible !important; }
-  .ac-doc-head, .ac-sec, .ac-chart-wrap, .ac-fase-card, .ac-esp-card,
+  .ac-sec, .ac-chart-wrap, .ac-fase-card, .ac-esp-card,
   .ac-rec, .ac-table { break-inside:avoid; }
+  .ac-sec-head { break-after:avoid; }
   .ac-chart-wrap { height:220px; }
   /* Garante as cores dos cards/gráficos na impressão */
   * { -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important; }
+
+  /* Capa */
+  #ac-capa { display:flex !important; flex-direction:column; min-height:250mm;
+    break-after:page; text-align:center; }
+  .ac-capa-logos { display:flex; justify-content:center; gap:26px; align-items:center; margin:4mm 0 14px; }
+  .ac-capa-logos img { height:62px; max-width:150px; object-fit:contain; }
+  .ac-capa-hier { border-bottom:2px solid #0A1A0F; padding-bottom:12px; }
+  .ac-capa-hier .l1 { font-size:10px; color:#6B7280; text-transform:uppercase; letter-spacing:.06em; }
+  .ac-capa-hier .l2 { font-size:14px; font-weight:700; color:#0A1A0F; margin-top:3px; }
+  .ac-capa-hier .l3 { font-size:11px; color:#4B5563; }
+  .ac-capa-mid { margin:auto 0; display:flex; flex-direction:column; gap:5px; align-items:center; }
+  .ac-capa-tipo { font-size:12px; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:#1A6B8C; }
+  .ac-capa-titulo { font-family:'Fraunces',Georgia,serif; font-size:30px; color:#0A1A0F; margin:6px 0 0; line-height:1.15; }
+  .ac-capa-sub { font-size:14px; color:#4B5563; }
+  .ac-capa-temp { margin-top:16px; font-size:18px; font-weight:700; color:#1A6B8C; }
+  .ac-capa-meta { margin:18px auto 0; border-collapse:collapse; font-size:11px; }
+  .ac-capa-meta td { border:1px solid #E5EBF0; padding:5px 12px; text-align:left; }
+  .ac-capa-meta td:first-child { color:#6B7280; font-weight:600; background:#F9FAFB; }
+  .ac-capa-rodape { margin-top:auto; font-size:9px; color:#9CA3AF; line-height:1.6;
+    border-top:1px solid #E5EBF0; padding-top:8px; }
+  .ac-capa-aviso { font-style:italic; margin-top:4px; }
 }
 </style>
 </head>
@@ -188,6 +222,7 @@
           </button>
         </div>
       </div>
+      <div id="ac-capa"></div>
       <div id="ac-conteudo"><div class="ac-loading">Escolha os filtros e clique em <strong>Gerar dossiê</strong>.</div></div>
     </div>`
 
