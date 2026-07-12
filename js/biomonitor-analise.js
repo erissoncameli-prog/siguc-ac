@@ -1,4 +1,4 @@
-// ── SIGUC-AC · Biomonitor — Dossiê Científico da Temporada ─────
+// ── SIGUC-AC · Biomonitor — Relatório Científico da Temporada ─────
 // Motor da página pages/analise-cientifica-biomonitor.html.
 // Junta duas fontes:
 //   • bio_relatorio_completo (091) — KPIs, taxas, séries observadas;
@@ -44,7 +44,7 @@ async function acCarregarChartJS() {
     const s = document.createElement('script')
     s.src = 'https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js'
     s.onload = () => { _acChartJs = true; res() }
-    // Se a CDN falhar, o dossiê ainda renderiza (texto/tabelas);
+    // Se a CDN falhar, o relatório ainda renderiza (texto/tabelas);
     // acMkChart é no-op quando Chart não está disponível.
     s.onerror = () => res()
     document.head.appendChild(s)
@@ -55,10 +55,10 @@ function acDestruirCharts() {
   _acCharts = {}
 }
 
-// ── Ponto de entrada — chamado por "Gerar dossiê" ───────────────
+// ── Ponto de entrada — chamado por "Gerar relatório" ───────────────
 window.acAplicar = async function (filtros) {
   const el = document.getElementById('ac-conteudo')
-  el.innerHTML = '<div class="ac-loading">Compilando o dossiê da temporada…</div>'
+  el.innerHTML = '<div class="ac-loading">Compilando o relatório da temporada…</div>'
   acDestruirCharts()
 
   const params = {
@@ -90,7 +90,7 @@ window.acAplicar = async function (filtros) {
       const cab = await getCabecalhoRelatorio()
       capaEl.innerHTML = acCapa(ana, cab)
     }
-  } catch (_) { /* capa é opcional — não bloqueia o dossiê */ }
+  } catch (_) { /* capa é opcional — não bloqueia o relatório */ }
 
   el.innerHTML = [
     acCabecalho(ana, filtros),
@@ -116,7 +116,7 @@ window.acAplicar = async function (filtros) {
   acChartClima(ana)
 }
 
-// ── Cabeçalho do dossiê ─────────────────────────────────────────
+// ── Cabeçalho do relatório ─────────────────────────────────────────
 function acCabecalho(ana, filtros) {
   const t = ana.temporada
   const hoje = new Date().toLocaleDateString('pt-BR')
@@ -127,7 +127,7 @@ function acCabecalho(ana, filtros) {
   return `
   <header class="ac-doc-head">
     <div class="ac-doc-brand">SIGUC-AC · SEMA-AC / DIMA · Biomonitor Quelônios</div>
-    <h1 class="ac-doc-title">Dossiê Científico da Temporada</h1>
+    <h1 class="ac-doc-title">Relatório Científico da Temporada</h1>
     <div class="ac-doc-meta">
       <span><strong>Temporada:</strong> ${nome}</span>
       <span><strong>Janela:</strong> ${janela}</span>
@@ -165,8 +165,8 @@ function acCapa(ana, cab) {
       ${cab.departamento ? `<div class="l3">${esc(cab.departamento)} (${esc(cab.siglaDep || 'DEUC')})</div>` : ''}
     </div>
     <div class="ac-capa-mid">
-      <div class="ac-capa-tipo">Dossiê Científico</div>
-      <h1 class="ac-capa-titulo">Dossiê Científico da Temporada</h1>
+      <div class="ac-capa-tipo">Relatório Científico</div>
+      <h1 class="ac-capa-titulo">Relatório Científico da Temporada</h1>
       <div class="ac-capa-sub">Biomonitoramento de Quelônios Amazônicos</div>
       <div class="ac-capa-temp">${nome}</div>
       <table class="ac-capa-meta">
