@@ -2,7 +2,7 @@
 -- SIGUC-AC · Biomonitor — RPC bio_analise_cientifica
 -- ───────────────────────────────────────────────────────────
 -- Complemento científico ao bio_relatorio_completo (091).
--- Acrescenta as dimensões que faltavam para o Dossiê Científico
+-- Acrescenta as dimensões que faltavam para o Relatório Científico
 -- da Temporada:
 --   1) Fase da temporada (início/meio/fim) — recorte por terços
 --      da janela [data_inicio, data_fim] da temporada-alvo, mais
