@@ -106,6 +106,11 @@
 .car-status-aguardando{background:#fffbeb;color:#d97706;border-color:#fde68a;}
 .car-status-analise{background:#eff6ff;color:#1d4ed8;border-color:#bfdbfe;}
 .car-status-outro{background:var(--cinza-100);color:var(--cinza-600);border-color:var(--borda);}
+.car-status-cancelado{background:#fef2f2;color:#dc2626;border-color:#fecaca;}
+.car-chip-status{cursor:pointer;font-family:'DM Sans',sans-serif;transition:opacity .15s,transform .1s;}
+.car-chip-status:hover{transform:translateY(-1px);}
+.car-chip-status.car-chip-off{opacity:.32;}
+.car-chip-todos{background:var(--cinza-100);color:var(--cinza-600);border-color:var(--borda);}
 .car-det-tab{padding:9px 14px;font-size:12px;font-weight:500;border:none;background:transparent;cursor:pointer;border-bottom:2px solid transparent;color:var(--cinza-500);font-family:'DM Sans',sans-serif;transition:all .15s;white-space:nowrap;flex:1;text-align:center;}
 .car-det-tab.ativo{color:#1F4E2C;border-bottom-color:#1F4E2C;background:#fff;}
 .car-det-tab:hover:not(.ativo){background:var(--cinza-50);}
@@ -816,6 +821,14 @@ const VEG_LAYERS = {
       {attribution:'Planet / NICFI',opacity:op/100,maxZoom:21,maxNativeZoom:18,
        errorTileUrl:'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw=='}); }
   },
+  sentinel: { layer:null, make(op){
+    const d = document.getElementById('sentinel-data')?.value || _sentinelDataSel;
+    if(!d) return null;
+    const nuvem = document.getElementById('sentinel-nuvem')?.value || 30;
+    return L.tileLayer(`/api/sentinel?z={z}&x={x}&y={y}&data=${encodeURIComponent(d)}&nuvem=${nuvem}`,
+      {attribution:'Sentinel-2 / Copernicus',opacity:op/100,maxZoom:18,maxNativeZoom:15,
+       errorTileUrl:'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw=='}); }
+  },
 };
 
 // ── Planet / NICFI — mosaicos mensais (chave protegida no proxy) ──
@@ -859,6 +872,54 @@ function planetAlterarMosaico(){
   _atualizarLegendaMapa();
 }
 
+// ── Sentinel-2 (Copernicus Data Space Ecosystem) — data exata + nuvem ──
+let _sentinelDatas = null, _sentinelDataSel = null;
+function _fmtDataBR(iso){ if(!iso) return '—'; const [y,m,d] = iso.split('-'); return `${d}/${m}/${y}`; }
+async function _sentinelCarregarDatas(){
+  const b = mapaL.getBounds();
+  const bbox = [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()].join(',');
+  try {
+    const r = await fetch(`/api/sentinel?bbox=${encodeURIComponent(bbox)}`, { signal: AbortSignal.timeout(15000) });
+    _sentinelDatas = await r.json();
+  } catch(_){ _sentinelDatas = { disponivel:false, motivo:'rede', datas:[] }; }
+  if(_sentinelDatas.datas?.length) _sentinelDataSel = _sentinelDatas.datas[0].data;
+  return _sentinelDatas;
+}
+async function _sentinelPopularSeletor(){
+  const sel  = document.getElementById('sentinel-data');
+  const stat = document.getElementById('sentinel-status');
+  if(!sel) return;
+  sel.innerHTML = '<option value="">carregando…</option>';
+  const info = await _sentinelCarregarDatas();
+  if(!info.disponivel || !info.datas.length){
+    sel.innerHTML = '<option value="">Nenhuma cena disponível</option>';
+    const chk = document.getElementById('veg-sentinel-chk'); if(chk) chk.disabled = true;
+    if(stat) stat.textContent = info.motivo === 'sem-credenciais'
+      ? 'Credenciais Copernicus não configuradas no servidor.'
+      : 'Nenhuma cena Sentinel-2 encontrada nesta área/período — tente afastar o zoom.';
+    return;
+  }
+  const chk = document.getElementById('veg-sentinel-chk'); if(chk) chk.disabled = false;
+  sel.innerHTML = info.datas.map(d => `<option value="${d.data}">${_fmtDataBR(d.data)} — nuvens ${d.nuvem.toFixed(0)}%</option>`).join('');
+  sel.value = _sentinelDataSel || info.datas[0].data;
+  if(stat) stat.textContent = `${info.datas.length} cena(s) nos últimos ${info.dias||60} dias`;
+  if(VEG_LAYERS.sentinel?.layer) _atualizarLegendaMapa();
+}
+function sentinelAlterarData(){
+  _sentinelDataSel = document.getElementById('sentinel-data')?.value || _sentinelDataSel;
+  const cfg = VEG_LAYERS.sentinel; if(!cfg?.layer) return;
+  const op = parseInt(document.getElementById('veg-sentinel-opacity')?.value||80);
+  mapaL.removeLayer(cfg.layer);
+  cfg.layer = cfg.make(op);
+  if(cfg.layer){ cfg.layer.addTo(mapaL); cfg.layer.setZIndex(150); }
+  _atualizarLegendaMapa();
+}
+function sentinelAlterarNuvem(){
+  const el = document.getElementById('sentinel-nuvem-val');
+  if(el) el.textContent = (document.getElementById('sentinel-nuvem')?.value||30)+'%';
+  sentinelAlterarData();
+}
+
 const GIBS_CAMADAS = [
   { id:'MODIS_Terra_CorrectedReflectance_TrueColor', fmt:'jpg', label:'MODIS Terra — Cor Real',         desc:'250m · revisita diária' },
   { id:'VIIRS_SNPP_CorrectedReflectance_TrueColor',  fmt:'jpg', label:'VIIRS SNPP — Cor Real',          desc:'375m · mais detalhes' },
@@ -892,7 +953,10 @@ function toggleCamadaVeg(id, ativo){
     } else {
       cfg.layer = cfg.make(op);
     }
-    if(!cfg.layer){ toast?.('Selecione um mês do mosaico Planet'); return; }
+    if(!cfg.layer){
+      toast?.(id === 'sentinel' ? 'Selecione uma data de cena Sentinel-2' : 'Selecione um mês do mosaico Planet');
+      return;
+    }
     cfg.layer.addTo(mapaL); cfg.layer.setZIndex(150);
   } else {
     if(cfg.layer){ mapaL.removeLayer(cfg.layer); cfg.layer=null; }
@@ -1578,11 +1642,14 @@ function toggleLayerBar(id){
     _tiAplicarEstadoUI();
     _tiAtualizarResumo();
   }
-  // Cobertura Vegetal: carrega os mosaicos Planet/NICFI no seletor de mês.
+  // Cobertura Vegetal: carrega os mosaicos Planet/NICFI e as datas Sentinel-2.
   if(id === 'veg'){
     const chk = document.getElementById('veg-planet-chk');
     if(chk) chk.checked = !!VEG_LAYERS.planet?.layer;
     _planetPopularSeletor();
+    const chkS = document.getElementById('veg-sentinel-chk');
+    if(chkS) chkS.checked = !!VEG_LAYERS.sentinel?.layer;
+    _sentinelPopularSeletor();
   }
   // Brigadas: restaura estado do toggle e dos seletores de exibição/peso
   if(id === 'brigadas'){
@@ -1710,6 +1777,35 @@ function _renderDropdown(id){
         <div id="planet-status" style="font-size:10px;color:#1e40af"></div>
       </div>
     </div>
+    <div style="border:1px solid #a7f3d0;border-radius:var(--raio);padding:10px 12px;background:#ecfdf5;margin-top:10px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+        <div style="width:14px;height:14px;border-radius:3px;background:#059669;flex-shrink:0"></div>
+        <label style="font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;flex:1">
+          <input type="checkbox" id="veg-sentinel-chk" style="accent-color:#059669;width:13px;height:13px" onchange="toggleCamadaVeg('sentinel',this.checked)">
+          🛰 Sentinel-2 — Cena de Data Exata
+        </label>
+      </div>
+      <p style="font-size:10px;color:#065f46;margin:0 0 8px">Copernicus/ESA · ~10 m/px · revisita ~5 dias. Só lista datas com cena real disponível para a área visível.</p>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <div>
+          <div style="font-size:10px;font-weight:700;color:#065f46;text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Data da cena</div>
+          <select id="sentinel-data" style="width:100%;font-size:11px;padding:4px 6px;border:1px solid #a7f3d0;border-radius:var(--raio);font-family:inherit;background:#fff" onchange="sentinelAlterarData()">
+            <option value="">carregando…</option>
+          </select>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:10px;color:#065f46;flex-shrink:0">Nuvem máx.:</span>
+          <input type="range" id="sentinel-nuvem" min="0" max="100" step="5" value="30" style="flex:1;accent-color:#059669" oninput="sentinelAlterarNuvem()">
+          <span style="font-size:10px;color:#065f46;width:28px" id="sentinel-nuvem-val">30%</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:10px;color:#065f46;flex-shrink:0">Opacidade:</span>
+          <input type="range" id="veg-sentinel-opacity" min="0" max="100" value="80" style="flex:1;accent-color:#059669" oninput="atualizarOpacidadeVeg('sentinel')">
+          <span style="font-size:10px;color:#065f46;width:28px">80%</span>
+        </div>
+        <div id="sentinel-status" style="font-size:10px;color:#065f46"></div>
+      </div>
+    </div>
   ` + foot;
   if(id==='car') return hdr('🏡 CAR — Cadastro Ambiental Rural') + `
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
@@ -1755,12 +1851,14 @@ function _renderDropdown(id){
         </select>
       </div>
       <div style="font-size:11px;color:var(--cinza-500)" id="car-status-txt"></div>
-      <div id="car-legenda-inline" style="display:none;gap:6px;flex-wrap:wrap">
-        <span style="font-size:10px;font-weight:700;color:var(--cinza-500);width:100%;margin-bottom:2px">LEGENDA:</span>
-        <span style="display:inline-flex;align-items:center;gap:4px;font-size:10px"><span id="car-leg-ativo" style="display:inline-block;width:14px;height:8px;border-radius:2px;background:#16a34a;border:1px solid #15803d"></span>Ativo</span>
-        <span style="display:inline-flex;align-items:center;gap:4px;font-size:10px"><span id="car-leg-aguardando" style="display:inline-block;width:14px;height:8px;border-radius:2px;background:#d97706;border:1px solid #b45309"></span>Aguardando</span>
-        <span style="display:inline-flex;align-items:center;gap:4px;font-size:10px"><span id="car-leg-analise" style="display:inline-block;width:14px;height:8px;border-radius:2px;background:#2563eb;border:1px solid #1d4ed8"></span>Em análise</span>
-        <span style="display:inline-flex;align-items:center;gap:4px;font-size:10px"><span id="car-leg-cancelado" style="display:inline-block;width:14px;height:8px;border-radius:2px;background:#dc2626;border:1px solid #b91c1c"></span>Cancelado</span>
+      <div id="car-legenda-inline" style="display:none;gap:6px;flex-wrap:wrap;align-items:center">
+        <span style="font-size:10px;font-weight:700;color:var(--cinza-500);width:100%;margin-bottom:2px">FILTRAR POR STATUS:</span>
+        <button type="button" class="car-det-badge car-status-ativo car-chip-status" data-car-chip="ativo" onclick="_carToggleChipStatus('ativo')" title="Mostrar/ocultar imóveis Ativos"><span id="car-leg-ativo" style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#16a34a"></span>Ativo <span id="car-leg-n-ativo"></span></button>
+        <button type="button" class="car-det-badge car-status-aguardando car-chip-status" data-car-chip="aguardando" onclick="_carToggleChipStatus('aguardando')" title="Mostrar/ocultar imóveis Aguardando"><span id="car-leg-aguardando" style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#d97706"></span>Aguardando <span id="car-leg-n-aguardando"></span></button>
+        <button type="button" class="car-det-badge car-status-analise car-chip-status" data-car-chip="analise" onclick="_carToggleChipStatus('analise')" title="Mostrar/ocultar imóveis Em análise"><span id="car-leg-analise" style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#2563eb"></span>Em análise <span id="car-leg-n-analise"></span></button>
+        <button type="button" class="car-det-badge car-status-cancelado car-chip-status" data-car-chip="cancelado" onclick="_carToggleChipStatus('cancelado')" title="Mostrar/ocultar imóveis Cancelados"><span id="car-leg-cancelado" style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#dc2626"></span>Cancelado <span id="car-leg-n-cancelado"></span></button>
+        <button type="button" class="car-det-badge car-status-outro car-chip-status" data-car-chip="outro" onclick="_carToggleChipStatus('outro')" title="Mostrar/ocultar outros status"><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#9ca3af"></span>Outros <span id="car-leg-n-outro"></span></button>
+        <button type="button" class="car-det-badge car-chip-status car-chip-todos" onclick="_carToggleTodosStatus()" title="Marcar/desmarcar todos">Todos</button>
       </div>
     </div>
   ` + foot;
@@ -2630,6 +2728,7 @@ function _atualizarLegendaMapa(){
   if(VEG_LAYERS.hidrografia?.layer)itens.push({ simbolo:'rect', cor:'#2563eb', opacidade:0.7, label:'Hidrografia — IBGE (rios/água)' });
   if(VEG_LAYERS.gibs?.layer){ const gibsSel = document.getElementById('gibs-camada'); const gibsLabel = gibsSel ? GIBS_CAMADAS.find(c=>c.id===gibsSel.value)?.label : null; itens.push({ simbolo:'rect', cor:'#6366f1', opacidade:0.7, label: gibsLabel ? 'GIBS — '+gibsLabel : 'GIBS — NASA Earthdata' }); }
   if(VEG_LAYERS.planet?.layer){ const pm = _planetMosaicos?.mosaicos?.find(m=>m.name===_planetMosaicoSel); itens.push({ simbolo:'rect', cor:'#2563eb', opacidade:0.7, label: 'Planet/NICFI — ' + (pm ? pm.label : 'mosaico') }); }
+  if(VEG_LAYERS.sentinel?.layer) itens.push({ simbolo:'rect', cor:'#059669', opacidade:0.7, label: 'Sentinel-2 — ' + _fmtDataBR(_sentinelDataSel) });
 
   // Camadas personalizadas
   camadas.filter(c=>c.visivel).forEach(c => {
@@ -2637,6 +2736,21 @@ function _atualizarLegendaMapa(){
   });
 
   CART.legendaAtualizar(itens);
+
+  // Rótulo fixo com a data da imagem de satélite ativa (a mais precisa primeiro).
+  if(VEG_LAYERS.sentinel?.layer && _sentinelDataSel){
+    const info = _sentinelDatas?.datas?.find(d=>d.data===_sentinelDataSel);
+    const nuvem = info ? ` · nuvens ${info.nuvem.toFixed(0)}%` : '';
+    CART.imagemDataAtualizar(`🛰 Sentinel-2 · ${_fmtDataBR(_sentinelDataSel)}${nuvem}`);
+  } else if(VEG_LAYERS.gibs?.layer){
+    const data = document.getElementById('gibs-data')?.value || _gibsDataDefault();
+    CART.imagemDataAtualizar(`🛰 NASA GIBS · ${_fmtDataBR(data)}`);
+  } else if(VEG_LAYERS.planet?.layer){
+    const pm = _planetMosaicos?.mosaicos?.find(m=>m.name===_planetMosaicoSel);
+    CART.imagemDataAtualizar(`🛰 Planet/NICFI · ${pm ? pm.label : 'mosaico mensal'}`);
+  } else {
+    CART.imagemDataAtualizar(null);
+  }
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -5296,6 +5410,39 @@ function aplicarFiltroStatusCAR(){
   });
   if(_carLayer) _aplicarCamadaCAR();
   _atualizarCfgStats();
+  _atualizarLegendaInlineCAR();
+}
+
+// Chips rápidos de status no painel principal (fora do modal)
+const CAR_STATUS_KEYS = ['ativo','aguardando','analise','cancelado','outro'];
+function _carToggleChipStatus(key){
+  if(_carStatusAtivos.has(key)) _carStatusAtivos.delete(key); else _carStatusAtivos.add(key);
+  if(_carLayer) _aplicarCamadaCAR();
+  _atualizarCfgStats();
+  _atualizarLegendaInlineCAR();
+}
+function _carToggleTodosStatus(){
+  const todosAtivos = CAR_STATUS_KEYS.every(k=>_carStatusAtivos.has(k));
+  _carStatusAtivos = new Set(todosAtivos ? [] : CAR_STATUS_KEYS);
+  if(_carLayer) _aplicarCamadaCAR();
+  _atualizarCfgStats();
+  _atualizarLegendaInlineCAR();
+}
+function _atualizarLegendaInlineCAR(){
+  const leg = document.getElementById('car-legenda-inline');
+  if(!leg) return;
+  if(!_carFeatures.length){ leg.style.display='none'; return; }
+  leg.style.display='flex';
+  const porKey = {};
+  _carFeatures.forEach(f=>{ const k=_carStatusKey(f.properties?.condicao); porKey[k]=(porKey[k]||0)+1; });
+  CAR_STATUS_KEYS.forEach(k=>{
+    const n = document.getElementById('car-leg-n-'+k);
+    if(n) n.textContent = `(${(porKey[k]||0).toLocaleString('pt-BR')})`;
+    const chip = leg.querySelector(`[data-car-chip="${k}"]`);
+    if(chip) chip.classList.toggle('car-chip-off', !_carStatusAtivos.has(k));
+    const dot = document.getElementById('car-leg-'+k);
+    if(dot && _carGlobal.cores[k]) dot.style.background = _carGlobal.cores[k];
+  });
 }
 function _atualizarCfgStats(){
   const sb = document.getElementById('car-cfg-stats'); if(!sb) return;
@@ -5370,15 +5517,7 @@ function _atualizarBadgeCAR(visiveis){
     const filtrado = vis.length < all.length ? ` <span style="color:#d97706">(${vis.length.toLocaleString('pt-BR')} visíveis)</span>` : '';
     sb.innerHTML=`✅ <strong>${all.length.toLocaleString('pt-BR')}</strong> imóvel(is) · ${areaTot.toLocaleString('pt-BR',{maximumFractionDigits:0})} ha${filtrado}`;
   }
-  // Mostra legenda inline com as cores atuais
-  const leg = document.getElementById('car-legenda-inline');
-  if(leg && all.length){
-    leg.style.display='flex';
-    ['ativo','aguardando','analise','cancelado'].forEach(k=>{
-      const el=document.getElementById('car-leg-'+k);
-      if(el) el.style.background=_carGlobal.cores[k];
-    });
-  }
+  _atualizarLegendaInlineCAR();
   _atualizarCfgStats();
   _atualizarBtnAnalisarTodos();
 }

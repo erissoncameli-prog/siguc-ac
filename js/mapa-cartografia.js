@@ -24,6 +24,7 @@ window.CART = (function () {
   let _map   = null;
   let _legCtrl = null;
   let _infoCtrl = null;
+  let _imgDataCtrl = null;
 
   // ─── 1. ESCALA ────────────────────────────────────────────────
   function _adicionarEscala() {
@@ -166,6 +167,31 @@ window.CART = (function () {
     `;
   }
 
+  // ─── 3b. RÓTULO DE DATA DA IMAGEM DE SATÉLITE ─────────────────
+  function _criarControleImagemData() {
+    const Ctrl = L.Control.extend({
+      options: { position: 'topright' },
+      onAdd() {
+        const div = L.DomUtil.create('div', 'cart-imgdata');
+        div.id = 'cart-imgdata-ctrl';
+        div.style.display = 'none';
+        L.DomEvent.disableClickPropagation(div);
+        return div;
+      }
+    });
+    _imgDataCtrl = new Ctrl();
+    _imgDataCtrl.addTo(_map);
+  }
+
+  // texto: string com a fonte/data da imagem ativa, ou null/'' para ocultar
+  function imagemDataAtualizar(texto) {
+    const el = document.getElementById('cart-imgdata-ctrl');
+    if (!el) return;
+    if (!texto) { el.style.display = 'none'; el.innerHTML = ''; return; }
+    el.style.display = 'block';
+    el.innerHTML = texto;
+  }
+
   // ─── 4. INIT principal ────────────────────────────────────────
   function init(mapaLeaflet) {
     if (!mapaLeaflet) return;
@@ -173,6 +199,7 @@ window.CART = (function () {
     _adicionarEscala();
     _criarControleLegenada();
     _criarControleInfo();
+    _criarControleImagemData();
     _injetarEstilos();
   }
 
@@ -395,6 +422,22 @@ window.CART = (function () {
   text-overflow: ellipsis;
 }
 
+/* ── Rótulo de data da imagem de satélite ── */
+.cart-imgdata {
+  background: rgba(17,24,16,.82);
+  border: 1px solid rgba(255,255,255,.18);
+  border-radius: 99px;
+  padding: 5px 12px;
+  font-family: 'DM Sans', Arial, sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  color: #f4efe6;
+  box-shadow: 0 2px 10px rgba(0,0,0,.28);
+  backdrop-filter: blur(3px);
+  white-space: nowrap;
+  margin-top: 6px;
+}
+
 /* ── Escala Leaflet — estilo refinado ── */
 .leaflet-control-scale-line {
   border: 2px solid #1F4E2C !important;
@@ -466,7 +509,7 @@ window.CART = (function () {
   }
 
   /* Controles cartográficos ficam visíveis */
-  .cart-legenda, .cart-info-strip,
+  .cart-legenda, .cart-info-strip, .cart-imgdata,
   .leaflet-control-scale, .rosa-norte { display: block !important; }
 
   /* Título impresso */
@@ -495,10 +538,11 @@ window.CART = (function () {
 
   // ─── Constantes expostas ─────────────────────────────────────
   return {
-    init:             init,
-    legendaAtualizar: legendaAtualizar,
-    imprimir:         imprimir,
-    rodapeHTML:       rodapeHTML,
+    init:                init,
+    legendaAtualizar:    legendaAtualizar,
+    imagemDataAtualizar: imagemDataAtualizar,
+    imprimir:            imprimir,
+    rodapeHTML:          rodapeHTML,
     DATUM,
     PROJECAO,
     FONTES,
