@@ -1,20 +1,25 @@
-// SIGUC-AC · Proxy Sentinel-2 L2A (Copernicus Data Space Ecosystem) —
-// GET /api/sentinel-tiles?z={z}&x={x}&y={y}&data=AAAA-MM-DD&nuvem=30
-// As credenciais CDSE_CLIENT_ID/CDSE_CLIENT_SECRET ficam SOMENTE no servidor;
-// o front nunca as recebe. Renderiza cor real (B04/B03/B02) via Process API,
-// filtrando pela data exata escolhida pelo usuário (ver /api/sentinel-dates
-// para a lista de datas com cena disponível).
+// SIGUC-AC · Sentinel-2 L2A (Copernicus Data Space Ecosystem) — endpoint único
+// que atende dois usos (consolidado num só arquivo para não estourar o limite
+// de Serverless Functions do plano Vercel):
 //
-// Uso no Leaflet (template — o L substitui {z}/{x}/{y}):
-//   L.tileLayer('/api/sentinel-tiles?z={z}&x={x}&y={y}&data=2026-07-10&nuvem=30')
+//   GET /api/sentinel?z={z}&x={x}&y={y}&data=AAAA-MM-DD&nuvem=30
+//     → tile PNG (cor real B04/B03/B02) via Process API, na data exata.
+//
+//   GET /api/sentinel?bbox=oeste,sul,leste,norte
+//     → lista de datas com cena disponível (Catalog API), com % de nuvem.
+//
+// As credenciais CDSE_CLIENT_ID/CDSE_CLIENT_SECRET ficam SOMENTE no servidor;
+// o front nunca as recebe.
 
 const CDSE_CLIENT_ID     = process.env.CDSE_CLIENT_ID;
 const CDSE_CLIENT_SECRET = process.env.CDSE_CLIENT_SECRET;
 
 const TOKEN_URL   = 'https://identity.dataspace.copernicus.eu/auth/realms/CDSE/protocol/openid-connect/token';
 const PROCESS_URL = 'https://sh.dataspace.copernicus.eu/api/v1/process';
+const CATALOG_URL = 'https://sh.dataspace.copernicus.eu/api/v1/catalog/1.0.0/search';
 
-const TILE_SIZE = 256;
+const TILE_SIZE   = 256;
+const DIAS_JANELA = 60; // procura cenas nos últimos N dias
 
 // PNG 1×1 transparente — devolvido quando não há credenciais ou tile
 // indisponível, para o mapa nunca quebrar (mostra "vazio" em vez de erro).
@@ -71,12 +76,7 @@ function evaluatePixel(s) {
   return [s.B04 * 2.5, s.B03 * 2.5, s.B02 * 2.5];
 }`;
 
-module.exports = async (req, res) => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  if(req.method === 'OPTIONS'){ res.status(204).end(); return; }
-  if(req.method !== 'GET'){ res.status(405).json({ error: 'Method not allowed' }); return; }
-
+async function _tiles(req, res){
   if(!CDSE_CLIENT_ID || !CDSE_CLIENT_SECRET){ tileVazio(res, 'sem-credenciais'); return; }
 
   const { z, x, y, data, nuvem } = req.query;
@@ -134,4 +134,81 @@ module.exports = async (req, res) => {
   } catch(_){
     tileVazio(res, 'erro');
   }
+}
+
+async function _dates(req, res){
+  if(!CDSE_CLIENT_ID || !CDSE_CLIENT_SECRET){
+    res.status(200)
+       .setHeader('Cache-Control', 'public, max-age=300')
+       .json({ disponivel: false, motivo: 'sem-credenciais', datas: [] });
+    return;
+  }
+
+  const partes = String(req.query.bbox || '').split(',').map(Number);
+  if(partes.length !== 4 || partes.some(n => !Number.isFinite(n))){
+    res.status(400).json({ error: 'Parâmetro bbox inválido (use oeste,sul,leste,norte)' }); return;
+  }
+  const [w, s, e, n] = partes;
+  if(w < -180 || e > 180 || s < -90 || n > 90 || w >= e || s >= n){
+    res.status(400).json({ error: 'bbox fora dos limites geográficos' }); return;
+  }
+
+  try {
+    const token = await _obterToken();
+    const fim = new Date();
+    const inicio = new Date(fim.getTime() - DIAS_JANELA * 86400000);
+    const payload = {
+      collections: ['sentinel-2-l2a'],
+      bbox: [w, s, e, n],
+      datetime: `${inicio.toISOString()}/${fim.toISOString()}`,
+      limit: 100,
+      fields: {
+        include: ['properties.datetime', 'properties.eo:cloud_cover'],
+        exclude: ['geometry', 'assets', 'links'],
+      },
+    };
+    const r = await fetch(CATALOG_URL, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(15000),
+    });
+    if(!r.ok) throw new Error(`catalog-http-${r.status}`);
+    const json = await r.json();
+    const features = Array.isArray(json.features) ? json.features : [];
+
+    // Agrupa por dia (YYYY-MM-DD), guardando a menor cobertura de nuvem do dia.
+    const porDia = {};
+    features.forEach(f => {
+      const dt = f.properties?.datetime;
+      const nuvemPct = f.properties?.['eo:cloud_cover'];
+      if(!dt || typeof nuvemPct !== 'number') return;
+      const dia = dt.slice(0, 10);
+      if(!(dia in porDia) || nuvemPct < porDia[dia]) porDia[dia] = nuvemPct;
+    });
+    const datas = Object.entries(porDia)
+      .map(([data, nuvem]) => ({ data, nuvem }))
+      .sort((a, b) => b.data.localeCompare(a.data));
+
+    res.status(200)
+       .setHeader('Content-Type', 'application/json')
+       .setHeader('Cache-Control', 'public, max-age=1800, s-maxage=1800') // 30min
+       .json({ disponivel: datas.length > 0, dias: DIAS_JANELA, datas });
+  } catch(err){
+    res.status(200)
+       .setHeader('Cache-Control', 'public, max-age=120')
+       .json({ disponivel: false, motivo: String(err.message || err), datas: [] });
+  }
+}
+
+module.exports = async (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  if(req.method === 'OPTIONS'){ res.status(204).end(); return; }
+  if(req.method !== 'GET'){ res.status(405).json({ error: 'Method not allowed' }); return; }
+
+  // Roteamento por parâmetro: bbox → lista de datas · z → tile de imagem.
+  if(req.query.bbox !== undefined) return _dates(req, res);
+  if(req.query.z !== undefined)    return _tiles(req, res);
+  res.status(400).json({ error: 'Informe bbox (datas) ou z/x/y/data (tile)' });
 };

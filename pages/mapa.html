@@ -825,7 +825,7 @@ const VEG_LAYERS = {
     const d = document.getElementById('sentinel-data')?.value || _sentinelDataSel;
     if(!d) return null;
     const nuvem = document.getElementById('sentinel-nuvem')?.value || 30;
-    return L.tileLayer(`/api/sentinel-tiles?z={z}&x={x}&y={y}&data=${encodeURIComponent(d)}&nuvem=${nuvem}`,
+    return L.tileLayer(`/api/sentinel?z={z}&x={x}&y={y}&data=${encodeURIComponent(d)}&nuvem=${nuvem}`,
       {attribution:'Sentinel-2 / Copernicus',opacity:op/100,maxZoom:18,maxNativeZoom:15,
        errorTileUrl:'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw=='}); }
   },
@@ -879,7 +879,7 @@ async function _sentinelCarregarDatas(){
   const b = mapaL.getBounds();
   const bbox = [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()].join(',');
   try {
-    const r = await fetch(`/api/sentinel-dates?bbox=${encodeURIComponent(bbox)}`, { signal: AbortSignal.timeout(15000) });
+    const r = await fetch(`/api/sentinel?bbox=${encodeURIComponent(bbox)}`, { signal: AbortSignal.timeout(15000) });
     _sentinelDatas = await r.json();
   } catch(_){ _sentinelDatas = { disponivel:false, motivo:'rede', datas:[] }; }
   if(_sentinelDatas.datas?.length) _sentinelDataSel = _sentinelDatas.datas[0].data;

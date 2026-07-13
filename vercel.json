@@ -4,6 +4,7 @@
     "SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF0cXR5YmNzdmVwZGFic3ZnYWx5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0MjMzNzgsImV4cCI6MjA5NTk5OTM3OH0.hWx1AB2rK7xdco1Dgagm0XUOBPQbxZVE614SW4SKoLk"
   },
   "rewrites": [
+    { "source": "/api/health/live", "destination": "/api/health" },
     { "source": "/(.*)", "destination": "/$1" }
   ],
   "headers": [
@@ -21,7 +22,6 @@
   ],
   "functions": {
     "api/health.js":         { "maxDuration": 10 },
-    "api/health/live.js":    { "maxDuration": 5  },
     "api/metrics.js":        { "maxDuration": 5  },
     "api/car-proxy.js":      { "maxDuration": 60 },
     "api/prodes-proxy.js":   { "maxDuration": 60 },
@@ -29,6 +29,7 @@
     "api/dof-proxy.js":      { "maxDuration": 30 },
     "api/planet-tiles.js":   { "maxDuration": 30 },
     "api/planet-mosaics.js": { "maxDuration": 30 },
+    "api/sentinel.js":       { "maxDuration": 30 },
     "api/geo.js":            { "maxDuration": 30 },
     "api/biomonitor-apk-latest.js": { "maxDuration": 15 }
   },
