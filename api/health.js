@@ -50,6 +50,14 @@ module.exports = async (req, res) => {
     return;
   }
 
+  // /api/health/live (via rewrite no vercel.json) — só confirma que o
+  // processo está vivo, sem checar dependências externas. Consolidado
+  // aqui para não ultrapassar o limite de Serverless Functions da Vercel.
+  if (req.url.split('?')[0].endsWith('/live')) {
+    res.status(200).json({ status: 'alive', timestamp: new Date().toISOString() });
+    return;
+  }
+
   const startAll = Date.now();
 
   const [database, auth] = await Promise.all([
