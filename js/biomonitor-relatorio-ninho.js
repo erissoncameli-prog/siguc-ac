@@ -9,9 +9,10 @@
 // com jsPDF, cada bloco checa o espaço restante e pula de página
 // *antes* de começar — nunca no meio.
 // Usada em pages/biomonitor-validacao.html (ficha individual),
-// pages/relatorios-biomonitor.html (individual ou em lote — "todos os
-// ninhos da praia") e pages/biomonitor.html (app de campo, via
-// js/biomonitor-relatorio-campo.js).
+// pages/relatorios-biomonitor.html (individual, em lote — "todos os
+// ninhos da praia" — e no PDF do Painel, que reaproveita os helpers
+// _biopdf* daqui pra montar seu próprio conteúdo) e pages/biomonitor.html
+// (app de campo, via js/biomonitor-relatorio-campo.js).
 // Depende de: esc(), formatData() (js/config.js); getCabecalhoRelatorio(),
 // gerarProtocolo() (js/config-sistema.js); bioBuscarEventosServidor(),
 // bioMontarHistoricoNinho() (js/biomonitor-timeline.js);
