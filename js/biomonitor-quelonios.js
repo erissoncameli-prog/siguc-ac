@@ -1427,6 +1427,8 @@ function bioIniciarFotosGenerica({ prefixo, max, getState, setFotos, getContexto
           })
         }
       } else {
+        console.warn('[biomonitor] bCapturaProcessarArquivo indisponível — app rodando versão desatualizada (cache do dispositivo). Foto salva sem marca d\'água.')
+        bioToast('Este app está com uma versão desatualizada e salvou a foto sem marca d\'água. Remova e adicione o ícone do Biomonitor de novo na tela inicial.', 'err')
         dataUrl = await new Promise(res => {
           const r = new FileReader()
           r.onload = e => res(e.target.result)
