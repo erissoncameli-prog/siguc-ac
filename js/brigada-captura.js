@@ -91,21 +91,23 @@ async function bCameraCapturarPuro(videoEl, brigadista, gps, contexto = {}) {
 
 // ── Marca d'água ──────────────────────────────────────────────
 async function bCameraAguaMarca(ctx, w, h, brigadista, gps, contexto = {}) {
-  const linha1 = brigadista?.nome ?? 'Brigadista'
+  const linhaTipo = contexto.tipoOcorrencia || null
+  const linhaLocal = contexto.local || null
+  const linhaNome = brigadista?.nome ?? 'Brigadista'
   const partes = []
   if (contexto.brigada) partes.push(contexto.brigada)
   if (contexto.equipe)  partes.push(`Equipe ${contexto.equipe}`)
-  const linha2 = partes.length ? partes.join(' · ') : null
-  const linha3 = gps
+  const linhaGrupo = partes.length ? partes.join(' · ') : null
+  const linhaGps = gps
     ? `${gps.lat.toFixed(5)}, ${gps.lng.toFixed(5)}`
     : 'GPS indisponível'
-  const linha4 = new Date().toLocaleString('pt-BR', { timeZone: 'America/Rio_Branco' })
+  const linhaData = new Date().toLocaleString('pt-BR', { timeZone: 'America/Rio_Branco' })
 
   const pad = 12
   const fs  = Math.max(14, Math.round(h * 0.018))
   ctx.font = `${fs}px DM Mono, monospace`
 
-  const linhas  = [linha1, linha2, linha3, linha4].filter(Boolean)
+  const linhas  = [linhaTipo, linhaLocal, linhaNome, linhaGrupo, linhaGps, linhaData].filter(Boolean)
   const largMax = Math.max(...linhas.map(l => ctx.measureText(l).width))
   const alturaCaixa = (fs + 4) * linhas.length + pad * 2
 
@@ -119,8 +121,14 @@ async function bCameraAguaMarca(ctx, w, h, brigadista, gps, contexto = {}) {
 
   ctx.fillStyle = '#ffffff'
   linhas.forEach((l, i) => {
-    // brigada/equipe em tom levemente diferente para destacar
-    ctx.fillStyle = (i === 1 && linha2) ? '#C9E8D6' : '#ffffff'
+    // tipo de ocorrência em destaque; grupo/equipe em tom levemente diferente
+    if (l === linhaTipo) {
+      ctx.font = `bold ${fs}px DM Sans, sans-serif`
+      ctx.fillStyle = '#F0CB6A'
+    } else {
+      ctx.font = `${fs}px DM Mono, monospace`
+      ctx.fillStyle = (l === linhaLocal || l === linhaGrupo) ? '#C9E8D6' : '#ffffff'
+    }
     ctx.fillText(l, x + pad, y + pad + fs + i * (fs + 4))
   })
 
@@ -137,7 +145,8 @@ async function bCameraAguaMarca(ctx, w, h, brigadista, gps, contexto = {}) {
 
   // Logos institucionais — canto inferior direito, discretas
   try {
-    const logosCache = await bOfflineGetConfig('logos_cache_v2')
+    const logosCache = contexto.logos
+      ?? (typeof bOfflineGetConfig === 'function' ? await bOfflineGetConfig('logos_cache_v2') : null)
     // [src, escala]: SEMA −40% (0.60), Acre −15% (0.85)
     const entradas = [
       [logosCache?.sec, 0.60],
