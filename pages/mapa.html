@@ -3457,6 +3457,7 @@ let _tlFiltro = 'ambos', _tlDiasJanela = 30, _tlCustom = null
 const TL_ANO_MIN = 2001, TL_ANO_MAX = new Date().getFullYear()
 let _tlFocosLayer = null, _tlGibsLayer = null, _tlProdesLayer = null, _tlDeterLayer = null
 let _tlPlanetLayer = null      // imagem Planet/NICFI (alta resolução) da linha do tempo
+let _tlS2Layer = null          // composição anual Sentinel-2 (época seca, 10 m)
 let _tlImgLabel = null         // rótulo da imagem exibida (p/ CART.imagemDataAtualizar)
 let _tlAnoAtual = null         // ano selecionado no modo Anos
 const _tlMesSel = {}           // mês escolhido por ano (name do mosaico Planet)
@@ -3484,8 +3485,8 @@ function toggleTimeline() {
 }
 
 function _tlLimpar() {
-  ;[_tlFocosLayer, _tlGibsLayer, _tlProdesLayer, _tlDeterLayer, _tlPlanetLayer].forEach(l => { if (l) mapaL.removeLayer(l) })
-  _tlFocosLayer = _tlGibsLayer = _tlProdesLayer = _tlDeterLayer = _tlPlanetLayer = null
+  ;[_tlFocosLayer, _tlGibsLayer, _tlProdesLayer, _tlDeterLayer, _tlPlanetLayer, _tlS2Layer].forEach(l => { if (l) mapaL.removeLayer(l) })
+  _tlFocosLayer = _tlGibsLayer = _tlProdesLayer = _tlDeterLayer = _tlPlanetLayer = _tlS2Layer = null
   _tlImgLabel = null
   const tm = document.getElementById('tl-meses'); if (tm) tm.style.display = 'none'
 }
@@ -3569,14 +3570,31 @@ function _tlSetGibs(dateStr) {
 // Anos com mosaico Planet/NICFI (2015/2016+) usam imagem de ~4,77 m em
 // opacidade total — substitui visualmente o mapa base, estilo Google Earth.
 // Anos anteriores caem para o MODIS/GIBS (250 m, único gratuito da época).
-function _tlSetPlanet(mos) {
+function _tlRemoverSat() {
   if (_tlGibsLayer)   { mapaL.removeLayer(_tlGibsLayer);   _tlGibsLayer = null }
   if (_tlPlanetLayer) { mapaL.removeLayer(_tlPlanetLayer); _tlPlanetLayer = null }
+  if (_tlS2Layer)     { mapaL.removeLayer(_tlS2Layer);     _tlS2Layer = null }
+}
+
+function _tlSetPlanet(mos) {
+  _tlRemoverSat()
   _tlPlanetLayer = L.tileLayer(`/api/planet-tiles?z={z}&x={x}&y={y}&m=${encodeURIComponent(mos.name)}`,
     { attribution: 'Planet / NICFI', opacity: 1, maxZoom: 21, maxNativeZoom: 18,
       errorTileUrl: 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==' })
   _tlPlanetLayer.addTo(mapaL); _tlPlanetLayer.setZIndex(140)
   _tlImgLabel = `🛰 Planet/NICFI · ${mos.label} · ~4,7 m`
+}
+
+// Composição anual Sentinel-2 (época seca) — usada quando a conta Planet
+// não tem os mosaicos NICFI. 10 m/px, cenas menos nubladas de mai–out.
+const TL_S2_ANO_MIN = 2017
+function _tlSetSentinelAno(ano) {
+  _tlRemoverSat()
+  _tlS2Layer = L.tileLayer(`/api/sentinel?z={z}&x={x}&y={y}&ano=${ano}`,
+    { attribution: 'Sentinel-2 / Copernicus', opacity: 1, maxZoom: 21, maxNativeZoom: 15,
+      errorTileUrl: 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==' })
+  _tlS2Layer.addTo(mapaL); _tlS2Layer.setZIndex(140)
+  _tlImgLabel = `🛰 Sentinel-2 · época seca ${ano} · 10 m`
 }
 
 // Agrupa mosaicos Planet por ano (primeiro AAAA-MM do nome)
@@ -3629,11 +3647,15 @@ async function _tlSetSatelite(ano) {
     _tlRenderMeses(ano, lista, sel.name)
     return 'planet'
   }
-  // Sem mosaico Planet para o ano (pré-2016 ou sem chave) → MODIS/GIBS
-  if (_tlPlanetLayer) { mapaL.removeLayer(_tlPlanetLayer); _tlPlanetLayer = null }
+  // Sem mosaico Planet → composição anual Sentinel-2 (2017+), depois MODIS
+  _tlRenderMeses(ano, null, null)
+  if (ano >= TL_S2_ANO_MIN) {
+    _tlSetSentinelAno(ano)
+    return 'sentinel'
+  }
+  _tlRemoverSat()
   _tlSetGibs(`${ano}-08-15`)
   _tlImgLabel = `🛰 NASA/MODIS · ago/${ano} · 250 m`
-  _tlRenderMeses(ano, null, null)
   return 'gibs'
 }
 function _tlSetProdes(ano) {
@@ -3700,14 +3722,14 @@ async function _tlRenderAno(ano) {
   _tlPainel(pr ? pr.n : null, pr ? pr.ha : null, TL_FOCOS_ANO[ano] ?? null)
   const st = document.getElementById('tl-stat')
   if (st) st.textContent = (pr ? `` : `PRODES anual disponível a partir de 2008 · `)
-    + (fonteImg === 'planet'
-        ? `Imagem Planet/NICFI ~4,7 m — dê zoom para ver detalhes da cobertura`
-        : `Satélite NASA/MODIS 250 m (alta resolução disponível a partir de 2016)`)
+    + (fonteImg === 'planet'   ? `Imagem Planet/NICFI ~4,7 m — dê zoom para ver detalhes da cobertura`
+     : fonteImg === 'sentinel' ? `Imagem Sentinel-2 10 m (composição da época seca) — dê zoom para ver detalhes`
+     :                           `Satélite NASA/MODIS 250 m (alta resolução disponível a partir de ${TL_S2_ANO_MIN})`)
   _atualizarLegendaMapa()
 }
 
 async function _tlRenderDia(ds) {
-  if (_tlPlanetLayer) { mapaL.removeLayer(_tlPlanetLayer); _tlPlanetLayer = null } // Planet é mensal
+  _tlRemoverSat() // Planet/Sentinel são mensais/anuais; modo Dias usa MODIS diário
   _tlRenderMeses(null, null, null)
   _tlSetGibs(ds)
   _tlImgLabel = `🛰 NASA/MODIS · ${_fmtDataBR(ds)} · 250 m`

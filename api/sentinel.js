@@ -5,6 +5,11 @@
 //   GET /api/sentinel?z={z}&x={x}&y={y}&data=AAAA-MM-DD&nuvem=30
 //     → tile PNG (cor real B04/B03/B02) via Process API, na data exata.
 //
+//   GET /api/sentinel?z={z}&x={x}&y={y}&ano=AAAA
+//     → tile PNG de composição anual (época seca mai–out, mosaicking
+//       leastCC = pixels das cenas menos nubladas). Usado pela Linha do
+//       Tempo do mapa para imagem histórica de alta resolução por ano.
+//
 //   GET /api/sentinel?bbox=oeste,sul,leste,norte
 //     → lista de datas com cena disponível (Catalog API), com % de nuvem.
 //
@@ -79,7 +84,7 @@ function evaluatePixel(s) {
 async function _tiles(req, res){
   if(!CDSE_CLIENT_ID || !CDSE_CLIENT_SECRET){ tileVazio(res, 'sem-credenciais'); return; }
 
-  const { z, x, y, data, nuvem } = req.query;
+  const { z, x, y, data, ano, nuvem } = req.query;
 
   // Validação estrita — evita SSRF / parâmetros inválidos no corpo do POST.
   const zi = parseInt(z, 10), xi = parseInt(x, 10), yi = parseInt(y, 10);
@@ -87,14 +92,36 @@ async function _tiles(req, res){
      zi < 0 || zi > 20 || xi < 0 || yi < 0){
     res.status(400).json({ error: 'Parâmetros z/x/y inválidos' }); return;
   }
-  if(typeof data !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(data)){
-    res.status(400).json({ error: 'Parâmetro data inválido (use AAAA-MM-DD)' }); return;
+
+  // Dois modos: data=AAAA-MM-DD (cena do dia exato) ou ano=AAAA
+  // (composição da época seca do ano — jun–out, pixels menos nublados).
+  let timeRange, mosaickingOrder = null, nuvemMax, anoCorrente = false;
+  if(typeof ano === 'string' && ano){
+    const anoi = parseInt(ano, 10);
+    const anoHoje = new Date().getFullYear();
+    if(!Number.isInteger(anoi) || anoi < 2015 || anoi > anoHoje){
+      res.status(400).json({ error: 'Parâmetro ano inválido' }); return;
+    }
+    const hoje = new Date().toISOString().slice(0, 10);
+    let from = `${anoi}-05-01`, to = `${anoi}-10-31`;
+    if(to > hoje){ to = hoje; anoCorrente = true; }
+    if(from > hoje) from = `${anoi}-01-01`;
+    timeRange = { from: `${from}T00:00:00Z`, to: `${to}T23:59:59Z` };
+    mosaickingOrder = 'leastCC';                       // cena menos nublada primeiro
+    nuvemMax = Math.min(100, Math.max(0, parseInt(nuvem, 10) || 60));
+  } else {
+    if(typeof data !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(data)){
+      res.status(400).json({ error: 'Parâmetro data inválido (use AAAA-MM-DD) ou informe ano=AAAA' }); return;
+    }
+    timeRange = { from: `${data}T00:00:00Z`, to: `${data}T23:59:59Z` };
+    nuvemMax = Math.min(100, Math.max(0, parseInt(nuvem, 10) || 30));
   }
-  const nuvemMax = Math.min(100, Math.max(0, parseInt(nuvem, 10) || 30));
 
   try {
     const token = await _obterToken();
     const bbox = _tileParaBBox3857(zi, xi, yi);
+    const dataFilter = { timeRange, maxCloudCoverage: nuvemMax };
+    if(mosaickingOrder) dataFilter.mosaickingOrder = mosaickingOrder;
     const payload = {
       input: {
         bounds: {
@@ -103,10 +130,7 @@ async function _tiles(req, res){
         },
         data: [{
           type: 'sentinel-2-l2a',
-          dataFilter: {
-            timeRange: { from: `${data}T00:00:00Z`, to: `${data}T23:59:59Z` },
-            maxCloudCoverage: nuvemMax,
-          },
+          dataFilter,
         }],
       },
       output: {
@@ -128,8 +152,11 @@ async function _tiles(req, res){
     const buf = Buffer.from(await r.arrayBuffer());
     res.status(200)
        .setHeader('Content-Type', 'image/png')
-       // Cena de um dia específico é imutável → cache longo na borda.
-       .setHeader('Cache-Control', 'public, max-age=86400, s-maxage=2592000, immutable')
+       // Cena/composição de ano fechado é imutável → cache longo na borda.
+       // Ano corrente ainda recebe cenas novas → cache de 1 dia.
+       .setHeader('Cache-Control', anoCorrente
+         ? 'public, max-age=3600, s-maxage=86400'
+         : 'public, max-age=86400, s-maxage=2592000, immutable')
        .send(buf);
   } catch(_){
     tileVazio(res, 'erro');
