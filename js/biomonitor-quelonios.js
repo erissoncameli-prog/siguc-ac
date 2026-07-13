@@ -1417,7 +1417,9 @@ function bioIniciarFotosGenerica({ prefixo, max, getState, setFotos, getContexto
             r.onload = e => res(e.target.result)
             r.readAsDataURL(blob)
           })
-        } catch {
+        } catch (err) {
+          console.warn('[biomonitor] falha ao aplicar marca d\'água, salvando foto original:', err)
+          bioToast('Não foi possível aplicar a marca d\'água nesta foto. Ela foi salva sem marca — tente tirar novamente se possível.', 'err')
           dataUrl = await new Promise(res => {
             const r = new FileReader()
             r.onload = e => res(e.target.result)

@@ -12,6 +12,7 @@
 <script src="../js/config.js"></script>
 <script src="../js/config-sistema.js"></script>
 <script src="../js/layout.js"></script>
+<script src="../js/brigada-captura.js"></script>
 <script src="../js/biomonitor-timeline.js"></script>
 <script src="../js/biomonitor-relatorio-ninho.js"></script>
 </head>
@@ -97,6 +98,7 @@
   if (!['super_admin','gestor','tecnico'].includes(usuario.perfil)) {
     window.location.href = '../pages/dashboard.html'; return
   }
+  const podeReprocessar = ['super_admin','gestor'].includes(usuario.perfil)
 
   document.getElementById('app').innerHTML =
     gerarLayout('Validação de Ninhos', 'biomonitor-validacao') +
@@ -409,6 +411,7 @@
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px solid var(--borda)">
           <button class="btn btn-sm btn-secondary" onclick="bioAbrirRelatorioNinho(db,'${n.id}')">Gerar PDF</button>
           ${temFotos ? `<button class="btn btn-sm btn-secondary" onclick='verFotos(${JSON.stringify(n.foto_urls)})'>Fotos (${n.foto_urls.length})</button>` : ''}
+          ${temFotos && podeReprocessar ? `<button class="btn btn-sm btn-secondary" onclick="reprocessarFotos('${n.id}')">Reaplicar marca d'água</button>` : ''}
           ${!n.lat ? `<button class="btn btn-sm" style="background:rgba(245,158,11,.15);color:#f59e0b;border:1px solid rgba(245,158,11,.3);border-radius:6px;padding:4px 10px;cursor:pointer" onclick="abrirModalGPS('${n.id}','${esc(n.numero_ninho)}')">+ GPS</button>` : ''}
           ${n.status_validacao !== 'validado'   ? `<button class="btn btn-sm btn-primary"   onclick="validar('${n.id}')">Validar</button>` : ''}
           ${n.status_validacao !== 'rejeitado'  ? `<button class="btn btn-sm" style="background:#ef444433;color:#ef4444;border:none;border-radius:6px;padding:4px 10px;cursor:pointer" onclick="abrirRejeitar('${n.id}','${esc(n.numero_ninho)}','rejeitado')">Rejeitar</button>` : ''}
@@ -456,6 +459,115 @@
     if (error) { toast(error.message, 'error'); return }
     toast(_rejTipo === 'rejeitado' ? 'Ninho rejeitado.' : 'Correção solicitada.', 'success')
     fecharModalRejeitar()
+    await carregarDados()
+  }
+
+  // ── Reprocessar fotos (aplicar/corrigir marca d'água) ──────────
+  // Reaproveita o mesmo pipeline de captura do app de campo
+  // (bCapturaProcessarArquivo/bCameraAguaMarca, em brigada-captura.js),
+  // reconstruindo o contexto a partir dos dados já salvos no ninho —
+  // não é preciso re-fotografar. Sobrescreve o arquivo original no
+  // Storage (mesmo caminho) e adiciona um sufixo de versão à URL salva
+  // para evitar cache de CDN/navegador.
+  let _logosReproc = null
+  async function _buscarLogosReproc() {
+    if (_logosReproc) return _logosReproc
+    try {
+      const { data } = await db.from('config_sistema').select('dados').eq('id', 1).single()
+      const logos = data?.dados?.logos
+      if (!logos) return null
+      const baixar = async url => {
+        if (!url) return null
+        try { const r = await fetch(url); return r.ok ? await r.blob() : null } catch { return null }
+      }
+      const blobParaBase64 = blob => new Promise((res, rej) => {
+        const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = rej; fr.readAsDataURL(blob)
+      })
+      const logoParaBranco = async blob => {
+        const img = new Image()
+        const bUrl = URL.createObjectURL(blob)
+        await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = bUrl })
+        const cv = document.createElement('canvas')
+        cv.width = img.naturalWidth; cv.height = img.naturalHeight
+        const ctx = cv.getContext('2d')
+        ctx.drawImage(img, 0, 0)
+        const d = ctx.getImageData(0, 0, cv.width, cv.height)
+        const p = d.data
+        for (let i = 0; i < p.length; i += 4) {
+          const lum = (p[i] * 0.299 + p[i + 1] * 0.587 + p[i + 2] * 0.114) / 255
+          const tinta = (1 - lum) * (p[i + 3] / 255)
+          p[i] = p[i + 1] = p[i + 2] = 255
+          p[i + 3] = Math.round(255 * Math.min(1, tinta * 1.25))
+        }
+        ctx.putImageData(d, 0, 0)
+        URL.revokeObjectURL(bUrl)
+        return new Promise(res => cv.toBlob(b => res(b), 'image/png'))
+      }
+      const preparar = async (urlBranca, urlColorida) => {
+        const oficial = await baixar(urlBranca)
+        if (oficial) return blobParaBase64(oficial)
+        const colorida = await baixar(urlColorida)
+        if (!colorida) return null
+        return blobParaBase64(await logoParaBranco(colorida))
+      }
+      _logosReproc = {
+        gov: await preparar(logos.governo_branca_url,    logos.governo_url),
+        sec: await preparar(logos.secretaria_branca_url, logos.secretaria_url),
+      }
+    } catch (e) { console.warn('[reprocessar-fotos] logos:', e); _logosReproc = null }
+    return _logosReproc
+  }
+
+  // Extrai o caminho do arquivo dentro do bucket a partir da URL pública.
+  function _caminhoNoBucket(url) {
+    const marcador = '/biomonitor-fotos/'
+    const i = url.indexOf(marcador)
+    if (i === -1) return null
+    return url.slice(i + marcador.length).split('?')[0]
+  }
+
+  window.reprocessarFotos = async function(ninhoId) {
+    const n = _ninhos.find(x => x.id === ninhoId)
+    if (!n || !n.foto_urls?.length) return
+    if (!confirm(`Reaplicar a marca d'água nas ${n.foto_urls.length} foto(s) deste ninho?\n\nOs arquivos originais no Storage serão sobrescritos — essa ação não pode ser desfeita.`)) return
+
+    const gps = (n.lat != null && n.lng != null) ? { lat: Number(n.lat), lng: Number(n.lng) } : null
+    const contexto = {
+      brigada: n.grupo_nome || null,
+      tipoOcorrencia: 'Encontro de Ninho',
+      local: n.praia_nome ? `Praia: ${n.praia_nome}` : null,
+      logos: await _buscarLogosReproc(),
+    }
+
+    let ok = 0, falhas = 0
+    const novasUrls = [...n.foto_urls]
+    for (let i = 0; i < n.foto_urls.length; i++) {
+      const urlOriginal = n.foto_urls[i]
+      const caminho = _caminhoNoBucket(urlOriginal)
+      if (!caminho) { falhas++; continue }
+      try {
+        const resp = await fetch(urlOriginal)
+        if (!resp.ok) throw new Error('não foi possível baixar a foto original')
+        const blobOriginal = await resp.blob()
+        const blobMarcado = await bCapturaProcessarArquivo(
+          blobOriginal, { nome: n.monitor_nome || 'Monitor' }, gps, contexto
+        )
+        const { error: upErr } = await db.storage.from('biomonitor-fotos')
+          .upload(caminho, blobMarcado, { upsert: true, contentType: 'image/jpeg' })
+        if (upErr) throw upErr
+        novasUrls[i] = `${urlOriginal.split('?')[0]}?v=${Date.now()}`
+        ok++
+      } catch (e) {
+        console.warn('[reprocessar-fotos] falha na foto', urlOriginal, e)
+        falhas++
+      }
+    }
+
+    if (ok) {
+      const { error } = await db.from('ninhos_quelonios').update({ foto_urls: novasUrls }).eq('id', n.id)
+      if (error) { toast(error.message, 'error'); return }
+    }
+    toast(falhas ? `${ok} foto(s) reprocessada(s), ${falhas} falharam.` : `${ok} foto(s) reprocessada(s) com sucesso.`, falhas ? 'error' : 'success')
     await carregarDados()
   }
 
