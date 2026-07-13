@@ -2160,7 +2160,7 @@ document.getElementById('bio-btn-sync-fila')?.addEventListener('click', () => {
 // Service Worker para PWA (atualização) — pulado no app nativo (Capacitor),
 // onde os arquivos já são locais e a atualização vem por Release do APK.
 if ('serviceWorker' in navigator && !window.Capacitor) {
-  navigator.serviceWorker.register('/pwa/sw.js').then(reg => {
+  navigator.serviceWorker.register('/pwa/sw.js', { scope: '/' }).then(reg => {
     reg.addEventListener('updatefound', () => {
       const nw = reg.installing
       nw.addEventListener('statechange', () => {
