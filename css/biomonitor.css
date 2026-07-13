@@ -1789,6 +1789,42 @@ body.field-mode .bio-home-nome { font-size: 26px; }
   font-size: 13px; color: #374151; font-style: italic; white-space: pre-wrap;
 }
 
+/* ── Fotos das ocorrências do ninho — visualizador em tela cheia ── */
+.bio-foto-overlay {
+  position: fixed; inset: 0; z-index: 4000;
+  background: rgba(10,20,25,.92);
+  display: none; align-items: center; justify-content: center;
+}
+.bio-foto-overlay.aberto { display: flex; }
+.bio-foto-img {
+  max-width: min(92vw, 1100px); max-height: 82vh;
+  object-fit: contain; border-radius: 6px;
+}
+.bio-foto-legenda {
+  position: absolute; left: 0; right: 0; bottom: 22px;
+  text-align: center; color: #fff; font-size: 13.5px;
+  padding: 0 60px; text-shadow: 0 1px 3px rgba(0,0,0,.6);
+}
+.bio-foto-fechar {
+  position: absolute; top: 14px; right: 18px;
+  border: 0; background: none; color: #fff; font-size: 34px; line-height: 1;
+  cursor: pointer; opacity: .85;
+}
+.bio-foto-fechar:hover { opacity: 1; }
+.bio-foto-nav {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  border: 0; background: rgba(255,255,255,.12); color: #fff;
+  font-size: 34px; line-height: 1; width: 48px; height: 48px; border-radius: 50%;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+}
+.bio-foto-nav:hover { background: rgba(255,255,255,.22); }
+.bio-foto-prev { left: 14px; }
+.bio-foto-next { right: 14px; }
+@media (max-width: 640px) {
+  .bio-foto-nav { width: 40px; height: 40px; font-size: 28px; }
+  .bio-foto-legenda { padding: 0 46px; font-size: 12.5px; }
+}
+
 /* ── Fila de sync: registros com erro ────────────────────────── */
 .bio-sync-erros {
   border: 1px solid rgba(220,38,38,.35); background: rgba(220,38,38,.06);
