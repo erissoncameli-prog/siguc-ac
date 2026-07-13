@@ -1367,6 +1367,7 @@ function renderPagina(){
                 </div>
                 <div style="font-size:10px;font-weight:700;color:var(--cinza-500);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">Tipo de zona:</div>
                 <div id="zonas-tipos-lista" style="display:flex;flex-direction:column;gap:3px"></div>
+                <div id="zonas-extras-lista"></div>
               </div>
               <div id="zonas-stat" style="font-size:10px;color:var(--cinza-400);margin-top:6px"></div>
             </div>
@@ -2280,16 +2281,30 @@ function _vegCard(id, titulo, desc, cor){
 // ══════════════════════════════════════════════════════════════
 // CAMADAS PERSONALIZADAS (Supabase camadas_mapa)
 // ══════════════════════════════════════════════════════════════
+// Camadas cujo GeoJSON já vem com "zona_codigo" nas properties são
+// zoneamento de UC (mesmo schema do data/uc_zonas_acre.geojson) e
+// passam a ser controladas pelo painel/switch de Zonas de Manejo,
+// em vez de aparecerem como uma camada avulsa.
+let _zonasExtras = [];
+
+function _ehCamadaZona(c){
+  return (c.geojson?.features||[]).some(f => f.properties && f.properties.zona_codigo);
+}
+
 async function carregarCamadas(){
   const { data } = await db.from('camadas_mapa').select('*, unidades_conservacao(id,nome,sigla)').order('ordem');
   const visPref = JSON.parse(localStorage.getItem('siguc_camadas_vis')||'{}');
-  camadas = (data||[]).map(c => ({
+  const todas = data||[];
+  _zonasExtras = todas.filter(_ehCamadaZona);
+  camadas = todas.filter(c => !_ehCamadaZona(c)).map(c => ({
     ...c,
     visivel: visPref.hasOwnProperty(c.id) ? visPref[c.id] : false,
     layer: null
   }));
   camadas.forEach(c => { if(c.visivel) _renderizarCamada(c); });
   renderCamadasHtml();
+  _zonasConstruirPainel();
+  if(_zonasAtivo) _renderizarZonas();
 }
 
 function _renderizarCamada(c){
@@ -2518,8 +2533,12 @@ async function salvarStyleCamada(id){
   if(error){ toast('Erro ao salvar: '+error.message,'error'); return; }
   toast('Estilo salvo!','success');
 }
+function _buscarCamadaOuExtra(id){
+  return camadas.find(x=>x.id===id) || _zonasExtras.find(x=>x.id===id);
+}
+
 async function renomearCamada(id){
-  const c=camadas.find(x=>x.id===id); if(!c) return;
+  const c=_buscarCamadaOuExtra(id); if(!c) return;
   const novoNome=prompt('Novo nome para a camada:',c.nome);
   if(!novoNome||novoNome.trim()===''||novoNome.trim()===c.nome) return;
   const nome=novoNome.trim();
@@ -2527,6 +2546,7 @@ async function renomearCamada(id){
   if(error){ toast('Erro ao renomear: '+error.message,'error'); return; }
   c.nome=nome;
   renderCamadasHtml();
+  _zonasConstruirPainel();
   toast('Camada renomeada com sucesso!','success');
 }
 
@@ -2535,7 +2555,10 @@ async function removerCamada(id){
   const c=camadas.find(x=>x.id===id);
   if(c?.layer) mapaL.removeLayer(c.layer);
   camadas=camadas.filter(x=>x.id!==id);
+  const eraExtraZona = _zonasExtras.some(x=>x.id===id);
+  _zonasExtras=_zonasExtras.filter(x=>x.id!==id);
   renderCamadasHtml(); _atualizarLegendaMapa();
+  if(eraExtraZona){ _zonasConstruirPainel(); if(_zonasAtivo) _renderizarZonas(); }
   await db.from('camadas_mapa').delete().eq('id',id);
 }
 
@@ -2685,16 +2708,19 @@ function _atualizarLegendaMapa(){
   }
 
   // Zonas de Manejo — um item por tipo de zona marcado que tenha feições visíveis
-  if(_zonasAtivo && _zonasGeojson){
+  if(_zonasAtivo){
     const tiposAtivos = new Set(Array.from(document.querySelectorAll('[data-zona-tipo]:checked')).map(e=>e.dataset.zonaTipo));
-    const featsVisiveis = (_zonasGeojson.features||[]).filter(f => {
+    const todasFeatures = _zonasTodasFeatures();
+    const featsVisiveis = todasFeatures.filter(f => {
       const p = f.properties;
       if(_zonasFiltroUC !== 'todas' && p.uc_nome !== _zonasFiltroUC) return false;
       return tiposAtivos.has(p.zona_codigo);
     });
-    Object.entries(ZONA_META).forEach(([cod, meta]) => {
+    [...new Set(todasFeatures.map(f=>f.properties.zona_codigo).filter(Boolean))].forEach(cod => {
       if(!tiposAtivos.has(cod)) return;
-      if(!featsVisiveis.some(f => f.properties.zona_codigo === cod)) return;
+      const featsDoCod = featsVisiveis.filter(f => f.properties.zona_codigo === cod);
+      if(!featsDoCod.length) return;
+      const meta = _zonaMeta(cod, featsDoCod[0]?.properties._corCamada);
       itens.push({ simbolo:'rect', cor:meta.cor, opacidade:_zonasOpacity, dash:true, label:'Zona — '+meta.nome });
     });
   }
@@ -4718,7 +4744,7 @@ const ZONA_META = {
 async function toggleZonas(ativo){
   _zonasAtivo = ativo;
   if(ativo && !_zonasGeojson) await _carregarZonas();
-  else _renderizarZonas();
+  else { _zonasConstruirPainel(); _renderizarZonas(); }
   _atualizarLegendaMapa();
 }
 
@@ -4742,8 +4768,27 @@ async function _carregarZonas(){
   _renderizarZonas();
 }
 
+// Achata as features das camadas-extra (adicionadas pelo botão + com
+// schema de zoneamento) marcando a cor de origem, usada como fallback
+// quando o zona_codigo não existe em ZONA_META.
+function _zonasFeaturesExtras(){
+  const out=[];
+  _zonasExtras.forEach(c => (c.geojson?.features||[]).forEach(f => {
+    if(f.properties && f.properties.zona_codigo){
+      out.push({...f, properties:{...f.properties, _corCamada:c.cor, _camadaNome:c.nome}});
+    }
+  }));
+  return out;
+}
+function _zonasTodasFeatures(){
+  return (_zonasGeojson?.features||[]).concat(_zonasFeaturesExtras());
+}
+function _zonaMeta(cod, corFallback){
+  return ZONA_META[cod] || { nome: cod, cor: corFallback || '#6b7280' };
+}
+
 function _zonasConstruirPainel(){
-  const feats = _zonasGeojson?.features || [];
+  const feats = _zonasTodasFeatures();
   // Popular select de UCs
   const sel = document.getElementById('zonas-sel-uc');
   if(sel){
@@ -4751,22 +4796,38 @@ function _zonasConstruirPainel(){
     sel.innerHTML = '<option value="todas">Todas as UCs</option>' +
       ucs.map(u => `<option value="${escHtml(u)}">${escHtml(u)}</option>`).join('');
   }
-  // Popular lista de tipos
+  // Popular lista de tipos (inclui códigos fora do ZONA_META, vindos de camadas extra)
   const lista = document.getElementById('zonas-tipos-lista');
   if(lista){
     const tiposPresentes = [...new Set(feats.map(f => f.properties.zona_codigo).filter(Boolean))];
-    lista.innerHTML = Object.entries(ZONA_META)
-      .filter(([cod]) => tiposPresentes.includes(cod))
-      .map(([cod, meta]) => {
-        const n = feats.filter(f => f.properties.zona_codigo === cod).length;
-        return `<label style="display:flex;align-items:center;gap:7px;font-size:11px;color:var(--cinza-700);cursor:pointer;padding:2px 0">
-          <input type="checkbox" checked data-zona-tipo="${cod}" style="accent-color:${meta.cor};width:12px;height:12px;cursor:pointer;flex-shrink:0" onchange="_renderizarZonas()">
-          <div style="width:12px;height:12px;border-radius:2px;background:${meta.cor};flex-shrink:0"></div>
-          <span style="flex:1">${escHtml(meta.nome)}</span>
-          <span style="font-size:10px;color:var(--cinza-400)">${n}</span>
-        </label>`;
-      }).join('');
+    lista.innerHTML = tiposPresentes.map(cod => {
+      const featsDoCod = feats.filter(f => f.properties.zona_codigo === cod);
+      const meta = _zonaMeta(cod, featsDoCod[0]?.properties._corCamada);
+      const n = featsDoCod.length;
+      return `<label style="display:flex;align-items:center;gap:7px;font-size:11px;color:var(--cinza-700);cursor:pointer;padding:2px 0">
+        <input type="checkbox" checked data-zona-tipo="${cod}" style="accent-color:${meta.cor};width:12px;height:12px;cursor:pointer;flex-shrink:0" onchange="_renderizarZonas()">
+        <div style="width:12px;height:12px;border-radius:2px;background:${meta.cor};flex-shrink:0"></div>
+        <span style="flex:1">${escHtml(meta.nome)}</span>
+        <span style="font-size:10px;color:var(--cinza-400)">${n}</span>
+      </label>`;
+    }).join('');
   }
+  _zonasRenderExtrasLista();
+}
+
+function _zonasRenderExtrasLista(){
+  const el = document.getElementById('zonas-extras-lista'); if(!el) return;
+  const ehAdmin = appState.perfil==='super_admin'||appState.perfil==='gestor';
+  if(!ehAdmin || !_zonasExtras.length){ el.innerHTML=''; return; }
+  el.innerHTML = `<div style="font-size:10px;font-weight:700;color:var(--cinza-500);text-transform:uppercase;letter-spacing:.05em;margin:8px 0 5px">Zoneamentos adicionados via camada:</div>` +
+    _zonasExtras.map(c => `
+      <div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--cinza-700);padding:2px 0">
+        <div style="width:10px;height:10px;border-radius:2px;background:${c.cor};flex-shrink:0"></div>
+        <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escHtml(c.nome)}">${escHtml(c.nome)}</span>
+        <button class="btn-camada-exp" title="Renomear" onclick="renomearCamada('${c.id}')">✏</button>
+        <button onclick="removerCamada('${c.id}')" title="Remover"
+          style="font-size:11px;padding:1px 5px;border:1px solid #FCA5A5;border-radius:4px;background:#FEF2F2;color:#DC2626;cursor:pointer;flex-shrink:0">✕</button>
+      </div>`).join('');
 }
 
 function zonasFiltrarUC(uc){
@@ -4782,18 +4843,22 @@ function zonasAlterarOpacidade(v){
 
 function _renderizarZonas(){
   if(_zonasLayer){ mapaL.removeLayer(_zonasLayer); _zonasLayer = null; }
-  if(!_zonasGeojson || !_zonasAtivo) return;
+  const todasFeatures = _zonasTodasFeatures();
+  if(!_zonasAtivo || !todasFeatures.length){
+    const stat = document.getElementById('zonas-stat'); if(stat) stat.textContent = '';
+    const badge = document.getElementById('zonas-count-badge'); if(badge) badge.style.display = 'none';
+    return;
+  }
 
   const tiposAtivos = new Set(
     Array.from(document.querySelectorAll('[data-zona-tipo]:checked')).map(e => e.dataset.zonaTipo)
   );
 
   let count = 0;
-  _zonasLayer = L.geoJSON(_zonasGeojson, {
+  _zonasLayer = L.geoJSON({type:'FeatureCollection', features: todasFeatures}, {
     style: f => {
-      const meta = ZONA_META[f.properties.zona_codigo] || {};
-      const cor = meta.cor || '#6b7280';
-      return { color: cor, weight: 1.5, opacity: .9, fillColor: cor, fillOpacity: _zonasOpacity, dashArray: '4 3' };
+      const meta = _zonaMeta(f.properties.zona_codigo, f.properties._corCamada);
+      return { color: meta.cor, weight: 1.5, opacity: .9, fillColor: meta.cor, fillOpacity: _zonasOpacity, dashArray: '4 3' };
     },
     filter: f => {
       const p = f.properties;
@@ -4807,8 +4872,8 @@ function _renderizarZonas(){
     },
     onEachFeature: (f, layer) => {
       const p = f.properties;
-      const meta = ZONA_META[p.zona_codigo] || {};
-      const cor = meta.cor || '#6b7280';
+      const meta = _zonaMeta(p.zona_codigo, p._corCamada);
+      const cor = meta.cor;
       const ha = p.hectares ? Number(String(p.hectares).replace(',','.')).toLocaleString('pt-BR',{maximumFractionDigits:2}) : null;
       const atv = (meta.atividades||[]).map(a=>`<li style="margin-bottom:2px">${escHtml(a)}</li>`).join('');
       const rst = (meta.restricoes||[]).map(r=>`<li style="margin-bottom:2px">${escHtml(r)}</li>`).join('');
@@ -6875,7 +6940,7 @@ function vincularEventos(){
 function _zonasParaUC(ucNome){
   if(!_zonasGeojson) return [];
   return [...new Set(
-    (_zonasGeojson.features||[])
+    _zonasTodasFeatures()
       .filter(f => f.properties.uc_nome === ucNome)
       .map(f => f.properties.zona_codigo)
   )];
@@ -6930,7 +6995,7 @@ function _preencherZonaSection(section, ucNome){
 
   // Checkboxes individuais
   zonas.forEach(cod => {
-    const meta = ZONA_META[cod] || {nome: cod, cor:'#6b7280'};
+    const meta = _zonaMeta(cod);
     const lbl  = document.createElement('label');
     lbl.style.cssText = 'display:flex;align-items:center;gap:6px;padding:2px 0;cursor:pointer;color:#374151';
     const cb = document.createElement('input');
