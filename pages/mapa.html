@@ -253,6 +253,12 @@
 #timeline-bar input[type=range]{width:100%;accent-color:#1F4E2C;height:6px;}
 .tl-ticks{display:flex;justify-content:space-between;font-size:9px;color:#9ca3af;margin-top:3px;}
 .tl-stat{font-size:10px;color:#6b7280;margin-top:6px;min-height:13px;}
+/* Sub-seletor de mês (imagem Planet/NICFI do ano selecionado) */
+.tl-meses{display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-top:7px;padding-top:7px;border-top:1px dashed var(--borda);}
+.tl-meses-lbl{font-size:9px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.06em;margin-right:2px;}
+.tl-mes{border:1px solid var(--borda);background:#fff;font:inherit;font-size:10px;font-weight:600;color:#374151;padding:3px 8px;border-radius:99px;cursor:pointer;transition:all .12s;}
+.tl-mes:hover{border-color:#1F4E2C;color:#1F4E2C;}
+.tl-mes.on{background:#1F4E2C;color:#fff;border-color:#1F4E2C;}
 /* Filtro Focos/Desmat/Ambos */
 .tl-filtro{display:flex;background:#f1f5f3;border-radius:9px;padding:3px;gap:2px;}
 .tl-filtro button{border:none;background:none;font:inherit;font-size:11px;font-weight:600;color:#6b7280;padding:5px 10px;border-radius:7px;cursor:pointer;white-space:nowrap;}
@@ -1165,6 +1171,7 @@ function renderPagina(){
           </div>
           <input type="range" id="tl-slider" min="0" max="23" value="23" oninput="tlOnSlide()">
           <div class="tl-ticks" id="tl-ticks"></div>
+          <div class="tl-meses" id="tl-meses" style="display:none"></div>
           <div class="tl-stat" id="tl-stat"></div>
         </div>
 
@@ -2738,7 +2745,9 @@ function _atualizarLegendaMapa(){
   CART.legendaAtualizar(itens);
 
   // Rótulo fixo com a data da imagem de satélite ativa (a mais precisa primeiro).
-  if(VEG_LAYERS.sentinel?.layer && _sentinelDataSel){
+  if(_tlAberta && _tlImgLabel){
+    CART.imagemDataAtualizar(_tlImgLabel);
+  } else if(VEG_LAYERS.sentinel?.layer && _sentinelDataSel){
     const info = _sentinelDatas?.datas?.find(d=>d.data===_sentinelDataSel);
     const nuvem = info ? ` · nuvens ${info.nuvem.toFixed(0)}%` : '';
     CART.imagemDataAtualizar(`🛰 Sentinel-2 · ${_fmtDataBR(_sentinelDataSel)}${nuvem}`);
@@ -3433,8 +3442,12 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) _aut
 // ══════════════════════════════════════════════════════════════
 let _tlAberta = false, _tlModo = 'anos', _tlPlaying = false, _tlTimer = null, _tlDeb = null
 let _tlFiltro = 'ambos', _tlDiasJanela = 30, _tlCustom = null
-const TL_ANO_MIN = 2001, TL_ANO_MAX = 2024
+const TL_ANO_MIN = 2001, TL_ANO_MAX = new Date().getFullYear()
 let _tlFocosLayer = null, _tlGibsLayer = null, _tlProdesLayer = null, _tlDeterLayer = null
+let _tlPlanetLayer = null      // imagem Planet/NICFI (alta resolução) da linha do tempo
+let _tlImgLabel = null         // rótulo da imagem exibida (p/ CART.imagemDataAtualizar)
+let _tlAnoAtual = null         // ano selecionado no modo Anos
+const _tlMesSel = {}           // mês escolhido por ano (name do mosaico Planet)
 const _tlFocosCacheAno = {}
 
 // Estatísticas oficiais por ano (Acre) — focos: focos_calor_ac; desmatamento: PRODES yearly (≥2008)
@@ -3459,8 +3472,10 @@ function toggleTimeline() {
 }
 
 function _tlLimpar() {
-  ;[_tlFocosLayer, _tlGibsLayer, _tlProdesLayer, _tlDeterLayer].forEach(l => { if (l) mapaL.removeLayer(l) })
-  _tlFocosLayer = _tlGibsLayer = _tlProdesLayer = _tlDeterLayer = null
+  ;[_tlFocosLayer, _tlGibsLayer, _tlProdesLayer, _tlDeterLayer, _tlPlanetLayer].forEach(l => { if (l) mapaL.removeLayer(l) })
+  _tlFocosLayer = _tlGibsLayer = _tlProdesLayer = _tlDeterLayer = _tlPlanetLayer = null
+  _tlImgLabel = null
+  const tm = document.getElementById('tl-meses'); if (tm) tm.style.display = 'none'
 }
 
 const _mostraFocos  = () => _tlFiltro === 'ambos' || _tlFiltro === 'focos'
@@ -3537,6 +3552,78 @@ function _tlSetGibs(dateStr) {
   _tlGibsLayer = _gibsMake(100, dateStr, 'MODIS_Terra_CorrectedReflectance_TrueColor')
   _tlGibsLayer.addTo(mapaL); _tlGibsLayer.setZIndex(140)
 }
+
+// ── Imagem de satélite da linha do tempo ──────────────────────────────────
+// Anos com mosaico Planet/NICFI (2015/2016+) usam imagem de ~4,77 m em
+// opacidade total — substitui visualmente o mapa base, estilo Google Earth.
+// Anos anteriores caem para o MODIS/GIBS (250 m, único gratuito da época).
+function _tlSetPlanet(mos) {
+  if (_tlGibsLayer)   { mapaL.removeLayer(_tlGibsLayer);   _tlGibsLayer = null }
+  if (_tlPlanetLayer) { mapaL.removeLayer(_tlPlanetLayer); _tlPlanetLayer = null }
+  _tlPlanetLayer = L.tileLayer(`/api/planet-tiles?z={z}&x={x}&y={y}&m=${encodeURIComponent(mos.name)}`,
+    { attribution: 'Planet / NICFI', opacity: 1, maxZoom: 21, maxNativeZoom: 18,
+      errorTileUrl: 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==' })
+  _tlPlanetLayer.addTo(mapaL); _tlPlanetLayer.setZIndex(140)
+  _tlImgLabel = `🛰 Planet/NICFI · ${mos.label} · ~4,7 m`
+}
+
+// Agrupa mosaicos Planet por ano (primeiro AAAA-MM do nome)
+async function _tlMosaicosPorAno() {
+  const info = await _planetCarregarMosaicos()
+  if (!info?.disponivel || !info.mosaicos?.length) return null
+  const porAno = {}
+  info.mosaicos.forEach(m => {
+    const ano = parseInt((m.data || '').slice(0, 4), 10)
+    if (!ano) return
+    ;(porAno[ano] = porAno[ano] || []).push(m)
+  })
+  Object.values(porAno).forEach(l => l.sort((a, b) => a.data.localeCompare(b.data)))
+  return porAno
+}
+
+// Melhor mosaico do ano: prioriza a época seca no Acre (jun–set, menos
+// nuvem); sem mosaico nesses meses, usa o mais recente disponível do ano.
+function _tlEscolherMosaico(lista) {
+  const seco = lista.filter(m => { const mm = parseInt(m.data.slice(5, 7), 10); return mm >= 6 && mm <= 9 })
+  if (seco.length) return seco[seco.length - 1]
+  return lista[lista.length - 1]
+}
+
+// Renderiza os chips de mês do ano selecionado (zoom mensal da régua)
+function _tlRenderMeses(ano, lista, selName) {
+  const el = document.getElementById('tl-meses')
+  if (!el) return
+  if (!lista || lista.length <= 1) { el.style.display = 'none'; el.innerHTML = ''; return }
+  el.style.display = 'flex'
+  el.innerHTML = '<span class="tl-meses-lbl">Mês:</span>' + lista.map(m =>
+    `<button class="tl-mes${m.name === selName ? ' on' : ''}" onclick="tlSelMes('${escHtml(m.name)}')" title="${escHtml(m.label)}">${escHtml(m.label.split('/')[0])}</button>`
+  ).join('')
+}
+
+function tlSelMes(name) {
+  if (_tlAnoAtual == null) return
+  _tlMesSel[_tlAnoAtual] = name
+  _tlSetSatelite(_tlAnoAtual)
+}
+
+async function _tlSetSatelite(ano) {
+  _tlAnoAtual = ano
+  const porAno = await _tlMosaicosPorAno()
+  if (!_tlAberta || _tlModo !== 'anos' || _tlAnoAtual !== ano) return null
+  const lista = porAno?.[ano]
+  if (lista?.length) {
+    const sel = lista.find(m => m.name === _tlMesSel[ano]) || _tlEscolherMosaico(lista)
+    _tlSetPlanet(sel)
+    _tlRenderMeses(ano, lista, sel.name)
+    return 'planet'
+  }
+  // Sem mosaico Planet para o ano (pré-2016 ou sem chave) → MODIS/GIBS
+  if (_tlPlanetLayer) { mapaL.removeLayer(_tlPlanetLayer); _tlPlanetLayer = null }
+  _tlSetGibs(`${ano}-08-15`)
+  _tlImgLabel = `🛰 NASA/MODIS · ago/${ano} · 250 m`
+  _tlRenderMeses(ano, null, null)
+  return 'gibs'
+}
 function _tlSetProdes(ano) {
   if (_tlProdesLayer) { mapaL.removeLayer(_tlProdesLayer); _tlProdesLayer = null }
   if (!_mostraDesmat()) return
@@ -3585,7 +3672,7 @@ function _tlPlotDeter(dia) {
 }
 
 async function _tlRenderAno(ano) {
-  _tlSetGibs(`${ano}-08-15`)
+  const fonteImg = await _tlSetSatelite(ano)
   _tlSetProdes(ano)
   let pts = _tlFocosCacheAno[ano]
   if (!pts && _mostraFocos()) {
@@ -3600,12 +3687,18 @@ async function _tlRenderAno(ano) {
   const pr = TL_PRODES_ANO[ano]
   _tlPainel(pr ? pr.n : null, pr ? pr.ha : null, TL_FOCOS_ANO[ano] ?? null)
   const st = document.getElementById('tl-stat')
-  if (st) st.textContent = (pr ? `` : `PRODES anual disponível a partir de 2008 · `) + `Satélite NASA ${ano} · MapBiomas por ano: requer token GEE (em breve)`
+  if (st) st.textContent = (pr ? `` : `PRODES anual disponível a partir de 2008 · `)
+    + (fonteImg === 'planet'
+        ? `Imagem Planet/NICFI ~4,7 m — dê zoom para ver detalhes da cobertura`
+        : `Satélite NASA/MODIS 250 m (alta resolução disponível a partir de 2016)`)
   _atualizarLegendaMapa()
 }
 
 async function _tlRenderDia(ds) {
+  if (_tlPlanetLayer) { mapaL.removeLayer(_tlPlanetLayer); _tlPlanetLayer = null } // Planet é mensal
+  _tlRenderMeses(null, null, null)
   _tlSetGibs(ds)
+  _tlImgLabel = `🛰 NASA/MODIS · ${_fmtDataBR(ds)} · 250 m`
   if (_tlProdesLayer) { mapaL.removeLayer(_tlProdesLayer); _tlProdesLayer = null } // PRODES é anual
   if (!_focosNrtMapa.length) await _carregarFocos()
   if (_mostraDesmat() && !(_alertasMapa && _alertasMapa.length)) await _carregarAlertas()
