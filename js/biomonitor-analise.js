@@ -68,10 +68,11 @@ window.acAplicar = async function (filtros) {
     p_praia_id:     filtros.praia     || null,
   }
 
-  const [rRel, rAna, rDet] = await Promise.all([
+  const [rRel, rAna, rDet, rPr] = await Promise.all([
     db.rpc('bio_relatorio_completo', { ...params, p_tipo_localizacao: filtros.localizacao || null }),
     db.rpc('bio_analise_cientifica', { ...params, p_ref_date: null }),
     db.rpc('bio_analise_detalhada', params),
+    db.rpc('bio_analise_praias', params),
   ])
 
   if (rRel.error && rAna.error) {
@@ -81,6 +82,7 @@ window.acAplicar = async function (filtros) {
   const dados = rRel.data || {}
   const ana = rAna.data || {}
   const det = rDet.data || {}
+  const pr = rPr.data || {}
   const kpis = dados.kpis || {}
 
   await acCarregarChartJS()
@@ -90,6 +92,11 @@ window.acAplicar = async function (filtros) {
     const capaEl = document.getElementById('ac-capa')
     if (capaEl && typeof getCabecalhoRelatorio === 'function') {
       const cab = await getCabecalhoRelatorio()
+      // Biomonitor é vinculado ao Departamento de Biodiversidade, não ao DEUC
+      // (config_sistema.departamento é global e compartilhado com o relatório
+      // CAR — sobrescrever só aqui, depois de resolvido, evita mudar o CAR).
+      cab.departamento = 'Departamento de Biodiversidade'
+      cab.siglaDep = 'DEBIO'
       capaEl.innerHTML = acCapa(ana, cab)
     }
   } catch (_) { /* capa é opcional — não bloqueia o relatório */ }
@@ -100,6 +107,7 @@ window.acAplicar = async function (filtros) {
     acSecFase(ana),
     acSecFenologia(dados, ana),
     acSecEspecies(dados),
+    acSecPraias(pr),
     acSecOvos(det),
     acSecEclosao(det),
     acSecPerdas(det),
@@ -118,6 +126,7 @@ window.acAplicar = async function (filtros) {
   // Gráficos — depois do DOM montado
   acChartFenologia(dados, ana)
   acChartFase(ana)
+  acChartPraias(pr)
   acChartOvos(det)
   acChartEclosao(det)
   acChartPerdas(det)
@@ -174,7 +183,7 @@ function acCapa(ana, cab) {
       <div class="l1">${esc(cab.governo || 'Governo do Estado do Acre')}${gestao}</div>
       <div class="l2">${esc(cab.secretaria || 'Secretaria de Estado do Meio Ambiente do Acre')} — ${esc(cab.siglaSecr || 'SEMA-AC')}</div>
       <div class="l3">${esc(cab.diretoria || 'Diretoria de Meio Ambiente')} (${esc(cab.siglaDiret || 'DIMA')})</div>
-      ${cab.departamento ? `<div class="l3">${esc(cab.departamento)} (${esc(cab.siglaDep || 'DEUC')})</div>` : ''}
+      ${cab.departamento ? `<div class="l3">${esc(cab.departamento)} (${esc(cab.siglaDep || 'DEBIO')})</div>` : ''}
     </div>
     <div class="ac-capa-mid">
       <div class="ac-capa-tipo">Relatório Científico</div>
@@ -345,12 +354,80 @@ function acMini(txt) {
   return `<div class="ac-mini-title">${esc(txt)}</div>`
 }
 
-// ── 5 · Biologia dos ovos ───────────────────────────────────────
+const AC_TIPO_LOC_LBL = {
+  dentro_uc: 'Dentro de UC', margem_livre: 'Margem livre',
+  terra_indigena: 'Terra Indígena', area_municipal: 'Área municipal', outro: 'Outro',
+}
+
+// ── 5 · Área de monitoramento (praias) ───────────────────────────
+function acSecPraias(pr) {
+  if (!pr || !pr.resumo) return ''
+  const r = pr.resumo
+  const lista = pr.praias || []
+  const al = pr.alertas || {}
+  const alc = al.contagens || {}
+  const kmTotal = (acN(r.comprimento_total_m) / 1000).toFixed(2)
+  const haTotal = acN(r.area_total_ha).toFixed(2)
+
+  const linhas = lista.map(p => {
+    const km = p.comprimento_m != null ? `${(acN(p.comprimento_m) / 1000).toFixed(2)} km` : '—'
+    const ha = p.area_ha != null ? `${acN(p.area_ha).toFixed(2)} ha` : '—'
+    const semDim = p.comprimento_m == null || p.area_ha == null
+    return `<tr${semDim ? ' class="ac-row-alert"' : ''}>
+      <td>${esc(p.nome)}${p.experimental ? ' <span class="ac-tag-exp">exp.</span>' : ''}</td>
+      <td>${esc(AC_TIPO_LOC_LBL[p.tipo_localizacao] || p.tipo_localizacao || '—')}</td>
+      <td>${esc(p.uc_sigla || p.uc_nome || '—')}</td>
+      <td class="num">${km}</td>
+      <td class="num">${ha}</td>
+      <td class="num">${acFmt(p.ninhos_total)}</td>
+      <td class="num">${p.densidade_ninhos_km != null ? p.densidade_ninhos_km : '—'}</td>
+      <td class="num">${p.densidade_ninhos_ha != null ? p.densidade_ninhos_ha : '—'}</td>
+      <td class="num">${acPct(p.taxa_eclosao_pct)}</td>
+    </tr>`
+  }).join('')
+
+  const porTipo = (pr.por_tipo || []).map(t =>
+    `<tr><td>${esc(AC_TIPO_LOC_LBL[t.tipo] || t.tipo)}</td><td class="num">${acFmt(t.n)}</td><td class="num">${acFmt(t.ninhos)}</td></tr>`
+  ).join('')
+
+  const alertas = []
+  if ((al.praias_sem_dimensoes || []).length)
+    alertas.push(`<strong>${al.praias_sem_dimensoes.length} praia(s) sem comprimento/área cadastrado</strong> — impede o cálculo de densidade: ${al.praias_sem_dimensoes.map(esc).join(', ')}.`)
+  if ((al.praias_periodo_desalinhado || []).length)
+    alertas.push(`<strong>${al.praias_periodo_desalinhado.length} praia(s) com período de monitoramento desalinhado</strong> da temporada corrente — revisar cadastro: ${al.praias_periodo_desalinhado.map(esc).join(', ')}.`)
+  if (acN(alc.sem_periodo) > 0)
+    alertas.push(`<strong>${alc.sem_periodo} praia(s) sem período de monitoramento cadastrado.</strong>`)
+  if ((al.praias_sem_ninho || []).length)
+    alertas.push(`<strong>${al.praias_sem_ninho.length} praia(s) cadastrada(s) sem nenhum ninho registrado</strong> no período — esforço de busca zero ou ausência real: ${al.praias_sem_ninho.map(esc).join(', ')}.`)
+
+  return `<section class="ac-sec">
+    ${acSecTitle('05', 'Área de monitoramento — praias', 'Caracterização física da rede amostral e esforço de cobertura')}
+    <p class="ac-prosa">A densidade de nidificação só é comparável entre praias quando normalizada pelo <strong>esforço de amostragem</strong> — tradicionalmente ninhos por km de praia monitorada, mas praias muito estreitas ou muito largas distorcem essa métrica; a <strong>densidade por área (ninhos/ha)</strong> complementa a leitura, sobretudo em praias curtas e largas como bancos de areia amazônicos <span class="ac-cite">[ref.]</span>.</p>
+    <div class="ac-kpis">
+      <div class="ac-kpi" style="--c:#1A6B8C"><div class="ac-kpi-v">${acFmt(r.total_praias)}</div><div class="ac-kpi-l">Praias monitoradas</div></div>
+      <div class="ac-kpi" style="--c:#2A9D6F"><div class="ac-kpi-v">${kmTotal} km</div><div class="ac-kpi-l">Comprimento total</div></div>
+      <div class="ac-kpi" style="--c:#2A9D6F"><div class="ac-kpi-v">${haTotal} ha</div><div class="ac-kpi-l">Área total</div></div>
+      <div class="ac-kpi" style="--c:#C9A84C"><div class="ac-kpi-v">${acFmt(r.praias_com_ninhos)}/${acFmt(r.total_praias)}</div><div class="ac-kpi-l">Praias com registro</div></div>
+      <div class="ac-kpi" style="--c:#D97706"><div class="ac-kpi-v">${acFmt(r.praias_experimentais)}</div><div class="ac-kpi-l">Praias experimentais</div></div>
+    </div>
+    ${alertas.length ? `<div class="ac-flag ac-flag-warn">${alertas.map(a => `<div>${a}</div>`).join('')}</div>` : ''}
+    ${lista.length ? `<div class="ac-chart-wrap"><canvas id="ac-cv-praias" height="160"></canvas></div>
+    <table class="ac-table"><thead><tr>
+      <th>Praia</th><th>Localização</th><th>UC</th><th class="num">Compr.</th><th class="num">Área</th>
+      <th class="num">Ninhos</th><th class="num">Dens./km</th><th class="num">Dens./ha</th><th class="num">Eclosão</th>
+      </tr></thead><tbody>${linhas}</tbody></table>` : ''}
+    ${porTipo ? `${acMini('Rede por tipo de localização')}
+      <table class="ac-table"><thead><tr><th>Localização</th><th class="num">Praias</th><th class="num">Ninhos</th></tr></thead>
+      <tbody>${porTipo}</tbody></table>` : ''}
+  </section>`
+}
+
+// ── 6 · Biologia dos ovos ───────────────────────────────────────
 function acSecOvos(det) {
   const o = (det && det.ovos) || {}
   const causas = o.descartes_por_causa || []
   return `<section class="ac-sec">
-    ${acSecTitle('05', 'Biologia dos ovos', 'Postura, fertilidade e destino dos ovos')}
+    ${acSecTitle('06', 'Biologia dos ovos', 'Postura, fertilidade e destino dos ovos')}
     <p class="ac-prosa">A postura dos quelônios amazônicos varia com a espécie e o tamanho da fêmea — de ~4 ovos no muçuã a ~90 na tartaruga-da-Amazônia. A <strong>fertilidade</strong> (ovos íntegros ÷ postura) mede o potencial reprodutivo da coorte, e o <strong>descarte</strong> de ovos (natural, por predação ou por ação humana) reduz a base viável antes mesmo da incubação.</p>
     <div class="ac-kpis">
       <div class="ac-kpi" style="--c:#1A6B8C"><div class="ac-kpi-v">${acFmt(o.total_postura)}</div><div class="ac-kpi-l">Ovos na postura</div></div>
@@ -364,12 +441,12 @@ function acSecOvos(det) {
   </section>`
 }
 
-// ── 6 · Eclosão & mortalidade embrionária ───────────────────────
+// ── 7 · Eclosão & mortalidade embrionária ───────────────────────
 function acSecEclosao(det) {
   const e = (det && det.eclosao) || {}
   const total = acN(e.vivos) + acN(e.mortos) + acN(e.nao_nascidos)
   return `<section class="ac-sec">
-    ${acSecTitle('06', 'Eclosão & mortalidade embrionária', 'Desfecho dos ovos incubados')}
+    ${acSecTitle('07', 'Eclosão & mortalidade embrionária', 'Desfecho dos ovos incubados')}
     <p class="ac-prosa">Na abertura do ninho, os ovos se resolvem em <strong>filhotes vivos</strong>, <strong>filhotes mortos</strong> ou <strong>ovos não nascidos</strong> (embriões que não completaram o desenvolvimento). A mortalidade embrionária tem causas ambientais e sanitárias: temperatura fora da faixa ótima, <strong>alagamento</strong> dos ninhos e infecções fúngicas — a <strong>fusariose</strong> (<em>Fusarium keratoplasticum</em>) já foi documentada em cascas de <em>P. unifilis</em>, e o alagamento e o reuso de substrato/moldura em berçários favorecem o fungo <span class="ac-cite">[ref.]</span>.</p>
     <div class="ac-kpis">
       <div class="ac-kpi" style="--c:#2A9D6F"><div class="ac-kpi-v">${acFmt(e.vivos)}</div><div class="ac-kpi-l">Filhotes vivos</div></div>
@@ -383,14 +460,14 @@ function acSecEclosao(det) {
   </section>`
 }
 
-// ── 7 · Perdas & predação ───────────────────────────────────────
+// ── 8 · Perdas & predação ───────────────────────────────────────
 function acSecPerdas(det) {
   const p = (det && det.perdas) || {}
   const pf = (det && det.predacao_fases) || {}
   const inc = pf.incubacao || {}, ec = pf.eclosao || {}, so = pf.soltura || {}
   const totalPerdas = acN(p.ovos_alagamento) + acN(p.ovos_erosao) + acN(p.ovos_humana) + acN(p.ovos_predacao)
   return `<section class="ac-sec">
-    ${acSecTitle('07', 'Perdas & predação', 'Onde e como a coorte é perdida ao longo do ciclo')}
+    ${acSecTitle('08', 'Perdas & predação', 'Onde e como a coorte é perdida ao longo do ciclo')}
     <p class="ac-prosa">As perdas concentram-se em três frentes: <strong>hidrológicas</strong> (alagamento e erosão, ligadas ao pulso de inundação), <strong>humanas</strong> (coleta) e <strong>predação</strong> por animais. A predação atua em todas as fases — incubação, eclosão e soltura — e é a principal justificativa do manejo (transferência de ninhos e berçário) para elevar o recrutamento.</p>
     <div class="ac-kpis">
       <div class="ac-kpi" style="--c:#1A6B8C"><div class="ac-kpi-v">${acFmt(p.ovos_alagamento)}</div><div class="ac-kpi-l">Ovos perdidos — alagamento</div></div>
@@ -410,7 +487,7 @@ function acSecPerdas(det) {
   </section>`
 }
 
-// ── 8 · Tempos do ciclo (incubação e berçário) ──────────────────
+// ── 9 · Tempos do ciclo (incubação e berçário) ──────────────────
 function acSecTempos(det) {
   const inc = (det && det.incubacao) || {}
   const berc = (det && det.bercario_tempo) || {}
@@ -418,7 +495,7 @@ function acSecTempos(det) {
   const nInc = acN(inc.n), nBerc = acN(berc.n)
   const desvio = inc.desvio_medio_dias
   return `<section class="ac-sec">
-    ${acSecTitle('08', 'Tempos do ciclo', 'Incubação (observado × previsto) e permanência em berçário')}
+    ${acSecTitle('09', 'Tempos do ciclo', 'Incubação (observado × previsto) e permanência em berçário')}
     <p class="ac-prosa">A <strong>duração da incubação</strong> nos quelônios de rio depende diretamente da temperatura — a faixa típica é de <strong>${ref[0]}–${ref[1]} dias</strong>; temperaturas mais altas encurtam o desenvolvimento (e feminizam a coorte, ver seção de TSD). O <strong>tempo em berçário</strong> (headstarting) prolonga a proteção até um tamanho de soltura mais seguro, com o custo de manejo e de risco sanitário em cativeiro.</p>
     <div class="ac-kpis">
       <div class="ac-kpi" style="--c:#1A6B8C"><div class="ac-kpi-v">${inc.media_dias != null ? inc.media_dias + ' d' : '—'}</div><div class="ac-kpi-l">Incubação média observada (N=${acFmt(nInc)})</div></div>
@@ -432,7 +509,7 @@ function acSecTempos(det) {
   </section>`
 }
 
-// ── 9 · Crescimento em berçário ─────────────────────────────────
+// ── 10 · Crescimento em berçário ────────────────────────────────
 function acSecCrescimento(det) {
   const c = (det && det.crescimento) || {}
   const ctx = window.BIO_CONTEXTO || {}
@@ -443,7 +520,7 @@ function acSecCrescimento(det) {
 
   if (nb === 0) {
     return `<section class="ac-sec">
-      ${acSecTitle('09', 'Crescimento em berçário', 'Taxa de crescimento, idade × tamanho e tamanho de soltura')}
+      ${acSecTitle('10', 'Crescimento em berçário', 'Taxa de crescimento, idade × tamanho e tamanho de soltura')}
       ${fundamentacao}
       <div class="ac-flag ac-flag-warn"><strong>Aguardando dados de biometria.</strong> Não há medições de comprimento/peso registradas no berçário. Esta seção — curva de crescimento no tempo e por idade, taxa de crescimento por lote e tamanho na soltura vs. faixa ideal — passa a ser calculada automaticamente assim que os monitores registrarem <em>ocorrências do tipo biometria</em> no app de campo. Recomendação: padronizar uma biometria por lote a cada 15–30 dias.</div>
       ${acMini('Régua de referência (literatura)')}
@@ -473,7 +550,7 @@ function acSecCrescimento(det) {
   }).join('')
 
   return `<section class="ac-sec">
-    ${acSecTitle('09', 'Crescimento em berçário', 'Taxa de crescimento, idade × tamanho e tamanho de soltura')}
+    ${acSecTitle('10', 'Crescimento em berçário', 'Taxa de crescimento, idade × tamanho e tamanho de soltura')}
     ${fundamentacao}
     ${acMini('Crescimento por idade (comprimento × dias desde a eclosão)')}
     <div class="ac-chart-wrap" style="height:220px"><canvas id="ac-cv-cresc"></canvas></div>
@@ -486,11 +563,11 @@ function acSecCrescimento(det) {
   </section>`
 }
 
-// ── 10 · Temperatura & determinação sexual (TSD) ────────────────
+// ── 11 · Temperatura & determinação sexual (TSD) ────────────────
 function acSecTemperatura(ana) {
   const tp = ana.temperatura || {}
   const n = acN(tp.n_amostras)
-  if (!n) return `<section class="ac-sec">${acSecTitle('10', 'Temperatura & razão sexual (TSD)')}
+  if (!n) return `<section class="ac-sec">${acSecTitle('11', 'Temperatura & razão sexual (TSD)')}
     <p class="ac-prosa">A determinação sexual dos quelônios do gênero <em>Podocnemis</em> depende da temperatura de incubação (TSD): temperaturas mais altas produzem fêmeas; mais baixas, machos. O período termossensível ocorre no terço final da incubação.</p>
     <div class="ac-flag">Sem medições de temperatura de substrato suficientes para a leitura de razão sexual. Reforçar o registro de temperatura nas visitas.</div></section>`
 
@@ -509,7 +586,7 @@ function acSecTemperatura(ana) {
   }).join('')
 
   return `<section class="ac-sec">
-    ${acSecTitle('10', 'Temperatura & razão sexual (TSD)', 'Eixo direto de mudanças climáticas sobre a estrutura populacional')}
+    ${acSecTitle('11', 'Temperatura & razão sexual (TSD)', 'Eixo direto de mudanças climáticas sobre a estrutura populacional')}
     <p class="ac-prosa">A razão sexual da coorte é definida pela temperatura no <strong>terço final da incubação</strong> (TSD Ia): acima da temperatura pivotal predominam fêmeas; abaixo, machos. O aquecimento tende a <strong>feminizar</strong> as coortes, e em <em>P. sextuberculata</em> a faixa de transição estreita (~1,2 °C) deixa pouca margem. A leitura abaixo é <strong>qualitativa</strong> — usa a temperatura média observada, não a do período termossensível.</p>
     <div class="ac-temp-grid">
       <div class="ac-chart-wrap"><canvas id="ac-cv-temp" height="160"></canvas></div>
@@ -526,14 +603,14 @@ function acSecTemperatura(ana) {
   </section>`
 }
 
-// ── 6 · Mudanças climáticas & pulso de inundação ────────────────
+// ── 12 · Mudanças climáticas & pulso de inundação ───────────────
 function acSecClima(ana, kpis) {
   const c = ana.clima || {}
   const ctx = window.BIO_CONTEXTO || {}
   const alag = acN(c.ninhos_alagados)
   const ovosAlag = acN(c.ovos_perdidos_alagamento)
   return `<section class="ac-sec">
-    ${acSecTitle('11', 'Mudanças climáticas & pulso de inundação', 'Risco hidrológico e térmico sobre o recrutamento')}
+    ${acSecTitle('12', 'Mudanças climáticas & pulso de inundação', 'Risco hidrológico e térmico sobre o recrutamento')}
     <div class="ac-clima-obs">
       <div class="ac-kpi" style="--c:${alag ? '#DC2626' : '#2A9D6F'}"><div class="ac-kpi-v">${acFmt(alag)}</div><div class="ac-kpi-l">Ninhos com sinal de alagamento (obs.)</div></div>
       <div class="ac-kpi" style="--c:#D97706"><div class="ac-kpi-v">${acFmt(ovosAlag)}</div><div class="ac-kpi-l">Ovos perdidos por alagamento (obs.)</div></div>
@@ -545,12 +622,12 @@ function acSecClima(ana, kpis) {
   </section>`
 }
 
-// ── 7 · Comparação interanual & tendências ──────────────────────
+// ── 13 · Comparação interanual & tendências ─────────────────────
 function acSecInteranual(dados) {
   const anos = dados.por_ano || []
   const multi = anos.length >= 2
   return `<section class="ac-sec">
-    ${acSecTitle('12', 'Comparação interanual & tendências', 'Linha de base sendo construída a cada temporada')}
+    ${acSecTitle('13', 'Comparação interanual & tendências', 'Linha de base sendo construída a cada temporada')}
     ${multi
       ? `<p class="ac-prosa">A série abaixo compara ninhos, filhotes e taxa de eclosão entre os anos monitorados. Tendências estatísticas robustas exigem várias temporadas; leia as variações como sinais, não como conclusões.</p>
          <div class="ac-chart-wrap"><canvas id="ac-cv-inter" height="150"></canvas></div>`
@@ -588,7 +665,7 @@ function acSecPerspectivas(kpis, ana, dados, det) {
   recs.push(['Consolidação da série', 'Manter a validação científica dos ninhos em dia para que a comparação interanual ganhe robustez nas próximas temporadas.'])
 
   return `<section class="ac-sec">
-    ${acSecTitle('13', 'Perspectivas & recomendações de manejo')}
+    ${acSecTitle('14', 'Perspectivas & recomendações de manejo')}
     <div class="ac-recs">${recs.map(([t, d]) => `<div class="ac-rec"><div class="ac-rec-t">${esc(t)}</div><div class="ac-rec-d">${esc(d)}</div></div>`).join('')}</div>
   </section>`
 }
@@ -601,7 +678,7 @@ function acSecFundamentacao(dados) {
   ;['tsd_expansa', 'clima_pulso', 'alagamento', 'pqa', 'javaes',
     'crescimento_vb', 'headstart', 'fusariose', 'falha_reprodutiva'].forEach(r => refIds.add(r))
   return `<section class="ac-sec">
-    ${acSecTitle('14', 'Fundamentação & fontes')}
+    ${acSecTitle('15', 'Fundamentação & fontes')}
     <ul class="ac-refs">${window.bioReferenciasHTML(Array.from(refIds))}</ul>
   </section>`
 }
@@ -611,7 +688,7 @@ function acSecMetodologia(kpis, ana, det) {
   const total = acN(kpis.total_ninhos)
   const nBio = acN(((det || {}).crescimento || {}).n_biometrias)
   return `<section class="ac-sec ac-metodo">
-    ${acSecTitle('15', 'Metodologia & limitações')}
+    ${acSecTitle('16', 'Metodologia & limitações')}
     <p class="ac-prosa"><strong>Fonte dos dados observados:</strong> registros de campo do Biomonitor (ninhos, visitas, eclosões, transferências, berçário) validados no sistema. <strong>Recorte por fase:</strong> a temporada é dividida em terços iguais da janela [início, fim]; cada ninho é classificado pela data de encontro/postura.</p>
     <p class="ac-prosa"><strong>Taxas e métricas:</strong> eclosão = vivos ÷ (vivos + mortos + não nascidos); mortalidade embrionária = (mortos + não nascidos) ÷ total incubado; fertilidade = ovos íntegros ÷ postura; incubação = (nascimento − encontro); permanência em berçário = (soltura − entrada); taxa de crescimento = Δcomprimento ÷ Δdias entre a primeira e a última biometria do lote; idade do filhote = data da biometria − data de nascimento.</p>
     <div class="ac-flag ac-flag-info"><strong>Limitações:</strong> N amostral atual = ${acFmt(total)} ninho(s)${nBio === 0 ? '; <strong>0 biometrias</strong> — as análises de crescimento, idade × tamanho e tamanho de soltura ainda dependem do início do registro de biometria no campo' : ''}. A leitura de razão sexual (TSD) usa a temperatura média observada, não a do período termossensível, e é apenas indicativa. A quebra de descartes por causa (evento) pode não coincidir com o total de ovos descartados por ninho, que é reconciliado na sincronização. Comparações interanuais e correlações climáticas ganham significância com mais temporadas e com a integração de dados fluviométricos externos.</p></div>
@@ -661,6 +738,28 @@ function acChartFase(ana) {
     },
     options: { responsive: true, maintainAspectRatio: false,
       scales: { y: { beginAtZero: true, grid: { color: AC_GRID } }, x: { grid: { display: false } } },
+      plugins: { legend: { position: 'bottom' } } },
+  })
+}
+
+function acChartPraias(pr) {
+  const lista = ((pr || {}).praias || []).filter(p => p.densidade_ninhos_km != null || p.densidade_ninhos_ha != null)
+  if (!lista.length) return
+  acMkChart('ac-cv-praias', {
+    type: 'bar',
+    data: {
+      labels: lista.map(p => p.nome),
+      datasets: [
+        { label: 'Ninhos / km', data: lista.map(p => p.densidade_ninhos_km != null ? Number(p.densidade_ninhos_km) : null), backgroundColor: '#1A6B8C', yAxisID: 'y' },
+        { label: 'Ninhos / ha', data: lista.map(p => p.densidade_ninhos_ha != null ? Number(p.densidade_ninhos_ha) : null), backgroundColor: '#D97706', yAxisID: 'y2' },
+      ],
+    },
+    options: { responsive: true, maintainAspectRatio: false,
+      scales: {
+        y:  { beginAtZero: true, position: 'left',  grid: { color: AC_GRID }, title: { display: true, text: 'ninhos/km' } },
+        y2: { beginAtZero: true, position: 'right', grid: { drawOnChartArea: false }, title: { display: true, text: 'ninhos/ha' } },
+        x:  { grid: { display: false } },
+      },
       plugins: { legend: { position: 'bottom' } } },
   })
 }

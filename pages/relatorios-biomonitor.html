@@ -4,7 +4,6 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>SIGUC-AC · Relatórios Biomonitor</title>
 <link rel="stylesheet" href="../css/global.css">
-<link rel="stylesheet" href="../css/relatorio-print.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="../js/observability.js"></script>
 <script src="../js/queryLogger.js"></script>
@@ -12,6 +11,7 @@
 <script src="../js/config-sistema.js"></script>
 <script src="../js/layout.js"></script>
 <script src="../js/biomonitor-timeline.js"></script>
+<script src="../js/biomonitor-pdf-fonts.js"></script>
 <script src="../js/biomonitor-relatorio-ninho.js"></script>
 <style>
 /* ── Relatório Biomonitor ── */
@@ -1856,6 +1856,12 @@
           <span class="pa-tag" style="background:#9CA3AF;color:#fff">—</span></div>`
 
     document.getElementById('painel-conteudo').innerHTML = `
+      <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
+        <button class="btn btn-secondary" onclick="bioGerarPDFPainel()" style="padding:8px 14px" title="Gerar PDF do Painel">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          Gerar PDF
+        </button>
+      </div>
       ${kpis}
       <div class="painel-grid">
         <div class="painel-card">
@@ -1957,6 +1963,161 @@
     // Berçário por espécie — taxa de soltura e crescimento (comprimento)
     grafTaxaSoltura(d.taxa_soltura_por_especie || [], 'graf-p-taxa-solt', t => espLabel(t.especie))
     grafCrescEspecie(d.crescimento_por_especie || [], 'graf-p-cresc', 'comp_medio', 'cm')
+  }
+
+  // ── PDF do Painel — mesmo motor jsPDF do relatório de ninhos (js/
+  // biomonitor-relatorio-ninho.js, já carregado nesta página), reaproveitando
+  // os gráficos Chart.js já desenhados na tela (via toBase64Image) em vez de
+  // desenhar tudo de novo — evita duplicar 6 gráficos e mantém paginação
+  // sem cortar cards/gráficos (o problema do antigo window.print()).
+  function _painelTextoFiltros() {
+    const opt = id => { const s = sel(id); return s.selectedIndex > 0 ? s.options[s.selectedIndex].text : null }
+    return [opt('fil-temporada'), opt('fil-programa'), opt('fil-localizacao'), opt('fil-uc'), opt('fil-praia')]
+      .filter(Boolean).join(' · ') || 'Todos os registros (sem filtro)'
+  }
+
+  function _painelSecaoKpis(ctx, k, alertas) {
+    const nCrit = alertas.filter(a => a.sev === 'crit').length
+    const nAlta = alertas.filter(a => a.sev === 'alta').length
+    const baixados = Math.max((k.total_ovos_postura || 0) - (k.total_ovos_viaveis || 0), 0)
+    _biopdfTitulo(ctx, 'Indicadores Gerais')
+    _biopdfTabela(ctx, {
+      head: [['Indicador', 'Valor', 'Detalhe']],
+      body: [
+        ['Ninhos monitorados', v(k.total_ninhos), `${k.pendentes || 0} encontrados · ${k.transferidos || 0} transferidos`],
+        ['Ovos viáveis', v(k.total_ovos_viaveis), `postura ${formatNum(k.total_ovos_postura || 0)} − ${formatNum(baixados)} baixados`],
+        ['Filhotes vivos', v(k.total_filhotes_vivos), `${v(k.bercario_total_soltado)} soltos via berçário`],
+        ['Sucesso de nidificação', pct(k.taxa_sucesso_nidificacao_pct), 'ninhos eclodidos ÷ monitorados'],
+        ['Alertas ativos', String(alertas.length), `${nCrit} crítico(s) · ${nAlta} alto(s)`],
+      ],
+      columnStyles: { 0: { fontStyle: 'bold', cellWidth: 55 } },
+    })
+  }
+
+  function _painelSecaoAlertas(ctx, alertas) {
+    _biopdfTitulo(ctx, 'Alertas Ativos')
+    if (!alertas.length) {
+      _biopdfParagrafoMuted(ctx, 'Nenhum alerta ativo — nenhuma eclosão atrasada, alagamento ou predação pendente nos filtros atuais.')
+      return
+    }
+    _biopdfTabela(ctx, {
+      head: [['Severidade', 'Alerta', 'Detalhe']],
+      body: alertas.map(a => [a.tag, a.t, a.d]),
+      columnStyles: { 0: { cellWidth: 20 }, 1: { cellWidth: 55 } },
+    })
+  }
+
+  function _painelSecaoEclosao(ctx) {
+    const buckets = painelEclosao()
+    _biopdfTitulo(ctx, 'Eclosão — Próximos 7 Dias')
+    if (!buckets.length) {
+      _biopdfParagrafoMuted(ctx, 'Sem eclosões previstas para os próximos 7 dias nos filtros atuais.')
+      return
+    }
+    _biopdfTabela(ctx, {
+      head: [['Faixa', 'Ninhos', 'Espécies']],
+      body: buckets.map(b => {
+        const espCnt = {}
+        b.rows.forEach(r => { const e = espLabel(r.especie); espCnt[e] = (espCnt[e] || 0) + 1 })
+        return [b.lbl, String(b.rows.length), Object.entries(espCnt).map(([e, n]) => `${e} (${n})`).join(' · ') || '—']
+      }),
+      columnStyles: { 0: { cellWidth: 28 }, 1: { cellWidth: 20 } },
+    })
+  }
+
+  // Captura os gráficos Chart.js já renderizados na tela (o usuário precisa
+  // ter aberto a aba Painel antes) como imagem, em vez de redesenhar tudo —
+  // dispensa reimplementar 6 gráficos no motor jsPDF.
+  function _painelCapturarGrafico(id) {
+    const chart = _charts[id]
+    const canvas = document.getElementById(id)
+    if (!chart || !canvas?.width) return null
+    return { dataUrl: chart.toBase64Image('image/png', 1), ratio: canvas.height / canvas.width }
+  }
+
+  function _painelSecaoGraficos(ctx, itens) {
+    const disponiveis = itens.map(it => {
+      const g = _painelCapturarGrafico(it.id)
+      return g ? { ...it, ...g } : null
+    }).filter(Boolean)
+    if (!disponiveis.length) return
+    _biopdfTitulo(ctx, 'Gráficos')
+    const { pdf } = ctx
+    const gap = 6
+    const largura = (ctx.W - BIOPDF_M * 2 - gap) / 2
+    for (let i = 0; i < disponiveis.length; i += 2) {
+      const par = disponiveis.slice(i, i + 2)
+      const legLinhas = par.map(p => pdf.splitTextToSize(p.legenda, largura))
+      const nLinhasLeg = Math.max(...legLinhas.map(l => l.length))
+      const alturaImg = Math.min(Math.max(...par.map(p => largura * p.ratio)), 75)
+      const alturaTitulo = 4 + nLinhasLeg * 3.2
+      _biopdfGarantirEspaco(ctx, alturaTitulo + alturaImg + 8)
+      par.forEach((p, j) => {
+        const x = BIOPDF_M + j * (largura + gap)
+        pdf.setFont('DMSans', 'bold'); pdf.setFontSize(8); pdf.setTextColor(...BIOPDF_COR.texto)
+        pdf.text(p.titulo, x, ctx.y)
+        pdf.setFont('DMSans', 'normal'); pdf.setFontSize(6.8); pdf.setTextColor(...BIOPDF_COR.muted2)
+        pdf.text(legLinhas[j], x, ctx.y + 3.6)
+        pdf.addImage(p.dataUrl, 'PNG', x, ctx.y + alturaTitulo, largura, alturaImg)
+      })
+      ctx.y += alturaTitulo + alturaImg + 8
+    }
+  }
+
+  window.bioGerarPDFPainel = async function() {
+    if (!_dados) { toast('Aplique os filtros para carregar o painel antes de gerar o PDF.', 'warning'); return }
+    toast('Gerando PDF…', 'info')
+    try {
+      const [cab, protocolo] = await Promise.all([getCabecalhoRelatorio(), gerarProtocolo()])
+      cab.responsavel = {
+        nome: appState.usuario?.nome_completo || appState.usuario?.email || 'Usuário',
+        cargo: appState.perfil || '', registro: '', orgao: cab.siglaSecr,
+      }
+      // Biomonitor é vinculado ao Departamento de Biodiversidade, não ao DEUC
+      // (config_sistema.departamento é global e compartilhado com o CAR).
+      cab.departamento = 'Departamento de Biodiversidade'
+      cab.siglaDep = 'DEBIO'
+      cab.gestao = ''
+
+      await _biopdfCarregarLibs()
+      const pdf = _biopdfNovoDocumento()
+      const ctx = _biopdfCtx(pdf, cab, protocolo)
+      const logos = {
+        gov: cab.logoGoverno ? await _biopdfBuscarDataURL(cab.logoGoverno) : null,
+        secr: cab.logoSecr ? await _biopdfBuscarDataURL(cab.logoSecr) : null,
+      }
+
+      ctx.ninhoAtualTxt = 'Painel Executivo'
+      _biopdfRegistrarPagina(ctx)
+      pdf.setFont('DMSans', 'bold'); pdf.setFontSize(9); pdf.setTextColor(...BIOPDF_COR.muted2)
+      pdf.text('RELATÓRIO — BIOMONITOR', BIOPDF_M, ctx.y)
+      ctx.y += 8
+      pdf.setFontSize(20); pdf.setTextColor(...BIOPDF_COR.floresta)
+      pdf.text('Painel Executivo', BIOPDF_M, ctx.y)
+      ctx.y += 7
+      _biopdfParagrafoMuted(ctx, _painelTextoFiltros())
+
+      const k = _dados.kpis || {}
+      const ag = painelAgregados()
+      const alertas = painelAlertas(ag)
+      _painelSecaoKpis(ctx, k, alertas)
+      _painelSecaoAlertas(ctx, alertas)
+      _painelSecaoEclosao(ctx)
+      _painelSecaoGraficos(ctx, [
+        { id: 'graf-p-desfecho', titulo: 'Desfecho dos ninhos', legenda: 'Distribuição por status.' },
+        { id: 'graf-p-perdas', titulo: 'Perdas de ovos por causa', legenda: 'Ovos baixados nas visitas/registro.' },
+        { id: 'graf-p-fenologia', titulo: 'Fenologia da temporada', legenda: 'Ninhos encontrados e filhotes vivos por mês.' },
+        { id: 'graf-p-ovospraia', titulo: 'Ovos por praia (top 8)', legenda: 'Postura × viáveis × perdidos.' },
+        { id: 'graf-p-taxa-solt', titulo: 'Taxa de soltura por espécie', legenda: 'Filhotes soltos ÷ entrados no berçário (%).' },
+        { id: 'graf-p-cresc', titulo: 'Crescimento por espécie', legenda: 'Comprimento médio (cm) no berçário ao longo do tempo.' },
+      ])
+      _biopdfAssinatura(ctx)
+
+      _biopdfAplicarCabecalhoRodapeGlobal(ctx, logos)
+      _biopdfAbrirPreview(pdf, `painel-biomonitor-${new Date().toISOString().slice(0, 10)}.pdf`)
+    } catch (e) {
+      toast('Erro ao gerar PDF: ' + e.message, 'error')
+    }
   }
 
   // ═══════════════════════════════════════════════════════════════

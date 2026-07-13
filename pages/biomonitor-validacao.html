@@ -5,7 +5,6 @@
 <title>SIGUC-AC · Validação de Ninhos</title>
 <link rel="stylesheet" href="../css/global.css">
 <link rel="stylesheet" href="../css/biomonitor.css">
-<link rel="stylesheet" href="../css/relatorio-print.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="../js/observability.js"></script>
 <script src="../js/queryLogger.js"></script>
@@ -14,6 +13,7 @@
 <script src="../js/layout.js"></script>
 <script src="../js/brigada-captura.js"></script>
 <script src="../js/biomonitor-timeline.js"></script>
+<script src="../js/biomonitor-pdf-fonts.js"></script>
 <script src="../js/biomonitor-relatorio-ninho.js"></script>
 </head>
 <body>
@@ -139,6 +139,20 @@
         <select class="form-control" id="fil-temporada" style="width:180px" onchange="renderLista()">
           <option value="">Todas as temporadas</option>
         </select>
+        <select class="form-control" id="fil-monitor" style="width:180px" onchange="renderLista()">
+          <option value="">Todos os monitores</option>
+        </select>
+        <select class="form-control" id="fil-grupo" style="width:180px" onchange="renderLista()">
+          <option value="">Todos os grupos</option>
+        </select>
+        <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--cinza-500)">De
+          <input type="date" class="form-control" id="fil-data-ini" style="width:145px" onchange="renderLista()">
+        </label>
+        <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--cinza-500)">Até
+          <input type="date" class="form-control" id="fil-data-fim" style="width:145px" onchange="renderLista()">
+        </label>
+        <input class="form-control" id="fil-numero" style="width:120px" placeholder="Nº (ex: 47)" oninput="renderLista()"
+          title="Selecione praia e temporada para buscar por número do ninho" disabled>
       </div>
 
       <div id="stats-bar" style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap"></div>
@@ -253,6 +267,16 @@
     sel.innerHTML = `<option value="">Todas as praias</option>` +
       praias.map(p => `<option value="${p}">${p}</option>`).join('')
 
+    const monitores = [...new Set(_ninhos.map(n => n.monitor_nome).filter(Boolean))].sort()
+    const selMon = document.getElementById('fil-monitor')
+    selMon.innerHTML = `<option value="">Todos os monitores</option>` +
+      monitores.map(m => `<option value="${esc(m)}">${esc(m)}</option>`).join('')
+
+    const grupos = [...new Set(_ninhos.map(n => n.grupo_nome).filter(Boolean))].sort()
+    const selGrupo = document.getElementById('fil-grupo')
+    selGrupo.innerHTML = `<option value="">Todos os grupos</option>` +
+      grupos.map(g => `<option value="${esc(g)}">${esc(g)}</option>`).join('')
+
     // Temporadas: default na atual (uma vez)
     const selT = document.getElementById('fil-temporada')
     if (selT && !selT._init) {
@@ -299,6 +323,22 @@
       kpisNinho
   }
 
+  // Nº do ninho (código "PRAIA-ESPÉCIE-ANO-SEQ", ex: MAC-TR-2025-047) só é
+  // único dentro da mesma praia+temporada — o sequencial reinicia a cada
+  // temporada (bioGerarNumeroNinho). Por isso o campo só habilita quando
+  // ambas estão selecionadas, e a busca digitada compara só o final numérico.
+  function _numeroSeq(numeroNinho) {
+    const m = String(numeroNinho || '').match(/(\d+)$/)
+    return m ? parseInt(m[1], 10) : null
+  }
+
+  function _atualizarFiltroNumero(praia, temp) {
+    const inp = document.getElementById('fil-numero')
+    const habilitado = !!praia && !!temp
+    inp.disabled = !habilitado
+    if (!habilitado) inp.value = ''
+  }
+
   window.renderLista = function() {
     const busca      = document.getElementById('busca')?.value.toLowerCase() || ''
     const praia      = document.getElementById('fil-praia')?.value || ''
@@ -306,6 +346,14 @@
     const status     = document.getElementById('fil-status')?.value
     const statusNinho = document.getElementById('fil-status-ninho')?.value || ''
     const temp       = document.getElementById('fil-temporada')?.value || ''
+    const monitor    = document.getElementById('fil-monitor')?.value || ''
+    const grupo      = document.getElementById('fil-grupo')?.value || ''
+    const dataIni    = document.getElementById('fil-data-ini')?.value || ''
+    const dataFim    = document.getElementById('fil-data-fim')?.value || ''
+
+    _atualizarFiltroNumero(praia, temp)
+    const numero = document.getElementById('fil-numero')?.value.trim() || ''
+    const numeroAlvo = (praia && temp && numero) ? parseInt(numero, 10) : null
 
     const lista = _ninhos.filter(n =>
       (!busca       || n.numero_ninho?.toLowerCase().includes(busca) ||
@@ -315,7 +363,12 @@
       (!especie     || n.especie === especie) &&
       (!temp        || n.temporada_id === temp) &&
       (!statusNinho || n.status === statusNinho) &&
-      (status === undefined || status === '' || n.status_validacao === status)
+      (status === undefined || status === '' || n.status_validacao === status) &&
+      (!monitor     || n.monitor_nome === monitor) &&
+      (!grupo       || n.grupo_nome === grupo) &&
+      (!dataIni     || (n.data_encontro || '') >= dataIni) &&
+      (!dataFim     || (n.data_encontro || '') <= dataFim) &&
+      (numeroAlvo == null || _numeroSeq(n.numero_ninho) === numeroAlvo)
     )
 
     const cont = document.getElementById('lista-ninhos')
