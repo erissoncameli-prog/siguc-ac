@@ -414,6 +414,24 @@
   </div>
 </div>
 
+<!-- ── Modal: Berçários da Temporada ───────────────────────── -->
+<div class="modal-overlay" id="modal-temp-bercarios">
+  <div class="modal" style="max-width:640px">
+    <div class="modal-header">
+      <div class="modal-title">Berçários da Temporada — <span id="mtb-nome"></span></div>
+      <button class="modal-close" onclick="fecharModal('temp-bercarios')">×</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:.82rem;color:var(--t2,#888);margin:0 0 10px">Marque os berçários em uso nesta temporada e defina responsável e capacidade do ciclo (opcional). O berçário é o mesmo tanque; a configuração é por temporada.</p>
+      <div id="mtb-lista"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="fecharModal('temp-bercarios')">Cancelar</button>
+      <button class="btn btn-primary" onclick="salvarTempBercarios()">Salvar</button>
+    </div>
+  </div>
+</div>
+
 <script>
 ;(async function () {
   const usuario = await carregarUsuario()
@@ -542,6 +560,9 @@
           <select class="form-control" id="fil-prog-mapa" style="width:200px" onchange="renderMapaPraias()">
             <option value="">Todos os programas</option>
           </select>
+          <select class="form-control" id="fil-temp-mapa" style="width:200px" onchange="carregarMapaPraiasTemporada()">
+            <option value="">Todas as temporadas</option>
+          </select>
           <label style="display:flex;align-items:center;gap:6px;font-size:.85rem;cursor:pointer;user-select:none">
             <input type="checkbox" id="fil-fluxo-mapa" checked onchange="renderMapaPraias()" style="width:15px;height:15px">
             Fluxo de transferências
@@ -560,14 +581,23 @@
           <select class="form-control" id="fil-uc-berc" style="width:200px" onchange="filtrarBercarios()">
             <option value="">Todas as UCs</option>
           </select>
+          <select class="form-control" id="fil-temp-berc-sel" style="width:200px" onchange="onTemporadaBercMudou()">
+          </select>
+          <button class="btn btn-secondary" onclick="gerenciarBercariosTemporada(document.getElementById('fil-temp-berc-sel').value)">
+            Configurar nesta temporada
+          </button>
           <button class="btn btn-primary" onclick="abrirModalBercario()">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             Novo Berçário
           </button>
         </div>
+        <p style="margin:0 0 12px;font-size:.82rem;color:var(--t2,#888);max-width:760px">
+          Nome, tipo, localização e UC são permanentes (o berçário é reaproveitado ano após ano). Responsável, status
+          e capacidade abaixo refletem a <strong>temporada selecionada</strong> — mudam a cada ciclo sem perder o histórico.
+        </p>
         <div class="card"><div class="table-wrap"><div class="table-scroll">
           <table><thead><tr>
-            <th>Nome</th><th>Tipo</th><th>Capacidade</th><th>Localização</th><th>Responsável</th><th>Status</th><th></th>
+            <th>Nome</th><th>Tipo</th><th>Capacidade</th><th>Localização</th><th>Responsável (temporada)</th><th>Status (temporada)</th><th></th>
           </tr></thead><tbody id="tbody-bercarios"><tr><td colspan="7" class="empty-row">Carregando...</td></tr></tbody></table>
         </div></div></div>
       </div>
@@ -596,12 +626,15 @@
             <option value="descartado">Descartados</option>
             <option value="">Todos</option>
           </select>
+          <select class="form-control" id="fil-temp-alq" style="width:200px" onchange="renderAlertas()">
+            <option value="">Todas as temporadas</option>
+          </select>
           <button class="btn btn-secondary" onclick="recarregarAlertas()">Atualizar</button>
         </div>
         <div class="card"><div class="table-wrap"><div class="table-scroll">
           <table><thead><tr>
-            <th>Severidade</th><th>Faixa</th><th>Alerta</th><th>Praia / Grupo</th><th>Providência</th><th>Quando</th><th>Status</th><th></th>
-          </tr></thead><tbody id="tbody-alertas"><tr><td colspan="8" class="empty-row">Carregando...</td></tr></tbody></table>
+            <th>Severidade</th><th>Faixa</th><th>Alerta</th><th>Praia / Grupo</th><th>Temporada</th><th>Providência</th><th>Quando</th><th>Status</th><th></th>
+          </tr></thead><tbody id="tbody-alertas"><tr><td colspan="9" class="empty-row">Carregando...</td></tr></tbody></table>
         </div></div></div>
 
         <h3 style="margin:24px 0 8px;font-size:1rem">Limiares científicos (editáveis)</h3>
@@ -626,6 +659,7 @@
   let _editGrupoId = null, _editMonitorId = null, _editPraiaId = null, _editTemporadaId = null
   let _loginMonitorId = null
   let _editBercarioId = null
+  let _tempBercariosMap = {}
 
   await carregarDados()
 
@@ -658,8 +692,15 @@
     renderMonitores()
     renderPraias()
     renderTemporadas()
-    filtrarBercarios()
+    await inicializarBercariosTemporada()
     popularSelects()
+  }
+
+  // Temporada "atual" para telas que não são de um programa específico
+  // (berçário não tem programa_id próprio): a de is_atual mais recente;
+  // senão a de maior ano_base.
+  function temporadaAtualGlobal() {
+    return _temporadas.find(t => t.is_atual) || _temporadas[0] || null
   }
 
   function popularSelects() {
@@ -790,6 +831,7 @@
       <td><span class="badge ${STATUS_CLR[t.status] || 'badge-neutral'}">${STATUS_LBL[t.status] || t.status}</span></td>
       <td style="white-space:nowrap;text-align:right">
         <button class="btn btn-sm btn-secondary" onclick="gerenciarPraiasTemporada('${t.id}')">Praias</button>
+        <button class="btn btn-sm btn-secondary" onclick="gerenciarBercariosTemporada('${t.id}')">Berçários</button>
         ${!t.is_atual && t.status !== 'arquivada' ? `<button class="btn btn-sm btn-primary" onclick="ativarTemporada('${t.id}','${esc(t.nome)}')">Ativar</button>` : ''}
         ${t.status === 'em_andamento' ? `<button class="btn btn-sm" style="background:#f59e0b22;color:#b45309;border:none;border-radius:6px;padding:4px 10px;cursor:pointer" onclick="encerrarTemporada('${t.id}','${esc(t.nome)}')">Encerrar</button>` : ''}
         <button class="btn btn-sm btn-secondary" onclick="editarTemporada('${t.id}')">Editar</button>
@@ -924,20 +966,28 @@
     ])
     _alertas = al || []
     _limiares = lim || []
+    const selTemp = document.getElementById('fil-temp-alq')
+    if (selTemp && !selTemp.dataset.pop) {
+      selTemp.dataset.pop = '1'
+      selTemp.innerHTML = '<option value="">Todas as temporadas</option>' +
+        _temporadas.map(t => `<option value="${t.id}">${esc(t.nome)}${t.is_atual ? ' (atual)' : ''}</option>`).join('')
+    }
     renderAlertas()
     renderLimiares()
   }
 
   window.renderAlertas = function() {
-    const sev = document.getElementById('fil-sev-alq')?.value || ''
-    const st  = document.getElementById('fil-status-alq')?.value
+    const sev  = document.getElementById('fil-sev-alq')?.value || ''
+    const st   = document.getElementById('fil-status-alq')?.value
+    const temp = document.getElementById('fil-temp-alq')?.value || ''
     const lista = _alertas.filter(a =>
       (!sev || a.severidade === sev) &&
+      (!temp || a.temporada_id === temp) &&
       (st === '' || st === undefined ? true :
        st === 'abertos' ? ['aberto','ciente'].includes(a.status) : a.status === st)
     )
     const tb = document.getElementById('tbody-alertas')
-    if (!lista.length) { tb.innerHTML = '<tr><td colspan="8" class="empty-row">Nenhum alerta.</td></tr>'; return }
+    if (!lista.length) { tb.innerHTML = '<tr><td colspan="9" class="empty-row">Nenhum alerta.</td></tr>'; return }
     tb.innerHTML = lista.map(a => {
       const [sl, sc] = SEV_ALQ[a.severidade] || [a.severidade, '#888']
       const [stl, stc] = STATUS_ALQ[a.status] || [a.status, '#888']
@@ -948,6 +998,7 @@
         <td style="white-space:nowrap">${esc(a.faixa)}</td>
         <td style="max-width:240px">${esc(a.titulo)}</td>
         <td style="font-size:.82rem">${esc(local)}</td>
+        <td style="font-size:.8rem;white-space:nowrap">${a.temporada_nome ? esc(a.temporada_nome) : '—'}</td>
         <td style="max-width:260px;font-size:.8rem;color:var(--t2,#888)">${esc(a.providencia || '')}</td>
         <td style="white-space:nowrap;font-size:.82rem">${formatData(a.criado_em)}</td>
         <td><span style="color:${stc};font-weight:600;font-size:.82rem">${stl}</span></td>
@@ -1101,12 +1152,16 @@
 
   // ── Aba Mapa: visão geral das praias ─────────────────────────
   let _mapaPraias = null, _mapaLayer = null, _mapaFluxoLayer = null, _mapaInit = false, _transfPraias = null
+  let _mapaPraiasData = null
 
   async function ensureMapaPraias() {
     if (!_mapaInit) {
       const sel = document.getElementById('fil-prog-mapa')
       sel.innerHTML = '<option value="">Todos os programas</option>' +
         _programas.map(p => `<option value="${p.id}">${esc(p.nome)}</option>`).join('')
+      const selTemp = document.getElementById('fil-temp-mapa')
+      selTemp.innerHTML = '<option value="">Todas as temporadas</option>' +
+        _temporadas.map(t => `<option value="${t.id}">${esc(t.nome)}${t.is_atual ? ' (atual)' : ''}</option>`).join('')
       _mapaPraias = L.map('mapa-praias', { center: [-9.0, -70.5], zoom: 6 })
       _baseSatelite().addTo(_mapaPraias)
       _mapaLayer = L.layerGroup().addTo(_mapaPraias)
@@ -1116,8 +1171,25 @@
         _transfPraias = data || []
       } catch(e) { _transfPraias = [] }
       _mapaInit = true
+      await carregarMapaPraiasTemporada()
+      return
     }
     setTimeout(() => { _mapaPraias.invalidateSize(); renderMapaPraias() }, 150)
+  }
+
+  // Recarrega os dados de praia conforme a temporada escolhida no Mapa.
+  // "Todas as temporadas" reaproveita _praias (histórico completo, já carregado);
+  // uma temporada específica busca vw_praias_biomonitor_temporada (agregado só daquele ciclo).
+  window.carregarMapaPraiasTemporada = async function() {
+    const temp = document.getElementById('fil-temp-mapa')?.value || ''
+    if (!temp) {
+      _mapaPraiasData = _praias
+    } else {
+      const { data, error } = await db.from('vw_praias_biomonitor_temporada').select('*').eq('temporada_id', temp)
+      if (error) { toast('Erro ao carregar mapa da temporada: ' + error.message, 'error'); _mapaPraiasData = [] }
+      else _mapaPraiasData = data || []
+    }
+    setTimeout(() => { if (_mapaPraias) { _mapaPraias.invalidateSize(); renderMapaPraias() } }, 50)
   }
 
   function _popupPraia(p) {
@@ -1145,7 +1217,7 @@
     const verFluxo = document.getElementById('fil-fluxo-mapa').checked
     _mapaLayer.clearLayers(); _mapaFluxoLayer.clearLayers()
 
-    const lista = _praias.filter(p => !prog || p.programa_id === prog)
+    const lista = (_mapaPraiasData || _praias).filter(p => !prog || p.programa_id === prog)
     const coordDe = {}
     let bounds = null
     const estende = b => { if (!b || !b.isValid()) return; bounds = bounds ? bounds.extend(b) : L.latLngBounds(b.getSouthWest(), b.getNorthEast()) }
@@ -1598,7 +1670,83 @@
     fecharModal('temp-praias')
   }
 
+  // ── Berçários participantes por temporada ──────────────────────
+  let _mtbTemporadaId = null
+  window.gerenciarBercariosTemporada = async function(temporadaId) {
+    if (!temporadaId) { toast('Selecione uma temporada.', 'error'); return }
+    const t = _temporadas.find(x => x.id === temporadaId); if (!t) return
+    _mtbTemporadaId = temporadaId
+    document.getElementById('mtb-nome').textContent = t.nome
+    const { data: tb } = await db.from('temporada_bercarios')
+      .select('bercario_id,ativo,responsavel_id,capacidade_max').eq('temporada_id', temporadaId)
+    const mapa = {}; (tb || []).forEach(r => mapa[r.bercario_id] = r)
+    const monOpts = m => `<option value="">Nenhum</option>` + _monitores.map(x => `<option value="${x.id}" ${m === x.id ? 'selected' : ''}>${esc(x.nome_completo)}</option>`).join('')
+    document.getElementById('mtb-lista').innerHTML = _bercarios.map(b => {
+      const cfg = mapa[b.id]
+      const ativo = cfg ? cfg.ativo : true
+      const resp  = cfg ? cfg.responsavel_id : b.responsavel_id
+      const cap   = cfg ? cfg.capacidade_max : b.capacidade_max
+      return `
+      <div style="display:flex;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid rgba(127,127,127,.15)">
+        <input type="checkbox" class="mtb-chk" data-bercario="${b.id}" ${ativo ? 'checked' : ''} style="width:18px;height:18px;flex-shrink:0">
+        <div style="flex:1;min-width:120px"><strong>${esc(b.nome)}</strong></div>
+        <select data-resp="${b.id}" style="width:170px;background:rgba(127,127,127,.08);border:1px solid rgba(127,127,127,.25);border-radius:6px;padding:5px 7px;color:inherit;font-size:.8rem">${monOpts(resp)}</select>
+        <input type="number" min="0" placeholder="cap." data-cap="${b.id}" value="${cap ?? ''}"
+          style="width:64px;background:rgba(127,127,127,.08);border:1px solid rgba(127,127,127,.25);border-radius:6px;padding:5px 7px;color:inherit;font-size:.82rem">
+      </div>`
+    }).join('')
+    document.getElementById('modal-temp-bercarios').classList.add('aberto')
+  }
+  window.salvarTempBercarios = async function() {
+    const chks = [...document.querySelectorAll('.mtb-chk')]
+    const emUso  = chks.filter(c => c.checked).map(c => c.dataset.bercario)
+    const fora   = chks.filter(c => !c.checked).map(c => c.dataset.bercario)
+    for (const bercarioId of emUso) {
+      const resp = document.querySelector(`[data-resp="${bercarioId}"]`)?.value || null
+      const cap  = document.querySelector(`[data-cap="${bercarioId}"]`)?.value
+      const { error } = await db.from('temporada_bercarios').upsert({
+        temporada_id: _mtbTemporadaId, bercario_id: bercarioId, ativo: true,
+        responsavel_id: resp, capacidade_max: cap ? parseInt(cap) : null,
+      }, { onConflict: 'temporada_id,bercario_id' })
+      if (error) { toast(error.message, 'error'); return }
+    }
+    if (fora.length) {
+      await db.from('temporada_bercarios').delete().eq('temporada_id', _mtbTemporadaId).in('bercario_id', fora)
+    }
+    toast('Berçários da temporada atualizados.', 'success')
+    fecharModal('temp-bercarios')
+    if (document.getElementById('fil-temp-berc-sel')?.value === _mtbTemporadaId) {
+      await carregarTempBercarios(_mtbTemporadaId)
+    }
+  }
+
   // ── Berçários ─────────────────────────────────────────────
+  // O cadastro (bercarios) é permanente; responsável/status/capacidade
+  // exibidos aqui são os EFETIVOS da temporada selecionada (temporada_bercarios),
+  // com fallback para o cadastro base quando a temporada ainda não tem
+  // configuração própria (ex.: temporadas antigas, anteriores a este recurso).
+  async function inicializarBercariosTemporada() {
+    const sel = document.getElementById('fil-temp-berc-sel')
+    if (!sel) { filtrarBercarios(); return }
+    sel.innerHTML = _temporadas.map(t => `<option value="${t.id}">${esc(t.nome)}${t.is_atual ? ' (atual)' : ''}</option>`).join('')
+    const atual = temporadaAtualGlobal()
+    if (atual) sel.value = atual.id
+    await carregarTempBercarios(sel.value)
+  }
+
+  async function carregarTempBercarios(temporadaId) {
+    _tempBercariosMap = {}
+    if (!temporadaId) { filtrarBercarios(); return }
+    const { data } = await db.from('temporada_bercarios').select('*').eq('temporada_id', temporadaId)
+    ;(data || []).forEach(r => { _tempBercariosMap[r.bercario_id] = r })
+    filtrarBercarios()
+  }
+
+  window.onTemporadaBercMudou = async function() {
+    const temp = document.getElementById('fil-temp-berc-sel')?.value || ''
+    await carregarTempBercarios(temp)
+  }
+
   window.filtrarBercarios = filtrarBercarios
   function filtrarBercarios() {
     const q   = (document.getElementById('busca-bercarios')?.value ?? '').toLowerCase()
@@ -1617,14 +1765,19 @@
     const TIPO_LABEL = { tanque_fibra: 'Tanque fibra', piscina_alvenaria: 'Piscina alvenaria', viveiro: 'Viveiro', outro: 'Outro' }
     tb.innerHTML = lista.map(b => {
       const uc   = _ucs.find(u => u.id === b.uc_id)
-      const resp = _monitores.find(m => m.id === b.responsavel_id)
+      const cfg  = _tempBercariosMap[b.id]
+      const naoConfigurado = !cfg
+      const ativo   = cfg ? cfg.ativo : b.status
+      const respId  = cfg ? cfg.responsavel_id : b.responsavel_id
+      const cap     = cfg ? (cfg.capacidade_max ?? b.capacidade_max) : b.capacidade_max
+      const resp = _monitores.find(m => m.id === respId)
       return `<tr>
         <td><strong>${b.nome}</strong></td>
         <td>${TIPO_LABEL[b.tipo] ?? b.tipo}</td>
-        <td>${b.capacidade_max ?? '—'}</td>
+        <td>${cap ?? '—'}</td>
         <td style="max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${b.localizacao_descricao ?? (uc ? uc.nome : '—')}</td>
         <td>${resp ? resp.nome_completo : '—'}</td>
-        <td><span class="badge ${b.status ? 'badge-success' : 'badge-secondary'}">${b.status ? 'Ativo' : 'Inativo'}</span></td>
+        <td><span class="badge ${ativo ? 'badge-success' : 'badge-secondary'}">${ativo ? 'Ativo' : 'Fora de uso'}</span>${naoConfigurado ? ' <span class="badge badge-neutral" title="Sem configuração própria nesta temporada — mostrando o cadastro base">não configurado</span>' : ''}</td>
         <td style="white-space:nowrap">
           <button class="btn btn-sm btn-secondary" onclick="editarBercario('${b.id}')">Editar</button>
         </td>
