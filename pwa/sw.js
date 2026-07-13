@@ -1,5 +1,5 @@
 // ── SIGUC Brigadas — Service Worker ───────────────────────────
-const CACHE = 'siguc-brigadas-v215'
+const CACHE = 'siguc-brigadas-v216'
 
 const APP_SHELL = [
   '/pages/brigada.html',
@@ -52,11 +52,11 @@ self.addEventListener('activate', ev => {
 self.addEventListener('fetch', ev => {
   const url = new URL(ev.request.url)
 
-  // Supabase, config de ambiente e chamadas dinâmicas de API (ex.: POST
-  // /api/overpass): network-first sem cache. Tiles GET de /api/ seguem no
-  // fluxo cache-first abaixo (bom para /api/mapbiomas-tile e /api/meteo).
-  if (url.hostname.endsWith('.supabase.co') || url.pathname === '/api/env'
-      || (url.pathname.startsWith('/api/') && ev.request.method !== 'GET')) {
+  // Supabase e qualquer chamada a /api/*: sempre network-first, sem cache.
+  // Proxies como focos-proxy (FIRMS) e prodes-proxy (desmatamento) trazem
+  // dados que mudam a qualquer momento — nunca podem ser servidos do cache
+  // do service worker, sob risco de mostrar alerta de incêndio desatualizado.
+  if (url.hostname.endsWith('.supabase.co') || url.pathname.startsWith('/api/')) {
     ev.respondWith(
       fetch(ev.request).catch(() =>
         new Response(JSON.stringify({ error: 'offline' }), {
