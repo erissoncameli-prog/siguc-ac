@@ -1,5 +1,5 @@
 // ── SIGUC Brigadas — Service Worker ───────────────────────────
-const CACHE = 'siguc-brigadas-v217'
+const CACHE = 'siguc-brigadas-v218'
 
 const APP_SHELL = [
   '/pages/brigada.html',

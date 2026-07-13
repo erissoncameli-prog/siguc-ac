@@ -2315,10 +2315,22 @@ function _renderizarCamada(c){
     style: usePalette
       ? (f) => { const n=f.properties?.name||f.properties?.Name||f.properties?.NAME||''; const fill=featFill[n]||paletaFixa[n]||'#9ca3af'; const stroke=featStroke[n]||globalStroke||fill; return {color:stroke,weight:sw,opacity:.9,fillColor:fill,fillOpacity:fo,dashArray:'5 4'}; }
       : { color:globalStroke||c.cor, weight:sw, opacity:.9, fillColor:c.cor, fillOpacity:fo, dashArray:'5 4' },
-    onEachFeature: hasNames ? (f,layer) => {
+    onEachFeature: (f,layer) => {
       const n=f.properties?.name||f.properties?.Name||f.properties?.NAME||'';
-      if(n){ layer.bindTooltip(n,{permanent:true,direction:'center',className:'subbacia-label'}); layer.on('add',()=>layer.openTooltip()); }
-    } : undefined
+      if(hasNames && n){ layer.bindTooltip(n,{permanent:true,direction:'center',className:'subbacia-label'}); layer.on('add',()=>layer.openTooltip()); }
+      const props = f.properties||{};
+      const linhas = Object.entries(props)
+        .filter(([k,v]) => k!=='name'&&k!=='Name'&&k!=='NAME' && v!==null && v!==undefined && v!=='')
+        .map(([k,v]) => `<div class="cp-row"><strong>${escHtml(k)}:</strong> <span>${escHtml(String(v))}</span></div>`).join('');
+      layer.bindPopup(`
+        <div class="camada-popup">
+          <div class="cp-header" style="background:${c.cor}">🗂 ${escHtml(c.nome)}</div>
+          <div class="cp-layer">
+            ${n?`<div class="cp-layer-nome">${escHtml(n)}</div>`:''}
+            ${linhas || '<div style="color:var(--cinza-400);font-size:11px">Sem informações adicionais</div>'}
+          </div>
+        </div>`, {className:'camada-popup-wrap', maxWidth:340});
+    }
   });
   c.layer.addTo(mapaL);
 }
