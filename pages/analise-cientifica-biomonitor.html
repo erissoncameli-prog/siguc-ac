@@ -108,8 +108,8 @@
 .ac-clima-obs { display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:10px; margin:12px 0; }
 
 /* Interanual + gráficos */
-.ac-chart-wrap { background:var(--branco); border:1px solid var(--borda); border-radius:var(--raio-lg); padding:14px; box-shadow:var(--sombra); margin:12px 0; position:relative; height:200px; }
-.ac-chart-wrap canvas { max-height:100%; }
+.ac-chart-wrap { background:var(--branco); border:1px solid var(--borda); border-radius:var(--raio-lg); padding:14px; box-shadow:var(--sombra); margin:12px 0; position:relative; height:200px; overflow:hidden; }
+.ac-chart-wrap canvas { max-width:100% !important; width:100% !important; max-height:100%; }
 
 /* Tabelas */
 .ac-table { width:100%; border-collapse:collapse; font-size:12.5px; margin:12px 0; background:var(--branco); border-radius:var(--raio-lg); overflow:hidden; box-shadow:var(--sombra); }

@@ -55,6 +55,26 @@ function acDestruirCharts() {
   _acCharts = {}
 }
 
+// Chart.js só redimensiona os canvas via ResizeObserver, que nem sempre
+// dispara na transição para o layout de impressão — sem isso o canvas
+// fica com a largura da tela e é cortado pela página impressa/PDF.
+// Forçamos um resize() explícito ao entrar e sair do modo impressão.
+let _acPrintBound = false
+function acBindPrintResize() {
+  if (_acPrintBound) return
+  _acPrintBound = true
+  const resizeTodos = () => Object.values(_acCharts).forEach(c => { try { c.resize() } catch (_) {} })
+  window.addEventListener('beforeprint', resizeTodos)
+  window.addEventListener('afterprint', resizeTodos)
+  if (window.matchMedia) {
+    const mq = window.matchMedia('print')
+    const onChange = (e) => { if (e.matches) resizeTodos() }
+    if (mq.addEventListener) mq.addEventListener('change', onChange)
+    else if (mq.addListener) mq.addListener(onChange)
+  }
+}
+acBindPrintResize()
+
 // ── Ponto de entrada — chamado por "Gerar relatório" ───────────────
 window.acAplicar = async function (filtros) {
   const el = document.getElementById('ac-conteudo')
