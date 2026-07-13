@@ -246,7 +246,10 @@
   // app de campo).
   async function montarTimelines() {
     const mapa = await bioBuscarEventosServidor(db, _ninhos)
-    _ninhos.forEach(n => { n._eventos = bioMontarHistoricoNinho(n, mapa[n.uuid_cliente]) })
+    _ninhos.forEach(n => {
+      n._eventos = bioMontarHistoricoNinho(n, mapa[n.uuid_cliente])
+      n._fotosOcorrencias = bioColetarFotosOcorrencias(n._eventos)
+    })
   }
 
   // Alertas científicos de incubação (migration 093), agrupados por ninho
@@ -377,7 +380,8 @@
     cont.innerHTML = lista.map(n => {
       const sclr = STATUS_CLR[n.status_validacao] || '#888'
       const nclr = NINHO_CLR[n.status] || '#888'
-      const temFotos = n.foto_urls?.length > 0
+      const temFotosPostura = n.foto_urls?.length > 0
+      const totalFotosOcorrencias = n._fotosOcorrencias?.length || 0
       const alertas = _alertasPorNinho[n.id] || []
       const borda = alertas.some(a => a.severidade === 'critica') ? '#ef4444'
                   : alertas.length ? '#f59e0b' : 'var(--borda)'
@@ -463,8 +467,8 @@
 
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px solid var(--borda)">
           <button class="btn btn-sm btn-secondary" onclick="bioAbrirRelatorioNinho(db,'${n.id}')">Gerar PDF</button>
-          ${temFotos ? `<button class="btn btn-sm btn-secondary" onclick='verFotos(${JSON.stringify(n.foto_urls)})'>Fotos (${n.foto_urls.length})</button>` : ''}
-          ${temFotos && podeReprocessar ? `<button class="btn btn-sm btn-secondary" onclick="reprocessarFotos('${n.id}')">Reaplicar marca d'água</button>` : ''}
+          ${totalFotosOcorrencias ? `<button class="btn btn-sm btn-secondary" onclick="verFotos('${n.id}')">Fotos (${totalFotosOcorrencias})</button>` : ''}
+          ${temFotosPostura && podeReprocessar ? `<button class="btn btn-sm btn-secondary" onclick="reprocessarFotos('${n.id}')">Reaplicar marca d'água</button>` : ''}
           ${!n.lat ? `<button class="btn btn-sm" style="background:rgba(245,158,11,.15);color:#f59e0b;border:1px solid rgba(245,158,11,.3);border-radius:6px;padding:4px 10px;cursor:pointer" onclick="abrirModalGPS('${n.id}','${esc(n.numero_ninho)}')">+ GPS</button>` : ''}
           ${n.status_validacao !== 'validado'   ? `<button class="btn btn-sm btn-primary"   onclick="validar('${n.id}')">Validar</button>` : ''}
           ${n.status_validacao !== 'rejeitado'  ? `<button class="btn btn-sm" style="background:#ef444433;color:#ef4444;border:none;border-radius:6px;padding:4px 10px;cursor:pointer" onclick="abrirRejeitar('${n.id}','${esc(n.numero_ninho)}','rejeitado')">Rejeitar</button>` : ''}
@@ -624,11 +628,76 @@
     await carregarDados()
   }
 
-  window.verFotos = function(urls) {
-    document.getElementById('fotos-grid').innerHTML = urls.map(u =>
-      `<img src="${u}" style="width:100%;border-radius:8px;object-fit:cover;aspect-ratio:4/3" loading="lazy">`
+  // Fotos de TODAS as ocorrências do ninho (localização, transferências,
+  // visitas, eclosão — ver bioColetarFotosOcorrencias), cada uma com a
+  // legenda da ocorrência que a gerou. Clique numa miniatura abre em
+  // tela cheia, com navegação entre todas as fotos da lista.
+  let _fotosNinhoAtual = []
+  window.verFotos = function(ninhoId) {
+    const n = _ninhos.find(x => x.id === ninhoId)
+    _fotosNinhoAtual = n?._fotosOcorrencias || []
+    document.getElementById('fotos-grid').innerHTML = _fotosNinhoAtual.map((f, i) => `
+      <div style="position:relative;cursor:zoom-in" onclick="bioAbrirFotoTelaCheia(${i})">
+        <img src="${esc(f.url)}" style="width:100%;height:100%;border-radius:8px;object-fit:cover;aspect-ratio:4/3;display:block" loading="lazy">
+        <span style="position:absolute;left:0;right:0;bottom:0;padding:4px 8px;font-size:.7rem;color:#fff;background:linear-gradient(transparent,rgba(0,0,0,.72));border-radius:0 0 8px 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(f.legenda)}</span>
+      </div>`
     ).join('')
     document.getElementById('modal-fotos').classList.add('aberto')
+  }
+
+  // ── Visualizador em tela cheia ──────────────────────────────────
+  let _fotoIdxAtual = -1
+  window.bioAbrirFotoTelaCheia = function(i) {
+    _fotoIdxAtual = i
+    let ov = document.getElementById('bio-foto-overlay')
+    if (!ov) {
+      ov = document.createElement('div')
+      ov.id = 'bio-foto-overlay'
+      ov.className = 'bio-foto-overlay'
+      ov.innerHTML = `
+        <button type="button" class="bio-foto-fechar" aria-label="Fechar">&times;</button>
+        <button type="button" class="bio-foto-nav bio-foto-prev" aria-label="Foto anterior">&lsaquo;</button>
+        <img class="bio-foto-img">
+        <button type="button" class="bio-foto-nav bio-foto-next" aria-label="Próxima foto">&rsaquo;</button>
+        <div class="bio-foto-legenda"></div>`
+      ov.addEventListener('click', e => { if (e.target === ov) bioFecharFotoTelaCheia() })
+      ov.querySelector('.bio-foto-fechar').addEventListener('click', bioFecharFotoTelaCheia)
+      ov.querySelector('.bio-foto-prev').addEventListener('click', () => bioNavegarFoto(-1))
+      ov.querySelector('.bio-foto-next').addEventListener('click', () => bioNavegarFoto(1))
+      document.body.appendChild(ov)
+      document.addEventListener('keydown', _bioFotoTeclado)
+    }
+    ov.classList.add('aberto')
+    bioRenderFotoAtual()
+  }
+
+  function bioRenderFotoAtual() {
+    const f = _fotosNinhoAtual[_fotoIdxAtual]
+    if (!f) return
+    const ov = document.getElementById('bio-foto-overlay')
+    ov.querySelector('.bio-foto-img').src = f.url
+    ov.querySelector('.bio-foto-legenda').textContent = f.legenda
+    const varios = _fotosNinhoAtual.length > 1
+    ov.querySelector('.bio-foto-prev').style.display = varios ? '' : 'none'
+    ov.querySelector('.bio-foto-next').style.display = varios ? '' : 'none'
+  }
+
+  function bioNavegarFoto(delta) {
+    if (!_fotosNinhoAtual.length) return
+    _fotoIdxAtual = (_fotoIdxAtual + delta + _fotosNinhoAtual.length) % _fotosNinhoAtual.length
+    bioRenderFotoAtual()
+  }
+
+  function bioFecharFotoTelaCheia() {
+    document.getElementById('bio-foto-overlay')?.classList.remove('aberto')
+  }
+
+  function _bioFotoTeclado(e) {
+    const ov = document.getElementById('bio-foto-overlay')
+    if (!ov?.classList.contains('aberto')) return
+    if (e.key === 'Escape') bioFecharFotoTelaCheia()
+    else if (e.key === 'ArrowLeft') bioNavegarFoto(-1)
+    else if (e.key === 'ArrowRight') bioNavegarFoto(1)
   }
 
   window.abrirModalGPS = function(id, numero) {

@@ -32,6 +32,7 @@ function bioEventoVisita(r) {
         : r.temperatura_ar_c != null ? `${r.temperatura_ar_c}°C` : null,
     ].filter(Boolean).join(' · '),
     detalhe: r,                                     // registro bruto p/ botão "Detalhes"
+    fotos: r.foto_urls || [],
   }
 }
 
@@ -116,10 +117,10 @@ async function bioBuscarEventosServidor(sb, ninhos) {
   try {
     const [rTransf, rVisita, rLote, rSol] = await Promise.all([
       sb.from('vw_transferencias_praia')
-        .select('ninho_id,data_transferencia,hora_transferencia,praia_destino_nome,local_destino')
+        .select('ninho_id,data_transferencia,hora_transferencia,praia_destino_nome,local_destino,foto_urls')
         .in('ninho_id', serverIds),
       sb.from('visitas_ninho')
-        .select('ninho_id,data_visita,hora_visita,status_ninho,temperatura_substrato_c,temperatura_ar_c,umidade,predacao_incubacao,ovos_predados_n,ovos_perdidos_alagamento,ovos_perdidos_erosao,ovos_perdidos_humana,causa_destruicao,sinal_alagamento,intervencao,observacoes')
+        .select('ninho_id,data_visita,hora_visita,status_ninho,temperatura_substrato_c,temperatura_ar_c,umidade,predacao_incubacao,ovos_predados_n,ovos_perdidos_alagamento,ovos_perdidos_erosao,ovos_perdidos_humana,causa_destruicao,sinal_alagamento,intervencao,observacoes,foto_urls')
         .in('ninho_id', serverIds),
       sb.from('lotes_bercario')
         .select('ninho_id,data_entrada,hora_entrada,qtd_entrada,bercario_nome')
@@ -140,6 +141,7 @@ async function bioBuscarEventosServidor(sb, ninhos) {
       data: r.data_transferencia, hora: r.hora_transferencia,
       txt: `Transferido${r.praia_destino_nome ? ' → ' + r.praia_destino_nome
         : r.local_destino ? ' → ' + r.local_destino : ''}`,
+      fotos: r.foto_urls || [],
     }))
     pushRows(rVisita, 'visita', bioEventoVisita)
     pushRows(rLote, 'bercario', r => ({
@@ -177,6 +179,7 @@ function bioMontarHistoricoNinho(n, eventosServidor) {
       tipo: 'localizacao', data: n.data_encontro, hora: n.hora_desova, registro,
       txt: `Localização · ${n.qtd_ovos} ovos na postura`
         + (registro > 0 ? ` · ${registro} descartados no registro` : ''),
+      fotos: n.foto_urls || [],
     })
   }
 
@@ -188,6 +191,7 @@ function bioMontarHistoricoNinho(n, eventosServidor) {
         n.filhotes_mortos          ? `${n.filhotes_mortos} mortos`     : null,
         n.ovos_nao_nascidos        ? `${n.ovos_nao_nascidos} não nasc.`: null,
       ].filter(Boolean).join(' · '),
+      fotos: n.eclosao_foto_urls || [],
     })
   }
 
@@ -212,6 +216,24 @@ function bioMontarHistoricoNinho(n, eventosServidor) {
   })
 
   return evs
+}
+
+// Fotos de todas as ocorrências do ninho, da localização até a
+// eclosão (escopo "até a chegada ao berçário" — lotes_bercario não
+// tem foto própria; soltura/ocorrências de berçário ficam de fora
+// por serem posteriores a esse ponto). `evs` já vem ordenado por
+// bioMontarHistoricoNinho. Cada foto herda a legenda do evento que a
+// gerou (data + txt do evento).
+const BIO_FOTOS_TIPOS_OCORRENCIA = ['localizacao', 'transf', 'visita', 'eclosao']
+function bioColetarFotosOcorrencias(evs) {
+  const fd = iso => iso ? new Date(iso + 'T12:00').toLocaleDateString('pt-BR') : ''
+  const fotos = []
+  ;(evs || []).forEach(ev => {
+    if (!BIO_FOTOS_TIPOS_OCORRENCIA.includes(ev.tipo) || !ev.fotos?.length) return
+    const legenda = [ev.txt, fd(ev.data)].filter(Boolean).join(' · ')
+    ev.fotos.forEach(url => fotos.push({ url, legenda }))
+  })
+  return fotos
 }
 
 // Renderiza o bloco colapsável de histórico (toggle + linha do tempo).
