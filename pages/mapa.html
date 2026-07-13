@@ -106,6 +106,11 @@
 .car-status-aguardando{background:#fffbeb;color:#d97706;border-color:#fde68a;}
 .car-status-analise{background:#eff6ff;color:#1d4ed8;border-color:#bfdbfe;}
 .car-status-outro{background:var(--cinza-100);color:var(--cinza-600);border-color:var(--borda);}
+.car-status-cancelado{background:#fef2f2;color:#dc2626;border-color:#fecaca;}
+.car-chip-status{cursor:pointer;font-family:'DM Sans',sans-serif;transition:opacity .15s,transform .1s;}
+.car-chip-status:hover{transform:translateY(-1px);}
+.car-chip-status.car-chip-off{opacity:.32;}
+.car-chip-todos{background:var(--cinza-100);color:var(--cinza-600);border-color:var(--borda);}
 .car-det-tab{padding:9px 14px;font-size:12px;font-weight:500;border:none;background:transparent;cursor:pointer;border-bottom:2px solid transparent;color:var(--cinza-500);font-family:'DM Sans',sans-serif;transition:all .15s;white-space:nowrap;flex:1;text-align:center;}
 .car-det-tab.ativo{color:#1F4E2C;border-bottom-color:#1F4E2C;background:#fff;}
 .car-det-tab:hover:not(.ativo){background:var(--cinza-50);}
@@ -1755,12 +1760,14 @@ function _renderDropdown(id){
         </select>
       </div>
       <div style="font-size:11px;color:var(--cinza-500)" id="car-status-txt"></div>
-      <div id="car-legenda-inline" style="display:none;gap:6px;flex-wrap:wrap">
-        <span style="font-size:10px;font-weight:700;color:var(--cinza-500);width:100%;margin-bottom:2px">LEGENDA:</span>
-        <span style="display:inline-flex;align-items:center;gap:4px;font-size:10px"><span id="car-leg-ativo" style="display:inline-block;width:14px;height:8px;border-radius:2px;background:#16a34a;border:1px solid #15803d"></span>Ativo</span>
-        <span style="display:inline-flex;align-items:center;gap:4px;font-size:10px"><span id="car-leg-aguardando" style="display:inline-block;width:14px;height:8px;border-radius:2px;background:#d97706;border:1px solid #b45309"></span>Aguardando</span>
-        <span style="display:inline-flex;align-items:center;gap:4px;font-size:10px"><span id="car-leg-analise" style="display:inline-block;width:14px;height:8px;border-radius:2px;background:#2563eb;border:1px solid #1d4ed8"></span>Em análise</span>
-        <span style="display:inline-flex;align-items:center;gap:4px;font-size:10px"><span id="car-leg-cancelado" style="display:inline-block;width:14px;height:8px;border-radius:2px;background:#dc2626;border:1px solid #b91c1c"></span>Cancelado</span>
+      <div id="car-legenda-inline" style="display:none;gap:6px;flex-wrap:wrap;align-items:center">
+        <span style="font-size:10px;font-weight:700;color:var(--cinza-500);width:100%;margin-bottom:2px">FILTRAR POR STATUS:</span>
+        <button type="button" class="car-det-badge car-status-ativo car-chip-status" data-car-chip="ativo" onclick="_carToggleChipStatus('ativo')" title="Mostrar/ocultar imóveis Ativos"><span id="car-leg-ativo" style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#16a34a"></span>Ativo <span id="car-leg-n-ativo"></span></button>
+        <button type="button" class="car-det-badge car-status-aguardando car-chip-status" data-car-chip="aguardando" onclick="_carToggleChipStatus('aguardando')" title="Mostrar/ocultar imóveis Aguardando"><span id="car-leg-aguardando" style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#d97706"></span>Aguardando <span id="car-leg-n-aguardando"></span></button>
+        <button type="button" class="car-det-badge car-status-analise car-chip-status" data-car-chip="analise" onclick="_carToggleChipStatus('analise')" title="Mostrar/ocultar imóveis Em análise"><span id="car-leg-analise" style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#2563eb"></span>Em análise <span id="car-leg-n-analise"></span></button>
+        <button type="button" class="car-det-badge car-status-cancelado car-chip-status" data-car-chip="cancelado" onclick="_carToggleChipStatus('cancelado')" title="Mostrar/ocultar imóveis Cancelados"><span id="car-leg-cancelado" style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#dc2626"></span>Cancelado <span id="car-leg-n-cancelado"></span></button>
+        <button type="button" class="car-det-badge car-status-outro car-chip-status" data-car-chip="outro" onclick="_carToggleChipStatus('outro')" title="Mostrar/ocultar outros status"><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#9ca3af"></span>Outros <span id="car-leg-n-outro"></span></button>
+        <button type="button" class="car-det-badge car-chip-status car-chip-todos" onclick="_carToggleTodosStatus()" title="Marcar/desmarcar todos">Todos</button>
       </div>
     </div>
   ` + foot;
@@ -5296,6 +5303,39 @@ function aplicarFiltroStatusCAR(){
   });
   if(_carLayer) _aplicarCamadaCAR();
   _atualizarCfgStats();
+  _atualizarLegendaInlineCAR();
+}
+
+// Chips rápidos de status no painel principal (fora do modal)
+const CAR_STATUS_KEYS = ['ativo','aguardando','analise','cancelado','outro'];
+function _carToggleChipStatus(key){
+  if(_carStatusAtivos.has(key)) _carStatusAtivos.delete(key); else _carStatusAtivos.add(key);
+  if(_carLayer) _aplicarCamadaCAR();
+  _atualizarCfgStats();
+  _atualizarLegendaInlineCAR();
+}
+function _carToggleTodosStatus(){
+  const todosAtivos = CAR_STATUS_KEYS.every(k=>_carStatusAtivos.has(k));
+  _carStatusAtivos = new Set(todosAtivos ? [] : CAR_STATUS_KEYS);
+  if(_carLayer) _aplicarCamadaCAR();
+  _atualizarCfgStats();
+  _atualizarLegendaInlineCAR();
+}
+function _atualizarLegendaInlineCAR(){
+  const leg = document.getElementById('car-legenda-inline');
+  if(!leg) return;
+  if(!_carFeatures.length){ leg.style.display='none'; return; }
+  leg.style.display='flex';
+  const porKey = {};
+  _carFeatures.forEach(f=>{ const k=_carStatusKey(f.properties?.condicao); porKey[k]=(porKey[k]||0)+1; });
+  CAR_STATUS_KEYS.forEach(k=>{
+    const n = document.getElementById('car-leg-n-'+k);
+    if(n) n.textContent = `(${(porKey[k]||0).toLocaleString('pt-BR')})`;
+    const chip = leg.querySelector(`[data-car-chip="${k}"]`);
+    if(chip) chip.classList.toggle('car-chip-off', !_carStatusAtivos.has(k));
+    const dot = document.getElementById('car-leg-'+k);
+    if(dot && _carGlobal.cores[k]) dot.style.background = _carGlobal.cores[k];
+  });
 }
 function _atualizarCfgStats(){
   const sb = document.getElementById('car-cfg-stats'); if(!sb) return;
@@ -5370,15 +5410,7 @@ function _atualizarBadgeCAR(visiveis){
     const filtrado = vis.length < all.length ? ` <span style="color:#d97706">(${vis.length.toLocaleString('pt-BR')} visíveis)</span>` : '';
     sb.innerHTML=`✅ <strong>${all.length.toLocaleString('pt-BR')}</strong> imóvel(is) · ${areaTot.toLocaleString('pt-BR',{maximumFractionDigits:0})} ha${filtrado}`;
   }
-  // Mostra legenda inline com as cores atuais
-  const leg = document.getElementById('car-legenda-inline');
-  if(leg && all.length){
-    leg.style.display='flex';
-    ['ativo','aguardando','analise','cancelado'].forEach(k=>{
-      const el=document.getElementById('car-leg-'+k);
-      if(el) el.style.background=_carGlobal.cores[k];
-    });
-  }
+  _atualizarLegendaInlineCAR();
   _atualizarCfgStats();
   _atualizarBtnAnalisarTodos();
 }
