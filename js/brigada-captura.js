@@ -90,7 +90,17 @@ async function bCameraCapturarPuro(videoEl, brigadista, gps, contexto = {}) {
 }
 
 // ── Marca d'água ──────────────────────────────────────────────
+// Cada bloco (texto, badge, logos) é isolado em seu próprio try/catch:
+// uma falha num bloco não pode apagar o que os outros já desenharam no
+// canvas. Sem isso, uma única exceção em qualquer etapa fazia o chamador
+// descartar TODO o trabalho e usar a foto original sem nenhuma marca.
 async function bCameraAguaMarca(ctx, w, h, brigadista, gps, contexto = {}) {
+  // w/h devem ser números finitos e positivos — uma imagem com dimensões
+  // inválidas (ex.: falha de decodificação) não pode gerar NaN/Infinity
+  // nos cálculos abaixo, o que faria roundRect() lançar RangeError.
+  const wSafe = Number.isFinite(w) && w > 0 ? w : 1280
+  const hSafe = Number.isFinite(h) && h > 0 ? h : 720
+
   const linhaTipo = contexto.tipoOcorrencia || null
   const linhaLocal = contexto.local || null
   const linhaNome = brigadista?.nome ?? 'Brigadista'
@@ -98,53 +108,60 @@ async function bCameraAguaMarca(ctx, w, h, brigadista, gps, contexto = {}) {
   if (contexto.brigada) partes.push(contexto.brigada)
   if (contexto.equipe)  partes.push(`Equipe ${contexto.equipe}`)
   const linhaGrupo = partes.length ? partes.join(' · ') : null
-  const linhaGps = gps
+  const linhaGps = (gps && Number.isFinite(gps.lat) && Number.isFinite(gps.lng))
     ? `${gps.lat.toFixed(5)}, ${gps.lng.toFixed(5)}`
     : 'GPS indisponível'
   const linhaData = new Date().toLocaleString('pt-BR', { timeZone: 'America/Rio_Branco' })
 
   const pad = 12
-  const fs  = Math.max(14, Math.round(h * 0.018))
-  ctx.font = `${fs}px DM Mono, monospace`
+  const fs  = Math.max(14, Math.round(hSafe * 0.018))
 
-  const linhas  = [linhaTipo, linhaLocal, linhaNome, linhaGrupo, linhaGps, linhaData].filter(Boolean)
-  const largMax = Math.max(...linhas.map(l => ctx.measureText(l).width))
-  const alturaCaixa = (fs + 4) * linhas.length + pad * 2
+  // Bloco de texto (nome/tipo/local/gps/data) — se algo aqui falhar,
+  // ainda tentamos desenhar o badge e os logos em seguida.
+  try {
+    ctx.font = `${fs}px DM Mono, monospace`
+    const linhas  = [linhaTipo, linhaLocal, linhaNome, linhaGrupo, linhaGps, linhaData].filter(Boolean)
+    const largMax = Math.max(0, ...linhas.map(l => ctx.measureText(l).width))
+    const alturaCaixa = (fs + 4) * linhas.length + pad * 2
 
-  const x = pad
-  const y = h - alturaCaixa - pad
+    const x = pad
+    const y = hSafe - alturaCaixa - pad
 
-  ctx.fillStyle = 'rgba(0,0,0,0.55)'
-  ctx.beginPath()
-  ctx.roundRect(x, y, largMax + pad * 2, alturaCaixa, 6)
-  ctx.fill()
+    ctx.fillStyle = 'rgba(0,0,0,0.55)'
+    ctx.beginPath()
+    ctx.roundRect(x, y, largMax + pad * 2, alturaCaixa, 6)
+    ctx.fill()
 
-  ctx.fillStyle = '#ffffff'
-  linhas.forEach((l, i) => {
-    // tipo de ocorrência em destaque; grupo/equipe em tom levemente diferente
-    if (l === linhaTipo) {
-      ctx.font = `bold ${fs}px DM Sans, sans-serif`
-      ctx.fillStyle = '#F0CB6A'
-    } else {
-      ctx.font = `${fs}px DM Mono, monospace`
-      ctx.fillStyle = (l === linhaLocal || l === linhaGrupo) ? '#C9E8D6' : '#ffffff'
-    }
-    ctx.fillText(l, x + pad, y + pad + fs + i * (fs + 4))
-  })
+    ctx.fillStyle = '#ffffff'
+    linhas.forEach((l, i) => {
+      // tipo de ocorrência em destaque; grupo/equipe em tom levemente diferente
+      if (l === linhaTipo) {
+        ctx.font = `bold ${fs}px DM Sans, sans-serif`
+        ctx.fillStyle = '#F0CB6A'
+      } else {
+        ctx.font = `${fs}px DM Mono, monospace`
+        ctx.fillStyle = (l === linhaLocal || l === linhaGrupo) ? '#C9E8D6' : '#ffffff'
+      }
+      ctx.fillText(l, x + pad, y + pad + fs + i * (fs + 4))
+    })
+  } catch (e) { console.warn('[marca-dagua] bloco de texto:', e) }
 
-  // SIGUC badge
-  ctx.font = `bold ${fs * 0.9}px DM Sans, sans-serif`
-  ctx.fillStyle = 'rgba(0,0,0,0.55)'
-  const badge = 'SIGUC/SEMA-AC'
-  const bw = ctx.measureText(badge).width + pad * 2
-  ctx.beginPath()
-  ctx.roundRect(w - bw - pad, pad, bw, fs + pad * 1.5, 6)
-  ctx.fill()
-  ctx.fillStyle = '#7BE0AE'
-  ctx.fillText(badge, w - bw - pad + pad, pad + fs)
+  // Badge SIGUC/SEMA-AC
+  try {
+    ctx.font = `bold ${fs * 0.9}px DM Sans, sans-serif`
+    ctx.fillStyle = 'rgba(0,0,0,0.55)'
+    const badge = 'SIGUC/SEMA-AC'
+    const bw = ctx.measureText(badge).width + pad * 2
+    ctx.beginPath()
+    ctx.roundRect(wSafe - bw - pad, pad, bw, fs + pad * 1.5, 6)
+    ctx.fill()
+    ctx.fillStyle = '#7BE0AE'
+    ctx.fillText(badge, wSafe - bw - pad + pad, pad + fs)
+  } catch (e) { console.warn('[marca-dagua] badge:', e) }
 
   // Logos institucionais — canto inferior direito, discretas
   try {
+    const w = wSafe, h = hSafe
     const logosCache = contexto.logos
       ?? (typeof bOfflineGetConfig === 'function' ? await bOfflineGetConfig('logos_cache_v2') : null)
     // [src, escala]: SEMA −40% (0.60), Acre −15% (0.85)
