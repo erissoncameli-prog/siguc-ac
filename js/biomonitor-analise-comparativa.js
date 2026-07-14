@@ -47,8 +47,15 @@ window.acAplicarComparativo = async function (temporadaIds, filtros) {
       temporada: ana.temporada || {},
     }
   })))
-    // Mais antiga → mais recente (leitura cronológica esquerda→direita)
-    .sort((a, b) => acData_ord(a.temporada.data_inicio) - acData_ord(b.temporada.data_inicio))
+    // Mais antiga → mais recente (leitura cronológica esquerda→direita).
+    // data_inicio é 'YYYY-MM-DD' — comparável como string, não como número
+    // (o bug anterior fazia `string - string` = NaN, e o sort virava no-op,
+    // deixando a ordem de clique dos chips — daí a 2026/2027 aparecer à
+    // esquerda da 2025/2026).
+    .sort((a, b) => {
+      const da = acData_ord(a.temporada.data_inicio), db = acData_ord(b.temporada.data_inicio)
+      return da < db ? -1 : da > db ? 1 : 0
+    })
 
   await acCarregarChartJS()
 
