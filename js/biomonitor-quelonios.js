@@ -3457,6 +3457,9 @@ async function bioCarregarAbertos() {
         .select('id,uuid_cliente,numero_ninho,numero_atual,especie,data_encontro,hora_desova,status,status_validacao,motivo_rejeicao,qtd_ovos,ovos_integros,ovos_descartados,descartados_natural,descartados_predacao,descartados_humana,ovos_viaveis,ovos_perdidos_total,dist_rio_m,dist_rio_metodo,temperatura_c,umidade_pct,profundidade_cm,observacoes,foto_urls,lat,lng,precisao_gps_m,criado_em,praia_id,praia_nome,praia_atual_id,praia_atual_nome,monitor_id,monitor_nome,data_nascimento,filhotes_vivos,filhotes_mortos,ovos_nao_nascidos,incubacao_dias_previstos,data_prevista_eclosao,dias_para_eclosao')
         .eq('grupo_id', BioApp.monitor.grupo_id)
         .order('numero_atual', { ascending: false })
+      // Escopa à temporada atual — sem isso, ninhos de temporadas encerradas
+      // (ex.: histórico lançado no sistema) aparecem misturados na lista.
+      if (BioApp.temporadaAtual?.id) q = q.eq('temporada_id', BioApp.temporadaAtual.id)
       if (filtroStatus === 'eclodido') {
         q = q.in('status', POS_ECLOSAO)
       } else if (filtroStatus) {
@@ -3470,7 +3473,8 @@ async function bioCarregarAbertos() {
       if (error) throw error
 
       // Mescla: inclui ninhos locais pendentes que ainda não chegaram no servidor
-      const localPend = await bioOfflineListarNinhos(filtroPraia ? { praiaAtualId: filtroPraia.id } : {})
+      const localPend = (await bioOfflineListarNinhos(filtroPraia ? { praiaAtualId: filtroPraia.id } : {}))
+        .filter(n => bioNinhoNaTemporada(n, BioApp.temporadaAtual))
       const uuidsServ = new Set((data ?? []).map(n => n.uuid_cliente).filter(Boolean))
       const praias    = await bioOfflineListarPraias()
       const locaisSo  = localPend
@@ -3483,13 +3487,15 @@ async function bioCarregarAbertos() {
       console.warn('[biomonitor abertos]', e)
       estadoEl.textContent = 'Sem conexão — exibindo dados locais'
       const praias   = await bioOfflineListarPraias()
-      const localAll = await bioOfflineListarNinhos(filtroPraia ? { praiaAtualId: filtroPraia.id } : {})
+      const localAll = (await bioOfflineListarNinhos(filtroPraia ? { praiaAtualId: filtroPraia.id } : {}))
+        .filter(n => bioNinhoNaTemporada(n, BioApp.temporadaAtual))
       ninhos = localAll.filter(estaAberto).map(n => bioMapNinhoPraias(n, praias))
     }
   } else {
     estadoEl.textContent = 'Offline — exibindo dados locais'
     const praias   = await bioOfflineListarPraias()
-    const localAll = await bioOfflineListarNinhos(filtroPraia ? { praiaAtualId: filtroPraia.id } : {})
+    const localAll = (await bioOfflineListarNinhos(filtroPraia ? { praiaAtualId: filtroPraia.id } : {}))
+      .filter(n => bioNinhoNaTemporada(n, BioApp.temporadaAtual))
     ninhos = localAll.filter(estaAberto).map(n => bioMapNinhoPraias(n, praias))
   }
 
@@ -3515,7 +3521,8 @@ async function bioCarregarAbertos() {
 
 async function bioAbrirTelaHistorico() {
   const praiaId = BioApp.praiaAtual?.id
-  const ninhos  = await bioOfflineListarNinhos({ praiaId })
+  const ninhos  = (await bioOfflineListarNinhos({ praiaId }))
+    .filter(n => bioNinhoNaTemporada(n, BioApp.temporadaAtual))
   bioRenderizarListaNinhos('bio-lista-historico', ninhos, false)
   bioMostrarTela('tela-historico')
 }
@@ -3729,7 +3736,8 @@ async function bioCarregarTelaSincronizacao() {
 async function bioCarregarFilaLocal() {
   const filtroPraia = BioApp.filaFiltroPraia
   const praias  = await bioOfflineListarPraias()
-  let ninhos    = await bioOfflineListarNinhos(filtroPraia ? { praiaId: filtroPraia.id } : {})
+  let ninhos    = (await bioOfflineListarNinhos(filtroPraia ? { praiaId: filtroPraia.id } : {}))
+    .filter(n => bioNinhoNaTemporada(n, BioApp.temporadaAtual))
 
   // Busca eventos vinculados para enriquecer o status exibido
   const [transfs, ecls] = await Promise.all([
@@ -3859,7 +3867,8 @@ async function bioAtualizarCardCorrecao() {
   try {
     const todos = await bioOfflineListarNinhos({})
     n = todos.filter(x => x.status_validacao === 'em_correcao'
-      && x.status !== 'eclodido' && x.status !== 'perdido').length
+      && x.status !== 'eclodido' && x.status !== 'perdido'
+      && bioNinhoNaTemporada(x, BioApp.temporadaAtual)).length
   } catch (_) {}
   card.hidden = n === 0
   if (count) count.textContent = `${n} ninho${n !== 1 ? 's' : ''}`
@@ -4297,8 +4306,9 @@ async function bioCarregarTelaDados() {
   }
   const _tempDados = selTemp?.value || BioApp.temporadaAtual?.id || null
 
-  // Dados locais (sempre disponíveis)
-  const ninhos = await bioOfflineListarNinhos()
+  // Dados locais (sempre disponíveis) — escopados à temporada selecionada
+  const ninhos = (await bioOfflineListarNinhos())
+    .filter(n => !_tempDados || n.temporada_id === _tempDados)
   _bioSetText('bio-kpi-ninhos-local', ninhos.length)
   _bioSetText('bio-kpi-eclodidos-local', ninhos.filter(n => ['eclodido', 'em_bercario', 'soltado'].includes(n.status)).length)
 
