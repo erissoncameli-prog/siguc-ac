@@ -6614,16 +6614,18 @@ function _toggleProdesCarLayer(tipo, ativo){
     const el=document.getElementById(`prodes-toggle-${tipo}`); if(el) el.checked=false; return;
   }
 
-  _prodesCarLayers[tipo] = L.geoJSON({type:'FeatureCollection',features:feats},{
+  // Camada das manchas: cor por conformidade CF + hover com a classificação
+  // legal, borda reforçada (weight 2) para delimitar cada mancha.
+  const manchas = L.geoJSON({type:'FeatureCollection',features:feats},{
     style(feat){
       const clf = feat.properties?.clf;
       if(tipo==='anual' && clf){
         const cor = clf.cor||'#dc2626';
-        return {fillColor:cor, fillOpacity:0.55, color:cor, weight:1, opacity:0.9};
+        return {fillColor:cor, fillOpacity:0.5, color:cor, weight:2, opacity:1};
       }
       const corFill   = tipo==='anual'?'#dc2626':'#c2410c';
-      const corStroke = tipo==='anual'?'#991b1b':'#7c2d12';
-      return {fillColor:corFill, fillOpacity:0.55, color:corStroke, weight:1, opacity:0.9};
+      const corStroke = tipo==='anual'?'#7f1d1d':'#7c2d12';
+      return {fillColor:corFill, fillOpacity:0.5, color:corStroke, weight:2, opacity:1};
     },
     onEachFeature(feat,layer){
       const pr = feat.properties||{};
@@ -6636,7 +6638,19 @@ function _toggleProdesCarLayer(tipo, ativo){
         {sticky:true}
       );
     }
-  }).addTo(mapaL);
+  });
+  // Camada-rótulo (invisível, não-interativa): ano permanente nas manchas ≥ 1 ha,
+  // sem tirar o hover da camada de baixo (pointer-events desligado).
+  const grandes = feats.filter(f => Number(f.properties?.ha_calc||0) >= 1);
+  const rotulos = L.geoJSON({type:'FeatureCollection',features:grandes},{
+    interactive:false,
+    style(){ return {stroke:false, fill:false, opacity:0, fillOpacity:0}; },
+    onEachFeature(feat,layer){
+      layer.bindTooltip(String(feat.properties?.ano||''), {permanent:true, direction:'center', className:'prodes-ano-label', interactive:false});
+      layer.on('add', ()=>layer.openTooltip());
+    }
+  });
+  _prodesCarLayers[tipo] = L.featureGroup([manchas, rotulos]).addTo(mapaL);
 }
 
 function _limparProdesCarLayers(){
