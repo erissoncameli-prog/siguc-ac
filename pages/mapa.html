@@ -173,6 +173,9 @@
 /* Sub-bacia labels */
 .subbacia-label{background:rgba(255,255,255,.82)!important;border:1px solid rgba(0,0,0,.12)!important;border-radius:4px!important;font-size:11px!important;font-weight:700!important;color:#1a3c2a!important;padding:2px 7px!important;white-space:nowrap!important;pointer-events:none!important;}
 .subbacia-label::before{display:none!important;}
+/* Rótulo do ano nas manchas PRODES (análise da zona) */
+.prodes-ano-label{background:rgba(0,0,0,.72)!important;border:none!important;border-radius:4px!important;font-size:10px!important;font-weight:700!important;color:#fff!important;padding:1px 5px!important;white-space:nowrap!important;pointer-events:none!important;box-shadow:0 1px 3px rgba(0,0,0,.4)!important;}
+.prodes-ano-label::before{display:none!important;}
 /* Popup camadas */
 .leaflet-popup.camada-popup-wrap .leaflet-popup-content-wrapper{padding:0;border-radius:10px;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,.22);}
 .leaflet-popup.camada-popup-wrap .leaflet-popup-content{margin:0;min-width:200px;max-width:300px;}
@@ -1049,7 +1052,7 @@ let _zonasFiltroUC = 'todas';
 let _zonasTiposAtivos = new Set(['ZI','ZP','ZOA','ZOC','ZEX','ZPO','ZPR','ZUE','ZUP','ZUC','ZOT']);
 let _zonasSelecaoPorUC = {}; // { ucNome: Set<codigoZona> } — null = todas visíveis
 // Análise PRODES por zona de manejo (espelha o motor do CAR, sem RL/ASV)
-let _zonaFeatRegistro = new Map(); // zid → feature (repovoado a cada render)
+let _zonaFeatRegistro = new Map(); // zid estável (f.__zid) → feature; não é zerado
 let _zonaRegSeq = 0;
 const _zonaProdesCache = new Map(); // chave da zona → dados PRODES/focos
 const _prodesZonaLayers = { anual:null, hist:null, focos:null };
@@ -4873,7 +4876,6 @@ function zonasAlterarOpacidade(v){
 
 function _renderizarZonas(){
   if(_zonasLayer){ mapaL.removeLayer(_zonasLayer); _zonasLayer = null; }
-  _zonaFeatRegistro.clear(); _zonaRegSeq = 0;
   const todasFeatures = _zonasTodasFeatures();
   if(!_zonasAtivo || !todasFeatures.length){
     const stat = document.getElementById('zonas-stat'); if(stat) stat.textContent = '';
@@ -4905,7 +4907,10 @@ function _renderizarZonas(){
       const p = f.properties;
       const meta = _zonaMeta(p.zona_codigo, p._corCamada);
       const cor = meta.cor;
-      const zid = 'z' + (_zonaRegSeq++); _zonaFeatRegistro.set(zid, f);
+      // id estável por feição (persiste entre re-renders) → o botão nunca perde a referência
+      let zid = f.__zid;
+      if(!zid){ zid = 'z' + (_zonaRegSeq++); f.__zid = zid; }
+      _zonaFeatRegistro.set(zid, f);
       const ha = p.hectares ? Number(String(p.hectares).replace(',','.')).toLocaleString('pt-BR',{maximumFractionDigits:2}) : null;
       const atv = (meta.atividades||[]).map(a=>`<li style="margin-bottom:2px">${escHtml(a)}</li>`).join('');
       const rst = (meta.restricoes||[]).map(r=>`<li style="margin-bottom:2px">${escHtml(r)}</li>`).join('');
@@ -7128,12 +7133,20 @@ function _toggleProdesZonaLayer(tipo, ativo){
   const feats = src?.geojsonFeatures||[];
   if(!feats.length){ toast('Nenhum polígono PRODES nesta zona.','info'); const el=document.getElementById(`zprodes-toggle-${tipo}`); if(el) el.checked=false; return; }
   const corFill   = tipo==='anual'?'#dc2626':'#c2410c';
-  const corStroke = tipo==='anual'?'#991b1b':'#7c2d12';
+  const corStroke = tipo==='anual'?'#7f1d1d':'#7c2d12';
+  // interactive:false → o clique atravessa a mancha e reabre o popup da zona
+  // (com o botão de análise), em vez de ser capturado por ela.
   _prodesZonaLayers[tipo] = L.geoJSON({type:'FeatureCollection',features:feats},{
-    style(){ return {fillColor:corFill,fillOpacity:0.55,color:corStroke,weight:1,opacity:0.9}; },
+    interactive: false,
+    style(){ return {fillColor:corFill,fillOpacity:0.5,color:corStroke,weight:2,opacity:1,dashArray:null}; },
     onEachFeature(feat,layer){
-      const ha = Number(feat.properties?.ha_calc||0).toLocaleString('pt-BR',{maximumFractionDigits:2});
-      layer.bindTooltip(`<strong>PRODES ${tipo==='anual'?'Anual':'Pré-2008'}</strong><br>Ano: ${feat.properties?.ano||'—'}<br>Área: ${ha} ha`,{sticky:true});
+      const ano  = feat.properties?.ano || '—';
+      const haNum= Number(feat.properties?.ha_calc||0);
+      // Rótulo permanente do ano só nas manchas relevantes (≥ 1 ha) para não poluir
+      if(haNum >= 1){
+        layer.bindTooltip(String(ano), { permanent:true, direction:'center', className:'prodes-ano-label', interactive:false });
+        layer.on('add', ()=>layer.openTooltip());
+      }
     }
   }).addTo(mapaL);
 }
@@ -7187,9 +7200,25 @@ function _htmlProdesZona(d, f){
   }).join('');
 
   const focos = d.focos||{};
-  const totalFocos = (focos.historico||[]).reduce((s,r)=>s+Number(r.total||0),0) + (focos.recentes?.total||0);
+  const focosHist = (focos.historico||[]).slice().sort((a,b)=>Number(a.ano)-Number(b.ano));
+  const totalFocos = focosHist.reduce((s,r)=>s+Number(r.total||0),0) + (focos.recentes?.total||0);
   const anosProdes = new Set([...Object.keys(anual.porAno), ...Object.keys(historico.porAno)]);
-  const focosCorrel = (focos.historico||[]).filter(r=>anosProdes.has(String(r.ano)));
+  const focosCorrel = focosHist.filter(r=>anosProdes.has(String(r.ano)));
+  // Gráfico de barras dos focos por ano (correlação c/ desmatamento em vermelho)
+  const maxFocos = Math.max(...focosHist.map(r=>Number(r.total||0)), 1);
+  const barrasFocos = focosHist.map(r=>{
+    const n = Number(r.total||0); const w=(n/maxFocos*100).toFixed(1);
+    const corr = anosProdes.has(String(r.ano));
+    const cor = corr ? '#ef4444' : '#f97316';
+    return `<div style="display:flex;align-items:center;gap:6px;padding:2px 0">
+      <span style="font-size:10px;color:var(--cinza-500);width:32px;flex-shrink:0">${r.ano}</span>
+      <div style="flex:1;height:13px;background:#f3f4f6;border-radius:3px;overflow:hidden">
+        <div style="height:100%;width:${w}%;background:${cor};border-radius:3px"></div>
+      </div>
+      <span style="font-size:10px;font-weight:600;color:var(--cinza-700);width:34px;text-align:right">${n.toLocaleString('pt-BR')}</span>
+      ${corr?`<span title="Desmatamento PRODES no mesmo ano" style="font-size:9px;color:#dc2626;width:12px">⚠</span>`:`<span style="width:12px"></span>`}
+    </div>`;
+  }).join('');
 
   const verdict = semDados
     ? `<div style="padding:12px;background:#f0fdf4;border:1px solid #86efac;border-radius:var(--raio);margin-bottom:10px">
@@ -7239,6 +7268,10 @@ function _htmlProdesZona(d, f){
       <div style="font-size:10px;font-weight:700;color:#9a3412;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px">🔥 Focos de calor — INPE/FIRMS</div>
       <div style="font-size:22px;font-weight:700;color:#ea580c;line-height:1.1">${totalFocos.toLocaleString('pt-BR')}</div>
       <div style="font-size:10px;color:#9a3412">focos no entorno (jul–out, MODIS+VIIRS)${focosCorrel.length?` · <span style="color:#dc2626;font-weight:700">⚠ correlação c/ desmatamento em ${focosCorrel.length} ano(s)</span>`:''}</div>
+      ${barrasFocos?`<div style="margin-top:8px;border-top:1px solid #fed7aa;padding-top:8px">
+        <div style="font-size:9px;font-weight:700;color:#9a3412;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">Série histórica por ano · <span style="color:#ef4444">■</span> com desmatamento PRODES</div>
+        ${barrasFocos}
+      </div>`:''}
     </div>`:''}
 
     <div style="padding:8px 10px;background:var(--cinza-50);border:1px solid var(--borda);border-radius:var(--raio);margin-bottom:10px">
