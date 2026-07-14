@@ -687,6 +687,24 @@ body.mapa-imersivo .page-body{animation:none!important;transform:none!important;
   </div>
 </div>
 
+<!-- Painel lateral — Análise PRODES da Zona de Manejo -->
+<div class="car-det-panel" id="zona-prodes-panel">
+  <div class="car-det-resize-handle" id="zona-prodes-resize-handle" title="Arrastar para redimensionar"></div>
+  <div class="car-det-header">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
+      <div style="flex:1;min-width:0">
+        <h4 id="zona-prodes-titulo">🗂 Zona de Manejo — PRODES</h4>
+        <p id="zona-prodes-sub" style="font-size:10px;color:rgba(255,255,255,.65);margin-top:4px;line-height:1.3"></p>
+      </div>
+      <button onclick="fecharProdesZona()"
+        style="background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:50%;width:28px;height:28px;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;flex-shrink:0">✕</button>
+    </div>
+  </div>
+  <div class="car-det-body" id="zona-prodes-body">
+    <div style="padding:40px 0;text-align:center;color:var(--cinza-400)">Selecione uma zona e clique em “Analisar desmatamento”.</div>
+  </div>
+</div>
+
 <!-- Modal Projeto de Análise -->
 <div class="proj-overlay" id="proj-overlay" style="display:none" onclick="if(event.target===this)fecharModalProjeto()">
   <div class="proj-modal">
@@ -1030,6 +1048,12 @@ let _zonasGeojson = null, _zonasLayer = null, _zonasAtivo = false, _zonasOpacity
 let _zonasFiltroUC = 'todas';
 let _zonasTiposAtivos = new Set(['ZI','ZP','ZOA','ZOC','ZEX','ZPO','ZPR','ZUE','ZUP','ZUC','ZOT']);
 let _zonasSelecaoPorUC = {}; // { ucNome: Set<codigoZona> } — null = todas visíveis
+// Análise PRODES por zona de manejo (espelha o motor do CAR, sem RL/ASV)
+let _zonaFeatRegistro = new Map(); // zid → feature (repovoado a cada render)
+let _zonaRegSeq = 0;
+const _zonaProdesCache = new Map(); // chave da zona → dados PRODES/focos
+const _prodesZonaLayers = { anual:null, hist:null, focos:null };
+let _zonaProdesFeatAtual = null;
 let _acreEstilo = { cor:'#1F4E2C', espessura:4, opacidade:1, dashArray:'none', sombraCor:'#000000', sombraBlur:14, sombraOpacidade:0.55, sombraOffset:3 };
 let _carLayer = null, _carFeatures = [], _carCarregado = false, _carCarregando = false;
 let _carAbertoCod = null, _carUCAtual = null;
@@ -1368,6 +1392,12 @@ function renderPagina(){
                 <div style="font-size:10px;font-weight:700;color:var(--cinza-500);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">Tipo de zona:</div>
                 <div id="zonas-tipos-lista" style="display:flex;flex-direction:column;gap:3px"></div>
                 <div id="zonas-extras-lista"></div>
+                <button id="zonas-analisar-prodes" onclick="analisarProdesZonasLote()"
+                  style="margin-top:9px;width:100%;display:flex;align-items:center;justify-content:center;gap:6px;padding:8px;background:#fef2f2;border:1px solid #fca5a5;border-radius:var(--raio);font-size:12px;font-weight:600;color:#dc2626;cursor:pointer;font-family:inherit;transition:background .15s"
+                  onmouseover="this.style.background='#fee2e2'" onmouseout="this.style.background='#fef2f2'"
+                  title="Roda a análise PRODES/INPE de todas as zonas visíveis e gera um relatório consolidado com ranking de desmatamento">
+                  🌳 Analisar PRODES das zonas visíveis
+                </button>
               </div>
               <div id="zonas-stat" style="font-size:10px;color:var(--cinza-400);margin-top:6px"></div>
             </div>
@@ -4843,6 +4873,7 @@ function zonasAlterarOpacidade(v){
 
 function _renderizarZonas(){
   if(_zonasLayer){ mapaL.removeLayer(_zonasLayer); _zonasLayer = null; }
+  _zonaFeatRegistro.clear(); _zonaRegSeq = 0;
   const todasFeatures = _zonasTodasFeatures();
   if(!_zonasAtivo || !todasFeatures.length){
     const stat = document.getElementById('zonas-stat'); if(stat) stat.textContent = '';
@@ -4874,6 +4905,7 @@ function _renderizarZonas(){
       const p = f.properties;
       const meta = _zonaMeta(p.zona_codigo, p._corCamada);
       const cor = meta.cor;
+      const zid = 'z' + (_zonaRegSeq++); _zonaFeatRegistro.set(zid, f);
       const ha = p.hectares ? Number(String(p.hectares).replace(',','.')).toLocaleString('pt-BR',{maximumFractionDigits:2}) : null;
       const atv = (meta.atividades||[]).map(a=>`<li style="margin-bottom:2px">${escHtml(a)}</li>`).join('');
       const rst = (meta.restricoes||[]).map(r=>`<li style="margin-bottom:2px">${escHtml(r)}</li>`).join('');
@@ -4907,6 +4939,10 @@ function _renderizarZonas(){
             ${meta.base_legal ? `<div style="font-size:10px;color:#6b7280;border-top:1px solid #e5e7eb;padding-top:7px;line-height:1.4">
               <span style="font-weight:700">⚖ Base Legal:</span> ${escHtml(meta.base_legal)}
             </div>` : ''}
+            <button onclick="analisarProdesZona('${zid}')" style="margin-top:2px;width:100%;display:flex;align-items:center;justify-content:center;gap:6px;padding:8px;background:#fef2f2;border:1px solid #fca5a5;border-radius:6px;font-size:12px;font-weight:600;color:#dc2626;cursor:pointer;font-family:inherit;transition:background .15s"
+              onmouseover="this.style.background='#fee2e2'" onmouseout="this.style.background='#fef2f2'">
+              🌳 Analisar desmatamento (PRODES)
+            </button>
           </div>
         </div>`, {className:'camada-popup-wrap', maxWidth:360});
       layer.on('mouseover', () => layer.setStyle({weight:2.5, fillOpacity: Math.min(_zonasOpacity + 0.2, 1)}));
@@ -6847,14 +6883,14 @@ async function _marcarTodosCAR(feats){
   if(_carDetAba==='marcados') _renderCarDetBody();
 }
 
-function _abrirProgressoAnalise(total){
+function _abrirProgressoAnalise(total, titulo, subtitulo){
   document.getElementById('analise-prog-overlay')?.remove();
   const el = document.createElement('div');
   el.id = 'analise-prog-overlay';
   el.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;font-family:DM Sans,system-ui,sans-serif';
   el.innerHTML = `<div style="background:#fff;border-radius:12px;width:360px;max-width:92vw;padding:20px;box-shadow:0 20px 60px rgba(0,0,0,.25)">
-    <h3 style="margin:0 0 4px;font-size:14px;color:#0A1A0F">🔬 Analisando imóveis CAR</h3>
-    <p style="margin:0 0 12px;font-size:12px;color:#6b7280">Rodando diagnóstico e PRODES de cada imóvel…</p>
+    <h3 style="margin:0 0 4px;font-size:14px;color:#0A1A0F">${escHtml(titulo||'🔬 Analisando imóveis CAR')}</h3>
+    <p style="margin:0 0 12px;font-size:12px;color:#6b7280">${escHtml(subtitulo||'Rodando diagnóstico e PRODES de cada imóvel…')}</p>
     <div style="height:10px;background:#e5e7eb;border-radius:5px;overflow:hidden">
       <div id="analise-prog-bar" style="height:100%;width:0%;background:#2D6A4F;transition:width .2s"></div>
     </div>
@@ -6881,6 +6917,7 @@ function _cancelarAnaliseLote(){
 // ── Abrir / fechar painel ─────────────────────────────────────────────────
 async function abrirDetalhesCAR(f){
   _limparProdesCarLayers();
+  fecharProdesZona();
   _carAbertoFeat=f;
   _carAbertoCod=f.properties?.cod_imovel;
   const panel=document.getElementById('car-det-panel'); if(!panel) return;
@@ -6925,13 +6962,438 @@ function fecharDetalhesCAR(){
 }());
 
 // ══════════════════════════════════════════════════════════════
+// ANÁLISE PRODES DAS ZONAS DE MANEJO
+// Reaproveita /api/prodes-proxy + turf (mesmo motor do CAR), mas com
+// enquadramento pela regra da própria zona (SNUC/Plano de Manejo) — sem
+// Reserva Legal / Código Florestal, que valem só para o imóvel rural.
+// ══════════════════════════════════════════════════════════════
+const _ZONA_GRUPO_PROTECAO = new Set(['ZI','ZP','ZOC','ZUP','ZUE','ZUC']);
+const _ZONA_GRUPO_USO      = new Set(['ZEX','ZPR','ZPO','ZOT']);
+
+function _enquadrarZona(cod){
+  if(_ZONA_GRUPO_PROTECAO.has(cod)) return {
+    nivel:'grave', cor:'#dc2626', rotulo:'🔴 Supressão irregular',
+    texto:'Zona de proteção — a supressão de vegetação é, em regra, vedada. O desmatamento detectado tende a ser irregular e sujeito a apuração.' };
+  if(_ZONA_GRUPO_USO.has(cod)) return {
+    nivel:'atencao', cor:'#d97706', rotulo:'🟠 Verificar autorização',
+    texto:'Zona de uso sustentável — o uso é permitido, mas o PRODES detecta corte raso. Supressão sem plano de manejo aprovado é irregular.' };
+  if(cod==='ZOA') return {
+    nivel:'regulado', cor:'#ca8a04', rotulo:'🟡 Uso regulado',
+    texto:'Zona de amortecimento — atividades reguladas. Avaliar se a supressão respeitou as normas do entorno (APP/RL e Código Florestal).' };
+  return { nivel:'neutro', cor:'#6b7280', rotulo:'Sem enquadramento definido',
+    texto:'Tipo de zona sem regra específica cadastrada — avaliar caso a caso pelo Plano de Manejo.' };
+}
+
+// Chave de cache estável por feição (uc + código + bbox arredondado)
+function _zonaKey(f){
+  const p = f.properties||{};
+  let bb = '';
+  try{ bb = turf.bbox(f).map(n=>n.toFixed(3)).join(','); }catch(_){}
+  return `${p.uc_nome||''}::${p.zona_codigo||''}::${bb}`;
+}
+
+// Soma o desmatamento (ha) que cai dentro do polígono da zona, por ano
+function _prodesIntersectZona(poly, features){
+  const porAno = {}; let totalHa = 0; let nIntersect = 0;
+  const geojsonFeatures = [];
+  for(const feat of (features||[])){
+    if(!feat.geometry) continue;
+    try{
+      const inter = turf.intersect(poly, feat);
+      if(!inter) continue;
+      const ha = turf.area(inter)/10000;
+      if(ha < 0.01) continue;
+      const ano = String(feat.properties?.year||feat.properties?.ano
+        ||feat.properties?.data_detec?.slice(0,4)||'N/D');
+      porAno[ano] = (porAno[ano]||0) + ha;
+      totalHa += ha; nIntersect++;
+      geojsonFeatures.push({...inter, properties:{...feat.properties, ha_calc:ha, ano}});
+    }catch(_){}
+  }
+  return { porAno, totalHa, nIntersect, geojsonFeatures };
+}
+
+async function _fetchProdesZona(f){
+  if(!f?.geometry) return { erro:'Geometria inválida para esta zona.' };
+  if(typeof turf==='undefined' || typeof turf.bbox!=='function')
+    return { erro:'Biblioteca de cálculo espacial (Turf) indisponível. Recarregue a página.' };
+  try{
+    const bb = turf.bbox(f);
+    const bbox = [bb[0]-0.005, bb[1]-0.005, bb[2]+0.005, bb[3]+0.005];
+    const [prodesRes, focosRes] = await Promise.allSettled([
+      fetch('/api/prodes-proxy', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ bbox }), signal: AbortSignal.timeout(45000),
+      }).then(r=>r.json()),
+      _fetchFocosCAR(bbox),
+    ]);
+
+    const json = prodesRes.status==='fulfilled' ? prodesRes.value : null;
+    if(!json || json.error) throw new Error(json?.error || 'Erro PRODES');
+
+    const areaZona = parseFloat(String(f.properties?.hectares||'').replace(',','.')) || turf.area(f)/10000;
+    const anual     = _prodesIntersectZona(f, json.anual?.features);
+    const historico = _prodesIntersectZona(f, json.historico?.features);
+    const totalGeral = anual.totalHa + historico.totalHa;
+    const anosAnual  = Object.keys(anual.porAno).sort();
+    const nFeaturesAnual     = json.anual?.features?.length||0;
+    const nFeaturesHistorico = json.historico?.features?.length||0;
+    // Teto do proxy (MAX_FEAT=2000): sinaliza subestimativa em zonas grandes
+    const truncado = nFeaturesAnual>=2000 || nFeaturesHistorico>=2000;
+    const focosData = focosRes.status==='fulfilled' ? focosRes.value
+      : { historico:[], recentes:{total:0,focos:[]} };
+
+    return { anual, historico, totalGeral, anosAnual, areaZona,
+      nFeaturesAnual, nFeaturesHistorico, truncado, focos: focosData };
+  }catch(e){
+    const msg = e.name==='TimeoutError'
+      ? 'Tempo limite atingido — o servidor INPE pode estar lento. Tente novamente.'
+      : (e.message||'Erro ao consultar PRODES.');
+    return { erro: msg, link:'https://terrabrasilis.dpi.inpe.br' };
+  }
+}
+
+// ── Abrir / fechar painel da zona ─────────────────────────────────────────
+function analisarProdesZona(zid){
+  const f = _zonaFeatRegistro.get(zid);
+  if(!f){ toast('Zona não encontrada — reabra o popup e tente de novo.','warning'); return; }
+  try{ mapaL.closePopup(); }catch(_){}
+  abrirProdesZona(f);
+}
+
+function abrirProdesZona(f){
+  if(!f) return;
+  _limparProdesZonaLayers();
+  // fecha o painel do CAR para não sobrepor
+  document.getElementById('car-det-panel')?.classList.remove('aberto');
+  _zonaProdesFeatAtual = f;
+  const p = f.properties||{};
+  const meta = _zonaMeta(p.zona_codigo, p._corCamada);
+  const panel = document.getElementById('zona-prodes-panel'); if(!panel) return;
+  const tit = document.getElementById('zona-prodes-titulo');
+  const sub = document.getElementById('zona-prodes-sub');
+  if(tit) tit.innerHTML = `🗂 ${escHtml(p.zona_codigo||'')} — ${escHtml(meta.nome||p.zona_nome||'Zona')}`;
+  if(sub) sub.textContent = p.uc_nome||'';
+  panel.classList.add('aberto');
+  const bod = document.getElementById('zona-prodes-body');
+  const key = _zonaKey(f);
+  if(_zonaProdesCache.has(key)){
+    if(bod) bod.innerHTML = _htmlProdesZona(_zonaProdesCache.get(key), f);
+    return;
+  }
+  if(bod) bod.innerHTML = _htmlProdesZonaLoading();
+  _fetchProdesZona(f).then(d=>{
+    _zonaProdesCache.set(key, d);
+    if(_zonaProdesFeatAtual===f){
+      const b = document.getElementById('zona-prodes-body');
+      if(b) b.innerHTML = _htmlProdesZona(d, f);
+    }
+  });
+}
+
+function fecharProdesZona(){
+  document.getElementById('zona-prodes-panel')?.classList.remove('aberto');
+  _zonaProdesFeatAtual = null;
+  _limparProdesZonaLayers();
+}
+
+function _limparProdesZonaLayers(){
+  ['anual','hist','focos'].forEach(t=>{ if(_prodesZonaLayers[t]){ mapaL.removeLayer(_prodesZonaLayers[t]); _prodesZonaLayers[t]=null; } });
+}
+
+function _toggleProdesZonaLayer(tipo, ativo){
+  if(_prodesZonaLayers[tipo]){ mapaL.removeLayer(_prodesZonaLayers[tipo]); _prodesZonaLayers[tipo]=null; }
+  if(!ativo) return;
+  const f = _zonaProdesFeatAtual;
+  const d = f ? _zonaProdesCache.get(_zonaKey(f)) : null;
+  if(!d || d.erro){ toast('Dados PRODES não carregados.','warning'); const el=document.getElementById(`zprodes-toggle-${tipo}`); if(el) el.checked=false; return; }
+
+  if(tipo==='focos'){
+    const pts = d.focos?.recentes?.focos || [];
+    const markers = [];
+    for(const pt of pts){
+      const lat = pt.lat ?? pt.latitude, lon = pt.lon ?? pt.longitude;
+      if(lat==null || lon==null) continue;
+      try{ if(f?.geometry && !turf.booleanPointInPolygon(turf.point([lon,lat]), f)) continue; }catch(_){}
+      const m = L.circleMarker([lat,lon],{radius:5,fillColor:'#f97316',fillOpacity:0.85,color:'#9a3412',weight:1});
+      m.bindTooltip(`🔥 Foco · ${pt.acq_date||pt.ano||'—'}`,{sticky:true});
+      markers.push(m);
+    }
+    if(!markers.length){ toast('Nenhum foco recente dentro desta zona.','info'); const el=document.getElementById('zprodes-toggle-focos'); if(el) el.checked=false; return; }
+    _prodesZonaLayers.focos = L.layerGroup(markers).addTo(mapaL);
+    return;
+  }
+
+  const src = tipo==='anual' ? d.anual : d.historico;
+  const feats = src?.geojsonFeatures||[];
+  if(!feats.length){ toast('Nenhum polígono PRODES nesta zona.','info'); const el=document.getElementById(`zprodes-toggle-${tipo}`); if(el) el.checked=false; return; }
+  const corFill   = tipo==='anual'?'#dc2626':'#c2410c';
+  const corStroke = tipo==='anual'?'#991b1b':'#7c2d12';
+  _prodesZonaLayers[tipo] = L.geoJSON({type:'FeatureCollection',features:feats},{
+    style(){ return {fillColor:corFill,fillOpacity:0.55,color:corStroke,weight:1,opacity:0.9}; },
+    onEachFeature(feat,layer){
+      const ha = Number(feat.properties?.ha_calc||0).toLocaleString('pt-BR',{maximumFractionDigits:2});
+      layer.bindTooltip(`<strong>PRODES ${tipo==='anual'?'Anual':'Pré-2008'}</strong><br>Ano: ${feat.properties?.ano||'—'}<br>Área: ${ha} ha`,{sticky:true});
+    }
+  }).addTo(mapaL);
+}
+
+function _htmlProdesZonaLoading(){
+  return `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:220px;gap:12px;color:var(--cinza-500)">
+    <div style="width:28px;height:28px;border:3px solid #e5e7eb;border-top-color:#dc2626;border-radius:50%;animation:spin .8s linear infinite"></div>
+    <div style="font-size:13px;font-weight:600">Consultando PRODES/INPE…</div>
+    <div style="font-size:11px;color:var(--cinza-400);text-align:center;max-width:220px">Calculando o desmatamento dentro desta zona de manejo</div>
+  </div>`;
+}
+
+function _htmlProdesZona(d, f){
+  const p = f?.properties||{};
+  if(d?.erro) return `
+    <div style="padding:20px;display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;align-items:flex-start;gap:10px;padding:12px;background:#fef2f2;border:1px solid #fca5a5;border-radius:var(--raio)">
+        <span style="font-size:20px;flex-shrink:0">⚠️</span>
+        <div>
+          <div style="font-size:12px;font-weight:600;color:#dc2626;margin-bottom:4px">Não foi possível obter os dados</div>
+          <div style="font-size:11px;color:#6b7280;line-height:1.5">${escHtml(d.erro)}</div>
+        </div>
+      </div>
+      ${d.link?`<a href="${d.link}" target="_blank" style="font-size:11px;color:#2563eb;text-align:center">Acessar TerraBrasilis →</a>`:''}
+      <button onclick="abrirProdesZona(_zonaProdesFeatAtual)" class="btn btn-outline" style="font-size:12px">🔄 Tentar novamente</button>
+    </div>`;
+
+  const f2 = n=>Number(n||0).toLocaleString('pt-BR',{maximumFractionDigits:2});
+  const f1 = n=>Number(n||0).toLocaleString('pt-BR',{maximumFractionDigits:1});
+  const pct = (v,t)=> t>0 ? v/t*100 : 0;
+  const anual     = d.anual||{totalHa:0,porAno:{},nIntersect:0,geojsonFeatures:[]};
+  const historico = d.historico||{totalHa:0,porAno:{},nIntersect:0,geojsonFeatures:[]};
+  const pctGeral = pct(d.totalGeral||0, d.areaZona||1);
+  const pctAnual = pct(anual.totalHa, d.areaZona||1);
+  const pctHist  = pct(historico.totalHa, d.areaZona||1);
+  const corGeral = pctGeral>15?'#dc2626':pctGeral>3?'#d97706':'#16a34a';
+  const semDados = (d.totalGeral||0) < 0.01;
+  const enq  = _enquadrarZona(p.zona_codigo);
+  const meta = _zonaMeta(p.zona_codigo, p._corCamada);
+
+  const maxAnualHa = Math.max(...Object.values(anual.porAno), 0.01);
+  const barrasAnos = d.anosAnual.map(ano=>{
+    const ha = anual.porAno[ano]; const w=(ha/maxAnualHa*100).toFixed(1);
+    return `<div style="display:flex;align-items:center;gap:6px;padding:3px 0">
+      <span style="font-size:10px;color:var(--cinza-500);width:32px;flex-shrink:0">${ano}</span>
+      <div style="flex:1;height:14px;background:#f3f4f6;border-radius:3px;overflow:hidden">
+        <div style="height:100%;width:${w}%;background:#dc2626;border-radius:3px"></div>
+      </div>
+      <span style="font-size:10px;font-weight:600;color:var(--cinza-700);width:60px;text-align:right">${f2(ha)} ha</span>
+    </div>`;
+  }).join('');
+
+  const focos = d.focos||{};
+  const totalFocos = (focos.historico||[]).reduce((s,r)=>s+Number(r.total||0),0) + (focos.recentes?.total||0);
+  const anosProdes = new Set([...Object.keys(anual.porAno), ...Object.keys(historico.porAno)]);
+  const focosCorrel = (focos.historico||[]).filter(r=>anosProdes.has(String(r.ano)));
+
+  const verdict = semDados
+    ? `<div style="padding:12px;background:#f0fdf4;border:1px solid #86efac;border-radius:var(--raio);margin-bottom:10px">
+        <div style="font-size:12px;font-weight:700;color:#16a34a;margin-bottom:3px">✅ Sem desmatamento PRODES</div>
+        <div style="font-size:11px;color:#166534;line-height:1.5">Nenhum polígono de desmatamento do PRODES/INPE foi detectado dentro desta zona.</div>
+      </div>`
+    : `<div style="padding:12px;background:#fff;border:1px solid ${enq.cor}55;border-left:4px solid ${enq.cor};border-radius:var(--raio);margin-bottom:10px">
+        <div style="font-size:12px;font-weight:700;color:${enq.cor};margin-bottom:4px">${enq.rotulo}</div>
+        <div style="font-size:11px;color:#374151;line-height:1.5;margin-bottom:6px">${escHtml(enq.texto)}</div>
+        ${meta.base_legal?`<div style="font-size:10px;color:#6b7280;border-top:1px solid #e5e7eb;padding-top:6px;line-height:1.4"><span style="font-weight:700">⚖ Base:</span> ${escHtml(meta.base_legal)}</div>`:''}
+      </div>`;
+
+  return `<div style="padding:4px 0">
+    ${verdict}
+    ${d.truncado?`<div style="padding:8px 10px;background:#fffbeb;border:1px solid #fde68a;border-radius:var(--raio);font-size:10px;color:#92400e;line-height:1.5;margin-bottom:10px">
+      ⚠️ <strong>Total subestimado:</strong> esta zona é grande e atingiu o limite de 2.000 polígonos por consulta ao INPE. O número abaixo é um piso — para o valor exato consulte o TerraBrasilis diretamente.
+    </div>`:''}
+
+    <div style="margin:0 0 10px;padding:14px;background:${semDados?'#f0fdf4':'#fef2f2'};border:1px solid ${semDados?'#86efac':'#fca5a5'};border-radius:var(--raio);text-align:center">
+      <div style="font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Total desmatado — PRODES/INPE</div>
+      <div style="font-size:28px;font-weight:700;color:${semDados?'#16a34a':corGeral};line-height:1.1">${f2(d.totalGeral)} ha</div>
+      <div style="font-size:12px;color:#6b7280;margin-top:2px">${f1(pctGeral)}% da zona (${f2(d.areaZona)} ha)</div>
+      <div style="height:6px;background:#e5e7eb;border-radius:3px;overflow:hidden;margin-top:8px">
+        <div style="height:100%;width:${Math.min(100,pctGeral).toFixed(1)}%;background:${corGeral};border-radius:3px"></div>
+      </div>
+    </div>
+
+    ${semDados?'':`
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+      <div style="padding:10px 12px;background:#fff7ed;border:1px solid #fed7aa;border-radius:var(--raio)">
+        <div style="font-size:9px;font-weight:700;color:#9a3412;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">🕰 Acumulado pré-2008</div>
+        <div style="font-size:18px;font-weight:700;color:#c2410c">${f2(historico.totalHa)} ha</div>
+        <div style="font-size:10px;color:#9a3412;margin-top:2px">${f1(pctHist)}% da zona</div>
+      </div>
+      <div style="padding:10px 12px;background:#fef2f2;border:1px solid #fca5a5;border-radius:var(--raio)">
+        <div style="font-size:9px;font-weight:700;color:#991b1b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">📅 Anual 2008–hoje</div>
+        <div style="font-size:18px;font-weight:700;color:#dc2626">${f2(anual.totalHa)} ha</div>
+        <div style="font-size:10px;color:#991b1b;margin-top:2px">${f1(pctAnual)}% · ${d.anosAnual.length} ano(s)</div>
+      </div>
+    </div>
+    ${d.anosAnual.length?`<div style="padding:10px 12px;background:var(--cinza-50);border:1px solid var(--borda);border-radius:var(--raio);margin-bottom:10px">
+      <div style="font-size:10px;font-weight:700;color:var(--cinza-600);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Desmatamento anual (ha)</div>
+      ${barrasAnos}
+    </div>`:''}`}
+
+    ${totalFocos?`<div style="padding:10px 12px;background:#fff7ed;border:1px solid #fed7aa;border-radius:var(--raio);margin-bottom:10px">
+      <div style="font-size:10px;font-weight:700;color:#9a3412;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px">🔥 Focos de calor — INPE/FIRMS</div>
+      <div style="font-size:22px;font-weight:700;color:#ea580c;line-height:1.1">${totalFocos.toLocaleString('pt-BR')}</div>
+      <div style="font-size:10px;color:#9a3412">focos no entorno (jul–out, MODIS+VIIRS)${focosCorrel.length?` · <span style="color:#dc2626;font-weight:700">⚠ correlação c/ desmatamento em ${focosCorrel.length} ano(s)</span>`:''}</div>
+    </div>`:''}
+
+    <div style="padding:8px 10px;background:var(--cinza-50);border:1px solid var(--borda);border-radius:var(--raio);margin-bottom:10px">
+      <div style="font-size:10px;font-weight:700;color:var(--cinza-600);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">🗺 Exibir no mapa</div>
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:4px 0;border-bottom:1px solid var(--cinza-100)">
+        <input type="checkbox" id="zprodes-toggle-anual" style="accent-color:#dc2626;width:13px;height:13px;cursor:pointer" onchange="_toggleProdesZonaLayer('anual',this.checked)">
+        <div style="width:12px;height:12px;background:#dc2626;border-radius:2px;flex-shrink:0;opacity:.85"></div>
+        <span style="font-size:11px;color:var(--cinza-700);flex:1">Desmatamento anual (2008–hoje)</span>
+      </label>
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:4px 0;border-bottom:1px solid var(--cinza-100)">
+        <input type="checkbox" id="zprodes-toggle-hist" style="accent-color:#c2410c;width:13px;height:13px;cursor:pointer" onchange="_toggleProdesZonaLayer('hist',this.checked)">
+        <div style="width:12px;height:12px;background:#c2410c;border-radius:2px;flex-shrink:0;opacity:.85"></div>
+        <span style="font-size:11px;color:var(--cinza-700);flex:1">Acumulado pré-2008</span>
+      </label>
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:4px 0">
+        <input type="checkbox" id="zprodes-toggle-focos" style="accent-color:#f97316;width:13px;height:13px;cursor:pointer" onchange="_toggleProdesZonaLayer('focos',this.checked)">
+        <div style="width:12px;height:12px;background:#f97316;border-radius:50%;flex-shrink:0;opacity:.9"></div>
+        <span style="font-size:11px;color:var(--cinza-700);flex:1">Focos de calor recentes</span>
+      </label>
+    </div>
+
+    <div style="padding:8px 10px;background:#fffbeb;border:1px solid #fde68a;border-radius:var(--raio);font-size:10px;color:#92400e;line-height:1.5;margin-bottom:10px">
+      ⚠️ <strong>Precisão:</strong> PRODES tem resolução de 30m. Margem de 5–15%. Para uso oficial, consulte o INPE diretamente.
+    </div>
+    <div style="text-align:center;margin-top:4px">
+      <a href="https://terrabrasilis.dpi.inpe.br/app/dashboard/deforestation/biomes/amazon/increments" target="_blank" style="font-size:10px;color:#2563eb;text-decoration:none">📊 Ver painel oficial PRODES/INPE →</a>
+    </div>
+  </div>`;
+}
+
+// ── Análise em lote: PRODES de todas as zonas visíveis + ranking ──────────
+function _zonasFeaturesVisiveis(){
+  const todas = _zonasTodasFeatures();
+  const tiposAtivos = new Set(Array.from(document.querySelectorAll('[data-zona-tipo]:checked')).map(e=>e.dataset.zonaTipo));
+  return todas.filter(f=>{
+    const p = f.properties||{};
+    if(!f.geometry) return false;
+    if(_zonasFiltroUC!=='todas' && p.uc_nome!==_zonasFiltroUC) return false;
+    if(tiposAtivos.size>0 && !tiposAtivos.has(p.zona_codigo)) return false;
+    const selUC = _zonasSelecaoPorUC[p.uc_nome];
+    if(selUC && !selUC.has(p.zona_codigo)) return false;
+    return true;
+  });
+}
+
+async function analisarProdesZonasLote(){
+  if(!_zonasAtivo){ toast('Ative "Exibir zonas de manejo" primeiro.','warning'); return; }
+  const feats = _zonasFeaturesVisiveis();
+  if(!feats.length){ toast('Nenhuma zona visível para analisar.','warning'); return; }
+  const escopo = _zonasFiltroUC==='todas' ? 'de todas as UCs' : `da UC ${_zonasFiltroUC}`;
+  if(feats.length>25 && !confirm(
+      `Você vai analisar ${feats.length} zonas ${escopo}.\n\n`+
+      `Cada uma consulta o PRODES/INPE — pode levar alguns minutos. Continuar?`)) return;
+
+  _analiseLoteCancel = false;
+  _abrirProgressoAnalise(feats.length, '🌳 Analisando zonas de manejo', 'Consultando PRODES/INPE de cada zona…');
+  const resultados = [];
+  let concluidos=0, idx=0; const CONC=3;
+  async function worker(){
+    while(idx<feats.length && !_analiseLoteCancel){
+      const f = feats[idx++];
+      const key = _zonaKey(f);
+      let d = _zonaProdesCache.get(key);
+      if(!d){ try{ d = await _fetchProdesZona(f); _zonaProdesCache.set(key,d); }catch(e){ d={erro:e.message}; } }
+      if(d && !d.erro) resultados.push({ f, d });
+      concluidos++; _atualizarProgressoAnalise(concluidos, feats.length);
+    }
+  }
+  await Promise.all(Array.from({length:Math.min(CONC,feats.length)}, worker));
+  _fecharProgressoAnalise();
+  if(_analiseLoteCancel){ toast(`Análise interrompida em ${concluidos}/${feats.length}.`,'warning'); }
+  if(!resultados.length){ toast('Não foi possível analisar as zonas (falha de rede?).','error'); return; }
+  _abrirRelatorioZonasLote(resultados);
+}
+
+function _abrirRelatorioZonasLote(resultados){
+  // agrega por uc + zona_codigo (uma UC pode ter vários polígonos por zona)
+  const mapa = new Map();
+  for(const {f,d} of resultados){
+    const p = f.properties||{};
+    const k = (p.uc_nome||'')+'||'+(p.zona_codigo||'');
+    let g = mapa.get(k);
+    if(!g){ g={ uc:p.uc_nome||'—', cod:p.zona_codigo||'—', nome:_zonaMeta(p.zona_codigo,p._corCamada).nome, total:0, area:0, n:0 }; mapa.set(k,g); }
+    g.total += d.totalGeral||0; g.area += d.areaZona||0; g.n++;
+  }
+  const linhas = [...mapa.values()].sort((a,b)=>b.total-a.total);
+  const totGeral = linhas.reduce((s,l)=>s+l.total,0);
+  const f2 = n=>Number(n||0).toLocaleString('pt-BR',{maximumFractionDigits:2});
+  const f1 = n=>Number(n||0).toLocaleString('pt-BR',{maximumFractionDigits:1});
+  const escopo = _zonasFiltroUC==='todas' ? 'Todas as UCs' : _zonasFiltroUC;
+
+  const rows = linhas.map((l,i)=>{
+    const pctZ = l.area>0 ? l.total/l.area*100 : 0;
+    const cor  = l.total<0.01 ? '#16a34a' : _enquadrarZona(l.cod).cor;
+    return `<tr style="border-bottom:1px solid #eef2f7">
+      <td style="padding:7px 8px;font-size:11px;color:#6b7280;text-align:center">${i+1}</td>
+      <td style="padding:7px 8px;font-size:11px;color:#111827"><strong>${escHtml(l.cod)}</strong> — ${escHtml(l.nome)}<div style="font-size:9px;color:#9ca3af">${escHtml(l.uc)}${l.n>1?` · ${l.n} polígonos`:''}</div></td>
+      <td style="padding:7px 8px;font-size:12px;font-weight:700;color:${cor};text-align:right;white-space:nowrap">${f2(l.total)} ha</td>
+      <td style="padding:7px 8px;font-size:11px;color:#6b7280;text-align:right;white-space:nowrap">${f1(pctZ)}%</td>
+    </tr>`;
+  }).join('');
+
+  const el = document.createElement('div');
+  el.id = 'zonas-relatorio-overlay';
+  el.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;font-family:DM Sans,system-ui,sans-serif;padding:16px';
+  el.onclick = e => { if(e.target===el) el.remove(); };
+  el.innerHTML = `<div style="background:#fff;border-radius:14px;width:min(680px,96vw);max-height:88vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 16px 48px rgba(0,0,0,.32)">
+    <div class="car-cfg-header">
+      <span style="font-size:20px">🌳</span>
+      <h3>Desmatamento por Zona de Manejo — PRODES</h3>
+      <button onclick="document.getElementById('zonas-relatorio-overlay').remove()" style="background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:50%;width:28px;height:28px;cursor:pointer;font-size:15px">✕</button>
+    </div>
+    <div style="padding:14px 18px;border-bottom:1px solid var(--borda);display:flex;gap:18px;flex-wrap:wrap">
+      <div><div style="font-size:9px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.05em">Escopo</div><div style="font-size:13px;font-weight:700;color:#0A1A0F">${escHtml(escopo)}</div></div>
+      <div><div style="font-size:9px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.05em">Zonas analisadas</div><div style="font-size:13px;font-weight:700;color:#0A1A0F">${linhas.length}</div></div>
+      <div><div style="font-size:9px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.05em">Total desmatado</div><div style="font-size:13px;font-weight:700;color:#dc2626">${f2(totGeral)} ha</div></div>
+    </div>
+    <div style="flex:1;overflow-y:auto;padding:6px 12px 14px">
+      <table style="width:100%;border-collapse:collapse">
+        <thead><tr style="border-bottom:2px solid #e5e7eb">
+          <th style="padding:6px 8px;font-size:9px;color:#6b7280;text-transform:uppercase;text-align:center">#</th>
+          <th style="padding:6px 8px;font-size:9px;color:#6b7280;text-transform:uppercase;text-align:left">Zona / UC</th>
+          <th style="padding:6px 8px;font-size:9px;color:#6b7280;text-transform:uppercase;text-align:right">Desmatado</th>
+          <th style="padding:6px 8px;font-size:9px;color:#6b7280;text-transform:uppercase;text-align:right">% da zona</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+    <div style="padding:10px 18px;border-top:1px solid var(--borda);font-size:10px;color:#9ca3af;line-height:1.5">Fonte: PRODES/INPE (TerraBrasilis) · % calculado sobre a área de cada zona · Clique numa zona no mapa para o detalhamento por ano.</div>
+  </div>`;
+  document.body.appendChild(el);
+}
+
+// ── Resize do painel de zona (espelha o do CAR) ───────────────────────────
+(function _iniciarResizeZonaProdes(){
+  const handle = document.getElementById('zona-prodes-resize-handle');
+  if(!handle) return setTimeout(_iniciarResizeZonaProdes,300);
+  const panel = document.getElementById('zona-prodes-panel');
+  let dragging=false, startX=0, startW=0;
+  const saved = parseInt(localStorage.getItem(CAR_WIDTH_KEY));
+  if(saved&&saved>=280&&saved<=680) panel.style.width=saved+'px';
+  handle.addEventListener('mousedown',e=>{ dragging=true; startX=e.clientX; startW=panel.offsetWidth; handle.classList.add('dragging'); e.preventDefault(); });
+  document.addEventListener('mousemove',e=>{ if(!dragging) return; const w=Math.max(280,Math.min(680,startW-(e.clientX-startX))); panel.style.width=w+'px'; });
+  document.addEventListener('mouseup',()=>{ if(!dragging) return; dragging=false; handle.classList.remove('dragging'); localStorage.setItem(CAR_WIDTH_KEY,panel.offsetWidth); });
+}());
+
+// ══════════════════════════════════════════════════════════════
 // CLICK NO MAPA
 // ══════════════════════════════════════════════════════════════
 function onMapaClick(e){
   if(document.getElementById('car-det-panel').classList.contains('aberto')) fecharDetalhesCAR();
+  if(document.getElementById('zona-prodes-panel')?.classList.contains('aberto')) fecharProdesZona();
 }
 function vincularEventos(){
-  document.addEventListener('keydown', e => { if(e.key==='Escape') fecharDetalhesCAR(); });
+  document.addEventListener('keydown', e => { if(e.key==='Escape'){ fecharDetalhesCAR(); fecharProdesZona(); } });
   // Nota: o preenchimento das zonas no popup é feito via popup.on('add') em _renderizarUC
 }
 
