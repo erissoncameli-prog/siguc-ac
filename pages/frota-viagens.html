@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>SIGUC-AC · Frota — Agenda de Viagens</title>
+<link rel="stylesheet" href="../css/global.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../js/observability.js"></script>
+<script src="../js/queryLogger.js"></script>
+<script src="../js/config.js"></script>
+<script src="../js/layout.js"></script>
+</head>
+<body>
+<div id="app"></div>
+
+<!-- Modal Aprovar -->
+<div class="modal-overlay" id="modal-aprovar">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-header">
+      <div class="modal-title">Aprovar viagem</div>
+      <button class="modal-close" onclick="fecharModal('aprovar')">×</button>
+    </div>
+    <div class="modal-body">
+      <div id="ap-resumo" style="font-size:13px;color:#6B7280;margin-bottom:14px"></div>
+      <div class="form-group"><label class="form-label">Veículo <span class="obrig">*</span></label>
+        <select class="form-control" id="ap-veiculo"><option value="">Selecione...</option></select>
+        <div id="ap-aviso-veiculo" style="display:none;font-size:12px;color:#991B1B;margin-top:6px">Nenhum veículo disponível para esse período — todos estão ocupados ou em manutenção.</div>
+      </div>
+      <div class="form-group"><label class="form-label">Motorista <span class="obrig">*</span></label>
+        <select class="form-control" id="ap-motorista"><option value="">Selecione...</option></select></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="fecharModal('aprovar')">Cancelar</button>
+      <button class="btn btn-primary" id="btn-confirmar-aprovar" onclick="confirmarAprovar()">Aprovar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Recusar -->
+<div class="modal-overlay" id="modal-recusar">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-header">
+      <div class="modal-title">Recusar solicitação</div>
+      <button class="modal-close" onclick="fecharModal('recusar')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label">Motivo <span class="obrig">*</span></label>
+        <textarea class="form-control" id="rc-motivo" rows="3"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="fecharModal('recusar')">Voltar</button>
+      <button class="btn btn-primary" style="background:#DC2626" id="btn-confirmar-recusar" onclick="confirmarRecusar()">Recusar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Detalhe -->
+<div class="modal-overlay" id="modal-detalhe">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-header">
+      <div class="modal-title">Detalhes da viagem</div>
+      <button class="modal-close" onclick="fecharModal('detalhe')">×</button>
+    </div>
+    <div class="modal-body" id="det-corpo"></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="fecharModal('detalhe')">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let _viagens = [], _veiculos = [], _motoristas = [], _acaoId = null
+
+const STATUS_LABEL = { solicitada:'Solicitada', aprovada:'Aprovada', recusada:'Recusada',
+  em_andamento:'Em andamento', concluida:'Concluída', cancelada:'Cancelada' }
+const STATUS_BADGE = { solicitada:'badge-ouro', aprovada:'badge-blue', recusada:'badge-erro',
+  em_andamento:'badge-verde', concluida:'badge-cinza', cancelada:'badge-cinza' }
+const STATUS_VEIC_LABEL = { disponivel:'Disponível', em_viagem:'Em viagem', em_manutencao:'Em manutenção', cedido:'Cedido', baixado:'Baixado' }
+
+;(async function () {
+  const usuario = await carregarUsuario()
+  if (!usuario) { window.location.href = '../index.html'; return }
+
+  const { data: nivel } = await db.rpc('nivel_efetivo', { p_usuario: usuario.id, p_modulo_chave: 'frota' })
+  if (nivel !== 'editar') {
+    document.body.innerHTML = '<div style="padding:60px;text-align:center;font-family:\'DM Sans\',sans-serif;color:#6B7280">Apenas o setor de transporte pode acessar a agenda de aprovação.</div>'
+    return
+  }
+
+  document.getElementById('app').innerHTML =
+    gerarLayout('Frota — Agenda de Viagens', 'frota-viagens') +
+    `<div class="fade-in">
+      <div class="kpi-grid">
+        <div class="kpi-card ouro"><div class="kpi-label">Pendentes de aprovação</div><div class="kpi-valor" id="k-pend">—</div></div>
+        <div class="kpi-card azul"><div class="kpi-label">Aprovadas (aguardando saída)</div><div class="kpi-valor" id="k-aprov">—</div></div>
+        <div class="kpi-card verde"><div class="kpi-label">Em andamento</div><div class="kpi-valor" id="k-andamento">—</div></div>
+        <div class="kpi-card erro"><div class="kpi-label">Com avarias reportadas</div><div class="kpi-valor" id="k-avarias">—</div></div>
+      </div>
+      <div class="filter-bar">
+        <input class="form-control search-input" id="busca" placeholder="Buscar destino, solicitante..." oninput="renderViagens()">
+        <select class="form-control" id="fil-status" style="width:180px" onchange="renderViagens()">
+          <option value="">Todos os status</option>
+          <option value="solicitada" selected>Solicitadas</option>
+          <option value="aprovada">Aprovadas</option>
+          <option value="em_andamento">Em andamento</option>
+          <option value="concluida">Concluídas</option>
+          <option value="recusada">Recusadas</option>
+          <option value="cancelada">Canceladas</option>
+        </select>
+      </div>
+      <div class="card">
+        <div class="table-wrap"><div class="table-scroll">
+          <table>
+            <thead><tr><th>Destino</th><th>Solicitante</th><th>Período</th><th>Veículo / Motorista</th><th>Status</th><th>Ações</th></tr></thead>
+            <tbody id="tbody"><tr><td colspan="6" style="text-align:center;padding:32px;color:#9CA3AF">Carregando...</td></tr></tbody>
+          </table>
+        </div></div>
+      </div>
+    </div>` +
+    '</div></div></div>'
+
+  carregarLogosSidebar()
+  bIconsAplicar()
+  await Promise.all([carregarVeiculos(), carregarMotoristas()])
+  await carregarViagens()
+})()
+
+async function carregarVeiculos() {
+  const { data } = await db.from('frota_veiculos').select('id,placa,modelo,tipo,status')
+    .eq('ativo', true).neq('status', 'baixado').order('placa')
+  _veiculos = data || []
+}
+async function carregarMotoristas() {
+  const { data } = await db.from('frota_motoristas').select('id,nome,cnh_validade,habilitacao_fluvial_validade,status')
+    .eq('ativo', true).eq('status', 'ativo').order('nome')
+  _motoristas = data || []
+}
+
+async function carregarViagens() {
+  const { data } = await db.from('vw_frota_viagens_detalhe').select('*').order('data_saida_prevista', { ascending: false }).limit(200)
+  _viagens = data || []
+  renderKpis(); renderViagens()
+}
+
+function renderKpis() {
+  const set = (id, v) => document.getElementById(id).textContent = v
+  set('k-pend', _viagens.filter(v => v.status === 'solicitada').length)
+  set('k-aprov', _viagens.filter(v => v.status === 'aprovada').length)
+  set('k-andamento', _viagens.filter(v => v.status === 'em_andamento').length)
+  set('k-avarias', _viagens.filter(v => v.avarias).length)
+}
+
+function formatDataHora(str) {
+  if (!str) return '—'
+  return new Date(str).toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', year:'2-digit', hour:'2-digit', minute:'2-digit' })
+}
+
+function renderViagens() {
+  const q = (document.getElementById('busca')?.value || '').toLowerCase()
+  const status = document.getElementById('fil-status')?.value
+  const lista = _viagens.filter(v =>
+    (!q || `${v.destino} ${v.solicitante_nome}`.toLowerCase().includes(q)) &&
+    (!status || v.status === status))
+
+  const tbody = document.getElementById('tbody')
+  if (!lista.length) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:32px;color:#9CA3AF">Nenhuma viagem encontrada</td></tr>'; return }
+  tbody.innerHTML = lista.map(v => `
+    <tr>
+      <td><strong>${esc(v.destino)}</strong>${v.avarias ? ' <span class="badge badge-erro">Avaria</span>' : ''}</td>
+      <td style="font-size:12px">${esc(v.solicitante_nome)}${v.setor_sigla ? `<br><span style="color:#9CA3AF">${esc(v.setor_sigla)}</span>` : ''}</td>
+      <td style="font-size:12px">${formatDataHora(v.data_saida_prevista)}<br>até ${formatDataHora(v.data_retorno_prevista)}</td>
+      <td style="font-size:12px">${v.veiculo_placa ? `${esc(v.veiculo_modelo)} <span class="mono">(${esc(v.veiculo_placa)})</span><br>${esc(v.motorista_nome||'—')}` : '<span style="color:#9CA3AF">A definir</span>'}</td>
+      <td><span class="badge ${STATUS_BADGE[v.status]||'badge-cinza'}">${STATUS_LABEL[v.status]||v.status}</span></td>
+      <td style="white-space:nowrap">
+        ${v.status === 'solicitada' ? `
+          <button class="btn btn-xs btn-primary" onclick="abrirAprovar('${v.id}')">Aprovar</button>
+          <button class="btn btn-xs btn-ghost" style="color:#DC2626" onclick="abrirRecusar('${v.id}')">Recusar</button>
+        ` : `<button class="btn btn-xs btn-ghost" onclick="abrirDetalhe('${v.id}')">Ver</button>`}
+      </td>
+    </tr>`).join('')
+}
+
+async function abrirAprovar(id) {
+  const v = _viagens.find(x => x.id === id)
+  _acaoId = id
+  document.getElementById('ap-resumo').innerHTML =
+    `<strong>${esc(v.destino)}</strong><br>${formatDataHora(v.data_saida_prevista)} até ${formatDataHora(v.data_retorno_prevista)}<br>Solicitante: ${esc(v.solicitante_nome)}`
+  document.getElementById('ap-veiculo').innerHTML = '<option value="">Carregando disponibilidade...</option>'
+  document.getElementById('ap-aviso-veiculo').style.display = 'none'
+  document.getElementById('ap-motorista').innerHTML = '<option value="">Selecione...</option>' +
+    _motoristas.map(x => {
+      const cnhOk = !x.cnh_validade || new Date(x.cnh_validade) >= new Date()
+      const fluvialOk = !x.habilitacao_fluvial_validade || new Date(x.habilitacao_fluvial_validade) >= new Date()
+      const apto = cnhOk && fluvialOk
+      return `<option value="${x.id}" ${apto ? '' : 'disabled'}>${esc(x.nome)}${apto ? '' : ' (habilitação vencida)'}</option>`
+    }).join('')
+  document.getElementById('modal-aprovar').classList.add('aberto')
+
+  // Veículos ocupados (em viagem/manutenção/cedidos) ou já alocados a
+  // outra viagem aprovada nesse mesmo período não entram na lista.
+  const { data: disponiveis } = await db.rpc('frota_veiculos_disponiveis', {
+    p_inicio: v.data_saida_prevista, p_fim: v.data_retorno_prevista
+  })
+  if (_acaoId !== id) return // modal trocou de viagem antes da resposta chegar
+  const idsDisponiveis = new Set((disponiveis || []).map(x => x.id))
+  document.getElementById('ap-veiculo').innerHTML = '<option value="">Selecione...</option>' +
+    _veiculos.filter(x => x.status !== 'baixado').map(x => {
+      const livre = idsDisponiveis.has(x.id)
+      return `<option value="${x.id}" ${livre ? '' : 'disabled'}>${esc(x.placa)} — ${esc(x.modelo)}${livre ? '' : ` (ocupado — ${STATUS_VEIC_LABEL[x.status] || x.status})`}</option>`
+    }).join('')
+  document.getElementById('ap-aviso-veiculo').style.display = idsDisponiveis.size ? 'none' : ''
+}
+
+async function confirmarAprovar() {
+  const veiculo_id = document.getElementById('ap-veiculo').value
+  const motorista_id = document.getElementById('ap-motorista').value
+  if (!veiculo_id || !motorista_id) { toast('Selecione veículo e motorista', 'error'); return }
+  const btn = document.getElementById('btn-confirmar-aprovar')
+  btn.disabled = true; btn.textContent = 'Aprovando...'
+  try {
+    const { error } = await db.rpc('frota_aprovar_viagem', { p_viagem_id: _acaoId, p_veiculo_id: veiculo_id, p_motorista_id: motorista_id })
+    if (error) throw error
+    toast('Viagem aprovada!', 'success')
+    fecharModal('aprovar'); await carregarViagens()
+  } catch (e) { toast(e.message || 'Erro ao aprovar', 'error') }
+  finally { btn.disabled = false; btn.textContent = 'Aprovar' }
+}
+
+function abrirRecusar(id) {
+  _acaoId = id
+  document.getElementById('rc-motivo').value = ''
+  document.getElementById('modal-recusar').classList.add('aberto')
+}
+
+async function confirmarRecusar() {
+  const motivo = document.getElementById('rc-motivo').value.trim()
+  if (!motivo) { toast('Informe o motivo da recusa', 'error'); return }
+  const btn = document.getElementById('btn-confirmar-recusar')
+  btn.disabled = true
+  try {
+    const { error } = await db.rpc('frota_recusar_viagem', { p_viagem_id: _acaoId, p_motivo: motivo })
+    if (error) throw error
+    toast('Solicitação recusada', 'success')
+    fecharModal('recusar'); await carregarViagens()
+  } catch (e) { toast(e.message || 'Erro ao recusar', 'error') }
+  finally { btn.disabled = false }
+}
+
+function abrirDetalhe(id) {
+  const v = _viagens.find(x => x.id === id)
+  document.getElementById('det-corpo').innerHTML = `
+    <div style="font-size:13px;line-height:1.8">
+      <div><strong>Destino:</strong> ${esc(v.destino)}</div>
+      <div><strong>Finalidade:</strong> ${esc(v.finalidade)}</div>
+      <div><strong>Solicitante:</strong> ${esc(v.solicitante_nome)} ${v.setor_sigla ? `(${esc(v.setor_sigla)})` : ''}</div>
+      <div><strong>Período previsto:</strong> ${formatDataHora(v.data_saida_prevista)} → ${formatDataHora(v.data_retorno_prevista)}</div>
+      ${v.veiculo_placa ? `<div><strong>Veículo:</strong> ${esc(v.veiculo_modelo)} (${esc(v.veiculo_placa)})</div>` : ''}
+      ${v.motorista_nome ? `<div><strong>Motorista:</strong> ${esc(v.motorista_nome)}</div>` : ''}
+      ${v.checkout_em ? `<div><strong>Saída registrada:</strong> ${formatDataHora(v.checkout_em)} — ${v.km_saida ? formatNum(v.km_saida)+' km' : (v.horas_saida ? formatNum(v.horas_saida,1)+' h' : '—')}</div>` : ''}
+      ${v.checkin_em ? `<div><strong>Chegada registrada:</strong> ${formatDataHora(v.checkin_em)} — ${v.km_chegada ? formatNum(v.km_chegada)+' km' : (v.horas_chegada ? formatNum(v.horas_chegada,1)+' h' : '—')}</div>` : ''}
+      ${v.observacoes_checkin ? `<div><strong>Observações:</strong> ${esc(v.observacoes_checkin)}</div>` : ''}
+      ${v.avarias ? `<div style="color:#DC2626"><strong>Avarias:</strong> ${esc(v.avarias)}</div>` : ''}
+      ${v.motivo_recusa ? `<div><strong>Motivo da recusa:</strong> ${esc(v.motivo_recusa)}</div>` : ''}
+      ${v.motivo_cancelamento ? `<div><strong>Motivo do cancelamento:</strong> ${esc(v.motivo_cancelamento)}</div>` : ''}
+    </div>`
+  document.getElementById('modal-detalhe').classList.add('aberto')
+}
+
+function fecharModal(qual) { document.getElementById(`modal-${qual}`).classList.remove('aberto'); _acaoId = null }
+</script>
+</body>
+</html>
