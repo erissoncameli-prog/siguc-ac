@@ -5,6 +5,8 @@
 <meta name="theme-color" content="#1F4E2C">
 <title>SIGUC-AC · App Frota</title>
 <link rel="manifest" href="/pwa/manifest-frota.json">
+<link rel="apple-touch-icon" href="/pwa/icons/apple-touch-icon-frota.png">
+<link rel="icon" href="/pwa/icons/icon-frota-192.png">
 <link rel="stylesheet" href="../css/global.css">
 <script>
 // Stub de segurança: se o CDN não carregar (offline), config.js não quebra.
@@ -39,6 +41,8 @@ const _frotaReady = _dbReady.then(function () {
   }
 });
 </script>
+<script src="../js/frota-offline.js"></script>
+<script src="../js/frota-sync.js"></script>
 <script src="../js/layout.js"></script>
 </head>
 <body>
@@ -420,7 +424,8 @@ function montarShellMotorista() {
         </button>
         <button class="fm-pill-btn fm-primaria" data-tab="nova" onclick="motoristaAba('nova')">${bico('plus')}<span>Viagem</span></button>
         <button class="fm-pill-btn" data-tab="historico" onclick="motoristaAba('historico')">${bico('clock')}<span>Histórico</span></button>
-        <button class="fm-pill-btn" data-tab="config" onclick="motoristaAba('config')">${bico('sliders')}<span>Config</span></button>
+        <button class="fm-pill-btn" data-tab="config" onclick="motoristaAba('config')">
+          <span class="fm-badge" id="fm-config-dot" hidden>&nbsp;</span>${bico('sliders')}<span>Config</span></button>
       </nav>
     </div>`
   carregarLogosFaixaMotorista()
@@ -449,14 +454,77 @@ async function renderModoMotorista() {
       '<div class="card" style="text-align:center;padding:40px;color:#6B7280">Você não está cadastrado como motorista no SIGUC.<br>Procure o setor de transporte para regularizar seu cadastro.</div>'
     return
   }
+  instalarGatilhosSyncFrota()
   await carregarViagensMotorista()
+  fSyncRodar()
+}
+
+// ── Offline: dispara sincronização ao reconectar/reabrir/periodicamente ─
+let _fSyncTriggersInstalados = false
+function instalarGatilhosSyncFrota() {
+  if (_fSyncTriggersInstalados) return
+  _fSyncTriggersInstalados = true
+
+  fSyncOn('confirmado', () => carregarViagensMotorista())
+  fSyncOn('sync-fim', ({ ok, erros }) => {
+    atualizarBadgePendentesSync()
+    if (ok > 0) toast(`${ok} registro(s) enviado(s) ao setor de transporte.`, 'success')
+    if (erros > 0) toast(`${erros} pendência(s) ainda não puderam ser enviadas.`, 'warning')
+  })
+  fSyncOn('erro', () => atualizarBadgePendentesSync())
+
+  window.addEventListener('online', () => fSyncRodar())
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) fSyncRodar() })
+  setInterval(() => fSyncRodar(), 45000)
+  atualizarBadgePendentesSync()
+}
+
+async function atualizarBadgePendentesSync() {
+  const n = await fOfflineContarPendentes()
+  const dot = document.getElementById('fm-config-dot')
+  if (dot) dot.hidden = n === 0
+  const cfgTxt = document.getElementById('fm-cfg-pendentes')
+  if (cfgTxt) cfgTxt.textContent = n
+}
+
+// Heurística de falha de rede (offline real ou fetch que não completou) —
+// distingue de erro de validação/negócio devolvido pelo próprio servidor.
+function fPareceOffline(e) {
+  if (!navigator.onLine) return true
+  const msg = (e?.message || '').toLowerCase()
+  return msg.includes('fetch') || msg.includes('network') || msg.includes('failed to fetch')
 }
 
 async function carregarViagensMotorista() {
-  const { data } = await db.from('vw_frota_viagens_detalhe').select('*')
-    .eq('motorista_id', _motorista.id)
-    .order('data_saida_prevista', { ascending: false }).limit(100)
+  let data = null
+  try {
+    if (!navigator.onLine) throw new Error('offline')
+    const r = await db.from('vw_frota_viagens_detalhe').select('*')
+      .eq('motorista_id', _motorista.id)
+      .order('data_saida_prevista', { ascending: false }).limit(100)
+    if (r.error) throw r.error
+    data = r.data || []
+    await fOfflineCacheViagens(data)
+  } catch (e) {
+    data = await fOfflineViagensCache()
+    if (data.length) toast('Sem conexão — mostrando última lista salva.', 'warning')
+  }
   _viagens = data || []
+
+  // Anexa viagens avulsas abertas offline e ainda não sincronizadas,
+  // pra o motorista continuar vendo/concluindo mesmo sem rede.
+  const pendentesDireta = await fOfflineListarPendentes()
+  pendentesDireta.filter(a => a.tipo === 'abrir_direta').forEach(a => {
+    if (_viagens.some(v => v.id === a.uuid_cliente)) return
+    const veic = _veiculosDisponiveisAgora.find(v => v.id === a.payload.p_veiculo_id)
+    _viagens.unshift({
+      id: a.uuid_cliente, status: 'em_andamento', destino: a.payload.p_destino,
+      finalidade: a.payload.p_finalidade, veiculo_modelo: veic?.modelo || 'Veículo', veiculo_placa: veic?.placa || '—',
+      veiculo_medidor: veic?.medidor, data_saida_prevista: a.criado_em, data_retorno_prevista: a.criado_em,
+      aberta_direto: true, _pendenteSync: true,
+    })
+  })
+
   const pendentes = _viagens.filter(v => v.status === 'aprovada' || v.status === 'em_andamento').length
   const badge = document.getElementById('fm-badge')
   if (badge) { badge.textContent = pendentes; badge.hidden = !pendentes }
@@ -482,13 +550,15 @@ function fmCardViagem(v) {
           <div style="font-weight:700">${esc(v.destino)}</div>
           <div style="font-size:12px;color:#6B7280;margin-top:2px">${esc(v.finalidade)}</div>
           <div style="font-size:12px;color:#9CA3AF;margin-top:6px">${formatDataHora(v.data_saida_prevista)} → ${formatDataHora(v.data_retorno_prevista)}</div>
-          <div style="font-size:12px;margin-top:4px">${esc(v.veiculo_modelo)} <span class="mono">(${esc(v.veiculo_placa)})</span>${v.aberta_direto ? ' <span class="badge badge-roxo">Avulsa</span>' : ''}</div>
+          <div style="font-size:12px;margin-top:4px">${esc(v.veiculo_modelo)} <span class="mono">(${esc(v.veiculo_placa)})</span>${v.aberta_direto ? ' <span class="badge badge-roxo">Avulsa</span>' : ''}${v._pendenteSync ? ' <span class="badge badge-cinza">Aguardando envio</span>' : ''}</div>
         </div>
         <div style="text-align:right">
           <span class="badge ${STATUS_BADGE[v.status]}">${STATUS_LABEL[v.status]}</span><br>
-          ${v.status === 'aprovada'
-            ? `<button class="btn btn-sm btn-primary" style="margin-top:8px" onclick="abrirCheckout('${v.id}')">Iniciar Viagem</button>`
-            : `<button class="btn btn-sm btn-primary" style="margin-top:8px" onclick="abrirCheckin('${v.id}')">Concluir Viagem</button>`}
+          ${v._pendenteSync
+            ? `<span style="font-size:11px;color:#9CA3AF;display:block;margin-top:8px">Será enviada ao reconectar</span>`
+            : v.status === 'aprovada'
+              ? `<button class="btn btn-sm btn-primary" style="margin-top:8px" onclick="abrirCheckout('${v.id}')">Iniciar Viagem</button>`
+              : `<button class="btn btn-sm btn-primary" style="margin-top:8px" onclick="abrirCheckin('${v.id}')">Concluir Viagem</button>`}
         </div>
       </div>
     </div>`
@@ -592,14 +662,29 @@ async function renderFmNovaViagem() {
 }
 
 async function carregarVeiculosDisponiveisAgora() {
-  const { data } = await db.from('frota_veiculos').select('id,placa,modelo,medidor')
-    .eq('ativo', true).eq('status', 'disponivel').order('placa')
-  _veiculosDisponiveisAgora = data || []
+  let data = null, offline = false
+  try {
+    if (!navigator.onLine) throw new Error('offline')
+    const r = await db.from('frota_veiculos').select('id,placa,modelo,medidor')
+      .eq('ativo', true).eq('status', 'disponivel').order('placa')
+    if (r.error) throw r.error
+    data = r.data || []
+    await fOfflineSetConfig('veiculos_cache', data)
+  } catch (e) {
+    data = await fOfflineGetConfig('veiculos_cache') || []
+    offline = true
+  }
+  _veiculosDisponiveisAgora = data
   const sel = document.getElementById('nv-veiculo')
   if (!sel) return
   sel.innerHTML = _veiculosDisponiveisAgora.length
     ? '<option value="">Selecione...</option>' + _veiculosDisponiveisAgora.map(v => `<option value="${v.id}">${esc(v.placa)} — ${esc(v.modelo)}</option>`).join('')
     : '<option value="">Nenhum veículo disponível agora</option>'
+  if (offline && _veiculosDisponiveisAgora.length) {
+    document.getElementById('nv-conteudo-aviso-offline')?.remove()
+    sel.insertAdjacentHTML('afterend',
+      '<div id="nv-conteudo-aviso-offline" style="font-size:11px;color:#9CA3AF;margin-top:4px">Lista salva offline — pode estar desatualizada.</div>')
+  }
   ajustarLabelMedidaNV()
 }
 
@@ -618,28 +703,67 @@ async function confirmarNovaViagemDireta() {
   if (isNaN(medida) || medida < 0) { toast('Informe a leitura do medidor', 'error'); return }
   const btn = document.getElementById('btn-abrir-nv')
   btn.disabled = true; btn.textContent = 'Iniciando...'
+  const payload = {
+    p_veiculo_id: veiculo_id, p_destino: destino, p_finalidade: finalidade,
+    p_medida: medida, p_combustivel_pct: parseInt(document.getElementById('nv-combustivel').value)
+  }
   try {
-    const { error } = await db.rpc('frota_abrir_viagem_direta', {
-      p_veiculo_id: veiculo_id, p_destino: destino, p_finalidade: finalidade,
-      p_medida: medida, p_combustivel_pct: parseInt(document.getElementById('nv-combustivel').value)
-    })
+    if (!navigator.onLine) throw new Error('offline')
+    const { error } = await db.rpc('frota_abrir_viagem_direta', payload)
     if (error) throw error
     toast('Viagem iniciada! Boa viagem.', 'success')
     await carregarViagensMotorista()
     motoristaAba('inicio')
-  } catch (e) { toast(e.message || 'Erro ao abrir viagem', 'error') }
+  } catch (e) {
+    if (fPareceOffline(e)) {
+      await fOfflineEnfileirar('abrir_direta', payload)
+      toast('Sem conexão — viagem registrada localmente e será enviada ao reconectar.', 'warning')
+      await carregarViagensMotorista()
+      motoristaAba('inicio')
+    } else {
+      toast(e.message || 'Erro ao abrir viagem', 'error')
+    }
+  }
   finally { btn.disabled = false; btn.innerHTML = `${bico('plus')} Iniciar Viagem` }
 }
 
 // ── Aba Config ───────────────────────────────────────────────────
-function renderFmConfig() {
+async function renderFmConfig() {
   document.getElementById('fm-conteudo').innerHTML = `
+    <div class="form-section-label">Envio de registros</div>
+    <div class="card" style="margin-bottom:16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+        <div style="font-size:13px;color:#6B7280">Pendente(s) para enviar: <strong id="fm-cfg-pendentes">—</strong></div>
+        <button class="btn btn-sm btn-secondary" id="btn-sync-agora" onclick="sincronizarAgora()">${bico('upload')} Sincronizar agora</button>
+      </div>
+    </div>
     <div class="form-section-label">Configurações</div>
     <div class="card" style="padding:0">
       ${_papeis.length > 1 ? `<button class="fm-config-item" onclick="trocarPerfil()">${bico('shield')} Trocar perfil</button>` : ''}
       <a class="fm-config-item" href="frota-tarefas.html">${bico('clipboard')} Minhas Tarefas</a>
+      <button class="fm-config-item" style="color:#DC2626" onclick="zerarFilaLocalFrota()">${bico('trash')} Zerar fila local</button>
       <button class="fm-config-item" style="color:#DC2626" onclick="fazerLogout()">${bico('logout')} Sair</button>
     </div>`
+  await atualizarBadgePendentesSync()
+}
+
+async function sincronizarAgora() {
+  const btn = document.getElementById('btn-sync-agora')
+  btn.disabled = true; btn.textContent = 'Sincronizando...'
+  const r = await fSyncRodar()
+  if (r === 'vazio') toast('Nada pendente para enviar', 'info')
+  else if (r === 'sem_conexao') toast('Sem conexão no momento — tente novamente mais tarde', 'warning')
+  await atualizarBadgePendentesSync()
+  btn.disabled = false; btn.innerHTML = `${bico('upload')} Sincronizar agora`
+}
+
+async function zerarFilaLocalFrota() {
+  const n = await fOfflineContarPendentes()
+  if (n > 0 && !confirm(`Existem ${n} registro(s) ainda não enviados. Zerar a fila local vai descartá-los. Continuar?`)) return
+  await fOfflineZerarFila()
+  toast('Fila local zerada', 'success')
+  await atualizarBadgePendentesSync()
+  await carregarViagensMotorista()
 }
 
 function abrirCheckout(id) {
@@ -657,15 +781,26 @@ async function confirmarCheckout() {
   if (isNaN(medida) || medida < 0) { toast('Informe a leitura do medidor', 'error'); return }
   const btn = document.getElementById('btn-confirmar-checkout')
   btn.disabled = true; btn.textContent = 'Registrando...'
+  const payload = {
+    p_viagem_id: _acaoId, p_medida: medida,
+    p_combustivel_pct: parseInt(document.getElementById('co-combustivel').value)
+  }
   try {
-    const { error } = await db.rpc('frota_checkout_viagem', {
-      p_viagem_id: _acaoId, p_medida: medida,
-      p_combustivel_pct: parseInt(document.getElementById('co-combustivel').value)
-    })
+    if (!navigator.onLine) throw new Error('offline')
+    const { error } = await db.rpc('frota_checkout_viagem', payload)
     if (error) throw error
     toast('Viagem iniciada! Boa viagem.', 'success')
     fecharModal('checkout'); await carregarViagensMotorista()
-  } catch (e) { toast(e.message || 'Erro ao iniciar viagem', 'error') }
+  } catch (e) {
+    if (fPareceOffline(e)) {
+      await fOfflineEnfileirar('checkout', payload)
+      toast('Sem conexão — registrado localmente, será enviado ao reconectar.', 'warning')
+      fecharModal('checkout')
+      atualizarBadgePendentesSync()
+    } else {
+      toast(e.message || 'Erro ao iniciar viagem', 'error')
+    }
+  }
   finally { btn.disabled = false; btn.textContent = 'Iniciar Viagem' }
 }
 
@@ -686,17 +821,28 @@ async function confirmarCheckin() {
   if (isNaN(medida) || medida < 0) { toast('Informe a leitura do medidor', 'error'); return }
   const btn = document.getElementById('btn-confirmar-checkin')
   btn.disabled = true; btn.textContent = 'Registrando...'
+  const payload = {
+    p_viagem_id: _acaoId, p_medida: medida,
+    p_combustivel_pct: parseInt(document.getElementById('ci-combustivel').value),
+    p_observacoes: document.getElementById('ci-obs').value.trim() || null,
+    p_avarias: document.getElementById('ci-avarias').value.trim() || ''
+  }
   try {
-    const { error } = await db.rpc('frota_checkin_viagem', {
-      p_viagem_id: _acaoId, p_medida: medida,
-      p_combustivel_pct: parseInt(document.getElementById('ci-combustivel').value),
-      p_observacoes: document.getElementById('ci-obs').value.trim() || null,
-      p_avarias: document.getElementById('ci-avarias').value.trim() || ''
-    })
+    if (!navigator.onLine) throw new Error('offline')
+    const { error } = await db.rpc('frota_checkin_viagem', payload)
     if (error) throw error
     toast('Viagem concluída!', 'success')
     fecharModal('checkin'); await carregarViagensMotorista()
-  } catch (e) { toast(e.message || 'Erro ao concluir viagem', 'error') }
+  } catch (e) {
+    if (fPareceOffline(e)) {
+      await fOfflineEnfileirar('checkin', payload)
+      toast('Sem conexão — registrado localmente, será enviado ao reconectar.', 'warning')
+      fecharModal('checkin')
+      atualizarBadgePendentesSync()
+    } else {
+      toast(e.message || 'Erro ao concluir viagem', 'error')
+    }
+  }
   finally { btn.disabled = false; btn.textContent = 'Concluir Viagem' }
 }
 
