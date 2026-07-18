@@ -21,6 +21,13 @@
       <button class="modal-close" onclick="fecharModal('veiculo')">×</button>
     </div>
     <div class="modal-body">
+      <div id="v-tabs" style="display:none;gap:4px;padding:4px;background:rgba(0,0,0,.06);border-radius:10px;width:fit-content;margin-bottom:14px">
+        <button type="button" class="tab-btn ativo" id="v-tab-dados" onclick="mudarAbaVeiculo('dados')">Dados</button>
+        <button type="button" class="tab-btn" id="v-tab-manutencao" onclick="mudarAbaVeiculo('manutencao')">Manutenção</button>
+        <button type="button" class="tab-btn" id="v-tab-multas" onclick="mudarAbaVeiculo('multas')">Multas</button>
+      </div>
+
+      <div id="v-aba-dados">
       <div class="veic-foto-wrap">
         <div class="veic-foto-preview" id="v-foto-preview" data-icon="truck"></div>
         <div>
@@ -117,6 +124,48 @@
       </div>
       <div class="form-group"><label class="form-label">Observações</label>
         <textarea class="form-control" id="v-obs" rows="2"></textarea></div>
+      </div>
+
+      <div id="v-aba-manutencao" style="display:none">
+        <div class="form-section-label">Planos preventivos</div>
+        <div id="v-manut-planos" style="margin-bottom:18px"></div>
+        <div class="form-section-label">Ordens de serviço</div>
+        <div id="v-manut-os"></div>
+      </div>
+
+      <div id="v-aba-multas" style="display:none">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px;flex-wrap:wrap">
+          <div style="font-size:12px;color:#6B7280;max-width:360px">
+            Consulte multas na página oficial do Detran-AC (placa/Renavam abaixo) e registre o resultado aqui.
+          </div>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="consultarDetran()" data-icon="search">Consultar no Detran-AC</button>
+        </div>
+        <div id="v-multas-lista" style="margin-bottom:16px"></div>
+        <div id="v-multas-form" style="border-top:1px solid var(--borda,#E5E7EB);padding-top:14px">
+          <div class="form-section-label">Registrar multa</div>
+          <div class="grid-2">
+            <div class="form-group"><label class="form-label">Data da infração</label><input class="form-control" id="mu-data" type="date"></div>
+            <div class="form-group"><label class="form-label">Órgão autuador</label><input class="form-control" id="mu-orgao" placeholder="DETRAN-AC"></div>
+          </div>
+          <div class="form-group"><label class="form-label">Descrição da infração</label><input class="form-control" id="mu-descricao"></div>
+          <div class="grid-2">
+            <div class="form-group"><label class="form-label">Valor (R$)</label><input class="form-control" id="mu-valor" type="number" min="0" step="0.01"></div>
+            <div class="form-group"><label class="form-label">Pontos</label><input class="form-control" id="mu-pontos" type="number" min="0" max="20"></div>
+          </div>
+          <div class="grid-2">
+            <div class="form-group"><label class="form-label">Vencimento</label><input class="form-control" id="mu-vencimento" type="date"></div>
+            <div class="form-group"><label class="form-label">Status</label>
+              <select class="form-control" id="mu-status">
+                <option value="pendente">Pendente</option>
+                <option value="paga">Paga</option>
+                <option value="recorrida">Recorrida</option>
+                <option value="cancelada">Cancelada</option>
+              </select></div>
+          </div>
+          <div class="form-group"><label class="form-label">Observações</label><input class="form-control" id="mu-obs"></div>
+          <button class="btn btn-primary btn-sm" id="btn-add-multa" onclick="adicionarMulta()">Adicionar</button>
+        </div>
+      </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" id="btn-excluir-veiculo" style="margin-right:auto;color:#DC2626;display:none" onclick="excluirVeiculo()" data-icon="trash">Inativar</button>
@@ -231,6 +280,7 @@ let _podeEditar = false
 let _veiculos = [], _motoristas = [], _setores = [], _usuarios = [], _docsPorVeiculo = {}
 let _editVeiculoId = null, _editMotoristaId = null, _docsVeiculoId = null
 let _vFotoFile = null, _vFotoUrlAtual = null
+let _multasVeiculoAtual = []
 
 const TIPO_VEIC = { carro:'Carro', caminhonete:'Caminhonete', van:'Van', onibus:'Ônibus',
   caminhao:'Caminhão', motocicleta:'Motocicleta', quadriciclo:'Quadriciclo',
@@ -241,6 +291,13 @@ const BADGE_STATUS_VEIC = { disponivel:'badge-verde', em_viagem:'badge-blue', em
 const STATUS_MOT = { ativo:'Ativo', ferias:'Férias', afastado:'Afastado', inativo:'Inativo' }
 const BADGE_STATUS_MOT = { ativo:'badge-verde', ferias:'badge-blue', afastado:'badge-ouro', inativo:'badge-cinza' }
 const TIPO_DOC = { crlv:'CRLV', licenciamento:'Licenciamento', seguro:'Seguro', ipva:'IPVA', vistoria:'Vistoria', tacografo:'Tacógrafo', outro:'Outro' }
+const TIPO_OS_LABEL_L = { preventiva:'Preventiva', corretiva:'Corretiva' }
+const TIPO_OS_BADGE_L = { preventiva:'badge-verde', corretiva:'badge-ouro' }
+const STATUS_OS_LABEL_L = { aberta:'Aberta', em_andamento:'Em andamento', concluida:'Concluída', cancelada:'Cancelada' }
+const STATUS_OS_BADGE_L = { aberta:'badge-erro', em_andamento:'badge-ouro', concluida:'badge-verde', cancelada:'badge-cinza' }
+const STATUS_MULTA_LABEL = { pendente:'Pendente', paga:'Paga', recorrida:'Recorrida', cancelada:'Cancelada' }
+const STATUS_MULTA_BADGE = { pendente:'badge-erro', paga:'badge-verde', recorrida:'badge-ouro', cancelada:'badge-cinza' }
+const DETRAN_AC_URL = 'https://www.detran.ac.gov.br/site/apps/veiculo/consulta/filtro-consulta-veiculo.jsp'
 
 ;(async function () {
   const usuario = await carregarUsuario()
@@ -595,7 +652,139 @@ function abrirModalVeiculo(id = null) {
   _vFotoUrlAtual = v?.foto_url || null
   document.getElementById('v-foto-input').value = ''
   _setVeicFotoPreview(_vFotoUrlAtual)
+
+  document.getElementById('v-tabs').style.display = v ? 'flex' : 'none'
+  mudarAbaVeiculo('dados')
+  if (v) {
+    carregarManutencaoVeiculo(v.id)
+    carregarMultasVeiculo(v.id)
+  }
+
   document.getElementById('modal-veiculo').classList.add('aberto')
+}
+
+function mudarAbaVeiculo(aba) {
+  document.getElementById('v-aba-dados').style.display       = aba === 'dados'       ? '' : 'none'
+  document.getElementById('v-aba-manutencao').style.display  = aba === 'manutencao'  ? '' : 'none'
+  document.getElementById('v-aba-multas').style.display      = aba === 'multas'      ? '' : 'none'
+  document.getElementById('v-tab-dados').classList.toggle('ativo', aba === 'dados')
+  document.getElementById('v-tab-manutencao').classList.toggle('ativo', aba === 'manutencao')
+  document.getElementById('v-tab-multas').classList.toggle('ativo', aba === 'multas')
+}
+
+// ── Modal Veículo: aba Manutenção (somente leitura) ────────────
+async function carregarManutencaoVeiculo(veiculoId) {
+  const elPlanos = document.getElementById('v-manut-planos')
+  const elOs = document.getElementById('v-manut-os')
+  elPlanos.innerHTML = elOs.innerHTML = '<div style="text-align:center;color:#9CA3AF;padding:16px;font-size:13px">Carregando...</div>'
+  const [{ data: planos }, { data: os }] = await Promise.all([
+    db.from('vw_frota_manutencoes_pendentes').select('*').eq('veiculo_id', veiculoId),
+    db.from('vw_frota_os_detalhe').select('*').eq('veiculo_id', veiculoId).order('data_abertura', { ascending: false }),
+  ])
+  elPlanos.innerHTML = !planos?.length
+    ? '<div style="text-align:center;color:#9CA3AF;padding:16px;font-size:13px">Nenhum plano preventivo cadastrado</div>'
+    : planos.map(p => {
+        const unidade = p.medidor === 'horimetro' ? 'h' : 'km'
+        const intervalo = [
+          p.intervalo_km != null ? `${formatNum(p.intervalo_km,1)} ${unidade}` : null,
+          p.intervalo_meses != null ? `${p.intervalo_meses} meses` : null
+        ].filter(Boolean).join(' ou ')
+        const sit = situacaoPlanoVeic(p)
+        return `<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid #F3F4F6;font-size:13px">
+          <span style="flex:1">${esc(p.item)}</span>
+          <span class="mono" style="color:#6B7280">${intervalo || '—'}</span>
+          <span class="badge ${SITUACAO_BADGE_L[sit]}">${SITUACAO_LABEL_L[sit]}</span>
+        </div>`
+      }).join('')
+  elOs.innerHTML = !os?.length
+    ? '<div style="text-align:center;color:#9CA3AF;padding:16px;font-size:13px">Nenhuma ordem de serviço registrada</div>'
+    : os.map(o => `
+      <div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid #F3F4F6;font-size:13px;flex-wrap:wrap">
+        <span class="badge ${TIPO_OS_BADGE_L[o.tipo]||'badge-cinza'}">${TIPO_OS_LABEL_L[o.tipo]||o.tipo}</span>
+        <span style="flex:1;min-width:120px">${esc(o.descricao)}</span>
+        <span class="badge ${STATUS_OS_BADGE_L[o.status]||'badge-cinza'}">${STATUS_OS_LABEL_L[o.status]||o.status}</span>
+        <span class="mono" style="width:90px;text-align:right">${o.custo_total != null ? formatBRL(o.custo_total) : '—'}</span>
+        <span style="width:90px;text-align:right;color:#9CA3AF">${formatData(o.data_abertura)}</span>
+      </div>`).join('')
+}
+function situacaoPlanoVeic(p) {
+  const usoVencido = p.restante_uso != null && p.restante_uso <= 0
+  const usoProximo  = p.restante_uso != null && p.restante_uso > 0 && p.restante_uso <= (p.intervalo_km * 0.1)
+  const diasVencido = p.restante_dias != null && p.restante_dias <= 0
+  const diasProximo = p.restante_dias != null && p.restante_dias > 0 && p.restante_dias <= 15
+  if (usoVencido || diasVencido) return 'vencido'
+  if (usoProximo || diasProximo) return 'proximo'
+  return 'ok'
+}
+const SITUACAO_LABEL_L = { ok:'Em dia', proximo:'Próximo', vencido:'Vencido' }
+const SITUACAO_BADGE_L = { ok:'badge-verde', proximo:'badge-ouro', vencido:'badge-erro' }
+
+// ── Modal Veículo: aba Multas (registro manual — consulta assistida) ─
+function consultarDetran() {
+  const v = _editVeiculoId ? _veiculos.find(x => x.id === _editVeiculoId) : null
+  if (v) toast(`Placa ${v.placa}${v.renavam ? ' · Renavam ' + v.renavam : ''} — copie no site do Detran-AC`, 'info')
+  window.open(DETRAN_AC_URL, '_blank', 'noopener')
+}
+
+async function carregarMultasVeiculo(veiculoId) {
+  const el = document.getElementById('v-multas-lista')
+  el.innerHTML = '<div style="text-align:center;color:#9CA3AF;padding:16px;font-size:13px">Carregando...</div>'
+  const { data } = await db.from('frota_multas').select('*').eq('veiculo_id', veiculoId).order('data_infracao', { ascending: false })
+  _multasVeiculoAtual = data || []
+  document.getElementById('v-multas-form').style.display = _podeEditar ? '' : 'none'
+  renderMultasVeiculo()
+}
+
+function renderMultasVeiculo() {
+  const el = document.getElementById('v-multas-lista')
+  if (!_multasVeiculoAtual.length) { el.innerHTML = '<div style="text-align:center;color:#9CA3AF;padding:16px;font-size:13px">Nenhuma multa registrada</div>'; return }
+  el.innerHTML = _multasVeiculoAtual.map(m => `
+    <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #F3F4F6;font-size:13px;flex-wrap:wrap">
+      <span style="color:#6B7280">${formatData(m.data_infracao)}</span>
+      <span style="flex:1;min-width:140px">${esc(m.descricao)}${m.orgao_autuador ? `<br><span style="font-size:11px;color:#9CA3AF">${esc(m.orgao_autuador)}</span>` : ''}</span>
+      <span class="mono">${m.valor != null ? formatBRL(m.valor) : '—'}</span>
+      ${m.pontos != null ? `<span class="badge badge-cinza">${m.pontos} pts</span>` : ''}
+      <span class="badge ${STATUS_MULTA_BADGE[m.status]||'badge-cinza'}">${STATUS_MULTA_LABEL[m.status]||m.status}</span>
+      ${_podeEditar ? `<button class="btn btn-xs btn-ghost" style="color:#DC2626" onclick="removerMulta('${m.id}')">${bico('trash')}</button>` : ''}
+    </div>`).join('')
+}
+
+async function adicionarMulta() {
+  if (!_editVeiculoId) return
+  const data_infracao = document.getElementById('mu-data').value
+  const descricao = document.getElementById('mu-descricao').value.trim()
+  if (!data_infracao || !descricao) { toast('Data e descrição da infração são obrigatórias', 'error'); return }
+  const payload = {
+    veiculo_id: _editVeiculoId,
+    data_infracao,
+    descricao,
+    orgao_autuador: document.getElementById('mu-orgao').value.trim() || null,
+    valor: document.getElementById('mu-valor').value ? parseFloat(document.getElementById('mu-valor').value) : null,
+    pontos: document.getElementById('mu-pontos').value ? parseInt(document.getElementById('mu-pontos').value) : null,
+    vencimento: document.getElementById('mu-vencimento').value || null,
+    status: document.getElementById('mu-status').value,
+    observacoes: document.getElementById('mu-obs').value.trim() || null,
+  }
+  const btn = document.getElementById('btn-add-multa')
+  btn.disabled = true
+  try {
+    const { data, error } = await db.from('frota_multas').insert(payload).select().single()
+    if (error) throw error
+    _multasVeiculoAtual.unshift(data)
+    ;['mu-data','mu-orgao','mu-descricao','mu-valor','mu-pontos','mu-vencimento','mu-obs'].forEach(id => document.getElementById(id).value = '')
+    document.getElementById('mu-status').value = 'pendente'
+    renderMultasVeiculo()
+    toast('Multa registrada', 'success')
+  } catch (e) { toast(e.message || 'Erro ao registrar', 'error') }
+  finally { btn.disabled = false }
+}
+
+async function removerMulta(id) {
+  if (!confirm('Remover este registro de multa?')) return
+  const { error } = await db.from('frota_multas').delete().eq('id', id)
+  if (error) { toast(error.message, 'error'); return }
+  _multasVeiculoAtual = _multasVeiculoAtual.filter(m => m.id !== id)
+  renderMultasVeiculo()
 }
 
 async function salvarVeiculo() {
@@ -799,7 +988,7 @@ async function removerDoc(id) {
 
 function fecharModal(qual) {
   document.getElementById(`modal-${qual}`).classList.remove('aberto')
-  if (qual === 'veiculo') _editVeiculoId = null
+  if (qual === 'veiculo') { _editVeiculoId = null; _multasVeiculoAtual = [] }
   if (qual === 'motorista') _editMotoristaId = null
   if (qual === 'docs') _docsVeiculoId = null
 }
