@@ -820,6 +820,7 @@ async function renderFmConfig() {
       ${_papeis.length > 1 ? `<button class="fm-config-item" onclick="trocarPerfil()">${bico('shield')} Trocar perfil</button>` : ''}
       <button class="fm-config-item" onclick="abrirTarefasFrota()">${bico('clipboard')} Minhas Tarefas</button>
       <button class="fm-config-item" onclick="alterarPinFrota()">${bico('key')} Alterar PIN</button>
+      <button class="fm-config-item" id="btn-verificar-update-frota" onclick="verificarAtualizacaoFrota()">${bico('download')} Verificar atualização</button>
       <button class="fm-config-item" style="color:#DC2626" onclick="zerarFilaLocalFrota()">${bico('trash')} Zerar fila local</button>
       <button class="fm-config-item" style="color:#DC2626" onclick="fazerLogout()">${bico('logout')} Sair</button>
     </div>`
@@ -843,6 +844,35 @@ async function zerarFilaLocalFrota() {
   toast('Fila local zerada', 'success')
   await atualizarBadgePendentesSync()
   await carregarViagensMotorista()
+}
+
+// ── Verificar atualização (Web/PWA) ───────────────────────────────
+// O app Frota é PWA (sem shell Capacitor ainda): a atualização vem pelo
+// ciclo do service worker. Força um reg.update(); se houver versão nova,
+// o SW novo instala (skipWaiting no sw.js) e a página recarrega.
+async function verificarAtualizacaoFrota() {
+  const btn = document.getElementById('btn-verificar-update-frota')
+  if (btn) btn.disabled = true
+  const reabilita = () => { if (btn) btn.disabled = false }
+  if (!('serviceWorker' in navigator)) { location.reload(); return }
+  toast('Verificando atualização…', 'info')
+  let reg
+  try { reg = await navigator.serviceWorker.getRegistration() } catch (e) { reg = null }
+  if (!reg) { location.reload(); return }
+  let achou = false
+  reg.addEventListener('updatefound', () => {
+    achou = true
+    const nw = reg.installing
+    if (!nw) return
+    nw.addEventListener('statechange', () => {
+      if (nw.state === 'installed') {
+        toast('Atualização encontrada — recarregando…', 'success')
+        setTimeout(() => location.reload(), 900)
+      }
+    })
+  })
+  try { await reg.update() } catch (e) { console.warn('[frota-app] update', e) }
+  setTimeout(() => { if (!achou) { toast('App já está atualizado', 'success'); reabilita() } }, 2500)
 }
 
 function abrirCheckout(id) {
