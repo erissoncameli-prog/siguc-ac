@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>SIGUC-AC · App do Motorista</title>
+<link rel="stylesheet" href="../css/global.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../js/observability.js"></script>
+<script src="../js/queryLogger.js"></script>
+<script src="../js/config.js"></script>
+<script src="../js/layout.js"></script>
+</head>
+<body>
+<div id="app"></div>
+
+<!-- Modal Check-out (iniciar viagem) -->
+<div class="modal-overlay" id="modal-checkout">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-header">
+      <div class="modal-title">Iniciar viagem — Check-out</div>
+      <button class="modal-close" onclick="fecharModal('checkout')">×</button>
+    </div>
+    <div class="modal-body">
+      <div id="co-resumo" style="font-size:13px;color:#6B7280;margin-bottom:14px"></div>
+      <div class="form-group"><label class="form-label" id="co-medida-label">Hodômetro na saída (km) <span class="obrig">*</span></label>
+        <input class="form-control" id="co-medida" type="number" min="0" step="0.1"></div>
+      <div class="form-group"><label class="form-label">Nível de combustível</label>
+        <select class="form-control" id="co-combustivel">
+          <option value="100">Cheio</option>
+          <option value="75">3/4</option>
+          <option value="50" selected>1/2</option>
+          <option value="25">1/4</option>
+          <option value="10">Reserva</option>
+        </select></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="fecharModal('checkout')">Cancelar</button>
+      <button class="btn btn-primary" id="btn-confirmar-checkout" onclick="confirmarCheckout()">Iniciar Viagem</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Check-in (concluir viagem) -->
+<div class="modal-overlay" id="modal-checkin">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-header">
+      <div class="modal-title">Concluir viagem — Check-in</div>
+      <button class="modal-close" onclick="fecharModal('checkin')">×</button>
+    </div>
+    <div class="modal-body">
+      <div id="ci-resumo" style="font-size:13px;color:#6B7280;margin-bottom:14px"></div>
+      <div class="form-group"><label class="form-label" id="ci-medida-label">Hodômetro na chegada (km) <span class="obrig">*</span></label>
+        <input class="form-control" id="ci-medida" type="number" min="0" step="0.1"></div>
+      <div class="form-group"><label class="form-label">Nível de combustível</label>
+        <select class="form-control" id="ci-combustivel">
+          <option value="100">Cheio</option>
+          <option value="75">3/4</option>
+          <option value="50" selected>1/2</option>
+          <option value="25">1/4</option>
+          <option value="10">Reserva</option>
+        </select></div>
+      <div class="form-group"><label class="form-label">Observações</label>
+        <textarea class="form-control" id="ci-obs" rows="2" placeholder="Ocorrências durante a viagem (opcional)"></textarea></div>
+      <div class="form-group"><label class="form-label">Avarias no veículo</label>
+        <textarea class="form-control" id="ci-avarias" rows="2" placeholder="Descreva se houver algum dano ou defeito (deixe em branco se não houver)"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="fecharModal('checkin')">Cancelar</button>
+      <button class="btn btn-primary" id="btn-confirmar-checkin" onclick="confirmarCheckin()">Concluir Viagem</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let _usuario = null, _motorista = null, _viagens = [], _acaoId = null
+
+const STATUS_LABEL = { aprovada:'Aguardando saída', em_andamento:'Em andamento', concluida:'Concluída' }
+const STATUS_BADGE = { aprovada:'badge-blue', em_andamento:'badge-verde', concluida:'badge-cinza' }
+
+;(async function () {
+  _usuario = await carregarUsuario()
+  if (!_usuario) { window.location.href = '../index.html'; return }
+
+  document.getElementById('app').innerHTML = gerarLayout('App do Motorista', 'frota-motorista') +
+    '<div class="fade-in" id="conteudo" style="max-width:900px"><div style="text-align:center;padding:40px;color:#9CA3AF">Carregando...</div></div></div></div>'
+  carregarLogosSidebar()
+
+  const { data: mot } = await db.from('frota_motoristas').select('*').eq('usuario_id', _usuario.id).eq('ativo', true).maybeSingle()
+  _motorista = mot
+  if (!_motorista) {
+    document.getElementById('conteudo').innerHTML =
+      '<div class="card" style="text-align:center;padding:40px;color:#6B7280">Você não está cadastrado como motorista no SIGUC.<br>Procure o setor de transporte para regularizar seu cadastro.</div>'
+    return
+  }
+
+  renderShell()
+  await carregarViagens()
+})()
+
+function renderShell() {
+  document.getElementById('conteudo').innerHTML = `
+    <div class="card" style="margin-bottom:16px;display:flex;align-items:center;gap:14px">
+      <div class="sidebar-avatar" style="width:48px;height:48px;font-size:16px">${iniciais(_motorista.nome)}</div>
+      <div>
+        <div style="font-weight:700;font-size:15px">${esc(_motorista.nome)}</div>
+        <div style="font-size:12px;color:#9CA3AF">CNH ${esc(_motorista.cnh_categoria||'—')} ${_motorista.cnh_numero ? '· '+esc(_motorista.cnh_numero) : ''}</div>
+      </div>
+    </div>
+    <div class="form-section-label">Minhas viagens</div>
+    <div id="lista-ativas" style="margin-bottom:24px"></div>
+    <div class="form-section-label">Diário de bordo — viagens concluídas</div>
+    <div id="lista-historico"></div>`
+  bIconsAplicar()
+}
+
+async function carregarViagens() {
+  const { data } = await db.from('vw_frota_viagens_detalhe').select('*')
+    .eq('motorista_id', _motorista.id)
+    .order('data_saida_prevista', { ascending: false }).limit(100)
+  _viagens = data || []
+  renderListas()
+}
+
+function formatDataHora(str) {
+  if (!str) return '—'
+  return new Date(str).toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', year:'2-digit', hour:'2-digit', minute:'2-digit' })
+}
+
+function renderListas() {
+  const ativas = _viagens.filter(v => v.status === 'aprovada' || v.status === 'em_andamento')
+  const historico = _viagens.filter(v => v.status === 'concluida')
+
+  const elAtivas = document.getElementById('lista-ativas')
+  elAtivas.innerHTML = !ativas.length
+    ? '<div class="card" style="text-align:center;padding:24px;color:#9CA3AF">Nenhuma viagem pendente no momento</div>'
+    : ativas.map(v => `
+      <div class="card" style="margin-bottom:10px">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap">
+          <div>
+            <div style="font-weight:700">${esc(v.destino)}</div>
+            <div style="font-size:12px;color:#6B7280;margin-top:2px">${esc(v.finalidade)}</div>
+            <div style="font-size:12px;color:#9CA3AF;margin-top:6px">${formatDataHora(v.data_saida_prevista)} → ${formatDataHora(v.data_retorno_prevista)}</div>
+            <div style="font-size:12px;margin-top:4px">${esc(v.veiculo_modelo)} <span class="mono">(${esc(v.veiculo_placa)})</span></div>
+          </div>
+          <div style="text-align:right">
+            <span class="badge ${STATUS_BADGE[v.status]}">${STATUS_LABEL[v.status]}</span><br>
+            ${v.status === 'aprovada'
+              ? `<button class="btn btn-sm btn-primary" style="margin-top:8px" onclick="abrirCheckout('${v.id}')">Iniciar Viagem</button>`
+              : `<button class="btn btn-sm btn-primary" style="margin-top:8px" onclick="abrirCheckin('${v.id}')">Concluir Viagem</button>`}
+          </div>
+        </div>
+      </div>`).join('')
+
+  const elHist = document.getElementById('lista-historico')
+  elHist.innerHTML = !historico.length
+    ? '<div class="card" style="text-align:center;padding:24px;color:#9CA3AF">Nenhuma viagem concluída ainda</div>'
+    : `<div class="card"><div class="table-wrap"><div class="table-scroll">
+        <table>
+          <thead><tr><th>Destino</th><th>Período</th><th>Veículo</th><th>Percurso</th><th>Avarias</th></tr></thead>
+          <tbody>${historico.map(v => {
+            const usoSaida = v.km_saida ?? v.horas_saida, usoChegada = v.km_chegada ?? v.horas_chegada
+            const unidade = v.veiculo_medidor === 'horimetro' ? 'h' : 'km'
+            const percurso = (usoSaida != null && usoChegada != null) ? `${formatNum(usoChegada - usoSaida, 1)} ${unidade}` : '—'
+            return `<tr>
+              <td><strong>${esc(v.destino)}</strong></td>
+              <td style="font-size:12px">${formatDataHora(v.checkout_em)}<br>até ${formatDataHora(v.checkin_em)}</td>
+              <td style="font-size:12px">${esc(v.veiculo_modelo)} <span class="mono">(${esc(v.veiculo_placa)})</span></td>
+              <td class="mono" style="font-size:12px">${percurso}</td>
+              <td style="font-size:12px">${v.avarias ? `<span class="badge badge-erro">Sim</span>` : '<span style="color:#9CA3AF">Não</span>'}</td>
+            </tr>`
+          }).join('')}</tbody>
+        </table>
+      </div></div></div>`
+}
+
+function abrirCheckout(id) {
+  const v = _viagens.find(x => x.id === id)
+  _acaoId = id
+  document.getElementById('co-resumo').innerHTML = `<strong>${esc(v.destino)}</strong><br>${esc(v.veiculo_modelo)} (${esc(v.veiculo_placa)})`
+  document.getElementById('co-medida-label').textContent =
+    v.veiculo_medidor === 'horimetro' ? 'Horímetro na saída (horas) *' : 'Hodômetro na saída (km) *'
+  document.getElementById('co-medida').value = ''
+  document.getElementById('modal-checkout').classList.add('aberto')
+}
+
+async function confirmarCheckout() {
+  const medida = parseFloat(document.getElementById('co-medida').value)
+  if (isNaN(medida) || medida < 0) { toast('Informe a leitura do medidor', 'error'); return }
+  const btn = document.getElementById('btn-confirmar-checkout')
+  btn.disabled = true; btn.textContent = 'Registrando...'
+  try {
+    const { error } = await db.rpc('frota_checkout_viagem', {
+      p_viagem_id: _acaoId, p_medida: medida,
+      p_combustivel_pct: parseInt(document.getElementById('co-combustivel').value)
+    })
+    if (error) throw error
+    toast('Viagem iniciada! Boa viagem.', 'success')
+    fecharModal('checkout'); await carregarViagens()
+  } catch (e) { toast(e.message || 'Erro ao iniciar viagem', 'error') }
+  finally { btn.disabled = false; btn.textContent = 'Iniciar Viagem' }
+}
+
+function abrirCheckin(id) {
+  const v = _viagens.find(x => x.id === id)
+  _acaoId = id
+  document.getElementById('ci-resumo').innerHTML = `<strong>${esc(v.destino)}</strong><br>${esc(v.veiculo_modelo)} (${esc(v.veiculo_placa)})`
+  document.getElementById('ci-medida-label').textContent =
+    v.veiculo_medidor === 'horimetro' ? 'Horímetro na chegada (horas) *' : 'Hodômetro na chegada (km) *'
+  document.getElementById('ci-medida').value = ''
+  document.getElementById('ci-obs').value = ''
+  document.getElementById('ci-avarias').value = ''
+  document.getElementById('modal-checkin').classList.add('aberto')
+}
+
+async function confirmarCheckin() {
+  const medida = parseFloat(document.getElementById('ci-medida').value)
+  if (isNaN(medida) || medida < 0) { toast('Informe a leitura do medidor', 'error'); return }
+  const btn = document.getElementById('btn-confirmar-checkin')
+  btn.disabled = true; btn.textContent = 'Registrando...'
+  try {
+    const { error } = await db.rpc('frota_checkin_viagem', {
+      p_viagem_id: _acaoId, p_medida: medida,
+      p_combustivel_pct: parseInt(document.getElementById('ci-combustivel').value),
+      p_observacoes: document.getElementById('ci-obs').value.trim() || null,
+      p_avarias: document.getElementById('ci-avarias').value.trim() || ''
+    })
+    if (error) throw error
+    toast('Viagem concluída!', 'success')
+    fecharModal('checkin'); await carregarViagens()
+  } catch (e) { toast(e.message || 'Erro ao concluir viagem', 'error') }
+  finally { btn.disabled = false; btn.textContent = 'Concluir Viagem' }
+}
+
+function fecharModal(qual) { document.getElementById(`modal-${qual}`).classList.remove('aberto'); _acaoId = null }
+</script>
+
+<style>
+.form-section-label {
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .06em; color: var(--verde-c, #52B788);
+  padding: 8px 0 4px; margin-bottom: 12px;
+}
+</style>
+</body>
+</html>

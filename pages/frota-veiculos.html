@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>SIGUC-AC · Frota — Veículos e Motoristas</title>
+<link rel="stylesheet" href="../css/global.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../js/observability.js"></script>
+<script src="../js/queryLogger.js"></script>
+<script src="../js/config.js"></script>
+<script src="../js/layout.js"></script>
+</head>
+<body>
+<div id="app"></div>
+
+<!-- Modal Veículo -->
+<div class="modal-overlay" id="modal-veiculo">
+  <div class="modal" style="max-width:640px">
+    <div class="modal-header">
+      <div class="modal-title" id="mv-titulo">Novo Veículo</div>
+      <button class="modal-close" onclick="fecharModal('veiculo')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Placa / Nº de inscrição <span class="obrig">*</span></label>
+          <input class="form-control" id="v-placa" placeholder="ABC1D23" maxlength="10" style="text-transform:uppercase"></div>
+        <div class="form-group"><label class="form-label">Tipo <span class="obrig">*</span></label>
+          <select class="form-control" id="v-tipo" onchange="ajustarMedidor()">
+            <option value="carro">Carro</option>
+            <option value="caminhonete">Caminhonete</option>
+            <option value="van">Van</option>
+            <option value="onibus">Ônibus</option>
+            <option value="caminhao">Caminhão</option>
+            <option value="motocicleta">Motocicleta</option>
+            <option value="quadriciclo">Quadriciclo</option>
+            <option value="embarcacao">Embarcação (barco/voadeira)</option>
+            <option value="outro">Outro</option>
+          </select></div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Marca</label><input class="form-control" id="v-marca" placeholder="Toyota"></div>
+        <div class="form-group"><label class="form-label">Modelo <span class="obrig">*</span></label><input class="form-control" id="v-modelo" placeholder="Hilux SW4"></div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Ano fabricação / modelo</label>
+          <div style="display:flex;gap:8px">
+            <input class="form-control" id="v-ano-fab" type="number" min="1950" max="2100" placeholder="2023">
+            <input class="form-control" id="v-ano-mod" type="number" min="1950" max="2100" placeholder="2024">
+          </div></div>
+        <div class="form-group"><label class="form-label">Cor</label><input class="form-control" id="v-cor" placeholder="Branca"></div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Renavam</label><input class="form-control" id="v-renavam"></div>
+        <div class="form-group"><label class="form-label">Chassi</label><input class="form-control" id="v-chassi"></div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Combustível</label>
+          <select class="form-control" id="v-combustivel">
+            <option value="">—</option>
+            <option value="flex">Flex</option>
+            <option value="gasolina">Gasolina</option>
+            <option value="etanol">Etanol</option>
+            <option value="diesel">Diesel</option>
+            <option value="eletrico">Elétrico</option>
+            <option value="hibrido">Híbrido</option>
+          </select></div>
+        <div class="form-group"><label class="form-label">Capacidade (passageiros)</label>
+          <input class="form-control" id="v-capacidade" type="number" min="1" max="99"></div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Medidor de uso</label>
+          <select class="form-control" id="v-medidor" onchange="mostrarCampoMedidor()">
+            <option value="hodometro">Hodômetro (km)</option>
+            <option value="horimetro">Horímetro (horas)</option>
+          </select></div>
+        <div class="form-group">
+          <label class="form-label" id="v-uso-label">Hodômetro atual (km)</label>
+          <input class="form-control" id="v-uso" type="number" min="0" step="0.1" placeholder="0"></div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Setor de lotação</label>
+          <select class="form-control" id="v-setor"><option value="">—</option></select></div>
+        <div class="form-group"><label class="form-label">Status</label>
+          <select class="form-control" id="v-status">
+            <option value="disponivel">Disponível</option>
+            <option value="em_viagem">Em viagem</option>
+            <option value="em_manutencao">Em manutenção</option>
+            <option value="cedido">Cedido</option>
+            <option value="baixado">Baixado</option>
+          </select></div>
+      </div>
+      <div class="form-group">
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+          <input type="checkbox" id="v-dedicado"> Veículo dedicado ao setor (uso exclusivo da lotação)
+        </label>
+      </div>
+      <div class="form-group"><label class="form-label">Observações</label>
+        <textarea class="form-control" id="v-obs" rows="2"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" id="btn-excluir-veiculo" style="margin-right:auto;color:#DC2626;display:none" onclick="excluirVeiculo()" data-icon="trash">Inativar</button>
+      <button class="btn btn-secondary" onclick="fecharModal('veiculo')">Cancelar</button>
+      <button class="btn btn-primary" id="btn-salvar-veiculo" onclick="salvarVeiculo()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Motorista -->
+<div class="modal-overlay" id="modal-motorista">
+  <div class="modal" style="max-width:640px">
+    <div class="modal-header">
+      <div class="modal-title" id="mm-titulo">Novo Motorista</div>
+      <button class="modal-close" onclick="fecharModal('motorista')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label">Nome completo <span class="obrig">*</span></label>
+        <input class="form-control" id="m-nome"></div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Vínculo</label>
+          <select class="form-control" id="m-vinculo" onchange="mostrarCamposVinculo()">
+            <option value="servidor">Servidor</option>
+            <option value="terceirizado">Terceirizado</option>
+          </select></div>
+        <div class="form-group" id="wrap-m-usuario"><label class="form-label">Usuário do SIGUC (opcional)</label>
+          <select class="form-control" id="m-usuario"><option value="">—</option></select></div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Matrícula</label><input class="form-control" id="m-matricula"></div>
+        <div class="form-group"><label class="form-label">Telefone</label><input class="form-control" id="m-telefone" placeholder="(68) 9…"></div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">CNH — número</label><input class="form-control" id="m-cnh"></div>
+        <div class="form-group"><label class="form-label">CNH — categoria</label>
+          <select class="form-control" id="m-cnh-cat">
+            <option value="">—</option>
+            <option>A</option><option>B</option><option>AB</option>
+            <option>C</option><option>D</option><option>E</option>
+            <option>AC</option><option>AD</option><option>AE</option>
+          </select></div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">CNH — validade</label><input class="form-control" id="m-cnh-val" type="date"></div>
+        <div class="form-group"><label class="form-label">Portaria de autorização</label><input class="form-control" id="m-portaria" placeholder="Portaria nº …"></div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Hab. fluvial (arrais/motonauta)</label><input class="form-control" id="m-hab-fluvial" placeholder="Nº da habilitação"></div>
+        <div class="form-group"><label class="form-label">Hab. fluvial — validade</label><input class="form-control" id="m-hab-fluvial-val" type="date"></div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Setor de lotação</label>
+          <select class="form-control" id="m-setor"><option value="">—</option></select></div>
+        <div class="form-group"><label class="form-label">Status</label>
+          <select class="form-control" id="m-status">
+            <option value="ativo">Ativo</option>
+            <option value="ferias">Férias</option>
+            <option value="afastado">Afastado</option>
+            <option value="inativo">Inativo</option>
+          </select></div>
+      </div>
+      <div class="form-group"><label class="form-label">Observações</label>
+        <textarea class="form-control" id="m-obs" rows="2"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" id="btn-excluir-motorista" style="margin-right:auto;color:#DC2626;display:none" onclick="excluirMotorista()" data-icon="trash">Inativar</button>
+      <button class="btn btn-secondary" onclick="fecharModal('motorista')">Cancelar</button>
+      <button class="btn btn-primary" id="btn-salvar-motorista" onclick="salvarMotorista()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Documentos do veículo -->
+<div class="modal-overlay" id="modal-docs">
+  <div class="modal" style="max-width:640px">
+    <div class="modal-header">
+      <div class="modal-title" id="md-titulo">Documentos</div>
+      <button class="modal-close" onclick="fecharModal('docs')">×</button>
+    </div>
+    <div class="modal-body">
+      <div id="docs-lista" style="margin-bottom:16px"></div>
+      <div id="docs-form" style="border-top:1px solid var(--borda,#E5E7EB);padding-top:14px">
+        <div class="form-section-label">Adicionar documento</div>
+        <div class="grid-2">
+          <div class="form-group"><label class="form-label">Tipo</label>
+            <select class="form-control" id="d-tipo">
+              <option value="crlv">CRLV</option>
+              <option value="licenciamento">Licenciamento</option>
+              <option value="ipva">IPVA</option>
+              <option value="seguro">Seguro</option>
+              <option value="vistoria">Vistoria</option>
+              <option value="tacografo">Tacógrafo</option>
+              <option value="outro">Outro</option>
+            </select></div>
+          <div class="form-group"><label class="form-label">Número</label><input class="form-control" id="d-numero"></div>
+        </div>
+        <div class="grid-2">
+          <div class="form-group"><label class="form-label">Vencimento</label><input class="form-control" id="d-venc" type="date"></div>
+          <div class="form-group"><label class="form-label">Descrição</label><input class="form-control" id="d-desc"></div>
+        </div>
+        <button class="btn btn-primary btn-sm" id="btn-add-doc" onclick="adicionarDoc()">Adicionar</button>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="fecharModal('docs')">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let _podeEditar = false
+let _veiculos = [], _motoristas = [], _setores = [], _usuarios = [], _docsPorVeiculo = {}
+let _editVeiculoId = null, _editMotoristaId = null, _docsVeiculoId = null
+
+const TIPO_VEIC = { carro:'Carro', caminhonete:'Caminhonete', van:'Van', onibus:'Ônibus',
+  caminhao:'Caminhão', motocicleta:'Motocicleta', quadriciclo:'Quadriciclo',
+  embarcacao:'Embarcação', outro:'Outro' }
+const COMB = { gasolina:'Gasolina', etanol:'Etanol', flex:'Flex', diesel:'Diesel', eletrico:'Elétrico', hibrido:'Híbrido' }
+const STATUS_VEIC = { disponivel:'Disponível', em_viagem:'Em viagem', em_manutencao:'Em manutenção', cedido:'Cedido', baixado:'Baixado' }
+const BADGE_STATUS_VEIC = { disponivel:'badge-verde', em_viagem:'badge-blue', em_manutencao:'badge-ouro', cedido:'badge-roxo', baixado:'badge-cinza' }
+const STATUS_MOT = { ativo:'Ativo', ferias:'Férias', afastado:'Afastado', inativo:'Inativo' }
+const BADGE_STATUS_MOT = { ativo:'badge-verde', ferias:'badge-blue', afastado:'badge-ouro', inativo:'badge-cinza' }
+const TIPO_DOC = { crlv:'CRLV', licenciamento:'Licenciamento', seguro:'Seguro', ipva:'IPVA', vistoria:'Vistoria', tacografo:'Tacógrafo', outro:'Outro' }
+
+;(async function () {
+  const usuario = await carregarUsuario()
+  if (!usuario) { window.location.href = '../index.html'; return }
+
+  const { data: nivel } = await db.rpc('nivel_efetivo', { p_usuario: usuario.id, p_modulo_chave: 'frota' })
+  if (!nivel || nivel === 'sem_acesso') {
+    document.body.innerHTML = '<div style="padding:60px;text-align:center;font-family:\'DM Sans\',sans-serif;color:#6B7280">Você não tem acesso ao módulo Frota.</div>'
+    return
+  }
+  _podeEditar = nivel === 'editar'
+
+  document.getElementById('app').innerHTML =
+    gerarLayout('Frota — Veículos e Motoristas', 'frota-veiculos') +
+    `<div class="fade-in">
+      <div class="kpi-grid">
+        <div class="kpi-card verde"><div class="kpi-label">Veículos na frota</div><div class="kpi-valor" id="k-veic">—</div></div>
+        <div class="kpi-card azul"><div class="kpi-label">Disponíveis</div><div class="kpi-valor" id="k-disp">—</div></div>
+        <div class="kpi-card ouro"><div class="kpi-label">Em manutenção</div><div class="kpi-valor" id="k-manut">—</div></div>
+        <div class="kpi-card verde"><div class="kpi-label">Motoristas ativos</div><div class="kpi-valor" id="k-mot">—</div></div>
+        <div class="kpi-card erro"><div class="kpi-label">Habilitações irregulares</div><div class="kpi-valor" id="k-cnh">—</div></div>
+        <div class="kpi-card erro"><div class="kpi-label">Docs a vencer (30d)</div><div class="kpi-valor" id="k-docs">—</div></div>
+      </div>
+
+      <div class="card" style="margin-bottom:16px">
+        <div style="display:flex;gap:4px;padding:4px;background:rgba(0,0,0,.06);border-radius:10px;width:fit-content">
+          <button class="tab-btn ativo" id="tab-veiculos" onclick="mudarAba('veiculos')">Veículos</button>
+          <button class="tab-btn" id="tab-motoristas" onclick="mudarAba('motoristas')">Motoristas</button>
+        </div>
+      </div>
+
+      <div id="aba-veiculos">
+        <div class="filter-bar">
+          <input class="form-control search-input" id="busca-v" placeholder="Buscar placa, modelo..." oninput="renderVeiculos()">
+          <select class="form-control" id="fil-v-setor" style="width:180px" onchange="renderVeiculos()"><option value="">Todos os setores</option></select>
+          <select class="form-control" id="fil-v-tipo" style="width:150px" onchange="renderVeiculos()">
+            <option value="">Tipo</option>
+            ${Object.entries(TIPO_VEIC).map(([v,l]) => `<option value="${v}">${l}</option>`).join('')}
+          </select>
+          <select class="form-control" id="fil-v-status" style="width:160px" onchange="renderVeiculos()">
+            <option value="">Status</option>
+            ${Object.entries(STATUS_VEIC).map(([v,l]) => `<option value="${v}">${l}</option>`).join('')}
+          </select>
+          ${_podeEditar ? `<button class="btn btn-primary" onclick="abrirModalVeiculo()">${bico('truck')} Novo Veículo</button>` : ''}
+        </div>
+        <div class="card">
+          <div class="table-wrap"><div class="table-scroll">
+            <table>
+              <thead><tr><th>Veículo</th><th>Tipo</th><th>Setor</th><th>Uso atual</th><th>Status</th><th>Documentos</th><th>Ações</th></tr></thead>
+              <tbody id="tbody-veiculos"><tr><td colspan="7" style="text-align:center;padding:32px;color:#9CA3AF">Carregando...</td></tr></tbody>
+            </table>
+          </div></div>
+        </div>
+      </div>
+
+      <div id="aba-motoristas" style="display:none">
+        <div class="filter-bar">
+          <input class="form-control search-input" id="busca-m" placeholder="Buscar motorista..." oninput="renderMotoristas()">
+          <select class="form-control" id="fil-m-setor" style="width:180px" onchange="renderMotoristas()"><option value="">Todos os setores</option></select>
+          <select class="form-control" id="fil-m-vinculo" style="width:140px" onchange="renderMotoristas()">
+            <option value="">Vínculo</option>
+            <option value="servidor">Servidor</option>
+            <option value="terceirizado">Terceirizado</option>
+          </select>
+          <select class="form-control" id="fil-m-status" style="width:130px" onchange="renderMotoristas()">
+            <option value="">Status</option>
+            ${Object.entries(STATUS_MOT).map(([v,l]) => `<option value="${v}">${l}</option>`).join('')}
+          </select>
+          ${_podeEditar ? `<button class="btn btn-primary" onclick="abrirModalMotorista()">${bico('user')} Novo Motorista</button>` : ''}
+        </div>
+        <div class="card">
+          <div class="table-wrap"><div class="table-scroll">
+            <table>
+              <thead><tr><th>Nome</th><th>Vínculo</th><th>CNH</th><th>Validade CNH</th><th>Setor</th><th>Telefone</th><th>Status</th>${_podeEditar?'<th>Ações</th>':''}</tr></thead>
+              <tbody id="tbody-motoristas"><tr><td colspan="8" style="text-align:center;padding:32px;color:#9CA3AF">Carregando...</td></tr></tbody>
+            </table>
+          </div></div>
+        </div>
+      </div>
+    </div>` +
+    '</div></div></div>'
+
+  carregarLogosSidebar()
+  bIconsAplicar()
+  await carregarSetores()
+  await Promise.all([carregarVeiculos(), carregarMotoristas(), carregarUsuariosApp()])
+  renderKpis()
+})()
+
+function mudarAba(aba) {
+  document.getElementById('aba-veiculos').style.display   = aba === 'veiculos'   ? '' : 'none'
+  document.getElementById('aba-motoristas').style.display = aba === 'motoristas' ? '' : 'none'
+  document.getElementById('tab-veiculos').classList.toggle('ativo', aba === 'veiculos')
+  document.getElementById('tab-motoristas').classList.toggle('ativo', aba === 'motoristas')
+}
+
+// ── Cargas ────────────────────────────────────────────────────
+async function carregarSetores() {
+  const { data } = await db.from('unidades_organizacionais')
+    .select('id,sigla,nome').eq('ativo', true).order('sigla')
+  _setores = data || []
+  const opts = _setores.map(s => `<option value="${s.id}">${esc(s.sigla)} — ${esc(s.nome)}</option>`).join('')
+  ;['v-setor','m-setor','fil-v-setor','fil-m-setor'].forEach(id =>
+    document.getElementById(id)?.insertAdjacentHTML('beforeend', opts))
+}
+
+async function carregarUsuariosApp() {
+  // Nem todo perfil enxerga a tabela usuarios — falha silenciosa é aceitável
+  const { data } = await db.from('usuarios').select('id,nome_completo').eq('ativo', true).order('nome_completo')
+  _usuarios = data || []
+  const sel = document.getElementById('m-usuario')
+  if (sel) sel.innerHTML = '<option value="">—</option>' +
+    _usuarios.map(u => `<option value="${u.id}">${esc(u.nome_completo)}</option>`).join('')
+}
+
+async function carregarVeiculos() {
+  const [{ data: veics }, { data: docs }] = await Promise.all([
+    db.from('frota_veiculos').select('*, unidades_organizacionais(sigla,nome)')
+      .eq('ativo', true).order('placa'),
+    db.from('frota_veiculo_documentos').select('*').order('data_vencimento')
+  ])
+  _veiculos = veics || []
+  _docsPorVeiculo = {}
+  ;(docs || []).forEach(d => { (_docsPorVeiculo[d.veiculo_id] = _docsPorVeiculo[d.veiculo_id] || []).push(d) })
+  renderVeiculos()
+}
+
+async function carregarMotoristas() {
+  const { data } = await db.from('frota_motoristas')
+    .select('*, unidades_organizacionais(sigla,nome)')
+    .eq('ativo', true).order('nome')
+  _motoristas = data || []
+  renderMotoristas()
+}
+
+// ── Helpers de vencimento ─────────────────────────────────────
+function diasAte(dataStr) {
+  if (!dataStr) return null
+  return Math.floor((new Date(dataStr + 'T12:00:00') - new Date()) / 86400000)
+}
+function badgeVencimento(dataStr, rotuloVazio) {
+  const dias = diasAte(dataStr)
+  if (dias === null) return `<span style="color:#9CA3AF">${rotuloVazio || '—'}</span>`
+  if (dias < 0)   return `<span class="badge badge-erro">Vencida ${formatData(dataStr)}</span>`
+  if (dias <= 30) return `<span class="badge badge-ouro">${formatData(dataStr)} (${dias}d)</span>`
+  return `<span class="badge badge-verde">${formatData(dataStr)}</span>`
+}
+
+// ── KPIs ──────────────────────────────────────────────────────
+function renderKpis() {
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v }
+  set('k-veic',  _veiculos.length)
+  set('k-disp',  _veiculos.filter(v => v.status === 'disponivel').length)
+  set('k-manut', _veiculos.filter(v => v.status === 'em_manutencao').length)
+  set('k-mot',   _motoristas.filter(m => m.status === 'ativo').length)
+  set('k-cnh',   _motoristas.filter(m => {
+    const c = diasAte(m.cnh_validade), f = diasAte(m.habilitacao_fluvial_validade)
+    return (c !== null && c <= 30) || (f !== null && f <= 30)
+  }).length)
+  let docsAlerta = 0
+  Object.values(_docsPorVeiculo).forEach(list => list.forEach(d => {
+    const dd = diasAte(d.data_vencimento)
+    if (dd !== null && dd <= 30) docsAlerta++
+  }))
+  set('k-docs', docsAlerta)
+}
+
+// ── Render Veículos ───────────────────────────────────────────
+function renderVeiculos() {
+  const q = (document.getElementById('busca-v')?.value || '').toLowerCase()
+  const setor = document.getElementById('fil-v-setor')?.value
+  const tipo = document.getElementById('fil-v-tipo')?.value
+  const status = document.getElementById('fil-v-status')?.value
+  const lista = _veiculos.filter(v =>
+    (!q || `${v.placa} ${v.marca||''} ${v.modelo}`.toLowerCase().includes(q)) &&
+    (!setor || v.setor_id === setor) && (!tipo || v.tipo === tipo) && (!status || v.status === status))
+
+  const tbody = document.getElementById('tbody-veiculos')
+  if (!tbody) return
+  if (!lista.length) { tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:32px;color:#9CA3AF">Nenhum veículo encontrado</td></tr>'; return }
+  tbody.innerHTML = lista.map(v => {
+    const docs = _docsPorVeiculo[v.id] || []
+    const proxDoc = docs.filter(d => d.data_vencimento).sort((a,b) => a.data_vencimento.localeCompare(b.data_vencimento))[0]
+    const uso = v.medidor === 'horimetro'
+      ? `${formatNum(v.horimetro_horas, 1)} h`
+      : `${formatNum(v.hodometro_km)} km`
+    return `<tr>
+      <td><strong>${esc(v.marca ? v.marca + ' ' : '')}${esc(v.modelo)}</strong><br><span class="mono" style="font-size:12px;color:#6B7280">${esc(v.placa)}</span></td>
+      <td style="font-size:12px">${TIPO_VEIC[v.tipo] || esc(v.tipo)}</td>
+      <td style="font-size:12px">${v.unidades_organizacionais ? `<strong>${esc(v.unidades_organizacionais.sigla)}</strong>` : '—'}
+        ${v.dedicado_setor ? '<br><span class="badge badge-roxo">Dedicado</span>' : ''}</td>
+      <td class="mono" style="font-size:12px">${uso}</td>
+      <td><span class="badge ${BADGE_STATUS_VEIC[v.status]||'badge-cinza'}">${STATUS_VEIC[v.status]||esc(v.status)}</span></td>
+      <td style="font-size:12px">${proxDoc ? badgeVencimento(proxDoc.data_vencimento) : '<span style="color:#9CA3AF">—</span>'}</td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-xs btn-ghost" onclick="abrirModalDocs('${v.id}')">Docs${docs.length ? ` (${docs.length})` : ''}</button>
+        ${_podeEditar ? `<button class="btn btn-xs btn-ghost" onclick="abrirModalVeiculo('${v.id}')">Editar</button>` : ''}
+      </td>
+    </tr>`
+  }).join('')
+}
+
+// ── Render Motoristas ─────────────────────────────────────────
+function renderMotoristas() {
+  const q = (document.getElementById('busca-m')?.value || '').toLowerCase()
+  const setor = document.getElementById('fil-m-setor')?.value
+  const vinculo = document.getElementById('fil-m-vinculo')?.value
+  const status = document.getElementById('fil-m-status')?.value
+  const lista = _motoristas.filter(m =>
+    (!q || `${m.nome} ${m.matricula||''}`.toLowerCase().includes(q)) &&
+    (!setor || m.setor_id === setor) && (!vinculo || m.vinculo === vinculo) && (!status || m.status === status))
+
+  const tbody = document.getElementById('tbody-motoristas')
+  if (!tbody) return
+  const cols = _podeEditar ? 8 : 7
+  if (!lista.length) { tbody.innerHTML = `<tr><td colspan="${cols}" style="text-align:center;padding:32px;color:#9CA3AF">Nenhum motorista encontrado</td></tr>`; return }
+  tbody.innerHTML = lista.map(m => {
+    const cnh = m.cnh_numero
+      ? `<span class="mono">${esc(m.cnh_numero)}</span>${m.cnh_categoria ? ` <span class="badge badge-cinza">${esc(m.cnh_categoria)}</span>` : ''}`
+      : (m.habilitacao_fluvial ? `<span class="mono">${esc(m.habilitacao_fluvial)}</span> <span class="badge badge-teal">Fluvial</span>` : '—')
+    const validade = m.cnh_validade
+      ? badgeVencimento(m.cnh_validade)
+      : (m.habilitacao_fluvial_validade ? badgeVencimento(m.habilitacao_fluvial_validade) : '<span style="color:#9CA3AF">—</span>')
+    return `<tr>
+      <td><strong>${esc(m.nome)}</strong>${m.matricula ? `<br><span class="mono" style="font-size:11px;color:#9CA3AF">Mat. ${esc(m.matricula)}</span>` : ''}</td>
+      <td><span class="badge ${m.vinculo === 'servidor' ? 'badge-verde' : 'badge-ouro'}">${m.vinculo === 'servidor' ? 'Servidor' : 'Terceirizado'}</span></td>
+      <td style="font-size:12px">${cnh}</td>
+      <td>${validade}</td>
+      <td style="font-size:12px">${m.unidades_organizacionais ? `<strong>${esc(m.unidades_organizacionais.sigla)}</strong>` : '—'}</td>
+      <td class="mono" style="font-size:12px">${esc(m.telefone || '—')}</td>
+      <td><span class="badge ${BADGE_STATUS_MOT[m.status]||'badge-cinza'}">${STATUS_MOT[m.status]||esc(m.status)}</span></td>
+      ${_podeEditar ? `<td><button class="btn btn-xs btn-ghost" onclick="abrirModalMotorista('${m.id}')">Editar</button></td>` : ''}
+    </tr>`
+  }).join('')
+}
+
+// ── Modal Veículo ─────────────────────────────────────────────
+function ajustarMedidor() {
+  const tipo = document.getElementById('v-tipo').value
+  document.getElementById('v-medidor').value = tipo === 'embarcacao' ? 'horimetro' : 'hodometro'
+  mostrarCampoMedidor()
+}
+function mostrarCampoMedidor() {
+  const medidor = document.getElementById('v-medidor').value
+  document.getElementById('v-uso-label').textContent =
+    medidor === 'horimetro' ? 'Horímetro atual (horas)' : 'Hodômetro atual (km)'
+}
+
+function abrirModalVeiculo(id = null) {
+  const v = id ? _veiculos.find(x => x.id === id) : null
+  _editVeiculoId = v?.id || null
+  document.getElementById('mv-titulo').textContent = v ? `Editar — ${v.placa}` : 'Novo Veículo'
+  document.getElementById('btn-excluir-veiculo').style.display = v ? '' : 'none'
+  document.getElementById('v-placa').value = v?.placa || ''
+  document.getElementById('v-tipo').value = v?.tipo || 'carro'
+  document.getElementById('v-marca').value = v?.marca || ''
+  document.getElementById('v-modelo').value = v?.modelo || ''
+  document.getElementById('v-ano-fab').value = v?.ano_fabricacao || ''
+  document.getElementById('v-ano-mod').value = v?.ano_modelo || ''
+  document.getElementById('v-cor').value = v?.cor || ''
+  document.getElementById('v-renavam').value = v?.renavam || ''
+  document.getElementById('v-chassi').value = v?.chassi || ''
+  document.getElementById('v-combustivel').value = v?.combustivel || ''
+  document.getElementById('v-capacidade').value = v?.capacidade_passageiros || ''
+  document.getElementById('v-medidor').value = v?.medidor || 'hodometro'
+  document.getElementById('v-uso').value = v ? (v.medidor === 'horimetro' ? v.horimetro_horas : v.hodometro_km) : ''
+  document.getElementById('v-setor').value = v?.setor_id || ''
+  document.getElementById('v-status').value = v?.status || 'disponivel'
+  document.getElementById('v-dedicado').checked = !!v?.dedicado_setor
+  document.getElementById('v-obs').value = v?.observacoes || ''
+  mostrarCampoMedidor()
+  document.getElementById('modal-veiculo').classList.add('aberto')
+}
+
+async function salvarVeiculo() {
+  const placa = document.getElementById('v-placa').value.trim()
+  const modelo = document.getElementById('v-modelo').value.trim()
+  if (!placa || !modelo) { toast('Placa e modelo são obrigatórios', 'error'); return }
+  const medidor = document.getElementById('v-medidor').value
+  const uso = parseFloat(document.getElementById('v-uso').value) || 0
+  const payload = {
+    placa, modelo,
+    tipo: document.getElementById('v-tipo').value,
+    marca: document.getElementById('v-marca').value.trim() || null,
+    ano_fabricacao: parseInt(document.getElementById('v-ano-fab').value) || null,
+    ano_modelo: parseInt(document.getElementById('v-ano-mod').value) || null,
+    cor: document.getElementById('v-cor').value.trim() || null,
+    renavam: document.getElementById('v-renavam').value.trim() || null,
+    chassi: document.getElementById('v-chassi').value.trim() || null,
+    combustivel: document.getElementById('v-combustivel').value || null,
+    capacidade_passageiros: parseInt(document.getElementById('v-capacidade').value) || null,
+    medidor,
+    hodometro_km: medidor === 'hodometro' ? uso : 0,
+    horimetro_horas: medidor === 'horimetro' ? uso : 0,
+    setor_id: document.getElementById('v-setor').value || null,
+    dedicado_setor: document.getElementById('v-dedicado').checked,
+    status: document.getElementById('v-status').value,
+    observacoes: document.getElementById('v-obs').value.trim() || null,
+  }
+  const btn = document.getElementById('btn-salvar-veiculo')
+  btn.disabled = true; btn.textContent = 'Salvando...'
+  try {
+    if (_editVeiculoId) {
+      const { error } = await db.from('frota_veiculos').update(payload).eq('id', _editVeiculoId)
+      if (error) throw error
+      toast('Veículo atualizado!', 'success')
+    } else {
+      const { error } = await db.from('frota_veiculos').insert(payload)
+      if (error) throw error
+      toast('Veículo cadastrado!', 'success')
+    }
+    fecharModal('veiculo'); await carregarVeiculos(); renderKpis()
+  } catch (e) {
+    toast(e.message?.includes('duplicate') ? 'Já existe veículo com esta placa' : (e.message || 'Erro ao salvar'), 'error')
+  } finally { btn.disabled = false; btn.textContent = 'Salvar' }
+}
+
+async function excluirVeiculo() {
+  if (!_editVeiculoId) return
+  if (!confirm('Inativar este veículo? Ele sai das listagens, mas o histórico é preservado.')) return
+  const { error } = await db.from('frota_veiculos').update({ ativo: false }).eq('id', _editVeiculoId)
+  if (error) { toast(error.message, 'error'); return }
+  toast('Veículo inativado', 'success')
+  fecharModal('veiculo'); await carregarVeiculos(); renderKpis()
+}
+
+// ── Modal Motorista ───────────────────────────────────────────
+function mostrarCamposVinculo() {
+  const servidor = document.getElementById('m-vinculo').value === 'servidor'
+  document.getElementById('wrap-m-usuario').style.display = servidor ? '' : 'none'
+}
+
+function abrirModalMotorista(id = null) {
+  const m = id ? _motoristas.find(x => x.id === id) : null
+  _editMotoristaId = m?.id || null
+  document.getElementById('mm-titulo').textContent = m ? `Editar — ${m.nome}` : 'Novo Motorista'
+  document.getElementById('btn-excluir-motorista').style.display = m ? '' : 'none'
+  document.getElementById('m-nome').value = m?.nome || ''
+  document.getElementById('m-vinculo').value = m?.vinculo || 'servidor'
+  document.getElementById('m-usuario').value = m?.usuario_id || ''
+  document.getElementById('m-matricula').value = m?.matricula || ''
+  document.getElementById('m-telefone').value = m?.telefone || ''
+  document.getElementById('m-cnh').value = m?.cnh_numero || ''
+  document.getElementById('m-cnh-cat').value = m?.cnh_categoria || ''
+  document.getElementById('m-cnh-val').value = m?.cnh_validade || ''
+  document.getElementById('m-portaria').value = m?.portaria_autorizacao || ''
+  document.getElementById('m-hab-fluvial').value = m?.habilitacao_fluvial || ''
+  document.getElementById('m-hab-fluvial-val').value = m?.habilitacao_fluvial_validade || ''
+  document.getElementById('m-setor').value = m?.setor_id || ''
+  document.getElementById('m-status').value = m?.status || 'ativo'
+  document.getElementById('m-obs').value = m?.observacoes || ''
+  mostrarCamposVinculo()
+  document.getElementById('modal-motorista').classList.add('aberto')
+}
+
+async function salvarMotorista() {
+  const nome = document.getElementById('m-nome').value.trim()
+  if (!nome) { toast('Nome é obrigatório', 'error'); return }
+  const payload = {
+    nome,
+    vinculo: document.getElementById('m-vinculo').value,
+    usuario_id: document.getElementById('m-vinculo').value === 'servidor'
+      ? (document.getElementById('m-usuario').value || null) : null,
+    matricula: document.getElementById('m-matricula').value.trim() || null,
+    telefone: document.getElementById('m-telefone').value.trim() || null,
+    cnh_numero: document.getElementById('m-cnh').value.trim() || null,
+    cnh_categoria: document.getElementById('m-cnh-cat').value || null,
+    cnh_validade: document.getElementById('m-cnh-val').value || null,
+    portaria_autorizacao: document.getElementById('m-portaria').value.trim() || null,
+    habilitacao_fluvial: document.getElementById('m-hab-fluvial').value.trim() || null,
+    habilitacao_fluvial_validade: document.getElementById('m-hab-fluvial-val').value || null,
+    setor_id: document.getElementById('m-setor').value || null,
+    status: document.getElementById('m-status').value,
+    observacoes: document.getElementById('m-obs').value.trim() || null,
+  }
+  const btn = document.getElementById('btn-salvar-motorista')
+  btn.disabled = true; btn.textContent = 'Salvando...'
+  try {
+    if (_editMotoristaId) {
+      const { error } = await db.from('frota_motoristas').update(payload).eq('id', _editMotoristaId)
+      if (error) throw error
+      toast('Motorista atualizado!', 'success')
+    } else {
+      const { error } = await db.from('frota_motoristas').insert(payload)
+      if (error) throw error
+      toast('Motorista cadastrado!', 'success')
+    }
+    fecharModal('motorista'); await carregarMotoristas(); renderKpis()
+  } catch (e) {
+    toast(e.message?.includes('duplicate') ? 'Este usuário já está vinculado a outro motorista' : (e.message || 'Erro ao salvar'), 'error')
+  } finally { btn.disabled = false; btn.textContent = 'Salvar' }
+}
+
+async function excluirMotorista() {
+  if (!_editMotoristaId) return
+  if (!confirm('Inativar este motorista? Ele sai das listagens, mas o histórico é preservado.')) return
+  const { error } = await db.from('frota_motoristas').update({ ativo: false }).eq('id', _editMotoristaId)
+  if (error) { toast(error.message, 'error'); return }
+  toast('Motorista inativado', 'success')
+  fecharModal('motorista'); await carregarMotoristas(); renderKpis()
+}
+
+// ── Modal Documentos ──────────────────────────────────────────
+function abrirModalDocs(veiculoId) {
+  _docsVeiculoId = veiculoId
+  const v = _veiculos.find(x => x.id === veiculoId)
+  document.getElementById('md-titulo').textContent = `Documentos — ${v ? v.placa : ''}`
+  document.getElementById('docs-form').style.display = _podeEditar ? '' : 'none'
+  renderDocs()
+  document.getElementById('modal-docs').classList.add('aberto')
+}
+
+function renderDocs() {
+  const docs = _docsPorVeiculo[_docsVeiculoId] || []
+  const el = document.getElementById('docs-lista')
+  if (!docs.length) { el.innerHTML = '<div style="text-align:center;color:#9CA3AF;padding:16px;font-size:13px">Nenhum documento cadastrado</div>'; return }
+  el.innerHTML = docs.map(d => `
+    <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #F3F4F6;font-size:13px">
+      <span class="badge badge-cinza">${TIPO_DOC[d.tipo] || esc(d.tipo)}</span>
+      <span style="flex:1">${esc(d.numero || d.descricao || '—')}</span>
+      ${badgeVencimento(d.data_vencimento, 'Sem vencimento')}
+      ${_podeEditar ? `<button class="btn btn-xs btn-ghost" style="color:#DC2626" onclick="removerDoc('${d.id}')">${bico('trash')}</button>` : ''}
+    </div>`).join('')
+}
+
+async function adicionarDoc() {
+  if (!_docsVeiculoId) return
+  const payload = {
+    veiculo_id: _docsVeiculoId,
+    tipo: document.getElementById('d-tipo').value,
+    numero: document.getElementById('d-numero').value.trim() || null,
+    descricao: document.getElementById('d-desc').value.trim() || null,
+    data_vencimento: document.getElementById('d-venc').value || null,
+  }
+  const btn = document.getElementById('btn-add-doc')
+  btn.disabled = true
+  try {
+    const { data, error } = await db.from('frota_veiculo_documentos').insert(payload).select().single()
+    if (error) throw error
+    ;(_docsPorVeiculo[_docsVeiculoId] = _docsPorVeiculo[_docsVeiculoId] || []).push(data)
+    document.getElementById('d-numero').value = ''
+    document.getElementById('d-desc').value = ''
+    document.getElementById('d-venc').value = ''
+    renderDocs(); renderVeiculos(); renderKpis()
+    toast('Documento adicionado', 'success')
+  } catch (e) { toast(e.message || 'Erro ao adicionar', 'error') }
+  finally { btn.disabled = false }
+}
+
+async function removerDoc(id) {
+  if (!confirm('Remover este documento?')) return
+  const { error } = await db.from('frota_veiculo_documentos').delete().eq('id', id)
+  if (error) { toast(error.message, 'error'); return }
+  _docsPorVeiculo[_docsVeiculoId] = (_docsPorVeiculo[_docsVeiculoId] || []).filter(d => d.id !== id)
+  renderDocs(); renderVeiculos(); renderKpis()
+}
+
+function fecharModal(qual) {
+  document.getElementById(`modal-${qual}`).classList.remove('aberto')
+  if (qual === 'veiculo') _editVeiculoId = null
+  if (qual === 'motorista') _editMotoristaId = null
+  if (qual === 'docs') _docsVeiculoId = null
+}
+</script>
+
+<style>
+.tab-btn {
+  padding: 6px 18px; border: none; background: transparent;
+  border-radius: 7px; font-size: 13px; font-weight: 500;
+  color: var(--texto-secundario, #6B7280); cursor: pointer;
+  transition: background .15s, color .15s;
+}
+.tab-btn.ativo { background: white; color: var(--floresta, #0A1A0F); box-shadow: 0 1px 4px rgba(0,0,0,.12); }
+.tab-btn:hover:not(.ativo) { background: rgba(255,255,255,.5); }
+.form-section-label {
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .06em; color: var(--verde-c, #52B788);
+  padding: 8px 0 4px; margin-bottom: 12px;
+}
+</style>
+</body>
+</html>

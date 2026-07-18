@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>SIGUC-AC · Solicitar Viagem</title>
+<link rel="stylesheet" href="../css/global.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../js/observability.js"></script>
+<script src="../js/queryLogger.js"></script>
+<script src="../js/config.js"></script>
+<script src="../js/layout.js"></script>
+</head>
+<body>
+<div id="app"></div>
+
+<div class="modal-overlay" id="modal-cancelar">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-header">
+      <div class="modal-title">Cancelar solicitação</div>
+      <button class="modal-close" onclick="fecharModalCancelar()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label">Motivo (opcional)</label>
+        <textarea class="form-control" id="c-motivo" rows="3"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="fecharModalCancelar()">Voltar</button>
+      <button class="btn btn-primary" style="background:#DC2626" id="btn-confirmar-cancelar" onclick="confirmarCancelar()">Cancelar Viagem</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let _usuario = null, _setores = [], _ucs = [], _minhasViagens = [], _cancelarId = null
+
+const STATUS_LABEL = { solicitada:'Solicitada', aprovada:'Aprovada', recusada:'Recusada',
+  em_andamento:'Em andamento', concluida:'Concluída', cancelada:'Cancelada' }
+const STATUS_BADGE = { solicitada:'badge-ouro', aprovada:'badge-blue', recusada:'badge-erro',
+  em_andamento:'badge-verde', concluida:'badge-cinza', cancelada:'badge-cinza' }
+
+;(async function () {
+  _usuario = await carregarUsuario()
+  if (!_usuario) { window.location.href = '../index.html'; return }
+
+  document.getElementById('app').innerHTML =
+    gerarLayout('Solicitar Viagem', 'frota-solicitar') +
+    `<div class="fade-in" style="max-width:1000px">
+      <div class="card" style="margin-bottom:20px">
+        <div class="form-section-label" style="padding:0 0 14px">Nova solicitação de viagem</div>
+        <div class="grid-2">
+          <div class="form-group"><label class="form-label">Setor solicitante</label>
+            <select class="form-control" id="f-setor"><option value="">—</option></select></div>
+          <div class="form-group"><label class="form-label">Nº de passageiros</label>
+            <input class="form-control" id="f-passageiros" type="number" min="1" max="99" placeholder="1"></div>
+        </div>
+        <div class="form-group"><label class="form-label">Destino <span class="obrig">*</span></label>
+          <input class="form-control" id="f-destino" placeholder="Ex.: Sede da UC, endereço, município..."></div>
+        <div class="form-group"><label class="form-label">Unidade de Conservação (se aplicável)</label>
+          <select class="form-control" id="f-uc"><option value="">—</option></select></div>
+        <div class="form-group"><label class="form-label">Finalidade <span class="obrig">*</span></label>
+          <textarea class="form-control" id="f-finalidade" rows="2" placeholder="Descreva o motivo da viagem"></textarea></div>
+        <div class="grid-2">
+          <div class="form-group"><label class="form-label">Saída prevista <span class="obrig">*</span></label>
+            <input class="form-control" id="f-saida" type="datetime-local"></div>
+          <div class="form-group"><label class="form-label">Retorno previsto <span class="obrig">*</span></label>
+            <input class="form-control" id="f-retorno" type="datetime-local"></div>
+        </div>
+        <button class="btn btn-primary" id="btn-solicitar" onclick="solicitar()">${bico('truck')} Solicitar Viagem</button>
+      </div>
+
+      <div class="card">
+        <div class="form-section-label" style="padding:0 0 14px">Minhas solicitações</div>
+        <div class="table-wrap"><div class="table-scroll">
+          <table>
+            <thead><tr><th>Destino</th><th>Período</th><th>Veículo / Motorista</th><th>Status</th><th>Ações</th></tr></thead>
+            <tbody id="tbody-minhas"><tr><td colspan="5" style="text-align:center;padding:32px;color:#9CA3AF">Carregando...</td></tr></tbody>
+          </table>
+        </div></div>
+      </div>
+    </div>` +
+    '</div></div></div>'
+
+  carregarLogosSidebar()
+  bIconsAplicar()
+  await Promise.all([carregarSetores(), carregarUCs()])
+  await carregarMinhasViagens()
+})()
+
+async function carregarSetores() {
+  const { data } = await db.from('unidades_organizacionais').select('id,sigla,nome').eq('ativo', true).order('sigla')
+  _setores = data || []
+  document.getElementById('f-setor').insertAdjacentHTML('beforeend',
+    _setores.map(s => `<option value="${s.id}">${esc(s.sigla)} — ${esc(s.nome)}</option>`).join(''))
+}
+
+async function carregarUCs() {
+  const { data } = await db.from('unidades_conservacao').select('id,nome,codigo').eq('ativo', true).order('codigo')
+  _ucs = data || []
+  document.getElementById('f-uc').insertAdjacentHTML('beforeend',
+    _ucs.map(u => `<option value="${u.id}">${esc(u.codigo)} — ${esc(u.nome)}</option>`).join(''))
+}
+
+async function carregarMinhasViagens() {
+  const { data } = await db.from('vw_frota_viagens_detalhe')
+    .select('*').eq('solicitante_id', _usuario.id).order('data_saida_prevista', { ascending: false }).limit(50)
+  _minhasViagens = data || []
+  renderMinhasViagens()
+}
+
+function renderMinhasViagens() {
+  const tbody = document.getElementById('tbody-minhas')
+  if (!_minhasViagens.length) { tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:32px;color:#9CA3AF">Nenhuma solicitação ainda</td></tr>'; return }
+  tbody.innerHTML = _minhasViagens.map(v => {
+    const podeCancelar = ['solicitada','aprovada'].includes(v.status)
+    return `<tr>
+      <td><strong>${esc(v.destino)}</strong><br><span style="font-size:11px;color:#9CA3AF">${esc(v.finalidade)}</span></td>
+      <td style="font-size:12px">${formatDataHora(v.data_saida_prevista)}<br>até ${formatDataHora(v.data_retorno_prevista)}</td>
+      <td style="font-size:12px">${v.veiculo_placa ? `${esc(v.veiculo_modelo)} <span class="mono">(${esc(v.veiculo_placa)})</span><br>${esc(v.motorista_nome||'—')}` : '<span style="color:#9CA3AF">A definir</span>'}</td>
+      <td><span class="badge ${STATUS_BADGE[v.status]||'badge-cinza'}">${STATUS_LABEL[v.status]||v.status}</span>
+        ${v.status === 'recusada' && v.motivo_recusa ? `<div style="font-size:11px;color:#9CA3AF;margin-top:4px">${esc(v.motivo_recusa)}</div>` : ''}</td>
+      <td>${podeCancelar ? `<button class="btn btn-xs btn-ghost" style="color:#DC2626" onclick="abrirModalCancelar('${v.id}')">Cancelar</button>` : '—'}</td>
+    </tr>`
+  }).join('')
+}
+
+function formatDataHora(str) {
+  if (!str) return '—'
+  return new Date(str).toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', year:'2-digit', hour:'2-digit', minute:'2-digit' })
+}
+
+async function solicitar() {
+  const destino = document.getElementById('f-destino').value.trim()
+  const finalidade = document.getElementById('f-finalidade').value.trim()
+  const saida = document.getElementById('f-saida').value
+  const retorno = document.getElementById('f-retorno').value
+  if (!destino || !finalidade || !saida || !retorno) { toast('Preencha destino, finalidade e o período da viagem', 'error'); return }
+  if (new Date(retorno) <= new Date(saida)) { toast('O retorno deve ser depois da saída', 'error'); return }
+
+  const payload = {
+    solicitante_id: _usuario.id,
+    setor_solicitante_id: document.getElementById('f-setor').value || null,
+    destino,
+    uc_destino_id: document.getElementById('f-uc').value || null,
+    finalidade,
+    passageiros: parseInt(document.getElementById('f-passageiros').value) || null,
+    data_saida_prevista: new Date(saida).toISOString(),
+    data_retorno_prevista: new Date(retorno).toISOString(),
+  }
+  const btn = document.getElementById('btn-solicitar')
+  btn.disabled = true; btn.textContent = 'Enviando...'
+  try {
+    const { error } = await db.from('frota_viagens').insert(payload)
+    if (error) throw error
+    toast('Solicitação enviada ao setor de transporte!', 'success')
+    document.getElementById('f-destino').value = ''
+    document.getElementById('f-finalidade').value = ''
+    document.getElementById('f-saida').value = ''
+    document.getElementById('f-retorno').value = ''
+    document.getElementById('f-passageiros').value = ''
+    document.getElementById('f-uc').value = ''
+    await carregarMinhasViagens()
+  } catch (e) { toast(e.message || 'Erro ao solicitar viagem', 'error') }
+  finally { btn.disabled = false; btn.innerHTML = `${bico('truck')} Solicitar Viagem` }
+}
+
+function abrirModalCancelar(id) {
+  _cancelarId = id
+  document.getElementById('c-motivo').value = ''
+  document.getElementById('modal-cancelar').classList.add('aberto')
+}
+function fecharModalCancelar() { document.getElementById('modal-cancelar').classList.remove('aberto'); _cancelarId = null }
+
+async function confirmarCancelar() {
+  if (!_cancelarId) return
+  const btn = document.getElementById('btn-confirmar-cancelar')
+  btn.disabled = true
+  try {
+    const { error } = await db.rpc('frota_cancelar_viagem', {
+      p_viagem_id: _cancelarId, p_motivo: document.getElementById('c-motivo').value.trim() || null
+    })
+    if (error) throw error
+    toast('Viagem cancelada', 'success')
+    fecharModalCancelar(); await carregarMinhasViagens()
+  } catch (e) { toast(e.message || 'Erro ao cancelar', 'error') }
+  finally { btn.disabled = false }
+}
+</script>
+
+<style>
+.form-section-label {
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .06em; color: var(--verde-c, #52B788);
+  padding: 8px 0 4px; margin-bottom: 12px;
+}
+</style>
+</body>
+</html>
