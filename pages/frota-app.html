@@ -171,7 +171,7 @@ const SITUACAO_BADGE = { ok:'badge-verde', proximo:'badge-ouro', vencido:'badge-
 
 ;(async function () {
   _usuario = await carregarUsuario()
-  if (!_usuario) { window.location.href = '../index.html'; return }
+  if (!_usuario) { localStorage.setItem('siguc_redirect', 'pages/frota-app.html'); window.location.href = '../index.html'; return }
 
   document.getElementById('app').innerHTML =
     '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;color:#9CA3AF;font-family:\'DM Sans\',sans-serif">Carregando...</div>'
