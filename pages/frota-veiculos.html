@@ -97,10 +97,23 @@
             <option value="baixado">Baixado</option>
           </select></div>
       </div>
+      <div class="form-group"><label class="form-label">Motorista vinculado (opcional)</label>
+        <select class="form-control" id="v-motorista-padrao"><option value="">—</option></select></div>
       <div class="form-group">
         <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
           <input type="checkbox" id="v-dedicado"> Veículo dedicado ao setor (uso exclusivo da lotação)
         </label>
+      </div>
+      <div class="form-group">
+        <label class="form-label" style="display:block;margin-bottom:6px">Equipamentos</label>
+        <div style="display:flex;gap:18px;flex-wrap:wrap">
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+            <input type="checkbox" id="v-starlink"> Starlink</label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+            <input type="checkbox" id="v-guincho"> Guincho</label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+            <input type="checkbox" id="v-reboque"> Reboque</label>
+        </div>
       </div>
       <div class="form-group"><label class="form-label">Observações</label>
         <textarea class="form-control" id="v-obs" rows="2"></textarea></div>
@@ -349,7 +362,7 @@ async function carregarUsuariosApp() {
 
 async function carregarVeiculos() {
   const [{ data: veics }, { data: docs }] = await Promise.all([
-    db.from('frota_veiculos').select('*, unidades_organizacionais(sigla,nome)')
+    db.from('frota_veiculos').select('*, unidades_organizacionais(sigla,nome), frota_motoristas(nome)')
       .eq('ativo', true).order('placa'),
     db.from('frota_veiculo_documentos').select('*').order('data_vencimento')
   ])
@@ -392,6 +405,8 @@ async function carregarMotoristas() {
     .select('*, unidades_organizacionais(sigla,nome)')
     .eq('ativo', true).order('nome')
   _motoristas = data || []
+  document.getElementById('v-motorista-padrao').insertAdjacentHTML('beforeend',
+    _motoristas.map(m => `<option value="${m.id}">${esc(m.nome)}</option>`).join(''))
   renderMotoristas()
 }
 
@@ -446,10 +461,20 @@ function renderVeiculos() {
     const uso = v.medidor === 'horimetro'
       ? `${formatNum(v.horimetro_horas, 1)} h`
       : `${formatNum(v.hodometro_km)} km`
+    const equipamentos = [
+      v.tem_starlink ? '<span class="badge badge-blue">Starlink</span>' : '',
+      v.tem_guincho ? '<span class="badge badge-cinza">Guincho</span>' : '',
+      v.tem_reboque ? '<span class="badge badge-cinza">Reboque</span>' : '',
+    ].filter(Boolean).join(' ')
     return `<tr>
       <td><div style="display:flex;align-items:center;gap:8px">
         ${v.foto_url ? `<img src="${v.foto_url}" alt="" style="width:40px;height:32px;object-fit:cover;border-radius:6px;flex-shrink:0">` : ''}
-        <div><strong>${esc(v.marca ? v.marca + ' ' : '')}${esc(v.modelo)}</strong><br><span class="mono" style="font-size:12px;color:#6B7280">${esc(v.placa)}</span></div>
+        <div>
+          <strong>${esc(v.marca ? v.marca + ' ' : '')}${esc(v.modelo)}</strong><br>
+          <span class="mono" style="font-size:12px;color:#6B7280">${esc(v.placa)}</span>
+          ${v.frota_motoristas ? `<br><span style="font-size:11px;color:#9CA3AF">Motorista: ${esc(v.frota_motoristas.nome)}</span>` : ''}
+          ${equipamentos ? `<div style="margin-top:3px">${equipamentos}</div>` : ''}
+        </div>
       </div></td>
       <td style="font-size:12px">${TIPO_VEIC[v.tipo] || esc(v.tipo)}</td>
       <td style="font-size:12px">${v.unidades_organizacionais ? `<strong>${esc(v.unidades_organizacionais.sigla)}</strong>` : '—'}
@@ -558,7 +583,11 @@ function abrirModalVeiculo(id = null) {
   document.getElementById('v-uso').value = v ? (v.medidor === 'horimetro' ? v.horimetro_horas : v.hodometro_km) : ''
   document.getElementById('v-setor').value = v?.setor_id || ''
   document.getElementById('v-status').value = v?.status || 'disponivel'
+  document.getElementById('v-motorista-padrao').value = v?.motorista_padrao_id || ''
   document.getElementById('v-dedicado').checked = !!v?.dedicado_setor
+  document.getElementById('v-starlink').checked = !!v?.tem_starlink
+  document.getElementById('v-guincho').checked = !!v?.tem_guincho
+  document.getElementById('v-reboque').checked = !!v?.tem_reboque
   document.getElementById('v-obs').value = v?.observacoes || ''
   mostrarCampoMedidor()
   _vFotoFile = null
@@ -589,7 +618,11 @@ async function salvarVeiculo() {
     hodometro_km: medidor === 'hodometro' ? uso : 0,
     horimetro_horas: medidor === 'horimetro' ? uso : 0,
     setor_id: document.getElementById('v-setor').value || null,
+    motorista_padrao_id: document.getElementById('v-motorista-padrao').value || null,
     dedicado_setor: document.getElementById('v-dedicado').checked,
+    tem_starlink: document.getElementById('v-starlink').checked,
+    tem_guincho: document.getElementById('v-guincho').checked,
+    tem_reboque: document.getElementById('v-reboque').checked,
     status: document.getElementById('v-status').value,
     observacoes: document.getElementById('v-obs').value.trim() || null,
   }
