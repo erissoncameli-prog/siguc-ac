@@ -1,8 +1,8 @@
 {
   "name": "SIGUC Frota",
   "short_name": "Frota",
-  "description": "App do Motorista — Setor de Transporte SEMA-AC",
-  "start_url": "/pages/frota-motorista.html",
+  "description": "Motorista, solicitante e gestor — Setor de Transporte SEMA-AC",
+  "start_url": "/pages/frota-app.html",
   "scope": "/",
   "display": "standalone",
   "background_color": "#F6FAF6",
