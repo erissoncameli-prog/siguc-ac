@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>SIGUC-AC · Frota — Minhas Tarefas</title>
+<link rel="stylesheet" href="../css/global.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../js/observability.js"></script>
+<script src="../js/queryLogger.js"></script>
+<script src="../js/config.js"></script>
+<script src="../js/layout.js"></script>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+let _usuario = null, _tarefas = []
+
+const SUBTIPO_LABEL = {
+  viagem_solicitada: 'Aprovação pendente',
+  viagem_aprovada:   'Viagem aprovada',
+  viagem_recusada:   'Viagem recusada',
+  manutencao:        'Manutenção',
+}
+const SUBTIPO_ICON = {
+  viagem_solicitada: 'truck',
+  viagem_aprovada:   'check',
+  viagem_recusada:   'x',
+  manutencao:        'clock',
+}
+const SUBTIPO_BADGE = {
+  viagem_solicitada: 'badge-ouro',
+  viagem_aprovada:   'badge-verde',
+  viagem_recusada:   'badge-erro',
+  manutencao:        'badge-blue',
+}
+
+;(async function () {
+  _usuario = await carregarUsuario()
+  if (!_usuario) { window.location.href = '../index.html'; return }
+
+  document.getElementById('app').innerHTML =
+    gerarLayout('Frota — Minhas Tarefas', 'frota-tarefas') +
+    `<div class="fade-in" style="max-width:900px">
+      <div class="card" style="margin-bottom:16px">
+        <div class="form-section-label" style="padding:0 0 12px">Pendentes</div>
+        <div id="lista-pendentes"></div>
+      </div>
+      <div class="card">
+        <div class="form-section-label" style="padding:0 0 12px">Resolvidas recentemente</div>
+        <div id="lista-resolvidas"></div>
+      </div>
+    </div>` +
+    '</div></div></div>'
+
+  carregarLogosSidebar()
+  bIconsAplicar()
+  await carregarTarefas()
+})()
+
+async function carregarTarefas() {
+  const { data } = await db.from('notificacoes')
+    .select('*')
+    .eq('destinatario_id', _usuario.id)
+    .eq('tipo', 'frota')
+    .order('criado_em', { ascending: false })
+  _tarefas = data || []
+  renderTarefas()
+}
+
+function linkDaTarefa(n) {
+  const subtipo = n.meta?.subtipo, para = n.meta?.para
+  if (subtipo === 'viagem_solicitada') return '../pages/frota-viagens.html'
+  if (subtipo === 'manutencao') return '../pages/frota-manutencao.html'
+  if (subtipo === 'viagem_aprovada' && para === 'motorista') return '../pages/frota-motorista.html'
+  if (subtipo === 'viagem_aprovada' || subtipo === 'viagem_recusada') return '../pages/frota-solicitar.html'
+  return null
+}
+
+function formatDataHora(str) {
+  if (!str) return '—'
+  return new Date(str).toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', year:'2-digit', hour:'2-digit', minute:'2-digit' })
+}
+
+function renderTarefas() {
+  const pendentes = _tarefas.filter(n => n.status !== 'resolvida')
+  const resolvidas = _tarefas.filter(n => n.status === 'resolvida').slice(0, 20)
+
+  const cartao = n => {
+    const subtipo = n.meta?.subtipo
+    const href = linkDaTarefa(n)
+    const naoLida = n.status === 'gerada' || n.status === 'enviada'
+    return `<div class="card" style="margin-bottom:8px;${naoLida ? 'border-left:3px solid var(--verde-c,#52B788)' : ''}">
+      <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:wrap">
+        <div style="flex:1;min-width:200px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+            ${bico(SUBTIPO_ICON[subtipo] || 'help')}
+            <span class="badge ${SUBTIPO_BADGE[subtipo] || 'badge-cinza'}">${SUBTIPO_LABEL[subtipo] || 'Aviso'}</span>
+            <span style="font-size:11px;color:#9CA3AF">${formatDataHora(n.criado_em)}</span>
+          </div>
+          <div style="font-weight:700;font-size:14px">${esc(n.titulo)}</div>
+          <div style="font-size:13px;color:#6B7280;margin-top:2px">${esc(n.mensagem)}</div>
+        </div>
+        <div style="display:flex;gap:6px;flex-shrink:0">
+          ${href && n.status !== 'resolvida' ? `<button class="btn btn-xs btn-secondary" onclick="abrirTarefa('${n.id}','${href}')">Ver</button>` : ''}
+          ${n.status !== 'resolvida' ? `<button class="btn btn-xs btn-primary" onclick="resolverTarefa('${n.id}')">Concluir</button>` : ''}
+        </div>
+      </div>
+    </div>`
+  }
+
+  document.getElementById('lista-pendentes').innerHTML = pendentes.length
+    ? pendentes.map(cartao).join('')
+    : '<div style="text-align:center;color:#9CA3AF;padding:24px">Nenhuma tarefa pendente</div>'
+
+  document.getElementById('lista-resolvidas').innerHTML = resolvidas.length
+    ? resolvidas.map(cartao).join('')
+    : '<div style="text-align:center;color:#9CA3AF;padding:24px">Nenhuma tarefa resolvida ainda</div>'
+
+  bIconsAplicar()
+}
+
+async function abrirTarefa(id, href) {
+  try { await db.rpc('avancar_notificacao', { p_notificacao_id: id, p_novo_status: 'visualizada' }) } catch (e) {}
+  window.location.href = href
+}
+
+async function resolverTarefa(id) {
+  try {
+    const { error } = await db.rpc('avancar_notificacao', { p_notificacao_id: id, p_novo_status: 'resolvida' })
+    if (error) throw error
+    await carregarTarefas()
+  } catch (e) { toast(e.message || 'Erro ao concluir tarefa', 'error') }
+}
+</script>
+
+<style>
+.form-section-label {
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .06em; color: var(--verde-c, #52B788);
+  padding: 8px 0 4px; margin-bottom: 12px;
+}
+</style>
+</body>
+</html>

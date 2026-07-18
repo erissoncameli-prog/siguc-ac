@@ -81,9 +81,21 @@
         <div class="form-group"><label class="form-label">Data de conclusão</label>
           <input class="form-control" id="os-conclusao" type="date"></div>
       </div>
+
+      <div class="form-group">
+        <label class="form-label">Peças/itens utilizados</label>
+        <div id="os-itens-lista" style="margin-bottom:8px"></div>
+        <div style="display:flex;gap:8px;align-items:flex-end">
+          <input class="form-control" id="oi-descricao" placeholder="Descrição da peça/serviço" style="flex:2">
+          <input class="form-control" id="oi-qtd" type="number" min="0.01" step="0.01" value="1" placeholder="Qtd" style="width:70px">
+          <input class="form-control" id="oi-valor" type="number" min="0" step="0.01" placeholder="Valor unit. (R$)" style="width:110px">
+          <button type="button" class="btn btn-secondary btn-sm" onclick="adicionarItemOS()">Adicionar</button>
+        </div>
+      </div>
+
       <div class="grid-2">
-        <div class="form-group"><label class="form-label">Custo (R$)</label>
-          <input class="form-control" id="os-custo" type="number" min="0" step="0.01"></div>
+        <div class="form-group"><label class="form-label">Mão de obra (R$)</label>
+          <input class="form-control" id="os-custo" type="number" min="0" step="0.01" oninput="recalcularTotalOS()"></div>
         <div class="form-group"><label class="form-label">Status</label>
           <select class="form-control" id="os-status" onchange="ajustarDataConclusao()">
             <option value="aberta">Aberta</option>
@@ -91,6 +103,10 @@
             <option value="concluida">Concluída</option>
             <option value="cancelada">Cancelada</option>
           </select></div>
+      </div>
+      <div class="form-group" style="text-align:right;font-size:14px">
+        Peças: <strong id="os-total-pecas">R$ 0,00</strong> · Mão de obra: <strong id="os-total-mo">R$ 0,00</strong> ·
+        Total da OS: <strong id="os-total" style="color:var(--verde-c,#52B788);font-size:16px">R$ 0,00</strong>
       </div>
       <div class="form-group"><label class="form-label">Observações</label>
         <textarea class="form-control" id="os-obs" rows="2"></textarea></div>
@@ -106,6 +122,7 @@
 let _podeEditar = false
 let _veiculos = [], _planos = [], _ordens = []
 let _editPlanoId = null, _editOsId = null
+let _osItensAtual = []
 
 const TIPO_OS_LABEL = { preventiva:'Preventiva', corretiva:'Corretiva' }
 const TIPO_OS_BADGE = { preventiva:'badge-verde', corretiva:'badge-ouro' }
@@ -207,8 +224,8 @@ async function carregarPlanos() {
 }
 
 async function carregarOS() {
-  const { data } = await db.from('frota_ordens_servico')
-    .select('*, frota_veiculos(placa,modelo)')
+  const { data } = await db.from('vw_frota_os_detalhe')
+    .select('*')
     .order('data_abertura', { ascending: false })
   _ordens = data || []
   renderOS()
@@ -223,7 +240,7 @@ function renderKpis() {
   const desde = new Date(); desde.setDate(desde.getDate() - 30)
   const custo30 = _ordens
     .filter(o => o.status === 'concluida' && o.data_conclusao && new Date(o.data_conclusao) >= desde)
-    .reduce((acc, o) => acc + (Number(o.custo) || 0), 0)
+    .reduce((acc, o) => acc + (Number(o.custo_total) || 0), 0)
   set('k-custo', formatBRL(custo30))
 }
 
@@ -280,7 +297,7 @@ function renderOS() {
   const q = (document.getElementById('busca-os')?.value || '').toLowerCase()
   const status = document.getElementById('fil-os-status')?.value
   const lista = _ordens.filter(o =>
-    (!q || `${o.frota_veiculos?.placa||''} ${o.frota_veiculos?.modelo||''} ${o.descricao}`.toLowerCase().includes(q)) &&
+    (!q || `${o.placa||''} ${o.modelo||''} ${o.descricao}`.toLowerCase().includes(q)) &&
     (!status || o.status === status))
   const tbody = document.getElementById('tbody-os')
   if (!tbody) return
@@ -288,11 +305,11 @@ function renderOS() {
   if (!lista.length) { tbody.innerHTML = `<tr><td colspan="${cols}" style="text-align:center;padding:32px;color:#9CA3AF">Nenhuma ordem de serviço encontrada</td></tr>`; return }
   tbody.innerHTML = lista.map(o => `
     <tr>
-      <td style="font-size:12px"><strong>${esc(o.frota_veiculos?.placa||'—')}</strong><br>${esc(o.frota_veiculos?.modelo||'')}</td>
+      <td style="font-size:12px"><strong>${esc(o.placa||'—')}</strong><br>${esc(o.modelo||'')}</td>
       <td><span class="badge ${TIPO_OS_BADGE[o.tipo]}">${TIPO_OS_LABEL[o.tipo]}</span></td>
       <td style="font-size:12px;max-width:220px">${esc(o.descricao)}</td>
       <td style="font-size:12px">${esc(o.oficina||'—')}</td>
-      <td class="mono" style="font-size:12px">${o.custo != null ? formatBRL(o.custo) : '—'}</td>
+      <td class="mono" style="font-size:12px">${o.custo_total != null ? formatBRL(o.custo_total) : '—'}${o.custo_pecas > 0 ? `<div style="font-size:10px;color:#9CA3AF">peças ${formatBRL(o.custo_pecas)}</div>` : ''}</td>
       <td><span class="badge ${STATUS_OS_BADGE[o.status]}">${STATUS_OS_LABEL[o.status]}</span></td>
       <td style="font-size:12px">${formatData(o.data_abertura)}${o.data_conclusao ? `<br>até ${formatData(o.data_conclusao)}` : ''}</td>
       ${_podeEditar ? `<td><button class="btn btn-xs btn-ghost" onclick="abrirModalOS('${o.id}')">Editar</button></td>` : ''}
@@ -388,7 +405,48 @@ function ajustarDataConclusao() {
   }
 }
 
-function abrirModalOS(id = null) {
+// ── Itens/peças da OS ───────────────────────────────────────────
+function renderItensOS() {
+  const el = document.getElementById('os-itens-lista')
+  el.innerHTML = !_osItensAtual.length
+    ? '<div style="font-size:12px;color:#9CA3AF">Nenhum item adicionado</div>'
+    : _osItensAtual.map((it, i) => `
+      <div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #F3F4F6;font-size:13px">
+        <span style="flex:2">${esc(it.descricao)}</span>
+        <span class="mono" style="width:60px;text-align:right">${formatNum(it.quantidade,2)}×</span>
+        <span class="mono" style="width:90px;text-align:right">${formatBRL(it.valor_unitario)}</span>
+        <span class="mono" style="width:90px;text-align:right;font-weight:600">${formatBRL(it.quantidade * it.valor_unitario)}</span>
+        <button type="button" class="btn btn-xs btn-ghost" style="color:#DC2626" onclick="removerItemOS(${i})">${bico('trash')}</button>
+      </div>`).join('')
+  recalcularTotalOS()
+}
+
+function adicionarItemOS() {
+  const descricao = document.getElementById('oi-descricao').value.trim()
+  const quantidade = parseFloat(document.getElementById('oi-qtd').value)
+  const valor_unitario = parseFloat(document.getElementById('oi-valor').value)
+  if (!descricao || !quantidade || isNaN(valor_unitario)) { toast('Preencha descrição, quantidade e valor do item', 'error'); return }
+  _osItensAtual.push({ descricao, quantidade, valor_unitario })
+  document.getElementById('oi-descricao').value = ''
+  document.getElementById('oi-qtd').value = '1'
+  document.getElementById('oi-valor').value = ''
+  renderItensOS()
+}
+
+function removerItemOS(i) {
+  _osItensAtual.splice(i, 1)
+  renderItensOS()
+}
+
+function recalcularTotalOS() {
+  const totalPecas = _osItensAtual.reduce((acc, it) => acc + it.quantidade * it.valor_unitario, 0)
+  const maoObra = parseFloat(document.getElementById('os-custo').value) || 0
+  document.getElementById('os-total-pecas').textContent = formatBRL(totalPecas)
+  document.getElementById('os-total-mo').textContent = formatBRL(maoObra)
+  document.getElementById('os-total').textContent = formatBRL(totalPecas + maoObra)
+}
+
+async function abrirModalOS(id = null) {
   const o = id ? _ordens.find(x => x.id === id) : null
   _editOsId = o?.id || null
   document.getElementById('os-titulo').textContent = o ? 'Editar Ordem de Serviço' : 'Nova Ordem de Serviço'
@@ -401,9 +459,18 @@ function abrirModalOS(id = null) {
   document.getElementById('os-km').value = o?.km_veiculo ?? ''
   document.getElementById('os-abertura').value = o?.data_abertura || new Date().toISOString().slice(0,10)
   document.getElementById('os-conclusao').value = o?.data_conclusao || ''
-  document.getElementById('os-custo').value = o?.custo ?? ''
+  document.getElementById('os-custo').value = o?.custo_mao_obra ?? ''
   document.getElementById('os-status').value = o?.status || 'aberta'
   document.getElementById('os-obs').value = o?.observacoes || ''
+  document.getElementById('oi-descricao').value = ''
+  document.getElementById('oi-qtd').value = '1'
+  document.getElementById('oi-valor').value = ''
+  _osItensAtual = []
+  if (o) {
+    const { data } = await db.from('frota_os_itens').select('*').eq('os_id', o.id).order('criado_em')
+    _osItensAtual = (data || []).map(it => ({ descricao: it.descricao, quantidade: Number(it.quantidade), valor_unitario: Number(it.valor_unitario) }))
+  }
+  renderItensOS()
   document.getElementById('modal-os').classList.add('aberto')
 }
 
@@ -420,22 +487,30 @@ async function salvarOS() {
     km_veiculo: document.getElementById('os-km').value ? parseFloat(document.getElementById('os-km').value) : null,
     data_abertura: document.getElementById('os-abertura').value || new Date().toISOString().slice(0,10),
     data_conclusao: document.getElementById('os-conclusao').value || null,
-    custo: document.getElementById('os-custo').value ? parseFloat(document.getElementById('os-custo').value) : null,
+    custo_mao_obra: document.getElementById('os-custo').value ? parseFloat(document.getElementById('os-custo').value) : null,
     status: document.getElementById('os-status').value,
     observacoes: document.getElementById('os-obs').value.trim() || null,
   }
   const btn = document.getElementById('btn-salvar-os')
   btn.disabled = true; btn.textContent = 'Salvando...'
   try {
+    let osId = _editOsId
     if (_editOsId) {
       const { error } = await db.from('frota_ordens_servico').update(payload).eq('id', _editOsId)
       if (error) throw error
-      toast('Ordem de serviço atualizada!', 'success')
     } else {
-      const { error } = await db.from('frota_ordens_servico').insert(payload)
+      const { data, error } = await db.from('frota_ordens_servico').insert(payload).select('id').single()
       if (error) throw error
-      toast('Ordem de serviço aberta!', 'success')
+      osId = data.id
     }
+    await db.from('frota_os_itens').delete().eq('os_id', osId)
+    if (_osItensAtual.length) {
+      const { error: itensErr } = await db.from('frota_os_itens').insert(
+        _osItensAtual.map(it => ({ os_id: osId, descricao: it.descricao, quantidade: it.quantidade, valor_unitario: it.valor_unitario }))
+      )
+      if (itensErr) throw itensErr
+    }
+    toast(_editOsId ? 'Ordem de serviço atualizada!' : 'Ordem de serviço aberta!', 'success')
     fecharModal('os')
     await Promise.all([carregarOS(), carregarPlanos(), carregarVeiculos()])
   } catch (e) { toast(e.message || 'Erro ao salvar', 'error') }

@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#1F4E2C">
+  <title>Instalar — SIGUC Frota</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root { --verde:#1F4E2C; --verde-esc:#153A20; --fundo:#F6FAF6; --texto:#16241B; --suave:#5B6E62; }
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family:'DM Sans',system-ui,sans-serif; background:var(--fundo); color:var(--texto); line-height:1.55; }
+    .topo { background:var(--verde); color:#fff; text-align:center; padding:40px 20px 32px; }
+    .topo svg { margin-bottom:12px; }
+    .topo h1 { font-size:1.7rem; font-weight:700; }
+    .topo p { opacity:.92; margin-top:6px; font-size:1.05rem; }
+    main { max-width:560px; margin:0 auto; padding:24px 20px 60px; }
+    .cartao { background:#fff; border:1px solid #E2EBE4; border-radius:16px; padding:24px 20px; margin-top:20px; }
+    .cartao h2 { font-size:1.2rem; margin-bottom:6px; display:flex; align-items:center; gap:8px; }
+    .cartao .sub { color:var(--suave); font-size:.95rem; margin-bottom:16px; }
+    .qr-wrap { text-align:center; margin:8px 0 18px; }
+    .qr-wrap img { width:200px; height:200px; border-radius:12px; border:1px solid #E2EBE4; }
+    .qr-wrap p { font-size:.85rem; color:var(--suave); margin-top:8px; }
+    ol { padding-left:0; list-style:none; counter-reset:passo; }
+    ol li { counter-increment:passo; display:flex; gap:12px; margin-bottom:14px; font-size:1.02rem; }
+    ol li::before { content:counter(passo); flex:0 0 28px; height:28px; background:#E7F5EE; color:var(--verde-esc);
+      font-weight:700; border-radius:50%; display:flex; align-items:center; justify-content:center; }
+    .nota { background:#FFF8E8; border:1px solid #EFDFB0; border-radius:12px; padding:12px 14px; font-size:.92rem; color:#6B5A22; margin-top:8px; }
+    .rodape { text-align:center; color:var(--suave); font-size:.85rem; margin-top:32px; }
+    .rodape a { color:var(--verde-esc); }
+    b { font-weight:600; }
+    .copia-link { display:flex; align-items:center; gap:10px; width:100%; margin-top:10px;
+      background:#E7F5EE; border:1.5px dashed var(--verde); border-radius:12px; padding:13px 14px;
+      cursor:pointer; font-family:inherit; font-size:1rem; line-height:1.35; color:var(--verde-esc);
+      font-weight:600; text-align:left; transition:transform .12s, background .12s; -webkit-tap-highlight-color:transparent; }
+    .copia-link:active { transform:scale(.99); background:#D8EEE1; }
+    .copia-link .cl-url { flex:1; word-break:break-all; }
+    .copia-link .cl-ic { flex-shrink:0; display:flex; align-items:center; }
+    .copia-link .cl-ok { display:none; flex:1; }
+    .copia-link.ok { background:var(--verde); border-style:solid; border-color:var(--verde); color:#fff; }
+    .copia-link.ok .cl-url, .copia-link.ok .cl-ic { display:none; }
+    .copia-link.ok .cl-ok { display:block; }
+  </style>
+</head>
+<body>
+
+<header class="topo">
+  <svg width="56" height="56" viewBox="0 0 48 48" fill="none">
+    <circle cx="24" cy="24" r="24" fill="#fff" fill-opacity=".15"/>
+    <path d="M10 26h2c.6 0 1-.4 1-1v-3c0-.9.7-1.7 1.5-1.9C15.7 19.6 18 19 18 19s1.3-1.4 2.2-2.3c.5-.4 1.1-.7 1.8-.7h9c.6 0 1.1.4 1.4.9l1.4 2.9c.7.2 1.4 1 1.4 1.9v4c0 .6-.4 1-1 1h-2" stroke="#fff" stroke-width="1.6" fill="none"/>
+    <circle cx="16" cy="26" r="2.5" fill="#fff"/><circle cx="30" cy="26" r="2.5" fill="#fff"/>
+  </svg>
+  <h1>SIGUC Frota</h1>
+  <p>App do Motorista — viagens, diário de bordo e avisos no celular</p>
+</header>
+
+<main>
+
+  <!-- ── QR PARA COMPARTILHAR ─────────────────────────────── -->
+  <section class="cartao">
+    <h2>📲 Escaneie ou compartilhe</h2>
+    <p class="sub">Mostre este QR code para o motorista escanear com a câmera do celular, ou copie o link e mande por WhatsApp.</p>
+    <div class="qr-wrap">
+      <img id="qr-img" src="" alt="QR code de instalação">
+      <p>Aponte a câmera do celular para o código</p>
+    </div>
+    <button type="button" class="copia-link" id="btn-copiar" onclick="copiarLink()" aria-label="Copiar o link de instalação">
+      <span class="cl-url" id="cl-url">siguc-ac.vercel.app/pages/instalar-frota.html</span>
+      <span class="cl-ic" aria-hidden="true">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+      </span>
+      <span class="cl-ok" id="cl-ok">✓ Link copiado!</span>
+    </button>
+  </section>
+
+  <!-- ── ANDROID ──────────────────────────────────────────── -->
+  <section class="cartao">
+    <h2>📱 Celular Android</h2>
+    <p class="sub">O app instala direto pelo navegador Chrome — sem loja de aplicativos, sem arquivo pra baixar.</p>
+    <ol>
+      <li><span>Abra <b>este link</b> no navegador <b>Chrome</b> do celular (use o QR acima ou o botão de copiar).</span></li>
+      <li><span>Toque no menu <b>⋮</b> (três pontinhos, canto superior direito) e escolha <b>"Instalar app"</b> ou <b>"Adicionar à tela inicial"</b>.</span></li>
+      <li><span>Confirme tocando em <b>Instalar</b>. Pronto! O ícone <b>SIGUC Frota</b> aparece na tela inicial, como qualquer outro app.</span></li>
+    </ol>
+  </section>
+
+  <!-- ── iPHONE ───────────────────────────────────────────── -->
+  <section class="cartao">
+    <h2>🍎 iPhone (iOS)</h2>
+    <p class="sub">No iPhone, o app é instalado direto pelo navegador Safari — sem loja de aplicativos.</p>
+    <ol>
+      <li><span>Abra este link no <b>Safari</b> (precisa ser o Safari, não funciona em outro navegador).</span></li>
+      <li><span>Toque no botão de <b>compartilhar</b> <span style="font-size:1.1em">⎋</span> (quadrado com seta para cima, na barra de baixo).</span></li>
+      <li><span>Role a lista e toque em <b>"Adicionar à Tela de Início"</b>.</span></li>
+      <li><span>Toque em <b>Adicionar</b>. Use o app <b>sempre pelo ícone</b> da tela inicial — no iPhone, é só assim que os avisos de viagem funcionam.</span></li>
+    </ol>
+  </section>
+
+  <!-- ── PRIMEIRO USO ─────────────────────────────────────── -->
+  <section class="cartao">
+    <h2>✅ Primeiro uso (importante!)</h2>
+    <ol>
+      <li><span>Abra o app pelo <b>ícone da tela inicial</b> e faça login com seu e-mail e senha do SIGUC.</span></li>
+      <li><span>Toque em <b>"Ativar"</b> no aviso de notificações que aparece na tela inicial do app.</span></li>
+      <li><span>Permita quando o celular perguntar sobre <b>notificações</b>. A partir daí você recebe um aviso sempre que uma viagem for aprovada pra você.</span></li>
+    </ol>
+    <p class="nota">⚠️ Se o motorista ainda não tiver cadastro no SIGUC, o setor de transporte precisa cadastrá-lo antes em <b>Veículos e Motoristas</b>, vinculando o e-mail de login dele.</p>
+  </section>
+
+  <p class="rodape">
+    SEMA-AC · Secretaria de Estado de Meio Ambiente do Acre<br>
+    Dúvidas? Procure o setor de transporte ou a equipe DIMA.<br>
+    <a href="/pages/frota-motorista.html">Abrir a versão web</a>
+  </p>
+</main>
+
+<script>
+  var LINK_APP = 'https://siguc-ac.vercel.app/pages/instalar-frota.html';
+  document.getElementById('qr-img').src =
+    'https://api.qrserver.com/v1/create-qr-code/?data=' + encodeURIComponent(LINK_APP) + '&size=320x320&format=png&margin=12';
+
+  function _copiaOk() {
+    var btn = document.getElementById('btn-copiar');
+    if (!btn) return;
+    btn.classList.add('ok');
+    clearTimeout(btn._t);
+    btn._t = setTimeout(function () { btn.classList.remove('ok'); }, 2800);
+  }
+  function _copiaFallback(texto) {
+    var ta = document.createElement('textarea');
+    ta.value = texto; ta.setAttribute('readonly', '');
+    ta.style.position = 'absolute'; ta.style.left = '-9999px'; ta.style.fontSize = '16px';
+    document.body.appendChild(ta);
+    ta.select(); ta.setSelectionRange(0, texto.length);
+    var ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+    document.body.removeChild(ta);
+    return ok;
+  }
+  function copiarLink() {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(LINK_APP).then(_copiaOk, function () {
+        if (_copiaFallback(LINK_APP)) _copiaOk();
+      });
+    } else if (_copiaFallback(LINK_APP)) {
+      _copiaOk();
+    }
+  }
+</script>
+
+</body>
+</html>
