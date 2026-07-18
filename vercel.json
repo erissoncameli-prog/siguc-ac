@@ -5,6 +5,7 @@
   },
   "rewrites": [
     { "source": "/api/health/live", "destination": "/api/health" },
+    { "source": "/api/metrics", "destination": "/api/health" },
     { "source": "/(.*)", "destination": "/$1" }
   ],
   "headers": [
@@ -22,7 +23,6 @@
   ],
   "functions": {
     "api/health.js":         { "maxDuration": 10 },
-    "api/metrics.js":        { "maxDuration": 5  },
     "api/car-proxy.js":      { "maxDuration": 60 },
     "api/prodes-proxy.js":   { "maxDuration": 60 },
     "api/focos-proxy.js":    { "maxDuration": 30 },
@@ -31,7 +31,8 @@
     "api/planet-mosaics.js": { "maxDuration": 30 },
     "api/sentinel.js":       { "maxDuration": 30 },
     "api/geo.js":            { "maxDuration": 30 },
-    "api/biomonitor-apk-latest.js": { "maxDuration": 15 }
+    "api/biomonitor-apk-latest.js": { "maxDuration": 15 },
+    "api/push-send.js":      { "maxDuration": 10 }
   },
   "crons": [
     {

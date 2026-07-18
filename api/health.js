@@ -1,6 +1,9 @@
-// ── SIGUC-AC · Health Check Endpoint (Regra 4) ───────────────────
+// ── SIGUC-AC · Health Check + Metrics Endpoint (Regras 4 e 7) ────
 // Vercel Serverless Function: GET /api/health
 // Retorna 200 (healthy), 207 (degraded) ou 503 (unhealthy).
+// /api/metrics (via rewrite no vercel.json) também cai aqui — mesma
+// consolidação já usada para /api/health/live, para não ultrapassar
+// o limite de Serverless Functions do plano Hobby na Vercel.
 
 // Fallback igual aos proxies (focos-proxy/dof-proxy): se a Vercel não
 // tiver as env vars configuradas, usa os valores públicos (URL + chave
@@ -44,16 +47,51 @@ async function checkSupabaseAuth() {
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
 }
 
+// ── Métricas (ex-api/metrics.js) — snapshots enviados pelo cliente ─
+const _metricsStore = { snapshots: [] };
+
+async function handleMetrics(req, res) {
+  if (req.method === 'POST') {
+    let body = '';
+    for await (const chunk of req) body += chunk;
+    try {
+      const snapshot = JSON.parse(body);
+      _metricsStore.snapshots.push({ ...snapshot, receivedAt: new Date().toISOString() });
+      if (_metricsStore.snapshots.length > 100) _metricsStore.snapshots.shift();
+      res.status(202).json({ ok: true });
+    } catch {
+      res.status(400).json({ error: 'Invalid JSON' });
+    }
+    return;
+  }
+
+  if (req.method === 'GET') {
+    res.status(200).json({
+      snapshots: _metricsStore.snapshots.slice(-10),
+      total: _metricsStore.snapshots.length,
+    });
+    return;
+  }
+
+  res.status(405).json({ error: 'Method not allowed' });
+}
+
 module.exports = async (req, res) => {
+  const path = req.url.split('?')[0];
+
+  if (path.endsWith('/metrics')) {
+    await handleMetrics(req, res);
+    return;
+  }
+
   if (req.method !== 'GET') {
     res.status(405).json({ error: 'Method not allowed' });
     return;
   }
 
   // /api/health/live (via rewrite no vercel.json) — só confirma que o
-  // processo está vivo, sem checar dependências externas. Consolidado
-  // aqui para não ultrapassar o limite de Serverless Functions da Vercel.
-  if (req.url.split('?')[0].endsWith('/live')) {
+  // processo está vivo, sem checar dependências externas.
+  if (path.endsWith('/live')) {
     res.status(200).json({ status: 'alive', timestamp: new Date().toISOString() });
     return;
   }
