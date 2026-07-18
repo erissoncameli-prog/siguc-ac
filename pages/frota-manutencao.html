@@ -52,7 +52,10 @@
 <div class="modal-overlay" id="modal-os">
   <div class="modal" style="max-width:560px">
     <div class="modal-header">
-      <div class="modal-title" id="os-titulo">Nova Ordem de Serviço</div>
+      <div>
+        <div class="modal-title" id="os-titulo">Nova Ordem de Serviço</div>
+        <div id="os-codigo-badge" style="font-size:11px;color:#9CA3AF;margin-top:2px"></div>
+      </div>
       <button class="modal-close" onclick="fecharModal('os')">×</button>
     </div>
     <div class="modal-body">
@@ -75,6 +78,8 @@
         <div class="form-group" id="os-km-wrap"><label class="form-label" id="os-km-label">Hodômetro no momento (km)</label>
           <input class="form-control" id="os-km" type="number" min="0" step="0.1"></div>
       </div>
+      <div class="form-group"><label class="form-label">Código/Nº da OS do fornecedor</label>
+        <input class="form-control" id="os-codigo-fornecedor" placeholder="Nº que a oficina usa no documento dela"></div>
       <div class="grid-2">
         <div class="form-group"><label class="form-label">Data de abertura</label>
           <input class="form-control" id="os-abertura" type="date"></div>
@@ -187,8 +192,8 @@ const STATUS_OS_BADGE = { aberta:'badge-erro', em_andamento:'badge-ouro', conclu
         <div class="card">
           <div class="table-wrap"><div class="table-scroll">
             <table>
-              <thead><tr><th>Veículo</th><th>Tipo</th><th>Descrição</th><th>Oficina</th><th>Custo</th><th>Status</th><th>Datas</th>${_podeEditar?'<th>Ações</th>':''}</tr></thead>
-              <tbody id="tbody-os"><tr><td colspan="8" style="text-align:center;padding:32px;color:#9CA3AF">Carregando...</td></tr></tbody>
+              <thead><tr><th>Código</th><th>Veículo</th><th>Tipo</th><th>Descrição</th><th>Oficina</th><th>Custo</th><th>Status</th><th>Datas</th>${_podeEditar?'<th>Ações</th>':''}</tr></thead>
+              <tbody id="tbody-os"><tr><td colspan="9" style="text-align:center;padding:32px;color:#9CA3AF">Carregando...</td></tr></tbody>
             </table>
           </div></div>
         </div>
@@ -313,10 +318,11 @@ function renderOS() {
     (!status || o.status === status))
   const tbody = document.getElementById('tbody-os')
   if (!tbody) return
-  const cols = _podeEditar ? 8 : 7
+  const cols = _podeEditar ? 9 : 8
   if (!lista.length) { tbody.innerHTML = `<tr><td colspan="${cols}" style="text-align:center;padding:32px;color:#9CA3AF">Nenhuma ordem de serviço encontrada</td></tr>`; return }
   tbody.innerHTML = lista.map(o => `
     <tr>
+      <td class="mono" style="font-size:12px">${esc(o.codigo||'—')}</td>
       <td style="font-size:12px"><strong>${esc(o.placa||'—')}</strong><br>${esc(o.modelo||'')}</td>
       <td><span class="badge ${TIPO_OS_BADGE[o.tipo]}">${TIPO_OS_LABEL[o.tipo]}</span></td>
       <td style="font-size:12px;max-width:220px">${esc(o.descricao)}</td>
@@ -466,12 +472,14 @@ async function abrirModalOS(id = null) {
   const o = id ? _ordens.find(x => x.id === id) : null
   _editOsId = o?.id || null
   document.getElementById('os-titulo').textContent = o ? 'Editar Ordem de Serviço' : 'Nova Ordem de Serviço'
+  document.getElementById('os-codigo-badge').textContent = o?.codigo ? `Código ${o.codigo}` : 'Código gerado automaticamente ao salvar'
   document.getElementById('os-veiculo').value = o?.veiculo_id || ''
   atualizarPlanosDoVeiculo()
   document.getElementById('os-plano').value = o?.plano_id || ''
   document.getElementById('os-tipo').value = o?.tipo || 'corretiva'
   document.getElementById('os-descricao').value = o?.descricao || ''
   document.getElementById('os-oficina').value = o?.oficina || ''
+  document.getElementById('os-codigo-fornecedor').value = o?.codigo_fornecedor || ''
   document.getElementById('os-km').value = o?.km_veiculo ?? ''
   document.getElementById('os-abertura').value = o?.data_abertura || new Date().toISOString().slice(0,10)
   document.getElementById('os-conclusao').value = o?.data_conclusao || ''
@@ -501,6 +509,7 @@ async function salvarOS() {
     tipo: document.getElementById('os-tipo').value,
     descricao,
     oficina: document.getElementById('os-oficina').value.trim() || null,
+    codigo_fornecedor: document.getElementById('os-codigo-fornecedor').value.trim() || null,
     km_veiculo: document.getElementById('os-km').value ? parseFloat(document.getElementById('os-km').value) : null,
     data_abertura: document.getElementById('os-abertura').value || new Date().toISOString().slice(0,10),
     data_conclusao: document.getElementById('os-conclusao').value || null,
