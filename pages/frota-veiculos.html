@@ -275,6 +275,23 @@
   </div>
 </div>
 
+<!-- Modal Detalhes da Manutenção (plano ou OS — somente leitura) -->
+<div class="modal-overlay" id="modal-manut-detalhe">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title" id="md2-titulo">Detalhes</div>
+        <div id="md2-subtitulo" style="font-size:11px;color:#9CA3AF;margin-top:2px"></div>
+      </div>
+      <button class="modal-close" onclick="fecharModal('manut-detalhe')">×</button>
+    </div>
+    <div class="modal-body" id="md2-corpo"></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="fecharModal('manut-detalhe')">Fechar</button>
+    </div>
+  </div>
+</div>
+
 <script>
 let _podeEditar = false
 let _veiculos = [], _motoristas = [], _setores = [], _usuarios = [], _docsPorVeiculo = {}
@@ -673,6 +690,8 @@ function mudarAbaVeiculo(aba) {
 }
 
 // ── Modal Veículo: aba Manutenção (somente leitura) ────────────
+let _planosVeicAtual = [], _osVeicAtual = []
+
 async function carregarManutencaoVeiculo(veiculoId) {
   const elPlanos = document.getElementById('v-manut-planos')
   const elOs = document.getElementById('v-manut-os')
@@ -681,31 +700,97 @@ async function carregarManutencaoVeiculo(veiculoId) {
     db.from('vw_frota_manutencoes_pendentes').select('*').eq('veiculo_id', veiculoId),
     db.from('vw_frota_os_detalhe').select('*').eq('veiculo_id', veiculoId).order('data_abertura', { ascending: false }),
   ])
-  elPlanos.innerHTML = !planos?.length
+  _planosVeicAtual = planos || []
+  _osVeicAtual = os || []
+  elPlanos.innerHTML = !_planosVeicAtual.length
     ? '<div style="text-align:center;color:#9CA3AF;padding:16px;font-size:13px">Nenhum plano preventivo cadastrado</div>'
-    : planos.map(p => {
+    : _planosVeicAtual.map(p => {
         const unidade = p.medidor === 'horimetro' ? 'h' : 'km'
         const intervalo = [
           p.intervalo_km != null ? `${formatNum(p.intervalo_km,1)} ${unidade}` : null,
           p.intervalo_meses != null ? `${p.intervalo_meses} meses` : null
         ].filter(Boolean).join(' ou ')
         const sit = situacaoPlanoVeic(p)
-        return `<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid #F3F4F6;font-size:13px">
+        return `<div class="v-manut-row" onclick="abrirDetalheManutencao('plano','${p.id}')" style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid #F3F4F6;font-size:13px;cursor:pointer">
           <span style="flex:1">${esc(p.item)}</span>
           <span class="mono" style="color:#6B7280">${intervalo || '—'}</span>
           <span class="badge ${SITUACAO_BADGE_L[sit]}">${SITUACAO_LABEL_L[sit]}</span>
         </div>`
       }).join('')
-  elOs.innerHTML = !os?.length
+  elOs.innerHTML = !_osVeicAtual.length
     ? '<div style="text-align:center;color:#9CA3AF;padding:16px;font-size:13px">Nenhuma ordem de serviço registrada</div>'
-    : os.map(o => `
-      <div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid #F3F4F6;font-size:13px;flex-wrap:wrap">
+    : _osVeicAtual.map(o => `
+      <div class="v-manut-row" onclick="abrirDetalheManutencao('os','${o.id}')" style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid #F3F4F6;font-size:13px;flex-wrap:wrap;cursor:pointer">
+        <span class="mono" style="width:100px;color:#9CA3AF">${esc(o.codigo||'—')}</span>
         <span class="badge ${TIPO_OS_BADGE_L[o.tipo]||'badge-cinza'}">${TIPO_OS_LABEL_L[o.tipo]||o.tipo}</span>
         <span style="flex:1;min-width:120px">${esc(o.descricao)}</span>
         <span class="badge ${STATUS_OS_BADGE_L[o.status]||'badge-cinza'}">${STATUS_OS_LABEL_L[o.status]||o.status}</span>
         <span class="mono" style="width:90px;text-align:right">${o.custo_total != null ? formatBRL(o.custo_total) : '—'}</span>
         <span style="width:90px;text-align:right;color:#9CA3AF">${formatData(o.data_abertura)}</span>
       </div>`).join('')
+}
+
+// ── Modal Detalhes da Manutenção (plano ou OS) ─────────────────
+async function abrirDetalheManutencao(tipo, id) {
+  const corpo = document.getElementById('md2-corpo')
+  document.getElementById('md2-subtitulo').textContent = ''
+  if (tipo === 'plano') {
+    const p = _planosVeicAtual.find(x => x.id === id)
+    if (!p) return
+    document.getElementById('md2-titulo').textContent = 'Plano preventivo'
+    const unidade = p.medidor === 'horimetro' ? 'h' : 'km'
+    const intervalo = [
+      p.intervalo_km != null ? `${formatNum(p.intervalo_km,1)} ${unidade}` : null,
+      p.intervalo_meses != null ? `${p.intervalo_meses} meses` : null
+    ].filter(Boolean).join(' ou ') || '—'
+    const ultima = [
+      p.ultima_execucao_km != null ? `${formatNum(p.ultima_execucao_km,1)} ${unidade}` : null,
+      p.ultima_execucao_data ? formatData(p.ultima_execucao_data) : null
+    ].filter(Boolean).join(' · ') || '—'
+    const sit = situacaoPlanoVeic(p)
+    corpo.innerHTML = `
+      <div class="md2-campo"><span class="md2-lbl">Item</span><span>${esc(p.item)}</span></div>
+      <div class="md2-campo"><span class="md2-lbl">Intervalo</span><span>${intervalo}</span></div>
+      <div class="md2-campo"><span class="md2-lbl">Última execução</span><span>${ultima}</span></div>
+      <div class="md2-campo"><span class="md2-lbl">Situação</span><span class="badge ${SITUACAO_BADGE_L[sit]}">${SITUACAO_LABEL_L[sit]}</span></div>
+      ${p.observacoes ? `<div class="md2-campo"><span class="md2-lbl">Observações</span><span>${esc(p.observacoes)}</span></div>` : ''}`
+  } else {
+    const o = _osVeicAtual.find(x => x.id === id)
+    if (!o) return
+    document.getElementById('md2-titulo').textContent = 'Ordem de Serviço'
+    document.getElementById('md2-subtitulo').textContent = o.codigo ? `Código ${o.codigo}` : ''
+    corpo.innerHTML = '<div style="text-align:center;color:#9CA3AF;padding:16px;font-size:13px">Carregando itens...</div>'
+    document.getElementById('modal-manut-detalhe').classList.add('aberto')
+    const { data: itens } = await db.from('frota_os_itens').select('*').eq('os_id', o.id).order('criado_em')
+    const linhasItens = (itens || []).map(it => `
+      <tr>
+        <td>${esc(it.descricao)}${it.marca ? `<br><span style="font-size:11px;color:#9CA3AF">${esc(it.marca)}</span>` : ''}</td>
+        <td class="mono" style="text-align:right">${formatNum(it.quantidade,2)}</td>
+        <td class="mono" style="text-align:right">${formatBRL(it.valor_unitario)}</td>
+        <td class="mono" style="text-align:right;font-weight:600">${formatBRL(it.subtotal)}</td>
+      </tr>`).join('')
+    corpo.innerHTML = `
+      <div class="md2-campo"><span class="md2-lbl">Veículo</span><span>${esc(o.placa||'—')} — ${esc(o.modelo||'')}</span></div>
+      <div class="md2-campo"><span class="md2-lbl">Tipo</span><span class="badge ${TIPO_OS_BADGE_L[o.tipo]||'badge-cinza'}">${TIPO_OS_LABEL_L[o.tipo]||o.tipo}</span></div>
+      <div class="md2-campo"><span class="md2-lbl">Status</span><span class="badge ${STATUS_OS_BADGE_L[o.status]||'badge-cinza'}">${STATUS_OS_LABEL_L[o.status]||o.status}</span></div>
+      <div class="md2-campo"><span class="md2-lbl">Descrição</span><span>${esc(o.descricao)}</span></div>
+      <div class="md2-campo"><span class="md2-lbl">Oficina/fornecedor</span><span>${esc(o.oficina||'—')}</span></div>
+      ${o.codigo_fornecedor ? `<div class="md2-campo"><span class="md2-lbl">Código do fornecedor</span><span class="mono">${esc(o.codigo_fornecedor)}</span></div>` : ''}
+      <div class="md2-campo"><span class="md2-lbl">Hodômetro/horímetro</span><span>${o.km_veiculo != null ? formatNum(o.km_veiculo,1) : '—'}</span></div>
+      <div class="md2-campo"><span class="md2-lbl">Datas</span><span>${formatData(o.data_abertura)}${o.data_conclusao ? ` até ${formatData(o.data_conclusao)}` : ' (em aberto)'}</span></div>
+      ${itens?.length ? `
+      <div class="md2-lbl" style="margin:12px 0 6px">Peças/itens</div>
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead><tr style="border-bottom:1px solid #E5E7EB"><th style="text-align:left;padding:4px 0">Descrição</th><th style="text-align:right;padding:4px 0">Qtd</th><th style="text-align:right;padding:4px 0">Valor</th><th style="text-align:right;padding:4px 0">Subtotal</th></tr></thead>
+        <tbody>${linhasItens}</tbody>
+      </table>` : ''}
+      <div class="md2-campo" style="margin-top:10px"><span class="md2-lbl">Mão de obra</span><span class="mono">${formatBRL(o.custo_mao_obra||0)}</span></div>
+      <div class="md2-campo"><span class="md2-lbl">Peças</span><span class="mono">${formatBRL(o.custo_pecas||0)}</span></div>
+      <div class="md2-campo"><span class="md2-lbl">Total</span><span class="mono" style="font-weight:700;color:var(--verde-c,#52B788)">${formatBRL(o.custo_total||0)}</span></div>
+      ${o.observacoes ? `<div class="md2-campo"><span class="md2-lbl">Observações</span><span>${esc(o.observacoes)}</span></div>` : ''}`
+    return
+  }
+  document.getElementById('modal-manut-detalhe').classList.add('aberto')
 }
 function situacaoPlanoVeic(p) {
   const usoVencido = p.restante_uso != null && p.restante_uso <= 0
@@ -1031,6 +1116,10 @@ function fecharModal(qual) {
   border:1px solid var(--borda,#E5E7EB); border-radius:10px; padding:8px 10px;
   min-width:140px; background:#fff;
 }
+/* Linhas clicáveis da aba Manutenção + modal de detalhes */
+.v-manut-row:hover { background:#F9FAFB; }
+.md2-campo { display:flex; gap:10px; padding:6px 0; border-bottom:1px solid #F3F4F6; font-size:13px; }
+.md2-lbl { width:150px; flex-shrink:0; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:#9CA3AF; }
 </style>
 </body>
 </html>
