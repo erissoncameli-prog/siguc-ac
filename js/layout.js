@@ -140,8 +140,6 @@ function gerarLayout(tituloPagina, paginaAtiva) {
         { id: 'frota-app',       href: '../pages/frota-app.html',       label: 'App Frota', target: '_blank' },
         { id: 'frota-tarefas',   href: '../pages/frota-tarefas.html',   label: 'Minhas Tarefas' },
         { id: 'frota-solicitar', href: '../pages/frota-solicitar.html', label: 'Solicitar Viagem' },
-        { id: 'frota-motorista', href: '../pages/frota-motorista.html', label: 'App do Motorista',
-          perfis: ['super_admin','secretario','diretor','chefe_departamento','gestor','gestor_uc','tecnico','assistente_admin','financeiro'] },
         { id: 'frota-viagens',   href: '../pages/frota-viagens.html',   label: 'Agenda de Viagens',
           perfis: ['super_admin','diretor','chefe_departamento','gestor','assistente_admin'] },
         { id: 'frota-manutencao', href: '../pages/frota-manutencao.html', label: 'Manutenção',
