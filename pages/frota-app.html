@@ -230,6 +230,26 @@ const _frotaReady = _dbReady.then(function () {
   </div>
 </div>
 
+<!-- Modal Instalar (QR — igual aos demais apps do sistema) -->
+<div class="modal-overlay" id="modal-instalar">
+  <div class="modal" style="max-width:360px">
+    <div class="modal-header">
+      <div class="modal-title">Instalar o App Frota</div>
+      <button class="modal-close" onclick="fecharModal('instalar')">×</button>
+    </div>
+    <div class="modal-body" style="text-align:center">
+      <p style="font-size:13px;color:#6B7280;margin-bottom:14px">Aponte a câmera de outro aparelho para o QR, ou toque em "Abrir página" para instalar neste.</p>
+      <img id="instalar-qr" alt="QR de instalação" style="width:220px;height:220px;border-radius:12px;background:#F3F4F6">
+      <p id="instalar-link" style="font-size:12px;color:#1F4E2C;word-break:break-all;margin-top:12px"></p>
+      <p style="font-size:11px;color:#9CA3AF;margin-top:6px">Precisa de internet para gerar o QR.</p>
+    </div>
+    <div class="modal-footer">
+      <a class="btn btn-secondary" id="instalar-abrir" href="#" target="_blank" rel="noopener">Abrir página</a>
+      <button class="btn btn-primary" onclick="fecharModal('instalar')">Fechar</button>
+    </div>
+  </div>
+</div>
+
 <!-- Tela de PIN (bloqueio de dispositivo compartilhado/perdido) -->
 <div id="fm-pin-tela" class="fm-pin-tela" hidden>
   <div class="fm-pin-card">
@@ -820,6 +840,7 @@ async function renderFmConfig() {
       ${_papeis.length > 1 ? `<button class="fm-config-item" onclick="trocarPerfil()">${bico('shield')} Trocar perfil</button>` : ''}
       <button class="fm-config-item" onclick="abrirTarefasFrota()">${bico('clipboard')} Minhas Tarefas</button>
       <button class="fm-config-item" onclick="alterarPinFrota()">${bico('key')} Alterar PIN</button>
+      <button class="fm-config-item" onclick="abrirInstalarFrota()">${bico('qr')} Instalar o app</button>
       <button class="fm-config-item" id="btn-verificar-update-frota" onclick="verificarAtualizacaoFrota()">${bico('download')} Verificar atualização</button>
       <button class="fm-config-item" style="color:#DC2626" onclick="zerarFilaLocalFrota()">${bico('trash')} Zerar fila local</button>
       <button class="fm-config-item" style="color:#DC2626" onclick="fazerLogout()">${bico('logout')} Sair</button>
@@ -844,6 +865,17 @@ async function zerarFilaLocalFrota() {
   toast('Fila local zerada', 'success')
   await atualizarBadgePendentesSync()
   await carregarViagensMotorista()
+}
+
+// ── Instalar o app (QR — igual aos demais apps do sistema) ────────
+const FROTA_INSTALL_URL = 'https://siguc-ac.vercel.app/pages/instalar-frota.html'
+function abrirInstalarFrota() {
+  const url = FROTA_INSTALL_URL
+  const qr = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(url)}&size=320x320&format=png&margin=12`
+  document.getElementById('instalar-qr').src = qr
+  document.getElementById('instalar-link').textContent = url
+  document.getElementById('instalar-abrir').href = url
+  document.getElementById('modal-instalar').classList.add('aberto')
 }
 
 // ── Verificar atualização (Web/PWA) ───────────────────────────────
