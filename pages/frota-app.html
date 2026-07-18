@@ -462,18 +462,10 @@ function renderTopo(peek) {
         ${_modoAtivo !== 'solicitante' ? `<button class="btn btn-xs btn-secondary" onclick="entrarModo('solicitante', false)" data-icon="truck">Solicitar viagem</button>` : ''}
       </div>
     </div>
-    <div class="card" id="push-banner" style="display:none;margin-bottom:16px;background:#F0FDF4;border-color:#BBF7D0">
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
-        <div>
-          <div style="font-weight:700;font-size:13px">Ativar notificações</div>
-          <div style="font-size:12px;color:#6B7280">Receba um aviso no celular quando houver novidade nas suas viagens.</div>
-        </div>
-        <button class="btn btn-primary btn-sm" id="btn-ativar-push" onclick="ativarPush()">Ativar</button>
-      </div>
-    </div>
+    <div id="push-slot"></div>
     <div id="modo-corpo"></div>`
   bIconsAplicar()
-  verificarStatusPush()
+  atualizarEntradaPush()
 }
 
 function formatDataHora(str) {
@@ -671,15 +663,6 @@ function renderFmInicio() {
         <div style="font-size:12px;color:#9CA3AF">CNH ${esc(_motorista.cnh_categoria||'—')} ${_motorista.cnh_numero ? '· '+esc(_motorista.cnh_numero) : ''}</div>
       </div>
     </div>
-    <div class="card" id="push-banner" style="display:none;margin-bottom:16px;background:#F0FDF4;border-color:#BBF7D0">
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
-        <div>
-          <div style="font-weight:700;font-size:13px">Ativar notificações</div>
-          <div style="font-size:12px;color:#6B7280">Receba um aviso no celular quando houver novidade nas suas viagens.</div>
-        </div>
-        <button class="btn btn-primary btn-sm" id="btn-ativar-push" onclick="ativarPush()">Ativar</button>
-      </div>
-    </div>
     ${ativas.length ? `
       <div class="form-section-label">Viagem em andamento</div>
       ${ativas.slice(0, 1).map(fmCardViagem).join('')}
@@ -688,7 +671,6 @@ function renderFmInicio() {
         Nenhuma viagem pendente no momento.<br>
         <button class="btn btn-secondary btn-sm" style="margin-top:12px" onclick="motoristaAba('nova')">Abrir uma viagem</button>
       </div>`}`
-  verificarStatusPush()
 }
 
 // ── Aba Solicitações (viagens atribuídas a mim aguardando ação) ──
@@ -910,6 +892,8 @@ async function renderFmConfig() {
         <button class="btn btn-sm btn-secondary" id="btn-sync-agora" onclick="sincronizarAgora()">${bico('upload')} Sincronizar agora</button>
       </div>
     </div>
+    <div class="form-section-label">Notificações</div>
+    <div class="card" style="padding:0;margin-bottom:16px" id="fm-cfg-push">${itemPushConfig('carregando')}</div>
     <div class="form-section-label">Configurações</div>
     <div class="card" style="padding:0">
       ${_papeis.length > 1 ? `<button class="fm-config-item" onclick="trocarPerfil()">${bico('shield')} Trocar perfil</button>` : ''}
@@ -921,6 +905,14 @@ async function renderFmConfig() {
       <button class="fm-config-item" style="color:#DC2626" onclick="fazerLogout()">${bico('logout')} Sair</button>
     </div>`
   await atualizarBadgePendentesSync()
+  atualizarItemPushConfig()
+}
+
+async function atualizarItemPushConfig() {
+  const alvo = document.getElementById('fm-cfg-push')
+  if (!alvo) return
+  alvo.innerHTML = itemPushConfig(await estadoPush())
+  bIconsAplicar(alvo)
 }
 
 async function sincronizarAgora() {
@@ -1783,27 +1775,77 @@ function _urlBase64ToUint8Array(base64) {
   return Uint8Array.from([...raw].map(c => c.charCodeAt(0)))
 }
 
-async function verificarStatusPush() {
-  const banner = document.getElementById('push-banner')
-  if (!banner) return
-  if (!('serviceWorker' in navigator) || !('PushManager' in window) || typeof Notification === 'undefined') return
-  if (Notification.permission === 'denied') return
-  try {
-    const reg = await navigator.serviceWorker.getRegistration()
-    const sub = reg ? await reg.pushManager.getSubscription() : null
-    banner.style.display = sub ? 'none' : ''
-  } catch (e) { banner.style.display = '' }
+function ehIOS() {
+  return /iP(hone|ad|od)/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+}
+function ehStandalone() {
+  return window.matchMedia?.('(display-mode: standalone)').matches || window.navigator.standalone === true
 }
 
-async function ativarPush() {
-  const btn = document.getElementById('btn-ativar-push')
-  btn.disabled = true; btn.textContent = 'Ativando...'
+// Estado real do push, sem tratar exceção como "não inscrito":
+// 'ativado' | 'ativavel' | 'bloqueado' | 'ios-instalar' | 'indisponivel'
+async function estadoPush() {
+  const suportado = ('serviceWorker' in navigator) && ('PushManager' in window) && (typeof Notification !== 'undefined')
+  // No iOS o push só existe dentro do app instalado na Tela de Início
+  // (iOS 16.4+). Em aba do Safari as APIs nem aparecem.
+  if (!suportado) return (ehIOS() && !ehStandalone()) ? 'ios-instalar' : 'indisponivel'
+  if (Notification.permission === 'denied') return 'bloqueado'
   try {
-    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-      toast('Seu navegador não suporta notificações push', 'error'); return
-    }
+    const reg = await navigator.serviceWorker.getRegistration('/pages/frota-app.html')
+             || await navigator.serviceWorker.getRegistration()
+    if (reg && await reg.pushManager.getSubscription()) return 'ativado'
+  } catch (e) { /* segue como ativável */ }
+  if (ehIOS() && !ehStandalone()) return 'ios-instalar'
+  return 'ativavel'
+}
+
+// Item de Notificações no Config (settings — mostra estado, não incomoda)
+function itemPushConfig(estado) {
+  if (estado === 'carregando')
+    return `<div class="fm-config-item" style="cursor:default;color:#9CA3AF">${bico('bell')} <span>Verificando…</span></div>`
+  if (estado === 'ativado')
+    return `<div class="fm-config-item" style="cursor:default"><span style="color:var(--verde-c,#52B788);display:inline-flex">${bico('check')}</span> <span>Notificações ativadas</span></div>`
+  if (estado === 'ativavel')
+    return `<button class="fm-config-item" onclick="ativarPushFrota()">${bico('bell')} Ativar notificações no celular</button>`
+  if (estado === 'bloqueado')
+    return `<div class="fm-config-item" style="cursor:default;color:#92400E">${bico('bell')} <span>Notificações bloqueadas — libere nas configurações do navegador para este site.</span></div>`
+  if (estado === 'ios-instalar')
+    return `<button class="fm-config-item" onclick="abrirInstalarFrota()">${bico('download')} <span>No iPhone, instale o app na Tela de Início para receber notificações.</span></button>`
+  return `<div class="fm-config-item" style="cursor:default;color:#9CA3AF">${bico('bell')} <span>Notificações indisponíveis neste dispositivo</span></div>`
+}
+
+// Slot do topo (desktop): só aparece quando é de fato acionável — não fica
+// reaparecendo quando já está ativado, bloqueado ou indisponível.
+async function atualizarEntradaPush() {
+  const slot = document.getElementById('push-slot')
+  if (!slot) return
+  if (await estadoPush() !== 'ativavel') { slot.innerHTML = ''; return }
+  slot.innerHTML = `
+    <div class="card" style="margin-bottom:16px;background:#F0FDF4;border-color:#BBF7D0">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+        <div>
+          <div style="font-weight:700;font-size:13px">Ativar notificações</div>
+          <div style="font-size:12px;color:#6B7280">Receba um aviso no celular quando houver novidade nas suas viagens.</div>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="ativarPushFrota()">Ativar</button>
+      </div>
+    </div>`
+}
+
+// Ativa o push e devolve mensagem clara em cada falha (misto iPhone/Android).
+async function ativarPushFrota() {
+  if (ehIOS() && !ehStandalone()) {
+    toast('No iPhone, instale o app na Tela de Início primeiro (menu Compartilhar → Adicionar à Tela de Início).', 'warning')
+    return
+  }
+  if (!('serviceWorker' in navigator) || !('PushManager' in window) || typeof Notification === 'undefined') {
+    toast('Este dispositivo não suporta notificações push', 'error'); return
+  }
+  try {
     const permissao = await Notification.requestPermission()
-    if (permissao !== 'granted') { toast('Permissão de notificação negada', 'error'); return }
+    if (permissao === 'denied') { toast('Permissão bloqueada. Libere as notificações deste site nas configurações do navegador.', 'error'); return }
+    if (permissao !== 'granted') { toast('Ative as notificações para receber avisos das suas viagens.', 'warning'); return }
 
     const reg = await navigator.serviceWorker.register('/pwa/sw.js', { scope: '/pages/frota-app.html' })
     await navigator.serviceWorker.ready
@@ -1822,12 +1864,14 @@ async function ativarPush() {
       auth_key: json.keys.auth,
       user_agent: navigator.userAgent,
     }, { onConflict: 'usuario_id,endpoint' })
-    if (error) throw error
-
-    toast('Notificações ativadas!', 'success')
-    document.getElementById('push-banner').style.display = 'none'
-  } catch (e) { toast(e.message || 'Erro ao ativar notificações', 'error') }
-  finally { btn.disabled = false; btn.textContent = 'Ativar' }
+    if (error) { toast('Notificações ativadas no aparelho, mas não foi possível registrar no servidor: ' + (error.message || 'tente de novo'), 'warning') }
+    else toast('Notificações ativadas!', 'success')
+  } catch (e) {
+    toast('Não foi possível ativar as notificações: ' + (e.message || 'tente novamente'), 'error')
+  }
+  // Reflete o novo estado onde estiver visível
+  atualizarEntradaPush()
+  atualizarItemPushConfig()
 }
 
 if ('serviceWorker' in navigator && !window.Capacitor) {
