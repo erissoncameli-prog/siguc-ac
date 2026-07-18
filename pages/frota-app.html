@@ -1237,7 +1237,7 @@ async function ativarPush() {
     const permissao = await Notification.requestPermission()
     if (permissao !== 'granted') { toast('Permissão de notificação negada', 'error'); return }
 
-    const reg = await navigator.serviceWorker.register('/pwa/sw.js')
+    const reg = await navigator.serviceWorker.register('/pwa/sw.js', { scope: '/pages/frota-app.html' })
     await navigator.serviceWorker.ready
     let sub = await reg.pushManager.getSubscription()
     if (!sub) {
@@ -1263,7 +1263,7 @@ async function ativarPush() {
 }
 
 if ('serviceWorker' in navigator && !window.Capacitor) {
-  navigator.serviceWorker.register('/pwa/sw.js').catch(() => {})
+  navigator.serviceWorker.register('/pwa/sw.js', { scope: '/pages/frota-app.html' }).catch(() => {})
 }
 </script>
 
