@@ -160,24 +160,36 @@ D) Gestão de Pesquisa (13 etapas)
 E) Dashboard Executivo por nível (UC / Diretoria / Secretaria)
 
 ## Versionamento (OBRIGATÓRIO — vale para TODA sessão)
-- A versão de referência do app é o cache do service worker em
-  `pwa/sw.js`: `const CACHE = 'siguc-brigadas-vN'`.
+- `pwa/sw.js` é um único arquivo compartilhado pelos 3 PWAs (Brigadas,
+  Biomonitor, Frota), mas cache e versão são ISOLADOS por app: cada
+  página registra o SW com `scope` próprio (`/pages/brigada.html`,
+  `/pages/biomonitor.html`, `/pages/frota-app.html`), e o SW deriva
+  `APP` do `self.registration.scope` para escolher o app shell e o
+  nome do cache (`siguc-<app>-vN`). O objeto `VERSOES` no topo do
+  arquivo guarda o contador de cada um.
 - A CADA implementação concluída, ANTES do commit/deploy, INCREMENTAR
-  a versão: ler o número atual de `CACHE` em `pwa/sw.js` e subir em 1
-  (vN → vN+1). Ex.: `siguc-brigadas-v114` → `siguc-brigadas-v115`.
-- Isso invalida o cache do service worker e garante que os aparelhos
-  (web/PWA e app de campo) recebam a versão nova. Sem isso, os usuários
-  continuam vendo a versão antiga.
-- Obrigatório sempre que a entrega tocar arquivos web (HTML/JS/CSS/PWA).
-  Entregas só de banco/migrations (sem arquivos web) dispensam o
-  incremento — na dúvida, incremente.
-- Mencionar a nova versão no commit (ex.: "sw.js: cache vN → vN+1").
+  em `pwa/sw.js` SÓ o contador do app que a entrega tocou (vN → vN+1
+  dentro de `VERSOES.brigadas`, `VERSOES.biomonitor` ou
+  `VERSOES.frota`) — não mexer nos outros dois. Se a entrega tocar
+  mais de um app (ex.: um JS compartilhado como `js/config.js` ou
+  `brigada-captura.js`, usado por Brigadas E Biomonitor), incrementar
+  todos os apps afetados.
+- Isso invalida o cache do service worker daquele app e garante que os
+  aparelhos (web/PWA e app de campo) recebam a versão nova. Sem isso,
+  os usuários continuam vendo a versão antiga.
+- Obrigatório sempre que a entrega tocar arquivos web (HTML/JS/CSS/PWA)
+  daquele app específico. Entregas só de banco/migrations (sem
+  arquivos web) dispensam o incremento — na dúvida, incremente.
+- Se adicionar/remover arquivo do app shell de um app, atualizar
+  também a lista correspondente em `SHELLS` (mesmo arquivo).
+- Mencionar a nova versão no commit (ex.: "sw.js: biomonitor v1 → v2").
 - Esta regra é permanente e deve ser seguida em todas as sessões, sem
   precisar ser solicitada novamente.
 
 ## Regras de desenvolvimento
 - VERSIONAMENTO: a cada implementação concluída, subir a versão do cache
-  em `pwa/sw.js` (vN → vN+1) — ver seção "Versionamento" acima.
+  do(s) app(s) afetado(s) em `pwa/sw.js` (vN → vN+1) — ver seção
+  "Versionamento" acima.
 - Manter design system — nunca alterar variáveis CSS sem alinhamento
 - Novos JS em js/ seguindo padrão do projeto
 - Novas páginas em pages/ com gerarLayout() obrigatório

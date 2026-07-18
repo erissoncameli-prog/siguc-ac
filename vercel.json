@@ -10,6 +10,12 @@
   ],
   "headers": [
     {
+      "source": "/pwa/sw.js",
+      "headers": [
+        { "key": "Service-Worker-Allowed", "value": "/" }
+      ]
+    },
+    {
       "source": "/(.*)",
       "headers": [
         { "key": "X-Content-Type-Options",  "value": "nosniff" },
