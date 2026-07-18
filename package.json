@@ -9,5 +9,8 @@
   "devDependencies": {
     "@playwright/test": "^1.44.0",
     "pptxgenjs": "^4.0.1"
+  },
+  "dependencies": {
+    "web-push": "^3.6.7"
   }
 }
