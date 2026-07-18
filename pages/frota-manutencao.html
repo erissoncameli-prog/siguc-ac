@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>SIGUC-AC · Frota — Manutenção</title>
+<link rel="stylesheet" href="../css/global.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../js/observability.js"></script>
+<script src="../js/queryLogger.js"></script>
+<script src="../js/config.js"></script>
+<script src="../js/layout.js"></script>
+</head>
+<body>
+<div id="app"></div>
+
+<!-- Modal Plano -->
+<div class="modal-overlay" id="modal-plano">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-header">
+      <div class="modal-title" id="pl-titulo">Novo Plano Preventivo</div>
+      <button class="modal-close" onclick="fecharModal('plano')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label">Veículo <span class="obrig">*</span></label>
+        <select class="form-control" id="pl-veiculo"><option value="">Selecione...</option></select></div>
+      <div class="form-group"><label class="form-label">Item <span class="obrig">*</span></label>
+        <input class="form-control" id="pl-item" placeholder="Ex.: Troca de óleo, Revisão geral..."></div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label" id="pl-intervalo-uso-label">Intervalo (km)</label>
+          <input class="form-control" id="pl-intervalo-uso" type="number" min="0" step="0.1" placeholder="10000"></div>
+        <div class="form-group"><label class="form-label">Intervalo (meses)</label>
+          <input class="form-control" id="pl-intervalo-meses" type="number" min="0" placeholder="6"></div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label" id="pl-ultima-uso-label">Última execução (km)</label>
+          <input class="form-control" id="pl-ultima-uso" type="number" min="0" step="0.1"></div>
+        <div class="form-group"><label class="form-label">Última execução (data)</label>
+          <input class="form-control" id="pl-ultima-data" type="date"></div>
+      </div>
+      <div class="form-group"><label class="form-label">Observações</label>
+        <textarea class="form-control" id="pl-obs" rows="2"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" id="btn-excluir-plano" style="margin-right:auto;color:#DC2626;display:none" onclick="excluirPlano()" data-icon="trash">Inativar</button>
+      <button class="btn btn-secondary" onclick="fecharModal('plano')">Cancelar</button>
+      <button class="btn btn-primary" id="btn-salvar-plano" onclick="salvarPlano()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Ordem de Serviço -->
+<div class="modal-overlay" id="modal-os">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-header">
+      <div class="modal-title" id="os-titulo">Nova Ordem de Serviço</div>
+      <button class="modal-close" onclick="fecharModal('os')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Veículo <span class="obrig">*</span></label>
+          <select class="form-control" id="os-veiculo" onchange="atualizarPlanosDoVeiculo()"><option value="">Selecione...</option></select></div>
+        <div class="form-group"><label class="form-label">Tipo</label>
+          <select class="form-control" id="os-tipo">
+            <option value="corretiva">Corretiva</option>
+            <option value="preventiva">Preventiva</option>
+          </select></div>
+      </div>
+      <div class="form-group" id="wrap-os-plano"><label class="form-label">Plano preventivo vinculado (opcional)</label>
+        <select class="form-control" id="os-plano"><option value="">—</option></select></div>
+      <div class="form-group"><label class="form-label">Descrição do problema/serviço <span class="obrig">*</span></label>
+        <textarea class="form-control" id="os-descricao" rows="2"></textarea></div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Oficina/fornecedor</label>
+          <input class="form-control" id="os-oficina"></div>
+        <div class="form-group" id="os-km-wrap"><label class="form-label" id="os-km-label">Hodômetro no momento (km)</label>
+          <input class="form-control" id="os-km" type="number" min="0" step="0.1"></div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Data de abertura</label>
+          <input class="form-control" id="os-abertura" type="date"></div>
+        <div class="form-group"><label class="form-label">Data de conclusão</label>
+          <input class="form-control" id="os-conclusao" type="date"></div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Custo (R$)</label>
+          <input class="form-control" id="os-custo" type="number" min="0" step="0.01"></div>
+        <div class="form-group"><label class="form-label">Status</label>
+          <select class="form-control" id="os-status" onchange="ajustarDataConclusao()">
+            <option value="aberta">Aberta</option>
+            <option value="em_andamento">Em andamento</option>
+            <option value="concluida">Concluída</option>
+            <option value="cancelada">Cancelada</option>
+          </select></div>
+      </div>
+      <div class="form-group"><label class="form-label">Observações</label>
+        <textarea class="form-control" id="os-obs" rows="2"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="fecharModal('os')">Cancelar</button>
+      <button class="btn btn-primary" id="btn-salvar-os" onclick="salvarOS()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let _podeEditar = false
+let _veiculos = [], _planos = [], _ordens = []
+let _editPlanoId = null, _editOsId = null
+
+const TIPO_OS_LABEL = { preventiva:'Preventiva', corretiva:'Corretiva' }
+const TIPO_OS_BADGE = { preventiva:'badge-verde', corretiva:'badge-ouro' }
+const STATUS_OS_LABEL = { aberta:'Aberta', em_andamento:'Em andamento', concluida:'Concluída', cancelada:'Cancelada' }
+const STATUS_OS_BADGE = { aberta:'badge-erro', em_andamento:'badge-ouro', concluida:'badge-verde', cancelada:'badge-cinza' }
+
+;(async function () {
+  const usuario = await carregarUsuario()
+  if (!usuario) { window.location.href = '../index.html'; return }
+
+  const { data: nivel } = await db.rpc('nivel_efetivo', { p_usuario: usuario.id, p_modulo_chave: 'frota' })
+  if (!nivel || nivel === 'sem_acesso') {
+    document.body.innerHTML = '<div style="padding:60px;text-align:center;font-family:\'DM Sans\',sans-serif;color:#6B7280">Você não tem acesso ao módulo Frota.</div>'
+    return
+  }
+  _podeEditar = nivel === 'editar'
+
+  document.getElementById('app').innerHTML =
+    gerarLayout('Frota — Manutenção', 'frota-manutencao') +
+    `<div class="fade-in">
+      <div class="kpi-grid">
+        <div class="kpi-card erro"><div class="kpi-label">OS abertas</div><div class="kpi-valor" id="k-os-abertas">—</div></div>
+        <div class="kpi-card ouro"><div class="kpi-label">Planos próximos do vencimento</div><div class="kpi-valor" id="k-plano-prox">—</div></div>
+        <div class="kpi-card erro"><div class="kpi-label">Planos vencidos</div><div class="kpi-valor" id="k-plano-venc">—</div></div>
+        <div class="kpi-card verde"><div class="kpi-label">Custo (últimos 30 dias)</div><div class="kpi-valor" id="k-custo" style="font-size:19px">—</div></div>
+      </div>
+
+      <div class="card" style="margin-bottom:16px">
+        <div style="display:flex;gap:4px;padding:4px;background:rgba(0,0,0,.06);border-radius:10px;width:fit-content">
+          <button class="tab-btn ativo" id="tab-planos" onclick="mudarAba('planos')">Planos Preventivos</button>
+          <button class="tab-btn" id="tab-os" onclick="mudarAba('os')">Ordens de Serviço</button>
+        </div>
+      </div>
+
+      <div id="aba-planos">
+        <div class="filter-bar">
+          <input class="form-control search-input" id="busca-pl" placeholder="Buscar veículo, item..." oninput="renderPlanos()">
+          ${_podeEditar ? `<button class="btn btn-primary" onclick="abrirModalPlano()">${bico('clock')} Novo Plano</button>` : ''}
+        </div>
+        <div class="card">
+          <div class="table-wrap"><div class="table-scroll">
+            <table>
+              <thead><tr><th>Veículo</th><th>Item</th><th>Intervalo</th><th>Última execução</th><th>Situação</th>${_podeEditar?'<th>Ações</th>':''}</tr></thead>
+              <tbody id="tbody-planos"><tr><td colspan="6" style="text-align:center;padding:32px;color:#9CA3AF">Carregando...</td></tr></tbody>
+            </table>
+          </div></div>
+        </div>
+      </div>
+
+      <div id="aba-os" style="display:none">
+        <div class="filter-bar">
+          <input class="form-control search-input" id="busca-os" placeholder="Buscar veículo, descrição..." oninput="renderOS()">
+          <select class="form-control" id="fil-os-status" style="width:160px" onchange="renderOS()">
+            <option value="">Status</option>
+            ${Object.entries(STATUS_OS_LABEL).map(([v,l]) => `<option value="${v}">${l}</option>`).join('')}
+          </select>
+          ${_podeEditar ? `<button class="btn btn-primary" onclick="abrirModalOS()">${bico('edit')} Nova OS</button>` : ''}
+        </div>
+        <div class="card">
+          <div class="table-wrap"><div class="table-scroll">
+            <table>
+              <thead><tr><th>Veículo</th><th>Tipo</th><th>Descrição</th><th>Oficina</th><th>Custo</th><th>Status</th><th>Datas</th>${_podeEditar?'<th>Ações</th>':''}</tr></thead>
+              <tbody id="tbody-os"><tr><td colspan="8" style="text-align:center;padding:32px;color:#9CA3AF">Carregando...</td></tr></tbody>
+            </table>
+          </div></div>
+        </div>
+      </div>
+    </div>` +
+    '</div></div></div>'
+
+  carregarLogosSidebar()
+  bIconsAplicar()
+  await carregarVeiculos()
+  await Promise.all([carregarPlanos(), carregarOS()])
+})()
+
+function mudarAba(aba) {
+  document.getElementById('aba-planos').style.display = aba === 'planos' ? '' : 'none'
+  document.getElementById('aba-os').style.display     = aba === 'os'     ? '' : 'none'
+  document.getElementById('tab-planos').classList.toggle('ativo', aba === 'planos')
+  document.getElementById('tab-os').classList.toggle('ativo', aba === 'os')
+}
+
+// ── Cargas ────────────────────────────────────────────────────
+async function carregarVeiculos() {
+  const { data } = await db.from('frota_veiculos').select('id,placa,modelo,medidor,hodometro_km,horimetro_horas')
+    .eq('ativo', true).order('placa')
+  _veiculos = data || []
+  const opts = _veiculos.map(v => `<option value="${v.id}">${esc(v.placa)} — ${esc(v.modelo)}</option>`).join('')
+  document.getElementById('pl-veiculo').insertAdjacentHTML('beforeend', opts)
+  document.getElementById('os-veiculo').insertAdjacentHTML('beforeend', opts)
+}
+
+async function carregarPlanos() {
+  const { data } = await db.from('vw_frota_manutencoes_pendentes').select('*').order('placa')
+  _planos = data || []
+  renderPlanos()
+  renderKpis()
+}
+
+async function carregarOS() {
+  const { data } = await db.from('frota_ordens_servico')
+    .select('*, frota_veiculos(placa,modelo)')
+    .order('data_abertura', { ascending: false })
+  _ordens = data || []
+  renderOS()
+  renderKpis()
+}
+
+function renderKpis() {
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v }
+  set('k-os-abertas', _ordens.filter(o => o.status === 'aberta' || o.status === 'em_andamento').length)
+  set('k-plano-venc', _planos.filter(p => situacaoPlano(p) === 'vencido').length)
+  set('k-plano-prox', _planos.filter(p => situacaoPlano(p) === 'proximo').length)
+  const desde = new Date(); desde.setDate(desde.getDate() - 30)
+  const custo30 = _ordens
+    .filter(o => o.status === 'concluida' && o.data_conclusao && new Date(o.data_conclusao) >= desde)
+    .reduce((acc, o) => acc + (Number(o.custo) || 0), 0)
+  set('k-custo', formatBRL(custo30))
+}
+
+// ── Situação do plano (ok / próximo / vencido) ─────────────────
+function situacaoPlano(p) {
+  const usoVencido = p.restante_uso != null && p.restante_uso <= 0
+  const usoProximo  = p.restante_uso != null && p.restante_uso > 0 && p.restante_uso <= (p.intervalo_km * 0.1)
+  const diasVencido = p.restante_dias != null && p.restante_dias <= 0
+  const diasProximo = p.restante_dias != null && p.restante_dias > 0 && p.restante_dias <= 15
+  if (usoVencido || diasVencido) return 'vencido'
+  if (usoProximo || diasProximo) return 'proximo'
+  return 'ok'
+}
+const SITUACAO_LABEL = { ok:'Em dia', proximo:'Próximo', vencido:'Vencido' }
+const SITUACAO_BADGE = { ok:'badge-verde', proximo:'badge-ouro', vencido:'badge-erro' }
+
+// ── Render Planos ────────────────────────────────────────────
+function renderPlanos() {
+  const q = (document.getElementById('busca-pl')?.value || '').toLowerCase()
+  const lista = _planos.filter(p => (!q || `${p.placa} ${p.modelo} ${p.item}`.toLowerCase().includes(q)))
+  const tbody = document.getElementById('tbody-planos')
+  if (!tbody) return
+  const cols = _podeEditar ? 6 : 5
+  if (!lista.length) { tbody.innerHTML = `<tr><td colspan="${cols}" style="text-align:center;padding:32px;color:#9CA3AF">Nenhum plano cadastrado</td></tr>`; return }
+  tbody.innerHTML = lista.map(p => {
+    const unidade = p.medidor === 'horimetro' ? 'h' : 'km'
+    const intervalo = [
+      p.intervalo_km != null ? `${formatNum(p.intervalo_km,1)} ${unidade}` : null,
+      p.intervalo_meses != null ? `${p.intervalo_meses} meses` : null
+    ].filter(Boolean).join(' ou ')
+    const ultima = [
+      p.ultima_execucao_km != null ? `${formatNum(p.ultima_execucao_km,1)} ${unidade}` : null,
+      p.ultima_execucao_data ? formatData(p.ultima_execucao_data) : null
+    ].filter(Boolean).join(' · ') || '—'
+    const sit = situacaoPlano(p)
+    const detalhe = sit === 'vencido'
+      ? (p.restante_uso != null && p.restante_uso <= 0 ? `${formatNum(Math.abs(p.restante_uso),1)} ${unidade} atrasado` : `${Math.abs(p.restante_dias)}d atrasado`)
+      : sit === 'proximo'
+        ? (p.restante_uso != null && p.restante_uso <= (p.intervalo_km*0.1) ? `faltam ${formatNum(p.restante_uso,1)} ${unidade}` : `faltam ${p.restante_dias}d`)
+        : ''
+    return `<tr>
+      <td style="font-size:12px"><strong>${esc(p.placa)}</strong><br>${esc(p.modelo)}</td>
+      <td style="font-size:12px">${esc(p.item)}</td>
+      <td class="mono" style="font-size:12px">${intervalo || '—'}</td>
+      <td class="mono" style="font-size:12px">${ultima}</td>
+      <td><span class="badge ${SITUACAO_BADGE[sit]}">${SITUACAO_LABEL[sit]}</span>${detalhe ? `<div style="font-size:11px;color:#9CA3AF;margin-top:2px">${detalhe}</div>` : ''}</td>
+      ${_podeEditar ? `<td><button class="btn btn-xs btn-ghost" onclick="abrirModalPlano('${p.id}')">Editar</button></td>` : ''}
+    </tr>`
+  }).join('')
+}
+
+// ── Render OS ─────────────────────────────────────────────────
+function renderOS() {
+  const q = (document.getElementById('busca-os')?.value || '').toLowerCase()
+  const status = document.getElementById('fil-os-status')?.value
+  const lista = _ordens.filter(o =>
+    (!q || `${o.frota_veiculos?.placa||''} ${o.frota_veiculos?.modelo||''} ${o.descricao}`.toLowerCase().includes(q)) &&
+    (!status || o.status === status))
+  const tbody = document.getElementById('tbody-os')
+  if (!tbody) return
+  const cols = _podeEditar ? 8 : 7
+  if (!lista.length) { tbody.innerHTML = `<tr><td colspan="${cols}" style="text-align:center;padding:32px;color:#9CA3AF">Nenhuma ordem de serviço encontrada</td></tr>`; return }
+  tbody.innerHTML = lista.map(o => `
+    <tr>
+      <td style="font-size:12px"><strong>${esc(o.frota_veiculos?.placa||'—')}</strong><br>${esc(o.frota_veiculos?.modelo||'')}</td>
+      <td><span class="badge ${TIPO_OS_BADGE[o.tipo]}">${TIPO_OS_LABEL[o.tipo]}</span></td>
+      <td style="font-size:12px;max-width:220px">${esc(o.descricao)}</td>
+      <td style="font-size:12px">${esc(o.oficina||'—')}</td>
+      <td class="mono" style="font-size:12px">${o.custo != null ? formatBRL(o.custo) : '—'}</td>
+      <td><span class="badge ${STATUS_OS_BADGE[o.status]}">${STATUS_OS_LABEL[o.status]}</span></td>
+      <td style="font-size:12px">${formatData(o.data_abertura)}${o.data_conclusao ? `<br>até ${formatData(o.data_conclusao)}` : ''}</td>
+      ${_podeEditar ? `<td><button class="btn btn-xs btn-ghost" onclick="abrirModalOS('${o.id}')">Editar</button></td>` : ''}
+    </tr>`).join('')
+}
+
+// ── Modal Plano ───────────────────────────────────────────────
+function _medidorDoVeiculo(veiculoId) {
+  return _veiculos.find(v => v.id === veiculoId)?.medidor || 'hodometro'
+}
+function _ajustarLabelsPlano() {
+  const medidor = _medidorDoVeiculo(document.getElementById('pl-veiculo').value)
+  const unidade = medidor === 'horimetro' ? 'horas' : 'km'
+  document.getElementById('pl-intervalo-uso-label').textContent = `Intervalo (${unidade})`
+  document.getElementById('pl-ultima-uso-label').textContent = `Última execução (${unidade})`
+}
+
+function abrirModalPlano(id = null) {
+  const p = id ? _planos.find(x => x.id === id) : null
+  _editPlanoId = p?.id || null
+  document.getElementById('pl-titulo').textContent = p ? 'Editar Plano' : 'Novo Plano Preventivo'
+  document.getElementById('btn-excluir-plano').style.display = p ? '' : 'none'
+  document.getElementById('pl-veiculo').value = p?.veiculo_id || ''
+  document.getElementById('pl-item').value = p?.item || ''
+  document.getElementById('pl-intervalo-uso').value = p?.intervalo_km ?? ''
+  document.getElementById('pl-intervalo-meses').value = p?.intervalo_meses ?? ''
+  document.getElementById('pl-ultima-uso').value = p?.ultima_execucao_km ?? ''
+  document.getElementById('pl-ultima-data').value = p?.ultima_execucao_data || ''
+  document.getElementById('pl-obs').value = p?.observacoes || ''
+  _ajustarLabelsPlano()
+  document.getElementById('modal-plano').classList.add('aberto')
+}
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('pl-veiculo')?.addEventListener('change', _ajustarLabelsPlano)
+})
+
+async function salvarPlano() {
+  const veiculo_id = document.getElementById('pl-veiculo').value
+  const item = document.getElementById('pl-item').value.trim()
+  const intervalo_km = document.getElementById('pl-intervalo-uso').value
+  const intervalo_meses = document.getElementById('pl-intervalo-meses').value
+  if (!veiculo_id || !item) { toast('Veículo e item são obrigatórios', 'error'); return }
+  if (!intervalo_km && !intervalo_meses) { toast('Informe ao menos um intervalo (uso ou tempo)', 'error'); return }
+  const payload = {
+    veiculo_id, item,
+    intervalo_km: intervalo_km ? parseFloat(intervalo_km) : null,
+    intervalo_meses: intervalo_meses ? parseInt(intervalo_meses) : null,
+    ultima_execucao_km: document.getElementById('pl-ultima-uso').value ? parseFloat(document.getElementById('pl-ultima-uso').value) : null,
+    ultima_execucao_data: document.getElementById('pl-ultima-data').value || null,
+    observacoes: document.getElementById('pl-obs').value.trim() || null,
+  }
+  const btn = document.getElementById('btn-salvar-plano')
+  btn.disabled = true; btn.textContent = 'Salvando...'
+  try {
+    if (_editPlanoId) {
+      const { error } = await db.from('frota_planos_manutencao').update(payload).eq('id', _editPlanoId)
+      if (error) throw error
+      toast('Plano atualizado!', 'success')
+    } else {
+      const { error } = await db.from('frota_planos_manutencao').insert(payload)
+      if (error) throw error
+      toast('Plano cadastrado!', 'success')
+    }
+    fecharModal('plano'); await carregarPlanos()
+  } catch (e) { toast(e.message || 'Erro ao salvar', 'error') }
+  finally { btn.disabled = false; btn.textContent = 'Salvar' }
+}
+
+async function excluirPlano() {
+  if (!_editPlanoId) return
+  if (!confirm('Inativar este plano preventivo?')) return
+  const { error } = await db.from('frota_planos_manutencao').update({ ativo: false }).eq('id', _editPlanoId)
+  if (error) { toast(error.message, 'error'); return }
+  toast('Plano inativado', 'success')
+  fecharModal('plano'); await carregarPlanos()
+}
+
+// ── Modal OS ──────────────────────────────────────────────────
+function atualizarPlanosDoVeiculo() {
+  const veiculoId = document.getElementById('os-veiculo').value
+  const medidor = _medidorDoVeiculo(veiculoId)
+  document.getElementById('os-km-label').textContent =
+    medidor === 'horimetro' ? 'Horímetro no momento (horas)' : 'Hodômetro no momento (km)'
+  const planosDoVeiculo = _planos.filter(p => p.veiculo_id === veiculoId)
+  document.getElementById('os-plano').innerHTML = '<option value="">—</option>' +
+    planosDoVeiculo.map(p => `<option value="${p.id}">${esc(p.item)}</option>`).join('')
+}
+
+function ajustarDataConclusao() {
+  const status = document.getElementById('os-status').value
+  if (status === 'concluida' && !document.getElementById('os-conclusao').value) {
+    document.getElementById('os-conclusao').value = new Date().toISOString().slice(0,10)
+  }
+}
+
+function abrirModalOS(id = null) {
+  const o = id ? _ordens.find(x => x.id === id) : null
+  _editOsId = o?.id || null
+  document.getElementById('os-titulo').textContent = o ? 'Editar Ordem de Serviço' : 'Nova Ordem de Serviço'
+  document.getElementById('os-veiculo').value = o?.veiculo_id || ''
+  atualizarPlanosDoVeiculo()
+  document.getElementById('os-plano').value = o?.plano_id || ''
+  document.getElementById('os-tipo').value = o?.tipo || 'corretiva'
+  document.getElementById('os-descricao').value = o?.descricao || ''
+  document.getElementById('os-oficina').value = o?.oficina || ''
+  document.getElementById('os-km').value = o?.km_veiculo ?? ''
+  document.getElementById('os-abertura').value = o?.data_abertura || new Date().toISOString().slice(0,10)
+  document.getElementById('os-conclusao').value = o?.data_conclusao || ''
+  document.getElementById('os-custo').value = o?.custo ?? ''
+  document.getElementById('os-status').value = o?.status || 'aberta'
+  document.getElementById('os-obs').value = o?.observacoes || ''
+  document.getElementById('modal-os').classList.add('aberto')
+}
+
+async function salvarOS() {
+  const veiculo_id = document.getElementById('os-veiculo').value
+  const descricao = document.getElementById('os-descricao').value.trim()
+  if (!veiculo_id || !descricao) { toast('Veículo e descrição são obrigatórios', 'error'); return }
+  const payload = {
+    veiculo_id,
+    plano_id: document.getElementById('os-plano').value || null,
+    tipo: document.getElementById('os-tipo').value,
+    descricao,
+    oficina: document.getElementById('os-oficina').value.trim() || null,
+    km_veiculo: document.getElementById('os-km').value ? parseFloat(document.getElementById('os-km').value) : null,
+    data_abertura: document.getElementById('os-abertura').value || new Date().toISOString().slice(0,10),
+    data_conclusao: document.getElementById('os-conclusao').value || null,
+    custo: document.getElementById('os-custo').value ? parseFloat(document.getElementById('os-custo').value) : null,
+    status: document.getElementById('os-status').value,
+    observacoes: document.getElementById('os-obs').value.trim() || null,
+  }
+  const btn = document.getElementById('btn-salvar-os')
+  btn.disabled = true; btn.textContent = 'Salvando...'
+  try {
+    if (_editOsId) {
+      const { error } = await db.from('frota_ordens_servico').update(payload).eq('id', _editOsId)
+      if (error) throw error
+      toast('Ordem de serviço atualizada!', 'success')
+    } else {
+      const { error } = await db.from('frota_ordens_servico').insert(payload)
+      if (error) throw error
+      toast('Ordem de serviço aberta!', 'success')
+    }
+    fecharModal('os')
+    await Promise.all([carregarOS(), carregarPlanos(), carregarVeiculos()])
+  } catch (e) { toast(e.message || 'Erro ao salvar', 'error') }
+  finally { btn.disabled = false; btn.textContent = 'Salvar' }
+}
+
+function fecharModal(qual) {
+  document.getElementById(`modal-${qual}`).classList.remove('aberto')
+  if (qual === 'plano') _editPlanoId = null
+  if (qual === 'os') _editOsId = null
+}
+</script>
+
+<style>
+.tab-btn {
+  padding: 6px 18px; border: none; background: transparent;
+  border-radius: 7px; font-size: 13px; font-weight: 500;
+  color: var(--texto-secundario, #6B7280); cursor: pointer;
+  transition: background .15s, color .15s;
+}
+.tab-btn.ativo { background: white; color: var(--floresta, #0A1A0F); box-shadow: 0 1px 4px rgba(0,0,0,.12); }
+.tab-btn:hover:not(.ativo) { background: rgba(255,255,255,.5); }
+</style>
+</body>
+</html>
