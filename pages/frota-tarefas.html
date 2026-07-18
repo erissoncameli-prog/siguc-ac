@@ -20,18 +20,21 @@ const SUBTIPO_LABEL = {
   viagem_solicitada: 'Aprovação pendente',
   viagem_aprovada:   'Viagem aprovada',
   viagem_recusada:   'Viagem recusada',
+  viagem_direta:     'Viagem sem agendamento',
   manutencao:        'Manutenção',
 }
 const SUBTIPO_ICON = {
   viagem_solicitada: 'truck',
   viagem_aprovada:   'check',
   viagem_recusada:   'x',
+  viagem_direta:     'plus',
   manutencao:        'clock',
 }
 const SUBTIPO_BADGE = {
   viagem_solicitada: 'badge-ouro',
   viagem_aprovada:   'badge-verde',
   viagem_recusada:   'badge-erro',
+  viagem_direta:     'badge-roxo',
   manutencao:        'badge-blue',
 }
 
@@ -70,7 +73,7 @@ async function carregarTarefas() {
 
 function linkDaTarefa(n) {
   const subtipo = n.meta?.subtipo, para = n.meta?.para
-  if (subtipo === 'viagem_solicitada') return '../pages/frota-viagens.html'
+  if (subtipo === 'viagem_solicitada' || subtipo === 'viagem_direta') return '../pages/frota-viagens.html'
   if (subtipo === 'manutencao') return '../pages/frota-manutencao.html'
   if (subtipo === 'viagem_aprovada' && para === 'motorista') return '../pages/frota-motorista.html'
   if (subtipo === 'viagem_aprovada' || subtipo === 'viagem_recusada') return '../pages/frota-solicitar.html'
