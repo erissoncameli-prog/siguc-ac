@@ -61,10 +61,11 @@ const STATUS_BADGE = { solicitada:'badge-ouro', aprovada:'badge-blue', recusada:
           <textarea class="form-control" id="f-finalidade" rows="2" placeholder="Descreva o motivo da viagem"></textarea></div>
         <div class="grid-2">
           <div class="form-group"><label class="form-label">Saída prevista <span class="obrig">*</span></label>
-            <input class="form-control" id="f-saida" type="datetime-local"></div>
+            <input class="form-control" id="f-saida" type="datetime-local" onchange="checarDisponibilidade()"></div>
           <div class="form-group"><label class="form-label">Retorno previsto <span class="obrig">*</span></label>
-            <input class="form-control" id="f-retorno" type="datetime-local"></div>
+            <input class="form-control" id="f-retorno" type="datetime-local" onchange="checarDisponibilidade()"></div>
         </div>
+        <div id="aviso-disponibilidade" style="display:none;font-size:12px;padding:8px 12px;border-radius:8px;margin-bottom:14px"></div>
         <button class="btn btn-primary" id="btn-solicitar" onclick="solicitar()">${bico('truck')} Solicitar Viagem</button>
       </div>
 
@@ -128,6 +129,31 @@ function formatDataHora(str) {
   return new Date(str).toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', year:'2-digit', hour:'2-digit', minute:'2-digit' })
 }
 
+let _ultimaChecagemDisponivel = null
+
+async function checarDisponibilidade() {
+  const saida = document.getElementById('f-saida').value
+  const retorno = document.getElementById('f-retorno').value
+  const aviso = document.getElementById('aviso-disponibilidade')
+  if (!saida || !retorno || new Date(retorno) <= new Date(saida)) { aviso.style.display = 'none'; _ultimaChecagemDisponivel = null; return }
+
+  aviso.style.display = ''
+  aviso.style.background = '#F3F4F6'; aviso.style.color = '#6B7280'
+  aviso.textContent = 'Verificando disponibilidade de veículos...'
+  const { data, error } = await db.rpc('frota_veiculos_disponiveis', {
+    p_inicio: new Date(saida).toISOString(), p_fim: new Date(retorno).toISOString()
+  })
+  if (error) { aviso.style.display = 'none'; return }
+  _ultimaChecagemDisponivel = data?.length || 0
+  if (_ultimaChecagemDisponivel > 0) {
+    aviso.style.background = '#DCFCE7'; aviso.style.color = '#166534'
+    aviso.textContent = `${_ultimaChecagemDisponivel} veículo(s) disponível(is) nesse período.`
+  } else {
+    aviso.style.background = '#FEE2E2'; aviso.style.color = '#991B1B'
+    aviso.textContent = 'Nenhum veículo disponível para esse período no momento — o setor de transporte ainda pode conseguir remanejar, mas a solicitação pode demorar mais para ser aprovada.'
+  }
+}
+
 async function solicitar() {
   const destino = document.getElementById('f-destino').value.trim()
   const finalidade = document.getElementById('f-finalidade').value.trim()
@@ -135,6 +161,8 @@ async function solicitar() {
   const retorno = document.getElementById('f-retorno').value
   if (!destino || !finalidade || !saida || !retorno) { toast('Preencha destino, finalidade e o período da viagem', 'error'); return }
   if (new Date(retorno) <= new Date(saida)) { toast('O retorno deve ser depois da saída', 'error'); return }
+  if (_ultimaChecagemDisponivel === 0 &&
+      !confirm('Nenhum veículo está disponível para esse período no momento. Quer enviar a solicitação mesmo assim?')) return
 
   const payload = {
     solicitante_id: _usuario.id,
@@ -158,6 +186,8 @@ async function solicitar() {
     document.getElementById('f-retorno').value = ''
     document.getElementById('f-passageiros').value = ''
     document.getElementById('f-uc').value = ''
+    document.getElementById('aviso-disponibilidade').style.display = 'none'
+    _ultimaChecagemDisponivel = null
     await carregarMinhasViagens()
   } catch (e) { toast(e.message || 'Erro ao solicitar viagem', 'error') }
   finally { btn.disabled = false; btn.innerHTML = `${bico('truck')} Solicitar Viagem` }

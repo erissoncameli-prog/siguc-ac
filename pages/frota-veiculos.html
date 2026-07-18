@@ -21,6 +21,14 @@
       <button class="modal-close" onclick="fecharModal('veiculo')">×</button>
     </div>
     <div class="modal-body">
+      <div class="veic-foto-wrap">
+        <div class="veic-foto-preview" id="v-foto-preview" data-icon="truck"></div>
+        <div>
+          <button type="button" class="veic-foto-btn" data-icon="camera" onclick="document.getElementById('v-foto-input').click()">Selecionar foto</button>
+          <span class="veic-foto-remover" id="v-foto-remover" onclick="removerFotoVeiculo()">✕ Remover foto</span>
+        </div>
+        <input type="file" id="v-foto-input" accept="image/*" style="display:none" onchange="previewFotoVeiculo(this)">
+      </div>
       <div class="grid-2">
         <div class="form-group"><label class="form-label">Placa / Nº de inscrição <span class="obrig">*</span></label>
           <input class="form-control" id="v-placa" placeholder="ABC1D23" maxlength="10" style="text-transform:uppercase"></div>
@@ -209,6 +217,7 @@
 let _podeEditar = false
 let _veiculos = [], _motoristas = [], _setores = [], _usuarios = [], _docsPorVeiculo = {}
 let _editVeiculoId = null, _editMotoristaId = null, _docsVeiculoId = null
+let _vFotoFile = null, _vFotoUrlAtual = null
 
 const TIPO_VEIC = { carro:'Carro', caminhonete:'Caminhonete', van:'Van', onibus:'Ônibus',
   caminhao:'Caminhão', motocicleta:'Motocicleta', quadriciclo:'Quadriciclo',
@@ -251,6 +260,10 @@ const TIPO_DOC = { crlv:'CRLV', licenciamento:'Licenciamento', seguro:'Seguro', 
       </div>
 
       <div id="aba-veiculos">
+        <div class="card" style="margin-bottom:16px">
+          <div class="form-section-label" style="padding:0 0 12px">Disponibilidade da frota agora</div>
+          <div id="painel-disponibilidade"></div>
+        </div>
         <div class="filter-bar">
           <input class="form-control search-input" id="busca-v" placeholder="Buscar placa, modelo..." oninput="renderVeiculos()">
           <select class="form-control" id="fil-v-setor" style="width:180px" onchange="renderVeiculos()"><option value="">Todos os setores</option></select>
@@ -344,6 +357,34 @@ async function carregarVeiculos() {
   _docsPorVeiculo = {}
   ;(docs || []).forEach(d => { (_docsPorVeiculo[d.veiculo_id] = _docsPorVeiculo[d.veiculo_id] || []).push(d) })
   renderVeiculos()
+  renderDisponibilidade()
+}
+
+// ── Painel de disponibilidade (disponíveis × ocupados agora) ───
+function renderDisponibilidade() {
+  const el = document.getElementById('painel-disponibilidade')
+  if (!el) return
+  const frota = _veiculos.filter(v => v.status !== 'baixado')
+  const disponiveis = frota.filter(v => v.status === 'disponivel')
+  const ocupados = frota.filter(v => v.status !== 'disponivel')
+  const card = v => `
+    <div class="veic-disp-card">
+      <span class="badge ${BADGE_STATUS_VEIC[v.status]||'badge-cinza'}">${STATUS_VEIC[v.status]||v.status}</span>
+      <div style="font-weight:700;font-size:13px;margin-top:6px">${esc(v.marca ? v.marca + ' ' : '')}${esc(v.modelo)}</div>
+      <div class="mono" style="font-size:11px;color:#9CA3AF">${esc(v.placa)}${v.unidades_organizacionais ? ' · ' + esc(v.unidades_organizacionais.sigla) : ''}</div>
+    </div>`
+  if (!frota.length) { el.innerHTML = '<div style="text-align:center;color:#9CA3AF;padding:16px;font-size:13px">Nenhum veículo cadastrado</div>'; return }
+  el.innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px">
+      <div>
+        <div style="font-size:12px;font-weight:700;color:#166534;margin-bottom:8px">Disponíveis (${disponiveis.length})</div>
+        <div class="veic-disp-grid">${disponiveis.length ? disponiveis.map(card).join('') : '<div style="color:#9CA3AF;font-size:12px">Nenhum veículo disponível</div>'}</div>
+      </div>
+      <div>
+        <div style="font-size:12px;font-weight:700;color:#991B1B;margin-bottom:8px">Ocupados (${ocupados.length})</div>
+        <div class="veic-disp-grid">${ocupados.length ? ocupados.map(card).join('') : '<div style="color:#9CA3AF;font-size:12px">Nenhum veículo ocupado</div>'}</div>
+      </div>
+    </div>`
 }
 
 async function carregarMotoristas() {
@@ -406,7 +447,10 @@ function renderVeiculos() {
       ? `${formatNum(v.horimetro_horas, 1)} h`
       : `${formatNum(v.hodometro_km)} km`
     return `<tr>
-      <td><strong>${esc(v.marca ? v.marca + ' ' : '')}${esc(v.modelo)}</strong><br><span class="mono" style="font-size:12px;color:#6B7280">${esc(v.placa)}</span></td>
+      <td><div style="display:flex;align-items:center;gap:8px">
+        ${v.foto_url ? `<img src="${v.foto_url}" alt="" style="width:40px;height:32px;object-fit:cover;border-radius:6px;flex-shrink:0">` : ''}
+        <div><strong>${esc(v.marca ? v.marca + ' ' : '')}${esc(v.modelo)}</strong><br><span class="mono" style="font-size:12px;color:#6B7280">${esc(v.placa)}</span></div>
+      </div></td>
       <td style="font-size:12px">${TIPO_VEIC[v.tipo] || esc(v.tipo)}</td>
       <td style="font-size:12px">${v.unidades_organizacionais ? `<strong>${esc(v.unidades_organizacionais.sigla)}</strong>` : '—'}
         ${v.dedicado_setor ? '<br><span class="badge badge-roxo">Dedicado</span>' : ''}</td>
@@ -467,6 +511,33 @@ function mostrarCampoMedidor() {
     medidor === 'horimetro' ? 'Horímetro atual (horas)' : 'Hodômetro atual (km)'
 }
 
+function _setVeicFotoPreview(url) {
+  const wrap = document.getElementById('v-foto-preview')
+  const rem  = document.getElementById('v-foto-remover')
+  if (url) {
+    wrap.innerHTML = `<img src="${url}" alt="foto do veículo">`
+    rem.classList.add('visivel')
+  } else {
+    wrap.innerHTML = bico('truck')
+    rem.classList.remove('visivel')
+  }
+}
+
+function previewFotoVeiculo(input) {
+  const file = input.files[0]
+  if (!file) return
+  if (file.size > 5 * 1024 * 1024) { toast('Foto deve ter no máximo 5 MB', 'error'); input.value = ''; return }
+  _vFotoFile = file
+  _setVeicFotoPreview(URL.createObjectURL(file))
+}
+
+function removerFotoVeiculo() {
+  _vFotoFile = null
+  _vFotoUrlAtual = null
+  document.getElementById('v-foto-input').value = ''
+  _setVeicFotoPreview(null)
+}
+
 function abrirModalVeiculo(id = null) {
   const v = id ? _veiculos.find(x => x.id === id) : null
   _editVeiculoId = v?.id || null
@@ -490,6 +561,10 @@ function abrirModalVeiculo(id = null) {
   document.getElementById('v-dedicado').checked = !!v?.dedicado_setor
   document.getElementById('v-obs').value = v?.observacoes || ''
   mostrarCampoMedidor()
+  _vFotoFile = null
+  _vFotoUrlAtual = v?.foto_url || null
+  document.getElementById('v-foto-input').value = ''
+  _setVeicFotoPreview(_vFotoUrlAtual)
   document.getElementById('modal-veiculo').classList.add('aberto')
 }
 
@@ -521,6 +596,18 @@ async function salvarVeiculo() {
   const btn = document.getElementById('btn-salvar-veiculo')
   btn.disabled = true; btn.textContent = 'Salvando...'
   try {
+    if (_vFotoFile) {
+      btn.textContent = 'Enviando foto...'
+      const ext  = _vFotoFile.name.split('.').pop().toLowerCase() || 'jpg'
+      const path = `${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`
+      const { error: upErr } = await db.storage.from('frota-veiculos').upload(path, _vFotoFile, { upsert: true })
+      if (upErr) throw upErr
+      const { data: urlData } = db.storage.from('frota-veiculos').getPublicUrl(path)
+      payload.foto_url = urlData.publicUrl
+      btn.textContent = 'Salvando...'
+    } else {
+      payload.foto_url = _vFotoUrlAtual
+    }
     if (_editVeiculoId) {
       const { error } = await db.from('frota_veiculos').update(payload).eq('id', _editVeiculoId)
       if (error) throw error
@@ -697,6 +784,29 @@ function fecharModal(qual) {
   font-size: 11px; font-weight: 700; text-transform: uppercase;
   letter-spacing: .06em; color: var(--verde-c, #52B788);
   padding: 8px 0 4px; margin-bottom: 12px;
+}
+/* Campo de foto do veículo */
+.veic-foto-wrap { display:flex; align-items:center; gap:14px; margin-bottom:16px; }
+.veic-foto-preview {
+  width:120px; height:80px; border-radius:10px; object-fit:cover;
+  border:2px dashed var(--verde-c,#52B788); background:#f3f4f6;
+  display:flex; align-items:center; justify-content:center;
+  color:var(--verde-c,#52B788); font-size:28px; overflow:hidden; flex-shrink:0;
+}
+.veic-foto-preview img { width:100%; height:100%; object-fit:cover; border-radius:8px; }
+.veic-foto-btn {
+  display:block; font-size:12px; font-weight:600; color:var(--verde-c,#52B788);
+  background:rgba(82,183,136,.1); border:1px dashed var(--verde-c,#52B788);
+  border-radius:8px; padding:6px 14px; cursor:pointer; transition:background .15s;
+}
+.veic-foto-btn:hover { background:rgba(82,183,136,.2); }
+.veic-foto-remover { font-size:11px; color:#EF4444; cursor:pointer; display:none; margin-top:6px; }
+.veic-foto-remover.visivel { display:block; }
+/* Painel de disponibilidade */
+.veic-disp-grid { display:flex; flex-wrap:wrap; gap:8px; }
+.veic-disp-card {
+  border:1px solid var(--borda,#E5E7EB); border-radius:10px; padding:8px 10px;
+  min-width:140px; background:#fff;
 }
 </style>
 </body>
