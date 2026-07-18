@@ -1072,7 +1072,7 @@ async function boot() {
   try { await _brigReady } catch (e) { console.warn('[boot] env indisponível:', e.message) }
   // No app nativo (Capacitor) os arquivos já são locais — SW só na web
   if ('serviceWorker' in navigator && !window.Capacitor) {
-    navigator.serviceWorker.register('/pwa/sw.js').catch(console.warn)
+    navigator.serviceWorker.register('/pwa/sw.js', { scope: '/pages/brigada.html' }).catch(console.warn)
   }
   await bOfflineInit()
   bOfflinePersistir()

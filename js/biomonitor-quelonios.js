@@ -4567,14 +4567,14 @@ async function bioVersaoBuild() {
   try {
     const r = await fetch('/pwa/sw.js', { cache: 'no-store' })
     const txt = await r.text()
-    const m = txt.match(/siguc-brigadas-v(\d+)/)
+    const m = txt.match(/siguc-biomonitor-v(\d+)/)
     if (m) return 'v' + m[1]
   } catch (_) {}
   try {
     if (!('caches' in window)) return null
     const keys = await caches.keys()
     const vers = keys
-      .map(k => (k.match(/siguc-brigadas-v(\d+)/) || [])[1])
+      .map(k => (k.match(/siguc-biomonitor-v(\d+)/) || [])[1])
       .filter(Boolean)
       .map(Number)
     if (vers.length) return 'v' + Math.max(...vers)
