@@ -51,7 +51,10 @@ const STATUS_BADGE = { solicitada:'badge-ouro', aprovada:'badge-blue', recusada:
           <div class="form-group"><label class="form-label">Setor solicitante</label>
             <select class="form-control" id="f-setor"><option value="">—</option></select></div>
           <div class="form-group"><label class="form-label">Nº de passageiros</label>
-            <input class="form-control" id="f-passageiros" type="number" min="1" max="99" placeholder="1"></div>
+            <input class="form-control" id="f-passageiros" type="number" min="1" max="99" placeholder="1" oninput="checarPassageiros()"></div>
+        </div>
+        <div id="aviso-passageiros" style="display:none;font-size:12px;background:#FEF3C7;color:#92400E;padding:8px 12px;border-radius:8px;margin-bottom:14px">
+          Mais de 4 passageiros — o setor de transporte pode precisar escalar mais de um veículo para atender essa viagem.
         </div>
         <div class="form-group"><label class="form-label">Destino <span class="obrig">*</span></label>
           <input class="form-control" id="f-destino" placeholder="Ex.: Sede da UC, endereço, município..."></div>
@@ -131,6 +134,11 @@ function formatDataHora(str) {
 
 let _ultimaChecagemDisponivel = null
 
+function checarPassageiros() {
+  const n = parseInt(document.getElementById('f-passageiros').value) || 0
+  document.getElementById('aviso-passageiros').style.display = n > 4 ? '' : 'none'
+}
+
 async function checarDisponibilidade() {
   const saida = document.getElementById('f-saida').value
   const retorno = document.getElementById('f-retorno').value
@@ -185,6 +193,7 @@ async function solicitar() {
     document.getElementById('f-saida').value = ''
     document.getElementById('f-retorno').value = ''
     document.getElementById('f-passageiros').value = ''
+    document.getElementById('aviso-passageiros').style.display = 'none'
     document.getElementById('f-uc').value = ''
     document.getElementById('aviso-disponibilidade').style.display = 'none'
     _ultimaChecagemDisponivel = null
