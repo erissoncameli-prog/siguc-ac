@@ -75,6 +75,7 @@ function gerarLayout(tituloPagina, paginaAtiva) {
     'frota-motorista':          { svg: '<circle cx="12" cy="7" r="4"/><path d="M5.5 21a6.5 6.5 0 0 1 13 0"/><circle cx="12" cy="7" r="1" fill="currentColor"/>', cor: '#fb923c', bg: 'rgba(251,146,60,0.22)' },
     'frota-manutencao':         { svg: '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>', cor: '#a78bfa', bg: 'rgba(167,139,250,0.22)' },
     'frota-tarefas':            { svg: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/>', cor: '#67e8f9', bg: 'rgba(103,232,249,0.22)' },
+    'frota-app':                { svg: '<rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/>', cor: '#2dd4bf', bg: 'rgba(45,212,191,0.22)' },
   };
 
   function renderPill(id, size) {
@@ -136,6 +137,7 @@ function gerarLayout(tituloPagina, paginaAtiva) {
       label: 'Frota — Transporte',
       perfis: ['super_admin','secretario','diretor','chefe_departamento','gestor','gestor_uc','tecnico','assistente_admin','financeiro','visualizador'],
       itens: [
+        { id: 'frota-app',       href: '../pages/frota-app.html',       label: 'App Frota', target: '_blank' },
         { id: 'frota-tarefas',   href: '../pages/frota-tarefas.html',   label: 'Minhas Tarefas' },
         { id: 'frota-solicitar', href: '../pages/frota-solicitar.html', label: 'Solicitar Viagem' },
         { id: 'frota-motorista', href: '../pages/frota-motorista.html', label: 'App do Motorista',
