@@ -1118,12 +1118,7 @@ async function renderModoGestor() {
     <div class="form-section-label">Viagens em andamento</div>
     <div id="g-lista-andamento" style="margin-bottom:24px"></div>
     <div class="form-section-label">Alertas de manutenção</div>
-    <div id="g-lista-manut" style="margin-bottom:24px"></div>
-    <div class="card" style="padding:16px;display:flex;flex-wrap:wrap;gap:8px;justify-content:center">
-      <a class="btn btn-sm btn-secondary" href="frota-viagens.html">Agenda completa</a>
-      <a class="btn btn-sm btn-secondary" href="frota-manutencao.html">Manutenção</a>
-      <a class="btn btn-sm btn-secondary" href="frota-veiculos.html">Veículos e motoristas</a>
-    </div>`
+    <div id="g-lista-manut" style="margin-bottom:24px"></div>`
   await Promise.all([carregarVeiculosGestor(), carregarMotoristasGestor()])
   await Promise.all([carregarViagensGestor(), carregarManutGestor()])
 }
