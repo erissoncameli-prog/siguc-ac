@@ -185,6 +185,8 @@
     <div class="modal-body">
       <div class="form-group"><label class="form-label">Nome completo <span class="obrig">*</span></label>
         <input class="form-control" id="m-nome"></div>
+      <div class="form-group"><label class="form-label">CPF</label>
+        <input class="form-control" id="m-cpf" placeholder="000.000.000-00"></div>
       <div class="grid-2">
         <div class="form-group"><label class="form-label">Vínculo</label>
           <select class="form-control" id="m-vinculo" onchange="mostrarCamposVinculo()">
@@ -229,11 +231,82 @@
       </div>
       <div class="form-group"><label class="form-label">Observações</label>
         <textarea class="form-control" id="m-obs" rows="2"></textarea></div>
+
+      <!-- Acesso ao App Frota -->
+      <div id="m-acesso-wrap">
+        <div class="form-section-label" style="margin-top:12px">Acesso ao App Frota</div>
+        <div id="m-acesso-novo">
+          <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer">
+            <input type="checkbox" id="m-criar-acesso" checked style="width:16px;height:16px;cursor:pointer;margin-top:2px">
+            <span>Criar login no App Frota ao salvar
+              <span style="display:block;font-size:11px;color:#9CA3AF">Login pelo CPF (ou e-mail, se preferir gerar depois), com senha provisória gerada automaticamente e troca obrigatória no 1º acesso.</span>
+            </span>
+          </label>
+        </div>
+        <div id="m-acesso-existente" style="display:none;font-size:13px;color:#6B7280"></div>
+      </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" id="btn-excluir-motorista" style="margin-right:auto;color:#DC2626;display:none" onclick="excluirMotorista()" data-icon="trash">Inativar</button>
       <button class="btn btn-secondary" onclick="fecharModal('motorista')">Cancelar</button>
       <button class="btn btn-primary" id="btn-salvar-motorista" onclick="salvarMotorista()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Gerar Login (Motorista) -->
+<div class="modal-overlay" id="modal-login-motorista">
+  <div class="modal" style="max-width:460px">
+    <div class="modal-header">
+      <div class="modal-title">Gerar Login do App Frota</div>
+      <button class="modal-close" onclick="fecharModal('login-motorista')">×</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:13px;color:#6B7280;margin-bottom:16px">
+        Será criado um acesso no App Frota para <strong id="login-nome-mot"></strong>.
+        O motorista deverá trocar a senha provisória no primeiro acesso.
+      </p>
+      <p id="login-mot-cpf-info" style="font-size:12px;color:#9CA3AF;margin-bottom:12px"></p>
+      <div class="form-group"><label class="form-label">E-mail (opcional)</label>
+        <input class="form-control" id="login-mot-email" type="email" placeholder="Em branco: usa o CPF cadastrado">
+        <span style="font-size:11px;color:#9CA3AF">Sem e-mail nem CPF cadastrado, não é possível gerar o login.</span>
+      </div>
+      <div class="form-group"><label class="form-label">Senha Provisória (opcional)</label>
+        <input class="form-control" id="login-mot-senha" type="text" placeholder="Em branco: gerada automaticamente">
+        <span style="font-size:11px;color:#9CA3AF">Comunique a senha ao motorista pessoalmente ou via WhatsApp seguro.</span>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="fecharModal('login-motorista')">Cancelar</button>
+      <button class="btn btn-primary" id="login-mot-btn" onclick="confirmarLoginMotorista()">Criar Login</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Credenciais Geradas (Motorista) -->
+<div class="modal-overlay" id="modal-credenciais-motorista">
+  <div class="modal" style="max-width:600px">
+    <div class="modal-header">
+      <div class="modal-title">Acessos Criados</div>
+      <button class="modal-close" onclick="fecharModal('credenciais-motorista')">×</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:13px;color:#B45309;background:rgba(245,158,11,.12);border-radius:8px;padding:10px 12px;margin-bottom:14px">
+        ⚠ Anote ou copie as senhas agora — por segurança, elas não poderão ser
+        consultadas depois. Repasse a cada motorista pessoalmente ou via
+        WhatsApp seguro. A troca de senha é obrigatória no primeiro acesso.
+      </p>
+      <div class="table-wrap"><div class="table-scroll" style="max-height:320px">
+        <table>
+          <thead><tr><th>Motorista</th><th>Login no app</th><th>Senha provisória</th></tr></thead>
+          <tbody id="cred-mot-tbody"></tbody>
+        </table>
+      </div></div>
+      <div id="cred-mot-erros" style="display:none;font-size:12px;color:#B91C1C;margin-top:12px"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="copiarCredenciaisMotorista()">Copiar tudo</button>
+      <button class="btn btn-primary" onclick="fecharModal('credenciais-motorista')">Fechar</button>
     </div>
   </div>
 </div>
@@ -298,6 +371,7 @@ let _veiculos = [], _motoristas = [], _setores = [], _usuarios = [], _docsPorVei
 let _editVeiculoId = null, _editMotoristaId = null, _docsVeiculoId = null
 let _vFotoFile = null, _vFotoUrlAtual = null
 let _multasVeiculoAtual = []
+let _loginMotoristaId = null, _credMotTexto = ''
 
 const TIPO_VEIC = { carro:'Carro', caminhonete:'Caminhonete', van:'Van', onibus:'Ônibus',
   caminhao:'Caminhão', motocicleta:'Motocicleta', quadriciclo:'Quadriciclo',
@@ -388,6 +462,7 @@ const DETRAN_AC_URL = 'https://www.detran.ac.gov.br/site/apps/veiculo/consulta/f
             ${Object.entries(STATUS_MOT).map(([v,l]) => `<option value="${v}">${l}</option>`).join('')}
           </select>
           <a class="btn btn-secondary" href="../pages/instalar-frota.html" target="_blank" rel="noopener">${bico('share')} Compartilhar app do motorista</a>
+          ${_podeEditar ? `<button class="btn btn-secondary" onclick="gerarLoginsMotoristasPendentes()" data-icon="key" title="Cria acesso ao App Frota para todos os motoristas ativos sem login">Gerar logins pendentes</button>` : ''}
           ${_podeEditar ? `<button class="btn btn-primary" onclick="abrirModalMotorista()">${bico('user')} Novo Motorista</button>` : ''}
         </div>
         <div class="card">
@@ -594,7 +669,10 @@ function renderMotoristas() {
       <td style="font-size:12px">${m.unidades_organizacionais ? `<strong>${esc(m.unidades_organizacionais.sigla)}</strong>` : '—'}</td>
       <td class="mono" style="font-size:12px">${esc(m.telefone || '—')}</td>
       <td><span class="badge ${BADGE_STATUS_MOT[m.status]||'badge-cinza'}">${STATUS_MOT[m.status]||esc(m.status)}</span></td>
-      ${_podeEditar ? `<td><button class="btn btn-xs btn-ghost" onclick="abrirModalMotorista('${m.id}')">Editar</button></td>` : ''}
+      ${_podeEditar ? `<td style="white-space:nowrap">
+        <button class="btn btn-xs btn-ghost" onclick="abrirModalMotorista('${m.id}')">Editar</button>
+        ${!m.usuario_id ? `<button class="btn btn-xs" style="background:#F59E0B;color:#fff;border:none" onclick='abrirModalLoginMotorista("${m.id}","${esc(m.nome)}","${esc(m.cpf||'')}")'>Gerar login</button>` : ''}
+      </td>` : ''}
     </tr>`
   }).join('')
 }
@@ -952,6 +1030,7 @@ function abrirModalMotorista(id = null) {
   document.getElementById('mm-titulo').textContent = m ? `Editar — ${m.nome}` : 'Novo Motorista'
   document.getElementById('btn-excluir-motorista').style.display = m ? '' : 'none'
   document.getElementById('m-nome').value = m?.nome || ''
+  document.getElementById('m-cpf').value = m?.cpf || ''
   document.getElementById('m-vinculo').value = m?.vinculo || 'servidor'
   document.getElementById('m-usuario').value = m?.usuario_id || ''
   document.getElementById('m-matricula').value = m?.matricula || ''
@@ -966,6 +1045,26 @@ function abrirModalMotorista(id = null) {
   document.getElementById('m-status').value = m?.status || 'ativo'
   document.getElementById('m-obs').value = m?.observacoes || ''
   mostrarCamposVinculo()
+
+  document.getElementById('m-criar-acesso').checked = true
+  if (!m) {
+    // Cadastro novo: mostra o checkbox de criar acesso ao salvar
+    document.getElementById('m-acesso-novo').style.display = ''
+    document.getElementById('m-acesso-existente').style.display = 'none'
+  } else if (m.usuario_id) {
+    // Já tem login — nada a fazer aqui (reatribuir é feito pelo campo "Usuário do SIGUC")
+    document.getElementById('m-acesso-novo').style.display = 'none'
+    const el = document.getElementById('m-acesso-existente')
+    el.style.display = ''
+    el.innerHTML = `${bico('check')} Já possui acesso ao App Frota`
+  } else {
+    // Motorista existente sem login: oferece gerar agora
+    document.getElementById('m-acesso-novo').style.display = 'none'
+    const el = document.getElementById('m-acesso-existente')
+    el.style.display = ''
+    el.innerHTML = `<button type="button" class="btn btn-secondary btn-sm" onclick="abrirModalLoginMotorista('${m.id}','${esc(m.nome)}','${esc(m.cpf||'')}')">Gerar login</button>`
+  }
+
   document.getElementById('modal-motorista').classList.add('aberto')
 }
 
@@ -974,6 +1073,7 @@ async function salvarMotorista() {
   if (!nome) { toast('Nome é obrigatório', 'error'); return }
   const payload = {
     nome,
+    cpf: document.getElementById('m-cpf').value.trim() || null,
     vinculo: document.getElementById('m-vinculo').value,
     usuario_id: document.getElementById('m-vinculo').value === 'servidor'
       ? (document.getElementById('m-usuario').value || null) : null,
@@ -989,22 +1089,115 @@ async function salvarMotorista() {
     status: document.getElementById('m-status').value,
     observacoes: document.getElementById('m-obs').value.trim() || null,
   }
+  const editando = _editMotoristaId
+  const criarAcesso = !editando && !payload.usuario_id && document.getElementById('m-criar-acesso').checked
   const btn = document.getElementById('btn-salvar-motorista')
   btn.disabled = true; btn.textContent = 'Salvando...'
   try {
-    if (_editMotoristaId) {
-      const { error } = await db.from('frota_motoristas').update(payload).eq('id', _editMotoristaId)
-      if (error) throw error
-      toast('Motorista atualizado!', 'success')
-    } else {
-      const { error } = await db.from('frota_motoristas').insert(payload)
-      if (error) throw error
-      toast('Motorista cadastrado!', 'success')
+    const { data: salvo, error } = editando
+      ? await db.from('frota_motoristas').update(payload).eq('id', editando).select('id').single()
+      : await db.from('frota_motoristas').insert(payload).select('id').single()
+    if (error) throw error
+    toast(editando ? 'Motorista atualizado!' : 'Motorista cadastrado!', 'success')
+    fecharModal('motorista')
+
+    if (criarAcesso) {
+      btn.textContent = 'Criando acesso...'
+      try {
+        const cred = await chamarGerarLoginMotorista({ motorista_id: salvo.id })
+        mostrarCredenciaisMotorista([cred])
+      } catch (e) {
+        toast(`Motorista salvo, mas o acesso ao app falhou: ${e.message}. Use o botão "Gerar login" na lista.`, 'error')
+      }
     }
-    fecharModal('motorista'); await carregarMotoristas(); renderKpis()
+    await carregarMotoristas(); renderKpis()
   } catch (e) {
     toast(e.message?.includes('duplicate') ? 'Este usuário já está vinculado a outro motorista' : (e.message || 'Erro ao salvar'), 'error')
   } finally { btn.disabled = false; btn.textContent = 'Salvar' }
+}
+
+// ── Acesso ao App Frota (gerar login) ──────────────────────────
+async function chamarGerarLoginMotorista(payload) {
+  const { data: { session } } = await db.auth.getSession()
+  if (!session?.access_token) throw new Error('Sessão expirada. Faça login novamente.')
+  const resp = await fetch(`${SUPABASE_URL}/functions/v1/gerar-login-motorista`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${session.access_token}`,
+      'apikey': SUPABASE_ANON_KEY,
+    },
+    body: JSON.stringify(payload),
+  })
+  const result = await resp.json()
+  if (!resp.ok) throw new Error(result.error || 'Erro ao criar login')
+  return result
+}
+
+function abrirModalLoginMotorista(id, nome, cpf) {
+  _loginMotoristaId = id
+  document.getElementById('login-nome-mot').textContent = nome
+  document.getElementById('login-mot-email').value = ''
+  document.getElementById('login-mot-senha').value = ''
+  document.getElementById('login-mot-cpf-info').textContent = cpf
+    ? `CPF cadastrado: ${cpf}` : 'Sem CPF cadastrado — informe um e-mail abaixo.'
+  document.getElementById('modal-login-motorista').classList.add('aberto')
+}
+
+async function confirmarLoginMotorista() {
+  const email = document.getElementById('login-mot-email').value.trim()
+  const senha_temp = document.getElementById('login-mot-senha').value
+  if (senha_temp && senha_temp.length < 6) { toast('Senha provisória deve ter no mínimo 6 caracteres', 'error'); return }
+  const btn = document.getElementById('login-mot-btn')
+  btn.disabled = true; btn.textContent = 'Criando...'
+  try {
+    const cred = await chamarGerarLoginMotorista({
+      motorista_id: _loginMotoristaId,
+      email: email || null,
+      senha_temp: senha_temp || null,
+    })
+    fecharModal('login-motorista')
+    mostrarCredenciaisMotorista([cred])
+    await carregarMotoristas()
+  } catch (e) { toast(e.message || 'Erro ao criar login', 'error') }
+  finally { btn.disabled = false; btn.textContent = 'Criar Login' }
+}
+
+async function gerarLoginsMotoristasPendentes() {
+  const pendentes = _motoristas.filter(m => m.status === 'ativo' && !m.usuario_id).length
+  if (!pendentes) { toast('Todos os motoristas ativos já possuem login no app', 'success'); return }
+  if (!confirm(`Criar acesso ao App Frota para ${pendentes} motorista(s) ativo(s) sem login? As senhas provisórias serão geradas automaticamente.`)) return
+  try {
+    const result = await chamarGerarLoginMotorista({ lote: true })
+    mostrarCredenciaisMotorista(result.resultados, result.erros)
+    await carregarMotoristas()
+  } catch (e) { toast(e.message || 'Erro ao gerar logins', 'error') }
+}
+
+function mostrarCredenciaisMotorista(lista, erros = []) {
+  _credMotTexto = lista.map(r =>
+    `${r.nome} — login: ${r.login}${r.login_por_cpf ? ' (CPF)' : ''} — senha provisória: ${r.senha_temp}`
+  ).join('\n')
+  document.getElementById('cred-mot-tbody').innerHTML = lista.length
+    ? lista.map(r => `<tr>
+        <td>${esc(r.nome)}</td>
+        <td>${esc(r.login)}${r.login_por_cpf ? ' <span class="badge badge-ouro" style="font-size:10px">CPF</span>' : ''}</td>
+        <td style="font-family:monospace;font-weight:600">${esc(r.senha_temp)}</td>
+      </tr>`).join('')
+    : '<tr><td colspan="3" style="color:#9CA3AF">Nenhum acesso criado.</td></tr>'
+  const errosEl = document.getElementById('cred-mot-erros')
+  errosEl.style.display = erros.length ? '' : 'none'
+  errosEl.innerHTML = erros.length
+    ? '<strong>Não foi possível criar:</strong><br>' + erros.map(e => `${esc(e.nome)}: ${esc(e.erro)}`).join('<br>')
+    : ''
+  document.getElementById('modal-credenciais-motorista').classList.add('aberto')
+}
+
+function copiarCredenciaisMotorista() {
+  navigator.clipboard?.writeText(_credMotTexto).then(
+    () => toast('Copiado!', 'success'),
+    () => toast('Não foi possível copiar', 'error')
+  )
 }
 
 async function excluirMotorista() {
@@ -1076,6 +1269,7 @@ function fecharModal(qual) {
   if (qual === 'veiculo') { _editVeiculoId = null; _multasVeiculoAtual = [] }
   if (qual === 'motorista') _editMotoristaId = null
   if (qual === 'docs') _docsVeiculoId = null
+  if (qual === 'login-motorista') _loginMotoristaId = null
 }
 </script>
 
