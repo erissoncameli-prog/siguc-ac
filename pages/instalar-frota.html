@@ -64,8 +64,8 @@
       <img id="qr-img" src="" alt="QR code de instalação">
       <p>Aponte a câmera do celular para o código</p>
     </div>
-    <button type="button" class="copia-link" id="btn-copiar" onclick="copiarLink()" aria-label="Copiar o link de instalação">
-      <span class="cl-url" id="cl-url">siguc-ac.vercel.app/pages/instalar-frota.html</span>
+    <button type="button" class="copia-link" id="btn-copiar" onclick="copiarLink()" aria-label="Copiar o link do app">
+      <span class="cl-url" id="cl-url">siguc-ac.vercel.app/pages/frota-app.html</span>
       <span class="cl-ic" aria-hidden="true">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
       </span>
@@ -89,11 +89,12 @@
     <h2>🍎 iPhone (iOS)</h2>
     <p class="sub">No iPhone, o app é instalado direto pelo navegador Safari — sem loja de aplicativos.</p>
     <ol>
-      <li><span>Abra este link no <b>Safari</b> (precisa ser o Safari, não funciona em outro navegador).</span></li>
-      <li><span>Toque no botão de <b>compartilhar</b> <span style="font-size:1.1em">⎋</span> (quadrado com seta para cima, na barra de baixo).</span></li>
+      <li><span>Toque no botão de copiar acima para copiar o link e <b>cole na barra de endereços do Safari</b> (precisa ser o Safari, não funciona em outro navegador nem dentro do WhatsApp).</span></li>
+      <li><span>Com a página do app aberta no Safari, toque no botão de <b>compartilhar</b> <span style="font-size:1.1em">⎋</span> (quadrado com seta para cima, na barra de baixo).</span></li>
       <li><span>Role a lista e toque em <b>"Adicionar à Tela de Início"</b>.</span></li>
       <li><span>Toque em <b>Adicionar</b>. Use o app <b>sempre pelo ícone</b> da tela inicial — no iPhone, é só assim que os avisos de viagem funcionam.</span></li>
     </ol>
+    <p class="nota">⚠️ Se aparecer só a tela de instruções (esta página) depois de instalar, é porque o "Adicionar à Tela de Início" foi feito nela em vez de na página do app — apague o ícone e repita o passo 1 colando o link na barra de endereços.</p>
   </section>
 
   <!-- ── PRIMEIRO USO ─────────────────────────────────────── -->
@@ -115,7 +116,7 @@
 </main>
 
 <script>
-  var LINK_APP = 'https://siguc-ac.vercel.app/pages/instalar-frota.html';
+  var LINK_APP = 'https://siguc-ac.vercel.app/pages/frota-app.html';
   document.getElementById('qr-img').src =
     'https://api.qrserver.com/v1/create-qr-code/?data=' + encodeURIComponent(LINK_APP) + '&size=320x320&format=png&margin=12';
 
