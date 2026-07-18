@@ -75,7 +75,7 @@ function linkDaTarefa(n) {
   const subtipo = n.meta?.subtipo, para = n.meta?.para
   if (subtipo === 'viagem_solicitada' || subtipo === 'viagem_direta') return '../pages/frota-viagens.html'
   if (subtipo === 'manutencao') return '../pages/frota-manutencao.html'
-  if (subtipo === 'viagem_aprovada' && para === 'motorista') return '../pages/frota-motorista.html'
+  if (subtipo === 'viagem_aprovada' && para === 'motorista') return '../pages/frota-app.html'
   if (subtipo === 'viagem_aprovada' || subtipo === 'viagem_recusada') return '../pages/frota-solicitar.html'
   return null
 }
