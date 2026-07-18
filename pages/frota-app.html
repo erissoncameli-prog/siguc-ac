@@ -518,6 +518,7 @@ function montarShellMotorista() {
         </button>
         <button class="fm-pill-btn fm-primaria" data-tab="nova" onclick="motoristaAba('nova')">${bico('plus')}<span>Viagem</span></button>
         <button class="fm-pill-btn" data-tab="historico" onclick="motoristaAba('historico')">${bico('clock')}<span>Histórico</span></button>
+        <button class="fm-pill-btn" data-tab="dados" onclick="motoristaAba('dados')">${bico('bar-chart')}<span>Dados</span></button>
         <button class="fm-pill-btn" data-tab="config" onclick="motoristaAba('config')">
           <span class="fm-badge" id="fm-config-dot" hidden>&nbsp;</span>${bico('sliders')}<span>Config</span></button>
       </nav>
@@ -633,6 +634,7 @@ function motoristaAba(aba) {
   else if (aba === 'solicitacoes') renderFmSolicitacoes()
   else if (aba === 'nova') renderFmNovaViagem()
   else if (aba === 'historico') renderFmHistorico()
+  else if (aba === 'dados') renderFmDados()
   else if (aba === 'config') renderFmConfig()
 }
 
@@ -723,6 +725,79 @@ function renderFmHistorico() {
             }).join('')}</tbody>
           </table>
         </div></div></div>`}`
+}
+
+// ── Aba Dados (números + gráfico das viagens do próprio motorista) ─
+// Tudo calculado a partir de _viagens (já carregado do banco ou do cache
+// offline), sem chamada extra — funciona mesmo sem conexão.
+function renderFmDados() {
+  const concluidas = _viagens.filter(v => v.status === 'concluida')
+  const ativas     = _viagens.filter(v => v.status === 'aprovada' || v.status === 'em_andamento')
+
+  let km = 0, horas = 0
+  concluidas.forEach(v => {
+    if (v.veiculo_medidor === 'horimetro') {
+      if (v.horas_saida != null && v.horas_chegada != null) horas += Math.max(0, v.horas_chegada - v.horas_saida)
+    } else if (v.km_saida != null && v.km_chegada != null) {
+      km += Math.max(0, v.km_chegada - v.km_saida)
+    }
+  })
+  const avulsas    = concluidas.filter(v => v.aberta_direto).length
+  const comAvarias = concluidas.filter(v => v.avarias).length
+
+  const agora = new Date()
+  const chave = d => d.getFullYear() * 12 + d.getMonth()
+  const mesAtual = chave(agora)
+  const dataRef = v => new Date(v.checkin_em || v.data_saida_prevista)
+  const noMes = concluidas.filter(v => chave(dataRef(v)) === mesAtual).length
+
+  // Série dos últimos 6 meses (viagens concluídas por mês)
+  const meses = []
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(agora.getFullYear(), agora.getMonth() - i, 1)
+    meses.push({ k: chave(d), label: d.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', ''), n: 0 })
+  }
+  concluidas.forEach(v => { const m = meses.find(x => x.k === chave(dataRef(v))); if (m) m.n++ })
+  const maxN = Math.max(1, ...meses.map(m => m.n))
+
+  const kpi = (cls, label, valor) =>
+    `<div class="kpi-card ${cls}"><div class="kpi-label">${label}</div><div class="kpi-valor">${valor}</div></div>`
+
+  const html = `
+    <div class="card" style="margin-bottom:16px;display:flex;align-items:center;gap:14px">
+      <div class="sidebar-avatar" style="width:44px;height:44px;font-size:15px">${iniciais(_motorista.nome)}</div>
+      <div>
+        <div style="font-weight:700;font-size:15px">Meus números</div>
+        <div style="font-size:12px;color:#9CA3AF">Resumo das suas viagens no SIGUC</div>
+      </div>
+    </div>
+    <div class="kpi-grid" style="margin-bottom:16px">
+      ${kpi('verde', 'Viagens concluídas', concluidas.length)}
+      ${kpi('azul',  'Km rodados', formatNum(km, 0))}
+      ${kpi('ouro',  'Este mês', noMes)}
+      ${kpi('erro',  'Com avaria', comAvarias)}
+    </div>
+    ${(horas > 0 || avulsas > 0) ? `
+      <div class="card" style="margin-bottom:16px;padding:12px 16px;font-size:13px;color:#6B7280;display:flex;flex-wrap:wrap;gap:16px">
+        ${horas > 0 ? `<span>Horas de operação (horímetro): <strong style="color:#1F4E2C">${formatNum(horas, 1)} h</strong></span>` : ''}
+        ${avulsas > 0 ? `<span>Viagens avulsas: <strong style="color:#1F4E2C">${avulsas}</strong></span>` : ''}
+        ${ativas.length ? `<span>Em aberto agora: <strong style="color:#1F4E2C">${ativas.length}</strong></span>` : ''}
+      </div>` : ''}
+    <div class="form-section-label">Viagens concluídas por mês</div>
+    <div class="card">
+      ${concluidas.length ? `
+        <div class="fm-chart">
+          ${meses.map(m => `
+            <div class="fm-chart-col">
+              <div class="fm-chart-num">${m.n || ''}</div>
+              <div class="fm-chart-bar" style="height:${m.n ? 6 + Math.round((m.n / maxN) * 104) : 3}px"></div>
+              <div class="fm-chart-lab">${esc(m.label)}</div>
+            </div>`).join('')}
+        </div>` : `
+        <div style="text-align:center;padding:24px;color:#9CA3AF">Nenhuma viagem concluída ainda.<br>Seus números aparecem aqui depois do primeiro check-in.</div>`}
+    </div>`
+
+  document.getElementById('fm-conteudo').innerHTML = html
 }
 
 // ── Aba Nova Viagem (avulsa, sem agendamento prévio) ─────────────
@@ -1797,11 +1872,11 @@ if ('serviceWorker' in navigator && !window.Capacitor) {
 .fm-pill-nav {
   position: fixed; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); left: 50%; transform: translateX(-50%);
   max-width: calc(100vw - 16px);
-  background: #0A1A0F; border-radius: 32px; height: 64px; padding: 0 10px;
-  display: flex; align-items: center; gap: 4px; box-shadow: 0 8px 32px rgba(0,0,0,.35); z-index: 1000;
+  background: #0A1A0F; border-radius: 32px; height: 64px; padding: 0 8px;
+  display: flex; align-items: center; gap: 3px; box-shadow: 0 8px 32px rgba(0,0,0,.35); z-index: 1000;
 }
 .fm-pill-btn {
-  position: relative; width: 50px; height: 50px; border-radius: 50%;
+  position: relative; width: 48px; height: 48px; border-radius: 50%;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   border: none; background: transparent; cursor: pointer; color: rgba(255,255,255,.5); gap: 2px;
   transition: background .15s, color .15s; font-size: 9px; font-weight: 600; font-family: 'DM Sans', sans-serif;
@@ -1823,6 +1898,13 @@ if ('serviceWorker' in navigator && !window.Capacitor) {
 }
 .fm-config-item:last-child { border-bottom: none; }
 .fm-config-item:hover { background: #F9FAFB; }
+
+/* ── Gráfico de barras (aba Dados) ──────────────────────────────── */
+.fm-chart { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; padding: 8px 2px 0; }
+.fm-chart-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 5px; }
+.fm-chart-num { font-size: 11px; font-weight: 700; color: #1F4E2C; min-height: 14px; }
+.fm-chart-bar { width: 100%; max-width: 34px; background: linear-gradient(180deg, #52B788, #1F4E2C); border-radius: 6px 6px 0 0; min-height: 3px; }
+.fm-chart-lab { font-size: 10px; color: #9CA3AF; text-transform: capitalize; }
 
 /* ── Tela de PIN (bloqueio de acesso) ───────────────────────────── */
 .fm-pin-tela {
@@ -1849,9 +1931,10 @@ if ('serviceWorker' in navigator && !window.Capacitor) {
 .fm-pin-aux { font-size: 15px; background: rgba(255,255,255,.06); }
 .fm-pin-link { margin-top: 22px; background: none; border: none; color: rgba(255,255,255,.75); font-size: 13px; text-decoration: underline; cursor: pointer; }
 @media (max-width: 380px) {
-  .fm-pill-nav { padding: 0 6px; gap: 2px; }
-  .fm-pill-btn { width: 46px; height: 46px; font-size: 8px; }
-  .fm-pill-btn.fm-primaria { width: 50px; height: 50px; }
+  .fm-pill-nav { padding: 0 5px; gap: 1px; }
+  .fm-pill-btn { width: 44px; height: 44px; font-size: 8px; }
+  .fm-pill-btn svg { width: 18px; height: 18px; }
+  .fm-pill-btn.fm-primaria { width: 48px; height: 48px; }
 }
 </style>
 </body>
