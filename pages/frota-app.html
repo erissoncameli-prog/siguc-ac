@@ -6,14 +6,59 @@
 <title>SIGUC-AC · App Frota</title>
 <link rel="manifest" href="/pwa/manifest-frota.json">
 <link rel="stylesheet" href="../css/global.css">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+// Stub de segurança: se o CDN não carregar (offline), config.js não quebra.
+window.supabase = window.supabase || { createClient: () => null }
+window.__API_MONITOR_OFF = true
+</script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"
+        onerror="console.warn('[frota-app] Supabase CDN indisponível')"></script>
 <script src="../js/observability.js"></script>
 <script src="../js/queryLogger.js"></script>
 <script src="../js/config.js"></script>
+<script>
+// ── Cliente Supabase ISOLADO para o App Frota ──────────────────
+// Mesmo padrão do App Brigadas/Biomonitor: sessão própria em
+// localStorage, nunca toca a sessionStorage da plataforma principal.
+const _frotaReady = _dbReady.then(function () {
+  if (!window.supabase || typeof window.supabase.createClient !== 'function') return
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) return
+  try {
+    const _frotaDb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: {
+        storageKey:       'siguc-frota-session',
+        storage:          window.localStorage,
+        persistSession:   true,
+        autoRefreshToken: true,
+        detectSessionInUrl: false,
+      },
+    });
+    if (_frotaDb) { db = _frotaDb; window.db = _frotaDb }
+  } catch (e) {
+    console.error('[frota-app] cliente isolado FALHOU:', e)
+  }
+});
+</script>
 <script src="../js/layout.js"></script>
 </head>
 <body>
 <div id="app"></div>
+
+<!-- Tela de login própria do App Frota -->
+<div id="tela-login-frota" class="fm-login-tela" hidden>
+  <div class="fm-login-card">
+    <div class="fm-login-marca">
+      <div class="fm-login-titulo">App Frota</div>
+      <div class="fm-login-sub">SEMA-AC · Setor de Transporte</div>
+    </div>
+    <div class="form-group"><label class="form-label">E-mail ou CPF</label>
+      <input class="form-control" id="lf-usuario" autocomplete="username" placeholder="seu@email.com"></div>
+    <div class="form-group"><label class="form-label">Senha</label>
+      <input class="form-control" id="lf-senha" type="password" autocomplete="current-password" placeholder="••••••••"></div>
+    <div id="lf-erro" style="display:none;font-size:12px;color:#DC2626;margin-bottom:10px"></div>
+    <button class="btn btn-primary" id="btn-login-frota" style="width:100%" onclick="loginFrota()">Entrar</button>
+  </div>
+</div>
 
 <!-- Modal Check-out (iniciar viagem — Motorista) -->
 <div class="modal-overlay" id="modal-checkout">
@@ -170,9 +215,62 @@ const SITUACAO_LABEL = { ok:'Em dia', proximo:'Próximo', vencido:'Vencido' }
 const SITUACAO_BADGE = { ok:'badge-verde', proximo:'badge-ouro', vencido:'badge-erro' }
 
 ;(async function () {
-  _usuario = await carregarUsuario()
-  if (!_usuario) { window.location.href = '../index.html'; return }
+  await _frotaReady
+  if (!db) { mostrarLoginFrota('Serviço indisponível no momento. Tente novamente.'); return }
 
+  const { data: { session } } = await db.auth.getSession()
+  if (!session) { mostrarLoginFrota(); return }
+
+  await entrarComSessao(session)
+})()
+
+function mostrarLoginFrota(erro) {
+  document.getElementById('app').innerHTML = ''
+  document.getElementById('tela-login-frota').hidden = false
+  if (erro) {
+    const el = document.getElementById('lf-erro')
+    el.textContent = erro; el.style.display = ''
+  }
+}
+
+async function loginFrota() {
+  const usuario = document.getElementById('lf-usuario').value.trim()
+  const senha = document.getElementById('lf-senha').value
+  const erroEl = document.getElementById('lf-erro')
+  erroEl.style.display = 'none'
+  if (!usuario || !senha) { erroEl.textContent = 'Informe usuário e senha'; erroEl.style.display = ''; return }
+  const btn = document.getElementById('btn-login-frota')
+  btn.disabled = true; btn.textContent = 'Entrando...'
+  try {
+    const email = usuario.includes('@') ? usuario : `${usuario.replace(/\D/g,'')}@motoristas.siguc.local`
+    const { data, error } = await db.auth.signInWithPassword({ email, password: senha })
+    if (error) throw error
+    await entrarComSessao(data.session)
+  } catch (e) {
+    erroEl.textContent = 'E-mail/CPF ou senha inválidos'
+    erroEl.style.display = ''
+  } finally {
+    btn.disabled = false; btn.textContent = 'Entrar'
+  }
+}
+
+// Sobrescreve o fazerLogout() genérico de layout.js: aqui a sessão é
+// isolada (client próprio em localStorage) e não deve redirecionar
+// para o login da plataforma principal.
+async function fazerLogout() {
+  try { await db.auth.signOut() } catch (e) {}
+  sessionStorage.removeItem('frotaModoAtivo')
+  window.location.reload()
+}
+
+async function entrarComSessao(session) {
+  const { data: u } = await db.from('usuarios').select('*').eq('id', session.user.id).single()
+  if (!u || !u.ativo) { await db.auth.signOut(); mostrarLoginFrota('Usuário inativo ou não encontrado.'); return }
+  appState.usuario = u
+  appState.perfil = u.perfil
+  _usuario = u
+
+  document.getElementById('tela-login-frota').hidden = true
   document.getElementById('app').innerHTML =
     '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;color:#9CA3AF;font-family:\'DM Sans\',sans-serif">Carregando...</div>'
 
@@ -195,7 +293,7 @@ const SITUACAO_BADGE = { ok:'badge-verde', proximo:'badge-ouro', vencido:'badge-
     montarShellDesktop()
     renderSeletorPerfil()
   }
-})()
+}
 
 // ── Shell desktop (Solicitante/Gestor/seletor) ─────────────────
 function montarShellDesktop() {
@@ -1029,6 +1127,19 @@ if ('serviceWorker' in navigator && !window.Capacitor) {
   letter-spacing: .06em; color: var(--verde-c, #52B788);
   padding: 8px 0 4px; margin-bottom: 12px;
 }
+
+/* ── Tela de login própria do App Frota ─────────────────────────── */
+.fm-login-tela {
+  min-height: 100vh; display: flex; align-items: center; justify-content: center;
+  padding: 24px; background: linear-gradient(135deg, #0A1A0F 0%, #0E5A3C 60%, #1F4E2C 130%);
+}
+.fm-login-card {
+  width: 100%; max-width: 360px; background: #fff; border-radius: 16px;
+  padding: 32px 28px; box-shadow: 0 12px 40px rgba(0,0,0,.25);
+}
+.fm-login-marca { text-align: center; margin-bottom: 24px; }
+.fm-login-titulo { font-family: 'Fraunces', serif; font-weight: 700; font-size: 22px; color: #1F4E2C; }
+.fm-login-sub { font-size: 12px; color: #6B7280; margin-top: 4px; }
 
 /* ── Shell nativo do Motorista (faixa de logos + barra de botões) ── */
 .fm-shell { min-height: 100vh; background: #F6FAF6; display: flex; flex-direction: column; }
