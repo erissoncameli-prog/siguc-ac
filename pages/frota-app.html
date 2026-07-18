@@ -142,19 +142,37 @@ const _frotaReady = _dbReady.then(function () {
 
 <!-- Modal Aprovar (Gestor) -->
 <div class="modal-overlay" id="modal-aprovar">
-  <div class="modal" style="max-width:480px">
+  <div class="modal" style="max-width:560px">
     <div class="modal-header">
       <div class="modal-title">Aprovar viagem</div>
       <button class="modal-close" onclick="fecharModal('aprovar')">×</button>
     </div>
     <div class="modal-body">
-      <div id="ap-resumo" style="font-size:13px;color:#6B7280;margin-bottom:14px"></div>
-      <div class="form-group"><label class="form-label">Veículo <span class="obrig">*</span></label>
-        <select class="form-control" id="ap-veiculo"><option value="">Selecione...</option></select>
-        <div id="ap-aviso-veiculo" style="display:none;font-size:12px;color:#991B1B;margin-top:6px">Nenhum veículo disponível para esse período — todos estão ocupados ou em manutenção.</div>
+      <div id="ap-resumo" style="font-size:13px;color:#6B7280;margin-bottom:10px"></div>
+      <div id="ap-alerta-passageiros" style="display:none;font-size:12px;background:#FEF3C7;color:#92400E;padding:8px 12px;border-radius:8px;margin-bottom:14px">
+        Mais de 4 passageiros — um veículo pode não comportar o grupo. Use "Dividir em mais de um veículo" para escalar mais de um veículo/motorista para essa viagem.
       </div>
-      <div class="form-group"><label class="form-label">Motorista <span class="obrig">*</span></label>
-        <select class="form-control" id="ap-motorista"><option value="">Selecione...</option></select></div>
+
+      <div id="ap-modo-unico">
+        <div class="form-group"><label class="form-label">Veículo <span class="obrig">*</span></label>
+          <select class="form-control" id="ap-veiculo" onchange="checarCapacidadeUnica()"><option value="">Selecione...</option></select>
+          <div id="ap-aviso-veiculo" style="display:none;font-size:12px;color:#991B1B;margin-top:6px">Nenhum veículo disponível para esse período — todos estão ocupados ou em manutenção.</div>
+          <div id="ap-aviso-capacidade" style="display:none;font-size:12px;color:#991B1B;margin-top:6px">Este veículo não comporta todos os passageiros. Use "Dividir em mais de um veículo".</div>
+        </div>
+        <div class="form-group"><label class="form-label">Motorista <span class="obrig">*</span></label>
+          <select class="form-control" id="ap-motorista"><option value="">Selecione...</option></select></div>
+        <button class="btn btn-xs btn-ghost" onclick="ativarModoMultiplo()">Dividir em mais de um veículo</button>
+      </div>
+
+      <div id="ap-modo-multiplo" style="display:none">
+        <div style="font-size:12px;color:#6B7280;margin-bottom:8px">
+          Distribua os <strong id="ap-total-passageiros">0</strong> passageiros entre os veículos abaixo.
+          Total alocado: <strong id="ap-total-alocado">0</strong>
+        </div>
+        <div id="ap-linhas"></div>
+        <button class="btn btn-xs btn-ghost" onclick="adicionarLinhaAlocacao()">+ adicionar veículo</button>
+        <button class="btn btn-xs btn-ghost" onclick="desativarModoMultiplo()" style="margin-left:8px">Voltar para 1 veículo</button>
+      </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="fecharModal('aprovar')">Cancelar</button>
@@ -398,7 +416,10 @@ function situacaoPlano(p) {
   if (usoProximo || diasProximo) return 'proximo'
   return 'ok'
 }
-function fecharModal(qual) { document.getElementById(`modal-${qual}`).classList.remove('aberto'); _acaoId = null }
+function fecharModal(qual) {
+  document.getElementById(`modal-${qual}`).classList.remove('aberto')
+  _acaoId = null; _viagemAprovando = null; _linhasAlocacaoG = []
+}
 
 // ═══════════════════════════════════════════════════════════════
 // MODO MOTORISTA — shell nativo (faixa de logos + barra de botões,
@@ -858,7 +879,10 @@ async function renderModoSolicitante() {
         <div class="form-group"><label class="form-label">Setor solicitante</label>
           <select class="form-control" id="f-setor"><option value="">—</option></select></div>
         <div class="form-group"><label class="form-label">Nº de passageiros</label>
-          <input class="form-control" id="f-passageiros" type="number" min="1" max="99" placeholder="1"></div>
+          <input class="form-control" id="f-passageiros" type="number" min="1" max="99" placeholder="1" oninput="checarPassageiros()"></div>
+      </div>
+      <div id="aviso-passageiros" style="display:none;font-size:12px;background:#FEF3C7;color:#92400E;padding:8px 12px;border-radius:8px;margin-bottom:14px">
+        Mais de 4 passageiros — o setor de transporte pode precisar escalar mais de um veículo para atender essa viagem.
       </div>
       <div class="form-group"><label class="form-label">Destino <span class="obrig">*</span></label>
         <input class="form-control" id="f-destino" placeholder="Ex.: Sede da UC, endereço, município..."></div>
@@ -928,6 +952,11 @@ function renderMinhasViagens() {
   }).join('')
 }
 
+function checarPassageiros() {
+  const n = parseInt(document.getElementById('f-passageiros').value) || 0
+  document.getElementById('aviso-passageiros').style.display = n > 4 ? '' : 'none'
+}
+
 async function checarDisponibilidade() {
   const saida = document.getElementById('f-saida').value
   const retorno = document.getElementById('f-retorno').value
@@ -982,6 +1011,7 @@ async function solicitar() {
     document.getElementById('f-saida').value = ''
     document.getElementById('f-retorno').value = ''
     document.getElementById('f-passageiros').value = ''
+    document.getElementById('aviso-passageiros').style.display = 'none'
     document.getElementById('f-uc').value = ''
     document.getElementById('aviso-disponibilidade').style.display = 'none'
     _ultimaChecagemDisponivel = null
@@ -1041,7 +1071,7 @@ async function renderModoGestor() {
 }
 
 async function carregarVeiculosGestor() {
-  const { data } = await db.from('frota_veiculos').select('id,placa,modelo,tipo,status')
+  const { data } = await db.from('frota_veiculos').select('id,placa,modelo,tipo,status,capacidade_passageiros')
     .eq('ativo', true).neq('status', 'baixado').order('placa')
   _veiculosG = data || []
 }
@@ -1141,40 +1171,143 @@ function renderListaManutGestor() {
   }).join('')
 }
 
+let _viagemAprovando = null, _idsDisponiveisG = new Set(), _linhasAlocacaoG = []
+
+function optsMotoristasG(selecionado) {
+  return '<option value="">Selecione...</option>' + _motoristasG.map(x => {
+    const cnhOk = !x.cnh_validade || new Date(x.cnh_validade) >= new Date()
+    const fluvialOk = !x.habilitacao_fluvial_validade || new Date(x.habilitacao_fluvial_validade) >= new Date()
+    const apto = cnhOk && fluvialOk
+    return `<option value="${x.id}" ${x.id === selecionado ? 'selected' : ''} ${apto ? '' : 'disabled'}>${esc(x.nome)}${apto ? '' : ' (habilitação vencida)'}</option>`
+  }).join('')
+}
+
+function optsVeiculosG(selecionado) {
+  return '<option value="">Selecione...</option>' + _veiculosG.filter(x => x.status !== 'baixado').map(x => {
+    const livre = _idsDisponiveisG.has(x.id)
+    return `<option value="${x.id}" ${x.id === selecionado ? 'selected' : ''} ${livre ? '' : 'disabled'}>${esc(x.placa)} — ${esc(x.modelo)}${x.capacidade_passageiros ? ` (${x.capacidade_passageiros} lug.)` : ''}${livre ? '' : ` (ocupado — ${STATUS_VEIC_LABEL[x.status] || x.status})`}</option>`
+  }).join('')
+}
+
 async function abrirAprovar(id) {
   const v = _viagensPendentes.find(x => x.id === id)
   _acaoId = id
+  _viagemAprovando = v
   document.getElementById('ap-resumo').innerHTML =
-    `<strong>${esc(v.destino)}</strong><br>${formatDataHora(v.data_saida_prevista)} até ${formatDataHora(v.data_retorno_prevista)}<br>Solicitante: ${esc(v.solicitante_nome)}`
+    `<strong>${esc(v.destino)}</strong><br>${formatDataHora(v.data_saida_prevista)} até ${formatDataHora(v.data_retorno_prevista)}<br>Solicitante: ${esc(v.solicitante_nome)}${v.passageiros ? ` · ${v.passageiros} passageiro(s)` : ''}`
+  document.getElementById('ap-alerta-passageiros').style.display = (v.passageiros || 0) > 4 ? '' : 'none'
   document.getElementById('ap-veiculo').innerHTML = '<option value="">Carregando disponibilidade...</option>'
   document.getElementById('ap-aviso-veiculo').style.display = 'none'
-  document.getElementById('ap-motorista').innerHTML = '<option value="">Selecione...</option>' +
-    _motoristasG.map(x => {
-      const cnhOk = !x.cnh_validade || new Date(x.cnh_validade) >= new Date()
-      const fluvialOk = !x.habilitacao_fluvial_validade || new Date(x.habilitacao_fluvial_validade) >= new Date()
-      const apto = cnhOk && fluvialOk
-      return `<option value="${x.id}" ${apto ? '' : 'disabled'}>${esc(x.nome)}${apto ? '' : ' (habilitação vencida)'}</option>`
-    }).join('')
+  document.getElementById('ap-aviso-capacidade').style.display = 'none'
+  document.getElementById('ap-motorista').innerHTML = optsMotoristasG(null)
+  desativarModoMultiplo()
   document.getElementById('modal-aprovar').classList.add('aberto')
 
   const { data: disponiveis } = await db.rpc('frota_veiculos_disponiveis', {
     p_inicio: v.data_saida_prevista, p_fim: v.data_retorno_prevista
   })
   if (_acaoId !== id) return
-  const idsDisponiveis = new Set((disponiveis || []).map(x => x.id))
-  document.getElementById('ap-veiculo').innerHTML = '<option value="">Selecione...</option>' +
-    _veiculosG.filter(x => x.status !== 'baixado').map(x => {
-      const livre = idsDisponiveis.has(x.id)
-      return `<option value="${x.id}" ${livre ? '' : 'disabled'}>${esc(x.placa)} — ${esc(x.modelo)}${livre ? '' : ` (ocupado — ${STATUS_VEIC_LABEL[x.status] || x.status})`}</option>`
-    }).join('')
-  document.getElementById('ap-aviso-veiculo').style.display = idsDisponiveis.size ? 'none' : ''
+  _idsDisponiveisG = new Set((disponiveis || []).map(x => x.id))
+  document.getElementById('ap-veiculo').innerHTML = optsVeiculosG(null)
+  document.getElementById('ap-aviso-veiculo').style.display = _idsDisponiveisG.size ? 'none' : ''
+
+  // Mais de 4 passageiros: já sugere de cara a divisão em vários veículos.
+  if ((v.passageiros || 0) > 4) await ativarModoMultiplo()
+}
+
+function checarCapacidadeUnica() {
+  const sel = document.getElementById('ap-veiculo')
+  const veic = _veiculosG.find(x => x.id === sel.value)
+  const passageiros = _viagemAprovando?.passageiros || 0
+  const estoura = veic && veic.capacidade_passageiros && passageiros > veic.capacidade_passageiros
+  document.getElementById('ap-aviso-capacidade').style.display = estoura ? '' : 'none'
+}
+
+function desativarModoMultiplo() {
+  document.getElementById('ap-modo-unico').style.display = ''
+  document.getElementById('ap-modo-multiplo').style.display = 'none'
+  _linhasAlocacaoG = []
+}
+
+async function ativarModoMultiplo() {
+  document.getElementById('ap-modo-unico').style.display = 'none'
+  document.getElementById('ap-modo-multiplo').style.display = ''
+  document.getElementById('ap-total-passageiros').textContent = _viagemAprovando?.passageiros || 0
+
+  const { data: sugestoes } = await db.rpc('frota_sugerir_alocacao', { p_viagem_id: _acaoId })
+  _linhasAlocacaoG = (sugestoes && sugestoes.length)
+    ? sugestoes.map(s => ({ veiculo_id: s.veiculo_id, motorista_id: null, passageiros: s.passageiros_sugeridos }))
+    : [{ veiculo_id: null, motorista_id: null, passageiros: _viagemAprovando?.passageiros || 1 }, { veiculo_id: null, motorista_id: null, passageiros: 0 }]
+  renderLinhasAlocacaoG()
+}
+
+function adicionarLinhaAlocacao() {
+  _linhasAlocacaoG.push({ veiculo_id: null, motorista_id: null, passageiros: 0 })
+  renderLinhasAlocacaoG()
+}
+
+function removerLinhaAlocacao(i) {
+  _linhasAlocacaoG.splice(i, 1)
+  renderLinhasAlocacaoG()
+}
+
+function atualizarLinhaAlocacao(i, campo, valor) {
+  _linhasAlocacaoG[i][campo] = campo === 'passageiros' ? (parseInt(valor) || 0) : (valor || null)
+  atualizarTotalAlocadoG()
+}
+
+function atualizarTotalAlocadoG() {
+  const total = _linhasAlocacaoG.reduce((s, l) => s + (l.passageiros || 0), 0)
+  const alvo = _viagemAprovando?.passageiros || 0
+  const el = document.getElementById('ap-total-alocado')
+  el.textContent = total
+  el.style.color = total === alvo ? '#166534' : '#991B1B'
+}
+
+function renderLinhasAlocacaoG() {
+  const cont = document.getElementById('ap-linhas')
+  cont.innerHTML = _linhasAlocacaoG.map((l, i) => `
+    <div style="display:flex;gap:8px;align-items:flex-start;margin-bottom:8px;flex-wrap:wrap">
+      <select class="form-control" style="flex:2;min-width:120px" onchange="atualizarLinhaAlocacao(${i},'veiculo_id',this.value)">${optsVeiculosG(l.veiculo_id)}</select>
+      <select class="form-control" style="flex:2;min-width:120px" onchange="atualizarLinhaAlocacao(${i},'motorista_id',this.value)">${optsMotoristasG(l.motorista_id)}</select>
+      <input class="form-control" style="flex:1;min-width:60px" type="number" min="1" max="99" value="${l.passageiros || ''}" placeholder="pax" oninput="atualizarLinhaAlocacao(${i},'passageiros',this.value)">
+      <button class="btn btn-xs btn-ghost" style="color:#DC2626" onclick="removerLinhaAlocacao(${i})">×</button>
+    </div>`).join('')
+  atualizarTotalAlocadoG()
 }
 
 async function confirmarAprovar() {
+  const multiplo = document.getElementById('ap-modo-multiplo').style.display !== 'none'
+  const btn = document.getElementById('btn-confirmar-aprovar')
+
+  if (multiplo) {
+    const alvo = _viagemAprovando?.passageiros || 0
+    const total = _linhasAlocacaoG.reduce((s, l) => s + (l.passageiros || 0), 0)
+    if (_linhasAlocacaoG.some(l => !l.veiculo_id || !l.motorista_id || !l.passageiros)) {
+      toast('Preencha veículo, motorista e passageiros em todas as linhas', 'error'); return
+    }
+    if (total !== alvo) { toast(`A soma dos passageiros (${total}) precisa ser igual ao total solicitado (${alvo})`, 'error'); return }
+    btn.disabled = true; btn.textContent = 'Aprovando...'
+    try {
+      const { error } = await db.rpc('frota_aprovar_viagem_multipla', {
+        p_viagem_id: _acaoId,
+        p_alocacoes: _linhasAlocacaoG.map(l => ({ veiculo_id: l.veiculo_id, motorista_id: l.motorista_id, passageiros: l.passageiros }))
+      })
+      if (error) throw error
+      toast(`Viagem aprovada com ${_linhasAlocacaoG.length} veículos!`, 'success')
+      fecharModal('aprovar'); await carregarViagensGestor()
+    } catch (e) { toast(e.message || 'Erro ao aprovar', 'error') }
+    finally { btn.disabled = false; btn.textContent = 'Aprovar' }
+    return
+  }
+
   const veiculo_id = document.getElementById('ap-veiculo').value
   const motorista_id = document.getElementById('ap-motorista').value
   if (!veiculo_id || !motorista_id) { toast('Selecione veículo e motorista', 'error'); return }
-  const btn = document.getElementById('btn-confirmar-aprovar')
+  const veic = _veiculosG.find(x => x.id === veiculo_id)
+  const passageiros = _viagemAprovando?.passageiros || 0
+  if (veic && veic.capacidade_passageiros && passageiros > veic.capacidade_passageiros &&
+      !confirm(`Este veículo comporta ${veic.capacidade_passageiros} passageiro(s), mas a viagem tem ${passageiros}. Aprovar mesmo assim?`)) return
   btn.disabled = true; btn.textContent = 'Aprovando...'
   try {
     const { error } = await db.rpc('frota_aprovar_viagem', { p_viagem_id: _acaoId, p_veiculo_id: veiculo_id, p_motorista_id: motorista_id })

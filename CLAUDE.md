@@ -20,6 +20,14 @@ Sistema já tem login, sidebar, layout e páginas funcionando.
   - App Brigadas: brigada.html (app de campo), brigadas.html e
     admin-brigadas.html (gestão), relatorios-brigadas.html,
     instalar-brigadas.html (página pública de instalação/atualização)
+  - Frota (Setor de Transporte): DUAS superfícies para o MESMO fluxo
+    de solicitar/aprovar viagem — páginas web de mesa
+    (frota-solicitar.html solicita, frota-viagens.html aprova/recusa)
+    E o app unificado de campo/mobile frota-app.html (modos
+    solicitante/motorista/gestor, PWA instalável via
+    instalar-frota.html, sem shell Capacitor ainda). Gestão de frota:
+    frota-veiculos.html, frota-manutencao.html, frota-tarefas.html.
+    Ver regra de duplicação obrigatória em "Regras de desenvolvimento".
 - js/ → config.js, layout.js, mapa-cartografia.js, observability.js,
   queryLogger.js; brigada-offline.js (IndexedDB), brigada-sync.js,
   brigada-captura.js (câmera/GPS/marca d'água), brigada-fauna.js
@@ -208,6 +216,21 @@ E) Dashboard Executivo por nível (UC / Diretoria / Secretaria)
   novo APK a cada mudança. Só gerar quando o usuário pedir ou quando já
   houver acúmulo suficiente para valer a pena. Mudanças web/PWA podem ir à
   produção normalmente (lembrar de subir a versão do cache em pwa/sw.js).
+- DUPLICAÇÃO OBRIGATÓRIA — Frota tem o MESMO fluxo em duas superfícies
+  (páginas web de mesa E o app unificado frota-app.html). Qualquer
+  mudança FUNCIONAL num dos pares abaixo (alerta novo, validação nova,
+  campo novo, RPC nova chamada na aprovação/solicitação etc.) tem que
+  ser replicada no outro par na MESMA entrega — nunca só um lado.
+  Antes de marcar a tarefa como concluída, checar explicitamente se o
+  par existe e foi tocado:
+  - Solicitar viagem: `frota-solicitar.html` ⇄ `frota-app.html` (modo
+    solicitante, função `renderModoSolicitante`)
+  - Aprovar/recusar viagem: `frota-viagens.html` ⇄ `frota-app.html`
+    (modo gestor, funções `abrirAprovar`/`confirmarAprovar`)
+  Esse padrão de "página de mesa" + "app unificado" cobrindo o mesmo
+  fluxo tende a se repetir conforme o módulo Frota crescer — ao criar
+  uma tela nova de mesa que já tenha equivalente no app (ou vice-versa),
+  aplicar a mesma regra e documentar o par aqui.
 
 ## Variáveis de ambiente
 SUPABASE_URL=https://atqtybcsvepdabsvgaly.supabase.co
