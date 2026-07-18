@@ -313,6 +313,7 @@ const TIPO_DOC = { crlv:'CRLV', licenciamento:'Licenciamento', seguro:'Seguro', 
             <option value="">Status</option>
             ${Object.entries(STATUS_MOT).map(([v,l]) => `<option value="${v}">${l}</option>`).join('')}
           </select>
+          <a class="btn btn-secondary" href="../pages/instalar-frota.html" target="_blank" rel="noopener">${bico('share')} Compartilhar app do motorista</a>
           ${_podeEditar ? `<button class="btn btn-primary" onclick="abrirModalMotorista()">${bico('user')} Novo Motorista</button>` : ''}
         </div>
         <div class="card">

@@ -2,7 +2,9 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta name="theme-color" content="#1F4E2C">
 <title>SIGUC-AC · App do Motorista</title>
+<link rel="manifest" href="/pwa/manifest-frota.json">
 <link rel="stylesheet" href="../css/global.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="../js/observability.js"></script>
@@ -106,10 +108,20 @@ function renderShell() {
         <div style="font-size:12px;color:#9CA3AF">CNH ${esc(_motorista.cnh_categoria||'—')} ${_motorista.cnh_numero ? '· '+esc(_motorista.cnh_numero) : ''}</div>
       </div>
     </div>
+    <div class="card" id="push-banner" style="display:none;margin-bottom:16px;background:#F0FDF4;border-color:#BBF7D0">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+        <div>
+          <div style="font-weight:700;font-size:13px">Ativar notificações</div>
+          <div style="font-size:12px;color:#6B7280">Receba um aviso no celular quando uma viagem for aprovada pra você.</div>
+        </div>
+        <button class="btn btn-primary btn-sm" id="btn-ativar-push" onclick="ativarPush()">Ativar</button>
+      </div>
+    </div>
     <div class="form-section-label">Minhas viagens</div>
     <div id="lista-ativas" style="margin-bottom:24px"></div>
     <div class="form-section-label">Diário de bordo — viagens concluídas</div>
     <div id="lista-historico"></div>`
+  verificarStatusPush()
   bIconsAplicar()
 }
 
@@ -232,6 +244,67 @@ async function confirmarCheckin() {
 }
 
 function fecharModal(qual) { document.getElementById(`modal-${qual}`).classList.remove('aberto'); _acaoId = null }
+
+// ── Notificações push (Web Push) ────────────────────────────────
+const VAPID_PUBLIC_KEY = 'BNBItDsjrq4XbepGWprx_KtriJrd-AR_Evj_QDPFEl_NRs6PVO4zQQnIO1iCm7nmtnm_VFtXC3Yhwx2GaX1c5ko'
+
+function _urlBase64ToUint8Array(base64) {
+  const padding = '='.repeat((4 - base64.length % 4) % 4)
+  const base64safe = (base64 + padding).replace(/-/g, '+').replace(/_/g, '/')
+  const raw = atob(base64safe)
+  return Uint8Array.from([...raw].map(c => c.charCodeAt(0)))
+}
+
+async function verificarStatusPush() {
+  const banner = document.getElementById('push-banner')
+  if (!banner) return
+  if (!('serviceWorker' in navigator) || !('PushManager' in window) || typeof Notification === 'undefined') return
+  if (Notification.permission === 'denied') return
+  try {
+    const reg = await navigator.serviceWorker.getRegistration()
+    const sub = reg ? await reg.pushManager.getSubscription() : null
+    banner.style.display = sub ? 'none' : ''
+  } catch (e) { banner.style.display = '' }
+}
+
+async function ativarPush() {
+  const btn = document.getElementById('btn-ativar-push')
+  btn.disabled = true; btn.textContent = 'Ativando...'
+  try {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+      toast('Seu navegador não suporta notificações push', 'error'); return
+    }
+    const permissao = await Notification.requestPermission()
+    if (permissao !== 'granted') { toast('Permissão de notificação negada', 'error'); return }
+
+    const reg = await navigator.serviceWorker.register('/pwa/sw.js')
+    await navigator.serviceWorker.ready
+    let sub = await reg.pushManager.getSubscription()
+    if (!sub) {
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: _urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+      })
+    }
+    const json = sub.toJSON()
+    const { error } = await db.from('push_subscriptions').upsert({
+      usuario_id: _usuario.id,
+      endpoint: json.endpoint,
+      p256dh: json.keys.p256dh,
+      auth_key: json.keys.auth,
+      user_agent: navigator.userAgent,
+    }, { onConflict: 'usuario_id,endpoint' })
+    if (error) throw error
+
+    toast('Notificações ativadas!', 'success')
+    document.getElementById('push-banner').style.display = 'none'
+  } catch (e) { toast(e.message || 'Erro ao ativar notificações', 'error') }
+  finally { btn.disabled = false; btn.textContent = 'Ativar' }
+}
+
+if ('serviceWorker' in navigator && !window.Capacitor) {
+  navigator.serviceWorker.register('/pwa/sw.js').catch(() => {})
+}
 </script>
 
 <style>
