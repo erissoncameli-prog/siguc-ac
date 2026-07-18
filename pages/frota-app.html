@@ -1739,9 +1739,15 @@ async function fPinProcessar() {
 function fPinFechar() { document.getElementById('fm-pin-tela').hidden = true; _fPinBuf = ''; _fPinPrimeiro = '' }
 
 async function pinEsqueci() {
-  await fOfflineSetConfig('pin_hash', null); await fOfflineSetConfig('pin_dono', null)
+  // Saída de emergência: NUNCA pode falhar em silêncio. Cada passo é
+  // isolado para que uma falha (IndexedDB, signOut) não impeça o reload
+  // e a volta para a tela de login.
+  try { await fOfflineSetConfig('pin_hash', null); await fOfflineSetConfig('pin_dono', null) } catch (e) {}
   try { await db.auth.signOut() } catch (e) {}
-  sessionStorage.removeItem('frotaModoAtivo')
+  // Garante que a sessão persistida some mesmo se o signOut falhar,
+  // senão o reload cairia de novo no portão de PIN.
+  try { localStorage.removeItem('siguc-frota-session') } catch (e) {}
+  try { sessionStorage.removeItem('frotaModoAtivo') } catch (e) {}
   window.location.reload()
 }
 
