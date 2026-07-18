@@ -213,6 +213,52 @@ const _frotaReady = _dbReady.then(function () {
   </div>
 </div>
 
+<!-- Modal Tarefas (in-app — usa a sessão isolada do app, sem sair para
+     a página de mesa que exigiria o login da plataforma) -->
+<div class="modal-overlay" id="modal-tarefas">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-header">
+      <div class="modal-title">Minhas tarefas</div>
+      <button class="modal-close" onclick="fecharModal('tarefas')">×</button>
+    </div>
+    <div class="modal-body" id="tarefas-corpo">
+      <div style="text-align:center;padding:32px;color:#9CA3AF">Carregando...</div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="fecharModal('tarefas')">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Tela de PIN (bloqueio de dispositivo compartilhado/perdido) -->
+<div id="fm-pin-tela" class="fm-pin-tela" hidden>
+  <div class="fm-pin-card">
+    <div class="fm-pin-marca">App Frota</div>
+    <div class="fm-pin-titulo" id="fm-pin-titulo">Digite seu PIN</div>
+    <div class="fm-pin-sub" id="fm-pin-sub"></div>
+    <div class="fm-pin-dots" id="fm-pin-dots">
+      <span class="fm-pin-dot"></span><span class="fm-pin-dot"></span>
+      <span class="fm-pin-dot"></span><span class="fm-pin-dot"></span>
+    </div>
+    <div class="fm-pin-erro" id="fm-pin-erro" hidden></div>
+    <div class="fm-pin-keypad" id="fm-pin-keypad">
+      <button class="fm-pin-key" data-v="1">1</button>
+      <button class="fm-pin-key" data-v="2">2</button>
+      <button class="fm-pin-key" data-v="3">3</button>
+      <button class="fm-pin-key" data-v="4">4</button>
+      <button class="fm-pin-key" data-v="5">5</button>
+      <button class="fm-pin-key" data-v="6">6</button>
+      <button class="fm-pin-key" data-v="7">7</button>
+      <button class="fm-pin-key" data-v="8">8</button>
+      <button class="fm-pin-key" data-v="9">9</button>
+      <button class="fm-pin-key fm-pin-aux" data-act="apagar">⌫</button>
+      <button class="fm-pin-key" data-v="0">0</button>
+      <button class="fm-pin-key fm-pin-aux" data-act="ok">OK</button>
+    </div>
+    <button class="fm-pin-link" id="fm-pin-esqueci" onclick="pinEsqueci()">Esqueci o PIN — sair</button>
+  </div>
+</div>
+
 <script>
 // ── Estado geral ────────────────────────────────────────────────
 let _usuario = null, _motorista = null, _ehGestor = false, _papeis = []
@@ -267,7 +313,7 @@ async function loginFrota() {
     const email = usuario.includes('@') ? usuario : `${usuario.replace(/\D/g,'')}@motoristas.siguc.local`
     const { data, error } = await db.auth.signInWithPassword({ email, password: senha })
     if (error) throw error
-    await entrarComSessao(data.session)
+    await entrarComSessao(data.session, true)
   } catch (e) {
     erroEl.textContent = 'E-mail/CPF ou senha inválidos'
     erroEl.style.display = ''
@@ -285,7 +331,7 @@ async function fazerLogout() {
   window.location.reload()
 }
 
-async function entrarComSessao(session) {
+async function entrarComSessao(session, jaAutenticouSenha = false) {
   const { data: u } = await db.from('usuarios').select('*').eq('id', session.user.id).single()
   if (!u || !u.ativo) { await db.auth.signOut(); mostrarLoginFrota('Usuário inativo ou não encontrado.'); return }
   appState.usuario = u
@@ -293,6 +339,13 @@ async function entrarComSessao(session) {
   _usuario = u
 
   document.getElementById('tela-login-frota').hidden = true
+
+  // Portão de PIN: cria (1º acesso) ou confirma o PIN antes de liberar o
+  // app. Login por senha recém-feito passa direto (mas cria PIN se não
+  // houver). Auto-bloqueio por inatividade fica instalado a seguir.
+  await portaoPin(jaAutenticouSenha)
+  instalarAutoLockPin()
+
   document.getElementById('app').innerHTML =
     '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;color:#9CA3AF;font-family:\'DM Sans\',sans-serif">Carregando...</div>'
 
@@ -385,7 +438,7 @@ function renderTopo(peek) {
           : (_papeis.length > 1 ? `<button class="btn btn-xs btn-ghost" onclick="trocarPerfil()">Trocar perfil</button>` : '')}
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <a class="btn btn-xs btn-secondary" href="frota-tarefas.html" data-icon="clipboard">Tarefas</a>
+        <button class="btn btn-xs btn-secondary" onclick="abrirTarefasFrota()" data-icon="clipboard">Tarefas</button>
         ${_modoAtivo !== 'solicitante' ? `<button class="btn btn-xs btn-secondary" onclick="entrarModo('solicitante', false)" data-icon="truck">Solicitar viagem</button>` : ''}
       </div>
     </div>
@@ -724,9 +777,13 @@ async function confirmarNovaViagemDireta() {
   if (isNaN(medida) || medida < 0) { toast('Informe a leitura do medidor', 'error'); return }
   const btn = document.getElementById('btn-abrir-nv')
   btn.disabled = true; btn.textContent = 'Iniciando...'
+  // Chave de deduplicação estável: reenvios (online ou pela fila offline)
+  // reusam o mesmo uuid, e a RPC devolve a viagem já criada em vez de
+  // abrir uma duplicada.
   const payload = {
     p_veiculo_id: veiculo_id, p_destino: destino, p_finalidade: finalidade,
-    p_medida: medida, p_combustivel_pct: parseInt(document.getElementById('nv-combustivel').value)
+    p_medida: medida, p_combustivel_pct: parseInt(document.getElementById('nv-combustivel').value),
+    p_uuid_cliente: _fUuid()
   }
   try {
     if (!navigator.onLine) throw new Error('offline')
@@ -761,7 +818,8 @@ async function renderFmConfig() {
     <div class="form-section-label">Configurações</div>
     <div class="card" style="padding:0">
       ${_papeis.length > 1 ? `<button class="fm-config-item" onclick="trocarPerfil()">${bico('shield')} Trocar perfil</button>` : ''}
-      <a class="fm-config-item" href="frota-tarefas.html">${bico('clipboard')} Minhas Tarefas</a>
+      <button class="fm-config-item" onclick="abrirTarefasFrota()">${bico('clipboard')} Minhas Tarefas</button>
+      <button class="fm-config-item" onclick="alterarPinFrota()">${bico('key')} Alterar PIN</button>
       <button class="fm-config-item" style="color:#DC2626" onclick="zerarFilaLocalFrota()">${bico('trash')} Zerar fila local</button>
       <button class="fm-config-item" style="color:#DC2626" onclick="fazerLogout()">${bico('logout')} Sair</button>
     </div>`
@@ -1060,12 +1118,7 @@ async function renderModoGestor() {
     <div class="form-section-label">Viagens em andamento</div>
     <div id="g-lista-andamento" style="margin-bottom:24px"></div>
     <div class="form-section-label">Alertas de manutenção</div>
-    <div id="g-lista-manut" style="margin-bottom:24px"></div>
-    <div class="card" style="padding:16px;display:flex;flex-wrap:wrap;gap:8px;justify-content:center">
-      <a class="btn btn-sm btn-secondary" href="frota-viagens.html">Agenda completa</a>
-      <a class="btn btn-sm btn-secondary" href="frota-manutencao.html">Manutenção</a>
-      <a class="btn btn-sm btn-secondary" href="frota-veiculos.html">Veículos e motoristas</a>
-    </div>`
+    <div id="g-lista-manut" style="margin-bottom:24px"></div>`
   await Promise.all([carregarVeiculosGestor(), carregarMotoristasGestor()])
   await Promise.all([carregarViagensGestor(), carregarManutGestor()])
 }
@@ -1338,6 +1391,251 @@ async function confirmarRecusar() {
   finally { btn.disabled = false }
 }
 
+// ═══════════════════════════════════════════════════════════════
+// TAREFAS (in-app) — inbox de notificações de frota do usuário, usando
+// a MESMA sessão isolada do app. Antes o app abria frota-tarefas.html
+// (página de mesa, cliente sessionStorage da plataforma), o que jogava
+// o motorista/gestor logado só pelo app de volta para o login. Agora é
+// um modal dentro do próprio app.
+// ═══════════════════════════════════════════════════════════════
+let _fTarefas = []
+const F_TAR_LABEL = {
+  viagem_solicitada: 'Aprovação pendente', viagem_aprovada: 'Viagem aprovada',
+  viagem_recusada: 'Viagem recusada', viagem_direta: 'Viagem sem agendamento', manutencao: 'Manutenção',
+}
+const F_TAR_ICON  = { viagem_solicitada:'truck', viagem_aprovada:'check', viagem_recusada:'x', viagem_direta:'plus', manutencao:'clock' }
+const F_TAR_BADGE = { viagem_solicitada:'badge-ouro', viagem_aprovada:'badge-verde', viagem_recusada:'badge-erro', viagem_direta:'badge-roxo', manutencao:'badge-blue' }
+
+async function abrirTarefasFrota() {
+  document.getElementById('modal-tarefas').classList.add('aberto')
+  document.getElementById('tarefas-corpo').innerHTML = '<div style="text-align:center;padding:32px;color:#9CA3AF">Carregando...</div>'
+  await carregarTarefasFrota()
+}
+
+async function carregarTarefasFrota() {
+  try {
+    const { data, error } = await db.from('notificacoes').select('*')
+      .eq('destinatario_id', _usuario.id).eq('tipo', 'frota')
+      .order('criado_em', { ascending: false }).limit(60)
+    if (error) throw error
+    _fTarefas = data || []
+  } catch (e) {
+    document.getElementById('tarefas-corpo').innerHTML = '<div style="text-align:center;padding:24px;color:#9CA3AF">Não foi possível carregar as tarefas agora.</div>'
+    return
+  }
+  renderTarefasFrota()
+}
+
+function renderTarefasFrota() {
+  const pendentes = _fTarefas.filter(n => n.status !== 'resolvida')
+  const resolvidas = _fTarefas.filter(n => n.status === 'resolvida').slice(0, 10)
+  const cartao = n => {
+    const st = n.meta?.subtipo
+    const naoLida = n.status === 'gerada' || n.status === 'enviada'
+    return `<div class="card" style="margin-bottom:8px;${naoLida ? 'border-left:3px solid var(--verde-c,#52B788)' : ''}">
+      <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:wrap">
+        <div style="flex:1;min-width:180px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+            ${bico(F_TAR_ICON[st] || 'help')}
+            <span class="badge ${F_TAR_BADGE[st] || 'badge-cinza'}">${F_TAR_LABEL[st] || 'Aviso'}</span>
+            <span style="font-size:11px;color:#9CA3AF">${formatDataHora(n.criado_em)}</span>
+          </div>
+          <div style="font-weight:700;font-size:14px">${esc(n.titulo)}</div>
+          <div style="font-size:13px;color:#6B7280;margin-top:2px">${esc(n.mensagem)}</div>
+        </div>
+        <div style="display:flex;gap:6px;flex-shrink:0">
+          ${tarefaTemDestinoNoApp(n) && n.status !== 'resolvida' ? `<button class="btn btn-xs btn-secondary" onclick="verTarefaFrota('${n.id}')">Ver</button>` : ''}
+          ${n.status !== 'resolvida' ? `<button class="btn btn-xs btn-primary" onclick="resolverTarefaFrota('${n.id}')">Concluir</button>` : ''}
+        </div>
+      </div>
+    </div>`
+  }
+  document.getElementById('tarefas-corpo').innerHTML = `
+    <div class="form-section-label" style="padding:0 0 8px">Pendentes</div>
+    ${pendentes.length ? pendentes.map(cartao).join('') : '<div style="text-align:center;color:#9CA3AF;padding:16px">Nenhuma tarefa pendente</div>'}
+    ${resolvidas.length ? `<div class="form-section-label" style="padding:16px 0 8px">Resolvidas recentemente</div>${resolvidas.map(cartao).join('')}` : ''}`
+  bIconsAplicar()
+}
+
+// Só oferece "Ver" quando o app consegue levar o usuário ao lugar certo
+// dentro dele mesmo (sem sair para página de mesa).
+function tarefaTemDestinoNoApp(n) {
+  const st = n.meta?.subtipo, para = n.meta?.para
+  if ((st === 'viagem_solicitada' || st === 'viagem_direta' || st === 'manutencao') && _ehGestor) return true
+  if (st === 'viagem_aprovada' && para === 'motorista' && _motorista) return true
+  if ((st === 'viagem_aprovada' || st === 'viagem_recusada') && para === 'solicitante') return true
+  return false
+}
+
+async function verTarefaFrota(id) {
+  const n = _fTarefas.find(x => x.id === id)
+  if (!n) return
+  try { await db.rpc('avancar_notificacao', { p_notificacao_id: id, p_novo_status: 'visualizada' }) } catch (e) {}
+  const st = n.meta?.subtipo, para = n.meta?.para
+  fecharModal('tarefas')
+  if ((st === 'viagem_solicitada' || st === 'viagem_direta' || st === 'manutencao') && _ehGestor) {
+    await entrarModo('gestor', false)
+  } else if (st === 'viagem_aprovada' && para === 'motorista' && _motorista) {
+    await entrarModo('motorista', false); motoristaAba('solicitacoes')
+  } else if ((st === 'viagem_aprovada' || st === 'viagem_recusada') && para === 'solicitante') {
+    await entrarModo('solicitante', false)
+  }
+}
+
+async function resolverTarefaFrota(id) {
+  try {
+    const { error } = await db.rpc('avancar_notificacao', { p_notificacao_id: id, p_novo_status: 'resolvida' })
+    if (error) throw error
+    await carregarTarefasFrota()
+  } catch (e) { toast(e.message || 'Erro ao concluir tarefa', 'error') }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PIN de acesso — protege a sessão persistente (localStorage) num
+// aparelho compartilhado/perdido. Mesmo padrão do app Brigadas: hash
+// SHA-256(pin + usuario_id) guardado no IndexedDB do próprio app.
+// ═══════════════════════════════════════════════════════════════
+let _fPinBuf = '', _fPinModo = 'unlock', _fPinPrimeiro = '', _fPinResolve = null
+let _fPinKeypadInit = false, _fPinHiddenAt = null, _fPinAutoLockInit = false
+
+async function fPinHash(pin) {
+  const dados = new TextEncoder().encode(pin + _usuario.id)
+  const buf = await crypto.subtle.digest('SHA-256', dados)
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('')
+}
+
+function fPinAtualizarDots() {
+  document.querySelectorAll('#fm-pin-dots .fm-pin-dot').forEach((d, i) => d.classList.toggle('ativo', i < _fPinBuf.length))
+}
+
+function fPinInitKeypad() {
+  if (_fPinKeypadInit) return; _fPinKeypadInit = true
+  document.getElementById('fm-pin-keypad').addEventListener('click', ev => {
+    const btn = ev.target.closest('button'); if (!btn) return
+    if (btn.dataset.v != null) {
+      if (_fPinBuf.length < 4) {
+        _fPinBuf += btn.dataset.v; fPinAtualizarDots()
+        document.getElementById('fm-pin-erro').hidden = true
+        if (_fPinBuf.length === 4) fPinProcessar()
+      }
+    } else if (btn.dataset.act === 'apagar') {
+      _fPinBuf = _fPinBuf.slice(0, -1); fPinAtualizarDots()
+    } else if (btn.dataset.act === 'ok') {
+      if (_fPinBuf.length === 4) fPinProcessar()
+    }
+  })
+}
+
+function fPinReset() { _fPinBuf = ''; fPinAtualizarDots() }
+
+function fPinMostrar(modo) {
+  _fPinModo = modo; _fPinBuf = ''; _fPinPrimeiro = ''
+  const titulo = document.getElementById('fm-pin-titulo')
+  const sub = document.getElementById('fm-pin-sub')
+  const link = document.getElementById('fm-pin-esqueci')
+  document.getElementById('fm-pin-erro').hidden = true
+  if (modo === 'unlock') {
+    titulo.textContent = 'Digite seu PIN'
+    sub.textContent = 'Olá, ' + ((_usuario.nome_completo || '').split(' ')[0] || '')
+    link.textContent = 'Esqueci o PIN — sair'
+  } else {
+    titulo.textContent = 'Criar PIN de acesso'
+    sub.textContent = 'Escolha um PIN de 4 dígitos'
+    link.textContent = 'Sair'
+  }
+  fPinInitKeypad(); fPinAtualizarDots()
+  document.getElementById('fm-pin-tela').hidden = false
+}
+
+// Decide entre pedir PIN (unlock), criar PIN (setup) ou passar direto
+// (login por senha recém-feito). Resolve quando liberado.
+function portaoPin(jaAutenticouSenha) {
+  return new Promise(async resolve => {
+    let hash, dono
+    try {
+      hash = await fOfflineGetConfig('pin_hash')
+      dono = await fOfflineGetConfig('pin_dono')
+    } catch (e) {
+      // Sem acesso ao IndexedDB não dá para verificar o PIN. O PIN é uma
+      // trava de conveniência, não a fronteira de auth (a sessão já está
+      // autenticada) — libera em vez de travar o app.
+      console.warn('[frota-app] PIN indisponível:', e); resolve(true); return
+    }
+    if (hash && dono !== _usuario.id) {
+      try { await fOfflineSetConfig('pin_hash', null); await fOfflineSetConfig('pin_dono', null) } catch (e) {}
+      hash = null
+    }
+    _fPinResolve = resolve
+    if (!hash) { fPinMostrar('setup1') }
+    else if (jaAutenticouSenha) { _fPinResolve = null; resolve(true) }
+    else { fPinMostrar('unlock') }
+  })
+}
+
+async function fPinProcessar() {
+  const erro = document.getElementById('fm-pin-erro')
+  try {
+    if (_fPinModo === 'unlock') {
+      const h = await fPinHash(_fPinBuf)
+      if (h === await fOfflineGetConfig('pin_hash')) {
+        fPinFechar()
+        if (_fPinResolve) { const r = _fPinResolve; _fPinResolve = null; r(true) }
+      } else {
+        erro.hidden = false; erro.textContent = 'PIN incorreto. Tente novamente.'; fPinReset()
+      }
+      return
+    }
+    if (_fPinModo === 'setup1') {
+      _fPinPrimeiro = _fPinBuf; _fPinModo = 'setup2'; _fPinBuf = ''
+      document.getElementById('fm-pin-sub').textContent = 'Confirme seu PIN'
+      erro.hidden = true; fPinAtualizarDots(); return
+    }
+    // setup2
+    if (_fPinBuf !== _fPinPrimeiro) {
+      erro.hidden = false; erro.textContent = 'Os PINs não coincidem. Comece de novo.'
+      _fPinModo = 'setup1'; _fPinPrimeiro = ''; _fPinBuf = ''
+      document.getElementById('fm-pin-sub').textContent = 'Escolha um PIN de 4 dígitos'
+      fPinAtualizarDots(); return
+    }
+    const h = await fPinHash(_fPinBuf)
+    await fOfflineSetConfig('pin_hash', h)
+    await fOfflineSetConfig('pin_dono', _usuario.id)
+    fPinFechar()
+    if (_fPinResolve) { const r = _fPinResolve; _fPinResolve = null; r(true) }
+  } catch (e) {
+    erro.hidden = false; erro.textContent = 'Erro ao processar o PIN. Tente de novo.'; fPinReset()
+  }
+}
+
+function fPinFechar() { document.getElementById('fm-pin-tela').hidden = true; _fPinBuf = ''; _fPinPrimeiro = '' }
+
+async function pinEsqueci() {
+  await fOfflineSetConfig('pin_hash', null); await fOfflineSetConfig('pin_dono', null)
+  try { await db.auth.signOut() } catch (e) {}
+  sessionStorage.removeItem('frotaModoAtivo')
+  window.location.reload()
+}
+
+async function alterarPinFrota() {
+  await new Promise(resolve => { _fPinResolve = resolve; fPinMostrar('setup1') })
+  toast('PIN alterado', 'success')
+}
+
+// Auto-bloqueio: volta a pedir o PIN se o app ficou em segundo plano por
+// mais de 5 min (aparelho deixado aberto/desbloqueado).
+function instalarAutoLockPin() {
+  if (_fPinAutoLockInit) return; _fPinAutoLockInit = true
+  document.addEventListener('visibilitychange', async () => {
+    if (document.hidden) { _fPinHiddenAt = Date.now(); return }
+    if (!_fPinHiddenAt) return
+    const decorrido = Date.now() - _fPinHiddenAt; _fPinHiddenAt = null
+    const hash = await fOfflineGetConfig('pin_hash')
+    if (hash && decorrido > 5 * 60 * 1000 && document.getElementById('fm-pin-tela').hidden) {
+      await new Promise(resolve => { _fPinResolve = resolve; fPinMostrar('unlock') })
+    }
+  })
+}
+
 // ── Notificações push (Web Push) — compartilhado por todos os modos ─
 const VAPID_PUBLIC_KEY = 'BNBItDsjrq4XbepGWprx_KtriJrd-AR_Evj_QDPFEl_NRs6PVO4zQQnIO1iCm7nmtnm_VFtXC3Yhwx2GaX1c5ko'
 
@@ -1463,6 +1761,31 @@ if ('serviceWorker' in navigator && !window.Capacitor) {
 }
 .fm-config-item:last-child { border-bottom: none; }
 .fm-config-item:hover { background: #F9FAFB; }
+
+/* ── Tela de PIN (bloqueio de acesso) ───────────────────────────── */
+.fm-pin-tela {
+  position: fixed; inset: 0; z-index: 3000;
+  background: linear-gradient(135deg, #0A1A0F 0%, #0E5A3C 60%, #1F4E2C 130%);
+  display: flex; align-items: center; justify-content: center;
+  padding: calc(24px + env(safe-area-inset-top)) 24px calc(24px + env(safe-area-inset-bottom));
+}
+.fm-pin-card { width: 100%; max-width: 320px; text-align: center; color: #fff; }
+.fm-pin-marca { font-family: 'Fraunces', serif; font-weight: 700; font-size: 18px; opacity: .85; }
+.fm-pin-titulo { font-size: 20px; font-weight: 700; margin-top: 18px; }
+.fm-pin-sub { font-size: 13px; opacity: .75; margin-top: 4px; min-height: 18px; }
+.fm-pin-dots { display: flex; gap: 14px; justify-content: center; margin: 22px 0; }
+.fm-pin-dot { width: 14px; height: 14px; border-radius: 50%; border: 2px solid rgba(255,255,255,.5); box-sizing: border-box; }
+.fm-pin-dot.ativo { background: #fff; border-color: #fff; }
+.fm-pin-erro { color: #FCA5A5; font-size: 13px; min-height: 18px; margin-bottom: 8px; }
+.fm-pin-keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; max-width: 260px; margin: 0 auto; }
+.fm-pin-key {
+  height: 62px; border-radius: 16px; border: none; cursor: pointer;
+  background: rgba(255,255,255,.12); color: #fff; font-size: 22px; font-weight: 600;
+  font-family: 'DM Sans', sans-serif; -webkit-tap-highlight-color: transparent;
+}
+.fm-pin-key:active { transform: scale(.94); background: rgba(255,255,255,.22); }
+.fm-pin-aux { font-size: 15px; background: rgba(255,255,255,.06); }
+.fm-pin-link { margin-top: 22px; background: none; border: none; color: rgba(255,255,255,.75); font-size: 13px; text-decoration: underline; cursor: pointer; }
 @media (max-width: 380px) {
   .fm-pill-nav { padding: 0 6px; gap: 2px; }
   .fm-pill-btn { width: 46px; height: 46px; font-size: 8px; }
