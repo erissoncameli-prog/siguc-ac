@@ -860,6 +860,16 @@ function motoristaAba(aba) {
   fwTransicaoTela('fm-conteudo', dir)
 }
 
+// Telefone digitado sem padrão fixo (traço, parênteses, com/sem DDI) —
+// limpa tudo que não é dígito e assume Brasil (55) quando não vier o
+// código do país, pra montar o link do WhatsApp Web/app (wa.me).
+function fmLinkWhatsapp(telefone) {
+  const digitos = (telefone || '').replace(/\D/g, '')
+  if (!digitos) return ''
+  const numero = digitos.length <= 11 ? '55' + digitos : digitos
+  return `<a href="https://wa.me/${numero}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:inherit;text-decoration:underline">${bico('chat')} ${esc(telefone)}</a>`
+}
+
 function fmCardViagem(v) {
   return `
     <div class="card" style="margin-bottom:10px">
@@ -867,7 +877,7 @@ function fmCardViagem(v) {
         <div>
           <div style="font-weight:700">${esc(v.destino)}</div>
           <div style="font-size:12px;color:#6B7280;margin-top:2px">${esc(v.finalidade)}</div>
-          ${v.solicitante_nome ? `<div style="font-size:12px;color:#6B7280;margin-top:4px">${esc(v.solicitante_nome)}${v.solicitante_telefone ? ' · '+esc(v.solicitante_telefone) : ''}</div>` : ''}
+          ${v.solicitante_nome ? `<div style="font-size:12px;color:#6B7280;margin-top:4px">${esc(v.solicitante_nome)}${v.solicitante_telefone ? ' · '+fmLinkWhatsapp(v.solicitante_telefone) : ''}</div>` : ''}
           ${v.lista_passageiros ? `<div style="font-size:12px;color:#6B7280;margin-top:4px">Passageiros: ${esc(v.lista_passageiros).replace(/\n/g,', ')}</div>` : ''}
           <div style="font-size:12px;color:#9CA3AF;margin-top:6px">${formatDataHora(v.data_saida_prevista)} → ${formatDataHora(v.data_retorno_prevista)}</div>
           <div style="font-size:12px;margin-top:4px">${esc(v.veiculo_modelo)} <span class="mono">(${esc(v.veiculo_placa)})</span>${v.aberta_direto ? ' <span class="badge badge-roxo">Avulsa</span>' : ''}${v._pendenteSync ? ' <span class="badge badge-cinza">Aguardando envio</span>' : ''}</div>
