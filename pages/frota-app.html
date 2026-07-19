@@ -438,9 +438,27 @@ async function entrarComSessao(session, jaAutenticouSenha = false) {
 }
 
 // ── Shell desktop (Solicitante/Gestor/seletor) ─────────────────
+// Shell PRÓPRIO do app (não usa gerarLayout da plataforma): o app é
+// isolado, então NÃO deve exibir a sidebar completa da plataforma nem
+// o botão ☰ que a abre — aquelas guias (Dashboard, Mapa, etc.) levam a
+// páginas que exigem o login da plataforma. A navegação do app vive no
+// próprio conteúdo (seletor de perfil, "Solicitar viagem", "Tarefas",
+// "Trocar perfil"). O modo Motorista já segue esse padrão próprio.
 function montarShellDesktop() {
-  document.getElementById('app').innerHTML = gerarLayout('App Frota', 'frota-app') +
-    '<div class="fade-in fw-theme" id="conteudo" style="max-width:900px"><div style="text-align:center;padding:40px;color:#9CA3AF">Carregando...</div></div></div></div>'
+  document.getElementById('app').innerHTML = `
+    <div class="frota-app-shell fw-theme">
+      <header class="topbar">
+        <div style="flex:1">
+          <div class="topbar-breadcrumb"><span>SIGUC-AC</span><span>›</span><span>App Frota</span></div>
+          <div class="topbar-title">App Frota</div>
+        </div>
+      </header>
+      <div class="page-body">
+        <div class="fade-in" id="conteudo" style="max-width:900px;margin:0 auto">
+          <div style="text-align:center;padding:40px;color:#9CA3AF">Carregando...</div>
+        </div>
+      </div>
+    </div>`
   carregarLogosSidebar()
   bIconsAplicar()
 }
@@ -2303,6 +2321,10 @@ if ('serviceWorker' in navigator && !window.Capacitor) {
 .fm-login-marca { text-align: center; margin-bottom: 24px; }
 .fm-login-titulo { font-family: 'Fraunces', serif; font-weight: 700; font-size: 22px; color: #1F4E2C; }
 .fm-login-sub { font-size: 12px; color: #6B7280; margin-top: 4px; }
+
+/* ── Shell próprio do app (Gestor/Solicitante): coluna de altura total
+   sem a sidebar da plataforma nem o botão ☰. ── */
+.frota-app-shell { min-height: 100vh; background: #F6FAF6; display: flex; flex-direction: column; }
 
 /* ── Shell nativo do Motorista (faixa de logos + barra de botões) ── */
 .fm-shell { min-height: 100vh; background: #F6FAF6; display: flex; flex-direction: column; }
