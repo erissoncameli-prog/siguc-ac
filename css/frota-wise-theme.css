@@ -230,8 +230,56 @@
   100% { background-position: 0 50%; }
 }
 
+/* ── Transições de tela (troca de aba/modo, estilo Wise) ─────────
+   Aplicadas via fwTransicaoTela() (js/frota-wise.js) nos contêineres
+   que trocam de conteúdo (abas do app, modo solicitante/gestor). */
+.fw-theme .fw-tela-avancar { animation: fw-tela-avancar 320ms var(--fw-ease) both; }
+.fw-theme .fw-tela-voltar  { animation: fw-tela-voltar 320ms var(--fw-ease) both; }
+.fw-theme .fw-tela-fade    { animation: fw-tela-fade 260ms var(--fw-ease) both; }
+@keyframes fw-tela-avancar {
+  from { opacity: 0; transform: translateX(18px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes fw-tela-voltar {
+  from { opacity: 0; transform: translateX(-18px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes fw-tela-fade {
+  from { opacity: 0; transform: translateY(8px) scale(.99); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* Indicador ativo do bottom nav desliza suavemente entre abas */
+.fw-theme .fm-pill-btn { transition: background 200ms var(--fw-ease), color 200ms var(--fw-ease), transform 150ms var(--fw-ease); }
+
+/* Modal como "sheet": entra com leve subida + escala, não só aparece.
+   Sem prefixo .fw-theme: os modais de Frota vivem fora do wrapper
+   (irmãos de #app no <body>), mas este arquivo só é carregado nas
+   páginas de Frota — não vaza para o resto do sistema.
+   global.css usa display:none/flex para abrir o modal, o que impede
+   qualquer transição (não há frame anterior pra animar a partir de
+   "display:none"). Aqui, só nas páginas de Frota, troca-se para
+   visibility+opacity, que anima normalmente. */
+.modal-overlay {
+  display: flex !important; visibility: hidden; opacity: 0; pointer-events: none;
+  transition: opacity 200ms cubic-bezier(0.2, 0.8, 0.2, 1), visibility 0s linear 200ms;
+}
+.modal-overlay.aberto {
+  visibility: visible; opacity: 1; pointer-events: auto;
+  transition: opacity 200ms cubic-bezier(0.2, 0.8, 0.2, 1), visibility 0s linear;
+}
+.modal-overlay .modal {
+  transform: translateY(14px) scale(.98);
+  transition: transform 240ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.modal-overlay.aberto .modal { transform: translateY(0) scale(1); }
+@media (prefers-reduced-motion: reduce) {
+  .modal-overlay, .modal-overlay .modal { transition: none; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .fw-theme .fw-list-item { animation: none; opacity: 1; transform: none; }
   .fw-theme .fw-skeleton { animation: none; }
   .fw-theme .btn, .fw-theme .fw-badge { transition: none; }
+  .fw-theme .fw-tela-avancar, .fw-theme .fw-tela-voltar, .fw-theme .fw-tela-fade { animation: none; opacity: 1; transform: none; }
 }
