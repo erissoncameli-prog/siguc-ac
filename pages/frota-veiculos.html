@@ -28,6 +28,7 @@
         <button type="button" class="tab-btn" id="v-tab-manutencao" onclick="mudarAbaVeiculo('manutencao')">Manutenção</button>
         <button type="button" class="tab-btn" id="v-tab-multas" onclick="mudarAbaVeiculo('multas')">Multas</button>
         <button type="button" class="tab-btn" id="v-tab-consumo" onclick="mudarAbaVeiculo('consumo')">Consumo</button>
+        <button type="button" class="tab-btn" id="v-tab-autorizados" onclick="mudarAbaVeiculo('autorizados')">Autorizados</button>
       </div>
 
       <div id="v-aba-dados">
@@ -175,6 +176,18 @@
           Só abastecimentos <strong>validados</strong> entram nesses números (contrato/fonte já classificados pela gestão).
         </div>
         <div id="v-consumo-corpo">Carregando...</div>
+      </div>
+
+      <div id="v-aba-autorizados" style="display:none">
+        <div style="font-size:12px;color:#6B7280;margin-bottom:14px">
+          O <strong>motorista vinculado</strong> (aba Dados) sempre vê este veículo no abastecimento avulso.
+          Libere abaixo outros motoristas que também podem usá-lo (ex.: empréstimo entre setores) — sem trocar o vinculado.
+        </div>
+        <div id="v-autorizados-lista" style="margin-bottom:16px"></div>
+        <div style="display:flex;gap:8px">
+          <select class="form-control" id="v-autorizado-add"><option value="">Selecione um motorista...</option></select>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="adicionarAutorizado()">Adicionar</button>
+        </div>
       </div>
     </div>
     <div class="modal-footer">
@@ -764,20 +777,23 @@ function abrirModalVeiculo(id = null) {
     carregarManutencaoVeiculo(v.id)
     carregarMultasVeiculo(v.id)
     carregarConsumoVeiculo(v.id, v.medidor)
+    carregarAutorizadosVeiculo(v.id)
   }
 
   document.getElementById('modal-veiculo').classList.add('aberto')
 }
 
 function mudarAbaVeiculo(aba) {
-  document.getElementById('v-aba-dados').style.display       = aba === 'dados'       ? '' : 'none'
-  document.getElementById('v-aba-manutencao').style.display  = aba === 'manutencao'  ? '' : 'none'
-  document.getElementById('v-aba-multas').style.display      = aba === 'multas'      ? '' : 'none'
-  document.getElementById('v-aba-consumo').style.display     = aba === 'consumo'     ? '' : 'none'
+  document.getElementById('v-aba-dados').style.display        = aba === 'dados'        ? '' : 'none'
+  document.getElementById('v-aba-manutencao').style.display   = aba === 'manutencao'   ? '' : 'none'
+  document.getElementById('v-aba-multas').style.display       = aba === 'multas'       ? '' : 'none'
+  document.getElementById('v-aba-consumo').style.display      = aba === 'consumo'      ? '' : 'none'
+  document.getElementById('v-aba-autorizados').style.display  = aba === 'autorizados'  ? '' : 'none'
   document.getElementById('v-tab-dados').classList.toggle('ativo', aba === 'dados')
   document.getElementById('v-tab-manutencao').classList.toggle('ativo', aba === 'manutencao')
   document.getElementById('v-tab-multas').classList.toggle('ativo', aba === 'multas')
   document.getElementById('v-tab-consumo').classList.toggle('ativo', aba === 'consumo')
+  document.getElementById('v-tab-autorizados').classList.toggle('ativo', aba === 'autorizados')
 }
 
 // ── Aba Consumo — abastecimentos VALIDADOS do veículo (padrão do
@@ -839,6 +855,57 @@ async function carregarConsumoVeiculo(veiculoId, medidor) {
           </tr>`).join('')}</tbody>
       </table>
     </div></div>`
+}
+
+// ── Modal Veículo: aba Autorizados — motoristas extras liberados a
+// usar o veículo no abastecimento avulso, além do vinculado (aba
+// Dados). Consumida pela RPC frota_veiculos_ativos_abastecimento
+// (migration 184).
+let _autorizadosVeicAtual = []
+
+async function carregarAutorizadosVeiculo(veiculoId) {
+  const lista = document.getElementById('v-autorizados-lista')
+  lista.innerHTML = 'Carregando...'
+  const { data, error } = await db.from('frota_veiculo_motoristas')
+    .select('motorista_id, frota_motoristas(nome)').eq('veiculo_id', veiculoId)
+  if (error) { lista.innerHTML = '<div style="color:#DC2626;font-size:13px">Erro ao carregar autorizados</div>'; return }
+  _autorizadosVeicAtual = data || []
+  renderAutorizadosVeiculo()
+}
+
+function renderAutorizadosVeiculo() {
+  const lista = document.getElementById('v-autorizados-lista')
+  lista.innerHTML = _autorizadosVeicAtual.length
+    ? _autorizadosVeicAtual.map(a => `
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border:1px solid var(--borda,#E5E7EB);border-radius:8px;margin-bottom:6px">
+        <span style="font-size:13px">${esc(a.frota_motoristas?.nome || '—')}</span>
+        <button type="button" class="btn-icon" onclick="removerAutorizado('${a.motorista_id}')" data-icon="x" title="Remover"></button>
+      </div>`).join('')
+    : '<div style="text-align:center;padding:14px;color:#9CA3AF;font-size:13px">Nenhum motorista extra liberado</div>'
+  bIconsAplicar(lista)
+
+  const jaAutorizados = new Set(_autorizadosVeicAtual.map(a => a.motorista_id))
+  const sel = document.getElementById('v-autorizado-add')
+  sel.innerHTML = '<option value="">Selecione um motorista...</option>' +
+    _motoristas.filter(m => !jaAutorizados.has(m.id)).map(m => `<option value="${m.id}">${esc(m.nome)}</option>`).join('')
+}
+
+async function adicionarAutorizado() {
+  const motoristaId = document.getElementById('v-autorizado-add').value
+  if (!motoristaId || !_editVeiculoId) return
+  const { error } = await db.from('frota_veiculo_motoristas')
+    .insert({ veiculo_id: _editVeiculoId, motorista_id: motoristaId, concedido_por: appState.usuario.id })
+  if (error) { toast(error.message || 'Erro ao liberar motorista', 'error'); return }
+  toast('Motorista liberado para este veículo', 'success')
+  await carregarAutorizadosVeiculo(_editVeiculoId)
+}
+
+async function removerAutorizado(motoristaId) {
+  if (!_editVeiculoId) return
+  const { error } = await db.from('frota_veiculo_motoristas')
+    .delete().eq('veiculo_id', _editVeiculoId).eq('motorista_id', motoristaId)
+  if (error) { toast(error.message || 'Erro ao remover liberação', 'error'); return }
+  await carregarAutorizadosVeiculo(_editVeiculoId)
 }
 
 // ── Modal Veículo: aba Manutenção (somente leitura) ────────────
