@@ -59,6 +59,7 @@ const SHELLS = {
   ],
   frota: [
     '/pages/frota-app.html',
+    '/pwa/icons/logo-frota.png',
     '/css/global.css',
     '/css/frota-wise-theme.css',
     '/js/observability.js',
