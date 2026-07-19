@@ -232,10 +232,14 @@
 
 /* ── Transições de tela (troca de aba/modo, estilo Wise) ─────────
    Aplicadas via fwTransicaoTela() (js/frota-wise.js) nos contêineres
-   que trocam de conteúdo (abas do app, modo solicitante/gestor). */
-.fw-theme .fw-tela-avancar { animation: fw-tela-avancar 320ms var(--fw-ease) both; }
-.fw-theme .fw-tela-voltar  { animation: fw-tela-voltar 320ms var(--fw-ease) both; }
-.fw-theme .fw-tela-fade    { animation: fw-tela-fade 260ms var(--fw-ease) both; }
+   que trocam de conteúdo (abas do app, modo solicitante/gestor).
+   Sem prefixo .fw-theme: a classe é adicionada no PRÓPRIO elemento que
+   já carrega .fw-theme (ex.: .frota-app-shell), então o seletor
+   descendente ".fw-theme .fw-tela-fade" nunca bateria ali — este
+   arquivo só carrega nas páginas de Frota, então não precisa do escopo. */
+.fw-tela-avancar { animation: fw-tela-avancar 320ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.fw-tela-voltar  { animation: fw-tela-voltar 320ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.fw-tela-fade    { animation: fw-tela-fade 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
 @keyframes fw-tela-avancar {
   from { opacity: 0; transform: translateX(18px); }
   to   { opacity: 1; transform: translateX(0); }
@@ -281,5 +285,5 @@
   .fw-theme .fw-list-item { animation: none; opacity: 1; transform: none; }
   .fw-theme .fw-skeleton { animation: none; }
   .fw-theme .btn, .fw-theme .fw-badge { transition: none; }
-  .fw-theme .fw-tela-avancar, .fw-theme .fw-tela-voltar, .fw-theme .fw-tela-fade { animation: none; opacity: 1; transform: none; }
+  .fw-tela-avancar, .fw-tela-voltar, .fw-tela-fade { animation: none; opacity: 1; transform: none; }
 }
