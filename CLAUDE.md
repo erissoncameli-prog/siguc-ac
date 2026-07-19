@@ -107,6 +107,18 @@ Frota — abastecimento (174–175):
   UPDATE pode_editar('frota')), trigger preenche atualizado_por/em.
   Liga/desliga a regra de captura de GPS por categoria — ver seção
   abaixo.
+- 178_frota_fix_overload_gps.sql: corrige overload duplicado que a
+  176 deixou no banco (CREATE OR REPLACE com lista de parâmetros
+  diferente cria função nova em vez de substituir — mesmo cuidado que
+  a 173 já tomava com DROP FUNCTION antes de recriar). Sem isso,
+  chamadas às RPCs de viagem/abastecimento sem p_lat/p_lng dão "could
+  not choose best candidate function". A 176 já foi corrigida no
+  arquivo para não repetir o erro em bases novas.
+- 179_frota_revoke_trigger_functions.sql: revoga EXECUTE de
+  frota_gerar_codigo_abastecimento e
+  frota_marcar_atualizador_config_gps (só devem rodar via trigger,
+  nunca chamadas direto pelo cliente) — achado pelo advisor de
+  segurança do Supabase, mesmo padrão da 165.
 
 ## Regra do sistema — localização GPS em Frota (configurável)
 Toda viagem (check-out e check-in, inclusive viagem avulsa) e todo

@@ -27,8 +27,12 @@ CREATE INDEX IF NOT EXISTS idx_frota_abast_loc
   ON frota_abastecimentos USING GIST (localizacao) WHERE localizacao IS NOT NULL;
 
 -- ── RPCs: parâmetros opcionais p_lat/p_lng (DEFAULT NULL — payloads
--- antigos, sem GPS, continuam funcionando) ──────────────────────
-
+-- antigos, sem GPS, continuam funcionando). CREATE OR REPLACE com uma
+-- lista de parâmetros diferente NÃO substitui a função — cria um
+-- overload novo, ambíguo para chamadas sem p_lat/p_lng (mesmo
+-- problema que a migration 173 preveniu). Por isso o DROP FUNCTION
+-- explícito da assinatura antiga antes de recriar, para cada uma.
+DROP FUNCTION IF EXISTS frota_checkout_viagem(uuid, numeric, smallint);
 CREATE OR REPLACE FUNCTION frota_checkout_viagem(
   p_viagem_id uuid, p_medida numeric, p_combustivel_pct smallint,
   p_lat numeric DEFAULT NULL, p_lng numeric DEFAULT NULL
@@ -66,6 +70,7 @@ BEGIN
 END;
 $$;
 
+DROP FUNCTION IF EXISTS frota_checkin_viagem(uuid, numeric, smallint, text, text);
 CREATE OR REPLACE FUNCTION frota_checkin_viagem(
   p_viagem_id uuid, p_medida numeric, p_combustivel_pct smallint,
   p_observacoes text, p_avarias text,
@@ -111,6 +116,7 @@ BEGIN
 END;
 $$;
 
+DROP FUNCTION IF EXISTS frota_registrar_abastecimento(uuid, numeric, numeric, numeric, numeric, boolean, uuid, text, text, text, text, uuid);
 CREATE OR REPLACE FUNCTION frota_registrar_abastecimento(
   p_veiculo_id uuid,
   p_medida numeric,
@@ -190,6 +196,7 @@ $$;
 -- Viagem avulsa (frota_abrir_viagem_direta, migration 173): já nasce
 -- "em_andamento" com checkout_em preenchido — é o equivalente de um
 -- check-out, então também recebe localizacao_saida.
+DROP FUNCTION IF EXISTS frota_abrir_viagem_direta(uuid, text, text, numeric, smallint, uuid);
 CREATE OR REPLACE FUNCTION frota_abrir_viagem_direta(
   p_veiculo_id uuid, p_destino text, p_finalidade text,
   p_medida numeric, p_combustivel_pct smallint, p_uuid_cliente uuid DEFAULT NULL,
@@ -275,7 +282,12 @@ END;
 $$;
 
 -- ── Views: expõem lat/lng extraídos (padrão das migrations 047/053) ──
-CREATE OR REPLACE VIEW vw_frota_viagens_detalhe AS
+-- vw_frota_viagens_detalhe: DROP+CREATE (não CREATE OR REPLACE) porque
+-- fv.* passa a incluir 2 colunas novas (localizacao_saida/chegada) no
+-- meio do SELECT — CREATE OR REPLACE só permite inserir colunas no
+-- final da lista, não no meio (mesmo motivo da migration 168).
+DROP VIEW IF EXISTS vw_frota_viagens_detalhe;
+CREATE VIEW vw_frota_viagens_detalhe WITH (security_invoker = true) AS
 SELECT
   fv.*,
   frota_nome_usuario(fv.solicitante_id) AS solicitante_nome,
@@ -296,9 +308,11 @@ LEFT JOIN unidades_organizacionais s ON s.id = fv.setor_solicitante_id
 LEFT JOIN frota_veiculos v         ON v.id = fv.veiculo_id
 LEFT JOIN frota_motoristas m       ON m.id = fv.motorista_id;
 
-ALTER VIEW vw_frota_viagens_detalhe SET (security_invoker = true);
-
-CREATE OR REPLACE VIEW vw_frota_abastecimentos_detalhe WITH (security_invoker = true) AS
+-- vw_frota_abastecimentos_detalhe: idem — a.* agora inclui a coluna
+-- nova "localizacao" no meio da lista (antes de v.placa), então
+-- também exige DROP+CREATE em vez de CREATE OR REPLACE.
+DROP VIEW IF EXISTS vw_frota_abastecimentos_detalhe;
+CREATE VIEW vw_frota_abastecimentos_detalhe WITH (security_invoker = true) AS
 SELECT
   a.*,
   v.placa, v.modelo, v.medidor,
