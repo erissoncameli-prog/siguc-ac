@@ -509,11 +509,13 @@ async function entrarModo(modo, persistir) {
     if (modo === 'gestor') await renderModoGestor()
     else await renderModoSolicitante()
   }
+  fwTransicaoTela(document.querySelector('.frota-app-shell, .fm-shell'), persistir ? 'fade' : 'avancar')
 }
-function voltarModoBase() { entrarModo(_modoBase, true) }
+function voltarModoBase() { entrarModo(_modoBase, true).then(() => fwTransicaoTela(document.querySelector('.frota-app-shell, .fm-shell'), 'voltar')) }
 function trocarPerfil() {
   sessionStorage.removeItem('frotaModoAtivo'); _modoBase = null; _modoAtivo = null
   montarShellDesktop(); renderSeletorPerfil()
+  fwTransicaoTela(document.querySelector('.frota-app-shell'), 'fade')
 }
 
 function renderTopo(peek) {
@@ -760,7 +762,9 @@ async function carregarViagensMotorista() {
 }
 
 // ── Navegação entre abas ────────────────────────────────────────
+const FM_ORDEM_ABAS = ['inicio', 'solicitacoes', 'nova', 'historico', 'dados', 'config']
 function motoristaAba(aba) {
+  const anterior = _fmAba
   _fmAba = aba
   document.querySelectorAll('.fm-pill-btn').forEach(b => b.classList.toggle('ativa', b.dataset.tab === aba))
   if (aba === 'inicio') renderFmInicio()
@@ -769,6 +773,8 @@ function motoristaAba(aba) {
   else if (aba === 'historico') renderFmHistorico()
   else if (aba === 'dados') renderFmDados()
   else if (aba === 'config') renderFmConfig()
+  const dir = FM_ORDEM_ABAS.indexOf(aba) >= FM_ORDEM_ABAS.indexOf(anterior) ? 'avancar' : 'voltar'
+  fwTransicaoTela('fm-conteudo', dir)
 }
 
 function fmCardViagem(v) {
