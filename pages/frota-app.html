@@ -262,18 +262,18 @@ const _frotaReady = _dbReady.then(function () {
     </div>
     <div class="fm-pin-erro" id="fm-pin-erro" hidden></div>
     <div class="fm-pin-keypad" id="fm-pin-keypad">
-      <button class="fm-pin-key" data-v="1">1</button>
-      <button class="fm-pin-key" data-v="2">2</button>
-      <button class="fm-pin-key" data-v="3">3</button>
-      <button class="fm-pin-key" data-v="4">4</button>
-      <button class="fm-pin-key" data-v="5">5</button>
-      <button class="fm-pin-key" data-v="6">6</button>
-      <button class="fm-pin-key" data-v="7">7</button>
-      <button class="fm-pin-key" data-v="8">8</button>
-      <button class="fm-pin-key" data-v="9">9</button>
-      <button class="fm-pin-key fm-pin-aux" data-act="apagar">⌫</button>
-      <button class="fm-pin-key" data-v="0">0</button>
-      <button class="fm-pin-key fm-pin-aux" data-act="ok">OK</button>
+      <button type="button" class="fm-pin-key" data-v="1">1</button>
+      <button type="button" class="fm-pin-key" data-v="2">2</button>
+      <button type="button" class="fm-pin-key" data-v="3">3</button>
+      <button type="button" class="fm-pin-key" data-v="4">4</button>
+      <button type="button" class="fm-pin-key" data-v="5">5</button>
+      <button type="button" class="fm-pin-key" data-v="6">6</button>
+      <button type="button" class="fm-pin-key" data-v="7">7</button>
+      <button type="button" class="fm-pin-key" data-v="8">8</button>
+      <button type="button" class="fm-pin-key" data-v="9">9</button>
+      <button type="button" class="fm-pin-key fm-pin-aux" data-act="apagar">⌫</button>
+      <button type="button" class="fm-pin-key" data-v="0">0</button>
+      <button type="button" class="fm-pin-key fm-pin-aux" data-act="ok">OK</button>
     </div>
     <button class="fm-pin-link" id="fm-pin-esqueci" onclick="pinEsqueci()">Esqueci o PIN — sair</button>
   </div>
@@ -1739,9 +1739,15 @@ async function fPinProcessar() {
 function fPinFechar() { document.getElementById('fm-pin-tela').hidden = true; _fPinBuf = ''; _fPinPrimeiro = '' }
 
 async function pinEsqueci() {
-  await fOfflineSetConfig('pin_hash', null); await fOfflineSetConfig('pin_dono', null)
+  // Saída de emergência: NUNCA pode falhar em silêncio. Cada passo é
+  // isolado para que uma falha (IndexedDB, signOut) não impeça o reload
+  // e a volta para a tela de login.
+  try { await fOfflineSetConfig('pin_hash', null); await fOfflineSetConfig('pin_dono', null) } catch (e) {}
   try { await db.auth.signOut() } catch (e) {}
-  sessionStorage.removeItem('frotaModoAtivo')
+  // Garante que a sessão persistida some mesmo se o signOut falhar,
+  // senão o reload cairia de novo no portão de PIN.
+  try { localStorage.removeItem('siguc-frota-session') } catch (e) {}
+  try { sessionStorage.removeItem('frotaModoAtivo') } catch (e) {}
   window.location.reload()
 }
 
