@@ -119,6 +119,29 @@ Frota — abastecimento (174–175):
   frota_marcar_atualizador_config_gps (só devem rodar via trigger,
   nunca chamadas direto pelo cliente) — achado pelo advisor de
   segurança do Supabase, mesmo padrão da 165.
+- 180_frota_abastecimento_trava_veiculo.sql: frota_registrar_abastecimento
+  passa a rejeitar p_veiculo_id diferente do veículo da viagem
+  em_andamento do motorista (quando existir) — trava de servidor,
+  segunda camada da regra abaixo.
+
+## Regra do sistema — trava de veículo no abastecimento
+O abastecimento nunca deve poder ser lançado num veículo diferente do
+que o motorista está de fato usando. Defesa em 2 camadas:
+1. App (frota-app.html, fmViagemAtivaDoMotorista): antes de abrir o
+   modal de abastecimento — de qualquer entrada (Início, aba Viagem,
+   ou card da viagem) — detecta se o motorista tem viagem
+   em_andamento (inclusive check-out feito offline, ainda não
+   sincronizado, consultando a fila local). Se achar, trava o veículo
+   (esconde o seletor). Só mostra o seletor livre quando não há
+   nenhuma viagem em andamento — nesse caso, exclui da lista veículos
+   em_manutencao/baixado (carregarVeiculosAtivosAbastecimento).
+2. Banco (frota_registrar_abastecimento, migration 180): valida de
+   novo, server-side — se o motorista tem viagem em_andamento, o
+   veículo enviado TEM que ser o dela, senão rejeita. Protege contra
+   cache desatualizado ou qualquer chamada fora do fluxo da tela.
+Qualquer novo ponto de entrada de abastecimento no app deve chamar
+abrirAbastecimento (que já aplica a trava) em vez de montar o modal
+na mão.
 
 ## Regra do sistema — localização GPS em Frota (configurável)
 Toda viagem (check-out e check-in, inclusive viagem avulsa) e todo
