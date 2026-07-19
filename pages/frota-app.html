@@ -122,6 +122,51 @@ const _frotaReady = _dbReady.then(function () {
   </div>
 </div>
 
+<!-- Modal Abastecimento (Motorista) — evento físico; contrato/fonte
+     nunca aparecem aqui, são classificados pela gestão na validação -->
+<div class="modal-overlay" id="modal-abastecimento">
+  <div class="modal" style="max-width:460px">
+    <div class="modal-header">
+      <div class="modal-title">Registrar abastecimento</div>
+      <button class="modal-close" onclick="fecharModalAbastecimento()">×</button>
+    </div>
+    <div class="modal-body">
+      <div id="ab-resumo" style="font-size:13px;color:#6B7280;margin-bottom:14px"></div>
+      <div class="form-group" id="ab-veiculo-grupo"><label class="form-label">Veículo <span class="obrig">*</span></label>
+        <select class="form-control" id="ab-veiculo" onchange="ajustarLabelMedidaAB()"><option value="">Carregando...</option></select></div>
+      <div class="form-group"><label class="form-label" id="ab-medida-label">Hodômetro no abastecimento (km) <span class="obrig">*</span></label>
+        <input class="form-control" id="ab-medida" type="number" min="0" step="0.1"></div>
+      <div style="display:flex;gap:10px">
+        <div class="form-group" style="flex:1"><label class="form-label">Litros <span class="obrig">*</span></label>
+          <input class="form-control" id="ab-litros" type="number" min="0" step="0.01" oninput="calcularValorAbastecimento()"></div>
+        <div class="form-group" style="flex:1"><label class="form-label">Preço/litro <span class="obrig">*</span></label>
+          <input class="form-control" id="ab-preco" type="number" min="0" step="0.001" oninput="calcularValorAbastecimento()"></div>
+      </div>
+      <div class="form-group"><label class="form-label">Valor total <span class="obrig">*</span></label>
+        <input class="form-control" id="ab-valor" type="number" min="0" step="0.01"></div>
+      <div class="form-group">
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+          <input type="checkbox" id="ab-tanque-cheio" checked style="width:auto"> Encheu o tanque
+        </label>
+      </div>
+      <div class="form-group"><label class="form-label">Posto</label>
+        <input class="form-control" id="ab-posto" placeholder="Nome do posto (opcional)"></div>
+      <div class="form-group"><label class="form-label">Foto do cupom fiscal</label>
+        <input class="form-control" id="ab-foto-cupom" type="file" accept="image/*" capture="environment" onchange="capturarFotoAbastecimento(this,'cupom')">
+        <div id="ab-foto-cupom-preview" style="margin-top:6px"></div></div>
+      <div class="form-group"><label class="form-label">Foto do hodômetro/horímetro</label>
+        <input class="form-control" id="ab-foto-hodometro" type="file" accept="image/*" capture="environment" onchange="capturarFotoAbastecimento(this,'hodometro')">
+        <div id="ab-foto-hodometro-preview" style="margin-top:6px"></div></div>
+      <div class="form-group"><label class="form-label">Observações</label>
+        <textarea class="form-control" id="ab-obs" rows="2" placeholder="Opcional"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="fecharModalAbastecimento()">Cancelar</button>
+      <button class="btn btn-primary" id="btn-confirmar-abastecimento" onclick="confirmarAbastecimento()">Registrar</button>
+    </div>
+  </div>
+</div>
+
 <!-- Modal Cancelar (Solicitante) -->
 <div class="modal-overlay" id="modal-cancelar">
   <div class="modal" style="max-width:420px">
@@ -543,8 +588,27 @@ async function renderModoMotorista() {
   }
   instalarGatilhosSyncFrota()
   await carregarViagensMotorista()
+  await carregarAbastecimentosMotorista()
   fSyncRodar()
 }
+
+// ── Abastecimentos do motorista (status: pendente/validado/rejeitado) ─
+let _abastecimentos = []
+async function carregarAbastecimentosMotorista() {
+  try {
+    if (!navigator.onLine) throw new Error('offline')
+    const r = await db.from('frota_abastecimentos').select('*')
+      .eq('motorista_id', _motorista.id).order('data_hora', { ascending: false }).limit(50)
+    if (r.error) throw r.error
+    _abastecimentos = r.data || []
+    await fOfflineSetConfig('abastecimentos_cache', _abastecimentos)
+  } catch (e) {
+    _abastecimentos = await fOfflineGetConfig('abastecimentos_cache') || []
+  }
+}
+
+const ABAST_STATUS_BADGE = { pendente: 'badge-cinza', validado: 'badge-verde', rejeitado: 'badge-erro' }
+const ABAST_STATUS_LABEL = { pendente: 'Pendente', validado: 'Validado', rejeitado: 'Rejeitado' }
 
 // ── Offline: dispara sincronização ao reconectar/reabrir/periodicamente ─
 let _fSyncTriggersInstalados = false
@@ -552,7 +616,7 @@ function instalarGatilhosSyncFrota() {
   if (_fSyncTriggersInstalados) return
   _fSyncTriggersInstalados = true
 
-  fSyncOn('confirmado', () => carregarViagensMotorista())
+  fSyncOn('confirmado', () => { carregarViagensMotorista(); carregarAbastecimentosMotorista() })
   fSyncOn('sync-fim', ({ ok, erros }) => {
     atualizarBadgePendentesSync()
     if (ok > 0) toast(`${ok} registro(s) enviado(s) ao setor de transporte.`, 'success')
@@ -562,8 +626,31 @@ function instalarGatilhosSyncFrota() {
 
   window.addEventListener('online', () => fSyncRodar())
   document.addEventListener('visibilitychange', () => { if (!document.hidden) fSyncRodar() })
-  setInterval(() => fSyncRodar(), 45000)
+  setInterval(() => { fSyncRodar(); fmAtualizarConfigGps() }, 45000)
   atualizarBadgePendentesSync()
+  fmAtualizarConfigGps()
+}
+
+// ── Config de captura de GPS (liga/desliga pelo gestor, migration 177) ─
+// Fail-safe: sem linha, sem cache e sem conexão → assume true (captura
+// ligada) — a regra do sistema só fica desligada se o gestor desligou
+// explicitamente e isso já chegou ao aparelho pelo menos uma vez.
+let _fmConfigGps = { captura_viagens: true, captura_abastecimento: true }
+
+async function fmAtualizarConfigGps() {
+  try {
+    if (!navigator.onLine) throw new Error('offline')
+    const { data, error } = await db.from('frota_config_gps').select('captura_viagens,captura_abastecimento').eq('id', 1).single()
+    if (error) throw error
+    if (data) {
+      _fmConfigGps = data
+      await fOfflineSetConfig('config_gps_cache', data)
+    }
+  } catch (e) {
+    const cache = await fOfflineGetConfig('config_gps_cache')
+    if (cache) _fmConfigGps = cache
+    // sem cache e sem conexão: mantém o default em memória (captura ligada)
+  }
 }
 
 async function atualizarBadgePendentesSync() {
@@ -580,6 +667,33 @@ function fPareceOffline(e) {
   if (!navigator.onLine) return true
   const msg = (e?.message || '').toLowerCase()
   return msg.includes('fetch') || msg.includes('network') || msg.includes('failed to fetch')
+}
+
+// ── Localização GPS silenciosa (regra do sistema) ────────────────
+// Captura best-effort no momento de iniciar/concluir viagem e de
+// abastecer — sem tela própria, nunca bloqueia a ação. Se o GPS
+// falhar, for negado ou demorar, segue sem coordenada (fica null no
+// payload). Só uma leitura pontual (getCurrentPosition), sem
+// watchPosition — não fica monitorando em segundo plano nem exige
+// permissão de localização "sempre".
+function fmObterGps() {
+  return new Promise(resolve => {
+    if (!('geolocation' in navigator)) { resolve(null); return }
+    const t = setTimeout(() => resolve(null), 6000)
+    navigator.geolocation.getCurrentPosition(
+      pos => { clearTimeout(t); resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }) },
+      () => { clearTimeout(t); resolve(null) },
+      { enableHighAccuracy: true, timeout: 5500, maximumAge: 30000 }
+    )
+  })
+}
+
+// Só captura se o gestor não tiver desligado a regra para essa
+// categoria (migration 177) — quando desligado, nem pede permissão de
+// localização ao navegador/SO.
+function fmObterGpsSeAtivo(chave) {
+  if (_fmConfigGps?.[chave] === false) return Promise.resolve(null)
+  return fmObterGps()
 }
 
 async function carregarViagensMotorista() {
@@ -646,7 +760,8 @@ function fmCardViagem(v) {
             ? `<span style="font-size:11px;color:#9CA3AF;display:block;margin-top:8px">Será enviada ao reconectar</span>`
             : v.status === 'aprovada'
               ? `<button class="btn btn-sm btn-primary" style="margin-top:8px" onclick="abrirCheckout('${v.id}')">Iniciar Viagem</button>`
-              : `<button class="btn btn-sm btn-primary" style="margin-top:8px" onclick="abrirCheckin('${v.id}')">Concluir Viagem</button>`}
+              : `<button class="btn btn-sm btn-primary" style="margin-top:8px" onclick="abrirCheckin('${v.id}')">Concluir Viagem</button>
+                 <button class="btn btn-sm btn-secondary" style="margin-top:6px;display:block" onclick="abrirAbastecimento('${v.id}')">${bico('fuel')} Abastecer</button>`}
         </div>
       </div>
     </div>`
@@ -706,7 +821,24 @@ function renderFmHistorico() {
               </tr>`
             }).join('')}</tbody>
           </table>
-        </div></div></div>`}`
+        </div></div></div>`}
+    <div class="form-section-label" style="margin-top:20px">Abastecimentos</div>
+    ${!_abastecimentos.length
+      ? '<div class="card" style="text-align:center;padding:24px;color:#9CA3AF">Nenhum abastecimento registrado ainda</div>'
+      : _abastecimentos.map(a => `
+        <div class="card" style="margin-bottom:10px">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap">
+            <div>
+              <div style="font-weight:700">${esc(a.codigo || 'Aguardando código')}</div>
+              <div style="font-size:12px;color:#6B7280;margin-top:2px">${formatNum(a.litros,2)} L · R$ ${formatNum(a.valor_total,2)} · ${formatDataHora(a.data_hora)}</div>
+              ${a.status === 'rejeitado' && a.motivo_rejeicao ? `<div style="font-size:12px;color:#DC2626;margin-top:6px">Motivo: ${esc(a.motivo_rejeicao)}</div>` : ''}
+            </div>
+            <div style="text-align:right">
+              <span class="badge ${ABAST_STATUS_BADGE[a.status]}">${ABAST_STATUS_LABEL[a.status]}</span><br>
+              ${a.status === 'rejeitado' ? `<button class="btn btn-sm btn-secondary" style="margin-top:8px" onclick="abrirAbastecimento(null)">Corrigir e reenviar</button>` : ''}
+            </div>
+          </div>
+        </div>`).join('')}`
 }
 
 // ── Aba Dados (números + gráfico das viagens do próprio motorista) ─
@@ -808,6 +940,11 @@ async function renderFmNovaViagem() {
           <option value="10">Reserva</option>
         </select></div>
       <button class="btn btn-primary" id="btn-abrir-nv" onclick="confirmarNovaViagemDireta()">${bico('plus')} Iniciar Viagem</button>
+    </div>
+    <div class="form-section-label" style="margin-top:20px">Abastecimento sem viagem</div>
+    <div class="card" style="text-align:center;padding:20px">
+      <p style="font-size:12px;color:#6B7280;margin-bottom:12px">Já abasteceu um veículo fora de uma viagem? Registre aqui.</p>
+      <button class="btn btn-secondary" onclick="abrirAbastecimento(null)">${bico('fuel')} Registrar abastecimento</button>
     </div>`
   await carregarVeiculosDisponiveisAgora()
 }
@@ -854,13 +991,14 @@ async function confirmarNovaViagemDireta() {
   if (isNaN(medida) || medida < 0) { toast('Informe a leitura do medidor', 'error'); return }
   const btn = document.getElementById('btn-abrir-nv')
   btn.disabled = true; btn.textContent = 'Iniciando...'
+  const gps = await fmObterGpsSeAtivo('captura_viagens')
   // Chave de deduplicação estável: reenvios (online ou pela fila offline)
   // reusam o mesmo uuid, e a RPC devolve a viagem já criada em vez de
   // abrir uma duplicada.
   const payload = {
     p_veiculo_id: veiculo_id, p_destino: destino, p_finalidade: finalidade,
     p_medida: medida, p_combustivel_pct: parseInt(document.getElementById('nv-combustivel').value),
-    p_uuid_cliente: _fUuid()
+    p_uuid_cliente: _fUuid(), p_lat: gps?.lat ?? null, p_lng: gps?.lng ?? null
   }
   try {
     if (!navigator.onLine) throw new Error('offline')
@@ -989,9 +1127,11 @@ async function confirmarCheckout() {
   if (isNaN(medida) || medida < 0) { toast('Informe a leitura do medidor', 'error'); return }
   const btn = document.getElementById('btn-confirmar-checkout')
   btn.disabled = true; btn.textContent = 'Registrando...'
+  const gps = await fmObterGpsSeAtivo('captura_viagens')
   const payload = {
     p_viagem_id: _acaoId, p_medida: medida,
-    p_combustivel_pct: parseInt(document.getElementById('co-combustivel').value)
+    p_combustivel_pct: parseInt(document.getElementById('co-combustivel').value),
+    p_lat: gps?.lat ?? null, p_lng: gps?.lng ?? null
   }
   try {
     if (!navigator.onLine) throw new Error('offline')
@@ -1029,11 +1169,13 @@ async function confirmarCheckin() {
   if (isNaN(medida) || medida < 0) { toast('Informe a leitura do medidor', 'error'); return }
   const btn = document.getElementById('btn-confirmar-checkin')
   btn.disabled = true; btn.textContent = 'Registrando...'
+  const gps = await fmObterGpsSeAtivo('captura_viagens')
   const payload = {
     p_viagem_id: _acaoId, p_medida: medida,
     p_combustivel_pct: parseInt(document.getElementById('ci-combustivel').value),
     p_observacoes: document.getElementById('ci-obs').value.trim() || null,
-    p_avarias: document.getElementById('ci-avarias').value.trim() || ''
+    p_avarias: document.getElementById('ci-avarias').value.trim() || '',
+    p_lat: gps?.lat ?? null, p_lng: gps?.lng ?? null
   }
   try {
     if (!navigator.onLine) throw new Error('offline')
@@ -1052,6 +1194,143 @@ async function confirmarCheckin() {
     }
   }
   finally { btn.disabled = false; btn.textContent = 'Concluir Viagem' }
+}
+
+// ── Abastecimento (evento físico registrado pelo motorista; a
+// gestão valida e vincula ao contrato depois, na mesa) ───────────
+let _abastViagemId = null
+let _abastVeiculos = []
+let _abastFotos = { cupom: null, hodometro: null }
+
+async function abrirAbastecimento(viagemId) {
+  _abastViagemId = viagemId
+  _abastFotos = { cupom: null, hodometro: null }
+  document.getElementById('ab-foto-cupom').value = ''
+  document.getElementById('ab-foto-hodometro').value = ''
+  document.getElementById('ab-foto-cupom-preview').innerHTML = ''
+  document.getElementById('ab-foto-hodometro-preview').innerHTML = ''
+  document.getElementById('ab-medida').value = ''
+  document.getElementById('ab-litros').value = ''
+  document.getElementById('ab-preco').value = ''
+  document.getElementById('ab-valor').value = ''
+  document.getElementById('ab-posto').value = ''
+  document.getElementById('ab-obs').value = ''
+  document.getElementById('ab-tanque-cheio').checked = true
+
+  const veiculoGrupo = document.getElementById('ab-veiculo-grupo')
+  if (viagemId) {
+    const v = _viagens.find(x => x.id === viagemId)
+    document.getElementById('ab-resumo').innerHTML = v ? `<strong>${esc(v.destino)}</strong><br>${esc(v.veiculo_modelo)} (${esc(v.veiculo_placa)})` : ''
+    veiculoGrupo.style.display = 'none'
+    _abastVeiculos = v ? [{ id: v.veiculo_id, placa: v.veiculo_placa, modelo: v.veiculo_modelo, medidor: v.veiculo_medidor }] : []
+    document.getElementById('ab-veiculo').innerHTML = _abastVeiculos.map(x => `<option value="${x.id}" selected>${esc(x.placa)}</option>`).join('')
+    ajustarLabelMedidaAB()
+  } else {
+    document.getElementById('ab-resumo').innerHTML = ''
+    veiculoGrupo.style.display = ''
+    await carregarVeiculosAtivosAbastecimento()
+  }
+  document.getElementById('modal-abastecimento').classList.add('aberto')
+}
+
+function fecharModalAbastecimento() {
+  document.getElementById('modal-abastecimento').classList.remove('aberto')
+  _abastViagemId = null
+}
+
+async function carregarVeiculosAtivosAbastecimento() {
+  let data = null
+  try {
+    if (!navigator.onLine) throw new Error('offline')
+    const r = await db.from('frota_veiculos').select('id,placa,modelo,medidor').eq('ativo', true).order('placa')
+    if (r.error) throw r.error
+    data = r.data || []
+    await fOfflineSetConfig('veiculos_ativos_cache', data)
+  } catch (e) {
+    data = await fOfflineGetConfig('veiculos_ativos_cache') || []
+  }
+  _abastVeiculos = data
+  const sel = document.getElementById('ab-veiculo')
+  sel.innerHTML = _abastVeiculos.length
+    ? '<option value="">Selecione...</option>' + _abastVeiculos.map(v => `<option value="${v.id}">${esc(v.placa)} — ${esc(v.modelo)}</option>`).join('')
+    : '<option value="">Nenhum veículo cadastrado</option>'
+  ajustarLabelMedidaAB()
+}
+
+function ajustarLabelMedidaAB() {
+  const v = _abastVeiculos.find(x => x.id === document.getElementById('ab-veiculo')?.value)
+  const label = document.getElementById('ab-medida-label')
+  if (label) label.innerHTML = (v?.medidor === 'horimetro' ? 'Horímetro no abastecimento (horas)' : 'Hodômetro no abastecimento (km)') + ' <span class="obrig">*</span>'
+}
+
+function calcularValorAbastecimento() {
+  const litros = parseFloat(document.getElementById('ab-litros').value)
+  const preco  = parseFloat(document.getElementById('ab-preco').value)
+  if (!isNaN(litros) && !isNaN(preco)) {
+    document.getElementById('ab-valor').value = (litros * preco).toFixed(2)
+  }
+}
+
+// Fotos convertidas para base64 na hora da captura — evita depender de
+// Blob (que fica inválido em background em iOS/PWA) até o sync subir
+// pro Storage (mesmo motivo da conversão em brigada-offline.js).
+function capturarFotoAbastecimento(input, qual) {
+  const file = input.files?.[0]
+  if (!file) return
+  const reader = new FileReader()
+  reader.onload = () => {
+    _abastFotos[qual] = reader.result
+    document.getElementById(`ab-foto-${qual}-preview`).innerHTML =
+      `<img src="${reader.result}" style="max-width:120px;max-height:120px;border-radius:8px;display:block">`
+  }
+  reader.readAsDataURL(file)
+}
+
+async function confirmarAbastecimento() {
+  const veiculo_id = document.getElementById('ab-veiculo').value
+  const medida = parseFloat(document.getElementById('ab-medida').value)
+  const litros = parseFloat(document.getElementById('ab-litros').value)
+  const preco  = parseFloat(document.getElementById('ab-preco').value)
+  const valor  = parseFloat(document.getElementById('ab-valor').value)
+  if (!veiculo_id) { toast('Selecione o veículo', 'error'); return }
+  if (isNaN(medida) || medida < 0) { toast('Informe a leitura do medidor', 'error'); return }
+  if (isNaN(litros) || litros <= 0) { toast('Informe os litros abastecidos', 'error'); return }
+  if (isNaN(preco) || preco <= 0) { toast('Informe o preço por litro', 'error'); return }
+  if (isNaN(valor) || valor <= 0) { toast('Informe o valor total', 'error'); return }
+
+  const btn = document.getElementById('btn-confirmar-abastecimento')
+  btn.disabled = true; btn.textContent = 'Registrando...'
+  const gps = await fmObterGpsSeAtivo('captura_abastecimento')
+
+  const payload = {
+    p_veiculo_id: veiculo_id, p_medida: medida, p_litros: litros, p_preco_litro: preco,
+    p_valor_total: valor, p_tanque_cheio: document.getElementById('ab-tanque-cheio').checked,
+    p_viagem_id: _abastViagemId, p_posto_nome: document.getElementById('ab-posto').value.trim() || null,
+    p_foto_cupom_url: null, p_foto_hodometro_url: null,
+    p_observacoes: document.getElementById('ab-obs').value.trim() || null,
+    p_uuid_cliente: _fUuid(), p_lat: gps?.lat ?? null, p_lng: gps?.lng ?? null
+  }
+  const fotos = { ..._abastFotos }
+
+  try {
+    if (!navigator.onLine) throw new Error('offline')
+    payload.p_foto_cupom_url = fotos.cupom ? await fSyncUploadFotoAbastecimento(fotos.cupom, payload.p_uuid_cliente, 'cupom') : null
+    payload.p_foto_hodometro_url = fotos.hodometro ? await fSyncUploadFotoAbastecimento(fotos.hodometro, payload.p_uuid_cliente, 'hodometro') : null
+    const { error } = await db.rpc('frota_registrar_abastecimento', payload)
+    if (error) throw error
+    toast('Abastecimento registrado! Aguardando validação do setor de transporte.', 'success')
+    fecharModalAbastecimento()
+  } catch (e) {
+    if (fPareceOffline(e)) {
+      await fOfflineEnfileirar('abastecimento', payload, fotos)
+      toast('Sem conexão — registrado localmente, será enviado ao reconectar.', 'warning')
+      fecharModalAbastecimento()
+      atualizarBadgePendentesSync()
+    } else {
+      toast(e.message || 'Erro ao registrar abastecimento', 'error')
+    }
+  }
+  finally { btn.disabled = false; btn.textContent = 'Registrar' }
 }
 
 // ═══════════════════════════════════════════════════════════════

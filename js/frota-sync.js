@@ -80,6 +80,32 @@ async function fSyncExecutar() {
   fSyncEmitir('sync-fim', { ok, erros, total: pendentes.length })
 }
 
+// base64 data-URL → Blob (upload após recuperar do IndexedDB)
+function fSyncBase64ParaBlob(dataUrl) {
+  const [header, b64] = dataUrl.split(',')
+  const mime = header.match(/:(.*?);/)?.[1] ?? 'image/jpeg'
+  const bytes = atob(b64)
+  const arr = new Uint8Array(bytes.length)
+  for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i)
+  return new Blob([arr], { type: mime })
+}
+
+// Upload de uma foto do abastecimento (cupom/hodômetro) para o Storage.
+// Usado tanto pelo caminho online direto (frota-app.html) quanto pelo
+// sync da fila offline — dataUrl já vem em base64 (evita Blob detachment
+// em iOS/PWA, mesmo motivo da conversão em brigada-offline.js).
+async function fSyncUploadFotoAbastecimento(dataUrl, uuidCliente, qual) {
+  const blob = fSyncBase64ParaBlob(dataUrl)
+  const ext  = blob.type?.includes('png') ? 'png' : 'jpg'
+  const path = `${uuidCliente}/${qual}.${ext}`
+  const { error } = await db.storage
+    .from('frota-abastecimentos')
+    .upload(path, blob, { upsert: true, contentType: blob.type ?? 'image/jpeg' })
+  if (error) throw new Error(`Falha no upload da foto (${qual}): ${error.message || error.error || JSON.stringify(error)}`)
+  const { data: { publicUrl } } = db.storage.from('frota-abastecimentos').getPublicUrl(path)
+  return publicUrl
+}
+
 async function fSyncUma(acao) {
   if (!db) return false
   await fOfflineMarcar(acao.uuid_cliente, 'enviando')
@@ -91,6 +117,11 @@ async function fSyncUma(acao) {
       ;({ error } = await db.rpc('frota_checkin_viagem', acao.payload))
     } else if (acao.tipo === 'abrir_direta') {
       ;({ error } = await db.rpc('frota_abrir_viagem_direta', acao.payload))
+    } else if (acao.tipo === 'abastecimento') {
+      const payload = { ...acao.payload }
+      if (acao.fotos?.cupom) payload.p_foto_cupom_url = await fSyncUploadFotoAbastecimento(acao.fotos.cupom, acao.uuid_cliente, 'cupom')
+      if (acao.fotos?.hodometro) payload.p_foto_hodometro_url = await fSyncUploadFotoAbastecimento(acao.fotos.hodometro, acao.uuid_cliente, 'hodometro')
+      ;({ error } = await db.rpc('frota_registrar_abastecimento', payload))
     } else {
       error = new Error('Tipo de ação desconhecido: ' + acao.tipo)
     }
