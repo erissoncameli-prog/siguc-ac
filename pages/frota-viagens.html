@@ -173,6 +173,13 @@ function formatDataHora(str) {
   return new Date(str).toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', year:'2-digit', hour:'2-digit', minute:'2-digit' })
 }
 
+// Localização capturada silenciosamente pelo app (regra do sistema) —
+// só aparece aqui, na mesa; nunca há tela de GPS no app do motorista.
+function linkMapa(lat, lng) {
+  if (lat == null || lng == null) return ''
+  return ` · <a href="https://www.google.com/maps?q=${lat},${lng}" target="_blank" rel="noopener" style="font-size:12px">Ver localização</a>`
+}
+
 function renderViagens() {
   const q = (document.getElementById('busca')?.value || '').toLowerCase()
   const status = document.getElementById('fil-status')?.value
@@ -382,8 +389,8 @@ function abrirDetalhe(id) {
       <div><strong>Período previsto:</strong> ${formatDataHora(v.data_saida_prevista)} → ${formatDataHora(v.data_retorno_prevista)}</div>
       ${v.veiculo_placa ? `<div><strong>Veículo:</strong> ${esc(v.veiculo_modelo)} (${esc(v.veiculo_placa)})</div>` : ''}
       ${v.motorista_nome ? `<div><strong>Motorista:</strong> ${esc(v.motorista_nome)}</div>` : ''}
-      ${v.checkout_em ? `<div><strong>Saída registrada:</strong> ${formatDataHora(v.checkout_em)} — ${v.km_saida ? formatNum(v.km_saida)+' km' : (v.horas_saida ? formatNum(v.horas_saida,1)+' h' : '—')}</div>` : ''}
-      ${v.checkin_em ? `<div><strong>Chegada registrada:</strong> ${formatDataHora(v.checkin_em)} — ${v.km_chegada ? formatNum(v.km_chegada)+' km' : (v.horas_chegada ? formatNum(v.horas_chegada,1)+' h' : '—')}</div>` : ''}
+      ${v.checkout_em ? `<div><strong>Saída registrada:</strong> ${formatDataHora(v.checkout_em)} — ${v.km_saida ? formatNum(v.km_saida)+' km' : (v.horas_saida ? formatNum(v.horas_saida,1)+' h' : '—')}${linkMapa(v.lat_saida, v.lng_saida)}</div>` : ''}
+      ${v.checkin_em ? `<div><strong>Chegada registrada:</strong> ${formatDataHora(v.checkin_em)} — ${v.km_chegada ? formatNum(v.km_chegada)+' km' : (v.horas_chegada ? formatNum(v.horas_chegada,1)+' h' : '—')}${linkMapa(v.lat_chegada, v.lng_chegada)}</div>` : ''}
       ${v.observacoes_checkin ? `<div><strong>Observações:</strong> ${esc(v.observacoes_checkin)}</div>` : ''}
       ${v.avarias ? `<div style="color:#DC2626"><strong>Avarias:</strong> ${esc(v.avarias)}</div>` : ''}
       ${v.motivo_recusa ? `<div><strong>Motivo da recusa:</strong> ${esc(v.motivo_recusa)}</div>` : ''}

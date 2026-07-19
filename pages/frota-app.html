@@ -646,6 +646,25 @@ function fPareceOffline(e) {
   return msg.includes('fetch') || msg.includes('network') || msg.includes('failed to fetch')
 }
 
+// ── Localização GPS silenciosa (regra do sistema) ────────────────
+// Captura best-effort no momento de iniciar/concluir viagem e de
+// abastecer — sem tela própria, nunca bloqueia a ação. Se o GPS
+// falhar, for negado ou demorar, segue sem coordenada (fica null no
+// payload). Só uma leitura pontual (getCurrentPosition), sem
+// watchPosition — não fica monitorando em segundo plano nem exige
+// permissão de localização "sempre".
+function fmObterGps() {
+  return new Promise(resolve => {
+    if (!('geolocation' in navigator)) { resolve(null); return }
+    const t = setTimeout(() => resolve(null), 6000)
+    navigator.geolocation.getCurrentPosition(
+      pos => { clearTimeout(t); resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }) },
+      () => { clearTimeout(t); resolve(null) },
+      { enableHighAccuracy: true, timeout: 5500, maximumAge: 30000 }
+    )
+  })
+}
+
 async function carregarViagensMotorista() {
   let data = null
   try {
@@ -941,13 +960,14 @@ async function confirmarNovaViagemDireta() {
   if (isNaN(medida) || medida < 0) { toast('Informe a leitura do medidor', 'error'); return }
   const btn = document.getElementById('btn-abrir-nv')
   btn.disabled = true; btn.textContent = 'Iniciando...'
+  const gps = await fmObterGps()
   // Chave de deduplicação estável: reenvios (online ou pela fila offline)
   // reusam o mesmo uuid, e a RPC devolve a viagem já criada em vez de
   // abrir uma duplicada.
   const payload = {
     p_veiculo_id: veiculo_id, p_destino: destino, p_finalidade: finalidade,
     p_medida: medida, p_combustivel_pct: parseInt(document.getElementById('nv-combustivel').value),
-    p_uuid_cliente: _fUuid()
+    p_uuid_cliente: _fUuid(), p_lat: gps?.lat ?? null, p_lng: gps?.lng ?? null
   }
   try {
     if (!navigator.onLine) throw new Error('offline')
@@ -1076,9 +1096,11 @@ async function confirmarCheckout() {
   if (isNaN(medida) || medida < 0) { toast('Informe a leitura do medidor', 'error'); return }
   const btn = document.getElementById('btn-confirmar-checkout')
   btn.disabled = true; btn.textContent = 'Registrando...'
+  const gps = await fmObterGps()
   const payload = {
     p_viagem_id: _acaoId, p_medida: medida,
-    p_combustivel_pct: parseInt(document.getElementById('co-combustivel').value)
+    p_combustivel_pct: parseInt(document.getElementById('co-combustivel').value),
+    p_lat: gps?.lat ?? null, p_lng: gps?.lng ?? null
   }
   try {
     if (!navigator.onLine) throw new Error('offline')
@@ -1116,11 +1138,13 @@ async function confirmarCheckin() {
   if (isNaN(medida) || medida < 0) { toast('Informe a leitura do medidor', 'error'); return }
   const btn = document.getElementById('btn-confirmar-checkin')
   btn.disabled = true; btn.textContent = 'Registrando...'
+  const gps = await fmObterGps()
   const payload = {
     p_viagem_id: _acaoId, p_medida: medida,
     p_combustivel_pct: parseInt(document.getElementById('ci-combustivel').value),
     p_observacoes: document.getElementById('ci-obs').value.trim() || null,
-    p_avarias: document.getElementById('ci-avarias').value.trim() || ''
+    p_avarias: document.getElementById('ci-avarias').value.trim() || '',
+    p_lat: gps?.lat ?? null, p_lng: gps?.lng ?? null
   }
   try {
     if (!navigator.onLine) throw new Error('offline')
@@ -1245,6 +1269,7 @@ async function confirmarAbastecimento() {
 
   const btn = document.getElementById('btn-confirmar-abastecimento')
   btn.disabled = true; btn.textContent = 'Registrando...'
+  const gps = await fmObterGps()
 
   const payload = {
     p_veiculo_id: veiculo_id, p_medida: medida, p_litros: litros, p_preco_litro: preco,
@@ -1252,7 +1277,7 @@ async function confirmarAbastecimento() {
     p_viagem_id: _abastViagemId, p_posto_nome: document.getElementById('ab-posto').value.trim() || null,
     p_foto_cupom_url: null, p_foto_hodometro_url: null,
     p_observacoes: document.getElementById('ab-obs').value.trim() || null,
-    p_uuid_cliente: _fUuid()
+    p_uuid_cliente: _fUuid(), p_lat: gps?.lat ?? null, p_lng: gps?.lng ?? null
   }
   const fotos = { ..._abastFotos }
 

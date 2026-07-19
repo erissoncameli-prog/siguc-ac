@@ -169,6 +169,13 @@ function formatDataHora(str) {
   return new Date(str).toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', year:'2-digit', hour:'2-digit', minute:'2-digit' })
 }
 
+// Localização capturada silenciosamente pelo app (regra do sistema) —
+// só aparece aqui, na mesa; nunca há tela de GPS no app do motorista.
+function linkMapa(lat, lng) {
+  if (lat == null || lng == null) return ''
+  return ` · <a href="https://www.google.com/maps?q=${lat},${lng}" target="_blank" rel="noopener" style="font-size:12px">Ver localização</a>`
+}
+
 function renderKpis() {
   const set = (id, v) => document.getElementById(id).textContent = v
   const agora = new Date()
@@ -310,7 +317,7 @@ function abrirDetalhe(id) {
       <div><strong>Código:</strong> ${esc(a.codigo||'—')}</div>
       <div><strong>Veículo:</strong> ${esc(a.modelo)} (${esc(a.placa)})</div>
       <div><strong>Motorista:</strong> ${esc(a.motorista_nome)}</div>
-      <div><strong>Data/hora:</strong> ${formatDataHora(a.data_hora)}</div>
+      <div><strong>Data/hora:</strong> ${formatDataHora(a.data_hora)}${linkMapa(a.lat, a.lng)}</div>
       <div><strong>Medida no abastecimento:</strong> ${formatNum(a.medida_no_abastecimento,1)} ${a.medidor === 'horimetro' ? 'h' : 'km'}</div>
       <div><strong>Litros:</strong> ${formatNum(a.litros,2)} L ${a.litros_ajustado != null ? `(ajustado: ${formatNum(a.litros_ajustado,2)} L)` : ''}</div>
       <div><strong>Preço/litro:</strong> ${formatBRL(a.preco_litro)}</div>

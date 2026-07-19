@@ -95,6 +95,26 @@ Frota — abastecimento (174–175):
   frota_rejeitar_abastecimento (gestão); view
   vw_frota_abastecimentos_detalhe (SECURITY INVOKER, padrão 165);
   bucket frota-abastecimentos (fotos de cupom/hodômetro).
+- 176_frota_localizacao_gps.sql: geometry(Point,4326) + GIST em
+  frota_viagens (localizacao_saida/localizacao_chegada) e
+  frota_abastecimentos (localizacao); parâmetros p_lat/p_lng
+  (DEFAULT NULL) em frota_checkout_viagem, frota_checkin_viagem,
+  frota_abrir_viagem_direta e frota_registrar_abastecimento; views
+  expõem lat/lng extraídos (ST_Y/ST_X, padrão 047/053). Ver regra do
+  sistema abaixo.
+
+## Regra do sistema — localização GPS em Frota
+Toda viagem (check-out e check-in, inclusive viagem avulsa) e todo
+abastecimento capturam a localização do aparelho no momento da ação.
+Captura é feita no app (frota-app.html, função `fmObterGps`), de forma
+silenciosa e melhor esforço — sem tela própria, sem watchPosition em
+segundo plano, e NUNCA bloqueia a ação se o GPS falhar, for negado ou
+demorar (timeout de 6s; segue com lat/lng null). A coordenada só é
+exibida na plataforma de mesa (frota-viagens.html,
+frota-abastecimentos.html — função `linkMapa`, link para o Google
+Maps), nunca no app do motorista. Qualquer nova ação do motorista que
+"inicie" ou "encerre" algo no módulo Frota deve seguir essa mesma
+regra — capturar via `fmObterGps` e persistir a coordenada.
 
 ## Enums do banco
 perfil_usuario: super_admin | gestor | tecnico | financeiro | visualizador
