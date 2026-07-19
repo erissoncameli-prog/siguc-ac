@@ -867,6 +867,8 @@ function fmCardViagem(v) {
         <div>
           <div style="font-weight:700">${esc(v.destino)}</div>
           <div style="font-size:12px;color:#6B7280;margin-top:2px">${esc(v.finalidade)}</div>
+          ${v.solicitante_nome ? `<div style="font-size:12px;color:#6B7280;margin-top:4px">${esc(v.solicitante_nome)}${v.solicitante_telefone ? ' · '+esc(v.solicitante_telefone) : ''}</div>` : ''}
+          ${v.lista_passageiros ? `<div style="font-size:12px;color:#6B7280;margin-top:4px">Passageiros: ${esc(v.lista_passageiros).replace(/\n/g,', ')}</div>` : ''}
           <div style="font-size:12px;color:#9CA3AF;margin-top:6px">${formatDataHora(v.data_saida_prevista)} → ${formatDataHora(v.data_retorno_prevista)}</div>
           <div style="font-size:12px;margin-top:4px">${esc(v.veiculo_modelo)} <span class="mono">(${esc(v.veiculo_placa)})</span>${v.aberta_direto ? ' <span class="badge badge-roxo">Avulsa</span>' : ''}${v._pendenteSync ? ' <span class="badge badge-cinza">Aguardando envio</span>' : ''}</div>
         </div>
@@ -1573,6 +1575,8 @@ async function renderModoSolicitante() {
       <div id="aviso-passageiros" style="display:none;font-size:12px;background:#FEF3C7;color:#92400E;padding:8px 12px;border-radius:8px;margin-bottom:14px">
         Mais de 4 passageiros — o setor de transporte pode precisar escalar mais de um veículo para atender essa viagem.
       </div>
+      <div class="form-group"><label class="form-label">Lista de passageiros (opcional)</label>
+        <textarea class="form-control" id="f-passageiros-lista" rows="3" placeholder="Um nome por linha"></textarea></div>
       <div class="form-group"><label class="form-label">Destino <span class="obrig">*</span></label>
         <input class="form-control" id="f-destino" placeholder="Ex.: Sede da UC, endereço, município..."></div>
       <div class="form-group"><label class="form-label">Unidade de Conservação (se aplicável)</label>
@@ -1686,6 +1690,7 @@ async function solicitar() {
     uc_destino_id: document.getElementById('f-uc').value || null,
     finalidade,
     passageiros: parseInt(document.getElementById('f-passageiros').value) || null,
+    lista_passageiros: document.getElementById('f-passageiros-lista').value.trim() || null,
     data_saida_prevista: new Date(saida).toISOString(),
     data_retorno_prevista: new Date(retorno).toISOString(),
   }
@@ -1700,6 +1705,7 @@ async function solicitar() {
     document.getElementById('f-saida').value = ''
     document.getElementById('f-retorno').value = ''
     document.getElementById('f-passageiros').value = ''
+    document.getElementById('f-passageiros-lista').value = ''
     document.getElementById('aviso-passageiros').style.display = 'none'
     document.getElementById('f-uc').value = ''
     document.getElementById('aviso-disponibilidade').style.display = 'none'
