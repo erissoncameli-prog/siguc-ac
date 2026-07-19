@@ -170,6 +170,27 @@ const _frotaReady = _dbReady.then(function () {
   </div>
 </div>
 
+<!-- Menu da foto do motorista (ver / trocar) -->
+<div class="modal-overlay" id="modal-foto-mot-menu">
+  <div class="modal" style="max-width:320px">
+    <div class="modal-header">
+      <div class="modal-title">Foto de perfil</div>
+      <button class="modal-close" onclick="fecharModal('foto-mot-menu')">×</button>
+    </div>
+    <div class="modal-body" style="display:flex;flex-direction:column;gap:8px">
+      <button class="btn btn-secondary" onclick="fecharModal('foto-mot-menu');verFotoMotorista()">Ver foto</button>
+      <button class="btn btn-secondary" onclick="fecharModal('foto-mot-menu');trocarFotoMotorista()">Trocar foto</button>
+    </div>
+  </div>
+</div>
+
+<!-- Visualizador de foto do motorista em tela cheia -->
+<div class="modal-overlay" id="modal-foto-mot-viewer" style="background:rgba(0,0,0,.9)" onclick="fecharModal('foto-mot-viewer')">
+  <img id="foto-mot-viewer-img" src="" alt="Foto de perfil" style="max-width:90vw;max-height:90vh;border-radius:12px;object-fit:contain">
+</div>
+
+<input type="file" id="input-foto-motorista" accept="image/*" style="display:none" onchange="processarFotoMotorista(this)">
+
 <!-- Modal Cancelar (Solicitante) -->
 <div class="modal-overlay" id="modal-cancelar">
   <div class="modal" style="max-width:420px">
@@ -430,7 +451,9 @@ async function entrarComSessao(session, jaAutenticouSenha = false) {
   if (salvo && (salvo === 'solicitante' || _papeis.includes(salvo))) {
     await entrarModo(salvo, true)
   } else if (_papeis.length === 0) {
-    await entrarModo('solicitante', true)
+    // Fallback automático (sem papel) — não persiste, senão um vínculo
+    // criado depois (motorista/gestor) fica preso no cache de sessão.
+    await entrarModo('solicitante', false)
   } else if (_papeis.length === 1) {
     await entrarModo(_papeis[0], true)
   } else {
@@ -553,6 +576,68 @@ function situacaoPlano(p) {
 function fecharModal(qual) {
   document.getElementById(`modal-${qual}`).classList.remove('aberto')
   _acaoId = null; _viagemAprovando = null; _linhasAlocacaoG = []
+}
+
+// ── Foto de perfil do motorista (self-service, só galeria) ────────
+function abrirMenuFotoMotorista() {
+  if (!_motorista?.foto_url) { trocarFotoMotorista(); return }
+  document.getElementById('modal-foto-mot-menu').classList.add('aberto')
+}
+function verFotoMotorista() {
+  if (!_motorista?.foto_url) return
+  document.getElementById('foto-mot-viewer-img').src = _motorista.foto_url
+  document.getElementById('modal-foto-mot-viewer').classList.add('aberto')
+}
+function trocarFotoMotorista() {
+  document.getElementById('input-foto-motorista').value = ''
+  document.getElementById('input-foto-motorista').click()
+}
+
+function fmFotoQuadrada(file, tam = 512) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file)
+    const img = new Image()
+    img.onload = () => {
+      const lado = Math.min(img.naturalWidth, img.naturalHeight)
+      const sx = (img.naturalWidth  - lado) / 2
+      const sy = (img.naturalHeight - lado) / 2
+      const c = document.createElement('canvas')
+      c.width = c.height = tam
+      c.getContext('2d').drawImage(img, sx, sy, lado, lado, 0, 0, tam, tam)
+      URL.revokeObjectURL(url)
+      c.toBlob(b => resolve(b), 'image/jpeg', 0.85)
+    }
+    img.onerror = reject
+    img.src = url
+  })
+}
+
+async function processarFotoMotorista(input) {
+  const file = input.files[0]
+  if (!file) return
+  if (file.size > 5 * 1024 * 1024) { toast('Foto deve ter no máximo 5 MB', 'error'); return }
+  toast('Enviando foto…', 'info')
+  try {
+    const quadrada = await fmFotoQuadrada(file, 512)
+    const path = `${_motorista.id}/perfil.jpg`
+    const { error: upErr } = await db.storage.from('frota-motoristas')
+      .upload(path, quadrada, { upsert: true, contentType: 'image/jpeg' })
+    if (upErr) throw upErr
+
+    const { data: { publicUrl } } = db.storage.from('frota-motoristas').getPublicUrl(path)
+    const fotoUrl = `${publicUrl}?t=${Date.now()}`
+
+    const { error: updErr } = await db.from('frota_motoristas')
+      .update({ foto_url: fotoUrl })
+      .eq('id', _motorista.id)
+    if (updErr) throw updErr
+
+    _motorista.foto_url = fotoUrl
+    if (_fmAba === 'inicio') renderFmInicio()
+    toast('Foto atualizada!', 'success')
+  } catch (e) {
+    toast('Erro ao enviar foto: ' + (e.message || e), 'error')
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -803,7 +888,11 @@ function renderFmInicio() {
   const ativas = _viagens.filter(v => v.status === 'aprovada' || v.status === 'em_andamento')
   document.getElementById('fm-conteudo').innerHTML = `
     <div class="card" style="margin-bottom:16px;display:flex;align-items:center;gap:14px">
-      <div class="sidebar-avatar" style="width:48px;height:48px;font-size:16px">${iniciais(_motorista.nome)}</div>
+      <button type="button" onclick="abrirMenuFotoMotorista()" style="border:none;padding:0;background:none;cursor:pointer;border-radius:50%" aria-label="Foto de perfil">
+        ${_motorista.foto_url
+          ? `<img src="${esc(_motorista.foto_url)}" alt="" style="width:48px;height:48px;border-radius:50%;object-fit:cover;display:block">`
+          : `<div class="sidebar-avatar" style="width:48px;height:48px;font-size:16px">${iniciais(_motorista.nome)}</div>`}
+      </button>
       <div>
         <div style="font-weight:700;font-size:15px">${esc(_motorista.nome)}</div>
         <div style="font-size:12px;color:#9CA3AF">CNH ${esc(_motorista.cnh_categoria||'—')} ${_motorista.cnh_numero ? '· '+esc(_motorista.cnh_numero) : ''}</div>
