@@ -193,6 +193,14 @@
       <button class="modal-close" onclick="fecharModal('motorista')">×</button>
     </div>
     <div class="modal-body">
+      <div class="veic-foto-wrap">
+        <div class="veic-foto-preview" id="m-foto-preview" data-icon="user"></div>
+        <div>
+          <button type="button" class="veic-foto-btn" data-icon="camera" onclick="document.getElementById('m-foto-input').click()">Selecionar foto</button>
+          <span class="veic-foto-remover" id="m-foto-remover" onclick="removerFotoMotorista()">✕ Remover foto</span>
+        </div>
+        <input type="file" id="m-foto-input" accept="image/*" style="display:none" onchange="previewFotoMotorista(this)">
+      </div>
       <div class="form-group"><label class="form-label">Nome completo <span class="obrig">*</span></label>
         <input class="form-control" id="m-nome"></div>
       <div class="form-group"><label class="form-label">CPF</label>
@@ -380,6 +388,7 @@ let _podeEditar = false
 let _veiculos = [], _motoristas = [], _setores = [], _usuarios = [], _docsPorVeiculo = {}
 let _editVeiculoId = null, _editMotoristaId = null, _docsVeiculoId = null
 let _vFotoFile = null, _vFotoUrlAtual = null
+let _mFotoFile = null, _mFotoUrlAtual = null
 let _multasVeiculoAtual = []
 let _loginMotoristaId = null, _credMotTexto = ''
 
@@ -671,8 +680,11 @@ function renderMotoristas() {
     const validade = m.cnh_validade
       ? badgeVencimento(m.cnh_validade)
       : (m.habilitacao_fluvial_validade ? badgeVencimento(m.habilitacao_fluvial_validade) : '<span style="color:#9CA3AF">—</span>')
+    const avatar = m.foto_url
+      ? `<img src="${esc(m.foto_url)}" alt="" style="width:32px;height:32px;border-radius:50%;object-fit:cover;flex-shrink:0">`
+      : `<div style="width:32px;height:32px;border-radius:50%;background:rgba(0,0,0,.08);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#6B7280;flex-shrink:0">${esc((m.nome||'?').charAt(0).toUpperCase())}</div>`
     return `<tr>
-      <td><strong>${esc(m.nome)}</strong>${m.matricula ? `<br><span class="mono" style="font-size:11px;color:#9CA3AF">Mat. ${esc(m.matricula)}</span>` : ''}</td>
+      <td><div style="display:flex;align-items:center;gap:10px">${avatar}<div><strong>${esc(m.nome)}</strong>${m.matricula ? `<br><span class="mono" style="font-size:11px;color:#9CA3AF">Mat. ${esc(m.matricula)}</span>` : ''}</div></div></td>
       <td><span class="badge ${m.vinculo === 'servidor' ? 'badge-verde' : 'badge-ouro'}">${m.vinculo === 'servidor' ? 'Servidor' : 'Terceirizado'}</span></td>
       <td style="font-size:12px">${cnh}</td>
       <td>${validade}</td>
@@ -717,6 +729,34 @@ function previewFotoVeiculo(input) {
   if (file.size > 5 * 1024 * 1024) { toast('Foto deve ter no máximo 5 MB', 'error'); input.value = ''; return }
   _vFotoFile = file
   _setVeicFotoPreview(URL.createObjectURL(file))
+}
+
+// ── Modal Motorista — foto ─────────────────────────────────────
+function _setMotFotoPreview(url) {
+  const wrap = document.getElementById('m-foto-preview')
+  const rem  = document.getElementById('m-foto-remover')
+  if (url) {
+    wrap.innerHTML = `<img src="${url}" alt="foto do motorista">`
+    rem.classList.add('visivel')
+  } else {
+    wrap.innerHTML = bico('user')
+    rem.classList.remove('visivel')
+  }
+}
+
+function previewFotoMotorista(input) {
+  const file = input.files[0]
+  if (!file) return
+  if (file.size > 5 * 1024 * 1024) { toast('Foto deve ter no máximo 5 MB', 'error'); input.value = ''; return }
+  _mFotoFile = file
+  _setMotFotoPreview(URL.createObjectURL(file))
+}
+
+function removerFotoMotorista() {
+  _mFotoFile = null
+  _mFotoUrlAtual = null
+  document.getElementById('m-foto-input').value = ''
+  _setMotFotoPreview(null)
 }
 
 function removerFotoVeiculo() {
@@ -1120,6 +1160,11 @@ function abrirModalMotorista(id = null) {
   document.getElementById('m-obs').value = m?.observacoes || ''
   mostrarCamposVinculo()
 
+  _mFotoFile = null
+  _mFotoUrlAtual = m?.foto_url || null
+  document.getElementById('m-foto-input').value = ''
+  _setMotFotoPreview(_mFotoUrlAtual)
+
   document.getElementById('m-criar-acesso').checked = true
   if (!m) {
     // Cadastro novo: mostra o checkbox de criar acesso ao salvar
@@ -1168,6 +1213,18 @@ async function salvarMotorista() {
   const btn = document.getElementById('btn-salvar-motorista')
   btn.disabled = true; btn.textContent = 'Salvando...'
   try {
+    if (_mFotoFile) {
+      btn.textContent = 'Enviando foto...'
+      const ext  = _mFotoFile.name.split('.').pop().toLowerCase() || 'jpg'
+      const path = `${editando || 'novo'}/${Date.now()}.${ext}`
+      const { error: upErr } = await db.storage.from('frota-motoristas').upload(path, _mFotoFile, { upsert: true })
+      if (upErr) throw upErr
+      const { data: urlData } = db.storage.from('frota-motoristas').getPublicUrl(path)
+      payload.foto_url = urlData.publicUrl
+      btn.textContent = 'Salvando...'
+    } else {
+      payload.foto_url = _mFotoUrlAtual
+    }
     const { data: salvo, error } = editando
       ? await db.from('frota_motoristas').update(payload).eq('id', editando).select('id').single()
       : await db.from('frota_motoristas').insert(payload).select('id').single()
