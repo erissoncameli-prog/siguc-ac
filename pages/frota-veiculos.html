@@ -25,6 +25,7 @@
         <button type="button" class="tab-btn ativo" id="v-tab-dados" onclick="mudarAbaVeiculo('dados')">Dados</button>
         <button type="button" class="tab-btn" id="v-tab-manutencao" onclick="mudarAbaVeiculo('manutencao')">Manutenção</button>
         <button type="button" class="tab-btn" id="v-tab-multas" onclick="mudarAbaVeiculo('multas')">Multas</button>
+        <button type="button" class="tab-btn" id="v-tab-consumo" onclick="mudarAbaVeiculo('consumo')">Consumo</button>
       </div>
 
       <div id="v-aba-dados">
@@ -165,6 +166,13 @@
           <div class="form-group"><label class="form-label">Observações</label><input class="form-control" id="mu-obs"></div>
           <button class="btn btn-primary btn-sm" id="btn-add-multa" onclick="adicionarMulta()">Adicionar</button>
         </div>
+      </div>
+
+      <div id="v-aba-consumo" style="display:none">
+        <div style="font-size:12px;color:#6B7280;margin-bottom:14px">
+          Só abastecimentos <strong>validados</strong> entram nesses números (contrato/fonte já classificados pela gestão).
+        </div>
+        <div id="v-consumo-corpo">Carregando...</div>
       </div>
     </div>
     <div class="modal-footer">
@@ -753,6 +761,7 @@ function abrirModalVeiculo(id = null) {
   if (v) {
     carregarManutencaoVeiculo(v.id)
     carregarMultasVeiculo(v.id)
+    carregarConsumoVeiculo(v.id, v.medidor)
   }
 
   document.getElementById('modal-veiculo').classList.add('aberto')
@@ -762,9 +771,72 @@ function mudarAbaVeiculo(aba) {
   document.getElementById('v-aba-dados').style.display       = aba === 'dados'       ? '' : 'none'
   document.getElementById('v-aba-manutencao').style.display  = aba === 'manutencao'  ? '' : 'none'
   document.getElementById('v-aba-multas').style.display      = aba === 'multas'      ? '' : 'none'
+  document.getElementById('v-aba-consumo').style.display     = aba === 'consumo'     ? '' : 'none'
   document.getElementById('v-tab-dados').classList.toggle('ativo', aba === 'dados')
   document.getElementById('v-tab-manutencao').classList.toggle('ativo', aba === 'manutencao')
   document.getElementById('v-tab-multas').classList.toggle('ativo', aba === 'multas')
+  document.getElementById('v-tab-consumo').classList.toggle('ativo', aba === 'consumo')
+}
+
+// ── Aba Consumo — abastecimentos VALIDADOS do veículo (padrão do
+// projeto: só validados entram em números de orçamento/consumo — ver
+// CLAUDE.md, "Frota — abastecimento"). Consumo médio pelo método
+// "tanque cheio a tanque cheio" (mesmo cálculo do app do motorista,
+// frota-app.html → fmResumoCombustivel).
+async function carregarConsumoVeiculo(veiculoId, medidor) {
+  const corpo = document.getElementById('v-consumo-corpo')
+  corpo.innerHTML = 'Carregando...'
+  const { data, error } = await db.from('vw_frota_abastecimentos_detalhe').select('*')
+    .eq('veiculo_id', veiculoId).eq('status', 'validado')
+    .order('data_hora', { ascending: true })
+  if (error) { corpo.innerHTML = '<div style="color:#DC2626;font-size:13px">Erro ao carregar consumo</div>'; return }
+
+  const regs = data || []
+  if (!regs.length) {
+    corpo.innerHTML = '<div style="text-align:center;padding:20px;color:#9CA3AF">Nenhum abastecimento validado ainda para este veículo</div>'
+    return
+  }
+
+  const litros = regs.reduce((s, a) => s + Number(a.litros_final || 0), 0)
+  const valor  = regs.reduce((s, a) => s + Number(a.valor_final || 0), 0)
+
+  let ultimoCheio = null
+  const taxas = []
+  regs.forEach(a => {
+    if (ultimoCheio) {
+      const distancia = Number(a.medida_no_abastecimento) - Number(ultimoCheio.medida_no_abastecimento)
+      const litrosPeriodo = Number(a.litros_final || 0)
+      if (distancia > 0 && litrosPeriodo > 0) taxas.push(distancia / litrosPeriodo)
+    }
+    if (a.tanque_cheio) ultimoCheio = a
+  })
+  const consumoMedio = taxas.length ? taxas.reduce((s, x) => s + x, 0) / taxas.length : null
+  const consumoTxt = consumoMedio == null ? '—'
+    : (medidor === 'horimetro' ? `${formatNum(1 / consumoMedio, 2)} L/h` : `${formatNum(consumoMedio, 2)} km/L`)
+
+  const recentes = regs.slice().reverse().slice(0, 10)
+
+  corpo.innerHTML = `
+    <div class="kpi-grid" style="margin-bottom:16px">
+      <div class="kpi-card verde"><div class="kpi-label">Abastecimentos</div><div class="kpi-valor">${regs.length}</div></div>
+      <div class="kpi-card azul"><div class="kpi-label">Litros</div><div class="kpi-valor">${formatNum(litros, 1)}</div></div>
+      <div class="kpi-card ouro"><div class="kpi-label">Total gasto</div><div class="kpi-valor">${formatBRL(valor)}</div></div>
+      <div class="kpi-card erro"><div class="kpi-label">Consumo médio</div><div class="kpi-valor" style="font-size:16px">${consumoTxt}</div></div>
+    </div>
+    <div class="form-section-label">Últimos abastecimentos</div>
+    <div class="table-wrap"><div class="table-scroll">
+      <table>
+        <thead><tr><th>Data</th><th>Motorista</th><th>Litros</th><th>Valor</th><th>Contrato</th></tr></thead>
+        <tbody>${recentes.map(a => `
+          <tr>
+            <td style="font-size:12px">${new Date(a.data_hora).toLocaleDateString('pt-BR')}</td>
+            <td style="font-size:12px">${esc(a.motorista_nome)}</td>
+            <td class="mono">${formatNum(a.litros_final, 2)} L</td>
+            <td class="mono">${formatBRL(a.valor_final)}</td>
+            <td style="font-size:12px">${esc(a.contrato_numero || '—')}</td>
+          </tr>`).join('')}</tbody>
+      </table>
+    </div></div>`
 }
 
 // ── Modal Veículo: aba Manutenção (somente leitura) ────────────
