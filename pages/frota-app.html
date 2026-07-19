@@ -597,8 +597,11 @@ let _abastecimentos = []
 async function carregarAbastecimentosMotorista() {
   try {
     if (!navigator.onLine) throw new Error('offline')
-    const r = await db.from('frota_abastecimentos').select('*')
-      .eq('motorista_id', _motorista.id).order('data_hora', { ascending: false }).limit(50)
+    // vw_frota_abastecimentos_detalhe (em vez da tabela crua) pra já
+    // trazer placa/modelo/medidor — usados no resumo de consumo por
+    // veículo da aba Dados.
+    const r = await db.from('vw_frota_abastecimentos_detalhe').select('*')
+      .eq('motorista_id', _motorista.id).order('data_hora', { ascending: false }).limit(100)
     if (r.error) throw r.error
     _abastecimentos = r.data || []
     await fOfflineSetConfig('abastecimentos_cache', _abastecimentos)
@@ -842,6 +845,50 @@ function renderFmHistorico() {
         </div>`).join('')}`
 }
 
+// ── Resumo de combustível (aba Dados) — agrupado por veículo, a
+// partir de _abastecimentos (vw_frota_abastecimentos_detalhe, já
+// carregado do banco ou do cache offline, sem chamada extra).
+// Abastecimentos rejeitados ficam fora da conta (dado contestado);
+// pendentes entram, já que fisicamente aconteceram.
+// Consumo médio: método "tanque cheio a tanque cheio" — entre dois
+// abastecimentos consecutivos do mesmo veículo com tanque_cheio=true,
+// os litros do 2º abastecimento representam o combustível gasto para
+// rodar a distância (ou usar as horas) entre os dois. Só é possível
+// calcular a partir do 2º "tanque cheio" de cada veículo.
+function fmResumoCombustivel() {
+  const validos = _abastecimentos.filter(a => a.status !== 'rejeitado')
+  const porVeiculo = {}
+  validos.forEach(a => {
+    const k = a.veiculo_id
+    if (!porVeiculo[k]) porVeiculo[k] = { placa: a.placa, modelo: a.modelo, medidor: a.medidor, registros: [] }
+    porVeiculo[k].registros.push(a)
+  })
+
+  let totalAbast = 0, totalLitros = 0, totalValor = 0
+  const veiculos = Object.values(porVeiculo).map(v => {
+    const regs = v.registros.slice().sort((a, b) => a.data_hora.localeCompare(b.data_hora))
+    const litros = regs.reduce((s, a) => s + Number(a.litros_final || 0), 0)
+    const valor  = regs.reduce((s, a) => s + Number(a.valor_final || 0), 0)
+    totalAbast += regs.length; totalLitros += litros; totalValor += valor
+
+    let ultimoCheio = null
+    const taxas = []
+    regs.forEach(a => {
+      if (ultimoCheio) {
+        const distancia = Number(a.medida_no_abastecimento) - Number(ultimoCheio.medida_no_abastecimento)
+        const litrosPeriodo = Number(a.litros_final || 0)
+        if (distancia > 0 && litrosPeriodo > 0) taxas.push(distancia / litrosPeriodo)
+      }
+      if (a.tanque_cheio) ultimoCheio = a
+    })
+    const consumoMedio = taxas.length ? taxas.reduce((s, x) => s + x, 0) / taxas.length : null
+
+    return { ...v, abastecimentos: regs.length, litros, valor, consumoMedio, temAmostra: taxas.length > 0 }
+  }).sort((a, b) => b.abastecimentos - a.abastecimentos)
+
+  return { totalAbast, totalLitros, totalValor, veiculos }
+}
+
 // ── Aba Dados (números + gráfico das viagens do próprio motorista) ─
 // Tudo calculado a partir de _viagens (já carregado do banco ou do cache
 // offline), sem chamada extra — funciona mesmo sem conexão.
@@ -878,6 +925,9 @@ function renderFmDados() {
   const kpi = (cls, label, valor) =>
     `<div class="kpi-card ${cls}"><div class="kpi-label">${label}</div><div class="kpi-valor">${valor}</div></div>`
 
+  const combustivel = fmResumoCombustivel()
+  const rejeitados = _abastecimentos.filter(a => a.status === 'rejeitado').length
+
   const html = `
     <div class="card" style="margin-bottom:16px;display:flex;align-items:center;gap:14px">
       <div class="sidebar-avatar" style="width:44px;height:44px;font-size:15px">${iniciais(_motorista.nome)}</div>
@@ -910,7 +960,34 @@ function renderFmDados() {
             </div>`).join('')}
         </div>` : `
         <div style="text-align:center;padding:24px;color:#9CA3AF">Nenhuma viagem concluída ainda.<br>Seus números aparecem aqui depois do primeiro check-in.</div>`}
-    </div>`
+    </div>
+
+    <div class="form-section-label" style="margin-top:20px">Combustível</div>
+    ${!combustivel.totalAbast ? `
+      <div class="card" style="text-align:center;padding:24px;color:#9CA3AF">Nenhum abastecimento registrado ainda.</div>
+    ` : `
+      <div class="kpi-grid" style="margin-bottom:16px">
+        ${kpi('verde', 'Abastecimentos', combustivel.totalAbast)}
+        ${kpi('azul',  'Litros abastecidos', formatNum(combustivel.totalLitros, 1))}
+        ${kpi('ouro',  'Total gasto', formatBRL(combustivel.totalValor))}
+      </div>
+      <div class="card" style="padding:0">
+        ${combustivel.veiculos.map(v => `
+          <div style="padding:14px 16px;border-bottom:1px solid #F3F4F6">
+            <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap">
+              <strong style="font-size:13px">${esc(v.modelo)} <span class="mono" style="color:#9CA3AF">(${esc(v.placa)})</span></strong>
+              <span style="font-size:12px;color:#9CA3AF">${v.abastecimentos} abastecimento(s)</span>
+            </div>
+            <div style="font-size:12px;color:#6B7280;margin-top:4px">
+              ${formatNum(v.litros, 1)} L · ${formatBRL(v.valor)}
+              ${v.temAmostra ? ` · Consumo médio: <strong style="color:#1F4E2C">${v.medidor === 'horimetro'
+                ? formatNum(1 / v.consumoMedio, 2) + ' L/h'
+                : formatNum(v.consumoMedio, 2) + ' km/L'}</strong>` : ' · Consumo médio: precisa de 2+ abastecimentos com tanque cheio'}
+            </div>
+          </div>`).join('')}
+      </div>
+      ${rejeitados ? `<div style="font-size:11px;color:#9CA3AF;margin-top:8px">${rejeitados} abastecimento(s) rejeitado(s) não entram nesses números — veja o motivo no Histórico.</div>` : ''}
+    `}`
 
   document.getElementById('fm-conteudo').innerHTML = html
 }
