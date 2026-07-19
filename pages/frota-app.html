@@ -1969,6 +1969,12 @@ if ('serviceWorker' in navigator && !window.Capacitor) {
 .fm-chart-lab { font-size: 10px; color: #9CA3AF; text-transform: capitalize; }
 
 /* ── Tela de PIN (bloqueio de acesso) ───────────────────────────── */
+/* O atributo HTML `hidden` depende da regra do user-agent
+   `[hidden]{display:none}`, mas a regra de AUTOR `display:flex` abaixo a
+   venceria na cascata (autor > user-agent), deixando os overlays de
+   login/PIN presos na tela para sempre. Estas regras, com especificidade
+   maior (classe + atributo), garantem que `hidden` realmente esconda. */
+.fm-login-tela[hidden], .fm-pin-tela[hidden] { display: none; }
 .fm-pin-tela {
   position: fixed; inset: 0; z-index: 3000;
   background: linear-gradient(135deg, #0A1A0F 0%, #0E5A3C 60%, #1F4E2C 130%);
