@@ -7,10 +7,12 @@
 
 ALTER TABLE frota_viagens ADD COLUMN IF NOT EXISTS lista_passageiros text;
 
--- CREATE OR REPLACE basta aqui: fv.* ganha lista_passageiros no fim
--- da lista (coluna nova é sempre a última), e a coluna adicionada
--- agora (solicitante_telefone) também vai ao fim do SELECT.
-CREATE OR REPLACE VIEW vw_frota_viagens_detalhe WITH (security_invoker = true) AS
+-- DROP+CREATE (não CREATE OR REPLACE): solicitante_telefone entra no
+-- meio da lista de colunas (logo após solicitante_nome), e CREATE OR
+-- REPLACE só permite adicionar coluna no final — mesmo motivo das
+-- migrations 168/176.
+DROP VIEW IF EXISTS vw_frota_viagens_detalhe;
+CREATE VIEW vw_frota_viagens_detalhe WITH (security_invoker = true) AS
 SELECT
   fv.*,
   frota_nome_usuario(fv.solicitante_id) AS solicitante_nome,
