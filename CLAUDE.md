@@ -123,6 +123,17 @@ Frota — abastecimento (174–175):
   passa a rejeitar p_veiculo_id diferente do veículo da viagem
   em_andamento do motorista (quando existir) — trava de servidor,
   segunda camada da regra abaixo.
+- 181_frota_fix_checkin_regressao.sql: corrige regressão que a 176
+  introduziu em frota_checkin_viagem — ao recriar a função pra
+  adicionar localizacao_chegada/p_lat/p_lng, usei o corpo original da
+  155 em vez do já corrigido pela 169, perdendo o cast explícito
+  ::status_veiculo_frota no CASE que define o status do veículo (erro
+  "column status is of type status_veiculo_frota but expression is of
+  type text", impedindo TODO check-in) e a chamada a
+  frota_checar_manutencao_veiculo() ao final. Lição: ao recriar uma
+  RPC pra adicionar parâmetro, sempre partir do CREATE OR REPLACE mais
+  recente (não do original), e testar os dois ramos de qualquer CASE
+  antes de aplicar em produção.
 
 ## Regra do sistema — trava de veículo no abastecimento
 O abastecimento nunca deve poder ser lançado num veículo diferente do
