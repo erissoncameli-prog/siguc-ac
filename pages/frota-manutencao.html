@@ -4,11 +4,13 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>SIGUC-AC · Frota — Manutenção</title>
 <link rel="stylesheet" href="../css/global.css">
+<link rel="stylesheet" href="../css/frota-wise-theme.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="../js/observability.js"></script>
 <script src="../js/queryLogger.js"></script>
 <script src="../js/config.js"></script>
 <script src="../js/layout.js"></script>
+<script src="../js/frota-wise.js"></script>
 </head>
 <body>
 <div id="app"></div>
@@ -135,7 +137,7 @@ let _osItensAtual = []
 const TIPO_OS_LABEL = { preventiva:'Preventiva', corretiva:'Corretiva' }
 const TIPO_OS_BADGE = { preventiva:'badge-verde', corretiva:'badge-ouro' }
 const STATUS_OS_LABEL = { aberta:'Aberta', em_andamento:'Em andamento', concluida:'Concluída', cancelada:'Cancelada' }
-const STATUS_OS_BADGE = { aberta:'badge-erro', em_andamento:'badge-ouro', concluida:'badge-verde', cancelada:'badge-cinza' }
+const STATUS_OS_BADGE = { aberta:'fw-badge fw-badge-inativo', em_andamento:'fw-badge fw-badge-manutencao', concluida:'fw-badge fw-badge-disponivel', cancelada:'badge-cinza' }
 
 ;(async function () {
   const usuario = await carregarUsuario()
@@ -150,12 +152,12 @@ const STATUS_OS_BADGE = { aberta:'badge-erro', em_andamento:'badge-ouro', conclu
 
   document.getElementById('app').innerHTML =
     gerarLayout('Frota — Manutenção', 'frota-manutencao') +
-    `<div class="fade-in">
+    `<div class="fade-in fw-theme">
       <div class="kpi-grid">
-        <div class="kpi-card erro"><div class="kpi-label">OS abertas</div><div class="kpi-valor" id="k-os-abertas">—</div></div>
-        <div class="kpi-card ouro"><div class="kpi-label">Planos próximos do vencimento</div><div class="kpi-valor" id="k-plano-prox">—</div></div>
-        <div class="kpi-card erro"><div class="kpi-label">Planos vencidos</div><div class="kpi-valor" id="k-plano-venc">—</div></div>
-        <div class="kpi-card verde"><div class="kpi-label">Custo (últimos 30 dias)</div><div class="kpi-valor" id="k-custo" style="font-size:19px">—</div></div>
+        <div class="fw-kpi-card"><div class="fw-kpi-label">OS abertas</div><div class="fw-kpi-value" id="k-os-abertas">0</div></div>
+        <div class="fw-kpi-card"><div class="fw-kpi-label">Planos próximos do vencimento</div><div class="fw-kpi-value" id="k-plano-prox">0</div></div>
+        <div class="fw-kpi-card"><div class="fw-kpi-label">Planos vencidos</div><div class="fw-kpi-value" id="k-plano-venc">0</div></div>
+        <div class="fw-kpi-card"><div class="fw-kpi-label">Custo (últimos 30 dias)</div><div class="fw-kpi-value" id="k-custo" style="font-size:1.4rem">—</div></div>
       </div>
 
       <div class="card" style="margin-bottom:16px">
@@ -250,7 +252,8 @@ async function carregarSugestoes() {
 }
 
 function renderKpis() {
-  const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v }
+  const set = (id, v) => { const el = document.getElementById(id); if (el) fwAnimateNumber(el, v) }
+  const setTexto = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v }
   set('k-os-abertas', _ordens.filter(o => o.status === 'aberta' || o.status === 'em_andamento').length)
   set('k-plano-venc', _planos.filter(p => situacaoPlano(p) === 'vencido').length)
   set('k-plano-prox', _planos.filter(p => situacaoPlano(p) === 'proximo').length)
@@ -258,7 +261,7 @@ function renderKpis() {
   const custo30 = _ordens
     .filter(o => o.status === 'concluida' && o.data_conclusao && new Date(o.data_conclusao) >= desde)
     .reduce((acc, o) => acc + (Number(o.custo_total) || 0), 0)
-  set('k-custo', formatBRL(custo30))
+  setTexto('k-custo', formatBRL(custo30))
 }
 
 // ── Situação do plano (ok / próximo / vencido) ─────────────────
@@ -272,7 +275,7 @@ function situacaoPlano(p) {
   return 'ok'
 }
 const SITUACAO_LABEL = { ok:'Em dia', proximo:'Próximo', vencido:'Vencido' }
-const SITUACAO_BADGE = { ok:'badge-verde', proximo:'badge-ouro', vencido:'badge-erro' }
+const SITUACAO_BADGE = { ok:'fw-badge fw-badge-disponivel', proximo:'fw-badge fw-badge-doc-vencendo', vencido:'fw-badge fw-badge-inativo' }
 
 // ── Render Planos ────────────────────────────────────────────
 function renderPlanos() {
