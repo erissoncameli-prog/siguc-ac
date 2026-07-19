@@ -428,7 +428,9 @@ async function entrarComSessao(session, jaAutenticouSenha = false) {
   if (salvo && (salvo === 'solicitante' || _papeis.includes(salvo))) {
     await entrarModo(salvo, true)
   } else if (_papeis.length === 0) {
-    await entrarModo('solicitante', true)
+    // Fallback automático (sem papel) — não persiste, senão um vínculo
+    // criado depois (motorista/gestor) fica preso no cache de sessão.
+    await entrarModo('solicitante', false)
   } else if (_papeis.length === 1) {
     await entrarModo(_papeis[0], true)
   } else {
