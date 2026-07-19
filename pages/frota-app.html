@@ -1376,9 +1376,10 @@ async function carregarVeiculosAtivosAbastecimento() {
     if (!navigator.onLine) throw new Error('offline')
     // Sem viagem em andamento pra travar o veículo automaticamente,
     // ao menos tira da lista quem fisicamente não poderia estar com o
-    // motorista agora (em manutenção ou baixado).
-    const r = await db.from('frota_veiculos').select('id,placa,modelo,medidor')
-      .eq('ativo', true).not('status', 'in', '(em_manutencao,baixado)').order('placa')
+    // motorista agora (em manutenção ou baixado). RPC SECURITY DEFINER
+    // (migration 183) — motorista não depende de grant no módulo
+    // Frota pra listar veículos que ele pode usar.
+    const r = await db.rpc('frota_veiculos_ativos_abastecimento')
     if (r.error) throw r.error
     data = r.data || []
     await fOfflineSetConfig('veiculos_ativos_cache', data)
