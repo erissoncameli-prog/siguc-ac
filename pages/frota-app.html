@@ -1682,8 +1682,8 @@ function portaoPin(jaAutenticouSenha) {
   return new Promise(async resolve => {
     let hash, dono
     try {
-      hash = await fOfflineGetConfig('pin_hash')
-      dono = await fOfflineGetConfig('pin_dono')
+      hash = await fComPrazo(fOfflineGetConfig('pin_hash'), 3000)
+      dono = await fComPrazo(fOfflineGetConfig('pin_dono'), 3000)
     } catch (e) {
       // Sem acesso ao IndexedDB não dá para verificar o PIN. O PIN é uma
       // trava de conveniência, não a fronteira de auth (a sessão já está
@@ -1738,12 +1738,24 @@ async function fPinProcessar() {
 
 function fPinFechar() { document.getElementById('fm-pin-tela').hidden = true; _fPinBuf = ''; _fPinPrimeiro = '' }
 
+// Corre uma promessa com prazo — usado na saída de emergência abaixo
+// para que uma chamada de rede/IndexedDB travada (sem exceção, só sem
+// resposta) não prenda o "Esqueci o PIN" para sempre.
+function fComPrazo(promessa, ms) {
+  return Promise.race([
+    Promise.resolve(promessa).catch(() => {}),
+    new Promise(res => setTimeout(res, ms)),
+  ])
+}
+
 async function pinEsqueci() {
-  // Saída de emergência: NUNCA pode falhar em silêncio. Cada passo é
-  // isolado para que uma falha (IndexedDB, signOut) não impeça o reload
-  // e a volta para a tela de login.
-  try { await fOfflineSetConfig('pin_hash', null); await fOfflineSetConfig('pin_dono', null) } catch (e) {}
-  try { await db.auth.signOut() } catch (e) {}
+  // Saída de emergência: NUNCA pode falhar em silêncio nem travar. Cada
+  // passo é isolado (try/catch) e tem prazo (fComPrazo) para que uma
+  // falha OU um travamento (IndexedDB, signOut sem rede) não impeça o
+  // reload e a volta para a tela de login.
+  try { await fComPrazo(fOfflineSetConfig('pin_hash', null), 2000) } catch (e) {}
+  try { await fComPrazo(fOfflineSetConfig('pin_dono', null), 2000) } catch (e) {}
+  try { await fComPrazo(db.auth.signOut(), 2000) } catch (e) {}
   // Garante que a sessão persistida some mesmo se o signOut falhar,
   // senão o reload cairia de novo no portão de PIN.
   try { localStorage.removeItem('siguc-frota-session') } catch (e) {}
