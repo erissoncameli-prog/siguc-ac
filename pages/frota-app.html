@@ -778,6 +778,7 @@ function renderFmInicio() {
         <div style="font-size:12px;color:#9CA3AF">CNH ${esc(_motorista.cnh_categoria||'—')} ${_motorista.cnh_numero ? '· '+esc(_motorista.cnh_numero) : ''}</div>
       </div>
     </div>
+    <button class="btn btn-secondary" style="width:100%;margin-bottom:16px" onclick="abrirAbastecimento(null)">${bico('fuel')} Registrar abastecimento</button>
     ${ativas.length ? `
       <div class="form-section-label">Viagem em andamento</div>
       ${ativas.slice(0, 1).map(fmCardViagem).join('')}
@@ -1202,7 +1203,31 @@ let _abastViagemId = null
 let _abastVeiculos = []
 let _abastFotos = { cupom: null, hodometro: null }
 
+// Trava de veículo (defesa em 2 camadas — a outra é a RPC, migration
+// 180): acha a viagem em andamento do motorista, mesmo que só exista
+// ainda na fila offline (check-out feito sem conexão, ainda não
+// sincronizado) — nesses casos _viagens ainda mostra o status antigo
+// vindo do servidor. Sem isso, quem tentasse abastecer entre o
+// check-out offline e o próximo sync veria a lista de veículos
+// destravada por engano.
+async function fmViagemAtivaDoMotorista() {
+  const direta = _viagens.find(v => v.status === 'em_andamento')
+  if (direta) return direta
+
+  const pendentes = await fOfflineListarPendentes()
+  const checkoutPendente = pendentes.find(a => a.tipo === 'checkout')
+  if (checkoutPendente) {
+    const v = _viagens.find(x => x.id === checkoutPendente.payload.p_viagem_id)
+    if (v) return v
+  }
+  return null
+}
+
 async function abrirAbastecimento(viagemId) {
+  if (!viagemId) {
+    const ativa = await fmViagemAtivaDoMotorista()
+    if (ativa) viagemId = ativa.id
+  }
   _abastViagemId = viagemId
   _abastFotos = { cupom: null, hodometro: null }
   document.getElementById('ab-foto-cupom').value = ''
@@ -1242,7 +1267,11 @@ async function carregarVeiculosAtivosAbastecimento() {
   let data = null
   try {
     if (!navigator.onLine) throw new Error('offline')
-    const r = await db.from('frota_veiculos').select('id,placa,modelo,medidor').eq('ativo', true).order('placa')
+    // Sem viagem em andamento pra travar o veículo automaticamente,
+    // ao menos tira da lista quem fisicamente não poderia estar com o
+    // motorista agora (em manutenção ou baixado).
+    const r = await db.from('frota_veiculos').select('id,placa,modelo,medidor')
+      .eq('ativo', true).not('status', 'in', '(em_manutencao,baixado)').order('placa')
     if (r.error) throw r.error
     data = r.data || []
     await fOfflineSetConfig('veiculos_ativos_cache', data)
