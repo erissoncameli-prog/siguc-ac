@@ -102,8 +102,13 @@ Frota — abastecimento (174–175):
   frota_abrir_viagem_direta e frota_registrar_abastecimento; views
   expõem lat/lng extraídos (ST_Y/ST_X, padrão 047/053). Ver regra do
   sistema abaixo.
+- 177_frota_config_gps.sql: tabela singleton frota_config_gps
+  (captura_viagens/captura_abastecimento, RLS SELECT autenticado /
+  UPDATE pode_editar('frota')), trigger preenche atualizado_por/em.
+  Liga/desliga a regra de captura de GPS por categoria — ver seção
+  abaixo.
 
-## Regra do sistema — localização GPS em Frota
+## Regra do sistema — localização GPS em Frota (configurável)
 Toda viagem (check-out e check-in, inclusive viagem avulsa) e todo
 abastecimento capturam a localização do aparelho no momento da ação.
 Captura é feita no app (frota-app.html, função `fmObterGps`), de forma
@@ -114,7 +119,19 @@ exibida na plataforma de mesa (frota-viagens.html,
 frota-abastecimentos.html — função `linkMapa`, link para o Google
 Maps), nunca no app do motorista. Qualquer nova ação do motorista que
 "inicie" ou "encerre" algo no módulo Frota deve seguir essa mesma
-regra — capturar via `fmObterGps` e persistir a coordenada.
+regra — capturar via `fmObterGpsSeAtivo` e persistir a coordenada.
+
+Liga/desliga por categoria (177_frota_config_gps.sql): tabela singleton
+`frota_config_gps` (captura_viagens / captura_abastecimento), editável
+só por quem edita 'frota'. Toggle na mesa: card no topo de
+frota-viagens.html (viagens: checkout/checkin/avulsa) e de
+frota-abastecimentos.html (abastecimento) — independentes entre si. O
+app lê e cacheia essa config no IndexedDB (fmAtualizarConfigGps,
+refeita a cada tick de sync de 45s); fail-safe = true sempre que não
+houver linha, cache ou conexão — a captura só fica desligada depois
+que a config "desligada" chegou ao aparelho pelo menos uma vez. Quando
+desligada, o app nem solicita permissão de geolocalização
+(fmObterGpsSeAtivo curto-circuita antes de chamar fmObterGps).
 
 ## Enums do banco
 perfil_usuario: super_admin | gestor | tecnico | financeiro | visualizador

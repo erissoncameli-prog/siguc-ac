@@ -626,8 +626,31 @@ function instalarGatilhosSyncFrota() {
 
   window.addEventListener('online', () => fSyncRodar())
   document.addEventListener('visibilitychange', () => { if (!document.hidden) fSyncRodar() })
-  setInterval(() => fSyncRodar(), 45000)
+  setInterval(() => { fSyncRodar(); fmAtualizarConfigGps() }, 45000)
   atualizarBadgePendentesSync()
+  fmAtualizarConfigGps()
+}
+
+// ── Config de captura de GPS (liga/desliga pelo gestor, migration 177) ─
+// Fail-safe: sem linha, sem cache e sem conexão → assume true (captura
+// ligada) — a regra do sistema só fica desligada se o gestor desligou
+// explicitamente e isso já chegou ao aparelho pelo menos uma vez.
+let _fmConfigGps = { captura_viagens: true, captura_abastecimento: true }
+
+async function fmAtualizarConfigGps() {
+  try {
+    if (!navigator.onLine) throw new Error('offline')
+    const { data, error } = await db.from('frota_config_gps').select('captura_viagens,captura_abastecimento').eq('id', 1).single()
+    if (error) throw error
+    if (data) {
+      _fmConfigGps = data
+      await fOfflineSetConfig('config_gps_cache', data)
+    }
+  } catch (e) {
+    const cache = await fOfflineGetConfig('config_gps_cache')
+    if (cache) _fmConfigGps = cache
+    // sem cache e sem conexão: mantém o default em memória (captura ligada)
+  }
 }
 
 async function atualizarBadgePendentesSync() {
@@ -663,6 +686,14 @@ function fmObterGps() {
       { enableHighAccuracy: true, timeout: 5500, maximumAge: 30000 }
     )
   })
+}
+
+// Só captura se o gestor não tiver desligado a regra para essa
+// categoria (migration 177) — quando desligado, nem pede permissão de
+// localização ao navegador/SO.
+function fmObterGpsSeAtivo(chave) {
+  if (_fmConfigGps?.[chave] === false) return Promise.resolve(null)
+  return fmObterGps()
 }
 
 async function carregarViagensMotorista() {
@@ -960,7 +991,7 @@ async function confirmarNovaViagemDireta() {
   if (isNaN(medida) || medida < 0) { toast('Informe a leitura do medidor', 'error'); return }
   const btn = document.getElementById('btn-abrir-nv')
   btn.disabled = true; btn.textContent = 'Iniciando...'
-  const gps = await fmObterGps()
+  const gps = await fmObterGpsSeAtivo('captura_viagens')
   // Chave de deduplicação estável: reenvios (online ou pela fila offline)
   // reusam o mesmo uuid, e a RPC devolve a viagem já criada em vez de
   // abrir uma duplicada.
@@ -1096,7 +1127,7 @@ async function confirmarCheckout() {
   if (isNaN(medida) || medida < 0) { toast('Informe a leitura do medidor', 'error'); return }
   const btn = document.getElementById('btn-confirmar-checkout')
   btn.disabled = true; btn.textContent = 'Registrando...'
-  const gps = await fmObterGps()
+  const gps = await fmObterGpsSeAtivo('captura_viagens')
   const payload = {
     p_viagem_id: _acaoId, p_medida: medida,
     p_combustivel_pct: parseInt(document.getElementById('co-combustivel').value),
@@ -1138,7 +1169,7 @@ async function confirmarCheckin() {
   if (isNaN(medida) || medida < 0) { toast('Informe a leitura do medidor', 'error'); return }
   const btn = document.getElementById('btn-confirmar-checkin')
   btn.disabled = true; btn.textContent = 'Registrando...'
-  const gps = await fmObterGps()
+  const gps = await fmObterGpsSeAtivo('captura_viagens')
   const payload = {
     p_viagem_id: _acaoId, p_medida: medida,
     p_combustivel_pct: parseInt(document.getElementById('ci-combustivel').value),
@@ -1269,7 +1300,7 @@ async function confirmarAbastecimento() {
 
   const btn = document.getElementById('btn-confirmar-abastecimento')
   btn.disabled = true; btn.textContent = 'Registrando...'
-  const gps = await fmObterGps()
+  const gps = await fmObterGpsSeAtivo('captura_abastecimento')
 
   const payload = {
     p_veiculo_id: veiculo_id, p_medida: medida, p_litros: litros, p_preco_litro: preco,

@@ -99,6 +99,15 @@ const FONTE_LABEL = { orcamentaria: 'Orçamentária', nao_orcamentaria: 'Não or
         <div class="kpi-card erro"><div class="kpi-label">Custo validado (mês)</div><div class="kpi-valor" id="k-custo">—</div></div>
       </div>
 
+      <div class="card" style="margin-bottom:16px;padding:14px 18px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+        <div>
+          <div style="font-weight:600;font-size:13px">Captura de localização (GPS) no abastecimento</div>
+          <div style="font-size:12px;color:#9CA3AF" id="cfg-gps-abast-info">Carregando...</div>
+        </div>
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+          <input type="checkbox" id="cfg-gps-abast" style="width:auto" onchange="salvarConfigGpsAbastecimento()"> Ativada
+        </label>
+      </div>
       <div class="filter-bar">
         <input class="form-control search-input" id="busca" placeholder="Buscar código, placa, motorista..." oninput="renderTabela()">
         <select class="form-control" id="fil-status" style="width:180px" onchange="renderTabela()">
@@ -141,9 +150,33 @@ const FONTE_LABEL = { orcamentaria: 'Orçamentária', nao_orcamentaria: 'Não or
 
   carregarLogosSidebar()
   bIconsAplicar()
-  await Promise.all([carregarContratos(), carregarVeiculos()])
+  await Promise.all([carregarContratos(), carregarVeiculos(), carregarConfigGps()])
   await carregarAbastecimentos()
 })()
+
+// ── Config de captura de GPS (migration 177) — captura_abastecimento
+// governa a captura no momento do registro de abastecimento no app.
+// Escrita passa pela RLS de frota_config_gps (só pode_editar('frota')).
+async function carregarConfigGps() {
+  const { data } = await db.from('frota_config_gps').select('*').eq('id', 1).single()
+  document.getElementById('cfg-gps-abast').checked = data ? data.captura_abastecimento : true
+  document.getElementById('cfg-gps-abast-info').textContent = data?.atualizado_em
+    ? `Última alteração: ${formatDataHora(data.atualizado_em)}`
+    : 'Ativada por padrão'
+}
+
+async function salvarConfigGpsAbastecimento() {
+  const ligado = document.getElementById('cfg-gps-abast').checked
+  try {
+    const { error } = await db.from('frota_config_gps').update({ captura_abastecimento: ligado }).eq('id', 1)
+    if (error) throw error
+    toast(ligado ? 'Captura de localização ativada para abastecimento' : 'Captura de localização desativada para abastecimento', 'success')
+    await carregarConfigGps()
+  } catch (e) {
+    toast(e.message || 'Erro ao salvar', 'error')
+    await carregarConfigGps()
+  }
+}
 
 async function carregarVeiculos() {
   const { data } = await db.from('frota_veiculos').select('id,placa,modelo').order('placa')
