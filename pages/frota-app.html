@@ -51,9 +51,10 @@ const _frotaReady = _dbReady.then(function () {
 <div id="app"></div>
 
 <!-- Tela de login própria do App Frota -->
-<div id="tela-login-frota" class="fm-login-tela" hidden>
+<div id="tela-login-frota" class="fm-login-tela fw-theme" hidden>
   <div class="fm-login-card">
     <div class="fm-login-marca">
+      <img class="fm-login-logo" src="../pwa/icons/logo-frota.png" alt="Transporte SEMA Acre">
       <div class="fm-login-titulo">App Frota</div>
       <div class="fm-login-sub">SEMA-AC · Setor de Transporte</div>
     </div>
@@ -298,8 +299,9 @@ const _frotaReady = _dbReady.then(function () {
 </div>
 
 <!-- Tela de PIN (bloqueio de dispositivo compartilhado/perdido) -->
-<div id="fm-pin-tela" class="fm-pin-tela" hidden>
+<div id="fm-pin-tela" class="fm-pin-tela fw-theme" hidden>
   <div class="fm-pin-card">
+    <img class="fm-pin-logo" src="../pwa/icons/logo-frota.png" alt="Transporte SEMA Acre">
     <div class="fm-pin-marca">App Frota</div>
     <div class="fm-pin-titulo" id="fm-pin-titulo">Digite seu PIN</div>
     <div class="fm-pin-sub" id="fm-pin-sub"></div>
@@ -2291,18 +2293,22 @@ if ('serviceWorker' in navigator && !window.Capacitor) {
   padding: 8px 0 4px; margin-bottom: 12px;
 }
 
-/* ── Tela de login própria do App Frota ─────────────────────────── */
+/* ── Tela de login própria do App Frota (tema Wise) ─────────────── */
 .fm-login-tela {
   min-height: 100vh; display: flex; align-items: center; justify-content: center;
-  padding: 24px; background: linear-gradient(135deg, #0A1A0F 0%, #0E5A3C 60%, #1F4E2C 130%);
+  padding: 24px; background: var(--fw-forest, #163300);
 }
 .fm-login-card {
-  width: 100%; max-width: 360px; background: #fff; border-radius: 16px;
+  width: 100%; max-width: 360px; background: var(--fw-bg, #fff); border-radius: 24px;
   padding: 32px 28px; box-shadow: 0 12px 40px rgba(0,0,0,.25);
 }
 .fm-login-marca { text-align: center; margin-bottom: 24px; }
-.fm-login-titulo { font-family: 'Fraunces', serif; font-weight: 700; font-size: 22px; color: #1F4E2C; }
-.fm-login-sub { font-size: 12px; color: #6B7280; margin-top: 4px; }
+.fm-login-logo { width: 84px; height: 84px; border-radius: 20px; object-fit: cover; margin-bottom: 14px; box-shadow: 0 4px 16px rgba(0,0,0,.18); }
+.fm-login-titulo {
+  font-family: var(--fw-font-display, 'Archivo', sans-serif); font-weight: 800; letter-spacing: -0.02em;
+  font-size: 22px; color: var(--fw-forest, #163300);
+}
+.fm-login-sub { font-size: 12px; color: var(--fw-text-muted, #6B7280); margin-top: 4px; }
 
 /* ── Shell nativo do Motorista (faixa de logos + barra de botões) ── */
 .fm-shell { min-height: 100vh; background: #F6FAF6; display: flex; flex-direction: column; }
@@ -2364,26 +2370,30 @@ if ('serviceWorker' in navigator && !window.Capacitor) {
 .fm-login-tela[hidden], .fm-pin-tela[hidden] { display: none; }
 .fm-pin-tela {
   position: fixed; inset: 0; z-index: 3000;
-  background: linear-gradient(135deg, #0A1A0F 0%, #0E5A3C 60%, #1F4E2C 130%);
+  background: var(--fw-forest, #163300);
   display: flex; align-items: center; justify-content: center;
   padding: calc(24px + env(safe-area-inset-top)) 24px calc(24px + env(safe-area-inset-bottom));
 }
 .fm-pin-card { width: 100%; max-width: 320px; text-align: center; color: #fff; }
-.fm-pin-marca { font-family: 'Fraunces', serif; font-weight: 700; font-size: 18px; opacity: .85; }
-.fm-pin-titulo { font-size: 20px; font-weight: 700; margin-top: 18px; }
+.fm-pin-logo { width: 64px; height: 64px; border-radius: 16px; object-fit: cover; margin-bottom: 10px; box-shadow: 0 4px 16px rgba(0,0,0,.25); }
+.fm-pin-marca { font-family: var(--fw-font-display, 'Archivo', sans-serif); font-weight: 800; font-size: 16px; opacity: .85; }
+.fm-pin-titulo { font-size: 20px; font-weight: 800; margin-top: 18px; font-family: var(--fw-font-display, 'Archivo', sans-serif); }
 .fm-pin-sub { font-size: 13px; opacity: .75; margin-top: 4px; min-height: 18px; }
 .fm-pin-dots { display: flex; gap: 14px; justify-content: center; margin: 22px 0; }
 .fm-pin-dot { width: 14px; height: 14px; border-radius: 50%; border: 2px solid rgba(255,255,255,.5); box-sizing: border-box; }
-.fm-pin-dot.ativo { background: #fff; border-color: #fff; }
+.fm-pin-dot.ativo { background: var(--fw-green, #9FE870); border-color: var(--fw-green, #9FE870); }
 .fm-pin-erro { color: #FCA5A5; font-size: 13px; min-height: 18px; margin-bottom: 8px; }
 .fm-pin-keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; max-width: 260px; margin: 0 auto; }
 .fm-pin-key {
   height: 62px; border-radius: 16px; border: none; cursor: pointer;
   background: rgba(255,255,255,.12); color: #fff; font-size: 22px; font-weight: 600;
-  font-family: 'DM Sans', sans-serif; -webkit-tap-highlight-color: transparent;
+  font-family: var(--fw-font-sans, 'Inter', sans-serif); -webkit-tap-highlight-color: transparent;
+  transition: background 180ms cubic-bezier(.2,.8,.2,1), transform 100ms;
 }
 .fm-pin-key:active { transform: scale(.94); background: rgba(255,255,255,.22); }
 .fm-pin-aux { font-size: 15px; background: rgba(255,255,255,.06); }
+.fm-pin-key[data-act="ok"] { background: var(--fw-green, #9FE870); color: var(--fw-forest, #163300); font-weight: 700; }
+.fm-pin-key[data-act="ok"]:active { background: #8ed95e; }
 .fm-pin-link { margin-top: 22px; background: none; border: none; color: rgba(255,255,255,.75); font-size: 13px; text-decoration: underline; cursor: pointer; }
 @media (max-width: 380px) {
   .fm-pill-nav { padding: 0 5px; gap: 1px; }
