@@ -4,11 +4,13 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>SIGUC-AC · Solicitar Viagem</title>
 <link rel="stylesheet" href="../css/global.css">
+<link rel="stylesheet" href="../css/frota-wise-theme.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="../js/observability.js"></script>
 <script src="../js/queryLogger.js"></script>
 <script src="../js/config.js"></script>
 <script src="../js/layout.js"></script>
+<script src="../js/frota-wise.js"></script>
 </head>
 <body>
 <div id="app"></div>
@@ -35,8 +37,8 @@ let _usuario = null, _setores = [], _ucs = [], _minhasViagens = [], _cancelarId 
 
 const STATUS_LABEL = { solicitada:'Solicitada', aprovada:'Aprovada', recusada:'Recusada',
   em_andamento:'Em andamento', concluida:'Concluída', cancelada:'Cancelada' }
-const STATUS_BADGE = { solicitada:'badge-ouro', aprovada:'badge-blue', recusada:'badge-erro',
-  em_andamento:'badge-verde', concluida:'badge-cinza', cancelada:'badge-cinza' }
+const STATUS_BADGE = { solicitada:'fw-badge fw-badge-manutencao', aprovada:'fw-badge fw-badge-em-rota', recusada:'fw-badge fw-badge-inativo',
+  em_andamento:'fw-badge fw-badge-em-rota', concluida:'fw-badge fw-badge-disponivel', cancelada:'badge-cinza' }
 
 ;(async function () {
   _usuario = await carregarUsuario()
@@ -44,7 +46,7 @@ const STATUS_BADGE = { solicitada:'badge-ouro', aprovada:'badge-blue', recusada:
 
   document.getElementById('app').innerHTML =
     gerarLayout('Solicitar Viagem', 'frota-solicitar') +
-    `<div class="fade-in" style="max-width:1000px">
+    `<div class="fade-in fw-theme" style="max-width:1000px">
       <div class="card" style="margin-bottom:20px">
         <div class="form-section-label" style="padding:0 0 14px">Nova solicitação de viagem</div>
         <div class="grid-2">

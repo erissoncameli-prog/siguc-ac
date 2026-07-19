@@ -4,11 +4,13 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>SIGUC-AC · Frota — Agenda de Viagens</title>
 <link rel="stylesheet" href="../css/global.css">
+<link rel="stylesheet" href="../css/frota-wise-theme.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="../js/observability.js"></script>
 <script src="../js/queryLogger.js"></script>
 <script src="../js/config.js"></script>
 <script src="../js/layout.js"></script>
+<script src="../js/frota-wise.js"></script>
 </head>
 <body>
 <div id="app"></div>
@@ -91,8 +93,8 @@ let _viagens = [], _veiculos = [], _motoristas = [], _acaoId = null
 
 const STATUS_LABEL = { solicitada:'Solicitada', aprovada:'Aprovada', recusada:'Recusada',
   em_andamento:'Em andamento', concluida:'Concluída', cancelada:'Cancelada' }
-const STATUS_BADGE = { solicitada:'badge-ouro', aprovada:'badge-blue', recusada:'badge-erro',
-  em_andamento:'badge-verde', concluida:'badge-cinza', cancelada:'badge-cinza' }
+const STATUS_BADGE = { solicitada:'fw-badge fw-badge-manutencao', aprovada:'fw-badge fw-badge-em-rota', recusada:'fw-badge fw-badge-inativo',
+  em_andamento:'fw-badge fw-badge-em-rota', concluida:'fw-badge fw-badge-disponivel', cancelada:'badge-cinza' }
 const STATUS_VEIC_LABEL = { disponivel:'Disponível', em_viagem:'Em viagem', em_manutencao:'Em manutenção', cedido:'Cedido', baixado:'Baixado' }
 
 ;(async function () {
@@ -107,12 +109,12 @@ const STATUS_VEIC_LABEL = { disponivel:'Disponível', em_viagem:'Em viagem', em_
 
   document.getElementById('app').innerHTML =
     gerarLayout('Frota — Agenda de Viagens', 'frota-viagens') +
-    `<div class="fade-in">
+    `<div class="fade-in fw-theme">
       <div class="kpi-grid">
-        <div class="kpi-card ouro"><div class="kpi-label">Pendentes de aprovação</div><div class="kpi-valor" id="k-pend">—</div></div>
-        <div class="kpi-card azul"><div class="kpi-label">Aprovadas (aguardando saída)</div><div class="kpi-valor" id="k-aprov">—</div></div>
-        <div class="kpi-card verde"><div class="kpi-label">Em andamento</div><div class="kpi-valor" id="k-andamento">—</div></div>
-        <div class="kpi-card erro"><div class="kpi-label">Com avarias reportadas</div><div class="kpi-valor" id="k-avarias">—</div></div>
+        <div class="fw-kpi-card"><div class="fw-kpi-label">Pendentes de aprovação</div><div class="fw-kpi-value" id="k-pend">0</div></div>
+        <div class="fw-kpi-card"><div class="fw-kpi-label">Aprovadas (aguardando saída)</div><div class="fw-kpi-value" id="k-aprov">0</div></div>
+        <div class="fw-kpi-card"><div class="fw-kpi-label">Em andamento</div><div class="fw-kpi-value" id="k-andamento">0</div></div>
+        <div class="fw-kpi-card"><div class="fw-kpi-label">Com avarias reportadas</div><div class="fw-kpi-value" id="k-avarias">0</div></div>
       </div>
       <div class="card" style="margin-bottom:16px;padding:14px 18px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
         <div>
@@ -194,7 +196,7 @@ async function carregarViagens() {
 }
 
 function renderKpis() {
-  const set = (id, v) => document.getElementById(id).textContent = v
+  const set = (id, v) => fwAnimateNumber(document.getElementById(id), v)
   set('k-pend', _viagens.filter(v => v.status === 'solicitada').length)
   set('k-aprov', _viagens.filter(v => v.status === 'aprovada').length)
   set('k-andamento', _viagens.filter(v => v.status === 'em_andamento').length)

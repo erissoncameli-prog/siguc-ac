@@ -8,6 +8,7 @@
 <link rel="apple-touch-icon" href="/pwa/icons/apple-touch-icon-frota.png">
 <link rel="icon" href="/pwa/icons/icon-frota-192.png">
 <link rel="stylesheet" href="../css/global.css">
+<link rel="stylesheet" href="../css/frota-wise-theme.css">
 <script>
 // Stub de segurança: se o CDN não carregar (offline), config.js não quebra.
 window.supabase = window.supabase || { createClient: () => null }
@@ -44,6 +45,7 @@ const _frotaReady = _dbReady.then(function () {
 <script src="../js/frota-offline.js"></script>
 <script src="../js/frota-sync.js"></script>
 <script src="../js/layout.js"></script>
+<script src="../js/frota-wise.js"></script>
 </head>
 <body>
 <div id="app"></div>
@@ -341,11 +343,11 @@ let _viagensPendentes = [], _veiculosG = [], _motoristasG = [], _manutPendentes 
 
 const STATUS_LABEL = { solicitada:'Solicitada', aprovada:'Aguardando saída', recusada:'Recusada',
   em_andamento:'Em andamento', concluida:'Concluída', cancelada:'Cancelada' }
-const STATUS_BADGE = { solicitada:'badge-ouro', aprovada:'badge-blue', recusada:'badge-erro',
-  em_andamento:'badge-verde', concluida:'badge-cinza', cancelada:'badge-cinza' }
+const STATUS_BADGE = { solicitada:'fw-badge fw-badge-manutencao', aprovada:'fw-badge fw-badge-em-rota', recusada:'fw-badge fw-badge-inativo',
+  em_andamento:'fw-badge fw-badge-em-rota', concluida:'fw-badge fw-badge-disponivel', cancelada:'badge-cinza' }
 const STATUS_VEIC_LABEL = { disponivel:'Disponível', em_viagem:'Em viagem', em_manutencao:'Em manutenção', cedido:'Cedido', baixado:'Baixado' }
 const SITUACAO_LABEL = { ok:'Em dia', proximo:'Próximo', vencido:'Vencido' }
-const SITUACAO_BADGE = { ok:'badge-verde', proximo:'badge-ouro', vencido:'badge-erro' }
+const SITUACAO_BADGE = { ok:'fw-badge fw-badge-disponivel', proximo:'fw-badge fw-badge-doc-vencendo', vencido:'fw-badge fw-badge-inativo' }
 
 ;(async function () {
   await _frotaReady
@@ -438,7 +440,7 @@ async function entrarComSessao(session, jaAutenticouSenha = false) {
 // ── Shell desktop (Solicitante/Gestor/seletor) ─────────────────
 function montarShellDesktop() {
   document.getElementById('app').innerHTML = gerarLayout('App Frota', 'frota-app') +
-    '<div class="fade-in" id="conteudo" style="max-width:900px"><div style="text-align:center;padding:40px;color:#9CA3AF">Carregando...</div></div></div></div>'
+    '<div class="fade-in fw-theme" id="conteudo" style="max-width:900px"><div style="text-align:center;padding:40px;color:#9CA3AF">Carregando...</div></div></div></div>'
   carregarLogosSidebar()
   bIconsAplicar()
 }
@@ -540,7 +542,7 @@ let _veiculosDisponiveisAgora = []
 
 function montarShellMotorista() {
   document.getElementById('app').innerHTML = `
-    <div class="fm-shell">
+    <div class="fm-shell fw-theme">
       <div class="fm-faixa">
         <div class="fm-faixa-logos">
           <span class="fm-logo-chip gov" hidden><img alt="Governo do Acre"></span>
@@ -610,7 +612,7 @@ async function carregarAbastecimentosMotorista() {
   }
 }
 
-const ABAST_STATUS_BADGE = { pendente: 'badge-cinza', validado: 'badge-verde', rejeitado: 'badge-erro' }
+const ABAST_STATUS_BADGE = { pendente: 'fw-badge fw-badge-manutencao', validado: 'fw-badge fw-badge-disponivel', rejeitado: 'fw-badge fw-badge-inativo' }
 const ABAST_STATUS_LABEL = { pendente: 'Pendente', validado: 'Validado', rejeitado: 'Rejeitado' }
 
 // ── Offline: dispara sincronização ao reconectar/reabrir/periodicamente ─
@@ -923,7 +925,7 @@ function renderFmDados() {
   const maxN = Math.max(1, ...meses.map(m => m.n))
 
   const kpi = (cls, label, valor) =>
-    `<div class="kpi-card ${cls}"><div class="kpi-label">${label}</div><div class="kpi-valor">${valor}</div></div>`
+    `<div class="fw-kpi-card"><div class="fw-kpi-label">${label}</div><div class="fw-kpi-value">${valor}</div></div>`
 
   const combustivel = fmResumoCombustivel()
   const rejeitados = _abastecimentos.filter(a => a.status === 'rejeitado').length
@@ -1622,10 +1624,10 @@ async function renderModoGestor() {
   const corpo = document.getElementById('modo-corpo')
   corpo.innerHTML = `
     <div class="kpi-grid" style="margin-bottom:20px">
-      <div class="kpi-card ouro"><div class="kpi-label">Pendentes</div><div class="kpi-valor" id="kg-pend">—</div></div>
-      <div class="kpi-card azul"><div class="kpi-label">Em andamento</div><div class="kpi-valor" id="kg-andamento">—</div></div>
-      <div class="kpi-card erro"><div class="kpi-label">Manutenção vencida</div><div class="kpi-valor" id="kg-manut">—</div></div>
-      <div class="kpi-card verde"><div class="kpi-label">Veículos disponíveis</div><div class="kpi-valor" id="kg-disp">—</div></div>
+      <div class="fw-kpi-card"><div class="fw-kpi-label">Pendentes</div><div class="fw-kpi-value" id="kg-pend">0</div></div>
+      <div class="fw-kpi-card"><div class="fw-kpi-label">Em andamento</div><div class="fw-kpi-value" id="kg-andamento">0</div></div>
+      <div class="fw-kpi-card"><div class="fw-kpi-label">Manutenção vencida</div><div class="fw-kpi-value" id="kg-manut">0</div></div>
+      <div class="fw-kpi-card"><div class="fw-kpi-label">Veículos disponíveis</div><div class="fw-kpi-value" id="kg-disp">0</div></div>
     </div>
     <div class="form-section-label">Aprovações pendentes</div>
     <div id="g-lista-pendentes" style="margin-bottom:24px"></div>
@@ -1666,7 +1668,7 @@ async function carregarManutGestor() {
 }
 
 function renderKpisGestor() {
-  const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v }
+  const set = (id, v) => { const el = document.getElementById(id); if (el) fwAnimateNumber(el, v) }
   set('kg-pend', _viagensPendentes.filter(v => v.status === 'solicitada').length)
   set('kg-andamento', _viagensPendentes.filter(v => v.status === 'em_andamento').length)
   set('kg-manut', _manutPendentes.filter(p => situacaoPlano(p) === 'vencido').length)
@@ -1918,7 +1920,7 @@ const F_TAR_LABEL = {
   viagem_recusada: 'Viagem recusada', viagem_direta: 'Viagem sem agendamento', manutencao: 'Manutenção',
 }
 const F_TAR_ICON  = { viagem_solicitada:'truck', viagem_aprovada:'check', viagem_recusada:'x', viagem_direta:'plus', manutencao:'clock' }
-const F_TAR_BADGE = { viagem_solicitada:'badge-ouro', viagem_aprovada:'badge-verde', viagem_recusada:'badge-erro', viagem_direta:'badge-roxo', manutencao:'badge-blue' }
+const F_TAR_BADGE = { viagem_solicitada:'fw-badge fw-badge-manutencao', viagem_aprovada:'fw-badge fw-badge-disponivel', viagem_recusada:'fw-badge fw-badge-inativo', viagem_direta:'fw-badge fw-badge-em-rota', manutencao:'fw-badge fw-badge-em-rota' }
 
 async function abrirTarefasFrota() {
   document.getElementById('modal-tarefas').classList.add('aberto')
