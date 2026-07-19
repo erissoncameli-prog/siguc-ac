@@ -4,11 +4,13 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>SIGUC-AC · Frota — Veículos e Motoristas</title>
 <link rel="stylesheet" href="../css/global.css">
+<link rel="stylesheet" href="../css/frota-wise-theme.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="../js/observability.js"></script>
 <script src="../js/queryLogger.js"></script>
 <script src="../js/config.js"></script>
 <script src="../js/layout.js"></script>
+<script src="../js/frota-wise.js"></script>
 </head>
 <body>
 <div id="app"></div>
@@ -386,7 +388,7 @@ const TIPO_VEIC = { carro:'Carro', caminhonete:'Caminhonete', van:'Van', onibus:
   embarcacao:'Embarcação', outro:'Outro' }
 const COMB = { gasolina:'Gasolina', etanol:'Etanol', flex:'Flex', diesel:'Diesel', eletrico:'Elétrico', hibrido:'Híbrido' }
 const STATUS_VEIC = { disponivel:'Disponível', em_viagem:'Em viagem', em_manutencao:'Em manutenção', cedido:'Cedido', baixado:'Baixado' }
-const BADGE_STATUS_VEIC = { disponivel:'badge-verde', em_viagem:'badge-blue', em_manutencao:'badge-ouro', cedido:'badge-roxo', baixado:'badge-cinza' }
+const BADGE_STATUS_VEIC = { disponivel:'fw-badge fw-badge-disponivel', em_viagem:'fw-badge fw-badge-em-rota', em_manutencao:'fw-badge fw-badge-manutencao', cedido:'fw-badge fw-badge-em-rota', baixado:'fw-badge fw-badge-inativo' }
 const STATUS_MOT = { ativo:'Ativo', ferias:'Férias', afastado:'Afastado', inativo:'Inativo' }
 const BADGE_STATUS_MOT = { ativo:'badge-verde', ferias:'badge-blue', afastado:'badge-ouro', inativo:'badge-cinza' }
 const TIPO_DOC = { crlv:'CRLV', licenciamento:'Licenciamento', seguro:'Seguro', ipva:'IPVA', vistoria:'Vistoria', tacografo:'Tacógrafo', outro:'Outro' }
@@ -411,14 +413,14 @@ const DETRAN_AC_URL = 'https://www.detran.ac.gov.br/site/apps/veiculo/consulta/f
 
   document.getElementById('app').innerHTML =
     gerarLayout('Frota — Veículos e Motoristas', 'frota-veiculos') +
-    `<div class="fade-in">
+    `<div class="fade-in fw-theme">
       <div class="kpi-grid">
-        <div class="kpi-card verde"><div class="kpi-label">Veículos na frota</div><div class="kpi-valor" id="k-veic">—</div></div>
-        <div class="kpi-card azul"><div class="kpi-label">Disponíveis</div><div class="kpi-valor" id="k-disp">—</div></div>
-        <div class="kpi-card ouro"><div class="kpi-label">Em manutenção</div><div class="kpi-valor" id="k-manut">—</div></div>
-        <div class="kpi-card verde"><div class="kpi-label">Motoristas ativos</div><div class="kpi-valor" id="k-mot">—</div></div>
-        <div class="kpi-card erro"><div class="kpi-label">Habilitações irregulares</div><div class="kpi-valor" id="k-cnh">—</div></div>
-        <div class="kpi-card erro"><div class="kpi-label">Docs a vencer (30d)</div><div class="kpi-valor" id="k-docs">—</div></div>
+        <div class="fw-kpi-card"><div class="fw-kpi-label">Veículos na frota</div><div class="fw-kpi-value" id="k-veic">0</div></div>
+        <div class="fw-kpi-card"><div class="fw-kpi-label">Disponíveis</div><div class="fw-kpi-value" id="k-disp">0</div></div>
+        <div class="fw-kpi-card"><div class="fw-kpi-label">Em manutenção</div><div class="fw-kpi-value" id="k-manut">0</div></div>
+        <div class="fw-kpi-card"><div class="fw-kpi-label">Motoristas ativos</div><div class="fw-kpi-value" id="k-mot">0</div></div>
+        <div class="fw-kpi-card"><div class="fw-kpi-label">Habilitações irregulares</div><div class="fw-kpi-value" id="k-cnh">0</div></div>
+        <div class="fw-kpi-card"><div class="fw-kpi-label">Docs a vencer (30d)</div><div class="fw-kpi-value" id="k-docs">0</div></div>
       </div>
 
       <div class="card" style="margin-bottom:16px">
@@ -583,7 +585,7 @@ function badgeVencimento(dataStr, rotuloVazio) {
 
 // ── KPIs ──────────────────────────────────────────────────────
 function renderKpis() {
-  const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v }
+  const set = (id, v) => { const el = document.getElementById(id); if (el) fwAnimateNumber(el, v) }
   set('k-veic',  _veiculos.length)
   set('k-disp',  _veiculos.filter(v => v.status === 'disponivel').length)
   set('k-manut', _veiculos.filter(v => v.status === 'em_manutencao').length)

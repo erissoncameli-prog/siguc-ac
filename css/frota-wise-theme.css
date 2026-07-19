@@ -1,0 +1,237 @@
+/* ── Frota · Tema Wise (isolado ao módulo Frota) ─────────────
+   Escopo: só afeta elementos dentro de .fw-theme.
+   NÃO altera css/global.css nem o design system institucional
+   (sidebar, header, demais páginas). Ver docs/frota-wise-design.md */
+@import url('https://fonts.googleapis.com/css2?family=Archivo:wght@700;800;900&family=Inter:wght@400;500;600;700&display=swap');
+
+.fw-theme {
+  --fw-green:        #9FE870;
+  --fw-forest:       #163300;
+  --fw-green-tint:   #DCF3D8;
+  --fw-bg:           #FFFFFF;
+  --fw-bg-muted:     #F2F5F7;
+  --fw-text:         #0E0F0C;
+  --fw-text-muted:   #454745;
+  --fw-border:       #E8EAED;
+
+  --fw-status-disp-bg:   #DCF3D8; --fw-status-disp-tx:   #163300;
+  --fw-status-rota-bg:   #E0E7FF; --fw-status-rota-tx:   #260AC0;
+  --fw-status-manut-bg:  #FDF3D7; --fw-status-manut-tx:  #7A5C00;
+  --fw-status-inativo-bg:#FBE9E6; --fw-status-inativo-tx:#A8200D;
+  --fw-status-doc-bg:    #FDF3D7; --fw-status-doc-tx:    #7A5C00;
+
+  --fw-font-display: 'Archivo', system-ui, sans-serif;
+  --fw-font-sans:    'Inter', system-ui, sans-serif;
+  --fw-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  font-family: var(--fw-font-sans);
+  color: var(--fw-text);
+  background: var(--fw-bg);
+}
+
+.fw-theme h1, .fw-theme h2, .fw-theme h3, .fw-theme .fw-title {
+  font-family: var(--fw-font-display);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.05;
+  color: var(--fw-forest);
+}
+
+.fw-theme .fw-mono,
+.fw-theme .fw-placa { font-variant-numeric: tabular-nums; }
+
+/* Botões */
+.fw-theme .btn {
+  border-radius: 9999px;
+  padding: 12px 24px;
+  font-weight: 600;
+  border: none;
+  box-shadow: none;
+  transition: background 200ms var(--fw-ease), transform 100ms var(--fw-ease);
+}
+.fw-theme .btn:active { transform: scale(0.97); }
+.fw-theme .btn-primary {
+  background: var(--fw-green);
+  color: var(--fw-forest);
+}
+.fw-theme .btn-primary:hover { background: #8ed95e; }
+.fw-theme .btn-secondary {
+  background: var(--fw-bg-muted);
+  color: var(--fw-text);
+}
+.fw-theme .btn-secondary:hover { background: #e6eaed; }
+.fw-theme .btn-tertiary {
+  background: transparent;
+  color: var(--fw-forest);
+}
+.fw-theme .btn-tertiary:hover { background: var(--fw-bg-muted); }
+
+/* Cards */
+.fw-theme .fw-card {
+  background: var(--fw-bg);
+  border: 1px solid var(--fw-border);
+  border-radius: 20px;
+  padding: 20px;
+}
+
+/* Card de veículo */
+.fw-theme .fw-vehicle-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: var(--fw-bg);
+  border: 1px solid var(--fw-border);
+  border-radius: 20px;
+  padding: 16px 20px;
+  transition: box-shadow 200ms var(--fw-ease);
+}
+.fw-theme .fw-vehicle-card:hover { box-shadow: 0 4px 16px rgba(14,15,12,.06); }
+.fw-theme .fw-vehicle-icon {
+  width: 48px; height: 48px; border-radius: 50%;
+  background: var(--fw-green-tint);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; color: var(--fw-forest);
+  overflow: hidden;
+}
+.fw-theme .fw-vehicle-icon img { width: 100%; height: 100%; object-fit: cover; }
+.fw-theme .fw-vehicle-main { flex: 1; min-width: 0; }
+.fw-theme .fw-placa-chip {
+  display: inline-block;
+  font-family: var(--fw-font-sans);
+  font-weight: 700;
+  font-size: .8rem;
+  background: var(--fw-bg-muted);
+  border-radius: 6px;
+  padding: 2px 8px;
+  letter-spacing: .04em;
+}
+.fw-theme .fw-vehicle-modelo { font-weight: 600; margin-top: 4px; }
+.fw-theme .fw-vehicle-motorista { color: var(--fw-text-muted); font-size: .85rem; }
+.fw-theme .fw-vehicle-metrics {
+  display: flex; gap: 20px; margin-top: 12px;
+  padding-top: 12px; border-top: 1px solid var(--fw-border);
+}
+.fw-theme .fw-vehicle-metric { font-size: .8rem; color: var(--fw-text-muted); }
+.fw-theme .fw-vehicle-metric strong { display: block; color: var(--fw-text); font-size: .95rem; }
+
+/* List item (viagens, abastecimentos, manutenções) */
+.fw-theme .fw-list-item {
+  display: flex; align-items: center; gap: 14px;
+  padding: 14px 4px;
+  border-bottom: 1px solid var(--fw-border);
+  opacity: 0; transform: translateY(12px);
+  animation: fw-fade-in 300ms var(--fw-ease) forwards;
+}
+.fw-theme .fw-list-icon {
+  width: 44px; height: 44px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; background: var(--fw-green-tint); color: var(--fw-forest);
+}
+.fw-theme .fw-list-main { flex: 1; min-width: 0; }
+.fw-theme .fw-list-title { font-weight: 600; }
+.fw-theme .fw-list-subtitle { font-size: .82rem; color: var(--fw-text-muted); }
+.fw-theme .fw-list-value { font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; }
+
+@keyframes fw-fade-in { to { opacity: 1; transform: translateY(0); } }
+
+/* KPI cards */
+.fw-theme .fw-kpi-card {
+  background: var(--fw-bg);
+  border: 1px solid var(--fw-border);
+  border-radius: 20px;
+  padding: 20px;
+}
+.fw-theme .fw-kpi-label { font-size: .8rem; color: var(--fw-text-muted); font-weight: 500; }
+.fw-theme .fw-kpi-value {
+  font-family: var(--fw-font-display);
+  font-size: 2.25rem; font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--fw-forest);
+  margin: 4px 0;
+}
+.fw-theme .fw-kpi-delta {
+  display: inline-flex; align-items: center; gap: 4px;
+  border-radius: 9999px; padding: 2px 10px;
+  font-size: .78rem; font-weight: 700;
+}
+.fw-theme .fw-kpi-delta.up { background: var(--fw-green-tint); color: var(--fw-forest); }
+.fw-theme .fw-kpi-delta.down { background: var(--fw-status-inativo-bg); color: var(--fw-status-inativo-tx); }
+
+/* Badges de status */
+.fw-theme .fw-badge {
+  display: inline-block;
+  border-radius: 9999px;
+  padding: 4px 12px;
+  font-size: .78rem;
+  font-weight: 600;
+  transition: background 200ms var(--fw-ease), color 200ms var(--fw-ease);
+}
+.fw-theme .fw-badge-disponivel { background: var(--fw-status-disp-bg); color: var(--fw-status-disp-tx); }
+.fw-theme .fw-badge-em-rota    { background: var(--fw-status-rota-bg); color: var(--fw-status-rota-tx); }
+.fw-theme .fw-badge-manutencao { background: var(--fw-status-manut-bg); color: var(--fw-status-manut-tx); }
+.fw-theme .fw-badge-inativo    { background: var(--fw-status-inativo-bg); color: var(--fw-status-inativo-tx); }
+.fw-theme .fw-badge-doc-vencendo { background: var(--fw-status-doc-bg); color: var(--fw-status-doc-tx); }
+
+/* Avatares */
+.fw-theme .fw-avatar {
+  width: 36px; height: 36px; border-radius: 50%;
+  background: var(--fw-green-tint); color: var(--fw-forest);
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: .85rem; overflow: hidden;
+}
+.fw-theme .fw-avatar img { width: 100%; height: 100%; object-fit: cover; }
+
+/* Inputs e filtros */
+.fw-theme input, .fw-theme select, .fw-theme textarea {
+  border-radius: 10px;
+  border: 1px solid var(--fw-border);
+  min-height: 56px;
+  font-family: var(--fw-font-sans);
+  padding: 0 14px;
+}
+.fw-theme textarea { min-height: 90px; padding: 12px 14px; }
+.fw-theme .fw-filter-chip {
+  display: inline-flex; align-items: center;
+  border-radius: 9999px;
+  padding: 8px 16px;
+  font-size: .85rem; font-weight: 600;
+  background: var(--fw-bg-muted); color: var(--fw-text);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background 200ms var(--fw-ease), color 200ms var(--fw-ease);
+}
+.fw-theme .fw-filter-chip.active {
+  background: var(--fw-green-tint); color: var(--fw-forest);
+}
+
+/* Tabelas */
+.fw-theme table.fw-table { width: 100%; border-collapse: collapse; }
+.fw-theme table.fw-table th {
+  text-transform: uppercase;
+  font-size: .7rem; letter-spacing: .04em;
+  color: var(--fw-text-muted); font-weight: 600;
+  text-align: left; padding: 10px 12px;
+}
+.fw-theme table.fw-table td {
+  padding: 0 12px; height: 56px;
+  border-top: 1px solid var(--fw-border);
+}
+.fw-theme table.fw-table tr:hover td { background: var(--fw-bg-muted); }
+
+/* Skeleton loading */
+.fw-theme .fw-skeleton {
+  background: linear-gradient(90deg, var(--fw-bg-muted) 25%, #e9ecee 37%, var(--fw-bg-muted) 63%);
+  background-size: 400% 100%;
+  border-radius: 10px;
+  animation: fw-shimmer 1.4s ease infinite;
+}
+@keyframes fw-shimmer {
+  0% { background-position: 100% 50%; }
+  100% { background-position: 0 50%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fw-theme .fw-list-item { animation: none; opacity: 1; transform: none; }
+  .fw-theme .fw-skeleton { animation: none; }
+  .fw-theme .btn, .fw-theme .fw-badge { transition: none; }
+}
