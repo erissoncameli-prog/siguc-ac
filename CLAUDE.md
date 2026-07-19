@@ -135,6 +135,22 @@ Frota — abastecimento (174–175):
   recente (não do original), e testar os dois ramos de qualquer CASE
   antes de aplicar em produção.
 
+## Relatórios de consumo de combustível
+Consumo médio calculado no cliente (sem RPC/view nova) pelo método
+"tanque cheio a tanque cheio": entre 2 abastecimentos consecutivos do
+mesmo veículo com tanque_cheio=true, os litros do 2º representam o
+combustível gasto na distância (ou horas) entre os dois — precisa de
+pelo menos 2 abastecimentos com tanque cheio pra aparecer. Km/L para
+hodômetro, L/h para horímetro (embarcações).
+- App do motorista (frota-app.html, aba Dados → fmResumoCombustivel):
+  números do próprio motorista, por veículo usado. Conta abastecimentos
+  pendentes+validados (rejeitados ficam fora — dado contestado).
+- Mesa (frota-veiculos.html, aba "Consumo" no cadastro do veículo →
+  carregarConsumoVeiculo): só abastecimentos VALIDADOS (mesma regra do
+  restante do módulo — contrato/fonte já classificados pela gestão).
+Os dois pontos usam vw_frota_abastecimentos_detalhe (já traz
+litros_final/valor_final ajustados e placa/modelo/medidor).
+
 ## Regra do sistema — trava de veículo no abastecimento
 O abastecimento nunca deve poder ser lançado num veículo diferente do
 que o motorista está de fato usando. Defesa em 2 camadas:
