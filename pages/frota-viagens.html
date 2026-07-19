@@ -420,7 +420,8 @@ function abrirDetalhe(id) {
     <div style="font-size:13px;line-height:1.8">
       <div><strong>Destino:</strong> ${esc(v.destino)}</div>
       <div><strong>Finalidade:</strong> ${esc(v.finalidade)}</div>
-      <div><strong>Solicitante:</strong> ${esc(v.solicitante_nome)} ${v.setor_sigla ? `(${esc(v.setor_sigla)})` : ''}</div>
+      <div><strong>Solicitante:</strong> ${esc(v.solicitante_nome)} ${v.setor_sigla ? `(${esc(v.setor_sigla)})` : ''}${v.solicitante_telefone ? ` · ${esc(v.solicitante_telefone)}` : ''}</div>
+      ${v.lista_passageiros ? `<div><strong>Passageiros:</strong> ${esc(v.lista_passageiros).replace(/\n/g,', ')}</div>` : ''}
       <div><strong>Período previsto:</strong> ${formatDataHora(v.data_saida_prevista)} → ${formatDataHora(v.data_retorno_prevista)}</div>
       ${v.veiculo_placa ? `<div><strong>Veículo:</strong> ${esc(v.veiculo_modelo)} (${esc(v.veiculo_placa)})</div>` : ''}
       ${v.motorista_nome ? `<div><strong>Motorista:</strong> ${esc(v.motorista_nome)}</div>` : ''}
