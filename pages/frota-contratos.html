@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>SIGUC-AC · Frota — Contratos de Combustível</title>
+<link rel="stylesheet" href="../css/global.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../js/observability.js"></script>
+<script src="../js/queryLogger.js"></script>
+<script src="../js/config.js"></script>
+<script src="../js/layout.js"></script>
+</head>
+<body>
+<div id="app"></div>
+
+<!-- Modal Fonte de Recurso -->
+<div class="modal-overlay" id="modal-fonte">
+  <div class="modal" style="max-width:460px">
+    <div class="modal-header">
+      <div class="modal-title" id="mf-titulo">Nova Fonte de Recurso</div>
+      <button class="modal-close" onclick="fecharModal('fonte')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label">Tipo <span class="obrig">*</span></label>
+        <select class="form-control" id="f-tipo">
+          <option value="orcamentaria">Orçamentária</option>
+          <option value="nao_orcamentaria">Não orçamentária</option>
+        </select></div>
+      <div class="form-group"><label class="form-label">Código <span class="obrig">*</span></label>
+        <input class="form-control" id="f-codigo" placeholder="Ex.: FR-2026-01"></div>
+      <div class="form-group"><label class="form-label">Descrição <span class="obrig">*</span></label>
+        <input class="form-control" id="f-descricao" placeholder="Ex.: Fundo Estadual do Meio Ambiente"></div>
+      <div class="form-group">
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+          <input type="checkbox" id="f-ativo" checked style="width:auto"> Ativa
+        </label>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="fecharModal('fonte')">Cancelar</button>
+      <button class="btn btn-primary" id="btn-salvar-fonte" onclick="salvarFonte()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Contrato -->
+<div class="modal-overlay" id="modal-contrato">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-header">
+      <div class="modal-title" id="mc-titulo">Novo Contrato</div>
+      <button class="modal-close" onclick="fecharModal('contrato')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Número <span class="obrig">*</span></label>
+          <input class="form-control" id="c-numero" placeholder="Ex.: 012/2026"></div>
+        <div class="form-group"><label class="form-label">Fornecedor / posto <span class="obrig">*</span></label>
+          <input class="form-control" id="c-fornecedor" placeholder="Ex.: Posto Central"></div>
+      </div>
+      <div class="form-group"><label class="form-label">Fonte de recurso <span class="obrig">*</span></label>
+        <select class="form-control" id="c-fonte"><option value="">Selecione...</option></select></div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Vigência início <span class="obrig">*</span></label>
+          <input class="form-control" id="c-vigencia-inicio" type="date"></div>
+        <div class="form-group"><label class="form-label">Vigência fim <span class="obrig">*</span></label>
+          <input class="form-control" id="c-vigencia-fim" type="date"></div>
+      </div>
+      <div class="form-group"><label class="form-label">Valor global (referência)</label>
+        <input class="form-control" id="c-valor-global" type="number" min="0" step="0.01" placeholder="Opcional — não controla saldo"></div>
+      <div class="form-group"><label class="form-label">Observações</label>
+        <textarea class="form-control" id="c-observacoes" rows="2"></textarea></div>
+      <div class="form-group">
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+          <input type="checkbox" id="c-ativo" checked style="width:auto"> Ativo
+        </label>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="fecharModal('contrato')">Cancelar</button>
+      <button class="btn btn-primary" id="btn-salvar-contrato" onclick="salvarContrato()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let _fontes = [], _contratos = [], _editandoFonteId = null, _editandoContratoId = null
+
+const FONTE_LABEL = { orcamentaria: 'Orçamentária', nao_orcamentaria: 'Não orçamentária' }
+
+;(async function () {
+  const usuario = await carregarUsuario()
+  if (!usuario) { window.location.href = '../index.html'; return }
+
+  const { data: nivel } = await db.rpc('nivel_efetivo', { p_usuario: usuario.id, p_modulo_chave: 'frota' })
+  if (nivel !== 'editar') {
+    document.body.innerHTML = '<div style="padding:60px;text-align:center;font-family:\'DM Sans\',sans-serif;color:#6B7280">Apenas o setor de transporte pode gerenciar contratos de combustível.</div>'
+    return
+  }
+
+  document.getElementById('app').innerHTML =
+    gerarLayout('Frota — Contratos de Combustível', 'frota-contratos') +
+    `<div class="fade-in">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+        <div class="form-section-label" style="margin:0">Fontes de recurso</div>
+        <button class="btn btn-sm btn-primary" onclick="abrirFonte(null)">${bico('plus')} Nova fonte</button>
+      </div>
+      <div class="card" style="margin-bottom:24px"><div class="table-wrap"><div class="table-scroll">
+        <table>
+          <thead><tr><th>Código</th><th>Descrição</th><th>Tipo</th><th>Status</th><th>Ações</th></tr></thead>
+          <tbody id="tbody-fontes"><tr><td colspan="5" style="text-align:center;padding:24px;color:#9CA3AF">Carregando...</td></tr></tbody>
+        </table>
+      </div></div></div>
+
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+        <div class="form-section-label" style="margin:0">Contratos de combustível</div>
+        <button class="btn btn-sm btn-primary" onclick="abrirContrato(null)">${bico('plus')} Novo contrato</button>
+      </div>
+      <div class="card"><div class="table-wrap"><div class="table-scroll">
+        <table>
+          <thead><tr><th>Número</th><th>Fornecedor</th><th>Fonte</th><th>Vigência</th><th>Valor global</th><th>Status</th><th>Ações</th></tr></thead>
+          <tbody id="tbody-contratos"><tr><td colspan="7" style="text-align:center;padding:24px;color:#9CA3AF">Carregando...</td></tr></tbody>
+        </table>
+      </div></div></div>
+    </div>` +
+    '</div></div></div>'
+
+  carregarLogosSidebar()
+  bIconsAplicar()
+  await carregarFontes()
+  await carregarContratos()
+})()
+
+function formatData(str) {
+  if (!str) return '—'
+  return new Date(str + 'T00:00:00').toLocaleDateString('pt-BR')
+}
+
+async function carregarFontes() {
+  const { data } = await db.from('frota_fontes_recurso').select('*').order('codigo')
+  _fontes = data || []
+  renderFontes()
+}
+
+function renderFontes() {
+  const tbody = document.getElementById('tbody-fontes')
+  if (!_fontes.length) { tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;color:#9CA3AF">Nenhuma fonte cadastrada</td></tr>'; return }
+  tbody.innerHTML = _fontes.map(f => `
+    <tr>
+      <td class="mono">${esc(f.codigo)}</td>
+      <td>${esc(f.descricao)}</td>
+      <td>${esc(FONTE_LABEL[f.tipo] || f.tipo)}</td>
+      <td><span class="badge ${f.ativo ? 'badge-verde' : 'badge-cinza'}">${f.ativo ? 'Ativa' : 'Inativa'}</span></td>
+      <td><button class="btn btn-xs btn-ghost" onclick="abrirFonte('${f.id}')">Editar</button></td>
+    </tr>`).join('')
+}
+
+function abrirFonte(id) {
+  _editandoFonteId = id
+  const f = id ? _fontes.find(x => x.id === id) : null
+  document.getElementById('mf-titulo').textContent = f ? 'Editar Fonte de Recurso' : 'Nova Fonte de Recurso'
+  document.getElementById('f-tipo').value = f?.tipo || 'orcamentaria'
+  document.getElementById('f-codigo').value = f?.codigo || ''
+  document.getElementById('f-descricao').value = f?.descricao || ''
+  document.getElementById('f-ativo').checked = f ? f.ativo : true
+  document.getElementById('modal-fonte').classList.add('aberto')
+}
+
+async function salvarFonte() {
+  const payload = {
+    tipo: document.getElementById('f-tipo').value,
+    codigo: document.getElementById('f-codigo').value.trim(),
+    descricao: document.getElementById('f-descricao').value.trim(),
+    ativo: document.getElementById('f-ativo').checked,
+  }
+  if (!payload.codigo || !payload.descricao) { toast('Preencha código e descrição', 'error'); return }
+  const btn = document.getElementById('btn-salvar-fonte')
+  btn.disabled = true
+  try {
+    const { error } = _editandoFonteId
+      ? await db.from('frota_fontes_recurso').update(payload).eq('id', _editandoFonteId)
+      : await db.from('frota_fontes_recurso').insert(payload)
+    if (error) throw error
+    toast('Fonte de recurso salva!', 'success')
+    fecharModal('fonte'); await carregarFontes()
+  } catch (e) { toast(e.message || 'Erro ao salvar', 'error') }
+  finally { btn.disabled = false }
+}
+
+async function carregarContratos() {
+  const { data } = await db.from('frota_contratos_combustivel').select('*, frota_fontes_recurso(tipo,codigo,descricao)').order('numero')
+  _contratos = data || []
+  renderContratos()
+  const sel = document.getElementById('c-fonte')
+  if (sel) sel.innerHTML = '<option value="">Selecione...</option>' + _fontes.map(f => `<option value="${f.id}">${esc(f.codigo)} — ${esc(f.descricao)}</option>`).join('')
+}
+
+function renderContratos() {
+  const tbody = document.getElementById('tbody-contratos')
+  if (!_contratos.length) { tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:24px;color:#9CA3AF">Nenhum contrato cadastrado</td></tr>'; return }
+  tbody.innerHTML = _contratos.map(c => `
+    <tr>
+      <td class="mono">${esc(c.numero)}</td>
+      <td>${esc(c.fornecedor)}</td>
+      <td style="font-size:12px">${esc(c.frota_fontes_recurso?.codigo || '—')}</td>
+      <td style="font-size:12px">${formatData(c.vigencia_inicio)} — ${formatData(c.vigencia_fim)}</td>
+      <td class="mono">${c.valor_global != null ? formatBRL(c.valor_global) : '—'}</td>
+      <td><span class="badge ${c.ativo ? 'badge-verde' : 'badge-cinza'}">${c.ativo ? 'Ativo' : 'Inativo'}</span></td>
+      <td><button class="btn btn-xs btn-ghost" onclick="abrirContrato('${c.id}')">Editar</button></td>
+    </tr>`).join('')
+}
+
+function abrirContrato(id) {
+  if (!_fontes.length) { toast('Cadastre uma fonte de recurso antes de criar um contrato', 'error'); return }
+  _editandoContratoId = id
+  const c = id ? _contratos.find(x => x.id === id) : null
+  document.getElementById('mc-titulo').textContent = c ? 'Editar Contrato' : 'Novo Contrato'
+  document.getElementById('c-numero').value = c?.numero || ''
+  document.getElementById('c-fornecedor').value = c?.fornecedor || ''
+  document.getElementById('c-fonte').value = c?.fonte_recurso_id || ''
+  document.getElementById('c-vigencia-inicio').value = c?.vigencia_inicio || ''
+  document.getElementById('c-vigencia-fim').value = c?.vigencia_fim || ''
+  document.getElementById('c-valor-global').value = c?.valor_global ?? ''
+  document.getElementById('c-observacoes').value = c?.observacoes || ''
+  document.getElementById('c-ativo').checked = c ? c.ativo : true
+  document.getElementById('modal-contrato').classList.add('aberto')
+}
+
+async function salvarContrato() {
+  const payload = {
+    numero: document.getElementById('c-numero').value.trim(),
+    fornecedor: document.getElementById('c-fornecedor').value.trim(),
+    fonte_recurso_id: document.getElementById('c-fonte').value,
+    vigencia_inicio: document.getElementById('c-vigencia-inicio').value,
+    vigencia_fim: document.getElementById('c-vigencia-fim').value,
+    valor_global: document.getElementById('c-valor-global').value === '' ? null : parseFloat(document.getElementById('c-valor-global').value),
+    observacoes: document.getElementById('c-observacoes').value.trim() || null,
+    ativo: document.getElementById('c-ativo').checked,
+  }
+  if (!payload.numero || !payload.fornecedor || !payload.fonte_recurso_id || !payload.vigencia_inicio || !payload.vigencia_fim) {
+    toast('Preencha número, fornecedor, fonte e vigência', 'error'); return
+  }
+  if (payload.vigencia_fim < payload.vigencia_inicio) { toast('Vigência final não pode ser anterior à inicial', 'error'); return }
+  const btn = document.getElementById('btn-salvar-contrato')
+  btn.disabled = true
+  try {
+    const { error } = _editandoContratoId
+      ? await db.from('frota_contratos_combustivel').update(payload).eq('id', _editandoContratoId)
+      : await db.from('frota_contratos_combustivel').insert(payload)
+    if (error) throw error
+    toast('Contrato salvo!', 'success')
+    fecharModal('contrato'); await carregarContratos()
+  } catch (e) { toast(e.message || 'Erro ao salvar', 'error') }
+  finally { btn.disabled = false }
+}
+
+function fecharModal(qual) {
+  document.getElementById(`modal-${qual}`).classList.remove('aberto')
+  _editandoFonteId = null; _editandoContratoId = null
+}
+</script>
+</body>
+</html>

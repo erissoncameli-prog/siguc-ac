@@ -70,13 +70,16 @@ function _fUuid() {
     : 'f-' + Date.now() + '-' + Math.random().toString(16).slice(2)
 }
 
-// tipo: 'checkout' | 'checkin' | 'abrir_direta'
-async function fOfflineEnfileirar(tipo, payload) {
+// tipo: 'checkout' | 'checkin' | 'abrir_direta' | 'abastecimento'
+// fotos (só usado por 'abastecimento'): { cupom, hodometro } em base64
+// data-URL — sobem para o Storage no sync, antes da chamada da RPC.
+async function fOfflineEnfileirar(tipo, payload, fotos) {
   const db = await fOfflineInit()
   const acao = {
-    uuid_cliente: _fUuid(),
+    uuid_cliente: payload.p_uuid_cliente || _fUuid(),
     tipo,
     payload,
+    fotos: fotos || null,
     status: 'pendente',
     criado_em: new Date().toISOString(),
   }

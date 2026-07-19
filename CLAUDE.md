@@ -27,6 +27,10 @@ Sistema já tem login, sidebar, layout e páginas funcionando.
     solicitante/motorista/gestor, PWA instalável via
     instalar-frota.html, sem shell Capacitor ainda). Gestão de frota:
     frota-veiculos.html, frota-manutencao.html, frota-tarefas.html.
+    Abastecimento: motorista registra o evento físico no frota-app.html
+    (modo motorista, offline-first); gestão valida e classifica em
+    frota-abastecimentos.html (contrato/fonte — motorista nunca vê).
+    Cadastro de fontes de recurso e contratos: frota-contratos.html.
     Ver regra de duplicação obrigatória em "Regras de desenvolvimento".
 - js/ → config.js, layout.js, mapa-cartografia.js, observability.js,
   queryLogger.js; brigada-offline.js (IndexedDB), brigada-sync.js,
@@ -76,6 +80,21 @@ Brigadas/registros de campo (042–060). Principais:
 - 060_origem_acionamento.sql: enum origem_acionamento
   (denuncia_193|informacao_populares|ronda_brigada|outro) +
   registros_campo.origem_acionamento; view atualizada
+
+Frota — abastecimento (174–175):
+- 174_frota_fontes_contratos.sql: frota_fontes_recurso (orçamentária/
+  não orçamentária), frota_contratos_combustivel (1 contrato → 1
+  fonte; valor_global só referência, sem controle de saldo na v1).
+  Cadastro de mesa (frota-contratos.html), RLS pode_ver/pode_editar.
+- 175_frota_abastecimentos.sql: frota_abastecimentos (evento físico
+  do motorista + campos de validação da gestão), código
+  ABAST-AAAA-NNNN (trigger, molde da 168); RPCs
+  frota_registrar_abastecimento (motorista, idempotente por
+  uuid_cliente, molde da 173 — nunca aceita contrato/status do
+  cliente), frota_validar_abastecimento (gestão, exige contrato_id),
+  frota_rejeitar_abastecimento (gestão); view
+  vw_frota_abastecimentos_detalhe (SECURITY INVOKER, padrão 165);
+  bucket frota-abastecimentos (fotos de cupom/hodômetro).
 
 ## Enums do banco
 perfil_usuario: super_admin | gestor | tecnico | financeiro | visualizador
@@ -231,6 +250,16 @@ E) Dashboard Executivo por nível (UC / Diretoria / Secretaria)
   fluxo tende a se repetir conforme o módulo Frota crescer — ao criar
   uma tela nova de mesa que já tenha equivalente no app (ou vice-versa),
   aplicar a mesma regra e documentar o par aqui.
+  EXCEÇÃO por decisão de produto — Abastecimento: o par não é
+  simétrico. REGISTRO do evento físico (litros/valor/fotos) só existe
+  no app (`frota-app.html`, modo motorista, função
+  `confirmarAbastecimento`) — motorista não tem acesso de mesa.
+  VALIDAÇÃO/classificação por contrato só existe na mesa
+  (`frota-abastecimentos.html`, funções `confirmarValidar`/
+  `confirmarRejeitar`) — não replicada no modo gestor do app na v1
+  (decisão registrada ao criar o fluxo). Se "lançar abastecimento"
+  for adicionado a uma tela de mesa, ou "validar" for adicionado ao
+  app, replicar nos dois lados na mesma entrega, como nos pares acima.
 
 ## Variáveis de ambiente
 SUPABASE_URL=https://atqtybcsvepdabsvgaly.supabase.co

@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>SIGUC-AC · Frota — Abastecimentos</title>
+<link rel="stylesheet" href="../css/global.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../js/observability.js"></script>
+<script src="../js/queryLogger.js"></script>
+<script src="../js/config.js"></script>
+<script src="../js/layout.js"></script>
+</head>
+<body>
+<div id="app"></div>
+
+<!-- Modal Validar -->
+<div class="modal-overlay" id="modal-validar">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-header">
+      <div class="modal-title">Validar abastecimento</div>
+      <button class="modal-close" onclick="fecharModal('validar')">×</button>
+    </div>
+    <div class="modal-body">
+      <div id="vl-resumo" style="font-size:13px;color:#6B7280;margin-bottom:14px"></div>
+      <div class="form-group"><label class="form-label">Contrato de combustível <span class="obrig">*</span></label>
+        <select class="form-control" id="vl-contrato" onchange="mostrarFonteContrato()"><option value="">Selecione...</option></select></div>
+      <div id="vl-fonte" style="font-size:12px;color:#6B7280;margin-bottom:14px"></div>
+      <div style="display:flex;gap:10px">
+        <div class="form-group" style="flex:1"><label class="form-label">Litros (ajuste, opcional)</label>
+          <input class="form-control" id="vl-litros-ajust" type="number" min="0" step="0.01"></div>
+        <div class="form-group" style="flex:1"><label class="form-label">Valor (ajuste, opcional)</label>
+          <input class="form-control" id="vl-valor-ajust" type="number" min="0" step="0.01"></div>
+      </div>
+      <div style="font-size:11px;color:#9CA3AF">O informado pelo motorista é mantido; o ajuste, se houver, é usado nos totais e relatórios.</div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="fecharModal('validar')">Cancelar</button>
+      <button class="btn btn-primary" id="btn-confirmar-validar" onclick="confirmarValidar()">Validar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Rejeitar -->
+<div class="modal-overlay" id="modal-rejeitar">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-header">
+      <div class="modal-title">Rejeitar abastecimento</div>
+      <button class="modal-close" onclick="fecharModal('rejeitar')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label">Motivo <span class="obrig">*</span></label>
+        <textarea class="form-control" id="rj-motivo" rows="3" placeholder="O motorista verá este motivo e poderá corrigir/reenviar"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="fecharModal('rejeitar')">Voltar</button>
+      <button class="btn btn-primary" style="background:#DC2626" id="btn-confirmar-rejeitar" onclick="confirmarRejeitar()">Rejeitar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Detalhe -->
+<div class="modal-overlay" id="modal-detalhe">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-header">
+      <div class="modal-title">Detalhes do abastecimento</div>
+      <button class="modal-close" onclick="fecharModal('detalhe')">×</button>
+    </div>
+    <div class="modal-body" id="det-corpo"></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="fecharModal('detalhe')">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let _abastecimentos = [], _contratos = [], _veiculos = [], _acaoId = null
+
+const STATUS_LABEL = { pendente: 'Pendente', validado: 'Validado', rejeitado: 'Rejeitado' }
+const STATUS_BADGE = { pendente: 'badge-ouro', validado: 'badge-verde', rejeitado: 'badge-erro' }
+const FONTE_LABEL = { orcamentaria: 'Orçamentária', nao_orcamentaria: 'Não orçamentária' }
+
+;(async function () {
+  const usuario = await carregarUsuario()
+  if (!usuario) { window.location.href = '../index.html'; return }
+
+  const { data: nivel } = await db.rpc('nivel_efetivo', { p_usuario: usuario.id, p_modulo_chave: 'frota' })
+  if (nivel !== 'editar') {
+    document.body.innerHTML = '<div style="padding:60px;text-align:center;font-family:\'DM Sans\',sans-serif;color:#6B7280">Apenas o setor de transporte pode validar abastecimentos.</div>'
+    return
+  }
+
+  document.getElementById('app').innerHTML =
+    gerarLayout('Frota — Abastecimentos', 'frota-abastecimentos') +
+    `<div class="fade-in">
+      <div class="kpi-grid">
+        <div class="kpi-card ouro"><div class="kpi-label">Pendentes de validação</div><div class="kpi-valor" id="k-pend">—</div></div>
+        <div class="kpi-card verde"><div class="kpi-label">Validados (mês atual)</div><div class="kpi-valor" id="k-validados">—</div></div>
+        <div class="kpi-card azul"><div class="kpi-label">Litros validados (mês)</div><div class="kpi-valor" id="k-litros">—</div></div>
+        <div class="kpi-card erro"><div class="kpi-label">Custo validado (mês)</div><div class="kpi-valor" id="k-custo">—</div></div>
+      </div>
+
+      <div class="filter-bar">
+        <input class="form-control search-input" id="busca" placeholder="Buscar código, placa, motorista..." oninput="renderTabela()">
+        <select class="form-control" id="fil-status" style="width:180px" onchange="renderTabela()">
+          <option value="">Todos os status</option>
+          <option value="pendente" selected>Pendentes</option>
+          <option value="validado">Validados</option>
+          <option value="rejeitado">Rejeitados</option>
+        </select>
+        <select class="form-control" id="fil-veiculo" style="width:200px" onchange="renderTabela()">
+          <option value="">Todos os veículos</option>
+        </select>
+      </div>
+
+      <div class="card">
+        <div class="table-wrap"><div class="table-scroll">
+          <table>
+            <thead><tr><th>Código</th><th>Veículo</th><th>Motorista</th><th>Data</th><th>Litros</th><th>Valor</th><th>Contrato / Fonte</th><th>Status</th><th>Ações</th></tr></thead>
+            <tbody id="tbody"><tr><td colspan="9" style="text-align:center;padding:32px;color:#9CA3AF">Carregando...</td></tr></tbody>
+          </table>
+        </div></div>
+      </div>
+
+      <div class="form-section-label" style="margin-top:20px">Totais por contrato (validados)</div>
+      <div class="card"><div class="table-wrap"><div class="table-scroll">
+        <table>
+          <thead><tr><th>Contrato</th><th>Fornecedor</th><th>Fonte</th><th>Litros</th><th>Valor</th></tr></thead>
+          <tbody id="tbody-contratos"><tr><td colspan="5" style="text-align:center;padding:20px;color:#9CA3AF">—</td></tr></tbody>
+        </table>
+      </div></div></div>
+
+      <div class="form-section-label" style="margin-top:20px">Totais por fonte de recurso (validados)</div>
+      <div class="card"><div class="table-wrap"><div class="table-scroll">
+        <table>
+          <thead><tr><th>Fonte</th><th>Tipo</th><th>Litros</th><th>Valor</th></tr></thead>
+          <tbody id="tbody-fontes"><tr><td colspan="4" style="text-align:center;padding:20px;color:#9CA3AF">—</td></tr></tbody>
+        </table>
+      </div></div></div>
+    </div>` +
+    '</div></div></div>'
+
+  carregarLogosSidebar()
+  bIconsAplicar()
+  await Promise.all([carregarContratos(), carregarVeiculos()])
+  await carregarAbastecimentos()
+})()
+
+async function carregarVeiculos() {
+  const { data } = await db.from('frota_veiculos').select('id,placa,modelo').order('placa')
+  _veiculos = data || []
+  document.getElementById('fil-veiculo').innerHTML =
+    '<option value="">Todos os veículos</option>' + _veiculos.map(v => `<option value="${v.id}">${esc(v.placa)} — ${esc(v.modelo)}</option>`).join('')
+}
+
+async function carregarContratos() {
+  const { data } = await db.from('frota_contratos_combustivel').select('*, frota_fontes_recurso(tipo,codigo,descricao)')
+    .eq('ativo', true).order('numero')
+  _contratos = data || []
+}
+
+async function carregarAbastecimentos() {
+  const { data } = await db.from('vw_frota_abastecimentos_detalhe').select('*').order('data_hora', { ascending: false }).limit(300)
+  _abastecimentos = data || []
+  renderKpis(); renderTabela(); renderTotais()
+}
+
+function formatDataHora(str) {
+  if (!str) return '—'
+  return new Date(str).toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', year:'2-digit', hour:'2-digit', minute:'2-digit' })
+}
+
+function renderKpis() {
+  const set = (id, v) => document.getElementById(id).textContent = v
+  const agora = new Date()
+  const noMes = a => { const d = new Date(a.data_hora); return d.getFullYear() === agora.getFullYear() && d.getMonth() === agora.getMonth() }
+  const validadosMes = _abastecimentos.filter(a => a.status === 'validado' && noMes(a))
+  set('k-pend', _abastecimentos.filter(a => a.status === 'pendente').length)
+  set('k-validados', validadosMes.length)
+  set('k-litros', formatNum(validadosMes.reduce((s,a) => s + Number(a.litros_final || 0), 0), 1))
+  set('k-custo', formatBRL(validadosMes.reduce((s,a) => s + Number(a.valor_final || 0), 0)))
+}
+
+function renderTabela() {
+  const q = (document.getElementById('busca')?.value || '').toLowerCase()
+  const status = document.getElementById('fil-status')?.value
+  const veiculo = document.getElementById('fil-veiculo')?.value
+  const lista = _abastecimentos.filter(a =>
+    (!q || `${a.codigo} ${a.placa} ${a.motorista_nome}`.toLowerCase().includes(q)) &&
+    (!status || a.status === status) &&
+    (!veiculo || a.veiculo_id === veiculo))
+
+  const tbody = document.getElementById('tbody')
+  if (!lista.length) { tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:32px;color:#9CA3AF">Nenhum abastecimento encontrado</td></tr>'; return }
+  tbody.innerHTML = lista.map(a => `
+    <tr>
+      <td class="mono">${esc(a.codigo || '—')}</td>
+      <td style="font-size:12px">${esc(a.modelo)} <span class="mono">(${esc(a.placa)})</span></td>
+      <td style="font-size:12px">${esc(a.motorista_nome)}</td>
+      <td style="font-size:12px">${formatDataHora(a.data_hora)}</td>
+      <td class="mono">${formatNum(a.litros_final, 2)} L</td>
+      <td class="mono">${formatBRL(a.valor_final)}</td>
+      <td style="font-size:12px">${a.contrato_numero ? `${esc(a.contrato_numero)}<br><span style="color:#9CA3AF">${esc(FONTE_LABEL[a.fonte_tipo]||'')} · ${esc(a.fonte_codigo||'')}</span>` : '<span style="color:#9CA3AF">A classificar</span>'}</td>
+      <td><span class="badge ${STATUS_BADGE[a.status]}">${STATUS_LABEL[a.status]}</span></td>
+      <td style="white-space:nowrap">
+        ${a.status === 'pendente' || a.status === 'rejeitado' ? `
+          <button class="btn btn-xs btn-primary" onclick="abrirValidar('${a.id}')">Validar</button>
+          ${a.status === 'pendente' ? `<button class="btn btn-xs btn-ghost" style="color:#DC2626" onclick="abrirRejeitar('${a.id}')">Rejeitar</button>` : ''}
+        ` : ''}
+        <button class="btn btn-xs btn-ghost" onclick="abrirDetalhe('${a.id}')">Ver</button>
+      </td>
+    </tr>`).join('')
+}
+
+function renderTotais() {
+  const validados = _abastecimentos.filter(a => a.status === 'validado')
+
+  const porContrato = {}
+  validados.forEach(a => {
+    const k = a.contrato_id
+    if (!porContrato[k]) porContrato[k] = { numero: a.contrato_numero, fornecedor: a.contrato_fornecedor, fonte: `${FONTE_LABEL[a.fonte_tipo]||''} · ${a.fonte_codigo||''}`, litros: 0, valor: 0 }
+    porContrato[k].litros += Number(a.litros_final || 0)
+    porContrato[k].valor += Number(a.valor_final || 0)
+  })
+  const tbContratos = document.getElementById('tbody-contratos')
+  const linhasContratos = Object.values(porContrato)
+  tbContratos.innerHTML = linhasContratos.length ? linhasContratos.map(c => `
+    <tr><td class="mono">${esc(c.numero)}</td><td style="font-size:12px">${esc(c.fornecedor)}</td><td style="font-size:12px">${esc(c.fonte)}</td>
+      <td class="mono">${formatNum(c.litros,2)} L</td><td class="mono">${formatBRL(c.valor)}</td></tr>`).join('')
+    : '<tr><td colspan="5" style="text-align:center;padding:20px;color:#9CA3AF">Nenhum abastecimento validado ainda</td></tr>'
+
+  const porFonte = {}
+  validados.forEach(a => {
+    const k = a.fonte_codigo || '—'
+    if (!porFonte[k]) porFonte[k] = { descricao: a.fonte_descricao || '—', tipo: a.fonte_tipo, litros: 0, valor: 0 }
+    porFonte[k].litros += Number(a.litros_final || 0)
+    porFonte[k].valor += Number(a.valor_final || 0)
+  })
+  const tbFontes = document.getElementById('tbody-fontes')
+  const linhasFontes = Object.values(porFonte)
+  tbFontes.innerHTML = linhasFontes.length ? linhasFontes.map(f => `
+    <tr><td style="font-size:12px">${esc(f.descricao)}</td><td style="font-size:12px">${esc(FONTE_LABEL[f.tipo]||'—')}</td>
+      <td class="mono">${formatNum(f.litros,2)} L</td><td class="mono">${formatBRL(f.valor)}</td></tr>`).join('')
+    : '<tr><td colspan="4" style="text-align:center;padding:20px;color:#9CA3AF">Nenhum abastecimento validado ainda</td></tr>'
+}
+
+function abrirValidar(id) {
+  const a = _abastecimentos.find(x => x.id === id)
+  _acaoId = id
+  document.getElementById('vl-resumo').innerHTML =
+    `<strong>${esc(a.codigo||'')}</strong> — ${esc(a.modelo)} (${esc(a.placa)})<br>${esc(a.motorista_nome)} · ${formatNum(a.litros,2)} L · ${formatBRL(a.valor_total)}${a.motivo_rejeicao ? `<br><span style="color:#DC2626">Rejeitado anteriormente: ${esc(a.motivo_rejeicao)}</span>` : ''}`
+  document.getElementById('vl-contrato').innerHTML =
+    '<option value="">Selecione...</option>' + _contratos.map(c => `<option value="${c.id}" ${c.id === a.contrato_id ? 'selected' : ''}>${esc(c.numero)} — ${esc(c.fornecedor)}</option>`).join('')
+  document.getElementById('vl-litros-ajust').value = a.litros_ajustado ?? ''
+  document.getElementById('vl-valor-ajust').value = a.valor_ajustado ?? ''
+  mostrarFonteContrato()
+  document.getElementById('modal-validar').classList.add('aberto')
+}
+
+function mostrarFonteContrato() {
+  const c = _contratos.find(x => x.id === document.getElementById('vl-contrato').value)
+  document.getElementById('vl-fonte').textContent = c
+    ? `Fonte: ${FONTE_LABEL[c.frota_fontes_recurso?.tipo] || '—'} · ${c.frota_fontes_recurso?.codigo || ''} — ${c.frota_fontes_recurso?.descricao || ''}`
+    : ''
+}
+
+async function confirmarValidar() {
+  const contrato_id = document.getElementById('vl-contrato').value
+  if (!contrato_id) { toast('Selecione o contrato', 'error'); return }
+  const litrosAjust = document.getElementById('vl-litros-ajust').value
+  const valorAjust  = document.getElementById('vl-valor-ajust').value
+  const btn = document.getElementById('btn-confirmar-validar')
+  btn.disabled = true; btn.textContent = 'Validando...'
+  try {
+    const { error } = await db.rpc('frota_validar_abastecimento', {
+      p_id: _acaoId, p_contrato_id: contrato_id,
+      p_litros_ajust: litrosAjust === '' ? null : parseFloat(litrosAjust),
+      p_valor_ajust: valorAjust === '' ? null : parseFloat(valorAjust),
+    })
+    if (error) throw error
+    toast('Abastecimento validado!', 'success')
+    fecharModal('validar'); await carregarAbastecimentos()
+  } catch (e) { toast(e.message || 'Erro ao validar', 'error') }
+  finally { btn.disabled = false; btn.textContent = 'Validar' }
+}
+
+function abrirRejeitar(id) {
+  _acaoId = id
+  document.getElementById('rj-motivo').value = ''
+  document.getElementById('modal-rejeitar').classList.add('aberto')
+}
+
+async function confirmarRejeitar() {
+  const motivo = document.getElementById('rj-motivo').value.trim()
+  if (!motivo) { toast('Informe o motivo da rejeição', 'error'); return }
+  const btn = document.getElementById('btn-confirmar-rejeitar')
+  btn.disabled = true
+  try {
+    const { error } = await db.rpc('frota_rejeitar_abastecimento', { p_id: _acaoId, p_motivo: motivo })
+    if (error) throw error
+    toast('Abastecimento rejeitado', 'success')
+    fecharModal('rejeitar'); await carregarAbastecimentos()
+  } catch (e) { toast(e.message || 'Erro ao rejeitar', 'error') }
+  finally { btn.disabled = false }
+}
+
+function abrirDetalhe(id) {
+  const a = _abastecimentos.find(x => x.id === id)
+  document.getElementById('det-corpo').innerHTML = `
+    <div style="font-size:13px;line-height:1.8">
+      <div><strong>Código:</strong> ${esc(a.codigo||'—')}</div>
+      <div><strong>Veículo:</strong> ${esc(a.modelo)} (${esc(a.placa)})</div>
+      <div><strong>Motorista:</strong> ${esc(a.motorista_nome)}</div>
+      <div><strong>Data/hora:</strong> ${formatDataHora(a.data_hora)}</div>
+      <div><strong>Medida no abastecimento:</strong> ${formatNum(a.medida_no_abastecimento,1)} ${a.medidor === 'horimetro' ? 'h' : 'km'}</div>
+      <div><strong>Litros:</strong> ${formatNum(a.litros,2)} L ${a.litros_ajustado != null ? `(ajustado: ${formatNum(a.litros_ajustado,2)} L)` : ''}</div>
+      <div><strong>Preço/litro:</strong> ${formatBRL(a.preco_litro)}</div>
+      <div><strong>Valor total:</strong> ${formatBRL(a.valor_total)} ${a.valor_ajustado != null ? `(ajustado: ${formatBRL(a.valor_ajustado)})` : ''}</div>
+      <div><strong>Tanque cheio:</strong> ${a.tanque_cheio ? 'Sim' : 'Não'}</div>
+      ${a.posto_nome ? `<div><strong>Posto:</strong> ${esc(a.posto_nome)}</div>` : ''}
+      ${a.viagem_id ? `<div><strong>Vinculado à viagem:</strong> Sim</div>` : ''}
+      ${a.observacoes_motorista ? `<div><strong>Observações do motorista:</strong> ${esc(a.observacoes_motorista)}</div>` : ''}
+      <div><strong>Status:</strong> <span class="badge ${STATUS_BADGE[a.status]}">${STATUS_LABEL[a.status]}</span></div>
+      ${a.contrato_numero ? `<div><strong>Contrato:</strong> ${esc(a.contrato_numero)} — ${esc(a.contrato_fornecedor||'')}</div>` : ''}
+      ${a.fonte_codigo ? `<div><strong>Fonte de recurso:</strong> ${esc(FONTE_LABEL[a.fonte_tipo]||'')} · ${esc(a.fonte_codigo)} — ${esc(a.fonte_descricao||'')}</div>` : ''}
+      ${a.motivo_rejeicao ? `<div style="color:#DC2626"><strong>Motivo da rejeição:</strong> ${esc(a.motivo_rejeicao)}</div>` : ''}
+      ${a.foto_cupom_url ? `<div style="margin-top:10px"><strong>Cupom fiscal:</strong><br><a href="${esc(a.foto_cupom_url)}" target="_blank"><img src="${esc(a.foto_cupom_url)}" style="max-width:200px;border-radius:8px;margin-top:6px"></a></div>` : ''}
+      ${a.foto_hodometro_url ? `<div style="margin-top:10px"><strong>Foto do medidor:</strong><br><a href="${esc(a.foto_hodometro_url)}" target="_blank"><img src="${esc(a.foto_hodometro_url)}" style="max-width:200px;border-radius:8px;margin-top:6px"></a></div>` : ''}
+    </div>`
+  document.getElementById('modal-detalhe').classList.add('aberto')
+}
+
+function fecharModal(qual) {
+  document.getElementById(`modal-${qual}`).classList.remove('aberto')
+  _acaoId = null
+}
+</script>
+</body>
+</html>
