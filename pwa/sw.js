@@ -14,7 +14,7 @@ const APP = SCOPE.includes('/pages/biomonitor.html') ? 'biomonitor'
 // Ao concluir uma implementação que toque arquivos web de um app,
 // incrementar SÓ o número daquele app (vN → vN+1) — não precisa mexer
 // nos outros dois.
-const VERSOES = { brigadas: 244, biomonitor: 4, frota: 13 }
+const VERSOES = { brigadas: 244, biomonitor: 4, frota: 14 }
 const CACHE = `siguc-${APP}-v${VERSOES[APP]}`
 
 const SHELLS = {
@@ -60,10 +60,12 @@ const SHELLS = {
   frota: [
     '/pages/frota-app.html',
     '/css/global.css',
+    '/css/frota-wise-theme.css',
     '/js/observability.js',
     '/js/queryLogger.js',
     '/js/config.js',
     '/js/layout.js',
+    '/js/frota-wise.js',
     '/js/frota-offline.js',
     '/js/frota-sync.js',
     'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2',

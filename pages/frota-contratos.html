@@ -4,11 +4,13 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>SIGUC-AC · Frota — Contratos de Combustível</title>
 <link rel="stylesheet" href="../css/global.css">
+<link rel="stylesheet" href="../css/frota-wise-theme.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="../js/observability.js"></script>
 <script src="../js/queryLogger.js"></script>
 <script src="../js/config.js"></script>
 <script src="../js/layout.js"></script>
+<script src="../js/frota-wise.js"></script>
 </head>
 <body>
 <div id="app"></div>
@@ -99,7 +101,7 @@ const FONTE_LABEL = { orcamentaria: 'Orçamentária', nao_orcamentaria: 'Não or
 
   document.getElementById('app').innerHTML =
     gerarLayout('Frota — Contratos de Combustível', 'frota-contratos') +
-    `<div class="fade-in">
+    `<div class="fade-in fw-theme">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
         <div class="form-section-label" style="margin:0">Fontes de recurso</div>
         <button class="btn btn-sm btn-primary" onclick="abrirFonte(null)">${bico('plus')} Nova fonte</button>
@@ -149,7 +151,7 @@ function renderFontes() {
       <td class="mono">${esc(f.codigo)}</td>
       <td>${esc(f.descricao)}</td>
       <td>${esc(FONTE_LABEL[f.tipo] || f.tipo)}</td>
-      <td><span class="badge ${f.ativo ? 'badge-verde' : 'badge-cinza'}">${f.ativo ? 'Ativa' : 'Inativa'}</span></td>
+      <td><span class="badge ${f.ativo ? 'fw-badge fw-badge-disponivel' : 'badge-cinza'}">${f.ativo ? 'Ativa' : 'Inativa'}</span></td>
       <td><button class="btn btn-xs btn-ghost" onclick="abrirFonte('${f.id}')">Editar</button></td>
     </tr>`).join('')
 }
@@ -204,7 +206,7 @@ function renderContratos() {
       <td style="font-size:12px">${esc(c.frota_fontes_recurso?.codigo || '—')}</td>
       <td style="font-size:12px">${formatData(c.vigencia_inicio)} — ${formatData(c.vigencia_fim)}</td>
       <td class="mono">${c.valor_global != null ? formatBRL(c.valor_global) : '—'}</td>
-      <td><span class="badge ${c.ativo ? 'badge-verde' : 'badge-cinza'}">${c.ativo ? 'Ativo' : 'Inativo'}</span></td>
+      <td><span class="badge ${c.ativo ? 'fw-badge fw-badge-disponivel' : 'badge-cinza'}">${c.ativo ? 'Ativo' : 'Inativo'}</span></td>
       <td><button class="btn btn-xs btn-ghost" onclick="abrirContrato('${c.id}')">Editar</button></td>
     </tr>`).join('')
 }

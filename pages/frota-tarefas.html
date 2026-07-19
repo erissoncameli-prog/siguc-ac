@@ -4,11 +4,13 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>SIGUC-AC · Frota — Minhas Tarefas</title>
 <link rel="stylesheet" href="../css/global.css">
+<link rel="stylesheet" href="../css/frota-wise-theme.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="../js/observability.js"></script>
 <script src="../js/queryLogger.js"></script>
 <script src="../js/config.js"></script>
 <script src="../js/layout.js"></script>
+<script src="../js/frota-wise.js"></script>
 </head>
 <body>
 <div id="app"></div>
@@ -31,11 +33,11 @@ const SUBTIPO_ICON = {
   manutencao:        'clock',
 }
 const SUBTIPO_BADGE = {
-  viagem_solicitada: 'badge-ouro',
-  viagem_aprovada:   'badge-verde',
-  viagem_recusada:   'badge-erro',
-  viagem_direta:     'badge-roxo',
-  manutencao:        'badge-blue',
+  viagem_solicitada: 'fw-badge fw-badge-manutencao',
+  viagem_aprovada:   'fw-badge fw-badge-disponivel',
+  viagem_recusada:   'fw-badge fw-badge-inativo',
+  viagem_direta:     'fw-badge fw-badge-em-rota',
+  manutencao:        'fw-badge fw-badge-em-rota',
 }
 
 ;(async function () {
@@ -44,7 +46,7 @@ const SUBTIPO_BADGE = {
 
   document.getElementById('app').innerHTML =
     gerarLayout('Frota — Minhas Tarefas', 'frota-tarefas') +
-    `<div class="fade-in" style="max-width:900px">
+    `<div class="fade-in fw-theme" style="max-width:900px">
       <div class="card" style="margin-bottom:16px">
         <div class="form-section-label" style="padding:0 0 12px">Pendentes</div>
         <div id="lista-pendentes"></div>

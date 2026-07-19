@@ -57,11 +57,17 @@ estilo odômetro para KPIs (respeita `prefers-reduced-motion`).
 ## Status da aplicação
 
 - [x] Tokens + componentes base (`css/frota-wise-theme.css`, `js/frota-wise.js`)
-- [x] `pages/frota-veiculos.html` — KPIs animados + badges de status de veículo (piloto)
-- [ ] Demais telas de mesa: `frota-viagens.html`, `frota-solicitar.html`,
-      `frota-manutencao.html`, `frota-tarefas.html`, `frota-abastecimentos.html`,
-      `frota-contratos.html`
-- [ ] `frota-app.html` (PWA de campo)
-- [ ] `fw-vehicle-card`, `fw-list-item`, `fw-filter-chip`, `fw-avatar` aplicados nas listagens
-- [ ] Lembrar de subir `VERSOES.frota` em `pwa/sw.js` quando a aplicação
-      em `frota-app.html`/telas web de frota for concluída
+- [x] `pages/frota-veiculos.html` — KPIs animados + badges de status de veículo
+- [x] `pages/frota-viagens.html` — KPIs animados + badges de status de viagem
+- [x] `pages/frota-solicitar.html` — badges de status de viagem
+- [x] `pages/frota-manutencao.html` — KPIs animados + badges de OS/plano de manutenção
+- [x] `pages/frota-tarefas.html` — badges de notificação
+- [x] `pages/frota-abastecimentos.html` — KPIs animados + badges de status
+- [x] `pages/frota-contratos.html` — badges ativo/inativo
+- [x] `pages/frota-app.html` (PWA de campo, modos solicitante/motorista/gestor) —
+      KPIs animados + badges de status nos 3 modos
+- [x] `pwa/sw.js` — `VERSOES.frota` incrementado (13 → 14) e shell atualizado
+      com `css/frota-wise-theme.css` + `js/frota-wise.js`
+- [ ] `fw-vehicle-card`, `fw-list-item`, `fw-filter-chip`, `fw-avatar` ainda não
+      aplicados nas listagens (hoje usam `<table>`/linhas no padrão institucional
+      já com badges Wise) — trocar exige repaginar a listagem, não só o token
