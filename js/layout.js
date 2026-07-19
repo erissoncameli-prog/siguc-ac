@@ -74,6 +74,8 @@ function gerarLayout(tituloPagina, paginaAtiva) {
     'frota-solicitar':          { svg: '<path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><path d="M9 17h6"/><circle cx="17" cy="17" r="2"/><line x1="12" y1="6" x2="12" y2="6.01"/>', cor: '#4ade80', bg: 'rgba(74,222,128,0.22)' },
     'frota-manutencao':         { svg: '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>', cor: '#a78bfa', bg: 'rgba(167,139,250,0.22)' },
     'frota-tarefas':            { svg: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/>', cor: '#67e8f9', bg: 'rgba(103,232,249,0.22)' },
+    'frota-abastecimentos':     { svg: '<line x1="3" y1="22" x2="15" y2="22"/><line x1="4" y1="9" x2="14" y2="9"/><path d="M14 22V4a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v18"/><path d="M14 13h2a2 2 0 0 1 2 2v2a2 2 0 0 0 2 2 2 2 0 0 0 2-2V9.83a2 2 0 0 0-.59-1.42L18 5"/>', cor: '#f97316', bg: 'rgba(249,115,22,0.22)' },
+    'frota-contratos':          { svg: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>', cor: '#38bdf8', bg: 'rgba(56,189,248,0.22)' },
     'frota-app':                { svg: '<rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/>', cor: '#2dd4bf', bg: 'rgba(45,212,191,0.22)' },
   };
 
@@ -142,6 +144,10 @@ function gerarLayout(tituloPagina, paginaAtiva) {
         { id: 'frota-viagens',   href: '../pages/frota-viagens.html',   label: 'Agenda de Viagens',
           perfis: ['super_admin','diretor','chefe_departamento','gestor','assistente_admin'] },
         { id: 'frota-manutencao', href: '../pages/frota-manutencao.html', label: 'Manutenção',
+          perfis: ['super_admin','diretor','chefe_departamento','gestor','assistente_admin'] },
+        { id: 'frota-abastecimentos', href: '../pages/frota-abastecimentos.html', label: 'Abastecimentos',
+          perfis: ['super_admin','diretor','chefe_departamento','gestor','assistente_admin'] },
+        { id: 'frota-contratos', href: '../pages/frota-contratos.html', label: 'Contratos de Combustível',
           perfis: ['super_admin','diretor','chefe_departamento','gestor','assistente_admin'] },
         { id: 'frota-veiculos',  href: '../pages/frota-veiculos.html',  label: 'Veículos e Motoristas',
           perfis: ['super_admin','secretario','diretor','chefe_departamento','gestor','gestor_uc','tecnico','assistente_admin','financeiro'] },

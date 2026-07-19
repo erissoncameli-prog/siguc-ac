@@ -114,6 +114,15 @@ const STATUS_VEIC_LABEL = { disponivel:'Disponível', em_viagem:'Em viagem', em_
         <div class="kpi-card verde"><div class="kpi-label">Em andamento</div><div class="kpi-valor" id="k-andamento">—</div></div>
         <div class="kpi-card erro"><div class="kpi-label">Com avarias reportadas</div><div class="kpi-valor" id="k-avarias">—</div></div>
       </div>
+      <div class="card" style="margin-bottom:16px;padding:14px 18px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+        <div>
+          <div style="font-weight:600;font-size:13px">Captura de localização (GPS) nas viagens</div>
+          <div style="font-size:12px;color:#9CA3AF" id="cfg-gps-viagens-info">Carregando...</div>
+        </div>
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+          <input type="checkbox" id="cfg-gps-viagens" style="width:auto" onchange="salvarConfigGpsViagens()"> Ativada
+        </label>
+      </div>
       <div class="filter-bar">
         <input class="form-control search-input" id="busca" placeholder="Buscar destino, solicitante..." oninput="renderViagens()">
         <select class="form-control" id="fil-status" style="width:180px" onchange="renderViagens()">
@@ -139,9 +148,33 @@ const STATUS_VEIC_LABEL = { disponivel:'Disponível', em_viagem:'Em viagem', em_
 
   carregarLogosSidebar()
   bIconsAplicar()
-  await Promise.all([carregarVeiculos(), carregarMotoristas()])
+  await Promise.all([carregarVeiculos(), carregarMotoristas(), carregarConfigGps()])
   await carregarViagens()
 })()
+
+// ── Config de captura de GPS (migration 177) — captura_viagens
+// governa check-out, check-in e viagem avulsa no app do motorista.
+// Escrita passa pela RLS de frota_config_gps (só pode_editar('frota')).
+async function carregarConfigGps() {
+  const { data } = await db.from('frota_config_gps').select('*').eq('id', 1).single()
+  document.getElementById('cfg-gps-viagens').checked = data ? data.captura_viagens : true
+  document.getElementById('cfg-gps-viagens-info').textContent = data?.atualizado_em
+    ? `Última alteração: ${formatDataHora(data.atualizado_em)}`
+    : 'Ativada por padrão'
+}
+
+async function salvarConfigGpsViagens() {
+  const ligado = document.getElementById('cfg-gps-viagens').checked
+  try {
+    const { error } = await db.from('frota_config_gps').update({ captura_viagens: ligado }).eq('id', 1)
+    if (error) throw error
+    toast(ligado ? 'Captura de localização ativada para viagens' : 'Captura de localização desativada para viagens', 'success')
+    await carregarConfigGps()
+  } catch (e) {
+    toast(e.message || 'Erro ao salvar', 'error')
+    await carregarConfigGps()
+  }
+}
 
 async function carregarVeiculos() {
   const { data } = await db.from('frota_veiculos').select('id,placa,modelo,tipo,status,capacidade_passageiros')
@@ -171,6 +204,13 @@ function renderKpis() {
 function formatDataHora(str) {
   if (!str) return '—'
   return new Date(str).toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', year:'2-digit', hour:'2-digit', minute:'2-digit' })
+}
+
+// Localização capturada silenciosamente pelo app (regra do sistema) —
+// só aparece aqui, na mesa; nunca há tela de GPS no app do motorista.
+function linkMapa(lat, lng) {
+  if (lat == null || lng == null) return ''
+  return ` · <a href="https://www.google.com/maps?q=${lat},${lng}" target="_blank" rel="noopener" style="font-size:12px">Ver localização</a>`
 }
 
 function renderViagens() {
@@ -382,8 +422,8 @@ function abrirDetalhe(id) {
       <div><strong>Período previsto:</strong> ${formatDataHora(v.data_saida_prevista)} → ${formatDataHora(v.data_retorno_prevista)}</div>
       ${v.veiculo_placa ? `<div><strong>Veículo:</strong> ${esc(v.veiculo_modelo)} (${esc(v.veiculo_placa)})</div>` : ''}
       ${v.motorista_nome ? `<div><strong>Motorista:</strong> ${esc(v.motorista_nome)}</div>` : ''}
-      ${v.checkout_em ? `<div><strong>Saída registrada:</strong> ${formatDataHora(v.checkout_em)} — ${v.km_saida ? formatNum(v.km_saida)+' km' : (v.horas_saida ? formatNum(v.horas_saida,1)+' h' : '—')}</div>` : ''}
-      ${v.checkin_em ? `<div><strong>Chegada registrada:</strong> ${formatDataHora(v.checkin_em)} — ${v.km_chegada ? formatNum(v.km_chegada)+' km' : (v.horas_chegada ? formatNum(v.horas_chegada,1)+' h' : '—')}</div>` : ''}
+      ${v.checkout_em ? `<div><strong>Saída registrada:</strong> ${formatDataHora(v.checkout_em)} — ${v.km_saida ? formatNum(v.km_saida)+' km' : (v.horas_saida ? formatNum(v.horas_saida,1)+' h' : '—')}${linkMapa(v.lat_saida, v.lng_saida)}</div>` : ''}
+      ${v.checkin_em ? `<div><strong>Chegada registrada:</strong> ${formatDataHora(v.checkin_em)} — ${v.km_chegada ? formatNum(v.km_chegada)+' km' : (v.horas_chegada ? formatNum(v.horas_chegada,1)+' h' : '—')}${linkMapa(v.lat_chegada, v.lng_chegada)}</div>` : ''}
       ${v.observacoes_checkin ? `<div><strong>Observações:</strong> ${esc(v.observacoes_checkin)}</div>` : ''}
       ${v.avarias ? `<div style="color:#DC2626"><strong>Avarias:</strong> ${esc(v.avarias)}</div>` : ''}
       ${v.motivo_recusa ? `<div><strong>Motivo da recusa:</strong> ${esc(v.motivo_recusa)}</div>` : ''}

@@ -27,6 +27,10 @@ Sistema já tem login, sidebar, layout e páginas funcionando.
     solicitante/motorista/gestor, PWA instalável via
     instalar-frota.html, sem shell Capacitor ainda). Gestão de frota:
     frota-veiculos.html, frota-manutencao.html, frota-tarefas.html.
+    Abastecimento: motorista registra o evento físico no frota-app.html
+    (modo motorista, offline-first); gestão valida e classifica em
+    frota-abastecimentos.html (contrato/fonte — motorista nunca vê).
+    Cadastro de fontes de recurso e contratos: frota-contratos.html.
     Ver regra de duplicação obrigatória em "Regras de desenvolvimento".
 - js/ → config.js, layout.js, mapa-cartografia.js, observability.js,
   queryLogger.js; brigada-offline.js (IndexedDB), brigada-sync.js,
@@ -76,6 +80,70 @@ Brigadas/registros de campo (042–060). Principais:
 - 060_origem_acionamento.sql: enum origem_acionamento
   (denuncia_193|informacao_populares|ronda_brigada|outro) +
   registros_campo.origem_acionamento; view atualizada
+
+Frota — abastecimento (174–175):
+- 174_frota_fontes_contratos.sql: frota_fontes_recurso (orçamentária/
+  não orçamentária), frota_contratos_combustivel (1 contrato → 1
+  fonte; valor_global só referência, sem controle de saldo na v1).
+  Cadastro de mesa (frota-contratos.html), RLS pode_ver/pode_editar.
+- 175_frota_abastecimentos.sql: frota_abastecimentos (evento físico
+  do motorista + campos de validação da gestão), código
+  ABAST-AAAA-NNNN (trigger, molde da 168); RPCs
+  frota_registrar_abastecimento (motorista, idempotente por
+  uuid_cliente, molde da 173 — nunca aceita contrato/status do
+  cliente), frota_validar_abastecimento (gestão, exige contrato_id),
+  frota_rejeitar_abastecimento (gestão); view
+  vw_frota_abastecimentos_detalhe (SECURITY INVOKER, padrão 165);
+  bucket frota-abastecimentos (fotos de cupom/hodômetro).
+- 176_frota_localizacao_gps.sql: geometry(Point,4326) + GIST em
+  frota_viagens (localizacao_saida/localizacao_chegada) e
+  frota_abastecimentos (localizacao); parâmetros p_lat/p_lng
+  (DEFAULT NULL) em frota_checkout_viagem, frota_checkin_viagem,
+  frota_abrir_viagem_direta e frota_registrar_abastecimento; views
+  expõem lat/lng extraídos (ST_Y/ST_X, padrão 047/053). Ver regra do
+  sistema abaixo.
+- 177_frota_config_gps.sql: tabela singleton frota_config_gps
+  (captura_viagens/captura_abastecimento, RLS SELECT autenticado /
+  UPDATE pode_editar('frota')), trigger preenche atualizado_por/em.
+  Liga/desliga a regra de captura de GPS por categoria — ver seção
+  abaixo.
+- 178_frota_fix_overload_gps.sql: corrige overload duplicado que a
+  176 deixou no banco (CREATE OR REPLACE com lista de parâmetros
+  diferente cria função nova em vez de substituir — mesmo cuidado que
+  a 173 já tomava com DROP FUNCTION antes de recriar). Sem isso,
+  chamadas às RPCs de viagem/abastecimento sem p_lat/p_lng dão "could
+  not choose best candidate function". A 176 já foi corrigida no
+  arquivo para não repetir o erro em bases novas.
+- 179_frota_revoke_trigger_functions.sql: revoga EXECUTE de
+  frota_gerar_codigo_abastecimento e
+  frota_marcar_atualizador_config_gps (só devem rodar via trigger,
+  nunca chamadas direto pelo cliente) — achado pelo advisor de
+  segurança do Supabase, mesmo padrão da 165.
+
+## Regra do sistema — localização GPS em Frota (configurável)
+Toda viagem (check-out e check-in, inclusive viagem avulsa) e todo
+abastecimento capturam a localização do aparelho no momento da ação.
+Captura é feita no app (frota-app.html, função `fmObterGps`), de forma
+silenciosa e melhor esforço — sem tela própria, sem watchPosition em
+segundo plano, e NUNCA bloqueia a ação se o GPS falhar, for negado ou
+demorar (timeout de 6s; segue com lat/lng null). A coordenada só é
+exibida na plataforma de mesa (frota-viagens.html,
+frota-abastecimentos.html — função `linkMapa`, link para o Google
+Maps), nunca no app do motorista. Qualquer nova ação do motorista que
+"inicie" ou "encerre" algo no módulo Frota deve seguir essa mesma
+regra — capturar via `fmObterGpsSeAtivo` e persistir a coordenada.
+
+Liga/desliga por categoria (177_frota_config_gps.sql): tabela singleton
+`frota_config_gps` (captura_viagens / captura_abastecimento), editável
+só por quem edita 'frota'. Toggle na mesa: card no topo de
+frota-viagens.html (viagens: checkout/checkin/avulsa) e de
+frota-abastecimentos.html (abastecimento) — independentes entre si. O
+app lê e cacheia essa config no IndexedDB (fmAtualizarConfigGps,
+refeita a cada tick de sync de 45s); fail-safe = true sempre que não
+houver linha, cache ou conexão — a captura só fica desligada depois
+que a config "desligada" chegou ao aparelho pelo menos uma vez. Quando
+desligada, o app nem solicita permissão de geolocalização
+(fmObterGpsSeAtivo curto-circuita antes de chamar fmObterGps).
 
 ## Enums do banco
 perfil_usuario: super_admin | gestor | tecnico | financeiro | visualizador
@@ -231,6 +299,16 @@ E) Dashboard Executivo por nível (UC / Diretoria / Secretaria)
   fluxo tende a se repetir conforme o módulo Frota crescer — ao criar
   uma tela nova de mesa que já tenha equivalente no app (ou vice-versa),
   aplicar a mesma regra e documentar o par aqui.
+  EXCEÇÃO por decisão de produto — Abastecimento: o par não é
+  simétrico. REGISTRO do evento físico (litros/valor/fotos) só existe
+  no app (`frota-app.html`, modo motorista, função
+  `confirmarAbastecimento`) — motorista não tem acesso de mesa.
+  VALIDAÇÃO/classificação por contrato só existe na mesa
+  (`frota-abastecimentos.html`, funções `confirmarValidar`/
+  `confirmarRejeitar`) — não replicada no modo gestor do app na v1
+  (decisão registrada ao criar o fluxo). Se "lançar abastecimento"
+  for adicionado a uma tela de mesa, ou "validar" for adicionado ao
+  app, replicar nos dois lados na mesma entrega, como nos pares acima.
 
 ## Variáveis de ambiente
 SUPABASE_URL=https://atqtybcsvepdabsvgaly.supabase.co
