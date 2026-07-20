@@ -509,6 +509,67 @@ function renderKpis() {
 // ════════════════════════════════════════════════════════════════
 let _charts = {}
 function destroyCharts() { Object.values(_charts).forEach(c => c.destroy()); _charts = {} }
+
+// ── Plugins dos gráficos de ranking (barra horizontal) ─────────
+// Rótulo de valor na ponta da barra: preserva o número exato que a
+// tabela dava. Em barra empilhada, mostra o TOTAL no fim da pilha.
+const rankValueLabels = {
+  id: 'rankValueLabels',
+  afterDatasetsDraw(chart) {
+    const cfg = chart.options.plugins?.rankValueLabels
+    if (!cfg || !cfg.display) return
+    const { ctx } = chart
+    const barSets = chart.data.datasets
+      .map((ds, di) => ({ ds, di }))
+      .filter(o => (o.ds.type || 'bar') === 'bar')
+    if (!barSets.length) return
+    const meta0 = chart.getDatasetMeta(barSets[0].di)
+    ctx.save()
+    ctx.font = '700 11px "DM Sans", system-ui, sans-serif'
+    ctx.fillStyle = '#374151'
+    ctx.textBaseline = 'middle'
+    meta0.data.forEach((_, i) => {
+      let total = 0, maxX = chart.scales.x.getPixelForValue(0)
+      barSets.forEach(({ ds, di }) => {
+        total += Number(ds.data[i]) || 0
+        const el = chart.getDatasetMeta(di).data[i]
+        if (el && el.x > maxX) maxX = el.x
+      })
+      const y = meta0.data[i].y
+      const txt = cfg.fmt ? cfg.fmt(total, i) : String(total)
+      ctx.fillText(txt, maxX + 6, y)
+    })
+    ctx.restore()
+  }
+}
+// Linha de referência vertical (ex.: média da frota no gráfico de consumo)
+const rankRefLine = {
+  id: 'rankRefLine',
+  afterDatasetsDraw(chart) {
+    const cfg = chart.options.plugins?.rankRefLine
+    if (!cfg || cfg.value == null) return
+    const x = chart.scales.x.getPixelForValue(cfg.value)
+    const { top, bottom } = chart.chartArea
+    const { ctx } = chart
+    ctx.save()
+    ctx.strokeStyle = '#6b7280'; ctx.lineWidth = 1.5; ctx.setLineDash([5, 4])
+    ctx.beginPath(); ctx.moveTo(x, top); ctx.lineTo(x, bottom); ctx.stroke()
+    if (cfg.label) {
+      ctx.setLineDash([]); ctx.fillStyle = '#6b7280'
+      ctx.font = '600 10px "DM Sans", system-ui, sans-serif'
+      ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'
+      ctx.fillText(cfg.label, x, top - 1)
+    }
+    ctx.restore()
+  }
+}
+Chart.register(rankValueLabels, rankRefLine)
+
+// Trunca rótulo longo de categoria (placa — modelo) no eixo Y
+function _rankTick(txt) {
+  const s = String(txt)
+  return s.length > 26 ? s.slice(0, 25) + '…' : s
+}
 function initChart(id, config) {
   const canvas = document.getElementById(id)
   if (!canvas) return
