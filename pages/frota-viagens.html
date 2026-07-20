@@ -6,6 +6,77 @@
 <link rel="stylesheet" href="../css/global.css">
 <link rel="stylesheet" href="../css/frota-wise-theme.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+/* ── Linha do Tempo (Gantt 30 dias) — escopo .frota-tl, não vaza
+   pro resto do sistema. Ver prompt em conversa com o usuário. ── */
+.frota-tl-toggle { display:flex; gap:4px; padding:4px; background:var(--fw-bg-muted,#F2F5F7);
+  border-radius:10px; width:fit-content }
+.frota-tl-toggle button { padding:7px 16px; font-size:.82rem; font-weight:600; border:none;
+  border-radius:8px; background:transparent; cursor:pointer; color:#6B7280; font-family:inherit;
+  transition:background .18s, color .18s }
+.frota-tl-toggle button.ativo { background:#fff; color:#163300; box-shadow:0 1px 4px rgba(0,0,0,.1) }
+
+.frota-tl-modos { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:14px 0 }
+.frota-tl-chip { padding:7px 15px; border-radius:999px; font-size:.8rem; font-weight:600;
+  background:#F2F5F7; color:#374151; border:1.5px solid transparent; cursor:pointer;
+  transition:background .18s, color .18s, transform .12s; font-family:inherit }
+.frota-tl-chip.ativo { background:#DCF3D8; color:#163300 }
+.frota-tl-chip:active { transform:scale(.96) }
+.frota-tl-sel-veic { padding:7px 12px; border-radius:8px; border:1.5px solid #E8EAED; font-size:.82rem;
+  font-family:inherit; display:none }
+.frota-tl-sel-veic.visivel { display:inline-block }
+
+.frota-tl-wrap { background:#fff; border:1px solid #E8EAED; border-radius:16px; overflow:hidden;
+  box-shadow:0 2px 12px rgba(0,0,0,.05) }
+.frota-tl-head { display:flex; border-bottom:1.5px solid #E8EAED; position:sticky; top:0; background:#fff; z-index:3 }
+.frota-tl-head-label { width:210px; flex-shrink:0; padding:10px 14px; font-size:.72rem; font-weight:700;
+  color:#9CA3AF; text-transform:uppercase; letter-spacing:.05em; border-right:1px solid #E8EAED }
+.frota-tl-head-days { flex:1; display:flex; overflow-x:auto; scrollbar-width:thin }
+.frota-tl-day { flex:1; min-width:34px; text-align:center; padding:8px 2px; font-size:.68rem;
+  font-weight:600; color:#9CA3AF; border-right:1px solid #F2F5F7 }
+.frota-tl-day.finde { background:#FAFBFC }
+.frota-tl-day.hoje { color:#163300; background:#DCF3D8 }
+.frota-tl-body { max-height:min(70vh,620px); overflow-y:auto; overflow-x:auto }
+.frota-tl-row { display:flex; border-bottom:1px solid #F2F5F7; position:relative; min-height:52px;
+  opacity:0; transform:translateY(8px); animation:frota-tl-fade .32s cubic-bezier(.2,.8,.2,1) forwards }
+.frota-tl-row:nth-child(1){animation-delay:.02s} .frota-tl-row:nth-child(2){animation-delay:.05s}
+.frota-tl-row:nth-child(3){animation-delay:.08s} .frota-tl-row:nth-child(4){animation-delay:.11s}
+.frota-tl-row:nth-child(5){animation-delay:.14s} .frota-tl-row:nth-child(n+6){animation-delay:.16s}
+@keyframes frota-tl-fade { to { opacity:1; transform:translateY(0) } }
+.frota-tl-row-label { width:210px; flex-shrink:0; padding:10px 14px; border-right:1px solid #E8EAED;
+  display:flex; flex-direction:column; justify-content:center; background:#fff; position:sticky; left:0; z-index:2 }
+.frota-tl-row-label strong { font-size:.82rem; color:#0E0F0C }
+.frota-tl-row-label span { font-size:.72rem; color:#9CA3AF; margin-top:1px }
+.frota-tl-lane { flex:1; position:relative; min-width:900px }
+.frota-tl-lane.vazia { background:repeating-linear-gradient(45deg,#FAFBFC,#FAFBFC 8px,#fff 8px,#fff 16px) }
+.frota-tl-grid-col { position:absolute; top:0; bottom:0; border-right:1px solid #F5F6F7 }
+.frota-tl-now { position:absolute; top:0; bottom:0; width:2px; background:#EF5B3C; z-index:4;
+  box-shadow:0 0 0 rgba(239,91,60,.5); animation:frota-tl-pulse 2.4s ease-in-out infinite }
+@keyframes frota-tl-pulse { 0%,100% { box-shadow:0 0 0 0 rgba(239,91,60,.35) } 50% { box-shadow:0 0 8px 2px rgba(239,91,60,.35) } }
+.frota-tl-bar { position:absolute; top:8px; height:36px; border-radius:9px; cursor:pointer;
+  display:flex; align-items:center; padding:0 10px; font-size:.72rem; font-weight:600; color:#fff;
+  overflow:hidden; white-space:nowrap; text-overflow:ellipsis; box-shadow:0 1px 4px rgba(0,0,0,.12);
+  transition:transform .16s cubic-bezier(.2,.8,.2,1), box-shadow .16s, filter .16s; z-index:1 }
+.frota-tl-bar:hover { transform:translateY(-2px) scale(1.015); box-shadow:0 6px 16px rgba(0,0,0,.22); z-index:2 }
+.frota-tl-bar.dim { opacity:.25; filter:grayscale(.4) }
+.frota-tl-bar.realce { outline:2px solid #163300; outline-offset:1px }
+.frota-tl-bar .tl-link-ico { flex-shrink:0; margin-right:4px; opacity:.85 }
+.frota-tl-ghost { position:absolute; top:8px; height:36px; border-radius:9px; border:1.5px dashed rgba(0,0,0,.25);
+  z-index:0 }
+.frota-tl-empty { padding:40px; text-align:center; color:#9CA3AF; font-size:.85rem }
+
+.frota-tl-tip { position:fixed; z-index:9000; background:#0E0F0C; color:#fff; padding:10px 13px;
+  border-radius:10px; font-size:.78rem; line-height:1.5; max-width:260px; box-shadow:0 8px 24px rgba(0,0,0,.3);
+  pointer-events:none; opacity:0; transform:translateY(4px); transition:opacity .12s, transform .12s }
+.frota-tl-tip.show { opacity:1; transform:translateY(0) }
+.frota-tl-tip strong { color:#9FE870 }
+
+@media (prefers-reduced-motion: reduce) {
+  .frota-tl-row { animation:none; opacity:1; transform:none }
+  .frota-tl-now { animation:none }
+  .frota-tl-bar, .frota-tl-chip, .frota-tl-toggle button { transition:none }
+}
+</style>
 <script src="../js/observability.js"></script>
 <script src="../js/queryLogger.js"></script>
 <script src="../js/config.js"></script>
@@ -90,6 +161,13 @@
 
 <script>
 let _viagens = [], _veiculos = [], _motoristas = [], _acaoId = null
+let _tlAtiva = false, _tlCarregada = false, _viagensTimeline = []
+let _tlModo = 'todos', _tlVeiculoId = null
+const TL_DIAS = 30
+const STATUS_TL_COR = {
+  solicitada:'#f59e0b', aprovada:'#3B82C4', em_andamento:'#7c3aed',
+  concluida:'#059669', recusada:'#9CA3AF', cancelada:'#9CA3AF',
+}
 
 const STATUS_LABEL = { solicitada:'Solicitada', aprovada:'Aprovada', recusada:'Recusada',
   em_andamento:'Em andamento', concluida:'Concluída', cancelada:'Cancelada' }
@@ -125,9 +203,9 @@ const STATUS_VEIC_LABEL = { disponivel:'Disponível', em_viagem:'Em viagem', em_
           <input type="checkbox" id="cfg-gps-viagens" style="width:auto" onchange="salvarConfigGpsViagens()"> Ativada
         </label>
       </div>
-      <div class="filter-bar">
-        <input class="form-control search-input" id="busca" placeholder="Buscar destino, solicitante..." oninput="renderViagens()">
-        <select class="form-control" id="fil-status" style="width:180px" onchange="renderViagens()">
+      <div class="filter-bar" style="align-items:center">
+        <input class="form-control search-input" id="busca" placeholder="Buscar destino, solicitante..." oninput="renderViagens(); if(_tlAtiva) renderTimeline()">
+        <select class="form-control" id="fil-status" style="width:180px" onchange="renderViagens(); if(_tlAtiva) renderTimeline()">
           <option value="">Todos os status</option>
           <option value="solicitada" selected>Solicitadas</option>
           <option value="aprovada">Aprovadas</option>
@@ -136,14 +214,36 @@ const STATUS_VEIC_LABEL = { disponivel:'Disponível', em_viagem:'Em viagem', em_
           <option value="recusada">Recusadas</option>
           <option value="cancelada">Canceladas</option>
         </select>
+        <div class="frota-tl-toggle" style="margin-left:auto">
+          <button type="button" id="btn-view-lista" class="ativo" onclick="mudarVisaoViagens('lista')">${bico('list')} Lista</button>
+          <button type="button" id="btn-view-tl" onclick="mudarVisaoViagens('timeline')">${bico('bar-chart')} Linha do Tempo</button>
+        </div>
       </div>
-      <div class="card">
+
+      <div class="card" id="card-lista">
         <div class="table-wrap"><div class="table-scroll">
           <table>
             <thead><tr><th>Destino</th><th>Solicitante</th><th>Período</th><th>Veículo / Motorista</th><th>Status</th><th>Ações</th></tr></thead>
             <tbody id="tbody"><tr><td colspan="6" style="text-align:center;padding:32px;color:#9CA3AF">Carregando...</td></tr></tbody>
           </table>
         </div></div>
+      </div>
+
+      <div id="card-timeline" style="display:none">
+        <div class="frota-tl-modos">
+          <button type="button" class="frota-tl-chip ativo" data-modo="todos" onclick="setModoTimeline('todos')">Todos os veículos</button>
+          <button type="button" class="frota-tl-chip" data-modo="individual" onclick="setModoTimeline('individual')">Veículo individual</button>
+          <select class="frota-tl-sel-veic" id="tl-sel-veiculo" onchange="_tlVeiculoId=this.value; renderTimeline()"></select>
+          <button type="button" class="frota-tl-chip" data-modo="demanda" onclick="setModoTimeline('demanda')">Por demanda</button>
+          <button type="button" class="btn btn-xs btn-ghost" style="margin-left:auto" onclick="irParaHojeTimeline()">${bico('pin')} Hoje</button>
+        </div>
+        <div class="frota-tl-wrap">
+          <div class="frota-tl-head">
+            <div class="frota-tl-head-label" id="tl-head-label">Veículo</div>
+            <div class="frota-tl-head-days" id="tl-head-days"></div>
+          </div>
+          <div class="frota-tl-body" id="tl-body"></div>
+        </div>
       </div>
     </div>` +
     '</div></div></div>'
@@ -438,6 +538,205 @@ function abrirDetalhe(id) {
 function fecharModal(qual) {
   document.getElementById(`modal-${qual}`).classList.remove('aberto')
   _acaoId = null; _viagemAprovando = null; _linhasAlocacao = []
+}
+
+// ════════════════════════════════════════════════════════════════
+// Linha do Tempo (Gantt de 30 dias) — visão alternativa à Lista,
+// sobre os mesmos dados de vw_frota_viagens_detalhe. Ver contexto
+// completo no prompt combinado com o usuário (agenda por veículo /
+// individual / por demanda, com destaque de viagens divididas).
+// ════════════════════════════════════════════════════════════════
+async function mudarVisaoViagens(qual) {
+  _tlAtiva = qual === 'timeline'
+  document.getElementById('btn-view-lista').classList.toggle('ativo', !_tlAtiva)
+  document.getElementById('btn-view-tl').classList.toggle('ativo', _tlAtiva)
+  document.getElementById('card-lista').style.display = _tlAtiva ? 'none' : ''
+  document.getElementById('card-timeline').style.display = _tlAtiva ? '' : 'none'
+  if (!_tlAtiva) return
+
+  if (!_tlCarregada) {
+    document.getElementById('tl-body').innerHTML = '<div class="frota-tl-empty">Carregando agenda...</div>'
+    await carregarViagensTimeline()
+    document.getElementById('tl-sel-veiculo').innerHTML = _veiculos
+      .slice().sort((a,b)=>a.placa.localeCompare(b.placa))
+      .map(v => `<option value="${v.id}">${esc(v.placa)} — ${esc(v.modelo)}</option>`).join('')
+    _tlCarregada = true
+  }
+  renderTimeline()
+}
+
+async function carregarViagensTimeline() {
+  const hoje = new Date(); hoje.setHours(0,0,0,0)
+  const fim = new Date(hoje.getTime() + TL_DIAS*86400*1000)
+  const { data, error } = await db.from('vw_frota_viagens_detalhe').select('*')
+    .lte('data_saida_prevista', fim.toISOString())
+    .gte('data_retorno_prevista', hoje.toISOString())
+    .order('data_saida_prevista', { ascending: true })
+    .limit(1000)
+  if (error) { toast('Erro ao carregar linha do tempo', 'error'); return }
+  _viagensTimeline = data || []
+}
+
+function setModoTimeline(modo) {
+  _tlModo = modo
+  document.querySelectorAll('.frota-tl-chip[data-modo]').forEach(b => b.classList.toggle('ativo', b.dataset.modo === modo))
+  const selVeic = document.getElementById('tl-sel-veiculo')
+  selVeic.classList.toggle('visivel', modo === 'individual')
+  if (modo === 'individual' && !_tlVeiculoId && _veiculos.length) {
+    _tlVeiculoId = _veiculos[0].id
+    selVeic.value = _tlVeiculoId
+  }
+  renderTimeline()
+}
+
+function tlRangeDias() {
+  const hoje = new Date(); hoje.setHours(0,0,0,0)
+  return Array.from({ length: TL_DIAS }, (_, i) => new Date(hoje.getTime() + i*86400*1000))
+}
+
+function tlPosicao(dataIni, dataFim, rangeIni, rangeFimMs) {
+  const totalMs = rangeFimMs - rangeIni.getTime()
+  const ini = Math.max(new Date(dataIni).getTime(), rangeIni.getTime())
+  const fim = Math.min(new Date(dataFim).getTime(), rangeFimMs)
+  const left = Math.max(0, (ini - rangeIni.getTime()) / totalMs * 100)
+  const width = Math.max(1.2, (fim - ini) / totalMs * 100)
+  return { left, width }
+}
+
+function tlViagensFiltradas() {
+  const q = (document.getElementById('busca')?.value || '').toLowerCase()
+  const status = document.getElementById('fil-status')?.value
+  return _viagensTimeline.filter(v =>
+    (!q || `${v.destino} ${v.solicitante_nome}`.toLowerCase().includes(q)) &&
+    (!status || v.status === status))
+}
+
+// Grupo "por demanda": raiz é o viagem_pai_id (se filha) ou o próprio
+// id (se mãe/única). Só entram grupos com mais de 1 alocação.
+function tlGrupoDemanda(v) { return v.viagem_pai_id || v.id }
+
+function renderTimeline() {
+  const dias = tlRangeDias()
+  const rangeIni = dias[0]
+  const rangeFimMs = dias[dias.length-1].getTime() + 86400*1000
+  const hojeMs = new Date().setHours(0,0,0,0)
+
+  // Cabeçalho de dias
+  document.getElementById('tl-head-days').innerHTML = dias.map(d => {
+    const finde = d.getDay() === 0 || d.getDay() === 6
+    const ehHoje = d.getTime() === hojeMs
+    return `<div class="frota-tl-day${finde?' finde':''}${ehHoje?' hoje':''}">${d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})}</div>`
+  }).join('')
+
+  const viagens = tlViagensFiltradas()
+  let linhas = []
+
+  if (_tlModo === 'demanda') {
+    document.getElementById('tl-head-label').textContent = 'Solicitação'
+    const grupos = {}
+    viagens.forEach(v => {
+      const g = tlGrupoDemanda(v)
+      grupos[g] = grupos[g] || []
+      grupos[g].push(v)
+    })
+    Object.entries(grupos).filter(([,vs]) => vs.length > 1).forEach(([g, vs]) => {
+      linhas.push({
+        label: vs[0].destino, sub: `${vs.length} veículos · ${vs[0].solicitante_nome||''}`,
+        bars: vs, grupo: g,
+      })
+    })
+    if (!linhas.length) {
+      document.getElementById('tl-body').innerHTML = '<div class="frota-tl-empty">Nenhuma solicitação dividida em mais de um veículo no período/filtro atual</div>'
+      return
+    }
+  } else if (_tlModo === 'individual') {
+    document.getElementById('tl-head-label').textContent = 'Veículo'
+    const veic = _veiculos.find(x => x.id === _tlVeiculoId)
+    const vs = viagens.filter(v => v.veiculo_id === _tlVeiculoId)
+    linhas.push({
+      label: veic ? `${veic.placa} — ${veic.modelo}` : 'Selecione um veículo',
+      sub: `${vs.length} viagem(ns) no período`, bars: vs, vazia: !vs.length,
+    })
+  } else {
+    document.getElementById('tl-head-label').textContent = 'Veículo'
+    const porVeiculo = {}
+    viagens.forEach(v => {
+      if (!v.veiculo_id) return
+      porVeiculo[v.veiculo_id] = porVeiculo[v.veiculo_id] || []
+      porVeiculo[v.veiculo_id].push(v)
+    })
+    _veiculos.slice().sort((a,b)=>a.placa.localeCompare(b.placa)).forEach(veic => {
+      const vs = porVeiculo[veic.id] || []
+      if (!vs.length) return // esconde veículos sem viagem no período/filtro
+      linhas.push({ label: `${veic.placa} — ${veic.modelo}`, sub: veic.tipo, bars: vs })
+    })
+    if (!linhas.length) {
+      document.getElementById('tl-body').innerHTML = '<div class="frota-tl-empty">Nenhuma viagem no período/filtro atual</div>'
+      return
+    }
+  }
+
+  const nowLeft = Math.max(0, Math.min(100, (Date.now() - rangeIni.getTime()) / (rangeFimMs - rangeIni.getTime()) * 100))
+
+  document.getElementById('tl-body').innerHTML = linhas.map(row => {
+    const barsHtml = (row.bars||[]).map(v => {
+      const { left, width } = tlPosicao(v.data_saida_prevista, v.data_retorno_prevista, rangeIni, rangeFimMs)
+      const cor = STATUS_TL_COR[v.status] || '#9CA3AF'
+      const grupo = v.viagem_pai_id || v.id
+      const dividida = v.viagem_pai_id || row.grupo
+      const labelBar = _tlModo === 'demanda' ? (v.veiculo_placa || 'A definir') : esc(v.destino)
+      let ghost = ''
+      if (v.checkout_em && v.checkin_em) {
+        const real = tlPosicao(v.checkout_em, v.checkin_em, rangeIni, rangeFimMs)
+        ghost = `<div class="frota-tl-ghost" style="left:${left}%;width:${width}%"></div>`
+      }
+      return `${ghost}<div class="frota-tl-bar" data-grupo="${grupo}" data-vid="${v.id}"
+        style="left:${left}%;width:${width}%;background:${cor}${v.status==='recusada'||v.status==='cancelada'?';background-image:repeating-linear-gradient(45deg,transparent,transparent 5px,rgba(255,255,255,.25) 5px,rgba(255,255,255,.25) 10px)':''}"
+        onmouseenter="tlHoverBar(event,'${v.id}')" onmouseleave="tlLeaveBar()"
+        onclick="abrirDetalhe('${v.id}')">${dividida ? bico('share','tl-link-ico') : ''}${labelBar}</div>`
+    }).join('')
+    return `<div class="frota-tl-row">
+      <div class="frota-tl-row-label"><strong>${esc(row.label)}</strong><span>${esc(row.sub||'')}</span></div>
+      <div class="frota-tl-lane${row.vazia?' vazia':''}">
+        <div class="frota-tl-now" style="left:${nowLeft}%"></div>
+        ${barsHtml}
+      </div>
+    </div>`
+  }).join('')
+}
+
+function irParaHojeTimeline() {
+  const body = document.getElementById('tl-body')
+  const now = body.querySelector('.frota-tl-now')
+  if (now) now.scrollIntoView({ inline:'center', block:'nearest', behavior:'smooth' })
+}
+
+let _tlTip = null
+function tlHoverBar(ev, id) {
+  const v = _viagensTimeline.find(x => x.id === id)
+  if (!v) return
+  const grupo = v.viagem_pai_id || v.id
+  document.querySelectorAll('.frota-tl-bar').forEach(b => {
+    const mesmoGrupo = b.dataset.grupo === grupo
+    b.classList.toggle('dim', !mesmoGrupo)
+    b.classList.toggle('realce', mesmoGrupo && b.dataset.vid !== id)
+  })
+
+  if (!_tlTip) { _tlTip = document.createElement('div'); _tlTip.className = 'frota-tl-tip'; document.body.appendChild(_tlTip) }
+  _tlTip.innerHTML = `<strong>${esc(v.destino)}</strong><br>${esc(v.finalidade||'')}<br>
+    ${formatDataHora(v.data_saida_prevista)} → ${formatDataHora(v.data_retorno_prevista)}<br>
+    ${v.veiculo_placa ? `${esc(v.veiculo_modelo)} (${esc(v.veiculo_placa)})<br>` : ''}
+    ${v.motorista_nome ? `Motorista: ${esc(v.motorista_nome)}<br>` : ''}
+    ${v.passageiros ? `${v.passageiros} passageiro(s)` : ''}`
+  const r = ev.target.getBoundingClientRect()
+  _tlTip.style.left = Math.min(window.innerWidth - 270, r.left) + 'px'
+  _tlTip.style.top = (r.bottom + 8) + 'px'
+  requestAnimationFrame(() => _tlTip.classList.add('show'))
+}
+
+function tlLeaveBar() {
+  document.querySelectorAll('.frota-tl-bar').forEach(b => { b.classList.remove('dim'); b.classList.remove('realce') })
+  if (_tlTip) _tlTip.classList.remove('show')
 }
 </script>
 </body>
