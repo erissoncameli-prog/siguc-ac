@@ -151,6 +151,8 @@ function gerarLayout(tituloPagina, paginaAtiva) {
         { id: 'frota-solicitar', href: '../pages/frota-solicitar.html', label: 'Solicitar Viagem' },
         { id: 'frota-viagens',   href: '../pages/frota-viagens.html',   label: 'Agenda de Viagens',
           perfis: ['super_admin','diretor','chefe_departamento','gestor','assistente_admin'] },
+        { id: 'frota-dashboard', href: '../pages/frota-dashboard.html', label: 'Painel de Frota',
+          perfis: ['super_admin','secretario','diretor','chefe_departamento','gestor','gestor_uc','tecnico','assistente_admin','financeiro'] },
         { id: 'frota-administrar', href: '../pages/frota-administrar.html', label: 'Administrar Frota',
           perfis: ['super_admin','secretario','diretor','chefe_departamento','gestor','gestor_uc','tecnico','assistente_admin','financeiro'] },
       ]

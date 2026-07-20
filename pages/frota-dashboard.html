@@ -1,0 +1,924 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>SIGUC-AC · Painel de Frota</title>
+<link rel="stylesheet" href="../css/global.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../js/observability.js"></script>
+<script src="../js/queryLogger.js"></script>
+<script src="../js/config.js"></script>
+<script src="../js/layout.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<style>
+.rel-topbar { display:flex; gap:10px; flex-wrap:wrap; align-items:center;
+              background:var(--branco); border:1px solid var(--borda);
+              border-radius:var(--raio-lg); padding:14px 16px; margin-bottom:18px }
+.rel-topbar label { font-size:.78rem; font-weight:600; color:var(--cinza-500);
+                    text-transform:uppercase; letter-spacing:.05em; margin-right:6px }
+.rel-topbar select, .rel-topbar input[type=date] {
+  padding:6px 10px; border-radius:7px; border:1.5px solid var(--borda);
+  font-size:.84rem; background:var(--branco); font-family:inherit }
+.periodo-custom { display:flex; gap:6px; align-items:center }
+.chart-card { background:var(--branco); border:1px solid var(--borda);
+              border-radius:var(--raio-lg); padding:16px;
+              box-shadow:0 2px 10px rgba(0,0,0,.06), 0 1px 3px rgba(0,0,0,.04) }
+.chart-title { font-size:.78rem; font-weight:700; color:var(--cinza-500);
+               text-transform:uppercase; letter-spacing:.06em; margin-bottom:12px }
+.chart-empty { font-size:.82rem; color:var(--cinza-400); padding:8px 0; text-align:center }
+.chart-canvas-wrap { position:relative; width:100% }
+.chart-grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px }
+@media(max-width:820px){ .chart-grid-2{ grid-template-columns:1fr } }
+.rel-table { width:100%; border-collapse:collapse; font-size:.82rem }
+.rel-table th { padding:8px 10px; text-align:left; font-size:.72rem; font-weight:700;
+                color:var(--cinza-500); text-transform:uppercase; letter-spacing:.05em;
+                border-bottom:1.5px solid var(--borda); white-space:nowrap; cursor:pointer;
+                user-select:none }
+.rel-table th:hover { color:var(--floresta) }
+.rel-table th.sort-asc::after  { content:' ▲'; font-size:.6rem }
+.rel-table th.sort-desc::after { content:' ▼'; font-size:.6rem }
+.rel-table td { padding:9px 10px; border-bottom:1px solid var(--cinza-100);
+                color:var(--cinza-800) }
+.rel-table tr:last-child td { border-bottom:none }
+.rel-table tr:hover td { background:var(--cinza-50) }
+.rel-table td.num { text-align:right; font-variant-numeric:tabular-nums }
+.rank-tabbar { display:flex; gap:4px; padding:4px; background:var(--cinza-50);
+               border-radius:10px; width:fit-content; margin-bottom:12px; flex-wrap:wrap }
+.rank-tab { padding:7px 14px; font-size:.8rem; font-weight:600; border:none; border-radius:8px;
+            background:transparent; cursor:pointer; color:var(--cinza-500); font-family:inherit }
+.rank-tab.ativo { background:var(--branco); color:var(--floresta);
+                  box-shadow:0 1px 3px rgba(0,0,0,.08) }
+.alerta-item { display:flex; align-items:center; gap:10px; padding:9px 4px;
+               border-bottom:1px solid var(--cinza-100); font-size:.84rem }
+.alerta-item:last-child { border-bottom:none }
+.alerta-badge { font-size:.7rem; font-weight:700; padding:2px 8px; border-radius:999px;
+                white-space:nowrap }
+.alerta-badge.critico { background:#fee2e2; color:#b91c1c }
+.alerta-badge.aviso   { background:#fef3c7; color:#92400e }
+.btn-export { display:flex; align-items:center; gap:5px; padding:7px 14px;
+              border-radius:8px; border:1.5px solid var(--borda); background:var(--branco);
+              font-size:.82rem; font-weight:600; cursor:pointer; color:var(--cinza-700);
+              font-family:inherit; white-space:nowrap }
+.btn-export:hover { background:var(--cinza-50) }
+.skel { background:linear-gradient(90deg,#f3f4f6 25%,#e9eaec 50%,#f3f4f6 75%);
+        background-size:200% 100%; animation:skel .9s infinite; border-radius:6px; height:14px }
+@keyframes skel{ from{background-position:200% 0} to{background-position:-200% 0} }
+.link-mapa { color:var(--verde-c); font-size:.78rem; text-decoration:none }
+.link-mapa:hover { text-decoration:underline }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+// ════════════════════════════════════════════════════════════════
+// Estado global
+// ════════════════════════════════════════════════════════════════
+let _usuario    = null
+let _viagens     = []   // vw_frota_viagens_detalhe no período
+let _abastec     = []   // vw_frota_abastecimentos_detalhe no período
+let _manutPend   = []   // vw_frota_manutencoes_pendentes (sem filtro de período — estado atual)
+let _veiculos    = []   // frota_veiculos
+let _motoristas  = []   // frota_motoristas
+let _ordensServ  = []   // frota_ordens_servico no período
+let _documentos  = []   // frota_veiculo_documentos (vencimento — sem filtro de período)
+let _setores     = []   // unidades_organizacionais
+let _carregando  = false
+let _rankAtivo   = 'veiculos-viagens'
+
+const STATUS_VIAGEM_LAB = {
+  solicitada:'Solicitada', aprovada:'Aprovada', recusada:'Recusada',
+  em_andamento:'Em andamento', concluida:'Concluída', cancelada:'Cancelada',
+}
+const STATUS_VIAGEM_COR = {
+  solicitada:'#f59e0b', aprovada:'#3B82C4', recusada:'#ef4444',
+  em_andamento:'#7c3aed', concluida:'#059669', cancelada:'#6b7280',
+}
+const STATUS_VEIC_LAB = {
+  disponivel:'Disponível', em_viagem:'Em viagem', em_manutencao:'Em manutenção',
+  cedido:'Cedido', baixado:'Baixado',
+}
+const STATUS_VEIC_COR = {
+  disponivel:'#059669', em_viagem:'#7c3aed', em_manutencao:'#f59e0b',
+  cedido:'#3B82C4', baixado:'#6b7280',
+}
+const TIPO_MANUT_LAB = { preventiva:'Preventiva', corretiva:'Corretiva' }
+
+// ════════════════════════════════════════════════════════════════
+// Inicialização
+// ════════════════════════════════════════════════════════════════
+;(async function () {
+  _usuario = await carregarUsuario()
+  if (!_usuario) { window.location.href = '../index.html'; return }
+
+  document.getElementById('app').innerHTML =
+    gerarLayout('Painel de Frota','frota-dashboard') + htmlPagina()
+
+  document.getElementById('sel-periodo').addEventListener('change', e => {
+    const custom = document.getElementById('periodo-custom')
+    custom.style.display = e.target.value === 'custom' ? 'flex' : 'none'
+    if (e.target.value !== 'custom') carregarDashboard()
+  })
+  document.getElementById('btn-gerar').addEventListener('click', carregarDashboard)
+  document.getElementById('sel-setor').addEventListener('change', carregarDashboard)
+  document.getElementById('sel-tipo').addEventListener('change', carregarDashboard)
+  document.getElementById('btn-exportar').addEventListener('click', exportarCSV)
+
+  document.querySelectorAll('.rank-tab').forEach(t => {
+    t.addEventListener('click', () => {
+      document.querySelectorAll('.rank-tab').forEach(x => x.classList.remove('ativo'))
+      t.classList.add('ativo')
+      _rankAtivo = t.dataset.rank
+      renderRankings()
+    })
+  })
+
+  setPeriodoMes()
+  await carregarSetores()
+  await carregarDashboard()
+
+  if (window._sigucBar) _sigucBarCompleta()
+})()
+
+// ════════════════════════════════════════════════════════════════
+// HTML estático
+// ════════════════════════════════════════════════════════════════
+function htmlPagina() {
+  const hoje = new Date()
+  const m1 = new Date(hoje.getFullYear(), hoje.getMonth(), 1).toISOString().slice(0,10)
+  const m2 = hoje.toISOString().slice(0,10)
+
+  return `<div class="page-content">
+  <div class="page-header" style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px">
+    <div>
+      <h1 class="page-title">Painel de Frota</h1>
+      <p class="page-subtitle">Visão gerencial de viagens, combustível, manutenção e uso da frota</p>
+    </div>
+    <button class="btn-export" id="btn-exportar">${bico('download')} Exportar CSV</button>
+  </div>
+
+  <div class="rel-topbar">
+    <div>
+      <label>Período</label>
+      <select id="sel-periodo">
+        <option value="mes">Mês atual</option>
+        <option value="30d">Últimos 30 dias</option>
+        <option value="90d">Últimos 90 dias</option>
+        <option value="ano">Este ano</option>
+        <option value="custom">Personalizado</option>
+      </select>
+    </div>
+    <div class="periodo-custom" id="periodo-custom" style="display:none">
+      <input type="date" id="periodo-ini" value="${m1}">
+      <span style="font-size:.8rem;color:var(--cinza-400)">até</span>
+      <input type="date" id="periodo-fim" value="${m2}">
+      <button class="btn btn-sm btn-primary" id="btn-gerar">Gerar</button>
+    </div>
+    <div>
+      <label>Setor</label>
+      <select id="sel-setor"><option value="">Todos</option></select>
+    </div>
+    <div>
+      <label>Tipo</label>
+      <select id="sel-tipo">
+        <option value="">Todos</option>
+        <option value="carro">Carro</option>
+        <option value="caminhonete">Caminhonete</option>
+        <option value="van">Van</option>
+        <option value="onibus">Ônibus</option>
+        <option value="caminhao">Caminhão</option>
+        <option value="motocicleta">Motocicleta</option>
+        <option value="quadriciclo">Quadriciclo</option>
+        <option value="embarcacao">Embarcação</option>
+        <option value="outro">Outro</option>
+      </select>
+    </div>
+    <span id="periodo-label" style="font-size:.82rem;color:var(--cinza-500)"></span>
+  </div>
+
+  <div id="dash-loading">
+    <div style="display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));margin-bottom:18px">
+      ${Array(8).fill('<div class="skel" style="height:80px;border-radius:10px"></div>').join('')}
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+      ${Array(4).fill('<div class="skel" style="height:200px;border-radius:12px"></div>').join('')}
+    </div>
+  </div>
+
+  <div id="dash-conteudo" hidden></div>
+</div>`
+}
+
+// ════════════════════════════════════════════════════════════════
+// Período
+// ════════════════════════════════════════════════════════════════
+function setPeriodoMes() {
+  const hoje = new Date()
+  const ini  = new Date(hoje.getFullYear(), hoje.getMonth(), 1)
+  document.getElementById('periodo-ini').value = ini.toISOString().slice(0,10)
+  document.getElementById('periodo-fim').value = hoje.toISOString().slice(0,10)
+}
+
+function getPeriodo() {
+  const sel  = document.getElementById('sel-periodo').value
+  const hoje = new Date()
+  let ini, fim = hoje
+
+  if (sel === 'custom') {
+    return {
+      ini: document.getElementById('periodo-ini').value,
+      fim: document.getElementById('periodo-fim').value,
+    }
+  }
+  if (sel === 'mes') ini = new Date(hoje.getFullYear(), hoje.getMonth(), 1)
+  if (sel === '30d') ini = new Date(hoje - 30*86400*1000)
+  if (sel === '90d') ini = new Date(hoje - 90*86400*1000)
+  if (sel === 'ano') ini = new Date(hoje.getFullYear(), 0, 1)
+  return { ini: ini.toISOString().slice(0,10), fim: fim.toISOString().slice(0,10) }
+}
+
+function exibirPeriodoLabel(ini, fim) {
+  const fmt = d => new Date(d+'T12:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'short',year:'numeric'})
+  document.getElementById('periodo-label').textContent = `${fmt(ini)} → ${fmt(fim)}`
+}
+
+// ════════════════════════════════════════════════════════════════
+// Carregamento de dados
+// ════════════════════════════════════════════════════════════════
+async function carregarSetores() {
+  const { data } = await db.from('unidades_organizacionais').select('id,sigla,nome').eq('ativo', true).order('nome')
+  _setores = data || []
+  const sel = document.getElementById('sel-setor')
+  sel.innerHTML = '<option value="">Todos</option>' +
+    _setores.map(s => `<option value="${s.id}">${esc(s.sigla || s.nome)}</option>`).join('')
+}
+
+async function carregarDashboard() {
+  if (_carregando) return
+  _carregando = true
+
+  const { ini, fim } = getPeriodo()
+  exibirPeriodoLabel(ini, fim)
+  const setorId = document.getElementById('sel-setor').value
+  const tipo    = document.getElementById('sel-tipo').value
+
+  document.getElementById('dash-loading').hidden = false
+  document.getElementById('dash-conteudo').hidden = true
+
+  const iniTs = ini + 'T00:00:00', fimTs = fim + 'T23:59:59'
+
+  const [veicRes, motRes, viagRes, abastRes, osRes, manutRes, docRes] = await Promise.all([
+    db.from('frota_veiculos').select('id,placa,modelo,tipo,status,setor_id,medidor,ativo').eq('ativo', true),
+    db.from('frota_motoristas').select('id,nome,setor_id,status,cnh_validade,habilitacao_fluvial_validade').eq('ativo', true),
+    db.from('vw_frota_viagens_detalhe')
+      .select('id,status,veiculo_id,veiculo_placa,veiculo_modelo,veiculo_tipo,veiculo_medidor,motorista_id,motorista_nome,setor_solicitante_id,setor_nome,setor_sigla,solicitante_nome,destino,finalidade,data_saida_prevista,data_retorno_prevista,checkout_em,checkin_em,km_saida,km_chegada,horas_saida,horas_chegada,avarias,motivo_recusa,motivo_cancelamento,criado_em,aprovado_em')
+      .gte('data_saida_prevista', iniTs).lte('data_saida_prevista', fimTs)
+      .order('data_saida_prevista', { ascending: false }).limit(5000),
+    db.from('vw_frota_abastecimentos_detalhe')
+      .select('id,veiculo_id,placa,modelo,medidor,motorista_id,motorista_nome,data_hora,litros_final,valor_final,tanque_cheio,medida_no_abastecimento,status,contrato_numero,fonte_tipo,fonte_codigo,fonte_descricao,motivo_rejeicao')
+      .gte('data_hora', iniTs).lte('data_hora', fimTs)
+      .order('data_hora', { ascending: true }).limit(5000),
+    db.from('frota_ordens_servico').select('id,veiculo_id,tipo,status,custo,data_abertura,data_conclusao')
+      .gte('data_abertura', ini).lte('data_abertura', fim).limit(5000),
+    db.from('vw_frota_manutencoes_pendentes').select('*'),
+    db.from('frota_veiculo_documentos').select('veiculo_id,tipo,descricao,data_vencimento'),
+  ])
+
+  _veiculos   = veicRes.data   || []
+  _motoristas = motRes.data    || []
+  _ordensServ = osRes.data     || []
+  _manutPend  = manutRes.data  || []
+  _documentos = docRes.data    || []
+
+  // Filtro por setor/tipo — aplicado no cliente (setor pode vir do
+  // solicitante da viagem ou da lotação do veículo/motorista)
+  let veiculosF = _veiculos
+  if (setorId) veiculosF = veiculosF.filter(v => v.setor_id === setorId)
+  if (tipo)    veiculosF = veiculosF.filter(v => v.tipo === tipo)
+  const idsVeicF = new Set(veiculosF.map(v => v.id))
+
+  _viagens = (viagRes.data || []).filter(v =>
+    (!setorId || v.setor_solicitante_id === setorId) &&
+    (!tipo || v.veiculo_tipo === tipo)
+  )
+  _abastec = (abastRes.data || []).filter(a =>
+    (!tipo || idsVeicF.has(a.veiculo_id)) && (!setorId || idsVeicF.has(a.veiculo_id))
+  )
+  if (!setorId && !tipo) _abastec = abastRes.data || []
+
+  _veiculosF = veiculosF
+
+  document.getElementById('dash-loading').hidden = true
+  document.getElementById('dash-conteudo').hidden = false
+  _carregando = false
+
+  renderDashboard()
+}
+let _veiculosF = []
+
+// ════════════════════════════════════════════════════════════════
+// Render principal
+// ════════════════════════════════════════════════════════════════
+function renderDashboard() {
+  const cont = document.getElementById('dash-conteudo')
+  cont.innerHTML = `
+    <div id="kpi-area"></div>
+    <div class="chart-grid-2">
+      <div class="chart-card">${chartStatusViagem()}</div>
+      <div class="chart-card">${chartViagensTempo()}</div>
+    </div>
+    <div class="chart-grid-2">
+      <div class="chart-card">${chartCombustivelMensal()}</div>
+      <div class="chart-card">${chartGastoFonte()}</div>
+    </div>
+    <div class="chart-grid-2">
+      <div class="chart-card">${chartManutencaoTipo()}</div>
+      <div class="chart-card">${chartOcupacaoFrota()}</div>
+    </div>
+    <div style="margin-bottom:14px">
+      <div class="chart-card">${chartViagensSetor()}</div>
+    </div>
+
+    <div class="card" style="margin-bottom:14px">
+      <div class="card-header"><div class="card-title">${bico('award')} Rankings</div></div>
+      <div class="card-body" style="padding:0 0 8px">
+        <div style="padding:0 16px">
+          <div class="rank-tabbar">
+            <button class="rank-tab ativo" data-rank="veiculos-viagens">Veículos · Viagens</button>
+            <button class="rank-tab" data-rank="veiculos-uso">Veículos · Km/Horas</button>
+            <button class="rank-tab" data-rank="veiculos-custo">Veículos · Custo total</button>
+            <button class="rank-tab" data-rank="veiculos-consumo">Veículos · Consumo</button>
+            <button class="rank-tab" data-rank="veiculos-os">Veículos · OS corretivas</button>
+            <button class="rank-tab" data-rank="motoristas-viagens">Motoristas · Viagens/Km</button>
+            <button class="rank-tab" data-rank="motoristas-rejeitados">Motoristas · Rejeitados</button>
+            <button class="rank-tab" data-rank="setores">Setores · Gasto</button>
+          </div>
+        </div>
+        <div id="rank-corpo" style="overflow-x:auto;padding:0 16px"></div>
+      </div>
+    </div>
+
+    <div class="grid-2" style="gap:14px;margin-bottom:14px">
+      <div class="card">
+        <div class="card-header"><div class="card-title">${bico('bell')} Manutenção vencendo/próxima</div></div>
+        <div class="card-body" style="padding:0 0 8px">${listaManutencaoAlerta()}</div>
+      </div>
+      <div class="card">
+        <div class="card-header"><div class="card-title">${bico('shield')} CNH / habilitação vencendo</div></div>
+        <div class="card-body" style="padding:0 0 8px">${listaHabilitacaoAlerta()}</div>
+      </div>
+    </div>
+
+    <div class="grid-2" style="gap:14px;margin-bottom:14px">
+      <div class="card">
+        <div class="card-header"><div class="card-title">${bico('file-text')} Documentos de veículo vencendo</div></div>
+        <div class="card-body" style="padding:0 0 8px">${listaDocumentosAlerta()}</div>
+      </div>
+      <div class="card">
+        <div class="card-header"><div class="card-title">${bico('flame')} Viagens com avarias registradas</div></div>
+        <div class="card-body" style="padding:0 0 8px">${listaAvarias()}</div>
+      </div>
+    </div>
+
+    <div class="grid-2" style="gap:14px;margin-bottom:14px">
+      <div class="card">
+        <div class="card-header"><div class="card-title">Motivos de recusa de viagem</div></div>
+        <div class="card-body" style="padding:0 0 8px">${listaMotivosRecusa()}</div>
+      </div>
+      <div class="card">
+        <div class="card-header"><div class="card-title">Veículos ociosos no período</div></div>
+        <div class="card-body" style="padding:0 0 8px">${listaOciosos()}</div>
+      </div>
+    </div>
+  `
+
+  renderKpis()
+  requestAnimationFrame(() => {
+    destroyCharts()
+    initChartStatusViagem()
+    initChartViagensTempo()
+    initChartCombustivelMensal()
+    initChartGastoFonte()
+    initChartManutencaoTipo()
+    initChartOcupacaoFrota()
+    initChartViagensSetor()
+    renderRankings()
+  })
+}
+
+// ════════════════════════════════════════════════════════════════
+// KPIs
+// ════════════════════════════════════════════════════════════════
+function kmPercorridoTotal() {
+  let km = 0
+  _viagens.forEach(v => {
+    if (v.veiculo_medidor === 'hodometro' && v.km_saida != null && v.km_chegada != null) {
+      km += Math.max(0, Number(v.km_chegada) - Number(v.km_saida))
+    }
+  })
+  return km
+}
+function horasPercorridoTotal() {
+  let h = 0
+  _viagens.forEach(v => {
+    if (v.veiculo_medidor === 'horimetro' && v.horas_saida != null && v.horas_chegada != null) {
+      h += Math.max(0, Number(v.horas_chegada) - Number(v.horas_saida))
+    }
+  })
+  return h
+}
+
+// Consumo médio "tanque cheio a tanque cheio" (mesmo método de
+// frota-veiculos.html/frota-app.html), agregado por veículo e depois
+// resumido em média simples (km/L para hodômetro).
+function consumoPorVeiculo(veiculoId) {
+  const regs = _abastec.filter(a => a.veiculo_id === veiculoId && a.status === 'validado')
+    .sort((a,b) => new Date(a.data_hora) - new Date(b.data_hora))
+  let ultimoCheio = null
+  const taxas = []
+  regs.forEach(a => {
+    if (ultimoCheio) {
+      const dist = Number(a.medida_no_abastecimento) - Number(ultimoCheio.medida_no_abastecimento)
+      const litros = Number(a.litros_final || 0)
+      if (dist > 0 && litros > 0) taxas.push(dist / litros)
+    }
+    if (a.tanque_cheio) ultimoCheio = a
+  })
+  return taxas.length ? taxas.reduce((s,x)=>s+x,0)/taxas.length : null
+}
+
+function renderKpis() {
+  const total = _viagens.length
+  const concluidas = _viagens.filter(v => v.status === 'concluida').length
+  const canceladas = _viagens.filter(v => v.status === 'cancelada' || v.status === 'recusada').length
+  const pctConcl = total ? Math.round(concluidas/total*100) : 0
+  const pctCanc  = total ? Math.round(canceladas/total*100) : 0
+
+  const veicAtivos = _veiculos.length
+  const veicDisp   = _veiculos.filter(v => v.status === 'disponivel').length
+
+  const km = kmPercorridoTotal(), horas = horasPercorridoTotal()
+
+  const litrosTotal = _abastec.filter(a=>a.status==='validado').reduce((s,a)=>s+Number(a.litros_final||0),0)
+  const valorTotal  = _abastec.filter(a=>a.status==='validado').reduce((s,a)=>s+Number(a.valor_final||0),0)
+
+  const custoManut = _ordensServ.filter(o=>o.status==='concluida').reduce((s,o)=>s+Number(o.custo||0),0)
+
+  const manutVencida = _manutPend.filter(m => (m.restante_uso!=null && m.restante_uso<0) || (m.restante_dias!=null && m.restante_dias<0)).length
+  const manutProxima = _manutPend.filter(m => (m.restante_dias!=null && m.restante_dias>=0 && m.restante_dias<30) && !((m.restante_uso!=null && m.restante_uso<0))).length
+
+  const hoje = new Date()
+  const em30 = new Date(hoje.getTime()+30*86400*1000)
+  const habVencendo = _motoristas.filter(m => {
+    const c = m.cnh_validade ? new Date(m.cnh_validade) : null
+    const f = m.habilitacao_fluvial_validade ? new Date(m.habilitacao_fluvial_validade) : null
+    return (c && c <= em30) || (f && f <= em30)
+  }).length
+
+  const abastPendentes = _abastec.filter(a=>a.status==='pendente').length
+
+  // Consumo médio geral (km/L) — média das médias por veículo com hodômetro
+  const consumos = _veiculosF.filter(v=>v.medidor==='hodometro').map(v=>consumoPorVeiculo(v.id)).filter(x=>x!=null)
+  const consumoGeral = consumos.length ? consumos.reduce((s,x)=>s+x,0)/consumos.length : null
+
+  document.getElementById('kpi-area').innerHTML = `
+    <div class="kpi-grid">
+      <div class="kpi-card"><div class="kpi-label">Viagens no período</div><div class="kpi-valor">${total}</div></div>
+      <div class="kpi-card azul"><div class="kpi-label">Concluídas</div><div class="kpi-valor">${concluidas} <span style="font-size:.9rem;color:var(--cinza-400)">(${pctConcl}%)</span></div></div>
+      <div class="kpi-card erro"><div class="kpi-label">Canceladas/recusadas</div><div class="kpi-valor">${canceladas} <span style="font-size:.9rem;color:var(--cinza-400)">(${pctCanc}%)</span></div></div>
+      <div class="kpi-card"><div class="kpi-label">Veículos ativos</div><div class="kpi-valor">${veicAtivos} <span style="font-size:.9rem;color:var(--cinza-400)">(${veicDisp} disp.)</span></div></div>
+      <div class="kpi-card"><div class="kpi-label">Km rodados</div><div class="kpi-valor">${formatNum(km,0)}</div></div>
+      <div class="kpi-card"><div class="kpi-label">Horas rodadas</div><div class="kpi-valor">${formatNum(horas,1)}</div></div>
+      <div class="kpi-card ouro"><div class="kpi-label">Gasto com combustível</div><div class="kpi-valor" style="font-size:20px">${formatBRL(valorTotal)}</div></div>
+      <div class="kpi-card"><div class="kpi-label">Litros abastecidos</div><div class="kpi-valor">${formatNum(litrosTotal,0)}</div></div>
+      <div class="kpi-card ${consumoGeral!=null ? '' : ''}"><div class="kpi-label">Consumo médio (km/L)</div><div class="kpi-valor">${consumoGeral!=null?formatNum(consumoGeral,2):'—'}</div></div>
+      <div class="kpi-card roxo"><div class="kpi-label">Custo de manutenção</div><div class="kpi-valor" style="font-size:20px">${formatBRL(custoManut)}</div></div>
+      <div class="kpi-card erro"><div class="kpi-label">Manutenção vencida</div><div class="kpi-valor">${manutVencida}</div></div>
+      <div class="kpi-card ouro"><div class="kpi-label">Manutenção próxima (30d)</div><div class="kpi-valor">${manutProxima}</div></div>
+      <div class="kpi-card erro"><div class="kpi-label">CNH/habilitação vencendo</div><div class="kpi-valor">${habVencendo}</div></div>
+      <div class="kpi-card ouro"><div class="kpi-label">Abastecimentos pendentes</div><div class="kpi-valor">${abastPendentes}</div></div>
+    </div>
+  `
+}
+
+// ════════════════════════════════════════════════════════════════
+// Gerenciamento Chart.js
+// ════════════════════════════════════════════════════════════════
+let _charts = {}
+function destroyCharts() { Object.values(_charts).forEach(c => c.destroy()); _charts = {} }
+function initChart(id, config) {
+  const canvas = document.getElementById(id)
+  if (!canvas) return
+  if (_charts[id]) _charts[id].destroy()
+  Chart.defaults.font.family = "'DM Sans', system-ui, sans-serif"
+  Chart.defaults.font.size = 11
+  Chart.defaults.color = '#6b7280'
+  _charts[id] = new Chart(canvas.getContext('2d'), config)
+}
+
+// ── Rosca: viagens por status ──────────────────────────────────
+function chartStatusViagem() {
+  return `<div class="chart-title">Viagens por status</div>
+    <div class="chart-canvas-wrap" style="height:230px"><canvas id="chart-status-viagem"></canvas></div>`
+}
+function initChartStatusViagem() {
+  const ks = Object.keys(STATUS_VIAGEM_LAB)
+  const cnt = {}; ks.forEach(k=>cnt[k]=0)
+  _viagens.forEach(v => { if (v.status in cnt) cnt[v.status]++ })
+  const total = _viagens.length || 1
+  initChart('chart-status-viagem', {
+    type:'doughnut',
+    data:{ labels: ks.map(k=>STATUS_VIAGEM_LAB[k]),
+      datasets:[{ data: ks.map(k=>cnt[k]), backgroundColor: ks.map(k=>STATUS_VIAGEM_COR[k]),
+        borderWidth:3, borderColor:'#fff', hoverOffset:10 }] },
+    options:{ responsive:true, maintainAspectRatio:false, cutout:'62%',
+      plugins:{ legend:{position:'bottom',labels:{boxWidth:11,padding:10,font:{size:10}}},
+        tooltip:{callbacks:{label:ctx=>` ${ctx.label}: ${ctx.parsed} (${Math.round(ctx.parsed/total*100)}%)`}} } }
+  })
+}
+
+// ── Linha: viagens ao longo do tempo (por semana) ──────────────
+function chartViagensTempo() {
+  return `<div class="chart-title">Viagens ao longo do tempo</div>
+    <div class="chart-canvas-wrap" style="height:230px"><canvas id="chart-viagens-tempo"></canvas></div>`
+}
+function initChartViagensTempo() {
+  const acc = {}
+  _viagens.forEach(v => {
+    if (!v.data_saida_prevista) return
+    const key = v.data_saida_prevista.slice(0,10)
+    acc[key] = (acc[key]||0) + 1
+  })
+  const dias = Object.keys(acc).sort()
+  const labels = dias.map(d => new Date(d+'T12:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'short'}))
+  initChart('chart-viagens-tempo', {
+    type:'line',
+    data:{ labels, datasets:[{ label:'Viagens', data: dias.map(d=>acc[d]),
+      borderColor:'#52B788', backgroundColor:'rgba(82,183,136,.14)', fill:true, tension:.35,
+      pointRadius:3, pointBackgroundColor:'#52B788' }] },
+    options:{ responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false} },
+      scales:{ y:{beginAtZero:true,ticks:{precision:0}}, x:{ticks:{maxRotation:35,font:{size:9}}} } }
+  })
+}
+
+// ── Barra: gasto com combustível por mês ───────────────────────
+function chartCombustivelMensal() {
+  return `<div class="chart-title">Gasto com combustível por mês</div>
+    <div class="chart-canvas-wrap" style="height:230px"><canvas id="chart-combustivel-mensal"></canvas></div>`
+}
+function initChartCombustivelMensal() {
+  const acc = {}
+  _abastec.filter(a=>a.status==='validado').forEach(a => {
+    const key = (a.data_hora||'').slice(0,7)
+    if (!key) return
+    acc[key] = (acc[key]||0) + Number(a.valor_final||0)
+  })
+  const meses = Object.keys(acc).sort()
+  const labels = meses.map(m => { const [a,mm]=m.split('-'); return new Date(+a,+mm-1,1).toLocaleDateString('pt-BR',{month:'short',year:'2-digit'}) })
+  initChart('chart-combustivel-mensal', {
+    type:'bar',
+    data:{ labels, datasets:[{ label:'Gasto (R$)', data: meses.map(m=>Math.round(acc[m]*100)/100),
+      backgroundColor:'#C9A84Ccc', borderColor:'#C9A84C', borderWidth:1.5, borderRadius:5 }] },
+    options:{ responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false}, tooltip:{callbacks:{label:ctx=>` ${formatBRL(ctx.parsed.y)}`}} },
+      scales:{ y:{beginAtZero:true}, x:{ticks:{font:{size:9}}} } }
+  })
+}
+
+// ── Barra horizontal: gasto por fonte de recurso ───────────────
+function chartGastoFonte() {
+  return `<div class="chart-title">Gasto por fonte de recurso</div>
+    <div class="chart-canvas-wrap" style="height:230px"><canvas id="chart-gasto-fonte"></canvas></div>`
+}
+function initChartGastoFonte() {
+  const acc = {}
+  _abastec.filter(a=>a.status==='validado').forEach(a => {
+    const key = a.fonte_tipo === 'orcamentaria' ? 'Orçamentária' : a.fonte_tipo === 'nao_orcamentaria' ? 'Não orçamentária' : 'Sem contrato vinculado'
+    acc[key] = (acc[key]||0) + Number(a.valor_final||0)
+  })
+  const labels = Object.keys(acc)
+  if (!labels.length) { document.getElementById('chart-gasto-fonte').closest('.chart-canvas-wrap').innerHTML = '<div class="chart-empty">Sem abastecimentos validados no período</div>'; return }
+  initChart('chart-gasto-fonte', {
+    type:'bar',
+    data:{ labels, datasets:[{ label:'Gasto (R$)', data: labels.map(l=>Math.round(acc[l]*100)/100),
+      backgroundColor:['#3B82C4cc','#12A66Acc','#9ca3afcc'], borderRadius:5 }] },
+    options:{ indexAxis:'y', responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false}, tooltip:{callbacks:{label:ctx=>` ${formatBRL(ctx.parsed.x)}`}} },
+      scales:{ x:{beginAtZero:true} } }
+  })
+}
+
+// ── Barra empilhada: manutenção preventiva x corretiva por mês ─
+function chartManutencaoTipo() {
+  return `<div class="chart-title">Custo de manutenção: preventiva x corretiva</div>
+    <div class="chart-canvas-wrap" style="height:230px"><canvas id="chart-manut-tipo"></canvas></div>`
+}
+function initChartManutencaoTipo() {
+  const concl = _ordensServ.filter(o=>o.status==='concluida')
+  if (!concl.length) { const el=document.getElementById('chart-manut-tipo'); if(el) el.closest('.chart-canvas-wrap').innerHTML='<div class="chart-empty">Sem OS concluídas no período</div>'; return }
+  const acc = {}
+  concl.forEach(o => {
+    const key = (o.data_conclusao || o.data_abertura || '').slice(0,7)
+    if (!key) return
+    if (!acc[key]) acc[key] = { preventiva:0, corretiva:0 }
+    acc[key][o.tipo] = (acc[key][o.tipo]||0) + Number(o.custo||0)
+  })
+  const meses = Object.keys(acc).sort()
+  const labels = meses.map(m => { const [a,mm]=m.split('-'); return new Date(+a,+mm-1,1).toLocaleDateString('pt-BR',{month:'short',year:'2-digit'}) })
+  initChart('chart-manut-tipo', {
+    type:'bar',
+    data:{ labels, datasets:[
+      { label:'Preventiva', data: meses.map(m=>Math.round((acc[m].preventiva||0)*100)/100), backgroundColor:'#12A66Acc', borderRadius:4 },
+      { label:'Corretiva',  data: meses.map(m=>Math.round((acc[m].corretiva||0)*100)/100),  backgroundColor:'#EF5B3Ccc', borderRadius:4 },
+    ]},
+    options:{ responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{position:'bottom',labels:{boxWidth:11,font:{size:10}}}, tooltip:{callbacks:{label:ctx=>` ${ctx.dataset.label}: ${formatBRL(ctx.parsed.y)}`}} },
+      scales:{ x:{stacked:true,ticks:{font:{size:9}}}, y:{stacked:true,beginAtZero:true} } }
+  })
+}
+
+// ── Rosca: ocupação atual da frota ─────────────────────────────
+function chartOcupacaoFrota() {
+  return `<div class="chart-title">Ocupação atual da frota</div>
+    <div class="chart-canvas-wrap" style="height:230px"><canvas id="chart-ocupacao"></canvas></div>`
+}
+function initChartOcupacaoFrota() {
+  const ks = Object.keys(STATUS_VEIC_LAB)
+  const cnt = {}; ks.forEach(k=>cnt[k]=0)
+  _veiculos.forEach(v => { if (v.status in cnt) cnt[v.status]++ })
+  const total = _veiculos.length || 1
+  initChart('chart-ocupacao', {
+    type:'doughnut',
+    data:{ labels: ks.map(k=>STATUS_VEIC_LAB[k]),
+      datasets:[{ data: ks.map(k=>cnt[k]), backgroundColor: ks.map(k=>STATUS_VEIC_COR[k]), borderWidth:3, borderColor:'#fff', hoverOffset:10 }] },
+    options:{ responsive:true, maintainAspectRatio:false, cutout:'62%',
+      plugins:{ legend:{position:'bottom',labels:{boxWidth:11,padding:10,font:{size:10}}},
+        tooltip:{callbacks:{label:ctx=>` ${ctx.label}: ${ctx.parsed} (${Math.round(ctx.parsed/total*100)}%)`}} } }
+  })
+}
+
+// ── Barra horizontal: viagens por setor solicitante ────────────
+function chartViagensSetor() {
+  return `<div class="chart-title">Viagens por setor solicitante</div>
+    <div class="chart-canvas-wrap" style="height:280px"><canvas id="chart-viagens-setor"></canvas></div>`
+}
+function initChartViagensSetor() {
+  const acc = {}
+  _viagens.forEach(v => {
+    const key = v.setor_sigla || v.setor_nome || 'Sem setor'
+    acc[key] = (acc[key]||0) + 1
+  })
+  const entradas = Object.entries(acc).sort((a,b)=>b[1]-a[1]).slice(0,12)
+  if (!entradas.length) { const el=document.getElementById('chart-viagens-setor'); if(el) el.closest('.chart-canvas-wrap').innerHTML='<div class="chart-empty">Sem viagens no período</div>'; return }
+  initChart('chart-viagens-setor', {
+    type:'bar',
+    data:{ labels: entradas.map(e=>e[0]), datasets:[{ label:'Viagens', data: entradas.map(e=>e[1]),
+      backgroundColor:'#3B82C4cc', borderRadius:5 }] },
+    options:{ indexAxis:'y', responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false} },
+      scales:{ x:{beginAtZero:true,ticks:{precision:0}} } }
+  })
+}
+
+// ════════════════════════════════════════════════════════════════
+// Rankings
+// ════════════════════════════════════════════════════════════════
+function tabela(headers, rows) {
+  if (!rows.length) return '<div class="chart-empty">Sem dados no período</div>'
+  return `<table class="rel-table"><thead><tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead>
+    <tbody>${rows.map(r=>`<tr>${r.map((c,i)=>`<td${i>0?' class="num"':''}>${c}</td>`).join('')}</tr>`).join('')}</tbody></table>`
+}
+
+function renderRankings() {
+  const cont = document.getElementById('rank-corpo')
+  if (!cont) return
+  const map = {
+    'veiculos-viagens':      rankVeiculosViagens,
+    'veiculos-uso':          rankVeiculosUso,
+    'veiculos-custo':        rankVeiculosCusto,
+    'veiculos-consumo':      rankVeiculosConsumo,
+    'veiculos-os':           rankVeiculosOS,
+    'motoristas-viagens':    rankMotoristasViagens,
+    'motoristas-rejeitados': rankMotoristasRejeitados,
+    'setores':               rankSetores,
+  }
+  cont.innerHTML = (map[_rankAtivo] || rankVeiculosViagens)()
+}
+
+function rankVeiculosViagens() {
+  const acc = {}
+  _viagens.filter(v=>v.status==='concluida').forEach(v => {
+    const key = v.veiculo_id
+    if (!key) return
+    acc[key] = acc[key] || { placa:v.veiculo_placa, modelo:v.veiculo_modelo, n:0 }
+    acc[key].n++
+  })
+  const rows = Object.values(acc).sort((a,b)=>b.n-a.n).slice(0,10)
+    .map((v,i) => [i+1, `${esc(v.placa)} — ${esc(v.modelo)}`, v.n])
+  return tabela(['#','Veículo','Viagens concluídas'], rows.map(r=>[r[0],r[1],r[2]]))
+}
+
+function rankVeiculosUso() {
+  const acc = {}
+  _viagens.forEach(v => {
+    if (!v.veiculo_id) return
+    acc[v.veiculo_id] = acc[v.veiculo_id] || { placa:v.veiculo_placa, modelo:v.veiculo_modelo, medidor:v.veiculo_medidor, uso:0 }
+    if (v.veiculo_medidor==='hodometro' && v.km_saida!=null && v.km_chegada!=null) acc[v.veiculo_id].uso += Math.max(0, v.km_chegada-v.km_saida)
+    if (v.veiculo_medidor==='horimetro' && v.horas_saida!=null && v.horas_chegada!=null) acc[v.veiculo_id].uso += Math.max(0, v.horas_chegada-v.horas_saida)
+  })
+  const rows = Object.values(acc).sort((a,b)=>b.uso-a.uso).slice(0,10)
+    .map((v,i)=>[i+1, `${esc(v.placa)} — ${esc(v.modelo)}`, `${formatNum(v.uso,1)} ${v.medidor==='horimetro'?'h':'km'}`])
+  return tabela(['#','Veículo','Uso no período'], rows)
+}
+
+function rankVeiculosCusto() {
+  const acc = {}
+  _veiculosF.forEach(v => { acc[v.id] = { placa:v.placa, modelo:v.modelo, combustivel:0, manutencao:0 } })
+  _abastec.filter(a=>a.status==='validado').forEach(a => { if (acc[a.veiculo_id]) acc[a.veiculo_id].combustivel += Number(a.valor_final||0) })
+  _ordensServ.filter(o=>o.status==='concluida').forEach(o => { if (acc[o.veiculo_id]) acc[o.veiculo_id].manutencao += Number(o.custo||0) })
+  const rows = Object.values(acc).map(v=>({...v, total: v.combustivel+v.manutencao}))
+    .sort((a,b)=>b.total-a.total).filter(v=>v.total>0).slice(0,10)
+    .map((v,i)=>[i+1, `${esc(v.placa)} — ${esc(v.modelo)}`, formatBRL(v.combustivel), formatBRL(v.manutencao), formatBRL(v.total)])
+  return tabela(['#','Veículo','Combustível','Manutenção','Total'], rows)
+}
+
+function rankVeiculosConsumo() {
+  const rows = _veiculosF.filter(v=>v.medidor==='hodometro').map(v => {
+    const c = consumoPorVeiculo(v.id)
+    return c!=null ? { placa:v.placa, modelo:v.modelo, c } : null
+  }).filter(Boolean).sort((a,b)=>a.c-b.c).slice(0,10) // pior primeiro
+    .map((v,i)=>[i+1, `${esc(v.placa)} — ${esc(v.modelo)}`, `${formatNum(v.c,2)} km/L`])
+  return tabela(['#','Veículo (pior consumo primeiro)','Km/L médio'], rows)
+}
+
+function rankVeiculosOS() {
+  const acc = {}
+  _ordensServ.filter(o=>o.tipo==='corretiva').forEach(o => {
+    acc[o.veiculo_id] = (acc[o.veiculo_id]||0) + 1
+  })
+  const rows = Object.entries(acc).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([veicId,n],i) => {
+    const v = _veiculos.find(x=>x.id===veicId)
+    return [i+1, v ? `${esc(v.placa)} — ${esc(v.modelo)}` : '—', n]
+  })
+  return tabela(['#','Veículo','OS corretivas'], rows)
+}
+
+function rankMotoristasViagens() {
+  const acc = {}
+  _viagens.filter(v=>v.status==='concluida').forEach(v => {
+    if (!v.motorista_id) return
+    acc[v.motorista_id] = acc[v.motorista_id] || { nome:v.motorista_nome, n:0, km:0 }
+    acc[v.motorista_id].n++
+    if (v.veiculo_medidor==='hodometro' && v.km_saida!=null && v.km_chegada!=null) acc[v.motorista_id].km += Math.max(0, v.km_chegada-v.km_saida)
+  })
+  const rows = Object.values(acc).sort((a,b)=>b.n-a.n).slice(0,10)
+    .map((m,i)=>[i+1, esc(m.nome), m.n, formatNum(m.km,0)])
+  return tabela(['#','Motorista','Viagens concluídas','Km rodados'], rows)
+}
+
+function rankMotoristasRejeitados() {
+  const acc = {}
+  _abastec.filter(a=>a.status==='rejeitado').forEach(a => {
+    acc[a.motorista_id] = acc[a.motorista_id] || { nome:a.motorista_nome, n:0 }
+    acc[a.motorista_id].n++
+  })
+  const rows = Object.values(acc).sort((a,b)=>b.n-a.n).slice(0,10)
+    .map((m,i)=>[i+1, esc(m.nome), m.n])
+  return tabela(['#','Motorista','Abastecimentos rejeitados'], rows)
+}
+
+function rankSetores() {
+  const acc = {}
+  _viagens.forEach(v => {
+    const key = v.setor_sigla || v.setor_nome || 'Sem setor'
+    acc[key] = acc[key] || { n:0, km:0 }
+    acc[key].n++
+    if (v.veiculo_medidor==='hodometro' && v.km_saida!=null && v.km_chegada!=null) acc[key].km += Math.max(0, v.km_chegada-v.km_saida)
+  })
+  const rows = Object.entries(acc).sort((a,b)=>b[1].n-a[1].n).slice(0,10)
+    .map(([nome,d],i)=>[i+1, esc(nome), d.n, formatNum(d.km,0)])
+  return tabela(['#','Setor','Viagens','Km rodados'], rows)
+}
+
+// ════════════════════════════════════════════════════════════════
+// Listas de alerta / sugestões adicionais
+// ════════════════════════════════════════════════════════════════
+function listaManutencaoAlerta() {
+  const itens = _manutPend.filter(m =>
+    (m.restante_uso != null && m.restante_uso < 30) ||
+    (m.restante_dias != null && m.restante_dias < 30)
+  ).sort((a,b) => (a.restante_dias??9999) - (b.restante_dias??9999)).slice(0,15)
+
+  if (!itens.length) return '<div class="chart-empty">Nenhuma manutenção vencida ou próxima</div>'
+  return itens.map(m => {
+    const vencida = (m.restante_uso!=null && m.restante_uso<0) || (m.restante_dias!=null && m.restante_dias<0)
+    return `<div class="alerta-item">
+      <span class="alerta-badge ${vencida?'critico':'aviso'}">${vencida?'Vencida':'Próxima'}</span>
+      <div style="flex:1">
+        <strong>${esc(m.placa)}</strong> — ${esc(m.item)}
+        <div style="font-size:.75rem;color:var(--cinza-500)">
+          ${m.restante_dias!=null ? `${m.restante_dias} dia(s)` : ''}
+          ${m.restante_uso!=null ? ` · ${formatNum(m.restante_uso,0)} ${m.medidor==='horimetro'?'h':'km'} restantes` : ''}
+        </div>
+      </div>
+    </div>`
+  }).join('')
+}
+
+function listaHabilitacaoAlerta() {
+  const hoje = new Date(); const em30 = new Date(hoje.getTime()+30*86400*1000)
+  const itens = _motoristas.filter(m => {
+    const c = m.cnh_validade ? new Date(m.cnh_validade) : null
+    const f = m.habilitacao_fluvial_validade ? new Date(m.habilitacao_fluvial_validade) : null
+    return (c && c <= em30) || (f && f <= em30)
+  })
+  if (!itens.length) return '<div class="chart-empty">Nenhuma habilitação vencendo</div>'
+  return itens.map(m => {
+    const venceCnh = m.cnh_validade && new Date(m.cnh_validade) < hoje
+    return `<div class="alerta-item">
+      <span class="alerta-badge ${venceCnh?'critico':'aviso'}">${venceCnh?'Vencida':'Próxima'}</span>
+      <div style="flex:1"><strong>${esc(m.nome)}</strong>
+        <div style="font-size:.75rem;color:var(--cinza-500)">
+          ${m.cnh_validade ? `CNH: ${new Date(m.cnh_validade+'T12:00:00').toLocaleDateString('pt-BR')}` : ''}
+          ${m.habilitacao_fluvial_validade ? ` · Hab. fluvial: ${new Date(m.habilitacao_fluvial_validade+'T12:00:00').toLocaleDateString('pt-BR')}` : ''}
+        </div>
+      </div>
+    </div>`
+  }).join('')
+}
+
+function listaDocumentosAlerta() {
+  const hoje = new Date(); const em30 = new Date(hoje.getTime()+30*86400*1000)
+  const itens = _documentos.filter(d => d.data_vencimento && new Date(d.data_vencimento) <= em30)
+    .sort((a,b) => new Date(a.data_vencimento) - new Date(b.data_vencimento)).slice(0,15)
+  if (!itens.length) return '<div class="chart-empty">Nenhum documento vencendo</div>'
+  return itens.map(d => {
+    const v = _veiculos.find(x=>x.id===d.veiculo_id)
+    const vencido = new Date(d.data_vencimento) < hoje
+    return `<div class="alerta-item">
+      <span class="alerta-badge ${vencido?'critico':'aviso'}">${vencido?'Vencido':'Próximo'}</span>
+      <div style="flex:1"><strong>${v?esc(v.placa):'—'}</strong> — ${esc(d.tipo)}${d.descricao?` (${esc(d.descricao)})`:''}
+        <div style="font-size:.75rem;color:var(--cinza-500)">${new Date(d.data_vencimento+'T12:00:00').toLocaleDateString('pt-BR')}</div>
+      </div>
+    </div>`
+  }).join('')
+}
+
+function listaAvarias() {
+  const itens = _viagens.filter(v => v.avarias && v.avarias.trim())
+  if (!itens.length) return '<div class="chart-empty">Nenhuma avaria registrada no período</div>'
+  return itens.slice(0,15).map(v => `<div class="alerta-item">
+    <span class="alerta-badge critico">Avaria</span>
+    <div style="flex:1"><strong>${esc(v.veiculo_placa)}</strong> — ${esc(v.motorista_nome||'—')}
+      <div style="font-size:.75rem;color:var(--cinza-500)">${esc(v.avarias)}</div>
+    </div>
+  </div>`).join('')
+}
+
+function listaMotivosRecusa() {
+  const acc = {}
+  _viagens.filter(v => v.motivo_recusa).forEach(v => {
+    const key = v.motivo_recusa.trim()
+    acc[key] = (acc[key]||0) + 1
+  })
+  const entradas = Object.entries(acc).sort((a,b)=>b[1]-a[1]).slice(0,10)
+  if (!entradas.length) return '<div class="chart-empty">Nenhuma viagem recusada no período</div>'
+  return entradas.map(([motivo,n]) => `<div class="alerta-item">
+    <span class="alerta-badge aviso">${n}x</span>
+    <div style="flex:1">${esc(motivo)}</div>
+  </div>`).join('')
+}
+
+function listaOciosos() {
+  const usados = new Set()
+  _viagens.forEach(v => { if (v.veiculo_id) usados.add(v.veiculo_id) })
+  _abastec.forEach(a => { if (a.veiculo_id) usados.add(a.veiculo_id) })
+  const ociosos = _veiculosF.filter(v => !usados.has(v.id) && v.status !== 'baixado')
+  if (!ociosos.length) return '<div class="chart-empty">Toda a frota teve alguma movimentação no período</div>'
+  return ociosos.slice(0,15).map(v => `<div class="alerta-item">
+    <span class="alerta-badge aviso">${STATUS_VEIC_LAB[v.status]||v.status}</span>
+    <div style="flex:1"><strong>${esc(v.placa)}</strong> — ${esc(v.modelo)}</div>
+  </div>`).join('')
+}
+
+// ════════════════════════════════════════════════════════════════
+// Exportar CSV
+// ════════════════════════════════════════════════════════════════
+function exportarCSV() {
+  const linhas = [['Placa','Modelo','Motorista','Setor','Status','Saída prevista','Retorno previsto','Km saída','Km chegada']]
+  _viagens.forEach(v => linhas.push([
+    v.veiculo_placa||'', v.veiculo_modelo||'', v.motorista_nome||'', v.setor_sigla||v.setor_nome||'',
+    STATUS_VIAGEM_LAB[v.status]||v.status, v.data_saida_prevista||'', v.data_retorno_prevista||'',
+    v.km_saida??'', v.km_chegada??'',
+  ]))
+  const csv = linhas.map(l => l.map(c => `"${String(c).replace(/"/g,'""')}"`).join(';')).join('\n')
+  const blob = new Blob(['﻿'+csv], { type:'text/csv;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url; a.download = `frota-viagens-${getPeriodo().ini}_a_${getPeriodo().fim}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+</script>
+</body>
+</html>
