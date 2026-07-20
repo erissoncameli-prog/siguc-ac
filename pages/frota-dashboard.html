@@ -84,6 +84,8 @@ let _documentos  = []   // frota_veiculo_documentos (vencimento — sem filtro d
 let _setores     = []   // unidades_organizacionais
 let _carregando  = false
 let _rankAtivo   = 'veiculos-viagens'
+let _rankView    = 'grafico'   // 'grafico' | 'tabela'
+let _rankChart   = null        // Chart.js do ranking ativo (ciclo próprio)
 
 const STATUS_VIAGEM_LAB = {
   solicitada:'Solicitada', aprovada:'Aprovada', recusada:'Recusada',
