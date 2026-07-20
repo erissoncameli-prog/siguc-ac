@@ -148,6 +148,33 @@
   </div>
 </div>
 
+<!-- Modal Consultar veículos livres por data -->
+<div class="modal-overlay" id="modal-disponibilidade">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-header">
+      <div class="modal-title">Veículos livres por data</div>
+      <button class="modal-close" onclick="fecharModal('disponibilidade')">×</button>
+    </div>
+    <div class="modal-body">
+      <div style="font-size:12px;color:#6B7280;margin-bottom:14px">
+        Mostra os veículos ativos, com status "Disponível" e sem nenhuma viagem aprovada/em
+        andamento que se sobreponha ao período informado — mesma checagem usada ao aprovar uma viagem.
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Início <span class="obrig">*</span></label>
+          <input class="form-control" type="datetime-local" id="disp-inicio"></div>
+        <div class="form-group"><label class="form-label">Fim <span class="obrig">*</span></label>
+          <input class="form-control" type="datetime-local" id="disp-fim"></div>
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="consultarDisponibilidade()">Consultar</button>
+      <div id="disp-resultado" style="margin-top:16px"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="fecharModal('disponibilidade')">Fechar</button>
+    </div>
+  </div>
+</div>
+
 <!-- Modal Detalhe -->
 <div class="modal-overlay" id="modal-detalhe">
   <div class="modal" style="max-width:520px">
@@ -217,7 +244,8 @@ const STATUS_VEIC_LABEL = { disponivel:'Disponível', em_viagem:'Em viagem', em_
           <option value="recusada">Recusadas</option>
           <option value="cancelada">Canceladas</option>
         </select>
-        <div class="frota-tl-toggle" style="margin-left:auto">
+        <button type="button" class="btn btn-sm btn-secondary" style="margin-left:auto" onclick="abrirDisponibilidade()">${bico('search')} Veículos livres por data</button>
+        <div class="frota-tl-toggle">
           <button type="button" id="btn-view-lista" class="ativo" onclick="mudarVisaoViagens('lista')">${bico('list')} Lista</button>
           <button type="button" id="btn-view-tl" onclick="mudarVisaoViagens('timeline')">${bico('bar-chart')} Linha do Tempo</button>
         </div>
@@ -541,6 +569,58 @@ function abrirDetalhe(id) {
 function fecharModal(qual) {
   document.getElementById(`modal-${qual}`).classList.remove('aberto')
   _acaoId = null; _viagemAprovando = null; _linhasAlocacao = []
+}
+
+// ── Consulta de veículos livres por data — mesma RPC usada na
+// aprovação (frota_veiculos_disponiveis, migration 156): ativo,
+// status 'disponivel' e sem viagem aprovada/em andamento que se
+// sobreponha ao período informado.
+function abrirDisponibilidade() {
+  const agora = new Date(); agora.setMinutes(0,0,0)
+  const daqui2h = new Date(agora.getTime() + 2*3600*1000)
+  document.getElementById('disp-inicio').value = toDatetimeLocal(agora)
+  document.getElementById('disp-fim').value = toDatetimeLocal(daqui2h)
+  document.getElementById('disp-resultado').innerHTML = ''
+  document.getElementById('modal-disponibilidade').classList.add('aberto')
+}
+
+function toDatetimeLocal(d) {
+  const p = n => String(n).padStart(2,'0')
+  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`
+}
+
+async function consultarDisponibilidade() {
+  const ini = document.getElementById('disp-inicio').value
+  const fim = document.getElementById('disp-fim').value
+  const cont = document.getElementById('disp-resultado')
+  if (!ini || !fim) { toast('Informe início e fim', 'error'); return }
+  if (new Date(fim) <= new Date(ini)) { toast('O fim precisa ser depois do início', 'error'); return }
+
+  cont.innerHTML = '<div style="text-align:center;padding:16px;color:#9CA3AF">Consultando...</div>'
+  const { data, error } = await db.rpc('frota_veiculos_disponiveis', {
+    p_inicio: new Date(ini).toISOString(), p_fim: new Date(fim).toISOString()
+  })
+  if (error) { cont.innerHTML = `<div style="color:#DC2626;font-size:13px">Erro ao consultar: ${esc(error.message)}</div>`; return }
+
+  const livres = data || []
+  const ativos = _veiculos.filter(v => v.status !== 'baixado').length
+  if (!livres.length) {
+    cont.innerHTML = `<div style="text-align:center;padding:24px;color:#9CA3AF;font-size:13px">
+      Nenhum veículo livre nesse período (0 de ${ativos} ativos).</div>`
+    return
+  }
+  cont.innerHTML = `
+    <div style="font-size:12px;color:#6B7280;margin-bottom:10px">${livres.length} de ${ativos} veículo(s) livre(s)</div>
+    ${livres.map(v => `
+      <div style="display:flex;align-items:center;gap:10px;padding:9px 4px;border-bottom:1px solid #F2F5F7">
+        <div class="frota-tl-row-avatar">${bico('truck')}</div>
+        <div style="flex:1">
+          <strong style="font-size:.85rem">${esc(v.placa)} — ${esc(v.modelo)}</strong>
+          <div style="font-size:.74rem;color:#9CA3AF">${esc(v.tipo)}${v.capacidade_passageiros ? ` · ${v.capacidade_passageiros} lug.` : ''}</div>
+        </div>
+        <span class="fw-badge fw-badge-disponivel">Livre</span>
+      </div>`).join('')}
+  `
 }
 
 // ════════════════════════════════════════════════════════════════
