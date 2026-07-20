@@ -44,9 +44,12 @@
 .frota-tl-row:nth-child(5){animation-delay:.14s} .frota-tl-row:nth-child(n+6){animation-delay:.16s}
 @keyframes frota-tl-fade { to { opacity:1; transform:translateY(0) } }
 .frota-tl-row-label { width:210px; flex-shrink:0; padding:10px 14px; border-right:1px solid #E8EAED;
-  display:flex; flex-direction:column; justify-content:center; background:#fff; position:sticky; left:0; z-index:2 }
-.frota-tl-row-label strong { font-size:.82rem; color:#0E0F0C }
-.frota-tl-row-label span { font-size:.72rem; color:#9CA3AF; margin-top:1px }
+  display:flex; align-items:center; gap:10px; background:#fff; position:sticky; left:0; z-index:2 }
+.frota-tl-row-avatar { width:32px; height:32px; border-radius:50%; background:#DCF3D8; color:#163300;
+  display:flex; align-items:center; justify-content:center; flex-shrink:0; font-size:15px }
+.frota-tl-row-txt { display:flex; flex-direction:column; justify-content:center; min-width:0 }
+.frota-tl-row-txt strong { font-size:.82rem; color:#0E0F0C; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+.frota-tl-row-txt span { font-size:.72rem; color:#9CA3AF; margin-top:1px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
 .frota-tl-lane { flex:1; position:relative; min-width:900px }
 .frota-tl-lane.vazia { background:repeating-linear-gradient(45deg,#FAFBFC,#FAFBFC 8px,#fff 8px,#fff 16px) }
 .frota-tl-grid-col { position:absolute; top:0; bottom:0; border-right:1px solid #F5F6F7 }
@@ -642,7 +645,7 @@ function renderTimeline() {
     Object.entries(grupos).filter(([,vs]) => vs.length > 1).forEach(([g, vs]) => {
       linhas.push({
         label: vs[0].destino, sub: `${vs.length} veículos · ${vs[0].solicitante_nome||''}`,
-        bars: vs, grupo: g,
+        bars: vs, grupo: g, icone: 'share',
       })
     })
     if (!linhas.length) {
@@ -655,7 +658,7 @@ function renderTimeline() {
     const vs = viagens.filter(v => v.veiculo_id === _tlVeiculoId)
     linhas.push({
       label: veic ? `${veic.placa} — ${veic.modelo}` : 'Selecione um veículo',
-      sub: `${vs.length} viagem(ns) no período`, bars: vs, vazia: !vs.length,
+      sub: `${vs.length} viagem(ns) no período`, bars: vs, vazia: !vs.length, icone: 'truck',
     })
   } else {
     document.getElementById('tl-head-label').textContent = 'Veículo'
@@ -668,7 +671,7 @@ function renderTimeline() {
     _veiculos.slice().sort((a,b)=>a.placa.localeCompare(b.placa)).forEach(veic => {
       const vs = porVeiculo[veic.id] || []
       if (!vs.length) return // esconde veículos sem viagem no período/filtro
-      linhas.push({ label: `${veic.placa} — ${veic.modelo}`, sub: veic.tipo, bars: vs })
+      linhas.push({ label: `${veic.placa} — ${veic.modelo}`, sub: veic.tipo, bars: vs, icone: 'truck' })
     })
     if (!linhas.length) {
       document.getElementById('tl-body').innerHTML = '<div class="frota-tl-empty">Nenhuma viagem no período/filtro atual</div>'
@@ -696,7 +699,10 @@ function renderTimeline() {
         onclick="abrirDetalhe('${v.id}')">${dividida ? bico('share','tl-link-ico') : ''}${labelBar}</div>`
     }).join('')
     return `<div class="frota-tl-row">
-      <div class="frota-tl-row-label"><strong>${esc(row.label)}</strong><span>${esc(row.sub||'')}</span></div>
+      <div class="frota-tl-row-label">
+        <div class="frota-tl-row-avatar">${bico(row.icone || 'truck')}</div>
+        <div class="frota-tl-row-txt"><strong>${esc(row.label)}</strong><span>${esc(row.sub||'')}</span></div>
+      </div>
       <div class="frota-tl-lane${row.vazia?' vazia':''}">
         <div class="frota-tl-now" style="left:${nowLeft}%"></div>
         ${barsHtml}
