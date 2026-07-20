@@ -31,6 +31,12 @@ Sistema já tem login, sidebar, layout e páginas funcionando.
     (modo motorista, offline-first); gestão valida e classifica em
     frota-abastecimentos.html (contrato/fonte — motorista nunca vê).
     Cadastro de fontes de recurso e contratos: frota-contratos.html.
+    frota-administrar.html reúne Manutenção/Abastecimentos/Contratos/
+    Veículos e Motoristas em abas (a única entrada no menu lateral) —
+    cada aba é a página correspondente carregada num iframe com
+    `?embed=1` (gerarLayout, js/layout.js, retorna só o conteúdo, sem
+    duplicar sidebar/topbar); as 4 páginas continuam existindo e
+    funcionando sozinhas, só não têm mais link direto na sidebar.
     Ver regra de duplicação obrigatória em "Regras de desenvolvimento".
 - js/ → config.js, layout.js, mapa-cartografia.js, observability.js,
   queryLogger.js; brigada-offline.js (IndexedDB), brigada-sync.js,
