@@ -67,8 +67,8 @@
         <div class="form-group"><label class="form-label">Vigência fim <span class="obrig">*</span></label>
           <input class="form-control" id="c-vigencia-fim" type="date"></div>
       </div>
-      <div class="form-group"><label class="form-label">Valor global (referência)</label>
-        <input class="form-control" id="c-valor-global" type="number" min="0" step="0.01" placeholder="Opcional — não controla saldo"></div>
+      <div class="form-group"><label class="form-label">Valor global</label>
+        <input class="form-control" id="c-valor-global" type="number" min="0" step="0.01" placeholder="Opcional — se informado, o saldo é debitado a cada validação"></div>
       <div class="form-group"><label class="form-label">Observações</label>
         <textarea class="form-control" id="c-observacoes" rows="2"></textarea></div>
       <div class="form-group">
@@ -119,8 +119,8 @@ const FONTE_LABEL = { orcamentaria: 'Orçamentária', nao_orcamentaria: 'Não or
       </div>
       <div class="card"><div class="table-wrap"><div class="table-scroll">
         <table>
-          <thead><tr><th>Número</th><th>Fornecedor</th><th>Fonte</th><th>Vigência</th><th>Valor global</th><th>Status</th><th>Ações</th></tr></thead>
-          <tbody id="tbody-contratos"><tr><td colspan="7" style="text-align:center;padding:24px;color:#9CA3AF">Carregando...</td></tr></tbody>
+          <thead><tr><th>Número</th><th>Fornecedor</th><th>Fonte</th><th>Vigência</th><th>Valor global</th><th>Saldo</th><th>Status</th><th>Ações</th></tr></thead>
+          <tbody id="tbody-contratos"><tr><td colspan="8" style="text-align:center;padding:24px;color:#9CA3AF">Carregando...</td></tr></tbody>
         </table>
       </div></div></div>
     </div>` +
@@ -198,17 +198,21 @@ async function carregarContratos() {
 
 function renderContratos() {
   const tbody = document.getElementById('tbody-contratos')
-  if (!_contratos.length) { tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:24px;color:#9CA3AF">Nenhum contrato cadastrado</td></tr>'; return }
-  tbody.innerHTML = _contratos.map(c => `
+  if (!_contratos.length) { tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:24px;color:#9CA3AF">Nenhum contrato cadastrado</td></tr>'; return }
+  tbody.innerHTML = _contratos.map(c => {
+    const saldoBaixo = c.saldo_atual != null && c.valor_global && c.saldo_atual <= c.valor_global * 0.1
+    return `
     <tr>
       <td class="mono">${esc(c.numero)}</td>
       <td>${esc(c.fornecedor)}</td>
       <td style="font-size:12px">${esc(c.frota_fontes_recurso?.codigo || '—')}</td>
       <td style="font-size:12px">${formatData(c.vigencia_inicio)} — ${formatData(c.vigencia_fim)}</td>
       <td class="mono">${c.valor_global != null ? formatBRL(c.valor_global) : '—'}</td>
+      <td class="mono" ${saldoBaixo ? 'style="color:#DC2626;font-weight:600"' : ''}>${c.saldo_atual != null ? formatBRL(c.saldo_atual) : '—'}</td>
       <td><span class="badge ${c.ativo ? 'fw-badge fw-badge-disponivel' : 'badge-cinza'}">${c.ativo ? 'Ativo' : 'Inativo'}</span></td>
       <td><button class="btn btn-xs btn-ghost" onclick="abrirContrato('${c.id}')">Editar</button></td>
-    </tr>`).join('')
+    </tr>`
+  }).join('')
 }
 
 function abrirContrato(id) {
