@@ -236,8 +236,8 @@ const STATUS_VEIC_LABEL = { disponivel:'Disponível', em_viagem:'Em viagem', em_
       <div class="filter-bar" style="align-items:center">
         <input class="form-control search-input" id="busca" placeholder="Buscar destino, solicitante..." oninput="renderViagens(); if(_tlAtiva) renderTimeline()">
         <select class="form-control" id="fil-status" style="width:180px" onchange="renderViagens(); if(_tlAtiva) renderTimeline()">
-          <option value="">Todos os status</option>
-          <option value="solicitada" selected>Solicitadas</option>
+          <option value="" selected>Todos os status</option>
+          <option value="solicitada">Solicitadas</option>
           <option value="aprovada">Aprovadas</option>
           <option value="em_andamento">Em andamento</option>
           <option value="concluida">Concluídas</option>
