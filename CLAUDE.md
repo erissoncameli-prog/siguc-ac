@@ -37,6 +37,12 @@ Sistema já tem login, sidebar, layout e páginas funcionando.
     `?embed=1` (gerarLayout, js/layout.js, retorna só o conteúdo, sem
     duplicar sidebar/topbar); as 4 páginas continuam existindo e
     funcionando sozinhas, só não têm mais link direto na sidebar.
+    O CSP padrão do site é `frame-ancestors 'none'` (vercel.json, anti-
+    clickjacking) — essas 4 páginas têm um bloco de headers próprio no
+    vercel.json com `frame-ancestors 'self'` + `X-Frame-Options:
+    SAMEORIGIN`, senão o navegador bloqueia o iframe. Qualquer página
+    nova que precise ser embutida (mesmo padrão) precisa do mesmo
+    carve-out — nunca afrouxar o `frame-ancestors 'none'` global.
     Ver regra de duplicação obrigatória em "Regras de desenvolvimento".
 - js/ → config.js, layout.js, mapa-cartografia.js, observability.js,
   queryLogger.js; brigada-offline.js (IndexedDB), brigada-sync.js,
