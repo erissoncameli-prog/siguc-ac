@@ -80,6 +80,7 @@ let _abastecimentos = [], _contratos = [], _veiculos = [], _acaoId = null
 const STATUS_LABEL = { pendente: 'Pendente', validado: 'Validado', rejeitado: 'Rejeitado' }
 const STATUS_BADGE = { pendente: 'fw-badge fw-badge-manutencao', validado: 'fw-badge fw-badge-disponivel', rejeitado: 'fw-badge fw-badge-inativo' }
 const FONTE_LABEL = { orcamentaria: 'Orçamentária', nao_orcamentaria: 'Não orçamentária' }
+const COMB = { gasolina:'Gasolina', etanol:'Etanol', flex:'Flex', diesel:'Diesel', eletrico:'Elétrico', hibrido:'Híbrido' }
 
 ;(async function () {
   const usuario = await carregarUsuario()
@@ -135,16 +136,16 @@ const FONTE_LABEL = { orcamentaria: 'Orçamentária', nao_orcamentaria: 'Não or
       <div class="form-section-label" style="margin-top:20px">Totais por contrato (validados)</div>
       <div class="card"><div class="table-wrap"><div class="table-scroll">
         <table>
-          <thead><tr><th>Contrato</th><th>Fornecedor</th><th>Fonte</th><th>Litros</th><th>Valor</th></tr></thead>
-          <tbody id="tbody-contratos"><tr><td colspan="5" style="text-align:center;padding:20px;color:#9CA3AF">—</td></tr></tbody>
+          <thead><tr><th>Contrato</th><th>Fornecedor</th><th>Fonte</th><th>Combustível</th><th>Litros</th><th>Valor</th></tr></thead>
+          <tbody id="tbody-contratos"><tr><td colspan="6" style="text-align:center;padding:20px;color:#9CA3AF">—</td></tr></tbody>
         </table>
       </div></div></div>
 
       <div class="form-section-label" style="margin-top:20px">Totais por fonte de recurso (validados)</div>
       <div class="card"><div class="table-wrap"><div class="table-scroll">
         <table>
-          <thead><tr><th>Fonte</th><th>Tipo</th><th>Litros</th><th>Valor</th></tr></thead>
-          <tbody id="tbody-fontes"><tr><td colspan="4" style="text-align:center;padding:20px;color:#9CA3AF">—</td></tr></tbody>
+          <thead><tr><th>Fonte</th><th>Tipo</th><th>Combustível</th><th>Litros</th><th>Valor</th></tr></thead>
+          <tbody id="tbody-fontes"><tr><td colspan="5" style="text-align:center;padding:20px;color:#9CA3AF">—</td></tr></tbody>
         </table>
       </div></div></div>
     </div>` +
@@ -259,8 +260,8 @@ function renderTotais() {
 
   const porContrato = {}
   validados.forEach(a => {
-    const k = a.contrato_id
-    if (!porContrato[k]) porContrato[k] = { numero: a.contrato_numero, fornecedor: a.contrato_fornecedor, fonte: `${FONTE_LABEL[a.fonte_tipo]||''} · ${a.fonte_codigo||''}`, litros: 0, valor: 0 }
+    const k = `${a.contrato_id}|${a.combustivel || '—'}`
+    if (!porContrato[k]) porContrato[k] = { numero: a.contrato_numero, fornecedor: a.contrato_fornecedor, fonte: `${FONTE_LABEL[a.fonte_tipo]||''} · ${a.fonte_codigo||''}`, combustivel: a.combustivel, litros: 0, valor: 0 }
     porContrato[k].litros += Number(a.litros_final || 0)
     porContrato[k].valor += Number(a.valor_final || 0)
   })
@@ -268,13 +269,14 @@ function renderTotais() {
   const linhasContratos = Object.values(porContrato)
   tbContratos.innerHTML = linhasContratos.length ? linhasContratos.map(c => `
     <tr><td class="mono">${esc(c.numero)}</td><td style="font-size:12px">${esc(c.fornecedor)}</td><td style="font-size:12px">${esc(c.fonte)}</td>
+      <td style="font-size:12px">${esc(COMB[c.combustivel] || '—')}</td>
       <td class="mono">${formatNum(c.litros,2)} L</td><td class="mono">${formatBRL(c.valor)}</td></tr>`).join('')
-    : '<tr><td colspan="5" style="text-align:center;padding:20px;color:#9CA3AF">Nenhum abastecimento validado ainda</td></tr>'
+    : '<tr><td colspan="6" style="text-align:center;padding:20px;color:#9CA3AF">Nenhum abastecimento validado ainda</td></tr>'
 
   const porFonte = {}
   validados.forEach(a => {
-    const k = a.fonte_codigo || '—'
-    if (!porFonte[k]) porFonte[k] = { descricao: a.fonte_descricao || '—', tipo: a.fonte_tipo, litros: 0, valor: 0 }
+    const k = `${a.fonte_codigo || '—'}|${a.combustivel || '—'}`
+    if (!porFonte[k]) porFonte[k] = { descricao: a.fonte_descricao || '—', tipo: a.fonte_tipo, combustivel: a.combustivel, litros: 0, valor: 0 }
     porFonte[k].litros += Number(a.litros_final || 0)
     porFonte[k].valor += Number(a.valor_final || 0)
   })
@@ -282,8 +284,9 @@ function renderTotais() {
   const linhasFontes = Object.values(porFonte)
   tbFontes.innerHTML = linhasFontes.length ? linhasFontes.map(f => `
     <tr><td style="font-size:12px">${esc(f.descricao)}</td><td style="font-size:12px">${esc(FONTE_LABEL[f.tipo]||'—')}</td>
+      <td style="font-size:12px">${esc(COMB[f.combustivel] || '—')}</td>
       <td class="mono">${formatNum(f.litros,2)} L</td><td class="mono">${formatBRL(f.valor)}</td></tr>`).join('')
-    : '<tr><td colspan="4" style="text-align:center;padding:20px;color:#9CA3AF">Nenhum abastecimento validado ainda</td></tr>'
+    : '<tr><td colspan="5" style="text-align:center;padding:20px;color:#9CA3AF">Nenhum abastecimento validado ainda</td></tr>'
 }
 
 function abrirValidar(id) {
