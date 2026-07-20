@@ -544,7 +544,7 @@ async function carregarUsuariosApp() {
 
 async function carregarVeiculos() {
   const [{ data: veics }, { data: docs }] = await Promise.all([
-    db.from('frota_veiculos').select('*, unidades_organizacionais(sigla,nome), frota_motoristas(nome)')
+    db.from('frota_veiculos').select('*, unidades_organizacionais(sigla,nome), frota_motoristas!motorista_padrao_id(nome)')
       .eq('ativo', true).order('placa'),
     db.from('frota_veiculo_documentos').select('*').order('data_vencimento')
   ])
