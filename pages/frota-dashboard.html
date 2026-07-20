@@ -129,11 +129,19 @@ const TIPO_MANUT_LAB = { preventiva:'Preventiva', corretiva:'Corretiva' }
   // a cada render, então o listener fica no ancestral estável.
   document.getElementById('dash-conteudo').addEventListener('click', e => {
     const t = e.target.closest('.rank-tab')
-    if (!t) return
-    document.querySelectorAll('.rank-tab').forEach(x => x.classList.remove('ativo'))
-    t.classList.add('ativo')
-    _rankAtivo = t.dataset.rank
-    renderRankings()
+    if (t) {
+      document.querySelectorAll('.rank-tab').forEach(x => x.classList.remove('ativo'))
+      t.classList.add('ativo')
+      _rankAtivo = t.dataset.rank
+      renderRankings()
+      return
+    }
+    const tg = e.target.closest('#rank-view-toggle')
+    if (tg) {
+      _rankView = _rankView === 'grafico' ? 'tabela' : 'grafico'
+      tg.textContent = _rankView === 'grafico' ? 'Ver tabela' : 'Ver gráfico'
+      renderRankings()
+    }
   })
 
   setPeriodoMes()
