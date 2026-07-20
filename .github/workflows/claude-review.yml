@@ -1,17 +1,22 @@
 name: Revisão por IA (Claude)
 
-# Agente de revisão: em cada PR, o Claude inspeciona o diff em busca de
-# bugs, problemas de segurança (RLS, vazamento de dados/PII, SECURITY
+# Agente de revisão: o Claude inspeciona o diff em busca de bugs,
+# problemas de segurança (RLS, vazamento de dados/PII, SECURITY
 # DEFINER, etc.) e regressões, e comenta no PR.
+#
+# DESATIVADO (consumo de créditos da API Anthropic) — só roda se
+# disparado manualmente via workflow_dispatch. Para reativar o
+# gatilho automático em PRs, trocar o bloco `on:` de volta para:
+#   pull_request:
+#     types: [opened, synchronize]
+#   issue_comment:
+#     types: [created]
 #
 # Requer o secret ANTHROPIC_API_KEY no repositório
 # (Settings → Secrets and variables → Actions). Sem ele, o job é pulado.
 
 on:
-  pull_request:
-    types: [opened, synchronize]
-  issue_comment:
-    types: [created]          # permite acionar com "@claude" em comentários
+  workflow_dispatch:
 
 permissions:
   contents: read
