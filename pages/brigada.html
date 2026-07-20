@@ -952,6 +952,7 @@ window.__API_MONITOR_OFF = true
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"
         onerror="console.warn('[brigada] Supabase CDN indisponível — modo offline')"></script>
 <script src="/js/config.js"></script>
+<script src="/js/qrcode-generator.js"></script>
 <script>
 // ── Cliente Supabase ISOLADO para o App de Campo ──────────────
 // Aguarda _dbReady (env carregado de /api/env) e então sobrescreve
@@ -2991,8 +2992,7 @@ const INSTALL_URL = 'https://siguc-ac.vercel.app/pages/instalar-brigadas.html'
 
 function abrirQRInstalacao() {
   const url = INSTALL_URL
-  const qr  = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(url)}&size=320x320&format=png&margin=12`
-  document.getElementById('qr-overlay-img').src = qr
+  document.getElementById('qr-overlay-img').src = gerarQRDataURL(url)
   document.getElementById('qr-overlay-link').textContent = url
   document.getElementById('qr-overlay').hidden = false
 }

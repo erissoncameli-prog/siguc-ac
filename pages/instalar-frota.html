@@ -111,10 +111,15 @@
   </p>
 </main>
 
+<script src="/js/qrcode-generator.js"></script>
 <script>
   var LINK_APP = 'https://siguc-ac.vercel.app/pages/frota-app.html';
-  document.getElementById('qr-img').src =
-    'https://api.qrserver.com/v1/create-qr-code/?data=' + encodeURIComponent(LINK_APP) + '&size=320x320&format=png&margin=12';
+  (function () {
+    var qr = qrcode(0, 'M');
+    qr.addData(LINK_APP);
+    qr.make();
+    document.getElementById('qr-img').src = qr.createDataURL(6, 4);
+  })();
 
   function _copiaOk() {
     var btn = document.getElementById('btn-copiar');

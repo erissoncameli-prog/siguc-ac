@@ -150,6 +150,16 @@ function formatData(str) {
   return d.toLocaleDateString('pt-BR');
 }
 
+// Gera QR code localmente (lib vendorizada js/qrcode-generator.js) — sem
+// depender de API externa (api.qrserver.com ficou instável/bloqueada em
+// algumas redes). Retorna data URL PNG pronta pra usar em <img src>.
+function gerarQRDataURL(texto, cellSize = 6, margin = 4) {
+  const qr = qrcode(0, 'M');
+  qr.addData(texto);
+  qr.make();
+  return qr.createDataURL(cellSize, margin);
+}
+
 function toast(msg, tipo = 'info') {
   const cores = { success: '#059669', error: '#DC2626', warning: '#D97706', info: '#2563EB' };
   const t = document.createElement('div');

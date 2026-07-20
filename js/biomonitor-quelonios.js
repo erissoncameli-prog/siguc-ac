@@ -4741,7 +4741,7 @@ async function bioVerificarAtualizacao() {
 }
 
 function bioAbrirQRInstalacao() {
-  const qr = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(BIO_INSTALL_URL)}&size=320x320&format=png&margin=12`
+  const qr = gerarQRDataURL(BIO_INSTALL_URL)
   const img  = document.getElementById('bio-qr-img')
   const link = document.getElementById('bio-qr-link')
   const ov   = document.getElementById('bio-qr-overlay')
