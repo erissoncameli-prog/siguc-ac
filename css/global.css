@@ -112,6 +112,11 @@ body { font-family: var(--font-sans); background: var(--cinza-50); color: var(--
 .topbar-breadcrumb span:last-child { color: var(--cinza-600); font-weight: 500; }
 .page-body { padding: 24px 28px; flex: 1; }
 
+/* Modo embutido (?embed=1) — página existente dentro de um iframe em
+   frota-administrar.html, sem sidebar/topbar duplicados. */
+.app-layout-embed .main-content { margin-left: 0; min-height: 0; }
+.page-body-embed { padding: 4px 4px 20px; }
+
 .card { background: var(--branco); border: 1px solid var(--borda); border-radius: var(--raio-lg); box-shadow: var(--sombra); transition: box-shadow .2s; }
 .card:hover { box-shadow: var(--sombra-md); }
 .card-header { padding: 14px 20px; border-bottom: 1px solid var(--borda); display: flex; align-items: center; justify-content: space-between; gap: 12px; background: var(--branco); border-radius: var(--raio-lg) var(--raio-lg) 0 0; }

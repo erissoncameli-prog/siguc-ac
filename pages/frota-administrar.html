@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>SIGUC-AC · Frota — Administrar</title>
+<link rel="stylesheet" href="../css/global.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../js/observability.js"></script>
+<script src="../js/queryLogger.js"></script>
+<script src="../js/config.js"></script>
+<script src="../js/layout.js"></script>
+</head>
+<body>
+<div id="app"></div>
+
+<style>
+.fa-tabs { display:flex; gap:4px; padding:4px; background:rgba(0,0,0,.06); border-radius:10px; width:fit-content; margin-bottom:16px; flex-wrap:wrap }
+.tab-btn {
+  padding: 6px 18px; border: none; background: transparent;
+  border-radius: 7px; font-size: 13px; font-weight: 500;
+  color: var(--texto-secundario, #6B7280); cursor: pointer;
+  transition: background .15s, color .15s;
+}
+.tab-btn.ativo { background: white; color: var(--floresta, #0A1A0F); box-shadow: 0 1px 4px rgba(0,0,0,.12); }
+.tab-btn:hover:not(.ativo) { background: rgba(255,255,255,.5); }
+.fa-frame-wrap { position:relative }
+.fa-frame { display:none; width:100%; border:0; }
+.fa-frame.ativo { display:block; }
+.fa-loading { text-align:center; padding:60px; color:#9CA3AF; font-size:13px }
+</style>
+
+<script>
+const FA_ABAS = [
+  { id: 'manutencao',     label: 'Manutenção',              src: 'frota-manutencao.html' },
+  { id: 'abastecimentos', label: 'Abastecimentos',          src: 'frota-abastecimentos.html' },
+  { id: 'contratos',      label: 'Contratos de Combustível', src: 'frota-contratos.html' },
+  { id: 'veiculos',       label: 'Veículos e Motoristas',    src: 'frota-veiculos.html' },
+]
+
+;(async function () {
+  const usuario = await carregarUsuario()
+  if (!usuario) { window.location.href = '../index.html'; return }
+
+  document.getElementById('app').innerHTML =
+    gerarLayout('Frota — Administrar', 'frota-administrar') +
+    `<div class="fade-in">
+      <div class="fa-tabs">${FA_ABAS.map((a, i) => `<button type="button" class="tab-btn${i === 0 ? ' ativo' : ''}" id="fa-tab-${a.id}" onclick="faMudarAba('${a.id}')">${a.label}</button>`).join('')}</div>
+      <div class="fa-frame-wrap">${FA_ABAS.map((a, i) => `
+        <div id="fa-loading-${a.id}" class="fa-loading"${i === 0 ? '' : ' style="display:none"'}>Carregando...</div>
+        <iframe id="fa-frame-${a.id}" class="fa-frame${i === 0 ? ' ativo' : ''}"></iframe>`).join('')}</div>
+    </div>`
+  carregarLogosSidebar()
+  faCarregarAba(FA_ABAS[0])
+})()
+
+function faMudarAba(id) {
+  FA_ABAS.forEach(a => {
+    document.getElementById(`fa-tab-${a.id}`).classList.toggle('ativo', a.id === id)
+    document.getElementById(`fa-frame-${a.id}`).classList.toggle('ativo', a.id === id)
+  })
+  const aba = FA_ABAS.find(a => a.id === id)
+  if (aba && !document.getElementById(`fa-frame-${id}`).src) faCarregarAba(aba)
+}
+
+function faCarregarAba(aba) {
+  const iframe = document.getElementById(`fa-frame-${aba.id}`)
+  iframe.addEventListener('load', () => faAjustarAltura(aba.id), { once: true })
+  iframe.src = `${aba.src}?embed=1`
+}
+
+function faAjustarAltura(id) {
+  const iframe = document.getElementById(`fa-frame-${id}`)
+  const loading = document.getElementById(`fa-loading-${id}`)
+  try {
+    const doc = iframe.contentDocument
+    const aplicar = () => { iframe.style.height = doc.documentElement.scrollHeight + 'px' }
+    aplicar()
+    loading.style.display = 'none'
+    if (window.ResizeObserver) new ResizeObserver(aplicar).observe(doc.body)
+  } catch (e) {
+    loading.style.display = 'none'
+    iframe.style.height = '80vh'
+  }
+}
+</script>
+</body>
+</html>
