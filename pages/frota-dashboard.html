@@ -123,13 +123,15 @@ const TIPO_MANUT_LAB = { preventiva:'Preventiva', corretiva:'Corretiva' }
   document.getElementById('sel-tipo').addEventListener('change', carregarDashboard)
   document.getElementById('btn-exportar').addEventListener('click', exportarCSV)
 
-  document.querySelectorAll('.rank-tab').forEach(t => {
-    t.addEventListener('click', () => {
-      document.querySelectorAll('.rank-tab').forEach(x => x.classList.remove('ativo'))
-      t.classList.add('ativo')
-      _rankAtivo = t.dataset.rank
-      renderRankings()
-    })
+  // Delegação: os botões .rank-tab são (re)criados dentro de #dash-conteudo
+  // a cada render, então o listener fica no ancestral estável.
+  document.getElementById('dash-conteudo').addEventListener('click', e => {
+    const t = e.target.closest('.rank-tab')
+    if (!t) return
+    document.querySelectorAll('.rank-tab').forEach(x => x.classList.remove('ativo'))
+    t.classList.add('ativo')
+    _rankAtivo = t.dataset.rank
+    renderRankings()
   })
 
   setPeriodoMes()

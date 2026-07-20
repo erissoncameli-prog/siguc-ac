@@ -19,6 +19,7 @@ window.__API_MONITOR_OFF = true
 <script src="../js/observability.js"></script>
 <script src="../js/queryLogger.js"></script>
 <script src="../js/config.js"></script>
+<script src="../js/qrcode-generator.js"></script>
 <script>
 // ── Cliente Supabase ISOLADO para o App Frota ──────────────────
 // Mesmo padrão do App Brigadas/Biomonitor: sessão própria em
@@ -1283,8 +1284,7 @@ async function zerarFilaLocalFrota() {
 const FROTA_INSTALL_URL = 'https://siguc-ac.vercel.app/pages/instalar-frota.html'
 function abrirInstalarFrota() {
   const url = FROTA_INSTALL_URL
-  const qr = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(url)}&size=320x320&format=png&margin=12`
-  document.getElementById('instalar-qr').src = qr
+  document.getElementById('instalar-qr').src = gerarQRDataURL(url)
   document.getElementById('instalar-link').textContent = url
   document.getElementById('instalar-abrir').href = url
   document.getElementById('modal-instalar').classList.add('aberto')

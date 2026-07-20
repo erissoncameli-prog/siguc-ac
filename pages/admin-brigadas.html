@@ -8,6 +8,7 @@
 <script src="../js/observability.js"></script>
 <script src="../js/queryLogger.js"></script>
 <script src="../js/config.js"></script>
+<script src="../js/qrcode-generator.js"></script>
 <script src="../js/layout.js"></script>
 </head>
 <body>
@@ -1450,9 +1451,8 @@ async function copiarCredenciais() {
 // ── Modal QR ─────────────────────────────────────────────────
 function abrirQR(brigId, brigNome) {
   const url = 'https://siguc-ac.vercel.app/pages/instalar-brigadas.html'
-  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(url)}&size=300x300&format=png&margin=10`
   document.getElementById('qr-titulo').textContent = `QR — ${brigNome}`
-  document.getElementById('qr-img').src = qrUrl
+  document.getElementById('qr-img').src = gerarQRDataURL(url)
   document.getElementById('qr-link').textContent = url
   document.getElementById('modal-qr').classList.add('aberto')
 }
