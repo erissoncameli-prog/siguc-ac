@@ -283,6 +283,7 @@ const STATUS_VEIC_LABEL = { disponivel:'Disponível', em_viagem:'Em viagem', em_
   bIconsAplicar()
   await Promise.all([carregarVeiculos(), carregarMotoristas(), carregarConfigGps()])
   await carregarViagens()
+  await mudarVisaoViagens('timeline')   // Linha do Tempo ativa por padrão
 })()
 
 // ── Config de captura de GPS (migration 177) — captura_viagens
