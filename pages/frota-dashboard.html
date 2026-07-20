@@ -351,7 +351,10 @@ function renderDashboard() {
     </div>
 
     <div class="card" style="margin-bottom:14px">
-      <div class="card-header"><div class="card-title">${bico('award')} Rankings</div></div>
+      <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+        <div class="card-title">${bico('award')} Rankings</div>
+        <button id="rank-view-toggle" class="btn-export" style="padding:5px 12px;font-size:.78rem">${_rankView === 'grafico' ? 'Ver tabela' : 'Ver gráfico'}</button>
+      </div>
       <div class="card-body" style="padding:0 0 8px">
         <div style="padding:0 16px">
           <div class="rank-tabbar">
