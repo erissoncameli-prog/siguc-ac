@@ -765,9 +765,35 @@ function tabela(headers, rows) {
     <tbody>${rows.map(r=>`<tr>${r.map((c,i)=>`<td${i>0?' class="num"':''}>${c}</td>`).join('')}</tr>`).join('')}</tbody></table>`
 }
 
+const _brlShort = v => 'R$ ' + formatNum(v, 0)
+
+// Config-base de gráfico de ranking (barra horizontal top-10)
+function _rankBar({ labels, datasets, stacked, valueFmt, xTicks, refLine, legend, tipFmt, topPad, rightPad }) {
+  return {
+    type:'bar',
+    data:{ labels, datasets },
+    options:{
+      indexAxis:'y', responsive:true, maintainAspectRatio:false,
+      layout:{ padding:{ right: rightPad||64, top: topPad||4 } },
+      plugins:{
+        legend: legend ? { position:'bottom', labels:{boxWidth:11,padding:8,font:{size:10}} } : { display:false },
+        tooltip: tipFmt ? { callbacks:{ label: tipFmt } } : {},
+        rankValueLabels:{ display:true, fmt: valueFmt },
+        rankRefLine: refLine || {},
+      },
+      scales:{
+        x:{ beginAtZero:true, stacked:!!stacked, ticks: Object.assign({ font:{size:9} }, xTicks||{}) },
+        y:{ stacked:!!stacked, ticks:{ font:{size:10}, autoSkip:false,
+              callback(v){ return _rankTick(this.getLabelForValue(v)) } } },
+      },
+    },
+  }
+}
+
 function renderRankings() {
   const cont = document.getElementById('rank-corpo')
   if (!cont) return
+  if (_rankChart) { _rankChart.destroy(); _rankChart = null }
   const map = {
     'veiculos-viagens':      rankVeiculosViagens,
     'veiculos-uso':          rankVeiculosUso,
@@ -778,20 +804,33 @@ function renderRankings() {
     'motoristas-rejeitados': rankMotoristasRejeitados,
     'setores':               rankSetores,
   }
-  cont.innerHTML = (map[_rankAtivo] || rankVeiculosViagens)()
+  const d = (map[_rankAtivo] || rankVeiculosViagens)()
+  if (!d.rows.length) { cont.innerHTML = '<div class="chart-empty">Sem dados no período</div>'; return }
+  if (_rankView === 'tabela') { cont.innerHTML = tabela(d.headers, d.rows); return }
+  const h = Math.max(150, d.labels.length * 34 + 46)
+  cont.innerHTML = `<div class="chart-canvas-wrap" style="height:${h}px"><canvas id="rank-canvas"></canvas></div>`
+  const ctx = document.getElementById('rank-canvas')?.getContext('2d')
+  if (ctx) _rankChart = new Chart(ctx, d.chart)
 }
 
 function rankVeiculosViagens() {
   const acc = {}
   _viagens.filter(v=>v.status==='concluida').forEach(v => {
-    const key = v.veiculo_id
-    if (!key) return
-    acc[key] = acc[key] || { placa:v.veiculo_placa, modelo:v.veiculo_modelo, n:0 }
-    acc[key].n++
+    if (!v.veiculo_id) return
+    acc[v.veiculo_id] = acc[v.veiculo_id] || { placa:v.veiculo_placa, modelo:v.veiculo_modelo, n:0 }
+    acc[v.veiculo_id].n++
   })
-  const rows = Object.values(acc).sort((a,b)=>b.n-a.n).slice(0,10)
-    .map((v,i) => [i+1, `${esc(v.placa)} — ${esc(v.modelo)}`, v.n])
-  return tabela(['#','Veículo','Viagens concluídas'], rows.map(r=>[r[0],r[1],r[2]]))
+  const arr = Object.values(acc).sort((a,b)=>b.n-a.n).slice(0,10)
+  const labels = arr.map(v=>`${v.placa} — ${v.modelo}`)
+  return {
+    headers:['#','Veículo','Viagens concluídas'],
+    rows: arr.map((v,i)=>[i+1, `${esc(v.placa)} — ${esc(v.modelo)}`, v.n]),
+    labels,
+    chart: _rankBar({ labels,
+      datasets:[{ label:'Viagens', data:arr.map(v=>v.n),
+        backgroundColor:'#52B788cc', borderColor:'#52B788', borderWidth:1.5, borderRadius:5 }],
+      valueFmt:v=>formatNum(v,0), xTicks:{ precision:0 } }),
+  }
 }
 
 function rankVeiculosUso() {
@@ -802,9 +841,20 @@ function rankVeiculosUso() {
     if (v.veiculo_medidor==='hodometro' && v.km_saida!=null && v.km_chegada!=null) acc[v.veiculo_id].uso += Math.max(0, v.km_chegada-v.km_saida)
     if (v.veiculo_medidor==='horimetro' && v.horas_saida!=null && v.horas_chegada!=null) acc[v.veiculo_id].uso += Math.max(0, v.horas_chegada-v.horas_saida)
   })
-  const rows = Object.values(acc).sort((a,b)=>b.uso-a.uso).slice(0,10)
-    .map((v,i)=>[i+1, `${esc(v.placa)} — ${esc(v.modelo)}`, `${formatNum(v.uso,1)} ${v.medidor==='horimetro'?'h':'km'}`])
-  return tabela(['#','Veículo','Uso no período'], rows)
+  const arr = Object.values(acc).filter(v=>v.uso>0).sort((a,b)=>b.uso-a.uso).slice(0,10)
+  const labels = arr.map(v=>`${v.placa} — ${v.modelo}`)
+  const un = arr.map(v=>v.medidor==='horimetro'?'h':'km')
+  return {
+    headers:['#','Veículo','Uso no período'],
+    rows: arr.map((v,i)=>[i+1, `${esc(v.placa)} — ${esc(v.modelo)}`, `${formatNum(v.uso,1)} ${un[i]}`]),
+    labels,
+    chart: _rankBar({ labels, rightPad:80,
+      datasets:[{ label:'Uso', data:arr.map(v=>v.uso),
+        backgroundColor:arr.map(v=>v.medidor==='horimetro'?'#12A66Acc':'#3B82C4cc'),
+        borderColor:arr.map(v=>v.medidor==='horimetro'?'#12A66A':'#3B82C4'), borderWidth:1.5, borderRadius:5 }],
+      valueFmt:(val,i)=>`${formatNum(val,1)} ${un[i]}`,
+      tipFmt:ctx=>` ${formatNum(ctx.parsed.x,1)} ${un[ctx.dataIndex]}` }),
+  }
 }
 
 function rankVeiculosCusto() {
@@ -812,31 +862,63 @@ function rankVeiculosCusto() {
   _veiculosF.forEach(v => { acc[v.id] = { placa:v.placa, modelo:v.modelo, combustivel:0, manutencao:0 } })
   _abastec.filter(a=>a.status==='validado').forEach(a => { if (acc[a.veiculo_id]) acc[a.veiculo_id].combustivel += Number(a.valor_final||0) })
   _ordensServ.filter(o=>o.status==='concluida').forEach(o => { if (acc[o.veiculo_id]) acc[o.veiculo_id].manutencao += Number(o.custo||0) })
-  const rows = Object.values(acc).map(v=>({...v, total: v.combustivel+v.manutencao}))
-    .sort((a,b)=>b.total-a.total).filter(v=>v.total>0).slice(0,10)
-    .map((v,i)=>[i+1, `${esc(v.placa)} — ${esc(v.modelo)}`, formatBRL(v.combustivel), formatBRL(v.manutencao), formatBRL(v.total)])
-  return tabela(['#','Veículo','Combustível','Manutenção','Total'], rows)
+  const arr = Object.values(acc).map(v=>({...v, total:v.combustivel+v.manutencao}))
+    .filter(v=>v.total>0).sort((a,b)=>b.total-a.total).slice(0,10)
+  const labels = arr.map(v=>`${v.placa} — ${v.modelo}`)
+  return {
+    headers:['#','Veículo','Combustível','Manutenção','Total'],
+    rows: arr.map((v,i)=>[i+1, `${esc(v.placa)} — ${esc(v.modelo)}`, formatBRL(v.combustivel), formatBRL(v.manutencao), formatBRL(v.total)]),
+    labels,
+    chart: _rankBar({ labels, stacked:true, legend:true, rightPad:92,
+      datasets:[
+        { label:'Combustível', data:arr.map(v=>v.combustivel), backgroundColor:'#C9A84Ccc', borderColor:'#C9A84C', borderWidth:1, borderRadius:3 },
+        { label:'Manutenção',  data:arr.map(v=>v.manutencao),  backgroundColor:'#3B82C4cc', borderColor:'#3B82C4', borderWidth:1, borderRadius:3 },
+      ],
+      valueFmt:total=>formatBRL(total),
+      xTicks:{ callback:_brlShort },
+      tipFmt:ctx=>` ${ctx.dataset.label}: ${formatBRL(ctx.parsed.x)}` }),
+  }
 }
 
 function rankVeiculosConsumo() {
-  const rows = _veiculosF.filter(v=>v.medidor==='hodometro').map(v => {
+  const todos = _veiculosF.filter(v=>v.medidor==='hodometro').map(v => {
     const c = consumoPorVeiculo(v.id)
     return c!=null ? { placa:v.placa, modelo:v.modelo, c } : null
-  }).filter(Boolean).sort((a,b)=>a.c-b.c).slice(0,10) // pior primeiro
-    .map((v,i)=>[i+1, `${esc(v.placa)} — ${esc(v.modelo)}`, `${formatNum(v.c,2)} km/L`])
-  return tabela(['#','Veículo (pior consumo primeiro)','Km/L médio'], rows)
+  }).filter(Boolean)
+  const media = todos.length ? todos.reduce((s,v)=>s+v.c,0)/todos.length : 0
+  const arr = todos.slice().sort((a,b)=>a.c-b.c).slice(0,10) // pior primeiro
+  const labels = arr.map(v=>`${v.placa} — ${v.modelo}`)
+  return {
+    headers:['#','Veículo (pior consumo primeiro)','Km/L médio'],
+    rows: arr.map((v,i)=>[i+1, `${esc(v.placa)} — ${esc(v.modelo)}`, `${formatNum(v.c,2)} km/L`]),
+    labels,
+    chart: _rankBar({ labels, topPad:16, rightPad:80,
+      datasets:[{ label:'Km/L', data:arr.map(v=>v.c),
+        backgroundColor:arr.map(v=>v.c<media?'#DC2626cc':'#52B788cc'),
+        borderColor:arr.map(v=>v.c<media?'#DC2626':'#52B788'), borderWidth:1.5, borderRadius:5 }],
+      valueFmt:v=>`${formatNum(v,2)}`,
+      refLine:{ value:media, label:`média ${formatNum(media,2)} km/L` },
+      tipFmt:ctx=>` ${formatNum(ctx.parsed.x,2)} km/L` }),
+  }
 }
 
 function rankVeiculosOS() {
   const acc = {}
-  _ordensServ.filter(o=>o.tipo==='corretiva').forEach(o => {
-    acc[o.veiculo_id] = (acc[o.veiculo_id]||0) + 1
-  })
-  const rows = Object.entries(acc).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([veicId,n],i) => {
+  _ordensServ.filter(o=>o.tipo==='corretiva').forEach(o => { acc[o.veiculo_id] = (acc[o.veiculo_id]||0) + 1 })
+  const arr = Object.entries(acc).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([veicId,n]) => {
     const v = _veiculos.find(x=>x.id===veicId)
-    return [i+1, v ? `${esc(v.placa)} — ${esc(v.modelo)}` : '—', n]
+    return { nome: v ? `${v.placa} — ${v.modelo}` : '—', n }
   })
-  return tabela(['#','Veículo','OS corretivas'], rows)
+  const labels = arr.map(v=>v.nome)
+  return {
+    headers:['#','Veículo','OS corretivas'],
+    rows: arr.map((v,i)=>[i+1, esc(v.nome), v.n]),
+    labels,
+    chart: _rankBar({ labels,
+      datasets:[{ label:'OS corretivas', data:arr.map(v=>v.n),
+        backgroundColor:'#F59E0Bcc', borderColor:'#F59E0B', borderWidth:1.5, borderRadius:5 }],
+      valueFmt:v=>formatNum(v,0), xTicks:{ precision:0 } }),
+  }
 }
 
 function rankMotoristasViagens() {
@@ -847,9 +929,19 @@ function rankMotoristasViagens() {
     acc[v.motorista_id].n++
     if (v.veiculo_medidor==='hodometro' && v.km_saida!=null && v.km_chegada!=null) acc[v.motorista_id].km += Math.max(0, v.km_chegada-v.km_saida)
   })
-  const rows = Object.values(acc).sort((a,b)=>b.n-a.n).slice(0,10)
-    .map((m,i)=>[i+1, esc(m.nome), m.n, formatNum(m.km,0)])
-  return tabela(['#','Motorista','Viagens concluídas','Km rodados'], rows)
+  const arr = Object.values(acc).sort((a,b)=>b.n-a.n).slice(0,10)
+  const labels = arr.map(m=>m.nome)
+  return {
+    headers:['#','Motorista','Viagens concluídas','Km rodados'],
+    rows: arr.map((m,i)=>[i+1, esc(m.nome), m.n, formatNum(m.km,0)]),
+    labels,
+    chart: _rankBar({ labels, rightPad:130,
+      datasets:[{ label:'Viagens', data:arr.map(m=>m.n),
+        backgroundColor:'#52B788cc', borderColor:'#52B788', borderWidth:1.5, borderRadius:5 }],
+      valueFmt:(v,i)=>`${formatNum(v,0)} · ${formatNum(arr[i].km,0)} km`,
+      xTicks:{ precision:0 },
+      tipFmt:ctx=>[` Viagens: ${arr[ctx.dataIndex].n}`, ` Km rodados: ${formatNum(arr[ctx.dataIndex].km,0)}`] }),
+  }
 }
 
 function rankMotoristasRejeitados() {
@@ -858,22 +950,50 @@ function rankMotoristasRejeitados() {
     acc[a.motorista_id] = acc[a.motorista_id] || { nome:a.motorista_nome, n:0 }
     acc[a.motorista_id].n++
   })
-  const rows = Object.values(acc).sort((a,b)=>b.n-a.n).slice(0,10)
-    .map((m,i)=>[i+1, esc(m.nome), m.n])
-  return tabela(['#','Motorista','Abastecimentos rejeitados'], rows)
+  const arr = Object.values(acc).sort((a,b)=>b.n-a.n).slice(0,10)
+  const labels = arr.map(m=>m.nome)
+  return {
+    headers:['#','Motorista','Abastecimentos rejeitados'],
+    rows: arr.map((m,i)=>[i+1, esc(m.nome), m.n]),
+    labels,
+    chart: _rankBar({ labels,
+      datasets:[{ label:'Rejeitados', data:arr.map(m=>m.n),
+        backgroundColor:'#DC2626cc', borderColor:'#DC2626', borderWidth:1.5, borderRadius:5 }],
+      valueFmt:v=>formatNum(v,0), xTicks:{ precision:0 } }),
+  }
 }
 
+// Setores · Gasto = custo real (combustível validado + manutenção
+// concluída) atribuído ao setor de lotação do veículo (frota_veiculos.setor_id)
 function rankSetores() {
+  const nomeSetor = id => { const s = _setores.find(x=>x.id===id); return s ? (s.sigla || s.nome) : 'Sem setor' }
+  const veicSetor = {}; _veiculosF.forEach(v => { veicSetor[v.id] = v.setor_id || null })
   const acc = {}
-  _viagens.forEach(v => {
-    const key = v.setor_sigla || v.setor_nome || 'Sem setor'
-    acc[key] = acc[key] || { n:0, km:0 }
-    acc[key].n++
-    if (v.veiculo_medidor==='hodometro' && v.km_saida!=null && v.km_chegada!=null) acc[key].km += Math.max(0, v.km_chegada-v.km_saida)
-  })
-  const rows = Object.entries(acc).sort((a,b)=>b[1].n-a[1].n).slice(0,10)
-    .map(([nome,d],i)=>[i+1, esc(nome), d.n, formatNum(d.km,0)])
-  return tabela(['#','Setor','Viagens','Km rodados'], rows)
+  const add = (veicId, campo, val) => {
+    if (!(veicId in veicSetor)) return
+    const sid = veicSetor[veicId]
+    const key = sid || '__none__'
+    acc[key] = acc[key] || { nome: sid ? nomeSetor(sid) : 'Sem setor', combustivel:0, manutencao:0 }
+    acc[key][campo] += val
+  }
+  _abastec.filter(a=>a.status==='validado').forEach(a => add(a.veiculo_id, 'combustivel', Number(a.valor_final||0)))
+  _ordensServ.filter(o=>o.status==='concluida').forEach(o => add(o.veiculo_id, 'manutencao', Number(o.custo||0)))
+  const arr = Object.values(acc).map(v=>({...v, total:v.combustivel+v.manutencao}))
+    .filter(v=>v.total>0).sort((a,b)=>b.total-a.total).slice(0,10)
+  const labels = arr.map(v=>v.nome)
+  return {
+    headers:['#','Setor','Combustível','Manutenção','Total'],
+    rows: arr.map((v,i)=>[i+1, esc(v.nome), formatBRL(v.combustivel), formatBRL(v.manutencao), formatBRL(v.total)]),
+    labels,
+    chart: _rankBar({ labels, stacked:true, legend:true, rightPad:92,
+      datasets:[
+        { label:'Combustível', data:arr.map(v=>v.combustivel), backgroundColor:'#C9A84Ccc', borderColor:'#C9A84C', borderWidth:1, borderRadius:3 },
+        { label:'Manutenção',  data:arr.map(v=>v.manutencao),  backgroundColor:'#3B82C4cc', borderColor:'#3B82C4', borderWidth:1, borderRadius:3 },
+      ],
+      valueFmt:total=>formatBRL(total),
+      xTicks:{ callback:_brlShort },
+      tipFmt:ctx=>` ${ctx.dataset.label}: ${formatBRL(ctx.parsed.x)}` }),
+  }
 }
 
 // ════════════════════════════════════════════════════════════════
