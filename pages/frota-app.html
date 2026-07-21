@@ -2061,9 +2061,14 @@ async function confirmarAprovar() {
   const passageiros = _viagemAprovando?.passageiros || 0
   if (veic && veic.capacidade_passageiros && passageiros > veic.capacidade_passageiros &&
       !confirm(`Este veículo comporta ${veic.capacidade_passageiros} passageiro(s), mas a viagem tem ${passageiros}. Aprovar mesmo assim?`)) return
+  const justif = (document.getElementById('ap-justif-dedicado')?.value || '').trim()
+  if (veic?.dedicado_setor) {
+    if (!_liberarDedicadoG) { toast('Veículo dedicado ao setor — marque "Liberar veículo dedicado do setor" para usá-lo', 'error'); return }
+    if (!justif) { toast('Informe a justificativa da liberação do veículo dedicado', 'error'); return }
+  }
   btn.disabled = true; btn.textContent = 'Aprovando...'
   try {
-    const { error } = await db.rpc('frota_aprovar_viagem', { p_viagem_id: _acaoId, p_veiculo_id: veiculo_id, p_motorista_id: motorista_id })
+    const { error } = await db.rpc('frota_aprovar_viagem', { p_viagem_id: _acaoId, p_veiculo_id: veiculo_id, p_motorista_id: motorista_id, p_liberar_dedicado: _liberarDedicadoG, p_justificativa: justif || null })
     if (error) throw error
     toast('Viagem aprovada!', 'success')
     fecharModal('aprovar'); await carregarViagensGestor()
