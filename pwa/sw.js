@@ -14,7 +14,7 @@ const APP = SCOPE.includes('/pages/biomonitor.html') ? 'biomonitor'
 // Ao concluir uma implementação que toque arquivos web de um app,
 // incrementar SÓ o número daquele app (vN → vN+1) — não precisa mexer
 // nos outros dois.
-const VERSOES = { brigadas: 246, biomonitor: 8, frota: 28 }
+const VERSOES = { brigadas: 247, biomonitor: 9, frota: 29 }
 const CACHE = `siguc-${APP}-v${VERSOES[APP]}`
 
 const SHELLS = {
@@ -124,9 +124,15 @@ self.addEventListener('fetch', ev => {
     return
   }
 
-  // App shell: cache-first, atualiza em background
+  // App shell: cache-first, atualiza em background.
+  // IMPORTANTE: caches.match(request) sem escopo procura em TODOS os
+  // Caches da origem (inclusive dos outros 2 apps, que cacheiam as
+  // mesmas URLs compartilhadas como /js/config.js) — isso quebrava o
+  // isolamento por app documentado no topo do arquivo, podendo servir
+  // um asset velho de um app desatualizado para outro já atualizado.
+  // Restringe a busca só ao cache da versão atual DESTE app.
   ev.respondWith(
-    caches.match(ev.request).then(cached => {
+    caches.open(CACHE).then(c => c.match(ev.request)).then(cached => {
       const network = fetch(ev.request).then(resp => {
         if (resp.ok && ev.request.method === 'GET') {
           caches.open(CACHE).then(c => c.put(ev.request, resp.clone()))
