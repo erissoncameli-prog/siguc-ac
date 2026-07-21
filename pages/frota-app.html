@@ -1707,6 +1707,11 @@ function agendarPreviewEscala() {
   clearTimeout(_previewEscalaTimer)
   _previewEscalaTimer = setTimeout(atualizarPreviewEscala, 400)
 }
+// Avatar tolerante a cache antigo: se o helper de frota-wise.js ainda não
+// tiver carregado (versão em cache anterior), mostra só o nome, sem travar.
+function _avatarEsc(foto, nome, size) {
+  return (typeof fwAvatarMotorista === 'function') ? fwAvatarMotorista(foto, nome, size) : ''
+}
 async function atualizarPreviewEscala() {
   const box = document.getElementById('preview-escala')
   if (!box) return
@@ -1724,13 +1729,13 @@ async function atualizarPreviewEscala() {
     p_inicio: new Date(saida).toISOString(), p_fim: new Date(retorno).toISOString(),
     p_passageiros: pax
   })
-  if (error) { box.style.display = 'none'; return }
+  if (error) { box.style.display = ''; box.textContent = 'Não foi possível carregar a sugestão de escala agora — a gestão de frota define o motorista na aprovação.'; return }
   const sugeridos = (data || []).filter(x => x.sugerido)
   if (!sugeridos.length) {
     box.innerHTML = '<strong>Motorista da vez</strong><br>Nenhum motorista elegível para o período no momento — a gestão de frota define na aprovação.'
     return
   }
-  const lista = sugeridos.map(x => `<span style="display:inline-flex;align-items:center;gap:6px;margin:2px 12px 2px 0">${fwAvatarMotorista(x.foto_url, x.nome, 28)}<strong>${esc(x.nome)}</strong></span>`).join('')
+  const lista = sugeridos.map(x => `<span style="display:inline-flex;align-items:center;gap:6px;margin:2px 12px 2px 0">${_avatarEsc(x.foto_url, x.nome, 28)}<strong>${esc(x.nome)}</strong></span>`).join('')
   const multi = sugeridos.length > 1
   box.innerHTML =
     `<div>Motorista${multi ? 's' : ''} da vez (sugestão — a confirmar pela gestão de frota):</div><div style="margin-top:6px;display:flex;flex-wrap:wrap;align-items:center">${lista}</div>` +
@@ -2088,7 +2093,7 @@ function renderEscalaBox() {
   const sug = _escalaFila.find(x => x.motorista_id === _escalaSugeridoId)
   const nunca = sug && !sug.ultima_viagem
   box.innerHTML =
-    `<div style="display:flex;align-items:center;gap:8px">${fwAvatarMotorista(sug ? sug.foto_url : null, sug ? sug.nome : '', 32)}
+    `<div style="display:flex;align-items:center;gap:8px">${_avatarEsc(sug ? sug.foto_url : null, sug ? sug.nome : '', 32)}
        <div><div style="font-weight:700">Motorista da vez (escala por rodízio): ${esc(sug ? sug.nome : '—')}</div>
        <div style="margin-top:2px">${nunca ? 'Ainda não fez viagem intermunicipal.' : 'É quem está há mais tempo sem viagem intermunicipal.'} Sugestão — você pode trocar.</div></div></div>
      <button type="button" class="btn btn-xs btn-ghost" style="margin-top:4px;color:#065F46" onclick="toggleFilaEscala()">Ver fila</button>
@@ -2101,7 +2106,7 @@ function toggleFilaEscala() {
   if (el.style.display === 'none') {
     el.innerHTML = _escalaFila.map((x, i) => {
       const quando = x.ultima_viagem ? new Date(x.ultima_viagem).toLocaleDateString('pt-BR') : 'nunca'
-      return `<div style="display:flex;align-items:center;gap:6px;padding:2px 0;${x.motorista_id === _escalaSugeridoId ? 'font-weight:700' : ''}">${i + 1}. ${fwAvatarMotorista(x.foto_url, x.nome, 22)} <span>${esc(x.nome)} — última: ${quando} · ${x.total_viagens} no total</span></div>`
+      return `<div style="display:flex;align-items:center;gap:6px;padding:2px 0;${x.motorista_id === _escalaSugeridoId ? 'font-weight:700' : ''}">${i + 1}. ${_avatarEsc(x.foto_url, x.nome, 22)} <span>${esc(x.nome)} — última: ${quando} · ${x.total_viagens} no total</span></div>`
     }).join('')
     el.style.display = ''
   } else el.style.display = 'none'
