@@ -1772,7 +1772,8 @@ async function renderModoGestor() {
 }
 
 async function carregarVeiculosGestor() {
-  const { data } = await db.from('frota_veiculos').select('id,placa,modelo,tipo,status,capacidade_passageiros')
+  const { data } = await db.from('frota_veiculos')
+    .select('id,placa,modelo,tipo,status,capacidade_passageiros,setor_id,dedicado_setor,setor:unidades_organizacionais(sigla,nome)')
     .eq('ativo', true).neq('status', 'baixado').order('placa')
   _veiculosG = data || []
 }
