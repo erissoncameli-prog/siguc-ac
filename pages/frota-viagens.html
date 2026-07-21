@@ -656,28 +656,32 @@ async function consultarDisponibilidade() {
   if (new Date(fim) <= new Date(ini)) { toast('O fim precisa ser depois do início', 'error'); return }
 
   cont.innerHTML = '<div style="text-align:center;padding:16px;color:#9CA3AF">Consultando...</div>'
+  // Inclui dedicados para mostrá-los como "bloqueado" (não como livre).
   const { data, error } = await db.rpc('frota_veiculos_disponiveis', {
-    p_inicio: new Date(ini).toISOString(), p_fim: new Date(fim).toISOString()
+    p_inicio: new Date(ini).toISOString(), p_fim: new Date(fim).toISOString(), p_incluir_dedicados: true
   })
   if (error) { cont.innerHTML = `<div style="color:#DC2626;font-size:13px">Erro ao consultar: ${esc(error.message)}</div>`; return }
 
-  const livres = data || []
+  const todos = data || []
+  const livres = todos.filter(v => !v.dedicado_setor)
   const ativos = _veiculos.filter(v => v.status !== 'baixado').length
-  if (!livres.length) {
+  if (!todos.length) {
     cont.innerHTML = `<div style="text-align:center;padding:24px;color:#9CA3AF;font-size:13px">
       Nenhum veículo livre nesse período (0 de ${ativos} ativos).</div>`
     return
   }
   cont.innerHTML = `
-    <div style="font-size:12px;color:#6B7280;margin-bottom:10px">${livres.length} de ${ativos} veículo(s) livre(s)</div>
-    ${livres.map(v => `
+    <div style="font-size:12px;color:#6B7280;margin-bottom:10px">${livres.length} de ${ativos} veículo(s) livre(s)${todos.length > livres.length ? ` · ${todos.length - livres.length} dedicado(s) bloqueado(s)` : ''}</div>
+    ${todos.map(v => `
       <div style="display:flex;align-items:center;gap:10px;padding:9px 4px;border-bottom:1px solid #F2F5F7">
         <div class="frota-tl-row-avatar">${bico('truck')}</div>
         <div style="flex:1">
           <strong style="font-size:.85rem">${esc(v.placa)} — ${esc(v.modelo)}</strong>
           <div style="font-size:.74rem;color:#9CA3AF">${esc(v.tipo)}${v.capacidade_passageiros ? ` · ${v.capacidade_passageiros} lug.` : ''}</div>
         </div>
-        <span class="fw-badge fw-badge-disponivel">Livre</span>
+        ${v.dedicado_setor
+          ? '<span class="fw-badge badge-roxo">Dedicado (bloqueado)</span>'
+          : '<span class="fw-badge fw-badge-disponivel">Livre</span>'}
       </div>`).join('')}
   `
 }
