@@ -627,7 +627,7 @@ function abrirDetalhe(id) {
 
 function fecharModal(qual) {
   document.getElementById(`modal-${qual}`).classList.remove('aberto')
-  _acaoId = null; _viagemAprovando = null; _linhasAlocacao = []
+  _acaoId = null; _viagemAprovando = null; _linhasAlocacao = []; _liberarDedicado = false
 }
 
 // ── Consulta de veículos livres por data — mesma RPC usada na
