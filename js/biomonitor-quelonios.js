@@ -4755,15 +4755,38 @@ function bioAbrirQRInstalacao() {
   }
 }
 
-async function bioSincronizarPraias() {
+// ── Registro central de sincronizações de "cache de referência" ─
+// Cada entrada é um catálogo do tipo espelho-do-servidor (ver
+// bioOfflineSubstituirCacheReferencia em biomonitor-offline.js).
+// Adicionar um catálogo novo no futuro é só acrescentar uma linha
+// aqui — nunca reimplementar fetch+substituição na mão em outro
+// lugar, senão o bug de "cache nunca esvazia" (praias/berçários,
+// jul/2026) volta a acontecer pro catálogo novo.
+const BIO_SYNCS_REFERENCIA = [
+  { nome: 'Praias',    fn: () => bioSyncCachePraias(BioApp.monitor?.grupo_id) },
+  { nome: 'Berçários', fn: () => bioSyncCacheBercarios() },
+  { nome: 'Temporada', fn: () => typeof bioSyncCacheTemporada  === 'function' ? bioSyncCacheTemporada(BioApp.monitor?.grupo_id) : Promise.resolve() },
+  { nome: 'Parâmetros de incubação', fn: () => typeof bioSyncCacheParametros === 'function' ? bioSyncCacheParametros() : Promise.resolve() },
+]
+
+async function bioSincronizarDadosReferencia() {
   if (!navigator.onLine) { bioToast('Sem conexão.', 'err'); return }
-  bioToast('Sincronizando praias…', 'info')
-  try {
-    await bioSyncCachePraias(BioApp.monitor?.grupo_id)
-    await bioCarregarPraiasHome()
-    bioToast('Praias atualizadas!', 'ok')
-  } catch (e) {
-    bioToast('Erro ao sincronizar praias.', 'err')
+  bioToast('Sincronizando dados…', 'info')
+
+  // Cada item roda isolado: um catálogo falhando (ex.: rede caiu no
+  // meio) não impede os outros de sincronizar nem trava o botão.
+  const resultados = await Promise.all(BIO_SYNCS_REFERENCIA.map(async ({ nome, fn }) => {
+    try { await fn(); return { nome, ok: true } }
+    catch (e) { console.error('[bio-sync-referencia]', nome, e); return { nome, ok: false } }
+  }))
+
+  await bioCarregarPraiasHome()
+
+  const falhas = resultados.filter(r => !r.ok)
+  if (!falhas.length) {
+    bioToast('Dados sincronizados!', 'ok')
+  } else {
+    bioToast(`Falhou: ${falhas.map(f => f.nome).join(', ')}. Os demais foram atualizados.`, 'err')
   }
 }
 
@@ -4820,7 +4843,7 @@ function bioIniciarConfig() {
     bioMostrarTela('tela-config-pin')
     bioIniciarTelaConfigPin()
   })
-  document.getElementById('bio-btn-sincronizar-praias')?.addEventListener('click', bioSincronizarPraias)
+  document.getElementById('bio-btn-sincronizar-praias')?.addEventListener('click', bioSincronizarDadosReferencia)
   document.getElementById('bio-btn-qr-instalar')?.addEventListener('click', bioAbrirQRInstalacao)
   document.getElementById('bio-btn-verificar-update')?.addEventListener('click', bioVerificarAtualizacao)
   document.getElementById('bio-btn-zerar-fila')?.addEventListener('click', async () => {
