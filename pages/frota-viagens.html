@@ -520,8 +520,9 @@ function renderEscalaBox() {
   const sug = _escalaFila.find(x => x.motorista_id === _escalaSugeridoId)
   const nunca = sug && !sug.ultima_viagem
   box.innerHTML =
-    `<div style="font-weight:700">Motorista da vez (escala por rodízio): ${esc(sug ? sug.nome : '—')}</div>
-     <div style="margin-top:2px">${nunca ? 'Ainda não fez viagem intermunicipal.' : 'É quem está há mais tempo sem viagem intermunicipal.'} Sugestão — você pode trocar.</div>
+    `<div style="display:flex;align-items:center;gap:8px">${fwAvatarMotorista(sug ? sug.foto_url : null, sug ? sug.nome : '', 32)}
+       <div><div style="font-weight:700">Motorista da vez (escala por rodízio): ${esc(sug ? sug.nome : '—')}</div>
+       <div style="margin-top:2px">${nunca ? 'Ainda não fez viagem intermunicipal.' : 'É quem está há mais tempo sem viagem intermunicipal.'} Sugestão — você pode trocar.</div></div></div>
      <button type="button" class="btn btn-xs btn-ghost" style="margin-top:4px;color:#065F46" onclick="toggleFilaEscala()">Ver fila</button>
      <div id="ap-escala-fila" style="display:none;margin-top:6px"></div>`
 }
@@ -532,7 +533,7 @@ function toggleFilaEscala() {
   if (el.style.display === 'none') {
     el.innerHTML = _escalaFila.map((x, i) => {
       const quando = x.ultima_viagem ? new Date(x.ultima_viagem).toLocaleDateString('pt-BR') : 'nunca'
-      return `<div style="padding:2px 0;${x.motorista_id === _escalaSugeridoId ? 'font-weight:700' : ''}">${i + 1}. ${esc(x.nome)} — última: ${quando} · ${x.total_viagens} no total</div>`
+      return `<div style="display:flex;align-items:center;gap:6px;padding:2px 0;${x.motorista_id === _escalaSugeridoId ? 'font-weight:700' : ''}">${i + 1}. ${fwAvatarMotorista(x.foto_url, x.nome, 22)} <span>${esc(x.nome)} — última: ${quando} · ${x.total_viagens} no total</span></div>`
     }).join('')
     el.style.display = ''
   } else el.style.display = 'none'

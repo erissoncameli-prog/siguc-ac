@@ -199,10 +199,10 @@ async function atualizarPreviewEscala() {
     box.innerHTML = '<strong>Motorista da vez</strong><br>Nenhum motorista elegível para o período no momento — a gestão de frota define na aprovação.'
     return
   }
-  const nomes = sugeridos.map(x => esc(x.nome)).join(', ')
+  const lista = sugeridos.map(x => `<span style="display:inline-flex;align-items:center;gap:6px;margin:2px 12px 2px 0">${fwAvatarMotorista(x.foto_url, x.nome, 28)}<strong>${esc(x.nome)}</strong></span>`).join('')
   const multi = sugeridos.length > 1
   box.innerHTML =
-    `<strong>Motorista${multi ? 's' : ''} da vez (sugestão — a confirmar pela gestão de frota):</strong><br>${nomes}` +
+    `<div>Motorista${multi ? 's' : ''} da vez (sugestão — a confirmar pela gestão de frota):</div><div style="margin-top:6px;display:flex;flex-wrap:wrap;align-items:center">${lista}</div>` +
     (multi ? `<div style="margin-top:4px">Esta viagem deve precisar de ${sugeridos.length} veículos; a gestão confirma a escala final.</div>` : '')
 }
 
