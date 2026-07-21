@@ -1913,6 +1913,7 @@ async function abrirAprovar(id) {
   document.getElementById('ap-aviso-capacidade').style.display = 'none'
   document.getElementById('ap-motorista').innerHTML = optsMotoristasG(null)
   desativarModoMultiplo()
+  resetDedicadoUIG()
   document.getElementById('modal-aprovar').classList.add('aberto')
 
   const { data: disponiveis } = await db.rpc('frota_veiculos_disponiveis', {
