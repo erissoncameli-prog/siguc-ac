@@ -102,6 +102,8 @@
         Mais de 4 passageiros — um veículo pode não comportar o grupo. Use "Dividir em mais de um veículo" para escalar mais de um veículo/motorista para essa viagem.
       </div>
 
+      <div id="ap-escala-box" style="display:none;font-size:12px;background:#ECFDF5;border:1px solid #A7F3D0;color:#065F46;padding:8px 12px;border-radius:8px;margin-bottom:14px"></div>
+
       <div id="ap-dedicado-box" style="display:none;font-size:12px;background:#F5F3FF;border:1px solid #DDD6FE;padding:8px 12px;border-radius:8px;margin-bottom:14px">
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:600;color:#5B21B6">
           <input type="checkbox" id="ap-liberar-dedicado" onchange="toggleLiberarDedicado()" style="width:auto"> Liberar veículo dedicado do setor para esta viagem
@@ -445,7 +447,7 @@ async function abrirAprovar(id) {
   _acaoId = id
   _viagemAprovando = v
   document.getElementById('ap-resumo').innerHTML =
-    `<strong>${esc(v.destino)}</strong><br>${formatDataHora(v.data_saida_prevista)} até ${formatDataHora(v.data_retorno_prevista)}<br>Solicitante: ${esc(v.solicitante_nome)}${v.passageiros ? ` · ${v.passageiros} passageiro(s)` : ''}`
+    `${v.cidade_destino ? `<div style="font-weight:700;color:#111827">${esc(v.cidade_origem||'Rio Branco')} → ${esc(v.cidade_destino)}</div>` : ''}<strong>${esc(v.destino)}</strong><br>${formatDataHora(v.data_saida_prevista)} até ${formatDataHora(v.data_retorno_prevista)}<br>Solicitante: ${esc(v.solicitante_nome)}${v.passageiros ? ` · ${v.passageiros} passageiro(s)` : ''}`
   document.getElementById('ap-alerta-passageiros').style.display = (v.passageiros || 0) > 4 ? '' : 'none'
   document.getElementById('ap-veiculo').innerHTML = '<option value="">Carregando disponibilidade...</option>'
   document.getElementById('ap-aviso-veiculo').style.display = 'none'
@@ -454,6 +456,9 @@ async function abrirAprovar(id) {
   desativarModoMultiplo()
   resetDedicadoUI()
   document.getElementById('modal-aprovar').classList.add('aberto')
+
+  // Viagem intermunicipal: sugere o motorista da vez (escala por rodízio).
+  sugerirEscala(v)
 
   // Veículos ocupados (em viagem/manutenção/cedidos) ou já alocados a
   // outra viagem aprovada nesse mesmo período não entram na lista.
@@ -478,6 +483,62 @@ function checarCapacidadeUnica() {
   document.getElementById('ap-aviso-capacidade').style.display = estoura ? '' : 'none'
 }
 
+// ── Escala de motorista da vez (viagem intermunicipal) ──────────
+// Sugestão por rodízio LRU: pré-seleciona o motorista da vez no select e
+// mostra a fila. É só sugestão — o gestor escolhe livremente.
+let _escalaFila = [], _escalaSugeridoId = null
+
+async function sugerirEscala(v) {
+  const box = document.getElementById('ap-escala-box')
+  _escalaFila = []; _escalaSugeridoId = null
+  if (!box) return
+  if (!v || !v.intermunicipal) { box.style.display = 'none'; return }
+  box.style.display = ''
+  box.textContent = 'Calculando escala de motoristas...'
+  const { data, error } = await db.rpc('frota_sugerir_motorista_escala', {
+    p_cidade_origem: v.cidade_origem, p_cidade_destino: v.cidade_destino,
+    p_inicio: v.data_saida_prevista, p_fim: v.data_retorno_prevista,
+    p_passageiros: v.passageiros || null
+  })
+  if (_acaoId !== v.id) return // modal trocou de viagem
+  if (error) { box.style.display = 'none'; return }
+  if (!data || !data.length) {
+    box.textContent = 'Escala: nenhum motorista elegível para o período (todos alocados, inaptos ou dedicados). Escolha manualmente.'
+    return
+  }
+  _escalaFila = data
+  const sug = data.find(x => x.sugerido) || data[0]
+  _escalaSugeridoId = sug.motorista_id
+  const sel = document.getElementById('ap-motorista')
+  if (sel) sel.innerHTML = optsMotoristas(_escalaSugeridoId)
+  renderEscalaBox()
+}
+
+function renderEscalaBox() {
+  const box = document.getElementById('ap-escala-box')
+  if (!box) return
+  const sug = _escalaFila.find(x => x.motorista_id === _escalaSugeridoId)
+  const nunca = sug && !sug.ultima_viagem
+  box.innerHTML =
+    `<div style="display:flex;align-items:center;gap:8px">${fwAvatarMotorista(sug ? sug.foto_url : null, sug ? sug.nome : '', 32)}
+       <div><div style="font-weight:700">Motorista da vez (escala por rodízio): ${esc(sug ? sug.nome : '—')}</div>
+       <div style="margin-top:2px">${nunca ? 'Ainda não fez viagem intermunicipal.' : 'É quem está há mais tempo sem viagem intermunicipal.'} Sugestão — você pode trocar.</div></div></div>
+     <button type="button" class="btn btn-xs btn-ghost" style="margin-top:4px;color:#065F46" onclick="toggleFilaEscala()">Ver fila</button>
+     <div id="ap-escala-fila" style="display:none;margin-top:6px"></div>`
+}
+
+function toggleFilaEscala() {
+  const el = document.getElementById('ap-escala-fila')
+  if (!el) return
+  if (el.style.display === 'none') {
+    el.innerHTML = _escalaFila.map((x, i) => {
+      const quando = x.ultima_viagem ? new Date(x.ultima_viagem).toLocaleDateString('pt-BR') : 'nunca'
+      return `<div style="display:flex;align-items:center;gap:6px;padding:2px 0;${x.motorista_id === _escalaSugeridoId ? 'font-weight:700' : ''}">${i + 1}. ${fwAvatarMotorista(x.foto_url, x.nome, 22)} <span>${esc(x.nome)} — última: ${quando} · ${x.total_viagens} no total</span></div>`
+    }).join('')
+    el.style.display = ''
+  } else el.style.display = 'none'
+}
+
 function desativarModoMultiplo() {
   document.getElementById('ap-modo-unico').style.display = ''
   document.getElementById('ap-modo-multiplo').style.display = 'none'
@@ -493,7 +554,23 @@ async function ativarModoMultiplo() {
   _linhasAlocacao = (sugestoes && sugestoes.length)
     ? sugestoes.map(s => ({ veiculo_id: s.veiculo_id, motorista_id: null, passageiros: s.passageiros_sugeridos }))
     : [{ veiculo_id: null, motorista_id: null, passageiros: _viagemAprovando?.passageiros || 1 }, { veiculo_id: null, motorista_id: null, passageiros: 0 }]
+  await preencherMotoristasEscala()
   renderLinhasAlocacao()
+}
+
+// Viagem intermunicipal: pré-preenche cada linha de alocação com o
+// motorista da vez (escala LRU, um por veículo) — sugestão, a gestão
+// confirma/troca antes de aprovar.
+async function preencherMotoristasEscala() {
+  const v = _viagemAprovando
+  if (!v || !v.intermunicipal) return
+  const { data } = await db.rpc('frota_sugerir_motorista_escala', {
+    p_cidade_origem: v.cidade_origem, p_cidade_destino: v.cidade_destino,
+    p_inicio: v.data_saida_prevista, p_fim: v.data_retorno_prevista,
+    p_passageiros: v.passageiros || null
+  })
+  const sug = (data || []).filter(x => x.sugerido)
+  _linhasAlocacao.forEach((l, i) => { if (!l.motorista_id && sug[i]) l.motorista_id = sug[i].motorista_id })
 }
 
 function adicionarLinhaAlocacao() {
