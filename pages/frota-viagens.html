@@ -406,6 +406,32 @@ function optsVeiculos(selecionado) {
   }).join('')
 }
 
+// Veículos dedicados ao setor ficam bloqueados por padrão; a gestão de
+// frota pode liberá-los pontualmente para esta viagem (fica auditado).
+function resetDedicadoUI() {
+  _liberarDedicado = false
+  const box = document.getElementById('ap-dedicado-box')
+  const chk = document.getElementById('ap-liberar-dedicado')
+  const jus = document.getElementById('ap-justif-dedicado')
+  if (chk) chk.checked = false
+  if (jus) { jus.value = ''; jus.style.display = 'none' }
+  if (box) box.style.display = _veiculos.some(x => x.dedicado_setor && x.status !== 'baixado') ? '' : 'none'
+}
+
+async function toggleLiberarDedicado() {
+  _liberarDedicado = document.getElementById('ap-liberar-dedicado').checked
+  document.getElementById('ap-justif-dedicado').style.display = _liberarDedicado ? '' : 'none'
+  const v = _viagemAprovando
+  if (v) {
+    const { data } = await db.rpc('frota_veiculos_disponiveis', {
+      p_inicio: v.data_saida_prevista, p_fim: v.data_retorno_prevista, p_incluir_dedicados: _liberarDedicado
+    })
+    _idsDisponiveis = new Set((data || []).map(x => x.id))
+  }
+  if (document.getElementById('ap-modo-multiplo').style.display !== 'none') renderLinhasAlocacao()
+  else document.getElementById('ap-veiculo').innerHTML = optsVeiculos(document.getElementById('ap-veiculo').value)
+}
+
 async function abrirAprovar(id) {
   const v = _viagens.find(x => x.id === id)
   _acaoId = id
