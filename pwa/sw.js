@@ -14,7 +14,7 @@ const APP = SCOPE.includes('/pages/biomonitor.html') ? 'biomonitor'
 // Ao concluir uma implementação que toque arquivos web de um app,
 // incrementar SÓ o número daquele app (vN → vN+1) — não precisa mexer
 // nos outros dois.
-const VERSOES = { brigadas: 247, biomonitor: 11, frota: 34 }
+const VERSOES = { brigadas: 247, biomonitor: 11, frota: 35 }
 const CACHE = `siguc-${APP}-v${VERSOES[APP]}`
 
 const SHELLS = {
@@ -163,12 +163,30 @@ self.addEventListener('push', ev => {
       body: data.body ?? '',
       icon: '/pwa/icons/icon-192.png',
       badge: '/pwa/icons/icon-192.png',
-      data: data.url ?? '/',
+      data: { url: data.url ?? '/', notif: data.notif ?? null, meta: data.meta ?? null },
     })
   )
 })
 
+// Clique na notificação: se o app já estiver aberto, FOCA a janela e manda
+// a notificação por postMessage (o app roteia pelo tipo, sem abrir aba nova
+// nem cair no login). Só abre janela nova quando não há app aberto.
+// Compat: versões antigas guardavam só a string da URL em `data`.
 self.addEventListener('notificationclick', ev => {
   ev.notification.close()
-  ev.waitUntil(self.clients.openWindow(ev.notification.data))
+  const d = ev.notification.data
+  const url = (d && typeof d === 'object' ? d.url : d) || '/'
+  const notif = (d && typeof d === 'object') ? d.notif : null
+  const meta = (d && typeof d === 'object') ? d.meta : null
+  const base = String(url).split('?')[0]
+  ev.waitUntil((async () => {
+    const wins = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+    const alvo = wins.find(c => c.url.includes(base))
+    if (alvo) {
+      await alvo.focus()
+      alvo.postMessage({ type: 'NOTIF_OPEN', notif, meta, url })
+      return
+    }
+    await self.clients.openWindow(url)
+  })())
 })

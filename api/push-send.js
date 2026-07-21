@@ -44,7 +44,7 @@ module.exports = async (req, res) => {
     res.status(503).json({ error: 'Push não configurado (VAPID ausente)' }); return;
   }
 
-  const { subscription, title, body, url } = req.body || {};
+  const { subscription, title, body, url, notif, meta } = req.body || {};
   if (!subscription?.endpoint || !subscription?.keys?.p256dh || !subscription?.keys?.auth) {
     res.status(400).json({ error: 'subscription inválida' }); return;
   }
@@ -52,7 +52,13 @@ module.exports = async (req, res) => {
   try {
     await webpush.sendNotification(
       subscription,
-      JSON.stringify({ title: title || 'SIGUC Frota', body: body || '', url: url || '/pages/frota-tarefas.html' })
+      JSON.stringify({
+        title: title || 'SIGUC Frota',
+        body: body || '',
+        url: url || '/pages/frota-app.html',
+        notif: notif || null,
+        meta: meta || null,
+      })
     );
     res.status(200).json({ ok: true });
   } catch (e) {
