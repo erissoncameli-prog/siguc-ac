@@ -5,9 +5,13 @@ name: Revisão de segurança por IA (Claude)
 # injeção, vazamento de chave, etc.) e comenta no PR.
 # Requer o secret ANTHROPIC_API_KEY. Sem ele, o job se autodesativa.
 
+# DESATIVADO TEMPORARIAMENTE (economia de créditos da API Anthropic).
+# Só roda sob demanda (Actions → este workflow → "Run workflow").
+# Para REATIVAR o modo automático, restaure o gatilho abaixo:
+#   pull_request:
+#     types: [opened, synchronize, reopened]
 on:
-  pull_request:
-    types: [opened, synchronize, reopened]
+  workflow_dispatch:
 
 permissions:
   contents: read
