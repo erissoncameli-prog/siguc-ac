@@ -1888,7 +1888,16 @@ function optsMotoristasG(selecionado) {
 function optsVeiculosG(selecionado) {
   return '<option value="">Selecione...</option>' + _veiculosG.filter(x => x.status !== 'baixado').map(x => {
     const livre = _idsDisponiveisG.has(x.id)
-    return `<option value="${x.id}" ${x.id === selecionado ? 'selected' : ''} ${livre ? '' : 'disabled'}>${esc(x.placa)} — ${esc(x.modelo)}${x.capacidade_passageiros ? ` (${x.capacidade_passageiros} lug.)` : ''}${livre ? '' : ` (ocupado — ${STATUS_VEIC_LABEL[x.status] || x.status})`}</option>`
+    const setor = x.setor?.sigla || 'setor'
+    let disabled = !livre, extra = ''
+    if (x.dedicado_setor) {
+      if (!_liberarDedicadoG) { disabled = true; extra = ` (dedicado ${setor} — requer liberação)` }
+      else if (!livre) { disabled = true; extra = ` (dedicado ${setor} — ocupado)` }
+      else { extra = ` (dedicado ${setor} — liberado)` }
+    } else if (!livre) {
+      extra = ` (ocupado — ${STATUS_VEIC_LABEL[x.status] || x.status})`
+    }
+    return `<option value="${x.id}" ${x.id === selecionado ? 'selected' : ''} ${disabled ? 'disabled' : ''}>${esc(x.placa)} — ${esc(x.modelo)}${x.capacidade_passageiros ? ` (${x.capacidade_passageiros} lug.)` : ''}${extra}</option>`
   }).join('')
 }
 
