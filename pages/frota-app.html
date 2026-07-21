@@ -889,6 +889,14 @@ function fmLinkWhatsapp(telefone) {
   return `<a href="https://wa.me/${numero}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:inherit;text-decoration:underline">${bico('chat')} ${esc(telefone)}</a>`
 }
 
+// Viagens agendadas (aprovada/em_andamento) por ordem de execução — a
+// saída mais próxima primeiro, pra facilitar o planejamento do motorista.
+// A busca vem em ordem decrescente (mais recentemente criada primeiro),
+// que serve bem para o Histórico mas não pra quem vai executar a viagem.
+function fmOrdenarPorSaida(lista) {
+  return [...lista].sort((a, b) => new Date(a.data_saida_prevista) - new Date(b.data_saida_prevista))
+}
+
 function fmCardViagem(v) {
   return `
     <div class="card" style="margin-bottom:10px">
@@ -916,7 +924,7 @@ function fmCardViagem(v) {
 
 // ── Aba Início ───────────────────────────────────────────────────
 function renderFmInicio() {
-  const ativas = _viagens.filter(v => v.status === 'aprovada' || v.status === 'em_andamento')
+  const ativas = fmOrdenarPorSaida(_viagens.filter(v => v.status === 'aprovada' || v.status === 'em_andamento'))
   document.getElementById('fm-conteudo').innerHTML = `
     <div class="card" style="margin-bottom:16px;display:flex;align-items:center;gap:14px">
       <button type="button" onclick="abrirMenuFotoMotorista()" style="border:none;padding:0;background:none;cursor:pointer;border-radius:50%" aria-label="Foto de perfil">
@@ -942,7 +950,7 @@ function renderFmInicio() {
 
 // ── Aba Solicitações (viagens atribuídas a mim aguardando ação) ──
 function renderFmSolicitacoes() {
-  const ativas = _viagens.filter(v => v.status === 'aprovada' || v.status === 'em_andamento')
+  const ativas = fmOrdenarPorSaida(_viagens.filter(v => v.status === 'aprovada' || v.status === 'em_andamento'))
   document.getElementById('fm-conteudo').innerHTML = `
     <div class="form-section-label">Minhas viagens</div>
     ${!ativas.length
