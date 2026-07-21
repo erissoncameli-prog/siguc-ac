@@ -176,6 +176,11 @@ function agendarPreviewEscala() {
   clearTimeout(_previewEscalaTimer)
   _previewEscalaTimer = setTimeout(atualizarPreviewEscala, 400)
 }
+// Avatar tolerante a cache antigo: se o helper de frota-wise.js ainda não
+// tiver carregado (versão em cache anterior), mostra só o nome, sem travar.
+function _avatarEsc(foto, nome, size) {
+  return (typeof fwAvatarMotorista === 'function') ? fwAvatarMotorista(foto, nome, size) : ''
+}
 async function atualizarPreviewEscala() {
   const box = document.getElementById('preview-escala')
   if (!box) return
@@ -193,13 +198,13 @@ async function atualizarPreviewEscala() {
     p_inicio: new Date(saida).toISOString(), p_fim: new Date(retorno).toISOString(),
     p_passageiros: pax
   })
-  if (error) { box.style.display = 'none'; return }
+  if (error) { box.style.display = ''; box.textContent = 'Não foi possível carregar a sugestão de escala agora — a gestão de frota define o motorista na aprovação.'; return }
   const sugeridos = (data || []).filter(x => x.sugerido)
   if (!sugeridos.length) {
     box.innerHTML = '<strong>Motorista da vez</strong><br>Nenhum motorista elegível para o período no momento — a gestão de frota define na aprovação.'
     return
   }
-  const lista = sugeridos.map(x => `<span style="display:inline-flex;align-items:center;gap:6px;margin:2px 12px 2px 0">${fwAvatarMotorista(x.foto_url, x.nome, 28)}<strong>${esc(x.nome)}</strong></span>`).join('')
+  const lista = sugeridos.map(x => `<span style="display:inline-flex;align-items:center;gap:10px;margin:4px 16px 4px 0">${_avatarEsc(x.foto_url, x.nome, 56)}<strong style="font-size:15px">${esc(x.nome)}</strong></span>`).join('')
   const multi = sugeridos.length > 1
   box.innerHTML =
     `<div>Motorista${multi ? 's' : ''} da vez (sugestão — a confirmar pela gestão de frota):</div><div style="margin-top:6px;display:flex;flex-wrap:wrap;align-items:center">${lista}</div>` +
