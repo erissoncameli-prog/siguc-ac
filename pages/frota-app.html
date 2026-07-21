@@ -584,7 +584,7 @@ function situacaoPlano(p) {
 }
 function fecharModal(qual) {
   document.getElementById(`modal-${qual}`).classList.remove('aberto')
-  _acaoId = null; _viagemAprovando = null; _linhasAlocacaoG = []
+  _acaoId = null; _viagemAprovando = null; _linhasAlocacaoG = []; _liberarDedicadoG = false
 }
 
 // ── Foto de perfil do motorista (self-service, só galeria) ────────
