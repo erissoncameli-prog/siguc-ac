@@ -1874,6 +1874,7 @@ function renderListaManutGestor() {
 }
 
 let _viagemAprovando = null, _idsDisponiveisG = new Set(), _linhasAlocacaoG = []
+let _liberarDedicadoG = false
 
 function optsMotoristasG(selecionado) {
   return '<option value="">Selecione...</option>' + _motoristasG.map(x => {
