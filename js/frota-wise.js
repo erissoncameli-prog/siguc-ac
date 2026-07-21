@@ -1,5 +1,35 @@
 // Frota · helpers do tema Wise (isolado ao módulo Frota)
 
+// Municípios do Acre (fonte: data/municipios_acre.geojson) — usados nos
+// comboboxes de cidade origem/destino da solicitação de viagem. O campo é
+// combobox (input + datalist): permite escolher da lista OU digitar cidade
+// de outro estado (texto livre).
+const MUNICIPIOS_AC = [
+  'Acrelândia', 'Assis Brasil', 'Brasiléia', 'Bujari', 'Capixaba',
+  'Cruzeiro do Sul', 'Epitaciolândia', 'Feijó', 'Jordão', 'Mâncio Lima',
+  'Manoel Urbano', 'Marechal Thaumaturgo', 'Plácido de Castro', 'Porto Acre',
+  'Porto Walter', 'Rio Branco', 'Rodrigues Alves', 'Santa Rosa do Purus',
+  'Sena Madureira', 'Senador Guiomard', 'Tarauacá', 'Xapuri'
+];
+
+// <datalist> com os municípios do AC para um <input list="id">.
+function fwDatalistCidades(id) {
+  return `<datalist id="${id}">` +
+    MUNICIPIOS_AC.map(m => `<option value="${m}"></option>`).join('') +
+    `</datalist>`;
+}
+
+// Avatar do motorista (foto redonda com fallback de iniciais). Usado na
+// sugestão da escala (motorista da vez) — nome + foto. esc/iniciais vêm
+// do config.js (carregado antes deste arquivo).
+function fwAvatarMotorista(foto, nome, size) {
+  size = size || 28;
+  const base = `width:${size}px;height:${size}px;border-radius:50%;flex-shrink:0;vertical-align:middle`;
+  return foto
+    ? `<img src="${esc(foto)}" alt="" style="${base};object-fit:cover;display:inline-block">`
+    : `<span class="sidebar-avatar" style="${base};font-size:${Math.round(size * 0.4)}px;display:inline-flex;align-items:center;justify-content:center">${esc(iniciais(nome || ''))}</span>`;
+}
+
 function fwAnimateNumber(el, valorFinal, opts) {
   opts = opts || {};
   const duracao = opts.duracao || 900;
