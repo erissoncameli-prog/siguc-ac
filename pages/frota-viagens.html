@@ -379,6 +379,7 @@ function renderViagens() {
 }
 
 let _viagemAprovando = null, _idsDisponiveis = new Set(), _linhasAlocacao = []
+let _liberarDedicado = false
 
 function optsMotoristas(selecionado) {
   return '<option value="">Selecione...</option>' + _motoristas.map(x => {
