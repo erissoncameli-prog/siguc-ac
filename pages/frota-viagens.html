@@ -497,7 +497,8 @@ async function sugerirEscala(v) {
   box.textContent = 'Calculando escala de motoristas...'
   const { data, error } = await db.rpc('frota_sugerir_motorista_escala', {
     p_cidade_origem: v.cidade_origem, p_cidade_destino: v.cidade_destino,
-    p_inicio: v.data_saida_prevista, p_fim: v.data_retorno_prevista
+    p_inicio: v.data_saida_prevista, p_fim: v.data_retorno_prevista,
+    p_passageiros: v.passageiros || null
   })
   if (_acaoId !== v.id) return // modal trocou de viagem
   if (error) { box.style.display = 'none'; return }
@@ -552,7 +553,23 @@ async function ativarModoMultiplo() {
   _linhasAlocacao = (sugestoes && sugestoes.length)
     ? sugestoes.map(s => ({ veiculo_id: s.veiculo_id, motorista_id: null, passageiros: s.passageiros_sugeridos }))
     : [{ veiculo_id: null, motorista_id: null, passageiros: _viagemAprovando?.passageiros || 1 }, { veiculo_id: null, motorista_id: null, passageiros: 0 }]
+  await preencherMotoristasEscala()
   renderLinhasAlocacao()
+}
+
+// Viagem intermunicipal: pré-preenche cada linha de alocação com o
+// motorista da vez (escala LRU, um por veículo) — sugestão, a gestão
+// confirma/troca antes de aprovar.
+async function preencherMotoristasEscala() {
+  const v = _viagemAprovando
+  if (!v || !v.intermunicipal) return
+  const { data } = await db.rpc('frota_sugerir_motorista_escala', {
+    p_cidade_origem: v.cidade_origem, p_cidade_destino: v.cidade_destino,
+    p_inicio: v.data_saida_prevista, p_fim: v.data_retorno_prevista,
+    p_passageiros: v.passageiros || null
+  })
+  const sug = (data || []).filter(x => x.sugerido)
+  _linhasAlocacao.forEach((l, i) => { if (!l.motorista_id && sug[i]) l.motorista_id = sug[i].motorista_id })
 }
 
 function adicionarLinhaAlocacao() {

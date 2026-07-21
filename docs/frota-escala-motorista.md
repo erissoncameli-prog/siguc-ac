@@ -224,6 +224,40 @@ Comportamento:
       motorista já alocado no período fica de fora, motorista nunca-viajou
       vem primeiro, conclusão de viagem move a fila.
 
+## 6.1 Extensão — motorista da vez também para o SOLICITANTE (implementado)
+
+Além da sugestão na aprovação, o **solicitante** já vê o motorista da vez
+ao preencher a solicitação (mesa `frota-solicitar.html` ⇄ app
+`frota-app.html` modo solicitante), como box informativo "a confirmar
+pela gestão de frota". Quando a viagem precisa de **2+ veículos**
+(passageiros não cabem em um), mostra **um motorista por veículo**.
+
+Banco:
+- **188_frota_escala_multivagas.sql**: `frota_sugerir_motorista_escala`
+  ganha `p_passageiros smallint DEFAULT NULL`. Com passageiros, calcula
+  quantos veículos a viagem exige (greedy por capacidade sobre
+  `frota_veiculos_disponiveis`, dedicados fora) e marca `sugerido=true`
+  nos **N primeiros** da fila LRU (N = veículos). Sem o parâmetro (chamada
+  da aprovação simples) → N=1, comportamento anterior. DROP antes de
+  recriar (assinatura muda, lição 178/181).
+- **189_frota_escala_auth_guard.sql**: a função é SECURITY DEFINER e não
+  checa permissão de módulo (o solicitante pode ter só 'visualizar'), mas
+  toda função em `public` nasce executável por `anon` (default privileges
+  do Supabase — `REVOKE FROM PUBLIC` não tira o grant do anon). Guarda:
+  exige `auth.uid()` não nulo (bloqueia anon, libera qualquer logado).
+
+Frontend:
+- Solicitante: box `#preview-escala` + `atualizarPreviewEscala()`
+  (debounce 400ms) disparado por cidade/datas/passageiros.
+- Gestor (confirmação): em modo múltiplo, `preencherMotoristasEscala()`
+  pré-preenche cada linha de alocação com o motorista da vez (um por
+  veículo) — sugestão, o gestor confirma/troca antes de aprovar.
+
+> Numeração: `188_frota_escala_multivagas` colide em número com um
+> `188_frota_config_saldo` de outra branch ainda não mergeada (mesma
+> situação dos 183/184 já duplicados no repo) — sem conflito de
+> dependência. As 3 migrations já foram aplicadas em produção.
+
 ## 7. Pontos em aberto / decisões futuras (fora do escopo desta v1)
 
 - Registrar/auditar se a sugestão foi seguida (hoje não grava nada).
