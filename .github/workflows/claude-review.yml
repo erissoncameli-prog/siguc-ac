@@ -7,11 +7,15 @@ name: Revisão por IA (Claude)
 # Requer o secret ANTHROPIC_API_KEY no repositório
 # (Settings → Secrets and variables → Actions). Sem ele, o job é pulado.
 
+# DESATIVADO TEMPORARIAMENTE (economia de créditos da API Anthropic).
+# Só roda sob demanda (Actions → este workflow → "Run workflow").
+# Para REATIVAR o modo automático, restaure os gatilhos abaixo:
+#   pull_request:
+#     types: [opened, synchronize]
+#   issue_comment:
+#     types: [created]          # permite acionar com "@claude" em comentários
 on:
-  pull_request:
-    types: [opened, synchronize]
-  issue_comment:
-    types: [created]          # permite acionar com "@claude" em comentários
+  workflow_dispatch:
 
 permissions:
   contents: read
