@@ -613,7 +613,8 @@ function abrirDetalhe(id) {
       <div><strong>Solicitante:</strong> ${esc(v.solicitante_nome)} ${v.setor_sigla ? `(${esc(v.setor_sigla)})` : ''}${v.solicitante_telefone ? ` · ${esc(v.solicitante_telefone)}` : ''}</div>
       ${v.lista_passageiros ? `<div><strong>Passageiros:</strong> ${esc(v.lista_passageiros).replace(/\n/g,', ')}</div>` : ''}
       <div><strong>Período previsto:</strong> ${formatDataHora(v.data_saida_prevista)} → ${formatDataHora(v.data_retorno_prevista)}</div>
-      ${v.veiculo_placa ? `<div><strong>Veículo:</strong> ${esc(v.veiculo_modelo)} (${esc(v.veiculo_placa)})</div>` : ''}
+      ${v.veiculo_placa ? `<div><strong>Veículo:</strong> ${esc(v.veiculo_modelo)} (${esc(v.veiculo_placa)})${v.veiculo_dedicado ? ` <span class="fw-badge badge-roxo">Dedicado ${v.veiculo_setor_sigla ? esc(v.veiculo_setor_sigla) : ''}</span>` : ''}</div>` : ''}
+      ${v.dedicado_liberado ? `<div style="color:#5B21B6"><strong>Veículo dedicado liberado por:</strong> ${esc(v.dedicado_liberado_por_nome || '—')}${v.dedicado_liberado_em ? ` em ${formatDataHora(v.dedicado_liberado_em)}` : ''}${v.dedicado_liberado_justificativa ? `<br><em>${esc(v.dedicado_liberado_justificativa)}</em>` : ''}</div>` : ''}
       ${v.motorista_nome ? `<div><strong>Motorista:</strong> ${esc(v.motorista_nome)}</div>` : ''}
       ${v.checkout_em ? `<div><strong>Saída registrada:</strong> ${formatDataHora(v.checkout_em)} — ${v.km_saida ? formatNum(v.km_saida)+' km' : (v.horas_saida ? formatNum(v.horas_saida,1)+' h' : '—')}${linkMapa(v.lat_saida, v.lng_saida)}</div>` : ''}
       ${v.checkin_em ? `<div><strong>Chegada registrada:</strong> ${formatDataHora(v.checkin_em)} — ${v.km_chegada ? formatNum(v.km_chegada)+' km' : (v.horas_chegada ? formatNum(v.horas_chegada,1)+' h' : '—')}${linkMapa(v.lat_chegada, v.lng_chegada)}</div>` : ''}
