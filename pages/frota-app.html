@@ -1275,11 +1275,34 @@ async function renderFmConfig() {
       <button class="fm-config-item" onclick="alterarPinFrota()">${bico('key')} Alterar PIN</button>
       <button class="fm-config-item" onclick="abrirInstalarFrota()">${bico('qr')} Instalar o app</button>
       <button class="fm-config-item" id="btn-verificar-update-frota" onclick="verificarAtualizacaoFrota()">${bico('download')} Verificar atualização</button>
+      <div class="fm-config-item" style="cursor:default;color:#9CA3AF" id="fm-cfg-versao">${bico('hash')} <span>Versão do app: —</span></div>
       <button class="fm-config-item" style="color:#DC2626" onclick="zerarFilaLocalFrota()">${bico('trash')} Zerar fila local</button>
       <button class="fm-config-item" style="color:#DC2626" onclick="fazerLogout()">${bico('logout')} Sair</button>
     </div>`
   await atualizarBadgePendentesSync()
   atualizarItemPushConfig()
+  atualizarVersaoFrota()
+}
+
+// Mostra a versão do cache do PWA instalado neste aparelho (VERSOES.frota
+// do sw.js — ver "Versionamento" no CLAUDE.md), pra acompanhar se o
+// aparelho já recebeu a última atualização web sem precisar abrir o
+// DevTools. Lida direto no Cache Storage (nome siguc-frota-vN), sem
+// precisar de mensagem ao service worker.
+async function atualizarVersaoFrota() {
+  const el = document.getElementById('fm-cfg-versao')
+  if (!el) return
+  const span = el.querySelector('span')
+  if (!('caches' in window)) { span.textContent = 'Versão do app: indisponível neste navegador'; return }
+  try {
+    const chaves = await caches.keys()
+    const chave = chaves.find(k => k.startsWith('siguc-frota-v'))
+    span.textContent = chave
+      ? `Versão do app: v${chave.split('-v').pop()}`
+      : 'Versão do app: ainda não instalada — toque em "Verificar atualização"'
+  } catch (e) {
+    span.textContent = 'Versão do app: indisponível'
+  }
 }
 
 async function atualizarItemPushConfig() {
