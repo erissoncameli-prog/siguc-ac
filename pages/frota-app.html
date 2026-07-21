@@ -1169,8 +1169,10 @@ async function carregarVeiculosDisponiveisAgora() {
   let data = null, offline = false
   try {
     if (!navigator.onLine) throw new Error('offline')
+    // Dedicados ficam de fora da viagem direta (autosserviço): só entram
+    // via aprovação da gestão. Servidor também bloqueia (migration 186).
     const r = await db.from('frota_veiculos').select('id,placa,modelo,medidor')
-      .eq('ativo', true).eq('status', 'disponivel').order('placa')
+      .eq('ativo', true).eq('status', 'disponivel').eq('dedicado_setor', false).order('placa')
     if (r.error) throw r.error
     data = r.data || []
     await fOfflineSetConfig('veiculos_cache', data)
