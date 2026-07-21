@@ -138,21 +138,35 @@ async function bioOfflineDelConfig(chave) {
   })
 }
 
-// ── Praias (cache para uso offline) ───────────────────────────
-// bioSyncCachePraias sempre busca a lista completa de praias ativas do
-// servidor — por isso aqui o cache local é totalmente substituído (clear
-// + put), não só atualizado. Um upsert puro nunca remove do aparelho uma
-// praia que foi desativada/excluída no servidor.
-async function bioOfflineSalvarPraias(lista) {
+// ── Cache de referência do servidor (praias, berçários, e qualquer
+// catálogo futuro do mesmo tipo) ──────────────────────────────
+// Diferença de contrato dos demais stores (ninhos, visitas, lotes,
+// ocorrências...): aqueles são FILA DE SINCRONIZAÇÃO — chave própria
+// do aparelho (uuid_cliente), nunca podem perder um registro criado
+// offline ainda não enviado, então só fazem put (merge).
+// Já um cache de referência representa uma lista INTEIRA e atual
+// vinda do servidor (chave = id do servidor) — o cache local precisa
+// virar espelho exato dela, inclusive removendo o que sumiu/foi
+// desativado lá. Um put puro nunca limpa o que saiu da lista; por
+// isso todo cache de referência deve chamar ESTE helper (clear +
+// put na mesma transação, atômico: se algo falhar no meio, a
+// transação inteira é abortada e o store fica como estava antes,
+// nunca meio vazio) em vez de reimplementar o padrão à mão.
+async function bioOfflineSubstituirCacheReferencia(storeName, lista) {
   const db = await bioOfflineInit()
   return new Promise((res, rej) => {
-    const tx = db.transaction('praias', 'readwrite')
-    const st = tx.objectStore('praias')
+    const tx = db.transaction(storeName, 'readwrite')
+    const st = tx.objectStore(storeName)
     st.clear()
-    lista.forEach(p => st.put(p))
+    lista.forEach(item => st.put(item))
     tx.oncomplete = () => res()
     tx.onerror    = () => rej(tx.error)
   })
+}
+
+// ── Praias (cache para uso offline) ───────────────────────────
+async function bioOfflineSalvarPraias(lista) {
+  return bioOfflineSubstituirCacheReferencia('praias', lista)
 }
 
 async function bioOfflineListarPraias(grupoProgramaId) {
@@ -473,20 +487,8 @@ async function bioOfflineSolturasDoBercario(bercarioId, temporadaId) {
 }
 
 // ── Berçários (cache do servidor) ─────────────────────────────
-// bioSyncCacheBercarios sempre busca a lista completa de berçários
-// ativos do servidor — substitui o cache local por inteiro (clear +
-// put), mesmo raciocínio de bioOfflineSalvarPraias: um upsert puro
-// nunca remove do aparelho um berçário desativado/excluído no servidor.
 async function bioOfflineSalvarBercarios(lista) {
-  const db = await bioOfflineInit()
-  return new Promise((res, rej) => {
-    const tx = db.transaction('bercarios_cache', 'readwrite')
-    const st = tx.objectStore('bercarios_cache')
-    st.clear()
-    lista.forEach(b => st.put(b))
-    tx.oncomplete = () => res()
-    tx.onerror    = () => rej(tx.error)
-  })
+  return bioOfflineSubstituirCacheReferencia('bercarios_cache', lista)
 }
 
 async function bioOfflineListarBercarios() {
