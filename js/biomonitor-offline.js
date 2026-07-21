@@ -139,11 +139,16 @@ async function bioOfflineDelConfig(chave) {
 }
 
 // ── Praias (cache para uso offline) ───────────────────────────
+// bioSyncCachePraias sempre busca a lista completa de praias ativas do
+// servidor — por isso aqui o cache local é totalmente substituído (clear
+// + put), não só atualizado. Um upsert puro nunca remove do aparelho uma
+// praia que foi desativada/excluída no servidor.
 async function bioOfflineSalvarPraias(lista) {
   const db = await bioOfflineInit()
   return new Promise((res, rej) => {
     const tx = db.transaction('praias', 'readwrite')
     const st = tx.objectStore('praias')
+    st.clear()
     lista.forEach(p => st.put(p))
     tx.oncomplete = () => res()
     tx.onerror    = () => rej(tx.error)
@@ -468,11 +473,16 @@ async function bioOfflineSolturasDoBercario(bercarioId, temporadaId) {
 }
 
 // ── Berçários (cache do servidor) ─────────────────────────────
+// bioSyncCacheBercarios sempre busca a lista completa de berçários
+// ativos do servidor — substitui o cache local por inteiro (clear +
+// put), mesmo raciocínio de bioOfflineSalvarPraias: um upsert puro
+// nunca remove do aparelho um berçário desativado/excluído no servidor.
 async function bioOfflineSalvarBercarios(lista) {
   const db = await bioOfflineInit()
   return new Promise((res, rej) => {
     const tx = db.transaction('bercarios_cache', 'readwrite')
     const st = tx.objectStore('bercarios_cache')
+    st.clear()
     lista.forEach(b => st.put(b))
     tx.oncomplete = () => res()
     tx.onerror    = () => rej(tx.error)
