@@ -1,5 +1,24 @@
 // Frota · helpers do tema Wise (isolado ao módulo Frota)
 
+// Municípios do Acre (fonte: data/municipios_acre.geojson) — usados nos
+// comboboxes de cidade origem/destino da solicitação de viagem. O campo é
+// combobox (input + datalist): permite escolher da lista OU digitar cidade
+// de outro estado (texto livre).
+const MUNICIPIOS_AC = [
+  'Acrelândia', 'Assis Brasil', 'Brasiléia', 'Bujari', 'Capixaba',
+  'Cruzeiro do Sul', 'Epitaciolândia', 'Feijó', 'Jordão', 'Mâncio Lima',
+  'Manoel Urbano', 'Marechal Thaumaturgo', 'Plácido de Castro', 'Porto Acre',
+  'Porto Walter', 'Rio Branco', 'Rodrigues Alves', 'Santa Rosa do Purus',
+  'Sena Madureira', 'Senador Guiomard', 'Tarauacá', 'Xapuri'
+];
+
+// <datalist> com os municípios do AC para um <input list="id">.
+function fwDatalistCidades(id) {
+  return `<datalist id="${id}">` +
+    MUNICIPIOS_AC.map(m => `<option value="${m}"></option>`).join('') +
+    `</datalist>`;
+}
+
 function fwAnimateNumber(el, valorFinal, opts) {
   opts = opts || {};
   const duracao = opts.duracao || 900;

@@ -60,8 +60,18 @@ const STATUS_BADGE = { solicitada:'fw-badge fw-badge-manutencao', aprovada:'fw-b
         </div>
         <div class="form-group"><label class="form-label">Lista de passageiros (opcional)</label>
           <textarea class="form-control" id="f-passageiros-lista" rows="3" placeholder="Um nome por linha"></textarea></div>
-        <div class="form-group"><label class="form-label">Destino <span class="obrig">*</span></label>
-          <input class="form-control" id="f-destino" placeholder="Ex.: Sede da UC, endereço, município..."></div>
+        <div class="grid-2">
+          <div class="form-group"><label class="form-label">Cidade de origem <span class="obrig">*</span></label>
+            <input class="form-control" id="f-cidade-origem" list="dl-cidades" value="Rio Branco" placeholder="Rio Branco" oninput="checarIntermunicipal()"></div>
+          <div class="form-group"><label class="form-label">Cidade de destino <span class="obrig">*</span></label>
+            <input class="form-control" id="f-cidade-destino" list="dl-cidades" placeholder="Ex.: Cruzeiro do Sul" oninput="checarIntermunicipal()"></div>
+        </div>
+        ${fwDatalistCidades('dl-cidades')}
+        <div id="aviso-intermunicipal" style="display:none;font-size:12px;background:#EFF6FF;color:#1E40AF;padding:8px 12px;border-radius:8px;margin-bottom:14px">
+          Viagem intermunicipal — ao aprovar, a gestão receberá a sugestão do motorista da vez (escala por rodízio).
+        </div>
+        <div class="form-group"><label class="form-label">Local / ponto de destino <span class="obrig">*</span></label>
+          <input class="form-control" id="f-destino" placeholder="Ex.: Sede da UC, endereço, ponto específico..."></div>
         <div class="form-group"><label class="form-label">Unidade de Conservação (se aplicável)</label>
           <select class="form-control" id="f-uc"><option value="">—</option></select></div>
         <div class="form-group"><label class="form-label">Finalidade <span class="obrig">*</span></label>
@@ -121,7 +131,7 @@ function renderMinhasViagens() {
   tbody.innerHTML = _minhasViagens.map(v => {
     const podeCancelar = ['solicitada','aprovada'].includes(v.status)
     return `<tr>
-      <td><strong>${esc(v.destino)}</strong><br><span style="font-size:11px;color:#9CA3AF">${esc(v.finalidade)}</span></td>
+      <td>${v.cidade_destino ? `<div style="font-size:12px;font-weight:600">${esc(v.cidade_origem||'Rio Branco')} → ${esc(v.cidade_destino)}</div>` : ''}<strong>${esc(v.destino)}</strong><br><span style="font-size:11px;color:#9CA3AF">${esc(v.finalidade)}</span></td>
       <td style="font-size:12px">${formatDataHora(v.data_saida_prevista)}<br>até ${formatDataHora(v.data_retorno_prevista)}</td>
       <td style="font-size:12px">${v.veiculo_placa ? `${esc(v.veiculo_modelo)} <span class="mono">(${esc(v.veiculo_placa)})</span><br>${esc(v.motorista_nome||'—')}` : '<span style="color:#9CA3AF">A definir</span>'}</td>
       <td><span class="badge ${STATUS_BADGE[v.status]||'badge-cinza'}">${STATUS_LABEL[v.status]||v.status}</span>
@@ -141,6 +151,17 @@ let _ultimaChecagemDisponivel = null
 function checarPassageiros() {
   const n = parseInt(document.getElementById('f-passageiros').value) || 0
   document.getElementById('aviso-passageiros').style.display = n > 4 ? '' : 'none'
+}
+
+// Normaliza cidade (mesma regra do banco: sem acento/caixa/espaço) para
+// detectar viagem intermunicipal no cliente.
+function normCidade(s) {
+  return (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim()
+}
+function checarIntermunicipal() {
+  const o = normCidade(document.getElementById('f-cidade-origem').value)
+  const d = normCidade(document.getElementById('f-cidade-destino').value)
+  document.getElementById('aviso-intermunicipal').style.display = (d && o && d !== o) ? '' : 'none'
 }
 
 async function checarDisponibilidade() {
@@ -167,10 +188,13 @@ async function checarDisponibilidade() {
 }
 
 async function solicitar() {
+  const cidadeOrigem = document.getElementById('f-cidade-origem').value.trim()
+  const cidadeDestino = document.getElementById('f-cidade-destino').value.trim()
   const destino = document.getElementById('f-destino').value.trim()
   const finalidade = document.getElementById('f-finalidade').value.trim()
   const saida = document.getElementById('f-saida').value
   const retorno = document.getElementById('f-retorno').value
+  if (!cidadeOrigem || !cidadeDestino) { toast('Preencha a cidade de origem e de destino', 'error'); return }
   if (!destino || !finalidade || !saida || !retorno) { toast('Preencha destino, finalidade e o período da viagem', 'error'); return }
   if (new Date(retorno) <= new Date(saida)) { toast('O retorno deve ser depois da saída', 'error'); return }
   if (_ultimaChecagemDisponivel === 0 &&
@@ -179,6 +203,8 @@ async function solicitar() {
   const payload = {
     solicitante_id: _usuario.id,
     setor_solicitante_id: document.getElementById('f-setor').value || null,
+    cidade_origem: cidadeOrigem,
+    cidade_destino: cidadeDestino,
     destino,
     uc_destino_id: document.getElementById('f-uc').value || null,
     finalidade,
@@ -193,6 +219,9 @@ async function solicitar() {
     const { error } = await db.from('frota_viagens').insert(payload)
     if (error) throw error
     toast('Solicitação enviada ao setor de transporte!', 'success')
+    document.getElementById('f-cidade-origem').value = 'Rio Branco'
+    document.getElementById('f-cidade-destino').value = ''
+    document.getElementById('aviso-intermunicipal').style.display = 'none'
     document.getElementById('f-destino').value = ''
     document.getElementById('f-finalidade').value = ''
     document.getElementById('f-saida').value = ''
