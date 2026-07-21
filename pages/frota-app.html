@@ -889,6 +889,14 @@ function fmLinkWhatsapp(telefone) {
   return `<a href="https://wa.me/${numero}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:inherit;text-decoration:underline">${bico('chat')} ${esc(telefone)}</a>`
 }
 
+// Viagens agendadas (aprovada/em_andamento) por ordem de execução — a
+// saída mais próxima primeiro, pra facilitar o planejamento do motorista.
+// A busca vem em ordem decrescente (mais recentemente criada primeiro),
+// que serve bem para o Histórico mas não pra quem vai executar a viagem.
+function fmOrdenarPorSaida(lista) {
+  return [...lista].sort((a, b) => new Date(a.data_saida_prevista) - new Date(b.data_saida_prevista))
+}
+
 function fmCardViagem(v) {
   return `
     <div class="card" style="margin-bottom:10px">
@@ -916,7 +924,7 @@ function fmCardViagem(v) {
 
 // ── Aba Início ───────────────────────────────────────────────────
 function renderFmInicio() {
-  const ativas = _viagens.filter(v => v.status === 'aprovada' || v.status === 'em_andamento')
+  const ativas = fmOrdenarPorSaida(_viagens.filter(v => v.status === 'aprovada' || v.status === 'em_andamento'))
   document.getElementById('fm-conteudo').innerHTML = `
     <div class="card" style="margin-bottom:16px;display:flex;align-items:center;gap:14px">
       <button type="button" onclick="abrirMenuFotoMotorista()" style="border:none;padding:0;background:none;cursor:pointer;border-radius:50%" aria-label="Foto de perfil">
@@ -942,7 +950,7 @@ function renderFmInicio() {
 
 // ── Aba Solicitações (viagens atribuídas a mim aguardando ação) ──
 function renderFmSolicitacoes() {
-  const ativas = _viagens.filter(v => v.status === 'aprovada' || v.status === 'em_andamento')
+  const ativas = fmOrdenarPorSaida(_viagens.filter(v => v.status === 'aprovada' || v.status === 'em_andamento'))
   document.getElementById('fm-conteudo').innerHTML = `
     <div class="form-section-label">Minhas viagens</div>
     ${!ativas.length
@@ -1267,11 +1275,34 @@ async function renderFmConfig() {
       <button class="fm-config-item" onclick="alterarPinFrota()">${bico('key')} Alterar PIN</button>
       <button class="fm-config-item" onclick="abrirInstalarFrota()">${bico('qr')} Instalar o app</button>
       <button class="fm-config-item" id="btn-verificar-update-frota" onclick="verificarAtualizacaoFrota()">${bico('download')} Verificar atualização</button>
+      <div class="fm-config-item" style="cursor:default;color:#9CA3AF" id="fm-cfg-versao">${bico('hash')} <span>Versão do app: —</span></div>
       <button class="fm-config-item" style="color:#DC2626" onclick="zerarFilaLocalFrota()">${bico('trash')} Zerar fila local</button>
       <button class="fm-config-item" style="color:#DC2626" onclick="fazerLogout()">${bico('logout')} Sair</button>
     </div>`
   await atualizarBadgePendentesSync()
   atualizarItemPushConfig()
+  atualizarVersaoFrota()
+}
+
+// Mostra a versão do cache do PWA instalado neste aparelho (VERSOES.frota
+// do sw.js — ver "Versionamento" no CLAUDE.md), pra acompanhar se o
+// aparelho já recebeu a última atualização web sem precisar abrir o
+// DevTools. Lida direto no Cache Storage (nome siguc-frota-vN), sem
+// precisar de mensagem ao service worker.
+async function atualizarVersaoFrota() {
+  const el = document.getElementById('fm-cfg-versao')
+  if (!el) return
+  const span = el.querySelector('span')
+  if (!('caches' in window)) { span.textContent = 'Versão do app: indisponível neste navegador'; return }
+  try {
+    const chaves = await caches.keys()
+    const chave = chaves.find(k => k.startsWith('siguc-frota-v'))
+    span.textContent = chave
+      ? `Versão do app: v${chave.split('-v').pop()}`
+      : 'Versão do app: ainda não instalada — toque em "Verificar atualização"'
+  } catch (e) {
+    span.textContent = 'Versão do app: indisponível'
+  }
 }
 
 async function atualizarItemPushConfig() {
