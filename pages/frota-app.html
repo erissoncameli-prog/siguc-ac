@@ -364,6 +364,10 @@ const _frotaReady = _dbReady.then(function () {
 // ── Estado geral ────────────────────────────────────────────────
 let _usuario = null, _motorista = null, _ehGestor = false, _papeis = []
 let _modoBase = null, _modoAtivo = null
+// Deep-link de notificação (push): /pages/frota-app.html?notif=<id>.
+// Aplicado após login+PIN+modo pronto (ver fim de entrarComSessao) ou na
+// hora, quando o SW manda NOTIF_OPEN e o app já está pronto.
+let _deepLinkNotif = new URLSearchParams(location.search).get('notif')
 let _acaoId = null, _cancelarId = null
 
 // ── Estado do modo Motorista ─────────────────────────────────────
@@ -471,6 +475,10 @@ async function entrarComSessao(session, jaAutenticouSenha = false) {
     montarShellDesktop()
     renderSeletorPerfil()
   }
+
+  // App pronto: se veio de um clique em notificação (push deep-link),
+  // roteia agora para o lugar certo pelo tipo da notificação.
+  if (_deepLinkNotif) { const id = _deepLinkNotif; _deepLinkNotif = null; abrirNotificacaoFrota(id) }
 }
 
 // ── Shell desktop (Solicitante/Gestor/seletor) ─────────────────
@@ -2334,6 +2342,12 @@ async function verTarefaFrota(id) {
   const n = _fTarefas.find(x => x.id === id)
   if (!n) return
   try { await db.rpc('avancar_notificacao', { p_notificacao_id: id, p_novo_status: 'visualizada' }) } catch (e) {}
+  await rotearNotifFrota(n)
+}
+
+// Roteia para o lugar certo dentro do app pelo tipo da notificação.
+// Fonte única de verdade usada pelo botão "Ver" e pelo clique no push.
+async function rotearNotifFrota(n) {
   const st = n.meta?.subtipo, para = n.meta?.para
   fecharModal('tarefas')
   if ((st === 'viagem_solicitada' || st === 'viagem_direta' || st === 'manutencao') && _ehGestor) {
@@ -2342,7 +2356,24 @@ async function verTarefaFrota(id) {
     await entrarModo('motorista', false); motoristaAba('solicitacoes')
   } else if ((st === 'viagem_aprovada' || st === 'viagem_recusada') && para === 'solicitante') {
     await entrarModo('solicitante', false)
+  } else {
+    // Sem destino específico (ou papel não confere): abre o inbox de Tarefas.
+    abrirTarefasFrota()
   }
+}
+
+// Clique numa notificação push (via SW postMessage, com app aberto, ou via
+// deep-link ?notif no cold start). Busca a notificação, marca visualizada
+// e roteia. Fallback para o inbox se não encontrar/roteável.
+async function abrirNotificacaoFrota(id) {
+  if (!id || !_usuario) return
+  let n = (_fTarefas || []).find(x => x.id === id)
+  if (!n) {
+    try { const { data } = await db.from('notificacoes').select('*').eq('id', id).maybeSingle(); n = data } catch (e) {}
+  }
+  if (!n) { abrirTarefasFrota(); return }
+  try { await db.rpc('avancar_notificacao', { p_notificacao_id: id, p_novo_status: 'visualizada' }) } catch (e) {}
+  await rotearNotifFrota(n)
 }
 
 async function resolverTarefaFrota(id) {
@@ -2628,6 +2659,14 @@ async function ativarPushFrota() {
 
 if ('serviceWorker' in navigator && !window.Capacitor) {
   navigator.serviceWorker.register('/pwa/sw.js', { scope: '/pages/frota-app.html' }).catch(() => {})
+  // Clique numa notificação com o app já aberto: o SW manda NOTIF_OPEN e o
+  // app roteia pelo tipo (sem abrir aba nova). Se o app ainda estiver
+  // carregando, guarda como deep-link pendente.
+  navigator.serviceWorker.addEventListener('message', ev => {
+    if (!ev.data || ev.data.type !== 'NOTIF_OPEN') return
+    if (_usuario) abrirNotificacaoFrota(ev.data.notif)
+    else _deepLinkNotif = ev.data.notif
+  })
 }
 </script>
 
