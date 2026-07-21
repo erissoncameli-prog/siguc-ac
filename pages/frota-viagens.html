@@ -102,6 +102,14 @@
         Mais de 4 passageiros — um veículo pode não comportar o grupo. Use "Dividir em mais de um veículo" para escalar mais de um veículo/motorista para essa viagem.
       </div>
 
+      <div id="ap-dedicado-box" style="display:none;font-size:12px;background:#F5F3FF;border:1px solid #DDD6FE;padding:8px 12px;border-radius:8px;margin-bottom:14px">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:600;color:#5B21B6">
+          <input type="checkbox" id="ap-liberar-dedicado" onchange="toggleLiberarDedicado()" style="width:auto"> Liberar veículo dedicado do setor para esta viagem
+        </label>
+        <div style="margin-top:6px;color:#6B7280">Veículos dedicados ficam bloqueados por padrão. Ao liberar, a gestão de frota assume a autorização (fica registrada na viagem).</div>
+        <textarea id="ap-justif-dedicado" class="form-control" rows="2" placeholder="Justificativa da liberação (obrigatória)" style="display:none;margin-top:8px"></textarea>
+      </div>
+
       <div id="ap-modo-unico">
         <div class="form-group"><label class="form-label">Veículo <span class="obrig">*</span></label>
           <select class="form-control" id="ap-veiculo" onchange="checarCapacidadeUnica()"><option value="">Selecione...</option></select>
