@@ -4741,13 +4741,18 @@ async function bioVerificarAtualizacao() {
 }
 
 function bioAbrirQRInstalacao() {
-  const qr = gerarQRDataURL(BIO_INSTALL_URL)
-  const img  = document.getElementById('bio-qr-img')
-  const link = document.getElementById('bio-qr-link')
-  const ov   = document.getElementById('bio-qr-overlay')
-  if (img)  img.src = qr
-  if (link) link.textContent = BIO_INSTALL_URL
-  if (ov)   ov.hidden = false
+  try {
+    const qr = gerarQRDataURL(BIO_INSTALL_URL)
+    const img  = document.getElementById('bio-qr-img')
+    const link = document.getElementById('bio-qr-link')
+    const ov   = document.getElementById('bio-qr-overlay')
+    if (img)  img.src = qr
+    if (link) link.textContent = BIO_INSTALL_URL
+    if (ov)   ov.hidden = false
+  } catch (e) {
+    console.error('[bio-qr]', e)
+    bioToast('Erro ao gerar QR: ' + (e?.message || e), 'err')
+  }
 }
 
 async function bioSincronizarPraias() {
