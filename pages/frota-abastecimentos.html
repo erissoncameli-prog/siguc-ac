@@ -31,8 +31,9 @@
         <div class="form-group" style="flex:1"><label class="form-label">Litros (ajuste, opcional)</label>
           <input class="form-control" id="vl-litros-ajust" type="number" min="0" step="0.01"></div>
         <div class="form-group" style="flex:1"><label class="form-label">Valor (ajuste, opcional)</label>
-          <input class="form-control" id="vl-valor-ajust" type="number" min="0" step="0.01"></div>
+          <input class="form-control" id="vl-valor-ajust" type="number" min="0" step="0.01" oninput="atualizarPreviewSaldo()"></div>
       </div>
+      <div id="vl-saldo-preview" style="font-size:12px;margin-bottom:14px"></div>
       <div style="font-size:11px;color:#9CA3AF">O informado pelo motorista é mantido; o ajuste, se houver, é usado nos totais e relatórios.</div>
     </div>
     <div class="modal-footer">
@@ -111,6 +112,16 @@ const COMB = { gasolina:'Gasolina', etanol:'Etanol', flex:'Flex', diesel:'Diesel
           <input type="checkbox" id="cfg-gps-abast" style="width:auto" onchange="salvarConfigGpsAbastecimento()"> Ativada
         </label>
       </div>
+
+      <div class="card" style="margin-bottom:16px;padding:14px 18px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+        <div>
+          <div style="font-weight:600;font-size:13px">Bloquear validação com saldo do contrato negativo</div>
+          <div style="font-size:12px;color:#9CA3AF" id="cfg-saldo-bloqueio-info">Carregando...</div>
+        </div>
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+          <input type="checkbox" id="cfg-saldo-bloqueio" style="width:auto" onchange="salvarConfigSaldo()"> Ativado
+        </label>
+      </div>
       <div class="filter-bar">
         <input class="form-control search-input" id="busca" placeholder="Buscar código, placa, motorista..." oninput="renderTabela()">
         <select class="form-control" id="fil-status" style="width:180px" onchange="renderTabela()">
@@ -153,7 +164,7 @@ const COMB = { gasolina:'Gasolina', etanol:'Etanol', flex:'Flex', diesel:'Diesel
 
   carregarLogosSidebar()
   bIconsAplicar()
-  await Promise.all([carregarContratos(), carregarVeiculos(), carregarConfigGps()])
+  await Promise.all([carregarContratos(), carregarVeiculos(), carregarConfigGps(), carregarConfigSaldo()])
   await carregarAbastecimentos()
 })()
 
@@ -178,6 +189,33 @@ async function salvarConfigGpsAbastecimento() {
   } catch (e) {
     toast(e.message || 'Erro ao salvar', 'error')
     await carregarConfigGps()
+  }
+}
+
+// ── Config de bloqueio de saldo negativo (migration 188) ────────
+// Só afeta contratos com saldo controlado (saldo_atual preenchido).
+// Fail-safe: ausência de linha é tratada como desligado (não bloqueia).
+let _configSaldo = { bloquear_saldo_negativo: false }
+
+async function carregarConfigSaldo() {
+  const { data } = await db.from('frota_config_saldo').select('*').eq('id', 1).single()
+  _configSaldo = data || { bloquear_saldo_negativo: false }
+  document.getElementById('cfg-saldo-bloqueio').checked = _configSaldo.bloquear_saldo_negativo
+  document.getElementById('cfg-saldo-bloqueio-info').textContent = _configSaldo.atualizado_em
+    ? `Última alteração: ${formatDataHora(_configSaldo.atualizado_em)}`
+    : 'Desativado por padrão'
+}
+
+async function salvarConfigSaldo() {
+  const ligado = document.getElementById('cfg-saldo-bloqueio').checked
+  try {
+    const { error } = await db.from('frota_config_saldo').update({ bloquear_saldo_negativo: ligado }).eq('id', 1)
+    if (error) throw error
+    toast(ligado ? 'Bloqueio de saldo negativo ativado' : 'Bloqueio de saldo negativo desativado', 'success')
+    await carregarConfigSaldo()
+  } catch (e) {
+    toast(e.message || 'Erro ao salvar', 'error')
+    await carregarConfigSaldo()
   }
 }
 
@@ -307,6 +345,25 @@ function mostrarFonteContrato() {
   document.getElementById('vl-fonte').textContent = c
     ? `Fonte: ${FONTE_LABEL[c.frota_fontes_recurso?.tipo] || '—'} · ${c.frota_fontes_recurso?.codigo || ''} — ${c.frota_fontes_recurso?.descricao || ''}`
     : ''
+  atualizarPreviewSaldo()
+}
+
+// Prévia do saldo do contrato após validar (1ª camada — a RPC, migration
+// 188, é a autoridade real). Só se aplica a contrato com saldo controlado.
+function atualizarPreviewSaldo() {
+  const c = _contratos.find(x => x.id === document.getElementById('vl-contrato').value)
+  const el = document.getElementById('vl-saldo-preview')
+  const btn = document.getElementById('btn-confirmar-validar')
+  if (!c || c.saldo_atual == null) { el.textContent = ''; btn.disabled = false; return }
+  const a = _abastecimentos.find(x => x.id === _acaoId)
+  const valorAjust = document.getElementById('vl-valor-ajust').value
+  const valorDebito = valorAjust !== '' ? parseFloat(valorAjust) : (a ? a.valor_total : 0)
+  const saldoFinal = c.saldo_atual - valorDebito
+  const negativo = saldoFinal < 0
+  const bloqueado = negativo && _configSaldo.bloquear_saldo_negativo
+  el.innerHTML = `Saldo do contrato: ${formatBRL(c.saldo_atual)} → após validar: <strong style="${negativo ? 'color:#DC2626' : ''}">${formatBRL(saldoFinal)}</strong>` +
+    (bloqueado ? '<br><span style="color:#DC2626">Bloqueado: saldo ficaria negativo. Ajuste o contrato antes de validar.</span>' : '')
+  btn.disabled = bloqueado
 }
 
 async function confirmarValidar() {
@@ -314,6 +371,13 @@ async function confirmarValidar() {
   if (!contrato_id) { toast('Selecione o contrato', 'error'); return }
   const litrosAjust = document.getElementById('vl-litros-ajust').value
   const valorAjust  = document.getElementById('vl-valor-ajust').value
+  const c = _contratos.find(x => x.id === contrato_id)
+  const a = _abastecimentos.find(x => x.id === _acaoId)
+  const valorDebito = valorAjust !== '' ? parseFloat(valorAjust) : (a ? a.valor_total : 0)
+  if (_configSaldo.bloquear_saldo_negativo && c && c.saldo_atual != null && (c.saldo_atual - valorDebito) < 0) {
+    toast('Saldo do contrato insuficiente — ajuste o contrato antes de validar', 'error')
+    return
+  }
   const btn = document.getElementById('btn-confirmar-validar')
   btn.disabled = true; btn.textContent = 'Validando...'
   try {
