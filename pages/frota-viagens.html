@@ -418,10 +418,12 @@ async function abrirAprovar(id) {
   document.getElementById('ap-aviso-capacidade').style.display = 'none'
   document.getElementById('ap-motorista').innerHTML = optsMotoristas(null)
   desativarModoMultiplo()
+  resetDedicadoUI()
   document.getElementById('modal-aprovar').classList.add('aberto')
 
   // Veículos ocupados (em viagem/manutenção/cedidos) ou já alocados a
   // outra viagem aprovada nesse mesmo período não entram na lista.
+  // Dedicados ficam de fora por padrão (p_incluir_dedicados=false).
   const { data: disponiveis } = await db.rpc('frota_veiculos_disponiveis', {
     p_inicio: v.data_saida_prevista, p_fim: v.data_retorno_prevista
   })
