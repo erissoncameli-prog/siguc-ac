@@ -2034,11 +2034,17 @@ async function confirmarAprovar() {
       toast('Preencha veículo, motorista e passageiros em todas as linhas', 'error'); return
     }
     if (total !== alvo) { toast(`A soma dos passageiros (${total}) precisa ser igual ao total solicitado (${alvo})`, 'error'); return }
+    const justifM = (document.getElementById('ap-justif-dedicado')?.value || '').trim()
+    if (_linhasAlocacaoG.some(l => _veiculosG.find(x => x.id === l.veiculo_id)?.dedicado_setor)) {
+      if (!_liberarDedicadoG) { toast('Há veículo dedicado na divisão — marque "Liberar veículo dedicado do setor"', 'error'); return }
+      if (!justifM) { toast('Informe a justificativa da liberação do veículo dedicado', 'error'); return }
+    }
     btn.disabled = true; btn.textContent = 'Aprovando...'
     try {
       const { error } = await db.rpc('frota_aprovar_viagem_multipla', {
         p_viagem_id: _acaoId,
-        p_alocacoes: _linhasAlocacaoG.map(l => ({ veiculo_id: l.veiculo_id, motorista_id: l.motorista_id, passageiros: l.passageiros }))
+        p_alocacoes: _linhasAlocacaoG.map(l => ({ veiculo_id: l.veiculo_id, motorista_id: l.motorista_id, passageiros: l.passageiros })),
+        p_liberar_dedicado: _liberarDedicadoG, p_justificativa: justifM || null
       })
       if (error) throw error
       toast(`Viagem aprovada com ${_linhasAlocacaoG.length} veículos!`, 'success')
