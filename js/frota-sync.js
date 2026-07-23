@@ -122,6 +122,8 @@ async function fSyncUma(acao) {
       if (acao.fotos?.cupom) payload.p_foto_cupom_url = await fSyncUploadFotoAbastecimento(acao.fotos.cupom, acao.uuid_cliente, 'cupom')
       if (acao.fotos?.hodometro) payload.p_foto_hodometro_url = await fSyncUploadFotoAbastecimento(acao.fotos.hodometro, acao.uuid_cliente, 'hodometro')
       ;({ error } = await db.rpc('frota_registrar_abastecimento', payload))
+    } else if (acao.tipo === 'defeito') {
+      ;({ error } = await db.rpc('frota_reportar_defeito', acao.payload))
     } else {
       error = new Error('Tipo de ação desconhecido: ' + acao.tipo)
     }
