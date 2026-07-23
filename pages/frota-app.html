@@ -543,11 +543,13 @@ async function entrarModo(modo, persistir) {
   if (modo === 'motorista') {
     montarShellMotorista()
     await renderModoMotorista()
+  } else if (modo === 'gestor') {
+    montarShellGestor()
+    await renderModoGestor()
   } else {
     montarShellDesktop()
     renderTopo(!persistir)
-    if (modo === 'gestor') await renderModoGestor()
-    else await renderModoSolicitante()
+    await renderModoSolicitante()
   }
   fwTransicaoTela(document.querySelector('.frota-app-shell, .fm-shell'), persistir ? 'fade' : 'avancar')
 }
@@ -706,6 +708,68 @@ async function carregarLogosFaixaMotorista() {
     aplicar('.fm-logo-chip.gov', logos.governo_branca_url || logos.governo_url)
     aplicar('.fm-logo-chip.sec', logos.secretaria_branca_url || logos.secretaria_url)
   } catch (e) { console.warn('[frota-app] logos', e) }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MODO GESTOR — mesmo shell nativo do Motorista (faixa de logos +
+// barra de botões), com abas próprias da função de gestão.
+// ═══════════════════════════════════════════════════════════════
+let _fgAba = 'inicio'
+const FG_ORDEM_ABAS = ['inicio', 'pendentes', 'andamento', 'manutencao', 'config']
+
+function montarShellGestor() {
+  document.getElementById('app').innerHTML = `
+    <div class="fm-shell fw-theme">
+      <div class="fm-faixa">
+        <div class="fm-faixa-logos">
+          <span class="fm-logo-chip gov" hidden><img alt="Governo do Acre"></span>
+          <span class="fm-logo-chip sec" hidden><img alt="SEMA-AC"></span>
+        </div>
+      </div>
+      <div id="fm-conteudo" class="fm-conteudo"></div>
+      <nav class="fm-pill-nav">
+        <button class="fm-pill-btn" data-tab="inicio" onclick="gestorAba('inicio')">${bico('home')}<span>Painel</span></button>
+        <button class="fm-pill-btn" data-tab="pendentes" onclick="gestorAba('pendentes')">
+          <span class="fm-badge" id="fg-badge-pend" hidden>0</span>${bico('list')}<span>Aprovações</span></button>
+        <button class="fm-pill-btn fm-primaria" data-tab="andamento" onclick="gestorAba('andamento')">${bico('truck')}<span>Em curso</span></button>
+        <button class="fm-pill-btn" data-tab="manutencao" onclick="gestorAba('manutencao')">
+          <span class="fm-badge" id="fg-badge-manut" hidden>0</span>${bico('wrench')}<span>Manutenção</span></button>
+        <button class="fm-pill-btn" data-tab="config" onclick="gestorAba('config')">${bico('sliders')}<span>Config</span></button>
+      </nav>
+    </div>`
+  carregarLogosFaixaMotorista()
+}
+
+function gestorAba(aba) {
+  const anterior = _fgAba
+  _fgAba = aba
+  document.querySelectorAll('.fm-pill-btn').forEach(b => b.classList.toggle('ativa', b.dataset.tab === aba))
+  if (aba === 'inicio') renderGestorInicio()
+  else if (aba === 'pendentes') renderGestorPendentes()
+  else if (aba === 'andamento') renderGestorAndamento()
+  else if (aba === 'manutencao') renderGestorManutencao()
+  else if (aba === 'config') renderGestorConfig()
+  const dir = FG_ORDEM_ABAS.indexOf(aba) >= FG_ORDEM_ABAS.indexOf(anterior) ? 'avancar' : 'voltar'
+  fwTransicaoTela('fm-conteudo', dir)
+}
+
+async function renderGestorConfig() {
+  document.getElementById('fm-conteudo').innerHTML = `
+    <div class="form-section-label">Notificações</div>
+    <div class="card" style="padding:0;margin-bottom:16px" id="fm-cfg-push">${itemPushConfig('carregando')}</div>
+    <div class="form-section-label">Configurações</div>
+    <div class="card" style="padding:0">
+      ${_papeis.length > 1 ? `<button class="fm-config-item" onclick="trocarPerfil()">${bico('shield')} Trocar perfil</button>` : ''}
+      <button class="fm-config-item" onclick="entrarModo('solicitante', false)">${bico('truck')} Solicitar viagem</button>
+      <button class="fm-config-item" onclick="abrirTarefasFrota()">${bico('clipboard')} Minhas Tarefas</button>
+      <button class="fm-config-item" onclick="alterarPinFrota()">${bico('key')} Alterar PIN</button>
+      <button class="fm-config-item" onclick="abrirInstalarFrota()">${bico('qr')} Instalar o app</button>
+      <button class="fm-config-item" id="btn-verificar-update-frota" onclick="verificarAtualizacaoFrota()">${bico('download')} Verificar atualização</button>
+      <div class="fm-config-item" style="cursor:default;color:#9CA3AF" id="fm-cfg-versao">${bico('hash')} <span>Versão do app: —</span></div>
+      <button class="fm-config-item" style="color:#DC2626" onclick="fazerLogout()">${bico('logout')} Sair</button>
+    </div>`
+  atualizarItemPushConfig()
+  atualizarVersaoFrota()
 }
 
 async function renderModoMotorista() {
@@ -1883,8 +1947,13 @@ async function confirmarCancelar() {
 // desktop, aqui é só aprovar/acompanhar rápido)
 // ═══════════════════════════════════════════════════════════════
 async function renderModoGestor() {
-  const corpo = document.getElementById('modo-corpo')
-  corpo.innerHTML = `
+  await Promise.all([carregarVeiculosGestor(), carregarMotoristasGestor()])
+  await Promise.all([carregarViagensGestor(), carregarManutGestor()])
+  gestorAba(_fgAba)
+}
+
+function renderGestorInicio() {
+  document.getElementById('fm-conteudo').innerHTML = `
     <div class="kpi-grid" style="margin-bottom:20px">
       <div class="fw-kpi-card"><div class="fw-kpi-label">Pendentes</div><div class="fw-kpi-value" id="kg-pend">0</div></div>
       <div class="fw-kpi-card"><div class="fw-kpi-label">Em andamento</div><div class="fw-kpi-value" id="kg-andamento">0</div></div>
@@ -1892,13 +1961,30 @@ async function renderModoGestor() {
       <div class="fw-kpi-card"><div class="fw-kpi-label">Veículos disponíveis</div><div class="fw-kpi-value" id="kg-disp">0</div></div>
     </div>
     <div class="form-section-label">Aprovações pendentes</div>
-    <div id="g-lista-pendentes" style="margin-bottom:24px"></div>
+    <div id="g-lista-pendentes" style="margin-bottom:24px"></div>`
+  renderKpisGestor()
+  renderListaPendentesGestor()
+}
+
+function renderGestorPendentes() {
+  document.getElementById('fm-conteudo').innerHTML = `
+    <div class="form-section-label">Aprovações pendentes</div>
+    <div id="g-lista-pendentes" style="margin-bottom:24px"></div>`
+  renderListaPendentesGestor()
+}
+
+function renderGestorAndamento() {
+  document.getElementById('fm-conteudo').innerHTML = `
     <div class="form-section-label">Viagens em andamento</div>
-    <div id="g-lista-andamento" style="margin-bottom:24px"></div>
+    <div id="g-lista-andamento" style="margin-bottom:24px"></div>`
+  renderListaAndamentoGestor()
+}
+
+function renderGestorManutencao() {
+  document.getElementById('fm-conteudo').innerHTML = `
     <div class="form-section-label">Alertas de manutenção</div>
     <div id="g-lista-manut" style="margin-bottom:24px"></div>`
-  await Promise.all([carregarVeiculosGestor(), carregarMotoristasGestor()])
-  await Promise.all([carregarViagensGestor(), carregarManutGestor()])
+  renderListaManutGestor()
 }
 
 async function carregarVeiculosGestor() {
@@ -1932,10 +2018,16 @@ async function carregarManutGestor() {
 
 function renderKpisGestor() {
   const set = (id, v) => { const el = document.getElementById(id); if (el) fwAnimateNumber(el, v) }
-  set('kg-pend', _viagensPendentes.filter(v => v.status === 'solicitada').length)
+  const pend = _viagensPendentes.filter(v => v.status === 'solicitada').length
+  const manutVencido = _manutPendentes.filter(p => situacaoPlano(p) === 'vencido').length
+  set('kg-pend', pend)
   set('kg-andamento', _viagensPendentes.filter(v => v.status === 'em_andamento').length)
-  set('kg-manut', _manutPendentes.filter(p => situacaoPlano(p) === 'vencido').length)
+  set('kg-manut', manutVencido)
   set('kg-disp', _veiculosG.filter(v => v.status === 'disponivel').length)
+  const bp = document.getElementById('fg-badge-pend')
+  if (bp) { bp.hidden = pend === 0; bp.textContent = pend }
+  const bm = document.getElementById('fg-badge-manut')
+  if (bm) { bm.hidden = manutVencido === 0; bm.textContent = manutVencido }
 }
 
 function renderListaPendentesGestor() {
@@ -1975,6 +2067,7 @@ function abrirDetalhe(id) {
   if (!v) return
   document.getElementById('det-corpo').innerHTML = `
     <div style="font-size:13px;line-height:1.8">
+      ${v.cidade_destino ? `<div><strong>Cidade:</strong> ${esc(v.cidade_origem||'Rio Branco')} → ${esc(v.cidade_destino)}</div>` : ''}
       <div><strong>Destino:</strong> ${esc(v.destino)}</div>
       <div><strong>Finalidade:</strong> ${esc(v.finalidade)}</div>
       <div><strong>Solicitante:</strong> ${esc(v.solicitante_nome)} ${v.setor_sigla ? `(${esc(v.setor_sigla)})` : ''}</div>
@@ -2062,7 +2155,7 @@ async function abrirAprovar(id) {
   _acaoId = id
   _viagemAprovando = v
   document.getElementById('ap-resumo').innerHTML =
-    `${v.cidade_destino ? `<div style="font-weight:700;color:#111827">${esc(v.cidade_origem||'Rio Branco')} → ${esc(v.cidade_destino)}</div>` : ''}<strong>${esc(v.destino)}</strong><br>${formatDataHora(v.data_saida_prevista)} até ${formatDataHora(v.data_retorno_prevista)}<br>Solicitante: ${esc(v.solicitante_nome)}${v.passageiros ? ` · ${v.passageiros} passageiro(s)` : ''}`
+    `${v.cidade_destino ? `<div style="font-weight:700;color:#111827">${esc(v.cidade_origem||'Rio Branco')} → ${esc(v.cidade_destino)}</div>` : ''}<strong>${esc(v.destino)}</strong><br>${esc(v.finalidade||'')}<br>${formatDataHora(v.data_saida_prevista)} até ${formatDataHora(v.data_retorno_prevista)}<br>Solicitante: ${esc(v.solicitante_nome)}${v.passageiros ? ` · ${v.passageiros} passageiro(s)` : ''}<br><button type="button" class="btn btn-xs btn-ghost" style="margin-top:6px" onclick="abrirDetalhe('${v.id}')">${bico('eye')} Ver detalhes</button>`
   document.getElementById('ap-alerta-passageiros').style.display = (v.passageiros || 0) > 4 ? '' : 'none'
   document.getElementById('ap-veiculo').innerHTML = '<option value="">Carregando disponibilidade...</option>'
   document.getElementById('ap-aviso-veiculo').style.display = 'none'
