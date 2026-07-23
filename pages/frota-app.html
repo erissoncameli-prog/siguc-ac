@@ -852,8 +852,12 @@ async function renderGestorConfig() {
       <button class="fm-config-item" onclick="alterarPinFrota()">${bico('key')} Alterar PIN</button>
       <button class="fm-config-item" onclick="abrirInstalarFrota()">${bico('qr')} Instalar o app</button>
       <button class="fm-config-item" id="btn-verificar-update-frota" onclick="verificarAtualizacaoFrota()">${bico('download')} Verificar atualização</button>
-      <div class="fm-config-item" style="cursor:default;color:#9CA3AF" id="fm-cfg-versao">${bico('hash')} <span>Versão do app: —</span></div>
       <button class="fm-config-item" style="color:#DC2626" onclick="fazerLogout()">${bico('logout')} Sair</button>
+    </div>
+    <div class="fm-creditos">
+      <p id="fm-cfg-versao">Versão do app: —</p>
+      <p>Desenvolvido por <strong>Erisson Cameli Santiago</strong></p>
+      <p>© ${new Date().getFullYear()} · Todos os direitos reservados</p>
     </div>`
   atualizarItemPushConfig()
   atualizarVersaoFrota()
@@ -1426,9 +1430,13 @@ async function renderFmConfig() {
       <button class="fm-config-item" onclick="alterarPinFrota()">${bico('key')} Alterar PIN</button>
       <button class="fm-config-item" onclick="abrirInstalarFrota()">${bico('qr')} Instalar o app</button>
       <button class="fm-config-item" id="btn-verificar-update-frota" onclick="verificarAtualizacaoFrota()">${bico('download')} Verificar atualização</button>
-      <div class="fm-config-item" style="cursor:default;color:#9CA3AF" id="fm-cfg-versao">${bico('hash')} <span>Versão do app: —</span></div>
       <button class="fm-config-item" style="color:#DC2626" onclick="zerarFilaLocalFrota()">${bico('trash')} Zerar fila local</button>
       <button class="fm-config-item" style="color:#DC2626" onclick="fazerLogout()">${bico('logout')} Sair</button>
+    </div>
+    <div class="fm-creditos">
+      <p id="fm-cfg-versao">Versão do app: —</p>
+      <p>Desenvolvido por <strong>Erisson Cameli Santiago</strong></p>
+      <p>© ${new Date().getFullYear()} · Todos os direitos reservados</p>
     </div>`
   await atualizarBadgePendentesSync()
   atualizarItemPushConfig()
@@ -1443,16 +1451,15 @@ async function renderFmConfig() {
 async function atualizarVersaoFrota() {
   const el = document.getElementById('fm-cfg-versao')
   if (!el) return
-  const span = el.querySelector('span')
-  if (!('caches' in window)) { span.textContent = 'Versão do app: indisponível neste navegador'; return }
+  if (!('caches' in window)) { el.textContent = 'Versão do app: indisponível neste navegador'; return }
   try {
     const chaves = await caches.keys()
     const chave = chaves.find(k => k.startsWith('siguc-frota-v'))
-    span.textContent = chave
+    el.textContent = chave
       ? `Versão do app: v${chave.split('-v').pop()}`
       : 'Versão do app: ainda não instalada — toque em "Verificar atualização"'
   } catch (e) {
-    span.textContent = 'Versão do app: indisponível'
+    el.textContent = 'Versão do app: indisponível'
   }
 }
 
@@ -2952,6 +2959,10 @@ if ('serviceWorker' in navigator && !window.Capacitor) {
 }
 .fm-config-item:last-child { border-bottom: none; }
 .fm-config-item:hover { background: #F9FAFB; }
+.fm-creditos { text-align: center; margin-top: 16px; }
+.fm-creditos p { margin: 2px 0; font-size: .78rem; color: #9CA3AF; }
+.fm-creditos p:first-child { font-size: .8rem; color: #6B7280; }
+.fm-creditos strong { font-weight: 600; color: #6B7280; }
 
 /* ── Gráfico de barras (aba Dados) ──────────────────────────────── */
 .fm-chart { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; padding: 8px 2px 0; }
