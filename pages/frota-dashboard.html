@@ -272,7 +272,7 @@ async function carregarDashboard() {
     db.from('frota_veiculos').select('id,placa,modelo,tipo,status,setor_id,medidor,ativo').eq('ativo', true),
     db.from('frota_motoristas').select('id,nome,setor_id,status,cnh_validade,habilitacao_fluvial_validade').eq('ativo', true),
     db.from('vw_frota_viagens_detalhe')
-      .select('id,status,veiculo_id,veiculo_placa,veiculo_modelo,veiculo_tipo,veiculo_medidor,motorista_id,motorista_nome,setor_solicitante_id,setor_nome,setor_sigla,solicitante_nome,destino,finalidade,data_saida_prevista,data_retorno_prevista,checkout_em,checkin_em,km_saida,km_chegada,horas_saida,horas_chegada,avarias,motivo_recusa,motivo_cancelamento,criado_em,aprovado_em')
+      .select('id,status,veiculo_id,veiculo_placa,veiculo_modelo,veiculo_tipo,veiculo_medidor,motorista_id,motorista_nome,setor_solicitante_id,setor_nome,setor_sigla,solicitante_nome,destino,finalidade,cidade_origem,cidade_destino,data_saida_prevista,data_retorno_prevista,checkout_em,checkin_em,km_saida,km_chegada,horas_saida,horas_chegada,avarias,motivo_recusa,motivo_cancelamento,criado_em,aprovado_em')
       .gte('data_saida_prevista', iniTs).lte('data_saida_prevista', fimTs)
       .order('data_saida_prevista', { ascending: false }).limit(5000),
     db.from('vw_frota_abastecimentos_detalhe')
@@ -907,10 +907,11 @@ function listaOciosos() {
 // Exportar CSV
 // ════════════════════════════════════════════════════════════════
 function exportarCSV() {
-  const linhas = [['Placa','Modelo','Motorista','Setor','Status','Saída prevista','Retorno previsto','Km saída','Km chegada']]
+  const linhas = [['Placa','Modelo','Motorista','Setor','Status','Destino','Cidade origem','Cidade destino','Finalidade','Saída prevista','Retorno previsto','Km saída','Km chegada']]
   _viagens.forEach(v => linhas.push([
     v.veiculo_placa||'', v.veiculo_modelo||'', v.motorista_nome||'', v.setor_sigla||v.setor_nome||'',
-    STATUS_VIAGEM_LAB[v.status]||v.status, v.data_saida_prevista||'', v.data_retorno_prevista||'',
+    STATUS_VIAGEM_LAB[v.status]||v.status, v.destino||'', v.cidade_origem||'', v.cidade_destino||'', v.finalidade||'',
+    v.data_saida_prevista||'', v.data_retorno_prevista||'',
     v.km_saida??'', v.km_chegada??'',
   ]))
   const csv = linhas.map(l => l.map(c => `"${String(c).replace(/"/g,'""')}"`).join(';')).join('\n')
