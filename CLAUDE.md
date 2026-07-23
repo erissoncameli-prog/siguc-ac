@@ -334,6 +334,13 @@ E) Dashboard Executivo por nível (UC / Diretoria / Secretaria)
 - Novas tabelas sempre com RLS habilitado
 - Migrations numeradas sequencialmente
 - Funções SQL com SECURITY DEFINER quando acessam auth.*
+- MIGRATIONS SEMPRE APLICADAS: toda migration criada (arquivo novo em
+  supabase/migrations/) deve ser aplicada no banco de produção
+  (projeto SIGUC-AC, id atqtybcsvepdabsvgaly) via mcp__Supabase__apply_migration
+  na mesma entrega — nunca deixar só o arquivo no repositório sem
+  rodar no banco. Depois de aplicar, checar mcp__Supabase__get_advisors
+  (type security) por avisos novos introduzidos pela migration. Regra
+  permanente, sem precisar ser pedida de novo.
 - Commits em português, pequenos e descritivos
 - NUNCA expor SERVICE_ROLE_KEY no frontend
 - ÍCONES: nunca usar emoji em UI (botões, chips, navegação, marcadores

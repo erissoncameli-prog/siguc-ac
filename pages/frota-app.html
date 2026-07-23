@@ -715,7 +715,7 @@ async function carregarLogosFaixaMotorista() {
 // barra de botões), com abas próprias da função de gestão.
 // ═══════════════════════════════════════════════════════════════
 let _fgAba = 'inicio'
-const FG_ORDEM_ABAS = ['inicio', 'pendentes', 'andamento', 'manutencao', 'config']
+const FG_ORDEM_ABAS = ['inicio', 'pendentes', 'andamento', 'manutencao', 'dados', 'config']
 
 function montarShellGestor() {
   document.getElementById('app').innerHTML = `
@@ -734,6 +734,7 @@ function montarShellGestor() {
         <button class="fm-pill-btn fm-primaria" data-tab="andamento" onclick="gestorAba('andamento')">${bico('truck')}<span>Em curso</span></button>
         <button class="fm-pill-btn" data-tab="manutencao" onclick="gestorAba('manutencao')">
           <span class="fm-badge" id="fg-badge-manut" hidden>0</span>${bico('wrench')}<span>Manutenção</span></button>
+        <button class="fm-pill-btn" data-tab="dados" onclick="gestorAba('dados')">${bico('bar-chart')}<span>Dados</span></button>
         <button class="fm-pill-btn" data-tab="config" onclick="gestorAba('config')">${bico('sliders')}<span>Config</span></button>
       </nav>
     </div>`
@@ -748,9 +749,95 @@ function gestorAba(aba) {
   else if (aba === 'pendentes') renderGestorPendentes()
   else if (aba === 'andamento') renderGestorAndamento()
   else if (aba === 'manutencao') renderGestorManutencao()
+  else if (aba === 'dados') renderGestorDados()
   else if (aba === 'config') renderGestorConfig()
   const dir = FG_ORDEM_ABAS.indexOf(aba) >= FG_ORDEM_ABAS.indexOf(anterior) ? 'avancar' : 'voltar'
   fwTransicaoTela('fm-conteudo', dir)
+}
+
+// ── Aba Dados: números da frota (viagens concluídas do período) ────
+let _viagensConcluidasG = [], _dadosGestorCarregado = false
+
+async function carregarDadosGestor() {
+  const { data } = await db.from('vw_frota_viagens_detalhe').select('*')
+    .eq('status', 'concluida')
+    .order('checkin_em', { ascending: false }).limit(500)
+  _viagensConcluidasG = data || []
+  _dadosGestorCarregado = true
+}
+
+async function renderGestorDados() {
+  const corpo = document.getElementById('fm-conteudo')
+  corpo.innerHTML = '<div style="text-align:center;padding:40px;color:#9CA3AF">Carregando...</div>'
+  if (!_dadosGestorCarregado) await carregarDadosGestor()
+  if (_fgAba !== 'dados') return
+  const concluidas = _viagensConcluidasG
+
+  let km = 0, horas = 0
+  concluidas.forEach(v => {
+    if (v.veiculo_medidor === 'horimetro') {
+      if (v.horas_saida != null && v.horas_chegada != null) horas += Math.max(0, v.horas_chegada - v.horas_saida)
+    } else if (v.km_saida != null && v.km_chegada != null) {
+      km += Math.max(0, v.km_chegada - v.km_saida)
+    }
+  })
+  const comAvarias = concluidas.filter(v => v.avarias).length
+
+  const agora = new Date()
+  const chave = d => d.getFullYear() * 12 + d.getMonth()
+  const mesAtual = chave(agora)
+  const dataRef = v => new Date(v.checkin_em || v.data_saida_prevista)
+  const noMes = concluidas.filter(v => chave(dataRef(v)) === mesAtual).length
+
+  const meses = []
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(agora.getFullYear(), agora.getMonth() - i, 1)
+    meses.push({ k: chave(d), label: d.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', ''), n: 0 })
+  }
+  concluidas.forEach(v => { const m = meses.find(x => x.k === chave(dataRef(v))); if (m) m.n++ })
+  const maxN = Math.max(1, ...meses.map(m => m.n))
+
+  const kpi = (label, valor) => `<div class="fw-kpi-card"><div class="fw-kpi-label">${label}</div><div class="fw-kpi-value">${valor}</div></div>`
+
+  // Ranking de veículos mais usados (por nº de viagens concluídas)
+  const porVeiculo = {}
+  concluidas.forEach(v => {
+    if (!v.veiculo_id) return
+    const reg = porVeiculo[v.veiculo_id] || { placa: v.veiculo_placa, modelo: v.veiculo_modelo, n: 0 }
+    reg.n++
+    porVeiculo[v.veiculo_id] = reg
+  })
+  const rankingVeiculos = Object.values(porVeiculo).sort((a, b) => b.n - a.n).slice(0, 5)
+
+  document.getElementById('fm-conteudo').innerHTML = `
+    <div class="kpi-grid" style="margin-bottom:16px">
+      ${kpi('Viagens concluídas', concluidas.length)}
+      ${kpi('Km rodados', formatNum(km, 0))}
+      ${kpi('Este mês', noMes)}
+      ${kpi('Com avaria', comAvarias)}
+    </div>
+    ${horas > 0 ? `<div class="card" style="margin-bottom:16px;padding:12px 16px;font-size:13px;color:#6B7280">Horas de operação (horímetro): <strong style="color:#1F4E2C">${formatNum(horas, 1)} h</strong></div>` : ''}
+    <div class="form-section-label">Viagens concluídas por mês</div>
+    <div class="card" style="margin-bottom:16px">
+      ${concluidas.length ? `
+        <div class="fm-chart">
+          ${meses.map(m => `
+            <div class="fm-chart-col">
+              <div class="fm-chart-num">${m.n || ''}</div>
+              <div class="fm-chart-bar" style="height:${m.n ? 6 + Math.round((m.n / maxN) * 104) : 3}px"></div>
+              <div class="fm-chart-lab">${esc(m.label)}</div>
+            </div>`).join('')}
+        </div>` : `
+        <div style="text-align:center;padding:24px;color:#9CA3AF">Nenhuma viagem concluída ainda.</div>`}
+    </div>
+    <div class="form-section-label">Veículos mais utilizados</div>
+    <div class="card" style="padding:0">
+      ${rankingVeiculos.length ? rankingVeiculos.map(v => `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid #F3F4F6">
+          <div><strong style="font-size:13px">${esc(v.modelo)}</strong><div style="font-size:11px;color:#9CA3AF">${esc(v.placa)}</div></div>
+          <span class="badge badge-verde">${v.n} viagem(ns)</span>
+        </div>`).join('') : '<div style="text-align:center;padding:20px;color:#9CA3AF">Sem dados no período</div>'}
+    </div>`
 }
 
 async function renderGestorConfig() {
@@ -765,8 +852,12 @@ async function renderGestorConfig() {
       <button class="fm-config-item" onclick="alterarPinFrota()">${bico('key')} Alterar PIN</button>
       <button class="fm-config-item" onclick="abrirInstalarFrota()">${bico('qr')} Instalar o app</button>
       <button class="fm-config-item" id="btn-verificar-update-frota" onclick="verificarAtualizacaoFrota()">${bico('download')} Verificar atualização</button>
-      <div class="fm-config-item" style="cursor:default;color:#9CA3AF" id="fm-cfg-versao">${bico('hash')} <span>Versão do app: —</span></div>
       <button class="fm-config-item" style="color:#DC2626" onclick="fazerLogout()">${bico('logout')} Sair</button>
+    </div>
+    <div class="fm-creditos">
+      <p id="fm-cfg-versao">Versão do app: —</p>
+      <p>Desenvolvido por <strong>Erisson Cameli Santiago</strong></p>
+      <p>© ${new Date().getFullYear()} · Todos os direitos reservados</p>
     </div>`
   atualizarItemPushConfig()
   atualizarVersaoFrota()
@@ -1253,7 +1344,7 @@ async function carregarVeiculosDisponiveisAgora() {
     if (!navigator.onLine) throw new Error('offline')
     // Dedicados ficam de fora da viagem direta (autosserviço): só entram
     // via aprovação da gestão. Servidor também bloqueia (migration 186).
-    const r = await db.from('frota_veiculos').select('id,placa,modelo,medidor')
+    const r = await db.from('frota_veiculos').select('id,placa,modelo,medidor,hodometro_km,horimetro_horas')
       .eq('ativo', true).eq('status', 'disponivel').eq('dedicado_setor', false).order('placa')
     if (r.error) throw r.error
     data = r.data || []
@@ -1279,7 +1370,9 @@ async function carregarVeiculosDisponiveisAgora() {
 function ajustarLabelMedidaNV() {
   const v = _veiculosDisponiveisAgora.find(x => x.id === document.getElementById('nv-veiculo')?.value)
   const label = document.getElementById('nv-medida-label')
-  if (label) label.innerHTML = (v?.medidor === 'horimetro' ? 'Horímetro na saída (horas)' : 'Hodômetro na saída (km)') + ' <span class="obrig">*</span>'
+  const ultima = v?.medidor === 'horimetro' ? v?.horimetro_horas : v?.hodometro_km
+  if (label) label.innerHTML = (v?.medidor === 'horimetro' ? 'Horímetro na saída (horas)' : 'Hodômetro na saída (km)') +
+    (ultima != null ? ` — última leitura: ${formatNum(ultima, 1)}` : '') + ' <span class="obrig">*</span>'
 }
 
 async function confirmarNovaViagemDireta() {
@@ -1289,6 +1382,9 @@ async function confirmarNovaViagemDireta() {
   const medida = parseFloat(document.getElementById('nv-medida').value)
   if (!veiculo_id || !destino || !finalidade) { toast('Selecione o veículo e preencha destino e finalidade', 'error'); return }
   if (isNaN(medida) || medida < 0) { toast('Informe a leitura do medidor', 'error'); return }
+  const veic = _veiculosDisponiveisAgora.find(x => x.id === veiculo_id)
+  const ultima = veic?.medidor === 'horimetro' ? veic?.horimetro_horas : veic?.hodometro_km
+  if (!fmChecarMedidaMinima(medida, ultima, veic?.medidor)) return
   const btn = document.getElementById('btn-abrir-nv')
   btn.disabled = true; btn.textContent = 'Iniciando...'
   const gps = await fmObterGpsSeAtivo('captura_viagens')
@@ -1339,9 +1435,13 @@ async function renderFmConfig() {
       <button class="fm-config-item" onclick="alterarPinFrota()">${bico('key')} Alterar PIN</button>
       <button class="fm-config-item" onclick="abrirInstalarFrota()">${bico('qr')} Instalar o app</button>
       <button class="fm-config-item" id="btn-verificar-update-frota" onclick="verificarAtualizacaoFrota()">${bico('download')} Verificar atualização</button>
-      <div class="fm-config-item" style="cursor:default;color:#9CA3AF" id="fm-cfg-versao">${bico('hash')} <span>Versão do app: —</span></div>
       <button class="fm-config-item" style="color:#DC2626" onclick="zerarFilaLocalFrota()">${bico('trash')} Zerar fila local</button>
       <button class="fm-config-item" style="color:#DC2626" onclick="fazerLogout()">${bico('logout')} Sair</button>
+    </div>
+    <div class="fm-creditos">
+      <p id="fm-cfg-versao">Versão do app: —</p>
+      <p>Desenvolvido por <strong>Erisson Cameli Santiago</strong></p>
+      <p>© ${new Date().getFullYear()} · Todos os direitos reservados</p>
     </div>`
   await atualizarBadgePendentesSync()
   atualizarItemPushConfig()
@@ -1356,16 +1456,15 @@ async function renderFmConfig() {
 async function atualizarVersaoFrota() {
   const el = document.getElementById('fm-cfg-versao')
   if (!el) return
-  const span = el.querySelector('span')
-  if (!('caches' in window)) { span.textContent = 'Versão do app: indisponível neste navegador'; return }
+  if (!('caches' in window)) { el.textContent = 'Versão do app: indisponível neste navegador'; return }
   try {
     const chaves = await caches.keys()
     const chave = chaves.find(k => k.startsWith('siguc-frota-v'))
-    span.textContent = chave
+    el.textContent = chave
       ? `Versão do app: v${chave.split('-v').pop()}`
       : 'Versão do app: ainda não instalada — toque em "Verificar atualização"'
   } catch (e) {
-    span.textContent = 'Versão do app: indisponível'
+    el.textContent = 'Versão do app: indisponível'
   }
 }
 
@@ -1434,12 +1533,28 @@ async function verificarAtualizacaoFrota() {
   setTimeout(() => { if (!achou) { toast('App já está atualizado', 'success'); reabilita() } }, 2500)
 }
 
+// ── Trava de medidor: alerta e bloqueia se a leitura for menor que a
+// última conhecida. Só feedback rápido — quem garante de verdade é a
+// validação equivalente no servidor (migration 192), que vale mesmo
+// se o registro for enfileirado offline e sincronizado depois.
+function fmChecarMedidaMinima(medida, ultima, medidor) {
+  if (ultima == null) return true
+  if (medida < ultima) {
+    const unidade = medidor === 'horimetro' ? 'horímetro' : 'hodômetro'
+    toast(`Verifique o ${unidade}: a leitura informada (${formatNum(medida, 1)}) é menor que a última registrada para este veículo (${formatNum(ultima, 1)}).`, 'error')
+    return false
+  }
+  return true
+}
+
 function abrirCheckout(id) {
   const v = _viagens.find(x => x.id === id)
   _acaoId = id
   document.getElementById('co-resumo').innerHTML = `<strong>${esc(v.destino)}</strong><br>${esc(v.veiculo_modelo)} (${esc(v.veiculo_placa)})`
+  const ultima = v.veiculo_medidor === 'horimetro' ? v.veiculo_horimetro_horas : v.veiculo_hodometro_km
   document.getElementById('co-medida-label').textContent =
-    v.veiculo_medidor === 'horimetro' ? 'Horímetro na saída (horas) *' : 'Hodômetro na saída (km) *'
+    (v.veiculo_medidor === 'horimetro' ? 'Horímetro na saída (horas)' : 'Hodômetro na saída (km)') +
+    (ultima != null ? ` — última leitura: ${formatNum(ultima, 1)}` : '') + ' *'
   document.getElementById('co-medida').value = ''
   document.getElementById('modal-checkout').classList.add('aberto')
 }
@@ -1447,6 +1562,9 @@ function abrirCheckout(id) {
 async function confirmarCheckout() {
   const medida = parseFloat(document.getElementById('co-medida').value)
   if (isNaN(medida) || medida < 0) { toast('Informe a leitura do medidor', 'error'); return }
+  const v = _viagens.find(x => x.id === _acaoId)
+  const ultima = v?.veiculo_medidor === 'horimetro' ? v?.veiculo_horimetro_horas : v?.veiculo_hodometro_km
+  if (!fmChecarMedidaMinima(medida, ultima, v?.veiculo_medidor)) return
   const btn = document.getElementById('btn-confirmar-checkout')
   btn.disabled = true; btn.textContent = 'Registrando...'
   const gps = await fmObterGpsSeAtivo('captura_viagens')
@@ -1478,8 +1596,10 @@ function abrirCheckin(id) {
   const v = _viagens.find(x => x.id === id)
   _acaoId = id
   document.getElementById('ci-resumo').innerHTML = `<strong>${esc(v.destino)}</strong><br>${esc(v.veiculo_modelo)} (${esc(v.veiculo_placa)})`
+  const saida = v.veiculo_medidor === 'horimetro' ? v.horas_saida : v.km_saida
   document.getElementById('ci-medida-label').textContent =
-    v.veiculo_medidor === 'horimetro' ? 'Horímetro na chegada (horas) *' : 'Hodômetro na chegada (km) *'
+    (v.veiculo_medidor === 'horimetro' ? 'Horímetro na chegada (horas)' : 'Hodômetro na chegada (km)') +
+    (saida != null ? ` — na saída: ${formatNum(saida, 1)}` : '') + ' *'
   document.getElementById('ci-medida').value = ''
   document.getElementById('ci-obs').value = ''
   document.getElementById('ci-avarias').value = ''
@@ -1489,6 +1609,9 @@ function abrirCheckin(id) {
 async function confirmarCheckin() {
   const medida = parseFloat(document.getElementById('ci-medida').value)
   if (isNaN(medida) || medida < 0) { toast('Informe a leitura do medidor', 'error'); return }
+  const v = _viagens.find(x => x.id === _acaoId)
+  const saida = v?.veiculo_medidor === 'horimetro' ? v?.horas_saida : v?.km_saida
+  if (!fmChecarMedidaMinima(medida, saida, v?.veiculo_medidor)) return
   const btn = document.getElementById('btn-confirmar-checkin')
   btn.disabled = true; btn.textContent = 'Registrando...'
   const gps = await fmObterGpsSeAtivo('captura_viagens')
@@ -1568,7 +1691,7 @@ async function abrirAbastecimento(viagemId) {
     const v = _viagens.find(x => x.id === viagemId)
     document.getElementById('ab-resumo').innerHTML = v ? `<strong>${esc(v.destino)}</strong><br>${esc(v.veiculo_modelo)} (${esc(v.veiculo_placa)})` : ''
     veiculoGrupo.style.display = 'none'
-    _abastVeiculos = v ? [{ id: v.veiculo_id, placa: v.veiculo_placa, modelo: v.veiculo_modelo, medidor: v.veiculo_medidor }] : []
+    _abastVeiculos = v ? [{ id: v.veiculo_id, placa: v.veiculo_placa, modelo: v.veiculo_modelo, medidor: v.veiculo_medidor, hodometro_km: v.veiculo_hodometro_km, horimetro_horas: v.veiculo_horimetro_horas }] : []
     document.getElementById('ab-veiculo').innerHTML = _abastVeiculos.map(x => `<option value="${x.id}" selected>${esc(x.placa)}</option>`).join('')
     ajustarLabelMedidaAB()
   } else {
@@ -1611,7 +1734,19 @@ async function carregarVeiculosAtivosAbastecimento() {
 function ajustarLabelMedidaAB() {
   const v = _abastVeiculos.find(x => x.id === document.getElementById('ab-veiculo')?.value)
   const label = document.getElementById('ab-medida-label')
-  if (label) label.innerHTML = (v?.medidor === 'horimetro' ? 'Horímetro no abastecimento (horas)' : 'Hodômetro no abastecimento (km)') + ' <span class="obrig">*</span>'
+  const ultima = v?.medidor === 'horimetro' ? v?.horimetro_horas : v?.hodometro_km
+  if (label) label.innerHTML = (v?.medidor === 'horimetro' ? 'Horímetro no abastecimento (horas)' : 'Hodômetro no abastecimento (km)') +
+    (ultima != null ? ` — última leitura: ${formatNum(ultima, 1)}` : '') + ' <span class="obrig">*</span>'
+}
+
+// Best-effort: só enxerga os abastecimentos que este motorista já
+// sincronizou (_abastecimentos). A trava real de 120 min, que vale
+// pra frota toda e mesmo offline→sync, é a do servidor (migration 192).
+function fmUltimoAbastecimento(veiculoId) {
+  const doVeiculo = _abastecimentos
+    .filter(a => a.veiculo_id === veiculoId && a.status !== 'rejeitado')
+    .sort((a, b) => new Date(b.data_hora) - new Date(a.data_hora))
+  return doVeiculo[0] || null
 }
 
 function calcularValorAbastecimento() {
@@ -1649,17 +1784,32 @@ async function confirmarAbastecimento() {
   if (isNaN(preco) || preco <= 0) { toast('Informe o preço por litro', 'error'); return }
   if (isNaN(valor) || valor <= 0) { toast('Informe o valor total', 'error'); return }
 
+  const veic = _abastVeiculos.find(x => x.id === veiculo_id)
+  const ultima = veic?.medidor === 'horimetro' ? veic?.horimetro_horas : veic?.hodometro_km
+  if (!fmChecarMedidaMinima(medida, ultima, veic?.medidor)) return
+
+  const ultimoAbast = fmUltimoAbastecimento(veiculo_id)
+  if (ultimoAbast && (Date.now() - new Date(ultimoAbast.data_hora).getTime()) < 120 * 60000) {
+    toast('Já existe um abastecimento registrado para este veículo há menos de 2 horas.', 'error')
+    return
+  }
+
   const btn = document.getElementById('btn-confirmar-abastecimento')
   btn.disabled = true; btn.textContent = 'Registrando...'
   const gps = await fmObterGpsSeAtivo('captura_abastecimento')
 
+  // Hora real do abastecimento (relógio do aparelho, capturada agora —
+  // não a hora em que o servidor recebe, que pode vir horas depois se
+  // o registro for enfileirado offline). Migration 192 usa isto tanto
+  // pra exibir quanto pra travar reenvios com menos de 120 min.
   const payload = {
     p_veiculo_id: veiculo_id, p_medida: medida, p_litros: litros, p_preco_litro: preco,
     p_valor_total: valor, p_tanque_cheio: document.getElementById('ab-tanque-cheio').checked,
     p_viagem_id: _abastViagemId, p_posto_nome: document.getElementById('ab-posto').value.trim() || null,
     p_foto_cupom_url: null, p_foto_hodometro_url: null,
     p_observacoes: document.getElementById('ab-obs').value.trim() || null,
-    p_uuid_cliente: _fUuid(), p_lat: gps?.lat ?? null, p_lng: gps?.lng ?? null
+    p_uuid_cliente: _fUuid(), p_lat: gps?.lat ?? null, p_lng: gps?.lng ?? null,
+    p_data_hora: new Date().toISOString()
   }
   const fotos = { ..._abastFotos }
 
@@ -2865,6 +3015,10 @@ if ('serviceWorker' in navigator && !window.Capacitor) {
 }
 .fm-config-item:last-child { border-bottom: none; }
 .fm-config-item:hover { background: #F9FAFB; }
+.fm-creditos { text-align: center; margin-top: 16px; }
+.fm-creditos p { margin: 2px 0; font-size: .78rem; color: #9CA3AF; }
+.fm-creditos p:first-child { font-size: .8rem; color: #6B7280; }
+.fm-creditos strong { font-weight: 600; color: #6B7280; }
 
 /* ── Gráfico de barras (aba Dados) ──────────────────────────────── */
 .fm-chart { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; padding: 8px 2px 0; }
