@@ -715,7 +715,7 @@ async function carregarLogosFaixaMotorista() {
 // barra de botões), com abas próprias da função de gestão.
 // ═══════════════════════════════════════════════════════════════
 let _fgAba = 'inicio'
-const FG_ORDEM_ABAS = ['inicio', 'pendentes', 'andamento', 'manutencao', 'config']
+const FG_ORDEM_ABAS = ['inicio', 'pendentes', 'andamento', 'manutencao', 'dados', 'config']
 
 function montarShellGestor() {
   document.getElementById('app').innerHTML = `
@@ -734,6 +734,7 @@ function montarShellGestor() {
         <button class="fm-pill-btn fm-primaria" data-tab="andamento" onclick="gestorAba('andamento')">${bico('truck')}<span>Em curso</span></button>
         <button class="fm-pill-btn" data-tab="manutencao" onclick="gestorAba('manutencao')">
           <span class="fm-badge" id="fg-badge-manut" hidden>0</span>${bico('wrench')}<span>Manutenção</span></button>
+        <button class="fm-pill-btn" data-tab="dados" onclick="gestorAba('dados')">${bico('bar-chart')}<span>Dados</span></button>
         <button class="fm-pill-btn" data-tab="config" onclick="gestorAba('config')">${bico('sliders')}<span>Config</span></button>
       </nav>
     </div>`
@@ -748,9 +749,95 @@ function gestorAba(aba) {
   else if (aba === 'pendentes') renderGestorPendentes()
   else if (aba === 'andamento') renderGestorAndamento()
   else if (aba === 'manutencao') renderGestorManutencao()
+  else if (aba === 'dados') renderGestorDados()
   else if (aba === 'config') renderGestorConfig()
   const dir = FG_ORDEM_ABAS.indexOf(aba) >= FG_ORDEM_ABAS.indexOf(anterior) ? 'avancar' : 'voltar'
   fwTransicaoTela('fm-conteudo', dir)
+}
+
+// ── Aba Dados: números da frota (viagens concluídas do período) ────
+let _viagensConcluidasG = [], _dadosGestorCarregado = false
+
+async function carregarDadosGestor() {
+  const { data } = await db.from('vw_frota_viagens_detalhe').select('*')
+    .eq('status', 'concluida')
+    .order('checkin_em', { ascending: false }).limit(500)
+  _viagensConcluidasG = data || []
+  _dadosGestorCarregado = true
+}
+
+async function renderGestorDados() {
+  const corpo = document.getElementById('fm-conteudo')
+  corpo.innerHTML = '<div style="text-align:center;padding:40px;color:#9CA3AF">Carregando...</div>'
+  if (!_dadosGestorCarregado) await carregarDadosGestor()
+  if (_fgAba !== 'dados') return
+  const concluidas = _viagensConcluidasG
+
+  let km = 0, horas = 0
+  concluidas.forEach(v => {
+    if (v.veiculo_medidor === 'horimetro') {
+      if (v.horas_saida != null && v.horas_chegada != null) horas += Math.max(0, v.horas_chegada - v.horas_saida)
+    } else if (v.km_saida != null && v.km_chegada != null) {
+      km += Math.max(0, v.km_chegada - v.km_saida)
+    }
+  })
+  const comAvarias = concluidas.filter(v => v.avarias).length
+
+  const agora = new Date()
+  const chave = d => d.getFullYear() * 12 + d.getMonth()
+  const mesAtual = chave(agora)
+  const dataRef = v => new Date(v.checkin_em || v.data_saida_prevista)
+  const noMes = concluidas.filter(v => chave(dataRef(v)) === mesAtual).length
+
+  const meses = []
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(agora.getFullYear(), agora.getMonth() - i, 1)
+    meses.push({ k: chave(d), label: d.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', ''), n: 0 })
+  }
+  concluidas.forEach(v => { const m = meses.find(x => x.k === chave(dataRef(v))); if (m) m.n++ })
+  const maxN = Math.max(1, ...meses.map(m => m.n))
+
+  const kpi = (label, valor) => `<div class="fw-kpi-card"><div class="fw-kpi-label">${label}</div><div class="fw-kpi-value">${valor}</div></div>`
+
+  // Ranking de veículos mais usados (por nº de viagens concluídas)
+  const porVeiculo = {}
+  concluidas.forEach(v => {
+    if (!v.veiculo_id) return
+    const reg = porVeiculo[v.veiculo_id] || { placa: v.veiculo_placa, modelo: v.veiculo_modelo, n: 0 }
+    reg.n++
+    porVeiculo[v.veiculo_id] = reg
+  })
+  const rankingVeiculos = Object.values(porVeiculo).sort((a, b) => b.n - a.n).slice(0, 5)
+
+  document.getElementById('fm-conteudo').innerHTML = `
+    <div class="kpi-grid" style="margin-bottom:16px">
+      ${kpi('Viagens concluídas', concluidas.length)}
+      ${kpi('Km rodados', formatNum(km, 0))}
+      ${kpi('Este mês', noMes)}
+      ${kpi('Com avaria', comAvarias)}
+    </div>
+    ${horas > 0 ? `<div class="card" style="margin-bottom:16px;padding:12px 16px;font-size:13px;color:#6B7280">Horas de operação (horímetro): <strong style="color:#1F4E2C">${formatNum(horas, 1)} h</strong></div>` : ''}
+    <div class="form-section-label">Viagens concluídas por mês</div>
+    <div class="card" style="margin-bottom:16px">
+      ${concluidas.length ? `
+        <div class="fm-chart">
+          ${meses.map(m => `
+            <div class="fm-chart-col">
+              <div class="fm-chart-num">${m.n || ''}</div>
+              <div class="fm-chart-bar" style="height:${m.n ? 6 + Math.round((m.n / maxN) * 104) : 3}px"></div>
+              <div class="fm-chart-lab">${esc(m.label)}</div>
+            </div>`).join('')}
+        </div>` : `
+        <div style="text-align:center;padding:24px;color:#9CA3AF">Nenhuma viagem concluída ainda.</div>`}
+    </div>
+    <div class="form-section-label">Veículos mais utilizados</div>
+    <div class="card" style="padding:0">
+      ${rankingVeiculos.length ? rankingVeiculos.map(v => `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid #F3F4F6">
+          <div><strong style="font-size:13px">${esc(v.modelo)}</strong><div style="font-size:11px;color:#9CA3AF">${esc(v.placa)}</div></div>
+          <span class="badge badge-verde">${v.n} viagem(ns)</span>
+        </div>`).join('') : '<div style="text-align:center;padding:20px;color:#9CA3AF">Sem dados no período</div>'}
+    </div>`
 }
 
 async function renderGestorConfig() {
