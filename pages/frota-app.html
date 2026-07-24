@@ -434,22 +434,67 @@ function mostrarLoginFrota(erro) {
   }
 }
 
+function fmTempoRestante(ate) {
+  const min = Math.max(0, Math.ceil((new Date(ate) - Date.now()) / 60000))
+  return min <= 1 ? '1 minuto' : `${min} minutos`
+}
+
+// Login com a MESMA auditoria e bloqueio do login da plataforma
+// (index.html + migration 002): verificar_bloqueio antes,
+// registrar_tentativa_acesso depois, com bloqueio de 30 min após 5
+// falhas. Sem isto, o acesso por CPF do motorista era o caminho com
+// menos proteção e sem nenhum rastro em auditoria_acessos — logo o
+// perfil que opera patrimônio público em campo.
+//
+// O IP não é enviado de propósito: o login da plataforma tenta buscá-lo
+// em api.ipify.org, mas esse domínio não está no connect-src do CSP
+// (vercel.json), então a chamada é bloqueada e o valor chega nulo de
+// qualquer jeito. Aqui é nulo sem o custo da requisição.
 async function loginFrota() {
   const usuario = document.getElementById('lf-usuario').value.trim()
   const senha = document.getElementById('lf-senha').value
   const erroEl = document.getElementById('lf-erro')
+  const mostrarErro = txt => { erroEl.textContent = txt; erroEl.style.display = '' }
   erroEl.style.display = 'none'
-  if (!usuario || !senha) { erroEl.textContent = 'Informe usuário e senha'; erroEl.style.display = ''; return }
+  if (!usuario || !senha) { mostrarErro('Informe usuário e senha'); return }
   const btn = document.getElementById('btn-login-frota')
   btn.disabled = true; btn.textContent = 'Entrando...'
+
+  const email = usuario.includes('@') ? usuario : `${usuario.replace(/\D/g,'')}@motoristas.siguc.local`
+  const ua = navigator.userAgent.substring(0, 250)
+
   try {
-    const email = usuario.includes('@') ? usuario : `${usuario.replace(/\D/g,'')}@motoristas.siguc.local`
+    const { data: bloqueio } = await db.rpc('verificar_bloqueio', { p_email: email })
+    if (bloqueio?.bloqueado) {
+      mostrarErro(`Acesso bloqueado por excesso de tentativas. Tente de novo em ${fmTempoRestante(bloqueio.ate)}.`)
+      return
+    }
+
     const { data, error } = await db.auth.signInWithPassword({ email, password: senha })
-    if (error) throw error
+    if (error) {
+      const msg = error.message || ''
+      let texto = 'E-mail/CPF ou senha inválidos'
+      let motivo = 'credenciais_invalidas'
+      if (msg.includes('Email not confirmed')) { texto = 'E-mail não confirmado. Procure o setor de transporte.'; motivo = 'email_nao_confirmado' }
+      else if (msg.includes('Too many requests')) { texto = 'Muitas tentativas. Aguarde alguns minutos.'; motivo = 'rate_limit' }
+
+      const { data: reg } = await db.rpc('registrar_tentativa_acesso', {
+        p_email: email, p_sucesso: false, p_ip: null, p_user_agent: ua, p_motivo_falha: motivo
+      })
+      const restantes = 5 - (reg?.tentativas ?? 0)
+      if (reg?.tentativas >= 5) texto = 'Acesso bloqueado por 30 minutos após 5 tentativas. Procure o setor de transporte se precisar.'
+      else if (reg?.tentativas >= 3) texto += ` (${restantes} tentativa${restantes > 1 ? 's' : ''} restante${restantes > 1 ? 's' : ''})`
+      mostrarErro(texto)
+      return
+    }
+
+    // Aguarda o registro antes de seguir, senão a troca de tela cancela
+    // a requisição e o acesso não fica auditado (mesmo cuidado do
+    // index.html).
+    await db.rpc('registrar_tentativa_acesso', { p_email: email, p_sucesso: true, p_ip: null, p_user_agent: ua })
     await entrarComSessao(data.session, true)
   } catch (e) {
-    erroEl.textContent = 'E-mail/CPF ou senha inválidos'
-    erroEl.style.display = ''
+    mostrarErro('Erro ao conectar. Verifique a conexão e tente de novo.')
   } finally {
     btn.disabled = false; btn.textContent = 'Entrar'
   }
@@ -459,6 +504,13 @@ async function loginFrota() {
 // isolada (client próprio em localStorage) e não deve redirecionar
 // para o login da plataforma principal.
 async function fazerLogout() {
+  // Fecha o rastro da sessão em auditoria_acessos, como layout.js já faz
+  // na plataforma. Best-effort: nunca pode impedir a saída.
+  try {
+    if (_usuario?.id) {
+      await db.rpc('registrar_saida_acesso', { p_usuario_id: _usuario.id, p_email: _usuario.email, p_tipo: 'logout' })
+    }
+  } catch (e) {}
   try { await db.auth.signOut() } catch (e) {}
   sessionStorage.removeItem('frotaModoAtivo')
   window.location.reload()
@@ -2601,19 +2653,37 @@ function renderListaPendentesGestor() {
     </div>`).join('')
 }
 
+// Atraso = passou o retorno previsto e não houve check-in. Mesma regra
+// da vw_frota_viagens_vencidas (migration 201) e da trava de escala:
+// enquanto estiver assim, o motorista não pode ser escalado de novo.
+// Marcado aqui também para o gestor que trabalha pelo app ver o mesmo
+// que a mesa mostra (regra de duplicação do CLAUDE.md).
+function fmAtrasoViagem(v) {
+  if (v.status !== 'em_andamento' || !v.data_retorno_prevista) return null
+  const h = (Date.now() - new Date(v.data_retorno_prevista).getTime()) / 3600000
+  if (h <= 0) return null
+  return h >= 48 ? `${Math.floor(h / 24)} dias de atraso` : `${Math.max(1, Math.round(h))} h de atraso`
+}
+
 function renderListaAndamentoGestor() {
   const el = document.getElementById('g-lista-andamento')
   if (!el) return
   const lista = _viagensPendentes.filter(v => v.status === 'em_andamento')
   if (!lista.length) { el.innerHTML = '<div class="card" style="text-align:center;padding:20px;color:#9CA3AF">Nenhuma viagem em andamento</div>'; return }
-  el.innerHTML = lista.map(v => `
-    <div class="card" style="margin-bottom:8px;padding:12px 14px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+  // Atrasadas primeiro: são as que exigem ação.
+  const ordenada = [...lista].sort((a, b) => (fmAtrasoViagem(b) ? 1 : 0) - (fmAtrasoViagem(a) ? 1 : 0))
+  el.innerHTML = ordenada.map(v => {
+    const atraso = fmAtrasoViagem(v)
+    return `
+    <div class="card" style="margin-bottom:8px;padding:12px 14px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap${atraso ? ';border-left:3px solid #DC2626' : ''}">
       <div>
         <div style="font-weight:600;font-size:13px">${esc(v.destino)}</div>
         <div style="font-size:11px;color:#9CA3AF">${esc(v.veiculo_modelo)} (${esc(v.veiculo_placa)}) · ${esc(v.motorista_nome||'—')}</div>
+        ${atraso ? `<div style="font-size:11px;color:#DC2626;font-weight:600;margin-top:2px">${atraso} — sem check-in. O motorista não pode ser escalado até concluir.</div>` : ''}
       </div>
       <button class="btn btn-xs btn-ghost" onclick="abrirDetalhe('${v.id}')">Ver</button>
-    </div>`).join('')
+    </div>`
+  }).join('')
 }
 
 function abrirDetalhe(id) {
@@ -3143,7 +3213,10 @@ function portaoPin(jaAutenticouSenha) {
       console.warn('[frota-app] PIN indisponível:', e); resolve(true); return
     }
     if (hash && dono !== _usuario.id) {
-      try { await fOfflineSetConfig('pin_hash', null); await fOfflineSetConfig('pin_dono', null) } catch (e) {}
+      try {
+        await fOfflineSetConfig('pin_hash', null); await fOfflineSetConfig('pin_dono', null)
+        await fOfflineSetConfig('pin_falhas', 0); await fOfflineSetConfig('pin_bloqueado_ate', null)
+      } catch (e) {}
       hash = null
     }
     _fPinResolve = resolve
@@ -3153,16 +3226,77 @@ function portaoPin(jaAutenticouSenha) {
   })
 }
 
+// ── Limitador de tentativas do PIN ─────────────────────────────
+// O PIN tem 4 dígitos e o hash fica no aparelho: são 10.000
+// possibilidades. Sem limitador, quem pega o telefone destravado tenta
+// à vontade na própria tela. O contador é persistido (não vive só em
+// memória, senão fechar e reabrir o app zeraria), com espera
+// progressiva a partir da 3ª falha e derrubada da sessão na 10ª — aí o
+// PIN sozinho não basta mais, tem que entrar com senha de novo.
+const FPIN_MAX_TENTATIVAS = 10
+const FPIN_ESPERA_MS = [0, 0, 5e3, 15e3, 30e3, 60e3, 120e3, 300e3, 600e3]
+
+async function fPinFalhasAtuais() {
+  return (await fOfflineGetConfig('pin_falhas')) || 0
+}
+
+function fPinEsperaMs(falhas) {
+  return FPIN_ESPERA_MS[Math.min(falhas, FPIN_ESPERA_MS.length - 1)]
+}
+
+// Se ainda estiver de castigo, devolve os segundos restantes.
+async function fPinBloqueadoPor() {
+  const ate = await fOfflineGetConfig('pin_bloqueado_ate')
+  if (!ate) return 0
+  return Math.max(0, Math.ceil((new Date(ate).getTime() - Date.now()) / 1000))
+}
+
+async function fPinRegistrarFalha() {
+  const falhas = (await fPinFalhasAtuais()) + 1
+  await fOfflineSetConfig('pin_falhas', falhas)
+  const espera = fPinEsperaMs(falhas)
+  if (espera > 0) {
+    await fOfflineSetConfig('pin_bloqueado_ate', new Date(Date.now() + espera).toISOString())
+  }
+  return falhas
+}
+
+async function fPinZerarFalhas() {
+  await fOfflineSetConfig('pin_falhas', 0)
+  await fOfflineSetConfig('pin_bloqueado_ate', null)
+}
+
 async function fPinProcessar() {
   const erro = document.getElementById('fm-pin-erro')
   try {
     if (_fPinModo === 'unlock') {
+      const espera = await fPinBloqueadoPor()
+      if (espera > 0) {
+        erro.hidden = false
+        erro.textContent = `Muitas tentativas. Aguarde ${espera > 60 ? Math.ceil(espera / 60) + ' min' : espera + 's'} antes de tentar de novo.`
+        fPinReset()
+        return
+      }
       const h = await fPinHash(_fPinBuf)
       if (h === await fOfflineGetConfig('pin_hash')) {
+        await fPinZerarFalhas()
         fPinFechar()
         if (_fPinResolve) { const r = _fPinResolve; _fPinResolve = null; r(true) }
       } else {
-        erro.hidden = false; erro.textContent = 'PIN incorreto. Tente novamente.'; fPinReset()
+        const falhas = await fPinRegistrarFalha()
+        if (falhas >= FPIN_MAX_TENTATIVAS) {
+          // Derruba a sessão: daqui pra frente só com senha.
+          erro.hidden = false; erro.textContent = 'Muitas tentativas. Entre de novo com sua senha.'
+          fPinReset()
+          setTimeout(() => pinEsqueci(), 1200)
+          return
+        }
+        const proxima = fPinEsperaMs(falhas)
+        erro.hidden = false
+        erro.textContent = proxima > 0
+          ? `PIN incorreto. Aguarde ${proxima >= 60e3 ? Math.round(proxima / 60e3) + ' min' : Math.round(proxima / 1000) + 's'} (${FPIN_MAX_TENTATIVAS - falhas} tentativa(s) antes de precisar da senha).`
+          : 'PIN incorreto. Tente novamente.'
+        fPinReset()
       }
       return
     }
@@ -3181,6 +3315,7 @@ async function fPinProcessar() {
     const h = await fPinHash(_fPinBuf)
     await fOfflineSetConfig('pin_hash', h)
     await fOfflineSetConfig('pin_dono', _usuario.id)
+    await fPinZerarFalhas()
     fPinFechar()
     if (_fPinResolve) { const r = _fPinResolve; _fPinResolve = null; r(true) }
   } catch (e) {
@@ -3207,6 +3342,10 @@ async function pinEsqueci() {
   // reload e a volta para a tela de login.
   try { await fComPrazo(fOfflineSetConfig('pin_hash', null), 2000) } catch (e) {}
   try { await fComPrazo(fOfflineSetConfig('pin_dono', null), 2000) } catch (e) {}
+  // Zera o castigo junto: senão o próximo login por senha já nasceria
+  // bloqueado pelas falhas do dono anterior do aparelho.
+  try { await fComPrazo(fOfflineSetConfig('pin_falhas', 0), 2000) } catch (e) {}
+  try { await fComPrazo(fOfflineSetConfig('pin_bloqueado_ate', null), 2000) } catch (e) {}
   try { await fComPrazo(db.auth.signOut(), 2000) } catch (e) {}
   // Garante que a sessão persistida some mesmo se o signOut falhar,
   // senão o reload cairia de novo no portão de PIN.

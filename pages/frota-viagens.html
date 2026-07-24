@@ -234,6 +234,13 @@ const STATUS_VEIC_LABEL = { disponivel:'Disponível', em_viagem:'Em viagem', em_
         <div class="fw-kpi-card"><div class="fw-kpi-label">Em andamento</div><div class="fw-kpi-value" id="k-andamento">0</div></div>
         <div class="fw-kpi-card"><div class="fw-kpi-label">Com avarias reportadas</div><div class="fw-kpi-value" id="k-avarias">0</div></div>
       </div>
+      <div class="card" id="card-vencidas" style="margin-bottom:16px;padding:14px 18px;display:none;border-left:3px solid #DC2626">
+        <div style="font-weight:600;font-size:13px;color:#991B1B">Viagens vencidas sem check-in</div>
+        <div style="font-size:12px;color:#6B7280;margin-bottom:8px">
+          Passou o retorno previsto e o motorista não concluiu no app. Enquanto estiver assim, ele não pode ser escalado para outra viagem.
+        </div>
+        <div id="lista-vencidas"></div>
+      </div>
       <div class="card" style="margin-bottom:16px;padding:14px 18px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
         <div>
           <div style="font-weight:600;font-size:13px">Captura de localização (GPS) nas viagens</div>
@@ -335,7 +342,43 @@ async function carregarMotoristas() {
 async function carregarViagens() {
   const { data } = await db.from('vw_frota_viagens_detalhe').select('*').order('data_saida_prevista', { ascending: false }).limit(200)
   _viagens = data || []
-  renderKpis(); renderViagens()
+  renderKpis(); renderViagens(); carregarVencidas()
+}
+
+// Viagens que passaram do retorno previsto e seguem sem check-in
+// (migration 201). Além de sinalizar, é o lugar onde o gestor resolve:
+// o motorista fica travado para novas escalas até isso ser concluído ou
+// cancelado, então precisa ter para onde ir.
+let _vencidas = []
+async function carregarVencidas() {
+  const { data } = await db.from('vw_frota_viagens_vencidas').select('*').order('data_retorno_prevista')
+  _vencidas = data || []
+  renderVencidas()
+}
+
+function renderVencidas() {
+  const card = document.getElementById('card-vencidas')
+  const el = document.getElementById('lista-vencidas')
+  if (!card || !el) return
+  if (!_vencidas.length) { card.style.display = 'none'; return }
+  card.style.display = ''
+  el.innerHTML = _vencidas.map(v => {
+    const atraso = v.horas_atraso >= 48
+      ? `${Math.floor(v.horas_atraso / 24)} dias`
+      : `${Math.max(1, Math.round(v.horas_atraso))} h`
+    return `<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;border-top:1px solid #F3F4F6;padding:8px 0">
+      <div style="font-size:13px">
+        <strong>${esc(v.destino)}</strong>
+        <span style="color:#DC2626;font-weight:600"> · ${atraso} de atraso</span><br>
+        <span style="font-size:12px;color:#6B7280">
+          ${esc(v.motorista_nome || 'sem motorista')}${v.motorista_telefone ? ' · ' + esc(v.motorista_telefone) : ''}
+          ${v.veiculo_placa ? ' · <span class="mono">' + esc(v.veiculo_placa) + '</span>' : ''}
+          · retorno previsto ${formatDataHora(v.data_retorno_prevista)}
+        </span>
+      </div>
+      <button class="btn btn-xs btn-ghost" onclick="abrirDetalhe('${v.id}')">Ver viagem</button>
+    </div>`
+  }).join('')
 }
 
 function renderKpis() {
