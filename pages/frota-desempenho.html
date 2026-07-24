@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>SIGUC-AC · Frota — Desempenho</title>
+<link rel="stylesheet" href="../css/global.css">
+<link rel="stylesheet" href="../css/frota-wise-theme.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../js/observability.js"></script>
+<script src="../js/queryLogger.js"></script>
+<script src="../js/config.js"></script>
+<script src="../js/layout.js"></script>
+<script src="../js/frota-wise.js"></script>
+</head>
+<body>
+<div id="app"></div>
+
+<style>
+.fd-badge { display:inline-block; padding:2px 9px; border-radius:20px; font-size:11px; font-weight:600 }
+.fd-badge-ok { background:#ECFDF5; color:#047857 }
+.fd-badge-atraso { background:#FEF2F2; color:#B91C1C }
+.fd-badge-pendente { background:#FFFBEB; color:#92400E }
+.fd-tipo-viagem { background:#EFF6FF; color:#1D4ED8 }
+.fd-tipo-abastecimento { background:#F5F3FF; color:#6D28D9 }
+.fd-tipo-comunicado { background:#FFF7ED; color:#C2410C }
+.fd-tipo { display:inline-block; padding:2px 9px; border-radius:20px; font-size:11px; font-weight:600 }
+</style>
+
+<script>
+let _slaPendencias = []
+let _periodoDias = 30
+
+;(async function () {
+  const usuario = await carregarUsuario()
+  if (!usuario) { window.location.href = '../index.html'; return }
+
+  document.getElementById('app').innerHTML =
+    gerarLayout('Frota — Desempenho', 'frota-desempenho') +
+    `<div class="fade-in fw-theme">
+      <div class="kpi-grid">
+        <div class="fw-kpi-card"><div class="fw-kpi-label">Pendentes agora</div><div class="fw-kpi-value" id="k-pendentes">0</div></div>
+        <div class="fw-kpi-card"><div class="fw-kpi-label">Atrasados (fora do prazo)</div><div class="fw-kpi-value" id="k-atrasados" style="color:#B91C1C">0</div></div>
+        <div class="fw-kpi-card"><div class="fw-kpi-label">Tempo médio de decisão</div><div class="fw-kpi-value" id="k-tempo-medio" style="font-size:1.4rem">—</div></div>
+        <div class="fw-kpi-card"><div class="fw-kpi-label">% decidido dentro do prazo (${_periodoDias}d)</div><div class="fw-kpi-value" id="k-pct-prazo" style="font-size:1.4rem">—</div></div>
+      </div>
+
+      <div class="card" style="margin-bottom:16px">
+        <div class="form-section-label" style="padding:0 0 10px">Pendências em aberto agora, ordenadas por tempo de espera</div>
+        <div class="table-wrap"><div class="table-scroll">
+          <table>
+            <thead><tr><th>Tipo</th><th>Descrição</th><th>Veículo</th><th>Solicitante/Motorista</th><th>Aberto há</th><th>Prazo</th><th>Situação</th></tr></thead>
+            <tbody id="tbody-pendentes"><tr><td colspan="7" style="text-align:center;padding:32px;color:#9CA3AF">Carregando...</td></tr></tbody>
+          </table>
+        </div></div>
+      </div>
+
+      <div class="card" style="margin-bottom:16px">
+        <div class="form-section-label" style="padding:0 0 10px">Viagens em andamento sem check-in no prazo</div>
+        <div id="lista-viagens-vencidas"></div>
+      </div>
+
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;padding:0 0 10px">
+          <div class="form-section-label" style="padding:0">Histórico de decisões — últimos ${_periodoDias} dias</div>
+          <select class="form-control" id="fil-periodo" style="width:160px" onchange="fdMudarPeriodo()">
+            <option value="30">Últimos 30 dias</option>
+            <option value="60">Últimos 60 dias</option>
+            <option value="90">Últimos 90 dias</option>
+          </select>
+        </div>
+        <div class="table-wrap"><div class="table-scroll">
+          <table>
+            <thead><tr><th>Tipo</th><th>Descrição</th><th>Veículo</th><th>Solicitante/Motorista</th><th>Aberto em</th><th>Decidido em</th><th>Tempo até decisão</th><th>Dentro do prazo?</th></tr></thead>
+            <tbody id="tbody-historico"><tr><td colspan="8" style="text-align:center;padding:32px;color:#9CA3AF">Carregando...</td></tr></tbody>
+          </table>
+        </div></div>
+      </div>
+    </div>`
+
+  carregarLogosSidebar()
+  bIconsAplicar()
+  await carregarSla()
+  await carregarViagensVencidas()
+})()
+
+const TIPO_LABEL = { viagem: 'Viagem', abastecimento: 'Abastecimento', comunicado: 'Comunicado de defeito' }
+const TIPO_CLASSE = { viagem: 'fd-tipo-viagem', abastecimento: 'fd-tipo-abastecimento', comunicado: 'fd-tipo-comunicado' }
+
+function fdMudarPeriodo() {
+  _periodoDias = Number(document.getElementById('fil-periodo').value)
+  renderHistorico()
+}
+
+function fdFormatHoras(h) {
+  if (h == null) return '—'
+  if (h < 1) return Math.round(h * 60) + ' min'
+  if (h < 48) return Math.round(h) + 'h'
+  return (h / 24).toFixed(1) + ' dias'
+}
+
+async function carregarSla() {
+  try {
+    const { data, error } = await db.from('vw_frota_sla_pendencias').select('*')
+    if (error) throw error
+    _slaPendencias = data || []
+  } catch (e) {
+    console.error('[frota] carregarSla', e)
+    toast('Erro ao carregar dados de desempenho: ' + (e.message || e), 'error')
+    _slaPendencias = []
+  }
+  renderKpis()
+  renderPendentes()
+  renderHistorico()
+}
+
+function renderKpis() {
+  const pendentes = _slaPendencias.filter(p => !p.resolvido)
+  const atrasados = pendentes.filter(p => p.horas_decisao > p.prazo_horas)
+  const set = (id, v) => { const el = document.getElementById(id); if (el) fwAnimateNumber ? fwAnimateNumber(el, v) : el.textContent = v }
+  set('k-pendentes', pendentes.length)
+  set('k-atrasados', atrasados.length)
+
+  const desde = new Date(); desde.setDate(desde.getDate() - _periodoDias)
+  const decididos = _slaPendencias.filter(p => p.resolvido && p.decidido_em && new Date(p.decidido_em) >= desde)
+  if (decididos.length) {
+    const media = decididos.reduce((acc, p) => acc + Number(p.horas_decisao), 0) / decididos.length
+    document.getElementById('k-tempo-medio').textContent = fdFormatHoras(media)
+    const dentroPrazo = decididos.filter(p => p.horas_decisao <= p.prazo_horas).length
+    document.getElementById('k-pct-prazo').textContent = Math.round(dentroPrazo / decididos.length * 100) + '%'
+  } else {
+    document.getElementById('k-tempo-medio').textContent = '—'
+    document.getElementById('k-pct-prazo').textContent = '—'
+  }
+}
+
+function renderPendentes() {
+  const tbody = document.getElementById('tbody-pendentes')
+  const pendentes = _slaPendencias.filter(p => !p.resolvido).sort((a, b) => b.horas_decisao - a.horas_decisao)
+  if (!pendentes.length) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:24px;color:#9CA3AF">Nenhuma pendência em aberto.</td></tr>'
+    return
+  }
+  tbody.innerHTML = pendentes.map(p => {
+    const atrasado = p.horas_decisao > p.prazo_horas
+    return `<tr>
+      <td><span class="fd-tipo ${TIPO_CLASSE[p.origem]}">${TIPO_LABEL[p.origem]}</span></td>
+      <td>${esc(p.descricao || '—')}</td>
+      <td>${esc(p.veiculo_placa || '—')}</td>
+      <td>${esc(p.solicitante_nome || p.motorista_nome || '—')}</td>
+      <td>${fdFormatHoras(p.horas_decisao)}</td>
+      <td>${p.prazo_horas}h</td>
+      <td><span class="fd-badge ${atrasado ? 'fd-badge-atraso' : 'fd-badge-pendente'}">${atrasado ? 'Atrasado' : 'No prazo'}</span></td>
+    </tr>`
+  }).join('')
+}
+
+function renderHistorico() {
+  const tbody = document.getElementById('tbody-historico')
+  const desde = new Date(); desde.setDate(desde.getDate() - _periodoDias)
+  const decididos = _slaPendencias
+    .filter(p => p.resolvido && p.decidido_em && new Date(p.decidido_em) >= desde)
+    .sort((a, b) => new Date(b.decidido_em) - new Date(a.decidido_em))
+  if (!decididos.length) {
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:24px;color:#9CA3AF">Nenhuma decisão registrada no período.</td></tr>'
+    return
+  }
+  tbody.innerHTML = decididos.map(p => {
+    const dentroPrazo = p.horas_decisao <= p.prazo_horas
+    return `<tr>
+      <td><span class="fd-tipo ${TIPO_CLASSE[p.origem]}">${TIPO_LABEL[p.origem]}</span></td>
+      <td>${esc(p.descricao || '—')}</td>
+      <td>${esc(p.veiculo_placa || '—')}</td>
+      <td>${esc(p.solicitante_nome || p.motorista_nome || '—')}</td>
+      <td>${formatData(p.criado_em)}</td>
+      <td>${formatData(p.decidido_em)}</td>
+      <td>${fdFormatHoras(p.horas_decisao)}</td>
+      <td><span class="fd-badge ${dentroPrazo ? 'fd-badge-ok' : 'fd-badge-atraso'}">${dentroPrazo ? 'Sim' : 'Não'}</span></td>
+    </tr>`
+  }).join('')
+}
+
+// Reaproveita a view da migration 201 — viagem em_andamento sem check-in
+// dentro do prazo previsto de retorno. Não é uma "aprovação pendente"
+// (a viagem já foi decidida), mas é a outra ponta do "dar prosseguimento"
+// que o gestor precisa cobrar: motorista/veículo que não voltou.
+async function carregarViagensVencidas() {
+  const el = document.getElementById('lista-viagens-vencidas')
+  try {
+    const { data, error } = await db.from('vw_frota_viagens_vencidas').select('*').order('horas_atraso', { ascending: false })
+    if (error) throw error
+    if (!data || !data.length) {
+      el.innerHTML = '<div style="font-size:12px;color:#9CA3AF">Nenhuma viagem em atraso.</div>'
+      return
+    }
+    el.innerHTML = data.map(v => `
+      <div class="card" style="margin-bottom:8px;padding:12px 14px;border:1px solid #F3F4F6;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px">
+        <div>
+          <div style="font-weight:600;font-size:13px">${esc(v.veiculo_placa || v.placa || '—')} · ${esc(v.destino || '')}</div>
+          <div style="font-size:11px;color:#9CA3AF">${esc(v.motorista_nome || '')}</div>
+        </div>
+        <span class="fd-badge fd-badge-atraso">${Math.round(v.horas_atraso)}h de atraso</span>
+      </div>`).join('')
+  } catch (e) {
+    console.error('[frota] carregarViagensVencidas', e)
+    el.innerHTML = `<div style="font-size:12px;color:#B91C1C;background:#FEF2F2;border-radius:8px;padding:10px 12px">Não foi possível carregar. ${esc(e.message || String(e))}</div>`
+  }
+}
+</script>
+</body>
+</html>
