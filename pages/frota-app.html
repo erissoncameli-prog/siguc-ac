@@ -47,6 +47,7 @@ const _frotaReady = _dbReady.then(function () {
 <script src="../js/frota-sync.js"></script>
 <script src="../js/layout.js"></script>
 <script src="../js/frota-wise.js"></script>
+<script src="../js/frota-fotos.js"></script>
 </head>
 <body>
 <div id="app"></div>
@@ -672,9 +673,14 @@ function abrirMenuFotoMotorista() {
   if (!_motorista?.foto_url) { trocarFotoMotorista(); return }
   document.getElementById('modal-foto-mot-menu').classList.add('aberto')
 }
-function verFotoMotorista() {
+async function verFotoMotorista() {
   if (!_motorista?.foto_url) return
-  document.getElementById('foto-mot-viewer-img').src = _motorista.foto_url
+  // Bucket privado (migration 200): a URL guardada não serve o arquivo
+  // sozinha, precisa ser assinada. Sem rede não dá — avisa em vez de
+  // abrir um visualizador vazio.
+  const url = await frotaFotoUrlAssinada(_motorista.foto_url)
+  if (!url) { toast('Não foi possível abrir a foto agora. Verifique a conexão.', 'warning'); return }
+  document.getElementById('foto-mot-viewer-img').src = url
   document.getElementById('modal-foto-mot-viewer').classList.add('aberto')
 }
 function trocarFotoMotorista() {
@@ -1155,8 +1161,8 @@ function renderFmInicio() {
   document.getElementById('fm-conteudo').innerHTML = `
     <div class="card" style="margin-bottom:16px;display:flex;align-items:center;gap:14px">
       <button type="button" onclick="abrirMenuFotoMotorista()" style="border:none;padding:0;background:none;cursor:pointer;border-radius:50%" aria-label="Foto de perfil">
-        ${_motorista.foto_url
-          ? `<img src="${esc(_motorista.foto_url)}" alt="" style="width:48px;height:48px;border-radius:50%;object-fit:cover;display:block">`
+        ${frotaFotoAttr(_motorista.foto_url, iniciais(_motorista.nome))
+          ? `<img ${frotaFotoAttr(_motorista.foto_url, iniciais(_motorista.nome))} alt="" style="width:48px;height:48px;border-radius:50%;object-fit:cover;display:block;font-size:16px">`
           : `<div class="sidebar-avatar" style="width:48px;height:48px;font-size:16px">${iniciais(_motorista.nome)}</div>`}
       </button>
       <div>
@@ -1174,6 +1180,10 @@ function renderFmInicio() {
         Nenhuma viagem pendente no momento.<br>
         <button class="btn btn-secondary btn-sm" style="margin-top:12px" onclick="motoristaAba('nova')">Abrir uma viagem</button>
       </div>`}`
+  // Bucket privado (migration 200): o avatar sai marcado e é assinado
+  // aqui. Sem rede a assinatura falha e vira iniciais — o mesmo que já
+  // aparece quando o motorista não tem foto.
+  frotaAssinarFotos(document.getElementById('fm-conteudo'))
 }
 
 // ── Aba Solicitações (viagens atribuídas a mim aguardando ação) ──
@@ -2335,6 +2345,8 @@ async function atualizarPreviewEscala() {
   box.innerHTML =
     `<div>Motorista${multi ? 's' : ''} da vez (sugestão — a confirmar pela gestão de frota):</div><div style="margin-top:6px;display:flex;flex-wrap:wrap;align-items:center">${lista}</div>` +
     (multi ? `<div style="margin-top:4px">Esta viagem deve precisar de ${sugeridos.length} veículos; a gestão confirma a escala final.</div>` : '')
+  // Bucket privado (migration 200) — assina as fotos da sugestão.
+  frotaAssinarFotos(box)
 }
 
 async function checarDisponibilidade() {
@@ -2552,9 +2564,11 @@ function renderListaComunicadosGestor() {
       </div>
       <div style="font-size:13px;color:#374151;margin-top:8px">${esc(c.descricao)}</div>
       ${c.fotos_urls?.length ? `<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px">
-        ${c.fotos_urls.map(url => `<a href="${esc(url)}" target="_blank" rel="noopener"><img src="${esc(url)}" style="width:56px;height:56px;object-fit:cover;border-radius:8px;display:block"></a>`).join('')}
+        ${c.fotos_urls.map(url => `<a ${frotaFotoAttr(url)} target="_blank" rel="noopener"><img ${frotaFotoAttr(url)} style="width:56px;height:56px;object-fit:cover;border-radius:8px;display:block"></a>`).join('')}
       </div>` : ''}
     </div>`).join('')
+  // Bucket privado (migration 200) — assina depois de montar a lista.
+  frotaAssinarFotos(el)
 }
 
 async function descartarComunicado(id) {
@@ -2770,6 +2784,8 @@ function renderEscalaBox() {
        <div style="margin-top:2px">${nunca ? 'Ainda não fez viagem intermunicipal.' : 'É quem está há mais tempo sem viagem intermunicipal.'} Sugestão — você pode trocar.</div></div></div>
      <button type="button" class="btn btn-xs btn-ghost" style="margin-top:4px;color:#065F46" onclick="toggleFilaEscala()">Ver fila</button>
      <div id="ap-escala-fila" style="display:none;margin-top:6px"></div>`
+  // Bucket privado (migration 200) — assina a foto do motorista da vez.
+  frotaAssinarFotos(box)
 }
 
 function toggleFilaEscala() {
@@ -2781,6 +2797,8 @@ function toggleFilaEscala() {
       return `<div style="display:flex;align-items:center;gap:8px;padding:4px 0;${x.motorista_id === _escalaSugeridoId ? 'font-weight:700' : ''}">${i + 1}. ${_avatarEsc(x.foto_url, x.nome, 44)} <span>${esc(x.nome)} — última: ${quando} · ${x.total_viagens} no total</span></div>`
     }).join('')
     el.style.display = ''
+    // Bucket privado (migration 200) — assina os avatares da fila.
+    frotaAssinarFotos(el)
   } else el.style.display = 'none'
 }
 

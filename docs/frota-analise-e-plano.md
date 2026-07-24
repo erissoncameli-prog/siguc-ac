@@ -322,15 +322,49 @@ overload duplicado e as permissões preservadas após o `DROP`.
 
 *Versionamento:* `pwa/sw.js` — frota v45 → v46.
 
-### Fase 3 — Privacidade das fotos
+### Fase 3 — Privacidade das fotos — ⚠️ CÓDIGO PRONTO, FALTA APLICAR A 200
 
-8. Tornar privados os buckets `frota-abastecimentos`, `frota-manutencao`,
-   `frota-motoristas`, `frota-veiculos`; trocar `getPublicUrl` por `createSignedUrl` nos
-   pontos de leitura (mesa e app).
+8. ✅ `js/frota-fotos.js` (novo): assina URLs de bucket privado. O render segue
+   síncrono e só marca o elemento com `data-frota-foto`; depois do HTML na tela,
+   `frotaAssinarFotos(container)` resolve tudo agrupando por bucket — uma chamada de
+   rede por bucket, não por imagem. Mesmo padrão do `bIconsAplicar`.
+9. ✅ 13 pontos de exibição convertidos, nas duas superfícies: detalhe do abastecimento
+   e comunicados na mesa, comunicados no modo gestor do app, avatar do motorista na
+   tela inicial, visualizador de foto em tela cheia, prévia da escala (app **e**
+   `frota-solicitar.html`), fila da escala, listas de veículos e motoristas, e os dois
+   previews de edição de `frota-veiculos.html`.
+10. ✅ `199_frota_motoristas_fotos_escrita.sql` **aplicada**: as políticas de
+    INSERT/UPDATE/DELETE do bucket `frota-motoristas` eram `auth.uid() IS NOT NULL` —
+    qualquer usuário autenticado da plataforma podia sobrescrever ou apagar a foto de
+    qualquer motorista. Agora exigem gestão do módulo ou a própria pasta.
+11. ⏳ `200_frota_buckets_privados.sql` **criada mas NÃO aplicada** — ver abaixo.
 
-*Risco:* médio — quebra qualquer URL pública já salva. Mapear os pontos de leitura antes.
-*Nota:* vale avaliar o mesmo para `brigadistas`, `registros-campo` e `biomonitor-fotos`,
-que têm o aviso idêntico — mas em entrega separada, fora do escopo do Frota.
+**Por que a 200 não foi aplicada junto.** É a única migration do módulo incompatível
+com o cliente anterior: ela derruba a URL pública, e quem exibe foto passa a precisar
+do `frota-fotos.js`. Como este trabalho está numa branch, a produção ainda serve o
+cliente antigo — aplicar agora deixaria **toda foto do módulo quebrada** até o merge.
+A ordem correta é: merge + deploy do Vercel → só então aplicar a 200. Nessa ordem não
+há janela de quebra, porque o cliente novo funciona nos dois mundos (`createSignedUrl`
+vale igual em bucket público e privado, e há fallback para a URL crua).
+
+Isso abre uma exceção consciente à regra "toda migration criada é aplicada na mesma
+entrega" do `CLAUDE.md`. O motivo está no cabeçalho da própria 200, para quem for
+aplicar não precisar reconstruir o raciocínio.
+
+*Verificação executada:* o extrator de caminho foi testado contra **as 11 URLs reais
+gravadas hoje no banco** (não só casos sintéticos), cobrindo o sufixo `?t=` do
+cache-busting da foto do motorista e caminhos com escape de URL, e ignorando
+corretamente `blob:` e `data:` (previews locais, que não devem ser assinados). As
+políticas da 199 foram testadas com 5 asserções, incluindo uma **pré-condição
+explícita** de que o sujeito do teste realmente não edita Frota — a primeira rodada
+tinha passado por engano num usuário que já tinha a permissão, e 14 dos 67 usuários
+ativos têm.
+
+*Versionamento:* `pwa/sw.js` — frota v46 → v47, e `/js/frota-fotos.js` somado ao
+`SHELLS.frota`.
+
+*Nota:* `brigadistas`, `registros-campo`, `biomonitor-fotos` e `config-logos` têm o
+aviso idêntico e seguem públicos — mesma classe, outros módulos, entrega separada.
 
 ### Fase 4 — Paridade e auditoria
 

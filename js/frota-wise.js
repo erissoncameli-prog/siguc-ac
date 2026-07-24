@@ -22,12 +22,20 @@ function fwDatalistCidades(id) {
 // Avatar do motorista (foto redonda com fallback de iniciais). Usado na
 // sugestão da escala (motorista da vez) — nome + foto. esc/iniciais vêm
 // do config.js (carregado antes deste arquivo).
+//
+// O bucket frota-motoristas é privado (migration 200): o <img> sai sem
+// src, só marcado, e quem chamou precisa rodar frotaAssinarFotos() no
+// contêiner depois de inserir o HTML. Se a assinatura falhar (offline,
+// por exemplo), o data-frota-fallback faz virar as iniciais — o mesmo
+// que já aparece quando não há foto.
 function fwAvatarMotorista(foto, nome, size) {
   size = size || 28;
   const base = `width:${size}px;height:${size}px;border-radius:50%;flex-shrink:0;vertical-align:middle`;
-  return foto
-    ? `<img src="${esc(foto)}" alt="" style="${base};object-fit:cover;display:inline-block">`
-    : `<span class="sidebar-avatar" style="${base};font-size:${Math.round(size * 0.4)}px;display:inline-flex;align-items:center;justify-content:center">${esc(iniciais(nome || ''))}</span>`;
+  const ini = esc(iniciais(nome || ''));
+  const marca = (typeof frotaFotoAttr === 'function') ? frotaFotoAttr(foto, iniciais(nome || '')) : '';
+  return marca
+    ? `<img ${marca} alt="" style="${base};object-fit:cover;display:inline-block;font-size:${Math.round(size * 0.4)}px">`
+    : `<span class="sidebar-avatar" style="${base};font-size:${Math.round(size * 0.4)}px;display:inline-flex;align-items:center;justify-content:center">${ini}</span>`;
 }
 
 function fwAnimateNumber(el, valorFinal, opts) {
