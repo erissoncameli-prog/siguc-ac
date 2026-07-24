@@ -2801,10 +2801,20 @@ async function carregarManutGestor() {
 }
 
 let _comunicadosPendentes = []
+// Erro do Supabase era descartado aqui também — mesma cegueira da mesa.
+let _comunicadosGestorErro = null
 async function carregarComunicadosGestor() {
-  const { data } = await db.from('vw_frota_comunicados_manutencao').select('*')
-    .eq('status', 'pendente').order('criado_em', { ascending: false })
-  _comunicadosPendentes = data || []
+  try {
+    const { data, error } = await db.from('vw_frota_comunicados_manutencao').select('*')
+      .eq('status', 'pendente').order('criado_em', { ascending: false })
+    if (error) throw error
+    _comunicadosGestorErro = null
+    _comunicadosPendentes = data || []
+  } catch (e) {
+    _comunicadosGestorErro = e?.message || String(e)
+    _comunicadosPendentes = []
+    console.error('[frota-app] carregarComunicadosGestor', e)
+  }
   renderKpisGestor()
   renderListaComunicadosGestor()
 }
@@ -2824,9 +2834,28 @@ function renderKpisGestor() {
   if (bm) { bm.hidden = totalManut === 0; bm.textContent = totalManut }
 }
 
+// Fotos de UM comunicado, isoladas: falha aqui não derruba a lista.
+function htmlFotosComunicadoGestor(c) {
+  try {
+    if (!c.fotos_urls?.length) return ''
+    const fotos = c.fotos_urls
+      .map(url => `<a ${frotaFotoAttr(url)} target="_blank" rel="noopener"><img ${frotaFotoAttr(url)} style="width:56px;height:56px;object-fit:cover;border-radius:8px;display:block"></a>`)
+      .join('')
+    return `<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px">${fotos}</div>`
+  } catch (e) {
+    console.error('[frota-app] htmlFotosComunicadoGestor', e)
+    return '<div style="font-size:11px;color:#9CA3AF;margin-top:8px">(não foi possível exibir as fotos)</div>'
+  }
+}
+
 function renderListaComunicadosGestor() {
   const el = document.getElementById('g-lista-comunicados')
   if (!el) return
+  if (_comunicadosGestorErro) {
+    el.innerHTML = `<div class="card" style="padding:14px;font-size:12px;color:#B91C1C;background:#FEF2F2">
+      Não foi possível carregar os comunicados.<br><span style="color:#6B7280">${esc(_comunicadosGestorErro)}</span></div>`
+    return
+  }
   if (!_comunicadosPendentes.length) { el.innerHTML = '<div class="card" style="text-align:center;padding:20px;color:#9CA3AF">Nenhum comunicado pendente</div>'; return }
   el.innerHTML = _comunicadosPendentes.map(c => `
     <div class="card" style="margin-bottom:8px;padding:12px 14px">
@@ -2838,9 +2867,7 @@ function renderListaComunicadosGestor() {
         <button class="btn btn-xs btn-ghost" style="color:#DC2626" onclick="descartarComunicado('${c.id}')">Descartar</button>
       </div>
       <div style="font-size:13px;color:#374151;margin-top:8px">${esc(c.descricao)}</div>
-      ${c.fotos_urls?.length ? `<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px">
-        ${c.fotos_urls.map(url => `<a ${frotaFotoAttr(url)} target="_blank" rel="noopener"><img ${frotaFotoAttr(url)} style="width:56px;height:56px;object-fit:cover;border-radius:8px;display:block"></a>`).join('')}
-      </div>` : ''}
+      ${htmlFotosComunicadoGestor(c)}
     </div>`).join('')
   // Bucket privado (migration 200) — assina depois de montar a lista.
   frotaAssinarFotos(el)
