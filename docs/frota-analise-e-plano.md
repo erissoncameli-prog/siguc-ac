@@ -254,19 +254,35 @@ comunicado de defeito com fotos, offline-first e push. As lacunas relevantes:
 Ordem pensada para entregar o que protege dado e o que o campo sente primeiro, e para não
 misturar correção com feature na mesma entrega.
 
-### Fase 1 — Fechar o banco (só migrations, sem tocar UI)
+### Fase 1 — Fechar o banco (só migrations, sem tocar UI) — ✅ CONCLUÍDA em 24/07/2026
 
-1. Migration `196_frota_hardening_rpc.sql`: `REVOKE` de `anon` + guarda `auth.uid()` em
-   `frota_nome_usuario`, `frota_veiculos_disponiveis`, `frota_motorista_apto`; `REVOKE`
-   nas sete funções de trigger; filtro de dono no handler `unique_violation` de
-   `frota_registrar_abastecimento`; `SET search_path` nas três funções `frota_*` que
-   estão com search_path mutável.
-2. Recuperar `frota_alocacao_proporcional` do banco e commitar como arquivo.
-3. `docs/frota-migrations-mapa.md`: mapa arquivo → versão aplicada, e a nova convenção.
+1. ✅ `196_frota_hardening_rpc.sql`: `REVOKE` de `PUBLIC`/`anon` + guarda `auth.uid()` em
+   `frota_nome_usuario` e `frota_veiculos_disponiveis`; `REVOKE` total de
+   `frota_motorista_apto` (só chamada por funções `SECURITY DEFINER`); `REVOKE` nas sete
+   funções de trigger; `SET search_path` nas três funções `frota_*` mutáveis; filtro de
+   dono no handler `unique_violation` de `frota_registrar_abastecimento`.
+2. ✅ `197_frota_revoke_anon_rpcs.sql` — **ampliação do escopo original**. Depois da 196
+   ainda restavam **16** RPCs `SECURITY DEFINER` invocáveis por `anon`: as de ação
+   (aprovar, recusar, check-out, check-in, abastecer, validar, reportar defeito…). Todas
+   já tinham guarda interna, então não vazavam dado — mas continuavam invocáveis sem
+   sessão, servindo de oráculo pelas mensagens de erro. Fechadas todas de uma vez.
+   Resultado: **zero** funções `frota_*` `SECURITY DEFINER` executáveis por `anon`.
+3. ✅ `frota_alocacao_proporcional` recuperada do banco e commitada como
+   `192b_frota_alocacao_proporcional.sql` (não reaplicar — ver o mapa).
+4. ✅ `docs/frota-migrations-mapa.md`: mapa arquivo ⇄ versão aplicada e nova convenção.
 
-*Risco:* baixo. Nenhuma mudança de comportamento para usuário autenticado.
-*Verificação:* rodar `get_advisors` antes/depois e conferir que os avisos das funções
-tocadas sumiram.
+*Verificação executada:* 13 asserções em dois blocos de teste, com `SET ROLE` real —
+`anon` bloqueado nas 4 RPCs antes expostas e em `frota_pode_operar_viagem`;
+`authenticated` seguindo com as 18 RPCs, as duas views `SECURITY INVOKER` resolvendo
+nomes (25 e 1 linha), `frota_sugerir_alocacao` (gestor) e
+`frota_veiculos_ativos_abastecimento` (motorista) executando. Conferido também que
+nenhuma das funções recriadas gerou overload duplicado (lição da 178) e que
+`sem_search_path = 0`. Nenhuma mudança de comportamento para usuário autenticado.
+
+*Fora do escopo desta fase, registrado:* os avisos do advisor em objetos não-Frota
+(`spatial_ref_sys`, `cargos_atuais`, `v_aap_publica`, `brigadas_resumo`,
+`vw_registros_validacao`, `minhas_permissoes`, ~46 funções de outros módulos com
+search_path mutável) continuam abertos — mesma classe de defeito, módulos diferentes.
 
 ### Fase 2 — Fila offline confiável
 
