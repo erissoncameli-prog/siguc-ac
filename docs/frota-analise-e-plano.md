@@ -416,15 +416,47 @@ na auditoria da plataforma inteira, silenciosamente (há `try/catch`). No App Fr
 vai nulo de propósito, sem pagar o custo da requisição. Corrigir o `index.html` (liberar
 o domínio no CSP ou tirar a chamada) fica fora do escopo do módulo Frota.
 
-### Fase 5 — Checklist de inspeção (a feature)
+### Fase 5 — Checklist de inspeção (DVIR) — ✅ CONCLUÍDA em 24/07/2026
 
-13. Migration: `frota_checklist_itens` (configurável por tipo de veículo) e
-    `frota_inspecoes` (viagem, momento saída/chegada, item, conforme/não conforme, foto,
-    observação).
-14. App: etapa de checklist obrigatória antes do check-out e opcional no check-in; item
-    não conforme gera automaticamente um comunicado de defeito no funil que já existe.
-15. Mesa: aba de inspeções em `frota-administrar.html`, com o carve-out de
-    `frame-ancestors 'self'` no `vercel.json` se virar página embutida.
+13. ✅ `203_frota_inspecao_checklist.sql`: `frota_checklist_itens` (catálogo
+    configurável, com aplicabilidade por tipo de veículo e por momento),
+    `frota_inspecoes`, `frota_inspecao_itens`, a view `vw_frota_inspecoes` e o helper
+    `frota_registrar_inspecao`. Catálogo inicial com 18 itens, incluindo os específicos
+    de embarcação (colete, casco/motor de popa, remo e âncora) e de motocicleta
+    (capacete) — a frota do Acre não é só carro.
+14. ✅ `204_frota_checkout_checkin_com_inspecao.sql` + app: checklist antes do
+    check-out, e no check-in para os itens marcados. Item reprovado gera
+    automaticamente um comunicado de defeito no funil que **já existia** (193/194) —
+    um comunicado por inspeção, agregando os itens, para a mesa não receber enxurrada.
+    Item crítico reprovado muda o título da notificação à gestão.
+15. ✅ `frota-inspecoes.html`: catálogo editável (ordem, tipos de veículo, momento,
+    crítico, ativo) e histórico de inspeções com detalhe item a item e fotos. Entrou
+    como 5ª aba de `frota-administrar.html`, com o carve-out de `frame-ancestors 'self'`
+    no `vercel.json` — sem afrouxar o `'none'` global.
+
+**Decisão de projeto que vale registrar.** A inspeção NÃO é uma RPC separada chamada
+antes do check-out. Seria o desenho óbvio e estaria errado: no app o check-out é
+offline-first, então a fila teria **dois itens com dependência de ordem** entre si, e a
+fila não garante ordem depois de um erro isolado — dava para acabar com inspeção
+gravada e viagem não iniciada, ou o contrário. Por isso a inspeção entra como parâmetro
+opcional de `frota_checkout_viagem` / `frota_checkin_viagem`: uma transação, um item na
+fila, idempotente pelo mesmo `uuid_cliente` da 198. A verificação exercita exatamente
+isso (teste 9: check-out recusado por medidor menor não deixa inspeção órfã).
+
+*Verificação executada:* 13 asserções com dados fabricados e `RAISE` para rollback —
+catálogo filtrado por tipo, gravação da inspeção e dos itens, geração do comunicado no
+funil existente com a descrição certa, reenvio sem duplicar inspeção nem comunicado,
+**atomicidade** em check-out recusado, checklist de chegada, checklist sem reprovação
+não gerando comunicado, **cliente antigo sem `p_inspecao` seguindo funcionando**, e a
+view contando reprovados e críticos. Mais conferência de RLS nas três tabelas novas e
+de que segue em zero o número de funções `frota_*` expostas a `anon`.
+
+*Versionamento:* `pwa/sw.js` — frota v48 → v49.
+
+*Também nesta entrega:* `badge-vermelho` não existe no `css/global.css` (a classe é
+`badge-red`) — os 5 usos eram todos meus, desta fase, e foram corrigidos antes do
+commit. E o `CLAUDE.md` foi atualizado com a página nova e com a assimetria do
+checklist na regra de duplicação.
 
 ### Fase 6 — Painel e documentos
 

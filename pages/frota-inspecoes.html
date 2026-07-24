@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>SIGUC-AC · Frota — Inspeções</title>
+<link rel="stylesheet" href="../css/global.css">
+<link rel="stylesheet" href="../css/frota-wise-theme.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../js/observability.js"></script>
+<script src="../js/queryLogger.js"></script>
+<script src="../js/config.js"></script>
+<script src="../js/layout.js"></script>
+<script src="../js/frota-wise.js"></script>
+<script src="../js/frota-fotos.js"></script>
+</head>
+<body>
+<div id="app"></div>
+
+<!-- Modal Item do checklist -->
+<div class="modal-overlay" id="modal-item">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-header">
+      <div class="modal-title" id="it-titulo">Novo item do checklist</div>
+      <button class="modal-close" onclick="fecharModal('item')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label">Item <span class="obrig">*</span></label>
+        <input class="form-control" id="it-item" placeholder="Ex.: Pneus e estepe"></div>
+      <div class="form-group"><label class="form-label">Descrição / o que conferir</label>
+        <input class="form-control" id="it-descricao" placeholder="Ex.: Calibragem, sulco e estepe presente"></div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Ordem</label>
+          <input class="form-control" id="it-ordem" type="number" min="1" max="999" value="100"></div>
+        <div class="form-group"><label class="form-label">Aparece em</label>
+          <select class="form-control" id="it-momento">
+            <option value="saida">Só na saída</option>
+            <option value="ambos">Saída e chegada</option>
+            <option value="chegada">Só na chegada</option>
+          </select></div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Tipos de veículo</label>
+        <div style="font-size:11px;color:#9CA3AF;margin-bottom:6px">Nenhum marcado = vale para todos os tipos.</div>
+        <div id="it-tipos" style="display:flex;flex-wrap:wrap;gap:10px"></div>
+      </div>
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+        <input type="checkbox" id="it-critico" style="width:auto"> Item crítico (reprovado, a gestão é avisada com destaque)
+      </label>
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;margin-top:8px">
+        <input type="checkbox" id="it-ativo" style="width:auto" checked> Ativo
+      </label>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="fecharModal('item')">Cancelar</button>
+      <button class="btn btn-primary" id="btn-salvar-item" onclick="salvarItem()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Detalhe da inspeção -->
+<div class="modal-overlay" id="modal-inspecao">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-header">
+      <div class="modal-title">Inspeção</div>
+      <button class="modal-close" onclick="fecharModal('inspecao')">×</button>
+    </div>
+    <div class="modal-body" id="insp-corpo"></div>
+  </div>
+</div>
+
+<script>
+const TIPOS_VEICULO = ['carro','caminhonete','van','onibus','caminhao','motocicleta','quadriciclo','embarcacao','outro']
+const TIPO_LABEL = { carro:'Carro', caminhonete:'Caminhonete', van:'Van', onibus:'Ônibus',
+  caminhao:'Caminhão', motocicleta:'Motocicleta', quadriciclo:'Quadriciclo', embarcacao:'Embarcação', outro:'Outro' }
+
+let _itens = [], _inspecoes = [], _editItemId = null, _podeEditar = false
+
+;(async function () {
+  const usuario = await carregarUsuario()
+  if (!usuario) { window.location.href = '../index.html'; return }
+
+  const { data: nivel } = await db.rpc('nivel_efetivo', { p_usuario: usuario.id, p_modulo_chave: 'frota' })
+  if (nivel !== 'editar' && nivel !== 'ver') {
+    document.body.innerHTML = '<div style="padding:60px;text-align:center;font-family:\'DM Sans\',sans-serif;color:#6B7280">Sem acesso ao módulo Frota.</div>'
+    return
+  }
+  _podeEditar = nivel === 'editar'
+
+  document.getElementById('app').innerHTML =
+    gerarLayout('Frota — Inspeções', 'frota-inspecoes') + htmlPagina()
+
+  await Promise.all([carregarItens(), carregarInspecoes()])
+  bIconsAplicar()
+})()
+
+function htmlPagina() {
+  return `<div class="fade-in fw-theme">
+    <div class="kpi-grid">
+      <div class="fw-kpi-card"><div class="fw-kpi-label">Inspeções (30 dias)</div><div class="fw-kpi-value" id="k-insp">0</div></div>
+      <div class="fw-kpi-card"><div class="fw-kpi-label">Com item reprovado</div><div class="fw-kpi-value" id="k-reprov">0</div></div>
+      <div class="fw-kpi-card"><div class="fw-kpi-label">Reprovaram item crítico</div><div class="fw-kpi-value" id="k-critico">0</div></div>
+      <div class="fw-kpi-card"><div class="fw-kpi-label">Itens no checklist</div><div class="fw-kpi-value" id="k-itens">0</div></div>
+    </div>
+
+    <div class="card" style="margin-bottom:16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:6px">
+        <div>
+          <div style="font-weight:700;font-size:14px">Checklist de inspeção</div>
+          <div style="font-size:12px;color:#6B7280">
+            O que o motorista confere no app antes de sair. Item reprovado vira
+            comunicado de defeito para a gestão validar e abrir a OS.
+          </div>
+        </div>
+        ${_podeEditar ? `<button class="btn btn-primary btn-sm" onclick="abrirModalItem()">${bico('plus')} Novo item</button>` : ''}
+      </div>
+      <div class="table-wrap"><table class="table">
+        <thead><tr>
+          <th style="width:60px">Ordem</th><th>Item</th><th>Tipos de veículo</th>
+          <th style="width:120px">Momento</th><th style="width:90px">Crítico</th>
+          <th style="width:80px">Situação</th>${_podeEditar ? '<th style="width:80px"></th>' : ''}
+        </tr></thead>
+        <tbody id="tbody-itens"><tr><td colspan="7" style="text-align:center;padding:32px;color:#9CA3AF">Carregando...</td></tr></tbody>
+      </table></div>
+    </div>
+
+    <div class="card">
+      <div style="font-weight:700;font-size:14px;margin-bottom:6px">Inspeções realizadas</div>
+      <div class="table-wrap"><table class="table">
+        <thead><tr>
+          <th>Data</th><th>Veículo</th><th>Motorista</th><th>Momento</th>
+          <th>Resultado</th><th style="width:80px"></th>
+        </tr></thead>
+        <tbody id="tbody-insp"><tr><td colspan="6" style="text-align:center;padding:32px;color:#9CA3AF">Carregando...</td></tr></tbody>
+      </table></div>
+    </div>
+  </div>`
+}
+
+function formatDataHora(str) {
+  if (!str) return '—'
+  return new Date(str).toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', year:'2-digit', hour:'2-digit', minute:'2-digit' })
+}
+
+// ── Catálogo ───────────────────────────────────────────────────
+async function carregarItens() {
+  const { data } = await db.from('frota_checklist_itens').select('*').order('ordem')
+  _itens = data || []
+  renderItens()
+}
+
+function renderItens() {
+  const tbody = document.getElementById('tbody-itens')
+  if (!tbody) return
+  document.getElementById('k-itens').textContent = _itens.filter(i => i.ativo).length
+  if (!_itens.length) {
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:32px;color:#9CA3AF">Nenhum item cadastrado</td></tr>`
+    return
+  }
+  tbody.innerHTML = _itens.map(i => {
+    const tipos = (i.tipos_veiculo && i.tipos_veiculo.length)
+      ? i.tipos_veiculo.map(t => TIPO_LABEL[t] || t).join(', ')
+      : '<span style="color:#9CA3AF">Todos</span>'
+    const momento = i.na_saida && i.na_chegada ? 'Saída e chegada' : (i.na_saida ? 'Saída' : 'Chegada')
+    return `<tr${i.ativo ? '' : ' style="opacity:.5"'}>
+      <td class="mono">${i.ordem}</td>
+      <td><strong>${esc(i.item)}</strong>${i.descricao ? `<br><span style="font-size:11px;color:#9CA3AF">${esc(i.descricao)}</span>` : ''}</td>
+      <td style="font-size:12px">${tipos}</td>
+      <td style="font-size:12px">${momento}</td>
+      <td>${i.critico ? '<span class="badge badge-red">Crítico</span>' : '—'}</td>
+      <td>${i.ativo ? '<span class="badge badge-verde">Ativo</span>' : '<span class="badge badge-cinza">Inativo</span>'}</td>
+      ${_podeEditar ? `<td><button class="btn btn-xs btn-ghost" onclick="abrirModalItem('${i.id}')">Editar</button></td>` : ''}
+    </tr>`
+  }).join('')
+}
+
+function abrirModalItem(id) {
+  _editItemId = id || null
+  const i = id ? _itens.find(x => x.id === id) : null
+  document.getElementById('it-titulo').textContent = i ? 'Editar item do checklist' : 'Novo item do checklist'
+  document.getElementById('it-item').value = i?.item || ''
+  document.getElementById('it-descricao').value = i?.descricao || ''
+  document.getElementById('it-ordem').value = i?.ordem ?? 100
+  document.getElementById('it-momento').value =
+    i ? (i.na_saida && i.na_chegada ? 'ambos' : (i.na_chegada ? 'chegada' : 'saida')) : 'saida'
+  document.getElementById('it-critico').checked = !!i?.critico
+  document.getElementById('it-ativo').checked = i ? !!i.ativo : true
+  document.getElementById('it-tipos').innerHTML = TIPOS_VEICULO.map(t => `
+    <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+      <input type="checkbox" value="${t}" style="width:auto" ${i?.tipos_veiculo?.includes(t) ? 'checked' : ''}> ${TIPO_LABEL[t]}
+    </label>`).join('')
+  document.getElementById('modal-item').classList.add('aberto')
+}
+
+async function salvarItem() {
+  const item = document.getElementById('it-item').value.trim()
+  if (!item) { toast('Informe o nome do item', 'error'); return }
+  const momento = document.getElementById('it-momento').value
+  const tipos = Array.from(document.querySelectorAll('#it-tipos input:checked')).map(c => c.value)
+  const payload = {
+    item,
+    descricao: document.getElementById('it-descricao').value.trim() || null,
+    ordem: parseInt(document.getElementById('it-ordem').value) || 100,
+    na_saida: momento === 'saida' || momento === 'ambos',
+    na_chegada: momento === 'chegada' || momento === 'ambos',
+    tipos_veiculo: tipos.length ? tipos : null,
+    critico: document.getElementById('it-critico').checked,
+    ativo: document.getElementById('it-ativo').checked,
+  }
+  const btn = document.getElementById('btn-salvar-item')
+  btn.disabled = true; btn.textContent = 'Salvando...'
+  try {
+    const { error } = _editItemId
+      ? await db.from('frota_checklist_itens').update(payload).eq('id', _editItemId)
+      : await db.from('frota_checklist_itens').insert(payload)
+    if (error) throw error
+    toast('Item salvo', 'success')
+    fecharModal('item')
+    await carregarItens()
+  } catch (e) { toast(e.message || 'Erro ao salvar', 'error') }
+  finally { btn.disabled = false; btn.textContent = 'Salvar' }
+}
+
+// ── Inspeções realizadas ───────────────────────────────────────
+async function carregarInspecoes() {
+  const desde = new Date(Date.now() - 30 * 86400 * 1000).toISOString()
+  const { data } = await db.from('vw_frota_inspecoes').select('*')
+    .gte('data_hora', desde).order('data_hora', { ascending: false }).limit(200)
+  _inspecoes = data || []
+  renderInspecoes()
+}
+
+function renderInspecoes() {
+  const tbody = document.getElementById('tbody-insp')
+  if (!tbody) return
+  fwAnimateNumber(document.getElementById('k-insp'), _inspecoes.length)
+  fwAnimateNumber(document.getElementById('k-reprov'), _inspecoes.filter(i => i.itens_reprovados > 0).length)
+  fwAnimateNumber(document.getElementById('k-critico'), _inspecoes.filter(i => i.criticos_reprovados > 0).length)
+  if (!_inspecoes.length) {
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:32px;color:#9CA3AF">Nenhuma inspeção nos últimos 30 dias</td></tr>`
+    return
+  }
+  tbody.innerHTML = _inspecoes.map(i => {
+    const resultado = i.criticos_reprovados > 0
+      ? `<span class="badge badge-red">${i.criticos_reprovados} crítico(s)</span>`
+      : i.itens_reprovados > 0
+        ? `<span class="badge badge-ouro">${i.itens_reprovados} reprovado(s)</span>`
+        : '<span class="badge badge-verde">Tudo conforme</span>'
+    return `<tr>
+      <td style="font-size:12px">${formatDataHora(i.data_hora)}</td>
+      <td style="font-size:12px">${esc(i.veiculo_modelo || '')}<br><span class="mono">${esc(i.veiculo_placa || '—')}</span></td>
+      <td style="font-size:12px">${esc(i.motorista_nome || '—')}</td>
+      <td style="font-size:12px">${i.momento === 'saida' ? 'Saída' : 'Chegada'}</td>
+      <td>${resultado} <span style="font-size:11px;color:#9CA3AF">de ${i.total_itens}</span></td>
+      <td><button class="btn btn-xs btn-ghost" onclick="abrirInspecao('${i.id}')">Ver</button></td>
+    </tr>`
+  }).join('')
+}
+
+async function abrirInspecao(id) {
+  const i = _inspecoes.find(x => x.id === id)
+  if (!i) return
+  const corpo = document.getElementById('insp-corpo')
+  corpo.innerHTML = '<div style="padding:20px;color:#9CA3AF">Carregando...</div>'
+  document.getElementById('modal-inspecao').classList.add('aberto')
+
+  const { data: itens } = await db.from('frota_inspecao_itens')
+    .select('*').eq('inspecao_id', id).order('ordem')
+
+  corpo.innerHTML = `
+    <div style="font-size:13px;line-height:1.8;margin-bottom:12px">
+      <div><strong>Veículo:</strong> ${esc(i.veiculo_modelo || '')} <span class="mono">(${esc(i.veiculo_placa || '—')})</span></div>
+      <div><strong>Motorista:</strong> ${esc(i.motorista_nome || '—')}</div>
+      <div><strong>Momento:</strong> ${i.momento === 'saida' ? 'Saída' : 'Chegada'} · ${formatDataHora(i.data_hora)}</div>
+      ${i.viagem_destino ? `<div><strong>Viagem:</strong> ${esc(i.viagem_destino)}</div>` : ''}
+      ${i.observacoes ? `<div><strong>Observações:</strong> ${esc(i.observacoes)}</div>` : ''}
+      ${i.comunicado_id ? `<div style="color:#B45309"><strong>Gerou comunicado de defeito</strong> — trate em Manutenção.</div>` : ''}
+    </div>
+    ${(itens || []).map(it => `
+      <div style="border-top:1px solid #F3F4F6;padding:8px 0;display:flex;justify-content:space-between;gap:10px;align-items:flex-start">
+        <div style="min-width:0">
+          <div style="font-size:13px;font-weight:600">
+            ${esc(it.item_nome)}${it.critico ? ' <span class="badge badge-red" style="font-size:10px">crítico</span>' : ''}
+          </div>
+          ${it.observacao ? `<div style="font-size:12px;color:#6B7280">${esc(it.observacao)}</div>` : ''}
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+          ${it.foto_url ? `<a ${frotaFotoAttr(it.foto_url)} target="_blank" rel="noopener"><img ${frotaFotoAttr(it.foto_url)} style="width:40px;height:40px;object-fit:cover;border-radius:6px;display:block"></a>` : ''}
+          ${it.conforme
+            ? '<span class="badge badge-verde">OK</span>'
+            : '<span class="badge badge-red">Problema</span>'}
+        </div>
+      </div>`).join('')}`
+  // Bucket privado (migration 200) — assina as fotos dos itens.
+  frotaAssinarFotos(corpo)
+}
+
+function fecharModal(qual) {
+  document.getElementById(`modal-${qual}`).classList.remove('aberto')
+  if (qual === 'item') _editItemId = null
+}
+</script>
+</body>
+</html>

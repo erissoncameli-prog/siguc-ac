@@ -84,6 +84,7 @@ function gerarLayout(tituloPagina, paginaAtiva) {
     'frota-tarefas':            { svg: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/>', cor: '#67e8f9', bg: 'rgba(103,232,249,0.22)' },
     'frota-abastecimentos':     { svg: '<line x1="3" y1="22" x2="15" y2="22"/><line x1="4" y1="9" x2="14" y2="9"/><path d="M14 22V4a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v18"/><path d="M14 13h2a2 2 0 0 1 2 2v2a2 2 0 0 0 2 2 2 2 0 0 0 2-2V9.83a2 2 0 0 0-.59-1.42L18 5"/>', cor: '#f97316', bg: 'rgba(249,115,22,0.22)' },
     'frota-contratos':          { svg: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>', cor: '#38bdf8', bg: 'rgba(56,189,248,0.22)' },
+    'frota-inspecoes':          { svg: '<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>', cor: '#34d399', bg: 'rgba(52,211,153,0.22)' },
     'frota-app':                { svg: '<rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/>', cor: '#2dd4bf', bg: 'rgba(45,212,191,0.22)' },
   };
 
