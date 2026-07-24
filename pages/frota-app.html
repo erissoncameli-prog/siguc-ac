@@ -48,6 +48,17 @@ const _frotaReady = _dbReady.then(function () {
 <script src="../js/layout.js"></script>
 <script src="../js/frota-wise.js"></script>
 <script src="../js/frota-fotos.js"></script>
+<script>
+// Rede de segurança para js/frota-fotos.js. Se ele não carregar — deploy
+// a meio caminho, cache do navegador, bloqueio de rede — as funções
+// abaixo ficariam indefinidas, e QUALQUER template que as chame lançaria
+// ReferenceError. Como as chamadas ficam dentro de .map() que monta lista
+// inteira, o efeito não é "some a foto": some a LISTA TODA, em silêncio.
+// Degradar para "sem foto" é sempre melhor que uma tela vazia.
+window.frotaFotoAttr = window.frotaFotoAttr || function () { return '' }
+window.frotaAssinarFotos = window.frotaAssinarFotos || function () {}
+window.frotaFotoUrlAssinada = window.frotaFotoUrlAssinada || async function () { return null }
+</script>
 </head>
 <body>
 <div id="app"></div>
