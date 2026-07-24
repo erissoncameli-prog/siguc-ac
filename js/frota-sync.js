@@ -168,6 +168,30 @@ async function fSyncUploadFotoDefeito(dataUrl, uuidCliente, indice) {
   return fSyncUploadOuRecuperar('frota-manutencao', `${uuidCliente}/${indice}.${ext}`, blob, `foto ${indice + 1}`)
 }
 
+// Sobe as fotos do checklist e devolve as URLs para dentro do
+// p_inspecao. As fotos vêm indexadas pela POSIÇÃO do item
+// ({ '0': dataUrl, '3': dataUrl }), que é como o app as guarda — assim
+// o sync casa cada URL de volta no item certo sem depender de id.
+// Reaproveita o bucket frota-manutencao, que é o destino natural: o
+// item reprovado vira comunicado de defeito.
+//
+// `jaEnviadas` permite ao reenvio pular o que já subiu (mesma lição da
+// Fase 2: repetir upload no mesmo caminho vira UPDATE e é negado ao
+// motorista).
+async function fSubirFotosInspecao(payload, fotos, uuidCliente, jaEnviadas) {
+  const enviadas = { ...(jaEnviadas || {}) }
+  const base = uuidCliente || payload.p_uuid_cliente || _fUuid()
+  for (const idx of Object.keys(fotos)) {
+    if (!enviadas[idx]) {
+      enviadas[idx] = await fSyncUploadFotoDefeito(fotos[idx], `insp-${base}`, Number(idx))
+    }
+    if (payload.p_inspecao?.itens?.[Number(idx)]) {
+      payload.p_inspecao.itens[Number(idx)].foto_url = enviadas[idx]
+    }
+  }
+  return enviadas
+}
+
 // Retorna 'ok' | 'erro' | 'falha_permanente'.
 async function fSyncUma(acao) {
   if (!db) return 'erro'
@@ -180,10 +204,15 @@ async function fSyncUma(acao) {
   const enviadas = { ...(acao.fotos_enviadas || {}) }
   try {
     let error
-    if (acao.tipo === 'checkout') {
-      ;({ error } = await db.rpc('frota_checkout_viagem', acao.payload))
-    } else if (acao.tipo === 'checkin') {
-      ;({ error } = await db.rpc('frota_checkin_viagem', acao.payload))
+    if (acao.tipo === 'checkout' || acao.tipo === 'checkin') {
+      const payload = JSON.parse(JSON.stringify(acao.payload))
+      if (acao.fotos?.inspecao) {
+        const novas = await fSubirFotosInspecao(payload, acao.fotos.inspecao, acao.uuid_cliente, enviadas.inspecao)
+        enviadas.inspecao = novas
+        await fOfflineMarcar(acao.uuid_cliente, 'enviando', { fotos_enviadas: enviadas })
+      }
+      const rpc = acao.tipo === 'checkout' ? 'frota_checkout_viagem' : 'frota_checkin_viagem'
+      ;({ error } = await db.rpc(rpc, payload))
     } else if (acao.tipo === 'abrir_direta') {
       ;({ error } = await db.rpc('frota_abrir_viagem_direta', acao.payload))
     } else if (acao.tipo === 'abastecimento') {

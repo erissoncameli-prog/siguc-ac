@@ -31,14 +31,19 @@ Sistema já tem login, sidebar, layout e páginas funcionando.
     (modo motorista, offline-first); gestão valida e classifica em
     frota-abastecimentos.html (contrato/fonte — motorista nunca vê).
     Cadastro de fontes de recurso e contratos: frota-contratos.html.
+    Checklist de inspeção (DVIR): o motorista confere itens no app
+    antes do check-out (e no check-in, para os itens marcados); item
+    reprovado vira comunicado de defeito no funil que já existia.
+    Catálogo e histórico em frota-inspecoes.html.
     frota-administrar.html reúne Manutenção/Abastecimentos/Contratos/
-    Veículos e Motoristas em abas (a única entrada no menu lateral) —
+    Veículos e Motoristas/Inspeções em abas (a única entrada no menu
+    lateral) —
     cada aba é a página correspondente carregada num iframe com
     `?embed=1` (gerarLayout, js/layout.js, retorna só o conteúdo, sem
-    duplicar sidebar/topbar); as 4 páginas continuam existindo e
+    duplicar sidebar/topbar); as 5 páginas continuam existindo e
     funcionando sozinhas, só não têm mais link direto na sidebar.
     O CSP padrão do site é `frame-ancestors 'none'` (vercel.json, anti-
-    clickjacking) — essas 4 páginas têm um bloco de headers próprio no
+    clickjacking) — essas 5 páginas têm um bloco de headers próprio no
     vercel.json com `frame-ancestors 'self'` + `X-Frame-Options:
     SAMEORIGIN`, senão o navegador bloqueia o iframe. Qualquer página
     nova que precise ser embutida (mesmo padrão) precisa do mesmo
@@ -378,6 +383,16 @@ E) Dashboard Executivo por nível (UC / Diretoria / Secretaria)
   (decisão registrada ao criar o fluxo). Se "lançar abastecimento"
   for adicionado a uma tela de mesa, ou "validar" for adicionado ao
   app, replicar nos dois lados na mesma entrega, como nos pares acima.
+  EXCEÇÃO por decisão de produto — Checklist de inspeção (DVIR,
+  migrations 203/204): assimétrico pelo mesmo motivo do abastecimento.
+  REGISTRO da inspeção só existe no app (`frota-app.html`, funções
+  `abrirChecklist` / `clPayloadInspecao`, enviado junto do check-out e
+  do check-in — nunca como chamada separada, ver cabeçalho da 204),
+  porque quem confere o veículo é o motorista, em campo. CONFIGURAÇÃO
+  do catálogo e leitura do histórico só existem na mesa
+  (`frota-inspecoes.html`). Se "registrar inspeção" for para uma tela
+  de mesa, ou o catálogo virar editável no app, aplicar a regra dos
+  pares acima.
 
 ## Variáveis de ambiente
 SUPABASE_URL=https://atqtybcsvepdabsvgaly.supabase.co

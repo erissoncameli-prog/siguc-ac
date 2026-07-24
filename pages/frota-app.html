@@ -96,6 +96,32 @@ const _frotaReady = _dbReady.then(function () {
   </div>
 </div>
 
+<!-- Modal Checklist de inspeção (etapa antes do check-out/check-in) -->
+<div class="modal-overlay" id="modal-checklist">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-header">
+      <div class="modal-title" id="cl-titulo">Checklist de saída</div>
+      <button class="modal-close" onclick="fecharChecklist()">×</button>
+    </div>
+    <div class="modal-body">
+      <div style="font-size:12px;color:#6B7280;margin-bottom:12px">
+        Confira cada item antes de sair. O que estiver fora de condição vira
+        uma pendência para o setor de transporte.
+      </div>
+      <div id="cl-itens"></div>
+      <div class="form-group" style="margin-top:14px">
+        <label class="form-label">Observações gerais</label>
+        <textarea class="form-control" id="cl-obs" rows="2" placeholder="Opcional"></textarea>
+      </div>
+      <input type="file" id="cl-foto-input" accept="image/*" capture="environment" hidden onchange="capturarFotoChecklist(this)">
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="fecharChecklist()">Cancelar</button>
+      <button class="btn btn-primary" id="btn-checklist-continuar" onclick="continuarDoChecklist()">Continuar</button>
+    </div>
+  </div>
+</div>
+
 <!-- Modal Check-in (concluir viagem — Motorista) -->
 <div class="modal-overlay" id="modal-checkin">
   <div class="modal" style="max-width:420px">
@@ -998,6 +1024,9 @@ async function renderModoMotorista() {
   instalarGatilhosSyncFrota()
   await carregarViagensMotorista()
   await carregarAbastecimentosMotorista()
+  // Catálogo do checklist: cai no cache do IndexedDB quando offline,
+  // para o motorista conseguir inspecionar em campo sem sinal.
+  await carregarChecklistCatalogo()
   fSyncRodar()
 }
 
@@ -1752,7 +1781,176 @@ function fmChecarMedidaMinima(medida, ultima, medidor) {
   return true
 }
 
-function abrirCheckout(id) {
+// ── Checklist de inspeção (DVIR — migrations 203/204) ─────────────
+// Etapa que faltava: antes o defeito só era capturado NO CHECK-IN, em
+// texto livre, ou seja, o sistema descobria o problema depois da
+// viagem. Agora o motorista passa pela lista antes de liberar o
+// veículo, e item reprovado entra no MESMO funil do comunicado de
+// defeito (validação da gestão → OS) que já existia.
+//
+// A inspeção NÃO é enviada separada: vai como parâmetro do próprio
+// check-out/check-in, então é uma transação e um item de fila. Ver o
+// cabeçalho da migration 204.
+let _checklistCatalogo = []
+let _clRespostas = []
+let _clDestino = null      // 'checkout' | 'checkin'
+let _clViagemId = null
+let _clFotoIdx = null
+
+async function carregarChecklistCatalogo() {
+  try {
+    if (!navigator.onLine) throw new Error('offline')
+    const { data, error } = await db.from('frota_checklist_itens')
+      .select('id,ordem,item,descricao,tipos_veiculo,na_saida,na_chegada,critico')
+      .eq('ativo', true).order('ordem')
+    if (error) throw error
+    _checklistCatalogo = data || []
+    await fOfflineSetConfig('checklist_cache', _checklistCatalogo)
+  } catch (e) {
+    _checklistCatalogo = (await fOfflineGetConfig('checklist_cache')) || []
+  }
+}
+
+// Itens que valem para este veículo e este momento. tipos_veiculo nulo
+// ou vazio = vale para qualquer tipo.
+function clItensAplicaveis(viagem, momento) {
+  const tipo = viagem?.veiculo_tipo
+  return _checklistCatalogo
+    .filter(i => (momento === 'saida' ? i.na_saida : i.na_chegada))
+    .filter(i => !i.tipos_veiculo || !i.tipos_veiculo.length || (tipo && i.tipos_veiculo.includes(tipo)))
+    .sort((a, b) => (a.ordem || 100) - (b.ordem || 100))
+}
+
+// Abre o checklist; se não houver item aplicável, segue direto para a
+// tela de medidor (não trava o motorista por catálogo vazio).
+function abrirChecklist(viagemId, destino) {
+  const v = _viagens.find(x => x.id === viagemId)
+  const momento = destino === 'checkout' ? 'saida' : 'chegada'
+  const itens = clItensAplicaveis(v, momento)
+  _clViagemId = viagemId
+  _clDestino = destino
+  if (!itens.length) { seguirParaMedidor(); return }
+
+  _clRespostas = itens.map(i => ({
+    item_id: i.id, item_nome: i.item, ordem: i.ordem, critico: i.critico,
+    descricao: i.descricao, conforme: true, observacao: '', foto: null,
+  }))
+  document.getElementById('cl-titulo').textContent =
+    momento === 'saida' ? 'Checklist de saída' : 'Checklist de chegada'
+  document.getElementById('cl-obs').value = ''
+  renderChecklist()
+  document.getElementById('modal-checklist').classList.add('aberto')
+}
+
+function renderChecklist() {
+  document.getElementById('cl-itens').innerHTML = _clRespostas.map((r, i) => `
+    <div style="border-top:1px solid rgba(0,0,0,.06);padding:10px 0">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+        <div style="min-width:0">
+          <div style="font-size:13px;font-weight:600">
+            ${esc(r.item_nome)}${r.critico ? ' <span class="badge badge-red" style="font-size:10px">crítico</span>' : ''}
+          </div>
+          ${r.descricao ? `<div style="font-size:11px;color:#9CA3AF">${esc(r.descricao)}</div>` : ''}
+        </div>
+        <div style="display:flex;gap:6px;flex-shrink:0">
+          <button type="button" class="btn btn-xs ${r.conforme ? 'btn-primary' : 'btn-secondary'}"
+            onclick="marcarChecklist(${i}, true)">OK</button>
+          <button type="button" class="btn btn-xs ${!r.conforme ? 'btn-primary' : 'btn-secondary'}"
+            style="${!r.conforme ? 'background:#DC2626;border-color:#DC2626' : 'color:#DC2626'}"
+            onclick="marcarChecklist(${i}, false)">Problema</button>
+        </div>
+      </div>
+      ${!r.conforme ? `
+        <div style="margin-top:8px">
+          <input class="form-control" style="font-size:13px" placeholder="O que há de errado? (ajuda a oficina)"
+            value="${esc(r.observacao)}" oninput="_clRespostas[${i}].observacao = this.value">
+          <div style="display:flex;align-items:center;gap:8px;margin-top:6px">
+            <button type="button" class="btn btn-xs btn-secondary" onclick="pedirFotoChecklist(${i})">
+              ${bico('camera')} ${r.foto ? 'Trocar foto' : 'Anexar foto'}
+            </button>
+            ${r.foto ? `<img src="${r.foto}" style="width:40px;height:40px;object-fit:cover;border-radius:6px">
+              <button type="button" class="btn btn-xs btn-ghost" style="color:#DC2626" onclick="removerFotoChecklist(${i})">remover</button>` : ''}
+          </div>
+        </div>` : ''}
+    </div>`).join('')
+  bIconsAplicar(document.getElementById('cl-itens'))
+}
+
+function marcarChecklist(i, conforme) {
+  _clRespostas[i].conforme = conforme
+  if (conforme) { _clRespostas[i].observacao = ''; _clRespostas[i].foto = null }
+  renderChecklist()
+}
+
+function pedirFotoChecklist(i) {
+  _clFotoIdx = i
+  const inp = document.getElementById('cl-foto-input')
+  inp.value = ''
+  inp.click()
+}
+
+// base64 na captura, mesmo motivo do abastecimento e do defeito: em
+// iOS/PWA o Blob fica inválido em segundo plano antes do sync.
+function capturarFotoChecklist(input) {
+  const file = input.files?.[0]
+  input.value = ''
+  if (file == null || _clFotoIdx == null) return
+  const reader = new FileReader()
+  reader.onload = () => { _clRespostas[_clFotoIdx].foto = reader.result; _clFotoIdx = null; renderChecklist() }
+  reader.readAsDataURL(file)
+}
+
+function removerFotoChecklist(i) { _clRespostas[i].foto = null; renderChecklist() }
+
+function fecharChecklist() {
+  document.getElementById('modal-checklist').classList.remove('aberto')
+  _clRespostas = []; _clDestino = null; _clViagemId = null
+}
+
+function continuarDoChecklist() {
+  const faltaDescrever = _clRespostas.find(r => !r.conforme && !r.observacao.trim())
+  if (faltaDescrever) {
+    toast(`Descreva o problema em "${faltaDescrever.item_nome}" — a oficina precisa saber o que verificar.`, 'error')
+    return
+  }
+  document.getElementById('modal-checklist').classList.remove('aberto')
+  seguirParaMedidor()
+}
+
+// Vai para a tela de medidor (check-out ou check-in), preservando as
+// respostas do checklist para serem enviadas junto.
+function seguirParaMedidor() {
+  if (_clDestino === 'checkout') abrirModalCheckout(_clViagemId)
+  else abrirModalCheckin(_clViagemId)
+}
+
+// Monta o parâmetro p_inspecao da RPC. Devolve null quando não houve
+// checklist — a RPC trata null como "sem inspeção".
+function clPayloadInspecao() {
+  if (!_clRespostas.length) return null
+  return {
+    observacoes: document.getElementById('cl-obs')?.value.trim() || null,
+    itens: _clRespostas.map(r => ({
+      item_id: r.item_id, item_nome: r.item_nome, ordem: r.ordem,
+      critico: !!r.critico, conforme: !!r.conforme,
+      observacao: r.observacao?.trim() || null, foto_url: null,
+    })),
+  }
+}
+
+// Fotos do checklist para a fila offline: { '0': dataUrl, '3': dataUrl }
+// indexadas pela posição do item, para o sync casar a URL de volta.
+function clFotosParaFila() {
+  const fotos = {}
+  _clRespostas.forEach((r, i) => { if (r.foto) fotos[i] = r.foto })
+  return Object.keys(fotos).length ? fotos : null
+}
+
+// Ponto de entrada do botão "Iniciar viagem": passa pelo checklist
+// antes de chegar ao medidor.
+function abrirCheckout(id) { abrirChecklist(id, 'checkout') }
+
+function abrirModalCheckout(id) {
   const v = _viagens.find(x => x.id === id)
   _acaoId = id
   document.getElementById('co-resumo').innerHTML = `<strong>${esc(v.destino)}</strong><br>${esc(v.veiculo_modelo)} (${esc(v.veiculo_placa)})`
@@ -1781,19 +1979,25 @@ async function confirmarCheckout() {
     p_viagem_id: _acaoId, p_medida: medida,
     p_combustivel_pct: parseInt(document.getElementById('co-combustivel').value),
     p_lat: gps?.lat ?? null, p_lng: gps?.lng ?? null,
-    p_uuid_cliente: _fUuid()
+    p_uuid_cliente: _fUuid(),
+    p_inspecao: clPayloadInspecao()
   }
+  // Fotos do checklist viajam fora do payload e viram foto_url no
+  // envio (online aqui, offline no sync) — mesmo padrão do
+  // abastecimento e do comunicado de defeito.
+  const fotosInsp = clFotosParaFila()
   try {
     if (!navigator.onLine) throw new Error('offline')
+    if (fotosInsp) await fSubirFotosInspecao(payload, fotosInsp)
     const { error } = await db.rpc('frota_checkout_viagem', payload)
     if (error) throw error
     toast('Viagem iniciada! Boa viagem.', 'success')
-    fecharModal('checkout'); await carregarViagensMotorista()
+    fecharModal('checkout'); fecharChecklist(); await carregarViagensMotorista()
   } catch (e) {
     if (fPareceOffline(e)) {
-      await fOfflineEnfileirar('checkout', payload)
+      await fOfflineEnfileirar('checkout', payload, fotosInsp ? { inspecao: fotosInsp } : null)
       toast('Sem conexão — registrado localmente, será enviado ao reconectar.', 'warning')
-      fecharModal('checkout')
+      fecharModal('checkout'); fecharChecklist()
       atualizarBadgePendentesSync()
     } else {
       toast(e.message || 'Erro ao iniciar viagem', 'error')
@@ -1802,7 +2006,12 @@ async function confirmarCheckout() {
   finally { btn.disabled = false; btn.textContent = 'Iniciar Viagem' }
 }
 
-function abrirCheckin(id) {
+// Idem para "Concluir viagem" — no check-in o catálogo costuma ter
+// menos itens (só os marcados com na_chegada), e se não houver nenhum
+// abrirChecklist segue direto para o medidor.
+function abrirCheckin(id) { abrirChecklist(id, 'checkin') }
+
+function abrirModalCheckin(id) {
   const v = _viagens.find(x => x.id === id)
   _acaoId = id
   document.getElementById('ci-resumo').innerHTML = `<strong>${esc(v.destino)}</strong><br>${esc(v.veiculo_modelo)} (${esc(v.veiculo_placa)})`
@@ -1831,19 +2040,22 @@ async function confirmarCheckin() {
     p_observacoes: document.getElementById('ci-obs').value.trim() || null,
     p_avarias: document.getElementById('ci-avarias').value.trim() || '',
     p_lat: gps?.lat ?? null, p_lng: gps?.lng ?? null,
-    p_uuid_cliente: _fUuid()
+    p_uuid_cliente: _fUuid(),
+    p_inspecao: clPayloadInspecao()
   }
+  const fotosInsp = clFotosParaFila()
   try {
     if (!navigator.onLine) throw new Error('offline')
+    if (fotosInsp) await fSubirFotosInspecao(payload, fotosInsp)
     const { error } = await db.rpc('frota_checkin_viagem', payload)
     if (error) throw error
     toast('Viagem concluída!', 'success')
-    fecharModal('checkin'); await carregarViagensMotorista()
+    fecharModal('checkin'); fecharChecklist(); await carregarViagensMotorista()
   } catch (e) {
     if (fPareceOffline(e)) {
-      await fOfflineEnfileirar('checkin', payload)
+      await fOfflineEnfileirar('checkin', payload, fotosInsp ? { inspecao: fotosInsp } : null)
       toast('Sem conexão — registrado localmente, será enviado ao reconectar.', 'warning')
-      fecharModal('checkin')
+      fecharModal('checkin'); fecharChecklist()
       atualizarBadgePendentesSync()
     } else {
       toast(e.message || 'Erro ao concluir viagem', 'error')
