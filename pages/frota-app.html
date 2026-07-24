@@ -721,6 +721,7 @@ async function renderSolicitanteConfig() {
   document.getElementById('fm-conteudo').innerHTML = `
     <div class="form-section-label">Notificações</div>
     <div class="card" style="padding:0;margin-bottom:16px" id="fm-cfg-push">${itemPushConfig('carregando')}</div>
+    <div class="card" style="padding:0;margin-bottom:16px" id="fm-cfg-lembrete">${itemLembreteConfig('carregando')}</div>
     <div class="form-section-label">Configurações</div>
     <div class="card" style="padding:0">
       ${_papeis.length > 1 ? `<button class="fm-config-item" onclick="trocarPerfil()">${bico('shield')} Trocar perfil</button>` : ''}
@@ -736,6 +737,7 @@ async function renderSolicitanteConfig() {
       <p>© ${new Date().getFullYear()} · Todos os direitos reservados</p>
     </div>`
   atualizarItemPushConfig()
+  atualizarItemLembreteConfig()
   atualizarVersaoFrota()
 }
 
@@ -1007,6 +1009,7 @@ async function renderGestorConfig() {
   document.getElementById('fm-conteudo').innerHTML = `
     <div class="form-section-label">Notificações</div>
     <div class="card" style="padding:0;margin-bottom:16px" id="fm-cfg-push">${itemPushConfig('carregando')}</div>
+    <div class="card" style="padding:0;margin-bottom:16px" id="fm-cfg-lembrete">${itemLembreteConfig('carregando')}</div>
     <div class="form-section-label">Configurações</div>
     <div class="card" style="padding:0">
       ${_papeis.length > 1 ? `<button class="fm-config-item" onclick="trocarPerfil()">${bico('shield')} Trocar perfil</button>` : ''}
@@ -1023,6 +1026,7 @@ async function renderGestorConfig() {
       <p>© ${new Date().getFullYear()} · Todos os direitos reservados</p>
     </div>`
   atualizarItemPushConfig()
+  atualizarItemLembreteConfig()
   atualizarVersaoFrota()
 }
 
@@ -1604,6 +1608,7 @@ async function renderFmConfig() {
     </div>
     <div class="form-section-label">Notificações</div>
     <div class="card" style="padding:0;margin-bottom:16px" id="fm-cfg-push">${itemPushConfig('carregando')}</div>
+    <div class="card" style="padding:0;margin-bottom:16px" id="fm-cfg-lembrete">${itemLembreteConfig('carregando')}</div>
     <div class="form-section-label">Configurações</div>
     <div class="card" style="padding:0">
       ${_papeis.length > 1 ? `<button class="fm-config-item" onclick="trocarPerfil()">${bico('shield')} Trocar perfil</button>` : ''}
@@ -1622,6 +1627,7 @@ async function renderFmConfig() {
   await atualizarBadgePendentesSync()
   await renderFilaFrota()
   atualizarItemPushConfig()
+  atualizarItemLembreteConfig()
   atualizarVersaoFrota()
 }
 
@@ -3354,6 +3360,15 @@ async function rotearNotifFrota(n) {
   fecharModal('tarefas')
   if ((st === 'viagem_solicitada' || st === 'viagem_direta' || st === 'manutencao') && _ehGestor) {
     await entrarModo('gestor', false)
+  } else if (st === 'lembrete_viagem' && para === 'motorista' && _motorista) {
+    await entrarModo('motorista', false); motoristaAba('solicitacoes')
+  } else if (st === 'lembrete_viagem' && para === 'solicitante') {
+    await entrarModo('solicitante', false)
+    solicitanteAba('viagens')
+    if (n.meta?.viagem_id) {
+      await carregarMinhasViagens()
+      abrirDetalheSolicitante(n.meta.viagem_id)
+    }
   } else if (st === 'viagem_aprovada' && para === 'motorista' && _motorista) {
     await entrarModo('motorista', false); motoristaAba('solicitacoes')
   } else if ((st === 'viagem_aprovada' || st === 'viagem_recusada' || st === 'viagem_iniciada' || st === 'viagem_concluida') && para === 'solicitante') {
@@ -3713,6 +3728,56 @@ async function ativarPushFrota() {
   // Reflete o novo estado onde estiver visível
   atualizarEntradaPush()
   atualizarItemPushConfig()
+}
+
+// ── Lembretes de viagem (2h/1h/30min antes) — toggle independente do
+// push geral: desliga só esse tipo de aviso, sem mexer na inscrição
+// (aprovação/recusa de viagem e outros avisos continuam chegando).
+// Sem linha em frota_notif_preferencias = ativo (opt-out, não opt-in —
+// ver migration 208).
+let _lembreteViagemAtivo = null
+
+async function estadoLembreteViagem() {
+  if (_lembreteViagemAtivo !== null) return _lembreteViagemAtivo
+  try {
+    const { data } = await db.from('frota_notif_preferencias')
+      .select('lembrete_viagem_ativo').eq('usuario_id', _usuario.id).maybeSingle()
+    _lembreteViagemAtivo = data ? data.lembrete_viagem_ativo : true
+  } catch (e) {
+    _lembreteViagemAtivo = true
+  }
+  return _lembreteViagemAtivo
+}
+
+function itemLembreteConfig(estado) {
+  if (estado === 'carregando')
+    return `<div class="fm-config-item" style="cursor:default;color:#9CA3AF">${bico('clock')} <span>Verificando…</span></div>`
+  const ativo = estado === true
+  return `<button class="fm-config-item" onclick="alternarLembreteViagem()">
+    <span style="color:${ativo ? 'var(--verde-c,#52B788)' : '#9CA3AF'};display:inline-flex">${bico(ativo ? 'check' : 'x')}</span>
+    <span>Lembretes de viagem (2h, 1h e 30min antes)${ativo ? '' : ' — desativados'}</span>
+  </button>`
+}
+
+async function atualizarItemLembreteConfig() {
+  const alvo = document.getElementById('fm-cfg-lembrete')
+  if (!alvo) return
+  alvo.innerHTML = itemLembreteConfig(await estadoLembreteViagem())
+  bIconsAplicar(alvo)
+}
+
+async function alternarLembreteViagem() {
+  const novoValor = !(await estadoLembreteViagem())
+  try {
+    const { error } = await db.from('frota_notif_preferencias')
+      .upsert({ usuario_id: _usuario.id, lembrete_viagem_ativo: novoValor }, { onConflict: 'usuario_id' })
+    if (error) throw error
+    _lembreteViagemAtivo = novoValor
+    toast(novoValor ? 'Lembretes de viagem ativados' : 'Lembretes de viagem desativados', 'success')
+  } catch (e) {
+    toast('Não foi possível salvar: ' + (e.message || 'tente novamente'), 'error')
+  }
+  atualizarItemLembreteConfig()
 }
 
 if ('serviceWorker' in navigator && !window.Capacitor) {
