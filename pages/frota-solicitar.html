@@ -33,6 +33,18 @@
   </div>
 </div>
 
+<!-- Acompanhamento da viagem (par de abrirDetalheSolicitante do
+     frota-app.html — regra de duplicação do CLAUDE.md) -->
+<div class="modal-overlay" id="modal-detalhe">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-header">
+      <div class="modal-title">Acompanhar viagem</div>
+      <button class="modal-close" onclick="fecharModalDetalhe()">×</button>
+    </div>
+    <div class="modal-body" id="det-corpo"></div>
+  </div>
+</div>
+
 <script>
 let _usuario = null, _setores = [], _ucs = [], _minhasViagens = [], _cancelarId = null
 
@@ -132,13 +144,14 @@ function renderMinhasViagens() {
   if (!_minhasViagens.length) { tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:32px;color:#9CA3AF">Nenhuma solicitação ainda</td></tr>'; return }
   tbody.innerHTML = _minhasViagens.map(v => {
     const podeCancelar = ['solicitada','aprovada'].includes(v.status)
-    return `<tr>
+    return `<tr style="cursor:pointer" onclick="abrirDetalheSolicitante('${v.id}')">
       <td>${v.cidade_destino ? `<div style="font-size:12px;font-weight:600">${esc(v.cidade_origem||'Rio Branco')} → ${esc(v.cidade_destino)}</div>` : ''}<strong>${esc(v.destino)}</strong><br><span style="font-size:11px;color:#9CA3AF">${esc(v.finalidade)}</span></td>
       <td style="font-size:12px">${formatDataHora(v.data_saida_prevista)}<br>até ${formatDataHora(v.data_retorno_prevista)}</td>
       <td style="font-size:12px">${v.veiculo_placa ? `${esc(v.veiculo_modelo)} <span class="mono">(${esc(v.veiculo_placa)})</span><br>${esc(v.motorista_nome||'—')}` : '<span style="color:#9CA3AF">A definir</span>'}</td>
       <td><span class="badge ${STATUS_BADGE[v.status]||'badge-cinza'}">${STATUS_LABEL[v.status]||v.status}</span>
         ${v.status === 'recusada' && v.motivo_recusa ? `<div style="font-size:11px;color:#9CA3AF;margin-top:4px">${esc(v.motivo_recusa)}</div>` : ''}</td>
-      <td>${podeCancelar ? `<button class="btn btn-xs btn-ghost" style="color:#DC2626" onclick="abrirModalCancelar('${v.id}')">Cancelar</button>` : '—'}</td>
+      <td onclick="event.stopPropagation()">${podeCancelar ? `<button class="btn btn-xs btn-ghost" style="color:#DC2626" onclick="abrirModalCancelar('${v.id}')">Cancelar</button>` : ''}
+        <button class="btn btn-xs btn-ghost" onclick="abrirDetalheSolicitante('${v.id}')">Acompanhar</button></td>
     </tr>`
   }).join('')
 }
@@ -287,6 +300,109 @@ async function solicitar() {
     await carregarMinhasViagens()
   } catch (e) { toast(e.message || 'Erro ao solicitar viagem', 'error') }
   finally { btn.disabled = false; btn.innerHTML = `${bico('truck')} Solicitar Viagem` }
+}
+
+// ── Acompanhamento da viagem (par de abrirDetalheSolicitante do
+// frota-app.html — mesma linha do tempo, mesmo conteúdo, adaptado ao
+// layout de mesa). Antes a mesa só tinha a tabela plana: quem solicita
+// pelo computador — a maioria dos servidores — ficava sem o
+// acompanhamento que o app já dava.
+const FS_ETAPAS = ['solicitada', 'aprovada', 'em_andamento', 'concluida']
+
+function fsLinkMapa(lat, lng) {
+  if (lat == null || lng == null) return ''
+  return ` <a href="https://www.google.com/maps?q=${lat},${lng}" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline">${bico('pin')} ver no mapa</a>`
+}
+
+function fsLinkWhatsapp(telefone) {
+  const digitos = (telefone || '').replace(/\D/g, '')
+  if (!digitos) return ''
+  const numero = digitos.length <= 11 ? '55' + digitos : digitos
+  return `<a href="https://wa.me/${numero}" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline">${bico('chat')} ${esc(telefone)}</a>`
+}
+
+function fecharModalDetalhe() { document.getElementById('modal-detalhe').classList.remove('aberto') }
+
+function abrirDetalheSolicitante(id) {
+  const v = _minhasViagens.find(x => x.id === id)
+  if (!v) return
+  const finalizadaFora = v.status === 'recusada' || v.status === 'cancelada'
+  const etapaAtual = FS_ETAPAS.indexOf(v.status)
+  const podeCancelar = ['solicitada','aprovada'].includes(v.status)
+
+  const timeline = finalizadaFora
+    ? `<div class="card" style="margin-bottom:14px;background:${v.status === 'recusada' ? '#FEF2F2' : '#F9FAFB'}">
+        <div style="font-weight:700;color:${v.status === 'recusada' ? '#991B1B' : '#374151'}">${STATUS_LABEL[v.status]}</div>
+        ${v.status === 'recusada' && v.motivo_recusa ? `<div style="font-size:13px;color:#6B7280;margin-top:4px">${esc(v.motivo_recusa)}</div>` : ''}
+        ${v.status === 'cancelada' && v.motivo_cancelamento ? `<div style="font-size:13px;color:#6B7280;margin-top:4px">${esc(v.motivo_cancelamento)}</div>` : ''}
+      </div>`
+    : `<div class="card" style="margin-bottom:14px">
+        <div style="display:flex;justify-content:space-between">
+          ${[
+            { s: 'solicitada', l: 'Solicitada', em: v.criado_em },
+            { s: 'aprovada', l: 'Aprovada', em: v.aprovado_em },
+            { s: 'em_andamento', l: 'Em andamento', em: v.checkout_em },
+            { s: 'concluida', l: 'Concluída', em: v.checkin_em },
+          ].map((etapa, i) => {
+            const feita = i <= etapaAtual
+            return `<div style="flex:1;text-align:center">
+              <div style="width:22px;height:22px;border-radius:50%;margin:0 auto 6px;display:flex;align-items:center;justify-content:center;background:${feita ? 'var(--verde-c,#52B788)' : '#E5E7EB'};color:#fff;font-size:11px">${feita ? bico('check') : ''}</div>
+              <div style="font-size:11px;color:${feita ? '#1F4E2C' : '#9CA3AF'};font-weight:${feita ? '700' : '400'}">${etapa.l}</div>
+              ${etapa.em ? `<div style="font-size:10px;color:#9CA3AF">${formatDataHora(etapa.em)}</div>` : ''}
+            </div>`
+          }).join('')}
+        </div>
+      </div>`
+
+  document.getElementById('det-corpo').innerHTML = `
+    ${timeline}
+    <div style="font-size:13px;line-height:1.8">
+      ${v.cidade_destino ? `<div><strong>Cidade:</strong> ${esc(v.cidade_origem||'Rio Branco')} → ${esc(v.cidade_destino)}</div>` : ''}
+      <div><strong>Destino:</strong> ${esc(v.destino)}</div>
+      <div><strong>Finalidade:</strong> ${esc(v.finalidade)}</div>
+      <div><strong>Período previsto:</strong> ${formatDataHora(v.data_saida_prevista)} → ${formatDataHora(v.data_retorno_prevista)}</div>
+      ${v.passageiros ? `<div><strong>Passageiros:</strong> ${v.passageiros}${v.lista_passageiros ? ' — '+esc(v.lista_passageiros).replace(/\n/g,', ') : ''}</div>` : ''}
+    </div>
+    ${v.veiculo_placa ? `<div class="card" style="margin-top:14px;padding:14px;display:flex;align-items:center;gap:12px">
+      <div style="width:40px;height:40px;border-radius:10px;background:rgba(82,183,136,.12);display:flex;align-items:center;justify-content:center;color:var(--verde-c,#52B788);flex-shrink:0">${bico('truck')}</div>
+      <div style="font-size:13px">
+        <div style="font-weight:700">${esc(v.veiculo_modelo)} <span class="mono" style="color:#9CA3AF">(${esc(v.veiculo_placa)})</span></div>
+        ${v.motorista_nome ? `<div style="color:#6B7280">${esc(v.motorista_nome)}${v.motorista_telefone ? ' · '+fsLinkWhatsapp(v.motorista_telefone) : ''}</div>` : ''}
+      </div>
+    </div>` : ''}
+    ${v.checkout_em ? `<div style="font-size:13px;margin-top:10px"><strong>Saída registrada:</strong> ${formatDataHora(v.checkout_em)}${fsLinkMapa(v.lat_saida, v.lng_saida)}</div>` : ''}
+    ${v.checkin_em ? `<div style="font-size:13px;margin-top:4px"><strong>Chegada registrada:</strong> ${formatDataHora(v.checkin_em)}${fsLinkMapa(v.lat_chegada, v.lng_chegada)}</div>` : ''}
+    ${v.avarias ? `<div style="font-size:13px;color:#DC2626;margin-top:10px"><strong>Avarias registradas:</strong> ${esc(v.avarias)}</div>` : ''}
+    <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap">
+      ${podeCancelar ? `<button class="btn btn-secondary btn-sm" style="color:#DC2626" onclick="fecharModalDetalhe();abrirModalCancelar('${v.id}')">Cancelar viagem</button>` : ''}
+      <button class="btn btn-secondary btn-sm" onclick="repetirSolicitacao('${v.id}')">${bico('truck')} Solicitar de novo</button>
+    </div>`
+  document.getElementById('modal-detalhe').classList.add('aberto')
+  bIconsAplicar(document.getElementById('det-corpo'))
+}
+
+// Repete a solicitação: preenche o formulário (que na mesa é estático,
+// diferente do app, onde a tela é remontada) e leva o foco até ele.
+function repetirSolicitacao(id) {
+  const v = _minhasViagens.find(x => x.id === id)
+  if (!v) return
+  fecharModalDetalhe()
+  const set = (campo, valor) => { const el = document.getElementById(campo); if (el) el.value = valor ?? '' }
+  set('f-setor', v.setor_solicitante_id || '')
+  set('f-passageiros', v.passageiros || '')
+  set('f-passageiros-lista', v.lista_passageiros || '')
+  set('f-cidade-origem', v.cidade_origem || 'Rio Branco')
+  set('f-cidade-destino', v.cidade_destino || '')
+  set('f-destino', v.destino || '')
+  set('f-finalidade', v.finalidade || '')
+  set('f-uc', v.uc_destino_id || '')
+  // Datas ficam em branco de propósito: repetir uma viagem é repetir o
+  // roteiro, não o período — que quase sempre é outro.
+  set('f-saida', ''); set('f-retorno', '')
+  checarPassageiros(); checarIntermunicipal()
+  document.getElementById('f-saida')?.focus()
+  document.getElementById('f-saida')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  toast('Dados copiados — informe as novas datas da viagem.', 'info')
 }
 
 function abrirModalCancelar(id) {

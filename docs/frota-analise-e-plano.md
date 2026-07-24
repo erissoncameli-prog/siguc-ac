@@ -366,16 +366,55 @@ ativos têm.
 *Nota:* `brigadistas`, `registros-campo`, `biomonitor-fotos` e `config-logos` têm o
 aviso idêntico e seguem públicos — mesma classe, outros módulos, entrega separada.
 
-### Fase 4 — Paridade e auditoria
+### Fase 4 — Paridade e auditoria — ✅ CONCLUÍDA em 24/07/2026
 
-9. Levar a tela de acompanhamento do solicitante para `frota-solicitar.html` (timeline,
-   detalhe, mapa, repetir solicitação) — cumprindo a regra de duplicação.
-10. Auditar o login do App Frota: `verificar_bloqueio` + `registrar_tentativa_acesso` +
-    `registrar_saida_acesso`, como o `index.html` já faz.
-11. Limitador de tentativas do PIN (contador persistido + atraso progressivo + wipe da
-    sessão após N falhas).
-12. Bloquear aprovação de motorista que está em viagem `em_andamento` + painel de
-    "viagens vencidas sem check-in" na mesa.
+9. ✅ Tela de acompanhamento portada para `frota-solicitar.html`: linha do tempo
+   (solicitada → aprovada → em andamento → concluída) com carimbos, card de veículo e
+   motorista com WhatsApp, links de mapa do GPS, avarias e "solicitar de novo". Linha
+   da tabela virou clicável. Regra de duplicação cumprida.
+10. ✅ Login do App Frota auditado: `verificar_bloqueio` antes,
+    `registrar_tentativa_acesso` depois (com aviso de tentativas restantes e bloqueio
+    de 30 min na 5ª), e `registrar_saida_acesso` no logout. O acesso por CPF do
+    motorista era o caminho com menos proteção e sem rastro em `auditoria_acessos`.
+11. ✅ Limitador de tentativas do PIN: contador persistido no IndexedDB (não some ao
+    fechar o app), espera progressiva a partir da 3ª falha (5s → 10 min) e derrubada da
+    sessão na 10ª — daí em diante só com senha. Zerado ao acertar, ao definir PIN novo,
+    no "esqueci o PIN" e na troca de dono do aparelho.
+12. ✅ `201_frota_motorista_viagem_vencida.sql`: guarda `frota_checar_motorista_livre`
+    nas duas RPCs de aprovação + view `vw_frota_viagens_vencidas`. Painel de vencidas
+    em `frota-viagens.html` e marcação de atraso na aba "Em andamento" do modo gestor
+    do app (as duas superfícies).
+
+**Sobre a regra do item 12.** O bloqueio é para viagem em andamento **já vencida**
+(retorno previsto no passado), não para qualquer viagem em andamento. Enquanto a viagem
+corre dentro do prazo, a constraint de exclusão já impede sobreposição; escalar hoje,
+para o mês que vem, um motorista que está em viagem dentro do prazo é legítimo. O
+bloqueio vale exatamente para o estado que a constraint não enxerga — e o teste 2 da
+verificação confirma isso, checando que os períodos do caso testado de fato **não** se
+sobrepõem, ou seja, a constraint sozinha não pegaria.
+
+**Bug encontrado e corrigido de passagem** (`202_frota_viagens_detalhe_motorista_telefone.sql`):
+a tela de acompanhamento do app (commit `f1151b4`) monta um link de WhatsApp a partir
+de `v.motorista_telefone`, mas `vw_frota_viagens_detalhe` **nunca expôs essa coluna**.
+O campo chegava `undefined`, a condicional era sempre falsa e o link nunca aparecia —
+falha silenciosa, sem erro no console. Descoberto ao portar a tela para a mesa, onde a
+mesma linha seria copiada com o mesmo defeito. A coluna foi adicionada no fim da view,
+o que conserta as duas superfícies sem tocar em nenhuma delas.
+
+*Verificação executada:* 5 asserções para a 201 (com dados fabricados e `RAISE` para
+rollback) — bloqueio da escala com motorista atrasado, confirmação de que a constraint
+sozinha não pegaria, ausência de bloqueio indevido para viagem dentro do prazo, a view
+listando a viagem atrasada, e `anon` seguindo fechado. Mais 7 asserções de estado após
+a 202. Sintaxe conferida nas três páginas alteradas e todos os símbolos novos
+resolvidos.
+
+*Versionamento:* `pwa/sw.js` — frota v47 → v48.
+
+*Observação registrada:* `obterIP()` no `index.html` chama `api.ipify.org`, que não
+está no `connect-src` do CSP (`vercel.json`) — a chamada é bloqueada e o IP chega nulo
+na auditoria da plataforma inteira, silenciosamente (há `try/catch`). No App Frota o IP
+vai nulo de propósito, sem pagar o custo da requisição. Corrigir o `index.html` (liberar
+o domínio no CSP ou tirar a chamada) fica fora do escopo do módulo Frota.
 
 ### Fase 5 — Checklist de inspeção (a feature)
 
