@@ -106,6 +106,20 @@ async function fSyncUploadFotoAbastecimento(dataUrl, uuidCliente, qual) {
   return publicUrl
 }
 
+// Upload de uma foto do comunicado de defeito (bucket frota-manutencao,
+// migration 194) — mesmo molde de fSyncUploadFotoAbastecimento.
+async function fSyncUploadFotoDefeito(dataUrl, uuidCliente, indice) {
+  const blob = fSyncBase64ParaBlob(dataUrl)
+  const ext  = blob.type?.includes('png') ? 'png' : 'jpg'
+  const path = `${uuidCliente}/${indice}.${ext}`
+  const { error } = await db.storage
+    .from('frota-manutencao')
+    .upload(path, blob, { upsert: true, contentType: blob.type ?? 'image/jpeg' })
+  if (error) throw new Error(`Falha no upload da foto ${indice + 1}: ${error.message || error.error || JSON.stringify(error)}`)
+  const { data: { publicUrl } } = db.storage.from('frota-manutencao').getPublicUrl(path)
+  return publicUrl
+}
+
 async function fSyncUma(acao) {
   if (!db) return false
   await fOfflineMarcar(acao.uuid_cliente, 'enviando')
@@ -123,7 +137,13 @@ async function fSyncUma(acao) {
       if (acao.fotos?.hodometro) payload.p_foto_hodometro_url = await fSyncUploadFotoAbastecimento(acao.fotos.hodometro, acao.uuid_cliente, 'hodometro')
       ;({ error } = await db.rpc('frota_registrar_abastecimento', payload))
     } else if (acao.tipo === 'defeito') {
-      ;({ error } = await db.rpc('frota_reportar_defeito', acao.payload))
+      const payload = { ...acao.payload }
+      if (acao.fotos?.lista?.length) {
+        payload.p_fotos_urls = await Promise.all(
+          acao.fotos.lista.map((f, i) => fSyncUploadFotoDefeito(f, acao.uuid_cliente, i))
+        )
+      }
+      ;({ error } = await db.rpc('frota_reportar_defeito', payload))
     } else {
       error = new Error('Tipo de ação desconhecido: ' + acao.tipo)
     }

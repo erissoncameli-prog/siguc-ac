@@ -276,6 +276,9 @@ function renderComunicados() {
         </div>` : ''}
       </div>
       <div style="font-size:13px;color:#374151;margin-top:8px">${esc(c.descricao)}</div>
+      ${c.fotos_urls?.length ? `<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px">
+        ${c.fotos_urls.map(url => `<a href="${esc(url)}" target="_blank" rel="noopener"><img src="${esc(url)}" style="width:64px;height:64px;object-fit:cover;border-radius:8px;display:block"></a>`).join('')}
+      </div>` : ''}
     </div>`).join('')
 }
 

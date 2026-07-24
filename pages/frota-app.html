@@ -185,6 +185,11 @@ const _frotaReady = _dbReady.then(function () {
         <select class="form-control" id="df-veiculo"><option value="">Carregando...</option></select></div>
       <div class="form-group"><label class="form-label">Descreva o defeito <span class="obrig">*</span></label>
         <textarea class="form-control" id="df-descricao" rows="4" placeholder="Ex.: barulho no motor ao acelerar, pneu murchando, farol queimado..."></textarea></div>
+      <div class="form-group">
+        <label class="form-label">Fotos do defeito <span id="df-fotos-contador" style="color:#9CA3AF;font-weight:400">(0/5)</span></label>
+        <input class="form-control" id="df-foto-input" type="file" accept="image/*" capture="environment" onchange="capturarFotoDefeito(this)">
+        <div id="df-fotos-preview" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px"></div>
+      </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="fecharModal('defeito')">Cancelar</button>
@@ -1862,7 +1867,38 @@ async function confirmarAbastecimento() {
 // abrir a Ordem de Serviço corretiva na mesa (frota-manutencao.html).
 // Mesma trava de veículo do abastecimento: se há viagem em andamento,
 // o defeito é reportado nela; senão, escolhe entre os veículos dele.
-let _defeitoViagemId = null, _defeitoVeiculos = []
+let _defeitoViagemId = null, _defeitoVeiculos = [], _defeitoFotos = []
+
+// Fotos convertidas para base64 na captura (mesmo motivo do
+// abastecimento: Blob fica inválido em background em iOS/PWA até o
+// sync subir pro Storage). Até 5 por comunicado.
+function capturarFotoDefeito(input) {
+  const file = input.files?.[0]
+  input.value = ''
+  if (!file) return
+  if (_defeitoFotos.length >= 5) { toast('Máximo de 5 fotos por comunicado', 'error'); return }
+  const reader = new FileReader()
+  reader.onload = () => {
+    _defeitoFotos.push(reader.result)
+    renderFotosDefeito()
+  }
+  reader.readAsDataURL(file)
+}
+
+function removerFotoDefeito(i) {
+  _defeitoFotos.splice(i, 1)
+  renderFotosDefeito()
+}
+
+function renderFotosDefeito() {
+  document.getElementById('df-fotos-contador').textContent = `(${_defeitoFotos.length}/5)`
+  document.getElementById('df-foto-input').disabled = _defeitoFotos.length >= 5
+  document.getElementById('df-fotos-preview').innerHTML = _defeitoFotos.map((foto, i) => `
+    <div style="position:relative">
+      <img src="${foto}" style="width:64px;height:64px;object-fit:cover;border-radius:8px;display:block">
+      <button type="button" onclick="removerFotoDefeito(${i})" style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;border:none;background:#DC2626;color:#fff;font-size:12px;line-height:1;cursor:pointer">×</button>
+    </div>`).join('')
+}
 
 async function abrirDefeito(viagemId) {
   if (!viagemId) {
@@ -1871,6 +1907,9 @@ async function abrirDefeito(viagemId) {
   }
   _defeitoViagemId = viagemId
   document.getElementById('df-descricao').value = ''
+  _defeitoFotos = []
+  document.getElementById('df-foto-input').value = ''
+  renderFotosDefeito()
 
   const veiculoGrupo = document.getElementById('df-veiculo-grupo')
   if (viagemId) {
@@ -1905,17 +1944,21 @@ async function confirmarDefeito() {
   btn.disabled = true; btn.textContent = 'Enviando...'
   const payload = {
     p_veiculo_id: veiculo_id, p_descricao: descricao,
-    p_viagem_id: _defeitoViagemId, p_uuid_cliente: _fUuid()
+    p_viagem_id: _defeitoViagemId, p_uuid_cliente: _fUuid(), p_fotos_urls: null
   }
+  const fotos = [..._defeitoFotos]
   try {
     if (!navigator.onLine) throw new Error('offline')
+    if (fotos.length) {
+      payload.p_fotos_urls = await Promise.all(fotos.map((f, i) => fSyncUploadFotoDefeito(f, payload.p_uuid_cliente, i)))
+    }
     const { error } = await db.rpc('frota_reportar_defeito', payload)
     if (error) throw error
     toast('Defeito reportado! O setor de transporte vai avaliar.', 'success')
     fecharModal('defeito')
   } catch (e) {
     if (fPareceOffline(e)) {
-      await fOfflineEnfileirar('defeito', payload)
+      await fOfflineEnfileirar('defeito', payload, { lista: fotos })
       toast('Sem conexão — registrado localmente, será enviado ao reconectar.', 'warning')
       fecharModal('defeito')
       atualizarBadgePendentesSync()
@@ -2300,6 +2343,9 @@ function renderListaComunicadosGestor() {
         <button class="btn btn-xs btn-ghost" style="color:#DC2626" onclick="descartarComunicado('${c.id}')">Descartar</button>
       </div>
       <div style="font-size:13px;color:#374151;margin-top:8px">${esc(c.descricao)}</div>
+      ${c.fotos_urls?.length ? `<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px">
+        ${c.fotos_urls.map(url => `<a href="${esc(url)}" target="_blank" rel="noopener"><img src="${esc(url)}" style="width:56px;height:56px;object-fit:cover;border-radius:8px;display:block"></a>`).join('')}
+      </div>` : ''}
     </div>`).join('')
 }
 
