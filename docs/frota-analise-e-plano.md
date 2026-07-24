@@ -501,6 +501,41 @@ o cache de todos os motoristas em campo sem nenhum arquivo do app ter mudado.
 
 ---
 
+## 7b. Correção pós-entrega — foto do comunicado de defeito (24/07/2026)
+
+**Relatado:** na aba Manutenção do Administrar, o comunicado de defeito mostra os dados
+mas não as fotos; clicar no card não faz nada.
+
+**Causa:** `vw_frota_comunicados_manutencao` foi criada pela migration 193; a 194
+acrescentou `fotos_urls` à *tabela* e não refez a *view*. As duas telas leem a view, não
+a tabela — então `c.fotos_urls` chegava `undefined`, `c.fotos_urls?.length` era sempre
+falso e o bloco das fotos nunca entrava no HTML. Falha silenciosa: sem erro no console e
+sem imagem quebrada. Ou seja, **a foto do comunicado nunca apareceu desde que o recurso
+foi entregue na 194** — o dado sempre esteve correto na tabela e no Storage.
+
+Sobre o "clicar no card não faz nada": o card nunca foi clicável por desenho — as ações
+são os botões *Abrir OS* e *Descartar*, e o que é clicável é a própria foto (que não
+estava sendo renderizada).
+
+**Corrigido:** `206_frota_comunicados_view_fotos.sql` expõe a coluna na view, o que
+conserta a mesa e o modo gestor do app de uma vez.
+
+**Este é o terceiro caso da mesma família** no módulo — depois de `motorista_telefone`
+(202) e do `custo` inexistente que zerava o painel (Fase 6). Fica a regra: *ao adicionar
+coluna numa tabela que tem view de leitura, refazer a view na MESMA migration.*
+
+**Endurecimento de `js/frota-fotos.js`** feito junto, porque este episódio expôs que uma
+falha de assinatura era indistinguível de "não há foto":
+- o casamento das URLs assinadas passa a ter fallback posicional, além da chave `path` —
+  se o Storage devolvesse o caminho normalizado de forma diferente da enviada, **todas**
+  as fotos sumiriam em silêncio;
+- falha de assinatura agora deixa um marcador visível ("foto indisponível") com tooltip,
+  em vez de esconder o elemento;
+- `<a>` sem href perde o `target` e o cursor de link — link que não faz nada ao ser
+  clicado é pior que link nenhum, e era literalmente o sintoma relatado.
+
+---
+
 ## 8. Depois das seis fases
 
 Todas as fases do plano estão concluídas e em produção. O que ficou registrado como

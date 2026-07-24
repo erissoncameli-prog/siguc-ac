@@ -89,9 +89,17 @@ async function frotaAssinarFotos(root) {
       const paths = [...new Set(itens.map(i => i.path))]
       const { data, error } = await db.storage.from(bucket).createSignedUrls(paths, FROTA_FOTO_TTL)
       if (error) throw error
-      for (const d of (data || [])) {
-        if (d?.signedUrl && !d.error) assinadas[d.path] = d.signedUrl
-      }
+      const resp = data || []
+      resp.forEach((d, i) => {
+        const url = d?.signedUrl || d?.signedURL   // v2 usa signedUrl; tolera a grafia antiga
+        if (!url || d?.error) return
+        // Casa pelo path devolvido e, por segurança, também pela
+        // posição: se o Storage devolver o path normalizado de forma
+        // diferente da enviada, o casamento por chave falharia e TODAS
+        // as fotos sumiriam em silêncio.
+        if (d.path) assinadas[d.path] = url
+        if (paths[i] != null) assinadas[paths[i]] = url
+      })
     } catch (e) {
       console.warn('[frota-fotos] falha ao assinar', bucket, e?.message || e)
     }
@@ -117,22 +125,42 @@ function _frotaAplicarUrl(el, url) {
   }
 }
 
-// Sem foto exibível: troca por iniciais quando o chamador informou o
-// fallback (avatares), senão só esconde — melhor um espaço vazio que
-// um ícone de imagem quebrada.
+// Sem foto exibível. Avatar vira iniciais (o chamador informa o
+// fallback); qualquer outra imagem vira um marcador visível com
+// tooltip.
+//
+// O marcador é deliberado: antes a imagem era só escondida, então uma
+// falha de assinatura ficava indistinguível de "não há foto" — e o
+// usuário via um card sem nada, sem pista do que aconteceu. Agora
+// sobra um sinal na tela e um aviso no console.
 function _frotaFalhouFoto(el) {
   el.removeAttribute('data-frota-foto')
   const fb = el.dataset.frotaFallback
-  if (fb && el.tagName === 'IMG') {
-    const span = document.createElement('span')
-    span.className = 'sidebar-avatar'
-    span.style.cssText = el.getAttribute('style') || ''
-    span.style.display = 'inline-flex'
-    span.style.alignItems = 'center'
-    span.style.justifyContent = 'center'
-    span.textContent = fb
-    el.replaceWith(span)
+
+  if (el.tagName === 'A') {
+    // Link sem href não faz nada ao ser clicado — pior que não existir.
+    el.removeAttribute('target')
+    el.style.cursor = 'default'
     return
   }
-  if (el.tagName === 'IMG') el.style.display = 'none'
+  if (el.tagName !== 'IMG') return
+
+  const span = document.createElement('span')
+  span.style.cssText = el.getAttribute('style') || ''
+  span.style.display = 'inline-flex'
+  span.style.alignItems = 'center'
+  span.style.justifyContent = 'center'
+  if (fb) {
+    span.className = 'sidebar-avatar'
+    span.textContent = fb
+  } else {
+    span.style.background = 'rgba(0,0,0,.06)'
+    span.style.color = '#9CA3AF'
+    span.style.fontSize = '10px'
+    span.style.textAlign = 'center'
+    span.style.lineHeight = '1.2'
+    span.textContent = 'foto indisponível'
+    span.title = 'Não foi possível carregar a foto. Verifique a conexão e recarregue a página.'
+  }
+  el.replaceWith(span)
 }
