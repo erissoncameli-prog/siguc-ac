@@ -30,6 +30,9 @@
 </style>
 
 <script>
+// Subir junto com a versão do app quando uma página de aba mudar.
+const FA_VERSAO = '2026-07-24-3'
+
 const FA_ABAS = [
   { id: 'manutencao',     label: 'Manutenção',              src: 'frota-manutencao.html' },
   { id: 'abastecimentos', label: 'Abastecimentos',          src: 'frota-abastecimentos.html' },
@@ -66,7 +69,11 @@ function faMudarAba(id) {
 function faCarregarAba(aba) {
   const iframe = document.getElementById(`fa-frame-${aba.id}`)
   iframe.addEventListener('load', () => faAjustarAltura(aba.id), { once: true })
-  iframe.src = `${aba.src}?embed=1`
+  // &v= força o navegador a buscar a página da aba de novo a cada deploy.
+  // Sem isso o Safari (principalmente no iPhone) serve o HTML antigo do
+  // iframe por tempo indeterminado, e a aba fica mostrando uma versão
+  // anterior enquanto o resto do site já atualizou.
+  iframe.src = `${aba.src}?embed=1&v=${FA_VERSAO}`
 }
 
 function faAjustarAltura(id) {

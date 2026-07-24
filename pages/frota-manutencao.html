@@ -263,18 +263,62 @@ async function carregarOS() {
 // O motorista só reporta (frota-app.html); abrir a OS de verdade
 // (formulário completo — oficina, peças, custo) é só aqui na mesa.
 let _comunicados = []
+// O erro do Supabase era DESCARTADO aqui (`const { data } = ...`): se a
+// consulta falhasse, a lista ficava vazia sem nenhum sinal — nem na tela,
+// nem no console. Agora o motivo é guardado e exibido.
+let _comunicadosErro = null
 async function carregarComunicados() {
-  const { data } = await db.from('vw_frota_comunicados_manutencao').select('*')
-    .eq('status', 'pendente').order('criado_em', { ascending: false })
-  _comunicados = data || []
+  try {
+    const { data, error } = await db.from('vw_frota_comunicados_manutencao').select('*')
+      .eq('status', 'pendente').order('criado_em', { ascending: false })
+    if (error) throw error
+    _comunicadosErro = null
+    _comunicados = data || []
+  } catch (e) {
+    _comunicadosErro = e?.message || String(e)
+    _comunicados = []
+    console.error('[frota] carregarComunicados', e)
+  }
   renderComunicados()
+}
+
+// Monta o bloco de fotos de UM comunicado. Isolado e com try/catch de
+// propósito: foto é enfeite, o comunicado é o trabalho. Uma falha aqui
+// não pode derrubar o card — muito menos a lista inteira, que foi
+// exatamente o que aconteceu.
+function htmlFotosComunicado(c) {
+  try {
+    if (!c.fotos_urls?.length) return ''
+    const fotos = c.fotos_urls
+      .map(url => `<a ${frotaFotoAttr(url)} target="_blank" rel="noopener"><img ${frotaFotoAttr(url)} style="width:64px;height:64px;object-fit:cover;border-radius:8px;display:block"></a>`)
+      .join('')
+    return `<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px">${fotos}</div>`
+  } catch (e) {
+    console.error('[frota] htmlFotosComunicado', e)
+    return '<div style="font-size:11px;color:#9CA3AF;margin-top:8px">(não foi possível exibir as fotos)</div>'
+  }
 }
 
 function renderComunicados() {
   const card = document.getElementById('card-comunicados')
   const el = document.getElementById('lista-comunicados')
-  if (!_comunicados.length) { card.style.display = 'none'; return }
+  if (!card || !el) return
+
+  // O card fica SEMPRE visível. Antes ele se escondia quando a lista
+  // estava vazia, o que tornava "não há comunicado" indistinguível de
+  // "quebrou" — e foi o que cegou o diagnóstico deste bug.
   card.style.display = ''
+
+  if (_comunicadosErro) {
+    el.innerHTML = `<div style="font-size:12px;color:#B91C1C;background:#FEF2F2;border-radius:8px;padding:10px 12px">
+      Não foi possível carregar os comunicados.<br><span style="color:#6B7280">${esc(_comunicadosErro)}</span></div>`
+    return
+  }
+  if (!_comunicados.length) {
+    el.innerHTML = '<div style="font-size:12px;color:#9CA3AF">Nenhum comunicado de defeito pendente.</div>'
+    return
+  }
+
   el.innerHTML = _comunicados.map(c => `
     <div class="card" style="margin-bottom:8px;padding:12px 14px;border:1px solid #F3F4F6">
       <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:wrap">
@@ -288,9 +332,7 @@ function renderComunicados() {
         </div>` : ''}
       </div>
       <div style="font-size:13px;color:#374151;margin-top:8px">${esc(c.descricao)}</div>
-      ${c.fotos_urls?.length ? `<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px">
-        ${c.fotos_urls.map(url => `<a ${frotaFotoAttr(url)} target="_blank" rel="noopener"><img ${frotaFotoAttr(url)} style="width:64px;height:64px;object-fit:cover;border-radius:8px;display:block"></a>`).join('')}
-      </div>` : ''}
+      ${htmlFotosComunicado(c)}
     </div>`).join('')
   // Bucket privado (migration 200) — assina depois de montar a lista.
   frotaAssinarFotos(el)
