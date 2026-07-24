@@ -171,6 +171,33 @@ const _frotaReady = _dbReady.then(function () {
   </div>
 </div>
 
+<!-- Modal Solicitar manutenção (Motorista) — comunicado de defeito,
+     cai como pendência pra gestão validar e abrir a OS (mesa) -->
+<div class="modal-overlay" id="modal-defeito">
+  <div class="modal" style="max-width:460px">
+    <div class="modal-header">
+      <div class="modal-title">Solicitar manutenção</div>
+      <button class="modal-close" onclick="fecharModal('defeito')">×</button>
+    </div>
+    <div class="modal-body">
+      <div id="df-resumo" style="font-size:13px;color:#6B7280;margin-bottom:14px"></div>
+      <div class="form-group" id="df-veiculo-grupo"><label class="form-label">Veículo <span class="obrig">*</span></label>
+        <select class="form-control" id="df-veiculo"><option value="">Carregando...</option></select></div>
+      <div class="form-group"><label class="form-label">Descreva o defeito <span class="obrig">*</span></label>
+        <textarea class="form-control" id="df-descricao" rows="4" placeholder="Ex.: barulho no motor ao acelerar, pneu murchando, farol queimado..."></textarea></div>
+      <div class="form-group">
+        <label class="form-label">Fotos do defeito <span id="df-fotos-contador" style="color:#9CA3AF;font-weight:400">(0/5)</span></label>
+        <input class="form-control" id="df-foto-input" type="file" accept="image/*" capture="environment" onchange="capturarFotoDefeito(this)">
+        <div id="df-fotos-preview" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="fecharModal('defeito')">Cancelar</button>
+      <button class="btn btn-primary" id="btn-confirmar-defeito" onclick="confirmarDefeito()">Enviar</button>
+    </div>
+  </div>
+</div>
+
 <!-- Menu da foto do motorista (ver / trocar) -->
 <div class="modal-overlay" id="modal-foto-mot-menu">
   <div class="modal" style="max-width:320px">
@@ -1092,7 +1119,8 @@ function renderFmInicio() {
         <div style="font-size:12px;color:#9CA3AF">CNH ${esc(_motorista.cnh_categoria||'—')} ${_motorista.cnh_numero ? '· '+esc(_motorista.cnh_numero) : ''}</div>
       </div>
     </div>
-    <button class="btn btn-secondary" style="width:100%;margin-bottom:16px" onclick="abrirAbastecimento(null)">${bico('fuel')} Registrar abastecimento</button>
+    <button class="btn btn-secondary" style="width:100%;margin-bottom:10px" onclick="abrirAbastecimento(null)">${bico('fuel')} Registrar abastecimento</button>
+    <button class="btn btn-secondary" style="width:100%;margin-bottom:16px" onclick="abrirDefeito(null)">${bico('wrench')} Solicitar manutenção</button>
     ${ativas.length ? `
       <div class="form-section-label">Viagem em andamento</div>
       ${ativas.slice(0, 1).map(fmCardViagem).join('')}
@@ -1834,6 +1862,113 @@ async function confirmarAbastecimento() {
   finally { btn.disabled = false; btn.textContent = 'Registrar' }
 }
 
+// ── Solicitar manutenção (comunicado de defeito) ──────────────────
+// O motorista só reporta — vira pendência para a gestão validar e
+// abrir a Ordem de Serviço corretiva na mesa (frota-manutencao.html).
+// Mesma trava de veículo do abastecimento: se há viagem em andamento,
+// o defeito é reportado nela; senão, escolhe entre os veículos dele.
+let _defeitoViagemId = null, _defeitoVeiculos = [], _defeitoFotos = []
+
+// Fotos convertidas para base64 na captura (mesmo motivo do
+// abastecimento: Blob fica inválido em background em iOS/PWA até o
+// sync subir pro Storage). Até 5 por comunicado.
+function capturarFotoDefeito(input) {
+  const file = input.files?.[0]
+  input.value = ''
+  if (!file) return
+  if (_defeitoFotos.length >= 5) { toast('Máximo de 5 fotos por comunicado', 'error'); return }
+  const reader = new FileReader()
+  reader.onload = () => {
+    _defeitoFotos.push(reader.result)
+    renderFotosDefeito()
+  }
+  reader.readAsDataURL(file)
+}
+
+function removerFotoDefeito(i) {
+  _defeitoFotos.splice(i, 1)
+  renderFotosDefeito()
+}
+
+function renderFotosDefeito() {
+  document.getElementById('df-fotos-contador').textContent = `(${_defeitoFotos.length}/5)`
+  document.getElementById('df-foto-input').disabled = _defeitoFotos.length >= 5
+  document.getElementById('df-fotos-preview').innerHTML = _defeitoFotos.map((foto, i) => `
+    <div style="position:relative">
+      <img src="${foto}" style="width:64px;height:64px;object-fit:cover;border-radius:8px;display:block">
+      <button type="button" onclick="removerFotoDefeito(${i})" style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;border:none;background:#DC2626;color:#fff;font-size:12px;line-height:1;cursor:pointer">×</button>
+    </div>`).join('')
+}
+
+async function abrirDefeito(viagemId) {
+  if (!viagemId) {
+    const ativa = await fmViagemAtivaDoMotorista()
+    if (ativa) viagemId = ativa.id
+  }
+  _defeitoViagemId = viagemId
+  document.getElementById('df-descricao').value = ''
+  _defeitoFotos = []
+  document.getElementById('df-foto-input').value = ''
+  renderFotosDefeito()
+
+  const veiculoGrupo = document.getElementById('df-veiculo-grupo')
+  if (viagemId) {
+    const v = _viagens.find(x => x.id === viagemId)
+    document.getElementById('df-resumo').innerHTML = v ? `<strong>${esc(v.destino)}</strong><br>${esc(v.veiculo_modelo)} (${esc(v.veiculo_placa)})` : ''
+    veiculoGrupo.style.display = 'none'
+    _defeitoVeiculos = v ? [{ id: v.veiculo_id, placa: v.veiculo_placa, modelo: v.veiculo_modelo }] : []
+    document.getElementById('df-veiculo').innerHTML = _defeitoVeiculos.map(x => `<option value="${x.id}" selected>${esc(x.placa)}</option>`).join('')
+  } else {
+    document.getElementById('df-resumo').innerHTML = ''
+    veiculoGrupo.style.display = ''
+    document.getElementById('df-veiculo').innerHTML = '<option value="">Carregando...</option>'
+    // Mesma RPC do abastecimento avulso (183/184): veículo(s) do
+    // motorista, com fallback pra frota ativa toda se não houver nenhum
+    // configurado — evita duplicar a regra de "quais veículos ele usa".
+    if (!_abastVeiculos.length) await carregarVeiculosAtivosAbastecimento()
+    _defeitoVeiculos = _abastVeiculos
+    document.getElementById('df-veiculo').innerHTML = _defeitoVeiculos.length
+      ? '<option value="">Selecione...</option>' + _defeitoVeiculos.map(v => `<option value="${v.id}">${esc(v.placa)} — ${esc(v.modelo)}</option>`).join('')
+      : '<option value="">Nenhum veículo cadastrado</option>'
+  }
+  document.getElementById('modal-defeito').classList.add('aberto')
+}
+
+async function confirmarDefeito() {
+  const veiculo_id = document.getElementById('df-veiculo').value
+  const descricao = document.getElementById('df-descricao').value.trim()
+  if (!veiculo_id) { toast('Selecione o veículo', 'error'); return }
+  if (!descricao) { toast('Descreva o defeito', 'error'); return }
+
+  const btn = document.getElementById('btn-confirmar-defeito')
+  btn.disabled = true; btn.textContent = 'Enviando...'
+  const payload = {
+    p_veiculo_id: veiculo_id, p_descricao: descricao,
+    p_viagem_id: _defeitoViagemId, p_uuid_cliente: _fUuid(), p_fotos_urls: null
+  }
+  const fotos = [..._defeitoFotos]
+  try {
+    if (!navigator.onLine) throw new Error('offline')
+    if (fotos.length) {
+      payload.p_fotos_urls = await Promise.all(fotos.map((f, i) => fSyncUploadFotoDefeito(f, payload.p_uuid_cliente, i)))
+    }
+    const { error } = await db.rpc('frota_reportar_defeito', payload)
+    if (error) throw error
+    toast('Defeito reportado! O setor de transporte vai avaliar.', 'success')
+    fecharModal('defeito')
+  } catch (e) {
+    if (fPareceOffline(e)) {
+      await fOfflineEnfileirar('defeito', payload, { lista: fotos })
+      toast('Sem conexão — registrado localmente, será enviado ao reconectar.', 'warning')
+      fecharModal('defeito')
+      atualizarBadgePendentesSync()
+    } else {
+      toast(e.message || 'Erro ao reportar defeito', 'error')
+    }
+  }
+  finally { btn.disabled = false; btn.textContent = 'Enviar' }
+}
+
 // ═══════════════════════════════════════════════════════════════
 // MODO SOLICITANTE
 // ═══════════════════════════════════════════════════════════════
@@ -2098,7 +2233,7 @@ async function confirmarCancelar() {
 // ═══════════════════════════════════════════════════════════════
 async function renderModoGestor() {
   await Promise.all([carregarVeiculosGestor(), carregarMotoristasGestor()])
-  await Promise.all([carregarViagensGestor(), carregarManutGestor()])
+  await Promise.all([carregarViagensGestor(), carregarManutGestor(), carregarComunicadosGestor()])
   gestorAba(_fgAba)
 }
 
@@ -2132,8 +2267,12 @@ function renderGestorAndamento() {
 
 function renderGestorManutencao() {
   document.getElementById('fm-conteudo').innerHTML = `
+    <div class="form-section-label">Comunicados de defeito</div>
+    <div style="font-size:12px;color:#9CA3AF;margin:-10px 0 10px">Abrir a Ordem de Serviço é feito na mesa (Manutenção) — aqui dá pra descartar um falso alarme.</div>
+    <div id="g-lista-comunicados" style="margin-bottom:24px"></div>
     <div class="form-section-label">Alertas de manutenção</div>
     <div id="g-lista-manut" style="margin-bottom:24px"></div>`
+  renderListaComunicadosGestor()
   renderListaManutGestor()
 }
 
@@ -2166,6 +2305,15 @@ async function carregarManutGestor() {
   renderListaManutGestor()
 }
 
+let _comunicadosPendentes = []
+async function carregarComunicadosGestor() {
+  const { data } = await db.from('vw_frota_comunicados_manutencao').select('*')
+    .eq('status', 'pendente').order('criado_em', { ascending: false })
+  _comunicadosPendentes = data || []
+  renderKpisGestor()
+  renderListaComunicadosGestor()
+}
+
 function renderKpisGestor() {
   const set = (id, v) => { const el = document.getElementById(id); if (el) fwAnimateNumber(el, v) }
   const pend = _viagensPendentes.filter(v => v.status === 'solicitada').length
@@ -2177,7 +2325,41 @@ function renderKpisGestor() {
   const bp = document.getElementById('fg-badge-pend')
   if (bp) { bp.hidden = pend === 0; bp.textContent = pend }
   const bm = document.getElementById('fg-badge-manut')
-  if (bm) { bm.hidden = manutVencido === 0; bm.textContent = manutVencido }
+  const totalManut = manutVencido + _comunicadosPendentes.length
+  if (bm) { bm.hidden = totalManut === 0; bm.textContent = totalManut }
+}
+
+function renderListaComunicadosGestor() {
+  const el = document.getElementById('g-lista-comunicados')
+  if (!el) return
+  if (!_comunicadosPendentes.length) { el.innerHTML = '<div class="card" style="text-align:center;padding:20px;color:#9CA3AF">Nenhum comunicado pendente</div>'; return }
+  el.innerHTML = _comunicadosPendentes.map(c => `
+    <div class="card" style="margin-bottom:8px;padding:12px 14px">
+      <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start">
+        <div>
+          <div style="font-weight:600;font-size:13px">${esc(c.veiculo_placa)} · ${esc(c.veiculo_modelo)}</div>
+          <div style="font-size:11px;color:#9CA3AF">${esc(c.motorista_nome)} · ${formatDataHora(c.criado_em)}</div>
+        </div>
+        <button class="btn btn-xs btn-ghost" style="color:#DC2626" onclick="descartarComunicado('${c.id}')">Descartar</button>
+      </div>
+      <div style="font-size:13px;color:#374151;margin-top:8px">${esc(c.descricao)}</div>
+      ${c.fotos_urls?.length ? `<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px">
+        ${c.fotos_urls.map(url => `<a href="${esc(url)}" target="_blank" rel="noopener"><img src="${esc(url)}" style="width:56px;height:56px;object-fit:cover;border-radius:8px;display:block"></a>`).join('')}
+      </div>` : ''}
+    </div>`).join('')
+}
+
+async function descartarComunicado(id) {
+  const motivo = prompt('Motivo do descarte (opcional):')
+  if (motivo === null) return
+  try {
+    const { error } = await db.from('frota_comunicados_manutencao')
+      .update({ status: 'descartado', motivo_descarte: motivo || null, validado_por: appState.usuario.id, validado_em: new Date().toISOString() })
+      .eq('id', id)
+    if (error) throw error
+    toast('Comunicado descartado', 'success')
+    await carregarComunicadosGestor()
+  } catch (e) { toast(e.message || 'Erro ao descartar', 'error') }
 }
 
 function renderListaPendentesGestor() {

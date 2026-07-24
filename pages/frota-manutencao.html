@@ -160,6 +160,11 @@ const STATUS_OS_BADGE = { aberta:'fw-badge fw-badge-inativo', em_andamento:'fw-b
         <div class="fw-kpi-card"><div class="fw-kpi-label">Custo (últimos 30 dias)</div><div class="fw-kpi-value" id="k-custo" style="font-size:1.4rem">—</div></div>
       </div>
 
+      <div class="card" style="margin-bottom:16px" id="card-comunicados">
+        <div class="form-section-label" style="padding:0 0 10px">Comunicados de defeito (reportados pelos motoristas)</div>
+        <div id="lista-comunicados"></div>
+      </div>
+
       <div class="card" style="margin-bottom:16px">
         <div style="display:flex;gap:4px;padding:4px;background:rgba(0,0,0,.06);border-radius:10px;width:fit-content">
           <button class="tab-btn ativo" id="tab-planos" onclick="mudarAba('planos')">Planos Preventivos</button>
@@ -206,7 +211,7 @@ const STATUS_OS_BADGE = { aberta:'fw-badge fw-badge-inativo', em_andamento:'fw-b
   carregarLogosSidebar()
   bIconsAplicar()
   await carregarVeiculos()
-  await Promise.all([carregarPlanos(), carregarOS(), carregarSugestoes()])
+  await Promise.all([carregarPlanos(), carregarOS(), carregarSugestoes(), carregarComunicados()])
 })()
 
 function mudarAba(aba) {
@@ -240,6 +245,68 @@ async function carregarOS() {
   _ordens = data || []
   renderOS()
   renderKpis()
+}
+
+// ── Comunicados de defeito (reportados pelo motorista no app) ──
+// O motorista só reporta (frota-app.html); abrir a OS de verdade
+// (formulário completo — oficina, peças, custo) é só aqui na mesa.
+let _comunicados = []
+async function carregarComunicados() {
+  const { data } = await db.from('vw_frota_comunicados_manutencao').select('*')
+    .eq('status', 'pendente').order('criado_em', { ascending: false })
+  _comunicados = data || []
+  renderComunicados()
+}
+
+function renderComunicados() {
+  const card = document.getElementById('card-comunicados')
+  const el = document.getElementById('lista-comunicados')
+  if (!_comunicados.length) { card.style.display = 'none'; return }
+  card.style.display = ''
+  el.innerHTML = _comunicados.map(c => `
+    <div class="card" style="margin-bottom:8px;padding:12px 14px;border:1px solid #F3F4F6">
+      <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:wrap">
+        <div>
+          <div style="font-weight:600;font-size:13px">${esc(c.veiculo_placa)} · ${esc(c.veiculo_modelo)}</div>
+          <div style="font-size:11px;color:#9CA3AF">${esc(c.motorista_nome)} · ${formatDataHora(c.criado_em)}</div>
+        </div>
+        ${_podeEditar ? `<div style="display:flex;gap:8px">
+          <button class="btn btn-xs btn-secondary" onclick="abrirOSDoComunicado('${c.id}')">${bico('edit')} Abrir OS</button>
+          <button class="btn btn-xs btn-ghost" style="color:#DC2626" onclick="descartarComunicado('${c.id}')">Descartar</button>
+        </div>` : ''}
+      </div>
+      <div style="font-size:13px;color:#374151;margin-top:8px">${esc(c.descricao)}</div>
+      ${c.fotos_urls?.length ? `<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px">
+        ${c.fotos_urls.map(url => `<a href="${esc(url)}" target="_blank" rel="noopener"><img src="${esc(url)}" style="width:64px;height:64px;object-fit:cover;border-radius:8px;display:block"></a>`).join('')}
+      </div>` : ''}
+    </div>`).join('')
+}
+
+// Pré-preenche a Nova OS com veículo + descrição do comunicado; ao
+// salvar (salvarOS), o comunicado é vinculado e marcado como validado.
+let _comunicadoAbrindoOS = null
+async function abrirOSDoComunicado(id) {
+  const c = _comunicados.find(x => x.id === id)
+  if (!c) return
+  await abrirModalOS()
+  _comunicadoAbrindoOS = c
+  document.getElementById('os-veiculo').value = c.veiculo_id
+  atualizarPlanosDoVeiculo()
+  document.getElementById('os-tipo').value = 'corretiva'
+  document.getElementById('os-descricao').value = c.descricao
+}
+
+async function descartarComunicado(id) {
+  const motivo = prompt('Motivo do descarte (opcional):')
+  if (motivo === null) return
+  try {
+    const { error } = await db.from('frota_comunicados_manutencao')
+      .update({ status: 'descartado', motivo_descarte: motivo || null, validado_por: appState.usuario.id, validado_em: new Date().toISOString() })
+      .eq('id', id)
+    if (error) throw error
+    toast('Comunicado descartado', 'success')
+    await carregarComunicados()
+  } catch (e) { toast(e.message || 'Erro ao descartar', 'error') }
 }
 
 // ── Sugestões de peças/marcas (autocompletar — cresce sozinha) ─
@@ -474,6 +541,7 @@ function recalcularTotalOS() {
 async function abrirModalOS(id = null) {
   const o = id ? _ordens.find(x => x.id === id) : null
   _editOsId = o?.id || null
+  _comunicadoAbrindoOS = null
   document.getElementById('os-titulo').textContent = o ? 'Editar Ordem de Serviço' : 'Nova Ordem de Serviço'
   document.getElementById('os-codigo-badge').textContent = o?.codigo ? `Código ${o.codigo}` : 'Código gerado automaticamente ao salvar'
   document.getElementById('os-veiculo').value = o?.veiculo_id || ''
@@ -538,6 +606,15 @@ async function salvarOS() {
         _osItensAtual.map(it => ({ os_id: osId, descricao: it.descricao, marca: it.marca || null, quantidade: it.quantidade, valor_unitario: it.valor_unitario }))
       )
       if (itensErr) throw itensErr
+    }
+    // Nasceu de um comunicado de defeito (abrirOSDoComunicado): vincula
+    // e marca como validado — some da lista de pendentes.
+    if (_comunicadoAbrindoOS && !_editOsId) {
+      await db.from('frota_comunicados_manutencao')
+        .update({ status: 'validado', os_id: osId, validado_por: appState.usuario.id, validado_em: new Date().toISOString() })
+        .eq('id', _comunicadoAbrindoOS.id)
+      _comunicadoAbrindoOS = null
+      await carregarComunicados()
     }
     toast(_editOsId ? 'Ordem de serviço atualizada!' : 'Ordem de serviço aberta!', 'success')
     fecharModal('os')
