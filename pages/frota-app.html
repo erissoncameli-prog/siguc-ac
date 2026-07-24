@@ -508,13 +508,12 @@ async function entrarComSessao(session, jaAutenticouSenha = false) {
   if (_deepLinkNotif) { const id = _deepLinkNotif; _deepLinkNotif = null; abrirNotificacaoFrota(id) }
 }
 
-// ── Shell desktop (Solicitante/Gestor/seletor) ─────────────────
+// ── Shell desktop (só o seletor de perfil) ──────────────────────
 // Shell PRÓPRIO do app (não usa gerarLayout da plataforma): o app é
 // isolado, então NÃO deve exibir a sidebar completa da plataforma nem
-// o botão ☰ que a abre — aquelas guias (Dashboard, Mapa, etc.) levam a
-// páginas que exigem o login da plataforma. A navegação do app vive no
-// próprio conteúdo (seletor de perfil, "Solicitar viagem", "Tarefas",
-// "Trocar perfil"). O modo Motorista já segue esse padrão próprio.
+// o botão ☰ que a abre. Motorista, Gestor e Solicitante já usam o
+// shell nativo (fm-shell); este aqui só sobra pro seletor de perfil
+// (quando o usuário tem mais de um papel) e pro "Trocar perfil".
 function montarShellDesktop() {
   document.getElementById('app').innerHTML = `
     <div class="frota-app-shell fw-theme">
@@ -574,8 +573,8 @@ async function entrarModo(modo, persistir) {
     montarShellGestor()
     await renderModoGestor()
   } else {
-    montarShellDesktop()
-    renderTopo(!persistir)
+    if (!persistir) _fsAba = 'solicitar' // acesso rápido a partir do Motorista/Gestor sempre começa no formulário
+    montarShellSolicitante(!persistir)
     await renderModoSolicitante()
   }
   fwTransicaoTela(document.querySelector('.frota-app-shell, .fm-shell'), persistir ? 'fade' : 'avancar')
@@ -587,25 +586,67 @@ function trocarPerfil() {
   fwTransicaoTela(document.querySelector('.frota-app-shell'), 'fade')
 }
 
-function renderTopo(peek) {
-  const MODOS = { motorista: 'Motorista', gestor: 'Gestor de Transporte', solicitante: 'Solicitante' }
-  document.getElementById('conteudo').innerHTML = `
-    <div class="card" style="margin-bottom:16px;padding:14px 18px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
-      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-        <span class="badge badge-verde">${MODOS[_modoAtivo]}</span>
-        ${peek
-          ? `<button class="btn btn-xs btn-ghost" onclick="voltarModoBase()" data-icon="backspace">Voltar</button>`
-          : (_papeis.length > 1 ? `<button class="btn btn-xs btn-ghost" onclick="trocarPerfil()">Trocar perfil</button>` : '')}
+// ═══════════════════════════════════════════════════════════════
+// MODO SOLICITANTE — mesmo shell nativo do Motorista/Gestor (faixa
+// de logos + barra de botões), com "Voltar" quando é acesso rápido
+// (peek) a partir do Motorista/Gestor ("Solicitar viagem").
+// ═══════════════════════════════════════════════════════════════
+let _fsAba = 'solicitar', _fsPeek = false
+const FS_ORDEM_ABAS = ['solicitar', 'viagens', 'config']
+
+function montarShellSolicitante(peek) {
+  _fsPeek = !!peek
+  document.getElementById('app').innerHTML = `
+    <div class="fm-shell fw-theme">
+      <div class="fm-faixa">
+        ${_fsPeek ? `<button class="fm-voltar-btn" onclick="voltarModoBase()">${bico('backspace')}<span>Voltar</span></button>` : ''}
+        <div class="fm-faixa-logos">
+          <span class="fm-logo-chip gov" hidden><img alt="Governo do Acre"></span>
+          <span class="fm-logo-chip sec" hidden><img alt="SEMA-AC"></span>
+        </div>
       </div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button class="btn btn-xs btn-secondary" onclick="abrirTarefasFrota()" data-icon="clipboard">Tarefas</button>
-        ${_modoAtivo !== 'solicitante' ? `<button class="btn btn-xs btn-secondary" onclick="entrarModo('solicitante', false)" data-icon="truck">Solicitar viagem</button>` : ''}
-      </div>
+      <div id="fm-conteudo" class="fm-conteudo"></div>
+      <nav class="fm-pill-nav">
+        <button class="fm-pill-btn fm-primaria" data-tab="solicitar" onclick="solicitanteAba('solicitar')">${bico('truck')}<span>Solicitar</span></button>
+        <button class="fm-pill-btn" data-tab="viagens" onclick="solicitanteAba('viagens')">
+          <span class="fm-badge" id="fs-badge-viagens" hidden>0</span>${bico('list')}<span>Minhas viagens</span></button>
+        <button class="fm-pill-btn" data-tab="config" onclick="solicitanteAba('config')">${bico('sliders')}<span>Config</span></button>
+      </nav>
+    </div>`
+  carregarLogosFaixaMotorista()
+}
+
+function solicitanteAba(aba, prefill) {
+  const anterior = _fsAba
+  _fsAba = aba
+  document.querySelectorAll('.fm-pill-btn').forEach(b => b.classList.toggle('ativa', b.dataset.tab === aba))
+  if (aba === 'solicitar') renderSolicitanteForm(prefill)
+  else if (aba === 'viagens') renderSolicitanteViagens()
+  else if (aba === 'config') renderSolicitanteConfig()
+  const dir = FS_ORDEM_ABAS.indexOf(aba) >= FS_ORDEM_ABAS.indexOf(anterior) ? 'avancar' : 'voltar'
+  fwTransicaoTela('fm-conteudo', dir)
+}
+
+async function renderSolicitanteConfig() {
+  document.getElementById('fm-conteudo').innerHTML = `
+    <div class="form-section-label">Notificações</div>
+    <div class="card" style="padding:0;margin-bottom:16px" id="fm-cfg-push">${itemPushConfig('carregando')}</div>
+    <div class="form-section-label">Configurações</div>
+    <div class="card" style="padding:0">
+      ${_papeis.length > 1 ? `<button class="fm-config-item" onclick="trocarPerfil()">${bico('shield')} Trocar perfil</button>` : ''}
+      <button class="fm-config-item" onclick="abrirTarefasFrota()">${bico('clipboard')} Minhas Tarefas</button>
+      <button class="fm-config-item" onclick="alterarPinFrota()">${bico('key')} Alterar PIN</button>
+      <button class="fm-config-item" onclick="abrirInstalarFrota()">${bico('qr')} Instalar o app</button>
+      <button class="fm-config-item" id="btn-verificar-update-frota" onclick="verificarAtualizacaoFrota()">${bico('download')} Verificar atualização</button>
+      <button class="fm-config-item" style="color:#DC2626" onclick="fazerLogout()">${bico('logout')} Sair</button>
     </div>
-    <div id="push-slot"></div>
-    <div id="modo-corpo"></div>`
-  bIconsAplicar()
-  atualizarEntradaPush()
+    <div class="fm-creditos">
+      <p id="fm-cfg-versao">Versão do app: —</p>
+      <p>Desenvolvido por <strong>Erisson Cameli Santiago</strong></p>
+      <p>© ${new Date().getFullYear()} · Todos os direitos reservados</p>
+    </div>`
+  atualizarItemPushConfig()
+  atualizarVersaoFrota()
 }
 
 function formatDataHora(str) {
@@ -1973,9 +2014,34 @@ async function confirmarDefeito() {
 // MODO SOLICITANTE
 // ═══════════════════════════════════════════════════════════════
 async function renderModoSolicitante() {
-  const corpo = document.getElementById('modo-corpo')
-  corpo.innerHTML = `
-    <div class="card" style="margin-bottom:20px">
+  await Promise.all([carregarSetores(), carregarUCs()])
+  await carregarMinhasViagens()
+  solicitanteAba(_fsAba)
+}
+
+async function carregarSetores() {
+  const { data } = await db.from('unidades_organizacionais').select('id,sigla,nome').eq('ativo', true).order('sigla')
+  _setores = data || []
+}
+
+async function carregarUCs() {
+  const { data } = await db.from('unidades_conservacao').select('id,nome,codigo').eq('ativo', true).order('codigo')
+  _ucs = data || []
+}
+
+async function carregarMinhasViagens() {
+  const { data } = await db.from('vw_frota_viagens_detalhe')
+    .select('*').eq('solicitante_id', _usuario.id).order('data_saida_prevista', { ascending: false }).limit(50)
+  _minhasViagens = data || []
+  const ativas = _minhasViagens.filter(v => ['solicitada','aprovada','em_andamento'].includes(v.status)).length
+  const badge = document.getElementById('fs-badge-viagens')
+  if (badge) { badge.hidden = ativas === 0; badge.textContent = ativas }
+  renderSolicitanteViagens()
+}
+
+function renderSolicitanteForm(prefill) {
+  document.getElementById('fm-conteudo').innerHTML = `
+    <div class="card">
       <div class="form-section-label" style="padding:0 0 14px">Nova solicitação de viagem</div>
       <div class="grid-2">
         <div class="form-group"><label class="form-label">Setor solicitante</label>
@@ -2012,59 +2078,120 @@ async function renderModoSolicitante() {
           <input class="form-control" id="f-retorno" type="datetime-local" onchange="checarDisponibilidade()"></div>
       </div>
       <div id="aviso-disponibilidade" style="display:none;font-size:12px;padding:8px 12px;border-radius:8px;margin-bottom:14px"></div>
-      <button class="btn btn-primary" id="btn-solicitar" onclick="solicitar()">${bico('truck')} Solicitar Viagem</button>
-    </div>
-
-    <div class="card">
-      <div class="form-section-label" style="padding:0 0 14px">Minhas solicitações</div>
-      <div class="table-wrap"><div class="table-scroll">
-        <table>
-          <thead><tr><th>Destino</th><th>Período</th><th>Veículo / Motorista</th><th>Status</th><th>Ações</th></tr></thead>
-          <tbody id="tbody-minhas"><tr><td colspan="5" style="text-align:center;padding:32px;color:#9CA3AF">Carregando...</td></tr></tbody>
-        </table>
-      </div></div>
+      <button class="btn btn-primary" style="width:100%" id="btn-solicitar" onclick="solicitar()">${bico('truck')} Solicitar Viagem</button>
     </div>`
-  bIconsAplicar()
-  await Promise.all([carregarSetores(), carregarUCs()])
-  await carregarMinhasViagens()
-}
-
-async function carregarSetores() {
-  const { data } = await db.from('unidades_organizacionais').select('id,sigla,nome').eq('ativo', true).order('sigla')
-  _setores = data || []
   document.getElementById('f-setor').insertAdjacentHTML('beforeend',
     _setores.map(s => `<option value="${s.id}">${esc(s.sigla)} — ${esc(s.nome)}</option>`).join(''))
-}
-
-async function carregarUCs() {
-  const { data } = await db.from('unidades_conservacao').select('id,nome,codigo').eq('ativo', true).order('codigo')
-  _ucs = data || []
   document.getElementById('f-uc').insertAdjacentHTML('beforeend',
     _ucs.map(u => `<option value="${u.id}">${esc(u.codigo)} — ${esc(u.nome)}</option>`).join(''))
+  if (prefill) {
+    document.getElementById('f-setor').value = prefill.setor_solicitante_id || ''
+    document.getElementById('f-cidade-origem').value = prefill.cidade_origem || 'Rio Branco'
+    document.getElementById('f-cidade-destino').value = prefill.cidade_destino || ''
+    document.getElementById('f-destino').value = prefill.destino || ''
+    document.getElementById('f-uc').value = prefill.uc_destino_id || ''
+    document.getElementById('f-finalidade').value = prefill.finalidade || ''
+    document.getElementById('f-passageiros').value = prefill.passageiros || ''
+    document.getElementById('f-passageiros-lista').value = prefill.lista_passageiros || ''
+    checarPassageiros()
+    checarIntermunicipal()
+    toast('Campos preenchidos com base na viagem anterior — ajuste as datas e confira antes de enviar.', 'info')
+  }
+  bIconsAplicar()
 }
 
-async function carregarMinhasViagens() {
-  const { data } = await db.from('vw_frota_viagens_detalhe')
-    .select('*').eq('solicitante_id', _usuario.id).order('data_saida_prevista', { ascending: false }).limit(50)
-  _minhasViagens = data || []
-  renderMinhasViagens()
+// ── Aba Minhas viagens (cards, estilo apps de transporte) ─────────
+function renderSolicitanteViagens() {
+  document.getElementById('fm-conteudo').innerHTML = `
+    <div class="form-section-label">Minhas viagens</div>
+    <div id="fs-lista-viagens"></div>`
+  const el = document.getElementById('fs-lista-viagens')
+  if (!_minhasViagens.length) { el.innerHTML = '<div class="card" style="text-align:center;padding:28px;color:#9CA3AF">Nenhuma solicitação ainda</div>'; return }
+  el.innerHTML = _minhasViagens.map(v => `
+    <div class="card" style="margin-bottom:10px;cursor:pointer" onclick="abrirDetalheSolicitante('${v.id}')">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+        <div>
+          ${v.cidade_destino ? `<div style="font-size:12px;font-weight:600;color:#6B7280">${esc(v.cidade_origem||'Rio Branco')} → ${esc(v.cidade_destino)}</div>` : ''}
+          <div style="font-weight:700">${esc(v.destino)}</div>
+          <div style="font-size:12px;color:#9CA3AF;margin-top:2px">${formatDataHora(v.data_saida_prevista)}</div>
+        </div>
+        <span class="badge ${STATUS_BADGE[v.status]||'badge-cinza'}">${STATUS_LABEL[v.status]||v.status}</span>
+      </div>
+      ${v.veiculo_placa ? `<div style="font-size:12px;color:#6B7280;margin-top:8px">${esc(v.veiculo_modelo)} <span class="mono">(${esc(v.veiculo_placa)})</span>${v.motorista_nome ? ' · '+esc(v.motorista_nome) : ''}</div>` : ''}
+    </div>`).join('')
 }
 
-function renderMinhasViagens() {
-  const tbody = document.getElementById('tbody-minhas')
-  if (!tbody) return
-  if (!_minhasViagens.length) { tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:32px;color:#9CA3AF">Nenhuma solicitação ainda</td></tr>'; return }
-  tbody.innerHTML = _minhasViagens.map(v => {
-    const podeCancelar = ['solicitada','aprovada'].includes(v.status)
-    return `<tr>
-      <td>${v.cidade_destino ? `<div style="font-size:12px;font-weight:600">${esc(v.cidade_origem||'Rio Branco')} → ${esc(v.cidade_destino)}</div>` : ''}<strong>${esc(v.destino)}</strong><br><span style="font-size:11px;color:#9CA3AF">${esc(v.finalidade)}</span></td>
-      <td style="font-size:12px">${formatDataHora(v.data_saida_prevista)}<br>até ${formatDataHora(v.data_retorno_prevista)}</td>
-      <td style="font-size:12px">${v.veiculo_placa ? `${esc(v.veiculo_modelo)} <span class="mono">(${esc(v.veiculo_placa)})</span><br>${esc(v.motorista_nome||'—')}` : '<span style="color:#9CA3AF">A definir</span>'}</td>
-      <td><span class="badge ${STATUS_BADGE[v.status]||'badge-cinza'}">${STATUS_LABEL[v.status]||v.status}</span>
-        ${v.status === 'recusada' && v.motivo_recusa ? `<div style="font-size:11px;color:#9CA3AF;margin-top:4px">${esc(v.motivo_recusa)}</div>` : ''}</td>
-      <td>${podeCancelar ? `<button class="btn btn-xs btn-ghost" style="color:#DC2626" onclick="abrirModalCancelar('${v.id}')">Cancelar</button>` : '—'}</td>
-    </tr>`
-  }).join('')
+// ── Detalhe/acompanhamento de uma viagem (estilo apps de transporte:
+// linha do tempo de status + motorista/veículo + local de partida) ─
+const FS_ETAPAS = ['solicitada', 'aprovada', 'em_andamento', 'concluida']
+function fsLinkMapa(lat, lng) {
+  if (lat == null || lng == null) return ''
+  return ` <a href="https://www.google.com/maps?q=${lat},${lng}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:inherit;text-decoration:underline">${bico('pin')} ver no mapa</a>`
+}
+
+function abrirDetalheSolicitante(id) {
+  const v = _minhasViagens.find(x => x.id === id)
+  if (!v) return
+  const finalizadaFora = v.status === 'recusada' || v.status === 'cancelada'
+  const etapaAtual = FS_ETAPAS.indexOf(v.status)
+  const podeCancelar = ['solicitada','aprovada'].includes(v.status)
+
+  const timeline = finalizadaFora
+    ? `<div class="card" style="margin-bottom:14px;background:${v.status === 'recusada' ? '#FEF2F2' : '#F9FAFB'}">
+        <div style="font-weight:700;color:${v.status === 'recusada' ? '#991B1B' : '#374151'}">${STATUS_LABEL[v.status]}</div>
+        ${v.status === 'recusada' && v.motivo_recusa ? `<div style="font-size:13px;color:#6B7280;margin-top:4px">${esc(v.motivo_recusa)}</div>` : ''}
+        ${v.status === 'cancelada' && v.motivo_cancelamento ? `<div style="font-size:13px;color:#6B7280;margin-top:4px">${esc(v.motivo_cancelamento)}</div>` : ''}
+      </div>`
+    : `<div class="card" style="margin-bottom:14px">
+        <div style="display:flex;justify-content:space-between">
+          ${[
+            { s: 'solicitada', l: 'Solicitada', em: v.criado_em },
+            { s: 'aprovada', l: 'Aprovada', em: v.aprovado_em },
+            { s: 'em_andamento', l: 'Em andamento', em: v.checkout_em },
+            { s: 'concluida', l: 'Concluída', em: v.checkin_em },
+          ].map((etapa, i) => {
+            const feita = i <= etapaAtual
+            return `<div style="flex:1;text-align:center;position:relative">
+              <div style="width:22px;height:22px;border-radius:50%;margin:0 auto 6px;display:flex;align-items:center;justify-content:center;background:${feita ? 'var(--verde-c,#52B788)' : '#E5E7EB'};color:#fff;font-size:11px">${feita ? bico('check') : ''}</div>
+              <div style="font-size:11px;color:${feita ? '#1F4E2C' : '#9CA3AF'};font-weight:${feita ? '700' : '400'}">${etapa.l}</div>
+              ${etapa.em ? `<div style="font-size:10px;color:#9CA3AF">${formatDataHora(etapa.em)}</div>` : ''}
+            </div>`
+          }).join('')}
+        </div>
+      </div>`
+
+  document.getElementById('det-corpo').innerHTML = `
+    ${timeline}
+    <div style="font-size:13px;line-height:1.8">
+      ${v.cidade_destino ? `<div><strong>Cidade:</strong> ${esc(v.cidade_origem||'Rio Branco')} → ${esc(v.cidade_destino)}</div>` : ''}
+      <div><strong>Destino:</strong> ${esc(v.destino)}</div>
+      <div><strong>Finalidade:</strong> ${esc(v.finalidade)}</div>
+      <div><strong>Período previsto:</strong> ${formatDataHora(v.data_saida_prevista)} → ${formatDataHora(v.data_retorno_prevista)}</div>
+      ${v.passageiros ? `<div><strong>Passageiros:</strong> ${v.passageiros}${v.lista_passageiros ? ' — '+esc(v.lista_passageiros).replace(/\n/g,', ') : ''}</div>` : ''}
+    </div>
+    ${v.veiculo_placa ? `<div class="card" style="margin-top:14px;padding:14px;display:flex;align-items:center;gap:12px">
+      <div style="width:40px;height:40px;border-radius:10px;background:rgba(82,183,136,.12);display:flex;align-items:center;justify-content:center;color:var(--verde-c,#52B788);flex-shrink:0">${bico('truck')}</div>
+      <div style="font-size:13px">
+        <div style="font-weight:700">${esc(v.veiculo_modelo)} <span class="mono" style="color:#9CA3AF">(${esc(v.veiculo_placa)})</span></div>
+        ${v.motorista_nome ? `<div style="color:#6B7280">${esc(v.motorista_nome)}${v.motorista_telefone ? ' · '+fmLinkWhatsapp(v.motorista_telefone) : ''}</div>` : ''}
+      </div>
+    </div>` : ''}
+    ${v.checkout_em ? `<div style="font-size:13px;margin-top:10px"><strong>Saída registrada:</strong> ${formatDataHora(v.checkout_em)}${fsLinkMapa(v.lat_saida, v.lng_saida)}</div>` : ''}
+    ${v.checkin_em ? `<div style="font-size:13px;margin-top:4px"><strong>Chegada registrada:</strong> ${formatDataHora(v.checkin_em)}${fsLinkMapa(v.lat_chegada, v.lng_chegada)}</div>` : ''}
+    ${v.avarias ? `<div style="font-size:13px;color:#DC2626;margin-top:10px"><strong>Avarias registradas:</strong> ${esc(v.avarias)}</div>` : ''}
+    <div style="display:flex;gap:10px;margin-top:16px">
+      ${podeCancelar ? `<button class="btn btn-secondary btn-sm" style="color:#DC2626" onclick="fecharModal('detalhe');abrirModalCancelar('${v.id}')">Cancelar viagem</button>` : ''}
+      <button class="btn btn-secondary btn-sm" onclick="repetirSolicitacao('${v.id}')">${bico('truck')} Solicitar de novo</button>
+    </div>`
+  document.getElementById('modal-detalhe').classList.add('aberto')
+  bIconsAplicar(document.getElementById('det-corpo'))
+}
+
+function repetirSolicitacao(id) {
+  const v = _minhasViagens.find(x => x.id === id)
+  if (!v) return
+  fecharModal('detalhe')
+  solicitanteAba('solicitar', v)
 }
 
 function checarPassageiros() {
@@ -2201,6 +2328,7 @@ async function solicitar() {
     document.getElementById('aviso-disponibilidade').style.display = 'none'
     _ultimaChecagemDisponivel = null
     await carregarMinhasViagens()
+    solicitanteAba('viagens')
   } catch (e) { toast(e.message || 'Erro ao solicitar viagem', 'error') }
   finally { btn.disabled = false; btn.innerHTML = `${bico('truck')} Solicitar Viagem` }
 }
@@ -2222,7 +2350,7 @@ async function confirmarCancelar() {
     })
     if (error) throw error
     toast('Viagem cancelada', 'success')
-    fecharModalCancelar(); await carregarMinhasViagens()
+    fecharModalCancelar(); fecharModal('detalhe'); await carregarMinhasViagens()
   } catch (e) { toast(e.message || 'Erro ao cancelar', 'error') }
   finally { btn.disabled = false }
 }
@@ -2790,7 +2918,7 @@ function tarefaTemDestinoNoApp(n) {
   const st = n.meta?.subtipo, para = n.meta?.para
   if ((st === 'viagem_solicitada' || st === 'viagem_direta' || st === 'manutencao') && _ehGestor) return true
   if (st === 'viagem_aprovada' && para === 'motorista' && _motorista) return true
-  if ((st === 'viagem_aprovada' || st === 'viagem_recusada') && para === 'solicitante') return true
+  if ((st === 'viagem_aprovada' || st === 'viagem_recusada' || st === 'viagem_iniciada' || st === 'viagem_concluida') && para === 'solicitante') return true
   return false
 }
 
@@ -2810,8 +2938,13 @@ async function rotearNotifFrota(n) {
     await entrarModo('gestor', false)
   } else if (st === 'viagem_aprovada' && para === 'motorista' && _motorista) {
     await entrarModo('motorista', false); motoristaAba('solicitacoes')
-  } else if ((st === 'viagem_aprovada' || st === 'viagem_recusada') && para === 'solicitante') {
+  } else if ((st === 'viagem_aprovada' || st === 'viagem_recusada' || st === 'viagem_iniciada' || st === 'viagem_concluida') && para === 'solicitante') {
     await entrarModo('solicitante', false)
+    solicitanteAba('viagens')
+    if (n.meta?.viagem_id) {
+      await carregarMinhasViagens()
+      abrirDetalheSolicitante(n.meta.viagem_id)
+    }
   } else {
     // Sem destino específico (ou papel não confere): abre o inbox de Tarefas.
     abrirTarefasFrota()
@@ -3054,24 +3187,6 @@ function itemPushConfig(estado) {
   return `<div class="fm-config-item" style="cursor:default;color:#9CA3AF">${bico('bell')} <span>Notificações indisponíveis neste dispositivo</span></div>`
 }
 
-// Slot do topo (desktop): só aparece quando é de fato acionável — não fica
-// reaparecendo quando já está ativado, bloqueado ou indisponível.
-async function atualizarEntradaPush() {
-  const slot = document.getElementById('push-slot')
-  if (!slot) return
-  if (await estadoPush() !== 'ativavel') { slot.innerHTML = ''; return }
-  slot.innerHTML = `
-    <div class="card" style="margin-bottom:16px;background:#F0FDF4;border-color:#BBF7D0">
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
-        <div>
-          <div style="font-weight:700;font-size:13px">Ativar notificações</div>
-          <div style="font-size:12px;color:#6B7280">Receba um aviso no celular quando houver novidade nas suas viagens.</div>
-        </div>
-        <button class="btn btn-primary btn-sm" onclick="ativarPushFrota()">Ativar</button>
-      </div>
-    </div>`
-}
-
 // Ativa o push e devolve mensagem clara em cada falha (misto iPhone/Android).
 async function ativarPushFrota() {
   if (ehIOS() && !ehStandalone()) {
@@ -3150,11 +3265,12 @@ if ('serviceWorker' in navigator && !window.Capacitor) {
 }
 .fm-login-sub { font-size: 12px; color: var(--fw-text-muted, #6B7280); margin-top: 4px; }
 
-/* ── Shell próprio do app (Gestor/Solicitante): coluna de altura total
-   sem a sidebar da plataforma nem o botão ☰. ── */
+/* ── Shell próprio do app (só o seletor de perfil): coluna de altura
+   total sem a sidebar da plataforma nem o botão ☰. ── */
 .frota-app-shell { min-height: 100vh; background: #F6FAF6; display: flex; flex-direction: column; }
 
-/* ── Shell nativo do Motorista (faixa de logos + barra de botões) ── */
+/* ── Shell nativo (Motorista/Gestor/Solicitante: faixa de logos +
+   barra de botões) ── */
 .fm-shell { min-height: 100vh; background: #F6FAF6; display: flex; flex-direction: column; }
 .fm-faixa {
   position: sticky; top: 0; z-index: 800;
@@ -3162,6 +3278,12 @@ if ('serviceWorker' in navigator && !window.Capacitor) {
   padding: calc(14px + env(safe-area-inset-top)) 16px 14px;
 }
 .fm-faixa-logos { display: flex; align-items: center; justify-content: space-between; min-height: 40px; }
+.fm-voltar-btn {
+  display: inline-flex; align-items: center; gap: 6px; border: none; cursor: pointer;
+  background: rgba(255,255,255,.14); color: #fff; font-size: 12px; font-weight: 600;
+  font-family: 'DM Sans', sans-serif; padding: 6px 12px; border-radius: 20px; margin-bottom: 10px;
+}
+.fm-voltar-btn svg { width: 14px; height: 14px; stroke: currentColor; }
 .fm-logo-chip { max-width: 140px; height: 38px; display: flex; align-items: center; }
 .fm-logo-chip img { width: 100%; height: 100%; object-fit: contain; display: block; filter: drop-shadow(0 1px 3px rgba(0,0,0,.3)); }
 .fm-conteudo {
