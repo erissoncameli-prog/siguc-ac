@@ -11,6 +11,7 @@
 <script src="../js/config.js"></script>
 <script src="../js/layout.js"></script>
 <script src="../js/frota-wise.js"></script>
+<script src="../js/frota-fotos.js"></script>
 </head>
 <body>
 <div id="app"></div>
@@ -650,7 +651,7 @@ function renderVeiculos() {
     ].filter(Boolean).join(' ')
     return `<tr>
       <td><div style="display:flex;align-items:center;gap:8px">
-        ${v.foto_url ? `<img src="${v.foto_url}" alt="" style="width:40px;height:32px;object-fit:cover;border-radius:6px;flex-shrink:0">` : ''}
+        ${frotaFotoAttr(v.foto_url) ? `<img ${frotaFotoAttr(v.foto_url)} alt="" style="width:40px;height:32px;object-fit:cover;border-radius:6px;flex-shrink:0">` : ''}
         <div>
           <strong>${esc(v.marca ? v.marca + ' ' : '')}${esc(v.modelo)}</strong><br>
           <span class="mono" style="font-size:12px;color:#6B7280">${esc(v.placa)}</span>
@@ -670,6 +671,8 @@ function renderVeiculos() {
       </td>
     </tr>`
   }).join('')
+  // Bucket privado (migration 200) — assina depois de montar a tabela.
+  frotaAssinarFotos(tbody)
 }
 
 // ── Render Motoristas ─────────────────────────────────────────
@@ -693,9 +696,10 @@ function renderMotoristas() {
     const validade = m.cnh_validade
       ? badgeVencimento(m.cnh_validade)
       : (m.habilitacao_fluvial_validade ? badgeVencimento(m.habilitacao_fluvial_validade) : '<span style="color:#9CA3AF">—</span>')
-    const avatar = m.foto_url
-      ? `<img src="${esc(m.foto_url)}" alt="" style="width:32px;height:32px;border-radius:50%;object-fit:cover;flex-shrink:0">`
-      : `<div style="width:32px;height:32px;border-radius:50%;background:rgba(0,0,0,.08);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#6B7280;flex-shrink:0">${esc((m.nome||'?').charAt(0).toUpperCase())}</div>`
+    const inicial = esc((m.nome || '?').charAt(0).toUpperCase())
+    const avatar = frotaFotoAttr(m.foto_url, (m.nome || '?').charAt(0).toUpperCase())
+      ? `<img ${frotaFotoAttr(m.foto_url, (m.nome || '?').charAt(0).toUpperCase())} alt="" style="width:32px;height:32px;border-radius:50%;object-fit:cover;flex-shrink:0;font-size:12px">`
+      : `<div style="width:32px;height:32px;border-radius:50%;background:rgba(0,0,0,.08);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#6B7280;flex-shrink:0">${inicial}</div>`
     return `<tr>
       <td><div style="display:flex;align-items:center;gap:10px">${avatar}<div><strong>${esc(m.nome)}</strong>${m.matricula ? `<br><span class="mono" style="font-size:11px;color:#9CA3AF">Mat. ${esc(m.matricula)}</span>` : ''}</div></div></td>
       <td><span class="badge ${m.vinculo === 'servidor' ? 'badge-verde' : 'badge-ouro'}">${m.vinculo === 'servidor' ? 'Servidor' : 'Terceirizado'}</span></td>
@@ -710,6 +714,8 @@ function renderMotoristas() {
       </td>` : ''}
     </tr>`
   }).join('')
+  // Bucket privado (migration 200) — assina depois de montar a tabela.
+  frotaAssinarFotos(tbody)
 }
 
 // ── Modal Veículo ─────────────────────────────────────────────
@@ -724,11 +730,19 @@ function mostrarCampoMedidor() {
     medidor === 'horimetro' ? 'Horímetro atual (horas)' : 'Hodômetro atual (km)'
 }
 
+// Recebe DOIS tipos de url: blob local (foto recém-escolhida, ainda não
+// enviada) e a URL gravada no banco (ao abrir o modal para editar).
+// Só a segunda é de bucket privado e precisa ser assinada — daí o
+// frotaFotoAttr, que devolve vazio quando não é endereço de Storage.
 function _setVeicFotoPreview(url) {
   const wrap = document.getElementById('v-foto-preview')
   const rem  = document.getElementById('v-foto-remover')
   if (url) {
-    wrap.innerHTML = `<img src="${url}" alt="foto do veículo">`
+    const marca = frotaFotoAttr(url)
+    wrap.innerHTML = marca
+      ? `<img ${marca} alt="foto do veículo">`
+      : `<img src="${url}" alt="foto do veículo">`
+    if (marca) frotaAssinarFotos(wrap)
     rem.classList.add('visivel')
   } else {
     wrap.innerHTML = bico('truck')
@@ -745,11 +759,16 @@ function previewFotoVeiculo(input) {
 }
 
 // ── Modal Motorista — foto ─────────────────────────────────────
+// Mesmo caso do _setVeicFotoPreview: blob local ou URL gravada.
 function _setMotFotoPreview(url) {
   const wrap = document.getElementById('m-foto-preview')
   const rem  = document.getElementById('m-foto-remover')
   if (url) {
-    wrap.innerHTML = `<img src="${url}" alt="foto do motorista">`
+    const marca = frotaFotoAttr(url)
+    wrap.innerHTML = marca
+      ? `<img ${marca} alt="foto do motorista">`
+      : `<img src="${url}" alt="foto do motorista">`
+    if (marca) frotaAssinarFotos(wrap)
     rem.classList.add('visivel')
   } else {
     wrap.innerHTML = bico('user')

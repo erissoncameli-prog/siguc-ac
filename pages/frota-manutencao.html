@@ -11,6 +11,7 @@
 <script src="../js/config.js"></script>
 <script src="../js/layout.js"></script>
 <script src="../js/frota-wise.js"></script>
+<script src="../js/frota-fotos.js"></script>
 </head>
 <body>
 <div id="app"></div>
@@ -277,9 +278,11 @@ function renderComunicados() {
       </div>
       <div style="font-size:13px;color:#374151;margin-top:8px">${esc(c.descricao)}</div>
       ${c.fotos_urls?.length ? `<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px">
-        ${c.fotos_urls.map(url => `<a href="${esc(url)}" target="_blank" rel="noopener"><img src="${esc(url)}" style="width:64px;height:64px;object-fit:cover;border-radius:8px;display:block"></a>`).join('')}
+        ${c.fotos_urls.map(url => `<a ${frotaFotoAttr(url)} target="_blank" rel="noopener"><img ${frotaFotoAttr(url)} style="width:64px;height:64px;object-fit:cover;border-radius:8px;display:block"></a>`).join('')}
       </div>` : ''}
     </div>`).join('')
+  // Bucket privado (migration 200) — assina depois de montar a lista.
+  frotaAssinarFotos(el)
 }
 
 // Pré-preenche a Nova OS com veículo + descrição do comunicado; ao

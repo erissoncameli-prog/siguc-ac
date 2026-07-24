@@ -11,6 +11,7 @@
 <script src="../js/config.js"></script>
 <script src="../js/layout.js"></script>
 <script src="../js/frota-wise.js"></script>
+<script src="../js/frota-fotos.js"></script>
 </head>
 <body>
 <div id="app"></div>
@@ -369,10 +370,13 @@ function abrirDetalhe(id) {
       ${a.contrato_numero ? `<div><strong>Contrato:</strong> ${esc(a.contrato_numero)} — ${esc(a.contrato_fornecedor||'')}</div>` : ''}
       ${a.fonte_codigo ? `<div><strong>Fonte de recurso:</strong> ${esc(FONTE_LABEL[a.fonte_tipo]||'')} · ${esc(a.fonte_codigo)} — ${esc(a.fonte_descricao||'')}</div>` : ''}
       ${a.motivo_rejeicao ? `<div style="color:#DC2626"><strong>Motivo da rejeição:</strong> ${esc(a.motivo_rejeicao)}</div>` : ''}
-      ${a.foto_cupom_url ? `<div style="margin-top:10px"><strong>Cupom fiscal:</strong><br><a href="${esc(a.foto_cupom_url)}" target="_blank"><img src="${esc(a.foto_cupom_url)}" style="max-width:200px;border-radius:8px;margin-top:6px"></a></div>` : ''}
-      ${a.foto_hodometro_url ? `<div style="margin-top:10px"><strong>Foto do medidor:</strong><br><a href="${esc(a.foto_hodometro_url)}" target="_blank"><img src="${esc(a.foto_hodometro_url)}" style="max-width:200px;border-radius:8px;margin-top:6px"></a></div>` : ''}
+      ${a.foto_cupom_url ? `<div style="margin-top:10px"><strong>Cupom fiscal:</strong><br><a ${frotaFotoAttr(a.foto_cupom_url)} target="_blank" rel="noopener"><img ${frotaFotoAttr(a.foto_cupom_url)} style="max-width:200px;border-radius:8px;margin-top:6px"></a></div>` : ''}
+      ${a.foto_hodometro_url ? `<div style="margin-top:10px"><strong>Foto do medidor:</strong><br><a ${frotaFotoAttr(a.foto_hodometro_url)} target="_blank" rel="noopener"><img ${frotaFotoAttr(a.foto_hodometro_url)} style="max-width:200px;border-radius:8px;margin-top:6px"></a></div>` : ''}
     </div>`
   document.getElementById('modal-detalhe').classList.add('aberto')
+  // Bucket privado (migration 200): as fotos saem marcadas e são
+  // assinadas aqui, depois do HTML já estar na tela.
+  frotaAssinarFotos(document.getElementById('modal-detalhe'))
 }
 
 function fecharModal(qual) {

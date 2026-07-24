@@ -11,6 +11,7 @@
 <script src="../js/config.js"></script>
 <script src="../js/layout.js"></script>
 <script src="../js/frota-wise.js"></script>
+<script src="../js/frota-fotos.js"></script>
 </head>
 <body>
 <div id="app"></div>
@@ -209,6 +210,8 @@ async function atualizarPreviewEscala() {
   box.innerHTML =
     `<div>Motorista${multi ? 's' : ''} da vez (sugestão — a confirmar pela gestão de frota):</div><div style="margin-top:6px;display:flex;flex-wrap:wrap;align-items:center">${lista}</div>` +
     (multi ? `<div style="margin-top:4px">Esta viagem deve precisar de ${sugeridos.length} veículos; a gestão confirma a escala final.</div>` : '')
+  // Bucket privado (migration 200) — assina as fotos da sugestão.
+  frotaAssinarFotos(box)
 }
 
 async function checarDisponibilidade() {
