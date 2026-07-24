@@ -458,11 +458,70 @@ de que segue em zero o número de funções `frota_*` expostas a `anon`.
 commit. E o `CLAUDE.md` foi atualizado com a página nova e com a assimetria do
 checklist na regra de duplicação.
 
-### Fase 6 — Painel e documentos
+### Fase 6 — Painel e documentos — ✅ CONCLUÍDA em 24/07/2026
 
-16. Vencimento de documentos (CRLV, seguro, CNH) com alerta pelo módulo de notificação.
-17. Custo por km/hora por veículo no `frota-dashboard.html`.
-18. Atualizar o `CLAUDE.md` do Frota — idealmente a cada fase, não só no fim.
+16. ✅ `205_frota_vencimentos.sql`: `vw_frota_vencimentos` (documento de veículo + CNH +
+    habilitação fluvial numa lista só, que é como a gestão pensa o assunto) e
+    `frota_checar_vencimentos()`, agendada no pg_cron às 09h10 UTC (~06h10 no Acre).
+    Avisa a gestão e — no caso de habilitação — **o próprio motorista**, que senão
+    descobre o vencimento no dia em que for barrado na escala.
+    *Correção de premissa minha:* eu tinha registrado na análise que "a tabela está lá,
+    o fluxo não". Errado — o CRUD de documentos **já existe** em `frota-veiculos.html`;
+    a tabela está vazia por falta de preenchimento, não de tela. O que de fato faltava
+    era só o alerta, e é só isso que esta migration entrega.
+17. ✅ Custo por km/hora em `frota-dashboard.html` (nova aba de ranking): combustível
+    validado + manutenção concluída + multas, dividido pelo uso do período. O uso vem
+    das viagens concluídas, não do medidor do veículo — que é acumulado desde sempre e
+    daria um número sem sentido. Veículo sem uso no período fica de fora: sem
+    denominador, um veículo parado com uma OS cara apareceria como o mais caro da
+    frota, o oposto da leitura correta.
+18. ✅ `CLAUDE.md` atualizado com o bloco 196–205 e, na Fase 5, com a página nova e a
+    assimetria do checklist na regra de duplicação.
+
+**Bug silencioso encontrado e corrigido** (o mais consequente desta fase): o painel
+executivo carregava as ordens de serviço com
+`db.from('frota_ordens_servico').select('...,custo,...')` — e essa tabela **não tem
+coluna `custo`** (tem `custo_mao_obra`, e as peças ficam em `frota_os_itens`). O
+PostgREST rejeita o select inteiro, `osRes.data` volta nulo, `_ordensServ` vira `[]` — e
+**todo o custo de manutenção do painel sempre foi zero**, junto com o gráfico de
+manutenção por tipo e a coluna de manutenção do ranking de custo. Hoje há R$ 4.012 em OS
+concluídas que a direção via como R$ 0. Corrigido para ler de `vw_frota_os_detalhe`, cujo
+`custo_total` já soma mão de obra + peças. Sem essa correção o item 17 nasceria errado,
+porque o custo por km dependia justamente desse número.
+
+*Verificação executada:* 8 asserções para a 205, com dados fabricados e `RAISE` para
+rollback — a view unificando as três origens, a primeira rodada notificando, item fora
+da janela de 30 dias **não** alertando, distinção entre "vencido" e "a vencer", aviso ao
+próprio motorista, **dedupe** (segunda rodada no mesmo dia cria zero), job agendado, e a
+função fechada a `anon`/`authenticated`. Sintaxe do dashboard conferida.
+
+*Versionamento:* sem incremento em `pwa/sw.js`. A entrega tocou `frota-dashboard.html`,
+que é página de mesa e **não** faz parte do `SHELLS.frota` — subir a versão invalidaria
+o cache de todos os motoristas em campo sem nenhum arquivo do app ter mudado.
+
+---
+
+## 8. Depois das seis fases
+
+Todas as fases do plano estão concluídas e em produção. O que ficou registrado como
+fora de escopo, em ordem de risco:
+
+1. **Avisos do advisor fora do módulo Frota** — `spatial_ref_sys` sem RLS, 5 views
+   `SECURITY DEFINER` (`cargos_atuais`, `minhas_permissoes`, `vw_registros_validacao`,
+   `brigadas_resumo`, `v_aap_publica`) e ~46 funções de outros módulos com `search_path`
+   mutável. Mesma classe do que a Fase 1 corrigiu, módulos diferentes.
+2. **Buckets públicos e listáveis dos outros módulos** — `brigadistas`,
+   `registros-campo`, `biomonitor-fotos` e `config-logos`. Mesmo problema que a Fase 3
+   resolveu no Frota, e `brigadistas` também guarda foto de rosto.
+3. **`obterIP()` no `index.html`** chama `api.ipify.org`, que não está no `connect-src`
+   do CSP — a chamada é bloqueada e o IP chega nulo na auditoria da plataforma inteira,
+   silenciosamente.
+4. **Job `monitorar-alertas-diario` (pg_cron, jobid 1)** tem `<SERVICE_ROLE_KEY>` como
+   texto literal no comando, ou seja, provavelmente falha todo dia desde que foi criado.
+   Vale conferir `cron.job_run_details`.
+5. **Telemetria de veículo** (hodômetro e diagnóstico lidos do próprio veículo, como
+   Samsara/Fleetio) — exige hardware embarcado; é o teto do que dá para automatizar sem
+   ele, e fica registrado como decisão consciente, não esquecimento.
 
 ---
 
