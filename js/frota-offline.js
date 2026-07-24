@@ -73,6 +73,13 @@ function _fUuid() {
 // tipo: 'checkout' | 'checkin' | 'abrir_direta' | 'abastecimento'
 // fotos (só usado por 'abastecimento'): { cupom, hodometro } em base64
 // data-URL — sobem para o Storage no sync, antes da chamada da RPC.
+//
+// Estados: pendente → enviando → confirmado, e pendente →
+// falha_permanente quando o servidor recusa a ação repetidas vezes
+// (ver F_MAX_TENTATIVAS em frota-sync.js). `falha_permanente` existe
+// para a fila não ficar reenviando para sempre uma ação que o servidor
+// nunca vai aceitar — o motorista vê o motivo na tela de fila e
+// descarta.
 async function fOfflineEnfileirar(tipo, payload, fotos) {
   const db = await fOfflineInit()
   const acao = {
@@ -80,7 +87,10 @@ async function fOfflineEnfileirar(tipo, payload, fotos) {
     tipo,
     payload,
     fotos: fotos || null,
+    fotos_enviadas: null,   // URLs já no Storage (não re-upar no reenvio)
     status: 'pendente',
+    tentativas: 0,
+    proxima_tentativa: null, // ISO; enquanto estiver no futuro, o sync pula
     criado_em: new Date().toISOString(),
   }
   return new Promise((res, rej) => {
@@ -101,6 +111,65 @@ async function fOfflineListarPendentes() {
   })
 }
 
+// Pendentes que já podem ser tentadas AGORA — respeita o backoff
+// gravado em proxima_tentativa. É esta que o motor de sync consome;
+// fOfflineListarPendentes continua devolvendo tudo (badge, telas).
+async function fOfflineListarProntas() {
+  const agora = new Date().toISOString()
+  const pend  = await fOfflineListarPendentes()
+  return pend.filter(a => !a.proxima_tentativa || a.proxima_tentativa <= agora)
+}
+
+async function fOfflineListarFalhas() {
+  const db = await fOfflineInit()
+  return new Promise((res, rej) => {
+    const tx  = db.transaction('acoes', 'readonly')
+    const req = tx.objectStore('acoes').index('status').getAll(IDBKeyRange.only('falha_permanente'))
+    req.onsuccess = () => res(req.result)
+    req.onerror   = () => rej(req.error)
+  })
+}
+
+// Descarta UMA ação (usada no botão da tela de fila para itens em
+// falha permanente) — diferente de fOfflineZerarFila, que limpa tudo.
+async function fOfflineDescartar(uuid_cliente) {
+  const db = await fOfflineInit()
+  return new Promise((res, rej) => {
+    const tx = db.transaction('acoes', 'readwrite')
+    tx.objectStore('acoes').delete(uuid_cliente)
+    tx.oncomplete = () => res()
+    tx.onerror    = () => rej(tx.error)
+  })
+}
+
+// Volta um item de falha_permanente para a fila (botão "tentar de
+// novo"), zerando o contador e o backoff.
+async function fOfflineReenfileirar(uuid_cliente) {
+  return fOfflineMarcar(uuid_cliente, 'pendente', { tentativas: 0, proxima_tentativa: null })
+}
+
+// Destrava ações presas em 'enviando' — o app foi fechado (ou o SO
+// matou a aba) no meio de um envio. Sem isso o item não aparece nem
+// como pendente nem como falha: some da fila e nunca mais é tentado.
+// Seguro porque as RPCs são idempotentes por uuid_cliente: se o envio
+// tinha chegado ao servidor, a nova tentativa só devolve o registro.
+async function fOfflineRecuperarEnviando() {
+  const db = await fOfflineInit()
+  return new Promise((res, rej) => {
+    const tx  = db.transaction('acoes', 'readwrite')
+    const st  = tx.objectStore('acoes')
+    const req = st.index('status').openCursor(IDBKeyRange.only('enviando'))
+    req.onsuccess = ev => {
+      const c = ev.target.result
+      if (!c) return
+      st.put({ ...c.value, status: 'pendente', proxima_tentativa: null })
+      c.continue()
+    }
+    tx.oncomplete = () => res()
+    tx.onerror    = () => rej(tx.error)
+  })
+}
+
 async function fOfflineListarTodos() {
   const db = await fOfflineInit()
   return new Promise((res, rej) => {
@@ -114,6 +183,11 @@ async function fOfflineListarTodos() {
 async function fOfflineContarPendentes() {
   const pend = await fOfflineListarPendentes()
   return pend.length
+}
+
+async function fOfflineContarFalhas() {
+  const f = await fOfflineListarFalhas()
+  return f.length
 }
 
 async function fOfflineMarcar(uuid_cliente, status, extra = {}) {

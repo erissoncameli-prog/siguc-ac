@@ -284,21 +284,43 @@ nenhuma das funções recriadas gerou overload duplicado (lição da 178) e que
 `vw_registros_validacao`, `minhas_permissoes`, ~46 funções de outros módulos com
 search_path mutável) continuam abertos — mesma classe de defeito, módulos diferentes.
 
-### Fase 2 — Fila offline confiável
+### Fase 2 — Fila offline confiável — ✅ CONCLUÍDA em 24/07/2026
 
-4. Migration `197_frota_checkout_checkin_idempotente.sql`: `p_uuid_cliente` em
-   check-out/check-in, com a mesma proteção de `DROP FUNCTION` antes de recriar que a
-   lição da 181 deixou registrada, e teste dos dois ramos do `CASE` de status do veículo
-   **antes** de aplicar em produção.
-5. `frota-sync.js`: contador de tentativas, backoff exponencial, estado
-   `falha_permanente`, e mensagem de erro que diferencia "já foi enviado" de "falhou".
-6. `frota-app.html`: tela de fila mostrando o estado real de cada item e permitindo
-   descartar um item em falha permanente.
-7. Confirmar (ou descartar) o problema de `upsert` de foto do §3.2 com teste dirigido.
+4. ✅ `198_frota_checkout_checkin_idempotente.sql`: colunas `checkout_uuid_cliente` e
+   `checkin_uuid_cliente` em `frota_viagens` (+ índices únicos parciais) e parâmetro
+   `p_uuid_cliente` nas duas RPCs. São duas colunas porque check-out e check-in são
+   duas ações distintas sobre a mesma viagem — o `uuid_cliente` que já existia
+   identifica a viagem criada por viagem direta, não a ação. `DROP FUNCTION` antes de
+   recriar (lição da 178, já que a lista de parâmetros muda) e reaplicação dos
+   `REVOKE`/`GRANT` das 196/197, que o `DROP` zera.
+5. ✅ `frota-sync.js`: `F_MAX_TENTATIVAS = 5` com backoff (1, 2, 5, 15, 60 min), estado
+   `falha_permanente`, e memória das fotos já enviadas (`fotos_enviadas`) para o
+   reenvio não re-subir o que já está no Storage.
+6. ✅ `frota-app.html`: fila em Config → Envio de registros, com estado por item
+   ("aguardando", "nova tentativa em ~N min", "não foi aceito"), motivo da recusa e
+   botões **Tentar de novo** / **Descartar** por item — antes a única saída era zerar
+   a fila inteira, perdendo junto o que ainda ia sincronizar.
+7. ✅ §3.2 **confirmado**, não era hipótese. A política de `INSERT` dos buckets aceita
+   motorista ativo, mas a de `UPDATE` exige `pode_editar('frota')` — e `upsert` num
+   caminho existente vira `UPDATE`. Verificado contra os motoristas reais: dos três
+   ativos, **Gabriel Araújo Santiago** não é gestor e seria barrado; os outros dois
+   também são gestores, e é por isso que o bug nunca apareceu em teste. Corrigido no
+   cliente sem mexer em política: `upsert: false` + se o upload falhar, confere se o
+   objeto já está lá e reaproveita a URL (o caminho é determinístico).
+8. ✅ Extra não previsto: ação presa em `enviando` (app fechado no meio do envio) não
+   aparecia como pendente nem como falha — sumia da fila e nunca mais era tentada.
+   `fOfflineRecuperarEnviando()` devolve esses itens à fila no início de cada sync,
+   o que só é seguro porque agora todas as RPCs são idempotentes.
 
-*Risco:* médio — mexe no caminho crítico offline. Testar com rede simulada antes do
-deploy.
-*Versionamento:* subir `VERSOES.frota` no `pwa/sw.js`.
+*Verificação executada:* 12 asserções contra o banco de produção com dados fabricados
+e `RAISE` final para forçar rollback (confirmado depois: 4 veículos e 25 viagens
+intactos, nenhuma linha de teste). Cobriu o reenvio de check-out e de check-in
+(idempotentes, sem erro e sem duplicar efeito), **os dois ramos do `CASE`** de status
+do veículo — sem avaria → `disponivel`, com avaria → `em_manutencao` (lição da 181) —,
+o cliente antigo sem `p_uuid_cliente` ainda sendo barrado corretamente, ausência de
+overload duplicado e as permissões preservadas após o `DROP`.
+
+*Versionamento:* `pwa/sw.js` — frota v45 → v46.
 
 ### Fase 3 — Privacidade das fotos
 

@@ -971,12 +971,16 @@ function instalarGatilhosSyncFrota() {
   _fSyncTriggersInstalados = true
 
   fSyncOn('confirmado', () => { carregarViagensMotorista(); carregarAbastecimentosMotorista() })
-  fSyncOn('sync-fim', ({ ok, erros }) => {
-    atualizarBadgePendentesSync()
+  fSyncOn('sync-fim', ({ ok, erros, desistiu }) => {
+    atualizarBadgePendentesSync(); renderFilaFrota()
     if (ok > 0) toast(`${ok} registro(s) enviado(s) ao setor de transporte.`, 'success')
-    if (erros > 0) toast(`${erros} pendência(s) ainda não puderam ser enviadas.`, 'warning')
+    // Falha transitória não vira aviso: o item já tem backoff e volta
+    // sozinho. Só o que travou de vez merece a atenção do motorista.
+    if (desistiu > 0) toast(`${desistiu} registro(s) não foram aceitos. Veja em Config → Envio de registros.`, 'error')
+    else if (erros > 0 && ok === 0) toast(`${erros} pendência(s) ainda não puderam ser enviadas.`, 'warning')
   })
-  fSyncOn('erro', () => atualizarBadgePendentesSync())
+  fSyncOn('erro', () => { atualizarBadgePendentesSync(); renderFilaFrota() })
+  fSyncOn('falha-permanente', () => { atualizarBadgePendentesSync(); renderFilaFrota() })
 
   window.addEventListener('online', () => fSyncRodar())
   document.addEventListener('visibilitychange', () => { if (!document.hidden) fSyncRodar() })
@@ -1008,11 +1012,11 @@ async function fmAtualizarConfigGps() {
 }
 
 async function atualizarBadgePendentesSync() {
-  const n = await fOfflineContarPendentes()
+  const [n, falhas] = await Promise.all([fOfflineContarPendentes(), fOfflineContarFalhas()])
   const dot = document.getElementById('fm-config-dot')
-  if (dot) dot.hidden = n === 0
+  if (dot) dot.hidden = (n + falhas) === 0
   const cfgTxt = document.getElementById('fm-cfg-pendentes')
-  if (cfgTxt) cfgTxt.textContent = n
+  if (cfgTxt) cfgTxt.textContent = falhas ? `${n} (+${falhas} travado${falhas > 1 ? 's' : ''})` : n
 }
 
 // Heurística de falha de rede (offline real ou fetch que não completou) —
@@ -1494,6 +1498,7 @@ async function renderFmConfig() {
         <div style="font-size:13px;color:#6B7280">Pendente(s) para enviar: <strong id="fm-cfg-pendentes">—</strong></div>
         <button class="btn btn-sm btn-secondary" id="btn-sync-agora" onclick="sincronizarAgora()">${bico('upload')} Sincronizar agora</button>
       </div>
+      <div id="fm-cfg-fila" style="margin-top:12px"></div>
     </div>
     <div class="form-section-label">Notificações</div>
     <div class="card" style="padding:0;margin-bottom:16px" id="fm-cfg-push">${itemPushConfig('carregando')}</div>
@@ -1513,8 +1518,75 @@ async function renderFmConfig() {
       <p>© ${new Date().getFullYear()} · Todos os direitos reservados</p>
     </div>`
   await atualizarBadgePendentesSync()
+  await renderFilaFrota()
   atualizarItemPushConfig()
   atualizarVersaoFrota()
+}
+
+// ── Fila de envio: o que está esperando, o que travou e por quê ────
+// Antes o Config só mostrava um número. Quando um item falhava, o
+// motorista via "1 pendência não pôde ser enviada" sem saber qual nem
+// por quê, e a única saída era zerar a fila inteira (perdendo o que
+// ainda ia sincronizar). Agora cada ação aparece com estado, motivo e
+// saída individual.
+const FM_FILA_ROTULO = {
+  checkout: 'Início de viagem', checkin: 'Conclusão de viagem',
+  abrir_direta: 'Viagem avulsa', abastecimento: 'Abastecimento',
+  defeito: 'Comunicado de defeito',
+}
+
+async function renderFilaFrota() {
+  const el = document.getElementById('fm-cfg-fila')
+  if (!el) return
+  const [pendentes, falhas] = await Promise.all([fOfflineListarPendentes(), fOfflineListarFalhas()])
+  const itens = [...falhas, ...pendentes]
+  if (!itens.length) {
+    el.innerHTML = '<div style="font-size:12px;color:#9CA3AF">Nada na fila — tudo enviado.</div>'
+    return
+  }
+  const agora = Date.now()
+  el.innerHTML = itens.map(a => {
+    const permanente = a.status === 'falha_permanente'
+    const esperando = !permanente && a.proxima_tentativa && a.proxima_tentativa > new Date().toISOString()
+    const minutos = esperando ? Math.max(1, Math.round((new Date(a.proxima_tentativa).getTime() - agora) / 60000)) : 0
+    const cor = permanente ? '#DC2626' : esperando ? '#B45309' : '#6B7280'
+    const situacao = permanente
+      ? 'Não foi aceito pelo setor de transporte'
+      : esperando
+        ? `Nova tentativa em ~${minutos} min (${a.tentativas} falha${a.tentativas > 1 ? 's' : ''})`
+        : 'Aguardando envio'
+    return `
+      <div style="border-top:1px solid rgba(0,0,0,.06);padding:10px 0">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+          <div style="min-width:0">
+            <div style="font-size:13px;font-weight:600">${esc(FM_FILA_ROTULO[a.tipo] || a.tipo)}</div>
+            <div style="font-size:11px;color:#9CA3AF">${formatDataHora(a.criado_em)}</div>
+            <div style="font-size:11px;color:${cor};margin-top:2px">${esc(situacao)}</div>
+            ${permanente && a.erro ? `<div style="font-size:11px;color:#6B7280;margin-top:4px">${esc(a.erro)}</div>` : ''}
+          </div>
+          ${permanente ? `
+            <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0">
+              <button class="btn btn-xs btn-secondary" onclick="tentarDeNovoFila('${a.uuid_cliente}')">Tentar de novo</button>
+              <button class="btn btn-xs btn-ghost" style="color:#DC2626" onclick="descartarDaFila('${a.uuid_cliente}')">Descartar</button>
+            </div>` : ''}
+        </div>
+      </div>`
+  }).join('')
+}
+
+async function tentarDeNovoFila(uuid) {
+  await fOfflineReenfileirar(uuid)
+  await renderFilaFrota()
+  await atualizarBadgePendentesSync()
+  fSyncRodar()
+}
+
+async function descartarDaFila(uuid) {
+  if (!confirm('Descartar este registro? Ele não será enviado ao setor de transporte e não poderá ser recuperado.')) return
+  await fOfflineDescartar(uuid)
+  toast('Registro descartado', 'success')
+  await renderFilaFrota()
+  await atualizarBadgePendentesSync()
 }
 
 // Mostra a versão do cache do PWA instalado neste aparelho (VERSOES.frota
@@ -1555,11 +1627,13 @@ async function sincronizarAgora() {
 }
 
 async function zerarFilaLocalFrota() {
-  const n = await fOfflineContarPendentes()
-  if (n > 0 && !confirm(`Existem ${n} registro(s) ainda não enviados. Zerar a fila local vai descartá-los. Continuar?`)) return
+  const [n, falhas] = await Promise.all([fOfflineContarPendentes(), fOfflineContarFalhas()])
+  const total = n + falhas
+  if (total > 0 && !confirm(`Existem ${total} registro(s) ainda não enviados. Zerar a fila local vai descartá-los. Continuar?`)) return
   await fOfflineZerarFila()
   toast('Fila local zerada', 'success')
   await atualizarBadgePendentesSync()
+  await renderFilaFrota()
   await carregarViagensMotorista()
 }
 
@@ -1637,10 +1711,15 @@ async function confirmarCheckout() {
   const btn = document.getElementById('btn-confirmar-checkout')
   btn.disabled = true; btn.textContent = 'Registrando...'
   const gps = await fmObterGpsSeAtivo('captura_viagens')
+  // uuid da AÇÃO (migration 198): vai junto tanto no envio online
+  // quanto na fila offline. Se a RPC commitar e a resposta se perder,
+  // o reenvio traz o mesmo uuid e o servidor devolve a viagem sem
+  // repetir o efeito — em vez de recusar para sempre.
   const payload = {
     p_viagem_id: _acaoId, p_medida: medida,
     p_combustivel_pct: parseInt(document.getElementById('co-combustivel').value),
-    p_lat: gps?.lat ?? null, p_lng: gps?.lng ?? null
+    p_lat: gps?.lat ?? null, p_lng: gps?.lng ?? null,
+    p_uuid_cliente: _fUuid()
   }
   try {
     if (!navigator.onLine) throw new Error('offline')
@@ -1689,7 +1768,8 @@ async function confirmarCheckin() {
     p_combustivel_pct: parseInt(document.getElementById('ci-combustivel').value),
     p_observacoes: document.getElementById('ci-obs').value.trim() || null,
     p_avarias: document.getElementById('ci-avarias').value.trim() || '',
-    p_lat: gps?.lat ?? null, p_lng: gps?.lng ?? null
+    p_lat: gps?.lat ?? null, p_lng: gps?.lng ?? null,
+    p_uuid_cliente: _fUuid()
   }
   try {
     if (!navigator.onLine) throw new Error('offline')
