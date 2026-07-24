@@ -29,7 +29,12 @@ function frotaFotoRef(url) {
   const m = url.match(/\/storage\/v1\/object\/(?:public\/)?([^/]+)\/(.+)$/)
   if (!m) return null
   const bucket = m[1]
-  const path = decodeURIComponent(m[2].split('?')[0].split('#')[0])
+  const bruto = m[2].split('?')[0].split('#')[0]
+  // decodeURIComponent lança URIError em '%' solto. Um caminho estranho
+  // não pode derrubar o template que está sendo montado — devolve nulo,
+  // que o chamador já trata como "sem foto".
+  let path
+  try { path = decodeURIComponent(bruto) } catch (e) { path = bruto }
   if (!bucket || !path) return null
   return { bucket, path }
 }
