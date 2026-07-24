@@ -140,6 +140,19 @@ Frota — abastecimento (174–175):
   passa a rejeitar p_veiculo_id diferente do veículo da viagem
   em_andamento do motorista (quando existir) — trava de servidor,
   segunda camada da regra abaixo.
+- 196–205 (endurecimento + Fases 1 a 6 do plano em
+  docs/frota-analise-e-plano.md — ler o cabeçalho de cada uma):
+  196/197 fecham a superfície anônima (zero função frota_* SECURITY
+  DEFINER executável por anon); 198 torna check-out/check-in
+  idempotentes por uuid_cliente (fim da pílula envenenada na fila
+  offline); 199/200 tornam os buckets do Frota privados, com leitura
+  por signed URL (js/frota-fotos.js) e escrita restrita; 201 impede
+  escalar motorista com viagem vencida sem check-in
+  (vw_frota_viagens_vencidas); 202 expõe motorista_telefone na
+  vw_frota_viagens_detalhe; 203/204 são o checklist de inspeção (DVIR)
+  — a inspeção viaja DENTRO do check-out/check-in, nunca como chamada
+  separada; 205 alerta vencimento de documento e CNH por pg_cron
+  (frota_checar_vencimentos + vw_frota_vencimentos).
 - 181_frota_fix_checkin_regressao.sql: corrige regressão que a 176
   introduziu em frota_checkin_viagem — ao recriar a função pra
   adicionar localizacao_chegada/p_lat/p_lng, usei o corpo original da

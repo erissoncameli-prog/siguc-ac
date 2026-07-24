@@ -81,6 +81,7 @@ let _veiculos    = []   // frota_veiculos
 let _motoristas  = []   // frota_motoristas
 let _ordensServ  = []   // frota_ordens_servico no período
 let _documentos  = []   // frota_veiculo_documentos (vencimento — sem filtro de período)
+let _multas      = []   // frota_multas no período (entra no custo total de propriedade)
 let _setores     = []   // unidades_organizacionais
 let _carregando  = false
 let _rankAtivo   = 'veiculos-viagens'
@@ -268,7 +269,7 @@ async function carregarDashboard() {
 
   const iniTs = ini + 'T00:00:00', fimTs = fim + 'T23:59:59'
 
-  const [veicRes, motRes, viagRes, abastRes, osRes, manutRes, docRes] = await Promise.all([
+  const [veicRes, motRes, viagRes, abastRes, osRes, manutRes, docRes, multaRes] = await Promise.all([
     db.from('frota_veiculos').select('id,placa,modelo,tipo,status,setor_id,medidor,ativo').eq('ativo', true),
     db.from('frota_motoristas').select('id,nome,setor_id,status,cnh_validade,habilitacao_fluvial_validade').eq('ativo', true),
     db.from('vw_frota_viagens_detalhe')
@@ -279,10 +280,17 @@ async function carregarDashboard() {
       .select('id,veiculo_id,placa,modelo,medidor,motorista_id,motorista_nome,data_hora,litros_final,valor_final,tanque_cheio,medida_no_abastecimento,status,contrato_numero,fonte_tipo,fonte_codigo,fonte_descricao,motivo_rejeicao')
       .gte('data_hora', iniTs).lte('data_hora', fimTs)
       .order('data_hora', { ascending: true }).limit(5000),
-    db.from('frota_ordens_servico').select('id,veiculo_id,tipo,status,custo,data_abertura,data_conclusao')
+    // vw_frota_os_detalhe, não frota_ordens_servico: a tabela NÃO tem
+    // coluna `custo` (só custo_mao_obra), então o select antigo era
+    // rejeitado pelo PostgREST, _ordensServ vinha vazio e TODO o custo
+    // de manutenção do painel aparecia como zero. custo_total da view
+    // já soma mão de obra + peças.
+    db.from('vw_frota_os_detalhe').select('id,veiculo_id,tipo,status,custo_total,custo_pecas,custo_mao_obra,data_abertura,data_conclusao')
       .gte('data_abertura', ini).lte('data_abertura', fim).limit(5000),
     db.from('vw_frota_manutencoes_pendentes').select('*'),
     db.from('frota_veiculo_documentos').select('veiculo_id,tipo,descricao,data_vencimento'),
+    db.from('frota_multas').select('id,veiculo_id,valor,status,data_infracao')
+      .gte('data_infracao', ini).lte('data_infracao', fim).limit(5000),
   ])
 
   _veiculos   = veicRes.data   || []
@@ -290,6 +298,7 @@ async function carregarDashboard() {
   _ordensServ = osRes.data     || []
   _manutPend  = manutRes.data  || []
   _documentos = docRes.data    || []
+  _multas     = multaRes.data  || []
 
   // Filtro por setor/tipo — aplicado no cliente (setor pode vir do
   // solicitante da viagem ou da lotação do veículo/motorista)
@@ -349,6 +358,7 @@ function renderDashboard() {
             <button class="rank-tab" data-rank="veiculos-uso">Veículos · Km/Horas</button>
             <button class="rank-tab" data-rank="veiculos-custo">Veículos · Custo total</button>
             <button class="rank-tab" data-rank="veiculos-consumo">Veículos · Consumo</button>
+            <button class="rank-tab" data-rank="veiculos-custo-km">Veículos · Custo por km/h</button>
             <button class="rank-tab" data-rank="veiculos-os">Veículos · OS corretivas</button>
             <button class="rank-tab" data-rank="motoristas-viagens">Motoristas · Viagens/Km</button>
             <button class="rank-tab" data-rank="motoristas-rejeitados">Motoristas · Rejeitados</button>
@@ -463,7 +473,7 @@ function renderKpis() {
   const litrosTotal = _abastec.filter(a=>a.status==='validado').reduce((s,a)=>s+Number(a.litros_final||0),0)
   const valorTotal  = _abastec.filter(a=>a.status==='validado').reduce((s,a)=>s+Number(a.valor_final||0),0)
 
-  const custoManut = _ordensServ.filter(o=>o.status==='concluida').reduce((s,o)=>s+Number(o.custo||0),0)
+  const custoManut = _ordensServ.filter(o=>o.status==='concluida').reduce((s,o)=>s+Number(o.custo_total||0),0)
 
   const manutVencida = _manutPend.filter(m => (m.restante_uso!=null && m.restante_uso<0) || (m.restante_dias!=null && m.restante_dias<0)).length
   const manutProxima = _manutPend.filter(m => (m.restante_dias!=null && m.restante_dias>=0 && m.restante_dias<30) && !((m.restante_uso!=null && m.restante_uso<0))).length
@@ -623,7 +633,7 @@ function initChartManutencaoTipo() {
     const key = (o.data_conclusao || o.data_abertura || '').slice(0,7)
     if (!key) return
     if (!acc[key]) acc[key] = { preventiva:0, corretiva:0 }
-    acc[key][o.tipo] = (acc[key][o.tipo]||0) + Number(o.custo||0)
+    acc[key][o.tipo] = (acc[key][o.tipo]||0) + Number(o.custo_total||0)
   })
   const meses = Object.keys(acc).sort()
   const labels = meses.map(m => { const [a,mm]=m.split('-'); return new Date(+a,+mm-1,1).toLocaleDateString('pt-BR',{month:'short',year:'2-digit'}) })
@@ -699,6 +709,7 @@ function renderRankings() {
     'veiculos-uso':          rankVeiculosUso,
     'veiculos-custo':        rankVeiculosCusto,
     'veiculos-consumo':      rankVeiculosConsumo,
+    'veiculos-custo-km':     rankVeiculosCustoKm,
     'veiculos-os':           rankVeiculosOS,
     'motoristas-viagens':    rankMotoristasViagens,
     'motoristas-rejeitados': rankMotoristasRejeitados,
@@ -737,11 +748,70 @@ function rankVeiculosCusto() {
   const acc = {}
   _veiculosF.forEach(v => { acc[v.id] = { placa:v.placa, modelo:v.modelo, combustivel:0, manutencao:0 } })
   _abastec.filter(a=>a.status==='validado').forEach(a => { if (acc[a.veiculo_id]) acc[a.veiculo_id].combustivel += Number(a.valor_final||0) })
-  _ordensServ.filter(o=>o.status==='concluida').forEach(o => { if (acc[o.veiculo_id]) acc[o.veiculo_id].manutencao += Number(o.custo||0) })
+  _ordensServ.filter(o=>o.status==='concluida').forEach(o => { if (acc[o.veiculo_id]) acc[o.veiculo_id].manutencao += Number(o.custo_total||0) })
   const rows = Object.values(acc).map(v=>({...v, total: v.combustivel+v.manutencao}))
     .sort((a,b)=>b.total-a.total).filter(v=>v.total>0).slice(0,10)
     .map((v,i)=>[i+1, `${esc(v.placa)} — ${esc(v.modelo)}`, formatBRL(v.combustivel), formatBRL(v.manutencao), formatBRL(v.total)])
   return tabela(['#','Veículo','Combustível','Manutenção','Total'], rows)
+}
+
+// Uso do veículo no período, a partir das viagens concluídas: km para
+// hodômetro, horas para horímetro (embarcações). É o denominador do
+// custo por km — precisa vir da viagem, não do medidor do veículo, que
+// é acumulado desde sempre.
+function usoNoPeriodo(veiculoId, medidor) {
+  return _viagens
+    .filter(v => v.veiculo_id === veiculoId && v.status === 'concluida')
+    .reduce((s, v) => {
+      const ini = medidor === 'horimetro' ? v.horas_saida : v.km_saida
+      const fim = medidor === 'horimetro' ? v.horas_chegada : v.km_chegada
+      if (ini == null || fim == null) return s
+      return s + Math.max(0, Number(fim) - Number(ini))
+    }, 0)
+}
+
+// Custo total de propriedade por km (ou por hora, em embarcação):
+// combustível validado + manutenção concluída + multas, dividido pelo
+// uso do período. É o número que a direção pede e que o painel ainda
+// não dava — havia custo total e havia consumo, mas nada relacionando
+// os dois ao quanto o veículo de fato rodou.
+//
+// Só entra veículo com uso > 0 no período: sem denominador o valor
+// seria infinito, e um veículo parado com uma OS cara apareceria como
+// o mais caro da frota, o que é o oposto da leitura correta.
+function rankVeiculosCustoKm() {
+  const acc = {}
+  _veiculosF.forEach(v => {
+    acc[v.id] = { placa: v.placa, modelo: v.modelo, medidor: v.medidor,
+                  combustivel: 0, manutencao: 0, multas: 0,
+                  uso: usoNoPeriodo(v.id, v.medidor) }
+  })
+  _abastec.filter(a => a.status === 'validado')
+    .forEach(a => { if (acc[a.veiculo_id]) acc[a.veiculo_id].combustivel += Number(a.valor_final || 0) })
+  _ordensServ.filter(o => o.status === 'concluida')
+    .forEach(o => { if (acc[o.veiculo_id]) acc[o.veiculo_id].manutencao += Number(o.custo_total || 0) })
+  _multas.forEach(m => { if (acc[m.veiculo_id]) acc[m.veiculo_id].multas += Number(m.valor || 0) })
+
+  const linhas = Object.values(acc)
+    .map(v => ({ ...v, total: v.combustivel + v.manutencao + v.multas }))
+    .filter(v => v.uso > 0 && v.total > 0)
+    .map(v => ({ ...v, porUso: v.total / v.uso }))
+    .sort((a, b) => b.porUso - a.porUso)
+    .slice(0, 10)
+
+  if (!linhas.length) {
+    return '<div style="padding:24px;text-align:center;color:#9CA3AF;font-size:13px">' +
+      'Sem dados suficientes no período: é preciso ter viagem concluída (com medidor de saída e chegada) e algum custo lançado.</div>'
+  }
+
+  const rows = linhas.map((v, i) => [
+    i + 1,
+    `${esc(v.placa)} — ${esc(v.modelo)}`,
+    `${formatNum(v.uso, 0)} ${v.medidor === 'horimetro' ? 'h' : 'km'}`,
+    formatBRL(v.total),
+    `<strong>${formatBRL(v.porUso)}/${v.medidor === 'horimetro' ? 'h' : 'km'}</strong>`,
+  ])
+  return tabela(['#', 'Veículo (mais caro primeiro)', 'Uso no período', 'Custo total', 'Custo por km/h'], rows)
 }
 
 function rankVeiculosConsumo() {
