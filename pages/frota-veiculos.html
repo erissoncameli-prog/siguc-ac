@@ -12,6 +12,7 @@
 <script src="../js/layout.js"></script>
 <script src="../js/frota-wise.js"></script>
 <script src="../js/frota-fotos.js"></script>
+<script src="../js/frota-consumo.js"></script>
 <script>
 // Rede de segurança para js/frota-fotos.js. Se ele não carregar — deploy
 // a meio caminho, cache do navegador, bloqueio de rede — as funções
@@ -868,9 +869,9 @@ function mudarAbaVeiculo(aba) {
 
 // ── Aba Consumo — abastecimentos VALIDADOS do veículo (padrão do
 // projeto: só validados entram em números de orçamento/consumo — ver
-// CLAUDE.md, "Frota — abastecimento"). Consumo médio pelo método
-// "tanque cheio a tanque cheio" (mesmo cálculo do app do motorista,
-// frota-app.html → fmResumoCombustivel).
+// CLAUDE.md, "Frota — abastecimento"). Consumo médio = km total ÷
+// litros totais, via frotaConsumoVeiculo (js/frota-consumo.js) —
+// mesma função do app do motorista e do dashboard.
 async function carregarConsumoVeiculo(veiculoId, medidor) {
   const corpo = document.getElementById('v-consumo-corpo')
   corpo.innerHTML = 'Carregando...'
@@ -888,19 +889,7 @@ async function carregarConsumoVeiculo(veiculoId, medidor) {
   const litros = regs.reduce((s, a) => s + Number(a.litros_final || 0), 0)
   const valor  = regs.reduce((s, a) => s + Number(a.valor_final || 0), 0)
 
-  let ultimoCheio = null
-  const taxas = []
-  regs.forEach(a => {
-    if (ultimoCheio) {
-      const distancia = Number(a.medida_no_abastecimento) - Number(ultimoCheio.medida_no_abastecimento)
-      const litrosPeriodo = Number(a.litros_final || 0)
-      if (distancia > 0 && litrosPeriodo > 0) taxas.push(distancia / litrosPeriodo)
-    }
-    if (a.tanque_cheio) ultimoCheio = a
-  })
-  const consumoMedio = taxas.length ? taxas.reduce((s, x) => s + x, 0) / taxas.length : null
-  const consumoTxt = consumoMedio == null ? '—'
-    : (medidor === 'horimetro' ? `${formatNum(1 / consumoMedio, 2)} L/h` : `${formatNum(consumoMedio, 2)} km/L`)
+  const consumoTxt = frotaConsumoTexto(frotaConsumoVeiculo(regs, medidor))
 
   const recentes = regs.slice().reverse().slice(0, 10)
 

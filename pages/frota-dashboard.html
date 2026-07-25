@@ -9,6 +9,7 @@
 <script src="../js/queryLogger.js"></script>
 <script src="../js/config.js"></script>
 <script src="../js/layout.js"></script>
+<script src="../js/frota-consumo.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <style>
 .rel-topbar { display:flex; gap:10px; flex-wrap:wrap; align-items:center;
@@ -439,23 +440,14 @@ function horasPercorridoTotal() {
   return h
 }
 
-// Consumo médio "tanque cheio a tanque cheio" (mesmo método de
-// frota-veiculos.html/frota-app.html), agregado por veículo e depois
-// resumido em média simples (km/L para hodômetro).
-function consumoPorVeiculo(veiculoId) {
+// Consumo médio = km total ÷ litros totais, via frotaConsumoVeiculo
+// (js/frota-consumo.js) — mesma função da mesa e do app do motorista.
+// Só abastecimentos validados, como o resto dos números do dashboard.
+// Retorna o objeto do cálculo (ou null) para que o KPI da frota possa
+// somar distâncias e litros em vez de tirar média das médias.
+function consumoPorVeiculo(veiculoId, medidor) {
   const regs = _abastec.filter(a => a.veiculo_id === veiculoId && a.status === 'validado')
-    .sort((a,b) => new Date(a.data_hora) - new Date(b.data_hora))
-  let ultimoCheio = null
-  const taxas = []
-  regs.forEach(a => {
-    if (ultimoCheio) {
-      const dist = Number(a.medida_no_abastecimento) - Number(ultimoCheio.medida_no_abastecimento)
-      const litros = Number(a.litros_final || 0)
-      if (dist > 0 && litros > 0) taxas.push(dist / litros)
-    }
-    if (a.tanque_cheio) ultimoCheio = a
-  })
-  return taxas.length ? taxas.reduce((s,x)=>s+x,0)/taxas.length : null
+  return frotaConsumoVeiculo(regs, medidor)
 }
 
 function renderKpis() {
@@ -488,9 +480,11 @@ function renderKpis() {
 
   const abastPendentes = _abastec.filter(a=>a.status==='pendente').length
 
-  // Consumo médio geral (km/L) — média das médias por veículo com hodômetro
-  const consumos = _veiculosF.filter(v=>v.medidor==='hodometro').map(v=>consumoPorVeiculo(v.id)).filter(x=>x!=null)
-  const consumoGeral = consumos.length ? consumos.reduce((s,x)=>s+x,0)/consumos.length : null
+  // Consumo médio geral (km/L) — agregado da frota com hodômetro:
+  // soma dos km ÷ soma dos litros, não média das médias (senão uma
+  // moto que rodou 200 km pesaria igual a uma caminhonete com 20.000)
+  const consumos = _veiculosF.filter(v=>v.medidor==='hodometro').map(v=>consumoPorVeiculo(v.id,'hodometro'))
+  const consumoGeral = frotaConsumoAgregado(consumos, 'hodometro')
 
   document.getElementById('kpi-area').innerHTML = `
     <div class="kpi-grid">
@@ -816,8 +810,8 @@ function rankVeiculosCustoKm() {
 
 function rankVeiculosConsumo() {
   const rows = _veiculosF.filter(v=>v.medidor==='hodometro').map(v => {
-    const c = consumoPorVeiculo(v.id)
-    return c!=null ? { placa:v.placa, modelo:v.modelo, c } : null
+    const r = consumoPorVeiculo(v.id, 'hodometro')
+    return r ? { placa:v.placa, modelo:v.modelo, c:r.consumo } : null
   }).filter(Boolean).sort((a,b)=>a.c-b.c).slice(0,10) // pior primeiro
     .map((v,i)=>[i+1, `${esc(v.placa)} — ${esc(v.modelo)}`, `${formatNum(v.c,2)} km/L`])
   return tabela(['#','Veículo (pior consumo primeiro)','Km/L médio'], rows)

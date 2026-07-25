@@ -166,20 +166,39 @@ Frota — abastecimento (174–175):
   antes de aplicar em produção.
 
 ## Relatórios de consumo de combustível
-Consumo médio calculado no cliente (sem RPC/view nova) pelo método
-"tanque cheio a tanque cheio": entre 2 abastecimentos consecutivos do
-mesmo veículo com tanque_cheio=true, os litros do 2º representam o
-combustível gasto na distância (ou horas) entre os dois — precisa de
-pelo menos 2 abastecimentos com tanque cheio pra aparecer. Km/L para
-hodômetro, L/h para horímetro (embarcações).
+Cálculo em UM lugar só: `js/frota-consumo.js`
+(`frotaConsumoVeiculo` / `frotaConsumoAgregado` / `frotaConsumoTexto`).
+Nunca reimplementar nas páginas — antes eram 3 cópias do mesmo bloco,
+com o mesmo bug. No cliente, sem RPC/view nova.
+
+Método: agregado por odômetro — km total ÷ litros totais. A janela vai
+do 1º ao último abastecimento; os litros que contam são os de TODOS
+menos o do PRIMEIRO (o combustível dele foi queimado antes da janela
+começar; já o do último repõe o gasto que o odômetro dele mesmo já
+mede). Km/L para hodômetro, L/h para horímetro (embarcações).
+NÃO usa `tanque_cheio` — campo que o motorista marca por hábito, não
+por medição. Precisa de 2+ abastecimentos com km entre eles.
+Guarda de cauda: abastecimento recente sem km rodado (odômetro igual
+ao anterior) é descartado — jogaria litros no denominador sem km no
+numerador. Erro de fronteira (nível do tanque no 1º vs último) é
+inerente ao método agregado e se dilui com o histórico.
+Base: migration 192 garante medidor sempre crescente; a view
+vw_frota_abastecimentos_detalhe já traz litros_final/valor_final
+ajustados e placa/modelo/medidor.
+
+Três superfícies consomem a função (todas devem ser tocadas juntas):
 - App do motorista (frota-app.html, aba Dados → fmResumoCombustivel):
   números do próprio motorista, por veículo usado. Conta abastecimentos
   pendentes+validados (rejeitados ficam fora — dado contestado).
 - Mesa (frota-veiculos.html, aba "Consumo" no cadastro do veículo →
   carregarConsumoVeiculo): só abastecimentos VALIDADOS (mesma regra do
   restante do módulo — contrato/fonte já classificados pela gestão).
-Os dois pontos usam vw_frota_abastecimentos_detalhe (já traz
-litros_final/valor_final ajustados e placa/modelo/medidor).
+- Dashboard (frota-dashboard.html → consumoPorVeiculo): só validados;
+  KPI geral da frota usa `frotaConsumoAgregado` (soma km ÷ soma
+  litros), nunca média das médias — senão uma moto que rodou 200 km
+  pesa igual a uma caminhonete que rodou 20.000.
+Divergência intencional: o app conta pendentes e as telas de mesa não,
+então o mesmo veículo pode mostrar números diferentes nas duas.
 
 ## Regra do sistema — trava de veículo no abastecimento
 O abastecimento nunca deve poder ser lançado num veículo diferente do
