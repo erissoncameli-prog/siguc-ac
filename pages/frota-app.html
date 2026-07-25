@@ -48,6 +48,7 @@ const _frotaReady = _dbReady.then(function () {
 <script src="../js/layout.js"></script>
 <script src="../js/frota-wise.js"></script>
 <script src="../js/frota-fotos.js"></script>
+<script src="../js/frota-consumo.js"></script>
 <script>
 // Rede de segurança para js/frota-fotos.js. Se ele não carregar — deploy
 // a meio caminho, cache do navegador, bloqueio de rede — as funções
@@ -1340,11 +1341,8 @@ function renderFmHistorico() {
 // carregado do banco ou do cache offline, sem chamada extra).
 // Abastecimentos rejeitados ficam fora da conta (dado contestado);
 // pendentes entram, já que fisicamente aconteceram.
-// Consumo médio: método "tanque cheio a tanque cheio" — entre dois
-// abastecimentos consecutivos do mesmo veículo com tanque_cheio=true,
-// os litros do 2º abastecimento representam o combustível gasto para
-// rodar a distância (ou usar as horas) entre os dois. Só é possível
-// calcular a partir do 2º "tanque cheio" de cada veículo.
+// Consumo médio: km total ÷ litros totais, via frotaConsumoVeiculo
+// (js/frota-consumo.js) — mesma função da mesa e do dashboard.
 function fmResumoCombustivel() {
   const validos = _abastecimentos.filter(a => a.status !== 'rejeitado')
   const porVeiculo = {}
@@ -1361,19 +1359,9 @@ function fmResumoCombustivel() {
     const valor  = regs.reduce((s, a) => s + Number(a.valor_final || 0), 0)
     totalAbast += regs.length; totalLitros += litros; totalValor += valor
 
-    let ultimoCheio = null
-    const taxas = []
-    regs.forEach(a => {
-      if (ultimoCheio) {
-        const distancia = Number(a.medida_no_abastecimento) - Number(ultimoCheio.medida_no_abastecimento)
-        const litrosPeriodo = Number(a.litros_final || 0)
-        if (distancia > 0 && litrosPeriodo > 0) taxas.push(distancia / litrosPeriodo)
-      }
-      if (a.tanque_cheio) ultimoCheio = a
-    })
-    const consumoMedio = taxas.length ? taxas.reduce((s, x) => s + x, 0) / taxas.length : null
+    const consumo = frotaConsumoVeiculo(regs, v.medidor)
 
-    return { ...v, abastecimentos: regs.length, litros, valor, consumoMedio, temAmostra: taxas.length > 0 }
+    return { ...v, abastecimentos: regs.length, litros, valor, consumo }
   }).sort((a, b) => b.abastecimentos - a.abastecimentos)
 
   return { totalAbast, totalLitros, totalValor, veiculos }
@@ -1470,9 +1458,8 @@ function renderFmDados() {
             </div>
             <div style="font-size:12px;color:#6B7280;margin-top:4px">
               ${formatNum(v.litros, 1)} L · ${formatBRL(v.valor)}
-              ${v.temAmostra ? ` · Consumo médio: <strong style="color:#1F4E2C">${v.medidor === 'horimetro'
-                ? formatNum(1 / v.consumoMedio, 2) + ' L/h'
-                : formatNum(v.consumoMedio, 2) + ' km/L'}</strong>` : ' · Consumo médio: precisa de 2+ abastecimentos com tanque cheio'}
+              ${v.consumo ? ` · Consumo médio: <strong style="color:#1F4E2C">${frotaConsumoTexto(v.consumo)}</strong>`
+                : ' · Consumo médio: precisa de 2+ abastecimentos com quilometragem entre eles'}
             </div>
           </div>`).join('')}
       </div>
