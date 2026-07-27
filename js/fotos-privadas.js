@@ -35,21 +35,18 @@
 
 const FOTO_TTL = 3600 // 1 h — cobre a sessão de uma tela sem re-assinar
 
-// Cliente Supabase a usar para assinar.
-//
-// Não dá para usar `window.db` cegamente: os apps de campo têm cliente
-// próprio, com sessão isolada em localStorage. O Brigadas REATRIBUI o
-// global `db` para o dele (pages/brigada.html), então ali `db` já é o
-// certo — mas o Biomonitor guarda o seu em `window._bioDB_client` e
-// deixa `db` intocado, apontando para a sessão do SIGUC de mesa, que
-// no app não existe. Assinar com esse cliente devolve erro de sessão e
-// TODAS as fotos do Biomonitor sumiriam de uma vez.
-//
-// Ordem deliberada: o cliente do Biomonitor só existe nas telas do app
-// (pages/biomonitor.html); nas páginas de mesa e no Frota/Brigadas ele
-// é undefined e cai em `db`, que é o correto nesses contextos.
+// Cliente Supabase a usar para assinar. A resolução mora em
+// js/config.js (sigucDb), que é carregado antes deste arquivo em todas
+// as telas — uma implementação só, pelo mesmo motivo do
+// js/frota-consumo.js. O fallback cobre o caso de este arquivo ser
+// carregado sem o config.js.
 function _fotoDb() {
-  return window._bioDB_client || window.db || null
+  if (typeof sigucDb === 'function') return sigucDb()
+  // Fallback com a MESMA ordem de sigucDb: `db` antes de `window.db`
+  // — ver o comentário lá para o porquê.
+  if (window._bioDB_client) return window._bioDB_client
+  if (typeof db !== 'undefined' && db) return db
+  return window.db || null
 }
 
 // URL pública gravada no banco → { bucket, path }.

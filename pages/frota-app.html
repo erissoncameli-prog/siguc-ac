@@ -19,6 +19,8 @@ window.__API_MONITOR_OFF = true
 <script src="../js/observability.js"></script>
 <script src="../js/queryLogger.js"></script>
 <script src="../js/config.js"></script>
+<script src="../js/lgpd.js"></script>
+<script src="../js/lgpd-campo.js"></script>
 <script src="../js/qrcode-generator.js"></script>
 <script>
 // ── Cliente Supabase ISOLADO para o App Frota ──────────────────
@@ -655,6 +657,9 @@ function renderSeletorPerfil() {
 
 // ── Troca de modo ─────────────────────────────────────────────
 async function entrarModo(modo, persistir) {
+  // Aviso de privacidade do app (LGPD Art. 9º, migration 213). Roda
+  // uma vez só por carga — entrarModo dispara a cada troca de modo.
+  lgpdCampoIniciar()
   _modoAtivo = modo
   if (persistir) { _modoBase = modo; sessionStorage.setItem('frotaModoAtivo', modo) }
   if (modo === 'motorista') {
@@ -730,6 +735,7 @@ async function renderSolicitanteConfig() {
       <button class="fm-config-item" onclick="alterarPinFrota()">${bico('key')} Alterar PIN</button>
       <button class="fm-config-item" onclick="abrirInstalarFrota()">${bico('qr')} Instalar o app</button>
       <button class="fm-config-item" id="btn-verificar-update-frota" onclick="verificarAtualizacaoFrota()">${bico('download')} Verificar atualização</button>
+      <button class="fm-config-item" onclick="lgpdCampoAbrir()">${bico('shield')} Aviso de privacidade</button>
       <button class="fm-config-item" style="color:#DC2626" onclick="fazerLogout()">${bico('logout')} Sair</button>
     </div>
     <div class="fm-creditos">
@@ -1019,6 +1025,7 @@ async function renderGestorConfig() {
       <button class="fm-config-item" onclick="alterarPinFrota()">${bico('key')} Alterar PIN</button>
       <button class="fm-config-item" onclick="abrirInstalarFrota()">${bico('qr')} Instalar o app</button>
       <button class="fm-config-item" id="btn-verificar-update-frota" onclick="verificarAtualizacaoFrota()">${bico('download')} Verificar atualização</button>
+      <button class="fm-config-item" onclick="lgpdCampoAbrir()">${bico('shield')} Aviso de privacidade</button>
       <button class="fm-config-item" style="color:#DC2626" onclick="fazerLogout()">${bico('logout')} Sair</button>
     </div>
     <div class="fm-creditos">
@@ -1603,6 +1610,7 @@ async function renderFmConfig() {
       <button class="fm-config-item" onclick="alterarPinFrota()">${bico('key')} Alterar PIN</button>
       <button class="fm-config-item" onclick="abrirInstalarFrota()">${bico('qr')} Instalar o app</button>
       <button class="fm-config-item" id="btn-verificar-update-frota" onclick="verificarAtualizacaoFrota()">${bico('download')} Verificar atualização</button>
+      <button class="fm-config-item" onclick="lgpdCampoAbrir()">${bico('shield')} Aviso de privacidade</button>
       <button class="fm-config-item" style="color:#DC2626" onclick="zerarFilaLocalFrota()">${bico('trash')} Zerar fila local</button>
       <button class="fm-config-item" style="color:#DC2626" onclick="fazerLogout()">${bico('logout')} Sair</button>
     </div>
