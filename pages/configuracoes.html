@@ -299,6 +299,31 @@ function renderCfg(cfg){
       </div>
 
       <div class="cfg-section">
+        <div class="cfg-section-title">Log de acesso a dado de terceiro — CAR</div>
+        <div class="hint" style="margin:2px 0 10px">
+          Quem viu o nome/CPF de qual proprietário rural no mapa (migration 216). O CAR é a única base de
+          dado de TERCEIRO no sistema — pessoas que nunca interagiram com a SEMA-AC — daí o registro individual
+          de cada consulta, mitigação declarada no ROPA para o TRAT-013.
+        </div>
+        <div id="lgpd-acesso-car-lista" style="font-size:12px;color:var(--cinza-400)">Carregando…</div>
+      </div>
+
+      <div class="cfg-section">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+          <div>
+            <div class="cfg-section-title" style="margin-bottom:2px">Revisão anual de governança de LGPD</div>
+            <div id="lgpd-revisao-status" style="font-size:12px;color:var(--cinza-400)">Carregando…</div>
+          </div>
+          <button class="btn btn-outline" style="font-size:11px;flex-shrink:0" onclick="abrirMarcarRevisaoLgpd()">Marcar revisão feita</button>
+        </div>
+        <div class="hint" style="margin-top:8px">
+          Reveja o <a href="#" onclick="lgpdAbrirDocumento('plano_incidente');return false">Plano de Resposta a Incidente</a>,
+          os RIPDs de geolocalização e do CAR, e o ROPA (16 tratamentos) pelo menos uma vez por ano.
+          Sem revisão registrada há mais de 12 meses, o sistema notifica automaticamente quem edita esta tela.
+        </div>
+      </div>
+
+      <div class="cfg-section">
         <div class="cfg-section-title">Encarregado pelo Tratamento de Dados Pessoais (DPO)</div>
         <div class="alerta-info" style="margin-bottom:12px">ℹ️ Indicação obrigatória para órgão público (LGPD, art. 41). Estes dados aparecem na seção Contato da Política de Privacidade pública.</div>
         <div class="grid-2">
@@ -379,7 +404,7 @@ function trocarAba(id, btn){
   document.getElementById('pane-'+id)?.classList.add('ativo');
   btn.classList.add('ativo');
   if(id === 'armazenamento') carregarArmazenamento();
-  if(id === 'privacidade')  { carregarDocsLgpd(); carregarSolicitacoesLgpd(); }
+  if(id === 'privacidade')  { carregarDocsLgpd(); carregarSolicitacoesLgpd(); carregarAcessoCarLgpd(); carregarRevisaoLgpd(); }
 }
 
 // Lista os documentos vigentes com versão, data e hash. A leitura é da
@@ -510,6 +535,116 @@ function abrirRespostaLgpd(id){
       console.error('[lgpd] responder solicitação', e);
       btn.disabled = false; btn.textContent = 'Enviar resposta';
       toast('Não foi possível enviar a resposta','error');
+    }
+  });
+}
+
+// Data+hora completas — log de auditoria precisa da hora, não só do
+// dia (mesmo padrão de pages/historico-acessos.html).
+function _lgpdFmtDataHora(str){
+  if(!str) return '—';
+  const d = new Date(str);
+  return d.toLocaleDateString('pt-BR') + ' ' + d.toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' });
+}
+
+// Log de acesso a dado de terceiro (migration 216) — só os 30 mais
+// recentes: é trilha de auditoria, não relatório gerencial; para
+// investigar um caso específico, filtra direto no banco.
+async function carregarAcessoCarLgpd(){
+  const el = document.getElementById('lgpd-acesso-car-lista');
+  if(!el) return;
+  try {
+    const { data, error } = await db.from('vw_lgpd_acesso_car')
+      .select('cod_imovel,cpf_cnpj,acessado_em,usuario_nome,usuario_email')
+      .limit(30);
+    if(error) throw error;
+    if(!data?.length){ el.innerHTML = '<div style="font-size:12px;color:var(--cinza-400);padding:8px 0">Nenhum acesso registrado ainda.</div>'; return; }
+    el.innerHTML = `
+      <div style="font-size:11px;color:var(--cinza-400);margin-bottom:6px">Mostrando os ${data.length} acessos mais recentes.</div>
+      ` + data.map(a => `
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--cinza-100,#f3f4f6);font-size:12px">
+        <div style="min-width:0">
+          <strong>${esc(a.usuario_nome||'(usuário removido)')}</strong>
+          <span style="color:var(--cinza-400)"> viu o imóvel </span>
+          <span class="mono" style="font-size:11px">${esc(a.cod_imovel||'—')}</span>
+        </div>
+        <span style="color:var(--cinza-400);white-space:nowrap;font-size:11px">${_lgpdFmtDataHora(a.acessado_em)}</span>
+      </div>`).join('');
+  } catch(e){
+    console.error('[lgpd] log de acesso ao CAR', e);
+    el.textContent = 'Não foi possível carregar o log.';
+  }
+}
+
+// Revisão anual (migration 220) — mostra a última revisão registrada
+// e se está em dia (12 meses). lgpd_checar_revisao_anual (pg_cron,
+// mensal) usa o mesmo corte de 12 meses para notificar quem edita
+// esta tela quando a revisão atrasar.
+async function carregarRevisaoLgpd(){
+  const el = document.getElementById('lgpd-revisao-status');
+  if(!el) return;
+  try {
+    const { data, error } = await db.from('lgpd_revisoes')
+      .select('revisado_em,revisado_por,observacoes')
+      .order('revisado_em', { ascending:false }).limit(1).maybeSingle();
+    if(error) throw error;
+    if(!data){ el.innerHTML = '<span style="color:#d97706;font-weight:600">Nenhuma revisão registrada ainda.</span>'; return; }
+
+    let nomeRevisor = '';
+    if (data.revisado_por) {
+      const { data: u } = await db.from('usuarios').select('nome_completo').eq('id', data.revisado_por).maybeSingle();
+      if (u?.nome_completo) nomeRevisor = ` por ${esc(u.nome_completo)}`;
+    }
+
+    const atrasada = (Date.now() - new Date(data.revisado_em).getTime()) > 365*24*60*60*1000;
+    el.innerHTML = `Última revisão: <strong>${formatData(data.revisado_em)}</strong>${nomeRevisor}`
+      + (atrasada ? ' <span style="color:#d97706;font-weight:600">(atrasada — mais de 12 meses)</span>' : ' <span style="color:#16a34a">(em dia)</span>');
+  } catch(e){
+    console.error('[lgpd] revisão anual', e);
+    el.textContent = 'Não foi possível carregar.';
+  }
+}
+
+function abrirMarcarRevisaoLgpd(){
+  lgpdInjetarCss();
+  const ov = document.createElement('div');
+  ov.className = 'lgpd-gate-ov';
+  ov.innerHTML = `
+    <div class="lgpd-gate" style="max-width:480px">
+      <div class="lgpd-gate-head">
+        <h2>Marcar revisão de LGPD como feita</h2>
+        <p>Registra que a governança (ROPA, RIPD, políticas, log de acesso ao CAR) foi revisada hoje.</p>
+      </div>
+      <div class="lgpd-gate-body">
+        <div class="field">
+          <label>Observações (opcional)</label>
+          <textarea id="rev-lgpd-obs" rows="3" style="width:100%;padding:8px 10px;border:1px solid var(--borda,#D9D0BE);border-radius:8px;resize:vertical" placeholder="O que foi revisado, o que mudou..."></textarea>
+        </div>
+      </div>
+      <div class="lgpd-gate-foot">
+        <button class="lgpd-gate-btn" id="rev-lgpd-enviar">Confirmar revisão</button>
+      </div>
+    </div>`;
+  document.body.appendChild(ov);
+  document.body.style.overflow = 'hidden';
+  const fechar = () => { ov.remove(); document.body.style.overflow = ''; };
+  ov.addEventListener('click', e => { if(e.target === ov) fechar(); });
+
+  ov.querySelector('#rev-lgpd-enviar').addEventListener('click', async () => {
+    const observacoes = ov.querySelector('#rev-lgpd-obs').value.trim() || null;
+    const btn = ov.querySelector('#rev-lgpd-enviar');
+    btn.disabled = true; btn.textContent = 'Registrando…';
+    try {
+      const { error } = await db.from('lgpd_revisoes')
+        .insert({ revisado_por: appState.usuario?.id || null, observacoes });
+      if(error) throw error;
+      toast('Revisão registrada','success');
+      fechar();
+      carregarRevisaoLgpd();
+    } catch(e){
+      console.error('[lgpd] marcar revisão', e);
+      btn.disabled = false; btn.textContent = 'Confirmar revisão';
+      toast('Não foi possível registrar a revisão','error');
     }
   });
 }

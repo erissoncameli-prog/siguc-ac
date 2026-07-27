@@ -338,12 +338,50 @@ Plano em 5 fases; 0 a 2 entregues. Migrations 209–212.
   (mesa, link fixo no rodapé da sidebar, visível a qualquer perfil) e
   modal nos 3 apps de campo (Configurações → Meus dados). Administração
   das solicitações em Configurações → Privacidade.
-- Falta: Fase 4 (RIPD de geolocalização e do CAR + log de acesso a
-  dado de terceiro), Fase 5 (plano de incidente, revisão anual).
-  Pendente também: portal do pesquisador (perfil-pesquisador.html) não
-  tem "Meus dados" ainda — não carrega js/config.js/js/lgpd.js, então
-  precisaria de uma versão leve própria (mesmo padrão isolado de
-  pages/privacidade.html).
+- **RIPD** (migrations 217/218): dois relatórios de impacto, reusando
+  `lgpd_documentos` (mesmo `tipo` enum, `exige_aceite=false`,
+  `publico=false`) em vez de tabela própria — RIPD É um texto
+  versionado com data de vigência, a mesma coisa que Política/Termo/
+  Aviso. `ripd_geolocalizacao` cobre os 4 tratamentos de trabalhador
+  (TRAT-005/006/009/011); `ripd_car` cobre o TRAT-013 (volume + titular
+  de terceiro). ⚠️ Novo valor de enum SÓ pode ser usado depois de
+  commitado — precisa de uma migration própria só para o `ALTER TYPE
+  ... ADD VALUE`, antes de qualquer INSERT que o use (erro real visto
+  ao aplicar: "unsafe use of new value ... must be committed").
+- **Log de acesso a dado de terceiro** (`lgpd_acesso_dado_terceiro`,
+  migration 216): SELECT não dispara trigger no Postgres, então o
+  único jeito de garantir o registro é o cliente passar por uma RPC.
+  `car_consultar_local(cod_imovel)` substitui o
+  `.from('car_dados_locais').select('*').eq(...)` que
+  `_buscarDadosLocais` (pages/mapa.html) fazia direto — mesma
+  permissão de antes (`pode_ver('mapa')`), só passa a gravar quem viu
+  o nome/CPF de qual imóvel. A busca por nome/CPF/CNPJ
+  (`_consultaCARLocal`) continua com select direto — não expõe CPF na
+  tela dos resultados, então ficou fora do escopo do log (registrado
+  como risco residual conhecido no RIPD do CAR).
+- **Revisão anual como mecanismo, não só texto** (`lgpd_revisoes` +
+  `lgpd_checar_revisao_anual`, migration 220): pg_cron mensal (dia 1,
+  09h UTC) notifica quem edita Configurações → Privacidade se a última
+  revisão passou de 12 meses (ou nunca houve uma). Dedupe pelo mesmo
+  padrão da 207 (frota) — não notifica de novo enquanto já houver
+  notificação pendente do mesmo subtipo. Marcar revisão feita é ação
+  manual do admin (botão em Configurações → Privacidade), não
+  automática — não faz sentido o sistema se autodeclarar revisado.
+- **Plano de Resposta a Incidente** (Art. 48, migration 220): também
+  documento versionado (`tipo='plano_incidente'`), com detecção →
+  classificação de gravidade → contenção → comunicação (interna, ANPD,
+  titulares) → documentação → revisão pós-incidente.
+- Fechou o plano de 5 fases (0 a 5, todas as migrations 209–220
+  aplicadas em produção).
+- Pendente: migration 210 (buckets privados de Brigadas/Biomonitor)
+  segue esperando o deploy do código que assina (ver seção de fotos
+  privadas acima). Portal do pesquisador
+  (`perfil-pesquisador.html`) não tem "Meus dados" nem canal do
+  titular — não carrega `js/config.js`/`js/lgpd.js`, precisaria de
+  versão leve própria (mesmo padrão isolado de `pages/privacidade.html`).
+  `registro_participantes` segue com `dado_de_menor=true` por
+  precaução no ROPA, sem confirmação da área se há mesmo menor de
+  idade nas atividades de educação ambiental.
 
 ## Enums do banco
 perfil_usuario: super_admin | gestor | tecnico | financeiro | visualizador |
