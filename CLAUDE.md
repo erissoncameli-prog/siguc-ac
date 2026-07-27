@@ -319,12 +319,41 @@ Plano em 5 fases; 0 a 2 entregues. Migrations 209–212.
   config.js continua apontando para o cliente de mesa, SEM sessão.
   Ordem correta: `_bioDB_client` → `db` → `window.db`. Biomonitor usa
   só `window._bioDB_client`; Brigadas e Frota reatribuem `db`.
-- Falta: Fase 3 (canal do titular, Art. 18 + tela "Meus dados"),
-  Fase 4 (RIPD de geolocalização e do CAR + log de acesso a dado de
-  terceiro), Fase 5 (plano de incidente, revisão anual).
+- **Canal do titular / "Meus dados"** (`lgpd_solicitacoes_titular`,
+  migrations 214/215): serve as 5 populações (servidor, brigadista,
+  monitor, motorista, pesquisador) com UMA tabela e DUAS RPCs, porque
+  todas ancoram em `auth.users` — mesmo motivo de `lgpd_aceites`.
+  `lgpd_meus_dados()` (SECURITY INVOKER — só agrega o que a RLS de
+  cada tabela de identidade já libera para o próprio dono) devolve
+  cadastro + aceites + histórico de solicitações; `usuario_id` tem
+  `DEFAULT auth.uid()`, então o INSERT do cliente manda só
+  `{tipo, descricao}`. Trigger carimba `respondido_por`/`respondido_em`
+  no servidor (nunca confia no cliente) e notifica automaticamente:
+  nova solicitação → todo `super_admin`/`gestor` (não existe papel de
+  "encarregado" no sistema de permissões); resposta → o titular.
+  `vw_lgpd_solicitacoes` resolve o nome cruzando as 5 tabelas de
+  identidade, porque nem todo titular tem linha em `usuarios`.
+  Renderer único em `js/lgpd.js` (`lgpdMontarMeusDados` /
+  `lgpdAbrirMeusDados`) — página inteira em `pages/meus-dados.html`
+  (mesa, link fixo no rodapé da sidebar, visível a qualquer perfil) e
+  modal nos 3 apps de campo (Configurações → Meus dados). Administração
+  das solicitações em Configurações → Privacidade.
+- Falta: Fase 4 (RIPD de geolocalização e do CAR + log de acesso a
+  dado de terceiro), Fase 5 (plano de incidente, revisão anual).
+  Pendente também: portal do pesquisador (perfil-pesquisador.html) não
+  tem "Meus dados" ainda — não carrega js/config.js/js/lgpd.js, então
+  precisaria de uma versão leve própria (mesmo padrão isolado de
+  pages/privacidade.html).
 
 ## Enums do banco
-perfil_usuario: super_admin | gestor | tecnico | financeiro | visualizador
+perfil_usuario: super_admin | gestor | tecnico | financeiro | visualizador |
+  brigadista | biologo | secretario | diretor | chefe_departamento |
+  gestor_uc | assistente_admin | pesquisador_externo | validador_brigada |
+  validador_fauna
+  (lista completa — achado na Fase 3 do LGPD que este arquivo trazia
+  só 5 valores; brigadista/monitor/motorista/pesquisador TÊM linha em
+  `usuarios`, com perfil próprio, então também alcançam a mesa/sidebar
+  se logarem com e-mail+senha em vez do PIN do app de campo)
 categoria_uc: PI|REBIO|ESEC|MONA|RVS|FLONA|RESEX|RDS|RPPN|APA|ARIE
 grupo_uc: protecao_integral | uso_sustentavel
 esfera_uc: federal | estadual | municipal | privada

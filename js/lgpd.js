@@ -134,6 +134,38 @@ function lgpdInjetarCss() {
 .lgpd-gate-btn:disabled { background:var(--cinza-300,#d1d5db); color:var(--cinza-500,#6b7280); cursor:not-allowed }
 .lgpd-gate-hash { font-size:.68rem; color:var(--cinza-400,#9ca3af); margin-top:9px; text-align:center;
   word-break:break-all; font-family:ui-monospace,monospace }
+.lgpd-md-secao { margin-bottom:22px }
+.lgpd-md-secao:last-child { margin-bottom:0 }
+.lgpd-md-secao h3 { font-size:.92rem; margin:0 0 10px; color:var(--musgo,#1F4E2C) }
+.lgpd-md-dl { display:grid; grid-template-columns:auto 1fr; gap:6px 14px; font-size:.85rem; margin:0 }
+.lgpd-md-dl dt { color:var(--cinza-500,#6b7280); font-weight:600 }
+.lgpd-md-dl dd { margin:0 }
+.lgpd-md-lista { display:flex; flex-direction:column; gap:8px }
+.lgpd-md-item { display:flex; justify-content:space-between; gap:10px; font-size:.83rem;
+  padding:8px 10px; background:rgba(0,0,0,.03); border-radius:8px }
+.lgpd-md-item-data { color:var(--cinza-500,#6b7280); font-size:.78rem; white-space:nowrap }
+.lgpd-md-vazio { font-size:.83rem; color:var(--cinza-500,#6b7280); margin:0 }
+.lgpd-md-solic { padding:10px 12px; background:rgba(0,0,0,.03); border-radius:9px }
+.lgpd-md-solic-head { display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-size:.85rem }
+.lgpd-md-solic-desc { margin:6px 0 0; font-size:.83rem; color:var(--cinza-800,#1f2937) }
+.lgpd-md-solic-resp { margin-top:8px; font-size:.82rem; padding:8px 10px; background:rgba(31,78,44,.07); border-radius:7px }
+.lgpd-md-solic-prazo { margin-top:6px; font-size:.76rem; color:var(--cinza-500,#6b7280) }
+.lgpd-md-form { display:flex; flex-direction:column; gap:8px }
+.lgpd-md-form label { font-size:.8rem; font-weight:600; color:var(--cinza-500,#6b7280) }
+.lgpd-md-form select, .lgpd-md-form textarea {
+  font: inherit; font-size:.86rem; padding:8px 10px; border:1px solid var(--borda,#D9D0BE);
+  border-radius:8px; resize:vertical; width:100%
+}
+.lgpd-md-form .lgpd-gate-btn { margin-top:2px }
+.lgpd-md-hint { font-size:.76rem; color:var(--cinza-500,#6b7280) }
+.lgpd-md-carregando, .lgpd-md-erro { text-align:center; padding:30px 10px; font-size:.85rem; color:var(--cinza-500,#6b7280) }
+.lgpd-md-erro { color:#b91c1c }
+.lgpd-md-badge { display:inline-flex; align-items:center; font-size:10px; font-weight:700; padding:3px 9px;
+  border-radius:99px; white-space:nowrap; text-transform:uppercase; letter-spacing:.05em; line-height:1.4 }
+.lgpd-md-badge-verde  { background:#DCFCE7; color:#166534 }
+.lgpd-md-badge-ouro   { background:#FEF3C7; color:#92400E }
+.lgpd-md-badge-erro   { background:#FEE2E2; color:#991B1B }
+.lgpd-md-badge-cinza  { background:#F3F4F6; color:#4B5563 }
 `
   document.head.appendChild(s)
 }
@@ -229,6 +261,212 @@ function lgpdMostrarGate(pendentes) {
       if (typeof toast === 'function') toast('Não foi possível registrar. Tente novamente.', 'erro')
     }
   })
+}
+
+// ── "Meus dados" — canal do titular (Art. 18, migration 214) ──
+//
+// Serve as 5 populações de titular do sistema (servidor, brigadista,
+// monitor, motorista, pesquisador) com uma única RPC agregadora
+// (lgpd_meus_dados) e uma única tabela de solicitações
+// (lgpd_solicitacoes_titular). O conteúdo é o mesmo em toda
+// superfície; só a casca muda — página inteira na mesa
+// (pages/meus-dados.html), modal nos 3 apps de campo.
+//
+// A RPC devolve só as seções que existirem para o usuário logado
+// (uma pessoa pode ter mais de uma — ex.: um servidor que também é
+// brigadista) — cada seção aqui é omitida se vier null/vazia.
+
+const LGPD_TIPO_SOLIC_LABEL = {
+  acesso: 'Acesso aos meus dados',
+  correcao: 'Correção de dados',
+  exclusao: 'Exclusão / anonimização',
+  portabilidade: 'Portabilidade dos dados',
+  compartilhamento: 'Com quem meus dados são compartilhados',
+  revogacao_consentimento: 'Revogar consentimento (foto de perfil, notificação push)',
+  outro: 'Outro assunto',
+}
+const LGPD_STATUS_SOLIC_LABEL = {
+  recebida: 'Recebida', em_analise: 'Em análise', respondida: 'Respondida', indeferida: 'Indeferida',
+}
+const LGPD_STATUS_SOLIC_BADGE = {
+  recebida: 'lgpd-md-badge-cinza', em_analise: 'lgpd-md-badge-ouro',
+  respondida: 'lgpd-md-badge-verde', indeferida: 'lgpd-md-badge-erro',
+}
+
+function _lgpdMdLinha(label, valor, isDate) {
+  if (valor === null || valor === undefined || valor === '') return ''
+  let v
+  if (typeof valor === 'boolean') v = valor ? 'Sim' : 'Não'
+  else if (isDate) v = formatData(valor)
+  else v = esc(String(valor))
+  return `<dt>${esc(label)}</dt><dd>${v}</dd>`
+}
+
+function _lgpdMdSecao(titulo, obj, campos) {
+  if (!obj) return ''
+  const linhas = campos.map(([chave, label, isDate]) => _lgpdMdLinha(label, obj[chave], isDate)).join('')
+  if (!linhas) return ''
+  return `<div class="lgpd-md-secao"><h3>${esc(titulo)}</h3><dl class="lgpd-md-dl">${linhas}</dl></div>`
+}
+
+function _lgpdMdMarkup(dados) {
+  const d = dados || {}
+
+  const secoes = [
+    _lgpdMdSecao('Conta de acesso', d.usuario, [
+      ['nome_completo', 'Nome completo'], ['email', 'E-mail'], ['telefone', 'Telefone'],
+      ['perfil', 'Perfil de acesso'], ['ativo', 'Conta ativa'], ['criado_em', 'Cadastro criado em', true],
+    ]),
+    _lgpdMdSecao('Cadastro de brigadista', d.brigadista, [
+      ['nome_completo', 'Nome completo'], ['cpf', 'CPF'], ['rg', 'RG'],
+      ['data_nascimento', 'Data de nascimento', true], ['telefone', 'Telefone'], ['email', 'E-mail'],
+      ['cnh', 'CNH'], ['funcao', 'Função'], ['status', 'Status'],
+      ['contato_emergencia_nome', 'Contato de emergência'],
+      ['contato_emergencia_telefone', 'Telefone de emergência'],
+      ['brigada_nome', 'Brigada'], ['equipe_nome', 'Equipe'],
+    ]),
+    _lgpdMdSecao('Cadastro de monitor de biodiversidade', d.monitor, [
+      ['nome_completo', 'Nome completo'], ['cpf', 'CPF'], ['rg', 'RG'],
+      ['data_nascimento', 'Data de nascimento', true], ['telefone', 'Telefone'], ['email', 'E-mail'],
+      ['funcao', 'Função'], ['status', 'Status'], ['grupo_nome', 'Grupo'],
+    ]),
+    _lgpdMdSecao('Cadastro de motorista', d.motorista, [
+      ['nome', 'Nome'], ['cpf', 'CPF'], ['matricula', 'Matrícula'], ['telefone', 'Telefone'],
+      ['cnh_numero', 'CNH nº'], ['cnh_categoria', 'Categoria CNH'],
+      ['cnh_validade', 'CNH válida até', true], ['status', 'Status'], ['ativo', 'Ativo'],
+    ]),
+    _lgpdMdSecao('Cadastro de pesquisador', d.pesquisador, [
+      ['nome_completo', 'Nome completo'], ['cpf', 'CPF'], ['rg', 'RG'], ['email', 'E-mail'],
+      ['telefone', 'Telefone'], ['instituicao', 'Instituição'], ['titulacao', 'Titulação'], ['ativo', 'Ativo'],
+    ]),
+  ].filter(Boolean).join('')
+
+  const aceites = d.aceites || []
+  const aceitesHtml = aceites.length ? `
+    <div class="lgpd-md-secao">
+      <h3>Documentos que você já aceitou</h3>
+      <div class="lgpd-md-lista">
+        ${aceites.map(a => `<div class="lgpd-md-item">
+          <span>${esc(a.documento)} — v${esc(a.versao)}</span>
+          <span class="lgpd-md-item-data">${formatData(a.aceito_em)}</span>
+        </div>`).join('')}
+      </div>
+    </div>` : ''
+
+  const solicitacoes = d.solicitacoes || []
+  const solicitacoesHtml = `
+    <div class="lgpd-md-secao">
+      <h3>Minhas solicitações</h3>
+      ${!solicitacoes.length ? '<p class="lgpd-md-vazio">Nenhuma solicitação enviada ainda.</p>' : `
+      <div class="lgpd-md-lista">
+        ${solicitacoes.map(s => `
+          <div class="lgpd-md-solic">
+            <div class="lgpd-md-solic-head">
+              <span class="lgpd-md-badge ${LGPD_STATUS_SOLIC_BADGE[s.status] || 'lgpd-md-badge-cinza'}">${esc(LGPD_STATUS_SOLIC_LABEL[s.status] || s.status)}</span>
+              <strong>${esc(LGPD_TIPO_SOLIC_LABEL[s.tipo] || s.tipo)}</strong>
+              <span class="lgpd-md-item-data">${formatData(s.criado_em)}</span>
+            </div>
+            <p class="lgpd-md-solic-desc">${esc(s.descricao)}</p>
+            ${s.resposta ? `<div class="lgpd-md-solic-resp"><strong>Resposta:</strong> ${esc(s.resposta)}</div>` : `
+              <div class="lgpd-md-solic-prazo">Prazo de resposta: até ${formatData(s.prazo_em)}</div>`}
+          </div>`).join('')}
+      </div>`}
+    </div>`
+
+  const formHtml = `
+    <div class="lgpd-md-secao">
+      <h3>Nova solicitação</h3>
+      <form id="lgpd-md-form" class="lgpd-md-form">
+        <label>Tipo de solicitação</label>
+        <select id="lgpd-md-tipo">
+          ${Object.entries(LGPD_TIPO_SOLIC_LABEL).map(([v, l]) => `<option value="${v}">${esc(l)}</option>`).join('')}
+        </select>
+        <label>Descreva seu pedido</label>
+        <textarea id="lgpd-md-desc" rows="3" placeholder="Explique o que você precisa..." required></textarea>
+        <button type="submit" class="lgpd-gate-btn">Enviar solicitação</button>
+        <div class="lgpd-md-hint">Prazo de resposta: 15 dias.</div>
+      </form>
+    </div>`
+
+  return `<div class="lgpd-md">${secoes}${aceitesHtml}${solicitacoesHtml}${formHtml}</div>`
+}
+
+// Busca, renderiza e liga o formulário dentro de `root` (elemento ou
+// id). Reutilizável tanto pela página de mesa (injeta direto num card)
+// quanto pelo modal dos apps de campo — a única diferença é a casca.
+async function lgpdMontarMeusDados(root) {
+  const alvo = (typeof root === 'string' ? document.getElementById(root) : root)
+  if (!alvo) return
+  alvo.innerHTML = '<div class="lgpd-md-carregando">Carregando seus dados…</div>'
+
+  let dados
+  try {
+    const { data, error } = await db.rpc('lgpd_meus_dados')
+    if (error) throw error
+    dados = data
+  } catch (e) {
+    console.error('[lgpd] falha ao carregar meus dados:', e)
+    alvo.innerHTML = '<div class="lgpd-md-erro">Não foi possível carregar seus dados agora. Tente novamente mais tarde.</div>'
+    return
+  }
+
+  alvo.innerHTML = _lgpdMdMarkup(dados)
+  const form = alvo.querySelector('#lgpd-md-form')
+  if (!form) return
+
+  form.addEventListener('submit', async e => {
+    e.preventDefault()
+    const tipo = alvo.querySelector('#lgpd-md-tipo').value
+    const descricao = alvo.querySelector('#lgpd-md-desc').value.trim()
+    if (!descricao) return
+
+    const btn = form.querySelector('button[type=submit]')
+    btn.disabled = true
+    btn.textContent = 'Enviando…'
+    try {
+      // usuario_id tem DEFAULT auth.uid() (migration 215) — não
+      // precisa ser informado, e a policy de INSERT rejeitaria um
+      // valor diferente do da própria sessão de qualquer forma.
+      const { error } = await db.from('lgpd_solicitacoes_titular').insert({ tipo, descricao })
+      if (error) throw error
+      if (typeof toast === 'function') toast('Solicitação enviada', 'sucesso')
+      await lgpdMontarMeusDados(alvo) // re-renderiza com a nova solicitação na lista
+    } catch (e) {
+      console.error('[lgpd] falha ao enviar solicitação:', e)
+      btn.disabled = false
+      btn.textContent = 'Enviar solicitação'
+      if (typeof toast === 'function') toast('Não foi possível enviar. Tente novamente.', 'erro')
+    }
+  })
+}
+
+// Modal — usado pelos 3 apps de campo (mesa usa lgpdMontarMeusDados
+// direto num card da própria página, sem overlay).
+function lgpdAbrirMeusDados() {
+  lgpdInjetarCss()
+  if (document.getElementById('lgpd-md-ov')) return
+
+  const ov = document.createElement('div')
+  ov.className = 'lgpd-gate-ov'
+  ov.id = 'lgpd-md-ov'
+  ov.innerHTML = `
+    <div class="lgpd-gate" role="dialog" aria-modal="true">
+      <div class="lgpd-gate-head">
+        <h2>Meus dados</h2>
+        <p>O que o SIGUC guarda sobre você, e o canal para pedir acesso, correção ou exclusão.</p>
+      </div>
+      <div class="lgpd-gate-body" id="lgpd-md-corpo"></div>
+      <div class="lgpd-gate-foot">
+        <button class="lgpd-gate-btn" data-fechar style="background:var(--cinza-500,#6b7280)">Fechar</button>
+      </div>
+    </div>`
+  document.body.appendChild(ov)
+  document.body.style.overflow = 'hidden'
+  const fechar = () => { ov.remove(); document.body.style.overflow = '' }
+  ov.querySelector('[data-fechar]').addEventListener('click', fechar)
+  ov.addEventListener('click', e => { if (e.target === ov) fechar() })
+
+  lgpdMontarMeusDados(ov.querySelector('#lgpd-md-corpo'))
 }
 
 // ── Visualizador avulso (Configurações) ────────────────────────

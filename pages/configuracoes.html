@@ -287,6 +287,18 @@ function renderCfg(cfg){
       </div>
 
       <div class="cfg-section">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px">
+          <div class="cfg-section-title" style="margin-bottom:0">Solicitações de titulares (Art. 18)</div>
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--cinza-500,#6b7280);cursor:pointer">
+            <input type="checkbox" id="lgpd-solic-so-pendentes" checked onchange="carregarSolicitacoesLgpd()">
+            Só pendentes
+          </label>
+        </div>
+        <div class="hint" style="margin:2px 0 10px">Canal do titular (LGPD Art. 18): pedidos de acesso, correção, exclusão e afins, vindos de servidores, brigadistas, monitores, motoristas e pesquisadores. Prazo de resposta: 15 dias.</div>
+        <div id="lgpd-solic-lista" style="font-size:12px;color:var(--cinza-400)">Carregando…</div>
+      </div>
+
+      <div class="cfg-section">
         <div class="cfg-section-title">Encarregado pelo Tratamento de Dados Pessoais (DPO)</div>
         <div class="alerta-info" style="margin-bottom:12px">ℹ️ Indicação obrigatória para órgão público (LGPD, art. 41). Estes dados aparecem na seção Contato da Política de Privacidade pública.</div>
         <div class="grid-2">
@@ -367,7 +379,7 @@ function trocarAba(id, btn){
   document.getElementById('pane-'+id)?.classList.add('ativo');
   btn.classList.add('ativo');
   if(id === 'armazenamento') carregarArmazenamento();
-  if(id === 'privacidade')   carregarDocsLgpd();
+  if(id === 'privacidade')  { carregarDocsLgpd(); carregarSolicitacoesLgpd(); }
 }
 
 // Lista os documentos vigentes com versão, data e hash. A leitura é da
@@ -396,6 +408,110 @@ async function carregarDocsLgpd(){
     console.error('[lgpd] lista de documentos', e);
     el.textContent = 'Não foi possível carregar os documentos.';
   }
+}
+
+// ── Canal do titular (Art. 18) — administração ──────────────────
+// Lê de vw_lgpd_solicitacoes (migration 214), que já resolve o nome
+// do solicitante cruzando as 5 tabelas de identidade (servidor,
+// brigadista, monitor, motorista, pesquisador) — nem todo titular tem
+// linha em `usuarios`.
+const LGPD_SOLIC_TIPO_LABEL = {
+  acesso: 'Acesso aos dados', correcao: 'Correção de dados', exclusao: 'Exclusão / anonimização',
+  portabilidade: 'Portabilidade', compartilhamento: 'Compartilhamento',
+  revogacao_consentimento: 'Revogar consentimento', outro: 'Outro',
+};
+const LGPD_SOLIC_STATUS_LABEL = { recebida:'Recebida', em_analise:'Em análise', respondida:'Respondida', indeferida:'Indeferida' };
+const LGPD_SOLIC_STATUS_BADGE = { recebida:'badge-cinza', em_analise:'badge-ouro', respondida:'badge-verde', indeferida:'badge-erro' };
+const LGPD_SOLIC_PAPEL_LABEL = { servidor:'Servidor', brigadista:'Brigadista', monitor:'Monitor', motorista:'Motorista', pesquisador:'Pesquisador', desconhecido:'—' };
+
+async function carregarSolicitacoesLgpd(){
+  const el = document.getElementById('lgpd-solic-lista');
+  if(!el) return;
+  const soPendentes = document.getElementById('lgpd-solic-so-pendentes')?.checked;
+  el.textContent = 'Carregando…';
+  try {
+    let q = db.from('vw_lgpd_solicitacoes')
+      .select('id,tipo,descricao,status,resposta,criado_em,prazo_em,respondido_em,solicitante_nome,solicitante_email,solicitante_papel,respondido_por_nome')
+      .order('criado_em', { ascending:false });
+    if (soPendentes) q = q.in('status', ['recebida','em_analise']);
+    const { data, error } = await q;
+    if(error) throw error;
+    if(!data?.length){ el.innerHTML = `<div style="font-size:12px;color:var(--cinza-400);padding:8px 0">Nenhuma solicitação${soPendentes ? ' pendente' : ''}.</div>`; return; }
+
+    el.innerHTML = data.map(s => `
+      <div style="padding:11px 0;border-bottom:1px solid var(--cinza-100,#f3f4f6)">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px">
+          <span class="badge ${LGPD_SOLIC_STATUS_BADGE[s.status]||'badge-cinza'}">${esc(LGPD_SOLIC_STATUS_LABEL[s.status]||s.status)}</span>
+          <strong style="font-size:12.5px">${esc(LGPD_SOLIC_TIPO_LABEL[s.tipo]||s.tipo)}</strong>
+          <span style="font-size:11px;color:var(--cinza-400)">${esc(s.solicitante_nome||'(sem nome)')} · ${esc(LGPD_SOLIC_PAPEL_LABEL[s.solicitante_papel]||s.solicitante_papel)}</span>
+          <span style="font-size:11px;color:var(--cinza-400);margin-left:auto">${formatData(s.criado_em)}</span>
+        </div>
+        <div style="font-size:12.5px;color:var(--cinza-700);margin-bottom:6px">${esc(s.descricao)}</div>
+        ${s.resposta ? `<div style="font-size:11.5px;background:rgba(31,78,44,.07);padding:6px 9px;border-radius:7px;margin-bottom:6px"><strong>Resposta${s.respondido_por_nome?` de ${esc(s.respondido_por_nome)}`:''}:</strong> ${esc(s.resposta)}</div>`
+          : `<div style="font-size:11px;color:var(--cinza-400);margin-bottom:6px">Prazo de resposta: até ${formatData(s.prazo_em)}</div>`}
+        ${['recebida','em_analise'].includes(s.status) ? `<button class="btn btn-outline" style="font-size:11px" onclick="abrirRespostaLgpd('${s.id}')">Responder</button>` : ''}
+      </div>`).join('');
+  } catch(e){
+    console.error('[lgpd] lista de solicitações', e);
+    el.textContent = 'Não foi possível carregar as solicitações.';
+  }
+}
+
+// Modal simples de resposta — reaproveita o padrão de overlay do
+// próprio js/lgpd.js (lgpdInjetarCss/.lgpd-gate) para não introduzir
+// um terceiro estilo de modal na página.
+function abrirRespostaLgpd(id){
+  lgpdInjetarCss();
+  const ov = document.createElement('div');
+  ov.className = 'lgpd-gate-ov';
+  ov.innerHTML = `
+    <div class="lgpd-gate" style="max-width:480px">
+      <div class="lgpd-gate-head"><h2>Responder solicitação</h2></div>
+      <div class="lgpd-gate-body">
+        <div class="field" style="margin-bottom:12px">
+          <label>Status</label>
+          <select id="resp-lgpd-status" style="width:100%;padding:8px 10px;border:1px solid var(--borda,#D9D0BE);border-radius:8px">
+            <option value="em_analise">Em análise</option>
+            <option value="respondida">Respondida</option>
+            <option value="indeferida">Indeferida</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Resposta ao titular</label>
+          <textarea id="resp-lgpd-texto" rows="4" style="width:100%;padding:8px 10px;border:1px solid var(--borda,#D9D0BE);border-radius:8px;resize:vertical" placeholder="Texto que o titular vai ver..."></textarea>
+        </div>
+      </div>
+      <div class="lgpd-gate-foot">
+        <button class="lgpd-gate-btn" id="resp-lgpd-enviar">Enviar resposta</button>
+      </div>
+    </div>`;
+  document.body.appendChild(ov);
+  document.body.style.overflow = 'hidden';
+  const fechar = () => { ov.remove(); document.body.style.overflow = ''; };
+  ov.addEventListener('click', e => { if(e.target === ov) fechar(); });
+
+  ov.querySelector('#resp-lgpd-enviar').addEventListener('click', async () => {
+    const status = ov.querySelector('#resp-lgpd-status').value;
+    const resposta = ov.querySelector('#resp-lgpd-texto').value.trim();
+    if(status !== 'em_analise' && !resposta){ toast('Escreva a resposta antes de enviar','error'); return; }
+    const btn = ov.querySelector('#resp-lgpd-enviar');
+    btn.disabled = true; btn.textContent = 'Enviando…';
+    try {
+      // respondido_por/respondido_em são carimbados pelo trigger
+      // trg_lgpd_solic_carimbar (migration 214) — nunca informados
+      // pelo cliente.
+      const { error } = await db.from('lgpd_solicitacoes_titular')
+        .update({ status, resposta: resposta || null }).eq('id', id);
+      if(error) throw error;
+      toast('Resposta registrada','success');
+      fechar();
+      carregarSolicitacoesLgpd();
+    } catch(e){
+      console.error('[lgpd] responder solicitação', e);
+      btn.disabled = false; btn.textContent = 'Enviar resposta';
+      toast('Não foi possível enviar a resposta','error');
+    }
+  });
 }
 
 // ══════════════════════════════════════════════════════
