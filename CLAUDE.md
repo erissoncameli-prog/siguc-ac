@@ -270,6 +270,42 @@ js/frota-consumo.js.
   migration só DEPOIS do deploy do código que assina (ver cabeçalho
   das migrations 200 e 210).
 
+## LGPD — governança de dados pessoais
+Plano em 5 fases; 0 a 2 entregues. Migrations 209–212.
+- **ROPA vivo no banco** (`lgpd_tratamentos`, migration 211): 16
+  tratamentos mapeados, cada um apontando as TABELAS REAIS que o
+  materializam (coluna `tabelas`). Tabela nova com dado pessoal =
+  entrada nova no ROPA, na mesma entrega. É o que permite auditar o
+  registro contra o schema em vez de acreditar nele.
+- **BASE LEGAL NUNCA É CONSENTIMENTO** para o núcleo do sistema. SEMA
+  é órgão público: Art. 7º, III (política pública) e Art. 7º, II
+  (obrigação legal). Consentimento só no que é de fato opcional (foto
+  de perfil, push). Construir sobre consentimento criaria direito de
+  revogação que quebraria registros de guarda permanente.
+- **Documentos versionados** (`lgpd_documentos` +
+  `lgpd_documento_versoes`, migration 212): texto vive no banco, não em
+  HTML. `hash_sha256` é coluna GENERATED — não pode divergir do texto.
+  Editar = criar versão nova, o que volta a cobrar aceite de todos.
+- **Aceite** (`lgpd_aceites`): aponta para a VERSÃO, referencia
+  `auth.users` (único âncora comum a servidor, brigadista, monitor,
+  motorista e pesquisador). Sem policy de UPDATE/DELETE — é registro
+  de prova. Só entra pela RPC `lgpd_registrar_aceite` (idempotente).
+- **Gate de ciência**: disparado por `carregarUsuario()` (js/config.js),
+  que carrega `js/lgpd.js` dinamicamente. Deliberadamente NÃO é
+  `<script>` em cada página — assim nenhuma página nova nasce sem o
+  controle. Os 3 apps de campo não chamam `carregarUsuario` e por isso
+  não são bloqueados: são offline-first e um gate dependente de rede
+  poderia travar um brigadista em campo. FAIL-OPEN: se a RPC falhar, o
+  gate não aparece e o sistema segue.
+- **Página pública** `pages/privacidade.html` (sem login): a política é
+  o único documento com `publico = true`, porque fala também de quem
+  não é usuário (CPF vindo da API do SICAR — 53 mil titulares).
+  Encarregado/DPO vem de `config_sistema.dados.encarregado`, editável
+  em Configurações → Privacidade, sem migration nem deploy.
+- Falta: Fase 3 (canal do titular, Art. 18 + tela "Meus dados"),
+  Fase 4 (RIPD de geolocalização e do CAR + log de acesso a dado de
+  terceiro), Fase 5 (plano de incidente, revisão anual).
+
 ## Enums do banco
 perfil_usuario: super_admin | gestor | tecnico | financeiro | visualizador
 categoria_uc: PI|REBIO|ESEC|MONA|RVS|FLONA|RESEX|RDS|RPPN|APA|ARIE

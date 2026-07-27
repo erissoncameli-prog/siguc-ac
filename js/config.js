@@ -178,7 +178,34 @@ async function carregarUsuario() {
   appState.usuario = u;
   appState.perfil = u.perfil;
   if (window.SessionGuard) SessionGuard.init(u);
+  _lgpdGate();
   return u;
+}
+
+// Gate de ciência da Política de Privacidade e do Termo de Uso
+// (migration 212). Carregado dinamicamente daqui, e não por <script>
+// em cada página, de propósito: é um controle de conformidade, e
+// pendurá-lo em 38 tags significaria que toda página nova nasceria
+// sem ele — uma falha invisível. Como carregarUsuario() é o bootstrap
+// obrigatório de qualquer tela de mesa, amarrar o gate aqui garante
+// cobertura completa e automática.
+//
+// Os três apps de campo (brigada, biomonitor, frota-app) não chamam
+// carregarUsuario e portanto não são bloqueados — ver o cabeçalho de
+// js/lgpd.js para o porquê.
+//
+// Sem await: a página não espera o gate para renderizar; o overlay
+// cobre a tela sozinho quando (e se) houver pendência.
+function _lgpdGate() {
+  const seguir = () => { try { lgpdVerificarAceite() } catch (e) { console.warn('[lgpd]', e) } };
+  if (typeof lgpdVerificarAceite === 'function') { seguir(); return; }
+  if (document.getElementById('lgpd-js')) return;
+  const s = document.createElement('script');
+  s.id = 'lgpd-js';
+  s.src = '/js/lgpd.js';
+  s.onload = seguir;
+  s.onerror = () => console.warn('[lgpd] não foi possível carregar /js/lgpd.js');
+  document.head.appendChild(s);
 }
 
 function iniciais(nome) {
