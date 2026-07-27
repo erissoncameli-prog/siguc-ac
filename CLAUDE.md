@@ -302,6 +302,23 @@ Plano em 5 fases; 0 a 2 entregues. Migrations 209–212.
   não é usuário (CPF vindo da API do SICAR — 53 mil titulares).
   Encarregado/DPO vem de `config_sistema.dados.encarregado`, editável
   em Configurações → Privacidade, sem migration nem deploy.
+- **Aviso de campo** (`js/lgpd-campo.js` + migration 213): documento
+  próprio, curto, exibido DENTRO dos 3 apps — brigadista/monitor/
+  motorista são 4 dos 5 tratamentos de alto risco. Regra que manda no
+  arquivo: NADA pode impedir o trabalho de campo. Texto cacheado em
+  localStorage e reexibido sem rede; ciência gravada local primeiro e
+  sincronizada depois; falha de envio fica pendente e retenta na
+  próxima abertura, sem reexibir nem barrar. Reler em Configurações de
+  cada app.
+- O aviso de campo NÃO entra em `lgpd_pendencias_aceite()` (o gate de
+  mesa) — senão todo servidor administrativo veria aviso sobre GPS de
+  brigadista. Superfície própria: RPC `lgpd_aviso_campo()`.
+- **CLIENTE SUPABASE — use sempre `sigucDb()` (js/config.js)**, nunca
+  `window.db` direto. `db` é `let`, então NÃO é propriedade de window:
+  quando um app faz `db = clientePróprio`, o `window.db` publicado pelo
+  config.js continua apontando para o cliente de mesa, SEM sessão.
+  Ordem correta: `_bioDB_client` → `db` → `window.db`. Biomonitor usa
+  só `window._bioDB_client`; Brigadas e Frota reatribuem `db`.
 - Falta: Fase 3 (canal do titular, Art. 18 + tela "Meus dados"),
   Fase 4 (RIPD de geolocalização e do CAR + log de acesso a dado de
   terceiro), Fase 5 (plano de incidente, revisão anual).

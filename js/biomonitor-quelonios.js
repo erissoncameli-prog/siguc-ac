@@ -534,6 +534,10 @@ async function bioEntrarNaHome() {
 
   bioMostrarTela('tela-home')
   bioMostrarTela('tela-home')  // força re-renderização
+
+  // Aviso de privacidade do app (LGPD Art. 9º, migration 213) —
+  // offline-safe, ver js/lgpd-campo.js.
+  lgpdCampoIniciar()
 }
 
 function bioAtualizarChipConexao() {
@@ -4854,6 +4858,8 @@ function bioIniciarConfig() {
     document.body.classList.toggle('field-mode', ev.target.checked)
     await bioOfflineSetConfig('campo_field_mode', ev.target.checked)
   })
+
+  document.getElementById('bio-btn-aviso-privacidade')?.addEventListener('click', lgpdCampoAbrir)
 
   document.getElementById('bio-btn-alterar-pin')?.addEventListener('click', async () => {
     bioMostrarTela('tela-config-pin')
