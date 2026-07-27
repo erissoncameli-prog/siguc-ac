@@ -952,6 +952,7 @@ window.__API_MONITOR_OFF = true
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"
         onerror="console.warn('[brigada] Supabase CDN indisponível — modo offline')"></script>
 <script src="/js/config.js"></script>
+<script src="/js/fotos-privadas.js"></script>
 <script src="/js/qrcode-generator.js"></script>
 <script>
 // ── Cliente Supabase ISOLADO para o App de Campo ──────────────
@@ -3190,10 +3191,14 @@ function primeiroNome(n) {
 // ════════════════════════════════════════════════════════════════
 // Foto de perfil do brigadista
 // ════════════════════════════════════════════════════════════════
-function renderAvatar() {
+// O bucket `brigadistas` é privado (migration 210): a foto só aparece
+// depois de assinar a URL, o que exige rede. Offline — que é o estado
+// normal deste app em campo — a assinatura falha e o avatar cai nas
+// iniciais, em vez de virar imagem quebrada.
+async function renderAvatar() {
   const av    = document.getElementById('config-avatar')
   const letra = document.getElementById('avatar-letra')
-  const foto  = App.brigadista?.foto_url
+  const foto  = await fotoUrlAssinada(App.brigadista?.foto_url)
   if (foto) {
     av.style.backgroundImage = `url("${foto.replace(/"/g, '')}")`
     letra.hidden = true
@@ -3205,11 +3210,11 @@ function renderAvatar() {
 }
 
 // Avatar do brigadista na tela inicial (foto ou iniciais)
-function renderHomeAvatar() {
+async function renderHomeAvatar() {
   const av    = document.getElementById('home-avatar')
   const letra = document.getElementById('home-avatar-letra')
   if (!av) return
-  const foto = App.brigadista?.foto_url
+  const foto = await fotoUrlAssinada(App.brigadista?.foto_url)
   if (foto) {
     av.style.backgroundImage = `url("${foto.replace(/"/g, '')}")`
     if (letra) letra.hidden = true
@@ -3306,9 +3311,11 @@ function abrirMenuFoto() {
 }
 function fecharMenuFoto() { document.getElementById('avatar-menu').hidden = true }
 
-function abrirFotoViewer() {
-  const foto = App.brigadista?.foto_url
-  if (!foto) return
+async function abrirFotoViewer() {
+  const foto = await fotoUrlAssinada(App.brigadista?.foto_url)
+  // Sem assinatura (offline) não há o que mostrar em tela cheia —
+  // abrir o viewer vazio seria pior que não abrir.
+  if (!foto) { toast('Foto indisponível offline', 'erro'); return }
   document.getElementById('foto-viewer-img').src = foto
   document.getElementById('foto-viewer').hidden = false
 }

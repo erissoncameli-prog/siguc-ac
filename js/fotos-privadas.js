@@ -1,14 +1,25 @@
-// ── SIGUC Frota — exibição de fotos com URL assinada ───────────
+// ── SIGUC — exibição de fotos de bucket privado (URL assinada) ──
 //
-// Os buckets do módulo Frota são privados (migration 200): a URL
-// pública não serve mais o arquivo. Quem exibe foto precisa gerar uma
-// signed URL, o que é uma chamada de rede assíncrona — e o resto do
-// módulo monta tela com template literal síncrono.
+// Compartilhado pelos três apps (Frota, Brigadas, Biomonitor). Nasceu
+// no Frota (migration 200) e foi promovido a genérico na Fase 0 do
+// plano de LGPD, quando os buckets `brigadistas`, `registros-campo` e
+// `biomonitor-fotos` também deixaram de ser públicos (migration 210):
+// eram fotos de rosto e imagens de campo com GPS na marca d'água
+// servidas sem autenticação para quem tivesse a URL.
+//
+// Uma implementação só, de propósito — a lição do js/frota-consumo.js
+// (três cópias do mesmo bloco, com o mesmo bug). Os nomes antigos
+// `frota*` seguem exportados como alias no fim do arquivo, então os
+// call sites do Frota não precisaram ser tocados.
+//
+// Bucket privado não serve mais o arquivo pela URL pública: quem
+// exibe foto precisa gerar uma signed URL, que é uma chamada de rede
+// assíncrona — e as telas montam HTML com template literal síncrono.
 //
 // Padrão adotado (o mesmo de bIconsAplicar, em js/config.js): o
 // render continua síncrono e só marca o elemento com
-// `data-frota-foto`; depois de jogar o HTML na tela, chama-se
-// `frotaAssinarFotos(container)`, que resolve tudo de uma vez —
+// `data-foto-privada`; depois de jogar o HTML na tela, chama-se
+// `assinarFotos(container)`, que resolve tudo de uma vez —
 // agrupando por bucket, uma chamada por bucket em vez de uma por
 // imagem.
 //
@@ -17,14 +28,35 @@
 // segue valendo como endereço, e é dela que se extrai bucket +
 // caminho. Assim as linhas antigas continuam funcionando sem
 // migração de dados.
+//
+// Fotos ainda não sincronizadas (blob:/data: da fila offline dos apps
+// de campo) não são URL de Storage: fotoRef devolve null e o chamador
+// trata como "não há o que assinar", exibindo a imagem local direto.
 
-const FROTA_FOTO_TTL = 3600 // 1 h — cobre a sessão de uma tela sem re-assinar
+const FOTO_TTL = 3600 // 1 h — cobre a sessão de uma tela sem re-assinar
+
+// Cliente Supabase a usar para assinar.
+//
+// Não dá para usar `window.db` cegamente: os apps de campo têm cliente
+// próprio, com sessão isolada em localStorage. O Brigadas REATRIBUI o
+// global `db` para o dele (pages/brigada.html), então ali `db` já é o
+// certo — mas o Biomonitor guarda o seu em `window._bioDB_client` e
+// deixa `db` intocado, apontando para a sessão do SIGUC de mesa, que
+// no app não existe. Assinar com esse cliente devolve erro de sessão e
+// TODAS as fotos do Biomonitor sumiriam de uma vez.
+//
+// Ordem deliberada: o cliente do Biomonitor só existe nas telas do app
+// (pages/biomonitor.html); nas páginas de mesa e no Frota/Brigadas ele
+// é undefined e cai em `db`, que é o correto nesses contextos.
+function _fotoDb() {
+  return window._bioDB_client || window.db || null
+}
 
 // URL pública gravada no banco → { bucket, path }.
 // Formato: .../storage/v1/object/public/<bucket>/<caminho>[?query]
 // A query existe porque o app anexa ?t=<timestamp> ao trocar a foto
 // do motorista (cache-busting) — precisa ser descartada.
-function frotaFotoRef(url) {
+function fotoRef(url) {
   if (!url || typeof url !== 'string') return null
   const m = url.match(/\/storage\/v1\/object\/(?:public\/)?([^/]+)\/(.+)$/)
   if (!m) return null
@@ -46,26 +78,27 @@ function frotaFotoRef(url) {
 // `fallback`: iniciais a mostrar se a assinatura falhar (offline, sem
 // permissão). Sem isso, uma foto que não assina vira ícone de imagem
 // quebrada.
-function frotaFotoAttr(url, fallback) {
-  const ref = frotaFotoRef(url)
+function fotoAttr(url, fallback) {
+  const ref = fotoRef(url)
   if (!ref) return ''
-  const fb = fallback ? ` data-frota-fallback="${esc(fallback)}"` : ''
-  return `data-frota-foto="${esc(ref.bucket + '|' + ref.path)}"${fb}`
+  const fb = fallback ? ` data-foto-fallback="${esc(fallback)}"` : ''
+  return `data-foto-privada="${esc(ref.bucket + '|' + ref.path)}"${fb}`
 }
 
 // Assina UMA URL — para uso imperativo (definir .src na mão, abrir em
 // nova aba). Devolve null se não der para assinar; o chamador decide o
-// que fazer. Nos casos em massa prefira frotaAssinarFotos, que agrupa
+// que fazer. Nos casos em massa prefira assinarFotos, que agrupa
 // por bucket em vez de uma chamada por foto.
-async function frotaFotoUrlAssinada(url) {
-  const ref = frotaFotoRef(url)
-  if (!ref || !window.db) return null
+async function fotoUrlAssinada(url) {
+  const ref = fotoRef(url)
+  const sb  = _fotoDb()
+  if (!ref || !sb) return null
   try {
-    const { data, error } = await db.storage.from(ref.bucket).createSignedUrl(ref.path, FROTA_FOTO_TTL)
+    const { data, error } = await sb.storage.from(ref.bucket).createSignedUrl(ref.path, FOTO_TTL)
     if (error) throw error
     return data?.signedUrl || null
   } catch (e) {
-    console.warn('[frota-fotos] falha ao assinar', ref.bucket, e?.message || e)
+    console.warn('[fotos-privadas] falha ao assinar', ref.bucket, e?.message || e)
     return null
   }
 }
@@ -73,15 +106,16 @@ async function frotaFotoUrlAssinada(url) {
 // Assina tudo que estiver marcado dentro de `root` (ou do documento).
 // Em <img> preenche src; em <a> preenche href; em qualquer outro
 // elemento, define como background-image.
-async function frotaAssinarFotos(root) {
+async function assinarFotos(root) {
   const alvo = (typeof root === 'string' ? document.getElementById(root) : root) || document
-  const els = Array.from(alvo.querySelectorAll('[data-frota-foto]'))
-  if (!els.length || !window.db) return
+  const els = Array.from(alvo.querySelectorAll('[data-foto-privada]'))
+  const sb  = _fotoDb()
+  if (!els.length || !sb) return
 
   // Agrupa por bucket: uma chamada de rede por bucket, não por foto.
   const porBucket = new Map()
   for (const el of els) {
-    const [bucket, ...resto] = (el.dataset.frotaFoto || '').split('|')
+    const [bucket, ...resto] = (el.dataset.fotoPrivada || '').split('|')
     const path = resto.join('|')
     if (!bucket || !path) continue
     if (!porBucket.has(bucket)) porBucket.set(bucket, [])
@@ -92,7 +126,7 @@ async function frotaAssinarFotos(root) {
     let assinadas = {}
     try {
       const paths = [...new Set(itens.map(i => i.path))]
-      const { data, error } = await db.storage.from(bucket).createSignedUrls(paths, FROTA_FOTO_TTL)
+      const { data, error } = await sb.storage.from(bucket).createSignedUrls(paths, FOTO_TTL)
       if (error) throw error
       const resp = data || []
       resp.forEach((d, i) => {
@@ -106,22 +140,22 @@ async function frotaAssinarFotos(root) {
         if (paths[i] != null) assinadas[paths[i]] = url
       })
     } catch (e) {
-      console.warn('[frota-fotos] falha ao assinar', bucket, e?.message || e)
+      console.warn('[fotos-privadas] falha ao assinar', bucket, e?.message || e)
     }
     for (const { el, path } of itens) {
       const url = assinadas[path]
-      if (url) _frotaAplicarUrl(el, url)
-      else _frotaFalhouFoto(el)
+      if (url) _fotoAplicarUrl(el, url)
+      else _fotoFalhou(el)
     }
   }))
 }
 
-function _frotaAplicarUrl(el, url) {
-  el.removeAttribute('data-frota-foto')
+function _fotoAplicarUrl(el, url) {
+  el.removeAttribute('data-foto-privada')
   if (el.tagName === 'IMG') {
     // Se a imagem ainda assim não carregar (URL expirada numa tela
     // aberta há muito tempo), cai no mesmo fallback.
-    el.addEventListener('error', () => _frotaFalhouFoto(el), { once: true })
+    el.addEventListener('error', () => _fotoFalhou(el), { once: true })
     el.src = url
   } else if (el.tagName === 'A') {
     el.href = url
@@ -138,9 +172,9 @@ function _frotaAplicarUrl(el, url) {
 // falha de assinatura ficava indistinguível de "não há foto" — e o
 // usuário via um card sem nada, sem pista do que aconteceu. Agora
 // sobra um sinal na tela e um aviso no console.
-function _frotaFalhouFoto(el) {
-  el.removeAttribute('data-frota-foto')
-  const fb = el.dataset.frotaFallback
+function _fotoFalhou(el) {
+  el.removeAttribute('data-foto-privada')
+  const fb = el.dataset.fotoFallback
 
   if (el.tagName === 'A') {
     // Link sem href não faz nada ao ser clicado — pior que não existir.
@@ -169,3 +203,12 @@ function _frotaFalhouFoto(el) {
   }
   el.replaceWith(span)
 }
+
+// ── Aliases de compatibilidade — módulo Frota ──────────────────
+// O helper nasceu como js/frota-fotos.js e é chamado por estes nomes
+// em ~65 pontos do módulo. Manter os aliases evita churn sem criar uma
+// segunda implementação: são o MESMO objeto de função, não uma cópia.
+const frotaFotoRef        = fotoRef
+const frotaFotoAttr       = fotoAttr
+const frotaFotoUrlAssinada = fotoUrlAssinada
+const frotaAssinarFotos   = assinarFotos

@@ -146,7 +146,7 @@ Frota — abastecimento (174–175):
   DEFINER executável por anon); 198 torna check-out/check-in
   idempotentes por uuid_cliente (fim da pílula envenenada na fila
   offline); 199/200 tornam os buckets do Frota privados, com leitura
-  por signed URL (js/frota-fotos.js) e escrita restrita; 201 impede
+  por signed URL (js/fotos-privadas.js) e escrita restrita; 201 impede
   escalar motorista com viagem vencida sem check-in
   (vw_frota_viagens_vencidas); 202 expõe motorista_telefone na
   vw_frota_viagens_detalhe; 203/204 são o checklist de inspeção (DVIR)
@@ -243,6 +243,32 @@ houver linha, cache ou conexão — a captura só fica desligada depois
 que a config "desligada" chegou ao aparelho pelo menos uma vez. Quando
 desligada, o app nem solicita permissão de geolocalização
 (fmObterGpsSeAtivo curto-circuita antes de chamar fmObterGps).
+
+## Regra do sistema — fotos em bucket privado (LGPD)
+TODO bucket com imagem de pessoa ou dado pessoal é PRIVADO. Nenhum
+`getPublicUrl` serve arquivo: quem exibe assina na hora, com
+`js/fotos-privadas.js` (helper único, compartilhado pelos 3 apps —
+nasceu como js/frota-fotos.js na migration 200 e virou genérico na
+210). Nunca reimplementar assinatura numa página — é a mesma lição do
+js/frota-consumo.js.
+- Privados: frota-* (200), brigadistas, registros-campo,
+  biomonitor-fotos (210), pesquisa-documentos.
+- Públicos de propósito: só config-logos (marca institucional).
+- API: `fotoAttr(url, fallback)` no template (render síncrono) +
+  `assinarFotos(container)` depois de injetar o HTML; `fotoUrlAssinada
+  (url)` para uso imperativo (.src, window.open, fetch de PDF). Nomes
+  `frota*` seguem como alias.
+- O que fica GRAVADO no banco continua sendo a URL pública — ela vale
+  como endereço (bucket + caminho), não como acesso. Sem migração de
+  dados.
+- Sempre ter fallback: offline a assinatura falha, e avatar deve cair
+  nas iniciais, nunca em imagem quebrada. Fotos ainda na fila offline
+  são blob:/data: — `fotoRef` devolve null e o chamador exibe direto.
+- O helper resolve o cliente Supabase certo (`_fotoDb`): Brigadas
+  reatribui o global `db`, mas o Biomonitor usa `window._bioDB_client`.
+- ⚠️ Tornar um bucket privado QUEBRA o cliente antigo. Aplicar a
+  migration só DEPOIS do deploy do código que assina (ver cabeçalho
+  das migrations 200 e 210).
 
 ## Enums do banco
 perfil_usuario: super_admin | gestor | tecnico | financeiro | visualizador

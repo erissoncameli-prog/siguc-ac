@@ -8,6 +8,7 @@
 <script src="../js/observability.js"></script>
 <script src="../js/queryLogger.js"></script>
 <script src="../js/config.js"></script>
+<script src="../js/fotos-privadas.js"></script>
 <script src="../js/layout.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
@@ -1815,11 +1816,14 @@ function renderAlbumFauna() {
       <div class="album-grid">
         ${g.fotos.map(p => `
           <div class="album-thumb" data-fi="${p._fi}">
-            <img src="${esc(p.url)}" alt="${esc(p.label)}" loading="lazy">
+            <img ${fotoAttr(p.url)} alt="${esc(p.label)}" loading="lazy">
             ${ALBUM_ICONE[p.classe]?`<div class="album-thumb-badge"><img src="${ALBUM_ICONE[p.classe]}" alt=""></div>`:''}
           </div>`).join('')}
       </div>
     </div>`).join('')
+
+  // Bucket privado (migration 210): assina as miniaturas recém-montadas.
+  assinarFotos(corpo)
 
   corpo.querySelectorAll('.album-thumb').forEach(el =>
     el.addEventListener('click', () => lbAbrir(parseInt(el.dataset.fi), fotos))
@@ -1871,10 +1875,14 @@ function lbAbrir(idx, fotos) {
   document.getElementById('lb-overlay').removeAttribute('hidden')
 }
 
-function lbMostrar(animacao) {
+// async desde a migration 210: a foto vem de bucket privado e a URL
+// precisa ser assinada antes de virar src. Assina uma vez e reusa nos
+// dois ramos (com e sem animação).
+async function lbMostrar(animacao) {
   const fotos = window._lbFotos || []
   const p = fotos[_lbIdx]
   if (!p) return
+  const src = await fotoUrlAssinada(p.url) || p.url
   const wrap = document.getElementById('lb-img-wrap')
   const img  = document.getElementById('lb-img')
   const meta = document.getElementById('lb-meta')
@@ -1889,13 +1897,13 @@ function lbMostrar(animacao) {
   if (animacao) {
     wrap.classList.add('flip-out')
     setTimeout(() => {
-      img.src = p.url
+      img.src = src
       wrap.classList.remove('flip-out')
       wrap.classList.add('flip-in')
       setTimeout(() => wrap.classList.remove('flip-in'), 220)
     }, 200)
   } else {
-    img.src = p.url
+    img.src = src
   }
   img.alt = p.label
   meta.innerHTML = `
@@ -2737,7 +2745,7 @@ function exportarEAParticipantes() {
 }
 
 // ── Modal: Lista de Presença ──────────────────────────────────
-function abrirPresencaModal(url) {
+async function abrirPresencaModal(url) {
   let modal = document.getElementById('ea-presenca-modal')
   if (!modal) {
     modal = document.createElement('div')
@@ -2763,12 +2771,16 @@ function abrirPresencaModal(url) {
     document.body.appendChild(modal)
   }
 
-  document.getElementById('ea-presenca-dl').href = url
+  // A lista de presença traz nome de participante e sai do bucket
+  // registros-campo, privado desde a migration 210: iframe, <img> e o
+  // link "Abrir original" precisam todos da URL assinada.
+  const assinada = await fotoUrlAssinada(url) || url
+  document.getElementById('ea-presenca-dl').href = assinada
   const cont  = document.getElementById('ea-presenca-conteudo')
   const isPDF = /\.pdf($|\?)/i.test(url) || /content-type.*pdf/i.test(url)
   cont.innerHTML = isPDF
-    ? `<iframe src="${esc(url)}" style="width:100%;height:65vh;border:none;display:block"></iframe>`
-    : `<img src="${esc(url)}" alt="Lista de presença" style="width:100%;height:auto;display:block">`
+    ? `<iframe src="${esc(assinada)}" style="width:100%;height:65vh;border:none;display:block"></iframe>`
+    : `<img src="${esc(assinada)}" alt="Lista de presença" style="width:100%;height:auto;display:block">`
 
   modal.removeAttribute('hidden')
   document.body.style.overflow = 'hidden'
