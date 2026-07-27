@@ -9,6 +9,7 @@
 <script src="../js/observability.js"></script>
 <script src="../js/queryLogger.js"></script>
 <script src="../js/config.js"></script>
+<script src="../js/fotos-privadas.js"></script>
 <script src="../js/config-sistema.js"></script>
 <script src="../js/layout.js"></script>
 <script src="../js/brigada-captura.js"></script>
@@ -603,7 +604,9 @@
       const caminho = _caminhoNoBucket(urlOriginal)
       if (!caminho) { falhas++; continue }
       try {
-        const resp = await fetch(urlOriginal)
+        // Bucket privado (migration 210): assina antes de baixar o
+        // original, senão o fetch volta 400 e toda reaplicação falha.
+        const resp = await fetch(await fotoUrlAssinada(urlOriginal) || urlOriginal)
         if (!resp.ok) throw new Error('não foi possível baixar a foto original')
         const blobOriginal = await resp.blob()
         const blobMarcado = await bCapturaProcessarArquivo(
@@ -638,10 +641,12 @@
     _fotosNinhoAtual = n?._fotosOcorrencias || []
     document.getElementById('fotos-grid').innerHTML = _fotosNinhoAtual.map((f, i) => `
       <div style="position:relative;cursor:zoom-in" onclick="bioAbrirFotoTelaCheia(${i})">
-        <img src="${esc(f.url)}" style="width:100%;height:100%;border-radius:8px;object-fit:cover;aspect-ratio:4/3;display:block" loading="lazy">
+        <img ${fotoAttr(f.url)} style="width:100%;height:100%;border-radius:8px;object-fit:cover;aspect-ratio:4/3;display:block" loading="lazy">
         <span style="position:absolute;left:0;right:0;bottom:0;padding:4px 8px;font-size:.7rem;color:#fff;background:linear-gradient(transparent,rgba(0,0,0,.72));border-radius:0 0 8px 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(f.legenda)}</span>
       </div>`
     ).join('')
+    // Bucket privado (migration 210): assina as miniaturas do grid.
+    assinarFotos('fotos-grid')
     document.getElementById('modal-fotos').classList.add('aberto')
   }
 
@@ -671,11 +676,11 @@
     bioRenderFotoAtual()
   }
 
-  function bioRenderFotoAtual() {
+  async function bioRenderFotoAtual() {
     const f = _fotosNinhoAtual[_fotoIdxAtual]
     if (!f) return
     const ov = document.getElementById('bio-foto-overlay')
-    ov.querySelector('.bio-foto-img').src = f.url
+    ov.querySelector('.bio-foto-img').src = await fotoUrlAssinada(f.url) || f.url
     ov.querySelector('.bio-foto-legenda').textContent = f.legenda
     const varios = _fotosNinhoAtual.length > 1
     ov.querySelector('.bio-foto-prev').style.display = varios ? '' : 'none'

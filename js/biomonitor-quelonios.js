@@ -466,12 +466,18 @@ async function bioEntrarNaHome() {
 
   // Avatar
   const avatarEl = document.getElementById('bio-home-avatar')
+  const letraEl  = document.getElementById('bio-home-avatar-letra')
+  const inicial  = (monitor.nome_completo ?? 'M')[0].toUpperCase()
+  avatarEl.style.backgroundImage = ''
+  letraEl.textContent = inicial
+  // Bucket privado (migration 210): a foto exige assinar, que exige
+  // rede. Offline — o estado normal deste app — fica a inicial.
   if (monitor.foto_url) {
-    avatarEl.style.backgroundImage = `url(${monitor.foto_url})`
-    document.getElementById('bio-home-avatar-letra').textContent = ''
-  } else {
-    avatarEl.style.backgroundImage = ''
-    document.getElementById('bio-home-avatar-letra').textContent = (monitor.nome_completo ?? 'M')[0].toUpperCase()
+    fotoUrlAssinada(monitor.foto_url).then(u => {
+      if (!u) return
+      avatarEl.style.backgroundImage = `url("${u}")`
+      letraEl.textContent = ''
+    })
   }
 
   // Inicia GPS
@@ -501,11 +507,14 @@ async function bioEntrarNaHome() {
   if (cfgGrupo) cfgGrupo.textContent = monitor.grupo_nome ?? ''
   const cfgAvatarEl = document.getElementById('bio-config-avatar')
   if (cfgAvatarEl) {
+    cfgAvatarEl.style.backgroundImage = ''
+    cfgAvatarEl.textContent = (monitor.nome_completo ?? 'M')[0].toUpperCase()
     if (monitor.foto_url) {
-      cfgAvatarEl.style.backgroundImage = `url(${monitor.foto_url})`
-      cfgAvatarEl.textContent = ''
-    } else {
-      cfgAvatarEl.textContent = (monitor.nome_completo ?? 'M')[0].toUpperCase()
+      fotoUrlAssinada(monitor.foto_url).then(u => {
+        if (!u) return
+        cfgAvatarEl.style.backgroundImage = `url("${u}")`
+        cfgAvatarEl.textContent = ''
+      })
     }
   }
 
@@ -1207,8 +1216,10 @@ function bioAbrirCorrecaoNinho(ninho) {
     const grid = document.getElementById('bio-form-foto-grid')
     if (grid) {
       grid.innerHTML = ''
-      BioApp.formNinho.foto_urls.forEach(url => {
-        const img = document.createElement('img'); img.src = url; grid.appendChild(img)
+      BioApp.formNinho.foto_urls.forEach(async url => {
+        const img = document.createElement('img')
+        img.src = await fotoUrlAssinada(url) || url
+        grid.appendChild(img)
       })
     }
   }
@@ -1374,9 +1385,9 @@ function bioIniciarFotosGenerica({ prefixo, max, getState, setFotos, getContexto
     const fotos = getState() ?? []
     countEl.textContent = `(${fotos.length}/${max})`
     grid.innerHTML = ''
-    fotos.forEach((url, i) => {
+    fotos.forEach(async (url, i) => {
       const img = document.createElement('img')
-      img.src = url
+      img.src = await fotoUrlAssinada(url) || url
       img.addEventListener('click', () => {
         if (confirm('Remover esta foto?')) {
           const f = getState()
@@ -2570,11 +2581,14 @@ function bioRenderizarHistoricoNinhos(lotes) {
 }
 
 // ── Visualizador de foto em tela cheia (histórico: ocorrências/soltura) ──
-function bioAbrirFotoTelaCheia(url) {
+// Bucket biomonitor-fotos é privado (migration 210). `|| url` cobre a
+// foto ainda não sincronizada (dataURL da fila offline), que não é
+// endereço de Storage e portanto não tem o que assinar.
+async function bioAbrirFotoTelaCheia(url) {
   const viewer = document.getElementById('bio-foto-viewer')
   const img    = document.getElementById('bio-foto-viewer-img')
   if (!viewer || !img || !url) return
-  img.src = url
+  img.src = await fotoUrlAssinada(url) || url
   viewer.hidden = false
 }
 
@@ -2588,7 +2602,7 @@ function bioFecharFotoTelaCheia() {
 function _bioFotosGridHtml(fotoUrls) {
   if (!fotoUrls?.length) return ''
   return `<div class="bio-foto-grid">${
-    fotoUrls.map(u => `<img class="bio-foto-clicavel" src="${u}" data-foto-url="${u}" loading="lazy">`).join('')
+    fotoUrls.map(u => `<img class="bio-foto-clicavel" ${fotoAttr(u)} data-foto-url="${esc(u)}" loading="lazy">`).join('')
   }</div>`
 }
 
@@ -2619,6 +2633,7 @@ async function bioRenderizarSolturasDoBercario(bercarioId, temporadaId) {
         ${_bioFotosGridHtml(s.foto_urls)}
       </div>`
   }).join('')
+  assinarFotos(lista)
 }
 
 function bioAbrirTelaDetalheIndividuo(individuo) {
@@ -2828,6 +2843,7 @@ async function bioCarregarTimelineBercario(bercarioId, temporadaId) {
       </div>
     `
   }).join('')
+  assinarFotos(timelineEl)
 }
 
 function bioAbrirFormOcorrencia(lote) {
