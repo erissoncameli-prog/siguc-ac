@@ -129,21 +129,16 @@ function formatData(d) {
   return isNaN(dt) ? '—' : dt.toLocaleDateString('pt-BR')
 }
 
-// Aparece só quando a página foi aberta em aba/janela nova a partir de
-// outra tela do sistema (window.opener) — é aí que falta uma forma
-// fácil de voltar, sobretudo num PWA em modo standalone, sem barra de
-// endereço nem botão de fechar aba. Acesso direto (link do rodapé do
-// login, aba já existente, favorito) não mostra o botão.
-if (window.opener) {
+// Link interno (js/lgpd.js) navega nesta MESMA aba, então sempre há uma
+// página anterior na pilha de histórico desta aba quando se chega aqui
+// por um link do sistema — window.close() foi abandonado por ser
+// bloqueado silenciosamente por vários navegadores/PWAs instalados
+// (o clique não fazia nada). history.back() é a forma que sempre
+// funciona, inclusive num PWA em modo standalone sem barra de endereço.
+if (history.length > 1) {
   const barra = document.getElementById('fechar-barra')
   barra.hidden = false
-  document.getElementById('fechar-btn').addEventListener('click', () => {
-    window.close()
-    // Alguns navegadores não fecham a aba mesmo com opener (ex.: se o
-    // usuário navegou para outra página nela entre a abertura e o
-    // clique). Nesse caso, ao menos volta para a página anterior.
-    setTimeout(() => { if (!document.hidden) history.back() }, 300)
-  })
+  document.getElementById('fechar-btn').addEventListener('click', () => history.back())
 }
 
 ;(async function () {

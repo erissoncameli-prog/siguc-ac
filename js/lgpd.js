@@ -34,12 +34,15 @@ function lgpdMarkdown(md) {
 
   const inline = s => esc_(s)
     .replace(/`([^`]+)`/g, '<code>$1</code>')
-    // Link externo (http/s) sempre com rel=noopener (segurança). Link
-    // interno (relativo, começa com /) sem noopener DE PROPÓSITO: mantém
-    // window.opener na aba nova, para o botão "Estou ciente, fechar" de
-    // pages/privacidade.html conseguir fechar a aba com window.close().
+    // Link externo (http/s): abre em aba nova, rel=noopener por segurança.
+    // Link interno (relativo, começa com /): navega na MESMA aba — nada
+    // de target=_blank aqui. window.close() numa aba nova é bloqueado
+    // silenciosamente por muitos navegadores/PWAs instalados mesmo com
+    // window.opener presente (o clique não fazia nada); o botão "Estou
+    // ciente, fechar" de pages/privacidade.html usa history.back(), que
+    // sempre funciona porque a navegação ficou na mesma aba.
     .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>')
-    .replace(/\[([^\]]+)\]\((\/[^)\s]+)\)/g, '<a href="$2" target="_blank">$1</a>')
+    .replace(/\[([^\]]+)\]\((\/[^)\s]+)\)/g, '<a href="$2">$1</a>')
     .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
     .replace(/(^|[^*])\*([^*]+)\*/g, '$1<em>$2</em>')
 
