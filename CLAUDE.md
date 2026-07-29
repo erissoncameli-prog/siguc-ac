@@ -391,14 +391,34 @@ Plano em 5 fases; 0 a 2 entregues. Migrations 209–212.
   `esc`/`formatData`/`toast` já usado em `pages/privacidade.html`. Sem
   gate bloqueante de propósito (mudaria comportamento de quem já usa o
   portal, decisão de produto que não foi tomada).
-- Pendente, e não é código — precisa de decisão/dado humano:
-  nome do Encarregado (DPO, campo pronto em Configurações →
-  Privacidade, esperando portaria); confirmação da área se há menor de
-  idade nas atividades de educação ambiental (`registro_participantes`
-  segue com `dado_de_menor=true` por precaução no ROPA); e a primeira
-  revisão anual em si — o mecanismo está armado (`lgpd_revisoes` +
-  `lgpd_checar_revisao_anual`), mas fabricar uma revisão sem que um
-  responsável de fato revise seria simular conformidade, não entregá-la.
+### ⚠️ LGPD — pendências que dependem de decisão/dado humano (não é código)
+Plano tecnicamente completo (0 a 5, migrations 209–221 em produção),
+mas 3 itens não podem ser preenchidos por uma sessão de Claude Code —
+não é falta de tempo, é que fabricar qualquer um deles seria simular
+conformidade em vez de entregá-la. Ficam aqui até alguém trazer o dado:
+
+1. **Nome do Encarregado (DPO)**. Campo pronto em Configurações →
+   Privacidade (`config_sistema.dados.encarregado`: nome/e-mail/
+   telefone/portaria) — só preencher quando a portaria de designação
+   sair. Até lá, `pages/privacidade.html` mostra o canal institucional
+   da secretaria no lugar do nome.
+2. **Confirmação se há menor de idade nas atividades de educação
+   ambiental**. `lgpd_tratamentos.dado_de_menor = true` para TRAT-007
+   (`registro_participantes`) está marcado por PRECAUÇÃO, não por
+   confirmação — a tabela guarda `data_nascimento` e a área nunca
+   confirmou se há escolares. Se confirmado, o Art. 14 passa a exigir
+   consentimento específico de responsável e a coleta de CPF de menor
+   precisa ser reavaliada quanto à necessidade (Art. 6º, III). Pedir
+   isso à coordenação de educação ambiental.
+3. **Primeira revisão anual**. Mecanismo armado (`lgpd_revisoes` +
+   `lgpd_checar_revisao_anual`, pg_cron mensal) mas ZERO linhas em
+   `lgpd_revisoes` — ninguém revisou ROPA/RIPD/políticas/log do CAR
+   ainda. Botão "Marcar revisão feita" em Configurações → Privacidade
+   já funciona; precisa de um super_admin/gestor de fato ler os
+   documentos e clicar.
+
+Quando qualquer um desses chegar, é edição pontual — não precisa
+reabrir o plano.
 
 ## Enums do banco
 perfil_usuario: super_admin | gestor | tecnico | financeiro | visualizador |
