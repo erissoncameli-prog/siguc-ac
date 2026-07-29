@@ -221,6 +221,7 @@ function _lgpdCampoCss() {
 .lgpdc-doc ul { margin:0 0 12px; padding-left:20px }
 .lgpdc-doc li { margin:6px 0 }
 .lgpdc-doc strong { color:#0A1A0F }
+.lgpdc-doc a { color:#1F4E2C; text-decoration:underline; font-weight:600 }
 @media (min-width:600px) {
   .lgpdc-ov { align-items:center; padding:20px }
   .lgpdc-box { border-radius:16px }
