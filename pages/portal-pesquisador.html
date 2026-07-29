@@ -193,6 +193,24 @@ body{font-family:var(--ff-ui);background:var(--bg);color:var(--texto);min-height
   .tabs-nav{gap:3px;padding:4px}
   .tab-btn{font-size:11px}
 }
+
+/* ── Gate de ciência do Aviso de Privacidade (LGPD) ── */
+.lgpd-gate-ov{position:fixed;inset:0;background:rgba(10,26,15,.72);z-index:999;display:flex;align-items:center;justify-content:center;padding:20px}
+.lgpd-gate-box{background:var(--card);border-radius:16px;max-width:640px;width:100%;max-height:88vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:var(--sombra-m)}
+.lgpd-gate-head{padding:22px 26px 14px;border-bottom:1px solid var(--borda)}
+.lgpd-gate-head h2{font-family:var(--ff-display);font-weight:500;font-size:1.2rem;color:var(--texto)}
+.lgpd-gate-head p{font-size:12.5px;color:var(--texto-s);margin-top:4px}
+.lgpd-gate-body{overflow-y:auto;padding:20px 26px;font-size:.9rem;line-height:1.65;color:var(--texto)}
+.lgpd-gate-body h1{font-size:1.15rem;margin:0 0 12px}
+.lgpd-gate-body h2{font-size:1rem;margin:18px 0 7px;color:var(--verde-m)}
+.lgpd-gate-body p,.lgpd-gate-body ul{margin:0 0 10px}
+.lgpd-gate-body ul{padding-left:20px}
+.lgpd-gate-foot{padding:16px 26px calc(18px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--borda);background:var(--card)}
+.lgpd-gate-check{display:flex;gap:10px;align-items:flex-start;font-size:12.5px;color:var(--texto-m);cursor:pointer;margin-bottom:14px}
+.lgpd-gate-check input{margin-top:2px;width:16px;height:16px;flex-shrink:0;cursor:pointer;accent-color:var(--verde-c)}
+.lgpd-gate-btn{width:100%;height:46px;background:linear-gradient(135deg,var(--verde-c) 0%,var(--verde-m) 100%);color:#fff;border:none;border-radius:10px;font-size:13.5px;font-weight:600;cursor:pointer;font-family:var(--ff-ui)}
+.lgpd-gate-btn:disabled{opacity:.48;cursor:not-allowed}
+.lgpd-gate-erro{font-size:11.5px;color:#B91C1C;margin-top:8px;text-align:center}
 </style>
 </head>
 <body>
@@ -311,6 +329,11 @@ body{font-family:var(--ff-ui);background:var(--bg);color:var(--texto);min-height
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="../js/env-loader.js"></script>
+<!-- lgpdMarkdown (js/lgpd.js) é função pura, sem dependência de
+     config.js — reaproveitada aqui pelo mesmo motivo de
+     perfil-pesquisador.html: evita reescrever o parser de markdown
+     pela quarta vez no projeto. -->
+<script src="../js/lgpd.js"></script>
 <script>
 const { createClient } = supabase
 let db
@@ -625,6 +648,12 @@ async function carregarPortal() {
   document.getElementById('h-avatar').textContent = iniciais(pesq.nome_completo)
   document.getElementById('bv-titulo').textContent = `Olá, ${pesq.nome_completo.split(' ')[0]}!`
 
+  // Aviso de Privacidade do portal (LGPD, migration 223) — bloqueia só
+  // no primeiro acesso a cada versão nova. Ao contrário dos 3 apps de
+  // campo, o portal sempre tem conexão quando carrega, então não há
+  // cache offline nem fila de reenvio aqui.
+  lgpdPesquisaVerificar()
+
   const { data: pesquisas } = await db
     .from('pesquisas')
     .select(`
@@ -677,6 +706,78 @@ async function carregarPortal() {
   }
 
   document.getElementById('loading').style.display = 'none'
+}
+
+// ── Gate de ciência — Aviso de Privacidade do portal (LGPD) ─────
+// Bloqueia até o pesquisador declarar ciência da versão vigente.
+// Diferente do gate dos apps de campo (js/lgpd-campo.js), não precisa
+// de cache offline nem fila de reenvio — o portal sempre tem conexão
+// quando chega até aqui (a sessão já foi confirmada em carregarPortal).
+async function lgpdPesquisaVerificar() {
+  try {
+    const { data, error } = await db.rpc('lgpd_aviso_pesquisa')
+    if (error) throw error
+    const doc = Array.isArray(data) ? data[0] : data
+    if (!doc || doc.ja_ciente) return
+    lgpdPesquisaMostrarGate(doc)
+  } catch (e) {
+    // Fail-open: nunca travar o acesso ao portal por causa disto.
+    console.warn('[lgpd-pesquisa] não foi possível verificar o aviso:', e?.message || e)
+  }
+}
+
+function lgpdPesquisaMostrarGate(doc) {
+  if (document.getElementById('lgpd-gate-ov')) return
+
+  const corpo = (typeof lgpdMarkdown === 'function')
+    ? lgpdMarkdown(doc.conteudo_md)
+    : `<pre style="white-space:pre-wrap">${esc(doc.conteudo_md || '')}</pre>`
+
+  const ov = document.createElement('div')
+  ov.id = 'lgpd-gate-ov'
+  ov.className = 'lgpd-gate-ov'
+  ov.innerHTML = `
+    <div class="lgpd-gate-box" role="dialog" aria-modal="true" aria-labelledby="lgpd-gate-titulo">
+      <div class="lgpd-gate-head">
+        <h2 id="lgpd-gate-titulo">Antes de continuar</h2>
+        <p>Leia o aviso abaixo. Sua ciência fica registrada e é pedida só uma vez, até que haja uma nova versão.</p>
+      </div>
+      <div class="lgpd-gate-body">${corpo}</div>
+      <div class="lgpd-gate-foot">
+        <label class="lgpd-gate-check">
+          <input type="checkbox" id="lgpd-gate-chk">
+          <span>Declaro que li e estou ciente do aviso acima.</span>
+        </label>
+        <button class="lgpd-gate-btn" id="lgpd-gate-btn" disabled>Registrar ciência e continuar</button>
+        <div class="lgpd-gate-erro" id="lgpd-gate-erro" style="display:none"></div>
+      </div>
+    </div>`
+  document.body.appendChild(ov)
+
+  const chk = ov.querySelector('#lgpd-gate-chk')
+  const btn = ov.querySelector('#lgpd-gate-btn')
+  const erroEl = ov.querySelector('#lgpd-gate-erro')
+  chk.addEventListener('change', () => { btn.disabled = !chk.checked })
+
+  btn.addEventListener('click', async () => {
+    btn.disabled = true
+    btn.textContent = 'Registrando…'
+    erroEl.style.display = 'none'
+    try {
+      const { error } = await db.rpc('lgpd_registrar_aceite', {
+        p_versao_id:  doc.versao_id,
+        p_user_agent: navigator.userAgent,
+      })
+      if (error) throw error
+      ov.remove()
+    } catch (e) {
+      console.error('[lgpd-pesquisa] falha ao registrar aceite:', e)
+      btn.disabled = false
+      btn.textContent = 'Registrar ciência e continuar'
+      erroEl.textContent = 'Não foi possível registrar. Tente novamente.'
+      erroEl.style.display = 'block'
+    }
+  })
 }
 
 carregarPortal()
