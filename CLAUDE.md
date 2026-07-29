@@ -355,10 +355,20 @@ Plano em 5 fases; 0 a 2 entregues. Migrations 209–212.
   `.from('car_dados_locais').select('*').eq(...)` que
   `_buscarDadosLocais` (pages/mapa.html) fazia direto — mesma
   permissão de antes (`pode_ver('mapa')`), só passa a gravar quem viu
-  o nome/CPF de qual imóvel. A busca por nome/CPF/CNPJ
-  (`_consultaCARLocal`) continua com select direto — não expõe CPF na
-  tela dos resultados, então ficou fora do escopo do log (registrado
-  como risco residual conhecido no RIPD do CAR).
+  o nome/CPF de qual imóvel.
+- **Busca do CAR sem CPF no retorno** (`car_buscar_local`, migration
+  221 — fechou o risco residual que o RIPD v1.0 tinha registrado como
+  conhecido): `_consultaCARLocal` (pages/mapa.html) parou de fazer
+  select direto, que devolvia a linha bruta (com `cpf_cnpj`) pro
+  navegador. Achado ao investigar: esse select também FURAVA o log da
+  216 — `confirmarConsultaCAR` pré-populava `_carDadosLocais` com a
+  linha bruta da busca, então abrir o detalhe de um imóvel achado por
+  busca nunca chamava `car_consultar_local`. Corrigido nas duas
+  frentes: a RPC de busca não devolve `cpf_cnpj`, e `_buscarDadosLocais`
+  só reaproveita cache que já tem a chave `cpf_cnpj` (prova de que
+  passou pela RPC de log) — cache "leve" da busca não serve mais pra
+  isso. RIPD do CAR atualizado pra v1.1 documentando a correção (RIPD
+  não exige aceite, então nova versão não pede ciência de novo).
 - **Revisão anual como mecanismo, não só texto** (`lgpd_revisoes` +
   `lgpd_checar_revisao_anual`, migration 220): pg_cron mensal (dia 1,
   09h UTC) notifica quem edita Configurações → Privacidade se a última
@@ -371,17 +381,24 @@ Plano em 5 fases; 0 a 2 entregues. Migrations 209–212.
   documento versionado (`tipo='plano_incidente'`), com detecção →
   classificação de gravidade → contenção → comunicação (interna, ANPD,
   titulares) → documentação → revisão pós-incidente.
-- Fechou o plano de 5 fases (0 a 5, todas as migrations 209–220
-  aplicadas em produção).
-- Pendente: migration 210 (buckets privados de Brigadas/Biomonitor)
-  segue esperando o deploy do código que assina (ver seção de fotos
-  privadas acima). Portal do pesquisador
-  (`perfil-pesquisador.html`) não tem "Meus dados" nem canal do
-  titular — não carrega `js/config.js`/`js/lgpd.js`, precisaria de
-  versão leve própria (mesmo padrão isolado de `pages/privacidade.html`).
-  `registro_participantes` segue com `dado_de_menor=true` por
-  precaução no ROPA, sem confirmação da área se há mesmo menor de
-  idade nas atividades de educação ambiental.
+- Fechou o plano de 5 fases (0 a 5, todas as migrations 209–221
+  aplicadas em produção, migration 210 já aplicada após o deploy).
+- **Portal do pesquisador** (`perfil-pesquisador.html`) tem card 5
+  "Seus dados e seus direitos": lê Política/Termo e canal do titular
+  (formulário + histórico de solicitações), reaproveitando
+  `lgpdMarkdown`/`lgpdDocumentoVigente` de `js/lgpd.js` (funções puras,
+  não dependem de `config.js`) — mesmo padrão de shim local de
+  `esc`/`formatData`/`toast` já usado em `pages/privacidade.html`. Sem
+  gate bloqueante de propósito (mudaria comportamento de quem já usa o
+  portal, decisão de produto que não foi tomada).
+- Pendente, e não é código — precisa de decisão/dado humano:
+  nome do Encarregado (DPO, campo pronto em Configurações →
+  Privacidade, esperando portaria); confirmação da área se há menor de
+  idade nas atividades de educação ambiental (`registro_participantes`
+  segue com `dado_de_menor=true` por precaução no ROPA); e a primeira
+  revisão anual em si — o mecanismo está armado (`lgpd_revisoes` +
+  `lgpd_checar_revisao_anual`), mas fabricar uma revisão sem que um
+  responsável de fato revise seria simular conformidade, não entregá-la.
 
 ## Enums do banco
 perfil_usuario: super_admin | gestor | tecnico | financeiro | visualizador |

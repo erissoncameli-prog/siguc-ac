@@ -5461,16 +5461,19 @@ async function executarConsultaCAR(){
 }
 
 // Busca por nome ou CPF/CNPJ na planilha local
+//
+// Via RPC (não select direto): car_buscar_local (migration 221) nunca
+// devolve cpf_cnpj — o CPF não é necessário para escolher QUAL
+// resultado abrir, só o nome/imóvel são. Antes, a linha bruta (com
+// CPF) vinha pro navegador e um clique em "confirmar seleção"
+// pré-populava o cache de detalhe sem passar pela RPC de log
+// (car_consultar_local) — furava o log da migration 216 no caminho
+// mais comum de uso. `local` aqui NUNCA tem a chave `cpf_cnpj`, o que
+// `_buscarDadosLocais` usa para saber que ainda precisa buscar (e
+// logar) o registro completo na hora de abrir o detalhe.
 async function _consultaCARLocal(tipo, termo){
-  let q = db.from('car_dados_locais').select('*').limit(500);
-  if(tipo === 'cpf' || tipo === 'cnpj'){
-    const dig = termo.replace(/\D/g,'');
-    q = q.or(`cpf_cnpj.eq.${dig},cpf_cnpj.ilike.%${dig}%`);
-  }else{
-    const t = termo.replace(/[%,()]/g,' ').trim();
-    q = q.or(`nom_imovel.ilike.%${t}%,nome_compl.ilike.%${t}%`);
-  }
-  const { data, error } = await q;
+  const dig = (tipo === 'cpf' || tipo === 'cnpj') ? termo.replace(/\D/g,'') : termo.replace(/[%,()]/g,' ').trim();
+  const { data, error } = await db.rpc('car_buscar_local', { p_tipo: tipo, p_termo: dig });
   if(error) throw new Error(error.message);
   return (data||[]).filter(r=>r.cod_imovel).map(r=>({
     cod: r.cod_imovel,
@@ -5777,7 +5780,13 @@ function _selecionarCAR(f, layer){
 // log registra uma vez por imóvel por sessão, não a cada re-render.
 async function _buscarDadosLocais(cod){
   if(!cod) return null;
-  if(_carDadosLocais.has(cod)) return _carDadosLocais.get(cod);
+  // 'cpf_cnpj' in cache distingue o registro COMPLETO (veio da RPC de
+  // log) do cache leve que a busca pode ter semeado (confirmarConsultaCAR)
+  // — esse nunca tem a chave cpf_cnpj (ver _consultaCARLocal). Sem essa
+  // checagem, abrir o detalhe de um imóvel achado por busca mostraria o
+  // CPF sem nunca ter passado pela RPC que loga o acesso.
+  const cache = _carDadosLocais.get(cod);
+  if(cache && 'cpf_cnpj' in cache) return cache;
   const {data: rows} = await db.rpc('car_consultar_local', { p_cod_imovel: cod });
   const data = rows?.[0] || null;
   _carDadosLocais.set(cod, data||null);
@@ -5839,7 +5848,10 @@ function _htmlCarAtributos(f){
   const f2=n=>Number(n||0).toLocaleString('pt-BR',{maximumFractionDigits:2});
   const fDt=d=>d?new Date(d).toLocaleDateString('pt-BR'):'—';
   const local=_carDadosLocais.get(cod);
-  const carregando=!_carDadosLocais.has(cod);
+  // Mesma checagem de _buscarDadosLocais: um cache "leve" vindo da
+  // busca (sem a chave cpf_cnpj) ainda vai buscar o registro completo
+  // — o spinner deve continuar visível até isso terminar.
+  const carregando=!(local && 'cpf_cnpj' in local);
 
   const secaoLocal=carregando
     ?`<div class="car-det-field" style="background:var(--cinza-50);border-radius:var(--raio)">
