@@ -813,6 +813,8 @@
     <button class="btn-config-item" id="btn-buscar-especies" data-icon="leaf">Atualizar catálogo de espécies</button>
     <button class="btn-config-item" id="btn-qr-instalar" data-icon="qr">Instalar em outro aparelho (QR)</button>
     <button class="btn-config-item" id="btn-verificar-update" data-icon="download">Verificar atualização do app</button>
+    <button class="btn-config-item" id="btn-aviso-privacidade" data-icon="shield">Aviso de privacidade</button>
+    <button class="btn-config-item" id="btn-meus-dados" data-icon="user">Meus dados</button>
     <button class="btn-config-item btn-danger-soft" id="btn-zerar-fila" data-icon="trash">Zerar fila de registros</button>
     <button class="btn-config-item btn-danger" id="btn-sair" data-icon="logout">Sair / Trocar conta</button>
 
@@ -952,6 +954,9 @@ window.__API_MONITOR_OFF = true
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"
         onerror="console.warn('[brigada] Supabase CDN indisponível — modo offline')"></script>
 <script src="/js/config.js"></script>
+<script src="/js/fotos-privadas.js"></script>
+<script src="/js/lgpd.js"></script>
+<script src="/js/lgpd-campo.js"></script>
 <script src="/js/qrcode-generator.js"></script>
 <script>
 // ── Cliente Supabase ISOLADO para o App de Campo ──────────────
@@ -972,7 +977,12 @@ const _brigReady = _dbReady.then(function () {
       },
     });
     if (_brigDb) {
+      // window.db também: `db` é `let` (não vira propriedade de
+      // window), então sem esta linha window.db ficaria apontando para
+      // o cliente de mesa publicado por js/config.js — sem a sessão do
+      // brigadista. Mesmo cuidado que frota-app.html já tomava.
       db = _brigDb
+      window.db = _brigDb
       console.info('[brigada] cliente isolado com sessão persistente ativo')
     }
   } catch (e) {
@@ -1807,6 +1817,11 @@ async function entrarHome() {
 
   mostrarTela('tela-home')
   mascoteVideoTocar()
+
+  // Aviso de privacidade do app (LGPD Art. 9º, migration 213). Nunca
+  // bloqueia o trabalho: funciona do cache offline e a ciência é
+  // sincronizada depois — ver js/lgpd-campo.js.
+  lgpdCampoIniciar()
 
   bGpsIniciar(gps => {
     const card = document.getElementById('gps-card')
@@ -3190,10 +3205,14 @@ function primeiroNome(n) {
 // ════════════════════════════════════════════════════════════════
 // Foto de perfil do brigadista
 // ════════════════════════════════════════════════════════════════
-function renderAvatar() {
+// O bucket `brigadistas` é privado (migration 210): a foto só aparece
+// depois de assinar a URL, o que exige rede. Offline — que é o estado
+// normal deste app em campo — a assinatura falha e o avatar cai nas
+// iniciais, em vez de virar imagem quebrada.
+async function renderAvatar() {
   const av    = document.getElementById('config-avatar')
   const letra = document.getElementById('avatar-letra')
-  const foto  = App.brigadista?.foto_url
+  const foto  = await fotoUrlAssinada(App.brigadista?.foto_url)
   if (foto) {
     av.style.backgroundImage = `url("${foto.replace(/"/g, '')}")`
     letra.hidden = true
@@ -3205,11 +3224,11 @@ function renderAvatar() {
 }
 
 // Avatar do brigadista na tela inicial (foto ou iniciais)
-function renderHomeAvatar() {
+async function renderHomeAvatar() {
   const av    = document.getElementById('home-avatar')
   const letra = document.getElementById('home-avatar-letra')
   if (!av) return
-  const foto = App.brigadista?.foto_url
+  const foto = await fotoUrlAssinada(App.brigadista?.foto_url)
   if (foto) {
     av.style.backgroundImage = `url("${foto.replace(/"/g, '')}")`
     if (letra) letra.hidden = true
@@ -3306,9 +3325,11 @@ function abrirMenuFoto() {
 }
 function fecharMenuFoto() { document.getElementById('avatar-menu').hidden = true }
 
-function abrirFotoViewer() {
-  const foto = App.brigadista?.foto_url
-  if (!foto) return
+async function abrirFotoViewer() {
+  const foto = await fotoUrlAssinada(App.brigadista?.foto_url)
+  // Sem assinatura (offline) não há o que mostrar em tela cheia —
+  // abrir o viewer vazio seria pior que não abrir.
+  if (!foto) { toast('Foto indisponível offline', 'erro'); return }
   document.getElementById('foto-viewer-img').src = foto
   document.getElementById('foto-viewer').hidden = false
 }
@@ -3557,6 +3578,8 @@ document.addEventListener('DOMContentLoaded', () => {
     toast(ok ? 'Catálogo atualizado' : 'Sem conexão — tente mais tarde', ok ? 'ok' : 'warn')
   })
   document.getElementById('btn-verificar-update').addEventListener('click', verificarAtualizacao)
+  document.getElementById('btn-aviso-privacidade').addEventListener('click', lgpdCampoAbrir)
+  document.getElementById('btn-meus-dados').addEventListener('click', lgpdAbrirMeusDados)
   document.getElementById('btn-qr-instalar').addEventListener('click', abrirQRInstalacao)
   document.getElementById('qr-overlay-fechar').addEventListener('click', () => {
     document.getElementById('qr-overlay').hidden = true

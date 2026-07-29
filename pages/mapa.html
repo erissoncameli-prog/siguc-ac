@@ -5769,10 +5769,17 @@ function _selecionarCAR(f, layer){
 }
 
 // ── Dados do Supabase ─────────────────────────────────────────────────────
+// Via RPC (não select direto): car_consultar_local (migration 216)
+// registra em lgpd_acesso_dado_terceiro que ESTE servidor viu o
+// nome/CPF do proprietário deste imóvel — é o único ponto do sistema
+// que revela identidade de titular do CAR, um terceiro que nunca
+// interagiu com a SEMA-AC. O cache em _carDadosLocais garante que o
+// log registra uma vez por imóvel por sessão, não a cada re-render.
 async function _buscarDadosLocais(cod){
   if(!cod) return null;
   if(_carDadosLocais.has(cod)) return _carDadosLocais.get(cod);
-  const {data} = await db.from('car_dados_locais').select('*').eq('cod_imovel',cod).maybeSingle();
+  const {data: rows} = await db.rpc('car_consultar_local', { p_cod_imovel: cod });
+  const data = rows?.[0] || null;
   _carDadosLocais.set(cod, data||null);
   return data||null;
 }

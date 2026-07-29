@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>SIGUC-AC · Meus Dados</title>
+<link rel="stylesheet" href="../css/global.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../js/observability.js"></script>
+<script src="../js/queryLogger.js"></script>
+<script src="../js/config.js"></script>
+<script src="../js/lgpd.js"></script>
+<script src="../js/layout.js"></script>
+<style>
+.md-card { background:#fff; border:1px solid #E5E7EB; border-radius:14px; padding:24px 26px; max-width:720px }
+.md-intro { font-size:.84rem; color:#6B7280; margin:0 0 22px; line-height:1.55 }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+;(async function () {
+  const usuario = await carregarUsuario()
+  if (!usuario) { window.location.href = '../index.html'; return }
+
+  document.getElementById('app').innerHTML =
+    gerarLayout('Meus Dados', 'meus-dados') +
+    `<div class="fade-in">
+      <div class="md-card">
+        <p class="md-intro">
+          O que o SIGUC-AC guarda sobre você, e o canal para pedir acesso, correção,
+          exclusão ou informação sobre compartilhamento — direitos do Art. 18 da LGPD.
+          Veja também a <a href="privacidade.html" target="_blank">Política de Privacidade</a> completa.
+        </p>
+        <div id="lgpd-md-root"></div>
+      </div>
+    </div>`
+
+  lgpdMontarMeusDados('lgpd-md-root')
+})()
+</script>
+</body>
+</html>

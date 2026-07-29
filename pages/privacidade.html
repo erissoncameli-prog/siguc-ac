@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>SIGUC-AC · Política de Privacidade</title>
+<meta name="description" content="Política de Privacidade e Proteção de Dados Pessoais do SIGUC-AC — Secretaria de Estado de Meio Ambiente do Acre.">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --floresta:#0A1A0F; --musgo:#1F4E2C; --verde-c:#52B788;
+  --ouro:#C9A84C; --ouro-c:#F0CB6A; --t1:#F4EFE6;
+  --borda:#D9D0BE; --cinza-400:#9ca3af; --cinza-500:#6b7280; --cinza-800:#1f2937;
+}
+
+body {
+  font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
+  background: var(--t1); color: var(--cinza-800);
+  -webkit-font-smoothing: antialiased;
+}
+
+.topo {
+  background: var(--floresta); color: #fff;
+  padding: 26px 20px 22px;
+}
+.topo-in { max-width: 860px; margin: 0 auto; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.topo img { height: 42px; width: auto; }
+.topo h1 { font-size: 1.15rem; font-weight: 600; letter-spacing: .2px; }
+.topo .sub { font-size: .8rem; opacity: .72; margin-top: 2px; }
+
+main { max-width: 860px; margin: 0 auto; padding: 26px 20px 60px; }
+
+.folha {
+  background: #fff; border: 1px solid var(--borda); border-radius: 14px;
+  padding: 30px 32px; box-shadow: 0 1px 3px rgba(0,0,0,.05);
+}
+
+.meta {
+  font-size: .76rem; color: var(--cinza-500); border-bottom: 1px solid var(--borda);
+  padding-bottom: 12px; margin-bottom: 22px; display: flex; gap: 16px; flex-wrap: wrap;
+}
+
+.contato {
+  margin-top: 26px; padding: 18px 20px; border-radius: 11px;
+  background: rgba(31,78,44,.06); border: 1px solid rgba(31,78,44,.16);
+}
+.contato h2 { font-size: 1rem; margin: 0 0 10px; color: var(--musgo); }
+.contato dl { display: grid; grid-template-columns: auto 1fr; gap: 5px 14px; font-size: .86rem; }
+.contato dt { font-weight: 600; color: var(--cinza-500); }
+.contato .pendente { font-size: .8rem; color: var(--cinza-500); font-style: italic; }
+
+.hash {
+  margin-top: 18px; font-size: .68rem; color: var(--cinza-400);
+  font-family: ui-monospace, monospace; word-break: break-all; text-align: center;
+}
+
+.carregando, .erro { text-align: center; padding: 50px 20px; color: var(--cinza-500); font-size: .9rem; }
+.erro { color: #b91c1c; }
+
+@media (max-width: 600px) {
+  .folha { padding: 22px 18px; }
+  .contato dl { grid-template-columns: 1fr; gap: 2px; }
+  .contato dt { margin-top: 8px; }
+}
+</style>
+</head>
+<body>
+
+<header class="topo">
+  <div class="topo-in">
+    <img id="logo-sec" alt="" hidden>
+    <div>
+      <h1>SIGUC-AC</h1>
+      <div class="sub" id="sub-orgao">Sistema de Gestão de Unidades de Conservação do Acre</div>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="folha">
+    <div id="conteudo" class="carregando">Carregando…</div>
+  </div>
+</main>
+
+<script src="../js/env-loader.js"></script>
+<script src="../js/lgpd.js"></script>
+<script>
+// Página pública: não exige login. A Política de Privacidade é o único
+// documento com `publico = true` (migration 212) — o RLS garante que o
+// papel anon enxergue só ela, nunca o Termo de Uso nem o ROPA.
+//
+// Ela precisa ser pública porque também fala de quem NUNCA acessou o
+// sistema: o proprietário rural cujo CPF chega pela API do SICAR não
+// tem conta para ler uma política atrás de login.
+let db = null
+
+// `esc` e `formatData` normalmente vêm de js/config.js, que esta página
+// não carrega (config.js assume sessão). Como js/lgpd.js os utiliza,
+// definimos as duas aqui, com o mesmo comportamento.
+function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+  ))
+}
+function formatData(d) {
+  if (!d) return '—'
+  const dt = new Date(d + (String(d).length === 10 ? 'T12:00:00' : ''))
+  return isNaN(dt) ? '—' : dt.toLocaleDateString('pt-BR')
+}
+
+;(async function () {
+  const alvo = document.getElementById('conteudo')
+  try {
+    const env = await loadEnv()
+    if (!env.supabaseUrl || !env.supabaseKey) throw new Error('configuração de ambiente indisponível')
+    db = supabase.createClient(env.supabaseUrl, env.supabaseKey)
+
+    const [doc, cfg] = await Promise.all([
+      lgpdDocumentoVigente('politica_privacidade'),
+      db.from('config_sistema').select('dados').eq('id', 1).maybeSingle(),
+    ])
+    if (!doc) throw new Error('documento não encontrado')
+
+    const dados = cfg?.data?.dados || {}
+    aplicarIdentidade(dados)
+
+    alvo.className = ''
+    alvo.innerHTML = `
+      <div class="meta">
+        <span>Versão ${esc(doc.versao)}</span>
+        <span>Em vigor desde ${formatData(doc.vigente_desde)}</span>
+      </div>
+      <div class="lgpd-doc">${lgpdMarkdown(doc.conteudo_md)}</div>
+      ${blocoContato(dados)}
+      <div class="hash">Integridade do texto (SHA-256): ${esc(doc.hash_sha256)}</div>`
+
+    // js/lgpd.js traz o CSS de .lgpd-doc — reaproveitado aqui para que
+    // o documento tenha exatamente a mesma aparência dentro e fora do
+    // sistema.
+    lgpdInjetarCss()
+  } catch (e) {
+    console.error('[privacidade]', e)
+    alvo.className = 'erro'
+    alvo.textContent = 'Não foi possível carregar a Política de Privacidade. Tente novamente mais tarde.'
+  }
+})()
+
+function aplicarIdentidade(dados) {
+  const sec = dados.secretaria || {}
+  if (sec.nome) {
+    document.getElementById('sub-orgao').textContent =
+      sec.nome + (sec.sigla ? ` (${sec.sigla})` : '')
+  }
+  const url = dados.logos?.secretaria_url
+  if (url) {
+    const img = document.getElementById('logo-sec')
+    img.src = url
+    img.alt = sec.sigla || 'Logo'
+    img.hidden = false
+  }
+}
+
+// Seção 10 da política remete a este bloco. O Encarregado (DPO) é
+// designado por portaria e cadastrado em config_sistema.dados.encarregado
+// — assim a designação entra pela tela de Configurações, sem migration
+// nem deploy. Enquanto não houver designação, exibe o canal
+// institucional da secretaria e diz claramente que a indicação está
+// pendente, em vez de mostrar um campo vazio.
+function blocoContato(dados) {
+  const enc = dados.encarregado || {}
+  const sec = dados.secretaria  || {}
+  const linhas = []
+
+  if (enc.nome)     linhas.push(['Encarregado', esc(enc.nome)])
+  if (enc.email)    linhas.push(['E-mail', esc(enc.email)])
+  if (enc.telefone) linhas.push(['Telefone', esc(enc.telefone)])
+  if (enc.portaria) linhas.push(['Designação', esc(enc.portaria)])
+
+  if (!linhas.length) {
+    if (sec.email)    linhas.push(['E-mail', esc(sec.email)])
+    if (sec.telefone) linhas.push(['Telefone', esc(sec.telefone)])
+    if (sec.endereco) linhas.push(['Endereço', esc(sec.endereco)])
+  }
+
+  return `
+    <div class="contato">
+      <h2>Contato — Encarregado pelo Tratamento de Dados Pessoais</h2>
+      ${!enc.nome ? `<p class="pendente">A designação formal do Encarregado está em curso.
+        Até a publicação da portaria, use o canal institucional abaixo.</p>` : ''}
+      <dl>${linhas.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl>
+    </div>`
+}
+</script>
+</body>
+</html>

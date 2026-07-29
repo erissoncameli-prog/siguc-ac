@@ -9,6 +9,7 @@
 <script src="../js/observability.js"></script>
 <script src="../js/queryLogger.js"></script>
 <script src="../js/config.js"></script>
+<script src="../js/fotos-privadas.js"></script>
 <script src="../js/layout.js"></script>
 <style>
 .berc-tab-btn { background:transparent;border:none;padding:6px 14px;border-radius:7px;cursor:pointer;font-size:.85rem;font-weight:600;color:var(--bio-prim,#1A6B8C);opacity:.6;transition:all .15s }
@@ -563,11 +564,21 @@
     if (bercId) await abrirDetalhe(bercId, 'alertas')
   }
 
+  // Bucket biomonitor-fotos é privado (migration 210): o grid marca as
+  // imagens e assinarFotos resolve; o clique abre em nova aba, que
+  // precisa de uma URL assinada na hora (a do grid já foi consumida).
   window.verFotos = function(urls) {
     document.getElementById('fotos-grid').innerHTML = urls.map(u =>
-      `<img src="${u}" style="width:100%;border-radius:8px;object-fit:cover;aspect-ratio:4/3;cursor:pointer" loading="lazy" onclick="window.open('${u}','_blank')">`
+      `<img ${fotoAttr(u)} style="width:100%;border-radius:8px;object-fit:cover;aspect-ratio:4/3;cursor:pointer" loading="lazy" onclick="window.abrirFotoNovaAba('${esc(u)}')">`
     ).join('')
+    assinarFotos('fotos-grid')
     document.getElementById('modal-fotos').classList.add('aberto')
+  }
+
+  window.abrirFotoNovaAba = async function(url) {
+    const assinada = await fotoUrlAssinada(url)
+    if (!assinada) { toast('Não foi possível abrir a foto', 'error'); return }
+    window.open(assinada, '_blank', 'noopener')
   }
 
   window.verFotosSoltura = function(loteId, idx) {

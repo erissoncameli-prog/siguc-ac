@@ -15,6 +15,7 @@
 <script src="../js/observability.js"></script>
 <script src="../js/queryLogger.js"></script>
 <script src="../js/config.js"></script>
+<script src="../js/fotos-privadas.js"></script>
 <script src="../js/mapa-camadas.js"></script>
 <script src="../js/layout.js"></script>
 <style>
@@ -886,7 +887,8 @@ async function abrirDetalhe(id) {
   if (r.fotos_urls?.length) {
     fotosSec.hidden = false
     document.getElementById('modal-fotos-grid').innerHTML =
-      r.fotos_urls.map(u => `<img class="foto-thumb-val" src="${esc(u)}" alt="foto" onclick="abrirLightbox('${esc(u)}')">`).join('')
+      r.fotos_urls.map(u => `<img class="foto-thumb-val" ${fotoAttr(u)} alt="foto" onclick="abrirLightbox('${esc(u)}')">`).join('')
+    assinarFotos('modal-fotos-grid')
   } else { fotosSec.hidden = true }
 
   // Fauna
@@ -898,9 +900,13 @@ async function abrirDetalhe(id) {
     lpSec.hidden = false
     const url   = r.lista_presenca_url
     const ehPdf = /\.pdf(\?|$)/i.test(url)
+    // O PDF da lista de presença traz nome de participante — sai pelo
+    // mesmo bucket privado, então o <a> também precisa ser assinado
+    // (fotoAttr preenche href em <a>, src em <img>).
     document.getElementById('modal-lista-presenca').innerHTML = ehPdf
-      ? `<a class="btn-ver" href="${esc(url)}" target="_blank" rel="noopener">Abrir PDF da lista ↗</a>`
-      : `<img class="foto-thumb-val" src="${esc(url)}" alt="lista de presença" onclick="abrirLightbox('${esc(url)}')">`
+      ? `<a class="btn-ver" ${fotoAttr(url)} target="_blank" rel="noopener">Abrir PDF da lista ↗</a>`
+      : `<img class="foto-thumb-val" ${fotoAttr(url)} alt="lista de presença" onclick="abrirLightbox('${esc(url)}')">`
+    assinarFotos('modal-lista-presenca')
   } else { lpSec.hidden = true }
 
   // Participantes (educação ambiental)
@@ -1024,7 +1030,7 @@ async function carregarFaunaModal(rcId) {
 
     const fotosHtml = (f.fotos_urls?.length)
       ? `<div class="fauna-fotos-grid">
-          ${f.fotos_urls.map(u => `<img class="fauna-foto-thumb" src="${esc(u)}" alt="foto fauna" onclick="abrirLightbox('${esc(u)}')">`).join('')}
+          ${f.fotos_urls.map(u => `<img class="fauna-foto-thumb" ${fotoAttr(u)} alt="foto fauna" onclick="abrirLightbox('${esc(u)}')">`).join('')}
          </div>`
       : ''
 
@@ -1161,6 +1167,10 @@ async function carregarFaunaModal(rcId) {
       </div>
     </div>`
   }).join('')
+
+  // Bucket privado (migration 210): o render acima só marcou as fotos
+  // com data-foto-privada; aqui elas viram URL assinada.
+  assinarFotos(lista)
 
   // Autocomplete de espécies no campo "Nome científico" (biólogo/técnico)
   if (podeEditar) data.forEach(f => bindEspecieAutocomplete(f.id))
@@ -1640,8 +1650,12 @@ document.getElementById('val-gibs-data').addEventListener('change', () => { if (
 document.getElementById('val-btn-editar').addEventListener('click', _valEditarPoligono)
 document.getElementById('val-btn-desfazer').addEventListener('click', _valDesfazerEdicao)
 
-function abrirLightbox(url) {
-  document.getElementById('lightbox-img').src = url
+// Recebe a URL como está gravada no banco (bucket privado desde a
+// migration 210) e assina na hora de exibir em tamanho cheio.
+async function abrirLightbox(url) {
+  const assinada = await fotoUrlAssinada(url)
+  if (!assinada) { toast('Não foi possível carregar a foto', 'erro'); return }
+  document.getElementById('lightbox-img').src = assinada
   document.getElementById('lightbox').classList.remove('oculto')
 }
 

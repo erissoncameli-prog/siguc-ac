@@ -63,6 +63,28 @@ const { createClient } = supabase;
 let db;
 let SUPABASE_URL = '';      // exposto após env load
 let SUPABASE_ANON_KEY = ''; // exposto após env load — brigada.html usa para cliente isolado
+
+// Cliente Supabase correto para o contexto atual.
+//
+// Não dá para usar `db` cegamente: os apps de campo têm cliente
+// próprio, com sessão isolada em localStorage. Brigadas e Frota
+// REATRIBUEM o global `db` para o deles, então ali `db` já é o certo —
+// mas o Biomonitor guarda o seu em `window._bioDB_client` e deixa `db`
+// intocado, apontando para a sessão do SIGUC de mesa, que dentro do
+// app não existe. Assinar foto ou chamar RPC com o cliente errado
+// falha por falta de sessão.
+//
+// Ordem deliberada, e `db` vem ANTES de `window.db` por um motivo
+// concreto: `db` é declarado com `let`, então NÃO é propriedade de
+// window. Quando um app faz `db = clientePróprio`, o binding léxico
+// muda mas `window.db` continua apontando para o cliente de mesa que
+// esta linha 94 publicou. Preferir `window.db` devolveria o cliente
+// errado — sem sessão — em Brigadas.
+function sigucDb() {
+  if (window._bioDB_client) return window._bioDB_client;
+  if (typeof db !== 'undefined' && db) return db;
+  return window.db || null;
+}
 // _dbReady resolve assim que env estiver disponível e db inicializado
 const _dbReady = loadEnv().then(({ supabaseUrl, supabaseKey }) => {
   if (!supabaseUrl || !supabaseKey) return // env indisponível — db permanece null
@@ -178,7 +200,34 @@ async function carregarUsuario() {
   appState.usuario = u;
   appState.perfil = u.perfil;
   if (window.SessionGuard) SessionGuard.init(u);
+  _lgpdGate();
   return u;
+}
+
+// Gate de ciência da Política de Privacidade e do Termo de Uso
+// (migration 212). Carregado dinamicamente daqui, e não por <script>
+// em cada página, de propósito: é um controle de conformidade, e
+// pendurá-lo em 38 tags significaria que toda página nova nasceria
+// sem ele — uma falha invisível. Como carregarUsuario() é o bootstrap
+// obrigatório de qualquer tela de mesa, amarrar o gate aqui garante
+// cobertura completa e automática.
+//
+// Os três apps de campo (brigada, biomonitor, frota-app) não chamam
+// carregarUsuario e portanto não são bloqueados — ver o cabeçalho de
+// js/lgpd.js para o porquê.
+//
+// Sem await: a página não espera o gate para renderizar; o overlay
+// cobre a tela sozinho quando (e se) houver pendência.
+function _lgpdGate() {
+  const seguir = () => { try { lgpdVerificarAceite() } catch (e) { console.warn('[lgpd]', e) } };
+  if (typeof lgpdVerificarAceite === 'function') { seguir(); return; }
+  if (document.getElementById('lgpd-js')) return;
+  const s = document.createElement('script');
+  s.id = 'lgpd-js';
+  s.src = '/js/lgpd.js';
+  s.onload = seguir;
+  s.onerror = () => console.warn('[lgpd] não foi possível carregar /js/lgpd.js');
+  document.head.appendChild(s);
 }
 
 function iniciais(nome) {
