@@ -58,6 +58,22 @@ main { max-width: 860px; margin: 0 auto; padding: 26px 20px 60px; }
 .carregando, .erro { text-align: center; padding: 50px 20px; color: var(--cinza-500); font-size: .9rem; }
 .erro { color: #b91c1c; }
 
+/* Botão só aparece quando a página foi aberta em aba/janela nova a
+   partir de outra tela do sistema (ver script no fim do arquivo) —
+   é a facilidade de fechar que falta numa aba sem barra de navegação
+   (PWA em modo standalone, por exemplo). */
+.fechar-barra {
+  position: sticky; bottom: 0; left: 0; right: 0;
+  padding: 12px 20px calc(12px + env(safe-area-inset-bottom, 0px));
+  background: var(--t1); border-top: 1px solid var(--borda);
+  display: flex; justify-content: center; z-index: 10;
+}
+.fechar-btn {
+  width: 100%; max-width: 400px; padding: 13px; border: 0; border-radius: 10px;
+  font-size: .92rem; font-weight: 700; background: var(--musgo); color: #fff; cursor: pointer;
+}
+.fechar-btn:active { background: var(--floresta); }
+
 @media (max-width: 600px) {
   .folha { padding: 22px 18px; }
   .contato dl { grid-template-columns: 1fr; gap: 2px; }
@@ -83,6 +99,10 @@ main { max-width: 860px; margin: 0 auto; padding: 26px 20px 60px; }
   </div>
 </main>
 
+<div class="fechar-barra" id="fechar-barra" hidden>
+  <button class="fechar-btn" id="fechar-btn">Estou ciente, fechar</button>
+</div>
+
 <script src="../js/env-loader.js"></script>
 <script src="../js/lgpd.js"></script>
 <script>
@@ -107,6 +127,23 @@ function formatData(d) {
   if (!d) return '—'
   const dt = new Date(d + (String(d).length === 10 ? 'T12:00:00' : ''))
   return isNaN(dt) ? '—' : dt.toLocaleDateString('pt-BR')
+}
+
+// Aparece só quando a página foi aberta em aba/janela nova a partir de
+// outra tela do sistema (window.opener) — é aí que falta uma forma
+// fácil de voltar, sobretudo num PWA em modo standalone, sem barra de
+// endereço nem botão de fechar aba. Acesso direto (link do rodapé do
+// login, aba já existente, favorito) não mostra o botão.
+if (window.opener) {
+  const barra = document.getElementById('fechar-barra')
+  barra.hidden = false
+  document.getElementById('fechar-btn').addEventListener('click', () => {
+    window.close()
+    // Alguns navegadores não fecham a aba mesmo com opener (ex.: se o
+    // usuário navegou para outra página nela entre a abertura e o
+    // clique). Nesse caso, ao menos volta para a página anterior.
+    setTimeout(() => { if (!document.hidden) history.back() }, 300)
+  })
 }
 
 ;(async function () {
