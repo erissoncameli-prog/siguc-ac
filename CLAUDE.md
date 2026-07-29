@@ -146,7 +146,7 @@ Frota — abastecimento (174–175):
   DEFINER executável por anon); 198 torna check-out/check-in
   idempotentes por uuid_cliente (fim da pílula envenenada na fila
   offline); 199/200 tornam os buckets do Frota privados, com leitura
-  por signed URL (js/frota-fotos.js) e escrita restrita; 201 impede
+  por signed URL (js/fotos-privadas.js) e escrita restrita; 201 impede
   escalar motorista com viagem vencida sem check-in
   (vw_frota_viagens_vencidas); 202 expõe motorista_telefone na
   vw_frota_viagens_detalhe; 203/204 são o checklist de inspeção (DVIR)
@@ -244,8 +244,154 @@ que a config "desligada" chegou ao aparelho pelo menos uma vez. Quando
 desligada, o app nem solicita permissão de geolocalização
 (fmObterGpsSeAtivo curto-circuita antes de chamar fmObterGps).
 
+## Regra do sistema — fotos em bucket privado (LGPD)
+TODO bucket com imagem de pessoa ou dado pessoal é PRIVADO. Nenhum
+`getPublicUrl` serve arquivo: quem exibe assina na hora, com
+`js/fotos-privadas.js` (helper único, compartilhado pelos 3 apps —
+nasceu como js/frota-fotos.js na migration 200 e virou genérico na
+210). Nunca reimplementar assinatura numa página — é a mesma lição do
+js/frota-consumo.js.
+- Privados: frota-* (200), brigadistas, registros-campo,
+  biomonitor-fotos (210), pesquisa-documentos.
+- Públicos de propósito: só config-logos (marca institucional).
+- API: `fotoAttr(url, fallback)` no template (render síncrono) +
+  `assinarFotos(container)` depois de injetar o HTML; `fotoUrlAssinada
+  (url)` para uso imperativo (.src, window.open, fetch de PDF). Nomes
+  `frota*` seguem como alias.
+- O que fica GRAVADO no banco continua sendo a URL pública — ela vale
+  como endereço (bucket + caminho), não como acesso. Sem migração de
+  dados.
+- Sempre ter fallback: offline a assinatura falha, e avatar deve cair
+  nas iniciais, nunca em imagem quebrada. Fotos ainda na fila offline
+  são blob:/data: — `fotoRef` devolve null e o chamador exibe direto.
+- O helper resolve o cliente Supabase certo (`_fotoDb`): Brigadas
+  reatribui o global `db`, mas o Biomonitor usa `window._bioDB_client`.
+- ⚠️ Tornar um bucket privado QUEBRA o cliente antigo. Aplicar a
+  migration só DEPOIS do deploy do código que assina (ver cabeçalho
+  das migrations 200 e 210).
+
+## LGPD — governança de dados pessoais
+Plano em 5 fases; 0 a 2 entregues. Migrations 209–212.
+- **ROPA vivo no banco** (`lgpd_tratamentos`, migration 211): 16
+  tratamentos mapeados, cada um apontando as TABELAS REAIS que o
+  materializam (coluna `tabelas`). Tabela nova com dado pessoal =
+  entrada nova no ROPA, na mesma entrega. É o que permite auditar o
+  registro contra o schema em vez de acreditar nele.
+- **BASE LEGAL NUNCA É CONSENTIMENTO** para o núcleo do sistema. SEMA
+  é órgão público: Art. 7º, III (política pública) e Art. 7º, II
+  (obrigação legal). Consentimento só no que é de fato opcional (foto
+  de perfil, push). Construir sobre consentimento criaria direito de
+  revogação que quebraria registros de guarda permanente.
+- **Documentos versionados** (`lgpd_documentos` +
+  `lgpd_documento_versoes`, migration 212): texto vive no banco, não em
+  HTML. `hash_sha256` é coluna GENERATED — não pode divergir do texto.
+  Editar = criar versão nova, o que volta a cobrar aceite de todos.
+- **Aceite** (`lgpd_aceites`): aponta para a VERSÃO, referencia
+  `auth.users` (único âncora comum a servidor, brigadista, monitor,
+  motorista e pesquisador). Sem policy de UPDATE/DELETE — é registro
+  de prova. Só entra pela RPC `lgpd_registrar_aceite` (idempotente).
+- **Gate de ciência**: disparado por `carregarUsuario()` (js/config.js),
+  que carrega `js/lgpd.js` dinamicamente. Deliberadamente NÃO é
+  `<script>` em cada página — assim nenhuma página nova nasce sem o
+  controle. Os 3 apps de campo não chamam `carregarUsuario` e por isso
+  não são bloqueados: são offline-first e um gate dependente de rede
+  poderia travar um brigadista em campo. FAIL-OPEN: se a RPC falhar, o
+  gate não aparece e o sistema segue.
+- **Página pública** `pages/privacidade.html` (sem login): a política é
+  o único documento com `publico = true`, porque fala também de quem
+  não é usuário (CPF vindo da API do SICAR — 53 mil titulares).
+  Encarregado/DPO vem de `config_sistema.dados.encarregado`, editável
+  em Configurações → Privacidade, sem migration nem deploy.
+- **Aviso de campo** (`js/lgpd-campo.js` + migration 213): documento
+  próprio, curto, exibido DENTRO dos 3 apps — brigadista/monitor/
+  motorista são 4 dos 5 tratamentos de alto risco. Regra que manda no
+  arquivo: NADA pode impedir o trabalho de campo. Texto cacheado em
+  localStorage e reexibido sem rede; ciência gravada local primeiro e
+  sincronizada depois; falha de envio fica pendente e retenta na
+  próxima abertura, sem reexibir nem barrar. Reler em Configurações de
+  cada app.
+- O aviso de campo NÃO entra em `lgpd_pendencias_aceite()` (o gate de
+  mesa) — senão todo servidor administrativo veria aviso sobre GPS de
+  brigadista. Superfície própria: RPC `lgpd_aviso_campo()`.
+- **CLIENTE SUPABASE — use sempre `sigucDb()` (js/config.js)**, nunca
+  `window.db` direto. `db` é `let`, então NÃO é propriedade de window:
+  quando um app faz `db = clientePróprio`, o `window.db` publicado pelo
+  config.js continua apontando para o cliente de mesa, SEM sessão.
+  Ordem correta: `_bioDB_client` → `db` → `window.db`. Biomonitor usa
+  só `window._bioDB_client`; Brigadas e Frota reatribuem `db`.
+- **Canal do titular / "Meus dados"** (`lgpd_solicitacoes_titular`,
+  migrations 214/215): serve as 5 populações (servidor, brigadista,
+  monitor, motorista, pesquisador) com UMA tabela e DUAS RPCs, porque
+  todas ancoram em `auth.users` — mesmo motivo de `lgpd_aceites`.
+  `lgpd_meus_dados()` (SECURITY INVOKER — só agrega o que a RLS de
+  cada tabela de identidade já libera para o próprio dono) devolve
+  cadastro + aceites + histórico de solicitações; `usuario_id` tem
+  `DEFAULT auth.uid()`, então o INSERT do cliente manda só
+  `{tipo, descricao}`. Trigger carimba `respondido_por`/`respondido_em`
+  no servidor (nunca confia no cliente) e notifica automaticamente:
+  nova solicitação → todo `super_admin`/`gestor` (não existe papel de
+  "encarregado" no sistema de permissões); resposta → o titular.
+  `vw_lgpd_solicitacoes` resolve o nome cruzando as 5 tabelas de
+  identidade, porque nem todo titular tem linha em `usuarios`.
+  Renderer único em `js/lgpd.js` (`lgpdMontarMeusDados` /
+  `lgpdAbrirMeusDados`) — página inteira em `pages/meus-dados.html`
+  (mesa, link fixo no rodapé da sidebar, visível a qualquer perfil) e
+  modal nos 3 apps de campo (Configurações → Meus dados). Administração
+  das solicitações em Configurações → Privacidade.
+- **RIPD** (migrations 217/218): dois relatórios de impacto, reusando
+  `lgpd_documentos` (mesmo `tipo` enum, `exige_aceite=false`,
+  `publico=false`) em vez de tabela própria — RIPD É um texto
+  versionado com data de vigência, a mesma coisa que Política/Termo/
+  Aviso. `ripd_geolocalizacao` cobre os 4 tratamentos de trabalhador
+  (TRAT-005/006/009/011); `ripd_car` cobre o TRAT-013 (volume + titular
+  de terceiro). ⚠️ Novo valor de enum SÓ pode ser usado depois de
+  commitado — precisa de uma migration própria só para o `ALTER TYPE
+  ... ADD VALUE`, antes de qualquer INSERT que o use (erro real visto
+  ao aplicar: "unsafe use of new value ... must be committed").
+- **Log de acesso a dado de terceiro** (`lgpd_acesso_dado_terceiro`,
+  migration 216): SELECT não dispara trigger no Postgres, então o
+  único jeito de garantir o registro é o cliente passar por uma RPC.
+  `car_consultar_local(cod_imovel)` substitui o
+  `.from('car_dados_locais').select('*').eq(...)` que
+  `_buscarDadosLocais` (pages/mapa.html) fazia direto — mesma
+  permissão de antes (`pode_ver('mapa')`), só passa a gravar quem viu
+  o nome/CPF de qual imóvel. A busca por nome/CPF/CNPJ
+  (`_consultaCARLocal`) continua com select direto — não expõe CPF na
+  tela dos resultados, então ficou fora do escopo do log (registrado
+  como risco residual conhecido no RIPD do CAR).
+- **Revisão anual como mecanismo, não só texto** (`lgpd_revisoes` +
+  `lgpd_checar_revisao_anual`, migration 220): pg_cron mensal (dia 1,
+  09h UTC) notifica quem edita Configurações → Privacidade se a última
+  revisão passou de 12 meses (ou nunca houve uma). Dedupe pelo mesmo
+  padrão da 207 (frota) — não notifica de novo enquanto já houver
+  notificação pendente do mesmo subtipo. Marcar revisão feita é ação
+  manual do admin (botão em Configurações → Privacidade), não
+  automática — não faz sentido o sistema se autodeclarar revisado.
+- **Plano de Resposta a Incidente** (Art. 48, migration 220): também
+  documento versionado (`tipo='plano_incidente'`), com detecção →
+  classificação de gravidade → contenção → comunicação (interna, ANPD,
+  titulares) → documentação → revisão pós-incidente.
+- Fechou o plano de 5 fases (0 a 5, todas as migrations 209–220
+  aplicadas em produção).
+- Pendente: migration 210 (buckets privados de Brigadas/Biomonitor)
+  segue esperando o deploy do código que assina (ver seção de fotos
+  privadas acima). Portal do pesquisador
+  (`perfil-pesquisador.html`) não tem "Meus dados" nem canal do
+  titular — não carrega `js/config.js`/`js/lgpd.js`, precisaria de
+  versão leve própria (mesmo padrão isolado de `pages/privacidade.html`).
+  `registro_participantes` segue com `dado_de_menor=true` por
+  precaução no ROPA, sem confirmação da área se há mesmo menor de
+  idade nas atividades de educação ambiental.
+
 ## Enums do banco
-perfil_usuario: super_admin | gestor | tecnico | financeiro | visualizador
+perfil_usuario: super_admin | gestor | tecnico | financeiro | visualizador |
+  brigadista | biologo | secretario | diretor | chefe_departamento |
+  gestor_uc | assistente_admin | pesquisador_externo | validador_brigada |
+  validador_fauna
+  (lista completa — achado na Fase 3 do LGPD que este arquivo trazia
+  só 5 valores; brigadista/monitor/motorista/pesquisador TÊM linha em
+  `usuarios`, com perfil próprio, então também alcançam a mesa/sidebar
+  se logarem com e-mail+senha em vez do PIN do app de campo)
 categoria_uc: PI|REBIO|ESEC|MONA|RVS|FLONA|RESEX|RDS|RPPN|APA|ARIE
 grupo_uc: protecao_integral | uso_sustentavel
 esfera_uc: federal | estadual | municipal | privada

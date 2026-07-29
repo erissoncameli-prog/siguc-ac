@@ -239,10 +239,15 @@ function _biopdfCarregarLibs() {
 }
 
 // ── Imagens: logos institucionais e fotos (fetch → dataURL) ─────────
+// Baixa a imagem para embutir no PDF. Desde a migration 210 as fotos
+// de ninho vêm de bucket privado: fetch na URL crua devolve 400, então
+// assina antes. O `|| url` cobre o que não é Storage privado — logo do
+// governo (bucket config-logos, público) e qualquer URL externa.
 async function _biopdfBuscarDataURL(url) {
   if (!url) return null
   try {
-    const r = await fetch(url)
+    const alvo = await fotoUrlAssinada(url) || url
+    const r = await fetch(alvo)
     if (!r.ok) return null
     const blob = await r.blob()
     return await new Promise((res, rej) => {

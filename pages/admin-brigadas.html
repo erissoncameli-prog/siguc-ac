@@ -8,6 +8,7 @@
 <script src="../js/observability.js"></script>
 <script src="../js/queryLogger.js"></script>
 <script src="../js/config.js"></script>
+<script src="../js/fotos-privadas.js"></script>
 <script src="../js/qrcode-generator.js"></script>
 <script src="../js/layout.js"></script>
 </head>
@@ -1197,11 +1198,19 @@ async function salvarBrigada() {
 let _mbrFotoFile = null
 let _mbrFotoUrlAtual = null
 
+// Recebe dois tipos de URL: a gravada em brigadistas.foto_url (bucket
+// privado desde a migration 210, precisa assinar) e a blob: do preview
+// local, quando o usuário acabou de escolher um arquivo e ainda não
+// salvou. fotoAttr devolve '' para a blob: — daí o ramo direto.
 function _setBrigFotoPreview(url) {
   const wrap = document.getElementById('mbr-foto-preview')
   const rem  = document.getElementById('mbr-foto-remover')
   if (url) {
-    wrap.innerHTML = `<img src="${url}" alt="foto">`
+    const attr = fotoAttr(url)
+    wrap.innerHTML = attr
+      ? `<img ${attr} alt="foto">`
+      : `<img src="${esc(url)}" alt="foto">`
+    if (attr) assinarFotos(wrap)
     rem.classList.add('visivel')
   } else {
     wrap.innerHTML = '🧑'
