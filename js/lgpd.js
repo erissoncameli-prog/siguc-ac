@@ -34,6 +34,7 @@ function lgpdMarkdown(md) {
 
   const inline = s => esc_(s)
     .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+|\/[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>')
     .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
     .replace(/(^|[^*])\*([^*]+)\*/g, '$1<em>$2</em>')
 
@@ -114,6 +115,7 @@ function lgpdInjetarCss() {
 .lgpd-doc ul, .lgpd-doc ol { padding-left:22px }
 .lgpd-doc li { margin:3px 0 }
 .lgpd-doc code { background:rgba(0,0,0,.06); padding:1px 5px; border-radius:4px; font-size:.85em }
+.lgpd-doc a { color:var(--musgo,#1F4E2C); text-decoration:underline; font-weight:600 }
 .lgpd-doc table { border-collapse:collapse; width:100%; margin:10px 0; font-size:.84rem; display:block; overflow-x:auto }
 .lgpd-doc th, .lgpd-doc td { border:1px solid var(--borda,#D9D0BE); padding:6px 9px; text-align:left; vertical-align:top }
 .lgpd-doc th { background:rgba(31,78,44,.07); font-weight:600 }
