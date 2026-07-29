@@ -312,7 +312,59 @@ Plano em 5 fases; 0 a 2 entregues. Migrations 209–212.
   cada app.
 - O aviso de campo NÃO entra em `lgpd_pendencias_aceite()` (o gate de
   mesa) — senão todo servidor administrativo veria aviso sobre GPS de
-  brigadista. Superfície própria: RPC `lgpd_aviso_campo()`.
+  brigadista. Superfície própria: RPC `lgpd_aviso_campo(p_app)`.
+- **Documentos dedicados por app** (migrations 222/223): o Aviso de
+  Campo era UM texto genérico, idêntico nos 3 apps, listando as
+  atividades dos três juntas ("viagem, abastecimento, ocorrência...")
+  — um monitor lia sobre abastecimento, que nunca faz. `lgpd_documentos`
+  ganhou coluna `app` (NULL = documento geral; slug — Aviso de Campo por
+  app), reaproveitando o MESMO vocabulário de `lgpd_tratamentos.modulo`
+  (211): `brigadas`|`biomonitor`|`frota`|`pesquisa`. Constraint virou
+  `UNIQUE(tipo, coalesce(app,''))`. App novo no futuro = INSERT de uma
+  linha com o `app` dele — zero migration de schema.
+  `lgpd_aviso_campo(p_app)` recebe o slug; `p_app DEFAULT NULL` +
+  fail-open (RPC devolve vazio, nunca erro) cobre cliente antigo em
+  cache de PWA. ⚠️ Ao mudar a assinatura de `lgpd_aviso_campo()` de
+  zero para um parâmetro, `CREATE OR REPLACE` criou uma função NOVA em
+  vez de substituir (mesmo erro da 178/173 com Frota) — "function ...
+  is not unique" ao chamar sem argumento. Corrigido na 224 com `DROP
+  FUNCTION` explícito antes. Vale para qualquer RPC deste projeto: se a
+  lista de parâmetros muda, `DROP FUNCTION` primeiro, sempre.
+  O `aviso_campo` genérico antigo foi DESATIVADO (`ativo=false`), não
+  apagado — preserva o histórico de aceite de quem já usava os 3 apps;
+  os 3 avisos novos nasceram como documentos novos, do zero (v1.0), não
+  como versão nova do antigo.
+- **Cache do aviso de campo é por app** (`js/lgpd-campo.js`): como os 3
+  apps são páginas na MESMA origem, compartilham `localStorage` — sem
+  isso, abrir dois apps no mesmo aparelho faria um sobrescrever o cache
+  do outro. Cada HTML declara `window.LGPD_CAMPO_APP` ('brigadas'/
+  'biomonitor'/'frota') ANTES de carregar `lgpd-campo.js`; o arquivo lê
+  isso no load (top-level, não dentro de função) para escolher a RPC
+  certa e escopar as chaves de cache.
+- **Achado ao revisar o texto do GPS**: o Aviso de Campo dizia "não há
+  acompanhamento contínuo... a leitura acontece só no instante da
+  ação" para os 3 apps igualmente. Falso para 2 deles — Brigadas
+  (`bGpsIniciar`, js/brigada-captura.js) e Biomonitor (`bioIniciarGPS`,
+  js/biomonitor-quelonios.js) usam `watchPosition` (contínuo) enquanto
+  a tela principal está aberta, para indicador ao vivo na tela e —
+  no Biomonitor — checar proximidade de praia/ninho. Só o Frota
+  (`fmObterGps`) é `getCurrentPosition` pontual, como o texto sempre
+  disse. A ressalva que salva a alegação: o watch é só LOCAL — nunca
+  vira stream pro servidor. O que É gravado é uma localização única no
+  login (`brigadista_iniciar_sessao`/`bio_monitor_iniciar_sessao`) e a
+  localização de cada registro salvo; o "ping" de sessão a cada 5 min
+  (Brigadas, `brigadista_ping_sessao`) é só heartbeat de presença —
+  não carrega coordenada nenhuma. Textos novos (223) descrevem isso com
+  precisão, um por app. RIPD de geolocalização segue com a redação
+  antiga ("nenhum dos apps usa watchPosition") — pendente de correção
+  numa próxima revisão, mesmo mecanismo da migration 220.
+- **Aviso — Pesquisa** (`tipo='aviso_pesquisa'`, migration 223): o
+  portal do pesquisador não tinha nada específico sobre o que de fato
+  coleta (CPF/RG/documentos do projeto, sem GPS/foto) — só Política e
+  Termo genéricos. Gate PRÓPRIO em `portal-pesquisador.html`
+  (`lgpdPesquisaVerificar`), sem a complexidade offline do
+  `lgpd-campo.js` — o portal sempre tem conexão quando carrega, então
+  chama `lgpd_registrar_aceite` direto, sem cache/fila local.
 - **CLIENTE SUPABASE — use sempre `sigucDb()` (js/config.js)**, nunca
   `window.db` direto. `db` é `let`, então NÃO é propriedade de window:
   quando um app faz `db = clientePróprio`, o `window.db` publicado pelo
