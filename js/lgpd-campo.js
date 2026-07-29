@@ -23,9 +23,18 @@
 // frota-offline), cada uma com esquema próprio, e este é um registro
 // único por usuário — não um lote de dados de campo. Uma chave de
 // localStorage resolve nos três sem tocar em nenhuma fila.
+//
+// CADA APP TEM SEU PRÓPRIO AVISO (migration 223) — antes era um texto
+// genérico, o mesmo nos 3 apps, listando atividades que não se
+// aplicavam a quem lia (ex.: monitor lendo sobre abastecimento). Cada
+// HTML declara `window.LGPD_CAMPO_APP` ('brigadas'/'biomonitor'/
+// 'frota') ANTES de carregar este script; é esse valor que escolhe o
+// texto certo na RPC e evita que dois apps abertos no mesmo aparelho
+// (mesmo localStorage, mesma origem) leiam/sobrescrevam o cache um do
+// outro.
 
-const LGPD_CAMPO_DOC    = 'siguc-lgpd-aviso-doc'     // texto cacheado
-const LGPD_CAMPO_ESTADO = 'siguc-lgpd-aviso-estado'  // ciência do usuário
+const LGPD_CAMPO_DOC    = `siguc-lgpd-aviso-doc:${window.LGPD_CAMPO_APP || 'generico'}`
+const LGPD_CAMPO_ESTADO = `siguc-lgpd-aviso-estado:${window.LGPD_CAMPO_APP || 'generico'}`
 
 function _lgpdCampoLer(chave) {
   try { return JSON.parse(localStorage.getItem(chave) || 'null') } catch (e) { return null }
@@ -53,6 +62,13 @@ let _lgpdCampoJaRodou = false
 async function lgpdCampoIniciar() {
   if (_lgpdCampoJaRodou) return
   _lgpdCampoJaRodou = true
+  if (!window.LGPD_CAMPO_APP) {
+    // Cada HTML tem que declarar LGPD_CAMPO_APP antes de carregar este
+    // arquivo — sem isso não dá pra saber qual dos 3 avisos mostrar.
+    // Fail-open: loga e segue sem aviso, nunca bloqueia o app.
+    console.warn('[lgpd-campo] window.LGPD_CAMPO_APP não definido — aviso não será exibido')
+    return
+  }
   try {
     const doc = await _lgpdCampoSincronizar()
     if (!doc) return                       // sem texto (1º uso offline): nada a exibir
@@ -79,7 +95,7 @@ async function _lgpdCampoSincronizar() {
   if (!sb || navigator.onLine === false) return cache
 
   try {
-    const { data, error } = await sb.rpc('lgpd_aviso_campo')
+    const { data, error } = await sb.rpc('lgpd_aviso_campo', { p_app: window.LGPD_CAMPO_APP })
     if (error) throw error
     const doc = Array.isArray(data) ? data[0] : data
     if (!doc) return cache

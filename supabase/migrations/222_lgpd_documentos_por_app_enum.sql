@@ -1,0 +1,26 @@
+-- ═══════════════════════════════════════════════════════════
+-- SIGUC-AC · LGPD — documentos dedicados por app (1/3: enum)
+--
+-- O Aviso de Privacidade dos apps de campo (migration 213) era UM
+-- texto só, mostrado idêntico em Brigadas/Biomonitor/Frota, listando
+-- as três atividades juntas ("viagem, abastecimento, ocorrência...").
+-- Um monitor de quelônios lendo sobre "abastecimento" — que ele nunca
+-- faz — é a estranheza que motivou esta entrega: cada app passa a ter
+-- SEU PRÓPRIO texto, falando só do que aquele app de fato faz.
+--
+-- Isso exige `lgpd_documentos` deixar de ter no máximo UMA linha por
+-- `tipo` (constraint `lgpd_documentos_tipo_key`) — precisa de três
+-- linhas com tipo='aviso_campo', uma por app. Ver migration 223 para
+-- o ALTER TABLE que adiciona a coluna `app` e troca a constraint.
+--
+-- Além disso, o portal do pesquisador ganha um aviso PRÓPRIO,
+-- diferente da família "aviso_campo" (não é app de campo — é portal
+-- de mesa, sem GPS/foto, sobre CPF/RG/documentos do projeto) — daí um
+-- tipo de documento novo, não uma variação do aviso_campo.
+--
+-- Enum isolado numa migration própria, na frente: um valor novo de
+-- ENUM só pode ser usado depois de commitado (erro real, visto ao
+-- aplicar as migrations 217/219 deste mesmo plano de LGPD).
+-- ═══════════════════════════════════════════════════════════
+
+ALTER TYPE lgpd_tipo_documento ADD VALUE IF NOT EXISTS 'aviso_pesquisa';
