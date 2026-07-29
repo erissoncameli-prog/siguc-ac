@@ -141,9 +141,11 @@ async function _lgpdCampoEnviarCiencia(doc, estado) {
 }
 
 // ── Modal ──────────────────────────────────────────────────────
-// Sem botão de fechar: a saída é o "Entendi". Isso não conflita com a
-// regra de não bloquear o trabalho — o botão está sempre disponível e
-// não depende de rede alguma.
+// Sem botão de fechar: a saída é o botão do rodapé. Isso não conflita
+// com a regra de não bloquear o trabalho — o botão está sempre
+// disponível e não depende de rede alguma. No primeiro aceite (não
+// somenteLeitura), exige marcar o checkbox de ciência explícita antes
+// de habilitar o botão — mesmo padrão do gate de mesa (js/lgpd.js).
 function _lgpdCampoMostrar(doc, somenteLeitura) {
   if (document.getElementById('lgpd-campo-ov')) return
   _lgpdCampoCss()
@@ -160,10 +162,21 @@ function _lgpdCampoMostrar(doc, somenteLeitura) {
     <div class="lgpdc-box" role="dialog" aria-modal="true">
       <div class="lgpdc-body"><div class="lgpdc-doc">${corpo}</div></div>
       <div class="lgpdc-foot">
-        <button class="lgpdc-btn" id="lgpdc-ok">${somenteLeitura ? 'Fechar' : 'Entendi'}</button>
+        ${somenteLeitura ? '' : `
+        <label class="lgpdc-check">
+          <input type="checkbox" id="lgpdc-chk">
+          <span>Declaro que li e estou ciente do aviso acima.</span>
+        </label>`}
+        <button class="lgpdc-btn" id="lgpdc-ok" ${somenteLeitura ? '' : 'disabled'}>${somenteLeitura ? 'Fechar' : 'Registrar ciência e continuar'}</button>
       </div>
     </div>`
   document.body.appendChild(ov)
+
+  if (!somenteLeitura) {
+    const chk = ov.querySelector('#lgpdc-chk')
+    const btn = ov.querySelector('#lgpdc-ok')
+    chk.addEventListener('change', () => { btn.disabled = !chk.checked })
+  }
 
   ov.querySelector('#lgpdc-ok').addEventListener('click', () => {
     if (!somenteLeitura) _lgpdCampoRegistrar(doc)
@@ -194,9 +207,13 @@ function _lgpdCampoCss() {
 .lgpdc-body { overflow-y:auto; padding:22px 20px 8px; -webkit-overflow-scrolling:touch }
 .lgpdc-foot { padding:12px 20px calc(16px + env(safe-area-inset-bottom,0px));
   border-top:1px solid #E5E0D5; background:#fff }
+.lgpdc-check { display:flex; gap:9px; align-items:flex-start; font-size:.86rem;
+  color:#1f2937; cursor:pointer; margin-bottom:12px }
+.lgpdc-check input { margin-top:3px; width:17px; height:17px; flex-shrink:0; cursor:pointer }
 .lgpdc-btn { width:100%; padding:14px; border:0; border-radius:12px; font-size:1rem;
   font-weight:700; background:#1F4E2C; color:#fff; cursor:pointer }
 .lgpdc-btn:active { background:#163a20 }
+.lgpdc-btn:disabled { background:#D1D5DB; color:#6b7280; cursor:not-allowed }
 .lgpdc-doc { font-size:.94rem; line-height:1.6; color:#1f2937 }
 .lgpdc-doc h1 { font-size:1.2rem; margin:0 0 12px; color:#0A1A0F }
 .lgpdc-doc h2 { font-size:1rem; margin:20px 0 7px; color:#1F4E2C }
