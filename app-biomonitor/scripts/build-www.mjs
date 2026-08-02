@@ -35,7 +35,7 @@ mkdirSync(join(WWW, 'js'),           { recursive: true })
 mkdirSync(join(WWW, 'vendor/fonts'), { recursive: true })
 
 // ── JS compartilhado (transpilado para ES2017) ────────────────
-for (const f of ['config.js', 'biomonitor-offline.js', 'biomonitor-sync.js', 'biomonitor-alertas.js', 'brigada-captura.js', 'biomonitor-timeline.js', 'biomonitor-pdf-fonts.js', 'biomonitor-relatorio-ninho.js', 'biomonitor-relatorio-campo.js', 'biomonitor-quelonios.js']) {
+for (const f of ['config.js', 'fotos-privadas.js', 'lgpd.js', 'lgpd-campo.js', 'qrcode-generator.js', 'biomonitor-offline.js', 'biomonitor-sync.js', 'biomonitor-alertas.js', 'brigada-captura.js', 'biomonitor-timeline.js', 'biomonitor-pdf-fonts.js', 'biomonitor-relatorio-ninho.js', 'biomonitor-relatorio-campo.js', 'biomonitor-quelonios.js']) {
   copiarJsTranspilado(join(RAIZ, 'js', f), join(WWW, 'js', f))
 }
 
@@ -129,10 +129,21 @@ html = html.replace('</head>', `<script>window.__SIGUC_ENV=${envJson}</script>\n
 writeFileSync(join(WWW, 'index.html'), html)
 
 // ── Sanidade ───────────────────────────────────────────────────
-for (const f of ['index.html', 'vendor/supabase.js', 'vendor/fonts.css', 'css/biomonitor.css', 'js/config.js', 'js/biomonitor-timeline.js', 'js/biomonitor-pdf-fonts.js', 'js/biomonitor-relatorio-ninho.js', 'js/biomonitor-relatorio-campo.js', 'js/biomonitor-quelonios.js', 'pwa/icons/biomonitor-logo.png']) {
+for (const f of ['index.html', 'vendor/supabase.js', 'vendor/fonts.css', 'css/biomonitor.css', 'js/config.js', 'js/fotos-privadas.js', 'js/lgpd.js', 'js/lgpd-campo.js', 'js/qrcode-generator.js', 'js/biomonitor-timeline.js', 'js/biomonitor-pdf-fonts.js', 'js/biomonitor-relatorio-ninho.js', 'js/biomonitor-relatorio-campo.js', 'js/biomonitor-quelonios.js', 'pwa/icons/biomonitor-logo.png']) {
   if (!existsSync(join(WWW, f))) { console.error(`ERRO: faltando www/${f}`); process.exit(1) }
 }
 const indexFinal = readFileSync(join(WWW, 'index.html'), 'utf8')
+// Todo <script src="/js/…"> referenciado precisa ter sido embarcado — senão
+// vira 404 silencioso na WebView e a funcionalidade morre em campo (mesma
+// trava do app/scripts/build-www.mjs do Brigadas — foi exatamente a falta
+// dela aqui que deixou fotos-privadas.js/lgpd.js/lgpd-campo.js/
+// qrcode-generator.js de fora por várias entregas sem o build quebrar).
+for (const m of indexFinal.matchAll(/<script src="\/js\/([^"]+)"/g)) {
+  if (!existsSync(join(WWW, 'js', m[1]))) {
+    console.error(`ERRO: index.html referencia /js/${m[1]}, mas o arquivo não foi embarcado (adicione à lista de cópia)`)
+    process.exit(1)
+  }
+}
 if (/cdn\.jsdelivr|fonts\.googleapis/.test(indexFinal)) {
   console.error('ERRO: index.html ainda referencia CDN externo')
   process.exit(1)
@@ -145,7 +156,7 @@ if (!/window\.__SIGUC_ENV=\{.*supabaseUrl.*supabaseKey/.test(indexFinal)) {
 // quebravam o supabase.js em WebViews < 85. São sinais confiáveis (não
 // aparecem em strings do app), então servem de trava contra regressão do
 // alvo de transpilação. O esbuild também baixa ?. e ?? (ES2020) no mesmo passo.
-for (const f of ['vendor/supabase.js', 'js/config.js', 'js/biomonitor-quelonios.js', 'js/biomonitor-sync.js', 'js/biomonitor-offline.js', 'js/biomonitor-alertas.js', 'js/brigada-captura.js', 'js/biomonitor-timeline.js', 'js/biomonitor-pdf-fonts.js', 'js/biomonitor-relatorio-ninho.js', 'js/biomonitor-relatorio-campo.js']) {
+for (const f of ['vendor/supabase.js', 'js/config.js', 'js/fotos-privadas.js', 'js/lgpd.js', 'js/lgpd-campo.js', 'js/qrcode-generator.js', 'js/biomonitor-quelonios.js', 'js/biomonitor-sync.js', 'js/biomonitor-offline.js', 'js/biomonitor-alertas.js', 'js/brigada-captura.js', 'js/biomonitor-timeline.js', 'js/biomonitor-pdf-fonts.js', 'js/biomonitor-relatorio-ninho.js', 'js/biomonitor-relatorio-campo.js']) {
   const js = readFileSync(join(WWW, f), 'utf8')
   const proibidos = js.match(/\|\|=|&&=|\?\?=/g)
   if (proibidos) {
