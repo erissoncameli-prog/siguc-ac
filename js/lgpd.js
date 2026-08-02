@@ -411,7 +411,12 @@ async function lgpdMontarMeusDados(root) {
 
   let dados
   try {
-    const { data, error } = await db.rpc('lgpd_meus_dados')
+    // sigucDb(), nunca `db` direto — esta função é chamada pelos 3 apps
+    // de campo (ver comentário de lgpdAbrirMeusDados) e o Biomonitor
+    // nunca reatribui `db`, só `window._bioDB_client`; usar `db` aqui
+    // chamava a RPC pelo cliente de mesa sem sessão, sempre falhando
+    // no app nativo do Biomonitor (fail-open só escondia o erro).
+    const { data, error } = await sigucDb().rpc('lgpd_meus_dados')
     if (error) throw error
     dados = data
   } catch (e) {
@@ -437,7 +442,7 @@ async function lgpdMontarMeusDados(root) {
       // usuario_id tem DEFAULT auth.uid() (migration 215) — não
       // precisa ser informado, e a policy de INSERT rejeitaria um
       // valor diferente do da própria sessão de qualquer forma.
-      const { error } = await db.from('lgpd_solicitacoes_titular').insert({ tipo, descricao })
+      const { error } = await sigucDb().from('lgpd_solicitacoes_titular').insert({ tipo, descricao })
       if (error) throw error
       if (typeof toast === 'function') toast('Solicitação enviada', 'sucesso')
       await lgpdMontarMeusDados(alvo) // re-renderiza com a nova solicitação na lista
