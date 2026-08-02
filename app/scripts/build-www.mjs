@@ -19,7 +19,7 @@ mkdirSync(join(WWW, 'js'),           { recursive: true })
 mkdirSync(join(WWW, 'vendor/fonts'), { recursive: true })
 
 // ── JS compartilhado (idêntico ao site) ───────────────────────
-for (const f of ['config.js', 'brigada-offline.js', 'brigada-sync.js', 'brigada-captura.js', 'brigada-fauna.js', 'brigada-participantes.js']) {
+for (const f of ['config.js', 'fotos-privadas.js', 'lgpd.js', 'lgpd-campo.js', 'qrcode-generator.js', 'brigada-offline.js', 'brigada-sync.js', 'brigada-captura.js', 'brigada-area.js', 'brigada-fauna.js', 'brigada-participantes.js']) {
   cpSync(join(RAIZ, 'js', f), join(WWW, 'js', f))
 }
 
@@ -93,7 +93,18 @@ writeFileSync(join(WWW, 'index.html'), html)
 for (const f of ['index.html', 'vendor/supabase.js', 'vendor/fonts.css', 'css/brigada.css', 'js/config.js']) {
   if (!existsSync(join(WWW, f))) { console.error(`ERRO: faltando www/${f}`); process.exit(1) }
 }
-if (/cdn\.jsdelivr|fonts\.googleapis/.test(readFileSync(join(WWW, 'index.html'), 'utf8'))) {
+const idxFinal = readFileSync(join(WWW, 'index.html'), 'utf8')
+// Todo <script src="/js/…"> referenciado precisa ter sido embarcado — senão
+// vira 404 silencioso na WebView e a funcionalidade morre em campo (ex.: o
+// "Medir área" quando brigada-area.js ficou de fora da lista de cópia, ou a
+// tela toda em branco quando lgpd.js/lgpd-campo.js ficaram de fora).
+for (const m of idxFinal.matchAll(/<script src="\/js\/([^"]+)"/g)) {
+  if (!existsSync(join(WWW, 'js', m[1]))) {
+    console.error(`ERRO: index.html referencia /js/${m[1]}, mas o arquivo não foi embarcado (adicione à lista de cópia)`)
+    process.exit(1)
+  }
+}
+if (/cdn\.jsdelivr|fonts\.googleapis/.test(idxFinal)) {
   console.error('ERRO: index.html ainda referencia CDN externo')
   process.exit(1)
 }
