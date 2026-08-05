@@ -165,6 +165,40 @@ Frota — abastecimento (174–175):
   recente (não do original), e testar os dois ramos de qualquer CASE
   antes de aplicar em produção.
 
+Endurecimento fora do Frota (226–229) — ver
+docs/seguranca-advisor-2026-08.md. Fecha a pendência que a Fase 1 do
+Frota tinha registrado como "mesma classe de defeito, módulos
+diferentes". Advisor: 332 → 153 achados.
+- 226_seg_views_security_invoker.sql: cargos_atuais, brigadas_resumo,
+  vw_registros_validacao e minhas_permissoes eram SECURITY DEFINER, ou
+  seja, ignoravam a RLS — e como toda view em public é exposta pelo
+  PostgREST, ANON lia tudo (2 registros de campo com nome/GPS de
+  brigadista, 5 brigadas, 56 brigadistas, nome e e-mail de titulares de
+  cargo). Regressão testada com JWT real antes de aplicar: nenhuma —
+  chefe_brigada e visualizador veem menos, mas os dois já são
+  `sem_acesso` nos módulos que leem essas views.
+- 227/228_seg_fecha_superficie_anon + fix_revoke_public: 113 RPCs
+  SECURITY DEFINER deixam de ser executáveis sem login (inclusive de
+  AÇÃO: zerar_registros_campo, os 10 despachar_*, marcar_inadimplencia,
+  gestor_vincular_brigada…). Sobram 8, todas de fluxo público real
+  (login, cadastro de pesquisador, acompanhamento por token, validação
+  de AAP por QR, e 2 agregados usados pelos proxies em api/). Funções
+  de trigger perdem EXECUTE também de authenticated. A 227 também
+  removeu a policy `focos_import_tmp` — INSERT anônimo com
+  WITH CHECK (true) em focos_calor_ac, sobra de importação manual, que
+  o advisor NÃO acusa. ⚠️ A 227 nasceu errada (revogou de anon em vez
+  de PUBLIC) e não teve efeito nenhum; a 228 corrigiu. Ver a regra em
+  "Regras de desenvolvimento".
+- 229_seg_search_path_funcoes.sql: search_path fixo em `public,
+  pg_temp` nas 46 funções que ainda o tinham mutável (só ALTER
+  FUNCTION, nenhum corpo recriado).
+- Continuam abertos, com motivo registrado no doc: spatial_ref_sys
+  (anon consegue DELETE do srid 4326 — não corrigível daqui, postgres
+  não é dono nem superusuário; exige chamado no suporte do Supabase) e
+  o bucket pesquisa-documentos legível por anon (exige mover a
+  assinatura de URL para RPC com validação de token, mudança no portal
+  público do pesquisador).
+
 ## Relatórios de consumo de combustível
 Cálculo em UM lugar só: `js/frota-consumo.js`
 (`frotaConsumoVeiculo` / `frotaConsumoAgregado` / `frotaConsumoTexto`).
@@ -613,6 +647,28 @@ E) Dashboard Executivo por nível (UC / Diretoria / Secretaria)
   rodar no banco. Depois de aplicar, checar mcp__Supabase__get_advisors
   (type security) por avisos novos introduzidos pela migration. Regra
   permanente, sem precisar ser pedida de novo.
+- REVOKE EM FUNÇÃO É SEMPRE `FROM PUBLIC`, nunca só `FROM anon`. O
+  Postgres concede EXECUTE a `PUBLIC` por padrão em toda função nova;
+  revogar só do papel nominal deixa o grant de PUBLIC de pé, o comando
+  roda sem erro e NADA muda (`has_function_privilege('anon', …)` segue
+  true). Foi o que aconteceu com a 227, corrigida pela 228. E como
+  PUBLIC também é o que dá acesso a `authenticated` em parte das
+  funções, revogar sem `GRANT ... TO authenticated, service_role` no
+  mesmo passo derruba o sistema junto. ACL correta, igual à que as
+  196/197 deixaram no Frota: `{postgres=X, authenticated=X,
+  service_role=X}` — sem o `=X` de PUBLIC.
+- TODA MIGRATION DE PERMISSÃO TERMINA COM ASSERÇÃO. Um bloco `DO` final
+  que consulte o catálogo e dê `RAISE EXCEPTION` se a intenção não se
+  realizou (ninguém indevido com acesso, ninguém legítimo sem). REVOKE,
+  GRANT e `ALTER ... SET` falham em silêncio — foi assim que a 227
+  passou como sucesso sem ter feito nada. Vale a mesma lição da 178 e
+  da 224: o banco aceitar o comando não prova que o efeito ocorreu.
+- VIEW NOVA EM `public` NASCE COM `security_invoker = on`. Sem isso ela
+  roda com os privilégios do dono e IGNORA a RLS das tabelas de base —
+  e como toda view em `public` é exposta pelo PostgREST, qualquer
+  pessoa com a anon key lê tudo sem login. Corrigido nas 4 views
+  restantes pela 226 (o Frota já tinha sido pela 165). Ver
+  docs/seguranca-advisor-2026-08.md.
 - Commits em português, pequenos e descritivos
 - NUNCA expor SERVICE_ROLE_KEY no frontend
 - ÍCONES: nunca usar emoji em UI (botões, chips, navegação, marcadores
