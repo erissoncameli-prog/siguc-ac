@@ -409,14 +409,34 @@ async function lgpdMontarMeusDados(root) {
   if (!alvo) return
   alvo.innerHTML = '<div class="lgpd-md-carregando">Carregando seus dados…</div>'
 
+  // sigucDb(), nunca `db` direto — esta função é chamada pelos 3 apps de
+  // campo (ver comentário de lgpdAbrirMeusDados) e o Biomonitor nunca
+  // reatribui `db`, só `window._bioDB_client`; usar `db` aqui chamava a
+  // RPC pelo cliente de mesa sem sessão, sempre falhando no app nativo
+  // do Biomonitor.
+  const sb = sigucDb()
+
   let dados
   try {
-    // sigucDb(), nunca `db` direto — esta função é chamada pelos 3 apps
-    // de campo (ver comentário de lgpdAbrirMeusDados) e o Biomonitor
-    // nunca reatribui `db`, só `window._bioDB_client`; usar `db` aqui
-    // chamava a RPC pelo cliente de mesa sem sessão, sempre falhando
-    // no app nativo do Biomonitor (fail-open só escondia o erro).
-    const { data, error } = await sigucDb().rpc('lgpd_meus_dados')
+    // "Meus dados" exige sessão viva (não é dado cacheável offline). Nos
+    // 3 apps de campo o desbloqueio do dia a dia é por PIN local — não
+    // passa pelo Supabase Auth de novo — então se o token da última
+    // sessão expirou nesse meio tempo, getSession() pode devolver null
+    // sem tentar renovar. Força um refreshSession() antes de desistir, e
+    // só então mostra uma mensagem específica (em vez do genérico "tente
+    // mais tarde", que sugere problema no servidor quando na verdade é
+    // falta de sessão).
+    let { data: { session } } = await sb.auth.getSession()
+    if (!session) {
+      const { data: renovada } = await sb.auth.refreshSession().catch(() => ({ data: null }))
+      session = renovada?.session || null
+    }
+    if (!session) {
+      alvo.innerHTML = '<div class="lgpd-md-erro">Sua sessão expirou. Use "Sair / Trocar conta" e entre de novo (e-mail e senha) para consultar seus dados.</div>'
+      return
+    }
+
+    const { data, error } = await sb.rpc('lgpd_meus_dados')
     if (error) throw error
     dados = data
   } catch (e) {
@@ -442,7 +462,7 @@ async function lgpdMontarMeusDados(root) {
       // usuario_id tem DEFAULT auth.uid() (migration 215) — não
       // precisa ser informado, e a policy de INSERT rejeitaria um
       // valor diferente do da própria sessão de qualquer forma.
-      const { error } = await sigucDb().from('lgpd_solicitacoes_titular').insert({ tipo, descricao })
+      const { error } = await sb.from('lgpd_solicitacoes_titular').insert({ tipo, descricao })
       if (error) throw error
       if (typeof toast === 'function') toast('Solicitação enviada', 'sucesso')
       await lgpdMontarMeusDados(alvo) // re-renderiza com a nova solicitação na lista
