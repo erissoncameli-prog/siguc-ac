@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>SIGUC-AC · Biomonitor — Equipamentos</title>
+<link rel="stylesheet" href="../css/global.css">
+<link rel="stylesheet" href="../css/biomonitor.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../js/observability.js"></script>
+<script src="../js/queryLogger.js"></script>
+<script src="../js/config.js"></script>
+<script src="../js/layout.js"></script>
+<script src="../js/fotos-privadas.js"></script>
+<script>
+// Rede de segurança para js/fotos-privadas.js — ver mesmo comentário em
+// frota-inspecoes.html. Degradar para "sem foto" é melhor que quebrar a lista.
+window.fotoAttr = window.fotoAttr || function () { return '' }
+window.assinarFotos = window.assinarFotos || function () {}
+</script>
+</head>
+<body>
+<div id="app"></div>
+
+<!-- Modal: cadastro/edição de equipamento -->
+<div class="modal-overlay" id="modal-equip">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-header">
+      <div class="modal-title" id="eq-titulo">Novo equipamento</div>
+      <button class="modal-close" onclick="fecharModal('equip')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label">Descrição do bem <span class="obrig">*</span></label>
+        <input class="form-control" id="eq-descricao" placeholder="Ex.: GPS Garmin eTrex 22x"></div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Plaqueta de patrimônio</label>
+          <input class="form-control" id="eq-plaqueta" placeholder="Nº da plaqueta física (se houver)"></div>
+        <div class="form-group"><label class="form-label">Código interno</label>
+          <input class="form-control" id="eq-codigo" disabled placeholder="Gerado automaticamente"></div>
+      </div>
+      <div class="form-group"><label class="form-label">Foto</label>
+        <input class="form-control" type="file" accept="image/*" id="eq-foto-input" onchange="prevFotoEquip(event)">
+        <img id="eq-foto-preview" style="display:none;max-width:160px;border-radius:8px;margin-top:8px">
+      </div>
+      <div class="form-group"><label class="form-label">Status</label>
+        <select class="form-control" id="eq-status">
+          <option value="disponivel">Disponível</option>
+          <option value="manutencao">Em manutenção</option>
+          <option value="baixado">Baixado</option>
+        </select></div>
+      <div class="form-group"><label class="form-label">Observações</label>
+        <textarea class="form-control" id="eq-observacoes" rows="2"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="fecharModal('equip')">Cancelar</button>
+      <button class="btn btn-primary" id="btn-salvar-equip" onclick="salvarEquipamento()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: devolver equipamento(s) de uma cautela -->
+<div class="modal-overlay" id="modal-devolucao">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-header">
+      <div class="modal-title">Devolver equipamento(s)</div>
+      <button class="modal-close" onclick="fecharModal('devolucao')">×</button>
+    </div>
+    <div class="modal-body">
+      <div id="dev-itens" style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px"></div>
+      <div class="form-group"><label class="form-label">Observação</label>
+        <textarea class="form-control" id="dev-observacao" rows="2" placeholder="Estado de conservação, avaria, etc. (opcional)"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="fecharModal('devolucao')">Cancelar</button>
+      <button class="btn btn-primary" id="btn-confirmar-devolucao" onclick="confirmarDevolucao()">Confirmar devolução</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let _equipamentos = [], _cautelas = [], _editEquipId = null, _fotoEquipFile = null
+let _devCautelaId = null
+
+;(async function () {
+  const usuario = await carregarUsuario()
+  if (!usuario) { window.location.href = '../index.html'; return }
+  if (!['super_admin','gestor','tecnico'].includes(usuario.perfil)) {
+    window.location.href = '../pages/dashboard.html'; return
+  }
+
+  document.getElementById('app').innerHTML =
+    gerarLayout('Biomonitor — Equipamentos', 'biomonitor-equipamentos') + htmlPagina()
+
+  await Promise.all([carregarEquipamentos(), carregarCautelas()])
+  bIconsAplicar()
+})()
+
+function htmlPagina() {
+  return `<div class="fade-in">
+    <div class="kpi-grid">
+      <div class="card" style="padding:14px"><div style="font-size:12px;color:#6B7280">Total de equipamentos</div><div style="font-size:22px;font-weight:700" id="k-total">0</div></div>
+      <div class="card" style="padding:14px"><div style="font-size:12px;color:#6B7280">Disponíveis</div><div style="font-size:22px;font-weight:700" id="k-disp">0</div></div>
+      <div class="card" style="padding:14px"><div style="font-size:12px;color:#6B7280">Em cautela</div><div style="font-size:22px;font-weight:700" id="k-cautela">0</div></div>
+      <div class="card" style="padding:14px"><div style="font-size:12px;color:#6B7280">Manutenção/baixado</div><div style="font-size:22px;font-weight:700" id="k-outros">0</div></div>
+    </div>
+
+    <div class="card" style="margin-bottom:16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:6px">
+        <div>
+          <div style="font-weight:700;font-size:14px">Catálogo de equipamentos</div>
+          <div style="font-size:12px;color:#6B7280">Cadastro na mesa. A cautela (entrega ao monitor) é assinada no app de campo.</div>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="abrirModalEquip()">${bico('plus')} Novo equipamento</button>
+      </div>
+      <div class="table-wrap"><table class="table">
+        <thead><tr>
+          <th style="width:56px">Foto</th><th>Descrição</th><th>Código</th><th>Plaqueta</th>
+          <th style="width:110px">Status</th><th>Com monitor</th><th style="width:80px"></th>
+        </tr></thead>
+        <tbody id="tbody-equip"><tr><td colspan="7" style="text-align:center;padding:32px;color:#9CA3AF">Carregando...</td></tr></tbody>
+      </table></div>
+    </div>
+
+    <div class="card">
+      <div style="font-weight:700;font-size:14px;margin-bottom:6px">Cautelas — relatório de patrimônio</div>
+      <div class="table-wrap"><table class="table">
+        <thead><tr>
+          <th>Assinado em</th><th>Monitor</th><th>Termo</th><th>Itens</th><th style="width:110px">Status</th><th style="width:100px"></th>
+        </tr></thead>
+        <tbody id="tbody-cautelas"><tr><td colspan="6" style="text-align:center;padding:32px;color:#9CA3AF">Carregando...</td></tr></tbody>
+      </table></div>
+    </div>
+  </div>`
+}
+
+function formatDataHora(str) {
+  if (!str) return '—'
+  return new Date(str).toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', year:'2-digit', hour:'2-digit', minute:'2-digit' })
+}
+
+const STATUS_EQUIP_LABEL = { disponivel: 'Disponível', em_cautela: 'Em cautela', manutencao: 'Manutenção', baixado: 'Baixado' }
+const STATUS_EQUIP_BADGE = { disponivel: 'badge-verde', em_cautela: 'badge-ouro', manutencao: 'badge-cinza', baixado: 'badge-red' }
+
+// ── Catálogo ───────────────────────────────────────────────────
+async function carregarEquipamentos() {
+  const { data } = await db.from('vw_biomonitor_equipamentos_status').select('*').order('descricao')
+  _equipamentos = data || []
+  renderEquipamentos()
+}
+
+function renderEquipamentos() {
+  const tbody = document.getElementById('tbody-equip')
+  if (!tbody) return
+  document.getElementById('k-total').textContent = _equipamentos.length
+  document.getElementById('k-disp').textContent = _equipamentos.filter(e => e.status === 'disponivel').length
+  document.getElementById('k-cautela').textContent = _equipamentos.filter(e => e.status === 'em_cautela').length
+  document.getElementById('k-outros').textContent = _equipamentos.filter(e => e.status === 'manutencao' || e.status === 'baixado').length
+
+  if (!_equipamentos.length) {
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:32px;color:#9CA3AF">Nenhum equipamento cadastrado</td></tr>`
+    return
+  }
+  tbody.innerHTML = _equipamentos.map(e => `<tr>
+    <td>${e.foto_url ? `<img ${fotoAttr(e.foto_url)} style="width:36px;height:36px;object-fit:cover;border-radius:6px;display:block">` : '—'}</td>
+    <td><strong>${esc(e.descricao)}</strong>${e.observacoes ? `<br><span style="font-size:11px;color:#9CA3AF">${esc(e.observacoes)}</span>` : ''}</td>
+    <td class="mono">${esc(e.codigo || '—')}</td>
+    <td>${esc(e.plaqueta || '—')}</td>
+    <td><span class="badge ${STATUS_EQUIP_BADGE[e.status] || 'badge-cinza'}">${STATUS_EQUIP_LABEL[e.status] || e.status}</span></td>
+    <td style="font-size:12px">${esc(e.com_monitor || '—')}</td>
+    <td><button class="btn btn-xs btn-ghost" onclick="abrirModalEquip('${e.id}')">Editar</button></td>
+  </tr>`).join('')
+  assinarFotos(tbody)
+}
+
+function abrirModalEquip(id) {
+  _editEquipId = id || null
+  _fotoEquipFile = null
+  const e = id ? _equipamentos.find(x => x.id === id) : null
+  document.getElementById('eq-titulo').textContent = e ? 'Editar equipamento' : 'Novo equipamento'
+  document.getElementById('eq-descricao').value = e?.descricao || ''
+  document.getElementById('eq-plaqueta').value = e?.plaqueta || ''
+  document.getElementById('eq-codigo').value = e?.codigo || ''
+  document.getElementById('eq-status').value = (e && e.status !== 'em_cautela') ? e.status : 'disponivel'
+  document.getElementById('eq-status').disabled = e?.status === 'em_cautela'
+  document.getElementById('eq-observacoes').value = e?.observacoes || ''
+  const prev = document.getElementById('eq-foto-preview')
+  if (e?.foto_url) { prev.src = e.foto_url; prev.style.display = 'block' } else { prev.style.display = 'none' }
+  document.getElementById('eq-foto-input').value = ''
+  document.getElementById('modal-equip').classList.add('aberto')
+}
+
+function prevFotoEquip(ev) {
+  const file = ev.target.files[0]
+  if (!file) return
+  _fotoEquipFile = file
+  const prev = document.getElementById('eq-foto-preview')
+  prev.src = URL.createObjectURL(file)
+  prev.style.display = 'block'
+}
+
+async function salvarEquipamento() {
+  const descricao = document.getElementById('eq-descricao').value.trim()
+  if (!descricao) { toast('Informe a descrição do bem', 'error'); return }
+  const btn = document.getElementById('btn-salvar-equip')
+  btn.disabled = true; btn.textContent = 'Salvando...'
+  try {
+    let foto_url
+    if (_fotoEquipFile) {
+      const ext = (_fotoEquipFile.name.split('.').pop() || 'jpg').toLowerCase()
+      const path = `equipamentos/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`
+      const { error: upErr } = await db.storage.from('biomonitor-fotos').upload(path, _fotoEquipFile)
+      if (upErr) throw upErr
+      foto_url = db.storage.from('biomonitor-fotos').getPublicUrl(path).data.publicUrl
+    }
+    const payload = {
+      descricao,
+      plaqueta: document.getElementById('eq-plaqueta').value.trim() || null,
+      status: document.getElementById('eq-status').value,
+      observacoes: document.getElementById('eq-observacoes').value.trim() || null,
+      ...(foto_url ? { foto_url } : {}),
+    }
+    const { error } = _editEquipId
+      ? await db.from('biomonitor_equipamentos').update(payload).eq('id', _editEquipId)
+      : await db.from('biomonitor_equipamentos').insert(payload)
+    if (error) throw error
+    toast('Equipamento salvo', 'success')
+    fecharModal('equip')
+    await carregarEquipamentos()
+  } catch (e) { toast(e.message || 'Erro ao salvar', 'error') }
+  finally { btn.disabled = false; btn.textContent = 'Salvar' }
+}
+
+// ── Cautelas / devolução ─────────────────────────────────────────
+async function carregarCautelas() {
+  const { data } = await db.from('vw_biomonitor_cautelas_detalhe').select('*')
+    .order('assinado_em', { ascending: false }).limit(200)
+  _cautelas = data || []
+  renderCautelas()
+}
+
+function renderCautelas() {
+  const tbody = document.getElementById('tbody-cautelas')
+  if (!tbody) return
+  if (!_cautelas.length) {
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:32px;color:#9CA3AF">Nenhuma cautela registrada</td></tr>`
+    return
+  }
+  const STATUS_LABEL = { aberta: 'Aberta', parcial: 'Devolução parcial', devolvida: 'Devolvida' }
+  const STATUS_BADGE = { aberta: 'badge-ouro', parcial: 'badge-ouro', devolvida: 'badge-verde' }
+  tbody.innerHTML = _cautelas.map(c => `<tr>
+    <td style="font-size:12px">${formatDataHora(c.assinado_em)}</td>
+    <td style="font-size:12px">${esc(c.monitor_nome || '—')}</td>
+    <td class="mono" style="font-size:12px">v${esc(c.termo_versao)}</td>
+    <td style="font-size:12px">${(c.itens || []).map(i => esc(i.descricao) + (i.devolvido_em ? ' <span style="color:#9CA3AF">(devolvido)</span>' : '')).join(', ')}</td>
+    <td><span class="badge ${STATUS_BADGE[c.status] || 'badge-cinza'}">${STATUS_LABEL[c.status] || c.status}</span></td>
+    <td>${c.status !== 'devolvida' ? `<button class="btn btn-xs btn-ghost" onclick="abrirDevolucao('${c.id}')">Devolver</button>` : ''}</td>
+  </tr>`).join('')
+}
+
+function abrirDevolucao(cautelaId) {
+  const c = _cautelas.find(x => x.id === cautelaId)
+  if (!c) return
+  _devCautelaId = cautelaId
+  const pendentes = (c.itens || []).filter(i => !i.devolvido_em)
+  document.getElementById('dev-itens').innerHTML = pendentes.map(i => `
+    <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+      <input type="checkbox" class="dev-item-chk" value="${i.equipamento_id}" style="width:auto" checked>
+      ${esc(i.descricao)}${i.codigo ? ` <span class="mono" style="color:#9CA3AF">(${esc(i.codigo)})</span>` : ''}
+    </label>`).join('')
+  document.getElementById('dev-observacao').value = ''
+  document.getElementById('modal-devolucao').classList.add('aberto')
+}
+
+async function confirmarDevolucao() {
+  const ids = Array.from(document.querySelectorAll('.dev-item-chk:checked')).map(c => c.value)
+  if (!ids.length) { toast('Selecione ao menos um equipamento', 'error'); return }
+  const btn = document.getElementById('btn-confirmar-devolucao')
+  btn.disabled = true; btn.textContent = 'Confirmando...'
+  try {
+    const { error } = await db.rpc('biomonitor_devolver_equipamentos', {
+      p_cautela_id: _devCautelaId,
+      p_equipamento_ids: ids,
+      p_observacao: document.getElementById('dev-observacao').value.trim() || null,
+    })
+    if (error) throw error
+    toast('Devolução registrada', 'success')
+    fecharModal('devolucao')
+    await Promise.all([carregarEquipamentos(), carregarCautelas()])
+  } catch (e) { toast(e.message || 'Erro ao devolver', 'error') }
+  finally { btn.disabled = false; btn.textContent = 'Confirmar devolução' }
+}
+
+function fecharModal(qual) {
+  document.getElementById(`modal-${qual}`).classList.remove('aberto')
+  if (qual === 'equip') { _editEquipId = null; _fotoEquipFile = null }
+  if (qual === 'devolucao') _devCautelaId = null
+}
+</script>
+</body>
+</html>
