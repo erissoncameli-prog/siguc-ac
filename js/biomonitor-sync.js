@@ -637,12 +637,16 @@ async function bioSyncCautelas(monitorId, onProgresso) {
 }
 
 // ── Cache de equipamentos disponíveis para cautela ─────────────
-async function bioSyncCacheEquipamentos() {
-  if (!navigator.onLine) return
+// Filtra pelo grupo do monitor: a RPC de cautela (migration 228) só
+// aceita equipamento do mesmo grupo, então mostrar os de outros
+// grupos no app só confundiria o monitor.
+async function bioSyncCacheEquipamentos(grupoId) {
+  if (!navigator.onLine || !grupoId) return
   const { data, error } = await bioSupabase()
     .from('biomonitor_equipamentos')
-    .select('id,codigo,plaqueta,descricao,foto_url,status')
+    .select('id,codigo,plaqueta,descricao,categoria,foto_url,status')
     .eq('status', 'disponivel')
+    .eq('grupo_id', grupoId)
   if (error || !data) return
   await bioOfflineSalvarEquipamentos(data)
 }
@@ -670,10 +674,10 @@ async function bioSyncTudo({ monitorId, onProgresso, onConcluido, onErro } = {})
     const oc = await cat(bioSyncOcorrencias)
     const bi = await cat(bioSyncBiometriasInd)
     const ct = await cat(bioSyncCautelas)
-    bioSyncCacheEquipamentos().catch(() => {})
     // Pull: traz de volta mudanças do servidor (ex.: validação/correção
     // feita pelo gestor) para o IndexedDB.
     const grupoId = (typeof BioApp !== 'undefined' && BioApp.monitor?.grupo_id) || null
+    bioSyncCacheEquipamentos(grupoId).catch(() => {})
     if (grupoId) {
       try { await bioSyncPullNinhos(grupoId) } catch (_) {}
       // Berçário é compartilhado pela equipe — traz lotes/filhotes/biometrias

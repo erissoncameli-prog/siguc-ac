@@ -661,7 +661,7 @@ E) Dashboard Executivo por nível (UC / Diretoria / Secretaria)
   de mesa, ou o catálogo virar editável no app, aplicar a regra dos
   pares acima.
 
-## Biomonitor — Equipamentos em cautela (migrations 226/227)
+## Biomonitor — Equipamentos em cautela (migrations 226/227/228)
 Cadastro do bem é SEMPRE na mesa (`biomonitor-equipamentos.html`,
 perfil tecnico/gestor/super_admin): descrição, plaqueta física
 (texto livre, opcional) + código interno gerado por trigger
@@ -687,6 +687,22 @@ recebimento físico do bem). Relatório de patrimônio (quem está com
 o quê, histórico) é a própria `biomonitor-equipamentos.html`, view
 `vw_biomonitor_cautelas_detalhe`. `pwa/sw.js`: biomonitor v22 → v23
 (novo `js/biomonitor-equipamentos.js` no shell).
+
+Cadastro do bem (228): campos fixos comuns (`categoria` enum, `marca`,
+`modelo`, `numero_serie`, `data_aquisicao`, `fornecedor`) + `grupo_id`
+(FK `grupos_biomonitor` — bem pertence a um grupo de monitoramento,
+não a um pool geral da SEMA, decisão de produto) + `especificacoes
+jsonb` para os campos que só fazem sentido por categoria (ex.: IMEI
+de GPS, motor de embarcação — catálogo `ESPEC_CAMPOS` em
+`biomonitor-equipamentos.html`, evita tabela nova a cada tipo de
+equipamento). Valor de aquisição/nota fiscal ficaram de fora por
+decisão de produto (fora do escopo, não é dado financeiro que o
+cadastro pretende rastrear). Efeito colateral: `biomonitor_registrar_
+cautela` passa a validar que o equipamento é do MESMO grupo do
+monitor (mesmo espírito da trava de veículo do Frota, migration 180)
+— o cache de equipamentos do app (`bioSyncCacheEquipamentos`) já
+filtra por `grupo_id` do monitor pra não mostrar o que ele não pode
+pegar. `pwa/sw.js`: biomonitor v23 → v24.
 
 ## Variáveis de ambiente
 SUPABASE_URL=https://atqtybcsvepdabsvgaly.supabase.co

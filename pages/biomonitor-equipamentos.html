@@ -32,11 +32,32 @@ window.assinarFotos = window.assinarFotos || function () {}
       <div class="form-group"><label class="form-label">Descrição do bem <span class="obrig">*</span></label>
         <input class="form-control" id="eq-descricao" placeholder="Ex.: GPS Garmin eTrex 22x"></div>
       <div class="grid-2">
+        <div class="form-group"><label class="form-label">Categoria <span class="obrig">*</span></label>
+          <select class="form-control" id="eq-categoria" onchange="renderEspecificacoesForm()"></select></div>
+        <div class="form-group"><label class="form-label">Grupo de monitoramento <span class="obrig">*</span></label>
+          <select class="form-control" id="eq-grupo"></select></div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Marca</label>
+          <input class="form-control" id="eq-marca" placeholder="Ex.: Garmin"></div>
+        <div class="form-group"><label class="form-label">Modelo</label>
+          <input class="form-control" id="eq-modelo" placeholder="Ex.: eTrex 22x"></div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Nº de série (fabricante)</label>
+          <input class="form-control" id="eq-numero-serie" placeholder="Número de série do bem"></div>
         <div class="form-group"><label class="form-label">Plaqueta de patrimônio</label>
           <input class="form-control" id="eq-plaqueta" placeholder="Nº da plaqueta física (se houver)"></div>
-        <div class="form-group"><label class="form-label">Código interno</label>
-          <input class="form-control" id="eq-codigo" disabled placeholder="Gerado automaticamente"></div>
       </div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Data de aquisição</label>
+          <input class="form-control" type="date" id="eq-data-aquisicao"></div>
+        <div class="form-group"><label class="form-label">Fornecedor</label>
+          <input class="form-control" id="eq-fornecedor" placeholder="De quem foi adquirido"></div>
+      </div>
+      <div class="form-group"><label class="form-label">Código interno</label>
+        <input class="form-control" id="eq-codigo" disabled placeholder="Gerado automaticamente"></div>
+      <div id="eq-especificacoes-wrap"></div>
       <div class="form-group"><label class="form-label">Foto</label>
         <input class="form-control" type="file" accept="image/*" id="eq-foto-input" onchange="prevFotoEquip(event)">
         <img id="eq-foto-preview" style="display:none;max-width:160px;border-radius:8px;margin-top:8px">
@@ -77,8 +98,30 @@ window.assinarFotos = window.assinarFotos || function () {}
 </div>
 
 <script>
-let _equipamentos = [], _cautelas = [], _editEquipId = null, _fotoEquipFile = null
+let _equipamentos = [], _cautelas = [], _grupos = [], _editEquipId = null, _fotoEquipFile = null
 let _devCautelaId = null
+
+const CATEGORIA_LABEL = {
+  gps: 'GPS', camera: 'Câmera', equip_medicao: 'Equipamento de medição',
+  equip_mergulho: 'Equipamento de mergulho', embarcacao: 'Embarcação',
+  radio_comunicacao: 'Rádio de comunicação', informatica: 'Informática',
+  mobiliario_campo: 'Mobiliário de campo', outro: 'Outro',
+}
+
+// Campos específicos por categoria, gravados em `especificacoes` (jsonb).
+// Adicionar categoria nova = só mexer aqui + no enum do banco, sem tocar
+// no restante do formulário (mesmo espírito do catálogo de checklist do Frota).
+const ESPEC_CAMPOS = {
+  gps:               [{ key: 'imei', label: 'IMEI' }, { key: 'capacidade_bateria', label: 'Capacidade da bateria' }, { key: 'precisao_m', label: 'Precisão (m)' }],
+  camera:            [{ key: 'resolucao', label: 'Resolução' }, { key: 'tipo_bateria', label: 'Tipo de bateria' }, { key: 'cartao_memoria_gb', label: 'Cartão de memória (GB)' }],
+  equip_medicao:     [{ key: 'unidade_medida', label: 'Unidade de medida' }, { key: 'faixa_medicao', label: 'Faixa de medição' }],
+  equip_mergulho:    [{ key: 'tamanho', label: 'Tamanho/numeração' }],
+  embarcacao:        [{ key: 'motor_potencia_hp', label: 'Potência do motor (HP)' }, { key: 'capacidade_pessoas', label: 'Capacidade (pessoas)' }, { key: 'combustivel', label: 'Combustível' }],
+  radio_comunicacao: [{ key: 'frequencia', label: 'Frequência' }, { key: 'alcance_km', label: 'Alcance (km)' }],
+  informatica:       [{ key: 'sistema_operacional', label: 'Sistema operacional' }, { key: 'armazenamento_gb', label: 'Armazenamento (GB)' }],
+  mobiliario_campo:  [],
+  outro:             [],
+}
 
 ;(async function () {
   const usuario = await carregarUsuario()
@@ -90,9 +133,14 @@ let _devCautelaId = null
   document.getElementById('app').innerHTML =
     gerarLayout('Biomonitor — Equipamentos', 'biomonitor-equipamentos') + htmlPagina()
 
-  await Promise.all([carregarEquipamentos(), carregarCautelas()])
+  await Promise.all([carregarEquipamentos(), carregarCautelas(), carregarGrupos()])
   bIconsAplicar()
 })()
+
+async function carregarGrupos() {
+  const { data } = await db.from('grupos_biomonitor').select('id,nome').eq('ativo', true).order('nome')
+  _grupos = data || []
+}
 
 function htmlPagina() {
   return `<div class="fade-in">
@@ -113,10 +161,10 @@ function htmlPagina() {
       </div>
       <div class="table-wrap"><table class="table">
         <thead><tr>
-          <th style="width:56px">Foto</th><th>Descrição</th><th>Código</th><th>Plaqueta</th>
+          <th style="width:56px">Foto</th><th>Descrição</th><th>Categoria</th><th>Grupo</th><th>Código</th><th>Plaqueta</th>
           <th style="width:110px">Status</th><th>Com monitor</th><th style="width:80px"></th>
         </tr></thead>
-        <tbody id="tbody-equip"><tr><td colspan="7" style="text-align:center;padding:32px;color:#9CA3AF">Carregando...</td></tr></tbody>
+        <tbody id="tbody-equip"><tr><td colspan="9" style="text-align:center;padding:32px;color:#9CA3AF">Carregando...</td></tr></tbody>
       </table></div>
     </div>
 
@@ -156,12 +204,14 @@ function renderEquipamentos() {
   document.getElementById('k-outros').textContent = _equipamentos.filter(e => e.status === 'manutencao' || e.status === 'baixado').length
 
   if (!_equipamentos.length) {
-    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:32px;color:#9CA3AF">Nenhum equipamento cadastrado</td></tr>`
+    tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:32px;color:#9CA3AF">Nenhum equipamento cadastrado</td></tr>`
     return
   }
   tbody.innerHTML = _equipamentos.map(e => `<tr>
     <td>${e.foto_url ? `<img ${fotoAttr(e.foto_url)} style="width:36px;height:36px;object-fit:cover;border-radius:6px;display:block">` : '—'}</td>
-    <td><strong>${esc(e.descricao)}</strong>${e.observacoes ? `<br><span style="font-size:11px;color:#9CA3AF">${esc(e.observacoes)}</span>` : ''}</td>
+    <td><strong>${esc(e.descricao)}</strong>${e.marca || e.modelo ? `<br><span style="font-size:11px;color:#9CA3AF">${esc([e.marca, e.modelo].filter(Boolean).join(' · '))}</span>` : ''}</td>
+    <td style="font-size:12px">${esc(CATEGORIA_LABEL[e.categoria] || e.categoria)}</td>
+    <td style="font-size:12px">${esc(e.grupo_nome || '—')}</td>
     <td class="mono">${esc(e.codigo || '—')}</td>
     <td>${esc(e.plaqueta || '—')}</td>
     <td><span class="badge ${STATUS_EQUIP_BADGE[e.status] || 'badge-cinza'}">${STATUS_EQUIP_LABEL[e.status] || e.status}</span></td>
@@ -177,15 +227,59 @@ function abrirModalEquip(id) {
   const e = id ? _equipamentos.find(x => x.id === id) : null
   document.getElementById('eq-titulo').textContent = e ? 'Editar equipamento' : 'Novo equipamento'
   document.getElementById('eq-descricao').value = e?.descricao || ''
+
+  document.getElementById('eq-categoria').innerHTML = Object.entries(CATEGORIA_LABEL)
+    .map(([v, l]) => `<option value="${v}">${l}</option>`).join('')
+  document.getElementById('eq-categoria').value = e?.categoria || 'outro'
+
+  document.getElementById('eq-grupo').innerHTML =
+    `<option value="">Selecione...</option>` +
+    _grupos.map(g => `<option value="${g.id}">${esc(g.nome)}</option>`).join('')
+  document.getElementById('eq-grupo').value = e?.grupo_id || ''
+
+  document.getElementById('eq-marca').value = e?.marca || ''
+  document.getElementById('eq-modelo').value = e?.modelo || ''
+  document.getElementById('eq-numero-serie').value = e?.numero_serie || ''
   document.getElementById('eq-plaqueta').value = e?.plaqueta || ''
+  document.getElementById('eq-data-aquisicao').value = e?.data_aquisicao || ''
+  document.getElementById('eq-fornecedor').value = e?.fornecedor || ''
   document.getElementById('eq-codigo').value = e?.codigo || ''
   document.getElementById('eq-status').value = (e && e.status !== 'em_cautela') ? e.status : 'disponivel'
   document.getElementById('eq-status').disabled = e?.status === 'em_cautela'
   document.getElementById('eq-observacoes').value = e?.observacoes || ''
+
+  renderEspecificacoesForm(e?.especificacoes || {})
+
   const prev = document.getElementById('eq-foto-preview')
   if (e?.foto_url) { prev.src = e.foto_url; prev.style.display = 'block' } else { prev.style.display = 'none' }
   document.getElementById('eq-foto-input').value = ''
   document.getElementById('modal-equip').classList.add('aberto')
+}
+
+function renderEspecificacoesForm(valoresAtuais) {
+  const categoria = document.getElementById('eq-categoria').value
+  const campos = ESPEC_CAMPOS[categoria] || []
+  const wrap = document.getElementById('eq-especificacoes-wrap')
+  if (!campos.length) { wrap.innerHTML = ''; return }
+  const valores = valoresAtuais || {}
+  wrap.innerHTML = `
+    <div class="form-group"><label class="form-label">Especificações — ${CATEGORIA_LABEL[categoria]}</label></div>
+    <div class="grid-2">
+      ${campos.map(c => `
+        <div class="form-group">
+          <label class="form-label" style="font-size:11px">${c.label}</label>
+          <input class="form-control eq-espec-campo" data-key="${c.key}" value="${esc(valores[c.key] || '')}">
+        </div>`).join('')}
+    </div>`
+}
+
+function coletarEspecificacoes() {
+  const out = {}
+  document.querySelectorAll('.eq-espec-campo').forEach(inp => {
+    const v = inp.value.trim()
+    if (v) out[inp.dataset.key] = v
+  })
+  return out
 }
 
 function prevFotoEquip(ev) {
@@ -200,6 +294,8 @@ function prevFotoEquip(ev) {
 async function salvarEquipamento() {
   const descricao = document.getElementById('eq-descricao').value.trim()
   if (!descricao) { toast('Informe a descrição do bem', 'error'); return }
+  const grupo_id = document.getElementById('eq-grupo').value
+  if (!grupo_id) { toast('Selecione o grupo de monitoramento', 'error'); return }
   const btn = document.getElementById('btn-salvar-equip')
   btn.disabled = true; btn.textContent = 'Salvando...'
   try {
@@ -213,7 +309,15 @@ async function salvarEquipamento() {
     }
     const payload = {
       descricao,
+      categoria: document.getElementById('eq-categoria').value,
+      grupo_id,
+      marca: document.getElementById('eq-marca').value.trim() || null,
+      modelo: document.getElementById('eq-modelo').value.trim() || null,
+      numero_serie: document.getElementById('eq-numero-serie').value.trim() || null,
       plaqueta: document.getElementById('eq-plaqueta').value.trim() || null,
+      data_aquisicao: document.getElementById('eq-data-aquisicao').value || null,
+      fornecedor: document.getElementById('eq-fornecedor').value.trim() || null,
+      especificacoes: coletarEspecificacoes(),
       status: document.getElementById('eq-status').value,
       observacoes: document.getElementById('eq-observacoes').value.trim() || null,
       ...(foto_url ? { foto_url } : {}),
