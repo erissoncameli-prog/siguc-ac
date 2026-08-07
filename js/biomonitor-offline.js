@@ -9,7 +9,7 @@
 // Confirmados retidos 7 dias; pendentes nunca apagados.
 
 const BIO_DB_NAME    = 'siguc_biomonitor_v1'
-const BIO_DB_VERSION = 6
+const BIO_DB_VERSION = 7
 let _bioDB = null
 
 // ── Inicialização ──────────────────────────────────────────────
@@ -99,6 +99,15 @@ function bioOfflineInit() {
         const bi = db.createObjectStore('biometrias_ind', { keyPath: 'uuid_cliente' })
         bi.createIndex('individuo_uuid', 'individuo_uuid')
         bi.createIndex('status_sync',    'status_sync')
+      }
+
+      if (!db.objectStoreNames.contains('cautelas')) {
+        const c = db.createObjectStore('cautelas', { keyPath: 'uuid_cliente' })
+        c.createIndex('status_sync', 'status_sync')
+      }
+
+      if (!db.objectStoreNames.contains('equipamentos_cache')) {
+        db.createObjectStore('equipamentos_cache', { keyPath: 'id' })
       }
     }
 
@@ -807,7 +816,7 @@ async function bioOfflineReenfileirar(store, uuid) {
 async function bioOfflineLimparConfirmados() {
   const db     = await bioOfflineInit()
   const limite = new Date(Date.now() - 7 * 86400 * 1000).toISOString()
-  const stores = ['ninhos', 'transferencias', 'eclosoes', 'visitas', 'lotes', 'solturas', 'ocorrencias', 'descartes', 'individuos', 'biometrias_ind']
+  const stores = ['ninhos', 'transferencias', 'eclosoes', 'visitas', 'lotes', 'solturas', 'ocorrencias', 'descartes', 'individuos', 'biometrias_ind', 'cautelas']
   let removidos = 0
 
   for (const nome of stores) {
@@ -876,7 +885,7 @@ async function bioOfflineTemPin() {
 // ── Zerar fila (suporte à Config → Zerar fila) ────────────────
 async function bioOfflineZerarFila() {
   const db     = await bioOfflineInit()
-  const stores = ['ninhos', 'transferencias', 'eclosoes', 'visitas', 'lotes', 'solturas', 'ocorrencias', 'descartes', 'individuos', 'biometrias_ind']
+  const stores = ['ninhos', 'transferencias', 'eclosoes', 'visitas', 'lotes', 'solturas', 'ocorrencias', 'descartes', 'individuos', 'biometrias_ind', 'cautelas']
   for (const nome of stores) {
     await new Promise((res, rej) => {
       const tx  = db.transaction(nome, 'readwrite')
@@ -885,6 +894,53 @@ async function bioOfflineZerarFila() {
       req.onerror   = () => rej(req.error)
     })
   }
+}
+
+// ── Cautelas de equipamento ─────────────────────────────────────
+async function bioOfflineSalvarCautela(cautela) {
+  const db = await bioOfflineInit()
+  return new Promise((res, rej) => {
+    const tx  = db.transaction('cautelas', 'readwrite')
+    const req = tx.objectStore('cautelas').put(cautela)
+    req.onsuccess = () => res()
+    req.onerror   = () => rej(req.error)
+  })
+}
+
+async function bioOfflineListarCautelas() {
+  const db = await bioOfflineInit()
+  return new Promise((res, rej) => {
+    const tx  = db.transaction('cautelas', 'readonly')
+    const req = tx.objectStore('cautelas').getAll()
+    req.onsuccess = () => res((req.result || []).sort((a, b) => b.criado_em.localeCompare(a.criado_em)))
+    req.onerror   = () => rej(req.error)
+  })
+}
+
+async function bioOfflineCautelasPendentes() {
+  const db = await bioOfflineInit()
+  return new Promise((res, rej) => {
+    const tx  = db.transaction('cautelas', 'readonly')
+    const idx = tx.objectStore('cautelas').index('status_sync')
+    const req = idx.getAll('pendente')
+    req.onsuccess = () => res(req.result)
+    req.onerror   = () => rej(req.error)
+  })
+}
+
+// ── Cache de equipamentos disponíveis (referência, mesmo padrão de praias) ──
+async function bioOfflineSalvarEquipamentos(lista) {
+  return bioOfflineSubstituirCacheReferencia('equipamentos_cache', lista)
+}
+
+async function bioOfflineListarEquipamentos() {
+  const db = await bioOfflineInit()
+  return new Promise((res, rej) => {
+    const tx  = db.transaction('equipamentos_cache', 'readonly')
+    const req = tx.objectStore('equipamentos_cache').getAll()
+    req.onsuccess = () => res(req.result || [])
+    req.onerror   = () => rej(req.error)
+  })
 }
 
 // ── UUID v4 ────────────────────────────────────────────────────

@@ -604,6 +604,49 @@ async function bioSyncBiometriasInd(monitorId, onProgresso) {
   return n
 }
 
+// ── Sincronizar cautelas de equipamento pendentes ──────────────
+// Ao contrário das demais entidades (upsert direto na tabela), a
+// cautela só pode ser gravada via RPC — a tabela não tem policy de
+// INSERT para o cliente (mesmo padrão de lgpd_aceites/frota_inspecoes,
+// migration 227). RPC é idempotente por uuid_cliente.
+async function bioSyncCautelas(monitorId, onProgresso) {
+  const pendentes = await bioOfflineCautelasPendentes()
+  let n = 0
+  for (const c of pendentes) {
+    onProgresso?.('Cautela de equipamento…')
+
+    await bioOfflineAtualizarSync('cautelas', c.uuid_cliente, 'enviando')
+
+    const { data, error } = await bioSupabase().rpc('biomonitor_registrar_cautela', {
+      p_uuid_cliente:     c.uuid_cliente,
+      p_equipamento_ids:  c.equipamento_ids,
+      p_termo_versao_id:  c.termo_versao_id,
+      p_lat: c.lat ?? null,
+      p_lng: c.lng ?? null,
+    })
+
+    if (error) {
+      await bioOfflineMarcarErroSync('cautelas', c.uuid_cliente, error.message)
+      continue
+    }
+
+    await bioOfflineAtualizarSync('cautelas', c.uuid_cliente, 'confirmado', data)
+    n++
+  }
+  return n
+}
+
+// ── Cache de equipamentos disponíveis para cautela ─────────────
+async function bioSyncCacheEquipamentos() {
+  if (!navigator.onLine) return
+  const { data, error } = await bioSupabase()
+    .from('biomonitor_equipamentos')
+    .select('id,codigo,plaqueta,descricao,foto_url,status')
+    .eq('status', 'disponivel')
+  if (error || !data) return
+  await bioOfflineSalvarEquipamentos(data)
+}
+
 // ── Sincronização completa ────────────────────────────────────
 async function bioSyncTudo({ monitorId, onProgresso, onConcluido, onErro } = {}) {
   if (_bioSyncEmAndamento) return
@@ -626,6 +669,8 @@ async function bioSyncTudo({ monitorId, onProgresso, onConcluido, onErro } = {})
     const s  = await cat(bioSyncSolturas)
     const oc = await cat(bioSyncOcorrencias)
     const bi = await cat(bioSyncBiometriasInd)
+    const ct = await cat(bioSyncCautelas)
+    bioSyncCacheEquipamentos().catch(() => {})
     // Pull: traz de volta mudanças do servidor (ex.: validação/correção
     // feita pelo gestor) para o IndexedDB.
     const grupoId = (typeof BioApp !== 'undefined' && BioApp.monitor?.grupo_id) || null
@@ -642,7 +687,7 @@ async function bioSyncTudo({ monitorId, onProgresso, onConcluido, onErro } = {})
       try { await bioSyncPullOcorrencias(grupoId) } catch (_) {}
     }
     await bioOfflineLimparConfirmados()
-    onConcluido?.({ ninhos: n, transferencias: t, eclosoes: e, visitas: v, lotes: l, individuos: ind, solturas: s, ocorrencias: oc, biometrias: bi })
+    onConcluido?.({ ninhos: n, transferencias: t, eclosoes: e, visitas: v, lotes: l, individuos: ind, solturas: s, ocorrencias: oc, biometrias: bi, cautelas: ct })
   } catch (err) {
     onErro?.(err)
   } finally {

@@ -4861,6 +4861,10 @@ function bioIniciarConfig() {
 
   document.getElementById('bio-btn-aviso-privacidade')?.addEventListener('click', lgpdCampoAbrir)
   document.getElementById('bio-btn-meus-dados')?.addEventListener('click', lgpdAbrirMeusDados)
+  document.getElementById('bio-btn-meus-equipamentos')?.addEventListener('click', () => {
+    bioMostrarTela('tela-equipamentos')
+    if (typeof bioEquipIniciar === 'function') bioEquipIniciar()
+  })
 
   document.getElementById('bio-btn-alterar-pin')?.addEventListener('click', async () => {
     bioMostrarTela('tela-config-pin')
