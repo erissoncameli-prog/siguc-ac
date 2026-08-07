@@ -54,8 +54,11 @@ async function bioEquipRenderNova(corpo) {
   corpo.innerHTML = '<p style="color:#9CA3AF">Carregando equipamentos disponíveis...</p>'
   _bioEquipSel = new Set()
 
-  // Catálogo: tenta atualizar online, sempre lê do cache local (IndexedDB).
-  if (typeof bioSyncCacheEquipamentos === 'function') { try { await bioSyncCacheEquipamentos() } catch (_) {} }
+  // Catálogo: tenta atualizar online (só o do grupo do monitor — a RPC
+  // de cautela não aceita equipamento de outro grupo), sempre lê do
+  // cache local (IndexedDB) por baixo.
+  const grupoId = (typeof BioApp !== 'undefined' && BioApp.monitor?.grupo_id) || null
+  if (typeof bioSyncCacheEquipamentos === 'function') { try { await bioSyncCacheEquipamentos(grupoId) } catch (_) {} }
   const equipamentos = await bioOfflineListarEquipamentos()
 
   // Termo vigente: precisa estar disponível para poder assinar. Sem
