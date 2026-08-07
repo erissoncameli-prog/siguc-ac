@@ -661,6 +661,33 @@ E) Dashboard Executivo por nível (UC / Diretoria / Secretaria)
   de mesa, ou o catálogo virar editável no app, aplicar a regra dos
   pares acima.
 
+## Biomonitor — Equipamentos em cautela (migrations 226/227)
+Cadastro do bem é SEMPRE na mesa (`biomonitor-equipamentos.html`,
+perfil tecnico/gestor/super_admin): descrição, plaqueta física
+(texto livre, opcional) + código interno gerado por trigger
+(`BIOEQ-AAAA-NNNN`, molde da 175 do Frota), foto (bucket já privado
+`biomonitor-fotos`, migration 210 — sem bucket novo). A cautela —
+um ou mais equipamentos entregues de uma vez — é assinada pelo
+monitor no app (`pages/biomonitor.html` → Configurações → Meus
+equipamentos → `js/biomonitor-equipamentos.js`), reaproveitando o
+padrão de documento versionado do LGPD: `lgpd_documentos` ganhou o
+tipo `termo_equipamento` (enum novo, migration 226 — commitada
+separada da 227 por causa da regra de ADD VALUE do projeto) e a
+assinatura em si é um `lgpd_aceites` (ancorado em `auth.users`,
+mesma âncora comum a todos os perfis). Tabelas próprias
+`biomonitor_cautelas`/`biomonitor_cautela_itens` guardam qual
+monitor está com qual equipamento, com devolução por item (permite
+devolução parcial de uma cautela com vários itens). RPC
+`biomonitor_registrar_cautela` (chamada pelo app, idempotente por
+`uuid_cliente`, fila offline no IndexedDB — store `cautelas`,
+sincronizada por `bioSyncCautelas`) e RPC
+`biomonitor_devolver_equipamentos` (só mesa — decisão de produto:
+devolução nunca é feita pelo monitor no app, só a gestão confirma o
+recebimento físico do bem). Relatório de patrimônio (quem está com
+o quê, histórico) é a própria `biomonitor-equipamentos.html`, view
+`vw_biomonitor_cautelas_detalhe`. `pwa/sw.js`: biomonitor v22 → v23
+(novo `js/biomonitor-equipamentos.js` no shell).
+
 ## Variáveis de ambiente
 SUPABASE_URL=https://atqtybcsvepdabsvgaly.supabase.co
 SUPABASE_ANON_KEY=(pública, já em config.js)
