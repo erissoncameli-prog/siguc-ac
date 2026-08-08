@@ -3357,8 +3357,18 @@ async function verTarefaFrota(id) {
 async function rotearNotifFrota(n) {
   const st = n.meta?.subtipo, para = n.meta?.para
   fecharModal('tarefas')
-  if ((st === 'viagem_solicitada' || st === 'viagem_direta' || st === 'manutencao') && _ehGestor) {
+  if (st === 'viagem_solicitada' && _ehGestor) {
     await entrarModo('gestor', false)
+    gestorAba('pendentes')
+    if (n.meta?.viagem_id && _viagensPendentes.some(v => v.id === n.meta.viagem_id)) abrirAprovar(n.meta.viagem_id)
+  } else if (st === 'viagem_direta' && _ehGestor) {
+    await entrarModo('gestor', false)
+    gestorAba('andamento')
+    if (n.meta?.viagem_id && _viagensPendentes.some(v => v.id === n.meta.viagem_id)) abrirDetalhe(n.meta.viagem_id)
+  } else if (st === 'manutencao' && _ehGestor) {
+    // Sem modal de item único (Ordem de Serviço é aberta na mesa) — a aba já é o destino específico.
+    await entrarModo('gestor', false)
+    gestorAba('manutencao')
   } else if (st === 'lembrete_viagem' && para === 'motorista' && _motorista) {
     await entrarModo('motorista', false); motoristaAba('solicitacoes')
   } else if (st === 'lembrete_viagem' && para === 'solicitante') {
