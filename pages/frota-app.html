@@ -67,6 +67,12 @@ window.frotaFotoUrlAssinada = window.frotaFotoUrlAssinada || async function () {
 <body>
 <div id="app"></div>
 
+<!-- Host da barra inferior de navegação. Fica FORA de #app de propósito:
+     os montarShell* trocam o innerHTML de #app inteiro, e a barra não
+     pode ser filha de nenhum contêiner que receba animação de transform
+     (ver montarBarraNav, mais abaixo). -->
+<div id="fm-nav-host"></div>
+
 <!-- Tela de login própria do App Frota -->
 <div id="tela-login-frota" class="fm-login-tela fw-theme" hidden>
   <div class="fm-login-card">
@@ -468,6 +474,7 @@ const SITUACAO_BADGE = { ok:'fw-badge fw-badge-disponivel', proximo:'fw-badge fw
 
 function mostrarLoginFrota(erro) {
   document.getElementById('app').innerHTML = ''
+  montarBarraNav(null) // a barra vive fora de #app: limpar não é automático
   document.getElementById('tela-login-frota').hidden = false
   if (erro) {
     const el = document.getElementById('lf-erro')
@@ -572,18 +579,48 @@ async function entrarComSessao(session, jaAutenticouSenha = false) {
   await portaoPin(jaAutenticouSenha)
   instalarAutoLockPin()
 
-  document.getElementById('app').innerHTML =
-    '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;color:#9CA3AF;font-family:\'DM Sans\',sans-serif">Carregando...</div>'
+  const salvo = sessionStorage.getItem('frotaModoAtivo')
 
-  const [{ data: mot }, { data: nivel }] = await Promise.all([
-    db.from('frota_motoristas').select('*').eq('usuario_id', _usuario.id).eq('ativo', true).maybeSingle(),
-    db.rpc('nivel_efetivo', { p_usuario: _usuario.id, p_modulo_chave: 'frota' })
+  // Interface ANTES da rede. As duas consultas abaixo (cadastro de
+  // motorista e nível de acesso) não têm resposta em cache e, num sinal
+  // ruim, seguravam a tela num "Carregando..." nu por vários segundos —
+  // sem faixa e sem barra inferior. Era metade do "a barra demora a
+  // aparecer". Quem já usou o app tem o modo salvo na sessão, então o
+  // shell certo sobe na hora e só o conteúdo espera os dados.
+  montarShellProvisorio(salvo)
+
+  // Prazo nas duas consultas: sem rede elas ficam penduradas até o
+  // timeout do fetch (dezenas de segundos em alguns aparelhos).
+  const [rMot, rNivel] = await Promise.all([
+    fComPrazo(db.from('frota_motoristas').select('*').eq('usuario_id', _usuario.id).eq('ativo', true).maybeSingle(), 8000),
+    fComPrazo(db.rpc('nivel_efetivo', { p_usuario: _usuario.id, p_modulo_chave: 'frota' }), 8000)
   ])
+
+  // fComPrazo devolve undefined ao estourar o prazo; o supabase-js não
+  // rejeita em falha de rede, devolve { data:null, error }. Os dois
+  // casos são "não sei", e são diferentes de "sei que não tem" (que é
+  // data:null com error:null, resposta legítima do maybeSingle).
+  const semResposta = r => !r || !!r.error
+  const naoSei = semResposta(rMot) || semResposta(rNivel)
+
+  let mot = rMot?.data ?? null
+  let nivel = rNivel?.data ?? null
+
+  if (naoSei) {
+    // Offline/lento: usa o último perfil conhecido deste aparelho em vez
+    // de rebaixar o motorista a "sem papel" e jogá-lo no modo
+    // solicitante. Quem manda de fato continua sendo a RLS no servidor —
+    // este cache só decide qual tela abrir.
+    const cache = await fComPrazo(fOfflineGetConfig('perfil_cache'), 2000)
+    if (cache) { mot = cache.motorista ?? null; nivel = cache.nivel ?? null }
+  } else {
+    fOfflineSetConfig('perfil_cache', { motorista: mot, nivel }).catch(() => {})
+  }
+
   _motorista = mot
   _ehGestor = nivel === 'editar'
   _papeis = [...(_motorista ? ['motorista'] : []), ...(_ehGestor ? ['gestor'] : [])]
 
-  const salvo = sessionStorage.getItem('frotaModoAtivo')
   if (salvo && (salvo === 'solicitante' || _papeis.includes(salvo))) {
     await entrarModo(salvo, true)
   } else if (_papeis.length === 0) {
@@ -600,6 +637,32 @@ async function entrarComSessao(session, jaAutenticouSenha = false) {
   // App pronto: se veio de um clique em notificação (push deep-link),
   // roteia agora para o lugar certo pelo tipo da notificação.
   if (_deepLinkNotif) { const id = _deepLinkNotif; _deepLinkNotif = null; abrirNotificacaoFrota(id) }
+}
+
+// Sobe o shell do modo salvo na sessão já com esqueleto, antes de saber
+// os papéis do usuário. Se os dados desmentirem o palpite (perdeu o
+// vínculo de motorista, ganhou acesso de gestor), entrarModo remonta
+// logo em seguida — remontar custa um innerHTML, ficar sem interface
+// nenhuma por vários segundos custa a confiança de quem está em campo.
+// Primeiro acesso não tem modo salvo e cai no "Carregando..." de antes.
+function montarShellProvisorio(modo) {
+  if (modo === 'motorista')        { montarShellMotorista();    fmMarcarAbaAtiva(_fmAba) }
+  else if (modo === 'gestor')      { montarShellGestor();       fmMarcarAbaAtiva(_fgAba) }
+  else if (modo === 'solicitante') { montarShellSolicitante(false); fmMarcarAbaAtiva(_fsAba) }
+  else {
+    document.getElementById('app').innerHTML =
+      '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;color:#9CA3AF;font-family:\'DM Sans\',sans-serif">Carregando...</div>'
+    montarBarraNav(null)
+    return
+  }
+  document.getElementById('fm-conteudo').innerHTML =
+    [90, 120, 120].map(h => `<div style="margin-bottom:10px">${fwSkeleton(h)}</div>`).join('')
+
+  // A barra já está na tela, mas os dados ainda não chegaram: tocar numa
+  // aba agora chamaria um render sobre estado vazio. Os botões voltam a
+  // valer sozinhos — entrarModo remonta a barra inteira logo em seguida,
+  // e a única saída sem entrarModo (mais de um papel) remove a barra.
+  document.querySelectorAll('.fm-pill-btn').forEach(b => { b.disabled = true })
 }
 
 // ── Shell desktop (só o seletor de perfil) ──────────────────────
@@ -623,6 +686,7 @@ function montarShellDesktop() {
         </div>
       </div>
     </div>`
+  montarBarraNav(null) // seletor de perfil não tem abas
   carregarLogosSidebar()
   bIconsAplicar()
 }
@@ -654,6 +718,64 @@ function renderSeletorPerfil() {
       </div>
     </div>`
   bIconsAplicar()
+}
+
+// ── Barra inferior de navegação ───────────────────────────────
+// Renderizada num host próprio (#fm-nav-host), IRMÃO de #app — nunca
+// dentro da .fm-shell.
+//
+// Motivo (regressão que já voltou duas vezes): entrarModo anima a
+// .fm-shell com `transform`, e um transform diferente de `none` faz o
+// elemento virar containing block dos descendentes `position: fixed`
+// (CSS Transforms L1). Enquanto a barra era filha da .fm-shell, ela
+// deixava de se posicionar pela viewport e passava a se posicionar pelo
+// FIM DO DOCUMENTO: nas abas que rolam (Dados, Histórico, Config,
+// Viagem, Solicitar) ela sumia da tela, "voltava" só quando o usuário
+// rolava até o fim, e a camada composta desalinhava a área de toque —
+// a barra aparecia mas os botões não respondiam. Fora do elemento
+// animado, nenhuma animação futura na shell consegue alcançá-la.
+//
+// Passar `null` limpa a barra — obrigatório em toda tela que NÃO é um
+// dos três modos (login, seletor de perfil, carregamento inicial),
+// senão ela fica flutuando sobre uma tela onde não há aba nenhuma.
+const FM_NAVS = {
+  motorista: () => `
+    <button class="fm-pill-btn" data-tab="inicio" onclick="motoristaAba('inicio')">${bico('home')}<span>Início</span></button>
+    <button class="fm-pill-btn" data-tab="solicitacoes" onclick="motoristaAba('solicitacoes')">
+      <span class="fm-badge" id="fm-badge" hidden>0</span>${bico('list')}<span>Solicitações</span>
+    </button>
+    <button class="fm-pill-btn fm-primaria" data-tab="nova" onclick="motoristaAba('nova')">${bico('plus')}<span>Viagem</span></button>
+    <button class="fm-pill-btn" data-tab="historico" onclick="motoristaAba('historico')">${bico('clock')}<span>Histórico</span></button>
+    <button class="fm-pill-btn" data-tab="dados" onclick="motoristaAba('dados')">${bico('bar-chart')}<span>Dados</span></button>
+    <button class="fm-pill-btn" data-tab="config" onclick="motoristaAba('config')">
+      <span class="fm-badge" id="fm-config-dot" hidden>&nbsp;</span>${bico('sliders')}<span>Config</span></button>`,
+  gestor: () => `
+    <button class="fm-pill-btn" data-tab="inicio" onclick="gestorAba('inicio')">${bico('home')}<span>Painel</span></button>
+    <button class="fm-pill-btn" data-tab="pendentes" onclick="gestorAba('pendentes')">
+      <span class="fm-badge" id="fg-badge-pend" hidden>0</span>${bico('list')}<span>Aprovações</span></button>
+    <button class="fm-pill-btn fm-primaria" data-tab="andamento" onclick="gestorAba('andamento')">${bico('truck')}<span>Em curso</span></button>
+    <button class="fm-pill-btn" data-tab="manutencao" onclick="gestorAba('manutencao')">
+      <span class="fm-badge" id="fg-badge-manut" hidden>0</span>${bico('wrench')}<span>Manutenção</span></button>
+    <button class="fm-pill-btn" data-tab="dados" onclick="gestorAba('dados')">${bico('bar-chart')}<span>Dados</span></button>
+    <button class="fm-pill-btn" data-tab="config" onclick="gestorAba('config')">${bico('sliders')}<span>Config</span></button>`,
+  solicitante: () => `
+    <button class="fm-pill-btn fm-primaria" data-tab="solicitar" onclick="solicitanteAba('solicitar')">${bico('truck')}<span>Solicitar</span></button>
+    <button class="fm-pill-btn" data-tab="viagens" onclick="solicitanteAba('viagens')">
+      <span class="fm-badge" id="fs-badge-viagens" hidden>0</span>${bico('list')}<span>Minhas viagens</span></button>
+    <button class="fm-pill-btn" data-tab="config" onclick="solicitanteAba('config')">${bico('sliders')}<span>Config</span></button>`,
+}
+function montarBarraNav(modo) {
+  const host = document.getElementById('fm-nav-host')
+  if (!host) return
+  host.innerHTML = (modo && FM_NAVS[modo])
+    ? `<nav class="fm-pill-nav">${FM_NAVS[modo]()}</nav>`
+    : ''
+}
+
+// Marca a aba ativa. Os três modos faziam exatamente isto inline; virou
+// função porque a barra agora é montada num lugar só.
+function fmMarcarAbaAtiva(aba) {
+  document.querySelectorAll('.fm-pill-btn').forEach(b => b.classList.toggle('ativa', b.dataset.tab === aba))
 }
 
 // ── Troca de modo ─────────────────────────────────────────────
@@ -703,20 +825,15 @@ function montarShellSolicitante(peek) {
         </div>
       </div>
       <div id="fm-conteudo" class="fm-conteudo"></div>
-      <nav class="fm-pill-nav">
-        <button class="fm-pill-btn fm-primaria" data-tab="solicitar" onclick="solicitanteAba('solicitar')">${bico('truck')}<span>Solicitar</span></button>
-        <button class="fm-pill-btn" data-tab="viagens" onclick="solicitanteAba('viagens')">
-          <span class="fm-badge" id="fs-badge-viagens" hidden>0</span>${bico('list')}<span>Minhas viagens</span></button>
-        <button class="fm-pill-btn" data-tab="config" onclick="solicitanteAba('config')">${bico('sliders')}<span>Config</span></button>
-      </nav>
     </div>`
+  montarBarraNav('solicitante')
   carregarLogosFaixaMotorista()
 }
 
 function solicitanteAba(aba, prefill) {
   const anterior = _fsAba
   _fsAba = aba
-  document.querySelectorAll('.fm-pill-btn').forEach(b => b.classList.toggle('ativa', b.dataset.tab === aba))
+  fmMarcarAbaAtiva(aba)
   if (aba === 'solicitar') renderSolicitanteForm(prefill)
   else if (aba === 'viagens') renderSolicitanteViagens()
   else if (aba === 'config') renderSolicitanteConfig()
@@ -852,18 +969,8 @@ function montarShellMotorista() {
         </div>
       </div>
       <div id="fm-conteudo" class="fm-conteudo"></div>
-      <nav class="fm-pill-nav">
-        <button class="fm-pill-btn" data-tab="inicio" onclick="motoristaAba('inicio')">${bico('home')}<span>Início</span></button>
-        <button class="fm-pill-btn" data-tab="solicitacoes" onclick="motoristaAba('solicitacoes')">
-          <span class="fm-badge" id="fm-badge" hidden>0</span>${bico('list')}<span>Solicitações</span>
-        </button>
-        <button class="fm-pill-btn fm-primaria" data-tab="nova" onclick="motoristaAba('nova')">${bico('plus')}<span>Viagem</span></button>
-        <button class="fm-pill-btn" data-tab="historico" onclick="motoristaAba('historico')">${bico('clock')}<span>Histórico</span></button>
-        <button class="fm-pill-btn" data-tab="dados" onclick="motoristaAba('dados')">${bico('bar-chart')}<span>Dados</span></button>
-        <button class="fm-pill-btn" data-tab="config" onclick="motoristaAba('config')">
-          <span class="fm-badge" id="fm-config-dot" hidden>&nbsp;</span>${bico('sliders')}<span>Config</span></button>
-      </nav>
     </div>`
+  montarBarraNav('motorista')
   carregarLogosFaixaMotorista()
 }
 
@@ -901,24 +1008,15 @@ function montarShellGestor() {
         </div>
       </div>
       <div id="fm-conteudo" class="fm-conteudo"></div>
-      <nav class="fm-pill-nav">
-        <button class="fm-pill-btn" data-tab="inicio" onclick="gestorAba('inicio')">${bico('home')}<span>Painel</span></button>
-        <button class="fm-pill-btn" data-tab="pendentes" onclick="gestorAba('pendentes')">
-          <span class="fm-badge" id="fg-badge-pend" hidden>0</span>${bico('list')}<span>Aprovações</span></button>
-        <button class="fm-pill-btn fm-primaria" data-tab="andamento" onclick="gestorAba('andamento')">${bico('truck')}<span>Em curso</span></button>
-        <button class="fm-pill-btn" data-tab="manutencao" onclick="gestorAba('manutencao')">
-          <span class="fm-badge" id="fg-badge-manut" hidden>0</span>${bico('wrench')}<span>Manutenção</span></button>
-        <button class="fm-pill-btn" data-tab="dados" onclick="gestorAba('dados')">${bico('bar-chart')}<span>Dados</span></button>
-        <button class="fm-pill-btn" data-tab="config" onclick="gestorAba('config')">${bico('sliders')}<span>Config</span></button>
-      </nav>
     </div>`
+  montarBarraNav('gestor')
   carregarLogosFaixaMotorista()
 }
 
 function gestorAba(aba) {
   const anterior = _fgAba
   _fgAba = aba
-  document.querySelectorAll('.fm-pill-btn').forEach(b => b.classList.toggle('ativa', b.dataset.tab === aba))
+  fmMarcarAbaAtiva(aba)
   if (aba === 'inicio') renderGestorInicio()
   else if (aba === 'pendentes') renderGestorPendentes()
   else if (aba === 'andamento') renderGestorAndamento()
@@ -1208,7 +1306,7 @@ const FM_ORDEM_ABAS = ['inicio', 'solicitacoes', 'nova', 'historico', 'dados', '
 function motoristaAba(aba) {
   const anterior = _fmAba
   _fmAba = aba
-  document.querySelectorAll('.fm-pill-btn').forEach(b => b.classList.toggle('ativa', b.dataset.tab === aba))
+  fmMarcarAbaAtiva(aba)
   if (aba === 'inicio') renderFmInicio()
   else if (aba === 'solicitacoes') renderFmSolicitacoes()
   else if (aba === 'nova') renderFmNovaViagem()
@@ -3852,14 +3950,20 @@ if ('serviceWorker' in navigator && !window.Capacitor) {
   max-width: 640px; margin: 0 auto; width: 100%; box-sizing: border-box;
 }
 .fm-pill-nav {
-  /* will-change isola a barra na própria camada de composição do WebKit:
-     sem isso, a animação de transform em #fm-conteudo (fwTransicaoTela,
-     toda troca de aba) "arrasta" essa barra fixed junto durante o scroll
-     em abas com conteúdo alto (Dados/Histórico/Config/Viagem) — mesmo
-     bug de composição já documentado em css/brigada.css. Início/
-     Solicitações não mostravam o bug por caberem numa tela sem rolagem. */
-  position: fixed; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); left: 50%; transform: translateX(-50%);
-  will-change: transform;
+  /* Sem `transform` e sem `will-change` de propósito.
+     O `will-change: transform` que existia aqui era tentativa de conter
+     a barra "sumindo": prendia a barra numa camada de composição própria
+     e, com um ancestral transformado, os pixels pintados descolavam da
+     caixa real de hit-test — a barra aparecia e os botões não
+     respondiam ao toque. A causa de verdade era outra (transform
+     residual na .fm-shell; ver montarBarraNav no <script> desta página
+     e o comentário de fill-mode em css/frota-wise-theme.css) e está
+     resolvida na raiz: a barra não é mais descendente de nada animado.
+     O centramento usa margin auto em vez de left:50% + translateX(-50%)
+     para não reintroduzir transform nenhum neste elemento. */
+  position: fixed; bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+  left: 0; right: 0; margin-left: auto; margin-right: auto;
+  width: -webkit-fit-content; width: fit-content;
   max-width: calc(100vw - 16px);
   background: #0A1A0F; border-radius: 32px; height: 64px; padding: 0 8px;
   display: flex; align-items: center; gap: 3px; box-shadow: 0 8px 32px rgba(0,0,0,.35); z-index: 1000;

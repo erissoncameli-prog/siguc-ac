@@ -200,6 +200,36 @@ Três superfícies consomem a função (todas devem ser tocadas juntas):
 Divergência intencional: o app conta pendentes e as telas de mesa não,
 então o mesmo veículo pode mostrar números diferentes nas duas.
 
+## Regra do sistema — barra inferior do app Frota fora do que anima
+A `.fm-pill-nav` (barra de abas do frota-app.html) vive num host próprio,
+`#fm-nav-host`, IRMÃO de `#app` — nunca dentro da `.fm-shell`. Montada
+por `montarBarraNav(modo)`; `montarBarraNav(null)` limpa (obrigatório em
+toda tela sem abas: login, seletor de perfil, carregamento inicial).
+
+Motivo: `transform` diferente de `none` num ANCESTRAL faz o elemento
+virar containing block dos descendentes `position: fixed` (CSS
+Transforms L1). Enquanto a barra era filha da `.fm-shell` — animada por
+`entrarModo` via `fwTransicaoTela` —, ela se posicionava pelo fim do
+DOCUMENTO em vez da viewport: sumia nas abas que rolam (Dados,
+Histórico, Config, Viagem, Solicitar), "voltava" só ao rolar até o fim,
+e a área de toque descolava da pintada (barra visível, botões mortos).
+A regressão voltou 3 vezes porque foi diagnosticada como bug de
+composição do WebKit; não é — reproduz no Chrome desktop.
+
+Três travas, todas necessárias:
+1. Barra fora de qualquer contêiner animado (acima).
+2. `.fw-tela-*` usam `fill-mode: backwards`, NUNCA `both` — com `both`
+   o `transform: translateX(0)` do keyframe final persiste para sempre.
+   `fwTransicaoTela` ainda remove a classe no `animationend` (filtrando
+   `ev.target`, que o evento borbulha).
+3. Nada de `transform`/`will-change: transform` na própria barra — o
+   centramento usa `margin: auto`, não `left:50% + translateX(-50%)`.
+
+Guarda: `tests/frota-app-barra.test.js` (14 testes, 3 modos) — barra na
+viewport, zero transform nos ancestrais, fixa ao rolar, e clique real
+chegando ao botão. Qualquer elemento fixo novo no app deve seguir a
+mesma regra.
+
 ## Regra do sistema — trava de veículo no abastecimento
 O abastecimento nunca deve poder ser lançado num veículo diferente do
 que o motorista está de fato usando. Defesa em 2 camadas:
