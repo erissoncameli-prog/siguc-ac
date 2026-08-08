@@ -70,29 +70,50 @@ function fwSkeleton(alturaPx, larguraCss) {
 // Toca a animação de troca de tela num contêiner cujo conteúdo acabou de
 // ser trocado (innerHTML já novo). direcao: 'avancar' | 'voltar' | 'fade'.
 //
-// #fm-conteudo é irmão (não ancestral) da barra inferior position:fixed
-// (.fm-pill-nav) dentro de .fm-shell. Ainda assim, animar `transform`
-// nele (translateX/scale das classes fw-tela-*) dispara um bug real de
-// composição do WebKit/Chrome mobile: qualquer elemento da página
-// animando transform pode fazer um irmão position:fixed “grudar” no
-// scroll, sumir e ficar com a área de toque desalinhada até o próximo
-// reflow — mesmo sem relação de ancestralidade no DOM. will-change
-// isolando só a barra não foi suficiente na prática. Mesma classe de
-// bug documentada em css/brigada.css (ali evitada não usando transform
-// nenhum na tela). Por isso troca de ABA (sempre em #fm-conteudo) usa
-// as variantes -leve, só opacidade — sem transform, o bug não dispara.
-// Troca de MODO (motorista/gestor/solicitante, .fm-shell inteiro) pode
-// seguir com o slide de transform: a barra é descendente do próprio
-// elemento animado ali, então desliza junto de propósito.
+// ⚠️ A classe é REMOVIDA ao fim da animação, e as regras .fw-tela-* usam
+// fill-mode `backwards` (nunca `both`). Os dois cuidados servem à mesma
+// coisa: não deixar `transform` residual no elemento depois que a
+// animação acabou. Um transform diferente de `none` — e `translateX(0)`
+// é diferente de `none` — faz o elemento virar containing block dos
+// descendentes `position: fixed` (CSS Transforms L1). Foi assim que a
+// barra inferior do app (.fm-pill-nav), então descendente da .fm-shell
+// animada aqui, parou de se posicionar pela viewport e foi parar no fim
+// do documento: sumia nas abas com rolagem, "voltava" ao rolar até o
+// fim e ficava com a área de toque desalinhada. Hoje a barra vive fora
+// da .fm-shell (host próprio, ver montarBarraNav em frota-app.html), o
+// que já a torna imune — estas duas travas evitam que o mesmo padrão
+// derrube qualquer outro elemento fixo criado no futuro.
+const FW_TELA_CLASSES = ['fw-tela-avancar', 'fw-tela-voltar', 'fw-tela-fade'];
 function fwTransicaoTela(idOuEl, direcao) {
   const el = typeof idOuEl === 'string' ? document.getElementById(idOuEl) : idOuEl;
   if (!el) return;
   if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-  const semTransform = (typeof idOuEl === 'string' && idOuEl === 'fm-conteudo') || el.id === 'fm-conteudo';
-  const sufixo = semTransform ? '-leve' : '';
-  const classe = (direcao === 'voltar' ? 'fw-tela-voltar' : direcao === 'fade' ? 'fw-tela-fade' : 'fw-tela-avancar') + sufixo;
-  el.classList.remove('fw-tela-avancar', 'fw-tela-voltar', 'fw-tela-fade',
-    'fw-tela-avancar-leve', 'fw-tela-voltar-leve', 'fw-tela-fade-leve');
+  const classe = direcao === 'voltar' ? 'fw-tela-voltar' : direcao === 'fade' ? 'fw-tela-fade' : 'fw-tela-avancar';
+
+  // Solta o vigia da transição anterior: remover a classe abaixo dispara
+  // animationCANCEL, não animationEND, então sem isto o listener antigo
+  // ficaria pendurado a cada troca de aba (#fm-conteudo sobrevive às
+  // trocas dentro de um mesmo modo).
+  if (el._fwLimparTela) {
+    el.removeEventListener('animationend', el._fwLimparTela);
+    el.removeEventListener('animationcancel', el._fwLimparTela);
+  }
+
+  el.classList.remove(...FW_TELA_CLASSES);
   void el.offsetWidth; // força reflow para reiniciar a animação
   el.classList.add(classe);
+
+  // animationend borbulha: um card ou skeleton lá dentro terminando a
+  // própria animação limparia a classe no meio da transição. Só o evento
+  // do PRÓPRIO elemento conta.
+  const limpar = ev => {
+    if (ev.target !== el) return;
+    el.removeEventListener('animationend', limpar);
+    el.removeEventListener('animationcancel', limpar);
+    el._fwLimparTela = null;
+    el.classList.remove(...FW_TELA_CLASSES);
+  };
+  el._fwLimparTela = limpar;
+  el.addEventListener('animationend', limpar);
+  el.addEventListener('animationcancel', limpar);
 }

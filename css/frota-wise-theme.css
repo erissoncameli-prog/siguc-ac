@@ -236,10 +236,23 @@
    Sem prefixo .fw-theme: a classe é adicionada no PRÓPRIO elemento que
    já carrega .fw-theme (ex.: .frota-app-shell), então o seletor
    descendente ".fw-theme .fw-tela-fade" nunca bateria ali — este
-   arquivo só carrega nas páginas de Frota, então não precisa do escopo. */
-.fw-tela-avancar { animation: fw-tela-avancar 320ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
-.fw-tela-voltar  { animation: fw-tela-voltar 320ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
-.fw-tela-fade    { animation: fw-tela-fade 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+   arquivo só carrega nas páginas de Frota, então não precisa do escopo.
+
+   ⚠️ fill-mode é `backwards`, NUNCA `both`. Com `both` o estado final do
+   keyframe PERSISTE depois da animação — e o estado final aqui inclui
+   `transform: translateX(0)` / `translateY(0) scale(1)`, que é um
+   transform DIFERENTE de `none`. Um transform ≠ none faz o elemento
+   virar containing block dos descendentes `position: fixed` (CSS
+   Transforms L1). Como a classe também nunca era removida, a
+   `.fm-shell` do app ficava permanentemente transformada e a barra
+   inferior fixa (.fm-pill-nav) deixava de se posicionar pela viewport,
+   indo parar no fim do documento. `backwards` aplica só o estado
+   inicial antes de começar (visualmente idêntico, já que o estado final
+   é o natural) e não deixa nada pendurado; fwTransicaoTela ainda remove
+   a classe no animationend, por garantia. */
+.fw-tela-avancar { animation: fw-tela-avancar 320ms cubic-bezier(0.2, 0.8, 0.2, 1) backwards; }
+.fw-tela-voltar  { animation: fw-tela-voltar 320ms cubic-bezier(0.2, 0.8, 0.2, 1) backwards; }
+.fw-tela-fade    { animation: fw-tela-fade 260ms cubic-bezier(0.2, 0.8, 0.2, 1) backwards; }
 @keyframes fw-tela-avancar {
   from { opacity: 0; transform: translateX(18px); }
   to   { opacity: 1; transform: translateX(0); }
@@ -253,20 +266,24 @@
   to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 
-/* Variante "-leve": só opacidade, sem transform. Usada em #fm-conteudo
-   (troca de ABA dentro de um modo) — ver comentário em fwTransicaoTela
-   (js/frota-wise.js) sobre o bug de composição que transform nesse
-   contêiner dispara na barra inferior position:fixed irmã dele. */
-.fw-tela-avancar-leve,
-.fw-tela-voltar-leve  { animation: fw-tela-fade-leve 220ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
-.fw-tela-fade-leve    { animation: fw-tela-fade-leve 220ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
-@keyframes fw-tela-fade-leve {
-  from { opacity: 0; }
-  to   { opacity: 1; }
-}
+/* As variantes "-leve" (só opacidade) foram removidas: existiam para
+   evitar transform em #fm-conteudo, com base num diagnóstico errado
+   (bug de composição do WebKit com um irmão position:fixed). O problema
+   real era o transform residual na .fm-shell ANCESTRAL — ver comentário
+   do fill-mode acima. Com a barra inferior fora da .fm-shell e sem
+   estado residual, o slide normal de troca de aba voltou. */
 
-/* Indicador ativo do bottom nav desliza suavemente entre abas */
-.fw-theme .fm-pill-btn { transition: background 200ms var(--fw-ease), color 200ms var(--fw-ease), transform 150ms var(--fw-ease); }
+/* Indicador ativo do bottom nav desliza suavemente entre abas.
+   Sem prefixo .fw-theme (mesmo motivo já usado acima e no bloco de
+   .modal-overlay): a barra inferior do app vive fora do wrapper
+   .fw-theme, num host próprio irmão de #app, e este arquivo só carrega
+   nas páginas de Frota. */
+.fm-pill-btn {
+  /* --fw-ease é declarada em .fw-theme; fora dele a var não resolve e a
+     declaração inteira seria descartada — daí o fallback explícito. */
+  --fm-ease: var(--fw-ease, cubic-bezier(0.2, 0.8, 0.2, 1));
+  transition: background 200ms var(--fm-ease), color 200ms var(--fm-ease), transform 150ms var(--fm-ease);
+}
 
 /* Modal como "sheet": entra com leve subida + escala, não só aparece.
    Sem prefixo .fw-theme: os modais de Frota vivem fora do wrapper
