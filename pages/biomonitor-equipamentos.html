@@ -97,9 +97,47 @@ window.assinarFotos = window.assinarFotos || function () {}
   </div>
 </div>
 
+<!-- Modal: validar cautela (confirma/ajusta prazo) -->
+<div class="modal-overlay" id="modal-validar">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-header">
+      <div class="modal-title">Validar cautela</div>
+      <button class="modal-close" onclick="fecharModal('validar')">×</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:13px;color:#6B7280;margin:0 0 12px">
+        Ao validar, você passa a ser o responsável por acompanhar o prazo desta cautela — os avisos de vencimento chegam para você.
+      </p>
+      <div class="form-group"><label class="form-label">Data prevista de devolução</label>
+        <input class="form-control" type="date" id="val-data-prevista"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="fecharModal('validar')">Cancelar</button>
+      <button class="btn btn-primary" id="btn-confirmar-validacao" onclick="confirmarValidacao()">Validar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: tratar ocorrência de equipamento -->
+<div class="modal-overlay" id="modal-ocorrencia">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-header">
+      <div class="modal-title">Ocorrência de equipamento</div>
+      <button class="modal-close" onclick="fecharModal('ocorrencia')">×</button>
+    </div>
+    <div class="modal-body" id="ocorr-corpo"></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="fecharModal('ocorrencia')">Fechar</button>
+      <button class="btn btn-primary" id="btn-resolver-ocorrencia" onclick="resolverOcorrencia()">Marcar como resolvida</button>
+    </div>
+  </div>
+</div>
+
 <script>
-let _equipamentos = [], _cautelas = [], _grupos = [], _editEquipId = null, _fotoEquipFile = null
-let _devCautelaId = null
+let _equipamentos = [], _cautelas = [], _grupos = [], _ocorrencias = [], _editEquipId = null, _fotoEquipFile = null
+let _devCautelaId = null, _valCautelaId = null, _ocorrOcorrenciaId = null
+
+const TIPO_OCORRENCIA_LABEL = { dano: 'Dano', defeito: 'Defeito', extravio: 'Extravio', perda: 'Perda', outro: 'Outro' }
 
 const CATEGORIA_LABEL = {
   gps: 'GPS', camera: 'Câmera', equip_medicao: 'Equipamento de medição',
@@ -133,7 +171,7 @@ const ESPEC_CAMPOS = {
   document.getElementById('app').innerHTML =
     gerarLayout('Biomonitor — Equipamentos', 'biomonitor-equipamentos') + htmlPagina()
 
-  await Promise.all([carregarEquipamentos(), carregarCautelas(), carregarGrupos()])
+  await Promise.all([carregarEquipamentos(), carregarCautelas(), carregarGrupos(), carregarOcorrencias()])
   bIconsAplicar()
 })()
 
@@ -168,13 +206,25 @@ function htmlPagina() {
       </table></div>
     </div>
 
-    <div class="card">
+    <div class="card" style="margin-bottom:16px">
       <div style="font-weight:700;font-size:14px;margin-bottom:6px">Cautelas — relatório de patrimônio</div>
       <div class="table-wrap"><table class="table">
         <thead><tr>
-          <th>Assinado em</th><th>Monitor</th><th>Termo</th><th>Itens</th><th style="width:110px">Status</th><th style="width:100px"></th>
+          <th>Assinado em</th><th>Monitor</th><th>Itens</th><th>Devolução prevista</th>
+          <th style="width:130px">Validação</th><th style="width:110px">Status</th><th style="width:170px"></th>
         </tr></thead>
-        <tbody id="tbody-cautelas"><tr><td colspan="6" style="text-align:center;padding:32px;color:#9CA3AF">Carregando...</td></tr></tbody>
+        <tbody id="tbody-cautelas"><tr><td colspan="7" style="text-align:center;padding:32px;color:#9CA3AF">Carregando...</td></tr></tbody>
+      </table></div>
+    </div>
+
+    <div class="card">
+      <div style="font-weight:700;font-size:14px;margin-bottom:6px">Ocorrências em equipamentos</div>
+      <div class="table-wrap"><table class="table">
+        <thead><tr>
+          <th>Data</th><th>Equipamento</th><th>Monitor</th><th>Tipo</th><th>Descrição</th>
+          <th style="width:110px">Status</th><th style="width:80px"></th>
+        </tr></thead>
+        <tbody id="tbody-ocorrencias"><tr><td colspan="7" style="text-align:center;padding:32px;color:#9CA3AF">Carregando...</td></tr></tbody>
       </table></div>
     </div>
   </div>`
@@ -345,19 +395,120 @@ function renderCautelas() {
   const tbody = document.getElementById('tbody-cautelas')
   if (!tbody) return
   if (!_cautelas.length) {
-    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:32px;color:#9CA3AF">Nenhuma cautela registrada</td></tr>`
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:32px;color:#9CA3AF">Nenhuma cautela registrada</td></tr>`
     return
   }
   const STATUS_LABEL = { aberta: 'Aberta', parcial: 'Devolução parcial', devolvida: 'Devolvida' }
   const STATUS_BADGE = { aberta: 'badge-ouro', parcial: 'badge-ouro', devolvida: 'badge-verde' }
-  tbody.innerHTML = _cautelas.map(c => `<tr>
+  const hoje = new Date().toISOString().slice(0, 10)
+  tbody.innerHTML = _cautelas.map(c => {
+    const venceu = c.status !== 'devolvida' && c.data_prevista_devolucao && c.data_prevista_devolucao < hoje
+    const prazoFmt = c.data_prevista_devolucao
+      ? new Date(c.data_prevista_devolucao + 'T00:00:00').toLocaleDateString('pt-BR') : '—'
+    return `<tr>
     <td style="font-size:12px">${formatDataHora(c.assinado_em)}</td>
     <td style="font-size:12px">${esc(c.monitor_nome || '—')}</td>
-    <td class="mono" style="font-size:12px">v${esc(c.termo_versao)}</td>
     <td style="font-size:12px">${(c.itens || []).map(i => esc(i.descricao) + (i.devolvido_em ? ' <span style="color:#9CA3AF">(devolvido)</span>' : '')).join(', ')}</td>
+    <td style="font-size:12px${venceu ? ';color:#DC2626;font-weight:700' : ''}">${prazoFmt}${venceu ? ' (vencida)' : ''}</td>
+    <td>${c.validado_por ? '<span class="badge badge-verde">Validada</span>' : `<button class="btn btn-xs btn-ghost" onclick="abrirValidacao('${c.id}')">Validar</button>`}</td>
     <td><span class="badge ${STATUS_BADGE[c.status] || 'badge-cinza'}">${STATUS_LABEL[c.status] || c.status}</span></td>
     <td>${c.status !== 'devolvida' ? `<button class="btn btn-xs btn-ghost" onclick="abrirDevolucao('${c.id}')">Devolver</button>` : ''}</td>
+  </tr>`
+  }).join('')
+}
+
+function abrirValidacao(cautelaId) {
+  const c = _cautelas.find(x => x.id === cautelaId)
+  if (!c) return
+  _valCautelaId = cautelaId
+  document.getElementById('val-data-prevista').value = c.data_prevista_devolucao || ''
+  document.getElementById('modal-validar').classList.add('aberto')
+}
+
+async function confirmarValidacao() {
+  const btn = document.getElementById('btn-confirmar-validacao')
+  btn.disabled = true; btn.textContent = 'Validando...'
+  try {
+    const { error } = await db.rpc('biomonitor_validar_cautela', {
+      p_cautela_id: _valCautelaId,
+      p_nova_data_prevista: document.getElementById('val-data-prevista').value || null,
+    })
+    if (error) throw error
+    toast('Cautela validada', 'success')
+    fecharModal('validar')
+    await carregarCautelas()
+  } catch (e) { toast(e.message || 'Erro ao validar', 'error') }
+  finally { btn.disabled = false; btn.textContent = 'Validar' }
+}
+
+// ── Ocorrências de equipamento ───────────────────────────────────
+async function carregarOcorrencias() {
+  const { data } = await db.from('vw_biomonitor_ocorrencias_equipamento').select('*')
+    .order('criado_em', { ascending: false }).limit(200)
+  _ocorrencias = data || []
+  renderOcorrencias()
+}
+
+function renderOcorrencias() {
+  const tbody = document.getElementById('tbody-ocorrencias')
+  if (!tbody) return
+  if (!_ocorrencias.length) {
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:32px;color:#9CA3AF">Nenhuma ocorrência registrada</td></tr>`
+    return
+  }
+  const STATUS_LABEL = { aberta: 'Aberta', em_analise: 'Em análise', resolvida: 'Resolvida' }
+  const STATUS_BADGE = { aberta: 'badge-red', em_analise: 'badge-ouro', resolvida: 'badge-verde' }
+  tbody.innerHTML = _ocorrencias.map(o => `<tr>
+    <td style="font-size:12px">${formatDataHora(o.criado_em)}</td>
+    <td style="font-size:12px">${esc(o.equipamento_descricao)}${o.equipamento_codigo ? ` <span class="mono" style="color:#9CA3AF">(${esc(o.equipamento_codigo)})</span>` : ''}</td>
+    <td style="font-size:12px">${esc(o.monitor_nome || '—')}</td>
+    <td style="font-size:12px">${esc(TIPO_OCORRENCIA_LABEL[o.tipo] || o.tipo)}</td>
+    <td style="font-size:12px;max-width:220px">${esc(o.descricao)}</td>
+    <td><span class="badge ${STATUS_BADGE[o.status] || 'badge-cinza'}">${STATUS_LABEL[o.status] || o.status}</span></td>
+    <td>${o.status !== 'resolvida' ? `<button class="btn btn-xs btn-ghost" onclick="abrirOcorrencia('${o.id}')">Tratar</button>` : ''}</td>
   </tr>`).join('')
+}
+
+function abrirOcorrencia(ocorrenciaId) {
+  const o = _ocorrencias.find(x => x.id === ocorrenciaId)
+  if (!o) return
+  _ocorrOcorrenciaId = ocorrenciaId
+  document.getElementById('ocorr-corpo').innerHTML = `
+    <div style="font-size:13px;line-height:1.8;margin-bottom:12px">
+      <div><strong>Equipamento:</strong> ${esc(o.equipamento_descricao)}${o.equipamento_codigo ? ` (${esc(o.equipamento_codigo)})` : ''}</div>
+      <div><strong>Monitor:</strong> ${esc(o.monitor_nome || '—')}</div>
+      <div><strong>Tipo:</strong> ${esc(TIPO_OCORRENCIA_LABEL[o.tipo] || o.tipo)}</div>
+      <div><strong>Descrição:</strong> ${esc(o.descricao)}</div>
+    </div>
+    ${(o.fotos_urls || []).map(url => `<a ${fotoAttr(url)} target="_blank" rel="noopener"><img ${fotoAttr(url)} style="width:80px;height:80px;object-fit:cover;border-radius:8px;margin:0 6px 6px 0"></a>`).join('')}
+    <div class="form-group" style="margin-top:12px"><label class="form-label">Status do equipamento após tratar</label>
+      <select class="form-control" id="ocorr-status-equip">
+        <option value="">Manter como está</option>
+        <option value="disponivel">Disponível</option>
+        <option value="manutencao">Enviar para manutenção</option>
+        <option value="baixado">Baixar (perda/extravio confirmado)</option>
+      </select></div>
+  `
+  document.getElementById('modal-ocorrencia').classList.add('aberto')
+  assinarFotos(document.getElementById('ocorr-corpo'))
+}
+
+async function resolverOcorrencia() {
+  const btn = document.getElementById('btn-resolver-ocorrencia')
+  btn.disabled = true; btn.textContent = 'Salvando...'
+  try {
+    const statusEquip = document.getElementById('ocorr-status-equip').value || null
+    const { error } = await db.rpc('biomonitor_tratar_ocorrencia_equipamento', {
+      p_ocorrencia_id: _ocorrOcorrenciaId,
+      p_novo_status: 'resolvida',
+      p_novo_status_equipamento: statusEquip,
+    })
+    if (error) throw error
+    toast('Ocorrência tratada', 'success')
+    fecharModal('ocorrencia')
+    await Promise.all([carregarOcorrencias(), carregarEquipamentos()])
+  } catch (e) { toast(e.message || 'Erro ao tratar ocorrência', 'error') }
+  finally { btn.disabled = false; btn.textContent = 'Marcar como resolvida' }
 }
 
 function abrirDevolucao(cautelaId) {
@@ -397,6 +548,8 @@ function fecharModal(qual) {
   document.getElementById(`modal-${qual}`).classList.remove('aberto')
   if (qual === 'equip') { _editEquipId = null; _fotoEquipFile = null }
   if (qual === 'devolucao') _devCautelaId = null
+  if (qual === 'validar') _valCautelaId = null
+  if (qual === 'ocorrencia') _ocorrOcorrenciaId = null
 }
 </script>
 </body>
