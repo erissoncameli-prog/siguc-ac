@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
 <meta name="theme-color" content="#1F4E2C">
 <title>SIGUC-AC · App Frota</title>
 <link rel="manifest" href="/pwa/manifest-frota.json">
@@ -3852,7 +3852,14 @@ if ('serviceWorker' in navigator && !window.Capacitor) {
   max-width: 640px; margin: 0 auto; width: 100%; box-sizing: border-box;
 }
 .fm-pill-nav {
+  /* will-change isola a barra na própria camada de composição do WebKit:
+     sem isso, a animação de transform em #fm-conteudo (fwTransicaoTela,
+     toda troca de aba) "arrasta" essa barra fixed junto durante o scroll
+     em abas com conteúdo alto (Dados/Histórico/Config/Viagem) — mesmo
+     bug de composição já documentado em css/brigada.css. Início/
+     Solicitações não mostravam o bug por caberem numa tela sem rolagem. */
   position: fixed; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); left: 50%; transform: translateX(-50%);
+  will-change: transform;
   max-width: calc(100vw - 16px);
   background: #0A1A0F; border-radius: 32px; height: 64px; padding: 0 8px;
   display: flex; align-items: center; gap: 3px; box-shadow: 0 8px 32px rgba(0,0,0,.35); z-index: 1000;
