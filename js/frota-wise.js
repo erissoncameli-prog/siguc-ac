@@ -69,12 +69,30 @@ function fwSkeleton(alturaPx, larguraCss) {
 
 // Toca a animação de troca de tela num contêiner cujo conteúdo acabou de
 // ser trocado (innerHTML já novo). direcao: 'avancar' | 'voltar' | 'fade'.
+//
+// #fm-conteudo é irmão (não ancestral) da barra inferior position:fixed
+// (.fm-pill-nav) dentro de .fm-shell. Ainda assim, animar `transform`
+// nele (translateX/scale das classes fw-tela-*) dispara um bug real de
+// composição do WebKit/Chrome mobile: qualquer elemento da página
+// animando transform pode fazer um irmão position:fixed “grudar” no
+// scroll, sumir e ficar com a área de toque desalinhada até o próximo
+// reflow — mesmo sem relação de ancestralidade no DOM. will-change
+// isolando só a barra não foi suficiente na prática. Mesma classe de
+// bug documentada em css/brigada.css (ali evitada não usando transform
+// nenhum na tela). Por isso troca de ABA (sempre em #fm-conteudo) usa
+// as variantes -leve, só opacidade — sem transform, o bug não dispara.
+// Troca de MODO (motorista/gestor/solicitante, .fm-shell inteiro) pode
+// seguir com o slide de transform: a barra é descendente do próprio
+// elemento animado ali, então desliza junto de propósito.
 function fwTransicaoTela(idOuEl, direcao) {
   const el = typeof idOuEl === 'string' ? document.getElementById(idOuEl) : idOuEl;
   if (!el) return;
   if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-  const classe = direcao === 'voltar' ? 'fw-tela-voltar' : direcao === 'fade' ? 'fw-tela-fade' : 'fw-tela-avancar';
-  el.classList.remove('fw-tela-avancar', 'fw-tela-voltar', 'fw-tela-fade');
+  const semTransform = (typeof idOuEl === 'string' && idOuEl === 'fm-conteudo') || el.id === 'fm-conteudo';
+  const sufixo = semTransform ? '-leve' : '';
+  const classe = (direcao === 'voltar' ? 'fw-tela-voltar' : direcao === 'fade' ? 'fw-tela-fade' : 'fw-tela-avancar') + sufixo;
+  el.classList.remove('fw-tela-avancar', 'fw-tela-voltar', 'fw-tela-fade',
+    'fw-tela-avancar-leve', 'fw-tela-voltar-leve', 'fw-tela-fade-leve');
   void el.offsetWidth; // força reflow para reiniciar a animação
   el.classList.add(classe);
 }

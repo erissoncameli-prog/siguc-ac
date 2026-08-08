@@ -253,6 +253,18 @@
   to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 
+/* Variante "-leve": só opacidade, sem transform. Usada em #fm-conteudo
+   (troca de ABA dentro de um modo) — ver comentário em fwTransicaoTela
+   (js/frota-wise.js) sobre o bug de composição que transform nesse
+   contêiner dispara na barra inferior position:fixed irmã dele. */
+.fw-tela-avancar-leve,
+.fw-tela-voltar-leve  { animation: fw-tela-fade-leve 220ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.fw-tela-fade-leve    { animation: fw-tela-fade-leve 220ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+@keyframes fw-tela-fade-leve {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
 /* Indicador ativo do bottom nav desliza suavemente entre abas */
 .fw-theme .fm-pill-btn { transition: background 200ms var(--fw-ease), color 200ms var(--fw-ease), transform 150ms var(--fw-ease); }
 
