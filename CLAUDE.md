@@ -704,6 +704,35 @@ monitor (mesmo espírito da trava de veículo do Frota, migration 180)
 filtra por `grupo_id` do monitor pra não mostrar o que ele não pode
 pegar. `pwa/sw.js`: biomonitor v23 → v24.
 
+Prazo de devolução + alertas + ocorrências (229/230): toda cautela
+tem `data_prevista_devolucao` (obrigatória) — o monitor escolhe o
+prazo (7/15/30 dias) ao assinar no app, a RPC `biomonitor_registrar_
+cautela` ganhou o parâmetro `p_dias_prazo` (assinatura antiga sem
+esse parâmetro foi `DROP FUNCTION`ada, regra do projeto — CREATE OR
+REPLACE com lista de parâmetros diferente cria overload em vez de
+substituir). A cautela nasce pendente de validação; a mesa confirma
+via RPC `biomonitor_validar_cautela` (pode ajustar a data), e quem
+valida vira o "dono" da cautela para efeito de alerta — junto com o
+monitor e todo `super_admin` (rede de segurança se ninguém validou
+ainda). `biomonitor_checar_cautelas_vencidas` roda via pg_cron
+(diário, 09h15 UTC), dois avisos por cautela (3 dias antes + no
+vencimento) com dedupe por `ref` no `meta` da notificação — mesmo
+molde de `frota_checar_vencimentos` (migration 205). Novo valor
+`'biomonitor'` em `tipo_notificacao` (migration 229, própria por
+regra do ADD VALUE). `biomonitor_devolver_equipamentos` resolve os
+avisos pendentes da cautela quando ela é totalmente devolvida.
+
+Ocorrência de equipamento (dano/defeito/extravio/perda): o monitor
+reporta a qualquer momento pelo app (não só na devolução), mesmo com
+a cautela ainda aberta — tabela `biomonitor_equipamento_ocorrencias`,
+RPC `biomonitor_reportar_ocorrencia_equipamento` (idempotente por
+`uuid_cliente`, fila offline). Notifica os mesmos destinatários do
+alerta de vencimento (validador da cautela relacionada + todo
+super_admin). A mesa trata em `biomonitor-equipamentos.html`
+(RPC `biomonitor_tratar_ocorrencia_equipamento`), podendo mudar o
+status do bem (disponível/manutenção/baixado) no mesmo passo.
+`pwa/sw.js`: biomonitor v24 → v25.
+
 ## Variáveis de ambiente
 SUPABASE_URL=https://atqtybcsvepdabsvgaly.supabase.co
 SUPABASE_ANON_KEY=(pública, já em config.js)
