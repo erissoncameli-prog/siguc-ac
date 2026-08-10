@@ -1,1 +1,5 @@
 .vercel
+
+# Artefatos do Playwright (gerados por npx playwright test)
+test-results/
+playwright-report/
