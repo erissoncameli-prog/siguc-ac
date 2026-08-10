@@ -21,6 +21,9 @@
     .qr-wrap { text-align:center; margin:8px 0 18px; }
     .qr-wrap img { width:200px; height:200px; border-radius:12px; border:1px solid #E2EBE4; }
     .qr-wrap p { font-size:.85rem; color:var(--suave); margin-top:8px; }
+    .btn-baixar { display:block; text-align:center; background:var(--verde); color:#fff; text-decoration:none;
+      font-size:1.15rem; font-weight:700; padding:16px; border-radius:14px; margin:8px 0 18px; }
+    .btn-baixar:active { background:var(--verde-esc); }
     ol { padding-left:0; list-style:none; counter-reset:passo; }
     ol li { counter-increment:passo; display:flex; gap:12px; margin-bottom:14px; font-size:1.02rem; }
     ol li::before { content:counter(passo); flex:0 0 28px; height:28px; background:#E7F5EE; color:var(--verde-esc);
@@ -54,14 +57,14 @@
 
   <!-- ── QR PARA COMPARTILHAR ─────────────────────────────── -->
   <section class="cartao">
-    <h2>📲 Escaneie ou compartilhe</h2>
-    <p class="sub">Mostre este QR code para a pessoa escanear com a câmera do celular, ou copie o link e mande por WhatsApp. O app abre automaticamente no perfil certo — motorista, solicitante ou gestor de transporte.</p>
+    <h2>📲 Escaneie para instalar (Android)</h2>
+    <p class="sub">Aponte a câmera do celular Android para o QR — ele já baixa o arquivo de instalação do app. Ou mande o link por WhatsApp com o botão de copiar.</p>
     <div class="qr-wrap">
       <img id="qr-img" src="" alt="QR code de instalação">
       <p>Aponte a câmera do celular para o código</p>
     </div>
-    <button type="button" class="copia-link" id="btn-copiar" onclick="copiarLink()" aria-label="Copiar o link do app">
-      <span class="cl-url" id="cl-url">siguc-ac.vercel.app/pages/frota-app.html</span>
+    <button type="button" class="copia-link" id="btn-copiar" onclick="copiarLink()" aria-label="Copiar o link de instalação">
+      <span class="cl-url" id="cl-url">github.com/.../siguc-frota.apk</span>
       <span class="cl-ic" aria-hidden="true">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
       </span>
@@ -72,20 +75,36 @@
   <!-- ── ANDROID ──────────────────────────────────────────── -->
   <section class="cartao">
     <h2>📱 Celular Android</h2>
-    <p class="sub">O app instala direto pelo navegador Chrome — sem loja de aplicativos, sem arquivo pra baixar.</p>
+    <p class="sub">Instale o aplicativo uma única vez. Depois é só tocar no ícone, como qualquer outro app.</p>
+
+    <a class="btn-baixar" href="https://github.com/erissoncameli-prog/siguc-ac/releases/latest/download/siguc-frota.apk">
+      ⬇&nbsp; Baixar o aplicativo
+    </a>
+
     <ol>
-      <li><span>Abra <b>este link</b> no navegador <b>Chrome</b> do celular (use o QR acima ou o botão de copiar).</span></li>
-      <li><span>Toque no menu <b>⋮</b> (três pontinhos, canto superior direito) e escolha <b>"Instalar app"</b> ou <b>"Adicionar à tela inicial"</b>.</span></li>
-      <li><span>Confirme tocando em <b>Instalar</b>. Pronto! O ícone <b>SIGUC Frota</b> aparece na tela inicial, como qualquer outro app.</span></li>
+      <li><span>Toque no botão verde acima (ou escaneie o QR) e aguarde o download terminar.</span></li>
+      <li><span>Abra o arquivo baixado (<b>siguc-frota.apk</b>) — ele aparece na barra de notificações ou na pasta <b>Downloads</b>.</span></li>
+      <li><span>Se o celular perguntar sobre <b>"fontes desconhecidas"</b>, toque em <b>Configurações → Permitir desta fonte</b> e volte.</span></li>
+      <li><span>Toque em <b>Instalar</b>. Pronto! O ícone <b>SIGUC Frota</b> aparece na tela inicial.</span></li>
     </ol>
+
+    <p class="nota">⚠️ É normal o Android avisar sobre apps de fora da Play Store. Este aplicativo é
+    distribuído oficialmente pela SEMA-AC por este site.</p>
   </section>
 
   <!-- ── iPHONE ───────────────────────────────────────────── -->
   <section class="cartao">
     <h2>🍎 iPhone (iOS)</h2>
-    <p class="sub">No iPhone, o app é instalado direto pelo navegador Safari — sem loja de aplicativos.</p>
+    <p class="sub">No iPhone ainda não há instalador nativo — o app é instalado direto pelo navegador Safari, como um app comum, sem loja de aplicativos.</p>
+    <button type="button" class="copia-link" id="btn-copiar-ios" onclick="copiarLinkIOS()" aria-label="Copiar o link do app web">
+      <span class="cl-url" id="cl-url-ios">siguc-ac.vercel.app/pages/frota-app.html</span>
+      <span class="cl-ic" aria-hidden="true">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+      </span>
+      <span class="cl-ok" id="cl-ok-ios">✓ Link copiado! Agora cole no Safari</span>
+    </button>
     <ol>
-      <li><span>Toque no botão de copiar acima para copiar o link e <b>cole na barra de endereços do Safari</b> (precisa ser o Safari, não funciona em outro navegador nem dentro do WhatsApp).</span></li>
+      <li><span>Toque no botão acima para <b>copiar</b> o link e <b>cole na barra de endereços do Safari</b> (precisa ser o Safari, não funciona em outro navegador nem dentro do WhatsApp).</span></li>
       <li><span>Com a página do app aberta no Safari, toque no botão de <b>compartilhar</b> <span style="font-size:1.1em">⎋</span> (quadrado com seta para cima, na barra de baixo).</span></li>
       <li><span>Role a lista e toque em <b>"Adicionar à Tela de Início"</b>.</span></li>
       <li><span>Toque em <b>Adicionar</b>. Use o app <b>sempre pelo ícone</b> da tela inicial — no iPhone, é só assim que os avisos de viagem funcionam.</span></li>
@@ -104,6 +123,21 @@
     <p class="nota">⚠️ Se o motorista ainda não tiver cadastro no SIGUC, o setor de transporte precisa cadastrá-lo antes em <b>Veículos e Motoristas</b>, vinculando o e-mail de login dele.</p>
   </section>
 
+  <!-- ── ATUALIZAR O APP ──────────────────────────────────── -->
+  <section class="cartao">
+    <h2>🔄 Como atualizar o app</h2>
+    <p style="font-weight:600;margin:4px 0 6px">📱 Android</p>
+    <ol>
+      <li><span>Volte a esta página e toque em <b>"Baixar o aplicativo"</b> — ele sempre traz a versão mais recente.</span></li>
+      <li><span>Abra o <b>siguc-frota.apk</b> baixado e toque em <b>Instalar/Atualizar</b> por cima do app existente — seus dados são preservados.</span></li>
+    </ol>
+    <p style="font-weight:600;margin:16px 0 6px">🍎 iPhone (versão web)</p>
+    <ol>
+      <li><span>O app web atualiza sozinho ao abrir, quando há internet.</span></li>
+      <li><span>Se algo não mudar, feche o app pelo ícone e abra de novo (pode precisar abrir 2 vezes).</span></li>
+    </ol>
+  </section>
+
   <p class="rodape">
     SEMA-AC · Secretaria de Estado de Meio Ambiente do Acre<br>
     Dúvidas? Procure o setor de transporte ou a equipe DIMA.<br>
@@ -113,16 +147,17 @@
 
 <script src="/js/qrcode-generator.js"></script>
 <script>
+  var LINK_APK = 'https://github.com/erissoncameli-prog/siguc-ac/releases/latest/download/siguc-frota.apk';
   var LINK_APP = 'https://siguc-ac.vercel.app/pages/frota-app.html';
   (function () {
     var qr = qrcode(0, 'M');
-    qr.addData(LINK_APP);
+    qr.addData(LINK_APK);
     qr.make();
     document.getElementById('qr-img').src = qr.createDataURL(6, 4);
   })();
 
-  function _copiaOk() {
-    var btn = document.getElementById('btn-copiar');
+  function _copiaOk(idBtn) {
+    var btn = document.getElementById(idBtn);
     if (!btn) return;
     btn.classList.add('ok');
     clearTimeout(btn._t);
@@ -141,11 +176,20 @@
   }
   function copiarLink() {
     if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(LINK_APP).then(_copiaOk, function () {
-        if (_copiaFallback(LINK_APP)) _copiaOk();
+      navigator.clipboard.writeText(LINK_APK).then(function () { _copiaOk('btn-copiar'); }, function () {
+        if (_copiaFallback(LINK_APK)) _copiaOk('btn-copiar');
+      });
+    } else if (_copiaFallback(LINK_APK)) {
+      _copiaOk('btn-copiar');
+    }
+  }
+  function copiarLinkIOS() {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(LINK_APP).then(function () { _copiaOk('btn-copiar-ios'); }, function () {
+        if (_copiaFallback(LINK_APP)) _copiaOk('btn-copiar-ios');
       });
     } else if (_copiaFallback(LINK_APP)) {
-      _copiaOk();
+      _copiaOk('btn-copiar-ios');
     }
   }
 </script>
