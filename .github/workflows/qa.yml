@@ -75,3 +75,31 @@ jobs:
           name: playwright-report
           path: playwright-report/
           retention-days: 7
+
+  # ── 5. Regressão da barra inferior do App Frota ─────────────────
+  # Roda contra os arquivos DESTE commit, servidos localmente — não
+  # contra a URL pública como o job e2e. É proposital: o teste guarda um
+  # comportamento de CSS/DOM que não depende de login nem de banco, e
+  # precisa falhar no PR que quebrar, não um deploy depois. Ver a regra
+  # "barra inferior do app Frota fora do que anima" no CLAUDE.md.
+  frota-barra:
+    runs-on: ubuntu-latest
+    env:
+      TEST_BASE_URL: http://localhost:5500
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+      - run: npm install -D @playwright/test
+      - run: npx playwright install --with-deps chromium
+      - name: Servidor estático do checkout
+        run: npx --yes http-server . -p 5500 -s &
+      - name: Aguardar o servidor subir
+        run: timeout 60 bash -c 'until curl -sf http://localhost:5500/pages/frota-app.html > /dev/null; do sleep 1; done'
+      - run: npx playwright test tests/frota-app-barra.test.js
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report-frota-barra
+          path: playwright-report/
+          retention-days: 7
