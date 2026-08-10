@@ -565,8 +565,38 @@ async function fazerLogout() {
 }
 
 async function entrarComSessao(session, jaAutenticouSenha = false) {
-  const { data: u } = await db.from('usuarios').select('*').eq('id', session.user.id).single()
-  if (!u || !u.ativo) { await db.auth.signOut(); mostrarLoginFrota('Usuário inativo ou não encontrado.'); return }
+  // Este app é offline-first: esta consulta NÃO pode ser a diferença
+  // entre entrar e não entrar. Antes ela ia sem prazo e o resultado era
+  // desestruturado direto — em falha de rede `u` vinha null e o código
+  // caía no signOut(). Ou seja: abrir o app sem sinal DERRUBAVA a sessão
+  // de quem estava em campo, e só dava para voltar com internet.
+  //
+  // `maybeSingle` (e não `single`) porque com `single` a ausência de
+  // linha vem como ERRO, indistinguível de falha de rede. Com
+  // `maybeSingle`, data:null + error:null é resposta legítima do
+  // servidor ("esse usuário não existe / a RLS não deixa ver"), e
+  // error preenchido é "não consegui perguntar".
+  const rUsuario = await fComPrazo(
+    db.from('usuarios').select('*').eq('id', session.user.id).maybeSingle(), 8000)
+
+  let u = rUsuario?.data ?? null
+
+  if (!rUsuario || rUsuario.error) {
+    // Não deu para perguntar: cai no cadastro cacheado deste aparelho.
+    // A checagem de id evita que um aparelho com o cache do usuário A
+    // deixe o usuário B entrar com a identidade de A. Só cacheamos
+    // usuários ativos, então quem foi desativado depois ainda consegue
+    // abrir a tela offline — mas nada que ele tente gravar passa pela
+    // RLS, que continua sendo quem decide de verdade.
+    const cache = await fComPrazo(fOfflineGetConfig('usuario_cache'), 2000)
+    u = (cache && cache.id === session.user.id) ? cache : null
+    if (!u) { mostrarLoginFrota('Sem conexão para validar o acesso. Tente de novo com internet.'); return }
+  } else {
+    // O servidor respondeu de fato — só aqui o signOut é legítimo.
+    if (!u || !u.ativo) { await db.auth.signOut(); mostrarLoginFrota('Usuário inativo ou não encontrado.'); return }
+    fOfflineSetConfig('usuario_cache', u).catch(() => {})
+  }
+
   appState.usuario = u
   appState.perfil = u.perfil
   _usuario = u
