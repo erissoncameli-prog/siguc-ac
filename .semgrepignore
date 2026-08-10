@@ -5,5 +5,10 @@ test-results/
 playwright-report/
 
 # Projeto nativo Android gerado pelo Capacitor — boilerplate da plataforma
-# (a MainActivity de launcher precisa de exported=true por exigência do Android 12+)
+# (a MainActivity de launcher precisa de exported=true por exigência do Android 12+).
+# Os três shells são o mesmo boilerplate; só o app/ (Brigadas) estava listado
+# porque era o único que existia quando esta regra foi escrita. O que de fato
+# roda dentro dos três é o código web, que continua sendo escaneado.
 app/android/
+app-biomonitor/android/
+app-frota/android/
