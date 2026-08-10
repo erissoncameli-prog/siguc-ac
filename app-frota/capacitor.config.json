@@ -1,0 +1,12 @@
+{
+  "appId": "br.gov.ac.sema.siguc.frota",
+  "appName": "SIGUC Frota",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "https"
+  },
+  "android": {
+    "allowMixedContent": false,
+    "adjustMarginsForEdgeToEdge": "auto"
+  }
+}
