@@ -68,6 +68,11 @@ Sistema já tem login, sidebar, layout e páginas funcionando.
   + js/biomonitor-*.js; appId br.gov.ac.sema.siguc.biomonitor — convive com
   o Brigadas; build via app-biomonitor/scripts/build-www.mjs —
   ver docs/app-biomonitor.md; alterações sempre nos arquivos web)
+- app-frota/ → shell nativo Capacitor do Frota (APK Android gerado pelo
+  workflow frota-apk.yml a partir de pages/frota-app.html; appId
+  br.gov.ac.sema.siguc.frota — convive com Brigadas e Biomonitor; build via
+  app-frota/scripts/build-www.mjs — ver docs/app-frota.md; alterações
+  sempre nos arquivos web)
 
 ## Design system (nunca alterar variáveis sem alinhamento)
 --floresta:#0A1A0F | --verde-c:#52B788 | --ouro:#C9A84C | --ouro-c:#F0CB6A

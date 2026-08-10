@@ -1,0 +1,26 @@
+{
+  "name": "siguc-frota-app",
+  "version": "1.0.0",
+  "private": true,
+  "description": "SIGUC Frota — app nativo (Capacitor) de solicitação/aprovação de viagem, abastecimento e checklist (solicitante/motorista/gestor)",
+  "scripts": {
+    "build:www": "node scripts/build-www.mjs",
+    "sync": "npm run build:www && npx cap sync android",
+    "apk:debug": "npm run sync && cd android && ./gradlew assembleDebug",
+    "apk:release": "npm run sync && cd android && ./gradlew assembleRelease"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.0.0",
+    "@capacitor/core": "^8.0.0",
+    "@fontsource/archivo": "^5.2.5",
+    "@fontsource/inter": "^5.2.5",
+    "@fontsource/dm-mono": "^5.2.5",
+    "@fontsource/dm-sans": "^5.2.5",
+    "@fontsource/fraunces": "^5.2.5",
+    "@supabase/supabase-js": "^2.0.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.0.0",
+    "esbuild": "^0.24.2"
+  }
+}
