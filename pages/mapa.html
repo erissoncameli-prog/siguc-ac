@@ -428,6 +428,7 @@ body.mapa-imersivo .page-body{animation:none!important;transform:none!important;
 <script src="../js/observability.js"></script>
 <script src="../js/queryLogger.js"></script>
 <script src="../js/config.js"></script>
+<script src="../js/fotos-privadas.js"></script>
 <script src="../js/layout.js"></script>
 <script src="../js/config-sistema.js"></script>
 <script src="../js/relatorio-car.js"></script>
@@ -3162,13 +3163,14 @@ async function _carregarFaunaFotos(registroId, popupEl) {
   wrap.innerHTML = `
     <div style="font-size:10px;font-weight:700;color:#2D6A4F;text-transform:uppercase;letter-spacing:.05em;margin:6px 0 4px;border-top:1px solid #e5e7eb;padding-top:6px">🐾 Fotos de Fauna</div>
     <div class="brig-carousel" data-cid="${cid}" style="height:120px">
-      ${todasFotos.map((u,i) => `<img src="${escHtml(u)}" class="${i===0?'ativo':''}" alt="fauna ${i+1}" loading="lazy">`).join('')}
+      ${todasFotos.map((u,i) => `<img ${fotoAttr(u)} class="${i===0?'ativo':''}" alt="fauna ${i+1}" loading="lazy">`).join('')}
       ${multi ? `
         <button class="car-btn car-prev" onclick="_navCarrossel(this,-1)">‹</button>
         <button class="car-btn car-next" onclick="_navCarrossel(this,1)">›</button>
         <span class="car-counter">1/${todasFotos.length}</span>` : ''}
     </div>`
   if (multi) _iniciarCarrossel(wrap)
+  assinarFotos(wrap)
 }
 
 // ── Área evitada (incêndio/queimada evitada) no mapa ────────────────
@@ -3334,7 +3336,7 @@ function renderBrigadasMapa() {
 
     const carouselHtml = fotosN > 0 ? `
       <div class="brig-carousel" data-cid="${cid}">
-        ${fotos.map((u,i) => `<img src="${escHtml(u)}" class="${i===0?'ativo':''}" alt="foto ${i+1}" loading="lazy">`).join('')}
+        ${fotos.map((u,i) => `<img ${fotoAttr(u)} class="${i===0?'ativo':''}" alt="foto ${i+1}" loading="lazy">`).join('')}
         ${fotosN > 1 ? `
           <button class="car-btn car-prev" onclick="_navCarrossel(this,-1)">‹</button>
           <button class="car-btn car-next" onclick="_navCarrossel(this,1)">›</button>
@@ -3371,6 +3373,7 @@ function renderBrigadasMapa() {
     marker.on('popupopen',  e => {
       const el = e.popup.getElement()
       _iniciarCarrossel(el)
+      assinarFotos(el)
       if (r.n_fauna > 0) _carregarFaunaFotos(r.id, el)
     })
     marker.on('popupclose', () => { _pararCarrossel(cid); _pararCarrossel('fauna-' + r.id) })
