@@ -215,6 +215,12 @@ const STATUS_BADGE = { solicitada:'fw-badge fw-badge-manutencao', aprovada:'fw-b
   em_andamento:'fw-badge fw-badge-em-rota', concluida:'fw-badge fw-badge-disponivel', cancelada:'badge-cinza' }
 const STATUS_VEIC_LABEL = { disponivel:'Disponível', em_viagem:'Em viagem', em_manutencao:'Em manutenção', cedido:'Cedido', baixado:'Baixado' }
 
+// "Cidade origem → Cidade destino", reaproveitado em toda listagem que
+// mostra destino (mesmo padrão de frota-solicitar.html e frota-app.html).
+function cidadeDestinoHtml(v) {
+  return v.cidade_destino ? `<div style="font-size:11px;font-weight:600;color:#6B7280">${esc(v.cidade_origem||'Rio Branco')} → ${esc(v.cidade_destino)}</div>` : ''
+}
+
 ;(async function () {
   const usuario = await carregarUsuario()
   if (!usuario) { window.location.href = '../index.html'; return }
@@ -368,6 +374,7 @@ function renderVencidas() {
       : `${Math.max(1, Math.round(v.horas_atraso))} h`
     return `<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;border-top:1px solid #F3F4F6;padding:8px 0">
       <div style="font-size:13px">
+        ${cidadeDestinoHtml(v)}
         <strong>${esc(v.destino)}</strong>
         <span style="color:#DC2626;font-weight:600"> · ${atraso} de atraso</span><br>
         <span style="font-size:12px;color:#6B7280">
@@ -416,7 +423,7 @@ function renderViagens() {
       : (irmas.length ? `<br><span style="font-size:11px;color:#9CA3AF">Dividida em ${irmas.length + 1} veículos</span>` : '')
     return `
     <tr>
-      <td><strong>${esc(v.destino)}</strong>${v.avarias ? ' <span class="badge badge-erro">Avaria</span>' : ''}${parte}</td>
+      <td>${cidadeDestinoHtml(v)}<strong>${esc(v.destino)}</strong>${v.avarias ? ' <span class="badge badge-erro">Avaria</span>' : ''}${parte}</td>
       <td style="font-size:12px">${esc(v.solicitante_nome)}${v.setor_sigla ? `<br><span style="color:#9CA3AF">${esc(v.setor_sigla)}</span>` : ''}</td>
       <td style="font-size:12px">${formatDataHora(v.data_saida_prevista)}<br>até ${formatDataHora(v.data_retorno_prevista)}</td>
       <td style="font-size:12px">${v.veiculo_placa ? `${esc(v.veiculo_modelo)} <span class="mono">(${esc(v.veiculo_placa)})</span><br>${esc(v.motorista_nome||'—')}` : '<span style="color:#9CA3AF">A definir</span>'}</td>
@@ -1000,7 +1007,7 @@ function tlHoverBar(ev, id) {
   })
 
   if (!_tlTip) { _tlTip = document.createElement('div'); _tlTip.className = 'frota-tl-tip'; document.body.appendChild(_tlTip) }
-  _tlTip.innerHTML = `<strong>${esc(v.destino)}</strong><br>${esc(v.finalidade||'')}<br>
+  _tlTip.innerHTML = `${v.cidade_destino ? `${esc(v.cidade_origem||'Rio Branco')} → ${esc(v.cidade_destino)}<br>` : ''}<strong>${esc(v.destino)}</strong><br>${esc(v.finalidade||'')}<br>
     ${formatDataHora(v.data_saida_prevista)} → ${formatDataHora(v.data_retorno_prevista)}<br>
     ${v.veiculo_placa ? `${esc(v.veiculo_modelo)} (${esc(v.veiculo_placa)})<br>` : ''}
     ${v.motorista_nome ? `Motorista: ${esc(v.motorista_nome)}<br>` : ''}
