@@ -826,6 +826,66 @@ conformidade em vez de entregá-la. Ficam aqui até alguém trazer o dado:
 Quando qualquer um desses chegar, é edição pontual — não precisa
 reabrir o plano.
 
+## Advisor de segurança do Supabase — o que já foi triado
+Não reinvestigar do zero a cada sessão. Estado após a migration 242:
+
+- **ERROR `rls_disabled_in_public` em `public.spatial_ref_sys` — NÃO
+  é corrigível daqui, e nunca vai sumir do painel.** É o catálogo EPSG
+  do PostGIS (8.500 linhas), pertence a `supabase_admin`, e `postgres`
+  não é membro: `ALTER TABLE ... ENABLE ROW LEVEL SECURITY` devolve
+  `42501: must be owner of table spatial_ref_sys` (testado). O
+  `REVOKE` dos privilégios também não pega — postgres não pode revogar
+  concessão que não fez (testado em transação revertida: privilégios
+  seguem `true` depois do REVOKE).
+  ⚠ Risco residual REAL, e não é o RLS: `anon` e `authenticated` têm
+  INSERT/UPDATE/DELETE/**TRUNCATE** nessa tabela, herdados do
+  `GRANT ALL` da plataforma. Ler é inofensivo (EPSG é dado público),
+  mas um TRUNCATE anônimo derrubaria os 28 usos de `ST_Transform` do
+  projeto (área evitada 111/112/114, comprimento de praia 103).
+  Ação pendente: **chamado no suporte do Supabase** pedindo que o
+  `supabase_admin` revogue INSERT/UPDATE/DELETE/TRUNCATE de
+  `anon`/`authenticated`, mantendo SELECT. Não há caminho por SQL.
+  NÃO tentar `ALTER EXTENSION postgis SET SCHEMA extensions` para
+  resolver isto — resolveria também os 3 avisos `extension_in_public`,
+  mas com dezenas de colunas `geometry` e views dependentes o risco é
+  desproporcional.
+- `extension_in_public` (postgis, btree_gist, pg_net): aceitos, mesma
+  razão acima.
+- `anon_security_definer_function_executable` (12 restantes): todos
+  intencionais ou intocáveis — portal público do pesquisador por token
+  (`buscar_aap_por_token`, `buscar_pesquisa_por_token`,
+  `anexar_documento_publico`, `verificar_pesquisador_duplicado`), tela
+  de login antes de autenticar (`registrar_tentativa_acesso`,
+  `verificar_bloqueio`, migration 002), agregados read-only
+  (`focos_por_ano` ×2, `dof_volume_por_produto`) e `st_estimatedextent`
+  ×3 (do PostGIS, mesmo problema de dono do `spatial_ref_sys`).
+  Qualquer nome NOVO nessa lista é regressão — investigar.
+- `authenticated_security_definer_function_executable` (140): ruído
+  esperado, é o padrão do projeto (RPC `SECURITY DEFINER` chamada por
+  usuário logado). O subconjunto que importa é função de TRIGGER, e
+  não sobrou nenhuma — conferir com:
+  `SELECT p.proname FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+   JOIN pg_type t ON t.oid=p.prorettype WHERE n.nspname='public' AND p.prosecdef
+   AND t.typname='trigger' AND (has_function_privilege('anon',p.oid,'EXECUTE')
+   OR has_function_privilege('authenticated',p.oid,'EXECUTE'));`
+- `rls_enabled_no_policy` (5: `biomonitor_eq_contador`,
+  `frota_abast_contador`, `frota_os_contador`, `frota_push_config`,
+  `ocorrencia_seq`): correto de propósito. São tabelas de apoio
+  manipuladas só por trigger/RPC `SECURITY DEFINER`; RLS ligada sem
+  policy = ninguém acessa direto, que é o desejado.
+- `auth_leaked_password_protection`: ligar no painel (Authentication →
+  Sign In / Providers → Password → Leaked password protection). É
+  configuração de projeto, não tem SQL nem migration.
+
+### Pendência aberta — permissão em `avancar_notificacao`/`escalar_notificacao`
+A 242 tirou o acesso anônimo, mas as duas RPCs (Módulo C, Painel do
+Gestor) seguem `SECURITY DEFINER` **sem nenhuma checagem de
+permissão**: qualquer usuário autenticado, de qualquer perfil, pode
+marcar como resolvida ou encaminhar qualquer notificação de que
+conheça o uuid. Corrigir exige decidir a regra de negócio (quem pode
+avançar o quê), não é ajuste de GRANT — fica para quando o Módulo C
+for retomado.
+
 ## Enums do banco
 perfil_usuario: super_admin | gestor | tecnico | financeiro | visualizador |
   brigadista | biologo | secretario | diretor | chefe_departamento |
@@ -967,6 +1027,17 @@ E) Dashboard Executivo por nível (UC / Diretoria / Secretaria)
   rodar no banco. Depois de aplicar, checar mcp__Supabase__get_advisors
   (type security) por avisos novos introduzidos pela migration. Regra
   permanente, sem precisar ser pedida de novo.
+- REVOKE DE FUNÇÃO: `REVOKE ALL ON FUNCTION ... FROM PUBLIC` NÃO BASTA
+  neste projeto. O Supabase tem `ALTER DEFAULT PRIVILEGES IN SCHEMA
+  public GRANT ALL ON FUNCTIONS TO anon, authenticated, service_role`,
+  então toda função nasce com GRANT **explícito** para anon — revogar
+  de PUBLIC não encosta nele e a função continua no catálogo do
+  PostgREST. Sempre nomear os papéis:
+  `REVOKE EXECUTE ON FUNCTION f() FROM PUBLIC, anon;` e, se for função
+  de TRIGGER (só o trigger a chama), incluir `authenticated` também.
+  A migration 232 caiu nessa armadilha e reabriu a superfície anônima
+  do Frota que as 196/197 tinham fechado; corrigido pela 242. Moldes
+  certos: 197 (RPC) e 179 (trigger).
 - Commits em português, pequenos e descritivos
 - NUNCA expor SERVICE_ROLE_KEY no frontend
 - ÍCONES: nunca usar emoji em UI (botões, chips, navegação, marcadores
