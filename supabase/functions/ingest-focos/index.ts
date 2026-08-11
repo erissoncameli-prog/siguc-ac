@@ -7,6 +7,7 @@
 // ═══════════════════════════════════════════════════════════
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { carregarLimiteAcre, noAcre } from '../_shared/acre.ts'
 
 // Chave FIRMS: mesma já usada (e pública) em /api/focos-proxy.js.
 // Pode ser sobrescrita pelo secret FIRMS_MAP_KEY.
@@ -16,7 +17,11 @@ const SUPABASE_SRK = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 
 const db = createClient(SUPABASE_URL, SUPABASE_SRK)
 
-// Bounding box do Acre (W,S,E,N) com folga
+// Bounding box do Acre (W,S,E,N) com folga.
+// ⚠ O retângulo é só o que a API do FIRMS aceita como consulta — ele
+// engloba AM, RO, Peru e Bolívia. O que define de fato o que é do
+// Acre é o recorte pelo polígono, em ../_shared/acre.ts (e, como
+// garantia dura, a trigger da migration 239 no banco).
 const ACRE_BBOX = '-74.05,-11.25,-66.55,-7.05'
 const SENSORES  = ['VIIRS_NOAA20_NRT', 'VIIRS_SNPP_NRT', 'MODIS_NRT']
 const DIAS      = 3
@@ -71,6 +76,10 @@ async function buscarBDQueimadas(): Promise<any[]> {
 Deno.serve(async () => {
   const erros: string[] = []
   const linhas: any[] = []
+  // Carrega o polígono do Acre antes de montar os lotes. Fail-open:
+  // se não vier, nada é filtrado aqui e a trigger do banco assume.
+  const comLimite = await carregarLimiteAcre()
+  let foraAcre = 0
 
   // FIRMS (NASA)
   for (const s of SENSORES) {
@@ -78,6 +87,7 @@ Deno.serve(async () => {
       for (const f of await buscarFIRMS(s)) {
         const lat = parseFloat(f.latitude), lon = parseFloat(f.longitude)
         if (!isFinite(lat) || !isFinite(lon)) continue
+        if (!noAcre(lat, lon)) { foraAcre++; continue }
         linhas.push({
           lat, lon,
           data_hora: dataHoraUTC(f.acq_date, f.acq_time),
@@ -95,6 +105,7 @@ Deno.serve(async () => {
     for (const f of await buscarBDQueimadas()) {
       const lat = parseFloat(f.lat ?? f.latitude), lon = parseFloat(f.lon ?? f.longitude)
       if (!isFinite(lat) || !isFinite(lon)) continue
+      if (!noAcre(lat, lon)) { foraAcre++; continue }
       const dhRaw = f.data_hora_gmt ?? f.datahora
       // CSV vem como "YYYY-MM-DD HH:MM:SS" em GMT → marca como UTC
       const dataHora = dhRaw
@@ -124,7 +135,7 @@ Deno.serve(async () => {
   }
 
   return new Response(
-    JSON.stringify({ ok: true, inseridos, total: linhas.length, erros }),
+    JSON.stringify({ ok: true, inseridos, total: linhas.length, fora_do_acre: foraAcre, recorte_aplicado: comLimite, erros }),
     { headers: { 'Content-Type': 'application/json' } },
   )
 })

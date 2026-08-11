@@ -49,7 +49,8 @@ Sistema já tem login, sidebar, layout e páginas funcionando.
     nova que precise ser embutida (mesmo padrão) precisa do mesmo
     carve-out — nunca afrouxar o `frame-ancestors 'none'` global.
     Ver regra de duplicação obrigatória em "Regras de desenvolvimento".
-- js/ → config.js, layout.js, mapa-cartografia.js, observability.js,
+- js/ → config.js, layout.js, mapa-cartografia.js, mapa-recorte.js
+  (limite do Acre + ponto-em-UC), observability.js,
   queryLogger.js; brigada-offline.js (IndexedDB), brigada-sync.js,
   brigada-captura.js (câmera/GPS/marca d'água), brigada-fauna.js
 - css/ → sidebar.css, brigada.css (app de campo)
@@ -102,6 +103,13 @@ Brigadas/registros de campo (042–060). Principais:
 - 060_origem_acionamento.sql: enum origem_acionamento
   (denuncia_193|informacao_populares|ronda_brigada|outro) +
   registros_campo.origem_acionamento; view atualizada
+
+Mapa/alertas:
+- 239_limite_acre_recorte.sql: limite_acre (singleton PostGIS),
+  geo_ponto_no_acre(lat,lon) e trigger que descarta ponto fora do
+  estado em focos_calor/alertas_ambientais. Geometria carregada por
+  pg_net, em passo separado — ver "Regra do sistema — recorte pelo
+  limite do Acre".
 
 Frota — abastecimento (174–175):
 - 174_frota_fontes_contratos.sql: frota_fontes_recurso (orçamentária/
@@ -216,6 +224,83 @@ no-op e o Web Push de sempre continua valendo).
   pelo build nativo) com o Release mais novo `frota-v*` no GitHub e oferece
   o `.apk` para download; fora do APK, segue pelo SW como sempre. frota v71
   → v72.
+
+## Regra do sistema — recorte pelo limite do Acre (mapa e alertas)
+Alerta e foco de calor só existem no mapa se estiverem DENTRO do
+Acre. Não é filtro opcional, não tem toggle: é recorte, sempre ligado.
+
+Causa (medida, não suposta): FIRMS e o WFS do DETER só aceitam
+consulta por BOUNDING BOX, e um retângulo em volta do Acre engloba
+pedaços de AM, RO, Ucayali (Peru) e Pando (Bolívia). Antes da
+correção, 113 de 362 focos FIRMS (31%) e 503 de 1.733 alertas DETER
+(29%) gravados não eram do Acre — e apareciam desenhados no mapa. O
+BDQueimadas, única fonte que já filtrava de verdade (`estado='ACRE'`),
+estava 100% correto: o problema é o bbox, não a fonte.
+
+Geometria em UM lugar só: `js/mapa-recorte.js` (mesma lição do
+`js/frota-consumo.js` e do `js/fotos-privadas.js`). Antes,
+`pages/mapa.html` e `pages/alertas-ambientais.html` tinham cada um sua
+cópia de `_pipGeom` — e nenhuma testava o limite do estado. Nunca
+reimplementar PIP numa página.
+- API: `geoAcreCarregar()`, `geoNoAcre(lat,lng)`, `geoUCsPreparar(gj)`,
+  `geoUCEm(lat,lng)`, `geoClassificar(lista, getLatLng)`,
+  `geoLatLngDeGeom(geom)`.
+- Desempenho: bbox pré-calculada por anel + classificação feita UMA
+  vez na carga (carimba `_noAcre`/`_ucNome`/`_lat`/`_lng` no registro);
+  o render só lê o campo. 5.000 focos classificam em ~50 ms. Fazer PIP
+  por ponto a cada render trava a página (21 UCs, 49 mil vértices).
+- FAIL-OPEN: sem o limite carregado, `geoNoAcre` devolve true — falha
+  de rede nunca deve resultar em mapa vazio.
+
+Defesa em 3 camadas (mesmo espírito da trava de veículo do Frota,
+migration 180 + app):
+1. cliente — `js/mapa-recorte.js`, corrige a tela sem esperar cron;
+2. ingestão — `supabase/functions/_shared/acre.ts`, usado por
+   `ingest-focos` e `monitorar-alertas`: não gasta escrita com dado que
+   será descartado e faz os contadores devolvidos dizerem a verdade;
+3. banco — migration 239: `limite_acre` (singleton PostGIS),
+   `geo_ponto_no_acre(lat,lon)` e trigger BEFORE INSERT que DESCARTA
+   (RETURN NULL) ponto fora do estado em `focos_calor` e
+   `alertas_ambientais`. É a garantia dura: vale para qualquer rota de
+   ingestão, atual ou futura, sem depender de redeploy.
+⚠ A geometria NÃO está embutida na migration (988 vértices, ~21 KB).
+É carregada do MESMO arquivo que o cliente usa
+(`data/acre_estado.geojson`, servido em produção) via `pg_net`, para
+banco e navegador nunca discordarem da divisa. pg_net é assíncrono —
+a requisição só sai depois do COMMIT, então a carga é PASSO SEPARADO,
+depois de aplicar a migration:
+  `SELECT net.http_get('https://siguc-ac.vercel.app/data/acre_estado.geojson');`
+  (aguardar) `SELECT limite_acre_carregar();` → depois
+  `SELECT limite_acre_limpar_fora();`
+`geo_ponto_no_acre` é FAIL-OPEN com `limite_acre` vazia: banco novo se
+comporta como antes, nunca rejeitando toda a ingestão por falta do
+polígono. Conferir a carga pela área (16,4 milhões de ha).
+
+Filtro dentro/fora de UC vale para TUDO. O rádio `alerta-loc` era lido
+só por `renderAlertasMapa` — o rótulo dizia literalmente "Localização
+(DETER)" —, então o fogo continuava no mapa inteiro com "Somente
+dentro de UCs" ligado. Agora `_filtrarAlertas()`/`_filtrarFocos()` são
+a única definição de "o que está no mapa", e o painel-resumo consome
+exatamente essas funções (gráficos sempre batem com os marcadores).
+Ponto novo de exibição no mapa = usar essas funções, nunca refiltrar
+na mão. `_ucNomesEmExibicao()` (não confundir com `_ucNomesVisiveis()`,
+que é outra coisa e devolve null sem filtro): com a camada de UCs
+desligada, cai para TODAS as UCs — "dentro de UC" é fato geográfico, e
+conjunto vazio faria o filtro limpar o mapa sem explicação.
+
+`focos_calor_ac` (953 mil linhas, série histórica 2001-2024) NÃO foi
+limpa — apagar ~30% de um arquivo histórico é irreversível. A linha do
+tempo recorta esses pontos no cliente (`_tlRenderAno`).
+
+Painel-resumo (`abrirResumoAlertas`, pages/mapa.html): abre junto com a
+camada, gráficos em SVG à mão (o projeto não tem lib de gráfico; padrão
+já era esse, ver `#usc-donut`). Cores validadas para daltonismo sem
+sair das cores dos marcadores: desmatamento #166534 × queimada #EA580C
+(ΔE 9,6 protan) e dentro #2F9E5B × fora de UC #F59E0B (ΔE 9,4). NÃO
+usar #166534 com #DC2626 (a cor do marcador de queimada) num gráfico:
+ΔE 1,6 — indistinguível. Identidade sempre também em rótulo direto +
+tabela, nunca só na cor.
+Guarda: `tests/mapa-recorte.test.js`.
 
 ## Relatórios de consumo de combustível
 Cálculo em UM lugar só: `js/frota-consumo.js`

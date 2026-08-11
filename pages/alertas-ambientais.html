@@ -12,6 +12,9 @@
 <script src="../js/layout.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="../js/mapa-camadas.js"></script>
+<!-- Recorte geográfico (limite do Acre + ponto-em-UC): helper único,
+     compartilhado com pages/mapa.html. Ver js/mapa-recorte.js. -->
+<script src="../js/mapa-recorte.js"></script>
 <style>
 .alerta-wrapper { display:flex; flex-direction:column; gap:12px; height:calc(100vh - 108px); min-height:500px; }
 .alerta-topbar  { display:flex; align-items:center; gap:8px; flex-wrap:wrap; flex-shrink:0; }
@@ -101,35 +104,15 @@ function _alertaIcone(tipo, severidade) {
 }
 
 let _alertas = [], _mapaL = null, _marcadores = [], _perfilUsuario = ''
+let _alertasForaAcre = 0  // descartados pelo recorte do limite do estado
 let _ucGeojsonAlerta = null  // GeoJSON das UCs para cruzamento local
 
-// Algoritmo ray-casting: ponto dentro de polígono (anel de coordenadas)
-function _pipRing(pt, ring) {
-  let inside = false
-  const [x, y] = pt
-  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
-    const [xi, yi] = ring[i], [xj, yj] = ring[j]
-    if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) inside = !inside
-  }
-  return inside
-}
-
-function _pipGeom(pt, geom) {
-  if (!geom) return false
-  const rings = geom.type === 'Polygon'
-    ? geom.coordinates
-    : geom.type === 'MultiPolygon'
-      ? geom.coordinates.flat(1)
-      : []
-  // Verifica exterior de cada polígono (ignora buracos para simplicidade)
-  return rings.some(r => _pipRing(pt, r))
-}
-
+// Geometria (ponto-em-UC e limite do Acre) vem de js/mapa-recorte.js —
+// helper único, o mesmo que pages/mapa.html usa. Esta página tinha uma
+// cópia local do ray-casting que, além de duplicada, ignorava buracos
+// de polígono e nunca testava o limite do estado.
 function ucNomeParaCoordenada(lat, lng) {
-  if (!_ucGeojsonAlerta?.features) return null
-  const pt = [lng, lat]
-  const feat = _ucGeojsonAlerta.features.find(f => _pipGeom(pt, f.geometry))
-  return feat ? (feat.properties?.nome || feat.properties?.NAME || feat.properties?.name || null) : null
+  return geoUCEm(lat, lng)
 }
 
 async function _carregarUCGeojson() {
@@ -137,6 +120,7 @@ async function _carregarUCGeojson() {
   try {
     const r = await fetch('../data/uc_acre.geojson')
     _ucGeojsonAlerta = await r.json()
+    geoUCsPreparar(_ucGeojsonAlerta)
   } catch {}
 }
 
@@ -184,6 +168,7 @@ async function _carregarUCGeojson() {
         <div class="kpi-card alta"><div class="kpi-val" id="kpi-altos">—</div><div class="kpi-lbl">Altos</div></div>
         <div class="kpi-card"><div class="kpi-val" id="kpi-ucs">—</div><div class="kpi-lbl">UCs afetadas</div></div>
       </div>
+      <div id="recorte-nota" style="display:none;margin:-4px 0 10px;font-size:11px;color:#92400E;background:#FFFBEB;border:1px solid #FDE68A;border-radius:8px;padding:7px 10px;line-height:1.45"></div>
 
       <!-- Body: mapa + painel -->
       <div class="alerta-body">
@@ -317,7 +302,7 @@ async function _planetPopular() {
 }
 
 async function carregar() {
-  await _carregarUCGeojson()
+  await Promise.all([_carregarUCGeojson(), geoAcreCarregar()])
 
   const { data, error } = await db.from('alertas_ambientais')
     .select('*')
@@ -326,25 +311,21 @@ async function carregar() {
     .limit(500)
 
   if (error) { toast('Erro ao carregar alertas: ' + error.message, 'error'); return }
-  _alertas = data || []
+  // Recorte pelo limite do Acre: DETER e FIRMS são consultados por
+  // bounding box retangular, que invade AM, RO, Peru e Bolívia — sem
+  // este corte, ~29% dos alertas gravados não são do Acre. Mesma regra
+  // aplicada no Mapa das UCs. Ver js/mapa-recorte.js.
+  const todos = data || []
+  const classif = geoClassificar(todos, a => geoLatLngDeGeom(a.geom))
+  _alertas = todos.filter(a => a._noAcre)
+  _alertasForaAcre = classif.foraAcre
   filtrar()
 }
 
 function _alertaEmUC(a) {
   if (a.uc_id || a.uc_nome) return true
-  // fallback: cruzamento local pelo GeoJSON
-  if (!a.geom) return false
-  try {
-    let lat, lng
-    if (typeof a.geom === 'object' && a.geom.coordinates) {
-      lng = a.geom.coordinates[0]; lat = a.geom.coordinates[1]
-    } else {
-      const m = String(a.geom).match(/POINT\(([^ ]+) ([^ )]+)\)/)
-      if (m) { lng = parseFloat(m[1]); lat = parseFloat(m[2]) }
-      else return false
-    }
-    return !!ucNomeParaCoordenada(lat, lng)
-  } catch { return false }
+  // _ucNome já foi carimbado por geoClassificar() na carga.
+  return !!a._ucNome
 }
 
 function filtrar() {
@@ -372,8 +353,19 @@ function atualizarKPIs(lista) {
   document.getElementById('kpi-total').textContent = lista.length
   document.getElementById('kpi-criticos').textContent = lista.filter(a => a.severidade === 'critica').length
   document.getElementById('kpi-altos').textContent = lista.filter(a => a.severidade === 'alta').length
-  const ucs = new Set(lista.filter(a => a.uc_id).map(a => a.uc_id))
+  // Conta por nome resolvido no cruzamento local: uc_id vem nulo em
+  // todas as linhas gravadas pela ingestão, então contar uc_id
+  // mostrava sempre zero.
+  const ucs = new Set(lista.map(a => a.uc_nome || a._ucNome).filter(Boolean))
   document.getElementById('kpi-ucs').textContent = ucs.size
+
+  const nota = document.getElementById('recorte-nota')
+  if (nota) {
+    nota.style.display = _alertasForaAcre ? '' : 'none'
+    nota.innerHTML = _alertasForaAcre
+      ? `<strong>${_alertasForaAcre}</strong> alerta${_alertasForaAcre !== 1 ? 's' : ''} fora do limite do Acre ${_alertasForaAcre !== 1 ? 'foram descartados' : 'foi descartado'}. As fontes entregam os dados por retângulo, que invade AM, RO, Peru e Bolívia.`
+      : ''
+  }
 }
 
 function renderMarcadores(lista) {
