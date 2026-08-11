@@ -495,7 +495,13 @@ duas gerações de dado — cai no texto livre nas viagens antigas),
 ## Regra do sistema — status efetivo e blocos da lista de viagens
 Toda lista de viagem, em QUALQUER superfície, se divide em três blocos:
 **Em andamento**, **Próximas** (crescente — a mais perto primeiro) e
-**Passadas** (decrescente). Definição única em
+**Passadas** (decrescente). No app do solicitante os dois blocos longos
+são SUB-ABAS em chip (`fmChipsHTML`, o mesmo controle do Histórico do
+motorista) e "Em andamento" fica FIXA acima delas — é a única que exige
+atenção agora e quase sempre tem 0 ou 1 card; esconder atrás de aba
+faria caçar o que devia saltar aos olhos. Nas telas de mesa os três
+blocos são cabeçalhos na própria tabela (há espaço vertical, e
+frota-viagens.html ainda tem filtro de período). Definição única em
 `js/frota-viagens-status.js` (`fvStatus`, `fvGrupo`, `fvAgrupar`,
 `fvLabel`, `fvBadge`, `fvExplicacao`, `fvAtrasada`, `fvAtivas`) —
 mesma lição do `js/frota-consumo.js`: antes eram 4 cópias de
