@@ -418,6 +418,13 @@ body.mapa-imersivo .page-body{animation:none!important;transform:none!important;
 /* Painel análise alerta */
 .malerta-panel{position:fixed;top:0;right:0;width:400px;height:100vh;background:#fff;z-index:650;display:flex;flex-direction:column;box-shadow:-4px 0 32px rgba(0,0,0,.22);transition:transform .28s cubic-bezier(.4,0,.2,1);overflow:hidden;min-width:280px;max-width:600px;transform:translateX(100%);}
 .malerta-panel.aberto{transform:translateX(0);}
+/* Alça de redimensionar da gaveta lateral. O painel-resumo fica sobre
+   o mapa sem overlay, então quem está lendo precisa poder estreitá-lo
+   para ver o que está embaixo. */
+.painel-resize{position:absolute;left:0;top:0;bottom:0;width:7px;cursor:ew-resize;z-index:5;background:transparent;touch-action:none;}
+.painel-resize:hover,.painel-resize.arrastando{background:linear-gradient(90deg,rgba(31,78,44,.28),transparent);}
+/* Em tela estreita a gaveta não pode passar da viewport. */
+@media(max-width:520px){.malerta-panel{width:100vw !important;min-width:0;max-width:100vw;}.painel-resize{display:none;}}
 .malerta-tabs-bar{display:flex;border-bottom:1px solid var(--borda);flex-shrink:0;background:#fff;}
 .malerta-tab{flex:1;padding:10px 0;font-size:12px;font-weight:500;border:none;background:transparent;cursor:pointer;border-bottom:2px solid transparent;color:#6B7280;font-family:'DM Sans',sans-serif;transition:all .15s;}
 .malerta-tab.ativo{color:#1F4E2C;border-bottom-color:#1F4E2C;}
@@ -2980,17 +2987,92 @@ const RS_COR = {
 }
 let _resumoAberto = false
 
-function abrirResumoAlertas() {
+// Painel NÃO modal: sem overlay, o mapa segue clicável/arrastável com
+// o resumo aberto, e clique fora não fecha nada. Fecha só no ✕ ou ao
+// desligar a camada de alertas.
+function abrirResumoAlertas(porEscolha = true) {
+  const p = document.getElementById('resumo-panel')
+  if (!p) return
   _resumoAberto = true
-  document.getElementById('resumo-overlay').style.display = ''
-  document.getElementById('resumo-panel').classList.add('aberto')
+  if (porEscolha) { try { localStorage.setItem('siguc_resumo_alertas', '1') } catch {} }
+  // Os dois painéis ocupam a mesma gaveta à direita — abrir um fecha
+  // o outro, senão ficam empilhados e só o de cima é utilizável.
+  if (typeof fecharAnaliseAlertaMapa === 'function'
+      && document.getElementById('malerta-panel')?.classList.contains('aberto')) {
+    fecharAnaliseAlertaMapa()
+  }
+  _resumoLarguraAplicar(p)
+  _resumoResizeInit()
+  p.classList.add('aberto')
   renderResumoAlertas()
 }
 
-function fecharResumoAlertas() {
+// porEscolha=false é o fechamento automático ao desligar a camada —
+// não deve ser lido como "o usuário não quer mais ver o resumo".
+function fecharResumoAlertas(porEscolha = true) {
   _resumoAberto = false
-  document.getElementById('resumo-panel').classList.remove('aberto')
-  document.getElementById('resumo-overlay').style.display = 'none'
+  if (porEscolha) { try { localStorage.setItem('siguc_resumo_alertas', '0') } catch {} }
+  document.getElementById('resumo-panel')?.classList.remove('aberto')
+}
+
+// Preferência de exibição automática ao ligar a camada. Só bloqueia a
+// abertura se o usuário tiver fechado explicitamente antes.
+function _resumoAutoAbrir() {
+  try { return localStorage.getItem('siguc_resumo_alertas') !== '0' } catch { return true }
+}
+
+const RESUMO_LARG_MIN = 280, RESUMO_LARG_MAX = 600, RESUMO_LARG_PADRAO = 400
+
+function _resumoLargura() {
+  let v = RESUMO_LARG_PADRAO
+  try { v = parseInt(localStorage.getItem('siguc_resumo_largura') || '', 10) || RESUMO_LARG_PADRAO } catch {}
+  return Math.min(Math.max(v, RESUMO_LARG_MIN), Math.min(RESUMO_LARG_MAX, window.innerWidth))
+}
+function _resumoLarguraAplicar(p) {
+  if (window.innerWidth > 520) p.style.width = _resumoLargura() + 'px'
+}
+
+// Arrastar a borda esquerda para estreitar/alargar. Inicializado sob
+// demanda porque a marcação do painel vem DEPOIS deste script no DOM.
+let _resumoResizeOk = false
+function _resumoResizeInit() {
+  if (_resumoResizeOk) return
+  const alca = document.getElementById('resumo-resize')
+  const p    = document.getElementById('resumo-panel')
+  if (!alca || !p) return
+  _resumoResizeOk = true
+
+  let arrastando = false
+  const xDe = e => (e.touches && e.touches[0] ? e.touches[0].clientX : e.clientX)
+
+  const mover = e => {
+    if (!arrastando) return
+    const larg = Math.min(Math.max(window.innerWidth - xDe(e), RESUMO_LARG_MIN),
+                          Math.min(RESUMO_LARG_MAX, window.innerWidth))
+    p.style.width = larg + 'px'
+    e.preventDefault()
+  }
+  const soltar = () => {
+    if (!arrastando) return
+    arrastando = false
+    alca.classList.remove('arrastando')
+    document.body.style.userSelect = ''
+    try { localStorage.setItem('siguc_resumo_largura', String(parseInt(p.style.width, 10) || RESUMO_LARG_PADRAO)) } catch {}
+  }
+  const pegar = e => {
+    arrastando = true
+    alca.classList.add('arrastando')
+    // Sem isto, arrastar seleciona o texto do painel inteiro.
+    document.body.style.userSelect = 'none'
+    e.preventDefault()
+  }
+
+  alca.addEventListener('mousedown', pegar)
+  alca.addEventListener('touchstart', pegar, { passive: false })
+  document.addEventListener('mousemove', mover)
+  document.addEventListener('touchmove', mover, { passive: false })
+  document.addEventListener('mouseup', soltar)
+  document.addEventListener('touchend', soltar)
 }
 
 // Dia local do Acre (America/Rio_Branco, UTC-5) — sem isso, foco
@@ -3324,7 +3406,11 @@ async function toggleAlertasMapa(ativo) {
   _atualizarLegendaMapa()
   // O resumo abre junto com a camada — é onde a leitura "quanto disso
   // está dentro de UC" fica disponível sem clique a clique nos pontos.
-  if (ativo) abrirResumoAlertas(); else fecharResumoAlertas()
+  // Mas respeita quem já fechou antes: abrir de novo o que o usuário
+  // dispensou é justamente o incômodo que se quer evitar. O botão
+  // "Resumo e gráficos" no painel reabre a qualquer momento.
+  if (ativo) { if (_resumoAutoAbrir()) abrirResumoAlertas(false) }
+  else fecharResumoAlertas(false)
 }
 
 // Carrega DETER/desmatamento (focos vêm separados de focos_calor)
@@ -8332,6 +8418,9 @@ async function abrirAnaliseAlertaMapa(alertaKey) {
       <button onclick="fecharAnaliseAlertaMapa()" style="background:rgba(255,255,255,.2);border:none;color:#fff;border-radius:6px;cursor:pointer;padding:4px 9px;font-size:14px;line-height:1;flex-shrink:0">✕</button>
     </div>`
 
+  // Mesma gaveta do painel-resumo — ver comentário em abrirResumoAlertas.
+  // Fechamento automático, então não conta como o usuário dispensar o resumo.
+  if (_resumoAberto) fecharResumoAlertas(false)
   document.getElementById('malerta-overlay').style.display = ''
   document.getElementById('malerta-panel').classList.add('aberto')
   tabAnaliseAlertaMapa('prodes')
@@ -8725,15 +8814,21 @@ async function _ultimasColetasMapaAPI(){
 
 <!-- Painel-resumo dos alertas (totais + gráficos, dentro × fora de UC).
      Reusa a classe .malerta-panel (gaveta lateral) com ids próprios —
-     o painel de análise por alerta continua existindo em paralelo. -->
-<div id="resumo-overlay" onclick="fecharResumoAlertas()" style="display:none;position:fixed;inset:0;z-index:640;background:rgba(0,0,0,.2)"></div>
+     o painel de análise por alerta continua existindo em paralelo.
+
+     NÃO é modal e NÃO tem overlay de propósito: ele descreve o que
+     está no mapa, então precisa ser lido COM o mapa em uso. Um
+     overlay em cima da viewport fecharia o painel a cada clique e,
+     pior, bloquearia arrastar/zoom/clicar marcador no Leaflet. Mesmo
+     padrão do #uc-stats-card. Fecha só no ✕ ou ao desligar a camada. -->
 <div id="resumo-panel" class="malerta-panel">
+  <div id="resumo-resize" class="painel-resize" title="Arraste para estreitar ou alargar"></div>
   <div style="display:flex;align-items:flex-start;gap:8px;padding:14px 16px 12px;background:linear-gradient(135deg,#1F4E2Cee,#1F4E2C99)">
     <div style="flex:1;min-width:0">
       <div style="font-size:13px;font-weight:700;color:#fff;line-height:1.3">Resumo dos alertas</div>
       <div style="font-size:11px;color:rgba(255,255,255,.85);margin-top:3px">Desmatamento e focos de calor no Acre</div>
     </div>
-    <button onclick="fecharResumoAlertas()" style="background:rgba(255,255,255,.2);border:none;color:#fff;border-radius:6px;cursor:pointer;padding:4px 9px;font-size:14px;line-height:1;flex-shrink:0">✕</button>
+    <button onclick="fecharResumoAlertas()" title="Fechar resumo" style="background:rgba(255,255,255,.2);border:none;color:#fff;border-radius:6px;cursor:pointer;padding:4px 9px;font-size:14px;line-height:1;flex-shrink:0">✕</button>
   </div>
   <div id="resumo-body" class="malerta-body"></div>
 </div>
