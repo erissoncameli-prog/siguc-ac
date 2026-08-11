@@ -307,19 +307,70 @@ function fpAlertaNecessidadesHTML(v) {
 // dono do re-render (cada página tem sua própria render*).
 
 // Distribui os passageiros NOMEADOS da viagem (os que têm `id` —
-// vieram de frota_viagem_passageiros, migration 235) igualmente entre
-// as linhas, round-robin. Só mexe na composição de nomes: veículo e
-// motorista sugeridos por frota_sugerir_alocacao (que já pondera
-// capacidade) não são tocados — o gestor sempre pode corrigir depois
-// pelo seletor de cada chip. Viagem sem lista estruturada (antiga, ou
-// só o número preenchido) não é afetada: fica como estava antes desta
-// entrega, sem regredir a sugestão por capacidade nesse caso.
+// vieram de frota_viagem_passageiros, migration 235) entre as linhas.
+// Só mexe na composição de nomes: veículo e motorista sugeridos por
+// frota_sugerir_alocacao não são tocados — o gestor sempre pode
+// corrigir depois pelo seletor de cada chip. Viagem sem lista
+// estruturada (antiga, ou só o número preenchido) não é afetada.
+//
+// A COTA de cada linha manda: é quanto frota_sugerir_alocacao reservou
+// para aquele veículo, respeitando a capacidade dele (migration 242).
+// Sem isso, o round-robin cego podia pôr 3 nomes num carro de 2
+// lugares quando os veículos escalados têm capacidades diferentes.
+// Linha sem cota — a que o gestor acabou de adicionar à mão — cai no
+// rodízio igualitário de antes, que para veículos iguais dá o mesmo
+// resultado (6 passageiros em 2 veículos = 3 e 3).
 function fpDistribuirLinhas(linhas, viagem) {
   const pax = fpDaViagem(viagem).filter(p => p.id)
   if (!pax.length || !linhas.length) return
+  const cotas = linhas.map(l => l.passageiros || 0)
+  const temCota = cotas.some(c => c > 0)
   linhas.forEach(l => { l.passageiro_ids = [] })
-  pax.forEach((p, i) => linhas[i % linhas.length].passageiro_ids.push(p.id))
+  let prox = 0
+  pax.forEach(p => {
+    let alvo = -1
+    if (temCota) {
+      // Primeira linha, a partir da última usada, que ainda tem vaga na
+      // cota — mantém o rodízio dentro do que cabe.
+      for (let k = 0; k < linhas.length; k++) {
+        const j = (prox + k) % linhas.length
+        if (linhas[j].passageiro_ids.length < cotas[j]) { alvo = j; break }
+      }
+    }
+    // Sem cota, ou cotas todas cheias (frota não cobre o grupo): rodízio
+    // simples. O excedente fica visível na tela — cada linha avisa
+    // quando passa da capacidade do veículo.
+    if (alvo === -1) alvo = prox % linhas.length
+    linhas[alvo].passageiro_ids.push(p.id)
+    prox = alvo + 1
+  })
   linhas.forEach(l => { l.passageiros = l.passageiro_ids.length })
+}
+
+// Nenhum veículo elegível no período: o banco não tem o que sugerir e
+// a tela já avisa disso. As linhas nascem vazias mas com o grupo
+// PARTIDO em dois — antes a primeira linha vinha com o grupo inteiro
+// dentro, que é justamente o que se quer evitar.
+function fpLinhasVazias(total) {
+  const t = Math.max(total || 1, 1)
+  const metade = Math.ceil(t / 2)
+  return [
+    { veiculo_id: null, motorista_id: null, passageiros: metade },
+    { veiculo_id: null, motorista_id: null, passageiros: t - metade },
+  ]
+}
+
+// Aviso do topo do modal de aprovação: quem decide se o grupo cabe em
+// um veículo é a frota (frota_sugerir_alocacao, migration 242), não um
+// número fixo no HTML. `capacidadeTotal` é a soma da capacidade dos
+// veículos sugeridos — quando não cobre o grupo, o gestor precisa
+// saber ANTES de aprovar.
+function fpAvisoDivisaoHTML(veiculos, total, capacidadeTotal) {
+  if (!veiculos || veiculos < 2) return ''
+  const falta = (total || 0) - (capacidadeTotal || 0)
+  return `<strong>${total} passageiros não cabem em um veículo só.</strong>
+    Já escalamos ${veiculos} veículos com os passageiros divididos entre eles — confira abaixo e ajuste se precisar.
+    ${falta > 0 ? `<div style="margin-top:4px">Atenção: ainda faltam lugares para ${falta} passageiro(s) — não há veículo disponível suficiente nesse período.</div>` : ''}`
 }
 
 // Move um passageiro pra `novoIndice`. Resincroniza só a contagem das
