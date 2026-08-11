@@ -1202,6 +1202,7 @@ async function carregarAbastecimentosMotorista() {
     _abastecimentos = r.data || []
     await fOfflineSetConfig('abastecimentos_cache', _abastecimentos)
   } catch (e) {
+    if (navigator.onLine) console.error('[frota] falha ao carregar abastecimentos:', e)
     _abastecimentos = await fOfflineGetConfig('abastecimentos_cache') || []
   }
   motoristaAba(_fmAba)
@@ -1211,7 +1212,9 @@ const ABAST_STATUS_BADGE = { pendente: 'fw-badge fw-badge-manutencao', validado:
 const ABAST_STATUS_LABEL = { pendente: 'Pendente', validado: 'Validado', rejeitado: 'Rejeitado' }
 
 // ── Manutenções do motorista (comunicados + OS dos veículos que ele usa,
-// migration 232) — sem custo/oficina, decisão de produto registrada lá ─
+// migrations 232/233/234) — sem custo/oficina, decisão de produto
+// registrada na 232; escopo de veículos e correção do erro de plpgsql
+// que deixava a lista sempre vazia estão na 233/234 ─
 let _manutencoes = []
 async function carregarManutencoesMotorista() {
   try {
@@ -1221,6 +1224,11 @@ async function carregarManutencoesMotorista() {
     _manutencoes = r.data || []
     await fOfflineSetConfig('manutencoes_cache', _manutencoes)
   } catch (e) {
+    // Estar offline é esperado (app de campo) e cai no cache calado.
+    // Erro DE VERDADE vindo do banco, não: foi exatamente esse silêncio
+    // que escondeu por duas entregas um erro de plpgsql na RPC (a lista
+    // ficava vazia como se não houvesse manutenção). Ver migration 234.
+    if (navigator.onLine) console.error('[frota] falha ao carregar manutenções:', e)
     _manutencoes = await fOfflineGetConfig('manutencoes_cache') || []
   }
   motoristaAba(_fmAba)
