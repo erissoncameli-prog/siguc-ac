@@ -1182,9 +1182,12 @@ async function renderModoMotorista() {
     return
   }
   instalarGatilhosSyncFrota()
-  await carregarViagensMotorista()
-  await carregarAbastecimentosMotorista()
-  await carregarManutencoesMotorista()
+  // Carrega os três em silêncio e navega UMA vez no fim — antes cada
+  // loader chamava motoristaAba, animando a mesma tela 3× na abertura.
+  await carregarViagensMotorista(true)
+  await carregarAbastecimentosMotorista(true)
+  await carregarManutencoesMotorista(true)
+  motoristaAba(_fmAba)
   // Catálogo do checklist: cai no cache do IndexedDB quando offline,
   // para o motorista conseguir inspecionar em campo sem sinal.
   await carregarChecklistCatalogo()
@@ -1193,7 +1196,7 @@ async function renderModoMotorista() {
 
 // ── Abastecimentos do motorista (status: pendente/validado/rejeitado) ─
 let _abastecimentos = []
-async function carregarAbastecimentosMotorista() {
+async function carregarAbastecimentosMotorista(silencioso) {
   try {
     if (!navigator.onLine) throw new Error('offline')
     // vw_frota_abastecimentos_detalhe (em vez da tabela crua) pra já
@@ -1208,7 +1211,8 @@ async function carregarAbastecimentosMotorista() {
     if (navigator.onLine) console.error('[frota] falha ao carregar abastecimentos:', e)
     _abastecimentos = await fOfflineGetConfig('abastecimentos_cache') || []
   }
-  motoristaAba(_fmAba)
+  if (silencioso) fmRepintarSeSeguro()
+  else motoristaAba(_fmAba)
 }
 
 const ABAST_STATUS_BADGE = { pendente: 'fw-badge fw-badge-manutencao', validado: 'fw-badge fw-badge-disponivel', rejeitado: 'fw-badge fw-badge-inativo' }
@@ -1219,7 +1223,7 @@ const ABAST_STATUS_LABEL = { pendente: 'Pendente', validado: 'Validado', rejeita
 // registrada na 232; escopo de veículos e correção do erro de plpgsql
 // que deixava a lista sempre vazia estão na 233/234 ─
 let _manutencoes = []
-async function carregarManutencoesMotorista() {
+async function carregarManutencoesMotorista(silencioso) {
   try {
     if (!navigator.onLine) throw new Error('offline')
     const r = await db.rpc('frota_manutencoes_motorista')
@@ -1234,7 +1238,8 @@ async function carregarManutencoesMotorista() {
     if (navigator.onLine) console.error('[frota] falha ao carregar manutenções:', e)
     _manutencoes = await fOfflineGetConfig('manutencoes_cache') || []
   }
-  motoristaAba(_fmAba)
+  if (silencioso) fmRepintarSeSeguro()
+  else motoristaAba(_fmAba)
 }
 
 const MANUT_TIPO_LABEL = { preventiva: 'Preventiva', corretiva: 'Corretiva', comunicado: 'Relato enviado' }
@@ -1254,7 +1259,7 @@ function instalarGatilhosSyncFrota() {
   if (_fSyncTriggersInstalados) return
   _fSyncTriggersInstalados = true
 
-  fSyncOn('confirmado', () => { carregarViagensMotorista(); carregarAbastecimentosMotorista(); carregarManutencoesMotorista() })
+  fSyncOn('confirmado', () => { carregarViagensMotorista(true); carregarAbastecimentosMotorista(true); carregarManutencoesMotorista(true) })
   fSyncOn('sync-fim', ({ ok, erros, desistiu }) => {
     atualizarBadgePendentesSync(); renderFilaFrota()
     if (ok > 0) toast(`${ok} registro(s) enviado(s) ao setor de transporte.`, 'success')
@@ -1272,9 +1277,11 @@ function instalarGatilhosSyncFrota() {
   // mudança ao reabrir a tela manualmente.
   const atualizarDoServidor = () => {
     if (!navigator.onLine) return
-    carregarViagensMotorista()
-    carregarAbastecimentosMotorista()
-    carregarManutencoesMotorista()
+    // Sempre silencioso: é refresh de fundo, não pode navegar nem
+    // reescrever a tela por baixo de quem está usando o app.
+    carregarViagensMotorista(true)
+    carregarAbastecimentosMotorista(true)
+    carregarManutencoesMotorista(true)
   }
   window.addEventListener('online', () => { fSyncRodar(); atualizarDoServidor() })
   document.addEventListener('visibilitychange', () => { if (!document.hidden) { fSyncRodar(); atualizarDoServidor() } })
@@ -1350,7 +1357,7 @@ function fmObterGpsSeAtivo(chave) {
   return fmObterGps()
 }
 
-async function carregarViagensMotorista() {
+async function carregarViagensMotorista(silencioso) {
   let data = null
   try {
     if (!navigator.onLine) throw new Error('offline')
@@ -1384,7 +1391,12 @@ async function carregarViagensMotorista() {
   const pendentes = _viagens.filter(v => v.status === 'aprovada' || v.status === 'em_andamento').length
   const badge = document.getElementById('fm-badge')
   if (badge) { badge.textContent = pendentes; badge.hidden = !pendentes }
-  motoristaAba(_fmAba)
+  // O badge acima vive fora de #fm-conteudo, então é sempre atualizado.
+  // Já o conteúdo da aba: navega quando a chamada veio de uma ação do
+  // usuário (check-in/check-out concluído), e só repinta com cautela
+  // quando é o refresh de fundo. Ver fmRepintarSeSeguro.
+  if (silencioso) fmRepintarSeSeguro()
+  else motoristaAba(_fmAba)
 }
 
 // ── Navegação entre abas ────────────────────────────────────────
@@ -1401,6 +1413,39 @@ function motoristaAba(aba) {
   else if (aba === 'config') renderFmConfig()
   const dir = FM_ORDEM_ABAS.indexOf(aba) >= FM_ORDEM_ABAS.indexOf(anterior) ? 'avancar' : 'voltar'
   fwTransicaoTela('fm-conteudo', dir)
+}
+
+// Repinta a aba atual por causa de dado novo vindo do servidor — SEM
+// navegar. Diferente de motoristaAba(), não roda a animação de
+// transição e desiste sempre que repintar atrapalharia o usuário.
+//
+// Motivo: o refresh de 45s reaproveitava motoristaAba(), que é função
+// de NAVEGAÇÃO — reescreve #fm-conteudo inteiro e anima. Duas coisas
+// quebravam:
+//  1) Os três shells (motorista, gestor, solicitante) usam o MESMO id
+//     #fm-conteudo, e o intervalo instalado no modo motorista nunca é
+//     parado. Estando em Solicitar/Gestor, o refresh escrevia conteúdo
+//     de MOTORISTA por cima da tela aberta — a tela trocava sozinha.
+//  2) Mesmo dentro do modo motorista, reescrever o container apagava o
+//     que estava sendo digitado (formulário de viagem avulsa, busca do
+//     Histórico) e replicava a animação de slide a cada 45s.
+function fmRepintarSeSeguro() {
+  // Outro modo está usando #fm-conteudo — nunca escrever por cima.
+  if (_modoAtivo !== 'motorista') return
+  // Modal aberto por cima: repintar o fundo não ajuda e pode atrapalhar.
+  if (document.querySelector('.modal-overlay.aberto')) return
+  // Usuário digitando dentro da aba (ex.: busca do Histórico).
+  const foco = document.activeElement
+  if (foco && foco.closest && foco.closest('#fm-conteudo')
+      && /^(INPUT|TEXTAREA|SELECT)$/.test(foco.tagName)) return
+  // Só as abas que de fato exibem esses dados. 'nova' é formulário e
+  // 'config' não mostra viagem/abastecimento/manutenção — repintar as
+  // duas só destruiria estado à toa.
+  const render = {
+    inicio: renderFmInicio, solicitacoes: renderFmSolicitacoes,
+    historico: renderFmHistorico, dados: renderFmDados,
+  }[_fmAba]
+  if (render) render()
 }
 
 // Telefone digitado sem padrão fixo (traço, parênteses, com/sem DDI) —
