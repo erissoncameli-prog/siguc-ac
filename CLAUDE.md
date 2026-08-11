@@ -205,6 +205,17 @@ no-op e o Web Push de sempre continua valendo).
   cobrem até cenário offline, que nem FCM cobre.
 - `app-frota/scripts/build-www.mjs`: novo arquivo entra em `ARQUIVOS_JS`.
   `pwa/sw.js`: `SHELLS.frota` ganha o arquivo, frota v70 → v71.
+- **Achado ao testar em produção**: `verificarAtualizacaoFrota()` (Config
+  → Verificar atualização) só sabia checar o ciclo do service worker
+  (comentário antigo dizia "PWA, sem shell Capacitor ainda" — desatualizado,
+  o `app-frota/` já existe). Dentro do APK isso não faz nada (nunca há SW
+  registrado — `if ('serviceWorker' in navigator && !window.Capacitor)`),
+  então o botão só recarregava a página em silêncio, sem nunca oferecer o
+  APK novo. Corrigido no mesmo padrão do Brigadas (`pages/brigada.html`,
+  `verificarUpdateAndroid`): no APK, compara `window.FROTA_BUILD` (estampado
+  pelo build nativo) com o Release mais novo `frota-v*` no GitHub e oferece
+  o `.apk` para download; fora do APK, segue pelo SW como sempre. frota v71
+  → v72.
 
 ## Relatórios de consumo de combustível
 Cálculo em UM lugar só: `js/frota-consumo.js`
