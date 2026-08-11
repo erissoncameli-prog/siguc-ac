@@ -53,6 +53,18 @@ const FP_NECESSIDADES = [
 // remontada a cada troca de aba), então um único array basta.
 let _fpLista = []
 
+// Estado da busca de passageiro na base de usuários (autocomplete).
+// `_fpUltimosResultados` guarda os resultados da última busca — o
+// onclick de cada item referencia só o ÍNDICE (nunca dado digitado
+// embutido no HTML), pra não abrir brecha de injeção com nome que
+// tenha aspas. Achado ao desenhar isto (ver migration 236): a policy
+// de leitura de `usuarios` em produção já libera qualquer autenticado
+// a ler nome/telefone de qualquer colega — por isso a busca é uma
+// consulta comum, sem RPC privilegiada.
+let _fpBuscaTimer = null
+let _fpUsuarioSelecionado = null
+let _fpUltimosResultados = []
+
 function fpLista() { return _fpLista.map(p => Object.assign({}, p)) }
 
 // Payload no formato que a RPC frota_solicitar_viagem espera.
@@ -61,6 +73,7 @@ function fpPayload() {
     nome: p.nome,
     sexo: p.sexo || null,
     necessidade_especifica: p.necessidade_especifica || null,
+    usuario_id: p.usuario_id || null,
   }))
 }
 
@@ -71,6 +84,7 @@ function fpDefinirLista(arr) {
       nome: String(p.nome).trim().slice(0, 120),
       sexo: p.sexo && p.sexo !== 'nao_informado' ? p.sexo : null,
       necessidade_especifica: (p.necessidade_especifica || '').trim().slice(0, 200) || null,
+      usuario_id: p.usuario_id || null,
     }))
   fpRenderLista()
 }
@@ -82,13 +96,23 @@ function fpLimpar() { fpDefinirLista([]) }
 // mesa não cabe em celular).
 function fpFormHTML(opts) {
   const compacto = !!(opts && opts.compacto)
+  // Campo de nome com busca incremental na base de usuários — quem já
+  // é cadastrado no sistema entra com telefone pronto (resolvido ao
+  // vivo pela view, nunca copiado pra linha do passageiro).
+  const campoNome = `<div style="position:relative">
+         <input class="form-control" id="fp-nome" placeholder="Nome do passageiro" maxlength="120"
+                autocomplete="off" oninput="fpNomeAlterado()" style="width:100%">
+         <div id="fp-resultados" style="display:none;position:absolute;left:0;right:0;top:100%;z-index:20;
+              background:#fff;border:1px solid #E5E7EB;border-radius:8px;box-shadow:0 4px 14px rgba(0,0,0,.1);
+              max-height:220px;overflow-y:auto;margin-top:2px"></div>
+       </div>`
   const linha = compacto
     ? `<div style="display:flex;flex-direction:column;gap:8px">
-         <input class="form-control" id="fp-nome" placeholder="Nome do passageiro" maxlength="120">
+         ${campoNome}
          <select class="form-control" id="fp-sexo">${FP_SEXOS.map(s => `<option value="${s[0]}">${s[1]}</option>`).join('')}</select>
        </div>`
     : `<div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
-         <input class="form-control" id="fp-nome" placeholder="Nome do passageiro" maxlength="120" style="flex:2;min-width:180px">
+         <div style="flex:2;min-width:180px">${campoNome}</div>
          <select class="form-control" id="fp-sexo" style="flex:1;min-width:150px">${FP_SEXOS.map(s => `<option value="${s[0]}">${s[1]}</option>`).join('')}</select>
        </div>`
 
@@ -123,6 +147,56 @@ function fpToggleNecessidade() {
   else document.getElementById('fp-nec').value = ''
 }
 
+// ── Busca de passageiro na base de usuários ────────────────────
+// Debounced: só busca depois de parar de digitar, e só a partir de 2
+// letras (evita disparar consulta a cada tecla e enumeração trivial).
+function fpNomeAlterado() {
+  _fpUsuarioSelecionado = null
+  const termo = document.getElementById('fp-nome').value.trim()
+  clearTimeout(_fpBuscaTimer)
+  if (termo.length < 2) { fpFecharResultados(); return }
+  _fpBuscaTimer = setTimeout(() => fpBuscarUsuarios(termo), 300)
+}
+
+async function fpBuscarUsuarios(termo) {
+  const { data, error } = await db.from('usuarios')
+    .select('id,nome_completo,telefone')
+    .eq('ativo', true)
+    .ilike('nome_completo', `%${termo}%`)
+    .order('nome_completo')
+    .limit(8)
+  _fpUltimosResultados = (!error && data) ? data : []
+  fpRenderResultados()
+}
+
+function fpRenderResultados() {
+  const el = document.getElementById('fp-resultados')
+  if (!el) return
+  if (!_fpUltimosResultados.length) { el.innerHTML = ''; el.style.display = 'none'; return }
+  el.innerHTML = _fpUltimosResultados.map((u, i) => `
+    <div style="padding:7px 10px;cursor:pointer;font-size:13px;border-bottom:1px solid #F3F4F6" onclick="fpEscolherUsuario(${i})">
+      ${esc(u.nome_completo)}${u.telefone ? `<span style="color:#9CA3AF"> · ${esc(u.telefone)}</span>` : ''}
+    </div>`).join('')
+  el.style.display = ''
+}
+
+// Prefill do nome + vínculo. O telefone NÃO é copiado pra cá — a
+// tela de leitura resolve ele ao vivo (join na view), então continua
+// certo se a pessoa trocar de telefone depois de entrar na viagem.
+function fpEscolherUsuario(i) {
+  const u = _fpUltimosResultados[i]
+  if (!u) return
+  document.getElementById('fp-nome').value = u.nome_completo.slice(0, 120)
+  _fpUsuarioSelecionado = u.id
+  fpFecharResultados()
+}
+
+function fpFecharResultados() {
+  _fpUltimosResultados = []
+  const el = document.getElementById('fp-resultados')
+  if (el) { el.innerHTML = ''; el.style.display = 'none' }
+}
+
 function fpRenderLista() {
   const el = document.getElementById('fp-lista')
   if (!el) return
@@ -131,7 +205,7 @@ function fpRenderLista() {
     : _fpLista.map((p, i) => `
       <div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #F3F4F6;font-size:13px">
         <span style="flex:1;min-width:0">
-          <strong>${esc(p.nome)}</strong>${p.sexo ? `<span style="color:#9CA3AF"> · ${FP_SEXO_LABEL[p.sexo] || ''}</span>` : ''}
+          <strong>${esc(p.nome)}</strong>${p.sexo ? `<span style="color:#9CA3AF"> · ${FP_SEXO_LABEL[p.sexo] || ''}</span>` : ''}${p.usuario_id ? `<span style="color:#059669"> · cadastrado no sistema</span>` : ''}
           ${p.necessidade_especifica ? `<div style="font-size:11px;color:#92400E">Necessidade específica: ${esc(p.necessidade_especifica)}</div>` : ''}
         </span>
         <button type="button" class="btn btn-xs btn-ghost" style="color:#DC2626" onclick="fpRemover(${i})">${bico('trash')}</button>
@@ -164,10 +238,13 @@ function fpAdicionar() {
     nome: nome.slice(0, 120),
     sexo: document.getElementById('fp-sexo').value || null,
     necessidade_especifica: temNec ? nec.slice(0, 200) : null,
+    usuario_id: _fpUsuarioSelecionado,
   })
   document.getElementById('fp-nome').value = ''
   document.getElementById('fp-sexo').value = ''
   document.getElementById('fp-tem-nec').checked = false
+  _fpUsuarioSelecionado = null
+  fpFecharResultados()
   fpToggleNecessidade()
   fpRenderLista()
   document.getElementById('fp-nome').focus()
@@ -219,4 +296,76 @@ function fpAlertaNecessidadesHTML(v) {
     <strong>${comNec.length} passageiro(s) com necessidade específica</strong> — considere um veículo adequado.
     ${comNec.map(p => `<div style="margin-top:4px">${esc(p.nome)}: ${esc(p.necessidade_especifica)}</div>`).join('')}
   </div>`
+}
+
+// ── Divisão em vários veículos ─────────────────────────────────
+// Par obrigatório: frota-viagens.html (modo múltiplo da aprovação) e
+// frota-app.html modo gestor. As duas páginas mantêm seu próprio array
+// de alocações (_linhasAlocacao / _linhasAlocacaoG) — cada linha é
+// {veiculo_id, motorista_id, passageiros, passageiro_ids}. Estas
+// funções só operam sobre o array que a página passa; quem chama é
+// dono do re-render (cada página tem sua própria render*).
+
+// Distribui os passageiros NOMEADOS da viagem (os que têm `id` —
+// vieram de frota_viagem_passageiros, migration 235) igualmente entre
+// as linhas, round-robin. Só mexe na composição de nomes: veículo e
+// motorista sugeridos por frota_sugerir_alocacao (que já pondera
+// capacidade) não são tocados — o gestor sempre pode corrigir depois
+// pelo seletor de cada chip. Viagem sem lista estruturada (antiga, ou
+// só o número preenchido) não é afetada: fica como estava antes desta
+// entrega, sem regredir a sugestão por capacidade nesse caso.
+function fpDistribuirLinhas(linhas, viagem) {
+  const pax = fpDaViagem(viagem).filter(p => p.id)
+  if (!pax.length || !linhas.length) return
+  linhas.forEach(l => { l.passageiro_ids = [] })
+  pax.forEach((p, i) => linhas[i % linhas.length].passageiro_ids.push(p.id))
+  linhas.forEach(l => { l.passageiros = l.passageiro_ids.length })
+}
+
+// Move um passageiro pra `novoIndice`. Resincroniza só a contagem das
+// linhas de origem e destino — uma linha sem passageiro nomeado nenhum
+// mantém o número que o gestor digitou à mão (headcount sem nome).
+function fpMoverPassageiro(linhas, idPassageiro, novoIndice) {
+  linhas.forEach(l => {
+    const pos = (l.passageiro_ids || []).indexOf(idPassageiro)
+    if (pos !== -1) { l.passageiro_ids.splice(pos, 1); l.passageiros = l.passageiro_ids.length }
+  })
+  const alvo = linhas[novoIndice]
+  if (!alvo) return
+  alvo.passageiro_ids = alvo.passageiro_ids || []
+  alvo.passageiro_ids.push(idPassageiro)
+  alvo.passageiros = alvo.passageiro_ids.length
+}
+
+// Ao remover uma linha, os passageiros dela não podem ficar órfãos:
+// caem na linha 0 — mesmo destino padrão de quem nunca foi remanejado
+// (ver frota_aprovar_viagem_multipla, migration 236).
+function fpRemoverLinhaComPassageiros(linhas, i) {
+  const [removida] = linhas.splice(i, 1)
+  if (removida && removida.passageiro_ids && removida.passageiro_ids.length && linhas[0]) {
+    linhas[0].passageiro_ids = (linhas[0].passageiro_ids || []).concat(removida.passageiro_ids)
+    linhas[0].passageiros = linhas[0].passageiro_ids.length
+  }
+}
+
+// Chips dos passageiros de UMA linha, com seletor pra mover pra outra
+// linha. `onMoverFn` é o NOME (string) da função global que a página
+// expõe pra reagir ao onchange e re-renderizar — cada página tem seu
+// próprio array de alocações, então quem sabe redesenhar a tela é ela.
+function fpChipsLinhaHTML(linhas, i, viagem, onMoverFn) {
+  const l = linhas[i]
+  if (!l || !l.passageiro_ids || !l.passageiro_ids.length) return ''
+  const porId = {}
+  fpDaViagem(viagem).forEach(p => { if (p.id) porId[p.id] = p })
+  return `<div style="margin:6px 0 8px;display:flex;flex-direction:column;gap:4px">` +
+    l.passageiro_ids.map(id => {
+      const p = porId[id]
+      if (!p) return ''
+      return `<div style="display:flex;align-items:center;gap:6px;font-size:12px;background:#F9FAFB;border-radius:6px;padding:4px 8px">
+        <span style="flex:1;min-width:0">${esc(p.nome)}${p.necessidade_especifica ? `<span style="color:#92400E"> · ${esc(p.necessidade_especifica)}</span>` : ''}</span>
+        <select style="font-size:11px;padding:2px 4px;width:auto" onchange="${onMoverFn}('${id}', parseInt(this.value))">
+          ${linhas.map((_, j) => `<option value="${j}" ${j === i ? 'selected' : ''}>Veículo ${j + 1}</option>`).join('')}
+        </select>
+      </div>`
+    }).join('') + `</div>`
 }

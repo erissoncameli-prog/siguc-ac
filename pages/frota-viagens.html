@@ -608,7 +608,16 @@ async function ativarModoMultiplo() {
   _linhasAlocacao = (sugestoes && sugestoes.length)
     ? sugestoes.map(s => ({ veiculo_id: s.veiculo_id, motorista_id: null, passageiros: s.passageiros_sugeridos }))
     : [{ veiculo_id: null, motorista_id: null, passageiros: _viagemAprovando?.passageiros || 1 }, { veiculo_id: null, motorista_id: null, passageiros: 0 }]
+  // Distribui os nomes (quando a viagem tem lista estruturada)
+  // igualmente entre as linhas — js/frota-passageiros.js, par
+  // obrigatório com o modo gestor de frota-app.html.
+  fpDistribuirLinhas(_linhasAlocacao, _viagemAprovando)
   await preencherMotoristasEscala()
+  renderLinhasAlocacao()
+}
+
+function fpMoverAlocacao(idPassageiro, novoIndice) {
+  fpMoverPassageiro(_linhasAlocacao, idPassageiro, novoIndice)
   renderLinhasAlocacao()
 }
 
@@ -633,7 +642,7 @@ function adicionarLinhaAlocacao() {
 }
 
 function removerLinhaAlocacao(i) {
-  _linhasAlocacao.splice(i, 1)
+  fpRemoverLinhaComPassageiros(_linhasAlocacao, i)
   renderLinhasAlocacao()
 }
 
@@ -653,11 +662,14 @@ function atualizarTotalAlocado() {
 function renderLinhasAlocacao() {
   const cont = document.getElementById('ap-linhas')
   cont.innerHTML = _linhasAlocacao.map((l, i) => `
-    <div style="display:flex;gap:8px;align-items:flex-start;margin-bottom:8px">
+    <div style="border:1px solid #F3F4F6;border-radius:8px;padding:8px;margin-bottom:8px">
+    <div style="display:flex;gap:8px;align-items:flex-start">
       <select class="form-control" style="flex:2" onchange="atualizarLinhaAlocacao(${i},'veiculo_id',this.value)">${optsVeiculos(l.veiculo_id)}</select>
       <select class="form-control" style="flex:2" onchange="atualizarLinhaAlocacao(${i},'motorista_id',this.value)">${optsMotoristas(l.motorista_id)}</select>
       <input class="form-control" style="flex:1" type="number" min="1" max="99" value="${l.passageiros || ''}" placeholder="pax" oninput="atualizarLinhaAlocacao(${i},'passageiros',this.value)">
       <button class="btn btn-xs btn-ghost" style="color:#DC2626" onclick="removerLinhaAlocacao(${i})">×</button>
+    </div>
+    ${fpChipsLinhaHTML(_linhasAlocacao, i, _viagemAprovando, 'fpMoverAlocacao')}
     </div>`).join('')
   atualizarTotalAlocado()
 }
@@ -682,7 +694,7 @@ async function confirmarAprovar() {
     try {
       const { error } = await db.rpc('frota_aprovar_viagem_multipla', {
         p_viagem_id: _acaoId,
-        p_alocacoes: _linhasAlocacao.map(l => ({ veiculo_id: l.veiculo_id, motorista_id: l.motorista_id, passageiros: l.passageiros })),
+        p_alocacoes: _linhasAlocacao.map(l => ({ veiculo_id: l.veiculo_id, motorista_id: l.motorista_id, passageiros: l.passageiros, passageiro_ids: l.passageiro_ids || [] })),
         p_liberar_dedicado: _liberarDedicado, p_justificativa: justifM || null
       })
       if (error) throw error

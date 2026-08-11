@@ -2365,7 +2365,12 @@ function abrirCheckout(id) { abrirChecklist(id, 'checkout') }
 function abrirModalCheckout(id) {
   const v = _viagens.find(x => x.id === id)
   _acaoId = id
-  document.getElementById('co-resumo').innerHTML = `<strong>${esc(v.destino)}</strong><br>${esc(v.veiculo_modelo)} (${esc(v.veiculo_placa)})`
+  // Revisão dos passageiros ANTES de sair — visível, sem travar o
+  // check-out (nada pode impedir o trabalho de campo).
+  const pax = fpDaViagem(v)
+  document.getElementById('co-resumo').innerHTML =
+    `<strong>${esc(v.destino)}</strong><br>${esc(v.veiculo_modelo)} (${esc(v.veiculo_placa)})` +
+    (pax.length ? `<div style="margin-top:8px;font-weight:600;color:#374151">Confira os passageiros:</div>${fpResumoHTML(v)}` : '')
   const ultima = v.veiculo_medidor === 'horimetro' ? v.veiculo_horimetro_horas : v.veiculo_hodometro_km
   document.getElementById('co-medida-label').textContent =
     (v.veiculo_medidor === 'horimetro' ? 'Horímetro na saída (horas)' : 'Hodômetro na saída (km)') +
@@ -3547,7 +3552,14 @@ async function ativarModoMultiplo() {
   _linhasAlocacaoG = (sugestoes && sugestoes.length)
     ? sugestoes.map(s => ({ veiculo_id: s.veiculo_id, motorista_id: null, passageiros: s.passageiros_sugeridos }))
     : [{ veiculo_id: null, motorista_id: null, passageiros: _viagemAprovando?.passageiros || 1 }, { veiculo_id: null, motorista_id: null, passageiros: 0 }]
+  // Par de mesa: frota-viagens.html, mesma chamada.
+  fpDistribuirLinhas(_linhasAlocacaoG, _viagemAprovando)
   await preencherMotoristasEscala()
+  renderLinhasAlocacaoG()
+}
+
+function fpMoverAlocacaoG(idPassageiro, novoIndice) {
+  fpMoverPassageiro(_linhasAlocacaoG, idPassageiro, novoIndice)
   renderLinhasAlocacaoG()
 }
 
@@ -3572,7 +3584,7 @@ function adicionarLinhaAlocacao() {
 }
 
 function removerLinhaAlocacao(i) {
-  _linhasAlocacaoG.splice(i, 1)
+  fpRemoverLinhaComPassageiros(_linhasAlocacaoG, i)
   renderLinhasAlocacaoG()
 }
 
@@ -3592,11 +3604,14 @@ function atualizarTotalAlocadoG() {
 function renderLinhasAlocacaoG() {
   const cont = document.getElementById('ap-linhas')
   cont.innerHTML = _linhasAlocacaoG.map((l, i) => `
-    <div style="display:flex;gap:8px;align-items:flex-start;margin-bottom:8px;flex-wrap:wrap">
+    <div style="border:1px solid #F3F4F6;border-radius:8px;padding:8px;margin-bottom:8px">
+    <div style="display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap">
       <select class="form-control" style="flex:2;min-width:120px" onchange="atualizarLinhaAlocacao(${i},'veiculo_id',this.value)">${optsVeiculosG(l.veiculo_id)}</select>
       <select class="form-control" style="flex:2;min-width:120px" onchange="atualizarLinhaAlocacao(${i},'motorista_id',this.value)">${optsMotoristasG(l.motorista_id)}</select>
       <input class="form-control" style="flex:1;min-width:60px" type="number" min="1" max="99" value="${l.passageiros || ''}" placeholder="pax" oninput="atualizarLinhaAlocacao(${i},'passageiros',this.value)">
       <button class="btn btn-xs btn-ghost" style="color:#DC2626" onclick="removerLinhaAlocacao(${i})">×</button>
+    </div>
+    ${fpChipsLinhaHTML(_linhasAlocacaoG, i, _viagemAprovando, 'fpMoverAlocacaoG')}
     </div>`).join('')
   atualizarTotalAlocadoG()
 }
@@ -3621,7 +3636,7 @@ async function confirmarAprovar() {
     try {
       const { error } = await db.rpc('frota_aprovar_viagem_multipla', {
         p_viagem_id: _acaoId,
-        p_alocacoes: _linhasAlocacaoG.map(l => ({ veiculo_id: l.veiculo_id, motorista_id: l.motorista_id, passageiros: l.passageiros })),
+        p_alocacoes: _linhasAlocacaoG.map(l => ({ veiculo_id: l.veiculo_id, motorista_id: l.motorista_id, passageiros: l.passageiros, passageiro_ids: l.passageiro_ids || [] })),
         p_liberar_dedicado: _liberarDedicadoG, p_justificativa: justifM || null
       })
       if (error) throw error
