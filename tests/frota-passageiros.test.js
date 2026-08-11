@@ -253,8 +253,9 @@ test('divisão respeita a cota de cada veículo e parte o grupo quando não há 
       vaziasSemVeiculo: vazias.every(l => !l.veiculo_id),
       vaziasDivididas: vazias.map(l => l.passageiros),
       avisoUmVeiculo: fpAvisoDivisaoHTML(1, 4, 4),
-      avisoDois: fpAvisoDivisaoHTML(2, 6, 8),
-      avisoNaoCabe: fpAvisoDivisaoHTML(2, 10, 8),
+      avisoDois: fpAvisoDivisaoHTML(2, 6, 8, true),
+      avisoMunicipal: fpAvisoDivisaoHTML(2, 6, 8, false),
+      avisoNaoCabe: fpAvisoDivisaoHTML(2, 10, 8, true),
     };
   });
 
@@ -264,7 +265,10 @@ test('divisão respeita a cota de cada veículo e parte o grupo quando não há 
   expect(r.vaziasSemVeiculo).toBe(true);
   expect(r.vaziasDivididas).toEqual([3, 3]);      // e não [6, 0], o bug original
   expect(r.avisoUmVeiculo).toBe('');              // um veículo basta: nada a avisar
-  expect(r.avisoDois).toContain('2 veículos');
+  expect(r.avisoDois).toContain('Já escalamos 2 veículos');
   expect(r.avisoDois).not.toContain('faltam lugares');
+  // Municipal: divide o grupo, mas não promete veículo escolhido.
+  expect(r.avisoMunicipal).toContain('escolha o veículo e o motorista');
+  expect(r.avisoMunicipal).not.toContain('Já escalamos');
   expect(r.avisoNaoCabe).toContain('faltam lugares para 2');
 });

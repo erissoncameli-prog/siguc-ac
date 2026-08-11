@@ -520,9 +520,17 @@ sugerir) — podiam discordar na mesma viagem. Mesma lição do
   lugares pelo `COALESCE(cap, 4)`.
 - O `> 4` fixo saiu das duas telas de aprovação: `abrirAprovar` chama
   `frota_sugerir_alocacao` e abre o modo múltiplo quando vêm **2+
-  veículos**, já com eles selecionados e os nomes repartidos. O aviso
-  do topo é montado por `fpAvisoDivisaoHTML` e diz também quando a
-  frota disponível NÃO cobre o grupo.
+  veículos**, com o grupo já repartido entre as linhas. O aviso do
+  topo é montado por `fpAvisoDivisaoHTML` e diz também quando a frota
+  disponível NÃO cobre o grupo.
+- **Veículo e motorista só vêm pré-selecionados em viagem
+  INTERMUNICIPAL**, onde existe rodízio ("o da vez",
+  `frota_sugerir_motorista_escala`). Em viagem municipal o sistema
+  divide o grupo — quantos veículos e quantos passageiros em cada —
+  mas deixa os dois campos em branco para o gestor escolher: sem
+  rodízio por trás, pré-selecionar seria só pegar o de maior
+  capacidade da lista, sem critério. O texto do aviso muda junto
+  (`preSelecionado`) — a tela não promete o que não fez.
 - `fpDistribuirLinhas` respeita a cota de cada linha; sem cota (linha
   que o gestor adicionou à mão) cai no rodízio igualitário de antes.
   Cada linha avisa quando passa da capacidade do veículo escolhido —

@@ -571,7 +571,7 @@ async function abrirAprovar(id) {
   const nSug = (sugestoes || []).length
   const capSug = (sugestoes || []).reduce((s, x) => s + (x.capacidade_passageiros || 0), 0)
   const alerta = document.getElementById('ap-alerta-passageiros')
-  alerta.innerHTML = fpAvisoDivisaoHTML(nSug, v.passageiros || 0, capSug)
+  alerta.innerHTML = fpAvisoDivisaoHTML(nSug, v.passageiros || 0, capSug, !!v.intermunicipal)
   alerta.style.display = alerta.innerHTML ? '' : 'none'
   if (nSug > 1) await ativarModoMultiplo(sugestoes)
 }
@@ -664,8 +664,14 @@ async function ativarModoMultiplo(sugestoes) {
     const r = await db.rpc('frota_sugerir_alocacao', { p_viagem_id: _acaoId })
     sugestoes = r.data
   }
+  // Viagem MUNICIPAL: o sistema divide o grupo (quantos veículos e
+  // quantos passageiros em cada), mas não escolhe QUAL veículo nem qual
+  // motorista — isso é do gestor. O rodízio "da vez" só existe para
+  // viagem intermunicipal, e sem ele pré-selecionar seria só pegar o de
+  // maior capacidade da lista, sem critério nenhum por trás.
+  const preSelecionar = !!_viagemAprovando?.intermunicipal
   _linhasAlocacao = (sugestoes && sugestoes.length)
-    ? sugestoes.map(s => ({ veiculo_id: s.veiculo_id, motorista_id: null, passageiros: s.passageiros_sugeridos }))
+    ? sugestoes.map(s => ({ veiculo_id: preSelecionar ? s.veiculo_id : null, motorista_id: null, passageiros: s.passageiros_sugeridos }))
     : fpLinhasVazias(_viagemAprovando?.passageiros || 1)
   // Distribui os nomes (quando a viagem tem lista estruturada) entre as
   // linhas, respeitando a cota que o banco reservou para cada veículo —

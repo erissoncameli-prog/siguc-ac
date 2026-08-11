@@ -364,12 +364,16 @@ function fpLinhasVazias(total) {
 // um veículo é a frota (frota_sugerir_alocacao, migration 242), não um
 // número fixo no HTML. `capacidadeTotal` é a soma da capacidade dos
 // veículos sugeridos — quando não cobre o grupo, o gestor precisa
-// saber ANTES de aprovar.
-function fpAvisoDivisaoHTML(veiculos, total, capacidadeTotal) {
+// saber ANTES de aprovar. `preSelecionado` diz se os veículos já vêm
+// escolhidos (só intermunicipal, onde existe rodízio) ou se o gestor
+// ainda vai escolher — o texto não pode prometer o que a tela não fez.
+function fpAvisoDivisaoHTML(veiculos, total, capacidadeTotal, preSelecionado) {
   if (!veiculos || veiculos < 2) return ''
   const falta = (total || 0) - (capacidadeTotal || 0)
   return `<strong>${total} passageiros não cabem em um veículo só.</strong>
-    Já escalamos ${veiculos} veículos com os passageiros divididos entre eles — confira abaixo e ajuste se precisar.
+    ${preSelecionado
+      ? `Já escalamos ${veiculos} veículos com os passageiros divididos entre eles — confira abaixo e ajuste se precisar.`
+      : `Dividimos o grupo em ${veiculos} veículos com os passageiros já repartidos — escolha o veículo e o motorista de cada um abaixo.`}
     ${falta > 0 ? `<div style="margin-top:4px">Atenção: ainda faltam lugares para ${falta} passageiro(s) — não há veículo disponível suficiente nesse período.</div>` : ''}`
 }
 
