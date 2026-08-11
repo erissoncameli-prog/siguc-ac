@@ -4,6 +4,7 @@
 // ═══════════════════════════════════════════════════════════
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { carregarLimiteAcre, noAcre } from '../_shared/acre.ts'
 
 const FIRMS_KEY_ENV    = Deno.env.get('FIRMS_MAP_KEY') ?? ''
 // Mesma chave (já pública) usada em ingest-focos e /api/focos-proxy.js.
@@ -14,6 +15,10 @@ const SUPABASE_URL     = Deno.env.get('SUPABASE_URL') ?? ''
 const SUPABASE_SRK     = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 
 // Bounding box do Acre: W,S,E,N
+// ⚠ O retângulo é só o formato que FIRMS e o WFS do DETER aceitam —
+// ele engloba AM, RO, Peru e Bolívia. Quem define o que é do Acre é o
+// recorte pelo polígono (../_shared/acre.ts) e, como garantia dura, a
+// trigger da migration 239 no banco.
 const ACRE_BBOX = '-73.8,-11.14,-66.6,-7.12'
 
 const db = createClient(SUPABASE_URL, SUPABASE_SRK)
@@ -175,6 +180,7 @@ async function processarFIRMS(novos: number, erros: string[]): Promise<number> {
     const lat = parseFloat(f.latitude)
     const lng = parseFloat(f.longitude)
     const frp = parseFloat(f.frp ?? '0')
+    if (!noAcre(lat, lng)) continue  // bbox do FIRMS invade AM/RO/Peru/Bolívia
     const fonteId = `FIRMS_${f.acq_date}_${f.acq_time}_${f.latitude}_${f.longitude}`
 
     // Evitar duplicatas
@@ -227,6 +233,8 @@ async function processarDETER(novos: number, erros: string[]): Promise<number> {
       lat = parseFloat(flat[1]) ?? lat
     }
 
+    if (!noAcre(lat, lng)) continue  // WFS do DETER responde pelo bbox, não pelo estado
+
     const uc = await ucParaPonto(lat, lng)
     const { error } = await db.from('alertas_ambientais').insert({
       fonte: 'DETER',
@@ -254,6 +262,7 @@ async function processarBDQueimadas(novos: number, erros: string[]): Promise<num
     const lat = parseFloat(f.lat ?? f.latitude ?? '0')
     const lng = parseFloat(f.lon ?? f.longitude ?? '0')
     if (!lat || !lng) continue
+    if (!noAcre(lat, lng)) continue
 
     const fonteId = `BDQ_${f.id ?? f.data_hora_gmt ?? ''}_${lat}_${lng}`
     const { count } = await db.from('alertas_ambientais')
@@ -420,6 +429,11 @@ Deno.serve(async (req) => {
 
   try {
     console.log('[monitorar-alertas] Iniciando monitoramento...')
+
+    // Polígono do Acre antes de processar qualquer fonte. Fail-open:
+    // se não carregar, nada é filtrado aqui e a trigger do banco assume.
+    const comLimite = await carregarLimiteAcre()
+    if (!comLimite) erros.push('limite do Acre indisponível — recorte delegado ao banco')
 
     // Processar fontes em paralelo (FIRMS + BDQueimadas)
     // DETER separado pois é mais pesado
