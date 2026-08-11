@@ -36,7 +36,7 @@ mkdirSync(join(WWW, 'vendor/fonts'), { recursive: true })
 const ARQUIVOS_JS = [
   'observability.js', 'queryLogger.js', 'config.js', 'lgpd.js', 'lgpd-campo.js',
   'qrcode-generator.js', 'frota-offline.js', 'frota-sync.js', 'frota-notif-local.js', 'layout.js',
-  'frota-wise.js', 'fotos-privadas.js', 'frota-consumo.js',
+  'frota-wise.js', 'fotos-privadas.js', 'frota-consumo.js', 'frota-passageiros.js',
 ]
 for (const f of ARQUIVOS_JS) {
   copiarJsTranspilado(join(RAIZ, 'js', f), join(WWW, 'js', f))
