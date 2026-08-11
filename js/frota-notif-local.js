@@ -78,7 +78,12 @@ async function fmSincronizarLembretesLocais(viagens, papel) {
   const agendar = []
 
   for (const v of (viagens || [])) {
-    if (v.status !== 'aprovada' || !v.data_saida_prevista) continue
+    // fvStatus (js/frota-viagens-status.js) porque a viagem que venceu
+    // sem check-out não é mais 'aprovada' na prática — não faz sentido
+    // agendar lembrete para ela. Guarda de typeof: este arquivo também
+    // é carregado por páginas que não trazem o módulo.
+    const st = (typeof fvStatus === 'function') ? fvStatus(v) : v.status
+    if (st !== 'aprovada' || !v.data_saida_prevista) continue
     const saida = new Date(v.data_saida_prevista).getTime()
     if (isNaN(saida)) continue
     for (const janela of F_LEMBRETE_JANELAS) {

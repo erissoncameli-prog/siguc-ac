@@ -52,7 +52,9 @@ Sistema já tem login, sidebar, layout e páginas funcionando.
 - js/ → config.js, layout.js, mapa-cartografia.js, mapa-recorte.js
   (limite do Acre + ponto-em-UC), observability.js,
   queryLogger.js; brigada-offline.js (IndexedDB), brigada-sync.js,
-  brigada-captura.js (câmera/GPS/marca d'água), brigada-fauna.js
+  brigada-captura.js (câmera/GPS/marca d'água), brigada-fauna.js;
+  frota-consumo.js, frota-passageiros.js, frota-viagens-status.js
+  (status efetivo + blocos da lista de viagens)
 - css/ → sidebar.css, brigada.css (app de campo)
 - data/ → uc_acre.geojson, uc_zonas_acre.geojson, uc_detalhes.json,
   municipios_acre.geojson, ti_acre.geojson
@@ -489,6 +491,62 @@ duas gerações de dado — cai no texto livre nas viagens antigas),
 - Ainda em aberto: a RPC de divisão (186) não copia
   `cidade_origem`/`cidade_destino` para as viagens-filhas — lacuna
   anterior a esta entrega, sem relação com passageiros.
+
+## Regra do sistema — status efetivo e blocos da lista de viagens
+Toda lista de viagem, em QUALQUER superfície, se divide em três blocos:
+**Em andamento**, **Próximas** (crescente — a mais perto primeiro) e
+**Passadas** (decrescente). Definição única em
+`js/frota-viagens-status.js` (`fvStatus`, `fvGrupo`, `fvAgrupar`,
+`fvLabel`, `fvBadge`, `fvExplicacao`, `fvAtrasada`, `fvAtivas`) —
+mesma lição do `js/frota-consumo.js`: antes eram 4 cópias de
+STATUS_LABEL (frota-app, frota-solicitar, frota-viagens,
+frota-dashboard) e nenhuma noção de tempo. Nunca remontar rótulo,
+badge ou agrupamento numa página.
+
+**Viagem que passou do retorno previsto sem check-out não aconteceu**
+(migrations 240/241, status `nao_realizada`, terminal como
+recusada/cancelada). Antes ela ficava `aprovada` para sempre:
+"Aguardando saída" eterno no app do motorista, KPI de aprovadas
+inflado, fila de aprovação do gestor entupida com data vencida e
+nenhum histórico para o solicitante. (A `vw_frota_viagens_vencidas`,
+201, cobre o caso INVERSO: a que saiu e não fez check-in — essa
+continua "Em andamento", com selo de atraso.)
+- Corte pelo RETORNO previsto, nunca pela saída: sair duas horas
+  atrasado é rotina; o que caracteriza "não realizada" é a janela
+  inteira fechar sem o veículo se mover.
+- **Duas velocidades, de propósito.** Exibição: `status_efetivo` na
+  `vw_frota_viagens_detalhe` deriva SEM carência — a viagem cai em
+  "passadas" no minuto seguinte ao vencimento, sem esperar cron.
+  Gravação: `frota_encerrar_viagens_nao_realizadas()` por pg_cron
+  horário (`20 * * * *`) só materializa após 12h, para o check-out
+  feito offline em campo ainda encontrar a viagem aberta (mesmo
+  cuidado da 198 com a pílula envenenada da fila).
+  **Exibição lê `status_efetivo`/`fvStatus(v)`; `v.status` é o
+  registro, não o que se mostra.**
+- `motivo_nao_realizacao`: `sem_inicio` (venceu aprovada, sem
+  check-out) × `sem_aprovacao` (venceu solicitada, gestão nunca
+  respondeu). Um enum só, dois motivos — a distinção vive no texto.
+- Notificação só para viagem vencida há menos de 7 dias: encerrar
+  passivo antigo é certo, avisar todo mundo sobre viagem de um mês
+  atrás é barulho que ninguém resolve. `sem_aprovacao` não notifica a
+  gestão (o SLA da 207 já cobra o mesmo fato).
+- **Check-out tardio REABRE** (`frota_checkout_viagem` aceita
+  `nao_realizada` e limpa as marcas): nada se perde e a fila offline
+  nunca trava. Só falha se o slot já tiver sido dado a outra viagem no
+  período — aí a mensagem manda abrir viagem avulsa.
+- Aprovar viagem de janela vencida é bloqueado no banco pelo trigger
+  `trg_frota_viagem_aprovacao_vencida` (BEFORE UPDATE, cobre
+  `frota_aprovar_viagem`, a múltipla e qualquer caminho futuro sem
+  recriar função grande — lição da 181). As duas superfícies de
+  aprovação avisam antes de abrir o modal.
+- `nao_realizada` não conta como uso em lugar nenhum (consumo, %
+  de conclusão, rodízio de motorista — este já olhava só `concluida`).
+- Superfícies tocadas juntas (regra de duplicação): app solicitante,
+  app motorista (some do Início, entra no Histórico), app gestor (sai
+  da fila de aprovação), `frota-solicitar.html`, `frota-viagens.html`
+  (filtro de status + filtro de período + KPI "Não realizadas (30
+  dias)" + linha do tempo), `frota-dashboard.html` (rosca, KPI e CSV).
+- Guarda: `tests/frota-viagens-agrupamento.test.js`.
 
 ## Regra do sistema — trava de veículo no abastecimento
 O abastecimento nunca deve poder ser lançado num veículo diferente do

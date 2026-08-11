@@ -54,6 +54,7 @@ const _frotaReady = _dbReady.then(function () {
 <script src="../js/fotos-privadas.js"></script>
 <script src="../js/frota-consumo.js"></script>
 <script src="../js/frota-passageiros.js"></script>
+<script src="../js/frota-viagens-status.js"></script>
 <script>
 // Rede de segurança para js/fotos-privadas.js. Se ele não carregar — deploy
 // a meio caminho, cache do navegador, bloqueio de rede — as funções
@@ -459,10 +460,9 @@ let _setores = [], _ucs = [], _minhasViagens = [], _ultimaChecagemDisponivel = n
 // ── Estado do modo Gestor ────────────────────────────────────────
 let _viagensPendentes = [], _veiculosG = [], _motoristasG = [], _manutPendentes = []
 
-const STATUS_LABEL = { solicitada:'Solicitada', aprovada:'Aguardando saída', recusada:'Recusada',
-  em_andamento:'Em andamento', concluida:'Concluída', cancelada:'Cancelada' }
-const STATUS_BADGE = { solicitada:'fw-badge fw-badge-manutencao', aprovada:'fw-badge fw-badge-em-rota', recusada:'fw-badge fw-badge-inativo',
-  em_andamento:'fw-badge fw-badge-em-rota', concluida:'fw-badge fw-badge-disponivel', cancelada:'badge-cinza' }
+// Rótulo e badge de viagem vivem em js/frota-viagens-status.js (fvLabel/
+// fvBadge) — eram 4 cópias, uma por página. Aqui só o atalho de contexto.
+const vLabel = v => fvLabel(v, 'app')
 const STATUS_VEIC_LABEL = { disponivel:'Disponível', em_viagem:'Em viagem', em_manutencao:'Em manutenção', cedido:'Cedido', baixado:'Baixado' }
 const SITUACAO_LABEL = { ok:'Em dia', proximo:'Próximo', vencido:'Vencido' }
 const SITUACAO_BADGE = { ok:'fw-badge fw-badge-disponivel', proximo:'fw-badge fw-badge-doc-vencendo', vencido:'fw-badge fw-badge-inativo' }
@@ -1388,7 +1388,7 @@ async function carregarViagensMotorista(silencioso) {
     })
   })
 
-  const pendentes = _viagens.filter(v => v.status === 'aprovada' || v.status === 'em_andamento').length
+  const pendentes = fvAtivas(_viagens)
   const badge = document.getElementById('fm-badge')
   if (badge) { badge.textContent = pendentes; badge.hidden = !pendentes }
   // O badge acima vive fora de #fm-conteudo, então é sempre atualizado.
@@ -1479,7 +1479,7 @@ function fmCardViagem(v) {
           <div style="font-size:12px;margin-top:4px">${esc(v.veiculo_modelo)} <span class="mono">(${esc(v.veiculo_placa)})</span>${v.aberta_direto ? ' <span class="badge badge-roxo">Avulsa</span>' : ''}${v._pendenteSync ? ' <span class="badge badge-cinza">Aguardando envio</span>' : ''}</div>
         </div>
         <div style="text-align:right">
-          <span class="badge ${STATUS_BADGE[v.status]}">${STATUS_LABEL[v.status]}</span><br>
+          <span class="badge ${fvBadge(v)}">${vLabel(v)}</span><br>
           ${v._pendenteSync
             ? `<span style="font-size:11px;color:#9CA3AF;display:block;margin-top:8px">Será enviada ao reconectar</span>`
             : v.status === 'aprovada'
@@ -1493,7 +1493,10 @@ function fmCardViagem(v) {
 
 // ── Aba Início ───────────────────────────────────────────────────
 function renderFmInicio() {
-  const ativas = fmOrdenarPorSaida(_viagens.filter(v => v.status === 'aprovada' || v.status === 'em_andamento'))
+  // Viagem cuja janela fechou sem check-out não é mais pendência do
+  // motorista (migration 241) — fvGrupo tira ela daqui e o Histórico
+  // recebe como "Não realizada".
+  const ativas = fmOrdenarPorSaida(_viagens.filter(v => fvGrupo(v) !== 'passada'))
   document.getElementById('fm-conteudo').innerHTML = `
     <div class="card" style="margin-bottom:16px;display:flex;align-items:center;gap:14px">
       <button type="button" onclick="abrirMenuFotoMotorista()" style="border:none;padding:0;background:none;cursor:pointer;border-radius:50%" aria-label="Foto de perfil">
@@ -1522,14 +1525,29 @@ function renderFmInicio() {
   frotaAssinarFotos(document.getElementById('fm-conteudo'))
 }
 
+// Cabeçalho de bloco das listas de viagem (Em andamento / Próximas /
+// Passadas), com a contagem do bloco. Mesmo desenho nos dois modos do
+// app; agrupamento e ordem vêm de fvAgrupar (js/frota-viagens-status.js).
+// `total` existe para o bloco paginado: o cabeçalho conta o conjunto
+// inteiro, não só a página desenhada.
+function fmSecaoViagens(titulo, itens, montarCard, total) {
+  if (!itens || !itens.length) return ''
+  return `<div class="form-section-label" style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+      <span>${titulo}</span><span style="font-weight:600;color:#9CA3AF">${total == null ? itens.length : total}</span>
+    </div>${itens.map(montarCard).join('')}`
+}
+
 // ── Aba Solicitações (viagens atribuídas a mim aguardando ação) ──
+// Passadas ficam no Histórico, não aqui: esta aba é o que ainda exige
+// alguma coisa do motorista.
 function renderFmSolicitacoes() {
-  const ativas = fmOrdenarPorSaida(_viagens.filter(v => v.status === 'aprovada' || v.status === 'em_andamento'))
-  document.getElementById('fm-conteudo').innerHTML = `
-    <div class="form-section-label">Minhas viagens</div>
-    ${!ativas.length
-      ? '<div class="card" style="text-align:center;padding:24px;color:#9CA3AF">Nenhuma viagem pendente no momento</div>'
-      : ativas.map(fmCardViagem).join('')}`
+  const g = fvAgrupar(_viagens)
+  const vazio = !g.andamento.length && !g.futura.length
+  document.getElementById('fm-conteudo').innerHTML = vazio
+    ? `<div class="form-section-label">Minhas viagens</div>
+       <div class="card" style="text-align:center;padding:24px;color:#9CA3AF">Nenhuma viagem pendente no momento</div>`
+    : fmSecaoViagens('Em andamento', g.andamento, fmCardViagem)
+      + fmSecaoViagens('Próximas', g.futura, fmCardViagem)
 }
 
 // ── Aba Histórico (diário de bordo) ──────────────────────────────
@@ -1591,23 +1609,32 @@ function renderFmHistorico() {
   const busca = _fmHistoricoBusca.trim().toLowerCase()
 
   if (_fmHistoricoSub === 'viagens') {
-    let historico = _viagens.filter(v => v.status === 'concluida')
+    // Tudo que já encerrou, não só o que foi concluído: a viagem que
+    // venceu sem check-out (migration 241) some das pendências e
+    // precisa aparecer em algum lugar — este é o lugar.
+    let historico = fvAgrupar(_viagens).passada
     if (busca) historico = historico.filter(v => (v.destino || '').toLowerCase().includes(busca) || (v.veiculo_placa || '').toLowerCase().includes(busca))
     const pagina = historico.slice(0, _fmHistoricoLimite)
     el.innerHTML = fmHistoricoChips() + fmHistoricoBuscaInput('Buscar por destino ou placa...') + (
       !historico.length
-        ? '<div class="card" style="text-align:center;padding:24px;color:#9CA3AF">Nenhuma viagem concluída ainda</div>'
+        ? '<div class="card" style="text-align:center;padding:24px;color:#9CA3AF">Nenhuma viagem encerrada ainda</div>'
         : `<div class="card"><div class="table-wrap"><div class="table-scroll">
             <table>
-              <thead><tr><th>Destino</th><th>Período</th><th>Veículo</th><th>Percurso</th><th>Avarias</th></tr></thead>
+              <thead><tr><th>Destino</th><th>Situação</th><th>Período</th><th>Veículo</th><th>Percurso</th><th>Avarias</th></tr></thead>
               <tbody>${pagina.map(v => {
                 const usoSaida = v.km_saida ?? v.horas_saida, usoChegada = v.km_chegada ?? v.horas_chegada
                 const unidade = v.veiculo_medidor === 'horimetro' ? 'h' : 'km'
                 const percurso = (usoSaida != null && usoChegada != null) ? `${formatNum(usoChegada - usoSaida, 1)} ${unidade}` : '—'
+                // Sem check-out não há período real: mostra o previsto,
+                // senão a linha fica com dois traços sem explicação.
+                const periodo = v.checkout_em
+                  ? `${formatDataHora(v.checkout_em)}<br>até ${formatDataHora(v.checkin_em)}`
+                  : `<span style="color:#9CA3AF">previsto ${formatDataHora(v.data_saida_prevista)}</span>`
                 return `<tr>
                   <td><strong>${esc(v.destino)}</strong>${v.aberta_direto ? ' <span class="badge badge-roxo" style="font-size:10px">Avulsa</span>' : ''}</td>
-                  <td style="font-size:12px">${formatDataHora(v.checkout_em)}<br>até ${formatDataHora(v.checkin_em)}</td>
-                  <td style="font-size:12px">${esc(v.veiculo_modelo)} <span class="mono">(${esc(v.veiculo_placa)})</span></td>
+                  <td><span class="badge ${fvBadge(v)}" style="font-size:10px">${vLabel(v)}</span></td>
+                  <td style="font-size:12px">${periodo}</td>
+                  <td style="font-size:12px">${v.veiculo_placa ? `${esc(v.veiculo_modelo)} <span class="mono">(${esc(v.veiculo_placa)})</span>` : '—'}</td>
                   <td class="mono" style="font-size:12px">${percurso}</td>
                   <td style="font-size:12px">${v.avarias ? `<span class="badge badge-erro">Sim</span>` : '<span style="color:#9CA3AF">Não</span>'}</td>
                 </tr>`
@@ -2850,7 +2877,7 @@ async function carregarMinhasViagens() {
     .select('*').eq('solicitante_id', _usuario.id).order('data_saida_prevista', { ascending: false }).limit(50)
   _minhasViagens = data || []
   fmSincronizarLembretesLocais(_minhasViagens, 'solicitante')
-  const ativas = _minhasViagens.filter(v => ['solicitada','aprovada','em_andamento'].includes(v.status)).length
+  const ativas = fvAtivas(_minhasViagens)
   const badge = document.getElementById('fs-badge-viagens')
   if (badge) { badge.hidden = ativas === 0; badge.textContent = ativas }
   renderSolicitanteViagens()
@@ -2920,24 +2947,70 @@ function renderSolicitanteForm(prefill) {
 }
 
 // ── Aba Minhas viagens (cards, estilo apps de transporte) ─────────
+// Três blocos, na ordem do que exige atenção: o que está rodando, o
+// que vem pela frente (mais próxima primeiro) e o que já encerrou
+// (mais recente primeiro). Agrupamento e ordem em fvAgrupar
+// (js/frota-viagens-status.js) — as passadas incluem a viagem que
+// venceu sem sair, encerrada como "Não realizada" (migration 241).
+let _fsLimitePassadas = 5
+function fsVerMaisPassadas() { _fsLimitePassadas += 10; renderSolicitanteViagens() }
+
+// Dias inteiros de diferença entre a saída e hoje, ignorando a hora —
+// "amanhã" tem que valer para as 07h e para as 23h do mesmo dia.
+function fsDiasAte(iso) {
+  const d = new Date(iso), h = new Date()
+  return Math.round(
+    (new Date(d.getFullYear(), d.getMonth(), d.getDate()) -
+     new Date(h.getFullYear(), h.getMonth(), h.getDate())) / 86400000)
+}
+
+function fsQuando(v) {
+  if (!v.data_saida_prevista) return '—'
+  const dias = fsDiasAte(v.data_saida_prevista)
+  const hora = new Date(v.data_saida_prevista).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+  if (dias === 0) return `Hoje às ${hora}`
+  if (dias === 1) return `Amanhã às ${hora}`
+  if (dias > 1)  return `Em ${dias} dias · ${formatDataHora(v.data_saida_prevista)}`
+  return formatDataHora(v.data_saida_prevista)
+}
+
+function fsCardViagem(v) {
+  const explicacao = fvExplicacao(v)
+  return `
+    <div class="card" style="margin-bottom:10px;cursor:pointer" onclick="abrirDetalheSolicitante('${v.id}')">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+        <div>
+          ${v.cidade_destino ? `<div style="font-size:12px;font-weight:600;color:#6B7280">${esc(v.cidade_origem||'Rio Branco')} → ${esc(v.cidade_destino)}</div>` : ''}
+          <div style="font-weight:700">${esc(v.destino)}</div>
+          <div style="font-size:12px;color:#9CA3AF;margin-top:2px">${fsQuando(v)}</div>
+        </div>
+        <div style="text-align:right;flex-shrink:0">
+          <span class="badge ${fvBadge(v)}">${vLabel(v)}</span>
+          ${fvAtrasada(v) ? '<div style="font-size:11px;color:#DC2626;margin-top:4px">Sem check-in</div>' : ''}
+        </div>
+      </div>
+      ${v.veiculo_placa ? `<div style="font-size:12px;color:#6B7280;margin-top:8px">${esc(v.veiculo_modelo)} <span class="mono">(${esc(v.veiculo_placa)})</span>${v.motorista_nome ? ' · '+esc(v.motorista_nome) : ''}</div>` : ''}
+      ${explicacao ? `<div style="font-size:12px;color:#6B7280;margin-top:8px;background:#F9FAFB;border-radius:8px;padding:8px 10px">${esc(explicacao)}</div>` : ''}
+    </div>`
+}
+
 function renderSolicitanteViagens() {
   document.getElementById('fm-conteudo').innerHTML = `
     <div class="form-section-label">Minhas viagens</div>
     <div id="fs-lista-viagens"></div>`
   const el = document.getElementById('fs-lista-viagens')
   if (!_minhasViagens.length) { el.innerHTML = '<div class="card" style="text-align:center;padding:28px;color:#9CA3AF">Nenhuma solicitação ainda</div>'; return }
-  el.innerHTML = _minhasViagens.map(v => `
-    <div class="card" style="margin-bottom:10px;cursor:pointer" onclick="abrirDetalheSolicitante('${v.id}')">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
-        <div>
-          ${v.cidade_destino ? `<div style="font-size:12px;font-weight:600;color:#6B7280">${esc(v.cidade_origem||'Rio Branco')} → ${esc(v.cidade_destino)}</div>` : ''}
-          <div style="font-weight:700">${esc(v.destino)}</div>
-          <div style="font-size:12px;color:#9CA3AF;margin-top:2px">${formatDataHora(v.data_saida_prevista)}</div>
-        </div>
-        <span class="badge ${STATUS_BADGE[v.status]||'badge-cinza'}">${STATUS_LABEL[v.status]||v.status}</span>
-      </div>
-      ${v.veiculo_placa ? `<div style="font-size:12px;color:#6B7280;margin-top:8px">${esc(v.veiculo_modelo)} <span class="mono">(${esc(v.veiculo_placa)})</span>${v.motorista_nome ? ' · '+esc(v.motorista_nome) : ''}</div>` : ''}
-    </div>`).join('')
+
+  const g = fvAgrupar(_minhasViagens)
+  const passadas = g.passada.slice(0, _fsLimitePassadas)
+  const restantes = g.passada.length - passadas.length
+  el.innerHTML =
+    fmSecaoViagens('Em andamento', g.andamento, fsCardViagem) +
+    fmSecaoViagens('Próximas', g.futura, fsCardViagem) +
+    fmSecaoViagens('Passadas', passadas, fsCardViagem, g.passada.length) +
+    (restantes > 0
+      ? `<button class="btn btn-secondary btn-sm" style="width:100%" onclick="fsVerMaisPassadas()">Ver mais (${restantes} restantes)</button>`
+      : '')
 }
 
 // ── Detalhe/acompanhamento de uma viagem (estilo apps de transporte:
@@ -2952,15 +3025,19 @@ function abrirDetalheSolicitante(id) {
   const v = _minhasViagens.find(x => x.id === id)
   if (!v) return
   document.querySelector('#modal-detalhe .modal-title').textContent = 'Detalhes da viagem'
-  const finalizadaFora = v.status === 'recusada' || v.status === 'cancelada'
-  const etapaAtual = FS_ETAPAS.indexOf(v.status)
-  const podeCancelar = ['solicitada','aprovada'].includes(v.status)
+  // Status efetivo (migration 241): a viagem vencida sem check-out não
+  // tem linha do tempo para percorrer — ela parou onde parou.
+  const st = fvStatus(v)
+  const finalizadaFora = ['recusada','cancelada','nao_realizada'].includes(st)
+  const etapaAtual = FS_ETAPAS.indexOf(st)
+  const podeCancelar = ['solicitada','aprovada'].includes(st)
 
   const timeline = finalizadaFora
-    ? `<div class="card" style="margin-bottom:14px;background:${v.status === 'recusada' ? '#FEF2F2' : '#F9FAFB'}">
-        <div style="font-weight:700;color:${v.status === 'recusada' ? '#991B1B' : '#374151'}">${STATUS_LABEL[v.status]}</div>
-        ${v.status === 'recusada' && v.motivo_recusa ? `<div style="font-size:13px;color:#6B7280;margin-top:4px">${esc(v.motivo_recusa)}</div>` : ''}
-        ${v.status === 'cancelada' && v.motivo_cancelamento ? `<div style="font-size:13px;color:#6B7280;margin-top:4px">${esc(v.motivo_cancelamento)}</div>` : ''}
+    ? `<div class="card" style="margin-bottom:14px;background:${st === 'recusada' ? '#FEF2F2' : '#F9FAFB'}">
+        <div style="font-weight:700;color:${st === 'recusada' ? '#991B1B' : '#374151'}">${vLabel(v)}</div>
+        ${fvExplicacao(v) ? `<div style="font-size:13px;color:#6B7280;margin-top:4px">${esc(fvExplicacao(v))}</div>` : ''}
+        ${st === 'recusada' && v.motivo_recusa ? `<div style="font-size:13px;color:#6B7280;margin-top:4px">${esc(v.motivo_recusa)}</div>` : ''}
+        ${st === 'cancelada' && v.motivo_cancelamento ? `<div style="font-size:13px;color:#6B7280;margin-top:4px">${esc(v.motivo_cancelamento)}</div>` : ''}
       </div>`
     : `<div class="card" style="margin-bottom:14px">
         <div style="display:flex;justify-content:space-between">
@@ -3245,7 +3322,10 @@ async function carregarViagensGestor() {
   const { data } = await db.from('vw_frota_viagens_detalhe').select('*')
     .in('status', ['solicitada','em_andamento'])
     .order('data_saida_prevista', { ascending: false }).limit(100)
-  _viagensPendentes = data || []
+  // Solicitação cuja janela já fechou não é mais fila de aprovação — o
+  // banco recusa aprová-la (trigger da 241) e o cron vai encerrá-la.
+  // Sem isso, a fila do gestor acumula viagem impossível de resolver.
+  _viagensPendentes = (data || []).filter(v => fvGrupo(v) !== 'passada')
   renderKpisGestor()
   renderListaPendentesGestor()
   renderListaAndamentoGestor()
@@ -3485,6 +3565,12 @@ function optsVeiculosG(selecionado) {
 
 async function abrirAprovar(id) {
   const v = _viagensPendentes.find(x => x.id === id)
+  // Par da mesa (frota-viagens.html): o banco recusa aprovar viagem de
+  // janela vencida (trigger da migration 241) — avisa antes do modal.
+  if (fvStatus(v) === 'nao_realizada') {
+    toast('Esta viagem não pode mais ser aprovada: o retorno previsto já passou. Peça ao solicitante uma nova solicitação.', 'error')
+    return
+  }
   _acaoId = id
   _viagemAprovando = v
   document.getElementById('ap-resumo').innerHTML =
