@@ -1365,11 +1365,19 @@ function fmOrdenarPorSaida(lista) {
   return [...lista].sort((a, b) => new Date(a.data_saida_prevista) - new Date(b.data_saida_prevista))
 }
 
+// Bloco "Cidade origem → Cidade destino" reaproveitado em todo card/resumo
+// de viagem que mostra destino (ver CLAUDE.md — mesmo padrão já usado em
+// frota-solicitar.html e no modal de detalhe do gestor).
+function fmCidadeDestinoHtml(v) {
+  return v.cidade_destino ? `<div style="font-size:12px;font-weight:600;color:#6B7280">${esc(v.cidade_origem||'Rio Branco')} → ${esc(v.cidade_destino)}</div>` : ''
+}
+
 function fmCardViagem(v) {
   return `
     <div class="card" style="margin-bottom:10px">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap">
         <div>
+          ${fmCidadeDestinoHtml(v)}
           <div style="font-weight:700">${esc(v.destino)}</div>
           <div style="font-size:12px;color:#6B7280;margin-top:2px">${esc(v.finalidade)}</div>
           ${v.solicitante_nome ? `<div style="font-size:12px;color:#6B7280;margin-top:4px">${esc(v.solicitante_nome)}${v.solicitante_telefone ? ' · '+fmLinkWhatsapp(v.solicitante_telefone) : ''}</div>` : ''}
@@ -2097,7 +2105,7 @@ function abrirCheckout(id) { abrirChecklist(id, 'checkout') }
 function abrirModalCheckout(id) {
   const v = _viagens.find(x => x.id === id)
   _acaoId = id
-  document.getElementById('co-resumo').innerHTML = `<strong>${esc(v.destino)}</strong><br>${esc(v.veiculo_modelo)} (${esc(v.veiculo_placa)})`
+  document.getElementById('co-resumo').innerHTML = `${fmCidadeDestinoHtml(v)}<strong>${esc(v.destino)}</strong><br>${esc(v.veiculo_modelo)} (${esc(v.veiculo_placa)})`
   const ultima = v.veiculo_medidor === 'horimetro' ? v.veiculo_horimetro_horas : v.veiculo_hodometro_km
   document.getElementById('co-medida-label').textContent =
     (v.veiculo_medidor === 'horimetro' ? 'Horímetro na saída (horas)' : 'Hodômetro na saída (km)') +
@@ -2158,7 +2166,7 @@ function abrirCheckin(id) { abrirChecklist(id, 'checkin') }
 function abrirModalCheckin(id) {
   const v = _viagens.find(x => x.id === id)
   _acaoId = id
-  document.getElementById('ci-resumo').innerHTML = `<strong>${esc(v.destino)}</strong><br>${esc(v.veiculo_modelo)} (${esc(v.veiculo_placa)})`
+  document.getElementById('ci-resumo').innerHTML = `${fmCidadeDestinoHtml(v)}<strong>${esc(v.destino)}</strong><br>${esc(v.veiculo_modelo)} (${esc(v.veiculo_placa)})`
   const saida = v.veiculo_medidor === 'horimetro' ? v.horas_saida : v.km_saida
   document.getElementById('ci-medida-label').textContent =
     (v.veiculo_medidor === 'horimetro' ? 'Horímetro na chegada (horas)' : 'Hodômetro na chegada (km)') +
@@ -2256,7 +2264,7 @@ async function abrirAbastecimento(viagemId) {
   const veiculoGrupo = document.getElementById('ab-veiculo-grupo')
   if (viagemId) {
     const v = _viagens.find(x => x.id === viagemId)
-    document.getElementById('ab-resumo').innerHTML = v ? `<strong>${esc(v.destino)}</strong><br>${esc(v.veiculo_modelo)} (${esc(v.veiculo_placa)})` : ''
+    document.getElementById('ab-resumo').innerHTML = v ? `${fmCidadeDestinoHtml(v)}<strong>${esc(v.destino)}</strong><br>${esc(v.veiculo_modelo)} (${esc(v.veiculo_placa)})` : ''
     veiculoGrupo.style.display = 'none'
     _abastVeiculos = v ? [{ id: v.veiculo_id, placa: v.veiculo_placa, modelo: v.veiculo_modelo, medidor: v.veiculo_medidor, hodometro_km: v.veiculo_hodometro_km, horimetro_horas: v.veiculo_horimetro_horas }] : []
     document.getElementById('ab-veiculo').innerHTML = _abastVeiculos.map(x => `<option value="${x.id}" selected>${esc(x.placa)}</option>`).join('')
@@ -2453,7 +2461,7 @@ async function abrirDefeito(viagemId) {
   const veiculoGrupo = document.getElementById('df-veiculo-grupo')
   if (viagemId) {
     const v = _viagens.find(x => x.id === viagemId)
-    document.getElementById('df-resumo').innerHTML = v ? `<strong>${esc(v.destino)}</strong><br>${esc(v.veiculo_modelo)} (${esc(v.veiculo_placa)})` : ''
+    document.getElementById('df-resumo').innerHTML = v ? `${fmCidadeDestinoHtml(v)}<strong>${esc(v.destino)}</strong><br>${esc(v.veiculo_modelo)} (${esc(v.veiculo_placa)})` : ''
     veiculoGrupo.style.display = 'none'
     _defeitoVeiculos = v ? [{ id: v.veiculo_id, placa: v.veiculo_placa, modelo: v.veiculo_modelo }] : []
     document.getElementById('df-veiculo').innerHTML = _defeitoVeiculos.map(x => `<option value="${x.id}" selected>${esc(x.placa)}</option>`).join('')
@@ -3026,6 +3034,7 @@ function renderListaPendentesGestor() {
   if (!lista.length) { el.innerHTML = '<div class="card" style="text-align:center;padding:20px;color:#9CA3AF">Nenhuma aprovação pendente</div>'; return }
   el.innerHTML = lista.map(v => `
     <div class="card" style="margin-bottom:10px;padding:14px">
+      ${fmCidadeDestinoHtml(v)}
       <div style="font-weight:700">${esc(v.destino)}</div>
       <div style="font-size:12px;color:#6B7280;margin-top:2px">${esc(v.solicitante_nome)}${v.setor_sigla ? ' · '+esc(v.setor_sigla) : ''}</div>
       <div style="font-size:12px;color:#9CA3AF;margin-top:6px">${formatDataHora(v.data_saida_prevista)} → ${formatDataHora(v.data_retorno_prevista)}</div>
@@ -3060,6 +3069,7 @@ function renderListaAndamentoGestor() {
     return `
     <div class="card" style="margin-bottom:8px;padding:12px 14px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap${atraso ? ';border-left:3px solid #DC2626' : ''}">
       <div>
+        ${fmCidadeDestinoHtml(v)}
         <div style="font-weight:600;font-size:13px">${esc(v.destino)}</div>
         <div style="font-size:11px;color:#9CA3AF">${esc(v.veiculo_modelo)} (${esc(v.veiculo_placa)}) · ${esc(v.motorista_nome||'—')}</div>
         ${atraso ? `<div style="font-size:11px;color:#DC2626;font-weight:600;margin-top:2px">${atraso} — sem check-in. O motorista não pode ser escalado até concluir.</div>` : ''}
