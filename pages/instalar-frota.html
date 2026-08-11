@@ -18,9 +18,6 @@
     .cartao { background:#fff; border:1px solid #E2EBE4; border-radius:16px; padding:24px 20px; margin-top:20px; }
     .cartao h2 { font-size:1.2rem; margin-bottom:6px; display:flex; align-items:center; gap:8px; }
     .cartao .sub { color:var(--suave); font-size:.95rem; margin-bottom:16px; }
-    .qr-wrap { text-align:center; margin:8px 0 18px; }
-    .qr-wrap img { width:200px; height:200px; border-radius:12px; border:1px solid #E2EBE4; }
-    .qr-wrap p { font-size:.85rem; color:var(--suave); margin-top:8px; }
     .btn-baixar { display:block; text-align:center; background:var(--verde); color:#fff; text-decoration:none;
       font-size:1.15rem; font-weight:700; padding:16px; border-radius:14px; margin:8px 0 18px; }
     .btn-baixar:active { background:var(--verde-esc); }
@@ -58,19 +55,14 @@
   <!-- ── ANDROID ──────────────────────────────────────────── -->
   <section class="cartao">
     <h2>📱 Celular Android</h2>
-    <p class="sub">Escaneie o QR com a câmera do celular (ou toque no botão abaixo) para baixar o app. Instale uma única vez — depois é só tocar no ícone, como qualquer outro app.</p>
-
-    <div class="qr-wrap">
-      <img id="qr-img" src="" alt="QR code de instalação">
-      <p>Aponte a câmera do celular para o código</p>
-    </div>
+    <p class="sub">Instale o aplicativo uma única vez. Depois é só tocar no ícone, como qualquer outro app.</p>
 
     <a class="btn-baixar" href="https://github.com/erissoncameli-prog/siguc-ac/releases/latest/download/siguc-frota.apk">
       ⬇&nbsp; Baixar o aplicativo
     </a>
 
     <ol>
-      <li><span>Toque no botão verde acima (ou escaneie o QR) e aguarde o download terminar.</span></li>
+      <li><span>Toque no botão verde acima e aguarde o download terminar.</span></li>
       <li><span>Abra o arquivo baixado (<b>siguc-frota.apk</b>) — ele aparece na barra de notificações ou na pasta <b>Downloads</b>.</span></li>
       <li><span>Se o celular perguntar sobre <b>"fontes desconhecidas"</b>, toque em <b>Configurações → Permitir desta fonte</b> e volte.</span></li>
       <li><span>Toque em <b>Instalar</b>. Pronto! O ícone <b>SIGUC Frota</b> aparece na tela inicial.</span></li>
@@ -133,16 +125,8 @@
   </p>
 </main>
 
-<script src="/js/qrcode-generator.js"></script>
 <script>
-  var LINK_APK = 'https://github.com/erissoncameli-prog/siguc-ac/releases/latest/download/siguc-frota.apk';
   var LINK_APP = 'https://siguc-ac.vercel.app/pages/frota-app.html';
-  (function () {
-    var qr = qrcode(0, 'M');
-    qr.addData(LINK_APK);
-    qr.make();
-    document.getElementById('qr-img').src = qr.createDataURL(6, 4);
-  })();
 
   function _copiaOk(idBtn) {
     var btn = document.getElementById(idBtn);
