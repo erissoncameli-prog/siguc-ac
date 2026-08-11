@@ -55,27 +55,15 @@
 
 <main>
 
-  <!-- ── QR PARA COMPARTILHAR ─────────────────────────────── -->
+  <!-- ── ANDROID ──────────────────────────────────────────── -->
   <section class="cartao">
-    <h2>📲 Escaneie para instalar (Android)</h2>
-    <p class="sub">Aponte a câmera do celular Android para o QR — ele já baixa o arquivo de instalação do app. Ou mande o link por WhatsApp com o botão de copiar.</p>
+    <h2>📱 Celular Android</h2>
+    <p class="sub">Escaneie o QR com a câmera do celular (ou toque no botão abaixo) para baixar o app. Instale uma única vez — depois é só tocar no ícone, como qualquer outro app.</p>
+
     <div class="qr-wrap">
       <img id="qr-img" src="" alt="QR code de instalação">
       <p>Aponte a câmera do celular para o código</p>
     </div>
-    <button type="button" class="copia-link" id="btn-copiar" onclick="copiarLink()" aria-label="Copiar o link de instalação">
-      <span class="cl-url" id="cl-url">github.com/.../siguc-frota.apk</span>
-      <span class="cl-ic" aria-hidden="true">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
-      </span>
-      <span class="cl-ok" id="cl-ok">✓ Link copiado!</span>
-    </button>
-  </section>
-
-  <!-- ── ANDROID ──────────────────────────────────────────── -->
-  <section class="cartao">
-    <h2>📱 Celular Android</h2>
-    <p class="sub">Instale o aplicativo uma única vez. Depois é só tocar no ícone, como qualquer outro app.</p>
 
     <a class="btn-baixar" href="https://github.com/erissoncameli-prog/siguc-ac/releases/latest/download/siguc-frota.apk">
       ⬇&nbsp; Baixar o aplicativo
@@ -173,15 +161,6 @@
     try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
     document.body.removeChild(ta);
     return ok;
-  }
-  function copiarLink() {
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(LINK_APK).then(function () { _copiaOk('btn-copiar'); }, function () {
-        if (_copiaFallback(LINK_APK)) _copiaOk('btn-copiar');
-      });
-    } else if (_copiaFallback(LINK_APK)) {
-      _copiaOk('btn-copiar');
-    }
   }
   function copiarLinkIOS() {
     if (navigator.clipboard && navigator.clipboard.writeText) {
