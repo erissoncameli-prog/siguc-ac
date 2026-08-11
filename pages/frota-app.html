@@ -1582,15 +1582,24 @@ const FM_HIST_CHIPS = [
   { id: 'manutencoes', label: 'Manutenções' },
 ]
 
-function fmHistoricoChips() {
+// Sub-abas em chip, usadas pelo Histórico do motorista e pela lista do
+// solicitante. `n` é opcional: quando vem, o chip mostra a contagem —
+// é o que faz a aba não-ativa dizer quanto tem do outro lado.
+function fmChipsHTML(itens, ativo, acao) {
   return `<div style="display:flex;gap:8px;margin-bottom:12px;overflow-x:auto">
-    ${FM_HIST_CHIPS.map(c => `
-      <button type="button" onclick="fmHistoricoSub('${c.id}')"
+    ${itens.map(c => {
+      const on = ativo === c.id
+      return `<button type="button" onclick="${acao}('${c.id}')"
         style="flex:0 0 auto;padding:7px 14px;border-radius:999px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;
-          border:1px solid ${_fmHistoricoSub === c.id ? 'var(--fw-primary,#1F4E2C)' : '#E5E7EB'};
-          background:${_fmHistoricoSub === c.id ? 'var(--fw-primary,#1F4E2C)' : '#fff'};
-          color:${_fmHistoricoSub === c.id ? '#fff' : '#374151'}">${c.label}</button>`).join('')}
+          border:1px solid ${on ? 'var(--fw-primary,#1F4E2C)' : '#E5E7EB'};
+          background:${on ? 'var(--fw-primary,#1F4E2C)' : '#fff'};
+          color:${on ? '#fff' : '#374151'}">${c.label}${c.n != null ? ` <span style="opacity:.65">${c.n}</span>` : ''}</button>`
+    }).join('')}
   </div>`
+}
+
+function fmHistoricoChips() {
+  return fmChipsHTML(FM_HIST_CHIPS, _fmHistoricoSub, 'fmHistoricoSub')
 }
 
 function fmHistoricoBuscaInput(placeholder) {
@@ -2947,13 +2956,21 @@ function renderSolicitanteForm(prefill) {
 }
 
 // ── Aba Minhas viagens (cards, estilo apps de transporte) ─────────
-// Três blocos, na ordem do que exige atenção: o que está rodando, o
-// que vem pela frente (mais próxima primeiro) e o que já encerrou
-// (mais recente primeiro). Agrupamento e ordem em fvAgrupar
-// (js/frota-viagens-status.js) — as passadas incluem a viagem que
-// venceu sem sair, encerrada como "Não realizada" (migration 241).
+// "Em andamento" fica FIXA no topo, fora das sub-abas: é a única que
+// exige atenção agora e quase sempre tem 0 ou 1 card — escondê-la
+// atrás de uma aba faria caçar o que devia saltar aos olhos. As duas
+// listas longas (Próximas / Passadas) viram sub-abas em chip, o mesmo
+// controle do Histórico do motorista. Agrupamento e ordem em
+// fvAgrupar (js/frota-viagens-status.js) — as passadas incluem a
+// viagem que venceu sem sair, "Não realizada" (migration 241).
 let _fsLimitePassadas = 5
+let _fsAbaViagens = 'futura'
 function fsVerMaisPassadas() { _fsLimitePassadas += 10; renderSolicitanteViagens() }
+function fsAbaViagens(aba) {
+  _fsAbaViagens = aba
+  _fsLimitePassadas = 5
+  renderSolicitanteViagens()
+}
 
 // Dias inteiros de diferença entre a saída e hoje, ignorando a hora —
 // "amanhã" tem que valer para as 07h e para as 23h do mesmo dia.
@@ -3002,15 +3019,27 @@ function renderSolicitanteViagens() {
   if (!_minhasViagens.length) { el.innerHTML = '<div class="card" style="text-align:center;padding:28px;color:#9CA3AF">Nenhuma solicitação ainda</div>'; return }
 
   const g = fvAgrupar(_minhasViagens)
-  const passadas = g.passada.slice(0, _fsLimitePassadas)
-  const restantes = g.passada.length - passadas.length
-  el.innerHTML =
-    fmSecaoViagens('Em andamento', g.andamento, fsCardViagem) +
-    fmSecaoViagens('Próximas', g.futura, fsCardViagem) +
-    fmSecaoViagens('Passadas', passadas, fsCardViagem, g.passada.length) +
-    (restantes > 0
-      ? `<button class="btn btn-secondary btn-sm" style="width:100%" onclick="fsVerMaisPassadas()">Ver mais (${restantes} restantes)</button>`
-      : '')
+  const chips = fmChipsHTML([
+    { id: 'futura',  label: 'Próximas', n: g.futura.length },
+    { id: 'passada', label: 'Passadas', n: g.passada.length },
+  ], _fsAbaViagens, 'fsAbaViagens')
+
+  let corpo
+  if (_fsAbaViagens === 'passada') {
+    const pagina = g.passada.slice(0, _fsLimitePassadas)
+    const restantes = g.passada.length - pagina.length
+    corpo = !g.passada.length
+      ? '<div class="card" style="text-align:center;padding:24px;color:#9CA3AF">Nenhuma viagem encerrada ainda</div>'
+      : pagina.map(fsCardViagem).join('') + (restantes > 0
+          ? `<button class="btn btn-secondary btn-sm" style="width:100%" onclick="fsVerMaisPassadas()">Ver mais (${restantes} restantes)</button>`
+          : '')
+  } else {
+    corpo = !g.futura.length
+      ? '<div class="card" style="text-align:center;padding:24px;color:#9CA3AF">Nenhuma viagem programada</div>'
+      : g.futura.map(fsCardViagem).join('')
+  }
+
+  el.innerHTML = fmSecaoViagens('Em andamento', g.andamento, fsCardViagem) + chips + corpo
 }
 
 // ── Detalhe/acompanhamento de uma viagem (estilo apps de transporte:
