@@ -1200,6 +1200,7 @@ async function carregarAbastecimentosMotorista() {
   } catch (e) {
     _abastecimentos = await fOfflineGetConfig('abastecimentos_cache') || []
   }
+  motoristaAba(_fmAba)
 }
 
 const ABAST_STATUS_BADGE = { pendente: 'fw-badge fw-badge-manutencao', validado: 'fw-badge fw-badge-disponivel', rejeitado: 'fw-badge fw-badge-inativo' }
@@ -1223,9 +1224,18 @@ function instalarGatilhosSyncFrota() {
   fSyncOn('erro', () => { atualizarBadgePendentesSync(); renderFilaFrota() })
   fSyncOn('falha-permanente', () => { atualizarBadgePendentesSync(); renderFilaFrota() })
 
-  window.addEventListener('online', () => fSyncRodar())
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) fSyncRodar() })
-  setInterval(() => { fSyncRodar(); fmAtualizarConfigGps() }, 45000)
+  // Além de enviar a fila local, o heartbeat também busca o que mudou
+  // do lado do servidor (ex.: mesa validou um abastecimento ou
+  // aprovou/recusou uma viagem) — sem isso o motorista só via a
+  // mudança ao reabrir a tela manualmente.
+  const atualizarDoServidor = () => {
+    if (!navigator.onLine) return
+    carregarViagensMotorista()
+    carregarAbastecimentosMotorista()
+  }
+  window.addEventListener('online', () => { fSyncRodar(); atualizarDoServidor() })
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) { fSyncRodar(); atualizarDoServidor() } })
+  setInterval(() => { fSyncRodar(); fmAtualizarConfigGps(); atualizarDoServidor() }, 45000)
   atualizarBadgePendentesSync()
   fmAtualizarConfigGps()
 }
