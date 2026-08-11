@@ -321,6 +321,40 @@ Guardas: `tests/mapa-recorte.test.js` (geometria) e
 gaveta anima 0,28s: esperar o `transform` virar identidade antes de
 medir ou clicar, senão o alvo está em movimento.
 
+## Regra do sistema — painéis na tela cheia do mapa
+Em `pages/mapa.html`, TODO painel do nível do `<body>` (CAR, PRODES,
+projeto de análise, análise do alerta, painel-resumo, barra de
+progresso) sumia no modo imersivo. Eram DUAS causas independentes —
+corrigir só uma não resolvia:
+1. **Empilhamento**: `.mapa-wrapper.imersivo` tinha `z-index:2000` e os
+   painéis vão de 600 a 800. O wrapper pintava por cima, e isso
+   acontecia ANTES de qualquer fullscreen — por isso o sintoma aparecia
+   até no Safari do iPad, que não tem `requestFullscreen` fora de
+   `<video>`. Agora o wrapper é `z-index:300`: ele só precisa cobrir a
+   sidebar (100; 200 no mobile). **Manter a faixa 600–800 livre** é o
+   que faz painel novo aparecer sem entrar em lista nenhuma.
+2. **Top layer**: `requestFullscreen()` era chamado no wrapper, o que o
+   promove à top layer, onde só ele e seus DESCENDENTES são pintados —
+   um irmão não renderiza nem com `z-index:99999` (medido). Agora a
+   tela cheia é pedida em `document.documentElement`. Quem dá o visual
+   imersivo é a classe `.imersivo` (`position:fixed; inset:0`), não o
+   fullscreen nativo; pedir na raiz não muda nada visualmente e mantém
+   a página inteira dentro da subárvore.
+Mesma família da armadilha da barra do Frota: um ancestral muda as
+regras de renderização dos descendentes. Elemento novo que precise
+aparecer no imersivo = ficar na faixa acima de 300 e NÃO virar irmão
+de um elemento em fullscreen.
+No imersivo as gavetas da direita (`.malerta-panel` — resumo e análise
+por alerta) usam a geometria do drawer "Exibição" (recuo 14px, cantos
+arredondados) e se ALTERNAM com ele (`_setDrawer` / `abrirResumoAlertas`):
+disputam o mesmo canto.
+Guarda: `tests/mapa-telacheia.test.js`. A verificação é por PIXEL de
+propósito — `checkVisibility`, `getBoundingClientRect` e
+`elementFromPoint` reportam o painel como visível nos dois bugs, porque
+descrevem o layout, não o que foi pintado. Não precisa decodificar PNG:
+compara-se o recorte 1×1 do painel com o do fundo; bytes iguais = o
+painel não pintou nada ali.
+
 ## Relatórios de consumo de combustível
 Cálculo em UM lugar só: `js/frota-consumo.js`
 (`frotaConsumoVeiculo` / `frotaConsumoAgregado` / `frotaConsumoTexto`).

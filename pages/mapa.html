@@ -339,7 +339,16 @@ body.mapa-imersivo{overflow:hidden;}
 /* .page-body tem animation:forwards (transform), que vira bloco de contenção
    p/ position:fixed. Neutraliza no imersivo p/ o wrapper cobrir a viewport. */
 body.mapa-imersivo .page-body{animation:none!important;transform:none!important;}
-.mapa-wrapper.imersivo{position:fixed;inset:0;z-index:2000;height:100vh;min-height:0;margin:0;padding:10px;gap:0;background:var(--floresta,#0A1A0F);animation:mapa-fs-in .28s ease;}
+/* z-index 300, não 2000: o wrapper imersivo só precisa cobrir a sidebar
+   (z-index 100; 200 no mobile). Com 2000 ele enterrava TODOS os painéis
+   do nível do <body> — CAR (600), análise do alerta e resumo (650),
+   consulta CAR (700/701), nova camada (800) —, e isso já acontecia sem
+   nenhum fullscreen envolvido. Manter esta faixa livre é o que faz
+   painel novo aparecer no imersivo sem precisar entrar em lista nenhuma.
+   Os z-index internos do imersivo (layerbar 1200, controles 1250, drawer
+   1200) não são afetados: são filhos do wrapper e vivem no stacking
+   context dele. */
+.mapa-wrapper.imersivo{position:fixed;inset:0;z-index:300;height:100vh;min-height:0;margin:0;padding:10px;gap:0;background:var(--floresta,#0A1A0F);animation:mapa-fs-in .28s ease;}
 @keyframes mapa-fs-in{from{opacity:.4}to{opacity:1}}
 .mapa-wrapper.imersivo .mapa-topbar{display:none;}
 .mapa-wrapper.imersivo .mapa-container{gap:0;}
@@ -418,6 +427,14 @@ body.mapa-imersivo .page-body{animation:none!important;transform:none!important;
 /* Painel análise alerta */
 .malerta-panel{position:fixed;top:0;right:0;width:400px;height:100vh;background:#fff;z-index:650;display:flex;flex-direction:column;box-shadow:-4px 0 32px rgba(0,0,0,.22);transition:transform .28s cubic-bezier(.4,0,.2,1);overflow:hidden;min-width:280px;max-width:600px;transform:translateX(100%);}
 .malerta-panel.aberto{transform:translateX(0);}
+/* No imersivo as gavetas da direita (resumo e análise por alerta) usam
+   a mesma geometria do drawer "Exibição", com quem disputam o canto:
+   recuadas 14px e com cantos arredondados. Sem isto elas encostam na
+   borda enquanto todo o resto do modo é recuado, e parece quebrado.
+   O deslocamento de saída ganha +28px para a gaveta sumir por
+   completo apesar do recuo — mesma conta do .mapa-painel-wrap. */
+body.mapa-imersivo .malerta-panel{top:64px;right:14px;bottom:14px;height:auto;border-radius:16px;box-shadow:0 14px 44px rgba(10,26,15,.34);transform:translateX(calc(100% + 28px));}
+body.mapa-imersivo .malerta-panel.aberto{transform:none;}
 /* Alça de redimensionar da gaveta lateral. O painel-resumo fica sobre
    o mapa sem overlay, então quem está lendo precisa poder estreitá-lo
    para ver o que está embaixo. */
@@ -1521,10 +1538,20 @@ function entrarTelaCheia(){
   _fsOrigNext = wrap.nextSibling;
   if(wrap.parentNode !== document.body) document.body.appendChild(wrap);
   wrap.classList.add('imersivo');
-  // Fullscreen nativo no PRÓPRIO wrapper: vai p/ a top layer e cobre tudo,
-  // independentemente de stacking/containing block.
-  const reqFS = wrap.requestFullscreen || wrap.webkitRequestFullscreen;
-  if(reqFS){ try{ reqFS.call(wrap).catch(()=>{}); }catch(_){} }
+  // Fullscreen nativo na RAIZ do documento, nunca no wrapper.
+  // requestFullscreen promove o elemento à top layer, onde SÓ ele e seus
+  // descendentes são pintados — um irmão não renderiza nem com
+  // z-index 99999 (medido). Com o wrapper como elemento de tela cheia,
+  // todos os painéis do nível do <body> (CAR, PRODES, projeto de
+  // análise, análise do alerta, resumo, barra de progresso) sumiam.
+  // Fullscreen na raiz mantém a página inteira dentro da subárvore, e
+  // vale também para qualquer painel novo. Quem dá o visual imersivo é
+  // a classe .imersivo (position:fixed; inset:0), não o fullscreen —
+  // por isso nada se perde no Safari do iPad, que nem oferece
+  // requestFullscreen fora de <video>.
+  const raiz = document.documentElement;
+  const reqFS = raiz.requestFullscreen || raiz.webkitRequestFullscreen;
+  if(reqFS){ try{ const r = reqFS.call(raiz); if(r && r.catch) r.catch(()=>{}); }catch(_){} }
   _sincBotaoTelaCheia();
   setTimeout(()=>{ try{ mapaL && mapaL.invalidateSize(); }catch(_){} }, 360);
 }
@@ -1551,6 +1578,11 @@ function sairTelaCheia(){
 
 function _setDrawer(open){
   const d = document.querySelector('.mapa-painel-wrap'); if(!d) return;
+  // No imersivo o drawer "Exibição" e o painel-resumo ocupam o MESMO
+  // canto direito — abrir um fecha o outro, como já acontece entre o
+  // resumo e a análise por alerta. Fora do imersivo eles não se
+  // sobrepõem (o drawer fica na coluna do layout), então nada muda.
+  if(open && _mapaImersivo && _resumoAberto) fecharResumoAlertas(false);
   d.classList.toggle('drawer-aberto', open);
   document.getElementById('btn-fs-exibicao')?.classList.toggle('ativo', open);
 }
@@ -3001,6 +3033,9 @@ function abrirResumoAlertas(porEscolha = true) {
       && document.getElementById('malerta-panel')?.classList.contains('aberto')) {
     fecharAnaliseAlertaMapa()
   }
+  // Mesma disputa com o drawer "Exibição", mas só no imersivo, onde
+  // ele também vira gaveta da direita (ver _setDrawer).
+  if (_mapaImersivo) _setDrawer(false)
   _resumoLarguraAplicar(p)
   _resumoResizeInit()
   p.classList.add('aberto')
