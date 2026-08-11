@@ -294,13 +294,32 @@ tempo recorta esses pontos no cliente (`_tlRenderAno`).
 
 Painel-resumo (`abrirResumoAlertas`, pages/mapa.html): abre junto com a
 camada, gráficos em SVG à mão (o projeto não tem lib de gráfico; padrão
-já era esse, ver `#usc-donut`). Cores validadas para daltonismo sem
+já era esse, ver `#usc-donut`).
+⚠ NÃO é modal e NÃO tem overlay. Nasceu com um `#resumo-overlay`
+cobrindo a viewport (`inset:0`) com onclick de fechar, e isso fazia
+duas coisas erradas: fechava a qualquer clique fora E matava o mapa —
+arrastar, zoom e clique em marcador não chegavam ao Leaflet. Resumo do
+que está no mapa tem de ser lido COM o mapa em uso; é gaveta lateral,
+como o `#uc-stats-card`. Fecha só no ✕ ou ao desligar a camada.
+Qualquer painel novo que descreva o mapa segue a mesma regra —
+overlay de tela cheia só para diálogo que exige decisão.
+`fecharResumoAlertas(porEscolha)`: `false` é o fechamento automático ao
+desligar a camada e NÃO grava preferência; `true` (o ✕) grava
+`siguc_resumo_alertas='0'` e impede a reabertura automática até o
+usuário clicar em "Resumo e gráficos" de novo. Largura arrastável pela
+alça (`.painel-resize`, 280–600 px, persistida em
+`siguc_resumo_largura`) porque a gaveta cobre parte do mapa. Os dois
+painéis da direita (resumo e análise por alerta) se alternam — abrir um
+fecha o outro, senão empilham. Cores validadas para daltonismo sem
 sair das cores dos marcadores: desmatamento #166534 × queimada #EA580C
 (ΔE 9,6 protan) e dentro #2F9E5B × fora de UC #F59E0B (ΔE 9,4). NÃO
 usar #166534 com #DC2626 (a cor do marcador de queimada) num gráfico:
 ΔE 1,6 — indistinguível. Identidade sempre também em rótulo direto +
 tabela, nunca só na cor.
-Guarda: `tests/mapa-recorte.test.js`.
+Guardas: `tests/mapa-recorte.test.js` (geometria) e
+`tests/mapa-resumo-painel.test.js` (painel não-modal). Nos testes, a
+gaveta anima 0,28s: esperar o `transform` virar identidade antes de
+medir ou clicar, senão o alvo está em movimento.
 
 ## Relatórios de consumo de combustível
 Cálculo em UM lugar só: `js/frota-consumo.js`
