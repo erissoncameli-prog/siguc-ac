@@ -2011,6 +2011,15 @@ async function descartarDaFila(uuid) {
   await atualizarBadgePendentesSync()
 }
 
+// "Estou rodando dentro do APK?" — window.FROTA_BUILD é estampado no
+// <head> pelo build nativo (app-frota/scripts/build-www.mjs), então está
+// disponível desde o primeiro script; window.Capacitor depende do bridge
+// nativo ter sido publicado e pode ainda não existir. Checar os dois,
+// nessa ordem, é o que torna a detecção confiável.
+function fEhAppNativoFrota() {
+  return !!(window.FROTA_BUILD || window.Capacitor)
+}
+
 // Mostra a versão do cache do PWA instalado neste aparelho (VERSOES.frota
 // do sw.js — ver "Versionamento" no CLAUDE.md), pra acompanhar se o
 // aparelho já recebeu a última atualização web sem precisar abrir o
@@ -2021,7 +2030,14 @@ async function atualizarVersaoFrota() {
   if (!el) return
   // No APK, window.FROTA_BUILD é estampado pelo build nativo
   // (app-frota/scripts/build-www.mjs) — não passa pelo Cache Storage do SW.
-  if (window.Capacitor) {
+  // Testa FROTA_BUILD ANTES de window.Capacitor: o carimbo é injetado no
+  // <head>, então já existe quando esta função roda, enquanto o bridge do
+  // Capacitor pode não ter publicado window.Capacitor ainda. Era esse o
+  // motivo de o APK não mostrar versão nenhuma — caía no ramo do Cache
+  // Storage, que no shell nativo não tem cache 'siguc-frota-v*' (lá o SW
+  // nem é registrado) e exibia "ainda não instalada". Mesma abordagem do
+  // Brigadas (pages/brigada.html), que só lê window.BRIGADA_BUILD.
+  if (fEhAppNativoFrota()) {
     el.textContent = 'Versão do app: ' + (window.FROTA_BUILD || 'indisponível')
     return
   }
@@ -2107,7 +2123,7 @@ function fVersaoAtualApp() {
 }
 
 async function verificarAtualizacaoFrota() {
-  if (window.Capacitor) return verificarUpdateAndroidFrota()
+  if (fEhAppNativoFrota()) return verificarUpdateAndroidFrota()
   return verificarUpdateWebFrota()
 }
 
@@ -4173,7 +4189,7 @@ async function alternarLembreteViagem() {
   atualizarItemLembreteConfig()
 }
 
-if ('serviceWorker' in navigator && !window.Capacitor) {
+if ('serviceWorker' in navigator && !fEhAppNativoFrota()) {
   navigator.serviceWorker.register('/pwa/sw.js', { scope: '/pages/frota-app.html' }).catch(() => {})
   // Clique numa notificação com o app já aberto: o SW manda NOTIF_OPEN e o
   // app roteia pelo tipo (sem abrir aba nova). Se o app ainda estiver
