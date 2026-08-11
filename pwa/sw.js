@@ -79,6 +79,7 @@ const SHELLS = {
     '/js/frota-wise.js',
     '/js/frota-offline.js',
     '/js/frota-sync.js',
+    '/js/frota-notif-local.js',
     '/js/fotos-privadas.js',
     '/js/lgpd.js',
     '/js/lgpd-campo.js',

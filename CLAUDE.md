@@ -170,6 +170,42 @@ Frota — abastecimento (174–175):
   recente (não do original), e testar os dois ramos de qualquer CASE
   antes de aplicar em produção.
 
+## Notificações no APK Android (Frota) — sem FCM
+O Web Push (PushManager/VAPID, `pages/frota-app.html` + `pwa/sw.js` +
+`api/push-send.js`, migrations 164/191/208) funciona em Safari/PWA e
+navegadores, mas NUNCA entrega nada dentro do APK gerado pelo
+Capacitor — a WebView não tem processo de push nativo por trás (exigiria
+Firebase Cloud Messaging, app registrado, credenciais novas na Vercel;
+não implementado). Sem isso, `estadoPush()` no APK sempre cai em
+'indisponivel' e o Config mostrava "Notificações indisponíveis neste
+dispositivo" mesmo com o usuário querendo ativar.
+Solução adotada, sem infraestrutura nova: `js/frota-notif-local.js` +
+plugin `@capacitor/local-notifications` (só existe dentro do APK —
+`fmNotifNativaDisponivel()` guarda tudo; fora do APK essas funções são
+no-op e o Web Push de sempre continua valendo).
+- **Lembretes de viagem (2h/1h/30min antes)**: AGENDADOS no aparelho
+  (AlarmManager) com a hora exata, sempre que `carregarViagensMotorista`/
+  `carregarMinhasViagens` carregam a lista — entrega garantida mesmo com
+  o app fechado, porque não depende de o processo estar vivo. Mesmas
+  janelas do cron server-side (migration 208), IDs derivados por hash
+  (viagem+janela+papel) para poder cancelar o que não se aplica mais.
+  Reagenda sozinho depois de reboot do aparelho (o plugin já cuida
+  disso — `LocalNotificationRestoreReceiver` no manifest dele).
+- **Outros avisos** (aprovação/recusa de viagem etc., tabela
+  `notificacoes`): notificados na hora durante o tick de sync de 45s que
+  já existia (`instalarGatilhosSyncFrota`) — só chegam com o app
+  aberto/recente, teto do que dá sem FCM.
+- Config do app: `atualizarItemPushConfig` ramifica por
+  `fmNotifNativaDisponivel()` — no APK usa `estadoNotifNativa`/
+  `ativarNotifNativa` (permissão nativa de notificação do Android); fora
+  dele, `estadoPush`/`ativarPushFrota` (Web Push) como sempre.
+  `itemPushConfig(estado, acaoAtivar)` ganhou o 2º parâmetro pra isso.
+- Se FCM for implementado no futuro (entrega instantânea com app morto),
+  isso continua valendo por cima — os lembretes agendados localmente
+  cobrem até cenário offline, que nem FCM cobre.
+- `app-frota/scripts/build-www.mjs`: novo arquivo entra em `ARQUIVOS_JS`.
+  `pwa/sw.js`: `SHELLS.frota` ganha o arquivo, frota v70 → v71.
+
 ## Relatórios de consumo de combustível
 Cálculo em UM lugar só: `js/frota-consumo.js`
 (`frotaConsumoVeiculo` / `frotaConsumoAgregado` / `frotaConsumoTexto`).
