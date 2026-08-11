@@ -48,6 +48,7 @@ const _frotaReady = _dbReady.then(function () {
 </script>
 <script src="../js/frota-offline.js"></script>
 <script src="../js/frota-sync.js"></script>
+<script src="../js/frota-notif-local.js"></script>
 <script src="../js/layout.js"></script>
 <script src="../js/frota-wise.js"></script>
 <script src="../js/fotos-privadas.js"></script>
@@ -443,6 +444,7 @@ let _modoBase = null, _modoAtivo = null
 // Aplicado após login+PIN+modo pronto (ver fim de entrarComSessao) ou na
 // hora, quando o SW manda NOTIF_OPEN e o app já está pronto.
 let _deepLinkNotif = new URLSearchParams(location.search).get('notif')
+let _deepLinkNotifLembrete = null // toque em lembrete de viagem (notificação local, APK) antes do login
 let _acaoId = null, _cancelarId = null
 
 // ── Estado do modo Motorista ─────────────────────────────────────
@@ -667,6 +669,7 @@ async function entrarComSessao(session, jaAutenticouSenha = false) {
   // App pronto: se veio de um clique em notificação (push deep-link),
   // roteia agora para o lugar certo pelo tipo da notificação.
   if (_deepLinkNotif) { const id = _deepLinkNotif; _deepLinkNotif = null; abrirNotificacaoFrota(id) }
+  if (_deepLinkNotifLembrete) { const acao = _deepLinkNotifLembrete; _deepLinkNotifLembrete = null; acao() }
 }
 
 // Sobe o shell do modo salvo na sessão já com esqueleto, antes de saber
@@ -1225,9 +1228,11 @@ function instalarGatilhosSyncFrota() {
 
   window.addEventListener('online', () => fSyncRodar())
   document.addEventListener('visibilitychange', () => { if (!document.hidden) fSyncRodar() })
-  setInterval(() => { fSyncRodar(); fmAtualizarConfigGps() }, 45000)
+  setInterval(() => { fSyncRodar(); fmAtualizarConfigGps(); fmChecarNotifNativas() }, 45000)
   atualizarBadgePendentesSync()
   fmAtualizarConfigGps()
+  fmInstalarListenerNotifNativa()
+  fmChecarNotifNativas()
 }
 
 // ── Config de captura de GPS (liga/desliga pelo gestor, migration 177) ─
@@ -1310,6 +1315,7 @@ async function carregarViagensMotorista() {
     if (data.length) toast('Sem conexão — mostrando última lista salva.', 'warning')
   }
   _viagens = data || []
+  fmSincronizarLembretesLocais(_viagens, 'motorista')
 
   // Anexa viagens avulsas abertas offline e ainda não sincronizadas,
   // pra o motorista continuar vendo/concluindo mesmo sem rede.
@@ -1847,7 +1853,15 @@ async function atualizarVersaoFrota() {
 async function atualizarItemPushConfig() {
   const alvo = document.getElementById('fm-cfg-push')
   if (!alvo) return
-  alvo.innerHTML = itemPushConfig(await estadoPush())
+  // No APK (Capacitor), o Web Push (PushManager/VAPID) não entrega nada —
+  // a WebView não tem processo de push nativo por trás. Usa notificação
+  // local (js/frota-notif-local.js) em vez disso; fora do APK, Web Push
+  // continua sendo o caminho de sempre.
+  if (fmNotifNativaDisponivel()) {
+    alvo.innerHTML = itemPushConfig(await estadoNotifNativa(), 'ativarNotifNativa')
+  } else {
+    alvo.innerHTML = itemPushConfig(await estadoPush())
+  }
   bIconsAplicar(alvo)
 }
 
@@ -2531,6 +2545,7 @@ async function carregarMinhasViagens() {
   const { data } = await db.from('vw_frota_viagens_detalhe')
     .select('*').eq('solicitante_id', _usuario.id).order('data_saida_prevista', { ascending: false }).limit(50)
   _minhasViagens = data || []
+  fmSincronizarLembretesLocais(_minhasViagens, 'solicitante')
   const ativas = _minhasViagens.filter(v => ['solicitada','aprovada','em_andamento'].includes(v.status)).length
   const badge = document.getElementById('fs-badge-viagens')
   if (badge) { badge.hidden = ativas === 0; badge.textContent = ativas }
@@ -3811,16 +3826,20 @@ async function estadoPush() {
   return 'ativavel'
 }
 
-// Item de Notificações no Config (settings — mostra estado, não incomoda)
-function itemPushConfig(estado) {
+// Item de Notificações no Config (settings — mostra estado, não incomoda).
+// acaoAtivar: nome da função global chamada pelo botão "ativável" — no
+// APK é ativarNotifNativa() (notificação local), fora dele é
+// ativarPushFrota() (Web Push).
+function itemPushConfig(estado, acaoAtivar) {
+  acaoAtivar = acaoAtivar || 'ativarPushFrota'
   if (estado === 'carregando')
     return `<div class="fm-config-item" style="cursor:default;color:#9CA3AF">${bico('bell')} <span>Verificando…</span></div>`
   if (estado === 'ativado')
     return `<div class="fm-config-item" style="cursor:default"><span style="color:var(--verde-c,#52B788);display:inline-flex">${bico('check')}</span> <span>Notificações ativadas</span></div>`
   if (estado === 'ativavel')
-    return `<button class="fm-config-item" onclick="ativarPushFrota()">${bico('bell')} Ativar notificações no celular</button>`
+    return `<button class="fm-config-item" onclick="${acaoAtivar}()">${bico('bell')} Ativar notificações no celular</button>`
   if (estado === 'bloqueado')
-    return `<div class="fm-config-item" style="cursor:default;color:#92400E">${bico('bell')} <span>Notificações bloqueadas — libere nas configurações do navegador para este site.</span></div>`
+    return `<div class="fm-config-item" style="cursor:default;color:#92400E">${bico('bell')} <span>Notificações bloqueadas — libere nas configurações do aparelho para o app.</span></div>`
   if (estado === 'ios-instalar')
     return `<button class="fm-config-item" onclick="abrirInstalarFrota()">${bico('download')} <span>No iPhone, instale o app na Tela de Início para receber notificações.</span></button>`
   return `<div class="fm-config-item" style="cursor:default;color:#9CA3AF">${bico('bell')} <span>Notificações indisponíveis neste dispositivo</span></div>`
