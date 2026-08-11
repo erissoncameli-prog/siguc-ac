@@ -10,6 +10,7 @@
 <script src="../js/config.js"></script>
 <script src="../js/layout.js"></script>
 <script src="../js/frota-consumo.js"></script>
+<script src="../js/frota-viagens-status.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <style>
 .rel-topbar { display:flex; gap:10px; flex-wrap:wrap; align-items:center;
@@ -87,13 +88,15 @@ let _setores     = []   // unidades_organizacionais
 let _carregando  = false
 let _rankAtivo   = 'veiculos-viagens'
 
-const STATUS_VIAGEM_LAB = {
-  solicitada:'Solicitada', aprovada:'Aprovada', recusada:'Recusada',
-  em_andamento:'Em andamento', concluida:'Concluída', cancelada:'Cancelada',
-}
+// Rótulos vêm de js/frota-viagens-status.js (definição única). Só a
+// paleta da rosca é daqui. 'Não realizada' é cinza ESCURO de propósito:
+// separa de 'Cancelada' (#6b7280) por luminosidade, não por matiz — a
+// distinção sobrevive a daltonismo.
+const STATUS_VIAGEM_LAB = FV_STATUS_LABEL
 const STATUS_VIAGEM_COR = {
   solicitada:'#f59e0b', aprovada:'#3B82C4', recusada:'#ef4444',
   em_andamento:'#7c3aed', concluida:'#059669', cancelada:'#6b7280',
+  nao_realizada:'#374151',
 }
 const STATUS_VEIC_LAB = {
   disponivel:'Disponível', em_viagem:'Em viagem', em_manutencao:'Em manutenção',
@@ -274,7 +277,7 @@ async function carregarDashboard() {
     db.from('frota_veiculos').select('id,placa,modelo,tipo,status,setor_id,medidor,ativo').eq('ativo', true),
     db.from('frota_motoristas').select('id,nome,setor_id,status,cnh_validade,habilitacao_fluvial_validade').eq('ativo', true),
     db.from('vw_frota_viagens_detalhe')
-      .select('id,status,veiculo_id,veiculo_placa,veiculo_modelo,veiculo_tipo,veiculo_medidor,motorista_id,motorista_nome,setor_solicitante_id,setor_nome,setor_sigla,solicitante_nome,destino,finalidade,cidade_origem,cidade_destino,data_saida_prevista,data_retorno_prevista,checkout_em,checkin_em,km_saida,km_chegada,horas_saida,horas_chegada,avarias,motivo_recusa,motivo_cancelamento,criado_em,aprovado_em')
+      .select('id,status,status_efetivo,motivo_nao_realizacao,veiculo_id,veiculo_placa,veiculo_modelo,veiculo_tipo,veiculo_medidor,motorista_id,motorista_nome,setor_solicitante_id,setor_nome,setor_sigla,solicitante_nome,destino,finalidade,cidade_origem,cidade_destino,data_saida_prevista,data_retorno_prevista,checkout_em,checkin_em,km_saida,km_chegada,horas_saida,horas_chegada,avarias,motivo_recusa,motivo_cancelamento,criado_em,aprovado_em')
       .gte('data_saida_prevista', iniTs).lte('data_saida_prevista', fimTs)
       .order('data_saida_prevista', { ascending: false }).limit(5000),
     db.from('vw_frota_abastecimentos_detalhe')
@@ -452,10 +455,15 @@ function consumoPorVeiculo(veiculoId, medidor) {
 
 function renderKpis() {
   const total = _viagens.length
-  const concluidas = _viagens.filter(v => v.status === 'concluida').length
-  const canceladas = _viagens.filter(v => v.status === 'cancelada' || v.status === 'recusada').length
+  const concluidas = _viagens.filter(v => fvStatus(v) === 'concluida').length
+  const canceladas = _viagens.filter(v => ['cancelada','recusada'].includes(fvStatus(v))).length
+  // Aprovadas que nunca saíram (migration 241): veículo e motorista
+  // reservados sem deslocamento — desperdício que o painel escondia
+  // dentro de "Aprovada".
+  const naoRealizadas = _viagens.filter(v => fvStatus(v) === 'nao_realizada').length
   const pctConcl = total ? Math.round(concluidas/total*100) : 0
   const pctCanc  = total ? Math.round(canceladas/total*100) : 0
+  const pctNaoRe = total ? Math.round(naoRealizadas/total*100) : 0
 
   const veicAtivos = _veiculos.length
   const veicDisp   = _veiculos.filter(v => v.status === 'disponivel').length
@@ -491,6 +499,7 @@ function renderKpis() {
       <div class="kpi-card"><div class="kpi-label">Viagens no período</div><div class="kpi-valor">${total}</div></div>
       <div class="kpi-card azul"><div class="kpi-label">Concluídas</div><div class="kpi-valor">${concluidas} <span style="font-size:.9rem;color:var(--cinza-400)">(${pctConcl}%)</span></div></div>
       <div class="kpi-card erro"><div class="kpi-label">Canceladas/recusadas</div><div class="kpi-valor">${canceladas} <span style="font-size:.9rem;color:var(--cinza-400)">(${pctCanc}%)</span></div></div>
+      <div class="kpi-card erro"><div class="kpi-label">Não realizadas</div><div class="kpi-valor">${naoRealizadas} <span style="font-size:.9rem;color:var(--cinza-400)">(${pctNaoRe}%)</span></div></div>
       <div class="kpi-card"><div class="kpi-label">Veículos ativos</div><div class="kpi-valor">${veicAtivos} <span style="font-size:.9rem;color:var(--cinza-400)">(${veicDisp} disp.)</span></div></div>
       <div class="kpi-card"><div class="kpi-label">Km rodados</div><div class="kpi-valor">${formatNum(km,0)}</div></div>
       <div class="kpi-card"><div class="kpi-label">Horas rodadas</div><div class="kpi-valor">${formatNum(horas,1)}</div></div>
@@ -529,7 +538,7 @@ function chartStatusViagem() {
 function initChartStatusViagem() {
   const ks = Object.keys(STATUS_VIAGEM_LAB)
   const cnt = {}; ks.forEach(k=>cnt[k]=0)
-  _viagens.forEach(v => { if (v.status in cnt) cnt[v.status]++ })
+  _viagens.forEach(v => { const s = fvStatus(v); if (s in cnt) cnt[s]++ })
   const total = _viagens.length || 1
   initChart('chart-status-viagem', {
     type:'doughnut',
@@ -974,7 +983,7 @@ function exportarCSV() {
   const linhas = [['Placa','Modelo','Motorista','Setor','Status','Destino','Cidade origem','Cidade destino','Finalidade','Saída prevista','Retorno previsto','Km saída','Km chegada']]
   _viagens.forEach(v => linhas.push([
     v.veiculo_placa||'', v.veiculo_modelo||'', v.motorista_nome||'', v.setor_sigla||v.setor_nome||'',
-    STATUS_VIAGEM_LAB[v.status]||v.status, v.destino||'', v.cidade_origem||'', v.cidade_destino||'', v.finalidade||'',
+    fvLabel(v), v.destino||'', v.cidade_origem||'', v.cidade_destino||'', v.finalidade||'',
     v.data_saida_prevista||'', v.data_retorno_prevista||'',
     v.km_saida??'', v.km_chegada??'',
   ]))

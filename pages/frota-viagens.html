@@ -86,6 +86,7 @@
 <script src="../js/layout.js"></script>
 <script src="../js/frota-wise.js"></script>
 <script src="../js/frota-passageiros.js"></script>
+<script src="../js/frota-viagens-status.js"></script>
 </head>
 <body>
 <div id="app"></div>
@@ -211,12 +212,11 @@ const TL_DIAS = 30
 const STATUS_TL_COR = {
   solicitada:'#f59e0b', aprovada:'#3B82C4', em_andamento:'#7c3aed',
   concluida:'#059669', recusada:'#9CA3AF', cancelada:'#9CA3AF',
+  nao_realizada:'#9CA3AF',
 }
 
-const STATUS_LABEL = { solicitada:'Solicitada', aprovada:'Aprovada', recusada:'Recusada',
-  em_andamento:'Em andamento', concluida:'Concluída', cancelada:'Cancelada' }
-const STATUS_BADGE = { solicitada:'fw-badge fw-badge-manutencao', aprovada:'fw-badge fw-badge-em-rota', recusada:'fw-badge fw-badge-inativo',
-  em_andamento:'fw-badge fw-badge-em-rota', concluida:'fw-badge fw-badge-disponivel', cancelada:'badge-cinza' }
+// Rótulo, badge e agrupamento vivem em js/frota-viagens-status.js
+// (fvLabel/fvBadge/fvAgrupar) — antes eram 4 cópias, uma por página.
 const STATUS_VEIC_LABEL = { disponivel:'Disponível', em_viagem:'Em viagem', em_manutencao:'Em manutenção', cedido:'Cedido', baixado:'Baixado' }
 
 ;(async function () {
@@ -236,6 +236,7 @@ const STATUS_VEIC_LABEL = { disponivel:'Disponível', em_viagem:'Em viagem', em_
         <div class="fw-kpi-card"><div class="fw-kpi-label">Pendentes de aprovação</div><div class="fw-kpi-value" id="k-pend">0</div></div>
         <div class="fw-kpi-card"><div class="fw-kpi-label">Aprovadas (aguardando saída)</div><div class="fw-kpi-value" id="k-aprov">0</div></div>
         <div class="fw-kpi-card"><div class="fw-kpi-label">Em andamento</div><div class="fw-kpi-value" id="k-andamento">0</div></div>
+        <div class="fw-kpi-card"><div class="fw-kpi-label">Não realizadas (30 dias)</div><div class="fw-kpi-value" id="k-naorealizada">0</div></div>
         <div class="fw-kpi-card"><div class="fw-kpi-label">Com avarias reportadas</div><div class="fw-kpi-value" id="k-avarias">0</div></div>
       </div>
       <div class="card" id="card-vencidas" style="margin-bottom:16px;padding:14px 18px;display:none;border-left:3px solid #DC2626">
@@ -262,8 +263,15 @@ const STATUS_VEIC_LABEL = { disponivel:'Disponível', em_viagem:'Em viagem', em_
           <option value="aprovada">Aprovadas</option>
           <option value="em_andamento">Em andamento</option>
           <option value="concluida">Concluídas</option>
+          <option value="nao_realizada">Não realizadas</option>
           <option value="recusada">Recusadas</option>
           <option value="cancelada">Canceladas</option>
+        </select>
+        <select class="form-control" id="fil-periodo" style="width:170px" onchange="renderViagens()">
+          <option value="" selected>Todos os períodos</option>
+          <option value="andamento">Em andamento</option>
+          <option value="futura">Próximas</option>
+          <option value="passada">Passadas</option>
         </select>
         <button type="button" class="btn btn-sm btn-secondary" style="margin-left:auto" onclick="abrirDisponibilidade()">${bico('search')} Veículos livres por data</button>
         <div class="frota-tl-toggle">
@@ -387,9 +395,14 @@ function renderVencidas() {
 
 function renderKpis() {
   const set = (id, v) => fwAnimateNumber(document.getElementById(id), v)
-  set('k-pend', _viagens.filter(v => v.status === 'solicitada').length)
-  set('k-aprov', _viagens.filter(v => v.status === 'aprovada').length)
-  set('k-andamento', _viagens.filter(v => v.status === 'em_andamento').length)
+  // Por status EFETIVO: viagem cuja janela fechou sem sair não é mais
+  // pendência de aprovação nem está "aguardando saída" (migration 241).
+  const desde30 = Date.now() - 30 * 86400 * 1000
+  set('k-pend', _viagens.filter(v => fvStatus(v) === 'solicitada').length)
+  set('k-aprov', _viagens.filter(v => fvStatus(v) === 'aprovada').length)
+  set('k-andamento', _viagens.filter(v => fvStatus(v) === 'em_andamento').length)
+  set('k-naorealizada', _viagens.filter(v => fvStatus(v) === 'nao_realizada'
+    && new Date(v.data_retorno_prevista).getTime() >= desde30).length)
   set('k-avarias', _viagens.filter(v => v.avarias).length)
 }
 
@@ -405,34 +418,56 @@ function linkMapa(lat, lng) {
   return ` · <a href="https://www.google.com/maps?q=${lat},${lng}" target="_blank" rel="noopener" style="font-size:12px">Ver localização</a>`
 }
 
+// Cabeçalho de bloco da tabela agrupada — mesma divisão do app e da
+// tela do solicitante (Em andamento / Próximas / Passadas).
+function linhaGrupoViagens(titulo, n) {
+  return `<tr><td colspan="6" style="background:#F9FAFB;font-size:11px;font-weight:700;color:#6B7280;letter-spacing:.05em;text-transform:uppercase;padding:8px 12px">${titulo} · ${n}</td></tr>`
+}
+
+function linhaViagem(v) {
+  const st = fvStatus(v)
+  const irmas = v.viagem_pai_id ? _viagens.filter(x => x.viagem_pai_id === v.viagem_pai_id || x.id === v.viagem_pai_id) : _viagens.filter(x => x.viagem_pai_id === v.id)
+  const parte = v.viagem_pai_id ? `<br><span style="font-size:11px;color:#9CA3AF">Dividida em ${irmas.length + 1} veículos · ${v.passageiros || 0} pax nesta parte</span>`
+    : (irmas.length ? `<br><span style="font-size:11px;color:#9CA3AF">Dividida em ${irmas.length + 1} veículos</span>` : '')
+  const explicacao = fvExplicacao(v)
+  return `
+  <tr>
+    <td><strong>${esc(v.destino)}</strong>${v.avarias ? ' <span class="badge badge-erro">Avaria</span>' : ''}${parte}</td>
+    <td style="font-size:12px">${esc(v.solicitante_nome)}${v.setor_sigla ? `<br><span style="color:#9CA3AF">${esc(v.setor_sigla)}</span>` : ''}</td>
+    <td style="font-size:12px">${formatDataHora(v.data_saida_prevista)}<br>até ${formatDataHora(v.data_retorno_prevista)}</td>
+    <td style="font-size:12px">${v.veiculo_placa ? `${esc(v.veiculo_modelo)} <span class="mono">(${esc(v.veiculo_placa)})</span><br>${esc(v.motorista_nome||'—')}` : '<span style="color:#9CA3AF">A definir</span>'}</td>
+    <td><span class="badge ${fvBadge(v)}">${fvLabel(v)}</span>
+      ${fvAtrasada(v) ? '<div style="font-size:11px;color:#DC2626;margin-top:4px">Sem check-in</div>' : ''}
+      ${explicacao ? `<div style="font-size:11px;color:#9CA3AF;margin-top:4px">${esc(explicacao)}</div>` : ''}</td>
+    <td style="white-space:nowrap">
+      ${st === 'solicitada' ? `
+        <button class="btn btn-xs btn-primary" onclick="abrirAprovar('${v.id}')">Aprovar</button>
+        <button class="btn btn-xs btn-ghost" style="color:#DC2626" onclick="abrirRecusar('${v.id}')">Recusar</button>
+      ` : `<button class="btn btn-xs btn-ghost" onclick="abrirDetalhe('${v.id}')">Ver</button>`}
+    </td>
+  </tr>`
+}
+
 function renderViagens() {
   const q = (document.getElementById('busca')?.value || '').toLowerCase()
   const status = document.getElementById('fil-status')?.value
+  const periodo = document.getElementById('fil-periodo')?.value
   const lista = _viagens.filter(v =>
     (!q || `${v.destino} ${v.solicitante_nome}`.toLowerCase().includes(q)) &&
-    (!status || v.status === status))
+    (!status || fvStatus(v) === status) &&
+    (!periodo || fvGrupo(v) === periodo))
 
   const tbody = document.getElementById('tbody')
   if (!lista.length) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:32px;color:#9CA3AF">Nenhuma viagem encontrada</td></tr>'; return }
-  tbody.innerHTML = lista.map(v => {
-    const irmas = v.viagem_pai_id ? _viagens.filter(x => x.viagem_pai_id === v.viagem_pai_id || x.id === v.viagem_pai_id) : _viagens.filter(x => x.viagem_pai_id === v.id)
-    const parte = v.viagem_pai_id ? `<br><span style="font-size:11px;color:#9CA3AF">Dividida em ${irmas.length + 1} veículos · ${v.passageiros || 0} pax nesta parte</span>`
-      : (irmas.length ? `<br><span style="font-size:11px;color:#9CA3AF">Dividida em ${irmas.length + 1} veículos</span>` : '')
-    return `
-    <tr>
-      <td><strong>${esc(v.destino)}</strong>${v.avarias ? ' <span class="badge badge-erro">Avaria</span>' : ''}${parte}</td>
-      <td style="font-size:12px">${esc(v.solicitante_nome)}${v.setor_sigla ? `<br><span style="color:#9CA3AF">${esc(v.setor_sigla)}</span>` : ''}</td>
-      <td style="font-size:12px">${formatDataHora(v.data_saida_prevista)}<br>até ${formatDataHora(v.data_retorno_prevista)}</td>
-      <td style="font-size:12px">${v.veiculo_placa ? `${esc(v.veiculo_modelo)} <span class="mono">(${esc(v.veiculo_placa)})</span><br>${esc(v.motorista_nome||'—')}` : '<span style="color:#9CA3AF">A definir</span>'}</td>
-      <td><span class="badge ${STATUS_BADGE[v.status]||'badge-cinza'}">${STATUS_LABEL[v.status]||v.status}</span></td>
-      <td style="white-space:nowrap">
-        ${v.status === 'solicitada' ? `
-          <button class="btn btn-xs btn-primary" onclick="abrirAprovar('${v.id}')">Aprovar</button>
-          <button class="btn btn-xs btn-ghost" style="color:#DC2626" onclick="abrirRecusar('${v.id}')">Recusar</button>
-        ` : `<button class="btn btn-xs btn-ghost" onclick="abrirDetalhe('${v.id}')">Ver</button>`}
-      </td>
-    </tr>`
-  }).join('')
+
+  const g = fvAgrupar(lista)
+  tbody.innerHTML = [
+    ['Em andamento', g.andamento],
+    ['Próximas', g.futura],
+    ['Passadas', g.passada],
+  ].filter(([, l]) => l.length)
+   .map(([titulo, l]) => linhaGrupoViagens(titulo, l.length) + l.map(linhaViagem).join(''))
+   .join('')
 }
 
 let _viagemAprovando = null, _idsDisponiveis = new Set(), _linhasAlocacao = []
@@ -491,6 +526,12 @@ async function toggleLiberarDedicado() {
 
 async function abrirAprovar(id) {
   const v = _viagens.find(x => x.id === id)
+  // O banco recusa (trigger da migration 241) — melhor dizer aqui, com
+  // a saída, do que deixar o gestor preencher o modal para levar erro.
+  if (fvStatus(v) === 'nao_realizada') {
+    toast('Esta viagem não pode mais ser aprovada: o retorno previsto já passou. Peça ao solicitante uma nova solicitação.', 'error')
+    return
+  }
   _acaoId = id
   _viagemAprovando = v
   document.getElementById('ap-resumo').innerHTML =
@@ -754,6 +795,8 @@ function abrirDetalhe(id) {
       ${v.cidade_destino ? `<div><strong>Cidade:</strong> ${esc(v.cidade_origem||'Rio Branco')} → ${esc(v.cidade_destino)}</div>` : ''}
       <div><strong>Destino:</strong> ${esc(v.destino)}</div>
       <div><strong>Finalidade:</strong> ${esc(v.finalidade)}</div>
+      <div><strong>Situação:</strong> <span class="badge ${fvBadge(v)}">${fvLabel(v)}</span></div>
+      ${fvExplicacao(v) ? `<div style="color:#6B7280">${esc(fvExplicacao(v))}</div>` : ''}
       <div><strong>Solicitante:</strong> ${esc(v.solicitante_nome)} ${v.setor_sigla ? `(${esc(v.setor_sigla)})` : ''}${v.solicitante_telefone ? ` · ${esc(v.solicitante_telefone)}` : ''}</div>
       ${fpDaViagem(v).length ? `<div><strong>Passageiros:</strong>${fpResumoHTML(v)}</div>` : ''}
       <div><strong>Período previsto:</strong> ${formatDataHora(v.data_saida_prevista)} → ${formatDataHora(v.data_retorno_prevista)}</div>
@@ -899,7 +942,7 @@ function tlViagensFiltradas() {
   const status = document.getElementById('fil-status')?.value
   return _viagensTimeline.filter(v =>
     (!q || `${v.destino} ${v.solicitante_nome}`.toLowerCase().includes(q)) &&
-    (!status || v.status === status))
+    (!status || fvStatus(v) === status))
 }
 
 // Grupo "por demanda": raiz é o viagem_pai_id (se filha) ou o próprio
@@ -972,7 +1015,8 @@ function renderTimeline() {
   document.getElementById('tl-body').innerHTML = linhas.map(row => {
     const barsHtml = (row.bars||[]).map(v => {
       const { left, width } = tlPosicao(v.data_saida_prevista, v.data_retorno_prevista, rangeIni, rangeFimMs)
-      const cor = STATUS_TL_COR[v.status] || '#9CA3AF'
+      const st = fvStatus(v)
+      const cor = STATUS_TL_COR[st] || '#9CA3AF'
       const grupo = v.viagem_pai_id || v.id
       const dividida = v.viagem_pai_id || row.grupo
       const labelBar = _tlModo === 'demanda' ? (v.veiculo_placa || 'A definir') : esc(v.destino)
@@ -982,7 +1026,7 @@ function renderTimeline() {
         ghost = `<div class="frota-tl-ghost" style="left:${left}%;width:${width}%"></div>`
       }
       return `${ghost}<div class="frota-tl-bar" data-grupo="${grupo}" data-vid="${v.id}"
-        style="left:${left}%;width:${width}%;background:${cor}${v.status==='recusada'||v.status==='cancelada'?';background-image:repeating-linear-gradient(45deg,transparent,transparent 5px,rgba(255,255,255,.25) 5px,rgba(255,255,255,.25) 10px)':''}"
+        style="left:${left}%;width:${width}%;background:${cor}${['recusada','cancelada','nao_realizada'].includes(st)?';background-image:repeating-linear-gradient(45deg,transparent,transparent 5px,rgba(255,255,255,.25) 5px,rgba(255,255,255,.25) 10px)':''}"
         onmouseenter="tlHoverBar(event,'${v.id}')" onmouseleave="tlLeaveBar()"
         onclick="abrirDetalhe('${v.id}')">${dividida ? bico('share','tl-link-ico') : ''}${labelBar}</div>`
     }).join('')
@@ -1018,6 +1062,7 @@ function tlHoverBar(ev, id) {
 
   if (!_tlTip) { _tlTip = document.createElement('div'); _tlTip.className = 'frota-tl-tip'; document.body.appendChild(_tlTip) }
   _tlTip.innerHTML = `<strong>${esc(v.destino)}</strong><br>${esc(v.finalidade||'')}<br>
+    ${fvLabel(v)}<br>
     ${formatDataHora(v.data_saida_prevista)} → ${formatDataHora(v.data_retorno_prevista)}<br>
     ${v.veiculo_placa ? `${esc(v.veiculo_modelo)} (${esc(v.veiculo_placa)})<br>` : ''}
     ${v.motorista_nome ? `Motorista: ${esc(v.motorista_nome)}<br>` : ''}
