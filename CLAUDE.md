@@ -282,6 +282,42 @@ viewport, zero transform nos ancestrais, fixa ao rolar, e clique real
 chegando ao botão. Qualquer elemento fixo novo no app deve seguir a
 mesma regra.
 
+## Passageiros da viagem (migration 235)
+O que era texto livre (`frota_viagens.lista_passageiros`, migration
+184 — "um nome por linha") virou registro estruturado: tabela
+`frota_viagem_passageiros` (nome, `sexo` reaproveitando o enum
+`sexo_participante` da 084, `necessidade_especifica`). Editor e
+exibição vivem em UM arquivo, `js/frota-passageiros.js` — mesma
+lição do `js/frota-consumo.js`; nunca remontar a lista na página.
+API: `fpFormHTML({compacto})` (compacto = app, campos empilhados),
+`fpPayload`/`fpDefinirLista`/`fpLimpar`, `fpDaViagem` (normaliza as
+duas gerações de dado — cai no texto livre nas viagens antigas),
+`fpResumoHTML`, `fpAlertaNecessidadesHTML`. Guarda:
+`tests/frota-passageiros.test.js`.
+- Solicitação passou a usar a RPC `frota_solicitar_viagem`
+  (SECURITY **INVOKER**, não DEFINER): viagem + passageiros na mesma
+  transação — com tabela filha, dois `.insert()` deixariam viagem sem
+  os nomes se o segundo falhasse. A policy `frota_viag_insert` (158)
+  continua sendo quem autoriza; a RPC não amplia privilégio nenhum.
+- O `passageiros` (número) passa a ser derivado da lista quando ela
+  existe, e segue editável para quem ainda não sabe os nomes.
+- É por causa do ALERTA na aprovação que a necessidade é coletada:
+  `#ap-alerta-necessidades` existe nas DUAS superfícies
+  (frota-viagens.html e frota-app.html modo gestor) — par obrigatório.
+- LGPD: necessidade específica é dado de saúde (Art. 5º, II) →
+  `TRAT-017` no ROPA, base legal Art. 11, II, "b" + dever de
+  acessibilidade (Lei 13.146/2015). Campo opcional, 200 caracteres,
+  e purgado 90 dias depois da viagem por pg_cron
+  (`frota_purgar_necessidade_passageiros`) — o nome fica os 5 anos da
+  prestação de contas, a condição de saúde não. As sugestões de
+  necessidade são lista FIXA no código: alimentar
+  `frota_registrar_sugestao` (o catálogo aprendido da manutenção)
+  espalharia o dado de um passageiro para todos os solicitantes.
+- Limitação conhecida: na viagem dividida em vários veículos (RPC da
+  186) a lista fica na viagem-mãe, sem distribuição por veículo — e a
+  RPC também não copia `cidade_origem`/`cidade_destino` para as
+  filhas, lacuna anterior a esta entrega.
+
 ## Regra do sistema — trava de veículo no abastecimento
 O abastecimento nunca deve poder ser lançado num veículo diferente do
 que o motorista está de fato usando. Defesa em 2 camadas:
