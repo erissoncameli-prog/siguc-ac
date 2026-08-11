@@ -53,6 +53,7 @@ const _frotaReady = _dbReady.then(function () {
 <script src="../js/frota-wise.js"></script>
 <script src="../js/fotos-privadas.js"></script>
 <script src="../js/frota-consumo.js"></script>
+<script src="../js/frota-passageiros.js"></script>
 <script>
 // Rede de segurança para js/fotos-privadas.js. Se ele não carregar — deploy
 // a meio caminho, cache do navegador, bloqueio de rede — as funções
@@ -298,6 +299,8 @@ window.frotaFotoUrlAssinada = window.frotaFotoUrlAssinada || async function () {
       <div id="ap-alerta-passageiros" style="display:none;font-size:12px;background:#FEF3C7;color:#92400E;padding:8px 12px;border-radius:8px;margin-bottom:14px">
         Mais de 4 passageiros — um veículo pode não comportar o grupo. Use "Dividir em mais de um veículo" para escalar mais de um veículo/motorista para essa viagem.
       </div>
+      <!-- Par de mesa: frota-viagens.html, mesmo bloco. -->
+      <div id="ap-alerta-necessidades"></div>
 
       <div id="ap-escala-box" style="display:none;font-size:12px;background:#ECFDF5;border:1px solid #A7F3D0;color:#065F46;padding:8px 12px;border-radius:8px;margin-bottom:14px"></div>
 
@@ -1471,7 +1474,7 @@ function fmCardViagem(v) {
           <div style="font-weight:700">${esc(v.destino)}</div>
           <div style="font-size:12px;color:#6B7280;margin-top:2px">${esc(v.finalidade)}</div>
           ${v.solicitante_nome ? `<div style="font-size:12px;color:#6B7280;margin-top:4px">${esc(v.solicitante_nome)}${v.solicitante_telefone ? ' · '+fmLinkWhatsapp(v.solicitante_telefone) : ''}</div>` : ''}
-          ${v.lista_passageiros ? `<div style="font-size:12px;color:#6B7280;margin-top:4px">Passageiros: ${esc(v.lista_passageiros).replace(/\n/g,', ')}</div>` : ''}
+          ${fpDaViagem(v).length ? `<div style="font-size:12px;color:#6B7280;margin-top:4px">Passageiros:${fpResumoHTML(v)}</div>` : ''}
           <div style="font-size:12px;color:#9CA3AF;margin-top:6px">${formatDataHora(v.data_saida_prevista)} → ${formatDataHora(v.data_retorno_prevista)}</div>
           <div style="font-size:12px;margin-top:4px">${esc(v.veiculo_modelo)} <span class="mono">(${esc(v.veiculo_placa)})</span>${v.aberta_direto ? ' <span class="badge badge-roxo">Avulsa</span>' : ''}${v._pendenteSync ? ' <span class="badge badge-cinza">Aguardando envio</span>' : ''}</div>
         </div>
@@ -2407,7 +2410,12 @@ function abrirCheckout(id) { abrirChecklist(id, 'checkout') }
 function abrirModalCheckout(id) {
   const v = _viagens.find(x => x.id === id)
   _acaoId = id
-  document.getElementById('co-resumo').innerHTML = `<strong>${esc(v.destino)}</strong><br>${esc(v.veiculo_modelo)} (${esc(v.veiculo_placa)})`
+  // Revisão dos passageiros ANTES de sair — visível, sem travar o
+  // check-out (nada pode impedir o trabalho de campo).
+  const pax = fpDaViagem(v)
+  document.getElementById('co-resumo').innerHTML =
+    `<strong>${esc(v.destino)}</strong><br>${esc(v.veiculo_modelo)} (${esc(v.veiculo_placa)})` +
+    (pax.length ? `<div style="margin-top:8px;font-weight:600;color:#374151">Confira os passageiros:</div>${fpResumoHTML(v)}` : '')
   const ultima = v.veiculo_medidor === 'horimetro' ? v.veiculo_horimetro_horas : v.veiculo_hodometro_km
   document.getElementById('co-medida-label').textContent =
     (v.veiculo_medidor === 'horimetro' ? 'Horímetro na saída (horas)' : 'Hodômetro na saída (km)') +
@@ -2861,8 +2869,7 @@ function renderSolicitanteForm(prefill) {
       <div id="aviso-passageiros" style="display:none;font-size:12px;background:#FEF3C7;color:#92400E;padding:8px 12px;border-radius:8px;margin-bottom:14px">
         Mais de 4 passageiros — o setor de transporte pode precisar escalar mais de um veículo para atender essa viagem.
       </div>
-      <div class="form-group"><label class="form-label">Lista de passageiros (opcional)</label>
-        <textarea class="form-control" id="f-passageiros-lista" rows="3" placeholder="Um nome por linha"></textarea></div>
+      ${fpFormHTML({ compacto: true })}
       <div class="grid-2">
         <div class="form-group"><label class="form-label">Cidade de origem <span class="obrig">*</span></label>
           <input class="form-control" id="f-cidade-origem" list="dl-cidades" value="Rio Branco" placeholder="Rio Branco" oninput="checarIntermunicipal()"></div>
@@ -2901,11 +2908,14 @@ function renderSolicitanteForm(prefill) {
     document.getElementById('f-uc').value = prefill.uc_destino_id || ''
     document.getElementById('f-finalidade').value = prefill.finalidade || ''
     document.getElementById('f-passageiros').value = prefill.passageiros || ''
-    document.getElementById('f-passageiros-lista').value = prefill.lista_passageiros || ''
+    fpDefinirLista(fpDaViagem(prefill))
     checarPassageiros()
     checarIntermunicipal()
     toast('Campos preenchidos com base na viagem anterior — ajuste as datas e confira antes de enviar.', 'info')
   }
+  // A tela é remontada a cada troca de aba: sem prefill, a lista de
+  // passageiros começa vazia como o resto do formulário.
+  if (!prefill) fpLimpar()
   bIconsAplicar()
 }
 
@@ -2977,7 +2987,8 @@ function abrirDetalheSolicitante(id) {
       <div><strong>Destino:</strong> ${esc(v.destino)}</div>
       <div><strong>Finalidade:</strong> ${esc(v.finalidade)}</div>
       <div><strong>Período previsto:</strong> ${formatDataHora(v.data_saida_prevista)} → ${formatDataHora(v.data_retorno_prevista)}</div>
-      ${v.passageiros ? `<div><strong>Passageiros:</strong> ${v.passageiros}${v.lista_passageiros ? ' — '+esc(v.lista_passageiros).replace(/\n/g,', ') : ''}</div>` : ''}
+      ${v.passageiros ? `<div><strong>Passageiros:</strong> ${v.passageiros}</div>` : ''}
+      ${fpResumoHTML(v)}
     </div>
     ${v.veiculo_placa ? `<div class="card" style="margin-top:14px;padding:14px;display:flex;align-items:center;gap:12px">
       <div style="width:40px;height:40px;border-radius:10px;background:rgba(82,183,136,.12);display:flex;align-items:center;justify-content:center;color:var(--verde-c,#52B788);flex-shrink:0">${bico('truck')}</div>
@@ -3106,23 +3117,25 @@ async function solicitar() {
   if (_ultimaChecagemDisponivel === 0 &&
       !confirm('Nenhum veículo está disponível para esse período no momento. Quer enviar a solicitação mesmo assim?')) return
 
+  // Par de mesa: frota-solicitar.html, função solicitar(). Viagem e
+  // passageiros numa transação só (RPC da migration 235).
+  const pax = fpPayload()
   const payload = {
-    solicitante_id: _usuario.id,
-    setor_solicitante_id: document.getElementById('f-setor').value || null,
-    cidade_origem: cidadeOrigem,
-    cidade_destino: cidadeDestino,
-    destino,
-    uc_destino_id: document.getElementById('f-uc').value || null,
-    finalidade,
-    passageiros: parseInt(document.getElementById('f-passageiros').value) || null,
-    lista_passageiros: document.getElementById('f-passageiros-lista').value.trim() || null,
-    data_saida_prevista: new Date(saida).toISOString(),
-    data_retorno_prevista: new Date(retorno).toISOString(),
+    p_setor_id: document.getElementById('f-setor').value || null,
+    p_cidade_origem: cidadeOrigem,
+    p_cidade_destino: cidadeDestino,
+    p_destino: destino,
+    p_uc_destino_id: document.getElementById('f-uc').value || null,
+    p_finalidade: finalidade,
+    p_passageiros: parseInt(document.getElementById('f-passageiros').value) || pax.length || null,
+    p_saida: new Date(saida).toISOString(),
+    p_retorno: new Date(retorno).toISOString(),
+    p_lista_pax: pax,
   }
   const btn = document.getElementById('btn-solicitar')
   btn.disabled = true; btn.textContent = 'Enviando...'
   try {
-    const { error } = await db.from('frota_viagens').insert(payload)
+    const { error } = await db.rpc('frota_solicitar_viagem', payload)
     if (error) throw error
     toast('Solicitação enviada ao setor de transporte!', 'success')
     document.getElementById('f-cidade-origem').value = 'Rio Branco'
@@ -3134,7 +3147,7 @@ async function solicitar() {
     document.getElementById('f-saida').value = ''
     document.getElementById('f-retorno').value = ''
     document.getElementById('f-passageiros').value = ''
-    document.getElementById('f-passageiros-lista').value = ''
+    fpLimpar()
     document.getElementById('aviso-passageiros').style.display = 'none'
     document.getElementById('f-uc').value = ''
     document.getElementById('aviso-disponibilidade').style.display = 'none'
@@ -3477,6 +3490,7 @@ async function abrirAprovar(id) {
   document.getElementById('ap-resumo').innerHTML =
     `${v.cidade_destino ? `<div style="font-weight:700;color:#111827">${esc(v.cidade_origem||'Rio Branco')} → ${esc(v.cidade_destino)}</div>` : ''}<strong>${esc(v.destino)}</strong><br>${esc(v.finalidade||'')}<br>${formatDataHora(v.data_saida_prevista)} até ${formatDataHora(v.data_retorno_prevista)}<br>Solicitante: ${esc(v.solicitante_nome)}${v.passageiros ? ` · ${v.passageiros} passageiro(s)` : ''}<br><button type="button" class="btn btn-xs btn-ghost" style="margin-top:6px" onclick="abrirDetalhe('${v.id}')">${bico('eye')} Ver detalhes</button>`
   document.getElementById('ap-alerta-passageiros').style.display = (v.passageiros || 0) > 4 ? '' : 'none'
+  document.getElementById('ap-alerta-necessidades').innerHTML = fpAlertaNecessidadesHTML(v)
   document.getElementById('ap-veiculo').innerHTML = '<option value="">Carregando disponibilidade...</option>'
   document.getElementById('ap-aviso-veiculo').style.display = 'none'
   document.getElementById('ap-aviso-capacidade').style.display = 'none'
@@ -3583,7 +3597,14 @@ async function ativarModoMultiplo() {
   _linhasAlocacaoG = (sugestoes && sugestoes.length)
     ? sugestoes.map(s => ({ veiculo_id: s.veiculo_id, motorista_id: null, passageiros: s.passageiros_sugeridos }))
     : [{ veiculo_id: null, motorista_id: null, passageiros: _viagemAprovando?.passageiros || 1 }, { veiculo_id: null, motorista_id: null, passageiros: 0 }]
+  // Par de mesa: frota-viagens.html, mesma chamada.
+  fpDistribuirLinhas(_linhasAlocacaoG, _viagemAprovando)
   await preencherMotoristasEscala()
+  renderLinhasAlocacaoG()
+}
+
+function fpMoverAlocacaoG(idPassageiro, novoIndice) {
+  fpMoverPassageiro(_linhasAlocacaoG, idPassageiro, novoIndice)
   renderLinhasAlocacaoG()
 }
 
@@ -3608,7 +3629,7 @@ function adicionarLinhaAlocacao() {
 }
 
 function removerLinhaAlocacao(i) {
-  _linhasAlocacaoG.splice(i, 1)
+  fpRemoverLinhaComPassageiros(_linhasAlocacaoG, i)
   renderLinhasAlocacaoG()
 }
 
@@ -3628,11 +3649,14 @@ function atualizarTotalAlocadoG() {
 function renderLinhasAlocacaoG() {
   const cont = document.getElementById('ap-linhas')
   cont.innerHTML = _linhasAlocacaoG.map((l, i) => `
-    <div style="display:flex;gap:8px;align-items:flex-start;margin-bottom:8px;flex-wrap:wrap">
+    <div style="border:1px solid #F3F4F6;border-radius:8px;padding:8px;margin-bottom:8px">
+    <div style="display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap">
       <select class="form-control" style="flex:2;min-width:120px" onchange="atualizarLinhaAlocacao(${i},'veiculo_id',this.value)">${optsVeiculosG(l.veiculo_id)}</select>
       <select class="form-control" style="flex:2;min-width:120px" onchange="atualizarLinhaAlocacao(${i},'motorista_id',this.value)">${optsMotoristasG(l.motorista_id)}</select>
       <input class="form-control" style="flex:1;min-width:60px" type="number" min="1" max="99" value="${l.passageiros || ''}" placeholder="pax" oninput="atualizarLinhaAlocacao(${i},'passageiros',this.value)">
       <button class="btn btn-xs btn-ghost" style="color:#DC2626" onclick="removerLinhaAlocacao(${i})">×</button>
+    </div>
+    ${fpChipsLinhaHTML(_linhasAlocacaoG, i, _viagemAprovando, 'fpMoverAlocacaoG')}
     </div>`).join('')
   atualizarTotalAlocadoG()
 }
@@ -3657,7 +3681,7 @@ async function confirmarAprovar() {
     try {
       const { error } = await db.rpc('frota_aprovar_viagem_multipla', {
         p_viagem_id: _acaoId,
-        p_alocacoes: _linhasAlocacaoG.map(l => ({ veiculo_id: l.veiculo_id, motorista_id: l.motorista_id, passageiros: l.passageiros })),
+        p_alocacoes: _linhasAlocacaoG.map(l => ({ veiculo_id: l.veiculo_id, motorista_id: l.motorista_id, passageiros: l.passageiros, passageiro_ids: l.passageiro_ids || [] })),
         p_liberar_dedicado: _liberarDedicadoG, p_justificativa: justifM || null
       })
       if (error) throw error

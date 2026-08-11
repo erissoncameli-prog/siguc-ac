@@ -282,6 +282,76 @@ viewport, zero transform nos ancestrais, fixa ao rolar, e clique real
 chegando ao botão. Qualquer elemento fixo novo no app deve seguir a
 mesma regra.
 
+## Passageiros da viagem (migration 235)
+O que era texto livre (`frota_viagens.lista_passageiros`, migration
+184 — "um nome por linha") virou registro estruturado: tabela
+`frota_viagem_passageiros` (nome, `sexo` reaproveitando o enum
+`sexo_participante` da 084, `necessidade_especifica`). Editor e
+exibição vivem em UM arquivo, `js/frota-passageiros.js` — mesma
+lição do `js/frota-consumo.js`; nunca remontar a lista na página.
+API: `fpFormHTML({compacto})` (compacto = app, campos empilhados),
+`fpPayload`/`fpDefinirLista`/`fpLimpar`, `fpDaViagem` (normaliza as
+duas gerações de dado — cai no texto livre nas viagens antigas),
+`fpResumoHTML`, `fpAlertaNecessidadesHTML`. Guarda:
+`tests/frota-passageiros.test.js`.
+- Solicitação passou a usar a RPC `frota_solicitar_viagem`
+  (SECURITY **INVOKER**, não DEFINER): viagem + passageiros na mesma
+  transação — com tabela filha, dois `.insert()` deixariam viagem sem
+  os nomes se o segundo falhasse. A policy `frota_viag_insert` (158)
+  continua sendo quem autoriza; a RPC não amplia privilégio nenhum.
+- O `passageiros` (número) passa a ser derivado da lista quando ela
+  existe, e segue editável para quem ainda não sabe os nomes.
+- É por causa do ALERTA na aprovação que a necessidade é coletada:
+  `#ap-alerta-necessidades` existe nas DUAS superfícies
+  (frota-viagens.html e frota-app.html modo gestor) — par obrigatório.
+- LGPD: necessidade específica é dado de saúde (Art. 5º, II) →
+  `TRAT-017` no ROPA, base legal Art. 11, II, "b" + dever de
+  acessibilidade (Lei 13.146/2015). Campo opcional, 200 caracteres,
+  e purgado 90 dias depois da viagem por pg_cron
+  (`frota_purgar_necessidade_passageiros`) — o nome fica os 5 anos da
+  prestação de contas, a condição de saúde não. As sugestões de
+  necessidade são lista FIXA no código: alimentar
+  `frota_registrar_sugestao` (o catálogo aprendido da manutenção)
+  espalharia o dado de um passageiro para todos os solicitantes.
+- Vínculo com a base de usuários (migration 236): o campo nome tem
+  busca incremental em `usuarios` (`fpNomeAlterado`/`fpBuscarUsuarios`
+  em js/frota-passageiros.js) — quem já é cadastrado entra com
+  telefone pronto. `frota_viagem_passageiros.usuario_id` guarda só o
+  VÍNCULO (uuid); o telefone nunca é copiado pra linha, é resolvido ao
+  vivo via join na view (`vw_frota_viagens_detalhe.passageiros_lista`),
+  mesmo padrão de solicitante_nome/motorista_nome — não descola se a
+  pessoa trocar de telefone depois. Sem RPC privilegiada nova: achado
+  ao desenhar isto — a policy de SELECT de `usuarios` em produção
+  (`usuarios_auth_select`) já libera qualquer autenticado a ler
+  nome/telefone/cargo de qualquer colega, e essa policy NÃO está em
+  nenhuma migration do repositório (drift, aplicada fora do controle
+  de versão) — diverge do que a migration 001 e o ROPA (TRAT-001)
+  descrevem. Não foi alterada nesta entrega; fica registrada como
+  pendência de governança, não como bug desta funcionalidade.
+  Passageiro vinculado NÃO é notificado (decisão de produto — só quem
+  tem conta e foi de fato escalado/solicitou recebe notificação hoje).
+- Divisão em vários veículos distribui os NOMES, não só o número
+  (migration 236): `frota_aprovar_viagem_multipla` aceita
+  `passageiro_ids` por alocação e reaponta cada linha de
+  `frota_viagem_passageiros` pra viagem-filha certa — quem não é
+  citado em nenhuma alocação fica na viagem-mãe (primeira alocação, id
+  não muda), sem caso especial no código. Isso resolve sozinho o
+  "ficar no histórico da viagem" e a visibilidade certa por motorista
+  (a RLS da 235 delega pra policy da própria `frota_viagens`: o
+  motorista da filha só vê os nomes apontados pro veículo dele). Na
+  tela de aprovação (`ativarModoMultiplo`/`ativarModoMultiploG`), a
+  distribuição inicial é automática e igualitária (round-robin, só
+  quando a viagem tem lista estruturada — `fpDistribuirLinhas`); o
+  gestor remaneja depois pelo seletor de cada chip (`fpMoverPassageiro`
+  /`fpChipsLinhaHTML`) — sem drag-and-drop, o projeto não tem essa
+  dependência em lugar nenhum. Guarda: `tests/frota-passageiros.test.js`.
+- Motorista revê os passageiros no check-out (`abrirModalCheckout`,
+  `co-resumo`) — visível e destacado, SEM travar a ação: nada pode
+  impedir o trabalho de campo (regra do sistema).
+- Ainda em aberto: a RPC de divisão (186) não copia
+  `cidade_origem`/`cidade_destino` para as viagens-filhas — lacuna
+  anterior a esta entrega, sem relação com passageiros.
+
 ## Regra do sistema — trava de veículo no abastecimento
 O abastecimento nunca deve poder ser lançado num veículo diferente do
 que o motorista está de fato usando. Defesa em 2 camadas:

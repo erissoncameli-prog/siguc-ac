@@ -12,6 +12,7 @@
 <script src="../js/layout.js"></script>
 <script src="../js/frota-wise.js"></script>
 <script src="../js/fotos-privadas.js"></script>
+<script src="../js/frota-passageiros.js"></script>
 <script>
 // Rede de segurança para js/fotos-privadas.js. Se ele não carregar — deploy
 // a meio caminho, cache do navegador, bloqueio de rede — as funções
@@ -82,8 +83,7 @@ const STATUS_BADGE = { solicitada:'fw-badge fw-badge-manutencao', aprovada:'fw-b
         <div id="aviso-passageiros" style="display:none;font-size:12px;background:#FEF3C7;color:#92400E;padding:8px 12px;border-radius:8px;margin-bottom:14px">
           Mais de 4 passageiros — o setor de transporte pode precisar escalar mais de um veículo para atender essa viagem.
         </div>
-        <div class="form-group"><label class="form-label">Lista de passageiros (opcional)</label>
-          <textarea class="form-control" id="f-passageiros-lista" rows="3" placeholder="Um nome por linha"></textarea></div>
+        ${fpFormHTML()}
         <div class="grid-2">
           <div class="form-group"><label class="form-label">Cidade de origem <span class="obrig">*</span></label>
             <input class="form-control" id="f-cidade-origem" list="dl-cidades" value="Rio Branco" placeholder="Rio Branco" oninput="checarIntermunicipal()"></div>
@@ -125,6 +125,7 @@ const STATUS_BADGE = { solicitada:'fw-badge fw-badge-manutencao', aprovada:'fw-b
 
   carregarLogosSidebar()
   bIconsAplicar()
+  fpRenderLista()
   await Promise.all([carregarSetores(), carregarUCs()])
   await carregarMinhasViagens()
 })()
@@ -275,23 +276,27 @@ async function solicitar() {
   if (_ultimaChecagemDisponivel === 0 &&
       !confirm('Nenhum veículo está disponível para esse período no momento. Quer enviar a solicitação mesmo assim?')) return
 
+  // Viagem e passageiros numa transação só (RPC da migration 235) —
+  // com tabela filha, dois .insert() separados deixariam viagem sem os
+  // nomes se o segundo falhasse. A RPC é SECURITY INVOKER: a policy
+  // frota_viag_insert (migration 158) continua sendo quem autoriza.
+  const pax = fpPayload()
   const payload = {
-    solicitante_id: _usuario.id,
-    setor_solicitante_id: document.getElementById('f-setor').value || null,
-    cidade_origem: cidadeOrigem,
-    cidade_destino: cidadeDestino,
-    destino,
-    uc_destino_id: document.getElementById('f-uc').value || null,
-    finalidade,
-    passageiros: parseInt(document.getElementById('f-passageiros').value) || null,
-    lista_passageiros: document.getElementById('f-passageiros-lista').value.trim() || null,
-    data_saida_prevista: new Date(saida).toISOString(),
-    data_retorno_prevista: new Date(retorno).toISOString(),
+    p_setor_id: document.getElementById('f-setor').value || null,
+    p_cidade_origem: cidadeOrigem,
+    p_cidade_destino: cidadeDestino,
+    p_destino: destino,
+    p_uc_destino_id: document.getElementById('f-uc').value || null,
+    p_finalidade: finalidade,
+    p_passageiros: parseInt(document.getElementById('f-passageiros').value) || pax.length || null,
+    p_saida: new Date(saida).toISOString(),
+    p_retorno: new Date(retorno).toISOString(),
+    p_lista_pax: pax,
   }
   const btn = document.getElementById('btn-solicitar')
   btn.disabled = true; btn.textContent = 'Enviando...'
   try {
-    const { error } = await db.from('frota_viagens').insert(payload)
+    const { error } = await db.rpc('frota_solicitar_viagem', payload)
     if (error) throw error
     toast('Solicitação enviada ao setor de transporte!', 'success')
     document.getElementById('f-cidade-origem').value = 'Rio Branco'
@@ -303,7 +308,7 @@ async function solicitar() {
     document.getElementById('f-saida').value = ''
     document.getElementById('f-retorno').value = ''
     document.getElementById('f-passageiros').value = ''
-    document.getElementById('f-passageiros-lista').value = ''
+    fpLimpar()
     document.getElementById('aviso-passageiros').style.display = 'none'
     document.getElementById('f-uc').value = ''
     document.getElementById('aviso-disponibilidade').style.display = 'none'
@@ -372,7 +377,8 @@ function abrirDetalheSolicitante(id) {
       <div><strong>Destino:</strong> ${esc(v.destino)}</div>
       <div><strong>Finalidade:</strong> ${esc(v.finalidade)}</div>
       <div><strong>Período previsto:</strong> ${formatDataHora(v.data_saida_prevista)} → ${formatDataHora(v.data_retorno_prevista)}</div>
-      ${v.passageiros ? `<div><strong>Passageiros:</strong> ${v.passageiros}${v.lista_passageiros ? ' — '+esc(v.lista_passageiros).replace(/\n/g,', ') : ''}</div>` : ''}
+      ${v.passageiros ? `<div><strong>Passageiros:</strong> ${v.passageiros}</div>` : ''}
+      ${fpResumoHTML(v)}
     </div>
     ${v.veiculo_placa ? `<div class="card" style="margin-top:14px;padding:14px;display:flex;align-items:center;gap:12px">
       <div style="width:40px;height:40px;border-radius:10px;background:rgba(82,183,136,.12);display:flex;align-items:center;justify-content:center;color:var(--verde-c,#52B788);flex-shrink:0">${bico('truck')}</div>
@@ -401,7 +407,7 @@ function repetirSolicitacao(id) {
   const set = (campo, valor) => { const el = document.getElementById(campo); if (el) el.value = valor ?? '' }
   set('f-setor', v.setor_solicitante_id || '')
   set('f-passageiros', v.passageiros || '')
-  set('f-passageiros-lista', v.lista_passageiros || '')
+  fpDefinirLista(fpDaViagem(v))
   set('f-cidade-origem', v.cidade_origem || 'Rio Branco')
   set('f-cidade-destino', v.cidade_destino || '')
   set('f-destino', v.destino || '')

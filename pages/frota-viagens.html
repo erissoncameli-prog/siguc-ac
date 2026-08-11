@@ -85,6 +85,7 @@
 <script src="../js/config.js"></script>
 <script src="../js/layout.js"></script>
 <script src="../js/frota-wise.js"></script>
+<script src="../js/frota-passageiros.js"></script>
 </head>
 <body>
 <div id="app"></div>
@@ -101,6 +102,9 @@
       <div id="ap-alerta-passageiros" style="display:none;font-size:12px;background:#FEF3C7;color:#92400E;padding:8px 12px;border-radius:8px;margin-bottom:14px">
         Mais de 4 passageiros — um veículo pode não comportar o grupo. Use "Dividir em mais de um veículo" para escalar mais de um veículo/motorista para essa viagem.
       </div>
+      <!-- Necessidade específica de passageiro: é por causa deste
+           alerta que o dado é coletado (js/frota-passageiros.js). -->
+      <div id="ap-alerta-necessidades"></div>
 
       <div id="ap-escala-box" style="display:none;font-size:12px;background:#ECFDF5;border:1px solid #A7F3D0;color:#065F46;padding:8px 12px;border-radius:8px;margin-bottom:14px"></div>
 
@@ -492,6 +496,7 @@ async function abrirAprovar(id) {
   document.getElementById('ap-resumo').innerHTML =
     `${v.cidade_destino ? `<div style="font-weight:700;color:#111827">${esc(v.cidade_origem||'Rio Branco')} → ${esc(v.cidade_destino)}</div>` : ''}<strong>${esc(v.destino)}</strong><br>${esc(v.finalidade||'')}<br>${formatDataHora(v.data_saida_prevista)} até ${formatDataHora(v.data_retorno_prevista)}<br>Solicitante: ${esc(v.solicitante_nome)}${v.passageiros ? ` · ${v.passageiros} passageiro(s)` : ''}<br><button type="button" class="btn btn-xs btn-ghost" style="margin-top:6px" onclick="abrirDetalhe('${v.id}')">${bico('eye')} Ver detalhes</button>`
   document.getElementById('ap-alerta-passageiros').style.display = (v.passageiros || 0) > 4 ? '' : 'none'
+  document.getElementById('ap-alerta-necessidades').innerHTML = fpAlertaNecessidadesHTML(v)
   document.getElementById('ap-veiculo').innerHTML = '<option value="">Carregando disponibilidade...</option>'
   document.getElementById('ap-aviso-veiculo').style.display = 'none'
   document.getElementById('ap-aviso-capacidade').style.display = 'none'
@@ -603,7 +608,16 @@ async function ativarModoMultiplo() {
   _linhasAlocacao = (sugestoes && sugestoes.length)
     ? sugestoes.map(s => ({ veiculo_id: s.veiculo_id, motorista_id: null, passageiros: s.passageiros_sugeridos }))
     : [{ veiculo_id: null, motorista_id: null, passageiros: _viagemAprovando?.passageiros || 1 }, { veiculo_id: null, motorista_id: null, passageiros: 0 }]
+  // Distribui os nomes (quando a viagem tem lista estruturada)
+  // igualmente entre as linhas — js/frota-passageiros.js, par
+  // obrigatório com o modo gestor de frota-app.html.
+  fpDistribuirLinhas(_linhasAlocacao, _viagemAprovando)
   await preencherMotoristasEscala()
+  renderLinhasAlocacao()
+}
+
+function fpMoverAlocacao(idPassageiro, novoIndice) {
+  fpMoverPassageiro(_linhasAlocacao, idPassageiro, novoIndice)
   renderLinhasAlocacao()
 }
 
@@ -628,7 +642,7 @@ function adicionarLinhaAlocacao() {
 }
 
 function removerLinhaAlocacao(i) {
-  _linhasAlocacao.splice(i, 1)
+  fpRemoverLinhaComPassageiros(_linhasAlocacao, i)
   renderLinhasAlocacao()
 }
 
@@ -648,11 +662,14 @@ function atualizarTotalAlocado() {
 function renderLinhasAlocacao() {
   const cont = document.getElementById('ap-linhas')
   cont.innerHTML = _linhasAlocacao.map((l, i) => `
-    <div style="display:flex;gap:8px;align-items:flex-start;margin-bottom:8px">
+    <div style="border:1px solid #F3F4F6;border-radius:8px;padding:8px;margin-bottom:8px">
+    <div style="display:flex;gap:8px;align-items:flex-start">
       <select class="form-control" style="flex:2" onchange="atualizarLinhaAlocacao(${i},'veiculo_id',this.value)">${optsVeiculos(l.veiculo_id)}</select>
       <select class="form-control" style="flex:2" onchange="atualizarLinhaAlocacao(${i},'motorista_id',this.value)">${optsMotoristas(l.motorista_id)}</select>
       <input class="form-control" style="flex:1" type="number" min="1" max="99" value="${l.passageiros || ''}" placeholder="pax" oninput="atualizarLinhaAlocacao(${i},'passageiros',this.value)">
       <button class="btn btn-xs btn-ghost" style="color:#DC2626" onclick="removerLinhaAlocacao(${i})">×</button>
+    </div>
+    ${fpChipsLinhaHTML(_linhasAlocacao, i, _viagemAprovando, 'fpMoverAlocacao')}
     </div>`).join('')
   atualizarTotalAlocado()
 }
@@ -677,7 +694,7 @@ async function confirmarAprovar() {
     try {
       const { error } = await db.rpc('frota_aprovar_viagem_multipla', {
         p_viagem_id: _acaoId,
-        p_alocacoes: _linhasAlocacao.map(l => ({ veiculo_id: l.veiculo_id, motorista_id: l.motorista_id, passageiros: l.passageiros })),
+        p_alocacoes: _linhasAlocacao.map(l => ({ veiculo_id: l.veiculo_id, motorista_id: l.motorista_id, passageiros: l.passageiros, passageiro_ids: l.passageiro_ids || [] })),
         p_liberar_dedicado: _liberarDedicado, p_justificativa: justifM || null
       })
       if (error) throw error
@@ -738,7 +755,7 @@ function abrirDetalhe(id) {
       <div><strong>Destino:</strong> ${esc(v.destino)}</div>
       <div><strong>Finalidade:</strong> ${esc(v.finalidade)}</div>
       <div><strong>Solicitante:</strong> ${esc(v.solicitante_nome)} ${v.setor_sigla ? `(${esc(v.setor_sigla)})` : ''}${v.solicitante_telefone ? ` · ${esc(v.solicitante_telefone)}` : ''}</div>
-      ${v.lista_passageiros ? `<div><strong>Passageiros:</strong> ${esc(v.lista_passageiros).replace(/\n/g,', ')}</div>` : ''}
+      ${fpDaViagem(v).length ? `<div><strong>Passageiros:</strong>${fpResumoHTML(v)}</div>` : ''}
       <div><strong>Período previsto:</strong> ${formatDataHora(v.data_saida_prevista)} → ${formatDataHora(v.data_retorno_prevista)}</div>
       ${v.veiculo_placa ? `<div><strong>Veículo:</strong> ${esc(v.veiculo_modelo)} (${esc(v.veiculo_placa)})${v.veiculo_dedicado ? ` <span class="fw-badge badge-roxo">Dedicado ${v.veiculo_setor_sigla ? esc(v.veiculo_setor_sigla) : ''}</span>` : ''}</div>` : ''}
       ${v.dedicado_liberado ? `<div style="color:#5B21B6"><strong>Veículo dedicado liberado por:</strong> ${esc(v.dedicado_liberado_por_nome || '—')}${v.dedicado_liberado_em ? ` em ${formatDataHora(v.dedicado_liberado_em)}` : ''}${v.dedicado_liberado_justificativa ? `<br><em>${esc(v.dedicado_liberado_justificativa)}</em>` : ''}</div>` : ''}
