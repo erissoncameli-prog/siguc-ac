@@ -1181,6 +1181,7 @@ async function renderModoMotorista() {
   instalarGatilhosSyncFrota()
   await carregarViagensMotorista()
   await carregarAbastecimentosMotorista()
+  await carregarManutencoesMotorista()
   // Catálogo do checklist: cai no cache do IndexedDB quando offline,
   // para o motorista conseguir inspecionar em campo sem sinal.
   await carregarChecklistCatalogo()
@@ -1209,13 +1210,40 @@ async function carregarAbastecimentosMotorista() {
 const ABAST_STATUS_BADGE = { pendente: 'fw-badge fw-badge-manutencao', validado: 'fw-badge fw-badge-disponivel', rejeitado: 'fw-badge fw-badge-inativo' }
 const ABAST_STATUS_LABEL = { pendente: 'Pendente', validado: 'Validado', rejeitado: 'Rejeitado' }
 
+// ── Manutenções do motorista (comunicados + OS dos veículos que ele usa,
+// migration 232) — sem custo/oficina, decisão de produto registrada lá ─
+let _manutencoes = []
+async function carregarManutencoesMotorista() {
+  try {
+    if (!navigator.onLine) throw new Error('offline')
+    const r = await db.rpc('frota_manutencoes_motorista')
+    if (r.error) throw r.error
+    _manutencoes = r.data || []
+    await fOfflineSetConfig('manutencoes_cache', _manutencoes)
+  } catch (e) {
+    _manutencoes = await fOfflineGetConfig('manutencoes_cache') || []
+  }
+  motoristaAba(_fmAba)
+}
+
+const MANUT_TIPO_LABEL = { preventiva: 'Preventiva', corretiva: 'Corretiva', comunicado: 'Relato enviado' }
+const MANUT_STATUS_BADGE = {
+  aguardando_analise: 'fw-badge fw-badge-manutencao', aberta: 'fw-badge fw-badge-manutencao',
+  em_andamento: 'fw-badge fw-badge-manutencao', concluida: 'fw-badge fw-badge-disponivel',
+  cancelada: 'fw-badge fw-badge-inativo', descartada: 'fw-badge fw-badge-inativo',
+}
+const MANUT_STATUS_LABEL = {
+  aguardando_analise: 'Aguardando análise', aberta: 'Aberta', em_andamento: 'Em andamento',
+  concluida: 'Concluída', cancelada: 'Cancelada', descartada: 'Descartada',
+}
+
 // ── Offline: dispara sincronização ao reconectar/reabrir/periodicamente ─
 let _fSyncTriggersInstalados = false
 function instalarGatilhosSyncFrota() {
   if (_fSyncTriggersInstalados) return
   _fSyncTriggersInstalados = true
 
-  fSyncOn('confirmado', () => { carregarViagensMotorista(); carregarAbastecimentosMotorista() })
+  fSyncOn('confirmado', () => { carregarViagensMotorista(); carregarAbastecimentosMotorista(); carregarManutencoesMotorista() })
   fSyncOn('sync-fim', ({ ok, erros, desistiu }) => {
     atualizarBadgePendentesSync(); renderFilaFrota()
     if (ok > 0) toast(`${ok} registro(s) enviado(s) ao setor de transporte.`, 'success')
@@ -1235,6 +1263,7 @@ function instalarGatilhosSyncFrota() {
     if (!navigator.onLine) return
     carregarViagensMotorista()
     carregarAbastecimentosMotorista()
+    carregarManutencoesMotorista()
   }
   window.addEventListener('online', () => { fSyncRodar(); atualizarDoServidor() })
   document.addEventListener('visibilitychange', () => { if (!document.hidden) { fSyncRodar(); atualizarDoServidor() } })
@@ -1448,46 +1477,180 @@ function renderFmSolicitacoes() {
 }
 
 // ── Aba Histórico (diário de bordo) ──────────────────────────────
+// 3 categorias em sub-abas (chips) em vez de listas empilhadas — cada
+// uma com busca própria e "carregar mais" (20 em 20), pra escalar sem
+// virar rolagem infinita conforme o histórico cresce.
+let _fmHistoricoSub = 'viagens'
+let _fmHistoricoBusca = ''
+let _fmHistoricoLimite = 20
+
+function fmHistoricoSub(sub) {
+  _fmHistoricoSub = sub
+  _fmHistoricoBusca = ''
+  _fmHistoricoLimite = 20
+  renderFmHistorico()
+}
+
+function fmHistoricoBuscar(valor) {
+  _fmHistoricoBusca = valor
+  _fmHistoricoLimite = 20
+  renderFmHistorico()
+}
+
+function fmHistoricoMais() {
+  _fmHistoricoLimite += 20
+  renderFmHistorico()
+}
+
+const FM_HIST_CHIPS = [
+  { id: 'viagens', label: 'Viagens' },
+  { id: 'abastecimentos', label: 'Abastecimentos' },
+  { id: 'manutencoes', label: 'Manutenções' },
+]
+
+function fmHistoricoChips() {
+  return `<div style="display:flex;gap:8px;margin-bottom:12px;overflow-x:auto">
+    ${FM_HIST_CHIPS.map(c => `
+      <button type="button" onclick="fmHistoricoSub('${c.id}')"
+        style="flex:0 0 auto;padding:7px 14px;border-radius:999px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;
+          border:1px solid ${_fmHistoricoSub === c.id ? 'var(--fw-primary,#1F4E2C)' : '#E5E7EB'};
+          background:${_fmHistoricoSub === c.id ? 'var(--fw-primary,#1F4E2C)' : '#fff'};
+          color:${_fmHistoricoSub === c.id ? '#fff' : '#374151'}">${c.label}</button>`).join('')}
+  </div>`
+}
+
+function fmHistoricoBuscaInput(placeholder) {
+  return `<input type="search" value="${esc(_fmHistoricoBusca)}" placeholder="${esc(placeholder)}"
+    oninput="fmHistoricoBuscar(this.value)"
+    style="width:100%;padding:9px 12px;border:1px solid #E5E7EB;border-radius:8px;font-size:13px;margin-bottom:12px">`
+}
+
+function fmHistoricoBotaoMais(total) {
+  if (total <= _fmHistoricoLimite) return ''
+  return `<button class="btn btn-secondary btn-sm" style="width:100%;margin-top:10px" onclick="fmHistoricoMais()">Carregar mais (${total - _fmHistoricoLimite} restantes)</button>`
+}
+
 function renderFmHistorico() {
-  const historico = _viagens.filter(v => v.status === 'concluida')
-  document.getElementById('fm-conteudo').innerHTML = `
-    <div class="form-section-label">Diário de bordo — viagens concluídas</div>
-    ${!historico.length
-      ? '<div class="card" style="text-align:center;padding:24px;color:#9CA3AF">Nenhuma viagem concluída ainda</div>'
-      : `<div class="card"><div class="table-wrap"><div class="table-scroll">
-          <table>
-            <thead><tr><th>Destino</th><th>Período</th><th>Veículo</th><th>Percurso</th><th>Avarias</th></tr></thead>
-            <tbody>${historico.map(v => {
-              const usoSaida = v.km_saida ?? v.horas_saida, usoChegada = v.km_chegada ?? v.horas_chegada
-              const unidade = v.veiculo_medidor === 'horimetro' ? 'h' : 'km'
-              const percurso = (usoSaida != null && usoChegada != null) ? `${formatNum(usoChegada - usoSaida, 1)} ${unidade}` : '—'
-              return `<tr>
-                <td><strong>${esc(v.destino)}</strong>${v.aberta_direto ? ' <span class="badge badge-roxo" style="font-size:10px">Avulsa</span>' : ''}</td>
-                <td style="font-size:12px">${formatDataHora(v.checkout_em)}<br>até ${formatDataHora(v.checkin_em)}</td>
-                <td style="font-size:12px">${esc(v.veiculo_modelo)} <span class="mono">(${esc(v.veiculo_placa)})</span></td>
-                <td class="mono" style="font-size:12px">${percurso}</td>
-                <td style="font-size:12px">${v.avarias ? `<span class="badge badge-erro">Sim</span>` : '<span style="color:#9CA3AF">Não</span>'}</td>
-              </tr>`
-            }).join('')}</tbody>
-          </table>
-        </div></div></div>`}
-    <div class="form-section-label" style="margin-top:20px">Abastecimentos</div>
-    ${!_abastecimentos.length
-      ? '<div class="card" style="text-align:center;padding:24px;color:#9CA3AF">Nenhum abastecimento registrado ainda</div>'
-      : _abastecimentos.map(a => `
-        <div class="card" style="margin-bottom:10px">
+  const el = document.getElementById('fm-conteudo')
+  const busca = _fmHistoricoBusca.trim().toLowerCase()
+
+  if (_fmHistoricoSub === 'viagens') {
+    let historico = _viagens.filter(v => v.status === 'concluida')
+    if (busca) historico = historico.filter(v => (v.destino || '').toLowerCase().includes(busca) || (v.veiculo_placa || '').toLowerCase().includes(busca))
+    const pagina = historico.slice(0, _fmHistoricoLimite)
+    el.innerHTML = fmHistoricoChips() + fmHistoricoBuscaInput('Buscar por destino ou placa...') + (
+      !historico.length
+        ? '<div class="card" style="text-align:center;padding:24px;color:#9CA3AF">Nenhuma viagem concluída ainda</div>'
+        : `<div class="card"><div class="table-wrap"><div class="table-scroll">
+            <table>
+              <thead><tr><th>Destino</th><th>Período</th><th>Veículo</th><th>Percurso</th><th>Avarias</th></tr></thead>
+              <tbody>${pagina.map(v => {
+                const usoSaida = v.km_saida ?? v.horas_saida, usoChegada = v.km_chegada ?? v.horas_chegada
+                const unidade = v.veiculo_medidor === 'horimetro' ? 'h' : 'km'
+                const percurso = (usoSaida != null && usoChegada != null) ? `${formatNum(usoChegada - usoSaida, 1)} ${unidade}` : '—'
+                return `<tr>
+                  <td><strong>${esc(v.destino)}</strong>${v.aberta_direto ? ' <span class="badge badge-roxo" style="font-size:10px">Avulsa</span>' : ''}</td>
+                  <td style="font-size:12px">${formatDataHora(v.checkout_em)}<br>até ${formatDataHora(v.checkin_em)}</td>
+                  <td style="font-size:12px">${esc(v.veiculo_modelo)} <span class="mono">(${esc(v.veiculo_placa)})</span></td>
+                  <td class="mono" style="font-size:12px">${percurso}</td>
+                  <td style="font-size:12px">${v.avarias ? `<span class="badge badge-erro">Sim</span>` : '<span style="color:#9CA3AF">Não</span>'}</td>
+                </tr>`
+              }).join('')}</tbody>
+            </table>
+          </div></div></div>`
+    ) + fmHistoricoBotaoMais(historico.length)
+    return
+  }
+
+  if (_fmHistoricoSub === 'abastecimentos') {
+    let lista = _abastecimentos
+    if (busca) lista = lista.filter(a => (a.codigo || '').toLowerCase().includes(busca) || (a.placa || '').toLowerCase().includes(busca))
+    const pagina = lista.slice(0, _fmHistoricoLimite)
+    el.innerHTML = fmHistoricoChips() + fmHistoricoBuscaInput('Buscar por código ou placa...') + (
+      !lista.length
+        ? '<div class="card" style="text-align:center;padding:24px;color:#9CA3AF">Nenhum abastecimento registrado ainda</div>'
+        : pagina.map(a => `
+          <div class="card" style="margin-bottom:10px">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap">
+              <div>
+                <div style="font-weight:700">${esc(a.codigo || 'Aguardando código')}</div>
+                <div style="font-size:12px;color:#6B7280;margin-top:2px">${formatNum(a.litros,2)} L · R$ ${formatNum(a.valor_total,2)} · ${formatDataHora(a.data_hora)}</div>
+                ${a.status === 'rejeitado' && a.motivo_rejeicao ? `<div style="font-size:12px;color:#DC2626;margin-top:6px">Motivo: ${esc(a.motivo_rejeicao)}</div>` : ''}
+              </div>
+              <div style="text-align:right">
+                <span class="badge ${ABAST_STATUS_BADGE[a.status]}">${ABAST_STATUS_LABEL[a.status]}</span><br>
+                ${a.status === 'rejeitado' ? `<button class="btn btn-sm btn-secondary" style="margin-top:8px" onclick="abrirAbastecimento(null)">Corrigir e reenviar</button>` : ''}
+              </div>
+            </div>
+          </div>`).join('')
+    ) + fmHistoricoBotaoMais(lista.length)
+    return
+  }
+
+  // manutencoes
+  let manut = _manutencoes
+  if (busca) manut = manut.filter(m => (m.descricao || '').toLowerCase().includes(busca) || (m.placa || '').toLowerCase().includes(busca) || (m.codigo || '').toLowerCase().includes(busca))
+  const pagina = manut.slice(0, _fmHistoricoLimite)
+  el.innerHTML = fmHistoricoChips() + fmHistoricoBuscaInput('Buscar por descrição, código ou placa...') + (
+    !manut.length
+      ? '<div class="card" style="text-align:center;padding:24px;color:#9CA3AF">Nenhuma manutenção registrada ainda</div>'
+      : pagina.map(m => `
+        <div class="card" style="margin-bottom:10px;cursor:pointer" onclick="abrirDetalheManutencaoMotorista('${m.item_id}')">
           <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap">
             <div>
-              <div style="font-weight:700">${esc(a.codigo || 'Aguardando código')}</div>
-              <div style="font-size:12px;color:#6B7280;margin-top:2px">${formatNum(a.litros,2)} L · R$ ${formatNum(a.valor_total,2)} · ${formatDataHora(a.data_hora)}</div>
-              ${a.status === 'rejeitado' && a.motivo_rejeicao ? `<div style="font-size:12px;color:#DC2626;margin-top:6px">Motivo: ${esc(a.motivo_rejeicao)}</div>` : ''}
+              <div style="font-weight:700">${esc(m.codigo || MANUT_TIPO_LABEL[m.tipo] || 'Manutenção')}</div>
+              <div style="font-size:12px;color:#6B7280;margin-top:2px">${esc(m.veiculo_modelo || m.modelo)} <span class="mono">(${esc(m.placa)})</span></div>
+              <div style="font-size:12px;color:#6B7280;margin-top:2px">${esc(m.descricao || '').slice(0, 80)}${(m.descricao || '').length > 80 ? '…' : ''}</div>
+              <div style="font-size:11px;color:#9CA3AF;margin-top:4px">${formatDataHora(m.data_referencia)}</div>
             </div>
-            <div style="text-align:right">
-              <span class="badge ${ABAST_STATUS_BADGE[a.status]}">${ABAST_STATUS_LABEL[a.status]}</span><br>
-              ${a.status === 'rejeitado' ? `<button class="btn btn-sm btn-secondary" style="margin-top:8px" onclick="abrirAbastecimento(null)">Corrigir e reenviar</button>` : ''}
-            </div>
+            <span class="badge ${MANUT_STATUS_BADGE[m.status] || ''}">${MANUT_STATUS_LABEL[m.status] || m.status}</span>
           </div>
-        </div>`).join('')}`
+        </div>`).join('')
+  ) + fmHistoricoBotaoMais(manut.length)
+}
+
+// ── Detalhe de manutenção (motorista) — reusa o modal genérico
+// #modal-detalhe/#det-corpo (já usado pra detalhe de viagem do gestor/
+// solicitante). Peças (frota_manutencao_itens, migration 232) só vêm
+// pra OS com itens lançados e exigem rede — sem custo/valor, por
+// decisão de produto (motorista vê o que foi trocado, não o preço).
+async function abrirDetalheManutencaoMotorista(itemId) {
+  const m = _manutencoes.find(x => x.item_id === itemId)
+  if (!m) return
+  document.querySelector('#modal-detalhe .modal-title').textContent = m.codigo ? `Manutenção ${m.codigo}` : 'Manutenção'
+  document.getElementById('det-corpo').innerHTML = `
+    <div style="font-size:13px;line-height:1.8">
+      <div><strong>Veículo:</strong> ${esc(m.veiculo_modelo || m.modelo)} <span class="mono">(${esc(m.placa)})</span></div>
+      <div><strong>Tipo:</strong> ${esc(MANUT_TIPO_LABEL[m.tipo] || m.tipo)}</div>
+      <div><strong>Status:</strong> <span class="badge ${MANUT_STATUS_BADGE[m.status] || ''}">${MANUT_STATUS_LABEL[m.status] || m.status}</span></div>
+      <div><strong>Descrição:</strong> ${esc(m.descricao || '—')}</div>
+      <div><strong>Aberta em:</strong> ${formatDataHora(m.data_referencia)}</div>
+      ${m.data_conclusao ? `<div><strong>Concluída em:</strong> ${formatData(m.data_conclusao)}</div>` : ''}
+    </div>
+    <div id="det-manut-itens" style="margin-top:14px">
+      ${m.os_id ? '<div style="font-size:12px;color:#9CA3AF">Carregando peças e serviços...</div>' : ''}
+    </div>`
+  document.getElementById('modal-detalhe').classList.add('aberto')
+
+  if (!m.os_id) return
+  const alvo = document.getElementById('det-manut-itens')
+  if (!navigator.onLine) { alvo.innerHTML = '<div style="font-size:12px;color:#9CA3AF">Peças e serviços disponíveis apenas com conexão.</div>'; return }
+  try {
+    const r = await db.rpc('frota_manutencao_itens', { p_os_id: m.os_id })
+    if (r.error) throw r.error
+    const itens = r.data || []
+    alvo.innerHTML = !itens.length ? '' : `
+      <div class="form-section-label" style="margin-top:0">Peças e serviços</div>
+      <div class="card" style="padding:0">
+        ${itens.map(i => `
+          <div style="display:flex;justify-content:space-between;padding:10px 14px;border-bottom:1px solid #F3F4F6;font-size:13px">
+            <span>${esc(i.descricao)}${i.marca ? ` <span style="color:#9CA3AF">(${esc(i.marca)})</span>` : ''}</span>
+            <span class="mono">${formatNum(i.quantidade, i.quantidade % 1 === 0 ? 0 : 2)}x</span>
+          </div>`).join('')}
+      </div>`
+  } catch (e) {
+    alvo.innerHTML = '<div style="font-size:12px;color:#9CA3AF">Não foi possível carregar as peças agora.</div>'
+  }
 }
 
 // ── Resumo de combustível (aba Dados) — agrupado por veículo, a
@@ -2655,6 +2818,7 @@ function fsLinkMapa(lat, lng) {
 function abrirDetalheSolicitante(id) {
   const v = _minhasViagens.find(x => x.id === id)
   if (!v) return
+  document.querySelector('#modal-detalhe .modal-title').textContent = 'Detalhes da viagem'
   const finalizadaFora = v.status === 'recusada' || v.status === 'cancelada'
   const etapaAtual = FS_ETAPAS.indexOf(v.status)
   const podeCancelar = ['solicitada','aprovada'].includes(v.status)
@@ -3097,6 +3261,7 @@ function renderListaAndamentoGestor() {
 function abrirDetalhe(id) {
   const v = _viagensPendentes.find(x => x.id === id)
   if (!v) return
+  document.querySelector('#modal-detalhe .modal-title').textContent = 'Detalhes da viagem'
   document.getElementById('det-corpo').innerHTML = `
     <div style="font-size:13px;line-height:1.8">
       ${v.cidade_destino ? `<div><strong>Cidade:</strong> ${esc(v.cidade_origem||'Rio Branco')} → ${esc(v.cidade_destino)}</div>` : ''}
