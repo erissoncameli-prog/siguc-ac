@@ -1143,5 +1143,23 @@ PLANET_API_KEY=(Planet/NICFI Basemaps; só no servidor — usada pelos
   proxies /api/planet-tiles e /api/planet-mosaics. Nunca no frontend)
 
 ## Próxima tarefa
-Módulo A — Estrutura Organizacional SEMA-AC
-Criar migration 003_estrutura_organizacional.sql + página admin de gestão de cargos
+Módulo Qualidade da Água (IQA) — **Fase 0**, conforme
+`docs/qualidade-agua/plano.md`. Ler esse arquivo antes de começar: ele
+traz as decisões já tomadas (ΔT por `Temp Ar`, CONAMA Classe 2,
+censurado = metade do LD), os achados na série histórica e o escopo
+exato da fase.
+
+Entregar: migrations do cadastro (`agua_pontos_coleta`, `agua_campanhas`,
+`agua_coletas`, `agua_laboratorios`) a partir da **248**; seed das 20
+estações históricas com a coordenada de Santa Rosa do Purus corrigida;
+função única `agua_calcular_iqa()` + view com ΔT, faixa e conformidade
+CONAMA; `tests/agua-iqa.test.js` como regressão contra as 268 linhas de
+`docs/qualidade-agua/serie-historica.csv`; entrada no ROPA da LGPD.
+
+⚠ A planilha original foi anexada num chat e **não existe mais no
+sistema de arquivos**. Tudo que era preciso dela está em
+`docs/qualidade-agua/` (série completa em CSV + curvas `q_i` em JSON) —
+não procurar o `.xlsx`.
+
+Módulo A — Estrutura Organizacional SEMA-AC segue pendente (ver "A
+implementar", item A).
