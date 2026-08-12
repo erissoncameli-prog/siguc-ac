@@ -228,7 +228,7 @@ async function salvar() {
       toast('Usuário atualizado!', 'success')
     } else {
       const senha = document.getElementById('f-senha').value
-      if (!senha || senha.length < 6) { toast('Senha deve ter no mínimo 6 caracteres', 'error'); return }
+      if (!senha || senha.length < 8) { toast('Senha deve ter no mínimo 8 caracteres', 'error'); return }
       // Criação via Edge Function com service_role: não derruba a sessão do
       // admin (signUp trocaria a sessão) e respeita o controle de perfil
       const { data: { session } } = await db.auth.getSession()
@@ -273,7 +273,7 @@ function fecharModalReset() {
 async function confirmarResetSenha() {
   const s1 = document.getElementById('reset-senha1').value
   const s2 = document.getElementById('reset-senha2').value
-  if (!s1 || s1.length < 6) { toast('A senha deve ter no mínimo 6 caracteres', 'error'); return }
+  if (!s1 || s1.length < 8) { toast('A senha deve ter no mínimo 8 caracteres', 'error'); return }
   if (s1 !== s2) { toast('As senhas não coincidem', 'error'); return }
 
   const btn = document.getElementById('btn-reset')

@@ -33,7 +33,7 @@ Deno.serve(async (req) => {
     const senha = body.senha || ""
     const nome_completo = (body.nome_completo || "").trim()
     if (!email || !nome_completo) return json({ error: "Nome e e-mail são obrigatórios" }, 400)
-    if (!senha || senha.length < 6) return json({ error: "Senha deve ter no mínimo 6 caracteres" }, 400)
+    if (!senha || senha.length < 8) return json({ error: "Senha deve ter no mínimo 8 caracteres" }, 400)
 
     // Cria o usuário no Auth sem afetar a sessão do admin
     let userId: string | null = null
