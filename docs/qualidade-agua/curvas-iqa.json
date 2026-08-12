@@ -1,0 +1,89 @@
+{
+  "_doc": "Curvas de qualidade q_i do IQA CETESB/ANA, digitalizadas como pontos para interpolação linear. Ver docs/qualidade-agua/plano.md. Estas curvas produziram erro mediano de 1,75 ponto contra as 268 linhas com IQA da série histórica (correlação 0,946) — são ponto de partida validado, e devem ser refinadas na Fase 0 até o erro cair dentro da tolerância acordada.",
+  "_formato": "cada curva é uma lista de pares [x, q]; interpolar linearmente entre pontos, saturar nos extremos",
+  "_formula": "IQA = produto de (q_i elevado a w_i), com a soma dos w_i igual a 1",
+
+  "pesos": {
+    "od_saturacao": 0.17,
+    "coliformes_termotolerantes": 0.15,
+    "ph": 0.12,
+    "dbo": 0.10,
+    "nitrogenio_total": 0.10,
+    "fosforo_total": 0.10,
+    "delta_temperatura": 0.10,
+    "turbidez": 0.08,
+    "solidos_totais": 0.08
+  },
+
+  "curvas": {
+    "od_saturacao": {
+      "unidade": "% de saturação",
+      "nota": "Se só houver OD em mg/L, derivar a saturação pela temperatura da amostra — ver formula_saturacao_od.",
+      "pontos": [[0,3],[10,6],[20,10],[30,17],[40,26],[50,38],[60,52],[70,68],[80,82],[90,93],[100,99],[110,98],[120,92],[130,84],[140,77],[150,70],[200,47]]
+    },
+    "coliformes_termotolerantes": {
+      "unidade": "NMP/100 mL",
+      "nota": "Interpolar em ESCALA LOGARÍTMICA (log10 de x), não linear.",
+      "escala": "log10",
+      "pontos": [[1,99],[10,80],[100,50],[1000,22],[5000,10],[20000,5],[100000,3]]
+    },
+    "ph": {
+      "unidade": "adimensional",
+      "pontos": [[2,2],[3,3],[4,9],[5,22],[6,50],[6.5,72],[7,88],[7.5,94],[8,85],[8.5,68],[9,49],[10,24],[11,9],[12,3],[14,2]]
+    },
+    "dbo": {
+      "unidade": "mg/L",
+      "pontos": [[0,99],[2,80],[4,60],[6,46],[8,35],[10,28],[15,17],[20,11],[30,6],[50,3]]
+    },
+    "nitrogenio_total": {
+      "unidade": "mg/L",
+      "pontos": [[0,100],[1,88],[2,75],[4,50],[6,34],[10,21],[20,10],[50,5],[100,1]]
+    },
+    "fosforo_total": {
+      "unidade": "mg/L",
+      "pontos": [[0,99],[0.05,80],[0.1,66],[0.2,50],[0.3,38],[0.5,26],[1,16],[2,8],[5,5],[10,2]]
+    },
+    "delta_temperatura": {
+      "unidade": "°C — valor ABSOLUTO da diferença amostra menos referência",
+      "nota": "Referência decidida: Temp Ar (coluna existente em 94% da série). Sem Temp Ar, usar q neutro = 94 e marcar o registro.",
+      "q_neutro": 94,
+      "pontos": [[0,94],[1,92],[2,89],[3,86],[4,82],[5,76],[6,70],[8,58],[10,48],[15,30]]
+    },
+    "turbidez": {
+      "unidade": "UNT",
+      "pontos": [[0,99],[5,89],[10,83],[20,74],[40,60],[60,49],[80,40],[100,33],[150,24],[200,18],[300,10],[500,5],[1000,5]]
+    },
+    "solidos_totais": {
+      "unidade": "mg/L",
+      "nota": "Sólidos TOTAIS = dissolvidos + suspensão. A série histórica traz os dois separados.",
+      "pontos": [[0,80],[50,86],[100,89],[150,89],[200,86],[300,78],[400,68],[500,54],[600,42],[700,32],[1000,20],[1500,10]]
+    }
+  },
+
+  "formula_saturacao_od": {
+    "_doc": "Solubilidade do oxigênio na água doce ao nível do mar, em mg/L, dada a temperatura em °C. Saturação em % = OD_medido / Cs * 100.",
+    "expressao": "Cs = 14.652 - 0.41022*T + 0.007991*T^2 - 0.000077774*T^3"
+  },
+
+  "faixas": {
+    "_doc": "Limites CETESB, confirmados contra a própria série histórica: ÓTIMA começa em 79,24 e BOA termina em 79,03; REGULAR vai de 38,64 a 51,49.",
+    "_cor": "Paleta ordenada por luminosidade, proposta para daltonismo — a rampa verde/vermelho clássica é proibida pelo CLAUDE.md. Validar ΔE antes de implementar, e sempre acompanhar de rótulo, nunca só cor.",
+    "limites": [
+      { "nome": "Ótima",   "min": 79, "max": 100, "cor": "#1A5FA8" },
+      { "nome": "Boa",     "min": 51, "max": 79,  "cor": "#3E9E8F" },
+      { "nome": "Regular", "min": 36, "max": 51,  "cor": "#E8C05A" },
+      { "nome": "Ruim",    "min": 19, "max": 36,  "cor": "#D9722B" },
+      { "nome": "Péssima", "min": 0,  "max": 19,  "cor": "#6E1B33" }
+    ]
+  },
+
+  "conama_357_classe_2": {
+    "_doc": "Limites de conformidade legal para água doce Classe 2 (Resolução CONAMA 357/2005). Decidido: Classe 2 como padrão de todos os pontos, ajustável por ponto no cadastro. Leitura SEPARADA do IQA — um rio pode ter IQA 'Boa' e violar turbidez.",
+    "od":                        { "operador": ">=", "valor": 5,    "unidade": "mg/L" },
+    "dbo":                       { "operador": "<=", "valor": 5,    "unidade": "mg/L" },
+    "turbidez":                  { "operador": "<=", "valor": 100,  "unidade": "UNT" },
+    "coliformes_termotolerantes":{ "operador": "<=", "valor": 1000, "unidade": "NMP/100 mL" },
+    "ph":                        { "operador": "entre", "min": 6, "max": 9, "unidade": "adimensional" },
+    "fosforo_total":             { "operador": "<=", "valor": 0.1,  "unidade": "mg/L", "nota": "limite de ambiente lótico" }
+  }
+}
