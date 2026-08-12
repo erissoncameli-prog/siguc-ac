@@ -297,9 +297,10 @@ window.frotaFotoUrlAssinada = window.frotaFotoUrlAssinada || async function () {
     </div>
     <div class="modal-body">
       <div id="ap-resumo" style="font-size:13px;color:#6B7280;margin-bottom:10px"></div>
-      <div id="ap-alerta-passageiros" style="display:none;font-size:12px;background:#FEF3C7;color:#92400E;padding:8px 12px;border-radius:8px;margin-bottom:14px">
-        Mais de 4 passageiros — um veículo pode não comportar o grupo. Use "Dividir em mais de um veículo" para escalar mais de um veículo/motorista para essa viagem.
-      </div>
+      <!-- Texto montado por fpAvisoDivisaoHTML (js/frota-passageiros.js):
+           quem decide se o grupo cabe em um veículo é a capacidade real
+           da frota, não um número fixo aqui. Par de mesa: frota-viagens.html. -->
+      <div id="ap-alerta-passageiros" style="display:none;font-size:12px;background:#FEF3C7;color:#92400E;padding:8px 12px;border-radius:8px;margin-bottom:14px"></div>
       <!-- Par de mesa: frota-viagens.html, mesmo bloco. -->
       <div id="ap-alerta-necessidades"></div>
 
@@ -3604,7 +3605,7 @@ async function abrirAprovar(id) {
   _viagemAprovando = v
   document.getElementById('ap-resumo').innerHTML =
     `${v.cidade_destino ? `<div style="font-weight:700;color:#111827">${esc(v.cidade_origem||'Rio Branco')} → ${esc(v.cidade_destino)}</div>` : ''}<strong>${esc(v.destino)}</strong><br>${esc(v.finalidade||'')}<br>${formatDataHora(v.data_saida_prevista)} até ${formatDataHora(v.data_retorno_prevista)}<br>Solicitante: ${esc(v.solicitante_nome)}${v.passageiros ? ` · ${v.passageiros} passageiro(s)` : ''}<br><button type="button" class="btn btn-xs btn-ghost" style="margin-top:6px" onclick="abrirDetalhe('${v.id}')">${bico('eye')} Ver detalhes</button>`
-  document.getElementById('ap-alerta-passageiros').style.display = (v.passageiros || 0) > 4 ? '' : 'none'
+  document.getElementById('ap-alerta-passageiros').style.display = 'none'
   document.getElementById('ap-alerta-necessidades').innerHTML = fpAlertaNecessidadesHTML(v)
   document.getElementById('ap-veiculo').innerHTML = '<option value="">Carregando disponibilidade...</option>'
   document.getElementById('ap-aviso-veiculo').style.display = 'none'
@@ -3625,8 +3626,18 @@ async function abrirAprovar(id) {
   document.getElementById('ap-veiculo').innerHTML = optsVeiculosG(null)
   document.getElementById('ap-aviso-veiculo').style.display = _idsDisponiveisG.size ? 'none' : ''
 
-  // Mais de 4 passageiros: já sugere de cara a divisão em vários veículos.
-  if ((v.passageiros || 0) > 4) await ativarModoMultiplo()
+  // Par de mesa: frota-viagens.html, mesma regra. Quantos veículos o
+  // grupo precisa é decisão da frota (frota_sugerir_alocacao, migration
+  // 242), não de um número fixo na tela — dois ou mais e a aprovação já
+  // abre dividida, com os veículos escalados e os passageiros repartidos.
+  const { data: sugestoes } = await db.rpc('frota_sugerir_alocacao', { p_viagem_id: id })
+  if (_acaoId !== id) return
+  const nSug = (sugestoes || []).length
+  const capSug = (sugestoes || []).reduce((s, x) => s + (x.capacidade_passageiros || 0), 0)
+  const alerta = document.getElementById('ap-alerta-passageiros')
+  alerta.innerHTML = fpAvisoDivisaoHTML(nSug, v.passageiros || 0, capSug, !!v.intermunicipal)
+  alerta.style.display = alerta.innerHTML ? '' : 'none'
+  if (nSug > 1) await ativarModoMultiplo(sugestoes)
 }
 
 function checarCapacidadeUnica() {
@@ -3703,15 +3714,25 @@ function desativarModoMultiplo() {
   _linhasAlocacaoG = []
 }
 
-async function ativarModoMultiplo() {
+// `sugestoes` chega pronta quando quem chamou já consultou o banco
+// (abrirAprovar); o botão "Dividir em mais de um veículo" chama sem
+// argumento e a busca acontece aqui.
+async function ativarModoMultiplo(sugestoes) {
   document.getElementById('ap-modo-unico').style.display = 'none'
   document.getElementById('ap-modo-multiplo').style.display = ''
   document.getElementById('ap-total-passageiros').textContent = _viagemAprovando?.passageiros || 0
 
-  const { data: sugestoes } = await db.rpc('frota_sugerir_alocacao', { p_viagem_id: _acaoId })
+  if (!sugestoes) {
+    const r = await db.rpc('frota_sugerir_alocacao', { p_viagem_id: _acaoId })
+    sugestoes = r.data
+  }
+  // Par de mesa: frota-viagens.html, mesma regra. Viagem MUNICIPAL sai
+  // dividida, mas com veículo e motorista em branco — o rodízio "da
+  // vez" só existe para intermunicipal.
+  const preSelecionar = !!_viagemAprovando?.intermunicipal
   _linhasAlocacaoG = (sugestoes && sugestoes.length)
-    ? sugestoes.map(s => ({ veiculo_id: s.veiculo_id, motorista_id: null, passageiros: s.passageiros_sugeridos }))
-    : [{ veiculo_id: null, motorista_id: null, passageiros: _viagemAprovando?.passageiros || 1 }, { veiculo_id: null, motorista_id: null, passageiros: 0 }]
+    ? sugestoes.map(s => ({ veiculo_id: preSelecionar ? s.veiculo_id : null, motorista_id: null, passageiros: s.passageiros_sugeridos }))
+    : fpLinhasVazias(_viagemAprovando?.passageiros || 1)
   // Par de mesa: frota-viagens.html, mesma chamada.
   fpDistribuirLinhas(_linhasAlocacaoG, _viagemAprovando)
   await preencherMotoristasEscala()
@@ -3759,6 +3780,23 @@ function atualizarTotalAlocadoG() {
   const el = document.getElementById('ap-total-alocado')
   el.textContent = total
   el.style.color = total === alvo ? '#166534' : '#991B1B'
+  atualizarAvisosCapacidadeG()
+}
+
+// Par de mesa: frota-viagens.html (avisoCapacidadeLinha /
+// atualizarAvisosCapacidade). A capacidade tem significado único desde
+// a migration 242 — passageiros além do motorista —, então dá pra
+// avisar quando o gestor põe gente demais num veículo. Avisa, nunca
+// bloqueia. Sem re-render: o campo de número perderia o foco.
+function atualizarAvisosCapacidadeG() {
+  _linhasAlocacaoG.forEach((l, i) => {
+    const el = document.getElementById(`ap-cap-${i}`)
+    if (!el) return
+    const veic = _veiculosG.find(x => x.id === l.veiculo_id)
+    const cap = veic && veic.capacidade_passageiros
+    el.textContent = (!cap || (l.passageiros || 0) <= cap)
+      ? '' : `${veic.placa} comporta ${cap} passageiro(s) — há ${l.passageiros} nesta linha.`
+  })
 }
 
 function renderLinhasAlocacaoG() {
@@ -3771,6 +3809,7 @@ function renderLinhasAlocacaoG() {
       <input class="form-control" style="flex:1;min-width:60px" type="number" min="1" max="99" value="${l.passageiros || ''}" placeholder="pax" oninput="atualizarLinhaAlocacao(${i},'passageiros',this.value)">
       <button class="btn btn-xs btn-ghost" style="color:#DC2626" onclick="removerLinhaAlocacao(${i})">×</button>
     </div>
+    <div id="ap-cap-${i}" style="font-size:11px;color:#991B1B;margin-top:4px"></div>
     ${fpChipsLinhaHTML(_linhasAlocacaoG, i, _viagemAprovando, 'fpMoverAlocacaoG')}
     </div>`).join('')
   atualizarTotalAlocadoG()
