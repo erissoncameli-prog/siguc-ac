@@ -33,8 +33,8 @@ Deno.serve(async (req) => {
     if (!usuario_id) {
       return new Response(JSON.stringify({ error: "usuario_id obrigatório" }), { status: 400, headers: { ...CORS, "Content-Type": "application/json" } })
     }
-    if (!nova_senha || nova_senha.length < 6) {
-      return new Response(JSON.stringify({ error: "Senha deve ter no mínimo 6 caracteres" }), { status: 400, headers: { ...CORS, "Content-Type": "application/json" } })
+    if (!nova_senha || nova_senha.length < 8) {
+      return new Response(JSON.stringify({ error: "Senha deve ter no mínimo 8 caracteres" }), { status: 400, headers: { ...CORS, "Content-Type": "application/json" } })
     }
 
     const { error: resetErr } = await admin.auth.admin.updateUserById(usuario_id, { password: nova_senha })
