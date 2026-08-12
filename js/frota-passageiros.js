@@ -159,12 +159,12 @@ function fpNomeAlterado() {
 }
 
 async function fpBuscarUsuarios(termo) {
-  const { data, error } = await db.from('usuarios')
-    .select('id,nome_completo,telefone')
-    .eq('ativo', true)
-    .ilike('nome_completo', `%${termo}%`)
-    .order('nome_completo')
-    .limit(8)
+  // Segurança (pentest): passa pela RPC SECURITY DEFINER
+  // usuarios_diretorio_buscar (migration 244) em vez de ler `usuarios`
+  // direto — a leitura direta da tabela por um solicitante qualquer é
+  // fechada pela migration 245. A RPC devolve só id/nome/telefone de
+  // ativos, >=2 chars, máx 8.
+  const { data, error } = await db.rpc('usuarios_diretorio_buscar', { p_termo: termo })
   _fpUltimosResultados = (!error && data) ? data : []
   fpRenderResultados()
 }

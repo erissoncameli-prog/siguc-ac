@@ -1,0 +1,33 @@
+-- 243_car_fechar_leitura_direta_cpf.sql
+-- ─────────────────────────────────────────────────────────────
+-- ACHADO DE SEGURANÇA (pentest): a policy `car_dados_locais_select`
+-- usava `USING (true)` para `authenticated` — QUALQUER usuário logado
+-- (inclusive brigadista/monitor/motorista, que têm linha em `usuarios`
+-- e alcançam a mesa) podia rodar
+--   db.from('car_dados_locais').select('cpf_cnpj, nome_compl, ...')
+-- e exfiltrar 53.594 CPFs + nomes de TERCEIROS vindos do SICAR.
+--
+-- Isso FURAVA as duas defesas já existentes:
+--   • migration 216 (log de acesso a dado de terceiro): leitura direta
+--     na tabela não passa pela RPC `car_consultar_local`, logo não grava
+--     NADA no `lgpd_acesso_dado_terceiro`.
+--   • migration 221 (`car_buscar_local` sem `cpf_cnpj` no retorno):
+--     inútil enquanto a tabela crua continua legível com o CPF.
+--
+-- Correção: remover o SELECT direto para clientes. O acesso legítimo
+-- já é 100% via RPCs SECURITY DEFINER (`car_consultar_local`,
+-- `car_buscar_local`), que ignoram RLS e continuam funcionando —
+-- verificado: nenhum arquivo do frontend faz `.from('car_dados_locais')`
+-- direto (só comentários históricos na 216 e no CLAUDE.md).
+--
+-- A gestão (super_admin/gestor) mantém acesso pela policy `..._write`
+-- (cmd ALL, que já cobre SELECT) para o fluxo de importação/curadoria
+-- do CAR. Ninguém mais lê a tabela sem passar pela RPC logada.
+-- ─────────────────────────────────────────────────────────────
+
+DROP POLICY IF EXISTS car_dados_locais_select ON public.car_dados_locais;
+
+-- Sem policy de SELECT para o público autenticado, o default-deny do RLS
+-- passa a valer: leitura direta bloqueada para todos, exceto quem casa
+-- na policy ALL de curadoria (super_admin/gestor). As RPCs SECURITY
+-- DEFINER seguem servindo o mapa normalmente.
