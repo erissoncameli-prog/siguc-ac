@@ -492,6 +492,53 @@ duas gerações de dado — cai no texto livre nas viagens antigas),
   `cidade_origem`/`cidade_destino` para as viagens-filhas — lacuna
   anterior a esta entrega, sem relação com passageiros.
 
+## Regra do sistema — capacidade do veículo e divisão automática
+`frota_veiculos.capacidade_passageiros` = **passageiros ALÉM do
+motorista** (caminhonete cabine dupla de 5 lugares = 4). Está no
+`COMMENT` da coluna e no rótulo do cadastro (`frota-veiculos.html`).
+Antes o rótulo era só "Capacidade (passageiros)" e a frota entrou com
+os dois significados misturados — Ônix Plus (5 lugares) cadastrado
+como 4, Amarok/L200/Triton (também 5) como 5 —, então o sistema
+achava que uma caminhonete levava 5 passageiros e **um veículo só
+"cobria" um grupo de 6**: a aprovação abria com um veículo e todos
+dentro. Migration 242 fixa o significado e corrige os dados.
+
+Quantos veículos um grupo precisa é decisão do BANCO, nunca de um
+número fixo na tela. `frota_veiculos_para_grupo(inicio, fim, total)`
+(migration 242) é a definição única — escolhe os veículos (maior
+capacidade primeiro, até cobrir o grupo) e já devolve a **cota** de
+cada um, dividida proporcionalmente à capacidade (largest remainder:
+6 passageiros em 2 caminhonetes = 3 e 3). Antes essa regra existia em
+DUAS cópias, `frota_sugerir_alocacao` (192b) e
+`frota_sugerir_motorista_escala` (190, que decide quantos motoristas
+sugerir) — podiam discordar na mesma viagem. Mesma lição do
+`js/frota-consumo.js`.
+- Moto, quadriciclo e embarcação ficam FORA da sugestão automática (o
+  gestor continua podendo escolhê-los à mão — viagem fluvial existe).
+  Sem isso, a voadeira de teste (capacidade 6) era sugerida para
+  viagem por estrada, e uma moto sem capacidade preenchida valia 4
+  lugares pelo `COALESCE(cap, 4)`.
+- O `> 4` fixo saiu das duas telas de aprovação: `abrirAprovar` chama
+  `frota_sugerir_alocacao` e abre o modo múltiplo quando vêm **2+
+  veículos**, com o grupo já repartido entre as linhas. O aviso do
+  topo é montado por `fpAvisoDivisaoHTML` e diz também quando a frota
+  disponível NÃO cobre o grupo.
+- **Veículo e motorista só vêm pré-selecionados em viagem
+  INTERMUNICIPAL**, onde existe rodízio ("o da vez",
+  `frota_sugerir_motorista_escala`). Em viagem municipal o sistema
+  divide o grupo — quantos veículos e quantos passageiros em cada —
+  mas deixa os dois campos em branco para o gestor escolher: sem
+  rodízio por trás, pré-selecionar seria só pegar o de maior
+  capacidade da lista, sem critério. O texto do aviso muda junto
+  (`preSelecionado`) — a tela não promete o que não fez.
+- `fpDistribuirLinhas` respeita a cota de cada linha; sem cota (linha
+  que o gestor adicionou à mão) cai no rodízio igualitário de antes.
+  Cada linha avisa quando passa da capacidade do veículo escolhido —
+  avisa, nunca bloqueia.
+- Superfícies tocadas juntas (regra de duplicação): `frota-viagens.html`
+  e `frota-app.html` modo gestor. Guarda:
+  `tests/frota-passageiros.test.js`.
+
 ## Regra do sistema — status efetivo e blocos da lista de viagens
 Toda lista de viagem, em QUALQUER superfície, se divide em três blocos:
 **Em andamento**, **Próximas** (crescente — a mais perto primeiro) e

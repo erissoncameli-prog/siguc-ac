@@ -206,3 +206,69 @@ test('divisão em vários veículos: distribui igualmente e permite remanejar', 
   expect(r.sobrouUmaLinha).toBe(true);
   expect(r.herdouOrfaos).toBe('a,b,c');
 });
+
+// Migration 242: a aprovação passa a abrir JÁ dividida quando o grupo
+// não cabe em um veículo, e a distribuição dos nomes respeita a cota
+// que o banco reservou para cada veículo (antes o round-robin cego
+// podia pôr 3 nomes num carro de 2 lugares).
+test('divisão respeita a cota de cada veículo e parte o grupo quando não há sugestão', async ({ page }) => {
+  await page.goto(`${BASE}/pages/frota-app.html`);
+  await page.waitForFunction(() => typeof window.fpDistribuirLinhas === 'function', null, { timeout: 15_000 });
+
+  const r = await page.evaluate(() => {
+    const viagem = {
+      passageiros: 6,
+      passageiros_lista: [
+        { id: 'p1', nome: 'Pax 1' }, { id: 'p2', nome: 'Pax 2' }, { id: 'p3', nome: 'Pax 3' },
+        { id: 'p4', nome: 'Pax 4' }, { id: 'p5', nome: 'Pax 5' }, { id: 'p6', nome: 'Pax 6' },
+      ],
+    };
+
+    // Cotas desiguais, como frota_sugerir_alocacao devolve quando os
+    // veículos escalados têm capacidades diferentes (van 4 + carro 2).
+    const desiguais = [
+      { veiculo_id: 'v1', passageiros: 4 },
+      { veiculo_id: 'v2', passageiros: 2 },
+    ];
+    fpDistribuirLinhas(desiguais, viagem);
+    const respeitouCota = desiguais.map(l => l.passageiro_ids.length);
+
+    // Dois veículos de igual capacidade: o caso do dia a dia — 3 e 3.
+    const iguais = [{ veiculo_id: 'v1', passageiros: 3 }, { veiculo_id: 'v2', passageiros: 3 }];
+    fpDistribuirLinhas(iguais, viagem);
+    const meioAMeio = iguais.map(l => l.passageiro_ids.length);
+
+    // Frota não cobre o grupo: o excedente ainda é distribuído (não
+    // pode sumir da tela), e o gestor vê o estouro pelos avisos.
+    const insuficiente = [{ veiculo_id: 'v1', passageiros: 2 }, { veiculo_id: 'v2', passageiros: 2 }];
+    fpDistribuirLinhas(insuficiente, viagem);
+    const ninguemSumiu = insuficiente.reduce((s, l) => s + l.passageiro_ids.length, 0);
+
+    // Sem veículo disponível nenhum: linhas vazias já partem o grupo.
+    const vazias = fpLinhasVazias(6);
+    fpDistribuirLinhas(vazias, viagem);
+
+    return {
+      respeitouCota, meioAMeio, ninguemSumiu,
+      vaziasSemVeiculo: vazias.every(l => !l.veiculo_id),
+      vaziasDivididas: vazias.map(l => l.passageiros),
+      avisoUmVeiculo: fpAvisoDivisaoHTML(1, 4, 4),
+      avisoDois: fpAvisoDivisaoHTML(2, 6, 8, true),
+      avisoMunicipal: fpAvisoDivisaoHTML(2, 6, 8, false),
+      avisoNaoCabe: fpAvisoDivisaoHTML(2, 10, 8, true),
+    };
+  });
+
+  expect(r.respeitouCota).toEqual([4, 2]);        // nunca 3 e 3 num par 4+2
+  expect(r.meioAMeio).toEqual([3, 3]);            // 6 passageiros, 3 em cada
+  expect(r.ninguemSumiu).toBe(6);
+  expect(r.vaziasSemVeiculo).toBe(true);
+  expect(r.vaziasDivididas).toEqual([3, 3]);      // e não [6, 0], o bug original
+  expect(r.avisoUmVeiculo).toBe('');              // um veículo basta: nada a avisar
+  expect(r.avisoDois).toContain('Já escalamos 2 veículos');
+  expect(r.avisoDois).not.toContain('faltam lugares');
+  // Municipal: divide o grupo, mas não promete veículo escolhido.
+  expect(r.avisoMunicipal).toContain('escolha o veículo e o motorista');
+  expect(r.avisoMunicipal).not.toContain('Já escalamos');
+  expect(r.avisoNaoCabe).toContain('faltam lugares para 2');
+});
