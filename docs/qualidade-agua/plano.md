@@ -228,19 +228,164 @@ fidelidade — vai para quarentena na Fase 1.
   coordenada; adotado 192 m (o das linhas mais recentes).
 - **RIPD de geolocalização** (migration 217) precisa citar TRAT-018 na
   próxima revisão — mesmo mecanismo da pendência já registrada na 220.
-- `tests/agua-iqa.test.js` **não foi executado** na sessão que o
-  escreveu: o ambiente bloqueia a saída para o Supabase e para a
-  Vercel. A regressão que ele afirma foi conferida rodando as mesmas
-  268 linhas contra a função em produção por outro caminho, e o parser
-  do teste foi conferido linha a linha contra a leitura de referência.
-  Rodar o arquivo de fato, num ambiente com rede, é o primeiro passo da
-  Fase 1.
+- `tests/agua-iqa.test.js` **já foi executado de verdade** (atualização
+  desta nota — a sessão que escreveu o teste não tinha rede para
+  Supabase/Vercel e não pôde confirmar). Rodando em CI real
+  (`workflow_dispatch`, depois `pull_request`) ele revelou dois bugs
+  que a validação por fora não pegava:
+  `js/env-loader.js` não tinha fallback de localhost→produção (só
+  `js/config.js` tinha), então `window.db` nunca existia sob servidor
+  estático puro — corrigido, e beneficia as 11 páginas que carregam
+  esse arquivo, não só o teste. E `csvLinhas()` não fazia `trim()` no
+  **cabeçalho** do CSV (que é CRLF): a última coluna, `IQA CETESB`,
+  ficava com `\r` colado na chave, e o teste de faixa via 268
+  "divergências" em vez das 9 reais. As duas correções e o job
+  `agua-iqa` no `qa.yml` foram mesclados no PR #250, junto da Fase 0.
+  **Guarda rodando e verde: 5/5, mediana 0,695 — confirmado, não mais
+  pendência.**
+
+## Fase 1 — escopo desta entrega
+
+Migrar as 450 coletas de `docs/qualidade-agua/serie-historica.csv`
+para `agua_coletas`, com quarentena para o dado que não bate — nunca
+descarte. O schema já foi desenhado na Fase 0 pensando nisto: colunas
+`status` (`aguardando_lab`/`completo`/`quarentena` —
+`status_coleta_agua`), `quarentena_motivo` (texto livre),
+`linha_origem_planilha` (concilia com o CSV) e `censurados` (jsonb,
+para os valores `<1`) já existem, prontas para o import.
+
+1. **Casar ponto pelo `codigos_alias`.** `agua_pontos_coleta` tem 17
+   pontos reais; o `EstacaoCodigo` do CSV tem 20 valores distintos,
+   três deles grafia errada do código certo (achado 2 da Fase 0) — já
+   estão em `codigos_alias`. Casar por `EstacaoCodigo = codigo_ana OR
+   EstacaoCodigo = ANY(codigos_alias)`, nunca pelo nome do município
+   (tem variação de maiúscula/acento entre linhas da mesma estação).
+2. **Casar campanha por ano + ordem.** Coluna `Campanha` do CSV tem
+   variação de caixa e espaço (`Primeira`, `Primeira `, `primeira`,
+   `Segunda`) — normalizar antes de bater com o enum
+   `ordem_campanha_agua` (`primeira`/`segunda`). `agua_campanhas` já
+   tem as 20 combinações ano/ordem semeadas pela Fase 0.
+3. **Parser de CSV de verdade, não `split(',')`.** O arquivo é CRLF
+   (451/451 linhas) e tem 143 linhas com campo entre aspas contendo
+   vírgula — a coordenada e números com vírgula decimal (`"23,00"`).
+   `tests/agua-iqa.test.js` já tem esse parser pronto
+   (`separaCampos`/`csvLinhas`, com o fix do `trim()` no cabeçalho) —
+   reaproveitar, não escrever de novo.
+4. **Valor censurado tem regra própria.** Os 56 `<1` de coliformes (e
+   qualquer outro campo com prefixo `<`) não viram metade do limite
+   *na importação* — o dado bruto (`<1`, o limite) vai para a coluna
+   `censurados` (jsonb), e quem deriva o valor efetivo pro cálculo é a
+   view, seguindo a decisão 3 do plano (metade do limite). Gravar o
+   valor já dividido faria a coluna bruta mentir sobre o que foi
+   medido.
+5. **Quarentena, não conversão a olho, para o que não fecha:**
+   - Valor fisicamente impossível (pH fora de 0–14, OD acima da
+     saturação pela fórmula de `agua_od_saturacao`, etc.) —
+     achado 4 da Fase 0, são as linhas que fazem o erro máximo da
+     regressão chegar a 25 pontos.
+   - **Sólidos em suspensão** — a incoerência de unidade registrada
+     nas "Decisões ainda abertas" abaixo (mediana 0,342 mg/L com
+     turbidez mediana de 90 UNT) não deve ser resolvida por fator de
+     conversão adivinhado. Linhas com sólidos preenchidos entram em
+     quarentena com `quarentena_motivo` explicando a suspeita, até
+     alguém da SEMA conferir contra o laudo físico.
+   - Qualquer linha quarentenada precisa do **valor original
+     preservado** em algum lugar rastreável (a própria coluna, mesmo
+     que fora da faixa plausível, ou anotado em `observacoes`) — a
+     tela de conferência da Fase 1 só funciona se o número que a
+     planilha trazia continuar visível.
+6. **Não gravar o IQA da planilha.** As colunas `IQA`, `IQA %` e
+   `IQA CETESB` do CSV **não têm coluna correspondente em
+   `agua_coletas`** — de propósito. O índice é sempre derivado pela
+   view (`agua_calcular_iqa`), nunca importado; gravar o valor antigo
+   ao lado do novo reabriria a divergência que a Fase 0 fechou (achado
+   6: 9 das 268 faixas manuais discordavam do próprio número). Se
+   quiser conferir a migração linha a linha, comparar contra o CSV
+   direto, fora do banco — não como coluna.
+7. **Tela de conferência.** Interface simples (pode ser página nova ou
+   aba dentro de uma existente) para um técnico da SEMA revisar as
+   linhas em quarentena com o laudo físico em mãos: ver o valor
+   original, decidir (corrigir e promover a `completo`, ou manter
+   quarentenada com justificativa). Não precisa ser bonita nesta
+   fase — precisa existir, porque sem ela a quarentena vira gaveta sem
+   fundo.
+
+Regras do projeto que se aplicam: RLS já existe nas tabelas (Fase 0);
+migration nova (a partir da **253**) precisa ser aplicada em produção
+na mesma entrega, com `get_advisors` depois. Sem mudança em `pwa/sw.js`
+(módulo ainda não tem tela em nenhum dos 3 apps de campo).
+
+## Fase 1 — ENTREGUE (migration 253)
+
+As 450 linhas de `serie-historica.csv` estão em `agua_coletas`:
+**111 `completo`, 339 `quarentena`** (nenhuma perdida, nenhuma
+duplicada — conferido por `count(*)` antes e depois do import, e a
+`vw_agua_coletas_detalhe` enxerga as 450).
+
+- **Geração do bloco de import**: `scripts/agua_gerar_migration_serie_historica.py`
+  lê o CSV com `csv.reader` (parser de verdade — mesmo motivo do
+  `separaCampos`/`csvLinhas` do `tests/agua-iqa.test.js`, que não foi
+  reescrito, só reaproveitado em espírito) e escreve o bloco
+  `INSERT INTO _agua_import_raw VALUES (...)` da migration 253. Guardado
+  no repo para reexecutar se o CSV mudar — não é script de uso único
+  descartado.
+- **Casamento de ponto e campanha** feito em SQL (`JOIN` por
+  `codigos_alias` e por `ano+ordem`), com dois `DO $$` de sanity ANTES
+  do import que fazem a migration falhar alto se alguma linha não
+  casar — um `INNER JOIN` sozinho descartaria silenciosamente.
+- **Quarentena, três critérios do plano + um achado desta entrega**:
+  pH fora de 0–14 (3 linhas), OD acima de 150% da saturação calculada
+  por `agua_od_saturacao()` (1 linha — a mesma que, com o pH 16,36,
+  fazia o erro máximo do teste chegar a 25 pontos), e sólidos em
+  suspensão preenchidos (339 linhas — o critério que domina, por
+  desenho: é a pendência de unidade registrada nas "Decisões ainda
+  abertas"). **Achado só descoberto ao importar**: a linha 271 tem
+  `Ano=2022` na campanha mas `Data=2026-10-26` — todas as outras
+  coletas do mesmo período de certificação são de 2022; é 1 dígito
+  trocado (2→6), não campanha nova. Motivo adicionado a uma quarentena
+  que já existia pelo critério de sólidos — não criou linha nova.
+- **Valor censurado**: os 56 `<1` de coliformes termotolerantes foram
+  para `censurados` (o limite bruto) + a coluna numérica com metade do
+  limite, nunca as duas coisas misturadas.
+- **Não gravou o IQA da planilha** — nenhuma coluna nova em
+  `agua_coletas` para isso, como decidido.
+- **Tela de conferência**: `pages/agua-conferencia.html` — lista as
+  339 linhas em quarentena (filtro por ponto/código ANA/nº da linha),
+  abre um formulário com todos os campos de campo e laboratório
+  editáveis, mostra o motivo gerado pela migration, e tem dois botões:
+  promover a `completo` (some da lista) ou salvar mantendo a
+  quarentena com uma observação da conferência. Sem RPC nova — grava
+  direto em `agua_coletas` (`db.from(...).update(...)`), a policy
+  `agua_coletas_write` (pode_editar('agua')) já autoriza. Acesso
+  continua restrito a super_admin enquanto `modulos.agua.ativo = false`
+  (mesma regra da Fase 0) — não está na sidebar, é alcançada direto
+  pela URL.
+- `get_advisors` (security) depois da migration: nenhum aviso novo —
+  a 253 só insere dado em tabela e função já existentes, não cria
+  nada.
+- Sem mudança em `pwa/sw.js`, como previsto (nenhum dos 3 apps de
+  campo tem tela do módulo ainda).
+
+### Aplicação em produção — nota de execução
+
+A migration 253 tem ~450 linhas de `VALUES` (~100 KB), grande demais
+para uma única chamada de `apply_migration` nesta sessão. Foi aplicada
+em partes via `execute_sql` (tabela de estágio permanente, carregada
+em 8 lotes, depois o `JOIN`+quarentena+limpeza da tabela de estágio) —
+mesmo efeito final de rodar o arquivo inteiro de uma vez, só que em
+passos menores para caber na sessão. O arquivo em
+`supabase/migrations/253_agua_import_serie_historica.sql` é a fonte
+de verdade e reproduz o mesmo resultado se aplicado de uma vez (ex.:
+`supabase db push` local, ou uma sessão com folga de contexto maior).
+Conferido linha a linha contra o que foi de fato inserido (contagem,
+alias de ponto, censura, motivos de quarentena das linhas 271/296/
+369/370/371) antes de considerar a entrega pronta.
 
 ## Fases seguintes (resumo)
 
 | Fase | Entrega | Depende de |
 |------|---------|-----------|
-| 1 | Migração das 450 coletas, com **quarentena em vez de descarte** e tela de conferência | Fase 0 |
+| 1 | Migração das 450 coletas, com **quarentena em vez de descarte** e tela de conferência — escopo detalhado acima | Fase 0 |
 | 2 | Mesa: cadastro de pontos/laboratórios, lançamento de laudo com PDF anexado, fila de "aguardando laudo" | Fase 0 |
 | 3 | App de campo offline-first + shell Capacitor (`app-agua/`) | Fase 2 |
 | 4 | `agua-mapa.html` — mapa dedicado | Fase 1; **e obter GeoJSON de hidrografia**, que não existe em `data/` |
