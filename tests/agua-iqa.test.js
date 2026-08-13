@@ -86,7 +86,13 @@ function csvLinhas() {
   const bruto = fs.readFileSync(
     path.join(__dirname, '..', 'docs', 'qualidade-agua', 'serie-historica.csv'), 'utf8');
   const linhas = bruto.split('\n').filter(l => l.trim());
-  const cab = separaCampos(linhas[0]);
+  // O arquivo é CRLF (451/451 linhas — Excel). split('\n') deixa o \r
+  // no fim de cada linha, e ele cai no ÚLTIMO campo de cada uma. Sem
+  // trim() no CABEÇALHO (só os valores eram tratados), a chave virava
+  // "IQA CETESB\r" — toda leitura por r['IQA CETESB'] batia undefined
+  // e o teste de faixa via as 268 linhas como "divergentes" em vez das
+  // 9 reais.
+  const cab = separaCampos(linhas[0]).map(c => c.trim());
   return linhas.slice(1).map(l => {
     const campos = separaCampos(l);
     const o = {};
