@@ -466,6 +466,117 @@ módulo**, e se for o caso, um `INSERT` em `grupo_permissoes_padrao`
 (`grupo = 'Gestão'`, `perfil = 'biologo'`, `nivel = 'editar'`) resolve
 — não precisa de migration de schema, é dado.
 
+## Fase 2 — ENTREGUE (migrations 254–255)
+
+Todos os seis passos do escopo foram construídos e testados contra o
+banco de produção, com UMA exceção deliberada: o passo 6 (ativar o
+módulo) não foi executado — ver a seção logo abaixo, "O que ESTA
+entrega deixou pendente de propósito".
+
+- **`agua_valor_plausivel()`** (migration 254): função pura,
+  reaproveitando os mesmos limites que a migration 253 já validou
+  contra a série histórica — pH fora de 0–14 e OD acima de 150% da
+  saturação (`agua_od_saturacao()`) são `'impossivel'`; pH fora de 4–9
+  e OD entre 130–150% de saturação são `'improvavel'` (o teto de ~134%
+  de supersaturação plausível medido no refino da Fase 0); os demais
+  16 parâmetros de laboratório/campo só têm a checagem genérica de
+  não-negatividade — inventar faixa "provável" para eles sem dado de
+  série que a sustente seria o mesmo erro que a Fase 0 evitou com os
+  sólidos em suspensão. Testada por `execute_sql` direto contra os
+  casos conhecidos da migration 253 (pH 16,36 e OD 27 mg/L a 25,3 °C
+  → `'impossivel'`, batendo com o que a Fase 1 pôs em quarentena) antes
+  de qualquer código de tela existir.
+- **Bucket `agua-laudos`** (migration 255): privado desde o
+  nascimento (nunca esteve público) — os buckets mais antigos do
+  projeto nasceram públicos e só viraram privados numa migration
+  posterior; este já nasce do jeito certo. PDF + imagem
+  (`application/pdf`, `image/*`), 10 MB, RLS por
+  `pode_ver`/`pode_editar('agua')`. Só a mesa escreve (sem o par de
+  policy que o Frota precisa para o motorista subir a própria foto) —
+  não há app de campo do módulo `agua` ainda.
+- **`pages/agua-pontos.html`** (a rota que a Fase 0 já registrava
+  inativa): abas "Pontos de coleta" e "Laboratórios", CRUD de verdade
+  sobre `agua_pontos_coleta`/`agua_laboratorios`. O ponto aparece num
+  mapa Leaflet (OpenStreetMap, sem chave de API) desde a abertura do
+  formulário — clique ou arraste o marcador, ou digite lat/lng à mão
+  (os dois lados ficam sincronizados) — exatamente para pegar de
+  imediato o tipo de erro que a Santa Rosa do Purus só revelou meses
+  depois (coordenada de outro município, só visível olhando o mapa).
+  Campo `bacia` editável (resolve o Rio Iquiri quando alguém confirmar
+  a hidrografia) e `coordenada_conferida` marcável por ponto. Geometria
+  gravada como EWKT (`SRID=4326;POINT(lng lat)`) direto do cliente —
+  mesmo padrão já usado em produção por `pages/admin-biomonitor.html`
+  para a área da praia; não foi necessária RPC nova. Leitura de
+  `p.geom` via `geoLatLngDeGeom()` (`js/mapa-recorte.js`) — a mesma
+  função que `pages/alertas-ambientais.html` já usa para ler geometria
+  de tabela crua, nunca reimplementada aqui.
+- **`pages/agua-laudos.html`**: fila de `agua_coletas` com
+  `status = 'aguardando_lab'` (lida de `vw_agua_coletas_detalhe`,
+  ordenada pela mais antiga), com selo de dias de espera. "Lançar
+  laudo" abre um formulário com as duas metades da coleta — Campo
+  (para conferir/corrigir, já que é possível editar embora normalmente
+  venha preenchido pelo app de campo da Fase 3) e Laboratório (a
+  preencher) — mais laboratório responsável e upload do PDF/imagem
+  para o bucket `agua-laudos`. Cada campo numérico é checado ao perder
+  o foco via RPC `agua_valor_plausivel`; salvar recalcula tudo em
+  paralelo (não confia só no evento de blur — colar valor ou
+  autopreenchimento não dispara) e BLOQUEIA se algum campo vier
+  `'impossivel'`, ou pede confirmação explícita (`confirm()`, mesmo
+  padrão já usado em `frota-veiculos.html`) se algum vier
+  `'improvavel'`. Ao salvar, o status vira `'completo'` — a view deriva
+  IQA e conformidade CONAMA na hora, sem passo extra (conferido por
+  `execute_sql`: uma coleta de teste, inserida `aguardando_lab`,
+  atualizada exatamente como o formulário monta o payload, saiu com
+  IQA 76,23/"Boa" e `conama_conforme = true`).
+  Upload segue o MESMO padrão já em produção no Frota
+  (`db.storage.from(bucket).upload()` + `getPublicUrl()` grava o
+  endereço; quem exibe assina com `js/fotos-privadas.js`,
+  `fotoRef()`/`assinarFotos()` reaproveitados sem alteração).
+- **Sidebar** (`js/layout.js`): grupo novo "Qualidade da Água" com os
+  três links (Pontos e Laboratórios / Lançar Laudos / Conferência —
+  esta última já existia da Fase 1, só não tinha entrada na sidebar
+  ainda). Sem filtro de `perfis` no grupo, no mesmo padrão do grupo
+  "Gestão" — o controle de verdade é `nivel_efetivo('agua')` dentro de
+  cada página (como `pages/agua-conferencia.html` já fazia); um perfil
+  sem permissão vê o link e recebe a tela de acesso negado, não um
+  item de menu ausente. Ícone novo (gota d'água) em `iconePills`.
+- **Validação de verdade, não só leitura de código**: as duas páginas
+  foram carregadas com Playwright contra um servidor estático local —
+  zero erro JS/referência nos scripts próprios (os únicos erros de
+  console vieram de CDN bloqueado pelo proxy do ambiente — Supabase JS,
+  Leaflet, fontes —, não de código deste repositório); todo recurso
+  local (`js/*.js`, `css/*.css`) respondeu 200. Os dois blocos
+  `<script>` passaram por `node --check`. `bash scripts/guardrails.sh`
+  rodou limpo (0 falhas críticas; os 32 avisos são todos pré-existentes,
+  nenhum introduzido por esta entrega). `mcp__Supabase__get_advisors`
+  (security) depois das migrations 254/255: nenhum aviso novo.
+
+### O que ESTA entrega deixou pendente de propósito
+
+Diferente das entregas de Fase 0/1, que fecharam sozinhas, esta tem
+UM passo que não é uma sessão de Claude Code que decide:
+
+- **Permissão de `biologo`** (achado registrado acima, "Achado:
+  `biologo` não tem permissão padrão no grupo do módulo") — segue SEM
+  resolver. Não foi inserida nenhuma linha em
+  `grupo_permissoes_padrao` nesta entrega: é decisão de produto sobre
+  quem de fato opera esta mesa, e inventar a resposta seria simular a
+  decisão, não tomá-la — mesmo critério já usado neste plano para os
+  sólidos em suspensão e para o Encarregado de Dados na Fase de LGPD.
+- **`UPDATE modulos SET ativo = true WHERE chave = 'agua'`** (passo 6
+  do escopo) NÃO foi executado, exatamente porque depende da decisão
+  acima: ativar sem saber se `biologo` alcança a tela poderia deixar
+  quem efetivamente mede a água da SEMA sem acesso, com a mesa dizendo
+  que "está pronta". Até esta ativação rodar, o módulo `agua` segue
+  como a Fase 0 o deixou — inativo, alcançável só por `super_admin`
+  (inclusive `pages/agua-conferencia.html`, da Fase 1).
+- Assim que a resposta chegar: se `biologo` precisar de acesso, rodar
+  o `INSERT` descrito no achado (dado, não schema — não precisa de
+  migration nova, embora registrar como migration por rastreabilidade
+  também sirva); depois, em qualquer caso, rodar o `UPDATE` de
+  ativação. É literalmente a única coisa que falta — todo o resto
+  (migrations, bucket, as duas páginas, sidebar) já está em produção.
+
 ## Fases seguintes (resumo)
 
 | Fase | Entrega | Depende de |
