@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>SIGUC-AC · Qualidade da Água — Laudos</title>
+<link rel="stylesheet" href="../css/global.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../js/observability.js"></script>
+<script src="../js/queryLogger.js"></script>
+<script src="../js/config.js"></script>
+<script src="../js/layout.js"></script>
+<script src="../js/fotos-privadas.js"></script>
+</head>
+<body>
+<div id="app"></div>
+
+<!-- Modal de lançamento de laudo -->
+<div class="modal-overlay" id="modal-laudo">
+  <div class="modal" style="max-width:760px">
+    <div class="modal-header">
+      <div class="modal-title">Lançar laudo — <span id="lz-contexto"></span></div>
+      <button class="modal-close" onclick="fecharModalLaudo()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label">Laboratório <span class="obrig">*</span></label>
+        <select class="form-control" id="lz-laboratorio"><option value="">Selecione...</option></select></div>
+
+      <div class="form-section-label">Campo (conferir/corrigir se necessário)</div>
+      <div class="grid-3" id="lz-campo"></div>
+
+      <div class="form-section-label" style="margin-top:8px">Laboratório</div>
+      <div class="grid-3" id="lz-lab"></div>
+
+      <div class="form-section-label" style="margin-top:8px">Laudo (PDF ou imagem)</div>
+      <div class="form-group">
+        <input type="file" id="lz-arquivo" accept="application/pdf,image/*">
+        <div class="form-hint">Anexado ao lançar. Fica disponível para conferência posterior (leitura só de quem tem acesso ao módulo).</div>
+        <a id="lz-arquivo-atual" style="display:none;font-size:12px" target="_blank" rel="noopener">Ver laudo já anexado</a>
+      </div>
+
+      <div class="form-group"><label class="form-label">Observações</label>
+        <textarea class="form-control" id="lz-observacoes" rows="2"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="fecharModalLaudo()">Cancelar</button>
+      <button class="btn btn-primary" id="btn-salvar-laudo" onclick="salvarLaudo()">Salvar laudo</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Qualidade da Água · fila de laudos + lançamento ─────────────
+// Fase 2 do plano em docs/qualidade-agua/plano.md, itens 3 e 5.
+//
+// A fila é toda coleta com status='aguardando_lab' — o "campo" já foi
+// preenchido (Fase 3 vai alimentar isso pelo app; até lá a fila fica
+// vazia, e está correto ficar: não é escopo desta fase criar coleta do
+// zero pela mesa). Lançar o laudo preenche os parâmetros de
+// laboratório, anexa o PDF e muda o status para 'completo'.
+//
+// PLAUSIBILIDADE: nenhum limite é reimplementado aqui. Cada campo
+// numérico é checado via RPC agua_valor_plausivel() (migration 254),
+// que reusa os MESMOS limites que a migration 253 usou para pôr a
+// série histórica em quarentena (pH 0–14, OD acima da saturação).
+// 'impossivel' bloqueia o salvamento; 'improvavel' pede confirmação
+// explícita (confirm(), padrão já usado em outras telas do projeto —
+// ver frota-veiculos.html) sem travar quem está digitando.
+//
+// PDF: bucket privado agua-laudos (migration 255). Upload e
+// referência gravada seguem o MESMO padrão do resto do projeto —
+// getPublicUrl() grava o endereço (bucket+caminho), e quem exibe
+// assina na hora com js/fotos-privadas.js. Não reimplementar.
+
+const CAMPO_FIELDS = [
+  ['temp_ar', 'Temp. ar (°C)'], ['temp_amostra', 'Temp. amostra (°C)'],
+  ['ph', 'pH'], ['od', 'OD (mg/L)'],
+  ['turbidez', 'Turbidez (UNT)'], ['condutividade_eletrica', 'Condutividade (µS/cm)'],
+]
+const LAB_FIELDS = [
+  ['dbo', 'DBO (mg/L)'], ['nitrogenio_total', 'Nitrogênio total'], ['nitrogenio_amoniacal', 'Nitrogênio amoniacal'],
+  ['nitratos', 'Nitratos'], ['fosforo_total', 'Fósforo total'], ['ortofosfato_dissolvido', 'Ortofosfato dissolvido'],
+  ['solidos_dissolvidos_totais', 'Sólidos dissolvidos totais'], ['solidos_suspensao_totais', 'Sólidos em suspensão totais'],
+  ['coliformes_termotolerantes', 'Coliformes termotolerantes'], ['coliformes_totais', 'Coliformes totais'],
+  ['escherichia_coli', 'Escherichia coli'], ['alcalinidade_total', 'Alcalinidade total'],
+  ['carbono_organico_total', 'Carbono orgânico total'], ['cloreto', 'Cloreto'],
+  ['condutividade_especifica', 'Condutividade específica'], ['descarga_liquida', 'Descarga líquida'],
+]
+const TODOS_OS_CAMPOS = [...CAMPO_FIELDS, ...LAB_FIELDS].map(([c]) => c)
+
+let _fila = [], _labs = [], _editandoId = null, _podeEditar = false
+
+;(async function () {
+  const usuario = await carregarUsuario()
+  if (!usuario) { window.location.href = '../index.html'; return }
+
+  const { data: nivel } = await db.rpc('nivel_efetivo', { p_usuario: usuario.id, p_modulo_chave: 'agua' })
+  if (!nivel || nivel === 'sem_acesso') {
+    document.body.innerHTML = '<div style="padding:60px;text-align:center;font-family:\'DM Sans\',sans-serif;color:#6B7280">Você não tem acesso ao módulo Qualidade da Água.</div>'
+    return
+  }
+  _podeEditar = nivel === 'editar'
+
+  document.getElementById('app').innerHTML =
+    gerarLayout('Qualidade da Água — Laudos', 'agua-laudos') +
+    `<div class="fade-in">
+      <p style="color:#6B7280;font-size:13px;margin:0 0 16px">
+        Coletas com o campo já preenchido, aguardando o laudo do laboratório. Ordenadas pela mais antiga primeiro.
+      </p>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+        <input class="form-control" id="lz-filtro" placeholder="Filtrar por ponto, código ANA..." style="max-width:340px" oninput="renderFila()">
+        <span id="lz-contador" style="font-size:12px;color:#6B7280"></span>
+      </div>
+      <div class="card"><div class="table-wrap"><div class="table-scroll">
+        <table>
+          <thead><tr><th>Ponto</th><th>Campanha</th><th>Data da coleta</th><th>Aguardando há</th><th>Ações</th></tr></thead>
+          <tbody id="tbody-fila"><tr><td colspan="5" style="text-align:center;padding:24px;color:#9CA3AF">Carregando...</td></tr></tbody>
+        </table>
+      </div></div></div>
+    </div>` +
+    '</div></div></div>'
+
+  carregarLogosSidebar()
+  await Promise.all([carregarLabsAtivos(), carregarFila()])
+})()
+
+async function carregarLabsAtivos() {
+  const { data } = await db.from('agua_laboratorios').select('id,nome').eq('ativo', true).order('nome')
+  _labs = data || []
+  const sel = document.getElementById('lz-laboratorio')
+  if (sel) sel.innerHTML = '<option value="">Selecione...</option>' + _labs.map(l => `<option value="${l.id}">${esc(l.nome)}</option>`).join('')
+}
+
+async function carregarFila() {
+  const { data, error } = await db.from('vw_agua_coletas_detalhe')
+    .select('*')
+    .eq('status', 'aguardando_lab')
+    .order('data_coleta')
+  if (error) { toast(error.message || 'Erro ao carregar fila', 'error'); return }
+  _fila = data || []
+  renderFila()
+}
+
+function diasEsperando(dataColeta) {
+  const ms = Date.now() - new Date(dataColeta + 'T00:00:00').getTime()
+  return Math.max(0, Math.floor(ms / 86400000))
+}
+
+function renderFila() {
+  const termo = (document.getElementById('lz-filtro')?.value || '').trim().toLowerCase()
+  const tbody = document.getElementById('tbody-fila')
+  const lista = _fila.filter(c => !termo
+    || (c.ponto_nome || '').toLowerCase().includes(termo)
+    || (c.codigo_ana || '').includes(termo))
+  document.getElementById('lz-contador').textContent = `${lista.length} de ${_fila.length} aguardando laudo`
+  if (!lista.length) { tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;color:#9CA3AF">Nenhuma coleta aguardando laudo</td></tr>'; return }
+  tbody.innerHTML = lista.map(c => {
+    const dias = diasEsperando(c.data_coleta)
+    return `
+    <tr>
+      <td>${esc(c.ponto_nome)} <span style="color:#9CA3AF;font-size:11px">(${esc(c.codigo_ana)})</span></td>
+      <td style="font-size:12px">${c.campanha_ano}/${c.campanha_ordem === 'segunda' ? '2ª' : '1ª'}</td>
+      <td style="font-size:12px">${formatData(c.data_coleta)}</td>
+      <td><span class="badge ${dias > 30 ? 'badge-erro' : dias > 15 ? 'badge-ouro' : 'badge-cinza'}">${dias} dia${dias === 1 ? '' : 's'}</span></td>
+      <td>${_podeEditar ? `<button class="btn btn-xs btn-primary" onclick="abrirLaudo('${c.id}')">Lançar laudo</button>` : '—'}</td>
+    </tr>`
+  }).join('')
+}
+
+function abrirLaudo(id) {
+  _editandoId = id
+  const c = _fila.find(x => x.id === id)
+  if (!c) return
+  document.getElementById('lz-contexto').textContent =
+    `${c.ponto_nome} (${c.codigo_ana}) · campanha ${c.campanha_ano}/${c.campanha_ordem === 'segunda' ? '2ª' : '1ª'} · coletado em ${formatData(c.data_coleta)}`
+  document.getElementById('lz-laboratorio').value = c.laboratorio_id || ''
+  document.getElementById('lz-observacoes').value = c.observacoes || ''
+  document.getElementById('lz-arquivo').value = ''
+
+  const linkAtual = document.getElementById('lz-arquivo-atual')
+  const ref = c.laudo_url ? fotoRef(c.laudo_url) : null
+  if (ref) {
+    linkAtual.style.display = 'inline'
+    linkAtual.textContent = 'Ver laudo já anexado'
+    linkAtual.setAttribute('data-foto-privada', `${ref.bucket}|${ref.path}`)
+  } else {
+    linkAtual.style.display = 'none'
+    linkAtual.removeAttribute('data-foto-privada')
+  }
+
+  document.getElementById('lz-campo').innerHTML = CAMPO_FIELDS.map(([campo, rotulo]) => `
+    <div class="form-group"><label class="form-label">${esc(rotulo)}</label>
+      <input class="form-control" id="lz-f-${campo}" type="number" step="any" value="${c[campo] ?? ''}" onblur="lzChecarCampo('${campo}')">
+      <div class="form-hint" id="lz-h-${campo}"></div></div>`).join('')
+  document.getElementById('lz-lab').innerHTML = LAB_FIELDS.map(([campo, rotulo]) => `
+    <div class="form-group"><label class="form-label">${esc(rotulo)}</label>
+      <input class="form-control" id="lz-f-${campo}" type="number" step="any" value="${c[campo] ?? ''}" onblur="lzChecarCampo('${campo}')">
+      <div class="form-hint" id="lz-h-${campo}"></div></div>`).join('')
+
+  if (c.laudo_url) assinarFotos(document.getElementById('modal-laudo'))
+  document.getElementById('modal-laudo').classList.add('aberto')
+}
+
+function lzValor(campo) {
+  const v = document.getElementById(`lz-f-${campo}`)?.value
+  return v === '' || v == null ? null : parseFloat(v)
+}
+
+async function lzChecarCampo(campo) {
+  const valor = lzValor(campo)
+  const hint = document.getElementById(`lz-h-${campo}`)
+  if (!hint) return null
+  if (valor == null) { hint.textContent = ''; return null }
+  const tempAmostra = lzValor('temp_amostra')
+  const { data: classe } = await db.rpc('agua_valor_plausivel', { p_parametro: campo, p_valor: valor, p_temp_amostra: tempAmostra })
+  if (classe === 'impossivel') {
+    hint.textContent = 'Valor fisicamente impossível — corrija antes de salvar.'
+    hint.style.color = 'var(--erro)'
+  } else if (classe === 'improvavel') {
+    hint.textContent = 'Valor fora do range típico da série — confirme antes de salvar.'
+    hint.style.color = 'var(--aviso)'
+  } else {
+    hint.textContent = ''
+  }
+  return classe
+}
+
+async function salvarLaudo() {
+  if (!_editandoId) return
+  const laboratorioId = document.getElementById('lz-laboratorio').value
+  if (!laboratorioId) { toast('Selecione o laboratório', 'error'); return }
+
+  // Recalcula plausibilidade de TODOS os campos no momento de salvar —
+  // não confia só no blur (autofill/colar valor não dispara o evento).
+  // Em paralelo: são ~20 chamadas independentes, uma por campo.
+  const classes = {}
+  await Promise.all(TODOS_OS_CAMPOS.map(async campo => { classes[campo] = await lzChecarCampo(campo) }))
+
+  const impossiveis = TODOS_OS_CAMPOS.filter(c => classes[c] === 'impossivel')
+  if (impossiveis.length) {
+    toast(`Corrija valor(es) impossível(is): ${impossiveis.join(', ')}`, 'error')
+    return
+  }
+  const improvaveis = TODOS_OS_CAMPOS.filter(c => classes[c] === 'improvavel')
+  if (improvaveis.length && !confirm(`Os seguintes valores estão fora do range típico da série histórica: ${improvaveis.join(', ')}. Confirma que estão corretos, conforme o laudo físico?`)) {
+    return
+  }
+
+  const payload = {
+    laboratorio_id: laboratorioId,
+    observacoes: document.getElementById('lz-observacoes').value.trim() || null,
+    status: 'completo',
+  }
+  for (const campo of TODOS_OS_CAMPOS) payload[campo] = lzValor(campo)
+
+  const btn = document.getElementById('btn-salvar-laudo')
+  btn.disabled = true
+  try {
+    const arquivo = document.getElementById('lz-arquivo').files[0]
+    if (arquivo) {
+      if (arquivo.size > 10 * 1024 * 1024) throw new Error('Arquivo deve ter no máximo 10 MB')
+      const ext = (arquivo.name.split('.').pop() || 'pdf').toLowerCase()
+      const path = `${_editandoId}/${Date.now()}.${ext}`
+      const { error: upErr } = await db.storage.from('agua-laudos').upload(path, arquivo, { contentType: arquivo.type || 'application/pdf' })
+      if (upErr) throw upErr
+      const { data: { publicUrl } } = db.storage.from('agua-laudos').getPublicUrl(path)
+      payload.laudo_url = publicUrl
+    }
+
+    const { error } = await db.from('agua_coletas').update(payload).eq('id', _editandoId)
+    if (error) throw error
+    toast('Laudo lançado — coleta marcada como completa!', 'success')
+    fecharModalLaudo()
+    await carregarFila()
+  } catch (e) { toast(e.message || 'Erro ao salvar laudo', 'error') }
+  finally { btn.disabled = false }
+}
+
+function fecharModalLaudo() {
+  document.getElementById('modal-laudo').classList.remove('aberto')
+  _editandoId = null
+}
+</script>
+<style>
+.form-section-label {
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .06em; color: var(--verde-medio);
+  padding: 8px 0 4px; margin-bottom: 12px;
+}
+</style>
+</body>
+</html>

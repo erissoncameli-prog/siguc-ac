@@ -381,12 +381,192 @@ Conferido linha a linha contra o que foi de fato inserido (contagem,
 alias de ponto, censura, motivos de quarentena das linhas 271/296/
 369/370/371) antes de considerar a entrega pronta.
 
+## Fase 2 — escopo desta entrega
+
+Depende só da Fase 0 (não da Fase 1) — as duas rodaram em paralelo,
+em branches separadas. Próxima migration livre: conferir com
+`mcp__Supabase__list_migrations` antes de escrever, **não assumir
+254** — a Fase 1 já consumiu a 253 sem que esta entrega soubesse
+disso de antemão, e pode haver outra migration entre elas por outro
+motivo do projeto.
+
+A mesa: cadastro de pontos/laboratórios com CRUD de verdade (hoje só
+existe o seed da Fase 0 — 17 pontos, sem tela para editar ou
+cadastrar um 18º), lançamento de laudo de laboratório com PDF
+anexado, fila de "aguardando laudo". A entrada do módulo no catálogo
+já existe (`modulos.chave = 'agua'`, `rota = '../pages/agua-pontos.html'`),
+criada inativa pela Fase 0 — Fase 2 é quem cria essa página de fato e
+decide quando ativar.
+
+1. **Cadastro de pontos** (`pages/agua-pontos.html` — a rota já
+   registrada). CRUD sobre `agua_pontos_coleta`: código ANA, nome,
+   município, rio, bacia, altitude, classe de enquadramento, UC
+   relacionada (opcional). **Ponto no mapa na hora de salvar** — nota
+   de desenho já fechada mais abaixo neste documento, é o que evita
+   repetir o erro da Santa Rosa do Purus (coordenada de outro
+   município, só visível olhando o mapa). Ganho de propósito: dá para
+   também resolver dois itens que a Fase 0/1 deixaram em aberto —
+   bacia do Rio Iquiri (NULA, "Iquiri" é grafia errada do Iaco e do
+   Abunã em outras linhas) e marcar `coordenada_conferida = true`
+   pontualmente, quando alguém confirmar a posição real de uma
+   estação (nenhuma das 17 foi conferida em campo ainda).
+2. **Cadastro de laboratórios** — CRUD simples sobre
+   `agua_laboratorios`. Serve prestação de contas (qual laboratório
+   produziu qual resultado), não tem urgência de desenho.
+3. **Lançamento de laudo**: escolher uma coleta com
+   `status = 'aguardando_lab'`, preencher os parâmetros de
+   laboratório, anexar o PDF do laudo. Faixa de validação por
+   parâmetro na digitação — bloqueia o fisicamente impossível (mesmos
+   limites que a migration 253 usou para quarentena: pH fora de
+   0–14, OD acima da saturação por `agua_od_saturacao()`), pede
+   confirmação no improvável. **Não reimplementar esses limites numa
+   segunda cópia** — se a Fase 1 codificou o critério em SQL na
+   migration 253, extrair para uma função reaproveitável
+   (`agua_valor_plausivel()` ou similar) em vez de duplicar em JS; é a
+   mesma lição de `js/frota-consumo.js`.
+4. **Bucket privado para o PDF do laudo** — não existe ainda
+   (`config_logos`/`registros-campo`/`pesquisa-documentos`/`frota-*`
+   são os buckets hoje; nenhum é do módulo `agua`). Criar
+   `agua-laudos` (privado, `allowed_mime_types` incluindo
+   `application/pdf` — o precedente mais próximo é o bucket
+   `pesquisa-documentos`, que já mistura PDF com imagem). Reaproveitar
+   `js/fotos-privadas.js` para assinar a URL na exibição — **não**
+   escrever um assinador novo.
+5. **Fila de "aguardando laudo"** — lista de `agua_coletas` com
+   `status = 'aguardando_lab'`, ordenada por tempo de espera. Fonte:
+   `vw_agua_coletas_detalhe` (Fase 0), que já resolve nome do ponto e
+   campanha.
+6. **Ativar o módulo por último**, depois que a página existir e
+   funcionar: `UPDATE modulos SET ativo = true WHERE chave = 'agua'`.
+   Antes disso, nada aparece na sidebar de ninguém (nem de quem tem
+   `pode_editar`) — só `super_admin` bypassa, porque `nivel_efetivo()`
+   devolve `sem_acesso` cedo quando o módulo está inativo. Isso também
+   é a chave que hoje trava `pages/agua-conferencia.html` (entregue na
+   Fase 1) para todo mundo além de `super_admin` — as duas telas
+   passam a valer no mesmo instante em que este UPDATE roda, então não
+   tem por que fazer duas ativações separadas.
+
+### Achado: `biologo` não tem permissão padrão no grupo do módulo — RESOLVIDO
+
+O módulo `agua` nasceu no grupo `'Gestão'` (`modulos.grupo`, Fase 0).
+Consultado `grupo_permissoes_padrao` para esse grupo: `super_admin`,
+`gestor`, `tecnico`, `diretor`, `chefe_departamento`, `gestor_uc` e
+`assistente_admin` têm `editar`; `financeiro`, `visualizador` e
+`secretario` têm `visualizar`; `brigadista`, `pesquisador_externo`,
+`validador_brigada` e `validador_fauna` têm `sem_acesso` (correto,
+não deviam mesmo). `biologo` não tinha linha nenhuma — cairia em
+`sem_acesso` por padrão, o mesmo caminho de quem não deveria acessar.
+
+**Confirmado nesta entrega**: `tecnico`/`gestor` (que já têm `editar`
+no grupo `'Gestão'`) cobrem quem opera a mesa de Qualidade da Água na
+SEMA — `biologo` não é o perfil que faltava. Nenhuma linha nova foi
+inserida em `grupo_permissoes_padrao`; o módulo foi ativado
+diretamente (migration 256).
+
+## Fase 2 — ENTREGUE (migrations 254–255)
+
+Todos os seis passos do escopo foram construídos e testados contra o
+banco de produção, com UMA exceção deliberada: o passo 6 (ativar o
+módulo) não foi executado — ver a seção logo abaixo, "O que ESTA
+entrega deixou pendente de propósito".
+
+- **`agua_valor_plausivel()`** (migration 254): função pura,
+  reaproveitando os mesmos limites que a migration 253 já validou
+  contra a série histórica — pH fora de 0–14 e OD acima de 150% da
+  saturação (`agua_od_saturacao()`) são `'impossivel'`; pH fora de 4–9
+  e OD entre 130–150% de saturação são `'improvavel'` (o teto de ~134%
+  de supersaturação plausível medido no refino da Fase 0); os demais
+  16 parâmetros de laboratório/campo só têm a checagem genérica de
+  não-negatividade — inventar faixa "provável" para eles sem dado de
+  série que a sustente seria o mesmo erro que a Fase 0 evitou com os
+  sólidos em suspensão. Testada por `execute_sql` direto contra os
+  casos conhecidos da migration 253 (pH 16,36 e OD 27 mg/L a 25,3 °C
+  → `'impossivel'`, batendo com o que a Fase 1 pôs em quarentena) antes
+  de qualquer código de tela existir.
+- **Bucket `agua-laudos`** (migration 255): privado desde o
+  nascimento (nunca esteve público) — os buckets mais antigos do
+  projeto nasceram públicos e só viraram privados numa migration
+  posterior; este já nasce do jeito certo. PDF + imagem
+  (`application/pdf`, `image/*`), 10 MB, RLS por
+  `pode_ver`/`pode_editar('agua')`. Só a mesa escreve (sem o par de
+  policy que o Frota precisa para o motorista subir a própria foto) —
+  não há app de campo do módulo `agua` ainda.
+- **`pages/agua-pontos.html`** (a rota que a Fase 0 já registrava
+  inativa): abas "Pontos de coleta" e "Laboratórios", CRUD de verdade
+  sobre `agua_pontos_coleta`/`agua_laboratorios`. O ponto aparece num
+  mapa Leaflet (OpenStreetMap, sem chave de API) desde a abertura do
+  formulário — clique ou arraste o marcador, ou digite lat/lng à mão
+  (os dois lados ficam sincronizados) — exatamente para pegar de
+  imediato o tipo de erro que a Santa Rosa do Purus só revelou meses
+  depois (coordenada de outro município, só visível olhando o mapa).
+  Campo `bacia` editável (resolve o Rio Iquiri quando alguém confirmar
+  a hidrografia) e `coordenada_conferida` marcável por ponto. Geometria
+  gravada como EWKT (`SRID=4326;POINT(lng lat)`) direto do cliente —
+  mesmo padrão já usado em produção por `pages/admin-biomonitor.html`
+  para a área da praia; não foi necessária RPC nova. Leitura de
+  `p.geom` via `geoLatLngDeGeom()` (`js/mapa-recorte.js`) — a mesma
+  função que `pages/alertas-ambientais.html` já usa para ler geometria
+  de tabela crua, nunca reimplementada aqui.
+- **`pages/agua-laudos.html`**: fila de `agua_coletas` com
+  `status = 'aguardando_lab'` (lida de `vw_agua_coletas_detalhe`,
+  ordenada pela mais antiga), com selo de dias de espera. "Lançar
+  laudo" abre um formulário com as duas metades da coleta — Campo
+  (para conferir/corrigir, já que é possível editar embora normalmente
+  venha preenchido pelo app de campo da Fase 3) e Laboratório (a
+  preencher) — mais laboratório responsável e upload do PDF/imagem
+  para o bucket `agua-laudos`. Cada campo numérico é checado ao perder
+  o foco via RPC `agua_valor_plausivel`; salvar recalcula tudo em
+  paralelo (não confia só no evento de blur — colar valor ou
+  autopreenchimento não dispara) e BLOQUEIA se algum campo vier
+  `'impossivel'`, ou pede confirmação explícita (`confirm()`, mesmo
+  padrão já usado em `frota-veiculos.html`) se algum vier
+  `'improvavel'`. Ao salvar, o status vira `'completo'` — a view deriva
+  IQA e conformidade CONAMA na hora, sem passo extra (conferido por
+  `execute_sql`: uma coleta de teste, inserida `aguardando_lab`,
+  atualizada exatamente como o formulário monta o payload, saiu com
+  IQA 76,23/"Boa" e `conama_conforme = true`).
+  Upload segue o MESMO padrão já em produção no Frota
+  (`db.storage.from(bucket).upload()` + `getPublicUrl()` grava o
+  endereço; quem exibe assina com `js/fotos-privadas.js`,
+  `fotoRef()`/`assinarFotos()` reaproveitados sem alteração).
+- **Sidebar** (`js/layout.js`): grupo novo "Qualidade da Água" com os
+  três links (Pontos e Laboratórios / Lançar Laudos / Conferência —
+  esta última já existia da Fase 1, só não tinha entrada na sidebar
+  ainda). Sem filtro de `perfis` no grupo, no mesmo padrão do grupo
+  "Gestão" — o controle de verdade é `nivel_efetivo('agua')` dentro de
+  cada página (como `pages/agua-conferencia.html` já fazia); um perfil
+  sem permissão vê o link e recebe a tela de acesso negado, não um
+  item de menu ausente. Ícone novo (gota d'água) em `iconePills`.
+- **Validação de verdade, não só leitura de código**: as duas páginas
+  foram carregadas com Playwright contra um servidor estático local —
+  zero erro JS/referência nos scripts próprios (os únicos erros de
+  console vieram de CDN bloqueado pelo proxy do ambiente — Supabase JS,
+  Leaflet, fontes —, não de código deste repositório); todo recurso
+  local (`js/*.js`, `css/*.css`) respondeu 200. Os dois blocos
+  `<script>` passaram por `node --check`. `bash scripts/guardrails.sh`
+  rodou limpo (0 falhas críticas; os 32 avisos são todos pré-existentes,
+  nenhum introduzido por esta entrega). `mcp__Supabase__get_advisors`
+  (security) depois das migrations 254/255: nenhum aviso novo.
+
+### Ativação do módulo (migration 256) — feita após confirmação
+
+A pergunta em aberto ("`biologo` precisa de permissão antes de
+ativar?") foi respondida: `tecnico`/`gestor` já cobrem quem opera a
+mesa. `UPDATE modulos SET ativo = true WHERE chave = 'agua'`
+(migration 256) rodou em produção — `pages/agua-pontos.html`,
+`pages/agua-laudos.html` e `pages/agua-conferencia.html` (Fase 1)
+passam a valer para todo mundo com permissão no grupo `'Gestão'`, não
+só `super_admin`. Conferido por `nivel_efetivo()`: um usuário
+`tecnico` de teste resolve `'editar'` no módulo `agua` depois do
+UPDATE (antes, `sem_acesso`). `get_advisors` (security) depois da
+migration: nenhum achado novo.
+
 ## Fases seguintes (resumo)
 
 | Fase | Entrega | Depende de |
 |------|---------|-----------|
 | 1 | Migração das 450 coletas, com **quarentena em vez de descarte** e tela de conferência — escopo detalhado acima | Fase 0 |
-| 2 | Mesa: cadastro de pontos/laboratórios, lançamento de laudo com PDF anexado, fila de "aguardando laudo" | Fase 0 |
+| 2 | Mesa: cadastro de pontos/laboratórios, lançamento de laudo com PDF anexado, fila de "aguardando laudo" — escopo detalhado acima | Fase 0 |
 | 3 | App de campo offline-first + shell Capacitor (`app-agua/`) | Fase 2 |
 | 4 | `agua-mapa.html` — mapa dedicado | Fase 1; **e obter GeoJSON de hidrografia**, que não existe em `data/` |
 | 5 | Relatório automático por bacia, reaproveitando `scripts/gerar-pptx.js` | Fase 1 |
