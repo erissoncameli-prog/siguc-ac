@@ -561,14 +561,111 @@ só `super_admin`. Conferido por `nivel_efetivo()`: um usuário
 UPDATE (antes, `sem_acesso`). `get_advisors` (security) depois da
 migration: nenhum achado novo.
 
+## Fase 4 — ENTREGUE (sem migration nova; `pages/agua-mapa.html`)
+
+A Fase 3 (app de campo) foi **pulada de propósito** por decisão do
+usuário — a Fase 4 entrou primeiro. Nenhuma tabela/coluna nova: a tela
+só lê o que as Fases 0–2 já expõem (`agua_pontos_coleta`,
+`agua_campanhas`, `vw_agua_coletas_detalhe`). RLS de leitura já estava
+coberta por `pode_ver('agua')` — confirmado antes de escrever qualquer
+coisa, nenhuma policy nova foi necessária.
+
+- **Eixo temporal = lista real de campanhas**, não um intervalo
+  contínuo de anos como em `pages/mapa.html` (`_tlRenderAno`): só
+  existem ~20 campanhas no banco (2016–2026, primeira/segunda por ano),
+  uma barra de 25 anos ficaria cheia de posições sem dado. Slider por
+  índice + botões anterior/próxima, rótulo "AAAA · 1ª/2ª campanha".
+- **Ponto sem coleta na campanha fica vazado** (`fillOpacity: 0`, borda
+  tracejada, raio igual ao de um ponto com dado) — nunca é removido do
+  mapa. Testado com Leaflet real stubado (ver "Validação" abaixo).
+- **Clique abre gaveta lateral** (`#amapa-gaveta`, `z-index: 650`,
+  dentro da faixa 600–800 documentada em "painéis na tela cheia do
+  mapa" no `CLAUDE.md`) — fecha só pelo ✕ (`fecharGaveta()`), nunca por
+  clique fora; sem overlay cobrindo o mapa. Elemento static no `<body>`,
+  fora do bloco `<script>` de autenticação — mesmo padrão de
+  `#malerta-panel`/`#resumo-panel` em `pages/mapa.html`, o que permite
+  testar a mecânica da gaveta sem precisar de sessão Supabase real.
+- **IQA (preenchimento do marcador) e conformidade CONAMA (cor da
+  borda) são dois canais visuais separados** — um rio "Boa" que viola
+  turbidez mostra as duas coisas ao mesmo tempo, nunca uma escondendo a
+  outra. Terceiro estado tratado à parte: `conama_violacoes IS NULL`
+  ("sem limites cadastrados para a classe") não é a mesma coisa que
+  conforme — teria virado bug se os dois caíssem no mesmo badge verde.
+  `status = 'quarentena'` reduz a opacidade do preenchimento (dado em
+  conferência, não escondido). Tudo isso é repetido em texto na gaveta
+  — nunca só na cor (regra do projeto).
+- **Achado ao validar com os 17 pontos reais**: a "regra do sistema —
+  recorte pelo limite do Acre" (sempre ligada, sem toggle, em
+  `pages/mapa.html`/`pages/alertas-ambientais.html`) existe porque
+  FIRMS/DETER são ingeridos por bounding box e trazem alertas de fora
+  do estado sem checagem nenhuma. `agua_pontos_coleta` é o oposto:
+  17 pontos cadastrados um a um por servidor da SEMA, com mapa na hora
+  de salvar (`pages/agua-pontos.html`). Aplicar o mesmo filtro mesmo
+  assim faria Assis Brasil — estação real na fronteira Acre-Peru-
+  Bolívia — sumir do mapa: ela cai ~72 m fora do polígono simplificado
+  de `data/acre_estado.geojson` (medido com Shapely,
+  `geom.exterior.distance(ponto) ≈ 0,00064°`), precisão de polígono, não
+  erro de cadastro. `pages/agua-mapa.html` usa `js/mapa-recorte.js`
+  (`geoAcreCarregar`/`geoNoAcre`) só para DESENHAR a linha do limite do
+  estado (contexto visual) — nunca para descartar um ponto de coleta. A
+  UC de cada ponto vem do `uc_id` já cadastrado (autoritativo), não
+  recalculada por `geoUCEm()` — evita carregar `uc_acre.geojson` (4,7
+  MB) só para confirmar o que o cadastro já sabe.
+- **Camada de hidrografia (rios) NÃO entrou nesta entrega.** O plano
+  prescrevia buscar a Base Hidrográfica Ottocodificada da ANA
+  (SNIRH/dados abertos) e, se a fonte estivesse inacessível, parar e
+  documentar em vez de simular a geometria — foi exatamente o que
+  aconteceu. Fontes tentadas nesta sessão, todas devolvendo 403 na
+  política de rede do ambiente de execução (confirmado por `WebFetch` E
+  por `curl` direto ao proxy — `CONNECT tunnel failed, response 403` em
+  todas, não um erro de DNS/timeout que sugerisse tentar de novo):
+  `portal1.snirh.gov.br` (MapServer ArcGIS REST da ANA, o candidato mais
+  promissor — suporta consulta por bbox/UF e devolve GeoJSON direto,
+  sem precisar converter shapefile), `dadosabertos.ana.gov.br`,
+  `www.ana.gov.br`, `servicodados.ibge.gov.br`, `geoservicos.ibge.gov.br`,
+  `dadosabertos.mma.gov.br`, `terrabrasilis.dpi.inpe.br`,
+  `sema.ac.gov.br`, `geoaplicada.com`. Domínios de infraestrutura
+  (`github.com`, `registry.npmjs.org`, `pypi.org`) continuaram
+  acessíveis no mesmo ambiente — não é uma falha de rede genérica, é uma
+  política que bloqueia especificamente domínios de dado geoespacial/
+  governo não listados. **Pendência explícita para a próxima sessão com
+  esses domínios liberados**: baixar a BHO (ou o serviço MapServer da
+  ANA, que evitaria a conversão shapefile→GeoJSON), recortar pelo limite
+  do Acre reaproveitando `js/mapa-recorte.js`/`data/acre_estado.geojson`
+  (script único em `scripts/`, guardado no repo para reexecução, mesmo
+  padrão de `scripts/agua_gerar_migration_serie_historica.py`),
+  simplificar para peso de arquivo (mapshaper — já testado disponível
+  neste ambiente) e só então adicionar a camada com toggle. O mapa
+  funciona inteiro sem essa camada; nenhuma geometria foi inventada.
+- **Validação de verdade**: as 5 novas linhas de sidebar/ícone
+  (`js/layout.js`) e a página foram carregadas com Playwright contra
+  servidor estático local. `tests/agua-mapa.test.js` (5 testes) —
+  limite do Acre carrega e bate com os 16 pontos não-fronteiriços
+  (Assis Brasil documentado à parte, ver acima); `montarMarcadores` não
+  descarta ponto curado; gaveta não é modal e fecha só pelo ✕; IQA e
+  CONAMA continuam lado a lado em três cenários (violação, conforme,
+  sem limites); ponto sem coleta fica vazado sem sumir. Os dois testes
+  que dependem de Leaflet de verdade (`unpkg.com`, bloqueado pela MESMA
+  política de rede do parágrafo acima) foram confirmados à parte com um
+  stub local de `L.circleMarker` — `fillOpacity`/`color`/`dashArray`
+  saem exatamente como o código espera (0,92 sólido para completo/
+  conforme, 0,5 para quarentena, 0 e tracejado para vazado) — e devem
+  passar de verdade em qualquer ambiente com acesso normal ao unpkg.com
+  (o mesmo do qual `pages/agua-pontos.html` já depende). `bash
+  scripts/guardrails.sh`: 0 falhas críticas, mesmos 32 avisos
+  pré-existentes, nenhum novo.
+- Sem migration nesta entrega — `mcp__Supabase__list_migrations`
+  confirmou a última como `256_agua_ativar_modulo` antes de começar;
+  como não foi preciso schema novo, não há `257_*` para aplicar.
+
 ## Fases seguintes (resumo)
 
 | Fase | Entrega | Depende de |
 |------|---------|-----------|
 | 1 | Migração das 450 coletas, com **quarentena em vez de descarte** e tela de conferência — escopo detalhado acima | Fase 0 |
 | 2 | Mesa: cadastro de pontos/laboratórios, lançamento de laudo com PDF anexado, fila de "aguardando laudo" — escopo detalhado acima | Fase 0 |
-| 3 | App de campo offline-first + shell Capacitor (`app-agua/`) | Fase 2 |
-| 4 | `agua-mapa.html` — mapa dedicado | Fase 1; **e obter GeoJSON de hidrografia**, que não existe em `data/` |
+| 3 | App de campo offline-first + shell Capacitor (`app-agua/`) — **pulada de propósito**, ver "Fase 4 — ENTREGUE" | Fase 2 |
+| 4 | `agua-mapa.html` — mapa dedicado — **ENTREGUE** (sem a camada de hidrografia, ver abaixo) | Fase 1 |
 | 5 | Relatório automático por bacia, reaproveitando `scripts/gerar-pptx.js` | Fase 1 |
 
 ### Notas de desenho já fechadas
@@ -601,5 +698,9 @@ migration: nenhum achado novo.
   Fase 1.
 - **Quem coleta, nominalmente** — quantas pessoas e de qual setor.
   Dimensiona o cadastro de coletores e a entrada no ROPA. Entra na Fase 3.
-- **Hidrografia** — existe shapefile de rios do Acre na SEMA, ou buscar
-  na ANA? Entra na Fase 4.
+- **Hidrografia** — decisão tomada: buscar na ANA (não usar shapefile
+  da SEMA). Tentado na Fase 4 e bloqueado por política de rede da
+  sessão que executou — ver "Fase 4 — ENTREGUE" para os domínios já
+  identificados (o MapServer ArcGIS da ANA em `portal1.snirh.gov.br` é
+  o mais promissor, devolve GeoJSON direto por bbox/UF). Fica pendente
+  para uma sessão com esses domínios liberados.
