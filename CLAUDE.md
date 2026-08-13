@@ -1142,7 +1142,7 @@ RESEND_API_KEY=(e-mail de alertas)
 PLANET_API_KEY=(Planet/NICFI Basemaps; só no servidor — usada pelos
   proxies /api/planet-tiles e /api/planet-mosaics. Nunca no frontend)
 
-## Qualidade da Água (IQA) — migrations 248–252
+## Qualidade da Água (IQA) — migrations 248–256
 Módulo IRMÃO de Brigadas/Biomonitor/Frota, não aninhado no Biomonitor
 (`grupos_biomonitor` exige `uc_id NOT NULL` e a maioria dos pontos fica
 fora de UC). Plano completo e histórico das decisões em
@@ -1212,9 +1212,26 @@ e `agua_conama_violacoes`.
   campo a campo, promove a `completo` ou mantém com observação — sem
   RPC nova, grava direto via `pode_editar('agua')`). Detalhe completo
   em `docs/qualidade-agua/plano.md`, seção "Fase 1 — ENTREGUE".
-- **Fases 2 a 5 pendentes** (telas de mesa, app de campo,
-  `agua-mapa.html`, relatório por bacia) — ver o plano. Quando a Fase 2
-  começar, `VERSOES` em `pwa/sw.js` ganha a chave `agua`.
+- **Fase 2 ENTREGUE (migrations 254–256)**: a mesa. `agua_valor_plausivel()`
+  (254) é a definição única de "esse valor faz sentido?" — reusa os
+  MESMOS limites que a 253 já validou (pH 0–14 impossível/4–9
+  improvável; OD >150% da saturação impossível/>130% improvável);
+  nenhuma página reimplementa faixa nenhuma. Bucket `agua-laudos` (255,
+  privado desde o nascimento — PDF+imagem, 10 MB). Duas páginas novas:
+  `pages/agua-pontos.html` (CRUD de pontos — com mapa Leaflet na hora
+  de salvar, EWKT `SRID=4326;POINT(lng lat)` direto do cliente, mesmo
+  padrão de `admin-biomonitor.html` — e de laboratórios) e
+  `pages/agua-laudos.html` (fila de `status='aguardando_lab'` +
+  lançamento: cada campo checado por `agua_valor_plausivel` ao perder
+  o foco, salvar bloqueia `'impossivel'` e pede `confirm()` para
+  `'improvavel'`). Sidebar ganhou o grupo "Qualidade da Água" (3 links,
+  incluindo a Conferência da Fase 1 que não tinha entrada ainda).
+  **Módulo ATIVO** (migration 256) — confirmado que `tecnico`/`gestor`
+  (já com `editar` no grupo `'Gestão'`) cobrem quem opera a mesa;
+  `biologo` não precisou de permissão nova.
+- **Fases 3 a 5 pendentes** (app de campo, `agua-mapa.html`, relatório
+  por bacia) — ver o plano. Quando a Fase 3 começar, `VERSOES` em
+  `pwa/sw.js` ganha a chave `agua`.
 
 ⚠ Dois aprendizados desta entrega que valem para TODA função nova:
 `REVOKE ... FROM PUBLIC` não fecha nada no Supabase (o `ALTER DEFAULT
@@ -1223,16 +1240,17 @@ papel pelo nome), e toda função precisa nascer com `SET search_path =
 public`, senão o advisor de segurança acusa.
 
 ## Próxima tarefa
-Módulo Qualidade da Água (IQA) — **Fase 2**, conforme
-`docs/qualidade-agua/plano.md` ("Fases seguintes"). Fases 0 e 1 estão
-entregues e em produção (migrations 248–253, todas aplicadas): cadastro,
-IQA, CONAMA, e as 450 coletas históricas importadas (111 completas,
-339 em quarentena, tela de conferência em
-`pages/agua-conferencia.html`). Fase 2 é a mesa: cadastro de pontos/
-laboratórios com CRUD de verdade (hoje só existe seed), lançamento de
-laudo com PDF anexado (bucket privado, `js/fotos-privadas.js`), fila de
-"aguardando laudo". Ativar o módulo (`modulos.agua.ativo = true`) faz
-parte desta entrega — é o que dá sentido a ter uma página de fato.
+Módulo Qualidade da Água (IQA) — **Fase 3 (app de campo)**. Fases 0 a 2
+estão entregues, em produção e ATIVAS para todo mundo com permissão
+(migrations 248–256): cadastro, IQA, CONAMA, as 450 coletas históricas
+importadas, tela de conferência, e a mesa completa (pontos,
+laboratórios, lançamento de laudo, fila).
+
+`app-agua/`, offline-first, login por e-mail/senha + PIN no molde do
+`brigada.html` — plano em `docs/qualidade-agua/plano.md`, seção
+"Fases seguintes" e "Notas de desenho já fechadas". Ao criar a próxima
+migration, rodar `mcp__Supabase__list_migrations` primeiro — não
+assumir o número pelo que está no repositório local.
 
 **Sólidos em suspensão continua pendência de conferência humana**
 (mediana de 0,342 mg/L com turbidez mediana de 90 UNT — provável
