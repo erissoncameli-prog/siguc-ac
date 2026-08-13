@@ -1229,9 +1229,33 @@ e `agua_conama_violacoes`.
   **Módulo ATIVO** (migration 256) — confirmado que `tecnico`/`gestor`
   (já com `editar` no grupo `'Gestão'`) cobrem quem opera a mesa;
   `biologo` não precisou de permissão nova.
-- **Fases 3 a 5 pendentes** (app de campo, `agua-mapa.html`, relatório
-  por bacia) — ver o plano. Quando a Fase 3 começar, `VERSOES` em
-  `pwa/sw.js` ganha a chave `agua`.
+- **Fase 4 ENTREGUE (sem migration)**: `pages/agua-mapa.html`, mapa
+  dedicado — eixo temporal por campanha real (ano+ordem, não intervalo
+  contínuo de anos — só ~20 campanhas existem), ponto sem coleta na
+  campanha fica VAZADO (nunca some), gaveta lateral (`#amapa-gaveta`,
+  não modal, fecha só no ✕) com IQA e conformidade CONAMA em blocos
+  SEPARADOS (nunca um substitui o outro; terceiro estado "sem limites
+  cadastrados" tratado à parte de "conforme"). Reaproveita
+  `js/mapa-recorte.js` só para desenhar a linha do limite do Acre —
+  **não filtra os 17 pontos de coleta por `geoNoAcre`**: diferente de
+  focos/alertas (ingeridos por bbox, precisam do recorte para não trazer
+  lixo de outro país/estado), os pontos são cadastrados um a um pela
+  SEMA; Assis Brasil (fronteira Acre-Peru-Bolívia) cai ~72 m fora do
+  polígono simplificado de `data/acre_estado.geojson` e sumiria do mapa
+  se o mesmo filtro fosse aplicado — ver comentário em
+  `montarMarcadores()`. UC de cada ponto vem do `uc_id` já cadastrado
+  (autoritativo), não recalculada por `geoUCEm()`. Guarda:
+  `tests/agua-mapa.test.js`.
+  **Camada de hidrografia (rios) NÃO entrou** — domínios de dado
+  geoespacial testados (ANA/SNIRH, IBGE, MMA, INPE, SEMA-AC) devolveram
+  403 na política de rede da sessão que tentou; pendência documentada
+  em `docs/qualidade-agua/plano.md`, seção "Fase 4 — ENTREGUE", para
+  quando uma sessão tiver esses domínios liberados.
+- **Fase 3 (app de campo) PULADA DE PROPÓSITO** — por decisão do
+  usuário, a Fase 4 entrou antes. Continua pendente, não esquecida; ver
+  "Próxima tarefa". Quando começar, `VERSOES` em `pwa/sw.js` ganha a
+  chave `agua`.
+- **Fase 5 pendente** (relatório automático por bacia) — ver o plano.
 
 ⚠ Dois aprendizados desta entrega que valem para TODA função nova:
 `REVOKE ... FROM PUBLIC` não fecha nada no Supabase (o `ALTER DEFAULT
@@ -1240,11 +1264,17 @@ papel pelo nome), e toda função precisa nascer com `SET search_path =
 public`, senão o advisor de segurança acusa.
 
 ## Próxima tarefa
-Módulo Qualidade da Água (IQA) — **Fase 3 (app de campo)**. Fases 0 a 2
-estão entregues, em produção e ATIVAS para todo mundo com permissão
-(migrations 248–256): cadastro, IQA, CONAMA, as 450 coletas históricas
-importadas, tela de conferência, e a mesa completa (pontos,
-laboratórios, lançamento de laudo, fila).
+Módulo Qualidade da Água (IQA) — **Fase 3 (app de campo)**, retomada
+depois de ter sido PULADA DE PROPÓSITO nesta rodada (o usuário pediu a
+Fase 4 primeiro — não foi esquecimento). Fases 0, 1, 2 e 4 estão
+entregues, em produção e ATIVAS para todo mundo com permissão
+(migrations 248–256, sem migration nova na Fase 4): cadastro, IQA,
+CONAMA, as 450 coletas históricas importadas, tela de conferência, a
+mesa completa (pontos, laboratórios, lançamento de laudo, fila) e o
+mapa dedicado (`pages/agua-mapa.html`, sem a camada de hidrografia —
+ver `docs/qualidade-agua/plano.md`, seção "Fase 4 — ENTREGUE", para a
+lista de domínios bloqueados nesta sessão e o que falta pra terminar
+isso quando a rede permitir).
 
 `app-agua/`, offline-first, login por e-mail/senha + PIN no molde do
 `brigada.html` — plano em `docs/qualidade-agua/plano.md`, seção

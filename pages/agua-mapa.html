@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>SIGUC-AC · Qualidade da Água — Mapa</title>
+<link rel="stylesheet" href="../css/global.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="../js/observability.js"></script>
+<script src="../js/queryLogger.js"></script>
+<script src="../js/config.js"></script>
+<script src="../js/layout.js"></script>
+<script src="../js/mapa-recorte.js"></script>
+<script src="../js/fotos-privadas.js"></script>
+</head>
+<body>
+<div id="app"></div>
+
+<div id="amapa-gaveta" class="amapa-gaveta">
+  <div class="amapa-gaveta-head">
+    <div>
+      <div class="amapa-gaveta-titulo" id="ag-titulo">—</div>
+      <div class="amapa-gaveta-sub" id="ag-sub"></div>
+    </div>
+    <button class="modal-close" onclick="fecharGaveta()">×</button>
+  </div>
+  <div class="amapa-gaveta-body" id="ag-corpo"></div>
+</div>
+
+<script>
+// ── Qualidade da Água · Mapa (Fase 4) ───────────────────────────
+// Plano em docs/qualidade-agua/plano.md, seção "Fases seguintes" +
+// "Notas de desenho já fechadas". Só leitura — cadastro de ponto é
+// pages/agua-pontos.html, lançamento de laudo é agua-laudos.html.
+//
+// EIXO TEMPORAL = controle principal, no molde do _tlRenderAno de
+// pages/mapa.html, mas sobre a lista REAL de campanhas (ano+ordem),
+// não um intervalo contínuo de anos — só existem ~20 campanhas no
+// banco, uma barra de 25 anos ficaria cheia de posições sem dado.
+//
+// PONTO SEM COLETA NA CAMPANHA FICA VAZADO (fillOpacity 0, borda
+// tracejada), nunca some — a lacuna de monitoramento é informação.
+//
+// IQA (preenchimento) e CONFORMIDADE CONAMA (cor da borda) são dois
+// canais visuais SEPARADOS no mesmo marcador — nunca um substitui o
+// outro (regra do módulo: um rio pode ter IQA "Boa" e violar
+// turbidez). status='quarentena' reduz a opacidade do preenchimento
+// (dado em conferência, não escondido) — tudo isso é repetido em
+// texto na gaveta, nunca só na cor (regra do projeto).
+//
+// CAMADA DE HIDROGRAFIA: NÃO entra nesta entrega. O plano previa
+// buscar a Base Hidrográfica Ottocodificada da ANA (SNIRH/dados
+// abertos); nesta sessão TODOS os domínios de dado geoespacial
+// testados (portal1.snirh.gov.br, dadosabertos.ana.gov.br,
+// www.ana.gov.br, servicodados.ibge.gov.br, geoservicos.ibge.gov.br,
+// dadosabertos.mma.gov.br, terrabrasilis.dpi.inpe.br, sema.ac.gov.br,
+// geoaplicada.com) voltaram 403 da política de rede do ambiente —
+// confirmado por WebFetch e por curl direto ao proxy (CONNECT tunnel
+// failed, response 403 em todos). Sem acesso à fonte oficial, e por
+// instrução explícita do plano ("não inventar geometria"), a camada
+// fica de fora — pendência registrada em docs/qualidade-agua/plano.md
+// para uma sessão com rede liberada para esses domínios.
+//
+// LIMITE DO ACRE: reaproveita js/mapa-recorte.js inteiro
+// (geoAcreCarregar/geoNoAcre), nunca uma cópia de PIP aqui — mas só
+// para DESENHAR a linha do estado (contexto visual), não para filtrar
+// os pontos de coleta. A "regra do sistema — recorte pelo limite do
+// Acre" existe porque FIRMS/DETER são ingeridos por BOUNDING BOX e
+// trazem lixo de fora do estado sem checagem nenhuma; os 17 pontos de
+// agua_pontos_coleta são cadastrados um a um por servidor da SEMA
+// (mapa na hora de salvar, pages/agua-pontos.html) — dado curado, não
+// ingestão automática. Achado ao validar esta tela: Assis Brasil
+// (fronteira Acre-Peru-Bolívia) cai ~72 m fora do polígono
+// simplificado — geoNoAcre() reportaria "fora", e aplicar o mesmo
+// filtro agressivo apagaria do mapa uma estação oficial de verdade.
+// Ver comentário em montarMarcadores().
+//
+// A UC de cada ponto vem do campo `uc_id` já cadastrado (autoritativo,
+// escolhido à mão em agua-pontos.html) — não recalculado por
+// geoUCEm(), que exigiria carregar o uc_acre.geojson inteiro (4,7 MB)
+// só para confirmar o que o cadastro já sabe.
+
+const CLASSE_LABEL = { especial: 'Especial', classe_1: 'Classe 1', classe_2: 'Classe 2', classe_3: 'Classe 3', classe_4: 'Classe 4' }
+const ACRE_CENTRO = [-9.5, -70.0]
+
+const IQA_FAIXA_COR = { 'Ótima': '#15803D', 'Boa': '#84CC16', 'Regular': '#CA8A04', 'Ruim': '#EA580C', 'Péssima': '#B91C1C' }
+const IQA_FAIXA_BADGE = { 'Ótima': 'badge-verde', 'Boa': 'badge-teal', 'Regular': 'badge-ouro', 'Ruim': 'badge-erro badge-outline', 'Péssima': 'badge-erro' }
+const SEM_IQA_COR = '#9CA3AF'
+
+// Mesmos campos/rótulos de pages/agua-laudos.html e agua-conferencia.html
+// (rótulo estático, sem cálculo — não é o que a regra "cálculo em UM
+// lugar só" cobre; IQA e CONAMA continuam vindo prontos da view).
+const PARAM_FIELDS = [
+  ['temp_ar', 'Temp. ar (°C)'], ['temp_amostra', 'Temp. amostra (°C)'],
+  ['ph', 'pH'], ['od', 'OD (mg/L)'],
+  ['turbidez', 'Turbidez (UNT)'], ['condutividade_eletrica', 'Condutividade (µS/cm)'],
+  ['dbo', 'DBO (mg/L)'], ['nitrogenio_total', 'Nitrogênio total'], ['nitrogenio_amoniacal', 'Nitrogênio amoniacal'],
+  ['nitratos', 'Nitratos'], ['fosforo_total', 'Fósforo total'], ['ortofosfato_dissolvido', 'Ortofosfato dissolvido'],
+  ['solidos_dissolvidos_totais', 'Sólidos dissolvidos totais'], ['solidos_suspensao_totais', 'Sólidos em suspensão totais'],
+  ['coliformes_termotolerantes', 'Coliformes termotolerantes'], ['coliformes_totais', 'Coliformes totais'],
+  ['escherichia_coli', 'Escherichia coli'], ['alcalinidade_total', 'Alcalinidade total'],
+  ['carbono_organico_total', 'Carbono orgânico total'], ['cloreto', 'Cloreto'],
+  ['condutividade_especifica', 'Condutividade específica'], ['descarga_liquida', 'Descarga líquida'],
+]
+const PARAM_LABEL = Object.fromEntries(PARAM_FIELDS)
+
+let mapaAgua = null
+let _pontos = [], _campanhas = [], _coletas = [], _coletaPorChave = {}, _ucsPorId = {}
+let _markers = {}
+let _campanhaIdx = 0
+let _gavetaAberta = false, _gavetaPontoId = null
+
+;(async function () {
+  const usuario = await carregarUsuario()
+  if (!usuario) { window.location.href = '../index.html'; return }
+
+  const { data: nivel } = await db.rpc('nivel_efetivo', { p_usuario: usuario.id, p_modulo_chave: 'agua' })
+  if (!nivel || nivel === 'sem_acesso') {
+    document.body.innerHTML = '<div style="padding:60px;text-align:center;font-family:\'DM Sans\',sans-serif;color:#6B7280">Você não tem acesso ao módulo Qualidade da Água.</div>'
+    return
+  }
+
+  document.getElementById('app').innerHTML = gerarLayout('Qualidade da Água — Mapa', 'agua-mapa') + montarConteudo()
+  carregarLogosSidebar()
+  bIconsAplicar()
+
+  inicializarMapa()
+  await carregarPontos()
+  await Promise.all([carregarCampanhas(), carregarColetas(), carregarUCs()])
+  await geoAcreCarregar()
+  desenharLimiteAcre()
+  montarMarcadores()
+
+  const slider = document.getElementById('amapa-tl-slider')
+  slider.max = Math.max(0, _campanhas.length - 1)
+  if (_campanhas.length) renderCampanha(_campanhas.length - 1)
+  else document.getElementById('amapa-tl-resumo').textContent = 'Nenhuma campanha cadastrada'
+})()
+
+function montarConteudo() {
+  return `<div class="fade-in">
+    <div class="card" style="margin-bottom:12px;padding:12px 16px">
+      <div class="amapa-tl">
+        <button class="amapa-tl-btn" id="amapa-tl-prev" onclick="tlAguaAndar(-1)" title="Campanha anterior">‹</button>
+        <input type="range" id="amapa-tl-slider" min="0" max="0" value="0" oninput="tlAguaSlide()">
+        <button class="amapa-tl-btn" id="amapa-tl-next" onclick="tlAguaAndar(1)" title="Próxima campanha">›</button>
+        <div class="amapa-tl-info">
+          <strong id="amapa-tl-label">—</strong>
+          <span id="amapa-tl-periodo" style="font-size:11px;color:var(--cinza-500)"></span>
+        </div>
+        <span id="amapa-tl-resumo" style="font-size:12px;color:var(--cinza-500);margin-left:auto"></span>
+      </div>
+    </div>
+    <div class="amapa-wrapper">
+      <div id="amapa"></div>
+      <div id="amapa-legenda" class="amapa-legenda">
+        <div class="amapa-legenda-tit">IQA (preenchimento)</div>
+        <div class="amapa-legenda-linha">
+          ${Object.entries(IQA_FAIXA_COR).map(([faixa, cor]) => `<span class="amapa-chip"><span class="amapa-dot" style="background:${cor}"></span>${faixa}</span>`).join('')}
+        </div>
+        <div class="amapa-legenda-tit" style="margin-top:8px">Conformidade CONAMA (borda)</div>
+        <div class="amapa-legenda-linha">
+          <span class="amapa-chip"><span class="amapa-dot" style="background:#fff;border:2px solid #16A34A"></span>Conforme</span>
+          <span class="amapa-chip"><span class="amapa-dot" style="background:#fff;border:3px solid #DC2626"></span>Violação</span>
+          <span class="amapa-chip"><span class="amapa-dot amapa-dot-tracejado"></span>Sem limites p/ a classe</span>
+        </div>
+        <div class="amapa-legenda-linha" style="margin-top:6px">
+          <span class="amapa-chip"><span class="amapa-dot amapa-dot-vazado"></span>Sem coleta na campanha</span>
+        </div>
+        <div class="amapa-legenda-linha">
+          <span class="amapa-chip">Preenchimento fraco = em conferência (quarentena)</span>
+        </div>
+      </div>
+    </div>
+  </div>`
+}
+
+// ── Mapa base ────────────────────────────────────────────────
+function inicializarMapa() {
+  mapaAgua = L.map('amapa', { attributionControl: false }).setView(ACRE_CENTRO, 7)
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 18, attribution: '© OpenStreetMap'
+  }).addTo(mapaAgua)
+}
+
+async function desenharLimiteAcre() {
+  try {
+    const r = await fetch('../data/acre_estado.geojson')
+    if (!r.ok) throw new Error('HTTP ' + r.status)
+    const gj = await r.json()
+    L.geoJSON(gj, { style: { color: '#1F4E2C', weight: 2, fill: false, opacity: .55 }, interactive: false }).addTo(mapaAgua)
+  } catch (e) {
+    console.warn('[agua-mapa] limite do Acre indisponível para desenho:', e.message)
+  }
+}
+
+// ── Cargas ────────────────────────────────────────────────────
+async function carregarPontos() {
+  const { data, error } = await db.from('agua_pontos_coleta').select('*').eq('ativo', true).order('nome')
+  if (error) { toast(error.message || 'Erro ao carregar pontos', 'error'); return }
+  _pontos = (data || []).map(p => {
+    const ll = geoLatLngDeGeom(p.geom)
+    return { ...p, _lat: ll ? ll[0] : null, _lng: ll ? ll[1] : null }
+  })
+}
+
+async function carregarCampanhas() {
+  const { data, error } = await db.from('agua_campanhas').select('*')
+  if (error) { toast(error.message || 'Erro ao carregar campanhas', 'error'); return }
+  _campanhas = (data || []).sort((a, b) => a.ano - b.ano || (a.ordem === 'segunda' ? 1 : 0) - (b.ordem === 'segunda' ? 1 : 0))
+}
+
+async function carregarColetas() {
+  const { data, error } = await db.from('vw_agua_coletas_detalhe').select('*')
+  if (error) { toast(error.message || 'Erro ao carregar coletas', 'error'); return }
+  _coletas = data || []
+  _coletaPorChave = {}
+  for (const c of _coletas) _coletaPorChave[c.ponto_id + '|' + c.campanha_id] = c
+}
+
+async function carregarUCs() {
+  const ids = [...new Set(_pontos.map(p => p.uc_id).filter(Boolean))]
+  if (!ids.length) return
+  const { data } = await db.from('unidades_conservacao').select('id,nome').in('id', ids)
+  _ucsPorId = Object.fromEntries((data || []).map(u => [u.id, u.nome]))
+}
+
+// ── Marcadores ────────────────────────────────────────────────
+function montarMarcadores() {
+  // NÃO filtra por geoNoAcre aqui — diferente de focos/alertas (onde o
+  // recorte existe porque a ingestão por BOUNDING BOX traz lixo de
+  // AM/RO/Peru/Bolívia sem checagem nenhuma), os pontos de coleta são
+  // cadastrados um a um por servidor da SEMA em agua-pontos.html, com
+  // mapa na hora de salvar. Achado ao validar esta tela: Assis Brasil
+  // (estação ANA num município na fronteira Acre-Peru-Bolívia) cai
+  // ~72 m fora do polígono simplificado de data/acre_estado.geojson —
+  // real, mas é precisão de polígono, não erro de cadastro. Aplicar o
+  // mesmo recorte agressivo de focos/alertas apagaria do mapa uma
+  // estação oficial de verdade. geoAcreCarregar() continua sendo usado
+  // para desenhar a linha do limite (contexto visual).
+  for (const p of _pontos) {
+    if (p._lat == null || p._lng == null) continue
+    const m = L.circleMarker([p._lat, p._lng], { radius: 9, weight: 2, color: SEM_IQA_COR, fillColor: SEM_IQA_COR, fillOpacity: 0 })
+    m.on('click', () => abrirGaveta(p.id))
+    m.addTo(mapaAgua)
+    _markers[p.id] = m
+  }
+}
+
+// ── Eixo temporal (campanhas) ───────────────────────────────────
+function tlAguaAndar(delta) {
+  const novo = _campanhaIdx + delta
+  if (novo < 0 || novo >= _campanhas.length) return
+  renderCampanha(novo)
+}
+function tlAguaSlide() {
+  renderCampanha(+document.getElementById('amapa-tl-slider').value)
+}
+
+function renderCampanha(idx) {
+  const camp = _campanhas[idx]
+  if (!camp) return
+  _campanhaIdx = idx
+  document.getElementById('amapa-tl-slider').value = idx
+  const ordemLbl = camp.ordem === 'segunda' ? '2ª campanha' : '1ª campanha'
+  document.getElementById('amapa-tl-label').textContent = `${camp.ano} · ${ordemLbl}`
+  document.getElementById('amapa-tl-periodo').textContent = (camp.data_inicio && camp.data_fim)
+    ? `${formatData(camp.data_inicio)} – ${formatData(camp.data_fim)}` : ''
+  document.getElementById('amapa-tl-prev').disabled = idx === 0
+  document.getElementById('amapa-tl-next').disabled = idx === _campanhas.length - 1
+
+  let comColeta = 0
+  for (const p of _pontos) {
+    const marker = _markers[p.id]
+    if (!marker) continue
+    const coleta = _coletaPorChave[p.id + '|' + camp.id] || null
+    marker._coletaAtual = coleta
+
+    if (coleta) {
+      comColeta++
+      const semLimites = coleta.conama_violacoes == null
+      const violou = !semLimites && coleta.conama_violacoes.length > 0
+      const corBorda = semLimites ? SEM_IQA_COR : (violou ? '#DC2626' : '#16A34A')
+      marker.setStyle({
+        fillColor: IQA_FAIXA_COR[coleta.iqa_faixa] || SEM_IQA_COR,
+        fillOpacity: coleta.status === 'quarentena' ? .5 : .92,
+        color: corBorda,
+        weight: violou ? 3 : 2,
+        dashArray: semLimites ? '3,3' : null,
+      })
+      marker.bindTooltip(`${esc(p.nome)} — IQA ${coleta.iqa != null ? coleta.iqa.toFixed(0) : '—'} (${coleta.iqa_faixa || 'sem dado suficiente'})`, { direction: 'top', offset: [0, -8] })
+    } else {
+      marker.setStyle({ fillColor: '#fff', fillOpacity: 0, color: SEM_IQA_COR, weight: 1.5, dashArray: '4,4' })
+      marker.bindTooltip(`${esc(p.nome)} — sem coleta nesta campanha`, { direction: 'top', offset: [0, -8] })
+    }
+  }
+  document.getElementById('amapa-tl-resumo').textContent = `${comColeta} de ${_pontos.length} pontos com coleta nesta campanha`
+
+  if (_gavetaAberta && _gavetaPontoId) abrirGaveta(_gavetaPontoId, true)
+}
+
+// ── Gaveta lateral (nunca modal — regra do sistema) ─────────────
+function abrirGaveta(pontoId, mantendoCampanha) {
+  _gavetaPontoId = pontoId
+  _gavetaAberta = true
+  const p = _pontos.find(x => x.id === pontoId)
+  if (!p) return
+  const camp = _campanhas[_campanhaIdx]
+  const coleta = camp ? (_coletaPorChave[pontoId + '|' + camp.id] || null) : null
+
+  document.getElementById('ag-titulo').textContent = p.nome
+  document.getElementById('ag-sub').textContent = `${p.codigo_ana} · ${p.rio}`
+  document.getElementById('ag-corpo').innerHTML = montarCorpoGaveta(p, coleta, camp)
+  assinarFotos(document.getElementById('ag-corpo'))
+  if (!mantendoCampanha) document.getElementById('amapa-gaveta').classList.add('aberta')
+}
+
+function fecharGaveta() {
+  _gavetaAberta = false
+  _gavetaPontoId = null
+  document.getElementById('amapa-gaveta').classList.remove('aberta')
+}
+
+function _fmtN(v) { return v == null ? '—' : Number(v).toLocaleString('pt-BR', { maximumFractionDigits: 2 }) }
+
+function montarCorpoGaveta(p, coleta, camp) {
+  const ucNome = p.uc_id ? (_ucsPorId[p.uc_id] || 'UC não identificada') : null
+  const ordemLbl = camp ? (camp.ordem === 'segunda' ? '2ª campanha' : '1ª campanha') : ''
+
+  let html = `
+    <div class="ag-secao">
+      <div class="ag-linha"><span>Município</span><strong>${esc(p.municipio)}</strong></div>
+      <div class="ag-linha"><span>Bacia</span><strong>${esc(p.bacia || '—')}</strong></div>
+      <div class="ag-linha"><span>Classe de enquadramento</span><strong>${CLASSE_LABEL[p.classe_enquadramento] || esc(p.classe_enquadramento)}</strong></div>
+      <div class="ag-linha"><span>Unidade de Conservação</span><strong>${ucNome ? esc(ucNome) : 'Fora de UC'}</strong></div>
+      <div class="ag-linha"><span>Coordenada</span><strong class="mono">${p._lat != null ? p._lat.toFixed(5) + ', ' + p._lng.toFixed(5) : '—'}</strong></div>
+    </div>
+    <div class="divider"></div>
+    <div class="ag-secao">
+      <div class="form-section-label" style="padding-top:0">${camp ? camp.ano + ' · ' + ordemLbl : 'Sem campanha selecionada'}</div>`
+
+  if (!camp) {
+    html += `<div class="form-hint">Nenhuma campanha cadastrada ainda.</div>`
+  } else if (!coleta) {
+    html += `<div class="alert alert-warning">Sem coleta registrada nesta campanha para este ponto. A lacuna de monitoramento fica visível de propósito — o ponto não desaparece do mapa.</div>`
+  } else {
+    html += `
+      <div class="ag-linha"><span>Data da coleta</span><strong>${formatData(coleta.data_coleta)}${coleta.hora_coleta ? ' às ' + String(coleta.hora_coleta).slice(0, 5) : ''}</strong></div>
+      <div class="ag-linha"><span>Coletor</span><strong>${esc(coleta.coletor_nome || '—')}</strong></div>
+      <div class="ag-linha"><span>Laboratório</span><strong>${esc(coleta.laboratorio_nome || '—')}</strong></div>
+      <div class="ag-linha"><span>Status</span><span class="badge ${coleta.status === 'completo' ? 'badge-verde' : 'badge-ouro'}">${coleta.status === 'completo' ? 'Completo' : 'Em conferência'}</span></div>
+      ${coleta.status === 'quarentena' && coleta.quarentena_motivo ? `<div class="form-hint" style="margin-top:2px">${esc(coleta.quarentena_motivo)}</div>` : ''}
+      ${coleta.laudo_url ? `<div style="margin-top:8px"><a href="#" ${fotoAttr(coleta.laudo_url)} target="_blank" rel="noopener" class="btn btn-xs btn-secondary">${bico('download')} Ver laudo</a></div>` : ''}
+
+      <div class="grid-2" style="margin-top:14px">
+        <div class="ag-card-metrica">
+          <div class="ag-card-tit">IQA</div>
+          <div class="ag-card-valor" style="color:${IQA_FAIXA_COR[coleta.iqa_faixa] || SEM_IQA_COR}">${coleta.iqa != null ? Number(coleta.iqa).toFixed(1) : '—'}</div>
+          <span class="badge ${IQA_FAIXA_BADGE[coleta.iqa_faixa] || 'badge-cinza'}">${coleta.iqa_faixa || 'Sem dado suficiente'}</span>
+        </div>
+        <div class="ag-card-metrica">
+          <div class="ag-card-tit">Conformidade CONAMA</div>
+          ${coleta.conama_violacoes == null
+            ? `<span class="badge badge-cinza">Sem limites p/ ${CLASSE_LABEL[p.classe_enquadramento] || p.classe_enquadramento}</span>`
+            : coleta.conama_violacoes.length === 0
+              ? `<span class="badge badge-verde">Conforme</span>`
+              : `<span class="badge badge-erro">${coleta.conama_violacoes.length} violação${coleta.conama_violacoes.length > 1 ? 'ões' : ''}</span>
+                 <div style="margin-top:6px;font-size:11.5px;color:var(--cinza-600)">${coleta.conama_violacoes.map(v => esc(PARAM_LABEL[v] || v)).join(', ')}</div>`}
+        </div>
+      </div>
+
+      <div class="form-section-label" style="margin-top:16px">Parâmetros medidos</div>
+      <div class="ag-params">
+        ${PARAM_FIELDS.filter(([campo]) => coleta[campo] != null).map(([campo, rotulo]) => `
+          <div class="ag-param-linha${coleta.conama_violacoes?.includes(campo) ? ' ag-param-violado' : ''}">
+            <span>${rotulo}</span><strong>${_fmtN(coleta[campo])}</strong>
+          </div>`).join('') || '<div class="form-hint">Nenhum parâmetro numérico registrado.</div>'}
+      </div>
+      ${coleta.observacoes ? `<div class="form-section-label" style="margin-top:14px">Observações</div><p style="font-size:12.5px;color:var(--cinza-600);margin:0">${esc(coleta.observacoes)}</p>` : ''}
+    `
+  }
+  html += `</div>`
+
+  const historico = _campanhas
+    .map((c, i) => ({ c, i, col: _coletaPorChave[p.id + '|' + c.id] || null }))
+    .filter(x => x.col)
+  if (historico.length) {
+    html += `<div class="divider"></div><div class="form-section-label">Histórico da série (${historico.length} coleta${historico.length > 1 ? 's' : ''})</div><div class="ag-historico">`
+    html += historico.map(({ c, i, col }) => `
+      <button type="button" class="ag-hist-linha${camp && c.id === camp.id ? ' ag-hist-atual' : ''}" onclick="renderCampanha(${i})">
+        <span class="amapa-dot" style="background:${IQA_FAIXA_COR[col.iqa_faixa] || SEM_IQA_COR}"></span>
+        <span>${c.ano} · ${c.ordem === 'segunda' ? '2ª' : '1ª'}</span>
+        <strong>${col.iqa != null ? Number(col.iqa).toFixed(0) : '—'}</strong>
+        <span class="ag-hist-conama">${col.conama_violacoes == null ? 'sem limite' : col.conama_violacoes.length ? 'violação' : 'conforme'}</span>
+      </button>`).join('')
+    html += `</div>`
+  }
+
+  return html
+}
+</script>
+<style>
+.amapa-wrapper { position: relative; height: calc(100vh - 176px); min-height: 480px; border-radius: var(--raio-lg); overflow: hidden; border: 1px solid var(--borda); }
+#amapa { position: absolute; inset: 0; z-index: 0; }
+
+.amapa-tl { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.amapa-tl-btn { width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--borda-forte); background: #fff; cursor: pointer; font-size: 17px; line-height: 1; display: flex; align-items: center; justify-content: center; color: var(--verde-medio); flex-shrink: 0; }
+.amapa-tl-btn:hover:not(:disabled) { background: var(--cinza-50); }
+.amapa-tl-btn:disabled { opacity: .35; cursor: default; }
+#amapa-tl-slider { flex: 1; min-width: 140px; accent-color: var(--verde-medio); }
+.amapa-tl-info { display: flex; flex-direction: column; min-width: 170px; font-size: 13px; }
+
+.amapa-legenda { position: absolute; bottom: 14px; left: 14px; z-index: 500; background: #fff; border-radius: 12px; box-shadow: 0 4px 24px rgba(0,0,0,.18); padding: 12px 14px; font-family: 'DM Sans', sans-serif; max-width: 240px; }
+.amapa-legenda-tit { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--cinza-500); }
+.amapa-legenda-linha { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 5px; align-items: center; }
+.amapa-chip { display: inline-flex; align-items: center; gap: 4px; font-size: 10.5px; color: var(--cinza-700); }
+.amapa-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex: none; }
+.amapa-dot-tracejado { background: #fff; border: 2px dashed #9CA3AF; }
+.amapa-dot-vazado { background: #fff; border: 2px dashed #9CA3AF; }
+
+.amapa-gaveta { position: fixed; top: 0; right: 0; width: 400px; max-width: 100vw; height: 100vh; background: #fff; z-index: 650; box-shadow: -4px 0 32px rgba(0,0,0,.22); transform: translateX(100%); transition: transform .28s cubic-bezier(.4,0,.2,1); display: flex; flex-direction: column; overflow: hidden; }
+.amapa-gaveta.aberta { transform: translateX(0); }
+.amapa-gaveta-head { padding: 16px 20px; border-bottom: 1px solid var(--borda); display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; flex-shrink: 0; }
+.amapa-gaveta-titulo { font-size: 15px; font-weight: 700; color: var(--cinza-800); }
+.amapa-gaveta-sub { font-size: 12px; color: var(--cinza-500); margin-top: 2px; }
+.amapa-gaveta-body { padding: 16px 20px; overflow-y: auto; flex: 1; }
+@media (max-width: 520px) { .amapa-gaveta { width: 100vw; } }
+
+.ag-secao { font-size: 13px; }
+.ag-linha { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 5px 0; border-bottom: 1px solid var(--cinza-50); font-size: 12.5px; color: var(--cinza-600); }
+.ag-linha strong { color: var(--cinza-800); font-weight: 600; text-align: right; }
+.form-section-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--verde-medio); padding: 8px 0 4px; margin-bottom: 8px; }
+
+.ag-card-metrica { background: var(--cinza-50); border-radius: var(--raio); padding: 12px; text-align: center; }
+.ag-card-tit { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--cinza-500); margin-bottom: 4px; }
+.ag-card-valor { font-size: 26px; font-weight: 800; line-height: 1; margin-bottom: 6px; }
+
+.ag-params { display: flex; flex-direction: column; }
+.ag-param-linha { display: flex; align-items: center; justify-content: space-between; padding: 4px 6px; font-size: 12px; color: var(--cinza-600); border-radius: 6px; }
+.ag-param-linha strong { color: var(--cinza-800); }
+.ag-param-violado { background: #FEE2E2; }
+.ag-param-violado strong { color: #991B1B; }
+
+.ag-historico { display: flex; flex-direction: column; gap: 4px; }
+.ag-hist-linha { display: flex; align-items: center; gap: 8px; width: 100%; padding: 6px 8px; border-radius: 6px; border: 1px solid transparent; background: transparent; cursor: pointer; font-family: inherit; font-size: 12px; color: var(--cinza-700); text-align: left; }
+.ag-hist-linha:hover { background: var(--cinza-50); }
+.ag-hist-atual { border-color: var(--verde-claro); background: var(--verde-bg); }
+.ag-hist-linha strong { margin-left: auto; color: var(--cinza-800); }
+.ag-hist-conama { font-size: 10px; color: var(--cinza-400); min-width: 48px; text-align: right; }
+</style>
+</body>
+</html>
