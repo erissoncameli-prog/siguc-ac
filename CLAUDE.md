@@ -1205,27 +1205,29 @@ public`, senão o advisor de segurança acusa.
 
 ## Próxima tarefa
 Módulo Qualidade da Água (IQA) — **Fase 1**, conforme
-`docs/qualidade-agua/plano.md` (a Fase 0 está entregue, migrations
-248–252; ler a seção "Fase 0 — ENTREGUE", que corrige quatro coisas que
-o plano supunha).
+`docs/qualidade-agua/plano.md`. A Fase 0 está entregue e mesclada
+(PR #250; migrations 248–252b, todas aplicadas em produção) — ler a
+seção **"Fase 1 — escopo desta entrega"** do plano, que já detalha os
+7 passos e as regras do schema (colunas `status`/`quarentena_motivo`/
+`linha_origem_planilha`/`censurados` já existem em `agua_coletas`,
+prontas para o import).
 
-Entregar: migração das 450 coletas de `docs/qualidade-agua/serie-
-historica.csv` para `agua_coletas`, com **quarentena em vez de
-descarte** (pH 16,36, OD de 27 mg/L, valores impossíveis vão para
-`status = 'quarentena'` com motivo, não para o lixo) e tela de
-conferência. Casar as linhas com o ponto certo por
-`agua_pontos_coleta.codigos_alias`. Preencher `agua_campanhas.periodo`
-com quem conhece o calendário de certificação.
+Resumo: migrar as 450 coletas de `docs/qualidade-agua/serie-
+historica.csv` para `agua_coletas`, casando ponto por
+`codigos_alias` (17 pontos reais, 3 códigos do CSV são grafia errada
+— já mapeados) e campanha por ano+ordem. **Quarentena, nunca
+descarte**, para pH/OD impossíveis e para os sólidos em suspensão
+(ver pendência abaixo). Parser de CSV de verdade — 143 das 451 linhas
+têm campo entre aspas com vírgula dentro; reaproveitar
+`separaCampos`/`csvLinhas` de `tests/agua-iqa.test.js` (já corrigido
+para o CRLF do arquivo), não escrever de novo. **Não gravar o IQA da
+planilha em `agua_coletas`** — o índice é sempre derivado pela view.
 
-⚠ Antes de tudo: rodar `tests/agua-iqa.test.js` num ambiente com rede.
-A sessão que o escreveu não conseguiu executá-lo (saída bloqueada para
-Supabase e Vercel) — a regressão foi conferida por outro caminho, mas o
-arquivo em si nunca rodou.
-
-⚠ Ao ler o CSV, usar parser de CSV de verdade: 143 das 451 linhas têm
-campo entre aspas com vírgula dentro (a coordenada inteira num campo
-só; `"23,00"` em Temp Ar; `"0,050"` em FosforoTotal). `split(',')`
-desloca as colunas dessas linhas em silêncio.
+✅ `tests/agua-iqa.test.js` já roda em CI (job `agua-iqa` no
+`qa.yml`) e está verde: 5/5, mediana 0,695 contra as 268 linhas.
+Achou e corrigiu dois bugs reais no caminho (`js/env-loader.js` sem
+fallback de localhost, e o `trim()` faltando no cabeçalho do CSV) —
+ambos já mesclados. Não precisa validar isso de novo.
 
 ⚠ A planilha original foi anexada num chat e **não existe mais no
 sistema de arquivos**. Tudo que era preciso dela está em
@@ -1234,8 +1236,9 @@ não procurar o `.xlsx`.
 
 **Não decidir por algoritmo** a pendência dos sólidos em suspensão
 (mediana de 0,342 mg/L com turbidez mediana de 90 UNT — provável
-mistura de g/L com mg/L ao longo dos anos). Precisa de alguém da SEMA
-conferindo laudos antigos.
+mistura de g/L com mg/L ao longo dos anos): linhas afetadas vão para
+quarentena, não para uma conversão adivinhada. Precisa de alguém da
+SEMA conferindo laudos antigos.
 
 Módulo A — Estrutura Organizacional SEMA-AC segue pendente (ver "A
 implementar", item A).
