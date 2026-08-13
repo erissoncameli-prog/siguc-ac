@@ -315,6 +315,72 @@ migration nova (a partir da **253**) precisa ser aplicada em produção
 na mesma entrega, com `get_advisors` depois. Sem mudança em `pwa/sw.js`
 (módulo ainda não tem tela em nenhum dos 3 apps de campo).
 
+## Fase 1 — ENTREGUE (migration 253)
+
+As 450 linhas de `serie-historica.csv` estão em `agua_coletas`:
+**111 `completo`, 339 `quarentena`** (nenhuma perdida, nenhuma
+duplicada — conferido por `count(*)` antes e depois do import, e a
+`vw_agua_coletas_detalhe` enxerga as 450).
+
+- **Geração do bloco de import**: `scripts/agua_gerar_migration_serie_historica.py`
+  lê o CSV com `csv.reader` (parser de verdade — mesmo motivo do
+  `separaCampos`/`csvLinhas` do `tests/agua-iqa.test.js`, que não foi
+  reescrito, só reaproveitado em espírito) e escreve o bloco
+  `INSERT INTO _agua_import_raw VALUES (...)` da migration 253. Guardado
+  no repo para reexecutar se o CSV mudar — não é script de uso único
+  descartado.
+- **Casamento de ponto e campanha** feito em SQL (`JOIN` por
+  `codigos_alias` e por `ano+ordem`), com dois `DO $$` de sanity ANTES
+  do import que fazem a migration falhar alto se alguma linha não
+  casar — um `INNER JOIN` sozinho descartaria silenciosamente.
+- **Quarentena, três critérios do plano + um achado desta entrega**:
+  pH fora de 0–14 (3 linhas), OD acima de 150% da saturação calculada
+  por `agua_od_saturacao()` (1 linha — a mesma que, com o pH 16,36,
+  fazia o erro máximo do teste chegar a 25 pontos), e sólidos em
+  suspensão preenchidos (339 linhas — o critério que domina, por
+  desenho: é a pendência de unidade registrada nas "Decisões ainda
+  abertas"). **Achado só descoberto ao importar**: a linha 271 tem
+  `Ano=2022` na campanha mas `Data=2026-10-26` — todas as outras
+  coletas do mesmo período de certificação são de 2022; é 1 dígito
+  trocado (2→6), não campanha nova. Motivo adicionado a uma quarentena
+  que já existia pelo critério de sólidos — não criou linha nova.
+- **Valor censurado**: os 56 `<1` de coliformes termotolerantes foram
+  para `censurados` (o limite bruto) + a coluna numérica com metade do
+  limite, nunca as duas coisas misturadas.
+- **Não gravou o IQA da planilha** — nenhuma coluna nova em
+  `agua_coletas` para isso, como decidido.
+- **Tela de conferência**: `pages/agua-conferencia.html` — lista as
+  339 linhas em quarentena (filtro por ponto/código ANA/nº da linha),
+  abre um formulário com todos os campos de campo e laboratório
+  editáveis, mostra o motivo gerado pela migration, e tem dois botões:
+  promover a `completo` (some da lista) ou salvar mantendo a
+  quarentena com uma observação da conferência. Sem RPC nova — grava
+  direto em `agua_coletas` (`db.from(...).update(...)`), a policy
+  `agua_coletas_write` (pode_editar('agua')) já autoriza. Acesso
+  continua restrito a super_admin enquanto `modulos.agua.ativo = false`
+  (mesma regra da Fase 0) — não está na sidebar, é alcançada direto
+  pela URL.
+- `get_advisors` (security) depois da migration: nenhum aviso novo —
+  a 253 só insere dado em tabela e função já existentes, não cria
+  nada.
+- Sem mudança em `pwa/sw.js`, como previsto (nenhum dos 3 apps de
+  campo tem tela do módulo ainda).
+
+### Aplicação em produção — nota de execução
+
+A migration 253 tem ~450 linhas de `VALUES` (~100 KB), grande demais
+para uma única chamada de `apply_migration` nesta sessão. Foi aplicada
+em partes via `execute_sql` (tabela de estágio permanente, carregada
+em 8 lotes, depois o `JOIN`+quarentena+limpeza da tabela de estágio) —
+mesmo efeito final de rodar o arquivo inteiro de uma vez, só que em
+passos menores para caber na sessão. O arquivo em
+`supabase/migrations/253_agua_import_serie_historica.sql` é a fonte
+de verdade e reproduz o mesmo resultado se aplicado de uma vez (ex.:
+`supabase db push` local, ou uma sessão com folga de contexto maior).
+Conferido linha a linha contra o que foi de fato inserido (contagem,
+alias de ponto, censura, motivos de quarentena das linhas 271/296/
+369/370/371) antes de considerar a entrega pronta.
+
 ## Fases seguintes (resumo)
 
 | Fase | Entrega | Depende de |
