@@ -1,0 +1,24 @@
+-- ═══════════════════════════════════════════════════════════
+-- SIGUC-AC · Qualidade da Água — fecha agua_conama_violacoes p/ anon
+--
+-- POR QUE ESTA MIGRATION EXISTE COMO ARQUIVO SEPARADO
+-- O REVOKE abaixo já estava aplicado em produção (era originalmente
+-- a segunda metade da 252, rodada como uma chamada de apply_migration
+-- própria, batizada "252b_agua_conama_revoke_anon" no histórico do
+-- Supabase) antes deste arquivo existir no repositório — por isso
+-- `supabase_migrations.schema_migrations` tinha uma versão sem
+-- arquivo correspondente aqui. O texto do REVOKE também foi copiado
+-- para o final de `252_agua_fix_search_path.sql` como documentação
+-- do resultado final, mas isso não bastava: reconstruir o banco só a
+-- partir dos arquivos do repositório pularia esta aplicação, porque
+-- ela nunca tinha arquivo próprio. Este arquivo fecha essa divergência
+-- entre o histórico do banco e o repositório. Rodar o REVOKE de novo
+-- é idempotente — não erro se já tiver sido revogado.
+--
+-- Ver o comentário completo em 252_agua_fix_search_path.sql: o motivo
+-- é que `ALTER DEFAULT PRIVILEGES` do projeto concede EXECUTE a `anon`
+-- por NOME em toda função nova do schema `public`, então
+-- `REVOKE ... FROM PUBLIC` sozinho não fecha nada aqui — tem que
+-- revogar do papel pelo nome.
+REVOKE EXECUTE ON FUNCTION agua_conama_violacoes(classe_enquadramento_agua,numeric,numeric,numeric,numeric,numeric,numeric)
+  FROM anon;
