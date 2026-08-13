@@ -1142,24 +1142,100 @@ RESEND_API_KEY=(e-mail de alertas)
 PLANET_API_KEY=(Planet/NICFI Basemaps; só no servidor — usada pelos
   proxies /api/planet-tiles e /api/planet-mosaics. Nunca no frontend)
 
-## Próxima tarefa
-Módulo Qualidade da Água (IQA) — **Fase 0**, conforme
-`docs/qualidade-agua/plano.md`. Ler esse arquivo antes de começar: ele
-traz as decisões já tomadas (ΔT por `Temp Ar`, CONAMA Classe 2,
-censurado = metade do LD), os achados na série histórica e o escopo
-exato da fase.
+## Qualidade da Água (IQA) — migrations 248–252
+Módulo IRMÃO de Brigadas/Biomonitor/Frota, não aninhado no Biomonitor
+(`grupos_biomonitor` exige `uc_id NOT NULL` e a maioria dos pontos fica
+fora de UC). Plano completo e histórico das decisões em
+`docs/qualidade-agua/plano.md` — ler antes de mexer.
 
-Entregar: migrations do cadastro (`agua_pontos_coleta`, `agua_campanhas`,
-`agua_coletas`, `agua_laboratorios`) a partir da **248**; seed das 20
-estações históricas com a coordenada de Santa Rosa do Purus corrigida;
-função única `agua_calcular_iqa()` + view com ΔT, faixa e conformidade
-CONAMA; `tests/agua-iqa.test.js` como regressão contra as 268 linhas de
-`docs/qualidade-agua/serie-historica.csv`; entrada no ROPA da LGPD.
+**O CÁLCULO DO IQA VIVE EM UM LUGAR SÓ: `agua_calcular_iqa()`**
+(migration 249). Nenhuma página reimplementa a conta em JavaScript —
+mesma lição de `js/frota-consumo.js` e `js/mapa-recorte.js`. Tela nova
+que precise do índice lê `vw_agua_coletas_detalhe`; não recalcula.
+Junto vêm `agua_iqa_q` (curvas), `agua_od_saturacao`, `agua_iqa_faixa`
+e `agua_conama_violacoes`.
+
+- **Cadastro (248):** `agua_pontos_coleta` (código ANA + `codigos_alias`
+  para as grafias erradas da planilha, PostGIS, classe de
+  enquadramento), `agua_campanhas` (ano + primeira/segunda),
+  `agua_coletas` (campo e laboratório na MESMA linha — é sempre 1:1) e
+  `agua_laboratorios`. RLS em todas por `pode_ver`/`pode_editar('agua')`.
+  O módulo `agua` nasceu em `modulos` com **`ativo = false`**: durante
+  as Fases 0 e 1 só super_admin alcança as tabelas, que é o certo numa
+  fase sem tela. Ativar é UPDATE de uma linha, na entrega que criar a
+  página.
+- **Bruto grava, derivado deriva.** `temp_ar` e `temp_amostra` são
+  colunas; o ΔT sai na view. Se a SEMA adotar ponto de controle a
+  montante no futuro, é troca de view, não migração de dados. Vale
+  igual para a saturação de OD (grava-se mg/L) e para os sólidos
+  totais (grava-se dissolvidos e suspensão separados).
+- **A FAIXA É DERIVADA, NUNCA DIGITADA.** Na planilha, 9 das 268
+  classificações contradiziam o próprio valor (IQA 44,15 marcado BOA).
+  No sistema isso deixa de ser possível.
+- **Valor censurado (`<1`)**: a coluna numérica guarda METADE do limite
+  de detecção e `agua_coletas.censurados` (jsonb) guarda de qual limite
+  veio — senão `0,5` no banco vira resultado medido que ninguém
+  reconcilia com o laudo.
+- **IQA e conformidade CONAMA são leituras SEPARADAS**: um rio pode ter
+  IQA "Boa" e violar o limite de turbidez. `agua_conama_violacoes`
+  devolve a LISTA do que está fora (array vazio = conforme; NULL = a
+  classe do ponto não tem limites cadastrados, que NÃO é o mesmo que
+  conforme). Limites em tabela (`agua_limites_conama`), não em código:
+  só a Classe 2 está validada, as outras entram por INSERT.
+- **Piso de peso**: abaixo de 0,60 de peso medido a função devolve NULL
+  em vez de um índice montado com dois parâmetros; os pesos são
+  renormalizados pelo que existe, senão faltar dado pareceria piora do
+  rio.
+- Guarda: `tests/agua-iqa.test.js` — regressão contra as 268 linhas com
+  IQA da série histórica, chamando a função DE VERDADE por RPC (uma
+  cópia em JS no teste seria o que a migration existe para impedir).
+  Erro mediano 0,695 (baseline do plano: 1,75). ⚠ A comparação usa ΔT
+  neutro de propósito: a série histórica foi calculada SEM o termo de
+  temperatura.
+- **Fases 1 a 5 pendentes** (migração das 450 coletas com quarentena,
+  telas de mesa, app de campo, `agua-mapa.html`, relatório por bacia) —
+  ver o plano. Quando a Fase 2 começar, `VERSOES` em `pwa/sw.js` ganha
+  a chave `agua`.
+
+⚠ Dois aprendizados desta entrega que valem para TODA função nova:
+`REVOKE ... FROM PUBLIC` não fecha nada no Supabase (o `ALTER DEFAULT
+PRIVILEGES` do projeto concede EXECUTE a `anon` por NOME — revogar do
+papel pelo nome), e toda função precisa nascer com `SET search_path =
+public`, senão o advisor de segurança acusa.
+
+## Próxima tarefa
+Módulo Qualidade da Água (IQA) — **Fase 1**, conforme
+`docs/qualidade-agua/plano.md` (a Fase 0 está entregue, migrations
+248–252; ler a seção "Fase 0 — ENTREGUE", que corrige quatro coisas que
+o plano supunha).
+
+Entregar: migração das 450 coletas de `docs/qualidade-agua/serie-
+historica.csv` para `agua_coletas`, com **quarentena em vez de
+descarte** (pH 16,36, OD de 27 mg/L, valores impossíveis vão para
+`status = 'quarentena'` com motivo, não para o lixo) e tela de
+conferência. Casar as linhas com o ponto certo por
+`agua_pontos_coleta.codigos_alias`. Preencher `agua_campanhas.periodo`
+com quem conhece o calendário de certificação.
+
+⚠ Antes de tudo: rodar `tests/agua-iqa.test.js` num ambiente com rede.
+A sessão que o escreveu não conseguiu executá-lo (saída bloqueada para
+Supabase e Vercel) — a regressão foi conferida por outro caminho, mas o
+arquivo em si nunca rodou.
+
+⚠ Ao ler o CSV, usar parser de CSV de verdade: 143 das 451 linhas têm
+campo entre aspas com vírgula dentro (a coordenada inteira num campo
+só; `"23,00"` em Temp Ar; `"0,050"` em FosforoTotal). `split(',')`
+desloca as colunas dessas linhas em silêncio.
 
 ⚠ A planilha original foi anexada num chat e **não existe mais no
 sistema de arquivos**. Tudo que era preciso dela está em
 `docs/qualidade-agua/` (série completa em CSV + curvas `q_i` em JSON) —
 não procurar o `.xlsx`.
+
+**Não decidir por algoritmo** a pendência dos sólidos em suspensão
+(mediana de 0,342 mg/L com turbidez mediana de 90 UNT — provável
+mistura de g/L com mg/L ao longo dos anos). Precisa de alguém da SEMA
+conferindo laudos antigos.
 
 Módulo A — Estrutura Organizacional SEMA-AC segue pendente (ver "A
 implementar", item A).
