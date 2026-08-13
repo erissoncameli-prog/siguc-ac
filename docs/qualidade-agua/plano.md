@@ -139,6 +139,103 @@ seguida de `get_advisors` (type security). Fase 0 não toca arquivos web,
 então **não precisa** subir versão em `pwa/sw.js` — isso começa na Fase
 2. Quando começar, `VERSOES` ganha a chave `agua`.
 
+## Fase 0 — ENTREGUE (migrations 248–252)
+
+O que ficou no banco: `agua_pontos_coleta`, `agua_campanhas`,
+`agua_coletas`, `agua_laboratorios` e `agua_limites_conama` (todas com
+RLS, módulo `agua` registrado em `modulos` como **inativo** até a Fase
+2 entregar a página); `agua_calcular_iqa()` + `agua_iqa_q()` +
+`agua_od_saturacao()` + `agua_iqa_faixa()` + `agua_conama_violacoes()`;
+`vw_agua_coletas_detalhe`; seed das estações e das campanhas; TRAT-018
+e TRAT-019 no ROPA. Guarda: `tests/agua-iqa.test.js`.
+
+### Quatro correções ao que este plano supunha
+
+1. **A série histórica foi calculada SEM o ΔT.** Descoberto ao
+   reproduzir o baseline: os 1,75 só batem com o ΔT no `q` neutro. Não
+   muda a decisão de adotar ΔT — muda o que se pode comparar com o quê.
+   A regressão compara com ΔT neutro (mesmo método da planilha) e mede
+   o efeito de ligar o termo à parte: **mediana 0,30 ponto**, máximo
+   8,33. A view marca `delta_temperatura_neutro` por linha.
+2. **São 17 estações, não 20.** Os outros três códigos são as próprias
+   grafias erradas que o achado 1 descreve (13433800 e 13488000 por
+   13438000; 1360100 por 13601000). Semear 20 criaria três estações
+   fantasmas. As grafias ficam em `agua_pontos_coleta.codigos_alias`,
+   para a Fase 1 casar as 450 linhas sem inventar ponto.
+3. **Santa Rosa do Purus está 279 km de Porto Walter, não ~400.** A
+   correção foi feita; a distância medida entre as duas posições é
+   279 km em linha reta. A coordenada nova é a **sede municipal**, um
+   localizador provisório — não a posição da estação, que ninguém
+   levantou. Está marcada como `coordenada_conferida = false`, junto
+   com as outras 16 (nenhuma foi conferida em campo).
+4. **A planilha traz vírgula decimal dentro de campo com aspas**
+   (`"23,00"` em Temp Ar, `"0,050"` em FosforoTotal) e a coordenada
+   inteira num campo só. São 143 linhas com aspas: quem for ler o CSV
+   na Fase 1 precisa de parser de CSV de verdade, não `split(',')`.
+
+### O refino das curvas
+
+Erro mediano contra as 268 linhas: **1,75 → 0,695**. Dentro de ±5:
+89% → 90,3%. Dentro de ±10: 99% → 99,25%. Correlação: 0,946 → 0,960.
+
+Método: ajuste dos valores `q` nos nós, coordenada a coordenada, com
+duas restrições — a forma da curva é preservada (monotonicidade por
+trecho) e **nenhum nó se afasta mais de 5 pontos** do valor
+digitalizado, para a curva continuar sendo a da CETESB e não uma
+regressão livre sobre a planilha. O ganho não é sobreajuste: em
+validação cruzada (metade treina, metade valida), o erro mediano fora
+da amostra cai de 1,72 para 1,21. A curva de ΔT **não se moveu** — a
+série nunca a exercitou, então não havia sinal para ajustar, o que
+serve de aferição de que o procedimento não inventa ajuste sem
+evidência.
+
+O erro máximo continua alto (25,0) e é o esperado: são as linhas com
+pH 16,36 e OD de 27 mg/L. Dado impossível não deve ser reproduzido com
+fidelidade — vai para quarentena na Fase 1.
+
+### Decisões novas, tomadas aqui
+
+- **Piso de peso.** Abaixo de 0,60 de peso medido, `agua_calcular_iqa`
+  devolve NULL em vez de um índice montado com dois parâmetros. A tela
+  mostra "sem índice"; um número seria pior que nenhum.
+- **Pesos renormalizados** pelo que existe. Sem isso, faltar parâmetro
+  puxaria o índice para baixo como se o rio tivesse piorado.
+- **Limites CONAMA em tabela** (`agua_limites_conama`), não em `CASE`:
+  só a Classe 2 está validada, e as outras entram por INSERT quando
+  alguém conferir a resolução. Classe sem limite cadastrado devolve
+  NULL — que não é o mesmo que "conforme", e a tela não pode confundir
+  os dois.
+- **Saturação de OD derivada**, nunca gravada. A coluna "OD (%)" da
+  planilha bate com o valor derivado (diferença mediana de 1,03 ponto
+  percentual), então ela também era derivada.
+
+### Aprendizados de infraestrutura que valem para o projeto todo
+
+- `REVOKE ... FROM PUBLIC` **não fecha função nenhuma** no Supabase: o
+  `ALTER DEFAULT PRIVILEGES` do projeto concede EXECUTE a `anon` por
+  NOME em toda função nova do schema `public`. Tem que revogar do papel
+  pelo nome. Pego no `proacl` depois de aplicar a 249, corrigido na 252.
+- O advisor reclamou de `search_path` mutável nas cinco funções novas.
+  Toda função deste projeto precisa nascer com `SET search_path =
+  public` (corrigido na 252 e no arquivo da 249).
+
+### O que a Fase 0 deixou em aberto (além do que já estava)
+
+- **Bacia do Rio Iquiri** (Senador Guiomard) ficou NULA: "Iquiri"
+  aparece na planilha também como grafia errada do Iaco e do Abunã, e o
+  nome não basta para decidir. Campo editável na Fase 2.
+- **Altitude de Porto Walter** aparece como 201 m e 192 m para a mesma
+  coordenada; adotado 192 m (o das linhas mais recentes).
+- **RIPD de geolocalização** (migration 217) precisa citar TRAT-018 na
+  próxima revisão — mesmo mecanismo da pendência já registrada na 220.
+- `tests/agua-iqa.test.js` **não foi executado** na sessão que o
+  escreveu: o ambiente bloqueia a saída para o Supabase e para a
+  Vercel. A regressão que ele afirma foi conferida rodando as mesmas
+  268 linhas contra a função em produção por outro caminho, e o parser
+  do teste foi conferido linha a linha contra a leitura de referência.
+  Rodar o arquivo de fato, num ambiente com rede, é o primeiro passo da
+  Fase 1.
+
 ## Fases seguintes (resumo)
 
 | Fase | Entrega | Depende de |
