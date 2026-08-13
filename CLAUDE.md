@@ -1224,15 +1224,35 @@ public`, senão o advisor de segurança acusa.
 
 ## Próxima tarefa
 Módulo Qualidade da Água (IQA) — **Fase 2**, conforme
-`docs/qualidade-agua/plano.md` ("Fases seguintes"). Fases 0 e 1 estão
-entregues e em produção (migrations 248–253, todas aplicadas): cadastro,
-IQA, CONAMA, e as 450 coletas históricas importadas (111 completas,
-339 em quarentena, tela de conferência em
-`pages/agua-conferencia.html`). Fase 2 é a mesa: cadastro de pontos/
-laboratórios com CRUD de verdade (hoje só existe seed), lançamento de
-laudo com PDF anexado (bucket privado, `js/fotos-privadas.js`), fila de
-"aguardando laudo". Ativar o módulo (`modulos.agua.ativo = true`) faz
-parte desta entrega — é o que dá sentido a ter uma página de fato.
+`docs/qualidade-agua/plano.md`, seção **"Fase 2 — escopo desta
+entrega"** (logo depois de "Fase 1 — ENTREGUE"), que já tem os 6
+passos e dois achados de conferência antes de ativar o módulo. Fases
+0 e 1 estão entregues e em produção (migrations 248–253, todas
+aplicadas): cadastro, IQA, CONAMA, e as 450 coletas históricas
+importadas (111 completas, 339 em quarentena, tela de conferência em
+`pages/agua-conferencia.html`).
+
+Resumo: cadastro de pontos (`pages/agua-pontos.html` — rota já
+registrada no catálogo, só falta a página) e de laboratórios,
+lançamento de laudo com PDF anexado num bucket novo (`agua-laudos`,
+privado — reaproveitar `js/fotos-privadas.js`), fila de "aguardando
+laudo". **Ativar o módulo por último**
+(`UPDATE modulos SET ativo = true WHERE chave = 'agua'`), depois que
+a página existir — esse UPDATE também destrava
+`pages/agua-conferencia.html` (Fase 1) para todo mundo além de
+`super_admin`, então as duas telas passam a valer juntas.
+
+⚠ **Antes de ativar o módulo, confirmar se `biologo` precisa de
+permissão.** `grupo_permissoes_padrao` para o grupo `'Gestão'` (o
+grupo do módulo `agua`) não tem linha para o perfil `biologo` — cai em
+`sem_acesso`. Se for esse o perfil típico de quem mede água na SEMA
+(mais provável que `tecnico`), ativar o módulo sozinho não resolve
+nada para essa pessoa. Ver o achado completo no plano.
+
+⚠ **Não reinventar a numeração da próxima migration.** A Fase 1
+consumiu a 253 numa branch paralela a esta — rodar
+`mcp__Supabase__list_migrations` antes de escrever a próxima, nunca
+assumir o número pelo que está no repositório local.
 
 **Sólidos em suspensão continua pendência de conferência humana**
 (mediana de 0,342 mg/L com turbidez mediana de 90 UNT — provável
