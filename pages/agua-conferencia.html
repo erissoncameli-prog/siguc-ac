@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>SIGUC-AC · Qualidade da Água — Conferência de Quarentena</title>
+<link rel="stylesheet" href="../css/global.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../js/observability.js"></script>
+<script src="../js/queryLogger.js"></script>
+<script src="../js/config.js"></script>
+<script src="../js/layout.js"></script>
+</head>
+<body>
+<div id="app"></div>
+
+<!-- Modal de conferência -->
+<div class="modal-overlay" id="modal-ag">
+  <div class="modal" style="max-width:680px">
+    <div class="modal-header">
+      <div class="modal-title">Conferir coleta — linha <span id="ag-linha"></span> da planilha</div>
+      <button class="modal-close" onclick="fecharModalAg()">×</button>
+    </div>
+    <div class="modal-body">
+      <div id="ag-motivo" style="background:#FEF3C7;border:1px solid #FDE68A;border-radius:8px;padding:10px 12px;font-size:13px;color:#92400E;margin-bottom:16px;white-space:pre-wrap"></div>
+      <div style="font-size:12px;color:#6B7280;margin-bottom:12px" id="ag-contexto"></div>
+
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Data da coleta</label>
+          <input class="form-control" id="ag-data" type="date"></div>
+        <div class="form-group"><label class="form-label">Hora</label>
+          <input class="form-control" id="ag-hora" type="time"></div>
+      </div>
+
+      <div class="form-section-label" style="margin-top:8px">Campo</div>
+      <div class="grid-3" id="ag-campo"></div>
+
+      <div class="form-section-label" style="margin-top:16px">Laboratório</div>
+      <div class="grid-3" id="ag-lab"></div>
+
+      <div class="form-group" style="margin-top:12px"><label class="form-label">Observações desta conferência</label>
+        <textarea class="form-control" id="ag-observacoes" rows="2" placeholder="Ex.: conferido com o laudo físico — valor confere, mantido em quarentena por unidade divergente."></textarea></div>
+    </div>
+    <div class="modal-footer" style="justify-content:space-between">
+      <button class="btn btn-secondary" onclick="salvarAg(false)" id="btn-manter">Salvar e manter em quarentena</button>
+      <button class="btn btn-primary" onclick="salvarAg(true)" id="btn-promover">Corrigido — promover a completo</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Qualidade da Água · tela de conferência de quarentena ──────
+// Fase 1 do plano em docs/qualidade-agua/plano.md, decisão 7 do
+// escopo. Lista as coletas que a migration 253 pôs em quarentena
+// (valor impossível ou sólidos em suspensão com unidade suspeita) e
+// deixa um técnico decidir, com o laudo físico em mãos: corrigir e
+// promover a `completo`, ou manter quarentenada com justificativa.
+// Sem tela, quarentena vira gaveta sem fundo.
+//
+// Simples de propósito — a mesa completa (cadastro de pontos/labs,
+// lançamento de laudo) é a Fase 2. Acesso via pode_editar('agua'):
+// enquanto o módulo estiver inativo no catálogo (`modulos.agua`),
+// isso só resolve para super_admin (ver cabeçalho da migration 248).
+
+const CAMPO_FIELDS = [
+  ['temp_ar', 'Temp. ar (°C)'], ['temp_amostra', 'Temp. amostra (°C)'],
+  ['ph', 'pH'], ['od', 'OD (mg/L)'],
+  ['turbidez', 'Turbidez (UNT)'], ['condutividade_eletrica', 'Condutividade (µS/cm)'],
+]
+const LAB_FIELDS = [
+  ['dbo', 'DBO (mg/L)'], ['nitrogenio_total', 'Nitrogênio total'], ['nitrogenio_amoniacal', 'Nitrogênio amoniacal'],
+  ['nitratos', 'Nitratos'], ['fosforo_total', 'Fósforo total'], ['ortofosfato_dissolvido', 'Ortofosfato dissolvido'],
+  ['solidos_dissolvidos_totais', 'Sólidos dissolvidos totais'], ['solidos_suspensao_totais', 'Sólidos em suspensão totais'],
+  ['coliformes_termotolerantes', 'Coliformes termotolerantes'], ['coliformes_totais', 'Coliformes totais'],
+  ['escherichia_coli', 'Escherichia coli'], ['alcalinidade_total', 'Alcalinidade total'],
+  ['carbono_organico_total', 'Carbono orgânico total'], ['cloreto', 'Cloreto'],
+  ['condutividade_especifica', 'Condutividade específica'], ['descarga_liquida', 'Descarga líquida'],
+]
+
+let _coletas = [], _editandoId = null
+
+;(async function () {
+  const usuario = await carregarUsuario()
+  if (!usuario) { window.location.href = '../index.html'; return }
+
+  const { data: nivel } = await db.rpc('nivel_efetivo', { p_usuario: usuario.id, p_modulo_chave: 'agua' })
+  if (nivel !== 'editar') {
+    document.body.innerHTML = '<div style="padding:60px;text-align:center;font-family:\'DM Sans\',sans-serif;color:#6B7280">Sem acesso à conferência de Qualidade da Água.</div>'
+    return
+  }
+
+  document.getElementById('app').innerHTML =
+    gerarLayout('Qualidade da Água — Conferência', 'agua-conferencia') +
+    `<div class="fade-in">
+      <p style="color:#6B7280;font-size:13px;margin:0 0 16px">
+        Coletas da série histórica que caíram em quarentena na importação (migration 253) — valor fisicamente
+        impossível ou sólidos em suspensão com unidade sob suspeita. Conferir com o laudo físico da linha indicada
+        e decidir: corrigir e promover, ou manter quarentenada com justificativa.
+      </p>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+        <input class="form-control" id="ag-filtro" placeholder="Filtrar por ponto, código ANA ou nº da linha..." style="max-width:340px" oninput="renderLista()">
+        <span id="ag-contador" style="font-size:12px;color:#6B7280"></span>
+      </div>
+      <div class="card"><div class="table-wrap"><div class="table-scroll">
+        <table>
+          <thead><tr><th>Linha</th><th>Ponto</th><th>Campanha</th><th>Data</th><th>Motivo</th><th>Ações</th></tr></thead>
+          <tbody id="tbody-ag"><tr><td colspan="6" style="text-align:center;padding:24px;color:#9CA3AF">Carregando...</td></tr></tbody>
+        </table>
+      </div></div></div>
+    </div>` +
+    '</div></div></div>'
+
+  carregarLogosSidebar()
+  await carregarLista()
+})()
+
+async function carregarLista() {
+  const { data, error } = await db.from('agua_coletas')
+    .select('*, agua_pontos_coleta(nome,codigo_ana), agua_campanhas(ano,ordem)')
+    .eq('status', 'quarentena')
+    .order('linha_origem_planilha')
+  if (error) { toast(error.message || 'Erro ao carregar', 'error'); return }
+  _coletas = data || []
+  renderLista()
+}
+
+function renderLista() {
+  const termo = (document.getElementById('ag-filtro')?.value || '').trim().toLowerCase()
+  const tbody = document.getElementById('tbody-ag')
+  const lista = _coletas.filter(c => {
+    if (!termo) return true
+    return String(c.linha_origem_planilha).includes(termo)
+      || (c.agua_pontos_coleta?.nome || '').toLowerCase().includes(termo)
+      || (c.agua_pontos_coleta?.codigo_ana || '').includes(termo)
+  })
+  document.getElementById('ag-contador').textContent = `${lista.length} de ${_coletas.length} em quarentena`
+  if (!lista.length) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:24px;color:#9CA3AF">Nenhuma coleta em quarentena</td></tr>'; return }
+  tbody.innerHTML = lista.map(c => `
+    <tr>
+      <td class="mono">${esc(c.linha_origem_planilha ?? '—')}</td>
+      <td>${esc(c.agua_pontos_coleta?.nome || '—')} <span style="color:#9CA3AF;font-size:11px">(${esc(c.agua_pontos_coleta?.codigo_ana || '')})</span></td>
+      <td style="font-size:12px">${esc(c.agua_campanhas?.ano ?? '')}/${c.agua_campanhas?.ordem === 'segunda' ? '2ª' : '1ª'}</td>
+      <td style="font-size:12px">${formatData(c.data_coleta)}</td>
+      <td style="font-size:12px;max-width:360px;white-space:normal">${esc((c.quarentena_motivo || '').slice(0, 140))}${(c.quarentena_motivo || '').length > 140 ? '…' : ''}</td>
+      <td><button class="btn btn-xs btn-ghost" onclick="abrirAg('${c.id}')">Conferir</button></td>
+    </tr>`).join('')
+}
+
+function formatData(str) {
+  if (!str) return '—'
+  return new Date(str + 'T00:00:00').toLocaleDateString('pt-BR')
+}
+
+function abrirAg(id) {
+  _editandoId = id
+  const c = _coletas.find(x => x.id === id)
+  if (!c) return
+  document.getElementById('ag-linha').textContent = c.linha_origem_planilha ?? '—'
+  document.getElementById('ag-motivo').textContent = c.quarentena_motivo || '—'
+  document.getElementById('ag-contexto').textContent =
+    `${c.agua_pontos_coleta?.nome || ''} (${c.agua_pontos_coleta?.codigo_ana || ''}) · campanha ${c.agua_campanhas?.ano ?? ''}/${c.agua_campanhas?.ordem === 'segunda' ? '2ª' : '1ª'}`
+  document.getElementById('ag-data').value = c.data_coleta || ''
+  document.getElementById('ag-hora').value = c.hora_coleta ? c.hora_coleta.slice(0, 5) : ''
+  document.getElementById('ag-observacoes').value = c.observacoes || ''
+
+  document.getElementById('ag-campo').innerHTML = CAMPO_FIELDS.map(([campo, rotulo]) => `
+    <div class="form-group"><label class="form-label">${esc(rotulo)}</label>
+      <input class="form-control" id="ag-f-${campo}" type="number" step="any" value="${c[campo] ?? ''}"></div>`).join('')
+  document.getElementById('ag-lab').innerHTML = LAB_FIELDS.map(([campo, rotulo]) => `
+    <div class="form-group"><label class="form-label">${esc(rotulo)}</label>
+      <input class="form-control" id="ag-f-${campo}" type="number" step="any" value="${c[campo] ?? ''}"></div>`).join('')
+
+  document.getElementById('modal-ag').classList.add('aberto')
+}
+
+function fecharModalAg() {
+  document.getElementById('modal-ag').classList.remove('aberto')
+  _editandoId = null
+}
+
+function valorCampo(campo) {
+  const v = document.getElementById(`ag-f-${campo}`).value
+  return v === '' ? null : parseFloat(v)
+}
+
+async function salvarAg(promover) {
+  if (!_editandoId) return
+  const payload = { observacoes: document.getElementById('ag-observacoes').value.trim() || null }
+  const dataColeta = document.getElementById('ag-data').value
+  if (dataColeta) payload.data_coleta = dataColeta
+  payload.hora_coleta = document.getElementById('ag-hora').value || null
+  for (const [campo] of [...CAMPO_FIELDS, ...LAB_FIELDS]) payload[campo] = valorCampo(campo)
+
+  if (promover) {
+    payload.status = 'completo'
+    payload.quarentena_motivo = null
+  }
+
+  const btn = document.getElementById(promover ? 'btn-promover' : 'btn-manter')
+  btn.disabled = true
+  try {
+    const { error } = await db.from('agua_coletas').update(payload).eq('id', _editandoId)
+    if (error) throw error
+    toast(promover ? 'Coleta promovida a completo!' : 'Conferência salva — mantida em quarentena.', 'success')
+    fecharModalAg()
+    await carregarLista()
+  } catch (e) { toast(e.message || 'Erro ao salvar', 'error') }
+  finally { btn.disabled = false }
+}
+</script>
+</body>
+</html>

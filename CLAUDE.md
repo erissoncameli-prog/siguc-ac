@@ -1192,10 +1192,29 @@ e `agua_conama_violacoes`.
   Erro mediano 0,695 (baseline do plano: 1,75). ⚠ A comparação usa ΔT
   neutro de propósito: a série histórica foi calculada SEM o termo de
   temperatura.
-- **Fases 1 a 5 pendentes** (migração das 450 coletas com quarentena,
-  telas de mesa, app de campo, `agua-mapa.html`, relatório por bacia) —
-  ver o plano. Quando a Fase 2 começar, `VERSOES` em `pwa/sw.js` ganha
-  a chave `agua`.
+- **Fase 1 ENTREGUE (migration 253)**: as 450 coletas de
+  `docs/qualidade-agua/serie-historica.csv` estão em `agua_coletas` —
+  **111 `completo`, 339 `quarentena`**. Ponto casado por
+  `codigos_alias`, campanha por `ano+ordem`, os dois com `DO $$` de
+  sanity ANTES do insert (falha alto se alguma linha não casar, em vez
+  de um `INNER JOIN` descartar em silêncio). Quarentena por pH fora de
+  0–14, OD >150% da saturação (`agua_od_saturacao`), sólidos em
+  suspensão preenchidos (339 linhas — o critério que domina, de
+  propósito, é a pendência de unidade ainda sem resolver) e um achado
+  desta entrega: linha 271 com o ano da campanha (2022) e a data da
+  coleta (2026) divergindo por mais de 1 ano (1 dígito trocado, não
+  campanha nova) — quarentena, sem corrigir por suposição. Censurado
+  (`<1`) vai para `censurados` (bruto) + metade do limite na coluna
+  numérica. IQA da planilha NÃO foi gravado. Bloco de import gerado por
+  `scripts/agua_gerar_migration_serie_historica.py` (csv.reader de
+  verdade, guardado no repo para reexecutar se o CSV mudar). Tela de
+  conferência: `pages/agua-conferencia.html` (lista quarentena, edita
+  campo a campo, promove a `completo` ou mantém com observação — sem
+  RPC nova, grava direto via `pode_editar('agua')`). Detalhe completo
+  em `docs/qualidade-agua/plano.md`, seção "Fase 1 — ENTREGUE".
+- **Fases 2 a 5 pendentes** (telas de mesa, app de campo,
+  `agua-mapa.html`, relatório por bacia) — ver o plano. Quando a Fase 2
+  começar, `VERSOES` em `pwa/sw.js` ganha a chave `agua`.
 
 ⚠ Dois aprendizados desta entrega que valem para TODA função nova:
 `REVOKE ... FROM PUBLIC` não fecha nada no Supabase (o `ALTER DEFAULT
@@ -1204,38 +1223,22 @@ papel pelo nome), e toda função precisa nascer com `SET search_path =
 public`, senão o advisor de segurança acusa.
 
 ## Próxima tarefa
-Módulo Qualidade da Água (IQA) — **Fase 1**, conforme
-`docs/qualidade-agua/plano.md` (a Fase 0 está entregue, migrations
-248–252; ler a seção "Fase 0 — ENTREGUE", que corrige quatro coisas que
-o plano supunha).
+Módulo Qualidade da Água (IQA) — **Fase 2**, conforme
+`docs/qualidade-agua/plano.md` ("Fases seguintes"). Fases 0 e 1 estão
+entregues e em produção (migrations 248–253, todas aplicadas): cadastro,
+IQA, CONAMA, e as 450 coletas históricas importadas (111 completas,
+339 em quarentena, tela de conferência em
+`pages/agua-conferencia.html`). Fase 2 é a mesa: cadastro de pontos/
+laboratórios com CRUD de verdade (hoje só existe seed), lançamento de
+laudo com PDF anexado (bucket privado, `js/fotos-privadas.js`), fila de
+"aguardando laudo". Ativar o módulo (`modulos.agua.ativo = true`) faz
+parte desta entrega — é o que dá sentido a ter uma página de fato.
 
-Entregar: migração das 450 coletas de `docs/qualidade-agua/serie-
-historica.csv` para `agua_coletas`, com **quarentena em vez de
-descarte** (pH 16,36, OD de 27 mg/L, valores impossíveis vão para
-`status = 'quarentena'` com motivo, não para o lixo) e tela de
-conferência. Casar as linhas com o ponto certo por
-`agua_pontos_coleta.codigos_alias`. Preencher `agua_campanhas.periodo`
-com quem conhece o calendário de certificação.
-
-⚠ Antes de tudo: rodar `tests/agua-iqa.test.js` num ambiente com rede.
-A sessão que o escreveu não conseguiu executá-lo (saída bloqueada para
-Supabase e Vercel) — a regressão foi conferida por outro caminho, mas o
-arquivo em si nunca rodou.
-
-⚠ Ao ler o CSV, usar parser de CSV de verdade: 143 das 451 linhas têm
-campo entre aspas com vírgula dentro (a coordenada inteira num campo
-só; `"23,00"` em Temp Ar; `"0,050"` em FosforoTotal). `split(',')`
-desloca as colunas dessas linhas em silêncio.
-
-⚠ A planilha original foi anexada num chat e **não existe mais no
-sistema de arquivos**. Tudo que era preciso dela está em
-`docs/qualidade-agua/` (série completa em CSV + curvas `q_i` em JSON) —
-não procurar o `.xlsx`.
-
-**Não decidir por algoritmo** a pendência dos sólidos em suspensão
+**Sólidos em suspensão continua pendência de conferência humana**
 (mediana de 0,342 mg/L com turbidez mediana de 90 UNT — provável
-mistura de g/L com mg/L ao longo dos anos). Precisa de alguém da SEMA
-conferindo laudos antigos.
+mistura de g/L com mg/L ao longo dos anos): as 339 linhas quarentenadas
+por isso esperam alguém da SEMA com o laudo físico, usando a tela de
+`pages/agua-conferencia.html`. Não é tarefa de código.
 
 Módulo A — Estrutura Organizacional SEMA-AC segue pendente (ver "A
 implementar", item A).
