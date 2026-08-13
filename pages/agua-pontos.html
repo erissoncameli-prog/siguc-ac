@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>SIGUC-AC · Qualidade da Água — Pontos e Laboratórios</title>
+<link rel="stylesheet" href="../css/global.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="../js/observability.js"></script>
+<script src="../js/queryLogger.js"></script>
+<script src="../js/config.js"></script>
+<script src="../js/layout.js"></script>
+<script src="../js/mapa-recorte.js"></script>
+</head>
+<body>
+<div id="app"></div>
+
+<!-- Modal Ponto de coleta -->
+<div class="modal-overlay" id="modal-ponto">
+  <div class="modal" style="max-width:680px">
+    <div class="modal-header">
+      <div class="modal-title" id="mp-titulo">Novo Ponto de Coleta</div>
+      <button class="modal-close" onclick="fecharModal('ponto')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Código ANA <span class="obrig">*</span></label>
+          <input class="form-control mono" id="p-codigo" placeholder="13438000" maxlength="10"></div>
+        <div class="form-group"><label class="form-label">Nome <span class="obrig">*</span></label>
+          <input class="form-control" id="p-nome" placeholder="Ex.: Assis Brasil"></div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Município <span class="obrig">*</span></label>
+          <input class="form-control" id="p-municipio" placeholder="Ex.: Assis Brasil"></div>
+        <div class="form-group"><label class="form-label">Rio <span class="obrig">*</span></label>
+          <input class="form-control" id="p-rio" placeholder="Ex.: Rio Acre"></div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Bacia hidrográfica</label>
+          <input class="form-control" id="p-bacia" placeholder="Ex.: Purus — deixe em branco se não houver certeza"></div>
+        <div class="form-group"><label class="form-label">Classe de enquadramento</label>
+          <select class="form-control" id="p-classe">
+            <option value="especial">Especial</option>
+            <option value="classe_1">Classe 1</option>
+            <option value="classe_2" selected>Classe 2</option>
+            <option value="classe_3">Classe 3</option>
+            <option value="classe_4">Classe 4</option>
+          </select></div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Altitude (m)</label>
+          <input class="form-control" id="p-altitude" type="number" step="0.1"></div>
+        <div class="form-group"><label class="form-label">UC relacionada</label>
+          <select class="form-control" id="p-uc"><option value="">Nenhuma / fora de UC</option></select></div>
+      </div>
+
+      <div class="form-section-label">Coordenada — clique no mapa ou arraste o marcador</div>
+      <div id="pt-mapa-wrap" style="height:240px;border-radius:8px;overflow:hidden;border:1px solid var(--borda);margin-bottom:12px"></div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Latitude <span class="obrig">*</span></label>
+          <input class="form-control mono" id="p-lat" type="number" step="0.000001" onchange="_ptCampoManual()"></div>
+        <div class="form-group"><label class="form-label">Longitude <span class="obrig">*</span></label>
+          <input class="form-control mono" id="p-lng" type="number" step="0.000001" onchange="_ptCampoManual()"></div>
+      </div>
+      <div class="form-group">
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+          <input type="checkbox" id="p-coord-conferida" style="width:auto"> Coordenada conferida em campo
+        </label>
+      </div>
+      <div class="form-group"><label class="form-label">Observação sobre a coordenada</label>
+        <textarea class="form-control" id="p-coord-obs" rows="2" placeholder="Ex.: conferida por GPS em campo em 20/08/2026"></textarea></div>
+
+      <div class="form-group"><label class="form-label">Observações gerais</label>
+        <textarea class="form-control" id="p-obs" rows="2"></textarea></div>
+      <div class="form-group">
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+          <input type="checkbox" id="p-ativo" checked style="width:auto"> Ativo
+        </label>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="fecharModal('ponto')">Cancelar</button>
+      <button class="btn btn-primary" id="btn-salvar-ponto" onclick="salvarPonto()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Laboratório -->
+<div class="modal-overlay" id="modal-lab">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-header">
+      <div class="modal-title" id="ml-titulo">Novo Laboratório</div>
+      <button class="modal-close" onclick="fecharModal('lab')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label">Nome <span class="obrig">*</span></label>
+        <input class="form-control" id="l-nome" placeholder="Ex.: Laboratório Ambiental XYZ"></div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">CNPJ</label>
+          <input class="form-control mono" id="l-cnpj" placeholder="Só números" maxlength="14"></div>
+        <div class="form-group"><label class="form-label">Acreditação (ISO/IEC 17025)</label>
+          <input class="form-control" id="l-acreditacao" placeholder="Nº da acreditação, se houver"></div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Responsável técnico</label>
+          <input class="form-control" id="l-responsavel" placeholder="Nome"></div>
+        <div class="form-group"><label class="form-label">Registro em conselho</label>
+          <input class="form-control" id="l-registro" placeholder="CRQ/CRBio..."></div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">E-mail</label>
+          <input class="form-control" id="l-email" type="email"></div>
+        <div class="form-group"><label class="form-label">Telefone</label>
+          <input class="form-control" id="l-telefone"></div>
+      </div>
+      <div class="form-group"><label class="form-label">Observações</label>
+        <textarea class="form-control" id="l-obs" rows="2"></textarea></div>
+      <div class="form-group">
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+          <input type="checkbox" id="l-ativo" checked style="width:auto"> Ativo
+        </label>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="fecharModal('lab')">Cancelar</button>
+      <button class="btn btn-primary" id="btn-salvar-lab" onclick="salvarLab()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Qualidade da Água · mesa: pontos de coleta e laboratórios ──
+// Fase 2 do plano em docs/qualidade-agua/plano.md. CRUD de verdade
+// sobre agua_pontos_coleta e agua_laboratorios — a Fase 0/1 só tinham
+// seed e conferência de quarentena, sem tela para editar ou cadastrar
+// um 18º ponto.
+//
+// PONTO NO MAPA NA HORA DE SALVAR: a Fase 0 corrigiu, sem tela, uma
+// coordenada trocada (Santa Rosa do Purus gravada 279 km longe, na
+// posição de Porto Walter) que só ficou visível olhando o mapa. Este
+// formulário mostra o marcador desde a abertura para que esse tipo de
+// erro apareça ANTES de salvar, não numa auditoria posterior.
+//
+// classe_enquadramento e demais campos seguem o schema da migration
+// 248; nada de RPC nova — pode_editar('agua') já autoriza escrita
+// direta (mesma base de pages/agua-conferencia.html).
+
+let _pontos = [], _labs = [], _ucs = []
+let _editandoPontoId = null, _editandoLabId = null
+let _podeEditar = false
+let _ptMap = null, _ptMarker = null, _ptMovidoManualmente = false
+
+const CLASSE_LABEL = { especial: 'Especial', classe_1: 'Classe 1', classe_2: 'Classe 2', classe_3: 'Classe 3', classe_4: 'Classe 4' }
+const ACRE_CENTRO = [-9.5, -70.0]
+
+;(async function () {
+  const usuario = await carregarUsuario()
+  if (!usuario) { window.location.href = '../index.html'; return }
+
+  const { data: nivel } = await db.rpc('nivel_efetivo', { p_usuario: usuario.id, p_modulo_chave: 'agua' })
+  if (!nivel || nivel === 'sem_acesso') {
+    document.body.innerHTML = '<div style="padding:60px;text-align:center;font-family:\'DM Sans\',sans-serif;color:#6B7280">Você não tem acesso ao módulo Qualidade da Água.</div>'
+    return
+  }
+  _podeEditar = nivel === 'editar'
+
+  document.getElementById('app').innerHTML =
+    gerarLayout('Qualidade da Água — Pontos e Laboratórios', 'agua-pontos') +
+    `<div class="fade-in">
+      <div class="card" style="margin-bottom:16px">
+        <div style="display:flex;gap:4px;padding:4px;background:rgba(0,0,0,.06);border-radius:10px;width:fit-content">
+          <button class="tab-btn ativo" id="tab-pontos" onclick="mudarAbaAgua('pontos')">Pontos de coleta</button>
+          <button class="tab-btn" id="tab-labs" onclick="mudarAbaAgua('labs')">Laboratórios</button>
+        </div>
+      </div>
+
+      <div id="aba-pontos">
+        <div class="filter-bar">
+          <input class="form-control search-input" id="busca-pontos" placeholder="Buscar código, nome, rio..." oninput="renderPontos()">
+          ${_podeEditar ? `<button class="btn btn-primary" onclick="abrirPonto(null)">${bico('plus')} Novo Ponto</button>` : ''}
+        </div>
+        <div class="card"><div class="table-wrap"><div class="table-scroll">
+          <table>
+            <thead><tr><th>Código ANA</th><th>Ponto</th><th>Rio</th><th>Bacia</th><th>Classe</th><th>Coordenada</th><th>Status</th><th>Ações</th></tr></thead>
+            <tbody id="tbody-pontos"><tr><td colspan="8" style="text-align:center;padding:24px;color:#9CA3AF">Carregando...</td></tr></tbody>
+          </table>
+        </div></div></div>
+      </div>
+
+      <div id="aba-labs" style="display:none">
+        <div class="filter-bar">
+          <input class="form-control search-input" id="busca-labs" placeholder="Buscar laboratório..." oninput="renderLabs()">
+          ${_podeEditar ? `<button class="btn btn-primary" onclick="abrirLab(null)">${bico('plus')} Novo Laboratório</button>` : ''}
+        </div>
+        <div class="card"><div class="table-wrap"><div class="table-scroll">
+          <table>
+            <thead><tr><th>Nome</th><th>CNPJ</th><th>Responsável técnico</th><th>Contato</th><th>Status</th><th>Ações</th></tr></thead>
+            <tbody id="tbody-labs"><tr><td colspan="6" style="text-align:center;padding:24px;color:#9CA3AF">Carregando...</td></tr></tbody>
+          </table>
+        </div></div></div>
+      </div>
+    </div>` +
+    '</div></div></div>'
+
+  carregarLogosSidebar()
+  bIconsAplicar()
+  await Promise.all([carregarUCs(), carregarPontos(), carregarLabs()])
+})()
+
+function mudarAbaAgua(aba) {
+  document.getElementById('aba-pontos').style.display = aba === 'pontos' ? '' : 'none'
+  document.getElementById('aba-labs').style.display   = aba === 'labs'   ? '' : 'none'
+  document.getElementById('tab-pontos').classList.toggle('ativo', aba === 'pontos')
+  document.getElementById('tab-labs').classList.toggle('ativo', aba === 'labs')
+}
+
+// ── Cargas ────────────────────────────────────────────────────
+async function carregarUCs() {
+  const { data } = await db.from('unidades_conservacao').select('id,nome').order('nome')
+  _ucs = data || []
+  const sel = document.getElementById('p-uc')
+  if (sel) sel.innerHTML = '<option value="">Nenhuma / fora de UC</option>' + _ucs.map(u => `<option value="${u.id}">${esc(u.nome)}</option>`).join('')
+}
+
+async function carregarPontos() {
+  const { data, error } = await db.from('agua_pontos_coleta').select('*').order('nome')
+  if (error) { toast(error.message || 'Erro ao carregar pontos', 'error'); return }
+  _pontos = data || []
+  renderPontos()
+}
+
+function renderPontos() {
+  const termo = (document.getElementById('busca-pontos')?.value || '').trim().toLowerCase()
+  const tbody = document.getElementById('tbody-pontos')
+  const lista = _pontos.filter(p => !termo
+    || p.codigo_ana.includes(termo)
+    || p.nome.toLowerCase().includes(termo)
+    || p.rio.toLowerCase().includes(termo)
+    || p.municipio.toLowerCase().includes(termo))
+  if (!lista.length) { tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:24px;color:#9CA3AF">Nenhum ponto encontrado</td></tr>'; return }
+  tbody.innerHTML = lista.map(p => `
+    <tr>
+      <td class="mono">${esc(p.codigo_ana)}</td>
+      <td>${esc(p.nome)} <span style="color:#9CA3AF;font-size:11px">(${esc(p.municipio)})</span></td>
+      <td style="font-size:12px">${esc(p.rio)}</td>
+      <td style="font-size:12px">${esc(p.bacia || '—')}</td>
+      <td><span class="badge badge-blue">${CLASSE_LABEL[p.classe_enquadramento] || p.classe_enquadramento}</span></td>
+      <td><span class="badge ${p.coordenada_conferida ? 'badge-verde' : 'badge-ouro badge-outline'}">${p.coordenada_conferida ? 'Conferida' : 'Não conferida'}</span></td>
+      <td><span class="badge ${p.ativo ? 'badge-verde' : 'badge-cinza'}">${p.ativo ? 'Ativo' : 'Inativo'}</span></td>
+      <td>${_podeEditar ? `<button class="btn btn-xs btn-ghost" onclick="abrirPonto('${p.id}')">Editar</button>` : '—'}</td>
+    </tr>`).join('')
+}
+
+async function carregarLabs() {
+  const { data, error } = await db.from('agua_laboratorios').select('*').order('nome')
+  if (error) { toast(error.message || 'Erro ao carregar laboratórios', 'error'); return }
+  _labs = data || []
+  renderLabs()
+}
+
+function renderLabs() {
+  const termo = (document.getElementById('busca-labs')?.value || '').trim().toLowerCase()
+  const tbody = document.getElementById('tbody-labs')
+  const lista = _labs.filter(l => !termo || l.nome.toLowerCase().includes(termo))
+  if (!lista.length) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:24px;color:#9CA3AF">Nenhum laboratório cadastrado</td></tr>'; return }
+  tbody.innerHTML = lista.map(l => `
+    <tr>
+      <td>${esc(l.nome)}</td>
+      <td class="mono" style="font-size:12px">${esc(l.cnpj || '—')}</td>
+      <td style="font-size:12px">${esc(l.responsavel_tecnico || '—')}</td>
+      <td style="font-size:12px">${esc(l.email || l.telefone || '—')}</td>
+      <td><span class="badge ${l.ativo ? 'badge-verde' : 'badge-cinza'}">${l.ativo ? 'Ativo' : 'Inativo'}</span></td>
+      <td>${_podeEditar ? `<button class="btn btn-xs btn-ghost" onclick="abrirLab('${l.id}')">Editar</button>` : '—'}</td>
+    </tr>`).join('')
+}
+
+// ── Mapa do ponto ────────────────────────────────────────────
+function _ptInicializarMapa() {
+  if (_ptMap) return
+  _ptMap = L.map('pt-mapa-wrap', { attributionControl: false }).setView(ACRE_CENTRO, 6)
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 18, attribution: '© OpenStreetMap'
+  }).addTo(_ptMap)
+  _ptMarker = L.marker(ACRE_CENTRO, { draggable: true }).addTo(_ptMap)
+  _ptMarker.on('dragend', () => _ptAtualizarCamposDoMarcador())
+  _ptMap.on('click', e => { _ptMarker.setLatLng(e.latlng); _ptAtualizarCamposDoMarcador() })
+}
+
+function _ptAtualizarCamposDoMarcador() {
+  const ll = _ptMarker.getLatLng()
+  document.getElementById('p-lat').value = ll.lat.toFixed(6)
+  document.getElementById('p-lng').value = ll.lng.toFixed(6)
+}
+
+// Usuário digitou lat/lng na mão — move o marcador para acompanhar.
+function _ptCampoManual() {
+  const lat = parseFloat(document.getElementById('p-lat').value)
+  const lng = parseFloat(document.getElementById('p-lng').value)
+  if (isNaN(lat) || isNaN(lng) || !_ptMap) return
+  _ptMarker.setLatLng([lat, lng])
+  _ptMap.setView([lat, lng], _ptMap.getZoom() < 10 ? 12 : _ptMap.getZoom())
+}
+
+function _ptPosicionar(lat, lng, zoom) {
+  const ll = (lat != null && lng != null) ? [lat, lng] : ACRE_CENTRO
+  _ptMarker.setLatLng(ll)
+  _ptMap.setView(ll, zoom || (lat != null ? 12 : 6))
+  document.getElementById('p-lat').value = lat != null ? lat.toFixed(6) : ''
+  document.getElementById('p-lng').value = lng != null ? lng.toFixed(6) : ''
+}
+
+// ── Ponto — abrir/salvar ─────────────────────────────────────
+function abrirPonto(id) {
+  _editandoPontoId = id
+  const p = id ? _pontos.find(x => x.id === id) : null
+  document.getElementById('mp-titulo').textContent = p ? 'Editar Ponto de Coleta' : 'Novo Ponto de Coleta'
+  document.getElementById('p-codigo').value = p?.codigo_ana || ''
+  document.getElementById('p-nome').value = p?.nome || ''
+  document.getElementById('p-municipio').value = p?.municipio || ''
+  document.getElementById('p-rio').value = p?.rio || ''
+  document.getElementById('p-bacia').value = p?.bacia || ''
+  document.getElementById('p-classe').value = p?.classe_enquadramento || 'classe_2'
+  document.getElementById('p-altitude').value = p?.altitude_m ?? ''
+  document.getElementById('p-uc').value = p?.uc_id || ''
+  document.getElementById('p-coord-conferida').checked = !!p?.coordenada_conferida
+  document.getElementById('p-coord-obs').value = p?.coordenada_observacao || ''
+  document.getElementById('p-obs').value = p?.observacoes || ''
+  document.getElementById('p-ativo').checked = p ? p.ativo : true
+
+  document.getElementById('modal-ponto').classList.add('aberto')
+  _ptInicializarMapa()
+  setTimeout(() => {
+    _ptMap.invalidateSize()
+    const ll = p ? geoLatLngDeGeom(p.geom) : null
+    _ptPosicionar(ll ? ll[0] : null, ll ? ll[1] : null, ll ? 12 : 6)
+  }, 60)
+}
+
+async function salvarPonto() {
+  const payload = {
+    codigo_ana: document.getElementById('p-codigo').value.trim(),
+    nome: document.getElementById('p-nome').value.trim(),
+    municipio: document.getElementById('p-municipio').value.trim(),
+    rio: document.getElementById('p-rio').value.trim(),
+    bacia: document.getElementById('p-bacia').value.trim() || null,
+    classe_enquadramento: document.getElementById('p-classe').value,
+    altitude_m: document.getElementById('p-altitude').value === '' ? null : parseFloat(document.getElementById('p-altitude').value),
+    uc_id: document.getElementById('p-uc').value || null,
+    coordenada_conferida: document.getElementById('p-coord-conferida').checked,
+    coordenada_observacao: document.getElementById('p-coord-obs').value.trim() || null,
+    observacoes: document.getElementById('p-obs').value.trim() || null,
+    ativo: document.getElementById('p-ativo').checked,
+  }
+  const lat = parseFloat(document.getElementById('p-lat').value)
+  const lng = parseFloat(document.getElementById('p-lng').value)
+
+  if (!payload.codigo_ana || !/^[0-9]{6,10}$/.test(payload.codigo_ana)) { toast('Código ANA precisa ter de 6 a 10 dígitos', 'error'); return }
+  if (!payload.nome || !payload.municipio || !payload.rio) { toast('Preencha nome, município e rio', 'error'); return }
+  if (isNaN(lat) || isNaN(lng)) { toast('Marque a posição do ponto no mapa', 'error'); return }
+  payload.geom = `SRID=4326;POINT(${lng} ${lat})`
+
+  const btn = document.getElementById('btn-salvar-ponto')
+  btn.disabled = true
+  try {
+    const { error } = _editandoPontoId
+      ? await db.from('agua_pontos_coleta').update(payload).eq('id', _editandoPontoId)
+      : await db.from('agua_pontos_coleta').insert(payload)
+    if (error) throw error
+    toast('Ponto de coleta salvo!', 'success')
+    fecharModal('ponto')
+    await carregarPontos()
+  } catch (e) { toast(e.message || 'Erro ao salvar', 'error') }
+  finally { btn.disabled = false }
+}
+
+// ── Laboratório — abrir/salvar ───────────────────────────────
+function abrirLab(id) {
+  _editandoLabId = id
+  const l = id ? _labs.find(x => x.id === id) : null
+  document.getElementById('ml-titulo').textContent = l ? 'Editar Laboratório' : 'Novo Laboratório'
+  document.getElementById('l-nome').value = l?.nome || ''
+  document.getElementById('l-cnpj').value = l?.cnpj || ''
+  document.getElementById('l-acreditacao').value = l?.acreditacao || ''
+  document.getElementById('l-responsavel').value = l?.responsavel_tecnico || ''
+  document.getElementById('l-registro').value = l?.registro_conselho || ''
+  document.getElementById('l-email').value = l?.email || ''
+  document.getElementById('l-telefone').value = l?.telefone || ''
+  document.getElementById('l-obs').value = l?.observacoes || ''
+  document.getElementById('l-ativo').checked = l ? l.ativo : true
+  document.getElementById('modal-lab').classList.add('aberto')
+}
+
+async function salvarLab() {
+  const payload = {
+    nome: document.getElementById('l-nome').value.trim(),
+    cnpj: document.getElementById('l-cnpj').value.replace(/\D/g, '') || null,
+    acreditacao: document.getElementById('l-acreditacao').value.trim() || null,
+    responsavel_tecnico: document.getElementById('l-responsavel').value.trim() || null,
+    registro_conselho: document.getElementById('l-registro').value.trim() || null,
+    email: document.getElementById('l-email').value.trim() || null,
+    telefone: document.getElementById('l-telefone').value.trim() || null,
+    observacoes: document.getElementById('l-obs').value.trim() || null,
+    ativo: document.getElementById('l-ativo').checked,
+  }
+  if (!payload.nome || payload.nome.length < 2) { toast('Informe o nome do laboratório', 'error'); return }
+  const btn = document.getElementById('btn-salvar-lab')
+  btn.disabled = true
+  try {
+    const { error } = _editandoLabId
+      ? await db.from('agua_laboratorios').update(payload).eq('id', _editandoLabId)
+      : await db.from('agua_laboratorios').insert(payload)
+    if (error) throw error
+    toast('Laboratório salvo!', 'success')
+    fecharModal('lab')
+    await carregarLabs()
+  } catch (e) { toast(e.message || 'Erro ao salvar', 'error') }
+  finally { btn.disabled = false }
+}
+
+function fecharModal(qual) {
+  document.getElementById(`modal-${qual}`).classList.remove('aberto')
+  if (qual === 'ponto') _editandoPontoId = null
+  if (qual === 'lab') _editandoLabId = null
+}
+</script>
+<style>
+.tab-btn {
+  padding: 6px 18px; border: none; background: transparent;
+  border-radius: 7px; font-size: 13px; font-weight: 500;
+  color: var(--cinza-500); cursor: pointer;
+  transition: background .15s, color .15s;
+}
+.tab-btn.ativo { background: #fff; color: var(--verde); box-shadow: 0 1px 4px rgba(0,0,0,.12); }
+.tab-btn:hover:not(.ativo) { background: rgba(255,255,255,.5); }
+.form-section-label {
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .06em; color: var(--verde-medio);
+  padding: 8px 0 4px; margin-bottom: 12px;
+}
+</style>
+</body>
+</html>
