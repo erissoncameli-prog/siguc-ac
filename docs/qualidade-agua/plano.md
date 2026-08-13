@@ -446,7 +446,7 @@ decide quando ativar.
    passam a valer no mesmo instante em que este UPDATE roda, então não
    tem por que fazer duas ativações separadas.
 
-### Achado: `biologo` não tem permissão padrão no grupo do módulo
+### Achado: `biologo` não tem permissão padrão no grupo do módulo — RESOLVIDO
 
 O módulo `agua` nasceu no grupo `'Gestão'` (`modulos.grupo`, Fase 0).
 Consultado `grupo_permissoes_padrao` para esse grupo: `super_admin`,
@@ -454,17 +454,14 @@ Consultado `grupo_permissoes_padrao` para esse grupo: `super_admin`,
 `assistente_admin` têm `editar`; `financeiro`, `visualizador` e
 `secretario` têm `visualizar`; `brigadista`, `pesquisador_externo`,
 `validador_brigada` e `validador_fauna` têm `sem_acesso` (correto,
-não deviam mesmo). **`biologo` não tem linha nenhuma** — cai em
+não deviam mesmo). `biologo` não tinha linha nenhuma — cairia em
 `sem_acesso` por padrão, o mesmo caminho de quem não deveria acessar.
 
-Se o perfil típico de quem mede qualidade da água na SEMA for
-`biologo` (mais plausível que `tecnico` dado o domínio — mas isso é a
-mesma pergunta já registrada como pendência aberta, "Quem coleta,
-nominalmente"), ativar o módulo não adianta nada para essa pessoa: a
-página existe, mas ela não abre. **Confirmar isso antes de ativar o
-módulo**, e se for o caso, um `INSERT` em `grupo_permissoes_padrao`
-(`grupo = 'Gestão'`, `perfil = 'biologo'`, `nivel = 'editar'`) resolve
-— não precisa de migration de schema, é dado.
+**Confirmado nesta entrega**: `tecnico`/`gestor` (que já têm `editar`
+no grupo `'Gestão'`) cobrem quem opera a mesa de Qualidade da Água na
+SEMA — `biologo` não é o perfil que faltava. Nenhuma linha nova foi
+inserida em `grupo_permissoes_padrao`; o módulo foi ativado
+diretamente (migration 256).
 
 ## Fase 2 — ENTREGUE (migrations 254–255)
 
@@ -551,31 +548,18 @@ entrega deixou pendente de propósito".
   nenhum introduzido por esta entrega). `mcp__Supabase__get_advisors`
   (security) depois das migrations 254/255: nenhum aviso novo.
 
-### O que ESTA entrega deixou pendente de propósito
+### Ativação do módulo (migration 256) — feita após confirmação
 
-Diferente das entregas de Fase 0/1, que fecharam sozinhas, esta tem
-UM passo que não é uma sessão de Claude Code que decide:
-
-- **Permissão de `biologo`** (achado registrado acima, "Achado:
-  `biologo` não tem permissão padrão no grupo do módulo") — segue SEM
-  resolver. Não foi inserida nenhuma linha em
-  `grupo_permissoes_padrao` nesta entrega: é decisão de produto sobre
-  quem de fato opera esta mesa, e inventar a resposta seria simular a
-  decisão, não tomá-la — mesmo critério já usado neste plano para os
-  sólidos em suspensão e para o Encarregado de Dados na Fase de LGPD.
-- **`UPDATE modulos SET ativo = true WHERE chave = 'agua'`** (passo 6
-  do escopo) NÃO foi executado, exatamente porque depende da decisão
-  acima: ativar sem saber se `biologo` alcança a tela poderia deixar
-  quem efetivamente mede a água da SEMA sem acesso, com a mesa dizendo
-  que "está pronta". Até esta ativação rodar, o módulo `agua` segue
-  como a Fase 0 o deixou — inativo, alcançável só por `super_admin`
-  (inclusive `pages/agua-conferencia.html`, da Fase 1).
-- Assim que a resposta chegar: se `biologo` precisar de acesso, rodar
-  o `INSERT` descrito no achado (dado, não schema — não precisa de
-  migration nova, embora registrar como migration por rastreabilidade
-  também sirva); depois, em qualquer caso, rodar o `UPDATE` de
-  ativação. É literalmente a única coisa que falta — todo o resto
-  (migrations, bucket, as duas páginas, sidebar) já está em produção.
+A pergunta em aberto ("`biologo` precisa de permissão antes de
+ativar?") foi respondida: `tecnico`/`gestor` já cobrem quem opera a
+mesa. `UPDATE modulos SET ativo = true WHERE chave = 'agua'`
+(migration 256) rodou em produção — `pages/agua-pontos.html`,
+`pages/agua-laudos.html` e `pages/agua-conferencia.html` (Fase 1)
+passam a valer para todo mundo com permissão no grupo `'Gestão'`, não
+só `super_admin`. Conferido por `nivel_efetivo()`: um usuário
+`tecnico` de teste resolve `'editar'` no módulo `agua` depois do
+UPDATE (antes, `sem_acesso`). `get_advisors` (security) depois da
+migration: nenhum achado novo.
 
 ## Fases seguintes (resumo)
 

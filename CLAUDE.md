@@ -1142,7 +1142,7 @@ RESEND_API_KEY=(e-mail de alertas)
 PLANET_API_KEY=(Planet/NICFI Basemaps; só no servidor — usada pelos
   proxies /api/planet-tiles e /api/planet-mosaics. Nunca no frontend)
 
-## Qualidade da Água (IQA) — migrations 248–255
+## Qualidade da Água (IQA) — migrations 248–256
 Módulo IRMÃO de Brigadas/Biomonitor/Frota, não aninhado no Biomonitor
 (`grupos_biomonitor` exige `uc_id NOT NULL` e a maioria dos pontos fica
 fora de UC). Plano completo e histórico das decisões em
@@ -1212,7 +1212,7 @@ e `agua_conama_violacoes`.
   campo a campo, promove a `completo` ou mantém com observação — sem
   RPC nova, grava direto via `pode_editar('agua')`). Detalhe completo
   em `docs/qualidade-agua/plano.md`, seção "Fase 1 — ENTREGUE".
-- **Fase 2 ENTREGUE (migrations 254–255)**: a mesa. `agua_valor_plausivel()`
+- **Fase 2 ENTREGUE (migrations 254–256)**: a mesa. `agua_valor_plausivel()`
   (254) é a definição única de "esse valor faz sentido?" — reusa os
   MESMOS limites que a 253 já validou (pH 0–14 impossível/4–9
   improvável; OD >150% da saturação impossível/>130% improvável);
@@ -1226,8 +1226,9 @@ e `agua_conama_violacoes`.
   o foco, salvar bloqueia `'impossivel'` e pede `confirm()` para
   `'improvavel'`). Sidebar ganhou o grupo "Qualidade da Água" (3 links,
   incluindo a Conferência da Fase 1 que não tinha entrada ainda).
-  **O módulo continua INATIVO** — ver "Próxima tarefa" abaixo, é a
-  única coisa que falta.
+  **Módulo ATIVO** (migration 256) — confirmado que `tecnico`/`gestor`
+  (já com `editar` no grupo `'Gestão'`) cobrem quem opera a mesa;
+  `biologo` não precisou de permissão nova.
 - **Fases 3 a 5 pendentes** (app de campo, `agua-mapa.html`, relatório
   por bacia) — ver o plano. Quando a Fase 3 começar, `VERSOES` em
   `pwa/sw.js` ganha a chave `agua`.
@@ -1239,28 +1240,17 @@ papel pelo nome), e toda função precisa nascer com `SET search_path =
 public`, senão o advisor de segurança acusa.
 
 ## Próxima tarefa
-Duas coisas, nessa ordem, ANTES de começar a Fase 3 (app de campo):
+Módulo Qualidade da Água (IQA) — **Fase 3 (app de campo)**. Fases 0 a 2
+estão entregues, em produção e ATIVAS para todo mundo com permissão
+(migrations 248–256): cadastro, IQA, CONAMA, as 450 coletas históricas
+importadas, tela de conferência, e a mesa completa (pontos,
+laboratórios, lançamento de laudo, fila).
 
-1. **Decidir a permissão de `biologo` e ativar o módulo Qualidade da
-   Água.** A Fase 2 (mesa: pontos, laboratórios, lançamento de laudo,
-   fila) está pronta e em produção (migrations 254–255 aplicadas,
-   páginas testadas), mas `modulos.agua.ativo` continua `false` de
-   propósito — ver `docs/qualidade-agua/plano.md`, seção "Fase 2 —
-   ENTREGUE", subseção "O que ESTA entrega deixou pendente de
-   propósito". Resumo: `grupo_permissoes_padrao` para o grupo
-   `'Gestão'` não tem linha para o perfil `biologo` (cai em
-   `sem_acesso`, igual a quem não deveria acessar) e ninguém confirmou
-   se é esse o perfil de quem mede água na SEMA. Perguntar antes de
-   rodar `UPDATE modulos SET ativo = true WHERE chave = 'agua'` — esse
-   UPDATE também destrava `pages/agua-conferencia.html` (Fase 1) para
-   todo mundo além de `super_admin`.
-2. Depois disso, **Fase 3 — app de campo** (`app-agua/`, offline-first,
-   login por e-mail/senha + PIN no molde do `brigada.html`) — plano em
-   `docs/qualidade-agua/plano.md`, seção "Fases seguintes" e "Notas de
-   desenho já fechadas". Ao criar a próxima migration, rodar
-   `mcp__Supabase__list_migrations` primeiro — não assumir o número
-   pelo que está no repositório local (a Fase 1 já consumiu a 253 numa
-   branch paralela sem que a Fase 2 soubesse de antemão).
+`app-agua/`, offline-first, login por e-mail/senha + PIN no molde do
+`brigada.html` — plano em `docs/qualidade-agua/plano.md`, seção
+"Fases seguintes" e "Notas de desenho já fechadas". Ao criar a próxima
+migration, rodar `mcp__Supabase__list_migrations` primeiro — não
+assumir o número pelo que está no repositório local.
 
 **Sólidos em suspensão continua pendência de conferência humana**
 (mediana de 0,342 mg/L com turbidez mediana de 90 UNT — provável

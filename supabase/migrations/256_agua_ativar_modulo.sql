@@ -1,0 +1,25 @@
+-- ═══════════════════════════════════════════════════════════
+-- SIGUC-AC · Qualidade da Água — ativação do módulo
+-- Fase 2 do plano em docs/qualidade-agua/plano.md, item 6 (o único
+-- passo do escopo que dependia de confirmação humana, não de código).
+--
+-- CONFIRMADO: os perfis que já têm `editar` no grupo 'Gestão'
+-- (tecnico, gestor, super_admin, diretor, chefe_departamento,
+-- gestor_uc, assistente_admin) cobrem quem opera a mesa de Qualidade
+-- da Água na SEMA. `biologo` NÃO recebeu permissão nova — não é o
+-- perfil que faltava, então não há INSERT em
+-- `grupo_permissoes_padrao` nesta migration. Achado registrado no
+-- plano fica resolvido, sem mudança de dado.
+--
+-- Este UPDATE é o que faz duas telas passarem a valer para todo mundo
+-- além de super_admin, no mesmo instante: `pages/agua-pontos.html` /
+-- `pages/agua-laudos.html` (Fase 2, recém-criadas) e
+-- `pages/agua-conferencia.html` (Fase 1, que já existia mas ficava
+-- restrita a super_admin enquanto o módulo estivesse inativo — ver
+-- cabeçalho da migration 248). `nivel_efetivo()` (migration 057)
+-- resolve `sem_acesso` para módulo inativo antes mesmo de olhar perfil
+-- ou permissão — por isso nenhuma tela deste módulo aparecia para
+-- ninguém além de super_admin até este UPDATE rodar.
+-- ═══════════════════════════════════════════════════════════
+
+UPDATE modulos SET ativo = true WHERE chave = 'agua';
