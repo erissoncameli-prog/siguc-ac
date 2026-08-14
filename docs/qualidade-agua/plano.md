@@ -658,6 +658,193 @@ coisa, nenhuma policy nova foi necessária.
   confirmou a última como `256_agua_ativar_modulo` antes de começar;
   como não foi preciso schema novo, não há `257_*` para aplicar.
 
+## Fase 5 — ENTREGUE (sem migration nova; `pages/agua-relatorios.html`)
+
+Relatório automático por bacia hidrográfica, nos DOIS formatos pedidos
+pelo usuário: **PDF** (documento de registro/fiscalização) e **PPTX**
+(apresentação executiva), gerados da mesma tela de mesa a partir da
+mesma fonte de dados. Fecha o plano original de 5 fases.
+
+### Correção ao que o plano original previa
+
+"Reaproveitando `scripts/gerar-pptx.js`" — investigado antes de
+desenhar esta fase: aquele arquivo é o gerador do deck de
+**treinamento** do app Brigadas (`node scripts/gerar-pptx.js`, monta
+slides com mockup de celular a partir de `tmp/slides-screenshots/`,
+ferramenta de desenvolvedor, não algo que um usuário aciona no
+navegador). Não é o motor certo para copiar — reaproveitada dele só a
+**paleta de cores e convenções visuais** (header escuro + barra
+dourada, cards com sombra suave), documentado em
+`js/agua-relatorio-pptx.js`. O padrão de verdade para "relatório que o
+técnico gera na hora, no navegador" é o do Biomonitor
+(`js/biomonitor-relatorio-ninho.js`): timbre oficial via
+`getCabecalhoRelatorio()`/`gerarProtocolo()` (js/config-sistema.js),
+jsPDF desenhado direto (nunca screenshot/print de HTML), paginação que
+nunca corta um bloco no meio. O desenho visual do PDF é copiado desse
+padrão (não dá pra chamar as funções de lá, que são específicas de
+ninho); a fonte DM Sans embutida (`BIOPDF_FONT_REGULAR_B64`/
+`BIOPDF_FONT_BOLD_B64`, `js/biomonitor-pdf-fonts.js`, 150 KB de
+base64) é **reaproveitada por `<script src>`, sem cópia** — é só um
+recurso de fonte, não lógica de domínio do Biomonitor.
+
+### Fonte única dos dados: `js/agua-relatorio-dados.js`
+
+Nenhum dos dois geradores recalcula IQA/CONAMA — tudo já vem pronto de
+`vw_agua_coletas_detalhe` (`agua_calcular_iqa()`/
+`agua_conama_violacoes()`, migration 249), mesma lição de
+`js/frota-consumo.js` e `js/mapa-recorte.js`. Este arquivo é a ÚNICA
+agregação (bacias presentes, campanhas de uma bacia, recorte por
+intervalo de campanhas, agrupamento por ponto, resumo), consumida
+pelos DOIS geradores — evita a quinta cópia dos rótulos de parâmetro
+que já existiam em `agua-laudos.html`/`agua-conferencia.html`/
+`agua-mapa.html` (consolidados em `AGUA_REL_PARAM_LABEL`, também
+compartilhado entre PDF e PPTX). Funções puras (recebem array já
+buscado), separadas das que tocam rede — testável sem sessão Supabase,
+mesmo padrão de `montarCorpoGaveta` em `agua-mapa.html`.
+
+- **Sem RPC nova.** O plano original cogitava que agregação por bacia
+  "pode genuinamente precisar de SQL"; na prática,
+  `vw_agua_coletas_detalhe` filtrada por `ponto_bacia` no cliente
+  (`pode_ver('agua')` já cobre a leitura, confirmado antes de escrever
+  qualquer coisa) foi suficiente — a agregação em si (agrupar, ordenar
+  campanha, somar/calcular média de valores JÁ prontos) não é a
+  fórmula do IQA, é só apresentação, e cabe em JS puro sem duplicar
+  cálculo nenhum.
+- **Um relatório = uma bacia + um recorte de campanhas**, como
+  decidido: seletor de bacia (`agua_pontos_coleta.bacia`, com
+  **bacia NULA tratada como "Sem bacia definida"**, nunca descartada —
+  é o caso do Rio Iquiri, pendência de conferência da Fase 2) + dois
+  seletores de campanha (inicial/final, populados só com as campanhas
+  que a bacia escolhida realmente tem, ordenados por ano+ordem).
+- **Coleta em quarentena aparece MARCADA**, nunca escondida nem
+  apresentada como completa: badge no resumo da tela, coluna "Status"
+  com destaque em laranja na tabela do PDF, e o texto de aviso deixa
+  explícito que o IQA/CONAMA dela é preliminar.
+- **Série do IQA nunca omite uma campanha sem coleta** — vira `null`
+  (gap no gráfico do PPTX), mesmo espírito do ponto "vazado" da Fase 4.
+
+### PDF (`js/agua-relatorio-pdf.js`)
+
+Capa com KPIs da bacia (pontos, coletas, campanhas, IQA médio,
+conformidade CONAMA, quarentena) + aviso de quarentena/violações
+quando existem, seguida de uma seção por ponto com tabela
+(Campanha/Data/Status/IQA/Faixa/CONAMA) — IQA e conformidade CONAMA
+**lado a lado na mesma linha**, nunca um escondendo o outro (regra do
+módulo, já em `agua-mapa.html`). Cores da faixa do IQA copiadas por
+VALOR de `IQA_FAIXA_COR` (`agua-mapa.html`) — mesma paleta validada
+para daltonismo, não uma nova.
+
+### PPTX (`js/agua-relatorio-pptx.js`)
+
+4 slides: capa, resumo (KPIs em cards), evolução do IQA por ponto
+(**gráfico de linha nativo do pptxgenjs** — `ppt/charts/chart1.xml`
+real dentro do arquivo, não uma imagem rasterizada) e conformidade
+CONAMA (tabela de parâmetros violados). Paleta e convenções visuais
+copiadas por VALOR de `scripts/gerar-pptx.js` (`C.darkBg`/`C.gold`/
+etc.), não a lógica de slide de celular.
+
+### Bibliotecas — vendorizadas, não CDN (deviação documentada)
+
+O padrão do Biomonitor carrega jsPDF/autotable por CDN
+(`cdn.jsdelivr.net`); esta entrega vendorizou as DUAS (mesma versão —
+jsPDF 2.5.2 + autotable 3.8.4 — só o transporte muda) em `js/vendor/`,
+no mesmo padrão de `turf-6.5.0.min.js`/`proj4-2.11.0.min.js`. Motivo:
+a pptxgenjs **já precisava** ser vendorizada (`js/vendor/
+pptxgenjs-4.0.1.bundle.js`, a partir do bundle de browser em
+`node_modules/pptxgenjs/dist/`, mesma versão que
+`scripts/gerar-pptx.js` usa) — instrução explícita desta entrega — e
+a sessão que construiu isto rodava numa política de rede que bloqueava
+`cdn.jsdelivr.net`/`unpkg.com` (mesma restrição já documentada na Fase
+4 para Leaflet/hidrografia), então vendorizar jsPDF também foi o que
+permitiu **validar de verdade** os dois geradores nesta sessão, em vez
+de só ler o código. `jspdf`/`jspdf-autotable` foram instalados
+temporariamente via npm só para extrair o bundle UMD (não entraram
+como dependência do projeto — mesmo tratamento que turf/proj4, que
+também não aparecem no `package.json`). O código de
+`js/agua-relatorio-pdf.js` não tem nenhuma dependência de CDN
+específica; se algum dia o projeto padronizar em vendorizar tudo (ou
+voltar pro CDN), é só trocar as duas linhas de `_agpdfCarregarLibs()`.
+
+### Validação de verdade — arquivos reais, não só "não lançou exceção"
+
+`tests/agua-relatorios.test.js` (Playwright, servidor estático local,
+Chromium explícito — mesmo contorno de `tests/agua-app-fluxo.test.js`
+para o `chrome-headless-shell` que não vem pré-instalado): 3 testes de
+agregação pura (bacia NULA vira "Sem bacia definida"; recorte por
+campanha soma certo; série do IQA preenche gap com `null`) + 4 testes
+que geram os arquivos de verdade contra uma fixture no formato exato
+de `vw_agua_coletas_detalhe` (bacia "Rio Acre" com 2 pontos, 3
+campanhas, 1 coleta em quarentena, 1 violação CONAMA, 1 gap de série;
+e a bacia NULA/Rio Iquiri, separada):
+
+- **PDF**: aberto de verdade com `pdf-parse` (a lib migrou pra API por
+  classe na v2 — `getInfo()`/`getText()`, não a função da v1) — o texto
+  extraído bate exatamente com os dados da fixture (nomes dos pontos,
+  bacia, IQA, "Quarentena", protocolo, timbre "SEMA-AC"), com 2 páginas
+  (capa + pontos). Tamanho real observado: ~27 KB (a fonte embutida
+  domina o peso; `compress:true` no jsPDF já reduz bastante).
+- **PPTX**: aberto de verdade com `jszip` (PPTX é um zip OOXML) — 4
+  partes `ppt/slides/slideN.xml`, `ppt/charts/chart1.xml` presente
+  (confirma que o gráfico nativo foi de fato criado, não só chamado), e
+  o texto dos slides contém os mesmos dados esperados. ~120 KB.
+- As duas bibliotecas de verificação (`pdf-parse`, `jszip`) entraram
+  como **devDependencies** (`package.json`) — mesmo tratamento que
+  `pptxgenjs` já tinha (usada por `scripts/gerar-pptx.js`, também
+  devDependency). O projeto commita `node_modules/` (674 arquivos já
+  antes desta entrega — confirmado antes de decidir), então isso soma
+  ao repositório; a alternativa (confiar só em "não lançou exceção",
+  sem confirmar que o PDF/PPTX abrem e têm o texto certo) não
+  atenderia ao pedido explícito de validar de verdade.
+- `bash scripts/guardrails.sh`: 0 falhas críticas, mesmos 32 avisos
+  pré-existentes, nenhum novo (sem migration nesta entrega, nada pra
+  security advisor checar).
+
+### Sidebar e ícone
+
+`js/layout.js`: novo item "Relatórios" no grupo "Qualidade da Água"
+(`agua-relatorios.html`, 5º link do grupo) + ícone próprio
+(`iconePills['agua-relatorios']`). `js/config.js`: ícone `monitor`
+novo em `BICON_PATHS` (tela + suporte, estilo Feather, mesmo padrão de
+todos os outros — reaproveitado também no botão "Gerar PPTX" da
+tela). Sem mudança em `pwa/sw.js` — página de mesa, não toca nenhum
+arquivo compartilhado pelos 3 apps de campo.
+
+### Departamento no timbre — sem override
+
+Diferente do Biomonitor (que sobrescreve `departamento`/`siglaDep`
+para "Departamento de Biodiversidade"/DEBIO, decisão registrada na
+fase de origem daquele módulo), o relatório da Água usa o
+`departamento` PADRÃO de `getCabecalhoRelatorio()` (Departamento de
+Unidades de Conservação/DEUC) sem sobrescrever — não foi encontrada,
+em `lgpd_tratamentos` (TRAT-018/019) nem no `CLAUDE.md`, nenhuma
+atribuição documentada do módulo `agua` a CIGMA ou outro departamento
+específico, e inventar um seria o mesmo erro que o projeto já evita em
+outras pendências (ex.: bacia do Rio Iquiri). Se a SEMA confirmar a
+atribuição correta no futuro, é a mesma troca de duas linhas que o
+Biomonitor fez.
+
+## Fase 5 concluída — plano original fechado
+
+Todas as 5 fases do plano original (`docs/qualidade-agua/plano.md`)
+estão entregues, aplicadas em produção (onde havia schema) e validadas
+com Playwright/`execute_sql` contra o banco real. O que fica pendente,
+todo já registrado no lugar certo deste documento, e nenhum é tarefa
+de código de uma sessão de Claude Code:
+
+1. **Camada de hidrografia (rios) no mapa** — bloqueada por política de
+   rede da sessão que tentou (Fase 4); domínios candidatos já
+   identificados (`portal1.snirh.gov.br` da ANA).
+2. **Ícone do launcher do app Água** — `app-agua/android` usa o
+   placeholder genérico do Capacitor; trocar antes do primeiro APK real
+   (Fase 3).
+3. **Sólidos em suspensão** — 339 coletas em quarentena por suspeita de
+   mistura de unidade (g/L vs mg/L); só alguém da SEMA com o laudo
+   físico resolve, pela tela `pages/agua-conferencia.html` (Fase 1).
+
+Nenhuma dessas três é reaberta pela Fase 5. Qualquer trabalho futuro no
+módulo — RPC nova, tela nova, App Água com APK — é extensão do que já
+está entregue, não retomada de fase.
+
 ## Fases seguintes (resumo)
 
 | Fase | Entrega | Depende de |
@@ -666,7 +853,7 @@ coisa, nenhuma policy nova foi necessária.
 | 2 | Mesa: cadastro de pontos/laboratórios, lançamento de laudo com PDF anexado, fila de "aguardando laudo" — escopo detalhado acima | Fase 0 |
 | 3 | App de campo offline-first + shell Capacitor (`app-agua/`) — **ENTREGUE**, ver "Fase 3 — ENTREGUE" | Fase 2 |
 | 4 | `agua-mapa.html` — mapa dedicado — **ENTREGUE** (sem a camada de hidrografia, ver abaixo) | Fase 1 |
-| 5 | Relatório automático por bacia, reaproveitando `scripts/gerar-pptx.js` | Fase 1 |
+| 5 | Relatório automático por bacia — **ENTREGUE**, ver "Fase 5 — ENTREGUE" | Fase 1 |
 
 ### Notas de desenho já fechadas
 
