@@ -1,0 +1,18 @@
+{
+  "name": "SIGUC Qualidade da Água",
+  "short_name": "Água SIGUC",
+  "description": "Coleta de campo para o monitoramento de qualidade da água — SEMA/AC",
+  "start_url": "/pages/agua-app.html",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#F6FAF6",
+  "theme_color": "#2F6FB0",
+  "orientation": "portrait-primary",
+  "lang": "pt-BR",
+  "categories": ["government", "productivity"],
+  "icons": [
+    { "src": "/pwa/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/pwa/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ],
+  "prefer_related_applications": false
+}
