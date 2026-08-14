@@ -1140,6 +1140,18 @@ async function salvarRegistro() {
 // js/agua-iqa-visual.js). 'aguardando_lab' não tem IQA e cai sozinho
 // no tratamento de "vazado" que o gráfico já tinha para pontos nulos.
 
+// Rótulo dos parâmetros que agua_conama_violacoes de fato avalia (só
+// esses 6 — os demais campos do laudo não têm limite CONAMA
+// cadastrado). Mesmos nomes de PARAM_LABEL em pages/agua-mapa.html;
+// não centralizado em js/agua-iqa-visual.js de propósito — é rótulo
+// estático, sem cálculo, mesma decisão já registrada naquele arquivo
+// para PARAM_FIELDS (duplicado também em agua-laudos.html/
+// agua-conferencia.html).
+const CONAMA_PARAM_LABEL = {
+  od: 'OD', dbo: 'DBO', turbidez: 'Turbidez', ph: 'pH',
+  fosforo_total: 'Fósforo total', coliformes_termotolerantes: 'Coliformes termotolerantes',
+}
+
 // Formata `date` puro (sem hora) sem sofrer o desvio de fuso do
 // `new Date('AAAA-MM-DD')` (interpretado como UTC meia-noite — vira o
 // dia anterior em fusos negativos como o do Acre). Mesmo padrão já
@@ -1179,7 +1191,7 @@ async function carregarHistoricoPonto(pontoId) {
   estado.textContent = 'Carregando…'
   try {
     const { data, error } = await db.from('vw_agua_coletas_detalhe')
-      .select('id,data_coleta,campanha_ano,campanha_ordem,status,iqa,iqa_faixa,conama_conforme')
+      .select('id,data_coleta,campanha_ano,campanha_ordem,status,iqa,iqa_faixa,conama_conforme,conama_violacoes')
       .eq('ponto_id', pontoId)
       .order('data_coleta')
     if (error) throw error
@@ -1209,7 +1221,9 @@ async function carregarHistoricoPonto(pontoId) {
         <div style="text-align:right;flex-shrink:0;margin-left:10px;max-width:52%">
           ${aguaIqaChipHTML(c.iqa, c.iqa_faixa, c.status === 'aguardando_lab' ? 'Aguardando laudo' : undefined, c.status === 'quarentena')}
           ${c.status !== 'aguardando_lab' ? `<div style="font-size:11px;color:${c.conama_conforme == null ? '#9CA3AF' : c.conama_conforme ? '#059669' : '#C2410C'};margin-top:2px">
-            ${c.conama_conforme == null ? 'CONAMA — sem limites cadastrados' : c.conama_conforme ? 'Conforme CONAMA' : 'Fora do limite CONAMA'}
+            ${c.conama_conforme == null ? 'CONAMA — sem limites cadastrados'
+              : c.conama_conforme ? 'Conforme CONAMA'
+              : `Fora do limite: ${(c.conama_violacoes || []).map(v => esc(CONAMA_PARAM_LABEL[v] || v)).join(', ')}`}
           </div>` : ''}
         </div>
       </div>`).join('')
