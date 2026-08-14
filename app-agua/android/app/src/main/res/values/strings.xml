@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">SIGUC Água</string>
+    <string name="title_activity_main">SIGUC Água</string>
+    <string name="package_name">br.gov.ac.sema.siguc.agua</string>
+    <string name="custom_url_scheme">br.gov.ac.sema.siguc.agua</string>
+</resources>

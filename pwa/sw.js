@@ -9,12 +9,13 @@
 const SCOPE = self.registration.scope
 const APP = SCOPE.includes('/pages/biomonitor.html') ? 'biomonitor'
   : SCOPE.includes('/pages/frota-app.html') ? 'frota'
+  : SCOPE.includes('/pages/agua-app.html') ? 'agua'
   : 'brigadas'
 
 // Ao concluir uma implementação que toque arquivos web de um app,
 // incrementar SÓ o número daquele app (vN → vN+1) — não precisa mexer
 // nos outros dois.
-const VERSOES = { brigadas: 258, biomonitor: 25, frota: 82 }
+const VERSOES = { brigadas: 258, biomonitor: 25, frota: 82, agua: 1 }
 const CACHE = `siguc-${APP}-v${VERSOES[APP]}`
 
 const SHELLS = {
@@ -86,6 +87,19 @@ const SHELLS = {
     '/js/frota-consumo.js',
     '/js/frota-passageiros.js',
     '/js/frota-viagens-status.js',
+    'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2',
+  ],
+  agua: [
+    '/pages/agua-app.html',
+    '/css/agua-app.css',
+    '/js/config.js',
+    '/js/fotos-privadas.js',
+    '/js/lgpd.js',
+    '/js/lgpd-campo.js',
+    '/js/qrcode-generator.js',
+    '/js/agua-offline.js',
+    '/js/agua-sync.js',
+    '/js/brigada-captura.js',
     'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2',
   ],
 }

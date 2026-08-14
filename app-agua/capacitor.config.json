@@ -1,0 +1,12 @@
+{
+  "appId": "br.gov.ac.sema.siguc.agua",
+  "appName": "SIGUC Água",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "https"
+  },
+  "android": {
+    "allowMixedContent": false,
+    "adjustMarginsForEdgeToEdge": "auto"
+  }
+}
