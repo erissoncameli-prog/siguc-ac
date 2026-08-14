@@ -664,16 +664,18 @@ coisa, nenhuma policy nova foi necessária.
 |------|---------|-----------|
 | 1 | Migração das 450 coletas, com **quarentena em vez de descarte** e tela de conferência — escopo detalhado acima | Fase 0 |
 | 2 | Mesa: cadastro de pontos/laboratórios, lançamento de laudo com PDF anexado, fila de "aguardando laudo" — escopo detalhado acima | Fase 0 |
-| 3 | App de campo offline-first + shell Capacitor (`app-agua/`) — **pulada de propósito**, ver "Fase 4 — ENTREGUE" | Fase 2 |
+| 3 | App de campo offline-first + shell Capacitor (`app-agua/`) — **ENTREGUE**, ver "Fase 3 — ENTREGUE" | Fase 2 |
 | 4 | `agua-mapa.html` — mapa dedicado — **ENTREGUE** (sem a camada de hidrografia, ver abaixo) | Fase 1 |
 | 5 | Relatório automático por bacia, reaproveitando `scripts/gerar-pptx.js` | Fase 1 |
 
 ### Notas de desenho já fechadas
 
-- **App de campo serve os dois casos** (técnico que também usa a mesa e
-  coletor dedicado): login Supabase por e-mail e senha + PIN, no molde do
-  `brigada.html`; tabela de coletores com vínculo opcional ao usuário de
-  mesa, como `brigadistas.usuario_id`.
+- **App de campo**: login Supabase por e-mail e senha + PIN, no molde
+  do `brigada.html`. ~~Tabela de coletores com vínculo opcional ao
+  usuário de mesa~~ — decisão revista na Fase 3: não existe população
+  de coletores sem conta administrativa (diferente do Brigadas), quem
+  coleta já é usuário de mesa (`tecnico`/`gestor`/`biologo`). Sem
+  tabela de identidade nova — ver "Fase 3 — ENTREGUE".
 - **Laudo chega por e-mail, de laboratório terceirizado.** O PDF fica
   anexado à coleta **sempre** (bucket privado, URL assinada por
   `js/fotos-privadas.js` — regra do projeto). Faixa de validação por
@@ -692,15 +694,199 @@ coisa, nenhuma policy nova foi necessária.
   turbidez. As duas aparecem lado a lado — o índice para a série
   histórica e a comunicação, a conformidade para o papel de fiscalização.
 
+## Fase 3 — ENTREGUE (migrations 257–260; `app-agua/`, `pages/agua-app.html`)
+
+App de campo offline-first para a coleta de amostras, no molde do
+Brigadas (`pages/brigada.html` + `js/brigada-offline.js` +
+`js/brigada-sync.js`, adaptados/simplificados) — login Supabase por
+e-mail e senha, PIN de 4 dígitos para reentrada rápida, fila em
+IndexedDB, sincronização por `uuid_cliente`.
+
+### A decisão que estava em aberto — RESOLVIDA
+
+"Quem coleta, nominalmente" (pendência registrada acima desde a Fase
+0): **o usuário perguntou e respondeu nesta rodada — quem coleta água
+hoje são os MESMOS técnicos que já usam a mesa** (perfil
+`tecnico`/`gestor`/`biologo`, DIMA/CIGMA), não uma população de campo
+sem conta administrativa (diferente do Brigadas, onde essa população
+existe de fato e por isso tem `brigadistas` como identidade paralela).
+
+Implicação de desenho: **nenhuma tabela de identidade nova.** O app
+loga com a MESMA conta Supabase Auth de `usuarios` que já opera
+`pages/agua-pontos.html`/`agua-laudos.html` — `agua_coletas.coletor_id`
+(que já existia desde a Fase 0, `REFERENCES usuarios(id)`) é
+preenchido com `auth.uid()` direto, sem tabela intermediária tipo
+`brigadistas.usuario_id`. `pode_editar('agua')` (já em produção desde a
+Fase 0) já é a permissão certa para o app gravar — nenhuma policy nova.
+
+### O que foi construído
+
+- **`pages/agua-app.html`** — shell próprio (sem `gerarLayout()`, como
+  os outros 3 apps de campo): login e-mail/senha com cliente Supabase
+  isolado (`storageKey: 'siguc-agua-session'`, mesmo padrão do
+  Brigadas), PIN de 4 dígitos (hash SHA-256 salgado pelo próprio id do
+  usuário, `js/agua-offline.js`), tela Home, **Nova coleta** (ponto de
+  uma lista cacheada — nunca digitado —, data/hora, 6 parâmetros de
+  campo com checagem de plausibilidade via `agua_valor_plausivel()`
+  RPC — a mesma função da Fase 2, nunca reimplementada —, código da
+  amostra opcional, foto do ponto, observações), Fila (offline queue),
+  Config (trocar PIN, instalar por QR, verificar atualização, aviso de
+  privacidade, zerar fila, sair). Só UMA foto por coleta (não até 5
+  como o Brigadas) — o app registra o estado do ponto, não uma galeria
+  de evidências.
+- **`js/agua-offline.js` / `js/agua-sync.js`** — molde direto de
+  `brigada-offline.js`/`brigada-sync.js`, simplificado: sem filhos
+  (fauna/participantes) porque uma coleta é uma linha só (mesmo desenho
+  1:1 de `agua_coletas` desde a Fase 0). Idempotência por
+  `uuid_cliente` com `.upsert(payload,{onConflict:'uuid_cliente'})` —
+  molde do Brigadas (upsert simples), não da RPC SECURITY DEFINER do
+  Frota: aqui não há elevação de privilégio a proteger, o coletor já
+  tem `pode_editar('agua')` como usuário de mesa. Mesma lição de Blob
+  → base64 antes de gravar no IndexedDB (Blob do IndexedDB fica
+  inválido depois que o app vai para background no iOS).
+- **Câmera/GPS/marca d'água: `js/brigada-captura.js` reaproveitado sem
+  alteração** (o app não escreve captura própria — regra do projeto).
+  **GPS é PONTUAL** (`bGpsUmaLeitura()`, `getCurrentPosition`), não
+  contínuo como Brigadas/Biomonitor (`watchPosition`) — decisão nova
+  desta entrega, documentada no Aviso de Privacidade (migration 259):
+  a única leitura de posição serve para comparar com a coordenada
+  CADASTRADA do ponto (auditoria da coleta), finalidade pontual por
+  natureza, sem uso concreto para indicador de GPS ao vivo na tela.
+  Divergência > 1 km entre o GPS do momento e a coordenada do ponto
+  vira AVISO não bloqueante (`atualizarDivergenciaGps()`) — "nada pode
+  impedir o trabalho de campo" (regra do sistema).
+- **Bucket `agua-fotos-campo`** (migration 258) — PRIVADO desde o
+  nascimento, diferente de `agua-laudos` (PDF/imagem do laudo,
+  lançado pela mesa): fotos de campo são capturadas pelo coletor no
+  momento da coleta, mesma família da foto de ocorrência do
+  Brigadas/cupom do Frota — conceitos diferentes não dividem bucket,
+  mesmo sendo o mesmo módulo. Sem policy dupla tipo Frota (motorista
+  sem acesso de mesa): aqui quem coleta já tem `pode_editar('agua')`.
+- **`uuid_cliente`/`codigo_amostra`** (migration 257, corrigida pela
+  257b): `agua_coletas` ganhou as duas colunas. **Achado ao testar
+  contra o banco de verdade**: o índice UNIQUE inicial era PARCIAL
+  (`WHERE uuid_cliente IS NOT NULL`, para permitir múltiplas linhas
+  NULL das coletas lançadas pela mesa) — mas o Postgres só infere um
+  índice parcial como alvo de `ON CONFLICT (coluna)` quando a cláusula
+  repete o MESMO predicado, o que o upsert do PostgREST/supabase-js
+  não faz. Toda sincronização falharia com "there is no unique or
+  exclusion constraint matching the ON CONFLICT specification". Não
+  precisava de índice parcial: UNIQUE padrão do Postgres já trata
+  múltiplos NULL como não-conflitantes — corrigido na 257b para um
+  UNIQUE CONSTRAINT normal.
+- **`vw_agua_coletas_detalhe` atualizada** (migration 260) — **achado
+  ao validar de ponta a ponta contra o banco**: a view usa `c.*` para
+  trazer as colunas de `agua_coletas`, mas `SELECT *` numa view é
+  expandido no momento em que ela é CRIADA, não a cada consulta —
+  colunas adicionadas depois na tabela base (`uuid_cliente`/
+  `codigo_amostra`, migration 257) não apareciam na view até ela ser
+  recriada. Sem isso, `pages/agua-laudos.html` nunca veria o código da
+  amostra que o coletor escreveu no app. Corrigido enumerando
+  explicitamente as colunas de `agua_coletas` (mesma ordem da migration
+  248) e acrescentando só `codigo_amostra` no FIM da lista de saída —
+  `CREATE OR REPLACE VIEW` só aceita adicionar coluna ao final, nunca
+  no meio (`uuid_cliente` ficou de fora de propósito: é chave interna
+  do app, sem uso na mesa).
+- **Aviso de Privacidade — variante `agua`** (migration 259): mesmo
+  mecanismo das migrations 222/223 — uma linha nova em `lgpd_documentos`
+  com `app='agua'`, zero migration de schema. **ROPA sem entrada nova**:
+  a migration 251 (Fase 0) já tinha registrado TRAT-018 antecipando
+  esta fase, e já descrevendo exatamente o padrão adotado (leitura
+  pontual, não contínua) — esta entrega só materializa em texto o que
+  o ROPA já previa.
+- **Infraestrutura do shell nativo pronta, APK NÃO gerado** (regra do
+  projeto): `app-agua/` (`capacitor.config.json` com `appId
+  br.gov.ac.sema.siguc.agua`, `package.json`, `scripts/build-www.mjs`
+  molde do Brigadas, `android/` copiado de `app/android` com o pacote
+  Java/`applicationId` renomeados), `.github/workflows/agua-apk.yml`
+  (não disparado), `pages/instalar-agua.html`, `pwa/manifest-agua.json`.
+  `pwa/sw.js`: novo branch de `APP` por scope
+  (`/pages/agua-app.html`), `VERSOES.agua = 1`, `SHELLS.agua`. Ícone do
+  launcher Android ainda é o placeholder genérico do Capacitor (sem
+  arte própria nesta entrega — não bloqueia o app nascer, só falta
+  quando alguém gerar o primeiro APK de verdade).
+- **`npm install` + `node scripts/build-www.mjs` rodados de verdade**
+  nesta sessão (com `SUPABASE_URL`/`SUPABASE_ANON_KEY` explícitos, já
+  que `/api/env` da produção está fora da política de rede do
+  ambiente de execução) — confirma que o pipeline de build do app
+  nativo funciona de ponta a ponta: transpila para ES2017, embarca
+  Supabase UMD + fontes, reescreve `agua-app.html` para `index.html`,
+  passa nas checagens de sanidade (nenhum `<script src="/js/…">` sem
+  embarcar, nenhum resquício de CDN, credenciais embarcadas).
+
+### Achado ao validar com Playwright — bug real na geração do CSS
+
+`css/agua-app.css` nasceu de um `sed` que trocava o cabeçalho de
+`css/brigada.css` (classe raiz `.brigada-app` → `.agua-app`). O
+primeiro `sed` assumiu que o comentário de cabeçalho tinha 3 linhas;
+na verdade tinha 5. O resultado: as linhas 4–5 do comentário original
+sobraram como TEXTO CRU fora de qualquer `/* … */` (a substituição já
+tinha fechado um comentário novo, mais curto, na linha 4) — um "radius
+ousado, DM Mono nos dados…" solto no meio do CSS, seguido de uma linha
+de `───` decorativa. Isso quebrou o parser CSS bem no início do
+arquivo, e o parser não voltou a sincronizar antes da regra
+`[hidden] { display: none !important; }` — que existe especificamente
+para forçar telas escondidas a sumirem mesmo com CSS custom
+concorrente. Com essa regra descartada, TODAS as telas do app (login,
+PIN, home, formulário…) ficavam com `display` vindo de outras regras
+(`.lock-screen{display:flex}` etc.) e apareciam **simultaneamente**,
+sobrepostas — só visível checando `getComputedStyle` de verdade
+(`hidden=true` mas `display:flex`), não pela leitura do arquivo. Um
+bug de produção real, não só de teste — encontrado, isolado com um
+harness mínimo (`performance.now()` + log dentro da própria página,
+para eliminar o atraso de entrega assíncrona das mensagens de console
+via CDP como fonte de confusão) e corrigido regenerando o CSS com a
+substituição de cabeçalho correta (5 linhas). Lição para qualquer
+`sed`/geração de CSS por script neste projeto: conferir a extensão
+REAL do bloco substituído, não assumir pelo número de linhas do
+cabeçalho novo.
+
+### Validação
+
+`tests/agua-app-fluxo.test.js` (Playwright, servidor estático local,
+`chromium` explícito — o `chrome-headless-shell` que o Playwright
+1.61 pediria não está pré-instalado neste ambiente): salva uma coleta
+completa (ponto, data, 6 parâmetros, foto com marca d'água real via
+canvas do Chromium, código da amostra, observações), confirma a forma
+exata do registro no IndexedDB (foto em base64, nunca Blob cru), a
+fila mostrando "Pendente", e o badge de contagem; um segundo teste
+sobe um cliente Supabase stub (rede real para `*.supabase.co`
+bloqueada pelo proxy do ambiente, confirmado por `curl` antes de
+escrever o teste) e confere que `aSyncRodar()` monta exatamente o
+payload esperado (campanha resolvida, localização em EWKT, nenhum
+campo interno do IndexedDB vazando para o banco) e move o registro
+para `confirmado`.
+
+**Contrato do lado do banco conferido à parte, contra produção**
+(mesmo padrão da Fase 2 — "uma coleta de teste, inserida e conferida
+via `execute_sql`", não fabricado em JS): inserida uma coleta com a
+forma exata do payload que `js/agua-sync.js` produziria (incluindo o
+upsert de campanha por `ano+ordem`, replicado linha a linha), conferido
+que `vw_agua_coletas_detalhe` devolve `status='aguardando_lab'` com
+todos os campos certos (foi esse passo que revelou a lacuna do
+`codigo_amostra`, migration 260) e que a query exata de
+`carregarFila()` em `pages/agua-laudos.html`
+(`.eq('status','aguardando_lab').order('data_coleta')`) enxerga a
+linha. Linha de teste apagada ao final (`DELETE … WHERE uuid_cliente
+= …`); a campanha 2026/segunda criada no processo é dado real
+(qualquer coleta real desse período a reaproveitaria) e foi mantida.
+
+`mcp__Supabase__get_advisors` (security) depois de cada migration
+(257, 257b, 258, 259, 260): nenhum achado novo — mesmos 165 avisos
+pré-existentes do projeto. `bash scripts/guardrails.sh`: 0 falhas
+críticas, mesmos 32 avisos pré-existentes.
+
 ## Decisões ainda abertas (não travam a Fase 0)
 
 - **Sólidos em suspensão** — a incoerência de unidade acima. Entra na
-  Fase 1.
-- **Quem coleta, nominalmente** — quantas pessoas e de qual setor.
-  Dimensiona o cadastro de coletores e a entrada no ROPA. Entra na Fase 3.
+  Fase 1 (pendência de conferência humana, ver `pages/agua-conferencia.html`).
 - **Hidrografia** — decisão tomada: buscar na ANA (não usar shapefile
   da SEMA). Tentado na Fase 4 e bloqueado por política de rede da
   sessão que executou — ver "Fase 4 — ENTREGUE" para os domínios já
   identificados (o MapServer ArcGIS da ANA em `portal1.snirh.gov.br` é
   o mais promissor, devolve GeoJSON direto por bbox/UF). Fica pendente
   para uma sessão com esses domínios liberados.
+- **Ícone do app Água** — o launcher Android usa o placeholder
+  genérico do Capacitor (`app-agua/android`); nenhuma arte própria foi
+  gerada nesta entrega (sem ferramenta de geração de imagem
+  disponível). Trocar antes do primeiro APK real.
