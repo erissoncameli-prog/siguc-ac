@@ -234,7 +234,7 @@ test('Histórico: gráfico por ponto e lista de minhas coletas', async ({ page }
   await page.evaluate(() => {
     const HIST_PONTO = [
       { id: 'c1', data_coleta: '2024-03-10', campanha_ano: 2024, campanha_ordem: 'primeira', status: 'completo', iqa: 82, iqa_faixa: 'Ótima', conama_conforme: true },
-      { id: 'c2', data_coleta: '2024-09-14', campanha_ano: 2024, campanha_ordem: 'segunda', status: 'quarentena', iqa: 61, iqa_faixa: 'Regular', conama_conforme: false },
+      { id: 'c2', data_coleta: '2024-09-14', campanha_ano: 2024, campanha_ordem: 'segunda', status: 'quarentena', iqa: 61, iqa_faixa: 'Regular', conama_conforme: false, conama_violacoes: ['dbo', 'turbidez'] },
       { id: 'c3', data_coleta: '2025-03-12', campanha_ano: 2025, campanha_ordem: 'primeira', status: 'aguardando_lab', iqa: null, iqa_faixa: null, conama_conforme: null },
     ]
     const MINHAS = [
@@ -297,6 +297,6 @@ test('Histórico: gráfico por ponto e lista de minhas coletas', async ({ page }
   await expect(page.locator('#h-ponto-lista .sync-item')).toHaveCount(3)
   await expect(page.locator('#h-ponto-lista')).toContainText('82 · Ótima')
   await expect(page.locator('#h-ponto-lista')).toContainText('61 · Regular · em conferência')
-  await expect(page.locator('#h-ponto-lista')).toContainText('Fora do limite CONAMA')
+  await expect(page.locator('#h-ponto-lista')).toContainText('Fora do limite: DBO, Turbidez')
   await expect(page.locator('#h-ponto-lista')).toContainText('Aguardando laudo')
 });
