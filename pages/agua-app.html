@@ -1129,11 +1129,16 @@ async function salvarRegistro() {
 // coletas por ponto (série desde 2016) e o app de campo não pretende
 // espelhar o banco inteiro — mesmo raciocínio de btn-atualizar-pontos.
 //
-// IQA só existe depois que a mesa lança o laudo (status='completo') —
-// a busca por ponto filtra por isso, senão o gráfico misturaria
-// leituras de coletas ainda em quarentena/aguardando laboratório, que
-// a view calcula mas não são dado verificado (mesma cautela de
-// pages/agua-mapa.html, que reduz a opacidade em vez de confiar cego).
+// IQA existe assim que o laudo é lançado, mesmo antes da mesa
+// confirmar — 'quarentena' já tem IQA calculado pela view, só
+// 'aguardando_lab' não. Achado ao usar: filtrar por status='completo'
+// deixava o gráfico praticamente vazio a partir de 2022 (quase toda a
+// série recente ainda em quarentena — pendência de conferência humana
+// documentada no ROPA). Mesma cautela de pages/agua-mapa.html: NUNCA
+// esconder o dado em quarentena, só marcar visualmente que não é
+// definitivo (preenchimento fraco, texto "em conferência" — ver
+// js/agua-iqa-visual.js). 'aguardando_lab' não tem IQA e cai sozinho
+// no tratamento de "vazado" que o gráfico já tinha para pontos nulos.
 
 // Formata `date` puro (sem hora) sem sofrer o desvio de fuso do
 // `new Date('AAAA-MM-DD')` (interpretado como UTC meia-noite — vira o
@@ -1174,21 +1179,20 @@ async function carregarHistoricoPonto(pontoId) {
   estado.textContent = 'Carregando…'
   try {
     const { data, error } = await db.from('vw_agua_coletas_detalhe')
-      .select('id,data_coleta,campanha_ano,campanha_ordem,iqa,iqa_faixa,conama_conforme')
+      .select('id,data_coleta,campanha_ano,campanha_ordem,status,iqa,iqa_faixa,conama_conforme')
       .eq('ponto_id', pontoId)
-      .eq('status', 'completo')
       .order('data_coleta')
     if (error) throw error
 
     if (!data.length) {
-      estado.textContent = 'Nenhuma coleta com laudo completo neste ponto ainda.'
+      estado.textContent = 'Nenhuma coleta neste ponto ainda.'
       return
     }
     estado.textContent = ''
 
     const pontosGrafico = data.map(c => ({
       label: aguaCampanhaLabel(c.campanha_ano, c.campanha_ordem, true),
-      iqa: c.iqa, faixa: c.iqa_faixa,
+      iqa: c.iqa, faixa: c.iqa_faixa, status: c.status,
     }))
     graf.hidden = false
     graf.innerHTML = aguaIqaGraficoHTML(pontosGrafico)
@@ -1203,10 +1207,10 @@ async function carregarHistoricoPonto(pontoId) {
           <span>${formatDataColeta(c.data_coleta)}</span>
         </div>
         <div style="text-align:right;flex-shrink:0;margin-left:10px;max-width:52%">
-          ${aguaIqaChipHTML(c.iqa, c.iqa_faixa)}
-          <div style="font-size:11px;color:${c.conama_conforme == null ? '#9CA3AF' : c.conama_conforme ? '#059669' : '#C2410C'};margin-top:2px">
+          ${aguaIqaChipHTML(c.iqa, c.iqa_faixa, c.status === 'aguardando_lab' ? 'Aguardando laudo' : undefined, c.status === 'quarentena')}
+          ${c.status !== 'aguardando_lab' ? `<div style="font-size:11px;color:${c.conama_conforme == null ? '#9CA3AF' : c.conama_conforme ? '#059669' : '#C2410C'};margin-top:2px">
             ${c.conama_conforme == null ? 'CONAMA — sem limites cadastrados' : c.conama_conforme ? 'Conforme CONAMA' : 'Fora do limite CONAMA'}
-          </div>
+          </div>` : ''}
         </div>
       </div>`).join('')
   } catch (e) {
@@ -1249,8 +1253,8 @@ async function carregarMinhasColetas() {
           ${c.codigo_amostra ? `<span style="display:block;font-family:var(--font-mono)">Amostra: ${esc(c.codigo_amostra)}</span>` : ''}
         </div>
         <div style="text-align:right;flex-shrink:0;margin-left:10px">
-          ${c.status === 'completo'
-            ? aguaIqaChipHTML(c.iqa, c.iqa_faixa)
+          ${c.iqa != null
+            ? aguaIqaChipHTML(c.iqa, c.iqa_faixa, undefined, c.status === 'quarentena')
             : `<span style="font-size:12px;font-weight:700;color:${STATUS_COR[c.status] || '#6B7280'}">${STATUS_LABEL[c.status] || c.status}</span>`}
         </div>
       </div>`).join('')

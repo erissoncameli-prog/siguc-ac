@@ -48,14 +48,17 @@ function aguaCampanhaLabel(ano, ordem, curto) {
 
 // Chip/badge autocontido (cor direta, sem depender de global.css) —
 // para o app de campo. `fb` = texto de fallback quando faixa é nula.
-function aguaIqaChipHTML(iqa, faixa, fb) {
+// `provisorio` = coleta ainda em quarentena (mesma cautela do mapa:
+// mostra o dado, mas visualmente distinto de um laudo já conferido —
+// nunca esconde, nunca finge que é definitivo).
+function aguaIqaChipHTML(iqa, faixa, fb, provisorio) {
   if (iqa == null || !faixa) {
     return `<span style="display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:700;color:${AGUA_SEM_IQA_COR}">
       <span style="width:9px;height:9px;border-radius:50%;background:${AGUA_SEM_IQA_COR}"></span>${fb || 'Sem índice'}</span>`
   }
   const cor = AGUA_IQA_FAIXA_COR[faixa] || AGUA_SEM_IQA_COR
-  return `<span style="display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:700;color:${cor}">
-    <span style="width:9px;height:9px;border-radius:50%;background:${cor}"></span>${Number(iqa).toFixed(0)} · ${faixa}</span>`
+  return `<span style="display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:700;color:${cor};opacity:${provisorio ? .65 : 1}">
+    <span style="width:9px;height:9px;border-radius:50%;background:${cor}"></span>${Number(iqa).toFixed(0)} · ${faixa}${provisorio ? ' · em conferência' : ''}</span>`
 }
 
 // ── Gráfico de linha do IQA por campanha (SVG desenhado à mão — o
@@ -101,7 +104,11 @@ function aguaIqaGraficoHTML(pontos, opts) {
       return `<circle cx="${x(i)}" cy="${y(50)}" r="4" fill="none" stroke="${AGUA_SEM_IQA_COR}" stroke-width="1.5" stroke-dasharray="2,2"/>`
     }
     const cor = AGUA_IQA_FAIXA_COR[p.faixa] || AGUA_SEM_IQA_COR
-    return `<circle cx="${x(i)}" cy="${y(p.iqa)}" r="5" fill="${cor}" stroke="#fff" stroke-width="1.5"/>`
+    // Preenchimento fraco = quarentena (ainda em conferência), mesmo
+    // limiar 0,5 de agua-mapa.html — nunca esconder o dado, só marcar
+    // que não é definitivo.
+    const fillOpacity = p.status === 'quarentena' ? .5 : 1
+    return `<circle cx="${x(i)}" cy="${y(p.iqa)}" r="5" fill="${cor}" fill-opacity="${fillOpacity}" stroke="#fff" stroke-width="1.5"/>`
   }).join('')
 
   // Rótulos do eixo X — só a cada N para não amontoar em telas
@@ -115,9 +122,12 @@ function aguaIqaGraficoHTML(pontos, opts) {
     <span style="display:inline-flex;align-items:center;gap:4px;font-size:10px;color:#6B7280">
       <span style="width:8px;height:8px;border-radius:50%;background:${AGUA_IQA_FAIXA_COR[f]}"></span>${f}</span>`).join('')
 
+  const temQuarentena = pontos.some(p => p.status === 'quarentena')
+
   return `
     <svg viewBox="0 0 ${w} ${h}" width="100%" height="${h}" role="img" aria-label="Gráfico de IQA por campanha">
       ${grade}${linhas}${pontosSvg}${rotulos}
     </svg>
-    <div style="display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:4px">${legenda}</div>`
+    <div style="display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:4px">${legenda}</div>
+    ${temQuarentena ? '<p style="text-align:center;font-size:10px;color:#9CA3AF;margin-top:4px">Preenchimento fraco = ainda em conferência (dado não verificado)</p>' : ''}`
 }
