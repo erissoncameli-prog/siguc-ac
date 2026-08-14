@@ -87,6 +87,7 @@ function gerarLayout(tituloPagina, paginaAtiva) {
     'frota-contratos':          { svg: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>', cor: '#38bdf8', bg: 'rgba(56,189,248,0.22)' },
     'frota-inspecoes':          { svg: '<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>', cor: '#34d399', bg: 'rgba(52,211,153,0.22)' },
     'frota-app':                { svg: '<rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/>', cor: '#2dd4bf', bg: 'rgba(45,212,191,0.22)' },
+    'agua-app':                 { svg: '<path d="M12 2s7 8.5 7 13a7 7 0 0 1-14 0c0-4.5 7-13 7-13z"/>', cor: '#0284c7', bg: 'rgba(2,132,199,0.22)' },
     'agua-mapa':                { svg: '<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/>', cor: '#0ea5e9', bg: 'rgba(14,165,233,0.22)' },
     'agua-pontos':              { svg: '<path d="M12 2s7 8.5 7 13a7 7 0 0 1-14 0c0-4.5 7-13 7-13z"/>', cor: '#38bdf8', bg: 'rgba(56,189,248,0.22)' },
     'agua-laudos':              { svg: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M12 11s2.5 3 2.5 4.7a2.5 2.5 0 0 1-5 0C9.5 14 12 11 12 11z"/>', cor: '#0ea5e9', bg: 'rgba(14,165,233,0.22)' },
@@ -161,6 +162,7 @@ function gerarLayout(tituloPagina, paginaAtiva) {
     {
       id: 'agua', label: 'Qualidade da Água', super: 'Diretoria Técnica',
       itens: [
+        { id: 'agua-app',         href: '../pages/agua-app.html',         label: 'App de Campo', target: '_blank' },
         { id: 'agua-mapa',        href: '../pages/agua-mapa.html',        label: 'Mapa' },
         { id: 'agua-pontos',      href: '../pages/agua-pontos.html',      label: 'Pontos e Laboratórios' },
         { id: 'agua-laudos',      href: '../pages/agua-laudos.html',      label: 'Lançar Laudos' },
