@@ -224,3 +224,72 @@ test('sincronização move pendente → confirmado e monta o payload esperado', 
 
   await expect(page.locator('#nav-badge')).toBeHidden();
 });
+
+test('Histórico: gráfico por ponto e lista de minhas coletas', async ({ page }) => {
+  await abrirAppSemLogin(page);
+  await entrarComoColetorDeTeste(page);
+
+  // Stub do cliente Supabase para as duas consultas da aba Histórico —
+  // mesma técnica do teste de sync: sem rede real neste ambiente.
+  await page.evaluate(() => {
+    const HIST_PONTO = [
+      { id: 'c1', data_coleta: '2024-03-10', campanha_ano: 2024, campanha_ordem: 'primeira', iqa: 82, iqa_faixa: 'Ótima', conama_conforme: true },
+      { id: 'c2', data_coleta: '2024-09-14', campanha_ano: 2024, campanha_ordem: 'segunda', iqa: 61, iqa_faixa: 'Regular', conama_conforme: false },
+      { id: 'c3', data_coleta: '2025-03-12', campanha_ano: 2025, campanha_ordem: 'primeira', iqa: null, iqa_faixa: null, conama_conforme: null },
+    ]
+    const MINHAS = [
+      { id: 'm1', ponto_nome: 'Rio Teste', codigo_ana: '12345678', data_coleta: '2026-08-10', campanha_ano: 2026, campanha_ordem: 'segunda', status: 'aguardando_lab', iqa: null, iqa_faixa: null, conama_conforme: null, codigo_amostra: 'AM-01' },
+      { id: 'm2', ponto_nome: 'Rio Teste', codigo_ana: '12345678', data_coleta: '2026-01-05', campanha_ano: 2026, campanha_ordem: 'primeira', status: 'completo', iqa: 74, iqa_faixa: 'Boa', conama_conforme: true, codigo_amostra: null },
+    ]
+    window.db = {
+      from: (tabela) => ({
+        select: () => ({
+          eq: (campo, valor) => {
+            const chain = {
+              _filtros: { [campo]: valor },
+              eq(c2, v2) { this._filtros[c2] = v2; return this },
+              order() { return this },
+              async then(resolve) {
+                if (tabela !== 'vw_agua_coletas_detalhe') return resolve({ data: [], error: null })
+                if ('ponto_id' in this._filtros) return resolve({ data: HIST_PONTO, error: null })
+                if ('coletor_id' in this._filtros) return resolve({ data: MINHAS, error: null })
+                resolve({ data: [], error: null })
+              },
+              limit() { return this },
+            }
+            return chain
+          },
+        }),
+      }),
+    }
+    db = window.db
+  })
+
+  await page.locator('[data-tela="tela-historico"]').click()
+  await page.locator('#tela-historico').waitFor({ state: 'visible' })
+
+  // "Minhas coletas" carrega sozinho ao abrir a aba
+  await expect(page.locator('#h-minhas-lista .sync-item')).toHaveCount(2)
+  await expect(page.locator('#h-minhas-lista')).toContainText('Aguardando laudo')
+  await expect(page.locator('#h-minhas-lista')).toContainText('74 · Boa')
+  await expect(page.locator('#h-minhas-lista')).toContainText('AM-01')
+
+  // Histórico por ponto: escolher o ponto dispara o gráfico + lista
+  await page.selectOption('#h-ponto', 'ponto-teste-0001')
+  await page.locator('#h-ponto-grafico svg').waitFor({ state: 'visible', timeout: 10_000 })
+
+  // 2 pontos com IQA (círculos preenchidos) + 1 vazado (sem IQA, tracejado)
+  const circulosPreenchidos = page.locator('#h-ponto-grafico circle[stroke="#fff"]')
+  await expect(circulosPreenchidos).toHaveCount(2)
+  const circuloVazado = page.locator('#h-ponto-grafico circle[stroke-dasharray]')
+  await expect(circuloVazado).toHaveCount(1)
+
+  // Legenda mostra as 5 faixas, sempre com o nome em texto (nunca só cor)
+  for (const faixa of ['Ótima', 'Boa', 'Regular', 'Ruim', 'Péssima']) {
+    await expect(page.locator('#h-ponto-grafico')).toContainText(faixa)
+  }
+
+  await expect(page.locator('#h-ponto-lista .sync-item')).toHaveCount(3)
+  await expect(page.locator('#h-ponto-lista')).toContainText('82 · Ótima')
+  await expect(page.locator('#h-ponto-lista')).toContainText('Fora do limite CONAMA')
+});

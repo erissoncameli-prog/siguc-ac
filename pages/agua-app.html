@@ -286,6 +286,31 @@
   </div>
 </div>
 
+<!-- ══ TELA: HISTÓRICO DE IQA ══════════════════════════════════ -->
+<div id="tela-historico" class="tela" hidden>
+  <header class="form-header">
+    <button class="btn-back" id="btn-back-historico" aria-label="Voltar">‹</button>
+    <span>Histórico de IQA</span>
+    <span></span>
+  </header>
+
+  <div class="form-body">
+    <div class="form-section">
+      <label class="form-label">Ponto de coleta</label>
+      <select id="h-ponto" class="form-select">
+        <option value="">Selecione um ponto…</option>
+      </select>
+    </div>
+    <div id="h-ponto-estado" class="campo-dica"></div>
+    <div id="h-ponto-grafico" hidden></div>
+    <div id="h-ponto-lista"></div>
+
+    <div class="form-section-titulo" style="margin-top:22px">Minhas coletas</div>
+    <div id="h-minhas-estado" class="campo-dica"></div>
+    <div id="h-minhas-lista"></div>
+  </div>
+</div>
+
 <!-- ══ TELA: FILA DE SINCRONIZAÇÃO ════════════════════════════ -->
 <div id="tela-fila" class="tela" hidden>
   <header class="form-header">
@@ -364,6 +389,10 @@
   <button class="pill-btn" id="nav-nova">
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2s7 8.5 7 13a7 7 0 0 1-14 0c0-4.5 7-13 7-13z"/></svg>
     <span>Coletar</span>
+  </button>
+  <button class="pill-btn" data-tela="tela-historico" id="nav-historico">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M18.7 8 13 13.7l-3-3L5.5 15.2"/></svg>
+    <span>Histórico</span>
   </button>
   <button class="pill-btn" data-tela="tela-fila" id="nav-fila">
     <span class="pill-badge" id="nav-badge" hidden>0</span>
@@ -453,6 +482,7 @@ const _aguaReady = _dbReady.then(function () {
 <script src="/js/agua-offline.js"></script>
 <script src="/js/agua-sync.js"></script>
 <script src="/js/brigada-captura.js"></script>
+<script src="/js/agua-iqa-visual.js"></script>
 <script>
 // ════════════════════════════════════════════════════════════════
 // Estado global do app
@@ -465,6 +495,7 @@ const App = {
   gpsAtual: null,           // leitura pontual mais recente (bGpsUmaLeitura)
   pinSetupFase: 1,
   pinSetupPrimeiro: '',
+  _historicoPontoId: null,  // último ponto escolhido na aba Histórico
 }
 
 const INSTALL_URL = 'https://siguc-ac.vercel.app/pages/instalar-agua.html'
@@ -530,8 +561,9 @@ function mostrarTela(id, empurrar = true) {
     b.classList.toggle('ativa', b.dataset.tela === id)
   })
 
-  if (id === 'tela-fila')   carregarFila()
-  if (id === 'tela-config') carregarConfig()
+  if (id === 'tela-fila')      carregarFila()
+  if (id === 'tela-config')    carregarConfig()
+  if (id === 'tela-historico') abrirHistorico()
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -1089,6 +1121,146 @@ async function salvarRegistro() {
 }
 
 // ════════════════════════════════════════════════════════════════
+// Histórico de IQA
+// ════════════════════════════════════════════════════════════════
+// Precisa de conexão (não é escrita de campo — regra de "nunca
+// bloquear o trabalho" vale para SALVAR uma coleta, não para navegar
+// num histórico). Sem cache offline de propósito: são até centenas de
+// coletas por ponto (série desde 2016) e o app de campo não pretende
+// espelhar o banco inteiro — mesmo raciocínio de btn-atualizar-pontos.
+//
+// IQA só existe depois que a mesa lança o laudo (status='completo') —
+// a busca por ponto filtra por isso, senão o gráfico misturaria
+// leituras de coletas ainda em quarentena/aguardando laboratório, que
+// a view calcula mas não são dado verificado (mesma cautela de
+// pages/agua-mapa.html, que reduz a opacidade em vez de confiar cego).
+
+// Formata `date` puro (sem hora) sem sofrer o desvio de fuso do
+// `new Date('AAAA-MM-DD')` (interpretado como UTC meia-noite — vira o
+// dia anterior em fusos negativos como o do Acre). Mesmo padrão já
+// usado em agua-conferencia.html/agua-laudos.html.
+function formatDataColeta(str) {
+  if (!str) return '—'
+  return new Date(str + 'T00:00:00').toLocaleDateString('pt-BR')
+}
+
+function popularSelectPontoHistorico() {
+  const sel = document.getElementById('h-ponto')
+  const atual = sel.value
+  sel.innerHTML = '<option value="">Selecione um ponto…</option>' +
+    (App.pontos || []).map(p => `<option value="${p.id}">${esc(p.nome)} (${esc(p.codigo_ana)})</option>`).join('')
+  if (atual) sel.value = atual
+}
+
+async function abrirHistorico() {
+  if (!App.pontos.length) App.pontos = await aOfflineListarPontos()
+  popularSelectPontoHistorico()
+  if (App._historicoPontoId) {
+    document.getElementById('h-ponto').value = App._historicoPontoId
+    carregarHistoricoPonto(App._historicoPontoId)
+  }
+  carregarMinhasColetas()
+}
+
+async function carregarHistoricoPonto(pontoId) {
+  const estado = document.getElementById('h-ponto-estado')
+  const graf = document.getElementById('h-ponto-grafico')
+  const lista = document.getElementById('h-ponto-lista')
+  graf.hidden = true; graf.innerHTML = ''; lista.innerHTML = ''
+
+  if (!pontoId) { estado.textContent = ''; return }
+  if (!db) { estado.textContent = 'Sem conexão — o histórico por ponto precisa de internet.'; return }
+
+  estado.textContent = 'Carregando…'
+  try {
+    const { data, error } = await db.from('vw_agua_coletas_detalhe')
+      .select('id,data_coleta,campanha_ano,campanha_ordem,iqa,iqa_faixa,conama_conforme')
+      .eq('ponto_id', pontoId)
+      .eq('status', 'completo')
+      .order('data_coleta')
+    if (error) throw error
+
+    if (!data.length) {
+      estado.textContent = 'Nenhuma coleta com laudo completo neste ponto ainda.'
+      return
+    }
+    estado.textContent = ''
+
+    const pontosGrafico = data.map(c => ({
+      label: aguaCampanhaLabel(c.campanha_ano, c.campanha_ordem, true),
+      iqa: c.iqa, faixa: c.iqa_faixa,
+    }))
+    graf.hidden = false
+    graf.innerHTML = aguaIqaGraficoHTML(pontosGrafico)
+
+    // Lista em texto — leitura acessível ponto a ponto, sem depender
+    // de apontar/tocar no gráfico (regra do skill de dataviz: uma
+    // visão em tabela sempre disponível).
+    lista.innerHTML = data.slice().reverse().map(c => `
+      <div class="sync-item">
+        <div class="sync-info" style="flex:1">
+          <strong>${esc(aguaCampanhaLabel(c.campanha_ano, c.campanha_ordem))}</strong>
+          <span>${formatDataColeta(c.data_coleta)}</span>
+        </div>
+        <div style="text-align:right;flex-shrink:0;margin-left:10px;max-width:52%">
+          ${aguaIqaChipHTML(c.iqa, c.iqa_faixa)}
+          <div style="font-size:11px;color:${c.conama_conforme == null ? '#9CA3AF' : c.conama_conforme ? '#059669' : '#C2410C'};margin-top:2px">
+            ${c.conama_conforme == null ? 'CONAMA — sem limites cadastrados' : c.conama_conforme ? 'Conforme CONAMA' : 'Fora do limite CONAMA'}
+          </div>
+        </div>
+      </div>`).join('')
+  } catch (e) {
+    estado.textContent = 'Não foi possível carregar — verifique a conexão.'
+    console.warn('[historico ponto]', e)
+  }
+}
+
+async function carregarMinhasColetas() {
+  const estado = document.getElementById('h-minhas-estado')
+  const lista = document.getElementById('h-minhas-lista')
+  lista.innerHTML = ''
+
+  if (!db) { estado.textContent = 'Sem conexão — suas coletas anteriores aparecem aqui quando houver internet.'; return }
+  if (!App.coletor?.id) { estado.textContent = ''; return }
+
+  estado.textContent = 'Carregando…'
+  try {
+    const { data, error } = await db.from('vw_agua_coletas_detalhe')
+      .select('id,ponto_nome,codigo_ana,data_coleta,campanha_ano,campanha_ordem,status,iqa,iqa_faixa,conama_conforme,codigo_amostra')
+      .eq('coletor_id', App.coletor.id)
+      .order('data_coleta', { ascending: false })
+      .limit(30)
+    if (error) throw error
+
+    if (!data.length) {
+      estado.textContent = 'Você ainda não tem coletas sincronizadas.'
+      return
+    }
+    estado.textContent = ''
+
+    const STATUS_LABEL = { aguardando_lab: 'Aguardando laudo', quarentena: 'Em conferência', completo: null }
+    const STATUS_COR   = { aguardando_lab: '#6B7280', quarentena: '#CA8A04' }
+
+    lista.innerHTML = data.map(c => `
+      <div class="sync-item">
+        <div class="sync-info" style="flex:1">
+          <strong>${esc(c.ponto_nome)}</strong>
+          <span style="display:block">${formatDataColeta(c.data_coleta)} · ${esc(aguaCampanhaLabel(c.campanha_ano, c.campanha_ordem))}</span>
+          ${c.codigo_amostra ? `<span style="display:block;font-family:var(--font-mono)">Amostra: ${esc(c.codigo_amostra)}</span>` : ''}
+        </div>
+        <div style="text-align:right;flex-shrink:0;margin-left:10px">
+          ${c.status === 'completo'
+            ? aguaIqaChipHTML(c.iqa, c.iqa_faixa)
+            : `<span style="font-size:12px;font-weight:700;color:${STATUS_COR[c.status] || '#6B7280'}">${STATUS_LABEL[c.status] || c.status}</span>`}
+        </div>
+      </div>`).join('')
+  } catch (e) {
+    estado.textContent = 'Não foi possível carregar — verifique a conexão.'
+    console.warn('[minhas coletas]', e)
+  }
+}
+
+// ════════════════════════════════════════════════════════════════
 // Fila
 // ════════════════════════════════════════════════════════════════
 function bFormatDataHora(str) {
@@ -1286,6 +1458,11 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-descartar').addEventListener('click', () => { if (confirm('Descartar esta coleta?')) mostrarTela('tela-home') })
   document.getElementById('btn-back-fila').addEventListener('click', () => mostrarTela('tela-home'))
   document.getElementById('btn-back-config').addEventListener('click', () => mostrarTela('tela-home'))
+  document.getElementById('btn-back-historico').addEventListener('click', () => mostrarTela('tela-home'))
+  document.getElementById('h-ponto').addEventListener('change', e => {
+    App._historicoPontoId = e.target.value || null
+    carregarHistoricoPonto(e.target.value)
+  })
 
   document.getElementById('btn-update-agora').addEventListener('click', aplicarUpdate)
   document.getElementById('btn-update-depois').addEventListener('click', () => { document.getElementById('update-banner').hidden = true })

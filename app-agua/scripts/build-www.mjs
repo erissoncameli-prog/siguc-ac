@@ -31,7 +31,7 @@ mkdirSync(join(WWW, 'js'),           { recursive: true })
 mkdirSync(join(WWW, 'vendor/fonts'), { recursive: true })
 
 // ── JS compartilhado (transpilado para ES2017) ────────────────
-for (const f of ['config.js', 'fotos-privadas.js', 'lgpd.js', 'lgpd-campo.js', 'qrcode-generator.js', 'agua-offline.js', 'agua-sync.js', 'brigada-captura.js']) {
+for (const f of ['config.js', 'fotos-privadas.js', 'lgpd.js', 'lgpd-campo.js', 'qrcode-generator.js', 'agua-offline.js', 'agua-sync.js', 'brigada-captura.js', 'agua-iqa-visual.js']) {
   copiarJsTranspilado(join(RAIZ, 'js', f), join(WWW, 'js', f))
 }
 
@@ -118,7 +118,7 @@ html = html.replace('</head>', `<script>window.__SIGUC_ENV=${envJson}</script>\n
 writeFileSync(join(WWW, 'index.html'), html)
 
 // ── Sanidade ───────────────────────────────────────────────────
-for (const f of ['index.html', 'vendor/supabase.js', 'vendor/fonts.css', 'css/agua-app.css', 'js/config.js', 'js/fotos-privadas.js', 'js/lgpd.js', 'js/lgpd-campo.js', 'js/qrcode-generator.js', 'js/agua-offline.js', 'js/agua-sync.js', 'js/brigada-captura.js']) {
+for (const f of ['index.html', 'vendor/supabase.js', 'vendor/fonts.css', 'css/agua-app.css', 'js/config.js', 'js/fotos-privadas.js', 'js/lgpd.js', 'js/lgpd-campo.js', 'js/qrcode-generator.js', 'js/agua-offline.js', 'js/agua-sync.js', 'js/brigada-captura.js', 'js/agua-iqa-visual.js']) {
   if (!existsSync(join(WWW, f))) { console.error(`ERRO: faltando www/${f}`); process.exit(1) }
 }
 const indexFinal = readFileSync(join(WWW, 'index.html'), 'utf8')
@@ -141,7 +141,7 @@ if (!/window\.__SIGUC_ENV=\{.*supabaseUrl.*supabaseKey/.test(indexFinal)) {
 }
 // Garante que a transpilação removeu os operadores ES2021 (||= &&= ??=) que
 // quebravam libs modernas em WebViews < 85.
-for (const f of ['vendor/supabase.js', 'js/config.js', 'js/fotos-privadas.js', 'js/lgpd.js', 'js/lgpd-campo.js', 'js/qrcode-generator.js', 'js/agua-offline.js', 'js/agua-sync.js', 'js/brigada-captura.js']) {
+for (const f of ['vendor/supabase.js', 'js/config.js', 'js/fotos-privadas.js', 'js/lgpd.js', 'js/lgpd-campo.js', 'js/qrcode-generator.js', 'js/agua-offline.js', 'js/agua-sync.js', 'js/brigada-captura.js', 'js/agua-iqa-visual.js']) {
   const js = readFileSync(join(WWW, f), 'utf8')
   const proibidos = js.match(/\|\|=|&&=|\?\?=/g)
   if (proibidos) {
