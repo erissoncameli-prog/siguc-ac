@@ -1,0 +1,1394 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#2F6FB0">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>SIGUC Qualidade da Água</title>
+  <link rel="manifest" href="/pwa/manifest-agua.json">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&family=Fraunces:wght@700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/agua-app.css">
+  <style>
+    /* Divisor de seção dentro do formulário de coleta — não existe em
+       css/agua-app.css (molde de brigada.css, que não tinha esse
+       agrupamento); mesmo padrão local já usado em agua-laudos.html
+       para .form-section-label. */
+    .form-section-titulo {
+      font-size: 11px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .06em; opacity: .6; margin: 18px 0 4px;
+    }
+  </style>
+</head>
+<body class="agua-app">
+
+<!-- ══ TELA: LOGIN ══════════════════════════════════════════════ -->
+<div id="tela-login" class="tela lock-screen" hidden>
+  <div class="lock-logo">
+    <svg width="64" height="64" viewBox="0 0 24 24" fill="#fff" class="lock-mascote" style="padding:10px" aria-hidden="true"><path d="M12 2s7 8.5 7 13a7 7 0 0 1-14 0c0-4.5 7-13 7-13z"/></svg>
+    <span class="lock-titulo">Qualidade da Água</span>
+  </div>
+  <p class="lock-dica">App de Campo — Faça seu login</p>
+  <div class="login-form">
+    <input type="text" id="login-email" class="login-input" placeholder="E-mail" autocomplete="username">
+    <div class="login-senha-wrap">
+      <input type="password" id="login-senha" class="login-input" placeholder="Senha" autocomplete="current-password">
+      <button type="button" id="btn-toggle-senha" class="btn-toggle-senha" aria-label="Mostrar senha" data-icon="eye"></button>
+    </div>
+    <button id="btn-fazer-login" class="btn-login-submit">Entrar</button>
+  </div>
+  <p class="lock-erro" id="login-erro" hidden></p>
+</div>
+
+<!-- ══ TELA: TROCAR SENHA (1º acesso) ══════════════════════════ -->
+<div id="tela-trocar-senha" class="tela lock-screen" hidden>
+  <div class="lock-logo">
+    <svg width="64" height="64" viewBox="0 0 24 24" fill="#fff" class="lock-mascote" style="padding:10px" aria-hidden="true"><path d="M12 2s7 8.5 7 13a7 7 0 0 1-14 0c0-4.5 7-13 7-13z"/></svg>
+    <span class="lock-titulo">Criar Nova Senha</span>
+  </div>
+  <p class="lock-dica">Você entrou com uma senha provisória.<br>Crie sua senha pessoal para continuar.</p>
+  <div class="login-form">
+    <input type="password" id="troca-senha1" class="login-input" placeholder="Nova senha (mín. 6 caracteres)" autocomplete="new-password">
+    <input type="password" id="troca-senha2" class="login-input" placeholder="Repita a nova senha" autocomplete="new-password">
+    <button id="btn-trocar-senha" class="btn-login-submit">Salvar e continuar</button>
+  </div>
+  <p class="lock-erro" id="troca-erro" hidden></p>
+</div>
+
+<!-- ══ TELA: BLOQUEIO (PIN) ═════════════════════════════════════ -->
+<div id="tela-bloqueio" class="tela ativa lock-screen" hidden>
+  <div class="lock-faixa">
+    <span class="faixa-logo-chip gov" hidden><img alt="Governo do Acre"></span>
+    <span class="faixa-logo-chip sec" hidden><img alt="SEMA-AC"></span>
+  </div>
+  <div class="lock-logo">
+    <svg width="64" height="64" viewBox="0 0 24 24" fill="#fff" class="lock-mascote" style="padding:10px" aria-hidden="true"><path d="M12 2s7 8.5 7 13a7 7 0 0 1-14 0c0-4.5 7-13 7-13z"/></svg>
+    <span class="lock-titulo">Qualidade da Água</span>
+  </div>
+  <p class="lock-subtitulo" id="lock-nome">Carregando…</p>
+  <p class="lock-offline-badge" id="lock-offline" hidden>Modo offline — dados locais</p>
+  <p class="lock-dica">Digite seu PIN de campo</p>
+  <div class="pin-display" id="pin-display">
+    <span class="pin-dot" data-i="0"></span>
+    <span class="pin-dot" data-i="1"></span>
+    <span class="pin-dot" data-i="2"></span>
+    <span class="pin-dot" data-i="3"></span>
+  </div>
+  <div class="pin-keypad" id="pin-keypad">
+    <button class="pin-key" data-v="1">1</button>
+    <button class="pin-key" data-v="2">2</button>
+    <button class="pin-key" data-v="3">3</button>
+    <button class="pin-key" data-v="4">4</button>
+    <button class="pin-key" data-v="5">5</button>
+    <button class="pin-key" data-v="6">6</button>
+    <button class="pin-key" data-v="7">7</button>
+    <button class="pin-key" data-v="8">8</button>
+    <button class="pin-key" data-v="9">9</button>
+    <button class="pin-key pin-clear" id="pin-clear" data-icon="backspace" aria-label="Apagar"></button>
+    <button class="pin-key" data-v="0">0</button>
+    <button class="pin-key pin-ok" id="pin-ok" data-icon="check" aria-label="Confirmar"></button>
+  </div>
+  <button class="btn-link" id="btn-esqueci-pin">Esqueci o PIN — entrar com senha</button>
+  <p class="lock-erro" id="lock-erro" hidden></p>
+</div>
+
+<!-- ══ TELA: CONFIGURAR PIN ════════════════════════════════════ -->
+<div id="tela-config-pin" class="tela lock-screen" hidden>
+  <div class="lock-faixa">
+    <span class="faixa-logo-chip gov" hidden><img alt="Governo do Acre"></span>
+    <span class="faixa-logo-chip sec" hidden><img alt="SEMA-AC"></span>
+  </div>
+  <div class="lock-logo">
+    <svg width="64" height="64" viewBox="0 0 24 24" fill="#fff" class="lock-mascote" style="padding:10px" aria-hidden="true"><path d="M12 2s7 8.5 7 13a7 7 0 0 1-14 0c0-4.5 7-13 7-13z"/></svg>
+    <span class="lock-titulo">Criar PIN de Campo</span>
+  </div>
+  <p class="lock-subtitulo" id="pin-setup-nome" style="font-size:1rem;opacity:.75;margin-bottom:4px"></p>
+  <p class="lock-dica" id="pin-setup-dica">Escolha um PIN de 4 dígitos</p>
+  <div class="pin-display" id="pin-setup-display">
+    <span class="pin-dot" data-i="0"></span>
+    <span class="pin-dot" data-i="1"></span>
+    <span class="pin-dot" data-i="2"></span>
+    <span class="pin-dot" data-i="3"></span>
+  </div>
+  <div class="pin-keypad" id="pin-setup-keypad">
+    <button class="pin-key" data-v="1">1</button>
+    <button class="pin-key" data-v="2">2</button>
+    <button class="pin-key" data-v="3">3</button>
+    <button class="pin-key" data-v="4">4</button>
+    <button class="pin-key" data-v="5">5</button>
+    <button class="pin-key" data-v="6">6</button>
+    <button class="pin-key" data-v="7">7</button>
+    <button class="pin-key" data-v="8">8</button>
+    <button class="pin-key" data-v="9">9</button>
+    <button class="pin-key pin-clear" id="pin-setup-clear" data-icon="backspace" aria-label="Apagar"></button>
+    <button class="pin-key" data-v="0">0</button>
+    <button class="pin-key pin-ok" id="pin-setup-ok" data-icon="check" aria-label="Confirmar"></button>
+  </div>
+  <p class="lock-erro" id="pin-setup-erro" hidden></p>
+</div>
+
+<!-- ══ TELA: HOME ══════════════════════════════════════════════ -->
+<div id="tela-home" class="tela" hidden>
+  <div class="faixa-inst">
+    <div class="faixa-logos">
+      <span class="faixa-logo-chip gov" hidden><img alt="Governo do Acre"></span>
+      <span class="faixa-logo-chip sec" hidden><img alt="SEMA-AC"></span>
+    </div>
+  </div>
+
+  <header class="home-header">
+    <div class="home-id">
+      <div class="home-avatar" id="home-avatar"><span id="home-avatar-letra"></span></div>
+      <div class="home-id-texto">
+        <p class="home-saudacao" id="home-saudacao">Bom dia</p>
+        <h1 class="home-nome" id="home-nome">Coletor</h1>
+      </div>
+    </div>
+    <button class="btn-icon" id="btn-sync-home" aria-label="Sincronizar" title="Sincronizar agora">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+    </button>
+  </header>
+
+  <div class="gps-card" id="gps-card">
+    <div class="gps-info">
+      <span class="gps-label">GPS</span>
+      <span class="gps-coords" id="gps-coords">Leitura só no momento de salvar a coleta</span>
+    </div>
+    <div class="gps-lado">
+      <span class="conn-chip" id="conn-chip"><span class="conn-dot"></span><span id="conn-texto">…</span></span>
+    </div>
+  </div>
+
+  <p class="home-instrucao">Registre uma coleta de amostra de água</p>
+
+  <button class="natureza-btn monitoramento" id="btn-nova-coleta" style="width:100%">
+    <div class="natureza-icon">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2s7 8.5 7 13a7 7 0 0 1-14 0c0-4.5 7-13 7-13z" fill="#fff"/></svg>
+    </div>
+    <div class="natureza-label">
+      <strong>Nova coleta</strong>
+      <span>Selecionar ponto, medir e fotografar</span>
+    </div>
+    <span class="natureza-chevron">›</span>
+  </button>
+
+  <div class="home-fila-card" id="home-fila-card" hidden>
+    <span class="fila-icone">⏳</span>
+    <div>
+      <strong id="home-fila-count">0 coletas</strong>
+      <span> aguardando sincronização</span>
+    </div>
+    <button class="btn-link" id="btn-ver-fila">Ver fila →</button>
+  </div>
+</div>
+
+<!-- ══ TELA: NOVA COLETA ═══════════════════════════════════════ -->
+<div id="tela-form" class="tela" hidden>
+  <header class="form-header" id="form-header">
+    <button class="btn-back" id="btn-back-form" aria-label="Voltar">‹</button>
+    <span class="form-natureza-label">Nova coleta</span>
+    <button class="btn-icon btn-danger" id="btn-descartar" aria-label="Descartar">✕</button>
+  </header>
+
+  <div class="form-body">
+    <div class="form-section">
+      <label class="form-label">Ponto de coleta *</label>
+      <select id="f-ponto" class="form-select">
+        <option value="">Selecione…</option>
+      </select>
+      <div class="campo-dica" id="f-ponto-info"></div>
+    </div>
+
+    <div class="grid-2" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div class="form-section">
+        <label class="form-label">Data da coleta *</label>
+        <input type="date" id="f-data" class="form-input">
+      </div>
+      <div class="form-section">
+        <label class="form-label">Hora</label>
+        <input type="time" id="f-hora" class="form-input">
+      </div>
+    </div>
+
+    <!-- GPS pontual -->
+    <div class="gps-card compact" id="form-gps-card">
+      <div class="gps-info">
+        <span class="gps-coords sm" id="form-gps-coords">GPS ainda não lido</span>
+        <span class="gps-acc" id="form-gps-acc"></span>
+      </div>
+      <button type="button" class="btn-icon" id="btn-ler-gps" aria-label="Ler GPS agora">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22"/><line x1="2" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="22" y2="12"/></svg>
+      </button>
+    </div>
+    <div class="campo-dica" id="f-gps-divergencia" style="color:var(--alerta)" hidden></div>
+
+    <div class="form-section-titulo">Parâmetros de campo</div>
+    <div class="grid-2" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div class="form-section">
+        <label class="form-label">Temp. ar (°C)</label>
+        <input type="number" step="any" id="f-temp-ar" class="form-input" inputmode="decimal" onblur="agChecarCampo('temp_ar')">
+        <div class="campo-dica" id="f-h-temp_ar"></div>
+      </div>
+      <div class="form-section">
+        <label class="form-label">Temp. amostra (°C)</label>
+        <input type="number" step="any" id="f-temp-amostra" class="form-input" inputmode="decimal" onblur="agChecarCampo('temp_amostra')">
+        <div class="campo-dica" id="f-h-temp_amostra"></div>
+      </div>
+      <div class="form-section">
+        <label class="form-label">pH</label>
+        <input type="number" step="any" id="f-ph" class="form-input" inputmode="decimal" onblur="agChecarCampo('ph')">
+        <div class="campo-dica" id="f-h-ph"></div>
+      </div>
+      <div class="form-section">
+        <label class="form-label">OD (mg/L)</label>
+        <input type="number" step="any" id="f-od" class="form-input" inputmode="decimal" onblur="agChecarCampo('od')">
+        <div class="campo-dica" id="f-h-od"></div>
+      </div>
+      <div class="form-section">
+        <label class="form-label">Turbidez (UNT)</label>
+        <input type="number" step="any" id="f-turbidez" class="form-input" inputmode="decimal" onblur="agChecarCampo('turbidez')">
+        <div class="campo-dica" id="f-h-turbidez"></div>
+      </div>
+      <div class="form-section">
+        <label class="form-label">Condutividade (µS/cm)</label>
+        <input type="number" step="any" id="f-condutividade" class="form-input" inputmode="decimal" onblur="agChecarCampo('condutividade_eletrica')">
+        <div class="campo-dica" id="f-h-condutividade_eletrica"></div>
+      </div>
+    </div>
+
+    <div class="form-section-titulo">Amostra e foto</div>
+    <div class="form-section">
+      <label class="form-label">Código da amostra (rótulo do frasco)</label>
+      <input type="text" id="f-codigo-amostra" class="form-input" placeholder="Opcional — como está escrito no frasco">
+    </div>
+
+    <div class="form-section">
+      <div class="section-header">
+        <label class="form-label">Foto do ponto de coleta</label>
+        <div class="foto-acoes">
+          <button class="btn-sm btn-prim" id="btn-abrir-camera" type="button" data-icon="camera">Câmera</button>
+          <button class="btn-sm btn-galeria" id="btn-abrir-galeria" type="button" data-icon="image">Galeria</button>
+        </div>
+      </div>
+      <input type="file" id="input-foto-camera" accept="image/*" capture="environment" hidden>
+      <input type="file" id="input-foto-galeria" accept="image/*" hidden>
+      <div class="foto-grid" id="foto-grid"></div>
+    </div>
+
+    <div class="form-section">
+      <label class="form-label">Observações</label>
+      <textarea id="f-obs" class="form-textarea" rows="3" placeholder="Opcional"></textarea>
+    </div>
+
+    <button class="btn-salvar" id="btn-salvar">Salvar coleta</button>
+  </div>
+</div>
+
+<!-- ══ TELA: FILA DE SINCRONIZAÇÃO ════════════════════════════ -->
+<div id="tela-fila" class="tela" hidden>
+  <header class="form-header">
+    <button class="btn-back" id="btn-back-fila" aria-label="Voltar">‹</button>
+    <span>Fila de Envio</span>
+    <button class="btn-icon" id="btn-sync-fila" aria-label="Sincronizar">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+    </button>
+  </header>
+
+  <div class="fila-stats" id="fila-stats">
+    <div class="fila-stat">
+      <span class="fila-stat-n" id="stat-pendentes">0</span>
+      <span>Pendentes</span>
+    </div>
+    <div class="fila-stat">
+      <span class="fila-stat-n" id="stat-enviando">0</span>
+      <span>Enviando</span>
+    </div>
+    <div class="fila-stat">
+      <span class="fila-stat-n" id="stat-confirmados">0</span>
+      <span>Confirmados</span>
+    </div>
+  </div>
+
+  <div id="fila-lista" class="sync-queue"></div>
+</div>
+
+<!-- ══ TELA: CONFIGURAÇÕES ════════════════════════════════════ -->
+<div id="tela-config" class="tela" hidden>
+  <header class="form-header">
+    <button class="btn-back" id="btn-back-config" aria-label="Voltar">‹</button>
+    <span>Configurações</span>
+    <span></span>
+  </header>
+
+  <div class="form-body">
+    <div class="config-card" id="config-coletor-card">
+      <div class="config-avatar" aria-hidden="true"><span id="avatar-letra">C</span></div>
+      <div>
+        <strong id="config-nome-coletor">—</strong>
+        <p style="margin:2px 0 0;opacity:.55;font-size:.75rem">Qualidade da Água — App de campo</p>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <label class="form-label">Armazenamento</label>
+      <div class="quota-bar-wrap">
+        <div class="quota-bar"><div class="quota-fill" id="quota-fill"></div></div>
+        <span id="quota-texto">—</span>
+      </div>
+    </div>
+
+    <button class="btn-config-item" id="btn-alterar-pin" data-icon="key">Alterar PIN de campo</button>
+    <button class="btn-config-item" id="btn-atualizar-pontos" data-icon="pin">Atualizar lista de pontos de coleta</button>
+    <button class="btn-config-item" id="btn-qr-instalar" data-icon="qr">Instalar em outro aparelho (QR)</button>
+    <button class="btn-config-item" id="btn-verificar-update" data-icon="download">Verificar atualização do app</button>
+    <button class="btn-config-item" id="btn-aviso-privacidade" data-icon="shield">Aviso de privacidade</button>
+    <button class="btn-config-item" id="btn-meus-dados" data-icon="user">Meus dados</button>
+    <button class="btn-config-item btn-danger-soft" id="btn-zerar-fila" data-icon="trash">Zerar fila de coletas</button>
+    <button class="btn-config-item btn-danger" id="btn-sair" data-icon="logout">Sair / Trocar conta</button>
+
+    <div class="app-creditos">
+      <p id="app-versao"></p>
+      <p id="app-copyright"></p>
+    </div>
+  </div>
+</div>
+
+<!-- ══ NAV PILL ════════════════════════════════════════════════ -->
+<nav class="pill-nav" id="pill-nav" hidden>
+  <button class="pill-btn" data-tela="tela-home" id="nav-home">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+    <span>Início</span>
+  </button>
+  <button class="pill-btn" id="nav-nova">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2s7 8.5 7 13a7 7 0 0 1-14 0c0-4.5 7-13 7-13z"/></svg>
+    <span>Coletar</span>
+  </button>
+  <button class="pill-btn" data-tela="tela-fila" id="nav-fila">
+    <span class="pill-badge" id="nav-badge" hidden>0</span>
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+    <span>Fila</span>
+  </button>
+  <button class="pill-btn" data-tela="tela-config" id="nav-config">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
+    <span>Config</span>
+  </button>
+</nav>
+
+<!-- ══ BARRA DE PROGRESSO DE SYNC ═════════════════════════════ -->
+<div id="sync-progress" class="sync-progress-wrap" hidden>
+  <div class="sync-progress-inner">
+    <span class="sync-progress-spin">⟳</span>
+    <div class="sync-progress-info">
+      <span id="sync-pb-texto">Sincronizando…</span>
+      <div class="sync-pb-track">
+        <div class="sync-pb-fill" id="sync-pb-fill"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ OVERLAY: QR de instalação ══════════════════════════════ -->
+<div id="qr-overlay" class="qr-overlay" hidden>
+  <div class="qr-card">
+    <h3 data-icon="qr">Instalar em outro aparelho</h3>
+    <p>Peça para a pessoa <strong>apontar a câmera</strong> do celular para o código abaixo. Ela cai direto nas instruções de instalação (Android e iPhone).</p>
+    <img id="qr-overlay-img" alt="QR Code de instalação">
+    <p class="qr-overlay-link" id="qr-overlay-link"></p>
+    <p class="qr-overlay-nota">Precisa de internet para gerar o código.</p>
+    <button class="btn-config-item" id="qr-overlay-fechar">Fechar</button>
+  </div>
+</div>
+
+<!-- ══ BANNER: atualização disponível ════════════════════════ -->
+<div id="update-banner" class="update-banner" hidden>
+  <span data-icon="download">Nova versão disponível</span>
+  <div class="update-banner-acoes">
+    <button id="btn-update-agora" class="ub-btn ub-btn-prim" type="button">Atualizar</button>
+    <button id="btn-update-depois" class="ub-btn" type="button">Depois</button>
+  </div>
+</div>
+
+<!-- ── Scripts ─────────────────────────────────────────────── -->
+<script>
+window.supabase = window.supabase || { createClient: () => null }
+window.__API_MONITOR_OFF = true
+</script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"
+        onerror="console.warn('[agua-app] Supabase CDN indisponível — modo offline')"></script>
+<script src="/js/config.js"></script>
+<script src="/js/fotos-privadas.js"></script>
+<script src="/js/lgpd.js"></script>
+<script>window.LGPD_CAMPO_APP = 'agua'</script>
+<script src="/js/lgpd-campo.js"></script>
+<script src="/js/qrcode-generator.js"></script>
+<script>
+// ── Cliente Supabase ISOLADO para o App de Campo ──────────────
+// Mesmo padrão de pages/brigada.html: sessão em localStorage com
+// storageKey próprio, nunca reaproveitando a sessionStorage da mesa.
+const _aguaReady = _dbReady.then(function () {
+  if (!window.supabase || typeof window.supabase.createClient !== 'function') return
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) return
+  try {
+    const _aguaDb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: {
+        storageKey:       'siguc-agua-session',
+        storage:          window.localStorage,
+        persistSession:   true,
+        autoRefreshToken: true,
+        detectSessionInUrl: false,
+      },
+    });
+    if (_aguaDb) {
+      db = _aguaDb
+      window.db = _aguaDb
+      console.info('[agua-app] cliente isolado com sessão persistente ativo')
+    }
+  } catch (e) {
+    console.error('[agua-app] cliente isolado FALHOU — usando sessão por janela:', e)
+  }
+});
+</script>
+<script src="/js/agua-offline.js"></script>
+<script src="/js/agua-sync.js"></script>
+<script src="/js/brigada-captura.js"></script>
+<script>
+// ════════════════════════════════════════════════════════════════
+// Estado global do app
+// ════════════════════════════════════════════════════════════════
+const App = {
+  coletor: null,          // { id, nome_completo } — linha de `usuarios`
+  telasHistorico: [],
+  pontos: [],              // cache de agua_pontos_coleta
+  pontoAtual: null,
+  gpsAtual: null,           // leitura pontual mais recente (bGpsUmaLeitura)
+  pinSetupFase: 1,
+  pinSetupPrimeiro: '',
+}
+
+const INSTALL_URL = 'https://siguc-ac.vercel.app/pages/instalar-agua.html'
+
+// ════════════════════════════════════════════════════════════════
+// Utilitários
+// ════════════════════════════════════════════════════════════════
+async function pinHash(pin, coletorId) {
+  const data = new TextEncoder().encode(pin + coletorId)
+  const buf  = await crypto.subtle.digest('SHA-256', data)
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('')
+}
+
+function saudacao() {
+  const h = new Date().getHours()
+  if (h < 12) return 'Bom dia'
+  if (h < 18) return 'Boa tarde'
+  return 'Boa noite'
+}
+
+// Extrai [lat,lng] de uma coluna geometry do PostGIS servida pelo
+// PostgREST (GeoJSON ou texto 'POINT(lng lat)') — versão mínima,
+// só o essencial para comparar coordenadas aqui. A versão completa
+// (js/mapa-recorte.js) também carrega o recorte do Acre, que este
+// app de campo não usa.
+function agLatLngDeGeom(geom) {
+  if (!geom) return null
+  try {
+    if (typeof geom === 'object' && Array.isArray(geom.coordinates)) {
+      return { lat: Number(geom.coordinates[1]), lng: Number(geom.coordinates[0]) }
+    }
+    const m = String(geom).match(/POINT\s*\(([^ ]+) ([^ )]+)\)/i)
+    if (m) return { lat: parseFloat(m[2]), lng: parseFloat(m[1]) }
+  } catch (e) { /* geometria ilegível */ }
+  return null
+}
+
+// Distância aproximada em metros (haversine) — só para o aviso de
+// divergência, não precisa de precisão geodésica maior.
+function agDistanciaMetros(a, b) {
+  if (!a || !b) return null
+  const R = 6371000
+  const toRad = d => d * Math.PI / 180
+  const dLat = toRad(b.lat - a.lat), dLng = toRad(b.lng - a.lng)
+  const s = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2
+  return R * 2 * Math.atan2(Math.sqrt(s), Math.sqrt(1 - s))
+}
+
+// ════════════════════════════════════════════════════════════════
+// Navegação entre telas
+// ════════════════════════════════════════════════════════════════
+function mostrarTela(id, empurrar = true) {
+  document.querySelectorAll('.tela').forEach(t => t.hidden = true)
+  const tela = document.getElementById(id)
+  if (tela) tela.hidden = false
+
+  const temNav = !['tela-bloqueio', 'tela-config-pin', 'tela-login', 'tela-trocar-senha'].includes(id)
+  document.getElementById('pill-nav').hidden = !temNav
+
+  if (empurrar && App.telasHistorico.at(-1) !== id) App.telasHistorico.push(id)
+
+  document.querySelectorAll('.pill-btn').forEach(b => {
+    b.classList.toggle('ativa', b.dataset.tela === id)
+  })
+
+  if (id === 'tela-fila')   carregarFila()
+  if (id === 'tela-config') carregarConfig()
+}
+
+// ════════════════════════════════════════════════════════════════
+// Boot / autenticação
+// ════════════════════════════════════════════════════════════════
+async function boot() {
+  try { await _aguaReady } catch (e) { console.warn('[boot] env indisponível:', e.message) }
+  if ('serviceWorker' in navigator && !window.Capacitor) {
+    navigator.serviceWorker.register('/pwa/sw.js', { scope: '/pages/agua-app.html' }).catch(console.warn)
+  }
+  await aOfflineInit()
+  aOfflinePersistir()
+  inserirFaixasInst()
+  carregarLogosInstitucionais()
+  checarAtualizacaoAuto()
+
+  if (db) {
+    try {
+      const { data: { session: sessaoAtiva } } = await db.auth.getSession()
+      if (sessaoAtiva) { await prosseguirAposAuth(sessaoAtiva); return }
+    } catch (e) { console.warn('[boot] Sessão indisponível:', e.message) }
+  }
+
+  const coletorCached = await aOfflineGetConfig('coletor')
+  const pinSalvo = await aOfflineGetConfig('pin_hash')
+  const pinDono  = await aOfflineGetConfig('pin_dono')
+  if (coletorCached && pinSalvo && pinDono === coletorCached.id) {
+    App.coletor = coletorCached
+    document.getElementById('lock-nome').textContent = coletorCached.nome_completo?.split(' ')[0] || 'Coletor'
+    document.getElementById('lock-offline').hidden = false
+    mostrarTela('tela-bloqueio', false)
+    return
+  }
+
+  mostrarTela('tela-login', false)
+}
+
+async function prosseguirAposAuth(session, jaAutenticou = false) {
+  const { data: usuarioData } = await db
+    .from('usuarios')
+    .select('id, nome_completo, perfil, ativo, deve_trocar_senha')
+    .eq('id', session.user.id)
+    .maybeSingle()
+
+  if (!usuarioData || usuarioData.ativo !== true) {
+    mostrarErroLogin('Usuário inativo ou não encontrado. Fale com a gestão do seu setor.')
+    mostrarTela('tela-login', false)
+    return
+  }
+
+  const coletor = { id: usuarioData.id, nome_completo: usuarioData.nome_completo }
+  await aOfflineSetConfig('coletor', coletor)
+  App.coletor = coletor
+
+  await sincronizarPontos()
+
+  if (usuarioData.deve_trocar_senha) {
+    document.getElementById('troca-erro').hidden = true
+    document.getElementById('troca-senha1').value = ''
+    document.getElementById('troca-senha2').value = ''
+    mostrarTela('tela-trocar-senha', false)
+    return
+  }
+
+  await continuarParaPin(coletor, jaAutenticou)
+}
+
+async function continuarParaPin(coletor, jaAutenticou = false) {
+  let pinSalvo  = await aOfflineGetConfig('pin_hash')
+  const pinDono = await aOfflineGetConfig('pin_dono')
+
+  if (pinSalvo && pinDono !== coletor.id) {
+    await aOfflineSetConfig('pin_hash', null)
+    await aOfflineSetConfig('pin_dono', null)
+    pinSalvo = null
+  }
+
+  if (!pinSalvo) {
+    const primeiroNome = coletor.nome_completo?.split(' ')[0] || 'Coletor'
+    document.getElementById('pin-setup-nome').textContent = `Olá, ${primeiroNome}!`
+    document.getElementById('pin-setup-dica').textContent = 'Escolha um PIN de 4 dígitos'
+    toast('Login realizado! Configure seu PIN de acesso.', 'success')
+    mostrarTela('tela-config-pin', false)
+  } else if (jaAutenticou) {
+    toast('Login realizado!', 'success')
+    entrarHome()
+  } else {
+    document.getElementById('lock-nome').textContent = coletor.nome_completo?.split(' ')[0] || 'Coletor'
+    document.getElementById('lock-offline').hidden = true
+    mostrarTela('tela-bloqueio', false)
+  }
+}
+
+async function confirmarTrocaSenha() {
+  const s1 = document.getElementById('troca-senha1').value
+  const s2 = document.getElementById('troca-senha2').value
+  const erroEl = document.getElementById('troca-erro')
+  erroEl.hidden = true
+
+  if (!s1 || s1.length < 6) { erroEl.textContent = 'A nova senha deve ter no mínimo 6 caracteres.'; erroEl.hidden = false; return }
+  if (s1 !== s2) { erroEl.textContent = 'As senhas não coincidem.'; erroEl.hidden = false; return }
+
+  const btn = document.getElementById('btn-trocar-senha')
+  btn.disabled = true
+  btn.textContent = 'Salvando…'
+  try {
+    const { error } = await db.auth.updateUser({ password: s1 })
+    if (error) throw error
+    const { data: { session } } = await db.auth.getSession()
+    if (session) await db.from('usuarios').update({ deve_trocar_senha: false }).eq('id', session.user.id)
+    toast('Senha alterada com sucesso!', 'success')
+    await continuarParaPin(App.coletor, true)
+  } catch (e) {
+    erroEl.textContent = 'Erro ao trocar a senha: ' + (e.message || 'tente novamente.')
+    erroEl.hidden = false
+  } finally {
+    btn.disabled = false
+    btn.textContent = 'Salvar e continuar'
+  }
+}
+
+// ── Conexão ────────────────────────────────────────────────────
+let _connEstado = null
+function aplicarEstadoConexao(online) {
+  if (online === _connEstado) return
+  const mudou = _connEstado !== null
+  _connEstado = online
+  const chip = document.getElementById('conn-chip')
+  document.getElementById('conn-texto').textContent = online ? 'Online' : 'Offline'
+  chip.classList.toggle('on', online)
+  chip.classList.toggle('off', !online)
+  if (mudou && online) toast('Conexão restabelecida', 'ok')
+}
+async function verificarConexao() {
+  if (document.hidden) return
+  aplicarEstadoConexao(await aSyncTemConexao())
+}
+
+// ── Faixa institucional (logos Governo/SEMA) ──────────────────
+function inserirFaixasInst() {
+  // sem-op — Água não usa mascote/faixa decorativa própria; mantém a
+  // função para o mesmo ponto de chamada do carregarLogosInstitucionais
+  // (que já popula os .faixa-logo-chip presentes nas telas de PIN).
+}
+
+function renderFaixaLogos(c) {
+  document.querySelectorAll('.faixa-logo-chip.gov img').forEach(img => { if (c?.gov) { img.src = c.gov; img.closest('.faixa-logo-chip').hidden = false } })
+  document.querySelectorAll('.faixa-logo-chip.sec img').forEach(img => { if (c?.sec) { img.src = c.sec; img.closest('.faixa-logo-chip').hidden = false } })
+}
+
+async function carregarLogosInstitucionais() {
+  try {
+    const cache = await aOfflineGetConfig('logos_cache_v2')
+    if (cache) renderFaixaLogos(cache)
+    if (!db || !await aSyncTemConexao()) return
+    const { data } = await db.from('config_sistema').select('dados').eq('id', 1).single()
+    const logos = data?.dados?.logos
+    if (!logos) return
+    const baixar = async url => {
+      if (!url) return null
+      const r = await fetch(url)
+      return r.ok ? await r.blob() : null
+    }
+    const preparar = async urlColorida => {
+      const blob = await baixar(urlColorida)
+      return blob ? await aOfflineBlobParaBase64(blob) : null
+    }
+    // Sem o knockout branco do Brigadas: aqui as logos só aparecem em
+    // fundo escuro nas telas de PIN, e a versão colorida já contrasta
+    // o bastante — simplificação deliberada.
+    const novo = {
+      gov: await preparar(logos.governo_url),
+      sec: await preparar(logos.secretaria_url),
+    }
+    if (novo.gov || novo.sec) {
+      await aOfflineSetConfig('logos_cache_v2', novo)
+      renderFaixaLogos(novo)
+    }
+  } catch (e) { console.warn('[logos]', e) }
+}
+
+function mostrarErroLogin(msg) {
+  const el = document.getElementById('login-erro')
+  el.textContent = msg
+  el.hidden = false
+}
+
+async function fazerLogin() {
+  const email = document.getElementById('login-email').value.trim()
+  const senha = document.getElementById('login-senha').value
+  document.getElementById('login-erro').hidden = true
+
+  try { await _aguaReady } catch (e) { console.warn('[fazerLogin] env:', e.message) }
+  if (!db) { mostrarErroLogin('Sem conexão. Conecte à internet para fazer o primeiro login.'); return }
+  if (!email || !senha) { mostrarErroLogin('Preencha e-mail e senha.'); return }
+
+  const btn = document.getElementById('btn-fazer-login')
+  btn.disabled = true
+  btn.textContent = 'Entrando…'
+  try {
+    const { data, error } = await db.auth.signInWithPassword({ email, password: senha })
+    if (error) {
+      mostrarErroLogin(error.status === 400 ? 'Login ou senha incorretos.' : 'Erro ao conectar. Tente novamente.')
+      return
+    }
+    await prosseguirAposAuth(data.session, true)
+  } catch (e) {
+    console.error('[fazerLogin]', e)
+    mostrarErroLogin('Erro inesperado: ' + (e.message || 'tente novamente.'))
+  } finally {
+    btn.disabled = false
+    btn.textContent = 'Entrar'
+  }
+}
+
+// ── Cache offline dos pontos de coleta ────────────────────────
+async function sincronizarPontos() {
+  if (!db) return false
+  try {
+    const { data, error } = await db.from('agua_pontos_coleta')
+      .select('id, codigo_ana, nome, municipio, rio, geom')
+      .eq('ativo', true)
+    if (error || !data) return false
+    await aOfflineSalvarPontos(data)
+    App.pontos = data
+    return true
+  } catch { return false }
+}
+
+// ════════════════════════════════════════════════════════════════
+// PIN — Desbloqueio
+// ════════════════════════════════════════════════════════════════
+let _pinAtual = ''
+
+function initPinKeypad(prefix, aoConfirmar) {
+  const display  = document.getElementById(`${prefix}-display`) || document.getElementById('pin-display')
+  const keypad   = document.getElementById(`${prefix}-keypad`)  || document.getElementById('pin-keypad')
+  const clearBtn = document.getElementById(`${prefix}-clear`)
+  const okBtn    = document.getElementById(`${prefix}-ok`)
+
+  keypad.querySelectorAll('.pin-key[data-v]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (_pinAtual.length < 4) {
+        _pinAtual += btn.dataset.v
+        atualizarPinDisplay(display, _pinAtual)
+        if (_pinAtual.length >= 4) aoConfirmar()
+      }
+    })
+  })
+  if (clearBtn) clearBtn.addEventListener('click', () => { _pinAtual = _pinAtual.slice(0, -1); atualizarPinDisplay(display, _pinAtual) })
+  if (okBtn) okBtn.addEventListener('click', () => { if (_pinAtual.length >= 4) aoConfirmar() })
+}
+
+function atualizarPinDisplay(displayEl, pinStr) {
+  displayEl.querySelectorAll('.pin-dot').forEach((dot, i) => dot.classList.toggle('ativo', i < pinStr.length))
+}
+
+async function tentarDesbloquear() {
+  try {
+    const hash = await pinHash(_pinAtual, App.coletor.id)
+    const hashSalvo = await aOfflineGetConfig('pin_hash')
+    if (hash === hashSalvo) {
+      _pinAtual = ''
+      atualizarPinDisplay(document.getElementById('pin-display'), '')
+      entrarHome()
+    } else {
+      document.getElementById('lock-erro').hidden = false
+      document.getElementById('lock-erro').textContent = 'PIN incorreto. Tente novamente.'
+      _pinAtual = ''
+      atualizarPinDisplay(document.getElementById('pin-display'), '')
+    }
+  } catch (e) {
+    console.error('[tentarDesbloquear]', e)
+    document.getElementById('lock-erro').hidden = false
+    document.getElementById('lock-erro').textContent = 'Erro ao verificar PIN. Tente novamente.'
+    _pinAtual = ''
+    atualizarPinDisplay(document.getElementById('pin-display'), '')
+  }
+}
+
+// ════════════════════════════════════════════════════════════════
+// PIN — Configuração
+// ════════════════════════════════════════════════════════════════
+let _pinSetupAtual = ''
+let _pinSetupFase  = 1
+let _pinSetupPrim  = ''
+
+function initPinSetupKeypad() {
+  const display  = document.getElementById('pin-setup-display')
+  const keypad   = document.getElementById('pin-setup-keypad')
+  const clearBtn = document.getElementById('pin-setup-clear')
+  const okBtn    = document.getElementById('pin-setup-ok')
+
+  keypad.querySelectorAll('.pin-key[data-v]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (_pinSetupAtual.length < 4) {
+        _pinSetupAtual += btn.dataset.v
+        atualizarPinDisplay(display, _pinSetupAtual)
+        document.getElementById('pin-setup-erro').hidden = true
+        if (_pinSetupAtual.length === 4) confirmarPinSetup()
+      }
+    })
+  })
+  if (clearBtn) clearBtn.addEventListener('click', () => { _pinSetupAtual = _pinSetupAtual.slice(0, -1); atualizarPinDisplay(display, _pinSetupAtual) })
+  if (okBtn) okBtn.addEventListener('click', () => {
+    if (_pinSetupAtual.length < 4) {
+      document.getElementById('pin-setup-erro').hidden = false
+      document.getElementById('pin-setup-erro').textContent = 'Digite os 4 dígitos do PIN.'
+      return
+    }
+    confirmarPinSetup()
+  })
+}
+
+async function confirmarPinSetup() {
+  try {
+    if (_pinSetupFase === 1) {
+      _pinSetupPrim = _pinSetupAtual
+      _pinSetupAtual = ''
+      atualizarPinDisplay(document.getElementById('pin-setup-display'), '')
+      document.getElementById('pin-setup-dica').textContent = 'Confirme seu PIN de 4 dígitos'
+      _pinSetupFase = 2
+      return
+    }
+    if (_pinSetupAtual !== _pinSetupPrim) {
+      document.getElementById('pin-setup-erro').hidden = false
+      document.getElementById('pin-setup-erro').textContent = 'PINs não coincidem. Tente novamente.'
+      _pinSetupAtual = ''; _pinSetupPrim = ''; _pinSetupFase = 1
+      document.getElementById('pin-setup-dica').textContent = 'Escolha um PIN de 4 dígitos'
+      atualizarPinDisplay(document.getElementById('pin-setup-display'), '')
+      return
+    }
+    const hash = await pinHash(_pinSetupAtual, App.coletor.id)
+    await aOfflineSetConfig('pin_hash', hash)
+    await aOfflineSetConfig('pin_dono', App.coletor.id)
+    _pinSetupAtual = ''; _pinSetupPrim = ''; _pinSetupFase = 1
+    entrarHome()
+  } catch (e) {
+    console.error('[confirmarPinSetup]', e)
+    document.getElementById('pin-setup-erro').hidden = false
+    document.getElementById('pin-setup-erro').textContent = 'Erro ao salvar PIN: ' + (e.message || 'tente novamente.')
+    _pinSetupAtual = ''; _pinSetupPrim = ''; _pinSetupFase = 1
+    atualizarPinDisplay(document.getElementById('pin-setup-display'), '')
+  }
+}
+
+// ════════════════════════════════════════════════════════════════
+// Home
+// ════════════════════════════════════════════════════════════════
+async function entrarHome() {
+  document.getElementById('home-saudacao').textContent = saudacao()
+  document.getElementById('home-nome').textContent = App.coletor?.nome_completo?.split(' ').slice(0, 2).join(' ') || 'Coletor'
+  document.getElementById('home-avatar-letra').textContent = (App.coletor?.nome_completo || 'C').charAt(0).toUpperCase()
+
+  mostrarTela('tela-home')
+
+  // Aviso de privacidade do app (LGPD Art. 9º) — nunca bloqueia o
+  // trabalho: funciona do cache offline, ciência sincronizada depois.
+  lgpdCampoIniciar()
+
+  if (!App.pontos.length) {
+    App.pontos = await aOfflineListarPontos()
+    if (!App.pontos.length) sincronizarPontos()
+  }
+
+  await atualizarBadgeFila()
+  aSyncOn('confirmado', atualizarBadgeFila)
+  aSyncOn('erro', d => {
+    atualizarBadgeFila()
+    if (d && d.uuid === null && d.err) toast(d.err, 'erro')
+  })
+}
+
+async function atualizarBadgeFila() {
+  const n = await aSyncContarPendentes()
+  const badge = document.getElementById('nav-badge')
+  const card  = document.getElementById('home-fila-card')
+  const cnt   = document.getElementById('home-fila-count')
+  badge.textContent = n
+  badge.hidden = n === 0
+  card.hidden  = n === 0
+  if (n > 0) cnt.textContent = `${n} coleta${n > 1 ? 's' : ''}`
+}
+
+// ════════════════════════════════════════════════════════════════
+// Nova coleta
+// ════════════════════════════════════════════════════════════════
+function popularSelectPonto() {
+  const sel = document.getElementById('f-ponto')
+  const lista = App.pontos || []
+  sel.innerHTML = '<option value="">Selecione…</option>' +
+    lista.map(p => `<option value="${p.id}">${p.nome} (${p.codigo_ana})</option>`).join('')
+}
+
+function abrirFormulario() {
+  App.pontoAtual = null
+  App.gpsAtual = null
+  bCapturaLimpar()
+  _atualizarGaleriaFotos()
+  popularSelectPonto()
+  document.getElementById('f-ponto').value = ''
+  document.getElementById('f-ponto-info').textContent = ''
+  document.getElementById('f-data').value = new Date().toISOString().slice(0, 10)
+  document.getElementById('f-hora').value = new Date().toTimeString().slice(0, 5)
+  document.getElementById('form-gps-coords').textContent = 'GPS ainda não lido'
+  document.getElementById('form-gps-acc').textContent = ''
+  document.getElementById('f-gps-divergencia').hidden = true
+  ;['temp-ar', 'temp-amostra', 'ph', 'od', 'turbidez', 'condutividade'].forEach(id => {
+    document.getElementById(`f-${id}`).value = ''
+  })
+  document.getElementById('f-codigo-amostra').value = ''
+  document.getElementById('f-obs').value = ''
+  mostrarTela('tela-form')
+}
+
+function agValorCampo(id) {
+  const v = document.getElementById(id).value
+  return v === '' ? null : parseFloat(v)
+}
+
+// Checa plausibilidade de um campo via RPC (mesma função que a mesa
+// usa em agua-laudos.html, migration 254) — nunca reimplementar os
+// limites aqui.
+async function agChecarCampo(campo) {
+  const idMap = { temp_ar: 'f-temp-ar', temp_amostra: 'f-temp-amostra', ph: 'f-ph', od: 'f-od', turbidez: 'f-turbidez', condutividade_eletrica: 'f-condutividade' }
+  const valor = agValorCampo(idMap[campo])
+  const hint = document.getElementById(`f-h-${campo}`)
+  if (!hint) return null
+  if (valor == null || !db) { hint.textContent = ''; return null }
+  const tempAmostra = agValorCampo('f-temp-amostra')
+  try {
+    const { data: classe } = await db.rpc('agua_valor_plausivel', { p_parametro: campo, p_valor: valor, p_temp_amostra: tempAmostra })
+    if (classe === 'impossivel') { hint.textContent = 'Valor fisicamente impossível — confira o instrumento.'; hint.style.color = 'var(--erro,#dc2626)' }
+    else if (classe === 'improvavel') { hint.textContent = 'Valor fora do range típico — confira antes de salvar.'; hint.style.color = 'var(--alerta,#d97706)' }
+    else hint.textContent = ''
+    return classe
+  } catch { return null }   // offline: sem checagem, nunca bloqueia
+}
+
+function _getContextoFoto() {
+  const ponto = (App.pontos || []).find(p => p.id === document.getElementById('f-ponto').value)
+  return { tipoOcorrencia: 'Coleta de água', local: ponto?.nome || '' }
+}
+
+function _atualizarGaleriaFotos() {
+  bCapturaMostrarGaleria(document.getElementById('foto-grid'))
+}
+
+async function abrirCamera() {
+  if (bCapturaGetFotos().length >= 1) { toast('Já há uma foto — remova para trocar', 'warn'); return }
+  if (bCameraEhNativa()) {
+    const blob = await bCameraNativaCapturar({ nome: App.coletor?.nome_completo }, App.gpsAtual, 'CAMERA', _getContextoFoto())
+    if (blob && bCapturaAdicionar(blob)) _atualizarGaleriaFotos()
+    return
+  }
+  document.getElementById('input-foto-camera').click()
+}
+
+async function abrirGaleria() {
+  if (bCapturaGetFotos().length >= 1) { toast('Já há uma foto — remova para trocar', 'warn'); return }
+  if (bCameraEhNativa()) {
+    const blob = await bCameraNativaCapturar({ nome: App.coletor?.nome_completo }, App.gpsAtual, 'PHOTOS', _getContextoFoto())
+    if (blob && bCapturaAdicionar(blob)) _atualizarGaleriaFotos()
+    return
+  }
+  document.getElementById('input-foto-galeria').click()
+}
+
+async function processarFotosArquivos(fileList) {
+  const files = Array.from(fileList || [])
+  if (!files.length) return
+  const f = files[0]
+  if (!f.type.startsWith('image/')) return
+  if (bCapturaGetFotos().length >= 1) { toast('Já há uma foto — remova para trocar', 'warn'); return }
+  try {
+    const blob = await bCapturaProcessarArquivo(f, { nome: App.coletor?.nome_completo }, App.gpsAtual, _getContextoFoto())
+    if (blob && bCapturaAdicionar(blob)) _atualizarGaleriaFotos()
+  } catch (e) { console.warn('[foto]', e) }
+}
+
+async function lerGpsAgora() {
+  const btn = document.getElementById('btn-ler-gps')
+  btn.disabled = true
+  try {
+    App.gpsAtual = await bGpsUmaLeitura()
+    document.getElementById('form-gps-coords').textContent = `${App.gpsAtual.lat.toFixed(5)}, ${App.gpsAtual.lng.toFixed(5)}`
+    document.getElementById('form-gps-acc').textContent = App.gpsAtual.acc ? `±${Math.round(App.gpsAtual.acc)}m` : ''
+    atualizarDivergenciaGps()
+  } catch (e) {
+    toast('Não foi possível ler o GPS agora — a coleta pode ser salva sem localização', 'warn')
+  } finally {
+    btn.disabled = false
+  }
+}
+
+function atualizarDivergenciaGps() {
+  const el = document.getElementById('f-gps-divergencia')
+  const pontoId = document.getElementById('f-ponto').value
+  const ponto = (App.pontos || []).find(p => p.id === pontoId)
+  const pontoLatLng = ponto ? agLatLngDeGeom(ponto.geom) : null
+  if (!App.gpsAtual || !pontoLatLng) { el.hidden = true; return }
+  const dist = agDistanciaMetros(App.gpsAtual, pontoLatLng)
+  // Aviso, nunca bloqueio — "nada pode impedir o trabalho de campo"
+  // (regra do sistema). GPS de celular tem erro de dezenas de metros;
+  // o limiar de 1 km só sinaliza divergência grosseira (ponto errado).
+  if (dist != null && dist > 1000) {
+    el.hidden = false
+    el.textContent = `Você está a ${(dist / 1000).toFixed(1)} km da coordenada cadastrada do ponto — confirme se é o ponto certo antes de salvar.`
+  } else {
+    el.hidden = true
+  }
+}
+
+async function salvarRegistro() {
+  const pontoId = document.getElementById('f-ponto').value
+  const dataColeta = document.getElementById('f-data').value
+  if (!pontoId) { toast('Selecione o ponto de coleta', 'warn'); return }
+  if (!dataColeta) { toast('Informe a data da coleta', 'warn'); return }
+
+  const fotos = bCapturaGetFotos()
+  const [ano, mes] = dataColeta.split('-').map(Number)
+  const ordem = mes <= 6 ? 'primeira' : 'segunda'   // cheia/seca — ver js/agua-sync.js
+
+  const registro = {
+    uuid_cliente: crypto.randomUUID(),
+    ponto_id: pontoId,
+    campanha_ano: ano,
+    campanha_ordem: ordem,
+    data_coleta: dataColeta,
+    hora_coleta: document.getElementById('f-hora').value || null,
+    coletor_id: App.coletor?.id ?? null,
+    temp_ar: agValorCampo('f-temp-ar'),
+    temp_amostra: agValorCampo('f-temp-amostra'),
+    ph: agValorCampo('f-ph'),
+    od: agValorCampo('f-od'),
+    turbidez: agValorCampo('f-turbidez'),
+    condutividade_eletrica: agValorCampo('f-condutividade'),
+    codigo_amostra: document.getElementById('f-codigo-amostra').value.trim() || null,
+    observacoes: document.getElementById('f-obs').value.trim() || null,
+    lat: App.gpsAtual?.lat ?? null,
+    lng: App.gpsAtual?.lng ?? null,
+    foto_blob: fotos[0] || null,
+  }
+
+  try {
+    await aOfflineSalvar(registro)
+    toast('Coleta salva! Será enviada quando houver conexão.', 'ok')
+    await atualizarBadgeFila()
+    aSyncRegistrarBackground()
+    aSyncRodar()
+    mostrarTela('tela-home')
+  } catch (err) {
+    toast('Erro ao salvar: ' + err.message, 'erro')
+  }
+}
+
+// ════════════════════════════════════════════════════════════════
+// Fila
+// ════════════════════════════════════════════════════════════════
+function bFormatDataHora(str) {
+  if (!str) return '—'
+  const d = new Date(str)
+  if (isNaN(d)) return str.slice(0, 16).replace('T', ' ')
+  return d.toLocaleDateString('pt-BR') + ' ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+}
+
+function agRenderItemFila(r) {
+  const statusLabel = { pendente: 'Pendente', enviando: 'Enviando…', confirmado: 'Enviado' }
+  const ponto = (App.pontos || []).find(p => p.id === r.ponto_id)
+  return `
+    <div class="sync-item sync-${r.status}">
+      <span class="sync-icon">${bico('pin')}</span>
+      <div class="sync-info">
+        <strong>${esc(ponto?.nome || 'Ponto de coleta')}</strong>
+        <span>${bico('clock')} Coleta: ${bFormatDataHora(r.data_coleta)} ${r.hora_coleta ? r.hora_coleta.slice(0, 5) : ''}</span>
+        <span class="sync-meta-item">${r.foto_blob ? bico('camera') + ' Com foto' : 'Sem foto'}</span>
+        ${r.sincronizado_em ? `<span>${bico('upload')} Envio: ${bFormatDataHora(r.sincronizado_em)}</span>` : ''}
+        ${r.ultimo_erro ? `<span class="sync-erro-msg">⚠ ${esc(r.ultimo_erro)}</span>` : ''}
+      </div>
+      <span class="sync-status sync-${r.status}">${statusLabel[r.status] || r.status}</span>
+    </div>`
+}
+
+async function carregarFila() {
+  const todos = await aOfflineListarTodos()
+  const stats = { pendente: 0, enviando: 0, confirmado: 0 }
+  todos.forEach(r => { if (stats[r.status] != null) stats[r.status]++ })
+  document.getElementById('stat-pendentes').textContent   = stats.pendente
+  document.getElementById('stat-enviando').textContent    = stats.enviando
+  document.getElementById('stat-confirmados').textContent = stats.confirmado
+
+  const lista = document.getElementById('fila-lista')
+  lista.innerHTML = todos.length
+    ? todos.map(agRenderItemFila).join('')
+    : '<p style="opacity:.6;text-align:center;padding:24px 0">Nenhuma coleta na fila</p>'
+}
+
+// ════════════════════════════════════════════════════════════════
+// Config
+// ════════════════════════════════════════════════════════════════
+async function carregarConfig() {
+  document.getElementById('config-nome-coletor').textContent = App.coletor?.nome_completo || '—'
+  document.getElementById('avatar-letra').textContent = (App.coletor?.nome_completo || 'C').charAt(0).toUpperCase()
+
+  const quota = await aOfflineQuota()
+  if (quota) {
+    document.getElementById('quota-fill').style.width = quota.pct + '%'
+    const usadoMb = (quota.usado / 1024 / 1024).toFixed(1)
+    const totalMb = (quota.total / 1024 / 1024).toFixed(0)
+    document.getElementById('quota-texto').textContent = `${usadoMb} MB de ${totalMb} MB (${quota.pct}%)`
+  }
+}
+
+function abrirQRInstalacao() {
+  document.getElementById('qr-overlay-img').src = gerarQRDataURL(INSTALL_URL)
+  document.getElementById('qr-overlay-link').textContent = INSTALL_URL
+  document.getElementById('qr-overlay').hidden = false
+}
+
+// ── Verificar atualização do app ──────────────────────────────
+const GH_RELEASES_API = 'https://api.github.com/repos/erissoncameli-prog/siguc-ac/releases'
+const APP_VERSAO_WEB = '1.0.0'
+
+function versaoAtualApp() {
+  const m = String(window.AGUA_BUILD || '').match(/(\d+\.\d+\.\d+)/)
+  return m ? m[1] : null
+}
+function cmpVersao(a, b) {
+  const pa = a.split('.').map(Number), pb = b.split('.').map(Number)
+  for (let i = 0; i < 3; i++) {
+    if ((pa[i] || 0) > (pb[i] || 0)) return 1
+    if ((pa[i] || 0) < (pb[i] || 0)) return -1
+  }
+  return 0
+}
+async function verificarAtualizacao() {
+  if (window.Capacitor) return verificarUpdateAndroid()
+  return verificarUpdateWeb()
+}
+async function verificarUpdateAndroid() {
+  toast('Verificando atualização…', 'info')
+  const atual = versaoAtualApp()
+  try {
+    const resp = await fetch(`${GH_RELEASES_API}?per_page=10`, { headers: { Accept: 'application/vnd.github+json' } })
+    const lista = await resp.json()
+    const rel = (lista || []).find(r => !r.draft && !r.prerelease && /^agua-v\d/.test(r.tag_name || ''))
+    if (!rel) { toast('Não foi possível verificar agora', 'warn'); return }
+    const ultima = rel.tag_name.replace('agua-v', '')
+    if (atual && cmpVersao(ultima, atual) > 0) {
+      const apk = rel.assets?.find(a => a.name?.endsWith('.apk'))?.browser_download_url || rel.html_url
+      if (confirm(`Nova versão ${ultima} disponível.\nVocê está na ${atual}.\n\nBaixar agora?`)) window.open(apk, '_blank')
+    } else {
+      toast(`Você já está na versão mais recente (${atual || ultima})`, 'ok')
+    }
+  } catch (e) { toast('Sem conexão para verificar', 'warn') }
+}
+async function verificarUpdateWeb() {
+  if (!('serviceWorker' in navigator)) { location.reload(); return }
+  toast('Verificando atualização…', 'info')
+  const reg = await navigator.serviceWorker.getRegistration()
+  if (!reg) { location.reload(); return }
+  let achou = false
+  reg.addEventListener('updatefound', () => {
+    achou = true
+    const nw = reg.installing
+    if (!nw) return
+    nw.addEventListener('statechange', () => {
+      if (nw.state === 'installed') { toast('Atualização encontrada — recarregando…', 'ok'); setTimeout(() => location.reload(), 900) }
+    })
+  })
+  try { await reg.update() } catch (e) {}
+  setTimeout(() => { if (!achou) toast('App já está atualizado', 'ok') }, 2500)
+}
+let _swWaiting = null
+let _apkUpdateUrl = null
+function mostrarBannerUpdate() {
+  document.getElementById('update-banner').hidden = false
+  document.getElementById('nav-config')?.classList.add('tem-update')
+}
+function aplicarUpdate() {
+  if (window.Capacitor) { if (_apkUpdateUrl) window.open(_apkUpdateUrl, '_blank'); return }
+  if (_swWaiting) { try { _swWaiting.postMessage({ type: 'SKIP_WAITING' }) } catch (e) {} }
+  setTimeout(() => location.reload(), 300)
+}
+async function checarAtualizacaoAuto() {
+  if (window.Capacitor) {
+    const ultima = await aOfflineGetConfig('update_check_ts')
+    if (ultima && Date.now() - ultima < 86400000) return
+    try {
+      const resp = await fetch(`${GH_RELEASES_API}?per_page=5`, { headers: { Accept: 'application/vnd.github+json' } })
+      const lista = await resp.json()
+      const rel = (lista || []).find(r => !r.draft && !r.prerelease && /^agua-v\d/.test(r.tag_name || ''))
+      await aOfflineSetConfig('update_check_ts', Date.now())
+      const atual = versaoAtualApp()
+      if (rel && atual && cmpVersao(rel.tag_name.replace('agua-v', ''), atual) > 0) {
+        _apkUpdateUrl = rel.assets?.find(a => a.name?.endsWith('.apk'))?.browser_download_url || rel.html_url
+        mostrarBannerUpdate()
+      }
+    } catch (e) {}
+    return
+  }
+  if (!('serviceWorker' in navigator)) return
+  try {
+    const reg = await navigator.serviceWorker.getRegistration()
+    if (!reg) return
+    if (reg.waiting) { _swWaiting = reg.waiting; mostrarBannerUpdate() }
+    reg.addEventListener('updatefound', () => {
+      const nw = reg.installing
+      if (!nw) return
+      nw.addEventListener('statechange', () => {
+        if (nw.state === 'installed' && navigator.serviceWorker.controller) { _swWaiting = reg.waiting || nw; mostrarBannerUpdate() }
+      })
+    })
+    reg.update().catch(() => {})
+  } catch (e) {}
+}
+
+// ════════════════════════════════════════════════════════════════
+// Event Listeners
+// ════════════════════════════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('btn-fazer-login').addEventListener('click', fazerLogin)
+  document.getElementById('login-email').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('login-senha').focus() })
+  document.getElementById('login-senha').addEventListener('keydown', e => { if (e.key === 'Enter') fazerLogin() })
+  document.getElementById('btn-toggle-senha').addEventListener('click', () => {
+    const inp = document.getElementById('login-senha')
+    inp.type = inp.type === 'password' ? 'text' : 'password'
+  })
+
+  document.getElementById('btn-trocar-senha').addEventListener('click', confirmarTrocaSenha)
+  document.getElementById('troca-senha1').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('troca-senha2').focus() })
+  document.getElementById('troca-senha2').addEventListener('keydown', e => { if (e.key === 'Enter') confirmarTrocaSenha() })
+
+  initPinKeypad('pin', tentarDesbloquear)
+  document.getElementById('btn-esqueci-pin').addEventListener('click', async () => {
+    if (!confirm('Descartar o PIN deste aparelho e entrar novamente com e-mail e senha? É necessário ter internet. Coletas pendentes são preservadas.')) return
+    await aOfflineSetConfig('pin_hash', null)
+    await aOfflineSetConfig('pin_dono', null)
+    await aOfflineSetConfig('coletor', null)
+    App.coletor = null
+    try { if (db) await db.auth.signOut() } catch {}
+    document.getElementById('login-erro').hidden = true
+    mostrarTela('tela-login', false)
+  })
+  initPinSetupKeypad()
+
+  document.querySelectorAll('.pill-btn[data-tela]').forEach(btn => btn.addEventListener('click', () => mostrarTela(btn.dataset.tela)))
+  document.getElementById('nav-nova').addEventListener('click', abrirFormulario)
+  document.getElementById('btn-nova-coleta').addEventListener('click', abrirFormulario)
+
+  document.getElementById('btn-back-form').addEventListener('click', () => mostrarTela('tela-home'))
+  document.getElementById('btn-descartar').addEventListener('click', () => { if (confirm('Descartar esta coleta?')) mostrarTela('tela-home') })
+  document.getElementById('btn-back-fila').addEventListener('click', () => mostrarTela('tela-home'))
+  document.getElementById('btn-back-config').addEventListener('click', () => mostrarTela('tela-home'))
+
+  document.getElementById('btn-update-agora').addEventListener('click', aplicarUpdate)
+  document.getElementById('btn-update-depois').addEventListener('click', () => { document.getElementById('update-banner').hidden = true })
+
+  document.getElementById('btn-sync-home').addEventListener('click', async () => {
+    toast('Sincronizando…', 'info')
+    const r = await aSyncRodar()
+    if (r === 'sem_conexao') toast('Sem conexão — será enviado automaticamente', 'warn')
+    if (r === 'vazio') toast('Nenhuma coleta pendente', 'info')
+  })
+  document.getElementById('btn-ver-fila').addEventListener('click', () => mostrarTela('tela-fila'))
+
+  document.getElementById('f-ponto').addEventListener('change', () => {
+    const ponto = (App.pontos || []).find(p => p.id === document.getElementById('f-ponto').value)
+    document.getElementById('f-ponto-info').textContent = ponto ? `${ponto.municipio} · ${ponto.rio}` : ''
+    atualizarDivergenciaGps()
+  })
+  document.getElementById('btn-ler-gps').addEventListener('click', lerGpsAgora)
+  document.getElementById('btn-abrir-camera').addEventListener('click', abrirCamera)
+  document.getElementById('btn-abrir-galeria').addEventListener('click', abrirGaleria)
+  document.getElementById('input-foto-camera').addEventListener('change', e => { processarFotosArquivos(e.target.files); e.target.value = '' })
+  document.getElementById('input-foto-galeria').addEventListener('change', e => { processarFotosArquivos(e.target.files); e.target.value = '' })
+  document.getElementById('btn-salvar').addEventListener('click', salvarRegistro)
+
+  document.getElementById('btn-sync-fila').addEventListener('click', async () => {
+    toast('Sincronizando…', 'info')
+    const r = await aSyncRodar()
+    if (r === 'sem_conexao') toast('Sem conexão — será enviado automaticamente', 'warn')
+    if (r === 'vazio') toast('Nenhuma coleta pendente', 'info')
+  })
+
+  document.getElementById('btn-alterar-pin').addEventListener('click', () => {
+    _pinSetupFase = 1; _pinSetupPrim = ''; _pinSetupAtual = ''
+    document.getElementById('pin-setup-dica').textContent = 'Novo PIN (4 dígitos)'
+    mostrarTela('tela-config-pin')
+  })
+  document.getElementById('btn-atualizar-pontos').addEventListener('click', async () => {
+    toast('Atualizando pontos…', 'info')
+    const ok = await sincronizarPontos()
+    toast(ok ? `${App.pontos.length} pontos atualizados` : 'Sem conexão — tente mais tarde', ok ? 'ok' : 'warn')
+  })
+  document.getElementById('btn-verificar-update').addEventListener('click', verificarAtualizacao)
+  document.getElementById('btn-aviso-privacidade').addEventListener('click', lgpdCampoAbrir)
+  document.getElementById('btn-meus-dados').addEventListener('click', lgpdAbrirMeusDados)
+  document.getElementById('btn-qr-instalar').addEventListener('click', abrirQRInstalacao)
+  document.getElementById('qr-overlay-fechar').addEventListener('click', () => { document.getElementById('qr-overlay').hidden = true })
+  document.getElementById('btn-zerar-fila').addEventListener('click', async () => {
+    const total = await aSyncContarPendentes()
+    const msg = total > 0
+      ? `Apagar ${total} coleta${total !== 1 ? 's' : ''} pendente${total !== 1 ? 's' : ''}? Esta ação não pode ser desfeita.`
+      : 'Zerar toda a fila (incluindo confirmadas)? Esta ação não pode ser desfeita.'
+    if (!confirm(msg)) return
+    await aOfflineZerarFila()
+    await atualizarBadgeFila()
+    toast('Fila zerada.', 'ok')
+  })
+  document.getElementById('btn-sair').addEventListener('click', async () => {
+    if (!confirm('Sair do app? Coletas não enviadas e seu PIN permanecem salvos neste aparelho.')) return
+    await db.auth.signOut()
+    App.coletor = null
+    document.getElementById('login-erro').hidden = true
+    mostrarTela('tela-login', false)
+  })
+
+  ;(function () {
+    const wrap = document.getElementById('sync-progress')
+    const fill = document.getElementById('sync-pb-fill')
+    const texto = document.getElementById('sync-pb-texto')
+    let _timer = null
+    function mostrarBarra(pct, msg) { clearTimeout(_timer); fill.style.width = pct + '%'; texto.textContent = msg; wrap.hidden = false }
+    function esconderBarra(delay = 3000) { _timer = setTimeout(() => { wrap.hidden = true }, delay) }
+    aSyncOn('sync-start', ({ total }) => mostrarBarra(0, `Sincronizando 0 / ${total}…`))
+    aSyncOn('sync-progresso', ({ ok, erros, total }) => {
+      const feitos = ok + erros
+      mostrarBarra(Math.round((feitos / total) * 100), `Sincronizando ${feitos} / ${total}…`)
+    })
+    aSyncOn('sync-fim', ({ ok, erros }) => {
+      if (erros === 0) {
+        mostrarBarra(100, `✓ ${ok} coleta${ok !== 1 ? 's' : ''} enviada${ok !== 1 ? 's' : ''}`)
+        if (ok > 0) toast(`${ok} coleta${ok !== 1 ? 's' : ''} sincronizada${ok !== 1 ? 's' : ''}!`, 'ok')
+      } else {
+        mostrarBarra(100, `${ok} enviada${ok !== 1 ? 's' : ''} · ${erros} com erro`)
+        toast(`${erros} coleta(s) não puderam ser enviadas`, 'warn')
+      }
+      esconderBarra(3000)
+      atualizarBadgeFila()
+      carregarFila()
+    })
+  })()
+
+  window.addEventListener('online', () => { aSyncRodar(); verificarConexao() })
+  window.addEventListener('offline', verificarConexao)
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) { aSyncRodar(); verificarConexao() } })
+  setInterval(() => aSyncRodar(), 45000)
+  verificarConexao()
+  setInterval(verificarConexao, 30000)
+
+  document.getElementById('app-versao').textContent = 'SIGUC Qualidade da Água · ' + (window.AGUA_BUILD || `v${APP_VERSAO_WEB} (web)`)
+  document.getElementById('app-copyright').textContent = `© ${new Date().getFullYear()} · SEMA-AC`
+
+  boot()
+  aSyncRodar()
+})
+</script>
+</body>
+</html>
