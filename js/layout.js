@@ -91,6 +91,7 @@ function gerarLayout(tituloPagina, paginaAtiva) {
     'agua-pontos':              { svg: '<path d="M12 2s7 8.5 7 13a7 7 0 0 1-14 0c0-4.5 7-13 7-13z"/>', cor: '#38bdf8', bg: 'rgba(56,189,248,0.22)' },
     'agua-laudos':              { svg: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M12 11s2.5 3 2.5 4.7a2.5 2.5 0 0 1-5 0C9.5 14 12 11 12 11z"/>', cor: '#0ea5e9', bg: 'rgba(14,165,233,0.22)' },
     'agua-conferencia':         { svg: '<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>', cor: '#0891b2', bg: 'rgba(8,145,178,0.22)' },
+    'agua-relatorios':          { svg: '<rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>', cor: '#0284c7', bg: 'rgba(2,132,199,0.22)' },
   };
 
   function renderPill(id, size) {
@@ -165,6 +166,7 @@ function gerarLayout(tituloPagina, paginaAtiva) {
         { id: 'agua-pontos',      href: '../pages/agua-pontos.html',      label: 'Pontos e Laboratórios' },
         { id: 'agua-laudos',      href: '../pages/agua-laudos.html',      label: 'Lançar Laudos' },
         { id: 'agua-conferencia', href: '../pages/agua-conferencia.html', label: 'Conferência' },
+        { id: 'agua-relatorios',  href: '../pages/agua-relatorios.html',  label: 'Relatórios' },
       ]
     },
     {
