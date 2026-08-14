@@ -99,9 +99,17 @@ function gerarLayout(tituloPagina, paginaAtiva) {
     return `<span style="display:inline-flex;align-items:center;justify-content:center;width:${px}px;height:${px}px;border-radius:7px;background:${p.bg};flex-shrink:0"><svg width="${Math.round(px*.5)}" height="${Math.round(px*.5)}" viewBox="0 0 24 24" fill="none" stroke="${p.cor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${p.svg}</svg></span>`;
   }
 
+  // Cada grupo é um acordeão independente (recolhível/expansível); o
+  // `super` opcional agrupa vários grupos sob um rótulo maior — só um
+  // divisor visual (não é ele mesmo recolhível), e é o que separa
+  // "Diretoria Técnica" de "Administrativo" pedido pelo usuário. Grupos
+  // sem `super` (Principal, Sistema) ficam fora dos dois, como blocos
+  // fixos no topo e no fim — Principal é transversal a todo perfil, e
+  // Sistema é administração DO SOFTWARE, não da SEMA (não confundir com
+  // o superbloco "Administrativo", que é área da secretaria).
   const navGroups = [
     {
-      label: 'Principal',
+      id: 'principal', label: 'Principal',
       itens: [
         { id: 'dashboard',           href: '../pages/dashboard.html',           label: t('nav.dashboard') },
         { id: 'dashboard-executivo', href: '../pages/dashboard-executivo.html', label: 'Dashboard Executivo' },
@@ -110,7 +118,7 @@ function gerarLayout(tituloPagina, paginaAtiva) {
       ]
     },
     {
-      label: 'Gestão',
+      id: 'gestao', label: 'Gestão', super: 'Diretoria Técnica',
       itens: [
         { id: 'monitoramento',      href: '../pages/monitoramento.html',      label: t('nav.monitoramento') },
         { id: 'netflora',           href: '../pages/netflora.html',           label: 'Netflora — Inventário' },
@@ -123,7 +131,7 @@ function gerarLayout(tituloPagina, paginaAtiva) {
       ]
     },
     {
-      label: 'Brigadas de Incêndio',
+      id: 'brigadas', label: 'Brigadas de Incêndio', super: 'Diretoria Técnica',
       itens: [
         { id: 'brigada-app',         href: '../pages/brigada.html',             label: 'App de Campo', target: '_blank' },
         { id: 'validacao-campo',     href: '../pages/validacao-campo.html',     label: 'Validação de Campo',
@@ -134,7 +142,7 @@ function gerarLayout(tituloPagina, paginaAtiva) {
       ]
     },
     {
-      label: 'Biomonitor',
+      id: 'biomonitor', label: 'Biomonitor', super: 'Diretoria Técnica',
       itens: [
         { id: 'biomonitor-app',        href: '../pages/biomonitor.html',           label: 'App de Campo', target: '_blank' },
         { id: 'biomonitor-validacao',  href: '../pages/biomonitor-validacao.html', label: 'Validação de Ninhos',
@@ -151,7 +159,16 @@ function gerarLayout(tituloPagina, paginaAtiva) {
       ]
     },
     {
-      label: 'Frota — Transporte',
+      id: 'agua', label: 'Qualidade da Água', super: 'Diretoria Técnica',
+      itens: [
+        { id: 'agua-mapa',        href: '../pages/agua-mapa.html',        label: 'Mapa' },
+        { id: 'agua-pontos',      href: '../pages/agua-pontos.html',      label: 'Pontos e Laboratórios' },
+        { id: 'agua-laudos',      href: '../pages/agua-laudos.html',      label: 'Lançar Laudos' },
+        { id: 'agua-conferencia', href: '../pages/agua-conferencia.html', label: 'Conferência' },
+      ]
+    },
+    {
+      id: 'frota', label: 'Frota — Transporte', super: 'Administrativo',
       perfis: ['super_admin','secretario','diretor','chefe_departamento','gestor','gestor_uc','tecnico','assistente_admin','financeiro','visualizador'],
       itens: [
         { id: 'frota-app',       href: '../pages/frota-app.html',       label: 'App Frota', target: '_blank' },
@@ -166,16 +183,7 @@ function gerarLayout(tituloPagina, paginaAtiva) {
       ]
     },
     {
-      label: 'Qualidade da Água',
-      itens: [
-        { id: 'agua-mapa',        href: '../pages/agua-mapa.html',        label: 'Mapa' },
-        { id: 'agua-pontos',      href: '../pages/agua-pontos.html',      label: 'Pontos e Laboratórios' },
-        { id: 'agua-laudos',      href: '../pages/agua-laudos.html',      label: 'Lançar Laudos' },
-        { id: 'agua-conferencia', href: '../pages/agua-conferencia.html', label: 'Conferência' },
-      ]
-    },
-    {
-      label: 'Administração',
+      id: 'sistema', label: 'Sistema',
       perfis: ['super_admin', 'gestor'],
       itens: [
         { id: 'usuarios',                 href: '../pages/usuarios.html',                 label: t('nav.usuarios') },
@@ -187,6 +195,16 @@ function gerarLayout(tituloPagina, paginaAtiva) {
   ];
 
   const u = appState.usuario;
+
+  // Grupo da página atual: nasce sempre aberto, sem depender do que foi
+  // salvo — chegar numa página e ver o próprio link escondido seria pior
+  // do que a barra comprida que este acordeão resolve.
+  const grupoAtivoId = (navGroups.find(g => g.itens.some(i => i.id === paginaAtiva)) || {}).id || null;
+
+  let estadoGrupos = {};
+  try { estadoGrupos = JSON.parse(localStorage.getItem('siguc_nav_grupos') || '{}'); } catch (e) { /* localStorage indisponível */ }
+
+  let superAtual;
   const navHtml = navGroups.map(grupo => {
     if (grupo.perfis && u && !grupo.perfis.includes(u.perfil)) return '';
     const itensHtml = grupo.itens
@@ -197,7 +215,21 @@ function gerarLayout(tituloPagina, paginaAtiva) {
         return `<a href="${item.href}"${target} class="nav-item${ativo}">${renderPill(item.id, 26)}<span>${item.label}</span></a>`;
       }).join('');
     if (!itensHtml) return '';
-    return `<div class="nav-section">${grupo.label}</div>${itensHtml}`;
+
+    let prefixo = '';
+    if (grupo.super !== superAtual) {
+      superAtual = grupo.super;
+      if (superAtual) prefixo = `<div class="nav-super">${esc(superAtual)}</div>`;
+    }
+
+    const aberto = grupo.id === grupoAtivoId ? true : !!estadoGrupos[grupo.id];
+    return `${prefixo}<div class="nav-grupo${aberto ? ' aberto' : ''}" data-grupo="${grupo.id}">
+      <button type="button" class="nav-section-toggle" onclick="toggleNavGrupo('${grupo.id}')" aria-expanded="${aberto}">
+        <span class="nav-section">${grupo.label}</span>
+        <svg class="nav-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="nav-grupo-corpo"><div class="nav-grupo-corpo-inner">${itensHtml}</div></div>
+    </div>`;
   }).join('');
 
   const nomeDisplay = u?.nome_completo || 'Usuário';
@@ -271,6 +303,20 @@ function carregarLogosSidebar() {
 function toggleSidebarMobile() {
   document.getElementById('sidebar')?.classList.toggle('aberta');
   document.querySelector('.sidebar-overlay')?.classList.toggle('ativo');
+}
+
+// Acordeão dos grupos da sidebar — abre/fecha e lembra a escolha entre
+// páginas (a navegação aqui é sempre load de página inteira, nunca SPA).
+function toggleNavGrupo(id) {
+  const el = document.querySelector(`.nav-grupo[data-grupo="${id}"]`);
+  if (!el) return;
+  const aberto = !el.classList.contains('aberto');
+  el.classList.toggle('aberto', aberto);
+  el.querySelector('.nav-section-toggle')?.setAttribute('aria-expanded', String(aberto));
+  let estado = {};
+  try { estado = JSON.parse(localStorage.getItem('siguc_nav_grupos') || '{}'); } catch (e) { /* ignora */ }
+  estado[id] = aberto;
+  try { localStorage.setItem('siguc_nav_grupos', JSON.stringify(estado)); } catch (e) { /* ignora */ }
 }
 
 async function fazerLogout() {

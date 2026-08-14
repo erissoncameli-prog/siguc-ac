@@ -873,6 +873,59 @@ conformidade em vez de entregá-la. Ficam aqui até alguém trazer o dado:
 Quando qualquer um desses chegar, é edição pontual — não precisa
 reabrir o plano.
 
+## Regra do sistema — sidebar de mesa (grupos recolhíveis)
+A sidebar (`js/layout.js`, `gerarLayout()`, usado pelas 45 páginas de
+mesa) tinha 7 grupos soltos, 37 links — lista comprida demais. Virou
+acordeão de 2 níveis, sem tocar nenhuma das 45 páginas (só
+`js/layout.js` + `css/global.css`, que já é a fonte única do menu).
+- **Grupo → acordeão.** Cada `nav-section` virou um `<button>`
+  (`.nav-section-toggle`) que abre/fecha um `.nav-grupo-corpo`. O grupo
+  da página atual **nasce sempre aberto**, calculado dentro do próprio
+  `gerarLayout()` (que já recebe `paginaAtiva`) — nunca escondido atrás
+  de um acordeão fechado. Os demais respeitam a preferência salva em
+  `localStorage['siguc_nav_grupos']` (por `toggleNavGrupo(id)`); sem
+  preferência salva, começam fechados.
+- **Superbloco é só um divisor, não um acordeão próprio.** `grupo.super`
+  (`'Diretoria Técnica'` ou `'Administrativo'`) emite um `<div
+  class="nav-super">` antes do primeiro grupo daquela leva — a função
+  compara `grupo.super` com o super do grupo anterior renderizado, só
+  imprime de novo quando muda. Frota — Transporte é o único grupo em
+  `'Administrativo'`; Gestão/Brigadas/Biomonitor/Água ficam em
+  `'Diretoria Técnica'`. `Principal` (Dashboard/Mapa/Unidades) e
+  `Sistema` (Usuários/Estrutura Org./Configurações/Saúde do Sistema,
+  renomeado de "Administração" nesta entrega) ficam SEM `super` —
+  blocos fixos no topo e no fim. Não confundir os dois "administra":
+  `Sistema` é administração DO SOFTWARE; `Administrativo` é área da
+  SEMA (onde Frota mora, e onde um Almoxarifado/Patrimônio futuro
+  entraria sem reabrir a estrutura).
+- **Colapso por `grid-template-rows: 0fr → 1fr`, nunca
+  `transform`/`max-height` com transform.** Mesma armadilha documentada
+  na barra do app Frota (`transform` num ancestral vira containing
+  block de descendentes `position:fixed`) — aqui não há `position:fixed`
+  dentro da nav, mas a regra do projeto é não introduzir `transform` de
+  novo num ancestral da sidebar sem necessidade. O chevron (`.nav-chevron`)
+  gira via `transform: rotate()`, mas é folha (SVG), não ancestral de
+  nada.
+- Rail de ícones (recolher a barra inteira, não só os grupos) foi
+  avaliado e adiado por decisão do usuário — só o acordeão por grupo
+  entrou nesta entrega.
+- `pwa/sw.js`: só `VERSOES.frota` sobe (81→82) — `js/layout.js` E
+  `css/global.css` estão nos DOIS lugares do shell do Frota (`<link>`/
+  `<script>` em `frota-app.html` E `SHELLS.frota`). Brigadas/Biomonitor
+  não sobem: `css/global.css` está em `SHELLS.brigadas` mas
+  `brigada.html` não o referencia (entrada obsoleta no shell, não
+  mexida aqui) e `biomonitor.html` não usa nenhum dos dois arquivos.
+- Guarda: `tests/sidebar-grupos.test.js`. `gerarLayout()` exige
+  `appState`/`t`/`esc` (de `js/config.js`) e `config.js` por sua vez
+  exige o global `supabase` do CDN — o teste carrega os arquivos numa
+  página vazia dedicada (`tests/fixtures/sidebar-harness.html`) com um
+  stub de `window.supabase.createClient`, porque nenhuma página real do
+  projeto serve de base: todas já declaram seu próprio `let db` no
+  escopo global, e isso colide com o `let db` de `config.js` (dois
+  `<script>` clássicos no mesmo documento compartilham o mesmo escopo
+  léxico para `let`/`const` — a segunda declaração quebra o parse da
+  página inteira, silenciosamente, sem lançar no `<script>` em si).
+
 ## Enums do banco
 perfil_usuario: super_admin | gestor | tecnico | financeiro | visualizador |
   brigadista | biologo | secretario | diretor | chefe_departamento |

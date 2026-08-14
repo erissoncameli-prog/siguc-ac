@@ -99,6 +99,25 @@ body { font-family: var(--font-sans); background: var(--cinza-50); color: var(--
 .nav-icon { width: 16px; height: 16px; flex-shrink: 0; opacity: .7; }
 .nav-item.ativo .nav-icon, .nav-item:hover .nav-icon { opacity: 1; }
 
+/* Superbloco (ex.: "Diretoria Técnica", "Administrativo") — só um
+   divisor visual acima de um ou mais grupos; não é ele mesmo
+   recolhível. Cada grupo abaixo dele é seu próprio acordeão. */
+.nav-super { font-size: 9px; font-weight: 700; color: var(--ouro-claro); text-transform: uppercase; letter-spacing: .12em; padding: 16px 18px 2px; opacity: .8; }
+.nav-super:first-child { padding-top: 8px; }
+
+/* Acordeão dos grupos — cabeçalho vira botão; o corpo colapsa via
+   grid-template-rows (nunca transform/max-height: transform num
+   ancestral cria containing block pra descendentes position:fixed,
+   mesma armadilha documentada na barra do app Frota). */
+.nav-section-toggle { display: flex; align-items: center; width: 100%; background: none; border: none; cursor: pointer; padding: 0; margin: 0; text-align: left; color: inherit; font: inherit; }
+.nav-section-toggle .nav-section { flex: 1; padding: 12px 4px 5px 18px; }
+.nav-section-toggle:hover .nav-section { color: rgba(255,255,255,.55); }
+.nav-chevron { flex-shrink: 0; margin-right: 16px; color: rgba(255,255,255,.4); transition: transform .2s ease, opacity .2s ease; }
+.nav-grupo.aberto .nav-chevron { transform: rotate(180deg); opacity: .8; }
+.nav-grupo-corpo { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .22s ease; }
+.nav-grupo.aberto .nav-grupo-corpo { grid-template-rows: 1fr; }
+.nav-grupo-corpo-inner { overflow: hidden; min-height: 0; }
+
 .sidebar-footer { padding: 14px 18px; border-top: 1px solid rgba(255,255,255,.1); display: flex; flex-direction: column; gap: 6px; }
 .btn-alterar-senha { display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 10px; background: transparent; border: 1px solid rgba(255,255,255,.1); border-radius: var(--raio); color: rgba(255,255,255,.55); font-family: var(--font-sans); font-size: 12px; cursor: pointer; transition: all .15s; text-decoration: none; }
 .btn-alterar-senha:hover { background: rgba(255,255,255,.08); color: rgba(255,255,255,.85); border-color: rgba(255,255,255,.2); }
