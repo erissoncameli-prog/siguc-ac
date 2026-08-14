@@ -16,7 +16,7 @@
 // Biomonitor; a página que usa este arquivo inclui aquele <script>
 // como dependência, igual a como o mapa reaproveita js/mapa-recorte.js.
 //
-// Depende de: esc(), formatData() (js/config.js); getCabecalhoRelatorio(),
+// Depende de: formatData() (js/config.js); getCabecalhoRelatorio(),
 // gerarProtocolo() (js/config-sistema.js); BIOPDF_FONT_REGULAR_B64/
 // BIOPDF_FONT_BOLD_B64 (js/biomonitor-pdf-fonts.js); aguaRelLabelCampanha(),
 // AGUA_REL_PARAM_LABEL (js/agua-relatorio-dados.js); jsPDF + jspdf-autotable
