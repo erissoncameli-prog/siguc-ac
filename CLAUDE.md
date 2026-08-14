@@ -1312,7 +1312,22 @@ e `agua_conama_violacoes`.
   quando uma sessão tiver esses domínios liberados.
 - **Fase 3 (app de campo) ENTREGUE** — depois desta rodada, ver seção
   própria "Qualidade da Água — app de campo (Fase 3)" abaixo.
-- **Fase 5 pendente** (relatório automático por bacia) — ver o plano.
+- **Fase 5 ENTREGUE (sem migration)**: `pages/agua-relatorios.html` —
+  relatório por bacia hidrográfica nos dois formatos pedidos, PDF
+  (`js/agua-relatorio-pdf.js`, timbre oficial, molde jsPDF do
+  Biomonitor) e PPTX (`js/agua-relatorio-pptx.js`, gráfico de linha
+  nativo da evolução do IQA por ponto, paleta de
+  `scripts/gerar-pptx.js`). Fonte única dos dados/agregação em
+  `js/agua-relatorio-dados.js`, nunca recalcula IQA/CONAMA — lê
+  `vw_agua_coletas_detalhe` pronta. Bacia NULA (Rio Iquiri) vira "Sem
+  bacia definida", nunca quebra; coleta em quarentena aparece marcada,
+  nunca escondida. jsPDF/autotable/pptxgenjs vendorizados em
+  `js/vendor/` (turf/proj4 já eram; jsPDF passou a ser também, nesta
+  entrega, para permitir validar os dois arquivos de verdade dentro da
+  política de rede da sessão). Fecha o plano original de 5 fases — ver
+  "Fase 5 — ENTREGUE" em `docs/qualidade-agua/plano.md` para o
+  detalhe completo e o que ficou pendente (hidrografia, ícone do app,
+  sólidos em suspensão — nenhum deles reaberto por esta fase).
 
 ⚠ Dois aprendizados desta entrega que valem para TODA função nova:
 `REVOKE ... FROM PUBLIC` não fecha nada no Supabase (o `ALTER DEFAULT
@@ -1377,14 +1392,24 @@ telas do app renderizarem sobrepostas) — em
 `docs/qualidade-agua/plano.md`, seção "Fase 3 — ENTREGUE".
 
 ## Próxima tarefa
-Módulo Qualidade da Água (IQA): Fases 0–4 entregues, em produção e
-ATIVAS para todo mundo com permissão. Falta só a **Fase 5** (relatório
-automático por bacia, reaproveitando `scripts/gerar-pptx.js` — ver
-`docs/qualidade-agua/plano.md`) e a **camada de hidrografia** da Fase 4
-(bloqueada por política de rede da sessão que tentou — ver "Fase 4 —
-ENTREGUE" para os domínios já identificados). Ao criar a próxima
-migration, rodar `mcp__Supabase__list_migrations` primeiro — não
-assumir o número pelo que está no repositório local.
+Módulo Qualidade da Água (IQA): as 5 fases do plano original estão
+ENTREGUES (ver `docs/qualidade-agua/plano.md`, seções "Fase 0" a "Fase
+5 — ENTREGUE"). Fase 5 fechou o plano: `pages/agua-relatorios.html`
+gera relatório por bacia hidrográfica em PDF (documento de registro —
+`js/agua-relatorio-pdf.js`, timbre oficial, padrão jsPDF do
+Biomonitor) E PPTX (apresentação executiva — `js/agua-relatorio-pptx.js`,
+gráfico nativo de evolução do IQA), sempre lendo `vw_agua_coletas_detalhe`
+pronta, nunca recalculando IQA/CONAMA. Sem migration nesta fase.
+Pendências que sobraram, nenhuma delas tarefa de código de uma sessão
+só (ver "Fase 5 concluída — plano original fechado" no plano para o
+resumo): **camada de hidrografia** do mapa (Fase 4, bloqueada por
+política de rede — domínios já identificados), **ícone do app Água**
+(placeholder do Capacitor) e **sólidos em suspensão** (conferência
+humana pendente, `pages/agua-conferencia.html`). Módulo Qualidade da
+Água não tem mais fase planejada em aberto — trabalho futuro nele é
+extensão nova, não retomada de plano. Ao criar qualquer migration
+neste ou em outro módulo, rodar `mcp__Supabase__list_migrations`
+primeiro — não assumir o número pelo que está no repositório local.
 
 **Sólidos em suspensão continua pendência de conferência humana**
 (mediana de 0,342 mg/L com turbidez mediana de 90 UNT — provável
