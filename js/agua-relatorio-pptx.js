@@ -19,8 +19,7 @@
 
 const AGPPTX_C = {
   darkBg: '0A1A0F', green: '52B788', gold: 'C9A84C', goldLt: 'F0CB6A',
-  txt: 'F4EFE6', bg: 'EFF7F2', white: 'FFFFFF', muted: '6B7280',
-  border: 'D1FAE5', cardDk: '132B1A',
+  txt: 'F4EFE6', bg: 'EFF7F2', white: 'FFFFFF', muted: '6B7280', border: 'D1FAE5',
 }
 const AGPPTX_W = 10, AGPPTX_H = 5.625, AGPPTX_M = 0.4
 
