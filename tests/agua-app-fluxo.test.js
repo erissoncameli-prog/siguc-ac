@@ -233,9 +233,9 @@ test('Histórico: gráfico por ponto e lista de minhas coletas', async ({ page }
   // mesma técnica do teste de sync: sem rede real neste ambiente.
   await page.evaluate(() => {
     const HIST_PONTO = [
-      { id: 'c1', data_coleta: '2024-03-10', campanha_ano: 2024, campanha_ordem: 'primeira', iqa: 82, iqa_faixa: 'Ótima', conama_conforme: true },
-      { id: 'c2', data_coleta: '2024-09-14', campanha_ano: 2024, campanha_ordem: 'segunda', iqa: 61, iqa_faixa: 'Regular', conama_conforme: false },
-      { id: 'c3', data_coleta: '2025-03-12', campanha_ano: 2025, campanha_ordem: 'primeira', iqa: null, iqa_faixa: null, conama_conforme: null },
+      { id: 'c1', data_coleta: '2024-03-10', campanha_ano: 2024, campanha_ordem: 'primeira', status: 'completo', iqa: 82, iqa_faixa: 'Ótima', conama_conforme: true },
+      { id: 'c2', data_coleta: '2024-09-14', campanha_ano: 2024, campanha_ordem: 'segunda', status: 'quarentena', iqa: 61, iqa_faixa: 'Regular', conama_conforme: false },
+      { id: 'c3', data_coleta: '2025-03-12', campanha_ano: 2025, campanha_ordem: 'primeira', status: 'aguardando_lab', iqa: null, iqa_faixa: null, conama_conforme: null },
     ]
     const MINHAS = [
       { id: 'm1', ponto_nome: 'Rio Teste', codigo_ana: '12345678', data_coleta: '2026-08-10', campanha_ano: 2026, campanha_ordem: 'segunda', status: 'aguardando_lab', iqa: null, iqa_faixa: null, conama_conforme: null, codigo_amostra: 'AM-01' },
@@ -278,11 +278,16 @@ test('Histórico: gráfico por ponto e lista de minhas coletas', async ({ page }
   await page.selectOption('#h-ponto', 'ponto-teste-0001')
   await page.locator('#h-ponto-grafico svg').waitFor({ state: 'visible', timeout: 10_000 })
 
-  // 2 pontos com IQA (círculos preenchidos) + 1 vazado (sem IQA, tracejado)
+  // 2 pontos com IQA (círculos preenchidos, um deles em quarentena — mesma
+  // cautela do mapa: nunca esconder, só marcar preenchimento fraco) + 1
+  // vazado (aguardando_lab, sem IQA ainda, tracejado)
   const circulosPreenchidos = page.locator('#h-ponto-grafico circle[stroke="#fff"]')
   await expect(circulosPreenchidos).toHaveCount(2)
+  const circuloQuarentena = page.locator('#h-ponto-grafico circle[fill-opacity="0.5"]')
+  await expect(circuloQuarentena).toHaveCount(1)
   const circuloVazado = page.locator('#h-ponto-grafico circle[stroke-dasharray]')
   await expect(circuloVazado).toHaveCount(1)
+  await expect(page.locator('#h-ponto-grafico')).toContainText('ainda em conferência')
 
   // Legenda mostra as 5 faixas, sempre com o nome em texto (nunca só cor)
   for (const faixa of ['Ótima', 'Boa', 'Regular', 'Ruim', 'Péssima']) {
@@ -291,5 +296,7 @@ test('Histórico: gráfico por ponto e lista de minhas coletas', async ({ page }
 
   await expect(page.locator('#h-ponto-lista .sync-item')).toHaveCount(3)
   await expect(page.locator('#h-ponto-lista')).toContainText('82 · Ótima')
+  await expect(page.locator('#h-ponto-lista')).toContainText('61 · Regular · em conferência')
   await expect(page.locator('#h-ponto-lista')).toContainText('Fora do limite CONAMA')
+  await expect(page.locator('#h-ponto-lista')).toContainText('Aguardando laudo')
 });
