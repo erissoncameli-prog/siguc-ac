@@ -76,6 +76,12 @@ Sistema já tem login, sidebar, layout e páginas funcionando.
   br.gov.ac.sema.siguc.frota — convive com Brigadas e Biomonitor; build via
   app-frota/scripts/build-www.mjs — ver docs/app-frota.md; alterações
   sempre nos arquivos web)
+- app-agua/ → shell nativo Capacitor da Qualidade da Água (APK Android
+  NÃO gerado ainda — infra pronta, ver docs/app-agua.md — a partir de
+  pages/agua-app.html + js/agua-offline.js + js/agua-sync.js; appId
+  br.gov.ac.sema.siguc.agua — convive com Brigadas/Biomonitor/Frota;
+  build via app-agua/scripts/build-www.mjs; alterações sempre nos
+  arquivos web)
 
 ## Design system (nunca alterar variáveis sem alinhamento)
 --floresta:#0A1A0F | --verde-c:#52B788 | --ouro:#C9A84C | --ouro-c:#F0CB6A
@@ -1304,10 +1310,8 @@ e `agua_conama_violacoes`.
   403 na política de rede da sessão que tentou; pendência documentada
   em `docs/qualidade-agua/plano.md`, seção "Fase 4 — ENTREGUE", para
   quando uma sessão tiver esses domínios liberados.
-- **Fase 3 (app de campo) PULADA DE PROPÓSITO** — por decisão do
-  usuário, a Fase 4 entrou antes. Continua pendente, não esquecida; ver
-  "Próxima tarefa". Quando começar, `VERSOES` em `pwa/sw.js` ganha a
-  chave `agua`.
+- **Fase 3 (app de campo) ENTREGUE** — depois desta rodada, ver seção
+  própria "Qualidade da Água — app de campo (Fase 3)" abaixo.
 - **Fase 5 pendente** (relatório automático por bacia) — ver o plano.
 
 ⚠ Dois aprendizados desta entrega que valem para TODA função nova:
@@ -1316,22 +1320,69 @@ PRIVILEGES` do projeto concede EXECUTE a `anon` por NOME — revogar do
 papel pelo nome), e toda função precisa nascer com `SET search_path =
 public`, senão o advisor de segurança acusa.
 
-## Próxima tarefa
-Módulo Qualidade da Água (IQA) — **Fase 3 (app de campo)**, retomada
-depois de ter sido PULADA DE PROPÓSITO nesta rodada (o usuário pediu a
-Fase 4 primeiro — não foi esquecimento). Fases 0, 1, 2 e 4 estão
-entregues, em produção e ATIVAS para todo mundo com permissão
-(migrations 248–256, sem migration nova na Fase 4): cadastro, IQA,
-CONAMA, as 450 coletas históricas importadas, tela de conferência, a
-mesa completa (pontos, laboratórios, lançamento de laudo, fila) e o
-mapa dedicado (`pages/agua-mapa.html`, sem a camada de hidrografia —
-ver `docs/qualidade-agua/plano.md`, seção "Fase 4 — ENTREGUE", para a
-lista de domínios bloqueados nesta sessão e o que falta pra terminar
-isso quando a rede permitir).
+## Qualidade da Água — app de campo (Fase 3, migrations 257–260)
 
-`app-agua/`, offline-first, login por e-mail/senha + PIN no molde do
-`brigada.html` — plano em `docs/qualidade-agua/plano.md`, seção
-"Fases seguintes" e "Notas de desenho já fechadas". Ao criar a próxima
+App de campo offline-first para a coleta de amostras: `pages/agua-app.html`
++ `js/agua-offline.js`/`js/agua-sync.js` (molde de
+`brigada-offline.js`/`brigada-sync.js`, simplificado — coleta é linha
+única, sem filhos tipo fauna/participantes), câmera/GPS via
+`js/brigada-captura.js` reaproveitado sem alteração, shell nativo
+`app-agua/` (appId `br.gov.ac.sema.siguc.agua`, convive com os outros
+3), `.github/workflows/agua-apk.yml` (infra pronta, APK **não**
+gerado — regra do projeto).
+
+**Quem coleta — decidido nesta entrega**: os MESMOS técnicos que já
+usam a mesa (`tecnico`/`gestor`/`biologo`), não uma população de campo
+sem conta (diferente do Brigadas). Por isso **não existe tabela de
+identidade nova** — `agua_coletas.coletor_id` (desde a Fase 0) é
+preenchido com `auth.uid()` direto, e `pode_editar('agua')` (já em
+produção) já autoriza o app a gravar. ROPA sem entrada nova: TRAT-018
+(migration 251, Fase 0) já previa GPS pontual + foto para esta fase.
+
+**GPS é PONTUAL** (`bGpsUmaLeitura`), não contínuo como Brigadas/
+Biomonitor — só compara com a coordenada cadastrada do ponto
+(auditoria), sem indicador ao vivo. Divergência > 1 km vira aviso não
+bloqueante, nunca trava o salvamento.
+
+Bucket próprio `agua-fotos-campo` (privado desde o nascimento,
+diferente de `agua-laudos` — que é o PDF do laudo, lançado pela mesa).
+Idempotência por `uuid_cliente` (upsert simples, molde Brigadas — sem
+elevação de privilégio a proteger como no Frota).
+
+**Dois achados só visíveis testando contra o banco de verdade** (guardar
+para qualquer migration futura deste tipo):
+1. Índice UNIQUE **parcial** (`WHERE x IS NOT NULL`) não é alvo válido
+   de `ON CONFLICT (x)` do PostgREST/supabase-js — o Postgres só infere
+   índice parcial quando a cláusula ON CONFLICT repete o mesmo
+   predicado, o que o upsert do cliente não faz. Toda sincronização
+   falhava. Corrigido (257b) para UNIQUE CONSTRAINT normal — que já
+   trata múltiplos NULL como não-conflitantes sem precisar de índice
+   parcial nenhum.
+2. `c.*` numa view (`vw_agua_coletas_detalhe`) expande no momento da
+   CRIAÇÃO da view, não a cada consulta — coluna nova na tabela base
+   não aparece na view até ela ser recriada. `CREATE OR REPLACE VIEW`
+   só aceita ACRESCENTAR coluna ao final da saída, nunca no meio:
+   corrigir exige enumerar as colunas antigas explicitamente e só
+   então acrescentar a nova (migration 260).
+
+Guarda: `tests/agua-app-fluxo.test.js` (Playwright, cliente Supabase
+stub — rede real bloqueada neste tipo de ambiente de execução).
+Contrato do lado do banco conferido à parte via `execute_sql` contra
+produção (mesmo padrão da Fase 2), linha de teste apagada ao final.
+
+Detalhe completo — inclusive um bug real de geração de CSS achado
+nesta entrega (`sed` de cabeçalho mal calculado corrompeu
+`css/agua-app.css` e derrubou a regra `[hidden]`, fazendo todas as
+telas do app renderizarem sobrepostas) — em
+`docs/qualidade-agua/plano.md`, seção "Fase 3 — ENTREGUE".
+
+## Próxima tarefa
+Módulo Qualidade da Água (IQA): Fases 0–4 entregues, em produção e
+ATIVAS para todo mundo com permissão. Falta só a **Fase 5** (relatório
+automático por bacia, reaproveitando `scripts/gerar-pptx.js` — ver
+`docs/qualidade-agua/plano.md`) e a **camada de hidrografia** da Fase 4
+(bloqueada por política de rede da sessão que tentou — ver "Fase 4 —
+ENTREGUE" para os domínios já identificados). Ao criar a próxima
 migration, rodar `mcp__Supabase__list_migrations` primeiro — não
 assumir o número pelo que está no repositório local.
 
@@ -1340,6 +1391,10 @@ assumir o número pelo que está no repositório local.
 mistura de g/L com mg/L ao longo dos anos): as 339 linhas quarentenadas
 por isso esperam alguém da SEMA com o laudo físico, usando a tela de
 `pages/agua-conferencia.html`. Não é tarefa de código.
+
+**Ícone do launcher do app Água** ainda é o placeholder genérico do
+Capacitor (`app-agua/android`) — trocar por arte própria antes do
+primeiro APK real.
 
 Módulo A — Estrutura Organizacional SEMA-AC segue pendente (ver "A
 implementar", item A).
