@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>SIGUC-AC · Qualidade da Água — Relatórios</title>
+<link rel="stylesheet" href="../css/global.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../js/observability.js"></script>
+<script src="../js/queryLogger.js"></script>
+<script src="../js/config.js"></script>
+<script src="../js/config-sistema.js"></script>
+<script src="../js/layout.js"></script>
+<script src="../js/biomonitor-pdf-fonts.js"></script>
+<script src="../js/agua-relatorio-dados.js"></script>
+<script src="../js/agua-relatorio-pdf.js"></script>
+<script src="../js/agua-relatorio-pptx.js"></script>
+<style>
+.arel-filtros {
+  display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end;
+  background:var(--branco); border-radius:var(--raio-lg);
+  padding:14px 16px; margin-bottom:18px; border:1px solid var(--borda);
+  box-shadow:var(--sombra);
+}
+.arel-filtros label { display:flex; flex-direction:column; gap:4px; font-size:12px; color:var(--cinza-500); }
+.arel-filtros select { background:var(--branco); border:1px solid var(--borda-forte); color:var(--cinza-900); border-radius:var(--raio); padding:7px 10px; font-size:13px; min-width:200px; }
+.arel-acoes { display:flex; gap:8px; align-items:flex-end; margin-left:auto; flex-wrap:wrap }
+.arel-resumo-titulo { font-size:14px; font-weight:700; color:var(--cinza-900); margin:0 0 10px }
+.arel-pontos-lista { display:flex; flex-direction:column; gap:0 }
+.arel-ponto-row {
+  display:grid; grid-template-columns:1.6fr .9fr .9fr .7fr; gap:10px; align-items:center;
+  padding:9px 12px; border-top:1px solid var(--borda); font-size:12.5px;
+}
+.arel-ponto-row:first-child { border-top:none }
+.arel-ponto-nome { font-weight:600; color:var(--cinza-900) }
+.arel-ponto-sub { font-size:11px; color:var(--cinza-500) }
+.arel-vazio { text-align:center; padding:36px; color:var(--cinza-400); font-size:13px }
+.arel-quarentena-aviso {
+  display:flex; align-items:center; gap:8px; padding:9px 12px; border-radius:9px;
+  background:var(--aviso-bg); border:1px solid #FDE68A; color:var(--aviso);
+  font-size:12px; margin-bottom:14px;
+}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+;(async function () {
+  const usuario = await carregarUsuario()
+  if (!usuario) { window.location.href = '../index.html'; return }
+
+  const { data: nivel } = await db.rpc('nivel_efetivo', { p_usuario: usuario.id, p_modulo_chave: 'agua' })
+  if (!nivel || nivel === 'sem_acesso') {
+    document.body.innerHTML = '<div style="padding:60px;text-align:center;font-family:\'DM Sans\',sans-serif;color:#6B7280">Você não tem acesso ao módulo Qualidade da Água.</div>'
+    return
+  }
+
+  document.getElementById('app').innerHTML =
+    gerarLayout('Qualidade da Água — Relatórios', 'agua-relatorios') +
+    `<div class="fade-in">
+      <p style="color:var(--cinza-500);font-size:13px;margin:0 0 16px">
+        Relatório de uma bacia hidrográfica, num recorte de campanhas. IQA e conformidade CONAMA vêm
+        prontos do banco (nunca recalculados aqui) — coletas ainda em quarentena aparecem marcadas.
+      </p>
+
+      <div class="arel-filtros">
+        <label>Bacia hidrográfica
+          <select id="rl-bacia"><option value="">Carregando...</option></select>
+        </label>
+        <label>Campanha inicial
+          <select id="rl-de" disabled><option value="">—</option></select>
+        </label>
+        <label>Campanha final
+          <select id="rl-ate" disabled><option value="">—</option></select>
+        </label>
+        <div class="arel-acoes">
+          <button class="btn btn-secondary" id="rl-btn-pdf" onclick="gerarPdf()" disabled data-icon="file-text">Gerar PDF</button>
+          <button class="btn btn-primary" id="rl-btn-pptx" onclick="gerarPptx()" disabled data-icon="monitor">Gerar PPTX</button>
+        </div>
+      </div>
+
+      <div id="rl-conteudo"><div class="arel-vazio">Selecione uma bacia para ver o resumo do período.</div></div>
+    </div>`
+
+  bIconsAplicar(document.getElementById('app'))
+
+  const sel = id => document.getElementById(id)
+  let _todasColetasResumo = []
+  let _coletasBaciaAtual = []
+  let _relatorioAtual = null
+  let _labelBaciaAtual = ''
+
+  // ── Carrega o seletor de bacias ──────────────────────────────────
+  try {
+    _todasColetasResumo = await aguaRelBuscarResumoBacias(db)
+  } catch (e) {
+    sel('rl-conteudo').innerHTML = `<div class="arel-vazio">Erro ao carregar bacias: ${esc(e.message)}</div>`
+    return
+  }
+  const bacias = aguaRelListarBacias(_todasColetasResumo)
+  sel('rl-bacia').innerHTML = '<option value="">Selecione...</option>' +
+    bacias.map(b => `<option value="${esc(b.bacia)}">${esc(b.label)} (${b.nPontos} ponto${b.nPontos !== 1 ? 's' : ''})</option>`).join('')
+
+  sel('rl-bacia').addEventListener('change', carregarBacia)
+  sel('rl-de').addEventListener('change', recalcularRelatorio)
+  sel('rl-ate').addEventListener('change', recalcularRelatorio)
+
+  async function carregarBacia() {
+    const chave = sel('rl-bacia').value
+    _relatorioAtual = null
+    atualizarBotoes()
+    if (!chave) {
+      sel('rl-de').innerHTML = '<option value="">—</option>'; sel('rl-de').disabled = true
+      sel('rl-ate').innerHTML = '<option value="">—</option>'; sel('rl-ate').disabled = true
+      sel('rl-conteudo').innerHTML = '<div class="arel-vazio">Selecione uma bacia para ver o resumo do período.</div>'
+      return
+    }
+    _labelBaciaAtual = chave === AGUA_REL_SEM_BACIA ? 'Sem bacia definida' : chave
+    sel('rl-conteudo').innerHTML = '<div class="arel-vazio">Carregando coletas da bacia...</div>'
+    try {
+      _coletasBaciaAtual = await aguaRelBuscarColetasDaBacia(db, chave === AGUA_REL_SEM_BACIA ? null : chave)
+    } catch (e) {
+      sel('rl-conteudo').innerHTML = `<div class="arel-vazio">Erro ao carregar coletas: ${esc(e.message)}</div>`
+      return
+    }
+    const campanhas = aguaRelCampanhasDe(_coletasBaciaAtual)
+    const opts = campanhas.map(c => `<option value="${c.campanha_id}">${esc(aguaRelLabelCampanha(c))}</option>`).join('')
+    sel('rl-de').innerHTML = opts; sel('rl-de').disabled = false
+    sel('rl-ate').innerHTML = opts; sel('rl-ate').disabled = false
+    if (campanhas.length) {
+      sel('rl-de').value = campanhas[0].campanha_id
+      sel('rl-ate').value = campanhas[campanhas.length - 1].campanha_id
+    }
+    recalcularRelatorio()
+  }
+
+  function recalcularRelatorio() {
+    if (!_coletasBaciaAtual.length) { _relatorioAtual = null; atualizarBotoes(); return }
+    _relatorioAtual = aguaRelMontar(_coletasBaciaAtual, {
+      campanhaDeId: sel('rl-de').value || null,
+      campanhaAteId: sel('rl-ate').value || null,
+    })
+    renderResumo(_relatorioAtual)
+    atualizarBotoes()
+  }
+
+  function atualizarBotoes() {
+    const tem = !!(_relatorioAtual && _relatorioAtual.coletas.length)
+    sel('rl-btn-pdf').disabled = !tem
+    sel('rl-btn-pptx').disabled = !tem
+  }
+
+  function renderResumo(rel) {
+    const r = rel.resumo
+    let html = ''
+    if (r.quarentena > 0) {
+      html += `<div class="arel-quarentena-aviso">${bico('help')} ${r.quarentena} coleta(s) deste período em quarentena — pendente de conferência humana (Configurações › Qualidade da Água › Conferência). Aparecem marcadas nos relatórios gerados.</div>`
+    }
+    html += `<div class="kpi-grid">
+      <div class="kpi-card"><div class="kpi-label">Pontos de coleta</div><div class="kpi-valor">${r.nPontos}</div></div>
+      <div class="kpi-card"><div class="kpi-label">Campanhas no período</div><div class="kpi-valor">${rel.campanhas.length}</div></div>
+      <div class="kpi-card"><div class="kpi-label">Coletas</div><div class="kpi-valor">${r.totalColetas}</div></div>
+      <div class="kpi-card ouro"><div class="kpi-label">IQA médio</div><div class="kpi-valor">${r.iqaMedio != null ? r.iqaMedio.toFixed(1) : '—'}</div></div>
+      <div class="kpi-card azul"><div class="kpi-label">Conforme CONAMA</div><div class="kpi-valor">${r.pctConforme != null ? r.pctConforme.toFixed(0) + '%' : '—'}</div><div class="kpi-sub">${r.comConama} coleta(s) com limite cadastrado</div></div>
+      <div class="kpi-card erro"><div class="kpi-label">Em quarentena</div><div class="kpi-valor">${r.quarentena}</div></div>
+    </div>`
+
+    if (!rel.pontos.length) {
+      html += '<div class="arel-vazio">Nenhuma coleta encontrada para esta bacia no período selecionado.</div>'
+    } else {
+      html += '<div class="card" style="padding:14px 16px 6px"><p class="arel-resumo-titulo">Pontos incluídos no relatório</p><div class="arel-pontos-lista">' +
+        rel.pontos.map(p => `
+          <div class="arel-ponto-row">
+            <div><div class="arel-ponto-nome">${esc(p.nome)}</div><div class="arel-ponto-sub">${esc([p.rio, p.municipio].filter(Boolean).join(' · '))}</div></div>
+            <div>${esc(p.codigo_ana || '—')}</div>
+            <div>${p.coletas.length} coleta${p.coletas.length !== 1 ? 's' : ''}</div>
+            <div>${p.coletas.filter(c => c.status === 'quarentena').length ? `<span class="badge badge-ouro">quarentena</span>` : ''}</div>
+          </div>`).join('') +
+        '</div></div>'
+    }
+    sel('rl-conteudo').innerHTML = html
+    bIconsAplicar(sel('rl-conteudo'))
+  }
+
+  function periodoTxt(rel) {
+    if (!rel.campanhas.length) return 'Sem campanhas no período'
+    const ini = aguaRelLabelCampanha(rel.campanhas[0])
+    const fim = aguaRelLabelCampanha(rel.campanhas[rel.campanhas.length - 1])
+    return ini === fim ? ini : `${ini} — ${fim}`
+  }
+
+  async function prepararCabecalho() {
+    const [cab, protocolo] = await Promise.all([getCabecalhoRelatorio(), gerarProtocolo()])
+    cab.responsavel = {
+      nome: appState.usuario?.nome_completo || appState.usuario?.email || 'Usuário',
+      cargo: appState.perfil || '', orgao: cab.siglaSecr,
+    }
+    return { cab, protocolo }
+  }
+
+  window.gerarPdf = async function () {
+    if (!_relatorioAtual) return
+    const btn = sel('rl-btn-pdf')
+    btn.disabled = true; const htmlOrig = btn.innerHTML
+    btn.textContent = 'Gerando PDF...'
+    try {
+      const { cab, protocolo } = await prepararCabecalho()
+      const pdf = await aguaRelMontarPdf(_relatorioAtual, _labelBaciaAtual, periodoTxt(_relatorioAtual), cab, protocolo)
+      const nomeArq = `qualidade-agua-${_labelBaciaAtual}`.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^\w-]+/g, '-')
+      aguaRelBaixarPdf(pdf, `${nomeArq}.pdf`)
+      toast('PDF gerado.', 'success')
+    } catch (e) {
+      toast('Erro ao gerar PDF: ' + e.message, 'error')
+    } finally {
+      btn.disabled = false; btn.innerHTML = htmlOrig
+    }
+  }
+
+  window.gerarPptx = async function () {
+    if (!_relatorioAtual) return
+    const btn = sel('rl-btn-pptx')
+    btn.disabled = true; const htmlOrig = btn.innerHTML
+    btn.textContent = 'Gerando PPTX...'
+    try {
+      const { protocolo } = await prepararCabecalho()
+      const blob = await aguaRelMontarPptx(_relatorioAtual, _labelBaciaAtual, periodoTxt(_relatorioAtual), protocolo)
+      const nomeArq = `qualidade-agua-${_labelBaciaAtual}`.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^\w-]+/g, '-')
+      aguaRelBaixarPptx(blob, `${nomeArq}.pptx`)
+      toast('PPTX gerado.', 'success')
+    } catch (e) {
+      toast('Erro ao gerar PPTX: ' + e.message, 'error')
+    } finally {
+      btn.disabled = false; btn.innerHTML = htmlOrig
+    }
+  }
+})()
+</script>
+</body>
+</html>
