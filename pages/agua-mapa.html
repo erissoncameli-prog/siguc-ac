@@ -13,6 +13,7 @@
 <script src="../js/layout.js"></script>
 <script src="../js/mapa-recorte.js"></script>
 <script src="../js/fotos-privadas.js"></script>
+<script src="../js/agua-iqa-visual.js"></script>
 </head>
 <body>
 <div id="app"></div>
@@ -84,9 +85,13 @@
 const CLASSE_LABEL = { especial: 'Especial', classe_1: 'Classe 1', classe_2: 'Classe 2', classe_3: 'Classe 3', classe_4: 'Classe 4' }
 const ACRE_CENTRO = [-9.5, -70.0]
 
-const IQA_FAIXA_COR = { 'Ótima': '#15803D', 'Boa': '#84CC16', 'Regular': '#CA8A04', 'Ruim': '#EA580C', 'Péssima': '#B91C1C' }
-const IQA_FAIXA_BADGE = { 'Ótima': 'badge-verde', 'Boa': 'badge-teal', 'Regular': 'badge-ouro', 'Ruim': 'badge-erro badge-outline', 'Péssima': 'badge-erro' }
-const SEM_IQA_COR = '#9CA3AF'
+// Definição única em js/agua-iqa-visual.js (reaproveitada pelo app de
+// campo também) — paleta corrigida nesta entrega: a anterior falhava
+// o validador de daltonismo (Ruim×Regular indistinguíveis). Ver
+// cabeçalho daquele arquivo.
+const IQA_FAIXA_COR = AGUA_IQA_FAIXA_COR
+const IQA_FAIXA_BADGE = AGUA_IQA_FAIXA_BADGE
+const SEM_IQA_COR = AGUA_SEM_IQA_COR
 
 // Mesmos campos/rótulos de pages/agua-laudos.html e agua-conferencia.html
 // (rótulo estático, sem cálculo — não é o que a regra "cálculo em UM
