@@ -197,6 +197,63 @@ test.describe('agregação (js/agua-relatorio-dados.js) — pura, sem rede', () 
     expect(await page.evaluate(() => window.aguaRelFiltrosTxt({ rio: null, status: null, iqaFaixa: null, conamaStatus: null }))).toBe('');
   });
 
+  test('opts.bacia filtra DENTRO de um conjunto com várias bacias — o escopo "Acre todo"', async ({ page }) => {
+    await page.goto(PAGINA);
+    await page.waitForFunction(() => typeof window.aguaRelMontar === 'function');
+
+    // aguaRelBuscarTodasColetas junta bacias diferentes num array só;
+    // opts.bacia é o filtro que recorta isso client-side, sem nova ida
+    // ao banco — mesma chave que aguaRelListarBacias/aguaRelChaveBacia
+    // já usam (AGUA_REL_SEM_BACIA para bacia nula).
+    const todas = [...fixtureColetasRioAcre(), ...fixtureColetasPurusMultiRio(), ...fixtureColetasSemBacia()];
+
+    const semFiltro = await page.evaluate((coletas) => window.aguaRelMontar(coletas, {}), todas);
+    expect(semFiltro.pontos).toHaveLength(6); // 2 (Rio Acre) + 3 (Purus) + 1 (sem bacia)
+
+    const soPurus = await page.evaluate((coletas) => window.aguaRelMontar(coletas, { bacia: 'Purus' }), todas);
+    expect(soPurus.pontos.map(p => p.nome).sort()).toEqual(['Manoel Urbano', 'Sena Madureira', 'Xapuri']);
+    expect(soPurus.filtros.bacia).toBe('Purus');
+
+    const soRioAcre = await page.evaluate((coletas) => window.aguaRelMontar(coletas, { bacia: 'Rio Acre' }), todas);
+    expect(soRioAcre.pontos.map(p => p.nome).sort()).toEqual(['Porto Acre', 'Rio Branco']);
+
+    const semBacia = await page.evaluate((coletas) => window.aguaRelMontar(coletas, { bacia: window.AGUA_REL_SEM_BACIA }), todas);
+    expect(semBacia.pontos.map(p => p.nome)).toEqual(['Senador Guiomard']);
+
+    // Texto legível dos filtros inclui a bacia quando o filtro está ativo.
+    const txt = await page.evaluate(() => window.aguaRelFiltrosTxt({ bacia: 'Purus', rio: null, status: null, iqaFaixa: null, conamaStatus: null }));
+    expect(txt).toBe('Bacia: Purus');
+    const txtSemBacia = await page.evaluate(() => window.aguaRelFiltrosTxt({ bacia: window.AGUA_REL_SEM_BACIA, rio: null, status: null, iqaFaixa: null, conamaStatus: null }));
+    expect(txtSemBacia).toBe('Bacia: Sem bacia definida');
+  });
+
+  test('aguaRelBuscarTodasColetas busca sem filtro de bacia nenhum — o escopo "Acre todo"', async ({ page }) => {
+    await page.goto(PAGINA);
+    await page.waitForFunction(() => typeof window.aguaRelBuscarTodasColetas === 'function');
+
+    const chamada = await page.evaluate(async (coletas) => {
+      const chamados = [];
+      const dbFalso = {
+        from(tabela) {
+          chamados.push('from:' + tabela)
+          return {
+            select() {
+              chamados.push('select')
+              return { order() { chamados.push('order'); return Promise.resolve({ data: coletas, error: null }) } }
+            },
+          }
+        },
+      };
+      const resultado = await window.aguaRelBuscarTodasColetas(dbFalso)
+      return { resultado, chamados }
+    }, fixtureColetasRioAcre());
+
+    // NUNCA chama .eq()/.is() de bacia — é o que distingue de
+    // aguaRelBuscarColetasDaBacia (que sempre filtra por UMA).
+    expect(chamada.chamados).toEqual(['from:vw_agua_coletas_detalhe', 'select', 'order']);
+    expect(chamada.resultado).toHaveLength(5);
+  });
+
   test('aguaRelSerieIQA preenche gap com null, nunca omite a campanha', async ({ page }) => {
     await page.goto(PAGINA);
     await page.waitForFunction(() => typeof window.aguaRelMontar === 'function' && typeof window.aguaRelSerieIQA === 'function');
