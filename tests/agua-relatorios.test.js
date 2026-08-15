@@ -432,3 +432,183 @@ test.describe('geração real dos arquivos — PDF e PPTX', () => {
     expect(parsed.text).toMatch(/aguardando laudo/i);
   });
 });
+
+// ── Agregações novas do painel ────────────────────────────────────
+test.describe('agregações do painel (pura, sem rede)', () => {
+  test('aguaRelPorCampanha / aguaRelVariacaoIQA / aguaRelDistribuicaoFaixas / aguaRelIqaPorPonto', async ({ page }) => {
+    await page.goto(PAGINA);
+    await page.waitForFunction(() => typeof window.aguaRelPorCampanha === 'function');
+
+    const out = await page.evaluate((coletas) => {
+      const rel = window.aguaRelMontar(coletas, {});
+      const porCampanha = window.aguaRelPorCampanha(rel);
+      return {
+        porCampanha,
+        variacao: window.aguaRelVariacaoIQA(porCampanha),
+        dist: window.aguaRelDistribuicaoFaixas(rel.coletas),
+        porPonto: window.aguaRelIqaPorPonto(rel),
+        ranking: window.aguaRelViolacoesRanking(rel.resumo, 6),
+      };
+    }, fixtureColetasRioAcre());
+
+    // Uma linha por campanha do recorte, em ordem cronológica.
+    expect(out.porCampanha.map(c => c.labelCurto)).toEqual(['2024·1ª', '2024·2ª', '2025·1ª']);
+    expect(out.porCampanha[0].nColetas).toBe(2);
+    expect(out.porCampanha[0].iqaMedio).toBeCloseTo((78.4 + 82.1) / 2, 4);
+
+    // Variação = duas ÚLTIMAS campanhas com índice (2024·2ª → 2025·1ª).
+    expect(out.variacao.delta).toBeCloseTo((12.5 + 74.0) / 2 - 61.2, 4);
+    expect(out.variacao.labelAnterior).toBe('2024 · 2ª campanha');
+
+    // Distribuição usa a faixa que veio do banco — nunca derivada aqui.
+    expect(out.dist.contagem).toEqual({ Boa: 2, Regular: 1, 'Péssima': 1, 'Ótima': 1 });
+    expect(out.dist.semIQA).toBe(0);
+    expect(out.dist.predominante).toBe('Boa');
+
+    // Pontos ordenados do melhor IQA médio para o pior; quarentena marcada.
+    expect(out.porPonto.map(p => p.nome)).toEqual(['Porto Acre', 'Rio Branco']);
+    expect(out.porPonto[1].quarentena).toBe(true);
+
+    // Ranking de violações, do mais frequente para o menos.
+    expect(out.ranking[0].n).toBe(1);
+    expect(out.ranking.map(v => v.parametro).sort()).toEqual(['od', 'ph', 'turbidez']);
+  });
+
+  test('variação é null com menos de duas campanhas com índice — nunca inventa tendência', async ({ page }) => {
+    await page.goto(PAGINA);
+    await page.waitForFunction(() => typeof window.aguaRelVariacaoIQA === 'function');
+    const v = await page.evaluate((coletas) => {
+      const rel = window.aguaRelMontar(coletas, {});
+      return window.aguaRelVariacaoIQA(window.aguaRelPorCampanha(rel));
+    }, fixtureColetasPurusMultiRio()); // 1 campanha só
+    expect(v).toBeNull();
+  });
+
+  test('aguaRelSerieIQA carrega faixa e status da linha do banco (para o gráfico colorir sem classificar)', async ({ page }) => {
+    await page.goto(PAGINA);
+    await page.waitForFunction(() => typeof window.aguaRelSerieIQA === 'function');
+    const serie = await page.evaluate((coletas) => {
+      const rel = window.aguaRelMontar(coletas, {});
+      return window.aguaRelSerieIQA(rel.pontos.find(p => p.ponto_id === 'p-rb'), rel.campanhas);
+    }, fixtureColetasRioAcre());
+    expect(serie[2]).toMatchObject({ iqa: 12.5, faixa: 'Péssima', status: 'quarentena' });
+  });
+});
+
+// ── Painel renderizado de ponta a ponta ──────────────────────────
+// A tela exige sessão Supabase; o cliente é substituído por um stub
+// ANTES de qualquer script da página (addInitScript), mesmo padrão de
+// tests/permissao-organograma.test.js — aqui aplicado à página real,
+// não a um harness, porque o que está sob teste é o render.
+const USUARIO_STUB = { id: 'u-teste', nome_completo: 'Técnica de Teste', email: 't@x.invalid', perfil: 'gestor', ativo: true };
+
+async function abrirPainelComStub(page, coletas) {
+  await page.addInitScript(({ coletas, usuario }) => {
+    window.loadEnv = () => Promise.resolve({ supabaseUrl: 'http://fake.test', supabaseKey: 'fake-key' });
+    const consulta = (linhas) => {
+      const q = {
+        _linhas: linhas,
+        eq(col, val) { q._linhas = q._linhas.filter(l => l[col] === val); return q },
+        is(col, val) { q._linhas = q._linhas.filter(l => l[col] === val); return q },
+        order() { return q },
+        then(res) { return Promise.resolve({ data: q._linhas, error: null }).then(res) },
+      };
+      return q;
+    };
+    window.supabase = {
+      createClient: () => ({
+        auth: {
+          getSession: async () => ({ data: { session: { user: { id: 'u-teste' } } } }),
+          signOut: async () => ({}),
+        },
+        rpc: async (nome) => (nome === 'nivel_efetivo' ? { data: 'editar' } : { data: null }),
+        from: (tabela) => {
+          if (tabela === 'usuarios') return { select: () => ({ eq: () => ({ single: async () => ({ data: usuario }) }) }) };
+          if (tabela === 'minhas_permissoes') return { select: async () => ({ data: [{ chave: 'agua', nivel: 'editar' }] }) };
+          if (tabela === 'vw_agua_coletas_detalhe') return { select: () => consulta(coletas.slice()) };
+          return { select: () => ({ eq: () => ({ single: async () => ({ data: null }) }) }) };
+        },
+      }),
+    };
+  }, { coletas, usuario: USUARIO_STUB });
+
+  await page.goto(PAGINA);
+  await page.waitForSelector('#rl-bacia option[value="Rio Acre"]', { timeout: 15_000 });
+  await page.selectOption('#rl-bacia', 'Rio Acre');
+  await page.waitForSelector('.adash-grid');
+}
+
+test.describe('painel (dashboard) — render com dado real da view', () => {
+  test('monta os cards do painel a partir da bacia escolhida', async ({ page }) => {
+    await abrirPainelComStub(page, fixtureColetasRioAcre());
+
+    // KPI de IQA médio: (78.4+61.2+12.5+82.1+74.0)/5 = 61.64
+    await expect(page.locator('.adash-card-escuro .adash-num')).toHaveText('61.6');
+    // Chip de variação vs. campanha anterior existe (3 campanhas na fixture).
+    await expect(page.locator('.adash-card-escuro .adash-delta')).toBeVisible();
+
+    // Medidor CONAMA: 2 conformes de 4 avaliadas = 50%.
+    await expect(page.locator('.adash-card svg[aria-label*="limite cadastrado"]')).toBeVisible();
+    await expect(page.locator('.adash-card svg[aria-label*="limite cadastrado"]')).toContainText('50%');
+
+    // Barras: uma por ponto, com o valor rotulado (média do ponto).
+    const barras = page.locator('.adash-barras-plot svg[aria-label^="Barras"]');
+    await expect(barras).toBeVisible();
+    await expect(barras).toContainText('78.1'); // Porto Acre (82.1 + 74.0)/2
+    await expect(barras).toContainText('50.7'); // Rio Branco (78.4+61.2+12.5)/3
+
+    // Ranking de violações e tabela de pontos.
+    await expect(page.locator('.adash-lista-linha')).toHaveCount(3); // turbidez, ph, od
+    await expect(page.locator('.adash-tabela-linha')).toHaveCount(2);
+  });
+
+  test('coleta em quarentena aparece MARCADA, nunca escondida', async ({ page }) => {
+    await abrirPainelComStub(page, fixtureColetasRioAcre());
+
+    await expect(page.locator('.adash-aviso')).toContainText('1 coleta(s) deste período em quarentena');
+    // O ponto com quarentena continua na tabela, com selo.
+    await expect(page.locator('.adash-tabela-linha', { hasText: 'Rio Branco' }).locator('.badge')).toHaveText('quarentena');
+    // E a faixa "Péssima" da coleta quarentenada continua contada na distribuição.
+    await expect(page.locator('.adash-card', { hasText: 'Distribuição por faixa' })).toContainText('Péssima');
+  });
+
+  test('chip de campanha recorta só a EXIBIÇÃO da distribuição, sem mexer no relatório exportado', async ({ page }) => {
+    await abrirPainelComStub(page, fixtureColetasRioAcre());
+    const cardDist = page.locator('.adash-card', { hasText: 'Distribuição por faixa' });
+
+    await expect(cardDist.locator('.adash-num')).toHaveText('5'); // período inteiro
+    await cardDist.getByRole('button', { name: '2024·1ª' }).click();
+    await expect(cardDist.locator('.adash-num')).toHaveText('2'); // só a 1ª campanha de 2024
+
+    // O KPI do período (e portanto o que o PDF exporta) NÃO mudou.
+    await expect(page.locator('.adash-card-escuro .adash-num')).toHaveText('61.6');
+  });
+
+  test('painel de filtros abre pela pílula e o contador reflete os filtros ativos', async ({ page }) => {
+    await abrirPainelComStub(page, fixtureColetasRioAcre());
+
+    await expect(page.locator('#rl-filtros')).toBeHidden();
+    await page.click('#rl-btn-filtros');
+    await expect(page.locator('#rl-filtros')).toBeVisible();
+
+    await expect(page.locator('#rl-filtros-n')).toBeHidden();
+    await page.selectOption('#rl-status', 'completo');
+    await expect(page.locator('#rl-filtros-n')).toHaveText('1');
+    await expect(page.locator('.alert-info')).toContainText('Status: Completo');
+
+    // Exportar continua habilitado enquanto houver coleta no recorte.
+    await expect(page.locator('#rl-btn-export')).toBeEnabled();
+    await page.selectOption('#rl-iqa-faixa', 'Ótima');
+    await page.selectOption('#rl-status', 'quarentena'); // combinação vazia
+    await expect(page.locator('#rl-btn-export')).toBeDisabled();
+    await expect(page.locator('#rl-conteudo')).toContainText('Nenhuma coleta encontrada');
+  });
+
+  test('estado vazio: sem bacia escolhida o painel não renderiza card nenhum', async ({ page }) => {
+    await abrirPainelComStub(page, fixtureColetasRioAcre());
+    await page.selectOption('#rl-bacia', '');
+    await expect(page.locator('.adash-grid')).toHaveCount(0);
+    await expect(page.locator('#rl-conteudo')).toContainText('Escolha uma bacia');
+    await expect(page.locator('#rl-btn-export')).toBeDisabled();
+  });
+});
