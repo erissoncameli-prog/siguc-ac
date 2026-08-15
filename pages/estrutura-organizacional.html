@@ -1124,17 +1124,39 @@ function renderLotacoes() {
   const tbody = document.getElementById('tbody-lotacoes')
   if (!tbody) return
   const podeEditar = ['super_admin','diretor'].includes(_perfilUsuario)
-  if (!_lotacoes.length) {
+
+  // Chefia (cargos_atuais.titular_id) já concede alcance por
+  // DERIVAÇÃO — usuario_unidades(), migration 262 — sem precisar de
+  // linha em usuario_lotacoes. Antes esta tabela só mostrava as
+  // lotações EXPLÍCITAS, então quem já era chefe de algo (10 dos 20
+  // servidores de mesa) parecia "sem lotação" mesmo já coberto —
+  // achado ao usar de verdade em produção: duas lotações cadastradas
+  // manualmente duplicavam exatamente a unidade que o cargo da pessoa
+  // já cobria. Mostrar as duas fontes juntas, com a de cargo
+  // somente-leitura (encerra pela aba Cargos, não daqui), é o que
+  // resolve — sem duplicar dado nenhum no banco.
+  const porCargo = _cargosAtuais
+    .filter(c => c.titular_id)
+    .map(c => ({
+      origem: 'cargo', usuario_nome: c.titular_nome, unidade_sigla: c.unidade_sigla,
+      unidade_nome: c.unidade_nome, data_inicio: c.titular_desde, portaria: c.portaria_nomeacao,
+    }))
+  const explicitas = _lotacoes.map(l => ({ ...l, origem: 'explicita' }))
+  const todas = [...porCargo, ...explicitas].sort((a, b) => (a.usuario_nome || '').localeCompare(b.usuario_nome || ''))
+
+  if (!todas.length) {
     tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:32px;color:#9CA3AF">Nenhuma lotação registrada ainda.</td></tr>`
     return
   }
-  tbody.innerHTML = _lotacoes.map(l => `<tr>
+  tbody.innerHTML = todas.map(l => `<tr${l.origem === 'cargo' ? ' style="color:#6B7280"' : ''}>
     <td>${esc(l.usuario_nome)}</td>
     <td>${esc(l.unidade_sigla)} — ${esc(l.unidade_nome)}</td>
-    <td>${l.principal ? '<span class="badge badge-verde">Principal</span>' : ''}</td>
+    <td>${l.origem === 'cargo'
+      ? '<span class="badge" style="background:rgba(148,163,184,.2);color:#374151">Chefia</span>'
+      : (l.principal ? '<span class="badge badge-verde">Principal</span>' : '')}</td>
     <td>${formatData(l.data_inicio)}</td>
     <td>${esc(l.portaria || '—')}</td>
-    ${podeEditar ? `<td><button class="btn btn-xs btn-ghost" onclick="encerrarLotacao('${l.id}')">Encerrar</button></td>` : ''}
+    ${podeEditar ? `<td>${l.origem === 'explicita' ? `<button class="btn btn-xs btn-ghost" onclick="encerrarLotacao('${l.id}')">Encerrar</button>` : `<span style="font-size:11px;color:#9CA3AF">via aba Cargos</span>`}</td>` : ''}
   </tr>`).join('')
 }
 
