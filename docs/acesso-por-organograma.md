@@ -205,6 +205,9 @@ Decisões de desenho, todas deliberadas:
 - **Nunca eleva acima do teto do perfil** — um `visualizador` credenciado
   em Frota vê Frota; não vira editor. Exceção de *alcance*, não de
   *capacidade*.
+- **Concedido apenas por `super_admin`** (decisão 2). A tabela guarda
+  `concedido_por` desde o início, então estender a concessão aos chefes
+  das unidades donas no futuro é ampliar uma checagem — não redesenhar.
 - Toda concessão/renovação/revogação é **auditada** — e aqui a missão
   anterior encaixa: é o mesmo mecanismo de trilha desenhado em
   `docs/qualidade-agua/plano-seguranca-dados.md`, agora com um segundo
