@@ -113,15 +113,15 @@ function perfilIr(aba) {
   if (!rodape || !acoes) return
   if (aba === 'perfil') {
     rodape.textContent = 'Alterações valem para todos os apps do sistema'
-    acoes.innerHTML = `<button class="btn btn-secundario" onclick="fecharPerfil()">Cancelar</button>
-      <button class="btn btn-primario" onclick="perfilSalvar()">Salvar</button>`
+    acoes.innerHTML = `<button class="btn btn-secondary" onclick="fecharPerfil()">Cancelar</button>
+      <button class="btn btn-primary" onclick="perfilSalvar()">Salvar</button>`
   } else if (aba === 'senha') {
     rodape.textContent = 'Você continua conectado após trocar a senha'
-    acoes.innerHTML = `<button class="btn btn-secundario" onclick="fecharPerfil()">Cancelar</button>
-      <button class="btn btn-primario" onclick="perfilTrocarSenha()">Alterar senha</button>`
+    acoes.innerHTML = `<button class="btn btn-secondary" onclick="fecharPerfil()">Cancelar</button>
+      <button class="btn btn-primary" onclick="perfilTrocarSenha()">Alterar senha</button>`
   } else {
     rodape.textContent = ''
-    acoes.innerHTML = `<button class="btn btn-secundario" onclick="fecharPerfil()">Fechar</button>`
+    acoes.innerHTML = `<button class="btn btn-secondary" onclick="fecharPerfil()">Fechar</button>`
   }
 }
 
@@ -185,10 +185,10 @@ function _perfilPainelDados(u, temFoto) {
         nos apps de campo em que você tem cadastro vinculado (Brigadas, Biomonitor,
         Frota e Qualidade da Água). É opcional: você pode remover quando quiser.
         <div class="pf-foto-acoes">
-          <button class="btn btn-secundario btn-sm" onclick="perfilEscolherFoto()">
+          <button class="btn btn-secondary btn-sm" onclick="perfilEscolherFoto()">
             ${temFoto ? 'Trocar foto' : 'Enviar foto'}
           </button>
-          ${temFoto ? `<button class="btn btn-texto btn-sm" onclick="perfilRemoverFoto()">Remover</button>` : ''}
+          ${temFoto ? `<button class="btn btn-ghost btn-sm" onclick="perfilRemoverFoto()">Remover</button>` : ''}
         </div>
       </div>
     </div>
@@ -291,7 +291,7 @@ async function perfilSalvar() {
   const nome  = document.getElementById('pf-nome').value.trim()
   const tel   = document.getElementById('pf-tel').value.trim()
   const cargo = document.getElementById('pf-cargo').value.trim()
-  if (nome.length < 3) { toast('Informe seu nome completo.', 'erro'); return }
+  if (nome.length < 3) { toast('Informe seu nome completo.', 'error'); return }
 
   _perfilSalvando = true
   try {
@@ -308,10 +308,10 @@ async function perfilSalvar() {
     if (elNome) elNome.textContent = nome
     document.getElementById('pf-nome-topo').textContent = nome
     perfilAtualizarAvatarSidebar()
-    toast('Perfil atualizado.', 'sucesso')
+    toast('Perfil atualizado.', 'success')
     fecharPerfil()
   } catch (e) {
-    toast(e.message || 'Não foi possível salvar.', 'erro')
+    toast(e.message || 'Não foi possível salvar.', 'error')
   } finally { _perfilSalvando = false }
 }
 
@@ -323,7 +323,7 @@ async function perfilFotoEscolhida(input) {
   input.value = ''
   if (!arq) return
   if (arq.size > 5 * 1024 * 1024 && !/^image\//.test(arq.type)) {
-    toast('Escolha uma imagem de até 5 MB.', 'erro'); return
+    toast('Escolha uma imagem de até 5 MB.', 'error'); return
   }
   toast('Enviando foto…', 'info')
   try {
@@ -348,9 +348,9 @@ async function perfilFotoEscolhida(input) {
     _perfilApagarObjeto(antiga)          // sem await: limpeza, não bloqueia a tela
     await _perfilPintarFoto(pub.publicUrl)
     perfilAtualizarAvatarSidebar()
-    toast('Foto atualizada em todos os apps.', 'sucesso')
+    toast('Foto atualizada em todos os apps.', 'success')
   } catch (e) {
-    toast(e.message || 'Não foi possível enviar a foto.', 'erro')
+    toast(e.message || 'Não foi possível enviar a foto.', 'error')
   }
 }
 
@@ -364,8 +364,8 @@ async function perfilRemoverFoto() {
     await _perfilApagarObjeto(antiga)
     await _perfilPintarFoto(null)
     perfilAtualizarAvatarSidebar()
-    toast('Foto removida.', 'sucesso')
-  } catch (e) { toast(e.message || 'Não foi possível remover a foto.', 'erro') }
+    toast('Foto removida.', 'success')
+  } catch (e) { toast(e.message || 'Não foi possível remover a foto.', 'error') }
 }
 
 // Apaga o objeto no Storage. A LGPD pede que remover a foto apague o
@@ -395,8 +395,8 @@ async function _perfilPintarFoto(url) {
   if (painel) {
     const acoes = painel.querySelector('.pf-foto-acoes')
     if (acoes) acoes.innerHTML =
-      `<button class="btn btn-secundario btn-sm" onclick="perfilEscolherFoto()">${url ? 'Trocar foto' : 'Enviar foto'}</button>` +
-      (url ? `<button class="btn btn-texto btn-sm" onclick="perfilRemoverFoto()">Remover</button>` : '')
+      `<button class="btn btn-secondary btn-sm" onclick="perfilEscolherFoto()">${url ? 'Trocar foto' : 'Enviar foto'}</button>` +
+      (url ? `<button class="btn btn-ghost btn-sm" onclick="perfilRemoverFoto()">Remover</button>` : '')
   }
 }
 
@@ -447,10 +447,10 @@ async function perfilTrocarSenha() {
   const s0 = document.getElementById('pf-s0').value
   const s1 = document.getElementById('pf-s1').value
   const s2 = document.getElementById('pf-s2').value
-  if (!s0)             { toast('Informe sua senha atual.', 'erro'); return }
-  if (s1.length < 8)   { toast('A nova senha precisa de ao menos 8 caracteres.', 'erro'); return }
-  if (s1 !== s2)       { toast('As senhas não coincidem.', 'erro'); return }
-  if (s1 === s0)       { toast('A nova senha precisa ser diferente da atual.', 'erro'); return }
+  if (!s0)             { toast('Informe sua senha atual.', 'error'); return }
+  if (s1.length < 8)   { toast('A nova senha precisa de ao menos 8 caracteres.', 'error'); return }
+  if (s1 !== s2)       { toast('As senhas não coincidem.', 'error'); return }
+  if (s1 === s0)       { toast('A nova senha precisa ser diferente da atual.', 'error'); return }
 
   _perfilSalvando = true
   try {
@@ -458,15 +458,15 @@ async function perfilTrocarSenha() {
     // pages/trocar-senha.html já usava no modo voluntário.
     const { data: { user } } = await db.auth.getUser()
     const { error: loginErr } = await db.auth.signInWithPassword({ email: user.email, password: s0 })
-    if (loginErr) { toast('Senha atual incorreta.', 'erro'); return }
+    if (loginErr) { toast('Senha atual incorreta.', 'error'); return }
 
     const { error } = await db.auth.updateUser({ password: s1 })
     if (error) throw error
     await db.from('usuarios').update({ deve_trocar_senha: false }).eq('id', appState.usuario.id)
-    toast('Senha alterada.', 'sucesso')
+    toast('Senha alterada.', 'success')
     fecharPerfil()
   } catch (e) {
-    toast(e.message || 'Não foi possível alterar a senha.', 'erro')
+    toast(e.message || 'Não foi possível alterar a senha.', 'error')
   } finally { _perfilSalvando = false }
 }
 
@@ -484,7 +484,7 @@ async function _perfilCarregarAcessos() {
     if (error) throw error
     if (!data?.length) { el.innerHTML = `<span class="pf-ajuda">Nenhum acesso registrado ainda.</span>`; return }
     el.innerHTML = data.map(a => `<div class="pf-acesso">
-      <span class="pf-acesso-quando">${esc(formatData(a.created_at, true))}</span>
+      <span class="pf-acesso-quando">${esc(_perfilQuando(a.created_at))}</span>
       <span class="pf-acesso-onde">${esc(_perfilNavegador(a.user_agent))}</span>
       ${a.sucesso === false ? '<span class="pf-acesso-falha">falhou</span>' : ''}
     </div>`).join('')
