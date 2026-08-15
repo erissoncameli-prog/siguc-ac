@@ -198,8 +198,112 @@ function aguaRelResumo(coletas) {
 function aguaRelSerieIQA(ponto, campanhas) {
   const porCampanha = {}
   ponto.coletas.forEach(c => { porCampanha[c.campanha_id] = c })
-  return campanhas.map(camp => ({
-    label: aguaRelLabelCampanha(camp),
-    iqa: porCampanha[camp.campanha_id]?.iqa ?? null,
-  }))
+  return campanhas.map(camp => {
+    const c = porCampanha[camp.campanha_id]
+    return {
+      label: aguaRelLabelCampanha(camp),
+      iqa: c?.iqa ?? null,
+      // faixa/status vêm DA LINHA do banco (nunca derivados aqui) —
+      // é o que permite ao gráfico de linha colorir o ponto pela faixa
+      // real e marcar quarentena sem a página classificar nada.
+      faixa: c?.iqa_faixa ?? null,
+      status: c?.status ?? null,
+    }
+  })
+}
+
+// ── Agregações do painel (pages/agua-relatorios.html) ────────────
+// Puras, testáveis sem rede, no mesmo espírito das de cima: SÓ contam
+// e somam o que a view já entregou. Nenhuma delas classifica faixa a
+// partir de uma média — classificar é papel de agua_iqa_faixa() no
+// banco; o painel só mostra o número quando a faixa não vem pronta.
+
+// Uma linha por campanha do recorte, em ordem cronológica — base do
+// eixo temporal do painel e da variação vs. campanha anterior.
+// Campanha sem coleta no recorte continua na lista (nColetas 0,
+// iqaMedio null): lacuna de monitoramento é informação, mesmo
+// princípio do ponto "vazado" em agua-mapa.html.
+function aguaRelPorCampanha(rel) {
+  const porId = {}
+  ;(rel.coletas || []).forEach(c => {
+    if (!porId[c.campanha_id]) porId[c.campanha_id] = []
+    porId[c.campanha_id].push(c)
+  })
+  return (rel.campanhas || []).map(camp => {
+    const coletas = porId[camp.campanha_id] || []
+    const resumo = aguaRelResumo(coletas)
+    return {
+      campanha_id: camp.campanha_id,
+      label: aguaRelLabelCampanha(camp),
+      labelCurto: `${camp.campanha_ano}·${camp.campanha_ordem === 'primeira' ? '1ª' : '2ª'}`,
+      nColetas: resumo.totalColetas,
+      nPontos: resumo.nPontos,
+      iqaMedio: resumo.iqaMedio,
+      pctConforme: resumo.pctConforme,
+      quarentena: resumo.quarentena,
+    }
+  })
+}
+
+// IQA médio de cada ponto no recorte, do maior para o menor (ponto sem
+// nenhuma coleta com IQA vai para o fim, com iqaMedio null — nunca
+// sumindo da lista). `quarentena` marca que a média inclui coleta
+// ainda em conferência, para a barra sair esmaecida.
+function aguaRelIqaPorPonto(rel) {
+  return (rel.pontos || []).map(p => {
+    const comIQA = p.coletas.filter(c => c.iqa != null)
+    return {
+      ponto_id: p.ponto_id, nome: p.nome, codigo_ana: p.codigo_ana,
+      rio: p.rio, municipio: p.municipio,
+      nColetas: p.coletas.length,
+      comIQA: comIQA.length,
+      iqaMedio: comIQA.length ? comIQA.reduce((s, c) => s + c.iqa, 0) / comIQA.length : null,
+      quarentena: p.coletas.some(c => c.status === 'quarentena'),
+    }
+  }).sort((a, b) => {
+    if (a.iqaMedio == null && b.iqaMedio == null) return (a.nome || '').localeCompare(b.nome || '', 'pt-BR')
+    if (a.iqaMedio == null) return 1
+    if (b.iqaMedio == null) return -1
+    return b.iqaMedio - a.iqaMedio
+  })
+}
+
+// Contagem de coletas por faixa do IQA — a faixa vem pronta da view
+// (iqa_faixa), nunca derivada aqui. `semIQA` conta as coletas sem
+// índice (aguardando laudo ou piso de peso da agua_calcular_iqa).
+function aguaRelDistribuicaoFaixas(coletas) {
+  const contagem = {}
+  let semIQA = 0
+  ;(coletas || []).forEach(c => {
+    if (c.iqa == null || !c.iqa_faixa) { semIQA++; return }
+    contagem[c.iqa_faixa] = (contagem[c.iqa_faixa] || 0) + 1
+  })
+  const total = (coletas || []).length - semIQA
+  let predominante = null, maior = 0
+  Object.entries(contagem).forEach(([f, n]) => { if (n > maior) { maior = n; predominante = f } })
+  return { contagem, semIQA, comIQA: total, predominante, nPredominante: maior }
+}
+
+// Variação do IQA médio entre as DUAS últimas campanhas com índice do
+// recorte (o chip "vs. campanha anterior" do painel). Devolve null
+// quando não há duas campanhas comparáveis — melhor não mostrar chip
+// nenhum do que inventar uma tendência com uma medição só.
+function aguaRelVariacaoIQA(porCampanha) {
+  const comIQA = (porCampanha || []).filter(c => c.iqaMedio != null)
+  if (comIQA.length < 2) return null
+  const atual = comIQA[comIQA.length - 1], anterior = comIQA[comIQA.length - 2]
+  return {
+    atual: atual.iqaMedio, anterior: anterior.iqaMedio,
+    delta: atual.iqaMedio - anterior.iqaMedio,
+    labelAtual: atual.label, labelAnterior: anterior.label,
+  }
+}
+
+// Ranking dos parâmetros que mais violaram o limite CONAMA no recorte
+// (violacoesPorParametro já vem de aguaRelResumo — só ordena e rotula).
+function aguaRelViolacoesRanking(resumo, limite) {
+  return Object.entries(resumo.violacoesPorParametro || {})
+    .map(([p, n]) => ({ parametro: p, label: AGUA_REL_PARAM_LABEL[p] || p, n }))
+    .sort((a, b) => b.n - a.n || a.label.localeCompare(b.label, 'pt-BR'))
+    .slice(0, limite || 6)
 }
