@@ -10,6 +10,27 @@ e exige senha; exclusão exige justificativa.
 
 ---
 
+## Decisões tomadas (2026-08-15) — não reabrir
+
+1. **Senha por JANELA na conferência** (uma reautenticação libera N minutos
+   de edição; cada gravação da janela carimba a mesma prova na trilha) e
+   **por registro nas demais telas** (`agua-laudos`, `agua-pontos`).
+   Motivo: 339 coletas em quarentena são editadas em lote; senha por
+   gravação inviabilizaria o trabalho, e o custo de errar ali é baixo
+   porque tudo fica na trilha. Janela sugerida: 5 min, renovável, e
+   **invalidada ao trocar de registro por mais de X minutos ociosa** —
+   valor a definir na implementação (ver §7).
+2. **A trilha tem de resistir ao super_admin.** Ver §2.1 — o requisito se
+   divide em dois adversários com respostas diferentes, e só um deles é
+   resolvível dentro do banco.
+3. **Escopo: só Qualidade da Água por enquanto.** O trigger e a tabela
+   nascem genéricos (recebem `tabela`/`registro_id`, não têm nada de
+   `agua` na forma), mas **só são ligados às 4 tabelas do módulo**.
+   Estender a Brigadas/Biomonitor/Frota depois é `CREATE TRIGGER`, não
+   redesenho — e é decisão de outra missão.
+
+---
+
 ## 0. O que existe hoje (fatos verificados)
 
 | Fato | Onde | Consequência |
