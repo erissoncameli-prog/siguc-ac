@@ -107,17 +107,75 @@ hash           text
   — disponível no PostgREST, `NULL` fora dele (cron/psql), e isso é
   informação, não falha.
 
-**Integridade da própria trilha (honestidade necessária):** um super_admin
-com acesso ao painel do Supabase pode editar qualquer tabela, inclusive
-esta. Não existe "log inviolável" dentro do mesmo banco. O que dá para
-fazer, e que proponho: encadeamento de hash (`hash = sha256(hash_anterior
-|| conteúdo da linha)`, carimbado por trigger `BEFORE INSERT`) mais uma RPC
-`agua_auditoria_verificar()` que percorre a cadeia e aponta a primeira
-linha adulterada ou removida. Não impede a adulteração — **torna-a
-detectável**, que é o máximo alcançável sem exportar a trilha para fora do
-banco. Se o requisito real for "nem o super_admin pode mexer", isso é uma
-conversa sobre destino externo (bucket WORM / outro projeto Supabase) e
-deve ser decidido explicitamente, não presumido.
+### 2.1 Integridade da trilha — dois adversários, duas respostas
+
+Decisão 2 diz "a trilha resiste ao super_admin". Mas "super_admin" no
+SIGUC é **um perfil na tabela `usuarios`**, não o dono do painel do
+Supabase. São ameaças diferentes e só uma delas se resolve dentro do banco.
+
+**Adversário A — o super_admin do sistema** (entra pelo navegador, JWT
+`authenticated`, é o Erisson e quem mais tiver o perfil). Contra ele a
+trilha fica **de fato imutável, não apenas auditável**:
+
+- RLS com policy **só de SELECT**; nenhuma de INSERT/UPDATE/DELETE.
+- `REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON agua_auditoria FROM authenticated, anon;`
+- Quem grava é a função de trigger, `SECURITY DEFINER`, dona `postgres`,
+  **sem EXECUTE para `authenticated`/`anon`** (padrão da migration 179).
+- Sem RPC de escrita na trilha. Não existe caminho pelo PostgREST.
+
+Isso é garantia dura: o perfil mais alto da aplicação pode ler tudo e não
+pode alterar nem apagar uma linha. **É o que a decisão 2 pedia, e está
+resolvido.**
+
+**Adversário B — quem tem o painel do Supabase / `service_role`.** Esse
+papel ignora RLS por definição; pode reescrever linhas, desligar o trigger
+(`ALTER TABLE ... DISABLE TRIGGER`), remover o cron ou dar `TRUNCATE`.
+Nenhum controle *dentro* do mesmo banco o alcança — dizer o contrário seria
+mentir. A resposta é em duas partes:
+
+1. **Encadeamento de hash** (`hash = sha256(hash_anterior || conteúdo
+   canônico da linha)`, carimbado por trigger `BEFORE INSERT`) + RPC
+   `agua_auditoria_verificar()` que percorre a cadeia e aponta a primeira
+   linha adulterada, reordenada ou removida. Sozinho isso ainda não basta:
+   quem reescreve uma linha pode **recalcular a cadeia inteira** a partir
+   dali. Falta o ponto fixo externo.
+2. **Âncora diária fora do banco** (é isto que fecha o buraco). Um
+   `pg_cron` diário publica, para fora do Supabase, um selo com:
+   `data`, `total de linhas`, `id e timestamp da última linha`, `hash da
+   cabeça da cadeia`. Uma cadeia reescrita passa a **divergir de um selo
+   que o adversário não controla**, e a divergência é datada — dá para
+   dizer *quando* a adulteração aconteceu.
+
+   Destinos propostos, os dois com infraestrutura que o projeto **já tem**:
+   - **E-mail institucional via Resend** (`RESEND_API_KEY` já existe, é o
+     mesmo caminho dos alertas ambientais). Cópia numa caixa que o
+     administrador do banco não controla, com timestamp do provedor.
+     Prova simples e suficiente para uso administrativo.
+   - **Commit num arquivo append-only do repositório GitHub** (endpoint
+     novo na Vercel, `api/agua-selo.js`, com token de repo). Histórico do
+     GitHub é datado e reescrevê-lo é visível. Mais forte que o e-mail e
+     mais trabalhoso — **avaliar na implementação; e-mail é o mínimo
+     obrigatório, o commit é o desejável.**
+
+   O selo é **público quanto ao hash e mudo quanto ao conteúdo**: não
+   vazam dados da trilha, só o resumo criptográfico e as contagens.
+
+3. **Silenciamento também vira anomalia visível.** Desligar o trigger não
+   adultera nada — apenas faz a trilha parar de crescer. Por isso o selo
+   carrega `total de linhas` e `timestamp da última linha`: um dia sem
+   selo, ou um selo com contagem estagnada num período de trabalho normal,
+   é o sinal. A tela de auditoria mostra "último selo emitido em…" no topo.
+
+**Limite que fica registrado, porque é real:** com acesso ao `service_role`
+é possível apagar a trilha inteira e cancelar o cron. O que o desenho
+garante é que isso **não passa despercebido** — o histórico de selos
+externos denuncia a lacuna. Imutabilidade absoluta contra o administrador
+da própria infraestrutura exigiria escrever a trilha, em tempo real, num
+sistema sob outra chave e outro dono (outro projeto Supabase com
+credencial separada, ou storage WORM contratado). Isso é decisão
+orçamentária e institucional, não de código, e **não está incluída nesta
+missão** — mas o encadeamento de hash já deixa a porta pronta: mudar o
+destino do selo depois não altera nada do que foi gravado.
 
 ### Camada 2 — Só super_admin lê
 
