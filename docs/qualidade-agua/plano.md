@@ -1073,7 +1073,26 @@ críticas, mesmos 32 avisos pré-existentes.
   identificados (o MapServer ArcGIS da ANA em `portal1.snirh.gov.br` é
   o mais promissor, devolve GeoJSON direto por bbox/UF). Fica pendente
   para uma sessão com esses domínios liberados.
-- **Ícone do app Água** — o launcher Android usa o placeholder
-  genérico do Capacitor (`app-agua/android`); nenhuma arte própria foi
-  gerada nesta entrega (sem ferramenta de geração de imagem
-  disponível). Trocar antes do primeiro APK real.
+- ~~**Ícone do app Água**~~ — **resolvido.** Arte gerada por IA a partir
+  de um prompt calibrado na identidade visual dos outros 3 apps (fundo
+  verde-floresta `#0A1A0F`, arco de luz diagonal, ilustração central,
+  título + subtítulo, selos de função — molde do Frota, não o badge
+  circular do Biomonitor). A imagem bruta veio num canvas preto de
+  1254×1254 com o ícone (squircle arredondado) inset; recorte por
+  flood-fill de conectividade a partir das bordas (não por chave de
+  cor — evita furar áreas escuras internas da própria arte, como o
+  cabo preto da sonda) gerou `pwa/icons/icon-agua-512.png` e
+  `icon-agua-192.png` (cantos transparentes, uso "any") e
+  `icon-agua-maskable-512.png` (fundo `#0A1A0F` full-bleed, conteúdo a
+  ~78% de escala — mesma proporção de `icon-frota-maskable-512.png`,
+  medida diretamente no arquivo existente) e
+  `apple-touch-icon-agua.png` (180×180, achatado sobre o mesmo verde,
+  padrão do Biomonitor). `app-agua/scripts/gerar-icones.mjs` — mesmo
+  molde sem dependências de `app-frota/scripts/gerar-icones.mjs` — já
+  rodou de verdade e substituiu o placeholder do Capacitor em
+  `app-agua/android/app/src/main/res/mipmap-*` e nas 11 telas de
+  splash. `pwa/manifest-agua.json` passou a apontar para os ícones
+  próprios (3 entradas — `any` 192/512 + `maskable` 512, mesmo formato
+  do manifest do Frota, não mais o `icon-192.png`/`icon-512.png`
+  genérico); `pages/agua-app.html` ganhou o
+  `<link rel="apple-touch-icon">` que faltava. `sw.js`: agua v5 → v6.
