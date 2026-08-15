@@ -18,6 +18,41 @@ const AGUA_REL_SEM_BACIA = '__sem_bacia__' // chave interna p/ bacia NULA (ex.: 
 function aguaRelChaveBacia(bacia) { return bacia || AGUA_REL_SEM_BACIA }
 function aguaRelLabelBacia(bacia) { return bacia || 'Sem bacia definida' }
 
+// Rótulos estáticos dos filtros novos (busca por rio/status/faixa/CONAMA)
+// — mesmo espírito de AGUA_REL_PARAM_LABEL logo abaixo: não é cálculo,
+// só rótulo, compartilhado pela tela e pelos dois geradores.
+const AGUA_REL_STATUS_LABEL = { aguardando_lab: 'Aguardando laudo', completo: 'Completo', quarentena: 'Quarentena' }
+const AGUA_REL_CONAMA_LABEL = { conforme: 'Conforme', violacao: 'Violação', sem_limites: 'Sem limites cadastrados' }
+
+// Deriva o mesmo "terceiro estado" que pages/agua-mapa.html já trata
+// (conama_violacoes NULL não é o mesmo que conforme) — usado tanto pelo
+// filtro quanto por quem quiser rotular a coleta em uma palavra só.
+function aguaRelConamaStatus(coleta) {
+  if (coleta.conama_violacoes == null) return 'sem_limites'
+  return coleta.conama_violacoes.length > 0 ? 'violacao' : 'conforme'
+}
+
+// Rios distintos presentes numa lista de coletas — usada para popular o
+// seletor de rio DEPOIS que uma bacia é escolhida (uma bacia pode ter
+// mais de um rio: Purus tem Rio Acre/Rio Iaco/Rio Purus, por exemplo).
+function aguaRelRiosDe(coletas) {
+  return [...new Set((coletas || []).map(c => c.ponto_rio).filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b, 'pt-BR'))
+}
+
+// Texto legível dos filtros ativos (além de bacia/campanha) — usado na
+// tela E nos dois documentos gerados, pra nenhum dos dois "esconder"
+// que o relatório está recortado (não é a bacia inteira).
+function aguaRelFiltrosTxt(filtros) {
+  if (!filtros) return ''
+  const partes = []
+  if (filtros.rio) partes.push(`Rio: ${filtros.rio}`)
+  if (filtros.status) partes.push(`Status: ${AGUA_REL_STATUS_LABEL[filtros.status] || filtros.status}`)
+  if (filtros.iqaFaixa) partes.push(`Faixa IQA: ${filtros.iqaFaixa}`)
+  if (filtros.conamaStatus) partes.push(`CONAMA: ${AGUA_REL_CONAMA_LABEL[filtros.conamaStatus] || filtros.conamaStatus}`)
+  return partes.join(' · ')
+}
+
 // Mesmos campos/rótulos de pages/agua-laudos.html, agua-conferencia.html
 // e agua-mapa.html (rótulo estático, sem cálculo — não é o que a regra
 // "cálculo em UM lugar só" cobre). Compartilhado entre os dois geradores
@@ -94,7 +129,16 @@ function aguaRelCampanhasDe(coletas) {
 
 // Monta o relatório de uma bacia: recorta pelo intervalo de campanhas
 // [campanhaDeId, campanhaAteId] (ids de agua_campanhas; omitido =
-// desde o início / até o fim), agrupa por ponto e resume. Puro.
+// desde o início / até o fim), aplica os filtros de busca opcionais
+// (rio, status, faixa do IQA, conformidade CONAMA — todos "E" entre
+// si, refinando o que a bacia+período já trouxe, nunca substituindo),
+// agrupa por ponto e resume. Puro.
+//
+// `campanhas` continua vindo do intervalo inteiro (não é recalculada
+// pelos filtros de busca) — o eixo temporal do relatório fica estável
+// mesmo que um filtro esvazie uma campanha específica; é o mesmo
+// espírito do ponto "vazado" em agua-mapa.html: lacuna é informação,
+// não redesenha o eixo.
 function aguaRelMontar(coletasDaBacia, opts = {}) {
   const todasCampanhas = aguaRelCampanhasDe(coletasDaBacia)
   const idxDe  = opts.campanhaDeId  ? todasCampanhas.findIndex(c => c.campanha_id === opts.campanhaDeId)  : 0
@@ -103,9 +147,12 @@ function aguaRelMontar(coletasDaBacia, opts = {}) {
   const campanhas = todasCampanhas.slice(Math.max(idxDe, 0), idxAte + 1)
   const idsPermitidos = new Set(campanhas.map(c => c.campanha_id))
 
-  const coletas = (coletasDaBacia || [])
-    .filter(c => idsPermitidos.has(c.campanha_id))
-    .sort((a, b) => aguaRelCompararCampanha(a, b) || (a.ponto_nome || '').localeCompare(b.ponto_nome || '', 'pt-BR'))
+  let coletas = (coletasDaBacia || []).filter(c => idsPermitidos.has(c.campanha_id))
+  if (opts.rio) coletas = coletas.filter(c => c.ponto_rio === opts.rio)
+  if (opts.status) coletas = coletas.filter(c => c.status === opts.status)
+  if (opts.iqaFaixa) coletas = coletas.filter(c => c.iqa_faixa === opts.iqaFaixa)
+  if (opts.conamaStatus) coletas = coletas.filter(c => aguaRelConamaStatus(c) === opts.conamaStatus)
+  coletas = coletas.sort((a, b) => aguaRelCompararCampanha(a, b) || (a.ponto_nome || '').localeCompare(b.ponto_nome || '', 'pt-BR'))
 
   const porPonto = {}
   coletas.forEach(c => {
@@ -119,7 +166,8 @@ function aguaRelMontar(coletasDaBacia, opts = {}) {
   })
   const pontos = Object.values(porPonto).sort((a, b) => (a.nome || '').localeCompare(b.nome || '', 'pt-BR'))
 
-  return { campanhas, coletas, pontos, resumo: aguaRelResumo(coletas) }
+  const filtros = { rio: opts.rio || null, status: opts.status || null, iqaFaixa: opts.iqaFaixa || null, conamaStatus: opts.conamaStatus || null }
+  return { campanhas, coletas, pontos, resumo: aguaRelResumo(coletas), filtros }
 }
 
 function aguaRelResumo(coletas) {

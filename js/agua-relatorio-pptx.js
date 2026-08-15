@@ -14,8 +14,8 @@
 // screenshots), então não há função para reaproveitar de lá, só a
 // paleta de cores.
 //
-// Depende de: aguaRelLabelCampanha(), aguaRelSerieIQA() (js/agua-relatorio-
-// dados.js); window.PptxGenJS (js/vendor/pptxgenjs-4.0.1.bundle.js).
+// Depende de: aguaRelLabelCampanha(), aguaRelSerieIQA(), aguaRelFiltrosTxt()
+// (js/agua-relatorio-dados.js); window.PptxGenJS (js/vendor/pptxgenjs-4.0.1.bundle.js).
 
 const AGPPTX_C = {
   darkBg: '0A1A0F', green: '52B788', gold: 'C9A84C', goldLt: 'F0CB6A',
@@ -54,7 +54,7 @@ function _agpptxCard(pres, slide, x, y, w, h, opts = {}) {
 }
 
 // ── Slide 1: capa ────────────────────────────────────────────────
-function _agpptxSlideCapa(pres, labelBacia, periodoTxt, protocolo) {
+function _agpptxSlideCapa(pres, labelBacia, periodoTxt, protocolo, filtrosTxt) {
   const s = pres.addSlide()
   s.background = { color: AGPPTX_C.darkBg }
   s.addShape(pres.shapes.RECTANGLE, { x: 0, y: AGPPTX_H - 0.12, w: AGPPTX_W, h: 0.12, fill: { color: AGPPTX_C.gold }, line: { color: AGPPTX_C.gold, width: 0 } })
@@ -62,6 +62,11 @@ function _agpptxSlideCapa(pres, labelBacia, periodoTxt, protocolo) {
   const titulo = labelBacia === 'Sem bacia definida' ? labelBacia : `Bacia do ${labelBacia}`
   s.addText(titulo, { x: AGPPTX_M, y: 1.55, w: 9.2, h: 1.4, fontSize: 34, color: AGPPTX_C.txt, fontFace: 'Georgia', bold: true, valign: 'top' })
   s.addText(periodoTxt, { x: AGPPTX_M, y: 2.95, w: 9.2, h: 0.5, fontSize: 15, color: AGPPTX_C.goldLt, fontFace: 'Calibri' })
+  // Filtros ativos (rio/status/faixa IQA/CONAMA) — mesma preocupação do
+  // PDF: a capa não pode parecer "a bacia inteira" quando foi recortada.
+  if (filtrosTxt) {
+    s.addText(`Filtros aplicados: ${filtrosTxt}`, { x: AGPPTX_M, y: 3.4, w: 9.2, h: 0.35, fontSize: 10, color: AGPPTX_C.green, fontFace: 'Calibri', italic: true })
+  }
   s.addText(`SEMA-AC · DIMA · Protocolo ${protocolo}`, { x: AGPPTX_M, y: AGPPTX_H - 0.55, w: 9.2, h: 0.35, fontSize: 9, color: AGPPTX_C.green, fontFace: 'Calibri' })
 }
 
@@ -159,7 +164,7 @@ async function aguaRelMontarPptx(relatorio, labelBacia, periodoTxt, protocolo) {
   pres.title = `Qualidade da Água — ${labelBacia}`
   pres.author = 'SEMA-AC · DIMA'
 
-  _agpptxSlideCapa(pres, labelBacia, periodoTxt, protocolo)
+  _agpptxSlideCapa(pres, labelBacia, periodoTxt, protocolo, aguaRelFiltrosTxt(relatorio.filtros))
   _agpptxSlideResumo(pres, relatorio)
   _agpptxSlideEvolucao(pres, relatorio)
   _agpptxSlideConama(pres, relatorio)
