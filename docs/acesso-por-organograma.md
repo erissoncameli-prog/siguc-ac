@@ -562,7 +562,25 @@ visível a quem acessa a página, ações restritas a `super_admin`/`diretor`
 porque é quem `pode_editar('estrutura-organizacional')` de fato resolve
 hoje — checado em `perfil_permissoes_padrao`, não copiado do padrão
 `['super_admin','gestor']` que outras abas da mesma página usam, que não
-bate com a RLS real deste módulo), **2 entregue**
+bate com a RLS real deste módulo).
+
+**Achado ao usar em produção (2026-08-15, mesmo dia do merge)**: a
+tabela da aba só listava lotações EXPLÍCITAS — quem já tinha alcance
+por cargo (chefia, `usuario_unidades()` já une as duas fontes desde a
+migration 262) não aparecia, dando a impressão de que era preciso
+recadastrar todo mundo. Confirmado com dado real: dos 20 servidores de
+mesa, 10 já cobertos por cargo, e as 2 primeiras lotações cadastradas
+manualmente na tela duplicavam exatamente a unidade que o cargo da
+pessoa já cobria (Maria Antônia → DERHQA, já chefe da Divisão de
+Recursos Hídricos; Átila → UC-016, já gestor do Núcleo Antimary).
+Corrigido: a tabela agora mostra as duas fontes juntas — chefia como
+linha somente-leitura (selo "Chefia", sem botão de encerrar, que
+continua sendo função da aba Cargos) — sem duplicar dado nenhum no
+banco. As 2 linhas duplicadas foram removidas. Falta cadastrar de
+verdade: 6 servidores (3 gestor, 3 tecnico) — os 3 super_admin nunca
+precisam de lotação, bypassam `nivel_efetivo()` no primeiro passo.
+
+**2 entregue**
 (migration 265 + aba "Acesso por Setor" em `estrutura-organizacional.html`,
 restrita a super_admin), **3 entregue** (migration 266 — tabela
 `credenciamentos`, cron de vencimento com dedupe, aba "Credenciamentos"
