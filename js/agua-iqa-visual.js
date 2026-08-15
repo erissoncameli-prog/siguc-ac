@@ -194,8 +194,11 @@ function aguaIqaGaugeHTML(pct, opts) {
   // encostava no número (que é grande e de largura variável) e ainda
   // era cortado pela viewBox em rótulo longo. Em HTML ele quebra linha
   // e centraliza sozinho.
+  // `display:block` + `height:auto` no próprio SVG: sem isso ele é
+  // inline (herda line-height) e a caixa fica mais alta que o desenho,
+  // empurrando o rótulo para fora do contêiner.
   return `<div style="text-align:center">
-    <svg viewBox="0 0 ${w} ${h}" width="100%" height="auto" role="img"
+    <svg viewBox="0 0 ${w} ${h}" style="display:block;width:100%;height:auto" role="img"
         aria-label="${_aguaEsc(o.rotulo || 'Medidor')}: ${temValor ? Math.round(pct) + '%' : 'sem dado'}">
       ${segs}
       <text x="${cx}" y="${cy + 4}" text-anchor="middle" font-family="'Fraunces',Georgia,serif" font-size="${Math.round(w * 0.145)}" font-weight="700" fill="#111827">${temValor ? Math.round(pct) + '%' : o.vazioTexto}</text>
