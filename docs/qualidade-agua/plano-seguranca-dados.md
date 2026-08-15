@@ -329,8 +329,11 @@ protege contra corrupção acidental, não contra adulteração deliberada (ver
 | Risco | Tratamento |
 |---|---|
 | Página nova esquece de logar | Trigger no banco — impossível esquecer |
-| Super_admin adultera a trilha | Hash encadeado + verificador; destino externo é decisão à parte |
+| Super_admin do sistema adultera a trilha | Impedido: RLS só de SELECT + REVOKE + trigger `SECURITY DEFINER` sem EXECUTE (§2.1, adversário A) |
+| Quem tem `service_role` adultera a trilha | Detectável: hash encadeado + selo diário fora do banco (§2.1, adversário B). Impedir exigiria infra sob outra chave — fora desta missão |
+| Trigger desligado em silêncio | Selo carrega contagem e data da última linha; estagnação/ausência de selo é o sinal |
 | Senha em log de query | Opção A/B evitam; C fica documentada como limitação |
+| Janela de senha vira passe livre | Janela por usuário **e por tela**, com prazo do servidor; toda gravação carimba a prova e o horário da senha |
 | App de campo quebra offline | INSERT não passa por RPC nem por reauth |
 | Conferência em massa fica lenta | Reauth por janela, não por campo |
 | Trilha cresce sem controle | `dados_antes/depois` só das colunas do diff em UPDATE (INSERT/DELETE guardam a linha inteira) + política de retenção |
