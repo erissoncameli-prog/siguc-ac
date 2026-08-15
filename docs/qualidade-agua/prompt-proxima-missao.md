@@ -1,7 +1,8 @@
 # Prompt — próxima missão (segurança dos dados de Qualidade da Água)
 
-Colar como primeira mensagem da sessão. Responder às 5 decisões do plano
-ANTES de colar, ou o Claude vai perguntar (o que também está certo).
+Colar como primeira mensagem da sessão. As decisões de rumo já estão
+tomadas e registradas na seção "Decisões tomadas" do plano — o que sobrou
+em aberto (§6) não bloqueia o início.
 
 ---
 
