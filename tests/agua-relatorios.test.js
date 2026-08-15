@@ -298,10 +298,11 @@ test.describe('geração real dos arquivos — PDF e PPTX', () => {
     expect(parsed.numpages).toBe(3);
     expect(parsed.text).toContain('IQA MÉDIO POR PONTO DE COLETA');
     expect(parsed.text).toMatch(/Ponto 12/);
-    // 12 pontos, gráfico limitado aos 10 melhores — a tabela detalhada
-    // continua trazendo todos, então o recorte é só do gráfico.
-    expect(parsed.text).toContain('(10 de 12)');
-    expect(parsed.text).toMatch(/Ponto 1\b/);
+    // 12 pontos, gráfico limitado aos 10 melhores — e o título diz isso.
+    // (Os títulos de bloco/seção saem em CAIXA ALTA no documento.)
+    expect(parsed.text).toContain('(10 DE 12)');
+    // O recorte é SÓ do gráfico: o detalhamento continua trazendo os 12.
+    for (let p = 1; p <= 12; p++) expect(parsed.text).toContain(`PONTO ${p} —`);
   });
 
   test('PDF: bacia sem dado cadastrado (Rio Iquiri, NULL) não quebra o fluxo', async ({ page }) => {
