@@ -384,7 +384,7 @@ function _lgpdMdMarkup(dados) {
     </div>`
 
   const formHtml = `
-    <div class="lgpd-md-secao">
+    <div class="lgpd-md-secao" id="solicitacao">
       <h3>Nova solicitação</h3>
       <form id="lgpd-md-form" class="lgpd-md-form">
         <label>Tipo de solicitação</label>
