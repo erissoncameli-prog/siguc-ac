@@ -504,6 +504,18 @@ Frota) — não existe teto único correto sem inventar um número. Se essa
 definição não for a desejada, corrige-se com UPDATE no catálogo
 existente, não com redesenho de código.
 
+**Frente 5 parcial** (migration 268 + §3 revisado): inventariei as 129
+policies com `perfil` direto (77 tabelas) e, ao testar candidatas óbvias
+de conversão, achei algo que muda a forma de fazer o resto — o catálogo
+(`perfil_permissoes_padrao`/`grupo_permissoes_padrao`) e a RLS real
+DIVERGEM na maioria das tabelas testadas (documentos, equipe, netflora,
+unidades, mapa, alertas, indicadores — ver tabela no §3.0). Converter
+sem checar teria introduzido bug de acesso (ampliar ou reduzir
+silenciosamente). Convertida só `config_sistema`, a única sem
+divergência, verificada com `pode_editar('configuracoes')` simulando
+super_admin (`true`) e gestor (`false`). O resto fica classificado e
+documentado no §3.2 para as próximas sessões, sem tocar em nada.
+
 | # | Entrega | Depende de |
 |---|---|---|
 | 1 | ✅ `usuario_lotacoes` + derivação a partir de `cargo_ocupacoes` (migration 262) + tela de lotação (aba "Lotações" em `estrutura-organizacional.html`) | — |
