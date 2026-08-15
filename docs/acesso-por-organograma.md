@@ -372,10 +372,20 @@ existia; agora ele existe, e o custo de generalizar é `CREATE TRIGGER`.
 
 ## 8. Frentes de trabalho
 
+Progresso (2026-08-15): **1 parcial** (tabela/funções prontas — migration
+262; falta a tela de lotação em Usuários/Estrutura Org.), **2 entregue**
+(migration 265 + aba "Acesso por Setor" em `estrutura-organizacional.html`,
+restrita a super_admin), **6 entregue** (migrations 263/264 — Biomonitor
+no catálogo, com correção de regressão do fallback de grupo, verificada
+por consulta a `nivel_efetivo()` antes de fechar). Nenhuma delas mudou o
+acesso de ninguém: `alcance_por_lotacao()` existe e foi testada (4/4 casos
+de herança, em transação com ROLLBACK) mas `nivel_efetivo()` ainda não a
+chama — isso só acontece na frente 4.
+
 | # | Entrega | Depende de |
 |---|---|---|
-| 1 | `usuario_lotacoes` + derivação a partir de `cargo_ocupacoes` + tela de lotação em Usuários/Estrutura Org. | — |
-| 2 | `modulo_unidades` + herança pela árvore + tela de amarração módulo↔setor | 1 |
+| 1 | `usuario_lotacoes` + derivação a partir de `cargo_ocupacoes` (✅ migration 262) + tela de lotação em Usuários/Estrutura Org. (pendente) | — |
+| 2 | ✅ `modulo_unidades` + herança pela árvore + tela de amarração módulo↔setor (migration 265 + aba "Acesso por Setor") | 1 |
 | 3 | `credenciamentos` + tela + cron de vencimento + revogação | — (pode ir em paralelo) |
 | 4 | `nivel_efetivo()` v2 + `modulos.exige_lotacao` + `vw_impacto_lotacao` | 1, 2, 3 |
 | 5 | Inventário das 133 policies + conversão por lotes | 4 |
