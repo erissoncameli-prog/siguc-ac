@@ -259,8 +259,11 @@ test.describe('geração real dos arquivos — PDF e PPTX', () => {
     expect(texto).toContain('EVOLUÇÃO DO IQA MÉDIO DA BACIA POR CAMPANHA');
     // Legenda da distribuição traz a contagem ao lado da cor (a cor
     // nunca carrega o dado sozinha), com a faixa que veio do banco.
-    expect(texto).toMatch(/Boa\s*2\b/);       // 2 coletas 'Boa' na fixture
-    expect(texto).toMatch(/Péssima\s*1\b/);   // a quarentenada, contada e não escondida
+    // `(?!\d)` e não `\b`: no texto extraído a legenda sai colada na
+    // próxima ("…Boa 2Regular 1…"), e entre '2' e 'R' — dois caracteres
+    // de palavra — não existe borda \b.
+    expect(texto).toMatch(/Boa\s*2(?!\d)/);       // 2 coletas 'Boa' na fixture
+    expect(texto).toMatch(/Péssima\s*1(?!\d)/);   // a quarentenada, contada e não escondida
     // Ranking de violações substituiu o parágrafo de texto corrido.
     expect(texto).toMatch(/Turbidez/);
     // Barras do IQA por ponto: média de cada ponto, rotulada.
