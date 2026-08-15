@@ -441,7 +441,8 @@ let _moduloUnidades = []
         <button class="tab-btn" onclick="ativarAba('delegacoes', this)">Delegações</button>
         <button class="tab-btn" onclick="ativarAba('unidades', this)">Unidades</button>
         ${usuario.perfil === 'super_admin' ? `
-        <button class="tab-btn" onclick="ativarAba('modulos-setor', this)">Acesso por Setor</button>` : ''}
+        <button class="tab-btn" onclick="ativarAba('modulos-setor', this)">Acesso por Setor</button>
+        <button class="tab-btn" onclick="ativarAba('credenciamentos', this)">Credenciamentos</button>` : ''}
       </div>
 
       <div id="tab-organograma" class="tab-panel ativo">
