@@ -969,6 +969,69 @@ Pessoas chave:
 
 Unidades: SECRETARIA > DIMA > DEUC | CIGMA | JURÍDICO
 
+## Regra do sistema — Acesso por organograma
+Plano completo, com o levantamento contra produção que justifica cada
+escolha, em `docs/acesso-por-organograma.md`. Resumo do que existe hoje
+(migrations 262–269, todas com verificação real contra o banco, não só
+lidas — snapshot 1656/1656 sem divergência, cadeia de hash 9/9 sem
+quebra):
+
+- **`usuario_lotacoes`**: onde cada servidor trabalha (histórico, não
+  estado — mudar de setor fecha uma linha e abre outra). Diferente de
+  `cargo_ocupacoes` (chefia, 1 titular por unidade) — quem ocupa cargo
+  é lotado por DERIVAÇÃO (`usuario_unidades()`), nunca digitado duas
+  vezes. Tela: aba "Lotações" em `estrutura-organizacional.html`.
+- **`modulo_unidades`**: qual setor é DONO de cada módulo, com herança
+  pela árvore (`alcance_por_lotacao()`) — descendente da unidade dona
+  herda o mesmo nível; ancestral (chefia acima) herda só `visualizar`.
+  Tela: aba "Acesso por Setor", só super_admin.
+- **`credenciamentos`**: exceção de acesso fora do setor, sempre com
+  prazo (`data_fim` obrigatória) e justificativa (mín. 20 caracteres,
+  checado no banco), só concedida por super_admin,
+  `teto_do_perfil()`-capada (nunca eleva além do que o perfil já
+  alcança em algum módulo hoje). Cron diário avisa vencimento. Tela:
+  aba "Credenciamentos", só super_admin.
+- **`nivel_efetivo()`** (v2, migration 267): mesma assinatura de
+  sempre. Ordem: super_admin → credenciamento vigente → override
+  individual (`usuario_permissoes`, válvula de escape) →
+  **`modulos.exige_lotacao = false`** (hoje, em TODO módulo): cai no
+  padrão de sempre (`perfil_permissoes_padrao` > `grupo_permissoes_padrao`
+  > sem_acesso) → se `true`: alcance por lotação, capado pelo teto do
+  perfil, com fail-open para o padrão de sempre se o módulo não tiver
+  dono cadastrado.
+- **`trilha_auditoria`** (migration 269): genérica (`tabela`/
+  `registro_id`, sem nada específico de módulo), trigger ligado nas 4
+  tabelas acima. Só super_admin lê; **nem o super_admin escreve** —
+  só o trigger grava (`REVOKE` + `SECURITY DEFINER`). Cadeia de hash
+  encadeado + `trilha_auditoria_verificar()`. Selo diário
+  (`trilha_auditoria_selos`) é gerado e gravado, mas o ENVIO para fora
+  do banco não está implementado (exigiria embutir `SERVICE_ROLE_KEY`
+  num cron — anti-padrão que o projeto evita).
+
+**Regra permanente, vale a partir de agora**: policy nova que decide
+acesso a MÓDULO usa `pode_ver`/`pode_editar`, nunca `perfil = '...'`
+direto. Se aparecer `perfil = '...'` numa policy nova, é dívida técnica
+e precisa de justificativa escrita no commit.
+
+**Antes de converter uma policy EXISTENTE para `pode_ver`/`pode_editar`,
+comparar o array de perfis hard-coded contra o que
+`perfil_permissoes_padrao`/`grupo_permissoes_padrao` concede hoje para
+o módulo.** Achado real (não hipótese): na maioria das tabelas testadas
+(`documentos`, `equipe_servidores`, `netflora_*`, `unidades_conservacao`,
+`camadas_mapa`, `alertas_ambientais`, `monitoramento_indicadores`) o
+catálogo DIVERGE da regra real — converter às cegas amplia ou reduz
+acesso de verdade, silenciosamente. `config_sistema` foi a única
+convertida (migration 268) porque as duas fontes coincidiam
+exatamente. Ver §3.2 de `docs/acesso-por-organograma.md` para a lista
+completa classificada (o que já foi convertido, o que tem drift, o que
+é dono-do-registro/app-de-campo e fica como está).
+
+Guarda: `tests/permissao-organograma.test.js` cobre a metade
+client-side (`appState.permissoes` alimentado por `minhas_permissoes`
+em `carregarUsuario()`, fail-open). A metade em SQL não tem guarda
+automatizada ainda — foi verificada por transações com `ROLLBACK`
+durante as migrations, não por teste que rode sozinho.
+
 ## Módulos — situação
 
 ### Já implementado
