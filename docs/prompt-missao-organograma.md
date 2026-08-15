@@ -57,6 +57,11 @@ Só então:
 5. Inventário das **133 policies que checam `perfil` direto** e conversão
    por lotes, classificando cada uma antes (acesso a módulo → converter;
    dono do próprio registro → fica; app de campo → fica).
+6b. **Sidebar (`js/layout.js`) passa a ler `minhas_permissoes`.** Hoje 12
+   dos 39 itens de menu têm lista de perfis fixa no código e a view
+   `minhas_permissoes` **não é consultada em lugar nenhum** — sem esta
+   frente, a restrição por setor valeria no banco e não apareceria na
+   tela.
 7. Trilha de auditoria genérica sobre as tabelas de permissão.
 9. Regra no `CLAUDE.md` + `tests/permissao-organograma.test.js`.
 
