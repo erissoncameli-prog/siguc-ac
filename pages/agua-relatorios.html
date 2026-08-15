@@ -94,6 +94,11 @@
   background:var(--branco); border:1px solid var(--borda); border-radius:var(--adash-raio);
   padding:18px 20px; box-shadow:var(--sombra); display:flex; flex-direction:column; min-width:0;
 }
+/* O card é um flex-column esticado até a altura da linha da grade; sem
+   isto os filhos ENCOLHEM (flex-shrink padrão 1) e o conteúdo vaza por
+   cima do vizinho — foi o que fazia o rótulo do medidor aparecer atrás
+   dos chips de conformidade. */
+.adash-card > * { flex-shrink:0 }
 .adash-kpis { display:flex; flex-direction:column; gap:16px; min-width:0 }
 .adash-card-escuro { background:linear-gradient(160deg,#1F4E2C 0%,#0A1A0F 100%); border-color:#0A1A0F; color:#fff }
 .adash-card-escuro .adash-card-tit, .adash-card-escuro .adash-card-pe { color:rgba(255,255,255,.72) }
