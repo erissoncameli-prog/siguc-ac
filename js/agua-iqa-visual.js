@@ -190,12 +190,18 @@ function aguaIqaGaugeHTML(pct, opts) {
     segs += `<line x1="${(cx + rIn * cos).toFixed(1)}" y1="${(cy + rIn * sin).toFixed(1)}" x2="${(cx + rOut * cos).toFixed(1)}" y2="${(cy + rOut * sin).toFixed(1)}" stroke="${cor}" stroke-width="6" stroke-linecap="round"/>`
   }
 
-  return `<svg viewBox="0 0 ${w} ${h}" width="100%" height="auto" role="img"
-      aria-label="${_aguaEsc(o.rotulo || 'Medidor')}: ${temValor ? Math.round(pct) + '%' : 'sem dado'}">
-    ${segs}
-    <text x="${cx}" y="${cy - 6}" text-anchor="middle" font-family="'Fraunces',Georgia,serif" font-size="${Math.round(w * 0.155)}" font-weight="700" fill="#111827">${temValor ? Math.round(pct) + '%' : o.vazioTexto}</text>
-    ${o.rotulo ? `<text x="${cx}" y="${cy + 14}" text-anchor="middle" font-family="'DM Sans',sans-serif" font-size="12" fill="#6B7280">${_aguaEsc(o.rotulo)}</text>` : ''}
-  </svg>`
+  // O rótulo fica FORA do SVG, em HTML: dentro dele, o texto de 12px
+  // encostava no número (que é grande e de largura variável) e ainda
+  // era cortado pela viewBox em rótulo longo. Em HTML ele quebra linha
+  // e centraliza sozinho.
+  return `<div style="text-align:center">
+    <svg viewBox="0 0 ${w} ${h}" width="100%" height="auto" role="img"
+        aria-label="${_aguaEsc(o.rotulo || 'Medidor')}: ${temValor ? Math.round(pct) + '%' : 'sem dado'}">
+      ${segs}
+      <text x="${cx}" y="${cy + 4}" text-anchor="middle" font-family="'Fraunces',Georgia,serif" font-size="${Math.round(w * 0.145)}" font-weight="700" fill="#111827">${temValor ? Math.round(pct) + '%' : o.vazioTexto}</text>
+    </svg>
+    ${o.rotulo ? `<p style="font-size:12px;color:#6B7280;margin:-6px 0 0;line-height:1.35">${_aguaEsc(o.rotulo)}</p>` : ''}
+  </div>`
 }
 
 // Barras verticais de magnitude, com o valor rotulado acima de cada
