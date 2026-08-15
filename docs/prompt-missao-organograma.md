@@ -44,8 +44,12 @@ Comece pelas frentes que **não mudam o acesso de ninguém** (todas com
 2. `modulo_unidades` + herança pela árvore (descendente herda o nível;
    ancestral herda **só `visualizar`**) + tela de amarração módulo↔setor.
 3. `credenciamentos` + tela + cron de vencimento + revogação.
-6. `biomonitor` no catálogo de `modulos` — hoje **não existe lá**, e sem
-   isso o módulo não pode ser governado por nada.
+6. `biomonitor` no catálogo de `modulos`. O módulo existe e é usado
+   (`admin-biomonitor.html` e cia.), mas **não tem chave em `modulos`** —
+   é autorizado por `perfil = ANY(...)` direto nas policies, e as de
+   SELECT são `USING (true)` (qualquer autenticado lê tudo). Entrar no
+   catálogo é pré-requisito para governá-lo; revisar essas leituras vem
+   junto, e serve de modelo para a frente 5.
 
 Só então:
 
