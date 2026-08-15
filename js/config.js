@@ -201,7 +201,25 @@ async function carregarUsuario() {
   appState.perfil = u.perfil;
   if (window.SessionGuard) SessionGuard.init(u);
   _lgpdGate();
+  _perfilModal();
   return u;
+}
+
+// Modal "Meu Perfil" (js/perfil.js), aberto pelo bloco do nome na
+// sidebar. Carregado daqui pelo MESMO motivo do gate de LGPD acima:
+// amarrado ao bootstrap obrigatório, nenhuma página nova nasce sem ele.
+// Depois de carregar, pinta o avatar — a foto vem de bucket privado e
+// precisa ser assinada, então o HTML da sidebar nasce com as iniciais.
+function _perfilModal() {
+  const pintar = () => { try { perfilAtualizarAvatarSidebar() } catch (e) { console.warn('[perfil]', e) } };
+  if (typeof abrirPerfil === 'function') { pintar(); return; }
+  if (document.getElementById('perfil-js')) return;
+  const s = document.createElement('script');
+  s.id = 'perfil-js';
+  s.src = '/js/perfil.js';
+  s.onload = pintar;
+  s.onerror = () => console.warn('[perfil] não foi possível carregar /js/perfil.js');
+  document.head.appendChild(s);
 }
 
 // Gate de ciência da Política de Privacidade e do Termo de Uso
