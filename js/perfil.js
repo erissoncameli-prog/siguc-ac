@@ -334,7 +334,10 @@ async function perfilFotoEscolhida(input) {
   const arq = input.files?.[0]
   input.value = ''
   if (!arq) return
-  if (arq.size > 5 * 1024 * 1024 || !/^image\//.test(arq.type)) {
+  // arq.type vem vazio em alguns navegadores para HEIC/HEIF (iOS) — o
+  // <input accept="image/*"> já filtrou a escolha, então só um MIME
+  // reconhecido e explicitamente NÃO-imagem é rejeitado aqui.
+  if (arq.size > 5 * 1024 * 1024 || (arq.type && !/^image\//.test(arq.type))) {
     toast('Escolha uma imagem de até 5 MB.', 'error'); return
   }
   toast('Enviando foto…', 'info')
