@@ -415,11 +415,18 @@ async function salvarLab() {
     ativo: document.getElementById('l-ativo').checked,
   }
   if (!payload.nome || payload.nome.length < 2) { toast('Informe o nome do laboratório', 'error'); return }
+
+  let r = null
+  if (_editandoLabId) {
+    r = await reautenticar({ motivo: 'editar este laboratório' })
+    if (!r) return
+  }
+
   const btn = document.getElementById('btn-salvar-lab')
   btn.disabled = true
   try {
     const { error } = _editandoLabId
-      ? await db.from('agua_laboratorios').update(payload).eq('id', _editandoLabId)
+      ? await db.rpc('agua_atualizar_laboratorio', { p_id: _editandoLabId, p_campos: payload, p_justificativa: r.justificativa })
       : await db.from('agua_laboratorios').insert(payload)
     if (error) throw error
     toast('Laboratório salvo!', 'success')
