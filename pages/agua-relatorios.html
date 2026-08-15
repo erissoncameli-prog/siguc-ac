@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>SIGUC-AC · Qualidade da Água — Relatórios</title>
+<title>SIGUC-AC · Qualidade da Água — Painel e Relatórios</title>
 <link rel="stylesheet" href="../css/global.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="../js/observability.js"></script>
@@ -11,37 +11,163 @@
 <script src="../js/config-sistema.js"></script>
 <script src="../js/layout.js"></script>
 <script src="../js/biomonitor-pdf-fonts.js"></script>
+<script src="../js/agua-iqa-visual.js"></script>
 <script src="../js/agua-relatorio-dados.js"></script>
 <script src="../js/agua-relatorio-pdf.js"></script>
 <script src="../js/agua-relatorio-pptx.js"></script>
 <style>
-.arel-filtros {
+/* ── Painel da Qualidade da Água ───────────────────────────────────
+   Layout de cards inspirado no modelo de dashboard aprovado pelo
+   usuário (cabeçalho com pílulas à direita, coluna estreita de KPIs,
+   medidor semicircular, barras com valor rotulado, card de lista).
+   As CORES são as do design system do projeto (nunca as do modelo) e
+   os gráficos saem de js/agua-iqa-visual.js — a página não desenha
+   SVG nem classifica faixa nenhuma. */
+
+.adash { --adash-raio: 18px; }
+
+.adash-head { display:flex; flex-wrap:wrap; gap:14px; align-items:flex-start; margin-bottom:18px }
+.adash-titulo { font-family:var(--font-display); font-size:30px; line-height:1.15; font-weight:700; color:var(--cinza-900); margin:0 }
+.adash-sub { font-size:12.5px; color:var(--cinza-500); margin:4px 0 0; max-width:56ch }
+.adash-head-acoes { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-left:auto }
+
+.adash-pill {
+  display:inline-flex; align-items:center; gap:7px; height:38px; padding:0 15px;
+  border-radius:999px; border:1px solid var(--borda); background:var(--branco);
+  color:var(--cinza-700); font-family:var(--font-sans); font-size:13px; font-weight:600;
+  box-shadow:var(--sombra); cursor:pointer; transition:border-color .15s, box-shadow .15s;
+}
+.adash-pill:hover:not(:disabled) { border-color:var(--borda-forte); box-shadow:var(--sombra-md) }
+.adash-pill:disabled { opacity:.5; cursor:not-allowed }
+.adash-pill svg { width:16px; height:16px; flex-shrink:0 }
+.adash-pill-primary { background:var(--verde-medio); border-color:var(--verde-medio); color:#fff }
+.adash-pill-primary:hover:not(:disabled) { background:var(--verde); border-color:var(--verde) }
+.adash-pill-ativo { border-color:var(--verde-medio); color:var(--verde-medio) }
+.adash-pill-n {
+  display:inline-flex; align-items:center; justify-content:center; min-width:18px; height:18px;
+  padding:0 5px; border-radius:9px; background:var(--verde-medio); color:#fff; font-size:11px; font-weight:700;
+}
+.adash-pill-select { position:relative; padding-right:34px }
+.adash-pill-select select {
+  appearance:none; border:none; background:none; font:inherit; color:inherit;
+  padding:0; margin:0; cursor:pointer; max-width:230px; outline:none;
+}
+.adash-pill-select .adash-chev { position:absolute; right:13px; pointer-events:none; color:var(--cinza-400) }
+
+.adash-export { position:relative }
+.adash-menu {
+  position:absolute; right:0; top:44px; z-index:60; min-width:216px; padding:6px;
+  background:var(--branco); border:1px solid var(--borda); border-radius:14px; box-shadow:var(--sombra-lg);
+}
+.adash-menu button {
+  display:flex; align-items:center; gap:9px; width:100%; padding:9px 11px; border:none; background:none;
+  border-radius:9px; font:inherit; font-size:13px; color:var(--cinza-700); text-align:left; cursor:pointer;
+}
+.adash-menu button:hover:not(:disabled) { background:var(--cinza-100) }
+.adash-menu button:disabled { opacity:.45; cursor:not-allowed }
+.adash-menu button svg { width:16px; height:16px; color:var(--cinza-500) }
+
+.adash-filtros {
   display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end;
-  background:var(--branco); border-radius:var(--raio-lg);
-  padding:14px 16px; margin-bottom:18px; border:1px solid var(--borda);
-  box-shadow:var(--sombra);
+  background:var(--branco); border:1px solid var(--borda); border-radius:var(--adash-raio);
+  padding:14px 16px; margin-bottom:16px; box-shadow:var(--sombra);
 }
-.arel-filtros label { display:flex; flex-direction:column; gap:4px; font-size:12px; color:var(--cinza-500); }
-.arel-filtros select { background:var(--branco); border:1px solid var(--borda-forte); color:var(--cinza-900); border-radius:var(--raio); padding:7px 10px; font-size:13px; min-width:200px; }
-.arel-acoes { display:flex; gap:8px; align-items:flex-end; margin-left:auto; flex-wrap:wrap }
-.arel-resumo-titulo { font-size:14px; font-weight:700; color:var(--cinza-900); margin:0 0 10px }
-.arel-pontos-lista { display:flex; flex-direction:column; gap:0 }
-.arel-ponto-row {
-  display:grid; grid-template-columns:1.6fr .9fr .9fr .7fr; gap:10px; align-items:center;
-  padding:9px 12px; border-top:1px solid var(--borda); font-size:12.5px;
+.adash-filtros label { display:flex; flex-direction:column; gap:4px; font-size:11.5px; color:var(--cinza-500); font-weight:600 }
+.adash-filtros select {
+  background:var(--branco); border:1px solid var(--borda-forte); color:var(--cinza-900);
+  border-radius:10px; padding:8px 10px; font-size:13px; font-family:var(--font-sans); min-width:170px;
 }
-.arel-ponto-row:first-child { border-top:none }
-.arel-ponto-nome { font-weight:600; color:var(--cinza-900) }
-.arel-ponto-sub { font-size:11px; color:var(--cinza-500) }
-.arel-vazio { text-align:center; padding:36px; color:var(--cinza-400); font-size:13px }
-.arel-quarentena-aviso {
-  display:flex; align-items:center; gap:8px; padding:9px 12px; border-radius:9px;
-  background:var(--aviso-bg); border:1px solid #FDE68A; color:var(--aviso);
-  font-size:12px; margin-bottom:14px;
+.adash-filtros-limpar {
+  margin-left:auto; align-self:center; background:none; border:none; color:var(--verde-medio);
+  font-size:12px; font-weight:700; text-decoration:underline; cursor:pointer; padding:0;
 }
-.arel-filtros-busca { border-top:1px dashed var(--borda); margin-top:2px; padding-top:12px; width:100% }
-.arel-filtros-busca select { min-width:170px }
-.arel-filtros-limpar { margin-left:auto; background:none; border:none; color:inherit; font-size:11px; font-weight:700; text-decoration:underline; cursor:pointer; padding:0; flex-shrink:0 }
+
+/* Grade de cards — proporções do modelo: coluna de KPIs estreita,
+   dois cards grandes ao lado, faixa inferior 2:1. */
+.adash-grid { display:grid; grid-template-columns:.86fr 1.05fr 1.2fr; gap:16px; align-items:stretch }
+.adash-card {
+  background:var(--branco); border:1px solid var(--borda); border-radius:var(--adash-raio);
+  padding:18px 20px; box-shadow:var(--sombra); display:flex; flex-direction:column; min-width:0;
+}
+.adash-kpis { display:flex; flex-direction:column; gap:16px; min-width:0 }
+.adash-card-escuro { background:linear-gradient(160deg,#1F4E2C 0%,#0A1A0F 100%); border-color:#0A1A0F; color:#fff }
+.adash-card-escuro .adash-card-tit, .adash-card-escuro .adash-card-pe { color:rgba(255,255,255,.72) }
+.adash-card-escuro .adash-num { color:#fff }
+.adash-card-topo { display:flex; align-items:flex-start; gap:10px; margin-bottom:12px }
+.adash-card-tit { font-size:14.5px; font-weight:700; color:var(--cinza-900); margin:0 }
+.adash-card-tit-sub { font-size:11.5px; color:var(--cinza-500); margin:2px 0 0 }
+.adash-card-mais { margin-left:auto; color:var(--cinza-300); font-size:16px; letter-spacing:1px; line-height:1; user-select:none }
+.adash-num { font-family:var(--font-display); font-size:38px; font-weight:700; line-height:1.05; color:var(--cinza-900) }
+.adash-num-sm { font-size:30px }
+.adash-num-linha { display:flex; align-items:baseline; flex-wrap:wrap; gap:10px }
+.adash-card-pe { font-size:11.5px; color:var(--cinza-500); margin-top:auto; padding-top:12px }
+
+.adash-delta {
+  display:inline-flex; align-items:center; gap:4px; padding:3px 9px; border-radius:999px;
+  font-size:11.5px; font-weight:700; background:var(--sucesso-bg); color:var(--sucesso);
+}
+.adash-delta svg { width:12px; height:12px }
+.adash-delta.baixa { background:var(--erro-bg); color:var(--erro) }
+.adash-delta.neutro { background:var(--cinza-100); color:var(--cinza-600) }
+.adash-card-escuro .adash-delta { background:rgba(255,255,255,.14); color:#D8F3DC }
+.adash-card-escuro .adash-delta.baixa { background:rgba(252,165,165,.2); color:#FECACA }
+
+.adash-chips { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px }
+.adash-chip {
+  border:1px solid var(--borda); background:var(--branco); color:var(--cinza-600);
+  border-radius:999px; padding:5px 12px; font:inherit; font-size:11.5px; font-weight:600; cursor:pointer;
+}
+.adash-chip:hover { border-color:var(--borda-forte) }
+.adash-chip.ativo { background:var(--verde-medio); border-color:var(--verde-medio); color:#fff }
+
+.adash-lista { display:flex; flex-direction:column; gap:8px }
+.adash-lista-linha {
+  display:flex; align-items:center; gap:10px; padding:9px 12px;
+  background:var(--cinza-50); border:1px solid var(--borda); border-radius:12px; font-size:12.5px;
+}
+.adash-lista-rank {
+  display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; flex-shrink:0;
+  border-radius:50%; background:var(--branco); border:1px solid var(--borda-forte);
+  font-size:11px; font-weight:700; color:var(--cinza-600);
+}
+.adash-lista-nome { font-weight:600; color:var(--cinza-900); overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+.adash-lista-sub { font-size:11px; color:var(--cinza-500) }
+.adash-lista-val {
+  margin-left:auto; flex-shrink:0; padding:4px 10px; border-radius:999px;
+  background:var(--branco); border:1px solid var(--borda); font-size:11.5px; font-weight:700; color:var(--cinza-700);
+}
+
+.adash-barras { display:flex; gap:18px; align-items:stretch; min-width:0 }
+.adash-barras-resumo { flex:0 0 168px; display:flex; flex-direction:column; justify-content:center }
+.adash-barras-plot { flex:1; min-width:0; overflow-x:auto }
+.adash-span2 { grid-column:span 2 }
+.adash-span3 { grid-column:1 / -1 }
+
+.adash-tabela { display:flex; flex-direction:column }
+.adash-tabela-linha {
+  display:grid; grid-template-columns:1.6fr .9fr .8fr .8fr; gap:10px; align-items:center;
+  padding:9px 4px; border-top:1px solid var(--borda); font-size:12.5px;
+}
+.adash-tabela-linha:first-child { border-top:none }
+.adash-vazio { text-align:center; padding:44px 20px; color:var(--cinza-400); font-size:13px }
+.adash-aviso {
+  display:flex; align-items:center; gap:8px; padding:10px 13px; border-radius:12px;
+  background:var(--aviso-bg); border:1px solid #FDE68A; color:var(--aviso); font-size:12px; margin-bottom:14px;
+}
+.adash-aviso svg { width:16px; height:16px; flex-shrink:0 }
+
+@media (max-width: 1180px) {
+  .adash-grid { grid-template-columns:1fr 1fr }
+  .adash-span2 { grid-column:span 2 }
+}
+@media (max-width: 760px) {
+  .adash-grid { grid-template-columns:1fr }
+  .adash-span2, .adash-span3 { grid-column:span 1 }
+  .adash-head-acoes { margin-left:0; width:100% }
+  .adash-barras { flex-direction:column }
+  .adash-barras-resumo { flex:none }
+  .adash-tabela-linha { grid-template-columns:1.4fr .8fr; row-gap:2px }
+}
 </style>
 </head>
 <body>
@@ -59,43 +185,43 @@
 
   document.getElementById('app').innerHTML =
     gerarLayout('Qualidade da Água — Relatórios', 'agua-relatorios') +
-    `<div class="fade-in">
-      <p style="color:var(--cinza-500);font-size:13px;margin:0 0 16px">
-        Relatório de uma bacia hidrográfica, num recorte de campanhas. IQA e conformidade CONAMA vêm
-        prontos do banco (nunca recalculados aqui) — coletas ainda em quarentena aparecem marcadas.
-      </p>
-
-      <div class="arel-filtros">
-        <label>Bacia hidrográfica
-          <select id="rl-bacia"><option value="">Carregando...</option></select>
-        </label>
-        <label>Campanha inicial
-          <select id="rl-de" disabled><option value="">—</option></select>
-        </label>
-        <label>Campanha final
-          <select id="rl-ate" disabled><option value="">—</option></select>
-        </label>
-        <div class="arel-acoes">
-          <button class="btn btn-secondary" id="rl-btn-pdf" onclick="gerarPdf()" disabled data-icon="file-text">Gerar PDF</button>
-          <button class="btn btn-primary" id="rl-btn-pptx" onclick="gerarPptx()" disabled data-icon="monitor">Gerar PPTX</button>
+    `<div class="fade-in adash">
+      <div class="adash-head">
+        <div>
+          <h1 class="adash-titulo">Painel da Qualidade da Água</h1>
+          <p class="adash-sub">Panorama de uma bacia hidrográfica no recorte de campanhas escolhido.
+            IQA e conformidade CONAMA vêm prontos do banco — nunca recalculados aqui — e coleta em
+            conferência aparece marcada, nunca escondida.</p>
         </div>
-        <div class="arel-filtros-busca" style="display:flex;flex-wrap:wrap;gap:12px">
-          <label>Rio
-            <select id="rl-rio" disabled><option value="">Todos</option></select>
-          </label>
-          <label>Status
-            <select id="rl-status" disabled><option value="">Todos</option></select>
-          </label>
-          <label>Faixa do IQA
-            <select id="rl-iqa-faixa" disabled><option value="">Todas</option></select>
-          </label>
-          <label>Conformidade CONAMA
-            <select id="rl-conama" disabled><option value="">Todas</option></select>
-          </label>
+        <div class="adash-head-acoes">
+          <div class="adash-pill adash-pill-select">
+            <select id="rl-bacia" aria-label="Bacia hidrográfica"><option value="">Carregando...</option></select>
+            <span class="adash-chev" data-icon="chevron-down"></span>
+          </div>
+          <button class="adash-pill" id="rl-btn-filtros" type="button" onclick="alternarFiltros()" data-icon="sliders">
+            Filtros <span class="adash-pill-n" id="rl-filtros-n" hidden>0</span>
+          </button>
+          <div class="adash-export">
+            <button class="adash-pill adash-pill-primary" id="rl-btn-export" type="button" onclick="alternarExport()" disabled data-icon="download">Exportar</button>
+            <div class="adash-menu" id="rl-export-menu" hidden>
+              <button type="button" id="rl-btn-pdf" onclick="gerarPdf()" data-icon="file-text">Relatório em PDF</button>
+              <button type="button" id="rl-btn-pptx" onclick="gerarPptx()" data-icon="monitor">Apresentação em PPTX</button>
+            </div>
+          </div>
         </div>
       </div>
 
-      <div id="rl-conteudo"><div class="arel-vazio">Selecione uma bacia para ver o resumo do período.</div></div>
+      <div class="adash-filtros" id="rl-filtros" hidden>
+        <label>Campanha inicial<select id="rl-de" disabled><option value="">—</option></select></label>
+        <label>Campanha final<select id="rl-ate" disabled><option value="">—</option></select></label>
+        <label>Rio<select id="rl-rio" disabled><option value="">Todos</option></select></label>
+        <label>Status<select id="rl-status" disabled><option value="">Todos</option></select></label>
+        <label>Faixa do IQA<select id="rl-iqa-faixa" disabled><option value="">Todas</option></select></label>
+        <label>Conformidade CONAMA<select id="rl-conama" disabled><option value="">Todas</option></select></label>
+        <button type="button" class="adash-filtros-limpar" onclick="limparFiltrosBusca()">Limpar filtros</button>
+      </div>
+
+      <div id="rl-conteudo"><div class="adash-vazio">Escolha uma bacia hidrográfica para montar o painel.</div></div>
     </div>`
 
   bIconsAplicar(document.getElementById('app'))
@@ -105,23 +231,27 @@
   let _coletasBaciaAtual = []
   let _relatorioAtual = null
   let _labelBaciaAtual = ''
+  // Estado só de EXIBIÇÃO (não altera o recorte do relatório exportado):
+  // qual campanha o card de distribuição está mostrando e qual ponto o
+  // gráfico de evolução está traçando.
+  let _chipCampanha = null
+  let _pontoSerie = null
+  let _filtrosAbertos = false
 
   // ── Carrega o seletor de bacias ──────────────────────────────────
   try {
     _todasColetasResumo = await aguaRelBuscarResumoBacias(db)
   } catch (e) {
-    sel('rl-conteudo').innerHTML = `<div class="arel-vazio">Erro ao carregar bacias: ${esc(e.message)}</div>`
+    sel('rl-conteudo').innerHTML = `<div class="adash-vazio">Erro ao carregar bacias: ${esc(e.message)}</div>`
     return
   }
   const bacias = aguaRelListarBacias(_todasColetasResumo)
-  sel('rl-bacia').innerHTML = '<option value="">Selecione...</option>' +
+  sel('rl-bacia').innerHTML = '<option value="">Selecione a bacia...</option>' +
     bacias.map(b => `<option value="${esc(b.bacia)}">${esc(b.label)} (${b.nPontos} ponto${b.nPontos !== 1 ? 's' : ''})</option>`).join('')
 
-  // Selects estáticos (não dependem da bacia escolhida) — populados uma
-  // vez só, no boot da tela.
   sel('rl-status').innerHTML += Object.entries(AGUA_REL_STATUS_LABEL)
     .map(([v, l]) => `<option value="${v}">${esc(l)}</option>`).join('')
-  sel('rl-iqa-faixa').innerHTML += ['Ótima', 'Boa', 'Regular', 'Ruim', 'Péssima']
+  sel('rl-iqa-faixa').innerHTML += AGUA_IQA_FAIXA_ORDEM
     .map(f => `<option value="${esc(f)}">${esc(f)}</option>`).join('')
   sel('rl-conama').innerHTML += Object.entries(AGUA_REL_CONAMA_LABEL)
     .map(([v, l]) => `<option value="${v}">${esc(l)}</option>`).join('')
@@ -130,23 +260,39 @@
   ;['rl-de', 'rl-ate', 'rl-rio', 'rl-status', 'rl-iqa-faixa', 'rl-conama']
     .forEach(id => sel(id).addEventListener('change', recalcularRelatorio))
 
+  // Fecha o menu de exportar ao clicar fora (mesma cortesia de qualquer
+  // popover do projeto) — o painel de filtros NÃO fecha assim: é área
+  // de trabalho, não menu.
+  document.addEventListener('click', ev => {
+    if (!ev.target.closest('.adash-export')) sel('rl-export-menu').hidden = true
+  })
+
+  window.alternarFiltros = function () {
+    _filtrosAbertos = !_filtrosAbertos
+    sel('rl-filtros').hidden = !_filtrosAbertos
+    sel('rl-btn-filtros').classList.toggle('adash-pill-ativo', _filtrosAbertos)
+  }
+  window.alternarExport = function () {
+    const m = sel('rl-export-menu'); m.hidden = !m.hidden
+  }
+
   async function carregarBacia() {
     const chave = sel('rl-bacia').value
-    _relatorioAtual = null
+    _relatorioAtual = null; _chipCampanha = null; _pontoSerie = null
     atualizarBotoes()
     const camposBusca = ['rl-de', 'rl-ate', 'rl-rio', 'rl-status', 'rl-iqa-faixa', 'rl-conama']
     if (!chave) {
       sel('rl-de').innerHTML = '<option value="">—</option>'; sel('rl-ate').innerHTML = '<option value="">—</option>'
       camposBusca.forEach(id => { sel(id).disabled = true })
-      sel('rl-conteudo').innerHTML = '<div class="arel-vazio">Selecione uma bacia para ver o resumo do período.</div>'
+      sel('rl-conteudo').innerHTML = '<div class="adash-vazio">Escolha uma bacia hidrográfica para montar o painel.</div>'
       return
     }
     _labelBaciaAtual = chave === AGUA_REL_SEM_BACIA ? 'Sem bacia definida' : chave
-    sel('rl-conteudo').innerHTML = '<div class="arel-vazio">Carregando coletas da bacia...</div>'
+    sel('rl-conteudo').innerHTML = '<div class="adash-vazio">Carregando coletas da bacia...</div>'
     try {
       _coletasBaciaAtual = await aguaRelBuscarColetasDaBacia(db, chave === AGUA_REL_SEM_BACIA ? null : chave)
     } catch (e) {
-      sel('rl-conteudo').innerHTML = `<div class="arel-vazio">Erro ao carregar coletas: ${esc(e.message)}</div>`
+      sel('rl-conteudo').innerHTML = `<div class="adash-vazio">Erro ao carregar coletas: ${esc(e.message)}</div>`
       return
     }
     const campanhas = aguaRelCampanhasDe(_coletasBaciaAtual)
@@ -156,9 +302,6 @@
       sel('rl-de').value = campanhas[0].campanha_id
       sel('rl-ate').value = campanhas[campanhas.length - 1].campanha_id
     }
-    // Rio depende da bacia (Purus tem Rio Acre/Iaco/Purus, por exemplo) —
-    // repopulado a cada troca de bacia; os demais (status/faixa/CONAMA)
-    // são fixos e só voltam pra "Todos/Todas".
     sel('rl-rio').innerHTML = '<option value="">Todos</option>' +
       aguaRelRiosDe(_coletasBaciaAtual).map(r => `<option value="${esc(r)}">${esc(r)}</option>`).join('')
     sel('rl-status').value = ''; sel('rl-iqa-faixa').value = ''; sel('rl-conama').value = ''
@@ -176,7 +319,13 @@
       iqaFaixa: sel('rl-iqa-faixa').value || null,
       conamaStatus: sel('rl-conama').value || null,
     })
-    renderResumo(_relatorioAtual)
+    // Estado de exibição que não sobrevive ao novo recorte é zerado —
+    // um chip apontando para campanha que saiu do período mostraria
+    // "0 coletas" sem explicação.
+    const ids = new Set(_relatorioAtual.campanhas.map(c => c.campanha_id))
+    if (_chipCampanha && !ids.has(_chipCampanha)) _chipCampanha = null
+    if (_pontoSerie && !_relatorioAtual.pontos.some(p => p.ponto_id === _pontoSerie)) _pontoSerie = null
+    renderPainel(_relatorioAtual)
     atualizarBotoes()
   }
 
@@ -185,45 +334,198 @@
     sel('rl-iqa-faixa').value = ''; sel('rl-conama').value = ''
     recalcularRelatorio()
   }
+  window.selecionarChipCampanha = function (id) { _chipCampanha = id || null; renderPainel(_relatorioAtual) }
+  window.selecionarPontoSerie = function (id) { _pontoSerie = id || null; renderPainel(_relatorioAtual) }
 
   function atualizarBotoes() {
     const tem = !!(_relatorioAtual && _relatorioAtual.coletas.length)
+    sel('rl-btn-export').disabled = !tem
     sel('rl-btn-pdf').disabled = !tem
     sel('rl-btn-pptx').disabled = !tem
+    if (!tem) sel('rl-export-menu').hidden = true
+    const nFiltros = _relatorioAtual
+      ? Object.values(_relatorioAtual.filtros).filter(Boolean).length : 0
+    const chip = sel('rl-filtros-n')
+    chip.hidden = nFiltros === 0
+    chip.textContent = nFiltros
   }
 
-  function renderResumo(rel) {
+  // ── Render do painel ────────────────────────────────────────────
+  function chipDelta(delta, sufixo) {
+    if (delta == null) return ''
+    const classe = Math.abs(delta) < 0.05 ? 'neutro' : (delta > 0 ? '' : 'baixa')
+    const icone = Math.abs(delta) < 0.05 ? '' : bico(delta > 0 ? 'arrow-up' : 'arrow-down')
+    const sinal = delta > 0 ? '+' : ''
+    return `<span class="adash-delta ${classe}">${icone}${sinal}${delta.toFixed(1)}${sufixo || ''}</span>`
+  }
+
+  function nomeCurto(nome) {
+    const n = String(nome || '')
+    return n.length > 11 ? n.slice(0, 10) + '…' : n
+  }
+
+  function renderPainel(rel) {
+    if (!rel) { sel('rl-conteudo').innerHTML = '<div class="adash-vazio">Escolha uma bacia hidrográfica para montar o painel.</div>'; return }
     const r = rel.resumo
+    const porCampanha = aguaRelPorCampanha(rel)
+    const variacao = aguaRelVariacaoIQA(porCampanha)
+    const porPonto = aguaRelIqaPorPonto(rel)
+    const ranking = aguaRelViolacoesRanking(r, 6)
+
+    // Card de distribuição: mostra o período inteiro ou só a campanha
+    // do chip selecionado.
+    const coletasChip = _chipCampanha ? rel.coletas.filter(c => c.campanha_id === _chipCampanha) : rel.coletas
+    const dist = aguaRelDistribuicaoFaixas(coletasChip)
+    const boasOuMelhor = (dist.contagem['Ótima'] || 0) + (dist.contagem['Boa'] || 0)
+    const pctBoas = dist.comIQA ? (boasOuMelhor / dist.comIQA) * 100 : null
+
     let html = ''
     const filtrosTxt = aguaRelFiltrosTxt(rel.filtros)
     if (filtrosTxt) {
-      html += `<div class="alert alert-info">${bico('search')}<span>Filtrado por: ${esc(filtrosTxt)} — o PDF/PPTX gerado reflete só o que está aqui, não a bacia inteira.</span><button type="button" class="arel-filtros-limpar" onclick="limparFiltrosBusca()">Limpar filtros</button></div>`
+      html += `<div class="alert alert-info">${bico('search')}<span>Filtrado por: ${esc(filtrosTxt)} — o PDF/PPTX gerado reflete só o que está aqui, não a bacia inteira.</span><button type="button" class="adash-filtros-limpar" onclick="limparFiltrosBusca()">Limpar filtros</button></div>`
     }
     if (r.quarentena > 0) {
-      html += `<div class="arel-quarentena-aviso">${bico('help')} ${r.quarentena} coleta(s) deste período em quarentena — pendente de conferência humana (Configurações › Qualidade da Água › Conferência). Aparecem marcadas nos relatórios gerados.</div>`
+      html += `<div class="adash-aviso">${bico('help')}<span>${r.quarentena} coleta(s) deste período em quarentena — pendente de conferência humana (Qualidade da Água › Conferência). Aparecem marcadas no painel e nos arquivos gerados.</span></div>`
     }
-    html += `<div class="kpi-grid">
-      <div class="kpi-card"><div class="kpi-label">Pontos de coleta</div><div class="kpi-valor">${r.nPontos}</div></div>
-      <div class="kpi-card"><div class="kpi-label">Campanhas no período</div><div class="kpi-valor">${rel.campanhas.length}</div></div>
-      <div class="kpi-card"><div class="kpi-label">Coletas</div><div class="kpi-valor">${r.totalColetas}</div></div>
-      <div class="kpi-card ouro"><div class="kpi-label">IQA médio</div><div class="kpi-valor">${r.iqaMedio != null ? r.iqaMedio.toFixed(1) : '—'}</div></div>
-      <div class="kpi-card azul"><div class="kpi-label">Conforme CONAMA</div><div class="kpi-valor">${r.pctConforme != null ? r.pctConforme.toFixed(0) + '%' : '—'}</div><div class="kpi-sub">${r.comConama} coleta(s) com limite cadastrado</div></div>
-      <div class="kpi-card erro"><div class="kpi-label">Em quarentena</div><div class="kpi-valor">${r.quarentena}</div></div>
+
+    if (!rel.coletas.length) {
+      html += '<div class="adash-vazio">Nenhuma coleta encontrada para esta bacia no período e filtros selecionados.</div>'
+      sel('rl-conteudo').innerHTML = html
+      bIconsAplicar(sel('rl-conteudo'))
+      return
+    }
+
+    // ── Linha 1 ──────────────────────────────────────────────────
+    html += '<div class="adash-grid">'
+
+    // Coluna 1: dois KPIs empilhados (o de cima invertido, como o modelo)
+    html += `<div class="adash-kpis">
+      <div class="adash-card adash-card-escuro">
+        <div class="adash-card-topo"><p class="adash-card-tit" style="color:#fff">IQA médio do período</p><span class="adash-card-mais" style="color:rgba(255,255,255,.35)">•••</span></div>
+        <div class="adash-num-linha">
+          <span class="adash-num">${r.iqaMedio != null ? r.iqaMedio.toFixed(1) : '—'}</span>
+          ${variacao ? chipDelta(variacao.delta) : ''}
+        </div>
+        <p class="adash-card-pe">${r.comIQA} de ${r.totalColetas} coleta(s) com índice calculado${variacao ? ` · variação vs. ${esc(variacao.labelAnterior)}` : ''}</p>
+      </div>
+      <div class="adash-card">
+        <div class="adash-card-topo"><p class="adash-card-tit">Coletas no período</p><span class="adash-card-mais">•••</span></div>
+        <div class="adash-num-linha">
+          <span class="adash-num">${formatNum(r.totalColetas)}</span>
+          <span class="adash-delta neutro">${r.nPontos} ponto${r.nPontos !== 1 ? 's' : ''}</span>
+        </div>
+        <p class="adash-card-pe">${rel.campanhas.length} campanha(s) no recorte · ${r.quarentena} em conferência</p>
+      </div>
     </div>`
 
-    if (!rel.pontos.length) {
-      html += '<div class="arel-vazio">Nenhuma coleta encontrada para esta bacia no período selecionado.</div>'
-    } else {
-      html += '<div class="card" style="padding:14px 16px 6px"><p class="arel-resumo-titulo">Pontos incluídos no relatório</p><div class="arel-pontos-lista">' +
-        rel.pontos.map(p => `
-          <div class="arel-ponto-row">
-            <div><div class="arel-ponto-nome">${esc(p.nome)}</div><div class="arel-ponto-sub">${esc([p.rio, p.municipio].filter(Boolean).join(' · '))}</div></div>
-            <div>${esc(p.codigo_ana || '—')}</div>
-            <div>${p.coletas.length} coleta${p.coletas.length !== 1 ? 's' : ''}</div>
-            <div>${p.coletas.filter(c => c.status === 'quarentena').length ? `<span class="badge badge-ouro">quarentena</span>` : ''}</div>
-          </div>`).join('') +
-        '</div></div>'
-    }
+    // Coluna 2: distribuição por faixa, com chips de campanha
+    const chips = [`<button type="button" class="adash-chip ${!_chipCampanha ? 'ativo' : ''}" onclick="selecionarPontoSerie(_pontoSerieAtual);selecionarChipCampanha('')">Período</button>`]
+      .concat(porCampanha.map(c => `<button type="button" class="adash-chip ${_chipCampanha === c.campanha_id ? 'ativo' : ''}" onclick="selecionarChipCampanha('${esc(c.campanha_id)}')" title="${esc(c.label)}">${esc(c.labelCurto)}</button>`))
+      .join('')
+    html += `<div class="adash-card">
+      <div class="adash-card-topo">
+        <div><p class="adash-card-tit">Distribuição por faixa do IQA</p>
+          <p class="adash-card-tit-sub">${_chipCampanha ? esc(porCampanha.find(c => c.campanha_id === _chipCampanha)?.label || '') : 'Todo o período selecionado'}</p></div>
+        <span class="adash-card-mais">•••</span>
+      </div>
+      <div class="adash-chips">${chips}</div>
+      <div class="adash-num-linha" style="margin-bottom:12px">
+        <span class="adash-num adash-num-sm">${formatNum(dist.comIQA)}</span>
+        ${pctBoas != null ? `<span class="adash-delta ${pctBoas >= 50 ? '' : 'baixa'}">${pctBoas.toFixed(0)}% Boa ou Ótima</span>` : ''}
+      </div>
+      ${aguaIqaFaixasBarraHTML(dist.contagem, dist.semIQA)}
+      <p class="adash-card-pe">${dist.predominante ? `Faixa predominante: <strong>${esc(dist.predominante)}</strong> (${dist.nPredominante} coleta(s))` : 'Sem coleta com índice calculado neste recorte'}</p>
+    </div>`
+
+    // Coluna 3: medidor de conformidade CONAMA
+    const semLimites = r.totalColetas - r.comConama
+    html += `<div class="adash-card">
+      <div class="adash-card-topo">
+        <div><p class="adash-card-tit">Conformidade CONAMA</p>
+          <p class="adash-card-tit-sub">Leitura separada do IQA — um rio pode ter índice bom e ainda violar um limite.</p></div>
+        <span class="adash-card-mais">•••</span>
+      </div>
+      ${aguaIqaGaugeHTML(r.pctConforme, { rotulo: 'das coletas com limite cadastrado', width: 260 })}
+      <div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:6px">
+        <span class="adash-delta">${r.conforme} conforme</span>
+        <span class="adash-delta baixa">${r.comConama - r.conforme} com violação</span>
+        ${semLimites > 0 ? `<span class="adash-delta neutro">${semLimites} sem limites cadastrados</span>` : ''}
+      </div>
+      <p class="adash-card-pe">"Sem limites cadastrados" não é o mesmo que conforme: a classe de enquadramento desses pontos ainda não tem limites na tabela.</p>
+    </div>`
+
+    // ── Linha 2 ──────────────────────────────────────────────────
+    const barras = porPonto.slice(0, 7).map(p => ({
+      label: nomeCurto(p.nome), valor: p.iqaMedio,
+      valorTexto: p.iqaMedio != null ? p.iqaMedio.toFixed(1) : '—',
+      titulo: `${p.nome}${p.rio ? ' · ' + p.rio : ''}`, fraco: p.quarentena,
+    }))
+    html += `<div class="adash-card adash-span2">
+      <div class="adash-card-topo">
+        <div><p class="adash-card-tit">IQA médio por ponto de coleta</p>
+          <p class="adash-card-tit-sub">Média das coletas do recorte, do melhor para o pior${porPonto.length > 7 ? ` · 7 de ${porPonto.length} pontos` : ''}</p></div>
+        <span class="adash-card-mais">•••</span>
+      </div>
+      <div class="adash-barras">
+        <div class="adash-barras-resumo">
+          <div class="adash-num">${pctBoas != null ? pctBoas.toFixed(0) + '%' : '—'}</div>
+          <p class="adash-card-pe" style="margin-top:6px;padding-top:0">das coletas com índice estão em faixa <strong>Boa ou Ótima</strong>${porPonto[0] && porPonto[0].iqaMedio != null ? `. Melhor ponto do período: <strong>${esc(porPonto[0].nome)}</strong>.` : '.'}</p>
+        </div>
+        <div class="adash-barras-plot">${aguaIqaBarrasHTML(barras, { vazio: 'Nenhum ponto com IQA calculado no recorte' })}</div>
+      </div>
+    </div>`
+
+    html += `<div class="adash-card">
+      <div class="adash-card-topo">
+        <div><p class="adash-card-tit">Parâmetros que mais violaram</p>
+          <p class="adash-card-tit-sub">Coletas fora do limite da classe, por parâmetro</p></div>
+        <span class="adash-card-mais">•••</span>
+      </div>
+      ${ranking.length ? `<div class="adash-lista">${ranking.map((v, i) => `
+        <div class="adash-lista-linha">
+          <span class="adash-lista-rank">${i + 1}</span>
+          <div style="min-width:0"><div class="adash-lista-nome">${esc(v.label)}</div>
+            <div class="adash-lista-sub">${((v.n / (r.comConama || 1)) * 100).toFixed(0)}% das coletas avaliadas</div></div>
+          <span class="adash-lista-val">${v.n}</span>
+        </div>`).join('')}</div>`
+        : '<p style="font-size:12.5px;color:var(--cinza-500);padding:14px 0">Nenhuma violação de limite CONAMA no recorte — ou nenhum ponto com limites cadastrados para a classe.</p>'}
+      <p class="adash-card-pe">${r.comConama} coleta(s) avaliadas contra a classe de enquadramento do ponto.</p>
+    </div>`
+
+    // ── Linha 3: evolução do IQA de um ponto ─────────────────────
+    const pontoSel = _pontoSerie
+      ? rel.pontos.find(p => p.ponto_id === _pontoSerie)
+      : rel.pontos.find(p => p.coletas.some(c => c.iqa != null)) || rel.pontos[0]
+    const serie = pontoSel ? aguaRelSerieIQA(pontoSel, rel.campanhas) : []
+    html += `<div class="adash-card adash-span3">
+      <div class="adash-card-topo">
+        <div><p class="adash-card-tit">Evolução do IQA por campanha</p>
+          <p class="adash-card-tit-sub">${pontoSel ? esc(pontoSel.nome) + (pontoSel.rio ? ' · ' + esc(pontoSel.rio) : '') : 'Sem ponto no recorte'} — campanha sem coleta fica vazada, nunca some do eixo</p></div>
+        <span class="adash-card-mais">•••</span>
+      </div>
+      <div class="adash-chips">${rel.pontos.map(p => `
+        <button type="button" class="adash-chip ${pontoSel && p.ponto_id === pontoSel.ponto_id ? 'ativo' : ''}" onclick="selecionarPontoSerie('${esc(p.ponto_id)}')">${esc(p.nome)}</button>`).join('')}</div>
+      ${aguaIqaGraficoHTML(serie, { width: 720, height: 210 })}
+    </div>`
+
+    // ── Tabela de pontos (o que vai no PDF/PPTX) ─────────────────
+    html += `<div class="adash-card adash-span3 adash-tabela">
+      <div class="adash-card-topo">
+        <div><p class="adash-card-tit">Pontos incluídos no relatório</p>
+          <p class="adash-card-tit-sub">É exatamente esta lista que o PDF e o PPTX exportam</p></div>
+      </div>
+      ${porPonto.map(p => `
+        <div class="adash-tabela-linha">
+          <div><div class="adash-lista-nome">${esc(p.nome)}</div>
+            <div class="adash-lista-sub">${esc([p.rio, p.municipio].filter(Boolean).join(' · '))}</div></div>
+          <div>${esc(p.codigo_ana || '—')}</div>
+          <div>${p.nColetas} coleta${p.nColetas !== 1 ? 's' : ''}</div>
+          <div>${p.iqaMedio != null ? `IQA ${p.iqaMedio.toFixed(1)}` : '<span style="color:var(--cinza-400)">sem índice</span>'}
+            ${p.quarentena ? '<span class="badge badge-ouro">quarentena</span>' : ''}</div>
+        </div>`).join('')}
+    </div>`
+
+    html += '</div>' // .adash-grid
     sel('rl-conteudo').innerHTML = html
     bIconsAplicar(sel('rl-conteudo'))
   }
@@ -244,39 +546,44 @@
     return { cab, protocolo }
   }
 
+  function nomeArquivo() {
+    return `qualidade-agua-${_labelBaciaAtual}`.toLowerCase()
+      .normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^\w-]+/g, '-')
+  }
+
   window.gerarPdf = async function () {
     if (!_relatorioAtual) return
+    sel('rl-export-menu').hidden = true
     const btn = sel('rl-btn-pdf')
     btn.disabled = true; const htmlOrig = btn.innerHTML
     btn.textContent = 'Gerando PDF...'
     try {
       const { cab, protocolo } = await prepararCabecalho()
       const pdf = await aguaRelMontarPdf(_relatorioAtual, _labelBaciaAtual, periodoTxt(_relatorioAtual), cab, protocolo)
-      const nomeArq = `qualidade-agua-${_labelBaciaAtual}`.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^\w-]+/g, '-')
-      aguaRelBaixarPdf(pdf, `${nomeArq}.pdf`)
+      aguaRelBaixarPdf(pdf, `${nomeArquivo()}.pdf`)
       toast('PDF gerado.', 'success')
     } catch (e) {
       toast('Erro ao gerar PDF: ' + e.message, 'error')
     } finally {
-      btn.disabled = false; btn.innerHTML = htmlOrig
+      btn.disabled = false; btn.innerHTML = htmlOrig; bIconsAplicar(btn)
     }
   }
 
   window.gerarPptx = async function () {
     if (!_relatorioAtual) return
+    sel('rl-export-menu').hidden = true
     const btn = sel('rl-btn-pptx')
     btn.disabled = true; const htmlOrig = btn.innerHTML
     btn.textContent = 'Gerando PPTX...'
     try {
       const { protocolo } = await prepararCabecalho()
       const blob = await aguaRelMontarPptx(_relatorioAtual, _labelBaciaAtual, periodoTxt(_relatorioAtual), protocolo)
-      const nomeArq = `qualidade-agua-${_labelBaciaAtual}`.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^\w-]+/g, '-')
-      aguaRelBaixarPptx(blob, `${nomeArq}.pptx`)
+      aguaRelBaixarPptx(blob, `${nomeArquivo()}.pptx`)
       toast('PPTX gerado.', 'success')
     } catch (e) {
       toast('Erro ao gerar PPTX: ' + e.message, 'error')
     } finally {
-      btn.disabled = false; btn.innerHTML = htmlOrig
+      btn.disabled = false; btn.innerHTML = htmlOrig; bIconsAplicar(btn)
     }
   }
 })()
