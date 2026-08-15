@@ -1040,6 +1040,10 @@ durante as migrations, não por teste que rode sozinho.
 - Páginas: todas as listadas em pages/
 - Auditoria de acessos com bloqueio
 - GeoJSONs do Acre
+- Estrutura Organizacional (`unidades_organizacionais`, `cargos`,
+  `cargo_ocupacoes`, `delegacoes_temporarias`) — ver
+  `pages/estrutura-organizacional.html` e "Regra do sistema — Acesso
+  por organograma" acima
 
 ### App Brigadas (campo) — implementado
 - Offline-first (IndexedDB) + sync; login Supabase + PIN; câmera/GPS/
