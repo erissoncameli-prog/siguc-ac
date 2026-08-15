@@ -730,9 +730,9 @@ function rankVeiculosViagens() {
     acc[key] = acc[key] || { placa:v.veiculo_placa, modelo:v.veiculo_modelo, n:0 }
     acc[key].n++
   })
-  const rows = Object.values(acc).sort((a,b)=>b.n-a.n).slice(0,10)
-    .map((v,i) => [i+1, `${esc(v.placa)} — ${esc(v.modelo)}`, v.n])
-  return tabela(['#','Veículo','Viagens concluídas'], rows.map(r=>[r[0],r[1],r[2]]))
+  const itens = Object.values(acc).sort((a,b)=>b.n-a.n).slice(0,10)
+    .map(v => ({ label: `${v.placa} — ${v.modelo}`, valor: v.n }))
+  return rankBarrasHTML(itens, { vazio: 'Sem viagens concluídas no período' })
 }
 
 function rankVeiculosUso() {
@@ -743,9 +743,9 @@ function rankVeiculosUso() {
     if (v.veiculo_medidor==='hodometro' && v.km_saida!=null && v.km_chegada!=null) acc[v.veiculo_id].uso += Math.max(0, v.km_chegada-v.km_saida)
     if (v.veiculo_medidor==='horimetro' && v.horas_saida!=null && v.horas_chegada!=null) acc[v.veiculo_id].uso += Math.max(0, v.horas_chegada-v.horas_saida)
   })
-  const rows = Object.values(acc).sort((a,b)=>b.uso-a.uso).slice(0,10)
-    .map((v,i)=>[i+1, `${esc(v.placa)} — ${esc(v.modelo)}`, `${formatNum(v.uso,1)} ${v.medidor==='horimetro'?'h':'km'}`])
-  return tabela(['#','Veículo','Uso no período'], rows)
+  const itens = Object.values(acc).sort((a,b)=>b.uso-a.uso).slice(0,10)
+    .map(v => ({ label: `${v.placa} — ${v.modelo}`, valor: v.uso, valorFmt: `${formatNum(v.uso,1)} ${v.medidor==='horimetro'?'h':'km'}` }))
+  return rankBarrasHTML(itens, { vazio: 'Sem uso registrado no período' })
 }
 
 function rankVeiculosCusto() {
