@@ -35,7 +35,7 @@ REVOKE EXECUTE ON FUNCTION alcance_por_lotacao(uuid, text) FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION credenciamento_vigente(uuid, text) FROM PUBLIC;
 
 REVOKE EXECUTE ON FUNCTION teto_do_perfil(perfil_usuario) FROM PUBLIC;
-REVOKE EXECUTE ON FUNCTION nivel_efetivo_calc(uuid, text) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION nivel_efetivo_calc(uuid, text, boolean) FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION vw_impacto_lotacao(text) FROM PUBLIC;
 
 REVOKE EXECUTE ON FUNCTION trilha_auditoria_verificar() FROM PUBLIC;
