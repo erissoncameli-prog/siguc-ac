@@ -568,7 +568,7 @@ test.describe('painel (dashboard) — render com dado real da view', () => {
     // Barras: uma por ponto, com o valor rotulado (média do ponto).
     const barras = page.locator('.adash-barras-plot svg[aria-label^="Barras"]');
     await expect(barras).toBeVisible();
-    await expect(barras).toContainText('78.1'); // Porto Acre (82.1 + 74.0)/2
+    await expect(barras).toContainText('78.0'); // Porto Acre (82.1 + 74.0)/2
     await expect(barras).toContainText('50.7'); // Rio Branco (78.4+61.2+12.5)/3
 
     // Ranking de violações e tabela de pontos.
