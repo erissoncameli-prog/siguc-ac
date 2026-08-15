@@ -616,13 +616,16 @@ async function carregarDados() {
   _unidades = r6.data || []
 
   if (_perfilUsuario === 'super_admin') {
-    const [r7, r8] = await Promise.all([
+    const [r7, r8, r9] = await Promise.all([
       db.from('modulos').select('id,chave,nome,grupo').eq('ativo', true).order('grupo').order('ordem'),
       db.from('vw_modulo_unidades').select('*'),
+      db.from('vw_credenciamentos').select('*').order('concedido_em', { ascending: false }),
     ])
     _modulos = r7.data || []
     _moduloUnidades = r8.data || []
+    _credenciamentos = r9.data || []
     renderModulosUnidades()
+    filtrarCredenciamentos()
   }
 
   renderOrganograma()
