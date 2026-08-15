@@ -341,19 +341,39 @@ protege contra corrupção acidental, não contra adulteração deliberada (ver
 
 ---
 
-## 6. Decisões ainda em aberto (não bloqueiam o início)
+## 6. Pontos sem resposta — resolvidos por padrão seguro (2026-08-15)
 
-1. **Expurgo físico**: exclusão lógica com justificativa é suficiente, ou o
-   super_admin precisa mesmo poder apagar de vez? O plano prevê as duas;
-   na dúvida, entregar só a lógica — acrescentar o expurgo depois é uma
-   RPC, remover um dado apagado não é nada.
-2. **Alteração feita pelo próprio app de campo** (correção de coleta ainda
-   na fila offline) entra na regra de senha? Recomendação: **não** —
-   enquanto não sincronizou não existe dado no banco para auditar, e a
-   trava mataria o trabalho offline. Depois de sincronizada, a coleta só
-   se altera pela mesa, com as regras de todos.
-3. **Destino do selo**: e-mail institucional (mínimo) + commit no GitHub
-   (desejável)? Definir qual endereço institucional recebe.
+O usuário não tinha como decidir os dois pontos abaixo no momento do
+planejamento. **Nenhum deles bloqueia a missão**: ambos foram desenhados
+para que a resposta chegue depois sem retrabalho e sem migração de dados.
+
+1. **Expurgo físico — NÃO entra.** Entrega-se apenas a exclusão lógica com
+   justificativa. Razão de ser este o padrão: acrescentar o expurgo depois
+   é uma RPC nova sobre uma trilha que já existe; recuperar um dado
+   apagado por engano não é nada. A porta fica aberta e nada do que for
+   construído agora precisa mudar para abri-la.
+2. **Destino do selo — configurável, não hard-coded.** O selo é sempre
+   **gerado e gravado** em `agua_auditoria_selos` (a cadeia funciona
+   independentemente do envio). O endereço de destino sai de
+   `config_sistema.dados` — mesmo padrão do Encarregado/DPO (§LGPD do
+   CLAUDE.md): editável em Configurações, **sem migration e sem deploy**.
+   Enquanto ninguém preencher o endereço, o selo é gerado e **não é
+   enviado**, e a tela de auditoria mostra o aviso *"os selos não estão
+   sendo publicados fora do banco — a trilha ainda não tem âncora
+   externa"*. A lacuna fica **visível**, nunca silenciosa: um selo que
+   ninguém sabe que não está saindo é pior que nenhum selo.
+
+   ⚠ Consequência aceita: até o endereço ser preenchido, vale só a
+   proteção contra o adversário A (§2.1). A proteção contra o adversário
+   B começa a valer no dia em que o primeiro selo sai do banco — e o
+   histórico anterior a esse dia não fica coberto retroativamente. Dizer
+   isso na tela também.
+
+3. **Alteração feita pelo próprio app de campo** (correção de coleta ainda
+   na fila offline) **não** entra na regra de senha — enquanto não
+   sincronizou não existe dado no banco para auditar, e a trava mataria o
+   trabalho offline. Depois de sincronizada, a coleta só se altera pela
+   mesa, com as regras de todos.
 
 ## 7. Detalhes a fixar na implementação
 
