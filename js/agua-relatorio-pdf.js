@@ -2,6 +2,9 @@
 // Documento de registro/fiscalização: tabela de coletas por ponto e
 // campanha, com IQA e conformidade CONAMA lado a lado (nunca um
 // escondendo o outro — regra do módulo, já em pages/agua-mapa.html).
+// Também tem aguaRelMontarPdfColeta() — ficha de UMA coleta, usada
+// pelo app de campo (pages/agua-app.html) para exportar/compartilhar
+// ao tocar num card do Histórico. Mesmos primitivos de desenho.
 // Desenhado direto com jsPDF (texto/tabelas), no MESMO motor e padrão
 // visual do relatório do Biomonitor (js/biomonitor-relatorio-ninho.js):
 // cabeçalho/rodapé com timbre oficial, paginação que nunca corta um
@@ -30,6 +33,12 @@ const AGPDF_IQA_COR = {
   'Ruim': [234, 88, 12], 'Péssima': [185, 28, 28],
 }
 const AGPDF_SEM_IQA_COR = [156, 163, 175]
+
+// Mesmo rótulo estático de pages/agua-mapa.html/agua-pontos.html
+// (CLASSE_LABEL) — duplicado aqui pela mesma razão de AGUA_REL_PARAM_LABEL
+// em js/agua-relatorio-dados.js: não é cálculo, não entra na regra de
+// centralização.
+const AGPDF_CLASSE_LABEL = { especial: 'Especial', classe_1: 'Classe 1', classe_2: 'Classe 2', classe_3: 'Classe 3', classe_4: 'Classe 4' }
 
 const AGPDF_M = 15
 const AGPDF_TOPO = 26
@@ -279,6 +288,114 @@ async function aguaRelMontarPdf(relatorio, labelBacia, periodoTxt, cab, protocol
     _agpdfParagrafo(ctx, 'Nenhuma coleta encontrada para esta bacia no período selecionado.')
   } else {
     relatorio.pontos.forEach(ponto => _agpdfSecaoPonto(ctx, ponto))
+  }
+
+  _agpdfAplicarCabecalhoRodapeGlobal(ctx, logos)
+  return pdf
+}
+
+// ── Ficha de UMA coleta — usada pelo app de campo (toque no card do
+// Histórico em pages/agua-app.html) para exportar/compartilhar. Uma
+// página normalmente (só estoura pra 2 se "Observações" for longo);
+// não tem capa como o relatório por bacia, o título já é a própria
+// coleta. Reaproveita os MESMOS primitivos de desenho (_agpdfTitulo,
+// _agpdfParagrafo, _agpdfTabela, cabeçalho/rodapé) — nunca uma segunda
+// implementação de layout de PDF neste módulo.
+function _agpdfCartaoDuplo(ctx, esquerda, direita) {
+  const { pdf } = ctx
+  const colW = (ctx.W - AGPDF_M * 2 - 8) / 2
+  _agpdfGarantirEspaco(ctx, 26)
+  const y0 = ctx.y
+  ;[[AGPDF_M, esquerda], [AGPDF_M + colW + 8, direita]].forEach(([x, cartao]) => {
+    pdf.setDrawColor(...AGPDF_COR.borda); pdf.setLineWidth(0.3)
+    pdf.roundedRect(x, y0, colW, 24, 1.5, 1.5)
+    pdf.setFont('DMSans', 'normal'); pdf.setFontSize(7.5); pdf.setTextColor(...AGPDF_COR.muted)
+    pdf.text(cartao.titulo, x + 4, y0 + 7)
+    pdf.setFont('DMSans', 'bold'); pdf.setFontSize(15); pdf.setTextColor(...(cartao.cor || AGPDF_COR.texto))
+    pdf.text(cartao.valor, x + 4, y0 + 16)
+    if (cartao.sub) {
+      pdf.setFont('DMSans', 'normal'); pdf.setFontSize(7.5); pdf.setTextColor(...AGPDF_COR.muted)
+      const linhasSub = pdf.splitTextToSize(cartao.sub, colW - 8)
+      pdf.text(linhasSub[0], x + 4, y0 + 21)
+    }
+  })
+  ctx.y = y0 + 24 + 6
+}
+
+async function aguaRelMontarPdfColeta(coleta, cab, protocolo) {
+  await _agpdfCarregarLibs()
+  const pdf = _agpdfNovoDocumento()
+  const ctx = _agpdfCtx(pdf, cab, protocolo)
+
+  const logos = {
+    gov: cab.logoGoverno ? await _agpdfBuscarDataURL(cab.logoGoverno) : null,
+    secr: cab.logoSecr ? await _agpdfBuscarDataURL(cab.logoSecr) : null,
+  }
+
+  ctx.y = 34
+  pdf.setFont('DMSans', 'bold'); pdf.setFontSize(9); pdf.setTextColor(...AGPDF_COR.muted2)
+  pdf.text('FICHA DE COLETA — QUALIDADE DA ÁGUA', AGPDF_M, ctx.y)
+  ctx.y += 9
+  pdf.setFontSize(16); pdf.setTextColor(...AGPDF_COR.floresta)
+  pdf.text(`${coleta.ponto_nome}${coleta.codigo_ana ? ' — ' + coleta.codigo_ana : ''}`, AGPDF_M, ctx.y)
+  ctx.y += 6
+  const sub = [coleta.ponto_rio, coleta.ponto_municipio, AGPDF_CLASSE_LABEL[coleta.classe_enquadramento] || coleta.classe_enquadramento].filter(Boolean).join(' · ')
+  if (sub) {
+    pdf.setFont('DMSans', 'normal'); pdf.setFontSize(8.5); pdf.setTextColor(...AGPDF_COR.muted)
+    pdf.text(sub, AGPDF_M, ctx.y)
+    ctx.y += 8
+  } else ctx.y += 4
+
+  _agpdfParagrafo(ctx, `${aguaRelLabelCampanha(coleta)} · Coletado em ${formatData(coleta.data_coleta)}${coleta.hora_coleta ? ' às ' + String(coleta.hora_coleta).slice(0, 5) : ''} · Coletor: ${coleta.coletor_nome || '—'} · Laboratório: ${coleta.laboratorio_nome || '—'}`, { bold: true })
+  if (coleta.status === 'quarentena') {
+    _agpdfParagrafo(ctx, `Em conferência (quarentena)${coleta.quarentena_motivo ? ': ' + coleta.quarentena_motivo : ''} — IQA e conformidade abaixo são preliminares, pendentes de validação da equipe técnica.`, { muted: true })
+  }
+
+  const semLimites = coleta.conama_violacoes == null
+  const violou = !semLimites && coleta.conama_violacoes.length > 0
+  _agpdfCartaoDuplo(ctx,
+    {
+      titulo: 'IQA',
+      valor: coleta.iqa != null ? Number(coleta.iqa).toFixed(1) : '—',
+      sub: coleta.iqa_faixa || 'Sem dado suficiente',
+      cor: AGPDF_IQA_COR[coleta.iqa_faixa] || AGPDF_SEM_IQA_COR,
+    },
+    {
+      titulo: 'CONFORMIDADE CONAMA',
+      valor: semLimites ? 'Sem limites' : (violou ? `${coleta.conama_violacoes.length} violação(ões)` : 'Conforme'),
+      sub: violou ? coleta.conama_violacoes.map(v => AGUA_REL_PARAM_LABEL[v] || v).join(', ')
+        : (semLimites ? `Classe ${AGPDF_CLASSE_LABEL[coleta.classe_enquadramento] || coleta.classe_enquadramento || '—'} sem limites cadastrados` : ''),
+      cor: violou ? [185, 28, 28] : (semLimites ? AGPDF_SEM_IQA_COR : [21, 128, 61]),
+    })
+
+  const linhasParam = Object.entries(AGUA_REL_PARAM_LABEL)
+    .filter(([campo]) => coleta[campo] != null)
+    .map(([campo, rotulo]) => [rotulo, Number(coleta[campo]).toLocaleString('pt-BR', { maximumFractionDigits: 2 }), coleta.conama_violacoes?.includes(campo) ? 'Fora do limite' : ''])
+
+  if (linhasParam.length) {
+    _agpdfTitulo(ctx, 'Parâmetros medidos')
+    _agpdfTabela(ctx, {
+      head: [['Parâmetro', 'Valor', '']],
+      body: linhasParam,
+      columnStyles: { 0: { cellWidth: 70 }, 1: { cellWidth: 40, halign: 'right' }, 2: { cellWidth: 'auto' } },
+      didParseCell: data => {
+        if (data.section !== 'body') return
+        if (linhasParam[data.row.index][2]) {
+          data.cell.styles.textColor = [185, 28, 28]
+          if (data.column.index !== 1) data.cell.styles.fontStyle = 'bold'
+        }
+      },
+    })
+  } else {
+    _agpdfParagrafo(ctx, 'Nenhum parâmetro numérico registrado ainda — aguardando laudo do laboratório.', { muted: true })
+  }
+
+  if (coleta.observacoes) {
+    _agpdfTitulo(ctx, 'Observações')
+    _agpdfParagrafo(ctx, coleta.observacoes)
+  }
+  if (coleta.codigo_amostra) {
+    _agpdfParagrafo(ctx, `Amostra: ${coleta.codigo_amostra}`, { muted: true })
   }
 
   _agpdfAplicarCabecalhoRodapeGlobal(ctx, logos)
