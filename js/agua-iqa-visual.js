@@ -19,12 +19,20 @@
 
 const AGUA_IQA_FAIXA_ORDEM = ['Ótima', 'Boa', 'Regular', 'Ruim', 'Péssima']
 
+// PÉSSIMA CORRIGIDA (painel de relatórios): #9F1239 ↔ Ruim (#C2410C)
+// dava ΔE 12,3 para visão NORMAL — abaixo do piso 15 do validador do
+// skill de dataviz, ou seja, duas faixas vizinhas da MESMA escala que
+// um leitor sem daltonismo custa a separar (o problema só apareceu
+// agora porque o painel põe as 5 faixas lado a lado numa barra
+// segmentada; no mapa e no app elas nunca se encostavam). #86198F
+// mantém a leitura pior→melhor e passa os 5 checks
+// (scripts/validate_palette.js do skill, modo light).
 const AGUA_IQA_FAIXA_COR = {
   'Ótima':   '#1D4ED8',
   'Boa':     '#059669',
   'Regular': '#CA8A04',
   'Ruim':    '#C2410C',
-  'Péssima': '#9F1239',
+  'Péssima': '#86198F',
 }
 
 // Classes badge-* de css/global.css — só usável em telas de mesa que
@@ -35,7 +43,7 @@ const AGUA_IQA_FAIXA_BADGE = {
   'Boa':     'badge-verde',
   'Regular': 'badge-ouro',
   'Ruim':    'badge-erro badge-outline',
-  'Péssima': 'badge-erro',
+  'Péssima': 'badge-roxo', // acompanha a cor nova de AGUA_IQA_FAIXA_COR (badge e marcador nunca podem discordar na mesma tela)
 }
 
 const AGUA_SEM_IQA_COR = '#9CA3AF'
@@ -130,4 +138,135 @@ function aguaIqaGraficoHTML(pontos, opts) {
     </svg>
     <div style="display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:4px">${legenda}</div>
     ${temQuarentena ? '<p style="text-align:center;font-size:10px;color:#9CA3AF;margin-top:4px">Preenchimento fraco = ainda em conferência (dado não verificado)</p>' : ''}`
+}
+
+// ── Primitivos do painel (pages/agua-relatorios.html) ────────────
+// Mesmos SVGs desenhados à mão do gráfico acima — moram aqui, e não na
+// página, pelo mesmo motivo de sempre (js/frota-consumo.js): tela nova
+// que precise de barra/medidor/distribuição por faixa usa estes, nunca
+// remonta o desenho. Todos devolvem HTML pronto e não dependem de
+// global.css (o app de campo não o carrega).
+//
+// Nenhum deles calcula IQA nem classifica faixa: recebem números e
+// faixas JÁ vindos do banco (agua_calcular_iqa/agua_iqa_faixa,
+// migration 249). Classificar a MÉDIA de um período numa faixa seria
+// recalcular no cliente — por isso as barras de magnitude usam uma
+// escala de UM tom só (verde institucional), não a paleta de faixa.
+
+function _aguaHex(h) {
+  const n = parseInt(h.slice(1), 16)
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255]
+}
+function _aguaMistura(a, b, t) {
+  const A = _aguaHex(a), B = _aguaHex(b)
+  const c = A.map((v, i) => Math.round(v + (B[i] - v) * Math.max(0, Math.min(1, t))))
+  return '#' + c.map(v => v.toString(16).padStart(2, '0')).join('')
+}
+function _aguaEsc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"]/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[m]))
+}
+
+// Medidor semicircular segmentado (0–100%). Sequencial de UM tom
+// (magnitude, não identidade — regra do skill de dataviz): os
+// segmentos preenchidos vão de verde-claro a verde-escuro; o restante
+// fica cinza. O número no centro é o dado; a cor só reforça.
+function aguaIqaGaugeHTML(pct, opts) {
+  const o = Object.assign({
+    width: 280, segmentos: 34, corDe: '#7FD4A8', corAte: '#1F4E2C',
+    vazio: '#E5E7EB', rotulo: '', vazioTexto: '—',
+  }, opts || {})
+  const w = o.width, cx = w / 2, cy = w / 2
+  const rOut = w / 2 - 6, rIn = rOut - Math.max(14, w * 0.075)
+  const h = Math.round(cy + 12)
+  const n = o.segmentos
+  const temValor = pct != null && isFinite(pct)
+  const preenchidos = temValor ? Math.round((Math.max(0, Math.min(100, pct)) / 100) * n) : 0
+
+  let segs = ''
+  for (let i = 0; i < n; i++) {
+    const ang = Math.PI * ((i + 0.5) / n) + Math.PI // 180° → 360°
+    const cos = Math.cos(ang), sin = Math.sin(ang)
+    const cor = i < preenchidos ? _aguaMistura(o.corDe, o.corAte, n === 1 ? 1 : i / (n - 1)) : o.vazio
+    segs += `<line x1="${(cx + rIn * cos).toFixed(1)}" y1="${(cy + rIn * sin).toFixed(1)}" x2="${(cx + rOut * cos).toFixed(1)}" y2="${(cy + rOut * sin).toFixed(1)}" stroke="${cor}" stroke-width="6" stroke-linecap="round"/>`
+  }
+
+  // O rótulo fica FORA do SVG, em HTML: dentro dele, o texto de 12px
+  // encostava no número (que é grande e de largura variável) e ainda
+  // era cortado pela viewBox em rótulo longo. Em HTML ele quebra linha
+  // e centraliza sozinho.
+  // `display:block` + `height:auto` no próprio SVG: sem isso ele é
+  // inline (herda line-height) e a caixa fica mais alta que o desenho,
+  // empurrando o rótulo para fora do contêiner.
+  return `<div style="text-align:center">
+    <svg viewBox="0 0 ${w} ${h}" style="display:block;width:100%;max-width:${w}px;height:auto;margin:0 auto" role="img"
+        aria-label="${_aguaEsc(o.rotulo || 'Medidor')}: ${temValor ? Math.round(pct) + '%' : 'sem dado'}">
+      ${segs}
+      <text x="${cx}" y="${cy + 4}" text-anchor="middle" font-family="'Fraunces',Georgia,serif" font-size="${Math.round(w * 0.145)}" font-weight="700" fill="#111827">${temValor ? Math.round(pct) + '%' : o.vazioTexto}</text>
+    </svg>
+    ${o.rotulo ? `<p style="font-size:12px;color:#6B7280;margin:-6px 0 0;line-height:1.35">${_aguaEsc(o.rotulo)}</p>` : ''}
+  </div>`
+}
+
+// Barras verticais de magnitude, com o valor rotulado acima de cada
+// uma (o "badge" do modelo) e a maior destacada. UMA série → sem
+// legenda, por regra do skill; identidade fica no rótulo do eixo X e
+// no <title> (tooltip nativo, camada de hover mínima).
+// `itens`: [{ label, valor, valorTexto, titulo, fraco }] — `fraco`
+// marca dado ainda em conferência (quarentena), nunca escondido.
+function aguaIqaBarrasHTML(itens, opts) {
+  const o = Object.assign({ max: 100, height: 210, corBase: '#CDE9DA', corTopo: '#2D6A4F', vazio: 'Sem dado' }, opts || {})
+  const lista = itens || []
+  if (!lista.length) return `<p style="text-align:center;color:#9CA3AF;font-size:12px;padding:28px 0">${_aguaEsc(o.vazio)}</p>`
+
+  const larguraBarra = 52, gap = 16
+  const w = lista.length * larguraBarra + (lista.length - 1) * gap
+  const h = o.height, PAD_T = 34, PAD_B = 34
+  const plotH = h - PAD_T - PAD_B
+  const maiorValor = Math.max(...lista.map(i => (i.valor == null ? 0 : i.valor)))
+
+  const barras = lista.map((it, i) => {
+    const x = i * (larguraBarra + gap)
+    const temValor = it.valor != null && isFinite(it.valor)
+    const alt = temValor ? Math.max(6, (Math.max(0, Math.min(o.max, it.valor)) / o.max) * plotH) : 6
+    const y = PAD_T + plotH - alt
+    const destaque = temValor && it.valor === maiorValor
+    const yBadge = Math.max(4, y - 26)
+    const rx = Math.min(12, larguraBarra / 2)
+    return `<g>
+      <title>${_aguaEsc(it.titulo || it.label)}${temValor ? ' — ' + _aguaEsc(it.valorTexto) : ''}</title>
+      <rect x="${x}" y="${y}" width="${larguraBarra}" height="${alt}" rx="${rx}" fill="${temValor ? (destaque ? o.corTopo : o.corBase) : '#F3F4F6'}" fill-opacity="${it.fraco ? .55 : 1}"/>
+      <rect x="${x + 6}" y="${yBadge}" width="${larguraBarra - 12}" height="19" rx="9.5" fill="#F3F4F6"/>
+      <text x="${x + larguraBarra / 2}" y="${yBadge + 13}" text-anchor="middle" font-family="'DM Sans',sans-serif" font-size="11" font-weight="700" fill="${temValor ? '#374151' : '#9CA3AF'}">${_aguaEsc(temValor ? it.valorTexto : '—')}</text>
+      <text x="${x + larguraBarra / 2}" y="${h - 12}" text-anchor="middle" font-family="'DM Sans',sans-serif" font-size="10.5" fill="#6B7280">${_aguaEsc(it.label)}</text>
+    </g>`
+  }).join('')
+
+  const temFraco = lista.some(i => i.fraco)
+  return `<svg viewBox="0 0 ${w} ${h}" width="100%" height="${h}" preserveAspectRatio="xMidYMax meet"
+      role="img" aria-label="Barras: ${_aguaEsc(lista.map(i => `${i.label} ${i.valorTexto || '—'}`).join(', '))}">${barras}</svg>
+    ${temFraco ? '<p style="font-size:10px;color:#9CA3AF;margin-top:2px">Barra esmaecida = inclui coleta ainda em conferência</p>' : ''}`
+}
+
+// Barra horizontal segmentada da distribuição por faixa do IQA — a
+// única leitura do painel em que as 5 cores de faixa aparecem juntas.
+// 2px de respiro entre segmentos (spec do skill) e legenda sempre
+// presente com o número ao lado: a cor nunca carrega o dado sozinha.
+// `contagem`: { 'Ótima': n, ... }; `semIQA` entra como segmento cinza.
+function aguaIqaFaixasBarraHTML(contagem, semIQA, opts) {
+  const o = Object.assign({ altura: 14 }, opts || {})
+  const itens = AGUA_IQA_FAIXA_ORDEM
+    .map(f => ({ label: f, n: (contagem || {})[f] || 0, cor: AGUA_IQA_FAIXA_COR[f] }))
+    .concat(semIQA ? [{ label: 'Sem índice', n: semIQA, cor: AGUA_SEM_IQA_COR }] : [])
+  const total = itens.reduce((s, i) => s + i.n, 0)
+  if (!total) return '<p style="font-size:12px;color:#9CA3AF;margin:8px 0">Nenhuma coleta com índice calculado no recorte.</p>'
+
+  const segmentos = itens.filter(i => i.n > 0).map(i =>
+    `<div title="${_aguaEsc(i.label)}: ${i.n} coleta(s)" style="flex:${i.n} 1 0;background:${i.cor};min-width:4px"></div>`).join('')
+  const legenda = itens.filter(i => i.n > 0).map(i => `
+    <span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;color:#374151">
+      <span style="width:8px;height:8px;border-radius:2px;background:${i.cor}"></span>${_aguaEsc(i.label)}
+      <strong style="color:#111827">${i.n}</strong></span>`).join('')
+
+  return `<div style="display:flex;gap:2px;height:${o.altura}px;border-radius:${o.altura / 2}px;overflow:hidden;background:#F3F4F6">${segmentos}</div>
+    <div style="display:flex;flex-wrap:wrap;gap:10px 14px;margin-top:10px">${legenda}</div>`
 }
