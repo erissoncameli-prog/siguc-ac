@@ -1245,6 +1245,30 @@ bloco/seção estão em CAIXA ALTA no documento.
 
 `pwa/sw.js`: agua v12 → v13 (`agua-relatorio-pdf.js` está no shell).
 
+### E também no PPTX (slide 2)
+
+O slide "Resumo do período" (só 6 números) virou **"Painel do período"**,
+com os mesmos blocos: KPIs, distribuição por faixa, conformidade CONAMA
+e IQA médio por ponto. Os slides 3 (evolução por ponto) e 4 (tabela de
+violações CONAMA) continuam como estavam — são o aprofundamento, e já
+cobrem o ranking de parâmetros.
+
+**Diferença deliberada em relação ao PDF: aqui os gráficos são NATIVOS**
+(`addChart` do pptxgenjs — barra empilhada, rosca, barras), não desenho.
+Num deck, quem apresenta precisa poder editar, recolorir e copiar o
+gráfico; num documento impresso, não. Mesma leitura, meio diferente.
+A rosca da conformidade traz os **três** estados como fatias distintas —
+"sem limites cadastrados" nunca é somado a "conforme".
+
+`js/agua-relatorio-pptx.js` não está em shell de app nenhum (só a mesa
+usa), então esta parte não mexe em `pwa/sw.js`.
+
+⚠️ Não foi possível conferir o PPTX renderizado nesta máquina (não há
+LibreOffice/PowerPoint para converter). A verificação foi estrutural,
+sobre o XML dentro do .pptx: 4 slides, 3 partes de `chart` referenciadas
+pelo slide 2, séries/valores e as cores da paleta corretas — e o teste
+novo trava exatamente isso.
+
 ## Decisões ainda abertas (não travam a Fase 0)
 
 - **Sólidos em suspensão** — a incoerência de unidade acima. Entra na
