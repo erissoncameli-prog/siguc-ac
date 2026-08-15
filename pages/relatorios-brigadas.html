@@ -1319,6 +1319,12 @@ function renderTabelaEquipes() {
     return
   }
   const on = m => _equipeSort === m ? ' style="font-weight:700;color:#0A1A0F"' : ''
+  const maxSort = Math.max(...rows.map(r => r[_equipeSort]), 1)
+  const cel = (m, txt, v) => {
+    if (m !== _equipeSort || !(v > 0)) return `<td${on(m)}>${txt}</td>`
+    const pct = Math.round(v / maxSort * 100)
+    return `<td${on(m)}><div style="display:flex;align-items:center;gap:6px"><div class="bar-wrap" style="width:44px"><div class="bar-fill" style="width:${pct}%;background:#2D6A4F"></div></div><span>${txt}</span></div></td>`
+  }
   cont.innerHTML = `<table class="rel-table">
     <thead><tr>
       <th>Equipe</th><th>Brigada</th>
@@ -1330,10 +1336,10 @@ function renderTabelaEquipes() {
     <tbody>${rows.map((r, i) => `<tr>
       <td>${i === 0 ? bico('award') + ' ' : ''}<strong>${esc(r.nome)}</strong></td>
       <td style="font-size:.82rem;color:var(--cinza-500)">${esc(r.brigada)}</td>
-      <td${on('n')}>${r.n}</td>
-      <td${on('area')}>${r.area > 0 ? formatNum(r.area, 1) : '—'}</td>
-      <td${on('fauna')}>${r.fauna > 0 ? `${bico('paw')} ${r.fauna}` : '—'}</td>
-      <td${on('horas')}>${r.horas > 0 ? formatNum(r.horas, 1) : '—'}</td>
+      ${cel('n', r.n, r.n)}
+      ${cel('area', r.area > 0 ? formatNum(r.area, 1) : '—', r.area)}
+      ${cel('fauna', r.fauna > 0 ? `${bico('paw')} ${r.fauna}` : '—', r.fauna)}
+      ${cel('horas', r.horas > 0 ? formatNum(r.horas, 1) : '—', r.horas)}
     </tr>`).join('')}</tbody>
   </table>`
 }
@@ -1366,6 +1372,7 @@ function tabelaBrigadas(registros, brigadas) {
     .sort((a,b)=>b.n-a.n).slice(0,10)
 
   if (!rows.length) return '<p class="chart-empty" style="padding:12px">Sem dados</p>'
+  const maxN = Math.max(...rows.map(r=>r.n), 1)
   return `<table class="rel-table">
     <thead><tr>
       <th>Brigada</th><th>Regional</th><th>Registros</th><th>Fauna</th>
@@ -1374,7 +1381,7 @@ function tabelaBrigadas(registros, brigadas) {
     <tbody>${rows.map(r=>`<tr>
       <td>${esc(r.nome)}</td>
       <td>${r.regional ? (REGIONAL_LAB[r.regional]||r.regional) : '—'}</td>
-      <td><strong>${r.n}</strong></td>
+      <td><div style="display:flex;align-items:center;gap:6px"><div class="bar-wrap" style="width:44px"><div class="bar-fill" style="width:${Math.round(r.n/maxN*100)}%;background:#2D6A4F"></div></div><strong>${r.n}</strong></div></td>
       <td>${r.fauna > 0 ? `${bico('paw')} ${r.fauna}` : '—'}</td>
       <td>${r.haEvit > 0 ? `<span style="color:#5b21b6;font-weight:700">${formatNum(r.haEvit,1)} ha</span>` : '—'}</td>
       <td>
@@ -1399,6 +1406,7 @@ function tabelaBrigadistas(registros) {
     .sort((a,b)=>b.n-a.n).slice(0,10)
 
   if (!rows.length) return '<p class="chart-empty" style="padding:12px">Sem dados</p>'
+  const maxN = Math.max(...rows.map(r=>r.n), 1)
   return `<table class="rel-table">
     <thead><tr>
       <th>Brigadista</th><th>Naturezas</th><th>Registros</th><th>Fauna</th><th>Última atividade</th>
@@ -1406,7 +1414,7 @@ function tabelaBrigadistas(registros) {
     <tbody>${rows.map(r=>`<tr>
       <td>${esc(r.nome)}</td>
       <td>${r.nats.map(n=>`<span class="nat-chip ${n}">${natIco(n)}</span>`).join(' ')}</td>
-      <td><strong>${r.n}</strong></td>
+      <td><div style="display:flex;align-items:center;gap:6px"><div class="bar-wrap" style="width:44px"><div class="bar-fill" style="width:${Math.round(r.n/maxN*100)}%;background:#2D6A4F"></div></div><strong>${r.n}</strong></div></td>
       <td>${r.fauna > 0 ? `${bico('paw')} ${r.fauna}` : '—'}</td>
       <td style="font-size:.78rem;color:var(--cinza-500)">${r.ultima ? new Date(r.ultima).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',year:'2-digit',timeZone:'America/Rio_Branco'}) : '—'}</td>
     </tr>`).join('')}</tbody>
@@ -1423,6 +1431,7 @@ function tabelaRegional(registros) {
     return { regional: lab, n: regs.length, fauna, haEvit, pct, key: k }
   }).sort((a,b)=>b.n-a.n)
 
+  const maxN = Math.max(...rows.map(r=>r.n), 1)
   return `<table class="rel-table">
     <thead><tr>
       <th>Regional</th><th>Registros</th><th>Prevenção</th><th>Combate</th><th>Monitoramento</th>
@@ -1433,9 +1442,12 @@ function tabelaRegional(registros) {
       const prev = regs.filter(x=>x.natureza==='prevencao').length
       const comb = regs.filter(x=>x.natureza==='combate').length
       const moni = regs.filter(x=>x.natureza==='monitoramento').length
+      const barraN = r.n > 0
+        ? `<div style="display:flex;align-items:center;gap:6px"><div class="bar-wrap" style="width:44px"><div class="bar-fill" style="width:${Math.round(r.n/maxN*100)}%;background:#2D6A4F"></div></div><strong>${r.n}</strong></div>`
+        : '—'
       return `<tr>
         <td><strong>${esc(r.regional)}</strong></td>
-        <td>${r.n||'—'}</td>
+        <td>${barraN}</td>
         <td>${prev||'—'}</td>
         <td>${comb||'—'}</td>
         <td>${moni||'—'}</td>
