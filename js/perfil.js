@@ -50,10 +50,20 @@ function _perfilCarregarFotos() {
 // Avatar da sidebar: iniciais por padrão, foto quando houver. Chamado
 // no fim do bootstrap de cada página e de novo após salvar, para a
 // troca aparecer sem recarregar.
-async function perfilAtualizarAvatarSidebar() {
+async function perfilAtualizarAvatarSidebar(tentativa) {
   const el = document.getElementById('sidebar-avatar')
   const u = appState.usuario
-  if (!el || !u) return
+  // Corrida real: carregarUsuario() dispara o carregamento deste arquivo
+  // ANTES de a página montar o gerarLayout(), então na primeira chamada a
+  // sidebar pode ainda não existir. carregarLogosSidebar() chama de novo
+  // depois de renderizar, mas só se este arquivo já tiver chegado — as
+  // duas ordens são possíveis, e a espera curta cobre as duas.
+  if (!el) {
+    const n = (tentativa || 0) + 1
+    if (n <= 20) setTimeout(() => perfilAtualizarAvatarSidebar(n), 150)
+    return
+  }
+  if (!u) return
   const ini = iniciais(u.nome_completo)
   if (!u.foto_url) { el.textContent = ini; el.style.backgroundImage = ''; return }
   const ok = await _perfilCarregarFotos()
