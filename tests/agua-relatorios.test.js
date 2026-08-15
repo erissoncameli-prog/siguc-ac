@@ -798,11 +798,81 @@ test.describe('painel (dashboard) — render com dado real da view', () => {
     await expect(page.locator('#rl-conteudo')).toContainText('Nenhuma coleta encontrada');
   });
 
-  test('estado vazio: sem bacia escolhida o painel não renderiza card nenhum', async ({ page }) => {
+  test('distribuição por faixa é uma ROSCA (donut), não mais barra — mesmo dado, novo desenho', async ({ page }) => {
     await abrirPainelComStub(page, fixtureColetasRioAcre());
-    await page.selectOption('#rl-bacia', '');
-    await expect(page.locator('.adash-grid')).toHaveCount(0);
-    await expect(page.locator('#rl-conteudo')).toContainText('Escolha uma bacia');
-    await expect(page.locator('#rl-btn-export')).toBeDisabled();
+    const cardDist = page.locator('.adash-card', { hasText: 'Distribuição por faixa' });
+    await expect(cardDist.locator('svg[aria-label^="Distribuição por faixa do IQA"]')).toBeVisible();
+    // A cor nunca carrega o dado sozinha — legenda com rótulo + número
+    // continua obrigatória, igual valia para a barra antiga.
+    await expect(cardDist).toContainText('Péssima');
+    await expect(cardDist).toContainText('Ótima');
+  });
+
+  test('"Acre todo" é o escopo padrão — o painel mostra dado sem exigir escolha de bacia', async ({ page }) => {
+    await abrirPainelComStub(page, fixtureColetasRioAcre());
+    // Nenhum selectOption foi chamado: os dados vieram do carregamento
+    // automático no boot. O cabeçalho nasce em "Acre todo".
+    await expect(page.locator('#rl-bacia')).toHaveValue('');
+    await expect(page.locator('#rl-bacia option:checked')).toContainText('Acre todo');
+    await expect(page.locator('.adash-grid')).toBeVisible();
+    await expect(page.locator('.adash-card-escuro .adash-num')).toHaveText('61.6');
+    await expect(page.locator('#rl-btn-export')).toBeEnabled();
+  });
+
+  test('escolher uma bacia no cabeçalho recorta os dados e desabilita o filtro de bacia da gaveta', async ({ page }) => {
+    const duasBacias = [...fixtureColetasRioAcre(), ...fixtureColetasPurusMultiRio()];
+    await abrirPainelComStub(page, duasBacias);
+
+    // Em "Acre todo", as duas bacias entram — 5 pontos de tabela (2 + 3).
+    await expect(page.locator('.adash-tabela-linha')).toHaveCount(5);
+    await page.click('#rl-btn-filtros');
+    await expect(page.locator('#rl-bacia-filtro')).toBeEnabled();
+
+    await page.selectOption('#rl-bacia', 'Purus');
+    await expect(page.locator('.adash-tabela-linha')).toHaveCount(3); // só a bacia Purus
+    // Filtrar por bacia de novo na gaveta seria redundante — desabilita.
+    await expect(page.locator('#rl-bacia-filtro')).toBeDisabled();
+  });
+
+  test('filtro de bacia na gaveta narrows "Acre todo" sem voltar ao cabeçalho', async ({ page }) => {
+    const duasBacias = [...fixtureColetasRioAcre(), ...fixtureColetasPurusMultiRio()];
+    await abrirPainelComStub(page, duasBacias);
+
+    await page.click('#rl-btn-filtros');
+    await expect(page.locator('#rl-bacia-filtro')).toBeEnabled();
+    await page.selectOption('#rl-bacia-filtro', 'Purus');
+
+    await expect(page.locator('.adash-tabela-linha')).toHaveCount(3);
+    await expect(page.locator('.alert-info')).toContainText('Bacia: Purus');
+    await expect(page.locator('#rl-filtros-n')).toHaveText('1');
+    // O cabeçalho continua em "Acre todo" — só a gaveta recortou.
+    await expect(page.locator('#rl-bacia')).toHaveValue('');
+
+    await page.click('.adash-filtros-limpar');
+    await expect(page.locator('.adash-tabela-linha')).toHaveCount(5);
+  });
+
+  test('mapa mostra um marcador por ponto do recorte, colorido pela coleta mais recente', async ({ page }) => {
+    const pontosGeom = [
+      { id: 'p-rb', ativo: true, geom: { type: 'Point', coordinates: [-67.810, -9.975] } },
+      { id: 'p-pa', ativo: true, geom: { type: 'Point', coordinates: [-67.550, -9.590] } },
+    ];
+    await abrirPainelComStub(page, fixtureColetasRioAcre(), { pontosGeom });
+
+    await page.waitForFunction(() => document.querySelectorAll('#rl-mapa path.leaflet-interactive').length >= 2, null, { timeout: 10_000 });
+    await expect(page.locator('#rl-mapa path.leaflet-interactive')).toHaveCount(2);
+    await expect(page.locator('#rl-mapa-sub')).toContainText('2 pontos no recorte atual');
+  });
+
+  test('mapa não quebra quando um ponto não tem coordenada cadastrada — fica de fora, sem travar os outros', async ({ page }) => {
+    // Só o Rio Branco tem geom; Porto Acre não — a regra é "sem geom não
+    // desenha", nunca "sem geom quebra o mapa inteiro".
+    const pontosGeom = [{ id: 'p-rb', ativo: true, geom: { type: 'Point', coordinates: [-67.810, -9.975] } }];
+    await abrirPainelComStub(page, fixtureColetasRioAcre(), { pontosGeom });
+
+    await page.waitForFunction(() => document.querySelectorAll('#rl-mapa path.leaflet-interactive').length >= 1, null, { timeout: 10_000 });
+    await expect(page.locator('#rl-mapa path.leaflet-interactive')).toHaveCount(1);
+    // O resto do painel (que não depende de geom) segue normal.
+    await expect(page.locator('.adash-card-escuro .adash-num')).toHaveText('61.6');
   });
 });
