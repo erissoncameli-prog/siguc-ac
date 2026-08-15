@@ -684,6 +684,14 @@ async function carregarDados() {
   const r6 = await db.from('unidades_organizacionais').select('*').eq('ativo', true).order('criado_em')
   _unidades = r6.data || []
 
+  const [rLot, rSemLot] = await Promise.all([
+    db.from('vw_lotacoes_vigentes').select('*'),
+    db.from('vw_usuarios_sem_lotacao').select('*'),
+  ])
+  _lotacoes = rLot.data || []
+  _semLotacao = rSemLot.data || []
+  renderLotacoes()
+
   if (_perfilUsuario === 'super_admin') {
     const [r7, r8, r9] = await Promise.all([
       db.from('modulos').select('id,chave,nome,grupo').eq('ativo', true).order('grupo').order('ordem'),
