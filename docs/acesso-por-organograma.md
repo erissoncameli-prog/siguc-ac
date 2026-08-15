@@ -375,12 +375,16 @@ existia; agora ele existe, e o custo de generalizar é `CREATE TRIGGER`.
 Progresso (2026-08-15): **1 parcial** (tabela/funções prontas — migration
 262; falta a tela de lotação em Usuários/Estrutura Org.), **2 entregue**
 (migration 265 + aba "Acesso por Setor" em `estrutura-organizacional.html`,
-restrita a super_admin), **6 entregue** (migrations 263/264 — Biomonitor
-no catálogo, com correção de regressão do fallback de grupo, verificada
-por consulta a `nivel_efetivo()` antes de fechar). Nenhuma delas mudou o
-acesso de ninguém: `alcance_por_lotacao()` existe e foi testada (4/4 casos
-de herança, em transação com ROLLBACK) mas `nivel_efetivo()` ainda não a
-chama — isso só acontece na frente 4.
+restrita a super_admin), **3 entregue** (migration 266 — tabela
+`credenciamentos`, cron de vencimento com dedupe, aba "Credenciamentos"
+com conceder/renovar/revogar, tudo restrito a super_admin), **6 entregue**
+(migrations 263/264 — Biomonitor no catálogo, com correção de regressão
+do fallback de grupo, verificada por consulta a `nivel_efetivo()` antes de
+fechar). Nenhuma delas mudou o acesso de ninguém: `alcance_por_lotacao()`
+e `credenciamento_vigente()` existem e foram testadas (herança 4/4,
+credenciamento 7/7 casos — vigência, dedupe do cron, revogação e as
+constraints de justificativa/prazo — em transação com ROLLBACK) mas
+`nivel_efetivo()` ainda não as chama — isso só acontece na frente 4.
 
 | # | Entrega | Depende de |
 |---|---|---|
