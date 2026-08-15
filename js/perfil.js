@@ -98,8 +98,7 @@ function abrirPerfil(aba) {
   document.body.style.overflow = 'hidden'
   document.addEventListener('keydown', _perfilEsc)
   perfilIr(_perfilAba)
-  bIconsAplicar(ov)
-  _perfilCarregarFotos().then(() => assinarFotos(ov))
+  if (u.foto_url) _perfilCarregarFotos().then(ok => { if (ok) _perfilPintarFoto(u.foto_url) })
   _perfilCarregarAcessos()
 }
 
