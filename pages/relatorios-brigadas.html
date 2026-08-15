@@ -1431,6 +1431,7 @@ function tabelaRegional(registros) {
     return { regional: lab, n: regs.length, fauna, haEvit, pct, key: k }
   }).sort((a,b)=>b.n-a.n)
 
+  const maxN = Math.max(...rows.map(r=>r.n), 1)
   return `<table class="rel-table">
     <thead><tr>
       <th>Regional</th><th>Registros</th><th>Prevenção</th><th>Combate</th><th>Monitoramento</th>
@@ -1441,9 +1442,12 @@ function tabelaRegional(registros) {
       const prev = regs.filter(x=>x.natureza==='prevencao').length
       const comb = regs.filter(x=>x.natureza==='combate').length
       const moni = regs.filter(x=>x.natureza==='monitoramento').length
+      const barraN = r.n > 0
+        ? `<div style="display:flex;align-items:center;gap:6px"><div class="bar-wrap" style="width:44px"><div class="bar-fill" style="width:${Math.round(r.n/maxN*100)}%;background:#2D6A4F"></div></div><strong>${r.n}</strong></div>`
+        : '—'
       return `<tr>
         <td><strong>${esc(r.regional)}</strong></td>
-        <td>${r.n||'—'}</td>
+        <td>${barraN}</td>
         <td>${prev||'—'}</td>
         <td>${comb||'—'}</td>
         <td>${moni||'—'}</td>
