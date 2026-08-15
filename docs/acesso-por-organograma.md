@@ -392,6 +392,31 @@ credenciamento 7/7 casos — vigência, dedupe do cron, revogação e as
 constraints de justificativa/prazo — em transação com ROLLBACK) mas
 `nivel_efetivo()` ainda não as chama — isso só acontece na frente 4.
 
+**Frente 4 entregue** (migration 267): `nivel_efetivo()` agora é um
+wrapper fino sobre `nivel_efetivo_calc()` (mesma assinatura de sempre —
+`pode_ver`/`pode_editar`/`minhas_permissoes` não mudaram). A engrenagem
+está ligada; `modulos.exige_lotacao` nasce `false` em TODOS os módulos
+existentes, então nada muda até a frente 8 ligar módulo a módulo.
+Verificação, não só afirmação: snapshot de `nivel_efetivo()` para os 69
+usuários ativos × 24 módulos ativos (1656 combinações) tirado ANTES da
+migration e comparado DEPOIS — **0 divergências**. `vw_impacto_lotacao()`
+testada em duas pontas, dentro de `BEGIN`/`ROLLBACK`: sem dono cadastrado
+em `modulo_unidades`, tudo "igual" (fail-open); com um dono simulado
+(DERHQA em 'agua'), a lista de "perde" apareceu corretamente para quem
+tinha acesso pelo caminho antigo e não está lotado ali — exatamente o
+que a ferramenta existe para mostrar antes de qualquer virada real.
+
+**Decisão de implementação registrada** (não estava fechada no plano
+original): "teto do perfil" — usado para capar credenciamento e alcance
+por lotação — foi definido como `teto_do_perfil(perfil)` = o maior nível
+que aquele perfil já alcança em QUALQUER módulo hoje
+(`perfil_permissoes_padrao` ∪ `grupo_permissoes_padrao`), não um valor
+fixo por perfil. Motivo: o mesmo perfil tem `editar` num grupo e
+`visualizar` noutro (ex.: `tecnico` edita em Gestão, só visualiza em
+Frota) — não existe teto único correto sem inventar um número. Se essa
+definição não for a desejada, corrige-se com UPDATE no catálogo
+existente, não com redesenho de código.
+
 | # | Entrega | Depende de |
 |---|---|---|
 | 1 | ✅ `usuario_lotacoes` + derivação a partir de `cargo_ocupacoes` (migration 262) + tela de lotação (aba "Lotações" em `estrutura-organizacional.html`) | — |
