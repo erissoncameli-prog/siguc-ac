@@ -432,7 +432,9 @@ async function salvarLab() {
     toast('Laboratório salvo!', 'success')
     fecharModal('lab')
     await carregarLabs()
-  } catch (e) { toast(e.message || 'Erro ao salvar', 'error') }
+  } catch (e) {
+    toast(e.message?.includes('REAUTH_NECESSARIA') ? 'Sessão de confirmação expirou — tente novamente.' : (e.message || 'Erro ao salvar'), 'error')
+  }
   finally { btn.disabled = false }
 }
 
