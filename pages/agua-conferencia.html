@@ -9,6 +9,7 @@
 <script src="../js/queryLogger.js"></script>
 <script src="../js/config.js"></script>
 <script src="../js/layout.js"></script>
+<script src="../js/reautenticar.js"></script>
 </head>
 <body>
 <div id="app"></div>
@@ -195,15 +196,25 @@ async function salvarAg(promover) {
     payload.quarentena_motivo = null
   }
 
+  // Janela de 5 min: a conferência edita 339 coletas em quarentena, uma
+  // por vez — pedir senha a cada gravação inviabilizaria o trabalho.
+  // docs/qualidade-agua/plano-seguranca-dados.md, decisão 1.
+  const r = await reautenticar({ janelaMin: 5, motivo: 'salvar esta conferência' })
+  if (!r) return
+
   const btn = document.getElementById(promover ? 'btn-promover' : 'btn-manter')
   btn.disabled = true
   try {
-    const { error } = await db.from('agua_coletas').update(payload).eq('id', _editandoId)
+    const { error } = await db.rpc('agua_atualizar_coleta', {
+      p_id: _editandoId, p_campos: payload, p_justificativa: r.justificativa,
+    })
     if (error) throw error
     toast(promover ? 'Coleta promovida a completo!' : 'Conferência salva — mantida em quarentena.', 'success')
     fecharModalAg()
     await carregarLista()
-  } catch (e) { toast(e.message || 'Erro ao salvar', 'error') }
+  } catch (e) {
+    toast(e.message?.includes('REAUTH_NECESSARIA') ? 'Sessão de confirmação expirou — tente novamente.' : (e.message || 'Erro ao salvar'), 'error')
+  }
   finally { btn.disabled = false }
 }
 </script>

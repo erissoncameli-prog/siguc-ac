@@ -10,6 +10,7 @@
 <script src="../js/config.js"></script>
 <script src="../js/layout.js"></script>
 <script src="../js/fotos-privadas.js"></script>
+<script src="../js/reautenticar.js"></script>
 </head>
 <body>
 <div id="app"></div>
@@ -252,6 +253,11 @@ async function salvarLaudo() {
   }
   for (const campo of TODOS_OS_CAMPOS) payload[campo] = lzValor(campo)
 
+  // Por registro (não janela): lançar laudo é ação isolada, diferente
+  // da edição em lote da conferência. docs/qualidade-agua/plano-seguranca-dados.md.
+  const r = await reautenticar({ motivo: 'lançar este laudo' })
+  if (!r) return
+
   const btn = document.getElementById('btn-salvar-laudo')
   btn.disabled = true
   try {
@@ -266,12 +272,16 @@ async function salvarLaudo() {
       payload.laudo_url = publicUrl
     }
 
-    const { error } = await db.from('agua_coletas').update(payload).eq('id', _editandoId)
+    const { error } = await db.rpc('agua_atualizar_coleta', {
+      p_id: _editandoId, p_campos: payload, p_justificativa: r.justificativa,
+    })
     if (error) throw error
     toast('Laudo lançado — coleta marcada como completa!', 'success')
     fecharModalLaudo()
     await carregarFila()
-  } catch (e) { toast(e.message || 'Erro ao salvar laudo', 'error') }
+  } catch (e) {
+    toast(e.message?.includes('REAUTH_NECESSARIA') ? 'Sessão de confirmação expirou — tente novamente.' : (e.message || 'Erro ao salvar laudo'), 'error')
+  }
   finally { btn.disabled = false }
 }
 

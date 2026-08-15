@@ -385,3 +385,46 @@ para que a resposta chegue depois sem retrabalho e sem migração de dados.
   **expurgo quebra a cadeia de hash**, então a política tem de ser
   "arquivar o trecho com o selo correspondente", nunca `DELETE` solto.
 - Horário do cron do selo (evitar colidir com os crons já existentes).
+
+## 8. Implementado (2026-08-15)
+
+Pacote completo entregue (trilha + senha + justificativa), escolhido
+pelo usuário entre as opções apresentadas. Migration 270:
+- Trilha genérica (`trilha_auditoria`, já criada na frente 7 do
+  organograma) ligada a `agua_coletas`/`agua_pontos_coleta`/
+  `agua_campanhas`/`agua_laboratorios` por trigger.
+  `trilha_auditoria_registrar()` ganhou captura de
+  `current_setting('app.justificativa', true)`.
+- Reautenticação Opção A: `agua_reauth_valida(p_minutos)` consulta
+  `auth.mfa_amr_claims`/`auth.sessions` (método nativo do GoTrue, zero
+  infraestrutura nova). `js/reautenticar.js`: client Supabase ISOLADO
+  (`persistSession:false`) para o `signInWithPassword` de confirmação —
+  a sessão de trabalho nunca é tocada. Modal único (senha + justificativa
+  juntas, janela de reaproveitamento de senha configurável por chamada).
+- RPCs de escrita (`agua_atualizar_coleta`, `agua_excluir_coleta`,
+  `agua_atualizar_ponto`, `agua_atualizar_laboratorio`): checam
+  `pode_editar('agua')` → `agua_reauth_valida(5)` → justificativa ≥20
+  chars → `jsonb_populate_record` para UPDATE só das colunas na lista
+  branca. `agua_coletas` ganhou soft-delete
+  (`excluido_em`/`excluido_por`/`exclusao_justificativa`) — escopo só
+  coletas, sem UI de exclusão para pontos/laboratórios ainda.
+- Três páginas (`agua-conferencia.html`, `agua-laudos.html`,
+  `agua-pontos.html`) migradas de `.update()` direto para as RPCs, com
+  o modal de reautenticação antes de gravar.
+- Migration `271_agua_fecha_escrita_direta_APLICAR_APOS_DEPLOY.sql`
+  escrita mas **NÃO aplicada** — fecha UPDATE/DELETE direto via RLS,
+  só depois do frontend acima estar no ar (mesma lição das migrations
+  200/210/245: nunca fechar a superfície antes do cliente novo).
+
+**Achado de segurança na mesma entrega**: as 5 funções novas desta
+migration (`agua_reauth_valida` + as 4 RPCs de escrita) nasceram com
+`REVOKE EXECUTE ... FROM anon`, sem `PUBLIC` — que no Postgres é um
+grant à parte, e o Supabase concede `EXECUTE` a `PUBLIC` por padrão
+para função nova em `public`. Isso deixava as 5 chamáveis por `anon`
+(risco baixo na prática — todas checam `pode_editar('agua')`
+internamente, que nega para `auth.uid() = NULL` — mas superfície que
+não devia existir). Ao investigar, o mesmo erro apareceu em mais 10
+funções do organograma (262-269), já em produção via `main`. Corrigido
+junto pela migration `272_fecha_execute_public_organograma_agua.sql`
+— ver `docs/acesso-por-organograma.md` §8.2 para o detalhe completo e
+a causa raiz.

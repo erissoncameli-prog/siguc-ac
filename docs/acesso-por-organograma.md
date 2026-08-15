@@ -690,3 +690,41 @@ crash no arranque). O caminho feliz completo (criar usuário de verdade
 com lotação) não foi exercitado ponta a ponta — não há credencial de
 teste disponível nesta sessão para logar como `super_admin`/`gestor`
 no ambiente local.
+
+### 8.2 Achado de segurança — `REVOKE FROM anon` não fechava PUBLIC (2026-08-15)
+
+Rodando `get_advisors` depois de criar as RPCs da Água (§ ver
+`docs/qualidade-agua/plano-seguranca-dados.md`), notei que 10 funções
+desta frente — `usuario_unidades`, `minhas_unidades`,
+`unidade_ancestrais`, `unidade_descendentes`, `alcance_por_lotacao`,
+`credenciamento_vigente`, `teto_do_perfil`, `nivel_efetivo_calc`,
+`vw_impacto_lotacao`, `trilha_auditoria_verificar` — continuavam
+chamáveis por `anon`, apesar de cada `CREATE FUNCTION` ter terminado
+com `REVOKE EXECUTE ... FROM anon`.
+
+Causa: `anon` e `PUBLIC` são grants INDEPENDENTES no Postgres — o
+Supabase concede `EXECUTE` a `PUBLIC` por padrão para toda função nova
+em `public` (`ALTER DEFAULT PRIVILEGES`), e `has_function_privilege`
+soma o privilégio direto da role com o de `PUBLIC`. `REVOKE ... FROM
+anon` remove só o grant direto de `anon`; o de `PUBLIC` continua de
+pé e basta sozinho para autorizar a chamada anônima. Mesmo erro já
+visto e corrigido antes neste projeto (`seg_fix_revoke_public`,
+`261b_perfil_atualizar_foto_revoke_public`) — desta vez passou batido
+em 10 funções desta frente e mais 4 da Água (270) porque as migrations
+262-270 escreveram `REVOKE ... FROM anon` sem `PUBLIC` explícito.
+
+Risco medido, não catastrófico: todas as 14 funções checam
+`auth.uid()`/`pode_editar()`/`is_super_admin()` internamente, e para
+`anon` isso é sempre `NULL` → nega. Nenhuma vazava dado nem permitia
+escrita anônima — mas era uma camada de defesa que devia existir e não
+existia.
+
+Corrigido pela migration `272_fecha_execute_public_organograma_agua.sql`
+(`REVOKE EXECUTE ... FROM PUBLIC` nas 14 funções, aplicada em
+produção). Reverificado por `has_function_privilege`: `anon` = false,
+`authenticated` = true (preservado) nas 14; advisor de segurança sem
+achados novos.
+
+**Regra permanente, vale para toda função nova a partir de agora**:
+`REVOKE EXECUTE ON FUNCTION ... FROM PUBLIC, anon, authenticated;`
+sempre com `PUBLIC` explícito — nunca só `FROM anon`.
