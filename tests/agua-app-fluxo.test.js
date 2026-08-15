@@ -300,3 +300,90 @@ test('Histórico: gráfico por ponto e lista de minhas coletas', async ({ page }
   await expect(page.locator('#h-ponto-lista')).toContainText('Fora do limite: DBO, Turbidez')
   await expect(page.locator('#h-ponto-lista')).toContainText('Aguardando laudo')
 });
+
+test('Detalhe da coleta: abre ao tocar no card, mostra todos os dados e exporta PDF', async ({ page }) => {
+  await abrirAppSemLogin(page);
+  await entrarComoColetorDeTeste(page);
+
+  // Stub do cliente Supabase: "Minhas coletas" (lista) + o select('*')
+  // por id que abrirColetaDetalhe() dispara ao tocar num card.
+  await page.evaluate(() => {
+    const MINHAS = [
+      { id: 'm1', ponto_nome: 'Rio Teste', codigo_ana: '12345678', data_coleta: '2026-01-05', campanha_ano: 2026, campanha_ordem: 'primeira', status: 'completo', iqa: 69.66, iqa_faixa: 'Boa', conama_conforme: false, codigo_amostra: 'AM-2026-0001' },
+    ]
+    const DETALHE = {
+      id: 'm1', ponto_nome: 'Rio Teste', codigo_ana: '12345678', ponto_rio: 'Rio Teste', ponto_municipio: 'Rio Branco',
+      classe_enquadramento: 'classe_2', campanha_ano: 2026, campanha_ordem: 'primeira',
+      data_coleta: '2026-01-05', hora_coleta: '08:15:00', coletor_nome: 'Teste Coletor', laboratorio_nome: 'Laboratório Central',
+      status: 'completo', quarentena_motivo: null,
+      iqa: 69.66, iqa_faixa: 'Boa', conama_violacoes: ['dbo'],
+      od: 7.26, dbo: 9.0, turbidez: 26.56, ph: 7.43, fosforo_total: 0.029, coliformes_termotolerantes: 54,
+      observacoes: 'Coleta na margem direita, nível baixo.',
+      codigo_amostra: 'AM-2026-0001', foto_url: null, laudo_url: null,
+    }
+    window.db = {
+      from: (tabela) => ({
+        select: (campos) => {
+          if (campos === '*') {
+            return {
+              eq: (campo, valor) => ({
+                single: async () => {
+                  if (tabela !== 'vw_agua_coletas_detalhe' || campo !== 'id' || valor !== 'm1') return { data: null, error: { message: 'não encontrado' } }
+                  return { data: DETALHE, error: null }
+                },
+              }),
+            }
+          }
+          return {
+            eq: () => ({
+              order: () => ({
+                limit: () => ({
+                  async then(resolve) { resolve({ data: MINHAS, error: null }) },
+                }),
+              }),
+            }),
+          }
+        },
+      }),
+    }
+    db = window.db
+    // getCabecalhoRelatorio()/gerarProtocolo() (js/config-sistema.js) —
+    // stub simples, o conteúdo do PDF em si já é travado por
+    // tests/agua-relatorios.test.js (Ficha de coleta) chamando
+    // aguaRelMontarPdfColeta direto; aqui o alvo é só a integração do
+    // botão (chega a gerar um blob e aciona o compartilhamento).
+    window.getCabecalhoRelatorio = async () => ({
+      secretaria: 'SEMA-AC', siglaSecr: 'SEMA-AC', diretoria: 'DIMA', siglaDiret: 'DIMA', departamento: 'DEUC',
+      logoGoverno: null, logoSecr: null,
+    })
+    window.gerarProtocolo = async () => 'SIGUC-2026-TESTE'
+  })
+
+  await page.locator('[data-tela="tela-historico"]').click()
+  await page.locator('#tela-historico').waitFor({ state: 'visible' })
+  await expect(page.locator('#h-minhas-lista .sync-item')).toHaveCount(1)
+
+  await page.locator('#h-minhas-lista .sync-item').click()
+  await page.locator('#coleta-overlay').waitFor({ state: 'visible' })
+  await expect(page.locator('#cm-titulo')).toHaveText('Rio Teste')
+  await expect(page.locator('#cm-corpo')).toContainText('Laboratório Central')
+  await expect(page.locator('#cm-corpo')).toContainText('Classe 2')
+  await expect(page.locator('#cm-corpo')).toContainText('69.7')
+  await expect(page.locator('#cm-corpo')).toContainText('1 violação')
+  await expect(page.locator('#cm-corpo')).toContainText('DBO')
+  await expect(page.locator('#cm-corpo')).toContainText('Coleta na margem direita')
+  await expect(page.locator('#cm-corpo')).toContainText('AM-2026-0001')
+  await expect(page.locator('.cm-param-violado')).toContainText('DBO') // parâmetro violado destacado
+
+  // Exportar PDF: gera de verdade (jsPDF local, sem CDN) e cai no
+  // fallback de download — mesma trilha final de compartilharArquivo()
+  // quando não há Web Share API de arquivos no navegador headless.
+  const [downloadEv] = await Promise.all([
+    page.waitForEvent('download', { timeout: 20_000 }),
+    page.locator('#cm-exportar').click(),
+  ])
+  expect(downloadEv.suggestedFilename()).toMatch(/^ficha-coleta-AM-2026-0001\.pdf$/)
+
+  await page.locator('#cm-fechar').click()
+  await expect(page.locator('#coleta-overlay')).toBeHidden()
+});
