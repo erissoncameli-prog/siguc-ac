@@ -198,7 +198,7 @@ function aguaIqaGaugeHTML(pct, opts) {
   // inline (herda line-height) e a caixa fica mais alta que o desenho,
   // empurrando o rótulo para fora do contêiner.
   return `<div style="text-align:center">
-    <svg viewBox="0 0 ${w} ${h}" style="display:block;width:100%;height:auto" role="img"
+    <svg viewBox="0 0 ${w} ${h}" style="display:block;width:100%;max-width:${w}px;height:auto;margin:0 auto" role="img"
         aria-label="${_aguaEsc(o.rotulo || 'Medidor')}: ${temValor ? Math.round(pct) + '%' : 'sem dado'}">
       ${segs}
       <text x="${cx}" y="${cy + 4}" text-anchor="middle" font-family="'Fraunces',Georgia,serif" font-size="${Math.round(w * 0.145)}" font-weight="700" fill="#111827">${temValor ? Math.round(pct) + '%' : o.vazioTexto}</text>
