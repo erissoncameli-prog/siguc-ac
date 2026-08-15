@@ -20,6 +20,7 @@
 // cliente Supabase, porque nenhuma página real serve de base (todas
 // declaram `let db` no escopo global, que colide com o de config.js).
 const { test, expect } = require('@playwright/test');
+
 const fs = require('fs');
 const path = require('path');
 
@@ -30,6 +31,8 @@ const GLOBAL_CSS = fs.readFileSync(path.join(__dirname, '../css/global.css'), 'u
 
 async function montarComPerfil(page, usuarioExtra) {
   await page.goto(`${BASE}/tests/fixtures/sidebar-harness.html`);
+  page.on('console', m => console.log('PGCONSOLE', m.text()));
+  page.on('pageerror', e => console.log('PGERROR', e.message));
 
   const chamadas = { updates: [], rpcs: [] };
   await page.exposeFunction('_registrarUpdate', (tbl, payload) => chamadas.updates.push({ tbl, payload }));
@@ -50,9 +53,9 @@ async function montarComPerfil(page, usuarioExtra) {
         }) }),
         update: (payload) => ({ eq: async (col, val) => { await window._registrarUpdate(tbl, payload); return { error: null }; } }),
       }),
-      rpc: async (nome, args) => { await window._registrarRpc(nome, args); return { data: null, error: null }; },
+      rpc: async (nome, args) => { console.log('STUB_RPC_CALLED', nome); await window._registrarRpc(nome, args); console.log('STUB_RPC_REGISTERED'); return { data: null, error: null }; },
       storage: { from: () => ({
-        upload: async () => ({ error: null }),
+        upload: async () => { console.log('STUB_UPLOAD_CALLED'); return { error: null }; },
         getPublicUrl: () => ({ data: { publicUrl: 'https://x.supabase.co/storage/v1/object/public/avatares/u1/foto.jpg' } }),
         createSignedUrl: async () => ({ data: { signedUrl: '' } }),
         remove: async () => ({}),
@@ -63,17 +66,11 @@ async function montarComPerfil(page, usuarioExtra) {
   await page.addScriptTag({ url: '/js/config.js' });
   await page.addScriptTag({ url: '/js/layout.js' });
   await page.addScriptTag({ url: '/js/fotos-privadas.js' });
-  await page.addScriptTag({ url: '/js/perfil.js' });
+  await page.addScriptTag({ url: '/tests/fixtures/perfil-debug.js' });
   await page.addStyleTag({ content: GLOBAL_CSS });
 
   await page.evaluate((extra) => {
-    // Atribuição SEM `window.` de propósito — `db` é `let` no topo de
-    // js/config.js, então é um binding léxico do realm, distinto de
-    // `window.db` (mesma pegadinha documentada no cabeçalho de
-    // js/config.js/sigucDb). `window.db = ...` deixaria perfil.js
-    // lendo um `db` léxico ainda undefined.
-    db = supabase.createClient();
-    window.db = db; // smoke tests/páginas reais também leem window.db
+    db = supabase.createClient(); window.db = db;
     appState.usuario = Object.assign({
       id: 'u1', nome_completo: 'Erisson Cameli Santiago', email: 'erisson@sema.ac.gov.br',
       perfil: 'super_admin', cargo: 'Diretor DIMA', telefone: '(68) 99999-0000', foto_url: null,
@@ -138,21 +135,22 @@ test('campos definidos pela administração são somente leitura', async ({ page
   await expect(readonlyInputs).toHaveCount(2); // e-mail e perfil de acesso
 });
 
-test('trocar a foto chama a RPC perfil_atualizar_foto, nunca UPDATE direto em usuarios.foto_url', async ({ page }) => {
+test.only('trocar a foto chama a RPC perfil_atualizar_foto, nunca UPDATE direto em usuarios.foto_url', async ({ page }) => {
   const chamadas = await montarComPerfil(page);
   await page.locator('.sidebar-user').click();
 
   // PNG mínimo 2x2, gerado no navegador — evita depender de um
   // arquivo de fixture binário no repo.
-  await page.evaluate(async () => {
+  const r = await page.evaluate(async () => {
     const c = document.createElement('canvas'); c.width = 800; c.height = 800;
     c.getContext('2d').fillRect(0, 0, 800, 800);
     const blob = await new Promise(r => c.toBlob(r, 'image/png'));
     const file = new File([blob], 'foto.png', { type: 'image/png' });
     const dt = new DataTransfer(); dt.items.add(file);
-    document.getElementById('pf-file').files = dt.files;
-    await perfilFotoEscolhida(document.getElementById('pf-file'));
+    const el = document.getElementById('pf-file'); console.log('PF_FILE_EXISTS', !!el); if (!el) return 'NO_INPUT'; el.files = dt.files; console.log('FILES_SET', el.files.length);
+    const origFn = perfilFotoEscolhida.toString(); console.log('FN_SRC_LEN', origFn.length); console.log('FN_SRC', origFn.slice(0,400)); try { await perfilFotoEscolhida(document.getElementById('pf-file')); return 'ok'; } catch(e) { return 'ERR:' + e.message; }
   });
+  console.log('EVAL_RESULT', r);
 
   await expect.poll(() => chamadas.rpcs.length).toBeGreaterThan(0);
   expect(chamadas.rpcs[0].nome).toBe('perfil_atualizar_foto');
