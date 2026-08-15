@@ -529,7 +529,7 @@ humana sobre qual conjunto de perfis é correto), ~40 tabelas tipo (c)
 Biomonitor/Brigadas/Pesquisa (mesmo cuidado tabela-a-tabela da 263), e
 consolidar as 3 policies redundantes de `camadas_mapa` | 4 |
 | 6 | ✅ `biomonitor` no catálogo de módulos + revisar os `USING (true)` das 4 tabelas de configuração (migrations 263/264). Tabelas de dado de campo (cautelas, ocorrências) ficaram de fora — são §3 (§1.5) | — |
-| 6b | **Sidebar passa a ler `minhas_permissoes`** em vez das listas de perfis fixas (§1.4b) | 4 |
+| 6b | 🟡 **Parcial**: `appState.permissoes` alimentado por `minhas_permissoes` em `carregarUsuario()` (js/config.js), fail-open. `js/layout.js` **ainda não lê isso** — nenhum dos 12 itens com `perfis:` hard-coded tem correspondência 1:1 com uma chave de módulo (ex.: `agua` no catálogo governa 6 itens de menu; `biomonitor-validacao`/`admin-biomonitor`/etc. não têm chave própria, só a genérica `biomonitor`); e os 3 candidatos com match exato (`validacao-campo`, `admin-brigadas`, grupo `frota`) têm o MESMO drift catálogo×realidade da frente 5 — converter esconderia ou mostraria links para perfis diferentes dos de hoje. Ver §1.4b | 4 |
 | 7 | Trilha de auditoria genérica sobre as tabelas de permissão | §5 |
 | 8 | Virada módulo a módulo (Frota → Água → …), com relatório de impacto | tudo |
 | 9 | Regra permanente no `CLAUDE.md` + `tests/permissao-organograma.test.js` | — |
