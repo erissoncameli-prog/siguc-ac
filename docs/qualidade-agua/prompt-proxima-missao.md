@@ -29,11 +29,18 @@ diga por quê antes de mudar.
    `lgpd_aceites`.
 3. **Encadeamento de hash + selo diário FORA do banco** (§2.1 do plano).
    O selo é obrigatório, não opcional: sem ponto fixo externo, quem
-   reescreve uma linha recalcula a cadeia toda. Mínimo: e-mail
-   institucional via Resend (`RESEND_API_KEY` já existe, mesmo caminho dos
-   alertas ambientais), com data, contagem de linhas, última linha e hash
-   da cabeça. Mais a RPC `agua_auditoria_verificar()` e "último selo
-   emitido em…" no topo da tela de auditoria.
+   reescreve uma linha recalcula a cadeia toda. Envio por e-mail via
+   Resend (`RESEND_API_KEY` já existe, mesmo caminho dos alertas
+   ambientais), com data, contagem de linhas, última linha e hash da
+   cabeça. Mais a RPC `agua_auditoria_verificar()` e "último selo emitido
+   em…" no topo da tela de auditoria.
+   **O endereço de destino ainda não foi definido** — não invente um e não
+   bloqueie a entrega por isso: o selo é sempre gerado e gravado em
+   `agua_auditoria_selos`, e o destino sai de `config_sistema.dados`,
+   editável em Configurações sem migration nem deploy (padrão do
+   Encarregado/DPO). Sem endereço preenchido, o selo é gerado e não
+   enviado, **com aviso na tela de auditoria** de que a trilha ainda não
+   tem âncora externa. Ver §6.2 do plano.
 4. **UPDATE/DELETE por RPC**, com justificativa validada no banco (não só
    no JS) e prova de reautenticação por senha **verificada no servidor**.
    INSERT continua direto e sem senha — o app de campo é offline-first e
