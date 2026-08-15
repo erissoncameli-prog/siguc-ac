@@ -46,6 +46,7 @@ function aguaRelRiosDe(coletas) {
 function aguaRelFiltrosTxt(filtros) {
   if (!filtros) return ''
   const partes = []
+  if (filtros.bacia) partes.push(`Bacia: ${filtros.bacia === AGUA_REL_SEM_BACIA ? 'Sem bacia definida' : filtros.bacia}`)
   if (filtros.rio) partes.push(`Rio: ${filtros.rio}`)
   if (filtros.status) partes.push(`Status: ${AGUA_REL_STATUS_LABEL[filtros.status] || filtros.status}`)
   if (filtros.iqaFaixa) partes.push(`Faixa IQA: ${filtros.iqaFaixa}`)
