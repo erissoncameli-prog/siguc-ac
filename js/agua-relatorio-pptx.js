@@ -1,8 +1,9 @@
 // ── SIGUC-AC · Qualidade da Água — Relatório PPTX por bacia (Fase 5) ─
 // Apresentação executiva (para gestores, não para arquivo — o
-// documento de registro é o PDF, js/agua-relatorio-pdf.js): evolução
-// do IQA por ponto ao longo das campanhas, resumo da bacia,
-// conformidade CONAMA. Usa pptxgenjs (js/vendor/pptxgenjs-4.0.1.bundle.js
+// documento de registro é o PDF, js/agua-relatorio-pdf.js): capa,
+// PAINEL do período (o mesmo da tela e da 1ª página do PDF), evolução
+// do IQA por ponto ao longo das campanhas e conformidade CONAMA
+// detalhada. Usa pptxgenjs (js/vendor/pptxgenjs-4.0.1.bundle.js
 // — vendorizado, mesmo padrão de js/vendor/turf-6.5.0.min.js/
 // proj4-2.11.0.min.js, para não depender de CDN).
 //
