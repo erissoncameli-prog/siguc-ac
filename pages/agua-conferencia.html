@@ -103,7 +103,7 @@ let _coletas = [], _editandoId = null
       </div>
       <div class="card"><div class="table-wrap"><div class="table-scroll">
         <table>
-          <thead><tr><th>Linha</th><th>Ponto</th><th>Campanha</th><th>Data</th><th>Motivo</th><th>Ações</th></tr></thead>
+          <thead><tr><th>Linha</th><th>Código</th><th>Ponto</th><th>Campanha</th><th>Data</th><th>Motivo</th><th>Ações</th></tr></thead>
           <tbody id="tbody-ag"><tr><td colspan="6" style="text-align:center;padding:24px;color:#9CA3AF">Carregando...</td></tr></tbody>
         </table>
       </div></div></div>
@@ -134,10 +134,11 @@ function renderLista() {
       || (c.agua_pontos_coleta?.codigo_ana || '').includes(termo)
   })
   document.getElementById('ag-contador').textContent = `${lista.length} de ${_coletas.length} em quarentena`
-  if (!lista.length) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:24px;color:#9CA3AF">Nenhuma coleta em quarentena</td></tr>'; return }
+  if (!lista.length) { tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:24px;color:#9CA3AF">Nenhuma coleta em quarentena</td></tr>'; return }
   tbody.innerHTML = lista.map(c => `
     <tr>
       <td class="mono">${esc(c.linha_origem_planilha ?? '—')}</td>
+      <td class="mono" style="font-size:11px">${esc(c.codigo_amostra || '—')}</td>
       <td>${esc(c.agua_pontos_coleta?.nome || '—')} <span style="color:#9CA3AF;font-size:11px">(${esc(c.agua_pontos_coleta?.codigo_ana || '')})</span></td>
       <td style="font-size:12px">${esc(c.agua_campanhas?.ano ?? '')}/${c.agua_campanhas?.ordem === 'segunda' ? '2ª' : '1ª'}</td>
       <td style="font-size:12px">${formatData(c.data_coleta)}</td>
@@ -158,7 +159,7 @@ function abrirAg(id) {
   document.getElementById('ag-linha').textContent = c.linha_origem_planilha ?? '—'
   document.getElementById('ag-motivo').textContent = c.quarentena_motivo || '—'
   document.getElementById('ag-contexto').textContent =
-    `${c.agua_pontos_coleta?.nome || ''} (${c.agua_pontos_coleta?.codigo_ana || ''}) · campanha ${c.agua_campanhas?.ano ?? ''}/${c.agua_campanhas?.ordem === 'segunda' ? '2ª' : '1ª'}`
+    `${c.codigo_amostra ? c.codigo_amostra + ' · ' : ''}${c.agua_pontos_coleta?.nome || ''} (${c.agua_pontos_coleta?.codigo_ana || ''}) · campanha ${c.agua_campanhas?.ano ?? ''}/${c.agua_campanhas?.ordem === 'segunda' ? '2ª' : '1ª'}`
   document.getElementById('ag-data').value = c.data_coleta || ''
   document.getElementById('ag-hora').value = c.hora_coleta ? c.hora_coleta.slice(0, 5) : ''
   document.getElementById('ag-observacoes').value = c.observacoes || ''

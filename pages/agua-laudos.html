@@ -113,7 +113,7 @@ let _fila = [], _labs = [], _editandoId = null, _podeEditar = false
       </div>
       <div class="card"><div class="table-wrap"><div class="table-scroll">
         <table>
-          <thead><tr><th>Ponto</th><th>Campanha</th><th>Data da coleta</th><th>Aguardando há</th><th>Ações</th></tr></thead>
+          <thead><tr><th>Código</th><th>Ponto</th><th>Campanha</th><th>Data da coleta</th><th>Aguardando há</th><th>Ações</th></tr></thead>
           <tbody id="tbody-fila"><tr><td colspan="5" style="text-align:center;padding:24px;color:#9CA3AF">Carregando...</td></tr></tbody>
         </table>
       </div></div></div>
@@ -153,11 +153,12 @@ function renderFila() {
     || (c.ponto_nome || '').toLowerCase().includes(termo)
     || (c.codigo_ana || '').includes(termo))
   document.getElementById('lz-contador').textContent = `${lista.length} de ${_fila.length} aguardando laudo`
-  if (!lista.length) { tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;color:#9CA3AF">Nenhuma coleta aguardando laudo</td></tr>'; return }
+  if (!lista.length) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:24px;color:#9CA3AF">Nenhuma coleta aguardando laudo</td></tr>'; return }
   tbody.innerHTML = lista.map(c => {
     const dias = diasEsperando(c.data_coleta)
     return `
     <tr>
+      <td class="mono" style="font-size:11px">${esc(c.codigo_amostra || '—')}</td>
       <td>${esc(c.ponto_nome)} <span style="color:#9CA3AF;font-size:11px">(${esc(c.codigo_ana)})</span></td>
       <td style="font-size:12px">${c.campanha_ano}/${c.campanha_ordem === 'segunda' ? '2ª' : '1ª'}</td>
       <td style="font-size:12px">${formatData(c.data_coleta)}</td>
@@ -172,7 +173,7 @@ function abrirLaudo(id) {
   const c = _fila.find(x => x.id === id)
   if (!c) return
   document.getElementById('lz-contexto').textContent =
-    `${c.ponto_nome} (${c.codigo_ana}) · campanha ${c.campanha_ano}/${c.campanha_ordem === 'segunda' ? '2ª' : '1ª'} · coletado em ${formatData(c.data_coleta)}`
+    `${c.codigo_amostra ? c.codigo_amostra + ' · ' : ''}${c.ponto_nome} (${c.codigo_ana}) · campanha ${c.campanha_ano}/${c.campanha_ordem === 'segunda' ? '2ª' : '1ª'} · coletado em ${formatData(c.data_coleta)}`
   document.getElementById('lz-laboratorio').value = c.laboratorio_id || ''
   document.getElementById('lz-observacoes').value = c.observacoes || ''
   document.getElementById('lz-arquivo').value = ''
