@@ -461,6 +461,21 @@ let _perfilUsuario = ''
         </div>
         <div id="unidades-content"><p style="color:#9CA3AF;padding:32px;text-align:center">Carregando...</p></div>
       </div>
+
+      ${usuario.perfil === 'super_admin' ? `
+      <div id="tab-modulos-setor" class="tab-panel">
+        <div class="aviso-inline" style="margin-bottom:16px">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <span>Define qual setor é "dono" de cada módulo. Quem é lotado na unidade (ou em unidade abaixo dela) recebe o nível marcado; quem chefia acima só visualiza. Ainda não afeta nenhum acesso — liga módulo a módulo, mais adiante. Ver <code>docs/acesso-por-organograma.md</code>.</span>
+        </div>
+        <div class="filter-bar">
+          <button class="btn btn-primary" onclick="abrirModalModuloUnidade()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Amarrar módulo a setor
+          </button>
+        </div>
+        <div id="modulos-setor-content"><p style="color:#9CA3AF;padding:32px;text-align:center">Carregando...</p></div>
+      </div>` : ''}
     </div>` +
     '</div></div></div>'
 
