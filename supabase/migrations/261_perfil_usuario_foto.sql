@@ -98,7 +98,11 @@ BEGIN
 END;
 $$;
 
-REVOKE EXECUTE ON FUNCTION usuarios_travar_campos_sensiveis() FROM anon, authenticated;
+-- REVOKE por nome de papel não basta: o Postgres concede EXECUTE a
+-- PUBLIC na criação da função, e PUBLIC inclui `anon` implicitamente
+-- (mesmo achado do ALTER DEFAULT PRIVILEGES do projeto, documentado no
+-- CLAUDE.md). Revogar de PUBLIC é o que de fato fecha.
+REVOKE EXECUTE ON FUNCTION usuarios_travar_campos_sensiveis() FROM PUBLIC;
 
 DROP TRIGGER IF EXISTS trg_usuarios_travar_campos_sensiveis ON usuarios;
 CREATE TRIGGER trg_usuarios_travar_campos_sensiveis
