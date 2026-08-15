@@ -22,7 +22,10 @@
 // Depende de: formatData() (js/config.js); getCabecalhoRelatorio(),
 // gerarProtocolo() (js/config-sistema.js); BIOPDF_FONT_REGULAR_B64/
 // BIOPDF_FONT_BOLD_B64 (js/biomonitor-pdf-fonts.js); aguaRelLabelCampanha(),
-// AGUA_REL_PARAM_LABEL, aguaRelFiltrosTxt() (js/agua-relatorio-dados.js);
+// AGUA_REL_PARAM_LABEL, aguaRelFiltrosTxt(), aguaRelDistribuicaoFaixas(),
+// aguaRelViolacoesRanking(), aguaRelIqaPorPonto(), aguaRelPorCampanha()
+// (js/agua-relatorio-dados.js); AGUA_IQA_FAIXA_COR/ORDEM
+// (js/agua-iqa-visual.js — só a paleta, com fallback local);
 // jsPDF + jspdf-autotable (js/vendor/jspdf-2.5.2.umd.min.js,
 // js/vendor/jspdf-autotable-3.8.4.min.js).
 
