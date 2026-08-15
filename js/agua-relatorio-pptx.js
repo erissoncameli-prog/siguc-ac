@@ -14,8 +14,10 @@
 // screenshots), então não há função para reaproveitar de lá, só a
 // paleta de cores.
 //
-// Depende de: aguaRelLabelCampanha(), aguaRelSerieIQA(), aguaRelFiltrosTxt()
-// (js/agua-relatorio-dados.js); window.PptxGenJS (js/vendor/pptxgenjs-4.0.1.bundle.js).
+// Depende de: aguaRelLabelCampanha(), aguaRelSerieIQA(), aguaRelFiltrosTxt(),
+// aguaRelDistribuicaoFaixas(), aguaRelIqaPorPonto() (js/agua-relatorio-dados.js);
+// AGUA_IQA_FAIXA_COR/ORDEM (js/agua-iqa-visual.js — só a paleta, com
+// fallback local); window.PptxGenJS (js/vendor/pptxgenjs-4.0.1.bundle.js).
 
 const AGPPTX_C = {
   darkBg: '0A1A0F', green: '52B788', gold: 'C9A84C', goldLt: 'F0CB6A',
