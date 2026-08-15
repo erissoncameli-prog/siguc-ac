@@ -1118,6 +1118,85 @@ linha. Linha de teste apagada ao final (`DELETE … WHERE uuid_cliente
 pré-existentes do projeto. `bash scripts/guardrails.sh`: 0 falhas
 críticas, mesmos 32 avisos pré-existentes.
 
+## Pós-lançamento — Painel visual em `pages/agua-relatorios.html`
+
+Fora do plano de 5 fases. A tela de Relatórios era um formulário
+(bacia + campanhas + 4 filtros) com 6 KPIs e uma lista de pontos; virou
+um **painel** — layout de cards inspirado num modelo de dashboard
+trazido pelo usuário (cabeçalho com pílulas à direita, coluna estreita
+de KPIs com o primeiro card invertido, medidor semicircular, barras com
+o valor rotulado acima, card de lista com ranking). Só o **estilo** veio
+do modelo: cores, fontes e componentes são os do design system do
+projeto.
+
+O que o painel mostra, e por quê:
+- **IQA médio do período** (card escuro) com variação vs. a campanha
+  anterior — `aguaRelVariacaoIQA` devolve `null` com menos de duas
+  campanhas com índice: sem duas medições não existe tendência, e
+  mostrar um chip de "+0" sugeriria estabilidade que ninguém mediu.
+- **Coletas no período** (pontos, campanhas, quantas em conferência).
+- **Distribuição por faixa do IQA** — barra segmentada, a única leitura
+  em que as 5 cores de faixa aparecem juntas. Chips de campanha
+  recortam **só a exibição** deste card; o recorte do relatório (e do
+  PDF/PPTX) continua sendo o dos filtros do topo.
+- **Conformidade CONAMA** em medidor semicircular, com os três estados
+  separados (conforme / violação / sem limites cadastrados) — nunca
+  substitui o IQA, nem é substituído por ele.
+- **IQA médio por ponto** em barras + **parâmetros que mais violaram**
+  em ranking; **evolução por campanha** de um ponto (gráfico de linha
+  que já existia, com o ponto escolhido por chip).
+- A lista de pontos continua embaixo, dizendo explicitamente que é o
+  que o PDF/PPTX exportam.
+
+Regras que a entrega respeitou (e que valem para qualquer tela nova do
+módulo):
+- **Nada de IQA/CONAMA recalculado no cliente.** As agregações novas
+  (`aguaRelPorCampanha`, `aguaRelIqaPorPonto`, `aguaRelDistribuicaoFaixas`,
+  `aguaRelVariacaoIQA`, `aguaRelViolacoesRanking`) só contam e somam o
+  que `vw_agua_coletas_detalhe` já entregou. **Classificar uma MÉDIA
+  numa faixa seria recalcular** — por isso as barras de magnitude usam
+  uma escala de um tom só (verde institucional) em vez da paleta de
+  faixa, e o KPI de IQA médio mostra o número sem rótulo de faixa.
+- **Gráfico mora em `js/agua-iqa-visual.js`**, nunca na página:
+  `aguaIqaGaugeHTML`, `aguaIqaBarrasHTML` e `aguaIqaFaixasBarraHTML`
+  entraram lá, ao lado do `aguaIqaGraficoHTML` que já existia.
+- **Coleta em quarentena nunca é escondida**: entra na distribuição,
+  esmaece a barra do ponto e continua com selo na lista.
+
+**Paleta do IQA corrigida nesta entrega**: `Péssima` era `#9F1239` e,
+contra `Ruim` (`#C2410C`), dava ΔE 12,3 para visão **normal** — abaixo
+do piso 15 do validador do skill de dataviz. Nunca tinha aparecido
+porque no mapa e no app as duas faixas jamais se encostavam; na barra
+segmentada, encostam. Passou a `#86198F` (passa os 5 checks em modo
+claro) e o badge de mapa acompanhou (`badge-erro` → `badge-roxo`):
+marcador e badge não podem discordar na mesma tela.
+
+Duas armadilhas de layout, resolvidas e documentadas no código:
+- `.adash-filtros`/`.adash-pill-n` definem `display`, o que **vence o
+  `[hidden]`** de `global.css` (mesma especificidade, folha posterior) —
+  precisam de regra `[hidden]` própria.
+- Card é `flex-column` esticado pela grade; sem `flex-shrink:0` nos
+  filhos, o conteúdo encolhe e **vaza por cima do vizinho** (era o
+  rótulo do medidor aparecendo atrás dos chips). O SVG do medidor
+  também precisa de `display:block; height:auto` — inline, herda
+  `line-height` e a caixa fica mais alta que o desenho.
+
+Guarda: `tests/agua-relatorios.test.js` ganhou 8 testes — 3 de
+agregação pura e 5 de render de ponta a ponta, com o cliente Supabase
+substituído por stub via `addInitScript` (e o CDN do supabase-js
+**bloqueado por `page.route`**, senão ele sobrescreve o stub em máquina
+com internet e a página cai no redirect de login). O `require` do
+`pdf-parse` virou preguiçoso: ele depende de binding nativo
+(`@napi-rs/canvas`) que não carrega em toda máquina, e no topo do
+arquivo derrubava a coleta inteira ("No tests found"), levando junto
+testes que nada têm a ver com PDF.
+
+`pwa/sw.js`: agua v11 → v12 (`agua-iqa-visual.js` e
+`agua-relatorio-dados.js` estão no shell); e brigadas 262 → 263,
+biomonitor 30 → 31, frota 86 → 87 porque `js/config.js` (3 ícones
+novos: `chevron-down`, `arrow-up`, `arrow-down`) está no shell dos
+quatro apps.
+
 ## Decisões ainda abertas (não travam a Fase 0)
 
 - **Sólidos em suspensão** — a incoerência de unidade acima. Entra na
