@@ -389,7 +389,7 @@ chama — isso só acontece na frente 4.
 | 3 | `credenciamentos` + tela + cron de vencimento + revogação | — (pode ir em paralelo) |
 | 4 | `nivel_efetivo()` v2 + `modulos.exige_lotacao` + `vw_impacto_lotacao` | 1, 2, 3 |
 | 5 | Inventário das 133 policies + conversão por lotes | 4 |
-| 6 | `biomonitor` no catálogo de módulos + revisar os `USING (true)` das tabelas dele (§1.5) | — |
+| 6 | ✅ `biomonitor` no catálogo de módulos + revisar os `USING (true)` das 4 tabelas de configuração (migrations 263/264). Tabelas de dado de campo (cautelas, ocorrências) ficaram de fora — são §3 (§1.5) | — |
 | 6b | **Sidebar passa a ler `minhas_permissoes`** em vez das listas de perfis fixas (§1.4b) | 4 |
 | 7 | Trilha de auditoria genérica sobre as tabelas de permissão | §5 |
 | 8 | Virada módulo a módulo (Frota → Água → …), com relatório de impacto | tudo |
