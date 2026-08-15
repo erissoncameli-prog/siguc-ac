@@ -217,13 +217,13 @@ test.describe('agregação (js/agua-relatorio-dados.js) — pura, sem rede', () 
     const soRioAcre = await page.evaluate((coletas) => window.aguaRelMontar(coletas, { bacia: 'Rio Acre' }), todas);
     expect(soRioAcre.pontos.map(p => p.nome).sort()).toEqual(['Porto Acre', 'Rio Branco']);
 
-    const semBacia = await page.evaluate((coletas) => window.aguaRelMontar(coletas, { bacia: window.AGUA_REL_SEM_BACIA }), todas);
+    const semBacia = await page.evaluate((coletas) => window.aguaRelMontar(coletas, { bacia: AGUA_REL_SEM_BACIA }), todas);
     expect(semBacia.pontos.map(p => p.nome)).toEqual(['Senador Guiomard']);
 
     // Texto legível dos filtros inclui a bacia quando o filtro está ativo.
     const txt = await page.evaluate(() => window.aguaRelFiltrosTxt({ bacia: 'Purus', rio: null, status: null, iqaFaixa: null, conamaStatus: null }));
     expect(txt).toBe('Bacia: Purus');
-    const txtSemBacia = await page.evaluate(() => window.aguaRelFiltrosTxt({ bacia: window.AGUA_REL_SEM_BACIA, rio: null, status: null, iqaFaixa: null, conamaStatus: null }));
+    const txtSemBacia = await page.evaluate(() => window.aguaRelFiltrosTxt({ bacia: AGUA_REL_SEM_BACIA, rio: null, status: null, iqaFaixa: null, conamaStatus: null }));
     expect(txtSemBacia).toBe('Bacia: Sem bacia definida');
   });
 
