@@ -1590,6 +1590,73 @@ marcador cair na mesma longitude — destructuring posicional com
 contagem errada de blanks; corrigido indexando por `p[6]`/`p[7]` em vez
 de contar vírgulas no olho.
 
+**Pós-lançamento — emblema + rio nas telas de bloqueio do app.** As 4
+telas com `.lock-screen` de `agua-app.html` (entrar, criar senha, digitar
+PIN, criar PIN) trocaram a gota plana em SVG pelo emblema do app
+(`/pwa/icons/icon-agua-512.png`, o mesmo do launcher) e ganharam um rio
+animado ao fundo, com resposta ao toque. Tudo em `js/agua-rio.js` (novo);
+nenhuma página redesenha nada.
+- **Campo de fluxo, nunca senóide.** A 1ª tentativa animava ondas
+  mudando de FASE: curva que muda de forma sem sair do lugar não é lida
+  como correnteza, o olho vê fio luminoso se contorcendo. O que vale é
+  partícula advectada (nasce no topo, deixa esteira, morre embaixo) — o
+  padrão VIAJA. Três coisas fazem parecer rio, e mexer nelas é mexer no
+  efeito: turbulência de ROTACIONAL (divergência zero, os fios se
+  enrolam em vez de se cruzarem), PERFIL DE CANAL (meio rápido, margem
+  quase parada — sem isso é chuva caindo, não rio) e ESTEIRA
+  (`destination-out` tirando alpha, nunca `clearRect`).
+- ⚠ **A diferença finita do rotacional tem de ser dividida por 2·d.**
+  Sem normalizar, a deriva lateral fica em ~1 px/s contra 46 px/s de
+  descida — chuva reta, sem redemoinho. Foi o defeito real da 1ª versão,
+  achado medindo o campo, não olhando a tela. Ao normalizar, o outro
+  extremo aparece: o `vy` chega a −62 (água SUBINDO). Calibragem final
+  por varredura numérica (`curl` 30, amortecimento 0,22 no eixo
+  vertical) + piso em `_campo`: a turbulência amassa a descida, nunca a
+  inverte.
+- ⚠ **Calibragem é proporcional à tela, nunca em pixel absoluto.** Com
+  escala fixa o redemoinho tem sempre ~139 px: numa tela de 274 é um
+  meandro calmo, numa de 430 vira rabisco miúdo e o fundo parece
+  ARRANHADO. `_calibrar()` amarra o tamanho do redemoinho à LARGURA e a
+  velocidade à ALTURA (a água leva ~12 s para atravessar em qualquer
+  aparelho).
+- ⚠ **Quem morre de idade renasce ESPALHADO, não no topo.** A travessia
+  (~12 s) é mais longa que a vida de um filete (3–9 s), então quase
+  nenhum completa o percurso; mandar todos de volta ao topo amontoava a
+  água na faixa de cima e deixava a metade de baixo vazia. Só quem sai
+  pela borda volta pelo topo.
+- **Toque na água**: a onda não é só um anel desenhado por cima — ela
+  EMPURRA o campo de fluxo ao passar (`_campo` soma o empurrão radial),
+  então os filetes se afastam do dedo de verdade, com anel, clarão curto
+  e respingos balísticos. Escutado na `.lock-screen` em CAPTURA, não no
+  canvas (que é `pointer-events:none`): assim apertar uma tecla do PIN
+  também ondula — cada dígito vira uma gota na água.
+- ⚠ **Armadilha de CSS achada aqui**: `.lock-screen > *` tem a MESMA
+  especificidade que `.lock-rio` e vem depois no arquivo, então vencia
+  com `position: relative` — e canvas relative vira item do flex,
+  empurrando o conteúdo das 4 telas. O `position: absolute` precisa ser
+  repetido na regra `.lock-screen > .lock-rio`. Empilhamento:
+  0 rio · 1 vinheta · 2 conteúdo.
+- **Bateria (aparelho de campo)**: as 4 telas coexistem no DOM, então
+  sem trava rodariam 4 rios ao mesmo tempo. `IntersectionObserver` só
+  anima a tela à vista, e `visibilitychange` para com o app em segundo
+  plano. Com "reduzir movimento" o rio desenha um quadro parado e o
+  toque nem é instalado.
+- ⚠ **`/pwa/icons/…` NÃO existe dentro do APK.** O emblema é a primeira
+  `<img>` de caminho absoluto do app; sem cópia explícita, as 4 telas do
+  APK abririam com imagem quebrada (o site serve pela Vercel, o shell
+  nativo não tem nada fora de `www/`). `app-agua/scripts/build-www.mjs`
+  passou a copiar `pwa/icons/` e ganhou uma trava para `<img src="/…">`
+  não embarcada — irmã da que já existia para `<script src="/js/…">`.
+  Qualquer imagem nova de caminho absoluto precisa entrar na lista.
+- Guarda: `tests/agua-rio.test.js` (5 testes). A verificação do desenho é
+  por PIXEL do próprio canvas (`getImageData`, canal alpha), não por
+  screenshot — a vinheta do CSS fica POR CIMA do rio, então um
+  screenshot mediria os dois misturados. Cobre também o emblema
+  carregando de fato (`naturalWidth > 0` pega caminho errado, que a olho
+  nu só some), o canvas não roubando o toque das teclas, e as telas
+  escondidas com ZERO pixel pintado.
+- `pwa/sw.js`: agua v15 → v16 (`js/agua-rio.js` e o ícone no shell).
+
 ## Próxima tarefa
 Módulo Qualidade da Água (IQA): as 5 fases do plano original estão
 ENTREGUES (ver `docs/qualidade-agua/plano.md`, seções "Fase 0" a "Fase

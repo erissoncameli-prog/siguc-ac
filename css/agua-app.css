@@ -73,14 +73,32 @@
   position: relative;
   overflow: hidden;
 }
+/* Rio animado ao fundo (js/agua-rio.js). Fica ATRÁS da vinheta, senão a
+   correnteza chega às bordas com força total e briga com o conteúdo.
+   pointer-events:none — o toque é escutado na .lock-screen, não aqui,
+   para não roubar o clique das teclas do PIN. */
+.lock-rio {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  display: block;
+  pointer-events: none;
+}
+/* Empilhamento das telas de bloqueio, de baixo para cima:
+   0 rio · 1 vinheta · 2 conteúdo.
+   O `position` PRECISA ser repetido aqui: `.lock-screen > *` (abaixo)
+   tem a mesma especificidade que `.lock-rio` e vem depois, então
+   venceria com `relative` — e um canvas relative vira item do flex,
+   empurrando o conteúdo das 4 telas para fora do lugar. */
+.lock-screen > .lock-rio { position: absolute; z-index: 0; }
+
 /* Véu sutil nas bordas para concentrar o olhar no centro (vinheta) */
 .lock-screen::after {
   content: '';
-  position: absolute; inset: 0; z-index: 0;
+  position: absolute; inset: 0; z-index: 1;
   pointer-events: none;
   background: radial-gradient(125% 95% at 50% 42%, transparent 58%, rgba(3,10,7,.55) 100%);
 }
-.lock-screen > * { position: relative; z-index: 1; }
+.lock-screen > * { position: relative; z-index: 2; }
 
 /* Faixa institucional (Governo + SEMA) no topo das telas de PIN */
 .lock-faixa {
@@ -679,8 +697,16 @@ body { margin: 0; }
 .faixa-inst.compacta .faixa-logo-chip.gov { height: 34px; max-width: 124px; }
 .faixa-inst.compacta .faixa-mascote { width: 58px; height: 58px; bottom: -26px; }
 
-/* Mascote nas telas de login/bloqueio/PIN */
-.lock-mascote { width: 84px; height: 84px; border-radius: 50%; }
+/* Emblema do app nas telas de login/bloqueio/PIN.
+   Sem recorte circular (o molde de brigada.css usava 50% porque lá é
+   uma foto de mascote): a arte do IQA já é um squircle com cantos
+   próprios e transparência em volta — arredondar de novo comeria as
+   pontas do emblema. */
+.lock-mascote {
+  width: 84px; height: 84px;
+  border-radius: 0;
+  filter: drop-shadow(0 7px 20px rgba(2,132,199,.5));
+}
 
 /* ── Animações do mascote ─────────────────────────────────── */
 /* Respiração suave (vida em repouso) */
