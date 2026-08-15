@@ -19,12 +19,20 @@
 
 const AGUA_IQA_FAIXA_ORDEM = ['Ótima', 'Boa', 'Regular', 'Ruim', 'Péssima']
 
+// PÉSSIMA CORRIGIDA (painel de relatórios): #9F1239 ↔ Ruim (#C2410C)
+// dava ΔE 12,3 para visão NORMAL — abaixo do piso 15 do validador do
+// skill de dataviz, ou seja, duas faixas vizinhas da MESMA escala que
+// um leitor sem daltonismo custa a separar (o problema só apareceu
+// agora porque o painel põe as 5 faixas lado a lado numa barra
+// segmentada; no mapa e no app elas nunca se encostavam). #86198F
+// mantém a leitura pior→melhor e passa os 5 checks
+// (scripts/validate_palette.js do skill, modo light).
 const AGUA_IQA_FAIXA_COR = {
   'Ótima':   '#1D4ED8',
   'Boa':     '#059669',
   'Regular': '#CA8A04',
   'Ruim':    '#C2410C',
-  'Péssima': '#9F1239',
+  'Péssima': '#86198F',
 }
 
 // Classes badge-* de css/global.css — só usável em telas de mesa que
