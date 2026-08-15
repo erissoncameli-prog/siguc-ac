@@ -247,26 +247,72 @@ function aguaIqaBarrasHTML(itens, opts) {
     ${temFraco ? '<p style="font-size:10px;color:#9CA3AF;margin-top:2px">Barra esmaecida = inclui coleta ainda em conferência</p>' : ''}`
 }
 
-// Barra horizontal segmentada da distribuição por faixa do IQA — a
-// única leitura do painel em que as 5 cores de faixa aparecem juntas.
-// 2px de respiro entre segmentos (spec do skill) e legenda sempre
-// presente com o número ao lado: a cor nunca carrega o dado sozinha.
-// `contagem`: { 'Ótima': n, ... }; `semIQA` entra como segmento cinza.
-function aguaIqaFaixasBarraHTML(contagem, semIQA, opts) {
-  const o = Object.assign({ altura: 14 }, opts || {})
+// Rosca (donut) da distribuição por faixa do IQA — a única leitura do
+// painel em que as 5 cores de faixa aparecem juntas. Substituiu uma
+// barra segmentada horizontal (pedido do usuário: "fica melhor com uma
+// rosca"); mesmo dado (aguaRelDistribuicaoFaixas), mesma regra de
+// nunca deixar a cor sozinha — legenda sempre junto, com o número.
+// `contagem`: { 'Ótima': n, ... }; `semIQA` entra como fatia cinza.
+function aguaIqaFaixasRoscaHTML(contagem, semIQA, opts) {
+  const o = Object.assign({ tamanho: 156, espessura: 24 }, opts || {})
   const itens = AGUA_IQA_FAIXA_ORDEM
     .map(f => ({ label: f, n: (contagem || {})[f] || 0, cor: AGUA_IQA_FAIXA_COR[f] }))
     .concat(semIQA ? [{ label: 'Sem índice', n: semIQA, cor: AGUA_SEM_IQA_COR }] : [])
+    .filter(i => i.n > 0)
   const total = itens.reduce((s, i) => s + i.n, 0)
-  if (!total) return '<p style="font-size:12px;color:#9CA3AF;margin:8px 0">Nenhuma coleta com índice calculado no recorte.</p>'
+  if (!total) return '<p style="text-align:center;font-size:12px;color:#9CA3AF;margin:8px 0;padding:20px 0">Nenhuma coleta com índice calculado no recorte.</p>'
 
-  const segmentos = itens.filter(i => i.n > 0).map(i =>
-    `<div title="${_aguaEsc(i.label)}: ${i.n} coleta(s)" style="flex:${i.n} 1 0;background:${i.cor};min-width:4px"></div>`).join('')
-  const legenda = itens.filter(i => i.n > 0).map(i => `
+  const w = o.tamanho, cx = w / 2, cy = w / 2, r = (w - o.espessura) / 2
+  const circ = 2 * Math.PI * r
+  const respiro = itens.length > 1 ? 1.6 : 0 // gap entre fatias, spec do skill de dataviz
+  let acumulado = 0
+  const arcos = itens.map(i => {
+    const frac = i.n / total
+    const comprimento = Math.max(frac * circ - respiro, 0.01)
+    const offset = -acumulado * circ
+    acumulado += frac
+    return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${i.cor}" stroke-width="${o.espessura}" stroke-linecap="butt"
+      stroke-dasharray="${comprimento.toFixed(2)} ${(circ - comprimento).toFixed(2)}"
+      stroke-dashoffset="${offset.toFixed(2)}" transform="rotate(-90 ${cx} ${cy})"><title>${_aguaEsc(i.label)}: ${i.n} coleta(s)</title></circle>`
+  }).join('')
+
+  const legenda = itens.map(i => `
     <span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;color:#374151">
       <span style="width:8px;height:8px;border-radius:2px;background:${i.cor}"></span>${_aguaEsc(i.label)}
       <strong style="color:#111827">${i.n}</strong></span>`).join('')
 
-  return `<div style="display:flex;gap:2px;height:${o.altura}px;border-radius:${o.altura / 2}px;overflow:hidden;background:#F3F4F6">${segmentos}</div>
-    <div style="display:flex;flex-wrap:wrap;gap:10px 14px;margin-top:10px">${legenda}</div>`
+  return `<div style="display:flex;flex-direction:column;align-items:center;gap:10px">
+    <svg viewBox="0 0 ${w} ${w}" style="display:block;width:${w}px;max-width:100%;height:auto" role="img"
+        aria-label="Distribuição por faixa do IQA: ${_aguaEsc(itens.map(i => `${i.label} ${i.n}`).join(', '))}">
+      <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#F3F4F6" stroke-width="${o.espessura}"/>
+      ${arcos}
+      <text x="${cx}" y="${cy - 3}" text-anchor="middle" font-family="'Fraunces',Georgia,serif" font-size="${Math.round(w * 0.155)}" font-weight="700" fill="#111827">${total}</text>
+      <text x="${cx}" y="${cy + 15}" text-anchor="middle" font-family="'DM Sans',sans-serif" font-size="10" fill="#6B7280">coleta${total !== 1 ? 's' : ''}</text>
+    </svg>
+    <div style="display:flex;flex-wrap:wrap;gap:8px 12px;justify-content:center">${legenda}</div>
+  </div>`
+}
+
+// ── Estilo de marcador (mapa) ─────────────────────────────────────
+// Preenchimento pela FAIXA do IQA + borda pela conformidade CONAMA —
+// os dois canais visuais nunca se substituem (regra do módulo: um rio
+// pode ter IQA "Boa" e violar turbidez). Quarentena reduz a opacidade
+// do preenchimento (dado em conferência, nunca escondido). Usado por
+// pages/agua-mapa.html (coleta da campanha selecionada no eixo
+// temporal) e pelo mapa do painel em pages/agua-relatorios.html
+// (coleta mais recente do recorte de campanhas filtrado) — o dado que
+// entra muda, o desenho não; nunca reimplementar isto numa tela nova.
+// `coleta` nula = ponto sem coleta no recorte atual (vazado, nunca some).
+function aguaIqaEstiloMarcador(coleta) {
+  if (!coleta) return { fillColor: '#fff', fillOpacity: 0, color: AGUA_SEM_IQA_COR, weight: 1.5, dashArray: '4,4' }
+  const semLimites = coleta.conama_violacoes == null
+  const violou = !semLimites && coleta.conama_violacoes.length > 0
+  const corBorda = semLimites ? AGUA_SEM_IQA_COR : (violou ? '#DC2626' : '#16A34A')
+  return {
+    fillColor: AGUA_IQA_FAIXA_COR[coleta.iqa_faixa] || AGUA_SEM_IQA_COR,
+    fillOpacity: coleta.status === 'quarentena' ? .5 : .92,
+    color: corBorda,
+    weight: violou ? 3 : 2,
+    dashArray: semLimites ? '3,3' : null,
+  }
 }
