@@ -1554,6 +1554,17 @@ seguinte ("…Boa 2Regular 1…"), então `\b` não serve depois do número
 (usar `(?!\d)`), e títulos de bloco/seção estão em CAIXA ALTA.
 `pwa/sw.js`: agua v12 → v13.
 
+**E no PPTX (slide 2)**: "Resumo do período" virou "Painel do período"
+com os mesmos blocos (KPIs, distribuição por faixa, rosca da
+conformidade CONAMA com os TRÊS estados, IQA médio por ponto); slides 3
+e 4 seguem iguais. Diferença deliberada em relação ao PDF: aqui os
+gráficos são **nativos** (`addChart` do pptxgenjs), porque num deck quem
+apresenta precisa editar/copiar o gráfico — no documento impresso, não.
+`js/agua-relatorio-pptx.js` não está em shell de app (só a mesa usa),
+então não mexe em `pwa/sw.js`. ⚠️ PPTX renderizado não pôde ser
+conferido (sem LibreOffice/PowerPoint na máquina) — a verificação é
+estrutural sobre o XML do .pptx, e é isso que o teste trava.
+
 ## Próxima tarefa
 Módulo Qualidade da Água (IQA): as 5 fases do plano original estão
 ENTREGUES (ver `docs/qualidade-agua/plano.md`, seções "Fase 0" a "Fase
