@@ -43,7 +43,7 @@ const AGUA_IQA_FAIXA_BADGE = {
   'Boa':     'badge-verde',
   'Regular': 'badge-ouro',
   'Ruim':    'badge-erro badge-outline',
-  'Péssima': 'badge-erro',
+  'Péssima': 'badge-roxo', // acompanha a cor nova de AGUA_IQA_FAIXA_COR (badge e marcador nunca podem discordar na mesma tela)
 }
 
 const AGUA_SEM_IQA_COR = '#9CA3AF'
