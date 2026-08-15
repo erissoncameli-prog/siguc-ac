@@ -1351,6 +1351,78 @@ automático já é o que está sob teste) e ganhou bloqueio de
 `tile.openstreetmap.org` (evita tempo de rede/flakiness sem quebrar o
 Leaflet, que continua carregando de verdade via unpkg).
 
+## Pós-lançamento — Código único da coleta + confirmação de coordenada por GPS
+
+Duas queixas de campo: (1) o app não dava nenhum sinal positivo quando o
+coletor estava no ponto certo — só existia um aviso silencioso acima de
+1 km, folgado demais para pegar erro de ponto; (2) não havia um
+identificador confiável por coleta para vínculo futuro (laudo, ocorrência,
+citação em relatório) — só `codigo_amostra`, texto livre opcional (0 das
+451 linhas em produção tinham o campo preenchido, conferido antes desta
+entrega).
+
+**Decisão do usuário: um campo só.** O plano original desta entrega previa
+uma 2ª coluna (`codigo_coleta`, sequencial, molde ABAST-AAAA-NNNN/
+BIOEQ-AAAA-NNNN) ao lado de `codigo_amostra`. Em vez disso, `codigo_amostra`
+passou a ser AUTOGERADO (trigger `trg_agua_coletas_codigo`, migration 273)
+no molde `COL-AAAA-NNNN` sempre que o cliente não informa nada — o comum.
+Se o coletor digitar um valor (etiqueta física pré-existente de um kit de
+laboratório), esse valor é respeitado, mesma regra do
+`frota_gerar_codigo_abastecimento` (migration 175). Na prática o fluxo
+normal inverte: o sistema gera o código antes de o coletor escrever no
+frasco, e ele copia o código gerado para o rótulo físico — o texto de
+ajuda do campo em `pages/agua-app.html` foi atualizado para refletir isso.
+As 451 linhas já em produção foram preenchidas na mesma migration, em
+ordem cronológica, consumindo a mesma tabela-contador
+(`agua_coletas_contador`) que o trigger usa daqui pra frente — não fazia
+sentido "coleta sem número" para o dado antigo, já que o propósito é
+vínculo futuro. `UNIQUE(codigo_amostra)` garante que o identificador é
+sempre único. Achado do advisor logo depois de aplicar: a função de
+trigger ficava executável via RPC por `anon`/`authenticated` — corrigida
+na migration 274, mesmo padrão da 179 (Frota).
+
+**Confirmação de coordenada — derivada, nunca gravada.** Mesma disciplina
+de `agua_iqa_faixa`: a distância entre o GPS do aparelho
+(`agua_coletas.localizacao`, já existente desde a Fase 0) e a coordenada
+cadastrada do ponto (`agua_pontos_coleta.geom`) não precisa de coluna
+nova — é calculada na view a cada leitura (`agua_gps_faixa(numeric)`,
+migration 273, usando `ST_Distance` sobre `geography` para distância
+geodésica real). Três faixas, calibradas pelo erro típico de GPS de
+celular (5–20 m a céu aberto, mais sob copa de árvore/margem de rio):
+`confirmado` ≤30 m, `atencao` 30–150 m, `divergente` >150 m; sem leitura
+de GPS a view devolve `NULL` (nunca confundido com "confirmado"). A MESMA
+classificação roda nos dois lados — `pages/agua-app.html` calcula em
+tempo real com `agGpsFaixa()`/`agDistanciaMetros()` (client-side, para dar
+feedback antes de qualquer round-trip) e a view recalcula do zero a
+partir do que foi de fato gravado, então o que a mesa e os relatórios veem
+depois bate com o que o coletor viu em campo. Segue SEM bloquear
+salvamento — regra do sistema, nada pode impedir o trabalho de campo — só
+mudou de "aviso silencioso acima de 1 km" para 3 estados sempre visíveis
+(verde/âmbar/vermelho) no formulário e no modal de detalhe da coleta.
+
+Telas tocadas: `pages/agua-app.html` (formulário — indicador de 3 faixas
+substitui o aviso antigo; modal de detalhe — código + confirmação de
+coordenada no topo, footer antigo "Amostra: X" removido por redundância;
+Histórico por ponto e "Minhas coletas" passam a mostrar o código),
+`pages/agua-conferencia.html` e `pages/agua-laudos.html` (coluna/contexto
+com o código, para cruzar com o laudo físico — ambas já liam a linha
+inteira, sem mudança de query). `js/agua-relatorio-pdf.js` não mudou — já
+exibia `codigo_amostra` na ficha individual, que passa a ser
+automaticamente o identificador único. Nenhuma mudança em
+`js/agua-offline.js`/`js/agua-sync.js` (schema genérico já repassa campo
+novo) nem em `js/agua-relatorio-dados.js`/`agua-relatorio-pptx.js`/
+`agua-iqa-visual.js`/`agua-mapa.html`/`agua-pontos.html` (não referenciam
+identificador individual de coleta).
+
+Guarda: `tests/agua-app-fluxo.test.js` ganhou o teste "confirmação de
+coordenada: 3 faixas de distância do ponto cadastrado" (as 3 faixas +
+estado sem leitura de GPS, contra o ponto de teste real); o teste de
+sincronização que citava "~250m — não dispara aviso" (limiar antigo de
+1 km) foi atualizado — com as novas faixas isso já seria `divergente`, só
+relevante para o indicador do formulário, o teste de payload de sync
+continua isolado disso. `pwa/sw.js`: agua v14 → v15 (`agua-app.html`
+mudou).
+
 ## Decisões ainda abertas (não travam a Fase 0)
 
 - **Sólidos em suspensão** — a incoerência de unidade acima. Entra na

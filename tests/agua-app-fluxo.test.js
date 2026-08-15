@@ -143,6 +143,40 @@ test('salva uma coleta offline e ela aparece na fila como pendente', async ({ pa
   expect(errosRelevantes, `Erros de console inesperados:\n${errosRelevantes.join('\n')}`).toEqual([]);
 });
 
+test('confirmação de coordenada: 3 faixas de distância do ponto cadastrado', async ({ page }) => {
+  await abrirAppSemLogin(page);
+  await entrarComoColetorDeTeste(page);
+
+  await page.locator('#btn-nova-coleta').click();
+  await page.locator('#tela-form').waitFor({ state: 'visible' });
+  await page.selectOption('#f-ponto', 'ponto-teste-0001');
+
+  // ponto-teste-0001 fica em (-9.9754, -67.8243). Deslocamentos em
+  // latitude calibrados para caírem dentro de cada faixa de
+  // agua_gps_faixa() (migration 273): ≤30m confirmado, 30-150m
+  // atenção, >150m divergente — mesmos limiares nos dois lados
+  // (cliente e banco), só o cliente reage na hora, antes de sincronizar.
+  const casos = [
+    { deltaLat: 0.00013, esperado: 'confere', cor: 'confirmado' },     // ~15m
+    { deltaLat: 0.00080, esperado: 'confira se é o ponto certo', cor: 'atencao' }, // ~89m
+    { deltaLat: 0.00450, esperado: 'confirme se é o ponto certo', cor: 'divergente' }, // ~500m (antes ficava silencioso: limiar antigo era 1km)
+  ];
+
+  for (const c of casos) {
+    await page.evaluate((deltaLat) => {
+      App.gpsAtual = { lat: -9.9754 + deltaLat, lng: -67.8243, acc: 8 }
+      atualizarDivergenciaGps()
+    }, c.deltaLat);
+    const el = page.locator('#f-gps-divergencia');
+    await expect(el).toBeVisible();
+    await expect(el).toContainText(new RegExp(c.esperado, 'i'));
+  }
+
+  // Sem leitura de GPS, o indicador some (nunca mostra "confirmado" à toa)
+  await page.evaluate(() => { App.gpsAtual = null; atualizarDivergenciaGps() });
+  await expect(page.locator('#f-gps-divergencia')).toBeHidden();
+});
+
 test('sincronização move pendente → confirmado e monta o payload esperado', async ({ page }) => {
   await abrirAppSemLogin(page);
   await entrarComoColetorDeTeste(page);
@@ -150,7 +184,10 @@ test('sincronização move pendente → confirmado e monta o payload esperado', 
   // Salva uma coleta mínima (sem foto, para isolar o teste de sync do
   // teste de captura de foto acima).
   await page.evaluate(async () => {
-    App.gpsAtual = { lat: -9.976, lng: -67.826, acc: 8 } // ~250m do ponto — não dispara aviso
+    // ~250m do ponto — antes do limiar de 1km ficava silencioso; com as
+    // 3 faixas da migration 273 isso já seria 'divergente' (só relevante
+    // para o indicador do formulário — este teste foca no payload de sync).
+    App.gpsAtual = { lat: -9.976, lng: -67.826, acc: 8 }
     const registro = {
       uuid_cliente: crypto.randomUUID(),
       ponto_id: 'ponto-teste-0001',

@@ -223,7 +223,7 @@
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22"/><line x1="2" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="22" y2="12"/></svg>
       </button>
     </div>
-    <div class="campo-dica" id="f-gps-divergencia" style="color:var(--alerta)" hidden></div>
+    <div class="campo-dica" id="f-gps-divergencia" hidden></div>
 
     <div class="form-section-titulo">Parâmetros de campo</div>
     <div class="grid-2" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
@@ -261,8 +261,9 @@
 
     <div class="form-section-titulo">Amostra e foto</div>
     <div class="form-section">
-      <label class="form-label">Código da amostra (rótulo do frasco)</label>
-      <input type="text" id="f-codigo-amostra" class="form-input" placeholder="Opcional — como está escrito no frasco">
+      <label class="form-label">Código da coleta</label>
+      <input type="text" id="f-codigo-amostra" class="form-input" placeholder="Gerado automaticamente ao sincronizar — preencha só se o frasco já tiver etiqueta própria">
+      <div class="campo-dica">Deixe em branco: o sistema gera um código único (ex.: COL-2026-0001) para escrever no frasco depois de sincronizar.</div>
     </div>
 
     <div class="form-section">
@@ -1090,21 +1091,40 @@ async function lerGpsAgora() {
   }
 }
 
+// Faixas espelham agua_gps_faixa() no banco (migration 273) — a MESMA
+// classificação é recalculada ali a partir de agua_coletas.localizacao
+// (o que este cliente envia) e do ponto cadastrado, então o que a mesa
+// e os relatórios veem depois bate com o que o coletor viu aqui.
+// ≤30 m = dentro do erro normal de GPS de celular a céu aberto;
+// 30–150 m = fora do erro típico, pede conferência; >150 m = provável
+// ponto errado. Sempre aviso, nunca bloqueio — "nada pode impedir o
+// trabalho de campo" (regra do sistema).
+function agGpsFaixa(distMetros) {
+  if (distMetros == null) return null
+  if (distMetros <= 30) return 'confirmado'
+  if (distMetros <= 150) return 'atencao'
+  return 'divergente'
+}
+
+const AG_GPS_FAIXA_COR = { confirmado: '#059669', atencao: 'var(--alerta)', divergente: '#C2410C' }
+
 function atualizarDivergenciaGps() {
   const el = document.getElementById('f-gps-divergencia')
   const pontoId = document.getElementById('f-ponto').value
   const ponto = (App.pontos || []).find(p => p.id === pontoId)
   const pontoLatLng = ponto ? agLatLngDeGeom(ponto.geom) : null
   if (!App.gpsAtual || !pontoLatLng) { el.hidden = true; return }
+
   const dist = agDistanciaMetros(App.gpsAtual, pontoLatLng)
-  // Aviso, nunca bloqueio — "nada pode impedir o trabalho de campo"
-  // (regra do sistema). GPS de celular tem erro de dezenas de metros;
-  // o limiar de 1 km só sinaliza divergência grosseira (ponto errado).
-  if (dist != null && dist > 1000) {
-    el.hidden = false
-    el.textContent = `Você está a ${(dist / 1000).toFixed(1)} km da coordenada cadastrada do ponto — confirme se é o ponto certo antes de salvar.`
+  const faixa = agGpsFaixa(dist)
+  el.hidden = false
+  el.style.color = AG_GPS_FAIXA_COR[faixa]
+  if (faixa === 'confirmado') {
+    el.textContent = `✓ Coordenada confere com o ponto cadastrado (${Math.round(dist)} m).`
+  } else if (faixa === 'atencao') {
+    el.textContent = `Você está a ${Math.round(dist)} m da coordenada cadastrada do ponto — confira se é o ponto certo.`
   } else {
-    el.hidden = true
+    el.textContent = `Você está a ${(dist / 1000).toFixed(2)} km da coordenada cadastrada do ponto — confirme se é o ponto certo antes de salvar.`
   }
 }
 
@@ -1222,7 +1242,7 @@ async function carregarHistoricoPonto(pontoId) {
   estado.textContent = 'Carregando…'
   try {
     const { data, error } = await db.from('vw_agua_coletas_detalhe')
-      .select('id,data_coleta,campanha_ano,campanha_ordem,status,iqa,iqa_faixa,conama_conforme,conama_violacoes')
+      .select('id,data_coleta,campanha_ano,campanha_ordem,status,iqa,iqa_faixa,conama_conforme,conama_violacoes,codigo_amostra')
       .eq('ponto_id', pontoId)
       .order('data_coleta')
     if (error) throw error
@@ -1248,6 +1268,7 @@ async function carregarHistoricoPonto(pontoId) {
         <div class="sync-info" style="flex:1">
           <strong>${esc(aguaCampanhaLabel(c.campanha_ano, c.campanha_ordem))}</strong>
           <span>${formatDataColeta(c.data_coleta)}</span>
+          ${c.codigo_amostra ? `<span style="display:block;font-family:var(--font-mono);font-size:11px">${esc(c.codigo_amostra)}</span>` : ''}
         </div>
         <div style="text-align:right;flex-shrink:0;margin-left:10px;max-width:52%">
           ${aguaIqaChipHTML(c.iqa, c.iqa_faixa, c.status === 'aguardando_lab' ? 'Aguardando laudo' : undefined, c.status === 'quarentena')}
@@ -1326,8 +1347,14 @@ function montarCorpoColetaModal(c) {
   const params = Object.entries(AGUA_REL_PARAM_LABEL).filter(([campo]) => c[campo] != null)
 
   return `
+    ${c.codigo_amostra ? `<div class="cm-linha"><span>Código</span><strong style="font-family:var(--font-mono)">${esc(c.codigo_amostra)}</strong></div>` : ''}
     <div class="cm-linha"><span>Ponto</span><strong>${esc(c.ponto_nome)}${c.codigo_ana ? ' · ' + esc(c.codigo_ana) : ''}</strong></div>
     ${c.ponto_rio || c.ponto_municipio ? `<div class="cm-linha"><span>Local</span><strong>${esc([c.ponto_rio, c.ponto_municipio].filter(Boolean).join(' · '))}</strong></div>` : ''}
+    ${c.gps_confirmacao ? `<div class="cm-linha"><span>Coordenada</span><strong style="color:${AG_GPS_FAIXA_COR[c.gps_confirmacao]}">${
+      c.gps_confirmacao === 'confirmado' ? `✓ Confere (${Math.round(c.distancia_ponto_metros)} m do ponto)`
+      : c.gps_confirmacao === 'atencao' ? `Atenção — ${Math.round(c.distancia_ponto_metros)} m do ponto cadastrado`
+      : `Divergente — ${(c.distancia_ponto_metros / 1000).toFixed(2)} km do ponto cadastrado`
+    }</strong></div>` : ''}
     ${c.classe_enquadramento ? `<div class="cm-linha"><span>Classe de enquadramento</span><strong>${esc(CLASSE_LABEL_APP[c.classe_enquadramento] || c.classe_enquadramento)}</strong></div>` : ''}
     <div class="cm-linha"><span>Campanha</span><strong>${esc(aguaCampanhaLabel(c.campanha_ano, c.campanha_ordem, false))}</strong></div>
     <div class="cm-linha"><span>Data</span><strong>${formatDataColeta(c.data_coleta)}${c.hora_coleta ? ' às ' + String(c.hora_coleta).slice(0, 5) : ''}</strong></div>
@@ -1364,8 +1391,6 @@ function montarCorpoColetaModal(c) {
       ${c.foto_url ? `<a href="#" class="cm-anexo-link" ${fotoAttr(c.foto_url)} target="_blank" rel="noopener">Ver foto de campo</a>` : ''}
       ${c.laudo_url ? `<a href="#" class="cm-anexo-link" ${fotoAttr(c.laudo_url)} target="_blank" rel="noopener">Ver laudo (PDF)</a>` : ''}
     </div>` : ''}
-
-    ${c.codigo_amostra ? `<p class="cm-hint" style="margin-top:10px">Amostra: ${esc(c.codigo_amostra)}</p>` : ''}
   `
 }
 
