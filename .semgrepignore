@@ -6,4 +6,9 @@ playwright-report/
 
 # Projeto nativo Android gerado pelo Capacitor — boilerplate da plataforma
 # (a MainActivity de launcher precisa de exported=true por exigência do Android 12+)
+# Os 4 shells nascem do mesmo template Capacitor (Brigadas, Biomonitor,
+# Frota, Água) — todos precisam da mesma exceção.
 app/android/
+app-biomonitor/android/
+app-frota/android/
+app-agua/android/
