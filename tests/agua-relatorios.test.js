@@ -24,11 +24,16 @@
 const { test, expect } = require('@playwright/test');
 const fs = require('fs');
 const path = require('path');
-const { PDFParse } = require('pdf-parse');
 const JSZip = require('jszip');
 
 // pdf-parse v2: API por classe (getInfo/getText), não a função v1.
+// `require` PREGUIÇOSO de propósito: o pdfjs por trás do pacote precisa
+// de @napi-rs/canvas (binding nativo) e não carrega em toda máquina —
+// no topo do arquivo, uma falha dele derrubava a coleta inteira ("No
+// tests found"), levando junto os testes de agregação e de painel, que
+// não têm nada a ver com PDF.
 async function extrairTextoPdf(buf) {
+  const { PDFParse } = require('pdf-parse');
   const parser = new PDFParse({ data: buf });
   const info = await parser.getInfo();
   const texto = await parser.getText();
