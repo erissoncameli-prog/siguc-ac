@@ -292,10 +292,16 @@ test.describe('geração real dos arquivos — PDF e PPTX', () => {
     }, fixtureColetasMuitosPontos());
 
     const parsed = await extrairTextoPdf(Buffer.from(base64, 'base64'));
-    // Nenhuma página só com cabeçalho/rodapé: toda página tem conteúdo
-    // (um título de bloco da capa ou um nome de ponto).
+    // 3 páginas exatas: painel + 2 de detalhamento. Se a capa cheia
+    // provocasse a folha em branco, viriam 4 — é essa a regressão que
+    // o número guarda.
+    expect(parsed.numpages).toBe(3);
     expect(parsed.text).toContain('IQA MÉDIO POR PONTO DE COLETA');
     expect(parsed.text).toMatch(/Ponto 12/);
+    // 12 pontos, gráfico limitado aos 10 melhores — a tabela detalhada
+    // continua trazendo todos, então o recorte é só do gráfico.
+    expect(parsed.text).toContain('(10 de 12)');
+    expect(parsed.text).toMatch(/Ponto 1\b/);
   });
 
   test('PDF: bacia sem dado cadastrado (Rio Iquiri, NULL) não quebra o fluxo', async ({ page }) => {
