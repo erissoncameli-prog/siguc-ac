@@ -118,6 +118,42 @@ por perfil hard-coded, e mudar o organograma não mexeria em um único link.
 Migrar a sidebar para `minhas_permissoes` passa a ser frente própria —
 sem ela, a restrição por setor valeria no banco e não apareceria na tela.
 
+**Atualização (frente 6b, 2026-08-15) — a metade fácil está pronta, a
+difícil não.** `appState.permissoes` agora é alimentado por
+`minhas_permissoes` dentro de `carregarUsuario()` (js/config.js),
+fail-open (`{}` se a consulta falhar — a sidebar cai para o
+comportamento de sempre, nunca some por instabilidade de rede). Isso é
+seguro e não muda nada visível hoje, porque `js/layout.js` ainda não lê
+`appState.permissoes` — e não pude ligar essa ponta com segurança:
+
+1. **Não existe correspondência 1:1 entre item de menu e módulo do
+   catálogo.** `agua` é UMA chave no catálogo e governa SEIS itens de
+   menu (agua-app/-mapa/-pontos/-laudos/-conferencia/-relatorios).
+   `biomonitor-validacao`, `biomonitor-bercarios`,
+   `biomonitor-equipamentos`, `admin-biomonitor`,
+   `analise-cientifica-biomonitor` não têm chave própria — só a genérica
+   `biomonitor` (criada na migration 263) cobre o grupo inteiro, sem
+   discriminar qual item é visualização e qual é administração.
+2. **Testei os 3 candidatos com match EXATO de chave**
+   (`validacao-campo`, `admin-brigadas`, e o grupo `frota` inteiro) —
+   nos três, o array hard-coded diverge do catálogo hoje, o mesmo
+   fenômeno da frente 5:
+   - `validacao-campo`: array atual = gestor/tecnico/super_admin/biologo.
+     Catálogo daria acesso a chefe_departamento/diretor/gestor/gestor_uc/
+     secretario/super_admin/tecnico/validador_brigada — **e não dá nada a
+     biologo**, que hoje vê o link.
+   - `admin-brigadas`: array atual = super_admin/gestor. Catálogo
+     acrescentaria chefe_departamento/diretor/gestor_uc/secretario/
+     tecnico/validador_brigada.
+   - grupo `frota`: array atual tem 10 perfis incluindo `visualizador`;
+     o catálogo dá `sem_acesso` a `visualizador` — o grupo sumiria da
+     sidebar dele.
+
+   Converter qualquer um dos três seria decidir, por conta própria, qual
+   das duas fontes é a correta — exatamente o que a frente 5 evitou
+   fazer. Fica para quando (ou se) a SEMA decidir alinhar o catálogo à
+   realidade, ou vice-versa.
+
 ### 1.5 Biomonitor: existe no sistema, **não existe no catálogo**
 
 O módulo está no ar e é usado (`admin-biomonitor.html`,
