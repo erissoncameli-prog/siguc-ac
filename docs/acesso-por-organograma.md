@@ -553,7 +553,7 @@ edição em si.
 
 ---
 
-## 9. Lotação inicial no cadastro de usuário (2026-08-15, pós-merge)
+### 8.1 Lotação inicial no cadastro de usuário (2026-08-15, pós-merge)
 
 Pedido do usuário: evitar o esquecimento de lotar um servidor recém-
 criado, tendo que lembrar de ir à Estrutura Organizacional depois.
