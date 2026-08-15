@@ -183,8 +183,12 @@ destino do selo depois não altera nada do que foi gravado.
 ALTER TABLE agua_auditoria ENABLE ROW LEVEL SECURITY;
 CREATE POLICY agua_aud_select ON agua_auditoria FOR SELECT USING (is_super_admin());
 -- SEM policy de INSERT/UPDATE/DELETE: quem grava é o trigger (SECURITY DEFINER).
-REVOKE INSERT, UPDATE, DELETE ON agua_auditoria FROM authenticated, anon;
+REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON agua_auditoria FROM authenticated, anon;
 ```
+
+Ler é privilégio do super_admin; escrever não é privilégio de ninguém pelo
+PostgREST. Ver §2.1 — é isto que torna a trilha imutável para o
+super_admin do sistema.
 
 Tela: `pages/agua-auditoria.html`, link na sidebar dentro do grupo
 "Qualidade da Água" **renderizado só para super_admin** (`js/layout.js` já
