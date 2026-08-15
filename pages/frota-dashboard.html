@@ -819,12 +819,12 @@ function rankVeiculosCustoKm() {
 }
 
 function rankVeiculosConsumo() {
-  const rows = _veiculosF.filter(v=>v.medidor==='hodometro').map(v => {
+  const itens = _veiculosF.filter(v=>v.medidor==='hodometro').map(v => {
     const r = consumoPorVeiculo(v.id, 'hodometro')
     return r ? { placa:v.placa, modelo:v.modelo, c:r.consumo } : null
   }).filter(Boolean).sort((a,b)=>a.c-b.c).slice(0,10) // pior primeiro
-    .map((v,i)=>[i+1, `${esc(v.placa)} — ${esc(v.modelo)}`, `${formatNum(v.c,2)} km/L`])
-  return tabela(['#','Veículo (pior consumo primeiro)','Km/L médio'], rows)
+    .map(v => ({ label: `${v.placa} — ${v.modelo}`, valor: v.c, valorFmt: `${formatNum(v.c,2)} km/L` }))
+  return rankBarrasHTML(itens, { vazio: 'Sem dados de consumo suficientes' })
 }
 
 function rankVeiculosOS() {
