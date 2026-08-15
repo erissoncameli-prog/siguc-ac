@@ -99,17 +99,53 @@ setor. Consequência medida:
 continuaria escrita à mão em cada policy, imune ao organograma e só
 alterável por migration — o oposto de "ajustar sem mexer no código".
 
-No cliente o quadro é bom: só 12 checagens de perfil hard-coded, em 6
-arquivos. **O acoplamento está no SQL, não no JavaScript.**
+### 1.4b A sidebar também não usa o catálogo (correção)
 
-### 1.5 Biomonitor não existe no catálogo de módulos
+Uma primeira contagem sugeriu que o cliente estava limpo ("12 checagens
+`perfil === '...'` em 6 arquivos"). **Está errado, e o erro importa**: a
+sidebar não compara strings — ela declara **listas de perfis** por item de
+menu (`perfis: ['gestor','tecnico','super_admin']`), forma que aquela busca
+não pegava.
 
-Há 23 módulos em `modulos`; **nenhum com chave `biomonitor`** (nem
-`pode_ver('biomonitor')` em migration alguma). Um módulo inteiro — com app
-de campo, equipamentos, cautelas — fora do sistema de permissão. Enquanto
-estiver fora, ele não pode ser governado por organograma nenhum: não há o
-que amarrar. Frota (`frota`), Brigadas (`brigadas` + 3) e Água (`agua`)
-estão no catálogo.
+| Itens de menu em `js/layout.js` | 39 |
+|---|---|
+| Com lista de perfis fixa no código | **12** |
+| Consultas a `minhas_permissoes` em `layout.js` + `config.js` | **0** |
+
+A view `minhas_permissoes`, criada justamente para o frontend, **não é
+consultada por ninguém na navegação**. Ou seja: o menu inteiro é decidido
+por perfil hard-coded, e mudar o organograma não mexeria em um único link.
+Migrar a sidebar para `minhas_permissoes` passa a ser frente própria —
+sem ela, a restrição por setor valeria no banco e não apareceria na tela.
+
+### 1.5 Biomonitor: existe no sistema, **não existe no catálogo**
+
+O módulo está no ar e é usado (`admin-biomonitor.html`,
+`biomonitor-validacao`, `-bercarios`, `-equipamentos`, relatórios, app de
+campo, tabelas próprias, migrations 226–230). O que **não** existe é linha
+com chave `biomonitor` em `modulos` — o catálogo de permissões. Ele é
+autorizado por outro caminho, e o caminho é o do §1.4:
+
+```sql
+-- policy real, em produção (grupos_biomonitor, programas_biomonitoramento,
+-- temporadas_biomonitor, biomonitor_equipamentos, cautelas…)
+USING (EXISTS (SELECT 1 FROM usuarios WHERE id = auth.uid()
+       AND perfil = ANY (ARRAY['tecnico','gestor','super_admin'])  AND ativo))
+```
+
+Duas consequências, ambas relevantes para esta missão:
+
+1. **Não há o que amarrar ao organograma** enquanto a chave não existir —
+   `pode_ver('biomonitor')` não resolve para nada. Entrar no catálogo é
+   pré-requisito, não melhoria.
+2. **As policies de SELECT dessas tabelas são `USING (true)`** — qualquer
+   usuário autenticado lê todo o dado do Biomonitor. Restrição por setor no
+   Biomonitor exige, além do catálogo, revisar essas leituras. É o exemplo
+   mais concreto do que a frente 5 (§3) tem de resolver, e vale como
+   modelo para os demais módulos.
+
+Frota (`frota`), Brigadas (`brigadas` + 3) e Água (`agua`) estão no
+catálogo.
 
 ---
 
