@@ -402,6 +402,8 @@ let _perfilUsuario = ''
         <button class="tab-btn" onclick="ativarAba('cargos', this)">Cargos</button>
         <button class="tab-btn" onclick="ativarAba('delegacoes', this)">Delegações</button>
         <button class="tab-btn" onclick="ativarAba('unidades', this)">Unidades</button>
+        ${usuario.perfil === 'super_admin' ? `
+        <button class="tab-btn" onclick="ativarAba('modulos-setor', this)">Acesso por Setor</button>` : ''}
       </div>
 
       <div id="tab-organograma" class="tab-panel ativo">
