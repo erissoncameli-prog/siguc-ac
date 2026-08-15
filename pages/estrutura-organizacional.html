@@ -352,6 +352,49 @@
   </div>
 </div>
 
+<!-- Modal: Nova Lotação -->
+<div class="modal-overlay" id="modal-lotacao">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Nova Lotação</div>
+      <button class="modal-close" onclick="fecharModalLotacao()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Servidor <span class="obrig">*</span></label>
+        <select class="form-control" id="lot-usuario"></select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Unidade <span class="obrig">*</span></label>
+        <select class="form-control" id="lot-unidade"></select>
+      </div>
+      <div class="form-group" style="display:flex;align-items:center;gap:8px">
+        <input type="checkbox" id="lot-principal" style="width:auto">
+        <label class="form-label" for="lot-principal" style="margin:0">Lotação principal</label>
+      </div>
+      <div class="form-hint" style="margin-top:-8px;margin-bottom:12px">Um servidor pode ter mais de uma lotação, mas só uma principal. Deixe desmarcado se ele já tem uma principal vigente.</div>
+      <div class="grid-2">
+        <div class="form-group">
+          <label class="form-label">Data de Início</label>
+          <input class="form-control" type="date" id="lot-inicio">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Portaria</label>
+          <input class="form-control" id="lot-portaria" placeholder="Opcional">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Observações</label>
+        <textarea class="form-control" id="lot-obs" rows="2" placeholder="Opcional"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="fecharModalLotacao()">Cancelar</button>
+      <button class="btn btn-primary" id="lot-btn-salvar" onclick="salvarLotacao()">Salvar</button>
+    </div>
+  </div>
+</div>
+
 <!-- Modal: Conceder credenciamento -->
 <div class="modal-overlay" id="modal-credenciamento">
   <div class="modal">
