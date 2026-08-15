@@ -307,7 +307,7 @@ function renderDiretoria() {
       <span class="sec-title">🔬 Pesquisas por fase</span>
       <span class="sec-sub">${pesquisas.length} total</span>
     </div>
-    ${renderDonut(pesqBlocos)}
+    ${donutLegendaHTML(pesqBlocos)}
   </div>
 </div>
 
@@ -315,7 +315,7 @@ function renderDiretoria() {
   <!-- Distribuição por grupo de UC -->
   <div class="card-box">
     <div class="sec-header"><span class="sec-title">🌿 UCs por grupo</span></div>
-    ${renderDonut([
+    ${donutLegendaHTML([
       { label:'Proteção Integral', n:pi, cor:'#1F4E2C' },
       { label:'Uso Sustentável',   n:us, cor:'#52B788' },
     ])}
@@ -419,7 +419,7 @@ function renderSecretaria() {
   <!-- Status das UCs -->
   <div class="card-box">
     <div class="sec-header"><span class="sec-title">🏷 Status das UCs</span></div>
-    ${renderDonut([
+    ${donutLegendaHTML([
       { label:'Regularizada',     n:statusUC.regularizada,     cor:'#22C55E' },
       { label:'Em Regularização', n:statusUC.em_regularizacao, cor:'#F59E0B' },
       { label:'Criada',           n:statusUC.criada,           cor:'#60A5FA' },
@@ -430,7 +430,7 @@ function renderSecretaria() {
   <!-- Ocorrências abertas por severidade -->
   <div class="card-box">
     <div class="sec-header"><span class="sec-title">⚠️ Ocorrências abertas</span></div>
-    ${renderDonut([
+    ${donutLegendaHTML([
       { label:'Crítica', n:ocSev.critica, cor:'#DC2626' },
       { label:'Alta',    n:ocSev.alta,    cor:'#F97316' },
       { label:'Média',   n:ocSev.media,   cor:'#F59E0B' },
@@ -441,7 +441,7 @@ function renderSecretaria() {
   <!-- Alertas por tipo -->
   <div class="card-box">
     <div class="sec-header"><span class="sec-title">🔥 Alertas por tipo</span></div>
-    ${renderDonut([
+    ${donutLegendaHTML([
       { label:'Queimada',     n:alertas.filter(a=>a.tipo==='queimada').length,     cor:'#DC2626' },
       { label:'Desmatamento', n:alertas.filter(a=>a.tipo==='desmatamento').length, cor:'#166534' },
       { label:'Degradação',   n:alertas.filter(a=>a.tipo==='degradacao').length,   cor:'#92400E' },
@@ -486,7 +486,7 @@ function renderSecretaria() {
 
 // ── Donut SVG simples ─────────────────────────────────────────
 
-function renderDonut(itens) {
+function donutLegendaHTML(itens) {
   const total = itens.reduce((s,i) => s + i.n, 0)
   if (!total) return '<p style="font-size:12px;color:#9CA3AF;padding:20px 0">Sem dados</p>'
 
