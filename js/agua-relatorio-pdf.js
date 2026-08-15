@@ -26,14 +26,33 @@
 // jsPDF + jspdf-autotable (js/vendor/jspdf-2.5.2.umd.min.js,
 // js/vendor/jspdf-autotable-3.8.4.min.js).
 
-// Mesma paleta de pages/agua-mapa.html (IQA_FAIXA_COR) — validada para
-// daltonismo junto com as outras cores do módulo (ver CLAUDE.md, seção
-// do painel-resumo do mapa principal). Cópia de valor, não de lógica.
-const AGPDF_IQA_COR = {
-  'Ótima': [21, 128, 61], 'Boa': [132, 204, 22], 'Regular': [202, 138, 4],
-  'Ruim': [234, 88, 12], 'Péssima': [185, 28, 28],
+// A paleta de faixa vem de js/agua-iqa-visual.js (AGUA_IQA_FAIXA_COR),
+// convertida de hex para RGB — o PDF NÃO tem cópia própria.
+// Antes tinha, e havia DIVERGIDO: 'Boa' era lima (#84CC16) enquanto o
+// mapa/app/painel usavam verde (#059669), e 'Péssima' continuou no
+// vermelho antigo depois da correção de daltonismo. Um relatório
+// impresso com cor diferente da tela é o pior lugar para essa
+// divergência aparecer. O fallback abaixo só existe para o caso de
+// alguma página futura carregar este arquivo sem o de visual.
+const AGPDF_IQA_COR_FALLBACK = {
+  'Ótima': [29, 78, 216], 'Boa': [5, 150, 105], 'Regular': [202, 138, 4],
+  'Ruim': [194, 65, 12], 'Péssima': [134, 25, 143],
 }
 const AGPDF_SEM_IQA_COR = [156, 163, 175]
+
+function _agpdfHexRGB(hex) {
+  const n = parseInt(String(hex).slice(1), 16)
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255]
+}
+function _agpdfCorFaixa(faixa) {
+  const paleta = typeof AGUA_IQA_FAIXA_COR !== 'undefined' ? AGUA_IQA_FAIXA_COR : null
+  if (paleta && paleta[faixa]) return _agpdfHexRGB(paleta[faixa])
+  return AGPDF_IQA_COR_FALLBACK[faixa] || AGPDF_SEM_IQA_COR
+}
+function _agpdfOrdemFaixas() {
+  return typeof AGUA_IQA_FAIXA_ORDEM !== 'undefined'
+    ? AGUA_IQA_FAIXA_ORDEM : ['Ótima', 'Boa', 'Regular', 'Ruim', 'Péssima']
+}
 
 // Mesmo rótulo estático de pages/agua-mapa.html/agua-pontos.html
 // (CLASSE_LABEL) — duplicado aqui pela mesma razão de AGUA_REL_PARAM_LABEL
