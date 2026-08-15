@@ -527,7 +527,10 @@ async function aguaRelMontarPdf(relatorio, labelBacia, periodoTxt, cab, protocol
   }
 
   _agpdfCapa(ctx, relatorio, labelBacia, periodoTxt)
-  _agpdfNovaPagina(ctx)
+  // Se a nota de quarentena já tiver empurrado a capa para a página
+  // seguinte, `y` volta ao topo — adicionar outra página deixaria uma
+  // em branco no meio do documento.
+  if (ctx.y > AGPDF_TOPO + 2) _agpdfNovaPagina(ctx)
   if (!relatorio.pontos.length) {
     _agpdfParagrafo(ctx, 'Nenhuma coleta encontrada para esta bacia no período selecionado.')
   } else {
