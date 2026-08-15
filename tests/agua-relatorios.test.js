@@ -404,6 +404,45 @@ test.describe('geração real dos arquivos — PDF e PPTX', () => {
     expect(textoTodosSlides).toContain('SIGUC-2026-TESTE');
   });
 
+  test('PPTX: slide 2 é o painel, com os gráficos NATIVOS (editáveis no PowerPoint)', async ({ page }) => {
+    test.setTimeout(60_000);
+    await page.goto(PAGINA);
+    await page.waitForFunction(() => typeof window.aguaRelMontarPptx === 'function');
+
+    const base64 = await page.evaluate(async (coletas) => {
+      const relatorio = window.aguaRelMontar(coletas, {});
+      const blob = await window.aguaRelMontarPptx(relatorio, 'Rio Acre', 'período', 'SIGUC-2026-PAINEL');
+      const buf = await blob.arrayBuffer();
+      let b = ''; const bytes = new Uint8Array(buf);
+      for (let i = 0; i < bytes.length; i++) b += String.fromCharCode(bytes[i]);
+      return btoa(b);
+    }, fixtureColetasRioAcre());
+
+    const zip = await JSZip.loadAsync(Buffer.from(base64, 'base64'));
+    const slide2 = await zip.files['ppt/slides/slide2.xml'].async('text');
+    const rels2 = await zip.files['ppt/slides/_rels/slide2.xml.rels'].async('text');
+
+    // Gráfico NATIVO, não imagem: o slide referencia 3 partes de chart
+    // (distribuição por faixa, rosca CONAMA, barras por ponto). É a
+    // diferença deliberada para o PDF, que desenha a mesma leitura.
+    expect((rels2.match(/charts\/chart\d+\.xml/g) || []).length).toBe(3);
+    expect(slide2).toContain('Painel do período');
+    expect(slide2).toContain('DISTRIBUIÇÃO POR FAIXA DO IQA');
+    expect(slide2).toContain('CONFORMIDADE CONAMA');
+    expect(slide2).toContain('IQA MÉDIO POR PONTO DE COLETA');
+    expect(slide2).toContain('61.6'); // KPI do IQA médio da fixture
+
+    const nomesCharts = Object.keys(zip.files).filter(n => /^ppt\/charts\/chart\d+\.xml$/.test(n));
+    const xmlCharts = (await Promise.all(nomesCharts.map(n => zip.files[n].async('text')))).join('\n');
+    // A faixa vem do banco e a cor, da paleta única de agua-iqa-visual.js
+    // — inclusive a 'Péssima' da coleta em quarentena, que não some.
+    expect(xmlCharts).toContain('<c:v>Péssima</c:v>');
+    expect(xmlCharts).toContain('86198F'); // Péssima (paleta corrigida)
+    expect(xmlCharts).toContain('059669'); // Boa
+    // Rosca CONAMA com os TRÊS estados — "sem limites" nunca somado a conforme.
+    expect(xmlCharts).toContain('Sem limites cadastrados');
+  });
+
   test('PPTX: bacia sem dado cadastrado (Rio Iquiri, NULL) não quebra o fluxo', async ({ page }) => {
     test.setTimeout(60_000);
     await page.goto(PAGINA);
