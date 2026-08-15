@@ -508,6 +508,12 @@ test.describe('agregações do painel (pura, sem rede)', () => {
 const USUARIO_STUB = { id: 'u-teste', nome_completo: 'Técnica de Teste', email: 't@x.invalid', perfil: 'gestor', ativo: true };
 
 async function abrirPainelComStub(page, coletas) {
+  // O supabase-js do CDN sobrescreveria window.supabase (o stub abaixo)
+  // em máquina com internet, e aí a página tentaria uma sessão de
+  // verdade e cairia no redirect para o login. Bloquear o CDN é o que
+  // torna o teste igual em máquina online e offline.
+  await page.route('**/cdn.jsdelivr.net/**', route => route.abort());
+
   await page.addInitScript(({ coletas, usuario }) => {
     window.loadEnv = () => Promise.resolve({ supabaseUrl: 'http://fake.test', supabaseKey: 'fake-key' });
     const consulta = (linhas) => {
