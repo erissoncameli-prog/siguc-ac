@@ -1406,6 +1406,7 @@ function tabelaBrigadistas(registros) {
     .sort((a,b)=>b.n-a.n).slice(0,10)
 
   if (!rows.length) return '<p class="chart-empty" style="padding:12px">Sem dados</p>'
+  const maxN = Math.max(...rows.map(r=>r.n), 1)
   return `<table class="rel-table">
     <thead><tr>
       <th>Brigadista</th><th>Naturezas</th><th>Registros</th><th>Fauna</th><th>Última atividade</th>
@@ -1413,7 +1414,7 @@ function tabelaBrigadistas(registros) {
     <tbody>${rows.map(r=>`<tr>
       <td>${esc(r.nome)}</td>
       <td>${r.nats.map(n=>`<span class="nat-chip ${n}">${natIco(n)}</span>`).join(' ')}</td>
-      <td><strong>${r.n}</strong></td>
+      <td><div style="display:flex;align-items:center;gap:6px"><div class="bar-wrap" style="width:44px"><div class="bar-fill" style="width:${Math.round(r.n/maxN*100)}%;background:#2D6A4F"></div></div><strong>${r.n}</strong></div></td>
       <td>${r.fauna > 0 ? `${bico('paw')} ${r.fauna}` : '—'}</td>
       <td style="font-size:.78rem;color:var(--cinza-500)">${r.ultima ? new Date(r.ultima).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',year:'2-digit',timeZone:'America/Rio_Branco'}) : '—'}</td>
     </tr>`).join('')}</tbody>
