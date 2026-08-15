@@ -252,13 +252,14 @@ function gerarLayout(tituloPagina, paginaAtiva) {
         </div>
       </div>
     </div>
-    <div class="sidebar-user">
+    <button type="button" class="sidebar-user" onclick="abrirPerfil()" aria-haspopup="dialog" title="Meu perfil">
       <div class="sidebar-avatar" id="sidebar-avatar">${avatarInicial}</div>
       <div class="sidebar-user-info">
         <div class="sidebar-user-nome" id="sidebar-nome">${esc(nomeDisplay)}</div>
         <div class="sidebar-user-perfil" id="sidebar-perfil">${esc(perfilDisplay)}</div>
       </div>
-    </div>
+      <svg class="sidebar-user-chevron" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+    </button>
     <nav class="sidebar-nav" id="sidebar-nav">${navHtml}</nav>
     <div class="sidebar-footer">
       <a class="btn-alterar-senha" href="../pages/meus-dados.html">
