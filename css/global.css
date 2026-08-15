@@ -145,16 +145,15 @@ body { font-family: var(--font-sans); background: var(--cinza-50); color: var(--
 .card-footer { padding: 10px 20px; border-top: 1px solid var(--borda); background: var(--cinza-50); border-radius: 0 0 var(--raio-lg) var(--raio-lg); }
 
 .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 24px; }
-.kpi-card { background: var(--branco); border: 1px solid var(--borda); border-radius: var(--raio-lg); padding: 18px 20px 16px; position: relative; overflow: hidden; box-shadow: var(--sombra); transition: box-shadow .2s, transform .2s; }
-.kpi-card:hover { box-shadow: var(--sombra-md); transform: translateY(-1px); }
-.kpi-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: var(--verde-claro); }
-.kpi-card.ouro::before { background: var(--ouro); }
-.kpi-card.azul::before { background: var(--azul-medio); }
-.kpi-card.erro::before { background: var(--erro); }
-.kpi-card.roxo::before { background: #7C3AED; }
-.kpi-label { font-size: 10px; color: var(--cinza-400); font-weight: 600; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 8px; }
-.kpi-valor { font-size: 26px; font-weight: 700; color: var(--cinza-900); letter-spacing: -.03em; line-height: 1; }
-.kpi-sub { font-size: 11px; color: var(--cinza-400); margin-top: 6px; line-height: 1.4; }
+.kpi-card { --kpi-cor: var(--verde-claro); background: var(--branco); border: 1px solid var(--borda); border-top: 6px solid var(--kpi-cor); border-radius: var(--raio-lg); padding: 18px 20px 18px; position: relative; box-shadow: 0 4px 6px -2px rgba(0,0,0,.10); transition: box-shadow .2s, transform .2s; }
+.kpi-card:hover { box-shadow: 0 6px 10px -3px rgba(0,0,0,.14); transform: translateY(-1px); }
+.kpi-card.ouro { --kpi-cor: var(--ouro); }
+.kpi-card.azul { --kpi-cor: var(--azul-medio); }
+.kpi-card.erro { --kpi-cor: var(--erro); }
+.kpi-card.roxo { --kpi-cor: #7C3AED; }
+.kpi-label { font-size: 10px; color: var(--cinza-400); font-weight: 600; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 10px; }
+.kpi-valor { font-size: 32px; font-weight: 800; color: var(--kpi-cor); letter-spacing: -.03em; line-height: 1; }
+.kpi-sub { font-size: 11px; color: var(--kpi-cor); margin-top: 8px; line-height: 1.4; }
 
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
