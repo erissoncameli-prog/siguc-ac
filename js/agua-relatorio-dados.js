@@ -91,6 +91,17 @@ async function aguaRelBuscarColetasDaBacia(db, bacia) {
   return data || []
 }
 
+// Todas as coletas do estado, de qualquer bacia — o escopo "Acre todo"
+// do painel (pages/agua-relatorios.html). Sem filtro nenhum de bacia;
+// quem quiser recortar por bacia depois disso usa `opts.bacia` em
+// aguaRelMontar (client-side, sem nova ida ao banco) — é o que permite
+// alternar de visão geral para uma bacia sem esperar rede de novo.
+async function aguaRelBuscarTodasColetas(db) {
+  const { data, error } = await db.from('vw_agua_coletas_detalhe').select('*').order('data_coleta')
+  if (error) throw error
+  return data || []
+}
+
 // ── Agregação (pura, testável sem rede) ─────────────────────────
 
 // Bacias presentes numa lista de coletas, com contagem de pontos —
