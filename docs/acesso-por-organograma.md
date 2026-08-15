@@ -510,7 +510,12 @@ existente, não com redesenho de código.
 | 2 | ✅ `modulo_unidades` + herança pela árvore + tela de amarração módulo↔setor (migration 265 + aba "Acesso por Setor") | 1 |
 | 3 | ✅ `credenciamentos` + tela + cron de vencimento + revogação (migration 266 + aba "Credenciamentos") | — (pode ir em paralelo) |
 | 4 | ✅ `nivel_efetivo()` v2 + `modulos.exige_lotacao` + `vw_impacto_lotacao` (migration 267) | 1, 2, 3 |
-| 5 | Inventário das 133 policies + conversão por lotes | 4 |
+| 5 | 🟡 **Parcial**: inventário completo (129 policies/77 tabelas) +
+achado de drift catálogo×RLS real (§3.0) + `config_sistema` convertida
+(migration 268, única sem drift). Restam: 8 tabelas com drift (decisão
+humana sobre qual conjunto de perfis é correto), ~40 tabelas tipo (c)
+Biomonitor/Brigadas/Pesquisa (mesmo cuidado tabela-a-tabela da 263), e
+consolidar as 3 policies redundantes de `camadas_mapa` | 4 |
 | 6 | ✅ `biomonitor` no catálogo de módulos + revisar os `USING (true)` das 4 tabelas de configuração (migrations 263/264). Tabelas de dado de campo (cautelas, ocorrências) ficaram de fora — são §3 (§1.5) | — |
 | 6b | **Sidebar passa a ler `minhas_permissoes`** em vez das listas de perfis fixas (§1.4b) | 4 |
 | 7 | Trilha de auditoria genérica sobre as tabelas de permissão | §5 |
