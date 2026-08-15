@@ -1501,6 +1501,39 @@ verdade aberto com pdf-parse) e em `tests/agua-app-fluxo.test.js`
 CDN). `pwa/sw.js`: agua v5 → v6, biomonitor v25 → v26 (ganhou
 `compartilhar-arquivo.js` no shell).
 
+**Pós-lançamento — Painel visual em `pages/agua-relatorios.html`.** A
+tela de Relatórios (formulário + 6 KPIs + lista) virou um painel de
+cards, com o layout inspirado num modelo de dashboard trazido pelo
+usuário — só o ESTILO (cabeçalho com pílulas, KPI invertido, medidor
+semicircular, barras com valor rotulado, card de ranking); cores e
+fontes seguem o design system. Os botões PDF/PPTX viraram um menu
+"Exportar" e os filtros, uma gaveta com contador — nenhum filtro foi
+perdido. Gráficos novos moram em `js/agua-iqa-visual.js`
+(`aguaIqaGaugeHTML`, `aguaIqaBarrasHTML`, `aguaIqaFaixasBarraHTML`,
+ao lado do `aguaIqaGraficoHTML` que já existia) e as agregações em
+`js/agua-relatorio-dados.js` (`aguaRelPorCampanha`, `aguaRelIqaPorPonto`,
+`aguaRelDistribuicaoFaixas`, `aguaRelVariacaoIQA`,
+`aguaRelViolacoesRanking`) — a página não desenha SVG nem agrega nada.
+**Classificar uma MÉDIA numa faixa seria recalcular no cliente**: por
+isso as barras de magnitude usam escala de um tom só (verde) em vez da
+paleta de faixa, e o KPI de IQA médio mostra só o número. Chip de
+campanha recorta a EXIBIÇÃO de um card, nunca o relatório exportado.
+Quarentena entra em tudo, marcada. **Paleta do IQA corrigida**:
+`Péssima` #9F1239 → **#86198F** (contra `Ruim` #C2410C dava ΔE 12,3 em
+visão normal, abaixo do piso 15 do validador do skill de dataviz — só
+apareceu agora porque as duas faixas nunca tinham se encostado antes da
+barra segmentada); badge do mapa acompanhou (`badge-erro` →
+`badge-roxo`). Duas armadilhas de layout documentadas no código: classe
+com `display` vence o `[hidden]` de global.css (precisa de regra
+`[hidden]` própria), e filho de card `flex-column` esticado pela grade
+precisa de `flex-shrink:0`, senão o conteúdo vaza por cima do vizinho.
+Guarda: +8 testes em `tests/agua-relatorios.test.js` (o CDN do
+supabase-js precisa ser bloqueado por `page.route`, senão sobrescreve o
+stub e a página redireciona pro login; o `require` do `pdf-parse` virou
+preguiçoso porque o binding nativo dele derrubava a coleta inteira).
+`pwa/sw.js`: agua v11 → v12; brigadas 262 → 263, biomonitor 30 → 31,
+frota 86 → 87 (js/config.js ganhou 3 ícones e está no shell dos 4).
+
 ## Próxima tarefa
 Módulo Qualidade da Água (IQA): as 5 fases do plano original estão
 ENTREGUES (ver `docs/qualidade-agua/plano.md`, seções "Fase 0" a "Fase
