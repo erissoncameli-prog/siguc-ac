@@ -227,6 +227,50 @@ test.describe('geração real dos arquivos — PDF e PPTX', () => {
     expect(texto).toContain('SEMA-AC');
     expect(texto).toContain('SIGUC-2026-TESTE');
     expect(texto).toMatch(/Quarentena/i);
+
+    // Primeira página = o mesmo painel da tela. Os quatro blocos de
+    // gráfico têm de estar lá, com os números que a tela mostraria.
+    expect(texto).toContain('DISTRIBUIÇÃO POR FAIXA DO IQA');
+    expect(texto).toContain('CONFORMIDADE CONAMA');
+    expect(texto).toContain('PARÂMETROS QUE MAIS VIOLARAM');
+    expect(texto).toContain('IQA MÉDIO POR PONTO DE COLETA');
+    expect(texto).toContain('EVOLUÇÃO DO IQA MÉDIO DA BACIA POR CAMPANHA');
+    // Legenda da distribuição traz a contagem ao lado da cor (a cor
+    // nunca carrega o dado sozinha), com a faixa que veio do banco.
+    expect(texto).toMatch(/Boa\s*2\b/);       // 2 coletas 'Boa' na fixture
+    expect(texto).toMatch(/Péssima\s*1\b/);   // a quarentenada, contada e não escondida
+    // Ranking de violações substituiu o parágrafo de texto corrido.
+    expect(texto).toMatch(/Turbidez/);
+    // Barras do IQA por ponto: média de cada ponto, rotulada.
+    expect(texto).toContain('78.0');          // Porto Acre (82.1 + 74.0)/2
+    expect(texto).toContain('50.7');          // Rio Branco (78.4+61.2+12.5)/3
+    // Medidor de conformidade: 2 conformes de 4 avaliadas.
+    expect(texto).toMatch(/2 conforme · 2 com violação/);
+  });
+
+  test('PDF: capa não gera página em branco quando a nota de quarentena empurra o conteúdo', async ({ page }) => {
+    test.setTimeout(60_000);
+    await page.goto(PAGINA);
+    await page.waitForFunction(() => typeof window.aguaRelMontarPdf === 'function');
+
+    // Bacia com muitos pontos: a capa fica cheia e a nota de quarentena
+    // pode cair na página seguinte — o documento não pode ganhar uma
+    // folha vazia por causa disso.
+    const base64 = await page.evaluate(async (coletas) => {
+      const relatorio = window.aguaRelMontar(coletas, {});
+      const cab = { secretaria: 'SEMA-AC', siglaSecr: 'SEMA-AC', diretoria: 'DIMA', siglaDiret: 'DIMA', departamento: 'DEUC', logoGoverno: null, logoSecr: null };
+      const pdf = await window.aguaRelMontarPdf(relatorio, 'Rio Acre', 'período', cab, 'SIGUC-2026-CHEIO');
+      const buf = await pdf.output('blob').arrayBuffer();
+      let b = ''; const bytes = new Uint8Array(buf);
+      for (let i = 0; i < bytes.length; i++) b += String.fromCharCode(bytes[i]);
+      return btoa(b);
+    }, fixtureColetasMuitosPontos());
+
+    const parsed = await extrairTextoPdf(Buffer.from(base64, 'base64'));
+    // Nenhuma página só com cabeçalho/rodapé: toda página tem conteúdo
+    // (um título de bloco da capa ou um nome de ponto).
+    expect(parsed.text).toContain('IQA MÉDIO POR PONTO DE COLETA');
+    expect(parsed.text).toMatch(/Ponto 12/);
   });
 
   test('PDF: bacia sem dado cadastrado (Rio Iquiri, NULL) não quebra o fluxo', async ({ page }) => {
