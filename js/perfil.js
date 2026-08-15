@@ -399,6 +399,7 @@ async function _perfilPintarFoto(url) {
     el.style.backgroundImage = ''
     el.textContent = iniciais(appState.usuario.nome_completo)
   } else {
+    await _perfilCarregarFotos()
     const assinada = await fotoUrlAssinada(url)
     if (assinada) { el.textContent = ''; el.style.backgroundImage = `url("${assinada}")` }
   }
