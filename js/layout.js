@@ -283,6 +283,10 @@ function gerarLayout(tituloPagina, paginaAtiva) {
 
 function carregarLogosSidebar() {
   _sigucBarCompleta();
+  // Avatar da sidebar: iniciais no HTML, foto quando houver (bucket
+  // privado, precisa ser assinada). perfil.js é carregado por
+  // carregarUsuario() e pode ainda não ter chegado — o guard cobre.
+  if (typeof perfilAtualizarAvatarSidebar === 'function') perfilAtualizarAvatarSidebar();
   document.querySelectorAll('a.nav-item[href]').forEach(link => {
     if (link._sigucNav) return;
     link._sigucNav = true;
