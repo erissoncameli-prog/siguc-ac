@@ -1197,6 +1197,54 @@ biomonitor 30 → 31, frota 86 → 87 porque `js/config.js` (3 ícones
 novos: `chevron-down`, `arrow-up`, `arrow-down`) está no shell dos
 quatro apps.
 
+### O painel também é a primeira página do PDF
+
+Pedido do usuário logo depois da entrega acima. A capa do relatório era
+identificação + 6 números soltos; passou a ser **o mesmo painel**, na
+mesma ordem de leitura (KPIs → distribuição por faixa → conformidade
+CONAMA + ranking de violações → IQA por ponto → evolução por campanha).
+Quem abre o PDF vê o que viu na tela; da página 2 em diante segue o
+detalhamento ponto a ponto de sempre.
+
+- **Desenhado com os primitivos do jsPDF**, não exportado da tela:
+  rasterizar o SVG exigiria canvas e sairia serrilhado no impresso. Os
+  DADOS vêm das mesmas funções de `js/agua-relatorio-dados.js` que
+  alimentam o painel — nenhuma agregação nova, nada de IQA/CONAMA
+  recalculado.
+- Uma diferença deliberada: na tela, a evolução do IQA é de **um ponto**
+  escolhido por chip; no PDF não há chip, e um gráfico por ponto encheria
+  o documento — imprime-se a **média da bacia por campanha**. Campanha
+  sem coleta continua virando GAP (linha quebrada), nunca interpolada.
+- O gráfico de barras se limita aos **10 melhores pontos** e o título diz
+  "(10 de N)"; o detalhamento das páginas seguintes continua trazendo
+  todos.
+- O parágrafo "parâmetros com violação: …" saiu: virou o ranking. Só a
+  ressalva da quarentena continua em texto — é advertência sobre a
+  confiabilidade do dado, não leitura de painel.
+- **Bug corrigido de tabela**: `AGPDF_IQA_COR` era uma cópia da paleta
+  que havia DIVERGIDO da tela — 'Boa' saía lima (#84CC16) contra o verde
+  (#059669) do mapa/app/painel, e 'Péssima' ficou no vermelho antigo
+  depois da correção de daltonismo. Agora a cor vem de
+  `AGUA_IQA_FAIXA_COR` convertida para RGB, com fallback local só para
+  quem carregar o PDF sem o arquivo de visual. Relatório impresso é o
+  pior lugar para a cor discordar da tela.
+- **Página em branco**: `aguaRelMontarPdf` chamava `_agpdfNovaPagina`
+  incondicionalmente depois da capa. Com a capa agora cheia, a nota de
+  quarentena pode transbordar sozinha para a folha seguinte — e a
+  chamada incondicional inseriria uma folha vazia no meio. Passou a ser
+  condicional (`if (ctx.y > AGPDF_TOPO + 2)`), com o teste travando a
+  contagem exata de páginas.
+
+Guarda: `tests/agua-relatorios.test.js` — asserções novas no teste de
+PDF que já existia (os cinco títulos de bloco, a legenda com contagem,
+as médias rotuladas nas barras e a linha do medidor) e um teste novo com
+fixture de 12 pontos para a contagem exata de páginas. ⚠️ Detalhe do
+texto extraído: a legenda sai colada na seguinte ("…Boa 2Regular 1…"),
+então `\b` **não** serve depois do número — usar `(?!\d)`; e títulos de
+bloco/seção estão em CAIXA ALTA no documento.
+
+`pwa/sw.js`: agua v12 → v13 (`agua-relatorio-pdf.js` está no shell).
+
 ## Decisões ainda abertas (não travam a Fase 0)
 
 - **Sólidos em suspensão** — a incoerência de unidade acima. Entra na
