@@ -1108,6 +1108,130 @@ async function removerModuloUnidade(id) {
   await carregarDados()
 }
 
+// ── Credenciamentos (acesso de exceção) ───────────────────
+// Frente 3 de docs/acesso-por-organograma.md. Só super_admin concede —
+// decisão tomada (não é `pode_editar`, é `is_super_admin()` na RLS).
+// Vencido, o credenciamento some sozinho de credenciamento_vigente()
+// (frente 4 consome); revogar é só para encerrar ANTES do prazo.
+
+const SITUACAO_CRED_LABEL = { ativo: 'Ativo', agendado: 'Agendado', expirado: 'Expirado', revogado: 'Revogado' }
+const SITUACAO_CRED_COR = {
+  ativo:     { bg: 'rgba(82,183,136,.15)', fg: '#166534' },
+  agendado:  { bg: 'rgba(126,206,232,.2)', fg: '#0F5549' },
+  expirado:  { bg: 'rgba(156,163,175,.2)', fg: '#374151' },
+  revogado:  { bg: 'rgba(239,68,68,.15)',  fg: '#991B1B' },
+}
+
+function filtrarCredenciamentos() {
+  const status = document.getElementById('fil-cred-status')?.value || 'ativo'
+  const lista = status === 'ativo' ? _credenciamentos.filter(c => c.situacao === 'ativo') : _credenciamentos
+  renderCredenciamentos(lista)
+}
+
+function renderCredenciamentos(lista) {
+  const tbody = document.getElementById('tbody-credenciamentos')
+  if (!tbody) return
+  if (!lista.length) {
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:32px;color:#9CA3AF">Nenhum credenciamento encontrado.</td></tr>`
+    return
+  }
+  tbody.innerHTML = lista.map(c => {
+    const cor = SITUACAO_CRED_COR[c.situacao] || SITUACAO_CRED_COR.expirado
+    const podeAgir = c.situacao === 'ativo' || c.situacao === 'agendado'
+    return `<tr>
+      <td>${esc(c.usuario_nome)}</td>
+      <td>${esc(c.modulo_nome)}</td>
+      <td>${esc(NIVEL_CONCEDIDO_LABEL[c.nivel] || c.nivel)}</td>
+      <td>${formatData(c.data_inicio)} – ${formatData(c.data_fim)}</td>
+      <td><span class="badge" style="background:${cor.bg};color:${cor.fg}">${SITUACAO_CRED_LABEL[c.situacao] || esc(c.situacao)}</span></td>
+      <td style="max-width:220px;font-size:12px;color:#6B7280" title="${esc(c.justificativa)}">${esc(c.justificativa)}</td>
+      <td>${esc(c.concedido_por_nome)}</td>
+      <td style="white-space:nowrap">
+        ${podeAgir ? `
+        <button class="btn btn-xs btn-ghost" onclick='renovarCredenciamento(${JSON.stringify({ id: c.id, usuario_id: c.usuario_id, modulo_id: c.modulo_id, nivel: c.nivel })})'>Renovar</button>
+        <button class="btn btn-xs btn-ghost" onclick="revogarCredenciamento('${c.id}')">Revogar</button>` : ''}
+      </td>
+    </tr>`
+  }).join('')
+}
+
+function abrirModalCredenciamento(prefill = null) {
+  document.getElementById('cred-usuario').innerHTML = _usuarios.map(u =>
+    `<option value="${u.id}">${esc(u.nome_completo)}</option>`).join('')
+  document.getElementById('cred-modulo').innerHTML = _modulos.map(m =>
+    `<option value="${m.id}">${esc(m.nome)} (${esc(m.chave)})</option>`).join('')
+  document.getElementById('cred-nivel').value = prefill?.nivel || 'editar'
+  document.getElementById('cred-prazo').value = '90'
+  document.getElementById('cred-justificativa').value = ''
+  document.getElementById('cred-portaria').value = ''
+  if (prefill) {
+    document.getElementById('cred-usuario').value = prefill.usuario_id
+    document.getElementById('cred-modulo').value = prefill.modulo_id
+    document.getElementById('cred-titulo').textContent = 'Renovar credenciamento'
+  } else {
+    document.getElementById('cred-titulo').textContent = 'Conceder credenciamento'
+  }
+  document.getElementById('modal-credenciamento').classList.add('aberto')
+}
+
+function fecharModalCredenciamento() {
+  document.getElementById('modal-credenciamento').classList.remove('aberto')
+  _credRenovarDeId = null
+}
+
+let _credRenovarDeId = null
+
+function renovarCredenciamento(c) {
+  _credRenovarDeId = c.id
+  abrirModalCredenciamento(c)
+}
+
+async function salvarCredenciamento() {
+  const usuario_id = document.getElementById('cred-usuario').value
+  const modulo_id  = document.getElementById('cred-modulo').value
+  const nivel      = document.getElementById('cred-nivel').value
+  const prazoDias  = parseInt(document.getElementById('cred-prazo').value, 10)
+  const justificativa = document.getElementById('cred-justificativa').value.trim()
+  const portaria   = document.getElementById('cred-portaria').value.trim() || null
+
+  if (!usuario_id || !modulo_id) { toast('Servidor e módulo são obrigatórios', 'error'); return }
+  if (justificativa.length < 20) { toast('Justificativa precisa de pelo menos 20 caracteres', 'error'); return }
+
+  const dataFim = new Date()
+  dataFim.setDate(dataFim.getDate() + prazoDias)
+
+  const btn = document.getElementById('cred-btn-salvar')
+  btn.disabled = true; btn.textContent = 'Salvando...'
+  try {
+    const { error } = await db.from('credenciamentos').insert({
+      usuario_id, modulo_id, nivel,
+      data_fim: dataFim.toISOString().slice(0, 10),
+      justificativa, portaria,
+      concedido_por: appState.usuario.id,
+      renovado_de: _credRenovarDeId,
+    })
+    if (error) throw error
+    toast(_credRenovarDeId ? 'Credenciamento renovado!' : 'Credenciamento concedido!', 'success')
+    fecharModalCredenciamento()
+    await carregarDados()
+  } catch(e) { toast(e.message || 'Erro ao salvar', 'error') }
+  finally { btn.disabled = false; btn.textContent = 'Conceder' }
+}
+
+async function revogarCredenciamento(id) {
+  const motivo = prompt('Motivo da revogação (obrigatório):')
+  if (motivo === null) return
+  if (!motivo.trim()) { toast('Informe o motivo da revogação', 'error'); return }
+  const { error } = await db.from('credenciamentos').update({
+    revogado_em: new Date().toISOString(),
+    revogado_por: appState.usuario.id,
+    revogado_motivo: motivo.trim(),
+  }).eq('id', id)
+  if (error) { toast(error.message, 'error'); return }
+  toast('Credenciamento revogado', 'success')
+  await carregarDados()
+}
+
 // ── Abas ──────────────────────────────────────────────────
 
 function ativarAba(nome, btn) {
