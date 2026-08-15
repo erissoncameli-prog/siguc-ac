@@ -946,6 +946,88 @@ function atualizarSelectUnidadePai() {
   }
 }
 
+// ── Acesso por Setor (modulo_unidades) ────────────────────
+// Frente 2 de docs/acesso-por-organograma.md. Escrita restrita a
+// super_admin pela RLS (modulo_unidades_admin) — amarrar módulo a setor
+// redefine quem alcança o quê em todo o sistema.
+
+const NIVEL_CONCEDIDO_LABEL = { editar: 'Editar', visualizar: 'Visualizar' }
+
+function renderModulosUnidades() {
+  const el = document.getElementById('modulos-setor-content')
+  if (!el) return
+  if (!_moduloUnidades.length) {
+    el.innerHTML = `<div class="empty-state"><p>Nenhum módulo amarrado a um setor ainda. Módulos sem amarração continuam com o acesso de hoje (por perfil).</p></div>`
+    return
+  }
+  const porModulo = {}
+  _moduloUnidades.forEach(mu => {
+    (porModulo[mu.modulo_chave] ||= { nome: mu.modulo_nome, linhas: [] }).linhas.push(mu)
+  })
+  let html = '<div class="card" style="overflow:hidden">'
+  Object.keys(porModulo).sort().forEach(chave => {
+    const grupo = porModulo[chave]
+    html += `<div style="padding:12px 16px;border-bottom:1px solid #F3F4F6">
+      <div style="font-size:13px;font-weight:700;color:#111827;margin-bottom:8px">${esc(grupo.nome)} <span style="font-weight:400;color:#9CA3AF">(${esc(chave)})</span></div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        ${grupo.linhas.map(mu => `
+          <div style="display:flex;align-items:center;gap:10px">
+            <span style="font-size:11px;font-weight:700;color:#6B7280;min-width:90px">${esc(mu.unidade_sigla)}</span>
+            <span style="font-size:12px;color:#111827;flex:1">${esc(mu.unidade_nome)}</span>
+            <span class="badge" style="background:${mu.nivel_concedido === 'editar' ? 'rgba(82,183,136,.15)' : 'rgba(156,163,175,.2)'};color:${mu.nivel_concedido === 'editar' ? '#166534' : '#374151'}">${NIVEL_CONCEDIDO_LABEL[mu.nivel_concedido] || esc(mu.nivel_concedido)}</span>
+            <button class="btn btn-xs btn-ghost" onclick="removerModuloUnidade('${mu.id}')">Remover</button>
+          </div>`).join('')}
+      </div>
+    </div>`
+  })
+  html += '</div>'
+  el.innerHTML = html
+}
+
+function abrirModalModuloUnidade() {
+  document.getElementById('mu-modulo').innerHTML = _modulos.map(m =>
+    `<option value="${m.id}">${esc(m.nome)} (${esc(m.chave)})</option>`).join('')
+  document.getElementById('mu-unidade').innerHTML = _unidades.filter(u => u.ativo).map(u =>
+    `<option value="${u.id}">${esc(u.sigla)} — ${esc(u.nome)}</option>`).join('')
+  document.getElementById('mu-nivel').value = 'editar'
+  document.getElementById('mu-obs').value = ''
+  document.getElementById('modal-modulo-unidade').classList.add('aberto')
+}
+
+function fecharModalModuloUnidade() {
+  document.getElementById('modal-modulo-unidade').classList.remove('aberto')
+}
+
+async function salvarModuloUnidade() {
+  const modulo_id      = document.getElementById('mu-modulo').value
+  const unidade_org_id = document.getElementById('mu-unidade').value
+  const nivel_concedido = document.getElementById('mu-nivel').value
+  if (!modulo_id || !unidade_org_id) { toast('Módulo e unidade são obrigatórios', 'error'); return }
+
+  const btn = document.getElementById('mu-btn-salvar')
+  btn.disabled = true; btn.textContent = 'Salvando...'
+  try {
+    const { error } = await db.from('modulo_unidades').insert({
+      modulo_id, unidade_org_id, nivel_concedido,
+      observacoes: document.getElementById('mu-obs').value.trim() || null,
+    })
+    if (error) throw error
+    toast('Amarração criada!', 'success')
+    fecharModalModuloUnidade()
+    await carregarDados()
+  } catch(e) {
+    toast(e.code === '23505' ? 'Este módulo já está amarrado a esta unidade' : (e.message || 'Erro ao salvar'), 'error')
+  } finally { btn.disabled = false; btn.textContent = 'Salvar' }
+}
+
+async function removerModuloUnidade(id) {
+  if (!confirm('Remover esta amarração? Deixará de conceder acesso por lotação para este módulo/unidade (só tem efeito nos módulos com "exige lotação" ligado).')) return
+  const { error } = await db.from('modulo_unidades').delete().eq('id', id)
+  if (error) { toast(error.message, 'error'); return }
+  toast('Amarração removida', 'success')
+  await carregarDados()
+}
+
 // ── Abas ──────────────────────────────────────────────────
 
 function ativarAba(nome, btn) {
