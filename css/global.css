@@ -83,8 +83,14 @@ body { font-family: var(--font-sans); background: var(--cinza-50); color: var(--
 .sidebar-brand-logo { font-family: var(--font-display); font-size: 20px; font-weight: 700; color: #fff; letter-spacing: -.02em; line-height: 1.1; }
 .sidebar-brand-sub { font-size: 9px; color: rgba(255,255,255,.45); letter-spacing: .07em; text-transform: uppercase; margin-top: 2px; text-align: center; }
 
-.sidebar-user { padding: 10px 12px; margin: 6px 10px; border-radius: 10px; background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.08); display: flex; align-items: center; gap: 10px; }
-.sidebar-avatar { width: 34px; height: 34px; border-radius: 50%; background: linear-gradient(135deg, #F4D35E, #D4A017); color: #1F4E2C; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 2px 8px rgba(212,160,23,.4); }
+/* Bloco do nome: é BOTÃO — abre o modal "Meu Perfil" (js/perfil.js).
+   Herda font/text-align porque <button> não herda nenhum dos dois. */
+.sidebar-user { padding: 10px 12px; margin: 6px 10px; border-radius: 10px; background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.08); display: flex; align-items: center; gap: 10px; width: calc(100% - 20px); font: inherit; text-align: left; cursor: pointer; transition: background .16s, border-color .16s; }
+.sidebar-user:hover { background: rgba(255,255,255,.13); border-color: rgba(244,211,94,.45); }
+.sidebar-user:focus-visible { outline: 2px solid var(--ouro-claro); outline-offset: 2px; }
+.sidebar-user-chevron { color: rgba(255,255,255,.4); flex-shrink: 0; }
+.sidebar-user:hover .sidebar-user-chevron { color: var(--ouro-claro); }
+.sidebar-avatar { width: 34px; height: 34px; border-radius: 50%; background: linear-gradient(135deg, #F4D35E, #D4A017); color: #1F4E2C; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 2px 8px rgba(212,160,23,.4); background-size: cover; background-position: center; overflow: hidden; }
 .sidebar-user-info { flex: 1; min-width: 0; }
 .sidebar-user-nome { font-size: 12px; font-weight: 600; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sidebar-user-perfil { font-size: 10px; color: rgba(255,255,255,.55); }
