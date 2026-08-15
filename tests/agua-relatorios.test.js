@@ -77,6 +77,22 @@ function fixtureColetasRioAcre() {
   ];
 }
 
+// Bacia "Purus" de verdade tem 3 rios (Rio Acre/Rio Iaco/Rio Purus,
+// confirmado contra produção antes de desenhar o filtro) — fixture com
+// 1 ponto por rio, pra testar que "filtrar por rio" refina DENTRO da
+// bacia, não é redundante com ela.
+function fixtureColetasPurusMultiRio() {
+  const base = { ponto_bacia: 'Purus', classe_enquadramento: 'classe_2', uc_id: null, campanha_id: 'c1', campanha_ano: 2024, campanha_ordem: 'primeira', data_coleta: '2024-04-01' };
+  return [
+    { ...base, ponto_id: 'p-ac', ponto_nome: 'Xapuri', ponto_rio: 'Rio Acre', ponto_municipio: 'Xapuri',
+      status: 'completo', iqa: 70.0, iqa_faixa: 'Boa', conama_violacoes: [] },
+    { ...base, ponto_id: 'p-ia', ponto_nome: 'Sena Madureira', ponto_rio: 'Rio Iaco', ponto_municipio: 'Sena Madureira',
+      status: 'aguardando_lab', iqa: null, iqa_faixa: null, conama_violacoes: null },
+    { ...base, ponto_id: 'p-pu', ponto_nome: 'Manoel Urbano', ponto_rio: 'Rio Purus', ponto_municipio: 'Manoel Urbano',
+      status: 'completo', iqa: 40.0, iqa_faixa: 'Ruim', conama_violacoes: ['turbidez', 'od'] },
+  ];
+}
+
 function fixtureColetasSemBacia() {
   return [
     { ponto_bacia: null, ponto_id: 'p-iq', ponto_nome: 'Senador Guiomard', codigo_ana: '99999000',
@@ -114,6 +130,44 @@ test.describe('agregação (js/agua-relatorio-dados.js) — pura, sem rede', () 
     const so1a = await page.evaluate((coletas) => window.aguaRelMontar(coletas, { campanhaAteId: 'c1' }), fixtureColetasRioAcre());
     expect(so1a.campanhas).toHaveLength(1);
     expect(so1a.resumo.totalColetas).toBe(2);
+  });
+
+  test('filtros de busca: rio, status, faixa do IQA e conformidade CONAMA refinam DENTRO da bacia', async ({ page }) => {
+    await page.goto(PAGINA);
+    await page.waitForFunction(() => typeof window.aguaRelMontar === 'function' && typeof window.aguaRelRiosDe === 'function' && typeof window.aguaRelFiltrosTxt === 'function');
+
+    const rios = await page.evaluate((coletas) => window.aguaRelRiosDe(coletas), fixtureColetasPurusMultiRio());
+    expect(rios).toEqual(['Rio Acre', 'Rio Iaco', 'Rio Purus']); // ordenado, os 3 rios da bacia real
+
+    // Rio: só o ponto do Rio Iaco entra.
+    const porRio = await page.evaluate((coletas) => window.aguaRelMontar(coletas, { rio: 'Rio Iaco' }), fixtureColetasPurusMultiRio());
+    expect(porRio.pontos.map(p => p.nome)).toEqual(['Sena Madureira']);
+    expect(porRio.filtros).toMatchObject({ rio: 'Rio Iaco', status: null, iqaFaixa: null, conamaStatus: null });
+
+    // Status: só o ponto aguardando_lab (Rio Iaco) entra.
+    const porStatus = await page.evaluate((coletas) => window.aguaRelMontar(coletas, { status: 'aguardando_lab' }), fixtureColetasPurusMultiRio());
+    expect(porStatus.pontos.map(p => p.nome)).toEqual(['Sena Madureira']);
+
+    // Faixa do IQA: só o ponto "Ruim" (Rio Purus) entra.
+    const porFaixa = await page.evaluate((coletas) => window.aguaRelMontar(coletas, { iqaFaixa: 'Ruim' }), fixtureColetasPurusMultiRio());
+    expect(porFaixa.pontos.map(p => p.nome)).toEqual(['Manoel Urbano']);
+
+    // Conformidade CONAMA: 'violacao' pega só o Rio Purus, 'sem_limites' só o Rio Iaco (conama_violacoes null).
+    const porViolacao = await page.evaluate((coletas) => window.aguaRelMontar(coletas, { conamaStatus: 'violacao' }), fixtureColetasPurusMultiRio());
+    expect(porViolacao.pontos.map(p => p.nome)).toEqual(['Manoel Urbano']);
+    const porSemLimites = await page.evaluate((coletas) => window.aguaRelMontar(coletas, { conamaStatus: 'sem_limites' }), fixtureColetasPurusMultiRio());
+    expect(porSemLimites.pontos.map(p => p.nome)).toEqual(['Sena Madureira']);
+
+    // Filtros combinam com "E", não "OU".
+    const combinado = await page.evaluate((coletas) => window.aguaRelMontar(coletas, { rio: 'Rio Purus', status: 'completo' }), fixtureColetasPurusMultiRio());
+    expect(combinado.pontos.map(p => p.nome)).toEqual(['Manoel Urbano']);
+    const combinadoVazio = await page.evaluate((coletas) => window.aguaRelMontar(coletas, { rio: 'Rio Purus', status: 'aguardando_lab' }), fixtureColetasPurusMultiRio());
+    expect(combinadoVazio.pontos).toHaveLength(0);
+
+    // Texto legível dos filtros ativos, reaproveitado pela tela e pelos dois geradores.
+    const txt = await page.evaluate(() => window.aguaRelFiltrosTxt({ rio: 'Rio Iaco', status: 'completo', iqaFaixa: null, conamaStatus: null }));
+    expect(txt).toBe('Rio: Rio Iaco · Status: Completo');
+    expect(await page.evaluate(() => window.aguaRelFiltrosTxt({ rio: null, status: null, iqaFaixa: null, conamaStatus: null }))).toBe('');
   });
 
   test('aguaRelSerieIQA preenche gap com null, nunca omite a campanha', async ({ page }) => {
@@ -191,6 +245,50 @@ test.describe('geração real dos arquivos — PDF e PPTX', () => {
     expect(buf.length).toBeGreaterThan(15_000);
     const parsed = await extrairTextoPdf(buf);
     expect(parsed.text).toContain('Sem bacia definida');
+  });
+
+  test('PDF: com filtro de rio ativo, a capa avisa "Filtros aplicados" e o ponto de fora do filtro não aparece', async ({ page }) => {
+    test.setTimeout(60_000);
+    await page.goto(PAGINA);
+    await page.waitForFunction(() => typeof window.aguaRelMontarPdf === 'function' && typeof window.aguaRelMontar === 'function');
+
+    const base64 = await page.evaluate(async (coletas) => {
+      const relatorio = window.aguaRelMontar(coletas, { rio: 'Rio Iaco' });
+      const cab = { secretaria: 'SEMA-AC', siglaSecr: 'SEMA-AC', diretoria: 'DIMA', siglaDiret: 'DIMA', departamento: 'DEUC', logoGoverno: null, logoSecr: null };
+      const pdf = await window.aguaRelMontarPdf(relatorio, 'Purus', '2024 · 1ª campanha', cab, 'SIGUC-2026-FILTRO1');
+      const buf = await pdf.output('blob').arrayBuffer();
+      let binary = ''; const bytes = new Uint8Array(buf);
+      for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+      return btoa(binary);
+    }, fixtureColetasPurusMultiRio());
+
+    const buf = Buffer.from(base64, 'base64');
+    const parsed = await extrairTextoPdf(buf);
+    expect(parsed.text).toMatch(/Filtros aplicados.*Rio: Rio Iaco/);
+    expect(parsed.text).toContain('Sena Madureira'); // ponto do rio filtrado
+    expect(parsed.text).not.toContain('Manoel Urbano'); // ponto de outro rio da mesma bacia — fora do filtro
+    expect(parsed.text).not.toContain('Xapuri');
+  });
+
+  test('PPTX: com filtro de status ativo, a capa avisa "Filtros aplicados"', async ({ page }) => {
+    test.setTimeout(60_000);
+    await page.goto(PAGINA);
+    await page.waitForFunction(() => typeof window.aguaRelMontarPptx === 'function' && typeof window.aguaRelMontar === 'function');
+
+    const base64 = await page.evaluate(async (coletas) => {
+      const relatorio = window.aguaRelMontar(coletas, { status: 'completo' });
+      const blob = await window.aguaRelMontarPptx(relatorio, 'Purus', '2024 · 1ª campanha', 'SIGUC-2026-FILTRO2');
+      const buf = await blob.arrayBuffer();
+      let binary = ''; const bytes = new Uint8Array(buf);
+      for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+      return btoa(binary);
+    }, fixtureColetasPurusMultiRio());
+
+    const buf = Buffer.from(base64, 'base64');
+    const zip = await JSZip.loadAsync(buf);
+    const nomesSlides = Object.keys(zip.files).filter(n => /^ppt\/slides\/slide\d+\.xml$/.test(n));
+    const textoTodosSlides = (await Promise.all(nomesSlides.map(n => zip.files[n].async('text')))).join('\n');
+    expect(textoTodosSlides).toMatch(/Filtros aplicados.*Status: Completo/);
   });
 
   test('PPTX: gera de verdade, é um zip válido com slides e traz os dados certos', async ({ page }) => {

@@ -823,6 +823,61 @@ outras pendências (ex.: bacia do Rio Iquiri). Se a SEMA confirmar a
 atribuição correta no futuro, é a mesma troca de duas linhas que o
 Biomonitor fez.
 
+### Melhoria pós-Fase 5: filtros de busca (rio, status, faixa do IQA, CONAMA)
+
+Pedido do usuário, feito depois do plano fechado: "inserir mais campos
+para busca. tipo por rio, por status e outros". Antes de codar,
+analisei os dados reais (`execute_sql` contra produção) pra não supor:
+a bacia Purus tem 3 rios (Rio Acre, Rio Iaco, Rio Purus) e Juruá tem 4
+— filtrar por rio DENTRO da bacia escolhida é útil de verdade, não
+redundante. E 75% das coletas (339 de 450) estão em quarentena — poder
+excluir (ou isolar) isso do relatório é um caso de uso concreto, não
+cosmético.
+
+Três arquiteturas foram apresentadas ao usuário antes de codar (A:
+refinar dentro do fluxo "uma bacia" atual; B: busca livre sem bacia
+obrigatória, exigiria redesenhar a capa do PDF/PPTX; C: híbrido, aba
+de consulta separada) — escolhida **A**, com os 4 campos: rio, status,
+faixa do IQA, conformidade CONAMA.
+
+- **`js/agua-relatorio-dados.js`**: `aguaRelMontar()` ganhou os opts
+  `rio`/`status`/`iqaFaixa`/`conamaStatus` — filtram "E" entre si,
+  aplicados DEPOIS do recorte por campanha, ANTES de agrupar por
+  ponto. O eixo `campanhas` continua vindo do intervalo inteiro (não é
+  recalculado pelos filtros de busca) — mesmo espírito do ponto
+  "vazado" em `agua-mapa.html`: um filtro que esvazia uma campanha não
+  redesenha o eixo temporal. Funções novas: `aguaRelRiosDe()` (rios
+  distintos de uma lista de coletas, pra popular o seletor dependente
+  da bacia), `aguaRelConamaStatus()` (deriva conforme/violação/sem
+  limites — mesmo terceiro estado que `agua-mapa.html` já trata),
+  `aguaRelFiltrosTxt()` (texto legível dos filtros ativos,
+  compartilhado pela tela E pelos dois geradores — não virou uma
+  terceira cópia da formatação).
+- **A capa do PDF e do PPTX avisam quando há filtro ativo**
+  ("Filtros aplicados: Rio: X · Status: Y") — decisão deliberada: sem
+  isso, um documento filtrado poderia ser confundido com "a bacia
+  inteira". `_agpptxSlideCapa()` passou a receber o texto de filtros
+  como parâmetro extra; `_agpdfCapa()` já tinha acesso a
+  `relatorio.filtros` (embutido no retorno de `aguaRelMontar()`, não
+  precisou mudar a assinatura de `aguaRelMontarPdf()`).
+- **Tela** (`pages/agua-relatorios.html`): 4 selects novos na barra de
+  filtros — Rio é repopulado a cada troca de bacia (`aguaRelRiosDe`
+  sobre as coletas já carregadas, sem nova consulta); Status/Faixa
+  IQA/CONAMA são fixos. Aviso azul (`.alert.alert-info`, classe já
+  existente no design system, reaproveitada) mostra os filtros ativos
+  com botão "Limpar filtros" acima do resumo, sempre que algum estiver
+  setado.
+- **Sem RPC/migration nova** — os filtros operam em JS puro sobre o
+  que `aguaRelBuscarColetasDaBacia()` já buscou; nenhuma consulta nova
+  ao banco.
+- **Testes**: `tests/agua-relatorios.test.js` ganhou uma fixture nova
+  (`fixtureColetasPurusMultiRio`, 3 pontos em 3 rios da bacia Purus,
+  espelhando o dado real que motivou o filtro) cobrindo os 4 filtros
+  isolados e combinados, mais 2 testes de geração REAL (PDF e PPTX)
+  confirmando que "Filtros aplicados" aparece no documento e que o
+  ponto fora do filtro não aparece no texto extraído. 11/11 passando;
+  `bash scripts/guardrails.sh` sem novo achado.
+
 ## Fase 5 concluída — plano original fechado
 
 Todas as 5 fases do plano original (`docs/qualidade-agua/plano.md`)

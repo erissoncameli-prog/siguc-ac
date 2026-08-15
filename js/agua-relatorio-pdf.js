@@ -22,8 +22,9 @@
 // Depende de: formatData() (js/config.js); getCabecalhoRelatorio(),
 // gerarProtocolo() (js/config-sistema.js); BIOPDF_FONT_REGULAR_B64/
 // BIOPDF_FONT_BOLD_B64 (js/biomonitor-pdf-fonts.js); aguaRelLabelCampanha(),
-// AGUA_REL_PARAM_LABEL (js/agua-relatorio-dados.js); jsPDF + jspdf-autotable
-// (js/vendor/jspdf-2.5.2.umd.min.js, js/vendor/jspdf-autotable-3.8.4.min.js).
+// AGUA_REL_PARAM_LABEL, aguaRelFiltrosTxt() (js/agua-relatorio-dados.js);
+// jsPDF + jspdf-autotable (js/vendor/jspdf-2.5.2.umd.min.js,
+// js/vendor/jspdf-autotable-3.8.4.min.js).
 
 // Mesma paleta de pages/agua-mapa.html (IQA_FAIXA_COR) — validada para
 // daltonismo junto com as outras cores do módulo (ver CLAUDE.md, seção
@@ -189,7 +190,19 @@ function _agpdfCapa(ctx, relatorio, labelBacia, periodoTxt) {
   ctx.y += linhasNome.length * 9 + 4
   pdf.setFont('DMSans', 'normal'); pdf.setFontSize(10); pdf.setTextColor(...AGPDF_COR.muted)
   pdf.text(periodoTxt, ctx.W / 2, ctx.y, { align: 'center' })
-  ctx.y += 30
+  ctx.y += 6
+
+  // Filtros de busca ativos (rio/status/faixa IQA/CONAMA) além de bacia
+  // e campanha — mostrados logo na capa, pra ninguém confundir este
+  // documento com "a bacia inteira" quando ele foi recortado.
+  const filtrosTxt = aguaRelFiltrosTxt(relatorio.filtros)
+  if (filtrosTxt) {
+    pdf.setFont('DMSans', 'bold'); pdf.setFontSize(8.5); pdf.setTextColor(...AGPDF_COR.floresta)
+    pdf.text(`Filtros aplicados: ${filtrosTxt}`, ctx.W / 2, ctx.y, { align: 'center' })
+    ctx.y += 24
+  } else {
+    ctx.y += 24
+  }
 
   const r = relatorio.resumo
   const kpis = [
