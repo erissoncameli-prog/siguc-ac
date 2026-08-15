@@ -221,7 +221,7 @@ GRANT  EXECUTE ON FUNCTION credenciamento_checar_vencimentos(int) TO service_rol
 SELECT cron.unschedule('credenciamentos-vencimentos-diario')
  WHERE EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'credenciamentos-vencimentos-diario');
 
--- 09h20 UTC ≈ 06h20 Acre — mesma janela da 205, evitando colidir com
--- outros crons diários do projeto (09h10 frota, 09h15 biomonitor).
-SELECT cron.schedule('credenciamentos-vencimentos-diario', '20 9 * * *',
+-- 09h25 UTC ≈ 06h25 Acre — mesma janela da 205; 09h10/15/20 já têm
+-- jobs (frota, biomonitor, quelônios, purga de passageiros).
+SELECT cron.schedule('credenciamentos-vencimentos-diario', '25 9 * * *',
   $cron$SELECT credenciamento_checar_vencimentos();$cron$);
