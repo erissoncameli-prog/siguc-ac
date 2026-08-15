@@ -224,13 +224,23 @@ endpoint de auth e não entra em log nenhum nosso.
 de uma chamada SQL** e pode aparecer nos logs de query do Supabase. Só usar
 se A e B estiverem descartados, e com a limitação registrada por escrito.
 
-**Granularidade — decisão sua (item 6.1):** por *registro* salvo ou por
-*janela de sessão de edição* (uma senha libera N minutos de edição, e cada
-gravação da janela registra o mesmo `reauth_prova`). Com 339 coletas em
-conferência, "por campo" está fora de questão; minha recomendação é
-**janela curta (5 min) na conferência em massa e por registro nas demais
-telas**, porque o custo de errar em conferência é baixo (tudo fica na
-trilha) e o de travar o trabalho é alto.
+**Granularidade — DECIDIDO (decisão 1):** janela na conferência, por
+registro nas demais telas. Consequências de desenho:
+
+- A janela é **do servidor, não do JavaScript**. Um `_janelaAberta = true`
+  no cliente seria o mesmo teatro que se está corrigindo. Na opção A
+  (JWT), a janela é a própria validade que a RPC aceita para a
+  autenticação por senha; na opção B (ticket), o ticket deixa de ser de
+  uso único na conferência e passa a ter `expira_em` + `usos`.
+- A janela é **por usuário e por tela** (`acao = 'conferencia'`), nunca um
+  passe livre para o módulo inteiro: reautenticar na conferência não pode
+  liberar exclusão em `agua-pontos`.
+- **Toda gravação da janela carimba `reauth_prova` na trilha**, com o id da
+  janela e o horário em que a senha foi de fato digitada. O log tem de
+  permitir dizer "estas 40 edições vieram de uma única confirmação às
+  14h03" — senão a janela vira um buraco na prova.
+- A tela mostra a janela ativa e o tempo restante, e oferece encerrá-la.
+  Fechar a página encerra. Ociosidade prolongada encerra (valor em §7).
 
 ### Camada 4 — Escrita passa a ser RPC
 
