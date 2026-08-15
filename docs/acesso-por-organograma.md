@@ -553,37 +553,6 @@ edição em si.
 
 ---
 
-### 8.1 Lotação inicial no cadastro de usuário (2026-08-15, pós-merge)
-
-Pedido do usuário: evitar o esquecimento de lotar um servidor recém-
-criado, tendo que lembrar de ir à Estrutura Organizacional depois.
-Entregue: campo opcional "Lotação inicial" no modal "Novo Usuário"
-(`pages/usuarios.html`), só na criação (edição continua usando a aba
-Lotações). Cargo/chefia e credenciamento ficaram FORA de propósito —
-cargo é vaga existente que se ocupa, não algo que nasce com a pessoa
-(quase ninguém já é chefe no primeiro dia); credenciamento é exceção
-pontual, não fluxo padrão.
-
-**Decisão de escopo de acesso, tomada explicitamente pelo usuário**: o
-modal de criação é aberto tanto por `super_admin` quanto por `gestor`,
-mas a RLS de `usuario_lotacoes` (frente 1) só permite escrita a
-`super_admin`/`diretor`. Perguntei se o campo deveria aparecer só para
-quem já pode editar lotação (opção A, respeita o limite existente) ou
-se `gestor` — que já cria a identidade inteira da pessoa (perfil, UC,
-cargo-texto) — também deveria poder lotar no mesmo passo (opção B,
-amplia). **Escolhida a opção B.** Implementação: a gravação da lotação
-saiu do cliente e entrou na Edge Function `admin-criar-usuario`, que já
-roda com `service_role` (ignora RLS) — em vez de replicar essa regra em
-JS, ela nasce correta ali. Melhor esforço: se a lotação falhar, a
-criação do usuário não é desfeita, e a resposta carrega `aviso` para a
-tela mostrar.
-
-Consequência registrada: `gestor` agora tem, por este caminho
-específico, uma capacidade que não tem em nenhuma outra tela do
-sistema (definir lotação). É deliberado, não drift — mas se a decisão
-mudar, o ponto único a reverter é a checagem de `body.unidade_org_id`
-na Edge Function, não um lugar espalhado.
-
 ## 8. Frentes de trabalho
 
 Progresso (2026-08-15): **1 entregue** (migration 262 + aba "Lotações" em
