@@ -6,7 +6,8 @@
 // card de "Ninhos abertos". Exige conexão (mesmo padrão de degradação do
 // resto do app).
 // Depende de: bioSupabase(), bioToast() (biomonitor-quelonios.js/sync.js);
-// bioColetarDadosRelatorioNinhos(), bioMontarPdfNinhos() (biomonitor-relatorio-ninho.js).
+// bioColetarDadosRelatorioNinhos(), bioMontarPdfNinhos() (biomonitor-relatorio-ninho.js);
+// compartilharArquivo() (js/compartilhar-arquivo.js).
 
 const BIOCAMPO_CAB_PADRAO = {
   governo: 'Governo do Estado do Acre', gestao: '',
@@ -16,51 +17,13 @@ const BIOCAMPO_CAB_PADRAO = {
   logoGoverno: null, logoSecr: null,
 }
 
-function _biocampoBlobParaBase64(blob) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onloadend = () => resolve(String(reader.result).split(',')[1])
-    reader.onerror = reject
-    reader.readAsDataURL(blob)
-  })
-}
-
 // ── Compartilhar o arquivo já gerado ────────────────────────────────
-// 1) App nativo (Capacitor/APK): grava no cache e abre a folha nativa de
-//    compartilhamento (WhatsApp, e-mail, etc. aparecem automaticamente).
-// 2) Navegador/PWA com Web Share API de arquivos (Chrome/Android, Safari/iOS).
-// 3) Fallback: baixa o PDF e orienta o envio manual.
+// Lógica das 3 camadas (nativo → Web Share → baixar) centralizada em
+// js/compartilhar-arquivo.js — Água virou o 2º consumidor nesta
+// entrega (ficha de coleta em PDF). Mantido como wrapper aqui só para
+// não mudar a assinatura já usada pelo resto deste arquivo.
 async function bioCompartilharArquivo(blob, filename, titulo) {
-  const nativo = window.Capacitor?.isNativePlatform?.() && window.Capacitor?.Plugins?.Filesystem && window.Capacitor?.Plugins?.Share
-  if (nativo) {
-    try {
-      const base64 = await _biocampoBlobParaBase64(blob)
-      const { Filesystem, Share } = window.Capacitor.Plugins
-      const gravado = await Filesystem.writeFile({ path: filename, data: base64, directory: 'CACHE' })
-      await Share.share({ title: titulo, url: gravado.uri, dialogTitle: 'Compartilhar ficha do ninho' })
-      return
-    } catch (e) {
-      console.warn('[biomonitor] compartilhamento nativo falhou, tentando alternativa:', e)
-    }
-  }
-
-  const file = new File([blob], filename, { type: 'application/pdf' })
-  if (navigator.canShare?.({ files: [file] })) {
-    try {
-      await navigator.share({ files: [file], title: titulo })
-      return
-    } catch (e) {
-      if (e?.name === 'AbortError') return
-      console.warn('[biomonitor] navigator.share falhou, baixando arquivo:', e)
-    }
-  }
-
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url; a.download = filename
-  document.body.appendChild(a); a.click(); a.remove()
-  setTimeout(() => URL.revokeObjectURL(url), 30000)
-  bioToast('PDF baixado — envie manualmente pelo WhatsApp ou e-mail.', '')
+  await compartilharArquivo(blob, filename, titulo, msg => bioToast(msg, ''))
 }
 
 // Logos institucionais (mesmas de config_sistema.dados.logos usadas na tela

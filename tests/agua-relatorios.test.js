@@ -247,4 +247,90 @@ test.describe('geração real dos arquivos — PDF e PPTX', () => {
     const textoTodosSlides = (await Promise.all(nomesSlides.map(n => zip.files[n].async('text')))).join('\n');
     expect(textoTodosSlides).toContain('Sem bacia definida');
   });
+
+  // Ficha de UMA coleta (js/agua-relatorio-pdf.js, aguaRelMontarPdfColeta) —
+  // usada pelo botão "Exportar PDF" do detalhe da coleta em
+  // pages/agua-app.html. Mesma técnica das duas primeiras: chama o
+  // gerador de verdade e abre o PDF com pdf-parse, não é só "não
+  // lançou exceção".
+  test('Ficha de coleta: gera de verdade, traz IQA, CONAMA (com o parâmetro violado) e observações', async ({ page }) => {
+    test.setTimeout(60_000);
+    await page.goto(PAGINA);
+    await page.waitForFunction(() => typeof window.aguaRelMontarPdfColeta === 'function');
+
+    const base64 = await page.evaluate(async () => {
+      const coleta = {
+        ponto_nome: 'Rio Branco', codigo_ana: '13601000', ponto_rio: 'Rio Acre', ponto_municipio: 'Rio Branco',
+        classe_enquadramento: 'classe_2', campanha_ano: 2024, campanha_ordem: 'segunda',
+        data_coleta: '2024-06-25', hora_coleta: '09:30', coletor_nome: 'Técnico de Teste',
+        laboratorio_nome: 'Laboratório Central', status: 'completo', quarentena_motivo: null,
+        iqa: 69.66, iqa_faixa: 'Boa', conama_violacoes: ['dbo'],
+        od: 7.26, dbo: 9.0, turbidez: 26.56, ph: 7.43, fosforo_total: 0.029, coliformes_termotolerantes: 54,
+        observacoes: 'Nível do rio baixo, coleta na margem direita.',
+        codigo_amostra: 'AM-2024-0099',
+      };
+      const cab = {
+        secretaria: 'Secretaria de Estado do Meio Ambiente do Acre', siglaSecr: 'SEMA-AC',
+        diretoria: 'Diretoria de Meio Ambiente', siglaDiret: 'DIMA', departamento: 'Departamento de Unidades de Conservação',
+        logoGoverno: null, logoSecr: null,
+      };
+      const pdf = await window.aguaRelMontarPdfColeta(coleta, cab, 'SIGUC-2026-FICHA1');
+      const blob = pdf.output('blob');
+      const buf = await blob.arrayBuffer();
+      let binary = '';
+      const bytes = new Uint8Array(buf);
+      for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+      return btoa(binary);
+    });
+
+    const buf = Buffer.from(base64, 'base64');
+    expect(buf.length).toBeGreaterThan(15_000);
+    fs.writeFileSync(path.join(OUT_DIR, 'ficha-coleta.pdf'), buf);
+
+    const parsed = await extrairTextoPdf(buf);
+    expect(parsed.numpages).toBe(1); // ficha de 1 coleta cabe numa página
+    const texto = parsed.text;
+    expect(texto).toContain('Rio Branco');
+    expect(texto).toContain('13601000');
+    expect(texto).toContain('SEMA-AC');
+    expect(texto).toContain('SIGUC-2026-FICHA1');
+    expect(texto).toContain('69.7'); // IQA arredondado (jsPDF quebra o "," do pt-BR em espaço/nada)
+    expect(texto).toMatch(/Boa/);
+    expect(texto).toMatch(/1 viola/); // "1 violação(ões)"
+    expect(texto).toMatch(/DBO/);
+    expect(texto).toContain('Nível do rio baixo');
+    expect(texto).toContain('AM-2024-0099');
+  });
+
+  test('Ficha de coleta: quarentena e sem parâmetros ainda não quebra o fluxo', async ({ page }) => {
+    test.setTimeout(60_000);
+    await page.goto(PAGINA);
+    await page.waitForFunction(() => typeof window.aguaRelMontarPdfColeta === 'function');
+
+    const base64 = await page.evaluate(async () => {
+      const coleta = {
+        ponto_nome: 'Senador Guiomard', codigo_ana: '99999000', ponto_rio: 'Rio Iquiri', ponto_municipio: 'Senador Guiomard',
+        classe_enquadramento: 'classe_2', campanha_ano: 2026, campanha_ordem: 'primeira',
+        data_coleta: '2026-08-10', hora_coleta: null, coletor_nome: 'Técnico de Teste',
+        laboratorio_nome: null, status: 'quarentena', quarentena_motivo: 'pH fora da faixa plausível',
+        iqa: null, iqa_faixa: null, conama_violacoes: null,
+        observacoes: null, codigo_amostra: null,
+      };
+      const cab = { secretaria: 'SEMA-AC', siglaSecr: 'SEMA-AC', diretoria: 'DIMA', siglaDiret: 'DIMA', departamento: 'DEUC', logoGoverno: null, logoSecr: null };
+      const pdf = await window.aguaRelMontarPdfColeta(coleta, cab, 'SIGUC-2026-FICHA2');
+      const blob = pdf.output('blob');
+      const buf = await blob.arrayBuffer();
+      let binary = '';
+      const bytes = new Uint8Array(buf);
+      for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+      return btoa(binary);
+    });
+
+    const buf = Buffer.from(base64, 'base64');
+    expect(buf.length).toBeGreaterThan(15_000);
+    const parsed = await extrairTextoPdf(buf);
+    expect(parsed.text).toContain('Senador Guiomard');
+    expect(parsed.text).toMatch(/pH fora da faixa plaus/);
+    expect(parsed.text).toMatch(/aguardando laudo/i);
+  });
 });
