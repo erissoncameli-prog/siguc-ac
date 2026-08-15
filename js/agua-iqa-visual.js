@@ -281,7 +281,10 @@ function aguaIqaFaixasRoscaHTML(contagem, semIQA, opts) {
       <span style="width:8px;height:8px;border-radius:2px;background:${i.cor}"></span>${_aguaEsc(i.label)}
       <strong style="color:#111827">${i.n}</strong></span>`).join('')
 
-  return `<div style="display:flex;flex-direction:column;align-items:center;gap:10px">
+  // `data-total` no wrapper: o total já está no centro da rosca (SVG),
+  // mas texto dentro de <text> é incômodo de asserir em teste — o
+  // atributo dá um jeito direto de ler o número sem parsear SVG.
+  return `<div data-total="${total}" style="display:flex;flex-direction:column;align-items:center;gap:10px">
     <svg viewBox="0 0 ${w} ${w}" style="display:block;width:${w}px;max-width:100%;height:auto" role="img"
         aria-label="Distribuição por faixa do IQA: ${_aguaEsc(itens.map(i => `${i.label} ${i.n}`).join(', '))}">
       <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#F3F4F6" stroke-width="${o.espessura}"/>
