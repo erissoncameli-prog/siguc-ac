@@ -1372,6 +1372,7 @@ function tabelaBrigadas(registros, brigadas) {
     .sort((a,b)=>b.n-a.n).slice(0,10)
 
   if (!rows.length) return '<p class="chart-empty" style="padding:12px">Sem dados</p>'
+  const maxN = Math.max(...rows.map(r=>r.n), 1)
   return `<table class="rel-table">
     <thead><tr>
       <th>Brigada</th><th>Regional</th><th>Registros</th><th>Fauna</th>
@@ -1380,7 +1381,7 @@ function tabelaBrigadas(registros, brigadas) {
     <tbody>${rows.map(r=>`<tr>
       <td>${esc(r.nome)}</td>
       <td>${r.regional ? (REGIONAL_LAB[r.regional]||r.regional) : '—'}</td>
-      <td><strong>${r.n}</strong></td>
+      <td><div style="display:flex;align-items:center;gap:6px"><div class="bar-wrap" style="width:44px"><div class="bar-fill" style="width:${Math.round(r.n/maxN*100)}%;background:#2D6A4F"></div></div><strong>${r.n}</strong></div></td>
       <td>${r.fauna > 0 ? `${bico('paw')} ${r.fauna}` : '—'}</td>
       <td>${r.haEvit > 0 ? `<span style="color:#5b21b6;font-weight:700">${formatNum(r.haEvit,1)} ha</span>` : '—'}</td>
       <td>
