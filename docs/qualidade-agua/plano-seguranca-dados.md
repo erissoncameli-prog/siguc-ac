@@ -341,17 +341,27 @@ protege contra corrupção acidental, não contra adulteração deliberada (ver
 
 ---
 
-## 6. Decisões que preciso de você antes de codar
+## 6. Decisões ainda em aberto (não bloqueiam o início)
 
-1. **Granularidade da senha**: por registro salvo ou janela de 5 min?
-   (recomendação: janela na conferência, por registro nas demais).
-2. **Exclusão**: lógica com justificativa é suficiente, ou o super_admin
-   precisa mesmo do expurgo físico?
-3. **A trilha precisa ser inviolável até para o super_admin?** Se sim, o
-   escopo cresce (destino externo) e vira frente própria.
-4. **Escopo**: só Qualidade da Água agora, ou já desenhar o trigger de
-   auditoria genérico para reuso em Brigadas/Biomonitor/Frota depois?
-   (o desenho acima já é genérico de propósito — muda só quanto se aplica).
-5. **Alteração feita pelo próprio app de campo** (correção de coleta ainda
-   na fila offline) entra na mesma regra de senha? (recomendação: não —
-   enquanto não sincronizou, não há dado no banco para auditar).
+1. **Expurgo físico**: exclusão lógica com justificativa é suficiente, ou o
+   super_admin precisa mesmo poder apagar de vez? O plano prevê as duas;
+   na dúvida, entregar só a lógica — acrescentar o expurgo depois é uma
+   RPC, remover um dado apagado não é nada.
+2. **Alteração feita pelo próprio app de campo** (correção de coleta ainda
+   na fila offline) entra na regra de senha? Recomendação: **não** —
+   enquanto não sincronizou não existe dado no banco para auditar, e a
+   trava mataria o trabalho offline. Depois de sincronizada, a coleta só
+   se altera pela mesa, com as regras de todos.
+3. **Destino do selo**: e-mail institucional (mínimo) + commit no GitHub
+   (desejável)? Definir qual endereço institucional recebe.
+
+## 7. Detalhes a fixar na implementação
+
+- Duração da janela de senha (sugestão: 5 min) e ociosidade que a encerra
+  (sugestão: 2 min sem gravar).
+- Tamanho mínimo da justificativa (sugestão: 20 caracteres) — validado no
+  banco.
+- Retenção da trilha (sugestão: 5 anos) e o que acontece ao expirar:
+  **expurgo quebra a cadeia de hash**, então a política tem de ser
+  "arquivar o trecho com o selo correspondente", nunca `DELETE` solto.
+- Horário do cron do selo (evitar colidir com os crons já existentes).
