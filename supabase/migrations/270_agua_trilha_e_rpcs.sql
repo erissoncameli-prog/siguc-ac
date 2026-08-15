@@ -15,7 +15,7 @@
 -- OPÇÃO A DE REAUTENTICAÇÃO — validada nesta entrega, não presumida.
 -- O GoTrue do Supabase já registra, por sessão, quando cada método de
 -- autenticação foi satisfeito (`auth.mfa_amr_claims`, 37 linhas reais
--- confirmadas em produção). `agua_reauth_valida()" usa isso: reautenticar
+-- confirmadas em produção). `agua_reauth_valida()` usa isso: reautenticar
 -- num client isolado cria uma sessão nova com `authentication_method =
 -- 'password'` e `updated_at = now()` — sem Edge Function, sem ticket
 -- próprio, sem a senha passar pelo nosso código.
