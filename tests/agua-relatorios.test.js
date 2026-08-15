@@ -538,7 +538,10 @@ async function abrirPainelComStub(page, coletas) {
   }, { coletas, usuario: USUARIO_STUB });
 
   await page.goto(PAGINA);
-  await page.waitForSelector('#rl-bacia option[value="Rio Acre"]', { timeout: 15_000 });
+  // `option` nunca é "visível" para o Playwright (está dentro do select
+  // fechado) — espera-se pela existência no DOM, não por visibilidade.
+  await page.waitForFunction(
+    () => !!document.querySelector('#rl-bacia option[value="Rio Acre"]'), null, { timeout: 15_000 });
   await page.selectOption('#rl-bacia', 'Rio Acre');
   await page.waitForSelector('.adash-grid');
 }
