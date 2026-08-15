@@ -1011,10 +1011,6 @@ Unidades: SECRETARIA > DIMA > DEUC | CIGMA | JURÍDICO
   dourado. Controlado em brigada.html (ehModoCopa/aplicarMascoteCopa).
 
 ### A implementar (ordem de prioridade)
-A) Estrutura Organizacional → 003_estrutura_organizacional.sql
-   Tabelas: unidades_organizacionais, cargos, cargo_ocupacoes,
-   delegacoes_temporarias. VIEW cargos_atuais.
-
 B) Alertas Ambientais → 005_alertas_ambientais.sql
    Fontes: DETER-B, BDQueimadas, FIRMS, PRODES
    Cron 06h BRT + cruzamento PostGIS ST_Within + e-mail ao gestor
