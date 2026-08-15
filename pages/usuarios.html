@@ -216,6 +216,8 @@ function abrirModal(u = null) {
   document.getElementById('f-cargo').value = u?.cargo || ''
   document.getElementById('f-tel').value = u?.telefone || ''
   document.getElementById('bloco-senha').style.display = u ? 'none' : ''
+  document.getElementById('bloco-lotacao').style.display = u ? 'none' : ''
+  document.getElementById('f-lotacao').value = ''
   document.getElementById('modal-usuario').classList.add('aberto')
 }
 
