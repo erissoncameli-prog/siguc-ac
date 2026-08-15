@@ -45,8 +45,9 @@ diga por quê antes de mudar.
    no JS) e prova de reautenticação por senha **verificada no servidor**.
    INSERT continua direto e sem senha — o app de campo é offline-first e
    nada pode quebrar isso.
-5. **Exclusão lógica** com justificativa. Expurgo físico só se confirmado
-   (§6.1 do plano); se não confirmado, entregar só a lógica.
+5. **Exclusão lógica** com justificativa. **Expurgo físico não entra
+   nesta missão** (§6.1 do plano) — não implemente, e não peça a decisão
+   de novo.
 6. **`pages/agua-auditoria.html`** com diff antes→depois campo a campo, e
    link na sidebar visível só ao super_admin.
 7. Migrar `agua-conferencia.html`, `agua-laudos.html` e `agua-pontos.html`
