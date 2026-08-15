@@ -628,7 +628,7 @@ consolidar as 3 policies redundantes de `camadas_mapa` | 4 |
 | 6b | 🟡 **Parcial**: `appState.permissoes` alimentado por `minhas_permissoes` em `carregarUsuario()` (js/config.js), fail-open. `js/layout.js` **ainda não lê isso** — nenhum dos 12 itens com `perfis:` hard-coded tem correspondência 1:1 com uma chave de módulo (ex.: `agua` no catálogo governa 6 itens de menu; `biomonitor-validacao`/`admin-biomonitor`/etc. não têm chave própria, só a genérica `biomonitor`); e os 3 candidatos com match exato (`validacao-campo`, `admin-brigadas`, grupo `frota`) têm o MESMO drift catálogo×realidade da frente 5 — converter esconderia ou mostraria links para perfis diferentes dos de hoje. Ver §1.4b | 4 |
 | 7 | ✅ Trilha de auditoria genérica sobre as tabelas de permissão (migration 269) — ver relato abaixo | §5 |
 | 8 | Virada módulo a módulo (Frota → Água → …), com relatório de impacto | tudo |
-| 9 | Regra permanente no `CLAUDE.md` + `tests/permissao-organograma.test.js` | — |
+| 9 | ✅ Regra permanente no `CLAUDE.md` (seção "Regra do sistema — Acesso por organograma") + `tests/permissao-organograma.test.js` (3 testes, rodados de verdade via Playwright + `http-server`, não só lidos) | — |
 
 A frente 6 é pequena e destrava governar o Biomonitor. As frentes 1 e 3
 são as que dão valor mais cedo (lotação visível; exceções com prazo), e
