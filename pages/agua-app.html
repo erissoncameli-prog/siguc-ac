@@ -28,7 +28,7 @@
 <!-- ══ TELA: LOGIN ══════════════════════════════════════════════ -->
 <div id="tela-login" class="tela lock-screen" hidden>
   <div class="lock-logo">
-    <svg width="64" height="64" viewBox="0 0 24 24" fill="#fff" class="lock-mascote" style="padding:10px" aria-hidden="true"><path d="M12 2s7 8.5 7 13a7 7 0 0 1-14 0c0-4.5 7-13 7-13z"/></svg>
+    <img src="/pwa/icons/icon-agua-512.png" alt="" class="lock-mascote">
     <span class="lock-titulo">Qualidade da Água</span>
   </div>
   <p class="lock-dica">App de Campo — Faça seu login</p>
@@ -46,7 +46,7 @@
 <!-- ══ TELA: TROCAR SENHA (1º acesso) ══════════════════════════ -->
 <div id="tela-trocar-senha" class="tela lock-screen" hidden>
   <div class="lock-logo">
-    <svg width="64" height="64" viewBox="0 0 24 24" fill="#fff" class="lock-mascote" style="padding:10px" aria-hidden="true"><path d="M12 2s7 8.5 7 13a7 7 0 0 1-14 0c0-4.5 7-13 7-13z"/></svg>
+    <img src="/pwa/icons/icon-agua-512.png" alt="" class="lock-mascote">
     <span class="lock-titulo">Criar Nova Senha</span>
   </div>
   <p class="lock-dica">Você entrou com uma senha provisória.<br>Crie sua senha pessoal para continuar.</p>
@@ -65,7 +65,7 @@
     <span class="faixa-logo-chip sec" hidden><img alt="SEMA-AC"></span>
   </div>
   <div class="lock-logo">
-    <svg width="64" height="64" viewBox="0 0 24 24" fill="#fff" class="lock-mascote" style="padding:10px" aria-hidden="true"><path d="M12 2s7 8.5 7 13a7 7 0 0 1-14 0c0-4.5 7-13 7-13z"/></svg>
+    <img src="/pwa/icons/icon-agua-512.png" alt="" class="lock-mascote">
     <span class="lock-titulo">Qualidade da Água</span>
   </div>
   <p class="lock-subtitulo" id="lock-nome">Carregando…</p>
@@ -102,7 +102,7 @@
     <span class="faixa-logo-chip sec" hidden><img alt="SEMA-AC"></span>
   </div>
   <div class="lock-logo">
-    <svg width="64" height="64" viewBox="0 0 24 24" fill="#fff" class="lock-mascote" style="padding:10px" aria-hidden="true"><path d="M12 2s7 8.5 7 13a7 7 0 0 1-14 0c0-4.5 7-13 7-13z"/></svg>
+    <img src="/pwa/icons/icon-agua-512.png" alt="" class="lock-mascote">
     <span class="lock-titulo">Criar PIN de Campo</span>
   </div>
   <p class="lock-subtitulo" id="pin-setup-nome" style="font-size:1rem;opacity:.75;margin-bottom:4px"></p>
@@ -503,6 +503,7 @@ const _aguaReady = _dbReady.then(function () {
 <script src="/js/agua-sync.js"></script>
 <script src="/js/brigada-captura.js"></script>
 <script src="/js/agua-iqa-visual.js"></script>
+<script src="/js/agua-rio.js"></script>
 <!-- Detalhe da coleta (Histórico) → exportar ficha em PDF: mesmo motor
      jsPDF do relatório por bacia (Fase 5) e o mesmo compartilhamento em
      3 camadas do Biomonitor. jsPDF/autotable em si são carregados sob
