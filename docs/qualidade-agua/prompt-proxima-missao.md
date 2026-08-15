@@ -45,6 +45,20 @@ diga por quê antes de mudar.
 7. Migrar `agua-conferencia.html`, `agua-laudos.html` e `agua-pontos.html`
    para as RPCs.
 
+## Decisões já tomadas (seguir, não reabrir)
+
+- **Senha por janela na conferência** (uma confirmação libera alguns
+  minutos de edição em lote) e **por registro nas demais telas**. A janela
+  é controlada pelo **servidor**, é escopada por usuário **e por tela**, e
+  cada gravação carimba na trilha o id da janela e o horário em que a
+  senha foi digitada.
+- **Escopo: só Qualidade da Água.** A tabela e o trigger nascem genéricos
+  (`tabela`/`registro_id`, nada de `agua` na forma), mas só são ligados às
+  4 tabelas do módulo. Estender aos outros módulos é outra missão.
+- **A trilha resiste ao super_admin** — nos dois níveis do §2.1: imutável
+  para o super_admin do sistema, e com adulteração detectável para quem
+  tem `service_role`.
+
 ## Restrições inegociáveis
 
 - **Não replique o padrão de reautenticação atual do projeto**
