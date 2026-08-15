@@ -215,6 +215,14 @@ select.form-control { cursor: pointer; }
 .filter-bar .form-control { height: 34px; font-size: 12px; }
 .search-input { width: 220px; }
 
+.rank-barra-row { display: grid; grid-template-columns: 130px 1fr 60px; align-items: center; gap: 12px; margin-bottom: 12px; }
+.rank-barra-row:last-child { margin-bottom: 0; }
+.rank-barra-label { font-size: 13px; color: var(--cinza-700); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rank-barra-sub { font-size: 11px; color: var(--cinza-400); font-weight: 400; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rank-barra-track { height: 15px; background: var(--cinza-100); border-radius: 7px; overflow: hidden; }
+.rank-barra-fill { height: 100%; border-radius: 7px; transition: width .4s; }
+.rank-barra-valor { font-family: var(--font-mono); font-size: 13px; font-weight: 700; color: var(--cinza-900); text-align: right; }
+
 .prog-wrap { display: flex; align-items: center; gap: 8px; }
 .prog-bar { flex: 1; height: 5px; background: var(--cinza-100); border-radius: 3px; overflow: hidden; min-width: 60px; }
 .prog-fill { height: 100%; border-radius: 3px; background: var(--verde-claro); transition: width .4s; }

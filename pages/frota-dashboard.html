@@ -10,6 +10,7 @@
 <script src="../js/config.js"></script>
 <script src="../js/layout.js"></script>
 <script src="../js/frota-consumo.js"></script>
+<script src="../js/ranking-barras.js"></script>
 <script src="../js/frota-viagens-status.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <style>
@@ -729,9 +730,9 @@ function rankVeiculosViagens() {
     acc[key] = acc[key] || { placa:v.veiculo_placa, modelo:v.veiculo_modelo, n:0 }
     acc[key].n++
   })
-  const rows = Object.values(acc).sort((a,b)=>b.n-a.n).slice(0,10)
-    .map((v,i) => [i+1, `${esc(v.placa)} — ${esc(v.modelo)}`, v.n])
-  return tabela(['#','Veículo','Viagens concluídas'], rows.map(r=>[r[0],r[1],r[2]]))
+  const itens = Object.values(acc).sort((a,b)=>b.n-a.n).slice(0,10)
+    .map(v => ({ label: `${v.placa} — ${v.modelo}`, valor: v.n }))
+  return rankBarrasHTML(itens, { vazio: 'Sem viagens concluídas no período' })
 }
 
 function rankVeiculosUso() {
@@ -742,9 +743,9 @@ function rankVeiculosUso() {
     if (v.veiculo_medidor==='hodometro' && v.km_saida!=null && v.km_chegada!=null) acc[v.veiculo_id].uso += Math.max(0, v.km_chegada-v.km_saida)
     if (v.veiculo_medidor==='horimetro' && v.horas_saida!=null && v.horas_chegada!=null) acc[v.veiculo_id].uso += Math.max(0, v.horas_chegada-v.horas_saida)
   })
-  const rows = Object.values(acc).sort((a,b)=>b.uso-a.uso).slice(0,10)
-    .map((v,i)=>[i+1, `${esc(v.placa)} — ${esc(v.modelo)}`, `${formatNum(v.uso,1)} ${v.medidor==='horimetro'?'h':'km'}`])
-  return tabela(['#','Veículo','Uso no período'], rows)
+  const itens = Object.values(acc).sort((a,b)=>b.uso-a.uso).slice(0,10)
+    .map(v => ({ label: `${v.placa} — ${v.modelo}`, valor: v.uso, valorFmt: `${formatNum(v.uso,1)} ${v.medidor==='horimetro'?'h':'km'}` }))
+  return rankBarrasHTML(itens, { vazio: 'Sem uso registrado no período' })
 }
 
 function rankVeiculosCusto() {
@@ -818,12 +819,12 @@ function rankVeiculosCustoKm() {
 }
 
 function rankVeiculosConsumo() {
-  const rows = _veiculosF.filter(v=>v.medidor==='hodometro').map(v => {
+  const itens = _veiculosF.filter(v=>v.medidor==='hodometro').map(v => {
     const r = consumoPorVeiculo(v.id, 'hodometro')
     return r ? { placa:v.placa, modelo:v.modelo, c:r.consumo } : null
   }).filter(Boolean).sort((a,b)=>a.c-b.c).slice(0,10) // pior primeiro
-    .map((v,i)=>[i+1, `${esc(v.placa)} — ${esc(v.modelo)}`, `${formatNum(v.c,2)} km/L`])
-  return tabela(['#','Veículo (pior consumo primeiro)','Km/L médio'], rows)
+    .map(v => ({ label: `${v.placa} — ${v.modelo}`, valor: v.c, valorFmt: `${formatNum(v.c,2)} km/L` }))
+  return rankBarrasHTML(itens, { vazio: 'Sem dados de consumo suficientes' })
 }
 
 function rankVeiculosOS() {
@@ -831,11 +832,11 @@ function rankVeiculosOS() {
   _ordensServ.filter(o=>o.tipo==='corretiva').forEach(o => {
     acc[o.veiculo_id] = (acc[o.veiculo_id]||0) + 1
   })
-  const rows = Object.entries(acc).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([veicId,n],i) => {
+  const itens = Object.entries(acc).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([veicId,n]) => {
     const v = _veiculos.find(x=>x.id===veicId)
-    return [i+1, v ? `${esc(v.placa)} — ${esc(v.modelo)}` : '—', n]
+    return { label: v ? `${v.placa} — ${v.modelo}` : '—', valor: n }
   })
-  return tabela(['#','Veículo','OS corretivas'], rows)
+  return rankBarrasHTML(itens, { vazio: 'Sem OS corretivas no período' })
 }
 
 function rankMotoristasViagens() {
@@ -846,9 +847,9 @@ function rankMotoristasViagens() {
     acc[v.motorista_id].n++
     if (v.veiculo_medidor==='hodometro' && v.km_saida!=null && v.km_chegada!=null) acc[v.motorista_id].km += Math.max(0, v.km_chegada-v.km_saida)
   })
-  const rows = Object.values(acc).sort((a,b)=>b.n-a.n).slice(0,10)
-    .map((m,i)=>[i+1, esc(m.nome), m.n, formatNum(m.km,0)])
-  return tabela(['#','Motorista','Viagens concluídas','Km rodados'], rows)
+  const itens = Object.values(acc).sort((a,b)=>b.n-a.n).slice(0,10)
+    .map(m => ({ label: m.nome, sub: `${formatNum(m.km,0)} km rodados`, valor: m.n, valorFmt: `${m.n} viagens` }))
+  return rankBarrasHTML(itens, { vazio: 'Sem viagens concluídas no período' })
 }
 
 function rankMotoristasRejeitados() {
@@ -857,9 +858,9 @@ function rankMotoristasRejeitados() {
     acc[a.motorista_id] = acc[a.motorista_id] || { nome:a.motorista_nome, n:0 }
     acc[a.motorista_id].n++
   })
-  const rows = Object.values(acc).sort((a,b)=>b.n-a.n).slice(0,10)
-    .map((m,i)=>[i+1, esc(m.nome), m.n])
-  return tabela(['#','Motorista','Abastecimentos rejeitados'], rows)
+  const itens = Object.values(acc).sort((a,b)=>b.n-a.n).slice(0,10)
+    .map(m => ({ label: m.nome, valor: m.n }))
+  return rankBarrasHTML(itens, { vazio: 'Sem abastecimentos rejeitados no período' })
 }
 
 function rankSetores() {
@@ -870,9 +871,9 @@ function rankSetores() {
     acc[key].n++
     if (v.veiculo_medidor==='hodometro' && v.km_saida!=null && v.km_chegada!=null) acc[key].km += Math.max(0, v.km_chegada-v.km_saida)
   })
-  const rows = Object.entries(acc).sort((a,b)=>b[1].n-a[1].n).slice(0,10)
-    .map(([nome,d],i)=>[i+1, esc(nome), d.n, formatNum(d.km,0)])
-  return tabela(['#','Setor','Viagens','Km rodados'], rows)
+  const itens = Object.entries(acc).sort((a,b)=>b[1].n-a[1].n).slice(0,10)
+    .map(([nome,d]) => ({ label: nome, sub: `${formatNum(d.km,0)} km rodados`, valor: d.n, valorFmt: `${d.n} viagens` }))
+  return rankBarrasHTML(itens, { vazio: 'Sem viagens no período' })
 }
 
 // ════════════════════════════════════════════════════════════════
