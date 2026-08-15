@@ -538,6 +538,16 @@ async function carregarDados() {
   const r6 = await db.from('unidades_organizacionais').select('*').eq('ativo', true).order('criado_em')
   _unidades = r6.data || []
 
+  if (_perfilUsuario === 'super_admin') {
+    const [r7, r8] = await Promise.all([
+      db.from('modulos').select('id,chave,nome,grupo').eq('ativo', true).order('grupo').order('ordem'),
+      db.from('vw_modulo_unidades').select('*'),
+    ])
+    _modulos = r7.data || []
+    _moduloUnidades = r8.data || []
+    renderModulosUnidades()
+  }
+
   renderOrganograma()
   renderCargos(_cargosAtuais)
   filtrarDelegacoes()
