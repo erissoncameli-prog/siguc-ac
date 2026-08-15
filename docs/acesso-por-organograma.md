@@ -304,15 +304,12 @@ existia; agora ele existe, e o custo de generalizar é `CREATE TRIGGER`.
    para sempre, e isso é resposta legítima, não pendência.
 2. **Lotação de cada servidor.** 20 pessoas de mesa; só 10 têm cargo. É
    trabalho de RH/chefia, não de código, e **é o pré-requisito de tudo**.
-3. **Quem pode conceder credenciamento?** Só super_admin, ou também o
-   chefe da unidade dona do módulo? (recomendação: chefe da unidade dona
-   concede, super_admin concede em qualquer, ambos auditados).
-4. **Prazo padrão do credenciamento** (sugestão: 90 dias).
-5. **Interpretação a confirmar**: li o pedido como *"o padrão passa a ser
-   restrição por setor, e existe um mecanismo controlado para dar acesso a
-   quem é de fora quando houver motivo"*. Se a intenção for só a segunda
-   metade (abrir exceções sem mexer no padrão de hoje), a missão encolhe
-   para §2.3 + tela, e as frentes 1–2 e 4 saem.
+3. ~~Quem pode conceder credenciamento?~~ **DECIDIDO: só `super_admin`**
+   (ver "Decisões tomadas").
+4. **Prazo padrão do credenciamento** (sugestão: 90 dias) — pode ser
+   fixado na implementação e ajustado depois em Configurações.
+5. ~~Interpretação a confirmar~~ **DECIDIDO: restrição por setor é o
+   padrão**, com liberação por super_admin.
 
 ---
 
