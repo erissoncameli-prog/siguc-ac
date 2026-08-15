@@ -372,8 +372,14 @@ existia; agora ele existe, e o custo de generalizar é `CREATE TRIGGER`.
 
 ## 8. Frentes de trabalho
 
-Progresso (2026-08-15): **1 parcial** (tabela/funções prontas — migration
-262; falta a tela de lotação em Usuários/Estrutura Org.), **2 entregue**
+Progresso (2026-08-15): **1 entregue** (migration 262 + aba "Lotações" em
+`estrutura-organizacional.html` — banner "sem lotação" via
+`vw_usuarios_sem_lotacao`, cadastro/encerramento via `usuario_lotacoes`;
+visível a quem acessa a página, ações restritas a `super_admin`/`diretor`
+porque é quem `pode_editar('estrutura-organizacional')` de fato resolve
+hoje — checado em `perfil_permissoes_padrao`, não copiado do padrão
+`['super_admin','gestor']` que outras abas da mesma página usam, que não
+bate com a RLS real deste módulo), **2 entregue**
 (migration 265 + aba "Acesso por Setor" em `estrutura-organizacional.html`,
 restrita a super_admin), **3 entregue** (migration 266 — tabela
 `credenciamentos`, cron de vencimento com dedupe, aba "Credenciamentos"
