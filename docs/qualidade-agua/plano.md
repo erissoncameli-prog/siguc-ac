@@ -1197,6 +1197,160 @@ biomonitor 30 → 31, frota 86 → 87 porque `js/config.js` (3 ícones
 novos: `chevron-down`, `arrow-up`, `arrow-down`) está no shell dos
 quatro apps.
 
+### O painel também é a primeira página do PDF
+
+Pedido do usuário logo depois da entrega acima. A capa do relatório era
+identificação + 6 números soltos; passou a ser **o mesmo painel**, na
+mesma ordem de leitura (KPIs → distribuição por faixa → conformidade
+CONAMA + ranking de violações → IQA por ponto → evolução por campanha).
+Quem abre o PDF vê o que viu na tela; da página 2 em diante segue o
+detalhamento ponto a ponto de sempre.
+
+- **Desenhado com os primitivos do jsPDF**, não exportado da tela:
+  rasterizar o SVG exigiria canvas e sairia serrilhado no impresso. Os
+  DADOS vêm das mesmas funções de `js/agua-relatorio-dados.js` que
+  alimentam o painel — nenhuma agregação nova, nada de IQA/CONAMA
+  recalculado.
+- Uma diferença deliberada: na tela, a evolução do IQA é de **um ponto**
+  escolhido por chip; no PDF não há chip, e um gráfico por ponto encheria
+  o documento — imprime-se a **média da bacia por campanha**. Campanha
+  sem coleta continua virando GAP (linha quebrada), nunca interpolada.
+- O gráfico de barras se limita aos **10 melhores pontos** e o título diz
+  "(10 de N)"; o detalhamento das páginas seguintes continua trazendo
+  todos.
+- O parágrafo "parâmetros com violação: …" saiu: virou o ranking. Só a
+  ressalva da quarentena continua em texto — é advertência sobre a
+  confiabilidade do dado, não leitura de painel.
+- **Bug corrigido de tabela**: `AGPDF_IQA_COR` era uma cópia da paleta
+  que havia DIVERGIDO da tela — 'Boa' saía lima (#84CC16) contra o verde
+  (#059669) do mapa/app/painel, e 'Péssima' ficou no vermelho antigo
+  depois da correção de daltonismo. Agora a cor vem de
+  `AGUA_IQA_FAIXA_COR` convertida para RGB, com fallback local só para
+  quem carregar o PDF sem o arquivo de visual. Relatório impresso é o
+  pior lugar para a cor discordar da tela.
+- **Página em branco**: `aguaRelMontarPdf` chamava `_agpdfNovaPagina`
+  incondicionalmente depois da capa. Com a capa agora cheia, a nota de
+  quarentena pode transbordar sozinha para a folha seguinte — e a
+  chamada incondicional inseriria uma folha vazia no meio. Passou a ser
+  condicional (`if (ctx.y > AGPDF_TOPO + 2)`), com o teste travando a
+  contagem exata de páginas.
+
+Guarda: `tests/agua-relatorios.test.js` — asserções novas no teste de
+PDF que já existia (os cinco títulos de bloco, a legenda com contagem,
+as médias rotuladas nas barras e a linha do medidor) e um teste novo com
+fixture de 12 pontos para a contagem exata de páginas. ⚠️ Detalhe do
+texto extraído: a legenda sai colada na seguinte ("…Boa 2Regular 1…"),
+então `\b` **não** serve depois do número — usar `(?!\d)`; e títulos de
+bloco/seção estão em CAIXA ALTA no documento.
+
+`pwa/sw.js`: agua v12 → v13 (`agua-relatorio-pdf.js` está no shell).
+
+### E também no PPTX (slide 2)
+
+O slide "Resumo do período" (só 6 números) virou **"Painel do período"**,
+com os mesmos blocos: KPIs, distribuição por faixa, conformidade CONAMA
+e IQA médio por ponto. Os slides 3 (evolução por ponto) e 4 (tabela de
+violações CONAMA) continuam como estavam — são o aprofundamento, e já
+cobrem o ranking de parâmetros.
+
+**Diferença deliberada em relação ao PDF: aqui os gráficos são NATIVOS**
+(`addChart` do pptxgenjs — barra empilhada, rosca, barras), não desenho.
+Num deck, quem apresenta precisa poder editar, recolorir e copiar o
+gráfico; num documento impresso, não. Mesma leitura, meio diferente.
+A rosca da conformidade traz os **três** estados como fatias distintas —
+"sem limites cadastrados" nunca é somado a "conforme".
+
+`js/agua-relatorio-pptx.js` não está em shell de app nenhum (só a mesa
+usa), então esta parte não mexe em `pwa/sw.js`.
+
+⚠️ Não foi possível conferir o PPTX renderizado nesta máquina (não há
+LibreOffice/PowerPoint para converter). A verificação foi estrutural,
+sobre o XML dentro do .pptx: 4 slides, 3 partes de `chart` referenciadas
+pelo slide 2, séries/valores e as cores da paleta corretas — e o teste
+novo trava exatamente isso.
+
+### Rosca em vez de barra, escopo "Acre todo" e mapa dinâmico no painel
+
+Três pedidos numa sessão só, todos sobre `pages/agua-relatorios.html`.
+
+**Distribuição por faixa virou rosca (donut).** Substituiu a barra
+segmentada — mesmo dado (`aguaRelDistribuicaoFaixas`), mesma regra de
+nunca deixar a cor sozinha (legenda com rótulo + número). Nova função
+`aguaIqaFaixasRoscaHTML()` em `js/agua-iqa-visual.js`; a antiga
+`aguaIqaFaixasBarraHTML()` foi removida (não sobrou nenhum outro
+consumidor). O total mostrado no centro do SVG é redundante de
+propósito com o atributo `data-total` no wrapper — texto dentro de
+`<text>` é incômodo de asserir em teste; o atributo dá um jeito direto.
+
+**"Acre todo" é o escopo padrão — não é mais preciso escolher bacia
+antes de ver algo.** O seletor de bacia do cabeçalho ganhou uma opção
+`Acre todo (N pontos)` como PRIMEIRA opção e valor `''` — reaproveita
+o mesmo branch que antes tratava `''` como "nada escolhido ainda"
+(agora significa "todas as bacias"). Rede nova: `aguaRelBuscarTodasColetas(db)`
+em `js/agua-relatorio-dados.js`, sem filtro de bacia nenhum — busca tudo
+de uma vez. `aguaRelMontar()` ganhou `opts.bacia`, que filtra CLIENT-SIDE
+dentro do que já foi carregado (mesma chave que `aguaRelListarBacias`/
+`aguaRelChaveBacia` sempre usaram, `AGUA_REL_SEM_BACIA` incluso) — é
+isso que permite trocar de bacia sem nova ida ao banco.
+
+**Quero mais detalhe = abro Filtros e aplico bacia + rio ali, sem
+voltar ao cabeçalho.** A gaveta de filtros ganhou um campo "Bacia"
+(`#rl-bacia-filtro`), primeiro da lista. Ele só existe de verdade
+quando o cabeçalho está em "Acre todo": nesse caso vem habilitado, com
+as bacias presentes no conjunto carregado; quando o cabeçalho já
+restringiu a uma bacia específica, o campo fica com valor fixo e
+DESABILITADO — filtrar de novo pelo mesmo eixo seria redundante e
+confuso. `_labelBaciaAtual` (usado em PDF/PPTX) é recalculado na hora
+de exportar por `labelBaciaExportacao()`: se a gaveta narrowed pra uma
+bacia, é ela que nomeia o arquivo/relatório, não "Acre todo".
+
+**Mapa dinâmico dos pontos**, reaproveitando toda a base de
+`pages/agua-mapa.html`: mesmo tile OSM, mesmo desenho do limite do
+Acre, e principalmente o mesmo ESTILO de marcador — que foi
+EXTRAÍDO para `js/agua-iqa-visual.js` como `aguaIqaEstiloMarcador(coleta)`
+(preenchimento pela faixa do IQA + borda pela conformidade CONAMA +
+opacidade reduzida na quarentena; `coleta` nula = ponto vazado, nunca
+some). `pages/agua-mapa.html` foi refatorado para chamar a mesma
+função em vez da cópia que tinha — nunca duas implementações do mesmo
+desenho. Diferença de leitura entre as duas telas: o mapa dedicado
+colore pela coleta da CAMPANHA selecionada no eixo temporal; o mapa do
+painel colore pela coleta MAIS RECENTE do recorte de campanhas já
+filtrado (nunca uma média classificada numa faixa — igual à regra de
+sempre).
+- Container do mapa (`#rl-mapa`) fica FORA de `#rl-conteudo` (que é
+  reconstruído inteiro a cada filtro) — nasce uma vez só, e só troca os
+  marcadores a cada recorte nova, preservando zoom/posição entre
+  filtros. Coordenadas vêm de `agua_pontos_coleta.geom`
+  (`geoLatLngDeGeom`, `js/mapa-recorte.js` — só a função utilitária,
+  sem a máquina de recorte por polígono: pontos de coleta são
+  cadastrados um a um, mesma decisão já registrada na Fase 4).
+- Ponto sem coordenada cadastrada fica de fora do mapa, sem travar os
+  outros (fail-soft, não fail-open — não dá pra desenhar o que não
+  existe).
+
+⚠️ **Achado ao testar com fixture de verdade**: um bug de índice na
+FIXTURE do teste (não no app) fazia todo marcador cair na mesma
+longitude — `PONTOS.map(([id, , , , , , , lat, lng]) => ...)` tinha um
+comprimento de destructuring errado (7 blanks em vez de 6), pegando o
+valor de longitude como se fosse latitude e deixando a longitude real
+undefined. Lição: ao montar fixture de coordenadas com destructuring
+posicional, contar os índices pelo array de origem, não "no olho" —
+ou, mais seguro, indexar por posição (`p[6]`, `p[7]`) em vez de blanks.
+
+`pwa/sw.js`: agua v13 → v14 (`agua-iqa-visual.js` e
+`agua-relatorio-dados.js`, os dois no shell do app de campo, mudaram).
+
+Guarda: `tests/agua-relatorios.test.js` ganhou testes de agregação pura
+(`opts.bacia` com várias bacias misturadas, `aguaRelBuscarTodasColetas`
+nunca chama `.eq()`/`.is()` de bacia) e de render (escopo padrão sem
+selectOption nenhum, troca de bacia no cabeçalho desabilita o filtro da
+gaveta, filtro da gaveta narrows sem tocar o cabeçalho, marcador por
+ponto com geom, ponto sem geom não quebra o mapa). `abrirPainelComStub`
+não seleciona mais bacia nenhuma por padrão (o próprio carregamento
+automático já é o que está sob teste) e ganhou bloqueio de
+`tile.openstreetmap.org` (evita tempo de rede/flakiness sem quebrar o
+Leaflet, que continua carregando de verdade via unpkg).
+
 ## Decisões ainda abertas (não travam a Fase 0)
 
 - **Sólidos em suspensão** — a incoerência de unidade acima. Entra na

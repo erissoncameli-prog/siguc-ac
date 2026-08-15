@@ -46,6 +46,7 @@ function aguaRelRiosDe(coletas) {
 function aguaRelFiltrosTxt(filtros) {
   if (!filtros) return ''
   const partes = []
+  if (filtros.bacia) partes.push(`Bacia: ${filtros.bacia === AGUA_REL_SEM_BACIA ? 'Sem bacia definida' : filtros.bacia}`)
   if (filtros.rio) partes.push(`Rio: ${filtros.rio}`)
   if (filtros.status) partes.push(`Status: ${AGUA_REL_STATUS_LABEL[filtros.status] || filtros.status}`)
   if (filtros.iqaFaixa) partes.push(`Faixa IQA: ${filtros.iqaFaixa}`)
@@ -90,6 +91,17 @@ async function aguaRelBuscarColetasDaBacia(db, bacia) {
   return data || []
 }
 
+// Todas as coletas do estado, de qualquer bacia — o escopo "Acre todo"
+// do painel (pages/agua-relatorios.html). Sem filtro nenhum de bacia;
+// quem quiser recortar por bacia depois disso usa `opts.bacia` em
+// aguaRelMontar (client-side, sem nova ida ao banco) — é o que permite
+// alternar de visão geral para uma bacia sem esperar rede de novo.
+async function aguaRelBuscarTodasColetas(db) {
+  const { data, error } = await db.from('vw_agua_coletas_detalhe').select('*').order('data_coleta')
+  if (error) throw error
+  return data || []
+}
+
 // ── Agregação (pura, testável sem rede) ─────────────────────────
 
 // Bacias presentes numa lista de coletas, com contagem de pontos —
@@ -127,12 +139,20 @@ function aguaRelCampanhasDe(coletas) {
   return Object.values(porId).sort(aguaRelCompararCampanha)
 }
 
-// Monta o relatório de uma bacia: recorta pelo intervalo de campanhas
+// Monta o relatório de um recorte: recorta pelo intervalo de campanhas
 // [campanhaDeId, campanhaAteId] (ids de agua_campanhas; omitido =
 // desde o início / até o fim), aplica os filtros de busca opcionais
-// (rio, status, faixa do IQA, conformidade CONAMA — todos "E" entre
-// si, refinando o que a bacia+período já trouxe, nunca substituindo),
+// (bacia, rio, status, faixa do IQA, conformidade CONAMA — todos "E"
+// entre si, refinando o que já foi carregado, nunca substituindo),
 // agrupa por ponto e resume. Puro.
+//
+// `bacia` existe para o escopo "Acre todo" (`coletasDaBacia` pode ter
+// VÁRIAS bacias misturadas, vindo de aguaRelBuscarTodasColetas) —
+// filtra client-side pela chave que aguaRelListarBacias/aguaRelChaveBacia
+// já usam (AGUA_REL_SEM_BACIA para bacia nula), sem nova ida ao banco.
+// Quando `coletasDaBacia` já veio recortado de UMA bacia só (fluxo
+// antigo, aguaRelBuscarColetasDaBacia), passar `opts.bacia` é
+// redundante mas inofensivo.
 //
 // `campanhas` continua vindo do intervalo inteiro (não é recalculada
 // pelos filtros de busca) — o eixo temporal do relatório fica estável
@@ -148,6 +168,7 @@ function aguaRelMontar(coletasDaBacia, opts = {}) {
   const idsPermitidos = new Set(campanhas.map(c => c.campanha_id))
 
   let coletas = (coletasDaBacia || []).filter(c => idsPermitidos.has(c.campanha_id))
+  if (opts.bacia) coletas = coletas.filter(c => aguaRelChaveBacia(c.ponto_bacia) === opts.bacia)
   if (opts.rio) coletas = coletas.filter(c => c.ponto_rio === opts.rio)
   if (opts.status) coletas = coletas.filter(c => c.status === opts.status)
   if (opts.iqaFaixa) coletas = coletas.filter(c => c.iqa_faixa === opts.iqaFaixa)
@@ -159,14 +180,17 @@ function aguaRelMontar(coletasDaBacia, opts = {}) {
     if (!porPonto[c.ponto_id]) {
       porPonto[c.ponto_id] = {
         ponto_id: c.ponto_id, nome: c.ponto_nome, codigo_ana: c.codigo_ana,
-        municipio: c.ponto_municipio, rio: c.ponto_rio, coletas: [],
+        municipio: c.ponto_municipio, rio: c.ponto_rio, bacia: c.ponto_bacia, coletas: [],
       }
     }
     porPonto[c.ponto_id].coletas.push(c)
   })
   const pontos = Object.values(porPonto).sort((a, b) => (a.nome || '').localeCompare(b.nome || '', 'pt-BR'))
 
-  const filtros = { rio: opts.rio || null, status: opts.status || null, iqaFaixa: opts.iqaFaixa || null, conamaStatus: opts.conamaStatus || null }
+  const filtros = {
+    bacia: opts.bacia || null, rio: opts.rio || null, status: opts.status || null,
+    iqaFaixa: opts.iqaFaixa || null, conamaStatus: opts.conamaStatus || null,
+  }
   return { campanhas, coletas, pontos, resumo: aguaRelResumo(coletas), filtros }
 }
 

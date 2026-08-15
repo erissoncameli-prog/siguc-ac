@@ -1,8 +1,9 @@
 // ── SIGUC-AC · Qualidade da Água — Relatório PPTX por bacia (Fase 5) ─
 // Apresentação executiva (para gestores, não para arquivo — o
-// documento de registro é o PDF, js/agua-relatorio-pdf.js): evolução
-// do IQA por ponto ao longo das campanhas, resumo da bacia,
-// conformidade CONAMA. Usa pptxgenjs (js/vendor/pptxgenjs-4.0.1.bundle.js
+// documento de registro é o PDF, js/agua-relatorio-pdf.js): capa,
+// PAINEL do período (o mesmo da tela e da 1ª página do PDF), evolução
+// do IQA por ponto ao longo das campanhas e conformidade CONAMA
+// detalhada. Usa pptxgenjs (js/vendor/pptxgenjs-4.0.1.bundle.js
 // — vendorizado, mesmo padrão de js/vendor/turf-6.5.0.min.js/
 // proj4-2.11.0.min.js, para não depender de CDN).
 //
@@ -14,8 +15,10 @@
 // screenshots), então não há função para reaproveitar de lá, só a
 // paleta de cores.
 //
-// Depende de: aguaRelLabelCampanha(), aguaRelSerieIQA(), aguaRelFiltrosTxt()
-// (js/agua-relatorio-dados.js); window.PptxGenJS (js/vendor/pptxgenjs-4.0.1.bundle.js).
+// Depende de: aguaRelLabelCampanha(), aguaRelSerieIQA(), aguaRelFiltrosTxt(),
+// aguaRelDistribuicaoFaixas(), aguaRelIqaPorPonto() (js/agua-relatorio-dados.js);
+// AGUA_IQA_FAIXA_COR/ORDEM (js/agua-iqa-visual.js — só a paleta, com
+// fallback local); window.PptxGenJS (js/vendor/pptxgenjs-4.0.1.bundle.js).
 
 const AGPPTX_C = {
   darkBg: '0A1A0F', green: '52B788', gold: 'C9A84C', goldLt: 'F0CB6A',
@@ -70,33 +73,114 @@ function _agpptxSlideCapa(pres, labelBacia, periodoTxt, protocolo, filtrosTxt) {
   s.addText(`SEMA-AC · DIMA · Protocolo ${protocolo}`, { x: AGPPTX_M, y: AGPPTX_H - 0.55, w: 9.2, h: 0.35, fontSize: 9, color: AGPPTX_C.green, fontFace: 'Calibri' })
 }
 
-// ── Slide 2: resumo (KPIs) ───────────────────────────────────────
-function _agpptxSlideResumo(pres, relatorio) {
+// ── Slide 2: painel (o mesmo da tela e da 1ª página do PDF) ──────
+// Aqui os gráficos são NATIVOS do PowerPoint (addChart), não desenho:
+// num deck, quem apresenta precisa poder editar/copiar o gráfico, e o
+// pptxgenjs já entrega isso. É a diferença deliberada para o PDF, onde
+// a mesma leitura é desenhada com primitivos (documento é impresso, não
+// editado).
+//
+// Os dados saem das MESMAS funções de js/agua-relatorio-dados.js que
+// alimentam a tela — nada de IQA/CONAMA recalculado, e a média de um
+// ponto nunca vira "faixa" (classificar é papel do banco), por isso as
+// barras por ponto usam um tom só.
+function _agpptxCorFaixa(faixa) {
+  const paleta = typeof AGUA_IQA_FAIXA_COR !== 'undefined' ? AGUA_IQA_FAIXA_COR : null
+  const hex = paleta && paleta[faixa]
+  return hex ? String(hex).replace('#', '') : '9CA3AF'
+}
+
+function _agpptxSlidePainel(pres, relatorio) {
   const s = pres.addSlide()
-  _agpptxHeader(pres, s, 'Resumo do período')
+  _agpptxHeader(pres, s, 'Painel do período')
   const r = relatorio.resumo
+
+  // KPIs — mesma faixa de seis do topo do painel
   const kpis = [
-    ['Pontos de coleta', String(r.nPontos)],
+    ['Pontos', String(r.nPontos)],
     ['Campanhas', String(relatorio.campanhas.length)],
     ['Coletas', String(r.totalColetas)],
     ['IQA médio', r.iqaMedio != null ? r.iqaMedio.toFixed(1) : '—'],
-    ['Conforme CONAMA', r.pctConforme != null ? r.pctConforme.toFixed(0) + '%' : 'sem limites'],
-    ['Em quarentena', String(r.quarentena)],
+    ['Conforme CONAMA', r.pctConforme != null ? r.pctConforme.toFixed(0) + '%' : '—'],
+    ['Em conferência', String(r.quarentena)],
   ]
-  const cw = (AGPPTX_W - AGPPTX_M * 2 - 0.3 * 2) / 3
-  const ch = 1.5
+  const gap = 0.14
+  const cw = (AGPPTX_W - AGPPTX_M * 2 - gap * (kpis.length - 1)) / kpis.length
   kpis.forEach(([lbl, val], i) => {
-    const col = i % 3, lin = Math.floor(i / 3)
-    const x = AGPPTX_M + col * (cw + 0.3)
-    const y = 1.0 + lin * (ch + 0.25)
-    _agpptxCard(pres, s, x, y, cw, ch)
-    s.addText(val, { x: x + 0.15, y: y + 0.15, w: cw - 0.3, h: 0.8, fontSize: 30, bold: true, color: AGPPTX_C.darkBg, fontFace: 'Georgia', align: 'center' })
-    s.addText(lbl.toUpperCase(), { x: x + 0.15, y: y + 0.95, w: cw - 0.3, h: 0.45, fontSize: 9, color: AGPPTX_C.muted, fontFace: 'Calibri', align: 'center', charSpacing: 1 })
+    const x = AGPPTX_M + i * (cw + gap)
+    _agpptxCard(pres, s, x, 0.95, cw, 0.92)
+    s.addText(val, { x: x + 0.05, y: 1.0, w: cw - 0.1, h: 0.5, fontSize: 20, bold: true, color: AGPPTX_C.darkBg, fontFace: 'Georgia', align: 'center', margin: 0 })
+    s.addText(lbl.toUpperCase(), { x: x + 0.05, y: 1.48, w: cw - 0.1, h: 0.32, fontSize: 7, color: AGPPTX_C.muted, fontFace: 'Calibri', align: 'center', charSpacing: 0.5, margin: 0 })
   })
-  if (r.quarentena > 0) {
-    s.addText(`${r.quarentena} coleta(s) em quarentena — dado ainda pendente de conferência humana; IQA/CONAMA associados são preliminares.`,
-      { x: AGPPTX_M, y: AGPPTX_H - 0.55, w: AGPPTX_W - AGPPTX_M * 2, h: 0.4, fontSize: 9, italic: true, color: 'CA8A04' })
+
+  // Distribuição por faixa (barra empilhada) — única leitura em que as
+  // 5 cores de faixa aparecem juntas; a faixa vem pronta do banco.
+  const meia = (AGPPTX_W - AGPPTX_M * 2 - 0.3) / 2
+  const yG = 2.15, hG = 1.45
+  const dist = aguaRelDistribuicaoFaixas(relatorio.coletas)
+  const ordem = typeof AGUA_IQA_FAIXA_ORDEM !== 'undefined' ? AGUA_IQA_FAIXA_ORDEM : ['Ótima', 'Boa', 'Regular', 'Ruim', 'Péssima']
+  const seriesFaixa = ordem.filter(f => (dist.contagem[f] || 0) > 0)
+    .map(f => ({ name: f, labels: ['Coletas'], values: [dist.contagem[f]] }))
+  if (dist.semIQA > 0) seriesFaixa.push({ name: 'Sem índice', labels: ['Coletas'], values: [dist.semIQA] })
+
+  s.addText('DISTRIBUIÇÃO POR FAIXA DO IQA', { x: AGPPTX_M, y: yG - 0.28, w: meia, h: 0.25, fontSize: 8, bold: true, color: AGPPTX_C.darkBg, fontFace: 'Calibri', charSpacing: 0.5, margin: 0 })
+  if (seriesFaixa.length) {
+    s.addChart(pres.ChartType.bar, seriesFaixa, {
+      x: AGPPTX_M, y: yG, w: meia, h: hG,
+      barDir: 'bar', barGrouping: 'stacked',
+      chartColors: seriesFaixa.map(f => (f.name === 'Sem índice' ? '9CA3AF' : _agpptxCorFaixa(f.name))),
+      showLegend: true, legendPos: 'b', legendFontSize: 8,
+      showValue: true, dataLabelColor: 'FFFFFF', dataLabelFontSize: 8,
+      catAxisHidden: true, valAxisHidden: true, showTitle: false,
+    })
+  } else {
+    s.addText('Nenhuma coleta com índice calculado no período.', { x: AGPPTX_M, y: yG + 0.5, w: meia, h: 0.4, fontSize: 10, color: AGPPTX_C.muted, align: 'center' })
   }
+
+  // Conformidade CONAMA — rosca com os TRÊS estados. "Sem limites
+  // cadastrados" é fatia própria, nunca somada a "conforme".
+  const xDir = AGPPTX_M + meia + 0.3
+  s.addText('CONFORMIDADE CONAMA', { x: xDir, y: yG - 0.28, w: meia, h: 0.25, fontSize: 8, bold: true, color: AGPPTX_C.darkBg, fontFace: 'Calibri', charSpacing: 0.5, margin: 0 })
+  const semLimites = r.totalColetas - r.comConama
+  const fatias = [
+    ['Conforme', r.conforme, '059669'],
+    ['Com violação', r.comConama - r.conforme, 'C2410C'],
+    ['Sem limites cadastrados', semLimites, '9CA3AF'],
+  ].filter(f => f[1] > 0)
+  if (fatias.length) {
+    s.addChart(pres.ChartType.doughnut, [{ name: 'Coletas', labels: fatias.map(f => f[0]), values: fatias.map(f => f[1]) }], {
+      x: xDir, y: yG, w: meia, h: hG,
+      chartColors: fatias.map(f => f[2]), holeSize: 55,
+      showLegend: true, legendPos: 'r', legendFontSize: 8,
+      showValue: true, dataLabelColor: 'FFFFFF', dataLabelFontSize: 8, showTitle: false,
+    })
+  } else {
+    s.addText('Nenhuma coleta avaliada contra limites no período.', { x: xDir, y: yG + 0.5, w: meia, h: 0.4, fontSize: 10, color: AGPPTX_C.muted, align: 'center' })
+  }
+
+  // IQA médio por ponto — magnitude, um tom só (ver comentário do bloco)
+  const porPonto = aguaRelIqaPorPonto(relatorio).filter(p => p.iqaMedio != null).slice(0, 10)
+  const yB = 4.05
+  s.addText(`IQA MÉDIO POR PONTO DE COLETA${porPonto.length < relatorio.pontos.length ? ` (${porPonto.length} DE ${relatorio.pontos.length})` : ''}`,
+    { x: AGPPTX_M, y: yB - 0.28, w: AGPPTX_W - AGPPTX_M * 2, h: 0.25, fontSize: 8, bold: true, color: AGPPTX_C.darkBg, fontFace: 'Calibri', charSpacing: 0.5, margin: 0 })
+  if (porPonto.length) {
+    s.addChart(pres.ChartType.bar, [{
+      name: 'IQA médio', labels: porPonto.map(p => p.nome), values: porPonto.map(p => Number(p.iqaMedio.toFixed(1))),
+    }], {
+      x: AGPPTX_M, y: yB, w: AGPPTX_W - AGPPTX_M * 2, h: 1.05,
+      barDir: 'col', chartColors: ['2D6A4F'], showLegend: false, showTitle: false,
+      valAxisMinVal: 0, valAxisMaxVal: 100, valAxisHidden: true,
+      catAxisLabelFontSize: 7, showValue: true, dataLabelFontSize: 7, dataLabelPosition: 'outEnd', dataLabelColor: '374151',
+    })
+  } else {
+    s.addText('Nenhum ponto com IQA calculado no período.', { x: AGPPTX_M, y: yB + 0.3, w: AGPPTX_W - AGPPTX_M * 2, h: 0.4, fontSize: 10, color: AGPPTX_C.muted, align: 'center' })
+  }
+
+  if (r.quarentena > 0) {
+    s.addText(`${r.quarentena} coleta(s) em quarentena — pendente(s) de conferência humana; contam nos gráficos acima e o IQA/CONAMA delas é preliminar.`,
+      { x: AGPPTX_M, y: AGPPTX_H - 0.4, w: AGPPTX_W - AGPPTX_M * 2, h: 0.32, fontSize: 8, italic: true, color: 'CA8A04', margin: 0 })
+  }
+  return s
 }
 
 // ── Slide 3: evolução do IQA por ponto ───────────────────────────
@@ -165,7 +249,7 @@ async function aguaRelMontarPptx(relatorio, labelBacia, periodoTxt, protocolo) {
   pres.author = 'SEMA-AC · DIMA'
 
   _agpptxSlideCapa(pres, labelBacia, periodoTxt, protocolo, aguaRelFiltrosTxt(relatorio.filtros))
-  _agpptxSlideResumo(pres, relatorio)
+  _agpptxSlidePainel(pres, relatorio)
   _agpptxSlideEvolucao(pres, relatorio)
   _agpptxSlideConama(pres, relatorio)
 
