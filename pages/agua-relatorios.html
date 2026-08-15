@@ -77,6 +77,10 @@
   background:var(--branco); border:1px solid var(--borda-forte); color:var(--cinza-900);
   border-radius:10px; padding:8px 10px; font-size:13px; font-family:var(--font-sans); min-width:170px;
 }
+/* `display:flex` acima vence o `[hidden]` de global.css (mesma
+   especificidade, esta folha vem depois) — sem isto o painel de
+   filtros nasce aberto e o botão nunca o fecha. */
+.adash-filtros[hidden] { display:none }
 .adash-filtros-limpar {
   margin-left:auto; align-self:center; background:none; border:none; color:var(--verde-medio);
   font-size:12px; font-weight:700; text-decoration:underline; cursor:pointer; padding:0;
