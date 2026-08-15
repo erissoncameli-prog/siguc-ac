@@ -1319,6 +1319,12 @@ function renderTabelaEquipes() {
     return
   }
   const on = m => _equipeSort === m ? ' style="font-weight:700;color:#0A1A0F"' : ''
+  const maxSort = Math.max(...rows.map(r => r[_equipeSort]), 1)
+  const cel = (m, txt, v) => {
+    if (m !== _equipeSort || !(v > 0)) return `<td${on(m)}>${txt}</td>`
+    const pct = Math.round(v / maxSort * 100)
+    return `<td${on(m)}><div style="display:flex;align-items:center;gap:6px"><div class="bar-wrap" style="width:44px"><div class="bar-fill" style="width:${pct}%;background:#2D6A4F"></div></div><span>${txt}</span></div></td>`
+  }
   cont.innerHTML = `<table class="rel-table">
     <thead><tr>
       <th>Equipe</th><th>Brigada</th>
@@ -1330,10 +1336,10 @@ function renderTabelaEquipes() {
     <tbody>${rows.map((r, i) => `<tr>
       <td>${i === 0 ? bico('award') + ' ' : ''}<strong>${esc(r.nome)}</strong></td>
       <td style="font-size:.82rem;color:var(--cinza-500)">${esc(r.brigada)}</td>
-      <td${on('n')}>${r.n}</td>
-      <td${on('area')}>${r.area > 0 ? formatNum(r.area, 1) : '—'}</td>
-      <td${on('fauna')}>${r.fauna > 0 ? `${bico('paw')} ${r.fauna}` : '—'}</td>
-      <td${on('horas')}>${r.horas > 0 ? formatNum(r.horas, 1) : '—'}</td>
+      ${cel('n', r.n, r.n)}
+      ${cel('area', r.area > 0 ? formatNum(r.area, 1) : '—', r.area)}
+      ${cel('fauna', r.fauna > 0 ? `${bico('paw')} ${r.fauna}` : '—', r.fauna)}
+      ${cel('horas', r.horas > 0 ? formatNum(r.horas, 1) : '—', r.horas)}
     </tr>`).join('')}</tbody>
   </table>`
 }
