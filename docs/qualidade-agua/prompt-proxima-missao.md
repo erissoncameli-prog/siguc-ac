@@ -22,18 +22,27 @@ diga por quê antes de mudar.
    usuário (com snapshot de nome/e-mail/perfil), valor anterior, valor
    novo, campos alterados, justificativa, origem, IP. Trigger, nunca
    chamada da página — tem de valer para mesa, app, sync e psql.
-2. **Leitura só para super_admin** (`is_super_admin()`, já existe), sem
-   policy de UPDATE/DELETE — é registro de prova, como `lgpd_aceites`.
-   Mais o encadeamento de hash e a RPC de verificação descritos no plano.
-3. **UPDATE/DELETE por RPC**, com justificativa validada no banco (não só
+2. **Leitura só para super_admin** (`is_super_admin()`, já existe) e
+   **escrita por ninguém** pelo PostgREST: sem policy de INSERT/UPDATE/
+   DELETE, `REVOKE` explícito, e a função de trigger `SECURITY DEFINER` sem
+   EXECUTE para `authenticated`/`anon`. É registro de prova, como
+   `lgpd_aceites`.
+3. **Encadeamento de hash + selo diário FORA do banco** (§2.1 do plano).
+   O selo é obrigatório, não opcional: sem ponto fixo externo, quem
+   reescreve uma linha recalcula a cadeia toda. Mínimo: e-mail
+   institucional via Resend (`RESEND_API_KEY` já existe, mesmo caminho dos
+   alertas ambientais), com data, contagem de linhas, última linha e hash
+   da cabeça. Mais a RPC `agua_auditoria_verificar()` e "último selo
+   emitido em…" no topo da tela de auditoria.
+4. **UPDATE/DELETE por RPC**, com justificativa validada no banco (não só
    no JS) e prova de reautenticação por senha **verificada no servidor**.
    INSERT continua direto e sem senha — o app de campo é offline-first e
    nada pode quebrar isso.
-4. **Exclusão lógica** com justificativa; expurgo físico só por
-   super_admin, também auditado.
-5. **`pages/agua-auditoria.html`** com diff antes→depois campo a campo, e
+5. **Exclusão lógica** com justificativa. Expurgo físico só se confirmado
+   (§6.1 do plano); se não confirmado, entregar só a lógica.
+6. **`pages/agua-auditoria.html`** com diff antes→depois campo a campo, e
    link na sidebar visível só ao super_admin.
-6. Migrar `agua-conferencia.html`, `agua-laudos.html` e `agua-pontos.html`
+7. Migrar `agua-conferencia.html`, `agua-laudos.html` e `agua-pontos.html`
    para as RPCs.
 
 ## Restrições inegociáveis
