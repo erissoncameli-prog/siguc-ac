@@ -67,6 +67,11 @@
         <div class="form-group"><label class="form-label">Cargo</label><input class="form-control" id="f-cargo" placeholder="Analista Ambiental"></div>
         <div class="form-group"><label class="form-label">Telefone</label><input class="form-control" id="f-tel" placeholder="(68) 99999-9999"></div>
       </div>
+      <div class="form-group" id="bloco-lotacao">
+        <label class="form-label">Lotação inicial</label>
+        <select class="form-control" id="f-lotacao"><option value="">Definir depois (aba Lotações)</option></select>
+        <div class="form-hint">Onde a pessoa trabalha — diferente de "UC de Atuação" acima, que é o escopo de dados dela, não o setor. Fica visível na aba Lotações de Estrutura Organizacional.</div>
+      </div>
       <div id="bloco-senha">
         <div class="form-group"><label class="form-label">Senha Inicial <span class="obrig">*</span></label>
           <input class="form-control" id="f-senha" type="password" placeholder="Mínimo 6 caracteres">
@@ -123,7 +128,7 @@ let editId = null
     '</div></div></div>'
 
   carregarLogosSidebar()
-  await carregarUCsOpcoes()
+  await Promise.all([carregarUCsOpcoes(), carregarLotacaoOpcoes()])
   await carregar()
 })()
 
@@ -131,6 +136,15 @@ async function carregarUCsOpcoes() {
   const { data } = await db.from('unidades_conservacao').select('id,nome,codigo').eq('ativo',true).order('codigo')
   const sel = document.getElementById('f-uc')
   data?.forEach(u => { const o = document.createElement('option'); o.value = u.id; o.textContent = `${u.codigo} — ${u.nome}`; sel.appendChild(o) })
+}
+
+// Lotação inicial no cadastro — docs/acesso-por-organograma.md. Só na
+// criação (bloco-lotacao fica escondido ao editar; a aba Lotações de
+// Estrutura Organizacional já cobre edição/encerramento).
+async function carregarLotacaoOpcoes() {
+  const { data } = await db.from('unidades_organizacionais').select('id,sigla,nome').eq('ativo',true).order('sigla')
+  const sel = document.getElementById('f-lotacao')
+  data?.forEach(u => { const o = document.createElement('option'); o.value = u.id; o.textContent = `${u.sigla} — ${u.nome}`; sel.appendChild(o) })
 }
 
 let _dados = []
@@ -202,6 +216,8 @@ function abrirModal(u = null) {
   document.getElementById('f-cargo').value = u?.cargo || ''
   document.getElementById('f-tel').value = u?.telefone || ''
   document.getElementById('bloco-senha').style.display = u ? 'none' : ''
+  document.getElementById('bloco-lotacao').style.display = u ? 'none' : ''
+  document.getElementById('f-lotacao').value = ''
   document.getElementById('modal-usuario').classList.add('aberto')
 }
 
@@ -243,11 +259,14 @@ async function salvar() {
           uc_id: document.getElementById('f-uc').value || null,
           cargo: document.getElementById('f-cargo').value.trim() || null,
           telefone: document.getElementById('f-tel').value.trim() || null,
+          unidade_org_id: document.getElementById('f-lotacao').value || null,
         })
       })
       const json = await resp.json()
       if (!resp.ok) throw new Error(json.error || 'Erro ao criar usuário')
-      toast('Usuário criado! Ele deverá trocar a senha no primeiro acesso.', 'success')
+      // Lotação é melhor esforço no servidor (ver admin-criar-usuario) —
+      // a criação do usuário nunca é desfeita por causa dela; só avisa.
+      toast(json.aviso || 'Usuário criado! Ele deverá trocar a senha no primeiro acesso.', json.aviso ? 'warning' : 'success')
     }
     fecharModal(); await carregar()
   } catch(e) { toast(e.message || 'Erro ao salvar', 'error') }

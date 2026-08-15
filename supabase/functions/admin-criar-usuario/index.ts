@@ -78,7 +78,26 @@ Deno.serve(async (req) => {
     })
     if (dbErr) throw dbErr
 
-    return json({ ok: true, id: userId })
+    // Lotação inicial (opcional) — frente "vínculos no cadastro" de
+    // docs/acesso-por-organograma.md. Decisão do usuário: quem já pode
+    // criar a identidade inteira da pessoa (perfil/UC/cargo-texto) também
+    // pode lotá-la, mesmo sendo `gestor` — por isso isto roda aqui, com
+    // service_role, em vez de um INSERT client-side em usuario_lotacoes
+    // (cuja RLS restringe a super_admin/diretor). Melhor esforço: se
+    // falhar, a criação do usuário NÃO é desfeita — o admin lota depois
+    // pela aba Lotações.
+    let lotacao_aviso: string | null = null
+    if (body.unidade_org_id) {
+      const { error: lotErr } = await admin.from("usuario_lotacoes").insert({
+        usuario_id: userId,
+        unidade_org_id: body.unidade_org_id,
+        principal: true,
+        criado_por: user.id,
+      })
+      if (lotErr) lotacao_aviso = `Usuário criado, mas a lotação inicial falhou: ${lotErr.message}`
+    }
+
+    return json({ ok: true, id: userId, aviso: lotacao_aviso })
   } catch (e) {
     return json({ error: e.message }, 500)
   }

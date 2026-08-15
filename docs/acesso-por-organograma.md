@@ -562,7 +562,25 @@ visível a quem acessa a página, ações restritas a `super_admin`/`diretor`
 porque é quem `pode_editar('estrutura-organizacional')` de fato resolve
 hoje — checado em `perfil_permissoes_padrao`, não copiado do padrão
 `['super_admin','gestor']` que outras abas da mesma página usam, que não
-bate com a RLS real deste módulo), **2 entregue**
+bate com a RLS real deste módulo).
+
+**Achado ao usar em produção (2026-08-15, mesmo dia do merge)**: a
+tabela da aba só listava lotações EXPLÍCITAS — quem já tinha alcance
+por cargo (chefia, `usuario_unidades()` já une as duas fontes desde a
+migration 262) não aparecia, dando a impressão de que era preciso
+recadastrar todo mundo. Confirmado com dado real: dos 20 servidores de
+mesa, 10 já cobertos por cargo, e as 2 primeiras lotações cadastradas
+manualmente na tela duplicavam exatamente a unidade que o cargo da
+pessoa já cobria (Maria Antônia → DERHQA, já chefe da Divisão de
+Recursos Hídricos; Átila → UC-016, já gestor do Núcleo Antimary).
+Corrigido: a tabela agora mostra as duas fontes juntas — chefia como
+linha somente-leitura (selo "Chefia", sem botão de encerrar, que
+continua sendo função da aba Cargos) — sem duplicar dado nenhum no
+banco. As 2 linhas duplicadas foram removidas. Falta cadastrar de
+verdade: 6 servidores (3 gestor, 3 tecnico) — os 3 super_admin nunca
+precisam de lotação, bypassam `nivel_efetivo()` no primeiro passo.
+
+**2 entregue**
 (migration 265 + aba "Acesso por Setor" em `estrutura-organizacional.html`,
 restrita a super_admin), **3 entregue** (migration 266 — tabela
 `credenciamentos`, cron de vencimento com dedupe, aba "Credenciamentos"
@@ -635,3 +653,40 @@ são as que dão valor mais cedo (lotação visível; exceções com prazo), e
 nenhuma delas muda o comportamento atual do sistema — a mudança de
 comportamento acontece só na frente 8, módulo a módulo, com impacto
 medido antes.
+
+### 8.1 Lotação inicial no cadastro de usuário (2026-08-15, pós-merge)
+
+Pedido do usuário: evitar o esquecimento de lotar um servidor recém-
+criado, tendo que lembrar de ir à Estrutura Organizacional depois.
+Entregue: campo opcional "Lotação inicial" no modal "Novo Usuário"
+(`pages/usuarios.html`), só na criação (edição continua usando a aba
+Lotações). Cargo/chefia e credenciamento ficaram FORA de propósito —
+cargo é vaga existente que se ocupa, não algo que nasce com a pessoa
+(quase ninguém já é chefe no primeiro dia); credenciamento é exceção
+pontual, não fluxo padrão.
+
+**Decisão de escopo de acesso, tomada explicitamente pelo usuário**: o
+modal de criação é aberto tanto por `super_admin` quanto por `gestor`,
+mas a RLS de `usuario_lotacoes` (frente 1) só permite escrita a
+`super_admin`/`diretor`. Perguntei se o campo deveria aparecer só para
+quem já pode editar lotação (opção A, respeita o limite existente) ou
+se `gestor` — que já cria a identidade inteira da pessoa (perfil, UC,
+cargo-texto) — também deveria poder lotar no mesmo passo (opção B,
+amplia). **Escolhida a opção B.** Implementação: a gravação da lotação
+saiu do cliente e entrou na Edge Function `admin-criar-usuario`
+(versão 18), que já roda com `service_role` (ignora RLS) — em vez de
+replicar essa regra em JS, ela nasce correta ali. Melhor esforço: se a
+lotação falhar, a criação do usuário não é desfeita, e a resposta
+carrega `aviso` para a tela mostrar.
+
+Consequência registrada: `gestor` agora tem, por este caminho
+específico, uma capacidade que não tem em nenhuma outra tela do
+sistema (definir lotação). É deliberado, não drift — mas se a decisão
+mudar, o ponto único a reverter é a checagem de `body.unidade_org_id`
+na Edge Function, não um lugar espalhado.
+
+Verificação: a função implantada responde `401` a token inválido (sem
+crash no arranque). O caminho feliz completo (criar usuário de verdade
+com lotação) não foi exercitado ponta a ponta — não há credencial de
+teste disponível nesta sessão para logar como `super_admin`/`gestor`
+no ambiente local.
