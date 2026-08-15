@@ -768,10 +768,11 @@ test.describe('painel (dashboard) — render com dado real da view', () => {
   test('chip de campanha recorta só a EXIBIÇÃO da distribuição, sem mexer no relatório exportado', async ({ page }) => {
     await abrirPainelComStub(page, fixtureColetasRioAcre());
     const cardDist = page.locator('.adash-card', { hasText: 'Distribuição por faixa' });
+    const rosca = cardDist.locator('[data-total]');
 
-    await expect(cardDist.locator('.adash-num')).toHaveText('5'); // período inteiro
+    await expect(rosca).toHaveAttribute('data-total', '5'); // período inteiro
     await cardDist.getByRole('button', { name: '2024·1ª' }).click();
-    await expect(cardDist.locator('.adash-num')).toHaveText('2'); // só a 1ª campanha de 2024
+    await expect(rosca).toHaveAttribute('data-total', '2'); // só a 1ª campanha de 2024
 
     // O KPI do período (e portanto o que o PDF exporta) NÃO mudou.
     await expect(page.locator('.adash-card-escuro .adash-num')).toHaveText('61.6');
