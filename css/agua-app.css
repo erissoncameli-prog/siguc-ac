@@ -1235,6 +1235,57 @@ body { margin: 0; }
 .qr-overlay-link { font-size: 11px !important; color: #6B7280 !important; word-break: break-all; margin: 10px 0 4px !important; }
 .qr-overlay-nota { font-size: 11px !important; color: #9CA3AF !important; }
 
+/* Detalhe da coleta (Histórico) — modal deslizando de baixo, mesma
+   linguagem visual do qr-overlay (cantos arredondados, sombra), só que
+   com cabeçalho/rodapé fixos e corpo rolável (conteúdo mais longo:
+   identificação + IQA/CONAMA + ~22 parâmetros + observações). */
+.cm-item-toque { cursor: pointer; }
+.cm-item-toque:active { opacity: .7; }
+.coleta-modal-overlay {
+  position: fixed; inset: 0; z-index: 9997;
+  background: rgba(10,26,15,.55);
+  display: flex; align-items: flex-end; justify-content: center;
+}
+.coleta-modal-overlay[hidden] { display: none; }
+.coleta-modal {
+  background: var(--surface); width: 100%; max-width: 480px;
+  max-height: 86vh; border-radius: 22px 22px 0 0;
+  display: flex; flex-direction: column; overflow: hidden;
+  animation: cmSobe .25s var(--ease-out);
+}
+@keyframes cmSobe { from { transform: translateY(24px); opacity: 0 } to { transform: translateY(0); opacity: 1 } }
+.coleta-modal-header {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 10px;
+  padding: 18px 18px 12px; border-bottom: 1px solid #E5E7EB; flex-shrink: 0;
+}
+.coleta-modal-header strong { display: block; font-size: 15px; color: var(--ink-d); }
+.coleta-modal-sub { display: block; font-size: 12px; color: #6B7280; margin-top: 2px; }
+.coleta-modal-close {
+  width: 30px; height: 30px; border-radius: 50%; border: none; flex-shrink: 0;
+  background: #F3F4F6; color: #6B7280; font-size: 18px; line-height: 1; cursor: pointer;
+}
+.coleta-modal-body { padding: 16px 18px; overflow-y: auto; flex: 1; min-height: 0; }
+.coleta-modal-footer { padding: 12px 18px 18px; border-top: 1px solid #E5E7EB; flex-shrink: 0; }
+
+.cm-linha { display: flex; justify-content: space-between; gap: 10px; padding: 6px 0; font-size: 13px; border-bottom: 1px solid #F3F4F6; }
+.cm-linha span { color: #6B7280; }
+.cm-linha strong { text-align: right; color: var(--ink-d); }
+.cm-hint { font-size: 12.5px; color: #6B7280; margin: 4px 0 0; }
+.cm-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+.cm-card { background: var(--app-bg); border-radius: 14px; padding: 10px 12px; }
+.cm-card-tit { display: block; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: #9CA3AF; }
+.cm-card-valor { display: block; font-size: 19px; font-weight: 700; margin-top: 2px; }
+.cm-card-sub { display: block; font-size: 11px; color: #6B7280; margin-top: 2px; }
+.cm-params { display: flex; flex-direction: column; }
+.cm-param-linha { display: flex; justify-content: space-between; padding: 6px 0; font-size: 12.5px; border-bottom: 1px solid #F3F4F6; }
+.cm-param-linha span { color: #6B7280; }
+.cm-param-linha.cm-param-violado span, .cm-param-linha.cm-param-violado strong { color: #C2410C; font-weight: 700; }
+.cm-obs { font-size: 13px; color: var(--ink-d); margin: 0; white-space: pre-wrap; }
+.cm-anexos { display: flex; flex-direction: column; gap: 6px; }
+.cm-anexo-link { font-size: 13px; font-weight: 600; color: var(--prim); text-decoration: none; }
+.cm-anexo-link:active { opacity: .7; }
+#cm-exportar:disabled { opacity: .6; cursor: default; }
+
 .sync-meta { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 2px; }
 .sync-meta-item { color: #6B7280; font-size: 12px; }
 .btn-ver-mais {

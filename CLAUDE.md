@@ -1391,6 +1391,53 @@ nesta entrega (`sed` de cabeçalho mal calculado corrompeu
 telas do app renderizarem sobrepostas) — em
 `docs/qualidade-agua/plano.md`, seção "Fase 3 — ENTREGUE".
 
+**Pós-lançamento (fora do plano de 5 fases) — Histórico de IQA no
+app.** Nova aba "Histórico" na barra inferior: gráfico de linha do IQA
+por campanha para um ponto escolhido + lista "Minhas coletas" do
+próprio técnico. Cor por faixa e o gráfico SVG saem de
+`js/agua-iqa-visual.js` (novo, reaproveitado também por
+`agua-mapa.html` — mesma lição de `js/frota-consumo.js`, nunca
+reimplementar em cada tela); a paleta antiga do IQA falhava o
+validador de daltonismo do skill de dataviz (Ruim×Regular
+indistinguíveis sob deuteranopia) e foi corrigida junto. Coleta em
+quarentena NUNCA é escondida do histórico — mesma cautela do mapa,
+aparece com preenchimento fraco + rótulo "em conferência" (achado ao
+usar: filtrar por `status='completo'` deixava o gráfico praticamente
+vazio a partir de 2022, quase toda a série recente ainda em
+quarentena). "Fora do limite" mostra o(s) parâmetro(s) que violou(aram)
+(`conama_violacoes` da view), não só a bandeira genérica.
+
+**Pós-lançamento — detalhe da coleta + exportar ficha em PDF.** Tocar
+num card do Histórico (por ponto ou "Minhas coletas") abre um modal
+(`#coleta-overlay`, busca a linha inteira por id na hora — as listas
+só trazem os campos que já usam) com todos os dados: identificação,
+cartões de IQA/CONAMA, os ~22 parâmetros medidos (violado destacado),
+observações e anexos (foto/laudo, assinados via
+`js/fotos-privadas.js`). Botão "Exportar PDF" gera uma ficha de UMA
+coleta — `aguaRelMontarPdfColeta()`, nova função em
+`js/agua-relatorio-pdf.js` (Fase 5), reaproveitando os MESMOS
+primitivos de desenho do relatório por bacia (nunca uma segunda
+implementação de layout de PDF no módulo) — e compartilha o arquivo
+com `js/compartilhar-arquivo.js` (**novo, arquivo compartilhado**:
+lógica de 3 camadas — nativo Capacitor → Web Share API → baixar —
+extraída de `js/biomonitor-relatorio-campo.js`, que virou wrapper fino
+em cima dela; Água é o 2º consumidor, mesma lição de
+`js/frota-consumo.js`, então centralizou em vez de copiar pela 2ª vez).
+Isso trouxe o motor de PDF (jsPDF + autotable vendorizados,
+`config-sistema.js`, `agua-relatorio-dados.js`, `biomonitor-pdf-fonts.js`)
+como dependência nova do shell do app de campo — carregado sob demanda
+(só quando o botão é usado), exige conexão (mesma trava que o
+Biomonitor já usa nesse caso). Achado ao mexer no build nativo: o
+Capacitor do app-biomonitor nunca tinha `js/biomonitor-equipamentos.js`
+na lista de cópia do `build-www.mjs` (gap da entrega das migrations
+226-228, sem relação com esta) — corrigido junto, pois bloqueava
+validar o build do próprio `app-agua`. Guarda: novo teste em
+`tests/agua-relatorios.test.js` (`aguaRelMontarPdfColeta`, PDF de
+verdade aberto com pdf-parse) e em `tests/agua-app-fluxo.test.js`
+(modal + exportação de ponta a ponta, PDF real gerado localmente sem
+CDN). `pwa/sw.js`: agua v5 → v6, biomonitor v25 → v26 (ganhou
+`compartilhar-arquivo.js` no shell).
+
 ## Próxima tarefa
 Módulo Qualidade da Água (IQA): as 5 fases do plano original estão
 ENTREGUES (ver `docs/qualidade-agua/plano.md`, seções "Fase 0" a "Fase

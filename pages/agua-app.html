@@ -431,6 +431,25 @@
   </div>
 </div>
 
+<!-- ══ OVERLAY: detalhe da coleta (toque num card do Histórico) ═ -->
+<div id="coleta-overlay" class="coleta-modal-overlay" hidden>
+  <div class="coleta-modal">
+    <div class="coleta-modal-header">
+      <div>
+        <strong id="cm-titulo">—</strong>
+        <span id="cm-subtitulo" class="coleta-modal-sub"></span>
+      </div>
+      <button type="button" id="cm-fechar" class="coleta-modal-close" aria-label="Fechar">×</button>
+    </div>
+    <div class="coleta-modal-body" id="cm-corpo"></div>
+    <div class="coleta-modal-footer">
+      <button type="button" id="cm-exportar" class="btn-salvar" data-icon="download" style="margin-top:0">
+        <span id="cm-exportar-label">Exportar PDF</span>
+      </button>
+    </div>
+  </div>
+</div>
+
 <!-- ══ BANNER: atualização disponível ════════════════════════ -->
 <div id="update-banner" class="update-banner" hidden>
   <span data-icon="download">Nova versão disponível</span>
@@ -484,6 +503,17 @@ const _aguaReady = _dbReady.then(function () {
 <script src="/js/agua-sync.js"></script>
 <script src="/js/brigada-captura.js"></script>
 <script src="/js/agua-iqa-visual.js"></script>
+<!-- Detalhe da coleta (Histórico) → exportar ficha em PDF: mesmo motor
+     jsPDF do relatório por bacia (Fase 5) e o mesmo compartilhamento em
+     3 camadas do Biomonitor. jsPDF/autotable em si são carregados sob
+     demanda (js/vendor/, ver _agpdfCarregarLibs em agua-relatorio-pdf.js)
+     só quando o botão "Exportar PDF" é usado — não pesa no carregamento
+     normal do app. -->
+<script src="/js/config-sistema.js"></script>
+<script src="/js/biomonitor-pdf-fonts.js"></script>
+<script src="/js/agua-relatorio-dados.js"></script>
+<script src="/js/agua-relatorio-pdf.js"></script>
+<script src="/js/compartilhar-arquivo.js"></script>
 <script>
 // ════════════════════════════════════════════════════════════════
 // Estado global do app
@@ -1214,7 +1244,7 @@ async function carregarHistoricoPonto(pontoId) {
     // de apontar/tocar no gráfico (regra do skill de dataviz: uma
     // visão em tabela sempre disponível).
     lista.innerHTML = data.slice().reverse().map(c => `
-      <div class="sync-item">
+      <div class="sync-item cm-item-toque" data-coleta-id="${c.id}">
         <div class="sync-info" style="flex:1">
           <strong>${esc(aguaCampanhaLabel(c.campanha_ano, c.campanha_ordem))}</strong>
           <span>${formatDataColeta(c.data_coleta)}</span>
@@ -1261,7 +1291,7 @@ async function carregarMinhasColetas() {
     const STATUS_COR   = { aguardando_lab: '#6B7280', quarentena: '#CA8A04' }
 
     lista.innerHTML = data.map(c => `
-      <div class="sync-item">
+      <div class="sync-item cm-item-toque" data-coleta-id="${c.id}">
         <div class="sync-info" style="flex:1">
           <strong>${esc(c.ponto_nome)}</strong>
           <span style="display:block">${formatDataColeta(c.data_coleta)} · ${esc(aguaCampanhaLabel(c.campanha_ano, c.campanha_ordem))}</span>
@@ -1276,6 +1306,133 @@ async function carregarMinhasColetas() {
   } catch (e) {
     estado.textContent = 'Não foi possível carregar — verifique a conexão.'
     console.warn('[minhas coletas]', e)
+  }
+}
+
+// ── Detalhe da coleta (toque num card das duas listas acima) ─────
+// Busca a linha inteira na hora (não fica pré-carregada nas listas,
+// que só trazem os campos que já usam) — sempre reflete o estado mais
+// recente do servidor. Mesmo rótulo estático AGUA_REL_PARAM_LABEL do
+// motor de PDF (js/agua-relatorio-dados.js), evitando uma 5ª cópia da
+// lista de ~22 parâmetros (já duplicada em agua-mapa.html,
+// agua-pontos.html, agua-laudos.html, agua-conferencia.html).
+const CLASSE_LABEL_APP = { especial: 'Especial', classe_1: 'Classe 1', classe_2: 'Classe 2', classe_3: 'Classe 3', classe_4: 'Classe 4' }
+let _coletaModalAtual = null
+
+function montarCorpoColetaModal(c) {
+  const semLimites = c.conama_violacoes == null
+  const violou = !semLimites && c.conama_violacoes.length > 0
+  const statusLabel = c.status === 'completo' ? 'Completo' : c.status === 'quarentena' ? 'Em conferência' : 'Aguardando laudo'
+  const params = Object.entries(AGUA_REL_PARAM_LABEL).filter(([campo]) => c[campo] != null)
+
+  return `
+    <div class="cm-linha"><span>Ponto</span><strong>${esc(c.ponto_nome)}${c.codigo_ana ? ' · ' + esc(c.codigo_ana) : ''}</strong></div>
+    ${c.ponto_rio || c.ponto_municipio ? `<div class="cm-linha"><span>Local</span><strong>${esc([c.ponto_rio, c.ponto_municipio].filter(Boolean).join(' · '))}</strong></div>` : ''}
+    ${c.classe_enquadramento ? `<div class="cm-linha"><span>Classe de enquadramento</span><strong>${esc(CLASSE_LABEL_APP[c.classe_enquadramento] || c.classe_enquadramento)}</strong></div>` : ''}
+    <div class="cm-linha"><span>Campanha</span><strong>${esc(aguaCampanhaLabel(c.campanha_ano, c.campanha_ordem, false))}</strong></div>
+    <div class="cm-linha"><span>Data</span><strong>${formatDataColeta(c.data_coleta)}${c.hora_coleta ? ' às ' + String(c.hora_coleta).slice(0, 5) : ''}</strong></div>
+    <div class="cm-linha"><span>Coletor</span><strong>${esc(c.coletor_nome || '—')}</strong></div>
+    <div class="cm-linha"><span>Laboratório</span><strong>${esc(c.laboratorio_nome || '—')}</strong></div>
+    <div class="cm-linha"><span>Status</span><strong>${statusLabel}</strong></div>
+    ${c.status === 'quarentena' && c.quarentena_motivo ? `<p class="cm-hint">${esc(c.quarentena_motivo)}</p>` : ''}
+
+    <div class="cm-cards">
+      <div class="cm-card">
+        <span class="cm-card-tit">IQA</span>
+        <strong class="cm-card-valor" style="color:${AGUA_IQA_FAIXA_COR[c.iqa_faixa] || AGUA_SEM_IQA_COR}">${c.iqa != null ? Number(c.iqa).toFixed(1) : '—'}</strong>
+        <span class="cm-card-sub">${esc(c.iqa_faixa || 'Sem dado suficiente')}</span>
+      </div>
+      <div class="cm-card">
+        <span class="cm-card-tit">CONAMA</span>
+        <strong class="cm-card-valor" style="color:${violou ? '#C2410C' : semLimites ? '#9CA3AF' : '#059669'}">${semLimites ? 'Sem limites' : violou ? `${c.conama_violacoes.length} violação${c.conama_violacoes.length > 1 ? 'ões' : ''}` : 'Conforme'}</strong>
+        ${violou ? `<span class="cm-card-sub">${esc(c.conama_violacoes.map(v => AGUA_REL_PARAM_LABEL[v] || v).join(', '))}</span>` : ''}
+      </div>
+    </div>
+
+    ${params.length ? `
+      <div class="form-section-titulo" style="margin-top:16px">Parâmetros medidos</div>
+      <div class="cm-params">
+        ${params.map(([campo, rotulo]) => `
+          <div class="cm-param-linha${c.conama_violacoes?.includes(campo) ? ' cm-param-violado' : ''}">
+            <span>${esc(rotulo)}</span><strong>${Number(c[campo]).toLocaleString('pt-BR', { maximumFractionDigits: 2 })}</strong>
+          </div>`).join('')}
+      </div>` : '<p class="cm-hint" style="margin-top:14px">Ainda sem parâmetros lançados — aguardando laudo do laboratório.</p>'}
+
+    ${c.observacoes ? `<div class="form-section-titulo" style="margin-top:16px">Observações</div><p class="cm-obs">${esc(c.observacoes)}</p>` : ''}
+
+    ${(c.foto_url || c.laudo_url) ? `<div class="form-section-titulo" style="margin-top:16px">Anexos</div><div class="cm-anexos">
+      ${c.foto_url ? `<a href="#" class="cm-anexo-link" ${fotoAttr(c.foto_url)} target="_blank" rel="noopener">Ver foto de campo</a>` : ''}
+      ${c.laudo_url ? `<a href="#" class="cm-anexo-link" ${fotoAttr(c.laudo_url)} target="_blank" rel="noopener">Ver laudo (PDF)</a>` : ''}
+    </div>` : ''}
+
+    ${c.codigo_amostra ? `<p class="cm-hint" style="margin-top:10px">Amostra: ${esc(c.codigo_amostra)}</p>` : ''}
+  `
+}
+
+async function abrirColetaDetalhe(coletaId) {
+  if (!coletaId) return
+  const overlay = document.getElementById('coleta-overlay')
+  const corpo = document.getElementById('cm-corpo')
+  const titulo = document.getElementById('cm-titulo')
+  const sub = document.getElementById('cm-subtitulo')
+  overlay.hidden = false
+  titulo.textContent = 'Carregando…'
+  sub.textContent = ''
+  corpo.innerHTML = ''
+  _coletaModalAtual = null
+
+  if (!db) {
+    titulo.textContent = 'Coleta'
+    corpo.innerHTML = '<p class="cm-hint">Sem conexão — o detalhe da coleta precisa de internet.</p>'
+    return
+  }
+
+  try {
+    const { data: c, error } = await db.from('vw_agua_coletas_detalhe').select('*').eq('id', coletaId).single()
+    if (error) throw error
+    _coletaModalAtual = c
+    titulo.textContent = c.ponto_nome
+    sub.textContent = aguaCampanhaLabel(c.campanha_ano, c.campanha_ordem, false)
+    corpo.innerHTML = montarCorpoColetaModal(c)
+    assinarFotos(corpo)
+  } catch (e) {
+    titulo.textContent = 'Coleta'
+    corpo.innerHTML = '<p class="cm-hint">Não foi possível carregar os dados — verifique a conexão.</p>'
+    console.warn('[coleta detalhe]', e)
+  }
+}
+
+function fecharColetaDetalhe() {
+  document.getElementById('coleta-overlay').hidden = true
+  _coletaModalAtual = null
+}
+
+// Exportar ficha em PDF + compartilhar — motor jsPDF do relatório por
+// bacia (js/agua-relatorio-pdf.js, Fase 5) e compartilhamento em 3
+// camadas do Biomonitor (js/compartilhar-arquivo.js). Exige conexão
+// (mesma trava que o Biomonitor já usa nesse caso — carrega a lib de
+// PDF e busca cabeçalho/protocolo institucional no servidor).
+async function exportarFichaColeta() {
+  const c = _coletaModalAtual
+  if (!c) return
+  if (!navigator.onLine) { toast('Requer conexão para gerar o PDF.', 'erro'); return }
+
+  const label = document.getElementById('cm-exportar-label')
+  const btn = document.getElementById('cm-exportar')
+  const textoOriginal = label.textContent
+  btn.disabled = true
+  label.textContent = 'Gerando PDF…'
+  try {
+    const [cab, protocolo] = await Promise.all([getCabecalhoRelatorio(), gerarProtocolo()])
+    const pdf = await aguaRelMontarPdfColeta(c, cab, protocolo)
+    const filename = `ficha-coleta-${(c.codigo_amostra || c.id).toString().replace(/[^\w-]+/g, '-')}.pdf`
+    await compartilharArquivo(pdf.output('blob'), filename, `Ficha de coleta — ${c.ponto_nome}`, msg => toast(msg, 'ok'))
+  } catch (e) {
+    console.error('[exportar ficha]', e)
+    toast('Erro ao gerar PDF: ' + e.message, 'erro')
+  } finally {
+    btn.disabled = false
+    label.textContent = textoOriginal
   }
 }
 
@@ -1482,6 +1639,19 @@ document.addEventListener('DOMContentLoaded', () => {
     App._historicoPontoId = e.target.value || null
     carregarHistoricoPonto(e.target.value)
   })
+  // Toque num card de coleta (Histórico por ponto OU Minhas coletas) →
+  // abre o detalhe. Delegação num ancestral comum — as listas são
+  // remontadas via innerHTML a cada carregamento, então listener por
+  // item vazaria/duplicaria.
+  document.getElementById('tela-historico').addEventListener('click', e => {
+    const item = e.target.closest('[data-coleta-id]')
+    if (item) abrirColetaDetalhe(item.dataset.coletaId)
+  })
+  document.getElementById('cm-fechar').addEventListener('click', fecharColetaDetalhe)
+  document.getElementById('coleta-overlay').addEventListener('click', e => {
+    if (e.target.id === 'coleta-overlay') fecharColetaDetalhe()
+  })
+  document.getElementById('cm-exportar').addEventListener('click', exportarFichaColeta)
 
   document.getElementById('btn-update-agora').addEventListener('click', aplicarUpdate)
   document.getElementById('btn-update-depois').addEventListener('click', () => { document.getElementById('update-banner').hidden = true })
