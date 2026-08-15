@@ -135,6 +135,7 @@
   <div class="faixa-inst">
     <div class="faixa-logos">
       <span class="faixa-logo-chip gov" hidden><img alt="Governo do Acre"></span>
+      <img src="/pwa/icons/icon-agua-512.png" alt="" class="faixa-mascote">
       <span class="faixa-logo-chip sec" hidden><img alt="SEMA-AC"></span>
     </div>
   </div>
@@ -736,9 +737,10 @@ async function verificarConexao() {
 
 // ── Faixa institucional (logos Governo/SEMA) ──────────────────
 function inserirFaixasInst() {
-  // sem-op — Água não usa mascote/faixa decorativa própria; mantém a
-  // função para o mesmo ponto de chamada do carregarLogosInstitucionais
-  // (que já popula os .faixa-logo-chip presentes nas telas de PIN).
+  // sem-op — o emblema da faixa (.faixa-mascote) é estático no HTML da
+  // Home, não injetado; mantém a função para o mesmo ponto de chamada do
+  // carregarLogosInstitucionais (que popula os .faixa-logo-chip, esses
+  // sim vindos da configuração).
 }
 
 function renderFaixaLogos(c) {

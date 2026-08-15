@@ -1,7 +1,8 @@
-// ── SIGUC Qualidade da Água · rio de fundo + toque na água ────────
+// ── SIGUC Qualidade da Água · rio, toque na água e emblema ───────
 // Executar: npx playwright test tests/agua-rio.test.js
 //
-// Guarda de js/agua-rio.js nas 4 telas com .lock-screen do app de campo.
+// Guarda de js/agua-rio.js nas 4 telas com .lock-screen do app de campo
+// e do emblema do app (telas de bloqueio + faixa institucional da Home).
 // Mesmo molde dos outros guardas de app (tests/agua-app-fluxo.test.js):
 // página real contra servidor estático local, sem depender de rede.
 //
@@ -202,5 +203,60 @@ test.describe('Rio de fundo das telas de bloqueio', () => {
     for (const p of paradas) {
       expect(p.alpha, `${p.sel} não pintou enquanto escondida`).toBe(0);
     }
+  });
+
+  test('emblema da Home fica centrado entre as logos e abaixo da faixa', async ({ page }) => {
+    await abrirApp(page);
+    await page.evaluate(() => mostrarTela('tela-home'));
+    await page.locator('#tela-home').waitFor({ state: 'visible' });
+
+    const em = page.locator('#tela-home .faixa-mascote');
+    await expect(em).toHaveCount(1);
+    expect(await em.evaluate(i => i.complete && i.naturalWidth > 0),
+      'o emblema da faixa carregou').toBe(true);
+
+    // Entre as duas logos = coluna do meio da grade, centrado na faixa.
+    const cx = await page.evaluate(() => {
+      const e = document.querySelector('#tela-home .faixa-mascote').getBoundingClientRect();
+      const f = document.querySelector('#tela-home .faixa-inst').getBoundingClientRect();
+      return {
+        centroEmblema: e.x + e.width / 2,
+        centroFaixa: f.x + f.width / 2,
+        transborda: (e.y + e.height) - (f.y + f.height),
+      };
+    });
+    expect(Math.abs(cx.centroEmblema - cx.centroFaixa),
+      'centrado na faixa').toBeLessThan(2);
+    // "Um pouco abaixo": tem de vazar para fora da faixa, sem se soltar dela.
+    expect(cx.transborda).toBeGreaterThan(10);
+    expect(cx.transborda).toBeLessThan(45);
+  });
+
+  test('a animação do emblema não descentra (armadilha do translateX)', async ({ page }) => {
+    await abrirApp(page);
+    await page.evaluate(() => mostrarTela('tela-home'));
+    await page.locator('#tela-home').waitFor({ state: 'visible' });
+
+    // O emblema é centrado por `left:50%` + `translateX(-50%)`. Um keyframe
+    // que esqueça o translateX joga a arte meia largura para a direita no
+    // meio do ciclo — some do lugar e ninguém liga o defeito à animação.
+    // Amostra um ciclo inteiro (4,6 s) e cobra o centro em TODOS os quadros.
+    const desvios = [];
+    for (let i = 0; i < 13; i++) {
+      desvios.push(await page.evaluate(() => {
+        const e = document.querySelector('#tela-home .faixa-mascote').getBoundingClientRect();
+        const f = document.querySelector('#tela-home .faixa-inst').getBoundingClientRect();
+        return Math.abs((e.x + e.width / 2) - (f.x + f.width / 2));
+      }));
+      await page.waitForTimeout(400);
+    }
+    const pior = Math.max(...desvios);
+    expect(pior, `maior desvio do centro no ciclo: ${pior.toFixed(2)}px`).toBeLessThan(2);
+
+    // E precisa estar de fato animando (duas animações: boiar + halo).
+    const anim = await page.locator('#tela-home .faixa-mascote')
+      .evaluate(el => getComputedStyle(el).animationName);
+    expect(anim).toContain('agua-emblema-boia');
+    expect(anim).toContain('agua-emblema-halo');
   });
 });

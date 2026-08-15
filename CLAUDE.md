@@ -1657,6 +1657,34 @@ nenhuma página redesenha nada.
   escondidas com ZERO pixel pintado.
 - `pwa/sw.js`: agua v15 → v16 (`js/agua-rio.js` e o ícone no shell).
 
+**Pós-lançamento — emblema na faixa institucional da Home.** O mesmo
+emblema entrou na `.faixa-inst` do `tela-home`, na coluna do MEIO da
+grade (entre Governo do Acre e SEMA) e transbordando ~27 px para baixo
+da faixa — a estrutura já existia no molde de `brigada.css` (grade
+`1fr 96px 1fr`, `.faixa-mascote` absoluto, `margin-bottom` da faixa
+reservando o espaço); só estava sem ocupante, porque Água não tem
+mascote. Animação própria de água: `agua-emblema-boia` (sobe/desce de
+leve) + `agua-emblema-halo` (o brilho ciano respirando junto), no lugar
+do `mascote-respira` herdado.
+- 70 px, não os 86 px do molde: lá o mascote é foto circular, aqui é um
+  squircle cheio — no mesmo tamanho pesa demais e invade o conteúdo.
+- `border-radius: 0` (mesma razão do `.lock-mascote`) e `cursor:pointer`
+  removido: no Brigadas tocar o mascote abre menu, aqui não faz nada.
+- ⚠ **TODO keyframe do emblema precisa repetir `translateX(-50%)`** — é
+  ele que centra na coluna do meio (`left:50%`). Um keyframe sem isso
+  joga a arte meia largura para a direita NO MEIO do ciclo, defeito que
+  ninguém liga à animação depois. O teste amostra o ciclo inteiro
+  (4,6 s) cobrando o centro em todos os quadros; conferido que reprova
+  de fato (34,77 px de desvio com um keyframe quebrado de propósito).
+- O `filter` do drop-shadow vive só nos keyframes do halo: declarado
+  também na regra base, sobrescreveria a animação e o brilho não
+  pulsaria.
+- Guarda: +2 testes em `tests/agua-rio.test.js` (7 no total).
+- `pwa/sw.js`: agua v16 → v17. Nenhum arquivo novo entra no shell, mas
+  `css/agua-app.css` e `pages/agua-app.html` (os dois tocados aqui) JÁ
+  estão nele e a v16 já tinha ido para produção — sem o incremento, quem
+  abrisse com a v16 em cache não receberia o emblema.
+
 ## Próxima tarefa
 Módulo Qualidade da Água (IQA): as 5 fases do plano original estão
 ENTREGUES (ver `docs/qualidade-agua/plano.md`, seções "Fase 0" a "Fase
