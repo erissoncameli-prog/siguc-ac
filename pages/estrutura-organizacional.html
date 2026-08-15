@@ -553,6 +553,29 @@ let _credenciamentos = []
         <div id="unidades-content"><p style="color:#9CA3AF;padding:32px;text-align:center">Carregando...</p></div>
       </div>
 
+      <div id="tab-lotacoes" class="tab-panel">
+        <div class="aviso-inline" style="margin-bottom:16px">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <span>Onde cada servidor trabalha — diferente de "Cargos" (chefia). Base do acesso por setor (ainda não liga acesso a nenhum módulo). Quem ocupa um cargo já aparece aqui automaticamente, sem precisar cadastrar de novo.</span>
+        </div>
+        <div id="lotacoes-sem-lotacao"></div>
+        <div class="filter-bar">
+          ${['super_admin','diretor'].includes(usuario.perfil) ? `
+          <button class="btn btn-primary" onclick="abrirModalLotacao()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Nova Lotação
+          </button>` : ''}
+        </div>
+        <div class="card">
+          <div class="table-wrap"><div class="table-scroll">
+            <table>
+              <thead><tr><th>Servidor</th><th>Unidade</th><th>Principal</th><th>Desde</th><th>Portaria</th>${['super_admin','diretor'].includes(usuario.perfil) ? '<th>Ações</th>' : ''}</tr></thead>
+              <tbody id="tbody-lotacoes"><tr><td colspan="6" style="text-align:center;padding:32px;color:#9CA3AF">Carregando...</td></tr></tbody>
+            </table>
+          </div></div>
+        </div>
+      </div>
+
       ${usuario.perfil === 'super_admin' ? `
       <div id="tab-modulos-setor" class="tab-panel">
         <div class="aviso-inline" style="margin-bottom:16px">
