@@ -4,12 +4,15 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>SIGUC-AC · Qualidade da Água — Painel e Relatórios</title>
 <link rel="stylesheet" href="../css/global.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="../js/observability.js"></script>
 <script src="../js/queryLogger.js"></script>
 <script src="../js/config.js"></script>
 <script src="../js/config-sistema.js"></script>
 <script src="../js/layout.js"></script>
+<script src="../js/mapa-recorte.js"></script>
 <script src="../js/biomonitor-pdf-fonts.js"></script>
 <script src="../js/agua-iqa-visual.js"></script>
 <script src="../js/agua-relatorio-dados.js"></script>
@@ -28,7 +31,7 @@
 
 .adash-head { display:flex; flex-wrap:wrap; gap:14px; align-items:flex-start; margin-bottom:18px }
 .adash-titulo { font-family:var(--font-display); font-size:30px; line-height:1.15; font-weight:700; color:var(--cinza-900); margin:0 }
-.adash-sub { font-size:12.5px; color:var(--cinza-500); margin:4px 0 0; max-width:56ch }
+.adash-sub { font-size:12.5px; color:var(--cinza-500); margin:4px 0 0; max-width:60ch }
 .adash-head-acoes { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-left:auto }
 
 .adash-pill {
@@ -51,7 +54,7 @@
 .adash-pill-select { position:relative; padding-right:34px }
 .adash-pill-select select {
   appearance:none; border:none; background:none; font:inherit; color:inherit;
-  padding:0; margin:0; cursor:pointer; max-width:230px; outline:none;
+  padding:0; margin:0; cursor:pointer; max-width:260px; outline:none;
 }
 .adash-pill-select .adash-chev { position:absolute; right:13px; pointer-events:none; color:var(--cinza-400) }
 
@@ -78,6 +81,7 @@
   background:var(--branco); border:1px solid var(--borda-forte); color:var(--cinza-900);
   border-radius:10px; padding:8px 10px; font-size:13px; font-family:var(--font-sans); min-width:170px;
 }
+.adash-filtros select:disabled { opacity:.5; cursor:not-allowed }
 /* `display:flex` acima vence o `[hidden]` de global.css (mesma
    especificidade, esta folha vem depois) — sem isto o painel de
    filtros nasce aberto e o botão nunca o fecha. */
@@ -86,6 +90,17 @@
   margin-left:auto; align-self:center; background:none; border:none; color:var(--verde-medio);
   font-size:12px; font-weight:700; text-decoration:underline; cursor:pointer; padding:0;
 }
+
+/* Mapa — card de largura total, sempre visível (não depende de haver
+   coleta no recorte: mostra onde os pontos ficam mesmo com 0 resultado). */
+.adash-mapa-card { margin-bottom:16px }
+.adash-mapa-wrap {
+  height:380px; border-radius:14px; overflow:hidden; border:1px solid var(--borda);
+  background:var(--cinza-50);
+}
+.adash-mapa-wrap #rl-mapa { height:100%; width:100% }
+.leaflet-container { font-family:var(--font-sans); background:var(--cinza-50) }
+.leaflet-tooltip { font-size:12px }
 
 /* Grade de cards — proporções do modelo: coluna de KPIs estreita,
    dois cards grandes ao lado, faixa inferior 2:1. */
@@ -177,6 +192,7 @@
   .adash-barras { flex-direction:column }
   .adash-barras-resumo { flex:none }
   .adash-tabela-linha { grid-template-columns:1.4fr .8fr; row-gap:2px }
+  .adash-mapa-wrap { height:280px }
 }
 </style>
 </head>
@@ -199,9 +215,9 @@
       <div class="adash-head">
         <div>
           <h1 class="adash-titulo">Painel da Qualidade da Água</h1>
-          <p class="adash-sub">Panorama de uma bacia hidrográfica no recorte de campanhas escolhido.
-            IQA e conformidade CONAMA vêm prontos do banco — nunca recalculados aqui — e coleta em
-            conferência aparece marcada, nunca escondida.</p>
+          <p class="adash-sub">Panorama do Acre inteiro ou de uma bacia hidrográfica, no recorte de campanhas
+            escolhido — por padrão, todo o período disponível. IQA e conformidade CONAMA vêm prontos do
+            banco — nunca recalculados aqui — e coleta em conferência aparece marcada, nunca escondida.</p>
         </div>
         <div class="adash-head-acoes">
           <div class="adash-pill adash-pill-select">
@@ -222,6 +238,7 @@
       </div>
 
       <div class="adash-filtros" id="rl-filtros" hidden>
+        <label>Bacia<select id="rl-bacia-filtro" disabled><option value="">Todas</option></select></label>
         <label>Campanha inicial<select id="rl-de" disabled><option value="">—</option></select></label>
         <label>Campanha final<select id="rl-ate" disabled><option value="">—</option></select></label>
         <label>Rio<select id="rl-rio" disabled><option value="">Todos</option></select></label>
@@ -231,7 +248,16 @@
         <button type="button" class="adash-filtros-limpar" onclick="limparFiltrosBusca()">Limpar filtros</button>
       </div>
 
-      <div id="rl-conteudo"><div class="adash-vazio">Escolha uma bacia hidrográfica para montar o painel.</div></div>
+      <div class="adash-card adash-mapa-card">
+        <div class="adash-card-topo">
+          <div><p class="adash-card-tit">Mapa dos pontos de coleta</p>
+            <p class="adash-card-tit-sub" id="rl-mapa-sub">Carregando pontos...</p></div>
+          <span class="adash-card-mais">•••</span>
+        </div>
+        <div class="adash-mapa-wrap"><div id="rl-mapa"></div></div>
+      </div>
+
+      <div id="rl-conteudo"><div class="adash-vazio">Carregando painel...</div></div>
     </div>`
 
   bIconsAplicar(document.getElementById('app'))
@@ -248,6 +274,67 @@
   let _pontoSerie = null
   let _filtrosAbertos = false
 
+  // ── Mapa ───────────────────────────────────────────────────────
+  // Container fica FORA de #rl-conteudo (que é reconstruído inteiro a
+  // cada filtro) — o mapa nasce uma vez só e só troca os marcadores,
+  // preservando zoom/posição entre filtros. Estilo de marcador e a
+  // regra "coleta nula fica vazada, nunca some" vêm de
+  // js/agua-iqa-visual.js (aguaIqaEstiloMarcador) — mesma definição do
+  // mapa dedicado (pages/agua-mapa.html), nunca reimplementada aqui.
+  let _mapaPainel = L.map('rl-mapa', { attributionControl: false }).setView([-9.5, -70.0], 6)
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18, attribution: '© OpenStreetMap' }).addTo(_mapaPainel)
+  ;(async function desenharLimiteAcre() {
+    try {
+      const r = await fetch('../data/acre_estado.geojson')
+      if (!r.ok) throw new Error('HTTP ' + r.status)
+      const gj = await r.json()
+      L.geoJSON(gj, { style: { color: '#1F4E2C', weight: 2, fill: false, opacity: .5 }, interactive: false }).addTo(_mapaPainel)
+    } catch (e) { console.warn('[agua-relatorios] limite do Acre indisponível para desenho:', e.message) }
+  })()
+
+  let _pontosGeomPorId = {}
+  let _mapaMarcadores = {}
+  try {
+    const { data, error } = await db.from('agua_pontos_coleta').select('id,geom').eq('ativo', true)
+    if (error) throw error
+    ;(data || []).forEach(p => {
+      const ll = geoLatLngDeGeom(p.geom)
+      if (ll) _pontosGeomPorId[p.id] = ll
+    })
+  } catch (e) {
+    console.warn('[agua-relatorios] pontos (coordenadas) indisponíveis:', e.message)
+  }
+
+  // `rel` pode ser null (erro de carga) — mostra o que já se sabe (a
+  // lista de pontos cadastrados, sem coleta) em vez de esconder o mapa.
+  function atualizarMapaPainel(rel) {
+    Object.values(_mapaMarcadores).forEach(m => _mapaPainel.removeLayer(m))
+    _mapaMarcadores = {}
+    const bounds = []
+    const pontos = rel ? rel.pontos : []
+    pontos.forEach(p => {
+      const ll = _pontosGeomPorId[p.ponto_id]
+      if (!ll) return
+      // Coleta mais recente do ponto DENTRO do recorte já filtrado — as
+      // coletas de cada ponto já vêm em ordem cronológica de
+      // aguaRelMontar, então o último item é o mais recente. Nunca a
+      // média classificada numa faixa (regra do módulo).
+      const ultima = p.coletas.length ? p.coletas[p.coletas.length - 1] : null
+      const m = L.circleMarker(ll, Object.assign({ radius: 8 }, aguaIqaEstiloMarcador(ultima)))
+      const iqaTxt = ultima && ultima.iqa != null
+        ? `IQA ${ultima.iqa.toFixed(0)} (${ultima.iqa_faixa || 'sem faixa'})`
+        : 'Sem coleta com índice no recorte'
+      m.bindTooltip(`<strong>${esc(p.nome)}</strong><br>${esc(iqaTxt)}`, { direction: 'top', offset: [0, -8] })
+      m.addTo(_mapaPainel)
+      _mapaMarcadores[p.ponto_id] = m
+      bounds.push(ll)
+    })
+    sel('rl-mapa-sub').textContent = bounds.length
+      ? `${bounds.length} ponto${bounds.length !== 1 ? 's' : ''} no recorte atual — cor pela coleta mais recente do período`
+      : 'Nenhum ponto no recorte atual'
+    if (bounds.length) _mapaPainel.fitBounds(bounds, { padding: [28, 28], maxZoom: 9 })
+  }
+
   // ── Carrega o seletor de bacias ──────────────────────────────────
   try {
     _todasColetasResumo = await aguaRelBuscarResumoBacias(db)
@@ -256,7 +343,12 @@
     return
   }
   const bacias = aguaRelListarBacias(_todasColetasResumo)
-  sel('rl-bacia').innerHTML = '<option value="">Selecione a bacia...</option>' +
+  const totalPontos = new Set(_todasColetasResumo.map(c => c.ponto_id)).size
+  // "Acre todo" é o valor vazio ('') — mesmo valor que, no modelo
+  // anterior, era "nenhuma bacia selecionada ainda". Aqui deixa de ser
+  // um placeholder: é o escopo padrão, carregado de cara (regra pedida
+  // pelo usuário — não obrigar a escolher bacia antes de ver algo).
+  sel('rl-bacia').innerHTML = `<option value="">Acre todo (${totalPontos} ponto${totalPontos !== 1 ? 's' : ''})</option>` +
     bacias.map(b => `<option value="${esc(b.bacia)}">${esc(b.label)} (${b.nPontos} ponto${b.nPontos !== 1 ? 's' : ''})</option>`).join('')
 
   sel('rl-status').innerHTML += Object.entries(AGUA_REL_STATUS_LABEL)
@@ -267,7 +359,7 @@
     .map(([v, l]) => `<option value="${v}">${esc(l)}</option>`).join('')
 
   sel('rl-bacia').addEventListener('change', carregarBacia)
-  ;['rl-de', 'rl-ate', 'rl-rio', 'rl-status', 'rl-iqa-faixa', 'rl-conama']
+  ;['rl-de', 'rl-ate', 'rl-bacia-filtro', 'rl-rio', 'rl-status', 'rl-iqa-faixa', 'rl-conama']
     .forEach(id => sel(id).addEventListener('change', recalcularRelatorio))
 
   // Fecha o menu de exportar ao clicar fora (mesma cortesia de qualquer
@@ -287,20 +379,16 @@
   }
 
   async function carregarBacia() {
-    const chave = sel('rl-bacia').value
+    const chave = sel('rl-bacia').value // '' = Acre todo
     _relatorioAtual = null; _chipCampanha = null; _pontoSerie = null
     atualizarBotoes()
-    const camposBusca = ['rl-de', 'rl-ate', 'rl-rio', 'rl-status', 'rl-iqa-faixa', 'rl-conama']
-    if (!chave) {
-      sel('rl-de').innerHTML = '<option value="">—</option>'; sel('rl-ate').innerHTML = '<option value="">—</option>'
-      camposBusca.forEach(id => { sel(id).disabled = true })
-      sel('rl-conteudo').innerHTML = '<div class="adash-vazio">Escolha uma bacia hidrográfica para montar o painel.</div>'
-      return
-    }
-    _labelBaciaAtual = chave === AGUA_REL_SEM_BACIA ? 'Sem bacia definida' : chave
-    sel('rl-conteudo').innerHTML = '<div class="adash-vazio">Carregando coletas da bacia...</div>'
+    const ehAcreTodo = !chave
+    _labelBaciaAtual = ehAcreTodo ? 'Acre (todas as bacias)' : (chave === AGUA_REL_SEM_BACIA ? 'Sem bacia definida' : chave)
+    sel('rl-conteudo').innerHTML = '<div class="adash-vazio">Carregando coletas...</div>'
     try {
-      _coletasBaciaAtual = await aguaRelBuscarColetasDaBacia(db, chave === AGUA_REL_SEM_BACIA ? null : chave)
+      _coletasBaciaAtual = ehAcreTodo
+        ? await aguaRelBuscarTodasColetas(db)
+        : await aguaRelBuscarColetasDaBacia(db, chave === AGUA_REL_SEM_BACIA ? null : chave)
     } catch (e) {
       sel('rl-conteudo').innerHTML = `<div class="adash-vazio">Erro ao carregar coletas: ${esc(e.message)}</div>`
       return
@@ -309,21 +397,41 @@
     const opts = campanhas.map(c => `<option value="${c.campanha_id}">${esc(aguaRelLabelCampanha(c))}</option>`).join('')
     sel('rl-de').innerHTML = opts; sel('rl-ate').innerHTML = opts
     if (campanhas.length) {
+      // Padrão = todo o período disponível (do 1º ao último campanha) —
+      // o filtro de campanha é seletivo, mas nasce mostrando tudo.
       sel('rl-de').value = campanhas[0].campanha_id
       sel('rl-ate').value = campanhas[campanhas.length - 1].campanha_id
     }
     sel('rl-rio').innerHTML = '<option value="">Todos</option>' +
       aguaRelRiosDe(_coletasBaciaAtual).map(r => `<option value="${esc(r)}">${esc(r)}</option>`).join('')
+
+    // Filtro de bacia da gaveta: só existe (e só habilita) quando o
+    // cabeçalho está em "Acre todo" — se o cabeçalho já restringiu a
+    // uma bacia, filtrar de novo por bacia seria redundante. É por
+    // aqui que "quero mais detalhe" vira "aplico bacia + rio na gaveta"
+    // sem precisar voltar ao cabeçalho.
+    const camposBacia = sel('rl-bacia-filtro')
+    if (ehAcreTodo) {
+      camposBacia.innerHTML = '<option value="">Todas</option>' +
+        aguaRelListarBacias(_coletasBaciaAtual).map(b => `<option value="${esc(b.bacia)}">${esc(b.label)}</option>`).join('')
+      camposBacia.value = ''
+      camposBacia.disabled = false
+    } else {
+      camposBacia.innerHTML = '<option value="">Todas</option>'
+      camposBacia.value = ''
+      camposBacia.disabled = true
+    }
+
     sel('rl-status').value = ''; sel('rl-iqa-faixa').value = ''; sel('rl-conama').value = ''
-    camposBusca.forEach(id => { sel(id).disabled = false })
+    ;['rl-de', 'rl-ate', 'rl-rio', 'rl-status', 'rl-iqa-faixa', 'rl-conama'].forEach(id => { sel(id).disabled = false })
     recalcularRelatorio()
   }
 
   function recalcularRelatorio() {
-    if (!_coletasBaciaAtual.length) { _relatorioAtual = null; atualizarBotoes(); return }
     _relatorioAtual = aguaRelMontar(_coletasBaciaAtual, {
       campanhaDeId: sel('rl-de').value || null,
       campanhaAteId: sel('rl-ate').value || null,
+      bacia: sel('rl-bacia-filtro').disabled ? null : (sel('rl-bacia-filtro').value || null),
       rio: sel('rl-rio').value || null,
       status: sel('rl-status').value || null,
       iqaFaixa: sel('rl-iqa-faixa').value || null,
@@ -336,16 +444,26 @@
     if (_chipCampanha && !ids.has(_chipCampanha)) _chipCampanha = null
     if (_pontoSerie && !_relatorioAtual.pontos.some(p => p.ponto_id === _pontoSerie)) _pontoSerie = null
     renderPainel(_relatorioAtual)
+    atualizarMapaPainel(_relatorioAtual)
     atualizarBotoes()
   }
 
   window.limparFiltrosBusca = function () {
-    sel('rl-rio').value = ''; sel('rl-status').value = ''
+    sel('rl-bacia-filtro').value = ''; sel('rl-rio').value = ''; sel('rl-status').value = ''
     sel('rl-iqa-faixa').value = ''; sel('rl-conama').value = ''
     recalcularRelatorio()
   }
   window.selecionarChipCampanha = function (id) { _chipCampanha = id || null; renderPainel(_relatorioAtual) }
   window.selecionarPontoSerie = function (id) { _pontoSerie = id || null; renderPainel(_relatorioAtual) }
+
+  // Label da bacia que efetivamente vale para exportação — se o
+  // cabeçalho está em "Acre todo" mas a gaveta narrowed por uma bacia,
+  // é essa bacia narrowed que descreve o recorte, não "Acre todo".
+  function labelBaciaExportacao() {
+    const f = _relatorioAtual && _relatorioAtual.filtros.bacia
+    if (f) return f === AGUA_REL_SEM_BACIA ? 'Sem bacia definida' : f
+    return _labelBaciaAtual
+  }
 
   function atualizarBotoes() {
     const tem = !!(_relatorioAtual && _relatorioAtual.coletas.length)
@@ -375,7 +493,7 @@
   }
 
   function renderPainel(rel) {
-    if (!rel) { sel('rl-conteudo').innerHTML = '<div class="adash-vazio">Escolha uma bacia hidrográfica para montar o painel.</div>'; return }
+    if (!rel) { sel('rl-conteudo').innerHTML = '<div class="adash-vazio">Carregando painel...</div>'; return }
     const r = rel.resumo
     const porCampanha = aguaRelPorCampanha(rel)
     const variacao = aguaRelVariacaoIQA(porCampanha)
@@ -392,14 +510,14 @@
     let html = ''
     const filtrosTxt = aguaRelFiltrosTxt(rel.filtros)
     if (filtrosTxt) {
-      html += `<div class="alert alert-info">${bico('search')}<span>Filtrado por: ${esc(filtrosTxt)} — o PDF/PPTX gerado reflete só o que está aqui, não a bacia inteira.</span><button type="button" class="adash-filtros-limpar" onclick="limparFiltrosBusca()">Limpar filtros</button></div>`
+      html += `<div class="alert alert-info">${bico('search')}<span>Filtrado por: ${esc(filtrosTxt)} — o PDF/PPTX gerado reflete só o que está aqui, não o escopo inteiro.</span><button type="button" class="adash-filtros-limpar" onclick="limparFiltrosBusca()">Limpar filtros</button></div>`
     }
     if (r.quarentena > 0) {
-      html += `<div class="adash-aviso">${bico('help')}<span>${r.quarentena} coleta(s) deste período em quarentena — pendente de conferência humana (Qualidade da Água › Conferência). Aparecem marcadas no painel e nos arquivos gerados.</span></div>`
+      html += `<div class="adash-aviso">${bico('help')}<span>${r.quarentena} coleta(s) deste período em quarentena — pendente de conferência humana (Qualidade da Água › Conferência). Aparecem marcadas no painel, no mapa e nos arquivos gerados.</span></div>`
     }
 
     if (!rel.coletas.length) {
-      html += '<div class="adash-vazio">Nenhuma coleta encontrada para esta bacia no período e filtros selecionados.</div>'
+      html += '<div class="adash-vazio">Nenhuma coleta encontrada para este recorte.</div>'
       sel('rl-conteudo').innerHTML = html
       bIconsAplicar(sel('rl-conteudo'))
       return
@@ -428,7 +546,7 @@
       </div>
     </div>`
 
-    // Coluna 2: distribuição por faixa, com chips de campanha
+    // Coluna 2: distribuição por faixa (rosca), com chips de campanha
     const chips = [`<button type="button" class="adash-chip ${!_chipCampanha ? 'ativo' : ''}" onclick="selecionarChipCampanha('')">Período</button>`]
       .concat(porCampanha.map(c => `<button type="button" class="adash-chip ${_chipCampanha === c.campanha_id ? 'ativo' : ''}" onclick="selecionarChipCampanha('${esc(c.campanha_id)}')" title="${esc(c.label)}">${esc(c.labelCurto)}</button>`))
       .join('')
@@ -439,12 +557,8 @@
         <span class="adash-card-mais">•••</span>
       </div>
       <div class="adash-chips">${chips}</div>
-      <div class="adash-num-linha" style="margin-bottom:12px">
-        <span class="adash-num adash-num-sm">${formatNum(dist.comIQA)}</span>
-        ${pctBoas != null ? `<span class="adash-delta ${pctBoas >= 50 ? '' : 'baixa'}">${pctBoas.toFixed(0)}% Boa ou Ótima</span>` : ''}
-      </div>
-      ${aguaIqaFaixasBarraHTML(dist.contagem, dist.semIQA)}
-      <p class="adash-card-pe">${dist.predominante ? `Faixa predominante: <strong>${esc(dist.predominante)}</strong> (${dist.nPredominante} coleta(s))` : 'Sem coleta com índice calculado neste recorte'}</p>
+      ${aguaIqaFaixasRoscaHTML(dist.contagem, dist.semIQA)}
+      <p class="adash-card-pe">${pctBoas != null ? `${pctBoas.toFixed(0)}% Boa ou Ótima` : 'Sem coleta com índice neste recorte'}${dist.predominante ? ` · faixa predominante: <strong>${esc(dist.predominante)}</strong>` : ''}</p>
     </div>`
 
     // Coluna 3: medidor de conformidade CONAMA
@@ -557,7 +671,7 @@
   }
 
   function nomeArquivo() {
-    return `qualidade-agua-${_labelBaciaAtual}`.toLowerCase()
+    return `qualidade-agua-${labelBaciaExportacao()}`.toLowerCase()
       .normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^\w-]+/g, '-')
   }
 
@@ -569,7 +683,7 @@
     btn.textContent = 'Gerando PDF...'
     try {
       const { cab, protocolo } = await prepararCabecalho()
-      const pdf = await aguaRelMontarPdf(_relatorioAtual, _labelBaciaAtual, periodoTxt(_relatorioAtual), cab, protocolo)
+      const pdf = await aguaRelMontarPdf(_relatorioAtual, labelBaciaExportacao(), periodoTxt(_relatorioAtual), cab, protocolo)
       aguaRelBaixarPdf(pdf, `${nomeArquivo()}.pdf`)
       toast('PDF gerado.', 'success')
     } catch (e) {
@@ -587,7 +701,7 @@
     btn.textContent = 'Gerando PPTX...'
     try {
       const { protocolo } = await prepararCabecalho()
-      const blob = await aguaRelMontarPptx(_relatorioAtual, _labelBaciaAtual, periodoTxt(_relatorioAtual), protocolo)
+      const blob = await aguaRelMontarPptx(_relatorioAtual, labelBaciaExportacao(), periodoTxt(_relatorioAtual), protocolo)
       aguaRelBaixarPptx(blob, `${nomeArquivo()}.pptx`)
       toast('PPTX gerado.', 'success')
     } catch (e) {
@@ -596,6 +710,10 @@
       btn.disabled = false; btn.innerHTML = htmlOrig; bIconsAplicar(btn)
     }
   }
+
+  // Boot: escopo padrão = Acre todo, carregado de cara (sem exigir
+  // escolha prévia de bacia — pedido do usuário).
+  await carregarBacia()
 })()
 </script>
 </body>
