@@ -190,11 +190,14 @@ GRANT EXECUTE ON FUNCTION perfil_atualizar_foto(text) TO authenticated;
 -- de perfil é opcional e sai por vontade da pessoa, então é o caso raro
 -- de consentimento (Art. 7º, I), como já registrado no plano de LGPD.
 UPDATE lgpd_tratamentos
-   SET observacoes = coalesce(observacoes || ' ', '') ||
-       'Inclui a foto de perfil (usuarios.foto_url, bucket privado `avatares`), '
-       'campo OPCIONAL baseado em consentimento (Art. 7º, I) e removível pelo '
-       'próprio titular em Perfil → Foto. A remoção apaga o arquivo no Storage, '
-       'não apenas o endereço.'
+   SET categorias_dados = array(
+         SELECT DISTINCT unnest(categorias_dados || ARRAY['foto de perfil (opcional)'])
+       ),
+       observacoes = coalesce(observacoes || ' ', '') ||
+       'A foto de perfil (usuarios.foto_url, bucket privado `avatares`) é campo '
+       'OPCIONAL, baseado em consentimento (Art. 7º, I) — diferente do restante '
+       'deste tratamento, que se apoia no Art. 7º, III. É removível pelo próprio '
+       'titular em Perfil → Foto, e a remoção apaga o arquivo no Storage, não '
+       'apenas o endereço gravado.'
  WHERE codigo = 'TRAT-001'
-   AND observacoes IS DISTINCT FROM NULL
    AND position('foto de perfil' in coalesce(observacoes, '')) = 0;
