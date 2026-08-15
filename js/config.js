@@ -100,7 +100,7 @@ const _dbReady = loadEnv().then(({ supabaseUrl, supabaseKey }) => {
 });
 
 // ── Estado global ─────────────────────────────────────────────
-const appState = { usuario: null, perfil: null };
+const appState = { usuario: null, perfil: null, permissoes: {} };
 
 // ── i18n ──────────────────────────────────────────────────────
 const i18n = {
