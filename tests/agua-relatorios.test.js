@@ -716,19 +716,19 @@ async function abrirPainelComStub(page, coletas, opts = {}) {
           if (tabela === 'usuarios') return { select: () => ({ eq: () => ({ single: async () => ({ data: usuario }) }) }) };
           if (tabela === 'minhas_permissoes') return { select: async () => ({ data: [{ chave: 'agua', nivel: 'editar' }] }) };
           if (tabela === 'vw_agua_coletas_detalhe') return { select: () => consulta(coletas.slice()) };
+          if (tabela === 'agua_pontos_coleta') return { select: () => consulta(pontosGeom.slice()) };
           return { select: () => ({ eq: () => ({ single: async () => ({ data: null }) }) }) };
         },
       }),
     };
-  }, { coletas, usuario: USUARIO_STUB });
+  }, { coletas, usuario: USUARIO_STUB, pontosGeom });
 
   await page.goto(PAGINA);
-  // `option` nunca é "visível" para o Playwright (está dentro do select
-  // fechado) — espera-se pela existência no DOM, não por visibilidade.
-  await page.waitForFunction(
-    () => !!document.querySelector('#rl-bacia option[value="Rio Acre"]'), null, { timeout: 15_000 });
-  await page.selectOption('#rl-bacia', 'Rio Acre');
-  await page.waitForSelector('.adash-grid');
+  // "Acre todo" é o escopo padrão: o painel carrega sozinho, sem exigir
+  // escolha de bacia antes (pedido do usuário) — por isso não há mais
+  // um selectOption aqui. `.adash-vazio` cobre o caso do recorte sem
+  // nenhuma coleta (também um resultado válido, não um erro).
+  await page.waitForSelector('.adash-grid, .adash-vazio', { timeout: 15_000 });
 }
 
 test.describe('painel (dashboard) — render com dado real da view', () => {
