@@ -12,6 +12,31 @@ houver motivo.
 
 ---
 
+## Decisões tomadas (2026-08-15) — não reabrir
+
+1. **Restrição por setor é o padrão.** Confirmada a leitura do §6.5: o
+   acesso passa a ser concedido pela **lotação**, e o perfil vira **teto**,
+   não concessão (`nivel = min(capacidade, alcance)`). A missão inclui as
+   frentes 1–2 e 4, não só o credenciamento.
+2. **Quem libera exceção é o super_admin.** O credenciamento (§2.3) é
+   concedido **apenas por `super_admin`** — não pelo chefe da unidade dona
+   do módulo. Resolve o §6.3 na versão mais restritiva, que é a certa para
+   começar: `concedido_por` já fica gravado, então delegar isso a chefes
+   depois é ampliar uma checagem, não redesenhar. Continua valendo tudo do
+   §2.3: prazo obrigatório, justificativa obrigatória, nunca acima do teto
+   do perfil, auditado, com aviso de vencimento.
+3. **A virada é módulo a módulo, com impacto medido antes** (§4). Nenhuma
+   entrega desta missão muda o acesso de ninguém até alguém ligar
+   `exige_lotacao` num módulo específico.
+
+Segue em aberto, e **é trabalho humano, não de código** (§6.1 e §6.2):
+lotação dos 20 servidores de mesa e qual unidade é dona de cada módulo.
+**Isso não bloqueia o início** — as frentes 1, 2, 3, 6 e 9 constroem o
+mecanismo inteiro com `exige_lotacao = false`, sem alterar o comportamento
+atual do sistema para ninguém.
+
+---
+
 ## 1. Diagnóstico — o que o banco mostra
 
 ### 1.1 O organograma já existe. E está desligado da permissão.
