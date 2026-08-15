@@ -493,6 +493,14 @@ async function _perfilCarregarAcessos() {
   }
 }
 
+// formatData() (js/config.js) devolve só a data — num histórico de
+// acesso a HORA é o que importa (dois logins do mesmo dia).
+function _perfilQuando(iso) {
+  if (!iso) return '—'
+  const d = new Date(iso)
+  return d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+}
+
 function _perfilNavegador(ua) {
   if (!ua) return '—'
   if (/SIGUC|Capacitor/i.test(ua)) return 'App de campo'
