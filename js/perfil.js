@@ -139,8 +139,11 @@ function perfilIr(aba) {
 function _perfilHTML(u) {
   const ini = iniciais(u.nome_completo)
   const perfilLabel = t(`perfis.${u.perfil}`) || u.perfil || ''
-  const fotoAttrs = u.foto_url ? fotoAttr(u.foto_url, ini) : ''
   const temFoto = !!u.foto_url
+  // O avatar nasce com as iniciais e vira foto em _perfilPintarFoto,
+  // depois que o assinador de URL chegou. Não dá para usar fotoAttr()
+  // aqui: fotos-privadas.js é carregado sob demanda e pode não existir
+  // no instante em que este HTML é montado.
 
   return `<div class="perfil-modal" role="dialog" aria-modal="true" aria-label="Meu perfil">
     <div class="pf-head">
