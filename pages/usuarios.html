@@ -128,7 +128,7 @@ let editId = null
     '</div></div></div>'
 
   carregarLogosSidebar()
-  await carregarUCsOpcoes()
+  await Promise.all([carregarUCsOpcoes(), carregarLotacaoOpcoes()])
   await carregar()
 })()
 
@@ -136,6 +136,15 @@ async function carregarUCsOpcoes() {
   const { data } = await db.from('unidades_conservacao').select('id,nome,codigo').eq('ativo',true).order('codigo')
   const sel = document.getElementById('f-uc')
   data?.forEach(u => { const o = document.createElement('option'); o.value = u.id; o.textContent = `${u.codigo} — ${u.nome}`; sel.appendChild(o) })
+}
+
+// Lotação inicial no cadastro — docs/acesso-por-organograma.md. Só na
+// criação (bloco-lotacao fica escondido ao editar; a aba Lotações de
+// Estrutura Organizacional já cobre edição/encerramento).
+async function carregarLotacaoOpcoes() {
+  const { data } = await db.from('unidades_organizacionais').select('id,sigla,nome').eq('ativo',true).order('sigla')
+  const sel = document.getElementById('f-lotacao')
+  data?.forEach(u => { const o = document.createElement('option'); o.value = u.id; o.textContent = `${u.sigla} — ${u.nome}`; sel.appendChild(o) })
 }
 
 let _dados = []
