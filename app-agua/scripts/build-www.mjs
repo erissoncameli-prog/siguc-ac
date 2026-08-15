@@ -31,7 +31,7 @@ mkdirSync(join(WWW, 'js/vendor'),    { recursive: true })
 mkdirSync(join(WWW, 'vendor/fonts'), { recursive: true })
 
 // ── JS compartilhado (transpilado para ES2017) ────────────────
-for (const f of ['config.js', 'fotos-privadas.js', 'lgpd.js', 'lgpd-campo.js', 'qrcode-generator.js', 'agua-offline.js', 'agua-sync.js', 'brigada-captura.js', 'agua-iqa-visual.js', 'config-sistema.js', 'biomonitor-pdf-fonts.js', 'agua-relatorio-dados.js', 'agua-relatorio-pdf.js', 'compartilhar-arquivo.js']) {
+for (const f of ['config.js', 'fotos-privadas.js', 'lgpd.js', 'lgpd-campo.js', 'qrcode-generator.js', 'agua-offline.js', 'agua-sync.js', 'brigada-captura.js', 'agua-iqa-visual.js', 'agua-rio.js', 'config-sistema.js', 'biomonitor-pdf-fonts.js', 'agua-relatorio-dados.js', 'agua-relatorio-pdf.js', 'compartilhar-arquivo.js']) {
   copiarJsTranspilado(join(RAIZ, 'js', f), join(WWW, 'js', f))
 }
 // js/vendor/ — jsPDF + jspdf-autotable, carregados sob demanda por
@@ -41,6 +41,17 @@ for (const f of ['config.js', 'fotos-privadas.js', 'lgpd.js', 'lgpd-campo.js', '
 // excedente em vez de estourar acima da raiz — conferido).
 for (const f of ['jspdf-2.5.2.umd.min.js', 'jspdf-autotable-3.8.4.min.js']) {
   copiarJsTranspilado(join(RAIZ, 'js/vendor', f), join(WWW, 'js/vendor', f))
+}
+
+// ── Imagens referenciadas pelo HTML ───────────────────────────
+// O emblema das 4 telas de bloqueio vem de /pwa/icons/. No site esse
+// caminho é servido pela Vercel; dentro do shell nativo não existe nada
+// fora de www/, então sem esta cópia o app abriria com imagem quebrada
+// no login. A trava de sanidade lá embaixo pega o esquecimento se outra
+// imagem for referenciada no futuro.
+mkdirSync(join(WWW, 'pwa/icons'), { recursive: true })
+for (const f of ['icon-agua-512.png']) {
+  cpSync(join(RAIZ, 'pwa/icons', f), join(WWW, 'pwa/icons', f))
 }
 
 // ── CSS (remove @import do Google Fonts — fontes são locais) ──
@@ -126,7 +137,7 @@ html = html.replace('</head>', `<script>window.__SIGUC_ENV=${envJson}</script>\n
 writeFileSync(join(WWW, 'index.html'), html)
 
 // ── Sanidade ───────────────────────────────────────────────────
-for (const f of ['index.html', 'vendor/supabase.js', 'vendor/fonts.css', 'css/agua-app.css', 'js/config.js', 'js/fotos-privadas.js', 'js/lgpd.js', 'js/lgpd-campo.js', 'js/qrcode-generator.js', 'js/agua-offline.js', 'js/agua-sync.js', 'js/brigada-captura.js', 'js/agua-iqa-visual.js', 'js/config-sistema.js', 'js/biomonitor-pdf-fonts.js', 'js/agua-relatorio-dados.js', 'js/agua-relatorio-pdf.js', 'js/compartilhar-arquivo.js', 'js/vendor/jspdf-2.5.2.umd.min.js', 'js/vendor/jspdf-autotable-3.8.4.min.js']) {
+for (const f of ['index.html', 'vendor/supabase.js', 'vendor/fonts.css', 'css/agua-app.css', 'js/config.js', 'js/fotos-privadas.js', 'js/lgpd.js', 'js/lgpd-campo.js', 'js/qrcode-generator.js', 'js/agua-offline.js', 'js/agua-sync.js', 'js/brigada-captura.js', 'js/agua-iqa-visual.js', 'js/agua-rio.js', 'js/config-sistema.js', 'js/biomonitor-pdf-fonts.js', 'js/agua-relatorio-dados.js', 'js/agua-relatorio-pdf.js', 'js/compartilhar-arquivo.js', 'js/vendor/jspdf-2.5.2.umd.min.js', 'js/vendor/jspdf-autotable-3.8.4.min.js']) {
   if (!existsSync(join(WWW, f))) { console.error(`ERRO: faltando www/${f}`); process.exit(1) }
 }
 const indexFinal = readFileSync(join(WWW, 'index.html'), 'utf8')
@@ -136,6 +147,14 @@ const indexFinal = readFileSync(join(WWW, 'index.html'), 'utf8')
 for (const m of indexFinal.matchAll(/<script src="\/js\/([^"]+)"/g)) {
   if (!existsSync(join(WWW, 'js', m[1]))) {
     console.error(`ERRO: index.html referencia /js/${m[1]}, mas o arquivo não foi embarcado (adicione à lista de cópia)`)
+    process.exit(1)
+  }
+}
+// Mesma trava para imagens: <img src="/…"> não embarcada vira imagem
+// quebrada na WebView, sem erro que apareça para ninguém.
+for (const m of indexFinal.matchAll(/<img[^>]+src="\/([^"]+)"/g)) {
+  if (!existsSync(join(WWW, m[1]))) {
+    console.error(`ERRO: index.html referencia /${m[1]}, mas o arquivo não foi embarcado (adicione à lista de cópia)`)
     process.exit(1)
   }
 }
@@ -149,7 +168,7 @@ if (!/window\.__SIGUC_ENV=\{.*supabaseUrl.*supabaseKey/.test(indexFinal)) {
 }
 // Garante que a transpilação removeu os operadores ES2021 (||= &&= ??=) que
 // quebravam libs modernas em WebViews < 85.
-for (const f of ['vendor/supabase.js', 'js/config.js', 'js/fotos-privadas.js', 'js/lgpd.js', 'js/lgpd-campo.js', 'js/qrcode-generator.js', 'js/agua-offline.js', 'js/agua-sync.js', 'js/brigada-captura.js', 'js/agua-iqa-visual.js', 'js/config-sistema.js', 'js/biomonitor-pdf-fonts.js', 'js/agua-relatorio-dados.js', 'js/agua-relatorio-pdf.js', 'js/compartilhar-arquivo.js', 'js/vendor/jspdf-2.5.2.umd.min.js', 'js/vendor/jspdf-autotable-3.8.4.min.js']) {
+for (const f of ['vendor/supabase.js', 'js/config.js', 'js/fotos-privadas.js', 'js/lgpd.js', 'js/lgpd-campo.js', 'js/qrcode-generator.js', 'js/agua-offline.js', 'js/agua-sync.js', 'js/brigada-captura.js', 'js/agua-iqa-visual.js', 'js/agua-rio.js', 'js/config-sistema.js', 'js/biomonitor-pdf-fonts.js', 'js/agua-relatorio-dados.js', 'js/agua-relatorio-pdf.js', 'js/compartilhar-arquivo.js', 'js/vendor/jspdf-2.5.2.umd.min.js', 'js/vendor/jspdf-autotable-3.8.4.min.js']) {
   const js = readFileSync(join(WWW, f), 'utf8')
   const proibidos = js.match(/\|\|=|&&=|\?\?=/g)
   if (proibidos) {
