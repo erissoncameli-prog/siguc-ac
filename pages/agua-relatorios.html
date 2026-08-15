@@ -39,6 +39,9 @@
   background:var(--aviso-bg); border:1px solid #FDE68A; color:var(--aviso);
   font-size:12px; margin-bottom:14px;
 }
+.arel-filtros-busca { border-top:1px dashed var(--borda); margin-top:2px; padding-top:12px; width:100% }
+.arel-filtros-busca select { min-width:170px }
+.arel-filtros-limpar { margin-left:auto; background:none; border:none; color:inherit; font-size:11px; font-weight:700; text-decoration:underline; cursor:pointer; padding:0; flex-shrink:0 }
 </style>
 </head>
 <body>
@@ -76,6 +79,20 @@
           <button class="btn btn-secondary" id="rl-btn-pdf" onclick="gerarPdf()" disabled data-icon="file-text">Gerar PDF</button>
           <button class="btn btn-primary" id="rl-btn-pptx" onclick="gerarPptx()" disabled data-icon="monitor">Gerar PPTX</button>
         </div>
+        <div class="arel-filtros-busca" style="display:flex;flex-wrap:wrap;gap:12px">
+          <label>Rio
+            <select id="rl-rio" disabled><option value="">Todos</option></select>
+          </label>
+          <label>Status
+            <select id="rl-status" disabled><option value="">Todos</option></select>
+          </label>
+          <label>Faixa do IQA
+            <select id="rl-iqa-faixa" disabled><option value="">Todas</option></select>
+          </label>
+          <label>Conformidade CONAMA
+            <select id="rl-conama" disabled><option value="">Todas</option></select>
+          </label>
+        </div>
       </div>
 
       <div id="rl-conteudo"><div class="arel-vazio">Selecione uma bacia para ver o resumo do período.</div></div>
@@ -100,17 +117,27 @@
   sel('rl-bacia').innerHTML = '<option value="">Selecione...</option>' +
     bacias.map(b => `<option value="${esc(b.bacia)}">${esc(b.label)} (${b.nPontos} ponto${b.nPontos !== 1 ? 's' : ''})</option>`).join('')
 
+  // Selects estáticos (não dependem da bacia escolhida) — populados uma
+  // vez só, no boot da tela.
+  sel('rl-status').innerHTML += Object.entries(AGUA_REL_STATUS_LABEL)
+    .map(([v, l]) => `<option value="${v}">${esc(l)}</option>`).join('')
+  sel('rl-iqa-faixa').innerHTML += ['Ótima', 'Boa', 'Regular', 'Ruim', 'Péssima']
+    .map(f => `<option value="${esc(f)}">${esc(f)}</option>`).join('')
+  sel('rl-conama').innerHTML += Object.entries(AGUA_REL_CONAMA_LABEL)
+    .map(([v, l]) => `<option value="${v}">${esc(l)}</option>`).join('')
+
   sel('rl-bacia').addEventListener('change', carregarBacia)
-  sel('rl-de').addEventListener('change', recalcularRelatorio)
-  sel('rl-ate').addEventListener('change', recalcularRelatorio)
+  ;['rl-de', 'rl-ate', 'rl-rio', 'rl-status', 'rl-iqa-faixa', 'rl-conama']
+    .forEach(id => sel(id).addEventListener('change', recalcularRelatorio))
 
   async function carregarBacia() {
     const chave = sel('rl-bacia').value
     _relatorioAtual = null
     atualizarBotoes()
+    const camposBusca = ['rl-de', 'rl-ate', 'rl-rio', 'rl-status', 'rl-iqa-faixa', 'rl-conama']
     if (!chave) {
-      sel('rl-de').innerHTML = '<option value="">—</option>'; sel('rl-de').disabled = true
-      sel('rl-ate').innerHTML = '<option value="">—</option>'; sel('rl-ate').disabled = true
+      sel('rl-de').innerHTML = '<option value="">—</option>'; sel('rl-ate').innerHTML = '<option value="">—</option>'
+      camposBusca.forEach(id => { sel(id).disabled = true })
       sel('rl-conteudo').innerHTML = '<div class="arel-vazio">Selecione uma bacia para ver o resumo do período.</div>'
       return
     }
@@ -124,12 +151,18 @@
     }
     const campanhas = aguaRelCampanhasDe(_coletasBaciaAtual)
     const opts = campanhas.map(c => `<option value="${c.campanha_id}">${esc(aguaRelLabelCampanha(c))}</option>`).join('')
-    sel('rl-de').innerHTML = opts; sel('rl-de').disabled = false
-    sel('rl-ate').innerHTML = opts; sel('rl-ate').disabled = false
+    sel('rl-de').innerHTML = opts; sel('rl-ate').innerHTML = opts
     if (campanhas.length) {
       sel('rl-de').value = campanhas[0].campanha_id
       sel('rl-ate').value = campanhas[campanhas.length - 1].campanha_id
     }
+    // Rio depende da bacia (Purus tem Rio Acre/Iaco/Purus, por exemplo) —
+    // repopulado a cada troca de bacia; os demais (status/faixa/CONAMA)
+    // são fixos e só voltam pra "Todos/Todas".
+    sel('rl-rio').innerHTML = '<option value="">Todos</option>' +
+      aguaRelRiosDe(_coletasBaciaAtual).map(r => `<option value="${esc(r)}">${esc(r)}</option>`).join('')
+    sel('rl-status').value = ''; sel('rl-iqa-faixa').value = ''; sel('rl-conama').value = ''
+    camposBusca.forEach(id => { sel(id).disabled = false })
     recalcularRelatorio()
   }
 
@@ -138,9 +171,19 @@
     _relatorioAtual = aguaRelMontar(_coletasBaciaAtual, {
       campanhaDeId: sel('rl-de').value || null,
       campanhaAteId: sel('rl-ate').value || null,
+      rio: sel('rl-rio').value || null,
+      status: sel('rl-status').value || null,
+      iqaFaixa: sel('rl-iqa-faixa').value || null,
+      conamaStatus: sel('rl-conama').value || null,
     })
     renderResumo(_relatorioAtual)
     atualizarBotoes()
+  }
+
+  window.limparFiltrosBusca = function () {
+    sel('rl-rio').value = ''; sel('rl-status').value = ''
+    sel('rl-iqa-faixa').value = ''; sel('rl-conama').value = ''
+    recalcularRelatorio()
   }
 
   function atualizarBotoes() {
@@ -152,6 +195,10 @@
   function renderResumo(rel) {
     const r = rel.resumo
     let html = ''
+    const filtrosTxt = aguaRelFiltrosTxt(rel.filtros)
+    if (filtrosTxt) {
+      html += `<div class="alert alert-info">${bico('search')}<span>Filtrado por: ${esc(filtrosTxt)} — o PDF/PPTX gerado reflete só o que está aqui, não a bacia inteira.</span><button type="button" class="arel-filtros-limpar" onclick="limparFiltrosBusca()">Limpar filtros</button></div>`
+    }
     if (r.quarentena > 0) {
       html += `<div class="arel-quarentena-aviso">${bico('help')} ${r.quarentena} coleta(s) deste período em quarentena — pendente de conferência humana (Configurações › Qualidade da Água › Conferência). Aparecem marcadas nos relatórios gerados.</div>`
     }
