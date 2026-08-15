@@ -449,7 +449,7 @@ function _agpdfCapa(ctx, relatorio, labelBacia, periodoTxt) {
   pdf.setFont('DMSans', 'normal'); pdf.setFontSize(6.8); pdf.setTextColor(...AGPDF_COR.muted)
   const semLimites = r.totalColetas - r.comConama
   pdf.text(`${r.conforme} conforme · ${r.comConama - r.conforme} com violação`, AGPDF_M + colEsq / 2, yBloco + hGauge + 1, { align: 'center' })
-  pdf.text(semLimites > 0 ? `${semLimites} sem limites cadastrados` : 'de todas as coletas avaliadas', AGPDF_M + colEsq / 2, yBloco + hGauge + 4.6, { align: 'center' })
+  pdf.text(semLimites > 0 ? `${semLimites} sem limites cadastrados` : 'todas com limites cadastrados', AGPDF_M + colEsq / 2, yBloco + hGauge + 4.6, { align: 'center' })
   const hRank = _agpdfRanking(ctx, aguaRelViolacoesRanking(r, 5), r.comConama, xDir, yBloco, colDir)
   ctx.y = yBloco + Math.max(hGauge + 6, hRank) + 8
 
