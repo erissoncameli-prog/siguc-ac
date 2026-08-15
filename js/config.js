@@ -100,7 +100,7 @@ const _dbReady = loadEnv().then(({ supabaseUrl, supabaseKey }) => {
 });
 
 // ── Estado global ─────────────────────────────────────────────
-const appState = { usuario: null, perfil: null };
+const appState = { usuario: null, perfil: null, permissoes: {} };
 
 // ── i18n ──────────────────────────────────────────────────────
 const i18n = {
@@ -199,6 +199,24 @@ async function carregarUsuario() {
   if (!u || !u.ativo) { await db.auth.signOut(); return null; }
   appState.usuario = u;
   appState.perfil = u.perfil;
+  // Frente 6b de docs/acesso-por-organograma.md: fonte para a sidebar
+  // decidir visibilidade por módulo (nivel_efetivo), em vez de arrays de
+  // perfil hard-coded em js/layout.js. Buscado aqui — bootstrap
+  // obrigatório de toda página de mesa, já `await`ado antes de
+  // gerarLayout() rodar — para não precisar tornar gerarLayout() async
+  // nem tocar nas ~45 páginas que a chamam.
+  // FAIL-OPEN deliberado: se a consulta falhar, appState.permissoes
+  // fica {} e js/layout.js cai para o comportamento de sempre (arrays
+  // `perfis:` hard-coded) — indisponibilidade de rede não pode esconder
+  // a sidebar inteira. A página em si continua protegida pela RLS,
+  // que não depende disto.
+  try {
+    const { data: perms } = await db.from('minhas_permissoes').select('chave,nivel');
+    appState.permissoes = Object.fromEntries((perms || []).map(p => [p.chave, p.nivel]));
+  } catch (e) {
+    console.warn('[permissoes] não foi possível carregar minhas_permissoes', e);
+    appState.permissoes = {};
+  }
   if (window.SessionGuard) SessionGuard.init(u);
   _lgpdGate();
   _perfilModal();
