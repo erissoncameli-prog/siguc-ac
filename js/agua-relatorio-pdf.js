@@ -375,64 +375,98 @@ function _agpdfLinhaCampanhas(ctx, serie, x, y, largura, altura) {
 }
 
 // ── Seções ────────────────────────────────────────────────────────
+// Primeira página = o mesmo painel da tela (pages/agua-relatorios.html),
+// na mesma ordem de leitura: identificação, KPIs, distribuição por
+// faixa, conformidade CONAMA + ranking de violações, IQA por ponto e
+// evolução por campanha. Quem abre o PDF vê o que viu na tela; as
+// páginas seguintes é que trazem o detalhamento ponto a ponto.
 function _agpdfCapa(ctx, relatorio, labelBacia, periodoTxt) {
   const { pdf } = ctx
-  ctx.y = 70
-  pdf.setFont('DMSans', 'bold'); pdf.setFontSize(9); pdf.setTextColor(...AGPDF_COR.muted2)
+  const L = ctx.W - AGPDF_M * 2
+  ctx.y = 40
+  pdf.setFont('DMSans', 'bold'); pdf.setFontSize(8.5); pdf.setTextColor(...AGPDF_COR.muted2)
   pdf.text('RELATÓRIO DE QUALIDADE DA ÁGUA — POR BACIA HIDROGRÁFICA', ctx.W / 2, ctx.y, { align: 'center' })
-  ctx.y += 12
-  pdf.setFontSize(22); pdf.setTextColor(...AGPDF_COR.floresta)
-  const linhasNome = pdf.splitTextToSize(labelBacia === 'Sem bacia definida' ? labelBacia : `Bacia do ${labelBacia}`, ctx.W - AGPDF_M * 2 - 20)
+  ctx.y += 10
+  pdf.setFontSize(20); pdf.setTextColor(...AGPDF_COR.floresta)
+  const linhasNome = pdf.splitTextToSize(labelBacia === 'Sem bacia definida' ? labelBacia : `Bacia do ${labelBacia}`, L - 20)
   pdf.text(linhasNome, ctx.W / 2, ctx.y, { align: 'center' })
-  ctx.y += linhasNome.length * 9 + 4
-  pdf.setFont('DMSans', 'normal'); pdf.setFontSize(10); pdf.setTextColor(...AGPDF_COR.muted)
+  ctx.y += linhasNome.length * 8 + 3
+  pdf.setFont('DMSans', 'normal'); pdf.setFontSize(9.5); pdf.setTextColor(...AGPDF_COR.muted)
   pdf.text(periodoTxt, ctx.W / 2, ctx.y, { align: 'center' })
-  ctx.y += 6
+  ctx.y += 5.5
 
   // Filtros de busca ativos (rio/status/faixa IQA/CONAMA) além de bacia
   // e campanha — mostrados logo na capa, pra ninguém confundir este
   // documento com "a bacia inteira" quando ele foi recortado.
   const filtrosTxt = aguaRelFiltrosTxt(relatorio.filtros)
   if (filtrosTxt) {
-    pdf.setFont('DMSans', 'bold'); pdf.setFontSize(8.5); pdf.setTextColor(...AGPDF_COR.floresta)
+    pdf.setFont('DMSans', 'bold'); pdf.setFontSize(8); pdf.setTextColor(...AGPDF_COR.floresta)
     pdf.text(`Filtros aplicados: ${filtrosTxt}`, ctx.W / 2, ctx.y, { align: 'center' })
-    ctx.y += 24
-  } else {
-    ctx.y += 24
+    ctx.y += 5
   }
+  ctx.y += 7
 
+  // ── Faixa de KPIs (os mesmos cartões do topo do painel) ─────────
   const r = relatorio.resumo
   const kpis = [
-    ['Pontos de coleta', String(r.nPontos)],
-    ['Coletas no período', String(r.totalColetas)],
+    ['Pontos', String(r.nPontos)],
+    ['Coletas', String(r.totalColetas)],
     ['Campanhas', String(relatorio.campanhas.length)],
-    ['IQA médio da bacia', r.iqaMedio != null ? r.iqaMedio.toFixed(1) : '—'],
-    ['Conformidade CONAMA', r.pctConforme != null ? r.pctConforme.toFixed(0) + '% conforme' : 'sem limites cadastrados'],
-    ['Coletas em quarentena', String(r.quarentena)],
+    ['IQA médio', r.iqaMedio != null ? r.iqaMedio.toFixed(1) : '—'],
+    ['Conforme CONAMA', r.pctConforme != null ? r.pctConforme.toFixed(0) + '%' : '—'],
+    ['Em conferência', String(r.quarentena)],
   ]
-  const colW = (ctx.W - AGPDF_M * 2) / 3
+  const colW = L / kpis.length
   kpis.forEach(([lbl, val], i) => {
-    const col = i % 3, lin = Math.floor(i / 3)
-    const x = AGPDF_M + col * colW
-    const y = ctx.y + lin * 26
+    const x = AGPDF_M + i * colW
     pdf.setDrawColor(...AGPDF_COR.borda); pdf.setLineWidth(0.3)
-    pdf.line(x, y - 5, x + colW - 8, y - 5)
-    pdf.setFont('DMSans', 'bold'); pdf.setFontSize(16); pdf.setTextColor(...AGPDF_COR.floresta)
-    pdf.text(val, x, y + 4)
-    pdf.setFont('DMSans', 'normal'); pdf.setFontSize(8); pdf.setTextColor(...AGPDF_COR.muted)
-    pdf.text(lbl, x, y + 10)
+    pdf.line(x, ctx.y, x + colW - 4, ctx.y)
+    pdf.setFont('DMSans', 'bold'); pdf.setFontSize(13); pdf.setTextColor(...AGPDF_COR.floresta)
+    pdf.text(val, x, ctx.y + 6)
+    pdf.setFont('DMSans', 'normal'); pdf.setFontSize(6.8); pdf.setTextColor(...AGPDF_COR.muted)
+    pdf.text(pdf.splitTextToSize(lbl, colW - 3), x, ctx.y + 10.2)
   })
-  ctx.y += 60
+  ctx.y += 20
 
+  // ── Distribuição por faixa do IQA ───────────────────────────────
+  const dist = aguaRelDistribuicaoFaixas(relatorio.coletas)
+  _agpdfRotuloBloco(ctx, 'Distribuição por faixa do IQA', AGPDF_M, L)
+  ctx.y += 6
+  ctx.y += _agpdfBarraFaixas(ctx, dist, AGPDF_M, ctx.y, L) + 8
+
+  // ── Conformidade CONAMA (medidor) + ranking de violações ────────
+  const colEsq = 58, gapCol = 8
+  const colDir = L - colEsq - gapCol
+  const xDir = AGPDF_M + colEsq + gapCol
+  _agpdfRotuloBloco(ctx, 'Conformidade CONAMA', AGPDF_M, colEsq)
+  _agpdfRotuloBloco(ctx, 'Parâmetros que mais violaram', xDir, colDir)
+  ctx.y += 6
+  const yBloco = ctx.y
+  const hGauge = _agpdfGauge(ctx, r.pctConforme, AGPDF_M + colEsq / 2, yBloco, colEsq)
+  pdf.setFont('DMSans', 'normal'); pdf.setFontSize(6.8); pdf.setTextColor(...AGPDF_COR.muted)
+  const semLimites = r.totalColetas - r.comConama
+  pdf.text(`${r.conforme} conforme · ${r.comConama - r.conforme} com violação`, AGPDF_M + colEsq / 2, yBloco + hGauge + 1, { align: 'center' })
+  pdf.text(semLimites > 0 ? `${semLimites} sem limites cadastrados` : 'de todas as coletas avaliadas', AGPDF_M + colEsq / 2, yBloco + hGauge + 4.6, { align: 'center' })
+  const hRank = _agpdfRanking(ctx, aguaRelViolacoesRanking(r, 5), r.comConama, xDir, yBloco, colDir)
+  ctx.y = yBloco + Math.max(hGauge + 6, hRank) + 8
+
+  // ── IQA médio por ponto ─────────────────────────────────────────
+  const porPonto = aguaRelIqaPorPonto(relatorio).slice(0, 10)
+  _agpdfRotuloBloco(ctx, `IQA médio por ponto de coleta${porPonto.length < relatorio.pontos.length ? ` (10 de ${relatorio.pontos.length})` : ''}`, AGPDF_M, L)
+  ctx.y += 8
+  ctx.y += _agpdfBarrasPontos(ctx, porPonto.map(p => ({ label: p.nome, valor: p.iqaMedio })), AGPDF_M, ctx.y, L, 36) + 8
+
+  // ── Evolução do IQA médio por campanha ──────────────────────────
+  const porCampanha = aguaRelPorCampanha(relatorio)
+  _agpdfRotuloBloco(ctx, 'Evolução do IQA médio da bacia por campanha', AGPDF_M, L)
+  ctx.y += 8
+  ctx.y += _agpdfLinhaCampanhas(ctx, porCampanha, AGPDF_M + 6, ctx.y, L - 6, 30) + 6
+
+  // A relação de parâmetros violados saiu daqui: virou o ranking acima.
+  // Só a ressalva da quarentena continua em texto — é uma advertência
+  // sobre a confiabilidade do dado, não uma leitura do painel.
   if (r.quarentena > 0) {
-    _agpdfParagrafo(ctx, `${r.quarentena} coleta(s) deste período está(ão) em quarentena — dado pendente de conferência humana (ver Configurações › Qualidade da Água › Conferência). As linhas em quarentena aparecem marcadas nas tabelas a seguir; o IQA e a conformidade CONAMA delas, quando exibidos, são preliminares.`, { muted: true })
-  }
-  if (Object.keys(r.violacoesPorParametro).length) {
-    const txt = Object.entries(r.violacoesPorParametro)
-      .sort((a, b) => b[1] - a[1])
-      .map(([p, n]) => `${AGUA_REL_PARAM_LABEL[p] || p} (${n})`)
-      .join(', ')
-    _agpdfParagrafo(ctx, `Parâmetros com violação da Resolução CONAMA (classe de enquadramento do ponto) no período: ${txt}.`, { muted: true })
+    _agpdfParagrafo(ctx, `${r.quarentena} coleta(s) deste período está(ão) em quarentena — dado pendente de conferência humana (ver Qualidade da Água › Conferência). Aparecem marcadas nas tabelas a seguir e contam nos gráficos acima; o IQA e a conformidade CONAMA delas são preliminares.`, { muted: true })
   }
 }
 
