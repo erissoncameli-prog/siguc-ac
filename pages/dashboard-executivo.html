@@ -8,6 +8,7 @@
 <script src="../js/observability.js"></script>
 <script src="../js/queryLogger.js"></script>
 <script src="../js/config.js"></script>
+<script src="../js/donut-legenda.js"></script>
 <script src="../js/layout.js"></script>
 <style>
 /* ── layout ── */
@@ -60,12 +61,6 @@
 .res-table th { background:#F9FAFB; padding:8px 12px; text-align:left; font-size:10px; font-weight:700; color:#6B7280; text-transform:uppercase; letter-spacing:.05em; border-bottom:1px solid var(--borda); }
 .res-table td { padding:10px 12px; border-bottom:1px solid #F3F4F6; }
 .res-table tr:last-child td { border-bottom:none; }
-
-/* ── donut simples (SVG) ── */
-.donut-wrap { display:flex; align-items:center; gap:16px; }
-.donut-legend { display:flex; flex-direction:column; gap:6px; }
-.leg-item { display:flex; align-items:center; gap:6px; font-size:11px; color:#374151; }
-.leg-dot  { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
 
 /* ── alertas recentes ── */
 .alerta-mini { display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid #F3F4F6; }
@@ -306,7 +301,7 @@ function renderDiretoria() {
       <span class="sec-title">🔬 Pesquisas por fase</span>
       <span class="sec-sub">${pesquisas.length} total</span>
     </div>
-    ${renderDonut(pesqBlocos)}
+    ${donutLegendaHTML(pesqBlocos)}
   </div>
 </div>
 
@@ -314,7 +309,7 @@ function renderDiretoria() {
   <!-- Distribuição por grupo de UC -->
   <div class="card-box">
     <div class="sec-header"><span class="sec-title">🌿 UCs por grupo</span></div>
-    ${renderDonut([
+    ${donutLegendaHTML([
       { label:'Proteção Integral', n:pi, cor:'#1F4E2C' },
       { label:'Uso Sustentável',   n:us, cor:'#52B788' },
     ])}
@@ -418,7 +413,7 @@ function renderSecretaria() {
   <!-- Status das UCs -->
   <div class="card-box">
     <div class="sec-header"><span class="sec-title">🏷 Status das UCs</span></div>
-    ${renderDonut([
+    ${donutLegendaHTML([
       { label:'Regularizada',     n:statusUC.regularizada,     cor:'#22C55E' },
       { label:'Em Regularização', n:statusUC.em_regularizacao, cor:'#F59E0B' },
       { label:'Criada',           n:statusUC.criada,           cor:'#60A5FA' },
@@ -429,7 +424,7 @@ function renderSecretaria() {
   <!-- Ocorrências abertas por severidade -->
   <div class="card-box">
     <div class="sec-header"><span class="sec-title">⚠️ Ocorrências abertas</span></div>
-    ${renderDonut([
+    ${donutLegendaHTML([
       { label:'Crítica', n:ocSev.critica, cor:'#DC2626' },
       { label:'Alta',    n:ocSev.alta,    cor:'#F97316' },
       { label:'Média',   n:ocSev.media,   cor:'#F59E0B' },
@@ -440,7 +435,7 @@ function renderSecretaria() {
   <!-- Alertas por tipo -->
   <div class="card-box">
     <div class="sec-header"><span class="sec-title">🔥 Alertas por tipo</span></div>
-    ${renderDonut([
+    ${donutLegendaHTML([
       { label:'Queimada',     n:alertas.filter(a=>a.tipo==='queimada').length,     cor:'#DC2626' },
       { label:'Desmatamento', n:alertas.filter(a=>a.tipo==='desmatamento').length, cor:'#166534' },
       { label:'Degradação',   n:alertas.filter(a=>a.tipo==='degradacao').length,   cor:'#92400E' },
@@ -483,42 +478,8 @@ function renderSecretaria() {
 </div>`
 }
 
-// ── Donut SVG simples ─────────────────────────────────────────
-
-function renderDonut(itens) {
-  const total = itens.reduce((s,i) => s + i.n, 0)
-  if (!total) return '<p style="font-size:12px;color:#9CA3AF;padding:20px 0">Sem dados</p>'
-
-  const r = 40, cx = 50, cy = 50
-  let ang = -90
-  const paths = itens.map(item => {
-    if (!item.n) return ''
-    const pct = item.n / total
-    const a1  = ang * Math.PI / 180
-    ang += pct * 360
-    const a2  = ang * Math.PI / 180
-    const large = pct > 0.5 ? 1 : 0
-    const x1 = cx + r * Math.cos(a1), y1 = cy + r * Math.sin(a1)
-    const x2 = cx + r * Math.cos(a2), y2 = cy + r * Math.sin(a2)
-    return `<path d="M${cx},${cy} L${x1},${y1} A${r},${r} 0 ${large},1 ${x2},${y2} Z" fill="${item.cor}" opacity=".85"/>`
-  }).join('')
-
-  return `
-<div class="donut-wrap">
-  <svg width="100" height="100" viewBox="0 0 100 100">
-    ${paths}
-    <circle cx="50" cy="50" r="22" fill="#fff"/>
-    <text x="50" y="54" text-anchor="middle" font-size="13" font-weight="800" fill="#111827">${total}</text>
-  </svg>
-  <div class="donut-legend">
-    ${itens.map(i => `
-    <div class="leg-item">
-      <div class="leg-dot" style="background:${i.cor}"></div>
-      <span>${esc(i.label)}: <strong>${i.n}</strong></span>
-    </div>`).join('')}
-  </div>
-</div>`
-}
+// Donut + legenda: js/donut-legenda.js (donutLegendaHTML), compartilhado
+// com outras páginas — nunca reimplementar aqui.
 
 // ── Boot ──────────────────────────────────────────────────────
 init()
