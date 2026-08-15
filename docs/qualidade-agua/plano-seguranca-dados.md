@@ -289,10 +289,14 @@ enumerar as colunas explicitamente, como já se aprendeu na migration 260.
 | 4 | Reautenticação (opção escolhida) + helper único `js/reautenticar.js` | Edge Function (se B) + JS |
 | 5 | Migração das 4 telas de mesa para as RPCs | `agua-conferencia`, `agua-laudos`, `agua-pontos` |
 | 6 | `pages/agua-auditoria.html` + link condicionado na sidebar | página nova + `js/layout.js` |
-| 7 | ROPA (TRAT-019) + retenção da trilha | migration LGPD |
-| 8 | Testes + `pwa/sw.js` (agua vN→vN+1) | `tests/agua-auditoria.test.js` |
+| 7 | **Selo diário externo** (pg_cron → e-mail Resend; commit GitHub se couber) + RPC `agua_auditoria_verificar()` + "último selo" na tela | migration + `api/` |
+| 8 | ROPA (TRAT-019) + retenção da trilha | migration LGPD |
+| 9 | Testes + `pwa/sw.js` (agua vN→vN+1) | `tests/agua-auditoria.test.js` |
 
-A frente 4 pode rodar em paralelo à 1–3; a 5 depende das duas.
+A frente 4 pode rodar em paralelo à 1–3; a 5 depende das duas. A frente 7
+depende só da 1 — e **não é opcional**: sem ela o encadeamento de hash
+protege contra corrupção acidental, não contra adulteração deliberada (ver
+§2.1).
 
 ---
 
