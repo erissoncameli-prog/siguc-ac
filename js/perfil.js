@@ -334,7 +334,7 @@ async function perfilFotoEscolhida(input) {
   const arq = input.files?.[0]
   input.value = ''
   if (!arq) return
-  if (arq.size > 5 * 1024 * 1024 && !/^image\//.test(arq.type)) {
+  if (arq.size > 5 * 1024 * 1024 || !/^image\//.test(arq.type)) {
     toast('Escolha uma imagem de até 5 MB.', 'error'); return
   }
   toast('Enviando foto…', 'info')
