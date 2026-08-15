@@ -184,7 +184,7 @@ BEGIN
 END;
 $$;
 
-REVOKE EXECUTE ON FUNCTION perfil_atualizar_foto(text) FROM anon;
+REVOKE EXECUTE ON FUNCTION perfil_atualizar_foto(text) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION perfil_atualizar_foto(text) TO authenticated;
 
 -- ── 5. ROPA — a foto entra no tratamento que já existe ──────
