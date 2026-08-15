@@ -1565,6 +1565,31 @@ então não mexe em `pwa/sw.js`. ⚠️ PPTX renderizado não pôde ser
 conferido (sem LibreOffice/PowerPoint na máquina) — a verificação é
 estrutural sobre o XML do .pptx, e é isso que o teste trava.
 
+**Rosca em vez de barra, escopo "Acre todo" e mapa dinâmico no
+painel.** Três pedidos numa sessão: distribuição por faixa virou rosca
+(`aguaIqaFaixasRoscaHTML`, substituiu `aguaIqaFaixasBarraHTML` — removida,
+sem outro consumidor); `Acre todo` é o valor `''` do seletor de bacia e
+agora o PADRÃO (nada mais de "escolha uma bacia" antes de ver algo) —
+`aguaRelBuscarTodasColetas()` busca sem filtro nenhum, e `aguaRelMontar()`
+ganhou `opts.bacia` pra recortar CLIENT-SIDE dentro do que já foi
+carregado; a gaveta de Filtros ganhou um campo "Bacia" que só habilita
+quando o cabeçalho está em "Acre todo" (senão seria redundante) — é por
+aí que "quero mais detalhe" vira "aplico bacia + rio na gaveta" sem
+voltar ao cabeçalho. Mapa novo reaproveita tudo de `pages/agua-mapa.html`:
+o ESTILO do marcador (preenchimento por faixa + borda por CONAMA +
+opacidade da quarentena) foi extraído pra `aguaIqaEstiloMarcador()` em
+`js/agua-iqa-visual.js` e as duas telas passaram a chamar a mesma
+função — nunca duas cópias do mesmo desenho. Diferença: o mapa dedicado
+colore pela campanha selecionada no eixo temporal; o do painel colore
+pela coleta MAIS RECENTE do recorte já filtrado (nunca média
+classificada numa faixa). Container do mapa fica FORA de `#rl-conteudo`
+(que é reconstruído a cada filtro) — nasce uma vez, só troca marcador,
+preserva zoom entre filtros. `pwa/sw.js`: agua v13 → v14. Achado
+testando: um bug de ÍNDICE na fixture do TESTE (não no app) fazia todo
+marcador cair na mesma longitude — destructuring posicional com
+contagem errada de blanks; corrigido indexando por `p[6]`/`p[7]` em vez
+de contar vírgulas no olho.
+
 ## Próxima tarefa
 Módulo Qualidade da Água (IQA): as 5 fases do plano original estão
 ENTREGUES (ver `docs/qualidade-agua/plano.md`, seções "Fase 0" a "Fase
