@@ -1464,5 +1464,16 @@ por isso esperam alguém da SEMA com o laudo físico, usando a tela de
 Capacitor (`app-agua/android`) — trocar por arte própria antes do
 primeiro APK real.
 
-Módulo A — Estrutura Organizacional SEMA-AC segue pendente (ver "A
-implementar", item A).
+**Acesso por organograma**: as 9 frentes do plano
+(`docs/acesso-por-organograma.md`) — lotação, amarração módulo↔setor,
+credenciamento, `nivel_efetivo()` v2, trilha de auditoria — estão
+ENTREGUES na infraestrutura (migrations 262–269), todas com
+`modulos.exige_lotacao = false`, ou seja **nada mudou de acesso para
+ninguém ainda**. Falta: (1) inventariar/converter o resto das ~125
+policies com `perfil` direto que sobraram (ver §3.2 do plano — a
+maioria tem DRIFT confirmado entre o catálogo de permissões e a RLS
+real, não é conversão mecânica); (2) ligar `exige_lotacao` módulo a
+módulo, o que depende de dado humano (lotação de cada servidor + qual
+setor é dono de cada módulo) e do relatório `vw_impacto_lotacao()`
+rodado antes de cada virada. Ver seção "Regra do sistema — Acesso por
+organograma" acima para o resumo do modelo.
