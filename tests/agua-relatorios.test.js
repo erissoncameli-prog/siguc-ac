@@ -98,6 +98,28 @@ function fixtureColetasPurusMultiRio() {
   ];
 }
 
+// Bacia grande (12 pontos × 2 campanhas) — usada para provar que a capa
+// cheia não produz página em branco e que o gráfico de barras se limita
+// aos 10 primeiros pontos sem quebrar o layout.
+function fixtureColetasMuitosPontos() {
+  const linhas = [];
+  for (let p = 1; p <= 12; p++) {
+    for (const [cid, ano, ordem] of [['c1', 2024, 'primeira'], ['c2', 2024, 'segunda']]) {
+      const iqa = 40 + p * 3;
+      linhas.push({
+        ponto_bacia: 'Rio Acre', ponto_id: `pt-${p}`, ponto_nome: `Ponto ${p}`, codigo_ana: `1360${p}`,
+        ponto_rio: 'Rio Acre', ponto_municipio: `Município ${p}`, classe_enquadramento: 'classe_2', uc_id: null,
+        campanha_id: cid, campanha_ano: ano, campanha_ordem: ordem,
+        data_coleta: `${ano}-0${ordem === 'primeira' ? 3 : 9}-10`,
+        status: p === 1 ? 'quarentena' : 'completo',
+        iqa, iqa_faixa: iqa >= 79 ? 'Ótima' : iqa >= 51 ? 'Boa' : 'Regular',
+        conama_violacoes: p % 3 === 0 ? ['turbidez'] : [],
+      });
+    }
+  }
+  return linhas;
+}
+
 function fixtureColetasSemBacia() {
   return [
     { ponto_bacia: null, ponto_id: 'p-iq', ponto_nome: 'Senador Guiomard', codigo_ana: '99999000',
