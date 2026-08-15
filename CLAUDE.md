@@ -1534,6 +1534,26 @@ preguiçoso porque o binding nativo dele derrubava a coleta inteira).
 `pwa/sw.js`: agua v11 → v12; brigadas 262 → 263, biomonitor 30 → 31,
 frota 86 → 87 (js/config.js ganhou 3 ícones e está no shell dos 4).
 
+**O painel também é a PRIMEIRA PÁGINA do PDF** (`js/agua-relatorio-pdf.js`).
+A capa era identificação + 6 números; virou o mesmo painel, na mesma
+ordem (KPIs → distribuição por faixa → CONAMA + ranking → IQA por ponto
+→ evolução por campanha), desenhado com os primitivos do jsPDF (não é o
+SVG da tela rasterizado — sairia serrilhado) e alimentado pelas MESMAS
+funções de `js/agua-relatorio-dados.js`. Diferença deliberada: sem chip
+para escolher ponto, o PDF traça a **média da bacia por campanha**; o
+gráfico de barras mostra os 10 melhores pontos ("(10 de N)" no título) e
+o detalhamento das páginas seguintes continua trazendo todos. Dois bugs
+corrigidos junto: (1) `AGPDF_IQA_COR` era cópia da paleta que havia
+DIVERGIDO da tela ('Boa' lima em vez de verde; 'Péssima' no vermelho
+pré-correção) — agora deriva de `AGUA_IQA_FAIXA_COR`, com fallback local;
+(2) `_agpdfNovaPagina` incondicional depois da capa inseria folha em
+branco quando a nota de quarentena transbordava sozinha — virou
+condicional, com teste travando a contagem exata de páginas. ⚠️ Ao
+escrever asserção sobre texto extraído de PDF: a legenda sai colada na
+seguinte ("…Boa 2Regular 1…"), então `\b` não serve depois do número
+(usar `(?!\d)`), e títulos de bloco/seção estão em CAIXA ALTA.
+`pwa/sw.js`: agua v12 → v13.
+
 ## Próxima tarefa
 Módulo Qualidade da Água (IQA): as 5 fases do plano original estão
 ENTREGUES (ver `docs/qualidade-agua/plano.md`, seções "Fase 0" a "Fase
