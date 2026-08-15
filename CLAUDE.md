@@ -1680,6 +1680,10 @@ do `mascote-respira` herdado.
   também na regra base, sobrescreveria a animação e o brilho não
   pulsaria.
 - Guarda: +2 testes em `tests/agua-rio.test.js` (7 no total).
+- `pwa/sw.js`: agua v16 → v17. Nenhum arquivo novo entra no shell, mas
+  `css/agua-app.css` e `pages/agua-app.html` (os dois tocados aqui) JÁ
+  estão nele e a v16 já tinha ido para produção — sem o incremento, quem
+  abrisse com a v16 em cache não receberia o emblema.
 
 ## Próxima tarefa
 Módulo Qualidade da Água (IQA): as 5 fases do plano original estão
