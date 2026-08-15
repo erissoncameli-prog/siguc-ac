@@ -815,9 +815,11 @@ input.bio-counter-val::-webkit-inner-spin-button { -webkit-appearance: none; mar
 .bio-dados-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
 .bio-kpi {
   background: var(--bio-surface); border: 1px solid #D0E4EF;
+  border-top: 6px solid var(--bio-prim);
   border-radius: 16px; padding: 14px 8px; text-align: center;
+  box-shadow: 0 4px 6px -2px rgba(0,0,0,.10);
 }
-.bio-kpi strong { display: block; font-size: 26px; font-family: var(--font-mono); color: var(--bio-ink); }
+.bio-kpi strong { display: block; font-size: 26px; font-weight: 800; font-family: var(--font-mono); color: var(--bio-prim); }
 .bio-kpi span { font-size: 11px; color: #6B7280; text-transform: uppercase; letter-spacing: .04em; }
 
 .bio-barra-row { display: grid; grid-template-columns: 110px 1fr 36px; align-items: center; gap: 8px; margin-bottom: 8px; }
