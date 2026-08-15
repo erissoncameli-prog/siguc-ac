@@ -332,7 +332,8 @@
     sel('rl-mapa-sub').textContent = bounds.length
       ? `${bounds.length} ponto${bounds.length !== 1 ? 's' : ''} no recorte atual — cor pela coleta mais recente do período`
       : 'Nenhum ponto no recorte atual'
-    if (bounds.length) _mapaPainel.fitBounds(bounds, { padding: [28, 28], maxZoom: 9 })
+    if (bounds.length === 1) _mapaPainel.setView(bounds[0], 10)
+    else if (bounds.length > 1) _mapaPainel.fitBounds(bounds, { padding: [28, 28], maxZoom: 9 })
   }
 
   // ── Carrega o seletor de bacias ──────────────────────────────────
