@@ -455,6 +455,66 @@ nada de `agua` na forma), aplicá-la a Água **e** às tabelas de permissão. A
 decisão "só Água por enquanto" foi tomada quando o segundo consumidor não
 existia; agora ele existe, e o custo de generalizar é `CREATE TRIGGER`.
 
+### 5.1 Frente 7 entregue (2026-08-15) — a trilha genérica existe
+
+Migration 269: `trilha_auditoria` (genérica, `tabela`/`registro_id`,
+sem nada de específico de módulo), trigger `trilha_auditoria_registrar()`
+ligado nas 4 tabelas de permissão (`usuario_lotacoes`, `modulo_unidades`,
+`credenciamentos`, `usuario_permissoes`), `trilha_auditoria_verificar()`
+(recomputa a cadeia de hash) e `trilha_auditoria_selos` + cron diário
+(9h30 UTC) que **gera e grava** o selo — mesma arquitetura do plano de
+Água §2, generalizada desde o início. Estender à Água (ou a qualquer
+tabela futura) é `CREATE TRIGGER trilha_auditoria_registrar('id')`, sem
+redesenho.
+
+**Verificado, não só declarado** (tudo em `BEGIN`/`ROLLBACK`, nada
+persistiu):
+- INSERT/UPDATE/DELETE reais nas 4 tabelas (9 operações) → 9 linhas
+  gravadas na trilha, `campos_alterados` do UPDATE mostrou só a coluna
+  que mudou (`atualizado_em` corretamente excluído), `registro_id`
+  composto de `usuario_permissoes` (chave `usuario_id,modulo_id`, sem
+  coluna `id` própria) saiu no formato `valor1|valor2` como desenhado.
+- `trilha_auditoria_verificar()` sobre as 9 linhas: 0 quebradas.
+- RLS: `gestor` autenticado lê **0 linhas** da trilha (só super_admin
+  vê); e **nem o super_admin** consegue `INSERT` direto na tabela — só
+  o trigger grava (`insufficient_privilege`, confirmado). Isto é o que
+  torna a trilha imutável para o adversário A (§2.1 do plano de Água).
+
+**O que ficou faltando, honestamente**: o selo é gerado e gravado, mas
+o **envio para fora do banco não está implementado**. Enviar por e-mail
+exigiria o cron chamar uma Edge Function via `pg_net`, o que obrigaria
+embutir a `SERVICE_ROLE_KEY` no comando do job — o anti-padrão que o
+projeto evita hoje (nenhum cron atual chama Edge Function; todos são
+função SQL pura, lição já registrada na migration 205). Resolver isso
+com segurança (Vault do Postgres, ou agendamento nativo de Edge
+Function) é trabalho de sessão futura. Até lá: a trilha é imutável
+contra o super_admin do sistema (resolvido), mas só **auditável**, não
+**ancorada**, contra quem tiver acesso a `service_role` — a mesma
+degradação graciosa que o plano de Água já previa para "sem endereço
+configurado".
+
+**Achado do advisor, registrado e não corrigido por engano**: o linter
+de segurança acusou `trilha_auditoria_verificar()` e
+`vw_impacto_lotacao()` (frente 4) como "SECURITY DEFINER executável por
+`authenticated`". Cheguei a escrever uma migration revogando `EXECUTE`
+de `authenticated` para "corrigir" — e percebi antes de aplicar que
+isso quebraria a função por completo: no Postgres/PostgREST não existe
+papel separado para "super_admin", só `anon`/`authenticated`/
+`service_role`; revogar de `authenticated` bloquearia a chamada **antes**
+da função rodar, impedindo o próprio super_admin de usá-la. A proteção
+real já está lá — `RAISE EXCEPTION` dentro da função — e é o único jeito
+correto de restringir uma RPC a um subconjunto de usuários autenticados
+neste modelo. Falso positivo aceito, não silenciado: fica registrado
+aqui para a próxima sessão não repetir a tentativa.
+
+Não entregue nesta frente (fora do escopo — isso é a Camada 3/4 do
+plano de Água, um mecanismo de workflow, não de trilha): justificativa
+obrigatória e reautenticação por senha para editar lotação/credenciamento/
+amarração. Essas 4 tabelas continuam protegidas só pela RLS
+(`is_super_admin()`/`pode_editar('estrutura-organizacional')`), que já
+é a trava de escrita — a trilha REGISTRA quem mexeu, não impede a
+edição em si.
+
 ---
 
 ## 6. O que depende de decisão humana (não é código)
