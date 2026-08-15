@@ -223,6 +223,14 @@ select.form-control { cursor: pointer; }
 .rank-barra-fill { height: 100%; border-radius: 7px; transition: width .4s; }
 .rank-barra-valor { font-family: var(--font-mono); font-size: 13px; font-weight: 700; color: var(--cinza-900); text-align: right; }
 
+.donut-legenda-wrap { display: flex; align-items: center; gap: 20px; }
+.donut-legenda-lista { display: flex; flex-direction: column; gap: 12px; flex: 1; min-width: 0; }
+.donut-legenda-item { display: flex; align-items: center; gap: 10px; }
+.donut-legenda-dot { width: 11px; height: 11px; border-radius: 3px; flex-shrink: 0; }
+.donut-legenda-label { font-size: 13px; color: var(--cinza-700); font-weight: 500; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.donut-legenda-valor { font-size: 13px; font-weight: 800; color: var(--cinza-900); }
+.donut-legenda-pct { font-size: 11px; color: var(--cinza-400); min-width: 42px; text-align: right; }
+
 .prog-wrap { display: flex; align-items: center; gap: 8px; }
 .prog-bar { flex: 1; height: 5px; background: var(--cinza-100); border-radius: 3px; overflow: hidden; min-width: 60px; }
 .prog-fill { height: 100%; border-radius: 3px; background: var(--verde-claro); transition: width .4s; }
