@@ -316,6 +316,135 @@
   </div>
 </div>
 
+<!-- Modal: Amarrar módulo a setor -->
+<div class="modal-overlay" id="modal-modulo-unidade">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Amarrar módulo a setor</div>
+      <button class="modal-close" onclick="fecharModalModuloUnidade()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Módulo <span class="obrig">*</span></label>
+        <select class="form-control" id="mu-modulo"></select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Unidade dona <span class="obrig">*</span></label>
+        <select class="form-control" id="mu-unidade"></select>
+        <div class="form-hint">Unidades abaixo desta herdam o mesmo nível; acima, só visualização.</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Nível concedido <span class="obrig">*</span></label>
+        <select class="form-control" id="mu-nivel">
+          <option value="editar" selected>Editar</option>
+          <option value="visualizar">Visualizar</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Observações</label>
+        <textarea class="form-control" id="mu-obs" rows="2" placeholder="Opcional"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="fecharModalModuloUnidade()">Cancelar</button>
+      <button class="btn btn-primary" id="mu-btn-salvar" onclick="salvarModuloUnidade()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Nova Lotação -->
+<div class="modal-overlay" id="modal-lotacao">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Nova Lotação</div>
+      <button class="modal-close" onclick="fecharModalLotacao()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Servidor <span class="obrig">*</span></label>
+        <select class="form-control" id="lot-usuario"></select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Unidade <span class="obrig">*</span></label>
+        <select class="form-control" id="lot-unidade"></select>
+      </div>
+      <div class="form-group" style="display:flex;align-items:center;gap:8px">
+        <input type="checkbox" id="lot-principal" style="width:auto">
+        <label class="form-label" for="lot-principal" style="margin:0">Lotação principal</label>
+      </div>
+      <div class="form-hint" style="margin-top:-8px;margin-bottom:12px">Um servidor pode ter mais de uma lotação, mas só uma principal. Deixe desmarcado se ele já tem uma principal vigente.</div>
+      <div class="grid-2">
+        <div class="form-group">
+          <label class="form-label">Data de Início</label>
+          <input class="form-control" type="date" id="lot-inicio">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Portaria</label>
+          <input class="form-control" id="lot-portaria" placeholder="Opcional">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Observações</label>
+        <textarea class="form-control" id="lot-obs" rows="2" placeholder="Opcional"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="fecharModalLotacao()">Cancelar</button>
+      <button class="btn btn-primary" id="lot-btn-salvar" onclick="salvarLotacao()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Conceder credenciamento -->
+<div class="modal-overlay" id="modal-credenciamento">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="cred-titulo">Conceder credenciamento</div>
+      <button class="modal-close" onclick="fecharModalCredenciamento()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Servidor <span class="obrig">*</span></label>
+        <select class="form-control" id="cred-usuario"></select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Módulo <span class="obrig">*</span></label>
+        <select class="form-control" id="cred-modulo"></select>
+      </div>
+      <div class="grid-2">
+        <div class="form-group">
+          <label class="form-label">Nível <span class="obrig">*</span></label>
+          <select class="form-control" id="cred-nivel">
+            <option value="editar" selected>Editar</option>
+            <option value="visualizar">Visualizar</option>
+          </select>
+          <div class="form-hint">Nunca acima do que o perfil do servidor já permite em outros módulos.</div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Prazo <span class="obrig">*</span></label>
+          <select class="form-control" id="cred-prazo">
+            <option value="30">30 dias</option>
+            <option value="90" selected>90 dias</option>
+            <option value="180">180 dias</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Justificativa <span class="obrig">*</span></label>
+        <textarea class="form-control" id="cred-justificativa" rows="3" placeholder="Por que este servidor precisa acessar este módulo fora do setor dele? (mínimo 20 caracteres)"></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Portaria</label>
+        <input class="form-control" id="cred-portaria" placeholder="Opcional">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="fecharModalCredenciamento()">Cancelar</button>
+      <button class="btn btn-primary" id="cred-btn-salvar" onclick="salvarCredenciamento()">Conceder</button>
+    </div>
+  </div>
+</div>
+
 <!-- Botão flutuante de ajuda -->
 <button class="fab-ajuda" onclick="toggleAjuda()" title="Como funciona" aria-label="Ajuda">
   <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
@@ -388,6 +517,11 @@ let _ocupacoes = []
 let _delegacoes = []
 let _unidades = []
 let _perfilUsuario = ''
+let _modulos = []
+let _moduloUnidades = []
+let _credenciamentos = []
+let _lotacoes = []
+let _semLotacao = []
 
 ;(async function () {
   const usuario = await carregarUsuario()
@@ -402,6 +536,10 @@ let _perfilUsuario = ''
         <button class="tab-btn" onclick="ativarAba('cargos', this)">Cargos</button>
         <button class="tab-btn" onclick="ativarAba('delegacoes', this)">Delegações</button>
         <button class="tab-btn" onclick="ativarAba('unidades', this)">Unidades</button>
+        <button class="tab-btn" onclick="ativarAba('lotacoes', this)">Lotações</button>
+        ${usuario.perfil === 'super_admin' ? `
+        <button class="tab-btn" onclick="ativarAba('modulos-setor', this)">Acesso por Setor</button>
+        <button class="tab-btn" onclick="ativarAba('credenciamentos', this)">Credenciamentos</button>` : ''}
       </div>
 
       <div id="tab-organograma" class="tab-panel ativo">
@@ -459,6 +597,69 @@ let _perfilUsuario = ''
         </div>
         <div id="unidades-content"><p style="color:#9CA3AF;padding:32px;text-align:center">Carregando...</p></div>
       </div>
+
+      <div id="tab-lotacoes" class="tab-panel">
+        <div class="aviso-inline" style="margin-bottom:16px">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <span>Onde cada servidor trabalha — diferente de "Cargos" (chefia). Base do acesso por setor (ainda não liga acesso a nenhum módulo). Quem ocupa um cargo já aparece aqui automaticamente, sem precisar cadastrar de novo.</span>
+        </div>
+        <div id="lotacoes-sem-lotacao"></div>
+        <div class="filter-bar">
+          ${['super_admin','diretor'].includes(usuario.perfil) ? `
+          <button class="btn btn-primary" onclick="abrirModalLotacao()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Nova Lotação
+          </button>` : ''}
+        </div>
+        <div class="card">
+          <div class="table-wrap"><div class="table-scroll">
+            <table>
+              <thead><tr><th>Servidor</th><th>Unidade</th><th>Principal</th><th>Desde</th><th>Portaria</th>${['super_admin','diretor'].includes(usuario.perfil) ? '<th>Ações</th>' : ''}</tr></thead>
+              <tbody id="tbody-lotacoes"><tr><td colspan="6" style="text-align:center;padding:32px;color:#9CA3AF">Carregando...</td></tr></tbody>
+            </table>
+          </div></div>
+        </div>
+      </div>
+
+      ${usuario.perfil === 'super_admin' ? `
+      <div id="tab-modulos-setor" class="tab-panel">
+        <div class="aviso-inline" style="margin-bottom:16px">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <span>Define qual setor é "dono" de cada módulo. Quem é lotado na unidade (ou em unidade abaixo dela) recebe o nível marcado; quem chefia acima só visualiza. Ainda não afeta nenhum acesso — liga módulo a módulo, mais adiante. Ver <code>docs/acesso-por-organograma.md</code>.</span>
+        </div>
+        <div class="filter-bar">
+          <button class="btn btn-primary" onclick="abrirModalModuloUnidade()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Amarrar módulo a setor
+          </button>
+        </div>
+        <div id="modulos-setor-content"><p style="color:#9CA3AF;padding:32px;text-align:center">Carregando...</p></div>
+      </div>
+
+      <div id="tab-credenciamentos" class="tab-panel">
+        <div class="aviso-inline" style="margin-bottom:16px">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <span>Acesso de exceção a um módulo, fora do setor da pessoa — sempre com prazo, sempre com justificativa. Só super_admin concede. Vencido, o acesso some sozinho (sem precisar revogar).</span>
+        </div>
+        <div class="filter-bar">
+          <select class="form-control" id="fil-cred-status" style="width:160px" onchange="filtrarCredenciamentos()">
+            <option value="ativo">Ativos</option>
+            <option value="todos">Todos</option>
+          </select>
+          <button class="btn btn-primary" onclick="abrirModalCredenciamento()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Conceder credenciamento
+          </button>
+        </div>
+        <div class="card">
+          <div class="table-wrap"><div class="table-scroll">
+            <table>
+              <thead><tr><th>Servidor</th><th>Módulo</th><th>Nível</th><th>Vigência</th><th>Situação</th><th>Justificativa</th><th>Concedido por</th><th>Ações</th></tr></thead>
+              <tbody id="tbody-credenciamentos"><tr><td colspan="8" style="text-align:center;padding:32px;color:#9CA3AF">Carregando...</td></tr></tbody>
+            </table>
+          </div></div>
+        </div>
+      </div>` : ''}
     </div>` +
     '</div></div></div>'
 
@@ -482,6 +683,27 @@ async function carregarDados() {
 
   const r6 = await db.from('unidades_organizacionais').select('*').eq('ativo', true).order('criado_em')
   _unidades = r6.data || []
+
+  const [rLot, rSemLot] = await Promise.all([
+    db.from('vw_lotacoes_vigentes').select('*'),
+    db.from('vw_usuarios_sem_lotacao').select('*'),
+  ])
+  _lotacoes = rLot.data || []
+  _semLotacao = rSemLot.data || []
+  renderLotacoes()
+
+  if (_perfilUsuario === 'super_admin') {
+    const [r7, r8, r9] = await Promise.all([
+      db.from('modulos').select('id,chave,nome,grupo').eq('ativo', true).order('grupo').order('ordem'),
+      db.from('vw_modulo_unidades').select('*'),
+      db.from('vw_credenciamentos').select('*').order('concedido_em', { ascending: false }),
+    ])
+    _modulos = r7.data || []
+    _moduloUnidades = r8.data || []
+    _credenciamentos = r9.data || []
+    renderModulosUnidades()
+    filtrarCredenciamentos()
+  }
 
   renderOrganograma()
   renderCargos(_cargosAtuais)
@@ -879,6 +1101,300 @@ function atualizarSelectUnidadePai() {
   if (_editUnidadeId !== undefined && document.getElementById('modal-unidade').classList.contains('aberto')) {
     popularSelectPai(document.getElementById('unid-pai').value)
   }
+}
+
+// ── Lotações (usuario_lotacoes) ───────────────────────────
+// Frente 1 de docs/acesso-por-organograma.md. Diferente de "Cargos"
+// (cargo_ocupacoes = chefia, 1 titular por unidade): lotação é onde o
+// servidor trabalha, e pode ser múltipla. Quem já ocupa cargo aparece
+// automaticamente no alcance (usuario_unidades(), migration 262) sem
+// precisar de linha aqui — esta tela só lista/gerencia as lotações
+// EXPLÍCITAS. Ainda não liga acesso a módulo nenhum (isso é a frente 4).
+
+function renderLotacoes() {
+  const semLotEl = document.getElementById('lotacoes-sem-lotacao')
+  if (semLotEl) {
+    semLotEl.innerHTML = _semLotacao.length ? `
+      <div class="aviso-inline">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        <span><strong>${_semLotacao.length} servidor${_semLotacao.length > 1 ? 'es' : ''} sem lotação:</strong> ${_semLotacao.map(u => esc(u.nome_completo)).join(', ')}.</span>
+      </div>` : ''
+  }
+
+  const tbody = document.getElementById('tbody-lotacoes')
+  if (!tbody) return
+  const podeEditar = ['super_admin','diretor'].includes(_perfilUsuario)
+  if (!_lotacoes.length) {
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:32px;color:#9CA3AF">Nenhuma lotação registrada ainda.</td></tr>`
+    return
+  }
+  tbody.innerHTML = _lotacoes.map(l => `<tr>
+    <td>${esc(l.usuario_nome)}</td>
+    <td>${esc(l.unidade_sigla)} — ${esc(l.unidade_nome)}</td>
+    <td>${l.principal ? '<span class="badge badge-verde">Principal</span>' : ''}</td>
+    <td>${formatData(l.data_inicio)}</td>
+    <td>${esc(l.portaria || '—')}</td>
+    ${podeEditar ? `<td><button class="btn btn-xs btn-ghost" onclick="encerrarLotacao('${l.id}')">Encerrar</button></td>` : ''}
+  </tr>`).join('')
+}
+
+function abrirModalLotacao() {
+  document.getElementById('lot-usuario').innerHTML = _usuarios.map(u =>
+    `<option value="${u.id}">${esc(u.nome_completo)}</option>`).join('')
+  document.getElementById('lot-unidade').innerHTML = _unidades.filter(u => u.ativo).map(u =>
+    `<option value="${u.id}">${esc(u.sigla)} — ${esc(u.nome)}</option>`).join('')
+  document.getElementById('lot-principal').checked = false
+  document.getElementById('lot-inicio').value = new Date().toISOString().slice(0, 10)
+  document.getElementById('lot-portaria').value = ''
+  document.getElementById('lot-obs').value = ''
+  document.getElementById('modal-lotacao').classList.add('aberto')
+}
+
+function fecharModalLotacao() {
+  document.getElementById('modal-lotacao').classList.remove('aberto')
+}
+
+async function salvarLotacao() {
+  const usuario_id = document.getElementById('lot-usuario').value
+  const unidade_org_id = document.getElementById('lot-unidade').value
+  if (!usuario_id || !unidade_org_id) { toast('Servidor e unidade são obrigatórios', 'error'); return }
+
+  const btn = document.getElementById('lot-btn-salvar')
+  btn.disabled = true; btn.textContent = 'Salvando...'
+  try {
+    const { error } = await db.from('usuario_lotacoes').insert({
+      usuario_id, unidade_org_id,
+      principal: document.getElementById('lot-principal').checked,
+      data_inicio: document.getElementById('lot-inicio').value || undefined,
+      portaria: document.getElementById('lot-portaria').value.trim() || null,
+      observacoes: document.getElementById('lot-obs').value.trim() || null,
+      criado_por: appState.usuario.id,
+    })
+    if (error) throw error
+    toast('Lotação registrada!', 'success')
+    fecharModalLotacao()
+    await carregarDados()
+  } catch(e) {
+    if (e.code === '23505') {
+      toast('Este servidor já tem lotação vigente nesta unidade (ou já tem uma lotação principal — desmarque "principal" ou encerre a anterior).', 'error')
+    } else {
+      toast(e.message || 'Erro ao salvar', 'error')
+    }
+  } finally { btn.disabled = false; btn.textContent = 'Salvar' }
+}
+
+async function encerrarLotacao(id) {
+  if (!confirm('Encerrar esta lotação? O servidor deixa de ser alcançado por esta unidade a partir de hoje.')) return
+  const { error } = await db.from('usuario_lotacoes').update({ data_fim: new Date().toISOString().slice(0, 10) }).eq('id', id)
+  if (error) { toast(error.message, 'error'); return }
+  toast('Lotação encerrada', 'success')
+  await carregarDados()
+}
+
+// ── Acesso por Setor (modulo_unidades) ────────────────────
+// Frente 2 de docs/acesso-por-organograma.md. Escrita restrita a
+// super_admin pela RLS (modulo_unidades_admin) — amarrar módulo a setor
+// redefine quem alcança o quê em todo o sistema.
+
+const NIVEL_CONCEDIDO_LABEL = { editar: 'Editar', visualizar: 'Visualizar' }
+
+function renderModulosUnidades() {
+  const el = document.getElementById('modulos-setor-content')
+  if (!el) return
+  if (!_moduloUnidades.length) {
+    el.innerHTML = `<div class="empty-state"><p>Nenhum módulo amarrado a um setor ainda. Módulos sem amarração continuam com o acesso de hoje (por perfil).</p></div>`
+    return
+  }
+  const porModulo = {}
+  _moduloUnidades.forEach(mu => {
+    (porModulo[mu.modulo_chave] ||= { nome: mu.modulo_nome, linhas: [] }).linhas.push(mu)
+  })
+  let html = '<div class="card" style="overflow:hidden">'
+  Object.keys(porModulo).sort().forEach(chave => {
+    const grupo = porModulo[chave]
+    html += `<div style="padding:12px 16px;border-bottom:1px solid #F3F4F6">
+      <div style="font-size:13px;font-weight:700;color:#111827;margin-bottom:8px">${esc(grupo.nome)} <span style="font-weight:400;color:#9CA3AF">(${esc(chave)})</span></div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        ${grupo.linhas.map(mu => `
+          <div style="display:flex;align-items:center;gap:10px">
+            <span style="font-size:11px;font-weight:700;color:#6B7280;min-width:90px">${esc(mu.unidade_sigla)}</span>
+            <span style="font-size:12px;color:#111827;flex:1">${esc(mu.unidade_nome)}</span>
+            <span class="badge" style="background:${mu.nivel_concedido === 'editar' ? 'rgba(82,183,136,.15)' : 'rgba(156,163,175,.2)'};color:${mu.nivel_concedido === 'editar' ? '#166534' : '#374151'}">${NIVEL_CONCEDIDO_LABEL[mu.nivel_concedido] || esc(mu.nivel_concedido)}</span>
+            <button class="btn btn-xs btn-ghost" onclick="removerModuloUnidade('${mu.id}')">Remover</button>
+          </div>`).join('')}
+      </div>
+    </div>`
+  })
+  html += '</div>'
+  el.innerHTML = html
+}
+
+function abrirModalModuloUnidade() {
+  document.getElementById('mu-modulo').innerHTML = _modulos.map(m =>
+    `<option value="${m.id}">${esc(m.nome)} (${esc(m.chave)})</option>`).join('')
+  document.getElementById('mu-unidade').innerHTML = _unidades.filter(u => u.ativo).map(u =>
+    `<option value="${u.id}">${esc(u.sigla)} — ${esc(u.nome)}</option>`).join('')
+  document.getElementById('mu-nivel').value = 'editar'
+  document.getElementById('mu-obs').value = ''
+  document.getElementById('modal-modulo-unidade').classList.add('aberto')
+}
+
+function fecharModalModuloUnidade() {
+  document.getElementById('modal-modulo-unidade').classList.remove('aberto')
+}
+
+async function salvarModuloUnidade() {
+  const modulo_id      = document.getElementById('mu-modulo').value
+  const unidade_org_id = document.getElementById('mu-unidade').value
+  const nivel_concedido = document.getElementById('mu-nivel').value
+  if (!modulo_id || !unidade_org_id) { toast('Módulo e unidade são obrigatórios', 'error'); return }
+
+  const btn = document.getElementById('mu-btn-salvar')
+  btn.disabled = true; btn.textContent = 'Salvando...'
+  try {
+    const { error } = await db.from('modulo_unidades').insert({
+      modulo_id, unidade_org_id, nivel_concedido,
+      observacoes: document.getElementById('mu-obs').value.trim() || null,
+    })
+    if (error) throw error
+    toast('Amarração criada!', 'success')
+    fecharModalModuloUnidade()
+    await carregarDados()
+  } catch(e) {
+    toast(e.code === '23505' ? 'Este módulo já está amarrado a esta unidade' : (e.message || 'Erro ao salvar'), 'error')
+  } finally { btn.disabled = false; btn.textContent = 'Salvar' }
+}
+
+async function removerModuloUnidade(id) {
+  if (!confirm('Remover esta amarração? Deixará de conceder acesso por lotação para este módulo/unidade (só tem efeito nos módulos com "exige lotação" ligado).')) return
+  const { error } = await db.from('modulo_unidades').delete().eq('id', id)
+  if (error) { toast(error.message, 'error'); return }
+  toast('Amarração removida', 'success')
+  await carregarDados()
+}
+
+// ── Credenciamentos (acesso de exceção) ───────────────────
+// Frente 3 de docs/acesso-por-organograma.md. Só super_admin concede —
+// decisão tomada (não é `pode_editar`, é `is_super_admin()` na RLS).
+// Vencido, o credenciamento some sozinho de credenciamento_vigente()
+// (frente 4 consome); revogar é só para encerrar ANTES do prazo.
+
+const SITUACAO_CRED_LABEL = { ativo: 'Ativo', agendado: 'Agendado', expirado: 'Expirado', revogado: 'Revogado' }
+const SITUACAO_CRED_COR = {
+  ativo:     { bg: 'rgba(82,183,136,.15)', fg: '#166534' },
+  agendado:  { bg: 'rgba(126,206,232,.2)', fg: '#0F5549' },
+  expirado:  { bg: 'rgba(156,163,175,.2)', fg: '#374151' },
+  revogado:  { bg: 'rgba(239,68,68,.15)',  fg: '#991B1B' },
+}
+
+function filtrarCredenciamentos() {
+  const status = document.getElementById('fil-cred-status')?.value || 'ativo'
+  const lista = status === 'ativo' ? _credenciamentos.filter(c => c.situacao === 'ativo') : _credenciamentos
+  renderCredenciamentos(lista)
+}
+
+function renderCredenciamentos(lista) {
+  const tbody = document.getElementById('tbody-credenciamentos')
+  if (!tbody) return
+  if (!lista.length) {
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:32px;color:#9CA3AF">Nenhum credenciamento encontrado.</td></tr>`
+    return
+  }
+  tbody.innerHTML = lista.map(c => {
+    const cor = SITUACAO_CRED_COR[c.situacao] || SITUACAO_CRED_COR.expirado
+    const podeAgir = c.situacao === 'ativo' || c.situacao === 'agendado'
+    return `<tr>
+      <td>${esc(c.usuario_nome)}</td>
+      <td>${esc(c.modulo_nome)}</td>
+      <td>${esc(NIVEL_CONCEDIDO_LABEL[c.nivel] || c.nivel)}</td>
+      <td>${formatData(c.data_inicio)} – ${formatData(c.data_fim)}</td>
+      <td><span class="badge" style="background:${cor.bg};color:${cor.fg}">${SITUACAO_CRED_LABEL[c.situacao] || esc(c.situacao)}</span></td>
+      <td style="max-width:220px;font-size:12px;color:#6B7280" title="${esc(c.justificativa)}">${esc(c.justificativa)}</td>
+      <td>${esc(c.concedido_por_nome)}</td>
+      <td style="white-space:nowrap">
+        ${podeAgir ? `
+        <button class="btn btn-xs btn-ghost" onclick='renovarCredenciamento(${JSON.stringify({ id: c.id, usuario_id: c.usuario_id, modulo_id: c.modulo_id, nivel: c.nivel })})'>Renovar</button>
+        <button class="btn btn-xs btn-ghost" onclick="revogarCredenciamento('${c.id}')">Revogar</button>` : ''}
+      </td>
+    </tr>`
+  }).join('')
+}
+
+function abrirModalCredenciamento(prefill = null) {
+  document.getElementById('cred-usuario').innerHTML = _usuarios.map(u =>
+    `<option value="${u.id}">${esc(u.nome_completo)}</option>`).join('')
+  document.getElementById('cred-modulo').innerHTML = _modulos.map(m =>
+    `<option value="${m.id}">${esc(m.nome)} (${esc(m.chave)})</option>`).join('')
+  document.getElementById('cred-nivel').value = prefill?.nivel || 'editar'
+  document.getElementById('cred-prazo').value = '90'
+  document.getElementById('cred-justificativa').value = ''
+  document.getElementById('cred-portaria').value = ''
+  if (prefill) {
+    document.getElementById('cred-usuario').value = prefill.usuario_id
+    document.getElementById('cred-modulo').value = prefill.modulo_id
+    document.getElementById('cred-titulo').textContent = 'Renovar credenciamento'
+  } else {
+    document.getElementById('cred-titulo').textContent = 'Conceder credenciamento'
+  }
+  document.getElementById('modal-credenciamento').classList.add('aberto')
+}
+
+function fecharModalCredenciamento() {
+  document.getElementById('modal-credenciamento').classList.remove('aberto')
+  _credRenovarDeId = null
+}
+
+let _credRenovarDeId = null
+
+function renovarCredenciamento(c) {
+  _credRenovarDeId = c.id
+  abrirModalCredenciamento(c)
+}
+
+async function salvarCredenciamento() {
+  const usuario_id = document.getElementById('cred-usuario').value
+  const modulo_id  = document.getElementById('cred-modulo').value
+  const nivel      = document.getElementById('cred-nivel').value
+  const prazoDias  = parseInt(document.getElementById('cred-prazo').value, 10)
+  const justificativa = document.getElementById('cred-justificativa').value.trim()
+  const portaria   = document.getElementById('cred-portaria').value.trim() || null
+
+  if (!usuario_id || !modulo_id) { toast('Servidor e módulo são obrigatórios', 'error'); return }
+  if (justificativa.length < 20) { toast('Justificativa precisa de pelo menos 20 caracteres', 'error'); return }
+
+  const dataFim = new Date()
+  dataFim.setDate(dataFim.getDate() + prazoDias)
+
+  const btn = document.getElementById('cred-btn-salvar')
+  btn.disabled = true; btn.textContent = 'Salvando...'
+  try {
+    const { error } = await db.from('credenciamentos').insert({
+      usuario_id, modulo_id, nivel,
+      data_fim: dataFim.toISOString().slice(0, 10),
+      justificativa, portaria,
+      concedido_por: appState.usuario.id,
+      renovado_de: _credRenovarDeId,
+    })
+    if (error) throw error
+    toast(_credRenovarDeId ? 'Credenciamento renovado!' : 'Credenciamento concedido!', 'success')
+    fecharModalCredenciamento()
+    await carregarDados()
+  } catch(e) { toast(e.message || 'Erro ao salvar', 'error') }
+  finally { btn.disabled = false; btn.textContent = 'Conceder' }
+}
+
+async function revogarCredenciamento(id) {
+  const motivo = prompt('Motivo da revogação (obrigatório):')
+  if (motivo === null) return
+  if (!motivo.trim()) { toast('Informe o motivo da revogação', 'error'); return }
+  const { error } = await db.from('credenciamentos').update({
+    revogado_em: new Date().toISOString(),
+    revogado_por: appState.usuario.id,
+    revogado_motivo: motivo.trim(),
+  }).eq('id', id)
+  if (error) { toast(error.message, 'error'); return }
+  toast('Credenciamento revogado', 'success')
+  await carregarDados()
 }
 
 // ── Abas ──────────────────────────────────────────────────
