@@ -419,7 +419,7 @@
     </div>`
 
     // Coluna 2: distribuição por faixa, com chips de campanha
-    const chips = [`<button type="button" class="adash-chip ${!_chipCampanha ? 'ativo' : ''}" onclick="selecionarPontoSerie(_pontoSerieAtual);selecionarChipCampanha('')">Período</button>`]
+    const chips = [`<button type="button" class="adash-chip ${!_chipCampanha ? 'ativo' : ''}" onclick="selecionarChipCampanha('')">Período</button>`]
       .concat(porCampanha.map(c => `<button type="button" class="adash-chip ${_chipCampanha === c.campanha_id ? 'ativo' : ''}" onclick="selecionarChipCampanha('${esc(c.campanha_id)}')" title="${esc(c.label)}">${esc(c.labelCurto)}</button>`))
       .join('')
     html += `<div class="adash-card">
