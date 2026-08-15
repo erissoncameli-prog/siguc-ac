@@ -270,24 +270,111 @@ já os usam ganham o organograma de graça, sem tocar em nenhuma delas.
 
 ---
 
-## 3. Fechar o buraco das 133 policies
+## 3. Fechar o buraco das 129 policies (frente 5 — entregue em parte, 2026-08-15)
 
 Sem esta frente, o resto é fachada. Não é conversão às cegas — é
-inventário e depois decisão caso a caso:
+inventário e depois decisão caso a caso.
 
-1. **Inventariar** as 133 (`pg_policies`), classificando cada uma:
-   (a) é acesso a **módulo** → converter para `pode_ver`/`pode_editar`;
-   (b) é regra de **dono do registro** (`usuario_id = auth.uid()`) →
-   legítima, fica como está — organograma não tem nada a ver com "meus
-   próprios dados";
-   (c) é regra de **app de campo** (brigadista/monitor/motorista) → fica;
-   esses 49 usuários não passam por organograma (§7).
-2. **Converter as do tipo (a)**, em lotes por módulo, cada lote com o
-   `vw_impacto` do §4 rodado antes.
-3. **Regra permanente no `CLAUDE.md`**: *policy nova decide acesso a módulo
-   por `pode_ver`/`pode_editar`; `perfil = '...'` dentro de policy é dívida
-   técnica e precisa de justificativa escrita.* É isso que impede o
-   problema de voltar no módulo seguinte.
+### 3.0 Achado que muda o plano: o catálogo e a RLS real DIVERGEM
+
+A ideia original era "identificar tipo (a) → trocar por
+`pode_ver`/`pode_editar`". Na prática, comparei — tabela a tabela — o
+array de perfis hard-coded contra o que `perfil_permissoes_padrao` +
+`grupo_permissoes_padrao` concedem HOJE para o módulo correspondente, e
+a maioria **não bate**:
+
+| Tabela | Array hard-coded hoje | O catálogo do módulo concederia | Efeito de converter às cegas |
+|---|---|---|---|
+| `documentos` | super_admin, gestor, tecnico | + assistente_admin, chefe_departamento, diretor, gestor_uc | **amplia** acesso |
+| `equipe_servidores` | super_admin, gestor | + assistente_admin, chefe_departamento, diretor | **amplia** |
+| `netflora_especies`/`netflora_inventarios` | tecnico, gestor, super_admin | + assistente_admin, chefe_departamento, gestor_uc | **amplia** |
+| `alertas_ambientais` | super_admin, gestor | + chefe_departamento, gestor_uc | **amplia** |
+| `monitoramento_indicadores` | super_admin (só) | maioria dos perfis de mesa | **amplia muito** |
+| `unidades_conservacao` | super_admin, **gestor** edita | catálogo só dá **visualizar** a todos, inclusive gestor | **reduz** — gestor perderia edição |
+| `camadas_mapa` | super_admin, **gestor** edita | catálogo só dá **visualizar** a todos | **reduz** |
+| `config_sistema` | super_admin (só) | ninguém além de super_admin, em nenhuma via | **idêntico** ✅ |
+
+Conclusão: `perfil_permissoes_padrao`/`grupo_permissoes_padrao` foram
+povoadas quando o catálogo nasceu (migrations `perfis_v2`/
+`catalogo_modulos`/`permissao_efetiva`, 18/07) com um conjunto de
+padrões que **nunca foi conferido contra a RLS real** de cada tabela —
+os dois sistemas evoluíram separados desde então. Isso não é specífico
+desta missão: é uma dívida pré-existente que a frente 5 tornou visível
+ao tentar fechá-la. Converter sem essa checagem teria introduzido bugs
+de segurança reais (acesso amplo demais) ou de produto (gestor perdendo
+o que já podia fazer) — silenciosamente, sem nenhum log de erro.
+
+### 3.1 O que foi convertido nesta sessão
+
+Só **`config_sistema`** (migration 268): é a única tabela testada onde
+o catálogo e a regra real coincidem — ninguém além de super_admin tem
+qualquer nível em `configuracoes`, em nenhuma das duas fontes. Verificado
+por `pode_editar('configuracoes')` simulando super_admin (`true`) e
+gestor (`false`), batendo com o comportamento anterior.
+
+### 3.2 Inventário completo — 129 policies, 77 tabelas
+
+Classificação (script de apoio: `bool_or` sobre `usuario_id = auth.uid()`
+e afins, e referência a tabelas de campo, cruzado manualmente):
+
+**(c) Fica — app de campo ou dono do registro** (não passa por
+organograma; ver §7): `alertas_quelonios`, `atividades_brigada`,
+`atividades_campo_catalogo`, `bercarios`, `biometrias_individuais`,
+`biomonitor_cautela_itens`, `biomonitor_cautelas`,
+`biomonitor_equipamento_ocorrencias`, `brigadas`,
+`brigadista_log_atividade`, `brigadista_sessoes`, `brigadistas`,
+`densidade_fauna_bioma`, `descartes_ovos`, `eclosoes_ninho`,
+`equipamentos_brigada`, `equipes_brigada`, `especies_fauna`,
+`especies_quelonio_catalogo`, `filhotes_bercario`, `lotes_bercario`,
+`monitor_bio_sessoes`, `monitores_biodiversidade`, `ninhos_quelonios`,
+`ocorrencias_bercario`, `parametros_incubacao_quelonios`,
+`pesquisa_documentos`, `pesquisa_emails`, `pesquisa_equipe`,
+`pesquisa_historico`, `pesquisa_relatorios`, `pesquisadores`,
+`pesquisas`, `praias_monitoramento`, `registro_fauna`,
+`registro_participantes`, `registros_campo`, `solturas_filhotes`,
+`temporada_praias`, `transferencias_ninho`, `visitas_ninho`.
+Estas tabelas do domínio Biomonitor/Brigadas/Pesquisa têm regra própria
+de dono (`monitores_biodiversidade.usuario_id`, `brigadistas.usuario_id`,
+`pesquisadores.user_id`) OU'd com um array de perfis de mesa — o mesmo
+padrão que a migration 263 tratou nas 4 tabelas de configuração do
+Biomonitor. Convertê-las exigiria o MESMO cuidado por tabela que
+`config_sistema` recebeu aqui (cada uma pode ter um array diferente do
+catálogo do módulo) — fica como próximo lote, não settled nesta sessão.
+
+**Sem módulo no catálogo — fora do mecanismo, por ora**: `dof_importacoes`,
+`dof_transportes`, `sinaflor_asv`, `focos_calor_ac`, `car_dados_locais`,
+`auditoria_acessos` (usa perfil, mas é sobre HISTÓRICO de acesso — decisão
+própria), `usuarios` (tabela de identidade, hardcoded por segurança —
+não candidata a conversão genérica), `cargo_ocupacoes`, `cargos`,
+`delegacoes_temporarias`, `unidades_organizacionais` (chefia — já
+discutido no §1.4b/§6, `gestor` tem policy própria de INSERT/UPDATE
+independente do catálogo), `projetos_analise`, `ocorrencias` (tem
+escopo por UC embutido na policy — `pode_editar` não modela UC, exigiria
+combinar os dois eixos, fora do escopo desta frente), `notificacoes`,
+`notificacoes_historico` (infraestrutura interna, não é "acesso a
+módulo"), `lgpd_*` (7 tabelas — governança deliberadamente separada do
+catálogo de módulos; não existe papel de "encarregado" no sistema de
+permissão, ver seção LGPD do `CLAUDE.md`), `painel-gestor` (via
+`projetos_analise`? não confirmado).
+
+**(a) Candidatas a módulo, mas com DRIFT confirmado** (não convertidas —
+decisão de qual conjunto de perfis é o CORRETO cabe à SEMA, não a mim):
+`documentos`, `equipe_servidores`, `netflora_especies`,
+`netflora_inventarios`, `alertas_ambientais`, `monitoramento_indicadores`,
+`unidades_conservacao`, `camadas_mapa` (+ 3 policies redundantes na mesma
+tabela — `camadas_mapa_insert/update/delete` duplicam `camadas_admin`
+com a mesma expressão; consolidar é limpeza segura independente da
+decisão de drift).
+
+**(a) Convertida**: `config_sistema` ✅ (migration 268).
+
+### 3.3 Regra permanente — já vale a partir de agora
+
+*Policy nova decide acesso a módulo por `pode_ver`/`pode_editar`;
+`perfil = '...'` dentro de policy é dívida técnica e precisa de
+justificativa escrita.* Adicionar também: **antes de converter uma
+policy EXISTENTE, comparar contra o catálogo do módulo primeiro** — a
+tabela do §3.0 é o precedente do porquê.
 
 ---
 
