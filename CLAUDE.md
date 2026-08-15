@@ -1534,6 +1534,62 @@ preguiçoso porque o binding nativo dele derrubava a coleta inteira).
 `pwa/sw.js`: agua v11 → v12; brigadas 262 → 263, biomonitor 30 → 31,
 frota 86 → 87 (js/config.js ganhou 3 ícones e está no shell dos 4).
 
+**O painel também é a PRIMEIRA PÁGINA do PDF** (`js/agua-relatorio-pdf.js`).
+A capa era identificação + 6 números; virou o mesmo painel, na mesma
+ordem (KPIs → distribuição por faixa → CONAMA + ranking → IQA por ponto
+→ evolução por campanha), desenhado com os primitivos do jsPDF (não é o
+SVG da tela rasterizado — sairia serrilhado) e alimentado pelas MESMAS
+funções de `js/agua-relatorio-dados.js`. Diferença deliberada: sem chip
+para escolher ponto, o PDF traça a **média da bacia por campanha**; o
+gráfico de barras mostra os 10 melhores pontos ("(10 de N)" no título) e
+o detalhamento das páginas seguintes continua trazendo todos. Dois bugs
+corrigidos junto: (1) `AGPDF_IQA_COR` era cópia da paleta que havia
+DIVERGIDO da tela ('Boa' lima em vez de verde; 'Péssima' no vermelho
+pré-correção) — agora deriva de `AGUA_IQA_FAIXA_COR`, com fallback local;
+(2) `_agpdfNovaPagina` incondicional depois da capa inseria folha em
+branco quando a nota de quarentena transbordava sozinha — virou
+condicional, com teste travando a contagem exata de páginas. ⚠️ Ao
+escrever asserção sobre texto extraído de PDF: a legenda sai colada na
+seguinte ("…Boa 2Regular 1…"), então `\b` não serve depois do número
+(usar `(?!\d)`), e títulos de bloco/seção estão em CAIXA ALTA.
+`pwa/sw.js`: agua v12 → v13.
+
+**E no PPTX (slide 2)**: "Resumo do período" virou "Painel do período"
+com os mesmos blocos (KPIs, distribuição por faixa, rosca da
+conformidade CONAMA com os TRÊS estados, IQA médio por ponto); slides 3
+e 4 seguem iguais. Diferença deliberada em relação ao PDF: aqui os
+gráficos são **nativos** (`addChart` do pptxgenjs), porque num deck quem
+apresenta precisa editar/copiar o gráfico — no documento impresso, não.
+`js/agua-relatorio-pptx.js` não está em shell de app (só a mesa usa),
+então não mexe em `pwa/sw.js`. ⚠️ PPTX renderizado não pôde ser
+conferido (sem LibreOffice/PowerPoint na máquina) — a verificação é
+estrutural sobre o XML do .pptx, e é isso que o teste trava.
+
+**Rosca em vez de barra, escopo "Acre todo" e mapa dinâmico no
+painel.** Três pedidos numa sessão: distribuição por faixa virou rosca
+(`aguaIqaFaixasRoscaHTML`, substituiu `aguaIqaFaixasBarraHTML` — removida,
+sem outro consumidor); `Acre todo` é o valor `''` do seletor de bacia e
+agora o PADRÃO (nada mais de "escolha uma bacia" antes de ver algo) —
+`aguaRelBuscarTodasColetas()` busca sem filtro nenhum, e `aguaRelMontar()`
+ganhou `opts.bacia` pra recortar CLIENT-SIDE dentro do que já foi
+carregado; a gaveta de Filtros ganhou um campo "Bacia" que só habilita
+quando o cabeçalho está em "Acre todo" (senão seria redundante) — é por
+aí que "quero mais detalhe" vira "aplico bacia + rio na gaveta" sem
+voltar ao cabeçalho. Mapa novo reaproveita tudo de `pages/agua-mapa.html`:
+o ESTILO do marcador (preenchimento por faixa + borda por CONAMA +
+opacidade da quarentena) foi extraído pra `aguaIqaEstiloMarcador()` em
+`js/agua-iqa-visual.js` e as duas telas passaram a chamar a mesma
+função — nunca duas cópias do mesmo desenho. Diferença: o mapa dedicado
+colore pela campanha selecionada no eixo temporal; o do painel colore
+pela coleta MAIS RECENTE do recorte já filtrado (nunca média
+classificada numa faixa). Container do mapa fica FORA de `#rl-conteudo`
+(que é reconstruído a cada filtro) — nasce uma vez, só troca marcador,
+preserva zoom entre filtros. `pwa/sw.js`: agua v13 → v14. Achado
+testando: um bug de ÍNDICE na fixture do TESTE (não no app) fazia todo
+marcador cair na mesma longitude — destructuring posicional com
+contagem errada de blanks; corrigido indexando por `p[6]`/`p[7]` em vez
+de contar vírgulas no olho.
+
 ## Próxima tarefa
 Módulo Qualidade da Água (IQA): as 5 fases do plano original estão
 ENTREGUES (ver `docs/qualidade-agua/plano.md`, seções "Fase 0" a "Fase
