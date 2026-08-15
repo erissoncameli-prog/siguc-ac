@@ -152,7 +152,7 @@ function _perfilHTML(u) {
       </button>
       <div class="pf-ident">
         <div class="pf-avatar">
-          <div class="pf-foto" id="pf-foto" ${fotoAttrs}>${temFoto ? '' : esc(ini)}</div>
+          <div class="pf-foto" id="pf-foto">${esc(ini)}</div>
           <button class="pf-cam" onclick="perfilEscolherFoto()" title="Trocar foto" aria-label="Trocar foto">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
           </button>
