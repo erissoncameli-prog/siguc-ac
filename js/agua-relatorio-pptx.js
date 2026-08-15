@@ -246,7 +246,7 @@ async function aguaRelMontarPptx(relatorio, labelBacia, periodoTxt, protocolo) {
   pres.author = 'SEMA-AC · DIMA'
 
   _agpptxSlideCapa(pres, labelBacia, periodoTxt, protocolo, aguaRelFiltrosTxt(relatorio.filtros))
-  _agpptxSlideResumo(pres, relatorio)
+  _agpptxSlidePainel(pres, relatorio)
   _agpptxSlideEvolucao(pres, relatorio)
   _agpptxSlideConama(pres, relatorio)
 
