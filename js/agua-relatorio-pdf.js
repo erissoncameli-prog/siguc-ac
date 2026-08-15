@@ -196,6 +196,184 @@ async function _agpdfBuscarDataURL(url) {
   } catch (e) { return null }
 }
 
+// ── Gráficos do painel, portados para o PDF ───────────────────────
+// Mesmas leituras de pages/agua-relatorios.html, desenhadas com os
+// primitivos do jsPDF (o projeto não tem lib de gráfico; converter o
+// SVG da tela em imagem exigiria canvas/rasterização e sairia serrilhado
+// no impresso). Os DADOS vêm das MESMAS funções de
+// js/agua-relatorio-dados.js que alimentam a tela — nenhuma agregação
+// nova aqui, e nada de IQA/CONAMA recalculado.
+//
+// Como na tela: a média de um ponto/campanha NUNCA é classificada numa
+// faixa (isso é papel de agua_iqa_faixa() no banco), então as barras de
+// magnitude usam um tom só; a paleta de faixa aparece apenas onde a
+// faixa vem pronta do banco, na distribuição.
+
+function _agpdfRotuloBloco(ctx, texto, x, largura) {
+  const { pdf } = ctx
+  pdf.setFont('DMSans', 'bold'); pdf.setFontSize(7.6); pdf.setTextColor(...AGPDF_COR.floresta)
+  pdf.text(texto.toUpperCase(), x, ctx.y)
+  pdf.setDrawColor(...AGPDF_COR.borda); pdf.setLineWidth(0.3)
+  pdf.line(x, ctx.y + 1.6, x + largura, ctx.y + 1.6)
+}
+
+// Barra segmentada da distribuição por faixa + legenda com o número ao
+// lado de cada cor (a cor nunca carrega o dado sozinha).
+function _agpdfBarraFaixas(ctx, dist, x, y, largura) {
+  const { pdf } = ctx
+  const itens = _agpdfOrdemFaixas()
+    .map(f => ({ label: f, n: dist.contagem[f] || 0, cor: _agpdfCorFaixa(f) }))
+    .concat(dist.semIQA ? [{ label: 'Sem índice', n: dist.semIQA, cor: AGPDF_SEM_IQA_COR }] : [])
+    .filter(i => i.n > 0)
+  const total = itens.reduce((s, i) => s + i.n, 0)
+  if (!total) {
+    pdf.setFont('DMSans', 'normal'); pdf.setFontSize(8); pdf.setTextColor(...AGPDF_COR.muted2)
+    pdf.text('Nenhuma coleta com índice calculado no período.', x, y + 4)
+    return 10
+  }
+  const alturaBarra = 4.4
+  const gap = 0.7
+  const util = largura - gap * (itens.length - 1)
+  let cx = x
+  itens.forEach(i => {
+    const w = (i.n / total) * util
+    pdf.setFillColor(...i.cor)
+    pdf.roundedRect(cx, y, Math.max(w, 1.2), alturaBarra, 1, 1, 'F')
+    cx += w + gap
+  })
+  // Legenda em até 3 colunas, quadradinho + rótulo + contagem
+  const porCol = Math.ceil(itens.length / 3)
+  const colW = largura / 3
+  let yLeg = y + alturaBarra + 5
+  itens.forEach((i, idx) => {
+    const col = Math.floor(idx / porCol), lin = idx % porCol
+    const lx = x + col * colW, ly = yLeg + lin * 4.4
+    pdf.setFillColor(...i.cor); pdf.roundedRect(lx, ly - 2.2, 2.4, 2.4, 0.5, 0.5, 'F')
+    pdf.setFont('DMSans', 'normal'); pdf.setFontSize(7.4); pdf.setTextColor(...AGPDF_COR.texto)
+    pdf.text(`${i.label}  ${i.n}`, lx + 3.6, ly)
+  })
+  return alturaBarra + 5 + porCol * 4.4
+}
+
+// Medidor semicircular segmentado (conformidade CONAMA) — mesma leitura
+// do card da tela, inclusive o terceiro estado ("sem limites") ficando
+// FORA do percentual e dito por extenso embaixo.
+function _agpdfGauge(ctx, pct, cxm, y, largura) {
+  const { pdf } = ctx
+  const r = Math.min(largura / 2 - 2, 21)
+  const cy = y + r
+  const N = 26
+  const temValor = pct != null && isFinite(pct)
+  const acesos = temValor ? Math.round((Math.max(0, Math.min(100, pct)) / 100) * N) : 0
+  pdf.setLineCap('round'); pdf.setLineWidth(1.7)
+  for (let i = 0; i < N; i++) {
+    const ang = Math.PI + Math.PI * ((i + 0.5) / N)
+    const cos = Math.cos(ang), sin = Math.sin(ang)
+    if (i < acesos) {
+      const t = N === 1 ? 1 : i / (N - 1)
+      pdf.setDrawColor(Math.round(127 - 96 * t), Math.round(212 - 134 * t), Math.round(168 - 124 * t))
+    } else {
+      pdf.setDrawColor(...AGPDF_COR.borda)
+    }
+    pdf.line(cxm + (r - 5) * cos, cy + (r - 5) * sin, cxm + r * cos, cy + r * sin)
+  }
+  pdf.setLineCap('butt'); pdf.setLineWidth(0.2)
+  pdf.setFont('DMSans', 'bold'); pdf.setFontSize(17); pdf.setTextColor(...AGPDF_COR.floresta)
+  pdf.text(temValor ? Math.round(pct) + '%' : '—', cxm, cy - 1, { align: 'center' })
+  return r + 3
+}
+
+// Ranking de parâmetros que mais violaram (o card de lista da tela).
+function _agpdfRanking(ctx, itens, totalAvaliadas, x, y, largura) {
+  const { pdf } = ctx
+  if (!itens.length) {
+    pdf.setFont('DMSans', 'normal'); pdf.setFontSize(8); pdf.setTextColor(...AGPDF_COR.muted2)
+    const l = pdf.splitTextToSize('Nenhuma violação de limite CONAMA no período — ou nenhum ponto com limites cadastrados para a classe.', largura)
+    pdf.text(l, x, y + 4)
+    return l.length * 4.2 + 4
+  }
+  const alt = 7
+  itens.forEach((v, i) => {
+    const ly = y + i * alt
+    pdf.setFillColor(...AGPDF_COR.claro); pdf.roundedRect(x, ly, largura, alt - 1.4, 1.2, 1.2, 'F')
+    pdf.setFont('DMSans', 'bold'); pdf.setFontSize(7); pdf.setTextColor(...AGPDF_COR.muted)
+    pdf.text(String(i + 1), x + 2.6, ly + 3.9, { align: 'center' })
+    pdf.setFontSize(8); pdf.setTextColor(...AGPDF_COR.texto)
+    pdf.text(v.label, x + 6, ly + 3.9)
+    pdf.setFont('DMSans', 'normal'); pdf.setFontSize(7.4); pdf.setTextColor(...AGPDF_COR.muted)
+    const pctTxt = totalAvaliadas ? ` (${((v.n / totalAvaliadas) * 100).toFixed(0)}%)` : ''
+    pdf.text(`${v.n} coleta(s)${pctTxt}`, x + largura - 2, ly + 3.9, { align: 'right' })
+  })
+  return itens.length * alt
+}
+
+// Barras verticais do IQA médio por ponto, com o valor rotulado acima
+// e a maior destacada — magnitude, então um tom só (ver comentário do
+// bloco). Ponto sem índice entra como barra vazia com "—".
+function _agpdfBarrasPontos(ctx, itens, x, y, largura, altura) {
+  const { pdf } = ctx
+  if (!itens.length) return 0
+  const n = itens.length
+  const passo = largura / n
+  const bw = Math.min(passo * 0.62, 14)
+  const plotH = altura - 12
+  const maior = Math.max(...itens.map(i => (i.valor == null ? 0 : i.valor)))
+  itens.forEach((it, i) => {
+    const bx = x + i * passo + (passo - bw) / 2
+    const tem = it.valor != null && isFinite(it.valor)
+    const h = tem ? Math.max(1.5, (Math.max(0, Math.min(100, it.valor)) / 100) * plotH) : 1.5
+    const by = y + 8 + (plotH - h)
+    if (tem && it.valor === maior) pdf.setFillColor(45, 106, 79)
+    else if (tem) pdf.setFillColor(205, 233, 218)
+    else pdf.setFillColor(243, 244, 246)
+    pdf.roundedRect(bx, by, bw, h, 1.6, 1.6, 'F')
+    pdf.setFont('DMSans', 'bold'); pdf.setFontSize(7); pdf.setTextColor(...AGPDF_COR.texto)
+    pdf.text(tem ? it.valor.toFixed(1) : '—', bx + bw / 2, by - 1.6, { align: 'center' })
+    pdf.setFont('DMSans', 'normal'); pdf.setFontSize(6.4); pdf.setTextColor(...AGPDF_COR.muted)
+    const nome = pdf.splitTextToSize(it.label, passo - 1)[0]
+    pdf.text(nome, bx + bw / 2, y + altura - 1, { align: 'center' })
+  })
+  return altura
+}
+
+// Evolução do IQA MÉDIO DA BACIA por campanha. Na tela o gráfico é de
+// um ponto escolhido por chip; num documento não há chip, e imprimir um
+// gráfico por ponto encheria o relatório — a média por campanha é a
+// leitura equivalente para o período inteiro. Campanha sem coleta vira
+// GAP (linha quebrada), nunca interpolada: lacuna de monitoramento é
+// informação, mesma regra do ponto vazado no mapa.
+function _agpdfLinhaCampanhas(ctx, serie, x, y, largura, altura) {
+  const { pdf } = ctx
+  const plotH = altura - 6
+  const px = i => serie.length === 1 ? x + largura / 2 : x + (largura * i) / (serie.length - 1)
+  const py = v => y + plotH * (1 - Math.max(0, Math.min(100, v)) / 100)
+
+  pdf.setDrawColor(...AGPDF_COR.borda); pdf.setLineWidth(0.2)
+  ;[0, 25, 50, 75, 100].forEach(v => {
+    pdf.line(x, py(v), x + largura, py(v))
+    pdf.setFont('DMSans', 'normal'); pdf.setFontSize(6); pdf.setTextColor(...AGPDF_COR.muted2)
+    pdf.text(String(v), x - 1.5, py(v) + 1, { align: 'right' })
+  })
+
+  pdf.setDrawColor(148, 163, 184); pdf.setLineWidth(0.5)
+  for (let i = 1; i < serie.length; i++) {
+    if (serie[i - 1].iqaMedio == null || serie[i].iqaMedio == null) continue
+    pdf.line(px(i - 1), py(serie[i - 1].iqaMedio), px(i), py(serie[i].iqaMedio))
+  }
+  serie.forEach((s, i) => {
+    if (s.iqaMedio == null) {
+      pdf.setDrawColor(...AGPDF_SEM_IQA_COR); pdf.setLineWidth(0.3)
+      pdf.circle(px(i), py(50), 1.1, 'S')
+    } else {
+      pdf.setFillColor(45, 106, 79)
+      pdf.circle(px(i), py(s.iqaMedio), 1.3, 'F')
+    }
+    pdf.setFont('DMSans', 'normal'); pdf.setFontSize(6.2); pdf.setTextColor(...AGPDF_COR.muted)
+    pdf.text(s.labelCurto, px(i), y + altura, { align: 'center' })
+  })
+  return altura
+}
+
 // ── Seções ────────────────────────────────────────────────────────
 function _agpdfCapa(ctx, relatorio, labelBacia, periodoTxt) {
   const { pdf } = ctx
@@ -293,7 +471,7 @@ function _agpdfSecaoPonto(ctx, ponto) {
         data.cell.styles.textColor = [202, 138, 4]; data.cell.styles.fontStyle = 'bold'
       }
       if (data.column.index === 4 && c.iqa_faixa) {
-        data.cell.styles.textColor = AGPDF_IQA_COR[c.iqa_faixa] || AGPDF_SEM_IQA_COR
+        data.cell.styles.textColor = _agpdfCorFaixa(c.iqa_faixa)
         data.cell.styles.fontStyle = 'bold'
       }
       if (data.column.index === 5 && c.conama_violacoes?.length > 0) {
@@ -390,7 +568,7 @@ async function aguaRelMontarPdfColeta(coleta, cab, protocolo) {
       titulo: 'IQA',
       valor: coleta.iqa != null ? Number(coleta.iqa).toFixed(1) : '—',
       sub: coleta.iqa_faixa || 'Sem dado suficiente',
-      cor: AGPDF_IQA_COR[coleta.iqa_faixa] || AGPDF_SEM_IQA_COR,
+      cor: _agpdfCorFaixa(coleta.iqa_faixa),
     },
     {
       titulo: 'CONFORMIDADE CONAMA',
