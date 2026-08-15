@@ -361,17 +361,27 @@ async function salvarPonto() {
   if (isNaN(lat) || isNaN(lng)) { toast('Marque a posição do ponto no mapa', 'error'); return }
   payload.geom = `SRID=4326;POINT(${lng} ${lat})`
 
+  // Cadastrar ponto novo não exige senha/justificativa — só EDITAR um
+  // já existente (INSERT continua direto, RLS de sempre).
+  let r = null
+  if (_editandoPontoId) {
+    r = await reautenticar({ motivo: 'editar este ponto de coleta' })
+    if (!r) return
+  }
+
   const btn = document.getElementById('btn-salvar-ponto')
   btn.disabled = true
   try {
     const { error } = _editandoPontoId
-      ? await db.from('agua_pontos_coleta').update(payload).eq('id', _editandoPontoId)
+      ? await db.rpc('agua_atualizar_ponto', { p_id: _editandoPontoId, p_campos: payload, p_justificativa: r.justificativa })
       : await db.from('agua_pontos_coleta').insert(payload)
     if (error) throw error
     toast('Ponto de coleta salvo!', 'success')
     fecharModal('ponto')
     await carregarPontos()
-  } catch (e) { toast(e.message || 'Erro ao salvar', 'error') }
+  } catch (e) {
+    toast(e.message?.includes('REAUTH_NECESSARIA') ? 'Sessão de confirmação expirou — tente novamente.' : (e.message || 'Erro ao salvar'), 'error')
+  }
   finally { btn.disabled = false }
 }
 
