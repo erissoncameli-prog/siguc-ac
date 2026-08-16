@@ -786,6 +786,25 @@ JS de página que os referencia). No modal "Meu Perfil", que roda nas
 ganharam `js/avatar-foto.js`; brigadas/biomonitor também
 `css/avatar-foto.css`).
 
+**Achado depois do deploy — Água tinha o desenho pronto, mas nunca
+leu nem exibiu a foto.** `pages/agua-app.html` já tinha `.home-avatar`/
+`.config-avatar` com CSS "liquid glass" e `cursor:pointer` prontos —
+pareciam clicáveis mas não tinham handler NENHUM, e a query de login
+nem selecionava `foto_url` (`prosseguirAposAuth`, só `id, nome_completo,
+perfil, ativo, deve_trocar_senha`). Corrigido: `foto_url` entra na
+query e em `App.coletor` (cacheado offline junto); `agAtualizarAvatar()`
+pinta os dois avatares via `fotoUrlAssinada`; `agRegistrarAvatarMenu()`
+liga os dois ao menu Ver/Trocar (`avatarFotoClicar`/`avatarFotoRegistrar`
+de `js/avatar-foto.js`) — chamado em `entrarHome()` e `carregarConfig()`.
+Troca sobe pelo MESMO `avatarSincronizarFotoPropria` dos outros 3 apps,
+mas aqui sem gravação redundante na própria tabela: Água NÃO tem tabela
+de identidade própria (migration 261) — o "coletor" É a linha de
+`usuarios`, então a RPC `perfil_atualizar_foto` já grava a única linha
+que existe. `pwa/sw.js`: agua 17→18 (`js/avatar-foto.js` +
+`css/avatar-foto.css` no shell). `app-agua/scripts/build-www.mjs`
+atualizado em paralelo (mesmo sem o APK ser gerado ainda) para não
+divergir do que os outros 3 `build-www.mjs` já fazem.
+
 ## LGPD — governança de dados pessoais
 Plano em 5 fases; 0 a 2 entregues. Migrations 209–212.
 - **ROPA vivo no banco** (`lgpd_tratamentos`, migration 211): 16

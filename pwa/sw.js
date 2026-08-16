@@ -99,8 +99,10 @@ const SHELLS = {
   agua: [
     '/pages/agua-app.html',
     '/css/agua-app.css',
+    '/css/avatar-foto.css',
     '/js/config.js',
     '/js/fotos-privadas.js',
+    '/js/avatar-foto.js',
     '/js/lgpd.js',
     '/js/lgpd-campo.js',
     '/js/qrcode-generator.js',
