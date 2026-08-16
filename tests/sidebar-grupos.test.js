@@ -246,3 +246,35 @@ test('grupo Brigadas de Incêndio some sem acesso a brigadas (proxy do grupo) e 
   await montarSidebar(page, 'dashboard', { perfil: 'tecnico', permissoes: { brigadas: 'editar' } });
   await expect(page.locator('.nav-grupo[data-grupo="brigadas"]')).toHaveCount(1);
 });
+
+test('Agenda/Painel/Administrar Frota somem sem lotação, mesmo com o perfil no array antigo (achado testando com Dima)', async ({ page }) => {
+  // tecnico está no array `perfis:` de frota-dashboard/frota-administrar,
+  // e gestor no de frota-viagens — mas nenhum dos dois garante lotação
+  // no DITLOG depois que exige_lotacao foi ligado em 'frota'. Os dois
+  // filtros (perfis E modulo) têm que valer juntos.
+  await montarSidebar(page, 'dashboard', { perfil: 'tecnico', permissoes: { frota: 'sem_acesso' } });
+  const grupo = page.locator('.nav-grupo[data-grupo="frota"]');
+  await expect(grupo.locator('a[href*="frota-viagens"]')).toHaveCount(0);
+  await expect(grupo.locator('a[href*="frota-dashboard"]')).toHaveCount(0);
+  await expect(grupo.locator('a[href*="frota-administrar"]')).toHaveCount(0);
+  // Solicitar Viagem/Minhas Tarefas continuam abertos mesmo sem lotação.
+  await expect(grupo.locator('a[href*="frota-solicitar"]')).toHaveCount(1);
+  await expect(grupo.locator('a[href*="frota-tarefas"]')).toHaveCount(1);
+});
+
+test('Agenda/Painel/Administrar Frota aparecem pra quem tem lotação E o perfil certo', async ({ page }) => {
+  await montarSidebar(page, 'dashboard', { perfil: 'gestor', permissoes: { frota: 'editar' } });
+  const grupo = page.locator('.nav-grupo[data-grupo="frota"]');
+  await expect(grupo.locator('a[href*="frota-viagens"]')).toHaveCount(1);
+  await expect(grupo.locator('a[href*="frota-dashboard"]')).toHaveCount(1);
+  await expect(grupo.locator('a[href*="frota-administrar"]')).toHaveCount(1);
+});
+
+test('Painel/Administrar Frota continuam escondidos de quem tem lotação mas não está no array de perfis', async ({ page }) => {
+  // visualizador tem lotação/nivel liberado, mas não está no array de
+  // frota-dashboard/frota-administrar — os dois filtros são AND, não OR.
+  await montarSidebar(page, 'dashboard', { perfil: 'visualizador', permissoes: { frota: 'editar' } });
+  const grupo = page.locator('.nav-grupo[data-grupo="frota"]');
+  await expect(grupo.locator('a[href*="frota-dashboard"]')).toHaveCount(0);
+  await expect(grupo.locator('a[href*="frota-administrar"]')).toHaveCount(0);
+});
