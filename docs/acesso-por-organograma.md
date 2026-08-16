@@ -443,16 +443,30 @@ ligado sem expansão (mesmos 7 do DEUC + super_admin mantêm editar).
 `pages/brigadas.html` **não tem link na sidebar** — sem item de menu
 pra gatear, a proteção fica só na RLS.
 
-**As outras 5 tabelas (`registro_fauna`, `registro_participantes`,
-`registros_campo`, `atividades_campo_catalogo`, `especies_fauna`) NÃO
-foram convertidas** — achado que trava conversão mecânica: o array de
-perfis varia por OPERAÇÃO na mesma tabela (`registro_fauna`: UPDATE
-aceita tecnico, INSERT/DELETE não; `registro_participantes`: escrita só
-gestor/super_admin, leitura inclui tecnico/biologo), e o catálogo só
-tem um nível por perfil/módulo — não representa "edita X mas não Y".
-Converter exigiria decisão específica por tabela/operação, fora do
-escopo de uma conversão mecânica. Fica pendência registrada, não
-tentar resolver com o mesmo padrão do resto do cluster.
+**Atualização (2026-08-16) — 2 das 5 "complexas" eram simples de
+verdade.** `atividades_campo_catalogo` (super_admin, gestor — chave
+`admin-brigadas`) e `especies_fauna` (biologo, gestor, super_admin —
+chave `validacao-campo`) tinham só um array DIFERENTE das outras 5 já
+convertidas, não múltiplos arrays por operação. Convertidas (migration
+286) com o mesmo processo seguro de sempre: catálogo de `admin-brigadas`
+corrigido (chefe_departamento/gestor_uc tinham editar, hoje não editam
+esta tabela — downgrade); catálogo de `validacao-campo` corrigido nas
+duas pontas (faltava `biologo`, tinha chefe_departamento/gestor_uc/
+validador_brigada de sobra). `exige_lotacao` NÃO ligado em nenhuma das
+duas chaves ainda — só a conversão de RLS, ativação fica pra quando/se
+alguém decidir o dono desses módulos.
+
+**As 3 tabelas genuinamente complexas (`registro_fauna`,
+`registro_participantes`, `registros_campo`) ficam como estão, por
+decisão do usuário.** O array de perfis varia por OPERAÇÃO na mesma
+tabela (`registro_fauna`: UPDATE aceita tecnico, INSERT/DELETE não;
+`registro_participantes`: escrita só gestor/super_admin, leitura inclui
+tecnico/biologo), e o catálogo só tem um nível por perfil/módulo — não
+representa "edita X mas não Y". Opção descartada por ora: unificar as
+operações primeiro (decidir se tecnico também cria/apaga fauna, não só
+atualiza) pra então converter com o mesmo processo de sempre. Fica
+registrado como limite do modelo atual, sem risco — continuam com o
+array hard-coded de sempre, fora do organograma.
 
 **`teto_do_perfil()` corrigido pra ser por módulo (migration 284, mesma
 sessão) — destrava Unidades/Equipe/Alertas-ambientais.** A causa exata
