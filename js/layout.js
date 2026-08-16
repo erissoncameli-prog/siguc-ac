@@ -121,6 +121,20 @@ function gerarLayout(tituloPagina, paginaAtiva) {
     },
     {
       id: 'gestao', label: 'Gestão', super: 'Diretoria Técnica',
+      // Gate por `modulo` usando 'monitoramento' como PROXY do grupo
+      // inteiro (não uma chave própria de "gestao" — não existe). Os 8
+      // itens têm chave 1:1 no catálogo, mas só monitoramento/netflora/
+      // alertas-ambientais/equipe foram convertidos e ligados por
+      // exige_lotacao nesta sessão (todos DEUC); painel-gestor/
+      // pesquisas/ocorrencias/relatorios continuam com RLS antiga, sem
+      // checagem de drift feita — usar a chave própria de cada um
+      // esconderia/mostraria errado pra quem não foi conferido.
+      // 'monitoramento' já está validado (mesmo dono, sem drift), serve
+      // de indicador confiável pro grupo todo. Decisão do usuário:
+      // esconder o grupo inteiro pra quem não é do DEUC, mesmo sabendo
+      // que a leitura das tabelas continua aberta por baixo (só o menu
+      // muda, não o RLS) — ver docs/acesso-por-organograma.md §3.1.
+      modulo: 'monitoramento',
       itens: [
         { id: 'monitoramento',      href: '../pages/monitoramento.html',      label: t('nav.monitoramento') },
         { id: 'netflora',           href: '../pages/netflora.html',           label: 'Netflora — Inventário' },
@@ -134,6 +148,11 @@ function gerarLayout(tituloPagina, paginaAtiva) {
     },
     {
       id: 'brigadas', label: 'Brigadas de Incêndio', super: 'Diretoria Técnica',
+      // 'brigadas' é a chave já convertida e ligada por exige_lotacao
+      // (DEUC) nesta sessão — mesmo raciocínio do grupo Gestão acima.
+      // Cobre também `brigada-app`, que não tem chave própria no
+      // catálogo (link só abre o app de campo).
+      modulo: 'brigadas',
       itens: [
         { id: 'brigada-app',         href: '../pages/brigada.html',             label: 'App de Campo', target: '_blank' },
         { id: 'validacao-campo',     href: '../pages/validacao-campo.html',     label: 'Validação de Campo',
@@ -190,17 +209,18 @@ function gerarLayout(tituloPagina, paginaAtiva) {
     },
     {
       id: 'frota', label: 'Frota — Transporte', super: 'Administrativo',
-      // Sem filtro de perfil no grupo: App Frota/Minhas Tarefas/Solicitar
-      // Viagem (sem `perfis:` próprio) têm que aparecer pra QUALQUER
-      // perfil — solicitar viagem nunca foi restrito por organograma
-      // nem por perfil (frota_viag_insert é dono-do-registro,
-      // solicitante_id = auth.uid()); o filtro antigo excluía brigadista/
-      // biologo/pesquisador_externo/validador_brigada/validador_fauna do
-      // grupo inteiro, escondendo até o link de solicitar. Agenda de
-      // Viagens/Painel de Frota/Administrar Frota mantêm seus próprios
-      // `perfis:` por item, intocados — só a aprovação/gestão é restrita.
+      // Sem filtro no GRUPO — precisa ficar aberto pra quem só tem
+      // acesso a Solicitar Viagem/Minhas Tarefas (sem `perfis:` próprio,
+      // abertos a qualquer perfil: solicitar viagem é dono-do-registro,
+      // frota_viag_insert nunca dependeu de organograma nem de perfil).
+      // "App Frota" volta a ter filtro de perfil PRÓPRIO (decisão do
+      // usuário, 2026-08-16, revertendo a abertura total de antes) —
+      // é o app completo (motorista/gestor também), não só solicitar.
+      // Agenda de Viagens/Painel/Administrar mantêm seus próprios
+      // `perfis:`, intocados.
       itens: [
-        { id: 'frota-app',       href: '../pages/frota-app.html',       label: 'App Frota', target: '_blank' },
+        { id: 'frota-app',       href: '../pages/frota-app.html',       label: 'App Frota', target: '_blank',
+          perfis: ['super_admin','secretario','diretor','chefe_departamento','gestor','gestor_uc','tecnico','assistente_admin','financeiro','visualizador'] },
         { id: 'frota-tarefas',   href: '../pages/frota-tarefas.html',   label: 'Minhas Tarefas' },
         { id: 'frota-solicitar', href: '../pages/frota-solicitar.html', label: 'Solicitar Viagem' },
         { id: 'frota-viagens',   href: '../pages/frota-viagens.html',   label: 'Agenda de Viagens',

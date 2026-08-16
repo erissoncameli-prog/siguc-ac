@@ -218,3 +218,31 @@ test('Agenda de Viagens/Painel/Administrar Frota continuam restritos por item, m
   await expect(grupo.locator('a[href*="frota-dashboard"]')).toHaveCount(0);
   await expect(grupo.locator('a[href*="frota-administrar"]')).toHaveCount(0);
 });
+
+test('App Frota volta a exigir perfil próprio (2026-08-16) — Solicitar Viagem/Minhas Tarefas continuam abertos', async ({ page }) => {
+  await montarSidebar(page, 'dashboard', { perfil: 'brigadista', permissoes: {} });
+
+  const grupo = page.locator('.nav-grupo[data-grupo="frota"]');
+  await expect(grupo.locator('a[href*="frota-app"]')).toHaveCount(0);
+  await expect(grupo.locator('a[href*="frota-solicitar"]')).toHaveCount(1);
+  await expect(grupo.locator('a[href*="frota-tarefas"]')).toHaveCount(1);
+
+  await montarSidebar(page, 'dashboard', { perfil: 'tecnico', permissoes: {} });
+  await expect(page.locator('.nav-grupo[data-grupo="frota"] a[href*="frota-app"]')).toHaveCount(1);
+});
+
+test('grupo Gestão some sem acesso a monitoramento (proxy do grupo) e aparece quando libera', async ({ page }) => {
+  await montarSidebar(page, 'dashboard', { perfil: 'tecnico', permissoes: { monitoramento: 'sem_acesso' } });
+  await expect(page.locator('.nav-grupo[data-grupo="gestao"]')).toHaveCount(0);
+
+  await montarSidebar(page, 'dashboard', { perfil: 'tecnico', permissoes: { monitoramento: 'editar' } });
+  await expect(page.locator('.nav-grupo[data-grupo="gestao"]')).toHaveCount(1);
+});
+
+test('grupo Brigadas de Incêndio some sem acesso a brigadas (proxy do grupo) e aparece quando libera', async ({ page }) => {
+  await montarSidebar(page, 'dashboard', { perfil: 'tecnico', permissoes: { brigadas: 'sem_acesso' } });
+  await expect(page.locator('.nav-grupo[data-grupo="brigadas"]')).toHaveCount(0);
+
+  await montarSidebar(page, 'dashboard', { perfil: 'tecnico', permissoes: { brigadas: 'editar' } });
+  await expect(page.locator('.nav-grupo[data-grupo="brigadas"]')).toHaveCount(1);
+});
