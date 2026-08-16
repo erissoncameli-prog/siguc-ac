@@ -1,8 +1,11 @@
 # Acesso por organograma — arquitetura de permissão do SIGUC
 
-Status: **PLANEJAMENTO — nada implementado.** Documento de arquitetura.
-Levantamento feito contra o banco de **produção** em 2026-08-15, não contra
-o repositório.
+Status: infraestrutura entregue (migrations 262–280); virada módulo a
+módulo em andamento — ver §3.1 e §8 pro que já está ligado (Biomonitor,
+Monitoramento, Netflora) e o que ficou de fora por decisão (Unidades/
+Equipe/Alertas-ambientais: RLS pronta, `exige_lotacao` ainda desligado).
+Levantamento original contra o banco de **produção** em 2026-08-15, não
+contra o repositório.
 
 Pedido: ligar o organograma da SEMA aos módulos (Frota, Biomonitor,
 Brigadas, Água…), de modo **robusto**, servindo a **todos os módulos
@@ -360,11 +363,73 @@ o que já podia fazer) — silenciosamente, sem nenhum log de erro.
 
 ### 3.1 O que foi convertido nesta sessão
 
-Só **`config_sistema`** (migration 268): é a única tabela testada onde
-o catálogo e a regra real coincidem — ninguém além de super_admin tem
+**`config_sistema`** (migration 268): é a única tabela onde o catálogo e
+a regra real já coincidiam de saída — ninguém além de super_admin tem
 qualquer nível em `configuracoes`, em nenhuma das duas fontes. Verificado
 por `pode_editar('configuracoes')` simulando super_admin (`true`) e
 gestor (`false`), batendo com o comportamento anterior.
+
+**Atualização (2026-08-16) — `unidades_conservacao`, `monitoramento_registros`,
+`netflora_especies`, `netflora_inventarios`, `alertas_ambientais`,
+`equipe_servidores`** (migration 276): as 6 de drift confirmado no §3.0
+foram convertidas — mas na direção oposta da tabela ali: em vez de
+seguir o catálogo (que ampliava acesso em quase todas), **o catálogo foi
+corrigido pra bater com o array de hoje**, decisão explícita do usuário
+("manter só quem já edita hoje") pergunta a pergunta pelas 2 frentes de
+drift (unidades: catálogo reduzia; as outras 4: catálogo ampliava).
+Depois da correção, `pode_editar(chave)` devolve exatamente o mesmo
+resultado do array antigo pra todo perfil — conversão sem mudar
+comportamento nenhum, só o mecanismo. `monitoramento_indicadores` ficou
+de fora de propósito: compartilha a chave `monitoramento` com
+`monitoramento_registros`, mas hoje só `super_admin` edita (mais
+restrito que o resto do módulo) — convertê-la ampliaria o cadastro de
+indicadores pra gestor/tecnico, que é uma decisão à parte, não decidida.
+
+**Achado ao ligar `exige_lotacao` (migrations 277–280) — `teto_do_perfil()`
+é global por perfil, não por módulo**:
+
+```sql
+SELECT COALESCE(MAX(nivel), 'sem_acesso') FROM (
+  SELECT nivel FROM perfil_permissoes_padrao WHERE perfil = p_perfil
+  UNION ALL SELECT nivel FROM grupo_permissoes_padrao WHERE perfil = p_perfil
+) t;
+```
+
+O teto é o nível MÁXIMO que o perfil tem em QUALQUER módulo do sistema,
+não no módulo sendo avaliado. Um `tecnico` lotado no DEUC, que edita
+Monitoramento/Netflora, tem teto `editar` — e esse mesmo teto se aplica
+a Unidades/Equipe/Alertas Ambientais no mesmo setor, mesmo esses três
+restringindo edição a `gestor`/`super_admin` hoje. Medido com a Ana
+Luisa Dias de Araújo (tecnico, lotada DEUC): `vw_impacto_lotacao`-style
+mostrou ela ganhando `editar` em Unidades e Equipe, que não tem hoje.
+Por isso `exige_lotacao` foi ligado só em `monitoramento`/`netflora`
+(migration 280) — os 2 dos 6 onde tecnico já edita hoje, sem expansão.
+`unidades`/`equipe`/`alertas-ambientais` ficam com RLS convertida
+(pronta, sem risco) mas `exige_lotacao=false` até esse teto virar por
+módulo ou a SEMA aceitar a expansão pra técnico nesses 3. Corrigir
+`teto_do_perfil()` pra ser por módulo é mudança na função central de
+`nivel_efetivo()` — não decidida, fica registrada como frente futura.
+
+**Lotação real cadastrada (migrations 277/279)**: DEUC = Átila de Araújo
+Magalhães, Claudia Lima Silva, Jomara Katrine Vitoriano de Souza, Raco
+Tanomaru Junior, Ricardo Antônio de Andrade Plácido, Samyr Vieira de
+Farias, Ana Luisa Dias de Araújo. DERHQA = Maria Antônia Zabala de
+Almeida Nobre. Marlon Castelo Branco e Quelyson Souza de Lima (perfil
+`gestor` no cadastro, mas brigadistas na prática, confirmado pelo
+usuário) ficaram sem lotação — perdem `editar` em Monitoramento/Netflora
+por decisão explícita, mesmo efeito que teriam em qualquer módulo do
+lote quando a chave for ligada.
+
+**Sidebar NÃO ganhou o gate por `modulo` nesta rodada**, diferente do
+Biomonitor. A leitura dessas 6 tabelas é aberta a qualquer autenticado
+(decisão de não mexer nela) — só a escrita segue o catálogo. Esconder o
+item do menu quando `permissoes[chave] === 'sem_acesso'` esconderia a
+página de quem ainda pode LER normalmente (ex.: todo `tecnico` tem
+`sem_acesso` no catálogo de `equipe`, mas lê `equipe_servidores` via
+policy aberta hoje) — regressão de navegação sem ganho de segurança,
+diferente do Biomonitor onde leitura e escrita são as duas gated pelo
+mesmo `nivel_efetivo()`. O gate de sidebar só faz sentido em módulo onde
+as duas camadas concordam.
 
 ### 3.2 Inventário completo — 129 policies, 77 tabelas
 
@@ -413,14 +478,18 @@ permissão, ver seção LGPD do `CLAUDE.md`), `painel-gestor` (via
 
 **(a) Candidatas a módulo, mas com DRIFT confirmado** (não convertidas —
 decisão de qual conjunto de perfis é o CORRETO cabe à SEMA, não a mim):
-`documentos`, `equipe_servidores`, `netflora_especies`,
-`netflora_inventarios`, `alertas_ambientais`, `monitoramento_indicadores`,
-`unidades_conservacao`, `camadas_mapa` (+ 3 policies redundantes na mesma
-tabela — `camadas_mapa_insert/update/delete` duplicam `camadas_admin`
-com a mesma expressão; consolidar é limpeza segura independente da
-decisão de drift).
+`documentos`, `monitoramento_indicadores` (fica de fora de propósito, ver
+§3.1), `camadas_mapa` (+ 3 policies redundantes na mesma tabela —
+`camadas_mapa_insert/update/delete` duplicam `camadas_admin` com a mesma
+expressão; consolidar é limpeza segura independente da decisão de
+drift).
 
-**(a) Convertida**: `config_sistema` ✅ (migration 268).
+**(a) Convertida**: `config_sistema` ✅ (migration 268);
+`unidades_conservacao`, `monitoramento_registros`, `netflora_especies`,
+`netflora_inventarios`, `alertas_ambientais`, `equipe_servidores` ✅
+(migration 276, 2026-08-16 — catálogo corrigido pra bater com o array de
+hoje, ver §3.1). `exige_lotacao` só ligado em `monitoramento`/`netflora`
+por ora (achado do teto por perfil, §3.1).
 
 ### 3.3 Regra permanente — já vale a partir de agora
 
