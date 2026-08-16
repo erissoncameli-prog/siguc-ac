@@ -552,7 +552,19 @@ verificadas sem drift. Testado: some pra `sem_acesso`, aparece pra
 anterior incluía o app inteiro (modos motorista/gestor também) — o
 pedido original era só Solicitar Viagem/Minhas Tarefas. Restaurado o
 array de perfis (o mesmo de antes) só no item `frota-app`; os outros
-dois continuam sem filtro. `pwa/sw.js`: frota 90 → 91. A leitura dessas 6 tabelas é aberta a qualquer autenticado
+dois continuam sem filtro. `pwa/sw.js`: frota 90 → 91.
+
+**Gate por `modulo` estendido pra ITEM, não só grupo (mesma sessão,
+achado testando com o Dima de novo).** "Painel de Frota" e "Administrar
+Frota" continuavam aparecendo pra ele mesmo sem lotação no DITLOG —
+os arrays `perfis:` desses 2 itens (e de "Agenda de Viagens") são
+pré-organograma, incluem `tecnico`/`gestor` em geral, nunca foram
+atualizados quando `exige_lotacao` foi ligado em `frota`. O mecanismo
+de gate (até então só em `grupo.modulo`) ganhou `item.modulo` — os 3
+itens ganharam `modulo: 'frota'` junto do array de perfis que já
+tinham; os dois filtros valem em AND (mais restritivo vence). Solicitar
+Viagem/Minhas Tarefas continuam sem filtro nenhum. `pwa/sw.js`: frota
+91 → 92. A leitura dessas 6 tabelas é aberta a qualquer autenticado
 (decisão de não mexer nela) — só a escrita segue o catálogo. Esconder o
 item do menu quando `permissoes[chave] === 'sem_acesso'` esconderia a
 página de quem ainda pode LER normalmente (ex.: todo `tecnico` tem
