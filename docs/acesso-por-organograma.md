@@ -534,8 +534,25 @@ mantêm seus filtros por item, intocados — aprovação/gestão continuam
 restritas. `pwa/sw.js`: frota 89 → 90. Guarda: 2 testes novos em
 `tests/sidebar-grupos.test.js`.
 
-**Sidebar NÃO ganhou o gate por `modulo` no cluster DEUC**, diferente do
-Biomonitor e da Água. A leitura dessas 6 tabelas é aberta a qualquer autenticado
+**Ajuste após teste em produção (2026-08-16, mesmo dia) — Gestão e
+Brigadas ganharam o gate de grupo afinal.** Testando com o usuário Dima
+(DEBIO) real, o pedido do usuário mudou depois de ver a sidebar ao
+vivo: esconder os grupos Gestão e Brigadas de Incêndio inteiros pra
+quem não é do DEUC, mesmo sabendo que a leitura das tabelas continua
+aberta por baixo (decisão explícita, ciente do trade-off acima). Como
+nenhuma chave de Gestão cobre o grupo inteiro (são 8 chaves
+independentes) e só 4 delas foram convertidas+ligadas nesta sessão
+(painel-gestor/pesquisas/ocorrencias/relatorios ficaram de fora, sem
+checagem de drift), o gate usa **`monitoramento`/`brigadas` como proxy
+do grupo inteiro** — são as únicas chaves de cada cluster já
+verificadas sem drift. Testado: some pra `sem_acesso`, aparece pra
+`editar`.
+
+**App Frota volta a exigir perfil próprio.** A abertura total do commit
+anterior incluía o app inteiro (modos motorista/gestor também) — o
+pedido original era só Solicitar Viagem/Minhas Tarefas. Restaurado o
+array de perfis (o mesmo de antes) só no item `frota-app`; os outros
+dois continuam sem filtro. `pwa/sw.js`: frota 90 → 91. A leitura dessas 6 tabelas é aberta a qualquer autenticado
 (decisão de não mexer nela) — só a escrita segue o catálogo. Esconder o
 item do menu quando `permissoes[chave] === 'sem_acesso'` esconderia a
 página de quem ainda pode LER normalmente (ex.: todo `tecnico` tem
