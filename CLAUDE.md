@@ -677,6 +677,71 @@ js/frota-consumo.js.
   migration só DEPOIS do deploy do código que assina (ver cabeçalho
   das migrations 200 e 210).
 
+## Regra do sistema — foto de perfil sincronizada em todos os apps
+UMA FOTO SÓ por pessoa, com fan-out em vez de join (migrations 261/289
+— ler o cabeçalho da 261 para o motivo: os 3 apps de campo são
+offline-first e leem `foto_url` da própria linha, cacheada no
+IndexedDB; um join no servidor sumiria com o avatar sem rede, cenário
+normal de campo). `usuarios.foto_url` é a fonte; a função interna
+`_perfil_propagar_foto(usuario_id, url)` copia o endereço para
+`brigadistas`/`frota_motoristas`/`monitores_biodiversidade` `WHERE
+usuario_id = usuario_id` — Água não entra (usa `usuarios.foto_url`
+direto, sem tabela de identidade própria).
+
+Duas RPCs chamam o mesmo fan-out, para as duas direções de troca:
+- `perfil_atualizar_foto(p_url)` — a PRÓPRIA pessoa troca a foto, em
+  QUALQUER superfície (modal "Meu Perfil" na mesa, ou dentro de
+  Brigadas/Frota/Biomonitor). `auth.uid()` é o alvo; valida que o
+  endereço está em `avatares/<uid>/…`.
+- `admin_atualizar_foto_usuario(p_usuario_id, p_url)` (289) —
+  super_admin/gestor define a foto de OUTRA pessoa no cadastro
+  (`pages/usuarios.html`, criação e edição). Mesma validação de
+  endereço, mas contra a pasta do ALVO, não de quem chama.
+
+**Bucket único: `avatares/<uid>/…`, privado desde a 261.** Os apps de
+campo tinham cada um o próprio bucket (`brigadistas`, `frota-
+motoristas`, `biomonitor-fotos`) e trocavam a foto gravando DIRETO lá
++ direto na própria tabela — a troca ficava presa naquele app, nunca
+voltava para `usuarios` nem para os outros dois. Corrigido: os 3 apps
+agora sobem para `avatares` e chamam `perfil_atualizar_foto` (helper
+único `avatarSincronizarFotoPropria`, `js/avatar-foto.js`) — e SÓ
+DEPOIS disso, opcionalmente, também atualizam a própria linha direto
+(idempotente com o que a RPC já fez; é o que sustenta um cadastro de
+campo sem `usuario_id` — PIN-only —, caso em que a RPC não tem o que
+propagar). Os buckets antigos continuam existindo (fotos já gravadas
+antes desta entrega), só não recebem upload novo do fluxo de troca de
+foto própria.
+
+**Moldura + menu "Ver foto / Trocar foto" únicos**
+(`js/avatar-foto.js` + `css/avatar-foto.css`): anel dourado afastado
+da borda sólida branca, sem glow/gradiente animado — de propósito,
+para não parecer o clichê visual de "gerado por IA". Tocar a foto abre
+um bottom sheet (Ver em tela cheia / Trocar / Cancelar); sem foto
+ainda, vai direto para trocar. Cada tela só monta o HTML
+(`.avatar-foto-wrap` → `.avatar-foto-anel` + `.avatar-foto` +
+`.avatar-foto-badge`) e registra o que "ver"/"trocar" significam ali
+com `avatarFotoRegistrar(id, {temFoto, verFoto, trocarFoto})` — nunca
+reimplementar o menu numa página. Usado em `pages/usuarios.html`
+(cadastro/edição), no modal "Meu Perfil" (`pf-foto`, retrofit) e no
+card de config do Biomonitor (`bio-config-avatar`, que antes ia direto
+pro seletor de arquivo, sem "ver"). Frota já tinha um menu próprio
+(`#modal-foto-mot-menu`) e Brigadas o "liquid glass" documentado
+abaixo — nenhum dos dois foi reskinado nesta entrega, só a
+sincronização por baixo; unificar o visual deles fica para quando for
+pedido.
+
+Carregamento: `css/avatar-foto.css` e `js/avatar-foto.js` são
+estáticos nas páginas que já os usam (`usuarios.html`,
+`brigada.html`, `biomonitor.html`, `frota-app.html` — sempre ANTES do
+JS de página que os referencia). No modal "Meu Perfil", que roda nas
+~45 páginas de mesa, o carregamento é sob demanda
+(`_perfilCarregarAvatarFoto` em `js/perfil.js`), mesmo padrão de
+`_perfilCarregarFotos` — nunca pendurar em cada página.
+
+`pwa/sw.js`: brigadas 263→264, biomonitor 31→32, frota 93→94 (os 3
+ganharam `js/avatar-foto.js`; brigadas/biomonitor também
+`css/avatar-foto.css`).
+
 ## LGPD — governança de dados pessoais
 Plano em 5 fases; 0 a 2 entregues. Migrations 209–212.
 - **ROPA vivo no banco** (`lgpd_tratamentos`, migration 211): 16

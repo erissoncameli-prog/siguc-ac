@@ -1,0 +1,36 @@
+/* ── SIGUC · Avatar de perfil — moldura + menu únicos ───────────────
+   Reaproveitado em qualquer tela que mostre foto de perfil: cadastro
+   de usuário (mesa), modal "Meu Perfil" e os 3 apps de campo — ver
+   js/avatar-foto.js e CLAUDE.md "Regra do sistema — foto de perfil
+   sincronizada".
+
+   Moldura em anel duplo (hairline dourado afastado + borda sólida
+   branca), sem glow/gradiente animado — de propósito, para não pesar
+   a mão no efeito. */
+.avatar-foto-wrap { position: relative; flex-shrink: 0; cursor: pointer; border-radius: 50%; }
+.avatar-foto-wrap:focus-visible { outline: 2px solid #F4D35E; outline-offset: 3px; }
+.avatar-foto-anel { position: absolute; inset: -5px; border-radius: 50%; border: 1.5px solid rgba(181,134,13,.45); pointer-events: none; transition: border-color .15s ease; }
+.avatar-foto-wrap:hover .avatar-foto-anel { border-color: rgba(181,134,13,.75); }
+.avatar-foto { width: 100%; height: 100%; border-radius: 50%; overflow: hidden; background: linear-gradient(135deg, #F4D35E, #D4A017); color: #1F4E2C; display: flex; align-items: center; justify-content: center; font-weight: 700; background-size: cover; background-position: center; border: 3px solid #fff; box-shadow: 0 2px 8px rgba(17,24,39,.16); transition: transform .15s ease; }
+.avatar-foto-wrap:hover .avatar-foto, .avatar-foto-wrap:active .avatar-foto { transform: scale(1.03); }
+.avatar-foto-badge { position: absolute; right: -3px; bottom: -3px; width: 26px; height: 26px; border-radius: 50%; background: #1F4E2C; color: #fff; display: flex; align-items: center; justify-content: center; border: 2px solid #fff; box-shadow: 0 1px 4px rgba(17,24,39,.25); }
+.avatar-foto-badge svg { width: 12px; height: 12px; }
+
+.avatar-menu-overlay, .avatar-viewer-overlay { position: fixed; inset: 0; z-index: 4200; display: none; align-items: flex-end; justify-content: center; }
+.avatar-menu-overlay.aberto, .avatar-viewer-overlay.aberto { display: flex; }
+.avatar-menu-overlay { background: rgba(17,24,39,.45); backdrop-filter: blur(1px); }
+.avatar-menu-card { width: 100%; max-width: 360px; background: #fff; border-radius: 16px 16px 0 0; padding: 10px; margin-bottom: 0; box-shadow: 0 -10px 30px rgba(17,24,39,.22); animation: avatarMenuSobe .2s ease; }
+@media (min-width: 640px) {
+  .avatar-menu-overlay { align-items: center; }
+  .avatar-menu-card { border-radius: 16px; margin-bottom: 0; }
+}
+@keyframes avatarMenuSobe { from { transform: translateY(14px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+.avatar-menu-item { display: flex; align-items: center; gap: 12px; width: 100%; padding: 13px 14px; border: none; background: none; text-align: left; font-size: 13.5px; font-weight: 600; color: #1F4E2C; border-radius: 12px; cursor: pointer; font-family: inherit; }
+.avatar-menu-item:hover { background: #F9FAFB; }
+.avatar-menu-item.sutil { color: #6B7280; font-weight: 500; }
+.avatar-menu-item svg { flex-shrink: 0; }
+
+.avatar-viewer-overlay { background: rgba(10,12,10,.94); }
+.avatar-viewer-overlay img { max-width: 92vw; max-height: 86vh; border-radius: 12px; box-shadow: 0 20px 60px rgba(0,0,0,.5); }
+.avatar-viewer-fechar { position: absolute; top: 18px; right: 18px; width: 38px; height: 38px; border-radius: 50%; background: rgba(255,255,255,.12); border: none; color: #fff; font-size: 16px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+.avatar-viewer-fechar:hover { background: rgba(255,255,255,.22); }
