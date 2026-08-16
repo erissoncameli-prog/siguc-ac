@@ -36,7 +36,7 @@ mkdirSync(join(WWW, 'vendor/fonts'), { recursive: true })
 const ARQUIVOS_JS = [
   'observability.js', 'queryLogger.js', 'config.js', 'lgpd.js', 'lgpd-campo.js',
   'qrcode-generator.js', 'frota-offline.js', 'frota-sync.js', 'frota-notif-local.js', 'layout.js',
-  'frota-wise.js', 'fotos-privadas.js', 'frota-consumo.js', 'frota-passageiros.js',
+  'frota-wise.js', 'fotos-privadas.js', 'avatar-foto.js', 'frota-consumo.js', 'frota-passageiros.js',
   'frota-viagens-status.js',
 ]
 for (const f of ARQUIVOS_JS) {

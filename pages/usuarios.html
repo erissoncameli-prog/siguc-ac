@@ -4,11 +4,14 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>SIGUC-AC · Usuários</title>
 <link rel="stylesheet" href="../css/global.css">
+<link rel="stylesheet" href="../css/avatar-foto.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="../js/observability.js"></script>
 <script src="../js/queryLogger.js"></script>
 <script src="../js/config.js"></script>
 <script src="../js/layout.js"></script>
+<script src="../js/fotos-privadas.js"></script>
+<script src="../js/avatar-foto.js"></script>
 </head>
 <body>
 <div id="app"></div>
@@ -47,6 +50,17 @@
       <button class="modal-close" onclick="fecharModal()">×</button>
     </div>
     <div class="modal-body">
+      <div class="form-group" style="display:flex;flex-direction:column;align-items:center;gap:8px;margin-bottom:14px">
+        <div class="avatar-foto-wrap" id="adm-foto-wrap" style="width:84px;height:84px" onclick="avatarFotoClicar('adm-foto')" role="button" tabindex="0" aria-label="Ver ou trocar foto">
+          <div class="avatar-foto-anel"></div>
+          <div class="avatar-foto" id="adm-foto-img" style="font-size:24px"></div>
+          <div class="avatar-foto-badge">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+          </div>
+        </div>
+        <div class="form-hint" style="text-align:center">Toque na foto para ver ou trocar — sincroniza com todos os apps que a pessoa usa.</div>
+        <input type="file" id="adm-foto-file" accept="image/*" hidden onchange="admFotoEscolhida(this)">
+      </div>
       <div class="form-group"><label class="form-label">Nome Completo <span class="obrig">*</span></label><input class="form-control" id="f-nome" placeholder="Nome do servidor"></div>
       <div class="form-group"><label class="form-label">E-mail <span class="obrig">*</span></label><input class="form-control" id="f-email" type="email" placeholder="email@sema.ac.gov.br"></div>
       <div class="grid-2">
@@ -180,7 +194,7 @@ function renderTabela(lista) {
     <tr>
       <td>
         <div style="display:flex;align-items:center;gap:10px">
-          <div style="width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,#F4D35E,#D4A017);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#1F4E2C;flex-shrink:0">${iniciais(u.nome_completo)}</div>
+          <div class="tbl-avatar" data-foto="${u.foto_url ? esc(u.foto_url) : ''}" style="width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,#F4D35E,#D4A017);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#1F4E2C;flex-shrink:0;background-size:cover;background-position:center">${iniciais(u.nome_completo)}</div>
           <div>
             <div style="font-weight:600;font-size:13px">${esc(u.nome_completo)}</div>
             ${u.cargo ? `<div style="font-size:11px;color:#9CA3AF">${esc(u.cargo)}</div>` : ''}
@@ -203,6 +217,17 @@ function renderTabela(lista) {
         </div>
       </td>
     </tr>`).join('')
+  admAssinarAvatares()
+}
+
+// Foto na listagem: bucket privado, então assina em lote depois do
+// render (não dá para assinar antes — a URL precisa existir na linha).
+async function admAssinarAvatares() {
+  const els = [...document.querySelectorAll('.tbl-avatar[data-foto]')].filter(el => el.dataset.foto)
+  for (const el of els) {
+    const url = await fotoUrlAssinada(el.dataset.foto)
+    if (url) { el.style.backgroundImage = `url("${url}")`; el.textContent = '' }
+  }
 }
 
 function abrirModal(u = null) {
@@ -218,11 +243,80 @@ function abrirModal(u = null) {
   document.getElementById('bloco-senha').style.display = u ? 'none' : ''
   document.getElementById('bloco-lotacao').style.display = u ? 'none' : ''
   document.getElementById('f-lotacao').value = ''
+  admInicializarAvatar(u)
   document.getElementById('modal-usuario').classList.add('aberto')
 }
 
 function editarUsuario(u) { abrirModal(u) }
 function fecharModal() { document.getElementById('modal-usuario').classList.remove('aberto'); editId = null; document.getElementById('f-email').disabled = false }
+
+// ── Foto de perfil no cadastro — ver/trocar (js/avatar-foto.js) +
+// sincronização com todos os apps (RPC admin_atualizar_foto_usuario,
+// migration 289). No modo criação o usuário ainda não tem `id`: a foto
+// fica PENDENTE (blob local) e só sobe depois que o Edge Function
+// devolve o id da conta recém-criada.
+let _admFotoAtual = null
+let _admFotoPendente = null
+let _admFotoRemovida = false
+
+function admInicializarAvatar(u) {
+  _admFotoAtual = u?.foto_url || null
+  _admFotoPendente = null
+  _admFotoRemovida = false
+  admPintarAvatar(u?.nome_completo)
+  avatarFotoRegistrar('adm-foto', {
+    temFoto: () => !!(_admFotoPendente || (_admFotoAtual && !_admFotoRemovida)),
+    verFoto: async () => {
+      if (_admFotoPendente) return URL.createObjectURL(_admFotoPendente)
+      if (!_admFotoAtual || _admFotoRemovida) return null
+      return await fotoUrlAssinada(_admFotoAtual)
+    },
+    trocarFoto: () => document.getElementById('adm-foto-file').click(),
+  })
+}
+
+async function admPintarAvatar(nomeCompleto) {
+  const el = document.getElementById('adm-foto-img')
+  if (!el) return
+  if (_admFotoPendente) {
+    el.style.backgroundImage = `url("${URL.createObjectURL(_admFotoPendente)}")`
+    el.textContent = ''
+    return
+  }
+  if (_admFotoAtual && !_admFotoRemovida) {
+    const url = await fotoUrlAssinada(_admFotoAtual)
+    if (url) { el.style.backgroundImage = `url("${url}")`; el.textContent = ''; return }
+  }
+  el.style.backgroundImage = ''
+  el.textContent = iniciais(nomeCompleto || document.getElementById('f-nome').value || '?')
+}
+
+async function admFotoEscolhida(input) {
+  const arq = input.files?.[0]
+  input.value = ''
+  if (!arq) return
+  if (arq.size > 5 * 1024 * 1024 || (arq.type && !/^image\//.test(arq.type))) {
+    toast('Escolha uma imagem de até 5 MB.', 'error'); return
+  }
+  _admFotoPendente = await avatarFotoReduzir(arq, 512)
+  _admFotoRemovida = false
+  await admPintarAvatar()
+  toast(editId ? 'Foto pronta — clique em Salvar para aplicar.' : 'Foto pronta — será enviada ao criar o usuário.', 'info')
+}
+
+// Sobe `_admFotoPendente` para avatares/<uid>/… e propaga via RPC.
+// `uid` é o alvo (o próprio editId em edição; o id devolvido pelo Edge
+// Function na criação).
+async function admSincronizarFotoPendente(uid) {
+  if (!_admFotoPendente) return
+  const path = `${uid}/${Date.now()}.jpg`
+  const { error: upErr } = await db.storage.from('avatares')
+    .upload(path, _admFotoPendente, { contentType: 'image/jpeg', upsert: false })
+  if (upErr) throw upErr
+  const { data: pub } = db.storage.from('avatares').getPublicUrl(path)
+  const { error: rpcErr } = await db.rpc('admin_atualizar_foto_usuario', { p_usuario_id: uid, p_url: pub.publicUrl })
+  if (rpcErr) throw rpcErr
+}
 
 async function salvar() {
   const nome_completo = document.getElementById('f-nome').value.trim()
@@ -241,6 +335,7 @@ async function salvar() {
         telefone: document.getElementById('f-tel').value.trim() || null,
       }).eq('id', editId)
       if (error) throw error
+      if (_admFotoPendente) await admSincronizarFotoPendente(editId)
       toast('Usuário atualizado!', 'success')
     } else {
       const senha = document.getElementById('f-senha').value
@@ -264,9 +359,17 @@ async function salvar() {
       })
       const json = await resp.json()
       if (!resp.ok) throw new Error(json.error || 'Erro ao criar usuário')
+      // Foto é melhor esforço, igual à lotação logo abaixo: a conta já
+      // foi criada, então uma falha aqui não desfaz o cadastro — só avisa.
+      let fotoAviso = null
+      if (_admFotoPendente && json.id) {
+        try { await admSincronizarFotoPendente(json.id) }
+        catch (e) { fotoAviso = `Usuário criado, mas a foto não pôde ser enviada: ${e.message}` }
+      }
       // Lotação é melhor esforço no servidor (ver admin-criar-usuario) —
       // a criação do usuário nunca é desfeita por causa dela; só avisa.
-      toast(json.aviso || 'Usuário criado! Ele deverá trocar a senha no primeiro acesso.', json.aviso ? 'warning' : 'success')
+      const aviso = fotoAviso || json.aviso
+      toast(aviso || 'Usuário criado! Ele deverá trocar a senha no primeiro acesso.', aviso ? 'warning' : 'success')
     }
     fecharModal(); await carregar()
   } catch(e) { toast(e.message || 'Erro ao salvar', 'error') }

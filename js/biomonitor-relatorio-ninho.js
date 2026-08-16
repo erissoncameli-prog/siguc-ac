@@ -17,6 +17,8 @@
 // gerarProtocolo() (js/config-sistema.js); bioBuscarEventosServidor(),
 // bioMontarHistoricoNinho() (js/biomonitor-timeline.js);
 // BIOPDF_FONT_REGULAR_B64/BIOPDF_FONT_BOLD_B64 (js/biomonitor-pdf-fonts.js);
+// relatorioPdfDesenharCabecalho() (js/relatorio-cabecalho-pdf.js — timbre
+// institucional, fonte única, compartilhada com o relatório da Água);
 // jsPDF + jspdf-autotable, carregados sob demanda via CDN.
 
 const BIOREL_ESPECIE = {
@@ -257,10 +259,6 @@ async function _biopdfBuscarDataURL(url) {
       fr.readAsDataURL(blob)
     })
   } catch (e) { return null }
-}
-
-function _biopdfFormatoImg(dataUrl) {
-  return /^data:image\/jpe?g/i.test(dataUrl || '') ? 'JPEG' : 'PNG'
 }
 
 // Enquadra (cover) uma imagem num canvas de proporção fixa, igual ao
@@ -720,22 +718,13 @@ async function _biopdfFolhaNinho(ctx, n, idx, total, modo) {
 // páginas já existentes (só assim dá pra saber o total de páginas para
 // "Pág. X/Y", e evita desenhar 2x nas páginas que o autoTable cria) ──
 function _biopdfDesenharCabecalhoPagina(pdf, cab, protocolo, logos) {
-  const W = pdf.internal.pageSize.getWidth()
-  const topo = 8
-  let x = BIOPDF_M
-  if (logos.gov) pdf.addImage(logos.gov, _biopdfFormatoImg(logos.gov), x, topo, 11, 11)
-  x += 13
-  if (logos.secr) pdf.addImage(logos.secr, _biopdfFormatoImg(logos.secr), x, topo, 11, 11)
-  const xTexto = BIOPDF_M + 26
-  pdf.setFont('DMSans', 'bold'); pdf.setFontSize(10.5); pdf.setTextColor(...BIOPDF_COR.floresta)
-  pdf.text(`${cab.secretaria} — ${cab.siglaSecr}`, xTexto, topo + 4.5)
-  pdf.setFont('DMSans', 'normal'); pdf.setFontSize(7.5); pdf.setTextColor(...BIOPDF_COR.muted)
-  pdf.text(`${cab.diretoria} · ${cab.departamento} · Biomonitoramento`, xTexto, topo + 8.5)
-  pdf.setFontSize(7); pdf.setTextColor(...BIOPDF_COR.muted2)
-  pdf.text(BIOREL_NOME_PLATAFORMA, W - BIOPDF_M, topo + 2.5, { align: 'right' })
-  pdf.text('Prot. ' + protocolo, W - BIOPDF_M, topo + 6.5, { align: 'right' })
-  pdf.setDrawColor(...BIOPDF_COR.floresta); pdf.setLineWidth(0.6)
-  pdf.line(BIOPDF_M, BIOPDF_TOPO - 4, W - BIOPDF_M, BIOPDF_TOPO - 4)
+  relatorioPdfDesenharCabecalho(pdf, {
+    margem: BIOPDF_M,
+    corFloresta: BIOPDF_COR.floresta, corMuted: BIOPDF_COR.muted, corMuted2: BIOPDF_COR.muted2,
+    cab, protocolo, logos,
+    nomePlataforma: BIOREL_NOME_PLATAFORMA,
+    linhaModulo: `${cab.diretoria} · ${cab.departamento} · Biomonitoramento`,
+  })
 }
 
 function _biopdfDesenharRodapePagina(pdf, cab, protocolo, ninhoTxt, numeroPagina, totalPaginas) {

@@ -12,6 +12,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&family=Fraunces:wght@700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/biomonitor.css">
+  <link rel="stylesheet" href="/css/avatar-foto.css">
 </head>
 <body class="bio-app">
 
@@ -1899,7 +1900,7 @@
       <div>
         <strong id="bio-config-nome">—</strong>
         <p id="bio-config-grupo" style="margin:2px 0 0;font-size:13px;opacity:.65">—</p>
-        <p style="margin:4px 0 0;font-size:11px;color:var(--bio-prim)">Tocar para alterar foto</p>
+        <p style="margin:4px 0 0;font-size:11px;color:var(--bio-prim)">Tocar para ver ou trocar a foto</p>
       </div>
     </button>
     <input type="file" id="bio-input-foto-perfil" accept="image/*" hidden>
@@ -2148,6 +2149,7 @@ window.__API_MONITOR_OFF = true
         onerror="console.warn('[biomonitor] Supabase CDN indisponível — modo offline')"></script>
 <script src="/js/config.js"></script>
 <script src="/js/fotos-privadas.js"></script>
+<script src="/js/avatar-foto.js"></script>
 <script src="/js/lgpd.js"></script>
 <script>window.LGPD_CAMPO_APP = 'biomonitor'</script>
 <script src="/js/lgpd-campo.js"></script>
@@ -2180,6 +2182,7 @@ const _bioReady = _dbReady.then(function () {
 <script src="/js/brigada-captura.js"></script>
 <script src="/js/biomonitor-timeline.js"></script>
 <script src="/js/biomonitor-pdf-fonts.js"></script>
+<script src="/js/relatorio-cabecalho-pdf.js"></script>
 <script src="/js/biomonitor-relatorio-ninho.js"></script>
 <script src="/js/compartilhar-arquivo.js"></script>
 <script src="/js/biomonitor-relatorio-campo.js"></script>

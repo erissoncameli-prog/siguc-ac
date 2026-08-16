@@ -26,6 +26,8 @@
 // aguaRelViolacoesRanking(), aguaRelIqaPorPonto(), aguaRelPorCampanha()
 // (js/agua-relatorio-dados.js); AGUA_IQA_FAIXA_COR/ORDEM
 // (js/agua-iqa-visual.js — só a paleta, com fallback local);
+// relatorioPdfDesenharCabecalho() (js/relatorio-cabecalho-pdf.js — timbre
+// institucional, fonte única, compartilhada com o Biomonitor);
 // jsPDF + jspdf-autotable (js/vendor/jspdf-2.5.2.umd.min.js,
 // js/vendor/jspdf-autotable-3.8.4.min.js).
 
@@ -146,22 +148,13 @@ function _agpdfTabela(ctx, opts) {
 // ── Cabeçalho/rodapé — passada final sobre todas as páginas já
 // existentes (só assim dá pra saber o total de páginas) ────────────
 function _agpdfDesenharCabecalhoPagina(pdf, cab, protocolo, logos) {
-  const W = pdf.internal.pageSize.getWidth()
-  const topo = 8
-  let x = AGPDF_M
-  if (logos.gov) pdf.addImage(logos.gov, /^data:image\/jpe?g/i.test(logos.gov) ? 'JPEG' : 'PNG', x, topo, 11, 11)
-  x += 13
-  if (logos.secr) pdf.addImage(logos.secr, /^data:image\/jpe?g/i.test(logos.secr) ? 'JPEG' : 'PNG', x, topo, 11, 11)
-  const xTexto = AGPDF_M + 26
-  pdf.setFont('DMSans', 'bold'); pdf.setFontSize(10.5); pdf.setTextColor(...AGPDF_COR.floresta)
-  pdf.text(`${cab.secretaria} — ${cab.siglaSecr}`, xTexto, topo + 4.5)
-  pdf.setFont('DMSans', 'normal'); pdf.setFontSize(7.5); pdf.setTextColor(...AGPDF_COR.muted)
-  pdf.text(`${cab.diretoria} · ${cab.departamento} · Qualidade da Água`, xTexto, topo + 8.5)
-  pdf.setFontSize(7); pdf.setTextColor(...AGPDF_COR.muted2)
-  pdf.text('SIGUC-AC', W - AGPDF_M, topo + 2.5, { align: 'right' })
-  pdf.text('Prot. ' + protocolo, W - AGPDF_M, topo + 6.5, { align: 'right' })
-  pdf.setDrawColor(...AGPDF_COR.floresta); pdf.setLineWidth(0.6)
-  pdf.line(AGPDF_M, AGPDF_TOPO - 4, W - AGPDF_M, AGPDF_TOPO - 4)
+  relatorioPdfDesenharCabecalho(pdf, {
+    margem: AGPDF_M,
+    corFloresta: AGPDF_COR.floresta, corMuted: AGPDF_COR.muted, corMuted2: AGPDF_COR.muted2,
+    cab, protocolo, logos,
+    nomePlataforma: 'SIGUC-AC',
+    linhaModulo: `${cab.diretoria} · ${cab.departamento} · Qualidade da Água`,
+  })
 }
 
 function _agpdfDesenharRodapePagina(pdf, cab, protocolo, numeroPagina, totalPaginas) {

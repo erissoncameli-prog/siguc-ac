@@ -1,8 +1,11 @@
 # Acesso por organograma — arquitetura de permissão do SIGUC
 
-Status: **PLANEJAMENTO — nada implementado.** Documento de arquitetura.
-Levantamento feito contra o banco de **produção** em 2026-08-15, não contra
-o repositório.
+Status: infraestrutura entregue (migrations 262–280); virada módulo a
+módulo em andamento — ver §3.1 e §8 pro que já está ligado (Biomonitor,
+Monitoramento, Netflora) e o que ficou de fora por decisão (Unidades/
+Equipe/Alertas-ambientais: RLS pronta, `exige_lotacao` ainda desligado).
+Levantamento original contra o banco de **produção** em 2026-08-15, não
+contra o repositório.
 
 Pedido: ligar o organograma da SEMA aos módulos (Frota, Biomonitor,
 Brigadas, Água…), de modo **robusto**, servindo a **todos os módulos
@@ -153,6 +156,24 @@ seguro e não muda nada visível hoje, porque `js/layout.js` ainda não lê
    das duas fontes é a correta — exatamente o que a frente 5 evitou
    fazer. Fica para quando (ou se) a SEMA decidir alinhar o catálogo à
    realidade, ou vice-versa.
+
+**Atualização (2026-08-16) — o grupo Biomonitor ligou a ponta.** Foi o
+gatilho real: usuário `tecnico` sem lotação continuava vendo o grupo
+inteiro na sidebar mesmo depois da migration 275 ligar
+`exige_lotacao=true` só nesse módulo — o RLS já bloqueava o dado, mas o
+menu mentia sobre o que a pessoa podia fazer. Diferente dos 3 candidatos
+acima, `biomonitor` tem match exato catálogo×sidebar (migration 263 criou
+a chave já cobrindo o grupo inteiro, sem os `perfis:` antigos discordando
+de nada) — por isso foi o primeiro a sair do papel. `js/layout.js` ganhou
+`grupo.modulo` (só no grupo Biomonitor, os outros ficam como estavam): se
+`appState.permissoes[grupo.modulo] === 'sem_acesso'`, o grupo inteiro some
+da sidebar, por cima dos `perfis:` de cada item (mais restritivo vence).
+Fail-open preservado — `appState.permissoes` vazio (rede fora do ar) não
+esconde nada. Guarda: 3 testes novos em `tests/sidebar-grupos.test.js`.
+`pwa/sw.js`: frota 87 → 88 (`js/layout.js` está no shell do app).
+`validacao-campo`/`admin-brigadas`/`frota` continuam de fora — o drift
+catálogo×realidade descrito acima não foi resolvido, converter esses às
+cegas mudaria acesso de gente de verdade sem decisão humana.
 
 ### 1.5 Biomonitor: existe no sistema, **não existe no catálogo**
 
@@ -342,11 +363,235 @@ o que já podia fazer) — silenciosamente, sem nenhum log de erro.
 
 ### 3.1 O que foi convertido nesta sessão
 
-Só **`config_sistema`** (migration 268): é a única tabela testada onde
-o catálogo e a regra real coincidem — ninguém além de super_admin tem
+**`config_sistema`** (migration 268): é a única tabela onde o catálogo e
+a regra real já coincidiam de saída — ninguém além de super_admin tem
 qualquer nível em `configuracoes`, em nenhuma das duas fontes. Verificado
 por `pode_editar('configuracoes')` simulando super_admin (`true`) e
 gestor (`false`), batendo com o comportamento anterior.
+
+**Atualização (2026-08-16) — `unidades_conservacao`, `monitoramento_registros`,
+`netflora_especies`, `netflora_inventarios`, `alertas_ambientais`,
+`equipe_servidores`** (migration 276): as 6 de drift confirmado no §3.0
+foram convertidas — mas na direção oposta da tabela ali: em vez de
+seguir o catálogo (que ampliava acesso em quase todas), **o catálogo foi
+corrigido pra bater com o array de hoje**, decisão explícita do usuário
+("manter só quem já edita hoje") pergunta a pergunta pelas 2 frentes de
+drift (unidades: catálogo reduzia; as outras 4: catálogo ampliava).
+Depois da correção, `pode_editar(chave)` devolve exatamente o mesmo
+resultado do array antigo pra todo perfil — conversão sem mudar
+comportamento nenhum, só o mecanismo. `monitoramento_indicadores` ficou
+de fora de propósito: compartilha a chave `monitoramento` com
+`monitoramento_registros`, mas hoje só `super_admin` edita (mais
+restrito que o resto do módulo) — convertê-la ampliaria o cadastro de
+indicadores pra gestor/tecnico, que é uma decisão à parte, não decidida.
+
+**Achado ao ligar `exige_lotacao` (migrations 277–280) — `teto_do_perfil()`
+é global por perfil, não por módulo**:
+
+```sql
+SELECT COALESCE(MAX(nivel), 'sem_acesso') FROM (
+  SELECT nivel FROM perfil_permissoes_padrao WHERE perfil = p_perfil
+  UNION ALL SELECT nivel FROM grupo_permissoes_padrao WHERE perfil = p_perfil
+) t;
+```
+
+O teto é o nível MÁXIMO que o perfil tem em QUALQUER módulo do sistema,
+não no módulo sendo avaliado. Um `tecnico` lotado no DEUC, que edita
+Monitoramento/Netflora, tem teto `editar` — e esse mesmo teto se aplica
+a Unidades/Equipe/Alertas Ambientais no mesmo setor, mesmo esses três
+restringindo edição a `gestor`/`super_admin` hoje. Medido com a Ana
+Luisa Dias de Araújo (tecnico, lotada DEUC): `vw_impacto_lotacao`-style
+mostrou ela ganhando `editar` em Unidades e Equipe, que não tem hoje.
+Por isso `exige_lotacao` foi ligado só em `monitoramento`/`netflora`
+(migration 280) — os 2 dos 6 onde tecnico já edita hoje, sem expansão.
+`unidades`/`equipe`/`alertas-ambientais` ficam com RLS convertida
+(pronta, sem risco) mas `exige_lotacao=false` até esse teto virar por
+módulo ou a SEMA aceitar a expansão pra técnico nesses 3. Corrigir
+`teto_do_perfil()` pra ser por módulo é mudança na função central de
+`nivel_efetivo()` — não decidida, fica registrada como frente futura.
+
+**Lotação real cadastrada (migrations 277/279)**: DEUC = Átila de Araújo
+Magalhães, Claudia Lima Silva, Jomara Katrine Vitoriano de Souza, Raco
+Tanomaru Junior, Ricardo Antônio de Andrade Plácido, Samyr Vieira de
+Farias, Ana Luisa Dias de Araújo. DERHQA = Maria Antônia Zabala de
+Almeida Nobre. Marlon Castelo Branco e Quelyson Souza de Lima (perfil
+`gestor` no cadastro, mas brigadistas na prática, confirmado pelo
+usuário) ficaram sem lotação — perdem `editar` em Monitoramento/Netflora
+por decisão explícita, mesmo efeito que teriam em qualquer módulo do
+lote quando a chave for ligada.
+
+**Água ativada logo em seguida (migration 281, mesma sessão)**: RLS já
+era 100% `pode_ver`/`pode_editar` desde a Fase 2 (`agua_campanhas`,
+`agua_coletas`, `agua_laboratorios`, `agua_pontos_coleta`), dono já
+cadastrado (DERHQA). Impacto medido: zero "ganha", só "perde" quem não
+está no DERHQA — sem o problema de teto por perfil (teto de
+gestor/tecnico já batia com o que `agua` concede). Ganhou o gate de
+sidebar (`grupo.modulo='agua'` em `js/layout.js`) igual ao Biomonitor,
+porque leitura e escrita das tabelas de dono são as duas gated —
+diferente do cluster DEUC abaixo. `pwa/sw.js`: frota 88 → 89.
+
+**Cluster Brigadas — só a metade simples convertida (migrations 282/283,
+mesma sessão)**: das 10 tabelas levantadas, só 5 têm um array único
+valendo pra TODA operação (`atividades_brigada`, `brigadas`,
+`brigadistas`, `equipamentos_brigada`, `equipes_brigada` — tecnico/
+gestor/super_admin + `is_chefe_brigada()` preservado como OR em
+`equipes_brigada`). Mesmo processo do DEUC: catálogo de `brigadas`
+corrigido (tecnico estava em `visualizar`, real é `editar`;
+chefe_departamento/gestor_uc/assistente_admin estavam em `editar`, real
+é sem essas 3), convertido pra `pode_editar('brigadas')`, `exige_lotacao`
+ligado sem expansão (mesmos 7 do DEUC + super_admin mantêm editar).
+`pages/brigadas.html` **não tem link na sidebar** — sem item de menu
+pra gatear, a proteção fica só na RLS.
+
+**Atualização (2026-08-16) — 2 das 5 "complexas" eram simples de
+verdade.** `atividades_campo_catalogo` (super_admin, gestor — chave
+`admin-brigadas`) e `especies_fauna` (biologo, gestor, super_admin —
+chave `validacao-campo`) tinham só um array DIFERENTE das outras 5 já
+convertidas, não múltiplos arrays por operação. Convertidas (migration
+286) com o mesmo processo seguro de sempre: catálogo de `admin-brigadas`
+corrigido (chefe_departamento/gestor_uc tinham editar, hoje não editam
+esta tabela — downgrade); catálogo de `validacao-campo` corrigido nas
+duas pontas (faltava `biologo`, tinha chefe_departamento/gestor_uc/
+validador_brigada de sobra). `exige_lotacao` NÃO ligado em nenhuma das
+duas chaves ainda — só a conversão de RLS, ativação fica pra quando/se
+alguém decidir o dono desses módulos.
+
+**As 3 tabelas genuinamente complexas (`registro_fauna`,
+`registro_participantes`, `registros_campo`) ficam como estão, por
+decisão do usuário.** O array de perfis varia por OPERAÇÃO na mesma
+tabela (`registro_fauna`: UPDATE aceita tecnico, INSERT/DELETE não;
+`registro_participantes`: escrita só gestor/super_admin, leitura inclui
+tecnico/biologo), e o catálogo só tem um nível por perfil/módulo — não
+representa "edita X mas não Y". Opção descartada por ora: unificar as
+operações primeiro (decidir se tecnico também cria/apaga fauna, não só
+atualiza) pra então converter com o mesmo processo de sempre. Fica
+registrado como limite do modelo atual, sem risco — continuam com o
+array hard-coded de sempre, fora do organograma.
+
+**`teto_do_perfil()` corrigido pra ser por módulo (migration 284, mesma
+sessão) — destrava Unidades/Equipe/Alertas-ambientais.** A causa exata
+do achado acima: `nivel_efetivo_calc()` usava `teto_do_perfil(perfil)`
+— nível MÁXIMO daquele perfil em QUALQUER módulo do sistema — como teto
+do alcance por lotação. Um `tecnico` lotado no DEUC (editor em
+monitoramento/netflora) "vazava" `editar` pra unidades/equipe/alertas,
+onde só super_admin/gestor editam hoje. Correção: novo helper
+`nivel_catalogo_perfil(perfil, modulo_id, grupo)` — mesma lógica de
+fallback que já existia duplicada 2x dentro de `nivel_efetivo_calc`
+(`perfil_permissoes_padrao` → `grupo_permissoes_padrao` →
+`sem_acesso`), agora usado também como teto no lugar do global. O teto
+do **credenciamento** (`LEAST(v_cred, teto_do_perfil(...))`) foi
+mantido global de propósito — é mecanismo de exceção explícita
+concedida por super_admin, semântica diferente do alcance por lotação
+comum.
+
+Validado com funções-sombra ANTES de tocar na função real: comparação
+`nivel_efetivo()` real × simulação nova pra TODOS os usuários ativos ×
+TODOS os módulos com dono = **zero diferença no estado atual**
+(nenhuma regressão nos 5 módulos já ativos). Simulação com
+`exige_lotacao` forçado nos 3 módulos travados = só a Ana Luisa (única
+`tecnico` lotada no DEUC) muda, de `editar` pra `visualizar`/
+`sem_acesso`, batendo com o array real; nenhum gestor muda. Só depois
+disso a função real foi trocada (`CREATE OR REPLACE`, mesma
+assinatura), e `exige_lotacao` ligado nos 3 (migration 285). Efeito
+colateral positivo: `REVOKE EXECUTE ... FROM authenticated` em
+`nivel_efetivo_calc` fechou 1 aviso do advisor de segurança que já
+existia (175 → 174 WARN).
+
+Dois casos que pareciam suspeitos ao conferir o resultado e que
+INVESTIGUEI antes de assumir bug: Jomara Katrine Vitoriano de Souza
+aparecendo com `editar` em `monitoramento`/`netflora`/`brigadas` sem
+lotação DEUC — na verdade tem CARGO num núcleo de UC (`usuario_unidades()`
+inclui cargo, não só lotação) que é descendente do DEUC na árvore,
+herdando o nível por `alcance_por_lotacao()` (regra documentada no
+§1.4, não bug). Glauco Feitosa com `editar` em `agua` sem eu ter
+cadastrado nada — lotação real, criada pelo próprio usuário direto na
+tela de Estrutura Organizacional, em paralelo a esta sessão (`criado_por`
+= o usuário, `criado_em` = durante a conversa). Nenhum dos dois é
+consequência da migration 284.
+
+**Frota ativado (migration 287, 2026-08-16) — decisão explícita, com
+custo conhecido.** DITLOG só tinha o usuário de teste ("Teste", lotado
+lá e reperfilado pra `gestor` na mesma sessão, pela própria pessoa
+direto na tela) — nenhum dos 10 gestores reais que hoje editam Frota
+está lotado no setor. Ligar `exige_lotacao` mesmo assim foi decisão do
+usuário: os 10 perdem `editar` em Frota até serem lotados no DITLOG (ou
+setor correto). RLS já era 100% `pode_ver`/`pode_editar` desde a
+entrega original do módulo — não precisou de conversão, só ativação.
+
+**Correção — sidebar do grupo Frota escondia "Solicitar Viagem" de 5
+perfis (2026-08-16).** Achado ao confirmar que "todo usuário tem que
+poder solicitar viagem": os DADOS já garantiam isso desde sempre
+(`frota_viag_insert` é dono-do-registro — `solicitante_id = auth.uid()`
+— nunca dependeu de `pode_editar('frota')`; `frota-app.html` cai
+automaticamente no modo solicitante pra quem não é gestor nem
+motorista). O gap era só a sidebar: o grupo `frota` tinha um array
+`perfis:` que excluía `brigadista`/`biologo`/`pesquisador_externo`/
+`validador_brigada`/`validador_fauna` do grupo INTEIRO, escondendo até
+o link de solicitar. Removido o filtro do grupo (não dos itens) — App
+Frota/Minhas Tarefas/Solicitar Viagem (sem `perfis:` próprio) ficam
+visíveis a todo mundo; Agenda de Viagens/Painel/Administrar Frota
+mantêm seus filtros por item, intocados — aprovação/gestão continuam
+restritas. `pwa/sw.js`: frota 89 → 90. Guarda: 2 testes novos em
+`tests/sidebar-grupos.test.js`.
+
+**Ajuste após teste em produção (2026-08-16, mesmo dia) — Gestão e
+Brigadas ganharam o gate de grupo afinal.** Testando com o usuário Dima
+(DEBIO) real, o pedido do usuário mudou depois de ver a sidebar ao
+vivo: esconder os grupos Gestão e Brigadas de Incêndio inteiros pra
+quem não é do DEUC, mesmo sabendo que a leitura das tabelas continua
+aberta por baixo (decisão explícita, ciente do trade-off acima). Como
+nenhuma chave de Gestão cobre o grupo inteiro (são 8 chaves
+independentes) e só 4 delas foram convertidas+ligadas nesta sessão
+(painel-gestor/pesquisas/ocorrencias/relatorios ficaram de fora, sem
+checagem de drift), o gate usa **`monitoramento`/`brigadas` como proxy
+do grupo inteiro** — são as únicas chaves de cada cluster já
+verificadas sem drift. Testado: some pra `sem_acesso`, aparece pra
+`editar`.
+
+**App Frota volta a exigir perfil próprio.** A abertura total do commit
+anterior incluía o app inteiro (modos motorista/gestor também) — o
+pedido original era só Solicitar Viagem/Minhas Tarefas. Restaurado o
+array de perfis (o mesmo de antes) só no item `frota-app`; os outros
+dois continuam sem filtro. `pwa/sw.js`: frota 90 → 91.
+
+**Gate por `modulo` estendido pra ITEM, não só grupo (mesma sessão,
+achado testando com o Dima de novo).** "Painel de Frota" e "Administrar
+Frota" continuavam aparecendo pra ele mesmo sem lotação no DITLOG —
+os arrays `perfis:` desses 2 itens (e de "Agenda de Viagens") são
+pré-organograma, incluem `tecnico`/`gestor` em geral, nunca foram
+atualizados quando `exige_lotacao` foi ligado em `frota`. O mecanismo
+de gate (até então só em `grupo.modulo`) ganhou `item.modulo` — os 3
+itens ganharam `modulo: 'frota'` junto do array de perfis que já
+tinham; os dois filtros valem em AND (mais restritivo vence). Solicitar
+Viagem/Minhas Tarefas continuam sem filtro nenhum. `pwa/sw.js`: frota
+91 → 92.
+
+**`tecnico` do DITLOG também aprova viagem (migration 288, mesma
+sessão) — achado testando com o próprio Teste.** Depois do gate por
+item, ele (tecnico, lotado DITLOG) continuava sem ver "Agenda de
+Viagens" — o array `perfis:` desse item nunca incluiu `tecnico` (é
+anterior à virada, aprovação sempre foi tratada como função de
+gestão). Decisão do usuário: `tecnico` do DITLOG também aprova. Duas
+mudanças, não só a sidebar — sem a segunda, o link apareceria mas
+`pode_editar('frota')` continuaria recusando de verdade:
+1. `perfis:` de `frota-viagens` ganhou `'tecnico'` — sozinho não faz
+   nada, o `modulo: 'frota'` do item já barra quem não está lotado.
+2. `perfil_permissoes_padrao(tecnico, frota) = 'editar'` (era
+   `'visualizar'`, fallback do grupo Frota) — sem isso o teto de
+   `LEAST(alcance_por_lotacao, teto)` capava em `visualizar` mesmo pra
+   quem está no DITLOG. Testado: só afeta tecnico REALMENTE lotado no
+   DITLOG (`alcance_por_lotacao` já barra os outros em `sem_acesso`,
+   independente do teto) — os outros 6 técnicos ativos do sistema
+   (DEUC/DEBIO/DERHQA/sem lotação) continuam `sem_acesso` em `frota`.
+`pwa/sw.js`: frota 92 → 93. A leitura dessas 6 tabelas é aberta a qualquer autenticado
+(decisão de não mexer nela) — só a escrita segue o catálogo. Esconder o
+item do menu quando `permissoes[chave] === 'sem_acesso'` esconderia a
+página de quem ainda pode LER normalmente (ex.: todo `tecnico` tem
+`sem_acesso` no catálogo de `equipe`, mas lê `equipe_servidores` via
+policy aberta hoje) — regressão de navegação sem ganho de segurança,
+diferente do Biomonitor onde leitura e escrita são as duas gated pelo
+mesmo `nivel_efetivo()`. O gate de sidebar só faz sentido em módulo onde
+as duas camadas concordam.
 
 ### 3.2 Inventário completo — 129 policies, 77 tabelas
 
@@ -395,14 +640,18 @@ permissão, ver seção LGPD do `CLAUDE.md`), `painel-gestor` (via
 
 **(a) Candidatas a módulo, mas com DRIFT confirmado** (não convertidas —
 decisão de qual conjunto de perfis é o CORRETO cabe à SEMA, não a mim):
-`documentos`, `equipe_servidores`, `netflora_especies`,
-`netflora_inventarios`, `alertas_ambientais`, `monitoramento_indicadores`,
-`unidades_conservacao`, `camadas_mapa` (+ 3 policies redundantes na mesma
-tabela — `camadas_mapa_insert/update/delete` duplicam `camadas_admin`
-com a mesma expressão; consolidar é limpeza segura independente da
-decisão de drift).
+`documentos`, `monitoramento_indicadores` (fica de fora de propósito, ver
+§3.1), `camadas_mapa` (+ 3 policies redundantes na mesma tabela —
+`camadas_mapa_insert/update/delete` duplicam `camadas_admin` com a mesma
+expressão; consolidar é limpeza segura independente da decisão de
+drift).
 
-**(a) Convertida**: `config_sistema` ✅ (migration 268).
+**(a) Convertida**: `config_sistema` ✅ (migration 268);
+`unidades_conservacao`, `monitoramento_registros`, `netflora_especies`,
+`netflora_inventarios`, `alertas_ambientais`, `equipe_servidores` ✅
+(migration 276, 2026-08-16 — catálogo corrigido pra bater com o array de
+hoje, ver §3.1). `exige_lotacao` só ligado em `monitoramento`/`netflora`
+por ora (achado do teto por perfil, §3.1).
 
 ### 3.3 Regra permanente — já vale a partir de agora
 
@@ -728,3 +977,37 @@ achados novos.
 **Regra permanente, vale para toda função nova a partir de agora**:
 `REVOKE EXECUTE ON FUNCTION ... FROM PUBLIC, anon, authenticated;`
 sempre com `PUBLIC` explícito — nunca só `FROM anon`.
+
+### 8.3 Achado — `data_fim` inclusivo fazia lotação/cargo antigo continuar valendo no dia da troca (2026-08-16)
+
+Testando com o usuário Teste (trocado de lotação 3 vezes na mesma
+sessão: DEBIO → DITLOG → DERHQA), o módulo antigo continuava aparecendo
+depois de cada troca. Causa: `usuario_unidades()` trata `data_fim` como
+limite **inclusivo** (`data_fim >= CURRENT_DATE` ainda conta como
+ativa), mas `encerrarLotacao()` (`pages/estrutura-organizacional.html`)
+gravava `data_fim = hoje` — o mesmo dia em que a lotação nova começava.
+Resultado: as duas ficavam ativas ao mesmo tempo por um dia inteiro,
+contradizendo o próprio texto do `confirm()` ("deixa de ser alcançado
+**a partir de** hoje").
+
+Encontrado 3 vezes na mesma sessão (2 lotações + 1 cargo do Teste,
+corrigidas manualmente por SQL uma a uma) antes de virar óbvio que era
+bug sistemático, não acaso.
+
+Corrigido em `encerrarLotacao()`: fecha **ontem**, não hoje, pra hoje já
+não contar (é o inverso do que a função fazia). Caso de borda: uma
+lotação criada e encerrada no MESMO dia não tem "ontem" válido sem
+violar `data_fim >= data_inicio` (a constraint `ck_lotacao_datas`) — aí
+a função apaga a linha em vez de tentar fechar com uma data inválida.
+
+`cargo_ocupacoes` **não tem o mesmo bug de código** — não existe botão
+"Encerrar" automático ali, `data_fim` é digitado à mão no modal de
+ocupação (`salvarOcupacao`). O cargo do Teste que causou o mesmo
+sintoma foi corrigido manualmente (SQL), não é bug de UI.
+
+Sem guarda automatizada ainda — a página não tem harness de teste
+isolado como `tests/sidebar-grupos.test.js` tem pra `js/layout.js`
+(ver comentário no topo daquele arquivo sobre por que as páginas reais
+não servem de base). Verificado manualmente contra produção: `nivel_efetivo()`
+do Teste parou de listar o módulo antigo assim que a correção equivalente
+foi aplicada por SQL às 3 linhas já existentes.

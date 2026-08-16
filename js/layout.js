@@ -121,6 +121,20 @@ function gerarLayout(tituloPagina, paginaAtiva) {
     },
     {
       id: 'gestao', label: 'Gestão', super: 'Diretoria Técnica',
+      // Gate por `modulo` usando 'monitoramento' como PROXY do grupo
+      // inteiro (não uma chave própria de "gestao" — não existe). Os 8
+      // itens têm chave 1:1 no catálogo, mas só monitoramento/netflora/
+      // alertas-ambientais/equipe foram convertidos e ligados por
+      // exige_lotacao nesta sessão (todos DEUC); painel-gestor/
+      // pesquisas/ocorrencias/relatorios continuam com RLS antiga, sem
+      // checagem de drift feita — usar a chave própria de cada um
+      // esconderia/mostraria errado pra quem não foi conferido.
+      // 'monitoramento' já está validado (mesmo dono, sem drift), serve
+      // de indicador confiável pro grupo todo. Decisão do usuário:
+      // esconder o grupo inteiro pra quem não é do DEUC, mesmo sabendo
+      // que a leitura das tabelas continua aberta por baixo (só o menu
+      // muda, não o RLS) — ver docs/acesso-por-organograma.md §3.1.
+      modulo: 'monitoramento',
       itens: [
         { id: 'monitoramento',      href: '../pages/monitoramento.html',      label: t('nav.monitoramento') },
         { id: 'netflora',           href: '../pages/netflora.html',           label: 'Netflora — Inventário' },
@@ -134,6 +148,11 @@ function gerarLayout(tituloPagina, paginaAtiva) {
     },
     {
       id: 'brigadas', label: 'Brigadas de Incêndio', super: 'Diretoria Técnica',
+      // 'brigadas' é a chave já convertida e ligada por exige_lotacao
+      // (DEUC) nesta sessão — mesmo raciocínio do grupo Gestão acima.
+      // Cobre também `brigada-app`, que não tem chave própria no
+      // catálogo (link só abre o app de campo).
+      modulo: 'brigadas',
       itens: [
         { id: 'brigada-app',         href: '../pages/brigada.html',             label: 'App de Campo', target: '_blank' },
         { id: 'validacao-campo',     href: '../pages/validacao-campo.html',     label: 'Validação de Campo',
@@ -145,6 +164,15 @@ function gerarLayout(tituloPagina, paginaAtiva) {
     },
     {
       id: 'biomonitor', label: 'Biomonitor', super: 'Diretoria Técnica',
+      // modulo: chave em `modulos` (minhas_permissoes/nivel_efetivo) que
+      // governa o grupo inteiro — o catálogo não discrimina item por
+      // item dentro do Biomonitor (migration 263), então o gate é do
+      // grupo, por cima dos arrays `perfis:` de cada item (que continuam
+      // valendo, mais restritivo vence). Ver docs/acesso-por-organograma.md
+      // §1.4b/§1.5 — só este grupo tem match exato catálogo×sidebar hoje;
+      // validacao-campo/admin-brigadas/frota ficam de fora por divergência
+      // catálogo×realidade ainda não resolvida.
+      modulo: 'biomonitor',
       itens: [
         { id: 'biomonitor-app',        href: '../pages/biomonitor.html',           label: 'App de Campo', target: '_blank' },
         { id: 'biomonitor-validacao',  href: '../pages/biomonitor-validacao.html', label: 'Validação de Ninhos',
@@ -162,6 +190,14 @@ function gerarLayout(tituloPagina, paginaAtiva) {
     },
     {
       id: 'agua', label: 'Qualidade da Água', super: 'Diretoria Técnica',
+      // Mesmo padrão do grupo Biomonitor: 'agua' é uma chave só no
+      // catálogo cobrindo o grupo inteiro (Fase 2), e RLS das tabelas
+      // de dono (campanhas/coletas/laboratórios/pontos) já é 100%
+      // pode_ver/pode_editar — leitura e escrita concordam, então
+      // esconder o grupo quando sem_acesso é seguro (diferente do
+      // cluster DEUC, onde leitura fica aberta e por isso NÃO ganhou
+      // esse gate — ver docs/acesso-por-organograma.md §3.1).
+      modulo: 'agua',
       itens: [
         { id: 'agua-app',         href: '../pages/agua-app.html',         label: 'App de Campo', target: '_blank' },
         { id: 'agua-mapa',        href: '../pages/agua-mapa.html',        label: 'Mapa' },
@@ -173,16 +209,37 @@ function gerarLayout(tituloPagina, paginaAtiva) {
     },
     {
       id: 'frota', label: 'Frota — Transporte', super: 'Administrativo',
-      perfis: ['super_admin','secretario','diretor','chefe_departamento','gestor','gestor_uc','tecnico','assistente_admin','financeiro','visualizador'],
+      // Sem filtro no GRUPO — precisa ficar aberto pra quem só tem
+      // acesso a Solicitar Viagem/Minhas Tarefas (sem `perfis:` próprio,
+      // abertos a qualquer perfil: solicitar viagem é dono-do-registro,
+      // frota_viag_insert nunca dependeu de organograma nem de perfil).
+      // "App Frota" volta a ter filtro de perfil PRÓPRIO (decisão do
+      // usuário, 2026-08-16, revertendo a abertura total de antes) —
+      // é o app completo (motorista/gestor também), não só solicitar.
+      // Agenda de Viagens/Painel/Administrar mantêm seus arrays de
+      // `perfis:` (pré-organograma) MAS ganham `modulo: 'frota'` também
+      // — os arrays sozinhos não bastam mais: incluem 'tecnico'/'gestor'
+      // em geral, sem olhar lotação, então qualquer tecnico (ex.: um
+      // lotado no DEBIO) ou gestor fora do DITLOG continuava vendo os
+      // 3, mesmo já sem `editar`/`visualizar` de verdade na RLS depois
+      // que exige_lotacao foi ligado em 'frota' (achado testando com
+      // Dima, 2026-08-16). Os dois filtros valem juntos (mais
+      // restritivo vence) — quem tem lotação E está no array certo.
       itens: [
-        { id: 'frota-app',       href: '../pages/frota-app.html',       label: 'App Frota', target: '_blank' },
+        { id: 'frota-app',       href: '../pages/frota-app.html',       label: 'App Frota', target: '_blank',
+          perfis: ['super_admin','secretario','diretor','chefe_departamento','gestor','gestor_uc','tecnico','assistente_admin','financeiro','visualizador'] },
         { id: 'frota-tarefas',   href: '../pages/frota-tarefas.html',   label: 'Minhas Tarefas' },
         { id: 'frota-solicitar', href: '../pages/frota-solicitar.html', label: 'Solicitar Viagem' },
-        { id: 'frota-viagens',   href: '../pages/frota-viagens.html',   label: 'Agenda de Viagens',
-          perfis: ['super_admin','diretor','chefe_departamento','gestor','assistente_admin'] },
-        { id: 'frota-dashboard', href: '../pages/frota-dashboard.html', label: 'Painel de Frota',
+        { id: 'frota-viagens',   href: '../pages/frota-viagens.html',   label: 'Agenda de Viagens', modulo: 'frota',
+          // 'tecnico' entrou por decisão do usuário (2026-08-16): quem é
+          // do DITLOG aprova viagem mesmo sendo tecnico, não só gestão.
+          // O `modulo: 'frota'` acima é quem impede isso vazar pra
+          // tecnico de outro setor — sem lotação no DITLOG, sem_acesso
+          // barra antes de chegar no array de perfis.
+          perfis: ['super_admin','diretor','chefe_departamento','gestor','assistente_admin','tecnico'] },
+        { id: 'frota-dashboard', href: '../pages/frota-dashboard.html', label: 'Painel de Frota', modulo: 'frota',
           perfis: ['super_admin','secretario','diretor','chefe_departamento','gestor','gestor_uc','tecnico','assistente_admin','financeiro'] },
-        { id: 'frota-administrar', href: '../pages/frota-administrar.html', label: 'Administrar Frota',
+        { id: 'frota-administrar', href: '../pages/frota-administrar.html', label: 'Administrar Frota', modulo: 'frota',
           perfis: ['super_admin','secretario','diretor','chefe_departamento','gestor','gestor_uc','tecnico','assistente_admin','financeiro'] },
       ]
     },
@@ -211,8 +268,14 @@ function gerarLayout(tituloPagina, paginaAtiva) {
   let superAtual;
   const navHtml = navGroups.map(grupo => {
     if (grupo.perfis && u && !grupo.perfis.includes(u.perfil)) return '';
+    // appState.permissoes vem de minhas_permissoes (nivel_efetivo), fail-open
+    // ({} se a consulta falhar — nunca esconde o grupo por instabilidade de
+    // rede). Só aplica quando o grupo declara `modulo` (nem todo item tem
+    // correspondência 1:1 com o catálogo — ver comentário no grupo Biomonitor).
+    if (grupo.modulo && appState.permissoes && appState.permissoes[grupo.modulo] === 'sem_acesso') return '';
     const itensHtml = grupo.itens
       .filter(item => !item.perfis || (u && item.perfis.includes(u.perfil)))
+      .filter(item => !item.modulo || !appState.permissoes || appState.permissoes[item.modulo] !== 'sem_acesso')
       .map(item => {
         const ativo   = paginaAtiva === item.id ? ' ativo' : '';
         const target  = item.target ? ` target="${item.target}" rel="noopener"` : '';

@@ -73,14 +73,32 @@
   position: relative;
   overflow: hidden;
 }
+/* Rio animado ao fundo (js/agua-rio.js). Fica ATRÁS da vinheta, senão a
+   correnteza chega às bordas com força total e briga com o conteúdo.
+   pointer-events:none — o toque é escutado na .lock-screen, não aqui,
+   para não roubar o clique das teclas do PIN. */
+.lock-rio {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  display: block;
+  pointer-events: none;
+}
+/* Empilhamento das telas de bloqueio, de baixo para cima:
+   0 rio · 1 vinheta · 2 conteúdo.
+   O `position` PRECISA ser repetido aqui: `.lock-screen > *` (abaixo)
+   tem a mesma especificidade que `.lock-rio` e vem depois, então
+   venceria com `relative` — e um canvas relative vira item do flex,
+   empurrando o conteúdo das 4 telas para fora do lugar. */
+.lock-screen > .lock-rio { position: absolute; z-index: 0; }
+
 /* Véu sutil nas bordas para concentrar o olhar no centro (vinheta) */
 .lock-screen::after {
   content: '';
-  position: absolute; inset: 0; z-index: 0;
+  position: absolute; inset: 0; z-index: 1;
   pointer-events: none;
   background: radial-gradient(125% 95% at 50% 42%, transparent 58%, rgba(3,10,7,.55) 100%);
 }
-.lock-screen > * { position: relative; z-index: 1; }
+.lock-screen > * { position: relative; z-index: 2; }
 
 /* Faixa institucional (Governo + SEMA) no topo das telas de PIN */
 .lock-faixa {
@@ -662,13 +680,22 @@ body { margin: 0; }
   width: 100%; height: 100%; object-fit: contain; display: block;
   filter: drop-shadow(0 1px 3px rgba(0,0,0,.3));
 }
+/* Emblema do app na faixa institucional da Home: coluna do MEIO da
+   grade (entre Governo do Acre e SEMA) e transbordando para baixo da
+   faixa — o `margin-bottom` de .faixa-inst reserva esse espaço.
+   Sem recorte circular, mesma razão do .lock-mascote: a arte já é um
+   squircle com cantos próprios.
+   O `filter` fica só nos keyframes de brilho (senão a animação seria
+   sobrescrita por esta regra e o halo não pulsaria). */
 .faixa-mascote {
   position: absolute;
-  left: 50%; bottom: -40px;
+  left: 50%; bottom: -30px;
   transform: translateX(-50%);
-  width: 86px; height: 86px;
-  border-radius: 50%;
-  filter: drop-shadow(0 4px 10px rgba(10,26,15,.35));
+  /* 70px, não os 86px do molde: ali o mascote é uma foto circular, aqui
+     é um squircle cheio — no mesmo tamanho ele pesa demais e invade o
+     conteúdo da Home. Cabe folgado na coluna de 96px da grade. */
+  width: 70px; height: 70px;
+  border-radius: 0;
 }
 
 /* Variante compacta: telas de tarefa (formulário/fauna) — mesma
@@ -679,8 +706,16 @@ body { margin: 0; }
 .faixa-inst.compacta .faixa-logo-chip.gov { height: 34px; max-width: 124px; }
 .faixa-inst.compacta .faixa-mascote { width: 58px; height: 58px; bottom: -26px; }
 
-/* Mascote nas telas de login/bloqueio/PIN */
-.lock-mascote { width: 84px; height: 84px; border-radius: 50%; }
+/* Emblema do app nas telas de login/bloqueio/PIN.
+   Sem recorte circular (o molde de brigada.css usava 50% porque lá é
+   uma foto de mascote): a arte do IQA já é um squircle com cantos
+   próprios e transparência em volta — arredondar de novo comeria as
+   pontas do emblema. */
+.lock-mascote {
+  width: 84px; height: 84px;
+  border-radius: 0;
+  filter: drop-shadow(0 7px 20px rgba(2,132,199,.5));
+}
 
 /* ── Animações do mascote ─────────────────────────────────── */
 /* Respiração suave (vida em repouso) */
@@ -688,7 +723,26 @@ body { margin: 0; }
   0%, 100% { transform: translateX(-50%) translateY(0) scale(1); }
   50%      { transform: translateX(-50%) translateY(-3px) scale(1.025); }
 }
-.faixa-mascote { animation: mascote-respira 3.4s ease-in-out infinite; }
+/* Emblema boiando: sobe e desce de leve, com o halo respirando junto —
+   leitura de gota sobre a água, em vez do "respira" do mascote do
+   Brigadas (que este arquivo herdou do molde).
+   ⚠ TODO keyframe precisa repetir `translateX(-50%)`: é ele que centra
+   o emblema na coluna do meio. Um keyframe sem isso joga a arte meia
+   largura para a direita no meio da animação. */
+@keyframes agua-emblema-boia {
+  0%, 100% { transform: translateX(-50%) translateY(0)      scale(1); }
+  50%      { transform: translateX(-50%) translateY(-5px)   scale(1.03); }
+}
+@keyframes agua-emblema-halo {
+  0%, 100% { filter: drop-shadow(0 5px 12px rgba(10,26,15,.40))
+                     drop-shadow(0 0 9px  rgba(56,189,248,.32)); }
+  50%      { filter: drop-shadow(0 9px 17px rgba(10,26,15,.32))
+                     drop-shadow(0 0 19px rgba(56,189,248,.58)); }
+}
+.faixa-mascote {
+  animation: agua-emblema-boia 4.6s ease-in-out infinite,
+             agua-emblema-halo 4.6s ease-in-out infinite;
+}
 
 @keyframes lock-respira {
   0%, 100% { transform: scale(1); }
@@ -718,7 +772,9 @@ body { margin: 0; }
 }
 
 /* ── Vídeo do mascote (overlay em tela cheia) ─────────────── */
-.faixa-mascote { cursor: pointer; }
+/* Sem `cursor: pointer` no emblema: diferente do mascote do Brigadas,
+   aqui tocar não abre nada — o cursor de mão prometeria uma ação que
+   não existe. */
 /* Modo Copa: brilho dourado festivo no mascote (não altera o posicionamento) */
 .faixa-mascote.copa, .lock-mascote.copa { filter: drop-shadow(0 3px 9px rgba(201,168,76,.8)); }
 .video-mascote-overlay {

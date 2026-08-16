@@ -15,7 +15,7 @@ const APP = SCOPE.includes('/pages/biomonitor.html') ? 'biomonitor'
 // Ao concluir uma implementação que toque arquivos web de um app,
 // incrementar SÓ o número daquele app (vN → vN+1) — não precisa mexer
 // nos outros dois.
-const VERSOES = { brigadas: 263, biomonitor: 31, frota: 87, agua: 15 }
+const VERSOES = { brigadas: 264, biomonitor: 32, frota: 94, agua: 19 }
 const CACHE = `siguc-${APP}-v${VERSOES[APP]}`
 
 const SHELLS = {
@@ -23,8 +23,10 @@ const SHELLS = {
     '/pages/brigada.html',
     '/css/brigada.css',
     '/css/global.css',
+    '/css/avatar-foto.css',
     '/js/config.js',
     '/js/fotos-privadas.js',
+    '/js/avatar-foto.js',
     '/js/lgpd.js',
     '/js/lgpd-campo.js',
     '/js/qrcode-generator.js',
@@ -49,8 +51,10 @@ const SHELLS = {
   biomonitor: [
     '/pages/biomonitor.html',
     '/css/biomonitor.css',
+    '/css/avatar-foto.css',
     '/js/config.js',
     '/js/fotos-privadas.js',
+    '/js/avatar-foto.js',
     '/js/lgpd.js',
     '/js/lgpd-campo.js',
     '/js/qrcode-generator.js',
@@ -60,6 +64,7 @@ const SHELLS = {
     '/js/brigada-captura.js',
     '/js/biomonitor-timeline.js',
     '/js/biomonitor-pdf-fonts.js',
+    '/js/relatorio-cabecalho-pdf.js',
     '/js/biomonitor-relatorio-ninho.js',
     '/js/compartilhar-arquivo.js',
     '/js/biomonitor-relatorio-campo.js',
@@ -83,6 +88,7 @@ const SHELLS = {
     '/js/frota-sync.js',
     '/js/frota-notif-local.js',
     '/js/fotos-privadas.js',
+    '/js/avatar-foto.js',
     '/js/lgpd.js',
     '/js/lgpd-campo.js',
     '/js/frota-consumo.js',
@@ -93,8 +99,10 @@ const SHELLS = {
   agua: [
     '/pages/agua-app.html',
     '/css/agua-app.css',
+    '/css/avatar-foto.css',
     '/js/config.js',
     '/js/fotos-privadas.js',
+    '/js/avatar-foto.js',
     '/js/lgpd.js',
     '/js/lgpd-campo.js',
     '/js/qrcode-generator.js',
@@ -102,8 +110,11 @@ const SHELLS = {
     '/js/agua-sync.js',
     '/js/brigada-captura.js',
     '/js/agua-iqa-visual.js',
+    '/js/agua-rio.js',
+    '/pwa/icons/icon-agua-512.png',
     '/js/config-sistema.js',
     '/js/biomonitor-pdf-fonts.js',
+    '/js/relatorio-cabecalho-pdf.js',
     '/js/agua-relatorio-dados.js',
     '/js/agua-relatorio-pdf.js',
     '/js/compartilhar-arquivo.js',

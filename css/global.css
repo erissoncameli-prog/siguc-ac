@@ -375,3 +375,9 @@ select.form-control { cursor: pointer; }
   .pf-acoes { width: 100%; }
   .pf-acoes .btn { flex: 1; justify-content: center; }
 }
+
+/* pf-foto (Meu Perfil) usa a moldura de css/avatar-foto.css — anel
+   afastado da borda sólida, no lugar do halo antigo. */
+.pf-avatar .pf-foto { border-radius: 50%; }
+.pf-avatar { position: relative; }
+.pf-avatar .avatar-foto-anel { inset: -5px; }
