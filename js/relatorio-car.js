@@ -702,18 +702,16 @@ function _htmlCabecalho(cab, protocolo, data, mini=false) {
   const logoSecr = cab.logoSecr     ? `<img src="${cab.logoSecr}"     alt="Logo Secretaria">` : '🏛';
   return `
   <div class="rel-cabecalho">
-    <div class="rel-logos">
-      <div class="rel-logo">${logoGov}</div>
-      <div class="rel-cab-div"></div>
-      <div class="rel-logo">${logoSecr}</div>
-    </div>
-    <div class="rel-cab-div" style="margin:0 6px"></div>
+    <div class="rel-logo">${logoGov}</div>
     <div class="rel-inst">
       <div class="gov">${_relEsc(cab.governo)}${cab.gestao?' · '+cab.gestao:''}</div>
       <div class="sec">${_relEsc(cab.secretaria)} — ${_relEsc(cab.siglaSecr)}</div>
       <div class="dir">${_relEsc(cab.diretoria)} · ${_relEsc(cab.departamento)}</div>
     </div>
-    <div class="rel-meta">SIGUC-AC<br>Emitido: ${data}<br>Prot. nº ${_relEsc(protocolo)}</div>
+    <div class="rel-logo-secr-col">
+      <div class="rel-logo">${logoSecr}</div>
+      <div class="rel-meta">SIGUC-AC<br>Emitido: ${data}<br>Prot. nº ${_relEsc(protocolo)}</div>
+    </div>
   </div>`;
 }
 

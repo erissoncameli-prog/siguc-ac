@@ -677,6 +677,50 @@ js/frota-consumo.js.
   migration só DEPOIS do deploy do código que assina (ver cabeçalho
   das migrations 200 e 210).
 
+## Regra do sistema — timbre institucional (logo Acre × logo SEMA) nos relatórios
+TODO relatório (PDF ou impressão/HTML) tem a logo do Governo do Acre
+na margem ESQUERDA e a da SEMA na margem DIREITA — nunca as duas do
+mesmo lado — e cada logo SEMPRE mantém a proporção original da
+imagem, nunca esticada num quadrado fixo.
+
+Achado real: os dois relatórios desenhados com jsPDF (Água e
+Biomonitor) tinham `pdf.addImage(logo, fmt, x, y, 11, 11)` — um
+quadrado fixo de 11×11mm que força qualquer logo não-quadrada a
+esticar/espremer, com as duas logos empilhadas do lado esquerdo.
+
+Fonte única do timbre em jsPDF: `js/relatorio-cabecalho-pdf.js`
+(`relatorioPdfDesenharCabecalho`) — mesma lição do
+`js/frota-consumo.js`/`js/mapa-recorte.js`, nunca reimplementar o
+desenho do cabeçalho numa página nova. A função usa
+`pdf.getImageProperties()` para pegar a proporção real da imagem e
+encaixa dentro de uma caixa máxima (object-fit:contain, nunca
+estica); o texto institucional fica centralizado no espaço entre as
+duas logos, e o bloco "SIGUC-AC / Prot. XXX" (que antes ficava no
+canto superior direito) passa a ficar ACIMA da logo da SEMA, na faixa
+livre entre o topo da página e o início das logos — senão colidiria
+com a logo que passou a ocupar aquele canto. Usado por
+`js/agua-relatorio-pdf.js` e `js/biomonitor-relatorio-ninho.js` (este
+último também gera a ficha de campo via
+`js/biomonitor-relatorio-campo.js`, sem cópia).
+- Toda página que carregue um dos dois geradores de PDF precisa
+  incluir `<script src=".../js/relatorio-cabecalho-pdf.js">` ANTES do
+  respectivo `agua-relatorio-pdf.js`/`biomonitor-relatorio-ninho.js` —
+  e entrar em `SHELLS.agua`/`SHELLS.biomonitor` (pwa/sw.js) e nas
+  listas `ARQUIVOS_JS` dos builds nativos
+  (`app-agua/scripts/build-www.mjs`, `app-biomonitor/scripts/build-www.mjs`).
+- Relatórios em HTML/impressão (sem jsPDF) seguem a MESMA regra de
+  posicionamento, com CSS: `js/relatorio-car.js` + `css/relatorio-print.css`
+  (`.rel-cabecalho`: logo à esquerda, `.rel-inst` centralizado
+  flex:1, `.rel-logo-secr-col` — logo da SEMA + protocolo empilhados —
+  à direita) e a capa de `pages/analise-cientifica-biomonitor.html`
+  (`.ac-capa-logos { justify-content: space-between }`, logos já eram
+  proporcionais por `object-fit: contain`, só a POSIÇÃO mudou). CSS
+  com `object-fit: contain` (nunca `cover`/`fill`) em qualquer `<img>`
+  de logo institucional é a regra equivalente em HTML.
+- Qualquer relatório novo (PDF ou impressão) que precise do timbre
+  institucional segue essa regra desde o nascimento — logo Acre à
+  esquerda, logo SEMA à direita, proporção preservada.
+
 ## LGPD — governança de dados pessoais
 Plano em 5 fases; 0 a 2 entregues. Migrations 209–212.
 - **ROPA vivo no banco** (`lgpd_tratamentos`, migration 211): 16
