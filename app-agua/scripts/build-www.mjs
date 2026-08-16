@@ -31,7 +31,7 @@ mkdirSync(join(WWW, 'js/vendor'),    { recursive: true })
 mkdirSync(join(WWW, 'vendor/fonts'), { recursive: true })
 
 // ── JS compartilhado (transpilado para ES2017) ────────────────
-for (const f of ['config.js', 'fotos-privadas.js', 'lgpd.js', 'lgpd-campo.js', 'qrcode-generator.js', 'agua-offline.js', 'agua-sync.js', 'brigada-captura.js', 'agua-iqa-visual.js', 'agua-rio.js', 'config-sistema.js', 'biomonitor-pdf-fonts.js', 'agua-relatorio-dados.js', 'agua-relatorio-pdf.js', 'compartilhar-arquivo.js']) {
+for (const f of ['config.js', 'fotos-privadas.js', 'lgpd.js', 'lgpd-campo.js', 'qrcode-generator.js', 'agua-offline.js', 'agua-sync.js', 'brigada-captura.js', 'agua-iqa-visual.js', 'agua-rio.js', 'config-sistema.js', 'biomonitor-pdf-fonts.js', 'relatorio-cabecalho-pdf.js', 'agua-relatorio-dados.js', 'agua-relatorio-pdf.js', 'compartilhar-arquivo.js']) {
   copiarJsTranspilado(join(RAIZ, 'js', f), join(WWW, 'js', f))
 }
 // js/vendor/ — jsPDF + jspdf-autotable, carregados sob demanda por
@@ -137,7 +137,7 @@ html = html.replace('</head>', `<script>window.__SIGUC_ENV=${envJson}</script>\n
 writeFileSync(join(WWW, 'index.html'), html)
 
 // ── Sanidade ───────────────────────────────────────────────────
-for (const f of ['index.html', 'vendor/supabase.js', 'vendor/fonts.css', 'css/agua-app.css', 'js/config.js', 'js/fotos-privadas.js', 'js/lgpd.js', 'js/lgpd-campo.js', 'js/qrcode-generator.js', 'js/agua-offline.js', 'js/agua-sync.js', 'js/brigada-captura.js', 'js/agua-iqa-visual.js', 'js/agua-rio.js', 'js/config-sistema.js', 'js/biomonitor-pdf-fonts.js', 'js/agua-relatorio-dados.js', 'js/agua-relatorio-pdf.js', 'js/compartilhar-arquivo.js', 'js/vendor/jspdf-2.5.2.umd.min.js', 'js/vendor/jspdf-autotable-3.8.4.min.js']) {
+for (const f of ['index.html', 'vendor/supabase.js', 'vendor/fonts.css', 'css/agua-app.css', 'js/config.js', 'js/fotos-privadas.js', 'js/lgpd.js', 'js/lgpd-campo.js', 'js/qrcode-generator.js', 'js/agua-offline.js', 'js/agua-sync.js', 'js/brigada-captura.js', 'js/agua-iqa-visual.js', 'js/agua-rio.js', 'js/config-sistema.js', 'js/biomonitor-pdf-fonts.js', 'js/relatorio-cabecalho-pdf.js', 'js/agua-relatorio-dados.js', 'js/agua-relatorio-pdf.js', 'js/compartilhar-arquivo.js', 'js/vendor/jspdf-2.5.2.umd.min.js', 'js/vendor/jspdf-autotable-3.8.4.min.js']) {
   if (!existsSync(join(WWW, f))) { console.error(`ERRO: faltando www/${f}`); process.exit(1) }
 }
 const indexFinal = readFileSync(join(WWW, 'index.html'), 'utf8')
@@ -168,7 +168,7 @@ if (!/window\.__SIGUC_ENV=\{.*supabaseUrl.*supabaseKey/.test(indexFinal)) {
 }
 // Garante que a transpilação removeu os operadores ES2021 (||= &&= ??=) que
 // quebravam libs modernas em WebViews < 85.
-for (const f of ['vendor/supabase.js', 'js/config.js', 'js/fotos-privadas.js', 'js/lgpd.js', 'js/lgpd-campo.js', 'js/qrcode-generator.js', 'js/agua-offline.js', 'js/agua-sync.js', 'js/brigada-captura.js', 'js/agua-iqa-visual.js', 'js/agua-rio.js', 'js/config-sistema.js', 'js/biomonitor-pdf-fonts.js', 'js/agua-relatorio-dados.js', 'js/agua-relatorio-pdf.js', 'js/compartilhar-arquivo.js', 'js/vendor/jspdf-2.5.2.umd.min.js', 'js/vendor/jspdf-autotable-3.8.4.min.js']) {
+for (const f of ['vendor/supabase.js', 'js/config.js', 'js/fotos-privadas.js', 'js/lgpd.js', 'js/lgpd-campo.js', 'js/qrcode-generator.js', 'js/agua-offline.js', 'js/agua-sync.js', 'js/brigada-captura.js', 'js/agua-iqa-visual.js', 'js/agua-rio.js', 'js/config-sistema.js', 'js/biomonitor-pdf-fonts.js', 'js/relatorio-cabecalho-pdf.js', 'js/agua-relatorio-dados.js', 'js/agua-relatorio-pdf.js', 'js/compartilhar-arquivo.js', 'js/vendor/jspdf-2.5.2.umd.min.js', 'js/vendor/jspdf-autotable-3.8.4.min.js']) {
   const js = readFileSync(join(WWW, f), 'utf8')
   const proibidos = js.match(/\|\|=|&&=|\?\?=/g)
   if (proibidos) {
