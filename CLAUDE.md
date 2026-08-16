@@ -1534,6 +1534,157 @@ preguiçoso porque o binding nativo dele derrubava a coleta inteira).
 `pwa/sw.js`: agua v11 → v12; brigadas 262 → 263, biomonitor 30 → 31,
 frota 86 → 87 (js/config.js ganhou 3 ícones e está no shell dos 4).
 
+**O painel também é a PRIMEIRA PÁGINA do PDF** (`js/agua-relatorio-pdf.js`).
+A capa era identificação + 6 números; virou o mesmo painel, na mesma
+ordem (KPIs → distribuição por faixa → CONAMA + ranking → IQA por ponto
+→ evolução por campanha), desenhado com os primitivos do jsPDF (não é o
+SVG da tela rasterizado — sairia serrilhado) e alimentado pelas MESMAS
+funções de `js/agua-relatorio-dados.js`. Diferença deliberada: sem chip
+para escolher ponto, o PDF traça a **média da bacia por campanha**; o
+gráfico de barras mostra os 10 melhores pontos ("(10 de N)" no título) e
+o detalhamento das páginas seguintes continua trazendo todos. Dois bugs
+corrigidos junto: (1) `AGPDF_IQA_COR` era cópia da paleta que havia
+DIVERGIDO da tela ('Boa' lima em vez de verde; 'Péssima' no vermelho
+pré-correção) — agora deriva de `AGUA_IQA_FAIXA_COR`, com fallback local;
+(2) `_agpdfNovaPagina` incondicional depois da capa inseria folha em
+branco quando a nota de quarentena transbordava sozinha — virou
+condicional, com teste travando a contagem exata de páginas. ⚠️ Ao
+escrever asserção sobre texto extraído de PDF: a legenda sai colada na
+seguinte ("…Boa 2Regular 1…"), então `\b` não serve depois do número
+(usar `(?!\d)`), e títulos de bloco/seção estão em CAIXA ALTA.
+`pwa/sw.js`: agua v12 → v13.
+
+**E no PPTX (slide 2)**: "Resumo do período" virou "Painel do período"
+com os mesmos blocos (KPIs, distribuição por faixa, rosca da
+conformidade CONAMA com os TRÊS estados, IQA médio por ponto); slides 3
+e 4 seguem iguais. Diferença deliberada em relação ao PDF: aqui os
+gráficos são **nativos** (`addChart` do pptxgenjs), porque num deck quem
+apresenta precisa editar/copiar o gráfico — no documento impresso, não.
+`js/agua-relatorio-pptx.js` não está em shell de app (só a mesa usa),
+então não mexe em `pwa/sw.js`. ⚠️ PPTX renderizado não pôde ser
+conferido (sem LibreOffice/PowerPoint na máquina) — a verificação é
+estrutural sobre o XML do .pptx, e é isso que o teste trava.
+
+**Rosca em vez de barra, escopo "Acre todo" e mapa dinâmico no
+painel.** Três pedidos numa sessão: distribuição por faixa virou rosca
+(`aguaIqaFaixasRoscaHTML`, substituiu `aguaIqaFaixasBarraHTML` — removida,
+sem outro consumidor); `Acre todo` é o valor `''` do seletor de bacia e
+agora o PADRÃO (nada mais de "escolha uma bacia" antes de ver algo) —
+`aguaRelBuscarTodasColetas()` busca sem filtro nenhum, e `aguaRelMontar()`
+ganhou `opts.bacia` pra recortar CLIENT-SIDE dentro do que já foi
+carregado; a gaveta de Filtros ganhou um campo "Bacia" que só habilita
+quando o cabeçalho está em "Acre todo" (senão seria redundante) — é por
+aí que "quero mais detalhe" vira "aplico bacia + rio na gaveta" sem
+voltar ao cabeçalho. Mapa novo reaproveita tudo de `pages/agua-mapa.html`:
+o ESTILO do marcador (preenchimento por faixa + borda por CONAMA +
+opacidade da quarentena) foi extraído pra `aguaIqaEstiloMarcador()` em
+`js/agua-iqa-visual.js` e as duas telas passaram a chamar a mesma
+função — nunca duas cópias do mesmo desenho. Diferença: o mapa dedicado
+colore pela campanha selecionada no eixo temporal; o do painel colore
+pela coleta MAIS RECENTE do recorte já filtrado (nunca média
+classificada numa faixa). Container do mapa fica FORA de `#rl-conteudo`
+(que é reconstruído a cada filtro) — nasce uma vez, só troca marcador,
+preserva zoom entre filtros. `pwa/sw.js`: agua v13 → v14. Achado
+testando: um bug de ÍNDICE na fixture do TESTE (não no app) fazia todo
+marcador cair na mesma longitude — destructuring posicional com
+contagem errada de blanks; corrigido indexando por `p[6]`/`p[7]` em vez
+de contar vírgulas no olho.
+
+**Pós-lançamento — emblema + rio nas telas de bloqueio do app.** As 4
+telas com `.lock-screen` de `agua-app.html` (entrar, criar senha, digitar
+PIN, criar PIN) trocaram a gota plana em SVG pelo emblema do app
+(`/pwa/icons/icon-agua-512.png`, o mesmo do launcher) e ganharam um rio
+animado ao fundo, com resposta ao toque. Tudo em `js/agua-rio.js` (novo);
+nenhuma página redesenha nada.
+- **Campo de fluxo, nunca senóide.** A 1ª tentativa animava ondas
+  mudando de FASE: curva que muda de forma sem sair do lugar não é lida
+  como correnteza, o olho vê fio luminoso se contorcendo. O que vale é
+  partícula advectada (nasce no topo, deixa esteira, morre embaixo) — o
+  padrão VIAJA. Três coisas fazem parecer rio, e mexer nelas é mexer no
+  efeito: turbulência de ROTACIONAL (divergência zero, os fios se
+  enrolam em vez de se cruzarem), PERFIL DE CANAL (meio rápido, margem
+  quase parada — sem isso é chuva caindo, não rio) e ESTEIRA
+  (`destination-out` tirando alpha, nunca `clearRect`).
+- ⚠ **A diferença finita do rotacional tem de ser dividida por 2·d.**
+  Sem normalizar, a deriva lateral fica em ~1 px/s contra 46 px/s de
+  descida — chuva reta, sem redemoinho. Foi o defeito real da 1ª versão,
+  achado medindo o campo, não olhando a tela. Ao normalizar, o outro
+  extremo aparece: o `vy` chega a −62 (água SUBINDO). Calibragem final
+  por varredura numérica (`curl` 30, amortecimento 0,22 no eixo
+  vertical) + piso em `_campo`: a turbulência amassa a descida, nunca a
+  inverte.
+- ⚠ **Calibragem é proporcional à tela, nunca em pixel absoluto.** Com
+  escala fixa o redemoinho tem sempre ~139 px: numa tela de 274 é um
+  meandro calmo, numa de 430 vira rabisco miúdo e o fundo parece
+  ARRANHADO. `_calibrar()` amarra o tamanho do redemoinho à LARGURA e a
+  velocidade à ALTURA (a água leva ~12 s para atravessar em qualquer
+  aparelho).
+- ⚠ **Quem morre de idade renasce ESPALHADO, não no topo.** A travessia
+  (~12 s) é mais longa que a vida de um filete (3–9 s), então quase
+  nenhum completa o percurso; mandar todos de volta ao topo amontoava a
+  água na faixa de cima e deixava a metade de baixo vazia. Só quem sai
+  pela borda volta pelo topo.
+- **Toque na água**: a onda não é só um anel desenhado por cima — ela
+  EMPURRA o campo de fluxo ao passar (`_campo` soma o empurrão radial),
+  então os filetes se afastam do dedo de verdade, com anel, clarão curto
+  e respingos balísticos. Escutado na `.lock-screen` em CAPTURA, não no
+  canvas (que é `pointer-events:none`): assim apertar uma tecla do PIN
+  também ondula — cada dígito vira uma gota na água.
+- ⚠ **Armadilha de CSS achada aqui**: `.lock-screen > *` tem a MESMA
+  especificidade que `.lock-rio` e vem depois no arquivo, então vencia
+  com `position: relative` — e canvas relative vira item do flex,
+  empurrando o conteúdo das 4 telas. O `position: absolute` precisa ser
+  repetido na regra `.lock-screen > .lock-rio`. Empilhamento:
+  0 rio · 1 vinheta · 2 conteúdo.
+- **Bateria (aparelho de campo)**: as 4 telas coexistem no DOM, então
+  sem trava rodariam 4 rios ao mesmo tempo. `IntersectionObserver` só
+  anima a tela à vista, e `visibilitychange` para com o app em segundo
+  plano. Com "reduzir movimento" o rio desenha um quadro parado e o
+  toque nem é instalado.
+- ⚠ **`/pwa/icons/…` NÃO existe dentro do APK.** O emblema é a primeira
+  `<img>` de caminho absoluto do app; sem cópia explícita, as 4 telas do
+  APK abririam com imagem quebrada (o site serve pela Vercel, o shell
+  nativo não tem nada fora de `www/`). `app-agua/scripts/build-www.mjs`
+  passou a copiar `pwa/icons/` e ganhou uma trava para `<img src="/…">`
+  não embarcada — irmã da que já existia para `<script src="/js/…">`.
+  Qualquer imagem nova de caminho absoluto precisa entrar na lista.
+- Guarda: `tests/agua-rio.test.js` (5 testes). A verificação do desenho é
+  por PIXEL do próprio canvas (`getImageData`, canal alpha), não por
+  screenshot — a vinheta do CSS fica POR CIMA do rio, então um
+  screenshot mediria os dois misturados. Cobre também o emblema
+  carregando de fato (`naturalWidth > 0` pega caminho errado, que a olho
+  nu só some), o canvas não roubando o toque das teclas, e as telas
+  escondidas com ZERO pixel pintado.
+- `pwa/sw.js`: agua v15 → v16 (`js/agua-rio.js` e o ícone no shell).
+
+**Pós-lançamento — emblema na faixa institucional da Home.** O mesmo
+emblema entrou na `.faixa-inst` do `tela-home`, na coluna do MEIO da
+grade (entre Governo do Acre e SEMA) e transbordando ~27 px para baixo
+da faixa — a estrutura já existia no molde de `brigada.css` (grade
+`1fr 96px 1fr`, `.faixa-mascote` absoluto, `margin-bottom` da faixa
+reservando o espaço); só estava sem ocupante, porque Água não tem
+mascote. Animação própria de água: `agua-emblema-boia` (sobe/desce de
+leve) + `agua-emblema-halo` (o brilho ciano respirando junto), no lugar
+do `mascote-respira` herdado.
+- 70 px, não os 86 px do molde: lá o mascote é foto circular, aqui é um
+  squircle cheio — no mesmo tamanho pesa demais e invade o conteúdo.
+- `border-radius: 0` (mesma razão do `.lock-mascote`) e `cursor:pointer`
+  removido: no Brigadas tocar o mascote abre menu, aqui não faz nada.
+- ⚠ **TODO keyframe do emblema precisa repetir `translateX(-50%)`** — é
+  ele que centra na coluna do meio (`left:50%`). Um keyframe sem isso
+  joga a arte meia largura para a direita NO MEIO do ciclo, defeito que
+  ninguém liga à animação depois. O teste amostra o ciclo inteiro
+  (4,6 s) cobrando o centro em todos os quadros; conferido que reprova
+  de fato (34,77 px de desvio com um keyframe quebrado de propósito).
+- O `filter` do drop-shadow vive só nos keyframes do halo: declarado
+  também na regra base, sobrescreveria a animação e o brilho não
+  pulsaria.
+- Guarda: +2 testes em `tests/agua-rio.test.js` (7 no total).
+- `pwa/sw.js`: agua v16 → v17. Nenhum arquivo novo entra no shell, mas
+  `css/agua-app.css` e `pages/agua-app.html` (os dois tocados aqui) JÁ
+  estão nele e a v16 já tinha ido para produção — sem o incremento, quem
+  abrisse com a v16 em cache não receberia o emblema.
+
 ## Próxima tarefa
 Módulo Qualidade da Água (IQA): as 5 fases do plano original estão
 ENTREGUES (ver `docs/qualidade-agua/plano.md`, seções "Fase 0" a "Fase

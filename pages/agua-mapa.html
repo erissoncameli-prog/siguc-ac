@@ -282,23 +282,16 @@ function renderCampanha(idx) {
     const coleta = _coletaPorChave[p.id + '|' + camp.id] || null
     marker._coletaAtual = coleta
 
-    if (coleta) {
-      comColeta++
-      const semLimites = coleta.conama_violacoes == null
-      const violou = !semLimites && coleta.conama_violacoes.length > 0
-      const corBorda = semLimites ? SEM_IQA_COR : (violou ? '#DC2626' : '#16A34A')
-      marker.setStyle({
-        fillColor: IQA_FAIXA_COR[coleta.iqa_faixa] || SEM_IQA_COR,
-        fillOpacity: coleta.status === 'quarentena' ? .5 : .92,
-        color: corBorda,
-        weight: violou ? 3 : 2,
-        dashArray: semLimites ? '3,3' : null,
-      })
-      marker.bindTooltip(`${esc(p.nome)} — IQA ${coleta.iqa != null ? coleta.iqa.toFixed(0) : '—'} (${coleta.iqa_faixa || 'sem dado suficiente'})`, { direction: 'top', offset: [0, -8] })
-    } else {
-      marker.setStyle({ fillColor: '#fff', fillOpacity: 0, color: SEM_IQA_COR, weight: 1.5, dashArray: '4,4' })
-      marker.bindTooltip(`${esc(p.nome)} — sem coleta nesta campanha`, { direction: 'top', offset: [0, -8] })
-    }
+    if (coleta) comColeta++
+    // Estilo (preenchimento por faixa + borda por CONAMA + opacidade da
+    // quarentena) em js/agua-iqa-visual.js — compartilhado com o mapa
+    // do painel de relatórios, nunca reimplementado numa tela.
+    marker.setStyle(aguaIqaEstiloMarcador(coleta))
+    marker.bindTooltip(
+      coleta
+        ? `${esc(p.nome)} — IQA ${coleta.iqa != null ? coleta.iqa.toFixed(0) : '—'} (${coleta.iqa_faixa || 'sem dado suficiente'})`
+        : `${esc(p.nome)} — sem coleta nesta campanha`,
+      { direction: 'top', offset: [0, -8] })
   }
   document.getElementById('amapa-tl-resumo').textContent = `${comColeta} de ${_pontos.length} pontos com coleta nesta campanha`
 
