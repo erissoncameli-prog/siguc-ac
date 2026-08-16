@@ -509,6 +509,15 @@ tela de Estrutura Organizacional, em paralelo a esta sessão (`criado_por`
 = o usuário, `criado_em` = durante a conversa). Nenhum dos dois é
 consequência da migration 284.
 
+**Frota ativado (migration 287, 2026-08-16) — decisão explícita, com
+custo conhecido.** DITLOG só tinha o usuário de teste ("Teste", lotado
+lá e reperfilado pra `gestor` na mesma sessão, pela própria pessoa
+direto na tela) — nenhum dos 10 gestores reais que hoje editam Frota
+está lotado no setor. Ligar `exige_lotacao` mesmo assim foi decisão do
+usuário: os 10 perdem `editar` em Frota até serem lotados no DITLOG (ou
+setor correto). RLS já era 100% `pode_ver`/`pode_editar` desde a
+entrega original do módulo — não precisou de conversão, só ativação.
+
 **Sidebar NÃO ganhou o gate por `modulo` no cluster DEUC**, diferente do
 Biomonitor e da Água. A leitura dessas 6 tabelas é aberta a qualquer autenticado
 (decisão de não mexer nela) — só a escrita segue o catálogo. Esconder o
