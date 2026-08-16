@@ -145,6 +145,15 @@ function gerarLayout(tituloPagina, paginaAtiva) {
     },
     {
       id: 'biomonitor', label: 'Biomonitor', super: 'Diretoria Técnica',
+      // modulo: chave em `modulos` (minhas_permissoes/nivel_efetivo) que
+      // governa o grupo inteiro — o catálogo não discrimina item por
+      // item dentro do Biomonitor (migration 263), então o gate é do
+      // grupo, por cima dos arrays `perfis:` de cada item (que continuam
+      // valendo, mais restritivo vence). Ver docs/acesso-por-organograma.md
+      // §1.4b/§1.5 — só este grupo tem match exato catálogo×sidebar hoje;
+      // validacao-campo/admin-brigadas/frota ficam de fora por divergência
+      // catálogo×realidade ainda não resolvida.
+      modulo: 'biomonitor',
       itens: [
         { id: 'biomonitor-app',        href: '../pages/biomonitor.html',           label: 'App de Campo', target: '_blank' },
         { id: 'biomonitor-validacao',  href: '../pages/biomonitor-validacao.html', label: 'Validação de Ninhos',
@@ -211,6 +220,11 @@ function gerarLayout(tituloPagina, paginaAtiva) {
   let superAtual;
   const navHtml = navGroups.map(grupo => {
     if (grupo.perfis && u && !grupo.perfis.includes(u.perfil)) return '';
+    // appState.permissoes vem de minhas_permissoes (nivel_efetivo), fail-open
+    // ({} se a consulta falhar — nunca esconde o grupo por instabilidade de
+    // rede). Só aplica quando o grupo declara `modulo` (nem todo item tem
+    // correspondência 1:1 com o catálogo — ver comentário no grupo Biomonitor).
+    if (grupo.modulo && appState.permissoes && appState.permissoes[grupo.modulo] === 'sem_acesso') return '';
     const itensHtml = grupo.itens
       .filter(item => !item.perfis || (u && item.perfis.includes(u.perfil)))
       .map(item => {

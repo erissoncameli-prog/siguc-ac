@@ -154,6 +154,24 @@ seguro e não muda nada visível hoje, porque `js/layout.js` ainda não lê
    fazer. Fica para quando (ou se) a SEMA decidir alinhar o catálogo à
    realidade, ou vice-versa.
 
+**Atualização (2026-08-16) — o grupo Biomonitor ligou a ponta.** Foi o
+gatilho real: usuário `tecnico` sem lotação continuava vendo o grupo
+inteiro na sidebar mesmo depois da migration 275 ligar
+`exige_lotacao=true` só nesse módulo — o RLS já bloqueava o dado, mas o
+menu mentia sobre o que a pessoa podia fazer. Diferente dos 3 candidatos
+acima, `biomonitor` tem match exato catálogo×sidebar (migration 263 criou
+a chave já cobrindo o grupo inteiro, sem os `perfis:` antigos discordando
+de nada) — por isso foi o primeiro a sair do papel. `js/layout.js` ganhou
+`grupo.modulo` (só no grupo Biomonitor, os outros ficam como estavam): se
+`appState.permissoes[grupo.modulo] === 'sem_acesso'`, o grupo inteiro some
+da sidebar, por cima dos `perfis:` de cada item (mais restritivo vence).
+Fail-open preservado — `appState.permissoes` vazio (rede fora do ar) não
+esconde nada. Guarda: 3 testes novos em `tests/sidebar-grupos.test.js`.
+`pwa/sw.js`: frota 87 → 88 (`js/layout.js` está no shell do app).
+`validacao-campo`/`admin-brigadas`/`frota` continuam de fora — o drift
+catálogo×realidade descrito acima não foi resolvido, converter esses às
+cegas mudaria acesso de gente de verdade sem decisão humana.
+
 ### 1.5 Biomonitor: existe no sistema, **não existe no catálogo**
 
 O módulo está no ar e é usado (`admin-biomonitor.html`,
