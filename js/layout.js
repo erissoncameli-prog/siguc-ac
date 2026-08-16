@@ -231,7 +231,12 @@ function gerarLayout(tituloPagina, paginaAtiva) {
         { id: 'frota-tarefas',   href: '../pages/frota-tarefas.html',   label: 'Minhas Tarefas' },
         { id: 'frota-solicitar', href: '../pages/frota-solicitar.html', label: 'Solicitar Viagem' },
         { id: 'frota-viagens',   href: '../pages/frota-viagens.html',   label: 'Agenda de Viagens', modulo: 'frota',
-          perfis: ['super_admin','diretor','chefe_departamento','gestor','assistente_admin'] },
+          // 'tecnico' entrou por decisão do usuário (2026-08-16): quem é
+          // do DITLOG aprova viagem mesmo sendo tecnico, não só gestão.
+          // O `modulo: 'frota'` acima é quem impede isso vazar pra
+          // tecnico de outro setor — sem lotação no DITLOG, sem_acesso
+          // barra antes de chegar no array de perfis.
+          perfis: ['super_admin','diretor','chefe_departamento','gestor','assistente_admin','tecnico'] },
         { id: 'frota-dashboard', href: '../pages/frota-dashboard.html', label: 'Painel de Frota', modulo: 'frota',
           perfis: ['super_admin','secretario','diretor','chefe_departamento','gestor','gestor_uc','tecnico','assistente_admin','financeiro'] },
         { id: 'frota-administrar', href: '../pages/frota-administrar.html', label: 'Administrar Frota', modulo: 'frota',

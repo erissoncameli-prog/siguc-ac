@@ -564,7 +564,26 @@ de gate (até então só em `grupo.modulo`) ganhou `item.modulo` — os 3
 itens ganharam `modulo: 'frota'` junto do array de perfis que já
 tinham; os dois filtros valem em AND (mais restritivo vence). Solicitar
 Viagem/Minhas Tarefas continuam sem filtro nenhum. `pwa/sw.js`: frota
-91 → 92. A leitura dessas 6 tabelas é aberta a qualquer autenticado
+91 → 92.
+
+**`tecnico` do DITLOG também aprova viagem (migration 288, mesma
+sessão) — achado testando com o próprio Teste.** Depois do gate por
+item, ele (tecnico, lotado DITLOG) continuava sem ver "Agenda de
+Viagens" — o array `perfis:` desse item nunca incluiu `tecnico` (é
+anterior à virada, aprovação sempre foi tratada como função de
+gestão). Decisão do usuário: `tecnico` do DITLOG também aprova. Duas
+mudanças, não só a sidebar — sem a segunda, o link apareceria mas
+`pode_editar('frota')` continuaria recusando de verdade:
+1. `perfis:` de `frota-viagens` ganhou `'tecnico'` — sozinho não faz
+   nada, o `modulo: 'frota'` do item já barra quem não está lotado.
+2. `perfil_permissoes_padrao(tecnico, frota) = 'editar'` (era
+   `'visualizar'`, fallback do grupo Frota) — sem isso o teto de
+   `LEAST(alcance_por_lotacao, teto)` capava em `visualizar` mesmo pra
+   quem está no DITLOG. Testado: só afeta tecnico REALMENTE lotado no
+   DITLOG (`alcance_por_lotacao` já barra os outros em `sem_acesso`,
+   independente do teto) — os outros 6 técnicos ativos do sistema
+   (DEUC/DEBIO/DERHQA/sem lotação) continuam `sem_acesso` em `frota`.
+`pwa/sw.js`: frota 92 → 93. A leitura dessas 6 tabelas é aberta a qualquer autenticado
 (decisão de não mexer nela) — só a escrita segue o catálogo. Esconder o
 item do menu quando `permissoes[chave] === 'sem_acesso'` esconderia a
 página de quem ainda pode LER normalmente (ex.: todo `tecnico` tem
