@@ -52,6 +52,7 @@ const _frotaReady = _dbReady.then(function () {
 <script src="../js/layout.js"></script>
 <script src="../js/frota-wise.js"></script>
 <script src="../js/fotos-privadas.js"></script>
+<script src="../js/avatar-foto.js"></script>
 <script src="../js/frota-consumo.js"></script>
 <script src="../js/frota-passageiros.js"></script>
 <script src="../js/frota-viagens-status.js"></script>
@@ -968,22 +969,19 @@ async function processarFotoMotorista(input) {
   toast('Enviando foto…', 'info')
   try {
     const quadrada = await fmFotoQuadrada(file, 512)
-    const path = `${_motorista.id}/perfil.jpg`
-    const { error: upErr } = await db.storage.from('frota-motoristas')
-      .upload(path, quadrada, { upsert: true, contentType: 'image/jpeg' })
-    if (upErr) throw upErr
-
-    const { data: { publicUrl } } = db.storage.from('frota-motoristas').getPublicUrl(path)
-    const fotoUrl = `${publicUrl}?t=${Date.now()}`
-
-    const { error: updErr } = await db.from('frota_motoristas')
-      .update({ foto_url: fotoUrl })
-      .eq('id', _motorista.id)
-    if (updErr) throw updErr
+    // Bucket único `avatares` + RPC perfil_atualizar_foto — mesma
+    // sincronização de Brigadas/Biomonitor (migrations 261/289). Antes
+    // gravava direto em `frota-motoristas`/frota_motoristas e a troca
+    // não voltava para usuarios nem para os outros apps.
+    const fotoUrl = await avatarSincronizarFotoPropria(db, quadrada)
+    // Redundante com o que a RPC já fez quando a conta é vinculada, mas
+    // é o que atualiza a própria linha para motorista PIN-only (sem
+    // usuario_id) — a RPC não tem o que propagar nesse caso.
+    await db.from('frota_motoristas').update({ foto_url: fotoUrl }).eq('id', _motorista.id)
 
     _motorista.foto_url = fotoUrl
     if (_fmAba === 'inicio') renderFmInicio()
-    toast('Foto atualizada!', 'success')
+    toast('Foto atualizada em todos os seus apps!', 'success')
   } catch (e) {
     toast('Erro ao enviar foto: ' + (e.message || e), 'error')
   }

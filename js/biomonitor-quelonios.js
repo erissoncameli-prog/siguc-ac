@@ -517,6 +517,15 @@ async function bioEntrarNaHome() {
       })
     }
   }
+  // Moldura/menu "Ver foto / Trocar foto" únicos (js/avatar-foto.js) —
+  // antes o card ia direto para o seletor de arquivo, sem opção de ver.
+  if (typeof avatarFotoRegistrar === 'function') {
+    avatarFotoRegistrar('bio-config-avatar', {
+      temFoto: () => !!BioApp.monitor?.foto_url,
+      verFoto: async () => BioApp.monitor?.foto_url ? await fotoUrlAssinada(BioApp.monitor.foto_url) : null,
+      trocarFoto: () => bioAlterarFotoMonitor(),
+    })
+  }
 
   // Listeners da home
   bioIniciarListenersHome()
@@ -4649,28 +4658,25 @@ async function bioAlterarFotoMonitor() {
   bioToast('Enviando foto…', 'info')
   try {
     const quadrada = await bioFotoQuadrada(blob, 512)
-    const path = `${monitor.id}/perfil.jpg`
-    const { error: upErr } = await bioSupabase().storage.from('biomonitor-fotos')
-      .upload(path, quadrada, { upsert: true, contentType: 'image/jpeg' })
-    if (upErr) throw upErr
-
-    const { data: { publicUrl } } = bioSupabase().storage.from('biomonitor-fotos').getPublicUrl(path)
-    const fotoUrl = `${publicUrl}?t=${Date.now()}`
-
-    const { error: updErr } = await bioSupabase()
-      .from('monitores_biodiversidade')
-      .update({ foto_url: fotoUrl })
-      .eq('id', monitor.id)
-    if (updErr) throw updErr
+    // Bucket único `avatares` + RPC perfil_atualizar_foto — mesma
+    // sincronização de Brigadas/Frota (migrations 261/289). Antes
+    // gravava direto em `biomonitor-fotos`/monitores_biodiversidade e a
+    // troca não voltava para usuarios nem para os outros apps.
+    const fotoUrl = await avatarSincronizarFotoPropria(bioSupabase(), quadrada)
+    // Redundante com o que a RPC já fez quando a conta é vinculada, mas
+    // é o que atualiza a própria linha para monitor PIN-only (sem
+    // usuario_id) — a RPC não tem o que propagar nesse caso.
+    await bioSupabase().from('monitores_biodiversidade').update({ foto_url: fotoUrl }).eq('id', monitor.id)
 
     BioApp.monitor.foto_url = fotoUrl
     await bioOfflineSetConfig('monitor', BioApp.monitor)
     const avatarEl = document.getElementById('bio-config-avatar')
     if (avatarEl) {
-      avatarEl.style.backgroundImage = `url(${fotoUrl})`
+      const assinada = await fotoUrlAssinada(fotoUrl)
+      avatarEl.style.backgroundImage = `url("${assinada || fotoUrl}")`
       avatarEl.textContent = ''
     }
-    bioToast('Foto atualizada!', 'ok')
+    bioToast('Foto atualizada em todos os seus apps!', 'ok')
   } catch (e) {
     bioToast('Erro ao enviar foto: ' + (e.message || e), 'err')
   }
@@ -4851,7 +4857,10 @@ async function bioCarregarConfigGPS() {
 }
 
 function bioIniciarConfig() {
-  document.getElementById('bio-config-avatar-btn')?.addEventListener('click', bioAlterarFotoMonitor)
+  document.getElementById('bio-config-avatar-btn')?.addEventListener('click', () => {
+    if (typeof avatarFotoClicar === 'function') avatarFotoClicar('bio-config-avatar')
+    else bioAlterarFotoMonitor()
+  })
   document.getElementById('bio-input-foto-perfil')?.addEventListener('change', () => {})
 
   document.getElementById('bio-toggle-campo')?.addEventListener('change', async ev => {
