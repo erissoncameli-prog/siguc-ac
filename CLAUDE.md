@@ -721,6 +721,28 @@ com a logo que passou a ocupar aquele canto. Usado por
   institucional segue essa regra desde o nascimento — logo Acre à
   esquerda, logo SEMA à direita, proporção preservada.
 
+Fonte das logos em si: SEMPRE `config_sistema.dados.logos`
+(`governo_url`/`secretaria_url`, gravados em Configurações →
+Institucional/Privacidade, `pages/configuracoes.html`). Nenhum
+relatório tem URL de logo fixa no código — todos leem
+`getCabecalhoRelatorio()` (`js/config-sistema.js`) no momento de
+gerar o documento, com a única exceção da ficha de campo do
+Biomonitor (`js/biomonitor-relatorio-campo.js`, `_biocampoBuscarLogos`),
+que consulta a MESMA coluna só porque `pages/biomonitor.html` usa
+cliente Supabase isolado (`window._bioDB_client`, sem o `db` global
+que `getCabecalhoRelatorio()` precisa) — não é uma segunda fonte,
+é a mesma fonte lida por outro cliente.
+`getConfigSistema()` cacheia em memória por aba (`_configSistemaCache`)
+para não bater no banco a cada relatório; `invalidarConfigCache()`
+(chamada por `_salvarDados()` em `pages/configuracoes.html` a cada
+troca) zera o cache da PRÓPRIA aba e grava um timestamp em
+`localStorage` (`siguc_config_sistema_atualizado`) — o evento
+`storage` do navegador dispara nas OUTRAS abas/páginas já abertas
+(nunca na que fez a mudança, é assim que o evento funciona), zerando
+o cache delas também. Efeito: trocar a logo em Configurações já vale
+para um relatório gerado logo em seguida, mesmo numa aba que já
+estava aberta antes da troca — sem precisar recarregar a página.
+
 ## Regra do sistema — foto de perfil sincronizada em todos os apps
 UMA FOTO SÓ por pessoa, com fan-out em vez de join (migrations 261/289
 — ler o cabeçalho da 261 para o motivo: os 3 apps de campo são
