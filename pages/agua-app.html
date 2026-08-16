@@ -12,6 +12,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&family=Fraunces:wght@700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/agua-app.css">
+  <link rel="stylesheet" href="/css/avatar-foto.css">
   <style>
     /* Divisor de seção dentro do formulário de coleta — não existe em
        css/agua-app.css (molde de brigada.css, que não tinha esse
@@ -142,7 +143,7 @@
 
   <header class="home-header">
     <div class="home-id">
-      <div class="home-avatar" id="home-avatar"><span id="home-avatar-letra"></span></div>
+      <div class="home-avatar" id="home-avatar" onclick="avatarFotoClicar('agua-home-avatar')" role="button" tabindex="0" aria-label="Ver ou trocar foto"><span id="home-avatar-letra"></span></div>
       <div class="home-id-texto">
         <p class="home-saudacao" id="home-saudacao">Bom dia</p>
         <h1 class="home-nome" id="home-nome">Coletor</h1>
@@ -351,12 +352,14 @@
 
   <div class="form-body">
     <div class="config-card" id="config-coletor-card">
-      <div class="config-avatar" aria-hidden="true"><span id="avatar-letra">C</span></div>
+      <div class="config-avatar" id="config-avatar" onclick="avatarFotoClicar('agua-config-avatar')" role="button" tabindex="0" aria-label="Ver ou trocar foto"><span id="avatar-letra">C</span></div>
       <div>
         <strong id="config-nome-coletor">—</strong>
         <p style="margin:2px 0 0;opacity:.55;font-size:.75rem">Qualidade da Água — App de campo</p>
+        <p style="margin:2px 0 0;opacity:.55;font-size:.7rem">Toque na foto para ver ou trocar</p>
       </div>
     </div>
+    <input type="file" id="input-foto-coletor" accept="image/*" hidden>
 
     <div class="form-section">
       <label class="form-label">Armazenamento</label>
@@ -469,6 +472,7 @@ window.__API_MONITOR_OFF = true
         onerror="console.warn('[agua-app] Supabase CDN indisponível — modo offline')"></script>
 <script src="/js/config.js"></script>
 <script src="/js/fotos-privadas.js"></script>
+<script src="/js/avatar-foto.js"></script>
 <script src="/js/lgpd.js"></script>
 <script>window.LGPD_CAMPO_APP = 'agua'</script>
 <script src="/js/lgpd-campo.js"></script>
@@ -638,7 +642,7 @@ async function boot() {
 async function prosseguirAposAuth(session, jaAutenticou = false) {
   const { data: usuarioData } = await db
     .from('usuarios')
-    .select('id, nome_completo, perfil, ativo, deve_trocar_senha')
+    .select('id, nome_completo, perfil, ativo, deve_trocar_senha, foto_url')
     .eq('id', session.user.id)
     .maybeSingle()
 
@@ -648,7 +652,10 @@ async function prosseguirAposAuth(session, jaAutenticou = false) {
     return
   }
 
-  const coletor = { id: usuarioData.id, nome_completo: usuarioData.nome_completo }
+  // Água não tem tabela de identidade própria (ver migration 261): o
+  // "coletor" É a linha de usuarios, então foto_url já É a foto certa —
+  // sem fan-out, sem RPC de propagação para ler, só para gravar.
+  const coletor = { id: usuarioData.id, nome_completo: usuarioData.nome_completo, foto_url: usuarioData.foto_url || null }
   await aOfflineSetConfig('coletor', coletor)
   App.coletor = coletor
 
@@ -946,12 +953,78 @@ async function confirmarPinSetup() {
 }
 
 // ════════════════════════════════════════════════════════════════
+// Foto de perfil — Água não tem tabela de identidade própria: o
+// "coletor" É a linha de usuarios (ver migration 261/289), então a
+// foto já é lida direto de App.coletor.foto_url, sem fan-out nenhum
+// para LER. Trocar sincroniza com os demais apps pela mesma RPC
+// perfil_atualizar_foto (helper único js/avatar-foto.js — nunca
+// reimplementar upload/menu aqui).
+// ════════════════════════════════════════════════════════════════
+function agRegistrarAvatarMenu() {
+  const cfg = {
+    temFoto: () => !!App.coletor?.foto_url,
+    verFoto: async () => App.coletor?.foto_url ? await fotoUrlAssinada(App.coletor.foto_url) : null,
+    trocarFoto: () => agAbrirSeletorFoto(),
+  }
+  avatarFotoRegistrar('agua-home-avatar', cfg)
+  avatarFotoRegistrar('agua-config-avatar', cfg)
+}
+
+function agAbrirSeletorFoto() {
+  if (!navigator.onLine) { toast('Sem conexão — troque a foto quando houver internet.', 'erro'); return }
+  const inp = document.getElementById('input-foto-coletor')
+  inp.value = ''
+  inp.click()
+}
+
+async function agFotoColetorEscolhida(input) {
+  const arq = input.files?.[0]
+  input.value = ''
+  if (!arq) return
+  if (arq.size > 5 * 1024 * 1024 || (arq.type && !/^image\//.test(arq.type))) {
+    toast('Escolha uma imagem de até 5 MB.', 'erro'); return
+  }
+  toast('Enviando foto…', 'info')
+  try {
+    const quadrada = await avatarFotoQuadrada(arq, 512)
+    const fotoUrl = await avatarSincronizarFotoPropria(db, quadrada)
+    App.coletor.foto_url = fotoUrl
+    await aOfflineSetConfig('coletor', App.coletor)
+    await agAtualizarAvatar()
+    toast('Foto atualizada em todos os seus apps!', 'success')
+  } catch (e) {
+    toast('Erro ao enviar foto: ' + (e.message || e), 'erro')
+  }
+}
+
+// Pinta os DOIS avatares (home + config) — mesma foto, duas telas.
+// Bucket privado: sem assinatura (offline) cai nas iniciais, nunca em
+// imagem quebrada — mesma regra do resto do sistema.
+async function agAtualizarAvatar() {
+  const url = App.coletor?.foto_url ? await fotoUrlAssinada(App.coletor.foto_url) : null
+  for (const id of ['home-avatar', 'config-avatar']) {
+    const el = document.getElementById(id)
+    if (!el) continue
+    const letra = el.querySelector('span')
+    if (url) {
+      el.style.backgroundImage = `url("${url}")`
+      if (letra) letra.style.display = 'none'
+    } else {
+      el.style.backgroundImage = ''
+      if (letra) letra.style.display = ''
+    }
+  }
+}
+
+// ════════════════════════════════════════════════════════════════
 // Home
 // ════════════════════════════════════════════════════════════════
 async function entrarHome() {
   document.getElementById('home-saudacao').textContent = saudacao()
   document.getElementById('home-nome').textContent = App.coletor?.nome_completo?.split(' ').slice(0, 2).join(' ') || 'Coletor'
   document.getElementById('home-avatar-letra').textContent = (App.coletor?.nome_completo || 'C').charAt(0).toUpperCase()
+  agRegistrarAvatarMenu()
+  agAtualizarAvatar()
 
   mostrarTela('tela-home')
 
@@ -1487,6 +1560,8 @@ async function carregarFila() {
 async function carregarConfig() {
   document.getElementById('config-nome-coletor').textContent = App.coletor?.nome_completo || '—'
   document.getElementById('avatar-letra').textContent = (App.coletor?.nome_completo || 'C').charAt(0).toUpperCase()
+  agRegistrarAvatarMenu()
+  agAtualizarAvatar()
 
   const quota = await aOfflineQuota()
   if (quota) {
@@ -1630,6 +1705,7 @@ document.addEventListener('DOMContentLoaded', () => {
   })
   initPinSetupKeypad()
 
+  document.getElementById('input-foto-coletor').addEventListener('change', function () { agFotoColetorEscolhida(this) })
   document.querySelectorAll('.pill-btn[data-tela]').forEach(btn => btn.addEventListener('click', () => mostrarTela(btn.dataset.tela)))
   document.getElementById('nav-nova').addEventListener('click', abrirFormulario)
   document.getElementById('btn-nova-coleta').addEventListener('click', abrirFormulario)
