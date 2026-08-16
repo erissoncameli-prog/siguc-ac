@@ -47,6 +47,29 @@ function _perfilCarregarFotos() {
   return window._perfilFotosPromise
 }
 
+// Moldura + menu "Ver foto / Trocar foto" únicos (js/avatar-foto.js +
+// css/avatar-foto.css) — mesmo carregamento sob demanda de
+// _perfilCarregarFotos, mesmo motivo (não pendurar em 45 páginas).
+function _perfilCarregarAvatarFoto() {
+  if (!document.getElementById('avatar-foto-css')) {
+    const l = document.createElement('link')
+    l.id = 'avatar-foto-css'
+    l.rel = 'stylesheet'
+    l.href = '/css/avatar-foto.css'
+    document.head.appendChild(l)
+  }
+  if (typeof avatarFotoClicar === 'function') return Promise.resolve(true)
+  if (window._perfilAvatarFotoPromise) return window._perfilAvatarFotoPromise
+  window._perfilAvatarFotoPromise = new Promise(resolve => {
+    const s = document.createElement('script')
+    s.src = '/js/avatar-foto.js'
+    s.onload = () => resolve(true)
+    s.onerror = () => { console.warn('[perfil] não foi possível carregar avatar-foto.js'); resolve(false) }
+    document.head.appendChild(s)
+  })
+  return window._perfilAvatarFotoPromise
+}
+
 // Avatar da sidebar: iniciais por padrão, foto quando houver. Chamado
 // no fim do bootstrap de cada página e de novo após salvar, para a
 // troca aparecer sem recarregar.
@@ -99,6 +122,7 @@ function abrirPerfil(aba) {
   document.addEventListener('keydown', _perfilEsc)
   perfilIr(_perfilAba)
   if (u.foto_url) _perfilCarregarFotos().then(ok => { if (ok) _perfilPintarFoto(u.foto_url) })
+  _perfilCarregarAvatarFoto().then(ok => { if (ok) _perfilRegistrarAvatar() })
   _perfilCarregarAcessos()
 }
 
@@ -151,7 +175,8 @@ function _perfilHTML(u) {
       </button>
       <div class="pf-ident">
         <div class="pf-avatar">
-          <div class="pf-foto" id="pf-foto">${esc(ini)}</div>
+          <div class="avatar-foto-anel"></div>
+          <div class="pf-foto" id="pf-foto" onclick="avatarFotoClicar('pf-foto')" role="button" tabindex="0" aria-label="Ver ou trocar foto">${esc(ini)}</div>
           <button class="pf-cam" onclick="perfilEscolherFoto()" title="Trocar foto" aria-label="Trocar foto">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
           </button>
@@ -328,6 +353,19 @@ async function perfilSalvar() {
 }
 
 // ── foto ──────────────────────────────────────────────────────
+function _perfilRegistrarAvatar() {
+  avatarFotoRegistrar('pf-foto', {
+    temFoto: () => !!appState.usuario?.foto_url,
+    verFoto: async () => {
+      const u = appState.usuario?.foto_url
+      if (!u) return null
+      await _perfilCarregarFotos()
+      return await fotoUrlAssinada(u)
+    },
+    trocarFoto: () => perfilEscolherFoto(),
+  })
+}
+
 function perfilEscolherFoto() { document.getElementById('pf-file')?.click() }
 
 async function perfilFotoEscolhida(input) {

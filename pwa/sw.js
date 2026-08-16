@@ -15,7 +15,7 @@ const APP = SCOPE.includes('/pages/biomonitor.html') ? 'biomonitor'
 // Ao concluir uma implementação que toque arquivos web de um app,
 // incrementar SÓ o número daquele app (vN → vN+1) — não precisa mexer
 // nos outros dois.
-const VERSOES = { brigadas: 263, biomonitor: 32, frota: 93, agua: 18 }
+const VERSOES = { brigadas: 264, biomonitor: 32, frota: 94, agua: 18 }
 const CACHE = `siguc-${APP}-v${VERSOES[APP]}`
 
 const SHELLS = {
@@ -23,8 +23,10 @@ const SHELLS = {
     '/pages/brigada.html',
     '/css/brigada.css',
     '/css/global.css',
+    '/css/avatar-foto.css',
     '/js/config.js',
     '/js/fotos-privadas.js',
+    '/js/avatar-foto.js',
     '/js/lgpd.js',
     '/js/lgpd-campo.js',
     '/js/qrcode-generator.js',
@@ -49,8 +51,10 @@ const SHELLS = {
   biomonitor: [
     '/pages/biomonitor.html',
     '/css/biomonitor.css',
+    '/css/avatar-foto.css',
     '/js/config.js',
     '/js/fotos-privadas.js',
+    '/js/avatar-foto.js',
     '/js/lgpd.js',
     '/js/lgpd-campo.js',
     '/js/qrcode-generator.js',
@@ -84,6 +88,7 @@ const SHELLS = {
     '/js/frota-sync.js',
     '/js/frota-notif-local.js',
     '/js/fotos-privadas.js',
+    '/js/avatar-foto.js',
     '/js/lgpd.js',
     '/js/lgpd-campo.js',
     '/js/frota-consumo.js',
