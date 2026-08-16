@@ -209,10 +209,12 @@ window.frotaFotoUrlAssinada = window.frotaFotoUrlAssinada || async function () {
       <div class="form-group"><label class="form-label">Posto</label>
         <input class="form-control" id="ab-posto" placeholder="Nome do posto (opcional)"></div>
       <div class="form-group"><label class="form-label">Foto do cupom fiscal</label>
-        <input class="form-control" id="ab-foto-cupom" type="file" accept="image/*" capture="environment" onchange="capturarFotoAbastecimento(this,'cupom')">
+        <button type="button" class="fm-foto-btn" id="ab-foto-cupom-btn" data-icon="camera" onclick="document.getElementById('ab-foto-cupom').click()"><span class="fm-foto-btn-label">Adicionar foto</span></button>
+        <input type="file" id="ab-foto-cupom" accept="image/*" capture="environment" hidden onchange="capturarFotoAbastecimento(this,'cupom')">
         <div id="ab-foto-cupom-preview" style="margin-top:6px"></div></div>
       <div class="form-group"><label class="form-label">Foto do hodômetro/horímetro</label>
-        <input class="form-control" id="ab-foto-hodometro" type="file" accept="image/*" capture="environment" onchange="capturarFotoAbastecimento(this,'hodometro')">
+        <button type="button" class="fm-foto-btn" id="ab-foto-hodometro-btn" data-icon="camera" onclick="document.getElementById('ab-foto-hodometro').click()"><span class="fm-foto-btn-label">Adicionar foto</span></button>
+        <input type="file" id="ab-foto-hodometro" accept="image/*" capture="environment" hidden onchange="capturarFotoAbastecimento(this,'hodometro')">
         <div id="ab-foto-hodometro-preview" style="margin-top:6px"></div></div>
       <div class="form-group"><label class="form-label">Observações</label>
         <textarea class="form-control" id="ab-obs" rows="2" placeholder="Opcional"></textarea></div>
@@ -239,8 +241,11 @@ window.frotaFotoUrlAssinada = window.frotaFotoUrlAssinada || async function () {
       <div class="form-group"><label class="form-label">Descreva o defeito <span class="obrig">*</span></label>
         <textarea class="form-control" id="df-descricao" rows="4" placeholder="Ex.: barulho no motor ao acelerar, pneu murchando, farol queimado..."></textarea></div>
       <div class="form-group">
-        <label class="form-label">Fotos do defeito <span id="df-fotos-contador" style="color:#9CA3AF;font-weight:400">(0/5)</span></label>
-        <input class="form-control" id="df-foto-input" type="file" accept="image/*" capture="environment" onchange="capturarFotoDefeito(this)">
+        <div class="fm-foto-header">
+          <label class="form-label" style="margin:0">Fotos do defeito <span id="df-fotos-contador" style="color:#9CA3AF;font-weight:400">(0/5)</span></label>
+          <button type="button" class="fm-foto-btn" id="df-foto-btn" data-icon="camera" onclick="document.getElementById('df-foto-input').click()"><span class="fm-foto-btn-label">Adicionar foto</span></button>
+        </div>
+        <input type="file" id="df-foto-input" accept="image/*" capture="environment" hidden onchange="capturarFotoDefeito(this)">
         <div id="df-fotos-preview" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px"></div>
       </div>
     </div>
@@ -2624,6 +2629,8 @@ async function abrirAbastecimento(viagemId) {
   document.getElementById('ab-foto-hodometro').value = ''
   document.getElementById('ab-foto-cupom-preview').innerHTML = ''
   document.getElementById('ab-foto-hodometro-preview').innerHTML = ''
+  document.querySelector('#ab-foto-cupom-btn .fm-foto-btn-label').textContent = 'Adicionar foto'
+  document.querySelector('#ab-foto-hodometro-btn .fm-foto-btn-label').textContent = 'Adicionar foto'
   document.getElementById('ab-medida').value = ''
   document.getElementById('ab-litros').value = ''
   document.getElementById('ab-preco').value = ''
@@ -2714,6 +2721,7 @@ function capturarFotoAbastecimento(input, qual) {
     _abastFotos[qual] = reader.result
     document.getElementById(`ab-foto-${qual}-preview`).innerHTML =
       `<img src="${reader.result}" style="max-width:120px;max-height:120px;border-radius:8px;display:block">`
+    document.querySelector(`#ab-foto-${qual}-btn .fm-foto-btn-label`).textContent = 'Trocar foto'
   }
   reader.readAsDataURL(file)
 }
@@ -2811,6 +2819,7 @@ function removerFotoDefeito(i) {
 function renderFotosDefeito() {
   document.getElementById('df-fotos-contador').textContent = `(${_defeitoFotos.length}/5)`
   document.getElementById('df-foto-input').disabled = _defeitoFotos.length >= 5
+  document.getElementById('df-foto-btn').disabled = _defeitoFotos.length >= 5
   document.getElementById('df-fotos-preview').innerHTML = _defeitoFotos.map((foto, i) => `
     <div style="position:relative">
       <img src="${foto}" style="width:64px;height:64px;object-fit:cover;border-radius:8px;display:block">
@@ -4529,6 +4538,22 @@ if ('serviceWorker' in navigator && !fEhAppNativoFrota()) {
 .fm-action-sub { font-size: 11.5px; opacity: .85; }
 .fm-action-chevron { flex-shrink: 0; opacity: .75; transform: rotate(-90deg); }
 .fm-action-chevron svg { width: 16px; height: 16px; stroke: #fff; }
+
+/* ── Botão "Adicionar foto": os campos de foto usavam o
+   <input type="file"> cru (botão/rótulo do navegador, sem relação
+   nenhuma com o resto do app) em vez do botão com ícone que
+   Brigadas/Biomonitor usam em todo campo de foto — só o input fica
+   escondido, disparado pelo clique no botão. Mesmo padrão visual do
+   .bio-btn-sm.prim/.btn-sm.btn-prim dos outros 2 apps de campo. ── */
+.fm-foto-header { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 6px; }
+.fm-foto-btn {
+  display: inline-flex; align-items: center; gap: 6px; border: none; cursor: pointer;
+  padding: 7px 14px; border-radius: 10px; background: var(--verde, #1F4E2C); color: #fff;
+  font-family: var(--font-sans, 'DM Sans', sans-serif); font-size: 13px; font-weight: 600;
+  -webkit-tap-highlight-color: transparent;
+}
+.fm-foto-btn svg { width: 14px; height: 14px; stroke: currentColor; }
+.fm-foto-btn:disabled { opacity: .5; cursor: not-allowed; }
 .fm-pill-nav {
   /* Sem `transform` e sem `will-change` de propósito.
      O `will-change: transform` que existia aqui era tentativa de conter
