@@ -677,6 +677,134 @@ js/frota-consumo.js.
   migration só DEPOIS do deploy do código que assina (ver cabeçalho
   das migrations 200 e 210).
 
+## Regra do sistema — timbre institucional (logo Acre × logo SEMA) nos relatórios
+TODO relatório (PDF ou impressão/HTML) tem a logo do Governo do Acre
+na margem ESQUERDA e a da SEMA na margem DIREITA — nunca as duas do
+mesmo lado — e cada logo SEMPRE mantém a proporção original da
+imagem, nunca esticada num quadrado fixo.
+
+Achado real: os dois relatórios desenhados com jsPDF (Água e
+Biomonitor) tinham `pdf.addImage(logo, fmt, x, y, 11, 11)` — um
+quadrado fixo de 11×11mm que força qualquer logo não-quadrada a
+esticar/espremer, com as duas logos empilhadas do lado esquerdo.
+
+Fonte única do timbre em jsPDF: `js/relatorio-cabecalho-pdf.js`
+(`relatorioPdfDesenharCabecalho`) — mesma lição do
+`js/frota-consumo.js`/`js/mapa-recorte.js`, nunca reimplementar o
+desenho do cabeçalho numa página nova. A função usa
+`pdf.getImageProperties()` para pegar a proporção real da imagem e
+encaixa dentro de uma caixa máxima (object-fit:contain, nunca
+estica); o texto institucional fica centralizado no espaço entre as
+duas logos, e o bloco "SIGUC-AC / Prot. XXX" (que antes ficava no
+canto superior direito) passa a ficar ACIMA da logo da SEMA, na faixa
+livre entre o topo da página e o início das logos — senão colidiria
+com a logo que passou a ocupar aquele canto. Usado por
+`js/agua-relatorio-pdf.js` e `js/biomonitor-relatorio-ninho.js` (este
+último também gera a ficha de campo via
+`js/biomonitor-relatorio-campo.js`, sem cópia).
+- Toda página que carregue um dos dois geradores de PDF precisa
+  incluir `<script src=".../js/relatorio-cabecalho-pdf.js">` ANTES do
+  respectivo `agua-relatorio-pdf.js`/`biomonitor-relatorio-ninho.js` —
+  e entrar em `SHELLS.agua`/`SHELLS.biomonitor` (pwa/sw.js) e nas
+  listas `ARQUIVOS_JS` dos builds nativos
+  (`app-agua/scripts/build-www.mjs`, `app-biomonitor/scripts/build-www.mjs`).
+- Relatórios em HTML/impressão (sem jsPDF) seguem a MESMA regra de
+  posicionamento, com CSS: `js/relatorio-car.js` + `css/relatorio-print.css`
+  (`.rel-cabecalho`: logo à esquerda, `.rel-inst` centralizado
+  flex:1, `.rel-logo-secr-col` — logo da SEMA + protocolo empilhados —
+  à direita) e a capa de `pages/analise-cientifica-biomonitor.html`
+  (`.ac-capa-logos { justify-content: space-between }`, logos já eram
+  proporcionais por `object-fit: contain`, só a POSIÇÃO mudou). CSS
+  com `object-fit: contain` (nunca `cover`/`fill`) em qualquer `<img>`
+  de logo institucional é a regra equivalente em HTML.
+- Qualquer relatório novo (PDF ou impressão) que precise do timbre
+  institucional segue essa regra desde o nascimento — logo Acre à
+  esquerda, logo SEMA à direita, proporção preservada.
+
+## Regra do sistema — foto de perfil sincronizada em todos os apps
+UMA FOTO SÓ por pessoa, com fan-out em vez de join (migrations 261/289
+— ler o cabeçalho da 261 para o motivo: os 3 apps de campo são
+offline-first e leem `foto_url` da própria linha, cacheada no
+IndexedDB; um join no servidor sumiria com o avatar sem rede, cenário
+normal de campo). `usuarios.foto_url` é a fonte; a função interna
+`_perfil_propagar_foto(usuario_id, url)` copia o endereço para
+`brigadistas`/`frota_motoristas`/`monitores_biodiversidade` `WHERE
+usuario_id = usuario_id` — Água não entra (usa `usuarios.foto_url`
+direto, sem tabela de identidade própria).
+
+Duas RPCs chamam o mesmo fan-out, para as duas direções de troca:
+- `perfil_atualizar_foto(p_url)` — a PRÓPRIA pessoa troca a foto, em
+  QUALQUER superfície (modal "Meu Perfil" na mesa, ou dentro de
+  Brigadas/Frota/Biomonitor). `auth.uid()` é o alvo; valida que o
+  endereço está em `avatares/<uid>/…`.
+- `admin_atualizar_foto_usuario(p_usuario_id, p_url)` (289) —
+  super_admin/gestor define a foto de OUTRA pessoa no cadastro
+  (`pages/usuarios.html`, criação e edição). Mesma validação de
+  endereço, mas contra a pasta do ALVO, não de quem chama.
+
+**Bucket único: `avatares/<uid>/…`, privado desde a 261.** Os apps de
+campo tinham cada um o próprio bucket (`brigadistas`, `frota-
+motoristas`, `biomonitor-fotos`) e trocavam a foto gravando DIRETO lá
++ direto na própria tabela — a troca ficava presa naquele app, nunca
+voltava para `usuarios` nem para os outros dois. Corrigido: os 3 apps
+agora sobem para `avatares` e chamam `perfil_atualizar_foto` (helper
+único `avatarSincronizarFotoPropria`, `js/avatar-foto.js`) — e SÓ
+DEPOIS disso, opcionalmente, também atualizam a própria linha direto
+(idempotente com o que a RPC já fez; é o que sustenta um cadastro de
+campo sem `usuario_id` — PIN-only —, caso em que a RPC não tem o que
+propagar). Os buckets antigos continuam existindo (fotos já gravadas
+antes desta entrega), só não recebem upload novo do fluxo de troca de
+foto própria.
+
+**Moldura + menu "Ver foto / Trocar foto" únicos**
+(`js/avatar-foto.js` + `css/avatar-foto.css`): anel dourado afastado
+da borda sólida branca, sem glow/gradiente animado — de propósito,
+para não parecer o clichê visual de "gerado por IA". Tocar a foto abre
+um bottom sheet (Ver em tela cheia / Trocar / Cancelar); sem foto
+ainda, vai direto para trocar. Cada tela só monta o HTML
+(`.avatar-foto-wrap` → `.avatar-foto-anel` + `.avatar-foto` +
+`.avatar-foto-badge`) e registra o que "ver"/"trocar" significam ali
+com `avatarFotoRegistrar(id, {temFoto, verFoto, trocarFoto})` — nunca
+reimplementar o menu numa página. Usado em `pages/usuarios.html`
+(cadastro/edição), no modal "Meu Perfil" (`pf-foto`, retrofit) e no
+card de config do Biomonitor (`bio-config-avatar`, que antes ia direto
+pro seletor de arquivo, sem "ver"). Frota já tinha um menu próprio
+(`#modal-foto-mot-menu`) e Brigadas o "liquid glass" documentado
+abaixo — nenhum dos dois foi reskinado nesta entrega, só a
+sincronização por baixo; unificar o visual deles fica para quando for
+pedido.
+
+Carregamento: `css/avatar-foto.css` e `js/avatar-foto.js` são
+estáticos nas páginas que já os usam (`usuarios.html`,
+`brigada.html`, `biomonitor.html`, `frota-app.html` — sempre ANTES do
+JS de página que os referencia). No modal "Meu Perfil", que roda nas
+~45 páginas de mesa, o carregamento é sob demanda
+(`_perfilCarregarAvatarFoto` em `js/perfil.js`), mesmo padrão de
+`_perfilCarregarFotos` — nunca pendurar em cada página.
+
+`pwa/sw.js`: brigadas 263→264, biomonitor 31→32, frota 93→94 (os 3
+ganharam `js/avatar-foto.js`; brigadas/biomonitor também
+`css/avatar-foto.css`).
+
+**Achado depois do deploy — Água tinha o desenho pronto, mas nunca
+leu nem exibiu a foto.** `pages/agua-app.html` já tinha `.home-avatar`/
+`.config-avatar` com CSS "liquid glass" e `cursor:pointer` prontos —
+pareciam clicáveis mas não tinham handler NENHUM, e a query de login
+nem selecionava `foto_url` (`prosseguirAposAuth`, só `id, nome_completo,
+perfil, ativo, deve_trocar_senha`). Corrigido: `foto_url` entra na
+query e em `App.coletor` (cacheado offline junto); `agAtualizarAvatar()`
+pinta os dois avatares via `fotoUrlAssinada`; `agRegistrarAvatarMenu()`
+liga os dois ao menu Ver/Trocar (`avatarFotoClicar`/`avatarFotoRegistrar`
+de `js/avatar-foto.js`) — chamado em `entrarHome()` e `carregarConfig()`.
+Troca sobe pelo MESMO `avatarSincronizarFotoPropria` dos outros 3 apps,
+mas aqui sem gravação redundante na própria tabela: Água NÃO tem tabela
+de identidade própria (migration 261) — o "coletor" É a linha de
+`usuarios`, então a RPC `perfil_atualizar_foto` já grava a única linha
+que existe. `pwa/sw.js`: agua 17→18 (`js/avatar-foto.js` +
+`css/avatar-foto.css` no shell). `app-agua/scripts/build-www.mjs`
+atualizado em paralelo (mesmo sem o APK ser gerado ainda) para não
+divergir do que os outros 3 `build-www.mjs` já fazem.
+
 ## LGPD — governança de dados pessoais
 Plano em 5 fases; 0 a 2 entregues. Migrations 209–212.
 - **ROPA vivo no banco** (`lgpd_tratamentos`, migration 211): 16
@@ -1589,6 +1717,101 @@ testando: um bug de ÍNDICE na fixture do TESTE (não no app) fazia todo
 marcador cair na mesma longitude — destructuring posicional com
 contagem errada de blanks; corrigido indexando por `p[6]`/`p[7]` em vez
 de contar vírgulas no olho.
+
+**Pós-lançamento — emblema + rio nas telas de bloqueio do app.** As 4
+telas com `.lock-screen` de `agua-app.html` (entrar, criar senha, digitar
+PIN, criar PIN) trocaram a gota plana em SVG pelo emblema do app
+(`/pwa/icons/icon-agua-512.png`, o mesmo do launcher) e ganharam um rio
+animado ao fundo, com resposta ao toque. Tudo em `js/agua-rio.js` (novo);
+nenhuma página redesenha nada.
+- **Campo de fluxo, nunca senóide.** A 1ª tentativa animava ondas
+  mudando de FASE: curva que muda de forma sem sair do lugar não é lida
+  como correnteza, o olho vê fio luminoso se contorcendo. O que vale é
+  partícula advectada (nasce no topo, deixa esteira, morre embaixo) — o
+  padrão VIAJA. Três coisas fazem parecer rio, e mexer nelas é mexer no
+  efeito: turbulência de ROTACIONAL (divergência zero, os fios se
+  enrolam em vez de se cruzarem), PERFIL DE CANAL (meio rápido, margem
+  quase parada — sem isso é chuva caindo, não rio) e ESTEIRA
+  (`destination-out` tirando alpha, nunca `clearRect`).
+- ⚠ **A diferença finita do rotacional tem de ser dividida por 2·d.**
+  Sem normalizar, a deriva lateral fica em ~1 px/s contra 46 px/s de
+  descida — chuva reta, sem redemoinho. Foi o defeito real da 1ª versão,
+  achado medindo o campo, não olhando a tela. Ao normalizar, o outro
+  extremo aparece: o `vy` chega a −62 (água SUBINDO). Calibragem final
+  por varredura numérica (`curl` 30, amortecimento 0,22 no eixo
+  vertical) + piso em `_campo`: a turbulência amassa a descida, nunca a
+  inverte.
+- ⚠ **Calibragem é proporcional à tela, nunca em pixel absoluto.** Com
+  escala fixa o redemoinho tem sempre ~139 px: numa tela de 274 é um
+  meandro calmo, numa de 430 vira rabisco miúdo e o fundo parece
+  ARRANHADO. `_calibrar()` amarra o tamanho do redemoinho à LARGURA e a
+  velocidade à ALTURA (a água leva ~12 s para atravessar em qualquer
+  aparelho).
+- ⚠ **Quem morre de idade renasce ESPALHADO, não no topo.** A travessia
+  (~12 s) é mais longa que a vida de um filete (3–9 s), então quase
+  nenhum completa o percurso; mandar todos de volta ao topo amontoava a
+  água na faixa de cima e deixava a metade de baixo vazia. Só quem sai
+  pela borda volta pelo topo.
+- **Toque na água**: a onda não é só um anel desenhado por cima — ela
+  EMPURRA o campo de fluxo ao passar (`_campo` soma o empurrão radial),
+  então os filetes se afastam do dedo de verdade, com anel, clarão curto
+  e respingos balísticos. Escutado na `.lock-screen` em CAPTURA, não no
+  canvas (que é `pointer-events:none`): assim apertar uma tecla do PIN
+  também ondula — cada dígito vira uma gota na água.
+- ⚠ **Armadilha de CSS achada aqui**: `.lock-screen > *` tem a MESMA
+  especificidade que `.lock-rio` e vem depois no arquivo, então vencia
+  com `position: relative` — e canvas relative vira item do flex,
+  empurrando o conteúdo das 4 telas. O `position: absolute` precisa ser
+  repetido na regra `.lock-screen > .lock-rio`. Empilhamento:
+  0 rio · 1 vinheta · 2 conteúdo.
+- **Bateria (aparelho de campo)**: as 4 telas coexistem no DOM, então
+  sem trava rodariam 4 rios ao mesmo tempo. `IntersectionObserver` só
+  anima a tela à vista, e `visibilitychange` para com o app em segundo
+  plano. Com "reduzir movimento" o rio desenha um quadro parado e o
+  toque nem é instalado.
+- ⚠ **`/pwa/icons/…` NÃO existe dentro do APK.** O emblema é a primeira
+  `<img>` de caminho absoluto do app; sem cópia explícita, as 4 telas do
+  APK abririam com imagem quebrada (o site serve pela Vercel, o shell
+  nativo não tem nada fora de `www/`). `app-agua/scripts/build-www.mjs`
+  passou a copiar `pwa/icons/` e ganhou uma trava para `<img src="/…">`
+  não embarcada — irmã da que já existia para `<script src="/js/…">`.
+  Qualquer imagem nova de caminho absoluto precisa entrar na lista.
+- Guarda: `tests/agua-rio.test.js` (5 testes). A verificação do desenho é
+  por PIXEL do próprio canvas (`getImageData`, canal alpha), não por
+  screenshot — a vinheta do CSS fica POR CIMA do rio, então um
+  screenshot mediria os dois misturados. Cobre também o emblema
+  carregando de fato (`naturalWidth > 0` pega caminho errado, que a olho
+  nu só some), o canvas não roubando o toque das teclas, e as telas
+  escondidas com ZERO pixel pintado.
+- `pwa/sw.js`: agua v15 → v16 (`js/agua-rio.js` e o ícone no shell).
+
+**Pós-lançamento — emblema na faixa institucional da Home.** O mesmo
+emblema entrou na `.faixa-inst` do `tela-home`, na coluna do MEIO da
+grade (entre Governo do Acre e SEMA) e transbordando ~27 px para baixo
+da faixa — a estrutura já existia no molde de `brigada.css` (grade
+`1fr 96px 1fr`, `.faixa-mascote` absoluto, `margin-bottom` da faixa
+reservando o espaço); só estava sem ocupante, porque Água não tem
+mascote. Animação própria de água: `agua-emblema-boia` (sobe/desce de
+leve) + `agua-emblema-halo` (o brilho ciano respirando junto), no lugar
+do `mascote-respira` herdado.
+- 70 px, não os 86 px do molde: lá o mascote é foto circular, aqui é um
+  squircle cheio — no mesmo tamanho pesa demais e invade o conteúdo.
+- `border-radius: 0` (mesma razão do `.lock-mascote`) e `cursor:pointer`
+  removido: no Brigadas tocar o mascote abre menu, aqui não faz nada.
+- ⚠ **TODO keyframe do emblema precisa repetir `translateX(-50%)`** — é
+  ele que centra na coluna do meio (`left:50%`). Um keyframe sem isso
+  joga a arte meia largura para a direita NO MEIO do ciclo, defeito que
+  ninguém liga à animação depois. O teste amostra o ciclo inteiro
+  (4,6 s) cobrando o centro em todos os quadros; conferido que reprova
+  de fato (34,77 px de desvio com um keyframe quebrado de propósito).
+- O `filter` do drop-shadow vive só nos keyframes do halo: declarado
+  também na regra base, sobrescreveria a animação e o brilho não
+  pulsaria.
+- Guarda: +2 testes em `tests/agua-rio.test.js` (7 no total).
+- `pwa/sw.js`: agua v16 → v17. Nenhum arquivo novo entra no shell, mas
+  `css/agua-app.css` e `pages/agua-app.html` (os dois tocados aqui) JÁ
+  estão nele e a v16 já tinha ido para produção — sem o incremento, quem
+  abrisse com a v16 em cache não receberia o emblema.
 
 ## Próxima tarefa
 Módulo Qualidade da Água (IQA): as 5 fases do plano original estão

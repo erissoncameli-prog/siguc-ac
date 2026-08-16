@@ -1207,7 +1207,27 @@ async function salvarLotacao() {
 
 async function encerrarLotacao(id) {
   if (!confirm('Encerrar esta lotação? O servidor deixa de ser alcançado por esta unidade a partir de hoje.')) return
-  const { error } = await db.from('usuario_lotacoes').update({ data_fim: new Date().toISOString().slice(0, 10) }).eq('id', id)
+  // nivel_efetivo()/usuario_unidades() tratam data_fim como limite
+  // INCLUSIVO (data_fim >= CURRENT_DATE ainda conta como ativa) — gravar
+  // hoje contradizia o próprio texto acima ("a partir de hoje"): a
+  // lotação continuava valendo até o fim do dia, e se uma lotação nova
+  // fosse criada hoje em outra unidade, as duas ficavam ativas ao mesmo
+  // tempo (achado em produção: usuário via módulo de duas unidades
+  // diferentes depois de trocar a lotação no mesmo dia). Fecha ONTEM,
+  // não hoje, pra hoje já não contar. Exceção: lotação criada hoje
+  // mesmo (data_inicio = hoje) não tem "ontem" válido sem violar
+  // data_fim >= data_inicio — nesse caso apaga em vez de fechar.
+  const hoje = new Date().toISOString().slice(0, 10)
+  const lot = _lotacoes.find(l => l.id === id)
+  if (lot && lot.data_inicio === hoje) {
+    const { error } = await db.from('usuario_lotacoes').delete().eq('id', id)
+    if (error) { toast(error.message, 'error'); return }
+    toast('Lotação removida (criada e encerrada no mesmo dia)', 'success')
+    await carregarDados()
+    return
+  }
+  const ontem = new Date(Date.now() - 86400000).toISOString().slice(0, 10)
+  const { error } = await db.from('usuario_lotacoes').update({ data_fim: ontem }).eq('id', id)
   if (error) { toast(error.message, 'error'); return }
   toast('Lotação encerrada', 'success')
   await carregarDados()
