@@ -11,7 +11,22 @@ async function getConfigSistema() {
   return _configSistemaCache;
 }
 
-function invalidarConfigCache() { _configSistemaCache = null; }
+const CONFIG_SISTEMA_STORAGE_KEY = 'siguc_config_sistema_atualizado';
+
+// Zera o cache desta aba e avisa as OUTRAS abas/páginas já abertas (ex.:
+// um relatório aberto numa aba enquanto alguém troca a logo em
+// Configurações noutra) — o evento `storage` só dispara nas abas que NÃO
+// fizeram a mudança, então a própria aba de Configurações já zera o cache
+// direto e as demais recebem o aviso sozinhas, sem polling e sem precisar
+// recarregar a página para a logo/dado institucional novo valer.
+function invalidarConfigCache() {
+  _configSistemaCache = null;
+  try { localStorage.setItem(CONFIG_SISTEMA_STORAGE_KEY, String(Date.now())); } catch (e) {}
+}
+
+window.addEventListener('storage', ev => {
+  if (ev.key === CONFIG_SISTEMA_STORAGE_KEY) _configSistemaCache = null;
+});
 
 async function getCabecalhoRelatorio() {
   const cfg = await getConfigSistema();
