@@ -8,6 +8,7 @@
 <link rel="apple-touch-icon" href="/pwa/icons/apple-touch-icon-frota.png">
 <link rel="icon" href="/pwa/icons/icon-frota-192.png">
 <link rel="stylesheet" href="../css/global.css">
+<link rel="stylesheet" href="../css/avatar-foto.css">
 <link rel="stylesheet" href="../css/frota-wise-theme.css">
 <script>
 // Stub de segurança: se o CDN não carregar (offline), config.js não quebra.
@@ -250,25 +251,10 @@ window.frotaFotoUrlAssinada = window.frotaFotoUrlAssinada || async function () {
   </div>
 </div>
 
-<!-- Menu da foto do motorista (ver / trocar) -->
-<div class="modal-overlay" id="modal-foto-mot-menu">
-  <div class="modal" style="max-width:320px">
-    <div class="modal-header">
-      <div class="modal-title">Foto de perfil</div>
-      <button class="modal-close" onclick="fecharModal('foto-mot-menu')">×</button>
-    </div>
-    <div class="modal-body" style="display:flex;flex-direction:column;gap:8px">
-      <button class="btn btn-secondary" onclick="fecharModal('foto-mot-menu');verFotoMotorista()">Ver foto</button>
-      <button class="btn btn-secondary" onclick="fecharModal('foto-mot-menu');trocarFotoMotorista()">Trocar foto</button>
-    </div>
-  </div>
-</div>
-
-<!-- Visualizador de foto do motorista em tela cheia -->
-<div class="modal-overlay" id="modal-foto-mot-viewer" style="background:rgba(0,0,0,.9)" onclick="fecharModal('foto-mot-viewer')">
-  <img id="foto-mot-viewer-img" src="" alt="Foto de perfil" style="max-width:90vw;max-height:90vh;border-radius:12px;object-fit:contain">
-</div>
-
+<!-- Foto de perfil do motorista: moldura + menu Ver/Trocar únicos da
+     plataforma (css/avatar-foto.css + js/avatar-foto.js) — mesmo
+     componente de usuarios.html/Brigadas/Biomonitor, ver
+     "Regra do sistema — foto de perfil sincronizada" no CLAUDE.md. -->
 <input type="file" id="input-foto-motorista" accept="image/*" style="display:none" onchange="processarFotoMotorista(this)">
 
 <!-- Modal Cancelar (Solicitante) -->
@@ -924,23 +910,23 @@ function fecharModal(qual) {
 }
 
 // ── Foto de perfil do motorista (self-service, só galeria) ────────
-function abrirMenuFotoMotorista() {
-  if (!_motorista?.foto_url) { trocarFotoMotorista(); return }
-  document.getElementById('modal-foto-mot-menu').classList.add('aberto')
-}
-async function verFotoMotorista() {
-  if (!_motorista?.foto_url) return
-  // Bucket privado (migration 200): a URL guardada não serve o arquivo
-  // sozinha, precisa ser assinada. Sem rede não dá — avisa em vez de
-  // abrir um visualizador vazio.
-  const url = await frotaFotoUrlAssinada(_motorista.foto_url)
-  if (!url) { toast('Não foi possível abrir a foto agora. Verifique a conexão.', 'warning'); return }
-  document.getElementById('foto-mot-viewer-img').src = url
-  document.getElementById('modal-foto-mot-viewer').classList.add('aberto')
-}
-function trocarFotoMotorista() {
-  document.getElementById('input-foto-motorista').value = ''
-  document.getElementById('input-foto-motorista').click()
+// Registrado no componente único de avatar (js/avatar-foto.js) — o
+// clique é tratado por avatarFotoClicar('fm-foto') no template de
+// renderFmInicio, nunca reimplementado aqui.
+function fmRegistrarAvatarMotorista() {
+  avatarFotoRegistrar('fm-foto', {
+    temFoto: () => !!_motorista?.foto_url,
+    verFoto: async () => {
+      if (!_motorista?.foto_url) return null
+      // Bucket privado (migration 200): a URL guardada não serve o
+      // arquivo sozinha, precisa ser assinada.
+      return await frotaFotoUrlAssinada(_motorista.foto_url)
+    },
+    trocarFoto: () => {
+      document.getElementById('input-foto-motorista').value = ''
+      document.getElementById('input-foto-motorista').click()
+    },
+  })
 }
 
 function fmFotoQuadrada(file, tam = 512) {
@@ -1491,6 +1477,15 @@ function fmCardViagem(v) {
 }
 
 // ── Aba Início ───────────────────────────────────────────────────
+// "Bom dia/Boa tarde/Boa noite" — mesmo padrão de brigada.html
+// (saudacao) e biomonitor.html, cada app com a sua cópia local.
+function fmSaudacao() {
+  const h = new Date().getHours()
+  if (h < 12) return 'Bom dia'
+  if (h < 18) return 'Boa tarde'
+  return 'Boa noite'
+}
+
 function renderFmInicio() {
   // Viagem cuja janela fechou sem check-out não é mais pendência do
   // motorista (migration 241) — fvGrupo tira ela daqui e o Histórico
@@ -1498,18 +1493,35 @@ function renderFmInicio() {
   const ativas = fmOrdenarPorSaida(_viagens.filter(v => fvGrupo(v) !== 'passada'))
   document.getElementById('fm-conteudo').innerHTML = `
     <div class="card" style="margin-bottom:16px;display:flex;align-items:center;gap:14px">
-      <button type="button" onclick="abrirMenuFotoMotorista()" style="border:none;padding:0;background:none;cursor:pointer;border-radius:50%" aria-label="Foto de perfil">
-        ${frotaFotoAttr(_motorista.foto_url, iniciais(_motorista.nome))
-          ? `<img ${frotaFotoAttr(_motorista.foto_url, iniciais(_motorista.nome))} alt="" style="width:48px;height:48px;border-radius:50%;object-fit:cover;display:block;font-size:16px">`
-          : `<div class="sidebar-avatar" style="width:48px;height:48px;font-size:16px">${iniciais(_motorista.nome)}</div>`}
-      </button>
+      <div class="avatar-foto-wrap" id="fm-foto-wrap" style="width:56px;height:56px" onclick="avatarFotoClicar('fm-foto')" role="button" tabindex="0" aria-label="Ver ou trocar foto">
+        <div class="avatar-foto-anel"></div>
+        <div class="avatar-foto" id="fm-foto-img" style="font-size:17px">${iniciais(_motorista.nome)}</div>
+        <div class="avatar-foto-badge">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+        </div>
+      </div>
       <div>
-        <div style="font-weight:700;font-size:15px">${esc(_motorista.nome)}</div>
-        <div style="font-size:12px;color:#9CA3AF">CNH ${esc(_motorista.cnh_categoria||'—')} ${_motorista.cnh_numero ? '· '+esc(_motorista.cnh_numero) : ''}</div>
+        <div class="fm-saudacao">${fmSaudacao()}</div>
+        <div class="fm-home-nome">${esc(_motorista.nome)}</div>
+        <div style="font-size:12px;color:#9CA3AF;margin-top:2px">CNH ${esc(_motorista.cnh_categoria||'—')} ${_motorista.cnh_numero ? '· '+esc(_motorista.cnh_numero) : ''}</div>
       </div>
     </div>
-    <button class="btn btn-secondary" style="width:100%;margin-bottom:10px" onclick="abrirAbastecimento(null)">${bico('fuel')} Registrar abastecimento</button>
-    <button class="btn btn-secondary" style="width:100%;margin-bottom:16px" onclick="abrirDefeito(null)">${bico('wrench')} Solicitar manutenção</button>
+    <button type="button" class="fm-action-card fuel" onclick="abrirAbastecimento(null)">
+      <span class="fm-action-icon">${bico('fuel')}</span>
+      <span class="fm-action-main">
+        <span class="fm-action-title">Registrar abastecimento</span>
+        <span class="fm-action-sub">Litros, valor e comprovante</span>
+      </span>
+      <span class="fm-action-chevron">${bico('chevron-down')}</span>
+    </button>
+    <button type="button" class="fm-action-card manut" onclick="abrirDefeito(null)">
+      <span class="fm-action-icon">${bico('wrench')}</span>
+      <span class="fm-action-main">
+        <span class="fm-action-title">Solicitar manutenção</span>
+        <span class="fm-action-sub">Avisar defeito ou pedir revisão</span>
+      </span>
+      <span class="fm-action-chevron">${bico('chevron-down')}</span>
+    </button>
     ${ativas.length ? `
       <div class="form-section-label">Viagem em andamento</div>
       ${ativas.slice(0, 1).map(fmCardViagem).join('')}
@@ -1518,10 +1530,24 @@ function renderFmInicio() {
         Nenhuma viagem pendente no momento.<br>
         <button class="btn btn-secondary btn-sm" style="margin-top:12px" onclick="motoristaAba('nova')">Abrir uma viagem</button>
       </div>`}`
-  // Bucket privado (migration 200): o avatar sai marcado e é assinado
-  // aqui. Sem rede a assinatura falha e vira iniciais — o mesmo que já
-  // aparece quando o motorista não tem foto.
-  frotaAssinarFotos(document.getElementById('fm-conteudo'))
+  fmRegistrarAvatarMotorista()
+  fmPintarAvatarMotorista()
+  bIconsAplicar()
+}
+
+// Bucket privado (migration 200): a moldura de avatar única
+// (css/avatar-foto.css) não faz assinatura sozinha — pinta aqui, e cai
+// nas iniciais sem rede, igual a qualquer outra tela que usa o mesmo
+// componente (ver admPintarAvatar em pages/usuarios.html).
+async function fmPintarAvatarMotorista() {
+  const el = document.getElementById('fm-foto-img')
+  if (!el) return
+  if (_motorista.foto_url) {
+    const url = await frotaFotoUrlAssinada(_motorista.foto_url)
+    if (url) { el.style.backgroundImage = `url("${url}")`; el.textContent = ''; return }
+  }
+  el.style.backgroundImage = ''
+  el.textContent = iniciais(_motorista.nome)
 }
 
 // Cabeçalho de bloco das listas de viagem (Em andamento / Próximas /
@@ -4472,6 +4498,37 @@ if ('serviceWorker' in navigator && !fEhAppNativoFrota()) {
   flex: 1; padding: 16px; padding-bottom: 112px;
   max-width: 640px; margin: 0 auto; width: 100%; box-sizing: border-box;
 }
+
+/* ── Identidade da Início (avatar + saudação): mesma linguagem do
+   app de campo do Brigadas — moldura de avatar única (avatar-foto.css)
+   e nome em Fraunces, a fonte de título da plataforma, em vez do
+   Archivo do tema Wise. ── */
+.fm-saudacao { font-size: 12px; color: var(--cinza-500, #6B7280); font-family: var(--font-sans, 'DM Sans', sans-serif); }
+.fm-home-nome { font-family: var(--font-display, 'Fraunces', serif); font-weight: 700; font-size: 18px; color: var(--verde, #1F4E2C); line-height: 1.15; }
+
+/* ── Cards de ação da Início (abastecimento/manutenção): blocos com
+   ícone em destaque + chevron, no lugar dos botões achatados do tema
+   Wise — mesma hierarquia visual dos cards "O que deseja registrar?"
+   do Biomonitor/Brigadas, com as cores institucionais do módulo. ── */
+.fm-action-card {
+  display: flex; align-items: center; gap: 14px; width: 100%; text-align: left;
+  border: none; cursor: pointer; padding: 16px 18px; border-radius: 18px;
+  margin-bottom: 10px; font-family: var(--font-sans, 'DM Sans', sans-serif);
+  color: #fff; transition: transform .12s var(--fw-ease, ease), box-shadow .12s;
+}
+.fm-action-card:active { transform: scale(.98); }
+.fm-action-card.fuel  { background: linear-gradient(135deg, #1F4E2C 0%, #2D6A4F 100%); box-shadow: 0 6px 18px rgba(31,78,44,.28); }
+.fm-action-card.manut { background: linear-gradient(135deg, #8a660a 0%, #B5860D 100%); box-shadow: 0 6px 18px rgba(181,134,13,.28); }
+.fm-action-icon {
+  width: 44px; height: 44px; border-radius: 12px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,.20);
+}
+.fm-action-icon svg { width: 21px; height: 21px; stroke: #fff; }
+.fm-action-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.fm-action-title { font-weight: 700; font-size: 14.5px; }
+.fm-action-sub { font-size: 11.5px; opacity: .85; }
+.fm-action-chevron { flex-shrink: 0; opacity: .75; transform: rotate(-90deg); }
+.fm-action-chevron svg { width: 16px; height: 16px; stroke: #fff; }
 .fm-pill-nav {
   /* Sem `transform` e sem `will-change` de propósito.
      O `will-change: transform` que existia aqui era tentativa de conter

@@ -71,3 +71,26 @@ estilo odômetro para KPIs (respeita `prefers-reduced-motion`).
 - [ ] `fw-vehicle-card`, `fw-list-item`, `fw-filter-chip`, `fw-avatar` ainda não
       aplicados nas listagens (hoje usam `<table>`/linhas no padrão institucional
       já com badges Wise) — trocar exige repaginar a listagem, não só o token
+
+## Exceção — identidade da tela Início (`frota-app.html`, modo motorista)
+
+A "casca" da Início (avatar, saudação, cards de ação) foi alinhada ao
+padrão institucional em vez de seguir o Tema Wise à risca — achado ao
+comparar lado a lado com o app Brigadas: o avatar sem moldura e os
+botões achatados destoavam demais do resto da plataforma. Trocado por:
+moldura de avatar única (`css/avatar-foto.css` + `js/avatar-foto.js`,
+mesma da CLAUDE.md "foto de perfil sincronizada" — o app tinha uma
+implementação própria do menu Ver/Trocar, `#modal-foto-mot-menu`,
+nunca migrada quando os outros 3 apps foram; removida em favor do
+componente único), nome em Fraunces (`--font-display`, a fonte de
+título da plataforma, não o Archivo do Wise) e os dois botões de ação
+(`Registrar abastecimento`/`Solicitar manutenção`) viraram cards com
+ícone em destaque (`.fm-action-card`), no mesmo espírito dos cards
+"O que deseja registrar?" do Biomonitor. O restante do app (badges,
+KPIs, formulários) continua no Tema Wise — decisão de escopo, não
+pendência.
+- `pwa/sw.js`: `SHELLS.frota` ganhou `/css/avatar-foto.css` (o arquivo
+  já estava faltando ali — o CSS nunca tinha ido nem para o `<link>`
+  da própria página, por isso a moldura nunca apareceu). `VERSOES.frota`
+  94 → 95. `app-frota/scripts/build-www.mjs`: `avatar-foto.css` entrou
+  em `ARQUIVOS_CSS`.
