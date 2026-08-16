@@ -216,18 +216,25 @@ function gerarLayout(tituloPagina, paginaAtiva) {
       // "App Frota" volta a ter filtro de perfil PRÓPRIO (decisão do
       // usuário, 2026-08-16, revertendo a abertura total de antes) —
       // é o app completo (motorista/gestor também), não só solicitar.
-      // Agenda de Viagens/Painel/Administrar mantêm seus próprios
-      // `perfis:`, intocados.
+      // Agenda de Viagens/Painel/Administrar mantêm seus arrays de
+      // `perfis:` (pré-organograma) MAS ganham `modulo: 'frota'` também
+      // — os arrays sozinhos não bastam mais: incluem 'tecnico'/'gestor'
+      // em geral, sem olhar lotação, então qualquer tecnico (ex.: um
+      // lotado no DEBIO) ou gestor fora do DITLOG continuava vendo os
+      // 3, mesmo já sem `editar`/`visualizar` de verdade na RLS depois
+      // que exige_lotacao foi ligado em 'frota' (achado testando com
+      // Dima, 2026-08-16). Os dois filtros valem juntos (mais
+      // restritivo vence) — quem tem lotação E está no array certo.
       itens: [
         { id: 'frota-app',       href: '../pages/frota-app.html',       label: 'App Frota', target: '_blank',
           perfis: ['super_admin','secretario','diretor','chefe_departamento','gestor','gestor_uc','tecnico','assistente_admin','financeiro','visualizador'] },
         { id: 'frota-tarefas',   href: '../pages/frota-tarefas.html',   label: 'Minhas Tarefas' },
         { id: 'frota-solicitar', href: '../pages/frota-solicitar.html', label: 'Solicitar Viagem' },
-        { id: 'frota-viagens',   href: '../pages/frota-viagens.html',   label: 'Agenda de Viagens',
+        { id: 'frota-viagens',   href: '../pages/frota-viagens.html',   label: 'Agenda de Viagens', modulo: 'frota',
           perfis: ['super_admin','diretor','chefe_departamento','gestor','assistente_admin'] },
-        { id: 'frota-dashboard', href: '../pages/frota-dashboard.html', label: 'Painel de Frota',
+        { id: 'frota-dashboard', href: '../pages/frota-dashboard.html', label: 'Painel de Frota', modulo: 'frota',
           perfis: ['super_admin','secretario','diretor','chefe_departamento','gestor','gestor_uc','tecnico','assistente_admin','financeiro'] },
-        { id: 'frota-administrar', href: '../pages/frota-administrar.html', label: 'Administrar Frota',
+        { id: 'frota-administrar', href: '../pages/frota-administrar.html', label: 'Administrar Frota', modulo: 'frota',
           perfis: ['super_admin','secretario','diretor','chefe_departamento','gestor','gestor_uc','tecnico','assistente_admin','financeiro'] },
       ]
     },
@@ -263,6 +270,7 @@ function gerarLayout(tituloPagina, paginaAtiva) {
     if (grupo.modulo && appState.permissoes && appState.permissoes[grupo.modulo] === 'sem_acesso') return '';
     const itensHtml = grupo.itens
       .filter(item => !item.perfis || (u && item.perfis.includes(u.perfil)))
+      .filter(item => !item.modulo || !appState.permissoes || appState.permissoes[item.modulo] !== 'sem_acesso')
       .map(item => {
         const ativo   = paginaAtiva === item.id ? ' ativo' : '';
         const target  = item.target ? ` target="${item.target}" rel="noopener"` : '';
