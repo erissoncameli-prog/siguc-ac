@@ -172,6 +172,24 @@ test('grupo Biomonitor aparece quando minhas_permissoes libera (lotado no DEBIO)
   await expect(page.locator('.nav-grupo[data-grupo="biomonitor"]')).toHaveCount(1);
 });
 
+test('grupo Água some quando minhas_permissoes diz sem_acesso (RLS de dono é 100% pode_ver/pode_editar, gate seguro)', async ({ page }) => {
+  await montarSidebar(page, 'dashboard', {
+    perfil: 'tecnico',
+    permissoes: { agua: 'sem_acesso' },
+  });
+
+  await expect(page.locator('.nav-grupo[data-grupo="agua"]')).toHaveCount(0);
+});
+
+test('grupo Água aparece quando minhas_permissoes libera (lotado no DERHQA)', async ({ page }) => {
+  await montarSidebar(page, 'dashboard', {
+    perfil: 'gestor',
+    permissoes: { agua: 'editar' },
+  });
+
+  await expect(page.locator('.nav-grupo[data-grupo="agua"]')).toHaveCount(1);
+});
+
 test('appState.permissoes vazio (fail-open) não esconde o grupo Biomonitor', async ({ page }) => {
   await montarSidebar(page, 'dashboard', { perfil: 'tecnico', permissoes: {} });
 

@@ -171,6 +171,14 @@ function gerarLayout(tituloPagina, paginaAtiva) {
     },
     {
       id: 'agua', label: 'Qualidade da Água', super: 'Diretoria Técnica',
+      // Mesmo padrão do grupo Biomonitor: 'agua' é uma chave só no
+      // catálogo cobrindo o grupo inteiro (Fase 2), e RLS das tabelas
+      // de dono (campanhas/coletas/laboratórios/pontos) já é 100%
+      // pode_ver/pode_editar — leitura e escrita concordam, então
+      // esconder o grupo quando sem_acesso é seguro (diferente do
+      // cluster DEUC, onde leitura fica aberta e por isso NÃO ganhou
+      // esse gate — ver docs/acesso-por-organograma.md §3.1).
+      modulo: 'agua',
       itens: [
         { id: 'agua-app',         href: '../pages/agua-app.html',         label: 'App de Campo', target: '_blank' },
         { id: 'agua-mapa',        href: '../pages/agua-mapa.html',        label: 'Mapa' },
