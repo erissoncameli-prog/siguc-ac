@@ -430,6 +430,30 @@ sidebar (`grupo.modulo='agua'` em `js/layout.js`) igual ao Biomonitor,
 porque leitura e escrita das tabelas de dono são as duas gated —
 diferente do cluster DEUC abaixo. `pwa/sw.js`: frota 88 → 89.
 
+**Cluster Brigadas — só a metade simples convertida (migrations 282/283,
+mesma sessão)**: das 10 tabelas levantadas, só 5 têm um array único
+valendo pra TODA operação (`atividades_brigada`, `brigadas`,
+`brigadistas`, `equipamentos_brigada`, `equipes_brigada` — tecnico/
+gestor/super_admin + `is_chefe_brigada()` preservado como OR em
+`equipes_brigada`). Mesmo processo do DEUC: catálogo de `brigadas`
+corrigido (tecnico estava em `visualizar`, real é `editar`;
+chefe_departamento/gestor_uc/assistente_admin estavam em `editar`, real
+é sem essas 3), convertido pra `pode_editar('brigadas')`, `exige_lotacao`
+ligado sem expansão (mesmos 7 do DEUC + super_admin mantêm editar).
+`pages/brigadas.html` **não tem link na sidebar** — sem item de menu
+pra gatear, a proteção fica só na RLS.
+
+**As outras 5 tabelas (`registro_fauna`, `registro_participantes`,
+`registros_campo`, `atividades_campo_catalogo`, `especies_fauna`) NÃO
+foram convertidas** — achado que trava conversão mecânica: o array de
+perfis varia por OPERAÇÃO na mesma tabela (`registro_fauna`: UPDATE
+aceita tecnico, INSERT/DELETE não; `registro_participantes`: escrita só
+gestor/super_admin, leitura inclui tecnico/biologo), e o catálogo só
+tem um nível por perfil/módulo — não representa "edita X mas não Y".
+Converter exigiria decisão específica por tabela/operação, fora do
+escopo de uma conversão mecânica. Fica pendência registrada, não
+tentar resolver com o mesmo padrão do resto do cluster.
+
 **Sidebar NÃO ganhou o gate por `modulo` no cluster DEUC**, diferente do
 Biomonitor e da Água. A leitura dessas 6 tabelas é aberta a qualquer autenticado
 (decisão de não mexer nela) — só a escrita segue o catálogo. Esconder o
