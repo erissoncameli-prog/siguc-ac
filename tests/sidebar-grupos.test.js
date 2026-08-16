@@ -195,3 +195,26 @@ test('appState.permissoes vazio (fail-open) não esconde o grupo Biomonitor', as
 
   await expect(page.locator('.nav-grupo[data-grupo="biomonitor"]')).toHaveCount(1);
 });
+
+test('grupo Frota aparece pra qualquer perfil — solicitar viagem nunca foi restrito por organograma', async ({ page }) => {
+  // brigadista/biologo/pesquisador_externo/validador_brigada/
+  // validador_fauna ficavam de fora do array `perfis:` do grupo inteiro
+  // — escondia até "Solicitar Viagem", que é dono-do-registro
+  // (frota_viag_insert: solicitante_id = auth.uid()), nunca dependeu de
+  // pode_editar('frota') nem de lotação.
+  for (const perfil of ['brigadista', 'biologo', 'pesquisador_externo', 'validador_brigada', 'validador_fauna']) {
+    await montarSidebar(page, 'dashboard', { perfil, permissoes: {} });
+    await expect(page.locator('.nav-grupo[data-grupo="frota"]')).toHaveCount(1);
+    await expect(page.locator('.nav-grupo[data-grupo="frota"] a[href*="frota-solicitar"]')).toHaveCount(1);
+  }
+});
+
+test('Agenda de Viagens/Painel/Administrar Frota continuam restritos por item, mesmo com o grupo aberto a todos', async ({ page }) => {
+  await montarSidebar(page, 'dashboard', { perfil: 'brigadista', permissoes: {} });
+
+  const grupo = page.locator('.nav-grupo[data-grupo="frota"]');
+  await expect(grupo.locator('a[href*="frota-solicitar"]')).toHaveCount(1);
+  await expect(grupo.locator('a[href*="frota-viagens"]')).toHaveCount(0);
+  await expect(grupo.locator('a[href*="frota-dashboard"]')).toHaveCount(0);
+  await expect(grupo.locator('a[href*="frota-administrar"]')).toHaveCount(0);
+});

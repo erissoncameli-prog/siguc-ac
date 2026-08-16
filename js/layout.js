@@ -190,7 +190,15 @@ function gerarLayout(tituloPagina, paginaAtiva) {
     },
     {
       id: 'frota', label: 'Frota — Transporte', super: 'Administrativo',
-      perfis: ['super_admin','secretario','diretor','chefe_departamento','gestor','gestor_uc','tecnico','assistente_admin','financeiro','visualizador'],
+      // Sem filtro de perfil no grupo: App Frota/Minhas Tarefas/Solicitar
+      // Viagem (sem `perfis:` próprio) têm que aparecer pra QUALQUER
+      // perfil — solicitar viagem nunca foi restrito por organograma
+      // nem por perfil (frota_viag_insert é dono-do-registro,
+      // solicitante_id = auth.uid()); o filtro antigo excluía brigadista/
+      // biologo/pesquisador_externo/validador_brigada/validador_fauna do
+      // grupo inteiro, escondendo até o link de solicitar. Agenda de
+      // Viagens/Painel de Frota/Administrar Frota mantêm seus próprios
+      // `perfis:` por item, intocados — só a aprovação/gestão é restrita.
       itens: [
         { id: 'frota-app',       href: '../pages/frota-app.html',       label: 'App Frota', target: '_blank' },
         { id: 'frota-tarefas',   href: '../pages/frota-tarefas.html',   label: 'Minhas Tarefas' },
