@@ -518,6 +518,22 @@ usuário: os 10 perdem `editar` em Frota até serem lotados no DITLOG (ou
 setor correto). RLS já era 100% `pode_ver`/`pode_editar` desde a
 entrega original do módulo — não precisou de conversão, só ativação.
 
+**Correção — sidebar do grupo Frota escondia "Solicitar Viagem" de 5
+perfis (2026-08-16).** Achado ao confirmar que "todo usuário tem que
+poder solicitar viagem": os DADOS já garantiam isso desde sempre
+(`frota_viag_insert` é dono-do-registro — `solicitante_id = auth.uid()`
+— nunca dependeu de `pode_editar('frota')`; `frota-app.html` cai
+automaticamente no modo solicitante pra quem não é gestor nem
+motorista). O gap era só a sidebar: o grupo `frota` tinha um array
+`perfis:` que excluía `brigadista`/`biologo`/`pesquisador_externo`/
+`validador_brigada`/`validador_fauna` do grupo INTEIRO, escondendo até
+o link de solicitar. Removido o filtro do grupo (não dos itens) — App
+Frota/Minhas Tarefas/Solicitar Viagem (sem `perfis:` próprio) ficam
+visíveis a todo mundo; Agenda de Viagens/Painel/Administrar Frota
+mantêm seus filtros por item, intocados — aprovação/gestão continuam
+restritas. `pwa/sw.js`: frota 89 → 90. Guarda: 2 testes novos em
+`tests/sidebar-grupos.test.js`.
+
 **Sidebar NÃO ganhou o gate por `modulo` no cluster DEUC**, diferente do
 Biomonitor e da Água. A leitura dessas 6 tabelas é aberta a qualquer autenticado
 (decisão de não mexer nela) — só a escrita segue o catálogo. Esconder o
