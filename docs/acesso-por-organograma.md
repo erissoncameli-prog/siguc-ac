@@ -454,6 +454,47 @@ Converter exigiria decisão específica por tabela/operação, fora do
 escopo de uma conversão mecânica. Fica pendência registrada, não
 tentar resolver com o mesmo padrão do resto do cluster.
 
+**`teto_do_perfil()` corrigido pra ser por módulo (migration 284, mesma
+sessão) — destrava Unidades/Equipe/Alertas-ambientais.** A causa exata
+do achado acima: `nivel_efetivo_calc()` usava `teto_do_perfil(perfil)`
+— nível MÁXIMO daquele perfil em QUALQUER módulo do sistema — como teto
+do alcance por lotação. Um `tecnico` lotado no DEUC (editor em
+monitoramento/netflora) "vazava" `editar` pra unidades/equipe/alertas,
+onde só super_admin/gestor editam hoje. Correção: novo helper
+`nivel_catalogo_perfil(perfil, modulo_id, grupo)` — mesma lógica de
+fallback que já existia duplicada 2x dentro de `nivel_efetivo_calc`
+(`perfil_permissoes_padrao` → `grupo_permissoes_padrao` →
+`sem_acesso`), agora usado também como teto no lugar do global. O teto
+do **credenciamento** (`LEAST(v_cred, teto_do_perfil(...))`) foi
+mantido global de propósito — é mecanismo de exceção explícita
+concedida por super_admin, semântica diferente do alcance por lotação
+comum.
+
+Validado com funções-sombra ANTES de tocar na função real: comparação
+`nivel_efetivo()` real × simulação nova pra TODOS os usuários ativos ×
+TODOS os módulos com dono = **zero diferença no estado atual**
+(nenhuma regressão nos 5 módulos já ativos). Simulação com
+`exige_lotacao` forçado nos 3 módulos travados = só a Ana Luisa (única
+`tecnico` lotada no DEUC) muda, de `editar` pra `visualizar`/
+`sem_acesso`, batendo com o array real; nenhum gestor muda. Só depois
+disso a função real foi trocada (`CREATE OR REPLACE`, mesma
+assinatura), e `exige_lotacao` ligado nos 3 (migration 285). Efeito
+colateral positivo: `REVOKE EXECUTE ... FROM authenticated` em
+`nivel_efetivo_calc` fechou 1 aviso do advisor de segurança que já
+existia (175 → 174 WARN).
+
+Dois casos que pareciam suspeitos ao conferir o resultado e que
+INVESTIGUEI antes de assumir bug: Jomara Katrine Vitoriano de Souza
+aparecendo com `editar` em `monitoramento`/`netflora`/`brigadas` sem
+lotação DEUC — na verdade tem CARGO num núcleo de UC (`usuario_unidades()`
+inclui cargo, não só lotação) que é descendente do DEUC na árvore,
+herdando o nível por `alcance_por_lotacao()` (regra documentada no
+§1.4, não bug). Glauco Feitosa com `editar` em `agua` sem eu ter
+cadastrado nada — lotação real, criada pelo próprio usuário direto na
+tela de Estrutura Organizacional, em paralelo a esta sessão (`criado_por`
+= o usuário, `criado_em` = durante a conversa). Nenhum dos dois é
+consequência da migration 284.
+
 **Sidebar NÃO ganhou o gate por `modulo` no cluster DEUC**, diferente do
 Biomonitor e da Água. A leitura dessas 6 tabelas é aberta a qualquer autenticado
 (decisão de não mexer nela) — só a escrita segue o catálogo. Esconder o
