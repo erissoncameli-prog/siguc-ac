@@ -420,8 +420,18 @@ usuário) ficaram sem lotação — perdem `editar` em Monitoramento/Netflora
 por decisão explícita, mesmo efeito que teriam em qualquer módulo do
 lote quando a chave for ligada.
 
-**Sidebar NÃO ganhou o gate por `modulo` nesta rodada**, diferente do
-Biomonitor. A leitura dessas 6 tabelas é aberta a qualquer autenticado
+**Água ativada logo em seguida (migration 281, mesma sessão)**: RLS já
+era 100% `pode_ver`/`pode_editar` desde a Fase 2 (`agua_campanhas`,
+`agua_coletas`, `agua_laboratorios`, `agua_pontos_coleta`), dono já
+cadastrado (DERHQA). Impacto medido: zero "ganha", só "perde" quem não
+está no DERHQA — sem o problema de teto por perfil (teto de
+gestor/tecnico já batia com o que `agua` concede). Ganhou o gate de
+sidebar (`grupo.modulo='agua'` em `js/layout.js`) igual ao Biomonitor,
+porque leitura e escrita das tabelas de dono são as duas gated —
+diferente do cluster DEUC abaixo. `pwa/sw.js`: frota 88 → 89.
+
+**Sidebar NÃO ganhou o gate por `modulo` no cluster DEUC**, diferente do
+Biomonitor e da Água. A leitura dessas 6 tabelas é aberta a qualquer autenticado
 (decisão de não mexer nela) — só a escrita segue o catálogo. Esconder o
 item do menu quando `permissoes[chave] === 'sem_acesso'` esconderia a
 página de quem ainda pode LER normalmente (ex.: todo `tecnico` tem
