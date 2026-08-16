@@ -50,7 +50,7 @@ cpSync(join(RAIZ, 'pwa/icons/logo-frota.png'), join(WWW, 'pwa/icons/logo-frota.p
 // ── CSS (remove @import do Google Fonts — fontes são locais) ──
 // Lista derivada de todo <link rel="stylesheet" href="../css/..."> em
 // pages/frota-app.html.
-const ARQUIVOS_CSS = ['global.css', 'frota-wise-theme.css']
+const ARQUIVOS_CSS = ['global.css', 'avatar-foto.css', 'frota-wise-theme.css']
 for (const f of ARQUIVOS_CSS) {
   let css = readFileSync(join(RAIZ, 'css', f), 'utf8')
   css = css.replace(/@import url\('https:\/\/fonts\.googleapis\.com[^']*'\);?\n?/g, '')
