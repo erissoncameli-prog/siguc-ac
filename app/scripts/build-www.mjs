@@ -19,7 +19,7 @@ mkdirSync(join(WWW, 'js'),           { recursive: true })
 mkdirSync(join(WWW, 'vendor/fonts'), { recursive: true })
 
 // ── JS compartilhado (idêntico ao site) ───────────────────────
-for (const f of ['config.js', 'fotos-privadas.js', 'lgpd.js', 'lgpd-campo.js', 'qrcode-generator.js', 'brigada-offline.js', 'brigada-sync.js', 'brigada-captura.js', 'brigada-area.js', 'brigada-fauna.js', 'brigada-participantes.js']) {
+for (const f of ['config.js', 'fotos-privadas.js', 'avatar-foto.js', 'lgpd.js', 'lgpd-campo.js', 'qrcode-generator.js', 'brigada-offline.js', 'brigada-sync.js', 'brigada-captura.js', 'brigada-area.js', 'brigada-fauna.js', 'brigada-participantes.js']) {
   cpSync(join(RAIZ, 'js', f), join(WWW, 'js', f))
 }
 
@@ -44,6 +44,7 @@ cpSync(join(RAIZ, 'data/municipios_acre.geojson'), join(WWW, 'data/municipios_ac
 let css = readFileSync(join(RAIZ, 'css', 'brigada.css'), 'utf8')
 css = css.replace(/@import url\('https:\/\/fonts\.googleapis\.com[^']*'\);?\n?/g, '')
 writeFileSync(join(WWW, 'css', 'brigada.css'), css)
+cpSync(join(RAIZ, 'css', 'avatar-foto.css'), join(WWW, 'css', 'avatar-foto.css'))
 
 // ── Vendor: Supabase UMD + fontes ──────────────────────────────
 cpSync(join(APP, 'node_modules/@supabase/supabase-js/dist/umd/supabase.js'), join(WWW, 'vendor/supabase.js'))
@@ -90,7 +91,7 @@ html = html.replace('</head>', `<script>window.BRIGADA_BUILD='v${versao} (app)'<
 writeFileSync(join(WWW, 'index.html'), html)
 
 // ── Sanidade ───────────────────────────────────────────────────
-for (const f of ['index.html', 'vendor/supabase.js', 'vendor/fonts.css', 'css/brigada.css', 'js/config.js']) {
+for (const f of ['index.html', 'vendor/supabase.js', 'vendor/fonts.css', 'css/brigada.css', 'css/avatar-foto.css', 'js/config.js', 'js/avatar-foto.js']) {
   if (!existsSync(join(WWW, f))) { console.error(`ERRO: faltando www/${f}`); process.exit(1) }
 }
 const idxFinal = readFileSync(join(WWW, 'index.html'), 'utf8')
