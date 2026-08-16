@@ -247,11 +247,11 @@ test('grupo Brigadas de Incêndio some sem acesso a brigadas (proxy do grupo) e 
   await expect(page.locator('.nav-grupo[data-grupo="brigadas"]')).toHaveCount(1);
 });
 
-test('Agenda/Painel/Administrar Frota somem sem lotação, mesmo com o perfil no array antigo (achado testando com Dima)', async ({ page }) => {
-  // tecnico está no array `perfis:` de frota-dashboard/frota-administrar,
-  // e gestor no de frota-viagens — mas nenhum dos dois garante lotação
-  // no DITLOG depois que exige_lotacao foi ligado em 'frota'. Os dois
-  // filtros (perfis E modulo) têm que valer juntos.
+test('Agenda/Painel/Administrar Frota somem sem lotação, mesmo com o perfil no array', async ({ page }) => {
+  // tecnico está no array `perfis:` dos 3 itens (frota-viagens ganhou
+  // tecnico em 2026-08-16 — DITLOG também aprova viagem, não só gestão)
+  // — mas isso não garante lotação no DITLOG. Os dois filtros (perfis E
+  // modulo) têm que valer juntos.
   await montarSidebar(page, 'dashboard', { perfil: 'tecnico', permissoes: { frota: 'sem_acesso' } });
   const grupo = page.locator('.nav-grupo[data-grupo="frota"]');
   await expect(grupo.locator('a[href*="frota-viagens"]')).toHaveCount(0);
@@ -277,4 +277,9 @@ test('Painel/Administrar Frota continuam escondidos de quem tem lotação mas n�
   const grupo = page.locator('.nav-grupo[data-grupo="frota"]');
   await expect(grupo.locator('a[href*="frota-dashboard"]')).toHaveCount(0);
   await expect(grupo.locator('a[href*="frota-administrar"]')).toHaveCount(0);
+});
+
+test('tecnico lotado no DITLOG (caso do usuário Teste) vê Agenda de Viagens', async ({ page }) => {
+  await montarSidebar(page, 'dashboard', { perfil: 'tecnico', permissoes: { frota: 'editar' } });
+  await expect(page.locator('.nav-grupo[data-grupo="frota"] a[href*="frota-viagens"]')).toHaveCount(1);
 });
