@@ -14,11 +14,13 @@ const RESEND_KEY       = Deno.env.get('RESEND_API_KEY') ?? ''
 const SUPABASE_URL     = Deno.env.get('SUPABASE_URL') ?? ''
 const SUPABASE_SRK     = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 
-// Bounding box do Acre: W,S,E,N
-// ⚠ O retângulo é só o formato que FIRMS e o WFS do DETER aceitam —
-// ele engloba AM, RO, Peru e Bolívia. Quem define o que é do Acre é o
-// recorte pelo polígono (../_shared/acre.ts) e, como garantia dura, a
-// trigger da migration 239 no banco.
+// Bounding box do Acre: W,S,E,N — usado só por FIRMS (a API não aceita
+// filtro por UF/polígono, só bbox). O DETER, desde a Entrega 2, filtra
+// por `uf='AC'` direto na fonte (ver processarDETER) — bbox nunca foi
+// preciso (engloba AM, RO, Peru e Bolívia).
+// ⚠ Quem define o que é do Acre, de fato, é o recorte pelo polígono
+// (../_shared/acre.ts) e, como garantia dura, as triggers do banco
+// (migrations 239/294).
 const ACRE_BBOX = '-73.8,-11.14,-66.6,-7.12'
 
 const db = createClient(SUPABASE_URL, SUPABASE_SRK)
@@ -32,15 +34,20 @@ function severidadeFRRP(frp: number): string {
   return 'baixa'
 }
 
-function severidadeAreaHa(ha: number): string {
-  if (ha >= 2500) return 'critica'
-  if (ha >= 1000) return 'alta'
-  if (ha >= 100)  return 'media'
-  return 'baixa'
-}
+// Severidade por área (DETER) NÃO vive mais aqui — a área só existe
+// depois que o polígono chega ao banco (ver migration 291) e a
+// severidade é calculada no MESMO lugar (migration 295,
+// alertas_resolver_campos): "cálculo em um lugar só", mesma regra do
+// projeto para IQA e consumo de combustível. Duplicar os limiares
+// aqui seria a mesma dívida que causou a área sempre nula antes.
 
 function hoje(): string {
   return new Date().toISOString().slice(0, 10)
+}
+
+function diasAtras(n: number): string {
+  const d = new Date(); d.setUTCDate(d.getUTCDate() - n)
+  return d.toISOString().slice(0, 10)
 }
 
 function csvParaObjetos(csv: string): Record<string, string>[] {
@@ -93,17 +100,94 @@ async function buscarFIRMS(): Promise<any[]> {
   })
 }
 
-// ── Busca DETER (desmatamento recente) ──────────────────────
+// ── Busca DETER (desmatamento/degradação/queimada — deter-amz) ──
+//
+// Contrato real do WFS (confirmado contra produção na Entrega 2 —
+// a documentação pública não estava acessível da sessão de dev):
+//   • `uf` é a SIGLA de 2 letras ('AC'), NÃO o nome extenso —
+//     `uf='ACRE'` devolve 0 resultados, sempre. Bug silencioso: o
+//     código antigo nem tentava filtrar por uf, só por BBOX.
+//   • Não existe atributo de área total no WFS. `areauckm`/
+//     `areamunkm` são a área SÓ dentro de UC / SÓ dentro de
+//     município — não a área do polígono. `area_km`/`areakm2`
+//     (o que o código antigo tentava ler) não existem em NENHUMA
+//     feição — por isso area_ha sempre saía nula.
+//   • `classname` tem pelo menos 6 valores distintos observados
+//     para o Acre (DESMATAMENTO_CR, DESMATAMENTO_VEG, CS_DESORDENADO,
+//     CS_GEOMETRICO, DEGRADACAO, CICATRIZ_DE_QUEIMADA) — o código
+//     antigo gravava TUDO como tipo='desmatamento'. O enum de
+//     alertas_ambientais.tipo já previa 'degradacao' desde o início;
+//     nunca tinha sido usado.
+//   • `municipality` traz o nome do município já resolvido pelo
+//     INPE — usado para preencher `municipio` sem precisar de
+//     point-in-polygon próprio.
+//   • Paginação real via `startIndex` + `sortBy=gid` (GeoServer
+//     aceita como extensão do WFS 1.0.0) — testado e estável.
+//   • Total para uf='AC', toda a série (desde 2016-08-04 até hoje):
+//     30.903 feições — volume pequeno, cabe um backfill completo.
 
-async function buscarDETER(): Promise<any[]> {
-  const url = `https://terrabrasilis.dpi.inpe.br/geoserver/deter-amz/ows?` +
-    `service=WFS&version=1.0.0&request=GetFeature` +
-    `&typeName=deter-amz:deter_amz&outputFormat=application/json` +
-    `&BBOX=${ACRE_BBOX},EPSG:4326&maxFeatures=200`
-  const res = await fetch(url, { signal: AbortSignal.timeout(20000) })
-  if (!res.ok) return []
+const DETER_WFS = 'https://terrabrasilis.dpi.inpe.br/geoserver/deter-amz/ows'
+
+// Mapeamento classname → tipo do alerta. Escolha de engenharia desta
+// entrega (documentação oficial do INPE não estava acessível para
+// confirmar a taxonomia palavra por palavra): corte raso e remoção de
+// vegetação são desmatamento pleno; cicatriz de queimada é o sinal de
+// fogo que o próprio DETER detecta (mesmo bucket que BDQUEIMADAS/FIRMS
+// para o enum 'queimada'); corte seletivo (ordenado ou não) e
+// degradação genérica caem em 'degradacao' — nunca fizeram parte de
+// 'desmatamento' aqui, e o enum já tinha esse terceiro valor pronto.
+function classnameParaTipo(classname: string | null | undefined): 'desmatamento' | 'queimada' | 'degradacao' {
+  const c = (classname ?? '').toUpperCase()
+  if (c === 'DESMATAMENTO_CR' || c === 'DESMATAMENTO_VEG') return 'desmatamento'
+  if (c === 'CICATRIZ_DE_QUEIMADA') return 'queimada'
+  return 'degradacao' // CS_DESORDENADO, CS_GEOMETRICO, DEGRADACAO, MINERACAO e qualquer classe nova
+}
+
+// Converte geometry (Polygon ou MultiPolygon) do GeoJSON do WFS em WKT
+// MULTIPOLYGON — a coluna `poligono` é sempre MultiPolygon (migration
+// 291), então um Polygon single vira multipolígono de 1 elemento.
+function geoJsonParaMultiPolygonWKT(geometry: any): string | null {
+  if (!geometry?.type || !geometry?.coordinates) return null
+  const anelParaWkt = (anel: number[][]) =>
+    '(' + anel.map(([x, y]: number[]) => `${x} ${y}`).join(',') + ')'
+  const polyParaWkt = (rings: number[][][]) => '(' + rings.map(anelParaWkt).join(',') + ')'
+
+  if (geometry.type === 'Polygon') {
+    return `MULTIPOLYGON(${polyParaWkt(geometry.coordinates)})`
+  }
+  if (geometry.type === 'MultiPolygon') {
+    return `MULTIPOLYGON(${geometry.coordinates.map(polyParaWkt).join(',')})`
+  }
+  return null
+}
+
+interface PaginaDETER {
+  features: any[]
+  total: number
+}
+
+async function buscarPaginaDETER(opts: {
+  desde?: string          // view_date >= desde (YYYY-MM-DD)
+  ate?: string            // view_date <= ate (YYYY-MM-DD)
+  startIndex: number
+  maxFeatures: number
+}): Promise<PaginaDETER> {
+  const filtros = [`uf='AC'`]
+  if (opts.desde) filtros.push(`view_date>='${opts.desde}'`)
+  if (opts.ate)   filtros.push(`view_date<='${opts.ate}'`)
+
+  const params = new URLSearchParams({
+    service: 'WFS', version: '1.0.0', request: 'GetFeature',
+    typeName: 'deter-amz:deter_amz', outputFormat: 'application/json',
+    CQL_FILTER: filtros.join(' AND '),
+    sortBy: 'gid',
+    startIndex: String(opts.startIndex),
+    maxFeatures: String(opts.maxFeatures),
+  })
+  const res = await fetch(`${DETER_WFS}?${params}`, { signal: AbortSignal.timeout(30000) })
+  if (!res.ok) throw new Error(`DETER HTTP ${res.status}`)
   const json = await res.json()
-  return json.features ?? []
+  return { features: json.features ?? [], total: json.totalFeatures ?? 0 }
 }
 
 // ── Busca BDQueimadas (focos INPE) ──────────────────────────
@@ -131,15 +215,11 @@ async function checarFIRMS() {
 }
 
 async function checarDETER() {
-  const url = `https://terrabrasilis.dpi.inpe.br/geoserver/deter-amz/ows?` +
-    `service=WFS&version=1.0.0&request=GetFeature` +
-    `&typeName=deter-amz:deter_amz&outputFormat=application/json` +
-    `&BBOX=${ACRE_BBOX},EPSG:4326&maxFeatures=200`
   try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(20000) })
-    if (!res.ok) return { fonte: 'DETER', ok: false, http_status: res.status, registros: 0, erro: `HTTP ${res.status}` }
-    const json = await res.json()
-    return { fonte: 'DETER', ok: true, http_status: res.status, registros: json.features?.length ?? 0, erro: null }
+    const { features, total } = await buscarPaginaDETER({
+      desde: diasAtras(15), ate: hoje(), startIndex: 0, maxFeatures: 5,
+    })
+    return { fonte: 'DETER', ok: true, http_status: 200, registros: features.length, total_uf_ac: total, erro: null }
   } catch (e) {
     return { fonte: 'DETER', ok: false, http_status: 0, registros: 0, erro: String((e as Error).message ?? e) }
   }
@@ -207,51 +287,64 @@ async function processarFIRMS(novos: number, erros: string[]): Promise<number> {
   return novos
 }
 
-// ── Processar DETER ─────────────────────────────────────────
+// ── Processar DETER ──────────────────────────────────────────
+//
+// Duas chamadas possíveis:
+//   • Cron/diário: janela móvel de `diasJanela` dias (padrão 15 —
+//     o DETER republica/revisa feições enquanto a nuvem não limpa a
+//     cena, então reprocessar um pouco do passado é intencional).
+//   • Backfill: `desde`/`ate` cobrindo o intervalo pedido (a rota
+//     HTTP abaixo cobre 2016-08-04 → hoje, em chamadas paginadas).
+//
+// UPSERT por fonte_id (migration 293, índice único): quando o INPE
+// revisa a geometria de uma feição já gravada (mesmo gid), o registro
+// se autocorrige na próxima passada — nunca duplica.
+async function processarDETER(opts: {
+  desde?: string
+  ate?: string
+  startIndex: number
+  maxPaginas: number
+  tamanhoPagina: number
+}, erros: string[]): Promise<{ processados: number; proximoStartIndex: number; concluido: boolean; totalFonte: number }> {
+  let startIndex = opts.startIndex
+  let processados = 0
+  let totalFonte = 0
 
-async function processarDETER(novos: number, erros: string[]): Promise<number> {
-  const feats = await buscarDETER()
-  for (const f of feats) {
-    const props = f.properties ?? {}
-    const fonteId = `DETER_${props.gid ?? props.fid ?? JSON.stringify(props).slice(0, 40)}`
+  for (let pagina = 0; pagina < opts.maxPaginas; pagina++) {
+    const { features, total } = await buscarPaginaDETER({
+      desde: opts.desde, ate: opts.ate, startIndex, maxFeatures: opts.tamanhoPagina,
+    })
+    totalFonte = total
+    if (!features.length) return { processados, proximoStartIndex: startIndex, concluido: true, totalFonte }
 
-    const { count } = await db.from('alertas_ambientais')
-      .select('id', { count: 'exact', head: true })
-      .eq('fonte_id', fonteId)
-    if ((count ?? 0) > 0) continue
+    const linhas = features.map((f: any) => {
+      const props = f.properties ?? {}
+      const wkt = geoJsonParaMultiPolygonWKT(f.geometry)
+      if (!wkt || !props.gid) return null
+      return {
+        fonte: 'DETER',
+        tipo: classnameParaTipo(props.classname),
+        severidade: 'baixa', // placeholder — recalculada no banco a partir da área real (migration 295)
+        poligono: wkt,
+        municipio: props.municipality ?? null,
+        fonte_id: `DETER_${props.gid}`,
+        data_referencia: props.view_date ?? opts.ate ?? hoje(),
+        raw_data: props,
+      }
+    }).filter(Boolean)
 
-    const areaKm2 = parseFloat(props.area_km ?? props.areakm2 ?? '0')
-    const areaHa  = areaKm2 * 100
-
-    // Centroide aproximado do bbox
-    const coords = f.geometry?.coordinates
-    let lat = -9.5, lng = -70.0
-    if (coords) {
-      // flatten coords para extrair primeiro ponto
-      const flat = coords.flat(5)
-      lng = parseFloat(flat[0]) ?? lng
-      lat = parseFloat(flat[1]) ?? lat
+    if (linhas.length) {
+      const { error, count } = await db.from('alertas_ambientais')
+        .upsert(linhas, { onConflict: 'fonte_id', ignoreDuplicates: false, count: 'exact' })
+      if (error) erros.push(`DETER (página startIndex=${startIndex}): ${error.message}`)
+      else processados += count ?? linhas.length
     }
 
-    if (!noAcre(lat, lng)) continue  // WFS do DETER responde pelo bbox, não pelo estado
-
-    const uc = await ucParaPonto(lat, lng)
-    const { error } = await db.from('alertas_ambientais').insert({
-      fonte: 'DETER',
-      tipo: 'desmatamento',
-      severidade: severidadeAreaHa(areaHa),
-      uc_id: uc?.id ?? null,
-      uc_nome: uc?.nome ?? null,
-      area_ha: areaHa > 0 ? areaHa : null,
-      geom: `POINT(${lng} ${lat})`,
-      fonte_id: fonteId,
-      data_referencia: props.data_imagem?.slice(0, 10) ?? hoje(),
-      raw_data: props,
-    })
-    if (error) erros.push(`DETER: ${error.message}`)
-    else novos++
+    startIndex += features.length
+    if (features.length < opts.tamanhoPagina) return { processados, proximoStartIndex: startIndex, concluido: true, totalFonte }
   }
-  return novos
+
+  return { processados, proximoStartIndex: startIndex, concluido: false, totalFonte }
 }
 
 // ── Processar BDQueimadas ───────────────────────────────────
@@ -323,7 +416,7 @@ async function enviarNotificacoes() {
       critica: '#DC2626', alta: '#F97316', media: '#F59E0B', baixa: '#059669'
     }
     const cor = corSev[alerta.severidade] ?? '#374151'
-    const tipoLabel = alerta.tipo === 'queimada' ? '🔥 Foco de Calor' : '🌳 Desmatamento'
+    const tipoLabel = alerta.tipo === 'queimada' ? '🔥 Foco de Calor' : alerta.tipo === 'degradacao' ? '🪓 Degradação Florestal' : '🌳 Desmatamento'
 
     const html = `<!DOCTYPE html>
 <html lang="pt-BR">
@@ -405,9 +498,10 @@ Deno.serve(async (req) => {
     })
   }
 
-  // ── Modo diagnóstico (dry-run): testa as fontes SEM inserir nem enviar e-mail ──
   let body: any = {}
   try { body = await req.json() } catch { /* corpo vazio */ }
+
+  // ── Modo diagnóstico (dry-run): testa as fontes SEM inserir nem enviar e-mail ──
   if (body?.check) {
     const [firms, deter, bdqueimadas] = await Promise.all([
       checarFIRMS(), checarDETER(), checarBDQueimadas(),
@@ -421,6 +515,31 @@ Deno.serve(async (req) => {
     }), {
       headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
     })
+  }
+
+  // ── Modo backfill DETER: carga retroativa em páginas (chamar repetido) ──
+  // Corpo: { backfill_deter: true, start_index?: number, max_paginas?: number,
+  //          tamanho_pagina?: number, desde?: string, ate?: string }
+  // Devolve proximo_start_index/concluido — quem chama repete até concluido=true.
+  if (body?.backfill_deter) {
+    const erros: string[] = []
+    try {
+      const r = await processarDETER({
+        desde: body.desde,
+        ate: body.ate,
+        startIndex: Number(body.start_index ?? 0),
+        maxPaginas: Number(body.max_paginas ?? 8),
+        tamanhoPagina: Number(body.tamanho_pagina ?? 400),
+      }, erros)
+      return new Response(JSON.stringify({
+        ok: true, modo: 'backfill_deter', ...r, erros,
+        timestamp: new Date().toISOString(),
+      }), { headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } })
+    } catch (e) {
+      return new Response(JSON.stringify({ ok: false, erro: e.message }), {
+        status: 500, headers: { 'Content-Type': 'application/json' },
+      })
+    }
   }
 
   const inicio = Date.now()
@@ -443,11 +562,17 @@ Deno.serve(async (req) => {
     ])
     novos = n1 + n2
 
-    // DETER (com timeout maior)
+    // DETER: janela móvel de 15 dias (a fonte revisa/republica feições
+    // enquanto a cena tem nuvem — reprocessar um pouco do passado é
+    // intencional; upsert por fonte_id nunca duplica).
     try {
-      novos += await processarDETER(0, erros)
+      const rDeter = await processarDETER({
+        desde: diasAtras(15), ate: hoje(), startIndex: 0, maxPaginas: 10, tamanhoPagina: 400,
+      }, erros)
+      novos += rDeter.processados
+      if (!rDeter.concluido) erros.push('DETER: janela de 15 dias não coube em 10 páginas — verificar volume incomum')
     } catch (e) {
-      erros.push(`DETER timeout: ${e.message}`)
+      erros.push(`DETER: ${e.message}`)
     }
 
     // Enviar notificações para alertas críticos/altos não notificados
