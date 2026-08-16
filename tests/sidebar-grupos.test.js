@@ -34,7 +34,7 @@ const BASE = process.env.TEST_BASE_URL || 'http://localhost:5500';
 const GLOBAL_CSS = fs.readFileSync(path.join(__dirname, '../css/global.css'), 'utf8')
   .replace(/@import[^;]+;/, '');
 
-async function montarSidebar(page, paginaAtiva) {
+async function montarSidebar(page, paginaAtiva, { perfil = 'super_admin', permissoes = {} } = {}) {
   await page.goto(`${BASE}/tests/fixtures/sidebar-harness.html`);
   // js/config.js espera o global `supabase` do CDN (@supabase/supabase-js)
   // — bloqueado nesta sandbox de teste. Um stub mínimo basta: o alvo
@@ -43,11 +43,12 @@ async function montarSidebar(page, paginaAtiva) {
   await page.addScriptTag({ url: '/js/config.js' });
   await page.addScriptTag({ url: '/js/layout.js' });
   await page.addStyleTag({ content: GLOBAL_CSS });
-  return page.evaluate((paginaAtivaArg) => {
-    appState.usuario = { nome_completo: 'Teste', perfil: 'super_admin' };
+  return page.evaluate(({ paginaAtivaArg, perfilArg, permissoesArg }) => {
+    appState.usuario = { nome_completo: 'Teste', perfil: perfilArg };
+    appState.permissoes = permissoesArg;
     const html = gerarLayout('Página de teste', paginaAtivaArg);
     document.body.insertAdjacentHTML('beforeend', html);
-  }, paginaAtiva);
+  }, { paginaAtivaArg: paginaAtiva, perfilArg: perfil, permissoesArg: permissoes });
 }
 
 test.beforeEach(async ({ page }) => {
@@ -144,4 +145,76 @@ test('corpo do grupo colapsa por grid-template-rows, sem transform em nenhum anc
   await page.waitForTimeout(250); // transição de 0,22s do grid-template-rows
   const abertoPx = await corpo.evaluate(el => parseFloat(getComputedStyle(el).gridTemplateRows));
   expect(abertoPx).toBeGreaterThan(0);
+});
+
+test('grupo Biomonitor some quando minhas_permissoes diz sem_acesso, mesmo com o perfil na lista antiga', async ({ page }) => {
+  // tecnico está nos arrays `perfis:` de todo item do grupo Biomonitor
+  // (js/layout.js) — sem o gate por `modulo`, o grupo apareceria mesmo
+  // sem lotação no DEBIO. Este é o cenário real do usuário "Teste"
+  // (perfil tecnico, sem lotação) depois da migration 275.
+  await montarSidebar(page, 'dashboard', {
+    perfil: 'tecnico',
+    permissoes: { biomonitor: 'sem_acesso' },
+  });
+
+  await expect(page.locator('.nav-grupo[data-grupo="biomonitor"]')).toHaveCount(0);
+  // Outro grupo sem `modulo` declarado continua imune ao gate — não é
+  // uma checagem geral, só onde o catálogo bate 1:1 com a sidebar.
+  await expect(page.locator('.nav-grupo[data-grupo="gestao"]')).toHaveCount(1);
+});
+
+test('grupo Biomonitor aparece quando minhas_permissoes libera (lotado no DEBIO)', async ({ page }) => {
+  await montarSidebar(page, 'dashboard', {
+    perfil: 'tecnico',
+    permissoes: { biomonitor: 'editar' },
+  });
+
+  await expect(page.locator('.nav-grupo[data-grupo="biomonitor"]')).toHaveCount(1);
+});
+
+test('grupo Água some quando minhas_permissoes diz sem_acesso (RLS de dono é 100% pode_ver/pode_editar, gate seguro)', async ({ page }) => {
+  await montarSidebar(page, 'dashboard', {
+    perfil: 'tecnico',
+    permissoes: { agua: 'sem_acesso' },
+  });
+
+  await expect(page.locator('.nav-grupo[data-grupo="agua"]')).toHaveCount(0);
+});
+
+test('grupo Água aparece quando minhas_permissoes libera (lotado no DERHQA)', async ({ page }) => {
+  await montarSidebar(page, 'dashboard', {
+    perfil: 'gestor',
+    permissoes: { agua: 'editar' },
+  });
+
+  await expect(page.locator('.nav-grupo[data-grupo="agua"]')).toHaveCount(1);
+});
+
+test('appState.permissoes vazio (fail-open) não esconde o grupo Biomonitor', async ({ page }) => {
+  await montarSidebar(page, 'dashboard', { perfil: 'tecnico', permissoes: {} });
+
+  await expect(page.locator('.nav-grupo[data-grupo="biomonitor"]')).toHaveCount(1);
+});
+
+test('grupo Frota aparece pra qualquer perfil — solicitar viagem nunca foi restrito por organograma', async ({ page }) => {
+  // brigadista/biologo/pesquisador_externo/validador_brigada/
+  // validador_fauna ficavam de fora do array `perfis:` do grupo inteiro
+  // — escondia até "Solicitar Viagem", que é dono-do-registro
+  // (frota_viag_insert: solicitante_id = auth.uid()), nunca dependeu de
+  // pode_editar('frota') nem de lotação.
+  for (const perfil of ['brigadista', 'biologo', 'pesquisador_externo', 'validador_brigada', 'validador_fauna']) {
+    await montarSidebar(page, 'dashboard', { perfil, permissoes: {} });
+    await expect(page.locator('.nav-grupo[data-grupo="frota"]')).toHaveCount(1);
+    await expect(page.locator('.nav-grupo[data-grupo="frota"] a[href*="frota-solicitar"]')).toHaveCount(1);
+  }
+});
+
+test('Agenda de Viagens/Painel/Administrar Frota continuam restritos por item, mesmo com o grupo aberto a todos', async ({ page }) => {
+  await montarSidebar(page, 'dashboard', { perfil: 'brigadista', permissoes: {} });
+
+  const grupo = page.locator('.nav-grupo[data-grupo="frota"]');
+  await expect(grupo.locator('a[href*="frota-solicitar"]')).toHaveCount(1);
+  await expect(grupo.locator('a[href*="frota-viagens"]')).toHaveCount(0);
+  await expect(grupo.locator('a[href*="frota-dashboard"]')).toHaveCount(0);
+  await expect(grupo.locator('a[href*="frota-administrar"]')).toHaveCount(0);
 });

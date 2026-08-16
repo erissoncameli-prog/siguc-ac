@@ -145,6 +145,15 @@ function gerarLayout(tituloPagina, paginaAtiva) {
     },
     {
       id: 'biomonitor', label: 'Biomonitor', super: 'Diretoria Técnica',
+      // modulo: chave em `modulos` (minhas_permissoes/nivel_efetivo) que
+      // governa o grupo inteiro — o catálogo não discrimina item por
+      // item dentro do Biomonitor (migration 263), então o gate é do
+      // grupo, por cima dos arrays `perfis:` de cada item (que continuam
+      // valendo, mais restritivo vence). Ver docs/acesso-por-organograma.md
+      // §1.4b/§1.5 — só este grupo tem match exato catálogo×sidebar hoje;
+      // validacao-campo/admin-brigadas/frota ficam de fora por divergência
+      // catálogo×realidade ainda não resolvida.
+      modulo: 'biomonitor',
       itens: [
         { id: 'biomonitor-app',        href: '../pages/biomonitor.html',           label: 'App de Campo', target: '_blank' },
         { id: 'biomonitor-validacao',  href: '../pages/biomonitor-validacao.html', label: 'Validação de Ninhos',
@@ -162,6 +171,14 @@ function gerarLayout(tituloPagina, paginaAtiva) {
     },
     {
       id: 'agua', label: 'Qualidade da Água', super: 'Diretoria Técnica',
+      // Mesmo padrão do grupo Biomonitor: 'agua' é uma chave só no
+      // catálogo cobrindo o grupo inteiro (Fase 2), e RLS das tabelas
+      // de dono (campanhas/coletas/laboratórios/pontos) já é 100%
+      // pode_ver/pode_editar — leitura e escrita concordam, então
+      // esconder o grupo quando sem_acesso é seguro (diferente do
+      // cluster DEUC, onde leitura fica aberta e por isso NÃO ganhou
+      // esse gate — ver docs/acesso-por-organograma.md §3.1).
+      modulo: 'agua',
       itens: [
         { id: 'agua-app',         href: '../pages/agua-app.html',         label: 'App de Campo', target: '_blank' },
         { id: 'agua-mapa',        href: '../pages/agua-mapa.html',        label: 'Mapa' },
@@ -173,7 +190,15 @@ function gerarLayout(tituloPagina, paginaAtiva) {
     },
     {
       id: 'frota', label: 'Frota — Transporte', super: 'Administrativo',
-      perfis: ['super_admin','secretario','diretor','chefe_departamento','gestor','gestor_uc','tecnico','assistente_admin','financeiro','visualizador'],
+      // Sem filtro de perfil no grupo: App Frota/Minhas Tarefas/Solicitar
+      // Viagem (sem `perfis:` próprio) têm que aparecer pra QUALQUER
+      // perfil — solicitar viagem nunca foi restrito por organograma
+      // nem por perfil (frota_viag_insert é dono-do-registro,
+      // solicitante_id = auth.uid()); o filtro antigo excluía brigadista/
+      // biologo/pesquisador_externo/validador_brigada/validador_fauna do
+      // grupo inteiro, escondendo até o link de solicitar. Agenda de
+      // Viagens/Painel de Frota/Administrar Frota mantêm seus próprios
+      // `perfis:` por item, intocados — só a aprovação/gestão é restrita.
       itens: [
         { id: 'frota-app',       href: '../pages/frota-app.html',       label: 'App Frota', target: '_blank' },
         { id: 'frota-tarefas',   href: '../pages/frota-tarefas.html',   label: 'Minhas Tarefas' },
@@ -211,6 +236,11 @@ function gerarLayout(tituloPagina, paginaAtiva) {
   let superAtual;
   const navHtml = navGroups.map(grupo => {
     if (grupo.perfis && u && !grupo.perfis.includes(u.perfil)) return '';
+    // appState.permissoes vem de minhas_permissoes (nivel_efetivo), fail-open
+    // ({} se a consulta falhar — nunca esconde o grupo por instabilidade de
+    // rede). Só aplica quando o grupo declara `modulo` (nem todo item tem
+    // correspondência 1:1 com o catálogo — ver comentário no grupo Biomonitor).
+    if (grupo.modulo && appState.permissoes && appState.permissoes[grupo.modulo] === 'sem_acesso') return '';
     const itensHtml = grupo.itens
       .filter(item => !item.perfis || (u && item.perfis.includes(u.perfil)))
       .map(item => {
