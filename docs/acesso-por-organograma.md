@@ -977,3 +977,37 @@ achados novos.
 **Regra permanente, vale para toda função nova a partir de agora**:
 `REVOKE EXECUTE ON FUNCTION ... FROM PUBLIC, anon, authenticated;`
 sempre com `PUBLIC` explícito — nunca só `FROM anon`.
+
+### 8.3 Achado — `data_fim` inclusivo fazia lotação/cargo antigo continuar valendo no dia da troca (2026-08-16)
+
+Testando com o usuário Teste (trocado de lotação 3 vezes na mesma
+sessão: DEBIO → DITLOG → DERHQA), o módulo antigo continuava aparecendo
+depois de cada troca. Causa: `usuario_unidades()` trata `data_fim` como
+limite **inclusivo** (`data_fim >= CURRENT_DATE` ainda conta como
+ativa), mas `encerrarLotacao()` (`pages/estrutura-organizacional.html`)
+gravava `data_fim = hoje` — o mesmo dia em que a lotação nova começava.
+Resultado: as duas ficavam ativas ao mesmo tempo por um dia inteiro,
+contradizendo o próprio texto do `confirm()` ("deixa de ser alcançado
+**a partir de** hoje").
+
+Encontrado 3 vezes na mesma sessão (2 lotações + 1 cargo do Teste,
+corrigidas manualmente por SQL uma a uma) antes de virar óbvio que era
+bug sistemático, não acaso.
+
+Corrigido em `encerrarLotacao()`: fecha **ontem**, não hoje, pra hoje já
+não contar (é o inverso do que a função fazia). Caso de borda: uma
+lotação criada e encerrada no MESMO dia não tem "ontem" válido sem
+violar `data_fim >= data_inicio` (a constraint `ck_lotacao_datas`) — aí
+a função apaga a linha em vez de tentar fechar com uma data inválida.
+
+`cargo_ocupacoes` **não tem o mesmo bug de código** — não existe botão
+"Encerrar" automático ali, `data_fim` é digitado à mão no modal de
+ocupação (`salvarOcupacao`). O cargo do Teste que causou o mesmo
+sintoma foi corrigido manualmente (SQL), não é bug de UI.
+
+Sem guarda automatizada ainda — a página não tem harness de teste
+isolado como `tests/sidebar-grupos.test.js` tem pra `js/layout.js`
+(ver comentário no topo daquele arquivo sobre por que as páginas reais
+não servem de base). Verificado manualmente contra produção: `nivel_efetivo()`
+do Teste parou de listar o módulo antigo assim que a correção equivalente
+foi aplicada por SQL às 3 linhas já existentes.
