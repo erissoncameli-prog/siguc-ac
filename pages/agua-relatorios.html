@@ -5,6 +5,7 @@
 <title>SIGUC-AC · Qualidade da Água — Painel e Relatórios</title>
 <link rel="stylesheet" href="../css/global.css">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,600;8..60,700&display=swap">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="../js/observability.js"></script>
@@ -29,10 +30,10 @@
    os gráficos saem de js/agua-iqa-visual.js — a página não desenha
    SVG nem classifica faixa nenhuma. */
 
-.adash { --adash-raio: 18px; }
+.adash { --adash-raio: 18px; --adash-azul: #2563A8; --adash-azul-esc: #164070; }
 
 .adash-head { display:flex; flex-wrap:wrap; gap:14px; align-items:flex-start; margin-bottom:18px }
-.adash-titulo { font-family:var(--font-display); font-size:30px; line-height:1.15; font-weight:700; color:var(--cinza-900); margin:0 }
+.adash-titulo { font-family:'Source Serif 4', Georgia, serif; font-size:30px; line-height:1.15; font-weight:700; color:var(--cinza-900); margin:0 }
 .adash-sub { font-size:12.5px; color:var(--cinza-500); margin:4px 0 0; max-width:60ch }
 .adash-head-acoes { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-left:auto }
 
@@ -45,9 +46,9 @@
 .adash-pill:hover:not(:disabled) { border-color:var(--borda-forte); box-shadow:var(--sombra-md) }
 .adash-pill:disabled { opacity:.5; cursor:not-allowed }
 .adash-pill svg { width:16px; height:16px; flex-shrink:0 }
-.adash-pill-primary { background:var(--verde-medio); border-color:var(--verde-medio); color:#fff }
-.adash-pill-primary:hover:not(:disabled) { background:var(--verde); border-color:var(--verde) }
-.adash-pill-ativo { border-color:var(--verde-medio); color:var(--verde-medio) }
+.adash-pill-primary { background:var(--adash-azul); border-color:var(--adash-azul); color:#fff }
+.adash-pill-primary:hover:not(:disabled) { background:var(--adash-azul-esc); border-color:var(--adash-azul-esc) }
+.adash-pill-ativo { border-color:var(--adash-azul); color:var(--adash-azul) }
 .adash-pill-n {
   display:inline-flex; align-items:center; justify-content:center; min-width:18px; height:18px;
   padding:0 5px; border-radius:9px; background:var(--verde-medio); color:#fff; font-size:11px; font-weight:700;
@@ -117,7 +118,7 @@
    dos chips de conformidade. */
 .adash-card > * { flex-shrink:0 }
 .adash-kpis { display:flex; flex-direction:column; gap:16px; min-width:0 }
-.adash-card-escuro { background:linear-gradient(160deg,#1F4E2C 0%,#0A1A0F 100%); border-color:#0A1A0F; color:#fff }
+.adash-card-escuro { background:linear-gradient(160deg,var(--adash-azul) 0%,var(--adash-azul-esc) 100%); border-color:var(--adash-azul-esc); color:#fff }
 .adash-card-escuro .adash-card-tit, .adash-card-escuro .adash-card-pe { color:rgba(255,255,255,.72) }
 .adash-card-escuro .adash-num { color:#fff }
 .adash-card-topo { display:flex; align-items:flex-start; gap:10px; margin-bottom:12px }
@@ -145,7 +146,7 @@
   border-radius:999px; padding:5px 12px; font:inherit; font-size:11.5px; font-weight:600; cursor:pointer;
 }
 .adash-chip:hover { border-color:var(--borda-forte) }
-.adash-chip.ativo { background:var(--verde-medio); border-color:var(--verde-medio); color:#fff }
+.adash-chip.ativo { background:var(--adash-azul); border-color:var(--adash-azul); color:#fff }
 
 .adash-lista { display:flex; flex-direction:column; gap:8px }
 .adash-lista-linha {
@@ -182,6 +183,28 @@
   background:var(--aviso-bg); border:1px solid #FDE68A; color:var(--aviso); font-size:12px; margin-bottom:14px;
 }
 .adash-aviso svg { width:16px; height:16px; flex-shrink:0 }
+
+/* Base Legal e Conformidade */
+.adash-legal-item { display:flex; flex-direction:column; gap:4px; padding:12px 14px; border-radius:10px; background:var(--cinza-50); border:1px solid var(--borda); margin-top:10px }
+.adash-legal-norma { font-size:12.5px; font-weight:700; color:var(--cinza-900) }
+.adash-legal-ementa { font-size:12px; color:var(--cinza-600); line-height:1.5 }
+.adash-legal-fonte { font-size:11px; color:var(--cinza-500); font-style:italic }
+.adash-legal-fonte a { color:var(--adash-azul); font-style:normal; font-weight:600; text-decoration:none }
+.adash-legal-fonte a:hover { text-decoration:underline }
+
+/* Entenda o cálculo do IQA (popup) */
+.adash-iqa-p { font-size:12.5px; color:var(--cinza-700); line-height:1.6; margin:0 0 4px }
+.adash-iqa-pesos { display:flex; flex-direction:column; gap:8px; margin-top:10px }
+.adash-iqa-peso-linha { display:grid; grid-template-columns:1.5fr 2fr auto; align-items:center; gap:10px; font-size:12px }
+.adash-iqa-peso-label { color:var(--cinza-700) }
+.adash-iqa-peso-barra { height:8px; border-radius:4px; background:var(--cinza-100); overflow:hidden }
+.adash-iqa-peso-fill { height:100%; background:var(--adash-azul); border-radius:4px }
+.adash-iqa-peso-valor { font-weight:700; color:var(--cinza-900); text-align:right; min-width:32px }
+.adash-iqa-faixas { display:flex; flex-direction:column; gap:6px; margin-top:8px }
+.adash-iqa-faixa-linha { display:flex; align-items:center; gap:8px; font-size:12.5px }
+.adash-iqa-faixa-dot { width:11px; height:11px; border-radius:50%; flex-shrink:0 }
+.adash-iqa-faixa-nome { font-weight:600; color:var(--cinza-900); width:70px }
+.adash-iqa-faixa-valor { color:var(--cinza-500) }
 
 @media (max-width: 1180px) {
   .adash-grid { grid-template-columns:1fr 1fr }
@@ -226,6 +249,7 @@
             <select id="rl-bacia" aria-label="Bacia hidrográfica"><option value="">Carregando...</option></select>
             <span class="adash-chev" data-icon="chevron-down"></span>
           </div>
+          <button class="adash-pill" type="button" onclick="alternarExplicacaoIqa()" data-icon="help">Entenda o cálculo</button>
           <button class="adash-pill" id="rl-btn-filtros" type="button" onclick="alternarFiltros()" data-icon="sliders">
             Filtros <span class="adash-pill-n" id="rl-filtros-n" hidden>0</span>
           </button>
@@ -260,9 +284,14 @@
       </div>
 
       <div id="rl-conteudo"><div class="adash-vazio">Carregando painel...</div></div>
-    </div>`
+    </div>
+    <div class="modal-overlay" id="rl-iqa-modal"><div class="modal" style="max-width:560px">${aguaPainelExplicacaoIqaHTML()}</div></div>`
 
   bIconsAplicar(document.getElementById('app'))
+
+  window.alternarExplicacaoIqa = function () {
+    document.getElementById('rl-iqa-modal').classList.toggle('aberto')
+  }
 
   const sel = id => document.getElementById(id)
   let _todasColetasResumo = []
@@ -274,6 +303,10 @@
   // gráfico de evolução está traçando.
   let _chipCampanha = null
   let _pontoSerie = null
+  // Base legal adicional (Configurações → Qualidade da Água) — some
+  // fica igual com qualquer filtro. A Resolução CONAMA 357/2005 é
+  // texto fixo, sempre mostrada por js/agua-painel.js.
+  let _baseLegal = []
   let _filtrosAbertos = false
 
   // ── Mapa ───────────────────────────────────────────────────────
@@ -442,7 +475,7 @@
   // Desenho dos cards: js/agua-painel.js, compartilhado com
   // pages/agua-publico.html — esta função só encaixa a string no DOM.
   function renderPainel(rel) {
-    sel('rl-conteudo').innerHTML = aguaPainelHTML(rel, { chipCampanha: _chipCampanha, pontoSerie: _pontoSerie })
+    sel('rl-conteudo').innerHTML = aguaPainelHTML(rel, { chipCampanha: _chipCampanha, pontoSerie: _pontoSerie, baseLegal: _baseLegal })
     bIconsAplicar(sel('rl-conteudo'))
   }
 
@@ -504,7 +537,10 @@
   }
 
   // Boot: escopo padrão = Acre todo, carregado de cara (sem exigir
-  // escolha prévia de bacia — pedido do usuário).
+  // escolha prévia de bacia — pedido do usuário). Base legal adicional
+  // buscada antes do 1º render, pra não aparecer incompleta e depois
+  // "pular" no card.
+  try { _baseLegal = (await getConfigSistema()).agua?.base_legal || [] } catch (e) { console.warn('[agua-relatorios] base legal indisponível:', e.message) }
   await carregarBacia()
 })()
 </script>

@@ -31,11 +31,15 @@ function aguaPainelNomeCurto(nome) {
   return n.length > 11 ? n.slice(0, 10) + '…' : n
 }
 
-// `estado`: { chipCampanha, pontoSerie } — só exibição (não altera o
-// recorte do relatório exportado), mesmo contrato de antes.
+// `estado`: { chipCampanha, pontoSerie, baseLegal } — chipCampanha/
+// pontoSerie são só exibição (não alteram o recorte do relatório
+// exportado); baseLegal é a lista adicional de atos cadastrada em
+// Configurações (config_sistema.dados.agua.base_legal), sempre
+// mostrada JUNTO da Resolução CONAMA 357/2005 (fixa, ver
+// aguaPainelBaseLegalHTML).
 function aguaPainelHTML(rel, estado) {
   if (!rel) return '<div class="adash-vazio">Carregando painel...</div>'
-  const { chipCampanha, pontoSerie } = estado || {}
+  const { chipCampanha, pontoSerie, baseLegal } = estado || {}
   const r = rel.resumo
   const porCampanha = aguaRelPorCampanha(rel)
   const variacao = aguaRelVariacaoIQA(porCampanha)
@@ -59,7 +63,7 @@ function aguaPainelHTML(rel, estado) {
   }
 
   if (!rel.coletas.length) {
-    return html + '<div class="adash-vazio">Nenhuma coleta encontrada para este recorte.</div>'
+    return html + '<div class="adash-vazio">Nenhuma coleta encontrada para este recorte.</div>' + aguaPainelBaseLegalHTML(baseLegal)
   }
 
   // ── Linha 1 ──────────────────────────────────────────────────
@@ -188,8 +192,100 @@ function aguaPainelHTML(rel, estado) {
       </div>`).join('')}
   </div>`
 
+  // ── Base legal (fora do .adash-grid — não é dado do recorte, é
+  // referência institucional fixa; some fica igual com qualquer filtro) ──
   html += '</div>' // .adash-grid
+  html += aguaPainelBaseLegalHTML(baseLegal)
   return html
+}
+
+// ── Base Legal e Conformidade ─────────────────────────────────────
+// A Resolução CONAMA nº 357/2005 é texto FIXO — é a mesma fonte que
+// `agua_limites_conama.fonte` já registra desde a migration 249 (Art.
+// 14/15, limites da Classe 2 aplicados no indicador "Conformidade
+// CONAMA" deste painel). `baseLegal` é a lista ADICIONAL, cadastrada
+// pela SEMA em Configurações → Qualidade da Água (config_sistema.dados
+// .agua.base_legal, sem migration) — nunca inventada aqui.
+function aguaPainelBaseLegalHTML(baseLegal) {
+  const extras = (baseLegal || []).map(n => `
+    <div class="adash-legal-item">
+      <span class="adash-legal-norma">${esc(n.titulo)}${n.orgao ? ' · ' + esc(n.orgao) : ''}</span>
+      ${n.ementa ? `<span class="adash-legal-ementa">${esc(n.ementa)}</span>` : ''}
+      <span class="adash-legal-fonte">${n.data ? formatData(n.data) : ''}${n.link ? ` · <a href="${esc(n.link)}" target="_blank" rel="noopener">ver documento</a>` : ''}</span>
+    </div>`).join('')
+  return `<div class="adash-card adash-legal" style="margin-top:16px">
+    <div class="adash-card-topo">
+      <div><p class="adash-card-tit">Base Legal e Conformidade</p>
+        <p class="adash-card-tit-sub">Norma que fundamenta os limites usados no indicador "Conformidade CONAMA" deste painel</p></div>
+      <span class="adash-card-mais">•••</span>
+    </div>
+    <div class="adash-legal-item">
+      <span class="adash-legal-norma">Resolução CONAMA nº 357, de 17 de março de 2005</span>
+      <span class="adash-legal-ementa">Dispõe sobre a classificação dos corpos de água e diretrizes ambientais para o seu enquadramento, bem como estabelece as condições e padrões de qualidade das águas. Art. 14 (Classe 1) e Art. 15 (Classe 2, por remissão ao Art. 14) definem os limites de OD, DBO, turbidez, coliformes termotolerantes, pH e fósforo total usados neste sistema.</span>
+      <span class="adash-legal-fonte">DOU nº 053, 18/03/2005, págs. 58-63 — alterada pelas Resoluções CONAMA nº 410/2009 e nº 430/2011</span>
+    </div>
+    ${extras}
+  </div>`
+}
+
+// ── "Entenda o cálculo do IQA" — popup ────────────────────────────
+// Conteúdo gerado a partir dos MESMOS números de agua_calcular_iqa()/
+// agua_iqa_faixa() (migration 249) — nunca uma explicação solta,
+// divergente do que o banco de fato calcula. Se os pesos ou as faixas
+// mudarem lá, este texto tem que ser atualizado junto.
+const AGUA_PAINEL_IQA_PESOS = [
+  { label: 'Oxigênio Dissolvido (saturação)', peso: 17 },
+  { label: 'Coliformes termotolerantes',      peso: 15 },
+  { label: 'pH',                              peso: 12 },
+  { label: 'DBO (Demanda Bioquímica de Oxigênio)', peso: 10 },
+  { label: 'Nitrogênio total',                peso: 10 },
+  { label: 'Fósforo total',                   peso: 10 },
+  { label: 'Variação de temperatura (ΔT)',    peso: 10 },
+  { label: 'Turbidez',                        peso: 8 },
+  { label: 'Sólidos totais',                  peso: 8 },
+]
+
+function aguaPainelExplicacaoIqaHTML() {
+  const linhasPeso = AGUA_PAINEL_IQA_PESOS.map(p => `
+    <div class="adash-iqa-peso-linha">
+      <span class="adash-iqa-peso-label">${esc(p.label)}</span>
+      <div class="adash-iqa-peso-barra"><div class="adash-iqa-peso-fill" style="width:${(p.peso / 17 * 100).toFixed(0)}%"></div></div>
+      <span class="adash-iqa-peso-valor">${p.peso}%</span>
+    </div>`).join('')
+
+  const linhasFaixa = AGUA_IQA_FAIXA_ORDEM.map(f => {
+    const rotulo = { 'Ótima': '≥ 79', 'Boa': '51 a 78', 'Regular': '36 a 50', 'Ruim': '19 a 35', 'Péssima': '< 19' }[f]
+    return `<div class="adash-iqa-faixa-linha">
+      <span class="adash-iqa-faixa-dot" style="background:${AGUA_IQA_FAIXA_COR[f]}"></span>
+      <span class="adash-iqa-faixa-nome">${esc(f)}</span>
+      <span class="adash-iqa-faixa-valor">${rotulo}</span>
+    </div>`
+  }).join('')
+
+  return `<div class="modal-header">
+      <div class="modal-title">Entenda o cálculo do IQA</div>
+      <button class="modal-close" onclick="alternarExplicacaoIqa()">×</button>
+    </div>
+    <div class="modal-body">
+      <p class="adash-iqa-p">O Índice de Qualidade da Água (IQA) usado neste sistema segue o método
+        <strong>CETESB/ANA</strong>: uma <strong>média geométrica ponderada</strong> de 9 parâmetros medidos em
+        campo e em laboratório. Cada parâmetro entra como uma nota de 0 a 100 (seu "q<sub>i</sub>"), lida numa
+        curva de qualidade própria — não é uma média simples dos valores medidos.</p>
+      <p class="adash-iqa-p">Nem todo parâmetro pesa igual: quanto mais direto o efeito na saúde do rio e de quem
+        usa a água, maior o peso.</p>
+      <div class="adash-iqa-pesos">${linhasPeso}</div>
+      <p class="adash-iqa-p" style="margin-top:14px">Se faltar mais de 40% do peso total (por exemplo, um laudo
+        ainda não chegou), o sistema não calcula o índice — mostra "sem índice" em vez de um número que
+        enganaria. Faixa final:</p>
+      <div class="adash-iqa-faixas">${linhasFaixa}</div>
+      <p class="adash-iqa-p" style="margin-top:14px">A <strong>Conformidade CONAMA</strong> é uma leitura
+        SEPARADA do IQA: verifica se cada parâmetro está dentro do limite legal da classe de enquadramento do
+        ponto (ver card "Base Legal e Conformidade"). Um ponto pode ter IQA "Boa" e ainda violar um limite
+        específico — os dois indicadores respondem perguntas diferentes.</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="alternarExplicacaoIqa()">Fechar</button>
+    </div>`
 }
 
 // ── Mapa dos pontos de coleta ────────────────────────────────────
