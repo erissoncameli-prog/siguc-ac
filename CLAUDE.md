@@ -2034,6 +2034,40 @@ duplicação obrigatória acima.
 - Sem mudança em `pwa/sw.js` (nenhuma das duas páginas é PWA/app de
   campo).
 
+**Pós-lançamento — Componentes cartográficos oficiais no mini-mapa do
+painel ("Mapa dos pontos de coleta").** Pedido do usuário: o mapa do
+painel (não o `pages/agua-mapa.html` dedicado — o card menor dentro do
+próprio painel de Relatórios/público) ganhou os mesmos componentes já
+padrão do Mapa das UCs (`pages/mapa.html`), em escala reduzida pro
+tamanho do card — nunca reimplementados do zero:
+- **Rosa dos ventos**: mesmo SVG de `_adicionarRosaDosVentos()`
+  (`pages/mapa.html`), copiado verbatim para `js/agua-painel.js`
+  (`_aguaPainelRosaDosVentos`) — mesma identidade visual "oficial" em
+  todo o sistema, só menor (40px em vez de 52px).
+- **Escala**: `L.control.scale()` nativo do Leaflet, métrica, mesma
+  configuração de `js/mapa-cartografia.js` (`_adicionarEscala`).
+- **Legenda**: mesmas categorias de `pages/agua-mapa.html`
+  (`#amapa-legenda`) — preenchimento = faixa do IQA, borda = CONAMA
+  (conforme/violação), preenchimento fraco = quarentena — nunca uma
+  terceira cópia da legenda; lê `AGUA_IQA_FAIXA_COR`/`_ORDEM` de
+  `js/agua-iqa-visual.js`, a mesma fonte que os marcadores já usam
+  (`aguaIqaEstiloMarcador`), então nunca diverge da cor real do ponto.
+- **Satélite**: alternância de 2 estados (Mapa/Satélite) — não o
+  painel completo de basemaps de `pages/mapa.html` (MapBiomas/PRODES/
+  Sentinel/Planet — overkill pra um card de 380px), só a MESMA fonte
+  de tile de satélite já usada lá (Google, `lyrs=s`, mesmos
+  subdomínios `mt0-3`) e no minimapa (`_adicionarMiniMapa`, `lyrs=y`)
+  — nunca um provedor de imagem novo.
+- Tudo em `aguaPainelMapaCriar()` (`js/agua-painel.js`), então vale
+  para as duas telas de graça — mesmo par de duplicação obrigatória.
+- Guarda: `tests/agua-relatorios.test.js` e `tests/agua-publico.test.js`
+  ganharam 1 teste cada (rosa/escala/legenda visíveis, toggle de
+  satélite troca o estado ativo sem quebrar os marcadores) — mesma
+  limitação de rede (Leaflet via unpkg.com) já documentada acima;
+  confirmado funcionando via stub de `L` fora da suíte automatizada
+  (rosa/escala/legenda/toggle, os 4 renderizando e o clique trocando
+  de tile de verdade).
+
 ## Próxima tarefa
 Módulo Qualidade da Água (IQA): as 5 fases do plano original estão
 ENTREGUES (ver `docs/qualidade-agua/plano.md`, seções "Fase 0" a "Fase

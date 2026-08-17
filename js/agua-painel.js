@@ -294,9 +294,97 @@ function aguaPainelExplicacaoIqaHTML() {
 // filtros (mesma regra de pages/agua-relatorios.html desde a Fase 5).
 // Estilo de marcador vem de js/agua-iqa-visual.js (aguaIqaEstiloMarcador)
 // — nunca reimplementado aqui.
+// Mapa base (ruas) e satélite — MESMA fonte de imagem de satélite já
+// usada em pages/mapa.html (Google, lyrs=s) e no minimapa de lá
+// (_adicionarMiniMapa, lyrs=y) — nunca uma segunda fonte de tile.
+const AGUA_PAINEL_TILE_RUAS = { url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', opts: { maxZoom: 18, attribution: '© OpenStreetMap' } }
+const AGUA_PAINEL_TILE_SATELITE = { url: 'https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', opts: { maxZoom: 20, subdomains: ['mt0', 'mt1', 'mt2', 'mt3'] } }
+
+// Rosa dos ventos — MESMO desenho/SVG de pages/mapa.html
+// (_adicionarRosaDosVentos), reaproveitado aqui pela regra do projeto
+// de nunca duplicar um componente cartográfico "oficial" com desenho
+// próprio numa tela nova.
+function _aguaPainelRosaDosVentos() {
+  const Ctrl = L.Control.extend({ options: { position: 'bottomleft' }, onAdd() {
+    const div = L.DomUtil.create('div', 'rosa-norte'); div.title = 'Norte'
+    div.innerHTML = `<svg viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="22" cy="22" r="20" fill="none" stroke="#e5e7eb" stroke-width="1"/>
+      <polygon points="22,3 26,22 22,19 18,22" fill="#dc2626"/>
+      <polygon points="22,41 18,22 22,25 26,22" fill="#9ca3af"/>
+      <circle cx="22" cy="22" r="3" fill="#1f2937"/>
+      <text x="22" y="14" text-anchor="middle" font-size="6" font-weight="700" font-family="DM Sans,sans-serif" fill="#dc2626">N</text>
+      <text x="22" y="43" text-anchor="middle" font-size="5.5" font-weight="600" font-family="DM Sans,sans-serif" fill="#6b7280">S</text>
+      <text x="41" y="23.5" text-anchor="middle" font-size="5.5" font-weight="600" font-family="DM Sans,sans-serif" fill="#6b7280">L</text>
+      <text x="3" y="23.5" text-anchor="middle" font-size="5.5" font-weight="600" font-family="DM Sans,sans-serif" fill="#6b7280">O</text>
+    </svg>`
+    L.DomEvent.disableClickPropagation(div); return div
+  } })
+  return new Ctrl()
+}
+
+// Legenda oficial (IQA + CONAMA) — MESMAS categorias de
+// pages/agua-mapa.html (`#amapa-legenda`), nunca uma segunda cópia:
+// preenchimento = faixa do IQA, borda = conformidade CONAMA,
+// preenchimento fraco = coleta em quarentena.
+function _aguaPainelLegendaHTML() {
+  const chipsIqa = AGUA_IQA_FAIXA_ORDEM.map(f => `<span class="adash-mapa-legenda-chip"><span class="adash-mapa-legenda-dot" style="background:${AGUA_IQA_FAIXA_COR[f]}"></span>${esc(f)}</span>`).join('')
+  return `<div class="adash-mapa-legenda-tit">IQA (preenchimento)</div>
+    <div class="adash-mapa-legenda-linha">${chipsIqa}</div>
+    <div class="adash-mapa-legenda-tit" style="margin-top:6px">CONAMA (borda)</div>
+    <div class="adash-mapa-legenda-linha">
+      <span class="adash-mapa-legenda-chip"><span class="adash-mapa-legenda-dot" style="background:#fff;border:2px solid #16A34A"></span>Conforme</span>
+      <span class="adash-mapa-legenda-chip"><span class="adash-mapa-legenda-dot" style="background:#fff;border:3px solid #DC2626"></span>Violação</span>
+    </div>
+    <div class="adash-mapa-legenda-linha" style="margin-top:4px">
+      <span class="adash-mapa-legenda-chip">Preenchimento fraco = em conferência</span>
+    </div>`
+}
+
+function _aguaPainelControleLegenda() {
+  const Ctrl = L.Control.extend({ options: { position: 'bottomright' }, onAdd() {
+    const div = L.DomUtil.create('div', 'adash-mapa-legenda')
+    div.innerHTML = _aguaPainelLegendaHTML()
+    L.DomEvent.disableClickPropagation(div); return div
+  } })
+  return new Ctrl()
+}
+
+// Alternar Mapa/Satélite — MESMA fonte de tile do seletor de basemap
+// de pages/mapa.html, só que reduzido a um toggle de 2 estados (o
+// widget aqui é pequeno demais para o painel completo de basemaps).
+function _aguaPainelControleSatelite(aoTrocar) {
+  const Ctrl = L.Control.extend({ options: { position: 'topright' }, onAdd() {
+    const div = L.DomUtil.create('div', 'adash-mapa-sat-ctrl')
+    div.innerHTML = `<button type="button" class="adash-mapa-sat-btn ativo" data-modo="ruas">Mapa</button><button type="button" class="adash-mapa-sat-btn" data-modo="satelite">Satélite</button>`
+    div.querySelectorAll('.adash-mapa-sat-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        div.querySelectorAll('.adash-mapa-sat-btn').forEach(b => b.classList.toggle('ativo', b === btn))
+        aoTrocar(btn.dataset.modo)
+      })
+    })
+    L.DomEvent.disableClickPropagation(div); return div
+  } })
+  return new Ctrl()
+}
+
 function aguaPainelMapaCriar(mapaElId, subElId) {
   const mapa = L.map(mapaElId, { attributionControl: false }).setView([-9.5, -70.0], 6)
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18, attribution: '© OpenStreetMap' }).addTo(mapa)
+  let camadaBase = L.tileLayer(AGUA_PAINEL_TILE_RUAS.url, AGUA_PAINEL_TILE_RUAS.opts).addTo(mapa)
+  function _trocarBase(modo) {
+    mapa.removeLayer(camadaBase)
+    const t = modo === 'satelite' ? AGUA_PAINEL_TILE_SATELITE : AGUA_PAINEL_TILE_RUAS
+    camadaBase = L.tileLayer(t.url, t.opts).addTo(mapa)
+    camadaBase.bringToBack()
+  }
+
+  // Componentes cartográficos oficiais — mesmos do Mapa das UCs
+  // (pages/mapa.html): rosa dos ventos, escala métrica, legenda,
+  // alternância de imagem de satélite.
+  _aguaPainelRosaDosVentos().addTo(mapa)
+  L.control.scale({ position: 'bottomleft', metric: true, imperial: false, maxWidth: 110 }).addTo(mapa)
+  _aguaPainelControleLegenda().addTo(mapa)
+  _aguaPainelControleSatelite(_trocarBase).addTo(mapa)
+
   ;(async function desenharLimiteAcre() {
     try {
       const r = await fetch('../data/acre_estado.geojson')
