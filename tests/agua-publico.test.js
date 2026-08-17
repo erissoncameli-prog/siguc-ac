@@ -271,6 +271,20 @@ test.describe('painel público — render sem sessão, só com as RPCs anon', ()
     await expect(page.locator('.adash-mapa-mun-label').first()).toBeVisible();
   });
 
+  test('painel "Configurar camadas" também no público: trocar espessura do limite do Acre e ocultar nomes dos municípios', async ({ page }) => {
+    await abrirPainelPublicoComStub(page);
+    await page.waitForFunction(() => document.querySelectorAll('.adash-mapa-mun-label').length > 0, null, { timeout: 10_000 });
+
+    await page.click('.adash-mapa-config-btn');
+    await expect(page.locator('.adash-mapa-config-painel')).toBeVisible();
+
+    await page.locator('.amcfg-acre-peso').evaluate(el => { el.value = '5'; el.dispatchEvent(new Event('input', { bubbles: true })) })
+    await expect(page.locator('.amcfg-acre-peso-val')).toHaveText('5')
+
+    await page.uncheck('.amcfg-mun-nomes');
+    await expect(page.locator('.adash-mapa-mun-label').first()).toBeHidden();
+  });
+
   test('cabeçalho institucional usa agua_publico_cabecalho() — logos exibidas quando existem', async ({ page }) => {
     await abrirPainelPublicoComStub(page, {
       cabecalho: { ...CABECALHO_PUBLICO, logoGoverno: 'https://exemplo.test/gov.png', logoSecr: 'https://exemplo.test/sema.png' },
