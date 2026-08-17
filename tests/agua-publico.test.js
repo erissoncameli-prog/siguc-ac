@@ -217,6 +217,31 @@ test.describe('painel público — render sem sessão, só com as RPCs anon', ()
     await expect(page.locator('#rl-mapa path.leaflet-interactive')).toHaveCount(2);
   });
 
+  test('mapa tem os componentes cartográficos oficiais: rosa dos ventos, escala, legenda (IQA+CONAMA) e alternância de satélite', async ({ page }) => {
+    await abrirPainelPublicoComStub(page);
+    await page.waitForFunction(() => document.querySelectorAll('#rl-mapa path.leaflet-interactive').length >= 2, null, { timeout: 10_000 });
+
+    // Rosa dos ventos — MESMO componente de pages/mapa.html.
+    await expect(page.locator('.rosa-norte svg')).toBeVisible();
+    // Escala nativa do Leaflet.
+    await expect(page.locator('.leaflet-control-scale')).toBeVisible();
+    // Legenda oficial: mesmas categorias de pages/agua-mapa.html.
+    const legenda = page.locator('.adash-mapa-legenda');
+    await expect(legenda).toContainText('IQA (preenchimento)');
+    await expect(legenda).toContainText('Ótima');
+    await expect(legenda).toContainText('CONAMA (borda)');
+    await expect(legenda).toContainText('Conforme');
+    await expect(legenda).toContainText('Violação');
+    await expect(legenda).toContainText('em conferência');
+
+    // Alternância Mapa/Satélite: nasce em "Mapa", clique troca o ativo
+    // e não quebra os marcadores já desenhados.
+    await expect(page.locator('.adash-mapa-sat-btn.ativo')).toHaveText('Mapa');
+    await page.click('.adash-mapa-sat-btn:has-text("Satélite")');
+    await expect(page.locator('.adash-mapa-sat-btn.ativo')).toHaveText('Satélite');
+    await expect(page.locator('#rl-mapa path.leaflet-interactive')).toHaveCount(2);
+  });
+
   test('cabeçalho institucional usa agua_publico_cabecalho() — logos exibidas quando existem', async ({ page }) => {
     await abrirPainelPublicoComStub(page, {
       cabecalho: { ...CABECALHO_PUBLICO, logoGoverno: 'https://exemplo.test/gov.png', logoSecr: 'https://exemplo.test/sema.png' },

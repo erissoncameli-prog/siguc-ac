@@ -899,6 +899,19 @@ test.describe('painel (dashboard) — render com dado real da view', () => {
     await expect(page.locator('#rl-mapa-sub')).toContainText('2 pontos no recorte atual');
   });
 
+  test('mapa tem os componentes cartográficos oficiais (rosa dos ventos, escala, legenda, alternância de satélite) — mesmo js/agua-painel.js do painel público', async ({ page }) => {
+    const pontosGeom = [{ id: 'p-rb', ativo: true, geom: { type: 'Point', coordinates: [-67.810, -9.975] } }];
+    await abrirPainelComStub(page, fixtureColetasRioAcre(), { pontosGeom });
+    await page.waitForFunction(() => document.querySelectorAll('#rl-mapa path.leaflet-interactive').length >= 1, null, { timeout: 10_000 });
+
+    await expect(page.locator('.rosa-norte svg')).toBeVisible();
+    await expect(page.locator('.leaflet-control-scale')).toBeVisible();
+    await expect(page.locator('.adash-mapa-legenda')).toContainText('CONAMA (borda)');
+    await expect(page.locator('.adash-mapa-sat-btn.ativo')).toHaveText('Mapa');
+    await page.click('.adash-mapa-sat-btn:has-text("Satélite")');
+    await expect(page.locator('.adash-mapa-sat-btn.ativo')).toHaveText('Satélite');
+  });
+
   test('mapa não quebra quando um ponto não tem coordenada cadastrada — fica de fora, sem travar os outros', async ({ page }) => {
     // Só o Rio Branco tem geom; Porto Acre não — a regra é "sem geom não
     // desenha", nunca "sem geom quebra o mapa inteiro".
