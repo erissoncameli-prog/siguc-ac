@@ -127,6 +127,12 @@
   position:absolute; top:36px; right:0; z-index:10; width:200px; padding:12px;
   background:var(--branco); border-radius:12px; box-shadow:0 4px 16px rgba(0,0,0,.22); font-family:var(--font-sans);
 }
+/* leaflet.css dá o MESMO z-index (1000) a .leaflet-top e .leaflet-bottom
+   — sem isto, o canto "bottomright" (legenda), que vem depois no DOM,
+   sempre pinta por cima do "topright" onde este painel mora, e o
+   painel abria escondido atrás da legenda num mapa baixo como este
+   card. O painel é temporário (só existe aberto) — precisa sobrepor. */
+.adash-mapa-wrap .leaflet-top.leaflet-right { z-index:1001 }
 .adash-mapa-config-tit { font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--cinza-500); margin:0 0 6px }
 .adash-mapa-config-linha { display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:12px; color:var(--cinza-700); margin-bottom:6px }
 .adash-mapa-config-linha input[type="color"] { width:26px; height:22px; padding:0; border:1px solid var(--borda); border-radius:5px; cursor:pointer }
