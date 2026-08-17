@@ -62,9 +62,9 @@ window.acAplicarComparativo = async function (temporadaIds, filtros) {
   try {
     const capaEl = document.getElementById('ac-capa')
     if (capaEl && typeof getCabecalhoRelatorio === 'function') {
-      const cab = await getCabecalhoRelatorio()
-      cab.departamento = 'Departamento de Biodiversidade'
-      cab.siglaDep = 'DEBIO'
+      // Departamento vem de modulo_departamento('biomonitor') — DEBIO,
+      // pelo organograma (migration 265/299) — não mais hardcoded aqui.
+      const cab = await getCabecalhoRelatorio('biomonitor')
       capaEl.innerHTML = acCmpCapa(bundles, cab)
     }
   } catch (_) { /* capa é opcional */ }

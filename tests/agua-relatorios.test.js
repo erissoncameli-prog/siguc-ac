@@ -330,6 +330,41 @@ test.describe('geração real dos arquivos — PDF e PPTX', () => {
     expect(texto).toMatch(/2 conforme · 2 com violação/);
   });
 
+  test('PDF: cabeçalho institucional em TRÊS linhas — Secretaria, Diretoria e Departamento separados (js/relatorio-cabecalho-pdf.js)', async ({ page }) => {
+    test.setTimeout(60_000);
+    await page.goto(PAGINA);
+    await page.waitForFunction(() => typeof window.aguaRelMontarPdf === 'function' && typeof window.aguaRelMontar === 'function');
+
+    const base64 = await page.evaluate(async (coletas) => {
+      const relatorio = window.aguaRelMontar(coletas, {});
+      // departamento vem de modulo_departamento('agua') em produção — aqui
+      // simulado direto no objeto cab, como getCabecalhoRelatorio('agua')
+      // devolveria (ver js/config-sistema.js).
+      const cab = {
+        secretaria: 'Secretaria de Estado do Meio Ambiente do Acre', siglaSecr: 'SEMA-AC',
+        diretoria: 'Diretoria de Meio Ambiente', siglaDiret: 'DIMA',
+        departamento: 'Departamento de Recursos Hídricos e Qualidade Ambiental', siglaDep: 'DERHQA',
+        logoGoverno: null, logoSecr: null,
+      };
+      const pdf = await window.aguaRelMontarPdf(relatorio, 'Rio Acre', '2024 · 1ª campanha', cab, 'SIGUC-2026-CABECALHO');
+      const blob = pdf.output('blob');
+      const buf = await blob.arrayBuffer();
+      let binary = ''; const bytes = new Uint8Array(buf);
+      for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+      return btoa(binary);
+    }, fixtureColetasRioAcre());
+
+    const texto = (await extrairTextoPdf(Buffer.from(base64, 'base64'))).text;
+    // As TRÊS linhas aparecem separadas — nunca mais "Diretoria ·
+    // Departamento · Módulo" numa string só (formato antigo).
+    expect(texto).toContain('Secretaria de Estado do Meio Ambiente do Acre — SEMA-AC');
+    expect(texto).toContain('Diretoria de Meio Ambiente');
+    expect(texto).toContain('Departamento de Recursos Hídricos e Qualidade Ambiental');
+    expect(texto).toContain('Qualidade da Água');
+    // Nunca mais o departamento genérico (DEUC) na Água — era o bug relatado.
+    expect(texto).not.toMatch(/Departamento de Unidades de Conserva/);
+  });
+
   test('PDF: capa não gera página em branco quando a nota de quarentena empurra o conteúdo', async ({ page }) => {
     test.setTimeout(60_000);
     await page.goto(PAGINA);
