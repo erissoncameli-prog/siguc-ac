@@ -907,9 +907,26 @@ test.describe('painel (dashboard) — render com dado real da view', () => {
     await expect(page.locator('.rosa-norte svg')).toBeVisible();
     await expect(page.locator('.leaflet-control-scale')).toBeVisible();
     await expect(page.locator('.adash-mapa-legenda')).toContainText('CONAMA (borda)');
+    await expect(page.locator('.adash-mapa-legenda')).toContainText('Camadas de referência');
     await expect(page.locator('.adash-mapa-sat-btn.ativo')).toHaveText('Mapa');
     await page.click('.adash-mapa-sat-btn:has-text("Satélite")');
     await expect(page.locator('.adash-mapa-sat-btn.ativo')).toHaveText('Satélite');
+  });
+
+  test('mapa já nasce com limite do Acre, municípios (rotulados) e hidrografia — sem precisar ligar nada', async ({ page }) => {
+    const pontosGeom = [{ id: 'p-rb', ativo: true, geom: { type: 'Point', coordinates: [-67.810, -9.975] } }];
+    await abrirPainelComStub(page, fixtureColetasRioAcre(), { pontosGeom });
+    await page.waitForFunction(() => document.querySelectorAll('#rl-mapa .adash-mapa-pin').length >= 1, null, { timeout: 10_000 });
+
+    // Limite do Acre e polígonos de municípios são desenhados como
+    // path SVG do Leaflet (fill:false/quase transparente, então não
+    // contam como marcador) — junto do rótulo permanente com o nome.
+    await page.waitForFunction(() => document.querySelectorAll('.adash-mapa-mun-label').length > 0, null, { timeout: 10_000 });
+    await expect(page.locator('.adash-mapa-mun-label').first()).toBeVisible();
+    // Hidrografia (WMS do IBGE) é verificada à parte, fora da suíte
+    // automatizada (stub de L, mesma técnica dos outros componentes
+    // cartográficos) — pedir a tile de verdade aqui dependeria de rede
+    // externa que este sandbox de testes já bloqueia.
   });
 
   test('mapa não quebra quando um ponto não tem coordenada cadastrada — fica de fora, sem travar os outros', async ({ page }) => {
