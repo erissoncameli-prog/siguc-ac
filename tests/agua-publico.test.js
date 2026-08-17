@@ -23,6 +23,11 @@
 //  4. o PDF/PPTX público usa um protocolo FIXO — nunca chama
 //     `gerar_protocolo_relatorio` (que incrementaria uma sequência
 //     institucional compartilhada por todos os relatórios do sistema).
+//  5. o card "Base Legal e Conformidade" e o popup "Entenda o cálculo
+//     do IQA" (js/agua-painel.js, pedido do usuário) aparecem nos dois
+//     painéis (mesa e público) com os MESMOS números reais de
+//     agua_calcular_iqa()/agua_iqa_faixa() — nunca um texto solto,
+//     divergente do que o banco calcula de verdade.
 
 const { test, expect } = require('@playwright/test');
 const fs = require('fs');
@@ -31,6 +36,7 @@ const path = require('path');
 const BASE = process.env.TEST_BASE_URL || 'http://localhost:5500';
 const PAGINA = `${BASE}/pages/agua-publico.html`;
 const MIGRATION = path.join(__dirname, '..', 'supabase', 'migrations', '297_agua_painel_publico.sql');
+const MIGRATION_298 = path.join(__dirname, '..', 'supabase', 'migrations', '298_agua_base_legal_publico.sql');
 
 const CHROMIUM_PATH = '/opt/pw-browsers/chromium';
 if (fs.existsSync(CHROMIUM_PATH)) {
@@ -140,6 +146,26 @@ test.describe('migration 297 — whitelist de colunas do painel público', () =>
   });
 });
 
+test.describe('migration 298 — base legal adicional no cabeçalho público', () => {
+  const sql298 = fs.readFileSync(MIGRATION_298, 'utf8');
+
+  test('baseLegal vem de config_sistema.dados.agua.base_legal, nunca hardcoded, com fallback []', () => {
+    expect(sql298).toMatch(/'baseLegal',\s*COALESCE\(dados->'agua'->'base_legal', '\[\]'::jsonb\)/);
+    // Não deve haver nenhum ato ESTADUAL fabricado embutido no SQL — a
+    // migration só REPASSA o que já está em config_sistema, nunca
+    // INSERTa um valor fixo (titulo/orgao/ementa/data de um ato
+    // específico). A Resolução CONAMA 357/2005, federal e pública, é
+    // texto fixo no CLIENTE (js/agua-painel.js), só citada em comentário
+    // aqui — nunca gravada como dado dentro do corpo SQL da função.
+    expect(sql298).not.toMatch(/jsonb_build_object\(\s*'titulo'/i);
+    expect(sql298).not.toMatch(/jsonb_build_array/i);
+  });
+
+  test('mantém a mesma assinatura (zero parâmetros) — CREATE OR REPLACE seguro', () => {
+    expect(sql298).toMatch(/CREATE OR REPLACE FUNCTION agua_publico_cabecalho\(\)/);
+  });
+});
+
 test.describe('painel público — render sem sessão, só com as RPCs anon', () => {
   test('monta o painel de ponta a ponta chamando SÓ agua_publico_* — sem login, sem redirecionar', async ({ page }) => {
     const erros = [];
@@ -188,6 +214,35 @@ test.describe('painel público — render sem sessão, só com as RPCs anon', ()
     await abrirPainelPublicoComStub(page, { coletas: [] });
     await expect(page.locator('.adash-vazio')).toBeVisible();
     await expect(page.locator('#rl-btn-export')).toBeDisabled();
+  });
+
+  test('card "Base Legal e Conformidade" mostra a CONAMA 357/2005 SEMPRE — inclusive sem coleta no recorte', async ({ page }) => {
+    await abrirPainelPublicoComStub(page, { coletas: [] });
+    await expect(page.locator('.adash-legal-norma').first()).toContainText('CONAMA nº 357');
+  });
+
+  test('atos adicionais cadastrados em Configurações (config_sistema.dados.agua.base_legal) aparecem junto da CONAMA', async ({ page }) => {
+    await abrirPainelPublicoComStub(page, {
+      cabecalho: { ...CABECALHO_PUBLICO, baseLegal: [{ titulo: 'Portaria SEMA-AC nº 12/2026', orgao: 'SEMA-AC', data: '2026-02-10', ementa: 'Ato de teste.', link: '' }] },
+    });
+    const itens = page.locator('.adash-legal-item');
+    await expect(itens).toHaveCount(2); // CONAMA fixa + o ato cadastrado
+    await expect(itens.nth(1)).toContainText('Portaria SEMA-AC nº 12/2026');
+  });
+
+  test('botão "Entenda o cálculo" abre o popup com os pesos REAIS de agua_calcular_iqa() e as faixas de agua_iqa_faixa()', async ({ page }) => {
+    await abrirPainelPublicoComStub(page);
+    await expect(page.locator('#rl-iqa-modal')).not.toHaveClass(/aberto/);
+
+    await page.click('button:has-text("Entenda o cálculo")');
+    await expect(page.locator('#rl-iqa-modal')).toHaveClass(/aberto/);
+    await expect(page.locator('#rl-iqa-modal')).toContainText('Oxigênio Dissolvido');
+    await expect(page.locator('#rl-iqa-modal')).toContainText('17%'); // peso do OD, migration 249
+    await expect(page.locator('#rl-iqa-modal')).toContainText('Péssima');
+    await expect(page.locator('#rl-iqa-modal')).toContainText('< 19'); // faixa Péssima, agua_iqa_faixa()
+
+    await page.locator('#rl-iqa-modal .modal-close').click();
+    await expect(page.locator('#rl-iqa-modal')).not.toHaveClass(/aberto/);
   });
 });
 

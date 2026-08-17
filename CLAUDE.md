@@ -1927,6 +1927,60 @@ público. Exportação de PDF e PPTX aberta a qualquer visitante.
   e se ganhar, é migration nova na whitelist (nunca afrouxar RLS nem
   expor a view interna), nunca herdado por acidente.
 
+**Pós-lançamento — Base legal, "Entenda o cálculo do IQA" e rebrand
+azul do painel (migration 298).** Pedido do usuário, aplicado nas DUAS
+telas (mesa e público) via `js/agua-painel.js`, junto com o par de
+duplicação obrigatória acima.
+
+- **Card "Base Legal e Conformidade"** (`aguaPainelBaseLegalHTML`):
+  sempre mostra a Resolução CONAMA nº 357/2005 (Art. 14/15 — texto
+  citado a partir do PDF oficial que o usuário enviou, conferido
+  linha a linha contra os limites já cadastrados em
+  `agua_limites_conama`, DOU nº 053 de 18/03/2005) — **texto fixo no
+  cliente**, nunca gerado/inventado. Atos ADICIONAIS (portaria
+  estadual etc.) são cadastrados em Configurações → Qualidade da Água
+  (`config_sistema.dados.agua.base_legal`, array de
+  `{titulo, orgao, data, link, ementa}` — mesmo padrão de
+  `responsaveis_tecnicos`/`encarregado`, sem migration nem deploy para
+  editar). Migration 298 só amplia `agua_publico_cabecalho()` com a
+  chave `baseLegal` (mesma assinatura, `CREATE OR REPLACE` seguro) —
+  a mesa lê `config_sistema` direto via `getConfigSistema()` (já
+  autenticada), o público via essa RPC. Card aparece INDEPENDENTE do
+  filtro/recorte de coletas (inclusive com "Nenhuma coleta encontrada").
+- **Popup "Entenda o cálculo do IQA"** (`aguaPainelExplicacaoIqaHTML`,
+  botão novo no cabeçalho, reaproveita `.modal-overlay`/`.modal` de
+  `css/global.css`): pesos e faixas são os NÚMEROS REAIS de
+  `agua_calcular_iqa()`/`agua_iqa_faixa()` (migration 249) — OD 17%,
+  Coliformes termotolerantes 15%, pH 12%, DBO 10%, Nitrogênio total
+  10%, Fósforo total 10%, ΔT 10%, Turbidez 8%, Sólidos totais 8%;
+  faixas Ótima ≥79 / Boa 51–78 / Regular 36–50 / Ruim 19–35 / Péssima
+  <19. Se o cálculo mudar lá, este texto tem que ser atualizado junto
+  — é comentário no próprio código, não teste automatizado.
+- **Rebrand azul do painel** — só a cor de MARCA (pílulas, cabeçalho
+  institucional, chip ativo, card escuro do KPI: `#2563A8` →
+  `#164070`, variáveis `--adash-azul`/`--adash-azul-esc` escopadas em
+  `.adash`, nunca a `--verde-medio` global — o resto do SIGUC-AC
+  continua verde). **A paleta da FAIXA do IQA (Ótima/Boa/Regular/Ruim/
+  Péssima, verde→vermelho, validada contra daltonismo) e o semáforo de
+  delta positivo/negativo (`--sucesso`/`--erro`) NÃO mudaram** —
+  decisão confirmada com o usuário: são semântica ambiental e
+  universal, não "verde de marca".
+- **Título em Source Serif 4** (`<link>` do Google Fonts nas DUAS
+  páginas, não em `css/global.css` — só este painel diverge do
+  Fraunces sitewide, escolha deliberada do usuário após comparar um
+  rascunho publicado como Artifact). CSP já cobria (`style-src`/
+  `font-src` já liberam `fonts.googleapis.com`/`fonts.gstatic.com`).
+- Guarda: `tests/agua-publico.test.js` ganhou os testes da migration
+  298 (estrutural, sem depender de rede) e 3 testes de render (card
+  sempre visível, atos adicionais somando à CONAMA, popup com os
+  pesos/faixas reais) — estes 3 últimos dependem do CDN real do
+  Leaflet (unpkg.com) para a página terminar de montar, mesma
+  limitação de rede já documentada para `tests/agua-relatorios.test.js`
+  (não é regressão: confirmado visualmente com screenshot renderizado
+  via stub de `L`, nas duas telas).
+- Sem mudança em `pwa/sw.js` (nenhuma das duas páginas é PWA/app de
+  campo).
+
 ## Próxima tarefa
 Módulo Qualidade da Água (IQA): as 5 fases do plano original estão
 ENTREGUES (ver `docs/qualidade-agua/plano.md`, seções "Fase 0" a "Fase
