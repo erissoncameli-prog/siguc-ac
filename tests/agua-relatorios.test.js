@@ -913,16 +913,27 @@ test.describe('painel (dashboard) — render com dado real da view', () => {
     await expect(page.locator('.adash-mapa-sat-btn.ativo')).toHaveText('Satélite');
   });
 
-  test('mapa já nasce com limite do Acre, municípios (rotulados) e hidrografia — sem precisar ligar nada', async ({ page }) => {
+  test('limite do Acre e municípios ficam OCULTOS no mapa de ruas — só aparecem ao trocar pra satélite', async ({ page }) => {
     const pontosGeom = [{ id: 'p-rb', ativo: true, geom: { type: 'Point', coordinates: [-67.810, -9.975] } }];
     await abrirPainelComStub(page, fixtureColetasRioAcre(), { pontosGeom });
     await page.waitForFunction(() => document.querySelectorAll('#rl-mapa .adash-mapa-pin').length >= 1, null, { timeout: 10_000 });
+    // Dá tempo dos dois geojson (limite do Acre + municípios) carregarem
+    // de fato — eles nascem OCULTOS por padrão (mapa de ruas), então não
+    // dá pra esperar por um seletor visível como sinal de "carregou".
+    await page.waitForTimeout(1500);
 
+    await expect(page.locator('.adash-mapa-mun-label')).toHaveCount(0);
+
+    await page.click('.adash-mapa-sat-btn:has-text("Satélite")');
     // Limite do Acre e polígonos de municípios são desenhados como
     // path SVG do Leaflet (fill:false/quase transparente, então não
     // contam como marcador) — junto do rótulo permanente com o nome.
     await page.waitForFunction(() => document.querySelectorAll('.adash-mapa-mun-label').length > 0, null, { timeout: 10_000 });
     await expect(page.locator('.adash-mapa-mun-label').first()).toBeVisible();
+
+    // Volta pro mapa de ruas — as camadas de referência somem de novo.
+    await page.click('.adash-mapa-sat-btn:has-text("Mapa")');
+    await expect(page.locator('.adash-mapa-mun-label')).toHaveCount(0);
     // Hidrografia (WMS do IBGE) é verificada à parte, fora da suíte
     // automatizada (stub de L, mesma técnica dos outros componentes
     // cartográficos) — pedir a tile de verdade aqui dependeria de rede
@@ -932,6 +943,8 @@ test.describe('painel (dashboard) — render com dado real da view', () => {
   test('painel "Configurar camadas": trocar cor/espessura atualiza o mapa e a legenda; desmarcar nomes esconde os rótulos', async ({ page }) => {
     const pontosGeom = [{ id: 'p-rb', ativo: true, geom: { type: 'Point', coordinates: [-67.810, -9.975] } }];
     await abrirPainelComStub(page, fixtureColetasRioAcre(), { pontosGeom });
+    // As delimitações só aparecem na visão satélite.
+    await page.click('.adash-mapa-sat-btn:has-text("Satélite")');
     await page.waitForFunction(() => document.querySelectorAll('.adash-mapa-mun-label').length > 0, null, { timeout: 10_000 });
 
     await page.click('.adash-mapa-config-btn');

@@ -2245,6 +2245,48 @@ entrega anterior:
 - Sem mudança em `pwa/sw.js` (nenhuma das duas páginas é PWA/app de
   campo).
 
+**Pós-lançamento — Limite do Acre/municípios só na visão satélite +
+satélite virou híbrido (nome de rio nativo).** Correção pedida pelo
+usuário sobre a entrega anterior: o limite do Acre, os municípios e a
+hidrografia (as 3 "camadas de referência") tinham virado sempre
+visíveis, inclusive no mapa de ruas — errado, porque o de ruas (OSM) já
+tem seus próprios limites/rótulos, então a camada nova só duplicava
+informação. A intenção sempre foi só para o satélite, que não tem nada
+disso.
+- **Visibilidade adiada, não condicionada no desenho.** Os 3 desenhos
+  (limite do Acre, municípios, hidrografia) carregam do mesmo jeito de
+  antes, mas não chamam mais `.addTo(mapa)` direto — cada um se
+  registra em `_registrarCamadaReferencia(layer)`
+  (`aguaPainelMapaCriar`, `js/agua-painel.js`), que adiciona/remove do
+  mapa conforme `_modoAtual` ('ruas' por padrão, `_atualizarCamadas
+  Referencia()` roda de novo a cada clique no toggle Mapa/Satélite).
+  Evita condição de corrida: os 3 fetches terminam em momentos
+  diferentes, bem depois do primeiro render — sem esse registro central,
+  cada um teria que saber sozinho se deve ou não estar visível no
+  instante em que termina de carregar.
+- **Satélite → híbrido**: `AGUA_PAINEL_TILE_SATELITE` trocou de
+  `lyrs=s` (satélite puro, sem rótulo nenhum) para `lyrs=y` — o MESMO
+  id do botão "Híbrido" de `pages/mapa.html` e do minimapa de lá
+  (`_adicionarMiniMapa`). É o mosaico que já traz nome de rio/cidade
+  como rótulo nativo do Google, sem depender só da geometria (sem
+  nome) da WMS de hidrografia do IBGE — nunca uma segunda fonte de
+  tile, só troca de camada dentro da mesma fonte. O botão continua
+  rotulado "Satélite" na UI (é como o usuário se refere à visão), só o
+  mosaico por trás mudou.
+- Legenda ganhou "(só satélite)" no título da seção "Camadas de
+  referência", pra não confundir quem olha o mapa de ruas sem ver
+  nenhuma delas.
+- Tudo em `js/agua-painel.js`, então vale para as duas telas de graça
+  (mesmo par de duplicação obrigatória do painel).
+- Guarda: os testes de "mapa nasce com..." viraram "fica oculto no
+  mapa de ruas, aparece ao trocar pra satélite, some de novo ao
+  voltar" nas duas suítes; o teste do painel "Configurar camadas"
+  agora troca pra satélite antes de abrir o painel (as delimitações
+  não existem no DOM em mapa de ruas). Confirmado fora da suíte via
+  stub de `L`: as 3 camadas ficam fora do mapa (`hasLayer` = false) em
+  ruas, entram ao trocar pra satélite, saem de novo ao voltar — e o
+  tile do satélite é `lyrs=y`.
+
 ## Próxima tarefa
 Módulo Qualidade da Água (IQA): as 5 fases do plano original estão
 ENTREGUES (ver `docs/qualidade-agua/plano.md`, seções "Fase 0" a "Fase

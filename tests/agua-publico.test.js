@@ -258,21 +258,23 @@ test.describe('painel público — render sem sessão, só com as RPCs anon', ()
     await expect(page.locator('#rl-mapa .adash-mapa-pin')).toHaveCount(2);
   });
 
-  test('mapa já nasce com limite do Acre, municípios (rotulados) e hidrografia — sem precisar ligar nada (mesmo em satélite, que não tem esses rótulos)', async ({ page }) => {
+  test('limite do Acre e municípios ficam OCULTOS no mapa de ruas — só aparecem na visão satélite (que agora é híbrida, com rótulo de rio nativo)', async ({ page }) => {
     await abrirPainelPublicoComStub(page);
     await page.waitForFunction(() => document.querySelectorAll('#rl-mapa .adash-mapa-pin').length >= 2, null, { timeout: 10_000 });
+    await page.waitForTimeout(1500);
+    await expect(page.locator('.adash-mapa-mun-label')).toHaveCount(0);
 
+    await page.click('.adash-mapa-sat-btn:has-text("Satélite")');
     await page.waitForFunction(() => document.querySelectorAll('.adash-mapa-mun-label').length > 0, null, { timeout: 10_000 });
     await expect(page.locator('.adash-mapa-mun-label').first()).toBeVisible();
 
-    // Troca pra satélite (onde o basemap não tem nenhum rótulo) — as
-    // camadas de referência continuam visíveis, sem depender do toggle.
-    await page.click('.adash-mapa-sat-btn:has-text("Satélite")');
-    await expect(page.locator('.adash-mapa-mun-label').first()).toBeVisible();
+    await page.click('.adash-mapa-sat-btn:has-text("Mapa")');
+    await expect(page.locator('.adash-mapa-mun-label')).toHaveCount(0);
   });
 
   test('painel "Configurar camadas" também no público: trocar espessura do limite do Acre e ocultar nomes dos municípios', async ({ page }) => {
     await abrirPainelPublicoComStub(page);
+    await page.click('.adash-mapa-sat-btn:has-text("Satélite")');
     await page.waitForFunction(() => document.querySelectorAll('.adash-mapa-mun-label').length > 0, null, { timeout: 10_000 });
 
     await page.click('.adash-mapa-config-btn');
