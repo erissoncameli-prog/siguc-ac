@@ -19,6 +19,17 @@ const ApiMonitor = (() => {
     catch { return 'atqtybcsvepdabsvgaly.supabase.co'; }
   })();
 
+  // Comparação de HOST de verdade (não substring): `u.includes(SUPA_HOST)`
+  // classificaria também uma URL tipo "https://evil.com/?x=SUPA_HOST" como
+  // Supabase. Sem impacto de segurança real (isto só escolhe o RÓTULO do
+  // toast de erro — nunca autoriza, valida ou grava nada; quem protege o
+  // dado é o RLS no Postgres), mas é o jeito certo de comparar host mesmo
+  // assim. `new URL(u, location.origin)` aceita path relativo (chamadas a
+  // /api/...) sem lançar.
+  function _ehHostSupabase(u) {
+    try { return new URL(u, location.origin).host === SUPA_HOST } catch { return false }
+  }
+
   // ── Registro fonte → nome amigável + solução ──────────────────
   const FONTES = [
     { teste: u => /\/api\/car-proxy/.test(u),    nome: 'CAR / SICAR',
@@ -31,7 +42,7 @@ const ApiMonitor = (() => {
       solucao: 'O portal de Dados Abertos do IBAMA está indisponível. Consultas de DOF ficam temporariamente sem resposta.' },
     { teste: u => /\/api\/health/.test(u),       nome: 'API interna (health)',
       solucao: 'O endpoint de saúde do sistema não respondeu. Pode ser uma instabilidade momentânea do servidor.' },
-    { teste: u => u.includes(SUPA_HOST),         nome: 'Banco de dados (Supabase)',
+    { teste: u => _ehHostSupabase(u),            nome: 'Banco de dados (Supabase)',
       solucao: 'Falha ao consultar o banco de dados. Verifique sua conexão. Se persistir, a base pode estar em manutenção — avise a equipe técnica.' },
     { teste: u => /\/api\//.test(u),             nome: 'API interna',
       solucao: 'Um serviço interno respondeu com erro. Se o problema continuar, abra a Saúde do Sistema para diagnosticar.' },
@@ -46,7 +57,7 @@ const ApiMonitor = (() => {
     if (!url) return false;
     // só monitora os proxies internos e o host do Supabase — evita
     // disparar por falha de tiles de mapa, CDNs e afins.
-    return /\/api\//.test(url) || url.includes(SUPA_HOST);
+    return /\/api\//.test(url) || _ehHostSupabase(url);
   }
 
   function _motivoLegivel(motivo) {
