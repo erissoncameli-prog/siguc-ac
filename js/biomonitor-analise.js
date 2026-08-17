@@ -111,12 +111,9 @@ window.acAplicar = async function (filtros) {
   try {
     const capaEl = document.getElementById('ac-capa')
     if (capaEl && typeof getCabecalhoRelatorio === 'function') {
-      const cab = await getCabecalhoRelatorio()
-      // Biomonitor é vinculado ao Departamento de Biodiversidade, não ao DEUC
-      // (config_sistema.departamento é global e compartilhado com o relatório
-      // CAR — sobrescrever só aqui, depois de resolvido, evita mudar o CAR).
-      cab.departamento = 'Departamento de Biodiversidade'
-      cab.siglaDep = 'DEBIO'
+      // Departamento vem de modulo_departamento('biomonitor') — DEBIO,
+      // pelo organograma (migration 265/299) — não mais hardcoded aqui.
+      const cab = await getCabecalhoRelatorio('biomonitor')
       capaEl.innerHTML = acCapa(ana, cab)
     }
   } catch (_) { /* capa é opcional — não bloqueia o relatório */ }

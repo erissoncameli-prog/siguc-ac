@@ -2069,15 +2069,13 @@
     if (!_dados) { toast('Aplique os filtros para carregar o painel antes de gerar o PDF.', 'warning'); return }
     toast('Gerando PDF…', 'info')
     try {
-      const [cab, protocolo] = await Promise.all([getCabecalhoRelatorio(), gerarProtocolo()])
+      // Departamento vem de modulo_departamento('biomonitor') — DEBIO,
+      // pelo organograma (migration 265/299) — não mais hardcoded aqui.
+      const [cab, protocolo] = await Promise.all([getCabecalhoRelatorio('biomonitor'), gerarProtocolo()])
       cab.responsavel = {
         nome: appState.usuario?.nome_completo || appState.usuario?.email || 'Usuário',
         cargo: appState.perfil || '', registro: '', orgao: cab.siglaSecr,
       }
-      // Biomonitor é vinculado ao Departamento de Biodiversidade, não ao DEUC
-      // (config_sistema.departamento é global e compartilhado com o CAR).
-      cab.departamento = 'Departamento de Biodiversidade'
-      cab.siglaDep = 'DEBIO'
       cab.gestao = ''
 
       await _biopdfCarregarLibs()

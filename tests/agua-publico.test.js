@@ -37,6 +37,7 @@ const BASE = process.env.TEST_BASE_URL || 'http://localhost:5500';
 const PAGINA = `${BASE}/pages/agua-publico.html`;
 const MIGRATION = path.join(__dirname, '..', 'supabase', 'migrations', '297_agua_painel_publico.sql');
 const MIGRATION_298 = path.join(__dirname, '..', 'supabase', 'migrations', '298_agua_base_legal_publico.sql');
+const MIGRATION_299 = path.join(__dirname, '..', 'supabase', 'migrations', '299_modulo_departamento_cabecalho.sql');
 
 const CHROMIUM_PATH = '/opt/pw-browsers/chromium';
 if (fs.existsSync(CHROMIUM_PATH)) {
@@ -163,6 +164,30 @@ test.describe('migration 298 — base legal adicional no cabeçalho público', (
 
   test('mantém a mesma assinatura (zero parâmetros) — CREATE OR REPLACE seguro', () => {
     expect(sql298).toMatch(/CREATE OR REPLACE FUNCTION agua_publico_cabecalho\(\)/);
+  });
+});
+
+test.describe('migration 299 — departamento por módulo (organograma), não mais campo genérico', () => {
+  const sql299 = fs.readFileSync(MIGRATION_299, 'utf8');
+
+  test('modulo_departamento() é SECURITY DEFINER com REVOKE explícito de anon — achado real (ALTER DEFAULT PRIVILEGES concede por nome)', () => {
+    expect(sql299).toMatch(/CREATE OR REPLACE FUNCTION modulo_departamento\(p_modulo_chave text\)/);
+    expect(sql299).toMatch(/SECURITY DEFINER/);
+    expect(sql299).toMatch(/SET search_path = public/);
+    // O REVOKE FROM PUBLIC sozinho não fechava `anon` neste projeto
+    // (confirmado testando como anon de verdade) — precisa do REVOKE
+    // explícito do papel, por nome, ANTES do GRANT para authenticated.
+    expect(sql299).toMatch(/REVOKE EXECUTE ON FUNCTION modulo_departamento\(text\) FROM anon/);
+    expect(sql299).toMatch(/GRANT EXECUTE ON FUNCTION modulo_departamento\(text\) TO authenticated/);
+  });
+
+  test('agua_publico_cabecalho() passa a derivar departamento de modulo_departamento(\'agua\'), com fallback pro campo genérico', () => {
+    expect(sql299).toMatch(/COALESCE\(\(SELECT nome FROM modulo_departamento\('agua'\)\),\s*dados->'departamento'->>'nome'/);
+  });
+
+  test('corrige o nome do DERHQA (estava só com a sigla, nunca por extenso)', () => {
+    expect(sql299).toMatch(/nome = 'Departamento de Recursos Hídricos e Qualidade Ambiental'/);
+    expect(sql299).toMatch(/WHERE sigla = 'DERHQA'/);
   });
 });
 

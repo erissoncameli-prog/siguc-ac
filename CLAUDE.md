@@ -1182,6 +1182,59 @@ em `carregarUsuario()`, fail-open). A metade em SQL não tem guarda
 automatizada ainda — foi verificada por transações com `ROLLBACK`
 durante as migrations, não por teste que rode sozinho.
 
+**Consumidor real de `modulo_unidades` — departamento certo no
+cabeçalho dos relatórios (migration 299).** Achado ao investigar por
+que o PDF da Qualidade da Água mostrava "Departamento de Unidades de
+Conservação": `getCabecalhoRelatorio()` (js/config-sistema.js) sempre
+leu UM campo genérico único (`config_sistema.dados.departamento`),
+compartilhado por TODO relatório do sistema, não importa o módulo.
+`modulo_unidades` já resolvia isso desde a migration 265 (`agua` →
+DERHQA, `biomonitor` → DEBIO, `frota` → DITLOG...) — só nunca tinha
+sido consumida por um relatório.
+- `getCabecalhoRelatorio(moduloChave)` ganhou parâmetro OPCIONAL: com
+  ele, `departamento`/`siglaDep` vêm da nova função
+  `modulo_departamento(chave)` (lê `modulo_unidades`); sem ele,
+  comportamento idêntico ao de sempre — nenhuma das ~10 páginas que já
+  chamavam a função sem argumento precisou mudar. Módulo sem dono
+  cadastrado cai no campo genérico de Configurações (fail-open, nunca
+  fica sem departamento nenhum).
+- **Achado colateral**: 4 telas do Biomonitor (`js/biomonitor-analise.js`,
+  `js/biomonitor-analise-comparativa.js`, `js/biomonitor-relatorio-ninho.js`,
+  `pages/relatorios-biomonitor.html`) já faziam
+  `cab.departamento = 'Departamento de Biodiversidade'` na mão, uma
+  cópia do mesmo workaround em cada arquivo, para o MESMO bug que a
+  Água tinha — só que a Água nunca ganhou cópia nenhuma, por isso
+  aparecia errada e o Biomonitor não. As 4 cópias foram substituídas
+  por `getCabecalhoRelatorio('biomonitor')`.
+- **Cabeçalho do PDF virou 3 linhas** (`js/relatorio-cabecalho-pdf.js`,
+  compartilhado por Água e Biomonitor): Secretaria (negrito) /
+  Diretoria / Departamento + nome do módulo — antes eram 2 linhas,
+  com Diretoria e Departamento espremidos numa string só
+  (`linhaModulo` pré-formatada pelo chamador). Agora a função lê
+  `cab.diretoria`/`cab.departamento` direto, e `linhaModulo` (opcional)
+  é só o sufixo pequeno da 3ª linha ("Qualidade da Água",
+  "Biomonitoramento"). Cabe no espaço já reservado (`AGPDF_TOPO`/
+  `BIOPDF_TOPO` não mudaram) — confirmado extraindo o texto de um PDF
+  gerado de verdade, as 3 linhas saem separadas.
+- **Nome do DERHQA corrigido**: a migration 004 tinha criado o nó no
+  organograma com `nome = sigla` como placeholder ("DERHQA"), nunca
+  preenchido por extenso — agora "Departamento de Recursos Hídricos e
+  Qualidade Ambiental".
+- ⚠️ **Achado testando como `anon` de verdade**: `modulo_departamento()`
+  respondia para `anon` mesmo só com `REVOKE ALL ... FROM PUBLIC` —
+  mesma lição da 165/249/252b/297, o `ALTER DEFAULT PRIVILEGES` do
+  projeto concede EXECUTE a `anon` por NOME em toda função nova.
+  Corrigido com `REVOKE EXECUTE ... FROM anon` explícito antes do
+  `GRANT ... TO authenticated`; a chamada aninhada de dentro de
+  `agua_publico_cabecalho()` (SECURITY DEFINER) continua funcionando
+  para o painel público — `current_user` é o dono durante toda a
+  cadeia, o REVOKE só fecha a chamada DIRETA.
+- Guarda: `tests/agua-publico.test.js` (migration 299 — SECURITY
+  DEFINER + REVOKE de anon + fallback) e
+  `tests/agua-relatorios.test.js` (PDF de verdade, as 3 linhas
+  separadas, nunca mais "Departamento de Unidades de Conservação" no
+  relatório da Água).
+
 ## Módulos — situação
 
 ### Já implementado

@@ -153,7 +153,7 @@ function _agpdfDesenharCabecalhoPagina(pdf, cab, protocolo, logos) {
     corFloresta: AGPDF_COR.floresta, corMuted: AGPDF_COR.muted, corMuted2: AGPDF_COR.muted2,
     cab, protocolo, logos,
     nomePlataforma: 'SIGUC-AC',
-    linhaModulo: `${cab.diretoria} · ${cab.departamento} · Qualidade da Água`,
+    linhaModulo: 'Qualidade da Água',
   })
 }
 

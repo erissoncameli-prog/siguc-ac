@@ -28,8 +28,27 @@ window.addEventListener('storage', ev => {
   if (ev.key === CONFIG_SISTEMA_STORAGE_KEY) _configSistemaCache = null;
 });
 
-async function getCabecalhoRelatorio() {
+// `moduloChave` (opcional): quando informado, o departamento vem de
+// modulo_departamento() — quem é dono do módulo no organograma
+// (modulo_unidades, migration 265), não mais o campo genérico único
+// de config_sistema.dados.departamento. Sem parâmetro, comportamento
+// idêntico ao de sempre (nenhuma das páginas que já chamam esta
+// função sem o argumento precisa mudar). Módulo sem dono cadastrado
+// cai no campo genérico — nunca fica sem departamento nenhum.
+// Ver CLAUDE.md, "Departamento correto no cabeçalho dos relatórios".
+async function getCabecalhoRelatorio(moduloChave) {
   const cfg = await getConfigSistema();
+  let departamento = cfg.departamento?.nome  || 'Departamento de Unidades de Conservação';
+  let siglaDep      = cfg.departamento?.sigla || 'DEUC';
+  if (moduloChave) {
+    try {
+      const { data } = await db.rpc('modulo_departamento', { p_modulo_chave: moduloChave });
+      const dono = data?.[0];
+      if (dono) { departamento = dono.nome; siglaDep = dono.sigla; }
+    } catch (e) {
+      console.warn('[config-sistema] modulo_departamento indisponível, usando campo genérico:', e.message);
+    }
+  }
   return {
     governo:      cfg.governo?.nome      || 'Governo do Estado do Acre',
     gestao:       cfg.governo?.gestao    || '',
@@ -37,8 +56,7 @@ async function getCabecalhoRelatorio() {
     siglaSecr:    cfg.secretaria?.sigla  || 'SEMA-AC',
     diretoria:    cfg.diretoria?.nome    || 'Diretoria de Meio Ambiente',
     siglaDiret:   cfg.diretoria?.sigla   || 'DIMA',
-    departamento: cfg.departamento?.nome || 'Departamento de Unidades de Conservação',
-    siglaDep:     cfg.departamento?.sigla|| 'DEUC',
+    departamento, siglaDep,
     endereco:     cfg.secretaria?.endereco || '',
     cep:          cfg.secretaria?.cep      || '',
     telefone:     cfg.secretaria?.telefone || '',

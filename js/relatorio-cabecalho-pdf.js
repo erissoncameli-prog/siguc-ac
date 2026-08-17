@@ -51,14 +51,22 @@ function relatorioPdfDesenharCabecalho(pdf, opts) {
   if (boxGov) pdf.addImage(logos.gov, boxGov.fmt, margem, topo + (RELPDF_LOGO_MAX_ALTURA - boxGov.h) / 2, boxGov.w, boxGov.h)
   if (boxSecr) pdf.addImage(logos.secr, boxSecr.fmt, W - margem - boxSecr.w, topo + (RELPDF_LOGO_MAX_ALTURA - boxSecr.h) / 2, boxSecr.w, boxSecr.h)
 
-  // Texto institucional centralizado no espaço entre as duas logos.
+  // Texto institucional centralizado no espaço entre as duas logos —
+  // TRÊS linhas (Secretaria / Diretoria / Departamento), cada uma lida
+  // direto de `cab`, nunca pré-formatada pelo chamador. O departamento
+  // é o que muda por módulo (getCabecalhoRelatorio(moduloChave) →
+  // modulo_departamento() → organograma, nunca mais um valor fixo por
+  // relatório) — ver CLAUDE.md. `linhaModulo` (opcional) é só o nome
+  // do módulo, um sufixo pequeno na 3ª linha.
   const xEsq = margem + (boxGov ? boxGov.w + 4 : 0)
   const xDir = W - margem - (boxSecr ? boxSecr.w + 4 : 0)
   const centro = (xEsq + xDir) / 2
-  pdf.setFont('DMSans', 'bold'); pdf.setFontSize(10.5); pdf.setTextColor(...corFloresta)
-  pdf.text(`${cab.secretaria} — ${cab.siglaSecr}`, centro, topo + 4.5, { align: 'center' })
+  pdf.setFont('DMSans', 'bold'); pdf.setFontSize(10); pdf.setTextColor(...corFloresta)
+  pdf.text(`${cab.secretaria} — ${cab.siglaSecr}`, centro, topo + 4, { align: 'center' })
   pdf.setFont('DMSans', 'normal'); pdf.setFontSize(7.5); pdf.setTextColor(...corMuted)
-  pdf.text(linhaModulo, centro, topo + 8.5, { align: 'center' })
+  pdf.text(cab.diretoria, centro, topo + 7.6, { align: 'center' })
+  pdf.setFont('DMSans', 'normal'); pdf.setFontSize(6.8); pdf.setTextColor(...corMuted2)
+  pdf.text(cab.departamento + (linhaModulo ? ' · ' + linhaModulo : ''), centro, topo + 10.8, { align: 'center' })
 
   // Plataforma/protocolo: com a logo da SEMA ocupando o canto superior
   // direito, o texto vai acima dela (faixa livre entre o topo da

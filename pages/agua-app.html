@@ -1525,7 +1525,7 @@ async function exportarFichaColeta() {
   btn.disabled = true
   label.textContent = 'Gerando PDF…'
   try {
-    const [cab, protocolo] = await Promise.all([getCabecalhoRelatorio(), gerarProtocolo()])
+    const [cab, protocolo] = await Promise.all([getCabecalhoRelatorio('agua'), gerarProtocolo()])
     const pdf = await aguaRelMontarPdfColeta(c, cab, protocolo)
     const filename = `ficha-coleta-${(c.codigo_amostra || c.id).toString().replace(/[^\w-]+/g, '-')}.pdf`
     await compartilharArquivo(pdf.output('blob'), filename, `Ficha de coleta — ${c.ponto_nome}`, msg => toast(msg, 'ok'))
