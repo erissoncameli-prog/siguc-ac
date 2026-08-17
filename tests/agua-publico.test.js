@@ -1,0 +1,249 @@
+// ── Qualidade da Água · Painel PÚBLICO (link para o site da SEMA) ────
+// Executar: npx playwright test tests/agua-publico.test.js
+// (precisa de um servidor estático na raiz do repo, igual aos demais
+//  testes do módulo — ver cabeçalho de tests/agua-relatorios.test.js)
+//
+// O que este arquivo trava, além do que tests/agua-relatorios.test.js
+// já cobre para o painel de mesa (os cards são os MESMOS — desenhados
+// por js/agua-painel.js, testado ali):
+//
+//  1. A LISTA DE COLUNAS que supabase/migrations/297_agua_painel_publico.sql
+//     devolve para `anon` — a garantia dura contra vazar coletor/GPS/
+//     foto/laudo/observações por descuido futuro (guarda estrutural,
+//     sem precisar de sessão de banco: lê o texto da migration);
+//  2. pages/agua-publico.html NUNCA chama `.from()` nem `db.auth` — só
+//     as três RPCs `agua_publico_*` (SECURITY DEFINER, migration 297).
+//     Um stub de `db` sem `from`/`auth` prova isso: se a página
+//     tentasse usar qualquer um dos dois, o teste quebraria com
+//     "... is not a function", não silenciosamente;
+//  3. a página renderiza o painel de ponta a ponta sem login (sem
+//     redirecionar para index.html, sem gate de LGPD/perfil — nenhum
+//     dos dois é alcançável, porque nenhum vive fora de
+//     carregarUsuario(), nunca chamada aqui);
+//  4. o PDF/PPTX público usa um protocolo FIXO — nunca chama
+//     `gerar_protocolo_relatorio` (que incrementaria uma sequência
+//     institucional compartilhada por todos os relatórios do sistema).
+
+const { test, expect } = require('@playwright/test');
+const fs = require('fs');
+const path = require('path');
+
+const BASE = process.env.TEST_BASE_URL || 'http://localhost:5500';
+const PAGINA = `${BASE}/pages/agua-publico.html`;
+const MIGRATION = path.join(__dirname, '..', 'supabase', 'migrations', '297_agua_painel_publico.sql');
+
+const CHROMIUM_PATH = '/opt/pw-browsers/chromium';
+if (fs.existsSync(CHROMIUM_PATH)) {
+  test.use({ launchOptions: { executablePath: CHROMIUM_PATH } });
+}
+
+// ── Fixture no formato que agua_publico_coletas() devolve (migration
+// 297) — mesmas 2 bacias/3 campanhas de tests/agua-relatorios.test.js,
+// só que já no formato "achatado" da RPC pública (sem os campos que a
+// função nunca expõe: coletor, GPS, foto, laudo, observações...).
+function fixtureColetasPublicas() {
+  const base = { ponto_bacia: 'Rio Acre' };
+  return [
+    { ...base, ponto_id: 'p-rb', ponto_nome: 'Rio Branco', codigo_ana: '13601000', ponto_municipio: 'Rio Branco', ponto_rio: 'Rio Acre',
+      campanha_id: 'c1', campanha_ano: 2024, campanha_ordem: 'primeira', data_coleta: '2024-03-10',
+      status: 'completo', iqa: 78.4, iqa_faixa: 'Boa', conama_violacoes: [] },
+    { ...base, ponto_id: 'p-rb', ponto_nome: 'Rio Branco', codigo_ana: '13601000', ponto_municipio: 'Rio Branco', ponto_rio: 'Rio Acre',
+      campanha_id: 'c3', campanha_ano: 2025, campanha_ordem: 'primeira', data_coleta: '2025-03-08',
+      status: 'quarentena', iqa: 12.5, iqa_faixa: 'Péssima', conama_violacoes: ['ph', 'od'] },
+    { ...base, ponto_id: 'p-pa', ponto_nome: 'Porto Acre', codigo_ana: '13488000', ponto_municipio: 'Porto Acre', ponto_rio: 'Rio Acre',
+      campanha_id: 'c1', campanha_ano: 2024, campanha_ordem: 'primeira', data_coleta: '2024-03-11',
+      status: 'completo', iqa: 82.1, iqa_faixa: 'Ótima', conama_violacoes: [] },
+  ];
+}
+
+const PONTOS_PUBLICOS = [
+  { id: 'p-rb', nome: 'Rio Branco', lat: -9.975, lng: -67.810 },
+  { id: 'p-pa', nome: 'Porto Acre', lat: -9.590, lng: -67.550 },
+];
+
+const CABECALHO_PUBLICO = {
+  secretaria: 'Secretaria de Estado do Meio Ambiente do Acre', siglaSecr: 'SEMA-AC',
+  diretoria: 'Diretoria de Meio Ambiente', siglaDiret: 'DIMA',
+  departamento: 'Departamento de Unidades de Conservação',
+  logoGoverno: null, logoSecr: null,
+};
+
+// Stub deliberadamente SEM `.from` e SEM `.auth` — só `.rpc`, as três
+// funções que a migration 297 abre para `anon`. Qualquer tentativa da
+// página de usar `.from()` ou `db.auth.*` estoura "is not a function"
+// (ver item 2 do cabeçalho).
+async function abrirPainelPublicoComStub(page, { coletas, pontos, cabecalho } = {}) {
+  await page.route('**/cdn.jsdelivr.net/**', route => route.abort());
+  await page.route('**/tile.openstreetmap.org/**', route => route.abort());
+
+  await page.addInitScript(({ coletas, pontos, cabecalho }) => {
+    window.loadEnv = () => Promise.resolve({ supabaseUrl: 'http://fake.test', supabaseKey: 'fake-anon-key' });
+    window.supabase = {
+      createClient: () => ({
+        rpc: async (nome) => {
+          if (nome === 'agua_publico_coletas') return { data: coletas, error: null };
+          if (nome === 'agua_publico_pontos') return { data: pontos, error: null };
+          if (nome === 'agua_publico_cabecalho') return { data: cabecalho, error: null };
+          throw new Error('RPC inesperada no painel público: ' + nome);
+        },
+      }),
+    };
+  }, { coletas: coletas || fixtureColetasPublicas(), pontos: pontos || PONTOS_PUBLICOS, cabecalho: cabecalho || CABECALHO_PUBLICO });
+
+  await page.goto(PAGINA);
+  await page.waitForSelector('.adash-grid, .adash-vazio', { timeout: 15_000 });
+}
+
+test.describe('migration 297 — whitelist de colunas do painel público', () => {
+  const sql = fs.readFileSync(MIGRATION, 'utf8');
+
+  function corpoDaFuncao(nome) {
+    const inicio = sql.indexOf(`FUNCTION ${nome}(`);
+    expect(inicio, `função ${nome} não encontrada na migration`).toBeGreaterThan(-1);
+    const fimMarcador = '\n$$;';
+    const fim = sql.indexOf(fimMarcador, inicio);
+    return sql.slice(inicio, fim);
+  }
+
+  test('agua_publico_coletas() nunca devolve coletor, GPS do aparelho, foto, laudo ou observações', () => {
+    const corpo = corpoDaFuncao('agua_publico_coletas');
+    const proibidas = [
+      'coletor_id', 'coletor_nome', 'criado_por', 'localizacao', 'gps_confirmacao',
+      'foto_url', 'laudo_url', 'observacoes', 'quarentena_motivo',
+      'linha_origem_planilha', 'laboratorio_id', 'laboratorio_nome',
+      'exclusao_justificativa', 'excluido_por', 'uuid_cliente',
+    ];
+    proibidas.forEach(col => {
+      expect(corpo, `coluna proibida "${col}" apareceu em agua_publico_coletas()`).not.toMatch(new RegExp(`\\b${col}\\b`));
+    });
+    // E filtra soft-delete — mesma regra de vw_agua_coletas_detalhe.
+    expect(corpo).toMatch(/excluido_em IS NULL/);
+  });
+
+  test('agua_publico_pontos() devolve só id/nome/lat/lng — nada de dado de cadastro interno', () => {
+    const corpo = corpoDaFuncao('agua_publico_pontos');
+    expect(corpo).not.toMatch(/observacoes|criado_em|atualizado_em|coordenada_observacao/);
+  });
+
+  test('as três funções são SECURITY DEFINER com search_path fixo e GRANT explícito para anon', () => {
+    ['agua_publico_coletas', 'agua_publico_pontos', 'agua_publico_cabecalho'].forEach(nome => {
+      const corpo = corpoDaFuncao(nome);
+      expect(corpo).toMatch(/SECURITY DEFINER/);
+      expect(corpo).toMatch(/SET search_path = public/);
+      expect(sql).toMatch(new RegExp(`GRANT EXECUTE ON FUNCTION ${nome}\\(\\)\\s+TO anon`));
+    });
+  });
+
+  test('cabeçalho público não expõe endereço/telefone/e-mail nem responsáveis técnicos', () => {
+    const corpo = corpoDaFuncao('agua_publico_cabecalho');
+    expect(corpo).not.toMatch(/endereco|telefone|email|responsaveis_tecnicos/);
+  });
+});
+
+test.describe('painel público — render sem sessão, só com as RPCs anon', () => {
+  test('monta o painel de ponta a ponta chamando SÓ agua_publico_* — sem login, sem redirecionar', async ({ page }) => {
+    const erros = [];
+    page.on('pageerror', e => erros.push(e.message));
+
+    await abrirPainelPublicoComStub(page);
+
+    expect(page.url()).toContain('agua-publico.html'); // nunca foi para index.html
+    await expect(page.locator('.adash-card-escuro .adash-num')).toHaveText('57.7'); // (78.4+12.5+82.1)/3
+    await expect(page.locator('.adash-tabela-linha')).toHaveCount(2);
+    expect(erros, 'erro de JS na página: ' + erros.join(' | ')).toHaveLength(0);
+  });
+
+  test('coleta em quarentena aparece MARCADA no painel público, nunca escondida', async ({ page }) => {
+    await abrirPainelPublicoComStub(page);
+    await expect(page.locator('.adash-aviso')).toContainText('em quarentena');
+    await expect(page.locator('.adash-aviso')).toContainText('dado preliminar');
+    await expect(page.locator('.adash-tabela-linha', { hasText: 'Rio Branco' }).locator('.badge')).toHaveText('quarentena');
+  });
+
+  test('mapa desenha os pontos vindos de agua_publico_pontos() (lat/lng já prontos, sem parsear geom)', async ({ page }) => {
+    await abrirPainelPublicoComStub(page);
+    await page.waitForFunction(() => document.querySelectorAll('#rl-mapa path.leaflet-interactive').length >= 2, null, { timeout: 10_000 });
+    await expect(page.locator('#rl-mapa path.leaflet-interactive')).toHaveCount(2);
+  });
+
+  test('cabeçalho institucional usa agua_publico_cabecalho() — logos exibidas quando existem', async ({ page }) => {
+    await abrirPainelPublicoComStub(page, {
+      cabecalho: { ...CABECALHO_PUBLICO, logoGoverno: 'https://exemplo.test/gov.png', logoSecr: 'https://exemplo.test/sema.png' },
+    });
+    await expect(page.locator('#apub-logo-gov')).toHaveAttribute('src', 'https://exemplo.test/gov.png');
+    await expect(page.locator('#apub-logo-secr')).toHaveAttribute('src', 'https://exemplo.test/sema.png');
+  });
+
+  test('bacia no cabeçalho e filtros da gaveta funcionam igual à tela de mesa (mesmo agua-painel.js)', async ({ page }) => {
+    await abrirPainelPublicoComStub(page);
+    await expect(page.locator('#rl-bacia option:checked')).toContainText('Acre todo');
+
+    await page.click('#rl-btn-filtros');
+    await page.selectOption('#rl-status', 'completo');
+    await expect(page.locator('#rl-filtros-n')).toHaveText('1');
+    await expect(page.locator('.adash-tabela-linha')).toHaveCount(2); // só as 2 completas, quarentena fora
+  });
+
+  test('sem coleta no recorte mostra vazio, nunca erro — export desabilitado', async ({ page }) => {
+    await abrirPainelPublicoComStub(page, { coletas: [] });
+    await expect(page.locator('.adash-vazio')).toBeVisible();
+    await expect(page.locator('#rl-btn-export')).toBeDisabled();
+  });
+});
+
+test.describe('exportação pública — protocolo fixo, nunca a RPC institucional', () => {
+  test('PDF gerado usa "Acesso público — não protocolado", nunca chama gerar_protocolo_relatorio', async ({ page }) => {
+    test.setTimeout(60_000);
+    const chamadasRpc = [];
+    await page.addInitScript(() => {
+      window.loadEnv = () => Promise.resolve({ supabaseUrl: 'http://fake.test', supabaseKey: 'fake-anon-key' });
+      window.__RPC_CHAMADAS__ = [];
+      window.supabase = {
+        createClient: () => ({
+          rpc: async (nome) => {
+            window.__RPC_CHAMADAS__.push(nome);
+            if (nome === 'agua_publico_coletas') return { data: [], error: null };
+            if (nome === 'agua_publico_pontos') return { data: [], error: null };
+            if (nome === 'agua_publico_cabecalho') return {
+              data: { secretaria: 'Secretaria de Estado do Meio Ambiente do Acre', siglaSecr: 'SEMA-AC',
+                       diretoria: 'Diretoria de Meio Ambiente', siglaDiret: 'DIMA',
+                       departamento: 'Departamento de Unidades de Conservação', logoGoverno: null, logoSecr: null },
+              error: null,
+            };
+            throw new Error('RPC inesperada: ' + nome);
+          },
+        }),
+      };
+    });
+    await page.route('**/cdn.jsdelivr.net/**', route => route.abort());
+    await page.route('**/tile.openstreetmap.org/**', route => route.abort());
+    await page.goto(PAGINA);
+    await page.waitForFunction(() => typeof window.aguaRelMontarPdf === 'function');
+
+    const base64 = await page.evaluate(async (coletas) => {
+      const relatorio = window.aguaRelMontar(coletas, {});
+      const cab = { secretaria: 'Secretaria de Estado do Meio Ambiente do Acre', siglaSecr: 'SEMA-AC',
+        diretoria: 'Diretoria de Meio Ambiente', siglaDiret: 'DIMA', departamento: 'Departamento de Unidades de Conservação',
+        logoGoverno: null, logoSecr: null };
+      const pdf = await window.aguaRelMontarPdf(relatorio, 'Rio Acre', '2024 · 1ª campanha', cab, 'Acesso público — não protocolado')
+      const blob = pdf.output('blob')
+      const buf = await blob.arrayBuffer()
+      let binary = ''
+      const bytes = new Uint8Array(buf)
+      for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i])
+      return btoa(binary)
+    }, fixtureColetasPublicas());
+
+    const buf = Buffer.from(base64, 'base64');
+    const { PDFParse } = require('pdf-parse');
+    const parser = new PDFParse({ data: buf });
+    const texto = (await parser.getText()).text;
+    await parser.destroy();
+
+    expect(texto).toContain('Acesso público');
+    expect(texto).not.toMatch(/Prot\. SIGUC-\d{4}-\d{4}/); // nunca um protocolo gerado de verdade
+
+    const chamadas = await page.evaluate(() => window.__RPC_CHAMADAS__);
+    expect(chamadas).not.toContain('gerar_protocolo_relatorio');
+  });
+});

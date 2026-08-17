@@ -1835,6 +1835,85 @@ do `mascote-respira` herdado.
   estão nele e a v16 já tinha ido para produção — sem o incremento, quem
   abrisse com a v16 em cache não receberia o emblema.
 
+**Pós-lançamento — Painel PÚBLICO (link para o site da SEMA), sem
+login.** `pages/agua-publico.html` — mesmo painel de
+`pages/agua-relatorios.html` (KPIs, rosca por faixa, medidor CONAMA,
+barras por ponto, evolução por campanha, mapa, exportação PDF/PPTX),
+publicável como link no site institucional. Decisão de acesso: só link
+direto, sem iframe — `frame-ancestors 'none'` global do `vercel.json`
+continua valendo também para esta página (nenhum carve-out novo).
+Quarentena ENTRA, marcada como dado preliminar (mesma regra do painel
+de mesa) — sem isso a série de 2022 em diante fica quase vazia no
+público. Exportação de PDF e PPTX aberta a qualquer visitante.
+
+- **Nunca duas cópias do painel**: os cards saíram de dentro de
+  `agua-relatorios.html` para `js/agua-painel.js` (novo —
+  `aguaPainelHTML()`, pura, devolve string; `aguaPainelMapaCriar()`,
+  cria o Leaflet + desenha o limite do Acre + atualiza marcador) — as
+  DUAS páginas chamam as mesmas funções. Mesma lição de
+  `js/frota-consumo.js`: um ajuste futuro no painel vale para as duas
+  telas de graça, nunca diverge.
+- **`anon` já tem GRANT de tabela em tudo** (padrão do Supabase) — o
+  que hoje bloqueia leitura pública é só a RLS de
+  `agua_coletas`/`agua_pontos_coleta` (`pode_ver('agua')`, que desde a
+  281 exige lotação). Afrouxar essa RLS para "ou lotação ou anon"
+  seria abrir a MESMA porta para qualquer chamada direta ao Supabase, e
+  o alvo aqui é uma superfície bem mais estreita. Solução: migration
+  297, três funções `agua_publico_*` **SECURITY DEFINER** (dono
+  `postgres`, que tem `BYPASSRLS` — mesmo mecanismo que já sustenta
+  `is_chefe_brigada()`/`nivel_efetivo()`), cada uma com **lista
+  explícita de colunas no `RETURNS TABLE`** — nunca `SELECT *`, nunca a
+  view interna `vw_agua_coletas_detalhe`. O que não está na lista não
+  pode vazar por descuido futuro:
+  - `agua_publico_coletas()` — ponto/campanha/data/status/IQA/CONAMA.
+    FICAM DE FORA (não existem como coluna, não é `WHERE` escondendo):
+    `coletor_id`/`coletor_nome`/`criado_por` (identifica o SERVIDOR,
+    não o rio), `localizacao`/`lat`/`lng`/`gps_confirmacao` (GPS do
+    aparelho do técnico), `foto_url`/`laudo_url`/`observacoes`/
+    `quarentena_motivo`, `linha_origem_planilha`, `laboratorio_id`.
+  - `agua_publico_pontos()` — id/nome/lat/lng já extraídos
+    (`ST_Y`/`ST_X`), para o mapa. A página pública nem carrega
+    `js/mapa-recorte.js` — não precisa parsear geom bruto.
+  - `agua_publico_cabecalho()` — só o timbre (nomes + URLs das logos),
+    mesmas chaves de `getCabecalhoRelatorio()`; sem endereço/telefone/
+    e-mail/responsáveis técnicos (não usados pelo timbre).
+  - IQA e CONAMA continuam calculados pelas MESMAS funções da view
+    interna (`agua_calcular_iqa`/`agua_conama_violacoes`) — chamadas
+    de DENTRO da função SECURITY DEFINER, então o `REVOKE` de `anon`
+    em `agua_conama_violacoes` (migration 252b, ela não é pura) segue
+    valendo para chamada DIRETA e não se aplica aqui dentro (mesmo
+    mecanismo de sempre: dentro do corpo de uma SECURITY DEFINER,
+    `current_user` é o dono). Confirmado rodando como `anon` de
+    verdade (`SET LOCAL ROLE anon`): as três funções respondem, e
+    `SELECT FROM agua_coletas` direto continua dando "permission
+    denied for function pode_editar" — a RLS de mesa não mudou em
+    nada.
+- **Sem protocolo institucional no PDF/PPTX público.**
+  `gerar_protocolo_relatorio()` incrementa uma sequência COMPARTILHADA
+  por todos os relatórios do sistema — não é apropriado deixar
+  visitante anônimo incrementá-la a cada exportação. O rodapé do
+  documento público usa o texto fixo "Acesso público — não
+  protocolado" no lugar do número; a RPC nunca é chamada por
+  `agua-publico.html`.
+- **Página autônoma de propósito**: sem `gerarLayout()`, sem
+  `carregarUsuario()` — e portanto sem gate de LGPD/perfil (os dois só
+  existem DENTRO de `carregarUsuario()`, nunca chamada aqui) e sem
+  redirecionamento para `index.html`. Ainda carrega `js/config.js`
+  (única fonte de `esc`/`bico`/`formatNum`/`BICON_PATHS`/`toast` — 
+  reaproveitar em vez de duplicar) mas nunca chama a função que
+  dispara login; cabeçalho institucional próprio (`.apub-*`, logo Acre
+  à esquerda/SEMA à direita — mesma regra de timbre do projeto) no
+  lugar da sidebar.
+- Guarda: `tests/agua-publico.test.js` — trava a LISTA DE COLUNAS lendo
+  o texto da migration 297 (nenhuma das proibidas aparece no
+  `RETURNS TABLE`), que a página nunca chama `.from()`/`db.auth` (stub
+  sem os dois — travaria com "is not a function" se a página tentasse),
+  render de ponta a ponta sem sessão, quarentena marcada, mapa a partir
+  de `agua_publico_pontos()`, e que a exportação nunca chama
+  `gerar_protocolo_relatorio`.
+- Sem mudança em `pwa/sw.js`: `agua-publico.html` não é PWA/app de
+  campo, não entra em nenhum `SHELLS`.
+
 ## Próxima tarefa
 Módulo Qualidade da Água (IQA): as 5 fases do plano original estão
 ENTREGUES (ver `docs/qualidade-agua/plano.md`, seções "Fase 0" a "Fase
@@ -1863,7 +1942,19 @@ por isso esperam alguém da SEMA com o laudo físico, usando a tela de
 
 **Ícone do launcher do app Água** ainda é o placeholder genérico do
 Capacitor (`app-agua/android`) — trocar por arte própria antes do
-primeiro APK real.
+primeiro APK real. (Nota: esta pendência já foi resolvida numa entrega
+posterior — ver "~~Ícone do app Água~~ — resolvido" em
+`docs/qualidade-agua/plano.md`, seção "Decisões ainda abertas"; este
+parágrafo ficou desatualizado e não foi reescrito agora, fora do
+escopo desta entrega.)
+
+**Painel público (link para o site da SEMA) — ENTREGUE.**
+`pages/agua-publico.html` + migration 297 (`agua_publico_coletas`/
+`agua_publico_pontos`/`agua_publico_cabecalho`, SECURITY DEFINER) — ver
+o parágrafo "Pós-lançamento — Painel PÚBLICO" acima, na seção da Fase 3
+do app de campo, para o desenho completo (whitelist de colunas, sem
+protocolo institucional, `js/agua-painel.js` compartilhado com a tela
+de mesa).
 
 **Acesso por organograma**: as 9 frentes do plano
 (`docs/acesso-por-organograma.md`) — lotação, amarração módulo↔setor,
