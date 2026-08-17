@@ -367,6 +367,31 @@ function _aguaPainelControleSatelite(aoTrocar) {
   return new Ctrl()
 }
 
+// Pino "gota d'água" (Opção A aprovada pelo usuário num Artifact de
+// comparação, antes de codar) — substitui o círculo simples. Cor de
+// preenchimento/borda continua vindo de aguaIqaEstiloMarcador
+// (js/agua-iqa-visual.js), nunca reimplementada aqui: só a FORMA do
+// marcador mudou, a semântica de cor (faixa do IQA/conformidade
+// CONAMA/quarentena) é a mesma de antes.
+function _aguaPainelPinSVG(estilo) {
+  const { fillColor, color, weight, dashArray, fillOpacity } = estilo
+  return `<svg viewBox="0 0 30 38" xmlns="http://www.w3.org/2000/svg" style="opacity:${fillOpacity == null ? 1 : fillOpacity}">
+    <path d="M15 1C7 1 1 7.5 1 15c0 9.5 12 20.5 13.3 21.7.4.4 1 .4 1.4 0C17 35.5 29 24.5 29 15 29 7.5 23 1 15 1Z"
+      fill="${fillColor}" stroke="${color}" stroke-width="${weight}" ${dashArray ? `stroke-dasharray="${dashArray}"` : ''}/>
+    <circle cx="15" cy="15" r="7.2" fill="#fff"/>
+    <path d="M15 9.5c1.8 2.4 4 5.3 4 7.7a4 4 0 1 1-8 0c0-2.4 2.2-5.3 4-7.7Z" fill="${fillColor}"/>
+  </svg>`
+}
+function _aguaPainelPinIcon(estilo) {
+  return L.divIcon({
+    className: 'adash-mapa-pin',
+    html: _aguaPainelPinSVG(estilo),
+    iconSize: [30, 38],
+    iconAnchor: [15, 38],
+    popupAnchor: [0, -34],
+  })
+}
+
 function aguaPainelMapaCriar(mapaElId, subElId) {
   const mapa = L.map(mapaElId, { attributionControl: false }).setView([-9.5, -70.0], 6)
   let camadaBase = L.tileLayer(AGUA_PAINEL_TILE_RUAS.url, AGUA_PAINEL_TILE_RUAS.opts).addTo(mapa)
@@ -398,8 +423,10 @@ function aguaPainelMapaCriar(mapaElId, subElId) {
 
   // `pontosGeomPorId`: { [ponto_id]: [lat, lng] }. `rel` pode ser null
   // (erro de carga) — mostra o que já se sabe (a lista de pontos
-  // cadastrados, sem coleta) em vez de esconder o mapa.
-  function atualizar(rel, pontosGeomPorId) {
+  // cadastrados, sem coleta) em vez de esconder o mapa. `onClique(ponto,
+  // ultimaColeta)` (opcional) — cada página decide o que "clicar no
+  // pino" abre (o popup de detalhe, ver aguaPainelColetaDetalheHTML).
+  function atualizar(rel, pontosGeomPorId, onClique) {
     Object.values(marcadores).forEach(m => mapa.removeLayer(m))
     marcadores = {}
     const bounds = []
@@ -411,11 +438,12 @@ function aguaPainelMapaCriar(mapaElId, subElId) {
       // as coletas de cada ponto já vêm em ordem cronológica de
       // aguaRelMontar. Nunca a média classificada numa faixa.
       const ultima = p.coletas.length ? p.coletas[p.coletas.length - 1] : null
-      const m = L.circleMarker(ll, Object.assign({ radius: 8 }, aguaIqaEstiloMarcador(ultima)))
+      const m = L.marker(ll, { icon: _aguaPainelPinIcon(aguaIqaEstiloMarcador(ultima)) })
       const iqaTxt = ultima && ultima.iqa != null
         ? `IQA ${ultima.iqa.toFixed(0)} (${ultima.iqa_faixa || 'sem faixa'})`
         : 'Sem coleta com índice no recorte'
-      m.bindTooltip(`<strong>${esc(p.nome)}</strong><br>${esc(iqaTxt)}`, { direction: 'top', offset: [0, -8] })
+      m.bindTooltip(`<strong>${esc(p.nome)}</strong><br>${esc(iqaTxt)}`, { direction: 'top', offset: [0, -30] })
+      if (onClique) m.on('click', () => onClique(p, ultima))
       m.addTo(mapa)
       marcadores[p.ponto_id] = m
       bounds.push(ll)
@@ -423,7 +451,7 @@ function aguaPainelMapaCriar(mapaElId, subElId) {
     const sub = document.getElementById(subElId)
     if (sub) {
       sub.textContent = bounds.length
-        ? `${bounds.length} ponto${bounds.length !== 1 ? 's' : ''} no recorte atual — cor pela coleta mais recente do período`
+        ? `${bounds.length} ponto${bounds.length !== 1 ? 's' : ''} no recorte atual — toque num ponto para ver os detalhes`
         : 'Nenhum ponto no recorte atual'
     }
     if (bounds.length === 1) mapa.setView(bounds[0], 10)
@@ -431,4 +459,78 @@ function aguaPainelMapaCriar(mapaElId, subElId) {
   }
 
   return { mapa, atualizar }
+}
+
+// ── Detalhe do ponto (popup ao clicar no pino) ──────────────────
+// Pura — devolve string, quem chama decide onde injetar e como abrir/
+// fechar (mesmo padrão de aguaPainelExplicacaoIqaHTML). `c` é a coleta
+// mais recente do ponto no recorte (linha crua de agua_coletas via
+// vw_agua_coletas_detalhe na mesa, ou de agua_publico_coletas() no
+// público — mesma forma, colunas a mais ou a menos). Campos que só
+// existem na mesa (coletor_nome, laboratorio_nome, quarentena_motivo,
+// observacoes) usam `!== undefined` para sumir de vez no público
+// (ausência de coluna) em vez de aparecer como "—" (campo existe, só
+// está vazio) — mesma distinção que o resto do projeto já usa.
+const AGUA_PAINEL_CLASSE_LABEL = { especial: 'Especial', classe_1: 'Classe 1', classe_2: 'Classe 2', classe_3: 'Classe 3', classe_4: 'Classe 4' }
+
+function aguaPainelColetaDetalheHTML(ponto, c) {
+  if (!c) {
+    return `<div class="modal-header">
+        <div class="modal-title">${esc(ponto.nome)}</div>
+        <button class="modal-close" onclick="fecharDetalheColetaPainel()">×</button>
+      </div>
+      <div class="modal-body"><p class="adet-hint">Nenhuma coleta registrada para este ponto no recorte atual.</p></div>
+      <div class="modal-footer"><button class="btn btn-secondary" onclick="fecharDetalheColetaPainel()">Fechar</button></div>`
+  }
+
+  const semLimites = c.conama_violacoes == null
+  const violou = !semLimites && c.conama_violacoes.length > 0
+  const statusLabel = c.status === 'completo' ? 'Completo'
+    : c.status === 'quarentena' ? 'Em conferência (quarentena)' : 'Aguardando laudo'
+  const params = Object.entries(AGUA_REL_PARAM_LABEL).filter(([campo]) => c[campo] != null)
+
+  return `<div class="modal-header">
+      <div>
+        <div class="modal-title">${esc(c.ponto_nome)}${c.codigo_ana ? ' · ' + esc(c.codigo_ana) : ''}</div>
+        <p class="adet-sub">${esc(aguaRelLabelCampanha(c))}</p>
+      </div>
+      <button class="modal-close" onclick="fecharDetalheColetaPainel()">×</button>
+    </div>
+    <div class="modal-body">
+      ${(c.ponto_rio || c.ponto_municipio) ? `<div class="adet-linha"><span>Local</span><strong>${esc([c.ponto_rio, c.ponto_municipio].filter(Boolean).join(' · '))}</strong></div>` : ''}
+      ${c.classe_enquadramento ? `<div class="adet-linha"><span>Classe de enquadramento</span><strong>${esc(AGUA_PAINEL_CLASSE_LABEL[c.classe_enquadramento] || c.classe_enquadramento)}</strong></div>` : ''}
+      <div class="adet-linha"><span>Data da coleta</span><strong>${formatData(c.data_coleta)}</strong></div>
+      ${c.coletor_nome !== undefined ? `<div class="adet-linha"><span>Coletor</span><strong>${esc(c.coletor_nome || '—')}</strong></div>` : ''}
+      ${c.laboratorio_nome !== undefined ? `<div class="adet-linha"><span>Laboratório</span><strong>${esc(c.laboratorio_nome || '—')}</strong></div>` : ''}
+      <div class="adet-linha"><span>Status</span><strong>${esc(statusLabel)}</strong></div>
+      ${c.status === 'quarentena' ? `<p class="adet-hint">Dado preliminar, pendente de conferência humana.${c.quarentena_motivo ? ' ' + esc(c.quarentena_motivo) : ''}</p>` : ''}
+
+      <div class="adet-cards">
+        <div class="adet-card">
+          <span class="adet-card-tit">IQA</span>
+          <strong class="adet-card-valor" style="color:${AGUA_IQA_FAIXA_COR[c.iqa_faixa] || AGUA_SEM_IQA_COR}">${c.iqa != null ? Number(c.iqa).toFixed(1) : '—'}</strong>
+          <span class="adet-card-sub">${esc(c.iqa_faixa || 'Sem dado suficiente')}</span>
+        </div>
+        <div class="adet-card">
+          <span class="adet-card-tit">CONAMA</span>
+          <strong class="adet-card-valor" style="color:${violou ? '#C2410C' : semLimites ? '#9CA3AF' : '#059669'}">${semLimites ? 'Sem limites' : violou ? `${c.conama_violacoes.length} violação${c.conama_violacoes.length > 1 ? 'ões' : ''}` : 'Conforme'}</strong>
+          ${violou ? `<span class="adet-card-sub">${esc(c.conama_violacoes.map(v => AGUA_REL_PARAM_LABEL[v] || v).join(', '))}</span>` : ''}
+        </div>
+      </div>
+
+      ${params.length ? `
+        <p class="adet-params-tit">Parâmetros medidos</p>
+        <div class="adet-params">
+          ${params.map(([campo, rotulo]) => `
+            <div class="adet-param-linha${c.conama_violacoes?.includes(campo) ? ' adet-param-violado' : ''}">
+              <span>${esc(rotulo)}</span><strong>${Number(c[campo]).toLocaleString('pt-BR', { maximumFractionDigits: 2 })}</strong>
+            </div>`).join('')}
+        </div>` : '<p class="adet-hint">Ainda sem parâmetros lançados — aguardando laudo do laboratório.</p>'}
+
+      ${c.observacoes ? `<p class="adet-params-tit">Observações</p><p class="adet-obs">${esc(c.observacoes)}</p>` : ''}
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="fecharDetalheColetaPainel()">Fechar</button>
+      <button class="btn btn-primary" id="adet-btn-exportar" onclick="exportarFichaColetaPainel()" data-icon="download">Exportar PDF</button>
+    </div>`
 }

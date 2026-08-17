@@ -894,15 +894,15 @@ test.describe('painel (dashboard) — render com dado real da view', () => {
     ];
     await abrirPainelComStub(page, fixtureColetasRioAcre(), { pontosGeom });
 
-    await page.waitForFunction(() => document.querySelectorAll('#rl-mapa path.leaflet-interactive').length >= 2, null, { timeout: 10_000 });
-    await expect(page.locator('#rl-mapa path.leaflet-interactive')).toHaveCount(2);
+    await page.waitForFunction(() => document.querySelectorAll('#rl-mapa .adash-mapa-pin').length >= 2, null, { timeout: 10_000 });
+    await expect(page.locator('#rl-mapa .adash-mapa-pin')).toHaveCount(2);
     await expect(page.locator('#rl-mapa-sub')).toContainText('2 pontos no recorte atual');
   });
 
   test('mapa tem os componentes cartográficos oficiais (rosa dos ventos, escala, legenda, alternância de satélite) — mesmo js/agua-painel.js do painel público', async ({ page }) => {
     const pontosGeom = [{ id: 'p-rb', ativo: true, geom: { type: 'Point', coordinates: [-67.810, -9.975] } }];
     await abrirPainelComStub(page, fixtureColetasRioAcre(), { pontosGeom });
-    await page.waitForFunction(() => document.querySelectorAll('#rl-mapa path.leaflet-interactive').length >= 1, null, { timeout: 10_000 });
+    await page.waitForFunction(() => document.querySelectorAll('#rl-mapa .adash-mapa-pin').length >= 1, null, { timeout: 10_000 });
 
     await expect(page.locator('.rosa-norte svg')).toBeVisible();
     await expect(page.locator('.leaflet-control-scale')).toBeVisible();
@@ -918,9 +918,29 @@ test.describe('painel (dashboard) — render com dado real da view', () => {
     const pontosGeom = [{ id: 'p-rb', ativo: true, geom: { type: 'Point', coordinates: [-67.810, -9.975] } }];
     await abrirPainelComStub(page, fixtureColetasRioAcre(), { pontosGeom });
 
-    await page.waitForFunction(() => document.querySelectorAll('#rl-mapa path.leaflet-interactive').length >= 1, null, { timeout: 10_000 });
-    await expect(page.locator('#rl-mapa path.leaflet-interactive')).toHaveCount(1);
+    await page.waitForFunction(() => document.querySelectorAll('#rl-mapa .adash-mapa-pin').length >= 1, null, { timeout: 10_000 });
+    await expect(page.locator('#rl-mapa .adash-mapa-pin')).toHaveCount(1);
     // O resto do painel (que não depende de geom) segue normal.
     await expect(page.locator('.adash-card-escuro .adash-num')).toHaveText('61.6');
+  });
+
+  test('clicar num pino abre o detalhe da coleta mais recente, com opção de exportar só esse ponto', async ({ page }) => {
+    const pontosGeom = [{ id: 'p-rb', ativo: true, geom: { type: 'Point', coordinates: [-67.810, -9.975] } }];
+    await abrirPainelComStub(page, fixtureColetasRioAcre(), { pontosGeom });
+
+    await page.waitForFunction(() => document.querySelectorAll('#rl-mapa .adash-mapa-pin').length >= 1, null, { timeout: 10_000 });
+    await page.click('#rl-mapa .adash-mapa-pin');
+
+    await expect(page.locator('#adet-modal')).toHaveClass(/aberto/);
+    await expect(page.locator('#adet-modal .modal-title')).toContainText('Rio Branco');
+    await expect(page.locator('#adet-modal .adet-card-tit')).toContainText(['IQA', 'CONAMA']);
+    // Fixture não traz os ~21 parâmetros brutos (só IQA/CONAMA já
+    // calculados) — o popup mostra a mensagem de "aguardando laudo",
+    // nunca uma lista vazia sem explicação.
+    await expect(page.locator('#adet-modal .adet-hint').last()).toContainText('aguardando laudo');
+    await expect(page.locator('#adet-btn-exportar')).toBeVisible();
+
+    await page.click('#adet-modal .modal-close');
+    await expect(page.locator('#adet-modal')).not.toHaveClass(/aberto/);
   });
 });

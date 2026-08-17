@@ -2068,6 +2068,60 @@ tamanho do card — nunca reimplementados do zero:
   (rosa/escala/legenda/toggle, os 4 renderizando e o clique trocando
   de tile de verdade).
 
+**Pós-lançamento — Pino gota-d'água + popup de detalhe do ponto, com
+exportação de UMA coleta (migration 300).** Pedido do usuário, com
+proposta apresentada e aprovada ANTES de codar (Artifact de comparação
+de 3 formas de marcador): o círculo simples do mapa do painel virou um
+pino "gota d'água" (Opção A), e clicar nele abre um popup com o
+detalhe da coleta mais recente do ponto + botão para exportar só
+aquela ficha em PDF.
+- **Forma do pino, não a cor/semântica**: `_aguaPainelPinSVG`/
+  `_aguaPainelPinIcon` (`js/agua-painel.js`) trocam `L.circleMarker`
+  por `L.marker` + `L.divIcon` com um SVG de gota (recorte branco +
+  glifo de gota dentro) — a cor de preenchimento (faixa do IQA), a
+  borda (conformidade CONAMA) e a opacidade reduzida (quarentena)
+  continuam vindo de `aguaIqaEstiloMarcador()`, sem nenhuma mudança de
+  semântica. `aguaPainelMapaCriar().atualizar(rel, geoms, onClique)`
+  ganhou o 3º parâmetro (opcional) — cada página decide o que "clicar
+  no pino" faz; sem ele, comportamento idêntico a antes.
+- **Dado ambiental, não pessoal — decisão confirmada com o usuário
+  antes de codar.** O popup só teria IQA/CONAMA que o mapa já mostra
+  sem os ~21 parâmetros medidos (pH, turbidez, OD...) — por isso a
+  migration 300 ampliou `agua_publico_coletas()` com esses parâmetros
+  + `classe_enquadramento`. Continuam de fora, sem mudança nenhuma:
+  coletor/GPS do aparelho/foto/laudo/observações/hora/código da
+  amostra (ausência de coluna no `RETURNS TABLE`, nunca `WHERE`
+  escondendo) — mesma disciplina de whitelist da 297. `CREATE OR
+  REPLACE` não aceita mudar a lista de colunas (lição repetida da
+  178/224/173/297) — `DROP FUNCTION` explícito antes.
+- **`aguaPainelColetaDetalheHTML(ponto, c)`** (`js/agua-painel.js`) é
+  pura e compartilhada pelas duas telas — mesmo par de duplicação
+  obrigatória do painel. Campos que só existem na mesa (`coletor_nome`,
+  `laboratorio_nome`, `quarentena_motivo`, `observacoes`) usam
+  `!== undefined` para sumir de vez no público (ausência de coluna) em
+  vez de aparecer como "—" (campo existe, só está vazio) — mesma
+  distinção que o resto do projeto já usa para dado ausente vs. dado
+  vazio. IQA/CONAMA calculados pela MESMA função do mapa/relatório,
+  nunca recalculados no popup.
+- **Exportar** reaproveita `aguaRelMontarPdfColeta()`/`aguaRelBaixarPdf()`
+  (`js/agua-relatorio-pdf.js`, já existentes desde o detalhe de coleta
+  do app de campo — pós-lançamento anterior) sem nenhuma alteração:
+  na mesa (`agua-relatorios.html`) usa `getCabecalhoRelatorio('agua')`
+  + `gerarProtocolo()`, como o PDF por bacia já fazia; no público
+  (`agua-publico.html`) usa o `_cab`/`PROTOCOLO_PUBLICO` já lidos para
+  o PDF por bacia — nunca chama `gerar_protocolo_relatorio()` (regra
+  da Fase pública, visitante anônimo não protocola).
+- Guarda: `tests/agua-relatorios.test.js`/`tests/agua-publico.test.js`
+  — seletor do marcador trocou de `path.leaflet-interactive`
+  (`L.circleMarker`) para `.adash-mapa-pin` (`L.divIcon`) em todos os
+  testes de mapa existentes, + 1 teste novo por tela (clique abre o
+  popup, botão de exportar visível, público sem "Coletor"/"Laboratório").
+  Mesma limitação de rede (unpkg.com) documentada acima; confirmado
+  funcionando via stub de `L` fora da suíte (pino SVG, callback de
+  clique, HTML do popup com IQA/CONAMA/parâmetro violado destacado).
+- Sem mudança em `pwa/sw.js` (nenhuma das duas páginas é PWA/app de
+  campo).
+
 ## Próxima tarefa
 Módulo Qualidade da Água (IQA): as 5 fases do plano original estão
 ENTREGUES (ver `docs/qualidade-agua/plano.md`, seções "Fase 0" a "Fase

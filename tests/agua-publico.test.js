@@ -213,13 +213,28 @@ test.describe('painel público — render sem sessão, só com as RPCs anon', ()
 
   test('mapa desenha os pontos vindos de agua_publico_pontos() (lat/lng já prontos, sem parsear geom)', async ({ page }) => {
     await abrirPainelPublicoComStub(page);
-    await page.waitForFunction(() => document.querySelectorAll('#rl-mapa path.leaflet-interactive').length >= 2, null, { timeout: 10_000 });
-    await expect(page.locator('#rl-mapa path.leaflet-interactive')).toHaveCount(2);
+    await page.waitForFunction(() => document.querySelectorAll('#rl-mapa .adash-mapa-pin').length >= 2, null, { timeout: 10_000 });
+    await expect(page.locator('#rl-mapa .adash-mapa-pin')).toHaveCount(2);
+  });
+
+  test('clicar num pino abre o detalhe da coleta, SEM coletor/laboratório (ausentes da RPC pública, migration 300)', async ({ page }) => {
+    await abrirPainelPublicoComStub(page);
+    await page.waitForFunction(() => document.querySelectorAll('#rl-mapa .adash-mapa-pin').length >= 2, null, { timeout: 10_000 });
+    await page.click('#rl-mapa .adash-mapa-pin >> nth=0');
+
+    await expect(page.locator('#adet-modal')).toHaveClass(/aberto/);
+    await expect(page.locator('#adet-btn-exportar')).toBeVisible();
+    // Ausência de coluna (RPC pública não devolve), nunca "—" de campo vazio.
+    await expect(page.locator('#adet-modal')).not.toContainText('Coletor');
+    await expect(page.locator('#adet-modal')).not.toContainText('Laboratório');
+
+    await page.click('#adet-modal .modal-close');
+    await expect(page.locator('#adet-modal')).not.toHaveClass(/aberto/);
   });
 
   test('mapa tem os componentes cartográficos oficiais: rosa dos ventos, escala, legenda (IQA+CONAMA) e alternância de satélite', async ({ page }) => {
     await abrirPainelPublicoComStub(page);
-    await page.waitForFunction(() => document.querySelectorAll('#rl-mapa path.leaflet-interactive').length >= 2, null, { timeout: 10_000 });
+    await page.waitForFunction(() => document.querySelectorAll('#rl-mapa .adash-mapa-pin').length >= 2, null, { timeout: 10_000 });
 
     // Rosa dos ventos — MESMO componente de pages/mapa.html.
     await expect(page.locator('.rosa-norte svg')).toBeVisible();
@@ -239,7 +254,7 @@ test.describe('painel público — render sem sessão, só com as RPCs anon', ()
     await expect(page.locator('.adash-mapa-sat-btn.ativo')).toHaveText('Mapa');
     await page.click('.adash-mapa-sat-btn:has-text("Satélite")');
     await expect(page.locator('.adash-mapa-sat-btn.ativo')).toHaveText('Satélite');
-    await expect(page.locator('#rl-mapa path.leaflet-interactive')).toHaveCount(2);
+    await expect(page.locator('#rl-mapa .adash-mapa-pin')).toHaveCount(2);
   });
 
   test('cabeçalho institucional usa agua_publico_cabecalho() — logos exibidas quando existem', async ({ page }) => {

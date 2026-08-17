@@ -206,6 +206,32 @@
 .adash-iqa-faixa-nome { font-weight:600; color:var(--cinza-900); width:70px }
 .adash-iqa-faixa-valor { color:var(--cinza-500) }
 
+/* Pino do mapa (Leaflet divIcon) — só cursor/sombra; a cor por faixa e
+   a borda por CONAMA já vêm prontas no SVG de _aguaPainelPinSVG. */
+.adash-mapa-pin { cursor:pointer }
+.adash-mapa-pin svg { display:block; filter:drop-shadow(0 3px 4px rgba(0,0,0,.28)) }
+
+/* Detalhe da coleta (popup ao clicar no pino) */
+.adet-sub { font-size:12px; color:var(--cinza-500); margin:2px 0 0; font-weight:500 }
+.adet-linha { display:flex; justify-content:space-between; gap:12px; padding:7px 0; border-bottom:1px solid var(--cinza-100); font-size:12.5px }
+.adet-linha span { color:var(--cinza-500) }
+.adet-linha strong { color:var(--cinza-900); text-align:right }
+.adet-hint { font-size:12px; color:var(--cinza-500); line-height:1.5; margin:8px 0 0 }
+.adet-cards { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:14px }
+.adet-card { background:var(--cinza-50); border:1px solid var(--borda); border-radius:12px; padding:12px 14px; display:flex; flex-direction:column; gap:2px }
+.adet-card-tit { font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--cinza-500) }
+.adet-card-valor { font-size:19px; font-weight:700 }
+.adet-card-sub { font-size:11px; color:var(--cinza-600); line-height:1.4 }
+.adet-params-tit { font-size:11.5px; font-weight:700; color:var(--cinza-700); margin:16px 0 8px }
+.adet-params { display:grid; grid-template-columns:1fr 1fr; gap:6px 14px }
+.adet-param-linha { display:flex; justify-content:space-between; gap:8px; font-size:12px; padding:5px 8px; border-radius:8px; background:var(--cinza-50) }
+.adet-param-linha span { color:var(--cinza-600) }
+.adet-param-linha strong { color:var(--cinza-900) }
+.adet-param-violado { background:#FEF2F2 }
+.adet-param-violado span, .adet-param-violado strong { color:#B91C1C }
+.adet-obs { font-size:12.5px; color:var(--cinza-700); line-height:1.6; margin:0; background:var(--cinza-50); border-radius:10px; padding:10px 12px }
+@media (max-width: 480px) { .adet-cards, .adet-params { grid-template-columns:1fr } }
+
 /* ── Moldura pública: cabeçalho institucional + faixa + rodapé ────── */
 body { background:var(--cinza-50) }
 .apub-topo {
@@ -336,12 +362,42 @@ body { background:var(--cinza-50) }
       <span>Fonte: SEMA-AC / DIMA — Sistema de Gestão de Unidades de Conservação do Acre (SIGUC-AC). Coleta em conferência aparece marcada, nunca escondida.</span>
       <a href="privacidade.html" target="_blank" rel="noopener">Política de Privacidade</a>
     </div>
-    <div class="modal-overlay" id="rl-iqa-modal"><div class="modal" style="max-width:560px">${aguaPainelExplicacaoIqaHTML()}</div></div>`
+    <div class="modal-overlay" id="rl-iqa-modal"><div class="modal" style="max-width:560px">${aguaPainelExplicacaoIqaHTML()}</div></div>
+    <div class="modal-overlay" id="adet-modal"><div class="modal" id="adet-modal-inner" style="max-width:600px"></div></div>`
 
   bIconsAplicar(document.getElementById('app'))
 
   window.alternarExplicacaoIqa = function () {
     document.getElementById('rl-iqa-modal').classList.toggle('aberto')
+  }
+
+  // ── Detalhe do ponto (popup ao clicar no pino) ──────────────────
+  // Mesmo renderer de pages/agua-relatorios.html (js/agua-painel.js);
+  // exportação usa o cabeçalho e o protocolo fixo já lidos para o PDF
+  // por bacia (_cab/PROTOCOLO_PUBLICO, mais abaixo) — nunca chama
+  // gerar_protocolo_relatorio() aqui (regra da Fase pública).
+  let _coletaDetalheAtual = null
+  window.abrirDetalheColetaPainel = function (ponto, coleta) {
+    _coletaDetalheAtual = coleta
+    document.getElementById('adet-modal-inner').innerHTML = aguaPainelColetaDetalheHTML(ponto, coleta)
+    document.getElementById('adet-modal').classList.add('aberto')
+    bIconsAplicar(document.getElementById('adet-modal-inner'))
+  }
+  window.fecharDetalheColetaPainel = function () {
+    document.getElementById('adet-modal').classList.remove('aberto')
+  }
+  window.exportarFichaColetaPainel = async function () {
+    if (!_coletaDetalheAtual || !_cab) return
+    const btn = document.getElementById('adet-btn-exportar')
+    if (btn) { btn.disabled = true; btn.textContent = 'Gerando...' }
+    try {
+      const pdf = await aguaRelMontarPdfColeta(_coletaDetalheAtual, _cab, PROTOCOLO_PUBLICO)
+      aguaRelBaixarPdf(pdf, `iqa-${(_coletaDetalheAtual.ponto_nome || 'ponto').toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${_coletaDetalheAtual.data_coleta || ''}.pdf`)
+    } catch (e) {
+      console.error(e); alert('Não foi possível gerar o PDF: ' + e.message)
+    } finally {
+      if (btn) { btn.disabled = false; btn.innerHTML = ''; btn.setAttribute('data-icon', 'download'); btn.appendChild(document.createTextNode('Exportar PDF')); bIconsAplicar(btn) }
+    }
   }
 
   const sel = id => document.getElementById(id)
@@ -368,7 +424,7 @@ body { background:var(--cinza-50) }
   } catch (e) {
     console.warn('[agua-publico] pontos (coordenadas) indisponíveis:', e.message)
   }
-  function atualizarMapaPainel(rel) { _mapaPainelCtl.atualizar(rel, _pontosGeomPorId) }
+  function atualizarMapaPainel(rel) { _mapaPainelCtl.atualizar(rel, _pontosGeomPorId, (ponto, coleta) => window.abrirDetalheColetaPainel(ponto, coleta)) }
 
   // ── Todas as coletas públicas, buscadas UMA vez ───────────────────
   // A RPC não filtra por bacia (ao contrário de aguaRelBuscarColetasDaBacia,
