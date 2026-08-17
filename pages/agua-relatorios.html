@@ -114,9 +114,15 @@
 .adash-mapa-legenda-linha { display:flex; flex-wrap:wrap; gap:6px; margin-top:4px; align-items:center }
 .adash-mapa-legenda-chip { display:inline-flex; align-items:center; gap:4px; font-size:10px; color:var(--cinza-700) }
 .adash-mapa-legenda-dot { width:9px; height:9px; border-radius:50%; display:inline-block; flex:none }
+.adash-mapa-legenda-linha-cor { width:12px; height:3px; border-radius:2px; display:inline-block; flex:none }
 .adash-mapa-sat-ctrl { display:flex; background:var(--branco); border-radius:8px; box-shadow:0 2px 10px rgba(0,0,0,.18); overflow:hidden; margin:8px 8px 0 0 }
 .adash-mapa-sat-btn { border:none; background:none; padding:6px 10px; font:inherit; font-size:11px; font-weight:600; color:var(--cinza-600); cursor:pointer }
 .adash-mapa-sat-btn.ativo { background:var(--adash-azul); color:#fff }
+
+/* Rótulo do nome do município (tooltip permanente) — mesmo estilo de
+   .subbacia-label em pages/mapa.html, nunca uma segunda cópia de CSS. */
+.adash-mapa-mun-label { background:rgba(255,255,255,.82)!important; border:1px solid rgba(0,0,0,.12)!important; border-radius:4px!important; font-size:10px!important; font-weight:700!important; color:#3730a3!important; padding:1px 6px!important; white-space:nowrap!important; pointer-events:none!important }
+.adash-mapa-mun-label::before { display:none!important }
 
 /* Grade de cards — proporções do modelo: coluna de KPIs estreita,
    dois cards grandes ao lado, faixa inferior 2:1. */
