@@ -2210,6 +2210,41 @@ mapa do painel.
 - Sem mudança em `pwa/sw.js` (nenhuma das duas páginas é PWA/app de
   campo).
 
+**Pós-lançamento — Painel de configuração sobrepondo a legenda +
+padrão amarelo contínuo.** Dois ajustes pedidos pelo usuário em cima da
+entrega anterior:
+- **Painel escondido atrás da legenda**: `.leaflet-top` e
+  `.leaflet-bottom` do Leaflet nascem com o MESMO z-index (1000) — o
+  canto `bottomright` (legenda) vem depois no DOM que o `topright`
+  (onde mora o botão de engrenagem), então sempre pintava por cima
+  quando os dois se sobrepunham num mapa baixo como este card. Um
+  z-index local no painel flutuante não resolve — a disputa é entre os
+  CANTOS (ancestrais), não entre os elementos dentro de cada canto.
+  Corrigido com `.adash-mapa-wrap .leaflet-top.leaflet-right {
+  z-index:1001 }`, escopado ao card do painel (não mexe em nenhum outro
+  mapa do sistema). O painel é temporário — só existe enquanto aberto —
+  então sobrepor a legenda é o comportamento certo.
+- **Padrão novo**: `AGUA_PAINEL_CAMADAS_PADRAO` passou a `acreCor:
+  '#FACC15', acrePeso: 2.6, munCor: '#FACC15', munPeso: 2` — linha
+  contínua amarela nas duas delimitações, limite do Acre 30% mais
+  espesso que os municípios (2,6 = 2 × 1,3, exato). O `dashArray: '4
+  6'` que fazia os municípios tracejados foi removido (linha contínua,
+  como pedido); os sliders de espessura do painel de configuração
+  ganharam `step="0.1"` (eram `step="1"`) para conseguir alcançar essa
+  proporção com precisão ao ajustar manualmente depois.
+- Preferência já salva em `localStorage` continua valendo — quem já
+  tinha mudado a cor antes desta entrega não é resetado; o padrão novo
+  só vale para quem nunca configurou nada.
+- Tudo em `js/agua-painel.js` + CSS das duas páginas, então vale para
+  as duas telas de graça (mesmo par de duplicação obrigatória).
+- Guarda: confirmado fora da suíte via stub de `L` (cor/espessura
+  inicial das duas camadas batendo com o padrão novo, proporção exata
+  1,3×) — mesma limitação de rede (unpkg.com) documentada acima para o
+  z-index (depende de CSS/Leaflet real renderizando, não testável pelo
+  stub).
+- Sem mudança em `pwa/sw.js` (nenhuma das duas páginas é PWA/app de
+  campo).
+
 ## Próxima tarefa
 Módulo Qualidade da Água (IQA): as 5 fases do plano original estão
 ENTREGUES (ver `docs/qualidade-agua/plano.md`, seções "Fase 0" a "Fase

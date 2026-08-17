@@ -315,7 +315,10 @@ const AGUA_PAINEL_HIDRO_WMS_LAYERS = 'CCAR:BC250_Massa_Dagua_A,CCAR:BC250_Trecho
 // siguc_nav_grupos/siguc_resumo_largura): é preferência de EXIBIÇÃO,
 // não dado do banco, então localStorage é o lugar certo, sem RPC nova.
 const AGUA_PAINEL_CAMADAS_CHAVE = 'siguc_agua_painel_camadas'
-const AGUA_PAINEL_CAMADAS_PADRAO = { acreCor: '#1F4E2C', acrePeso: 2, munCor: '#6366f1', munPeso: 1, munNomes: true }
+// Padrão pedido pelo usuário: linha contínua amarela nas duas
+// delimitações, limite do Acre 30% mais espesso que os municípios
+// (2,6 vs 2 — a mesma proporção pedida, só arredondada pro décimo).
+const AGUA_PAINEL_CAMADAS_PADRAO = { acreCor: '#FACC15', acrePeso: 2.6, munCor: '#FACC15', munPeso: 2, munNomes: true }
 function _aguaPainelCamadasCarregar() {
   try {
     const salvo = JSON.parse(localStorage.getItem(AGUA_PAINEL_CAMADAS_CHAVE) || '{}')
@@ -403,10 +406,10 @@ function _aguaPainelControleConfigCamadas(cfgInicial, aoMudar) {
       <div class="adash-mapa-config-painel" hidden>
         <p class="adash-mapa-config-tit">Limite do Acre</p>
         <label class="adash-mapa-config-linha">Cor <input type="color" class="amcfg-acre-cor" value="${cfgInicial.acreCor}"></label>
-        <label class="adash-mapa-config-linha">Espessura <input type="range" min="1" max="5" step="1" class="amcfg-acre-peso" value="${cfgInicial.acrePeso}"><span class="amcfg-acre-peso-val">${cfgInicial.acrePeso}</span></label>
+        <label class="adash-mapa-config-linha">Espessura <input type="range" min="1" max="5" step="0.1" class="amcfg-acre-peso" value="${cfgInicial.acrePeso}"><span class="amcfg-acre-peso-val">${cfgInicial.acrePeso}</span></label>
         <p class="adash-mapa-config-tit" style="margin-top:10px">Municípios</p>
         <label class="adash-mapa-config-linha">Cor <input type="color" class="amcfg-mun-cor" value="${cfgInicial.munCor}"></label>
-        <label class="adash-mapa-config-linha">Espessura <input type="range" min="1" max="5" step="1" class="amcfg-mun-peso" value="${cfgInicial.munPeso}"><span class="amcfg-mun-peso-val">${cfgInicial.munPeso}</span></label>
+        <label class="adash-mapa-config-linha">Espessura <input type="range" min="1" max="5" step="0.1" class="amcfg-mun-peso" value="${cfgInicial.munPeso}"><span class="amcfg-mun-peso-val">${cfgInicial.munPeso}</span></label>
         <label class="adash-mapa-config-check"><input type="checkbox" class="amcfg-mun-nomes" ${cfgInicial.munNomes ? 'checked' : ''}> Mostrar nomes dos municípios</label>
       </div>`
     const btn = div.querySelector('.adash-mapa-config-btn')
@@ -536,7 +539,9 @@ function aguaPainelMapaCriar(mapaElId, subElId) {
       if (!r.ok) throw new Error('HTTP ' + r.status)
       const gj = await r.json()
       _munLayer = L.geoJSON(gj, {
-        style: { color: _cfgCamadas.munCor, weight: _cfgCamadas.munPeso, opacity: .55, fillColor: _cfgCamadas.munCor, fillOpacity: .02, dashArray: '4 6' },
+        // Linha contínua (sem dashArray) — pedido do usuário, mesmo
+        // padrão visual do limite do Acre.
+        style: { color: _cfgCamadas.munCor, weight: _cfgCamadas.munPeso, opacity: .8, fillColor: _cfgCamadas.munCor, fillOpacity: .02 },
         interactive: false,
         onEachFeature(f, layer) {
           const nome = f.properties?.name || f.properties?.nome || f.properties?.NM_MUN || 'Município'
