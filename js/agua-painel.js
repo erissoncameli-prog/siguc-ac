@@ -295,10 +295,14 @@ function aguaPainelExplicacaoIqaHTML() {
 // Estilo de marcador vem de js/agua-iqa-visual.js (aguaIqaEstiloMarcador)
 // — nunca reimplementado aqui.
 // Mapa base (ruas) e satélite — MESMA fonte de imagem de satélite já
-// usada em pages/mapa.html (Google, lyrs=s) e no minimapa de lá
-// (_adicionarMiniMapa, lyrs=y) — nunca uma segunda fonte de tile.
+// usada em pages/mapa.html. Satélite usa o mosaico HÍBRIDO do Google
+// (lyrs=y — o mesmo id do botão "Híbrido" de pages/mapa.html e do
+// minimapa de lá, _adicionarMiniMapa), não o satélite puro (lyrs=s):
+// pedido do usuário — satélite puro não tem rótulo nenhum, o híbrido
+// já traz nome de rio/lugar nativo, sem depender só da geometria da
+// WMS de hidrografia. Nunca uma segunda fonte de tile.
 const AGUA_PAINEL_TILE_RUAS = { url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', opts: { maxZoom: 18, attribution: '© OpenStreetMap' } }
-const AGUA_PAINEL_TILE_SATELITE = { url: 'https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', opts: { maxZoom: 20, subdomains: ['mt0', 'mt1', 'mt2', 'mt3'] } }
+const AGUA_PAINEL_TILE_SATELITE = { url: 'https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', opts: { maxZoom: 20, subdomains: ['mt0', 'mt1', 'mt2', 'mt3'] } }
 
 // Hidrografia — MESMO serviço WMS de pages/mapa.html (HIDRO_WMS_URL/
 // HIDRO_WMS_LAYERS), nunca uma segunda fonte. Lá é uma camada
@@ -371,7 +375,7 @@ function _aguaPainelLegendaHTML(cfg) {
     <div class="adash-mapa-legenda-linha" style="margin-top:4px">
       <span class="adash-mapa-legenda-chip">Preenchimento fraco = em conferência</span>
     </div>
-    <div class="adash-mapa-legenda-tit" style="margin-top:6px">Camadas de referência</div>
+    <div class="adash-mapa-legenda-tit" style="margin-top:6px">Camadas de referência (só satélite)</div>
     <div class="adash-mapa-legenda-linha">
       <span class="adash-mapa-legenda-chip"><span class="adash-mapa-legenda-linha-cor" style="background:${c.acreCor}"></span>Limite do Acre</span>
       <span class="adash-mapa-legenda-chip"><span class="adash-mapa-legenda-linha-cor" style="background:${c.munCor};opacity:.6"></span>Municípios</span>
@@ -484,11 +488,33 @@ function _aguaPainelPinIcon(estilo) {
 function aguaPainelMapaCriar(mapaElId, subElId) {
   const mapa = L.map(mapaElId, { attributionControl: false }).setView([-9.5, -70.0], 6)
   let camadaBase = L.tileLayer(AGUA_PAINEL_TILE_RUAS.url, AGUA_PAINEL_TILE_RUAS.opts).addTo(mapa)
+
+  // Limite do Acre, municípios e hidrografia só fazem sentido no
+  // satélite — pedido do usuário: o mapa de ruas já tem seus próprios
+  // rótulos/divisas (OSM), essas camadas de referência existem pra
+  // compensar a falta deles na imagem de satélite. Guardado à parte
+  // (nunca dentro do mapa) porque os 3 desenhos terminam de carregar
+  // de forma assíncrona, em momentos diferentes do toggle de basemap.
+  let _modoAtual = 'ruas'
+  const _camadasReferencia = []
+  function _registrarCamadaReferencia(layer) {
+    _camadasReferencia.push(layer)
+    _atualizarCamadasReferencia()
+  }
+  function _atualizarCamadasReferencia() {
+    const visivel = _modoAtual === 'satelite'
+    _camadasReferencia.forEach(l => {
+      if (visivel && !mapa.hasLayer(l)) l.addTo(mapa)
+      else if (!visivel && mapa.hasLayer(l)) mapa.removeLayer(l)
+    })
+  }
   function _trocarBase(modo) {
     mapa.removeLayer(camadaBase)
     const t = modo === 'satelite' ? AGUA_PAINEL_TILE_SATELITE : AGUA_PAINEL_TILE_RUAS
     camadaBase = L.tileLayer(t.url, t.opts).addTo(mapa)
     camadaBase.bringToBack()
+    _modoAtual = modo
+    _atualizarCamadasReferencia()
   }
 
   // Componentes cartográficos oficiais — mesmos do Mapa das UCs
@@ -524,15 +550,16 @@ function aguaPainelMapaCriar(mapaElId, subElId) {
       const r = await fetch('../data/acre_estado.geojson')
       if (!r.ok) throw new Error('HTTP ' + r.status)
       const gj = await r.json()
-      _acreLayer = L.geoJSON(gj, { style: { color: _cfgCamadas.acreCor, weight: _cfgCamadas.acrePeso, fill: false, opacity: .5 }, interactive: false }).addTo(mapa)
+      _acreLayer = L.geoJSON(gj, { style: { color: _cfgCamadas.acreCor, weight: _cfgCamadas.acrePeso, fill: false, opacity: .5 }, interactive: false })
+      _registrarCamadaReferencia(_acreLayer)
     } catch (e) { console.warn('[agua-painel] limite do Acre indisponível para desenho:', e.message) }
   })()
 
   // Municípios — MESMO arquivo de pages/mapa.html (data/municipios_acre.
   // geojson), com o nome de cada um em tooltip permanente. Lá é um
-  // toggle (#mun-toggle); aqui nasce SEMPRE ligado (pode ser ocultado
-  // pelo painel "Configurar camadas" acima) — o card do painel não tem
-  // um menu de camadas completo como o do Mapa das UCs.
+  // toggle (#mun-toggle); aqui nasce SÓ na visão satélite (pode ser
+  // ocultado de vez pelo painel "Configurar camadas" acima) — o mapa
+  // de ruas já tem os próprios limites/rótulos do OSM.
   ;(async function desenharMunicipios() {
     try {
       const r = await fetch('../data/municipios_acre.geojson')
@@ -547,7 +574,8 @@ function aguaPainelMapaCriar(mapaElId, subElId) {
           const nome = f.properties?.name || f.properties?.nome || f.properties?.NM_MUN || 'Município'
           layer.bindTooltip(nome, { permanent: _cfgCamadas.munNomes, direction: 'center', className: 'adash-mapa-mun-label' })
         },
-      }).addTo(mapa)
+      })
+      _registrarCamadaReferencia(_munLayer)
     } catch (e) { console.warn('[agua-painel] municípios indisponíveis para desenho:', e.message) }
   })()
 
@@ -555,12 +583,14 @@ function aguaPainelMapaCriar(mapaElId, subElId) {
   // pages/mapa.html (ver AGUA_PAINEL_HIDRO_WMS_URL). Fica acima da
   // base (ruas/satélite) e abaixo dos pinos: _trocarBase() já chama
   // bringToBack() na base nova, então trocar pra satélite nunca cobre
-  // esta camada.
-  L.tileLayer.wms(AGUA_PAINEL_HIDRO_WMS_URL, {
+  // esta camada. Só satélite (ver _registrarCamadaReferencia acima) —
+  // o mosaico híbrido já traz nome de rio/lugar como rótulo nativo, a
+  // WMS complementa com a geometria exata dos corpos d'água.
+  _registrarCamadaReferencia(L.tileLayer.wms(AGUA_PAINEL_HIDRO_WMS_URL, {
     layers: AGUA_PAINEL_HIDRO_WMS_LAYERS, format: 'image/png', transparent: true, version: '1.1.1',
     opacity: .6, maxZoom: 22, maxNativeZoom: 16, attribution: 'Hidrografia · IBGE (BC250)',
     errorTileUrl: 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==',
-  }).addTo(mapa)
+  }))
 
   let marcadores = {}
 
