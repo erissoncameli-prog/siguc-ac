@@ -300,6 +300,15 @@ function aguaPainelExplicacaoIqaHTML() {
 const AGUA_PAINEL_TILE_RUAS = { url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', opts: { maxZoom: 18, attribution: '© OpenStreetMap' } }
 const AGUA_PAINEL_TILE_SATELITE = { url: 'https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', opts: { maxZoom: 20, subdomains: ['mt0', 'mt1', 'mt2', 'mt3'] } }
 
+// Hidrografia — MESMO serviço WMS de pages/mapa.html (HIDRO_WMS_URL/
+// HIDRO_WMS_LAYERS), nunca uma segunda fonte. Lá é uma camada
+// opcional (toggle); aqui entra SEMPRE ligada — pedido do usuário
+// para o satélite (que não tem nome de rio/via nenhum) já nascer com
+// o contexto geográfico pronto, sem precisar de um menu de camadas
+// que este card pequeno não tem espaço para oferecer.
+const AGUA_PAINEL_HIDRO_WMS_URL = 'https://geoservicos.ibge.gov.br/geoserver/ows'
+const AGUA_PAINEL_HIDRO_WMS_LAYERS = 'CCAR:BC250_Massa_Dagua_A,CCAR:BC250_Trecho_Drenagem_L'
+
 // Rosa dos ventos — MESMO desenho/SVG de pages/mapa.html
 // (_adicionarRosaDosVentos), reaproveitado aqui pela regra do projeto
 // de nunca duplicar um componente cartográfico "oficial" com desenho
@@ -337,6 +346,12 @@ function _aguaPainelLegendaHTML() {
     </div>
     <div class="adash-mapa-legenda-linha" style="margin-top:4px">
       <span class="adash-mapa-legenda-chip">Preenchimento fraco = em conferência</span>
+    </div>
+    <div class="adash-mapa-legenda-tit" style="margin-top:6px">Camadas de referência</div>
+    <div class="adash-mapa-legenda-linha">
+      <span class="adash-mapa-legenda-chip"><span class="adash-mapa-legenda-linha-cor" style="background:#1F4E2C"></span>Limite do Acre</span>
+      <span class="adash-mapa-legenda-chip"><span class="adash-mapa-legenda-linha-cor" style="background:#6366f1;opacity:.6"></span>Municípios</span>
+      <span class="adash-mapa-legenda-chip"><span class="adash-mapa-legenda-linha-cor" style="background:#2563eb"></span>Rios (IBGE)</span>
     </div>`
 }
 
@@ -418,6 +433,37 @@ function aguaPainelMapaCriar(mapaElId, subElId) {
       L.geoJSON(gj, { style: { color: '#1F4E2C', weight: 2, fill: false, opacity: .5 }, interactive: false }).addTo(mapa)
     } catch (e) { console.warn('[agua-painel] limite do Acre indisponível para desenho:', e.message) }
   })()
+
+  // Municípios — MESMO arquivo de pages/mapa.html (data/municipios_acre.
+  // geojson), com o nome de cada um em tooltip permanente. Lá é um
+  // toggle (#mun-toggle); aqui nasce SEMPRE ligado, pedido do usuário —
+  // o card do painel não tem um menu de camadas para ligar depois.
+  ;(async function desenharMunicipios() {
+    try {
+      const r = await fetch('../data/municipios_acre.geojson')
+      if (!r.ok) throw new Error('HTTP ' + r.status)
+      const gj = await r.json()
+      L.geoJSON(gj, {
+        style: { color: '#6366f1', weight: 1, opacity: .55, fillColor: '#6366f1', fillOpacity: .02, dashArray: '4 6' },
+        interactive: false,
+        onEachFeature(f, layer) {
+          const nome = f.properties?.name || f.properties?.nome || f.properties?.NM_MUN || 'Município'
+          layer.bindTooltip(nome, { permanent: true, direction: 'center', className: 'adash-mapa-mun-label' })
+        },
+      }).addTo(mapa)
+    } catch (e) { console.warn('[agua-painel] municípios indisponíveis para desenho:', e.message) }
+  })()
+
+  // Hidrografia (rios/massas d'água) — MESMO serviço WMS de
+  // pages/mapa.html (ver AGUA_PAINEL_HIDRO_WMS_URL). Fica acima da
+  // base (ruas/satélite) e abaixo dos pinos: _trocarBase() já chama
+  // bringToBack() na base nova, então trocar pra satélite nunca cobre
+  // esta camada.
+  L.tileLayer.wms(AGUA_PAINEL_HIDRO_WMS_URL, {
+    layers: AGUA_PAINEL_HIDRO_WMS_LAYERS, format: 'image/png', transparent: true, version: '1.1.1',
+    opacity: .6, maxZoom: 22, maxNativeZoom: 16, attribution: 'Hidrografia · IBGE (BC250)',
+    errorTileUrl: 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==',
+  }).addTo(mapa)
 
   let marcadores = {}
 

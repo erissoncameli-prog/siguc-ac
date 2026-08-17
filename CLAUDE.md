@@ -2122,6 +2122,46 @@ aquela ficha em PDF.
 - Sem mudança em `pwa/sw.js` (nenhuma das duas páginas é PWA/app de
   campo).
 
+**Pós-lançamento — Limite do Acre, municípios e hidrografia SEMPRE
+carregados no mapa do painel, inclusive no satélite.** Pedido do
+usuário: o satélite não tem nenhum rótulo político/hidrográfico (ao
+contrário do mapa de ruas, que já traz alguns do OpenStreetMap) — as
+mesmas camadas de referência que `pages/mapa.html` (Mapa das UCs) já
+oferece como TOGGLE entram aqui como parte fixa do mapa, sem menu de
+camadas (o card do painel não tem espaço para um).
+- **Municípios**: mesmo arquivo `data/municipios_acre.geojson` de
+  `pages/mapa.html` (`_carregarMunicipios`/`_renderizarMunicipios`),
+  desenhado com `L.geoJSON` + rótulo permanente por polígono
+  (`.adash-mapa-mun-label`, mesmo estilo visual de `.subbacia-label`
+  de lá — nunca uma segunda folha de CSS para o mesmo rótulo).
+- **Hidrografia (rios/massas d'água)**: MESMO serviço WMS de
+  `pages/mapa.html` (`HIDRO_WMS_URL`/`HIDRO_WMS_LAYERS` → IBGE BC250,
+  `geoservicos.ibge.gov.br`) — nunca uma segunda fonte. Lá é opcional
+  (`VEG_LAYERS.hidrografia`); aqui entra sempre ligada, na mesma
+  transparência.
+- **Limite do Acre** já entrava sempre ligado desde o desenho original
+  do mapa do painel (`desenharLimiteAcre`, sem mudança aqui).
+- Ordem de pilha: `_trocarBase()` (satélite/ruas) já chamava
+  `camadaBase.bringToBack()` — reaproveitado sem alteração, garante
+  que trocar de basemap nunca cobre a hidrografia (mesmo tilePane) nem
+  os polígonos de município (overlayPane, sempre acima de tile).
+  Pinos ficam acima de tudo por padrão do Leaflet (markerPane).
+- Tudo em `aguaPainelMapaCriar()` (`js/agua-painel.js`), então vale
+  para as duas telas de graça — mesmo par de duplicação obrigatória do
+  painel. Legenda (`_aguaPainelLegendaHTML`) ganhou a seção "Camadas de
+  referência" citando as três, para quem olha o mapa saber o que está
+  vendo.
+- Guarda: +1 teste por tela em `tests/agua-relatorios.test.js`/
+  `tests/agua-publico.test.js` (rótulo de município visível sem
+  precisar ligar nada, inclusive depois de trocar pra satélite) + a
+  legenda ganhou a asserção da nova seção nos testes já existentes.
+  Hidrografia (tile WMS de verdade) é rede externa que este sandbox já
+  bloqueia para os outros componentes — confirmada fora da suíte via
+  stub de `L` (2 camadas geoJSON + 1 camada WMS anexadas ao mapa,
+  nomes de município reais nos tooltips).
+- Sem mudança em `pwa/sw.js` (nenhuma das duas páginas é PWA/app de
+  campo).
+
 ## Próxima tarefa
 Módulo Qualidade da Água (IQA): as 5 fases do plano original estão
 ENTREGUES (ver `docs/qualidade-agua/plano.md`, seções "Fase 0" a "Fase

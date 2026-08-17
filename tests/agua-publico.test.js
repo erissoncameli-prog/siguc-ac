@@ -248,6 +248,7 @@ test.describe('painel público — render sem sessão, só com as RPCs anon', ()
     await expect(legenda).toContainText('Conforme');
     await expect(legenda).toContainText('Violação');
     await expect(legenda).toContainText('em conferência');
+    await expect(legenda).toContainText('Camadas de referência');
 
     // Alternância Mapa/Satélite: nasce em "Mapa", clique troca o ativo
     // e não quebra os marcadores já desenhados.
@@ -255,6 +256,19 @@ test.describe('painel público — render sem sessão, só com as RPCs anon', ()
     await page.click('.adash-mapa-sat-btn:has-text("Satélite")');
     await expect(page.locator('.adash-mapa-sat-btn.ativo')).toHaveText('Satélite');
     await expect(page.locator('#rl-mapa .adash-mapa-pin')).toHaveCount(2);
+  });
+
+  test('mapa já nasce com limite do Acre, municípios (rotulados) e hidrografia — sem precisar ligar nada (mesmo em satélite, que não tem esses rótulos)', async ({ page }) => {
+    await abrirPainelPublicoComStub(page);
+    await page.waitForFunction(() => document.querySelectorAll('#rl-mapa .adash-mapa-pin').length >= 2, null, { timeout: 10_000 });
+
+    await page.waitForFunction(() => document.querySelectorAll('.adash-mapa-mun-label').length > 0, null, { timeout: 10_000 });
+    await expect(page.locator('.adash-mapa-mun-label').first()).toBeVisible();
+
+    // Troca pra satélite (onde o basemap não tem nenhum rótulo) — as
+    // camadas de referência continuam visíveis, sem depender do toggle.
+    await page.click('.adash-mapa-sat-btn:has-text("Satélite")');
+    await expect(page.locator('.adash-mapa-mun-label').first()).toBeVisible();
   });
 
   test('cabeçalho institucional usa agua_publico_cabecalho() — logos exibidas quando existem', async ({ page }) => {
