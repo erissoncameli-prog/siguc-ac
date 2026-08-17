@@ -162,6 +162,7 @@ function renderCfg(cfg){
       <button class="cfg-tab"       onclick="trocarAba('relatorios',this)">📋 Relatórios</button>
       <button class="cfg-tab"       onclick="trocarAba('armazenamento',this)" id="tab-armazenamento">☁ Armazenamento</button>
       <button class="cfg-tab"       onclick="trocarAba('privacidade',this)" id="tab-privacidade" style="display:inline-flex;align-items:center;gap:6px">${bico('shield')} Privacidade</button>
+      <button class="cfg-tab"       onclick="trocarAba('agua-legal',this)" id="tab-agua-legal" style="display:inline-flex;align-items:center;gap:6px">${bico('clipboard')} Qualidade da Água</button>
     </div>
 
     <!-- TAB: IDENTIDADE -->
@@ -270,6 +271,21 @@ function renderCfg(cfg){
       <div id="arm-conteudo">
         <div class="arm-loading"><div class="arm-spinner"></div><span style="font-size:12px">Consultando banco...</span></div>
       </div>
+    </div>
+
+    <!-- TAB: QUALIDADE DA ÁGUA — BASE LEGAL -->
+    <div id="pane-agua-legal" class="cfg-pane" style="padding:20px">
+      <div style="font-size:13px;font-weight:700;color:var(--cinza-800);margin:0 0 4px">Base Legal e Conformidade</div>
+      <div class="hint" style="margin-bottom:8px">
+        Aparece no card "Base Legal e Conformidade" do painel da Qualidade da Água (mesa e link público) —
+        para que os órgãos de fiscalização entendam qual norma respalda a classificação exibida.
+        A Resolução CONAMA nº 357/2005 (Art. 14/15, limites da Classe 2) já vem fixa no sistema — ela é
+        quem fundamenta os limites cadastrados em Qualidade da Água › Pontos. Cadastre aqui só atos
+        ADICIONAIS (portaria estadual, ato de enquadramento da bacia, resolução do órgão gestor de
+        recursos hídricos etc.).
+      </div>
+      <div id="agua-legal-list">${(cfg.agua?.base_legal||[]).map(_aguaLegalRowHTML).join('')}</div>
+      <button type="button" class="btn btn-outline" style="font-size:11px;margin-top:6px" onclick="_addAguaLegal()">+ Adicionar norma</button>
     </div>
 
     <!-- TAB: PRIVACIDADE (LGPD) -->
@@ -916,6 +932,35 @@ function _addRespTec(){
   const list = document.getElementById('resp-tec-list');
   if(list) list.insertAdjacentHTML('beforeend', _respRowHTML({}));
 }
+
+function _aguaLegalRowHTML(r){
+  r = r || {};
+  return `<div class="agua-legal-row" style="display:flex;flex-direction:column;gap:8px;margin-bottom:8px;border:1px solid var(--borda);border-radius:8px;padding:10px;position:relative">
+    <div class="grid-2">
+      <div class="field"><label>Título / número do ato</label><input class="al-titulo" value="${esc(r.titulo||'')}" placeholder="Ex.: Portaria SEMA nº .../2026"></div>
+      <div class="field"><label>Órgão emissor</label><input class="al-orgao" value="${esc(r.orgao||'')}" placeholder="Ex.: SEMA-AC"></div>
+    </div>
+    <div class="grid-2">
+      <div class="field"><label>Data</label><input class="al-data" type="date" value="${esc(r.data||'')}"></div>
+      <div class="field"><label>Link (opcional)</label><input class="al-link" value="${esc(r.link||'')}" placeholder="https://..."></div>
+    </div>
+    <div class="field"><label>O que estabelece</label><textarea class="al-ementa" rows="2">${esc(r.ementa||'')}</textarea></div>
+    <button type="button" title="Remover" onclick="this.closest('.agua-legal-row').remove()" style="position:absolute;top:6px;right:6px;background:#fff;border:1px solid #fca5a5;color:#dc2626;border-radius:4px;font-size:11px;padding:2px 7px;cursor:pointer">✕</button>
+  </div>`;
+}
+function _addAguaLegal(){
+  const list = document.getElementById('agua-legal-list');
+  if(list) list.insertAdjacentHTML('beforeend', _aguaLegalRowHTML({}));
+}
+function _coletarAguaLegal(){
+  return [...document.querySelectorAll('.agua-legal-row')].map(row => ({
+    titulo: row.querySelector('.al-titulo')?.value.trim() || '',
+    orgao:  row.querySelector('.al-orgao')?.value.trim() || '',
+    data:   row.querySelector('.al-data')?.value.trim() || '',
+    link:   row.querySelector('.al-link')?.value.trim() || '',
+    ementa: row.querySelector('.al-ementa')?.value.trim() || '',
+  })).filter(r => r.titulo);
+}
 function _coletarResponsaveis(){
   return [...document.querySelectorAll('.resp-tec-row')].map(row => ({
     nome:     row.querySelector('.rt-nome')?.value.trim() || '',
@@ -940,6 +985,7 @@ async function salvarCfg(){
     protocolo_seq: parseInt(v('f-seq')||'0'),
     responsaveis_tecnicos: _coletarResponsaveis(),
     encarregado: { nome: v('f-dpo-nome'), email: v('f-dpo-email'), telefone: v('f-dpo-tel'), portaria: v('f-dpo-portaria') },
+    agua: { ...(cfg.agua||{}), base_legal: _coletarAguaLegal() },
   };
   await _salvarDados(novas);
   toast('Configurações salvas com sucesso.','success');
