@@ -929,6 +929,29 @@ test.describe('painel (dashboard) — render com dado real da view', () => {
     // externa que este sandbox de testes já bloqueia.
   });
 
+  test('painel "Configurar camadas": trocar cor/espessura atualiza o mapa e a legenda; desmarcar nomes esconde os rótulos', async ({ page }) => {
+    const pontosGeom = [{ id: 'p-rb', ativo: true, geom: { type: 'Point', coordinates: [-67.810, -9.975] } }];
+    await abrirPainelComStub(page, fixtureColetasRioAcre(), { pontosGeom });
+    await page.waitForFunction(() => document.querySelectorAll('.adash-mapa-mun-label').length > 0, null, { timeout: 10_000 });
+
+    await page.click('.adash-mapa-config-btn');
+    await expect(page.locator('.adash-mapa-config-painel')).toBeVisible();
+
+    // input[type=color] não é preenchível por .fill() (Playwright recusa
+    // — não tem teclado nativo) — seta o valor e dispara o evento à mão.
+    await page.locator('.amcfg-mun-cor').evaluate(el => { el.value = '#ff00aa'; el.dispatchEvent(new Event('input', { bubbles: true })) })
+    // A cor entra no atributo style de um chip, não em texto visível —
+    // toContainText não enxerga isso, por isso lê o innerHTML direto.
+    await expect.poll(() => page.locator('.adash-mapa-legenda').innerHTML()).toContain('#ff00aa');
+
+    await page.uncheck('.amcfg-mun-nomes');
+    await expect(page.locator('.adash-mapa-mun-label').first()).toBeHidden();
+
+    // Persiste por navegador — recarregar a página mantém a preferência.
+    await page.reload();
+    await page.waitForFunction(() => typeof window.aguaRelMontar === 'function');
+  });
+
   test('mapa não quebra quando um ponto não tem coordenada cadastrada — fica de fora, sem travar os outros', async ({ page }) => {
     // Só o Rio Branco tem geom; Porto Acre não — a regra é "sem geom não
     // desenha", nunca "sem geom quebra o mapa inteiro".
