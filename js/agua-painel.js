@@ -686,7 +686,7 @@ function aguaPainelColetaDetalheHTML(ponto, c) {
         </div>
         <div class="adet-card">
           <span class="adet-card-tit">CONAMA</span>
-          <strong class="adet-card-valor" style="color:${violou ? '#C2410C' : semLimites ? '#9CA3AF' : '#059669'}">${semLimites ? 'Sem limites' : violou ? `${c.conama_violacoes.length} violação${c.conama_violacoes.length > 1 ? 'ões' : ''}` : 'Conforme'}</strong>
+          <strong class="adet-card-valor" style="color:${violou ? '#C2410C' : semLimites ? '#9CA3AF' : '#059669'}">${semLimites ? 'Sem limites' : violou ? `${c.conama_violacoes.length} violação(ões)` : 'Conforme'}</strong>
           ${violou ? `<span class="adet-card-sub">${esc(c.conama_violacoes.map(v => AGUA_REL_PARAM_LABEL[v] || v).join(', '))}</span>` : ''}
         </div>
       </div>
