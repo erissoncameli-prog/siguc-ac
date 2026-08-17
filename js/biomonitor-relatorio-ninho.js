@@ -723,7 +723,7 @@ function _biopdfDesenharCabecalhoPagina(pdf, cab, protocolo, logos) {
     corFloresta: BIOPDF_COR.floresta, corMuted: BIOPDF_COR.muted, corMuted2: BIOPDF_COR.muted2,
     cab, protocolo, logos,
     nomePlataforma: BIOREL_NOME_PLATAFORMA,
-    linhaModulo: `${cab.diretoria} · ${cab.departamento} · Biomonitoramento`,
+    linhaModulo: 'Biomonitoramento',
   })
 }
 
@@ -807,16 +807,13 @@ async function bioAbrirRelatorioNinhos(db, ninhoIds) {
   toast('Gerando PDF…', 'info')
 
   try {
-    const [cab, protocolo] = await Promise.all([getCabecalhoRelatorio(), gerarProtocolo()])
+    // Departamento vem de modulo_departamento('biomonitor') — DEBIO,
+    // pelo organograma (migration 265/299) — não mais hardcoded aqui.
+    const [cab, protocolo] = await Promise.all([getCabecalhoRelatorio('biomonitor'), gerarProtocolo()])
     cab.responsavel = {
       nome: appState.usuario?.nome_completo || appState.usuario?.email || 'Usuário',
       cargo: appState.perfil || '', registro: '', orgao: cab.siglaSecr,
     }
-    // Biomonitor é vinculado ao Departamento de Biodiversidade, não ao DEUC
-    // (config_sistema.departamento é global e compartilhado com o relatório
-    // CAR — sobrescrever só aqui, depois de resolvido, evita mudar o CAR).
-    cab.departamento = 'Departamento de Biodiversidade'
-    cab.siglaDep = 'DEBIO'
     cab.gestao = '' // período de gestão não aparece na ficha do Biomonitor
 
     const ninhos = await bioColetarDadosRelatorioNinhos(db, ninhoIds)

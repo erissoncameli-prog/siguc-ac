@@ -487,7 +487,7 @@
   }
 
   async function prepararCabecalho() {
-    const [cab, protocolo] = await Promise.all([getCabecalhoRelatorio(), gerarProtocolo()])
+    const [cab, protocolo] = await Promise.all([getCabecalhoRelatorio('agua'), gerarProtocolo()])
     cab.responsavel = {
       nome: appState.usuario?.nome_completo || appState.usuario?.email || 'Usuário',
       cargo: appState.perfil || '', orgao: cab.siglaSecr,
