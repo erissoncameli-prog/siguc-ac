@@ -1913,6 +1913,19 @@ público. Exportação de PDF e PPTX aberta a qualquer visitante.
   `gerar_protocolo_relatorio`.
 - Sem mudança em `pwa/sw.js`: `agua-publico.html` não é PWA/app de
   campo, não entra em nenhum `SHELLS`.
+- **Regra permanente, pedida pelo usuário**: `pages/agua-relatorios.html`
+  (mesa) e `pages/agua-publico.html` (link público) são o mesmo par de
+  "duplicação obrigatória" que já existe para o Frota (ver "Regras de
+  desenvolvimento" acima) — mudança visual/funcional nos CARDS ou no
+  MAPA do painel (novo KPI, gráfico novo, filtro novo, campo novo na
+  tabela) entra em `js/agua-painel.js`, então já vale para as duas
+  telas de graça. Mas toda vez que a tela de MESA ganhar algo que a
+  função compartilhada não cobre (nova RPC de dado, novo campo que
+  não está na whitelist de `agua_publico_coletas()`/`agua_publico_pontos()`/
+  `agua_publico_cabecalho()`, nova ação que dependa de sessão), quem
+  entrega a mudança decide explicitamente se o público também ganha —
+  e se ganhar, é migration nova na whitelist (nunca afrouxar RLS nem
+  expor a view interna), nunca herdado por acidente.
 
 ## Próxima tarefa
 Módulo Qualidade da Água (IQA): as 5 fases do plano original estão
