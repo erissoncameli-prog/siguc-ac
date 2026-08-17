@@ -2162,6 +2162,54 @@ camadas (o card do painel não tem espaço para um).
 - Sem mudança em `pwa/sw.js` (nenhuma das duas páginas é PWA/app de
   campo).
 
+**Pós-lançamento — Configurar cor/espessura das delimitações e
+mostrar/ocultar nomes dos municípios.** Pedido do usuário, em cima da
+entrega anterior (limite do Acre + municípios + hidrografia sempre
+carregados): um botão de engrenagem (`.adash-mapa-config-ctrl`,
+`_aguaPainelControleConfigCamadas`) abre um painel flutuante com cor e
+espessura do limite do Acre, cor e espessura dos municípios, e um
+checkbox para mostrar/ocultar o nome de cada município — mudança ao
+vivo (sem botão "Aplicar"), mesmo espírito dos outros controles do
+mapa do painel.
+- **Preferência de EXIBIÇÃO, não dado do banco** — persistida em
+  `localStorage` (`siguc_agua_painel_camadas`, mesmo padrão de
+  `siguc_nav_grupos`/`siguc_resumo_largura`), por navegador, sem RPC
+  nova. `_aguaPainelCamadasCarregar`/`_aguaPainelCamadasSalvar`
+  (`js/agua-painel.js`) leem/gravam com fallback pro padrão
+  (`AGUA_PAINEL_CAMADAS_PADRAO`) se o storage estiver vazio, corrompido
+  ou indisponível (modo privado) — nunca quebra o mapa por isso.
+- **A legenda reflete a cor ao vivo**: `_aguaPainelLegendaHTML(cfg)`
+  ganhou o parâmetro `cfg` (antes hardcoded `#1F4E2C`/`#6366f1`) — ao
+  mudar a cor no painel de configuração, o chip "Limite do Acre"/
+  "Municípios" na legenda muda junto, nunca fica com a cor errada.
+  Guarda a referência do container da legenda
+  (`_legendaCtl.getContainer()`) para reescrever o innerHTML no mesmo
+  handler que restila as camadas.
+- **Restilo sem recarregar dado**: `setStyle()` nas duas camadas
+  (`L.geoJSON` já desenhadas) — não refaz o `fetch` dos geojson. O
+  toggle de nomes precisa de `unbindTooltip`+`bindTooltip` (o
+  `permanent` do tooltip do Leaflet não é uma propriedade que dá para
+  só atualizar, é preciso re-vincular) + `openTooltip()` quando volta a
+  mostrar.
+- Ícone de engrenagem é o MESMO padrão SVG de traço 24×24 já usado no
+  resto do projeto (não passou por `BICON_PATHS`/`bico()` porque este
+  arquivo não depende de `js/config.js` — é usado também pelo painel
+  público, que roda sem sessão).
+- Tudo em `js/agua-painel.js`, então vale para as duas telas de graça
+  (mesmo par de duplicação obrigatória) — inclusive no público, onde o
+  ajuste é só uma preferência local do navegador do visitante, sem
+  nenhum dado sensível envolvido.
+- Guarda: +1 teste por tela em `tests/agua-relatorios.test.js`/
+  `tests/agua-publico.test.js` (abrir o painel, trocar cor/espessura,
+  legenda atualiza, ocultar nomes esconde o rótulo). `input[type=color]`
+  não é preenchível por `page.fill()` no Playwright — o teste seta
+  `.value` e dispara `input` manualmente. Mesma limitação de rede
+  (unpkg.com) documentada acima; confirmado funcionando via stub de `L`
+  fora da suíte (restilo das duas camadas, legenda atualizada, toggle
+  de tooltip, persistência em localStorage).
+- Sem mudança em `pwa/sw.js` (nenhuma das duas páginas é PWA/app de
+  campo).
+
 ## Próxima tarefa
 Módulo Qualidade da Água (IQA): as 5 fases do plano original estão
 ENTREGUES (ver `docs/qualidade-agua/plano.md`, seções "Fase 0" a "Fase

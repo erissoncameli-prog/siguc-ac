@@ -309,6 +309,23 @@ const AGUA_PAINEL_TILE_SATELITE = { url: 'https://{s}.google.com/vt/lyrs=s&x={x}
 const AGUA_PAINEL_HIDRO_WMS_URL = 'https://geoservicos.ibge.gov.br/geoserver/ows'
 const AGUA_PAINEL_HIDRO_WMS_LAYERS = 'CCAR:BC250_Massa_Dagua_A,CCAR:BC250_Trecho_Drenagem_L'
 
+// Configuração das delimitações (cor/espessura do limite do Acre e dos
+// municípios, mostrar/ocultar o nome do município) — pedido do
+// usuário. Persistida por navegador (mesmo padrão de
+// siguc_nav_grupos/siguc_resumo_largura): é preferência de EXIBIÇÃO,
+// não dado do banco, então localStorage é o lugar certo, sem RPC nova.
+const AGUA_PAINEL_CAMADAS_CHAVE = 'siguc_agua_painel_camadas'
+const AGUA_PAINEL_CAMADAS_PADRAO = { acreCor: '#1F4E2C', acrePeso: 2, munCor: '#6366f1', munPeso: 1, munNomes: true }
+function _aguaPainelCamadasCarregar() {
+  try {
+    const salvo = JSON.parse(localStorage.getItem(AGUA_PAINEL_CAMADAS_CHAVE) || '{}')
+    return Object.assign({}, AGUA_PAINEL_CAMADAS_PADRAO, salvo)
+  } catch (e) { return Object.assign({}, AGUA_PAINEL_CAMADAS_PADRAO) }
+}
+function _aguaPainelCamadasSalvar(cfg) {
+  try { localStorage.setItem(AGUA_PAINEL_CAMADAS_CHAVE, JSON.stringify(cfg)) } catch (e) { /* modo privado/quota — segue sem persistir */ }
+}
+
 // Rosa dos ventos — MESMO desenho/SVG de pages/mapa.html
 // (_adicionarRosaDosVentos), reaproveitado aqui pela regra do projeto
 // de nunca duplicar um componente cartográfico "oficial" com desenho
@@ -335,7 +352,11 @@ function _aguaPainelRosaDosVentos() {
 // pages/agua-mapa.html (`#amapa-legenda`), nunca uma segunda cópia:
 // preenchimento = faixa do IQA, borda = conformidade CONAMA,
 // preenchimento fraco = coleta em quarentena.
-function _aguaPainelLegendaHTML() {
+// `cfg` (opcional) é a configuração ao vivo de _aguaPainelCamadasCarregar
+// — os chips de "Camadas de referência" refletem a cor escolhida pelo
+// usuário no painel de configuração, nunca ficam presos ao padrão.
+function _aguaPainelLegendaHTML(cfg) {
+  const c = cfg || AGUA_PAINEL_CAMADAS_PADRAO
   const chipsIqa = AGUA_IQA_FAIXA_ORDEM.map(f => `<span class="adash-mapa-legenda-chip"><span class="adash-mapa-legenda-dot" style="background:${AGUA_IQA_FAIXA_COR[f]}"></span>${esc(f)}</span>`).join('')
   return `<div class="adash-mapa-legenda-tit">IQA (preenchimento)</div>
     <div class="adash-mapa-legenda-linha">${chipsIqa}</div>
@@ -349,17 +370,67 @@ function _aguaPainelLegendaHTML() {
     </div>
     <div class="adash-mapa-legenda-tit" style="margin-top:6px">Camadas de referência</div>
     <div class="adash-mapa-legenda-linha">
-      <span class="adash-mapa-legenda-chip"><span class="adash-mapa-legenda-linha-cor" style="background:#1F4E2C"></span>Limite do Acre</span>
-      <span class="adash-mapa-legenda-chip"><span class="adash-mapa-legenda-linha-cor" style="background:#6366f1;opacity:.6"></span>Municípios</span>
+      <span class="adash-mapa-legenda-chip"><span class="adash-mapa-legenda-linha-cor" style="background:${c.acreCor}"></span>Limite do Acre</span>
+      <span class="adash-mapa-legenda-chip"><span class="adash-mapa-legenda-linha-cor" style="background:${c.munCor};opacity:.6"></span>Municípios</span>
       <span class="adash-mapa-legenda-chip"><span class="adash-mapa-legenda-linha-cor" style="background:#2563eb"></span>Rios (IBGE)</span>
     </div>`
 }
 
-function _aguaPainelControleLegenda() {
+function _aguaPainelControleLegenda(cfg) {
   const Ctrl = L.Control.extend({ options: { position: 'bottomright' }, onAdd() {
     const div = L.DomUtil.create('div', 'adash-mapa-legenda')
-    div.innerHTML = _aguaPainelLegendaHTML()
+    div.innerHTML = _aguaPainelLegendaHTML(cfg)
     L.DomEvent.disableClickPropagation(div); return div
+  } })
+  return new Ctrl()
+}
+
+// Painel "Configurar camadas" — cor/espessura do limite do Acre e dos
+// municípios, e mostrar/ocultar o nome do município. `cfgInicial` vem
+// de _aguaPainelCamadasCarregar (já com a preferência salva);
+// `aoMudar(cfg)` é chamado a cada alteração, ao vivo (sem botão
+// "Aplicar" — mesmo espírito dos outros controles do painel).
+function _aguaPainelControleConfigCamadas(cfgInicial, aoMudar) {
+  const Ctrl = L.Control.extend({ options: { position: 'topright' }, onAdd() {
+    const div = L.DomUtil.create('div', 'adash-mapa-config-ctrl')
+    div.innerHTML = `
+      <button type="button" class="adash-mapa-config-btn" title="Configurar camadas" aria-label="Configurar camadas">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/>
+        </svg>
+      </button>
+      <div class="adash-mapa-config-painel" hidden>
+        <p class="adash-mapa-config-tit">Limite do Acre</p>
+        <label class="adash-mapa-config-linha">Cor <input type="color" class="amcfg-acre-cor" value="${cfgInicial.acreCor}"></label>
+        <label class="adash-mapa-config-linha">Espessura <input type="range" min="1" max="5" step="1" class="amcfg-acre-peso" value="${cfgInicial.acrePeso}"><span class="amcfg-acre-peso-val">${cfgInicial.acrePeso}</span></label>
+        <p class="adash-mapa-config-tit" style="margin-top:10px">Municípios</p>
+        <label class="adash-mapa-config-linha">Cor <input type="color" class="amcfg-mun-cor" value="${cfgInicial.munCor}"></label>
+        <label class="adash-mapa-config-linha">Espessura <input type="range" min="1" max="5" step="1" class="amcfg-mun-peso" value="${cfgInicial.munPeso}"><span class="amcfg-mun-peso-val">${cfgInicial.munPeso}</span></label>
+        <label class="adash-mapa-config-check"><input type="checkbox" class="amcfg-mun-nomes" ${cfgInicial.munNomes ? 'checked' : ''}> Mostrar nomes dos municípios</label>
+      </div>`
+    const btn = div.querySelector('.adash-mapa-config-btn')
+    const painel = div.querySelector('.adash-mapa-config-painel')
+    btn.addEventListener('click', () => { painel.hidden = !painel.hidden })
+    const acrePesoVal = div.querySelector('.amcfg-acre-peso-val')
+    const munPesoVal = div.querySelector('.amcfg-mun-peso-val')
+    function ler() {
+      return {
+        acreCor: div.querySelector('.amcfg-acre-cor').value,
+        acrePeso: Number(div.querySelector('.amcfg-acre-peso').value),
+        munCor: div.querySelector('.amcfg-mun-cor').value,
+        munPeso: Number(div.querySelector('.amcfg-mun-peso').value),
+        munNomes: div.querySelector('.amcfg-mun-nomes').checked,
+      }
+    }
+    div.querySelectorAll('input').forEach(inp => inp.addEventListener('input', () => {
+      const cfg = ler()
+      acrePesoVal.textContent = cfg.acrePeso
+      munPesoVal.textContent = cfg.munPeso
+      aoMudar(cfg)
+    }))
+    L.DomEvent.disableClickPropagation(div)
+    return div
   } })
   return new Ctrl()
 }
@@ -419,36 +490,57 @@ function aguaPainelMapaCriar(mapaElId, subElId) {
 
   // Componentes cartográficos oficiais — mesmos do Mapa das UCs
   // (pages/mapa.html): rosa dos ventos, escala métrica, legenda,
-  // alternância de imagem de satélite.
+  // alternância de imagem de satélite, configuração das delimitações.
+  let _cfgCamadas = _aguaPainelCamadasCarregar()
+  let _acreLayer = null
+  let _munLayer = null
+  const _legendaCtl = _aguaPainelControleLegenda(_cfgCamadas).addTo(mapa)
+  const _legendaDiv = _legendaCtl.getContainer()
+
   _aguaPainelRosaDosVentos().addTo(mapa)
   L.control.scale({ position: 'bottomleft', metric: true, imperial: false, maxWidth: 110 }).addTo(mapa)
-  _aguaPainelControleLegenda().addTo(mapa)
   _aguaPainelControleSatelite(_trocarBase).addTo(mapa)
+  _aguaPainelControleConfigCamadas(_cfgCamadas, (novoCfg) => {
+    _cfgCamadas = novoCfg
+    _aguaPainelCamadasSalvar(novoCfg)
+    if (_acreLayer) _acreLayer.setStyle({ color: novoCfg.acreCor, weight: novoCfg.acrePeso })
+    if (_munLayer) {
+      _munLayer.setStyle({ color: novoCfg.munCor, weight: novoCfg.munPeso, fillColor: novoCfg.munCor })
+      _munLayer.eachLayer(layer => {
+        const nome = layer.feature?.properties?.name || layer.feature?.properties?.nome || layer.feature?.properties?.NM_MUN || 'Município'
+        layer.unbindTooltip()
+        layer.bindTooltip(nome, { permanent: novoCfg.munNomes, direction: 'center', className: 'adash-mapa-mun-label' })
+        if (novoCfg.munNomes) layer.openTooltip()
+      })
+    }
+    if (_legendaDiv) _legendaDiv.innerHTML = _aguaPainelLegendaHTML(novoCfg)
+  }).addTo(mapa)
 
   ;(async function desenharLimiteAcre() {
     try {
       const r = await fetch('../data/acre_estado.geojson')
       if (!r.ok) throw new Error('HTTP ' + r.status)
       const gj = await r.json()
-      L.geoJSON(gj, { style: { color: '#1F4E2C', weight: 2, fill: false, opacity: .5 }, interactive: false }).addTo(mapa)
+      _acreLayer = L.geoJSON(gj, { style: { color: _cfgCamadas.acreCor, weight: _cfgCamadas.acrePeso, fill: false, opacity: .5 }, interactive: false }).addTo(mapa)
     } catch (e) { console.warn('[agua-painel] limite do Acre indisponível para desenho:', e.message) }
   })()
 
   // Municípios — MESMO arquivo de pages/mapa.html (data/municipios_acre.
   // geojson), com o nome de cada um em tooltip permanente. Lá é um
-  // toggle (#mun-toggle); aqui nasce SEMPRE ligado, pedido do usuário —
-  // o card do painel não tem um menu de camadas para ligar depois.
+  // toggle (#mun-toggle); aqui nasce SEMPRE ligado (pode ser ocultado
+  // pelo painel "Configurar camadas" acima) — o card do painel não tem
+  // um menu de camadas completo como o do Mapa das UCs.
   ;(async function desenharMunicipios() {
     try {
       const r = await fetch('../data/municipios_acre.geojson')
       if (!r.ok) throw new Error('HTTP ' + r.status)
       const gj = await r.json()
-      L.geoJSON(gj, {
-        style: { color: '#6366f1', weight: 1, opacity: .55, fillColor: '#6366f1', fillOpacity: .02, dashArray: '4 6' },
+      _munLayer = L.geoJSON(gj, {
+        style: { color: _cfgCamadas.munCor, weight: _cfgCamadas.munPeso, opacity: .55, fillColor: _cfgCamadas.munCor, fillOpacity: .02, dashArray: '4 6' },
         interactive: false,
         onEachFeature(f, layer) {
           const nome = f.properties?.name || f.properties?.nome || f.properties?.NM_MUN || 'Município'
-          layer.bindTooltip(nome, { permanent: true, direction: 'center', className: 'adash-mapa-mun-label' })
+          layer.bindTooltip(nome, { permanent: _cfgCamadas.munNomes, direction: 'center', className: 'adash-mapa-mun-label' })
         },
       }).addTo(mapa)
     } catch (e) { console.warn('[agua-painel] municípios indisponíveis para desenho:', e.message) }
