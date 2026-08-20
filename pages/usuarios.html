@@ -102,6 +102,7 @@
 
 <script>
 let editId = null
+let usuarioEmEdicao = null
 
 ;(async function () {
   const usuario = await carregarUsuario()
@@ -232,10 +233,14 @@ async function admAssinarAvatares() {
 
 function abrirModal(u = null) {
   editId = u?.id || null
+  usuarioEmEdicao = u
   document.getElementById('modal-titulo').textContent = u ? 'Editar Usuário' : 'Novo Usuário'
   document.getElementById('f-nome').value = u?.nome_completo || ''
   document.getElementById('f-email').value = u?.email || ''
-  document.getElementById('f-email').disabled = !!u
+  // E-mail é o login (auth.users) — só super_admin pode corrigi-lo aqui
+  // (troca via admin-editar-email-usuario, que atualiza Auth + tabela
+  // juntos). gestor edita o resto do cadastro, mas não o login de outrem.
+  document.getElementById('f-email').disabled = !!u && appState.usuario?.perfil !== 'super_admin'
   document.getElementById('f-perfil').value = u?.perfil || 'visualizador'
   document.getElementById('f-uc').value = u?.uc_id || ''
   document.getElementById('f-cargo').value = u?.cargo || ''
@@ -248,7 +253,7 @@ function abrirModal(u = null) {
 }
 
 function editarUsuario(u) { abrirModal(u) }
-function fecharModal() { document.getElementById('modal-usuario').classList.remove('aberto'); editId = null; document.getElementById('f-email').disabled = false }
+function fecharModal() { document.getElementById('modal-usuario').classList.remove('aberto'); editId = null; usuarioEmEdicao = null; document.getElementById('f-email').disabled = false }
 
 // ── Foto de perfil no cadastro — ver/trocar (js/avatar-foto.js) +
 // sincronização com todos os apps (RPC admin_atualizar_foto_usuario,
@@ -328,6 +333,22 @@ async function salvar() {
 
   try {
     if (editId) {
+      // E-mail muda de rota: mexe em auth.users (login), não só na
+      // tabela — precisa da Edge Function com service_role. Campo só
+      // fica editável para super_admin (ver abrirModal); para os
+      // demais o valor no formulário é sempre igual ao original.
+      if (email !== (usuarioEmEdicao?.email || '')) {
+        const { data: { session } } = await db.auth.getSession()
+        if (!session?.access_token) throw new Error('Sessão expirada. Faça login novamente.')
+        const resp = await fetch(`${SUPABASE_URL}/functions/v1/admin-editar-email-usuario`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+          body: JSON.stringify({ usuario_id: editId, novo_email: email }),
+        })
+        const json = await resp.json()
+        if (!resp.ok) throw new Error(json.error || 'Erro ao atualizar e-mail')
+      }
+
       const { error } = await db.from('usuarios').update({
         nome_completo, perfil: document.getElementById('f-perfil').value,
         uc_id: document.getElementById('f-uc').value || null,
