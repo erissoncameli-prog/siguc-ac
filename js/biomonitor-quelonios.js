@@ -1393,6 +1393,11 @@ function bioIniciarFotosGenerica({ prefixo, max, getState, setFotos, getContexto
   const inp     = document.getElementById(`bio-${prefixo}-input-foto`)
   const countEl = document.getElementById(`bio-${prefixo}-foto-count`)
   if (!grid || !btnCam || !inp || !countEl) return null
+  // Galeria é opcional — só forms que tiverem o par botão+input ganham a
+  // opção (hoje só o cadastro de ninho, prefixo 'form'). Mesma marca
+  // d'água/pipeline da câmera: o arquivo entra pelo MESMO processarArquivos.
+  const btnGal = document.getElementById(`bio-${prefixo}-btn-galeria`)
+  const inpGal = document.getElementById(`bio-${prefixo}-input-foto-galeria`)
 
   function atualizarGrid() {
     const fotos = getState() ?? []
@@ -1413,14 +1418,13 @@ function bioIniciarFotosGenerica({ prefixo, max, getState, setFotos, getContexto
     })
   }
 
-  btnCam.addEventListener('click', () => inp.click())
-  inp.addEventListener('change', async () => {
+  async function processarArquivos(fileList, inputEl) {
     const fotos = getState() ?? []
     const monitor = BioApp.monitor
     const gps = typeof bGpsAtual === 'function' ? bGpsAtual() : null
     const logos = await bioOfflineGetConfig('bio_logos_cache_v1').catch(() => null)
     const ctxExtra = typeof getContexto === 'function' ? (getContexto() ?? {}) : {}
-    for (const file of Array.from(inp.files ?? [])) {
+    for (const file of Array.from(fileList ?? [])) {
       if (fotos.length >= max) break
       let dataUrl
       if (typeof bCapturaProcessarArquivo === 'function') {
@@ -1461,8 +1465,15 @@ function bioIniciarFotosGenerica({ prefixo, max, getState, setFotos, getContexto
     }
     setFotos(fotos)
     atualizarGrid()
-    inp.value = ''
-  })
+    inputEl.value = ''
+  }
+
+  btnCam.addEventListener('click', () => inp.click())
+  inp.addEventListener('change', () => processarArquivos(inp.files, inp))
+  if (btnGal && inpGal) {
+    btnGal.addEventListener('click', () => inpGal.click())
+    inpGal.addEventListener('change', () => processarArquivos(inpGal.files, inpGal))
+  }
 
   return { atualizarGrid }
 }

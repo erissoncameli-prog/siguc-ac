@@ -101,6 +101,28 @@
   </div>
 </div>
 
+<!-- ── Modal: Editar fotos do ninho (postura) ──────────────────── -->
+<div class="modal-overlay" id="modal-editar-fotos">
+  <div class="modal" style="max-width:700px">
+    <div class="modal-header">
+      <div class="modal-title">Editar fotos do ninho</div>
+      <button class="modal-close" onclick="fecharModalEditarFotos()">×</button>
+    </div>
+    <div class="modal-body">
+      <p style="margin:0 0 12px;font-size:.9rem;color:var(--cinza-500)">
+        Ninho: <strong id="ef-numero"></strong> — clique numa foto para removê-la.
+      </p>
+      <div id="ef-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-bottom:14px"></div>
+      <input type="file" id="ef-input" accept="image/*" multiple hidden>
+      <button class="btn btn-sm btn-secondary" onclick="document.getElementById('ef-input').click()">+ Adicionar fotos</button>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="fecharModalEditarFotos()">Cancelar</button>
+      <button class="btn btn-primary" id="ef-btn-salvar" onclick="salvarFotosEditando()">Salvar</button>
+    </div>
+  </div>
+</div>
+
 <script>
 ;(async function () {
   const usuario = await carregarUsuario()
@@ -478,6 +500,7 @@
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px solid var(--borda)">
           <button class="btn btn-sm btn-secondary" onclick="bioAbrirRelatorioNinho(db,'${n.id}')">Gerar PDF</button>
           ${totalFotosOcorrencias ? `<button class="btn btn-sm btn-secondary" onclick="verFotos('${n.id}')">Fotos (${totalFotosOcorrencias})</button>` : ''}
+          ${podeReprocessar ? `<button class="btn btn-sm btn-secondary" onclick="abrirModalEditarFotos('${n.id}')">Editar fotos${temFotosPostura ? ` (${n.foto_urls.length})` : ''}</button>` : ''}
           ${temFotosPostura && podeReprocessar ? `<button class="btn btn-sm btn-secondary" onclick="reprocessarFotos('${n.id}')">Reaplicar marca d'água</button>` : ''}
           ${!n.lat ? `<button class="btn btn-sm" style="background:rgba(245,158,11,.15);color:#f59e0b;border:1px solid rgba(245,158,11,.3);border-radius:6px;padding:4px 10px;cursor:pointer" onclick="abrirModalGPS('${n.id}')">+ GPS</button>`
             : `<button class="btn btn-sm btn-secondary" onclick="abrirModalGPS('${n.id}')">Editar localização</button>`}
@@ -639,6 +662,100 @@
     }
     toast(falhas ? `${ok} foto(s) reprocessada(s), ${falhas} falharam.` : `${ok} foto(s) reprocessada(s) com sucesso.`, falhas ? 'error' : 'success')
     await carregarDados()
+  }
+
+  // ── Editar fotos da postura (ninhos_quelonios.foto_urls) ────────
+  // Só as fotos do ENCONTRO (postura) do ninho — as demais etapas
+  // (transferência, eclosão…) têm suas próprias fotos, editadas junto do
+  // respectivo registro, fora do escopo desta tela. Fotos adicionadas
+  // aqui NÃO passam pela marca d'água automática (o pipeline de captura
+  // pressupõe monitor/GPS reais de campo, que não existem numa correção
+  // feita na mesa) — quem quiser marca d'água usa "Reaplicar marca
+  // d'água" depois de salvar.
+  let _efNinhoId = null, _efExistentes = [], _efNovos = []
+
+  window.abrirModalEditarFotos = function(id) {
+    const n = _ninhos.find(x => x.id === id)
+    if (!n) return
+    _efNinhoId = id
+    _efExistentes = [...(n.foto_urls || [])]
+    _efNovos = []
+    document.getElementById('ef-numero').textContent = n.numero_ninho
+    _renderGridEditarFotos()
+    document.getElementById('modal-editar-fotos').classList.add('aberto')
+  }
+
+  window.fecharModalEditarFotos = function() {
+    document.getElementById('modal-editar-fotos').classList.remove('aberto')
+    _efNinhoId = null; _efExistentes = []; _efNovos = []
+  }
+
+  async function _renderGridEditarFotos() {
+    const grid = document.getElementById('ef-grid')
+    grid.innerHTML = ''
+    for (let i = 0; i < _efExistentes.length; i++) {
+      const url = _efExistentes[i]
+      const img = document.createElement('img')
+      img.style.cssText = 'width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px;cursor:pointer'
+      img.title = 'Clique para remover'
+      img.src = await fotoUrlAssinada(url) || url
+      img.addEventListener('click', () => {
+        if (!confirm('Remover esta foto?')) return
+        _efExistentes.splice(i, 1)
+        _renderGridEditarFotos()
+      })
+      grid.appendChild(img)
+    }
+    _efNovos.forEach((file, i) => {
+      const img = document.createElement('img')
+      img.style.cssText = 'width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px;cursor:pointer;outline:2px solid #10b981'
+      img.title = 'Nova foto — clique para remover'
+      img.src = URL.createObjectURL(file)
+      img.addEventListener('click', () => {
+        _efNovos.splice(i, 1)
+        _renderGridEditarFotos()
+      })
+      grid.appendChild(img)
+    })
+    if (!_efExistentes.length && !_efNovos.length) {
+      grid.innerHTML = `<p style="color:var(--cinza-500);grid-column:1/-1;margin:0">Nenhuma foto.</p>`
+    }
+  }
+
+  document.getElementById('ef-input').addEventListener('change', () => {
+    const inp = document.getElementById('ef-input')
+    for (const f of Array.from(inp.files || [])) _efNovos.push(f)
+    inp.value = ''
+    _renderGridEditarFotos()
+  })
+
+  window.salvarFotosEditando = async function() {
+    const n = _ninhos.find(x => x.id === _efNinhoId)
+    if (!n) return
+    const btn = document.getElementById('ef-btn-salvar')
+    btn.disabled = true; btn.textContent = 'Salvando...'
+    try {
+      const novasUrls = [..._efExistentes]
+      for (let i = 0; i < _efNovos.length; i++) {
+        const file = _efNovos[i]
+        const ext = file.type === 'image/png' ? 'png' : 'jpg'
+        const caminho = `ninhos/${n.uuid_cliente || n.id}_mesa_${Date.now()}_${i}.${ext}`
+        const { error: upErr } = await db.storage.from('biomonitor-fotos')
+          .upload(caminho, file, { contentType: file.type || 'image/jpeg' })
+        if (upErr) throw upErr
+        const { data: pub } = db.storage.from('biomonitor-fotos').getPublicUrl(caminho)
+        novasUrls.push(pub.publicUrl)
+      }
+      const { error } = await db.from('ninhos_quelonios').update({ foto_urls: novasUrls }).eq('id', n.id)
+      if (error) throw error
+      toast('Fotos atualizadas!', 'success')
+      fecharModalEditarFotos()
+      await carregarDados()
+    } catch (e) {
+      toast(e.message || 'Erro ao salvar fotos', 'error')
+    } finally {
+      btn.disabled = false; btn.textContent = 'Salvar'
+    }
   }
 
   // Fotos de TODAS as ocorrências do ninho (localização, transferências,
