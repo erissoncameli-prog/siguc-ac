@@ -873,7 +873,7 @@ const VEG_LAYERS = {
   planet: { layer:null, make(op){
     const m = document.getElementById('planet-mosaico')?.value || _planetMosaicoSel;
     if(!m) return null;
-    return L.tileLayer(`/api/planet-tiles?z={z}&x={x}&y={y}&m=${encodeURIComponent(m)}`,
+    return L.tileLayer(`/api/planet?op=tiles&z={z}&x={x}&y={y}&m=${encodeURIComponent(m)}`,
       {attribution:'Planet / NICFI',opacity:op/100,maxZoom:21,maxNativeZoom:18,
        errorTileUrl:'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw=='}); }
   },
