@@ -437,3 +437,106 @@ registrado com o número para quem precisar reabrir.
    precisa conferir com o laudo físico e com o laboratório qual
    grandeza cada coluna guarda. Até lá, a regra alerta — corretamente.
 2. Continua valendo a pendência anterior dos **sólidos em suspensão**.
+
+---
+
+# Entrega 2 — ENTREGUE (migrations 304/305/306)
+
+Leitura assistida do laudo em PDF, em produção. Trabalha em cima da
+Entrega 1 (alertas comparativos) — a conferência lado a lado usa a
+mesma malha para sinalizar valores propostos que fujam do histórico.
+
+## Achado que mudou a arquitetura logo na abertura
+
+Os laudos reais enviados pelo usuário (17 páginas, mesmo lote) são
+**100% digitalização de mesa scanner** (Epson Scan 2, 200 dpi) —
+**zero objeto `/Font`** no PDF inteiro, confirmado objeto a objeto.
+O §3.1 do plano original prevendo "texto extraível, OCR fora do
+escopo v1" foi descartado nesta entrega: não existe texto para
+extrair. `pdf.js` (renderiza a página em canvas) + `tesseract.js`
+(OCR sobre o canvas) substituem o parser de texto que o plano
+original desenhou.
+
+## Calibração — medida, não estimada
+
+Gabarito por POSIÇÃO FIXA (fração da página, não busca de texto):
+medido nas 17 páginas do lote, a posição de cada linha varia no
+máximo ~17 px numa página de 3508 px (300 dpi) — ruído do próprio
+scanner, não do conteúdo. Duas descobertas concretas decidiram o
+desenho final:
+
+1. **A borda da tabela fica colada acima de cada valor.** Um recorte
+   que a inclua faz o Tesseract fundir régua + dígitos num blob só e
+   devolver STRING VAZIA — medido: "3,17" virou "" com a borda
+   dentro do recorte; sem ela, "3,17" a 87% de confiança. Por isso
+   toda caixa do gabarito começa ABAIXO do rótulo (deslocamento
+   positivo), nunca em cima.
+2. **Casas decimais são constante do TEMPLATE, nunca lidas do OCR.**
+   O glifo da vírgula é pequeno demais em 300 dpi para o OCR situar
+   com segurança — achado real: célula limpa "3,17" foi lida "3,47"
+   (troca 1↔4) num teste de página inteira, sem nenhum sinal de baixa
+   confiança que distinguisse o erro dos acertos ao redor. O parser
+   lê só os DÍGITOS e insere o separador na posição fixa que o
+   template declara (fósforo total e sólidos em suspensão têm 3
+   casas nesse laboratório; os demais têm 2 — confirmado visualmente
+   em 3 páginas, não inferido de uma só).
+
+Resultado medido, testando o motor de verdade (não uma cópia) contra
+os 14 parâmetros × 3 páginas reais: **40 de 42 corretos (95%)** em
+teste offline (Python + poppler); **10–11 de 14 (71–79%)** no
+navegador real (Playwright + Chromium), a diferença vindo do
+decodificador de imagem JPEG do navegador divergir sutilmente do
+poppler em casos-limite. Nas duas medições, TODA falha foi
+STRING VAZIA — nunca um número errado silencioso nos testes
+automatizados (a exceção real observada, sólidos em suspensão lido
+0,257 em vez de 0,297, é exatamente por isso que a conferência exige
+o recorte da imagem, nunca confia no texto sozinho).
+
+## O que foi construído
+
+| Peça | Onde |
+|---|---|
+| Gabarito do laboratório (posição + casas decimais) | `agua_laudo_templates` (304) |
+| Proveniência por campo (parser/digitado/corrigido) | `agua_coletas.origem_dados` (304) |
+| Gabarito calibrado do QUILAB | seed em `agua_laudo_templates` (305) |
+| `agua_atualizar_coleta` aceita `origem_dados` | 306 (mudança cirúrgica no corpo, assinatura intacta) |
+| Pipeline (render → recorte → OCR → interpretação → identidade) | `js/agua-laudo-ocr.js` |
+| `pdf.js` vendorizado (render de página em canvas) | `js/vendor/pdfjs/` |
+| `tesseract.js` vendorizado (core LSTM+SIMD, traineddata pt) | `js/vendor/tesseract/` |
+| Conferência lado a lado na mesa | `pages/agua-laudos.html` |
+| Guarda (pipeline real, navegador real, fixtures reais) | `tests/agua-laudo-parser.test.js` (10 testes) |
+| Fixtures — páginas reais extraídas do lote enviado | `tests/fixtures/laudos/*.pdf` |
+
+## Decisões de desenho
+
+- **Extração determinística, nunca por LLM** (mantido do plano
+  original) — o laudo é prova; um número plausível que não está no
+  papel é o pior modo de falha possível aqui.
+- **O recorte da imagem é o que a conferência mostra — nunca o texto
+  OCR re-digitado.** Um texto errado reexibido pareceria tão correto
+  quanto um certo; a imagem deixa o técnico comparar com o próprio
+  olho.
+- **Trava de identidade bloqueia autofill, nunca preenchimento
+  parcial.** Data ou procedência divergente da coleta aberta: nada é
+  proposto, só o confronto aparece. Testado com o cenário que a trava
+  existe para pegar (laudo de uma data lançado contra coleta de
+  outra).
+- **`js/vendor/tesseract/` só tem a variante SIMD** (quase universal
+  em navegadores atuais) — sem fallback não-SIMD nesta entrega;
+  registrado como limitação conhecida, não bloqueante.
+- **Carregamento sob demanda**: ~10 MB entre pdf.js e tesseract.js só
+  entram quando o técnico escolhe um PDF, nunca no load normal da
+  tela — mesmo padrão do motor de PDF do Biomonitor/Água.
+- Sem mudança em `pwa/sw.js`: `agua-laudos.html` é tela de mesa, não
+  app de campo — `js/agua-laudo-ocr.js` não entra em nenhum shell.
+
+## Pendências para a Entrega 3 (não bloqueiam esta)
+
+- Cadastro de templates pela mesa (hoje é SQL direto — `agua-pontos.html`
+  ganharia uma aba, como o plano original previa).
+- `agua_prazos_analise` (prazo de preservação por parâmetro).
+- Segundo laboratório: a estrutura já suporta (um template por
+  `laboratorio_id`), só não há amostra de um segundo laboratório para
+  calibrar.
+- OCR não-SIMD (navegador antigo) — sem amostra de necessidade real
+  ainda.

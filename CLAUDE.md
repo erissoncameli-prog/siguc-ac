@@ -2350,6 +2350,68 @@ RPC, compara número com número e desenha. Seis tipos, três níveis:
   todos os anos. Nada foi corrigido — é conferência humana com o laudo
   físico, como os sólidos em suspensão.
 
+## Regra do sistema — leitura assistida do laudo em PDF (Água)
+Entrega 2 do plano em `docs/qualidade-agua/plano-leitura-laudo-e-alertas.md`
+(migrations 304/305/306), em cima da malha de alertas da Entrega 1.
+`pages/agua-laudos.html` lê o PDF do laboratório e PROPÕE o
+preenchimento, campo a campo, com o recorte da imagem ao lado —
+NUNCA grava nada sozinho.
+
+**Achado que mudou a arquitetura logo na abertura**: os laudos reais
+enviados são digitalização de mesa scanner (Epson Scan 2, 200 dpi,
+zero fonte embutida) — não texto extraível. `pdf.js` renderiza a
+página em canvas; `tesseract.js` faz OCR sobre o recorte de cada
+célula (`js/agua-laudo-ocr.js`, único lugar do pipeline — nunca
+reimplementar numa página). Os dois vendorizados em `js/vendor/`
+(~10 MB, carregado só quando o técnico escolhe um PDF).
+
+- **Gabarito por POSIÇÃO FIXA**, não busca de texto —
+  `agua_laudo_templates` (por laboratório, versionado, `campos` +
+  `campos_identidade` em jsonb, fração 0–1 da página). Medido nas 17
+  páginas do lote real: a posição de cada linha varia no máximo
+  ~17 px numa página de 3508 px — ruído do scanner, não do conteúdo.
+- ⚠️ **A borda da tabela fica colada acima do valor.** Recorte que a
+  inclua faz o OCR fundir régua+dígitos e devolver string VAZIA
+  (medido: "3,17"→"" com a borda dentro; sem ela, "3,17" a 87% de
+  confiança). Toda caixa do gabarito começa ABAIXO do rótulo
+  (deslocamento positivo), nunca em cima — vale para qualquer
+  template novo de outro laboratório.
+- ⚠️ **Casas decimais são constante do TEMPLATE, nunca lidas do
+  OCR.** O glifo da vírgula é pequeno demais em 300 dpi para o OCR
+  situar com segurança — achado real: "3,17" foi lido "3,47" (troca
+  1↔4) numa célula limpa, sem sinal de baixa confiança. O parser lê
+  só os DÍGITOS e insere o separador na posição fixa do template.
+- **Nada entra no banco sem confirmação humana campo a campo**, e a
+  conferência mostra o RECORTE DA IMAGEM, nunca o texto OCR
+  re-digitado — um texto errado reexibido pareceria tão correto
+  quanto um certo. `agua_coletas.origem_dados` (jsonb) guarda, por
+  campo, se veio de `parser`/`digitado`/`corrigido_apos_parser`.
+- **Trava de identidade bloqueia TODO autofill** se data da coleta ou
+  procedência do laudo divergirem da coleta aberta na tela — nada é
+  proposto, só o confronto aparece. É a defesa contra lançar o laudo
+  do ponto A na coleta do ponto B.
+- **Extração determinística, nunca por LLM** — o laudo é prova
+  jurídica; um número plausível que não está no papel é o pior modo
+  de falha possível aqui.
+- Calibração medida contra o motor de OCR de verdade, não estimada:
+  40/42 (95%) em teste offline (poppler); 10–11/14 (71–79%) no
+  navegador real — a diferença é o decodificador JPEG do Chromium
+  divergir sutilmente do poppler em casos-limite. Toda falha medida
+  foi string vazia, nunca número errado silencioso.
+- `agua_atualizar_coleta` ganhou `origem_dados` na whitelist —
+  mudança CIRÚRGICA no corpo (assinatura intacta, sem `DROP
+  FUNCTION`); trocar a lógica de merge por COALESCE quebraria o NULL
+  explícito que a tela de conferência usa para limpar
+  `quarentena_motivo`.
+- Guarda: `tests/agua-laudo-parser.test.js` (10 testes, pipeline real
+  no Chromium, contra páginas REAIS extraídas do lote enviado —
+  `tests/fixtures/laudos/`, nunca fixture sintética).
+- Sem mudança em `pwa/sw.js`: `agua-laudos.html` é tela de mesa, não
+  app de campo.
+- Pendente para a Entrega 3: cadastro de template pela mesa (hoje é
+  SQL direto), `agua_prazos_analise`, segundo laboratório (estrutura
+  já suporta, falta amostra para calibrar).
+
 ## Próxima tarefa
 Módulo Qualidade da Água (IQA): as 5 fases do plano original estão
 ENTREGUES (ver `docs/qualidade-agua/plano.md`, seções "Fase 0" a "Fase
