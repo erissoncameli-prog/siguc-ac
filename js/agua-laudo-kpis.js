@@ -70,11 +70,12 @@ function aguaKpisSituacaoRoscaHTML(counts) {
 // Fila de laudos (pages/agua-laudos.html) — o que preocupa é atraso.
 const AGUA_LAUDO_LIMIAR_ATRASO = 30
 
-function aguaKpisFilaHTML(lista, labelFn) {
+function aguaKpisFilaHTML(lista, labelFn, statusCounts) {
   const s = _aguaKpiStats(lista)
   const atrasadas = s.dias.filter(d => d > AGUA_LAUDO_LIMIAR_ATRASO).length
   const pctAtrasadas = s.total ? Math.round((atrasadas / s.total) * 100) : 0
   return `<div class="adash-kpi-row">
+    ${aguaKpisSituacaoRoscaHTML(statusCounts)}
     <div class="adash-card">
       <div class="adash-card-topo"><p class="adash-card-tit">Aguardando laudo</p></div>
       <div class="adash-num-linha"><span class="adash-num">${s.total}</span></div>
