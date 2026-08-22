@@ -95,12 +95,13 @@ let _coletas = [], _editandoId = null
 
   document.getElementById('app').innerHTML =
     gerarLayout('Qualidade da Água — Conferência', 'agua-conferencia') +
-    `<div class="fade-in">
+    `<div class="fade-in adash">
       <p style="color:#6B7280;font-size:13px;margin:0 0 16px">
         Coletas da série histórica que caíram em quarentena na importação (migration 253) — valor fisicamente
         impossível ou sólidos em suspensão com unidade sob suspeita. Conferir com o laudo físico da linha indicada
         e decidir: corrigir e promover, ou manter quarentenada com justificativa.
       </p>
+      <div id="ag-kpis"></div>
       <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
         <input class="form-control" id="ag-filtro" placeholder="Filtrar por ponto, código ANA ou nº da linha..." style="max-width:340px" oninput="renderLista()">
         <span id="ag-contador" style="font-size:12px;color:#6B7280"></span>
