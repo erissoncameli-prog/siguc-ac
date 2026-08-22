@@ -10,6 +10,7 @@
 <script src="../js/config.js"></script>
 <script src="../js/layout.js"></script>
 <script src="../js/reautenticar.js"></script>
+<script src="../js/agua-alertas.js"></script>
 </head>
 <body>
 <div id="app"></div>
@@ -24,6 +25,7 @@
     <div class="modal-body">
       <div id="ag-motivo" style="background:#FEF3C7;border:1px solid #FDE68A;border-radius:8px;padding:10px 12px;font-size:13px;color:#92400E;margin-bottom:16px;white-space:pre-wrap"></div>
       <div style="font-size:12px;color:#6B7280;margin-bottom:12px" id="ag-contexto"></div>
+      <div id="ag-alertas"></div>
 
       <div class="grid-2">
         <div class="form-group"><label class="form-label">Data da coleta</label>
@@ -164,14 +166,18 @@ function abrirAg(id) {
   document.getElementById('ag-hora').value = c.hora_coleta ? c.hora_coleta.slice(0, 5) : ''
   document.getElementById('ag-observacoes').value = c.observacoes || ''
 
-  document.getElementById('ag-campo').innerHTML = CAMPO_FIELDS.map(([campo, rotulo]) => `
+  const campoHTML = ([campo, rotulo]) => `
     <div class="form-group"><label class="form-label">${esc(rotulo)}</label>
-      <input class="form-control" id="ag-f-${campo}" type="number" step="any" value="${c[campo] ?? ''}"></div>`).join('')
-  document.getElementById('ag-lab').innerHTML = LAB_FIELDS.map(([campo, rotulo]) => `
-    <div class="form-group"><label class="form-label">${esc(rotulo)}</label>
-      <input class="form-control" id="ag-f-${campo}" type="number" step="any" value="${c[campo] ?? ''}"></div>`).join('')
+      <input class="form-control" id="ag-f-${campo}" type="number" step="any" value="${c[campo] ?? ''}" oninput="agAgendarAvaliacao()">
+      <div class="form-hint" id="ag-h-${campo}"></div></div>`
+  document.getElementById('ag-campo').innerHTML = CAMPO_FIELDS.map(campoHTML).join('')
+  document.getElementById('ag-lab').innerHTML   = LAB_FIELDS.map(campoHTML).join('')
 
   document.getElementById('modal-ag').classList.add('aberto')
+  _alertas = []
+  agPintarAlertas()
+  agAvaliar()   // a linha já está preenchida: avalia de saída, que é o
+                // ponto desta tela — mostrar POR QUE o valor é suspeito
 }
 
 function fecharModalAg() {
@@ -184,6 +190,40 @@ function valorCampo(campo) {
   return v === '' ? null : parseFloat(v)
 }
 
+// Mesma malha do lançamento de laudo (js/agua-alertas.js, migrations
+// 254 e 302/302b). Aqui ela serve para o outro lado do problema:
+// a linha JÁ está em quarentena, e o que o conferente precisa ver é
+// qual valor é suspeito e contra que referência — não repetir o
+// motivo genérico gravado na importação.
+let _alertas = [], _timerAval = null
+
+function agAgendarAvaliacao() {
+  clearTimeout(_timerAval)
+  _timerAval = setTimeout(() => { agAvaliar() }, 500)
+}
+
+async function agAvaliar() {
+  const c = _coletas.find(x => x.id === _editandoId)
+  if (!c) return []
+  const valores = {}
+  for (const [campo] of [...CAMPO_FIELDS, ...LAB_FIELDS]) valores[campo] = valorCampo(campo)
+  _alertas = await aguaAlertasAvaliar(db, {
+    pontoId: c.ponto_id, ordem: c.agua_campanhas?.ordem, valores,
+    campanhaId: c.campanha_id, coletaId: c.id,
+  })
+  agPintarAlertas()
+  return _alertas
+}
+
+function agPintarAlertas() {
+  document.getElementById('ag-alertas').innerHTML =
+    aguaAlertasResumoHTML(_alertas, { titulo: 'O que ainda está inconsistente nesta linha' })
+  for (const [campo] of [...CAMPO_FIELDS, ...LAB_FIELDS]) {
+    const hint = document.getElementById(`ag-h-${campo}`)
+    if (hint) hint.innerHTML = aguaAlertaHintHTML(aguaAlertaDoCampo(_alertas, campo))
+  }
+}
+
 async function salvarAg(promover) {
   if (!_editandoId) return
   const payload = { observacoes: document.getElementById('ag-observacoes').value.trim() || null }
@@ -193,6 +233,21 @@ async function salvarAg(promover) {
   for (const [campo] of [...CAMPO_FIELDS, ...LAB_FIELDS]) payload[campo] = valorCampo(campo)
 
   if (promover) {
+    // Promover a `completo` é o ato que tira a linha da quarentena —
+    // com valor fisicamente impossível ainda no formulário, seria
+    // desfazer justamente o que a Fase 1 protegeu. Manter em
+    // quarentena continua permitido em qualquer estado: é o registro
+    // de "conferi e o laudo diz isso mesmo".
+    clearTimeout(_timerAval)
+    const alertas = await agAvaliar()
+    const bloqueios = aguaAlertasBloqueios(alertas)
+    if (bloqueios.length) {
+      toast(`Não dá para promover com valor impossível: ${bloqueios.map(a => AGUA_ALERTA_PARAM_ROTULO[a.parametro] || a.parametro).join(', ')}`, 'error')
+      return
+    }
+    const texto = aguaAlertasTextoConfirmacao(alertas)
+    if (texto && !confirm(texto)) return
+
     payload.status = 'completo'
     payload.quarentena_motivo = null
   }
