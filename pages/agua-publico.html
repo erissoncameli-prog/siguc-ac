@@ -417,6 +417,23 @@ body { background:var(--cinza-50) }
     }
   }
 
+  window.gerarXlsx = async function () {
+    if (!_relatorioAtual || !_cab) return
+    sel('rl-export-menu').hidden = true
+    const btn = sel('rl-btn-xlsx')
+    btn.disabled = true; const htmlOrig = btn.innerHTML
+    btn.textContent = 'Gerando planilha...'
+    try {
+      const buffer = await aguaRelMontarXlsx(_relatorioAtual, labelBaciaExportacao(), periodoTxt(_relatorioAtual), _cab, PROTOCOLO_PUBLICO)
+      aguaRelBaixarXlsx(buffer, `${nomeArquivo()}.xlsx`)
+      toast('Planilha gerada.', 'success')
+    } catch (e) {
+      toast('Erro ao gerar a planilha: ' + e.message, 'error')
+    } finally {
+      btn.disabled = false; btn.innerHTML = htmlOrig; bIconsAplicar(btn)
+    }
+  }
+
   // Boot: escopo padrão = Acre todo, carregado de cara.
   aplicarBacia()
 })()
