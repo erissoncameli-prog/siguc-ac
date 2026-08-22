@@ -2412,6 +2412,45 @@ reimplementar numa página). Os dois vendorizados em `js/vendor/`
   SQL direto), `agua_prazos_analise`, segundo laboratório (estrutura
   já suporta, falta amostra para calibrar).
 
+## Regra do sistema — gabarito de laudo e prazo de preservação (Água)
+Entrega 3 do plano em `docs/qualidade-agua/plano-leitura-laudo-e-alertas.md`
+(migrations 307/308/308b/309), fechando duas das quatro pendências da
+Entrega 2 (as outras duas — segundo laboratório, OCR não-SIMD —
+continuam sem amostra/necessidade real, registradas como estão).
+
+- **Cadastro de gabarito pela mesa** (aba "Gabaritos de laudo" em
+  `pages/agua-pontos.html`): editor de JSON, não calibrador visual —
+  medir a posição de cada campo contra um laudo real é trabalho de
+  quem está olhando o PDF (como a Entrega 2 fez para o QUILAB); a tela
+  cadastra o resultado dessa medição, não faz a medição. Editar (não
+  criar) exige reauth + justificativa, mesmo tratamento de
+  `agua_atualizar_ponto`/`agua_atualizar_laboratorio` — mudar o
+  gabarito muda o que o parser propõe em todo lançamento futuro.
+- **Prazo de preservação** (`agua_prazos_analise`, 18 parâmetros do
+  Standard Methods 24ª ED — a mesma norma citada no laudo — em tabela,
+  nunca código): `agua_prazo_preservacao_alertas(data_coleta,
+  data_recebimento, parametros[])` compara o intervalo coleta→
+  recebimento contra o prazo de cada parâmetro presente na amostra.
+  **Sempre informativo, nunca bloqueia** — estourar o prazo não é
+  "resultado errado", é "resultado com validade comprometida", e isso
+  tem de ficar registrado, não impedir o lançamento.
+- **Recebimento no laboratório é PROXY do início da análise** — este
+  laudo não imprime data de análise em si, só coleta e recebimento.
+  Aproximação FAVORÁVEL: a análise só pode ocorrer depois do
+  recebimento, então o alerta é piso do atraso real, nunca alarme
+  inflado. Campo novo: `agua_coletas.data_recebimento_laboratorio`.
+- ⚠️ **Recebimento NUNCA entra na trava de identidade.** Validado com
+  OCR de verdade: dia/mês saem corretos, mas o ano erra ocasionalmente
+  um dígito (mesmo modo de falha da Entrega 2 — "3,17"→"3,47").
+  Bloquear autofill por causa desse campo geraria falso bloqueio
+  demais. `aguaLaudoExtrairDataPlausivel()` só propõe a data quando o
+  ano cai num intervalo plausível (2015 até ano atual+1); fora disso,
+  `null` — o texto lido fica só como referência, o técnico digita.
+- Guarda: +2 testes em `tests/agua-laudo-parser.test.js` (12 no
+  total).
+- Sem mudança em `pwa/sw.js`: `agua-pontos.html` e `agua-laudos.html`
+  são telas de mesa, não app de campo.
+
 ## Próxima tarefa
 Módulo Qualidade da Água (IQA): as 5 fases do plano original estão
 ENTREGUES (ver `docs/qualidade-agua/plano.md`, seções "Fase 0" a "Fase

@@ -540,3 +540,60 @@ o recorte da imagem, nunca confia no texto sozinho).
   calibrar.
 - OCR não-SIMD (navegador antigo) — sem amostra de necessidade real
   ainda.
+
+---
+
+# Entrega 3 — ENTREGUE (migrations 307/308/308b/309)
+
+Duas das quatro pendências da Entrega 2 eram codificáveis sem dado
+novo do usuário; as outras duas (segundo laboratório, OCR não-SIMD)
+continuam sem amostra/necessidade real e ficam registradas como estão.
+
+## O que foi construído
+
+| Peça | Onde |
+|---|---|
+| RPC de edição do gabarito (reauth + justificativa) | `agua_atualizar_laudo_template` (307) |
+| Cadastro/edição de gabarito pela mesa | aba "Gabaritos de laudo" em `pages/agua-pontos.html` |
+| Prazo de preservação por parâmetro (Standard Methods) | `agua_prazos_analise`, 18 parâmetros seedados (308) |
+| `agua_coletas.data_recebimento_laboratorio` | coluna nova (308) |
+| A malha do prazo | `agua_prazo_preservacao_alertas()` (308, formatação pt-BR corrigida em 308b) |
+| Campo "Recebimento no laboratório" + alerta | `pages/agua-laudos.html` |
+| Extração da data de recebimento, com validação de plausibilidade | `js/agua-laudo-ocr.js` (`aguaLaudoExtrairDataPlausivel`) |
+| Gabarito do QUILAB ganha o campo `recebimento` | seed (309) |
+| Guarda | +2 testes em `tests/agua-laudo-parser.test.js` (12 no total) |
+
+## Decisões de desenho
+
+- **Cadastro de gabarito é um editor de JSON, não um calibrador visual
+  de posição.** Medir onde cada campo fica na página de um laudo real
+  é trabalho de quem está olhando o PDF (como a Entrega 2 fez para o
+  QUILAB) — a tela serve para CADASTRAR o resultado dessa medição, não
+  para fazer a medição. Validação de FORMA (top/left/width/height 0–1,
+  casas_decimais inteiro) acontece ao vivo, mas não confere se a
+  posição está certa contra um laudo de verdade.
+- **Editar (não criar) um gabarito passa por reauth + justificativa**,
+  mesmo tratamento de `agua_atualizar_ponto`/`agua_atualizar_laboratorio`
+  (migration 270) — mudar o gabarito muda o que o parser propõe em
+  todo lançamento futuro daquele laboratório, é mudança de
+  comportamento do sistema, não cadastro comum.
+- **Recebimento no laboratório é proxy de "início da análise"**, não o
+  dado real (este laudo não imprime data de análise em si) —
+  aproximação FAVORÁVEL: a análise só pode ocorrer depois do
+  recebimento, então um alerta disparado por essa conta é piso do
+  atraso real, nunca alarme inflado.
+- **Recebimento NUNCA entra na trava de identidade (§3.3).** Validado
+  com OCR de verdade contra as duas fixtures: dia/mês saem corretos,
+  mas o ano erra ocasionalmente um dígito (mesmo modo de falha já
+  documentado na Entrega 2) — bloquear autofill por causa desse campo
+  geraria falso bloqueio com frequência inaceitável.
+  `aguaLaudoExtrairDataPlausivel` só propõe a data quando o ano
+  extraído cai num intervalo plausível (2015 até ano atual+1); fora
+  disso devolve `null` e o texto lido fica só como referência.
+- **Prazo é sempre informativo (nível `informar`), nunca bloqueia** —
+  mesmo espírito de toda a malha de alertas: estourar o prazo não é
+  "resultado errado", é "resultado com validade comprometida", e isso
+  tem de ficar registrado, não impedir o lançamento.
+- **Prazos em Standard Methods 24ª ED** (a mesma norma que o laudo do
+  QUILAB cita), em tabela — parâmetro de referência normativa, nunca
+  código, mesmo motivo de `agua_limites_conama`/`agua_laudo_templates`.
