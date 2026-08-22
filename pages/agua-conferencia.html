@@ -127,8 +127,15 @@ let _coletas = [], _labs = [], _editandoId = null
     '</div></div></div>'
 
   carregarLogosSidebar()
-  await carregarLista()
+  await Promise.all([carregarLabsAtivos(), carregarLista()])
 })()
+
+async function carregarLabsAtivos() {
+  const { data } = await db.from('agua_laboratorios').select('id,nome').eq('ativo', true).order('nome')
+  _labs = data || []
+  const sel = document.getElementById('ag-laboratorio')
+  if (sel) sel.innerHTML = '<option value="">Selecione...</option>' + _labs.map(l => `<option value="${l.id}">${esc(l.nome)}</option>`).join('')
+}
 
 async function carregarLista() {
   const [{ data, error }, { data: statusRows }] = await Promise.all([
