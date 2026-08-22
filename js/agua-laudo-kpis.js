@@ -102,10 +102,11 @@ function aguaKpisFilaHTML(lista, labelFn, statusCounts) {
 // Quarentena (pages/agua-conferencia.html) — o que preocupa é volume e
 // tempo parado, não um limiar de atraso (a régua daqui não é urgência
 // de laboratório, é backlog de conferência humana).
-function aguaKpisQuarentenaHTML(lista, totalColetas, labelFn) {
+function aguaKpisQuarentenaHTML(lista, totalColetas, labelFn, statusCounts) {
   const s = _aguaKpiStats(lista)
   const pct = totalColetas ? (s.total / totalColetas) * 100 : null
   return `<div class="adash-kpi-row">
+    ${aguaKpisSituacaoRoscaHTML(statusCounts)}
     <div class="adash-card">
       <div class="adash-card-topo"><p class="adash-card-tit">Em quarentena</p></div>
       <div class="adash-num-linha"><span class="adash-num">${s.total}</span></div>
