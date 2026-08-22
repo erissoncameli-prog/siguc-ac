@@ -2,7 +2,7 @@ const { chromium } = require('playwright');
 const fs = require('fs');
 (async () => {
   const browser = await chromium.launch();
-  const page = await browser.newPage({ viewport: { width: 1100, height: 500 } });
+  const page = await browser.newPage({ viewport: { width: 1100, height: 650 } });
   await page.route('**/cdn.jsdelivr.net/**', route => route.abort());
   await page.route('**/tile.openstreetmap.org/**', route => route.abort());
   await page.addInitScript((coletas) => {
@@ -34,7 +34,10 @@ const fs = require('fs');
   await page.click('#rl-btn-export');
   await page.waitForTimeout(300);
   await page.screenshot({ path: 'verif-export-menu.png' });
-  const html = await page.locator('#rl-export-menu').innerHTML();
-  console.log(html);
+  const box = await page.locator('#rl-btn-xlsx').boundingBox();
+  const visible = await page.locator('#rl-btn-xlsx').isVisible();
+  console.log('xlsx button box:', box, 'visible:', visible);
+  const menuBox = await page.locator('#rl-export-menu').boundingBox();
+  console.log('menu box:', menuBox);
   await browser.close();
 })();
