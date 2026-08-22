@@ -137,6 +137,17 @@ async function carregarLista() {
   renderLista()
 }
 
+// `quarentena_motivo` pode reunir mais de um achado numa linha só — a
+// importação da série histórica (migration 253) concatena os critérios
+// com ' | ' (array_to_string(ARRAY[...], ' | ')) quando mais de um bate
+// na mesma coleta (ex.: pH impossível E ano da campanha divergente).
+// Contar os segmentos dá ao conferente uma ideia do tamanho do
+// problema antes de abrir o modal — 1 achado é digitação pontual, 3+
+// pode ser um laudo inteiro para revisar.
+function aguaContarInconsistencias(motivo) {
+  return motivo ? motivo.split(' | ').filter(s => s.trim()).length : 0
+}
+
 function renderLista() {
   const termo = (document.getElementById('ag-filtro')?.value || '').trim().toLowerCase()
   const tbody = document.getElementById('tbody-ag')
@@ -148,16 +159,22 @@ function renderLista() {
   })
   document.getElementById('ag-contador').textContent = `${lista.length} de ${_coletas.length} em quarentena`
   if (!lista.length) { tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:24px;color:#9CA3AF">Nenhuma coleta em quarentena</td></tr>'; return }
-  tbody.innerHTML = lista.map(c => `
+  tbody.innerHTML = lista.map(c => {
+    const nInc = aguaContarInconsistencias(c.quarentena_motivo)
+    return `
     <tr>
       <td class="mono">${esc(c.linha_origem_planilha ?? '—')}</td>
       <td class="mono" style="font-size:11px">${esc(c.codigo_amostra || '—')}</td>
       <td>${esc(c.agua_pontos_coleta?.nome || '—')} <span style="color:#9CA3AF;font-size:11px">(${esc(c.agua_pontos_coleta?.codigo_ana || '')})</span></td>
       <td style="font-size:12px">${esc(c.agua_campanhas?.ano ?? '')}/${c.agua_campanhas?.ordem === 'segunda' ? '2ª' : '1ª'}</td>
       <td style="font-size:12px">${formatData(c.data_coleta)}</td>
-      <td style="font-size:12px;max-width:360px;white-space:normal">${esc((c.quarentena_motivo || '').slice(0, 140))}${(c.quarentena_motivo || '').length > 140 ? '…' : ''}</td>
+      <td style="font-size:12px;max-width:360px;white-space:normal">
+        <span class="badge ${nInc > 1 ? 'badge-erro' : 'badge-cinza'}" title="${nInc} inconsistência${nInc === 1 ? '' : 's'} apontada${nInc === 1 ? '' : 's'} nesta linha" style="margin-right:6px;vertical-align:top">${nInc}</span>
+        ${esc((c.quarentena_motivo || '').slice(0, 140))}${(c.quarentena_motivo || '').length > 140 ? '…' : ''}
+      </td>
       <td><button class="btn btn-xs btn-ghost" onclick="abrirAg('${c.id}')">Conferir</button></td>
-    </tr>`).join('')
+    </tr>`
+  }).join('')
 }
 
 function formatData(str) {
