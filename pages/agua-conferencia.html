@@ -137,6 +137,17 @@ async function carregarLista() {
   renderLista()
 }
 
+// `quarentena_motivo` pode reunir mais de um achado numa linha só — a
+// importação da série histórica (migration 253) concatena os critérios
+// com ' | ' (array_to_string(ARRAY[...], ' | ')) quando mais de um bate
+// na mesma coleta (ex.: pH impossível E ano da campanha divergente).
+// Contar os segmentos dá ao conferente uma ideia do tamanho do
+// problema antes de abrir o modal — 1 achado é digitação pontual, 3+
+// pode ser um laudo inteiro para revisar.
+function aguaContarInconsistencias(motivo) {
+  return motivo ? motivo.split(' | ').filter(s => s.trim()).length : 0
+}
+
 function renderLista() {
   const termo = (document.getElementById('ag-filtro')?.value || '').trim().toLowerCase()
   const tbody = document.getElementById('tbody-ag')
