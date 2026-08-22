@@ -33,6 +33,7 @@
 // Índices pré-processados: { aneis:[{ring, minX, minY, maxX, maxY}], ... }
 let _geoAcre = null      // { aneis } — limite do estado
 let _geoUCs  = null      // [{ nome, aneis }] — uma entrada por UC
+let _geoMunicipios = null // [{ nome, aneis }] — uma entrada por município
 let _geoAcrePromise = null
 
 // ── Ponto em polígono (ray-casting) ───────────────────────────
@@ -138,6 +139,34 @@ function geoUCEm(lat, lng) {
   return null
 }
 
+// ── Municípios ─────────────────────────────────────────────────
+// Mesmo mecanismo de geoUCsPreparar/geoUCEm, para um segundo
+// conjunto de polígonos (data/municipios_acre.geojson). Existe porque
+// o boletim hidrometeorológico (rh-boletim.html) precisa de "focos de
+// calor por município" e `focos_calor.municipio` nunca é preenchido
+// na ingestão (achado ao construir o boletim: 0 de 291 linhas com o
+// campo) — a classificação sempre foi feita por quem monta o boletim
+// manualmente, olhando o mapa. Nunca uma segunda implementação de PIP:
+// reaproveita _geoIndexarGeom/_geoPipIndexado, só guarda um índice
+// nomeado a mais.
+function geoMunicipiosPreparar(geojson) {
+  if (!geojson?.features) { _geoMunicipios = null; return }
+  _geoMunicipios = geojson.features.map(f => ({
+    nome:  f.properties?.nome || f.properties?.NM_MUN || f.properties?.NAME || f.properties?.name || '',
+    aneis: _geoIndexarGeom(f.geometry)
+  })).filter(m => m.aneis.length)
+}
+
+function geoMunicipiosPreparados() { return !!_geoMunicipios }
+
+function geoMunicipioEm(lat, lng) {
+  if (!_geoMunicipios || !isFinite(lat) || !isFinite(lng)) return null
+  for (const m of _geoMunicipios) {
+    if (_geoPipIndexado(lng, lat, m.aneis)) return m.nome
+  }
+  return null
+}
+
 // ── Classificação em lote ─────────────────────────────────────
 
 // Carimba _noAcre e _ucNome em cada item da lista, UMA vez, na carga
@@ -193,5 +222,8 @@ window.geoNoAcre         = geoNoAcre
 window.geoUCsPreparar    = geoUCsPreparar
 window.geoUCsPreparadas  = geoUCsPreparadas
 window.geoUCEm           = geoUCEm
+window.geoMunicipiosPreparar   = geoMunicipiosPreparar
+window.geoMunicipiosPreparados = geoMunicipiosPreparados
+window.geoMunicipioEm          = geoMunicipioEm
 window.geoClassificar    = geoClassificar
 window.geoLatLngDeGeom   = geoLatLngDeGeom

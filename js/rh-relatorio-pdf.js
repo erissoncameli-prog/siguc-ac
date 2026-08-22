@@ -31,6 +31,82 @@ function _rhpdfVariacao(v) {
   return `${n > 0 ? '+' : ''}${_rhpdfNum(n, 0)}`
 }
 
+// ── Blocos reutilizáveis ─────────────────────────────────────────
+// Extraídos para serem chamados também por js/rh-boletim-pdf.js (bloco
+// "Nível dos Rios" do Boletim/Relatório) — nunca uma segunda
+// implementação da mesma tabela. Cada bloco só desenha a partir de
+// `ctx.y` corrente; quem chama decide o título da seção ao redor.
+
+function _rhpdfBlocoEmCota(ctx, dados) {
+  const emCota = (dados || []).filter(l => Number(l.estacoes_em_cota) > 0)
+  _agpdfTitulo(ctx, 'Rios com estação acima de cota')
+  if (!emCota.length) {
+    _agpdfParagrafo(ctx, 'Nenhuma estação acima da cota de atenção neste dia.', { muted: true })
+    return
+  }
+  _agpdfTabela(ctx, {
+    head: [['Rio', 'Estações em cota', 'Pior situação', 'Nível máx. (cm)', 'Variação (cm)', 'Chuva (mm)']],
+    body: emCota.map(l => [
+      l.rio, String(l.estacoes_em_cota), _rhpdfLabelCota(l.pior_situacao),
+      _rhpdfNum(l.nivel_max_cm, 0), _rhpdfVariacao(l.variacao_cm), _rhpdfNum(l.chuva_total_mm, 1),
+    ]),
+    columnStyles: { 1: { halign: 'center' }, 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right' } },
+  })
+}
+
+function _rhpdfBlocoResumoPorRio(ctx, dados) {
+  _agpdfTitulo(ctx, 'Resumo por rio — nível e chuva')
+  if (!(dados || []).length) {
+    _agpdfParagrafo(ctx, 'Nenhuma leitura registrada neste dia.', { muted: true })
+    return
+  }
+  _agpdfTabela(ctx, {
+    head: [['Rio', 'Bacia', 'Est.', 'Nível médio', 'Nível máx.', 'Variação', 'Chuva total', 'Chuva máx.']],
+    body: dados.map(l => [
+      l.rio, l.bacia || '—', String(l.n_estacoes),
+      _rhpdfNum(l.nivel_medio_cm, 0), _rhpdfNum(l.nivel_max_cm, 0), _rhpdfVariacao(l.variacao_cm),
+      _rhpdfNum(l.chuva_total_mm, 1), _rhpdfNum(l.chuva_max_mm, 1),
+    ]),
+    columnStyles: {
+      2: { halign: 'center' }, 3: { halign: 'right' }, 4: { halign: 'right' },
+      5: { halign: 'right' }, 6: { halign: 'right' }, 7: { halign: 'right' },
+    },
+  })
+}
+
+function _rhpdfBlocoDetalhePorEstacao(ctx, dados) {
+  const detalhes = (dados || []).flatMap(l => (l.detalhe || []).map(d => ({ rio: l.rio, ...d })))
+  if (!detalhes.length) return
+  _agpdfTitulo(ctx, 'Detalhe por estação')
+  _agpdfTabela(ctx, {
+    head: [['Estação', 'Rio', 'Nível início', 'Nível fim', 'Variação', 'Amplitude', 'Chuva', 'Situação']],
+    body: detalhes.map(d => [
+      d.nome, d.rio,
+      _rhpdfNum(d.nivel_ini_cm, 0), _rhpdfNum(d.nivel_fim_cm, 0), _rhpdfVariacao(d.variacao_cm),
+      _rhpdfNum(d.amplitude_cm, 0), _rhpdfNum(d.chuva_mm, 1), _rhpdfLabelCota(d.situacao),
+    ]),
+    columnStyles: {
+      2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' },
+      5: { halign: 'right' }, 6: { halign: 'right' },
+    },
+  })
+}
+
+function _rhpdfBlocoInventario(ctx, estacoes) {
+  const inv = estacoes || []
+  if (!inv.length) return
+  _agpdfTitulo(ctx, 'Estações cadastradas — estado atual')
+  _agpdfTabela(ctx, {
+    head: [['Estação', 'Código ANA', 'Rio', 'Município', 'Última leitura', 'Nível', 'Var. 24h', 'Situação']],
+    body: inv.map(e => [
+      e.nome, e.codigo_ana || '—', e.rio || '—', e.municipio || '—',
+      e.ultima_leitura ? new Date(e.ultima_leitura).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : 'sem leitura',
+      _rhpdfNum(e.nivel_atual_cm, 0), _rhpdfVariacao(e.variacao_24h_cm), _rhpdfLabelCota(e.situacao_cota),
+    ]),
+    columnStyles: { 5: { halign: 'right' }, 6: { halign: 'right' } },
+  })
+}
+
 // `linhas`: retorno de rh_relatorio_diario. `dataTxt`: dia em DD/MM/AAAA.
 // `estacoes` (opcional): vw_rh_estacoes_detalhe, para o anexo com o
 // estado atual de cada estação.
@@ -46,7 +122,6 @@ async function rhRelMontarPdfDiario(linhas, dataTxt, cab, protocolo, estacoes) {
   }
 
   const dados = linhas || []
-  const emCota = dados.filter(l => Number(l.estacoes_em_cota) > 0)
   const totalEstacoes = dados.reduce((s, l) => s + Number(l.n_estacoes || 0), 0)
   const chuvaTotal = dados.reduce((s, l) => s + Number(l.chuva_total_mm || 0), 0)
 
@@ -64,73 +139,14 @@ async function rhRelMontarPdfDiario(linhas, dataTxt, cab, protocolo, estacoes) {
 
   // A manchete: o que exige decisão hoje. Vem primeiro de propósito —
   // quem lê o relatório de cheia precisa disso na primeira olhada.
-  if (emCota.length) {
-    _agpdfTitulo(ctx, 'Rios com estação acima de cota')
-    _agpdfTabela(ctx, {
-      head: [['Rio', 'Estações em cota', 'Pior situação', 'Nível máx. (cm)', 'Variação (cm)', 'Chuva (mm)']],
-      body: emCota.map(l => [
-        l.rio, String(l.estacoes_em_cota), _rhpdfLabelCota(l.pior_situacao),
-        _rhpdfNum(l.nivel_max_cm, 0), _rhpdfVariacao(l.variacao_cm), _rhpdfNum(l.chuva_total_mm, 1),
-      ]),
-      columnStyles: { 1: { halign: 'center' }, 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right' } },
-    })
-  } else {
-    _agpdfTitulo(ctx, 'Rios com estação acima de cota')
-    _agpdfParagrafo(ctx, 'Nenhuma estação acima da cota de atenção neste dia.', { muted: true })
-  }
-
-  _agpdfTitulo(ctx, 'Resumo por rio')
-  if (dados.length) {
-    _agpdfTabela(ctx, {
-      head: [['Rio', 'Bacia', 'Est.', 'Nível médio', 'Nível máx.', 'Variação', 'Chuva total', 'Chuva máx.']],
-      body: dados.map(l => [
-        l.rio, l.bacia || '—', String(l.n_estacoes),
-        _rhpdfNum(l.nivel_medio_cm, 0), _rhpdfNum(l.nivel_max_cm, 0), _rhpdfVariacao(l.variacao_cm),
-        _rhpdfNum(l.chuva_total_mm, 1), _rhpdfNum(l.chuva_max_mm, 1),
-      ]),
-      columnStyles: {
-        2: { halign: 'center' }, 3: { halign: 'right' }, 4: { halign: 'right' },
-        5: { halign: 'right' }, 6: { halign: 'right' }, 7: { halign: 'right' },
-      },
-    })
-  } else {
-    _agpdfParagrafo(ctx, 'Nenhuma leitura registrada neste dia.', { muted: true })
-  }
-
-  // Detalhe por estação — o que sustenta o número agregado acima.
-  const detalhes = dados.flatMap(l => (l.detalhe || []).map(d => ({ rio: l.rio, ...d })))
-  if (detalhes.length) {
-    _agpdfTitulo(ctx, 'Detalhe por estação')
-    _agpdfTabela(ctx, {
-      head: [['Estação', 'Rio', 'Nível início', 'Nível fim', 'Variação', 'Amplitude', 'Chuva', 'Situação']],
-      body: detalhes.map(d => [
-        d.nome, d.rio,
-        _rhpdfNum(d.nivel_ini_cm, 0), _rhpdfNum(d.nivel_fim_cm, 0), _rhpdfVariacao(d.variacao_cm),
-        _rhpdfNum(d.amplitude_cm, 0), _rhpdfNum(d.chuva_mm, 1), _rhpdfLabelCota(d.situacao),
-      ]),
-      columnStyles: {
-        2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' },
-        5: { halign: 'right' }, 6: { halign: 'right' },
-      },
-    })
-  }
+  _rhpdfBlocoEmCota(ctx, dados)
+  _rhpdfBlocoResumoPorRio(ctx, dados)
+  _rhpdfBlocoDetalhePorEstacao(ctx, dados)
 
   // Anexo: inventário com o estado atual — inclusive as estações SEM
   // leitura no dia, que somem das tabelas acima. Silêncio de estação é
   // informação (pode ser telemetria caída), nunca se esconde.
-  const inv = estacoes || []
-  if (inv.length) {
-    _agpdfTitulo(ctx, 'Estações cadastradas — estado atual')
-    _agpdfTabela(ctx, {
-      head: [['Estação', 'Código ANA', 'Rio', 'Município', 'Última leitura', 'Nível', 'Var. 24h', 'Situação']],
-      body: inv.map(e => [
-        e.nome, e.codigo_ana || '—', e.rio || '—', e.municipio || '—',
-        e.ultima_leitura ? new Date(e.ultima_leitura).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : 'sem leitura',
-        _rhpdfNum(e.nivel_atual_cm, 0), _rhpdfVariacao(e.variacao_24h_cm), _rhpdfLabelCota(e.situacao_cota),
-      ]),
-      columnStyles: { 5: { halign: 'right' }, 6: { halign: 'right' } },
-    })
-  }
+  _rhpdfBlocoInventario(ctx, estacoes)
 
   _agpdfParagrafo(ctx,
     'Níveis e chuvas conforme as leituras recebidas das estações no período. Cotas de atenção, alerta e ' +
