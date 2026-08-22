@@ -12,6 +12,7 @@
 <script src="../js/layout.js"></script>
 <script src="../js/reautenticar.js"></script>
 <script src="../js/agua-alertas.js"></script>
+<script src="../js/agua-iqa-visual.js"></script>
 <script src="../js/agua-laudo-kpis.js"></script>
 </head>
 <body>
@@ -120,17 +121,19 @@ let _coletas = [], _editandoId = null
 })()
 
 async function carregarLista() {
-  const [{ data, error }, { count: totalColetas }] = await Promise.all([
+  const [{ data, error }, { data: statusRows }] = await Promise.all([
     db.from('agua_coletas')
       .select('*, agua_pontos_coleta(nome,codigo_ana), agua_campanhas(ano,ordem)')
       .eq('status', 'quarentena')
       .order('linha_origem_planilha'),
-    db.from('agua_coletas').select('id', { count: 'exact', head: true }),
+    db.from('agua_coletas').select('status'),
   ])
   if (error) { toast(error.message || 'Erro ao carregar', 'error'); return }
   _coletas = data || []
-  document.getElementById('ag-kpis').innerHTML = aguaKpisQuarentenaHTML(_coletas, totalColetas || 0,
-    c => `linha ${c.linha_origem_planilha ?? '—'} · ${c.agua_pontos_coleta?.nome || ''}`)
+  const counts = aguaContarPorStatus(statusRows)
+  const totalColetas = (statusRows || []).length
+  document.getElementById('ag-kpis').innerHTML = aguaKpisQuarentenaHTML(_coletas, totalColetas,
+    c => `linha ${c.linha_origem_planilha ?? '—'} · ${c.agua_pontos_coleta?.nome || ''}`, counts)
   renderLista()
 }
 
