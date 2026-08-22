@@ -155,9 +155,25 @@ async function rhBoletimMontarPdf(b, ctxDados, cab, protocolo) {
     await _rhbolImagem(ctx, b.mapa_risco_fogo_ucs_url, 'Fonte: INPE/BDQueimadas.')
   }
 
-  // ── Qualidade do ar ───────────────────────────────────────────────
+  // ── Qualidade do ar (automático — PurpleAir/MPAC) ────────────────
+  const ar = ctxDados.qualidadeAr || []
+  if (ar.length) {
+    _agpdfTitulo(ctx, 'Qualidade do ar — Rede PurpleAir/MPAC (PM2.5)')
+    _agpdfTabela(ctx, {
+      head: [['Sensor', 'PM2.5 bruto (µg/m³)', 'Última leitura']],
+      body: ar.map(s => [
+        s.nome || '—', _rhbolNum(s.pm25_bruto),
+        s.data_hora ? new Date(s.data_hora).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : '—',
+      ]),
+      columnStyles: { 1: { halign: 'right' } },
+    })
+    _agpdfParagrafo(ctx,
+      'PM2.5 bruto, sem calibração LRAPA (fórmula ainda não confirmada contra um boletim publicado). ' +
+      'Referência: OMS recomenda que a média diária não ultrapasse 15 µg/m³. Fonte: rede PurpleAir/MPAC.', { muted: true })
+  }
+
   if (b.qualidade_ar_purpleair_url || b.qualidade_ar_purpleair_texto) {
-    _agpdfTitulo(ctx, 'Qualidade do ar — Rede PurpleAir')
+    _agpdfTitulo(ctx, 'Qualidade do ar — mapa oficial PurpleAir')
     if (b.qualidade_ar_purpleair_texto) _agpdfParagrafo(ctx, b.qualidade_ar_purpleair_texto)
     await _rhbolImagem(ctx, b.qualidade_ar_purpleair_url, 'Fonte: PurpleAir/MPAC. Referência: Resolução CONAMA nº 506/2024.')
   }
