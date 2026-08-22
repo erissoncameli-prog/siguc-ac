@@ -252,20 +252,16 @@ function aguaIqaBarrasHTML(itens, opts) {
     ${temFraco ? '<p style="font-size:10px;color:#9CA3AF;margin-top:2px">Barra esmaecida = inclui coleta ainda em conferência</p>' : ''}`
 }
 
-// Rosca (donut) da distribuição por faixa do IQA — a única leitura do
-// painel em que as 5 cores de faixa aparecem juntas. Substituiu uma
-// barra segmentada horizontal (pedido do usuário: "fica melhor com uma
-// rosca"); mesmo dado (aguaRelDistribuicaoFaixas), mesma regra de
-// nunca deixar a cor sozinha — legenda sempre junto, com o número.
-// `contagem`: { 'Ótima': n, ... }; `semIQA` entra como fatia cinza.
-function aguaIqaFaixasRoscaHTML(contagem, semIQA, opts) {
-  const o = Object.assign({ tamanho: 156, espessura: 24 }, opts || {})
-  const itens = AGUA_IQA_FAIXA_ORDEM
-    .map(f => ({ label: f, n: (contagem || {})[f] || 0, cor: AGUA_IQA_FAIXA_COR[f] }))
-    .concat(semIQA ? [{ label: 'Sem índice', n: semIQA, cor: AGUA_SEM_IQA_COR }] : [])
-    .filter(i => i.n > 0)
+// Primitivo genérico de rosca (donut) — extraído desta função para
+// servir também KPIs de status fora do IQA (js/agua-laudo-kpis.js:
+// situação da série aguardando_lab/completo/quarentena). Nenhuma tela
+// desenha rosca na mão; toda rosca nova do módulo passa por aqui.
+// `itens`: [{label, n, cor}] JÁ filtrado a n>0 — quem chama decide o
+// que entra (faixa de IQA, status de coleta, o que for).
+function _aguaRoscaHTML(itens, opts) {
+  const o = Object.assign({ tamanho: 156, espessura: 24, vazioMsg: 'Sem dado.', ariaLabelPrefix: 'Distribuição', unidade: 'coleta' }, opts || {})
   const total = itens.reduce((s, i) => s + i.n, 0)
-  if (!total) return '<p style="text-align:center;font-size:12px;color:#9CA3AF;margin:8px 0;padding:20px 0">Nenhuma coleta com índice calculado no recorte.</p>'
+  if (!total) return `<p style="text-align:center;font-size:12px;color:#9CA3AF;margin:8px 0;padding:20px 0">${_aguaEsc(o.vazioMsg)}</p>`
 
   const w = o.tamanho, cx = w / 2, cy = w / 2, r = (w - o.espessura) / 2
   const circ = 2 * Math.PI * r
@@ -278,7 +274,7 @@ function aguaIqaFaixasRoscaHTML(contagem, semIQA, opts) {
     acumulado += frac
     return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${i.cor}" stroke-width="${o.espessura}" stroke-linecap="butt"
       stroke-dasharray="${comprimento.toFixed(2)} ${(circ - comprimento).toFixed(2)}"
-      stroke-dashoffset="${offset.toFixed(2)}" transform="rotate(-90 ${cx} ${cy})"><title>${_aguaEsc(i.label)}: ${i.n} coleta(s)</title></circle>`
+      stroke-dashoffset="${offset.toFixed(2)}" transform="rotate(-90 ${cx} ${cy})"><title>${_aguaEsc(i.label)}: ${i.n} ${o.unidade}${i.n !== 1 ? 's' : ''}</title></circle>`
   }).join('')
 
   const legenda = itens.map(i => `
@@ -291,14 +287,32 @@ function aguaIqaFaixasRoscaHTML(contagem, semIQA, opts) {
   // atributo dá um jeito direto de ler o número sem parsear SVG.
   return `<div data-total="${total}" style="display:flex;flex-direction:column;align-items:center;gap:10px">
     <svg viewBox="0 0 ${w} ${w}" style="display:block;width:${w}px;max-width:100%;height:auto" role="img"
-        aria-label="Distribuição por faixa do IQA: ${_aguaEsc(itens.map(i => `${i.label} ${i.n}`).join(', '))}">
+        aria-label="${_aguaEsc(o.ariaLabelPrefix)}: ${_aguaEsc(itens.map(i => `${i.label} ${i.n}`).join(', '))}">
       <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#F3F4F6" stroke-width="${o.espessura}"/>
       ${arcos}
       <text x="${cx}" y="${cy - 3}" text-anchor="middle" font-family="'Fraunces',Georgia,serif" font-size="${Math.round(w * 0.155)}" font-weight="700" fill="#111827">${total}</text>
-      <text x="${cx}" y="${cy + 15}" text-anchor="middle" font-family="'DM Sans',sans-serif" font-size="10" fill="#6B7280">coleta${total !== 1 ? 's' : ''}</text>
+      <text x="${cx}" y="${cy + 15}" text-anchor="middle" font-family="'DM Sans',sans-serif" font-size="10" fill="#6B7280">${_aguaEsc(o.unidade)}${total !== 1 ? 's' : ''}</text>
     </svg>
     <div style="display:flex;flex-wrap:wrap;gap:8px 12px;justify-content:center">${legenda}</div>
   </div>`
+}
+
+// Rosca (donut) da distribuição por faixa do IQA — a única leitura do
+// painel em que as 5 cores de faixa aparecem juntas. Substituiu uma
+// barra segmentada horizontal (pedido do usuário: "fica melhor com uma
+// rosca"); mesmo dado (aguaRelDistribuicaoFaixas), mesma regra de
+// nunca deixar a cor sozinha — legenda sempre junto, com o número.
+// `contagem`: { 'Ótima': n, ... }; `semIQA` entra como fatia cinza.
+function aguaIqaFaixasRoscaHTML(contagem, semIQA, opts) {
+  const o = Object.assign({ tamanho: 156, espessura: 24 }, opts || {})
+  const itens = AGUA_IQA_FAIXA_ORDEM
+    .map(f => ({ label: f, n: (contagem || {})[f] || 0, cor: AGUA_IQA_FAIXA_COR[f] }))
+    .concat(semIQA ? [{ label: 'Sem índice', n: semIQA, cor: AGUA_SEM_IQA_COR }] : [])
+    .filter(i => i.n > 0)
+  return _aguaRoscaHTML(itens, Object.assign({
+    vazioMsg: 'Nenhuma coleta com índice calculado no recorte.',
+    ariaLabelPrefix: 'Distribuição por faixa do IQA',
+  }, o))
 }
 
 // ── Estilo de marcador (mapa) ─────────────────────────────────────
