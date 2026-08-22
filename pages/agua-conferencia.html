@@ -248,6 +248,17 @@ async function salvarAg(promover) {
     const texto = aguaAlertasTextoConfirmacao(alertas)
     if (texto && !confirm(texto)) return
 
+    // Mesma regra de pages/agua-laudos.html (migration 310): promover
+    // sem NENHUM resultado de laboratório preenchido devolveria a
+    // linha para "completo sem dado" — o banco também bloqueia isso
+    // (ck_agua_completo_exige_dado_lab), esta é só a checagem
+    // adiantada para o técnico não descobrir só no erro do servidor.
+    const temDadoLab = LAB_FIELDS.some(([campo]) => valorCampo(campo) != null)
+    if (!temDadoLab) {
+      toast('Preencha ao menos um resultado de laboratório antes de promover a completo.', 'error')
+      return
+    }
+
     payload.status = 'completo'
     payload.quarentena_motivo = null
   }
@@ -269,7 +280,10 @@ async function salvarAg(promover) {
     fecharModalAg()
     await carregarLista()
   } catch (e) {
-    toast(e.message?.includes('REAUTH_NECESSARIA') ? 'Sessão de confirmação expirou — tente novamente.' : (e.message || 'Erro ao salvar'), 'error')
+    const msg = e.message?.includes('REAUTH_NECESSARIA') ? 'Sessão de confirmação expirou — tente novamente.'
+      : e.message?.includes('ck_agua_completo_exige_dado_lab') ? 'Preencha ao menos um resultado de laboratório antes de promover a completo.'
+      : (e.message || 'Erro ao salvar')
+    toast(msg, 'error')
   }
   finally { btn.disabled = false }
 }
