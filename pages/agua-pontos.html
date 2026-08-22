@@ -130,6 +130,44 @@
   </div>
 </div>
 
+<!-- Modal Equipamento (sonda) -->
+<div class="modal-overlay" id="modal-equip">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-header">
+      <div class="modal-title" id="me-titulo">Novo Equipamento</div>
+      <button class="modal-close" onclick="fecharModal('equip')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label">Nome/apelido <span class="obrig">*</span></label>
+        <input class="form-control" id="e-nome" placeholder="Ex.: Sonda 1 — HORIBA U-50"></div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Marca</label>
+          <input class="form-control" id="e-marca"></div>
+        <div class="form-group"><label class="form-label">Modelo</label>
+          <input class="form-control" id="e-modelo"></div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Nº de série</label>
+          <input class="form-control mono" id="e-serie"></div>
+        <div class="form-group"><label class="form-label">Data de aquisição</label>
+          <input class="form-control" id="e-aquisicao" type="date"></div>
+      </div>
+      <div class="form-group"><label class="form-label">Status</label>
+        <select class="form-control" id="e-status">
+          <option value="ativo">Ativo (aparece no app)</option>
+          <option value="manutencao">Em manutenção</option>
+          <option value="baixado">Baixado</option>
+        </select></div>
+      <div class="form-group"><label class="form-label">Observações</label>
+        <textarea class="form-control" id="e-obs" rows="2"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="fecharModal('equip')">Cancelar</button>
+      <button class="btn btn-primary" id="btn-salvar-equip" onclick="salvarEquip()">Salvar</button>
+    </div>
+  </div>
+</div>
+
 <!-- Modal Gabarito de laudo -->
 <div class="modal-overlay" id="modal-template">
   <div class="modal" style="max-width:760px">
@@ -196,8 +234,8 @@
 // 248; nada de RPC nova — pode_editar('agua') já autoriza escrita
 // direta (mesma base de pages/agua-conferencia.html).
 
-let _pontos = [], _labs = [], _ucs = [], _templates = []
-let _editandoPontoId = null, _editandoLabId = null, _editandoTemplateId = null
+let _pontos = [], _labs = [], _ucs = [], _templates = [], _equipamentos = []
+let _editandoPontoId = null, _editandoLabId = null, _editandoTemplateId = null, _editandoEquipId = null
 let _podeEditar = false
 let _ptMap = null, _ptMarker = null, _ptMovidoManualmente = false
 
@@ -222,6 +260,7 @@ const ACRE_CENTRO = [-9.5, -70.0]
         <div style="display:flex;gap:4px;padding:4px;background:rgba(0,0,0,.06);border-radius:10px;width:fit-content">
           <button class="tab-btn ativo" id="tab-pontos" onclick="mudarAbaAgua('pontos')">Pontos de coleta</button>
           <button class="tab-btn" id="tab-labs" onclick="mudarAbaAgua('labs')">Laboratórios</button>
+          <button class="tab-btn" id="tab-equip" onclick="mudarAbaAgua('equip')">Equipamentos</button>
           <button class="tab-btn" id="tab-templates" onclick="mudarAbaAgua('templates')">Gabaritos de laudo</button>
         </div>
       </div>
@@ -252,6 +291,24 @@ const ACRE_CENTRO = [-9.5, -70.0]
         </div></div></div>
       </div>
 
+      <div id="aba-equip" style="display:none">
+        <p style="color:#6B7280;font-size:13px;margin:0 0 12px">
+          Sondas usadas para ler os parâmetros de campo (temp./pH/OD/turbidez/condutividade)
+          na coleta. Cadastrada aqui, uma sonda "ativa" aparece no seletor do app de campo —
+          a última escolhida fica como padrão naquele aparelho, e pode ser trocada a qualquer momento.
+        </p>
+        <div class="filter-bar">
+          <input class="form-control search-input" id="busca-equip" placeholder="Buscar sonda..." oninput="renderEquipamentos()">
+          ${_podeEditar ? `<button class="btn btn-primary" onclick="abrirEquip(null)">${bico('plus')} Novo Equipamento</button>` : ''}
+        </div>
+        <div class="card"><div class="table-wrap"><div class="table-scroll">
+          <table>
+            <thead><tr><th>Nome</th><th>Marca/Modelo</th><th>Nº de série</th><th>Status</th><th>Ações</th></tr></thead>
+            <tbody id="tbody-equip"><tr><td colspan="5" style="text-align:center;padding:24px;color:#9CA3AF">Carregando...</td></tr></tbody>
+          </table>
+        </div></div></div>
+      </div>
+
       <div id="aba-templates" style="display:none">
         <p style="color:#6B7280;font-size:13px;margin:0 0 12px">
           O gabarito diz ao leitor automático de laudo (Qualidade da Água → Laudos) ONDE cada
@@ -273,15 +330,17 @@ const ACRE_CENTRO = [-9.5, -70.0]
 
   carregarLogosSidebar()
   bIconsAplicar()
-  await Promise.all([carregarUCs(), carregarPontos(), carregarLabs(), carregarTemplates()])
+  await Promise.all([carregarUCs(), carregarPontos(), carregarLabs(), carregarEquipamentos(), carregarTemplates()])
 })()
 
 function mudarAbaAgua(aba) {
   document.getElementById('aba-pontos').style.display    = aba === 'pontos'    ? '' : 'none'
   document.getElementById('aba-labs').style.display      = aba === 'labs'      ? '' : 'none'
+  document.getElementById('aba-equip').style.display     = aba === 'equip'     ? '' : 'none'
   document.getElementById('aba-templates').style.display = aba === 'templates' ? '' : 'none'
   document.getElementById('tab-pontos').classList.toggle('ativo', aba === 'pontos')
   document.getElementById('tab-labs').classList.toggle('ativo', aba === 'labs')
+  document.getElementById('tab-equip').classList.toggle('ativo', aba === 'equip')
   document.getElementById('tab-templates').classList.toggle('ativo', aba === 'templates')
 }
 
@@ -343,6 +402,84 @@ function renderLabs() {
       <td><span class="badge ${l.ativo ? 'badge-verde' : 'badge-cinza'}">${l.ativo ? 'Ativo' : 'Inativo'}</span></td>
       <td>${_podeEditar ? `<button class="btn btn-xs btn-ghost" onclick="abrirLab('${l.id}')">Editar</button>` : '—'}</td>
     </tr>`).join('')
+}
+
+// ── Equipamentos de leitura (sondas) ─────────────────────────────
+const EQUIP_STATUS_LABEL = { ativo: 'Ativo', manutencao: 'Em manutenção', baixado: 'Baixado' }
+const EQUIP_STATUS_BADGE = { ativo: 'badge-verde', manutencao: 'badge-ouro badge-outline', baixado: 'badge-cinza' }
+
+async function carregarEquipamentos() {
+  const { data, error } = await db.from('agua_equipamentos').select('*').order('nome')
+  if (error) { toast(error.message || 'Erro ao carregar equipamentos', 'error'); return }
+  _equipamentos = data || []
+  renderEquipamentos()
+}
+
+function renderEquipamentos() {
+  const termo = (document.getElementById('busca-equip')?.value || '').trim().toLowerCase()
+  const tbody = document.getElementById('tbody-equip')
+  const lista = _equipamentos.filter(e => !termo
+    || e.nome.toLowerCase().includes(termo)
+    || (e.marca || '').toLowerCase().includes(termo)
+    || (e.modelo || '').toLowerCase().includes(termo)
+    || (e.numero_serie || '').toLowerCase().includes(termo))
+  if (!lista.length) { tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;color:#9CA3AF">Nenhum equipamento cadastrado</td></tr>'; return }
+  tbody.innerHTML = lista.map(e => `
+    <tr>
+      <td>${esc(e.nome)}</td>
+      <td style="font-size:12px">${esc([e.marca, e.modelo].filter(Boolean).join(' / ') || '—')}</td>
+      <td class="mono" style="font-size:12px">${esc(e.numero_serie || '—')}</td>
+      <td><span class="badge ${EQUIP_STATUS_BADGE[e.status] || 'badge-cinza'}">${EQUIP_STATUS_LABEL[e.status] || e.status}</span></td>
+      <td>${_podeEditar ? `<button class="btn btn-xs btn-ghost" onclick="abrirEquip('${e.id}')">Editar</button>` : '—'}</td>
+    </tr>`).join('')
+}
+
+function abrirEquip(id) {
+  _editandoEquipId = id
+  const e = id ? _equipamentos.find(x => x.id === id) : null
+  document.getElementById('me-titulo').textContent = e ? 'Editar Equipamento' : 'Novo Equipamento'
+  document.getElementById('e-nome').value = e?.nome || ''
+  document.getElementById('e-marca').value = e?.marca || ''
+  document.getElementById('e-modelo').value = e?.modelo || ''
+  document.getElementById('e-serie').value = e?.numero_serie || ''
+  document.getElementById('e-aquisicao').value = e?.data_aquisicao || ''
+  document.getElementById('e-status').value = e?.status || 'ativo'
+  document.getElementById('e-obs').value = e?.observacoes || ''
+  document.getElementById('modal-equip').classList.add('aberto')
+}
+
+async function salvarEquip() {
+  const payload = {
+    nome: document.getElementById('e-nome').value.trim(),
+    marca: document.getElementById('e-marca').value.trim() || null,
+    modelo: document.getElementById('e-modelo').value.trim() || null,
+    numero_serie: document.getElementById('e-serie').value.trim() || null,
+    data_aquisicao: document.getElementById('e-aquisicao').value || null,
+    status: document.getElementById('e-status').value,
+    observacoes: document.getElementById('e-obs').value.trim() || null,
+  }
+  if (!payload.nome || payload.nome.length < 2) { toast('Informe o nome do equipamento', 'error'); return }
+
+  let r = null
+  if (_editandoEquipId) {
+    r = await reautenticar({ motivo: 'editar este equipamento de leitura' })
+    if (!r) return
+  }
+
+  const btn = document.getElementById('btn-salvar-equip')
+  btn.disabled = true
+  try {
+    const { error } = _editandoEquipId
+      ? await db.rpc('agua_atualizar_equipamento', { p_id: _editandoEquipId, p_campos: payload, p_justificativa: r.justificativa })
+      : await db.from('agua_equipamentos').insert(payload)
+    if (error) throw error
+    toast('Equipamento salvo!', 'success')
+    fecharModal('equip')
+    await carregarEquipamentos()
+  } catch (e) {
+    toast(e.message?.includes('REAUTH_NECESSARIA') ? 'Sessão de confirmação expirou — tente novamente.' : (e.message || 'Erro ao salvar'), 'error')
+  }
+  finally { btn.disabled = false }
 }
 
 // ── Gabaritos de laudo (Entrega 3) ──────────────────────────────
@@ -640,6 +777,7 @@ function fecharModal(qual) {
   document.getElementById(`modal-${qual}`).classList.remove('aberto')
   if (qual === 'ponto') _editandoPontoId = null
   if (qual === 'lab') _editandoLabId = null
+  if (qual === 'equip') _editandoEquipId = null
   if (qual === 'template') _editandoTemplateId = null
 }
 </script>
