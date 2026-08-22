@@ -383,10 +383,10 @@ function _aguaPainelLegendaHTML(cfg, sempre) {
     </div>`
 }
 
-function _aguaPainelControleLegenda(cfg, sempre) {
+function _aguaPainelControleLegenda(cfg, sempre, legendaFn) {
   const Ctrl = L.Control.extend({ options: { position: 'bottomright' }, onAdd() {
     const div = L.DomUtil.create('div', 'adash-mapa-legenda')
-    div.innerHTML = _aguaPainelLegendaHTML(cfg, sempre)
+    div.innerHTML = (legendaFn || _aguaPainelLegendaHTML)(cfg, sempre)
     L.DomEvent.disableClickPropagation(div); return div
   } })
   return new Ctrl()
@@ -492,8 +492,24 @@ function _aguaPainelPinIcon(estilo) {
 // ali o assunto É a rede hidrográfica, então esconder os rios no modo
 // ruas esvaziaria a tela. Opção ADITIVA de propósito — as duas telas
 // que já usavam a função não mudam de comportamento.
-function aguaPainelMapaCriar(mapaElId, subElId, opts) {
+// Base cartográfica compartilhada: mapa + tiles (ruas/satélite
+// híbrido) + rosa dos ventos + escala + legenda + camadas de
+// referência (limite do Acre, municípios, hidrografia IBGE) +
+// "Configurar camadas". NÃO sabe nada de coleta nem de IQA — quem
+// chama põe os próprios marcadores em cima. Extraída de
+// aguaPainelMapaCriar quando pages/rh-estacoes.html (plataformas
+// hidrometeorológicas) precisou dos MESMOS componentes com outros
+// marcadores e outra legenda: a alternativa seria uma segunda cópia
+// da rosa dos ventos e do painel de camadas, exatamente o que a regra
+// do projeto proíbe.
+//
+// `opts.legendaFn(cfg, referenciaSempre)` devolve o HTML da legenda
+// (o padrão é a legenda de IQA+CONAMA); `opts.referenciaSempre`
+// mantém as camadas de referência visíveis também no mapa de ruas.
+// Devolve { mapa, atualizarLegenda() }.
+function aguaPainelMapaBase(mapaElId, opts) {
   const _opts = opts || {}
+  const legendaFn = _opts.legendaFn || _aguaPainelLegendaHTML
   const mapa = L.map(mapaElId, { attributionControl: false }).setView([-9.5, -70.0], 6)
   let camadaBase = L.tileLayer(AGUA_PAINEL_TILE_RUAS.url, AGUA_PAINEL_TILE_RUAS.opts).addTo(mapa)
 
@@ -531,8 +547,11 @@ function aguaPainelMapaCriar(mapaElId, subElId, opts) {
   let _cfgCamadas = _aguaPainelCamadasCarregar()
   let _acreLayer = null
   let _munLayer = null
-  const _legendaCtl = _aguaPainelControleLegenda(_cfgCamadas, _opts.referenciaSempre).addTo(mapa)
+  const _legendaCtl = _aguaPainelControleLegenda(_cfgCamadas, _opts.referenciaSempre, legendaFn).addTo(mapa)
   const _legendaDiv = _legendaCtl.getContainer()
+  function atualizarLegenda() {
+    if (_legendaDiv) _legendaDiv.innerHTML = legendaFn(_cfgCamadas, _opts.referenciaSempre)
+  }
 
   _aguaPainelRosaDosVentos().addTo(mapa)
   L.control.scale({ position: 'bottomleft', metric: true, imperial: false, maxWidth: 110 }).addTo(mapa)
@@ -550,7 +569,7 @@ function aguaPainelMapaCriar(mapaElId, subElId, opts) {
         if (novoCfg.munNomes) layer.openTooltip()
       })
     }
-    if (_legendaDiv) _legendaDiv.innerHTML = _aguaPainelLegendaHTML(novoCfg, _opts.referenciaSempre)
+    atualizarLegenda()
   }).addTo(mapa)
 
   ;(async function desenharLimiteAcre() {
@@ -600,6 +619,13 @@ function aguaPainelMapaCriar(mapaElId, subElId, opts) {
     errorTileUrl: 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==',
   }))
 
+  return { mapa, atualizarLegenda }
+}
+
+// Mapa dos PONTOS DE COLETA (painel de Relatórios e público) — a base
+// acima + os pinos gota-d'água coloridos por IQA/CONAMA.
+function aguaPainelMapaCriar(mapaElId, subElId, opts) {
+  const { mapa } = aguaPainelMapaBase(mapaElId, opts)
   let marcadores = {}
 
   // `pontosGeomPorId`: { [ponto_id]: [lat, lng] }. `rel` pode ser null

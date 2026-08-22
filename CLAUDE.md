@@ -1166,6 +1166,58 @@ Plano e histórico em `docs/recursos-hidricos/plano.md` (Fase B).
 - `pwa/sw.js`: frota 98 → 99 (`js/layout.js`), agua 19 → 20
   (`js/agua-relatorio-dados.js`).
 
+## Recursos Hídricos — Fase C: Plataformas de Coleta (migrations 305-307)
+`pages/rh-estacoes.html` — estações hidrometeorológicas (nível, chuva,
+vazão) da ANA/estado/terceiros. Plano completo em
+`docs/recursos-hidricos/plano.md` (Fase C).
+- **Duas tabelas**: `rh_estacoes` (inventário + COTAS cadastradas em cm
+  — atenção/alerta/inundação, nunca calculadas) e `rh_medicoes` (série,
+  uma linha por leitura, com `origem` telemetria/convencional/
+  importação/manual). Não confundir com `agua_pontos_coleta` — aquele é
+  onde a SEMA amostra pro IQA; estação é infra de terceiro, série
+  própria. RLS pelo módulo `bacias` (mesma leitura de rede
+  hidrográfica).
+- **`situacao_cota` é DERIVADA em `vw_rh_estacoes_detalhe`**, nunca no
+  cliente. Estação SEM cota cadastrada é NULL → "Sem cota cadastrada",
+  NUNCA "normal" (mesma distinção de `conama_violacoes` nulo na Água).
+- **Testado contra a ANA de verdade, do banco (pg_net), antes de
+  desenhar**: a API telemétrica atual responde 401 (existe, exige
+  credencial); o SOAP antigo não responde mais. `ingest-hidro`
+  (Edge Function) está publicada e PRONTA, mas sem
+  `ANA_HIDROWEB_ID`/`ANA_HIDROWEB_SENHA` nos secrets devolve
+  `sem-credencial` sem gravar nada — ligar é cadastrar os 2 secrets +
+  agendar o cron comentado na migration 307, nunca no frontend.
+- **Hidrograma em SVG** (`js/rh-hidro.js`): nível em linha + chuva em
+  barra invertida do topo, cotas como linha tracejada SEMPRE rotulada
+  (nunca só cor). Mesmas 4 cores de cota já validadas contra
+  daltonismo em `js/agua-iqa-visual.js` — nunca uma paleta nova.
+- **`aguaPainelMapaBase()`** (novo, em `js/agua-painel.js`): a base
+  cartográfica (tiles, rosa dos ventos, escala, camadas de referência,
+  config) foi extraída de `aguaPainelMapaCriar` para servir também o
+  mapa de estações, com `legendaFn` injetável — cada tela usa sua
+  própria legenda sobre a mesma base.
+- **Camada no Mapa das UCs** (`pages/mapa.html`), pedido do usuário
+  "igual os CAR": aba "💧 Rec. Hídricos", checkbox liga/desliga,
+  círculos por `rhCotaCor`, popup com link pra tela dedicada.
+- **Relatório diário por RIO** (`rh_relatorio_diario`, nunca por
+  estação — é a leitura operacional real), em 4 formatos: tela, PDF
+  (`js/rh-relatorio-pdf.js`, reaproveita os primitivos de
+  `js/agua-relatorio-pdf.js` — `linhaModulo` parametrizado pra sair
+  "Recursos Hídricos" no timbre), CSV e e-mail diário
+  (`hidro-relatorio-diario`, destinatários em Configurações › Qualidade
+  da Água, `config_sistema.dados.hidro.emails` — lista vazia é decisão
+  válida, o aviso de cota segue por notificação mesmo sem e-mail).
+- **Notificação de cota** (`rh_checar_cotas`, cron de HORA em hora —
+  não 1×/dia como o resto do projeto, porque cheia é rápido; dedupe por
+  `ref` evita spam) para super_admin/gestor/diretor/chefe_departamento/
+  tecnico.
+- Guarda: `tests/rh-estacoes.test.js` (12 testes) — as 3 regras que não
+  podem quebrar: cota nunca calculada no cliente, sem-cota nunca vira
+  "normal", parser de planilha nunca inventa data.
+- `pwa/sw.js`: agua v20 → v21 (`agua-relatorio-dados.js`,
+  `agua-relatorio-pdf.js`, `agua-iqa-visual.js` — todos no shell do app
+  de campo da Água).
+
 ## Enums do banco
 perfil_usuario: super_admin | gestor | tecnico | financeiro | visualizador |
   brigadista | biologo | secretario | diretor | chefe_departamento |
@@ -2372,15 +2424,18 @@ disso.
   tile do satélite é `lyrs=y`.
 
 ## Próxima tarefa
-**Recursos Hídricos e Qualidade Ambiental (DERHQA)** — Fases A e B
-ENTREGUES (ver a seção "Recursos Hídricos — Fase B" acima). Próximo
-passo é a **Fase C — plataformas de coleta** (inventário das estações
-da ANA/estado, tabela `rh_estacoes`), e depois a Fase D (Qualidade do
-Ar). O polígono das bacias segue pendente: sem ele, o Painel das Bacias
-agrega pelo campo de texto do cadastro do ponto. O usuário enviou o
-Atlas de Vulnerabilidade a Inundações da ANA (pôster A0, 2013) —
-hidrografia + trechos inundáveis, SEM polígono de bacia; é tema próprio
-para uma camada futura, registrado em §B.4 do plano.
+**Recursos Hídricos e Qualidade Ambiental (DERHQA)** — Fases A, B e C
+ENTREGUES (ver "Recursos Hídricos — Fase B" e "— Fase C" acima).
+Próximo passo é a Fase D (Qualidade do Ar) — só estrutura reservada
+(subgrupo na sidebar + chave `ar` inativa no catálogo), nada
+implementado. O polígono das bacias segue pendente: sem ele, o Painel
+das Bacias agrega pelo campo de texto do cadastro do ponto. O ingestor
+automático da ANA (`ingest-hidro`) está pronto e publicado, mas
+desligado até a SEMA concluir o cadastro de credencial no HidroWeb —
+ver §C.3 do plano. O usuário enviou o Atlas de Vulnerabilidade a
+Inundações da ANA (pôster A0, 2013) — hidrografia + trechos inundáveis,
+SEM polígono de bacia; é tema próprio para uma camada futura,
+registrado em §B.4 do plano.
 
 Histórico da Fase A: Fase A ENTREGUE
 (sidebar reorganizada: o grupo agora é o departamento e Qualidade da

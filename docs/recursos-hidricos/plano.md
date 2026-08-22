@@ -233,22 +233,125 @@ caminho: é um PDF de apresentação a 1:2,85 milhões, sem
 georreferenciamento declarado; o dado vetorial correspondente vive no
 acervo da ANA (mesmo bloqueio de rede das outras fontes).
 
-## Fase C — Plataformas de coleta de dados (planejada)
+## Fase C — Plataformas de Coleta — ENTREGUE
 
-Inventário das estações que medem água no Acre, sejam da ANA, do estado
-ou de terceiros. **Tabela própria, não misturar com
-`agua_pontos_coleta`**: ponto de coleta é onde a SEMA amostra para o
-IQA; estação é infraestrutura de terceiro, com série própria.
+Escopo ampliado a pedido do usuário: não só o inventário (o que o
+desenho original previa), mas **série de medições + hidrograma +
+relatório diário por rio + notificação de cota + e-mail diário** —
+mesmo formato de tela já provado pela Água (agregação no banco, painel
+lê pronto, nada recalculado no cliente).
 
-Esboço: `rh_estacoes` (código na fonte — ex. Hidroweb —, nome, tipo
-`fluviometrica|pluviometrica|telemetrica|qualidade`, operadora, situação,
-rio, bacia, município, `geom Point 4326`, período da série, link).
-`agua_pontos_coleta.codigo_ana` já existe e vira o vínculo natural entre
-os dois. Carga do inventário: arquivo em `data/` ou Edge Function —
-mesmo bloqueio de rede da Fase B para baixar direto.
+Testado antes de escrever qualquer código: a ANA responde 401 na API
+telemétrica atual (existe, mas exige credencial de Identificador+Senha
+do HidroWeb) e o serviço SOAP antigo (telemetriaws1) não responde mais
+— medido do PRÓPRIO BANCO via `pg_net`, não deste sandbox (o banco
+alcança a internet normalmente; só esta sessão de desenvolvimento é
+bloqueada). Decisão do usuário: construir o ingestor completo e
+publicá-lo desligado, esperando a credencial.
 
-Produto: camada no mapa + card "cobertura de monitoramento por bacia"
-(quantas estações, de quem, qual bacia tem vazio).
+### C.1 Banco (migrations 305, 306, 306b, 307)
+
+- **`tipo_notificacao` ganha `'hidro'`** (305, migration própria — regra
+  do projeto: ADD VALUE precisa estar commitado antes de ser usado).
+- **Duas tabelas** (306): `rh_estacoes` (inventário — código ANA, tipo,
+  telemetria, operadora, rio, bacia, `geom Point`, e as **cotas de
+  atenção/alerta/inundação cadastradas em cm** — nunca calculadas) e
+  `rh_medicoes` (uma linha por leitura: nível/chuva/vazão + `origem`
+  telemetria/convencional/importação/manual — dado bruto de sensor e
+  dado digitado não podem ficar indistinguíveis depois, mesma
+  disciplina do `status` completo/quarentena da Água). Unique
+  `(estacao_id, data_hora, origem)` — constraint normal, não índice
+  parcial (lição da 257b: `ON CONFLICT` do PostgREST não mira índice
+  parcial). RLS pelo módulo `bacias` (mesma leitura de rede
+  hidrográfica; chave nova inflaria o catálogo à toa).
+- **`vw_rh_estacoes_detalhe`** (SECURITY INVOKER): última leitura,
+  variação em 24h (janela de ≥20h de defasagem — telemetria falha por
+  sensor, estação convencional lê 1×/dia), chuva 24h/7d, e
+  **`situacao_cota` DERIVADA comparando com as cotas cadastradas —
+  NULL quando a estação não tem cota nenhuma, que NÃO é "normal"**
+  (mesma distinção de `conama_violacoes` nulo na Qualidade da Água).
+- **`rh_relatorio_diario(data)`** (306b): agrega POR RIO (não por
+  estação — é assim que a leitura operacional acontece), com detalhe
+  por estação em jsonb. **`rh_registrar_medicoes(jsonb)`**: ingestão em
+  lote idempotente, usada pela importação de planilha na tela E pela
+  Edge Function. **`rh_checar_cotas()`**: SECURITY DEFINER, notifica
+  super_admin/gestor/diretor/chefe_departamento/tecnico quando uma
+  estação passa de cota, dedupe por `ref` (estação+situação+dia) —
+  mesmo molde de `frota_checar_vencimentos`.
+  Verificado contra produção com dado de teste antes do commit (linhas
+  apagadas ao final): relatório do dia devolveu variação de +215 cm e
+  50,5 mm de chuva; `rh_checar_cotas()` gerou notificação real dentro
+  de uma transação com ROLLBACK.
+- **Crons (307)**: `rh-checar-cotas` de HORA EM HORA (não 1×/dia como o
+  resto do projeto — cheia é evento rápido; o dedupe evita spam) e
+  `hidro-relatorio-diario` às 08h BRT. **`ingest-hidro` NÃO tem cron
+  agendado** — o comando fica pronto em comentário na migration, para
+  rodar quando a credencial da ANA existir.
+
+### C.2 Front-end
+
+- **`js/rh-hidro.js`** (novo): rótulos, cores de cota (as MESMAS 4
+  cores já validadas contra daltonismo em `js/agua-iqa-visual.js`,
+  reaproveitadas na ordem normal→grave — nunca uma paleta nova),
+  **hidrograma em SVG** (nível em linha + chuva em barras invertidas do
+  topo — convenção clássica da hidrologia, as duas no mesmo eixo de
+  tempo, cotas como linhas tracejadas SEMPRE rotuladas), exportação CSV
+  (BOM + `;`, o que o Excel pt-BR abre direto) e o **parser de
+  importação** — aceita as grafias de cabeçalho do HidroWeb e da
+  planilha do estado (não são iguais), nunca inventa data: linha sem
+  data válida é descartada e CONTADA, nunca silenciada.
+- **`js/rh-relatorio-pdf.js`** (novo): PDF do relatório diário,
+  reaproveitando os primitivos de `js/agua-relatorio-pdf.js`
+  (`_agpdfCtx`/`_agpdfTitulo`/`_agpdfTabela`/…) — nunca uma segunda
+  implementação de layout de PDF. `_agpdfDesenharCabecalhoPagina` ganhou
+  parâmetro `linhaModulo` para o timbre sair "Recursos Hídricos" em vez
+  de "Qualidade da Água".
+- **`pages/rh-estacoes.html`** (novo): KPIs, mapa, relatório diário por
+  rio, lista de estações com cadastro (`podeEditar`), importação de
+  planilha e exportações (PDF/CSV/CSV do inventário). Clicar numa
+  estação abre o hidrograma dos últimos 30 dias.
+- **`js/agua-painel.js` ganhou `aguaPainelMapaBase()`**: a base
+  cartográfica (tiles, rosa dos ventos, escala, camadas de referência,
+  "Configurar camadas") foi extraída de `aguaPainelMapaCriar` para ser
+  compartilhada com a tela de estações, que precisa dos MESMOS
+  componentes mas com marcadores/legenda diferentes (pinos de IQA ×
+  círculos de cota). `legendaFn` é injetável — cada tela passa a
+  própria legenda.
+- **Camada no Mapa das UCs** (`pages/mapa.html`), pedido do usuário
+  ("igual os CAR"): nova aba "💧 Rec. Hídricos" no molde exato do
+  toggle do CAR — checkbox liga/desliga, carrega uma vez e cacheia,
+  círculos coloridos por `rhCotaCor`, popup com nível/variação/link
+  para a tela dedicada, entrada na legenda geral do mapa quando ativa.
+- **Configurações › Qualidade da Água** ganhou o campo "Relatório
+  diário de rios — destinatários" (`config_sistema.dados.hidro.emails`,
+  textarea de e-mails) — lido pela Edge Function
+  `hidro-relatorio-diario`. Lista vazia é decisão válida: sem e-mail,
+  o aviso de cota segue chegando por notificação.
+
+### C.3 Ingestor da ANA — pronto, desligado
+
+`supabase/functions/ingest-hidro`: publicado, mas sem
+`ANA_HIDROWEB_ID`/`ANA_HIDROWEB_SENHA` nos secrets devolve
+`{ok:false, motivo:'sem-credencial'}` sem gravar nada. Quando a SEMA
+concluir o cadastro na ANA: cadastrar os dois secrets no painel do
+Supabase (nunca no repositório/frontend) e agendar o cron comentado na
+migration 307. A função autentica via OAuth do HidroWebService, busca a
+série telemétrica ADOTADA (dado já consistido pela ANA) de cada
+estação com `codigo_ana` + `telemetrica=true`, grava por
+`rh_registrar_medicoes` (idempotente) e roda `rh_checar_cotas()` na
+mesma execução.
+
+### C.4 Guarda
+
+`tests/rh-estacoes.test.js` (12 testes) — as três regras que não podem
+quebrar: situação de cota NUNCA calculada no cliente (vem pronta da
+view), estação sem cota NUNCA vira "normal", e o parser de planilha
+nunca inventa data (descarta e conta). Mesmo padrão de Leaflet
+vendorizado (`tests/fixtures/vendor/`) das outras suítes da Água.
+
+`pwa/sw.js`: agua v20 → v21 (`agua-relatorio-dados.js`,
+`agua-relatorio-pdf.js` e `agua-iqa-visual.js` — todos no shell do app
+de campo da Água — foram tocados por esta entrega).
 
 ---
 
