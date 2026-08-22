@@ -873,7 +873,7 @@ const VEG_LAYERS = {
   planet: { layer:null, make(op){
     const m = document.getElementById('planet-mosaico')?.value || _planetMosaicoSel;
     if(!m) return null;
-    return L.tileLayer(`/api/planet-tiles?z={z}&x={x}&y={y}&m=${encodeURIComponent(m)}`,
+    return L.tileLayer(`/api/planet?op=tiles&z={z}&x={x}&y={y}&m=${encodeURIComponent(m)}`,
       {attribution:'Planet / NICFI',opacity:op/100,maxZoom:21,maxNativeZoom:18,
        errorTileUrl:'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw=='}); }
   },
@@ -892,7 +892,7 @@ let _planetMosaicos = null, _planetMosaicoSel = null;
 async function _planetCarregarMosaicos(){
   if(_planetMosaicos) return _planetMosaicos;
   try {
-    const r = await fetch('/api/planet-mosaics', { signal: AbortSignal.timeout(15000) });
+    const r = await fetch('/api/planet?op=mosaics', { signal: AbortSignal.timeout(15000) });
     _planetMosaicos = await r.json();
   } catch(_){ _planetMosaicos = { disponivel:false, motivo:'rede', mosaicos:[] }; }
   if(_planetMosaicos.recente) _planetMosaicoSel = _planetMosaicos.recente.name;
@@ -4172,7 +4172,7 @@ function _tlRemoverSat() {
 
 function _tlSetPlanet(mos) {
   _tlRemoverSat()
-  _tlPlanetLayer = L.tileLayer(`/api/planet-tiles?z={z}&x={x}&y={y}&m=${encodeURIComponent(mos.name)}`,
+  _tlPlanetLayer = L.tileLayer(`/api/planet?op=tiles&z={z}&x={x}&y={y}&m=${encodeURIComponent(mos.name)}`,
     { attribution: 'Planet / NICFI', opacity: 1, maxZoom: 21, maxNativeZoom: 18,
       errorTileUrl: 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==' })
   _tlPlanetLayer.addTo(mapaL); _tlPlanetLayer.setZIndex(140)

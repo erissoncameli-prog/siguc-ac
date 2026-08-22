@@ -41,8 +41,12 @@ function mapaBasemapRuas(L) {
 }
 
 // ── Planet / NICFI (mosaicos mensais ~4,77 m) ─────────────────────
-// Tiles passam pelo proxy /api/planet-tiles (chave protegida no servidor).
-// O nome do mosaico vem de mapaPlanetMosaicos(); nada de chave no front.
+// Tiles passam pelo proxy /api/planet?op=tiles (chave protegida no
+// servidor) — api/planet-tiles.js e api/planet-mosaics.js foram unidos
+// num arquivo só (api/planet.js) para caber no limite de 12 Serverless
+// Functions do plano Hobby da Vercel (achado ao investigar por que a
+// produção parou de receber deploy). O nome do mosaico vem de
+// mapaPlanetMosaicos(); nada de chave no front.
 
 // Lista os mosaicos disponíveis (mais recentes primeiro). Cacheia em memória
 // para não repetir a chamada a cada mapa. Retorna { disponivel, recente, mosaicos }.
@@ -50,7 +54,7 @@ let _mapaPlanetCache = null;
 async function mapaPlanetMosaicos() {
   if (_mapaPlanetCache) return _mapaPlanetCache;
   try {
-    const r = await fetch('/api/planet-mosaics', { signal: AbortSignal.timeout(15000) });
+    const r = await fetch('/api/planet?op=mosaics', { signal: AbortSignal.timeout(15000) });
     _mapaPlanetCache = await r.json();
   } catch (_) {
     _mapaPlanetCache = { disponivel: false, motivo: 'rede', mosaicos: [] };
@@ -61,7 +65,7 @@ async function mapaPlanetMosaicos() {
 // Camada de um mosaico Planet (nome ex.: planet_medres_visual_2026-05_mosaic).
 function mapaPlanetLayer(L, mosaico, opacidade) {
   return L.tileLayer(
-    `/api/planet-tiles?z={z}&x={x}&y={y}&m=${encodeURIComponent(mosaico)}`,
+    `/api/planet?op=tiles&z={z}&x={x}&y={y}&m=${encodeURIComponent(mosaico)}`,
     {
       attribution: 'Planet / NICFI',
       opacity: (opacidade ?? 80) / 100,
