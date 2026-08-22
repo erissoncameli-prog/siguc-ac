@@ -259,7 +259,11 @@ function aguaIqaBarrasHTML(itens, opts) {
 // `itens`: [{label, n, cor}] JÁ filtrado a n>0 — quem chama decide o
 // que entra (faixa de IQA, status de coleta, o que for).
 function _aguaRoscaHTML(itens, opts) {
-  const o = Object.assign({ tamanho: 156, espessura: 24, vazioMsg: 'Sem dado.', ariaLabelPrefix: 'Distribuição', unidade: 'coleta' }, opts || {})
+  // `fonteCentro`: NUNCA Fraunces fora do uso já existente (faixa do
+  // IQA) — pedido explícito do usuário, registrado em CLAUDE.md
+  // ("Regra do sistema — fonte dos números de KPI"). Chamador novo
+  // passa DM Sans; o wrapper de IQA abaixo mantém o padrão antigo.
+  const o = Object.assign({ tamanho: 156, espessura: 24, vazioMsg: 'Sem dado.', ariaLabelPrefix: 'Distribuição', unidade: 'coleta', fonteCentro: "'Fraunces',Georgia,serif" }, opts || {})
   const total = itens.reduce((s, i) => s + i.n, 0)
   if (!total) return `<p style="text-align:center;font-size:12px;color:#9CA3AF;margin:8px 0;padding:20px 0">${_aguaEsc(o.vazioMsg)}</p>`
 
