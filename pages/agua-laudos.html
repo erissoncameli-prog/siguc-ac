@@ -169,6 +169,7 @@ async function carregarFila() {
     .order('data_coleta')
   if (error) { toast(error.message || 'Erro ao carregar fila', 'error'); return }
   _fila = data || []
+  document.getElementById('lz-kpis').innerHTML = aguaKpisFilaHTML(_fila, c => `${c.ponto_nome} (${c.codigo_ana})`)
   renderFila()
 }
 
