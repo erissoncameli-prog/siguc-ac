@@ -12,9 +12,13 @@
 # (mesmos secrets dos outros 2 apps). Sem eles, o APK sai assinado com a
 # chave de debug do runner (instala, mas a assinatura muda a cada build).
 #
-# Molde de .github/workflows/brigadas-apk.yml. Infraestrutura pronta,
-# NÃO disparada nesta entrega (regra do projeto: só gerar quando pedido
-# ou já houver acúmulo suficiente).
+# Molde de .github/workflows/brigadas-apk.yml.
+#
+# Além do dispatch manual e da tag, também dispara AUTOMATICAMENTE via
+# .github/workflows/apk-auto-trigger.yml sempre que VERSOES.agua sobe
+# em pwa/sw.js — regra do projeto desde a entrega de Recursos Hídricos
+# (Fase C): todo app gera APK novo sozinho quando atualiza, sem
+# precisar pedir.
 
 name: Água APK
 
