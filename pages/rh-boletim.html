@@ -299,7 +299,14 @@
         ${blocoImagem('mapa-risco', 'Risco de fogo — mapa do estado (upload — gerado no QGIS)', b.mapa_risco_fogo_url, 'f-texto-risco', 'Leitura do mapa', b.texto_risco_fogo)}
         ${blocoImagem('mapa-risco-ucs', 'Risco de fogo — mapa das UCs (upload — gerado no QGIS)', b.mapa_risco_fogo_ucs_url, 'f-texto-risco-ucs', 'Leitura do mapa', b.texto_risco_fogo_ucs)}
 
-        ${blocoImagem('qar-purpleair', 'Qualidade do ar — Rede PurpleAir (upload)', b.qualidade_ar_purpleair_url, 'f-qar-purpleair', 'Leitura', b.qualidade_ar_purpleair_texto)}
+        <div class="rhb-bloco">
+          <div class="rhb-bloco-tit">Qualidade do ar — Rede PurpleAir/MPAC (PM2.5)</div>
+          <div class="rhb-auto" id="rhb-auto-ar">Carregando...</div>
+          <p class="rhb-hint" style="margin-top:6px">Automático — leitura mais recente de cada sensor da rede MPAC no Acre.
+            PM2.5 <strong>bruto</strong>, sem calibração LRAPA (ainda não confirmada contra um boletim publicado — ver
+            <code>ar_leituras_purpleair</code>). Referência OMS: média diária não deveria ultrapassar 15 µg/m³.</p>
+        </div>
+        ${blocoImagem('qar-purpleair', 'Qualidade do ar — mapa oficial PurpleAir (upload, opcional)', b.qualidade_ar_purpleair_url, 'f-qar-purpleair', 'Leitura', b.qualidade_ar_purpleair_texto)}
         ${blocoImagem('qar-sisam', 'Qualidade do ar — SISAM/INPE (upload)', b.qualidade_ar_sisam_url, 'f-qar-sisam', 'Leitura', b.qualidade_ar_sisam_texto)}
 
         ${b.tipo === 'relatorio_hidrometeorologico' ? `
@@ -375,11 +382,18 @@
     }
   }
 
+  async function calcularQualidadeAr() {
+    const { data, error } = await db.rpc('rh_boletim_qualidade_ar')
+    if (error) throw error
+    return (data || []).sort((a, b) => (b.pm25_bruto ?? -1) - (a.pm25_bruto ?? -1))
+  }
+
   async function carregarBlocosAutomaticos() {
     const data = document.getElementById('f-data').value || _atual.data_referencia
     const elDiario = document.getElementById('rhb-auto-diario')
     const elChuva = document.getElementById('rhb-auto-chuva')
     const elFocos = document.getElementById('rhb-auto-focos')
+    const elAr = document.getElementById('rhb-auto-ar')
 
     try {
       const diario = await calcularDiario(data)
@@ -402,6 +416,15 @@
       window._rhbCtxFocos = focos
       elFocos.innerHTML = `<div style="margin-bottom:6px">${esc(focos.anual.texto)}</div><div>${esc(focos.mensal.texto)}</div>`
     } catch (e) { elFocos.textContent = 'Não foi possível calcular: ' + e.message }
+
+    try {
+      const ar = await calcularQualidadeAr()
+      window._rhbCtxAr = ar
+      elAr.innerHTML = ar.length
+        ? ar.map(s => `<div>${esc(s.nome)}: <strong>${s.pm25_bruto ?? '—'} µg/m³</strong>
+            <span class="rhb-hint">(${formatData(s.data_hora)})</span></div>`).join('')
+        : 'Nenhum sensor com leitura disponível — confira se a ingestão (ingest-purpleair) está ativa.'
+    } catch (e) { elAr.textContent = 'Não foi possível calcular: ' + e.message }
   }
 
   document.addEventListener('change', e => {
@@ -543,6 +566,7 @@
         chuvaAcumulada: window._rhbCtxChuva || [],
         focosAnual: window._rhbCtxFocos?.anual || null,
         focosMensal: window._rhbCtxFocos?.mensal || null,
+        qualidadeAr: window._rhbCtxAr || [],
       }
       const pdf = await rhBoletimMontarPdf(b, ctxDados, cab, protocolo)
       aguaRelBaixarPdf(pdf, `${b.tipo}-${data}.pdf`)
