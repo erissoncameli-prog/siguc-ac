@@ -126,7 +126,12 @@ function aguaIqaGraficoHTML(pontos, opts) {
   const rotulos = pontos.map((p, i) => (i % passo !== 0 && i !== n - 1) ? '' : `
     <text x="${x(i)}" y="${h - 8}" font-size="9" fill="#9CA3AF" text-anchor="middle">${p.label}</text>`).join('')
 
-  const legenda = AGUA_IQA_FAIXA_ORDEM.map(f => `
+  // `opts.semLegenda`: série cujos pontos NÃO têm faixa (ex.: IQA médio
+  // de uma bacia por campanha, em pages/rh-bacias.html) — mostrar a
+  // legenda das 5 faixas ali prometeria uma classificação que não foi
+  // feita (classificar uma média seria recalcular o que
+  // agua_iqa_faixa() faz no banco).
+  const legenda = o.semLegenda ? '' : AGUA_IQA_FAIXA_ORDEM.map(f => `
     <span style="display:inline-flex;align-items:center;gap:4px;font-size:10px;color:#6B7280">
       <span style="width:8px;height:8px;border-radius:50%;background:${AGUA_IQA_FAIXA_COR[f]}"></span>${f}</span>`).join('')
 
@@ -136,7 +141,7 @@ function aguaIqaGraficoHTML(pontos, opts) {
     <svg viewBox="0 0 ${w} ${h}" width="100%" height="${h}" role="img" aria-label="Gráfico de IQA por campanha">
       ${grade}${linhas}${pontosSvg}${rotulos}
     </svg>
-    <div style="display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:4px">${legenda}</div>
+    ${legenda ? `<div style="display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:4px">${legenda}</div>` : ''}
     ${temQuarentena ? '<p style="text-align:center;font-size:10px;color:#9CA3AF;margin-top:4px">Preenchimento fraco = ainda em conferência (dado não verificado)</p>' : ''}`
 }
 

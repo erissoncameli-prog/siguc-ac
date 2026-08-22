@@ -89,7 +89,7 @@ test('superbloco "Administrativo" cerca só o grupo Frota; "Diretoria Técnica" 
   const ordem = rotulos.map(r => r.tipo === 'super' ? `super:${r.texto}` : r.tipo);
   expect(ordem).toEqual([
     'principal',
-    'super:Diretoria Técnica', 'gestao', 'brigadas', 'biomonitor', 'agua',
+    'super:Diretoria Técnica', 'gestao', 'brigadas', 'biomonitor', 'derhqa',
     'super:Administrativo', 'frota',
     'sistema',
   ]);
@@ -98,31 +98,31 @@ test('superbloco "Administrativo" cerca só o grupo Frota; "Diretoria Técnica" 
 test('clicar no cabeçalho alterna o grupo e persiste a escolha entre renderizações', async ({ page }) => {
   await montarSidebar(page, 'dashboard');
 
-  const grupoAgua = page.locator('.nav-grupo[data-grupo="agua"]');
-  await expect(grupoAgua).not.toHaveClass(/aberto/);
+  const grupoRh = page.locator('.nav-grupo[data-grupo="derhqa"]');
+  await expect(grupoRh).not.toHaveClass(/aberto/);
 
-  await page.locator('.nav-grupo[data-grupo="agua"] .nav-section-toggle').click();
-  await expect(grupoAgua).toHaveClass(/aberto/);
-  await expect(page.locator('.nav-grupo[data-grupo="agua"] .nav-section-toggle')).toHaveAttribute('aria-expanded', 'true');
+  await grupoRh.locator('> .nav-section-toggle').click();
+  await expect(grupoRh).toHaveClass(/aberto/);
+  await expect(grupoRh.locator('> .nav-section-toggle')).toHaveAttribute('aria-expanded', 'true');
 
   const salvo = await page.evaluate(() => JSON.parse(localStorage.getItem('siguc_nav_grupos') || '{}'));
-  expect(salvo.agua).toBe(true);
+  expect(salvo.derhqa).toBe(true);
 
-  // Re-renderiza para uma página ativa diferente (não é mais 'agua' o
+  // Re-renderiza para uma página ativa diferente (não é mais o DERHQA o
   // grupo ativo) — a preferência salva continua valendo.
   await page.evaluate(() => document.querySelector('.app-layout')?.remove());
   await page.evaluate((paginaAtiva) => {
     document.body.insertAdjacentHTML('beforeend', gerarLayout('Outra página', paginaAtiva));
   }, 'unidades');
 
-  await expect(page.locator('.nav-grupo[data-grupo="agua"]')).toHaveClass(/aberto/);
+  await expect(page.locator('.nav-grupo[data-grupo="derhqa"]')).toHaveClass(/aberto/);
 });
 
 test('corpo do grupo colapsa por grid-template-rows, sem transform em nenhum ancestral da nav', async ({ page }) => {
   await montarSidebar(page, 'dashboard');
 
   const transforms = await page.evaluate(() => {
-    const seletores = ['.sidebar', '#sidebar-nav', '.nav-grupo[data-grupo="agua"]', '.nav-grupo-corpo'];
+    const seletores = ['.sidebar', '#sidebar-nav', '.nav-grupo[data-grupo="derhqa"]', '.nav-grupo[data-grupo="agua"]', '.nav-grupo-corpo'];
     return seletores.map(sel => {
       const el = document.querySelector(sel);
       return { sel, transform: el ? getComputedStyle(el).transform : null };
@@ -137,11 +137,11 @@ test('corpo do grupo colapsa por grid-template-rows, sem transform em nenhum anc
   // unidade fr para px no computed style — "0fr" vira "0px" — então a
   // asserção compara o fechado (0px) contra o mesmo grupo aberto
   // (altura real do conteúdo), em vez de comparar a string literal.
-  const corpo = page.locator('.nav-grupo[data-grupo="agua"] .nav-grupo-corpo');
+  const corpo = page.locator('.nav-grupo[data-grupo="derhqa"] > .nav-grupo-corpo');
   const fechadoPx = await corpo.evaluate(el => parseFloat(getComputedStyle(el).gridTemplateRows));
   expect(fechadoPx).toBe(0);
 
-  await page.locator('.nav-grupo[data-grupo="agua"] .nav-section-toggle').click();
+  await page.locator('.nav-grupo[data-grupo="derhqa"] > .nav-section-toggle').click();
   await page.waitForTimeout(250); // transição de 0,22s do grid-template-rows
   const abertoPx = await corpo.evaluate(el => parseFloat(getComputedStyle(el).gridTemplateRows));
   expect(abertoPx).toBeGreaterThan(0);
@@ -172,13 +172,19 @@ test('grupo Biomonitor aparece quando minhas_permissoes libera (lotado no DEBIO)
   await expect(page.locator('.nav-grupo[data-grupo="biomonitor"]')).toHaveCount(1);
 });
 
-test('grupo Água some quando minhas_permissoes diz sem_acesso (RLS de dono é 100% pode_ver/pode_editar, gate seguro)', async ({ page }) => {
+test('subgrupo Qualidade da Água some quando minhas_permissoes diz sem_acesso (RLS de dono é 100% pode_ver/pode_editar, gate seguro)', async ({ page }) => {
   await montarSidebar(page, 'dashboard', {
     perfil: 'tecnico',
     permissoes: { agua: 'sem_acesso' },
   });
 
   await expect(page.locator('.nav-grupo[data-grupo="agua"]')).toHaveCount(0);
+  // Bacias já tem página (Fase B/C) e não está no `permissoes` deste
+  // teste — continua visível, então o grupo do departamento permanece
+  // (regra do `if (!itensHtml)` só some o grupo quando NENHUM subgrupo
+  // sobra; hoje sempre sobra Bacias).
+  await expect(page.locator('.nav-grupo[data-grupo="derhqa"]')).toHaveCount(1);
+  await expect(page.locator('.nav-grupo[data-grupo="bacias"]')).toHaveCount(1);
 });
 
 test('grupo Água aparece quando minhas_permissoes libera (lotado no DERHQA)', async ({ page }) => {
@@ -282,4 +288,63 @@ test('Painel/Administrar Frota continuam escondidos de quem tem lotação mas n�
 test('tecnico lotado no DITLOG (caso do usuário Teste) vê Agenda de Viagens', async ({ page }) => {
   await montarSidebar(page, 'dashboard', { perfil: 'tecnico', permissoes: { frota: 'editar' } });
   await expect(page.locator('.nav-grupo[data-grupo="frota"] a[href*="frota-viagens"]')).toHaveCount(1);
+});
+
+// ── DERHQA · subgrupos (3º nível) ─────────────────────────────────
+// A entrega que renomeou o grupo para "Recursos Hídricos e Qual.
+// Ambiental" (o departamento) e transformou "Qualidade da Água" em
+// subgrupo criou um acordeão ANINHADO. As regras do 2º nível valem
+// iguais no 3º — em especial a que mais dói quebrar: o subgrupo da
+// página atual nasce aberto, senão o link fica escondido dois níveis
+// abaixo e o usuário não acha a própria página.
+
+test('DERHQA é o grupo e "Qualidade da Água" é subgrupo com os 6 links', async ({ page }) => {
+  await montarSidebar(page, 'dashboard');
+
+  const grupo = page.locator('.nav-grupo[data-grupo="derhqa"]');
+  await expect(grupo.locator('> .nav-section-toggle .nav-section'))
+    .toHaveText('Recursos Hídricos e Qual. Ambiental');
+
+  const sub = grupo.locator('.nav-grupo.nav-subgrupo[data-grupo="agua"]');
+  await expect(sub).toHaveCount(1);
+  await expect(sub.locator('.nav-section')).toHaveText('Qualidade da Água');
+  await expect(sub.locator('.nav-item')).toHaveCount(6);
+
+  // Bacias Hidrográficas ganhou páginas na Fase B/C (Painel das Bacias
+  // + Plataformas de Coleta); Qualidade do Ar segue só declarado em
+  // js/layout.js, sem página — subgrupo sem item não renderiza.
+  const subBacias = grupo.locator('.nav-grupo.nav-subgrupo[data-grupo="bacias"]');
+  await expect(subBacias).toHaveCount(1);
+  await expect(subBacias.locator('.nav-item')).toHaveCount(2);
+  await expect(page.locator('.nav-grupo[data-grupo="ar"]')).toHaveCount(0);
+});
+
+test('grupo E subgrupo da página ativa nascem abertos', async ({ page }) => {
+  await montarSidebar(page, 'agua-mapa');
+
+  await expect(page.locator('.nav-grupo[data-grupo="derhqa"]')).toHaveClass(/aberto/);
+  await expect(page.locator('.nav-grupo[data-grupo="agua"]')).toHaveClass(/aberto/);
+  // E o link da página ativa está de fato pintado como ativo.
+  await expect(page.locator('.nav-grupo[data-grupo="agua"] .nav-item.ativo')).toHaveCount(1);
+});
+
+test('subgrupo colapsa por grid-template-rows e lembra a escolha, como o grupo', async ({ page }) => {
+  await montarSidebar(page, 'dashboard');
+
+  await page.locator('.nav-grupo[data-grupo="derhqa"] > .nav-section-toggle').click();
+  await page.waitForTimeout(250);
+
+  const sub = page.locator('.nav-grupo[data-grupo="agua"]');
+  const corpoSub = sub.locator('> .nav-grupo-corpo');
+  await expect(sub).not.toHaveClass(/aberto/);
+  expect(await corpoSub.evaluate(el => parseFloat(getComputedStyle(el).gridTemplateRows))).toBe(0);
+  // Mesma mecânica do 2º nível: nada de transform em nenhum ancestral.
+  expect(await sub.evaluate(el => getComputedStyle(el).transform)).toBe('none');
+
+  await sub.locator('> .nav-section-toggle').click();
+  await page.waitForTimeout(250);
+  expect(await corpoSub.evaluate(el => parseFloat(getComputedStyle(el).gridTemplateRows))).toBeGreaterThan(0);
+
+  const salvo = await page.evaluate(() => JSON.parse(localStorage.getItem('siguc_nav_grupos') || '{}'));
+  expect(salvo.agua).toBe(true);
 });
