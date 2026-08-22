@@ -72,7 +72,7 @@ function aguaKpisSituacaoRoscaHTML(counts) {
       <div><p class="adash-card-tit">Situação da série</p>
         <p class="adash-card-tit-sub">Todas as coletas cadastradas, por status</p></div>
     </div>
-    ${_aguaRoscaHTML(itens, { vazioMsg: 'Nenhuma coleta cadastrada.', ariaLabelPrefix: 'Situação da série de coletas' })}
+    ${_aguaRoscaHTML(itens, { vazioMsg: 'Nenhuma coleta cadastrada.', ariaLabelPrefix: 'Situação da série de coletas', fonteCentro: "'DM Sans',sans-serif" })}
   </div>`
 }
 
