@@ -11,6 +11,8 @@
 <script src="../js/layout.js"></script>
 <script src="../js/fotos-privadas.js"></script>
 <script src="../js/reautenticar.js"></script>
+<script src="../js/agua-alertas.js"></script>
+<script src="../js/agua-laudo-ocr.js"></script>
 </head>
 <body>
 <div id="app"></div>
@@ -23,8 +25,22 @@
       <button class="modal-close" onclick="fecharModalLaudo()">×</button>
     </div>
     <div class="modal-body">
+      <div id="lz-alertas"></div>
       <div class="form-group"><label class="form-label">Laboratório <span class="obrig">*</span></label>
         <select class="form-control" id="lz-laboratorio"><option value="">Selecione...</option></select></div>
+
+      <div class="form-section-label" style="margin-top:8px">Laudo (PDF ou imagem)</div>
+      <div class="form-group">
+        <input type="file" id="lz-arquivo" accept="application/pdf,image/*" onchange="lzArquivoEscolhido()">
+        <div class="form-hint">Anexado ao lançar. Fica disponível para conferência posterior (leitura só de quem tem acesso ao módulo).</div>
+        <a id="lz-arquivo-atual" style="display:none;font-size:12px" target="_blank" rel="noopener">Ver laudo já anexado</a>
+      </div>
+      <div class="form-group" id="lz-parser-area" style="display:none">
+        <button class="btn btn-sm btn-secondary" type="button" id="btn-ler-laudo" onclick="lzLerLaudoAutomatico()">Ler laudo automaticamente</button>
+        <span id="lz-parser-status" style="font-size:12px;color:#6B7280;margin-left:8px"></span>
+      </div>
+      <div id="lz-identidade-alerta"></div>
+      <div id="lz-conferencia-parser"></div>
 
       <div class="form-section-label">Campo (conferir/corrigir se necessário)</div>
       <div class="grid-3" id="lz-campo"></div>
@@ -32,11 +48,14 @@
       <div class="form-section-label" style="margin-top:8px">Laboratório</div>
       <div class="grid-3" id="lz-lab"></div>
 
-      <div class="form-section-label" style="margin-top:8px">Laudo (PDF ou imagem)</div>
-      <div class="form-group">
-        <input type="file" id="lz-arquivo" accept="application/pdf,image/*">
-        <div class="form-hint">Anexado ao lançar. Fica disponível para conferência posterior (leitura só de quem tem acesso ao módulo).</div>
-        <a id="lz-arquivo-atual" style="display:none;font-size:12px" target="_blank" rel="noopener">Ver laudo já anexado</a>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Recebimento no laboratório</label>
+          <input class="form-control" id="lz-recebimento" type="date" oninput="lzAgendarAvaliacaoPrazo()">
+          <div class="form-hint">Data impressa no laudo — usada só para avisar se o prazo de preservação da amostra foi ultrapassado. Nunca impede salvar.</div>
+        </div>
+        <div class="form-group"><label class="form-label">&nbsp;</label>
+          <div id="lz-prazo-alerta"></div>
+        </div>
       </div>
 
       <div class="form-group"><label class="form-label">Observações</label>
@@ -59,13 +78,22 @@
 // zero pela mesa). Lançar o laudo preenche os parâmetros de
 // laboratório, anexa o PDF e muda o status para 'completo'.
 //
-// PLAUSIBILIDADE: nenhum limite é reimplementado aqui. Cada campo
-// numérico é checado via RPC agua_valor_plausivel() (migration 254),
-// que reusa os MESMOS limites que a migration 253 usou para pôr a
-// série histórica em quarentena (pH 0–14, OD acima da saturação).
-// 'impossivel' bloqueia o salvamento; 'improvavel' pede confirmação
-// explícita (confirm(), padrão já usado em outras telas do projeto —
-// ver frota-veiculos.html) sem travar quem está digitando.
+// ALERTAS: nenhum limite é reimplementado aqui. A malha inteira vive
+// em `agua_avaliar_coleta` (migrations 254 e 302/302b) e é aplicada
+// por js/agua-alertas.js — físico, faixa da série, atípico para o
+// ponto, erro de unidade, coerência entre parâmetros e contexto de
+// campanha. Nível 'bloqueio' impede salvar; 'confirmar' pede
+// confirmação explícita (confirm(), padrão do projeto) sem travar
+// quem está digitando; 'informar' só aparece.
+//
+// A avaliação é da COLETA INTEIRA, com debounce — nunca uma chamada
+// por campo. Dois motivos: as regras de coerência (ortofosfato ×
+// fósforo total, E. coli × termotolerantes) só existem olhando o
+// conjunto, e uma chamada por campo multiplicaria por 20 o custo de
+// uma RPC que agrega a série histórica (~750 ms medidos).
+//
+// Conformidade CONAMA continua FORA desta malha, de propósito: é
+// resultado do rio, não erro de digitação (ver cabeçalho da 302).
 //
 // PDF: bucket privado agua-laudos (migration 255). Upload e
 // referência gravada seguem o MESMO padrão do resto do projeto —
@@ -176,6 +204,8 @@ function abrirLaudo(id) {
     `${c.codigo_amostra ? c.codigo_amostra + ' · ' : ''}${c.ponto_nome} (${c.codigo_ana}) · campanha ${c.campanha_ano}/${c.campanha_ordem === 'segunda' ? '2ª' : '1ª'} · coletado em ${formatData(c.data_coleta)}`
   document.getElementById('lz-laboratorio').value = c.laboratorio_id || ''
   document.getElementById('lz-observacoes').value = c.observacoes || ''
+  document.getElementById('lz-recebimento').value = c.data_recebimento_laboratorio || ''
+  document.getElementById('lz-prazo-alerta').innerHTML = ''
   document.getElementById('lz-arquivo').value = ''
 
   const linkAtual = document.getElementById('lz-arquivo-atual')
@@ -191,15 +221,192 @@ function abrirLaudo(id) {
 
   document.getElementById('lz-campo').innerHTML = CAMPO_FIELDS.map(([campo, rotulo]) => `
     <div class="form-group"><label class="form-label">${esc(rotulo)}</label>
-      <input class="form-control" id="lz-f-${campo}" type="number" step="any" value="${c[campo] ?? ''}" onblur="lzChecarCampo('${campo}')">
+      <input class="form-control" id="lz-f-${campo}" type="number" step="any" value="${c[campo] ?? ''}" oninput="lzAgendarAvaliacao()">
       <div class="form-hint" id="lz-h-${campo}"></div></div>`).join('')
   document.getElementById('lz-lab').innerHTML = LAB_FIELDS.map(([campo, rotulo]) => `
     <div class="form-group"><label class="form-label">${esc(rotulo)}</label>
-      <input class="form-control" id="lz-f-${campo}" type="number" step="any" value="${c[campo] ?? ''}" onblur="lzChecarCampo('${campo}')">
+      <input class="form-control" id="lz-f-${campo}" type="number" step="any" value="${c[campo] ?? ''}" oninput="lzAgendarAvaliacao()">
       <div class="form-hint" id="lz-h-${campo}"></div></div>`).join('')
 
   if (c.laudo_url) assinarFotos(document.getElementById('modal-laudo'))
   document.getElementById('modal-laudo').classList.add('aberto')
+  _alertas = []
+  lzPintarAlertas()
+  lzAvaliar()   // o campo já vem preenchido da coleta — avalia de saída
+  lzAvaliarPrazo()
+
+  _origemDados = {}
+  _resultadoParser = null
+  document.getElementById('lz-prazo-alerta').innerHTML = ''
+  document.getElementById('lz-parser-area').style.display = 'none'
+  document.getElementById('lz-identidade-alerta').innerHTML = ''
+  document.getElementById('lz-conferencia-parser').innerHTML = ''
+  document.getElementById('lz-parser-status').textContent = ''
+}
+
+// ── Leitura assistida do laudo (Entrega 2) ─────────────────────
+// js/agua-laudo-ocr.js faz TUDO: renderiza o PDF, recorta cada célula
+// pela posição do gabarito, roda OCR, insere a vírgula na casa
+// decimal do TEMPLATE (nunca a que o OCR "achou"). Esta tela só chama
+// e desenha — nenhuma regra de extração mora aqui.
+let _origemDados = {}       // {parametro: 'parser'|'digitado'|'corrigido_apos_parser'}
+let _resultadoParser = null
+let _valoresPropostos = {}  // {parametro: valor} — o que foi ACEITO do parser, para detectar edição manual depois
+
+function lzArquivoEscolhido() {
+  const arquivo = document.getElementById('lz-arquivo').files[0]
+  const ehPdf = arquivo && /pdf$/i.test(arquivo.type || arquivo.name)
+  document.getElementById('lz-parser-area').style.display = ehPdf ? 'block' : 'none'
+  document.getElementById('lz-identidade-alerta').innerHTML = ''
+  document.getElementById('lz-conferencia-parser').innerHTML = ''
+  _resultadoParser = null
+}
+
+async function lzLerLaudoAutomatico() {
+  const arquivo = document.getElementById('lz-arquivo').files[0]
+  const laboratorioId = document.getElementById('lz-laboratorio').value
+  const c = _fila.find(x => x.id === _editandoId)
+  if (!arquivo || !c) return
+  if (!laboratorioId) { toast('Selecione o laboratório antes de ler o laudo', 'error'); return }
+
+  const btn = document.getElementById('btn-ler-laudo')
+  const status = document.getElementById('lz-parser-status')
+  btn.disabled = true
+  document.getElementById('lz-identidade-alerta').innerHTML = ''
+  document.getElementById('lz-conferencia-parser').innerHTML = ''
+
+  try {
+    const { data: tpl, error } = await db.from('agua_laudo_templates')
+      .select('campos, campos_identidade')
+      .eq('laboratorio_id', laboratorioId).eq('ativo', true)
+      .order('versao', { ascending: false }).limit(1).maybeSingle()
+    if (error) throw error
+    if (!tpl) {
+      status.textContent = 'Sem gabarito cadastrado para este laboratório — lance os valores manualmente.'
+      return
+    }
+
+    const ponto = { nome: c.ponto_nome, rio: c.ponto_rio, municipio: c.ponto_municipio, codigos_alias: c.codigos_alias || [] }
+    const coletaAberta = { data_coleta: c.data_coleta }
+
+    _resultadoParser = await aguaLaudoProcessarPdf(arquivo, {
+      template: tpl, coletaAberta, ponto,
+      onProgresso: (m) => { status.textContent = m },
+    })
+    status.textContent = ''
+    lzMontarConferenciaParser()
+    const campoRecebimento = document.getElementById('lz-recebimento')
+    if (_resultadoParser.dataRecebimento && !campoRecebimento.value) {
+      campoRecebimento.value = _resultadoParser.dataRecebimento
+    }
+    lzAvaliarPrazo()
+  } catch (e) {
+    status.textContent = 'Não foi possível ler o laudo automaticamente — lance manualmente.'
+    console.warn('[lz-parser]', e)
+  } finally {
+    btn.disabled = false
+  }
+}
+
+function lzMontarConferenciaParser() {
+  const r = _resultadoParser
+  if (!r) return
+
+  const alertaEl = document.getElementById('lz-identidade-alerta')
+  if (!r.identidade.ok) {
+    alertaEl.innerHTML = `<div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:8px;padding:10px 12px;font-size:12.5px;color:#991B1B;margin:8px 0">
+      <div style="font-weight:600;margin-bottom:4px">O laudo parece ser de outra amostra — nada foi preenchido automaticamente</div>
+      <ul style="margin:4px 0 0;padding-left:18px">
+        ${r.identidade.problemas.map(p => `<li>${esc(p.campo === 'data_coleta' ? 'Data da coleta' : 'Procedência')}: o laudo diz "${esc(p.pdf)}", a coleta aberta é "${esc(p.tela)}"</li>`).join('')}
+      </ul>
+      <div style="margin-top:6px">Confira se escolheu o laudo certo antes de digitar manualmente.</div>
+    </div>`
+    document.getElementById('lz-conferencia-parser').innerHTML = ''
+    return
+  }
+
+  alertaEl.innerHTML = `<div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:8px;padding:8px 12px;font-size:12.5px;color:#166534;margin:8px 0">
+    Identidade da amostra confere com o laudo (${esc(r.numeroLaudo || 'nº não lido')}). Confira cada valor abaixo antes de aceitar — o recorte da imagem é a prova, o texto lido pode errar um dígito.
+  </div>`
+
+  const TODOS = [...CAMPO_FIELDS, ...LAB_FIELDS]
+  const linhas = TODOS.filter(([campo]) => _resultadoParser.campos[campo]).map(([campo, rotulo]) => {
+    const c = r.campos[campo]
+    const semLeitura = c.valor == null
+    const corConf = c.confianca >= 80 ? 'var(--sucesso,#059669)' : c.confianca >= 60 ? 'var(--alerta,#D97706)' : '#9CA3AF'
+    return `<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #F3F4F6">
+      <img src="${c.recorteDataURL}" alt="recorte do laudo" style="height:28px;border:1px solid #E5E7EB;border-radius:4px;background:#fff">
+      <div style="flex:1;font-size:12.5px">${esc(rotulo)}</div>
+      <div style="font-size:12.5px;min-width:70px;text-align:right">
+        ${semLeitura ? '<span style="color:#9CA3AF">sem leitura</span>' : `<strong>${esc(String(c.valor))}</strong>${c.censurado ? ' <span title="valor censurado no laudo">(&lt;LQ)</span>' : ''}`}
+      </div>
+      <span style="font-size:10.5px;color:${corConf};min-width:36px;text-align:right">${semLeitura ? '' : c.confianca + '%'}</span>
+      <button class="btn btn-xs btn-secondary" type="button" ${semLeitura ? 'disabled' : ''} onclick="lzAceitarCampo('${campo}')">Aceitar</button>
+    </div>`
+  }).join('')
+
+  document.getElementById('lz-conferencia-parser').innerHTML = `
+    <div class="form-section-label" style="margin-top:8px">Conferência do laudo lido</div>
+    <div style="border:1px solid #E5E7EB;border-radius:8px;padding:8px 12px">${linhas}</div>
+    <button class="btn btn-xs btn-primary" type="button" style="margin-top:8px" onclick="lzAceitarTodosAltaConfianca()">Aceitar todos os de alta confiança (≥80%)</button>
+  `
+}
+
+function lzAceitarCampo(campo) {
+  const c = _resultadoParser?.campos?.[campo]
+  if (!c || c.valor == null) return
+  const input = document.getElementById(`lz-f-${campo}`)
+  if (!input) return
+  input.value = c.valor
+  _origemDados[campo] = 'parser'
+  _valoresPropostos[campo] = c.valor
+  lzAgendarAvaliacao()
+}
+
+function lzAceitarTodosAltaConfianca() {
+  const r = _resultadoParser
+  if (!r) return
+  for (const campo of Object.keys(r.campos)) {
+    const c = r.campos[campo]
+    if (c.valor != null && c.confianca >= 80) lzAceitarCampo(campo)
+  }
+  toast('Valores de alta confiança preenchidos — confira campo a campo antes de salvar', 'info')
+}
+
+// ── Prazo de preservação (Entrega 3) ────────────────────────────
+// A regra e o número (agua_prazos_analise) vivem no banco —
+// agua_prazo_preservacao_alertas(). Esta função só chama e desenha,
+// mesma lição de aguaAlertasAvaliar (js/agua-alertas.js). Informativo
+// sempre: NUNCA bloqueia salvar, nem quando estourado.
+let _timerPrazo = null
+
+function lzAgendarAvaliacaoPrazo() {
+  clearTimeout(_timerPrazo)
+  _timerPrazo = setTimeout(() => { lzAvaliarPrazo() }, 500)
+}
+
+async function lzAvaliarPrazo() {
+  const c = _fila.find(x => x.id === _editandoId)
+  const recebimento = document.getElementById('lz-recebimento').value || null
+  const alertaEl = document.getElementById('lz-prazo-alerta')
+  if (!c || !recebimento) { alertaEl.innerHTML = ''; return [] }
+
+  const presentes = TODOS_OS_CAMPOS.filter(campo => lzValor(campo) != null)
+  if (!presentes.length) { alertaEl.innerHTML = ''; return [] }
+
+  const { data: alertas, error } = await db.rpc('agua_prazo_preservacao_alertas', {
+    p_data_coleta: c.data_coleta, p_data_recebimento: recebimento, p_parametros: presentes,
+  })
+  if (error) { alertaEl.innerHTML = ''; return [] }
+
+  if (!alertas?.length) {
+    alertaEl.innerHTML = '<span style="font-size:11px;color:#059669">Dentro do prazo de preservação para os parâmetros preenchidos.</span>'
+    return alertas || []
+  }
+  alertaEl.innerHTML = `<div style="font-size:11px;color:#B45309">
+    ${alertas.length} parâmetro${alertas.length > 1 ? 's' : ''} recebido${alertas.length > 1 ? 's' : ''} após o prazo de preservação — só um registro, não impede salvar.
+  </div>`
+  return alertas
 }
 
 function lzValor(campo) {
@@ -207,23 +414,48 @@ function lzValor(campo) {
   return v === '' || v == null ? null : parseFloat(v)
 }
 
-async function lzChecarCampo(campo) {
-  const valor = lzValor(campo)
-  const hint = document.getElementById(`lz-h-${campo}`)
-  if (!hint) return null
-  if (valor == null) { hint.textContent = ''; return null }
-  const tempAmostra = lzValor('temp_amostra')
-  const { data: classe } = await db.rpc('agua_valor_plausivel', { p_parametro: campo, p_valor: valor, p_temp_amostra: tempAmostra })
-  if (classe === 'impossivel') {
-    hint.textContent = 'Valor fisicamente impossível — corrija antes de salvar.'
-    hint.style.color = 'var(--erro)'
-  } else if (classe === 'improvavel') {
-    hint.textContent = 'Valor fora do range típico da série — confirme antes de salvar.'
-    hint.style.color = 'var(--aviso)'
-  } else {
-    hint.textContent = ''
+let _alertas = [], _timerAval = null
+
+// Debounce de 500 ms: o técnico digita 20 campos seguidos e não
+// precisa de uma ida ao servidor por tecla.
+function lzAgendarAvaliacao() {
+  // Se o campo tinha vindo do parser e o técnico alterou o número à
+  // mão, a proveniência vira "corrigido" — não é mais o que o OCR
+  // leu. Comparado por valor (não por evento), porque o mesmo evento
+  // dispara tanto ao ACEITAR quanto ao editar depois.
+  for (const campo of Object.keys(_valoresPropostos)) {
+    if (_origemDados[campo] === 'parser' && lzValor(campo) !== _valoresPropostos[campo]) {
+      _origemDados[campo] = 'corrigido_apos_parser'
+    }
   }
-  return classe
+  clearTimeout(_timerAval)
+  _timerAval = setTimeout(() => { lzAvaliar() }, 500)
+  lzAgendarAvaliacaoPrazo()
+}
+
+function lzValoresAtuais() {
+  const v = {}
+  for (const campo of TODOS_OS_CAMPOS) v[campo] = lzValor(campo)
+  return v
+}
+
+async function lzAvaliar() {
+  const c = _fila.find(x => x.id === _editandoId)
+  if (!c) return []
+  _alertas = await aguaAlertasAvaliar(db, {
+    pontoId: c.ponto_id, ordem: c.campanha_ordem, valores: lzValoresAtuais(),
+    campanhaId: c.campanha_id, coletaId: c.id,
+  })
+  lzPintarAlertas()
+  return _alertas
+}
+
+function lzPintarAlertas() {
+  document.getElementById('lz-alertas').innerHTML = aguaAlertasResumoHTML(_alertas)
+  for (const campo of TODOS_OS_CAMPOS) {
+    const hint = document.getElementById(`lz-h-${campo}`)
+    if (hint) hint.innerHTML = aguaAlertaHintHTML(aguaAlertaDoCampo(_alertas, campo))
+  }
 }
 
 async function salvarLaudo() {
@@ -231,28 +463,34 @@ async function salvarLaudo() {
   const laboratorioId = document.getElementById('lz-laboratorio').value
   if (!laboratorioId) { toast('Selecione o laboratório', 'error'); return }
 
-  // Recalcula plausibilidade de TODOS os campos no momento de salvar —
-  // não confia só no blur (autofill/colar valor não dispara o evento).
-  // Em paralelo: são ~20 chamadas independentes, uma por campo.
-  const classes = {}
-  await Promise.all(TODOS_OS_CAMPOS.map(async campo => { classes[campo] = await lzChecarCampo(campo) }))
+  // Reavalia no momento de salvar — não confia no debounce (colar
+  // valor ou salvar rápido pode chegar antes da última avaliação).
+  clearTimeout(_timerAval)
+  const alertas = await lzAvaliar()
 
-  const impossiveis = TODOS_OS_CAMPOS.filter(c => classes[c] === 'impossivel')
-  if (impossiveis.length) {
-    toast(`Corrija valor(es) impossível(is): ${impossiveis.join(', ')}`, 'error')
+  const bloqueios = aguaAlertasBloqueios(alertas)
+  if (bloqueios.length) {
+    toast(`Corrija antes de salvar: ${bloqueios.map(a => AGUA_ALERTA_PARAM_ROTULO[a.parametro] || a.parametro).join(', ')}`, 'error')
     return
   }
-  const improvaveis = TODOS_OS_CAMPOS.filter(c => classes[c] === 'improvavel')
-  if (improvaveis.length && !confirm(`Os seguintes valores estão fora do range típico da série histórica: ${improvaveis.join(', ')}. Confirma que estão corretos, conforme o laudo físico?`)) {
-    return
-  }
+  const texto = aguaAlertasTextoConfirmacao(alertas)
+  if (texto && !confirm(texto)) return
 
   const payload = {
     laboratorio_id: laboratorioId,
     observacoes: document.getElementById('lz-observacoes').value.trim() || null,
     status: 'completo',
+    data_recebimento_laboratorio: document.getElementById('lz-recebimento').value || null,
   }
-  for (const campo of TODOS_OS_CAMPOS) payload[campo] = lzValor(campo)
+  const origemFinal = {}
+  for (const campo of TODOS_OS_CAMPOS) {
+    const valor = lzValor(campo)
+    payload[campo] = valor
+    if (valor == null) continue
+    // Campo sem passagem pelo parser e com valor: foi digitado à mão.
+    origemFinal[campo] = _origemDados[campo] || 'digitado'
+  }
+  payload.origem_dados = origemFinal
 
   // Por registro (não janela): lançar laudo é ação isolada, diferente
   // da edição em lote da conferência. docs/qualidade-agua/plano-seguranca-dados.md.
