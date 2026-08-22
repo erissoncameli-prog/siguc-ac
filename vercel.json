@@ -76,8 +76,7 @@
   "functions": {
     "api/health.js":         { "maxDuration": 10 },
     "api/geo-proxy/[fonte].js": { "maxDuration": 60 },
-    "api/planet-tiles.js":   { "maxDuration": 30 },
-    "api/planet-mosaics.js": { "maxDuration": 30 },
+    "api/planet.js":         { "maxDuration": 30 },
     "api/sentinel.js":       { "maxDuration": 30 },
     "api/geo.js":            { "maxDuration": 30 },
     "api/biomonitor-apk-latest.js": { "maxDuration": 15 },
