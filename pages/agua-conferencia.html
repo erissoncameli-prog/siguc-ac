@@ -14,6 +14,7 @@
 <script src="../js/agua-alertas.js"></script>
 <script src="../js/agua-iqa-visual.js"></script>
 <script src="../js/agua-laudo-kpis.js"></script>
+<script src="../js/fotos-privadas.js"></script>
 </head>
 <body>
 <div id="app"></div>
@@ -35,6 +36,15 @@
           <input class="form-control" id="ag-data" type="date"></div>
         <div class="form-group"><label class="form-label">Hora</label>
           <input class="form-control" id="ag-hora" type="time"></div>
+      </div>
+
+      <div class="form-section-label" style="margin-top:8px">Laboratório responsável e laudo</div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Laboratório</label>
+          <select class="form-control" id="ag-laboratorio"><option value="">Selecione...</option></select></div>
+        <div class="form-group"><label class="form-label">&nbsp;</label>
+          <a id="ag-arquivo-atual" class="btn btn-sm btn-secondary" style="display:none" target="_blank" rel="noopener">Ver laudo anexado</a>
+          <span id="ag-sem-laudo" style="font-size:12px;color:#9CA3AF">Nenhum laudo anexado nesta coleta.</span></div>
       </div>
 
       <div class="form-section-label" style="margin-top:8px">Campo</div>
@@ -82,7 +92,7 @@ const LAB_FIELDS = [
   ['condutividade_especifica', 'Condutividade específica'], ['descarga_liquida', 'Descarga líquida'],
 ]
 
-let _coletas = [], _editandoId = null
+let _coletas = [], _labs = [], _editandoId = null
 
 ;(async function () {
   const usuario = await carregarUsuario()
@@ -117,8 +127,15 @@ let _coletas = [], _editandoId = null
     '</div></div></div>'
 
   carregarLogosSidebar()
-  await carregarLista()
+  await Promise.all([carregarLabsAtivos(), carregarLista()])
 })()
+
+async function carregarLabsAtivos() {
+  const { data } = await db.from('agua_laboratorios').select('id,nome').eq('ativo', true).order('nome')
+  _labs = data || []
+  const sel = document.getElementById('ag-laboratorio')
+  if (sel) sel.innerHTML = '<option value="">Selecione...</option>' + _labs.map(l => `<option value="${l.id}">${esc(l.nome)}</option>`).join('')
+}
 
 async function carregarLista() {
   const [{ data, error }, { data: statusRows }] = await Promise.all([
@@ -193,6 +210,21 @@ function abrirAg(id) {
   document.getElementById('ag-data').value = c.data_coleta || ''
   document.getElementById('ag-hora').value = c.hora_coleta ? c.hora_coleta.slice(0, 5) : ''
   document.getElementById('ag-observacoes').value = c.observacoes || ''
+  document.getElementById('ag-laboratorio').value = c.laboratorio_id || ''
+
+  const linkLaudo = document.getElementById('ag-arquivo-atual')
+  const semLaudo = document.getElementById('ag-sem-laudo')
+  const ref = c.laudo_url ? fotoRef(c.laudo_url) : null
+  if (ref) {
+    linkLaudo.style.display = 'inline-flex'
+    semLaudo.style.display = 'none'
+    linkLaudo.setAttribute('data-foto-privada', `${ref.bucket}|${ref.path}`)
+    assinarFotos(document.getElementById('modal-ag'))
+  } else {
+    linkLaudo.style.display = 'none'
+    linkLaudo.removeAttribute('data-foto-privada')
+    semLaudo.style.display = 'inline'
+  }
 
   const campoHTML = ([campo, rotulo]) => `
     <div class="form-group"><label class="form-label">${esc(rotulo)}</label>
@@ -258,6 +290,7 @@ async function salvarAg(promover) {
   const dataColeta = document.getElementById('ag-data').value
   if (dataColeta) payload.data_coleta = dataColeta
   payload.hora_coleta = document.getElementById('ag-hora').value || null
+  payload.laboratorio_id = document.getElementById('ag-laboratorio').value || null
   for (const [campo] of [...CAMPO_FIELDS, ...LAB_FIELDS]) payload[campo] = valorCampo(campo)
 
   if (promover) {
