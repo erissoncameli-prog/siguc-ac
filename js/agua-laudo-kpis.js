@@ -123,7 +123,7 @@ function aguaKpisQuarentenaHTML(lista, totalColetas, labelFn, statusCounts) {
     </div>
     <div class="adash-card">
       <div class="adash-card-topo"><p class="adash-card-tit">% da série</p></div>
-      <div class="adash-num-linha"><span class="adash-num">${pct != null ? pct.toFixed(1) + '%' : '—'}</span></div>
+      <div class="adash-num-linha"><span class="adash-num" style="${AGUA_KPI_FONTE_NUM}">${pct != null ? pct.toFixed(1) + '%' : '—'}</span></div>
       <p class="adash-card-pe">${totalColetas ? `${s.total} de ${totalColetas} coleta(s) cadastradas` : 'sem coletas cadastradas'}</p>
     </div>
     <div class="adash-card">
