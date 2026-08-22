@@ -290,6 +290,7 @@ async function salvarAg(promover) {
   const dataColeta = document.getElementById('ag-data').value
   if (dataColeta) payload.data_coleta = dataColeta
   payload.hora_coleta = document.getElementById('ag-hora').value || null
+  payload.laboratorio_id = document.getElementById('ag-laboratorio').value || null
   for (const [campo] of [...CAMPO_FIELDS, ...LAB_FIELDS]) payload[campo] = valorCampo(campo)
 
   if (promover) {
