@@ -111,6 +111,7 @@ const SHELLS = {
     '/js/agua-sync.js',
     '/js/brigada-captura.js',
     '/js/agua-iqa-visual.js',
+    '/js/agua-alertas.js',
     '/js/agua-rio.js',
     '/pwa/icons/icon-agua-512.png',
     '/js/config-sistema.js',

@@ -231,32 +231,32 @@
     <div class="grid-2" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
       <div class="form-section">
         <label class="form-label">Temp. ar (°C)</label>
-        <input type="number" step="any" id="f-temp-ar" class="form-input" inputmode="decimal" onblur="agChecarCampo('temp_ar')">
+        <input type="number" step="any" id="f-temp-ar" class="form-input" inputmode="decimal" oninput="agAgendarAvaliacao()">
         <div class="campo-dica" id="f-h-temp_ar"></div>
       </div>
       <div class="form-section">
         <label class="form-label">Temp. amostra (°C)</label>
-        <input type="number" step="any" id="f-temp-amostra" class="form-input" inputmode="decimal" onblur="agChecarCampo('temp_amostra')">
+        <input type="number" step="any" id="f-temp-amostra" class="form-input" inputmode="decimal" oninput="agAgendarAvaliacao()">
         <div class="campo-dica" id="f-h-temp_amostra"></div>
       </div>
       <div class="form-section">
         <label class="form-label">pH</label>
-        <input type="number" step="any" id="f-ph" class="form-input" inputmode="decimal" onblur="agChecarCampo('ph')">
+        <input type="number" step="any" id="f-ph" class="form-input" inputmode="decimal" oninput="agAgendarAvaliacao()">
         <div class="campo-dica" id="f-h-ph"></div>
       </div>
       <div class="form-section">
         <label class="form-label">OD (mg/L)</label>
-        <input type="number" step="any" id="f-od" class="form-input" inputmode="decimal" onblur="agChecarCampo('od')">
+        <input type="number" step="any" id="f-od" class="form-input" inputmode="decimal" oninput="agAgendarAvaliacao()">
         <div class="campo-dica" id="f-h-od"></div>
       </div>
       <div class="form-section">
         <label class="form-label">Turbidez (UNT)</label>
-        <input type="number" step="any" id="f-turbidez" class="form-input" inputmode="decimal" onblur="agChecarCampo('turbidez')">
+        <input type="number" step="any" id="f-turbidez" class="form-input" inputmode="decimal" oninput="agAgendarAvaliacao()">
         <div class="campo-dica" id="f-h-turbidez"></div>
       </div>
       <div class="form-section">
         <label class="form-label">Condutividade (µS/cm)</label>
-        <input type="number" step="any" id="f-condutividade" class="form-input" inputmode="decimal" onblur="agChecarCampo('condutividade_eletrica')">
+        <input type="number" step="any" id="f-condutividade" class="form-input" inputmode="decimal" oninput="agAgendarAvaliacao()">
         <div class="campo-dica" id="f-h-condutividade_eletrica"></div>
       </div>
     </div>
@@ -286,6 +286,7 @@
       <textarea id="f-obs" class="form-textarea" rows="3" placeholder="Opcional"></textarea>
     </div>
 
+    <div id="f-alertas"></div>
     <button class="btn-salvar" id="btn-salvar">Salvar coleta</button>
   </div>
 </div>
@@ -509,6 +510,7 @@ const _aguaReady = _dbReady.then(function () {
 <script src="/js/agua-sync.js"></script>
 <script src="/js/brigada-captura.js"></script>
 <script src="/js/agua-iqa-visual.js"></script>
+<script src="/js/agua-alertas.js"></script>
 <script src="/js/agua-rio.js"></script>
 <!-- Detalhe da coleta (Histórico) → exportar ficha em PDF: mesmo motor
      jsPDF do relatório por bacia (Fase 5) e o mesmo compartilhamento em
@@ -530,6 +532,7 @@ const App = {
   coletor: null,          // { id, nome_completo } — linha de `usuarios`
   telasHistorico: [],
   pontos: [],              // cache de agua_pontos_coleta
+  baselines: null,         // faixas históricas por ponto (migration 302)
   pontoAtual: null,
   gpsAtual: null,           // leitura pontual mais recente (bGpsUmaLeitura)
   pinSetupFase: 1,
@@ -832,6 +835,16 @@ async function sincronizarPontos() {
     if (error || !data) return false
     await aOfflineSalvarPontos(data)
     App.pontos = data
+
+    // Faixas históricas por ponto (migration 302), para o app poder
+    // alertar SEM REDE — é o cenário normal na margem do rio. Poucos
+    // KB; guardadas no store `config` (chave-valor) para não exigir
+    // bump de versão do IndexedDB. Falhar aqui não invalida a sync dos
+    // pontos: sem baseline o app só perde o alerta comparativo.
+    try {
+      App.baselines = await aguaAlertasBaixarBaseline(db, data.map(p => p.id))
+      await aOfflineSetConfig('baselines', App.baselines)
+    } catch (e) { console.warn('[agua] baseline', e) }
     return true
   } catch { return false }
 }
@@ -1085,6 +1098,8 @@ function abrirFormulario() {
   })
   document.getElementById('f-codigo-amostra').value = ''
   document.getElementById('f-obs').value = ''
+  _agAlertas = []
+  agPintarAlertas()
   mostrarTela('tela-form')
 }
 
@@ -1093,23 +1108,67 @@ function agValorCampo(id) {
   return v === '' ? null : parseFloat(v)
 }
 
-// Checa plausibilidade de um campo via RPC (mesma função que a mesa
-// usa em agua-laudos.html, migration 254) — nunca reimplementar os
-// limites aqui.
-async function agChecarCampo(campo) {
-  const idMap = { temp_ar: 'f-temp-ar', temp_amostra: 'f-temp-amostra', ph: 'f-ph', od: 'f-od', turbidez: 'f-turbidez', condutividade_eletrica: 'f-condutividade' }
-  const valor = agValorCampo(idMap[campo])
-  const hint = document.getElementById(`f-h-${campo}`)
-  if (!hint) return null
-  if (valor == null || !db) { hint.textContent = ''; return null }
-  const tempAmostra = agValorCampo('f-temp-amostra')
-  try {
-    const { data: classe } = await db.rpc('agua_valor_plausivel', { p_parametro: campo, p_valor: valor, p_temp_amostra: tempAmostra })
-    if (classe === 'impossivel') { hint.textContent = 'Valor fisicamente impossível — confira o instrumento.'; hint.style.color = 'var(--erro,#dc2626)' }
-    else if (classe === 'improvavel') { hint.textContent = 'Valor fora do range típico — confira antes de salvar.'; hint.style.color = 'var(--alerta,#d97706)' }
-    else hint.textContent = ''
-    return classe
-  } catch { return null }   // offline: sem checagem, nunca bloqueia
+// Alertas comparativos. A malha inteira é definida no banco
+// (`agua_avaliar_coleta`, migrations 254 e 302/302b) e aplicada por
+// js/agua-alertas.js — este arquivo não conhece nenhum limiar.
+//
+// DOIS CAMINHOS, MESMO CRITÉRIO. Com rede, chama a RPC (malha
+// completa). Sem rede, compara com as faixas que a última sync
+// guardou no IndexedDB — comparação pura de número, sem regra
+// duplicada. É por isso que o baseline é publicado já na unidade
+// natural do parâmetro (ver cabeçalho da 302).
+//
+// NADA AQUI BLOQUEIA O SALVAMENTO, em nenhum dos dois caminhos:
+// "nada pode impedir o trabalho de campo" é regra do sistema. Nem
+// mesmo valor fisicamente impossível — o coletor pode estar com a
+// sonda descalibrada às 6h da manhã a 200 km de Rio Branco, e perder
+// a coleta é pior que gravar um número que a mesa vai conferir.
+const AG_CAMPO_INPUT = {
+  temp_ar: 'f-temp-ar', temp_amostra: 'f-temp-amostra', ph: 'f-ph',
+  od: 'f-od', turbidez: 'f-turbidez', condutividade_eletrica: 'f-condutividade',
+}
+let _agAlertas = [], _agTimerAval = null
+
+function agAgendarAvaliacao() {
+  clearTimeout(_agTimerAval)
+  _agTimerAval = setTimeout(() => { agAvaliarColeta() }, 500)
+}
+
+function agOrdemAtual() {
+  const d = document.getElementById('f-data').value
+  if (!d) return null
+  return Number(d.split('-')[1]) <= 6 ? 'primeira' : 'segunda'   // mesma regra de salvarRegistro
+}
+
+async function agAvaliarColeta() {
+  const pontoId = document.getElementById('f-ponto').value
+  const ordem   = agOrdemAtual()
+  if (!pontoId || !ordem) { _agAlertas = []; agPintarAlertas(); return [] }
+
+  const valores = {}
+  for (const [campo, id] of Object.entries(AG_CAMPO_INPUT)) valores[campo] = agValorCampo(id)
+
+  if (navigator.onLine && db) {
+    _agAlertas = await aguaAlertasAvaliar(db, { pontoId, ordem, valores })
+  } else {
+    _agAlertas = []
+  }
+  // Sem rede (ou RPC falhou), cai no baseline cacheado.
+  if (!_agAlertas.length) {
+    App.baselines ??= await aOfflineGetConfig('baselines')
+    _agAlertas = aguaAlertasDoBaseline(App.baselines?.[pontoId]?.[ordem], valores)
+  }
+  agPintarAlertas()
+  return _agAlertas
+}
+
+function agPintarAlertas() {
+  document.getElementById('f-alertas').innerHTML =
+    aguaAlertasResumoHTML(_agAlertas, { titulo: 'Confira estes valores antes de salvar' })
+  for (const campo of Object.keys(AG_CAMPO_INPUT)) {
+    const hint = document.getElementById(`f-h-${campo}`)
+    if (hint) hint.innerHTML = aguaAlertaHintHTML(aguaAlertaDoCampo(_agAlertas, campo))
+  }
 }
 
 function _getContextoFoto() {
@@ -1773,7 +1832,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const ponto = (App.pontos || []).find(p => p.id === document.getElementById('f-ponto').value)
     document.getElementById('f-ponto-info').textContent = ponto ? `${ponto.municipio} · ${ponto.rio}` : ''
     atualizarDivergenciaGps()
+    agAgendarAvaliacao()   // a faixa esperada é POR PONTO — trocar de ponto troca a régua
   })
+  // A ordem da campanha (1ª/2ª) sai do mês da coleta e também é parte
+  // da régua: cheia e seca têm faixas diferentes no mesmo ponto.
+  document.getElementById('f-data').addEventListener('change', agAgendarAvaliacao)
   document.getElementById('btn-ler-gps').addEventListener('click', lerGpsAgora)
   document.getElementById('btn-abrir-camera').addEventListener('click', abrirCamera)
   document.getElementById('btn-abrir-galeria').addEventListener('click', abrirGaleria)

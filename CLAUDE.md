@@ -2423,6 +2423,170 @@ disso.
   ruas, entram ao trocar pra satélite, saem de novo ao voltar — e o
   tile do satélite é `lyrs=y`.
 
+## Regra do sistema — alertas comparativos no lançamento (Água)
+Entrega 1 do plano em `docs/qualidade-agua/plano-leitura-laudo-e-alertas.md`
+(migrations 302/302b). A checagem física de valor isolado que existia
+(`agua_valor_plausivel`, 254) ganhou a camada COMPARATIVA que nunca
+teve: o valor lançado é comparado com o histórico do próprio ponto,
+com os demais parâmetros da mesma amostra e com a própria campanha.
+
+**A malha vive em UM lugar só: `agua_avaliar_coleta()`** — nenhuma
+tela reimplementa limiar (mesma lição de `js/frota-consumo.js` e
+`js/mapa-recorte.js`). `js/agua-alertas.js` é avaliador FINO: chama a
+RPC, compara número com número e desenha. Seis tipos, três níveis:
+`bloqueio` (só `fisico`; impede salvar **na mesa**), `confirmar`
+(pede `confirm()`), `informar` (nunca interrompe).
+- **Violação CONAMA NÃO é alerta de digitação** e não entra na malha.
+  Turbidez de 300 UNT em rio amazônico em cheia é resultado
+  verdadeiro e grave; tratá-la como suspeita ensina o técnico a
+  ignorar avisos. Continua em bloco separado (`agua_conama_violacoes`).
+- **A régua é por ponto E por ordem de campanha** (cheia × seca), com
+  degradação DECLARADA: `ponto_campanha` → `ponto` → `rio` → `serie`,
+  mínimo n=8. A mensagem é obrigada a dizer qual base usou e com que
+  `n` — "atípico para este ponto (mediana 45, n=31)" é acionável,
+  "valor atípico" não é.
+- **Estatística robusta (quartis ± 3×IQR, em escala log para os
+  parâmetros multiplicativos)**, nunca média + desvio padrão: a série
+  tem outlier real (turbidez p95 = 588 contra mediana 90) que
+  arrastaria a faixa até não alertar nada. `k = 3,0` foi MEDIDO contra
+  as 452 coletas de produção (dispara em 12,2% das `completo` × 22,0%
+  das `quarentena` — ~2× mais na população já suspeita, em todos os
+  cortes testados), não arbitrado.
+- **Contexto de campanha**: se os outros pontos da mesma campanha
+  saíram da faixa no mesmo sentido, é evento hidrológico e o alerta
+  cai para informativo. Sem isso a primeira cheia dispara 17 alertas
+  falsos e a malha perde credibilidade na primeira semana.
+- **No app, NADA bloqueia** — nem valor fisicamente impossível ("nada
+  pode impedir o trabalho de campo", regra do sistema). O app é
+  offline-first: cacheia as faixas (`vw_agua_baseline_ponto`, já na
+  unidade natural do parâmetro) no store `config` do IndexedDB e usa
+  `aguaAlertasDoBaseline`, que é COMPARAÇÃO PURA — nenhuma regra
+  duplicada em JS, e o critério novo do banco passa a valer assim que
+  sincronizar. Exceção deliberada e documentada à regra "um lugar só".
+- **Avaliação da coleta INTEIRA, com debounce de 500 ms — nunca uma
+  chamada por campo**: as regras de coerência (ortofosfato × fósforo
+  total, E. coli × termotolerantes, SDT × condutividade) só existem
+  olhando o conjunto.
+- ⚠️ **View que agrega série histórica não pode ser consultada dentro
+  de laço** — achado real desta entrega: `vw_agua_baseline_ponto`
+  custa 200 ms por avaliação e a 302 a chamava até 22× por chamada
+  (~4 s; um lote de 452 estourou o timeout de 60 s). A 302b lê uma vez
+  e itera em memória (750 ms). Vale para qualquer RPC futura.
+- **Superfícies tocadas juntas** (regra de duplicação):
+  `agua-laudos.html` (lançamento), `agua-conferencia.html` (promover
+  de quarentena exige resolver bloqueios; manter em quarentena
+  continua livre) e `agua-app.html` (campo, offline).
+- Guarda: `tests/agua-alertas.test.js` (12 testes) — o mais importante
+  exercita a página REAL do app e cobra que a coleta seja salva
+  mesmo com alerta na tela.
+- `pwa/sw.js`: agua 19 → 20.
+- **Achado de dado, novo**: ortofosfato dissolvido > fósforo total em
+  273 de 310 coletas (88%) — e NÃO é a conversão PO₄/P (daria fator
+  fixo 3,07): razão mediana 8,6, quartis 2,9 e 30,9, persistente em
+  todos os anos. Nada foi corrigido — é conferência humana com o laudo
+  físico, como os sólidos em suspensão.
+
+## Regra do sistema — leitura assistida do laudo em PDF (Água)
+Entrega 2 do plano em `docs/qualidade-agua/plano-leitura-laudo-e-alertas.md`
+(migrations 304/305/306), em cima da malha de alertas da Entrega 1.
+`pages/agua-laudos.html` lê o PDF do laboratório e PROPÕE o
+preenchimento, campo a campo, com o recorte da imagem ao lado —
+NUNCA grava nada sozinho.
+
+**Achado que mudou a arquitetura logo na abertura**: os laudos reais
+enviados são digitalização de mesa scanner (Epson Scan 2, 200 dpi,
+zero fonte embutida) — não texto extraível. `pdf.js` renderiza a
+página em canvas; `tesseract.js` faz OCR sobre o recorte de cada
+célula (`js/agua-laudo-ocr.js`, único lugar do pipeline — nunca
+reimplementar numa página). Os dois vendorizados em `js/vendor/`
+(~10 MB, carregado só quando o técnico escolhe um PDF).
+
+- **Gabarito por POSIÇÃO FIXA**, não busca de texto —
+  `agua_laudo_templates` (por laboratório, versionado, `campos` +
+  `campos_identidade` em jsonb, fração 0–1 da página). Medido nas 17
+  páginas do lote real: a posição de cada linha varia no máximo
+  ~17 px numa página de 3508 px — ruído do scanner, não do conteúdo.
+- ⚠️ **A borda da tabela fica colada acima do valor.** Recorte que a
+  inclua faz o OCR fundir régua+dígitos e devolver string VAZIA
+  (medido: "3,17"→"" com a borda dentro; sem ela, "3,17" a 87% de
+  confiança). Toda caixa do gabarito começa ABAIXO do rótulo
+  (deslocamento positivo), nunca em cima — vale para qualquer
+  template novo de outro laboratório.
+- ⚠️ **Casas decimais são constante do TEMPLATE, nunca lidas do
+  OCR.** O glifo da vírgula é pequeno demais em 300 dpi para o OCR
+  situar com segurança — achado real: "3,17" foi lido "3,47" (troca
+  1↔4) numa célula limpa, sem sinal de baixa confiança. O parser lê
+  só os DÍGITOS e insere o separador na posição fixa do template.
+- **Nada entra no banco sem confirmação humana campo a campo**, e a
+  conferência mostra o RECORTE DA IMAGEM, nunca o texto OCR
+  re-digitado — um texto errado reexibido pareceria tão correto
+  quanto um certo. `agua_coletas.origem_dados` (jsonb) guarda, por
+  campo, se veio de `parser`/`digitado`/`corrigido_apos_parser`.
+- **Trava de identidade bloqueia TODO autofill** se data da coleta ou
+  procedência do laudo divergirem da coleta aberta na tela — nada é
+  proposto, só o confronto aparece. É a defesa contra lançar o laudo
+  do ponto A na coleta do ponto B.
+- **Extração determinística, nunca por LLM** — o laudo é prova
+  jurídica; um número plausível que não está no papel é o pior modo
+  de falha possível aqui.
+- Calibração medida contra o motor de OCR de verdade, não estimada:
+  40/42 (95%) em teste offline (poppler); 10–11/14 (71–79%) no
+  navegador real — a diferença é o decodificador JPEG do Chromium
+  divergir sutilmente do poppler em casos-limite. Toda falha medida
+  foi string vazia, nunca número errado silencioso.
+- `agua_atualizar_coleta` ganhou `origem_dados` na whitelist —
+  mudança CIRÚRGICA no corpo (assinatura intacta, sem `DROP
+  FUNCTION`); trocar a lógica de merge por COALESCE quebraria o NULL
+  explícito que a tela de conferência usa para limpar
+  `quarentena_motivo`.
+- Guarda: `tests/agua-laudo-parser.test.js` (10 testes, pipeline real
+  no Chromium, contra páginas REAIS extraídas do lote enviado —
+  `tests/fixtures/laudos/`, nunca fixture sintética).
+- Sem mudança em `pwa/sw.js`: `agua-laudos.html` é tela de mesa, não
+  app de campo.
+- Pendente para a Entrega 3: cadastro de template pela mesa (hoje é
+  SQL direto), `agua_prazos_analise`, segundo laboratório (estrutura
+  já suporta, falta amostra para calibrar).
+
+## Regra do sistema — gabarito de laudo e prazo de preservação (Água)
+Entrega 3 do plano em `docs/qualidade-agua/plano-leitura-laudo-e-alertas.md`
+(migrations 307/308/308b/309), fechando duas das quatro pendências da
+Entrega 2 (as outras duas — segundo laboratório, OCR não-SIMD —
+continuam sem amostra/necessidade real, registradas como estão).
+
+- **Cadastro de gabarito pela mesa** (aba "Gabaritos de laudo" em
+  `pages/agua-pontos.html`): editor de JSON, não calibrador visual —
+  medir a posição de cada campo contra um laudo real é trabalho de
+  quem está olhando o PDF (como a Entrega 2 fez para o QUILAB); a tela
+  cadastra o resultado dessa medição, não faz a medição. Editar (não
+  criar) exige reauth + justificativa, mesmo tratamento de
+  `agua_atualizar_ponto`/`agua_atualizar_laboratorio` — mudar o
+  gabarito muda o que o parser propõe em todo lançamento futuro.
+- **Prazo de preservação** (`agua_prazos_analise`, 18 parâmetros do
+  Standard Methods 24ª ED — a mesma norma citada no laudo — em tabela,
+  nunca código): `agua_prazo_preservacao_alertas(data_coleta,
+  data_recebimento, parametros[])` compara o intervalo coleta→
+  recebimento contra o prazo de cada parâmetro presente na amostra.
+  **Sempre informativo, nunca bloqueia** — estourar o prazo não é
+  "resultado errado", é "resultado com validade comprometida", e isso
+  tem de ficar registrado, não impedir o lançamento.
+- **Recebimento no laboratório é PROXY do início da análise** — este
+  laudo não imprime data de análise em si, só coleta e recebimento.
+  Aproximação FAVORÁVEL: a análise só pode ocorrer depois do
+  recebimento, então o alerta é piso do atraso real, nunca alarme
+  inflado. Campo novo: `agua_coletas.data_recebimento_laboratorio`.
+- ⚠️ **Recebimento NUNCA entra na trava de identidade.** Validado com
+  OCR de verdade: dia/mês saem corretos, mas o ano erra ocasionalmente
+  um dígito (mesmo modo de falha da Entrega 2 — "3,17"→"3,47").
+  Bloquear autofill por causa desse campo geraria falso bloqueio
+  demais. `aguaLaudoExtrairDataPlausivel()` só propõe a data quando o
+  ano cai num intervalo plausível (2015 até ano atual+1); fora disso,
+  `null` — o texto lido fica só como referência, o técnico digita.
+- Guarda: +2 testes em `tests/agua-laudo-parser.test.js` (12 no
+  total).
+- Sem mudança em `pwa/sw.js`: `agua-pontos.html` e `agua-laudos.html`
+  são telas de mesa, não app de campo.
+
 ## Próxima tarefa
 **Recursos Hídricos e Qualidade Ambiental (DERHQA)** — Fases A, B e C
 ENTREGUES (ver "Recursos Hídricos — Fase B" e "— Fase C" acima).
