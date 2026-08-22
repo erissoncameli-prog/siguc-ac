@@ -1082,6 +1082,49 @@ acordeão de 2 níveis, sem tocar nenhuma das 45 páginas (só
   léxico para `let`/`const` — a segunda declaração quebra o parse da
   página inteira, silenciosamente, sem lançar no `<script>` em si).
 
+## Regra do sistema — subgrupo na sidebar (3º nível, DERHQA)
+`gerarLayout()` aceita `subgrupos` dentro de um grupo — acordeão
+ANINHADO. Hoje só o DERHQA usa: o grupo é o DEPARTAMENTO ("Recursos
+Hídricos e Qual. Ambiental") e cada tema é um subgrupo — "Qualidade da
+Água" (as 6 páginas de sempre), "Bacias Hidrográficas" e "Qualidade do
+Ar" (declarados em `js/layout.js`, ainda sem página). Plano completo em
+`docs/recursos-hidricos/plano.md`.
+- **Não virou `super:`**: `super` é a MACROÁREA da SEMA (Diretoria
+  Técnica × Administrativo) e o DERHQA está dentro da Diretoria Técnica
+  — além de `super` não recolher, e o departamento precisar continuar
+  sendo acordeão.
+- Subgrupo é o MESMO mecanismo do grupo, um nível abaixo: mesma classe
+  `.nav-grupo` (+ `.nav-subgrupo`), mesmo `toggleNavGrupo`, mesma
+  preferência em `siguc_nav_grupos` (ids únicos entre grupos e
+  subgrupos), mesmo colapso por `grid-template-rows` — nunca
+  `transform`. Grupo E subgrupo da página atual nascem abertos (só o
+  grupo não bastaria: o link ficaria escondido um nível abaixo).
+- **Subgrupo sem item não renderiza**, e grupo sem subgrupo visível
+  também não — é o que mantém Bacias/Ar declarados e invisíveis.
+- **Gate de permissão por SUBGRUPO**, não no grupo: um `modulo:` no
+  grupo esconderia o departamento inteiro de quem tem acesso a Bacias
+  mas não à Água.
+- ⚠️ **Bug real achado pelo teste ao aninhar**: `.nav-grupo.aberto
+  .nav-grupo-corpo` é seletor DESCENDENTE — abrir o grupo abria também
+  o corpo do subgrupo (e girava o chevron dele). As duas regras usam
+  combinador de FILHO (`>`) desde então (`css/global.css`). Nível novo =
+  mesmo cuidado.
+- **`modulos.grupo` NÃO é rótulo, é regra de acesso.** O rename NÃO
+  tocou `modulos.grupo` da chave `agua` (segue 'Gestão'): é a chave de
+  fallback de `nivel_catalogo_perfil` → `grupo_permissoes_padrao`, e
+  `agua` não tem NENHUMA linha em `perfil_permissoes_padrao` — todo o
+  acesso dela vem do padrão de 'Gestão'. Trocar o grupo tiraria acesso
+  de todo mundo em silêncio. Rótulo de menu vive em `js/layout.js`.
+- Migration 303: `bacias` e `ar` nascem no catálogo `ativo = false`
+  (só super_admin até existir tela, como `agua` na Fase 0) e
+  `exige_lotacao = false`, ligadas ao DERHQA em `modulo_unidades` (é o
+  que faz `modulo_departamento()` acertar o cabeçalho do primeiro
+  relatório). Páginas novas nascem `rh-*`/`ar-*` — as `agua-*` não são
+  renomeadas (quebraria `pwa/sw.js`, builds Capacitor, testes e links).
+- Guarda: `tests/sidebar-grupos.test.js` (21 testes, 3 do subgrupo).
+- `pwa/sw.js`: frota 97 → 98 (`js/layout.js` E `css/global.css` estão no
+  shell do Frota).
+
 ## Enums do banco
 perfil_usuario: super_admin | gestor | tecnico | financeiro | visualizador |
   brigadista | biologo | secretario | diretor | chefe_departamento |
@@ -2288,6 +2331,18 @@ disso.
   tile do satélite é `lyrs=y`.
 
 ## Próxima tarefa
+**Recursos Hídricos e Qualidade Ambiental (DERHQA)** — Fase A ENTREGUE
+(sidebar reorganizada: o grupo agora é o departamento e Qualidade da
+Água virou subgrupo; migration 303 criou `bacias` e `ar` no catálogo,
+inativas). Próximo passo é a **Fase B — Bacias Hidrográficas**
+(dashboard + relatórios sobre as bacias do Acre e as plataformas de
+coleta da ANA/estado), planejada em `docs/recursos-hidricos/plano.md`.
+Bloqueio conhecido e medido: `dadosabertos.ana.gov.br`, `snirh.gov.br`
+e `geoservicos.ibge.gov.br`/`servicos.ibge.gov.br` devolvem 403 no
+proxy das sessões de desenvolvimento — a geometria das bacias precisa
+de uma sessão com esses domínios liberados (ou do arquivo trazido pela
+SEMA); o navegador em produção alcança esses serviços normalmente.
+
 Módulo Qualidade da Água (IQA): as 5 fases do plano original estão
 ENTREGUES (ver `docs/qualidade-agua/plano.md`, seções "Fase 0" a "Fase
 5 — ENTREGUE"). Fase 5 fechou o plano: `pages/agua-relatorios.html`
