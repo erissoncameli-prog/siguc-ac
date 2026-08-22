@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>SIGUC-AC · Boletim do Tempo / Relatório Hidrometeorológico</title>
+<link rel="stylesheet" href="../css/global.css">
+<link rel="stylesheet" href="../css/agua-painel.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,600;8..60,700&display=swap">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../js/observability.js"></script>
+<script src="../js/queryLogger.js"></script>
+<script src="../js/config.js"></script>
+<script src="../js/config-sistema.js"></script>
+<script src="../js/layout.js"></script>
+<script src="../js/mapa-recorte.js"></script>
+<script src="../js/fotos-privadas.js"></script>
+<script src="../js/rh-hidro.js"></script>
+<script src="../js/rh-boletim.js"></script>
+<script src="../js/biomonitor-pdf-fonts.js"></script>
+<script src="../js/relatorio-cabecalho-pdf.js"></script>
+<script src="../js/agua-relatorio-dados.js"></script>
+<script src="../js/agua-relatorio-pdf.js"></script>
+<script src="../js/rh-relatorio-pdf.js"></script>
+<script src="../js/rh-boletim-pdf.js"></script>
+<style>
+.rhb-lista-item {
+  display:flex; align-items:center; justify-content:space-between; gap:14px;
+  padding:14px 4px; border-top:1px solid var(--borda);
+}
+.rhb-lista-item:first-child { border-top:none }
+.rhb-badge { display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:700; padding:2px 10px; border-radius:999px }
+.rhb-badge-rascunho  { background:rgba(202,138,4,.14); color:#92400E }
+.rhb-badge-publicado { background:rgba(5,150,105,.14); color:#065F46 }
+.rhb-vazio { text-align:center; color:var(--cinza-500); padding:36px 16px; font-size:13px }
+
+.rhb-bloco { border-top:1px solid var(--borda); padding-top:16px; margin-top:16px }
+.rhb-bloco:first-child { border-top:none; margin-top:0; padding-top:0 }
+.rhb-bloco-tit { font-weight:700; font-size:14px; color:var(--cinza-900); margin-bottom:8px }
+.rhb-bloco-sub { font-size:12px; color:var(--cinza-500); margin:-4px 0 10px }
+.rhb-form-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(190px, 1fr)); gap:10px }
+.rhb-form-grid label { display:flex; flex-direction:column; gap:4px; font-size:12px; color:var(--cinza-600); font-weight:600 }
+.rhb-form-grid input, .rhb-form-grid select, .rhb-form-grid textarea {
+  border:1px solid var(--borda-forte); border-radius:9px; padding:8px 10px; font:inherit; font-size:13px; font-weight:400;
+}
+.rhb-full { grid-column:1/-1 }
+.rhb-prev-tab { width:100%; border-collapse:collapse; font-size:12.5px; margin-bottom:6px }
+.rhb-prev-tab th { text-align:left; font-size:10.5px; text-transform:uppercase; color:var(--cinza-500); padding:0 6px 6px 0 }
+.rhb-prev-tab td { padding:3px 6px 3px 0; vertical-align:top }
+.rhb-prev-tab input { width:100%; border:1px solid var(--borda-forte); border-radius:7px; padding:5px 7px; font:inherit; font-size:12.5px }
+.rhb-img-preview { max-width:260px; max-height:140px; border:1px solid var(--borda); border-radius:9px; margin-top:6px; display:block }
+.rhb-hint { font-size:11.5px; color:var(--cinza-500); line-height:1.5 }
+.rhb-auto { background:var(--cinza-50); border:1px dashed var(--borda-forte); border-radius:9px; padding:10px 12px; font-size:12.5px; color:var(--cinza-700) }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+;(async function () {
+  const usuario = await carregarUsuario()
+  if (!usuario) { window.location.href = '../index.html'; return }
+
+  const { data: nivel } = await db.rpc('nivel_efetivo', { p_usuario: usuario.id, p_modulo_chave: 'bacias' })
+  if (!nivel || nivel === 'sem_acesso') {
+    document.body.innerHTML = '<div style="padding:60px;text-align:center;font-family:\'DM Sans\',sans-serif;color:#6B7280">Você não tem acesso ao módulo Bacias Hidrográficas.</div>'
+    return
+  }
+  const podeEditar = nivel === 'editar'
+  const hoje = new Date().toISOString().slice(0, 10)
+
+  document.getElementById('app').innerHTML =
+    gerarLayout('Boletim do Tempo / Relatório Hidrometeorológico', 'rh-boletim') +
+    `<div class="fade-in adash">
+      <div class="adash-head">
+        <div>
+          <h1 class="adash-titulo">Boletim do Tempo / Relatório Hidrometeorológico</h1>
+          <p class="adash-sub">Composição do boletim diário (SEMA/CIGMA): o que o sistema já sabe calcular
+            (nível dos rios, chuva acumulada, focos de calor por município) entra automático na hora de gerar
+            o PDF; previsão, avisos, mapas e prognóstico continuam sendo redigidos/anexados por quem monta a
+            edição — mapas de risco de fogo e de anomalia de chuva exigem QGIS e não são gerados aqui.</p>
+        </div>
+      </div>
+
+      <div id="rhb-lista-view">
+        <div class="adash-card">
+          <div class="adash-card-topo">
+            <div><p class="adash-card-tit">Edições</p>
+              <p class="adash-card-tit-sub">Rascunhos e edições publicadas, mais recentes primeiro</p></div>
+            ${podeEditar ? `
+            <div class="adash-export">
+              <button class="adash-pill adash-pill-primary" type="button" onclick="alternarNovo()" data-icon="plus">Nova edição</button>
+              <div class="adash-menu" id="rhb-novo-menu" hidden>
+                <button type="button" onclick="novaEdicao('boletim_tempo')">Boletim do Tempo</button>
+                <button type="button" onclick="novaEdicao('relatorio_hidrometeorologico')">Relatório Hidrometeorológico</button>
+              </div>
+            </div>` : ''}
+          </div>
+          <div id="rhb-lista"><div class="rhb-vazio">Carregando...</div></div>
+        </div>
+      </div>
+
+      <div id="rhb-editor-view" hidden></div>
+    </div>`
+
+  bIconsAplicar(document.getElementById('app'))
+
+  // ── Estado ───────────────────────────────────────────────────────
+  let _boletins = []
+  let _atual = null   // linha em edição (objeto local, refletido no banco a cada salvar)
+
+  window.alternarNovo = function () {
+    const m = document.getElementById('rhb-novo-menu')
+    m.hidden = !m.hidden
+  }
+
+  // ── Lista ────────────────────────────────────────────────────────
+  function renderLista() {
+    const alvo = document.getElementById('rhb-lista')
+    if (!_boletins.length) {
+      alvo.innerHTML = `<div class="rhb-vazio">Nenhuma edição ainda.${podeEditar ? ' Use "Nova edição" para começar.' : ''}</div>`
+      return
+    }
+    alvo.innerHTML = _boletins.map(b => `
+      <div class="rhb-lista-item">
+        <div>
+          <div style="font-weight:600;color:var(--cinza-900)">${esc(RH_BOLETIM_TIPO_LABEL[b.tipo] || b.tipo)} — ${esc(rhBoletimNumeroTxt(b))}</div>
+          <div class="rhb-hint">${esc(rhBoletimDataTxt(b))}${b.publicado_em ? ' · publicado em ' + esc(formatData(b.publicado_em)) : ''}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <span class="rhb-badge ${b.status === 'publicado' ? 'rhb-badge-publicado' : 'rhb-badge-rascunho'}">${b.status === 'publicado' ? 'Publicado' : 'Rascunho'}</span>
+          <button class="btn btn-secondary" style="padding:6px 12px;font-size:12.5px" onclick="abrirEditor('${b.id}')">${podeEditar && b.status !== 'publicado' ? 'Editar' : 'Ver / Exportar'}</button>
+        </div>
+      </div>`).join('')
+  }
+
+  async function carregarLista() {
+    try {
+      const { data, error } = await db.from('rh_boletins')
+        .select('id,tipo,numero,data_referencia,status,publicado_em')
+        .order('data_referencia', { ascending: false }).order('criado_em', { ascending: false })
+      if (error) throw error
+      _boletins = data || []
+    } catch (e) {
+      document.getElementById('rhb-lista').innerHTML = `<div class="rhb-vazio">Não foi possível carregar: ${esc(e.message)}</div>`
+      return
+    }
+    renderLista()
+  }
+
+  // ── Nova edição ──────────────────────────────────────────────────
+  window.novaEdicao = async function (tipo) {
+    document.getElementById('rhb-novo-menu').hidden = true
+    const linha = {
+      tipo, data_referencia: hoje, status: 'rascunho',
+      previsao_regional: rhBoletimPrevisaoNormalizar([]),
+      criado_por: usuario.id,
+    }
+    try {
+      const { data, error } = await db.from('rh_boletins').insert(linha).select().single()
+      if (error) throw error
+      await carregarLista()
+      abrirEditor(data.id)
+    } catch (e) {
+      toast('Não foi possível criar a edição: ' + e.message, 'erro')
+    }
+  }
+
+  // ── Copiar da edição anterior (mesmo tipo) ──────────────────────
+  window.copiarAnterior = async function () {
+    try {
+      const { data, error } = await db.from('rh_boletins').select('*')
+        .eq('tipo', _atual.tipo).neq('id', _atual.id)
+        .order('data_referencia', { ascending: false }).order('criado_em', { ascending: false })
+        .limit(1)
+      if (error) throw error
+      const anterior = data?.[0]
+      if (!anterior) { toast('Não há edição anterior deste tipo para copiar.', 'erro'); return }
+      ;['previsao_regional', 'aviso_meteorologico', 'prognostico_chuva_texto',
+        'texto_risco_fogo', 'texto_risco_fogo_ucs', 'qualidade_ar_purpleair_texto',
+        'qualidade_ar_sisam_texto', 'prognostico_sazonal_texto'].forEach(campo => {
+        _atual[campo] = anterior[campo]
+      })
+      _atual.previsao_regional = rhBoletimPrevisaoNormalizar(anterior.previsao_regional)
+      renderEditor()
+      toast('Copiado da edição anterior — revise antes de salvar.', 'sucesso')
+    } catch (e) {
+      toast('Não foi possível copiar: ' + e.message, 'erro')
+    }
+  }
+
+  // ── Editor ───────────────────────────────────────────────────────
+  window.abrirEditor = async function (id) {
+    try {
+      const { data, error } = await db.from('rh_boletins').select('*').eq('id', id).single()
+      if (error) throw error
+      _atual = data
+      _atual.previsao_regional = rhBoletimPrevisaoNormalizar(data.previsao_regional)
+    } catch (e) {
+      toast('Não foi possível abrir a edição: ' + e.message, 'erro')
+      return
+    }
+    document.getElementById('rhb-lista-view').hidden = true
+    document.getElementById('rhb-editor-view').hidden = false
+    renderEditor()
+  }
+
+  window.fecharEditor = function () {
+    _atual = null
+    document.getElementById('rhb-editor-view').hidden = true
+    document.getElementById('rhb-lista-view').hidden = false
+    carregarLista()
+  }
+
+  function campoTexto(id, label, valor, full) {
+    return `<label${full ? ' class="rhb-full"' : ''}>${label}<textarea id="${id}" rows="3">${esc(valor || '')}</textarea></label>`
+  }
+
+  function blocoImagem(idBase, label, urlAtual, textoId, textoLabel, textoValor) {
+    return `<div class="rhb-bloco">
+      <div class="rhb-bloco-tit">${label}</div>
+      ${textoId ? `<label style="display:block;margin-bottom:8px">${textoLabel}<textarea id="${textoId}" rows="2" style="width:100%;margin-top:4px;border:1px solid var(--borda-forte);border-radius:9px;padding:8px 10px;font:inherit;font-size:13px">${esc(textoValor || '')}</textarea></label>` : ''}
+      ${podeEditar ? `<input type="file" id="${idBase}-arquivo" accept="image/png,image/jpeg,image/webp">` : ''}
+      ${urlAtual ? `<img class="rhb-img-preview" data-foto-privada="" id="${idBase}-preview" src="">` : (podeEditar ? '' : '<p class="rhb-hint">Sem imagem anexada.</p>')}
+    </div>`
+  }
+
+  function renderEditor() {
+    const b = _atual
+    const somenteLeitura = !podeEditar || b.status === 'publicado'
+    const dis = somenteLeitura ? ' disabled' : ''
+    const alvo = document.getElementById('rhb-editor-view')
+    alvo.innerHTML = `
+      <div class="adash-card">
+        <div class="adash-card-topo">
+          <div><p class="adash-card-tit">${esc(RH_BOLETIM_TIPO_LABEL[b.tipo])} — ${esc(rhBoletimNumeroTxt(b))}</p>
+            <p class="adash-card-tit-sub">${b.status === 'publicado' ? 'Publicado — não pode mais ser editado' : 'Rascunho'}</p></div>
+          <div class="adash-export">
+            <button class="btn btn-secondary" onclick="fecharEditor()">Voltar</button>
+            ${podeEditar && b.status !== 'publicado' ? `<button class="btn btn-secondary" onclick="copiarAnterior()">Copiar da edição anterior</button>` : ''}
+            ${podeEditar && b.status !== 'publicado' ? `<button class="btn btn-secondary" onclick="salvarRascunho()" data-icon="save">Salvar rascunho</button>` : ''}
+            <button class="btn btn-secondary" onclick="exportarPdf()" data-icon="file-text">Exportar PDF</button>
+            ${podeEditar && b.status !== 'publicado' ? `<button class="btn btn-primary" onclick="publicar()">Publicar</button>` : ''}
+          </div>
+        </div>
+
+        <div class="rhb-bloco">
+          <div class="rhb-bloco-tit">Identificação</div>
+          <div class="rhb-form-grid">
+            <label>Data de referência<input type="date" id="f-data" value="${esc(b.data_referencia)}"${dis}></label>
+          </div>
+        </div>
+
+        <div class="rhb-bloco">
+          <div class="rhb-bloco-tit">Previsão regional (CENSIPAM)</div>
+          <p class="rhb-bloco-sub">Tabela 1 do boletim — uma linha por regional.</p>
+          <table class="rhb-prev-tab">
+            <thead><tr><th>Cidade</th><th>Temp. máx (°C)</th><th>Temp. mín (°C)</th><th>UR máx (%)</th><th>UR mín (%)</th><th>Vento</th><th>Condição do tempo</th></tr></thead>
+            <tbody>${b.previsao_regional.map((l, i) => `<tr>
+              <td>${esc(l.cidade)}</td>
+              <td><input id="prev-${i}-tmax" value="${esc(l.temp_max)}"${dis}></td>
+              <td><input id="prev-${i}-tmin" value="${esc(l.temp_min)}"${dis}></td>
+              <td><input id="prev-${i}-urmax" value="${esc(l.ur_max)}"${dis}></td>
+              <td><input id="prev-${i}-urmin" value="${esc(l.ur_min)}"${dis}></td>
+              <td><input id="prev-${i}-vento" value="${esc(l.vento_dir)}"${dis} style="width:70px"></td>
+              <td><input id="prev-${i}-cond" value="${esc(l.condicao)}"${dis}></td>
+            </tr>`).join('')}</tbody>
+          </table>
+        </div>
+
+        <div class="rhb-bloco">
+          <div class="rhb-bloco-tit">Aviso meteorológico (INMET)</div>
+          <textarea id="f-aviso" rows="3" style="width:100%;border:1px solid var(--borda-forte);border-radius:9px;padding:8px 10px;font:inherit;font-size:13px"${dis}>${esc(b.aviso_meteorologico || '')}</textarea>
+        </div>
+
+        <div class="rhb-bloco">
+          <div class="rhb-bloco-tit">Nível dos rios / PCD por bacia</div>
+          <div class="rhb-auto" id="rhb-auto-diario">Carregando o relatório diário do dia selecionado...</div>
+          <p class="rhb-hint" style="margin-top:6px">Automático — vem de "Plataformas de Coleta" (rh_relatorio_diario) na data de referência acima. Não é editável aqui; ajuste as leituras em Plataformas de Coleta.</p>
+        </div>
+
+        <div class="rhb-bloco">
+          <div class="rhb-bloco-tit">Chuva acumulada no mês, por estação</div>
+          <div class="rhb-auto" id="rhb-auto-chuva">Carregando...</div>
+        </div>
+
+        <div class="rhb-bloco">
+          <div class="rhb-bloco-tit">Prognóstico de chuva da semana</div>
+          <textarea id="f-prognostico-chuva" rows="3" style="width:100%;border:1px solid var(--borda-forte);border-radius:9px;padding:8px 10px;font:inherit;font-size:13px"${dis}>${esc(b.prognostico_chuva_texto || '')}</textarea>
+        </div>
+        ${blocoImagem('mapa-chuva', 'Mapa de previsão de chuva / anomalia (upload — gerado no QGIS)', b.mapa_chuva_url)}
+
+        <div class="rhb-bloco">
+          <div class="rhb-bloco-tit">Focos de calor por município</div>
+          <div class="rhb-auto" id="rhb-auto-focos">Carregando...</div>
+          <p class="rhb-hint" style="margin-top:6px">Automático — focos_calor classificado por município (ponto-em-polígono contra o limite de cada município), acumulado do mês e do ano corrente.</p>
+        </div>
+
+        ${blocoImagem('mapa-risco', 'Risco de fogo — mapa do estado (upload — gerado no QGIS)', b.mapa_risco_fogo_url, 'f-texto-risco', 'Leitura do mapa', b.texto_risco_fogo)}
+        ${blocoImagem('mapa-risco-ucs', 'Risco de fogo — mapa das UCs (upload — gerado no QGIS)', b.mapa_risco_fogo_ucs_url, 'f-texto-risco-ucs', 'Leitura do mapa', b.texto_risco_fogo_ucs)}
+
+        ${blocoImagem('qar-purpleair', 'Qualidade do ar — Rede PurpleAir (upload)', b.qualidade_ar_purpleair_url, 'f-qar-purpleair', 'Leitura', b.qualidade_ar_purpleair_texto)}
+        ${blocoImagem('qar-sisam', 'Qualidade do ar — SISAM/INPE (upload)', b.qualidade_ar_sisam_url, 'f-qar-sisam', 'Leitura', b.qualidade_ar_sisam_texto)}
+
+        ${b.tipo === 'relatorio_hidrometeorologico' ? `
+        <div class="rhb-bloco">
+          <div class="rhb-bloco-tit">Prognóstico climático sazonal (CPTEC/INPE, INMET, FUNCEME — trimestral)</div>
+          <textarea id="f-sazonal" rows="4" style="width:100%;border:1px solid var(--borda-forte);border-radius:9px;padding:8px 10px;font:inherit;font-size:13px"${dis}>${esc(b.prognostico_sazonal_texto || '')}</textarea>
+        </div>` : ''}
+
+        <div class="rhb-bloco">
+          <div class="rhb-bloco-tit">Observações</div>
+          <textarea id="f-obs" rows="2" style="width:100%;border:1px solid var(--borda-forte);border-radius:9px;padding:8px 10px;font:inherit;font-size:13px"${dis}>${esc(b.observacoes || '')}</textarea>
+        </div>
+      </div>`
+    bIconsAplicar(alvo)
+    ;['mapa-chuva-preview', 'mapa-risco-preview', 'mapa-risco-ucs-preview', 'qar-purpleair-preview', 'qar-sisam-preview'].forEach(id => {
+      const img = document.getElementById(id)
+      if (!img) return
+      const urlMap = {
+        'mapa-chuva-preview': b.mapa_chuva_url, 'mapa-risco-preview': b.mapa_risco_fogo_url,
+        'mapa-risco-ucs-preview': b.mapa_risco_fogo_ucs_url,
+        'qar-purpleair-preview': b.qualidade_ar_purpleair_url, 'qar-sisam-preview': b.qualidade_ar_sisam_url,
+      }
+      const url = urlMap[id]
+      if (url) { img.dataset.fotoPrivada = ''; img.src = url; assinarFotos(img.parentElement).catch(() => {}) }
+    })
+    carregarBlocosAutomaticos()
+  }
+
+  // ── Blocos automáticos (preview na tela) ─────────────────────────
+  let _municipiosPromise = null
+  function garantirMunicipios() {
+    if (!_municipiosPromise) {
+      _municipiosPromise = fetch('../data/municipios_acre.geojson').then(r => r.json()).then(gj => geoMunicipiosPreparar(gj))
+        .catch(e => console.warn('[rh-boletim] municípios indisponíveis:', e.message))
+    }
+    return _municipiosPromise
+  }
+
+  async function calcularDiario(data) {
+    const { data: linhas, error } = await db.rpc('rh_relatorio_diario', { p_data: data })
+    if (error) throw error
+    return linhas || []
+  }
+
+  async function calcularChuvaMes(data) {
+    const inicio = data.slice(0, 8) + '01'
+    const { data: medicoes, error } = await db.from('rh_medicoes').select('estacao_id,chuva_mm,data_hora')
+      .gte('data_hora', inicio).lte('data_hora', data + 'T23:59:59')
+    if (error) throw error
+    const { data: estacoes } = await db.from('rh_estacoes').select('id,nome')
+    const porId = {}
+    ;(estacoes || []).forEach(e => { porId[e.id] = { nome: e.nome } })
+    return rhBoletimChuvaAcumulada(medicoes || [], porId)
+  }
+
+  async function calcularFocos(data) {
+    await garantirMunicipios()
+    const fimAno = data + 'T23:59:59'
+    const inicioAno = data.slice(0, 4) + '-01-01'
+    const inicioMes = data.slice(0, 8) + '01'
+    const { data: focosAno, error } = await db.from('focos_calor').select('lat,lon,data_hora')
+      .gte('data_hora', inicioAno).lte('data_hora', fimAno)
+    if (error) throw error
+    const classificados = rhBoletimFocosClassificar(focosAno || [])
+    const resumoAno = rhBoletimFocosRanking(classificados, 10)
+    const classificadosMes = classificados.filter(f => f.data_hora >= inicioMes)
+    const resumoMes = rhBoletimFocosRanking(classificadosMes, 10)
+    const periodoAnoTxt = `01/01 a ${rhBoletimDataTxt({ data_referencia: data })}`
+    const periodoMesTxt = `01/${data.slice(5, 7)} a ${rhBoletimDataTxt({ data_referencia: data })}`
+    return {
+      anual: { resumo: resumoAno, texto: rhBoletimFocosTexto(resumoAno, periodoAnoTxt) },
+      mensal: { resumo: resumoMes, texto: rhBoletimFocosTexto(resumoMes, periodoMesTxt) },
+    }
+  }
+
+  async function carregarBlocosAutomaticos() {
+    const data = document.getElementById('f-data').value || _atual.data_referencia
+    const elDiario = document.getElementById('rhb-auto-diario')
+    const elChuva = document.getElementById('rhb-auto-chuva')
+    const elFocos = document.getElementById('rhb-auto-focos')
+
+    try {
+      const diario = await calcularDiario(data)
+      window._rhbCtxDiario = diario
+      elDiario.innerHTML = diario.length
+        ? diario.map(l => `<div>${esc(l.rio)} (${esc(l.bacia || 'bacia não informada')}): nível médio ${esc(rhNivel(l.nivel_medio_cm))}, variação ${esc(rhVariacao(l.variacao_cm))}, chuva ${esc(rhChuva(l.chuva_total_mm))}${Number(l.estacoes_em_cota) > 0 ? ` — <strong>${l.estacoes_em_cota} estação(ões) em ${esc(rhCotaLabel(l.pior_situacao))}</strong>` : ''}</div>`).join('')
+        : 'Nenhuma leitura registrada para esta data.'
+    } catch (e) { elDiario.textContent = 'Não foi possível calcular: ' + e.message }
+
+    try {
+      const chuva = await calcularChuvaMes(data)
+      window._rhbCtxChuva = chuva
+      elChuva.innerHTML = chuva.length
+        ? chuva.map(c => `<div>${esc(c.estacao)}: ${esc(rhChuva(c.total_mm))}</div>`).join('')
+        : 'Sem leituras de chuva no mês (rh_medicoes ainda vazia até a ingestão da ANA ser ligada, ou não houve lançamento manual).'
+    } catch (e) { elChuva.textContent = 'Não foi possível calcular: ' + e.message }
+
+    try {
+      const focos = await calcularFocos(data)
+      window._rhbCtxFocos = focos
+      elFocos.innerHTML = `<div style="margin-bottom:6px">${esc(focos.anual.texto)}</div><div>${esc(focos.mensal.texto)}</div>`
+    } catch (e) { elFocos.textContent = 'Não foi possível calcular: ' + e.message }
+  }
+
+  document.addEventListener('change', e => {
+    if (e.target.id === 'f-data' && _atual) carregarBlocosAutomaticos()
+  })
+
+  // ── Salvar ───────────────────────────────────────────────────────
+  function coletarPrevisao() {
+    return _atual.previsao_regional.map((l, i) => ({
+      cidade: l.cidade,
+      temp_max: document.getElementById(`prev-${i}-tmax`)?.value || '',
+      temp_min: document.getElementById(`prev-${i}-tmin`)?.value || '',
+      ur_max: document.getElementById(`prev-${i}-urmax`)?.value || '',
+      ur_min: document.getElementById(`prev-${i}-urmin`)?.value || '',
+      vento_dir: document.getElementById(`prev-${i}-vento`)?.value || '',
+      condicao: document.getElementById(`prev-${i}-cond`)?.value || '',
+    }))
+  }
+
+  async function subirImagemSe(idArquivo, bucket, prefixo) {
+    const el = document.getElementById(idArquivo)
+    const arq = el?.files?.[0]
+    if (!arq) return undefined // undefined = não mexe no campo
+    const path = `${prefixo}/${_atual.id}-${Date.now()}-${arq.name.replace(/[^\w.\-]+/g, '_')}`
+    const { error } = await db.storage.from(bucket).upload(path, arq, { contentType: arq.type })
+    if (error) throw error
+    const { data: { publicUrl } } = db.storage.from(bucket).getPublicUrl(path)
+    return publicUrl
+  }
+
+  function coletarCampos() {
+    return {
+      data_referencia: document.getElementById('f-data').value,
+      previsao_regional: coletarPrevisao(),
+      aviso_meteorologico: document.getElementById('f-aviso')?.value || null,
+      prognostico_chuva_texto: document.getElementById('f-prognostico-chuva')?.value || null,
+      texto_risco_fogo: document.getElementById('f-texto-risco')?.value || null,
+      texto_risco_fogo_ucs: document.getElementById('f-texto-risco-ucs')?.value || null,
+      qualidade_ar_purpleair_texto: document.getElementById('f-qar-purpleair')?.value || null,
+      qualidade_ar_sisam_texto: document.getElementById('f-qar-sisam')?.value || null,
+      prognostico_sazonal_texto: document.getElementById('f-sazonal')?.value || null,
+      observacoes: document.getElementById('f-obs')?.value || null,
+    }
+  }
+
+  window.salvarRascunho = async function () {
+    try {
+      const campos = coletarCampos()
+      const [mapaChuva, mapaRisco, mapaRiscoUcs, qarPurple, qarSisam] = await Promise.all([
+        subirImagemSe('mapa-chuva-arquivo', 'rh-boletim-imagens', 'chuva'),
+        subirImagemSe('mapa-risco-arquivo', 'rh-boletim-imagens', 'risco-fogo'),
+        subirImagemSe('mapa-risco-ucs-arquivo', 'rh-boletim-imagens', 'risco-fogo-ucs'),
+        subirImagemSe('qar-purpleair-arquivo', 'rh-boletim-imagens', 'qualidade-ar'),
+        subirImagemSe('qar-sisam-arquivo', 'rh-boletim-imagens', 'qualidade-ar'),
+      ])
+      if (mapaChuva !== undefined) campos.mapa_chuva_url = mapaChuva
+      if (mapaRisco !== undefined) campos.mapa_risco_fogo_url = mapaRisco
+      if (mapaRiscoUcs !== undefined) campos.mapa_risco_fogo_ucs_url = mapaRiscoUcs
+      if (qarPurple !== undefined) campos.qualidade_ar_purpleair_url = qarPurple
+      if (qarSisam !== undefined) campos.qualidade_ar_sisam_url = qarSisam
+
+      const { data, error } = await db.from('rh_boletins').update(campos).eq('id', _atual.id).select().single()
+      if (error) throw error
+      _atual = data
+      _atual.previsao_regional = rhBoletimPrevisaoNormalizar(data.previsao_regional)
+      toast('Rascunho salvo.', 'sucesso')
+      renderEditor()
+    } catch (e) {
+      toast('Não foi possível salvar: ' + e.message, 'erro')
+    }
+  }
+
+  window.publicar = async function () {
+    if (!confirm('Publicar esta edição? Depois de publicada, o número é atribuído e ela não pode mais ser editada.')) return
+    try {
+      await window.salvarRascunho()
+      const { data: numero, error } = await db.rpc('rh_publicar_boletim', { p_id: _atual.id })
+      if (error) throw error
+      toast(`Publicado como Nº${numero}.`, 'sucesso')
+      fecharEditor()
+    } catch (e) {
+      toast('Não foi possível publicar: ' + e.message, 'erro')
+    }
+  }
+
+  // ── Exportar PDF ─────────────────────────────────────────────────
+  window.exportarPdf = async function () {
+    try {
+      const data = document.getElementById('f-data')?.value || _atual.data_referencia
+      if (!window._rhbCtxDiario) await carregarBlocosAutomaticos()
+      const [cab, protocolo] = await Promise.all([getCabecalhoRelatorio('bacias'), gerarProtocolo()])
+      const b = { ..._atual, ...coletarCampos(), previsao_regional: coletarPrevisao() }
+      const ctxDados = {
+        diario: window._rhbCtxDiario || [],
+        chuvaAcumulada: window._rhbCtxChuva || [],
+        focosAnual: window._rhbCtxFocos?.anual || null,
+        focosMensal: window._rhbCtxFocos?.mensal || null,
+      }
+      const pdf = await rhBoletimMontarPdf(b, ctxDados, cab, protocolo)
+      aguaRelBaixarPdf(pdf, `${b.tipo}-${data}.pdf`)
+    } catch (e) {
+      toast('Não foi possível gerar o PDF: ' + e.message, 'erro')
+    }
+  }
+
+  await carregarLista()
+})()
+</script>
+</body>
+</html>
