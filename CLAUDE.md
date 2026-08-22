@@ -1082,6 +1082,142 @@ acordeão de 2 níveis, sem tocar nenhuma das 45 páginas (só
   léxico para `let`/`const` — a segunda declaração quebra o parse da
   página inteira, silenciosamente, sem lançar no `<script>` em si).
 
+## Regra do sistema — subgrupo na sidebar (3º nível, DERHQA)
+`gerarLayout()` aceita `subgrupos` dentro de um grupo — acordeão
+ANINHADO. Hoje só o DERHQA usa: o grupo é o DEPARTAMENTO ("Recursos
+Hídricos e Qual. Ambiental") e cada tema é um subgrupo — "Qualidade da
+Água" (as 6 páginas de sempre), "Bacias Hidrográficas" e "Qualidade do
+Ar" (declarados em `js/layout.js`, ainda sem página). Plano completo em
+`docs/recursos-hidricos/plano.md`.
+- **Não virou `super:`**: `super` é a MACROÁREA da SEMA (Diretoria
+  Técnica × Administrativo) e o DERHQA está dentro da Diretoria Técnica
+  — além de `super` não recolher, e o departamento precisar continuar
+  sendo acordeão.
+- Subgrupo é o MESMO mecanismo do grupo, um nível abaixo: mesma classe
+  `.nav-grupo` (+ `.nav-subgrupo`), mesmo `toggleNavGrupo`, mesma
+  preferência em `siguc_nav_grupos` (ids únicos entre grupos e
+  subgrupos), mesmo colapso por `grid-template-rows` — nunca
+  `transform`. Grupo E subgrupo da página atual nascem abertos (só o
+  grupo não bastaria: o link ficaria escondido um nível abaixo).
+- **Subgrupo sem item não renderiza**, e grupo sem subgrupo visível
+  também não — é o que mantém Bacias/Ar declarados e invisíveis.
+- **Gate de permissão por SUBGRUPO**, não no grupo: um `modulo:` no
+  grupo esconderia o departamento inteiro de quem tem acesso a Bacias
+  mas não à Água.
+- ⚠️ **Bug real achado pelo teste ao aninhar**: `.nav-grupo.aberto
+  .nav-grupo-corpo` é seletor DESCENDENTE — abrir o grupo abria também
+  o corpo do subgrupo (e girava o chevron dele). As duas regras usam
+  combinador de FILHO (`>`) desde então (`css/global.css`). Nível novo =
+  mesmo cuidado.
+- **`modulos.grupo` NÃO é rótulo, é regra de acesso.** O rename NÃO
+  tocou `modulos.grupo` da chave `agua` (segue 'Gestão'): é a chave de
+  fallback de `nivel_catalogo_perfil` → `grupo_permissoes_padrao`, e
+  `agua` não tem NENHUMA linha em `perfil_permissoes_padrao` — todo o
+  acesso dela vem do padrão de 'Gestão'. Trocar o grupo tiraria acesso
+  de todo mundo em silêncio. Rótulo de menu vive em `js/layout.js`.
+- Migration 303: `bacias` e `ar` nascem no catálogo `ativo = false`
+  (só super_admin até existir tela, como `agua` na Fase 0) e
+  `exige_lotacao = false`, ligadas ao DERHQA em `modulo_unidades` (é o
+  que faz `modulo_departamento()` acertar o cabeçalho do primeiro
+  relatório). Páginas novas nascem `rh-*`/`ar-*` — as `agua-*` não são
+  renomeadas (quebraria `pwa/sw.js`, builds Capacitor, testes e links).
+- Guarda: `tests/sidebar-grupos.test.js` (21 testes, 3 do subgrupo).
+- `pwa/sw.js`: frota 97 → 98 (`js/layout.js` E `css/global.css` estão no
+  shell do Frota).
+
+## Recursos Hídricos — Fase B: Painel das Bacias (migration 304)
+`pages/rh-bacias.html`, primeira tela do subgrupo Bacias Hidrográficas.
+Plano e histórico em `docs/recursos-hidricos/plano.md` (Fase B).
+- **NÃO existe polígono de bacia no sistema.** A divisão vem do texto
+  `agua_pontos_coleta.bacia` (Purus/Juruá/Madeira + 1 sem bacia), e a
+  tela **diz isso num aviso fixo** — nunca fingir recorte geográfico
+  que não foi feito. Quando o arquivo oficial chegar, entra a tabela
+  `bacias_hidrograficas` no molde do `limite_acre` (migration 239,
+  geometria carregada por pg_net do mesmo arquivo que o cliente usa) e
+  a bacia do ponto passa a ser derivada por ponto-em-polígono.
+- Razão de existir (não é cópia do painel da Água): `agua-relatorios`
+  sempre olha UM recorte; aqui a leitura é COMPARATIVA entre bacias.
+  Escolher uma bacia destaca e recorta o MAPA, mas **nunca some com as
+  outras da tabela** — senão a tela perde o sentido.
+- Agregação nova em `js/agua-relatorio-dados.js` (`aguaRelPorBacia`,
+  `aguaRelSerieBacia`), puras — nunca na página. **IQA médio de bacia é
+  NÚMERO, nunca faixa** (classificar média = recalcular o que
+  `agua_iqa_faixa()` faz no banco); por isso o gráfico é chamado com
+  `semLegenda` (opção nova de `aguaIqaGraficoHTML`).
+- Mapa é o MESMO `aguaPainelMapaCriar`, com `opts.referenciaSempre`
+  (novo, ADITIVO — as outras duas telas não mudam): aqui o assunto é a
+  rede hidrográfica, então limite/municípios/hidrografia IBGE aparecem
+  também no mapa de ruas, não só no satélite.
+- **`css/agua-painel.css` (novo) é a contraparte em CSS de
+  `js/agua-painel.js`** — os ~270 linhas de `.adash-*`/`.adet-*` eram
+  copiadas no `<style>` de `agua-relatorios.html` e `agua-publico.html`;
+  esta seria a 3ª cópia. As três páginas linkam a mesma folha; mudança
+  visual do painel entra AQUI e vale para as três (o par de duplicação
+  obrigatória mesa ⇄ público continua valendo igual).
+- Migration 304 ativa o módulo `bacias` (molde da 256 para `agua`).
+  `exige_lotacao` fica FALSE de propósito: leitura agregada do que já é
+  público, sem laudo nem dado pessoal.
+- Fail-open: se o Leaflet não carregar, o card do mapa some e os
+  números continuam — painel em branco por causa da camada visual é
+  pior que painel sem mapa.
+- Guarda: `tests/rh-bacias.test.js` (9). O Leaflet é servido de
+  `tests/fixtures/vendor/` por `page.route` (unpkg oscila na política
+  de rede do sandbox); a PÁGINA segue no CDN em produção.
+- `pwa/sw.js`: frota 98 → 99 (`js/layout.js`), agua 19 → 20
+  (`js/agua-relatorio-dados.js`).
+
+## Recursos Hídricos — Fase C: Plataformas de Coleta (migrations 305-307)
+`pages/rh-estacoes.html` — estações hidrometeorológicas (nível, chuva,
+vazão) da ANA/estado/terceiros. Plano completo em
+`docs/recursos-hidricos/plano.md` (Fase C).
+- **Duas tabelas**: `rh_estacoes` (inventário + COTAS cadastradas em cm
+  — atenção/alerta/inundação, nunca calculadas) e `rh_medicoes` (série,
+  uma linha por leitura, com `origem` telemetria/convencional/
+  importação/manual). Não confundir com `agua_pontos_coleta` — aquele é
+  onde a SEMA amostra pro IQA; estação é infra de terceiro, série
+  própria. RLS pelo módulo `bacias` (mesma leitura de rede
+  hidrográfica).
+- **`situacao_cota` é DERIVADA em `vw_rh_estacoes_detalhe`**, nunca no
+  cliente. Estação SEM cota cadastrada é NULL → "Sem cota cadastrada",
+  NUNCA "normal" (mesma distinção de `conama_violacoes` nulo na Água).
+- **Testado contra a ANA de verdade, do banco (pg_net), antes de
+  desenhar**: a API telemétrica atual responde 401 (existe, exige
+  credencial); o SOAP antigo não responde mais. `ingest-hidro`
+  (Edge Function) está publicada e PRONTA, mas sem
+  `ANA_HIDROWEB_ID`/`ANA_HIDROWEB_SENHA` nos secrets devolve
+  `sem-credencial` sem gravar nada — ligar é cadastrar os 2 secrets +
+  agendar o cron comentado na migration 307, nunca no frontend.
+- **Hidrograma em SVG** (`js/rh-hidro.js`): nível em linha + chuva em
+  barra invertida do topo, cotas como linha tracejada SEMPRE rotulada
+  (nunca só cor). Mesmas 4 cores de cota já validadas contra
+  daltonismo em `js/agua-iqa-visual.js` — nunca uma paleta nova.
+- **`aguaPainelMapaBase()`** (novo, em `js/agua-painel.js`): a base
+  cartográfica (tiles, rosa dos ventos, escala, camadas de referência,
+  config) foi extraída de `aguaPainelMapaCriar` para servir também o
+  mapa de estações, com `legendaFn` injetável — cada tela usa sua
+  própria legenda sobre a mesma base.
+- **Camada no Mapa das UCs** (`pages/mapa.html`), pedido do usuário
+  "igual os CAR": aba "💧 Rec. Hídricos", checkbox liga/desliga,
+  círculos por `rhCotaCor`, popup com link pra tela dedicada.
+- **Relatório diário por RIO** (`rh_relatorio_diario`, nunca por
+  estação — é a leitura operacional real), em 4 formatos: tela, PDF
+  (`js/rh-relatorio-pdf.js`, reaproveita os primitivos de
+  `js/agua-relatorio-pdf.js` — `linhaModulo` parametrizado pra sair
+  "Recursos Hídricos" no timbre), CSV e e-mail diário
+  (`hidro-relatorio-diario`, destinatários em Configurações › Qualidade
+  da Água, `config_sistema.dados.hidro.emails` — lista vazia é decisão
+  válida, o aviso de cota segue por notificação mesmo sem e-mail).
+- **Notificação de cota** (`rh_checar_cotas`, cron de HORA em hora —
+  não 1×/dia como o resto do projeto, porque cheia é rápido; dedupe por
+  `ref` evita spam) para super_admin/gestor/diretor/chefe_departamento/
+  tecnico.
+- Guarda: `tests/rh-estacoes.test.js` (12 testes) — as 3 regras que não
+  podem quebrar: cota nunca calculada no cliente, sem-cota nunca vira
+  "normal", parser de planilha nunca inventa data.
+- `pwa/sw.js`: agua v20 → v21 (`agua-relatorio-dados.js`,
+  `agua-relatorio-pdf.js`, `agua-iqa-visual.js` — todos no shell do app
+  de campo da Água).
+
 ## Enums do banco
 perfil_usuario: super_admin | gestor | tecnico | financeiro | visualizador |
   brigadista | biologo | secretario | diretor | chefe_departamento |
@@ -2452,6 +2588,31 @@ continuam sem amostra/necessidade real, registradas como estão).
   são telas de mesa, não app de campo.
 
 ## Próxima tarefa
+**Recursos Hídricos e Qualidade Ambiental (DERHQA)** — Fases A, B e C
+ENTREGUES (ver "Recursos Hídricos — Fase B" e "— Fase C" acima).
+Próximo passo é a Fase D (Qualidade do Ar) — só estrutura reservada
+(subgrupo na sidebar + chave `ar` inativa no catálogo), nada
+implementado. O polígono das bacias segue pendente: sem ele, o Painel
+das Bacias agrega pelo campo de texto do cadastro do ponto. O ingestor
+automático da ANA (`ingest-hidro`) está pronto e publicado, mas
+desligado até a SEMA concluir o cadastro de credencial no HidroWeb —
+ver §C.3 do plano. O usuário enviou o Atlas de Vulnerabilidade a
+Inundações da ANA (pôster A0, 2013) — hidrografia + trechos inundáveis,
+SEM polígono de bacia; é tema próprio para uma camada futura,
+registrado em §B.4 do plano.
+
+Histórico da Fase A: Fase A ENTREGUE
+(sidebar reorganizada: o grupo agora é o departamento e Qualidade da
+Água virou subgrupo; migration 303 criou `bacias` e `ar` no catálogo,
+inativas). Próximo passo é a **Fase B — Bacias Hidrográficas**
+(dashboard + relatórios sobre as bacias do Acre e as plataformas de
+coleta da ANA/estado), planejada em `docs/recursos-hidricos/plano.md`.
+Bloqueio conhecido e medido: `dadosabertos.ana.gov.br`, `snirh.gov.br`
+e `geoservicos.ibge.gov.br`/`servicos.ibge.gov.br` devolvem 403 no
+proxy das sessões de desenvolvimento — a geometria das bacias precisa
+de uma sessão com esses domínios liberados (ou do arquivo trazido pela
+SEMA); o navegador em produção alcança esses serviços normalmente.
+
 Módulo Qualidade da Água (IQA): as 5 fases do plano original estão
 ENTREGUES (ver `docs/qualidade-agua/plano.md`, seções "Fase 0" a "Fase
 5 — ENTREGUE"). Fase 5 fechou o plano: `pages/agua-relatorios.html`

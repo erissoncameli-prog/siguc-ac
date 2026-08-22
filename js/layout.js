@@ -93,6 +93,8 @@ function gerarLayout(tituloPagina, paginaAtiva) {
     'agua-laudos':              { svg: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M12 11s2.5 3 2.5 4.7a2.5 2.5 0 0 1-5 0C9.5 14 12 11 12 11z"/>', cor: '#0ea5e9', bg: 'rgba(14,165,233,0.22)' },
     'agua-conferencia':         { svg: '<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>', cor: '#0891b2', bg: 'rgba(8,145,178,0.22)' },
     'agua-relatorios':          { svg: '<rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>', cor: '#0284c7', bg: 'rgba(2,132,199,0.22)' },
+    'rh-estacoes':              { svg: '<path d="M12 2v6"/><circle cx="12" cy="10" r="2"/><path d="M7 21c1.5 0 1.5-1.5 3-1.5s1.5 1.5 3 1.5 1.5-1.5 3-1.5"/><path d="M5 17c1.8 0 1.8-1.5 3.6-1.5S10.4 17 12.2 17s1.8-1.5 3.6-1.5S17.6 17 19.4 17"/><path d="M12 12v2"/>', cor: '#22d3ee', bg: 'rgba(34,211,238,0.22)' },
+    'rh-bacias':                { svg: '<path d="M2 6c3 0 3 2 6 2s3-2 6-2 3 2 6 2"/><path d="M2 12c3 0 3 2 6 2s3-2 6-2 3 2 6 2"/><path d="M2 18c3 0 3 2 6 2s3-2 6-2 3 2 6 2"/>', cor: '#0891b2', bg: 'rgba(8,145,178,0.22)' },
   };
 
   function renderPill(id, size) {
@@ -189,22 +191,54 @@ function gerarLayout(tituloPagina, paginaAtiva) {
       ]
     },
     {
-      id: 'agua', label: 'Qualidade da Água', super: 'Diretoria Técnica',
-      // Mesmo padrão do grupo Biomonitor: 'agua' é uma chave só no
-      // catálogo cobrindo o grupo inteiro (Fase 2), e RLS das tabelas
-      // de dono (campanhas/coletas/laboratórios/pontos) já é 100%
-      // pode_ver/pode_editar — leitura e escrita concordam, então
-      // esconder o grupo quando sem_acesso é seguro (diferente do
-      // cluster DEUC, onde leitura fica aberta e por isso NÃO ganhou
-      // esse gate — ver docs/acesso-por-organograma.md §3.1).
-      modulo: 'agua',
-      itens: [
-        { id: 'agua-app',         href: '../pages/agua-app.html',         label: 'App de Campo', target: '_blank' },
-        { id: 'agua-mapa',        href: '../pages/agua-mapa.html',        label: 'Mapa' },
-        { id: 'agua-pontos',      href: '../pages/agua-pontos.html',      label: 'Pontos e Laboratórios' },
-        { id: 'agua-laudos',      href: '../pages/agua-laudos.html',      label: 'Lançar Laudos' },
-        { id: 'agua-conferencia', href: '../pages/agua-conferencia.html', label: 'Conferência' },
-        { id: 'agua-relatorios',  href: '../pages/agua-relatorios.html',  label: 'Relatórios' },
+      // DERHQA — Departamento de Recursos Hídricos e Qualidade
+      // Ambiental. O GRUPO é o departamento (o mesmo dono que
+      // `modulo_unidades` já aponta para a chave 'agua' desde a
+      // migration 265) e cada tema dele é um SUBGRUPO: Qualidade da
+      // Água (o que existe hoje), Bacias Hidrográficas e Qualidade do
+      // Ar (previstos — declarados sem item; subgrupo sem item não
+      // renderiza, então nada aparece até a primeira página nascer).
+      // NÃO virou `super:` de propósito: `super` é a MACROÁREA da SEMA
+      // (Diretoria Técnica × Administrativo) e o DERHQA está DENTRO da
+      // Diretoria Técnica — além de `super` não ser recolhível, e o
+      // departamento precisar continuar sendo um acordeão.
+      // Sem `modulo:` no grupo, também de propósito: o gate é por
+      // SUBGRUPO ('agua'/'bacias'/'ar'); um gate único aqui esconderia
+      // o departamento inteiro de quem tem acesso a Bacias mas não à
+      // Água.
+      id: 'derhqa', label: 'Recursos Hídricos e Qual. Ambiental', super: 'Diretoria Técnica',
+      subgrupos: [
+        {
+          id: 'agua', label: 'Qualidade da Água',
+          // Mesmo padrão do grupo Biomonitor: 'agua' é uma chave só no
+          // catálogo cobrindo o subgrupo inteiro (Fase 2), e RLS das
+          // tabelas de dono (campanhas/coletas/laboratórios/pontos) já
+          // é 100% pode_ver/pode_editar — leitura e escrita concordam,
+          // então esconder quando sem_acesso é seguro (diferente do
+          // cluster DEUC, onde leitura fica aberta e por isso NÃO
+          // ganhou esse gate — ver docs/acesso-por-organograma.md §3.1).
+          modulo: 'agua',
+          itens: [
+            { id: 'agua-app',         href: '../pages/agua-app.html',         label: 'App de Campo', target: '_blank' },
+            { id: 'agua-mapa',        href: '../pages/agua-mapa.html',        label: 'Mapa' },
+            { id: 'agua-pontos',      href: '../pages/agua-pontos.html',      label: 'Pontos e Laboratórios' },
+            { id: 'agua-laudos',      href: '../pages/agua-laudos.html',      label: 'Lançar Laudos' },
+            { id: 'agua-conferencia', href: '../pages/agua-conferencia.html', label: 'Conferência' },
+            { id: 'agua-relatorios',  href: '../pages/agua-relatorios.html',  label: 'Relatórios' },
+          ]
+        },
+        // 'bacias' entrou na Fase B (migration 304 ativou o módulo).
+        // 'ar' segue declarado e sem página — ver
+        // docs/recursos-hidricos/plano.md (Fase D); subgrupo sem item
+        // não renderiza, então nada aparece no menu até a primeira tela.
+        {
+          id: 'bacias', label: 'Bacias Hidrográficas', modulo: 'bacias',
+          itens: [
+            { id: 'rh-bacias',   href: '../pages/rh-bacias.html',   label: 'Painel das Bacias' },
+            { id: 'rh-estacoes', href: '../pages/rh-estacoes.html', label: 'Plataformas de Coleta' },
+          ]
+        },
+        { id: 'ar',     label: 'Qualidade do Ar',      modulo: 'ar',     itens: [] },
       ]
     },
     {
@@ -257,30 +291,62 @@ function gerarLayout(tituloPagina, paginaAtiva) {
 
   const u = appState.usuario;
 
+  // Um grupo tem `itens` OU `subgrupos` (acordeão aninhado, usado hoje
+  // só pelo DERHQA). Daqui pra baixo, tudo que precisa "os links deste
+  // grupo" passa por aqui, para os dois formatos responderem igual.
+  const itensDoGrupo = g => (g.subgrupos ? g.subgrupos.flatMap(s => s.itens) : g.itens);
+
   // Grupo da página atual: nasce sempre aberto, sem depender do que foi
   // salvo — chegar numa página e ver o próprio link escondido seria pior
-  // do que a barra comprida que este acordeão resolve.
-  const grupoAtivoId = (navGroups.find(g => g.itens.some(i => i.id === paginaAtiva)) || {}).id || null;
+  // do que a barra comprida que este acordeão resolve. Mesma regra vale
+  // para o subgrupo, senão o link ficaria escondido um nível abaixo.
+  const grupoAtivoId = (navGroups.find(g => itensDoGrupo(g).some(i => i.id === paginaAtiva)) || {}).id || null;
+  const subgrupoAtivoId = (navGroups.flatMap(g => g.subgrupos || [])
+    .find(s => s.itens.some(i => i.id === paginaAtiva)) || {}).id || null;
 
   let estadoGrupos = {};
   try { estadoGrupos = JSON.parse(localStorage.getItem('siguc_nav_grupos') || '{}'); } catch (e) { /* localStorage indisponível */ }
 
+  // appState.permissoes vem de minhas_permissoes (nivel_efetivo), fail-open
+  // ({} se a consulta falhar — nunca esconde nada por instabilidade de
+  // rede). Só aplica a quem declara `modulo` (nem todo item tem
+  // correspondência 1:1 com o catálogo — ver comentário no grupo Biomonitor).
+  const semAcesso = modulo => !!modulo && !!appState.permissoes && appState.permissoes[modulo] === 'sem_acesso';
+
+  const renderItens = itens => itens
+    .filter(item => !item.perfis || (u && item.perfis.includes(u.perfil)))
+    .filter(item => !semAcesso(item.modulo))
+    .map(item => {
+      const ativo   = paginaAtiva === item.id ? ' ativo' : '';
+      const target  = item.target ? ` target="${item.target}" rel="noopener"` : '';
+      return `<a href="${item.href}"${target} class="nav-item${ativo}">${renderPill(item.id, 26)}<span>${item.label}</span></a>`;
+    }).join('');
+
+  // Subgrupo: mesmo acordeão do grupo, um nível abaixo (mesma classe
+  // .nav-grupo + .nav-subgrupo, mesmo toggleNavGrupo, mesma preferência
+  // em siguc_nav_grupos — os ids são únicos entre grupos e subgrupos).
+  const renderSubgrupo = sub => {
+    if (sub.perfis && u && !sub.perfis.includes(u.perfil)) return '';
+    if (semAcesso(sub.modulo)) return '';
+    const itensHtml = renderItens(sub.itens);
+    if (!itensHtml) return '';
+    const aberto = sub.id === subgrupoAtivoId ? true : !!estadoGrupos[sub.id];
+    return `<div class="nav-grupo nav-subgrupo${aberto ? ' aberto' : ''}" data-grupo="${sub.id}">
+      <button type="button" class="nav-section-toggle" onclick="toggleNavGrupo('${sub.id}')" aria-expanded="${aberto}">
+        <span class="nav-section">${sub.label}</span>
+        <svg class="nav-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="nav-grupo-corpo"><div class="nav-grupo-corpo-inner">${itensHtml}</div></div>
+    </div>`;
+  };
+
   let superAtual;
   const navHtml = navGroups.map(grupo => {
     if (grupo.perfis && u && !grupo.perfis.includes(u.perfil)) return '';
-    // appState.permissoes vem de minhas_permissoes (nivel_efetivo), fail-open
-    // ({} se a consulta falhar — nunca esconde o grupo por instabilidade de
-    // rede). Só aplica quando o grupo declara `modulo` (nem todo item tem
-    // correspondência 1:1 com o catálogo — ver comentário no grupo Biomonitor).
-    if (grupo.modulo && appState.permissoes && appState.permissoes[grupo.modulo] === 'sem_acesso') return '';
-    const itensHtml = grupo.itens
-      .filter(item => !item.perfis || (u && item.perfis.includes(u.perfil)))
-      .filter(item => !item.modulo || !appState.permissoes || appState.permissoes[item.modulo] !== 'sem_acesso')
-      .map(item => {
-        const ativo   = paginaAtiva === item.id ? ' ativo' : '';
-        const target  = item.target ? ` target="${item.target}" rel="noopener"` : '';
-        return `<a href="${item.href}"${target} class="nav-item${ativo}">${renderPill(item.id, 26)}<span>${item.label}</span></a>`;
-      }).join('');
+    if (semAcesso(grupo.modulo)) return '';
+    const itensHtml = grupo.subgrupos
+      ? grupo.subgrupos.map(renderSubgrupo).join('')
+      : renderItens(grupo.itens);
     if (!itensHtml) return '';
 
     let prefixo = '';

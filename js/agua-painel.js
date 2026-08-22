@@ -362,7 +362,7 @@ function _aguaPainelRosaDosVentos() {
 // `cfg` (opcional) é a configuração ao vivo de _aguaPainelCamadasCarregar
 // — os chips de "Camadas de referência" refletem a cor escolhida pelo
 // usuário no painel de configuração, nunca ficam presos ao padrão.
-function _aguaPainelLegendaHTML(cfg) {
+function _aguaPainelLegendaHTML(cfg, sempre) {
   const c = cfg || AGUA_PAINEL_CAMADAS_PADRAO
   const chipsIqa = AGUA_IQA_FAIXA_ORDEM.map(f => `<span class="adash-mapa-legenda-chip"><span class="adash-mapa-legenda-dot" style="background:${AGUA_IQA_FAIXA_COR[f]}"></span>${esc(f)}</span>`).join('')
   return `<div class="adash-mapa-legenda-tit">IQA (preenchimento)</div>
@@ -375,7 +375,7 @@ function _aguaPainelLegendaHTML(cfg) {
     <div class="adash-mapa-legenda-linha" style="margin-top:4px">
       <span class="adash-mapa-legenda-chip">Preenchimento fraco = em conferência</span>
     </div>
-    <div class="adash-mapa-legenda-tit" style="margin-top:6px">Camadas de referência (só satélite)</div>
+    <div class="adash-mapa-legenda-tit" style="margin-top:6px">Camadas de referência${sempre ? '' : ' (só satélite)'}</div>
     <div class="adash-mapa-legenda-linha">
       <span class="adash-mapa-legenda-chip"><span class="adash-mapa-legenda-linha-cor" style="background:${c.acreCor}"></span>Limite do Acre</span>
       <span class="adash-mapa-legenda-chip"><span class="adash-mapa-legenda-linha-cor" style="background:${c.munCor};opacity:.6"></span>Municípios</span>
@@ -383,10 +383,10 @@ function _aguaPainelLegendaHTML(cfg) {
     </div>`
 }
 
-function _aguaPainelControleLegenda(cfg) {
+function _aguaPainelControleLegenda(cfg, sempre, legendaFn) {
   const Ctrl = L.Control.extend({ options: { position: 'bottomright' }, onAdd() {
     const div = L.DomUtil.create('div', 'adash-mapa-legenda')
-    div.innerHTML = _aguaPainelLegendaHTML(cfg)
+    div.innerHTML = (legendaFn || _aguaPainelLegendaHTML)(cfg, sempre)
     L.DomEvent.disableClickPropagation(div); return div
   } })
   return new Ctrl()
@@ -485,7 +485,31 @@ function _aguaPainelPinIcon(estilo) {
   })
 }
 
-function aguaPainelMapaCriar(mapaElId, subElId) {
+// `opts.referenciaSempre` (opcional): mantém limite do Acre,
+// municípios e hidrografia visíveis TAMBÉM no mapa de ruas. Padrão
+// (false) = só no satélite, como o painel de Relatórios/público pediu
+// (o OSM já traz divisas e nomes). pages/rh-bacias.html liga a opção:
+// ali o assunto É a rede hidrográfica, então esconder os rios no modo
+// ruas esvaziaria a tela. Opção ADITIVA de propósito — as duas telas
+// que já usavam a função não mudam de comportamento.
+// Base cartográfica compartilhada: mapa + tiles (ruas/satélite
+// híbrido) + rosa dos ventos + escala + legenda + camadas de
+// referência (limite do Acre, municípios, hidrografia IBGE) +
+// "Configurar camadas". NÃO sabe nada de coleta nem de IQA — quem
+// chama põe os próprios marcadores em cima. Extraída de
+// aguaPainelMapaCriar quando pages/rh-estacoes.html (plataformas
+// hidrometeorológicas) precisou dos MESMOS componentes com outros
+// marcadores e outra legenda: a alternativa seria uma segunda cópia
+// da rosa dos ventos e do painel de camadas, exatamente o que a regra
+// do projeto proíbe.
+//
+// `opts.legendaFn(cfg, referenciaSempre)` devolve o HTML da legenda
+// (o padrão é a legenda de IQA+CONAMA); `opts.referenciaSempre`
+// mantém as camadas de referência visíveis também no mapa de ruas.
+// Devolve { mapa, atualizarLegenda() }.
+function aguaPainelMapaBase(mapaElId, opts) {
+  const _opts = opts || {}
+  const legendaFn = _opts.legendaFn || _aguaPainelLegendaHTML
   const mapa = L.map(mapaElId, { attributionControl: false }).setView([-9.5, -70.0], 6)
   let camadaBase = L.tileLayer(AGUA_PAINEL_TILE_RUAS.url, AGUA_PAINEL_TILE_RUAS.opts).addTo(mapa)
 
@@ -502,7 +526,7 @@ function aguaPainelMapaCriar(mapaElId, subElId) {
     _atualizarCamadasReferencia()
   }
   function _atualizarCamadasReferencia() {
-    const visivel = _modoAtual === 'satelite'
+    const visivel = _opts.referenciaSempre || _modoAtual === 'satelite'
     _camadasReferencia.forEach(l => {
       if (visivel && !mapa.hasLayer(l)) l.addTo(mapa)
       else if (!visivel && mapa.hasLayer(l)) mapa.removeLayer(l)
@@ -523,8 +547,11 @@ function aguaPainelMapaCriar(mapaElId, subElId) {
   let _cfgCamadas = _aguaPainelCamadasCarregar()
   let _acreLayer = null
   let _munLayer = null
-  const _legendaCtl = _aguaPainelControleLegenda(_cfgCamadas).addTo(mapa)
+  const _legendaCtl = _aguaPainelControleLegenda(_cfgCamadas, _opts.referenciaSempre, legendaFn).addTo(mapa)
   const _legendaDiv = _legendaCtl.getContainer()
+  function atualizarLegenda() {
+    if (_legendaDiv) _legendaDiv.innerHTML = legendaFn(_cfgCamadas, _opts.referenciaSempre)
+  }
 
   _aguaPainelRosaDosVentos().addTo(mapa)
   L.control.scale({ position: 'bottomleft', metric: true, imperial: false, maxWidth: 110 }).addTo(mapa)
@@ -542,7 +569,7 @@ function aguaPainelMapaCriar(mapaElId, subElId) {
         if (novoCfg.munNomes) layer.openTooltip()
       })
     }
-    if (_legendaDiv) _legendaDiv.innerHTML = _aguaPainelLegendaHTML(novoCfg)
+    atualizarLegenda()
   }).addTo(mapa)
 
   ;(async function desenharLimiteAcre() {
@@ -592,6 +619,13 @@ function aguaPainelMapaCriar(mapaElId, subElId) {
     errorTileUrl: 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==',
   }))
 
+  return { mapa, atualizarLegenda }
+}
+
+// Mapa dos PONTOS DE COLETA (painel de Relatórios e público) — a base
+// acima + os pinos gota-d'água coloridos por IQA/CONAMA.
+function aguaPainelMapaCriar(mapaElId, subElId, opts) {
+  const { mapa } = aguaPainelMapaBase(mapaElId, opts)
   let marcadores = {}
 
   // `pontosGeomPorId`: { [ponto_id]: [lat, lng] }. `rel` pode ser null

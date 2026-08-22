@@ -286,6 +286,20 @@ function renderCfg(cfg){
       </div>
       <div id="agua-legal-list">${(cfg.agua?.base_legal||[]).map(_aguaLegalRowHTML).join('')}</div>
       <button type="button" class="btn btn-outline" style="font-size:11px;margin-top:6px" onclick="_addAguaLegal()">+ Adicionar norma</button>
+
+      <div class="cfg-section" style="margin-top:22px">
+        <div class="cfg-section-title">Relatório diário de rios — destinatários</div>
+        <div class="hint" style="margin-bottom:8px">
+          Quem recebe por e-mail, toda manhã, o resumo de variação de nível e chuva por rio
+          (Recursos Hídricos › Plataformas de Coleta). Um e-mail por linha. Lista vazia = ninguém
+          recebe e-mail — o aviso de cota atingida continua chegando pelas notificações do sistema,
+          que não dependem desta lista.
+        </div>
+        <div class="field">
+          <label>E-mails (um por linha)</label>
+          <textarea id="f-hidro-emails" rows="3" placeholder="defesacivil@ac.gov.br">${esc((cfg.hidro?.emails||[]).join('\n'))}</textarea>
+        </div>
+      </div>
     </div>
 
     <!-- TAB: PRIVACIDADE (LGPD) -->
@@ -952,6 +966,10 @@ function _addAguaLegal(){
   const list = document.getElementById('agua-legal-list');
   if(list) list.insertAdjacentHTML('beforeend', _aguaLegalRowHTML({}));
 }
+function _coletarHidroEmails(){
+  const txt = document.getElementById('f-hidro-emails')?.value || '';
+  return txt.split(/[\n,;]+/).map(e => e.trim()).filter(e => /.+@.+\..+/.test(e));
+}
 function _coletarAguaLegal(){
   return [...document.querySelectorAll('.agua-legal-row')].map(row => ({
     titulo: row.querySelector('.al-titulo')?.value.trim() || '',
@@ -986,6 +1004,11 @@ async function salvarCfg(){
     responsaveis_tecnicos: _coletarResponsaveis(),
     encarregado: { nome: v('f-dpo-nome'), email: v('f-dpo-email'), telefone: v('f-dpo-tel'), portaria: v('f-dpo-portaria') },
     agua: { ...(cfg.agua||{}), base_legal: _coletarAguaLegal() },
+    // Recursos Hídricos — destinatários do relatório diário por e-mail
+    // (lido pela Edge Function hidro-relatorio-diario). Lista vazia é
+    // decisão válida: sem e-mail, o aviso de cota segue só por
+    // notificação no sistema.
+    hidro: { ...(cfg.hidro||{}), emails: _coletarHidroEmails() },
   };
   await _salvarDados(novas);
   toast('Configurações salvas com sucesso.','success');

@@ -477,6 +477,7 @@ body.mapa-imersivo .malerta-panel.aberto{transform:none;}
 <!-- Recorte geográfico (limite do Acre + ponto-em-UC): helper único,
      compartilhado com pages/alertas-ambientais.html. Ver js/mapa-recorte.js. -->
 <script src="../js/mapa-recorte.js"></script>
+<script src="../js/rh-hidro.js"></script>
 </head>
 <body>
 <div id="app"><div style="display:flex;align-items:center;justify-content:center;height:100vh"><div class="spinner"></div></div></div>
@@ -1149,6 +1150,7 @@ function renderPagina(){
         <button class="mlb-tab" id="mlb-btn-car" onclick="toggleLayerBar('car')">🏡 CAR — Imóveis Rurais <span class="mlb-badge" id="car-count-badge" style="display:none">0</span></button>
         <button class="mlb-tab" id="mlb-btn-areas" onclick="toggleLayerBar('areas')">🌿 Áreas Territoriais <span class="mlb-badge" id="uc-count-badge" title="Unidades de Conservação" style="display:none">0</span> <span class="mlb-badge" id="ti-count-badge" title="Terras Indígenas" style="display:none">0</span></button>
         <button class="mlb-tab" id="mlb-btn-alertas" onclick="toggleLayerBar('alertas')">🔥 Alertas e Focos <span class="mlb-badge" id="alertas-count-badge" style="display:none">0</span></button>
+        <button class="mlb-tab" id="mlb-btn-hidro" onclick="toggleLayerBar('hidro')">💧 Rec. Hídricos <span class="mlb-badge" id="hidro-count-badge" style="display:none">0</span></button>
         <button class="mlb-tab" id="mlb-btn-brigadas" onclick="toggleLayerBar('brigadas')">🧯 Brigadas Comunitárias <span class="mlb-badge" id="brigadas-count-badge" style="display:none">0</span></button>
         <button class="mlb-tab" id="mlb-btn-projetos" onclick="toggleLayerBar('projetos')">📐 Projetos de Análise <span class="mlb-badge" id="projetos-count-badge" style="display:none">0</span></button>
         <button class="mlb-tab" id="mlb-btn-mun" onclick="toggleLayerBar('mun')">🏙 Municípios</button>
@@ -1892,6 +1894,24 @@ function _renderDropdown(id){
         <div id="sentinel-status" style="font-size:10px;color:#065f46"></div>
       </div>
     </div>
+  ` + foot;
+  if(id==='hidro') return hdr('💧 Recursos Hídricos — Estações') + `
+    <label style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;cursor:pointer">
+      <input type="checkbox" id="hidro-toggle" style="accent-color:#0891b2;width:14px;height:14px" onchange="toggleCamadaHidro(this)">
+      Exibir estações hidrometeorológicas
+    </label>
+    <p style="font-size:11px;color:var(--cinza-500);margin:5px 0 10px">Nível de rio, chuva e vazão — ANA, estado ou terceiros.
+      Cor = situação da cota (calculada pelo banco, comparando a leitura com as cotas cadastradas da estação).</p>
+    <div id="hidro-legenda-inline" style="display:none;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px">
+      <span style="font-size:10px;font-weight:700;color:var(--cinza-500);width:100%;margin-bottom:2px">SITUAÇÃO DA COTA:</span>
+      <span style="display:inline-flex;align-items:center;gap:4px;font-size:11px"><span style="width:9px;height:9px;border-radius:50%;background:#86198F;display:inline-block"></span>Inundação</span>
+      <span style="display:inline-flex;align-items:center;gap:4px;font-size:11px"><span style="width:9px;height:9px;border-radius:50%;background:#C2410C;display:inline-block"></span>Alerta</span>
+      <span style="display:inline-flex;align-items:center;gap:4px;font-size:11px"><span style="width:9px;height:9px;border-radius:50%;background:#CA8A04;display:inline-block"></span>Atenção</span>
+      <span style="display:inline-flex;align-items:center;gap:4px;font-size:11px"><span style="width:9px;height:9px;border-radius:50%;background:#059669;display:inline-block"></span>Normal</span>
+      <span style="display:inline-flex;align-items:center;gap:4px;font-size:11px"><span style="width:9px;height:9px;border-radius:50%;background:#9CA3AF;display:inline-block"></span>Sem cota cadastrada</span>
+    </div>
+    <div id="hidro-status-txt" style="font-size:11px;color:var(--cinza-500)"></div>
+    <a href="rh-estacoes.html" style="display:inline-block;margin-top:8px;font-size:12px;color:#0891b2;font-weight:600;text-decoration:none">Abrir Plataformas de Coleta (hidrograma, relatório diário) →</a>
   ` + foot;
   if(id==='car') return hdr('🏡 CAR — Cadastro Ambiental Rural') + `
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
@@ -2849,6 +2869,9 @@ function _atualizarLegendaMapa(){
 
   // CAR
   if(_carLayer) itens.push({ simbolo:'rect', cor:'#d97706', opacidade:0.15, label:'CAR — Imóveis Rurais' });
+
+  // Recursos Hídricos — Estações
+  if(_hidroLayer) itens.push({ simbolo:'circle', cor:'#0891b2', label:'Estações hidrometeorológicas' });
 
   // Cobertura Vegetal
   if(VEG_LAYERS.mapbiomas?.layer)  itens.push({ simbolo:'rect', cor:'#16a34a', opacidade:0.7, label:'MapBiomas Coleção 8' });
@@ -5611,6 +5634,57 @@ function _popularFiltroCarUC(targetId = 'car-sel-uc'){
     html += '</optgroup>';
   });
   sel.innerHTML = html;
+}
+
+let _hidroLayer = null, _hidroEstacoes = null;
+
+// Camada de estações hidrometeorológicas — reaproveita rhCotaCor/
+// rhCotaLabel de js/rh-hidro.js (mesma cor/rótulo da tela dedicada,
+// nunca uma segunda paleta). Carrega uma vez, cacheia; o toggle só
+// adiciona/remove do mapa. Situação da cota vem pronta de
+// vw_rh_estacoes_detalhe (migration 306) — nada é calculado aqui.
+async function toggleCamadaHidro(el){
+  if(!el.checked){
+    if(_hidroLayer){ mapaL.removeLayer(_hidroLayer); _hidroLayer=null; }
+    document.getElementById('hidro-legenda-inline').style.display='none';
+    document.getElementById('hidro-count-badge').style.display='none';
+    _atualizarLegendaMapa();
+    return;
+  }
+  const statusEl = document.getElementById('hidro-status-txt');
+  if(!_hidroEstacoes){
+    statusEl.textContent = 'Carregando estações...';
+    try{
+      const { data, error } = await db.from('vw_rh_estacoes_detalhe').select('*');
+      if(error) throw error;
+      _hidroEstacoes = data || [];
+    }catch(e){
+      statusEl.textContent = 'Erro ao carregar: ' + e.message;
+      el.checked = false;
+      return;
+    }
+  }
+  const comCoord = _hidroEstacoes.filter(e => e.lat!=null && e.lng!=null && e.ativo!==false);
+  _hidroLayer = L.layerGroup(comCoord.map(e => {
+    const m = L.circleMarker([e.lat, e.lng], {
+      radius: 7, fillColor: rhCotaCor(e.situacao_cota), fillOpacity: .9, color:'#fff', weight:2,
+    });
+    const nivel = e.nivel_atual_cm!=null ? e.nivel_atual_cm+' cm' : '—';
+    const variacao = e.variacao_24h_cm!=null ? (e.variacao_24h_cm>0?'+':'')+e.variacao_24h_cm+' cm/24h' : '';
+    m.bindPopup(`<div style="min-width:180px">
+        <strong>${esc(e.nome)}</strong><br>
+        <span style="font-size:11px;color:#6B7280">${esc([e.rio,e.municipio].filter(Boolean).join(' · ')||'—')}</span>
+        <div style="margin-top:6px;font-size:12px">Nível: <strong>${nivel}</strong> ${variacao?`<span style="color:#6B7280">(${variacao})</span>`:''}</div>
+        <div style="margin-top:2px;font-size:12px;color:${rhCotaCor(e.situacao_cota)};font-weight:700">${esc(rhCotaLabel(e.situacao_cota))}</div>
+        <a href="rh-estacoes.html" style="display:inline-block;margin-top:6px;font-size:11px;color:#0891b2">Ver série completa →</a>
+      </div>`);
+    return m;
+  })).addTo(mapaL);
+  statusEl.textContent = `${comCoord.length} de ${_hidroEstacoes.length} estação(ões) com coordenada.`;
+  document.getElementById('hidro-legenda-inline').style.display='flex';
+  const badge = document.getElementById('hidro-count-badge');
+  if(badge){ badge.textContent = comCoord.length; badge.style.display = comCoord.length?'':'none'; }
+  _atualizarLegendaMapa();
 }
 
 async function toggleCamadaCAR(el){
