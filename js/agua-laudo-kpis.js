@@ -13,6 +13,11 @@
 // agua_coletas.* com joins na outra) + um labelFn que decide como
 // identificar um item na legenda, e devolvem uma STRING html. Quem
 // chama decide onde encaixar no DOM.
+//
+// A rosca de "Situação da série" usa o primitivo genérico
+// _aguaRoscaHTML de js/agua-iqa-visual.js (nunca uma segunda cópia do
+// desenho) — por isso as duas páginas precisam carregar aquele arquivo
+// também, mesmo sem usar IQA nenhum aqui.
 
 function aguaDiasDesdeColeta(dataColeta) {
   const ms = Date.now() - new Date(dataColeta + 'T00:00:00').getTime()
