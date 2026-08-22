@@ -76,12 +76,11 @@ Sistema já tem login, sidebar, layout e páginas funcionando.
   br.gov.ac.sema.siguc.frota — convive com Brigadas e Biomonitor; build via
   app-frota/scripts/build-www.mjs — ver docs/app-frota.md; alterações
   sempre nos arquivos web)
-- app-agua/ → shell nativo Capacitor da Qualidade da Água (APK Android
-  NÃO gerado ainda — infra pronta, ver docs/app-agua.md — a partir de
-  pages/agua-app.html + js/agua-offline.js + js/agua-sync.js; appId
-  br.gov.ac.sema.siguc.agua — convive com Brigadas/Biomonitor/Frota;
-  build via app-agua/scripts/build-www.mjs; alterações sempre nos
-  arquivos web)
+- app-agua/ → shell nativo Capacitor da Qualidade da Água (APK Android,
+  ver docs/app-agua.md — a partir de pages/agua-app.html +
+  js/agua-offline.js + js/agua-sync.js; appId br.gov.ac.sema.siguc.agua
+  — convive com Brigadas/Biomonitor/Frota; build via
+  app-agua/scripts/build-www.mjs; alterações sempre nos arquivos web)
 
 ## Design system (nunca alterar variáveis sem alinhamento)
 --floresta:#0A1A0F | --verde-c:#52B788 | --ouro:#C9A84C | --ouro-c:#F0CB6A
@@ -1432,13 +1431,18 @@ D) Gestão de Pesquisa (13 etapas)
 E) Dashboard Executivo por nível (UC / Diretoria / Secretaria)
 
 ## Versionamento (OBRIGATÓRIO — vale para TODA sessão)
-- `pwa/sw.js` é um único arquivo compartilhado pelos 3 PWAs (Brigadas,
-  Biomonitor, Frota), mas cache e versão são ISOLADOS por app: cada
-  página registra o SW com `scope` próprio (`/pages/brigada.html`,
-  `/pages/biomonitor.html`, `/pages/frota-app.html`), e o SW deriva
-  `APP` do `self.registration.scope` para escolher o app shell e o
-  nome do cache (`siguc-<app>-vN`). O objeto `VERSOES` no topo do
-  arquivo guarda o contador de cada um.
+- `pwa/sw.js` é um único arquivo compartilhado pelos 4 PWAs (Brigadas,
+  Biomonitor, Frota, Água), mas cache e versão são ISOLADOS por app:
+  cada página registra o SW com `scope` próprio (`/pages/brigada.html`,
+  `/pages/biomonitor.html`, `/pages/frota-app.html`,
+  `/pages/agua-app.html`), e o SW deriva `APP` do
+  `self.registration.scope` para escolher o app shell e o nome do
+  cache (`siguc-<app>-vN`). O objeto `VERSOES` no topo do arquivo
+  guarda o contador de cada um.
+  **Esse mesmo contador agora também dispara o build do APK
+  automaticamente** — ver `.github/workflows/apk-auto-trigger.yml` e a
+  regra de APK em "Regras de desenvolvimento" abaixo. Não é um sistema
+  paralelo: é o MESMO incremento que esta seção já exige.
 - A CADA implementação concluída, ANTES do commit/deploy, INCREMENTAR
   em `pwa/sw.js` SÓ o contador do app que a entrega tocou (vN → vN+1
   dentro de `VERSOES.brigadas`, `VERSOES.biomonitor` ou
@@ -1483,10 +1487,24 @@ E) Dashboard Executivo por nível (UC / Diretoria / Secretaria)
   Lucide), registrado em js/config.js (BICON_PATHS). Em HTML estático
   use data-icon="nome" (bIconsAplicar injeta); em JS use bico('nome').
   Ícone novo = adicionar um path no MESMO estilo em BICON_PATHS.
-- APK Android (workflows brigadas-apk.yml e biomonitor-apk.yml): NÃO gerar
-  novo APK a cada mudança. Só gerar quando o usuário pedir ou quando já
-  houver acúmulo suficiente para valer a pena. Mudanças web/PWA podem ir à
-  produção normalmente (lembrar de subir a versão do cache em pwa/sw.js).
+- APK Android — REGRA MUDOU (decisão do usuário, substitui a regra
+  antiga de "só gerar quando pedido ou já houver acúmulo"): agora TODO
+  app gera APK novo SOZINHO sempre que atualiza, sem precisar pedir.
+  Mecanismo: `.github/workflows/apk-auto-trigger.yml` dispara em todo
+  push a `main` que mexa em `pwa/sw.js`, compara o `VERSOES` de antes ×
+  depois do commit, e roda `gh workflow run` no `<app>-apk.yml`
+  correspondente a cada contador que subiu. Não olha lista de arquivo
+  nenhuma — usa o PRÓPRIO contador que a regra "Versionamento" abaixo
+  já obriga subir a cada entrega que toca o shell de um app. Efeito
+  prático: **subir o contador de `VERSOES[app]` em `pwa/sw.js` (regra
+  de sempre, inalterada) agora TAMBÉM é o gatilho do build do APK** —
+  nenhum passo extra precisa ser lembrado além do que já era
+  obrigatório. Isso vale para os 4 apps (brigadas/biomonitor/frota/
+  agua), inclusive Água, que não tinha nenhum APK gerado até esta
+  decisão — o primeiro build saiu desta mesma entrega.
+  Continua tudo igual: mudança web/PWA vai à produção normalmente,
+  service worker invalidado pelo contador de sempre — só que agora,
+  além disso, o Android também recebe um Release novo sem intervenção.
 - DUPLICAÇÃO OBRIGATÓRIA — Frota tem o MESMO fluxo em duas superfícies
   (páginas web de mesa E o app unificado frota-app.html). Qualquer
   mudança FUNCIONAL num dos pares abaixo (alerta novo, validação nova,
@@ -1745,8 +1763,10 @@ App de campo offline-first para a coleta de amostras: `pages/agua-app.html`
 única, sem filhos tipo fauna/participantes), câmera/GPS via
 `js/brigada-captura.js` reaproveitado sem alteração, shell nativo
 `app-agua/` (appId `br.gov.ac.sema.siguc.agua`, convive com os outros
-3), `.github/workflows/agua-apk.yml` (infra pronta, APK **não**
-gerado — regra do projeto).
+3), `.github/workflows/agua-apk.yml`. Primeiro APK da Água gerado na
+entrega de Recursos Hídricos (Fase C) — junto com a mudança de regra
+que faz todo app buildar sozinho quando atualiza (ver "Versionamento"
+mais acima e a regra de APK em "Regras de desenvolvimento").
 
 **Quem coleta — decidido nesta entrega**: os MESMOS técnicos que já
 usam a mesa (`tecnico`/`gestor`/`biologo`), não uma população de campo

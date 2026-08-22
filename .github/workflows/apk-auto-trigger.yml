@@ -1,0 +1,91 @@
+# ── Disparo automático de APK — a cada push que suba a versão de um
+#    app em pwa/sw.js, aciona o workflow de build daquele app ──────
+#
+# Substitui a regra antiga do projeto ("não gerar APK a cada mudança,
+# só quando pedido ou já houver acúmulo suficiente") por decisão
+# explícita do usuário: agora TODO app atualizado gera APK novo,
+# sozinho, sem precisar pedir.
+#
+# POR QUE OLHAR pwa/sw.js E NÃO UMA LISTA DE ARQUIVOS: cada
+# brigadas-apk.yml/biomonitor-apk.yml/frota-apk.yml/agua-apk.yml teria
+# que manter sua PRÓPRIA lista de `paths:` em sincronia com a lista de
+# arquivos de cada build-www.mjs — exatamente o tipo de cópia duplicada
+# que o projeto evita em todo o resto do código (js/frota-consumo.js,
+# js/mapa-recorte.js etc.). O contador `VERSOES` em pwa/sw.js já é,
+# por regra do projeto (seção "Versionamento" do CLAUDE.md), o sinal
+# único e sempre atualizado de "este app mudou" — toda entrega que
+# toca um arquivo do shell de um app é OBRIGADA a subir o contador
+# dele. Este workflow só lê esse contador antes/depois do push; nunca
+# precisa saber QUAIS arquivos formam cada shell.
+#
+# Efeito colateral aceito: se o contador de um app subir por engano
+# (edição manual, revert), o build dispara mesmo sem mudança de
+# arquivo — inofensivo, só gasta um run de CI.
+
+name: Disparo automático de APK
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'pwa/sw.js'
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  detectar-e-disparar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Comparar VERSOES (antes × depois) e disparar o(s) app(s) que subiram
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          extrair_versoes() {
+            # Espera a linha: const VERSOES = { brigadas: N, biomonitor: N, frota: N, agua: N }
+            grep -oE "const VERSOES = \{[^}]*\}" "$1" | \
+              grep -oE '[a-z]+: *[0-9]+' | \
+              sed -E 's/: */ /'
+          }
+
+          if git cat-file -e HEAD~1:pwa/sw.js 2>/dev/null; then
+            git show HEAD~1:pwa/sw.js > /tmp/sw_antes.js
+          else
+            echo "" > /tmp/sw_antes.js   # primeiro commit com o arquivo — trata tudo como 'subiu'
+          fi
+          extrair_versoes /tmp/sw_antes.js > /tmp/versoes_antes.txt || true
+          extrair_versoes pwa/sw.js        > /tmp/versoes_depois.txt
+
+          declare -A WORKFLOW=(
+            [brigadas]="brigadas-apk.yml"
+            [biomonitor]="biomonitor-apk.yml"
+            [frota]="frota-apk.yml"
+            [agua]="agua-apk.yml"
+          )
+
+          DISPAROU=0
+          while read -r APP VER_NOVA; do
+            [ -z "${APP:-}" ] && continue
+            VER_ANTIGA=$(awk -v a="$APP" '$1==a{print $2}' /tmp/versoes_antes.txt || true)
+            if [ -z "$VER_ANTIGA" ] || [ "$VER_NOVA" -gt "$VER_ANTIGA" ] 2>/dev/null; then
+              WF="${WORKFLOW[$APP]:-}"
+              if [ -z "$WF" ]; then
+                echo "::warning::App '$APP' não tem workflow de APK mapeado — pulando."
+                continue
+              fi
+              echo "→ $APP subiu de '${VER_ANTIGA:-<novo>}' para '$VER_NOVA' — disparando $WF"
+              gh workflow run "$WF" --ref main
+              DISPAROU=1
+            fi
+          done < /tmp/versoes_depois.txt
+
+          if [ "$DISPAROU" -eq 0 ]; then
+            echo "Nenhum contador de VERSOES subiu neste push — nada a disparar."
+          fi
