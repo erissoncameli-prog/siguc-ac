@@ -119,10 +119,25 @@ body { font-family: var(--font-sans); background: var(--cinza-50); color: var(--
 .nav-section-toggle .nav-section { flex: 1; padding: 12px 4px 5px 18px; }
 .nav-section-toggle:hover .nav-section { color: rgba(255,255,255,.55); }
 .nav-chevron { flex-shrink: 0; margin-right: 16px; color: rgba(255,255,255,.4); transition: transform .2s ease, opacity .2s ease; }
-.nav-grupo.aberto .nav-chevron { transform: rotate(180deg); opacity: .8; }
+.nav-grupo.aberto > .nav-section-toggle .nav-chevron { transform: rotate(180deg); opacity: .8; }
 .nav-grupo-corpo { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .22s ease; }
-.nav-grupo.aberto .nav-grupo-corpo { grid-template-rows: 1fr; }
+.nav-grupo.aberto > .nav-grupo-corpo { grid-template-rows: 1fr; }
+/* Combinador de FILHO nas duas regras acima, não descendente: com o
+   subgrupo aninhado, `.nav-grupo.aberto .nav-grupo-corpo` abria também
+   o corpo do subgrupo (e girava o chevron dele) sempre que o grupo pai
+   estava aberto — cada acordeão precisa responder só ao próprio estado. */
 .nav-grupo-corpo-inner { overflow: hidden; min-height: 0; }
+
+/* Subgrupo — 3º nível, hoje só no DERHQA (Qualidade da Água /
+   Bacias Hidrográficas / Qualidade do Ar). Mesmo acordeão do grupo
+   (mesma classe .nav-grupo, mesmo colapso por grid-template-rows),
+   recuado e um pouco mais discreto para a hierarquia ficar legível
+   sem inventar outro mecanismo. */
+.nav-subgrupo .nav-section-toggle .nav-section { padding: 9px 4px 4px 30px; font-size: 9px; color: rgba(255,255,255,.26); letter-spacing: .09em; }
+.nav-subgrupo .nav-section-toggle:hover .nav-section { color: rgba(255,255,255,.5); }
+.nav-subgrupo .nav-chevron { margin-right: 18px; opacity: .75; }
+.nav-subgrupo .nav-item { padding-left: 30px; }
+.nav-subgrupo .nav-item:hover, .nav-subgrupo .nav-item.ativo { padding-left: 14px; margin-left: 12px; }
 
 .sidebar-footer { padding: 14px 18px; border-top: 1px solid rgba(255,255,255,.1); display: flex; flex-direction: column; gap: 6px; }
 .btn-alterar-senha { display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 10px; background: transparent; border: 1px solid rgba(255,255,255,.1); border-radius: var(--raio); color: rgba(255,255,255,.55); font-family: var(--font-sans); font-size: 12px; cursor: pointer; transition: all .15s; text-decoration: none; }
