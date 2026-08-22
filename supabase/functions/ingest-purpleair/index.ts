@@ -2,21 +2,28 @@
 // SIGUC-AC · Edge Function — ingestão da rede de sensores
 // PurpleAir/MPAC de qualidade do ar (PM2.5) → ar_leituras_purpleair.
 //
-// ESTADO: pronta e DESLIGADA. Sem a credencial (PURPLEAIR_API_KEY nos
-// secrets) a função devolve `{ ok:false, motivo:'sem-credencial' }` e
-// não grava nada — de propósito, mesmo padrão do ingest-hidro
-// (migration 306/307), para poder ser publicada antes de a SEMA
-// concluir o registro da chave gratuita no PurpleAir. Medido nesta
-// entrega, do próprio banco (pg_net): a API responde 403
-// ApiKeyMissingError sem credencial — não há via anônima.
+// ESTADO: LIGADA — PURPLEAIR_API_KEY configurada nos secrets do
+// Supabase em 22/08/2026. Confirmado contra a API de verdade: 28
+// sensores da rede MPAC dentro da bbox do Acre (ex.: MPAC_MNL_01_
+// promotoria, MPAC_PTA_01_Sec.infraestrutura).
 //
-// Como ligar, quando a chave existir:
-//   1. Registrar em https://develop.purpleair.com (gratuito, vinculado
-//      a conta Google) e obter a Read Key.
-//   2. Painel do Supabase → Edge Functions → Secrets:
-//      PURPLEAIR_API_KEY (nunca no frontend, nunca no repositório).
-//   3. Agendar no pg_cron (nenhum job criado ainda — ver 307_rh_crons.sql
-//      para o molde de como agendar só depois da credencial existir).
+// ACHADO REAL (não estava nos manuais consultados): `j.fields` na
+// resposta da API JÁ inclui "sensor_index" como primeiro elemento —
+// a 1ª versão desta função prependia "sensor_index" de novo,
+// desalinhando todos os índices por um (e a ordem devolvida também
+// NÃO é a mesma do parâmetro `fields` da requisição: veio
+// [sensor_index, last_seen, name, latitude, longitude, humidity,
+// temperature, pm2.5_cf_1] para um pedido em outra ordem — por isso
+// o código below localiza cada campo por NOME em `j.fields`, nunca
+// por posição fixa). Sintoma do bug original: "Invalid time value" ao
+// tentar montar a data a partir do campo errado.
+//
+// SEGUNDO ACHADO REAL: o campo `temperature` da API vem em
+// FAHRENHEIT por padrão (não documentado explicitamente nos manuais
+// consultados) — confirmado porque a 1ª carga real gravou 95-113 na
+// coluna `temperatura_c`, valor impossível para o Acre em Celsius.
+// Convertido aqui ((F-32)×5/9) antes de gravar — nunca grava
+// Fahrenheit numa coluna que diz ser Celsius.
 //
 // SEM CALIBRAÇÃO LRAPA — grava só o bruto (pm2.5_cf_1). Ver o
 // cabeçalho da migration 313 para o motivo: aplicar a fórmula
@@ -74,9 +81,11 @@ Deno.serve(async (req) => {
     if (!r.ok) throw new Error(`PurpleAir HTTP ${r.status}`)
     const j = await r.json()
 
-    // `sensor_index` é sempre o primeiro elemento da linha, além dos
-    // campos pedidos em `fields` — documentado pela própria PurpleAir.
-    const fields: string[] = ['sensor_index', ...(j.fields || [])]
+    // `j.fields` JÁ vem com "sensor_index" incluso — nunca prependar
+    // de novo (ver achado no cabeçalho). Localizar cada campo por
+    // nome, nunca por posição: a ordem devolvida não é a pedida.
+    const fields: string[] = j.fields || []
+    const iIndex = campoIndice(fields, 'sensor_index')
     const iNome = campoIndice(fields, 'name')
     const iLat = campoIndice(fields, 'latitude')
     const iLng = campoIndice(fields, 'longitude')
@@ -87,17 +96,23 @@ Deno.serve(async (req) => {
 
     const linhas = (j.data || []).map((row: any[]) => {
       const lastSeen = iVisto >= 0 ? row[iVisto] : null
-      if (lastSeen == null) return null
+      const sensorIndex = iIndex >= 0 ? row[iIndex] : null
+      if (lastSeen == null || sensorIndex == null) return null
       const lat = iLat >= 0 ? row[iLat] : null
       const lng = iLng >= 0 ? row[iLng] : null
       return {
-        sensor_index: row[0],
+        sensor_index: sensorIndex,
         nome: iNome >= 0 ? row[iNome] : null,
         geom: (lat != null && lng != null) ? `SRID=4326;POINT(${lng} ${lat})` : null,
         pm25_bruto: iPm25 >= 0 ? row[iPm25] : null,
         pm25_calibrado_lrapa: null, // ver cabeçalho da migration 313
         umidade_pct: iUmid >= 0 ? row[iUmid] : null,
-        temperatura_c: iTemp >= 0 ? row[iTemp] : null,
+        // O campo `temperature` da PurpleAir vem em FAHRENHEIT por
+        // padrão (confirmado contra dado real: valores 95-113 para o
+        // Acre só fazem sentido em °F — a coluna é `temperatura_c`,
+        // então converte aqui; nunca grava Fahrenheit numa coluna que
+        // diz ser Celsius).
+        temperatura_c: (iTemp >= 0 && row[iTemp] != null) ? Math.round((Number(row[iTemp]) - 32) * 5 / 9 * 100) / 100 : null,
         data_hora: new Date(Number(lastSeen) * 1000).toISOString(),
         bruto: row,
       }
