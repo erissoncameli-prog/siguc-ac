@@ -130,6 +130,55 @@
   </div>
 </div>
 
+<!-- Modal Gabarito de laudo -->
+<div class="modal-overlay" id="modal-template">
+  <div class="modal" style="max-width:760px">
+    <div class="modal-header">
+      <div class="modal-title" id="mt-titulo">Novo Gabarito</div>
+      <button class="modal-close" onclick="fecharModal('template')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Laboratório <span class="obrig">*</span></label>
+          <select class="form-control" id="t-laboratorio"><option value="">Selecione...</option></select></div>
+        <div class="form-group"><label class="form-label">Versão <span class="obrig">*</span></label>
+          <input class="form-control" id="t-versao" type="number" min="1" step="1" value="1"></div>
+      </div>
+      <div class="form-group"><label class="form-label">Âncora de texto <span class="obrig">*</span></label>
+        <input class="form-control" id="t-ancora" placeholder="Ex.: QUILAB — trecho que identifica este laboratório numa página desconhecida">
+        <div class="form-hint">Comparado por substring, sem diferenciar maiúscula/acento — só precisa ser um trecho que só aparece nos laudos deste laboratório.</div>
+      </div>
+      <div class="form-group">
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+          <input type="checkbox" id="t-ativo" checked style="width:auto"> Ativo
+        </label>
+      </div>
+
+      <div class="form-section-label">Campos de identidade (JSON)</div>
+      <div class="form-hint" style="margin-bottom:6px">
+        Caixas de TEXTO LIVRE usadas na trava de identidade — número do laudo, data da coleta, procedência.
+        Cada chave: <code>{"top":0..1,"left":0..1,"width":0..1,"height":0..1}</code>, fração da página.
+        Chave <code>recebimento</code> é opcional (alimenta o alerta de prazo de preservação, nunca a trava de identidade).
+      </div>
+      <textarea class="form-control mono" id="t-identidade-json" rows="6" style="font-size:12px" oninput="_tValidarJson()"></textarea>
+      <div id="t-identidade-preview" style="font-size:11px;color:#6B7280;margin-top:4px"></div>
+
+      <div class="form-section-label" style="margin-top:12px">Campos numéricos (JSON)</div>
+      <div class="form-hint" style="margin-bottom:6px">
+        Uma chave por parâmetro de <code>agua_coletas</code> (ex.: <code>temp_ar</code>, <code>fosforo_total</code>).
+        Cada valor: <code>{"top":0..1,"left":0..1,"width":0..1,"height":0..1,"casas_decimais":N}</code>.
+        <strong>casas_decimais é o que decide onde o parser insere a vírgula — nunca confie no que o OCR "achou".</strong>
+      </div>
+      <textarea class="form-control mono" id="t-campos-json" rows="10" style="font-size:12px" oninput="_tValidarJson()"></textarea>
+      <div id="t-campos-preview" style="font-size:11px;color:#6B7280;margin-top:4px"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="fecharModal('template')">Cancelar</button>
+      <button class="btn btn-primary" id="btn-salvar-template" onclick="salvarTemplate()">Salvar</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // ── Qualidade da Água · mesa: pontos de coleta e laboratórios ──
 // Fase 2 do plano em docs/qualidade-agua/plano.md. CRUD de verdade
@@ -147,8 +196,8 @@
 // 248; nada de RPC nova — pode_editar('agua') já autoriza escrita
 // direta (mesma base de pages/agua-conferencia.html).
 
-let _pontos = [], _labs = [], _ucs = []
-let _editandoPontoId = null, _editandoLabId = null
+let _pontos = [], _labs = [], _ucs = [], _templates = []
+let _editandoPontoId = null, _editandoLabId = null, _editandoTemplateId = null
 let _podeEditar = false
 let _ptMap = null, _ptMarker = null, _ptMovidoManualmente = false
 
@@ -173,6 +222,7 @@ const ACRE_CENTRO = [-9.5, -70.0]
         <div style="display:flex;gap:4px;padding:4px;background:rgba(0,0,0,.06);border-radius:10px;width:fit-content">
           <button class="tab-btn ativo" id="tab-pontos" onclick="mudarAbaAgua('pontos')">Pontos de coleta</button>
           <button class="tab-btn" id="tab-labs" onclick="mudarAbaAgua('labs')">Laboratórios</button>
+          <button class="tab-btn" id="tab-templates" onclick="mudarAbaAgua('templates')">Gabaritos de laudo</button>
         </div>
       </div>
 
@@ -201,19 +251,38 @@ const ACRE_CENTRO = [-9.5, -70.0]
           </table>
         </div></div></div>
       </div>
+
+      <div id="aba-templates" style="display:none">
+        <p style="color:#6B7280;font-size:13px;margin:0 0 12px">
+          O gabarito diz ao leitor automático de laudo (Qualidade da Água → Laudos) ONDE cada
+          parâmetro fica na página do laboratório e com quantas casas decimais ele imprime — nunca o valor em si.
+          Um laboratório novo, ou uma reformatação do relatório de um já cadastrado, exige um gabarito novo.
+        </p>
+        <div class="filter-bar">
+          ${_podeEditar ? `<button class="btn btn-primary" onclick="abrirTemplate(null)">${bico('plus')} Novo Gabarito</button>` : ''}
+        </div>
+        <div class="card"><div class="table-wrap"><div class="table-scroll">
+          <table>
+            <thead><tr><th>Laboratório</th><th>Versão</th><th>Âncora</th><th>Campos</th><th>Status</th><th>Ações</th></tr></thead>
+            <tbody id="tbody-templates"><tr><td colspan="6" style="text-align:center;padding:24px;color:#9CA3AF">Carregando...</td></tr></tbody>
+          </table>
+        </div></div></div>
+      </div>
     </div>` +
     '</div></div></div>'
 
   carregarLogosSidebar()
   bIconsAplicar()
-  await Promise.all([carregarUCs(), carregarPontos(), carregarLabs()])
+  await Promise.all([carregarUCs(), carregarPontos(), carregarLabs(), carregarTemplates()])
 })()
 
 function mudarAbaAgua(aba) {
-  document.getElementById('aba-pontos').style.display = aba === 'pontos' ? '' : 'none'
-  document.getElementById('aba-labs').style.display   = aba === 'labs'   ? '' : 'none'
+  document.getElementById('aba-pontos').style.display    = aba === 'pontos'    ? '' : 'none'
+  document.getElementById('aba-labs').style.display      = aba === 'labs'      ? '' : 'none'
+  document.getElementById('aba-templates').style.display = aba === 'templates' ? '' : 'none'
   document.getElementById('tab-pontos').classList.toggle('ativo', aba === 'pontos')
   document.getElementById('tab-labs').classList.toggle('ativo', aba === 'labs')
+  document.getElementById('tab-templates').classList.toggle('ativo', aba === 'templates')
 }
 
 // ── Cargas ────────────────────────────────────────────────────
@@ -274,6 +343,135 @@ function renderLabs() {
       <td><span class="badge ${l.ativo ? 'badge-verde' : 'badge-cinza'}">${l.ativo ? 'Ativo' : 'Inativo'}</span></td>
       <td>${_podeEditar ? `<button class="btn btn-xs btn-ghost" onclick="abrirLab('${l.id}')">Editar</button>` : '—'}</td>
     </tr>`).join('')
+}
+
+// ── Gabaritos de laudo (Entrega 3) ──────────────────────────────
+// CRUD sobre agua_laudo_templates (migration 304) — antes só existia
+// cadastro por SQL direto (migration 305, seed do QUILAB). O
+// EDITOR é um textarea de JSON, não um calibrador visual de posição:
+// calibrar coordenada por arrasto na tela é uma feature própria, fora
+// do escopo desta entrega — o fluxo real (medir posição contra
+// páginas reais do laudo, como a Entrega 2 fez para o QUILAB) segue
+// sendo trabalho de quem está olhando o PDF, não algo que a mesa
+// resolve sozinha. Esta tela serve para CADASTRAR o resultado dessa
+// medição (ou corrigi-lo), não para fazer a medição.
+async function carregarTemplates() {
+  const { data, error } = await db.from('agua_laudo_templates')
+    .select('*, agua_laboratorios(nome)').order('versao', { ascending: false })
+  if (error) { toast(error.message || 'Erro ao carregar gabaritos', 'error'); return }
+  _templates = data || []
+  renderTemplates()
+}
+
+function renderTemplates() {
+  const tbody = document.getElementById('tbody-templates')
+  if (!_templates.length) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:24px;color:#9CA3AF">Nenhum gabarito cadastrado</td></tr>'; return }
+  tbody.innerHTML = _templates.map(t => {
+    const nCampos = Object.keys(t.campos || {}).length
+    const nIdent = Object.keys(t.campos_identidade || {}).length
+    return `
+    <tr>
+      <td>${esc(t.agua_laboratorios?.nome || '—')}</td>
+      <td class="mono">${t.versao}</td>
+      <td style="font-size:12px" class="mono">${esc(t.ancora_texto)}</td>
+      <td style="font-size:12px">${nCampos} numéricos + ${nIdent} de identidade</td>
+      <td><span class="badge ${t.ativo ? 'badge-verde' : 'badge-cinza'}">${t.ativo ? 'Ativo' : 'Inativo'}</span></td>
+      <td>${_podeEditar ? `<button class="btn btn-xs btn-ghost" onclick="abrirTemplate('${t.id}')">Editar</button>` : '—'}</td>
+    </tr>`
+  }).join('')
+}
+
+function abrirTemplate(id) {
+  _editandoTemplateId = id
+  const t = id ? _templates.find(x => x.id === id) : null
+  document.getElementById('mt-titulo').textContent = t ? 'Editar Gabarito' : 'Novo Gabarito'
+  const selLab = document.getElementById('t-laboratorio')
+  selLab.innerHTML = '<option value="">Selecione...</option>' + _labs.map(l => `<option value="${l.id}">${esc(l.nome)}</option>`).join('')
+  selLab.value = t?.laboratorio_id || ''
+  document.getElementById('t-versao').value = t?.versao ?? 1
+  document.getElementById('t-ancora').value = t?.ancora_texto || ''
+  document.getElementById('t-ativo').checked = t ? t.ativo : true
+  document.getElementById('t-identidade-json').value = t ? JSON.stringify(t.campos_identidade || {}, null, 2) : '{\n  "numero_laudo": {"top": 0, "left": 0, "width": 0.5, "height": 0.02},\n  "data_coleta":  {"top": 0, "left": 0.6, "width": 0.3, "height": 0.02},\n  "procedencia":  {"top": 0, "left": 0.6, "width": 0.3, "height": 0.02}\n}'
+  document.getElementById('t-campos-json').value = t ? JSON.stringify(t.campos || {}, null, 2) : '{\n  "ph": {"top": 0, "left": 0.7, "width": 0.16, "height": 0.02, "casas_decimais": 2}\n}'
+  document.getElementById('t-identidade-preview').textContent = ''
+  document.getElementById('t-campos-preview').textContent = ''
+  document.getElementById('modal-template').classList.add('aberto')
+  _tValidarJson()
+}
+
+// Só valida a FORMA (chave → {top,left,width,height[,casas_decimais]}
+// numéricos entre 0 e 1) — não confere se a posição está certa contra
+// um laudo de verdade, isso só o técnico que mediu sabe.
+function _tCaixaValida(v, exigeCasas) {
+  if (!v || typeof v !== 'object') return false
+  for (const chave of ['top', 'left', 'width', 'height']) {
+    if (typeof v[chave] !== 'number' || v[chave] < 0 || v[chave] > 1) return false
+  }
+  if (exigeCasas && !(Number.isInteger(v.casas_decimais) && v.casas_decimais >= 0)) return false
+  return true
+}
+
+function _tValidarJson() {
+  const previewIdent = document.getElementById('t-identidade-preview')
+  const previewCampos = document.getElementById('t-campos-preview')
+  let identOk = true, camposOk = true, nIdent = 0, nCampos = 0
+  try {
+    const obj = JSON.parse(document.getElementById('t-identidade-json').value || '{}')
+    nIdent = Object.keys(obj).length
+    identOk = Object.values(obj).every(v => _tCaixaValida(v, false))
+    previewIdent.innerHTML = identOk
+      ? `<span style="color:var(--sucesso,#059669)">${nIdent} campo(s) de identidade — formato OK</span>`
+      : `<span style="color:var(--erro,#DC2626)">Formato inválido — cada campo precisa de top/left/width/height entre 0 e 1</span>`
+  } catch { identOk = false; previewIdent.innerHTML = '<span style="color:var(--erro,#DC2626)">JSON inválido</span>' }
+  try {
+    const obj = JSON.parse(document.getElementById('t-campos-json').value || '{}')
+    nCampos = Object.keys(obj).length
+    camposOk = Object.values(obj).every(v => _tCaixaValida(v, true))
+    previewCampos.innerHTML = camposOk
+      ? `<span style="color:var(--sucesso,#059669)">${nCampos} campo(s) numérico(s) — formato OK</span>`
+      : `<span style="color:var(--erro,#DC2626)">Formato inválido — cada campo precisa de top/left/width/height (0 a 1) e casas_decimais (inteiro ≥ 0)</span>`
+  } catch { camposOk = false; previewCampos.innerHTML = '<span style="color:var(--erro,#DC2626)">JSON inválido</span>' }
+  return identOk && camposOk
+}
+
+async function salvarTemplate() {
+  if (!_tValidarJson()) { toast('Corrija o formato dos campos JSON antes de salvar', 'error'); return }
+
+  const payload = {
+    laboratorio_id: document.getElementById('t-laboratorio').value,
+    versao: parseInt(document.getElementById('t-versao').value, 10) || 1,
+    ativo: document.getElementById('t-ativo').checked,
+    ancora_texto: document.getElementById('t-ancora').value.trim(),
+    campos_identidade: JSON.parse(document.getElementById('t-identidade-json').value || '{}'),
+    campos: JSON.parse(document.getElementById('t-campos-json').value || '{}'),
+  }
+  if (!payload.laboratorio_id) { toast('Selecione o laboratório', 'error'); return }
+  if (!payload.ancora_texto || payload.ancora_texto.length < 3) { toast('A âncora de texto precisa de pelo menos 3 caracteres', 'error'); return }
+  if (!Object.keys(payload.campos).length) { toast('Cadastre pelo menos um campo numérico', 'error'); return }
+
+  // Editar (não criar) muda o que o parser propõe em todo lançamento
+  // futuro desse laboratório — mesmo tratamento de agua_atualizar_ponto/
+  // agua_atualizar_laboratorio (migration 270): reauth + justificativa.
+  let r = null
+  if (_editandoTemplateId) {
+    r = await reautenticar({ motivo: 'editar este gabarito de laudo' })
+    if (!r) return
+  }
+
+  const btn = document.getElementById('btn-salvar-template')
+  btn.disabled = true
+  try {
+    const { error } = _editandoTemplateId
+      ? await db.rpc('agua_atualizar_laudo_template', { p_id: _editandoTemplateId, p_campos: payload, p_justificativa: r.justificativa })
+      : await db.from('agua_laudo_templates').insert(payload)
+    if (error) throw error
+    toast('Gabarito salvo!', 'success')
+    fecharModal('template')
+    await carregarTemplates()
+  } catch (e) {
+    toast(e.message?.includes('REAUTH_NECESSARIA') ? 'Sessão de confirmação expirou — tente novamente.' : (e.message || 'Erro ao salvar'), 'error')
+  }
+  finally { btn.disabled = false }
 }
 
 // ── Mapa do ponto ────────────────────────────────────────────
@@ -442,6 +640,7 @@ function fecharModal(qual) {
   document.getElementById(`modal-${qual}`).classList.remove('aberto')
   if (qual === 'ponto') _editandoPontoId = null
   if (qual === 'lab') _editandoLabId = null
+  if (qual === 'template') _editandoTemplateId = null
 }
 </script>
 <style>
