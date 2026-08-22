@@ -294,7 +294,7 @@ function _aguaRoscaHTML(itens, opts) {
         aria-label="${_aguaEsc(o.ariaLabelPrefix)}: ${_aguaEsc(itens.map(i => `${i.label} ${i.n}`).join(', '))}">
       <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#F3F4F6" stroke-width="${o.espessura}"/>
       ${arcos}
-      <text x="${cx}" y="${cy - 3}" text-anchor="middle" font-family="'Fraunces',Georgia,serif" font-size="${Math.round(w * 0.155)}" font-weight="700" fill="#111827">${total}</text>
+      <text x="${cx}" y="${cy - 3}" text-anchor="middle" font-family="${o.fonteCentro}" font-size="${Math.round(w * 0.155)}" font-weight="700" fill="#111827">${total}</text>
       <text x="${cx}" y="${cy + 15}" text-anchor="middle" font-family="'DM Sans',sans-serif" font-size="10" fill="#6B7280">${_aguaEsc(o.unidade)}${total !== 1 ? 's' : ''}</text>
     </svg>
     <div style="display:flex;flex-wrap:wrap;gap:8px 12px;justify-content:center">${legenda}</div>
