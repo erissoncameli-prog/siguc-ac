@@ -6,6 +6,10 @@
   "rewrites": [
     { "source": "/api/health/live", "destination": "/api/health" },
     { "source": "/api/metrics", "destination": "/api/health" },
+    { "source": "/api/car-proxy", "destination": "/api/geo-proxy/car" },
+    { "source": "/api/dof-proxy", "destination": "/api/geo-proxy/dof" },
+    { "source": "/api/focos-proxy", "destination": "/api/geo-proxy/focos" },
+    { "source": "/api/prodes-proxy", "destination": "/api/geo-proxy/prodes" },
     { "source": "/(.*)", "destination": "/$1" }
   ],
   "headers": [
@@ -71,10 +75,7 @@
   ],
   "functions": {
     "api/health.js":         { "maxDuration": 10 },
-    "api/car-proxy.js":      { "maxDuration": 60 },
-    "api/prodes-proxy.js":   { "maxDuration": 60 },
-    "api/focos-proxy.js":    { "maxDuration": 30 },
-    "api/dof-proxy.js":      { "maxDuration": 30 },
+    "api/geo-proxy/[fonte].js": { "maxDuration": 60 },
     "api/planet.js":         { "maxDuration": 30 },
     "api/sentinel.js":       { "maxDuration": 30 },
     "api/geo.js":            { "maxDuration": 30 },
