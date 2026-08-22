@@ -120,12 +120,17 @@ let _coletas = [], _editandoId = null
 })()
 
 async function carregarLista() {
-  const { data, error } = await db.from('agua_coletas')
-    .select('*, agua_pontos_coleta(nome,codigo_ana), agua_campanhas(ano,ordem)')
-    .eq('status', 'quarentena')
-    .order('linha_origem_planilha')
+  const [{ data, error }, { count: totalColetas }] = await Promise.all([
+    db.from('agua_coletas')
+      .select('*, agua_pontos_coleta(nome,codigo_ana), agua_campanhas(ano,ordem)')
+      .eq('status', 'quarentena')
+      .order('linha_origem_planilha'),
+    db.from('agua_coletas').select('id', { count: 'exact', head: true }),
+  ])
   if (error) { toast(error.message || 'Erro ao carregar', 'error'); return }
   _coletas = data || []
+  document.getElementById('ag-kpis').innerHTML = aguaKpisQuarentenaHTML(_coletas, totalColetas || 0,
+    c => `linha ${c.linha_origem_planilha ?? '—'} · ${c.agua_pontos_coleta?.nome || ''}`)
   renderLista()
 }
 
