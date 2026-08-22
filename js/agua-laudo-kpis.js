@@ -14,39 +14,61 @@
 // identificar um item na legenda, e devolvem uma STRING html. Quem
 // chama decide onde encaixar no DOM.
 //
-// A rosca de "Situação da série" usa o primitivo genérico
-// _aguaRoscaHTML de js/agua-iqa-visual.js (nunca uma segunda cópia do
-// desenho) — por isso as duas páginas precisam carregar aquele arquivo
-// também, mesmo sem usar IQA nenhum aqui.
-//
 // FONTE DOS NÚMEROS: nunca Fraunces aqui — pedido explícito do
 // usuário (achou o serifado "cara de IA"), registrado em CLAUDE.md
 // ("Regra do sistema — fonte dos números de KPI"). Todo `.adash-num`
-// deste arquivo carrega `AGUA_KPI_FONTE_NUM` inline; a rosca recebe
-// `fonteCentro` no mesmo valor. O resto do módulo (IQA médio, cards de
-// js/agua-painel.js) segue Fraunces normalmente — a regra é só para
-// números de KPI, não uma revisão do design system inteiro.
+// deste arquivo carrega `AGUA_KPI_FONTE_NUM` inline; o arco de status
+// recebe `fonteCentro` no mesmo valor. O resto do módulo (IQA médio,
+// cards de js/agua-painel.js) segue Fraunces normalmente — a regra é
+// só para números de KPI, não uma revisão do design system inteiro.
 const AGUA_KPI_FONTE_NUM = "font-family:var(--font-sans)"
+
+// Redesenho pedido pelo usuário a partir de uma referência visual
+// (dashboard "Ultraleads"): arco colorido no lugar da rosca fechada
+// (_aguaArcoCategoriasHTML, js/agua-iqa-visual.js), card escuro de
+// destaque para o número mais importante (.adash-card-escuro, já
+// existia em css/agua-painel.css — reaproveitado, não criado aqui),
+// pílula Média/Mediana no card de tempo, e barras com o total de cada
+// faixa de dias rotulado acima (aguaIqaBarrasHTML, já existente).
+// Nenhum desses três primitivos é redesenhado do zero — a mudança é
+// escolher QUAL primitivo já existente no módulo usar em cada card.
 
 function aguaDiasDesdeColeta(dataColeta) {
   const ms = Date.now() - new Date(dataColeta + 'T00:00:00').getTime()
   return Math.max(0, Math.floor(ms / 86400000))
 }
 
+function _aguaMediana(nums) {
+  if (!nums.length) return 0
+  const s = [...nums].sort((a, b) => a - b)
+  const meio = Math.floor(s.length / 2)
+  return s.length % 2 ? s[meio] : Math.round((s[meio - 1] + s[meio]) / 2)
+}
+
+// Faixas de dias de espera/quarentena — mesma leitura em ambas as
+// telas (0–7/8–15/16–30/30+), a última faixa é a que hoje "Atrasadas
+// (30+ dias)" cobria isoladamente; a distribuição fica mais informativa
+// que um único número porque mostra ONDE a fila está concentrada.
+const AGUA_KPI_FAIXAS_DIAS = [[0, 7, '0–7'], [8, 15, '8–15'], [16, 30, '16–30'], [31, Infinity, '30+']]
+
 function _aguaKpiStats(lista) {
   const dias = lista.map(c => aguaDiasDesdeColeta(c.data_coleta))
   const total = lista.length
   const media = total ? Math.round(dias.reduce((a, b) => a + b, 0) / total) : 0
+  const mediana = _aguaMediana(dias)
   let piorIdx = -1
   dias.forEach((d, i) => { if (piorIdx === -1 || d > dias[piorIdx]) piorIdx = i })
+  const faixas = AGUA_KPI_FAIXAS_DIAS.map(([min, max, label]) => ({
+    label, n: dias.filter(d => d >= min && d <= max).length,
+  }))
   return {
-    total, media, dias,
+    total, media, mediana, dias, faixas,
     itemMaisAntigo: piorIdx >= 0 ? lista[piorIdx] : null,
     diasMaisAntigo: piorIdx >= 0 ? dias[piorIdx] : null,
   }
 }
 
-// ── Situação da série (rosca de status) ─────────────────────────
+// ── Situação da série (arco de status) ──────────────────────────
 // Compartilhada pelas duas telas: quantas coletas estão em cada
 // status hoje (status_coleta_agua, migration 248) — a leitura mais
 // direta de "como vai a fila de laudos" no todo, não só o recorte que
@@ -72,38 +94,71 @@ function aguaKpisSituacaoRoscaHTML(counts) {
       <div><p class="adash-card-tit">Situação da série</p>
         <p class="adash-card-tit-sub">Todas as coletas cadastradas, por status</p></div>
     </div>
-    ${_aguaRoscaHTML(itens, { vazioMsg: 'Nenhuma coleta cadastrada.', ariaLabelPrefix: 'Situação da série de coletas', fonteCentro: "'DM Sans',sans-serif" })}
+    ${_aguaArcoCategoriasHTML(itens, { vazioMsg: 'Nenhuma coleta cadastrada.', ariaLabelPrefix: 'Situação da série de coletas' })}
   </div>`
 }
 
-// Fila de laudos (pages/agua-laudos.html) — o que preocupa é atraso.
-const AGUA_LAUDO_LIMIAR_ATRASO = 30
+// ── Pílula Média/Mediana ─────────────────────────────────────────
+// Guarda o último render de cada KPI row (dados + como redesenhar) só
+// para poder trocar o card de tempo sem refazer a consulta ao banco —
+// a pílula é preferência de EXIBIÇÃO, não filtro de dado.
+let _aguaKpiUltimoRender = null
+let _aguaKpiEstatistica = 'media'
 
-function aguaKpisFilaHTML(lista, labelFn, statusCounts) {
+function aguaKpisAlternarEstatistica(tipo) {
+  if (tipo === _aguaKpiEstatistica || !_aguaKpiUltimoRender) return
+  _aguaKpiEstatistica = tipo
+  const { containerId, render } = _aguaKpiUltimoRender
+  const el = document.getElementById(containerId)
+  if (el) el.innerHTML = render()
+}
+
+function _aguaKpiPilulasEstatisticaHTML() {
+  const opcoes = [['media', 'Média'], ['mediana', 'Mediana']]
+  return `<div class="adash-chips" style="margin-bottom:10px">
+    ${opcoes.map(([v, rotulo]) => `<button type="button" class="adash-chip ${_aguaKpiEstatistica === v ? 'ativo' : ''}" onclick="aguaKpisAlternarEstatistica('${v}')">${rotulo}</button>`).join('')}
+  </div>`
+}
+
+// Card escuro de destaque (.adash-card-escuro, já existe em
+// css/agua-painel.css — usado pelo "IQA médio do período" do painel de
+// Relatórios) para o número mais importante da tela.
+function _aguaKpiCardEscuroHTML(titulo, valor, legenda) {
+  return `<div class="adash-card adash-card-escuro">
+    <div class="adash-card-topo"><p class="adash-card-tit" style="color:#fff">${titulo}</p></div>
+    <div class="adash-num-linha"><span class="adash-num" style="${AGUA_KPI_FONTE_NUM}">${valor}</span></div>
+    <p class="adash-card-pe">${legenda}</p>
+  </div>`
+}
+
+// Fila de laudos (pages/agua-laudos.html).
+function aguaKpisFilaHTML(lista, labelFn, statusCounts, containerId) {
+  const render = () => aguaKpisFilaHTML(lista, labelFn, statusCounts, containerId)
+  if (containerId) _aguaKpiUltimoRender = { containerId, render }
+
   const s = _aguaKpiStats(lista)
-  const atrasadas = s.dias.filter(d => d > AGUA_LAUDO_LIMIAR_ATRASO).length
-  const pctAtrasadas = s.total ? Math.round((atrasadas / s.total) * 100) : 0
+  const valorTempo = _aguaKpiEstatistica === 'mediana' ? s.mediana : s.media
+  const maisAntiga = s.itemMaisAntigo
+    ? `Mais antiga: ${s.diasMaisAntigo} dia${s.diasMaisAntigo === 1 ? '' : 's'} — ${esc(labelFn(s.itemMaisAntigo))}`
+    : 'Nenhuma coleta aguardando'
+
   return `<div class="adash-kpi-row">
+    ${_aguaKpiCardEscuroHTML('Aguardando laudo', s.total, 'coleta(s) com campo preenchido, sem resultado de laboratório')}
     ${aguaKpisSituacaoRoscaHTML(statusCounts)}
     <div class="adash-card">
-      <div class="adash-card-topo"><p class="adash-card-tit">Aguardando laudo</p></div>
-      <div class="adash-num-linha"><span class="adash-num" style="${AGUA_KPI_FONTE_NUM}">${s.total}</span></div>
-      <p class="adash-card-pe">coleta(s) com campo preenchido, sem resultado de laboratório</p>
+      <div class="adash-card-topo"><p class="adash-card-tit">Tempo de espera</p></div>
+      ${_aguaKpiPilulasEstatisticaHTML()}
+      <div class="adash-num-linha"><span class="adash-num" style="${AGUA_KPI_FONTE_NUM}">${s.total ? valorTempo : '—'}</span>${s.total ? '<span class="adash-delta neutro">dias</span>' : ''}</div>
+      <p class="adash-card-pe">da data da coleta até hoje, ${_aguaKpiEstatistica === 'mediana' ? 'mediana' : 'média'} da fila atual</p>
     </div>
-    <div class="adash-card">
-      <div class="adash-card-topo"><p class="adash-card-tit">Tempo médio de espera</p></div>
-      <div class="adash-num-linha"><span class="adash-num" style="${AGUA_KPI_FONTE_NUM}">${s.total ? s.media : '—'}</span>${s.total ? '<span class="adash-delta neutro">dias</span>' : ''}</div>
-      <p class="adash-card-pe">da data da coleta até hoje, média da fila atual</p>
-    </div>
-    <div class="adash-card">
-      <div class="adash-card-topo"><p class="adash-card-tit">Atrasadas (${AGUA_LAUDO_LIMIAR_ATRASO}+ dias)</p></div>
-      <div class="adash-num-linha"><span class="adash-num" style="${AGUA_KPI_FONTE_NUM}">${atrasadas}</span>${s.total ? `<span class="adash-delta ${atrasadas ? 'baixa' : ''}">${pctAtrasadas}%</span>` : ''}</div>
-      <p class="adash-card-pe">da fila aguardando há mais de ${AGUA_LAUDO_LIMIAR_ATRASO} dias</p>
-    </div>
-    <div class="adash-card">
-      <div class="adash-card-topo"><p class="adash-card-tit">Mais antiga na fila</p></div>
-      <div class="adash-num-linha"><span class="adash-num" style="${AGUA_KPI_FONTE_NUM}">${s.itemMaisAntigo ? s.diasMaisAntigo : '—'}</span>${s.itemMaisAntigo ? '<span class="adash-delta neutro">dias</span>' : ''}</div>
-      <p class="adash-card-pe">${s.itemMaisAntigo ? esc(labelFn(s.itemMaisAntigo)) : 'Nenhuma coleta aguardando'}</p>
+    <div class="adash-card adash-span2">
+      <div class="adash-card-topo">
+        <div><p class="adash-card-tit">Distribuição por tempo de espera</p>
+          <p class="adash-card-tit-sub">Quantas coletas em cada faixa de dias</p></div>
+      </div>
+      ${aguaIqaBarrasHTML(s.faixas.map(f => ({ label: f.label, valor: f.n, valorTexto: String(f.n), titulo: `${f.n} coleta(s) entre ${f.label} dias esperando` })),
+        { max: Math.max(1, ...s.faixas.map(f => f.n)), height: 170, corBase: '#FDE68A', corTopo: '#B91C1C' })}
+      <p class="adash-card-pe">${maisAntiga}</p>
     </div>
   </div>`
 }
@@ -111,30 +166,34 @@ function aguaKpisFilaHTML(lista, labelFn, statusCounts) {
 // Quarentena (pages/agua-conferencia.html) — o que preocupa é volume e
 // tempo parado, não um limiar de atraso (a régua daqui não é urgência
 // de laboratório, é backlog de conferência humana).
-function aguaKpisQuarentenaHTML(lista, totalColetas, labelFn, statusCounts) {
+function aguaKpisQuarentenaHTML(lista, totalColetas, labelFn, statusCounts, containerId) {
+  const render = () => aguaKpisQuarentenaHTML(lista, totalColetas, labelFn, statusCounts, containerId)
+  if (containerId) _aguaKpiUltimoRender = { containerId, render }
+
   const s = _aguaKpiStats(lista)
   const pct = totalColetas ? (s.total / totalColetas) * 100 : null
+  const valorTempo = _aguaKpiEstatistica === 'mediana' ? s.mediana : s.media
+  const maisAntiga = s.itemMaisAntigo
+    ? `Mais antiga: ${s.diasMaisAntigo} dia${s.diasMaisAntigo === 1 ? '' : 's'} — ${esc(labelFn(s.itemMaisAntigo))}`
+    : 'Nenhuma coleta em quarentena'
+
   return `<div class="adash-kpi-row">
+    ${_aguaKpiCardEscuroHTML('Em quarentena', s.total, pct != null ? `${s.total} de ${totalColetas} coleta(s) cadastradas · ${pct.toFixed(1)}% da série` : 'pendente de conferência humana com o laudo físico')}
     ${aguaKpisSituacaoRoscaHTML(statusCounts)}
     <div class="adash-card">
-      <div class="adash-card-topo"><p class="adash-card-tit">Em quarentena</p></div>
-      <div class="adash-num-linha"><span class="adash-num" style="${AGUA_KPI_FONTE_NUM}">${s.total}</span></div>
-      <p class="adash-card-pe">pendente de conferência humana com o laudo físico</p>
+      <div class="adash-card-topo"><p class="adash-card-tit">Tempo em quarentena</p></div>
+      ${_aguaKpiPilulasEstatisticaHTML()}
+      <div class="adash-num-linha"><span class="adash-num" style="${AGUA_KPI_FONTE_NUM}">${s.total ? valorTempo : '—'}</span>${s.total ? '<span class="adash-delta neutro">dias</span>' : ''}</div>
+      <p class="adash-card-pe">desde a data da coleta, ${_aguaKpiEstatistica === 'mediana' ? 'mediana' : 'média'} das pendentes</p>
     </div>
-    <div class="adash-card">
-      <div class="adash-card-topo"><p class="adash-card-tit">% da série</p></div>
-      <div class="adash-num-linha"><span class="adash-num" style="${AGUA_KPI_FONTE_NUM}">${pct != null ? pct.toFixed(1) + '%' : '—'}</span></div>
-      <p class="adash-card-pe">${totalColetas ? `${s.total} de ${totalColetas} coleta(s) cadastradas` : 'sem coletas cadastradas'}</p>
-    </div>
-    <div class="adash-card">
-      <div class="adash-card-topo"><p class="adash-card-tit">Tempo médio em quarentena</p></div>
-      <div class="adash-num-linha"><span class="adash-num" style="${AGUA_KPI_FONTE_NUM}">${s.total ? s.media : '—'}</span>${s.total ? '<span class="adash-delta neutro">dias</span>' : ''}</div>
-      <p class="adash-card-pe">desde a data da coleta</p>
-    </div>
-    <div class="adash-card">
-      <div class="adash-card-topo"><p class="adash-card-tit">Mais antiga pendente</p></div>
-      <div class="adash-num-linha"><span class="adash-num" style="${AGUA_KPI_FONTE_NUM}">${s.itemMaisAntigo ? s.diasMaisAntigo : '—'}</span>${s.itemMaisAntigo ? '<span class="adash-delta neutro">dias</span>' : ''}</div>
-      <p class="adash-card-pe">${s.itemMaisAntigo ? esc(labelFn(s.itemMaisAntigo)) : 'Nenhuma coleta em quarentena'}</p>
+    <div class="adash-card adash-span2">
+      <div class="adash-card-topo">
+        <div><p class="adash-card-tit">Distribuição por tempo em quarentena</p>
+          <p class="adash-card-tit-sub">Quantas coletas em cada faixa de dias</p></div>
+      </div>
+      ${aguaIqaBarrasHTML(s.faixas.map(f => ({ label: f.label, valor: f.n, valorTexto: String(f.n), titulo: `${f.n} coleta(s) entre ${f.label} dias em quarentena` })),
+        { max: Math.max(1, ...s.faixas.map(f => f.n)), height: 170, corBase: '#FDE68A', corTopo: '#B91C1C' })}
+      <p class="adash-card-pe">${maisAntiga}</p>
     </div>
   </div>`
 }
