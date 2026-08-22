@@ -351,6 +351,7 @@ body { background:var(--cinza-50) }
     sel('rl-btn-export').disabled = !tem
     sel('rl-btn-pdf').disabled = !tem
     sel('rl-btn-pptx').disabled = !tem
+    sel('rl-btn-xlsx').disabled = !tem
     if (!tem) sel('rl-export-menu').hidden = true
     const nFiltros = _relatorioAtual
       ? Object.values(_relatorioAtual.filtros).filter(Boolean).length : 0
