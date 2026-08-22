@@ -269,6 +269,8 @@
         <div class="rhb-bloco">
           <div class="rhb-bloco-tit">Aviso meteorológico (INMET)</div>
           <textarea id="f-aviso" rows="3" style="width:100%;border:1px solid var(--borda-forte);border-radius:9px;padding:8px 10px;font:inherit;font-size:13px"${dis}>${esc(b.aviso_meteorologico || '')}</textarea>
+          ${somenteLeitura ? '' : `<button class="btn btn-secondary" type="button" style="margin-top:8px" onclick="buscarAvisoInmet()" data-icon="refresh-cw">Buscar avisos ativos do INMET</button>`}
+          <div id="rhb-inmet-resultado" style="margin-top:8px"></div>
         </div>
 
         <div class="rhb-bloco">
@@ -405,6 +407,50 @@
   document.addEventListener('change', e => {
     if (e.target.id === 'f-data' && _atual) carregarBlocosAutomaticos()
   })
+
+  // ── Aviso meteorológico — Fase 2 (INMET) ─────────────────────────
+  // Só PROPÕE o texto (via /api/inmet-avisos, proxy do endpoint
+  // oficial — o INMET não libera CORS para chamada direta do
+  // navegador). Nunca grava sozinho: quem monta o boletim escolhe
+  // "Usar este texto" e ainda pode editar antes de salvar — mesma
+  // disciplina da leitura assistida de laudo (Qualidade da Água).
+  function _rhbAvisoTextoPadrao(a) {
+    const linhas = [
+      `Aviso de ${a.evento}. Severidade Grau: ${a.severidade}.`,
+      `Início: ${a.inicio}${a.fim ? ' — Fim: ' + a.fim : ''}.`,
+    ]
+    if (a.riscos.length) linhas.push(`Riscos Potenciais: ${a.riscos.join(' ')}`)
+    if (a.municipiosAcre.length) linhas.push(`Municípios afetados no Acre: ${a.municipiosAcre.map(m => m.split(' - AC')[0]).join(', ')}.`)
+    linhas.push('Fonte: INMET.')
+    return linhas.join(' ')
+  }
+
+  window.usarAvisoInmet = function (idx, bucket) {
+    const a = (window._rhbInmet?.[bucket] || [])[idx]
+    if (!a) return
+    document.getElementById('f-aviso').value = _rhbAvisoTextoPadrao(a)
+    toast('Texto inserido — revise antes de salvar.', 'sucesso')
+  }
+
+  window.buscarAvisoInmet = async function () {
+    const alvo = document.getElementById('rhb-inmet-resultado')
+    alvo.innerHTML = '<p class="rhb-hint">Consultando o INMET...</p>'
+    try {
+      const r = await fetch('/api/inmet-avisos')
+      const j = await r.json()
+      if (!j.ok) throw new Error(j.erro || 'Falha na consulta.')
+      window._rhbInmet = { hoje: j.hoje, futuro: j.futuro }
+      const linha = (a, i, bucket) => `<div style="border:1px solid var(--borda);border-radius:9px;padding:8px 10px;margin-top:6px">
+          <div style="font-weight:600">${esc(a.evento)} — ${esc(a.severidade)}</div>
+          <div class="rhb-hint">${esc(a.inicio)}${a.fim ? ' até ' + esc(a.fim) : ''} · ${a.municipiosAcre.length} município(s) do Acre</div>
+          <button class="btn btn-secondary" style="padding:4px 10px;font-size:12px;margin-top:6px" onclick="usarAvisoInmet(${i},'${bucket}')">Usar este texto</button>
+        </div>`
+      const todos = [...j.hoje.map((a, i) => linha(a, i, 'hoje')), ...j.futuro.map((a, i) => linha(a, i, 'futuro'))]
+      alvo.innerHTML = todos.length ? todos.join('') : '<p class="rhb-hint">Nenhum aviso ativo do INMET para o Acre no momento.</p>'
+    } catch (e) {
+      alvo.innerHTML = `<p class="rhb-hint">Não foi possível consultar o INMET: ${esc(e.message)}</p>`
+    }
+  }
 
   // ── Salvar ───────────────────────────────────────────────────────
   function coletarPrevisao() {
