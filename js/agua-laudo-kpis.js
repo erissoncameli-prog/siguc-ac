@@ -92,7 +92,7 @@ function aguaKpisFilaHTML(lista, labelFn, statusCounts) {
     </div>
     <div class="adash-card">
       <div class="adash-card-topo"><p class="adash-card-tit">Tempo médio de espera</p></div>
-      <div class="adash-num-linha"><span class="adash-num">${s.total ? s.media : '—'}</span>${s.total ? '<span class="adash-delta neutro">dias</span>' : ''}</div>
+      <div class="adash-num-linha"><span class="adash-num" style="${AGUA_KPI_FONTE_NUM}">${s.total ? s.media : '—'}</span>${s.total ? '<span class="adash-delta neutro">dias</span>' : ''}</div>
       <p class="adash-card-pe">da data da coleta até hoje, média da fila atual</p>
     </div>
     <div class="adash-card">
@@ -128,7 +128,7 @@ function aguaKpisQuarentenaHTML(lista, totalColetas, labelFn, statusCounts) {
     </div>
     <div class="adash-card">
       <div class="adash-card-topo"><p class="adash-card-tit">Tempo médio em quarentena</p></div>
-      <div class="adash-num-linha"><span class="adash-num">${s.total ? s.media : '—'}</span>${s.total ? '<span class="adash-delta neutro">dias</span>' : ''}</div>
+      <div class="adash-num-linha"><span class="adash-num" style="${AGUA_KPI_FONTE_NUM}">${s.total ? s.media : '—'}</span>${s.total ? '<span class="adash-delta neutro">dias</span>' : ''}</div>
       <p class="adash-card-pe">desde a data da coleta</p>
     </div>
     <div class="adash-card">
