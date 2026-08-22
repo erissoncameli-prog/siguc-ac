@@ -48,7 +48,15 @@
 
 .adash-export { position:relative }
 .adash-menu {
-  position:absolute; right:0; top:44px; z-index:60; min-width:216px; padding:6px;
+  /* z-index acima de 1001: o mapa do painel (.adash-mapa-wrap
+     .leaflet-top.leaflet-right) usa 1001 para o botão de "Configurar
+     camadas" vencer a legenda do Leaflet — achado ao acrescentar o 3º
+     item (Planilha Excel), que deixou o menu alto o bastante para
+     encostar no card do mapa logo abaixo: com z-index:60 os controles
+     do Leaflet pintavam por cima do próprio menu de exportação, que
+     ficava clicável mas invisível. Um dropdown flutuante do cabeçalho
+     tem que vencer qualquer card do corpo da página, sempre. */
+  position:absolute; right:0; top:44px; z-index:1100; min-width:216px; padding:6px;
   background:var(--branco); border:1px solid var(--borda); border-radius:14px; box-shadow:var(--sombra-lg);
 }
 .adash-menu button {
