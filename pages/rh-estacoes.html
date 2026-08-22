@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>SIGUC-AC · Plataformas de Coleta</title>
+<link rel="stylesheet" href="../css/global.css">
+<link rel="stylesheet" href="../css/agua-painel.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,600;8..60,700&display=swap">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="../js/observability.js"></script>
+<script src="../js/queryLogger.js"></script>
+<script src="../js/config.js"></script>
+<script src="../js/config-sistema.js"></script>
+<script src="../js/layout.js"></script>
+<script src="../js/agua-iqa-visual.js"></script>
+<script src="../js/agua-painel.js"></script>
+<script src="../js/biomonitor-pdf-fonts.js"></script>
+<script src="../js/relatorio-cabecalho-pdf.js"></script>
+<script src="../js/agua-relatorio-dados.js"></script>
+<script src="../js/agua-relatorio-pdf.js"></script>
+<script src="../js/rh-hidro.js"></script>
+<script src="../js/rh-relatorio-pdf.js"></script>
+<style>
+/* Só o que é DESTA tela — cards, mapa e pílulas vêm de
+   css/agua-painel.css; hidrograma e cores de cota, de js/rh-hidro.js. */
+.rhe-kpis { display:grid; grid-template-columns:repeat(auto-fit, minmax(190px, 1fr)); gap:14px; margin-bottom:16px }
+.rhe-kpi { background:var(--branco); border:1px solid var(--borda); border-radius:var(--adash-raio); padding:16px 18px; box-shadow:var(--sombra) }
+.rhe-kpi-val { font-size:28px; font-weight:700; line-height:1.05; font-variant-numeric:tabular-nums; color:var(--cinza-900) }
+.rhe-kpi-lab { font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--cinza-500); margin-top:3px }
+.rhe-kpi-sub { font-size:11.5px; color:var(--cinza-500); margin-top:6px }
+
+.rhe-tab { width:100%; border-collapse:collapse; font-size:13px }
+.rhe-tab th { text-align:left; font-size:10.5px; text-transform:uppercase; letter-spacing:.05em; color:var(--cinza-500); font-weight:700; padding:0 10px 8px 0; white-space:nowrap }
+.rhe-tab td { padding:9px 10px 9px 0; border-top:1px solid var(--borda); vertical-align:middle }
+.rhe-tab td.num { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap }
+.rhe-tab tbody tr { cursor:pointer }
+.rhe-tab tbody tr:hover { background:var(--cinza-50) }
+.rhe-nome { font-weight:600; color:var(--cinza-900) }
+.rhe-sub { font-size:11px; color:var(--cinza-500) }
+
+.rhe-cota {
+  display:inline-flex; align-items:center; gap:5px; font-size:11.5px; font-weight:700;
+  padding:2px 9px; border-radius:999px; border:1px solid currentColor; white-space:nowrap;
+}
+.rhe-cota-dot { width:8px; height:8px; border-radius:50%; background:currentColor; flex:none }
+.rhe-sobe { color:var(--erro); font-weight:700 }
+.rhe-desce { color:var(--sucesso); font-weight:700 }
+
+.rhe-vazio { text-align:center; color:var(--cinza-500); padding:36px 16px; font-size:13px }
+.rhe-form-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(190px, 1fr)); gap:12px }
+.rhe-form-grid label { display:flex; flex-direction:column; gap:4px; font-size:12px; color:var(--cinza-600); font-weight:600 }
+.rhe-form-grid input, .rhe-form-grid select, .rhe-form-grid textarea {
+  border:1px solid var(--borda-forte); border-radius:9px; padding:8px 10px; font:inherit; font-size:13px; font-weight:400;
+}
+.rhe-form-full { grid-column:1/-1 }
+.rhe-hint { font-size:11.5px; color:var(--cinza-500); line-height:1.5 }
+.rhe-mapa-legenda-chip { display:inline-flex; align-items:center; gap:4px; font-size:10px; color:var(--cinza-700) }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+;(async function () {
+  const usuario = await carregarUsuario()
+  if (!usuario) { window.location.href = '../index.html'; return }
+
+  const { data: nivel } = await db.rpc('nivel_efetivo', { p_usuario: usuario.id, p_modulo_chave: 'bacias' })
+  if (!nivel || nivel === 'sem_acesso') {
+    document.body.innerHTML = '<div style="padding:60px;text-align:center;font-family:\'DM Sans\',sans-serif;color:#6B7280">Você não tem acesso ao módulo Bacias Hidrográficas.</div>'
+    return
+  }
+  const podeEditar = nivel === 'editar'
+
+  const hoje = new Date().toISOString().slice(0, 10)
+
+  document.getElementById('app').innerHTML =
+    gerarLayout('Plataformas de Coleta', 'rh-estacoes') +
+    `<div class="fade-in adash">
+      <div class="adash-head">
+        <div>
+          <h1 class="adash-titulo">Plataformas de Coleta de Dados</h1>
+          <p class="adash-sub">Estações hidrometeorológicas do Acre — nível de rio, chuva e vazão — da ANA,
+            do estado ou de terceiros. Cotas de atenção, alerta e inundação são cadastradas por estação; a
+            classificação é feita no banco, comparando a leitura com essas cotas.</p>
+        </div>
+        <div class="adash-head-acoes">
+          ${podeEditar ? `<button class="adash-pill" type="button" onclick="abrirImportacao()" data-icon="upload">Importar leituras</button>` : ''}
+          ${podeEditar ? `<button class="adash-pill" type="button" onclick="abrirEstacao()" data-icon="plus">Nova estação</button>` : ''}
+          <div class="adash-export">
+            <button class="adash-pill adash-pill-primary" id="rhe-btn-export" type="button" onclick="alternarExport()" data-icon="download">Exportar</button>
+            <div class="adash-menu" id="rhe-export-menu" hidden>
+              <button type="button" onclick="gerarPdfDiario()" data-icon="file-text">Relatório diário em PDF</button>
+              <button type="button" onclick="baixarCsvRelatorio()" data-icon="grid">Relatório diário em planilha</button>
+              <button type="button" onclick="baixarCsvEstacoes()" data-icon="grid">Inventário de estações (planilha)</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="rhe-kpis" class="rhe-kpis"></div>
+
+      <div class="adash-card adash-mapa-card">
+        <div class="adash-card-topo">
+          <div><p class="adash-card-tit">Onde estão as estações</p>
+            <p class="adash-card-tit-sub" id="rhe-mapa-sub">Carregando estações...</p></div>
+          <span class="adash-card-mais">•••</span>
+        </div>
+        <div class="adash-mapa-wrap"><div id="rhe-mapa"></div></div>
+      </div>
+
+      <div class="adash-card" style="margin-bottom:16px">
+        <div class="adash-card-topo">
+          <div><p class="adash-card-tit">Relatório diário por rio</p>
+            <p class="adash-card-tit-sub">Variação de nível e chuva acumulada no dia escolhido</p></div>
+          <input type="date" id="rhe-data" value="${hoje}" max="${hoje}"
+                 style="border:1px solid var(--borda-forte);border-radius:9px;padding:7px 10px;font:inherit;font-size:13px">
+        </div>
+        <div id="rhe-diario"><div class="rhe-vazio">Carregando...</div></div>
+      </div>
+
+      <div class="adash-card">
+        <div class="adash-card-topo">
+          <div><p class="adash-card-tit">Estações cadastradas</p>
+            <p class="adash-card-tit-sub">Toque numa linha para ver a série de nível e chuva</p></div>
+        </div>
+        <div style="overflow-x:auto"><div id="rhe-lista"><div class="rhe-vazio">Carregando...</div></div></div>
+      </div>
+    </div>
+    <div class="modal-overlay" id="rhe-modal"><div class="modal" id="rhe-modal-inner" style="max-width:820px"></div></div>`
+
+  bIconsAplicar(document.getElementById('app'))
+
+  // ── Estado ───────────────────────────────────────────────────────
+  let _estacoes = []      // vw_rh_estacoes_detalhe
+  let _diario = []        // rh_relatorio_diario(data)
+  let _mapaCtl = null
+  let _marcadores = {}
+
+  const fechar = () => document.getElementById('rhe-modal').classList.remove('aberto')
+  window.fecharModalRh = fechar
+  const abrir = (html) => {
+    document.getElementById('rhe-modal-inner').innerHTML = html
+    document.getElementById('rhe-modal').classList.add('aberto')
+    bIconsAplicar(document.getElementById('rhe-modal-inner'))
+  }
+
+  window.alternarExport = function () {
+    const m = document.getElementById('rhe-export-menu')
+    m.hidden = !m.hidden
+  }
+
+  // ── Mapa ─────────────────────────────────────────────────────────
+  // Base compartilhada (js/agua-painel.js): mesmos tiles, rosa dos
+  // ventos, escala, camadas de referência e painel de configuração do
+  // Mapa das UCs e do painel da Água — só os marcadores e a legenda
+  // são desta tela. `referenciaSempre`: aqui o assunto é a rede
+  // hidrográfica, como no Painel das Bacias.
+  function legendaCotas() {
+    const chips = ['normal', 'atencao', 'alerta', 'inundacao'].map(s =>
+      `<span class="rhe-mapa-legenda-chip"><span class="adash-mapa-legenda-dot" style="background:${RH_COTA_COR[s]}"></span>${RH_COTA_LABEL[s]}</span>`).join('')
+    return `<div class="adash-mapa-legenda-tit">Situação da cota</div>
+      <div class="adash-mapa-legenda-linha">${chips}</div>
+      <div class="adash-mapa-legenda-linha" style="margin-top:4px">
+        <span class="rhe-mapa-legenda-chip"><span class="adash-mapa-legenda-dot" style="background:${RH_SEM_COTA_COR}"></span>Sem cota cadastrada</span>
+      </div>
+      <div class="adash-mapa-legenda-linha" style="margin-top:4px">
+        <span class="rhe-mapa-legenda-chip">Contorno tracejado = sem leitura recente</span>
+      </div>
+      <div class="adash-mapa-legenda-tit" style="margin-top:6px">Camadas de referência</div>
+      <div class="adash-mapa-legenda-linha">
+        <span class="rhe-mapa-legenda-chip"><span class="adash-mapa-legenda-linha-cor" style="background:#FACC15"></span>Limite / municípios</span>
+        <span class="rhe-mapa-legenda-chip"><span class="adash-mapa-legenda-linha-cor" style="background:#2563eb"></span>Rios (IBGE)</span>
+      </div>`
+  }
+
+  try {
+    _mapaCtl = aguaPainelMapaBase('rhe-mapa', { referenciaSempre: true, legendaFn: legendaCotas })
+  } catch (e) {
+    console.warn('[rh-estacoes] mapa indisponível:', e.message)
+    document.querySelector('.adash-mapa-card')?.setAttribute('hidden', '')
+  }
+
+  function desenharMarcadores() {
+    if (!_mapaCtl) return
+    Object.values(_marcadores).forEach(m => _mapaCtl.mapa.removeLayer(m))
+    _marcadores = {}
+    const bounds = []
+    _estacoes.filter(e => e.lat != null && e.lng != null).forEach(e => {
+      const recente = e.ultima_leitura && (Date.now() - new Date(e.ultima_leitura).getTime()) <= 36 * 3600 * 1000
+      const m = L.circleMarker([e.lat, e.lng], {
+        radius: 8,
+        fillColor: rhCotaCor(e.situacao_cota),
+        fillOpacity: e.ativo === false ? .35 : .9,
+        color: '#fff',
+        weight: 2,
+        dashArray: recente ? null : '3 3',
+      })
+      m.bindTooltip(`<strong>${esc(e.nome)}</strong><br>${esc(rhNivel(e.nivel_atual_cm))} · ${esc(rhCotaLabel(e.situacao_cota))}`,
+        { direction: 'top' })
+      m.on('click', () => abrirSerie(e.id))
+      m.addTo(_mapaCtl.mapa)
+      _marcadores[e.id] = m
+      bounds.push([e.lat, e.lng])
+    })
+    const sub = document.getElementById('rhe-mapa-sub')
+    if (sub) {
+      sub.textContent = bounds.length
+        ? `${bounds.length} estação(ões) com coordenada — toque num ponto para ver a série`
+        : 'Nenhuma estação com coordenada cadastrada'
+    }
+    if (bounds.length === 1) _mapaCtl.mapa.setView(bounds[0], 10)
+    else if (bounds.length > 1) _mapaCtl.mapa.fitBounds(bounds, { padding: [28, 28], maxZoom: 9 })
+  }
+
+  // ── Render ───────────────────────────────────────────────────────
+  function chipCota(situacao) {
+    const cor = rhCotaCor(situacao)
+    return `<span class="rhe-cota" style="color:${cor}"><span class="rhe-cota-dot"></span>${esc(rhCotaLabel(situacao))}</span>`
+  }
+
+  function renderKpis() {
+    const r = rhResumoEstacoes(_estacoes)
+    const alvo = document.getElementById('rhe-kpis')
+    alvo.innerHTML = `
+      <div class="rhe-kpi">
+        <div class="rhe-kpi-val">${formatNum(r.total)}</div>
+        <div class="rhe-kpi-lab">Estações cadastradas</div>
+        <div class="rhe-kpi-sub">${formatNum(r.telemetricas)} telemétrica(s) · ${r.rios.length} rio(s)</div>
+      </div>
+      <div class="rhe-kpi">
+        <div class="rhe-kpi-val">${formatNum(r.comLeituraRecente)}</div>
+        <div class="rhe-kpi-lab">Com leitura nas últimas 36h</div>
+        <div class="rhe-kpi-sub">${r.semLeitura ? formatNum(r.semLeitura) + ' sem nenhuma leitura' : 'Todas já receberam leitura'}</div>
+      </div>
+      <div class="rhe-kpi">
+        <div class="rhe-kpi-val" style="color:${r.emCota ? rhCotaCor(r.pior) : 'var(--cinza-900)'}">${formatNum(r.emCota)}</div>
+        <div class="rhe-kpi-lab">Acima de alguma cota</div>
+        <div class="rhe-kpi-sub">${r.pior ? 'Pior situação: ' + esc(rhCotaLabel(r.pior)) : 'Nenhuma estação em cota'}</div>
+      </div>
+      <div class="rhe-kpi">
+        <div class="rhe-kpi-val">${formatNum(r.bacias.length)}</div>
+        <div class="rhe-kpi-lab">Bacias com estação</div>
+        <div class="rhe-kpi-sub">${r.bacias.length ? esc(r.bacias.join(' · ')) : 'Nenhuma bacia informada'}</div>
+      </div>`
+  }
+
+  function renderLista() {
+    const alvo = document.getElementById('rhe-lista')
+    if (!_estacoes.length) {
+      alvo.innerHTML = `<div class="rhe-vazio">Nenhuma estação cadastrada ainda.${podeEditar ? ' Use "Nova estação" para começar, ou "Importar leituras" depois de cadastrar.' : ''}</div>`
+      return
+    }
+    const linhas = _estacoes.map(e => {
+      const v = e.variacao_24h_cm
+      const classeV = v == null ? '' : (Number(v) > 0 ? 'rhe-sobe' : Number(v) < 0 ? 'rhe-desce' : '')
+      return `<tr onclick="abrirSerie('${e.id}')">
+        <td>
+          <div class="rhe-nome">${esc(e.nome)}</div>
+          <div class="rhe-sub">${esc([e.codigo_ana, e.rio, e.municipio].filter(Boolean).join(' · ') || '—')}</div>
+        </td>
+        <td><span class="rhe-sub">${esc(RH_TIPO_LABEL[e.tipo] || e.tipo)}${e.telemetrica ? ' · telemétrica' : ''}</span></td>
+        <td class="num">${esc(rhNivel(e.nivel_atual_cm))}</td>
+        <td class="num ${classeV}">${esc(rhVariacao(v))}</td>
+        <td class="num">${esc(rhChuva(e.chuva_24h))}</td>
+        <td class="num">${esc(rhChuva(e.chuva_7d))}</td>
+        <td>${chipCota(e.situacao_cota)}</td>
+        <td class="num"><span class="rhe-sub">${e.ultima_leitura ? esc(formatData(e.ultima_leitura)) : 'sem leitura'}</span></td>
+        ${podeEditar ? `<td><button class="btn btn-secondary" style="padding:4px 10px;font-size:12px" onclick="event.stopPropagation();abrirEstacao('${e.id}')">Editar</button></td>` : ''}
+      </tr>`
+    }).join('')
+    alvo.innerHTML = `<table class="rhe-tab">
+      <thead><tr>
+        <th>Estação</th><th>Tipo</th><th style="text-align:right">Nível</th>
+        <th style="text-align:right">24h</th><th style="text-align:right">Chuva 24h</th>
+        <th style="text-align:right">Chuva 7d</th><th>Cota</th><th style="text-align:right">Última leitura</th>
+        ${podeEditar ? '<th></th>' : ''}
+      </tr></thead><tbody>${linhas}</tbody></table>`
+  }
+
+  function renderDiario() {
+    const alvo = document.getElementById('rhe-diario')
+    if (!_diario.length) {
+      alvo.innerHTML = '<div class="rhe-vazio">Nenhuma leitura registrada neste dia.</div>'
+      return
+    }
+    const linhas = _diario.map(l => `
+      <tr>
+        <td><div class="rhe-nome">${esc(l.rio)}</div><div class="rhe-sub">${esc(l.bacia || 'Bacia não informada')} · ${formatNum(l.n_estacoes)} estação(ões)</div></td>
+        <td class="num">${esc(rhNivel(l.nivel_medio_cm))}</td>
+        <td class="num">${esc(rhNivel(l.nivel_max_cm))}</td>
+        <td class="num ${Number(l.variacao_cm) > 0 ? 'rhe-sobe' : Number(l.variacao_cm) < 0 ? 'rhe-desce' : ''}">${esc(rhVariacao(l.variacao_cm))}</td>
+        <td class="num">${esc(rhChuva(l.chuva_total_mm))}</td>
+        <td class="num">${esc(rhChuva(l.chuva_max_mm))}</td>
+        <td>${Number(l.estacoes_em_cota) > 0 ? chipCota(l.pior_situacao) + ` <span class="rhe-sub">(${formatNum(l.estacoes_em_cota)})</span>` : '<span class="rhe-sub">—</span>'}</td>
+      </tr>`).join('')
+    alvo.innerHTML = `<div style="overflow-x:auto"><table class="rhe-tab">
+      <thead><tr>
+        <th>Rio</th><th style="text-align:right">Nível médio</th><th style="text-align:right">Nível máx.</th>
+        <th style="text-align:right">Variação no dia</th><th style="text-align:right">Chuva total</th>
+        <th style="text-align:right">Chuva máx.</th><th>Estações em cota</th>
+      </tr></thead><tbody>${linhas}</tbody></table></div>`
+  }
+
+  // ── Série da estação (hidrograma) ────────────────────────────────
+  window.abrirSerie = async function (id) {
+    const e = _estacoes.find(x => x.id === id)
+    if (!e) return
+    abrir(`<div class="modal-header">
+        <div><div class="modal-title">${esc(e.nome)}</div>
+          <p class="rhe-sub">${esc([e.codigo_ana, e.rio, e.municipio].filter(Boolean).join(' · '))}</p></div>
+        <button class="modal-close" onclick="fecharModalRh()">×</button>
+      </div>
+      <div class="modal-body"><div class="rhe-vazio">Carregando leituras...</div></div>`)
+
+    const desde = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString()
+    let medicoes = []
+    try {
+      const { data, error } = await db.from('rh_medicoes').select('data_hora,nivel_cm,chuva_mm,vazao_m3s,origem')
+        .eq('estacao_id', id).gte('data_hora', desde).order('data_hora')
+      if (error) throw error
+      medicoes = data || []
+    } catch (err) {
+      abrir(`<div class="modal-header"><div class="modal-title">${esc(e.nome)}</div>
+          <button class="modal-close" onclick="fecharModalRh()">×</button></div>
+        <div class="modal-body"><p class="rhe-hint">Não foi possível carregar as leituras: ${esc(err.message)}</p></div>`)
+      return
+    }
+    window._rhSerieAtual = { estacao: e, medicoes }
+
+    const cotas = { atencao: e.cota_atencao_cm, alerta: e.cota_alerta_cm, inundacao: e.cota_inundacao_cm }
+    abrir(`<div class="modal-header">
+        <div><div class="modal-title">${esc(e.nome)}</div>
+          <p class="rhe-sub">${esc([e.codigo_ana, e.rio, e.municipio].filter(Boolean).join(' · '))} · últimos 30 dias</p></div>
+        <button class="modal-close" onclick="fecharModalRh()">×</button>
+      </div>
+      <div class="modal-body">
+        <div style="display:flex;flex-wrap:wrap;gap:18px;margin-bottom:12px">
+          <div><div class="rhe-kpi-val" style="font-size:22px">${esc(rhNivel(e.nivel_atual_cm))}</div><div class="rhe-kpi-lab">Nível atual</div></div>
+          <div><div class="rhe-kpi-val" style="font-size:22px">${esc(rhVariacao(e.variacao_24h_cm))}</div><div class="rhe-kpi-lab">Variação 24h</div></div>
+          <div><div class="rhe-kpi-val" style="font-size:22px">${esc(rhChuva(e.chuva_24h))}</div><div class="rhe-kpi-lab">Chuva 24h</div></div>
+          <div style="align-self:center">${chipCota(e.situacao_cota)}</div>
+        </div>
+        ${rhHidrogramaHTML(medicoes, { cotas, width: 740, height: 268 })}
+        <p class="rhe-hint" style="margin-top:10px">${medicoes.length} leitura(s) no período.
+          ${e.cota_alerta_cm == null && e.cota_atencao_cm == null && e.cota_inundacao_cm == null
+            ? 'Esta estação não tem cota cadastrada — sem elas o sistema não classifica a situação.' : ''}</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="fecharModalRh()">Fechar</button>
+        <button class="btn btn-secondary" onclick="baixarCsvSerie()" data-icon="grid">Baixar planilha</button>
+        ${podeEditar ? `<button class="btn btn-primary" onclick="abrirEstacao('${e.id}')">Editar estação</button>` : ''}
+      </div>`)
+  }
+
+  window.baixarCsvSerie = function () {
+    const s = window._rhSerieAtual
+    if (!s) return
+    rhBaixarCsv(rhCsvMedicoes(s.medicoes, s.estacao.nome), `serie-${(s.estacao.codigo_ana || s.estacao.nome).replace(/\W+/g, '-')}.csv`)
+  }
+
+  // ── Cadastro da estação ──────────────────────────────────────────
+  window.abrirEstacao = function (id) {
+    if (!podeEditar) return
+    const e = id ? _estacoes.find(x => x.id === id) || {} : {}
+    const opt = (v, atual, label) => `<option value="${v}"${v === atual ? ' selected' : ''}>${label}</option>`
+    abrir(`<div class="modal-header">
+        <div class="modal-title">${id ? 'Editar estação' : 'Nova estação'}</div>
+        <button class="modal-close" onclick="fecharModalRh()">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="rhe-form-grid">
+          <label class="rhe-form-full">Nome<input id="f-nome" value="${esc(e.nome || '')}" placeholder="Ex.: Rio Branco — Ponte Metálica"></label>
+          <label>Código ANA<input id="f-codigo" value="${esc(e.codigo_ana || '')}" placeholder="8 dígitos"></label>
+          <label>Código da operadora<input id="f-codop" value="${esc(e.codigo_operadora || '')}"></label>
+          <label>Tipo<select id="f-tipo">${Object.entries(RH_TIPO_LABEL).map(([v, l]) => opt(v, e.tipo || 'fluviopluviometrica', l)).join('')}</select></label>
+          <label>Situação<select id="f-situacao">${Object.entries(RH_SITUACAO_LABEL).map(([v, l]) => opt(v, e.situacao || 'operante', l)).join('')}</select></label>
+          <label>Telemétrica<select id="f-tele">${opt('sim', e.telemetrica ? 'sim' : 'nao', 'Sim')}${opt('nao', e.telemetrica ? 'sim' : 'nao', 'Não')}</select></label>
+          <label>Operadora<input id="f-operadora" value="${esc(e.operadora || '')}" placeholder="ANA, CPRM, SEMA-AC..."></label>
+          <label>Rio<input id="f-rio" value="${esc(e.rio || '')}"></label>
+          <label>Bacia<input id="f-bacia" value="${esc(e.bacia || '')}" placeholder="Purus, Juruá, Madeira"></label>
+          <label>Município<input id="f-municipio" value="${esc(e.municipio || '')}"></label>
+          <label>Latitude<input id="f-lat" type="number" step="0.000001" value="${e.lat ?? ''}"></label>
+          <label>Longitude<input id="f-lng" type="number" step="0.000001" value="${e.lng ?? ''}"></label>
+          <label>Cota de atenção (cm)<input id="f-atencao" type="number" value="${e.cota_atencao_cm ?? ''}"></label>
+          <label>Cota de alerta (cm)<input id="f-alerta" type="number" value="${e.cota_alerta_cm ?? ''}"></label>
+          <label>Cota de inundação (cm)<input id="f-inundacao" type="number" value="${e.cota_inundacao_cm ?? ''}"></label>
+          <label class="rhe-form-full">Link da fonte<input id="f-link" value="${esc(e.link_fonte || '')}" placeholder="Página da estação no HidroWeb, por exemplo"></label>
+          <label class="rhe-form-full">Observações<textarea id="f-obs" rows="2">${esc(e.observacoes || '')}</textarea></label>
+        </div>
+        <p class="rhe-hint" style="margin-top:10px">As cotas são valores de referência da operadora — deixe em branco
+          se a estação não tiver cota definida. Sem cota, o sistema não classifica a situação (e nunca supõe "normal").</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="fecharModalRh()">Cancelar</button>
+        <button class="btn btn-primary" onclick="salvarEstacao(${id ? `'${id}'` : 'null'})">Salvar</button>
+      </div>`)
+  }
+
+  const val = id => (document.getElementById(id)?.value || '').trim()
+  const num = id => { const v = val(id); return v === '' ? null : Number(v) }
+
+  window.salvarEstacao = async function (id) {
+    const nome = val('f-nome')
+    if (!nome) { toast('Informe o nome da estação.', 'erro'); return }
+    const lat = num('f-lat'), lng = num('f-lng')
+    if ((lat == null) !== (lng == null)) { toast('Informe latitude E longitude, ou nenhuma das duas.', 'erro'); return }
+
+    const linha = {
+      nome,
+      codigo_ana: val('f-codigo') || null,
+      codigo_operadora: val('f-codop') || null,
+      tipo: val('f-tipo'),
+      situacao: val('f-situacao'),
+      telemetrica: val('f-tele') === 'sim',
+      operadora: val('f-operadora') || null,
+      rio: val('f-rio') || null,
+      bacia: val('f-bacia') || null,
+      municipio: val('f-municipio') || null,
+      cota_atencao_cm: num('f-atencao'),
+      cota_alerta_cm: num('f-alerta'),
+      cota_inundacao_cm: num('f-inundacao'),
+      link_fonte: val('f-link') || null,
+      observacoes: val('f-obs') || null,
+      // EWKT direto do cliente — mesmo padrão de agua-pontos.html e
+      // admin-biomonitor.html.
+      geom: lat == null ? null : `SRID=4326;POINT(${lng} ${lat})`,
+    }
+    try {
+      const q = id
+        ? db.from('rh_estacoes').update(linha).eq('id', id)
+        : db.from('rh_estacoes').insert({ ...linha, criado_por: usuario.id })
+      const { error } = await q
+      if (error) throw error
+      toast(id ? 'Estação atualizada.' : 'Estação cadastrada.', 'sucesso')
+      fechar()
+      await carregar()
+    } catch (err) {
+      toast('Não foi possível salvar: ' + err.message, 'erro')
+    }
+  }
+
+  // ── Importação de leituras (planilha) ────────────────────────────
+  window.abrirImportacao = function () {
+    const opcoes = _estacoes.map(e => `<option value="${e.id}">${esc(e.nome)}${e.codigo_ana ? ' (' + esc(e.codigo_ana) + ')' : ''}</option>`).join('')
+    abrir(`<div class="modal-header">
+        <div class="modal-title">Importar leituras</div>
+        <button class="modal-close" onclick="fecharModalRh()">×</button>
+      </div>
+      <div class="modal-body">
+        <p class="rhe-hint">Arquivo CSV com uma linha por leitura. O cabeçalho pode vir do HidroWeb ou da
+          planilha do estado — são aceitas as grafias mais comuns:
+          <strong>data_hora</strong> (ou data), <strong>nivel_cm</strong> (ou cota), <strong>chuva_mm</strong>
+          (ou precipitação), <strong>vazao_m3s</strong>. Datas em dd/mm/aaaa ou ISO.</p>
+        <div class="rhe-form-grid" style="margin-top:12px">
+          <label class="rhe-form-full">Estação<select id="f-imp-estacao">${opcoes}</select></label>
+          <label class="rhe-form-full">Arquivo<input type="file" id="f-imp-arquivo" accept=".csv,text/csv"></label>
+          <label>Origem<select id="f-imp-origem">
+            <option value="importacao">Importação de arquivo</option>
+            <option value="convencional">Leitura convencional</option>
+            <option value="telemetria">Telemetria</option>
+            <option value="manual">Digitada</option>
+          </select></label>
+        </div>
+        <div id="rhe-imp-msg" class="rhe-hint" style="margin-top:10px"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="fecharModalRh()">Cancelar</button>
+        <button class="btn btn-primary" onclick="importarLeituras()">Importar</button>
+      </div>`)
+    if (!_estacoes.length) {
+      document.getElementById('rhe-imp-msg').innerHTML = '<strong>Cadastre uma estação antes</strong> — a leitura precisa pertencer a alguma.'
+    }
+  }
+
+  window.importarLeituras = async function () {
+    const arq = document.getElementById('f-imp-arquivo')?.files?.[0]
+    const estacaoId = val('f-imp-estacao')
+    const origem = val('f-imp-origem')
+    const msg = document.getElementById('rhe-imp-msg')
+    if (!arq || !estacaoId) { msg.textContent = 'Escolha a estação e o arquivo.'; return }
+
+    const texto = await arq.text()
+    const { linhas, erros } = rhParseCsvMedicoes(texto)
+    if (!linhas.length) {
+      msg.innerHTML = `<strong>Nada importado.</strong> ${esc(erros.join(' '))}`
+      return
+    }
+    msg.textContent = `Enviando ${linhas.length} leitura(s)...`
+    try {
+      const payload = linhas.map(l => ({
+        estacao_id: estacaoId, data_hora: l.data_hora,
+        nivel_cm: l.nivel_cm, chuva_mm: l.chuva_mm, vazao_m3s: l.vazao_m3s, origem,
+      }))
+      const { data, error } = await db.rpc('rh_registrar_medicoes', { p_medicoes: payload })
+      if (error) throw error
+      msg.innerHTML = `<strong>${data} leitura(s) gravada(s).</strong> ${esc(erros.join(' '))}`
+      toast(`${data} leitura(s) importada(s).`, 'sucesso')
+      await carregar()
+    } catch (err) {
+      msg.innerHTML = `<strong>Falhou:</strong> ${esc(err.message)}`
+    }
+  }
+
+  // ── Exportações ──────────────────────────────────────────────────
+  const dataSel = () => document.getElementById('rhe-data')?.value || hoje
+  const dataTxt = () => dataSel().split('-').reverse().join('/')
+
+  window.baixarCsvEstacoes = function () {
+    document.getElementById('rhe-export-menu').hidden = true
+    rhBaixarCsv(rhCsvEstacoes(_estacoes), `estacoes-hidro-${dataSel()}.csv`)
+  }
+  window.baixarCsvRelatorio = function () {
+    document.getElementById('rhe-export-menu').hidden = true
+    rhBaixarCsv(rhCsvRelatorioDiario(_diario, dataTxt()), `relatorio-diario-${dataSel()}.csv`)
+  }
+  window.gerarPdfDiario = async function () {
+    document.getElementById('rhe-export-menu').hidden = true
+    const btn = document.getElementById('rhe-btn-export')
+    btn.disabled = true
+    try {
+      const [cab, protocolo] = await Promise.all([getCabecalhoRelatorio('bacias'), gerarProtocolo()])
+      const pdf = await rhRelMontarPdfDiario(_diario, dataTxt(), cab, protocolo, _estacoes)
+      aguaRelBaixarPdf(pdf, `relatorio-hidro-${dataSel()}.pdf`)
+    } catch (err) {
+      toast('Não foi possível gerar o PDF: ' + err.message, 'erro')
+    } finally {
+      btn.disabled = false
+    }
+  }
+
+  // ── Carga ────────────────────────────────────────────────────────
+  async function carregarDiario() {
+    try {
+      const { data, error } = await db.rpc('rh_relatorio_diario', { p_data: dataSel() })
+      if (error) throw error
+      _diario = data || []
+    } catch (e) {
+      console.warn('[rh-estacoes] relatório diário indisponível:', e.message)
+      _diario = []
+    }
+    renderDiario()
+  }
+
+  async function carregar() {
+    try {
+      const { data, error } = await db.from('vw_rh_estacoes_detalhe').select('*').order('nome')
+      if (error) throw error
+      _estacoes = data || []
+    } catch (e) {
+      document.getElementById('rhe-lista').innerHTML =
+        `<div class="rhe-vazio">Não foi possível carregar as estações: ${esc(e.message)}</div>`
+      return
+    }
+    renderKpis()
+    renderLista()
+    desenharMarcadores()
+    await carregarDiario()
+  }
+
+  document.getElementById('rhe-data').addEventListener('change', carregarDiario)
+  await carregar()
+})()
+</script>
+</body>
+</html>

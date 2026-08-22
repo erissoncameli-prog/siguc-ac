@@ -147,13 +147,18 @@ function _agpdfTabela(ctx, opts) {
 
 // ── Cabeçalho/rodapé — passada final sobre todas as páginas já
 // existentes (só assim dá pra saber o total de páginas) ────────────
-function _agpdfDesenharCabecalhoPagina(pdf, cab, protocolo, logos) {
+// `linhaModulo` é o sufixo pequeno da 3ª linha do timbre. Parametrizado
+// (com o padrão de sempre) quando js/rh-relatorio-pdf.js passou a
+// reaproveitar estes primitivos para o relatório das plataformas
+// hidrometeorológicas — sem isso, o PDF do DERHQA sairia rotulado
+// "Qualidade da Água".
+function _agpdfDesenharCabecalhoPagina(pdf, cab, protocolo, logos, linhaModulo) {
   relatorioPdfDesenharCabecalho(pdf, {
     margem: AGPDF_M,
     corFloresta: AGPDF_COR.floresta, corMuted: AGPDF_COR.muted, corMuted2: AGPDF_COR.muted2,
     cab, protocolo, logos,
     nomePlataforma: 'SIGUC-AC',
-    linhaModulo: 'Qualidade da Água',
+    linhaModulo: linhaModulo || 'Qualidade da Água',
   })
 }
 
@@ -172,7 +177,7 @@ function _agpdfAplicarCabecalhoRodapeGlobal(ctx, logos) {
   const total = pdf.internal.getNumberOfPages()
   for (let i = 1; i <= total; i++) {
     pdf.setPage(i)
-    _agpdfDesenharCabecalhoPagina(pdf, ctx.cab, ctx.protocolo, logos)
+    _agpdfDesenharCabecalhoPagina(pdf, ctx.cab, ctx.protocolo, logos, ctx.linhaModulo)
     _agpdfDesenharRodapePagina(pdf, ctx.cab, ctx.protocolo, i, total)
   }
 }

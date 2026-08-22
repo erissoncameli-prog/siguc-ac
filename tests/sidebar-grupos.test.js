@@ -179,10 +179,12 @@ test('subgrupo Qualidade da Água some quando minhas_permissoes diz sem_acesso (
   });
 
   await expect(page.locator('.nav-grupo[data-grupo="agua"]')).toHaveCount(0);
-  // Bacias/Ar ainda não têm página, então nenhum subgrupo sobra e o
-  // grupo do departamento inteiro some junto (regra do `if (!itensHtml)`
-  // — grupo sem link nenhum nunca é desenhado).
-  await expect(page.locator('.nav-grupo[data-grupo="derhqa"]')).toHaveCount(0);
+  // Bacias já tem página (Fase B/C) e não está no `permissoes` deste
+  // teste — continua visível, então o grupo do departamento permanece
+  // (regra do `if (!itensHtml)` só some o grupo quando NENHUM subgrupo
+  // sobra; hoje sempre sobra Bacias).
+  await expect(page.locator('.nav-grupo[data-grupo="derhqa"]')).toHaveCount(1);
+  await expect(page.locator('.nav-grupo[data-grupo="bacias"]')).toHaveCount(1);
 });
 
 test('grupo Água aparece quando minhas_permissoes libera (lotado no DERHQA)', async ({ page }) => {
@@ -308,9 +310,12 @@ test('DERHQA é o grupo e "Qualidade da Água" é subgrupo com os 6 links', asyn
   await expect(sub.locator('.nav-section')).toHaveText('Qualidade da Água');
   await expect(sub.locator('.nav-item')).toHaveCount(6);
 
-  // Bacias Hidrográficas e Qualidade do Ar estão declarados em
-  // js/layout.js mas ainda sem página — subgrupo sem item não renderiza.
-  await expect(page.locator('.nav-grupo[data-grupo="bacias"]')).toHaveCount(0);
+  // Bacias Hidrográficas ganhou páginas na Fase B/C (Painel das Bacias
+  // + Plataformas de Coleta); Qualidade do Ar segue só declarado em
+  // js/layout.js, sem página — subgrupo sem item não renderiza.
+  const subBacias = grupo.locator('.nav-grupo.nav-subgrupo[data-grupo="bacias"]');
+  await expect(subBacias).toHaveCount(1);
+  await expect(subBacias.locator('.nav-item')).toHaveCount(2);
   await expect(page.locator('.nav-grupo[data-grupo="ar"]')).toHaveCount(0);
 });
 
