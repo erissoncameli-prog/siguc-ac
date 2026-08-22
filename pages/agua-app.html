@@ -228,6 +228,13 @@
     <div class="campo-dica" id="f-gps-divergencia" hidden></div>
 
     <div class="form-section-titulo">Parâmetros de campo</div>
+    <div class="form-section">
+      <label class="form-label">Equipamento de leitura (sonda)</label>
+      <select id="f-equipamento" class="form-select" onchange="agSalvarEquipamentoPadrao()">
+        <option value="">Não informado</option>
+      </select>
+      <div class="campo-dica">A última sonda escolhida fica como padrão neste aparelho.</div>
+    </div>
     <div class="grid-2" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
       <div class="form-section">
         <label class="form-label">Temp. ar (°C)</label>
@@ -532,6 +539,7 @@ const App = {
   coletor: null,          // { id, nome_completo } — linha de `usuarios`
   telasHistorico: [],
   pontos: [],              // cache de agua_pontos_coleta
+  equipamentos: [],        // cache de agua_equipamentos (sondas ativas)
   baselines: null,         // faixas históricas por ponto (migration 302)
   pontoAtual: null,
   gpsAtual: null,           // leitura pontual mais recente (bGpsUmaLeitura)
@@ -849,6 +857,24 @@ async function sincronizarPontos() {
   } catch { return false }
 }
 
+// ── Cache offline dos equipamentos de leitura (sondas) ────────
+// Cabe no store `config` (chave-valor), mesmo padrão de `baselines` —
+// lista pequena, não justifica object store próprio nem bump de
+// versão do IndexedDB.
+async function sincronizarEquipamentos() {
+  if (!db) return false
+  try {
+    const { data, error } = await db.from('agua_equipamentos')
+      .select('id, nome, status')
+      .eq('status', 'ativo')
+      .order('nome')
+    if (error || !data) return false
+    App.equipamentos = data
+    await aOfflineSetConfig('equipamentos', data)
+    return true
+  } catch { return false }
+}
+
 // ════════════════════════════════════════════════════════════════
 // PIN — Desbloqueio
 // ════════════════════════════════════════════════════════════════
@@ -1050,6 +1076,10 @@ async function entrarHome() {
     App.pontos = await aOfflineListarPontos()
     if (!App.pontos.length) sincronizarPontos()
   }
+  if (!App.equipamentos.length) {
+    App.equipamentos = (await aOfflineGetConfig('equipamentos')) || []
+    if (!App.equipamentos.length) sincronizarEquipamentos()
+  }
 
   await atualizarBadgeFila()
   aSyncOn('confirmado', atualizarBadgeFila)
@@ -1080,12 +1110,30 @@ function popularSelectPonto() {
     lista.map(p => `<option value="${p.id}">${p.nome} (${p.codigo_ana})</option>`).join('')
 }
 
-function abrirFormulario() {
+// ── Equipamento de leitura (sonda) — fica como padrão NESTE
+// APARELHO (IndexedDB, store `config`), não na conta do técnico —
+// decisão confirmada com o usuário antes de codar.
+async function popularSelectEquipamento() {
+  const sel = document.getElementById('f-equipamento')
+  const lista = App.equipamentos || []
+  sel.innerHTML = '<option value="">Não informado</option>' +
+    lista.map(e => `<option value="${e.id}">${e.nome}</option>`).join('')
+  const padraoId = await aOfflineGetConfig('equipamento_padrao_id')
+  if (padraoId && lista.some(e => e.id === padraoId)) sel.value = padraoId
+}
+
+async function agSalvarEquipamentoPadrao() {
+  const id = document.getElementById('f-equipamento').value
+  await aOfflineSetConfig('equipamento_padrao_id', id || null)
+}
+
+async function abrirFormulario() {
   App.pontoAtual = null
   App.gpsAtual = null
   bCapturaLimpar()
   _atualizarGaleriaFotos()
   popularSelectPonto()
+  await popularSelectEquipamento()
   document.getElementById('f-ponto').value = ''
   document.getElementById('f-ponto-info').textContent = ''
   document.getElementById('f-data').value = new Date().toISOString().slice(0, 10)
@@ -1282,6 +1330,7 @@ async function salvarRegistro() {
     data_coleta: dataColeta,
     hora_coleta: document.getElementById('f-hora').value || null,
     coletor_id: App.coletor?.id ?? null,
+    equipamento_id: document.getElementById('f-equipamento').value || null,
     temp_ar: agValorCampo('f-temp-ar'),
     temp_amostra: agValorCampo('f-temp-amostra'),
     ph: agValorCampo('f-ph'),
@@ -1859,6 +1908,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-atualizar-pontos').addEventListener('click', async () => {
     toast('Atualizando pontos…', 'info')
     const ok = await sincronizarPontos()
+    await sincronizarEquipamentos()
     toast(ok ? `${App.pontos.length} pontos atualizados` : 'Sem conexão — tente mais tarde', ok ? 'ok' : 'warn')
   })
   document.getElementById('btn-verificar-update').addEventListener('click', verificarAtualizacao)
