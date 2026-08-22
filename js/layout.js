@@ -93,6 +93,7 @@ function gerarLayout(tituloPagina, paginaAtiva) {
     'agua-laudos':              { svg: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M12 11s2.5 3 2.5 4.7a2.5 2.5 0 0 1-5 0C9.5 14 12 11 12 11z"/>', cor: '#0ea5e9', bg: 'rgba(14,165,233,0.22)' },
     'agua-conferencia':         { svg: '<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>', cor: '#0891b2', bg: 'rgba(8,145,178,0.22)' },
     'agua-relatorios':          { svg: '<rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>', cor: '#0284c7', bg: 'rgba(2,132,199,0.22)' },
+    'rh-bacias':                { svg: '<path d="M2 6c3 0 3 2 6 2s3-2 6-2 3 2 6 2"/><path d="M2 12c3 0 3 2 6 2s3-2 6-2 3 2 6 2"/><path d="M2 18c3 0 3 2 6 2s3-2 6-2 3 2 6 2"/>', cor: '#0891b2', bg: 'rgba(8,145,178,0.22)' },
   };
 
   function renderPill(id, size) {
@@ -225,12 +226,16 @@ function gerarLayout(tituloPagina, paginaAtiva) {
             { id: 'agua-relatorios',  href: '../pages/agua-relatorios.html',  label: 'Relatórios' },
           ]
         },
-        // Sem página ainda — ver docs/recursos-hidricos/plano.md (Fases
-        // B e D). As chaves 'bacias' e 'ar' já existem no catálogo de
-        // módulos (migration 301), ligadas ao DERHQA em
-        // `modulo_unidades`, para o cabeçalho dos relatórios sair com o
-        // departamento certo assim que a primeira página nascer.
-        { id: 'bacias', label: 'Bacias Hidrográficas', modulo: 'bacias', itens: [] },
+        // 'bacias' entrou na Fase B (migration 304 ativou o módulo).
+        // 'ar' segue declarado e sem página — ver
+        // docs/recursos-hidricos/plano.md (Fase D); subgrupo sem item
+        // não renderiza, então nada aparece no menu até a primeira tela.
+        {
+          id: 'bacias', label: 'Bacias Hidrográficas', modulo: 'bacias',
+          itens: [
+            { id: 'rh-bacias', href: '../pages/rh-bacias.html', label: 'Painel das Bacias' },
+          ]
+        },
         { id: 'ar',     label: 'Qualidade do Ar',      modulo: 'ar',     itens: [] },
       ]
     },

@@ -1125,6 +1125,47 @@ Ar" (declarados em `js/layout.js`, ainda sem página). Plano completo em
 - `pwa/sw.js`: frota 97 → 98 (`js/layout.js` E `css/global.css` estão no
   shell do Frota).
 
+## Recursos Hídricos — Fase B: Painel das Bacias (migration 304)
+`pages/rh-bacias.html`, primeira tela do subgrupo Bacias Hidrográficas.
+Plano e histórico em `docs/recursos-hidricos/plano.md` (Fase B).
+- **NÃO existe polígono de bacia no sistema.** A divisão vem do texto
+  `agua_pontos_coleta.bacia` (Purus/Juruá/Madeira + 1 sem bacia), e a
+  tela **diz isso num aviso fixo** — nunca fingir recorte geográfico
+  que não foi feito. Quando o arquivo oficial chegar, entra a tabela
+  `bacias_hidrograficas` no molde do `limite_acre` (migration 239,
+  geometria carregada por pg_net do mesmo arquivo que o cliente usa) e
+  a bacia do ponto passa a ser derivada por ponto-em-polígono.
+- Razão de existir (não é cópia do painel da Água): `agua-relatorios`
+  sempre olha UM recorte; aqui a leitura é COMPARATIVA entre bacias.
+  Escolher uma bacia destaca e recorta o MAPA, mas **nunca some com as
+  outras da tabela** — senão a tela perde o sentido.
+- Agregação nova em `js/agua-relatorio-dados.js` (`aguaRelPorBacia`,
+  `aguaRelSerieBacia`), puras — nunca na página. **IQA médio de bacia é
+  NÚMERO, nunca faixa** (classificar média = recalcular o que
+  `agua_iqa_faixa()` faz no banco); por isso o gráfico é chamado com
+  `semLegenda` (opção nova de `aguaIqaGraficoHTML`).
+- Mapa é o MESMO `aguaPainelMapaCriar`, com `opts.referenciaSempre`
+  (novo, ADITIVO — as outras duas telas não mudam): aqui o assunto é a
+  rede hidrográfica, então limite/municípios/hidrografia IBGE aparecem
+  também no mapa de ruas, não só no satélite.
+- **`css/agua-painel.css` (novo) é a contraparte em CSS de
+  `js/agua-painel.js`** — os ~270 linhas de `.adash-*`/`.adet-*` eram
+  copiadas no `<style>` de `agua-relatorios.html` e `agua-publico.html`;
+  esta seria a 3ª cópia. As três páginas linkam a mesma folha; mudança
+  visual do painel entra AQUI e vale para as três (o par de duplicação
+  obrigatória mesa ⇄ público continua valendo igual).
+- Migration 304 ativa o módulo `bacias` (molde da 256 para `agua`).
+  `exige_lotacao` fica FALSE de propósito: leitura agregada do que já é
+  público, sem laudo nem dado pessoal.
+- Fail-open: se o Leaflet não carregar, o card do mapa some e os
+  números continuam — painel em branco por causa da camada visual é
+  pior que painel sem mapa.
+- Guarda: `tests/rh-bacias.test.js` (9). O Leaflet é servido de
+  `tests/fixtures/vendor/` por `page.route` (unpkg oscila na política
+  de rede do sandbox); a PÁGINA segue no CDN em produção.
+- `pwa/sw.js`: frota 98 → 99 (`js/layout.js`), agua 19 → 20
+  (`js/agua-relatorio-dados.js`).
+
 ## Enums do banco
 perfil_usuario: super_admin | gestor | tecnico | financeiro | visualizador |
   brigadista | biologo | secretario | diretor | chefe_departamento |
@@ -2331,7 +2372,17 @@ disso.
   tile do satélite é `lyrs=y`.
 
 ## Próxima tarefa
-**Recursos Hídricos e Qualidade Ambiental (DERHQA)** — Fase A ENTREGUE
+**Recursos Hídricos e Qualidade Ambiental (DERHQA)** — Fases A e B
+ENTREGUES (ver a seção "Recursos Hídricos — Fase B" acima). Próximo
+passo é a **Fase C — plataformas de coleta** (inventário das estações
+da ANA/estado, tabela `rh_estacoes`), e depois a Fase D (Qualidade do
+Ar). O polígono das bacias segue pendente: sem ele, o Painel das Bacias
+agrega pelo campo de texto do cadastro do ponto. O usuário enviou o
+Atlas de Vulnerabilidade a Inundações da ANA (pôster A0, 2013) —
+hidrografia + trechos inundáveis, SEM polígono de bacia; é tema próprio
+para uma camada futura, registrado em §B.4 do plano.
+
+Histórico da Fase A: Fase A ENTREGUE
 (sidebar reorganizada: o grupo agora é o departamento e Qualidade da
 Água virou subgrupo; migration 303 criou `bacias` e `ar` no catálogo,
 inativas). Próximo passo é a **Fase B — Bacias Hidrográficas**

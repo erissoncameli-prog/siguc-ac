@@ -331,3 +331,81 @@ function aguaRelViolacoesRanking(resumo, limite) {
     .sort((a, b) => b.n - a.n || a.label.localeCompare(b.label, 'pt-BR'))
     .slice(0, limite || 6)
 }
+
+// ── Comparativo ENTRE bacias (pages/rh-bacias.html) ──────────────
+// Uma linha por bacia presente na lista, com os mesmos números que
+// aguaRelResumo já calcula para um recorte — só que agrupados por
+// bacia em vez de por campanha/ponto. Existe porque o painel de
+// Relatórios sempre olha UM recorte de cada vez ("Acre todo" ou uma
+// bacia); comparar Purus × Juruá × Madeira lado a lado era a leitura
+// que faltava, e é a razão de ser da tela de Bacias Hidrográficas.
+//
+// Bacia NULA entra como 'Sem bacia definida' (nunca descartada — hoje
+// é o caso do Rio Iquiri). `campanhas` são só as campanhas em que
+// AQUELA bacia tem coleta, para a série do gráfico não fingir
+// monitoramento que não houve.
+//
+// Puro: não vai ao banco, não classifica faixa (a faixa vem pronta da
+// view) e não infere geometria nenhuma — a divisão por bacia aqui é a
+// que está gravada em agua_pontos_coleta.bacia. Quando o polígono
+// oficial existir no PostGIS, é essa coluna que passa a ser derivada
+// por ponto-em-polígono; esta função continua igual.
+function aguaRelPorBacia(coletas) {
+  const porBacia = {}
+  ;(coletas || []).forEach(c => {
+    const chave = aguaRelChaveBacia(c.ponto_bacia)
+    if (!porBacia[chave]) porBacia[chave] = []
+    porBacia[chave].push(c)
+  })
+  return Object.entries(porBacia).map(([chave, lista]) => {
+    const resumo = aguaRelResumo(lista)
+    const campanhas = aguaRelCampanhasDe(lista)
+    const rios = aguaRelRiosDe(lista)
+    const ultima = campanhas.length ? campanhas[campanhas.length - 1] : null
+    return {
+      bacia: chave,
+      label: chave === AGUA_REL_SEM_BACIA ? 'Sem bacia definida' : chave,
+      semBacia: chave === AGUA_REL_SEM_BACIA,
+      nPontos: resumo.nPontos,
+      nColetas: resumo.totalColetas,
+      nRios: rios.length,
+      rios,
+      iqaMedio: resumo.iqaMedio,
+      pctConforme: resumo.pctConforme,
+      comConama: resumo.comConama,
+      quarentena: resumo.quarentena,
+      nCampanhas: campanhas.length,
+      ultimaCampanha: ultima ? aguaRelLabelCampanha(ultima) : null,
+      violacoesPorParametro: resumo.violacoesPorParametro,
+    }
+  }).sort((a, b) => {
+    // Sem bacia definida sempre por último — é lacuna de cadastro, não
+    // uma bacia de verdade; ficar no meio da comparação confunde.
+    if (a.semBacia !== b.semBacia) return a.semBacia ? 1 : -1
+    return b.nColetas - a.nColetas || a.label.localeCompare(b.label, 'pt-BR')
+  })
+}
+
+// Série do IQA médio de UMA bacia ao longo das campanhas — mesma
+// forma que aguaIqaGraficoHTML já consome ({label, iqa, faixa,
+// status}), reaproveitando aguaRelPorCampanha em vez de reagrupar.
+// `faixa` fica null de propósito: classificar uma MÉDIA numa faixa
+// seria recalcular no cliente o que agua_iqa_faixa() faz no banco
+// (mesma regra já documentada no painel de Relatórios) — o ponto sai
+// em cinza neutro, com o valor no eixo. Por isso a tela chama o
+// gráfico com `semLegenda`: mostrar as 5 faixas ali prometeria uma
+// classificação que não existe.
+//
+// O EIXO é o de TODAS as campanhas da lista recebida (não só as da
+// bacia): é o que deixa os mini-gráficos das bacias comparáveis lado a
+// lado, e campanha em que a bacia não foi medida sai como lacuna —
+// mesmo princípio do ponto "vazado" de agua-mapa.html.
+function aguaRelSerieBacia(coletas, bacia) {
+  const rel = aguaRelMontar(coletas, { bacia })
+  return aguaRelPorCampanha(rel).map(c => ({
+    label: c.labelCurto,
+    iqa: c.iqaMedio,
+    faixa: null,
+    status: c.quarentena > 0 ? 'quarentena' : 'completo',
+  }))
+}

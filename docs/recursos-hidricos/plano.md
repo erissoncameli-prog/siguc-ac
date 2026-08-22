@@ -5,8 +5,11 @@ já existe (Qualidade da Água, entregue em 5 fases —
 `docs/qualidade-agua/plano.md`) e abre espaço para Bacias Hidrográficas
 e, mais à frente, Qualidade do Ar.
 
-**Fase A — ENTREGUE** (esta rodada). Fases B a D são planejamento; nada
-delas foi implementado.
+**Fases A e B — ENTREGUES.** A Fase B saiu **sem o polígono das
+bacias** (não existe arquivo oficial no sistema, e as fontes da ANA/IBGE
+estão bloqueadas na política de rede das sessões de desenvolvimento) —
+a divisão por bacia vem do cadastro do ponto, e a tela avisa isso.
+Fases C e D são planejamento; nada delas foi implementado.
 
 ---
 
@@ -98,7 +101,69 @@ nascem `rh-*` (Bacias/Recursos Hídricos) e `ar-*`.
 
 ---
 
-## Fase B — Bacias Hidrográficas (planejada)
+## Fase B — Bacias Hidrográficas — ENTREGUE (sem o polígono)
+
+`pages/rh-bacias.html` ("Painel das Bacias", subgrupo Bacias
+Hidrográficas). Entregue com a divisão por bacia vindo do CADASTRO do
+ponto (`agua_pontos_coleta.bacia`, texto), porque o polígono oficial
+não existe no sistema — decisão do usuário depois de a busca por um
+arquivo público falhar (ver B.2 abaixo). A tela **diz isso na cara**,
+num aviso fixo no topo: nada de fingir recorte geográfico que não foi
+feito.
+
+O que a tela faz, e por que ela existe além do painel de Relatórios:
+o painel da Água sempre olha UM recorte de cada vez ("Acre todo" ou uma
+bacia). Comparar Purus × Juruá × Madeira lado a lado era a leitura que
+faltava. Escolher uma bacia aqui **destaca e recorta o mapa, mas nunca
+some com as outras da comparação**.
+
+- **Agregação nova, no lugar certo**: `aguaRelPorBacia(coletas)` e
+  `aguaRelSerieBacia(coletas, bacia)` em `js/agua-relatorio-dados.js`
+  (puras, sem rede) — nunca na página. Reusam `aguaRelResumo`/
+  `aguaRelPorCampanha`, então IQA e conformidade continuam vindo
+  prontos do banco.
+- **IQA médio de bacia é NÚMERO, nunca faixa.** Classificar uma média
+  seria recalcular no cliente o que `agua_iqa_faixa()` faz no banco —
+  mesma regra que o painel já seguia nas barras. Por isso os
+  mini-gráficos são chamados com `semLegenda` (opção nova em
+  `aguaIqaGraficoHTML`): exibir as 5 cores de faixa ali prometeria uma
+  classificação que não foi feita.
+- **Eixo comum**: a série de cada bacia usa TODAS as campanhas do
+  recorte, não só as daquela bacia — é o que deixa os mini-gráficos
+  comparáveis; campanha não medida vira lacuna, nunca some do eixo.
+- **Mapa é o MESMO `aguaPainelMapaCriar`** de Relatórios/público, com
+  `opts.referenciaSempre` (novo, aditivo): aqui o assunto é a rede
+  hidrográfica, então limite do Acre, municípios e hidrografia WMS do
+  IBGE ficam visíveis também no mapa de ruas — nas outras duas telas
+  seguem só no satélite, como o usuário pediu.
+- **CSS do painel virou arquivo**: `css/agua-painel.css`, contraparte
+  de `js/agua-painel.js`. Os ~270 linhas de `.adash-*`/`.adet-*` viviam
+  copiadas no `<style>` de `agua-relatorios.html` e `agua-publico.html`
+  — esta seria a TERCEIRA cópia. As três páginas agora linkam a mesma
+  folha (as 30 guardas das duas telas antigas rodaram e passaram depois
+  da extração).
+- **Migration 304** ativa o módulo `bacias` (`ativo=true` + rota),
+  mesmo passo que a 256 deu para `agua`. `exige_lotacao` fica FALSE de
+  propósito: é leitura agregada do que a SEMA já publica no painel
+  público, sem laudo nem dado pessoal — restringir ao DERHQA esconderia
+  da diretoria uma visão institucional.
+- **Fail-open no mapa**: se o Leaflet não carregar, o card do mapa some
+  e os números continuam — painel em branco por causa da camada visual
+  é pior que painel sem mapa.
+- Guarda: `tests/rh-bacias.test.js` (9 testes). O Leaflet é servido de
+  `tests/fixtures/vendor/` por `page.route` — `unpkg.com` oscila na
+  política de rede deste tipo de ambiente e sem isso metade dos testes
+  de mapa vira flake; a PÁGINA continua usando o CDN em produção.
+- `pwa/sw.js`: frota 98 → 99 (`js/layout.js`) e agua 19 → 20
+  (`js/agua-relatorio-dados.js`) — os dois arquivos tocados que estão
+  em shell de app.
+
+**O que fica faltando nesta fase**: o polígono. Quando ele chegar,
+entra a tabela `bacias_hidrograficas` (B.2 abaixo), a bacia do ponto
+passa a ser derivada por ponto-em-polígono e esta tela ganha os
+contornos no mapa — sem refazer card, agregação nem teste.
+
+## Fase B — desenho original (referência)
 
 Objetivo: dashboard + relatórios mostrando, no mapa do Acre, as bacias
 hidrográficas do estado e o que a SEMA monitora dentro de cada uma.
@@ -151,6 +216,22 @@ municípios e hidrografia WMS) e `js/agua-iqa-visual.js` (cores por
 faixa, validadas contra daltonismo).
 
 ---
+
+### B.4 Material recebido — Atlas de Vulnerabilidade a Inundações (ANA)
+
+O usuário enviou o pôster A0 `Atlas_vulnerabilidade_norte_A0_03_02_2014`
+(ANA, 2013; base cartográfica ao milionésimo do IBGE, DATUM SAD69,
+1:2.850.000). Conteúdo: hidrografia + **trechos de curso d'água
+inundáveis** classificados em alta/média/baixa vulnerabilidade. Para o
+Acre: 786 trechos em 50 cursos d'água nos 22 municípios (184 alta, 164
+média, 438 baixa); só Rio Branco tem 50 trechos, 43 de alta.
+
+**Não contém polígono de bacia** — não desbloqueia a Fase B. É um tema
+próprio (vulnerabilidade a inundação), candidato natural a camada/painel
+do DERHQA depois das Fases B e C. Extrair geometria do pôster não é
+caminho: é um PDF de apresentação a 1:2,85 milhões, sem
+georreferenciamento declarado; o dado vetorial correspondente vive no
+acervo da ANA (mesmo bloqueio de rede das outras fontes).
 
 ## Fase C — Plataformas de coleta de dados (planejada)
 

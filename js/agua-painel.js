@@ -362,7 +362,7 @@ function _aguaPainelRosaDosVentos() {
 // `cfg` (opcional) é a configuração ao vivo de _aguaPainelCamadasCarregar
 // — os chips de "Camadas de referência" refletem a cor escolhida pelo
 // usuário no painel de configuração, nunca ficam presos ao padrão.
-function _aguaPainelLegendaHTML(cfg) {
+function _aguaPainelLegendaHTML(cfg, sempre) {
   const c = cfg || AGUA_PAINEL_CAMADAS_PADRAO
   const chipsIqa = AGUA_IQA_FAIXA_ORDEM.map(f => `<span class="adash-mapa-legenda-chip"><span class="adash-mapa-legenda-dot" style="background:${AGUA_IQA_FAIXA_COR[f]}"></span>${esc(f)}</span>`).join('')
   return `<div class="adash-mapa-legenda-tit">IQA (preenchimento)</div>
@@ -375,7 +375,7 @@ function _aguaPainelLegendaHTML(cfg) {
     <div class="adash-mapa-legenda-linha" style="margin-top:4px">
       <span class="adash-mapa-legenda-chip">Preenchimento fraco = em conferência</span>
     </div>
-    <div class="adash-mapa-legenda-tit" style="margin-top:6px">Camadas de referência (só satélite)</div>
+    <div class="adash-mapa-legenda-tit" style="margin-top:6px">Camadas de referência${sempre ? '' : ' (só satélite)'}</div>
     <div class="adash-mapa-legenda-linha">
       <span class="adash-mapa-legenda-chip"><span class="adash-mapa-legenda-linha-cor" style="background:${c.acreCor}"></span>Limite do Acre</span>
       <span class="adash-mapa-legenda-chip"><span class="adash-mapa-legenda-linha-cor" style="background:${c.munCor};opacity:.6"></span>Municípios</span>
@@ -383,10 +383,10 @@ function _aguaPainelLegendaHTML(cfg) {
     </div>`
 }
 
-function _aguaPainelControleLegenda(cfg) {
+function _aguaPainelControleLegenda(cfg, sempre) {
   const Ctrl = L.Control.extend({ options: { position: 'bottomright' }, onAdd() {
     const div = L.DomUtil.create('div', 'adash-mapa-legenda')
-    div.innerHTML = _aguaPainelLegendaHTML(cfg)
+    div.innerHTML = _aguaPainelLegendaHTML(cfg, sempre)
     L.DomEvent.disableClickPropagation(div); return div
   } })
   return new Ctrl()
@@ -485,7 +485,15 @@ function _aguaPainelPinIcon(estilo) {
   })
 }
 
-function aguaPainelMapaCriar(mapaElId, subElId) {
+// `opts.referenciaSempre` (opcional): mantém limite do Acre,
+// municípios e hidrografia visíveis TAMBÉM no mapa de ruas. Padrão
+// (false) = só no satélite, como o painel de Relatórios/público pediu
+// (o OSM já traz divisas e nomes). pages/rh-bacias.html liga a opção:
+// ali o assunto É a rede hidrográfica, então esconder os rios no modo
+// ruas esvaziaria a tela. Opção ADITIVA de propósito — as duas telas
+// que já usavam a função não mudam de comportamento.
+function aguaPainelMapaCriar(mapaElId, subElId, opts) {
+  const _opts = opts || {}
   const mapa = L.map(mapaElId, { attributionControl: false }).setView([-9.5, -70.0], 6)
   let camadaBase = L.tileLayer(AGUA_PAINEL_TILE_RUAS.url, AGUA_PAINEL_TILE_RUAS.opts).addTo(mapa)
 
@@ -502,7 +510,7 @@ function aguaPainelMapaCriar(mapaElId, subElId) {
     _atualizarCamadasReferencia()
   }
   function _atualizarCamadasReferencia() {
-    const visivel = _modoAtual === 'satelite'
+    const visivel = _opts.referenciaSempre || _modoAtual === 'satelite'
     _camadasReferencia.forEach(l => {
       if (visivel && !mapa.hasLayer(l)) l.addTo(mapa)
       else if (!visivel && mapa.hasLayer(l)) mapa.removeLayer(l)
@@ -523,7 +531,7 @@ function aguaPainelMapaCriar(mapaElId, subElId) {
   let _cfgCamadas = _aguaPainelCamadasCarregar()
   let _acreLayer = null
   let _munLayer = null
-  const _legendaCtl = _aguaPainelControleLegenda(_cfgCamadas).addTo(mapa)
+  const _legendaCtl = _aguaPainelControleLegenda(_cfgCamadas, _opts.referenciaSempre).addTo(mapa)
   const _legendaDiv = _legendaCtl.getContainer()
 
   _aguaPainelRosaDosVentos().addTo(mapa)
@@ -542,7 +550,7 @@ function aguaPainelMapaCriar(mapaElId, subElId) {
         if (novoCfg.munNomes) layer.openTooltip()
       })
     }
-    if (_legendaDiv) _legendaDiv.innerHTML = _aguaPainelLegendaHTML(novoCfg)
+    if (_legendaDiv) _legendaDiv.innerHTML = _aguaPainelLegendaHTML(novoCfg, _opts.referenciaSempre)
   }).addTo(mapa)
 
   ;(async function desenharLimiteAcre() {
