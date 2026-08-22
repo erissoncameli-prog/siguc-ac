@@ -164,13 +164,13 @@ async function carregarLabsAtivos() {
 }
 
 async function carregarFila() {
-  const { data, error } = await db.from('vw_agua_coletas_detalhe')
-    .select('*')
-    .eq('status', 'aguardando_lab')
-    .order('data_coleta')
+  const [{ data, error }, { data: statusRows }] = await Promise.all([
+    db.from('vw_agua_coletas_detalhe').select('*').eq('status', 'aguardando_lab').order('data_coleta'),
+    db.from('agua_coletas').select('status'),
+  ])
   if (error) { toast(error.message || 'Erro ao carregar fila', 'error'); return }
   _fila = data || []
-  document.getElementById('lz-kpis').innerHTML = aguaKpisFilaHTML(_fila, c => `${c.ponto_nome} (${c.codigo_ana})`)
+  document.getElementById('lz-kpis').innerHTML = aguaKpisFilaHTML(_fila, c => `${c.ponto_nome} (${c.codigo_ana})`, aguaContarPorStatus(statusRows))
   renderFila()
 }
 
