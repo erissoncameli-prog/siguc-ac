@@ -4172,7 +4172,7 @@ function _tlRemoverSat() {
 
 function _tlSetPlanet(mos) {
   _tlRemoverSat()
-  _tlPlanetLayer = L.tileLayer(`/api/planet-tiles?z={z}&x={x}&y={y}&m=${encodeURIComponent(mos.name)}`,
+  _tlPlanetLayer = L.tileLayer(`/api/planet?op=tiles&z={z}&x={x}&y={y}&m=${encodeURIComponent(mos.name)}`,
     { attribution: 'Planet / NICFI', opacity: 1, maxZoom: 21, maxNativeZoom: 18,
       errorTileUrl: 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==' })
   _tlPlanetLayer.addTo(mapaL); _tlPlanetLayer.setZIndex(140)
