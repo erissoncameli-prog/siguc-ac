@@ -25,7 +25,7 @@ function initScript({ statusRows, filaRows, quarentenaRows, usuario }) {
           // atende TANTO a lista filtrada (quarentena) QUANTO a leitura
           // crua de status — a mesma tabela, dois selects diferentes,
           // igual à página real.
-          return { select: (cols) => consulta(statusRows.slice().map((s, i) => Object.assign({}, quarentenaRows[i] || {}, s))) };
+          return { select: () => consulta(statusRows.slice()) };
         }
         if (tabela === 'agua_laboratorios') return { select: () => consulta([]) };
         return { select: () => ({ eq: () => ({ single: async () => ({ data: null }) }) }) };
