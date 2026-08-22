@@ -133,6 +133,12 @@
 .adash-mapa-config-check { display:flex; align-items:center; gap:6px; font-size:11.5px; color:var(--cinza-700); margin-top:2px }
 .adash-mapa-config-check input { accent-color:var(--adash-azul) }
 
+/* Linha de KPIs simples (fila de laudo / quarentena, js/agua-laudo-kpis.js)
+   — mesmo card .adash-card do painel, N cards iguais lado a lado, sem a
+   proporção fixa do .adash-grid (que é para os 3 cards de composição
+   diferente do resumo). */
+.adash-kpi-row { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:16px; margin-bottom:16px }
+
 /* Grade de cards — proporções do modelo: coluna de KPIs estreita,
    dois cards grandes ao lado, faixa inferior 2:1. */
 .adash-grid { display:grid; grid-template-columns:.86fr 1.05fr 1.2fr; gap:16px; align-items:stretch }

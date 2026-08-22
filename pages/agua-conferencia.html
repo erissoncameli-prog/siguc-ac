@@ -4,6 +4,7 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>SIGUC-AC · Qualidade da Água — Conferência de Quarentena</title>
 <link rel="stylesheet" href="../css/global.css">
+<link rel="stylesheet" href="../css/agua-painel.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="../js/observability.js"></script>
 <script src="../js/queryLogger.js"></script>
@@ -11,6 +12,9 @@
 <script src="../js/layout.js"></script>
 <script src="../js/reautenticar.js"></script>
 <script src="../js/agua-alertas.js"></script>
+<script src="../js/agua-iqa-visual.js"></script>
+<script src="../js/agua-laudo-kpis.js"></script>
+<script src="../js/fotos-privadas.js"></script>
 </head>
 <body>
 <div id="app"></div>
@@ -32,6 +36,15 @@
           <input class="form-control" id="ag-data" type="date"></div>
         <div class="form-group"><label class="form-label">Hora</label>
           <input class="form-control" id="ag-hora" type="time"></div>
+      </div>
+
+      <div class="form-section-label" style="margin-top:8px">Laboratório responsável e laudo</div>
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Laboratório</label>
+          <select class="form-control" id="ag-laboratorio"><option value="">Selecione...</option></select></div>
+        <div class="form-group"><label class="form-label">&nbsp;</label>
+          <a id="ag-arquivo-atual" class="btn btn-sm btn-secondary" style="display:none" target="_blank" rel="noopener">Ver laudo anexado</a>
+          <span id="ag-sem-laudo" style="font-size:12px;color:#9CA3AF">Nenhum laudo anexado nesta coleta.</span></div>
       </div>
 
       <div class="form-section-label" style="margin-top:8px">Campo</div>
@@ -79,7 +92,7 @@ const LAB_FIELDS = [
   ['condutividade_especifica', 'Condutividade específica'], ['descarga_liquida', 'Descarga líquida'],
 ]
 
-let _coletas = [], _editandoId = null
+let _coletas = [], _labs = [], _editandoId = null
 
 ;(async function () {
   const usuario = await carregarUsuario()
@@ -93,12 +106,13 @@ let _coletas = [], _editandoId = null
 
   document.getElementById('app').innerHTML =
     gerarLayout('Qualidade da Água — Conferência', 'agua-conferencia') +
-    `<div class="fade-in">
+    `<div class="fade-in adash">
       <p style="color:#6B7280;font-size:13px;margin:0 0 16px">
         Coletas da série histórica que caíram em quarentena na importação (migration 253) — valor fisicamente
         impossível ou sólidos em suspensão com unidade sob suspeita. Conferir com o laudo físico da linha indicada
         e decidir: corrigir e promover, ou manter quarentenada com justificativa.
       </p>
+      <div id="ag-kpis"></div>
       <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
         <input class="form-control" id="ag-filtro" placeholder="Filtrar por ponto, código ANA ou nº da linha..." style="max-width:340px" oninput="renderLista()">
         <span id="ag-contador" style="font-size:12px;color:#6B7280"></span>
@@ -113,17 +127,42 @@ let _coletas = [], _editandoId = null
     '</div></div></div>'
 
   carregarLogosSidebar()
-  await carregarLista()
+  await Promise.all([carregarLabsAtivos(), carregarLista()])
 })()
 
+async function carregarLabsAtivos() {
+  const { data } = await db.from('agua_laboratorios').select('id,nome').eq('ativo', true).order('nome')
+  _labs = data || []
+  const sel = document.getElementById('ag-laboratorio')
+  if (sel) sel.innerHTML = '<option value="">Selecione...</option>' + _labs.map(l => `<option value="${l.id}">${esc(l.nome)}</option>`).join('')
+}
+
 async function carregarLista() {
-  const { data, error } = await db.from('agua_coletas')
-    .select('*, agua_pontos_coleta(nome,codigo_ana), agua_campanhas(ano,ordem)')
-    .eq('status', 'quarentena')
-    .order('linha_origem_planilha')
+  const [{ data, error }, { data: statusRows }] = await Promise.all([
+    db.from('agua_coletas')
+      .select('*, agua_pontos_coleta(nome,codigo_ana), agua_campanhas(ano,ordem)')
+      .eq('status', 'quarentena')
+      .order('linha_origem_planilha'),
+    db.from('agua_coletas').select('status'),
+  ])
   if (error) { toast(error.message || 'Erro ao carregar', 'error'); return }
   _coletas = data || []
+  const counts = aguaContarPorStatus(statusRows)
+  const totalColetas = (statusRows || []).length
+  document.getElementById('ag-kpis').innerHTML = aguaKpisQuarentenaHTML(_coletas, totalColetas,
+    c => `linha ${c.linha_origem_planilha ?? '—'} · ${c.agua_pontos_coleta?.nome || ''}`, counts, 'ag-kpis')
   renderLista()
+}
+
+// `quarentena_motivo` pode reunir mais de um achado numa linha só — a
+// importação da série histórica (migration 253) concatena os critérios
+// com ' | ' (array_to_string(ARRAY[...], ' | ')) quando mais de um bate
+// na mesma coleta (ex.: pH impossível E ano da campanha divergente).
+// Contar os segmentos dá ao conferente uma ideia do tamanho do
+// problema antes de abrir o modal — 1 achado é digitação pontual, 3+
+// pode ser um laudo inteiro para revisar.
+function aguaContarInconsistencias(motivo) {
+  return motivo ? motivo.split(' | ').filter(s => s.trim()).length : 0
 }
 
 function renderLista() {
@@ -137,16 +176,22 @@ function renderLista() {
   })
   document.getElementById('ag-contador').textContent = `${lista.length} de ${_coletas.length} em quarentena`
   if (!lista.length) { tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:24px;color:#9CA3AF">Nenhuma coleta em quarentena</td></tr>'; return }
-  tbody.innerHTML = lista.map(c => `
+  tbody.innerHTML = lista.map(c => {
+    const nInc = aguaContarInconsistencias(c.quarentena_motivo)
+    return `
     <tr>
       <td class="mono">${esc(c.linha_origem_planilha ?? '—')}</td>
       <td class="mono" style="font-size:11px">${esc(c.codigo_amostra || '—')}</td>
       <td>${esc(c.agua_pontos_coleta?.nome || '—')} <span style="color:#9CA3AF;font-size:11px">(${esc(c.agua_pontos_coleta?.codigo_ana || '')})</span></td>
       <td style="font-size:12px">${esc(c.agua_campanhas?.ano ?? '')}/${c.agua_campanhas?.ordem === 'segunda' ? '2ª' : '1ª'}</td>
       <td style="font-size:12px">${formatData(c.data_coleta)}</td>
-      <td style="font-size:12px;max-width:360px;white-space:normal">${esc((c.quarentena_motivo || '').slice(0, 140))}${(c.quarentena_motivo || '').length > 140 ? '…' : ''}</td>
+      <td style="font-size:12px;max-width:360px;white-space:normal">
+        <span class="badge ${nInc > 1 ? 'badge-erro' : 'badge-cinza'}" title="${nInc} inconsistência${nInc === 1 ? '' : 's'} apontada${nInc === 1 ? '' : 's'} nesta linha" style="margin-right:6px;vertical-align:top">${nInc}</span>
+        ${esc((c.quarentena_motivo || '').slice(0, 140))}${(c.quarentena_motivo || '').length > 140 ? '…' : ''}
+      </td>
       <td><button class="btn btn-xs btn-ghost" onclick="abrirAg('${c.id}')">Conferir</button></td>
-    </tr>`).join('')
+    </tr>`
+  }).join('')
 }
 
 function formatData(str) {
@@ -165,6 +210,21 @@ function abrirAg(id) {
   document.getElementById('ag-data').value = c.data_coleta || ''
   document.getElementById('ag-hora').value = c.hora_coleta ? c.hora_coleta.slice(0, 5) : ''
   document.getElementById('ag-observacoes').value = c.observacoes || ''
+  document.getElementById('ag-laboratorio').value = c.laboratorio_id || ''
+
+  const linkLaudo = document.getElementById('ag-arquivo-atual')
+  const semLaudo = document.getElementById('ag-sem-laudo')
+  const ref = c.laudo_url ? fotoRef(c.laudo_url) : null
+  if (ref) {
+    linkLaudo.style.display = 'inline-flex'
+    semLaudo.style.display = 'none'
+    linkLaudo.setAttribute('data-foto-privada', `${ref.bucket}|${ref.path}`)
+    assinarFotos(document.getElementById('modal-ag'))
+  } else {
+    linkLaudo.style.display = 'none'
+    linkLaudo.removeAttribute('data-foto-privada')
+    semLaudo.style.display = 'inline'
+  }
 
   const campoHTML = ([campo, rotulo]) => `
     <div class="form-group"><label class="form-label">${esc(rotulo)}</label>
@@ -230,6 +290,7 @@ async function salvarAg(promover) {
   const dataColeta = document.getElementById('ag-data').value
   if (dataColeta) payload.data_coleta = dataColeta
   payload.hora_coleta = document.getElementById('ag-hora').value || null
+  payload.laboratorio_id = document.getElementById('ag-laboratorio').value || null
   for (const [campo] of [...CAMPO_FIELDS, ...LAB_FIELDS]) payload[campo] = valorCampo(campo)
 
   if (promover) {
