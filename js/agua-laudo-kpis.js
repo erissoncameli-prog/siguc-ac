@@ -87,7 +87,7 @@ function aguaKpisFilaHTML(lista, labelFn, statusCounts) {
     ${aguaKpisSituacaoRoscaHTML(statusCounts)}
     <div class="adash-card">
       <div class="adash-card-topo"><p class="adash-card-tit">Aguardando laudo</p></div>
-      <div class="adash-num-linha"><span class="adash-num">${s.total}</span></div>
+      <div class="adash-num-linha"><span class="adash-num" style="${AGUA_KPI_FONTE_NUM}">${s.total}</span></div>
       <p class="adash-card-pe">coleta(s) com campo preenchido, sem resultado de laboratório</p>
     </div>
     <div class="adash-card">
@@ -118,7 +118,7 @@ function aguaKpisQuarentenaHTML(lista, totalColetas, labelFn, statusCounts) {
     ${aguaKpisSituacaoRoscaHTML(statusCounts)}
     <div class="adash-card">
       <div class="adash-card-topo"><p class="adash-card-tit">Em quarentena</p></div>
-      <div class="adash-num-linha"><span class="adash-num">${s.total}</span></div>
+      <div class="adash-num-linha"><span class="adash-num" style="${AGUA_KPI_FONTE_NUM}">${s.total}</span></div>
       <p class="adash-card-pe">pendente de conferência humana com o laudo físico</p>
     </div>
     <div class="adash-card">
