@@ -18,6 +18,15 @@
 // _aguaRoscaHTML de js/agua-iqa-visual.js (nunca uma segunda cópia do
 // desenho) — por isso as duas páginas precisam carregar aquele arquivo
 // também, mesmo sem usar IQA nenhum aqui.
+//
+// FONTE DOS NÚMEROS: nunca Fraunces aqui — pedido explícito do
+// usuário (achou o serifado "cara de IA"), registrado em CLAUDE.md
+// ("Regra do sistema — fonte dos números de KPI"). Todo `.adash-num`
+// deste arquivo carrega `AGUA_KPI_FONTE_NUM` inline; a rosca recebe
+// `fonteCentro` no mesmo valor. O resto do módulo (IQA médio, cards de
+// js/agua-painel.js) segue Fraunces normalmente — a regra é só para
+// números de KPI, não uma revisão do design system inteiro.
+const AGUA_KPI_FONTE_NUM = "font-family:var(--font-sans)"
 
 function aguaDiasDesdeColeta(dataColeta) {
   const ms = Date.now() - new Date(dataColeta + 'T00:00:00').getTime()
