@@ -173,10 +173,7 @@ async function carregarFila() {
   renderFila()
 }
 
-function diasEsperando(dataColeta) {
-  const ms = Date.now() - new Date(dataColeta + 'T00:00:00').getTime()
-  return Math.max(0, Math.floor(ms / 86400000))
-}
+const diasEsperando = aguaDiasDesdeColeta
 
 function renderFila() {
   const termo = (document.getElementById('lz-filtro')?.value || '').trim().toLowerCase()
