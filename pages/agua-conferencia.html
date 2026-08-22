@@ -150,7 +150,7 @@ async function carregarLista() {
   const counts = aguaContarPorStatus(statusRows)
   const totalColetas = (statusRows || []).length
   document.getElementById('ag-kpis').innerHTML = aguaKpisQuarentenaHTML(_coletas, totalColetas,
-    c => `linha ${c.linha_origem_planilha ?? '—'} · ${c.agua_pontos_coleta?.nome || ''}`, counts)
+    c => `linha ${c.linha_origem_planilha ?? '—'} · ${c.agua_pontos_coleta?.nome || ''}`, counts, 'ag-kpis')
   renderLista()
 }
 
