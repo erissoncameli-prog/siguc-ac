@@ -476,10 +476,24 @@ async function salvarLaudo() {
   const texto = aguaAlertasTextoConfirmacao(alertas)
   if (texto && !confirm(texto)) return
 
+  // Achado real: duas coletas lançadas via app foram marcadas
+  // "completo" com o PDF anexado mas ZERO campos de LABORATÓRIO
+  // preenchidos — o laudo "sumia" sem cair em revisão nenhuma
+  // (agua-conferencia.html só lista status='quarentena'). Sem pelo
+  // menos um resultado de laboratório, isto não é um laudo lançado —
+  // é um anexo sem dado. Em vez de bloquear e obrigar o técnico a
+  // voltar depois, roteia para a MESMA fila de conferência que já
+  // existe (a garantia dura equivalente mora no banco:
+  // ck_agua_completo_exige_dado_lab, migration 310 — nunca confie só
+  // no client-side).
+  const temDadoLab = LAB_FIELDS.some(([campo]) => lzValor(campo) != null)
+  const status = temDadoLab ? 'completo' : 'quarentena'
+
   const payload = {
     laboratorio_id: laboratorioId,
     observacoes: document.getElementById('lz-observacoes').value.trim() || null,
-    status: 'completo',
+    status,
+    quarentena_motivo: temDadoLab ? null : 'Laudo anexado sem nenhum resultado de laboratório preenchido — aguardando conferência.',
     data_recebimento_laboratorio: document.getElementById('lz-recebimento').value || null,
   }
   const origemFinal = {}
@@ -515,11 +529,20 @@ async function salvarLaudo() {
       p_id: _editandoId, p_campos: payload, p_justificativa: r.justificativa,
     })
     if (error) throw error
-    toast('Laudo lançado — coleta marcada como completa!', 'success')
+    toast(temDadoLab
+      ? 'Laudo lançado — coleta marcada como completa!'
+      : 'Nenhum resultado de laboratório foi preenchido — enviado para conferência (Configurações → Qualidade da Água → Conferência).', temDadoLab ? 'success' : 'info')
     fecharModalLaudo()
     await carregarFila()
   } catch (e) {
-    toast(e.message?.includes('REAUTH_NECESSARIA') ? 'Sessão de confirmação expirou — tente novamente.' : (e.message || 'Erro ao salvar laudo'), 'error')
+    // Rede de segurança: mesmo que o client-side deixe passar, o
+    // banco também barra completo sem nenhum dado de laboratório
+    // (ck_agua_completo_exige_dado_lab, migration 310) — nunca confie
+    // só na checagem daqui.
+    const msg = e.message?.includes('REAUTH_NECESSARIA') ? 'Sessão de confirmação expirou — tente novamente.'
+      : e.message?.includes('ck_agua_completo_exige_dado_lab') ? 'Preencha ao menos um resultado de laboratório antes de marcar como completo.'
+      : (e.message || 'Erro ao salvar laudo')
+    toast(msg, 'error')
   }
   finally { btn.disabled = false }
 }
