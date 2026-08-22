@@ -1456,3 +1456,15 @@ mudou).
   do manifest do Frota, não mais o `icon-192.png`/`icon-512.png`
   genérico); `pages/agua-app.html` ganhou o
   `<link rel="apple-touch-icon">` que faltava. `sw.js`: agua v5 → v6.
+
+---
+
+## Próxima missão — leitura do laudo em PDF + alertas comparativos
+
+Fora do plano original de 5 fases (que está fechado). Plano arquitetural em
+`docs/qualidade-agua/plano-leitura-laudo-e-alertas.md`; prompt de abertura
+da sessão em `docs/qualidade-agua/prompt-leitura-laudo.md`. Nada foi
+implementado ainda — as duas entregas são: (1) malha de alertas
+comparativos no lançamento (mesa e app), (2) leitura assistida do PDF do
+laboratório com conferência lado a lado. A ordem importa: o parser sem a
+malha de alertas é amplificador de erro.
