@@ -697,6 +697,30 @@ js/frota-consumo.js.
   migration só DEPOIS do deploy do código que assina (ver cabeçalho
   das migrations 200 e 210).
 
+## Regra do sistema — exportar .xlsx: ExcelJS, nunca o pacote "xlsx"/SheetJS
+Sempre que uma tela precisar gerar um Excel de verdade (não CSV) com
+formatação (cabeçalho colorido, linha destacada, congelar painel),
+vendorizar **ExcelJS** (`js/vendor/exceljs-4.4.0.bare.min.js` —
+`dist/exceljs.bare.js` oficial do pacote, feito pra browser, sem
+polyfill), carregado sob demanda como jsPDF/pptxgenjs. Duas armadilhas
+medidas nesta entrega (`js/agua-relatorio-xlsx.js`), não achadas por
+suposição:
+1. O pacote **`xlsx` (SheetJS) do npm está travado numa versão com CVE
+   de prototype pollution + ReDoS sem correção** — a SheetJS parou de
+   publicar release corrigida no npm e moveu para `cdn.sheetjs.com`
+   por fora. `npm install xlsx` sempre vem vulnerável.
+2. **Mesmo pegando a build corrigida direto do CDN oficial deles, a
+   build Community NÃO escreve estilo de célula de verdade.** `cell.s
+   = {fill:...}` é aceito sem erro, mas o fill nunca aparece no
+   `styles.xml` do arquivo gerado — confirmado abrindo o .xlsx e
+   inspecionando o zip, não por documentação. Cor de célula, negrito,
+   painel congelado só funcionam de verdade com o SheetJS Pro
+   (pago) ou com outra biblioteca. ExcelJS é MIT puro e escreve tudo
+   isso corretamente (confirmado do mesmo jeito: zip aberto,
+   `styles.xml` com o fill real, `s="N"` na célula).
+Nunca tentar `xlsx`/SheetJS de novo pra formatação — é retrabalho
+já feito.
+
 ## Regra do sistema — timbre institucional (logo Acre × logo SEMA) nos relatórios
 TODO relatório (PDF ou impressão/HTML) tem a logo do Governo do Acre
 na margem ESQUERDA e a da SEMA na margem DIREITA — nunca as duas do
