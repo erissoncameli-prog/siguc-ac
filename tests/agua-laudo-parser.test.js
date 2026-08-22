@@ -123,6 +123,25 @@ test.describe('interpretação de valor — casas decimais do template, nunca do
   })
 })
 
+test.describe('data de recebimento — prazo de preservação, NUNCA a trava de identidade', () => {
+  test('extrai data plausível (dia/mês corretos, ano dentro do intervalo aceito)', async ({ page }) => {
+    await comOcr(page)
+    const r = await page.evaluate(() => aguaLaudoExtrairDataPlausivel('no laboratório: 15/09/2025 |'))
+    expect(r).toBe('2025-09-15')
+  })
+
+  test('ano implausível (achado real: "2095"/"0005" por dígito trocado) devolve null — nunca propõe data errada', async ({ page }) => {
+    await comOcr(page)
+    const r = await page.evaluate(() => ({
+      anoFuturo: aguaLaudoExtrairDataPlausivel('24/09/2095'),
+      anoZerado: aguaLaudoExtrairDataPlausivel('24/09/0005'),
+      semData: aguaLaudoExtrairDataPlausivel('texto qualquer sem data'),
+      vazio: aguaLaudoExtrairDataPlausivel(''),
+    }))
+    for (const v of Object.values(r)) expect(v).toBeNull()
+  })
+})
+
 test.describe('trava de identidade (§3.3 do plano) — nunca autofill com amostra errada', () => {
   test('procedência e data batendo com a coleta aberta libera o autofill', async ({ page }) => {
     await comOcr(page)

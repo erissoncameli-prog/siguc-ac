@@ -48,6 +48,16 @@
       <div class="form-section-label" style="margin-top:8px">Laboratório</div>
       <div class="grid-3" id="lz-lab"></div>
 
+      <div class="grid-2">
+        <div class="form-group"><label class="form-label">Recebimento no laboratório</label>
+          <input class="form-control" id="lz-recebimento" type="date" oninput="lzAgendarAvaliacaoPrazo()">
+          <div class="form-hint">Data impressa no laudo — usada só para avisar se o prazo de preservação da amostra foi ultrapassado. Nunca impede salvar.</div>
+        </div>
+        <div class="form-group"><label class="form-label">&nbsp;</label>
+          <div id="lz-prazo-alerta"></div>
+        </div>
+      </div>
+
       <div class="form-group"><label class="form-label">Observações</label>
         <textarea class="form-control" id="lz-observacoes" rows="2"></textarea></div>
     </div>
@@ -194,6 +204,8 @@ function abrirLaudo(id) {
     `${c.codigo_amostra ? c.codigo_amostra + ' · ' : ''}${c.ponto_nome} (${c.codigo_ana}) · campanha ${c.campanha_ano}/${c.campanha_ordem === 'segunda' ? '2ª' : '1ª'} · coletado em ${formatData(c.data_coleta)}`
   document.getElementById('lz-laboratorio').value = c.laboratorio_id || ''
   document.getElementById('lz-observacoes').value = c.observacoes || ''
+  document.getElementById('lz-recebimento').value = c.data_recebimento_laboratorio || ''
+  document.getElementById('lz-prazo-alerta').innerHTML = ''
   document.getElementById('lz-arquivo').value = ''
 
   const linkAtual = document.getElementById('lz-arquivo-atual')
@@ -221,9 +233,11 @@ function abrirLaudo(id) {
   _alertas = []
   lzPintarAlertas()
   lzAvaliar()   // o campo já vem preenchido da coleta — avalia de saída
+  lzAvaliarPrazo()
 
   _origemDados = {}
   _resultadoParser = null
+  document.getElementById('lz-prazo-alerta').innerHTML = ''
   document.getElementById('lz-parser-area').style.display = 'none'
   document.getElementById('lz-identidade-alerta').innerHTML = ''
   document.getElementById('lz-conferencia-parser').innerHTML = ''
@@ -281,6 +295,11 @@ async function lzLerLaudoAutomatico() {
     })
     status.textContent = ''
     lzMontarConferenciaParser()
+    const campoRecebimento = document.getElementById('lz-recebimento')
+    if (_resultadoParser.dataRecebimento && !campoRecebimento.value) {
+      campoRecebimento.value = _resultadoParser.dataRecebimento
+    }
+    lzAvaliarPrazo()
   } catch (e) {
     status.textContent = 'Não foi possível ler o laudo automaticamente — lance manualmente.'
     console.warn('[lz-parser]', e)
@@ -354,6 +373,42 @@ function lzAceitarTodosAltaConfianca() {
   toast('Valores de alta confiança preenchidos — confira campo a campo antes de salvar', 'info')
 }
 
+// ── Prazo de preservação (Entrega 3) ────────────────────────────
+// A regra e o número (agua_prazos_analise) vivem no banco —
+// agua_prazo_preservacao_alertas(). Esta função só chama e desenha,
+// mesma lição de aguaAlertasAvaliar (js/agua-alertas.js). Informativo
+// sempre: NUNCA bloqueia salvar, nem quando estourado.
+let _timerPrazo = null
+
+function lzAgendarAvaliacaoPrazo() {
+  clearTimeout(_timerPrazo)
+  _timerPrazo = setTimeout(() => { lzAvaliarPrazo() }, 500)
+}
+
+async function lzAvaliarPrazo() {
+  const c = _fila.find(x => x.id === _editandoId)
+  const recebimento = document.getElementById('lz-recebimento').value || null
+  const alertaEl = document.getElementById('lz-prazo-alerta')
+  if (!c || !recebimento) { alertaEl.innerHTML = ''; return [] }
+
+  const presentes = TODOS_OS_CAMPOS.filter(campo => lzValor(campo) != null)
+  if (!presentes.length) { alertaEl.innerHTML = ''; return [] }
+
+  const { data: alertas, error } = await db.rpc('agua_prazo_preservacao_alertas', {
+    p_data_coleta: c.data_coleta, p_data_recebimento: recebimento, p_parametros: presentes,
+  })
+  if (error) { alertaEl.innerHTML = ''; return [] }
+
+  if (!alertas?.length) {
+    alertaEl.innerHTML = '<span style="font-size:11px;color:#059669">Dentro do prazo de preservação para os parâmetros preenchidos.</span>'
+    return alertas || []
+  }
+  alertaEl.innerHTML = `<div style="font-size:11px;color:#B45309">
+    ${alertas.length} parâmetro${alertas.length > 1 ? 's' : ''} recebido${alertas.length > 1 ? 's' : ''} após o prazo de preservação — só um registro, não impede salvar.
+  </div>`
+  return alertas
+}
+
 function lzValor(campo) {
   const v = document.getElementById(`lz-f-${campo}`)?.value
   return v === '' || v == null ? null : parseFloat(v)
@@ -375,6 +430,7 @@ function lzAgendarAvaliacao() {
   }
   clearTimeout(_timerAval)
   _timerAval = setTimeout(() => { lzAvaliar() }, 500)
+  lzAgendarAvaliacaoPrazo()
 }
 
 function lzValoresAtuais() {
@@ -424,6 +480,7 @@ async function salvarLaudo() {
     laboratorio_id: laboratorioId,
     observacoes: document.getElementById('lz-observacoes').value.trim() || null,
     status: 'completo',
+    data_recebimento_laboratorio: document.getElementById('lz-recebimento').value || null,
   }
   const origemFinal = {}
   for (const campo of TODOS_OS_CAMPOS) {

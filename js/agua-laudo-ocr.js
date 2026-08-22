@@ -198,6 +198,26 @@ function aguaLaudoConferirIdentidade(lido, coletaAberta, ponto) {
   return { ok: problemas.length === 0, problemas }
 }
 
+// ── Data de recebimento no laboratório (prazo de preservação) ──
+// NUNCA entra na trava de identidade — ver cabeçalho da migration
+// 309: o dia/mês saem corretos, mas o ANO ocasionalmente erra um
+// dígito (mesmo modo de falha do resto do pipeline). Bloquear
+// autofill por causa desse campo geraria falso bloqueio com
+// frequência demais. Em vez disso, só propõe a data quando o ano
+// extraído é PLAUSÍVEL — fora disso, devolve null e o texto lido
+// fica só como referência (o técnico digita).
+function aguaLaudoExtrairDataPlausivel(texto) {
+  const m = (texto || '').match(/(\d{2})\/(\d{2})\/(\d{4})/)
+  if (!m) return null
+  const [, dia, mes, ano] = m
+  const anoNum = Number(ano)
+  const anoAtual = new Date().getFullYear()
+  if (anoNum < 2015 || anoNum > anoAtual + 1) return null   // ano implausível — não propõe
+  const d = Number(dia), mo = Number(mes)
+  if (d < 1 || d > 31 || mo < 1 || mo > 12) return null
+  return `${ano}-${mes}-${dia}`
+}
+
 // ── Orquestra o pipeline inteiro ──────────────────────────────
 // `template` vem de agua_laudo_templates.campos/campos_identidade
 // (RPC/select já feito pela página). `coletaAberta`/`ponto` são o que
@@ -219,6 +239,10 @@ async function aguaLaudoProcessarPdf(arquivo, { template, coletaAberta, ponto, o
   }
 
   const identidade = aguaLaudoConferirIdentidade(lidoIdentidade, coletaAberta || {}, ponto || {})
+  // Fora da trava de identidade de propósito (ver
+  // aguaLaudoExtrairDataPlausivel) — só populado quando o texto lido
+  // tem um ano plausível.
+  const dataRecebimento = lidoIdentidade.recebimento ? aguaLaudoExtrairDataPlausivel(lidoIdentidade.recebimento) : null
 
   const campos = {}
   const total = Object.keys(template.campos || {}).length
@@ -241,6 +265,7 @@ async function aguaLaudoProcessarPdf(arquivo, { template, coletaAberta, ponto, o
     identidade: { ...identidade, lido: lidoIdentidade, recortes: recortesIdentidade },
     campos,
     numeroLaudo: lidoIdentidade.numero_laudo || null,
+    dataRecebimento,
   }
 }
 
