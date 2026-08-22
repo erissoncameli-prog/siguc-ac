@@ -11,6 +11,7 @@
 <script src="../js/layout.js"></script>
 <script src="../js/fotos-privadas.js"></script>
 <script src="../js/reautenticar.js"></script>
+<script src="../js/agua-alertas.js"></script>
 </head>
 <body>
 <div id="app"></div>
@@ -23,6 +24,7 @@
       <button class="modal-close" onclick="fecharModalLaudo()">×</button>
     </div>
     <div class="modal-body">
+      <div id="lz-alertas"></div>
       <div class="form-group"><label class="form-label">Laboratório <span class="obrig">*</span></label>
         <select class="form-control" id="lz-laboratorio"><option value="">Selecione...</option></select></div>
 
@@ -59,13 +61,22 @@
 // zero pela mesa). Lançar o laudo preenche os parâmetros de
 // laboratório, anexa o PDF e muda o status para 'completo'.
 //
-// PLAUSIBILIDADE: nenhum limite é reimplementado aqui. Cada campo
-// numérico é checado via RPC agua_valor_plausivel() (migration 254),
-// que reusa os MESMOS limites que a migration 253 usou para pôr a
-// série histórica em quarentena (pH 0–14, OD acima da saturação).
-// 'impossivel' bloqueia o salvamento; 'improvavel' pede confirmação
-// explícita (confirm(), padrão já usado em outras telas do projeto —
-// ver frota-veiculos.html) sem travar quem está digitando.
+// ALERTAS: nenhum limite é reimplementado aqui. A malha inteira vive
+// em `agua_avaliar_coleta` (migrations 254 e 302/302b) e é aplicada
+// por js/agua-alertas.js — físico, faixa da série, atípico para o
+// ponto, erro de unidade, coerência entre parâmetros e contexto de
+// campanha. Nível 'bloqueio' impede salvar; 'confirmar' pede
+// confirmação explícita (confirm(), padrão do projeto) sem travar
+// quem está digitando; 'informar' só aparece.
+//
+// A avaliação é da COLETA INTEIRA, com debounce — nunca uma chamada
+// por campo. Dois motivos: as regras de coerência (ortofosfato ×
+// fósforo total, E. coli × termotolerantes) só existem olhando o
+// conjunto, e uma chamada por campo multiplicaria por 20 o custo de
+// uma RPC que agrega a série histórica (~750 ms medidos).
+//
+// Conformidade CONAMA continua FORA desta malha, de propósito: é
+// resultado do rio, não erro de digitação (ver cabeçalho da 302).
 //
 // PDF: bucket privado agua-laudos (migration 255). Upload e
 // referência gravada seguem o MESMO padrão do resto do projeto —
@@ -191,15 +202,18 @@ function abrirLaudo(id) {
 
   document.getElementById('lz-campo').innerHTML = CAMPO_FIELDS.map(([campo, rotulo]) => `
     <div class="form-group"><label class="form-label">${esc(rotulo)}</label>
-      <input class="form-control" id="lz-f-${campo}" type="number" step="any" value="${c[campo] ?? ''}" onblur="lzChecarCampo('${campo}')">
+      <input class="form-control" id="lz-f-${campo}" type="number" step="any" value="${c[campo] ?? ''}" oninput="lzAgendarAvaliacao()">
       <div class="form-hint" id="lz-h-${campo}"></div></div>`).join('')
   document.getElementById('lz-lab').innerHTML = LAB_FIELDS.map(([campo, rotulo]) => `
     <div class="form-group"><label class="form-label">${esc(rotulo)}</label>
-      <input class="form-control" id="lz-f-${campo}" type="number" step="any" value="${c[campo] ?? ''}" onblur="lzChecarCampo('${campo}')">
+      <input class="form-control" id="lz-f-${campo}" type="number" step="any" value="${c[campo] ?? ''}" oninput="lzAgendarAvaliacao()">
       <div class="form-hint" id="lz-h-${campo}"></div></div>`).join('')
 
   if (c.laudo_url) assinarFotos(document.getElementById('modal-laudo'))
   document.getElementById('modal-laudo').classList.add('aberto')
+  _alertas = []
+  lzPintarAlertas()
+  lzAvaliar()   // o campo já vem preenchido da coleta — avalia de saída
 }
 
 function lzValor(campo) {
@@ -207,23 +221,38 @@ function lzValor(campo) {
   return v === '' || v == null ? null : parseFloat(v)
 }
 
-async function lzChecarCampo(campo) {
-  const valor = lzValor(campo)
-  const hint = document.getElementById(`lz-h-${campo}`)
-  if (!hint) return null
-  if (valor == null) { hint.textContent = ''; return null }
-  const tempAmostra = lzValor('temp_amostra')
-  const { data: classe } = await db.rpc('agua_valor_plausivel', { p_parametro: campo, p_valor: valor, p_temp_amostra: tempAmostra })
-  if (classe === 'impossivel') {
-    hint.textContent = 'Valor fisicamente impossível — corrija antes de salvar.'
-    hint.style.color = 'var(--erro)'
-  } else if (classe === 'improvavel') {
-    hint.textContent = 'Valor fora do range típico da série — confirme antes de salvar.'
-    hint.style.color = 'var(--aviso)'
-  } else {
-    hint.textContent = ''
+let _alertas = [], _timerAval = null
+
+// Debounce de 500 ms: o técnico digita 20 campos seguidos e não
+// precisa de uma ida ao servidor por tecla.
+function lzAgendarAvaliacao() {
+  clearTimeout(_timerAval)
+  _timerAval = setTimeout(() => { lzAvaliar() }, 500)
+}
+
+function lzValoresAtuais() {
+  const v = {}
+  for (const campo of TODOS_OS_CAMPOS) v[campo] = lzValor(campo)
+  return v
+}
+
+async function lzAvaliar() {
+  const c = _fila.find(x => x.id === _editandoId)
+  if (!c) return []
+  _alertas = await aguaAlertasAvaliar(db, {
+    pontoId: c.ponto_id, ordem: c.campanha_ordem, valores: lzValoresAtuais(),
+    campanhaId: c.campanha_id, coletaId: c.id,
+  })
+  lzPintarAlertas()
+  return _alertas
+}
+
+function lzPintarAlertas() {
+  document.getElementById('lz-alertas').innerHTML = aguaAlertasResumoHTML(_alertas)
+  for (const campo of TODOS_OS_CAMPOS) {
+    const hint = document.getElementById(`lz-h-${campo}`)
+    if (hint) hint.innerHTML = aguaAlertaHintHTML(aguaAlertaDoCampo(_alertas, campo))
   }
-  return classe
 }
 
 async function salvarLaudo() {
@@ -231,21 +260,18 @@ async function salvarLaudo() {
   const laboratorioId = document.getElementById('lz-laboratorio').value
   if (!laboratorioId) { toast('Selecione o laboratório', 'error'); return }
 
-  // Recalcula plausibilidade de TODOS os campos no momento de salvar —
-  // não confia só no blur (autofill/colar valor não dispara o evento).
-  // Em paralelo: são ~20 chamadas independentes, uma por campo.
-  const classes = {}
-  await Promise.all(TODOS_OS_CAMPOS.map(async campo => { classes[campo] = await lzChecarCampo(campo) }))
+  // Reavalia no momento de salvar — não confia no debounce (colar
+  // valor ou salvar rápido pode chegar antes da última avaliação).
+  clearTimeout(_timerAval)
+  const alertas = await lzAvaliar()
 
-  const impossiveis = TODOS_OS_CAMPOS.filter(c => classes[c] === 'impossivel')
-  if (impossiveis.length) {
-    toast(`Corrija valor(es) impossível(is): ${impossiveis.join(', ')}`, 'error')
+  const bloqueios = aguaAlertasBloqueios(alertas)
+  if (bloqueios.length) {
+    toast(`Corrija antes de salvar: ${bloqueios.map(a => AGUA_ALERTA_PARAM_ROTULO[a.parametro] || a.parametro).join(', ')}`, 'error')
     return
   }
-  const improvaveis = TODOS_OS_CAMPOS.filter(c => classes[c] === 'improvavel')
-  if (improvaveis.length && !confirm(`Os seguintes valores estão fora do range típico da série histórica: ${improvaveis.join(', ')}. Confirma que estão corretos, conforme o laudo físico?`)) {
-    return
-  }
+  const texto = aguaAlertasTextoConfirmacao(alertas)
+  if (texto && !confirm(texto)) return
 
   const payload = {
     laboratorio_id: laboratorioId,

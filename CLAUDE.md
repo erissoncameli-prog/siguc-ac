@@ -2287,6 +2287,69 @@ disso.
   ruas, entram ao trocar pra satélite, saem de novo ao voltar — e o
   tile do satélite é `lyrs=y`.
 
+## Regra do sistema — alertas comparativos no lançamento (Água)
+Entrega 1 do plano em `docs/qualidade-agua/plano-leitura-laudo-e-alertas.md`
+(migrations 302/302b). A checagem física de valor isolado que existia
+(`agua_valor_plausivel`, 254) ganhou a camada COMPARATIVA que nunca
+teve: o valor lançado é comparado com o histórico do próprio ponto,
+com os demais parâmetros da mesma amostra e com a própria campanha.
+
+**A malha vive em UM lugar só: `agua_avaliar_coleta()`** — nenhuma
+tela reimplementa limiar (mesma lição de `js/frota-consumo.js` e
+`js/mapa-recorte.js`). `js/agua-alertas.js` é avaliador FINO: chama a
+RPC, compara número com número e desenha. Seis tipos, três níveis:
+`bloqueio` (só `fisico`; impede salvar **na mesa**), `confirmar`
+(pede `confirm()`), `informar` (nunca interrompe).
+- **Violação CONAMA NÃO é alerta de digitação** e não entra na malha.
+  Turbidez de 300 UNT em rio amazônico em cheia é resultado
+  verdadeiro e grave; tratá-la como suspeita ensina o técnico a
+  ignorar avisos. Continua em bloco separado (`agua_conama_violacoes`).
+- **A régua é por ponto E por ordem de campanha** (cheia × seca), com
+  degradação DECLARADA: `ponto_campanha` → `ponto` → `rio` → `serie`,
+  mínimo n=8. A mensagem é obrigada a dizer qual base usou e com que
+  `n` — "atípico para este ponto (mediana 45, n=31)" é acionável,
+  "valor atípico" não é.
+- **Estatística robusta (quartis ± 3×IQR, em escala log para os
+  parâmetros multiplicativos)**, nunca média + desvio padrão: a série
+  tem outlier real (turbidez p95 = 588 contra mediana 90) que
+  arrastaria a faixa até não alertar nada. `k = 3,0` foi MEDIDO contra
+  as 452 coletas de produção (dispara em 12,2% das `completo` × 22,0%
+  das `quarentena` — ~2× mais na população já suspeita, em todos os
+  cortes testados), não arbitrado.
+- **Contexto de campanha**: se os outros pontos da mesma campanha
+  saíram da faixa no mesmo sentido, é evento hidrológico e o alerta
+  cai para informativo. Sem isso a primeira cheia dispara 17 alertas
+  falsos e a malha perde credibilidade na primeira semana.
+- **No app, NADA bloqueia** — nem valor fisicamente impossível ("nada
+  pode impedir o trabalho de campo", regra do sistema). O app é
+  offline-first: cacheia as faixas (`vw_agua_baseline_ponto`, já na
+  unidade natural do parâmetro) no store `config` do IndexedDB e usa
+  `aguaAlertasDoBaseline`, que é COMPARAÇÃO PURA — nenhuma regra
+  duplicada em JS, e o critério novo do banco passa a valer assim que
+  sincronizar. Exceção deliberada e documentada à regra "um lugar só".
+- **Avaliação da coleta INTEIRA, com debounce de 500 ms — nunca uma
+  chamada por campo**: as regras de coerência (ortofosfato × fósforo
+  total, E. coli × termotolerantes, SDT × condutividade) só existem
+  olhando o conjunto.
+- ⚠️ **View que agrega série histórica não pode ser consultada dentro
+  de laço** — achado real desta entrega: `vw_agua_baseline_ponto`
+  custa 200 ms por avaliação e a 302 a chamava até 22× por chamada
+  (~4 s; um lote de 452 estourou o timeout de 60 s). A 302b lê uma vez
+  e itera em memória (750 ms). Vale para qualquer RPC futura.
+- **Superfícies tocadas juntas** (regra de duplicação):
+  `agua-laudos.html` (lançamento), `agua-conferencia.html` (promover
+  de quarentena exige resolver bloqueios; manter em quarentena
+  continua livre) e `agua-app.html` (campo, offline).
+- Guarda: `tests/agua-alertas.test.js` (12 testes) — o mais importante
+  exercita a página REAL do app e cobra que a coleta seja salva
+  mesmo com alerta na tela.
+- `pwa/sw.js`: agua 19 → 20.
+- **Achado de dado, novo**: ortofosfato dissolvido > fósforo total em
+  273 de 310 coletas (88%) — e NÃO é a conversão PO₄/P (daria fator
+  fixo 3,07): razão mediana 8,6, quartis 2,9 e 30,9, persistente em
+  todos os anos. Nada foi corrigido — é conferência humana com o laudo
+  físico, como os sólidos em suspensão.
+
 ## Próxima tarefa
 Módulo Qualidade da Água (IQA): as 5 fases do plano original estão
 ENTREGUES (ver `docs/qualidade-agua/plano.md`, seções "Fase 0" a "Fase
