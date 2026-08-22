@@ -37,6 +37,36 @@ function _aguaKpiStats(lista) {
   }
 }
 
+// ── Situação da série (rosca de status) ─────────────────────────
+// Compartilhada pelas duas telas: quantas coletas estão em cada
+// status hoje (status_coleta_agua, migration 248) — a leitura mais
+// direta de "como vai a fila de laudos" no todo, não só o recorte que
+// cada página lista. Cores por SITUAÇÃO (pendência/ok/alerta), nunca
+// as cores de faixa do IQA — categorias diferentes, paleta diferente,
+// senão o leitor confundiria "aguardando laudo" com "faixa Regular".
+const AGUA_STATUS_ORDEM = ['aguardando_lab', 'completo', 'quarentena']
+const AGUA_STATUS_LABEL = { aguardando_lab: 'Aguardando laudo', completo: 'Completo', quarentena: 'Em quarentena' }
+const AGUA_STATUS_COR = { aguardando_lab: '#D97706', completo: '#059669', quarentena: '#DC2626' }
+
+function aguaContarPorStatus(linhas) {
+  const c = { aguardando_lab: 0, completo: 0, quarentena: 0 }
+  ;(linhas || []).forEach(l => { if (c[l.status] != null) c[l.status]++ })
+  return c
+}
+
+function aguaKpisSituacaoRoscaHTML(counts) {
+  const itens = AGUA_STATUS_ORDEM
+    .map(s => ({ label: AGUA_STATUS_LABEL[s], n: (counts || {})[s] || 0, cor: AGUA_STATUS_COR[s] }))
+    .filter(i => i.n > 0)
+  return `<div class="adash-card">
+    <div class="adash-card-topo">
+      <div><p class="adash-card-tit">Situação da série</p>
+        <p class="adash-card-tit-sub">Todas as coletas cadastradas, por status</p></div>
+    </div>
+    ${_aguaRoscaHTML(itens, { vazioMsg: 'Nenhuma coleta cadastrada.', ariaLabelPrefix: 'Situação da série de coletas' })}
+  </div>`
+}
+
 // Fila de laudos (pages/agua-laudos.html) — o que preocupa é atraso.
 const AGUA_LAUDO_LIMIAR_ATRASO = 30
 
