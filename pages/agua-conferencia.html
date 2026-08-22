@@ -4,6 +4,7 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>SIGUC-AC · Qualidade da Água — Conferência de Quarentena</title>
 <link rel="stylesheet" href="../css/global.css">
+<link rel="stylesheet" href="../css/agua-painel.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="../js/observability.js"></script>
 <script src="../js/queryLogger.js"></script>
@@ -11,6 +12,7 @@
 <script src="../js/layout.js"></script>
 <script src="../js/reautenticar.js"></script>
 <script src="../js/agua-alertas.js"></script>
+<script src="../js/agua-laudo-kpis.js"></script>
 </head>
 <body>
 <div id="app"></div>
@@ -93,12 +95,13 @@ let _coletas = [], _editandoId = null
 
   document.getElementById('app').innerHTML =
     gerarLayout('Qualidade da Água — Conferência', 'agua-conferencia') +
-    `<div class="fade-in">
+    `<div class="fade-in adash">
       <p style="color:#6B7280;font-size:13px;margin:0 0 16px">
         Coletas da série histórica que caíram em quarentena na importação (migration 253) — valor fisicamente
         impossível ou sólidos em suspensão com unidade sob suspeita. Conferir com o laudo físico da linha indicada
         e decidir: corrigir e promover, ou manter quarentenada com justificativa.
       </p>
+      <div id="ag-kpis"></div>
       <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
         <input class="form-control" id="ag-filtro" placeholder="Filtrar por ponto, código ANA ou nº da linha..." style="max-width:340px" oninput="renderLista()">
         <span id="ag-contador" style="font-size:12px;color:#6B7280"></span>
@@ -117,12 +120,17 @@ let _coletas = [], _editandoId = null
 })()
 
 async function carregarLista() {
-  const { data, error } = await db.from('agua_coletas')
-    .select('*, agua_pontos_coleta(nome,codigo_ana), agua_campanhas(ano,ordem)')
-    .eq('status', 'quarentena')
-    .order('linha_origem_planilha')
+  const [{ data, error }, { count: totalColetas }] = await Promise.all([
+    db.from('agua_coletas')
+      .select('*, agua_pontos_coleta(nome,codigo_ana), agua_campanhas(ano,ordem)')
+      .eq('status', 'quarentena')
+      .order('linha_origem_planilha'),
+    db.from('agua_coletas').select('id', { count: 'exact', head: true }),
+  ])
   if (error) { toast(error.message || 'Erro ao carregar', 'error'); return }
   _coletas = data || []
+  document.getElementById('ag-kpis').innerHTML = aguaKpisQuarentenaHTML(_coletas, totalColetas || 0,
+    c => `linha ${c.linha_origem_planilha ?? '—'} · ${c.agua_pontos_coleta?.nome || ''}`)
   renderLista()
 }
 
