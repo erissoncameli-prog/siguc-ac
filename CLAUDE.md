@@ -87,6 +87,27 @@ Sistema já tem login, sidebar, layout e páginas funcionando.
 --floresta:#0A1A0F | --verde-c:#52B788 | --ouro:#C9A84C | --ouro-c:#F0CB6A
 --t1:#F4EFE6 | Fontes: Fraunces (títulos) + DM Sans (UI)
 
+### Regra do sistema — fonte dos números de KPI: nunca Fraunces
+Pedido explícito do usuário: Fraunces (`--font-display`, a serifada de
+título do design system) NUNCA deve aparecer nos NÚMEROS de card de
+KPI (o valor grande — "365", "24 dias" etc.) — o usuário achou o
+efeito "cara pura de IA" ao ver os KPIs de Qualidade da Água
+(`js/agua-laudo-kpis.js`, cards `.adash-num` + centro da rosca de
+"Situação da série"). Corrigido com DM Sans (`var(--font-sans)`) nos
+dois lugares — `.adash-num` recebe `style` inline nesse arquivo, e
+`_aguaRoscaHTML` (`js/agua-iqa-visual.js`) ganhou o parâmetro
+`fonteCentro` para o texto central do donut, com Fraunces como padrão
+só para preservar o uso ANTIGO (faixa do IQA, `aguaIqaFaixasRoscaHTML`
+— não tocado por este pedido).
+- **Escopo da regra**: só o VALOR do KPI (o número grande). Títulos de
+  card, cabeçalhos de página e o resto do design system (Fraunces em
+  `.pf-nome`, `.sidebar-brand-logo` etc.) continuam como estavam —
+  isto não é uma revisão geral de tipografia, é a reação a um caso
+  específico que o usuário viu e não gostou.
+- Qualquer KPI NOVO (novo módulo, novo painel) que mostre um número
+  grande em destaque segue esta regra desde o nascimento: nunca
+  Fraunces no valor, DM Sans (`var(--font-sans)`) por padrão.
+
 ## Banco — migrations aplicadas
 001_initial.sql: usuarios, unidades_conservacao (PostGIS), ocorrencias,
 monitoramento_indicadores, monitoramento_registros, documentos,
