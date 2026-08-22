@@ -338,3 +338,102 @@ apagá-la ao final (padrão já usado na Fase 3) ou testar por fixture local.
 - **Fechar a pendência dos sólidos em suspensão** — os alertas de §4.3
   ajudam a detectar, mas a decisão sobre as 337 linhas continua sendo
   conferência humana com o laudo físico.
+
+---
+
+# Entrega 1 — ENTREGUE (migrations 302/302b)
+
+Malha de alertas comparativos em produção, nas três superfícies. O
+parser (Entrega 2) continua bloqueado pelas amostras de laudo (§9.0).
+
+## O que foi construído
+
+| Peça | Onde |
+|---|---|
+| Escala por parâmetro (log × linear) | `agua_parametro_log()` (302) |
+| Valores em formato longo, já filtrados | `vw_agua_valores_longos` (302) |
+| Faixa esperada por ponto × parâmetro × campanha | `vw_agua_baseline_ponto` (302) |
+| A malha (6 tipos de alerta) | `agua_avaliar_coleta()` (302, corrigida na 302b) |
+| Número com vírgula decimal | `agua_num_br()` (302b) |
+| Avaliador/renderizador único do cliente | `js/agua-alertas.js` |
+| Mesa — lançamento de laudo | `pages/agua-laudos.html` |
+| Mesa — conferência de quarentena | `pages/agua-conferencia.html` |
+| App de campo (offline) | `pages/agua-app.html` |
+| Guarda | `tests/agua-alertas.test.js` (12 testes, todos passando) |
+
+`pwa/sw.js`: agua 19 → 20. `app-agua/scripts/build-www.mjs` atualizado.
+
+## Calibragem: medida contra produção, não arbitrada
+
+A barreira é de Tukey (quartis ± k×IQR) em escala log para os
+parâmetros multiplicativos. `k` saiu de medir a taxa de disparo sobre
+as 452 coletas reais, separadas pelo que já se sabe delas:
+
+| k | dispara em `completo` (limpas) | em `quarentena` (suspeitas) | razão |
+|---|---|---|---|
+| 3,0 | **12,2%** | 22,0% | 1,8× |
+| 4,0 | 6,1% | 13,9% | 2,3× |
+| 5,0 | 1,7% | 8,6% | 4,9× |
+
+Em todos os cortes a barreira dispara ~2× mais na população já
+suspeita — o sinal é real, não ruído. **k = 3,0 adotado**: fica sob o
+teto de 15% de falso alarme em dado limpo que o plano fixou. Subir
+para 4,0 é editar uma linha do CASE se aparecer fadiga de alerta.
+
+## Dois achados de dado, nenhum deles previsto no plano
+
+**1. Ortofosfato dissolvido maior que fósforo total em 273 de 310
+coletas (88%).** O ortofosfato é uma FRAÇÃO do fósforo total — a
+relação está invertida na série quase inteira. Investigado antes de
+concluir: **não é** a conversão PO₄ ↔ P (que daria fator fixo de
+3,07); a razão mediana é 8,6, com quartis 2,9 e 30,9 e p90 em 194, e
+persiste em todos os anos (4× a 15×, com 2019 em 365×). Ou seja: não é
+mudança de unidade num ano, é sistemático. **Não corrigi nada** — é
+conferência humana com o laudo físico, exatamente como os sólidos em
+suspensão. Fica como pendência nova, do mesmo tipo.
+
+**2. Sólidos em suspensão × turbidez dispara em 52 de 60 coletas
+recentes** — todas já em quarentena, todas pelo mesmo motivo. É a
+pendência conhecida da Fase 1 (g/L × mg/L) sendo detectada pela regra
+nova: confirmação de que o detector funciona, não achado novo.
+
+## Achado de engenharia: view que agrega série não pode ir dentro de laço
+
+`vw_agua_baseline_ponto` custa 200 ms por avaliação (EXPLAIN ANALYZE em
+produção). A 302 consultava a view DENTRO do laço de parâmetros — até
+22 vezes por chamada, ~4 s por coleta; um lote de 452 estourou o
+timeout de 60 s, que foi como o defeito apareceu. A 302b lê uma vez o
+baseline do ponto e uma vez o contexto de campanha, ambos em jsonb, e
+itera em memória: **750 ms**. Vale para qualquer RPC futura do projeto.
+
+Medida e **não adotada**: unir as duas leituras numa CTE `MATERIALIZED`
+leva a 399 ms. Não compensa duplicar o corpo inteiro da função numa
+terceira migration — a tela avalia a coleta inteira de uma vez, com
+debounce, e 750 ms nessa interação não se distingue de 400 ms. Fica
+registrado com o número para quem precisar reabrir.
+
+## Decisões de desenho que valem revisitar antes da Entrega 2
+
+- **Avaliação da coleta INTEIRA, com debounce de 500 ms — nunca uma
+  chamada por campo.** As regras de coerência só existem olhando o
+  conjunto, e uma RPC por campo multiplicaria por 20 o custo.
+- **O app nunca bloqueia, nem em valor fisicamente impossível.** O
+  coletor pode estar com a sonda descalibrada a 200 km de Rio Branco;
+  perder a coleta é pior que gravar um número que a mesa vai conferir.
+  É o teste mais importante da suíte.
+- **Promover de quarentena a `completo` exige resolver os bloqueios**
+  (`agua-conferencia.html`). Manter em quarentena continua permitido em
+  qualquer estado — é o registro de "conferi, o laudo diz isso mesmo".
+- **Baseline offline cacheado no store `config` do IndexedDB**, não em
+  store nova: evita bump de versão do banco local do app.
+- Os rótulos de parâmetro estão em `js/agua-alertas.js` duplicando
+  `CONAMA_PARAM_LABEL`/`AGUA_REL_PARAM_LABEL` — o app de campo não
+  carrega os outros. Unificar os três é limpeza para outra entrega,
+  registrada aqui de propósito.
+
+## Pendências novas para humano (não são código)
+
+1. **Ortofosfato × fósforo total** (achado 1 acima): alguém da SEMA
+   precisa conferir com o laudo físico e com o laboratório qual
+   grandeza cada coluna guarda. Até lá, a regra alerta — corretamente.
+2. Continua valendo a pendência anterior dos **sólidos em suspensão**.
