@@ -97,7 +97,7 @@ function aguaKpisFilaHTML(lista, labelFn, statusCounts) {
     </div>
     <div class="adash-card">
       <div class="adash-card-topo"><p class="adash-card-tit">Atrasadas (${AGUA_LAUDO_LIMIAR_ATRASO}+ dias)</p></div>
-      <div class="adash-num-linha"><span class="adash-num">${atrasadas}</span>${s.total ? `<span class="adash-delta ${atrasadas ? 'baixa' : ''}">${pctAtrasadas}%</span>` : ''}</div>
+      <div class="adash-num-linha"><span class="adash-num" style="${AGUA_KPI_FONTE_NUM}">${atrasadas}</span>${s.total ? `<span class="adash-delta ${atrasadas ? 'baixa' : ''}">${pctAtrasadas}%</span>` : ''}</div>
       <p class="adash-card-pe">da fila aguardando há mais de ${AGUA_LAUDO_LIMIAR_ATRASO} dias</p>
     </div>
     <div class="adash-card">
