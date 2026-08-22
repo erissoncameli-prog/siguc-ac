@@ -102,7 +102,7 @@ function aguaKpisFilaHTML(lista, labelFn, statusCounts) {
     </div>
     <div class="adash-card">
       <div class="adash-card-topo"><p class="adash-card-tit">Mais antiga na fila</p></div>
-      <div class="adash-num-linha"><span class="adash-num">${s.itemMaisAntigo ? s.diasMaisAntigo : '—'}</span>${s.itemMaisAntigo ? '<span class="adash-delta neutro">dias</span>' : ''}</div>
+      <div class="adash-num-linha"><span class="adash-num" style="${AGUA_KPI_FONTE_NUM}">${s.itemMaisAntigo ? s.diasMaisAntigo : '—'}</span>${s.itemMaisAntigo ? '<span class="adash-delta neutro">dias</span>' : ''}</div>
       <p class="adash-card-pe">${s.itemMaisAntigo ? esc(labelFn(s.itemMaisAntigo)) : 'Nenhuma coleta aguardando'}</p>
     </div>
   </div>`
@@ -133,7 +133,7 @@ function aguaKpisQuarentenaHTML(lista, totalColetas, labelFn, statusCounts) {
     </div>
     <div class="adash-card">
       <div class="adash-card-topo"><p class="adash-card-tit">Mais antiga pendente</p></div>
-      <div class="adash-num-linha"><span class="adash-num">${s.itemMaisAntigo ? s.diasMaisAntigo : '—'}</span>${s.itemMaisAntigo ? '<span class="adash-delta neutro">dias</span>' : ''}</div>
+      <div class="adash-num-linha"><span class="adash-num" style="${AGUA_KPI_FONTE_NUM}">${s.itemMaisAntigo ? s.diasMaisAntigo : '—'}</span>${s.itemMaisAntigo ? '<span class="adash-delta neutro">dias</span>' : ''}</div>
       <p class="adash-card-pe">${s.itemMaisAntigo ? esc(labelFn(s.itemMaisAntigo)) : 'Nenhuma coleta em quarentena'}</p>
     </div>
   </div>`
