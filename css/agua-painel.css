@@ -48,6 +48,11 @@
   transition:background .15s, color .15s;
 }
 .adash-modo-btn.ativo { background:var(--branco); color:var(--adash-azul-esc); box-shadow:var(--sombra) }
+/* `display` acima vence o `[hidden]` de global.css (mesma especificidade,
+   esta folha vem depois) — mesma armadilha já documentada para
+   .adash-filtros; sem isto, quem só tem 1 dos 2 módulos veria o
+   segmented control mesmo escondido por atributo. */
+.adash-modo-tabs[hidden] { display:none }
 .adash-pill-n {
   display:inline-flex; align-items:center; justify-content:center; min-width:18px; height:18px;
   padding:0 5px; border-radius:9px; background:var(--verde-medio); color:#fff; font-size:11px; font-weight:700;
