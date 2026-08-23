@@ -332,13 +332,14 @@ function aguaRelViolacoesRanking(resumo, limite) {
     .slice(0, limite || 6)
 }
 
-// ── Comparativo ENTRE bacias (pages/rh-bacias.html) ──────────────
+// ── Comparativo ENTRE bacias (pages/agua-relatorios.html, modo
+// "Comparar bacias" — fundido do antigo pages/rh-bacias.html) ────
 // Uma linha por bacia presente na lista, com os mesmos números que
 // aguaRelResumo já calcula para um recorte — só que agrupados por
-// bacia em vez de por campanha/ponto. Existe porque o painel de
-// Relatórios sempre olha UM recorte de cada vez ("Acre todo" ou uma
-// bacia); comparar Purus × Juruá × Madeira lado a lado era a leitura
-// que faltava, e é a razão de ser da tela de Bacias Hidrográficas.
+// bacia em vez de por campanha/ponto. Existe porque o modo Painel
+// sempre olha UM recorte de cada vez ("Acre todo" ou uma bacia);
+// comparar Purus × Juruá × Madeira lado a lado era a leitura que
+// faltava, e é a razão de ser do modo Comparar bacias.
 //
 // Bacia NULA entra como 'Sem bacia definida' (nunca descartada — hoje
 // é o caso do Rio Iquiri). `campanhas` são só as campanhas em que
