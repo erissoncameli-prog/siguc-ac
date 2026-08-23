@@ -231,10 +231,16 @@ function gerarLayout(tituloPagina, paginaAtiva) {
         },
         // 'bacias' entrou na Fase B (migration 304 ativou o módulo).
         // 'ar' entrou na migration 316 (rede PurpleAir/MPAC, PM2.5).
+        // O comparativo entre bacias (antigo item "Painel das Bacias",
+        // pages/rh-bacias.html) se fundiu em agua-relatorios.html como
+        // um MODO da própria tela de Relatórios (pedido do usuário:
+        // um subgrupo só, sem link duplicado) — quem só tem acesso a
+        // 'bacias' (não a 'agua') chega lá pela URL com
+        // `?visao=bacias` (ex.: de fora do menu), não por este
+        // subgrupo; ver comentário em pages/agua-relatorios.html.
         {
           id: 'bacias', label: 'Bacias Hidrográficas', modulo: 'bacias',
           itens: [
-            { id: 'rh-bacias',   href: '../pages/rh-bacias.html',   label: 'Painel das Bacias' },
             { id: 'rh-estacoes', href: '../pages/rh-estacoes.html', label: 'Plataformas de Coleta' },
             { id: 'rh-boletim',  href: '../pages/rh-boletim.html',  label: 'Boletim do Tempo' },
           ]
