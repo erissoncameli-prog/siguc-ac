@@ -1,12 +1,13 @@
 /* ── SIGUC Qualidade da Água · CSS do painel (.adash-* / .adet-*) ──
    Contraparte em CSS de js/agua-painel.js: as MESMAS regras servem
-   pages/agua-relatorios.html (mesa), pages/agua-publico.html (link
-   público) e pages/rh-bacias.html (comparativo entre bacias). Antes
-   viviam num <style> copiado em cada página — na terceira tela isso
-   já seria a terceira cópia do mesmo arquivo, exatamente o que a
-   regra do projeto (js/frota-consumo.js, js/mapa-recorte.js) existe
-   para impedir. Mudança visual nos cards/mapa do painel entra AQUI e
-   vale para as três de graça.
+   pages/agua-relatorios.html (mesa — painel + comparativo entre
+   bacias, desde que pages/rh-bacias.html se fundiu nela) e
+   pages/agua-publico.html (link público). Antes viviam num <style>
+   copiado em cada página — na terceira tela isso já seria a terceira
+   cópia do mesmo arquivo, exatamente o que a regra do projeto
+   (js/frota-consumo.js, js/mapa-recorte.js) existe para impedir.
+   Mudança visual nos cards/mapa do painel entra AQUI e vale para as
+   duas telas de graça.
 
    Layout de cards inspirado no modelo de dashboard aprovado pelo
    usuário (cabeçalho com pílulas à direita, coluna estreita de KPIs,
