@@ -1,0 +1,2302 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>SIGUC-AC · Apresentação BioMonitor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Source+Sans+3:ital,wght@0,400;0,500;0,600;0,700;1,400;1,600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+<style>
+/* ============================================================
+   TOKENS
+   ============================================================ */
+:root{
+  color-scheme: light;
+  --bg:            #F2F6F5;
+  --bg-soft:       #E7EFED;
+  --surface:       #FFFFFF;
+  --surface-2:     #EEF3F1;
+  --line:          #D7E1DE;
+  --ink:           #0E2233;
+  --ink-soft:      #48606D;
+  --ink-mute:      #7B909A;
+
+  --river:         #135E78;
+  --river-strong:  #0B4258;
+  --river-tint:    #E4EEF1;
+  --river-deep:    #0A2A3B;
+  --river-deep-2:  #0E3B4E;
+  --river-deep-3:  #123C4C;
+
+  --forest:        #2F7D58;
+  --forest-tint:   #E4F0E7;
+  --sand:          #C9963F;
+  --sand-tint:     #F6ECD8;
+  --coral:         #B94B36;
+
+  --good:          #1BAF7A;
+  --warn:          #C9963F;
+  --crit:          #C1533A;
+
+  --on-dark-ink:      #EAF3EF;
+  --on-dark-ink-soft: #A9C2C9;
+  --on-dark-line:     rgba(234,243,239,0.16);
+  --on-dark-surface:  rgba(255,255,255,0.05);
+
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --series-4: #eda100;
+
+  --shadow-1: 0 1px 2px rgba(10,32,45,0.06), 0 8px 24px -12px rgba(10,32,45,0.18);
+  --radius-s: 8px;
+  --radius-m: 14px;
+  --radius-l: 22px;
+
+  --font-display: "Bricolage Grotesque", "Source Sans 3", sans-serif;
+  --font-body: "Source Sans 3", -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme: dark;
+    --bg:        #0A1B24;
+    --bg-soft:   #0D222D;
+    --surface:   #11293489;
+    --surface:   #112934;
+    --surface-2: #13303C;
+    --line:      #223E4A;
+    --ink:       #E9F3EF;
+    --ink-soft:  #A9C2C9;
+    --ink-mute:  #7C97A0;
+
+    --river:        #4FB6D6;
+    --river-strong: #7DD2ED;
+    --river-tint:   #12313D;
+    --river-deep:   #071820;
+    --river-deep-2: #0A222C;
+    --river-deep-3: #0D2833;
+
+    --forest:      #63C08D;
+    --forest-tint: #113325;
+    --sand:        #E3B565;
+    --sand-tint:   #2C2410;
+    --coral:       #E08268;
+
+    --good: #3FCB99;
+    --warn: #E3B565;
+    --crit: #E08268;
+
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+    --series-4: #c98500;
+    --shadow-1: 0 1px 2px rgba(0,0,0,0.3), 0 8px 28px -12px rgba(0,0,0,0.5);
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --bg:        #0A1B24;
+  --bg-soft:   #0D222D;
+  --surface:   #112934;
+  --surface-2: #13303C;
+  --line:      #223E4A;
+  --ink:       #E9F3EF;
+  --ink-soft:  #A9C2C9;
+  --ink-mute:  #7C97A0;
+
+  --river:        #4FB6D6;
+  --river-strong: #7DD2ED;
+  --river-tint:   #12313D;
+  --river-deep:   #071820;
+  --river-deep-2: #0A222C;
+  --river-deep-3: #0D2833;
+
+  --forest:      #63C08D;
+  --forest-tint: #113325;
+  --sand:        #E3B565;
+  --sand-tint:   #2C2410;
+  --coral:       #E08268;
+
+  --good: #3FCB99;
+  --warn: #E3B565;
+  --crit: #E08268;
+
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --series-4: #c98500;
+  --shadow-1: 0 1px 2px rgba(0,0,0,0.3), 0 8px 28px -12px rgba(0,0,0,0.5);
+}
+
+/* ============================================================
+   RESET / BASE
+   ============================================================ */
+*,*::before,*::after{ box-sizing:border-box; }
+html{ scroll-behavior:smooth; }
+@media (prefers-reduced-motion: reduce){
+  html{ scroll-behavior:auto; }
+  *,*::before,*::after{ animation-duration:0.001ms !important; animation-iteration-count:1 !important; transition-duration:0.001ms !important; scroll-behavior:auto !important; }
+}
+body{
+  margin:0;
+  background:var(--bg);
+  color:var(--ink);
+  font-family:var(--font-body);
+  font-size:16px;
+  line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+  overflow-x:hidden;
+}
+h1,h2,h3,h4{
+  font-family:var(--font-display);
+  font-weight:700;
+  margin:0;
+  text-wrap:balance;
+  letter-spacing:-0.01em;
+}
+p{ margin:0; }
+img,svg{ max-width:100%; display:block; }
+a{ color:inherit; }
+button{ font-family:inherit; }
+:focus-visible{ outline:2px solid var(--river); outline-offset:3px; border-radius:4px; }
+
+.mono{ font-family:var(--font-mono); }
+.eyebrow{
+  font-family:var(--font-mono);
+  font-size:0.72rem;
+  letter-spacing:0.14em;
+  text-transform:uppercase;
+  color:var(--river);
+  font-weight:600;
+}
+.chapter-dark .eyebrow{ color:var(--river-strong); }
+
+.demo-tag{
+  display:inline-flex; align-items:center; gap:6px;
+  font-family:var(--font-mono); font-size:0.68rem; letter-spacing:0.04em;
+  color:var(--ink-mute); border:1px solid var(--line); border-radius:99px;
+  padding:3px 10px 3px 8px; background:var(--surface-2);
+}
+.demo-tag::before{ content:""; width:6px; height:6px; border-radius:50%; background:var(--sand); flex:none; }
+.chapter-dark .demo-tag{ color:var(--on-dark-ink-soft); border-color:var(--on-dark-line); background:rgba(255,255,255,0.04); }
+
+/* ============================================================
+   LAYOUT SHELL
+   ============================================================ */
+.topbar{
+  position:fixed; top:0; right:0; z-index:60;
+  display:flex; align-items:center; gap:10px;
+  padding:14px 18px;
+}
+.lang-switch{
+  display:flex; background:var(--surface); border:1px solid var(--line);
+  border-radius:99px; padding:3px; box-shadow:var(--shadow-1);
+  backdrop-filter:blur(8px);
+}
+.lang-switch button{
+  border:none; background:transparent; color:var(--ink-soft);
+  font-family:var(--font-mono); font-size:0.72rem; font-weight:600;
+  letter-spacing:0.04em; padding:6px 11px; border-radius:99px; cursor:pointer;
+  transition:background 0.15s, color 0.15s;
+}
+.lang-switch button[aria-pressed="true"]{ background:var(--river); color:#fff; }
+.lang-switch button:hover:not([aria-pressed="true"]){ background:var(--surface-2); }
+
+.theme-note{
+  display:none;
+}
+
+.rail{
+  position:fixed; left:0; top:0; bottom:0; z-index:55;
+  width:34px; display:flex; align-items:center; justify-content:center;
+  pointer-events:none;
+}
+.rail-track{
+  position:relative; height:min(72vh,640px); width:2px;
+  background:linear-gradient(var(--line),var(--line));
+  pointer-events:auto;
+}
+.rail-fill{
+  position:absolute; left:0; top:0; width:2px; height:0%;
+  background:var(--river); transition:height 0.15s linear;
+}
+.rail-dot{
+  position:absolute; left:50%; transform:translate(-50%,-50%);
+  width:7px; height:7px; border-radius:50%; background:var(--line);
+  cursor:pointer; transition:background 0.2s, transform 0.2s;
+}
+.rail-dot:hover{ transform:translate(-50%,-50%) scale(1.5); }
+.rail-dot.active{ background:var(--river); transform:translate(-50%,-50%) scale(1.7); }
+@media (max-width: 860px){ .rail{ display:none; } }
+
+main{ position:relative; }
+
+.chapter{
+  position:relative;
+  padding:clamp(64px,10vw,120px) clamp(20px,6vw,80px);
+  background:var(--bg);
+  color:var(--ink);
+}
+.chapter-dark{
+  background:
+    radial-gradient(ellipse 80% 60% at 15% 0%, var(--river-deep-2), transparent 60%),
+    var(--river-deep);
+  color:var(--on-dark-ink);
+}
+.chapter-dark .ink-soft{ color:var(--on-dark-ink-soft); }
+.chapter-inner{
+  max-width:1120px; margin:0 auto; position:relative; z-index:2;
+}
+.chapter-inner--wide{ max-width:1280px; }
+
+.chapter-kicker{
+  display:flex; align-items:center; gap:12px; margin-bottom:22px;
+}
+.chapter-num{
+  font-family:var(--font-mono); font-size:0.75rem; color:var(--ink-mute);
+}
+.chapter-dark .chapter-num{ color:var(--on-dark-ink-soft); }
+
+h2.chapter-title{
+  font-size:clamp(1.9rem,3.4vw,3.1rem);
+  line-height:1.06;
+  max-width:16ch;
+}
+.lede{
+  font-size:clamp(1.05rem,1.4vw,1.28rem);
+  color:var(--ink-soft);
+  max-width:56ch;
+  margin-top:18px;
+  line-height:1.55;
+}
+.chapter-dark .lede{ color:var(--on-dark-ink-soft); }
+
+.reveal{
+  opacity:0; transform:translateY(30px) scale(0.975); filter:blur(6px);
+  transition:opacity 0.85s cubic-bezier(.16,.8,.2,1), transform 0.85s cubic-bezier(.16,.8,.2,1), filter 0.85s cubic-bezier(.16,.8,.2,1);
+  will-change:transform,opacity,filter;
+}
+.reveal.in{ opacity:1; transform:translateY(0) scale(1); filter:blur(0); }
+.reveal-delay-1{ transition-delay:0.09s; }
+.reveal-delay-2{ transition-delay:0.18s; }
+.reveal-delay-3{ transition-delay:0.27s; }
+.reveal-delay-4{ transition-delay:0.36s; }
+
+/* parallax-capable layer: JS sets --py (translateY px) on scroll */
+.parallax{ transform:translateY(var(--py,0px)); will-change:transform; }
+
+/* hero entrance (fires shortly after load, not scroll-gated) */
+.hero-anim{
+  opacity:0; transform:translateY(26px);
+  transition:opacity 0.9s cubic-bezier(.16,.8,.2,1), transform 0.9s cubic-bezier(.16,.8,.2,1);
+}
+.hero-anim.in{ opacity:1; transform:translateY(0); }
+.hero-visual.hero-anim{ transform:translateY(26px) scale(0.96); }
+.hero-visual.hero-anim.in{ transform:translateY(var(--py,0px)) scale(1); }
+
+/* ============================================================
+   WAVE DIVIDER (auto-inserted between dark/light chapters)
+   ============================================================ */
+.wave-divider{
+  position:absolute; left:0; right:0; bottom:-1px; height:64px;
+  pointer-events:none; z-index:3; overflow:hidden; line-height:0;
+}
+.wave-divider svg{ width:100%; height:100%; display:block; }
+.wave-divider path{ animation:waveDrift 14s ease-in-out infinite alternate; }
+@keyframes waveDrift{ 0%{ transform:translateX(0); } 100%{ transform:translateX(-2.5%); } }
+
+/* ============================================================
+   PHOTO FRAMES (ready to receive real photographs)
+   ============================================================ */
+.photo-frame{
+  position:relative; overflow:hidden; border-radius:var(--radius-m);
+  background:
+    linear-gradient(155deg, rgba(79,182,214,0.16), transparent 55%),
+    linear-gradient(160deg, var(--river-deep-3), var(--river-deep-2) 55%, var(--river-deep));
+  border:1px solid var(--on-dark-line);
+  display:flex; align-items:flex-end;
+  isolation:isolate;
+}
+.photo-frame img{
+  position:absolute; inset:0; width:100%; height:100%; object-fit:cover;
+  opacity:0; transition:opacity 0.6s ease; z-index:0;
+}
+.photo-frame img.loaded{ opacity:1; }
+.photo-frame::before{
+  content:""; position:absolute; inset:0; z-index:1;
+  background-image:
+    repeating-linear-gradient(115deg, rgba(255,255,255,0.05) 0 2px, transparent 2px 26px),
+    radial-gradient(circle at 30% 20%, rgba(255,255,255,0.09), transparent 45%);
+}
+.photo-frame .pf-ripple{ position:absolute; inset:0; z-index:1; opacity:0.5; }
+.photo-frame .pf-caption{
+  position:relative; z-index:2; width:100%;
+  padding:14px 16px; font-size:0.72rem; color:var(--on-dark-ink-soft);
+  background:linear-gradient(to top, rgba(5,15,20,0.72), transparent);
+  display:flex; align-items:center; gap:8px;
+}
+.photo-frame .pf-caption .pf-dot{ width:6px; height:6px; border-radius:50%; background:var(--sand); flex:none; animation:pfBlink 2.4s ease-in-out infinite; }
+@keyframes pfBlink{ 0%,100%{opacity:0.35;} 50%{opacity:1;} }
+.photo-frame.pf-hero{ aspect-ratio:3/4; min-height:340px; }
+.photo-gallery{ display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-top:22px; }
+@media (max-width:760px){ .photo-gallery{ grid-template-columns:1fr 1fr; } }
+.photo-frame.pf-tile{ aspect-ratio:4/5; }
+
+/* ============================================================
+   CHART "LIVE" HELPERS
+   ============================================================ */
+.bar-fill{ transition:filter 0.15s, transform 0.9s cubic-bezier(.16,.8,.2,1); transform-box:fill-box; transform-origin:left center; transform:scaleX(0); }
+.chart-card.in .bar-fill{ transform:scaleX(1); }
+.chart-card .trend-path{ transition:stroke-dashoffset 1.3s cubic-bezier(.16,.8,.2,1); }
+.chart-card .trend-area{ opacity:0; transition:opacity 1.1s ease 0.5s; }
+.chart-card.in .trend-area{ opacity:1; }
+.chart-card .trend-pt{ opacity:0; transform:scale(0.3); transform-box:fill-box; transform-origin:center; transition:opacity 0.4s ease, transform 0.4s cubic-bezier(.34,1.4,.64,1); }
+.chart-card.in .trend-pt{ opacity:1; transform:scale(1); }
+.live-pulse{ animation:livePulseKF 2.6s ease-in-out infinite; }
+@keyframes livePulseKF{ 0%,100%{ opacity:1; } 50%{ opacity:0.45; } }
+.chart-live-tag{
+  display:inline-flex; align-items:center; gap:6px; font-family:var(--font-mono);
+  font-size:0.62rem; letter-spacing:0.05em; text-transform:uppercase; color:var(--good);
+}
+.chart-live-tag .dot{ width:6px; height:6px; border-radius:50%; background:var(--good); box-shadow:0 0 0 0 rgba(27,175,122,0.5); animation:liveDot 1.8s infinite; }
+@keyframes liveDot{ 0%{box-shadow:0 0 0 0 rgba(27,175,122,0.55);} 70%{box-shadow:0 0 0 7px rgba(27,175,122,0);} 100%{box-shadow:0 0 0 0 rgba(27,175,122,0);} }
+
+/* generic grid helpers */
+.grid{ display:grid; gap:20px; }
+.g2{ grid-template-columns:repeat(2,1fr); }
+.g3{ grid-template-columns:repeat(3,1fr); }
+.g4{ grid-template-columns:repeat(4,1fr); }
+@media (max-width:900px){ .g2,.g3,.g4{ grid-template-columns:1fr; } }
+@media (min-width:901px) and (max-width:1100px){ .g4{grid-template-columns:repeat(2,1fr);} .g3{grid-template-columns:repeat(2,1fr);} }
+
+.card{
+  background:var(--surface); border:1px solid var(--line);
+  border-radius:var(--radius-m); padding:22px 22px;
+  box-shadow:var(--shadow-1);
+}
+.chapter-dark .card{
+  background:rgba(255,255,255,0.045); border-color:var(--on-dark-line);
+  box-shadow:none;
+}
+.card h4{ font-size:1.05rem; margin-bottom:8px; }
+.card p{ color:var(--ink-soft); font-size:0.94rem; }
+.chapter-dark .card p{ color:var(--on-dark-ink-soft); }
+
+/* ============================================================
+   HERO
+   ============================================================ */
+.hero{
+  min-height:100svh; display:flex; flex-direction:column; justify-content:center;
+  padding-top:120px; padding-bottom:60px;
+  overflow:hidden;
+}
+.hero-bg{
+  position:absolute; inset:0; z-index:0; overflow:hidden;
+}
+.hero-bg svg{ width:100%; height:100%; position:absolute; inset:0; transition:opacity 1.2s ease; }
+.hero-bg canvas{ position:absolute; inset:0; width:100%; height:100%; opacity:0; transition:opacity 1.6s ease; }
+.hero-bg canvas.on{ opacity:1; }
+.hero-bg svg.faded{ opacity:0.22; }
+.hero-content{
+  position:relative; z-index:2; max-width:1240px; margin:0 auto; width:100%;
+  display:grid; grid-template-columns:1.3fr 0.85fr; gap:56px; align-items:center;
+}
+.hero-text{ min-width:0; }
+.hero-visual{ position:relative; }
+@media (max-width:980px){
+  .hero-content{ grid-template-columns:1fr; }
+  .hero-visual{ order:-1; max-width:280px; margin:0 auto 8px; }
+}
+.hero-eyebrow{
+  font-family:var(--font-mono); font-size:0.78rem; letter-spacing:0.16em;
+  text-transform:uppercase; color:var(--river-strong); margin-bottom:26px;
+  display:flex; align-items:center; gap:10px;
+}
+.hero-eyebrow::before{ content:""; width:30px; height:1px; background:var(--river-strong); }
+.hero-title{
+  font-size:clamp(3rem,8.4vw,6.6rem); line-height:0.92; color:var(--on-dark-ink);
+  font-weight:800;
+}
+.hero-title em{ font-style:italic; color:var(--river-strong); font-weight:500; }
+.hero-sub{
+  margin-top:28px; font-size:clamp(1.1rem,1.9vw,1.45rem); max-width:44ch;
+  color:var(--on-dark-ink-soft); line-height:1.5;
+}
+.hero-meta{
+  margin-top:52px; display:flex; flex-wrap:wrap; gap:34px;
+}
+.hero-meta-item{ display:flex; flex-direction:column; gap:4px; }
+.hero-meta-item .n{ font-family:var(--font-mono); font-size:0.98rem; color:var(--river-strong); }
+.hero-meta-item .l{ font-size:0.82rem; color:var(--on-dark-ink-soft); max-width:20ch; }
+.scroll-cue{
+  position:absolute; bottom:34px; left:50%; transform:translateX(-50%);
+  display:flex; flex-direction:column; align-items:center; gap:8px;
+  color:var(--on-dark-ink-soft); font-family:var(--font-mono); font-size:0.68rem;
+  letter-spacing:0.1em; text-transform:uppercase; z-index:2;
+}
+.scroll-cue .line{ width:1px; height:34px; background:linear-gradient(var(--river-strong),transparent); animation:cuepulse 1.8s ease-in-out infinite; }
+@keyframes cuepulse{ 0%,100%{opacity:0.35;} 50%{opacity:1;} }
+
+/* ============================================================
+   SPECIES CARDS
+   ============================================================ */
+.species-strip{ display:flex; flex-wrap:wrap; gap:12px; margin-top:36px; }
+.species-chip{
+  display:flex; align-items:center; gap:10px;
+  border:1px solid var(--line); background:var(--surface);
+  border-radius:99px; padding:9px 16px 9px 10px;
+}
+.species-chip .dot{ width:9px; height:9px; border-radius:50%; flex:none; }
+.species-chip .name{ font-size:0.86rem; font-weight:600; }
+.species-chip .sci{ font-family:var(--font-mono); font-size:0.72rem; color:var(--ink-mute); font-style:italic; }
+
+/* ============================================================
+   BEFORE/AFTER PIPELINE
+   ============================================================ */
+.pipe{ display:flex; align-items:center; flex-wrap:wrap; gap:0; margin-top:10px; }
+.pipe-step{
+  display:flex; flex-direction:column; align-items:flex-start; gap:6px;
+  padding:14px 18px; border:1px solid var(--line); border-radius:var(--radius-s);
+  background:var(--surface); min-width:150px; flex:1 1 150px;
+}
+.pipe-step .k{ font-family:var(--font-mono); font-size:0.68rem; color:var(--ink-mute); }
+.pipe-step .t{ font-size:0.92rem; font-weight:600; }
+.pipe-arrow{ flex:none; width:26px; display:flex; align-items:center; justify-content:center; color:var(--ink-mute); }
+.pipe--broken .pipe-step{ border-style:dashed; }
+.pipe--broken .pipe-arrow{ color:var(--coral); }
+.pipe--flow .pipe-step{ border-color:var(--river); background:var(--river-tint); }
+.pipe--flow .pipe-arrow{ color:var(--river); }
+@media (max-width:760px){ .pipe{ flex-direction:column; align-items:stretch; } .pipe-arrow{ transform:rotate(90deg); margin:2px 0; } }
+
+/* ============================================================
+   DIAGRAM (svg) generic
+   ============================================================ */
+figure.diagram{ margin:32px 0 0; }
+figure.diagram svg{ width:100%; height:auto; overflow:visible; }
+figure.diagram figcaption{
+  margin-top:14px; font-size:0.82rem; color:var(--ink-mute); max-width:70ch;
+}
+.chapter-dark figure.diagram figcaption{ color:var(--on-dark-ink-soft); }
+.dg-text{ fill:currentColor; font-family:var(--font-body); }
+.dg-mono{ fill:currentColor; font-family:var(--font-mono); }
+.dg-line{ stroke:currentColor; fill:none; }
+.dg-box{ fill:var(--surface); stroke:var(--line); }
+.chapter-dark .dg-box{ fill:rgba(255,255,255,0.045); stroke:var(--on-dark-line); }
+.dg-accent{ fill:var(--river); }
+.dg-accent-stroke{ stroke:var(--river); }
+
+/* ============================================================
+   PHONE MOCKUP
+   ============================================================ */
+.phones{ display:flex; gap:28px; flex-wrap:wrap; justify-content:center; margin-top:8px; }
+.phone{
+  width:238px; flex:none;
+  background:var(--river-deep-3);
+  border-radius:30px; padding:9px;
+  box-shadow:var(--shadow-1), 0 0 0 1px rgba(255,255,255,0.05) inset;
+}
+.phone-screen{
+  background:var(--river-deep);
+  border-radius:22px; overflow:hidden; height:436px;
+  position:relative; display:flex; flex-direction:column;
+  color:var(--on-dark-ink);
+  font-size:0.72rem;
+}
+.phone-notch{
+  position:absolute; top:8px; left:50%; transform:translateX(-50%);
+  width:64px; height:16px; border-radius:99px; background:rgba(0,0,0,0.5); z-index:5;
+}
+.phone-caption{
+  text-align:center; margin-top:14px; font-size:0.8rem; color:var(--ink-soft); font-weight:600;
+}
+.chapter-dark .phone-caption{ color:var(--on-dark-ink-soft); }
+
+.ph-top{ padding:30px 14px 8px; }
+.ph-status{ display:flex; justify-content:space-between; align-items:center; font-family:var(--font-mono); font-size:0.6rem; color:var(--on-dark-ink-soft); }
+.ph-body{ flex:1; padding:10px 14px 14px; display:flex; flex-direction:column; gap:9px; overflow:hidden; }
+
+.ph-avatar-row{ display:flex; align-items:center; gap:10px; margin-bottom:4px; }
+.ph-avatar{
+  width:38px; height:38px; border-radius:50%; background:var(--river);
+  display:flex; align-items:center; justify-content:center;
+  font-family:var(--font-display); font-weight:700; font-size:0.9rem; color:#fff;
+  border:2px solid var(--sand);
+}
+.ph-name{ font-weight:700; font-size:0.82rem; }
+.ph-sub{ font-size:0.63rem; color:var(--on-dark-ink-soft); }
+.ph-chips{ display:flex; gap:6px; flex-wrap:wrap; margin-top:2px;}
+.ph-chip{
+  font-family:var(--font-mono); font-size:0.58rem; padding:3px 8px; border-radius:99px;
+  background:rgba(255,255,255,0.08); color:var(--on-dark-ink-soft);
+}
+.ph-btn{
+  margin-top:auto; background:var(--river); color:#fff; text-align:center;
+  padding:11px; border-radius:11px; font-weight:700; font-size:0.74rem;
+}
+.ph-btn.secondary{ background:rgba(255,255,255,0.08); color:var(--on-dark-ink); }
+
+.ph-field{ display:flex; flex-direction:column; gap:3px; }
+.ph-field .fl{ font-size:0.6rem; color:var(--on-dark-ink-soft); text-transform:uppercase; letter-spacing:0.04em; }
+.ph-field .fv{ background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:8px 10px; font-size:0.72rem; }
+.ph-gps{ display:flex; align-items:center; gap:6px; font-family:var(--font-mono); font-size:0.6rem; color:var(--good); }
+.ph-gps .pulse{ width:7px; height:7px; border-radius:50%; background:var(--good); box-shadow:0 0 0 0 rgba(63,203,153,0.6); animation:gpsping 2s infinite; }
+@keyframes gpsping{ 0%{box-shadow:0 0 0 0 rgba(63,203,153,0.5);} 70%{box-shadow:0 0 0 8px rgba(63,203,153,0);} 100%{box-shadow:0 0 0 0 rgba(63,203,153,0);} }
+.ph-photo{
+  height:78px; border-radius:10px; background:
+   linear-gradient(160deg, #163C2C, #0E2A20 60%, #0A2A3B);
+  position:relative; overflow:hidden; border:1px solid rgba(255,255,255,0.08);
+}
+.ph-photo::after{
+  content:"14/07 09:42 · -8.1102,-70.8123"; position:absolute; left:6px; bottom:5px;
+  font-family:var(--font-mono); font-size:0.48rem; color:rgba(255,255,255,0.75);
+  background:rgba(0,0,0,0.35); padding:2px 5px; border-radius:4px;
+}
+
+.ph-list-item{
+  display:flex; align-items:center; gap:8px; padding:8px 9px; border-radius:9px;
+  background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.06);
+}
+.ph-list-dot{ width:8px; height:8px; border-radius:50%; flex:none; }
+.ph-list-dot.done{ background:var(--good); }
+.ph-list-dot.pend{ background:var(--warn); }
+.ph-list-title{ font-size:0.68rem; font-weight:600; }
+.ph-list-sub{ font-size:0.58rem; color:var(--on-dark-ink-soft); }
+
+.ph-kpi-grid{ display:grid; grid-template-columns:1fr 1fr; gap:7px; }
+.ph-kpi{ background:rgba(255,255,255,0.06); border-radius:10px; padding:9px; }
+.ph-kpi .v{ font-family:var(--font-mono); font-weight:600; font-size:1.02rem; color:var(--river-strong); }
+.ph-kpi .l{ font-size:0.56rem; color:var(--on-dark-ink-soft); margin-top:2px; }
+
+/* ============================================================
+   CHARTS
+   ============================================================ */
+.chart-card{ background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-m); padding:24px; box-shadow:var(--shadow-1); }
+.chart-head{ display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom:18px; flex-wrap:wrap; }
+.chart-head h4{ font-size:1rem; }
+.chart-legend{ display:flex; gap:14px; flex-wrap:wrap; margin-top:14px; }
+.leg-item{ display:flex; align-items:center; gap:6px; font-size:0.78rem; color:var(--ink-soft); }
+.leg-swatch{ width:10px; height:10px; border-radius:3px; flex:none; }
+.chart-tooltip{
+  position:absolute; pointer-events:none; background:var(--ink); color:var(--bg);
+  font-family:var(--font-mono); font-size:0.68rem; padding:6px 9px; border-radius:6px;
+  transform:translate(-50%,-118%); opacity:0; transition:opacity 0.12s; white-space:nowrap; z-index:8;
+}
+.chart-wrap{ position:relative; }
+.bar-hit{ cursor:pointer; }
+.bar-hit:hover rect.bar-fill, .bar-hit:focus rect.bar-fill{ filter:brightness(1.08); }
+
+/* ============================================================
+   STAKEHOLDER FLOW
+   ============================================================ */
+.roles-row{ display:flex; flex-wrap:wrap; gap:14px; margin-top:30px; counter-reset:role; }
+.role-card{ flex:1 1 150px; background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-m); padding:18px 16px; position:relative; }
+.role-card .role-icn{ width:34px; height:34px; margin-bottom:12px; color:var(--river); }
+.role-card h5{ font-family:var(--font-display); font-size:0.98rem; margin-bottom:6px; }
+.role-card p{ font-size:0.8rem; color:var(--ink-soft); }
+.role-arrow{ display:flex; align-items:center; color:var(--ink-mute); }
+@media (max-width:900px){ .roles-row{ flex-direction:column; } .role-arrow{ transform:rotate(90deg); justify-content:center; padding:2px 0; } }
+
+/* ============================================================
+   TIMELINE / STORYBOARD
+   ============================================================ */
+.storyboard{ display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-top:34px; }
+@media (max-width:1000px){ .storyboard{ grid-template-columns:repeat(2,1fr); } }
+@media (max-width:560px){ .storyboard{ grid-template-columns:1fr; } }
+.story-frame{
+  background:rgba(255,255,255,0.04); border:1px solid var(--on-dark-line);
+  border-radius:var(--radius-m); padding:16px; display:flex; flex-direction:column; gap:10px;
+}
+.story-frame .fno{ font-family:var(--font-mono); font-size:0.7rem; color:var(--river-strong); }
+.story-frame .scene{
+  height:84px; border-radius:9px;
+  background:linear-gradient(135deg, var(--river-deep-2), var(--river-deep-3));
+  position:relative; overflow:hidden;
+}
+.story-frame h5{ font-size:0.88rem; }
+.story-frame p{ font-size:0.76rem; color:var(--on-dark-ink-soft); }
+
+/* ============================================================
+   ROADMAP existente/futuro
+   ============================================================ */
+.roadmap-cols{ display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-top:30px; }
+@media (max-width:800px){ .roadmap-cols{ grid-template-columns:1fr; } }
+.roadmap-col{ border-radius:var(--radius-m); padding:22px; }
+.roadmap-col.now{ background:var(--forest-tint); border:1px solid var(--forest); }
+.roadmap-col.next{ background:var(--surface); border:1px dashed var(--ink-mute); }
+.roadmap-col h4{ display:flex; align-items:center; gap:9px; font-size:1.02rem; margin-bottom:14px; }
+.rm-badge{ width:9px; height:9px; border-radius:50%; }
+.roadmap-col.now .rm-badge{ background:var(--forest); }
+.roadmap-col.next .rm-badge{ background:var(--ink-mute); }
+.rm-list{ display:flex; flex-direction:column; gap:10px; list-style:none; padding:0; margin:0; }
+.rm-list li{ font-size:0.88rem; padding-left:18px; position:relative; color:var(--ink-soft); }
+.roadmap-col.now .rm-list li::before{ content:"✓"; position:absolute; left:0; color:var(--forest); font-weight:700; }
+.roadmap-col.next .rm-list li::before{ content:"–"; position:absolute; left:2px; color:var(--ink-mute); }
+
+/* ============================================================
+   STACK TABLE
+   ============================================================ */
+.stack-grid{ display:grid; grid-template-columns:repeat(2,1fr); gap:14px; margin-top:30px; }
+@media (max-width:800px){ .stack-grid{ grid-template-columns:1fr; } }
+.stack-item{ background:rgba(255,255,255,0.045); border:1px solid var(--on-dark-line); border-radius:var(--radius-m); padding:18px 20px; }
+.stack-item .tag{ font-family:var(--font-mono); font-size:0.66rem; color:var(--river-strong); letter-spacing:0.06em; text-transform:uppercase; }
+.stack-item h5{ font-size:1rem; margin-top:6px; font-family:var(--font-mono); font-weight:600; color:var(--on-dark-ink); }
+.stack-item p{ font-size:0.84rem; color:var(--on-dark-ink-soft); margin-top:8px; }
+
+/* ============================================================
+   IMPACT CHAIN + FOOTER
+   ============================================================ */
+.chain{ display:flex; flex-wrap:wrap; align-items:center; gap:0; margin-top:38px; }
+.chain-node{ display:flex; flex-direction:column; gap:5px; padding:16px 4px; min-width:120px; }
+.chain-node .t{ font-weight:700; font-size:0.92rem; }
+.chain-node .s{ font-size:0.74rem; color:var(--on-dark-ink-soft); }
+.chain-arrow{ color:var(--river-strong); flex:none; width:30px; }
+
+footer.closing{
+  padding:70px clamp(20px,6vw,80px) 90px;
+}
+.closing-inner{ max-width:900px; margin:0 auto; text-align:left; }
+.closing-cta{ margin-top:34px; font-size:0.85rem; color:var(--on-dark-ink-soft); border-top:1px solid var(--on-dark-line); padding-top:22px; }
+
+/* KPI counters */
+.kpi-row{ display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-top:6px; }
+@media (max-width:900px){ .kpi-row{ grid-template-columns:repeat(2,1fr); } }
+.kpi-card{ background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-m); padding:20px; box-shadow:var(--shadow-1); }
+.kpi-card .v{ font-family:var(--font-mono); font-weight:600; font-size:2.1rem; color:var(--river-strong); font-variant-numeric:tabular-nums; }
+.kpi-card .l{ font-size:0.8rem; color:var(--ink-soft); margin-top:6px; }
+
+/* rings (scale) */
+.rings-wrap{ display:flex; justify-content:center; margin-top:20px; }
+.ring-labels{ display:flex; flex-direction:column; gap:16px; margin-top:30px; max-width:520px; margin-inline:auto; }
+.ring-labels li{ display:flex; gap:12px; align-items:baseline; font-size:0.92rem; list-style:none; }
+.ring-labels .sw{ width:11px; height:11px; border-radius:50%; flex:none; }
+
+.skip-link{
+  position:absolute; left:-999px; top:0; background:var(--river); color:#fff;
+  padding:10px 16px; border-radius:8px; z-index:100;
+}
+.skip-link:focus{ left:16px; top:16px; }
+
+.sr-only{ position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+</style>
+</head>
+<body>
+
+
+<a class="skip-link" href="#main" data-i18n="skip">Ir para o conteúdo</a>
+
+<div class="topbar">
+  <div class="lang-switch" role="group" aria-label="Idioma / Language / Idioma">
+    <button type="button" data-lang="pt" aria-pressed="true">PT</button>
+    <button type="button" data-lang="en" aria-pressed="false">EN</button>
+    <button type="button" data-lang="es" aria-pressed="false">ES</button>
+  </div>
+</div>
+
+<nav class="rail" aria-hidden="true">
+  <div class="rail-track" id="railTrack">
+    <div class="rail-fill" id="railFill"></div>
+  </div>
+</nav>
+
+<main id="main">
+
+<!-- ============================================================
+     01 HERO
+     ============================================================ -->
+<section class="chapter chapter-dark hero" id="s01" data-title-pt="Abertura" data-title-en="Opening" data-title-es="Apertura">
+  <div class="hero-bg" aria-hidden="true">
+    <svg viewBox="0 0 1400 900" preserveAspectRatio="xMidYMid slice" role="presentation" id="heroSvg">
+      <defs>
+        <linearGradient id="riverGlow" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stop-color="#4FB6D6" stop-opacity="0.16"/>
+          <stop offset="100%" stop-color="#4FB6D6" stop-opacity="0"/>
+        </linearGradient>
+      </defs>
+      <rect width="1400" height="900" fill="url(#riverGlow)"/>
+      <g stroke="#4FB6D6" stroke-opacity="0.22" fill="none" stroke-width="1.4">
+        <path d="M -50 620 C 250 560, 380 700, 620 640 S 1050 520, 1450 610"/>
+        <path d="M -50 700 C 260 650, 400 780, 640 720 S 1080 610, 1450 690"/>
+        <path d="M -50 780 C 270 740, 420 850, 660 800 S 1100 700, 1450 770"/>
+      </g>
+      <g stroke="#C9963F" stroke-opacity="0.28" fill="none" stroke-width="1">
+        <circle cx="1180" cy="210" r="60"/>
+        <circle cx="1180" cy="210" r="96"/>
+        <circle cx="1180" cy="210" r="134"/>
+      </g>
+    </svg>
+    <canvas id="heroCanvas"></canvas>
+  </div>
+  <div class="hero-content">
+    <div class="hero-text">
+      <div class="hero-eyebrow hero-anim" style="transition-delay:0.05s" data-i18n="hero.eyebrow">SEMA-AC · Plataforma de biomonitoramento</div>
+      <h1 class="hero-title hero-anim" id="heroTitle" style="transition-delay:0.16s" data-i18n-html="hero.title">BIO<em>MONITOR</em></h1>
+      <p class="hero-sub hero-anim" style="transition-delay:0.32s" data-i18n="hero.sub">Tecnologia e ciência para o monitoramento dos quelônios amazônicos — do ninho na praia até a decisão de conservação.</p>
+      <div class="hero-meta hero-anim" style="transition-delay:0.46s">
+        <div class="hero-meta-item"><span class="n mono" data-count-hero="8">0</span><span class="l" data-i18n="hero.meta1">espécies de quelônios monitoradas</span></div>
+        <div class="hero-meta-item"><span class="n mono">100%</span><span class="l" data-i18n="hero.meta2">funcional sem sinal de internet</span></div>
+        <div class="hero-meta-item"><span class="n mono">1</span><span class="l" data-i18n="hero.meta3">registro validado por biólogo antes de virar estatística</span></div>
+      </div>
+    </div>
+    <div class="hero-visual parallax hero-anim" id="heroVisual" style="--py:0px; transition-delay:0.24s">
+      <div class="photo-frame pf-hero" data-photo-id="hero-tracaja">
+        <img alt="" data-photo-img>
+        <div class="pf-caption"><span class="pf-dot"></span><span data-i18n="hero.photocap">Tracajá adulto · foto de campo</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="scroll-cue"><span data-i18n="hero.scroll">Role para explorar</span><span class="line"></span></div>
+</section>
+
+<!-- ============================================================
+     02 PROGRAMA
+     ============================================================ -->
+<section class="chapter" id="s02">
+  <div class="chapter-inner">
+    <div class="chapter-kicker"><span class="chapter-num mono">02</span><span class="eyebrow" data-i18n="s02.eyebrow">O programa</span></div>
+    <h2 class="chapter-title reveal" data-i18n="s02.title">Um programa de monitoramento, com espécies reais e praias reais.</h2>
+    <p class="lede reveal reveal-delay-1" data-i18n="s02.lede">O BioMonitor nasceu para o Programa de Monitoramento de Quelônios do Acre, em parceria com o ICMBio — grupos de campo organizados por Unidade de Conservação, acompanhando o ciclo reprodutivo em praias fluviais.</p>
+    <div class="species-strip reveal reveal-delay-2" id="speciesStrip"></div>
+    <div class="photo-gallery reveal reveal-delay-3">
+      <div class="photo-frame pf-tile" data-photo-id="gallery-eggs-nest">
+        <img alt="" data-photo-img>
+        <div class="pf-caption"><span class="pf-dot"></span><span data-i18n="s02.gcap1">Ovos no ninho</span></div>
+      </div>
+      <div class="photo-frame pf-tile" data-photo-id="gallery-hatchling-swim">
+        <img alt="" data-photo-img>
+        <div class="pf-caption"><span class="pf-dot"></span><span data-i18n="s02.gcap2">Filhote recém-eclodido</span></div>
+      </div>
+      <div class="photo-frame pf-tile" data-photo-id="gallery-nest-hole">
+        <img alt="" data-photo-img>
+        <div class="pf-caption"><span class="pf-dot"></span><span data-i18n="s02.gcap3">Ninho encontrado em campo</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     03 O DESAFIO
+     ============================================================ -->
+<section class="chapter chapter-dark" id="s03">
+  <div class="chapter-inner">
+    <div class="chapter-kicker"><span class="chapter-num mono">03</span><span class="eyebrow" data-i18n="s03.eyebrow">O desafio</span></div>
+    <h2 class="chapter-title reveal" data-i18n="s03.title">Uma praia amazônica não tem sinal de celular. O caderno de campo, tem.</h2>
+    <p class="lede reveal reveal-delay-1" data-i18n="s03.lede">O monitoramento tradicional depende de anotação manual, em condições adversas, sem padronização entre equipes — e o dado só chega a quem decide semanas depois, se chegar.</p>
+    <div class="reveal reveal-delay-2">
+      <div class="pipe pipe--broken" role="img" aria-label="Fluxo tradicional quebrado: campo, caderno, digitação, planilha, consolidação manual, atraso na análise">
+        <div class="pipe-step"><span class="k mono" data-i18n="s03.p1k">01</span><span class="t" data-i18n="s03.p1t">Campo</span></div>
+        <div class="pipe-arrow">→</div>
+        <div class="pipe-step"><span class="k mono" data-i18n="s03.p2k">02</span><span class="t" data-i18n="s03.p2t">Caderno molhado</span></div>
+        <div class="pipe-arrow">→</div>
+        <div class="pipe-step"><span class="k mono" data-i18n="s03.p3k">03</span><span class="t" data-i18n="s03.p3t">Digitação manual</span></div>
+        <div class="pipe-arrow">→</div>
+        <div class="pipe-step"><span class="k mono" data-i18n="s03.p4k">04</span><span class="t" data-i18n="s03.p4t">Planilhas soltas</span></div>
+        <div class="pipe-arrow">→</div>
+        <div class="pipe-step"><span class="k mono" data-i18n="s03.p5k">05</span><span class="t" data-i18n="s03.p5t">Consolidação tardia</span></div>
+      </div>
+    </div>
+    <div class="grid g4 reveal reveal-delay-3" style="margin-top:36px">
+      <div class="card"><h4 data-i18n="s03.c1t">Sem padronização</h4><p data-i18n="s03.c1p">Cada equipe registra do seu jeito — comparar praias vira trabalho manual.</p></div>
+      <div class="card"><h4 data-i18n="s03.c2t">Localização imprecisa</h4><p data-i18n="s03.c2p">Descrição por texto no lugar de coordenada georreferenciada.</p></div>
+      <div class="card"><h4 data-i18n="s03.c3t">Perda de histórico</h4><p data-i18n="s03.c3p">Caderno perdido ou molhado é temporada perdida.</p></div>
+      <div class="card"><h4 data-i18n="s03.c4t">Decisão tardia</h4><p data-i18n="s03.c4p">Quando o dado chega ao gestor, a temporada de desova já terminou.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     04 TRANSFORMAÇÃO
+     ============================================================ -->
+<section class="chapter" id="s04">
+  <div class="chapter-inner">
+    <div class="chapter-kicker"><span class="chapter-num mono">04</span><span class="eyebrow" data-i18n="s04.eyebrow">A transformação</span></div>
+    <h2 class="chapter-title reveal" data-i18n="s04.title">O BioMonitor não é um app de coleta. É um ecossistema de dado.</h2>
+    <p class="lede reveal reveal-delay-1" data-i18n="s04.lede">O mesmo registro que nasce na mão do monitor chega ao gestor como indicador — sem reescrita manual, sem planilha intermediária, sem perda.</p>
+    <div class="reveal reveal-delay-2" style="margin-top:30px">
+      <div class="pipe pipe--flow" role="img" aria-label="Fluxo do BioMonitor: coleta, sincronização, banco de dados, geoprocessamento, indicadores, decisão">
+        <div class="pipe-step"><span class="k mono" data-i18n="s04.p1k">campo</span><span class="t" data-i18n="s04.p1t">Coleta digital</span></div>
+        <div class="pipe-arrow">→</div>
+        <div class="pipe-step"><span class="k mono" data-i18n="s04.p2k">sync</span><span class="t" data-i18n="s04.p2t">Sincronização</span></div>
+        <div class="pipe-arrow">→</div>
+        <div class="pipe-step"><span class="k mono" data-i18n="s04.p3k">banco</span><span class="t" data-i18n="s04.p3t">Banco geoespacial</span></div>
+        <div class="pipe-arrow">→</div>
+        <div class="pipe-step"><span class="k mono" data-i18n="s04.p4k">análise</span><span class="t" data-i18n="s04.p4t">Indicadores</span></div>
+        <div class="pipe-arrow">→</div>
+        <div class="pipe-step"><span class="k mono" data-i18n="s04.p5k">gestão</span><span class="t" data-i18n="s04.p5t">Decisão</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     05 ARQUITETURA — visão geral
+     ============================================================ -->
+<section class="chapter chapter-dark" id="s05">
+  <div class="chapter-inner chapter-inner--wide">
+    <div class="chapter-kicker"><span class="chapter-num mono">05</span><span class="eyebrow" data-i18n="s05.eyebrow">Arquitetura</span></div>
+    <h2 class="chapter-title reveal" data-i18n="s05.title">Sete camadas, do dado bruto de campo à decisão de gestão.</h2>
+    <p class="lede reveal reveal-delay-1" data-i18n="s05.lede">Cada camada tem uma responsabilidade única — nenhuma tela recalcula o que outra camada já resolveu.</p>
+    <figure class="diagram reveal reveal-delay-2" id="archDiagram"></figure>
+    <figcaption class="reveal" data-i18n="s05.cap" style="margin-top:14px;font-size:0.82rem;color:var(--on-dark-ink-soft);max-width:70ch">Arquitetura em camadas: campo → comunicação → backend → banco de dados → geotecnologia → inteligência e análise → visualização.</figcaption>
+  </div>
+</section>
+
+<!-- ============================================================
+     06 APP DE CAMPO — mockups + offline
+     ============================================================ -->
+<section class="chapter" id="s06">
+  <div class="chapter-inner chapter-inner--wide">
+    <div class="chapter-kicker"><span class="chapter-num mono">06</span><span class="eyebrow" data-i18n="s06.eyebrow">O aplicativo de campo</span></div>
+    <h2 class="chapter-title reveal" data-i18n="s06.title">Feito para funcionar no meio do rio, sem uma barra de sinal.</h2>
+    <p class="lede reveal reveal-delay-1" data-i18n="s06.lede">Login por PIN, GPS, foto com marca d'água e fila de sincronização — tudo funciona offline; nada trava o trabalho de campo.</p>
+    <div class="phones reveal reveal-delay-2" style="margin-top:44px">
+      <div>
+        <div class="phone"><div class="phone-screen">
+          <div class="phone-notch"></div>
+          <div class="ph-top"><div class="ph-status"><span>09:41</span><span data-i18n="s06.offlinebadge">SEM SINAL</span></div></div>
+          <div class="ph-body">
+            <div class="ph-avatar-row">
+              <div class="ph-avatar">RM</div>
+              <div><div class="ph-name" data-i18n="s06.phname">Raimunda M.</div><div class="ph-sub" data-i18n="s06.phsub">Grupo Purus · RESEX Alto Purus</div></div>
+            </div>
+            <div class="ph-chips"><span class="ph-chip" data-i18n="s06.phchip1">Temporada 2026</span><span class="ph-chip" data-i18n="s06.phchip2">Praia P-04</span></div>
+            <div style="flex:1"></div>
+            <div class="ph-btn" data-i18n="s06.phbtn">Registrar ninho</div>
+            <div class="ph-btn secondary" style="margin-top:8px" data-i18n="s06.phbtn2">Meus dados</div>
+          </div>
+        </div></div>
+        <div class="phone-caption" data-i18n="s06.cap1">Tela inicial do monitor</div>
+      </div>
+      <div>
+        <div class="phone"><div class="phone-screen">
+          <div class="phone-notch"></div>
+          <div class="ph-top"><div class="ph-status"><span data-i18n="s06.newnest">Novo ninho</span><span>3/5</span></div></div>
+          <div class="ph-body">
+            <div class="ph-field"><span class="fl" data-i18n="s06.f1">Espécie</span><span class="fv mono" style="font-style:italic" data-i18n="s06.f1v">Podocnemis unifilis</span></div>
+            <div class="ph-field"><span class="fl" data-i18n="s06.f2">Nº do ninho</span><span class="fv mono" data-i18n="s06.f2v">P04-2026-031</span></div>
+            <div class="ph-gps"><span class="pulse"></span><span data-i18n="s06.gps">GPS: ±3,2 m — capturando</span></div>
+            <div class="ph-photo"></div>
+            <div style="flex:1"></div>
+            <div class="ph-btn" data-i18n="s06.save">Salvar no dispositivo</div>
+          </div>
+        </div></div>
+        <div class="phone-caption" data-i18n="s06.cap2">Registro do ninho, com foto e GPS</div>
+      </div>
+      <div>
+        <div class="phone"><div class="phone-screen">
+          <div class="phone-notch"></div>
+          <div class="ph-top"><div class="ph-status"><span data-i18n="s06.queue">Fila de envio</span><span>4</span></div></div>
+          <div class="ph-body">
+            <div class="ph-list-item"><span class="ph-list-dot done"></span><div><div class="ph-list-title" data-i18n="s06.q1t">Ninho P04-031</div><div class="ph-list-sub" data-i18n="s06.q1s">Sincronizado · 2 fotos</div></div></div>
+            <div class="ph-list-item"><span class="ph-list-dot done"></span><div><div class="ph-list-title" data-i18n="s06.q2t">Eclosão P03-027</div><div class="ph-list-sub" data-i18n="s06.q2s">Sincronizado · 1 foto</div></div></div>
+            <div class="ph-list-item"><span class="ph-list-dot pend"></span><div><div class="ph-list-title" data-i18n="s06.q3t">Ninho P04-032</div><div class="ph-list-sub" data-i18n="s06.q3s">Aguardando sinal</div></div></div>
+            <div class="ph-list-item"><span class="ph-list-dot pend"></span><div><div class="ph-list-title" data-i18n="s06.q4t">Transferência P02-019</div><div class="ph-list-sub" data-i18n="s06.q4s">Aguardando sinal</div></div></div>
+            <div style="flex:1"></div>
+            <div class="ph-btn secondary" data-i18n="s06.autosync">Sincroniza automaticamente ao voltar o sinal</div>
+          </div>
+        </div></div>
+        <div class="phone-caption" data-i18n="s06.cap3">Fila offline, com sincronização automática</div>
+      </div>
+      <div>
+        <div class="phone"><div class="phone-screen">
+          <div class="phone-notch"></div>
+          <div class="ph-top"><div class="ph-status"><span data-i18n="s06.mydata">Meus dados</span><span data-i18n="s06.season">Temporada 2026</span></div></div>
+          <div class="ph-body">
+            <div class="ph-kpi-grid">
+              <div class="ph-kpi"><div class="v mono">14</div><div class="l" data-i18n="s06.k1">ninhos registrados</div></div>
+              <div class="ph-kpi"><div class="v mono">6</div><div class="l" data-i18n="s06.k2">eclosões acompanhadas</div></div>
+              <div class="ph-kpi"><div class="v mono">89%</div><div class="l" data-i18n="s06.k3">taxa de eclosão do grupo</div></div>
+              <div class="ph-kpi"><div class="v mono">3</div><div class="l" data-i18n="s06.k4">pendentes de validação</div></div>
+            </div>
+            <div class="demo-tag" style="margin-top:10px" data-i18n="demo">Dados demonstrativos</div>
+          </div>
+        </div></div>
+        <div class="phone-caption" data-i18n="s06.cap4">Desempenho do próprio monitor</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     07 OFFLINE detail
+     ============================================================ -->
+<section class="chapter chapter-dark" id="s07">
+  <div class="chapter-inner">
+    <div class="chapter-kicker"><span class="chapter-num mono">07</span><span class="eyebrow" data-i18n="s07.eyebrow">Funcionamento offline</span></div>
+    <h2 class="chapter-title reveal" data-i18n="s07.title">Sem internet, a equipe não para. O aparelho segura tudo.</h2>
+    <p class="lede reveal reveal-delay-1" data-i18n="s07.lede">GPS, fotos e formulários continuam disponíveis; cada registro recebe um identificador único ainda em campo, o que evita duplicidade quando a sincronização finalmente acontece.</p>
+    <div class="grid g3 reveal reveal-delay-2" style="margin-top:34px">
+      <div class="card"><h4 data-i18n="s07.c1t">Sem sinal</h4><p data-i18n="s07.c1p">Formulário, câmera e GPS continuam ativos; nada bloqueia o registro.</p></div>
+      <div class="card"><h4 data-i18n="s07.c2t">Armazenamento local</h4><p data-i18n="s07.c2p">Dados e fotos ficam guardados no próprio aparelho até haver conexão.</p></div>
+      <div class="card"><h4 data-i18n="s07.c3t">Sincronização idempotente</h4><p data-i18n="s07.c3p">Reenviar não duplica: cada registro tem um identificador gerado ainda offline.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     08 CICLO DO NINHO
+     ============================================================ -->
+<section class="chapter" id="s08">
+  <div class="chapter-inner chapter-inner--wide">
+    <div class="chapter-kicker"><span class="chapter-num mono">08</span><span class="eyebrow" data-i18n="s08.eyebrow">O ciclo do ninho</span></div>
+    <h2 class="chapter-title reveal" data-i18n="s08.title">Todo ninho tem um estado — e o sistema sabe qual é, sempre.</h2>
+    <p class="lede reveal reveal-delay-1" data-i18n="s08.lede">Do encontro ao desfecho, cada mudança de estado é registrada em campo e vira parte do histórico da praia.</p>
+    <figure class="diagram reveal reveal-delay-2" id="nestFlow" style="margin-top:40px"></figure>
+  </div>
+</section>
+
+<!-- ============================================================
+     09 TRILHA DO DADO
+     ============================================================ -->
+<section class="chapter chapter-dark" id="s09">
+  <div class="chapter-inner chapter-inner--wide">
+    <div class="chapter-kicker"><span class="chapter-num mono">09</span><span class="eyebrow" data-i18n="s09.eyebrow">Um registro, do início ao fim</span></div>
+    <h2 class="chapter-title reveal" data-i18n="s09.title">Siga um único ninho da praia até o painel do gestor.</h2>
+    <p class="lede reveal reveal-delay-1" data-i18n="s09.lede">O mesmo identificador criado em campo percorre todo o caminho — nenhuma etapa reescreve o dado, todas apenas o enriquecem.</p>
+    <figure class="diagram reveal reveal-delay-2" id="trailDiagram" style="margin-top:40px"></figure>
+  </div>
+</section>
+
+<!-- ============================================================
+     10 ESCADA DO CONHECIMENTO
+     ============================================================ -->
+<section class="chapter" id="s10">
+  <div class="chapter-inner">
+    <div class="chapter-kicker"><span class="chapter-num mono">10</span><span class="eyebrow" data-i18n="s10.eyebrow">Da observação à evidência</span></div>
+    <h2 class="chapter-title reveal" data-i18n="s10.title">O BioMonitor transforma observação de campo em evidência para a conservação.</h2>
+    <figure class="diagram reveal reveal-delay-1" id="ladderDiagram" style="margin-top:38px"></figure>
+  </div>
+</section>
+
+<!-- ============================================================
+     11 INDICADORES
+     ============================================================ -->
+<section class="chapter" id="s11">
+  <div class="chapter-inner chapter-inner--wide">
+    <div class="chapter-kicker"><span class="chapter-num mono">11</span><span class="eyebrow" data-i18n="s11.eyebrow">Indicadores científicos</span></div>
+    <h2 class="chapter-title reveal" data-i18n="s11.title">O que a plataforma consegue extrair de cada temporada.</h2>
+    <p class="lede reveal reveal-delay-1" data-i18n="s11.lede">Os números abaixo ilustram o tipo de indicador que o BioMonitor calcula — todos com base fictícia, para fins de demonstração.</p>
+    <span class="demo-tag reveal reveal-delay-1" data-i18n="demo" style="margin-top:14px;display:inline-flex">Dados demonstrativos</span>
+
+    <div class="kpi-row reveal reveal-delay-2" style="margin-top:26px">
+      <div class="kpi-card"><div class="v" data-count="482">0</div><div class="l" data-i18n="s11.k1">ninhos registrados na temporada</div></div>
+      <div class="kpi-card"><div class="v" data-count="6120">0</div><div class="l" data-i18n="s11.k2">filhotes eclodidos</div></div>
+      <div class="kpi-card"><div class="v" data-count="81" data-suffix="%">0</div><div class="l" data-i18n="s11.k3">taxa média de sucesso reprodutivo</div></div>
+      <div class="kpi-card"><div class="v" data-count="19">0</div><div class="l" data-i18n="s11.k4">praias monitoradas</div></div>
+    </div>
+
+    <div class="grid g2 reveal reveal-delay-3" style="margin-top:26px">
+      <div class="chart-card"><div class="chart-head"><h4 data-i18n="s11.chart1t">Ninhos por espécie</h4><div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px"><span class="chart-live-tag"><span class="dot"></span><span data-i18n="chartlive">painel dinâmico</span></span><span class="demo-tag" data-i18n="demo">Dados demonstrativos</span></div></div>
+        <div class="chart-wrap" id="chartSpecies"></div>
+      </div>
+      <div class="chart-card"><div class="chart-head"><h4 data-i18n="s11.chart2t">Evolução da taxa de eclosão</h4><div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px"><span class="chart-live-tag"><span class="dot"></span><span data-i18n="chartlive">painel dinâmico</span></span><span class="demo-tag" data-i18n="demo">Dados demonstrativos</span></div></div>
+        <div class="chart-wrap" id="chartTrend"></div>
+      </div>
+    </div>
+    <div class="grid reveal reveal-delay-4" style="margin-top:20px">
+      <div class="chart-card"><div class="chart-head"><h4 data-i18n="s11.chart3t">Situação de validação científica dos registros</h4><span class="demo-tag" data-i18n="demo">Dados demonstrativos</span></div>
+        <div class="chart-wrap" id="chartValidation"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     12 GEOINTELIGÊNCIA
+     ============================================================ -->
+<section class="chapter chapter-dark" id="s12">
+  <div class="chapter-inner chapter-inner--wide">
+    <div class="chapter-kicker"><span class="chapter-num mono">12</span><span class="eyebrow" data-i18n="s12.eyebrow">Geointeligência</span></div>
+    <h2 class="chapter-title reveal" data-i18n="s12.title">Da bacia amazônica à praia, em três níveis de zoom.</h2>
+    <p class="lede reveal reveal-delay-1" data-i18n="s12.lede">Mapas ilustrativos e estilizados — a plataforma real usa geometria de precisão (PostGIS) para cada praia, ponto e polígono.</p>
+    <figure class="diagram reveal reveal-delay-2" id="geoDiagram" style="margin-top:40px"></figure>
+  </div>
+</section>
+
+<!-- ============================================================
+     13 PERFIS DE USO
+     ============================================================ -->
+<section class="chapter" id="s13">
+  <div class="chapter-inner chapter-inner--wide">
+    <div class="chapter-kicker"><span class="chapter-num mono">13</span><span class="eyebrow" data-i18n="s13.eyebrow">Quem usa o quê</span></div>
+    <h2 class="chapter-title reveal" data-i18n="s13.title">Um mesmo dado, lido em profundidades diferentes por cada perfil.</h2>
+    <div class="roles-row reveal reveal-delay-1" style="margin-top:30px" id="rolesRow"></div>
+  </div>
+</section>
+
+<!-- ============================================================
+     14 VALIDAÇÃO CIENTÍFICA
+     ============================================================ -->
+<section class="chapter chapter-dark" id="s14">
+  <div class="chapter-inner">
+    <div class="chapter-kicker"><span class="chapter-num mono">14</span><span class="eyebrow" data-i18n="s14.eyebrow">Validação científica</span></div>
+    <h2 class="chapter-title reveal" data-i18n="s14.title">Nenhum ninho vira estatística oficial sem passar por um biólogo.</h2>
+    <p class="lede reveal reveal-delay-1" data-i18n="s14.lede">Todo registro entra como pendente; a equipe técnica confirma, corrige ou rejeita, sempre com justificativa registrada.</p>
+    <figure class="diagram reveal reveal-delay-2" id="validationFlow" style="margin-top:36px"></figure>
+  </div>
+</section>
+
+<!-- ============================================================
+     15 GOVERNANÇA
+     ============================================================ -->
+<section class="chapter" id="s15">
+  <div class="chapter-inner">
+    <div class="chapter-kicker"><span class="chapter-num mono">15</span><span class="eyebrow" data-i18n="s15.eyebrow">Governança dos dados</span></div>
+    <h2 class="chapter-title reveal" data-i18n="s15.title">Rastreável do primeiro clique à exportação de um relatório.</h2>
+    <div class="grid g4 reveal reveal-delay-1" style="margin-top:30px">
+      <div class="card"><h4 data-i18n="s15.c1t">Autenticação e perfis</h4><p data-i18n="s15.c1p">Cada pessoa entra com identidade própria; permissões seguem o papel — monitor, coordenador, biólogo, gestor.</p></div>
+      <div class="card"><h4 data-i18n="s15.c2t">Registro de sessão</h4><p data-i18n="s15.c2p">Toda sessão de campo fica registrada, com dispositivo e horário.</p></div>
+      <div class="card"><h4 data-i18n="s15.c3t">Privacidade por padrão</h4><p data-i18n="s15.c3p">Fotos e dados pessoais nunca ficam publicamente acessíveis — acesso sempre autenticado e temporário.</p></div>
+      <div class="card"><h4 data-i18n="s15.c4t">Proteção de dados</h4><p data-i18n="s15.c4p">Aviso próprio de privacidade para quem coleta em campo, com linguagem adequada à atividade.</p></div>
+    </div>
+    <figure class="diagram reveal reveal-delay-2" id="govFlow" style="margin-top:40px"></figure>
+  </div>
+</section>
+
+<!-- ============================================================
+     16 CASO DE USO
+     ============================================================ -->
+<section class="chapter chapter-dark" id="s16">
+  <div class="chapter-inner chapter-inner--wide">
+    <div class="chapter-kicker"><span class="chapter-num mono">16</span><span class="eyebrow" data-i18n="s16.eyebrow">Caso demonstrativo</span></div>
+    <h2 class="chapter-title reveal" data-i18n="s16.title">Uma manhã na praia P-04, do jeito que ela realmente aconteceria.</h2>
+    <p class="lede reveal reveal-delay-1" data-i18n="s16.lede">Narrativa fictícia, construída para ilustrar o fluxo real do sistema — nenhum dado abaixo é registro verdadeiro.</p>
+    <span class="demo-tag reveal reveal-delay-1" data-i18n="s16.fict" style="margin-top:14px;display:inline-flex">Caso fictício, ilustrativo</span>
+    <div class="storyboard reveal reveal-delay-2" id="storyboardGrid"></div>
+  </div>
+</section>
+
+<!-- ============================================================
+     17 ROADMAP / IA
+     ============================================================ -->
+<section class="chapter" id="s17">
+  <div class="chapter-inner">
+    <div class="chapter-kicker"><span class="chapter-num mono">17</span><span class="eyebrow" data-i18n="s17.eyebrow">Hoje e amanhã</span></div>
+    <h2 class="chapter-title reveal" data-i18n="s17.title">O que já funciona — e o que é direção futura, não promessa.</h2>
+    <p class="lede reveal reveal-delay-1" data-i18n="s17.lede">Separação deliberada: nada listado à direita está implementado hoje.</p>
+    <div class="roadmap-cols reveal reveal-delay-2">
+      <div class="roadmap-col now">
+        <h4><span class="rm-badge"></span><span data-i18n="s17.nowtitle">Disponível hoje</span></h4>
+        <ul class="rm-list">
+          <li data-i18n="s17.now1">Registro offline de ninho, transferência e eclosão</li>
+          <li data-i18n="s17.now2">GPS e foto com marca d'água em cada registro</li>
+          <li data-i18n="s17.now3">Sincronização automática e idempotente</li>
+          <li data-i18n="s17.now4">Validação científica por biólogo, com motivo de rejeição</li>
+          <li data-i18n="s17.now5">Cálculo de taxa de eclosão por praia e temporada</li>
+          <li data-i18n="s17.now6">Controle de equipamentos em cautela</li>
+          <li data-i18n="s17.now7">Relatórios em PDF por ninho e por praia</li>
+        </ul>
+      </div>
+      <div class="roadmap-col next">
+        <h4><span class="rm-badge"></span><span data-i18n="s17.nexttitle">Direção futura (planejado)</span></h4>
+        <ul class="rm-list">
+          <li data-i18n="s17.next1">Identificação automática de espécie por imagem</li>
+          <li data-i18n="s17.next2">Detecção automática de inconsistências e anomalias</li>
+          <li data-i18n="s17.next3">Previsão de períodos de maior atividade reprodutiva</li>
+          <li data-i18n="s17.next4">Geração assistida de relatórios narrativos</li>
+          <li data-i18n="s17.next5">Integração com bases externas (proposta, sem acesso confirmado)</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     18 ESCALABILIDADE
+     ============================================================ -->
+<section class="chapter chapter-dark" id="s18">
+  <div class="chapter-inner">
+    <div class="chapter-kicker"><span class="chapter-num mono">18</span><span class="eyebrow" data-i18n="s18.eyebrow">Escalabilidade</span></div>
+    <h2 class="chapter-title reveal" data-i18n="s18.title">Nasceu para quelônios no Acre. O modelo já comporta mais.</h2>
+    <p class="lede reveal reveal-delay-1" data-i18n="s18.lede">O desenho de dados já prevê múltiplos programas e táxons — a trajetória abaixo é uma visão de expansão, não um roadmap confirmado.</p>
+    <figure class="diagram reveal reveal-delay-2" id="scaleDiagram" style="margin-top:40px"></figure>
+  </div>
+</section>
+
+<!-- ============================================================
+     19 STACK TECNOLÓGICA
+     ============================================================ -->
+<section class="chapter" id="s19" style="background:radial-gradient(ellipse 90% 60% at 85% 0%, var(--surface-2), var(--bg))">
+  <div class="chapter-inner chapter-inner--wide">
+    <div class="chapter-kicker"><span class="chapter-num mono">19</span><span class="eyebrow" data-i18n="s19.eyebrow">Arquitetura tecnológica</span></div>
+    <h2 class="chapter-title reveal" data-i18n="s19.title">A stack que já roda em produção — não uma stack hipotética.</h2>
+    <div class="stack-grid reveal reveal-delay-1" id="stackGrid" style="margin-top:30px"></div>
+  </div>
+</section>
+
+<!-- ============================================================
+     20 IMPACTO
+     ============================================================ -->
+<section class="chapter chapter-dark" id="s20">
+  <div class="chapter-inner">
+    <div class="chapter-kicker"><span class="chapter-num mono">20</span><span class="eyebrow" data-i18n="s20.eyebrow">Impacto para a conservação</span></div>
+    <h2 class="chapter-title reveal" data-i18n="s20.title">De um ninho registrado a uma espécie protegida.</h2>
+    <div class="chain reveal reveal-delay-1" id="impactChain"></div>
+  </div>
+</section>
+
+<!-- ============================================================
+     21 STAKEHOLDERS / FINANCIADORES (fecha o pitch institucional)
+     ============================================================ -->
+<section class="chapter" id="s21">
+  <div class="chapter-inner">
+    <div class="chapter-kicker"><span class="chapter-num mono">21</span><span class="eyebrow" data-i18n="s21.eyebrow">Para quem apoia e acompanha</span></div>
+    <h2 class="chapter-title reveal" data-i18n="s21.title">Evidência auditável para quem financia e para quem fiscaliza.</h2>
+    <p class="lede reveal reveal-delay-1" data-i18n="s21.lede">Instituições parceiras e financiadoras acompanham resultados por indicador — sem depender de relatório narrativo manual a cada prestação de contas.</p>
+    <div class="grid g3 reveal reveal-delay-2" style="margin-top:30px">
+      <div class="card"><h4 data-i18n="s21.c1t">Rastreabilidade</h4><p data-i18n="s21.c1p">Cada número do relatório final é rastreável até o registro de campo que o originou.</p></div>
+      <div class="card"><h4 data-i18n="s21.c2t">Comparabilidade</h4><p data-i18n="s21.c2p">Mesma metodologia entre praias, grupos e temporadas — comparar deixa de ser manual.</p></div>
+      <div class="card"><h4 data-i18n="s21.c3t">Transparência</h4><p data-i18n="s21.c3p">Indicadores públicos podem ser compartilhados sem expor dado pessoal de quem coletou.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     22 FECHAMENTO
+     ============================================================ -->
+<footer class="chapter chapter-dark closing" id="s22">
+  <div class="closing-inner">
+    <div class="chapter-kicker"><span class="chapter-num mono">22</span><span class="eyebrow" data-i18n="s22.eyebrow">Fechamento</span></div>
+    <h2 class="chapter-title reveal" data-i18n="s22.title">Um ninho de tracajá numa praia do Purus. Uma decisão de conservação em Rio Branco. O mesmo dado, o caminho inteiro.</h2>
+    <p class="lede reveal reveal-delay-1" data-i18n="s22.lede">É isso que o BioMonitor entrega: monitoramento confiável, ciência rastreável e gestão baseada em evidência — para que o quelônio amazônico continue voltando à mesma praia, ano após ano.</p>
+    <div class="closing-cta reveal reveal-delay-2">
+      <span data-i18n="s22.foot">SIGUC-AC · Sistema de Gestão de Unidades de Conservação do Acre — SEMA-AC / DIMA</span>
+    </div>
+  </div>
+</footer>
+
+</main>
+
+<script>
+(function(){
+"use strict";
+
+/* ============================================================
+   I18N DICTIONARY
+   ============================================================ */
+var I18N = {
+skip:{pt:"Ir para o conteúdo",en:"Skip to content",es:"Ir al contenido"},
+demo:{pt:"Dados demonstrativos",en:"Demonstrative data",es:"Datos demostrativos"},
+chartlive:{pt:"painel dinâmico",en:"live-style panel",es:"panel dinámico"},
+
+"hero.eyebrow":{pt:"SEMA-AC · Plataforma de biomonitoramento",en:"SEMA-AC · Biomonitoring platform",es:"SEMA-AC · Plataforma de biomonitoreo"},
+"hero.sub":{pt:"Tecnologia e ciência para o monitoramento dos quelônios amazônicos — do ninho na praia até a decisão de conservação.",en:"Technology and science for monitoring Amazonian freshwater turtles — from the nest on the beach to the conservation decision.",es:"Tecnología y ciencia para el monitoreo de los quelonios amazónicos — desde el nido en la playa hasta la decisión de conservación."},
+"hero.meta1":{pt:"espécies de quelônios monitoradas",en:"turtle species monitored",es:"especies de quelonios monitoreadas"},
+"hero.meta2":{pt:"funcional sem sinal de internet",en:"fully functional without internet signal",es:"funcional sin señal de internet"},
+"hero.meta3":{pt:"registro validado por biólogo antes de virar estatística",en:"record validated by a biologist before becoming statistics",es:"registro validado por un biólogo antes de convertirse en estadística"},
+"hero.scroll":{pt:"Role para explorar",en:"Scroll to explore",es:"Desplázate para explorar"},
+"hero.photocap":{pt:"Tracajá adulto · foto de campo",en:"Adult yellow-spotted turtle · field photo",es:"Taricaya adulta · foto de campo"},
+
+"s02.eyebrow":{pt:"O programa",en:"The program",es:"El programa"},
+"s02.title":{pt:"Um programa de monitoramento, com espécies reais e praias reais.",en:"A monitoring program, with real species and real beaches.",es:"Un programa de monitoreo, con especies reales y playas reales."},
+"s02.lede":{pt:"O BioMonitor nasceu para o Programa de Monitoramento de Quelônios do Acre, em parceria com o ICMBio — grupos de campo organizados por Unidade de Conservação, acompanhando o ciclo reprodutivo em praias fluviais.",en:"BioMonitor was built for the Acre Freshwater Turtle Monitoring Program, in partnership with ICMBio — field groups organized by Conservation Unit, following the reproductive cycle on river beaches.",es:"BioMonitor nació para el Programa de Monitoreo de Quelonios de Acre, en colaboración con el ICMBio — grupos de campo organizados por Unidad de Conservación, siguiendo el ciclo reproductivo en playas fluviales."},
+"s02.gcap1":{pt:"Ovos no ninho",en:"Eggs in the nest",es:"Huevos en el nido"},
+"s02.gcap2":{pt:"Filhote recém-eclodido",en:"Newly hatched turtle",es:"Cría recién nacida"},
+"s02.gcap3":{pt:"Ninho encontrado em campo",en:"Nest found in the field",es:"Nido encontrado en campo"},
+
+"s03.eyebrow":{pt:"O desafio",en:"The challenge",es:"El desafío"},
+"s03.title":{pt:"Uma praia amazônica não tem sinal de celular. O caderno de campo, tem.",en:"An Amazon beach has no phone signal. The field notebook does not need one.",es:"Una playa amazónica no tiene señal de celular. El cuaderno de campo, sí funciona."},
+"s03.lede":{pt:"O monitoramento tradicional depende de anotação manual, em condições adversas, sem padronização entre equipes — e o dado só chega a quem decide semanas depois, se chegar.",en:"Traditional monitoring depends on manual notes taken under harsh conditions, with no standardization across teams — and the data only reaches decision-makers weeks later, if at all.",es:"El monitoreo tradicional depende de anotaciones manuales, en condiciones adversas, sin estandarización entre equipos — y el dato llega a quien decide semanas después, si es que llega."},
+"s03.p1k":{pt:"01",en:"01",es:"01"}, "s03.p1t":{pt:"Campo",en:"Field",es:"Campo"},
+"s03.p2k":{pt:"02",en:"02",es:"02"}, "s03.p2t":{pt:"Caderno molhado",en:"Wet notebook",es:"Cuaderno mojado"},
+"s03.p3k":{pt:"03",en:"03",es:"03"}, "s03.p3t":{pt:"Digitação manual",en:"Manual typing",es:"Digitación manual"},
+"s03.p4k":{pt:"04",en:"04",es:"04"}, "s03.p4t":{pt:"Planilhas soltas",en:"Loose spreadsheets",es:"Planillas sueltas"},
+"s03.p5k":{pt:"05",en:"05",es:"05"}, "s03.p5t":{pt:"Consolidação tardia",en:"Late consolidation",es:"Consolidación tardía"},
+"s03.c1t":{pt:"Sem padronização",en:"No standardization",es:"Sin estandarización"},
+"s03.c1p":{pt:"Cada equipe registra do seu jeito — comparar praias vira trabalho manual.",en:"Each team records data its own way — comparing beaches becomes manual work.",es:"Cada equipo registra a su manera — comparar playas se vuelve trabajo manual."},
+"s03.c2t":{pt:"Localização imprecisa",en:"Imprecise location",es:"Ubicación imprecisa"},
+"s03.c2p":{pt:"Descrição por texto no lugar de coordenada georreferenciada.",en:"Text description instead of a georeferenced coordinate.",es:"Descripción por texto en lugar de coordenada georreferenciada."},
+"s03.c3t":{pt:"Perda de histórico",en:"Loss of history",es:"Pérdida de historial"},
+"s03.c3p":{pt:"Caderno perdido ou molhado é temporada perdida.",en:"A lost or soaked notebook means a lost season.",es:"Un cuaderno perdido o mojado es una temporada perdida."},
+"s03.c4t":{pt:"Decisão tardia",en:"Late decisions",es:"Decisión tardía"},
+"s03.c4p":{pt:"Quando o dado chega ao gestor, a temporada de desova já terminou.",en:"By the time data reaches managers, the nesting season is already over.",es:"Cuando el dato llega al gestor, la temporada de desove ya terminó."},
+
+"s04.eyebrow":{pt:"A transformação",en:"The transformation",es:"La transformación"},
+"s04.title":{pt:"O BioMonitor não é um app de coleta. É um ecossistema de dado.",en:"BioMonitor is not a data-collection app. It is a data ecosystem.",es:"BioMonitor no es una app de recolección. Es un ecosistema de datos."},
+"s04.lede":{pt:"O mesmo registro que nasce na mão do monitor chega ao gestor como indicador — sem reescrita manual, sem planilha intermediária, sem perda.",en:"The same record that starts in the monitor's hands reaches the manager as an indicator — no manual rewriting, no intermediate spreadsheet, no loss.",es:"El mismo registro que nace en la mano del monitor llega al gestor como indicador — sin reescritura manual, sin planilla intermedia, sin pérdida."},
+"s04.p1k":{pt:"campo",en:"field",es:"campo"}, "s04.p1t":{pt:"Coleta digital",en:"Digital collection",es:"Recolección digital"},
+"s04.p2k":{pt:"sync",en:"sync",es:"sync"}, "s04.p2t":{pt:"Sincronização",en:"Synchronization",es:"Sincronización"},
+"s04.p3k":{pt:"banco",en:"database",es:"base"}, "s04.p3t":{pt:"Banco geoespacial",en:"Geospatial database",es:"Base de datos geoespacial"},
+"s04.p4k":{pt:"análise",en:"analysis",es:"análisis"}, "s04.p4t":{pt:"Indicadores",en:"Indicators",es:"Indicadores"},
+"s04.p5k":{pt:"gestão",en:"management",es:"gestión"}, "s04.p5t":{pt:"Decisão",en:"Decision",es:"Decisión"},
+
+"s05.eyebrow":{pt:"Arquitetura",en:"Architecture",es:"Arquitectura"},
+"s05.title":{pt:"Sete camadas, do dado bruto de campo à decisão de gestão.",en:"Seven layers, from raw field data to management decisions.",es:"Siete capas, desde el dato bruto de campo hasta la decisión de gestión."},
+"s05.lede":{pt:"Cada camada tem uma responsabilidade única — nenhuma tela recalcula o que outra camada já resolveu.",en:"Each layer has a single responsibility — no screen recalculates what another layer already solved.",es:"Cada capa tiene una responsabilidad única — ninguna pantalla recalcula lo que otra capa ya resolvió."},
+"s05.cap":{pt:"Arquitetura em camadas: campo → comunicação → backend → banco de dados → geotecnologia → inteligência e análise → visualização.",en:"Layered architecture: field → communication → backend → database → geotechnology → intelligence and analysis → visualization.",es:"Arquitectura en capas: campo → comunicación → backend → base de datos → geotecnología → inteligencia y análisis → visualización."},
+
+"s06.eyebrow":{pt:"O aplicativo de campo",en:"The field app",es:"La aplicación de campo"},
+"s06.title":{pt:"Feito para funcionar no meio do rio, sem uma barra de sinal.",en:"Built to work in the middle of the river, without a single signal bar.",es:"Hecho para funcionar en medio del río, sin una barra de señal."},
+"s06.lede":{pt:"Login por PIN, GPS, foto com marca d'água e fila de sincronização — tudo funciona offline; nada trava o trabalho de campo.",en:"PIN login, GPS, watermarked photos and a sync queue — everything works offline; nothing blocks fieldwork.",es:"Inicio de sesión por PIN, GPS, foto con marca de agua y cola de sincronización — todo funciona sin conexión; nada detiene el trabajo de campo."},
+"s06.offlinebadge":{pt:"SEM SINAL",en:"NO SIGNAL",es:"SIN SEÑAL"},
+"s06.phname":{pt:"Raimunda M.",en:"Raimunda M.",es:"Raimunda M."},
+"s06.phsub":{pt:"Grupo Purus · RESEX Alto Purus",en:"Purus Group · RESEX Alto Purus",es:"Grupo Purus · RESEX Alto Purus"},
+"s06.phchip1":{pt:"Temporada 2026",en:"2026 season",es:"Temporada 2026"},
+"s06.phchip2":{pt:"Praia P-04",en:"Beach P-04",es:"Playa P-04"},
+"s06.phbtn":{pt:"Registrar ninho",en:"Register nest",es:"Registrar nido"},
+"s06.phbtn2":{pt:"Meus dados",en:"My data",es:"Mis datos"},
+"s06.cap1":{pt:"Tela inicial do monitor",en:"Monitor's home screen",es:"Pantalla inicial del monitor"},
+"s06.newnest":{pt:"Novo ninho",en:"New nest",es:"Nuevo nido"},
+"s06.f1":{pt:"Espécie",en:"Species",es:"Especie"},
+"s06.f1v":{pt:"Podocnemis unifilis",en:"Podocnemis unifilis",es:"Podocnemis unifilis"},
+"s06.f2":{pt:"Nº do ninho",en:"Nest No.",es:"N.º de nido"},
+"s06.f2v":{pt:"P04-2026-031",en:"P04-2026-031",es:"P04-2026-031"},
+"s06.gps":{pt:"GPS: ±3,2 m — capturando",en:"GPS: ±3.2 m — capturing",es:"GPS: ±3,2 m — capturando"},
+"s06.save":{pt:"Salvar no dispositivo",en:"Save on device",es:"Guardar en el dispositivo"},
+"s06.cap2":{pt:"Registro do ninho, com foto e GPS",en:"Nest record, with photo and GPS",es:"Registro del nido, con foto y GPS"},
+"s06.queue":{pt:"Fila de envio",en:"Upload queue",es:"Cola de envío"},
+"s06.q1t":{pt:"Ninho P04-031",en:"Nest P04-031",es:"Nido P04-031"},
+"s06.q1s":{pt:"Sincronizado · 2 fotos",en:"Synced · 2 photos",es:"Sincronizado · 2 fotos"},
+"s06.q2t":{pt:"Eclosão P03-027",en:"Hatching P03-027",es:"Eclosión P03-027"},
+"s06.q2s":{pt:"Sincronizado · 1 foto",en:"Synced · 1 photo",es:"Sincronizado · 1 foto"},
+"s06.q3t":{pt:"Ninho P04-032",en:"Nest P04-032",es:"Nido P04-032"},
+"s06.q3s":{pt:"Aguardando sinal",en:"Waiting for signal",es:"Esperando señal"},
+"s06.q4t":{pt:"Transferência P02-019",en:"Transfer P02-019",es:"Transferencia P02-019"},
+"s06.q4s":{pt:"Aguardando sinal",en:"Waiting for signal",es:"Esperando señal"},
+"s06.autosync":{pt:"Sincroniza automaticamente ao voltar o sinal",en:"Syncs automatically once signal returns",es:"Se sincroniza automáticamente al volver la señal"},
+"s06.cap3":{pt:"Fila offline, com sincronização automática",en:"Offline queue, with automatic sync",es:"Cola sin conexión, con sincronización automática"},
+"s06.mydata":{pt:"Meus dados",en:"My data",es:"Mis datos"},
+"s06.season":{pt:"Temporada 2026",en:"2026 season",es:"Temporada 2026"},
+"s06.k1":{pt:"ninhos registrados",en:"nests registered",es:"nidos registrados"},
+"s06.k2":{pt:"eclosões acompanhadas",en:"hatchings followed",es:"eclosiones seguidas"},
+"s06.k3":{pt:"taxa de eclosão do grupo",en:"group hatching rate",es:"tasa de eclosión del grupo"},
+"s06.k4":{pt:"pendentes de validação",en:"pending validation",es:"pendientes de validación"},
+"s06.cap4":{pt:"Desempenho do próprio monitor",en:"The monitor's own performance",es:"Desempeño del propio monitor"},
+
+"s07.eyebrow":{pt:"Funcionamento offline",en:"Offline operation",es:"Funcionamiento sin conexión"},
+"s07.title":{pt:"Sem internet, a equipe não para. O aparelho segura tudo.",en:"Without internet, the team keeps going. The device holds everything.",es:"Sin internet, el equipo no se detiene. El dispositivo lo sostiene todo."},
+"s07.lede":{pt:"GPS, fotos e formulários continuam disponíveis; cada registro recebe um identificador único ainda em campo, o que evita duplicidade quando a sincronização finalmente acontece.",en:"GPS, photos and forms remain available; every record gets a unique identifier while still in the field, which prevents duplicates once syncing finally happens.",es:"GPS, fotos y formularios siguen disponibles; cada registro recibe un identificador único aún en el campo, lo que evita duplicados cuando finalmente ocurre la sincronización."},
+"s07.c1t":{pt:"Sem sinal",en:"No signal",es:"Sin señal"},
+"s07.c1p":{pt:"Formulário, câmera e GPS continuam ativos; nada bloqueia o registro.",en:"Form, camera and GPS stay active; nothing blocks the record.",es:"Formulario, cámara y GPS siguen activos; nada bloquea el registro."},
+"s07.c2t":{pt:"Armazenamento local",en:"Local storage",es:"Almacenamiento local"},
+"s07.c2p":{pt:"Dados e fotos ficam guardados no próprio aparelho até haver conexão.",en:"Data and photos stay stored on the device itself until there is a connection.",es:"Los datos y las fotos quedan guardados en el propio dispositivo hasta que haya conexión."},
+"s07.c3t":{pt:"Sincronização idempotente",en:"Idempotent sync",es:"Sincronización idempotente"},
+"s07.c3p":{pt:"Reenviar não duplica: cada registro tem um identificador gerado ainda offline.",en:"Resending never duplicates: every record carries an identifier generated while still offline.",es:"Reenviar no duplica: cada registro tiene un identificador generado aún sin conexión."},
+
+"s08.eyebrow":{pt:"O ciclo do ninho",en:"The nest cycle",es:"El ciclo del nido"},
+"s08.title":{pt:"Todo ninho tem um estado — e o sistema sabe qual é, sempre.",en:"Every nest has a state — and the system always knows which one.",es:"Todo nido tiene un estado — y el sistema siempre sabe cuál es."},
+"s08.lede":{pt:"Do encontro ao desfecho, cada mudança de estado é registrada em campo e vira parte do histórico da praia.",en:"From discovery to outcome, every state change is recorded in the field and becomes part of the beach's history.",es:"Desde el hallazgo hasta el desenlace, cada cambio de estado se registra en campo y forma parte del historial de la playa."},
+
+"s09.eyebrow":{pt:"Um registro, do início ao fim",en:"One record, start to finish",es:"Un registro, de principio a fin"},
+"s09.title":{pt:"Siga um único ninho da praia até o painel do gestor.",en:"Follow a single nest from the beach to the manager's dashboard.",es:"Siga un solo nido desde la playa hasta el panel del gestor."},
+"s09.lede":{pt:"O mesmo identificador criado em campo percorre todo o caminho — nenhuma etapa reescreve o dado, todas apenas o enriquecem.",en:"The same identifier created in the field travels the whole way — no step rewrites the data, each one only enriches it.",es:"El mismo identificador creado en campo recorre todo el camino — ningún paso reescribe el dato, todos solo lo enriquecen."},
+
+"s10.eyebrow":{pt:"Da observação à evidência",en:"From observation to evidence",es:"De la observación a la evidencia"},
+"s10.title":{pt:"O BioMonitor transforma observação de campo em evidência para a conservação.",en:"BioMonitor turns field observation into evidence for conservation.",es:"BioMonitor transforma la observación de campo en evidencia para la conservación."},
+
+"s11.eyebrow":{pt:"Indicadores científicos",en:"Scientific indicators",es:"Indicadores científicos"},
+"s11.title":{pt:"O que a plataforma consegue extrair de cada temporada.",en:"What the platform can extract from every season.",es:"Lo que la plataforma puede extraer de cada temporada."},
+"s11.lede":{pt:"Os números abaixo ilustram o tipo de indicador que o BioMonitor calcula — todos com base fictícia, para fins de demonstração.",en:"The numbers below illustrate the kind of indicator BioMonitor calculates — all figures are fictional, for demonstration purposes only.",es:"Los números a continuación ilustran el tipo de indicador que BioMonitor calcula — todos con base ficticia, con fines de demostración."},
+"s11.k1":{pt:"ninhos registrados na temporada",en:"nests registered in the season",es:"nidos registrados en la temporada"},
+"s11.k2":{pt:"filhotes eclodidos",en:"hatchlings born",es:"crías eclosionadas"},
+"s11.k3":{pt:"taxa média de sucesso reprodutivo",en:"average reproductive success rate",es:"tasa media de éxito reproductivo"},
+"s11.k4":{pt:"praias monitoradas",en:"beaches monitored",es:"playas monitoreadas"},
+"s11.chart1t":{pt:"Ninhos por espécie",en:"Nests by species",es:"Nidos por especie"},
+"s11.chart2t":{pt:"Evolução da taxa de eclosão",en:"Hatching-rate trend",es:"Evolución de la tasa de eclosión"},
+"s11.chart3t":{pt:"Situação de validação científica dos registros",en:"Scientific validation status of records",es:"Situación de validación científica de los registros"},
+
+"s12.eyebrow":{pt:"Geointeligência",en:"Geointelligence",es:"Geointeligencia"},
+"s12.title":{pt:"Da bacia amazônica à praia, em três níveis de zoom.",en:"From the Amazon basin to the beach, across three zoom levels.",es:"De la cuenca amazónica a la playa, en tres niveles de zoom."},
+"s12.lede":{pt:"Mapas ilustrativos e estilizados — a plataforma real usa geometria de precisão (PostGIS) para cada praia, ponto e polígono.",en:"Illustrative, stylized maps — the real platform uses precision geometry (PostGIS) for every beach, point and polygon.",es:"Mapas ilustrativos y estilizados — la plataforma real usa geometría de precisión (PostGIS) para cada playa, punto y polígono."},
+
+"s13.eyebrow":{pt:"Quem usa o quê",en:"Who uses what",es:"Quién usa qué"},
+"s13.title":{pt:"Um mesmo dado, lido em profundidades diferentes por cada perfil.",en:"The same data, read at different depths by each role.",es:"Un mismo dato, leído en profundidades diferentes por cada perfil."},
+
+"s14.eyebrow":{pt:"Validação científica",en:"Scientific validation",es:"Validación científica"},
+"s14.title":{pt:"Nenhum ninho vira estatística oficial sem passar por um biólogo.",en:"No nest becomes official statistics without a biologist's review.",es:"Ningún nido se convierte en estadística oficial sin pasar por un biólogo."},
+"s14.lede":{pt:"Todo registro entra como pendente; a equipe técnica confirma, corrige ou rejeita, sempre com justificativa registrada.",en:"Every record starts as pending; the technical team confirms, corrects or rejects it, always with a recorded justification.",es:"Todo registro entra como pendiente; el equipo técnico confirma, corrige o rechaza, siempre con una justificación registrada."},
+
+"s15.eyebrow":{pt:"Governança dos dados",en:"Data governance",es:"Gobernanza de datos"},
+"s15.title":{pt:"Rastreável do primeiro clique à exportação de um relatório.",en:"Traceable from the first click to the report export.",es:"Trazable desde el primer clic hasta la exportación de un informe."},
+"s15.c1t":{pt:"Autenticação e perfis",en:"Authentication and roles",es:"Autenticación y perfiles"},
+"s15.c1p":{pt:"Cada pessoa entra com identidade própria; permissões seguem o papel — monitor, coordenador, biólogo, gestor.",en:"Everyone signs in with their own identity; permissions follow the role — monitor, coordinator, biologist, manager.",es:"Cada persona ingresa con su propia identidad; los permisos siguen el rol — monitor, coordinador, biólogo, gestor."},
+"s15.c2t":{pt:"Registro de sessão",en:"Session logging",es:"Registro de sesión"},
+"s15.c2p":{pt:"Toda sessão de campo fica registrada, com dispositivo e horário.",en:"Every field session is logged, with device and timestamp.",es:"Toda sesión de campo queda registrada, con dispositivo y horario."},
+"s15.c3t":{pt:"Privacidade por padrão",en:"Privacy by default",es:"Privacidad por defecto"},
+"s15.c3p":{pt:"Fotos e dados pessoais nunca ficam publicamente acessíveis — acesso sempre autenticado e temporário.",en:"Photos and personal data are never publicly accessible — access is always authenticated and temporary.",es:"Las fotos y los datos personales nunca son de acceso público — el acceso siempre es autenticado y temporal."},
+"s15.c4t":{pt:"Proteção de dados",en:"Data protection",es:"Protección de datos"},
+"s15.c4p":{pt:"Aviso próprio de privacidade para quem coleta em campo, com linguagem adequada à atividade.",en:"A dedicated privacy notice for field collectors, written in language suited to the activity.",es:"Aviso propio de privacidad para quien recolecta en campo, con lenguaje adecuado a la actividad."},
+
+"s16.eyebrow":{pt:"Caso demonstrativo",en:"Demonstration case",es:"Caso demostrativo"},
+"s16.title":{pt:"Uma manhã na praia P-04, do jeito que ela realmente aconteceria.",en:"A morning at beach P-04, the way it would actually unfold.",es:"Una mañana en la playa P-04, tal como sucedería en realidad."},
+"s16.lede":{pt:"Narrativa fictícia, construída para ilustrar o fluxo real do sistema — nenhum dado abaixo é registro verdadeiro.",en:"A fictional narrative, built to illustrate the system's real workflow — none of the data below is an actual record.",es:"Narrativa ficticia, construida para ilustrar el flujo real del sistema — ningún dato a continuación es un registro verdadero."},
+"s16.fict":{pt:"Caso fictício, ilustrativo",en:"Fictional, illustrative case",es:"Caso ficticio, ilustrativo"},
+
+"s17.eyebrow":{pt:"Hoje e amanhã",en:"Today and tomorrow",es:"Hoy y mañana"},
+"s17.title":{pt:"O que já funciona — e o que é direção futura, não promessa.",en:"What already works — and what is a future direction, not a promise.",es:"Lo que ya funciona — y lo que es una dirección futura, no una promesa."},
+"s17.lede":{pt:"Separação deliberada: nada listado à direita está implementado hoje.",en:"A deliberate separation: nothing listed on the right is implemented today.",es:"Separación deliberada: nada de lo listado a la derecha está implementado hoy."},
+"s17.nowtitle":{pt:"Disponível hoje",en:"Available today",es:"Disponible hoy"},
+"s17.now1":{pt:"Registro offline de ninho, transferência e eclosão",en:"Offline recording of nests, transfers and hatchings",es:"Registro sin conexión de nido, transferencia y eclosión"},
+"s17.now2":{pt:"GPS e foto com marca d'água em cada registro",en:"GPS and watermarked photo on every record",es:"GPS y foto con marca de agua en cada registro"},
+"s17.now3":{pt:"Sincronização automática e idempotente",en:"Automatic, idempotent synchronization",es:"Sincronización automática e idempotente"},
+"s17.now4":{pt:"Validação científica por biólogo, com motivo de rejeição",en:"Scientific validation by a biologist, with a rejection reason",es:"Validación científica por biólogo, con motivo de rechazo"},
+"s17.now5":{pt:"Cálculo de taxa de eclosão por praia e temporada",en:"Hatching-rate calculation by beach and season",es:"Cálculo de la tasa de eclosión por playa y temporada"},
+"s17.now6":{pt:"Controle de equipamentos em cautela",en:"Equipment custody control",es:"Control de equipos en custodia"},
+"s17.now7":{pt:"Relatórios em PDF por ninho e por praia",en:"PDF reports per nest and per beach",es:"Informes en PDF por nido y por playa"},
+"s17.nexttitle":{pt:"Direção futura (planejado)",en:"Future direction (planned)",es:"Dirección futura (planificado)"},
+"s17.next1":{pt:"Identificação automática de espécie por imagem",en:"Automatic species identification from images",es:"Identificación automática de especies por imagen"},
+"s17.next2":{pt:"Detecção automática de inconsistências e anomalias",en:"Automatic detection of inconsistencies and anomalies",es:"Detección automática de inconsistencias y anomalías"},
+"s17.next3":{pt:"Previsão de períodos de maior atividade reprodutiva",en:"Prediction of peak reproductive activity periods",es:"Predicción de períodos de mayor actividad reproductiva"},
+"s17.next4":{pt:"Geração assistida de relatórios narrativos",en:"Assisted generation of narrative reports",es:"Generación asistida de informes narrativos"},
+"s17.next5":{pt:"Integração com bases externas (proposta, sem acesso confirmado)",en:"Integration with external databases (proposed, access not confirmed)",es:"Integración con bases externas (propuesta, sin acceso confirmado)"},
+
+"s18.eyebrow":{pt:"Escalabilidade",en:"Scalability",es:"Escalabilidad"},
+"s18.title":{pt:"Nasceu para quelônios no Acre. O modelo já comporta mais.",en:"Born for turtles in Acre. The model already allows for more.",es:"Nació para quelonios en Acre. El modelo ya permite más."},
+"s18.lede":{pt:"O desenho de dados já prevê múltiplos programas e táxons — a trajetória abaixo é uma visão de expansão, não um roadmap confirmado.",en:"The data model already anticipates multiple programs and taxa — the path below is an expansion vision, not a confirmed roadmap.",es:"El diseño de datos ya prevé múltiples programas y taxones — la trayectoria a continuación es una visión de expansión, no una hoja de ruta confirmada."},
+
+"s19.eyebrow":{pt:"Arquitetura tecnológica",en:"Technology architecture",es:"Arquitectura tecnológica"},
+"s19.title":{pt:"A stack que já roda em produção — não uma stack hipotética.",en:"The stack already running in production — not a hypothetical one.",es:"La pila que ya funciona en producción — no una pila hipotética."},
+
+"s20.eyebrow":{pt:"Impacto para a conservação",en:"Impact for conservation",es:"Impacto para la conservación"},
+"s20.title":{pt:"De um ninho registrado a uma espécie protegida.",en:"From a recorded nest to a protected species.",es:"De un nido registrado a una especie protegida."},
+
+"s21.eyebrow":{pt:"Para quem apoia e acompanha",en:"For supporters and observers",es:"Para quien apoya y acompaña"},
+"s21.title":{pt:"Evidência auditável para quem financia e para quem fiscaliza.",en:"Auditable evidence for funders and oversight bodies.",es:"Evidencia auditable para quienes financian y quienes fiscalizan."},
+"s21.lede":{pt:"Instituições parceiras e financiadoras acompanham resultados por indicador — sem depender de relatório narrativo manual a cada prestação de contas.",en:"Partner and funding institutions track results by indicator — without relying on a manual narrative report for every accountability cycle.",es:"Las instituciones socias y financiadoras siguen los resultados por indicador — sin depender de un informe narrativo manual en cada rendición de cuentas."},
+"s21.c1t":{pt:"Rastreabilidade",en:"Traceability",es:"Trazabilidad"},
+"s21.c1p":{pt:"Cada número do relatório final é rastreável até o registro de campo que o originou.",en:"Every number in the final report traces back to the field record that generated it.",es:"Cada número del informe final es rastreable hasta el registro de campo que lo originó."},
+"s21.c2t":{pt:"Comparabilidade",en:"Comparability",es:"Comparabilidad"},
+"s21.c2p":{pt:"Mesma metodologia entre praias, grupos e temporadas — comparar deixa de ser manual.",en:"Same methodology across beaches, groups and seasons — comparison stops being manual work.",es:"Misma metodología entre playas, grupos y temporadas — comparar deja de ser manual."},
+"s21.c3t":{pt:"Transparência",en:"Transparency",es:"Transparencia"},
+"s21.c3p":{pt:"Indicadores públicos podem ser compartilhados sem expor dado pessoal de quem coletou.",en:"Public indicators can be shared without exposing the personal data of whoever collected them.",es:"Los indicadores públicos pueden compartirse sin exponer datos personales de quien los recolectó."},
+
+"s22.eyebrow":{pt:"Fechamento",en:"Closing",es:"Cierre"},
+"s22.title":{pt:"Um ninho de tracajá numa praia do Purus. Uma decisão de conservação em Rio Branco. O mesmo dado, o caminho inteiro.",en:"A tracajá nest on a beach along the Purus. A conservation decision in Rio Branco. The same data, the whole way through.",es:"Un nido de tracajá en una playa del Purus. Una decisión de conservación en Rio Branco. El mismo dato, todo el camino."},
+"s22.lede":{pt:"É isso que o BioMonitor entrega: monitoramento confiável, ciência rastreável e gestão baseada em evidência — para que o quelônio amazônico continue voltando à mesma praia, ano após ano.",en:"That is what BioMonitor delivers: reliable monitoring, traceable science and evidence-based management — so the Amazonian turtle keeps returning to the same beach, year after year.",es:"Eso es lo que entrega BioMonitor: monitoreo confiable, ciencia trazable y gestión basada en evidencia — para que el quelonio amazónico siga volviendo a la misma playa, año tras año."},
+"s22.foot":{pt:"SIGUC-AC · Sistema de Gestão de Unidades de Conservação do Acre — SEMA-AC / DIMA",en:"SIGUC-AC · Acre Conservation Units Management System — SEMA-AC / DIMA",es:"SIGUC-AC · Sistema de Gestión de Unidades de Conservación de Acre — SEMA-AC / DIMA"}
+};
+
+var hero = {pt:"BIO<em>MONITOR</em>", en:"BIO<em>MONITOR</em>", es:"BIO<em>MONITOR</em>"};
+
+/* ============================================================
+   DATA — species, roles, stack, storyboard, impact chain, scale
+   ============================================================ */
+var SPECIES = [
+  {sci:"Podocnemis expansa", pt:"Tartaruga-da-amazônia", en:"Giant South American turtle", es:"Tortuga arrau", c:"var(--series-1)"},
+  {sci:"Podocnemis unifilis", pt:"Tracajá", en:"Yellow-spotted river turtle", es:"Taricaya", c:"var(--series-2)"},
+  {sci:"Podocnemis sextuberculata", pt:"Iaçá / Cabeçudo", en:"Six-tubercled Amazon River turtle", es:"Cupiso", c:"var(--series-3)"},
+  {sci:"Podocnemis erythrocephala", pt:"Pitiú", en:"Red-headed Amazon River turtle", es:"Cabezón", c:"var(--series-4)"},
+  {sci:"Chelonoidis denticulatus", pt:"Jabuti-pé-elefante", en:"Yellow-footed tortoise", es:"Motelo", c:"var(--forest)"},
+  {sci:"Chelonoidis carbonarius", pt:"Jabuti-piranga", en:"Red-footed tortoise", es:"Charapa de tierra", c:"var(--sand)"},
+  {sci:"Kinosternon scorpioides", pt:"Muçuã", en:"Scorpion mud turtle", es:"Charapilla", c:"var(--coral)"},
+  {sci:"Podocnemis cayennensis", pt:"Cupido", en:"Cayenne slider", es:"Cupido", c:"var(--river)"}
+];
+
+function speciesLabel(s,lang){ return s[lang]; }
+
+var ROLES = [
+  {icon:"user", t:{pt:"Monitor de campo",en:"Field monitor",es:"Monitor de campo"}, p:{pt:"Registra ninhos, transferências e eclosões direto na praia.",en:"Records nests, transfers and hatchings right on the beach.",es:"Registra nidos, transferencias y eclosiones directo en la playa."}},
+  {icon:"team", t:{pt:"Coordenador de grupo",en:"Group coordinator",es:"Coordinador de grupo"}, p:{pt:"Acompanha a temporada e o desempenho dos monitores do grupo.",en:"Tracks the season and the performance of the group's monitors.",es:"Sigue la temporada y el desempeño de los monitores del grupo."}},
+  {icon:"flask", t:{pt:"Biólogo / DEBIO",en:"Biologist / DEBIO",es:"Biólogo / DEBIO"}, p:{pt:"Valida cientificamente cada registro antes de ele virar estatística.",en:"Scientifically validates every record before it becomes statistics.",es:"Valida científicamente cada registro antes de que se convierta en estadística."}},
+  {icon:"chart", t:{pt:"Gestor ambiental",en:"Environmental manager",es:"Gestor ambiental"}, p:{pt:"Visualiza indicadores por UC, praia e temporada para priorizar ações.",en:"Views indicators by Conservation Unit, beach and season to prioritize action.",es:"Visualiza indicadores por UC, playa y temporada para priorizar acciones."}},
+  {icon:"star", t:{pt:"Instituição parceira",en:"Partner institution",es:"Institución socia"}, p:{pt:"Acompanha resultados consolidados sem depender de relatório manual.",en:"Tracks consolidated results without relying on manual reports.",es:"Sigue resultados consolidados sin depender de informes manuales."}}
+];
+
+var STACK = [
+  {tag:{pt:"App de campo",en:"Field app",es:"App de campo"}, name:"HTML/JS + Capacitor", p:{pt:"Mesmo código do app web vira aplicativo Android nativo — sem duas bases de código para manter.",en:"The same web app code becomes a native Android app — no two codebases to maintain.",es:"El mismo código de la app web se convierte en app nativa de Android — sin dos bases de código que mantener."}},
+  {tag:{pt:"Armazenamento offline",en:"Offline storage",es:"Almacenamiento sin conexión"}, name:"IndexedDB", p:{pt:"Nativo do navegador, sem dependência externa, guarda a fila de registros pendentes.",en:"Native to the browser, no external dependency, holds the pending-record queue.",es:"Nativo del navegador, sin dependencia externa, guarda la cola de registros pendientes."}},
+  {tag:{pt:"Backend",en:"Backend",es:"Backend"}, name:"Supabase (Postgres + Auth)", p:{pt:"Autenticação, regras de acesso por perfil e API já resolvidas por uma única plataforma.",en:"Authentication, role-based access rules and API all solved by a single platform.",es:"Autenticación, reglas de acceso por perfil y API resueltas por una única plataforma."}},
+  {tag:{pt:"Banco geoespacial",en:"Geospatial database",es:"Base de datos geoespacial"}, name:"PostgreSQL + PostGIS", p:{pt:"Área e comprimento de cada praia calculados no próprio banco, a partir da geometria real.",en:"Every beach's area and length are calculated in the database itself, from the real geometry.",es:"El área y el largo de cada playa se calculan en la propia base, a partir de la geometría real."}},
+  {tag:{pt:"Mapas",en:"Maps",es:"Mapas"}, name:"Leaflet", p:{pt:"Biblioteca leve e já validada no restante da plataforma de gestão das UCs.",en:"A lightweight library already validated across the rest of the conservation-unit management platform.",es:"Biblioteca ligera y ya validada en el resto de la plataforma de gestión de las UC."}},
+  {tag:{pt:"Fotos e arquivos",en:"Photos and files",es:"Fotos y archivos"}, name:"Bucket privado + URL assinada", p:{pt:"Nenhuma foto de campo fica publicamente acessível — acesso sempre autenticado e temporário.",en:"No field photo is ever publicly accessible — access is always authenticated and temporary.",es:"Ninguna foto de campo queda de acceso público — el acceso siempre es autenticado y temporal."}}
+];
+
+var STORY = [
+  {t:{pt:"Chegada à praia",en:"Arriving at the beach",es:"Llegada a la playa"}, p:{pt:"A equipe abre o app e confirma o grupo e a temporada ativa.",en:"The team opens the app and confirms the group and the active season.",es:"El equipo abre la app y confirma el grupo y la temporada activa."}},
+  {t:{pt:"GPS capturado",en:"GPS captured",es:"GPS capturado"}, p:{pt:"A localização é registrada automaticamente ao abrir o formulário de ninho.",en:"Location is automatically captured when opening the nest form.",es:"La ubicación se registra automáticamente al abrir el formulario de nido."}},
+  {t:{pt:"Espécie identificada",en:"Species identified",es:"Especie identificada"}, p:{pt:"O monitor seleciona a espécie e fotografa a postura, com marca d'água aplicada.",en:"The monitor selects the species and photographs the clutch, with a watermark applied.",es:"El monitor selecciona la especie y fotografía la postura, con marca de agua aplicada."}},
+  {t:{pt:"Registro salvo offline",en:"Saved offline",es:"Registro guardado sin conexión"}, p:{pt:"Sem sinal na praia, o registro fica na fila do dispositivo.",en:"With no signal on the beach, the record waits in the device's queue.",es:"Sin señal en la playa, el registro queda en la cola del dispositivo."}},
+  {t:{pt:"Retorno com sinal",en:"Back within signal range",es:"Regreso con señal"}, p:{pt:"Ao chegar à base, o aparelho sincroniza tudo automaticamente.",en:"Back at base, the device syncs everything automatically.",es:"Al llegar a la base, el dispositivo sincroniza todo automáticamente."}},
+  {t:{pt:"Validação científica",en:"Scientific validation",es:"Validación científica"}, p:{pt:"O biólogo do DEBIO confere o registro e confirma a espécie e os dados.",en:"The DEBIO biologist reviews the record and confirms species and data.",es:"El biólogo del DEBIO revisa el registro y confirma la especie y los datos."}},
+  {t:{pt:"Painel atualizado",en:"Dashboard updated",es:"Panel actualizado"}, p:{pt:"O indicador de ninhos da praia P-04 sobe em tempo quase real.",en:"The nest indicator for beach P-04 rises in near real time.",es:"El indicador de nidos de la playa P-04 sube en tiempo casi real."}},
+  {t:{pt:"Decisão do gestor",en:"Manager's decision",es:"Decisión del gestor"}, p:{pt:"A SEMA-AC direciona reforço de equipe para a praia com maior concentração.",en:"SEMA-AC directs extra team support to the beach with the highest concentration.",es:"La SEMA-AC destina refuerzo de equipo a la playa con mayor concentración."}}
+];
+
+var IMPACT = [
+  {t:{pt:"Monitoramento",en:"Monitoring",es:"Monitoreo"}, s:{pt:"em campo, todo dia de temporada",en:"in the field, every day of the season",es:"en campo, cada día de la temporada"}},
+  {t:{pt:"Dados confiáveis",en:"Reliable data",es:"Datos confiables"}, s:{pt:"georreferenciados e validados",en:"georeferenced and validated",es:"georreferenciados y validados"}},
+  {t:{pt:"Conhecimento científico",en:"Scientific knowledge",es:"Conocimiento científico"}, s:{pt:"comparável entre praias e anos",en:"comparable across beaches and years",es:"comparable entre playas y años"}},
+  {t:{pt:"Gestão baseada em evidência",en:"Evidence-based management",es:"Gestión basada en evidencia"}, s:{pt:"prioridades definidas por indicador",en:"priorities defined by indicator",es:"prioridades definidas por indicador"}},
+  {t:{pt:"Ações de conservação",en:"Conservation actions",es:"Acciones de conservación"}, s:{pt:"reforço onde o dado aponta risco",en:"reinforcement where the data shows risk",es:"refuerzo donde el dato señala riesgo"}},
+  {t:{pt:"Quelônios protegidos",en:"Turtles protected",es:"Quelonios protegidos"}, s:{pt:"praia após praia, temporada após temporada",en:"beach after beach, season after season",es:"playa tras playa, temporada tras temporada"}}
+];
+
+var SCALE = [
+  {r:56, t:{pt:"Quelônios · Acre",en:"Turtles · Acre",es:"Quelonios · Acre"}, s:{pt:"hoje",en:"today",es:"hoy"}, c:"var(--river)"},
+  {r:92, t:{pt:"Multi-táxon · Acre",en:"Multi-taxa · Acre",es:"Multitaxón · Acre"}, s:{pt:"suportado pelo modelo de dados",en:"supported by the data model",es:"soportado por el modelo de datos"}, c:"var(--forest)"},
+  {r:128, t:{pt:"Amazônia brasileira",en:"Brazilian Amazon",es:"Amazonía brasileña"}, s:{pt:"visão de expansão",en:"expansion vision",es:"visión de expansión"}, c:"var(--sand)"},
+  {r:164, t:{pt:"Amazônia continental",en:"Pan-Amazon region",es:"Amazonía continental"}, s:{pt:"visão de longo prazo",en:"long-term vision",es:"visión de largo plazo"}, c:"var(--coral)"}
+];
+
+/* ============================================================
+   RENDER HELPERS
+   ============================================================ */
+function el(tag, attrs, children){
+  var n = document.createElementNS(attrs && attrs.__svg ? "http://www.w3.org/2000/svg" : null, tag);
+  if(!n) n = document.createElement(tag);
+  if(attrs){ for(var k in attrs){ if(k!=="__svg") n.setAttribute(k, attrs[k]); } }
+  (children||[]).forEach(function(c){ if(c!=null) n.appendChild(typeof c === "string" ? document.createTextNode(c) : c); });
+  return n;
+}
+function svgEl(tag, attrs, children){ attrs = attrs || {}; attrs.__svg = true; return el(tag, attrs, children); }
+
+var currentLang = "pt";
+
+/* ---- species strip (section 02) ---- */
+function renderSpeciesStrip(){
+  var wrap = document.getElementById("speciesStrip");
+  wrap.innerHTML = "";
+  SPECIES.forEach(function(s){
+    var chip = document.createElement("div"); chip.className = "species-chip";
+    var dot = document.createElement("span"); dot.className = "dot"; dot.style.background = s.c;
+    var name = document.createElement("span"); name.className = "name"; name.textContent = speciesLabel(s, currentLang);
+    var sci = document.createElement("span"); sci.className = "sci"; sci.textContent = s.sci;
+    chip.appendChild(dot); chip.appendChild(name); chip.appendChild(sci);
+    wrap.appendChild(chip);
+  });
+}
+
+/* ---- roles (section 13) ---- */
+var ROLE_ICONS = {
+  user:'<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/>',
+  team:'<circle cx="8" cy="9" r="3.4"/><circle cx="17" cy="9" r="3.4"/><path d="M2 21c0-3.6 2.7-6.5 6-6.5s6 2.9 6 6.5"/><path d="M12 21c0-3.6 2.7-6.5 6-6.5s6 2.9 6 6.5"/>',
+  flask:'<path d="M9 3h6M10 3v6l-5.5 9.5A2 2 0 0 0 6.2 21h11.6a2 2 0 0 0 1.7-2.5L14 9V3"/><path d="M8 15h8"/>',
+  chart:'<path d="M4 20V10M11 20V4M18 20v-7"/><path d="M2 20h20"/>',
+  star:'<path d="M12 2.5l2.9 6.3 6.9.8-5.1 4.8 1.4 6.8L12 17.8 5.9 21.2l1.4-6.8-5.1-4.8 6.9-.8z"/>'
+};
+function renderRoles(){
+  var wrap = document.getElementById("rolesRow");
+  wrap.innerHTML = "";
+  ROLES.forEach(function(r, i){
+    if(i>0){
+      var arrow = document.createElement("div"); arrow.className = "role-arrow";
+      arrow.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
+      wrap.appendChild(arrow);
+    }
+    var card = document.createElement("div"); card.className = "role-card";
+    var icn = document.createElement("div"); icn.className = "role-icn";
+    icn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">'+ROLE_ICONS[r.icon]+'</svg>';
+    var h = document.createElement("h5"); h.textContent = r.t[currentLang];
+    var p = document.createElement("p"); p.textContent = r.p[currentLang];
+    card.appendChild(icn); card.appendChild(h); card.appendChild(p);
+    wrap.appendChild(card);
+  });
+}
+
+/* ---- stack grid (section 19) ---- */
+function renderStack(){
+  var wrap = document.getElementById("stackGrid");
+  wrap.innerHTML = "";
+  STACK.forEach(function(s){
+    var item = document.createElement("div"); item.className = "stack-item";
+    var tag = document.createElement("div"); tag.className = "tag"; tag.textContent = s.tag[currentLang];
+    var name = document.createElement("h5"); name.textContent = s.name;
+    var p = document.createElement("p"); p.textContent = s.p[currentLang];
+    item.appendChild(tag); item.appendChild(name); item.appendChild(p);
+    wrap.appendChild(item);
+  });
+}
+
+/* ---- storyboard (section 16) ---- */
+function renderStoryboard(){
+  var wrap = document.getElementById("storyboardGrid");
+  wrap.innerHTML = "";
+  STORY.forEach(function(s, i){
+    var f = document.createElement("div"); f.className = "story-frame";
+    var no = document.createElement("div"); no.className = "fno mono"; no.textContent = String(i+1).padStart(2,"0");
+    var scene = document.createElement("div"); scene.className = "scene";
+    var h = document.createElement("h5"); h.textContent = s.t[currentLang];
+    var p = document.createElement("p"); p.textContent = s.p[currentLang];
+    f.appendChild(no); f.appendChild(scene); f.appendChild(h); f.appendChild(p);
+    wrap.appendChild(f);
+  });
+}
+
+/* ---- impact chain (section 20) ---- */
+function renderImpact(){
+  var wrap = document.getElementById("impactChain");
+  wrap.innerHTML = "";
+  IMPACT.forEach(function(n, i){
+    if(i>0){
+      var arrow = document.createElement("div"); arrow.className = "chain-arrow";
+      arrow.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
+      wrap.appendChild(arrow);
+    }
+    var node = document.createElement("div"); node.className = "chain-node";
+    var t = document.createElement("div"); t.className = "t"; t.textContent = n.t[currentLang];
+    var s = document.createElement("div"); s.className = "s"; s.textContent = n.s[currentLang];
+    node.appendChild(t); node.appendChild(s);
+    wrap.appendChild(node);
+  });
+}
+
+/* ============================================================
+   DIAGRAMS (hand-authored inline SVG)
+   ============================================================ */
+function renderArchDiagram(){
+  var L = {
+    pt:{layers:["Campo","Comunicação","Backend","Banco de dados","Geotecnologia","Inteligência e análise","Visualização"],
+        subs:["App offline, GPS, câmera, formulário","Fila local, sincronização, idempotência","API, autenticação, regras de acesso, auditoria","PostgreSQL + PostGIS, geometria real de praia","Mapas, pontos, polígonos, análise espacial","Indicadores, taxa de eclosão, séries históricas","Dashboards, relatórios, mapas, gráficos"]},
+    en:{layers:["Field","Communication","Backend","Database","Geotechnology","Intelligence and analysis","Visualization"],
+        subs:["Offline app, GPS, camera, form","Local queue, synchronization, idempotence","API, authentication, access rules, audit","PostgreSQL + PostGIS, real beach geometry","Maps, points, polygons, spatial analysis","Indicators, hatching rate, historical series","Dashboards, reports, maps, charts"]},
+    es:{layers:["Campo","Comunicación","Backend","Base de datos","Geotecnología","Inteligencia y análisis","Visualización"],
+        subs:["App sin conexión, GPS, cámara, formulario","Cola local, sincronización, idempotencia","API, autenticación, reglas de acceso, auditoría","PostgreSQL + PostGIS, geometría real de playa","Mapas, puntos, polígonos, análisis espacial","Indicadores, tasa de eclosión, series históricas","Paneles, informes, mapas, gráficos"]}
+  };
+  var d = L[currentLang];
+  var w=1040, boxH=64, gap=20, x=40, boxW=w-80, startY=20;
+  var svg = svgEl("svg",{viewBox:"0 0 "+w+" "+(startY + d.layers.length*(boxH+gap))},[]);
+  svg.setAttribute("role","img");
+  svg.setAttribute("aria-label", d.layers.join(" → "));
+  var defs = svgEl("defs",{},[svgEl("marker",{id:"archArrow",viewBox:"0 0 10 10",refX:"8",refY:"5",markerWidth:"7",markerHeight:"7",orient:"auto-start-reverse"},[svgEl("path",{d:"M0 0L10 5L0 10z",fill:"currentColor"})])]);
+  svg.appendChild(defs);
+  d.layers.forEach(function(name, i){
+    var y = startY + i*(boxH+gap);
+    var g = svgEl("g",{});
+    g.appendChild(svgEl("rect",{x:x,y:y,width:boxW,height:boxH,rx:12,class:"dg-box"}));
+    g.appendChild(svgEl("rect",{x:x,y:y,width:5,height:boxH,rx:2,fill: i%2===0 ? "var(--river)" : "var(--forest)"}));
+    g.appendChild(svgEl("text",{x:x+26,y:y+27,class:"dg-text",style:"font-weight:700;font-size:16px"},[String(i+1).padStart(2,"0")+"  "+name]));
+    g.appendChild(svgEl("text",{x:x+26,y:y+47,class:"dg-text",style:"font-size:12.5px;opacity:0.68"},[d.subs[i]]));
+    svg.appendChild(g);
+    if(i < d.layers.length-1){
+      svg.appendChild(svgEl("line",{x1:x+boxW/2,y1:y+boxH,x2:x+boxW/2,y2:y+boxH+gap,class:"dg-line",stroke:"currentColor","stroke-opacity":"0.35","marker-end":"url(#archArrow)"}));
+    }
+  });
+  var host = document.getElementById("archDiagram");
+  host.innerHTML = ""; host.appendChild(svg);
+}
+
+function renderNestFlow(){
+  var L = {
+    pt:{n:["Encontrado","Transferido","Eclodido","Perdido"], v:["monitor registra na praia","ovos levados a local seguro","filhotes contados: vivos, mortos, não nascidos","predação por pessoas ou animais"]},
+    en:{n:["Found","Transferred","Hatched","Lost"], v:["monitor logs it on the beach","eggs moved to a safer site","hatchlings counted: alive, dead, unhatched","predation by people or animals"]},
+    es:{n:["Encontrado","Transferido","Eclosionado","Perdido"], v:["el monitor lo registra en la playa","huevos trasladados a un lugar seguro","crías contadas: vivas, muertas, no nacidas","depredación por personas o animales"]}
+  };
+  var d = L[currentLang];
+  var w=1040,h=300;
+  var svg = svgEl("svg",{viewBox:"0 0 "+w+" "+h});
+  svg.setAttribute("role","img"); svg.setAttribute("aria-label", d.n.join(" → "));
+  var defs = svgEl("defs",{},[svgEl("marker",{id:"nestArrow",viewBox:"0 0 10 10",refX:"8",refY:"5",markerWidth:"7",markerHeight:"7",orient:"auto-start-reverse"},[svgEl("path",{d:"M0 0L10 5L0 10z",fill:"currentColor"})])]);
+  svg.appendChild(defs);
+  var boxW=190, boxH=76, y=40, xs=[40,320,600,880-40+40];
+  var main = [0,1,2]; var mx=[40,340,640];
+  main.forEach(function(i,idx){
+    var x=mx[idx];
+    var g = svgEl("g",{});
+    var fill = idx===2 ? "var(--good)" : "var(--river)";
+    g.appendChild(svgEl("rect",{x:x,y:y,width:boxW,height:boxH,rx:12,fill:idx===2?"var(--forest-tint)":"var(--river-tint)",stroke:fill,"stroke-width":"1.6"}));
+    g.appendChild(svgEl("text",{x:x+18,y:y+30,class:"dg-text",style:"font-weight:700;font-size:16px",fill:"currentColor"},[d.n[idx]]));
+    g.appendChild(svgEl("text",{x:x+18,y:y+52,class:"dg-text",style:"font-size:11.5px;opacity:0.7"},[d.v[idx]]));
+    svg.appendChild(g);
+    if(idx<2){
+      var ax1=x+boxW, ax2=mx[idx+1];
+      svg.appendChild(svgEl("line",{x1:ax1,y1:y+boxH/2,x2:ax2,y2:y+boxH/2,class:"dg-line",stroke:"currentColor","stroke-opacity":"0.4","marker-end":"url(#nestArrow)"}));
+    }
+  });
+  // branch to "perdido" from first box, dashed down
+  var px = mx[0], py=y+boxH;
+  var lostX = mx[0], lostY = y+boxH+70;
+  svg.appendChild(svgEl("line",{x1:px+boxW/2,y1:py,x2:lostX+boxW/2,y2:lostY,class:"dg-line",stroke:"var(--coral)","stroke-dasharray":"4 4","marker-end":"url(#nestArrow)"}));
+  var g2 = svgEl("g",{});
+  g2.appendChild(svgEl("rect",{x:lostX,y:lostY,width:boxW,height:boxH,rx:12,fill:"transparent",stroke:"var(--coral)","stroke-width":"1.6","stroke-dasharray":"4 4"}));
+  g2.appendChild(svgEl("text",{x:lostX+18,y:lostY+30,class:"dg-text",style:"font-weight:700;font-size:16px",fill:"var(--coral)"},[d.n[3]]));
+  g2.appendChild(svgEl("text",{x:lostX+18,y:lostY+52,class:"dg-text",style:"font-size:11.5px;opacity:0.7"},[d.v[3]]));
+  svg.appendChild(g2);
+  var host = document.getElementById("nestFlow");
+  host.innerHTML=""; host.appendChild(svg);
+}
+
+function renderTrailDiagram(){
+  var L = {
+    pt:["Monitor em campo","GPS + foto + formulário","Fila offline","Sincronização","Banco geoespacial","Validação científica","Indicador calculado","Painel do gestor"],
+    en:["Field monitor","GPS + photo + form","Offline queue","Synchronization","Geospatial database","Scientific validation","Indicator calculated","Manager's dashboard"],
+    es:["Monitor en campo","GPS + foto + formulario","Cola sin conexión","Sincronización","Base de datos geoespacial","Validación científica","Indicador calculado","Panel del gestor"]
+  };
+  var steps = L[currentLang];
+  var cols=4, rows=2, w=1040, cw=w/cols, ch=118;
+  var svg = svgEl("svg",{viewBox:"0 0 "+w+" "+(ch*rows+20)});
+  svg.setAttribute("role","img"); svg.setAttribute("aria-label", steps.join(" → "));
+  var defs = svgEl("defs",{},[svgEl("marker",{id:"trailArrow",viewBox:"0 0 10 10",refX:"8",refY:"5",markerWidth:"6",markerHeight:"6",orient:"auto-start-reverse"},[svgEl("path",{d:"M0 0L10 5L0 10z",fill:"currentColor"})])]);
+  svg.appendChild(defs);
+  steps.forEach(function(label, i){
+    var row = Math.floor(i/cols), col = i%cols;
+    var dispCol = row%2===1 ? (cols-1-col) : col;
+    var cx = dispCol*cw + cw/2, cy = row*ch + 50;
+    var r=30;
+    svg.appendChild(svgEl("circle",{cx:cx,cy:cy,r:r,class:"dg-box","stroke-width":"1.6"}));
+    svg.appendChild(svgEl("text",{x:cx,y:cy+5,"text-anchor":"middle",class:"dg-mono",style:"font-size:15px;font-weight:600",fill:"var(--river)"},[String(i+1)]));
+    svg.appendChild(svgEl("text",{x:cx,y:cy+r+20,"text-anchor":"middle",class:"dg-text",style:"font-size:12px"},[label]));
+    var nextIdx = i+1;
+    if(nextIdx < steps.length){
+      var nrow=Math.floor(nextIdx/cols), ncol=nextIdx%cols;
+      var ndispCol = nrow%2===1 ? (cols-1-ncol) : ncol;
+      if(nrow===row){
+        var ncx = ndispCol*cw+cw/2;
+        var dir = ncx>cx?1:-1;
+        svg.appendChild(svgEl("line",{x1:cx+dir*r,y1:cy,x2:ncx-dir*r,y2:cy,class:"dg-line",stroke:"currentColor","stroke-opacity":"0.4","marker-end":"url(#trailArrow)"}));
+      } else {
+        svg.appendChild(svgEl("line",{x1:cx,y1:cy+r,x2:cx,y2:cy+ch-r+18,class:"dg-line",stroke:"currentColor","stroke-opacity":"0.4","marker-end":"url(#trailArrow)"}));
+      }
+    }
+  });
+  var host = document.getElementById("trailDiagram");
+  host.innerHTML=""; host.appendChild(svg);
+}
+
+function renderLadder(){
+  var L = {
+    pt:[["Dado bruto","“Foi registrado um ninho.”"],["Informação","“A praia P-04 teve 42 ninhos na temporada.”"],["Indicador","“Taxa de sucesso reprodutivo de 81% na temporada.”"],["Conhecimento","Padrões espaciais e temporais entre praias e anos."],["Decisão","Priorização de áreas e reforço de equipe de campo."]],
+    en:[["Raw data","“A nest was recorded.”"],["Information","“Beach P-04 had 42 nests this season.”"],["Indicator","“81% reproductive success rate this season.”"],["Knowledge","Spatial and temporal patterns across beaches and years."],["Decision","Prioritizing areas and reinforcing field teams."]],
+    es:[["Dato bruto","“Se registró un nido.”"],["Información","“La playa P-04 tuvo 42 nidos en la temporada.”"],["Indicador","“Tasa de éxito reproductivo del 81% en la temporada.”"],["Conocimiento","Patrones espaciales y temporales entre playas y años."],["Decisión","Priorización de áreas y refuerzo del equipo de campo."]]
+  };
+  var steps = L[currentLang];
+  var n=steps.length, w=1040, stepW=w/n, baseY=280, maxH=210, stepH=maxH/n;
+  var svg = svgEl("svg",{viewBox:"0 0 "+w+" 320"});
+  svg.setAttribute("role","img"); svg.setAttribute("aria-label", steps.map(function(s){return s[0];}).join(" → "));
+  steps.forEach(function(s,i){
+    var bh = maxH - (n-1-i)*stepH + 40;
+    var x = i*stepW, y = baseY-bh;
+    svg.appendChild(svgEl("rect",{x:x+6,y:y,width:stepW-12,height:bh,rx:10,fill: i===n-1 ? "var(--river)" : "var(--surface-2)", stroke: i===n-1?"none":"var(--line)"}));
+    svg.appendChild(svgEl("text",{x:x+stepW/2,y:y-14,"text-anchor":"middle",class:"dg-text",style:"font-weight:700;font-size:14px"},[String(i+1)+". "+s[0]]));
+    var fo = svgEl("foreignObject",{x:x+12,y:y+10,width:stepW-24,height:bh-16});
+    var div = document.createElement("div");
+    div.setAttribute("xmlns","http://www.w3.org/1999/xhtml");
+    div.style.cssText = "font-family:var(--font-body);font-size:11.5px;line-height:1.4;color:"+(i===n-1?"#fff":"var(--ink-soft)")+";";
+    div.textContent = s[1];
+    fo.appendChild(div);
+    svg.appendChild(fo);
+  });
+  svg.appendChild(svgEl("line",{x1:0,y1:baseY,x2:w,y2:baseY,stroke:"currentColor","stroke-opacity":"0.25"}));
+  var host = document.getElementById("ladderDiagram");
+  host.innerHTML=""; host.appendChild(svg);
+}
+
+function renderGeoDiagram(){
+  var L = {
+    pt:["Amazônia","Acre","Praia monitorada"],
+    en:["Amazon","Acre","Monitored beach"],
+    es:["Amazonía","Acre","Playa monitoreada"]
+  };
+  var t = L[currentLang];
+  var w=1040,h=340;
+  var svg = svgEl("svg",{viewBox:"0 0 "+w+" "+h});
+  svg.setAttribute("role","img"); svg.setAttribute("aria-label", t.join(" → "));
+  function panel(x, title, inner){
+    var pw=310, ph=280, py=20;
+    var g = svgEl("g",{});
+    g.appendChild(svgEl("rect",{x:x,y:py,width:pw,height:ph,rx:14,class:"dg-box"}));
+    g.appendChild(svgEl("text",{x:x+16,y:py+26,class:"dg-mono",style:"font-size:11px;letter-spacing:.05em;opacity:.65"},[title.toUpperCase()]));
+    var clip = "clip"+x;
+    g.appendChild(svgEl("defs",{},[svgEl("clipPath",{id:clip},[svgEl("rect",{x:x+14,y:py+38,width:pw-28,height:ph-54,rx:8})])]));
+    var innerG = svgEl("g",{"clip-path":"url(#"+clip+")"},[inner]);
+    g.appendChild(innerG);
+    return g;
+  }
+  // amazon blob
+  var amz = svgEl("g",{},[
+    svgEl("path",{d:"M50 90 C 90 40, 200 30, 260 70 C 320 100, 300 170, 250 200 C 190 235, 100 220, 65 170 C 40 135, 35 115, 50 90 Z",fill:"var(--forest)",opacity:"0.22",transform:"translate(20,40)"}),
+    svgEl("path",{d:"M40 130 C 90 120, 150 150, 210 130 C 250 118, 290 140, 300 110",stroke:"var(--river)","stroke-width":"3",fill:"none",opacity:"0.6",transform:"translate(20,40)"}),
+    svgEl("circle",{cx:225,cy:150,r:6,fill:"var(--sand)",transform:"translate(20,40)"})
+  ]);
+  svg.appendChild(panel(30, t[0], amz));
+
+  // acre stylized state shape
+  var acre = svgEl("g",{},[
+    svgEl("path",{d:"M60 60 L230 50 L260 110 L220 190 L110 210 L50 150 Z",fill:"var(--forest)",opacity:"0.18",transform:"translate(20,20)"}),
+    svgEl("path",{d:"M60 60 L230 50 L260 110 L220 190 L110 210 L50 150 Z",stroke:"var(--river)","stroke-width":"2",fill:"none",transform:"translate(20,20)"}),
+    svgEl("path",{d:"M80 110 C 130 100, 170 130, 230 120",stroke:"var(--river)","stroke-width":"2.4",fill:"none",opacity:"0.7",transform:"translate(20,20)"}),
+    svgEl("circle",{cx:150,cy:130,r:7,fill:"var(--sand)",transform:"translate(20,20)"})
+  ]);
+  svg.appendChild(panel(365, t[1], acre));
+
+  // beach zoom
+  var beach = svgEl("g",{});
+  beach.appendChild(svgEl("path",{d:"M0 60 C 60 40, 120 90, 200 70 C 250 60, 280 90, 300 70 L300 260 L0 260 Z",fill:"var(--river)",opacity:"0.18",transform:"translate(15,10)"}));
+  beach.appendChild(svgEl("path",{d:"M0 60 C 60 40, 120 90, 200 70 C 250 60, 280 90, 300 70",stroke:"var(--river)","stroke-width":"2.4",fill:"none",transform:"translate(15,10)"}));
+  var nestPts = [[70,150],[110,175],[150,140],[190,190],[230,160],[95,205]];
+  nestPts.forEach(function(p,i){
+    var cx=p[0]+15, cy=p[1]+10;
+    var mg = svgEl("g",{});
+    if(!prefersReducedGlobal()){
+      var ring = svgEl("circle",{cx:cx,cy:cy,r:6,fill:"none",stroke:"var(--sand)","stroke-width":"1.4",opacity:"0.7"});
+      ring.appendChild(svgEl("animate",{attributeName:"r",values:"6;16;6",dur:"3.2s",begin:(i*0.4)+"s",repeatCount:"indefinite"}));
+      ring.appendChild(svgEl("animate",{attributeName:"opacity",values:"0.7;0;0.7",dur:"3.2s",begin:(i*0.4)+"s",repeatCount:"indefinite"}));
+      mg.appendChild(ring);
+    }
+    mg.appendChild(svgEl("circle",{cx:cx,cy:cy,r:6,fill:"var(--sand)",stroke:"var(--river-strong)","stroke-width":"1.4"}));
+    beach.appendChild(mg);
+  });
+  svg.appendChild(panel(700, t[2], beach));
+
+  // connecting chevrons (animated drift toward the next panel)
+  [340,675].forEach(function(cx,ci){
+    [0,14,28].forEach(function(off,oi){
+      var chev = svgEl("path",{d:"M"+(cx+off)+" 150 l16 10 l-16 10",stroke:"currentColor","stroke-width":"2",fill:"none",opacity:"0"});
+      if(!prefersReducedGlobal()){
+        chev.appendChild(svgEl("animate",{attributeName:"opacity",values:"0;0.55;0",dur:"1.8s",begin:(oi*0.5+ci*0.3)+"s",repeatCount:"indefinite"}));
+      } else {
+        chev.setAttribute("opacity","0.4");
+      }
+      svg.appendChild(chev);
+    });
+  });
+  var host = document.getElementById("geoDiagram");
+  host.innerHTML=""; host.appendChild(svg);
+}
+function prefersReducedGlobal(){
+  return window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+function renderValidationFlow(){
+  var L = {
+    pt:{n:["Registro em campo","Pendente","Validado","Em correção","Rejeitado"], sub:["monitor envia o ninho","aguardando análise técnica","vira estatística oficial","biólogo pede ajuste ao monitor","motivo sempre registrado"]},
+    en:{n:["Field record","Pending","Validated","Needs correction","Rejected"], sub:["monitor submits the nest","awaiting technical review","becomes official statistics","biologist requests a fix from the monitor","reason is always recorded"]},
+    es:{n:["Registro de campo","Pendiente","Validado","En corrección","Rechazado"], sub:["el monitor envía el nido","en espera de análisis técnico","se convierte en estadística oficial","el biólogo pide un ajuste al monitor","el motivo siempre queda registrado"]}
+  };
+  var d = L[currentLang];
+  var w=1040,h=230;
+  var svg = svgEl("svg",{viewBox:"0 0 "+w+" "+h});
+  svg.setAttribute("role","img"); svg.setAttribute("aria-label", d.n.join(" / "));
+  var defs = svgEl("defs",{},[svgEl("marker",{id:"valArrow",viewBox:"0 0 10 10",refX:"8",refY:"5",markerWidth:"6",markerHeight:"6",orient:"auto-start-reverse"},[svgEl("path",{d:"M0 0L10 5L0 10z",fill:"currentColor"})])]);
+  svg.appendChild(defs);
+  var x0=30, x1=300, boxW=180, boxH=64, y0=40;
+  // record -> pending
+  svg.appendChild(svgEl("rect",{x:x0,y:y0,width:170,height:boxH,rx:10,class:"dg-box"}));
+  svg.appendChild(svgEl("text",{x:x0+14,y:y0+27,class:"dg-text",style:"font-weight:700;font-size:14px"},[d.n[0]]));
+  svg.appendChild(svgEl("text",{x:x0+14,y:y0+47,class:"dg-text",style:"font-size:11px;opacity:.7"},[d.sub[0]]));
+  svg.appendChild(svgEl("line",{x1:x0+170,y1:y0+boxH/2,x2:x1,y2:y0+boxH/2,class:"dg-line",stroke:"currentColor","stroke-opacity":"0.4","marker-end":"url(#valArrow)"}));
+
+  svg.appendChild(svgEl("rect",{x:x1,y:y0,width:boxW,height:boxH,rx:10,fill:"var(--sand-tint)",stroke:"var(--sand)","stroke-width":"1.6"}));
+  svg.appendChild(svgEl("text",{x:x1+14,y:y0+27,class:"dg-text",style:"font-weight:700;font-size:14px"},[d.n[1]]));
+  svg.appendChild(svgEl("text",{x:x1+14,y:y0+47,class:"dg-text",style:"font-size:11px;opacity:.7"},[d.sub[1]]));
+
+  var outs = [
+    {label:d.n[2], sub:d.sub[2], color:"var(--good)", y:20},
+    {label:d.n[3], sub:d.sub[3], color:"var(--river)", y:100},
+    {label:d.n[4], sub:d.sub[4], color:"var(--coral)", y:180}
+  ];
+  var x2 = x1+boxW+140;
+  outs.forEach(function(o){
+    var cy = o.y + boxH/2;
+    svg.appendChild(svgEl("path",{d:"M"+(x1+boxW)+" "+(y0+boxH/2)+" C "+(x1+boxW+70)+" "+(y0+boxH/2)+", "+(x2-70)+" "+cy+", "+x2+" "+cy,stroke:"currentColor","stroke-opacity":"0.4",fill:"none","marker-end":"url(#valArrow)"}));
+    svg.appendChild(svgEl("rect",{x:x2,y:o.y,width:220,height:boxH,rx:10,fill:"transparent",stroke:o.color,"stroke-width":"1.6"}));
+    svg.appendChild(svgEl("text",{x:x2+14,y:o.y+27,class:"dg-text",style:"font-weight:700;font-size:14px",fill:o.color},[o.label]));
+    svg.appendChild(svgEl("text",{x:x2+14,y:o.y+47,class:"dg-text",style:"font-size:11px;opacity:.7"},[o.sub]));
+  });
+  var host = document.getElementById("validationFlow");
+  host.innerHTML=""; host.appendChild(svg);
+}
+
+function renderGovFlow(){
+  var L = {
+    pt:["Perfis e permissões","Registro de acesso","Auditoria","Cópias de segurança"],
+    en:["Roles and permissions","Access logging","Audit","Backups"],
+    es:["Perfiles y permisos","Registro de acceso","Auditoría","Copias de seguridad"]
+  };
+  var steps = L[currentLang];
+  var w=1040,h=140, boxW=220, gap=(w-boxW*steps.length)/(steps.length-1);
+  var svg = svgEl("svg",{viewBox:"0 0 "+w+" "+h});
+  svg.setAttribute("role","img"); svg.setAttribute("aria-label", steps.join(" → "));
+  var defs = svgEl("defs",{},[svgEl("marker",{id:"govArrow",viewBox:"0 0 10 10",refX:"8",refY:"5",markerWidth:"6",markerHeight:"6",orient:"auto-start-reverse"},[svgEl("path",{d:"M0 0L10 5L0 10z",fill:"currentColor"})])]);
+  svg.appendChild(defs);
+  steps.forEach(function(s,i){
+    var x = i*(boxW+gap), y=30, boxH=64;
+    svg.appendChild(svgEl("rect",{x:x,y:y,width:boxW,height:boxH,rx:10,class:"dg-box"}));
+    svg.appendChild(svgEl("text",{x:x+boxW/2,y:y+38,"text-anchor":"middle",class:"dg-text",style:"font-weight:700;font-size:13.5px"},[s]));
+    if(i<steps.length-1){
+      svg.appendChild(svgEl("line",{x1:x+boxW,y1:y+boxH/2,x2:x+boxW+gap,y2:y+boxH/2,class:"dg-line",stroke:"currentColor","stroke-opacity":"0.4","marker-end":"url(#govArrow)"}));
+    }
+  });
+  var host = document.getElementById("govFlow");
+  host.innerHTML=""; host.appendChild(svg);
+}
+
+function renderScaleDiagram(){
+  var host = document.getElementById("scaleDiagram");
+  var w=1040,h=380, cx=320, cy=190;
+  var svg = svgEl("svg",{viewBox:"0 0 "+w+" "+h});
+  svg.setAttribute("role","img"); svg.setAttribute("aria-label","scale rings");
+  SCALE.slice().reverse().forEach(function(s){
+    svg.appendChild(svgEl("circle",{cx:cx,cy:cy,r:s.r,fill:"none",stroke:s.c,"stroke-width":"1.6",opacity:"0.7"}));
+  });
+  svg.appendChild(svgEl("circle",{cx:cx,cy:cy,r:6,fill:"var(--river-strong)"}));
+  var legX = 700, legY=40;
+  SCALE.forEach(function(s,i){
+    var y = legY + i*58;
+    svg.appendChild(svgEl("circle",{cx:legX,cy:y,r:6,fill:s.c}));
+    svg.appendChild(svgEl("text",{x:legX+16,y:y+4,class:"dg-text",style:"font-weight:700;font-size:14px"},[s.t[currentLang]]));
+    svg.appendChild(svgEl("text",{x:legX+16,y:y+22,class:"dg-text",style:"font-size:11px;opacity:.65"},[s.s[currentLang]]));
+  });
+  host.innerHTML=""; host.appendChild(svg);
+}
+
+/* ============================================================
+   CHARTS
+   ============================================================ */
+function chartTooltip(container){
+  var tt = container.querySelector(".chart-tooltip");
+  if(!tt){ tt = document.createElement("div"); tt.className="chart-tooltip"; container.style.position="relative"; container.appendChild(tt); }
+  return tt;
+}
+
+function renderSpeciesChart(){
+  var LBL = {pt:"ninhos",en:"nests",es:"nidos"};
+  var DATA = [
+    {s:SPECIES[1], v:168},{s:SPECIES[0], v:121},{s:SPECIES[2], v:94},
+    {s:SPECIES[3], v:52},{s:SPECIES[4], v:31},{s:SPECIES[6], v:16}
+  ];
+  var host = document.getElementById("chartSpecies");
+  host.innerHTML="";
+  var max = Math.max.apply(null, DATA.map(function(d){return d.v;}));
+  var w=460, barH=30, gapY=14, leftPad=150, rightPad=52, topPad=6;
+  var h = topPad + DATA.length*(barH+gapY);
+  var svg = svgEl("svg",{viewBox:"0 0 "+w+" "+h});
+  svg.setAttribute("role","img");
+  DATA.forEach(function(d,i){
+    var y = topPad + i*(barH+gapY);
+    var maxBarW = w-leftPad-rightPad;
+    var bw = (d.v/max)*maxBarW;
+    var g = svgEl("g",{class:"bar-hit",tabindex:"0"});
+    g.appendChild(svgEl("text",{x:leftPad-10,y:y+barH/2+4,"text-anchor":"end",class:"dg-text",style:"font-size:11.5px;font-style:italic"},[speciesLabel(d.s,currentLang)]));
+    g.appendChild(svgEl("rect",{x:leftPad,y:y,width:maxBarW,height:barH,rx:6,fill:"var(--surface-2)"}));
+    var rect = svgEl("rect",{class:"bar-fill",x:leftPad,y:y,width:bw,height:barH,rx:6,fill:d.s.c,style:"transition-delay:"+(i*0.07)+"s"});
+    g.appendChild(rect);
+    g.appendChild(svgEl("text",{x:leftPad+bw+8,y:y+barH/2+4,class:"dg-mono",style:"font-size:11.5px;font-weight:600"},[String(d.v)]));
+    g.addEventListener("mouseenter", function(ev){ showTip(ev, d.s, d.v); });
+    g.addEventListener("mousemove", function(ev){ showTip(ev, d.s, d.v); });
+    g.addEventListener("mouseleave", hideTip);
+    g.addEventListener("focus", function(){ showTip(null, d.s, d.v, g); });
+    g.addEventListener("blur", hideTip);
+    svg.appendChild(g);
+  });
+  host.appendChild(svg);
+  var tt = chartTooltip(host);
+  function showTip(ev, s, v, focusEl){
+    tt.textContent = speciesLabel(s,currentLang)+": "+v+" "+LBL[currentLang];
+    tt.style.opacity="1";
+    var rect = (focusEl||ev.currentTarget).getBoundingClientRect();
+    var hostRect = host.getBoundingClientRect();
+    var cx = ev ? (ev.clientX - hostRect.left) : (rect.left - hostRect.left + rect.width/2);
+    var cy = ev ? (ev.clientY - hostRect.top) : (rect.top - hostRect.top);
+    tt.style.left = cx+"px"; tt.style.top = cy+"px";
+  }
+  function hideTip(){ tt.style.opacity="0"; }
+}
+
+function renderTrendChart(){
+  var YEARS = [2022,2023,2024,2025,2026];
+  var VALUES = [64,71,68,77,81];
+  var host = document.getElementById("chartTrend");
+  host.innerHTML="";
+  var w=460,h=210, padL=36, padR=14, padT=14, padB=30;
+  var plotW=w-padL-padR, plotH=h-padT-padB;
+  var maxV=100, minV=50;
+  function xFor(i){ return padL + (i/(YEARS.length-1))*plotW; }
+  function yFor(v){ return padT + (1-((v-minV)/(maxV-minV)))*plotH; }
+  var svg = svgEl("svg",{viewBox:"0 0 "+w+" "+h});
+  svg.setAttribute("role","img");
+  // gridlines
+  [50,65,80,100].forEach(function(gv){
+    var gy = yFor(gv);
+    svg.appendChild(svgEl("line",{x1:padL,y1:gy,x2:w-padR,y2:gy,stroke:"currentColor","stroke-opacity":"0.08"}));
+    svg.appendChild(svgEl("text",{x:padL-8,y:gy+4,"text-anchor":"end",class:"dg-mono",style:"font-size:9.5px;opacity:.55"},[gv+"%"]));
+  });
+  var pts = YEARS.map(function(y,i){ return [xFor(i), yFor(VALUES[i])]; });
+  var pathD = "M"+pts.map(function(p){return p[0]+" "+p[1];}).join(" L ");
+  var areaD = pathD + " L "+pts[pts.length-1][0]+" "+(padT+plotH)+" L "+pts[0][0]+" "+(padT+plotH)+" Z";
+  svg.appendChild(svgEl("defs",{},[svgEl("linearGradient",{id:"trendFill",x1:"0",y1:"0",x2:"0",y2:"1"},[
+    svgEl("stop",{offset:"0%","stop-color":"var(--series-1)","stop-opacity":"0.28"}),
+    svgEl("stop",{offset:"100%","stop-color":"var(--series-1)","stop-opacity":"0"})
+  ])]));
+  svg.appendChild(svgEl("path",{class:"trend-area",d:areaD,fill:"url(#trendFill)"}));
+  var linePath = svgEl("path",{class:"trend-path",d:pathD,fill:"none",stroke:"var(--series-1)","stroke-width":"2.4","stroke-linecap":"round","stroke-linejoin":"round"});
+  svg.appendChild(linePath);
+  var tt = chartTooltip(host);
+  pts.forEach(function(p,i){
+    var g = svgEl("g",{class:"bar-hit",tabindex:"0"});
+    g.appendChild(svgEl("circle",{cx:p[0],cy:p[1],r:9,fill:"transparent"}));
+    var isLast = i===pts.length-1;
+    g.appendChild(svgEl("circle",{class:"trend-pt"+(isLast?" live-pulse":""),cx:p[0],cy:p[1],r: isLast?5:3.6,fill:"var(--series-1)",stroke:"var(--surface)","stroke-width":"1.6",style:"transition-delay:"+(0.4+i*0.12)+"s"}));
+    svg.appendChild(g);
+    svg.appendChild(svgEl("text",{x:p[0],y:h-8,"text-anchor":"middle",class:"dg-mono",style:"font-size:9.5px;opacity:.6"},[String(YEARS[i])]));
+    g.addEventListener("mouseenter", function(ev){ tip(ev,i); });
+    g.addEventListener("mousemove", function(ev){ tip(ev,i); });
+    g.addEventListener("mouseleave", function(){ tt.style.opacity="0"; });
+    g.addEventListener("focus", function(){ tip(null,i,g); });
+    g.addEventListener("blur", function(){ tt.style.opacity="0"; });
+  });
+  function tip(ev,i,focusEl){
+    tt.textContent = YEARS[i]+": "+VALUES[i]+"%";
+    tt.style.opacity="1";
+    var hostRect = host.getBoundingClientRect();
+    var cx, cy;
+    if(ev){ cx = ev.clientX-hostRect.left; cy = ev.clientY-hostRect.top; }
+    else { var r=focusEl.getBoundingClientRect(); cx=r.left-hostRect.left+r.width/2; cy=r.top-hostRect.top; }
+    tt.style.left=cx+"px"; tt.style.top=cy+"px";
+  }
+  host.appendChild(svg);
+  var len = linePath.getTotalLength();
+  linePath.style.strokeDasharray = len;
+  linePath.style.strokeDashoffset = len;
+  var card = host.closest(".chart-card");
+  if(card && card.classList.contains("in")){ linePath.style.strokeDashoffset = "0"; }
+}
+
+function renderValidationChart(){
+  var L = {
+    pt:[["Validado",312],["Pendente",128],["Rejeitado",22]],
+    en:[["Validated",312],["Pending",128],["Rejected",22]],
+    es:[["Validado",312],["Pendiente",128],["Rechazado",22]]
+  };
+  var data = L[currentLang];
+  var colors = ["var(--good)","var(--warn)","var(--crit)"];
+  var total = data.reduce(function(a,d){return a+d[1];},0);
+  var host = document.getElementById("chartValidation");
+  host.innerHTML="";
+  var w=920,h=60, x=0;
+  var svg = svgEl("svg",{viewBox:"0 0 "+w+" "+h});
+  svg.setAttribute("role","img");
+  var tt = chartTooltip(host);
+  data.forEach(function(d,i){
+    var segW = (d[1]/total)*w;
+    var g = svgEl("g",{class:"bar-hit",tabindex:"0"});
+    g.appendChild(svgEl("rect",{class:"bar-fill",x:x+1,y:10,width:Math.max(segW-2,0),height:32,rx:6,fill:colors[i],style:"transition-delay:"+(i*0.1)+"s"}));
+    if(segW>70){
+      g.appendChild(svgEl("text",{x:x+segW/2,y:31,"text-anchor":"middle",class:"dg-mono",style:"font-size:12px;font-weight:600",fill:"#fff"},[Math.round(d[1]/total*100)+"%"]));
+    }
+    svg.appendChild(g);
+    g.addEventListener("mouseenter", function(ev){ tip(ev,d); });
+    g.addEventListener("mousemove", function(ev){ tip(ev,d); });
+    g.addEventListener("mouseleave", function(){ tt.style.opacity="0"; });
+    x += segW;
+  });
+  function tip(ev,d){
+    tt.textContent = d[0]+": "+d[1]+" ("+Math.round(d[1]/total*100)+"%)";
+    tt.style.opacity="1";
+    var hostRect=host.getBoundingClientRect();
+    tt.style.left=(ev.clientX-hostRect.left)+"px"; tt.style.top=(ev.clientY-hostRect.top)+"px";
+  }
+  host.appendChild(svg);
+  var leg = document.createElement("div"); leg.className="chart-legend";
+  data.forEach(function(d,i){
+    var item=document.createElement("div"); item.className="leg-item";
+    var sw=document.createElement("span"); sw.className="leg-swatch"; sw.style.background=colors[i];
+    var lb=document.createElement("span"); lb.textContent=d[0]+" — "+d[1];
+    item.appendChild(sw); item.appendChild(lb); leg.appendChild(item);
+  });
+  host.appendChild(leg);
+}
+
+function renderAllCharts(){
+  renderSpeciesChart();
+  renderTrendChart();
+  renderValidationChart();
+}
+function renderAllDiagrams(){
+  renderArchDiagram();
+  renderNestFlow();
+  renderTrailDiagram();
+  renderLadder();
+  renderGeoDiagram();
+  renderValidationFlow();
+  renderGovFlow();
+  renderScaleDiagram();
+}
+
+/* ============================================================
+   LANGUAGE SWITCH
+   ============================================================ */
+function applyLang(lang){
+  currentLang = lang;
+  document.documentElement.lang = lang;
+  document.querySelectorAll("[data-i18n]").forEach(function(node){
+    var key = node.getAttribute("data-i18n");
+    var entry = I18N[key];
+    if(entry && entry[lang] != null){ node.textContent = entry[lang]; }
+  });
+  document.querySelectorAll("[data-i18n-html]").forEach(function(node){
+    var key = node.getAttribute("data-i18n-html");
+    if(key === "hero.title"){ node.innerHTML = hero[lang]; }
+  });
+  document.querySelectorAll(".lang-switch button").forEach(function(b){
+    b.setAttribute("aria-pressed", b.getAttribute("data-lang")===lang ? "true":"false");
+  });
+  renderSpeciesStrip();
+  renderRoles();
+  renderStack();
+  renderStoryboard();
+  renderImpact();
+  renderAllDiagrams();
+  renderAllCharts();
+  applyPhotos();
+  try{ localStorage.setItem("biomonitor_lang", lang); }catch(e){}
+}
+
+/* ============================================================
+   PHOTOS — real photographs slot in here as data: URIs.
+   Empty today; frames render as styled placeholders until filled.
+   ============================================================ */
+var PHOTOS = {
+  /* "hero-tracaja": "data:image/jpeg;base64,...",
+     "gallery-eggs-nest": "data:image/jpeg;base64,...",
+     "gallery-hatchling-swim": "data:image/jpeg;base64,...",
+     "gallery-nest-hole": "data:image/jpeg;base64,..." */
+};
+function applyPhotos(){
+  document.querySelectorAll(".photo-frame[data-photo-id]").forEach(function(frame){
+    var id = frame.getAttribute("data-photo-id");
+    var img = frame.querySelector("[data-photo-img]");
+    if(!img) return;
+    var src = PHOTOS[id];
+    if(src && img.getAttribute("src") !== src){
+      img.setAttribute("src", src);
+      img.addEventListener("load", function(){ img.classList.add("loaded"); }, {once:true});
+    }
+  });
+}
+
+/* ============================================================
+   HERO CANVAS — ambient river current + drifting light
+   ============================================================ */
+function initHeroCanvas(){
+  var canvas = document.getElementById("heroCanvas");
+  var svg = document.getElementById("heroSvg");
+  var heroSection = document.getElementById("s01");
+  if(!canvas || !heroSection || prefersReducedGlobal()) return;
+  var ctx = canvas.getContext("2d");
+  if(!ctx) return;
+  var host = canvas.parentElement;
+  var W=0,H=0,DPR=1, raf=null, lastT=performance.now(), t0=lastT, running=false;
+
+  function resize(){
+    var r = host.getBoundingClientRect();
+    DPR = Math.min(window.devicePixelRatio||1, 2);
+    W = r.width; H = r.height;
+    canvas.width = Math.max(1,Math.round(W*DPR));
+    canvas.height = Math.max(1,Math.round(H*DPR));
+    ctx.setTransform(DPR,0,0,DPR,0,0);
+  }
+  resize();
+  window.addEventListener("resize", resize);
+
+  var N = 42, particles = [];
+  function spawn(initial){
+    return {
+      x: Math.random()*W,
+      y: initial ? Math.random()*H : -12,
+      r: 0.6+Math.random()*1.6,
+      speed: 9+Math.random()*16,
+      phase: Math.random()*Math.PI*2,
+      amp: 6+Math.random()*20,
+      alpha: 0.10+Math.random()*0.22,
+      sand: Math.random()<0.16
+    };
+  }
+  for(var i=0;i<N;i++) particles.push(spawn(true));
+
+  function frame(now){
+    var dt = Math.min((now-lastT)/1000, 0.05); lastT = now;
+    var time = (now-t0)/1000;
+    ctx.clearRect(0,0,W,H);
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    for(var b=0;b<3;b++){
+      ctx.beginPath();
+      var yBase = H*0.58 + b*H*0.1;
+      var amp = 14+b*6, freq=0.006+b*0.0012, speed=0.22+b*0.07;
+      for(var x=0;x<=W;x+=26){
+        var y = yBase + Math.sin(x*freq + time*speed)*amp;
+        if(x===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+      }
+      ctx.strokeStyle = "rgba(79,182,214,"+(0.11-b*0.02)+")";
+      ctx.lineWidth = 1.3;
+      ctx.stroke();
+    }
+    ctx.restore();
+    particles.forEach(function(p){
+      p.y += p.speed*dt;
+      if(p.y > H+12){ var np = spawn(false); Object.assign(p, np); }
+      var drawX = p.x + Math.sin((p.y*0.015)+p.phase)*p.amp;
+      var col = p.sand ? "201,150,63" : "79,182,214";
+      var g = ctx.createRadialGradient(drawX,p.y,0,drawX,p.y,p.r*6);
+      g.addColorStop(0, "rgba("+col+","+p.alpha+")");
+      g.addColorStop(1, "rgba("+col+",0)");
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(drawX,p.y,p.r*6,0,Math.PI*2);
+      ctx.fill();
+    });
+    if(running) raf = requestAnimationFrame(frame);
+  }
+  function start(){ if(running) return; running=true; lastT=performance.now(); raf=requestAnimationFrame(frame); canvas.classList.add("on"); svg.classList.add("faded"); }
+  function stop(){ running=false; if(raf) cancelAnimationFrame(raf); }
+
+  if("IntersectionObserver" in window){
+    var io = new IntersectionObserver(function(entries){
+      entries.forEach(function(e){ if(e.isIntersecting) start(); else stop(); });
+    }, {threshold:0.05});
+    io.observe(heroSection);
+  } else { start(); }
+  document.addEventListener("visibilitychange", function(){ if(document.hidden){ stop(); } else if(heroSection.getBoundingClientRect().top < window.innerHeight){ start(); } });
+}
+
+function triggerHeroEntrance(){
+  requestAnimationFrame(function(){
+    requestAnimationFrame(function(){
+      document.querySelectorAll(".hero-anim").forEach(function(el){ el.classList.add("in"); });
+    });
+  });
+}
+
+function initHeroParallax(){
+  var heroVisual = document.getElementById("heroVisual");
+  var heroSection = document.getElementById("s01");
+  if(!heroVisual || !heroSection || prefersReducedGlobal()) return;
+  function onScroll(){
+    var r = heroSection.getBoundingClientRect();
+    var progress = Math.min(Math.max(-r.top / (r.height||1), 0), 1);
+    heroVisual.style.setProperty("--py", (progress*46)+"px");
+  }
+  window.addEventListener("scroll", onScroll, {passive:true});
+  onScroll();
+}
+
+/* ============================================================
+   CHART REVEAL — draws values in when a chart enters view
+   ============================================================ */
+function initChartReveal(){
+  var cards = document.querySelectorAll(".chart-card");
+  if(prefersReducedGlobal() || !("IntersectionObserver" in window)){
+    cards.forEach(function(c){ c.classList.add("in"); var p=c.querySelector(".trend-path"); if(p) p.style.strokeDashoffset="0"; });
+    return;
+  }
+  var io = new IntersectionObserver(function(entries){
+    entries.forEach(function(e){
+      if(e.isIntersecting){
+        e.target.classList.add("in");
+        var path = e.target.querySelector(".trend-path");
+        if(path) path.style.strokeDashoffset = "0";
+        io.unobserve(e.target);
+      }
+    });
+  }, {threshold:0.35});
+  cards.forEach(function(c){ io.observe(c); });
+}
+
+/* ============================================================
+   WAVE DIVIDERS — riverbank seam between dark/light chapters
+   ============================================================ */
+function buildWaveDividers(){
+  var chs = Array.prototype.slice.call(document.querySelectorAll("main .chapter, footer.chapter"));
+  for(var i=0;i<chs.length-1;i++){
+    var a = chs[i], b = chs[i+1];
+    var aDark = a.classList.contains("chapter-dark");
+    var bDark = b.classList.contains("chapter-dark");
+    if(aDark === bDark) continue;
+    var div = document.createElement("div");
+    div.className = "wave-divider";
+    div.setAttribute("aria-hidden","true");
+    var fill = bDark ? "var(--river-deep)" : "var(--bg)";
+    div.innerHTML = '<svg viewBox="0 0 1440 80" preserveAspectRatio="none"><path d="M0,40 C 240,8 480,72 720,40 C 960,8 1200,72 1440,40 L1440,80 L0,80 Z" fill="'+fill+'"></path></svg>';
+    a.appendChild(div);
+  }
+}
+
+document.querySelectorAll(".lang-switch button").forEach(function(b){
+  b.addEventListener("click", function(){ applyLang(b.getAttribute("data-lang")); });
+});
+
+/* ============================================================
+   SCROLL REVEAL
+   ============================================================ */
+var prefersReduced = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+if(prefersReduced){
+  document.querySelectorAll(".reveal").forEach(function(n){ n.classList.add("in"); });
+} else if("IntersectionObserver" in window){
+  var io = new IntersectionObserver(function(entries){
+    entries.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add("in"); io.unobserve(e.target); } });
+  }, {threshold:0.16, rootMargin:"0px 0px -6% 0px"});
+  document.querySelectorAll(".reveal").forEach(function(n){ io.observe(n); });
+} else {
+  document.querySelectorAll(".reveal").forEach(function(n){ n.classList.add("in"); });
+}
+
+/* KPI counters */
+function animateCounters(){
+  document.querySelectorAll(".kpi-card .v[data-count]").forEach(function(node){
+    if(node.dataset.done) return;
+    var target = parseInt(node.getAttribute("data-count"),10);
+    var suffix = node.getAttribute("data-suffix")||"";
+    var dur = 1200, start = null;
+    function tick(ts){
+      if(!start) start = ts;
+      var p = Math.min((ts-start)/dur, 1);
+      var eased = 1-Math.pow(1-p,3);
+      node.textContent = Math.round(target*eased).toLocaleString("pt-BR") + suffix;
+      if(p<1) requestAnimationFrame(tick); else node.dataset.done = "1";
+    }
+    requestAnimationFrame(tick);
+  });
+}
+if(prefersReduced){
+  document.querySelectorAll(".kpi-card .v[data-count]").forEach(function(n){
+    n.textContent = n.getAttribute("data-count")+(n.getAttribute("data-suffix")||"");
+  });
+} else if("IntersectionObserver" in window){
+  var kpiRow = document.querySelector(".kpi-row");
+  if(kpiRow){
+    var io2 = new IntersectionObserver(function(entries){
+      entries.forEach(function(e){ if(e.isIntersecting){ animateCounters(); io2.disconnect(); } });
+    }, {threshold:0.3});
+    io2.observe(kpiRow);
+  }
+}
+
+/* ============================================================
+   RAIL PROGRESS
+   ============================================================ */
+var chapters = Array.prototype.slice.call(document.querySelectorAll("main .chapter, footer.chapter"));
+var railTrack = document.getElementById("railTrack");
+var railFill = document.getElementById("railFill");
+chapters.forEach(function(ch, i){
+  var dot = document.createElement("div");
+  dot.className = "rail-dot";
+  dot.style.top = ((i/(chapters.length-1))*100)+"%";
+  dot.addEventListener("click", function(){ ch.scrollIntoView({behavior: prefersReduced?"auto":"smooth"}); });
+  railTrack.appendChild(dot);
+});
+var railDots = railTrack.querySelectorAll(".rail-dot");
+function updateRail(){
+  var docH = document.documentElement.scrollHeight - window.innerHeight;
+  var p = docH>0 ? window.scrollY/docH : 0;
+  railFill.style.height = (p*100)+"%";
+  var activeIdx = 0;
+  chapters.forEach(function(ch,i){
+    var r = ch.getBoundingClientRect();
+    if(r.top < window.innerHeight*0.5) activeIdx = i;
+  });
+  railDots.forEach(function(d,i){ d.classList.toggle("active", i===activeIdx); });
+}
+window.addEventListener("scroll", updateRail, {passive:true});
+window.addEventListener("resize", updateRail);
+updateRail();
+
+/* ============================================================
+   INIT
+   ============================================================ */
+var savedLang = "pt";
+try{ savedLang = localStorage.getItem("biomonitor_lang") || "pt"; }catch(e){}
+applyLang(savedLang);
+buildWaveDividers();
+initHeroCanvas();
+triggerHeroEntrance();
+initHeroParallax();
+initChartReveal();
+
+})();
+</script>
+
+</body>
+</html>
