@@ -1233,7 +1233,10 @@ test.describe('alternância entre modos e acesso por módulo', () => {
     await expect(page.locator('#bloco-comparar')).toBeHidden();
     await expect(page.locator('.adash-modo-btn[data-modo="painel"]')).toHaveClass(/ativo/);
     // O painel carrega de verdade ao ser aberto pela 1ª vez (lazy init).
-    await expect(page.locator('.adash-titulo')).toContainText('Painel da Qualidade da Água');
+    // Os DOIS blocos (`#bloco-painel`/`#bloco-comparar`) sempre existem
+    // no DOM — só `hidden` alterna — então `.adash-titulo` sozinho
+    // resolveria pros dois títulos; escopar ao bloco visível.
+    await expect(page.locator('#bloco-painel .adash-titulo')).toContainText('Painel da Qualidade da Água');
 
     await page.click('.adash-modo-btn[data-modo="comparar"]');
     await expect(page.locator('#bloco-comparar')).toBeVisible();
