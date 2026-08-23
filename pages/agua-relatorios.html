@@ -24,9 +24,43 @@
 <script src="../js/agua-relatorio-pptx.js"></script>
 <script src="../js/agua-relatorio-xlsx.js"></script>
 <style>
-/* Só o que é desta tela — o painel (.adash-*/.adet-*) vive em
-   css/agua-painel.css, compartilhado com agua-publico.html e
-   rh-bacias.html. */
+/* Só o que é DESTA tela — cards/mapa do painel vêm de
+   css/agua-painel.css + js/agua-painel.js + js/agua-iqa-visual.js,
+   compartilhados com agua-publico.html. Os estilos .rhb-* abaixo são
+   do modo "Comparar bacias", herdados de pages/rh-bacias.html quando
+   as duas telas se fundiram numa só (pedido do usuário: o comparativo
+   entre bacias é só outra FORMA de olhar o mesmo relatório, não uma
+   tela separada) — link único na sidebar, sob "Qualidade da Água". */
+
+.rhb-bacias { display:grid; grid-template-columns:repeat(auto-fit, minmax(268px, 1fr)); gap:16px; margin-bottom:16px }
+.rhb-bacia-card { cursor:pointer; border:1px solid var(--borda); transition:border-color .15s, box-shadow .15s }
+.rhb-bacia-card:hover { border-color:var(--borda-forte); box-shadow:var(--sombra-md) }
+.rhb-bacia-card.ativo { border-color:var(--adash-azul); box-shadow:0 0 0 1px var(--adash-azul) }
+.rhb-bacia-nome { font-family:'Source Serif 4', Georgia, serif; font-size:19px; font-weight:700; color:var(--cinza-900); margin:0 }
+.rhb-bacia-sub { font-size:11.5px; color:var(--cinza-500); margin:2px 0 12px }
+.rhb-bacia-num { display:flex; gap:16px; flex-wrap:wrap; margin-bottom:10px }
+.rhb-num-val { font-size:22px; font-weight:700; color:var(--cinza-900); line-height:1.1; font-variant-numeric:tabular-nums }
+.rhb-num-lab { font-size:10.5px; color:var(--cinza-500); text-transform:uppercase; letter-spacing:.04em }
+.rhb-bacia-iqa { display:flex; align-items:baseline; gap:8px; margin-bottom:8px }
+.rhb-bacia-iqa strong { font-size:27px; font-variant-numeric:tabular-nums; line-height:1 }
+.rhb-quarentena { font-size:11px; color:var(--aviso); font-weight:600 }
+.rhb-sem-bacia { border-style:dashed }
+
+.rhb-tab { width:100%; border-collapse:collapse; font-size:13px }
+.rhb-tab th { text-align:left; font-size:10.5px; text-transform:uppercase; letter-spacing:.05em; color:var(--cinza-500); font-weight:700; padding:0 10px 8px 0; white-space:nowrap }
+.rhb-tab td { padding:9px 10px 9px 0; border-top:1px solid var(--borda); vertical-align:middle }
+.rhb-tab td.num { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap }
+.rhb-tab tr.ativo td { background:var(--azul-bg) }
+.rhb-tab-nome { font-weight:600; color:var(--cinza-900) }
+.rhb-tab-rios { font-size:11px; color:var(--cinza-500) }
+
+.rhb-serie-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:16px }
+.rhb-aviso {
+  display:flex; gap:10px; align-items:flex-start; background:var(--ouro-bg); border:1px solid #F0D98C;
+  border-radius:12px; padding:12px 14px; margin-bottom:16px; font-size:12.5px; color:#6B5310; line-height:1.55;
+}
+.rhb-aviso svg { width:17px; height:17px; flex:none; margin-top:1px }
+.rhb-aviso strong { display:block; color:#4A3A08 }
 </style>
 </head>
 <body>
@@ -36,63 +70,115 @@
   const usuario = await carregarUsuario()
   if (!usuario) { window.location.href = '../index.html'; return }
 
-  const { data: nivel } = await db.rpc('nivel_efetivo', { p_usuario: usuario.id, p_modulo_chave: 'agua' })
-  if (!nivel || nivel === 'sem_acesso') {
-    document.body.innerHTML = '<div style="padding:60px;text-align:center;font-family:\'DM Sans\',sans-serif;color:#6B7280">Você não tem acesso ao módulo Qualidade da Água.</div>'
+  // A tela virou o ponto de entrada dos DOIS módulos (a fusão com o
+  // antigo pages/rh-bacias.html) — checa os dois níveis e deixa cada
+  // um habilitar só o modo correspondente. Quem não tem NENHUM dos
+  // dois continua barrado.
+  const [{ data: nivelAgua }, { data: nivelBacias }] = await Promise.all([
+    db.rpc('nivel_efetivo', { p_usuario: usuario.id, p_modulo_chave: 'agua' }),
+    db.rpc('nivel_efetivo', { p_usuario: usuario.id, p_modulo_chave: 'bacias' }),
+  ])
+  const TEM_AGUA = !!nivelAgua && nivelAgua !== 'sem_acesso'
+  const TEM_BACIAS = !!nivelBacias && nivelBacias !== 'sem_acesso'
+  if (!TEM_AGUA && !TEM_BACIAS) {
+    document.body.innerHTML = '<div style="padding:60px;text-align:center;font-family:\'DM Sans\',sans-serif;color:#6B7280">Você não tem acesso a este painel (Qualidade da Água / Bacias Hidrográficas).</div>'
     return
   }
 
   document.getElementById('app').innerHTML =
     gerarLayout('Qualidade da Água — Relatórios', 'agua-relatorios') +
     `<div class="fade-in adash">
-      <div class="adash-head">
-        <div>
-          <h1 class="adash-titulo">Painel da Qualidade da Água</h1>
-          <p class="adash-sub">Panorama do Acre inteiro ou de uma bacia hidrográfica, no recorte de campanhas
-            escolhido — por padrão, todo o período disponível. IQA e conformidade CONAMA vêm prontos do
-            banco — nunca recalculados aqui — e coleta em conferência aparece marcada, nunca escondida.</p>
-        </div>
-        <div class="adash-head-acoes">
-          <div class="adash-pill adash-pill-select">
-            <select id="rl-bacia" aria-label="Bacia hidrográfica"><option value="">Carregando...</option></select>
-            <span class="adash-chev" data-icon="chevron-down"></span>
+      <div class="adash-modo-tabs" id="modo-tabs" ${TEM_AGUA && TEM_BACIAS ? '' : 'hidden'}>
+        <button type="button" class="adash-modo-btn" data-modo="painel" onclick="trocarModoAgua('painel')">Painel</button>
+        <button type="button" class="adash-modo-btn" data-modo="comparar" onclick="trocarModoAgua('comparar')">Comparar bacias</button>
+      </div>
+
+      <div id="bloco-painel" hidden>
+        <div class="adash-head">
+          <div>
+            <h1 class="adash-titulo">Painel da Qualidade da Água</h1>
+            <p class="adash-sub">Panorama do Acre inteiro ou de uma bacia hidrográfica, no recorte de campanhas
+              escolhido — por padrão, todo o período disponível. IQA e conformidade CONAMA vêm prontos do
+              banco — nunca recalculados aqui — e coleta em conferência aparece marcada, nunca escondida.</p>
           </div>
-          <button class="adash-pill" type="button" onclick="alternarExplicacaoIqa()" data-icon="help">Entenda o cálculo</button>
-          <button class="adash-pill" id="rl-btn-filtros" type="button" onclick="alternarFiltros()" data-icon="sliders">
-            Filtros <span class="adash-pill-n" id="rl-filtros-n" hidden>0</span>
-          </button>
-          <div class="adash-export">
-            <button class="adash-pill adash-pill-primary" id="rl-btn-export" type="button" onclick="alternarExport()" disabled data-icon="download">Exportar</button>
-            <div class="adash-menu" id="rl-export-menu" hidden>
-              <button type="button" id="rl-btn-pdf" onclick="gerarPdf()" data-icon="file-text">Relatório em PDF</button>
-              <button type="button" id="rl-btn-pptx" onclick="gerarPptx()" data-icon="monitor">Apresentação em PPTX</button>
-              <button type="button" id="rl-btn-xlsx" onclick="gerarXlsx()" data-icon="table">Planilha Excel (.xlsx)</button>
+          <div class="adash-head-acoes">
+            <div class="adash-pill adash-pill-select">
+              <select id="rl-bacia" aria-label="Bacia hidrográfica"><option value="">Carregando...</option></select>
+              <span class="adash-chev" data-icon="chevron-down"></span>
+            </div>
+            <button class="adash-pill" type="button" onclick="alternarExplicacaoIqa()" data-icon="help">Entenda o cálculo</button>
+            <button class="adash-pill" id="rl-btn-filtros" type="button" onclick="alternarFiltros()" data-icon="sliders">
+              Filtros <span class="adash-pill-n" id="rl-filtros-n" hidden>0</span>
+            </button>
+            <div class="adash-export">
+              <button class="adash-pill adash-pill-primary" id="rl-btn-export" type="button" onclick="alternarExport()" disabled data-icon="download">Exportar</button>
+              <div class="adash-menu" id="rl-export-menu" hidden>
+                <button type="button" id="rl-btn-pdf" onclick="gerarPdf()" data-icon="file-text">Relatório em PDF</button>
+                <button type="button" id="rl-btn-pptx" onclick="gerarPptx()" data-icon="monitor">Apresentação em PPTX</button>
+                <button type="button" id="rl-btn-xlsx" onclick="gerarXlsx()" data-icon="table">Planilha Excel (.xlsx)</button>
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      <div class="adash-filtros" id="rl-filtros" hidden>
-        <label>Bacia<select id="rl-bacia-filtro" disabled><option value="">Todas</option></select></label>
-        <label>Campanha inicial<select id="rl-de" disabled><option value="">—</option></select></label>
-        <label>Campanha final<select id="rl-ate" disabled><option value="">—</option></select></label>
-        <label>Rio<select id="rl-rio" disabled><option value="">Todos</option></select></label>
-        <label>Status<select id="rl-status" disabled><option value="">Todos</option></select></label>
-        <label>Faixa do IQA<select id="rl-iqa-faixa" disabled><option value="">Todas</option></select></label>
-        <label>Conformidade CONAMA<select id="rl-conama" disabled><option value="">Todas</option></select></label>
-        <button type="button" class="adash-filtros-limpar" onclick="limparFiltrosBusca()">Limpar filtros</button>
-      </div>
-
-      <div class="adash-card adash-mapa-card">
-        <div class="adash-card-topo">
-          <div><p class="adash-card-tit">Mapa dos pontos de coleta</p>
-            <p class="adash-card-tit-sub" id="rl-mapa-sub">Carregando pontos...</p></div>
-          <span class="adash-card-mais">•••</span>
+        <div class="adash-filtros" id="rl-filtros" hidden>
+          <label>Bacia<select id="rl-bacia-filtro" disabled><option value="">Todas</option></select></label>
+          <label>Campanha inicial<select id="rl-de" disabled><option value="">—</option></select></label>
+          <label>Campanha final<select id="rl-ate" disabled><option value="">—</option></select></label>
+          <label>Rio<select id="rl-rio" disabled><option value="">Todos</option></select></label>
+          <label>Status<select id="rl-status" disabled><option value="">Todos</option></select></label>
+          <label>Faixa do IQA<select id="rl-iqa-faixa" disabled><option value="">Todas</option></select></label>
+          <label>Conformidade CONAMA<select id="rl-conama" disabled><option value="">Todas</option></select></label>
+          <button type="button" class="adash-filtros-limpar" onclick="limparFiltrosBusca()">Limpar filtros</button>
         </div>
-        <div class="adash-mapa-wrap"><div id="rl-mapa"></div></div>
+
+        <div class="adash-card adash-mapa-card">
+          <div class="adash-card-topo">
+            <div><p class="adash-card-tit">Mapa dos pontos de coleta</p>
+              <p class="adash-card-tit-sub" id="rl-mapa-sub">Carregando pontos...</p></div>
+            <span class="adash-card-mais">•••</span>
+          </div>
+          <div class="adash-mapa-wrap"><div id="rl-mapa"></div></div>
+        </div>
+
+        <div id="rl-conteudo"><div class="adash-vazio">Carregando painel...</div></div>
       </div>
 
-      <div id="rl-conteudo"><div class="adash-vazio">Carregando painel...</div></div>
+      <div id="bloco-comparar" hidden>
+        <div class="adash-head">
+          <div>
+            <h1 class="adash-titulo">Bacias Hidrográficas do Acre</h1>
+            <p class="adash-sub">Comparativo entre as bacias monitoradas pela SEMA: onde estão os pontos de
+              coleta, quanto cada bacia já foi medida e como o IQA evoluiu em cada uma. IQA e conformidade
+              CONAMA vêm prontos do banco — nunca recalculados aqui — e coleta em conferência entra marcada,
+              nunca escondida.</p>
+          </div>
+          <div class="adash-head-acoes">
+            <button class="adash-pill" type="button" onclick="alternarExplicacaoIqa()" data-icon="help">Entenda o cálculo</button>
+          </div>
+        </div>
+
+        <div class="rhb-aviso">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <div>
+            <strong>A divisão por bacia ainda vem do cadastro do ponto, não de um polígono oficial.</strong>
+            O limite geográfico de cada bacia (ottobacias da ANA) não está carregado no sistema — quando
+            estiver, a bacia de cada ponto passa a ser determinada por posição, e esta visão ganha os
+            contornos no mapa. Os números abaixo já são reais: saem das coletas de <code>agua_coletas</code>.
+          </div>
+        </div>
+
+        <div class="adash-card adash-mapa-card">
+          <div class="adash-card-topo">
+            <div><p class="adash-card-tit">Pontos de coleta e rede hidrográfica</p>
+              <p class="adash-card-tit-sub" id="rhb-mapa-sub">Carregando pontos...</p></div>
+            <span class="adash-card-mais">•••</span>
+          </div>
+          <div class="adash-mapa-wrap"><div id="rhb-mapa"></div></div>
+        </div>
+
+        <div id="rhb-conteudo"><div class="adash-vazio">Carregando bacias...</div></div>
+      </div>
     </div>
     <div class="modal-overlay" id="rl-iqa-modal"><div class="modal" style="max-width:560px">${aguaPainelExplicacaoIqaHTML()}</div></div>
     <div class="modal-overlay" id="adet-modal"><div class="modal" id="adet-modal-inner" style="max-width:600px"></div></div>`
@@ -103,7 +189,7 @@
     document.getElementById('rl-iqa-modal').classList.toggle('aberto')
   }
 
-  // ── Detalhe do ponto (popup ao clicar no pino) ──────────────────
+  // ── Detalhe do ponto (popup ao clicar no pino, só no modo Painel) ──
   // Renderer/dado vêm de js/agua-painel.js e js/agua-relatorio-pdf.js,
   // compartilhados com pages/agua-publico.html — só a fonte do
   // cabeçalho/protocolo do PDF muda entre as duas telas.
@@ -133,6 +219,24 @@
   }
 
   const sel = id => document.getElementById(id)
+
+  // ── Coordenadas dos pontos: UMA busca só, compartilhada pelos dois
+  // modos (o mapa do Painel e o do Comparar leem a MESMA geometria).
+  let _pontosGeomPorId = {}
+  try {
+    const { data, error } = await db.from('agua_pontos_coleta').select('id,geom').eq('ativo', true)
+    if (error) throw error
+    ;(data || []).forEach(p => {
+      const ll = geoLatLngDeGeom(p.geom)
+      if (ll) _pontosGeomPorId[p.id] = ll
+    })
+  } catch (e) {
+    console.warn('[agua-relatorios] pontos (coordenadas) indisponíveis:', e.message)
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  // MODO 1 — Painel (Acre todo ou 1 bacia, com filtros e exportação)
+  // ══════════════════════════════════════════════════════════════════
   let _todasColetasResumo = []
   let _coletasBaciaAtual = []
   let _relatorioAtual = null
@@ -147,68 +251,9 @@
   // texto fixo, sempre mostrada por js/agua-painel.js.
   let _baseLegal = []
   let _filtrosAbertos = false
-
-  // ── Mapa ───────────────────────────────────────────────────────
-  // Criação/atualização do mapa: js/agua-painel.js, compartilhado com
-  // pages/agua-publico.html — nunca reimplementado aqui.
-  const _mapaPainelCtl = aguaPainelMapaCriar('rl-mapa', 'rl-mapa-sub')
-
-  let _pontosGeomPorId = {}
-  try {
-    const { data, error } = await db.from('agua_pontos_coleta').select('id,geom').eq('ativo', true)
-    if (error) throw error
-    ;(data || []).forEach(p => {
-      const ll = geoLatLngDeGeom(p.geom)
-      if (ll) _pontosGeomPorId[p.id] = ll
-    })
-  } catch (e) {
-    console.warn('[agua-relatorios] pontos (coordenadas) indisponíveis:', e.message)
-  }
+  let _mapaPainelCtl = null
 
   function atualizarMapaPainel(rel) { _mapaPainelCtl.atualizar(rel, _pontosGeomPorId, (ponto, coleta) => window.abrirDetalheColetaPainel(ponto, coleta)) }
-
-  // ── Carrega o seletor de bacias ──────────────────────────────────
-  try {
-    _todasColetasResumo = await aguaRelBuscarResumoBacias(db)
-  } catch (e) {
-    sel('rl-conteudo').innerHTML = `<div class="adash-vazio">Erro ao carregar bacias: ${esc(e.message)}</div>`
-    return
-  }
-  const bacias = aguaRelListarBacias(_todasColetasResumo)
-  const totalPontos = new Set(_todasColetasResumo.map(c => c.ponto_id)).size
-  // "Acre todo" é o valor vazio ('') — mesmo valor que, no modelo
-  // anterior, era "nenhuma bacia selecionada ainda". Aqui deixa de ser
-  // um placeholder: é o escopo padrão, carregado de cara (regra pedida
-  // pelo usuário — não obrigar a escolher bacia antes de ver algo).
-  sel('rl-bacia').innerHTML = `<option value="">Acre todo (${totalPontos} ponto${totalPontos !== 1 ? 's' : ''})</option>` +
-    bacias.map(b => `<option value="${esc(b.bacia)}">${esc(b.label)} (${b.nPontos} ponto${b.nPontos !== 1 ? 's' : ''})</option>`).join('')
-
-  sel('rl-status').innerHTML += Object.entries(AGUA_REL_STATUS_LABEL)
-    .map(([v, l]) => `<option value="${v}">${esc(l)}</option>`).join('')
-  sel('rl-iqa-faixa').innerHTML += AGUA_IQA_FAIXA_ORDEM
-    .map(f => `<option value="${esc(f)}">${esc(f)}</option>`).join('')
-  sel('rl-conama').innerHTML += Object.entries(AGUA_REL_CONAMA_LABEL)
-    .map(([v, l]) => `<option value="${v}">${esc(l)}</option>`).join('')
-
-  sel('rl-bacia').addEventListener('change', carregarBacia)
-  ;['rl-de', 'rl-ate', 'rl-bacia-filtro', 'rl-rio', 'rl-status', 'rl-iqa-faixa', 'rl-conama']
-    .forEach(id => sel(id).addEventListener('change', recalcularRelatorio))
-
-  // Fecha o menu de exportar ao clicar fora (mesma cortesia de qualquer
-  // popover do projeto) — o painel de filtros NÃO fecha assim: é área
-  // de trabalho, não menu.
-  document.addEventListener('click', ev => {
-    if (!ev.target.closest('.adash-export')) sel('rl-export-menu').hidden = true
-  })
-
-  window.alternarFiltros = function () {
-    _filtrosAbertos = !_filtrosAbertos
-    sel('rl-filtros').hidden = !_filtrosAbertos
-    sel('rl-btn-filtros').classList.toggle('adash-pill-ativo', _filtrosAbertos)
-  }
-  window.alternarExport = function () {
-    const m = sel('rl-export-menu'); m.hidden = !m.hidden
-  }
 
   async function carregarBacia() {
     const chave = sel('rl-bacia').value // '' = Acre todo
@@ -394,12 +439,252 @@
     }
   }
 
-  // Boot: escopo padrão = Acre todo, carregado de cara (sem exigir
-  // escolha prévia de bacia — pedido do usuário). Base legal adicional
-  // buscada antes do 1º render, pra não aparecer incompleta e depois
-  // "pular" no card.
-  try { _baseLegal = (await getConfigSistema()).agua?.base_legal || [] } catch (e) { console.warn('[agua-relatorios] base legal indisponível:', e.message) }
-  await carregarBacia()
+  let _painelIniciado = false
+  async function iniciarPainel() {
+    _mapaPainelCtl = aguaPainelMapaCriar('rl-mapa', 'rl-mapa-sub')
+
+    try {
+      _todasColetasResumo = await aguaRelBuscarResumoBacias(db)
+    } catch (e) {
+      sel('rl-conteudo').innerHTML = `<div class="adash-vazio">Erro ao carregar bacias: ${esc(e.message)}</div>`
+      return
+    }
+    const bacias = aguaRelListarBacias(_todasColetasResumo)
+    const totalPontos = new Set(_todasColetasResumo.map(c => c.ponto_id)).size
+    // "Acre todo" é o valor vazio ('') — o escopo padrão, carregado de
+    // cara (pedido do usuário — não obrigar a escolher bacia antes de
+    // ver algo).
+    sel('rl-bacia').innerHTML = `<option value="">Acre todo (${totalPontos} ponto${totalPontos !== 1 ? 's' : ''})</option>` +
+      bacias.map(b => `<option value="${esc(b.bacia)}">${esc(b.label)} (${b.nPontos} ponto${b.nPontos !== 1 ? 's' : ''})</option>`).join('')
+
+    sel('rl-status').innerHTML += Object.entries(AGUA_REL_STATUS_LABEL)
+      .map(([v, l]) => `<option value="${v}">${esc(l)}</option>`).join('')
+    sel('rl-iqa-faixa').innerHTML += AGUA_IQA_FAIXA_ORDEM
+      .map(f => `<option value="${esc(f)}">${esc(f)}</option>`).join('')
+    sel('rl-conama').innerHTML += Object.entries(AGUA_REL_CONAMA_LABEL)
+      .map(([v, l]) => `<option value="${v}">${esc(l)}</option>`).join('')
+
+    sel('rl-bacia').addEventListener('change', carregarBacia)
+    ;['rl-de', 'rl-ate', 'rl-bacia-filtro', 'rl-rio', 'rl-status', 'rl-iqa-faixa', 'rl-conama']
+      .forEach(id => sel(id).addEventListener('change', recalcularRelatorio))
+
+    // Fecha o menu de exportar ao clicar fora (mesma cortesia de qualquer
+    // popover do projeto) — o painel de filtros NÃO fecha assim: é área
+    // de trabalho, não menu.
+    document.addEventListener('click', ev => {
+      if (!ev.target.closest('.adash-export')) sel('rl-export-menu').hidden = true
+    })
+
+    window.alternarFiltros = function () {
+      _filtrosAbertos = !_filtrosAbertos
+      sel('rl-filtros').hidden = !_filtrosAbertos
+      sel('rl-btn-filtros').classList.toggle('adash-pill-ativo', _filtrosAbertos)
+    }
+    window.alternarExport = function () {
+      const m = sel('rl-export-menu'); m.hidden = !m.hidden
+    }
+
+    // Base legal adicional buscada antes do 1º render, pra não aparecer
+    // incompleta e depois "pular" no card.
+    try { _baseLegal = (await getConfigSistema()).agua?.base_legal || [] } catch (e) { console.warn('[agua-relatorios] base legal indisponível:', e.message) }
+    await carregarBacia()
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  // MODO 2 — Comparar bacias (antigo pages/rh-bacias.html)
+  // ══════════════════════════════════════════════════════════════════
+  // `_baciaSel` recorta só a EXIBIÇÃO (cards em destaque + pinos no
+  // mapa); a comparação entre bacias continua inteira na tabela —
+  // escolher uma bacia nunca esconde as outras, senão o modo perde a
+  // razão de existir.
+  let _coletasComparar = []
+  let _baciaSel = null
+  let _mapaCompararCtl = null
+
+  function fmtIqa(v) { return v == null ? '—' : v.toFixed(1) }
+  function fmtPct(v) { return v == null ? '—' : Math.round(v) + '%' }
+
+  function renderComparar() {
+    const bacias = aguaRelPorBacia(_coletasComparar)
+    const alvo = document.getElementById('rhb-conteudo')
+    if (!bacias.length) {
+      alvo.innerHTML = '<div class="adash-vazio">Nenhuma coleta cadastrada ainda.</div>'
+      return
+    }
+
+    const totalPontos = new Set(_coletasComparar.map(c => c.ponto_id)).size
+    const monitoradas = bacias.filter(b => !b.semBacia).length
+
+    const cards = bacias.map(b => `
+      <div class="adash-card rhb-bacia-card${b.semBacia ? ' rhb-sem-bacia' : ''}${_baciaSel === b.bacia ? ' ativo' : ''}"
+           onclick="selecionarBaciaComparar('${b.bacia.replace(/'/g, "\\'")}')" role="button" tabindex="0">
+        <p class="rhb-bacia-nome">${esc(b.label)}</p>
+        <p class="rhb-bacia-sub">${b.nRios} ${b.nRios === 1 ? 'rio monitorado' : 'rios monitorados'}${b.ultimaCampanha ? ' · última: ' + esc(b.ultimaCampanha) : ''}</p>
+        <div class="rhb-bacia-iqa">
+          <strong style="color:${b.iqaMedio == null ? AGUA_SEM_IQA_COR : 'var(--cinza-900)'}">${fmtIqa(b.iqaMedio)}</strong>
+          <span class="rhb-num-lab">IQA médio</span>
+        </div>
+        <div class="rhb-bacia-num">
+          <div><div class="rhb-num-val">${formatNum(b.nPontos)}</div><div class="rhb-num-lab">Pontos</div></div>
+          <div><div class="rhb-num-val">${formatNum(b.nColetas)}</div><div class="rhb-num-lab">Coletas</div></div>
+          <div><div class="rhb-num-val">${fmtPct(b.pctConforme)}</div><div class="rhb-num-lab">Conforme</div></div>
+        </div>
+        ${b.quarentena ? `<p class="rhb-quarentena">${b.quarentena} em conferência</p>` : ''}
+      </div>`).join('')
+
+    // Barras do IQA médio por bacia — escala de um tom só (nunca a
+    // paleta de faixa): classificar uma MÉDIA numa faixa seria
+    // recalcular no cliente o que agua_iqa_faixa() faz no banco.
+    const barras = aguaIqaBarrasHTML(bacias.map(b => ({
+      label: b.label.length > 12 ? b.label.slice(0, 11) + '…' : b.label,
+      titulo: b.label,
+      valor: b.iqaMedio,
+      valorTexto: fmtIqa(b.iqaMedio),
+      fraco: b.quarentena > 0,
+    })), { max: 100, height: 200, vazio: 'Sem IQA calculado em nenhuma bacia' })
+
+    const linhas = bacias.map(b => `
+      <tr class="${_baciaSel === b.bacia ? 'ativo' : ''}">
+        <td>
+          <div class="rhb-tab-nome">${esc(b.label)}</div>
+          ${b.rios.length ? `<div class="rhb-tab-rios">${esc(b.rios.slice(0, 4).join(', '))}${b.rios.length > 4 ? ` +${b.rios.length - 4}` : ''}</div>` : ''}
+        </td>
+        <td class="num">${formatNum(b.nPontos)}</td>
+        <td class="num">${formatNum(b.nColetas)}</td>
+        <td class="num">${formatNum(b.nCampanhas)}</td>
+        <td class="num">${fmtIqa(b.iqaMedio)}</td>
+        <td class="num">${fmtPct(b.pctConforme)}</td>
+        <td class="num">${b.quarentena ? formatNum(b.quarentena) : '—'}</td>
+      </tr>`).join('')
+
+    const series = bacias.map(b => `
+      <div class="adash-card">
+        <div class="adash-card-topo">
+          <div><p class="adash-card-tit">${esc(b.label)}</p>
+            <p class="adash-card-tit-sub">IQA médio da bacia por campanha</p></div>
+        </div>
+        ${aguaIqaGraficoHTML(aguaRelSerieBacia(_coletasComparar, b.bacia), { width: 330, height: 165, semLegenda: true })}
+      </div>`).join('')
+
+    // Violações CONAMA somadas por bacia — reaproveita o mesmo ranking
+    // do painel (aguaRelViolacoesRanking), por bacia em vez do recorte
+    // inteiro.
+    const violacoes = bacias.map(b => {
+      const rank = aguaRelViolacoesRanking({ violacoesPorParametro: b.violacoesPorParametro }, 4)
+      return `<div class="adash-lista-linha">
+          <span class="adash-lista-nome">${esc(b.label)}</span>
+          <span class="adash-lista-val">${rank.length ? esc(rank.map(r => `${r.label} (${r.n})`).join(' · ')) : 'Nenhuma violação registrada'}</span>
+        </div>`
+    }).join('')
+
+    alvo.innerHTML = `
+      <div class="rhb-bacias">${cards}</div>
+
+      <div class="adash-card" style="margin-bottom:16px">
+        <div class="adash-card-topo">
+          <div><p class="adash-card-tit">Comparativo entre bacias</p>
+            <p class="adash-card-tit-sub">${monitoradas} bacia${monitoradas === 1 ? '' : 's'} com ponto cadastrado · ${formatNum(totalPontos)} pontos · ${formatNum(_coletasComparar.length)} coletas</p></div>
+        </div>
+        <div style="overflow-x:auto">
+          <table class="rhb-tab">
+            <thead><tr>
+              <th>Bacia</th><th style="text-align:right">Pontos</th><th style="text-align:right">Coletas</th>
+              <th style="text-align:right">Campanhas</th><th style="text-align:right">IQA médio</th>
+              <th style="text-align:right">Conforme</th><th style="text-align:right">Em conferência</th>
+            </tr></thead>
+            <tbody>${linhas}</tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="adash-card" style="margin-bottom:16px">
+        <div class="adash-card-topo">
+          <div><p class="adash-card-tit">IQA médio por bacia</p>
+            <p class="adash-card-tit-sub">Média das coletas com índice calculado — a média não é classificada em faixa</p></div>
+        </div>
+        ${barras}
+      </div>
+
+      <div class="rhb-serie-grid" style="margin-bottom:16px">${series}</div>
+
+      <div class="adash-card">
+        <div class="adash-card-topo">
+          <div><p class="adash-card-tit">Parâmetros fora do limite CONAMA, por bacia</p>
+            <p class="adash-card-tit-sub">Conformidade é leitura SEPARADA do IQA — uma bacia pode ter IQA bom e violar um limite</p></div>
+        </div>
+        ${violacoes}
+      </div>`
+
+    bIconsAplicar(alvo)
+  }
+
+  function atualizarMapaComparar() {
+    // `aguaRelMontar` agrupa por ponto e é o mesmo formato que o mapa
+    // do painel consome — com `bacia` quando há uma selecionada.
+    if (!_mapaCompararCtl) return
+    const rel = aguaRelMontar(_coletasComparar, _baciaSel ? { bacia: _baciaSel } : {})
+    _mapaCompararCtl.atualizar(rel, _pontosGeomPorId)
+  }
+
+  // Clicar num card/bacia recorta o MAPA (e destaca o card); clicar de
+  // novo na mesma bacia volta ao Acre inteiro.
+  window.selecionarBaciaComparar = function (bacia) {
+    _baciaSel = _baciaSel === bacia ? null : bacia
+    renderComparar()
+    atualizarMapaComparar()
+  }
+
+  let _compararIniciado = false
+  async function iniciarComparar() {
+    // Mapa: MESMA função do modo Painel, com `referenciaSempre` — aqui
+    // o assunto é a rede hidrográfica, então rios/limites ficam
+    // visíveis também no mapa de ruas, não só no satélite.
+    // Fail-open: se o Leaflet não carregar (CDN fora do ar, rede de
+    // campo ruim), o mapa some mas os números continuam na tela —
+    // nunca deixar o modo inteiro em branco por causa da camada visual.
+    try {
+      _mapaCompararCtl = aguaPainelMapaCriar('rhb-mapa', 'rhb-mapa-sub', { referenciaSempre: true })
+    } catch (e) {
+      console.warn('[agua-relatorios] mapa (comparar) indisponível:', e.message)
+      document.querySelector('#bloco-comparar .adash-mapa-card')?.setAttribute('hidden', '')
+    }
+
+    try {
+      _coletasComparar = await aguaRelBuscarTodasColetas(db)
+    } catch (e) {
+      sel('rhb-conteudo').innerHTML = `<div class="adash-vazio">Não foi possível carregar as coletas: ${esc(e.message)}</div>`
+      return
+    }
+    renderComparar()
+    atualizarMapaComparar()
+  }
+
+  // ── Alternância entre modos ──────────────────────────────────────
+  let _modoAtual = null
+  window.trocarModoAgua = async function (modo) {
+    if (modo === 'painel' && !TEM_AGUA) return
+    if (modo === 'comparar' && !TEM_BACIAS) return
+    _modoAtual = modo
+    sel('bloco-painel').hidden = modo !== 'painel'
+    sel('bloco-comparar').hidden = modo !== 'comparar'
+    document.querySelectorAll('.adash-modo-btn').forEach(b => b.classList.toggle('ativo', b.dataset.modo === modo))
+
+    if (modo === 'painel' && !_painelIniciado) { _painelIniciado = true; await iniciarPainel() }
+    if (modo === 'comparar' && !_compararIniciado) { _compararIniciado = true; await iniciarComparar() }
+
+    // O mapa pode ter sido criado enquanto o container estava oculto
+    // (`display:none`) — o Leaflet mede 0×0 nesse instante e precisa
+    // ser avisado de que o tamanho real chegou.
+    const ctl = modo === 'painel' ? _mapaPainelCtl : _mapaCompararCtl
+    if (ctl) setTimeout(() => ctl.mapa.invalidateSize(), 30)
+  }
+
+  // Boot: modo inicial vem de `?visao=bacias` (link vindo de fora) ou
+  // do único módulo a que o usuário tem acesso; com os dois, começa no
+  // Painel.
+  const visaoPedida = new URLSearchParams(location.search).get('visao') === 'bacias' && TEM_BACIAS
+  const modoInicial = visaoPedida ? 'comparar' : (TEM_AGUA ? 'painel' : 'comparar')
+  await trocarModoAgua(modoInicial)
 })()
 </script>
 </body>
