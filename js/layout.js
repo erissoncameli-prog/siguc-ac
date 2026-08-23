@@ -94,7 +94,6 @@ function gerarLayout(tituloPagina, paginaAtiva) {
     'agua-conferencia':         { svg: '<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>', cor: '#0891b2', bg: 'rgba(8,145,178,0.22)' },
     'agua-relatorios':          { svg: '<rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>', cor: '#0284c7', bg: 'rgba(2,132,199,0.22)' },
     'rh-estacoes':              { svg: '<path d="M12 2v6"/><circle cx="12" cy="10" r="2"/><path d="M7 21c1.5 0 1.5-1.5 3-1.5s1.5 1.5 3 1.5 1.5-1.5 3-1.5"/><path d="M5 17c1.8 0 1.8-1.5 3.6-1.5S10.4 17 12.2 17s1.8-1.5 3.6-1.5S17.6 17 19.4 17"/><path d="M12 12v2"/>', cor: '#22d3ee', bg: 'rgba(34,211,238,0.22)' },
-    'rh-bacias':                { svg: '<path d="M2 6c3 0 3 2 6 2s3-2 6-2 3 2 6 2"/><path d="M2 12c3 0 3 2 6 2s3-2 6-2 3 2 6 2"/><path d="M2 18c3 0 3 2 6 2s3-2 6-2 3 2 6 2"/>', cor: '#0891b2', bg: 'rgba(8,145,178,0.22)' },
     'rh-boletim':               { svg: '<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18"/><path d="M8 2v4"/><path d="M16 2v4"/><path d="M8 14l2.5 2.5L16 11"/>', cor: '#0e7490', bg: 'rgba(14,116,144,0.22)' },
     'ar-qualidade':             { svg: '<path d="M9.6 4.6a2 2 0 1 1 2 3.4H2"/><path d="M12.6 19.4a2 2 0 1 0 2-3.4H2"/><path d="M17.7 7.7a2.5 2.5 0 1 1 1.8 4.3H2"/>', cor: '#0369a1', bg: 'rgba(3,105,161,0.22)' },
   };
