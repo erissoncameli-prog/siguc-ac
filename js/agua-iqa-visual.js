@@ -127,7 +127,8 @@ function aguaIqaGraficoHTML(pontos, opts) {
     <text x="${x(i)}" y="${h - 8}" font-size="9" fill="#9CA3AF" text-anchor="middle">${p.label}</text>`).join('')
 
   // `opts.semLegenda`: série cujos pontos NÃO têm faixa (ex.: IQA médio
-  // de uma bacia por campanha, em pages/rh-bacias.html) — mostrar a
+  // de uma bacia por campanha, no modo "Comparar bacias" de
+  // pages/agua-relatorios.html) — mostrar a
   // legenda das 5 faixas ali prometeria uma classificação que não foi
   // feita (classificar uma média seria recalcular o que
   // agua_iqa_faixa() faz no banco).
