@@ -997,3 +997,260 @@ test.describe('painel (dashboard) — render com dado real da view', () => {
     await expect(page.locator('#adet-modal')).not.toHaveClass(/aberto/);
   });
 });
+
+// ══════════════════════════════════════════════════════════════════
+// MODO "Comparar bacias" — fundido do antigo tests/rh-bacias.test.js
+// quando pages/rh-bacias.html virou um MODO desta mesma tela (pedido
+// do usuário: painel e comparativo são só duas formas de olhar o
+// mesmo relatório, sem razão pra viver em páginas separadas).
+//
+// O QUE ESTE BLOCO TRAVA (herdado do arquivo antigo): não existe
+// polígono de bacia no sistema — a divisão vem do campo de texto
+// `agua_pontos_coleta.bacia`, e o aviso do topo precisa dizer isso na
+// cara do usuário. Além disso: (1) a comparação ENTRE bacias é a razão
+// de existir do modo — escolher uma bacia destaca, mas NUNCA esconde
+// as outras da tabela; (2) IQA médio de bacia é número, nunca faixa;
+// (3) coleta em quarentena entra marcada, nunca escondida. E, NOVO
+// nesta fusão: o segmented control troca de modo sem recarregar a
+// página, e cada modo só é acessível a quem tem o módulo
+// correspondente ('agua' e/ou 'bacias').
+// ══════════════════════════════════════════════════════════════════
+
+function fixtureColetasComparativoBacias() {
+  const b = { classe_enquadramento: 'classe_2', uc_id: null };
+  return [
+    { ...b, ponto_bacia: 'Purus', ponto_id: 'p-rb', ponto_nome: 'Rio Branco', codigo_ana: '13601000', ponto_municipio: 'Rio Branco', ponto_rio: 'Rio Acre',
+      campanha_id: 'c1', campanha_ano: 2024, campanha_ordem: 'primeira', data_coleta: '2024-03-10',
+      status: 'completo', iqa: 80.0, iqa_faixa: 'Ótima', conama_violacoes: [] },
+    { ...b, ponto_bacia: 'Purus', ponto_id: 'p-rb', ponto_nome: 'Rio Branco', codigo_ana: '13601000', ponto_municipio: 'Rio Branco', ponto_rio: 'Rio Acre',
+      campanha_id: 'c2', campanha_ano: 2024, campanha_ordem: 'segunda', data_coleta: '2024-09-12',
+      status: 'quarentena', iqa: 40.0, iqa_faixa: 'Ruim', conama_violacoes: ['turbidez'] },
+    { ...b, ponto_bacia: 'Purus', ponto_id: 'p-sm', ponto_nome: 'Sena Madureira', codigo_ana: '13470000', ponto_municipio: 'Sena Madureira', ponto_rio: 'Rio Iaco',
+      campanha_id: 'c1', campanha_ano: 2024, campanha_ordem: 'primeira', data_coleta: '2024-03-11',
+      status: 'completo', iqa: 60.0, iqa_faixa: 'Boa', conama_violacoes: ['turbidez', 'od'] },
+    { ...b, ponto_bacia: 'Juruá', ponto_id: 'p-cz', ponto_nome: 'Cruzeiro do Sul', codigo_ana: '12500000', ponto_municipio: 'Cruzeiro do Sul', ponto_rio: 'Rio Juruá',
+      campanha_id: 'c1', campanha_ano: 2024, campanha_ordem: 'primeira', data_coleta: '2024-03-12',
+      status: 'completo', iqa: 70.0, iqa_faixa: 'Boa', conama_violacoes: [] },
+    { ...b, ponto_bacia: null, ponto_id: 'p-iq', ponto_nome: 'Rio Iquiri', codigo_ana: null, ponto_municipio: 'Rio Branco', ponto_rio: 'Rio Iquiri',
+      campanha_id: 'c1', campanha_ano: 2024, campanha_ordem: 'primeira', data_coleta: '2024-03-13',
+      status: 'completo', iqa: 50.0, iqa_faixa: 'Regular', conama_violacoes: null },
+  ];
+}
+
+const PONTOS_GEOM_COMPARATIVO = [
+  { id: 'p-rb', geom: { type: 'Point', coordinates: [-67.81, -9.97] }, ativo: true },
+  { id: 'p-sm', geom: { type: 'Point', coordinates: [-68.66, -9.06] }, ativo: true },
+  { id: 'p-cz', geom: { type: 'Point', coordinates: [-72.75, -7.63] }, ativo: true },
+  { id: 'p-iq', geom: { type: 'Point', coordinates: [-67.20, -9.60] }, ativo: true },
+];
+
+// `niveis` deixa cada teste simular acesso só a 'agua', só a 'bacias'
+// ou aos dois — o merge introduziu essa dimensão nova (antes eram duas
+// páginas com um `nivel_efetivo` cada, sempre 'editar' no stub).
+async function abrirPaginaComparar(page, { coletas = fixtureColetasComparativoBacias(), pontosGeom = PONTOS_GEOM_COMPARATIVO, niveis = { agua: 'editar', bacias: 'editar' }, visao = 'bacias' } = {}) {
+  await page.route('**/cdn.jsdelivr.net/**', route => route.abort());
+  await page.route('**/tile.openstreetmap.org/**', route => route.abort());
+  await page.route('**/unpkg.com/leaflet@1.9.4/dist/leaflet.js', route =>
+    route.fulfill({ path: path.join(__dirname, 'fixtures/vendor/leaflet.js'), contentType: 'application/javascript' }));
+  await page.route('**/unpkg.com/leaflet@1.9.4/dist/leaflet.css', route =>
+    route.fulfill({ path: path.join(__dirname, 'fixtures/vendor/leaflet.css'), contentType: 'text/css' }));
+
+  await page.addInitScript(({ coletas, usuario, pontosGeom, niveis }) => {
+    window.loadEnv = () => Promise.resolve({ supabaseUrl: 'http://fake.test', supabaseKey: 'fake-key' });
+    const consulta = (linhas) => {
+      const q = {
+        _linhas: linhas,
+        eq(col, val) { q._linhas = q._linhas.filter(l => l[col] === val); return q },
+        is(col, val) { q._linhas = q._linhas.filter(l => l[col] === val); return q },
+        order() { return q },
+        then(res) { return Promise.resolve({ data: q._linhas, error: null }).then(res) },
+      };
+      return q;
+    };
+    window.supabase = {
+      createClient: () => ({
+        auth: {
+          getSession: async () => ({ data: { session: { user: { id: 'u-teste' } } } }),
+          signOut: async () => ({}),
+        },
+        rpc: async (nome, args) => {
+          if (nome === 'nivel_efetivo') return { data: niveis[args?.p_modulo_chave] ?? 'sem_acesso' };
+          return { data: null };
+        },
+        from: (tabela) => {
+          if (tabela === 'usuarios') return { select: () => ({ eq: () => ({ single: async () => ({ data: usuario }) }) }) };
+          if (tabela === 'minhas_permissoes') return { select: async () => ({ data: Object.entries(niveis).map(([chave, nivel]) => ({ chave, nivel })) }) };
+          if (tabela === 'vw_agua_coletas_detalhe') return { select: () => consulta(coletas.slice()) };
+          if (tabela === 'agua_pontos_coleta') return { select: () => consulta(pontosGeom.slice()) };
+          return { select: () => ({ eq: () => ({ single: async () => ({ data: null }) }) }) };
+        },
+      }),
+    };
+  }, { coletas, usuario: USUARIO_STUB, pontosGeom, niveis });
+
+  await page.goto(visao ? `${PAGINA}?visao=${visao}` : PAGINA);
+  await page.waitForSelector('.rhb-bacias, .adash-vazio, .adash-grid', { timeout: 15_000 });
+}
+
+test.describe('aguaRelPorBacia — comparativo entre bacias (agregação, pura)', () => {
+  test('uma linha por bacia, com pontos/coletas/IQA/conformidade, e "sem bacia" por último', async ({ page }) => {
+    await page.goto(PAGINA);
+    await page.waitForFunction(() => typeof window.aguaRelPorBacia === 'function');
+
+    const bacias = await page.evaluate((coletas) => window.aguaRelPorBacia(coletas), fixtureColetasComparativoBacias());
+
+    expect(bacias.map(b => b.label)).toEqual(['Purus', 'Juruá', 'Sem bacia definida']);
+
+    const purus = bacias[0];
+    expect(purus).toMatchObject({ nPontos: 2, nColetas: 3, nRios: 2, quarentena: 1 });
+    expect(purus.iqaMedio).toBeCloseTo(60.0, 5);      // (80 + 40 + 60) / 3
+    expect(purus.pctConforme).toBeCloseTo(100 / 3, 5); // 1 conforme de 3 avaliadas
+    expect(purus.rios).toEqual(['Rio Acre', 'Rio Iaco']);
+    expect(purus.ultimaCampanha).toBe('2024 · 2ª campanha');
+
+    // "Sem bacia definida" nunca é descartada — é lacuna de cadastro
+    // (Rio Iquiri, caso real), e some da tela seria pior que aparecer.
+    const sem = bacias[2];
+    expect(sem.semBacia).toBe(true);
+    expect(sem.nColetas).toBe(1);
+    // conama_violacoes null = ponto sem limites cadastrados para a
+    // classe: não conta como conforme NEM como violação.
+    expect(sem.comConama).toBe(0);
+    expect(sem.pctConforme).toBeNull();
+  });
+
+  test('série da bacia é o IQA MÉDIO por campanha, sem faixa (média nunca é classificada)', async ({ page }) => {
+    await page.goto(PAGINA);
+    await page.waitForFunction(() => typeof window.aguaRelSerieBacia === 'function');
+
+    const serie = await page.evaluate((coletas) => window.aguaRelSerieBacia(coletas, 'Purus'), fixtureColetasComparativoBacias());
+    expect(serie).toHaveLength(2);
+    expect(serie[0]).toMatchObject({ label: '2024·1ª', iqa: 70, faixa: null, status: 'completo' });   // (80+60)/2
+    expect(serie[1]).toMatchObject({ label: '2024·2ª', iqa: 40, faixa: null, status: 'quarentena' }); // só a quarentenada
+  });
+});
+
+test.describe('modo Comparar bacias — render de ponta a ponta', () => {
+  test('?visao=bacias abre a página direto no modo Comparar, com o segmented control marcado', async ({ page }) => {
+    await abrirPaginaComparar(page);
+
+    await expect(page.locator('#bloco-comparar')).toBeVisible();
+    await expect(page.locator('#bloco-painel')).toBeHidden();
+    await expect(page.locator('.adash-modo-btn[data-modo="comparar"]')).toHaveClass(/ativo/);
+
+    await expect(page.locator('.rhb-bacia-card')).toHaveCount(3);
+    const purus = page.locator('.rhb-bacia-card', { hasText: 'Purus' });
+    await expect(purus.locator('.rhb-bacia-iqa strong')).toHaveText('60.0');
+    await expect(purus).toContainText('2 rios monitorados');
+    await expect(purus.locator('.rhb-quarentena')).toHaveText('1 em conferência');
+
+    // Tabela comparativa traz as três, sempre.
+    await expect(page.locator('.rhb-tab tbody tr')).toHaveCount(3);
+    await expect(page.locator('.rhb-tab tbody tr').first()).toContainText('Purus');
+  });
+
+  test('o aviso de que NÃO há polígono oficial de bacia é visível — a divisão vem do cadastro do ponto', async ({ page }) => {
+    await abrirPaginaComparar(page);
+
+    const aviso = page.locator('.rhb-aviso');
+    await expect(aviso).toBeVisible();
+    await expect(aviso).toContainText('ainda vem do cadastro do ponto, não de um polígono oficial');
+    await expect(aviso).toContainText('ottobacias da ANA');
+  });
+
+  test('escolher uma bacia destaca e recorta o MAPA, mas nunca some com as outras da comparação', async ({ page }) => {
+    await abrirPaginaComparar(page);
+
+    await expect(page.locator('#rhb-mapa .adash-mapa-pin')).toHaveCount(4);
+
+    await page.locator('.rhb-bacia-card', { hasText: 'Juruá' }).click();
+    await expect(page.locator('.rhb-bacia-card.ativo')).toContainText('Juruá');
+    await expect(page.locator('#rhb-mapa .adash-mapa-pin')).toHaveCount(1); // só Cruzeiro do Sul
+    // A comparação continua inteira — é a razão de existir do modo.
+    await expect(page.locator('.rhb-tab tbody tr')).toHaveCount(3);
+    await expect(page.locator('.rhb-bacia-card')).toHaveCount(3);
+
+    // Clicar de novo volta ao Acre inteiro.
+    await page.locator('.rhb-bacia-card', { hasText: 'Juruá' }).click();
+    await expect(page.locator('.rhb-bacia-card.ativo')).toHaveCount(0);
+    await expect(page.locator('#rhb-mapa .adash-mapa-pin')).toHaveCount(4);
+  });
+
+  test('rede hidrográfica e limites ficam visíveis também no mapa de RUAS (referenciaSempre) — diferente do modo Painel', async ({ page }) => {
+    await abrirPaginaComparar(page);
+
+    // Rótulo de município aparece sem precisar trocar para satélite.
+    await expect(page.locator('#bloco-comparar .adash-mapa-mun-label').first()).toBeVisible({ timeout: 10_000 });
+    // E a legenda não promete "só satélite" neste modo.
+    const legenda = page.locator('#bloco-comparar .adash-mapa-legenda');
+    await expect(legenda).toContainText('Camadas de referência');
+    await expect(legenda).not.toContainText('só satélite');
+  });
+
+  test('IQA médio por bacia sai como NÚMERO, nunca como faixa classificada', async ({ page }) => {
+    await abrirPaginaComparar(page);
+
+    const barras = page.locator('#bloco-comparar svg[aria-label^="Barras"]');
+    await expect(barras).toBeVisible();
+    await expect(barras).toContainText('60.0'); // Purus
+    await expect(barras).toContainText('70.0'); // Juruá
+    // Nenhum rótulo de faixa colado na média (a faixa só existe por coleta).
+    await expect(barras).not.toContainText('Ótima');
+    await expect(barras).not.toContainText('Regular');
+  });
+
+  test('violações CONAMA aparecem por bacia; bacia sem limites cadastrados não vira "conforme"', async ({ page }) => {
+    await abrirPaginaComparar(page);
+
+    const card = page.locator('#bloco-comparar .adash-card', { hasText: 'Parâmetros fora do limite CONAMA' });
+    await expect(card.locator('.adash-lista-linha', { hasText: 'Purus' })).toContainText('Turbidez (2)');
+    await expect(card.locator('.adash-lista-linha', { hasText: 'Juruá' })).toContainText('Nenhuma violação');
+    // Sem bacia definida: 1 coleta, sem limites → nem conforme nem violação.
+    await expect(page.locator('.rhb-tab tbody tr', { hasText: 'Sem bacia definida' })).toContainText('—');
+  });
+
+  test('sem coleta nenhuma, o modo diz isso — nunca quebra', async ({ page }) => {
+    await abrirPaginaComparar(page, { coletas: [] });
+    await expect(page.locator('#rhb-conteudo .adash-vazio')).toContainText('Nenhuma coleta cadastrada');
+  });
+});
+
+test.describe('alternância entre modos e acesso por módulo', () => {
+  test('com os dois módulos liberados, o segmented control aparece e troca de modo sem recarregar', async ({ page }) => {
+    await abrirPaginaComparar(page); // abre em Comparar (?visao=bacias)
+    await expect(page.locator('#modo-tabs')).toBeVisible();
+
+    await page.click('.adash-modo-btn[data-modo="painel"]');
+    await expect(page.locator('#bloco-painel')).toBeVisible();
+    await expect(page.locator('#bloco-comparar')).toBeHidden();
+    await expect(page.locator('.adash-modo-btn[data-modo="painel"]')).toHaveClass(/ativo/);
+    // O painel carrega de verdade ao ser aberto pela 1ª vez (lazy init).
+    await expect(page.locator('.adash-titulo')).toContainText('Painel da Qualidade da Água');
+
+    await page.click('.adash-modo-btn[data-modo="comparar"]');
+    await expect(page.locator('#bloco-comparar')).toBeVisible();
+    // Voltar ao modo Comparar não perde o estado (sem recarregar dado).
+    await expect(page.locator('.rhb-bacia-card')).toHaveCount(3);
+  });
+
+  test('só com acesso a "bacias" (sem "agua"), a página abre direto no modo Comparar e sem o segmented control', async ({ page }) => {
+    await abrirPaginaComparar(page, { niveis: { agua: 'sem_acesso', bacias: 'editar' }, visao: null });
+
+    await expect(page.locator('#modo-tabs')).toBeHidden();
+    await expect(page.locator('#bloco-comparar')).toBeVisible();
+    await expect(page.locator('#bloco-painel')).toBeHidden();
+  });
+
+  test('só com acesso a "agua" (sem "bacias"), ?visao=bacias é ignorado e a página abre no modo Painel', async ({ page }) => {
+    await abrirPaginaComparar(page, { niveis: { agua: 'editar', bacias: 'sem_acesso' }, visao: 'bacias' });
+
+    await expect(page.locator('#modo-tabs')).toBeHidden();
+    await expect(page.locator('#bloco-painel')).toBeVisible();
+    await expect(page.locator('#bloco-comparar')).toBeHidden();
+  });
+
+  test('sem acesso a nenhum dos dois módulos, a página barra com uma mensagem só', async ({ page }) => {
+    await abrirPaginaComparar(page, { niveis: { agua: 'sem_acesso', bacias: 'sem_acesso' } });
+    await expect(page.locator('body')).toContainText('Você não tem acesso a este painel');
+  });
+});
