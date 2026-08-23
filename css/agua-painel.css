@@ -34,6 +34,19 @@
 .adash-pill-primary { background:var(--adash-azul); border-color:var(--adash-azul); color:#fff }
 .adash-pill-primary:hover:not(:disabled) { background:var(--adash-azul-esc); border-color:var(--adash-azul-esc) }
 .adash-pill-ativo { border-color:var(--adash-azul); color:var(--adash-azul) }
+
+/* Alternância Painel ⇄ Comparar bacias (pages/agua-relatorios.html) —
+   as duas visões vivem na MESMA página desde a fusão com o antigo
+   pages/rh-bacias.html; isto é o segmented control que troca entre
+   elas. Some sozinho quando o usuário só tem acesso a uma das duas
+   (a página decide, não o CSS). */
+.adash-modo-tabs { display:inline-flex; padding:3px; border-radius:999px; background:var(--cinza-100); border:1px solid var(--borda); margin-bottom:14px }
+.adash-modo-btn {
+  border:none; background:transparent; height:32px; padding:0 16px; border-radius:999px;
+  font-family:var(--font-sans); font-size:13px; font-weight:600; color:var(--cinza-500); cursor:pointer;
+  transition:background .15s, color .15s;
+}
+.adash-modo-btn.ativo { background:var(--branco); color:var(--adash-azul-esc); box-shadow:var(--sombra) }
 .adash-pill-n {
   display:inline-flex; align-items:center; justify-content:center; min-width:18px; height:18px;
   padding:0 5px; border-radius:9px; background:var(--verde-medio); color:#fff; font-size:11px; font-weight:700;
