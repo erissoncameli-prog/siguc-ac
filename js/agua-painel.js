@@ -487,11 +487,12 @@ function _aguaPainelPinIcon(estilo) {
 
 // `opts.referenciaSempre` (opcional): mantém limite do Acre,
 // municípios e hidrografia visíveis TAMBÉM no mapa de ruas. Padrão
-// (false) = só no satélite, como o painel de Relatórios/público pediu
-// (o OSM já traz divisas e nomes). pages/rh-bacias.html liga a opção:
-// ali o assunto É a rede hidrográfica, então esconder os rios no modo
-// ruas esvaziaria a tela. Opção ADITIVA de propósito — as duas telas
-// que já usavam a função não mudam de comportamento.
+// (false) = só no satélite, como o modo Painel/público pediu (o OSM já
+// traz divisas e nomes). O modo "Comparar bacias" (pages/agua-relatorios.html,
+// fundido do antigo pages/rh-bacias.html) liga a opção: ali o assunto É
+// a rede hidrográfica, então esconder os rios no modo ruas esvaziaria a
+// tela. Opção ADITIVA de propósito — os outros usos da função não
+// mudam de comportamento.
 // Base cartográfica compartilhada: mapa + tiles (ruas/satélite
 // híbrido) + rosa dos ventos + escala + legenda + camadas de
 // referência (limite do Acre, municípios, hidrografia IBGE) +
