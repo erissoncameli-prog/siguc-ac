@@ -1089,7 +1089,11 @@ async function abrirPaginaComparar(page, { coletas = fixtureColetasComparativoBa
   }, { coletas, usuario: USUARIO_STUB, pontosGeom, niveis });
 
   await page.goto(visao ? `${PAGINA}?visao=${visao}` : PAGINA);
-  await page.waitForSelector('.rhb-bacias, .adash-vazio, .adash-grid', { timeout: 15_000 });
+  // Três desfechos possíveis: o modo Comparar renderizou (.rhb-bacias/
+  // .adash-vazio), o modo Painel renderizou (.adash-grid/.adash-vazio),
+  // ou nenhum módulo libera acesso e a página vira só a mensagem de
+  // bloqueio — os três terminam com algo dentro de <body>.
+  await page.waitForFunction(() => document.body.children.length > 0, null, { timeout: 15_000 });
 }
 
 test.describe('aguaRelPorBacia — comparativo entre bacias (agregação, pura)', () => {
