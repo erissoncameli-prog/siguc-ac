@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>SIGUC-AC · Qualidade do Ar</title>
+<link rel="stylesheet" href="../css/global.css">
+<link rel="stylesheet" href="../css/agua-painel.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,600;8..60,700&display=swap">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="../js/observability.js"></script>
+<script src="../js/queryLogger.js"></script>
+<script src="../js/config.js"></script>
+<script src="../js/config-sistema.js"></script>
+<script src="../js/layout.js"></script>
+<script src="../js/agua-iqa-visual.js"></script>
+<script src="../js/agua-painel.js"></script>
+<script src="../js/ar-qualidade.js"></script>
+<style>
+.arq-kpis { display:grid; grid-template-columns:repeat(auto-fit, minmax(190px, 1fr)); gap:14px; margin-bottom:16px }
+.arq-kpi { background:var(--branco); border:1px solid var(--borda); border-radius:var(--adash-raio); padding:16px 18px; box-shadow:var(--sombra) }
+.arq-kpi-val { font-size:28px; font-weight:700; line-height:1.05; font-variant-numeric:tabular-nums; color:var(--cinza-900) }
+.arq-kpi-lab { font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--cinza-500); margin-top:3px }
+.arq-kpi-sub { font-size:11.5px; color:var(--cinza-500); margin-top:6px }
+
+.arq-tab { width:100%; border-collapse:collapse; font-size:13px }
+.arq-tab th { text-align:left; font-size:10.5px; text-transform:uppercase; letter-spacing:.05em; color:var(--cinza-500); font-weight:700; padding:0 10px 8px 0; white-space:nowrap }
+.arq-tab td { padding:9px 10px 9px 0; border-top:1px solid var(--borda); vertical-align:middle }
+.arq-tab td.num { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap }
+.arq-tab tbody tr { cursor:pointer }
+.arq-tab tbody tr:hover { background:var(--cinza-50) }
+.arq-nome { font-weight:600; color:var(--cinza-900) }
+.arq-sub { font-size:11px; color:var(--cinza-500) }
+
+.arq-situacao {
+  display:inline-flex; align-items:center; gap:5px; font-size:11.5px; font-weight:700;
+  padding:2px 9px; border-radius:999px; border:1px solid currentColor; white-space:nowrap;
+}
+.arq-situacao-dot { width:8px; height:8px; border-radius:50%; background:currentColor; flex:none }
+.arq-vazio { text-align:center; color:var(--cinza-500); padding:36px 16px; font-size:13px }
+.arq-hint { font-size:11.5px; color:var(--cinza-500); line-height:1.5 }
+.arq-mapa-legenda-chip { display:inline-flex; align-items:center; gap:4px; font-size:10px; color:var(--cinza-700) }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+;(async function () {
+  const usuario = await carregarUsuario()
+  if (!usuario) { window.location.href = '../index.html'; return }
+
+  const { data: nivel } = await db.rpc('nivel_efetivo', { p_usuario: usuario.id, p_modulo_chave: 'ar' })
+  if (!nivel || nivel === 'sem_acesso') {
+    document.body.innerHTML = '<div style="padding:60px;text-align:center;font-family:\'DM Sans\',sans-serif;color:#6B7280">Você não tem acesso ao módulo Qualidade do Ar.</div>'
+    return
+  }
+
+  document.getElementById('app').innerHTML =
+    gerarLayout('Qualidade do Ar', 'ar-qualidade') +
+    `<div class="fade-in adash">
+      <div class="adash-head">
+        <div>
+          <h1 class="adash-titulo">Qualidade do Ar</h1>
+          <p class="adash-sub">Rede de sensores PurpleAir/MPAC no Acre — material particulado PM2.5, atualizado de hora
+            em hora. Valor <strong>bruto</strong> do sensor, sem calibração LRAPA (a fórmula publicada pela EPA/LRAPA
+            ainda não foi confirmada contra um boletim publicado — ver observação no rodapé). Referência: a OMS
+            recomenda que a média diária não ultrapasse 15 µg/m³.</p>
+        </div>
+      </div>
+
+      <div id="arq-kpis" class="arq-kpis"></div>
+
+      <div class="adash-card adash-mapa-card">
+        <div class="adash-card-topo">
+          <div><p class="adash-card-tit">Onde estão os sensores</p>
+            <p class="adash-card-tit-sub" id="arq-mapa-sub">Carregando sensores...</p></div>
+          <span class="adash-card-mais">•••</span>
+        </div>
+        <div class="adash-mapa-wrap"><div id="arq-mapa"></div></div>
+      </div>
+
+      <div class="adash-card">
+        <div class="adash-card-topo">
+          <div><p class="adash-card-tit">Sensores da rede MPAC</p>
+            <p class="adash-card-tit-sub">Toque numa linha para ver a série dos últimos 30 dias</p></div>
+        </div>
+        <div style="overflow-x:auto"><div id="arq-lista"><div class="arq-vazio">Carregando...</div></div></div>
+      </div>
+
+      <p class="arq-hint" style="margin-top:14px">
+        <strong>Sem classificação por faixa (tipo IQAr).</strong> A Resolução CONAMA Nº 506/2024 define um índice
+        oficial de qualidade do ar, mas as faixas numéricas dela não foram confirmadas contra o texto oficial nesta
+        entrega — mostrar uma classificação "boa/ruim" sem essa confirmação seria arriscar uma leitura errada de
+        saúde pública. O sistema mostra o número bruto e, como referência, só a diretriz da OMS já citada nos
+        boletins. Quando as faixas da 506/2024 forem confirmadas, entram no cálculo — nunca na tela sozinha.
+      </p>
+    </div>
+    <div class="modal-overlay" id="arq-modal"><div class="modal" id="arq-modal-inner" style="max-width:820px"></div></div>`
+
+  bIconsAplicar(document.getElementById('app'))
+
+  // ── Estado ───────────────────────────────────────────────────────
+  let _sensores = []   // vw_ar_sensores_atual
+  let _mapaCtl = null
+  let _marcadores = {}
+
+  const fechar = () => document.getElementById('arq-modal').classList.remove('aberto')
+  window.fecharModalAr = fechar
+  const abrir = (html) => {
+    document.getElementById('arq-modal-inner').innerHTML = html
+    document.getElementById('arq-modal').classList.add('aberto')
+    bIconsAplicar(document.getElementById('arq-modal-inner'))
+  }
+
+  // ── Mapa ─────────────────────────────────────────────────────────
+  function legenda() {
+    return `<div class="adash-mapa-legenda-tit">Situação (referência OMS)</div>
+      <div class="adash-mapa-legenda-linha">
+        <span class="arq-mapa-legenda-chip"><span class="adash-mapa-legenda-dot" style="background:${arPm25Cor(0)}"></span>Dentro (≤ 15 µg/m³)</span>
+        <span class="arq-mapa-legenda-chip"><span class="adash-mapa-legenda-dot" style="background:${arPm25Cor(999)}"></span>Acima</span>
+        <span class="arq-mapa-legenda-chip"><span class="adash-mapa-legenda-dot" style="background:${arPm25Cor(null)}"></span>Sem leitura</span>
+      </div>`
+  }
+
+  try {
+    _mapaCtl = aguaPainelMapaBase('arq-mapa', { referenciaSempre: false, legendaFn: legenda })
+  } catch (e) {
+    console.warn('[ar-qualidade] mapa indisponível:', e.message)
+    document.querySelector('.adash-mapa-card')?.setAttribute('hidden', '')
+  }
+
+  function desenharMarcadores() {
+    if (!_mapaCtl) return
+    Object.values(_marcadores).forEach(m => _mapaCtl.mapa.removeLayer(m))
+    _marcadores = {}
+    const bounds = []
+    _sensores.filter(s => s.lat != null && s.lng != null).forEach(s => {
+      const m = L.circleMarker([s.lat, s.lng], {
+        radius: 8, fillColor: arPm25Cor(s.pm25_bruto), fillOpacity: .9, color: '#fff', weight: 2,
+      })
+      m.bindTooltip(`<strong>${esc(s.nome)}</strong><br>${esc(arPm25Txt(s.pm25_bruto))} · ${esc(arPm25Situacao(s.pm25_bruto))}`,
+        { direction: 'top' })
+      m.on('click', () => abrirSerie(s.sensor_index))
+      m.addTo(_mapaCtl.mapa)
+      _marcadores[s.sensor_index] = m
+      bounds.push([s.lat, s.lng])
+    })
+    const sub = document.getElementById('arq-mapa-sub')
+    if (sub) {
+      sub.textContent = bounds.length
+        ? `${bounds.length} sensor(es) com coordenada — toque num ponto para ver a série`
+        : 'Nenhum sensor com coordenada disponível'
+    }
+    if (bounds.length === 1) _mapaCtl.mapa.setView(bounds[0], 10)
+    else if (bounds.length > 1) _mapaCtl.mapa.fitBounds(bounds, { padding: [28, 28], maxZoom: 10 })
+  }
+
+  // ── Render ───────────────────────────────────────────────────────
+  function chipSituacao(pm25) {
+    const cor = arPm25Cor(pm25)
+    return `<span class="arq-situacao" style="color:${cor}"><span class="arq-situacao-dot"></span>${esc(arPm25Situacao(pm25))}</span>`
+  }
+
+  function renderKpis() {
+    const r = arResumoSensores(_sensores)
+    const alvo = document.getElementById('arq-kpis')
+    alvo.innerHTML = `
+      <div class="arq-kpi">
+        <div class="arq-kpi-val">${formatNum(r.total)}</div>
+        <div class="arq-kpi-lab">Sensores da rede</div>
+        <div class="arq-kpi-sub">${formatNum(r.comLeitura)} com leitura recente</div>
+      </div>
+      <div class="arq-kpi">
+        <div class="arq-kpi-val">${arPm25Txt(r.media)}</div>
+        <div class="arq-kpi-lab">PM2.5 médio (bruto)</div>
+        <div class="arq-kpi-sub">Referência OMS: ≤ 15 µg/m³ (média diária)</div>
+      </div>
+      <div class="arq-kpi">
+        <div class="arq-kpi-val" style="color:${r.acima ? '#DC2626' : 'var(--cinza-900)'}">${formatNum(r.acima)}</div>
+        <div class="arq-kpi-lab">Acima da referência OMS</div>
+        <div class="arq-kpi-sub">${r.pior ? 'Pior leitura: ' + esc(r.pior.nome) + ' (' + arPm25Txt(r.pior.pm25_bruto) + ')' : 'Sem leitura'}</div>
+      </div>`
+  }
+
+  function renderLista() {
+    const alvo = document.getElementById('arq-lista')
+    if (!_sensores.length) {
+      alvo.innerHTML = '<div class="arq-vazio">Nenhum sensor com leitura ainda — confira se a ingestão (ingest-purpleair) está ativa.</div>'
+      return
+    }
+    const ordenada = [..._sensores].sort((a, b) => (b.pm25_bruto ?? -1) - (a.pm25_bruto ?? -1))
+    const linhas = ordenada.map(s => `<tr onclick="abrirSerie(${s.sensor_index})">
+        <td><div class="arq-nome">${esc(s.nome)}</div><div class="arq-sub">Sensor ${s.sensor_index}</div></td>
+        <td class="num">${esc(arPm25Txt(s.pm25_bruto))}</td>
+        <td class="num">${s.umidade_pct != null ? esc(s.umidade_pct) + '%' : '—'}</td>
+        <td class="num">${s.temperatura_c != null ? esc(s.temperatura_c) + ' °C' : '—'}</td>
+        <td>${chipSituacao(s.pm25_bruto)}</td>
+        <td class="num"><span class="arq-sub">${s.data_hora ? esc(formatData(s.data_hora)) : 'sem leitura'}</span></td>
+      </tr>`).join('')
+    alvo.innerHTML = `<table class="arq-tab">
+      <thead><tr>
+        <th>Sensor</th><th style="text-align:right">PM2.5 bruto</th><th style="text-align:right">Umidade</th>
+        <th style="text-align:right">Temperatura</th><th>Situação</th><th style="text-align:right">Última leitura</th>
+      </tr></thead><tbody>${linhas}</tbody></table>`
+  }
+
+  // ── Série do sensor ──────────────────────────────────────────────
+  window.abrirSerie = async function (sensorIndex) {
+    const s = _sensores.find(x => x.sensor_index === sensorIndex)
+    if (!s) return
+    abrir(`<div class="modal-header">
+        <div><div class="modal-title">${esc(s.nome)}</div>
+          <p class="arq-sub">Sensor ${s.sensor_index}</p></div>
+        <button class="modal-close" onclick="fecharModalAr()">×</button>
+      </div>
+      <div class="modal-body"><div class="arq-vazio">Carregando leituras...</div></div>`)
+
+    const desde = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString()
+    let leituras = []
+    try {
+      const { data, error } = await db.from('ar_leituras_purpleair')
+        .select('data_hora,pm25_bruto,umidade_pct,temperatura_c')
+        .eq('sensor_index', sensorIndex).gte('data_hora', desde).order('data_hora')
+      if (error) throw error
+      leituras = data || []
+    } catch (err) {
+      abrir(`<div class="modal-header"><div class="modal-title">${esc(s.nome)}</div>
+          <button class="modal-close" onclick="fecharModalAr()">×</button></div>
+        <div class="modal-body"><p class="arq-hint">Não foi possível carregar as leituras: ${esc(err.message)}</p></div>`)
+      return
+    }
+    window._arSerieAtual = { sensor: s, leituras }
+
+    abrir(`<div class="modal-header">
+        <div><div class="modal-title">${esc(s.nome)}</div>
+          <p class="arq-sub">Sensor ${s.sensor_index} · últimos 30 dias</p></div>
+        <button class="modal-close" onclick="fecharModalAr()">×</button>
+      </div>
+      <div class="modal-body">
+        <div style="display:flex;flex-wrap:wrap;gap:18px;margin-bottom:12px">
+          <div><div class="arq-kpi-val" style="font-size:22px">${esc(arPm25Txt(s.pm25_bruto))}</div><div class="arq-kpi-lab">PM2.5 atual (bruto)</div></div>
+          <div style="align-self:center">${chipSituacao(s.pm25_bruto)}</div>
+        </div>
+        ${arSerieHTML(leituras, { width: 740, height: 220 })}
+        <p class="arq-hint" style="margin-top:10px">${leituras.length} leitura(s) no período.</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="fecharModalAr()">Fechar</button>
+        <button class="btn btn-secondary" onclick="baixarCsvSerie()" data-icon="grid">Baixar planilha</button>
+      </div>`)
+  }
+
+  window.baixarCsvSerie = function () {
+    const s = window._arSerieAtual
+    if (!s) return
+    arBaixarCsv(arCsvSerie(s.leituras, s.sensor.nome), `qualidade-ar-sensor-${s.sensor.sensor_index}.csv`)
+  }
+
+  // ── Carga ────────────────────────────────────────────────────────
+  async function carregar() {
+    try {
+      const { data, error } = await db.from('vw_ar_sensores_atual').select('*').order('nome')
+      if (error) throw error
+      _sensores = data || []
+    } catch (e) {
+      document.getElementById('arq-lista').innerHTML =
+        `<div class="arq-vazio">Não foi possível carregar os sensores: ${esc(e.message)}</div>`
+      return
+    }
+    renderKpis()
+    renderLista()
+    desenharMarcadores()
+  }
+
+  await carregar()
+})()
+</script>
+</body>
+</html>

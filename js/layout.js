@@ -96,6 +96,7 @@ function gerarLayout(tituloPagina, paginaAtiva) {
     'rh-estacoes':              { svg: '<path d="M12 2v6"/><circle cx="12" cy="10" r="2"/><path d="M7 21c1.5 0 1.5-1.5 3-1.5s1.5 1.5 3 1.5 1.5-1.5 3-1.5"/><path d="M5 17c1.8 0 1.8-1.5 3.6-1.5S10.4 17 12.2 17s1.8-1.5 3.6-1.5S17.6 17 19.4 17"/><path d="M12 12v2"/>', cor: '#22d3ee', bg: 'rgba(34,211,238,0.22)' },
     'rh-bacias':                { svg: '<path d="M2 6c3 0 3 2 6 2s3-2 6-2 3 2 6 2"/><path d="M2 12c3 0 3 2 6 2s3-2 6-2 3 2 6 2"/><path d="M2 18c3 0 3 2 6 2s3-2 6-2 3 2 6 2"/>', cor: '#0891b2', bg: 'rgba(8,145,178,0.22)' },
     'rh-boletim':               { svg: '<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18"/><path d="M8 2v4"/><path d="M16 2v4"/><path d="M8 14l2.5 2.5L16 11"/>', cor: '#0e7490', bg: 'rgba(14,116,144,0.22)' },
+    'ar-qualidade':             { svg: '<path d="M9.6 4.6a2 2 0 1 1 2 3.4H2"/><path d="M12.6 19.4a2 2 0 1 0 2-3.4H2"/><path d="M17.7 7.7a2.5 2.5 0 1 1 1.8 4.3H2"/>', cor: '#0369a1', bg: 'rgba(3,105,161,0.22)' },
   };
 
   function renderPill(id, size) {
@@ -229,9 +230,7 @@ function gerarLayout(tituloPagina, paginaAtiva) {
           ]
         },
         // 'bacias' entrou na Fase B (migration 304 ativou o módulo).
-        // 'ar' segue declarado e sem página — ver
-        // docs/recursos-hidricos/plano.md (Fase D); subgrupo sem item
-        // não renderiza, então nada aparece no menu até a primeira tela.
+        // 'ar' entrou na migration 316 (rede PurpleAir/MPAC, PM2.5).
         {
           id: 'bacias', label: 'Bacias Hidrográficas', modulo: 'bacias',
           itens: [
@@ -240,7 +239,12 @@ function gerarLayout(tituloPagina, paginaAtiva) {
             { id: 'rh-boletim',  href: '../pages/rh-boletim.html',  label: 'Boletim do Tempo' },
           ]
         },
-        { id: 'ar',     label: 'Qualidade do Ar',      modulo: 'ar',     itens: [] },
+        {
+          id: 'ar', label: 'Qualidade do Ar', modulo: 'ar',
+          itens: [
+            { id: 'ar-qualidade', href: '../pages/ar-qualidade.html', label: 'Sensores PurpleAir/MPAC' },
+          ]
+        },
       ]
     },
     {
