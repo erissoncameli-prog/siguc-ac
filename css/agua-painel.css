@@ -94,7 +94,14 @@
   height:380px; border-radius:14px; overflow:hidden; border:1px solid var(--borda);
   background:var(--cinza-50);
 }
-.adash-mapa-wrap #rl-mapa { height:100%; width:100% }
+/* Genérico por FILHO DIRETO, não por ID — achado ao investigar "o
+   mapa não aparece" em pages/ar-qualidade.html: a regra só cobria
+   #rl-mapa (agua-relatorios/agua-publico), então rh-estacoes.html
+   (#rhe-mapa), rh-bacias.html (#rhb-mapa) e ar-qualidade.html
+   (#arq-mapa) ficavam sem altura — o container do Leaflet colapsava
+   para 0px e o mapa nunca aparecia. Uma regra só, vale para qualquer
+   id novo que nasça dentro de .adash-mapa-wrap. */
+.adash-mapa-wrap > div { height:100%; width:100% }
 .leaflet-container { font-family:var(--font-sans); background:var(--cinza-50) }
 .leaflet-tooltip { font-size:12px }
 
