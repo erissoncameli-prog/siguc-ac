@@ -17,7 +17,16 @@
 <script src="../js/agua-iqa-visual.js"></script>
 <script src="../js/agua-painel.js"></script>
 <script src="../js/ar-qualidade.js"></script>
+<script src="../js/ar-fumaca.js"></script>
 <style>
+.ar-fumaca-canvas { position:absolute; top:0; left:0; z-index:450; pointer-events:none }
+.ar-fumaca-ctrl { margin:10px !important }
+.ar-fumaca-btn {
+  background:var(--branco); border:none; border-radius:4px; padding:6px 10px; font:inherit; font-size:11.5px;
+  font-weight:600; color:var(--cinza-700); cursor:pointer; white-space:nowrap; box-shadow:0 1px 4px rgba(0,0,0,.35);
+}
+.ar-fumaca-btn:hover { background:var(--cinza-50) }
+.ar-fumaca-btn[aria-pressed="true"] { color:var(--floresta) }
 .arq-kpis { display:grid; grid-template-columns:repeat(auto-fit, minmax(190px, 1fr)); gap:14px; margin-bottom:16px }
 .arq-kpi { background:var(--branco); border:1px solid var(--borda); border-radius:var(--adash-raio); padding:16px 18px; box-shadow:var(--sombra) }
 .arq-kpi-val { font-size:28px; font-weight:700; line-height:1.05; font-variant-numeric:tabular-nums; color:var(--cinza-900) }
@@ -123,8 +132,13 @@
       </div>`
   }
 
+  let _fumacaCtl = null
   try {
     _mapaCtl = aguaPainelMapaBase('arq-mapa', { referenciaSempre: false, legendaFn: legenda })
+    if (typeof arFumacaInstalar === 'function') {
+      _fumacaCtl = arFumacaInstalar(_mapaCtl.mapa)
+      if (_fumacaCtl) _mapaCtl.mapa.addControl(arFumacaControle(_fumacaCtl))
+    }
   } catch (e) {
     console.warn('[ar-qualidade] mapa indisponível:', e.message)
     document.querySelector('.adash-mapa-card')?.setAttribute('hidden', '')
@@ -154,6 +168,7 @@
     }
     if (bounds.length === 1) _mapaCtl.mapa.setView(bounds[0], 10)
     else if (bounds.length > 1) _mapaCtl.mapa.fitBounds(bounds, { padding: [28, 28], maxZoom: 10 })
+    if (_fumacaCtl) _fumacaCtl.atualizar(_sensores)
   }
 
   // ── Render ───────────────────────────────────────────────────────
