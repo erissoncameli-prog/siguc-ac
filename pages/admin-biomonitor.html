@@ -428,15 +428,21 @@
     `<div class="fade-in">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:10px">
         <h2 style="margin:0;font-size:1.25rem">Administração — Biomonitor</h2>
-        <div style="display:flex;gap:6px;background:rgba(255,255,255,.07);border-radius:10px;padding:4px">
-          <button class="tab-btn ativo" id="tab-grupos"     onclick="mudarAba('grupos')">Grupos</button>
-          <button class="tab-btn"       id="tab-monitores"  onclick="mudarAba('monitores')">Monitores</button>
-          <button class="tab-btn"       id="tab-praias"     onclick="mudarAba('praias')">Praias</button>
-          <button class="tab-btn"       id="tab-temporadas" onclick="mudarAba('temporadas')">Temporadas</button>
-          <button class="tab-btn"       id="tab-especies"   onclick="mudarAba('especies')">Espécies</button>
-          <button class="tab-btn"       id="tab-mapa"       onclick="mudarAba('mapa')">Mapa</button>
-          <button class="tab-btn"       id="tab-bercarios"  onclick="mudarAba('bercarios')">Berçários</button>
-          <button class="tab-btn"       id="tab-alertas"    onclick="mudarAba('alertas')">Alertas</button>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <div style="display:flex;gap:6px;background:rgba(255,255,255,.07);border-radius:10px;padding:4px">
+            <button class="tab-btn ativo" id="tab-grupos"     onclick="mudarAba('grupos')">Grupos</button>
+            <button class="tab-btn"       id="tab-monitores"  onclick="mudarAba('monitores')">Monitores</button>
+            <button class="tab-btn"       id="tab-praias"     onclick="mudarAba('praias')">Praias</button>
+            <button class="tab-btn"       id="tab-temporadas" onclick="mudarAba('temporadas')">Temporadas</button>
+            <button class="tab-btn"       id="tab-especies"   onclick="mudarAba('especies')">Espécies</button>
+            <button class="tab-btn"       id="tab-mapa"       onclick="mudarAba('mapa')">Mapa</button>
+            <button class="tab-btn"       id="tab-bercarios"  onclick="mudarAba('bercarios')">Berçários</button>
+            <button class="tab-btn"       id="tab-alertas"    onclick="mudarAba('alertas')">Alertas</button>
+          </div>
+          <button class="btn btn-secondary" onclick="window.open('biomonitor-apresentacao.html','_blank')" title="Abre a apresentação institucional do BioMonitor em nova aba">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-3"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg>
+            Apresentação
+          </button>
         </div>
       </div>
 
