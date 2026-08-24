@@ -1586,6 +1586,53 @@ E) Dashboard Executivo por nível (UC / Diretoria / Secretaria)
   de mesa, ou o catálogo virar editável no app, aplicar a regra dos
   pares acima.
 
+## Regra do sistema — cálculos de ovos/filhotes do Biomonitor (UM lugar só)
+Mapa completo, com o histórico do bug encontrado e das 4 fontes de
+dado, em `docs/biomonitor-calculos-ovos-filhotes.md` — LER antes de
+mexer em qualquer cálculo de postura/eclosão/descarte/predação/
+berçário. Resumo (migration 320, 24/08/2026):
+
+Achado real: `vw_descartes_ovos` nunca expunha a coluna `causa`
+(existe na tabela desde a 123) — `relatorios-biomonitor.html` já
+consultava essa coluna, a query falhava (42703, coluna não existe) e a
+seção "Descarte de ovos por causa" ficava sempre zerada, EM SILÊNCIO
+(Supabase não lança exceção JS em erro de coluna; devolve
+`data:null, error:{...}` e o código não checava `error`). Junto com
+isso, cinco RPCs/views tinham fórmulas DIVERGENTES da mesma regra de
+negócio (viáveis calculado 2x em SQL diferente; mortalidade de
+berçário com 3 caminhos; "eclodidos" contando `em_bercario`/`soltado`
+em alguns lugares e não em outros) e cálculos que só existiam na
+Análise Científica (a tela mais recente e mais fácil de estender)
+nunca chegavam ao relatório oficial nem ao PDF por ninho.
+
+- **"Ovos viáveis/perdidos por causa"**: fórmula única em
+  `vw_ninho_ovos` (migration 124) — `viaveis = postura − Σ
+  descartes_ovos.qtd`. Toda RPC/view nova faz `JOIN vw_ninho_ovos`,
+  nunca refaz a soma.
+- **"Mortalidade em berçário"**: fórmula única em
+  `vw_lotes_bercario_mortalidade` (migration 133) — individual se o
+  lote tem filhotes rastreados, senão `ocorrencias_bercario` agregada,
+  nunca abaixo do confirmado em `solturas_filhotes.mortalidade`. Toda
+  RPC nova faz `JOIN vw_lotes_bercario_mortalidade`.
+- **Checklist de superfícies** (ao adicionar cálculo novo, marcar
+  quais foram tocadas): app de campo (`bio_dados_aba`), mesa/admin
+  (`vw_praias_biomonitor`), relatório web (`bio_relatorio_completo`),
+  PDF por ninho + ficha de campo + validação (`vw_ninhos_validacao`),
+  Análise Científica (`bio_analise_detalhada`/`bio_analise_praias`),
+  tela de Berçários. Um cálculo que nasce só na Análise Científica é o
+  padrão de falha mais comum — ao adicionar algo lá, perguntar
+  explicitamente se o relatório oficial e o PDF por ninho também
+  precisam.
+- **Nome de campo igual em toda RPC** (`taxa_eclosao_pct`,
+  `total_ovos_viaveis` etc.) — nunca um sinônimo novo pro mesmo dado.
+- **Coluna nova numa view existente entra SEMPRE ao final da lista** —
+  `CREATE OR REPLACE VIEW` rejeita (erro 42P16) reordenar ou inserir
+  no meio. Mesmo cuidado do `DROP FUNCTION` antes de mudar assinatura
+  de RPC, documentado em vários pontos deste arquivo.
+- **Testar a query do cliente contra o schema real** antes de assumir
+  que uma coluna existe — foi assim que o bug acima foi encontrado, não
+  lendo código.
+
 ## Biomonitor — Equipamentos em cautela (migrations 226/227/228)
 Cadastro do bem é SEMPRE na mesa (`biomonitor-equipamentos.html`,
 perfil tecnico/gestor/super_admin): descrição, plaqueta física

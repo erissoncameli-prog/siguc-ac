@@ -483,6 +483,28 @@ function _biopdfSecaoBalancoOvos(ctx, n) {
       body: [[n.descartados_natural || 0, n.descartados_predacao || 0, n.descartados_humana || 0]],
     })
   }
+  // Quebra fina de causa (alagamento/erosão), além de predação/humana já
+  // exibidas acima — vem de vw_ninhos_validacao (ovos_perda_alagamento/
+  // ovos_perda_erosao/ovos_perda_humana), fonte canônica única
+  // (vw_ninho_ovos), nunca recalculada aqui.
+  if (n.ovos_perda_alagamento || n.ovos_perda_erosao) {
+    _biopdfTabela(ctx, {
+      head: [['Perdas — alagamento', 'Perdas — erosão']],
+      body: [[n.ovos_perda_alagamento || 0, n.ovos_perda_erosao || 0]],
+    })
+  }
+  // Taxas científicas do ninho individual — mesma fórmula do relatório
+  // agregado (bio_relatorio_completo), calculada na view, nunca em JS.
+  if (n.taxa_eclosao_pct != null || n.taxa_fertilidade_pct != null || n.eficiencia_ninho_pct != null) {
+    _biopdfTabela(ctx, {
+      head: [['Taxa de eclosão', 'Taxa de fertilidade', 'Eficiência do ninho']],
+      body: [[
+        n.taxa_eclosao_pct != null ? `${n.taxa_eclosao_pct}%` : '—',
+        n.taxa_fertilidade_pct != null ? `${n.taxa_fertilidade_pct}%` : '—',
+        n.eficiencia_ninho_pct != null ? `${n.eficiencia_ninho_pct}%` : '—',
+      ]],
+    })
+  }
 }
 
 function _biopdfSecaoDonut(ctx, n) {
