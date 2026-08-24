@@ -34,6 +34,10 @@ const BIOREL_STATUS_VALID = {
   pendente: 'Pendente', validado: 'Validado', rejeitado: 'Rejeitado', em_correcao: 'Em correção',
 }
 const BIOREL_STATUS_FILHOTE = { ativo: 'Ativo', morto: 'Óbito', soltado: 'Soltado' }
+const BIOREL_ANOMALIA_TIPO = {
+  casco: 'Casco/carapaça deformada', membro: 'Membro ausente/atrofiado',
+  corpo: 'Corpo/coluna deformada', albinismo: 'Albinismo', outro: 'Outro',
+}
 const BIOREL_TIPO_OCORR = {
   alimentacao: 'Alimentação', biometria: 'Biometria (amostragem)', mortalidade: 'Mortalidade',
   doenca: 'Doença', tratamento: 'Tratamento', observacao: 'Observação',
@@ -94,7 +98,7 @@ async function bioColetarDadosRelatorioNinhos(db, ninhoIds, opts = {}) {
       : Promise.resolve({ data: [] }),
     loteIds.length
       ? db.from('filhotes_bercario')
-          .select('id,lote_id,numero,status,data_obito,causa_obito,doente,observacoes')
+          .select('id,lote_id,numero,status,data_obito,causa_obito,doente,anomalia,observacoes')
           .in('lote_id', loteIds).order('numero')
       : Promise.resolve({ data: [] }),
     db.from('solturas_filhotes')
@@ -198,13 +202,15 @@ function _biorelFilhotesResumoTxt(filhotes) {
   const ativos  = filhotes.filter(f => f.status === 'ativo').length
   const mortos  = filhotes.filter(f => f.status === 'morto').length
   const soltos  = filhotes.filter(f => f.status === 'soltado').length
-  const doentes = filhotes.filter(f => f.doente).length
+  const doentes  = filhotes.filter(f => f.doente).length
+  const anomalos = filhotes.filter(f => f.anomalia).length
   return [
     `${filhotes.length} filhote(s) numerados`,
     ativos ? `${ativos} ativo(s)` : null,
     soltos ? `${soltos} já soltos` : null,
     mortos ? `${mortos} óbito(s)` : null,
     doentes ? `${doentes} doente(s)` : null,
+    anomalos ? `${anomalos} com anomalia` : null,
   ].filter(Boolean).join(' · ')
 }
 
@@ -493,6 +499,14 @@ function _biopdfSecaoBalancoOvos(ctx, n) {
       body: [[n.ovos_perda_alagamento || 0, n.ovos_perda_erosao || 0]],
     })
   }
+  // Anomalia congênita (subconjunto de filhotes_vivos) — vw_ninhos_validacao
+  if (n.filhotes_anomalia) {
+    const tipos = (n.anomalia_tipos || []).map(t => BIOREL_ANOMALIA_TIPO[t] || t).join(', ') || '—'
+    _biopdfTabela(ctx, {
+      head: [['Filhotes com anomalia', 'Tipos observados']],
+      body: [[n.filhotes_anomalia, tipos]],
+    })
+  }
   // Taxas científicas do ninho individual — mesma fórmula do relatório
   // agregado (bio_relatorio_completo), calculada na view, nunca em JS.
   if (n.taxa_eclosao_pct != null || n.taxa_fertilidade_pct != null || n.eficiencia_ninho_pct != null) {
@@ -599,15 +613,16 @@ function _biopdfSecaoDestinoFilhotes(ctx, n, modo) {
         if (modo === 'completo') {
           _biopdfSubtitulo(ctx, `Filhotes individuais (${l.filhotes.length})`)
           _biopdfTabela(ctx, {
-            head: [['Nº', 'Status', 'Doente', 'Óbito', 'Biometrias registradas']],
+            head: [['Nº', 'Status', 'Doente', 'Anomalia', 'Óbito', 'Biometrias registradas']],
             body: l.filhotes.map(f => [
               String(f.numero),
               BIOREL_STATUS_FILHOTE[f.status] || f.status,
               f.doente ? 'Sim' : '—',
+              f.anomalia ? 'Sim' : '—',
               f.data_obito ? formatData(f.data_obito) + (f.causa_obito ? ' — ' + f.causa_obito : '') : '—',
               f.biometrias.length ? f.biometrias.map(b => `${formatData(b.data_medicao)}: ${_biorelBiometriaTxt(b)}`).join('\n') : '—',
             ]),
-            columnStyles: { 4: { cellWidth: 58 } },
+            columnStyles: { 5: { cellWidth: 52 } },
           })
         } else {
           _biopdfSubtitulo(ctx, 'Filhotes individuais')

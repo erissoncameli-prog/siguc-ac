@@ -1633,6 +1633,35 @@ nunca chegavam ao relatório oficial nem ao PDF por ninho.
   que uma coluna existe — foi assim que o bug acima foi encontrado, não
   lendo código.
 
+## Biomonitor — Anomalias congênitas em filhotes (migration 321)
+Registro de eclosão ganhou contador `filhotes_anomalia` (SUBCONJUNTO
+de `filhotes_vivos`, CHECK `<=`, nunca um 4º balde somado ao total —
+filhote deformado ainda é filhote vivo, segue o fluxo normal) + tipo
+por catálogo fechado (`anomalia_filhote_tipo`: casco/membro/corpo/
+albinismo/outro), múltipla escolha por eclosão. No berçário,
+`filhotes_bercario.anomalia` é flag INDEPENDENTE de `doente`
+(migration 144) — anomalia é congênita (conhecida desde a eclosão,
+toggle direto sem ocorrência), doente é adoecimento durante o
+cuidado (passa por ocorrência, captura causa/data).
+- Propagado às mesmas 5 superfícies da regra acima, na mesma entrega:
+  app (`bio_dados_aba`, KPI + contador/chips no form de eclosão +
+  toggle na tela do indivíduo), mesa/admin (`vw_praias_biomonitor`,
+  popup do mapa), relatório web (`bio_relatorio_completo`, KPI + taxa
+  + quebra por tipo), PDF por ninho + validação (`vw_ninhos_
+  validacao`, coluna "Anomalia" na tabela de filhotes individuais),
+  Análise Científica (`bio_analise_detalhada`).
+- **Achado ao aplicar**: `vw_praias_biomonitor` em produção tinha
+  DRIFT — colunas `grupo_id`/`grupo_nome`/`area_m2` existiam no banco
+  sem nenhuma migration commitada, e a correção de fan-out + eclodidos
+  (inclui `em_bercario`/`soltado`) da migration 146 nunca chegou a
+  essa view em produção (sobrescrita por esse drift, que partiu de uma
+  versão anterior). Corrigido junto, reconstruindo a view do
+  `pg_get_viewdef()` real de produção — nunca do arquivo de migration
+  local, que pode estar desatualizado. Lição: antes de `CREATE OR
+  REPLACE VIEW` numa view antiga, conferir `information_schema.columns`
+  contra produção, não só o histórico de migrations do repositório.
+- `pwa/sw.js`: biomonitor v34 → v35.
+
 ## Biomonitor — Equipamentos em cautela (migrations 226/227/228)
 Cadastro do bem é SEMPRE na mesa (`biomonitor-equipamentos.html`,
 perfil tecnico/gestor/super_admin): descrição, plaqueta física

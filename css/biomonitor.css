@@ -1496,6 +1496,7 @@ body.field-mode .bio-home-nome { font-size: 26px; }
 .bio-filhote-num.num-vivo  { color: #2A9D6F; }
 .bio-filhote-num.num-morto { color: #DC2626; }
 .bio-filhote-num.num-doente { color: #7C3AED; }
+.bio-filhote-num.num-anomalia { color: #B45309; }
 .bio-filhote-bio  { font-size: 10px; color: var(--bio-ink2); text-align: center; line-height: 1.3; }
 
 /* ── Grupos de berçário na lista de lotes ── */
