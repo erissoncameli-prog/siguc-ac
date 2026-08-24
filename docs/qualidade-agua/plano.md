@@ -1427,6 +1427,12 @@ mudou).
 
 - **Sólidos em suspensão** — a incoerência de unidade acima. Entra na
   Fase 1 (pendência de conferência humana, ver `pages/agua-conferencia.html`).
+  **Parcialmente resolvido (migration 318, pós-lançamento):** a SEMA
+  enviou planilha corrigida (Verificação de Dados, 17/07/2024); 108
+  das 339 linhas em quarentena por essa suspeita tinham de fato o
+  valor errado (÷1000, confirmado célula a célula contra a planilha
+  nova) — corrigidas e promovidas a `completo`. As outras 231 não
+  mudaram na planilha nova e continuam pendentes, sem alteração.
 - **Hidrografia** — decisão tomada: buscar na ANA (não usar shapefile
   da SEMA). Tentado na Fase 4 e bloqueado por política de rede da
   sessão que executou — ver "Fase 4 — ENTREGUE" para os domínios já

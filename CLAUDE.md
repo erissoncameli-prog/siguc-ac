@@ -2697,11 +2697,22 @@ extensão nova, não retomada de plano. Ao criar qualquer migration
 neste ou em outro módulo, rodar `mcp__Supabase__list_migrations`
 primeiro — não assumir o número pelo que está no repositório local.
 
-**Sólidos em suspensão continua pendência de conferência humana**
-(mediana de 0,342 mg/L com turbidez mediana de 90 UNT — provável
-mistura de g/L com mg/L ao longo dos anos): as 339 linhas quarentenadas
-por isso esperam alguém da SEMA com o laudo físico, usando a tela de
-`pages/agua-conferencia.html`. Não é tarefa de código.
+**Sólidos em suspensão — parcialmente resolvido (migration 318).** A
+SEMA enviou a planilha corrigida (Verificação de Dados, 17/07/2024) e
+108 das 339 linhas quarentenadas por essa suspeita de unidade
+(g/L×mg/L) tinham de fato o valor errado — corrigido no banco
+(dividido por 1000, exatamente como a planilha nova confirma célula a
+célula) e a linha promovida para `completo` (107 delas; a 108ª, linha
+61, já estava `completo` com o valor errado). As outras **231 linhas
+continuam pendentes**: a planilha corrigida não mudou o valor delas,
+então seguem esperando alguém da SEMA com o laudo físico, usando
+`pages/agua-conferencia.html`. Não é mais tarefa de código para as 108
+resolvidas; para as 231 restantes, segue igual a antes. Achado extra
+na mesma comparação: linha 335, `nitrogenio_amoniacal` estava 250 mg/L
+(vírgula deslocada), corrigido para 2,5 — não muda o status de
+quarentena dessa linha (motivo é outro, sólidos, ainda não conferido).
+`docs/qualidade-agua/serie-historica.csv` foi atualizado para refletir
+a planilha corrigida.
 
 **Ícone do launcher do app Água** ainda é o placeholder genérico do
 Capacitor (`app-agua/android`) — trocar por arte própria antes do
