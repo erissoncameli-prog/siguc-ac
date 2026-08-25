@@ -3547,7 +3547,7 @@ async function bioCarregarAbertos() {
     try {
       let q = bioSupabase()
         .from('vw_ninhos_validacao')
-        .select('id,uuid_cliente,numero_ninho,numero_atual,especie,data_encontro,hora_desova,status,status_validacao,motivo_rejeicao,qtd_ovos,ovos_integros,ovos_descartados,descartados_natural,descartados_predacao,descartados_humana,ovos_viaveis,ovos_perdidos_total,dist_rio_m,dist_rio_metodo,temperatura_c,umidade_pct,profundidade_cm,observacoes,foto_urls,lat,lng,precisao_gps_m,criado_em,praia_id,praia_nome,praia_atual_id,praia_atual_nome,monitor_id,monitor_nome,data_nascimento,filhotes_vivos,filhotes_mortos,ovos_nao_nascidos,incubacao_dias_previstos,data_prevista_eclosao,dias_para_eclosao')
+        .select('id,uuid_cliente,numero_ninho,numero_atual,especie,data_encontro,hora_desova,status,status_validacao,motivo_rejeicao,qtd_ovos,ovos_integros,ovos_descartados,descartados_natural,descartados_predacao,descartados_humana,ovos_viaveis,ovos_perdidos_total,dist_rio_m,dist_rio_metodo,temperatura_c,umidade_pct,profundidade_cm,observacoes,foto_urls,lat,lng,precisao_gps_m,criado_em,praia_id,praia_nome,praia_atual_id,praia_atual_nome,monitor_id,monitor_nome,data_nascimento,filhotes_vivos,filhotes_mortos,ovos_nao_nascidos,incubacao_dias_previstos,data_prevista_eclosao,dias_para_eclosao,temp_media_observada,data_prevista_eclosao_ajustada,dias_antecipacao_estimados')
         .eq('grupo_id', BioApp.monitor.grupo_id)
         .order('numero_atual', { ascending: false })
       // Escopa à temporada atual — sem isso, ninhos de temporadas encerradas
@@ -3693,6 +3693,14 @@ function bioNinhoCardInner(n, opts = {}) {
       <span><b>Eclosão prevista:</b> ${prev.dataTxt} · ${esc(prev.texto)}</span>
     </div>` : ''
 
+  // Antecipação por temperatura (temp. média acima do pivotal) — nunca
+  // substitui a previsão original, só avisa que ela pode estar adiantada.
+  const antecipHtml = (prev && n.dias_antecipacao_estimados != null && n.dias_antecipacao_estimados >= 3) ? `
+    <div class="bio-nfc-previsao faixa-atencao">
+      <span class="bio-nfc-prev-ico" aria-hidden="true"></span>
+      <span><b>Possível antecipação:</b> ~${n.dias_antecipacao_estimados} dia(s) por temperatura (média ${n.temp_media_observada}°C) — nova estimativa ${n.data_prevista_eclosao_ajustada ? new Date(n.data_prevista_eclosao_ajustada + 'T12:00').toLocaleDateString('pt-BR') : '—'}</span>
+    </div>` : ''
+
   const eclosaoHtml = (['eclodido', 'em_bercario', 'soltado'].includes(n.status) && (n.filhotes_vivos != null || n.filhotes_mortos != null || n.data_nascimento)) ? `
     <div class="bio-nfc-ovos">
       <span style="background:rgba(82,183,136,.18);color:#1E6B4A">Eclosão${n.data_nascimento ? ' ' + new Date(n.data_nascimento + 'T12:00').toLocaleDateString('pt-BR') : ''}</span>
@@ -3764,6 +3772,7 @@ function bioNinhoCardInner(n, opts = {}) {
     ${ovosHtml}
     ${condicoesHtml}
     ${previsaoHtml}
+    ${antecipHtml}
     ${eclosaoHtml}
     ${destinoHtml}
     ${histHtml}

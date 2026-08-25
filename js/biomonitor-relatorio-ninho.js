@@ -469,6 +469,8 @@ function _biopdfSecaoIdentificacao(ctx, n) {
     linha('Status de validação', BIOREL_STATUS_VALID[n.status_validacao] || n.status_validacao),
     n.motivo_rejeicao ? linha('Motivo (rejeição/correção)', n.motivo_rejeicao) : null,
     n.data_prevista_eclosao ? linha('Previsão de eclosão', formatData(n.data_prevista_eclosao)) : null,
+    (n.dias_antecipacao_estimados != null && n.dias_antecipacao_estimados >= 3) ? linha('Possível antecipação (temperatura)',
+      `~${n.dias_antecipacao_estimados} dia(s) — nova estimativa ${formatData(n.data_prevista_eclosao_ajustada)} (média ${n.temp_media_observada}°C)`) : null,
   ].filter(Boolean)
 
   _biopdfTabela(ctx, {
