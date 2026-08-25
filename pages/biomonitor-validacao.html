@@ -491,6 +491,7 @@
           · Vivos: ${n.filhotes_vivos ?? 0}
           · Mortos: ${n.filhotes_mortos ?? 0}
           · Não nascidos: ${n.ovos_nao_nascidos ?? 0}
+          ${n.filhotes_anomalia > 0 ? `· Com anomalia: <strong style="color:#B45309">${n.filhotes_anomalia}</strong>` : ''}
           ${n.predacao && n.predacao !== 'nenhuma' ? `· Predação: ${n.predacao}` : ''}
         </div>` : ''}
 
