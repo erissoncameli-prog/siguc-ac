@@ -1734,6 +1734,67 @@ super_admin). A mesa trata em `biomonitor-equipamentos.html`
 status do bem (disponível/manutenção/baixado) no mesmo passo.
 `pwa/sw.js`: biomonitor v24 → v25.
 
+## Biomonitor — Antecipação de eclosão por temperatura (migration 322)
+Temperatura acima da faixa pivotal não é só risco de feminização
+(094_alertas_quelonios.sql): também ACELERA o desenvolvimento
+embrionário e antecipa a eclosão. A previsão armazenada em
+`ninhos_quelonios.data_prevista_eclosao` (117) era estática — só
+espécie + data de postura, nunca revista pela temperatura real
+observada nas visitas. Fechado reaproveitando 100% do mecanismo já
+existente (mesma tabela de parâmetros por espécie, mesmas funções de
+avaliação já disparadas a cada leitura de temperatura, mesmo motor de
+alerta/notificação/dedup, mesmo cron agregado) — nenhum mecanismo
+paralelo.
+- `data_prevista_eclosao` ORIGINAL nunca é sobrescrita (é o
+  compromisso assumido no achado do ninho, referência para o
+  `desvio_dias` já calculado por `bio_monitoramento_eclosao`). A
+  previsão revista mora em colunas NOVAS: `ninhos_quelonios.
+  temp_media_observada` (média de TODAS as leituras — `temperatura_c`
+  do encontro + `visitas_ninho.temperatura_substrato_c` de cada
+  visita; NULL com menos de 2 leituras — uma leitura isolada não é
+  sinal), `data_prevista_eclosao_ajustada` e
+  `dias_antecipacao_estimados` (positivo = antecipada; piso em
+  `incubacao_dias_min` do catálogo da espécie, nunca ajuste absurdo
+  por um pico isolado de calor).
+- `bio_recalcular_previsao_ajustada(ninho_id)` faz a conta; chamada
+  DE DENTRO de `avaliar_ninho_quelonio`/`avaliar_visita_ninho` (094) —
+  não ganhou trigger própria, então usa os MESMOS gatilhos que já
+  disparavam a cada gravação de temperatura. `trg_ninho_alertas` ganhou
+  `data_encontro` na lista de colunas do `UPDATE OF` (a previsão
+  ajustada também depende da data do achado, não só da temperatura).
+- Alerta por ninho (`parametro='antecipacao_eclosao'`, severidade
+  `media`) dispara quando `dias_antecipacao_estimados >=
+  antecip_alerta_dias_min` (novo campo editável em
+  `parametros_incubacao_quelonios`, por espécie, default 5 dias) —
+  mesmo texto de providência (`prov_antecipacao`, editável) reforçando
+  visitas e preparo do berçário com antecedência, "para acompanhamento
+  científico da temporada" (pedido explícito do usuário). Dedup por
+  ninho, um alerta por vez (mesmo padrão do `atraso_eclosao`).
+- Alerta agregado NOVO em `quelonio_avaliar_agregados()` (bloco 5.4):
+  "Temporada quente — antecipação sistemática" por praia+temporada,
+  quando a MÉDIA de antecipação dos ninhos com leitura suficiente
+  passa do limiar — mesmo raciocínio do alerta de feminização de praia
+  (5.1), nunca confundir ninho isolado com sinal de temporada.
+- `acelera_dias_por_grau` (novo campo, `parametros_incubacao_quelonios`,
+  default 1,5 dia/°C acima do pivotal) é o fator científico —
+  parametrizável pelo biólogo/gestor, nunca hardcoded, mesma filosofia
+  dos demais limiares de TSD desta tabela.
+- `vw_ninhos_previsao_eclosao` e `vw_ninhos_validacao` ganharam as 3
+  colunas novas SEMPRE ao final (mesmo cuidado da 117 — `CREATE OR
+  REPLACE VIEW` não aceita reordenar; `vw_ninhos_validacao` recriada
+  via `DROP VIEW` primeiro). `bio_monitoramento_eclosao()` ganhou a
+  lista `antecipados` (piso de exibição 3 dias, mais baixo que o
+  limiar do alerta — dá visão cedo ao time científico sem
+  necessariamente notificar) e o contador correspondente.
+- Consumido em `pages/relatorios-biomonitor.html` (novo bucket
+  "Possível antecipação (temperatura)" no painel de eclosão + linha no
+  card de alertas ativos), no card do ninho no app
+  (`js/biomonitor-quelonios.js`, aviso abaixo da previsão normal,
+  reaproveitando a classe visual `faixa-atencao`) e no PDF por ninho
+  (`js/biomonitor-relatorio-ninho.js`, linha extra na Identificação
+  quando a antecipação é relevante).
+- `pwa/sw.js`: biomonitor v35 → v36.
+
 ## Variáveis de ambiente
 SUPABASE_URL=https://atqtybcsvepdabsvgaly.supabase.co
 SUPABASE_ANON_KEY=(pública, já em config.js)
@@ -2773,11 +2834,22 @@ extensão nova, não retomada de plano. Ao criar qualquer migration
 neste ou em outro módulo, rodar `mcp__Supabase__list_migrations`
 primeiro — não assumir o número pelo que está no repositório local.
 
-**Sólidos em suspensão continua pendência de conferência humana**
-(mediana de 0,342 mg/L com turbidez mediana de 90 UNT — provável
-mistura de g/L com mg/L ao longo dos anos): as 339 linhas quarentenadas
-por isso esperam alguém da SEMA com o laudo físico, usando a tela de
-`pages/agua-conferencia.html`. Não é tarefa de código.
+**Sólidos em suspensão — parcialmente resolvido (migration 318).** A
+SEMA enviou a planilha corrigida (Verificação de Dados, 17/07/2024) e
+108 das 339 linhas quarentenadas por essa suspeita de unidade
+(g/L×mg/L) tinham de fato o valor errado — corrigido no banco
+(dividido por 1000, exatamente como a planilha nova confirma célula a
+célula) e a linha promovida para `completo` (107 delas; a 108ª, linha
+61, já estava `completo` com o valor errado). As outras **231 linhas
+continuam pendentes**: a planilha corrigida não mudou o valor delas,
+então seguem esperando alguém da SEMA com o laudo físico, usando
+`pages/agua-conferencia.html`. Não é mais tarefa de código para as 108
+resolvidas; para as 231 restantes, segue igual a antes. Achado extra
+na mesma comparação: linha 335, `nitrogenio_amoniacal` estava 250 mg/L
+(vírgula deslocada), corrigido para 2,5 — não muda o status de
+quarentena dessa linha (motivo é outro, sólidos, ainda não conferido).
+`docs/qualidade-agua/serie-historica.csv` foi atualizado para refletir
+a planilha corrigida.
 
 **Ícone do launcher do app Água** ainda é o placeholder genérico do
 Capacitor (`app-agua/android`) — trocar por arte própria antes do

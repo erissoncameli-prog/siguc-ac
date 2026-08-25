@@ -627,7 +627,7 @@
     _painelPraias = Array.isArray(dp) ? dp : []
 
     let qp = db.from('vw_ninhos_previsao_eclosao')
-      .select('dias_para_eclosao,faixa_risco,situacao,especie,numero_atual,numero_ninho,praia_atual_nome,status,praia_id,praia_atual_id')
+      .select('dias_para_eclosao,faixa_risco,situacao,especie,numero_atual,numero_ninho,praia_atual_nome,status,praia_id,praia_atual_id,dias_antecipacao_estimados,data_prevista_eclosao_ajustada,temp_media_observada')
     if (tmp) qp = qp.eq('temporada_id', tmp)
     const { data: pv } = await qp
     let rows = pv || []
@@ -1868,12 +1868,18 @@
   function painelAlertas(ag) {
     const atrasados = _painelPrevisao.filter(r => r.faixa_risco === 'atrasado').length
     const hoje      = _painelPrevisao.filter(r => r.faixa_risco === 'hoje').length
+    // Antecipação por temperatura: mesmo piso (3 dias) usado por bio_monitoramento_eclosao
+    // para a lista "antecipados" — o disparo do ALERTA real (inbox do gestor) usa o
+    // limiar configurável de parametros_incubacao_quelonios.antecip_alerta_dias_min.
+    const antecipados = _painelPrevisao.filter(r =>
+      ['normal','atencao','hoje'].includes(r.faixa_risco) && (r.dias_antecipacao_estimados || 0) >= 3).length
     const A = []
     if (atrasados)         A.push({ sev:'crit', tag:'Crítico', t:`${atrasados} ninho(s) com eclosão atrasada`, d:'Passaram do máximo de incubação sem nascimento — verificar em campo' })
     if (ag.inundados)      A.push({ sev:'alta', tag:'Alto',    t:`${ag.inundados} ninho(s) com alagamento`,     d:'Alagamento ou sinal de inundação registrado nas visitas' })
     if (ag.predados)       A.push({ sev:'alta', tag:'Alto',    t:`${ag.predados} ninho(s) com predação`,        d:'Predação registrada na incubação ou em visita' })
     if (hoje)              A.push({ sev:'alta', tag:'Alto',    t:`${hoje} ninho(s) com eclosão prevista para hoje`, d:'Acompanhar nascimento e destino dos filhotes' })
     if (ag.falha_eclosao)  A.push({ sev:'alta', tag:'Alto',    t:`${ag.falha_eclosao} ninho(s) com falha de eclosão`, d:'Eclosão registrada com 0 filhotes vivos' })
+    if (antecipados)       A.push({ sev:'alta', tag:'Alto',    t:`${antecipados} ninho(s) com possível antecipação de eclosão`, d:'Temperatura média acima do pivotal projeta eclosão antes do previsto — reforçar visitas e preparar berçário' })
     return A
   }
 
@@ -1881,10 +1887,12 @@
   function painelEclosao() {
     const dias = r => r.dias_para_eclosao
     return [
-      { chave:'atraso', cor:'#ef4444', tag:'Atraso', lbl:'Atrasados',       rows:_painelPrevisao.filter(r => r.faixa_risco === 'atrasado') },
-      { chave:'hoje',   cor:'#2A9D6F', tag:'Hoje',   lbl:'Hoje',            rows:_painelPrevisao.filter(r => r.faixa_risco === 'hoje') },
-      { chave:'d13',    cor:'#1A6B8C', tag:'Próx.',  lbl:'Em 1–3 dias',     rows:_painelPrevisao.filter(r => dias(r) >= 1 && dias(r) <= 3) },
-      { chave:'d47',    cor:'#C9A84C', tag:'Semana', lbl:'Em 4–7 dias',     rows:_painelPrevisao.filter(r => dias(r) >= 4 && dias(r) <= 7) },
+      { chave:'atraso',  cor:'#ef4444', tag:'Atraso',  lbl:'Atrasados',                        rows:_painelPrevisao.filter(r => r.faixa_risco === 'atrasado') },
+      { chave:'hoje',    cor:'#2A9D6F', tag:'Hoje',    lbl:'Hoje',                              rows:_painelPrevisao.filter(r => r.faixa_risco === 'hoje') },
+      { chave:'d13',     cor:'#1A6B8C', tag:'Próx.',   lbl:'Em 1–3 dias',                       rows:_painelPrevisao.filter(r => dias(r) >= 1 && dias(r) <= 3) },
+      { chave:'d47',     cor:'#C9A84C', tag:'Semana',  lbl:'Em 4–7 dias',                       rows:_painelPrevisao.filter(r => dias(r) >= 4 && dias(r) <= 7) },
+      { chave:'antecip', cor:'#EA580C', tag:'Calor',   lbl:'Possível antecipação (temperatura)',
+        rows:_painelPrevisao.filter(r => ['normal','atencao','hoje'].includes(r.faixa_risco) && (r.dias_antecipacao_estimados || 0) >= 3) },
     ].filter(b => b.rows.length)
   }
 
