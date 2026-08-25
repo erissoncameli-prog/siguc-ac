@@ -1106,6 +1106,13 @@ function bioAbrirFormNinho() {
   document.getElementById('bio-form-desc-humana').value     = ''
   bioAtualizarDescarteBox()
 
+  // Método de contagem de ovos — default 'contado' em todo ninho novo
+  BioApp.contagemOvosMetodo = 'contado'
+  document.querySelectorAll('.bio-metodo-ovos-chip').forEach(c =>
+    c.classList.toggle('ativo', c.dataset.metodoOvos === 'contado'))
+  const _dicaOvos = document.getElementById('bio-ovos-metodo-dica')
+  if (_dicaOvos) _dicaOvos.hidden = true
+
   // Limpa condições do ninho
   document.getElementById('bio-form-temperatura').value   = ''
   document.getElementById('bio-form-umidade').value       = ''
@@ -1184,6 +1191,14 @@ function bioAbrirCorrecaoNinho(ninho) {
   document.getElementById('bio-form-desc-predacao').value = ninho.descartados_predacao || ''
   document.getElementById('bio-form-desc-humana').value   = ninho.descartados_humana   || ''
   bioAtualizarDescarteBox()
+
+  // Método de contagem de ovos — preserva o que já foi salvo (correção
+  // não recomeça a decisão contado/estimado do zero)
+  BioApp.contagemOvosMetodo = ninho.contagem_ovos_metodo ?? 'contado'
+  document.querySelectorAll('.bio-metodo-ovos-chip').forEach(c =>
+    c.classList.toggle('ativo', c.dataset.metodoOvos === BioApp.contagemOvosMetodo))
+  const _dicaOvosEdit = document.getElementById('bio-ovos-metodo-dica')
+  if (_dicaOvosEdit) _dicaOvosEdit.hidden = BioApp.contagemOvosMetodo !== 'estimado'
 
   // Condições
   document.getElementById('bio-form-temperatura').value   = ninho.temperatura_c   ?? ''
@@ -1332,6 +1347,7 @@ async function bioSalvarNinho() {
     qtd_ovos:         parseNum('bio-form-qtd-ovos'),
     ovos_integros:    parseNum('bio-form-ovos-integros'),
     ovos_descartados: parseNum('bio-form-ovos-descartados'),
+    contagem_ovos_metodo: BioApp.contagemOvosMetodo ?? 'contado',
     dist_rio_m:       isNaN(distVal) ? null : distVal,
     dist_rio_metodo:  document.getElementById('bio-form-dist-rio').value ? (BioApp.distRioMetodo ?? 'estimativa') : null,
     temperatura_c:    parseNum2('bio-form-temperatura'),
@@ -1502,14 +1518,21 @@ async function bioAbrirFormTransf(ninho) {
   document.getElementById('bio-transf-data').value            = new Date().toISOString().slice(0, 10)
   document.getElementById('bio-transf-ovos').value            = ''
   // Limite de ovos transferidos = íntegros encontrados (fallback: total).
-  // Não se pode transferir mais ovos do que foram encontrados no ninho.
+  // Não se pode transferir mais ovos do que foram encontrados no ninho
+  // — EXCETO quando a postura foi ESTIMADA: aqui é onde os ovos são de
+  // fato contados um a um, então divergir é o esperado, não um erro
+  // (ver "Regra do sistema — postura de ovos por estimativa").
+  const estimado   = ninho.contagem_ovos_metodo === 'estimado'
   const limiteOvos = ninho.ovos_integros ?? ninho.qtd_ovos ?? null
   const ovosInp    = document.getElementById('bio-transf-ovos')
   const ovosHint   = document.getElementById('bio-transf-ovos-hint')
   if (limiteOvos != null) {
-    ovosInp.max = limiteOvos
+    if (!estimado) ovosInp.max = limiteOvos
+    else ovosInp.removeAttribute('max')
     const base = ninho.ovos_integros != null ? 'íntegros' : 'encontrados'
-    ovosHint.textContent = `Máximo ${limiteOvos} ovos (${base} no ninho).`
+    ovosHint.textContent = estimado
+      ? `Postura estimada em ${limiteOvos} ovos (${base}) — conte os ovos ao transferir; a postura do ninho será corrigida para o número real.`
+      : `Máximo ${limiteOvos} ovos (${base} no ninho).`
     ovosHint.hidden = false
   } else {
     ovosInp.removeAttribute('max')
@@ -1757,9 +1780,13 @@ async function bioSalvarTransf() {
   if (!data)           { bioToast('Informe a data da transferência.', 'err'); return }
   if (isNaN(ovos) || ovos < 0) { bioToast('Informe o número de ovos.', 'err'); return }
   // Não pode transferir mais ovos do que os íntegros encontrados no ninho
-  // (fallback: total encontrado). Sem essa referência, não há como validar.
+  // (fallback: total encontrado) — EXCETO quando a postura foi ESTIMADA:
+  // aqui é onde os ovos são de fato contados um a um, então divergir é
+  // esperado e corrige a postura (abaixo), nunca bloqueia (ver "Regra do
+  // sistema — postura de ovos por estimativa").
+  const estimado   = ninho?.contagem_ovos_metodo === 'estimado'
   const limiteOvos = ninho?.ovos_integros ?? ninho?.qtd_ovos ?? null
-  if (limiteOvos != null && ovos > limiteOvos) {
+  if (!estimado && limiteOvos != null && ovos > limiteOvos) {
     const base = ninho?.ovos_integros != null ? 'íntegros' : 'encontrados'
     bioToast(`Máximo ${limiteOvos} ovos (${base} no ninho). Não é possível transferir mais do que foi encontrado.`, 'err')
     return
@@ -1785,6 +1812,11 @@ async function bioSalvarTransf() {
       + `O embrião pode já estar aderido à casca e morrer com o manuseio.\n\nRegistrar mesmo assim?`)) return
   }
 
+  // Postura estimada: a contagem feita ao transferir corrige a postura
+  // do ninho (mesmo mecanismo da eclosão) — só quando diverge do que
+  // estava estimado, para não gerar correção redundante idêntica.
+  const posturaCorrigida = (estimado && ovos !== ninho.qtd_ovos) ? ovos : null
+
   const transf = {
     uuid_cliente:       bioUuid(),
     ninho_uuid:         ninho.uuid_cliente,
@@ -1792,6 +1824,7 @@ async function bioSalvarTransf() {
     data_transferencia: data,
     hora_transferencia: hora,
     qtd_ovos:           ovos,
+    postura_corrigida:  posturaCorrigida,
     praia_destino_id:   destino.id,
     praia_destino_nome: destino.nome,
     numero_atual:       numeroAtual,
@@ -1810,6 +1843,11 @@ async function bioSalvarTransf() {
     status:           'transferido',
     praia_atual_id:   destino.id,
     praia_atual_nome: destino.nome,
+    ...(posturaCorrigida != null ? {
+      qtd_ovos_estimado_original: ninho.qtd_ovos_estimado_original ?? ninho.qtd_ovos,
+      qtd_ovos:                   posturaCorrigida,
+      contagem_ovos_metodo:       'confirmado_eclosao',
+    } : {}),
     numero_atual:     numeroAtual,
   })
   await bioOfflineSalvarTransf(transf)
@@ -1865,7 +1903,36 @@ async function bioAbrirFormEclosao(ninho) {
     }
   }
 
+  // Postura estimada: oferece corrigir com um toque a partir do total
+  // apurado nesta eclosão — ver "Regra do sistema — postura de ovos
+  // por estimativa". Não aparece para ninho 'contado'.
+  const posturaBox = document.getElementById('bio-ecl-postura-box')
+  if (posturaBox) {
+    posturaBox.hidden = ninho.contagem_ovos_metodo !== 'estimado'
+    const ckConfirmar = document.getElementById('bio-ecl-postura-confirmar')
+    if (ckConfirmar) ckConfirmar.checked = true
+    const origEl = document.getElementById('bio-ecl-postura-original')
+    if (origEl) origEl.textContent = ninho.qtd_ovos_estimado_original ?? ninho.qtd_ovos ?? '—'
+    bioAtualizarPosturaEclosaoBox()
+  }
+
   bioMostrarTela('tela-form-eclosao')
+}
+
+// Recalcula o total apurado (vivos + mortos + não nascidos) e mantém
+// o campo de correção da postura pré-preenchido com esse valor.
+function bioAtualizarPosturaEclosaoBox() {
+  const ninho = BioApp.formNinhoAtualizar
+  const box   = document.getElementById('bio-ecl-postura-box')
+  if (!box || box.hidden || !ninho || ninho.contagem_ovos_metodo !== 'estimado') return
+  const vivos    = parseInt(document.getElementById('bio-ecl-vivos').value)    || 0
+  const mortos   = parseInt(document.getElementById('bio-ecl-mortos').value)   || 0
+  const naoNasc  = parseInt(document.getElementById('bio-ecl-nao-nasc').value) || 0
+  const apurado  = vivos + mortos + naoNasc
+  const apEl = document.getElementById('bio-ecl-postura-apurado')
+  if (apEl) apEl.textContent = apurado
+  const inp = document.getElementById('bio-ecl-postura-corrigir')
+  if (inp) inp.value = apurado
 }
 
 function bioSetContador(id, val) {
@@ -1883,9 +1950,9 @@ function bioIniciarContadores() {
     const valEl  = document.getElementById(idValor)
     const plusEl = document.getElementById(`${idValor}-plus`)
     const minEl  = document.getElementById(`${idValor}-minus`)
-    plusEl?.addEventListener('click',  () => { valEl.value = parseInt(valEl.value || 0) + 1 })
-    minEl?.addEventListener('click',   () => { valEl.value = Math.max(min, parseInt(valEl.value || 0) - 1) })
-    valEl?.addEventListener('blur',    () => { let v = parseInt(valEl.value); if (isNaN(v) || v < min) v = min; valEl.value = v })
+    plusEl?.addEventListener('click',  () => { valEl.value = parseInt(valEl.value || 0) + 1; bioAtualizarPosturaEclosaoBox() })
+    minEl?.addEventListener('click',   () => { valEl.value = Math.max(min, parseInt(valEl.value || 0) - 1); bioAtualizarPosturaEclosaoBox() })
+    valEl?.addEventListener('blur',    () => { let v = parseInt(valEl.value); if (isNaN(v) || v < min) v = min; valEl.value = v; bioAtualizarPosturaEclosaoBox() })
   })
 
   // Predação
@@ -1923,13 +1990,29 @@ async function bioSalvarEclosao() {
 
   // Alerta de consistência: o total apurado (filhotes vivos + mortos +
   // ovos não nascidos) não deveria superar os ovos viáveis do ninho
-  // (postura − baixas das visitas).
-  const viaveis = BioApp._eclViaveis ?? bioOvosViaveisNinho(ninho)
+  // (postura − baixas das visitas). Só para ninho 'contado' — num
+  // ninho 'estimado' superar a postura é o esperado (é exatamente o
+  // que a correção abaixo existe para capturar), não um erro a avisar.
   const totalApurado = vivos + mortos + naoNascidos
-  if (viaveis != null && totalApurado > viaveis) {
-    const msg = `O total informado (${totalApurado}: ${vivos} vivos + ${mortos} mortos + ${naoNascidos} não nasc.) `
-      + `supera os ${viaveis} ovos viáveis do ninho.\n\nConfirmar assim mesmo?`
-    if (!confirm(msg)) return
+  if (ninho.contagem_ovos_metodo !== 'estimado') {
+    const viaveis = BioApp._eclViaveis ?? bioOvosViaveisNinho(ninho)
+    if (viaveis != null && totalApurado > viaveis) {
+      const msg = `O total informado (${totalApurado}: ${vivos} vivos + ${mortos} mortos + ${naoNascidos} não nasc.) `
+        + `supera os ${viaveis} ovos viáveis do ninho.\n\nConfirmar assim mesmo?`
+      if (!confirm(msg)) return
+    }
+  }
+
+  // Postura estimada: se o monitor confirmou a correção com um toque,
+  // o valor apurado nesta eclosão vira a postura oficial do ninho —
+  // aplicado pelo trigger do banco, nunca recalculado no cliente.
+  let posturaCorrigida = null
+  if (ninho.contagem_ovos_metodo === 'estimado') {
+    const ckConfirmar = document.getElementById('bio-ecl-postura-confirmar')
+    if (ckConfirmar?.checked) {
+      const v = parseInt(document.getElementById('bio-ecl-postura-corrigir').value)
+      posturaCorrigida = isNaN(v) ? totalApurado : v
+    }
   }
 
   const ecl = {
@@ -1943,12 +2026,24 @@ async function bioSalvarEclosao() {
     filhotes_mortos:   mortos,
     ovos_nao_nascidos: naoNascidos,
     predacao,
+    postura_corrigida: posturaCorrigida,
     foto_urls:         BioApp._fotosEcl?.length ? [...BioApp._fotosEcl] : [],
     status_sync:       'pendente',
     criado_em:         new Date().toISOString(),
   }
 
-  await bioOfflineSalvarNinho({ ...ninho, server_id: ninho.server_id ?? ninho.id ?? null, status: 'eclodido' })
+  await bioOfflineSalvarNinho({
+    ...ninho,
+    server_id: ninho.server_id ?? ninho.id ?? null,
+    status:    'eclodido',
+    // Reflete a correção localmente sem esperar o sync — o trigger do
+    // banco faz o mesmo ao lado do servidor (ver migration 322).
+    ...(posturaCorrigida != null ? {
+      qtd_ovos_estimado_original: ninho.qtd_ovos_estimado_original ?? ninho.qtd_ovos,
+      qtd_ovos:                   posturaCorrigida,
+      contagem_ovos_metodo:       'confirmado_eclosao',
+    } : {}),
+  })
   await bioOfflineSalvarEclosao(ecl)
   await bioAtualizarBadgeFila()
 
@@ -3547,7 +3642,7 @@ async function bioCarregarAbertos() {
     try {
       let q = bioSupabase()
         .from('vw_ninhos_validacao')
-        .select('id,uuid_cliente,numero_ninho,numero_atual,especie,data_encontro,hora_desova,status,status_validacao,motivo_rejeicao,qtd_ovos,ovos_integros,ovos_descartados,descartados_natural,descartados_predacao,descartados_humana,ovos_viaveis,ovos_perdidos_total,dist_rio_m,dist_rio_metodo,temperatura_c,umidade_pct,profundidade_cm,observacoes,foto_urls,lat,lng,precisao_gps_m,criado_em,praia_id,praia_nome,praia_atual_id,praia_atual_nome,monitor_id,monitor_nome,data_nascimento,filhotes_vivos,filhotes_mortos,ovos_nao_nascidos,incubacao_dias_previstos,data_prevista_eclosao,dias_para_eclosao,temp_media_observada,data_prevista_eclosao_ajustada,dias_antecipacao_estimados')
+        .select('id,uuid_cliente,numero_ninho,numero_atual,especie,data_encontro,hora_desova,status,status_validacao,motivo_rejeicao,qtd_ovos,ovos_integros,ovos_descartados,descartados_natural,descartados_predacao,descartados_humana,ovos_viaveis,ovos_perdidos_total,dist_rio_m,dist_rio_metodo,temperatura_c,umidade_pct,profundidade_cm,observacoes,foto_urls,lat,lng,precisao_gps_m,criado_em,praia_id,praia_nome,praia_atual_id,praia_atual_nome,monitor_id,monitor_nome,data_nascimento,filhotes_vivos,filhotes_mortos,ovos_nao_nascidos,incubacao_dias_previstos,data_prevista_eclosao,dias_para_eclosao,temp_media_observada,data_prevista_eclosao_ajustada,dias_antecipacao_estimados,contagem_ovos_metodo,qtd_ovos_estimado_original')
         .eq('grupo_id', BioApp.monitor.grupo_id)
         .order('numero_atual', { ascending: false })
       // Escopa à temporada atual — sem isso, ninhos de temporadas encerradas
@@ -3668,9 +3763,19 @@ function bioNinhoCardInner(n, opts = {}) {
   const _perdas   = (n.descartados_natural || 0) + (n.descartados_predacao || 0) + (n.descartados_humana || 0)
   const _viaveis  = n.ovos_viaveis ?? (n.qtd_ovos != null ? Math.max(n.qtd_ovos - _perdas, 0) : null)
   const _perdidoTotal = n.ovos_perdidos_total ?? _perdas
+  // Postura estimada — ver "Regra do sistema — postura de ovos por
+  // estimativa". 'estimado' aguarda confirmação; 'confirmado_eclosao'
+  // já foi corrigido e mostra o número original ao lado.
+  const posturaBadgeHtml = n.contagem_ovos_metodo === 'estimado'
+    ? `<span style="background:rgba(201,168,76,.2);color:#8a6d1f">Postura estimada</span>`
+    : n.contagem_ovos_metodo === 'confirmado_eclosao'
+      ? `<span style="background:rgba(82,183,136,.18);color:#1E6B4A">Estimado ${n.qtd_ovos_estimado_original ?? '—'} → confirmado ${n.qtd_ovos ?? '—'}</span>`
+      : ''
+
   const ovosHtml = (n.qtd_ovos != null || n.ovos_integros != null || n.ovos_descartados != null) ? `
     <div class="bio-nfc-ovos">
       ${n.qtd_ovos         != null ? `<span>${n.qtd_ovos} ovos</span>` : ''}
+      ${posturaBadgeHtml}
       ${n.ovos_integros    != null ? `<span>${n.ovos_integros} ínt. na postura</span>` : ''}
       ${n.ovos_descartados != null ? `<span>${n.ovos_descartados} desc. na postura</span>` : ''}
       ${_perdidoTotal > 0 ? `<span style="background:rgba(248,113,113,.18);color:#B91C1C">${_perdidoTotal} perdidos depois</span>` : ''}
@@ -3915,6 +4020,7 @@ async function bioCarregarFilaLocal() {
     const ovosHtml = (n.qtd_ovos != null || n.ovos_integros != null || n.ovos_descartados != null) ? `
       <div class="bio-nfc-ovos">
         ${n.qtd_ovos        != null ? `<span>${n.qtd_ovos} ovos</span>` : ''}
+        ${n.contagem_ovos_metodo === 'estimado' ? `<span style="background:rgba(201,168,76,.2);color:#8a6d1f">estimado</span>` : ''}
         ${n.ovos_integros   != null ? `<span>${n.ovos_integros} íntegros</span>` : ''}
         ${n.ovos_descartados != null ? `<span>${n.ovos_descartados} desc.</span>` : ''}
       </div>` : ''
@@ -4459,6 +4565,16 @@ async function bioCarregarTelaDados() {
     _bioSetRate('bio-r-transferencia', 'bio-rb-transferencia', data.taxa_transferencia_pct)
     _bioSetRate('bio-r-sobrev-berc',   'bio-rb-sobrev-berc',   data.taxa_sobrevivencia_bercario_pct)
     _bioSetRate('bio-r-mort-berc',     'bio-rb-mort-berc',     data.taxa_mortalidade_bercario_pct)
+
+    // Postura estimada — só aparece quando há algum ninho estimado
+    // (pendente ou já confirmado) na temporada selecionada.
+    const _rowPostura = document.getElementById('bio-kpi-row-postura-estimada')
+    const _temPostura = (data.postura_estimada_pendente_confirmacao > 0) || (data.postura_confirmada_total > 0)
+    if (_rowPostura) _rowPostura.hidden = !_temPostura
+    if (_temPostura) {
+      _bioSetText('bio-kpi-postura-pendente',   data.postura_estimada_pendente_confirmacao)
+      _bioSetText('bio-kpi-postura-confirmada', data.postura_confirmada_total)
+    }
 
     // Ovos viáveis/perdidos (base canônica) nos KPIs
     bioSupabase().rpc('bio_ovos_resumo', { p_temporada_id: _tempDados || null }).then(({ data: ov }) => {
@@ -5124,6 +5240,18 @@ document.addEventListener('DOMContentLoaded', async () => {
       btn.classList.add('ativa')
       BioApp.abertosStatusFiltro = btn.dataset.sfil || null
       bioCarregarAbertos()
+    })
+  })
+
+  // Chips de método de contagem de ovos (contado / estimado) — ver
+  // "Regra do sistema — postura de ovos por estimativa".
+  document.querySelectorAll('.bio-metodo-ovos-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      document.querySelectorAll('.bio-metodo-ovos-chip').forEach(c => c.classList.remove('ativo'))
+      chip.classList.add('ativo')
+      BioApp.contagemOvosMetodo = chip.dataset.metodoOvos
+      const dica = document.getElementById('bio-ovos-metodo-dica')
+      if (dica) dica.hidden = chip.dataset.metodoOvos !== 'estimado'
     })
   })
 

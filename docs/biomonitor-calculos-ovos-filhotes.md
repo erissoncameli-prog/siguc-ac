@@ -140,3 +140,57 @@ ninho? Normalmente sim.
    `ocorrencias_bercario`**: releia a checklist acima antes de aplicar
    — é sinal de que um cálculo de ovos/filhotes está mudando e as
    superfícies precisam ser revisadas juntas.
+
+## Postura de ovos por ESTIMATIVA (migration 322, 25/08/2026)
+
+Pedido do usuário: em noite de volume alto de ninhos, nem sempre dá
+para contar ovo a ovo — o monitor precisa poder ESTIMAR a postura no
+cadastro e corrigir depois, sem que a divergência seja tratada como
+erro. `ninhos_quelonios.contagem_ovos_metodo` (enum `contado` |
+`estimado` | `confirmado_eclosao`) marca a origem do número — mesmo
+padrão de `dist_rio_metodo` ('tracker'/'estimativa', mig. 074).
+Decisões confirmadas com o usuário: (1) a transferência TAMBÉM corrige
+a postura estimada, não só a eclosão; (2) a correção é oferecida com
+UM toque, valor apurado pré-preenchido, nunca automática; (3) ninhos
+cadastrados antes desta migration ficam `contado` (default da coluna,
+sem UPDATE em massa por suposição).
+
+- **A correção viaja DENTRO do evento** (`eclosoes_ninho.postura_
+  corrigida` / `transferencias_ninho.postura_corrigida`), aplicada por
+  trigger `AFTER INSERT` no ninho — nunca um segundo `.update()` do
+  cliente, que poderia falhar sozinho na fila offline (mesmo cuidado
+  do checklist DVIR do Frota, migration 204). `qtd_ovos_estimado_
+  original` preserva o número ORIGINAL para sempre — é a base do
+  cálculo de viés (`bio_relatorio_postura_estimada`), usado para
+  calibrar o método de estimativa entre temporadas.
+- **Trigger só corrige ninho `estimado`/`confirmado_eclosao`** — nunca
+  toca um ninho `contado`: ali, exceder os viáveis continua sendo
+  alerta de inconsistência de verdade (`confirm()` de sempre), não uma
+  correção esperada.
+- **Nada bloqueia no app** para ninho estimado — nem na eclosão
+  (confirm() de excesso desligado) nem na transferência (limite de
+  ovos deixa de ser hard block) — mesma regra "nada impede o trabalho
+  de campo" do LGPD de campo.
+- **Achado ao aplicar**: `CREATE OR REPLACE VIEW` em `vw_ninhos_
+  validacao`/`vw_praias_biomonitor` (reconstruídas do `pg_get_viewdef()`
+  real de produção, mesma lição da 321) apagou o `security_invoker=true`
+  que as duas já tinham (mig. 165) — reloption não é preservado pelo
+  replace. Corrigido com `ALTER VIEW ... SET (security_invoker=true)`
+  logo em seguida, no mesmo arquivo. E a RPC nova
+  (`bio_relatorio_postura_estimada`) nasceu com `EXECUTE` ainda em
+  `PUBLIC` (grant padrão do Postgres em função nova — `REVOKE ... FROM
+  anon` sozinho não fecha isso, é `PUBLIC` que precisa ser revogado).
+  Os dois vistos no advisor de segurança logo após aplicar, corrigidos
+  na mesma entrega. Vale para qualquer `CREATE OR REPLACE VIEW`/função
+  nova futura neste projeto.
+- Checklist de superfícies tocadas: app de campo (chips Contado/
+  Estimado no cadastro, confirmação com um toque na eclosão,
+  `bio_dados_aba` com contadores), mesa/admin (`vw_praias_biomonitor`,
+  popup do mapa), relatório oficial (`bio_relatorio_postura_estimada`,
+  bloco "Postura estimada — acompanhamento"), PDF por ninho + tela de
+  validação (`vw_ninhos_validacao`). **Análise Científica
+  (`bio_analise_detalhada`/`bio_analise_praias`) ficou de fora desta
+  entrega** — pendência registrada aqui, não esquecimento: ao estendê-la,
+  seguir o mesmo padrão (`n.contagem_ovos_metodo`, já disponível na
+  view canônica).
+- `pwa/sw.js`: biomonitor v35 → v36.

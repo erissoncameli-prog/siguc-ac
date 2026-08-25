@@ -1138,6 +1138,8 @@
       ${linha('Próprios / Recebidos', (p.ninhos_proprios ?? 0)+' / '+(p.ninhos_recebidos ?? 0))}
       ${linha('Incubando aqui', p.ninhos_incubando_aqui ?? 0)}
       ${linha('Ovos (postura)', p.ovos_postura_total ?? 0)}
+      ${(p.ninhos_postura_estimada ?? 0) > 0 ? linha('Postura estimada (pendente)', `<span style="color:#9a6b00">${p.ninhos_postura_estimada}</span>`) : ''}
+      ${(p.ninhos_postura_confirmada ?? 0) > 0 ? linha('Postura confirmada', `<span style="color:#1E6B4A">${p.ninhos_postura_confirmada}</span>`) : ''}
       ${linha('Ovos viáveis', (p.ovos_viaveis_total ?? 0) + ((p.ovos_perdidos_total ?? 0) > 0 ? ` <span style="color:#b3261e">(−${p.ovos_perdidos_total})</span>` : ''))}
       ${linha('Filhotes vivos', p.filhotes_vivos ?? 0)}
       ${(p.filhotes_anomalia ?? 0) > 0 ? linha('Com anomalia', `<span style="color:#9a6b00">${p.filhotes_anomalia}</span>`) : ''}
