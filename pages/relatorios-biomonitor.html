@@ -599,6 +599,10 @@
   let _descAgg = { natural:0, predacao:0, humana:0, total:0,
     porCausa: { predacao:0, alagamento:0, erosao:0, humana:0, natural:0 } }
   let _metasPraia = []
+  // Postura estimada — ver "Regra do sistema — postura de ovos por
+  // estimativa" (migration 322). Fonte única: bio_relatorio_postura_
+  // estimada, nunca recalculada aqui.
+  let _posturaEstimada = null
   let _chartJsCarregado = false
   let _bercMortalidade = []
   let _bercCrescimento = []
@@ -764,6 +768,15 @@
       const causa = ['predacao','alagamento','erosao','humana'].includes(r.causa) ? r.causa : 'natural'
       _descAgg.porCausa[causa] += q
     })
+
+    // Postura estimada: contagem por método + viés da estimativa
+    // (para calibrar o método nas próximas temporadas).
+    const { data: pe } = await db.rpc('bio_relatorio_postura_estimada', {
+      p_temporada_id: sel('fil-temporada').value || null,
+      p_praia_id:     sel('fil-praia').value     || null,
+      p_uc_id:        sel('fil-uc').value        || null,
+    })
+    _posturaEstimada = pe || null
 
     // Metas por praia (só faz sentido com uma temporada específica)
     _metasPraia = []
@@ -1056,6 +1069,30 @@
       </div>
       <div style="font-size:11px;color:#6B7280;margin-top:8px">
         "Filhotes vivos (líquido)" desconta as mortes já confirmadas em berçário — é o número que de fato deve chegar ao rio.
+      </div>
+      ${htmlPosturaEstimada()}
+    </div>`
+  }
+
+  // Postura estimada — acompanhamento das ações (nunca aparece se não
+  // houver nenhum ninho estimado no recorte, para não poluir o
+  // relatório de quem não usa esse fluxo).
+  function htmlPosturaEstimada() {
+    const p = _posturaEstimada
+    if (!p || ((p.estimados_pendentes || 0) === 0 && (p.confirmados || 0) === 0)) return ''
+    const vies = p.vies_medio_ovos != null
+      ? `${p.vies_medio_ovos > 0 ? '+' : ''}${p.vies_medio_ovos} ovos (${p.vies_percentual > 0 ? '+' : ''}${p.vies_percentual}%)`
+      : '—'
+    return `<div class="rel-sec" id="sec-postura-estimada" style="margin-top:16px;background:rgba(201,168,76,.08);border-radius:10px;padding:14px">
+      <div class="rel-sec-title" style="margin-top:0">Postura estimada — acompanhamento</div>
+      <div class="rel-kpi-grid">
+        ${kpiCard('Contados',              v(p.contados),            '#3b82f6')}
+        ${kpiCard('Estimados (pendentes)', v(p.estimados_pendentes), '#d97706')}
+        ${kpiCard('Confirmados',           v(p.confirmados),         '#2A9D6F')}
+      </div>
+      <div style="font-size:12px;color:#6B7280;margin-top:8px">
+        Viés médio da estimativa (confirmado − estimado): <b>${vies}</b> —
+        base para calibrar o método de estimativa nas próximas temporadas.
       </div>
     </div>`
   }
