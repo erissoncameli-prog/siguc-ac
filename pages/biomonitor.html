@@ -705,6 +705,41 @@
       </div>
     </div>
 
+    <!-- Filhotes com anomalia (subconjunto de vivos) -->
+    <div class="bio-form-section">
+      <span class="bio-form-label">Destes vivos, com anomalia (deformidade)</span>
+      <div class="bio-counter-row">
+        <button type="button" id="bio-ecl-anomalia-minus" class="bio-counter-btn">−</button>
+        <div style="flex:1;text-align:center">
+          <input type="number" inputmode="numeric" class="bio-counter-val" id="bio-ecl-anomalia" value="0" min="0">
+          <span class="bio-counter-label">Com anomalia</span>
+        </div>
+        <button type="button" id="bio-ecl-anomalia-plus" class="bio-counter-btn">+</button>
+      </div>
+      <div class="bio-pred-grid" id="bio-anom-tipos" style="margin-top:8px">
+        <div class="bio-pred-opt bio-anom-opt" data-anom="casco">
+          <span class="bio-pred-radio"></span>
+          <div class="bio-pred-texto"><strong>Casco/carapaça deformada</strong></div>
+        </div>
+        <div class="bio-pred-opt bio-anom-opt" data-anom="membro">
+          <span class="bio-pred-radio"></span>
+          <div class="bio-pred-texto"><strong>Membro ausente ou atrofiado</strong></div>
+        </div>
+        <div class="bio-pred-opt bio-anom-opt" data-anom="corpo">
+          <span class="bio-pred-radio"></span>
+          <div class="bio-pred-texto"><strong>Corpo/coluna deformada</strong></div>
+        </div>
+        <div class="bio-pred-opt bio-anom-opt" data-anom="albinismo">
+          <span class="bio-pred-radio"></span>
+          <div class="bio-pred-texto"><strong>Albinismo</strong></div>
+        </div>
+        <div class="bio-pred-opt bio-anom-opt" data-anom="outro">
+          <span class="bio-pred-radio"></span>
+          <div class="bio-pred-texto"><strong>Outro</strong></div>
+        </div>
+      </div>
+    </div>
+
     <!-- Filhotes mortos -->
     <div class="bio-form-section">
       <span class="bio-form-label">Filhotes mortos</span>
@@ -1309,6 +1344,10 @@
         <span class="bio-form-label">Doença</span>
         <strong id="bio-ind-doenca">—</strong>
       </div>
+      <div class="bio-det-lote-row">
+        <span class="bio-form-label">Anomalia (congênita)</span>
+        <strong id="bio-ind-anomalia">—</strong>
+      </div>
     </div>
 
     <div style="display:flex;gap:10px;padding:0 16px 8px">
@@ -1319,9 +1358,12 @@
         Marcar óbito
       </button>
     </div>
-    <div style="padding:0 16px 16px">
-      <button type="button" id="bio-btn-doenca-individuo" class="bio-btn-sm" style="width:100%;background:#7C3AED;color:#fff">
+    <div style="display:flex;gap:10px;padding:0 16px 16px">
+      <button type="button" id="bio-btn-doenca-individuo" class="bio-btn-sm" style="flex:1;background:#7C3AED;color:#fff">
         Marcar doente
+      </button>
+      <button type="button" id="bio-btn-anomalia-individuo" class="bio-btn-sm" style="flex:1;background:#B45309;color:#fff">
+        Marcar anomalia
       </button>
     </div>
 
@@ -1644,6 +1686,9 @@
         <div class="bio-kpi2"><strong id="bio-kpi-ovos-postura">—</strong><span>Ovos (postura)</span></div>
         <div class="bio-kpi2"><strong id="bio-kpi-ovos-viaveis" style="color:var(--bio-verde)">—</strong><span>Ovos viáveis</span></div>
         <div class="bio-kpi2"><strong id="bio-kpi-ovos-perdidos" style="color:var(--bio-perigo)">—</strong><span>Ovos perdidos</span></div>
+      </div>
+      <div class="bio-dados-kpi-row">
+        <div class="bio-kpi2"><strong id="bio-kpi-anomalia" style="color:#B45309">—</strong><span>Filhotes c/ anomalia</span></div>
       </div>
 
       <!-- Rate cards -->

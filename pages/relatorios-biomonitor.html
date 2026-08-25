@@ -882,7 +882,7 @@
     _mapaLeafletInst = null  // força reinicialização do mapa ao re-aplicar filtros
     el.innerHTML = `
       ${htmlSecGeral(k)}
-      ${htmlSecDescartes(_descAgg)}
+      ${htmlSecDescartes(_descAgg, d)}
       ${htmlSecTaxas(k)}
       ${htmlSecFenologia()}
       ${htmlSecEspecies(d.por_especie || [])}
@@ -955,7 +955,47 @@
   function espCor(e) { return ESP_COR[e] || '#9CA3AF' }
 
   // ── Seção: Visão Geral ───────────────────────────────────────────
-  function htmlSecDescartes(a) {
+  // `dados` (bio_relatorio_completo) traz três blocos que só existiam na
+  // Análise Científica antes desta entrega — respeitam TODOS os filtros
+  // do relatório (temporada/programa/UC/praia/localização), diferente da
+  // quebra fina acima (`_descAgg`, consulta direta a vw_descartes_ovos,
+  // que só filtra temporada/praia).
+  function htmlSecEtapaCausaHTML(dados) {
+    const etapas = dados.descartes_por_etapa || []
+    const destr = dados.ninhos_destruidos_por_causa || []
+    const anomTipos = dados.anomalia_por_tipo || []
+    const pf = dados.predacao_fases || {}
+    const ETAPA_LBL = { registro: 'No registro da postura', visita: 'Em visita de monitoramento', eclosao: 'Na eclosão' }
+    const ANOM_LBL = { casco: 'Casco/carapaça deformada', membro: 'Membro ausente/atrofiado', corpo: 'Corpo/coluna deformada', albinismo: 'Albinismo', outro: 'Outro' }
+    const anomHtml = anomTipos.length ? `
+      <p class="rel-chart-sub" style="margin:14px 0 8px">Anomalias congênitas por tipo (nº de eclosões com o tipo)</p>
+      <div class="rel-kpi-grid">
+        ${anomTipos.map(a => kpiCard(ANOM_LBL[a.tipo] || a.tipo, v(a.n_eclosoes), '#d97706')).join('')}
+      </div>` : ''
+    const etapaHtml = etapas.length ? `
+      <p class="rel-chart-sub" style="margin:14px 0 8px">Descartes por etapa do monitoramento</p>
+      <div class="rel-kpi-grid">
+        ${etapas.map(e => kpiCard(ETAPA_LBL[e.etapa] || e.etapa, v(e.qtd), '#38bdf8')).join('')}
+      </div>` : ''
+    const destrHtml = destr.length ? `
+      <p class="rel-chart-sub" style="margin:14px 0 8px">Ninhos destruídos por causa</p>
+      <div class="rel-kpi-grid">
+        ${destr.map(n => kpiCard(n.causa === '—' ? 'Não informada' : n.causa, v(n.n), '#ef4444')).join('')}
+      </div>` : ''
+    const fasesHtml = (pf.incubacao || pf.eclosao || pf.soltura) ? `
+      <p class="rel-chart-sub" style="margin:14px 0 8px">Predação por fase</p>
+      <div class="rel-kpi-grid">
+        ${kpiCard('Incubação — por animais', v(pf.incubacao?.animais), '#fb923c')}
+        ${kpiCard('Incubação — por pessoas', v(pf.incubacao?.pessoas), '#a78bfa')}
+        ${kpiCard('Eclosão — por animais', v(pf.eclosao?.por_animais), '#fb923c')}
+        ${kpiCard('Eclosão — por pessoas', v(pf.eclosao?.por_pessoas), '#a78bfa')}
+        ${kpiCard('Soltura — com predação', v(pf.soltura?.com), '#ef4444')}
+      </div>` : ''
+    if (!etapaHtml && !destrHtml && !fasesHtml && !anomHtml) return ''
+    return `${etapaHtml}${destrHtml}${fasesHtml}${anomHtml}`
+  }
+
+  function htmlSecDescartes(a, dados) {
     const pctOf = n => a.total ? Math.round(100 * n / a.total) : 0
     // Causa fina (predação/alagamento/erosão/humana/natural) — inclui
     // perdas naturais lançadas direto na postura, não só nas visitas.
@@ -982,6 +1022,7 @@
             ${kpiCard('Ação humana',      `${a.humana} (${pctOf(a.humana)}%)`,     '#a78bfa')}
           </div>
           ${finaHtml}
+          ${htmlSecEtapaCausaHTML(dados || {})}
         </div>
         <div class="rel-chart-card"><p class="rel-chart-title">Perdas por causa</p><div class="rel-chart-wrap" id="wrap-desc-causa"><canvas id="graf-desc-causa"></canvas></div></div>
       </div>
@@ -998,6 +1039,8 @@
         ${kpiCard('Ovos viáveis',        v(k.total_ovos_viaveis),   '#2A9D6F')}
         ${kpiCard('Ovos íntegros',       v(k.total_ovos_integros),  '#4ade80')}
         ${kpiCard('Filhotes vivos',      v(k.total_filhotes_vivos), '#34d399')}
+        ${kpiCard('Filhotes vivos (líquido)', v(k.total_filhotes_vivos_liquido), '#10b981')}
+        ${kpiCard('Filhotes com anomalia', v(k.total_filhotes_anomalia), '#d97706')}
         ${kpiCard('Filhotes mortos',     v(k.total_filhotes_mortos),'#f87171')}
         ${kpiCard('Média ovos/postura',  v(k.media_ovos_postura),   '#e5e7eb')}
         ${kpiCard('Dist. média ao rio',  v(k.dist_rio_media_m,'m'), '#38bdf8')}
@@ -1011,6 +1054,9 @@
         <div class="rel-chart-card"><p class="rel-chart-title">Status dos Ninhos</p><div class="rel-chart-wrap"><canvas id="graf-status"></canvas></div></div>
         <div class="rel-chart-card"><p class="rel-chart-title">Desfecho dos Ovos</p><div class="rel-chart-wrap"><canvas id="graf-desfecho"></canvas></div></div>
       </div>
+      <div style="font-size:11px;color:#6B7280;margin-top:8px">
+        "Filhotes vivos (líquido)" desconta as mortes já confirmadas em berçário — é o número que de fato deve chegar ao rio.
+      </div>
     </div>`
   }
 
@@ -1020,6 +1066,8 @@
       <div class="rel-sec-title">Taxas Científicas (Protocolo PQRA / TAMAR / ICMBio)</div>
       <div class="rel-taxa-grid">
         ${taxaCard('Taxa de Eclosão',k.taxa_eclosao_pct+'—',k.taxa_eclosao_pct,'#2A9D6F','Filhotes vivos / (vivos + mortos + não nascidos)')}
+        ${taxaCard('Mortalidade Embrionária',k.taxa_mortalidade_embrionaria_pct+'—',k.taxa_mortalidade_embrionaria_pct,'#ef4444','(Mortos + não nascidos) / total de ovos que chegaram à eclosão')}
+        ${taxaCard('Taxa de Anomalia',k.taxa_anomalia_pct+'—',k.taxa_anomalia_pct,'#d97706','Filhotes com anomalia congênita / total de filhotes vivos')}
         ${taxaCard('Sucesso de Nidificação',k.taxa_sucesso_nidificacao_pct+'—',k.taxa_sucesso_nidificacao_pct,'#1A6B8C','Ninhos eclodidos / total de ninhos monitorados')}
         ${taxaCard('Taxa de Fertilidade',k.taxa_fertilidade_pct+'—',k.taxa_fertilidade_pct,'#C9A84C','Ovos íntegros / ovos totais na postura')}
         ${taxaCard('Eficiência do Ninho',k.eficiencia_ninho_pct+'—',k.eficiencia_ninho_pct,'#7ECEE8','Filhotes vivos / ovos íntegros registrados')}

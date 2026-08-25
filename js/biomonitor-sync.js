@@ -261,6 +261,8 @@ async function bioSyncEclosoes(monitorId, onProgresso) {
       ninho_id:           ninhoServId,
       data_nascimento:    e.data_nascimento,
       filhotes_vivos:     e.filhotes_vivos,
+      filhotes_anomalia:  e.filhotes_anomalia ?? 0,
+      anomalia_tipos:     e.anomalia_tipos ?? null,
       filhotes_mortos:    e.filhotes_mortos,
       ovos_nao_nascidos:  e.ovos_nao_nascidos,
       predacao:           e.predacao,
@@ -534,6 +536,7 @@ async function bioSyncIndividuos(monitorId, onProgresso) {
       numero:        ind.numero,
       status:        ind.status || 'ativo',
       doente:        ind.doente        ?? false,
+      anomalia:      ind.anomalia      ?? false,
       data_obito:    ind.data_obito    || null,
       causa_obito:   ind.causa_obito   || null,
       observacoes:   ind.observacoes   || null,
@@ -907,7 +910,7 @@ async function bioSyncPullIndividuos(grupoId) {
   const { data, error } = await bioSupabase()
     .from('filhotes_bercario')
     .select(`
-      id, uuid_cliente, numero, status, doente, data_obito, causa_obito, observacoes,
+      id, uuid_cliente, numero, status, doente, anomalia, data_obito, causa_obito, observacoes,
       monitor_id, criado_em, sincronizado_em,
       lote:lotes_bercario!inner(uuid_cliente, grupo_id)
     `)
@@ -925,6 +928,7 @@ async function bioSyncPullIndividuos(grupoId) {
       numero:       ind.numero,
       status:       ind.status,
       doente:       ind.doente,
+      anomalia:     ind.anomalia,
       data_obito:   ind.data_obito,
       causa_obito:  ind.causa_obito,
       observacoes:  ind.observacoes,

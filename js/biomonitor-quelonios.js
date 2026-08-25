@@ -1838,12 +1838,16 @@ async function bioAbrirFormEclosao(ninho) {
 
   // Contadores
   bioSetContador('bio-ecl-vivos',    0)
+  bioSetContador('bio-ecl-anomalia', 0)
   bioSetContador('bio-ecl-mortos',   0)
   bioSetContador('bio-ecl-nao-nasc', 0)
 
   // Predação
-  document.querySelectorAll('.bio-pred-opt').forEach(o => o.classList.remove('sel'))
+  document.querySelectorAll('.bio-pred-opt:not(.bio-anom-opt)').forEach(o => o.classList.remove('sel'))
   document.querySelector('.bio-pred-opt[data-pred="nenhuma"]')?.classList.add('sel')
+
+  // Tipos de anomalia
+  document.querySelectorAll('.bio-anom-opt').forEach(o => o.classList.remove('sel'))
 
   // Ovos viáveis do ninho (postura − baixas nas visitas): referência
   // para o total de filhotes/ovos não nascidos informado.
@@ -1872,6 +1876,7 @@ function bioSetContador(id, val) {
 function bioIniciarContadores() {
   ;[
     { idValor: 'bio-ecl-vivos',    min: 0 },
+    { idValor: 'bio-ecl-anomalia', min: 0 },
     { idValor: 'bio-ecl-mortos',   min: 0 },
     { idValor: 'bio-ecl-nao-nasc', min: 0 },
   ].forEach(({ idValor, min }) => {
@@ -1884,12 +1889,17 @@ function bioIniciarContadores() {
   })
 
   // Predação
-  document.querySelectorAll('.bio-pred-opt').forEach(opt => {
+  document.querySelectorAll('.bio-pred-opt:not(.bio-anom-opt)').forEach(opt => {
     opt.addEventListener('click', () => {
-      document.querySelectorAll('.bio-pred-opt').forEach(o => o.classList.remove('sel', 'perigo'))
+      document.querySelectorAll('.bio-pred-opt:not(.bio-anom-opt)').forEach(o => o.classList.remove('sel', 'perigo'))
       opt.classList.add('sel')
       if (opt.dataset.pred !== 'nenhuma') opt.classList.add('perigo')
     })
+  })
+
+  // Tipos de anomalia — múltipla escolha (toggle, não exclusivo como predação)
+  document.querySelectorAll('.bio-anom-opt').forEach(opt => {
+    opt.addEventListener('click', () => opt.classList.toggle('sel'))
   })
 }
 
@@ -1897,11 +1907,19 @@ async function bioSalvarEclosao() {
   const ninho       = BioApp.formNinhoAtualizar
   const data        = document.getElementById('bio-ecl-data').value
   const vivos       = parseInt(document.getElementById('bio-ecl-vivos').value)    || 0
+  const anomalia    = parseInt(document.getElementById('bio-ecl-anomalia').value) || 0
   const mortos      = parseInt(document.getElementById('bio-ecl-mortos').value)   || 0
   const naoNascidos = parseInt(document.getElementById('bio-ecl-nao-nasc').value) || 0
-  const predacao    = document.querySelector('.bio-pred-opt.sel')?.dataset.pred ?? 'nenhuma'
+  const predacao    = document.querySelector('.bio-pred-opt:not(.bio-anom-opt).sel')?.dataset.pred ?? 'nenhuma'
+  const anomaliaTipos = [...document.querySelectorAll('.bio-anom-opt.sel')].map(o => o.dataset.anom)
 
   if (!data)  { bioToast('Informe a data de nascimento.', 'err'); return }
+
+  // Anomalia é subconjunto de vivos — nunca pode superar o total de vivos.
+  if (anomalia > vivos) {
+    bioToast('Filhotes com anomalia não pode ser maior que filhotes vivos.', 'err')
+    return
+  }
 
   // Alerta de consistência: o total apurado (filhotes vivos + mortos +
   // ovos não nascidos) não deveria superar os ovos viáveis do ninho
@@ -1920,6 +1938,8 @@ async function bioSalvarEclosao() {
     ninho_numero:      ninho.numero_ninho,
     data_nascimento:   data,
     filhotes_vivos:    vivos,
+    filhotes_anomalia: anomalia,
+    anomalia_tipos:    anomaliaTipos.length ? anomaliaTipos : null,
     filhotes_mortos:   mortos,
     ovos_nao_nascidos: naoNascidos,
     predacao,
@@ -2573,11 +2593,14 @@ async function bioRenderizarFilhotesDoBercario(bercarioId, temporadaId) {
          ult.peso_g != null ? `${ult.peso_g}g` : null].filter(Boolean).join(' · ')
       : 'sem biometria'
     const classeExtra = ind.status !== 'ativo' ? ` ${ind.status}` : ''
-    const classeCor = ind.status === 'morto' ? ' num-morto' : ind.doente ? ' num-doente' : ' num-vivo'
+    const classeCor = ind.status === 'morto' ? ' num-morto' : ind.doente ? ' num-doente' : ind.anomalia ? ' num-anomalia' : ' num-vivo'
+    const bioLabel = ind.status === 'ativo' && ind.doente ? 'doente'
+      : ind.status === 'ativo' && ind.anomalia ? 'anomalia'
+      : STATUS_LABEL[ind.status] ?? bioTxt
     return `
       <div class="bio-filhote-chip${classeExtra}" data-individuo-uuid="${ind.uuid_cliente}">
         <span class="bio-filhote-num${classeCor}">#${ind.numero}</span>
-        <span class="bio-filhote-bio">${ind.doente && ind.status === 'ativo' ? 'doente' : STATUS_LABEL[ind.status] ?? bioTxt}</span>
+        <span class="bio-filhote-bio">${bioLabel}</span>
       </div>`
   }).join('')
 }
@@ -2684,6 +2707,15 @@ function bioAbrirTelaDetalheIndividuo(individuo) {
     btnDoenca.textContent = individuo.doente ? 'Remover doença' : 'Marcar doente'
   }
 
+  // Anomalia é congênita (conhecida desde a eclosão) — toggle direto, sem
+  // abrir formulário de ocorrência (diferente de doença/óbito, que registram
+  // um evento durante o cuidado em berçário).
+  if (el('bio-ind-anomalia')) el('bio-ind-anomalia').textContent = individuo.anomalia ? 'Sim' : 'Não'
+  const btnAnomalia = el('bio-btn-anomalia-individuo')
+  if (btnAnomalia) {
+    btnAnomalia.textContent = individuo.anomalia ? 'Remover anomalia' : 'Marcar anomalia'
+  }
+
   bioCarregarTimelineIndividuo(individuo)
   bioMostrarTela('tela-detalhe-individuo')
 }
@@ -2734,6 +2766,22 @@ async function bioAlternarDoencaIndividuo(individuo) {
   BioApp.individuoAtual = atualizado
   bioSyncTudo({ monitorId: BioApp.monitor?.id, onConcluido: () => bioAtualizarBadgeFila() })
   bioToast('Doença removida do filhote #' + individuo.numero + '.', 'ok')
+  bioAbrirTelaDetalheIndividuo(atualizado)
+}
+
+// Anomalia é congênita (conhecida desde a eclosão, não um evento durante o
+// cuidado) — toggle direto nos dois sentidos, sem passar por ocorrência
+// (diferente de doença/óbito, que registram causa/data de verdade).
+async function bioAlternarAnomaliaIndividuo(individuo) {
+  const atualizado = {
+    ...individuo,
+    anomalia: !individuo.anomalia,
+    status_sync: 'pendente',
+  }
+  await bioOfflineSalvarIndividuo(atualizado)
+  BioApp.individuoAtual = atualizado
+  bioSyncTudo({ monitorId: BioApp.monitor?.id, onConcluido: () => bioAtualizarBadgeFila() })
+  bioToast(atualizado.anomalia ? 'Anomalia marcada no filhote #' + individuo.numero + '.' : 'Anomalia removida do filhote #' + individuo.numero + '.', 'ok')
   bioAbrirTelaDetalheIndividuo(atualizado)
 }
 
@@ -3153,6 +3201,11 @@ function bioIniciarPosEclosao() {
     if (!ind) return
     if (ind.doente) { bioAlternarDoencaIndividuo(ind); return }
     bioAbrirFormOcorrenciaIndividuo(ind, 'doenca')
+  })
+  document.getElementById('bio-btn-anomalia-individuo')?.addEventListener('click', () => {
+    const ind = BioApp.individuoAtual
+    if (!ind) return
+    bioAlternarAnomaliaIndividuo(ind)
   })
 
   // Biometria individual
@@ -4374,6 +4427,7 @@ async function bioCarregarTelaDados() {
     _bioSetText('bio-kpi-ninhos',    data.grupo_ninhos)
     _bioSetText('bio-kpi-filhotes',  data.filhotes_vivos)
     _bioSetText('bio-kpi-incubacao', data.incubacao_media_dias, ' d')
+    _bioSetText('bio-kpi-anomalia',  data.filhotes_anomalia)
 
     // KPIs — Tab Ninhos ("Eclodidos" = pós-eclosão: eclodido +
     // em berçário + soltado, agregado no servidor)
