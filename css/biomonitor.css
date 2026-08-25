@@ -647,6 +647,15 @@ input.bio-counter-val::-webkit-inner-spin-button { -webkit-appearance: none; mar
 .bio-dist-chip.ativo {
   border-color: var(--bio-prim); background: rgba(42,157,111,.12); color: var(--bio-prim);
 }
+.bio-metodo-ovos-chip {
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: 5px;
+  padding: 8px 10px; border-radius: 10px; border: 1.5px solid var(--bio-border);
+  background: transparent; color: var(--bio-muted); font-size: 13px; font-weight: 600;
+  cursor: pointer; transition: all .15s;
+}
+.bio-metodo-ovos-chip.ativo {
+  border-color: var(--bio-ouro, #C9A84C); background: rgba(201,168,76,.14); color: var(--bio-ink);
+}
 .bio-dist-medir { margin-top: 10px; }
 .bio-dist-dica { font-size: 11px; color: var(--bio-muted); margin: 6px 0 0; line-height: 1.5; }
 .bio-dist-valor {

@@ -459,6 +459,8 @@
         <div style="background:rgba(201,168,76,.10);border-radius:8px;padding:8px 10px;margin-bottom:8px;font-size:.82rem;display:flex;gap:16px;flex-wrap:wrap">
           <span><strong style="color:#C9A84C">Ovos</strong></span>
           ${n.qtd_ovos        != null ? `<span>Total: <strong>${n.qtd_ovos}</strong></span>` : ''}
+          ${n.contagem_ovos_metodo === 'estimado' ? `<span style="color:#9a6b00">Postura estimada — pendente de confirmação</span>` : ''}
+          ${n.contagem_ovos_metodo === 'confirmado_eclosao' ? `<span style="color:#1E6B4A">Estimado ${n.qtd_ovos_estimado_original ?? '—'} → confirmado ${n.qtd_ovos ?? '—'}</span>` : ''}
           ${n.ovos_integros   != null ? `<span>Íntegros na postura: <strong style="color:#4ade80">${n.ovos_integros}</strong></span>` : ''}
           ${n.ovos_descartados != null ? `<span>Descartados na postura: <strong style="color:#f87171">${n.ovos_descartados}</strong></span>` : ''}
           ${n.ovos_perdidos_total > 0 ? `<span>Perdas depois: <strong style="color:#f87171">${n.ovos_perdidos_total}</strong></span>` : ''}

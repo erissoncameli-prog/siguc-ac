@@ -422,6 +422,21 @@
     <!-- Ovos na postura -->
     <div class="bio-form-section">
       <span class="bio-form-label">Ovos na postura</span>
+      <div class="bio-dist-metodos" style="margin-bottom:10px">
+        <button type="button" class="bio-metodo-ovos-chip ativo" id="bio-ovos-metodo-contado" data-metodo-ovos="contado">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg>
+          Contado
+        </button>
+        <button type="button" class="bio-metodo-ovos-chip" id="bio-ovos-metodo-estimado" data-metodo-ovos="estimado">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12h20M12 2l10 10-10 10"/></svg>
+          Estimado
+        </button>
+      </div>
+      <div id="bio-ovos-metodo-dica" class="bio-dist-dica" hidden>
+        Postura estimada — o número será conferido e corrigido, se preciso,
+        na eclosão ou na transferência dos ovos. Nada é bloqueado por causa
+        dessa diferença.
+      </div>
       <div class="bio-ovos-grid">
         <div class="bio-ovos-campo">
           <label class="bio-ovos-label" for="bio-form-qtd-ovos">Total</label>
@@ -691,6 +706,22 @@
     </div>
 
     <div id="bio-ecl-viaveis" class="bio-ecl-viaveis" hidden></div>
+
+    <!-- Confirmação de postura estimada (só aparece quando o ninho foi
+         cadastrado com "Estimado" — bio-form) -->
+    <div id="bio-ecl-postura-box" class="bio-form-section" style="background:var(--bio-ouro-bg,#fdf6e3);border-color:rgba(201,168,76,.5)" hidden>
+      <span class="bio-form-label">Postura estimada neste ninho</span>
+      <p style="margin:4px 0 10px;font-size:13px;color:var(--bio-ink)">
+        Total apurado nesta eclosão: <b id="bio-ecl-postura-apurado">0</b> ovos
+        (estimativa original: <span id="bio-ecl-postura-original">—</span>).
+      </p>
+      <label class="bio-ovos-label" for="bio-ecl-postura-corrigir">Corrigir postura para</label>
+      <input type="number" id="bio-ecl-postura-corrigir" class="bio-form-input bio-ovos-input" min="0" max="999" inputmode="numeric">
+      <label style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:13px;color:var(--bio-ink)">
+        <input type="checkbox" id="bio-ecl-postura-confirmar" checked style="width:18px;height:18px">
+        Atualizar a postura deste ninho com o número apurado
+      </label>
+    </div>
 
     <!-- Filhotes vivos -->
     <div class="bio-form-section">
@@ -1686,6 +1717,13 @@
         <div class="bio-kpi2"><strong id="bio-kpi-ovos-postura">—</strong><span>Ovos (postura)</span></div>
         <div class="bio-kpi2"><strong id="bio-kpi-ovos-viaveis" style="color:var(--bio-verde)">—</strong><span>Ovos viáveis</span></div>
         <div class="bio-kpi2"><strong id="bio-kpi-ovos-perdidos" style="color:var(--bio-perigo)">—</strong><span>Ovos perdidos</span></div>
+      </div>
+      <!-- Postura estimada — ver "Regra do sistema — postura de ovos
+           por estimativa". Aparece só quando há algum ninho estimado
+           na temporada (acompanhamento das ações). -->
+      <div class="bio-dados-kpi-row" id="bio-kpi-row-postura-estimada" hidden>
+        <div class="bio-kpi2"><strong id="bio-kpi-postura-pendente" style="color:#8a6d1f">—</strong><span>Postura estimada pendente</span></div>
+        <div class="bio-kpi2"><strong id="bio-kpi-postura-confirmada" style="color:var(--bio-verde)">—</strong><span>Postura confirmada</span></div>
       </div>
       <div class="bio-dados-kpi-row">
         <div class="bio-kpi2"><strong id="bio-kpi-anomalia" style="color:#B45309">—</strong><span>Filhotes c/ anomalia</span></div>

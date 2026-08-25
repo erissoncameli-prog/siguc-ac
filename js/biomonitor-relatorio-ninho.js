@@ -481,6 +481,14 @@ function _biopdfSecaoIdentificacao(ctx, n) {
 
 function _biopdfSecaoBalancoOvos(ctx, n) {
   _biopdfTitulo(ctx, 'Balanço de Ovos')
+  // Postura estimada — ver "Regra do sistema — postura de ovos por
+  // estimativa" (migration 322). 'estimado' ainda não foi conferido;
+  // 'confirmado_eclosao' já foi corrigido (mostra o número original).
+  if (n.contagem_ovos_metodo === 'estimado') {
+    _biopdfParagrafo(ctx, 'Postura ESTIMADA — ainda não confirmada por contagem real.')
+  } else if (n.contagem_ovos_metodo === 'confirmado_eclosao') {
+    _biopdfParagrafo(ctx, `Postura estimada em ${n.qtd_ovos_estimado_original ?? '—'}, confirmada em ${n.qtd_ovos ?? '—'}.`)
+  }
   _biopdfTabela(ctx, {
     head: [['Total na postura', 'Íntegros', 'Descartados no registro', 'Perdidos (depois)', 'Viáveis']],
     body: [[n.qtd_ovos ?? '—', n.ovos_integros ?? '—', n.ovos_descartados ?? 0, n.ovos_perdidos_total ?? 0, n.ovos_viaveis ?? '—']],
