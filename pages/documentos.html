@@ -569,13 +569,13 @@ async function salvar() {
   }
 
   const btn = document.getElementById('btn-salvar')
-  btn.disabled = true; btn.textContent = 'Salvando...'
+  const _btnRest0 = btnEspera(btn)
   try {
     const { error } = await db.from('documentos').insert(payload)
     if (error) throw error
     toast('Documento adicionado!', 'success'); fecharModal(); await carregar()
   } catch(e) { toast(e.message || 'Erro ao salvar', 'error') }
-  finally { btn.disabled = false; btn.textContent = 'Salvar' }
+  finally {  _btnRest0() }
 }
 </script>
 </body>

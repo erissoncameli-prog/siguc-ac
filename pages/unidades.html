@@ -494,7 +494,7 @@ let _abaAtiva = 'lista'
             <div class="table-scroll">
               <table>
                 <thead><tr><th>Código</th><th>Nome</th><th>Categoria</th><th>Grupo</th><th>Área (ha)</th><th>Municípios</th><th>Status</th>${_podeEditar?'<th>Ações</th>':''}</tr></thead>
-                <tbody id="tbody-ucs"><tr><td colspan="8" style="text-align:center;padding:32px;color:#9CA3AF">Carregando...</td></tr></tbody>
+                <tbody id="tbody-ucs"><tr><td colspan="8" style="padding:12px 14px" aria-busy="true" aria-label="Carregando"><div class="skeleton skeleton-linha" style="width:86%"></div><div class="skeleton skeleton-linha" style="width:72%"></div><div class="skeleton skeleton-linha" style="width:90%"></div><div class="skeleton skeleton-linha" style="width:64%"></div></td></tr></tbody>
               </table>
             </div>
           </div>
@@ -672,7 +672,7 @@ async function salvarUC() {
   }
 
   const btn = document.getElementById('btn-salvar-uc')
-  btn.disabled = true; btn.textContent = 'Salvando...'
+  const _btnRest0 = btnEspera(btn)
   try {
     if (ucEditId) {
       const { error } = await db.from('unidades_conservacao').update(payload).eq('id', ucEditId)
@@ -691,7 +691,7 @@ async function salvarUC() {
   } catch(e) {
     toast(e.message || 'Erro ao salvar', 'error')
   } finally {
-    btn.disabled = false; btn.textContent = 'Salvar'
+  _btnRest0()
   }
 }
 
@@ -854,13 +854,13 @@ async function salvarDoc() {
   }
 
   const btn = document.getElementById('btn-salvar-doc')
-  btn.disabled = true; btn.textContent = 'Salvando...'
+  const _btnRest1 = btnEspera(btn)
   try {
     const { error } = await db.from('documentos').insert(payload)
     if (error) throw error
     toast('Documento adicionado!', 'success'); fecharModalDoc(); await carregarDocs()
   } catch(e) { toast(e.message || 'Erro ao salvar', 'error') }
-  finally { btn.disabled = false; btn.textContent = 'Salvar' }
+  finally {  _btnRest1() }
 }
 
 // ── Viewer ──

@@ -74,7 +74,7 @@ let editId = null
         <div class="table-wrap"><div class="table-scroll">
           <table>
             <thead><tr><th>Nome</th><th>UC</th><th>Cargo</th><th>Matrícula</th><th>Vínculo</th><th>Data Entrada</th>${podeEditar?'<th>Ações</th>':''}</tr></thead>
-            <tbody id="tbody"><tr><td colspan="7" style="text-align:center;padding:32px;color:#9CA3AF">Carregando...</td></tr></tbody>
+            <tbody id="tbody"><tr><td colspan="7" style="padding:12px 14px" aria-busy="true" aria-label="Carregando"><div class="skeleton skeleton-linha" style="width:86%"></div><div class="skeleton skeleton-linha" style="width:72%"></div><div class="skeleton skeleton-linha" style="width:90%"></div><div class="skeleton skeleton-linha" style="width:64%"></div></td></tr></tbody>
           </table>
         </div></div>
       </div>
@@ -162,7 +162,7 @@ async function salvar() {
     ativo: true,
   }
   const btn = document.getElementById('btn-salvar')
-  btn.disabled = true; btn.textContent = 'Salvando...'
+  const _btnRest0 = btnEspera(btn)
   try {
     if (editId) {
       const { error } = await db.from('equipe_servidores').update(payload).eq('id', editId)
@@ -175,7 +175,7 @@ async function salvar() {
     }
     fecharModal(); await carregar()
   } catch(e) { toast(e.message || 'Erro ao salvar', 'error') }
-  finally { btn.disabled = false; btn.textContent = 'Salvar' }
+  finally {  _btnRest0() }
 }
 </script>
 </body>

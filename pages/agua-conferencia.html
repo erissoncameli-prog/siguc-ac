@@ -12,6 +12,7 @@
 <script src="../js/layout.js"></script>
 <script src="../js/reautenticar.js"></script>
 <script src="../js/agua-alertas.js"></script>
+<script src="../js/grafico-teclado.js"></script>
 <script src="../js/agua-iqa-visual.js"></script>
 <script src="../js/agua-laudo-kpis.js"></script>
 <script src="../js/fotos-privadas.js"></script>
@@ -120,7 +121,7 @@ let _coletas = [], _labs = [], _editandoId = null
       <div class="card"><div class="table-wrap"><div class="table-scroll">
         <table>
           <thead><tr><th>Linha</th><th>Código</th><th>Ponto</th><th>Campanha</th><th>Data</th><th>Motivo</th><th>Ações</th></tr></thead>
-          <tbody id="tbody-ag"><tr><td colspan="6" style="text-align:center;padding:24px;color:#9CA3AF">Carregando...</td></tr></tbody>
+          <tbody id="tbody-ag"><tr><td colspan="6" style="padding:12px 14px" aria-busy="true" aria-label="Carregando"><div class="skeleton skeleton-linha" style="width:86%"></div><div class="skeleton skeleton-linha" style="width:72%"></div><div class="skeleton skeleton-linha" style="width:90%"></div><div class="skeleton skeleton-linha" style="width:64%"></div></td></tr></tbody>
         </table>
       </div></div></div>
     </div>` +

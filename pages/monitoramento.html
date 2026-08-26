@@ -80,7 +80,7 @@
         <div class="table-wrap"><div class="table-scroll">
           <table>
             <thead><tr><th>UC</th><th>Indicador</th><th>Categoria</th><th>Valor</th><th>Data Ref.</th><th>Metodologia</th></tr></thead>
-            <tbody id="tbody"><tr><td colspan="6" style="text-align:center;padding:32px;color:#9CA3AF">Carregando...</td></tr></tbody>
+            <tbody id="tbody"><tr><td colspan="6" style="padding:12px 14px" aria-busy="true" aria-label="Carregando"><div class="skeleton skeleton-linha" style="width:86%"></div><div class="skeleton skeleton-linha" style="width:72%"></div><div class="skeleton skeleton-linha" style="width:90%"></div><div class="skeleton skeleton-linha" style="width:64%"></div></td></tr></tbody>
           </table>
         </div></div>
       </div>
@@ -160,14 +160,14 @@ async function salvar() {
   }
 
   const btn = document.getElementById('btn-salvar')
-  btn.disabled = true; btn.textContent = 'Salvando...'
+  const _btnRest0 = btnEspera(btn)
   try {
     const { error } = await db.from('monitoramento_registros').insert(payload)
     if (error) throw error
     toast('Registro salvo!', 'success')
     fecharModal(); await carregar()
   } catch(e) { toast(e.message || 'Erro ao salvar', 'error') }
-  finally { btn.disabled = false; btn.textContent = 'Salvar' }
+  finally {  _btnRest0() }
 }
 </script>
 </body>

@@ -449,7 +449,8 @@ function renderSecretaria() {
     <span class="sec-title">📊 Consolidado por UC</span>
     <span class="sec-sub">Todas as ${ucs.length} unidades</span>
   </div>
-  <table class="res-table">
+  <div class="table-wrap">
+    <table class="res-table">
     <thead>
       <tr>
         <th>UC</th><th>Categoria</th><th>Área (ha)</th><th>Status</th>
@@ -474,7 +475,8 @@ function renderSecretaria() {
         </tr>`
       }).join('')}
     </tbody>
-  </table>
+    </table>
+  </div>
 </div>`
 }
 
