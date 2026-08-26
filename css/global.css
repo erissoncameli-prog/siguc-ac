@@ -219,6 +219,33 @@ tbody tr:hover td { background: #EDF7F1 !important; }
 .btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: var(--raio); font-family: var(--font-sans); font-size: 13px; font-weight: 500; cursor: pointer; transition: all .15s; border: 1px solid transparent; text-decoration: none; white-space: nowrap; line-height: 1.4; }
 .btn:active { transform: scale(.98); }
 .btn:focus-visible { outline: 3px solid rgba(82,183,136,.4); outline-offset: 2px; }
+
+/* ── Foco por teclado ──────────────────────────────────────────────
+   Havia 43 regras :hover no CSS contra 3 de :focus-visible — o estado
+   de mouse tinha sido desenhado 14× mais que o de teclado, e quem
+   navega por Tab (ou usa leitor de tela) não via onde estava.
+   Fallback por ELEMENTO em vez de lista de classes: assim controle
+   novo nasce com foco visível sem ninguém precisar lembrar. As regras
+   específicas que já existem (.btn, .sidebar-user, .form-control)
+   têm especificidade maior e continuam vencendo esta.
+   `:focus-visible`, nunca `:focus` — não pinta anel em clique de
+   mouse, só quando o navegador julga que o foco deve ser sinalizado. */
+a:focus-visible,
+button:focus-visible,
+summary:focus-visible,
+[tabindex]:focus-visible,
+input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 3px solid rgba(82,183,136,.55);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+/* A sidebar é escura (--floresta): o verde do anel some no fundo. Usa
+   o mesmo ouro que .sidebar-user:focus-visible já usava. */
+.sidebar a:focus-visible,
+.sidebar button:focus-visible,
+.sidebar [tabindex]:focus-visible {
+  outline-color: var(--ouro-claro);
+}
 .btn-primary { background: var(--verde-medio); color: #fff; border-color: var(--verde-medio); box-shadow: 0 1px 3px rgba(45,106,79,.3); }
 .btn-primary:hover { background: var(--verde); border-color: var(--verde); }
 .btn-secondary { background: var(--branco); color: var(--cinza-700); border-color: var(--borda-forte); }
@@ -245,7 +272,10 @@ tbody tr:hover td { background: #EDF7F1 !important; }
   background: var(--cinza-100); color: var(--cinza-500); cursor: not-allowed;
 }
 .btn-sm { padding: 5px 10px; font-size: 12px; }
-.btn-xs { padding: 3px 8px; font-size: 11px; border-radius: 6px; }
+/* 4px (era 3px) porque 3+11×1.4+3+2 = 23,4px, e a WCAG 2.2 AA exige
+   alvo de 24×24px. Agora dá 25,4px — diferença visual quase nula, em 94
+   usos no sistema. */
+.btn-xs { padding: 4px 9px; font-size: 11px; border-radius: 6px; }
 .btn-icon { padding: 7px; border-radius: var(--raio); }
 
 .form-group { margin-bottom: 16px; }
@@ -310,6 +340,44 @@ select.form-control { cursor: pointer; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .fade-in { animation: fadeIn .25s ease both; }
 .spinner { width: 20px; height: 20px; border: 2px solid var(--cinza-200); border-top-color: var(--verde-medio); border-radius: 50%; animation: spin .7s linear infinite; display: inline-block; }
+
+/* Botão em envio: `.btn.carregando`. Some com o rótulo e põe o giro no
+   lugar, mantendo a LARGURA do botão (color:transparent, não display)
+   — trocar o texto por "Enviando..." faria a linha inteira pular.
+   Reaproveita @keyframes spin, nunca uma animação nova. */
+.btn.carregando { position: relative; color: transparent !important; pointer-events: none; }
+.btn.carregando::after {
+  content: ''; position: absolute; inset: 0; margin: auto;
+  width: 14px; height: 14px; border-radius: 50%;
+  border: 2px solid rgba(255,255,255,.35); border-top-color: #fff;
+  animation: spin .7s linear infinite;
+}
+.btn-secondary.carregando::after, .btn-ghost.carregando::after {
+  border-color: var(--cinza-300); border-top-color: var(--cinza-600);
+}
+
+/* Esqueleto de carregamento. Existiam 2 ocorrências de "skeleton" em
+   todo o CSS: a espera por dados era um "Carregando..." de altura zero,
+   então a página saltava quando a consulta voltava. Aqui o espaço já
+   nasce com a altura final (a regra de CLS < 0,1 que a auditoria
+   apontou), e o vazio deixa de parecer erro. */
+.skeleton {
+  background: linear-gradient(90deg, var(--cinza-100) 0%, var(--cinza-200) 50%, var(--cinza-100) 100%);
+  background-size: 200% 100%;
+  animation: skeleton 1.4s ease-in-out infinite;
+  border-radius: 4px;
+}
+@keyframes skeleton { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+.skeleton-linha { height: 12px; margin-bottom: 10px; }
+.skeleton-linha:last-child { margin-bottom: 0; }
+.skeleton-titulo { height: 18px; width: 45%; margin-bottom: 14px; }
+.skeleton-bloco { padding: 16px 0; }
+/* Sem o brilho, o esqueleto vira bloco cinza parado — continua
+   reservando o espaço, que é a função principal. */
+@media (prefers-reduced-motion: reduce) {
+  .skeleton { animation: none; background: var(--cinza-100); }
+  .btn.carregando::after { animation: none; border-top-color: #fff; }
+}
 
 .loading-overlay { display: none; position: fixed; inset: 0; z-index: 300; background: rgba(255,255,255,.7); align-items: center; justify-content: center; flex-direction: column; gap: 12px; }
 .loading-overlay.ativo { display: flex; }
