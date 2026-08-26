@@ -183,7 +183,10 @@ body { font-family: var(--font-sans); background: var(--cinza-50); color: var(--
 .table-wrap { overflow-x: auto; }
 .table-scroll { max-height: calc(100vh - 340px); min-height: 300px; overflow-y: auto; }
 table { width: 100%; border-collapse: collapse; font-size: 13px; }
-thead th { text-align: left; padding: 10px 14px; font-size: 10px; font-weight: 700; color: var(--cinza-400); text-transform: uppercase; letter-spacing: .07em; border-bottom: 2px solid var(--borda); background: var(--cinza-50); position: sticky; top: 0; white-space: nowrap; user-select: none; }
+/* --cinza-400 sobre --cinza-50 dava 2,43:1 — como 10px em negrito é
+   "texto pequeno" pela WCAG, o mínimo AA é 4,5:1. --cinza-500 dá 4,63:1
+   sem mudar o desenho do cabeçalho. Vale para as 38 páginas com tabela. */
+thead th { text-align: left; padding: 10px 14px; font-size: 10px; font-weight: 700; color: var(--cinza-500); text-transform: uppercase; letter-spacing: .07em; border-bottom: 2px solid var(--borda); background: var(--cinza-50); position: sticky; top: 0; white-space: nowrap; user-select: none; }
 tbody td { padding: 11px 14px; border-bottom: 1px solid var(--borda); color: var(--cinza-700); vertical-align: middle; }
 tbody tr:nth-child(even) td { background: var(--cinza-50); }
 tbody tr:last-child td { border-bottom: none; }
@@ -196,6 +199,13 @@ tbody tr:hover td { background: #EDF7F1 !important; }
 .badge-blue   { background: #DBEAFE; color: #1E40AF; }
 .badge-ouro   { background: #FEF3C7; color: #92400E; }
 .badge-erro   { background: #FEE2E2; color: #991B1B; }
+/* Severidade crítica é o ÚNICO badge sólido do sistema, de propósito:
+   o enum severidade_ocorrencia tem 4 níveis e BADGE_SEVERIDADE mapeava
+   critica e alta para a mesma classe (badge-erro), apagando na tela uma
+   distinção que o banco guarda. Distingue por PREENCHIMENTO, não por
+   matiz nova — segue legível em daltonismo e em impressão P&B, e o
+   texto branco sobre #991B1B dá 8,31:1. */
+.badge-critica { background: #991B1B; color: #FFFFFF; }
 .badge-cinza  { background: var(--cinza-100); color: var(--cinza-600); }
 .badge-dark   { background: var(--cinza-200); color: var(--cinza-800); }
 .badge-roxo   { background: #EDE9FE; color: #5B21B6; }
@@ -217,6 +227,23 @@ tbody tr:hover td { background: #EDF7F1 !important; }
 .btn-ghost:hover { background: var(--cinza-100); color: var(--cinza-900); }
 .btn-danger { background: var(--erro); color: #fff; border-color: var(--erro); }
 .btn-danger:hover { background: #B91C1C; border-color: #B91C1C; }
+/* Desabilitado — o navegador já bloqueia o clique, mas até aqui o botão
+   continuava sólido e com cor de marca: não havia UMA regra :disabled em
+   todo o arquivo, contra 363 usos do atributo no HTML/JS. Sem retorno
+   visual, "cliquei e não aconteceu nada" é indistinguível de travamento.
+   Vem depois das variantes para vencer .btn-primary/.btn-danger sem
+   precisar de !important. */
+.btn:disabled, .btn[disabled], .btn[aria-disabled="true"] {
+  background: var(--cinza-200); border-color: var(--cinza-200); color: var(--cinza-500);
+  box-shadow: none; cursor: not-allowed;
+}
+.btn:disabled:hover, .btn[disabled]:hover, .btn[aria-disabled="true"]:hover {
+  background: var(--cinza-200); border-color: var(--cinza-200);
+}
+.btn:disabled:active, .btn[disabled]:active { transform: none; }
+.form-control:disabled, .form-control[readonly] {
+  background: var(--cinza-100); color: var(--cinza-500); cursor: not-allowed;
+}
 .btn-sm { padding: 5px 10px; font-size: 12px; }
 .btn-xs { padding: 3px 8px; font-size: 11px; border-radius: 6px; }
 .btn-icon { padding: 7px; border-radius: var(--raio); }

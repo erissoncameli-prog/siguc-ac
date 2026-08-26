@@ -106,17 +106,25 @@ function aguaIqaGraficoHTML(pontos, opts) {
   const linhas = segmentos.map(seg =>
     `<polyline points="${seg.join(' ')}" fill="none" stroke="#94A3B8" stroke-width="2" stroke-linecap="round"/>`).join('')
 
+  // `<title>` em TODO ponto: é o tooltip nativo do SVG, mesmo recurso
+  // que a rosca (`_aguaRoscaHTML`) e as barras já usavam — só o gráfico
+  // de linha tinha ficado sem, então passar o mouse sobre um ponto não
+  // revelava o valor e obrigava a abrir o detalhe da coleta.
   const pontosSvg = pontos.map((p, i) => {
+    const rotulo = _aguaEsc(p.label == null ? '' : String(p.label))
     if (p.iqa == null) {
       // Vazado — mesmo tratamento visual do mapa para "sem índice"
-      return `<circle cx="${x(i)}" cy="${y(50)}" r="4" fill="none" stroke="${AGUA_SEM_IQA_COR}" stroke-width="1.5" stroke-dasharray="2,2"/>`
+      return `<circle cx="${x(i)}" cy="${y(50)}" r="4" fill="none" stroke="${AGUA_SEM_IQA_COR}" stroke-width="1.5" stroke-dasharray="2,2"><title>${rotulo} — sem IQA calculado</title></circle>`
     }
     const cor = AGUA_IQA_FAIXA_COR[p.faixa] || AGUA_SEM_IQA_COR
     // Preenchimento fraco = quarentena (ainda em conferência), mesmo
     // limiar 0,5 de agua-mapa.html — nunca esconder o dado, só marcar
     // que não é definitivo.
-    const fillOpacity = p.status === 'quarentena' ? .5 : 1
-    return `<circle cx="${x(i)}" cy="${y(p.iqa)}" r="5" fill="${cor}" fill-opacity="${fillOpacity}" stroke="#fff" stroke-width="1.5"/>`
+    const quarentena = p.status === 'quarentena'
+    const fillOpacity = quarentena ? .5 : 1
+    const iqaTexto = Number(p.iqa).toFixed(1).replace('.', ',')
+    const dica = `${rotulo} — IQA ${iqaTexto}${p.faixa ? ' · ' + _aguaEsc(p.faixa) : ''}${quarentena ? ' · em conferência' : ''}`
+    return `<circle cx="${x(i)}" cy="${y(p.iqa)}" r="5" fill="${cor}" fill-opacity="${fillOpacity}" stroke="#fff" stroke-width="1.5"><title>${dica}</title></circle>`
   }).join('')
 
   // Rótulos do eixo X — só a cada N para não amontoar em telas
