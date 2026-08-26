@@ -311,12 +311,17 @@ test('DERHQA é o grupo e "Qualidade da Água" é subgrupo com os 6 links', asyn
   await expect(sub.locator('.nav-item')).toHaveCount(6);
 
   // Bacias Hidrográficas ganhou páginas na Fase B/C (Painel das Bacias
-  // + Plataformas de Coleta); Qualidade do Ar segue só declarado em
-  // js/layout.js, sem página — subgrupo sem item não renderiza.
+  // + Plataformas de Coleta) e o Boletim do Tempo na a88a9d8 — 3 itens.
   const subBacias = grupo.locator('.nav-grupo.nav-subgrupo[data-grupo="bacias"]');
   await expect(subBacias).toHaveCount(1);
-  await expect(subBacias.locator('.nav-item')).toHaveCount(2);
-  await expect(page.locator('.nav-grupo[data-grupo="ar"]')).toHaveCount(0);
+  await expect(subBacias.locator('.nav-item')).toHaveCount(3);
+
+  // Qualidade do Ar deixou de ser só declaração: a 206eaf6 trouxe
+  // pages/ar-qualidade.html, então o subgrupo passou a renderizar. O
+  // teste ainda cobrava a ausência dele e falhava só na suíte completa.
+  const subAr = grupo.locator('.nav-grupo.nav-subgrupo[data-grupo="ar"]');
+  await expect(subAr).toHaveCount(1);
+  await expect(subAr.locator('.nav-item')).toHaveCount(1);
 });
 
 test('grupo E subgrupo da página ativa nascem abertos', async ({ page }) => {

@@ -277,7 +277,10 @@ const BADGE_CATEGORIA = {
   PI:'badge-verde', REBIO:'badge-verde', ESEC:'badge-verde', MONA:'badge-verde', RVS:'badge-verde',
   FLONA:'badge-teal', FLOE:'badge-teal', RESEX:'badge-teal', RDS:'badge-teal', RPPN:'badge-blue', APA:'badge-ouro', ARIE:'badge-ouro'
 };
-const BADGE_SEVERIDADE = { critica:'badge-erro', alta:'badge-erro', media:'badge-ouro', baixa:'badge-verde' };
+// `critica` e `alta` apontavam as duas para 'badge-erro' — as duas
+// severidades mais altas ficavam indistinguíveis na lista de
+// ocorrências, embora o enum severidade_ocorrencia guarde a diferença.
+const BADGE_SEVERIDADE = { critica:'badge-critica', alta:'badge-erro', media:'badge-ouro', baixa:'badge-verde' };
 const BADGE_STATUS_OC = { aberta:'badge-erro', em_atendimento:'badge-ouro', resolvida:'badge-verde', arquivada:'badge-cinza' };
 const BADGE_STATUS_UC = { criada:'badge-cinza', regularizada:'badge-verde', em_regularizacao:'badge-ouro', decreto_suspenso:'badge-erro', em_revisao:'badge-blue' };
 
