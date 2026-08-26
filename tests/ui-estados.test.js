@@ -59,3 +59,23 @@ test('clique de mouse NAO pinta anel — o contrato do :focus-visible', async ({
   console.log(`apos clique outline-style=${estilo}`);
   expect(estilo).toBe('none');
 });
+
+// ── Guarda estrutural: nenhuma tabela de mesa sem contêiner de rolagem.
+// Sem isso a tabela empurra o corpo da página e o usuário rola a tela
+// INTEIRA de lado (cabeçalho e menu junto) no celular. O projeto já
+// tinha .table-wrap/.table-scroll em css/global.css; 4 páginas nunca
+// tinham sido envolvidas. Lê os arquivos, não o navegador — é uma regra
+// sobre a marcação, e assim vale para página nova sem custo de render.
+const fs = require('fs');
+const path = require('path');
+
+test('toda página de mesa com <table> tem contêiner de rolagem horizontal', () => {
+  const dir = path.join(__dirname, '..', 'pages');
+  const semProtecao = fs.readdirSync(dir)
+    .filter(f => f.endsWith('.html'))
+    .filter(f => {
+      const s = fs.readFileSync(path.join(dir, f), 'utf8');
+      return s.includes('<table') && !/table-wrap|table-scroll|overflow-x/.test(s);
+    });
+  expect(semProtecao, `sem contêiner de rolagem: ${semProtecao.join(', ')}`).toEqual([]);
+});

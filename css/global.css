@@ -37,6 +37,32 @@
   --raio:         8px;
   --raio-lg:      12px;
   --raio-xl:      16px;
+
+  /* ── Escalas de tipo e espaçamento ────────────────────────────────
+     ADITIVAS: nada no arquivo passa a usá-las agora, então esta entrega
+     não muda um pixel do que já está na tela. Existem para que cada
+     tela adote quando for tocada — trocar de uma vez os 16 tamanhos de
+     fonte e os 12 valores de espaçamento hoje em uso mexeria nas 45
+     páginas sem nenhum teste visual que segurasse a regressão.
+     Motivo de existirem: o arquivo tinha --raio/--raio-lg/--raio-xl
+     para canto (e usados com disciplina), mas nada equivalente para
+     tipo ou espaço, então cada valor foi escolhido no olho na hora em
+     que o componente foi escrito — daí 10.5px, 11.5px, 12.5px, 13.5px,
+     e 9px/22px convivendo com 8px/20px.
+     Tipo: escala modular; 12px é o piso (abaixo disso é anti-padrão de
+     legibilidade). Espaço: múltiplos de 4px. */
+  --txt-xs:       12px;
+  --txt-sm:       14px;
+  --txt-base:     16px;
+  --txt-lg:       18px;
+  --txt-xl:       24px;
+  --txt-2xl:      32px;
+  --e-1:          4px;
+  --e-2:          8px;
+  --e-3:          12px;
+  --e-4:          16px;
+  --e-5:          20px;
+  --e-6:          24px;
   --font-sans:    'DM Sans', system-ui, sans-serif;
   --font-mono:    'DM Mono', monospace;
   --font-display: 'Fraunces', Georgia, serif;
