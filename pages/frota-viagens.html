@@ -285,7 +285,7 @@ const STATUS_VEIC_LABEL = { disponivel:'Disponível', em_viagem:'Em viagem', em_
         <div class="table-wrap"><div class="table-scroll">
           <table>
             <thead><tr><th>Destino</th><th>Solicitante</th><th>Período</th><th>Veículo / Motorista</th><th>Status</th><th>Ações</th></tr></thead>
-            <tbody id="tbody"><tr><td colspan="6" style="text-align:center;padding:32px;color:#9CA3AF">Carregando...</td></tr></tbody>
+            <tbody id="tbody"><tr><td colspan="6" style="padding:12px 14px" aria-busy="true" aria-label="Carregando"><div class="skeleton skeleton-linha" style="width:86%"></div><div class="skeleton skeleton-linha" style="width:72%"></div><div class="skeleton skeleton-linha" style="width:90%"></div><div class="skeleton skeleton-linha" style="width:64%"></div></td></tr></tbody>
           </table>
         </div></div>
       </div>
@@ -780,7 +780,7 @@ async function confirmarAprovar() {
       if (!_liberarDedicado) { toast('Há veículo dedicado na divisão — marque "Liberar veículo dedicado do setor"', 'error'); return }
       if (!justifM) { toast('Informe a justificativa da liberação do veículo dedicado', 'error'); return }
     }
-    btn.disabled = true; btn.textContent = 'Aprovando...'
+    const _btnRest0 = btnEspera(btn)
     try {
       const { error } = await db.rpc('frota_aprovar_viagem_multipla', {
         p_viagem_id: _acaoId,
@@ -791,7 +791,7 @@ async function confirmarAprovar() {
       toast(`Viagem aprovada com ${_linhasAlocacao.length} veículos!`, 'success')
       fecharModal('aprovar'); await carregarViagens()
     } catch (e) { toast(e.message || 'Erro ao aprovar', 'error') }
-    finally { btn.disabled = false; btn.textContent = 'Aprovar' }
+    finally {    _btnRest0() }
     return
   }
 
@@ -807,14 +807,14 @@ async function confirmarAprovar() {
     if (!_liberarDedicado) { toast('Veículo dedicado ao setor — marque "Liberar veículo dedicado do setor" para usá-lo', 'error'); return }
     if (!justif) { toast('Informe a justificativa da liberação do veículo dedicado', 'error'); return }
   }
-  btn.disabled = true; btn.textContent = 'Aprovando...'
+  const _btnRest1 = btnEspera(btn)
   try {
     const { error } = await db.rpc('frota_aprovar_viagem', { p_viagem_id: _acaoId, p_veiculo_id: veiculo_id, p_motorista_id: motorista_id, p_liberar_dedicado: _liberarDedicado, p_justificativa: justif || null })
     if (error) throw error
     toast('Viagem aprovada!', 'success')
     fecharModal('aprovar'); await carregarViagens()
   } catch (e) { toast(e.message || 'Erro ao aprovar', 'error') }
-  finally { btn.disabled = false; btn.textContent = 'Aprovar' }
+  finally {  _btnRest1() }
 }
 
 function abrirRecusar(id) {

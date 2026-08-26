@@ -736,7 +736,7 @@
     const n = _ninhos.find(x => x.id === _efNinhoId)
     if (!n) return
     const btn = document.getElementById('ef-btn-salvar')
-    btn.disabled = true; btn.textContent = 'Salvando...'
+    const _btnRest0 = btnEspera(btn)
     try {
       const novasUrls = [..._efExistentes]
       for (let i = 0; i < _efNovos.length; i++) {
@@ -757,7 +757,7 @@
     } catch (e) {
       toast(e.message || 'Erro ao salvar fotos', 'error')
     } finally {
-      btn.disabled = false; btn.textContent = 'Salvar'
+    _btnRest0()
     }
   }
 

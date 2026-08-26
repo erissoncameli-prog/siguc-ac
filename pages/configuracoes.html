@@ -550,7 +550,7 @@ function abrirRespostaLgpd(id){
     const resposta = ov.querySelector('#resp-lgpd-texto').value.trim();
     if(status !== 'em_analise' && !resposta){ toast('Escreva a resposta antes de enviar','error'); return; }
     const btn = ov.querySelector('#resp-lgpd-enviar');
-    btn.disabled = true; btn.textContent = 'Enviando…';
+    const _btnRest0 = btnEspera(btn);
     try {
       // respondido_por/respondido_em são carimbados pelo trigger
       // trg_lgpd_solic_carimbar (migration 214) — nunca informados
@@ -563,7 +563,7 @@ function abrirRespostaLgpd(id){
       carregarSolicitacoesLgpd();
     } catch(e){
       console.error('[lgpd] responder solicitação', e);
-      btn.disabled = false; btn.textContent = 'Enviar resposta';
+    _btnRest0();
       toast('Não foi possível enviar a resposta','error');
     }
   });
@@ -663,7 +663,7 @@ function abrirMarcarRevisaoLgpd(){
   ov.querySelector('#rev-lgpd-enviar').addEventListener('click', async () => {
     const observacoes = ov.querySelector('#rev-lgpd-obs').value.trim() || null;
     const btn = ov.querySelector('#rev-lgpd-enviar');
-    btn.disabled = true; btn.textContent = 'Registrando…';
+    const _btnRest1 = btnEspera(btn);
     try {
       const { error } = await db.from('lgpd_revisoes')
         .insert({ revisado_por: appState.usuario?.id || null, observacoes });
@@ -673,7 +673,7 @@ function abrirMarcarRevisaoLgpd(){
       carregarRevisaoLgpd();
     } catch(e){
       console.error('[lgpd] marcar revisão', e);
-      btn.disabled = false; btn.textContent = 'Confirmar revisão';
+    _btnRest1();
       toast('Não foi possível registrar a revisão','error');
     }
   });

@@ -492,7 +492,7 @@ const DETRAN_AC_URL = 'https://www.detran.ac.gov.br/site/apps/veiculo/consulta/f
           <div class="table-wrap"><div class="table-scroll">
             <table>
               <thead><tr><th>Veículo</th><th>Tipo</th><th>Setor</th><th>Uso atual</th><th>Status</th><th>Documentos</th><th>Ações</th></tr></thead>
-              <tbody id="tbody-veiculos"><tr><td colspan="7" style="text-align:center;padding:32px;color:#9CA3AF">Carregando...</td></tr></tbody>
+              <tbody id="tbody-veiculos"><tr><td colspan="7" style="padding:12px 14px" aria-busy="true" aria-label="Carregando"><div class="skeleton skeleton-linha" style="width:86%"></div><div class="skeleton skeleton-linha" style="width:72%"></div><div class="skeleton skeleton-linha" style="width:90%"></div><div class="skeleton skeleton-linha" style="width:64%"></div></td></tr></tbody>
             </table>
           </div></div>
         </div>
@@ -519,7 +519,7 @@ const DETRAN_AC_URL = 'https://www.detran.ac.gov.br/site/apps/veiculo/consulta/f
           <div class="table-wrap"><div class="table-scroll">
             <table>
               <thead><tr><th>Nome</th><th>Vínculo</th><th>CNH</th><th>Validade CNH</th><th>Setor</th><th>Telefone</th><th>Status</th>${_podeEditar?'<th>Ações</th>':''}</tr></thead>
-              <tbody id="tbody-motoristas"><tr><td colspan="8" style="text-align:center;padding:32px;color:#9CA3AF">Carregando...</td></tr></tbody>
+              <tbody id="tbody-motoristas"><tr><td colspan="8" style="padding:12px 14px" aria-busy="true" aria-label="Carregando"><div class="skeleton skeleton-linha" style="width:86%"></div><div class="skeleton skeleton-linha" style="width:72%"></div><div class="skeleton skeleton-linha" style="width:90%"></div><div class="skeleton skeleton-linha" style="width:64%"></div></td></tr></tbody>
             </table>
           </div></div>
         </div>
@@ -1185,7 +1185,7 @@ async function salvarVeiculo() {
     observacoes: document.getElementById('v-obs').value.trim() || null,
   }
   const btn = document.getElementById('btn-salvar-veiculo')
-  btn.disabled = true; btn.textContent = 'Salvando...'
+  const _btnRest0 = btnEspera(btn)
   try {
     if (_vFotoFile) {
       btn.textContent = 'Enviando foto...'
@@ -1211,7 +1211,7 @@ async function salvarVeiculo() {
     fecharModal('veiculo'); await carregarVeiculos(); renderKpis()
   } catch (e) {
     toast(e.message?.includes('duplicate') ? 'Já existe veículo com esta placa' : (e.message || 'Erro ao salvar'), 'error')
-  } finally { btn.disabled = false; btn.textContent = 'Salvar' }
+  } finally {  _btnRest0() }
 }
 
 async function excluirVeiculo() {
@@ -1302,7 +1302,7 @@ async function salvarMotorista() {
   const editando = _editMotoristaId
   const criarAcesso = !editando && !payload.usuario_id && document.getElementById('m-criar-acesso').checked
   const btn = document.getElementById('btn-salvar-motorista')
-  btn.disabled = true; btn.textContent = 'Salvando...'
+  const _btnRest1 = btnEspera(btn)
   try {
     if (_mFotoFile) {
       btn.textContent = 'Enviando foto...'
@@ -1335,7 +1335,7 @@ async function salvarMotorista() {
     await carregarMotoristas(); renderKpis()
   } catch (e) {
     toast(e.message?.includes('duplicate') ? 'Este usuário já está vinculado a outro motorista' : (e.message || 'Erro ao salvar'), 'error')
-  } finally { btn.disabled = false; btn.textContent = 'Salvar' }
+  } finally {  _btnRest1() }
 }
 
 // ── Acesso ao App Frota (gerar login) ──────────────────────────
@@ -1371,7 +1371,7 @@ async function confirmarLoginMotorista() {
   const senha_temp = document.getElementById('login-mot-senha').value
   if (senha_temp && senha_temp.length < 6) { toast('Senha provisória deve ter no mínimo 6 caracteres', 'error'); return }
   const btn = document.getElementById('login-mot-btn')
-  btn.disabled = true; btn.textContent = 'Criando...'
+  const _btnRest2 = btnEspera(btn)
   try {
     const cred = await chamarGerarLoginMotorista({
       motorista_id: _loginMotoristaId,
@@ -1382,7 +1382,7 @@ async function confirmarLoginMotorista() {
     mostrarCredenciaisMotorista([cred])
     await carregarMotoristas()
   } catch (e) { toast(e.message || 'Erro ao criar login', 'error') }
-  finally { btn.disabled = false; btn.textContent = 'Criar Login' }
+  finally {  _btnRest2() }
 }
 
 async function gerarLoginsMotoristasPendentes() {

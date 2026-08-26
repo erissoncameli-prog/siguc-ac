@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><title>Harness de gráfico</title>
+<link rel="stylesheet" href="/css/global.css">
+<script src="/js/grafico-teclado.js"></script>
+<script src="/js/agua-iqa-visual.js"></script>
+</head><body style="background:#fff">
+<button id="antes">antes do gráfico</button>
+<div id="alvo" style="max-width:420px"></div>
+<button id="depois">depois do gráfico</button>
+<script>
+window.montar = () => {
+  document.getElementById('alvo').innerHTML = aguaIqaGraficoHTML([
+    { label:'2023/1', iqa:62.4, faixa:'Boa' },
+    { label:'2023/2', iqa:71.8, faixa:'Boa' },
+    { label:'2024/1', iqa:null },
+    { label:'2024/2', iqa:76.5, faixa:'Boa', status:'quarentena' },
+    { label:'2025/1', iqa:48.2, faixa:'Regular' },
+  ]);
+};
+</script>
+</body></html>
