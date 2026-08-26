@@ -405,7 +405,8 @@ async function tabDetalhe(tab) {
     }
     body.innerHTML = `
       <div style="margin-bottom:8px;font-size:11px;color:#6B7280;">${data.length} espécies · ${data.reduce((s,e)=>s+(e.quantidade||0),0)} indivíduos</div>
-      <table class="esp-table">
+      <div class="table-wrap">
+        <table class="esp-table">
         <thead><tr>
           <th>Espécie</th><th>Qtd</th><th>Confiança</th><th></th>
         </tr></thead>
@@ -420,7 +421,8 @@ async function tabDetalhe(tab) {
             <td>${e.valor_comercial ? '<span class="esp-badge-com">Comercial</span>' : ''}</td>
           </tr>`).join('')}
         </tbody>
-      </table>`;
+        </table>
+      </div>`;
 
   } else if (tab === 'dof') {
     body.innerHTML = '<div style="color:#9CA3AF;font-size:12px;padding:10px 0;">Carregando…</div>';

@@ -202,7 +202,7 @@ function htmlPagina() {
           <th style="width:56px">Foto</th><th>Descrição</th><th>Categoria</th><th>Grupo</th><th>Código</th><th>Plaqueta</th>
           <th style="width:110px">Status</th><th>Com monitor</th><th style="width:80px"></th>
         </tr></thead>
-        <tbody id="tbody-equip"><tr><td colspan="9" style="text-align:center;padding:32px;color:#9CA3AF">Carregando...</td></tr></tbody>
+        <tbody id="tbody-equip"><tr><td colspan="9" style="padding:12px 14px" aria-busy="true" aria-label="Carregando"><div class="skeleton skeleton-linha" style="width:86%"></div><div class="skeleton skeleton-linha" style="width:72%"></div><div class="skeleton skeleton-linha" style="width:90%"></div><div class="skeleton skeleton-linha" style="width:64%"></div></td></tr></tbody>
       </table></div>
     </div>
 
@@ -213,7 +213,7 @@ function htmlPagina() {
           <th>Assinado em</th><th>Monitor</th><th>Itens</th><th>Devolução prevista</th>
           <th style="width:130px">Validação</th><th style="width:110px">Status</th><th style="width:170px"></th>
         </tr></thead>
-        <tbody id="tbody-cautelas"><tr><td colspan="7" style="text-align:center;padding:32px;color:#9CA3AF">Carregando...</td></tr></tbody>
+        <tbody id="tbody-cautelas"><tr><td colspan="7" style="padding:12px 14px" aria-busy="true" aria-label="Carregando"><div class="skeleton skeleton-linha" style="width:86%"></div><div class="skeleton skeleton-linha" style="width:72%"></div><div class="skeleton skeleton-linha" style="width:90%"></div><div class="skeleton skeleton-linha" style="width:64%"></div></td></tr></tbody>
       </table></div>
     </div>
 
@@ -224,7 +224,7 @@ function htmlPagina() {
           <th>Data</th><th>Equipamento</th><th>Monitor</th><th>Tipo</th><th>Descrição</th>
           <th style="width:110px">Status</th><th style="width:80px"></th>
         </tr></thead>
-        <tbody id="tbody-ocorrencias"><tr><td colspan="7" style="text-align:center;padding:32px;color:#9CA3AF">Carregando...</td></tr></tbody>
+        <tbody id="tbody-ocorrencias"><tr><td colspan="7" style="padding:12px 14px" aria-busy="true" aria-label="Carregando"><div class="skeleton skeleton-linha" style="width:86%"></div><div class="skeleton skeleton-linha" style="width:72%"></div><div class="skeleton skeleton-linha" style="width:90%"></div><div class="skeleton skeleton-linha" style="width:64%"></div></td></tr></tbody>
       </table></div>
     </div>
   </div>`
@@ -347,7 +347,7 @@ async function salvarEquipamento() {
   const grupo_id = document.getElementById('eq-grupo').value
   if (!grupo_id) { toast('Selecione o grupo de monitoramento', 'error'); return }
   const btn = document.getElementById('btn-salvar-equip')
-  btn.disabled = true; btn.textContent = 'Salvando...'
+  const _btnRest0 = btnEspera(btn)
   try {
     let foto_url
     if (_fotoEquipFile) {
@@ -380,7 +380,7 @@ async function salvarEquipamento() {
     fecharModal('equip')
     await carregarEquipamentos()
   } catch (e) { toast(e.message || 'Erro ao salvar', 'error') }
-  finally { btn.disabled = false; btn.textContent = 'Salvar' }
+  finally {  _btnRest0() }
 }
 
 // ── Cautelas / devolução ─────────────────────────────────────────
@@ -427,7 +427,7 @@ function abrirValidacao(cautelaId) {
 
 async function confirmarValidacao() {
   const btn = document.getElementById('btn-confirmar-validacao')
-  btn.disabled = true; btn.textContent = 'Validando...'
+  const _btnRest1 = btnEspera(btn)
   try {
     const { error } = await db.rpc('biomonitor_validar_cautela', {
       p_cautela_id: _valCautelaId,
@@ -438,7 +438,7 @@ async function confirmarValidacao() {
     fecharModal('validar')
     await carregarCautelas()
   } catch (e) { toast(e.message || 'Erro ao validar', 'error') }
-  finally { btn.disabled = false; btn.textContent = 'Validar' }
+  finally {  _btnRest1() }
 }
 
 // ── Ocorrências de equipamento ───────────────────────────────────
@@ -495,7 +495,7 @@ function abrirOcorrencia(ocorrenciaId) {
 
 async function resolverOcorrencia() {
   const btn = document.getElementById('btn-resolver-ocorrencia')
-  btn.disabled = true; btn.textContent = 'Salvando...'
+  const _btnRest2 = btnEspera(btn)
   try {
     const statusEquip = document.getElementById('ocorr-status-equip').value || null
     const { error } = await db.rpc('biomonitor_tratar_ocorrencia_equipamento', {
@@ -508,7 +508,7 @@ async function resolverOcorrencia() {
     fecharModal('ocorrencia')
     await Promise.all([carregarOcorrencias(), carregarEquipamentos()])
   } catch (e) { toast(e.message || 'Erro ao tratar ocorrência', 'error') }
-  finally { btn.disabled = false; btn.textContent = 'Marcar como resolvida' }
+  finally {  _btnRest2() }
 }
 
 function abrirDevolucao(cautelaId) {
@@ -529,7 +529,7 @@ async function confirmarDevolucao() {
   const ids = Array.from(document.querySelectorAll('.dev-item-chk:checked')).map(c => c.value)
   if (!ids.length) { toast('Selecione ao menos um equipamento', 'error'); return }
   const btn = document.getElementById('btn-confirmar-devolucao')
-  btn.disabled = true; btn.textContent = 'Confirmando...'
+  const _btnRest3 = btnEspera(btn)
   try {
     const { error } = await db.rpc('biomonitor_devolver_equipamentos', {
       p_cautela_id: _devCautelaId,
@@ -541,7 +541,7 @@ async function confirmarDevolucao() {
     fecharModal('devolucao')
     await Promise.all([carregarEquipamentos(), carregarCautelas()])
   } catch (e) { toast(e.message || 'Erro ao devolver', 'error') }
-  finally { btn.disabled = false; btn.textContent = 'Confirmar devolução' }
+  finally {  _btnRest3() }
 }
 
 function fecharModal(qual) {

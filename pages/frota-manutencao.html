@@ -193,7 +193,7 @@ const STATUS_OS_BADGE = { aberta:'fw-badge fw-badge-inativo', em_andamento:'fw-b
           <div class="table-wrap"><div class="table-scroll">
             <table>
               <thead><tr><th>Veículo</th><th>Item</th><th>Intervalo</th><th>Última execução</th><th>Situação</th>${_podeEditar?'<th>Ações</th>':''}</tr></thead>
-              <tbody id="tbody-planos"><tr><td colspan="6" style="text-align:center;padding:32px;color:#9CA3AF">Carregando...</td></tr></tbody>
+              <tbody id="tbody-planos"><tr><td colspan="6" style="padding:12px 14px" aria-busy="true" aria-label="Carregando"><div class="skeleton skeleton-linha" style="width:86%"></div><div class="skeleton skeleton-linha" style="width:72%"></div><div class="skeleton skeleton-linha" style="width:90%"></div><div class="skeleton skeleton-linha" style="width:64%"></div></td></tr></tbody>
             </table>
           </div></div>
         </div>
@@ -212,7 +212,7 @@ const STATUS_OS_BADGE = { aberta:'fw-badge fw-badge-inativo', em_andamento:'fw-b
           <div class="table-wrap"><div class="table-scroll">
             <table>
               <thead><tr><th>Código</th><th>Veículo</th><th>Tipo</th><th>Descrição</th><th>Oficina</th><th>Custo</th><th>Status</th><th>Datas</th>${_podeEditar?'<th>Ações</th>':''}</tr></thead>
-              <tbody id="tbody-os"><tr><td colspan="9" style="text-align:center;padding:32px;color:#9CA3AF">Carregando...</td></tr></tbody>
+              <tbody id="tbody-os"><tr><td colspan="9" style="padding:12px 14px" aria-busy="true" aria-label="Carregando"><div class="skeleton skeleton-linha" style="width:86%"></div><div class="skeleton skeleton-linha" style="width:72%"></div><div class="skeleton skeleton-linha" style="width:90%"></div><div class="skeleton skeleton-linha" style="width:64%"></div></td></tr></tbody>
             </table>
           </div></div>
         </div>
@@ -511,7 +511,7 @@ async function salvarPlano() {
     observacoes: document.getElementById('pl-obs').value.trim() || null,
   }
   const btn = document.getElementById('btn-salvar-plano')
-  btn.disabled = true; btn.textContent = 'Salvando...'
+  const _btnRest0 = btnEspera(btn)
   try {
     if (_editPlanoId) {
       const { error } = await db.from('frota_planos_manutencao').update(payload).eq('id', _editPlanoId)
@@ -524,7 +524,7 @@ async function salvarPlano() {
     }
     fecharModal('plano'); await carregarPlanos()
   } catch (e) { toast(e.message || 'Erro ao salvar', 'error') }
-  finally { btn.disabled = false; btn.textContent = 'Salvar' }
+  finally {  _btnRest0() }
 }
 
 async function excluirPlano() {
@@ -650,7 +650,7 @@ async function salvarOS() {
     observacoes: document.getElementById('os-obs').value.trim() || null,
   }
   const btn = document.getElementById('btn-salvar-os')
-  btn.disabled = true; btn.textContent = 'Salvando...'
+  const _btnRest1 = btnEspera(btn)
   try {
     let osId = _editOsId
     if (_editOsId) {
@@ -681,7 +681,7 @@ async function salvarOS() {
     fecharModal('os')
     await Promise.all([carregarOS(), carregarPlanos(), carregarVeiculos()])
   } catch (e) { toast(e.message || 'Erro ao salvar', 'error') }
-  finally { btn.disabled = false; btn.textContent = 'Salvar' }
+  finally {  _btnRest1() }
 }
 
 function fecharModal(qual) {

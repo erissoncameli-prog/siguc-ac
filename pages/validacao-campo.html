@@ -984,7 +984,8 @@ async function carregarParticipantesModal(rcId) {
   document.getElementById('modal-part-count').textContent = `(${data.length})`
 
   lista.innerHTML = `
-    <table class="part-table">
+    <div class="table-wrap">
+      <table class="part-table">
       <thead><tr><th>Nome</th><th>CPF</th><th>Nascimento</th><th>Sexo</th></tr></thead>
       <tbody>
         ${data.map(p => `<tr>
@@ -994,7 +995,8 @@ async function carregarParticipantesModal(rcId) {
           <td>${esc(SEXO_PART_LAB[p.sexo] || '—')}</td>
         </tr>`).join('')}
       </tbody>
-    </table>`
+      </table>
+    </div>`
 }
 
 async function carregarFaunaModal(rcId) {

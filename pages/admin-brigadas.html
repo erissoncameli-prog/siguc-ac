@@ -918,7 +918,7 @@ async function confirmarSenhaEZerar() {
   if (!senha) { erroEl.textContent = 'Informe a senha.'; return }
 
   const btn = document.getElementById('zerar-btn-confirmar')
-  btn.disabled = true; btn.textContent = 'Verificando…'
+  const _btnRest0 = btnEspera(btn)
 
   try {
     // Reautentica o super_admin para confirmar identidade
@@ -960,7 +960,7 @@ async function confirmarSenhaEZerar() {
   } catch(e) {
     erroEl.textContent = e.message || 'Falha ao processar.'
   } finally {
-    btn.disabled = false; btn.textContent = 'Confirmar e apagar'
+  _btnRest0()
   }
 }
 
@@ -1182,7 +1182,7 @@ async function salvarBrigada() {
     ativa:             document.getElementById('mb-ativa').checked,
   }
   const btn = document.getElementById('mb-btn')
-  btn.disabled = true; btn.textContent = 'Salvando...'
+  const _btnRest1 = btnEspera(btn)
   try {
     const { error } = _editId.brigada
       ? await db.from('brigadas').update(payload).eq('id', _editId.brigada)
@@ -1191,7 +1191,7 @@ async function salvarBrigada() {
     toast(_editId.brigada ? 'Brigada atualizada!' : 'Brigada criada!', 'success')
     fecharModal('brigada'); await carregarDados()
   } catch(e) { toast(e.message || 'Erro ao salvar', 'error') }
-  finally { btn.disabled = false; btn.textContent = 'Salvar' }
+  finally {  _btnRest1() }
 }
 
 // ── Foto do Brigadista ───────────────────────────────────────
@@ -1332,7 +1332,7 @@ async function salvarBrigadista() {
     observacoes:           document.getElementById('mbr-obs').value.trim() || null,
   }
   const btn = document.getElementById('mbr-btn')
-  btn.disabled = true; btn.textContent = 'Salvando...'
+  const _btnRest2 = btnEspera(btn)
   try {
     // Upload de foto se houver arquivo novo selecionado
     if (_mbrFotoFile) {
@@ -1369,7 +1369,7 @@ async function salvarBrigadista() {
     }
     await carregarDados()
   } catch(e) { toast(e.message || 'Erro ao salvar', 'error') }
-  finally { btn.disabled = false; btn.textContent = 'Salvar' }
+  finally {  _btnRest2() }
 }
 
 // ── Modal Gerar Login ────────────────────────────────────────
@@ -1403,7 +1403,7 @@ async function confirmarLogin() {
   const senha_temp = document.getElementById('login-senha').value
   if (senha_temp && senha_temp.length < 6) { toast('Senha provisória deve ter no mínimo 6 caracteres', 'error'); return }
   const btn = document.getElementById('login-btn')
-  btn.disabled = true; btn.textContent = 'Criando...'
+  const _btnRest3 = btnEspera(btn)
   try {
     const cred = await chamarGerarLogin({
       brigadista_id: _loginBrigadistaId,
@@ -1414,7 +1414,7 @@ async function confirmarLogin() {
     mostrarCredenciais([cred])
     await carregarDados()
   } catch(e) { toast(e.message || 'Erro ao criar login', 'error') }
-  finally { btn.disabled = false; btn.textContent = 'Criar Login' }
+  finally {  _btnRest3() }
 }
 
 async function gerarLoginsPendentes() {
@@ -1598,7 +1598,7 @@ async function salvarDiario() {
     resultado:       document.getElementById('md-resultado').value.trim() || null,
   }
   const btn = document.getElementById('md-btn')
-  btn.disabled = true; btn.textContent = 'Salvando...'
+  const _btnRest4 = btnEspera(btn)
   try {
     const { error } = _editIdDiario
       ? await db.from('atividades_brigada').update(payload).eq('id', _editIdDiario)
@@ -1607,7 +1607,7 @@ async function salvarDiario() {
     toast(_editIdDiario ? 'Atividade atualizada!' : 'Atividade registrada!', 'success')
     fecharModal('diario'); await carregarDados()
   } catch(e) { toast(e.message || 'Erro ao salvar', 'error') }
-  finally { btn.disabled = false; btn.textContent = 'Salvar' }
+  finally {  _btnRest4() }
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -1669,7 +1669,7 @@ async function salvarEquipamento() {
     observacoes:     document.getElementById('meq-obs').value.trim() || null,
   }
   const btn = document.getElementById('meq-btn')
-  btn.disabled = true; btn.textContent = 'Salvando...'
+  const _btnRest5 = btnEspera(btn)
   try {
     const { error } = _editId.equipamento
       ? await db.from('equipamentos_brigada').update(payload).eq('id', _editId.equipamento)
@@ -1678,7 +1678,7 @@ async function salvarEquipamento() {
     toast(_editId.equipamento ? 'Equipamento atualizado!' : 'Equipamento adicionado!', 'success')
     fecharModal('equipamento'); await carregarDados()
   } catch(e) { toast(e.message || 'Erro ao salvar', 'error') }
-  finally { btn.disabled = false; btn.textContent = 'Salvar' }
+  finally {  _btnRest5() }
 }
 
 // ── Helpers ───────────────────────────────────────────────────

@@ -14,6 +14,7 @@
 <script src="../js/reautenticar.js"></script>
 <script src="../js/agua-alertas.js"></script>
 <script src="../js/agua-laudo-ocr.js"></script>
+<script src="../js/grafico-teclado.js"></script>
 <script src="../js/agua-iqa-visual.js"></script>
 <script src="../js/agua-laudo-kpis.js"></script>
 </head>
@@ -146,7 +147,7 @@ let _fila = [], _labs = [], _editandoId = null, _podeEditar = false
       <div class="card"><div class="table-wrap"><div class="table-scroll">
         <table>
           <thead><tr><th>Código</th><th>Ponto</th><th>Campanha</th><th>Data da coleta</th><th>Aguardando há</th><th>Ações</th></tr></thead>
-          <tbody id="tbody-fila"><tr><td colspan="5" style="text-align:center;padding:24px;color:#9CA3AF">Carregando...</td></tr></tbody>
+          <tbody id="tbody-fila"><tr><td colspan="5" style="padding:12px 14px" aria-busy="true" aria-label="Carregando"><div class="skeleton skeleton-linha" style="width:86%"></div><div class="skeleton skeleton-linha" style="width:72%"></div><div class="skeleton skeleton-linha" style="width:90%"></div><div class="skeleton skeleton-linha" style="width:64%"></div></td></tr></tbody>
         </table>
       </div></div></div>
     </div>` +

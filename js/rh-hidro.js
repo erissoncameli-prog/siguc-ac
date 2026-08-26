@@ -131,6 +131,27 @@ function rhHidrogramaHTML(medicoes, opts) {
       fill="#2563A8" fill-opacity=".68" rx="1"><title>${_rhEsc(rhChuva(m.chuva_mm))}</title></rect>`
   }).join('')
 
+  // Pontos de leitura, um por passo de tempo. Servem a duas coisas que
+  // faltavam: são a régua de navegação por teclado (`data-gt-ponto`,
+  // js/grafico-teclado.js) e dão tooltip de mouse à LINHA DE NÍVEL, que
+  // é a série principal do hidrograma e não tinha nenhum — só as barras
+  // de chuva tinham. Quase invisíveis de propósito: o desenho não muda,
+  // só ganha alvo. O título cobre o passo inteiro (nível + chuva), então
+  // as setas percorrem o tempo, não uma série de cada vez.
+  const pontosLeitura = dados.map(m => {
+    const cx = x(m.data_hora)
+    const nivel = m.nivel_cm == null ? null : Number(m.nivel_cm)
+    const cy = nivel == null ? (PAD_T + faixaChuva + (plotH - faixaChuva) / 2) : yNivel(nivel)
+    if (!isFinite(cx) || !isFinite(cy)) return ''
+    const d = new Date(m.data_hora)
+    const quando = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`
+    const partes = [`Nível ${rhNivel(nivel)}`]
+    if (m.chuva_mm != null) partes.push(`chuva ${rhChuva(m.chuva_mm)}`)
+    if (m.vazao_m3s != null) partes.push(`vazão ${rhVazao(m.vazao_m3s)}`)
+    return `<circle data-gt-ponto cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="4"
+      fill="#1F4E2C" fill-opacity="${nivel == null ? 0 : .01}"><title>${_rhEsc(quando)} — ${_rhEsc(partes.join(' · '))}</title></circle>`
+  }).join('')
+
   // Linhas de cota — pontilhadas, rotuladas à direita.
   const linhasCota = ['atencao', 'alerta', 'inundacao'].filter(k => cotas[k] != null).map(k => {
     const y = yNivel(Number(cotas[k]))
@@ -165,12 +186,19 @@ function rhHidrogramaHTML(medicoes, opts) {
     .map((m, i, arr) => `<text x="${x(m.data_hora).toFixed(1)}" y="${h - 8}" font-size="9" fill="#9CA3AF"
       text-anchor="${i === 0 ? 'start' : i === arr.length - 1 ? 'end' : 'middle'}">${fmtData(m.data_hora)}</text>`).join('')
 
-  return `
-    <svg viewBox="0 0 ${w} ${h}" width="100%" height="${h}" role="img"
+  const svgHidro = `<svg viewBox="0 0 ${w} ${h}" width="100%" height="${h}" role="img"
          aria-label="Hidrograma: nível do rio em centímetros e chuva em milímetros ao longo do período">
-      ${ticksNivel}${barras}${linhasCota}${linhaNivel}${rotulosX}${ticksChuva}
+      ${ticksNivel}${barras}${linhasCota}${linhaNivel}${pontosLeitura}${rotulosX}${ticksChuva}
       <text x="${PAD_L - 6}" y="${PAD_T + faixaChuva + 12}" font-size="8.5" fill="#9CA3AF" text-anchor="end">cm</text>
-    </svg>
+    </svg>`
+
+  // Degrada em silêncio se js/grafico-teclado.js não estiver carregado.
+  const corpoHidro = typeof graficoTecladoEnvolver === 'function'
+    ? graficoTecladoEnvolver(svgHidro, { rotulo: 'Hidrograma da estação' })
+    : svgHidro
+
+  return `
+    ${corpoHidro}
     <div style="display:flex;flex-wrap:wrap;gap:12px;justify-content:center;margin-top:2px;font-size:10.5px;color:#6B7280">
       <span style="display:inline-flex;align-items:center;gap:5px"><span style="width:14px;height:2px;background:#1F4E2C;display:inline-block"></span>Nível do rio (cm)</span>
       <span style="display:inline-flex;align-items:center;gap:5px"><span style="width:9px;height:9px;background:#2563A8;opacity:.68;display:inline-block;border-radius:1px"></span>Chuva (mm)</span>
