@@ -54,8 +54,17 @@ Sistema já tem login, sidebar, layout e páginas funcionando.
   queryLogger.js; brigada-offline.js (IndexedDB), brigada-sync.js,
   brigada-captura.js (câmera/GPS/marca d'água), brigada-fauna.js;
   frota-consumo.js, frota-passageiros.js, frota-viagens-status.js
-  (status efetivo + blocos da lista de viagens)
+  (status efetivo + blocos da lista de viagens);
+  grafico-teclado.js (acesso por teclado a TODO gráfico SVG — ver
+  "Regra do sistema — gráficos acessíveis por teclado")
 - css/ → sidebar.css, brigada.css (app de campo)
+- .claude/skills/ → 7 skills de UI/UX vindas de
+  nextlevelbuilder/ui-ux-pro-max-skill (MIT), versionadas no repo em
+  vez de instaladas como plugin para valerem também nas sessões web,
+  cujo container é efêmero. Procedência, correções de caminho feitas na
+  importação e limitações conferidas em `.claude/skills/README.md` —
+  ler antes de atualizar, as correções voltam a quebrar a cada
+  atualização do upstream.
 - data/ → uc_acre.geojson, uc_zonas_acre.geojson, uc_detalhes.json,
   municipios_acre.geojson, ti_acre.geojson
 - pwa/ → sw.js (service worker; subir CACHE a cada mudança web),
@@ -106,6 +115,95 @@ só para preservar o uso ANTIGO (faixa do IQA, `aguaIqaFaixasRoscaHTML`
 - Qualquer KPI NOVO (novo módulo, novo painel) que mostre um número
   grande em destaque segue esta regra desde o nascimento: nunca
   Fraunces no valor, DM Sans (`var(--font-sans)`) por padrão.
+
+## Regra do sistema — estados de interface (foco, espera, desabilitado)
+Auditoria de UI feita com a skill `ui-ux-pro-max` (ver
+`.claude/skills/README.md`) contra `css/global.css` e as 45 páginas de
+mesa. Quatro entregas, todas com número MEDIDO no repositório — nenhuma
+estimada. O que virou regra permanente:
+
+- **Foco por teclado é por ELEMENTO, não por lista de classes.**
+  `css/global.css` tem um fallback `a/button/summary/[tabindex]/input/
+  select/textarea:focus-visible` — controle novo nasce com anel visível
+  sem ninguém precisar lembrar. As regras específicas (`.btn`,
+  `.sidebar-user`, `.form-control`) têm especificidade maior e vencem.
+  Na sidebar o anel é `--ouro-claro`: o verde some no fundo
+  `--floresta`. **Sempre `:focus-visible`, nunca `:focus`** — clique de
+  mouse não pode pintar anel. Motivo de existir: havia 43 regras
+  `:hover` contra 3 de `:focus-visible`.
+- **Alvo de toque mínimo de 24×24px** (WCAG 2.2 AA) em qualquer
+  controle novo. `.btn-xs` media 23,4px em 94 usos e virou 25,4px.
+  Conferir com `getBoundingClientRect` no navegador, não no papel.
+- **Espera SEMPRE tem retorno visual, e nunca muda o layout.**
+  - Botão: `btnEspera(btn)` (js/config.js) → devolve a função que
+    restaura. Trava a LARGURA antes de esvaziar o rótulo, senão o botão
+    encolhe para o tamanho do giro e a barra de ações pula. **Nunca
+    voltar ao padrão `btn.textContent = 'Salvando...'`** — além do
+    pulo, ele obriga a repetir o rótulo original no `finally`, que é
+    onde desalinhava quando alguém mudava o texto no HTML.
+  - Lista/tabela: `skeletonTabelaHTML(colunas, linhas)` /
+    `skeletonBlocoHTML(linhas)`. **Nunca `<td>Carregando...</td>`**: o
+    texto ocupa uma linha e o dado ocupa N, então a página salta quando
+    a consulta volta (CLS). O esqueleto já nasce com a altura final.
+  - `prefers-reduced-motion` desliga o brilho e o giro, mantendo a
+    reserva de espaço — que é a função principal.
+- **`:disabled` tem estilo próprio** em `css/global.css` (vem DEPOIS
+  das variantes, para vencer `.btn-primary`/`.btn-danger` sem
+  `!important`). Antes não havia uma regra sequer, contra 363 usos do
+  atributo: o botão ficava inerte mas sólido e com cor de marca.
+- **Toda tabela vive dentro de `.table-wrap`** (ou `.table-scroll`),
+  que já existiam. Sem contêiner, no celular a tabela empurra o corpo e
+  o usuário rola a tela INTEIRA de lado. Guarda automatizada cobre isso
+  em página nova.
+- **Escalas `--txt-xs..--txt-2xl` e `--e-1..--e-6`** existem e estão
+  VAZIAS de propósito — nenhuma regra as usa ainda. São para adoção
+  tela a tela conforme cada uma for tocada; trocar de uma vez os 16
+  tamanhos de fonte e os 12 valores de espaçamento em uso mexeria nas
+  45 páginas sem teste visual que segurasse a regressão. Regra nova
+  que precise de tamanho ou espaço: usar a variável, não um número.
+- **Severidade `critica` é o único badge SÓLIDO do sistema**
+  (`.badge-critica`). `BADGE_SEVERIDADE` mapeava `critica` e `alta`
+  para a mesma classe, apagando na tela uma distinção que o enum
+  `severidade_ocorrencia` guarda. Distingue por PREENCHIMENTO, nunca
+  por matiz nova — segue legível em daltonismo e em impressão P&B.
+- Guardas: `tests/ui-estados.test.js` + `tests/fixtures/estilos-harness.html`
+  (que linka `css/global.css` como as páginas reais fazem).
+  ⚠️ **Medir estado visual no navegador, nunca lendo o CSS** — e não no
+  `sidebar-harness.html`, que não carrega folha de estilo nenhuma e
+  devolve a métrica de um elemento sem estilo (erro real cometido
+  aqui: 21px para um `.btn-xs`). ⚠️ **`.btn` tem `transition: all .15s`**:
+  ler `getComputedStyle().color` logo após `add('carregando')` pega
+  `rgba(...,0.65)` no meio da animação — esperar a transição fechar.
+
+## Regra do sistema — gráficos acessíveis por teclado
+`js/grafico-teclado.js` é a fonte única. Nenhuma tela reimplementa
+navegação, realce ou tabela alternativa — mesma lição de
+`js/frota-consumo.js` e `js/mapa-recorte.js`.
+
+- **UMA parada de Tab por gráfico**, com as SETAS percorrendo os pontos
+  (Home/End nas pontas). **Nunca um `tabindex` por ponto**: o gráfico
+  de IQA tem ~20 campanhas, mas o hidrograma de uma estação chega a
+  90+ medições, e 90 paradas de Tab dentro de um card inutilizariam o
+  teclado na página inteira. É o padrão de cursor virtual da WAI.
+- **O helper NÃO recebe uma segunda cópia dos valores** — lê os
+  `<title>` que os geradores já colocam em cada forma, os mesmos que
+  alimentam o tooltip nativo de mouse. Teclado, leitor de tela e tabela
+  alternativa nunca divergem do que o mouse mostra. Gráfico novo que
+  ponha `<title>` nos pontos ganha teclado de graça.
+- `data-gt-ponto` marca a régua de navegação quando DUAS séries têm
+  tooltip (caso do hidrograma: barra de chuva e ponto de nível). Sem o
+  marcador, vale toda forma com `<title>`.
+- API: `graficoTecladoEnvolver(svg, {rotulo, semTabela})` no gerador.
+  O resto é delegação em `document` — não existe `Aplicar(root)` para
+  lembrar de chamar, porque os gráficos são remontados a cada troca de
+  filtro.
+- Degrada em silêncio: sem o arquivo carregado, o gerador devolve
+  exatamente o que devolvia antes. Nenhuma página quebra por falta dele.
+- Carregar `<script src=".../js/grafico-teclado.js">` ANTES do gerador
+  (`agua-iqa-visual.js`/`rh-hidro.js`) e, se o app de campo usar,
+  entrar em `SHELLS.agua` (pwa/sw.js) e nas 3 listas de
+  `app-agua/scripts/build-www.mjs`.
+- Guarda: `tests/grafico-teclado.test.js`.
 
 ## Banco — migrations aplicadas
 001_initial.sql: usuarios, unidades_conservacao (PostGIS), ocorrencias,
@@ -1285,6 +1383,9 @@ db, appState.usuario, appState.perfil, t(), esc(), formatBRL(),
 formatNum(), formatData(), toast(), carregarUsuario(), iniciais(),
 BADGE_CATEGORIA, BADGE_SEVERIDADE, BADGE_STATUS_OC, BADGE_STATUS_UC
 Ícones: BICON_PATHS, bico('nome'), bIconsAplicar(root) (ver Regras).
+Estados de espera: btnEspera(btn) → função que restaura;
+skeletonTabelaHTML(colunas, linhas), skeletonBlocoHTML(linhas)
+(ver "Regra do sistema — estados de interface").
 
 ## Estrutura organizacional SEMA-AC
 Separação CARGO (permanente) x OCUPANTE (substituível por portaria).
@@ -1512,6 +1613,14 @@ E) Dashboard Executivo por nível (UC / Diretoria / Secretaria)
   do(s) app(s) afetado(s) em `pwa/sw.js` (vN → vN+1) — ver seção
   "Versionamento" acima.
 - Manter design system — nunca alterar variáveis CSS sem alinhamento
+- ESTADOS DE INTERFACE: controle interativo novo nasce com foco visível
+  (`:focus-visible`, nunca `:focus`), alvo de ≥24×24px, `:disabled` com
+  estilo, espera por `btnEspera()`/`skeleton*HTML()` e tabela dentro de
+  `.table-wrap` — ver "Regra do sistema — estados de interface". Nunca
+  `btn.textContent = 'Salvando...'` nem `<td>Carregando...</td>`.
+- GRÁFICO NOVO: pôr `<title>` em cada ponto e envolver com
+  `graficoTecladoEnvolver()` — ver "Regra do sistema — gráficos
+  acessíveis por teclado". Nunca um `tabindex` por ponto.
 - Novos JS em js/ seguindo padrão do projeto
 - Novas páginas em pages/ com gerarLayout() obrigatório
 - Novas tabelas sempre com RLS habilitado
