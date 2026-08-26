@@ -559,7 +559,7 @@ let _semLotacao = []
           <div class="table-wrap"><div class="table-scroll">
             <table>
               <thead><tr><th>Cargo</th><th>Unidade</th><th>Nível</th><th>Símbolo</th><th>Titular Atual</th><th>Desde</th><th>Portaria</th>${['super_admin','gestor'].includes(usuario.perfil) ? '<th>Ações</th>' : ''}</tr></thead>
-              <tbody id="tbody-cargos"><tr><td colspan="8" style="text-align:center;padding:32px;color:#9CA3AF">Carregando...</td></tr></tbody>
+              <tbody id="tbody-cargos"><tr><td colspan="8" style="padding:12px 14px" aria-busy="true" aria-label="Carregando"><div class="skeleton skeleton-linha" style="width:86%"></div><div class="skeleton skeleton-linha" style="width:72%"></div><div class="skeleton skeleton-linha" style="width:90%"></div><div class="skeleton skeleton-linha" style="width:64%"></div></td></tr></tbody>
             </table>
           </div></div>
         </div>
@@ -581,7 +581,7 @@ let _semLotacao = []
           <div class="table-wrap"><div class="table-scroll">
             <table>
               <thead><tr><th>Cargo</th><th>Titular</th><th>Substituto</th><th>Período</th><th>Motivo</th><th>Portaria</th><th>Status</th>${['super_admin'].includes(usuario.perfil) ? '<th>Ações</th>' : ''}</tr></thead>
-              <tbody id="tbody-delegacoes"><tr><td colspan="8" style="text-align:center;padding:32px;color:#9CA3AF">Carregando...</td></tr></tbody>
+              <tbody id="tbody-delegacoes"><tr><td colspan="8" style="padding:12px 14px" aria-busy="true" aria-label="Carregando"><div class="skeleton skeleton-linha" style="width:86%"></div><div class="skeleton skeleton-linha" style="width:72%"></div><div class="skeleton skeleton-linha" style="width:90%"></div><div class="skeleton skeleton-linha" style="width:64%"></div></td></tr></tbody>
             </table>
           </div></div>
         </div>
@@ -615,7 +615,7 @@ let _semLotacao = []
           <div class="table-wrap"><div class="table-scroll">
             <table>
               <thead><tr><th>Servidor</th><th>Unidade</th><th>Principal</th><th>Desde</th><th>Portaria</th>${['super_admin','diretor'].includes(usuario.perfil) ? '<th>Ações</th>' : ''}</tr></thead>
-              <tbody id="tbody-lotacoes"><tr><td colspan="6" style="text-align:center;padding:32px;color:#9CA3AF">Carregando...</td></tr></tbody>
+              <tbody id="tbody-lotacoes"><tr><td colspan="6" style="padding:12px 14px" aria-busy="true" aria-label="Carregando"><div class="skeleton skeleton-linha" style="width:86%"></div><div class="skeleton skeleton-linha" style="width:72%"></div><div class="skeleton skeleton-linha" style="width:90%"></div><div class="skeleton skeleton-linha" style="width:64%"></div></td></tr></tbody>
             </table>
           </div></div>
         </div>
@@ -655,7 +655,7 @@ let _semLotacao = []
           <div class="table-wrap"><div class="table-scroll">
             <table>
               <thead><tr><th>Servidor</th><th>Módulo</th><th>Nível</th><th>Vigência</th><th>Situação</th><th>Justificativa</th><th>Concedido por</th><th>Ações</th></tr></thead>
-              <tbody id="tbody-credenciamentos"><tr><td colspan="8" style="text-align:center;padding:32px;color:#9CA3AF">Carregando...</td></tr></tbody>
+              <tbody id="tbody-credenciamentos"><tr><td colspan="8" style="padding:12px 14px" aria-busy="true" aria-label="Carregando"><div class="skeleton skeleton-linha" style="width:86%"></div><div class="skeleton skeleton-linha" style="width:72%"></div><div class="skeleton skeleton-linha" style="width:90%"></div><div class="skeleton skeleton-linha" style="width:64%"></div></td></tr></tbody>
             </table>
           </div></div>
         </div>
@@ -953,7 +953,7 @@ async function salvarUnidade() {
   if (!sigla || !nome) { toast('Sigla e nome são obrigatórios', 'error'); return }
 
   const btn = document.getElementById('unid-btn-salvar')
-  btn.disabled = true; btn.textContent = 'Salvando...'
+  const _btnRest0 = btnEspera(btn)
   try {
     if (_editUnidadeId) {
       const { error } = await db.from('unidades_organizacionais')
@@ -970,7 +970,7 @@ async function salvarUnidade() {
     fecharModalUnidade()
     await carregarDados()
   } catch(e) { toast(e.message || 'Erro ao salvar', 'error') }
-  finally { btn.disabled = false; btn.textContent = 'Salvar' }
+  finally {  _btnRest0() }
 }
 
 async function toggleUnidade(id, ativoAtual) {
@@ -1023,7 +1023,7 @@ async function salvarOcupacao() {
     toast('Cargo, servidor e data de início são obrigatórios', 'error'); return
   }
   const btn = document.getElementById('ocup-btn-salvar')
-  btn.disabled = true; btn.textContent = 'Salvando...'
+  const _btnRest1 = btnEspera(btn)
   try {
     const { error } = await db.from('cargo_ocupacoes').insert({
       cargo_id, usuario_id, data_inicio,
@@ -1036,7 +1036,7 @@ async function salvarOcupacao() {
     fecharModalOcupacao()
     await carregarDados()
   } catch(e) { toast(e.message || 'Erro ao salvar', 'error') }
-  finally { btn.disabled = false; btn.textContent = 'Salvar' }
+  finally {  _btnRest1() }
 }
 
 // ── Modal Delegação ───────────────────────────────────────
@@ -1068,7 +1068,7 @@ async function salvarDelegacao() {
     toast('Titular e substituto não podem ser a mesma pessoa', 'error'); return
   }
   const btn = document.getElementById('del-btn-salvar')
-  btn.disabled = true; btn.textContent = 'Salvando...'
+  const _btnRest2 = btnEspera(btn)
   try {
     const { error } = await db.from('delegacoes_temporarias').insert({
       cargo_id, delegante_id, delegado_id, data_inicio, data_fim,
@@ -1081,7 +1081,7 @@ async function salvarDelegacao() {
     fecharModalDelegacao()
     await carregarDados()
   } catch(e) { toast(e.message || 'Erro ao salvar', 'error') }
-  finally { btn.disabled = false; btn.textContent = 'Salvar' }
+  finally {  _btnRest2() }
 }
 
 async function encerrarDelegacao(id, ativa) {
@@ -1182,7 +1182,7 @@ async function salvarLotacao() {
   if (!usuario_id || !unidade_org_id) { toast('Servidor e unidade são obrigatórios', 'error'); return }
 
   const btn = document.getElementById('lot-btn-salvar')
-  btn.disabled = true; btn.textContent = 'Salvando...'
+  const _btnRest3 = btnEspera(btn)
   try {
     const { error } = await db.from('usuario_lotacoes').insert({
       usuario_id, unidade_org_id,
@@ -1202,7 +1202,7 @@ async function salvarLotacao() {
     } else {
       toast(e.message || 'Erro ao salvar', 'error')
     }
-  } finally { btn.disabled = false; btn.textContent = 'Salvar' }
+  } finally {  _btnRest3() }
 }
 
 async function encerrarLotacao(id) {
@@ -1292,7 +1292,7 @@ async function salvarModuloUnidade() {
   if (!modulo_id || !unidade_org_id) { toast('Módulo e unidade são obrigatórios', 'error'); return }
 
   const btn = document.getElementById('mu-btn-salvar')
-  btn.disabled = true; btn.textContent = 'Salvando...'
+  const _btnRest4 = btnEspera(btn)
   try {
     const { error } = await db.from('modulo_unidades').insert({
       modulo_id, unidade_org_id, nivel_concedido,
@@ -1304,7 +1304,7 @@ async function salvarModuloUnidade() {
     await carregarDados()
   } catch(e) {
     toast(e.code === '23505' ? 'Este módulo já está amarrado a esta unidade' : (e.message || 'Erro ao salvar'), 'error')
-  } finally { btn.disabled = false; btn.textContent = 'Salvar' }
+  } finally {  _btnRest4() }
 }
 
 async function removerModuloUnidade(id) {
@@ -1408,7 +1408,7 @@ async function salvarCredenciamento() {
   dataFim.setDate(dataFim.getDate() + prazoDias)
 
   const btn = document.getElementById('cred-btn-salvar')
-  btn.disabled = true; btn.textContent = 'Salvando...'
+  const _btnRest5 = btnEspera(btn)
   try {
     const { error } = await db.from('credenciamentos').insert({
       usuario_id, modulo_id, nivel,
@@ -1422,7 +1422,7 @@ async function salvarCredenciamento() {
     fecharModalCredenciamento()
     await carregarDados()
   } catch(e) { toast(e.message || 'Erro ao salvar', 'error') }
-  finally { btn.disabled = false; btn.textContent = 'Conceder' }
+  finally {  _btnRest5() }
 }
 
 async function revogarCredenciamento(id) {

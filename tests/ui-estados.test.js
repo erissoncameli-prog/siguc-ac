@@ -79,3 +79,62 @@ test('toda página de mesa com <table> tem contêiner de rolagem horizontal', ()
     });
   expect(semProtecao, `sem contêiner de rolagem: ${semProtecao.join(', ')}`).toEqual([]);
 });
+
+// ── btnEspera + esqueleto (js/config.js). Estes são os helpers que as
+// telas passaram a chamar; se quebrarem, o envio de formulário some.
+test('btnEspera trava a largura, desabilita e restaura o rótulo original', async ({ page }) => {
+  await page.goto(PAG);
+  await page.waitForFunction(() => typeof window.btnEspera === 'function');
+
+  const b = page.locator('#b1');
+  const larguraAntes = (await b.boundingBox()).width;
+  const rotuloAntes  = await b.textContent();
+
+  await page.evaluate(() => { window._restaurar = btnEspera(document.getElementById('b1')); });
+
+  expect(await b.evaluate(e => e.disabled)).toBe(true);
+  expect(await b.evaluate(e => e.getAttribute('aria-busy'))).toBe('true');
+  // O requisito é NAO ENCOLHER, não ser idêntico: btnEspera usa
+  // Math.ceil para nunca ficar abaixo da largura natural (aqui, 66,33
+  // vira 67). Encolher é o defeito — 0,67px a mais, não.
+  const larguraDurante = (await b.boundingBox()).width;
+  expect(larguraDurante).toBeGreaterThanOrEqual(larguraAntes);
+  expect(larguraDurante).toBeLessThan(larguraAntes + 2);
+  // .btn tem `transition: all .15s`, então a cor ANIMA até transparente
+  // — ler logo após add('carregando') pega rgba(...,0.65) no meio do
+  // caminho. Espera a transição fechar em vez de medir um quadro solto.
+  await expect.poll(
+    () => b.evaluate(e => getComputedStyle(e).color),
+    { timeout: 2000 }
+  ).toBe('rgba(0, 0, 0, 0)');
+
+  await page.evaluate(() => window._restaurar());
+  expect(await b.evaluate(e => e.disabled)).toBe(false);
+  expect(await b.evaluate(e => e.hasAttribute('aria-busy'))).toBe(false);
+  expect(await b.textContent()).toBe(rotuloAntes);
+  expect((await b.boundingBox()).width).toBeCloseTo(larguraAntes, 1);
+});
+
+test('btnEspera é idempotente na restauração e tolera botão nulo', async ({ page }) => {
+  await page.goto(PAG);
+  await page.waitForFunction(() => typeof window.btnEspera === 'function');
+  const r = await page.evaluate(() => {
+    const f = btnEspera(null); f(); f();          // não pode lançar
+    const g = btnEspera(document.getElementById('b1'));
+    g(); g();                                      // restaurar 2x
+    return document.getElementById('b1').disabled;
+  });
+  expect(r).toBe(false);
+});
+
+test('esqueleto de tabela respeita o número de colunas e reserva altura', async ({ page }) => {
+  await page.goto(PAG);
+  await page.waitForFunction(() => typeof window.skeletonTabelaHTML === 'function');
+  await page.evaluate(() => {
+    document.getElementById('tb-sk').innerHTML = skeletonTabelaHTML(3, 4);
+  });
+  await expect(page.locator('#tb-sk tr')).toHaveCount(4);
+  await expect(page.locator('#tb-sk tr:first-child td')).toHaveCount(3);
+  const alt = (await page.locator('#tb-sk').boundingBox()).height;
+  expect(alt).toBeGreaterThan(100);   // 4 linhas de verdade, nao uma
+});

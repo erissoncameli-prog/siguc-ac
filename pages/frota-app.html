@@ -504,7 +504,7 @@ async function loginFrota() {
   erroEl.style.display = 'none'
   if (!usuario || !senha) { mostrarErro('Informe usuário e senha'); return }
   const btn = document.getElementById('btn-login-frota')
-  btn.disabled = true; btn.textContent = 'Entrando...'
+  const _btnRest0 = btnEspera(btn)
 
   const email = usuario.includes('@') ? usuario : `${usuario.replace(/\D/g,'')}@motoristas.siguc.local`
   const ua = navigator.userAgent.substring(0, 250)
@@ -542,7 +542,7 @@ async function loginFrota() {
   } catch (e) {
     mostrarErro('Erro ao conectar. Verifique a conexão e tente de novo.')
   } finally {
-    btn.disabled = false; btn.textContent = 'Entrar'
+  _btnRest0()
   }
 }
 
@@ -2497,7 +2497,7 @@ async function confirmarCheckout() {
   const ultima = v?.veiculo_medidor === 'horimetro' ? v?.veiculo_horimetro_horas : v?.veiculo_hodometro_km
   if (!fmChecarMedidaMinima(medida, ultima, v?.veiculo_medidor)) return
   const btn = document.getElementById('btn-confirmar-checkout')
-  btn.disabled = true; btn.textContent = 'Registrando...'
+  const _btnRest3 = btnEspera(btn)
   const gps = await fmObterGpsSeAtivo('captura_viagens')
   // uuid da AÇÃO (migration 198): vai junto tanto no envio online
   // quanto na fila offline. Se a RPC commitar e a resposta se perder,
@@ -2531,7 +2531,7 @@ async function confirmarCheckout() {
       toast(e.message || 'Erro ao iniciar viagem', 'error')
     }
   }
-  finally { btn.disabled = false; btn.textContent = 'Iniciar Viagem' }
+  finally {  _btnRest3() }
 }
 
 // Idem para "Concluir viagem" — no check-in o catálogo costuma ter
@@ -2560,7 +2560,7 @@ async function confirmarCheckin() {
   const saida = v?.veiculo_medidor === 'horimetro' ? v?.horas_saida : v?.km_saida
   if (!fmChecarMedidaMinima(medida, saida, v?.veiculo_medidor)) return
   const btn = document.getElementById('btn-confirmar-checkin')
-  btn.disabled = true; btn.textContent = 'Registrando...'
+  const _btnRest4 = btnEspera(btn)
   const gps = await fmObterGpsSeAtivo('captura_viagens')
   const payload = {
     p_viagem_id: _acaoId, p_medida: medida,
@@ -2589,7 +2589,7 @@ async function confirmarCheckin() {
       toast(e.message || 'Erro ao concluir viagem', 'error')
     }
   }
-  finally { btn.disabled = false; btn.textContent = 'Concluir Viagem' }
+  finally {  _btnRest4() }
 }
 
 // ── Abastecimento (evento físico registrado pelo motorista; a
@@ -2749,7 +2749,7 @@ async function confirmarAbastecimento() {
   }
 
   const btn = document.getElementById('btn-confirmar-abastecimento')
-  btn.disabled = true; btn.textContent = 'Registrando...'
+  const _btnRest5 = btnEspera(btn)
   const gps = await fmObterGpsSeAtivo('captura_abastecimento')
 
   // Hora real do abastecimento (relógio do aparelho, capturada agora —
@@ -2785,7 +2785,7 @@ async function confirmarAbastecimento() {
       toast(e.message || 'Erro ao registrar abastecimento', 'error')
     }
   }
-  finally { btn.disabled = false; btn.textContent = 'Registrar' }
+  finally {  _btnRest5() }
 }
 
 // ── Solicitar manutenção (comunicado de defeito) ──────────────────
@@ -2868,7 +2868,7 @@ async function confirmarDefeito() {
   if (!descricao) { toast('Descreva o defeito', 'error'); return }
 
   const btn = document.getElementById('btn-confirmar-defeito')
-  btn.disabled = true; btn.textContent = 'Enviando...'
+  const _btnRest6 = btnEspera(btn)
   const payload = {
     p_veiculo_id: veiculo_id, p_descricao: descricao,
     p_viagem_id: _defeitoViagemId, p_uuid_cliente: _fUuid(), p_fotos_urls: null
@@ -2893,7 +2893,7 @@ async function confirmarDefeito() {
       toast(e.message || 'Erro ao reportar defeito', 'error')
     }
   }
-  finally { btn.disabled = false; btn.textContent = 'Enviar' }
+  finally {  _btnRest6() }
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -3864,7 +3864,7 @@ async function confirmarAprovar() {
       if (!_liberarDedicadoG) { toast('Há veículo dedicado na divisão — marque "Liberar veículo dedicado do setor"', 'error'); return }
       if (!justifM) { toast('Informe a justificativa da liberação do veículo dedicado', 'error'); return }
     }
-    btn.disabled = true; btn.textContent = 'Aprovando...'
+    const _btnRest8 = btnEspera(btn)
     try {
       const { error } = await db.rpc('frota_aprovar_viagem_multipla', {
         p_viagem_id: _acaoId,
@@ -3875,7 +3875,7 @@ async function confirmarAprovar() {
       toast(`Viagem aprovada com ${_linhasAlocacaoG.length} veículos!`, 'success')
       fecharModal('aprovar'); await carregarViagensGestor()
     } catch (e) { toast(e.message || 'Erro ao aprovar', 'error') }
-    finally { btn.disabled = false; btn.textContent = 'Aprovar' }
+    finally {    _btnRest8() }
     return
   }
 
@@ -3891,14 +3891,14 @@ async function confirmarAprovar() {
     if (!_liberarDedicadoG) { toast('Veículo dedicado ao setor — marque "Liberar veículo dedicado do setor" para usá-lo', 'error'); return }
     if (!justif) { toast('Informe a justificativa da liberação do veículo dedicado', 'error'); return }
   }
-  btn.disabled = true; btn.textContent = 'Aprovando...'
+  const _btnRest9 = btnEspera(btn)
   try {
     const { error } = await db.rpc('frota_aprovar_viagem', { p_viagem_id: _acaoId, p_veiculo_id: veiculo_id, p_motorista_id: motorista_id, p_liberar_dedicado: _liberarDedicadoG, p_justificativa: justif || null })
     if (error) throw error
     toast('Viagem aprovada!', 'success')
     fecharModal('aprovar'); await carregarViagensGestor()
   } catch (e) { toast(e.message || 'Erro ao aprovar', 'error') }
-  finally { btn.disabled = false; btn.textContent = 'Aprovar' }
+  finally {  _btnRest9() }
 }
 
 function abrirRecusar(id) {

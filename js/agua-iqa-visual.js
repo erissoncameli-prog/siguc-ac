@@ -145,10 +145,19 @@ function aguaIqaGraficoHTML(pontos, opts) {
 
   const temQuarentena = pontos.some(p => p.status === 'quarentena')
 
-  return `
-    <svg viewBox="0 0 ${w} ${h}" width="100%" height="${h}" role="img" aria-label="Gráfico de IQA por campanha">
+  const svg = `<svg viewBox="0 0 ${w} ${h}" width="100%" height="${h}" role="img" aria-label="Gráfico de IQA por campanha">
       ${grade}${linhas}${pontosSvg}${rotulos}
-    </svg>
+    </svg>`
+
+  // Acesso por teclado + tabela alternativa (js/grafico-teclado.js).
+  // Degrada em silêncio: sem o arquivo carregado, o gráfico sai
+  // exatamente como saía antes — nenhuma página quebra por falta dele.
+  const corpo = typeof graficoTecladoEnvolver === 'function'
+    ? graficoTecladoEnvolver(svg, { rotulo: o.rotuloAcessivel || 'IQA por campanha' })
+    : svg
+
+  return `
+    ${corpo}
     ${legenda ? `<div style="display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:4px">${legenda}</div>` : ''}
     ${temQuarentena ? '<p style="text-align:center;font-size:10px;color:#9CA3AF;margin-top:4px">Preenchimento fraco = ainda em conferência (dado não verificado)</p>' : ''}`
 }

@@ -140,7 +140,7 @@ const COMB = { gasolina:'Gasolina', etanol:'Etanol', flex:'Flex', diesel:'Diesel
         <div class="table-wrap"><div class="table-scroll">
           <table>
             <thead><tr><th>Código</th><th>Veículo</th><th>Motorista</th><th>Data</th><th>Litros</th><th>Valor</th><th>Contrato / Fonte</th><th>Status</th><th>Ações</th></tr></thead>
-            <tbody id="tbody"><tr><td colspan="9" style="text-align:center;padding:32px;color:#9CA3AF">Carregando...</td></tr></tbody>
+            <tbody id="tbody"><tr><td colspan="9" style="padding:12px 14px" aria-busy="true" aria-label="Carregando"><div class="skeleton skeleton-linha" style="width:86%"></div><div class="skeleton skeleton-linha" style="width:72%"></div><div class="skeleton skeleton-linha" style="width:90%"></div><div class="skeleton skeleton-linha" style="width:64%"></div></td></tr></tbody>
           </table>
         </div></div>
       </div>
@@ -327,7 +327,7 @@ async function confirmarValidar() {
   const litrosAjust = document.getElementById('vl-litros-ajust').value
   const valorAjust  = document.getElementById('vl-valor-ajust').value
   const btn = document.getElementById('btn-confirmar-validar')
-  btn.disabled = true; btn.textContent = 'Validando...'
+  const _btnRest0 = btnEspera(btn)
   try {
     const { error } = await db.rpc('frota_validar_abastecimento', {
       p_id: _acaoId, p_contrato_id: contrato_id,
@@ -338,7 +338,7 @@ async function confirmarValidar() {
     toast('Abastecimento validado!', 'success')
     fecharModal('validar'); await carregarAbastecimentos()
   } catch (e) { toast(e.message || 'Erro ao validar', 'error') }
-  finally { btn.disabled = false; btn.textContent = 'Validar' }
+  finally {  _btnRest0() }
 }
 
 function abrirRejeitar(id) {

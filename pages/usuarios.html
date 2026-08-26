@@ -135,7 +135,7 @@ let usuarioEmEdicao = null
         <div class="table-wrap"><div class="table-scroll">
           <table>
             <thead><tr><th>Nome</th><th>E-mail</th><th>Perfil</th><th>UC de Atuação</th><th>Último Acesso</th><th>Status</th><th>Ações</th></tr></thead>
-            <tbody id="tbody"><tr><td colspan="7" style="text-align:center;padding:32px;color:#9CA3AF">Carregando...</td></tr></tbody>
+            <tbody id="tbody"><tr><td colspan="7" style="padding:12px 14px" aria-busy="true" aria-label="Carregando"><div class="skeleton skeleton-linha" style="width:86%"></div><div class="skeleton skeleton-linha" style="width:72%"></div><div class="skeleton skeleton-linha" style="width:90%"></div><div class="skeleton skeleton-linha" style="width:64%"></div></td></tr></tbody>
           </table>
         </div></div>
       </div>
@@ -329,7 +329,7 @@ async function salvar() {
   if (!nome_completo || !email) { toast('Nome e e-mail são obrigatórios', 'error'); return }
 
   const btn = document.getElementById('btn-salvar')
-  btn.disabled = true; btn.textContent = 'Salvando...'
+  const _btnRest0 = btnEspera(btn)
 
   try {
     if (editId) {
@@ -394,7 +394,7 @@ async function salvar() {
     }
     fecharModal(); await carregar()
   } catch(e) { toast(e.message || 'Erro ao salvar', 'error') }
-  finally { btn.disabled = false; btn.textContent = 'Salvar' }
+  finally {  _btnRest0() }
 }
 
 let _resetUsuarioId = null
@@ -420,7 +420,7 @@ async function confirmarResetSenha() {
   if (s1 !== s2) { toast('As senhas não coincidem', 'error'); return }
 
   const btn = document.getElementById('btn-reset')
-  btn.disabled = true; btn.textContent = 'Redefinindo...'
+  const _btnRest1 = btnEspera(btn)
   try {
     const { data: { session } } = await db.auth.getSession()
     const token = session?.access_token
@@ -436,7 +436,7 @@ async function confirmarResetSenha() {
     toast('Senha redefinida com sucesso. O usuário deverá trocá-la no próximo acesso.', 'success')
     fecharModalReset()
   } catch(e) { toast(e.message, 'error') }
-  finally { btn.disabled = false; btn.textContent = 'Redefinir Senha' }
+  finally {  _btnRest1() }
 }
 
 async function toggleAtivo(id, ativoAtual) {

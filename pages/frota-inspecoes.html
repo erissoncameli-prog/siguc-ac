@@ -130,7 +130,7 @@ function htmlPagina() {
           <th style="width:120px">Momento</th><th style="width:90px">Crítico</th>
           <th style="width:80px">Situação</th>${_podeEditar ? '<th style="width:80px"></th>' : ''}
         </tr></thead>
-        <tbody id="tbody-itens"><tr><td colspan="7" style="text-align:center;padding:32px;color:#9CA3AF">Carregando...</td></tr></tbody>
+        <tbody id="tbody-itens"><tr><td colspan="7" style="padding:12px 14px" aria-busy="true" aria-label="Carregando"><div class="skeleton skeleton-linha" style="width:86%"></div><div class="skeleton skeleton-linha" style="width:72%"></div><div class="skeleton skeleton-linha" style="width:90%"></div><div class="skeleton skeleton-linha" style="width:64%"></div></td></tr></tbody>
       </table></div>
     </div>
 
@@ -141,7 +141,7 @@ function htmlPagina() {
           <th>Data</th><th>Veículo</th><th>Motorista</th><th>Momento</th>
           <th>Resultado</th><th style="width:80px"></th>
         </tr></thead>
-        <tbody id="tbody-insp"><tr><td colspan="6" style="text-align:center;padding:32px;color:#9CA3AF">Carregando...</td></tr></tbody>
+        <tbody id="tbody-insp"><tr><td colspan="6" style="padding:12px 14px" aria-busy="true" aria-label="Carregando"><div class="skeleton skeleton-linha" style="width:86%"></div><div class="skeleton skeleton-linha" style="width:72%"></div><div class="skeleton skeleton-linha" style="width:90%"></div><div class="skeleton skeleton-linha" style="width:64%"></div></td></tr></tbody>
       </table></div>
     </div>
   </div>`
@@ -218,7 +218,7 @@ async function salvarItem() {
     ativo: document.getElementById('it-ativo').checked,
   }
   const btn = document.getElementById('btn-salvar-item')
-  btn.disabled = true; btn.textContent = 'Salvando...'
+  const _btnRest0 = btnEspera(btn)
   try {
     const { error } = _editItemId
       ? await db.from('frota_checklist_itens').update(payload).eq('id', _editItemId)
@@ -228,7 +228,7 @@ async function salvarItem() {
     fecharModal('item')
     await carregarItens()
   } catch (e) { toast(e.message || 'Erro ao salvar', 'error') }
-  finally { btn.disabled = false; btn.textContent = 'Salvar' }
+  finally {  _btnRest0() }
 }
 
 // ── Inspeções realizadas ───────────────────────────────────────
