@@ -2945,6 +2945,26 @@ monitor para aquele `auth.uid()`. Achado em produção com 1 monitor
   para qualquer tela de cadastro do projeto, não só esta. Guarda:
   `tests/biomonitor-admin-monitor.test.js` (consistência de fonte entre
   o payload de `salvarMonitor` e o `select` de `carregarDados`).
+- **Varredura das 45 telas de mesa** atrás do mesmo padrão (migration
+  324): 279 consultas, 114 com `select('*')` e 114 com colunas
+  explícitas; 46 formulários de edição conferidos. **Nenhuma outra
+  consulta com colunas explícitas tem o defeito.** O único outro caso
+  achado veio pelo outro caminho — formulário que carrega de VIEW:
+  `praias_monitoramento.observacoes` é editável e gravada no modal de
+  praia, mas `vw_praias_biomonitor` nunca expôs a coluna (mesmo efeito:
+  campo vazio + apaga ao salvar). Corrigido na 324, anexando a coluna
+  ao FINAL da view e derivando a definição do `pg_get_viewdef()` REAL
+  de produção — nunca do arquivo local, porque essa view tem drift
+  conhecido (ver 321). `ponto_acesso` e `area_geom` do mesmo formulário
+  NÃO são defeito: são reconstruídos de lat/lng e do polígono
+  redesenhado.
+- ⚠️ **Ao varrer isto de novo, dois pontos cegos custaram tempo**:
+  `select` escrito com CRASE (template literal — 5 no projeto, um deles
+  em `validacao-campo.html`, que está CORRETO) e a resolução de qual
+  `payload` pertence a qual formulário em página com vários (usar a
+  declaração mais próxima ANTES do `update`, nunca a primeira do
+  arquivo). Um script que não trate os dois produz falso positivo e,
+  pior, deixa de acusar o defeito real.
 
 ## Próxima tarefa
 **Recursos Hídricos e Qualidade Ambiental (DERHQA)** — Fases A, B e C
