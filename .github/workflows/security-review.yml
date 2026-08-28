@@ -1,8 +1,15 @@
 name: Revisão de segurança por IA (Claude)
 
-# Action oficial da Anthropic: em cada PR, o Claude analisa o diff
-# em busca de vulnerabilidades (RLS, exposição de PII, SECURITY DEFINER,
-# injeção, vazamento de chave, etc.) e comenta no PR.
+# Action oficial da Anthropic: o Claude analisa o diff em busca de
+# vulnerabilidades (RLS, exposição de PII, SECURITY DEFINER, injeção,
+# vazamento de chave, etc.) e comenta no PR.
+#
+# DESATIVADO (consumo de créditos da API Anthropic) — só roda se
+# disparado manualmente via workflow_dispatch. Para reativar o
+# gatilho automático em PRs, trocar o bloco `on:` de volta para:
+#   pull_request:
+#     types: [opened, synchronize, reopened]
+#
 # Requer o secret ANTHROPIC_API_KEY. Sem ele, o job se autodesativa.
 
 # DESATIVADO TEMPORARIAMENTE (economia de créditos da API Anthropic).
