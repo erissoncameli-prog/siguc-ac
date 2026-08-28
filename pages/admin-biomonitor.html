@@ -647,7 +647,15 @@
       { data: bercarios },
     ] = await Promise.all([
       db.from('grupos_biomonitor').select('*').order('nome'),
-      db.from('monitores_biodiversidade').select('id,nome_completo,cpf,funcao,status,usuario_id,grupo_id,email').order('nome_completo'),
+      // A lista de colunas TEM que cobrir todo campo do modal de edição
+      // (abrirModalMonitor lê daqui, salvarMonitor grava todos de volta).
+      // Faltando uma coluna, o campo abre em branco mesmo com dado no banco
+      // E o salvamento sobrescreve o que havia com null. Guarda:
+      // tests/biomonitor-admin-monitor.test.js.
+      db.from('monitores_biodiversidade').select(
+        'id,grupo_id,nome_completo,cpf,rg,data_nascimento,sexo,telefone,email,' +
+        'municipio_residencia,comunidade,funcao,status,data_inicio,data_fim,' +
+        'observacoes,usuario_id').order('nome_completo'),
       db.from('vw_praias_biomonitor').select('*').order('nome'),
       db.from('temporadas_biomonitor').select('*').order('ano_base', { ascending: false }),
       db.from('programas_biomonitoramento').select('id,nome').order('nome'),

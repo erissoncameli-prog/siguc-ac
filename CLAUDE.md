@@ -2935,6 +2935,16 @@ monitor para aquele `auth.uid()`. Achado em produção com 1 monitor
   produto, não bug.
 - Guarda: `tests/biomonitor-login.test.js` (verificado que reprova a
   versão antiga). `pwa/sw.js`: biomonitor v38 → v39.
+- **Achado junto, mesma tela**: o `.select()` que alimenta a lista de
+  monitores em `admin-biomonitor.html` trazia 8 das 17 colunas que o
+  modal de edição grava. Efeito triplo — campo abre em branco com dado
+  no banco, salvar sobrescreve o que havia com `null`, e `data_inicio`
+  (obrigatória na validação) vinha sempre vazia, barrando até uma
+  edição que só queria corrigir o CPF. **Regra: toda coluna que um
+  formulário GRAVA precisa estar no `select` que o alimenta** — vale
+  para qualquer tela de cadastro do projeto, não só esta. Guarda:
+  `tests/biomonitor-admin-monitor.test.js` (consistência de fonte entre
+  o payload de `salvarMonitor` e o `select` de `carregarDados`).
 
 ## Próxima tarefa
 **Recursos Hídricos e Qualidade Ambiental (DERHQA)** — Fases A, B e C
