@@ -631,6 +631,7 @@
   let _grupos = [], _monitores = [], _praias = [], _temporadas = [], _programas = [], _ucs = [], _bercarios = []
   let _editGrupoId = null, _editMonitorId = null, _editPraiaId = null, _editTemporadaId = null
   let _loginMonitorId = null
+  let _loginInfo = {}
   let _editBercarioId = null
 
   await carregarDados()
@@ -653,6 +654,15 @@
       db.from('unidades_conservacao').select('id,nome,sigla').order('nome'),
       db.from('bercarios').select('*').order('nome'),
     ])
+    // E-mail que REALMENTE autentica (auth.users), que a tabela de monitores
+    // nunca mostrou. É o que revela o cadastro divergindo do login — causa do
+    // "não vinculado a nenhum grupo" no app. Falha em silêncio: sem isso a
+    // coluna volta a ser só "Com login".
+    _loginInfo = {}
+    try {
+      const { data: infos } = await db.rpc('bio_monitores_login_info')
+      for (const i of infos || []) _loginInfo[i.monitor_id] = i
+    } catch (e) { console.warn('[bio-admin] login info', e) }
     _grupos = grupos || []
     _monitores = monitores || []
     _praias = praias || []
@@ -742,6 +752,19 @@
     const tbody = document.getElementById('tbody-monitores')
     if (!lista.length) { tbody.innerHTML = `<tr><td colspan="7" class="empty-row">Nenhum monitor encontrado.</td></tr>`; return }
     const FUNC = { coordenador: 'Coordenador', monitor: 'Monitor de Campo', auxiliar: 'Auxiliar' }
+    const celulaLogin = m => {
+      if (!m.usuario_id) return '<span class="badge badge-neutral">Sem login</span>'
+      const i = _loginInfo[m.id]
+      if (!i) return '<span class="badge badge-success">Com login</span>'
+      const acesso = i.ultimo_acesso
+        ? `último acesso ${formatData(i.ultimo_acesso)}`
+        : 'nunca acessou'
+      const aviso = i.divergente
+        ? `<div class="badge badge-warn" style="margin-top:4px" title="O cadastro mostra ${esc(i.email_cadastro || '—')}, mas quem autentica é ${esc(i.email_login)}. Entrar com o e-mail do cadastro leva ao erro &quot;não vinculado a nenhum grupo&quot;.">Cadastro: ${esc(i.email_cadastro || '—')}</div>`
+        : ''
+      return `<span class="badge badge-success">${esc(i.email_login)}</span>`
+           + `<div style="font-size:11px;margin-top:2px;opacity:.7">${acesso}</div>${aviso}`
+    }
     const STATUS = { ativo: 'badge-success', afastado: 'badge-warn', encerrado: 'badge-neutral' }
     tbody.innerHTML = lista.map(m => `<tr>
       <td><strong>${m.nome_completo}</strong></td>
@@ -749,9 +772,7 @@
       <td>${nomeGrupo(m.grupo_id)}</td>
       <td>${FUNC[m.funcao] || m.funcao}</td>
       <td><span class="badge ${STATUS[m.status] || 'badge-neutral'}">${m.status}</span></td>
-      <td>${m.usuario_id
-        ? '<span class="badge badge-success">Com login</span>'
-        : '<span class="badge badge-neutral">Sem login</span>'}</td>
+      <td>${celulaLogin(m)}</td>
       <td style="display:flex;gap:4px">
         <button class="btn btn-sm btn-secondary" onclick="editarMonitor('${m.id}')">Editar</button>
         ${!m.usuario_id ? `<button class="btn btn-sm btn-primary" onclick="abrirModalLogin('${m.id}','${esc(m.nome_completo)}','${esc(m.email||'')}')">Login</button>` : ''}

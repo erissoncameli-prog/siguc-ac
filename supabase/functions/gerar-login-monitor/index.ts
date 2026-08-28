@@ -33,10 +33,27 @@ async function provisionar(
   if (createErr) {
     const jaExiste = createErr.status === 422 || /already.*(registered|exists)/i.test(createErr.message)
     if (!jaExiste) throw createErr
-    // Usuário já existe — reutiliza e redefine senha
+    // E-mail já existe no Auth. Adotar a conta significa TROCAR A SENHA DELA:
+    // se ela pertence a outra pessoa do sistema (ou a outro monitor), isso
+    // derrubaria o acesso de quem já usa. Mesmas travas do
+    // gerar-login-brigadista.
     const { data: lista } = await admin.auth.admin.listUsers({ perPage: 1000 })
     const existente = lista?.users.find((u) => u.email?.toLowerCase() === email)
     if (!existente) throw new Error(`${email}: já existe no Auth mas não foi encontrado`)
+
+    const { data: contaExistente } = await admin
+      .from("usuarios").select("id, perfil").eq("id", existente.id).maybeSingle()
+    if (contaExistente) {
+      throw new Error(
+        `${email}: já é a conta de acesso de ${contaExistente.perfil} no sistema. ` +
+        `Use outro e-mail para o app, ou vincule o monitor a esta conta.`,
+      )
+    }
+    const { data: outroMon } = await admin
+      .from("monitores_biodiversidade").select("id, nome_completo")
+      .eq("usuario_id", existente.id).neq("id", mon.id).maybeSingle()
+    if (outroMon) throw new Error(`${email}: já vinculado ao monitor ${outroMon.nome_completo}`)
+
     const { error: updErr } = await admin.auth.admin.updateUserById(existente.id, {
       password: senha,
       email_confirm: true,
@@ -47,9 +64,13 @@ async function provisionar(
     userId = created!.user.id
   }
 
+  // Grava também em monitores_biodiversidade.email o e-mail REALMENTE usado no
+  // login. Sem isso o cadastro e o Auth divergem em silêncio (o admin edita o
+  // e-mail do monitor depois, a tela passa a mostrar um endereço que não
+  // autentica, e o monitor recebe "não vinculado a nenhum grupo" ao entrar).
   const { error: vincErr } = await admin
     .from("monitores_biodiversidade")
-    .update({ usuario_id: userId })
+    .update({ usuario_id: userId, email })
     .eq("id", mon.id)
   if (vincErr) throw vincErr
 

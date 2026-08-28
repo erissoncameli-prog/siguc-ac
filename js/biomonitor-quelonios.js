@@ -245,10 +245,25 @@ async function bioIniciar() {
   // Verifica se é monitor ativo
   const { data: monitor } = await bioSupabase().rpc('bio_monitor_atual')
   if (!monitor) {
+    // A conta autenticada não é um monitor ativo. Isso acontece quando a
+    // pessoa tem MAIS DE UMA conta (ex.: a de mesa e a do app, com e-mails
+    // diferentes) e entrou com a errada, ou quando ficou uma sessão antiga
+    // de outra pessoa guardada neste aparelho.
+    // A sessão TEM que ser encerrada aqui: ela é persistida em localStorage,
+    // então sem o signOut o app reabre nesta mesma tela para sempre. E a tela
+    // de login precisa ser reinicializada, senão o botão "Entrar" fica sem
+    // handler e a pessoa não consegue entrar com a conta certa.
+    const emailSessao = session?.user?.email || ''
+    try { await bioSupabase().auth.signOut() } catch {}
     bioMostrarTela('tela-login')
-    document.getElementById('bio-login-erro').textContent =
-      'Usuário não vinculado a nenhum grupo de monitoramento.'
-    document.getElementById('bio-login-erro').hidden = false
+    bioIniciarTelaLogin()
+    const erroEl = document.getElementById('bio-login-erro')
+    erroEl.textContent = emailSessao
+      ? `A conta ${emailSessao} não está cadastrada como monitor ativo. `
+        + 'Se você tem mais de um e-mail, entre com o que a coordenação usou '
+        + 'para criar seu acesso ao app.'
+      : 'Usuário não vinculado a nenhum grupo de monitoramento.'
+    erroEl.hidden = false
     return
   }
 
@@ -277,7 +292,10 @@ async function bioIniciar() {
 }
 
 // ── Login com e-mail/senha ─────────────────────────────────────
+let _bioLoginBind = false
 function bioIniciarTelaLogin() {
+  if (_bioLoginBind) return   // chamada de vários pontos; nunca duplicar listener
+  _bioLoginBind = true
   document.getElementById('bio-btn-login').addEventListener('click', async () => {
     const email = document.getElementById('bio-login-email').value.trim()
     const senha = document.getElementById('bio-login-senha').value
@@ -453,7 +471,7 @@ function bioIniciarKeypad(prefixo, onConfirmar) {
    ════════════════════════════════════════════════════════════ */
 async function bioEntrarNaHome() {
   const monitor = BioApp.monitor ?? await bioOfflineGetConfig('monitor')
-  if (!monitor) { bioMostrarTela('tela-login'); return }
+  if (!monitor) { bioMostrarTela('tela-login'); bioIniciarTelaLogin(); return }
   BioApp.monitor = monitor
 
   // Preenche nome/grupo
