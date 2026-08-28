@@ -16,7 +16,7 @@ jobs:
   guardrails:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Guardrails estáticos
         run: bash scripts/guardrails.sh
 
@@ -24,10 +24,10 @@ jobs:
   segredos:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with: { fetch-depth: 0 }
       - name: Gitleaks
-        uses: gitleaks/gitleaks-action@v2
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -36,7 +36,7 @@ jobs:
     runs-on: ubuntu-latest
     container: semgrep/semgrep
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Semgrep scan
         run: semgrep scan --config p/owasp-top-ten --config p/javascript --error --skip-unknown-extensions
 
@@ -44,9 +44,9 @@ jobs:
   trivy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Trivy filesystem scan
-        uses: aquasecurity/trivy-action@v0.36.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           scan-type: fs
           scanners: vuln,misconfig,secret
@@ -62,14 +62,14 @@ jobs:
     env:
       TEST_BASE_URL: ${{ vars.TEST_BASE_URL || 'https://siguc-ac.vercel.app' }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with: { node-version: '20' }
       - run: npm install -D @playwright/test
       - run: npx playwright install --with-deps chromium
       - name: Smoke + fluxo de pesquisa (read-only)
         run: npx playwright test tests/smoke.test.js tests/pesquisa-flow.test.js
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
           name: playwright-report
@@ -87,8 +87,8 @@ jobs:
     env:
       TEST_BASE_URL: http://localhost:5500
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with: { node-version: '20' }
       - run: npm install -D @playwright/test
       - run: npx playwright install --with-deps chromium
@@ -97,7 +97,7 @@ jobs:
       - name: Aguardar o servidor subir
         run: timeout 60 bash -c 'until curl -sf http://localhost:5500/pages/frota-app.html > /dev/null; do sleep 1; done'
       - run: npx playwright test tests/frota-app-barra.test.js
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
           name: playwright-report-frota-barra
