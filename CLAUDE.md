@@ -2898,6 +2898,44 @@ continuam sem amostra/necessidade real, registradas como estão).
 - Sem mudança em `pwa/sw.js`: `agua-pontos.html` e `agua-laudos.html`
   são telas de mesa, não app de campo.
 
+## Regra do sistema — identidade do monitor no app Biomonitor (migration 323)
+Quem autentica é `monitores_biodiversidade.usuario_id` → `auth.users`.
+`monitores_biodiversidade.email` é só CADASTRO: editá-lo NÃO troca o
+e-mail de login. Os dois divergindo é a causa real de "Usuário não
+vinculado a nenhum grupo de monitoramento" com o monitor ativo e o
+grupo certo — a pessoa entra com o e-mail que a tela mostra, autentica
+(é outra conta dela, a de mesa), e `bio_monitor_atual()` não acha
+monitor para aquele `auth.uid()`. Achado em produção com 1 monitor
+(cadastro gmail, login outlook).
+- **Nunca diagnosticar esse erro pelo cadastro do monitor** — o cadastro
+  costuma estar certo. Conferir `auth.users.email` do `usuario_id`.
+  `bio_monitores_login_info()` (SECURITY DEFINER, whitelist de colunas
+  no molde da 297, só `pode_editar('biomonitor')`) expõe e-mail real,
+  último acesso e a flag `divergente`; `admin-biomonitor.html` mostra
+  isso na coluna "Login app", que antes só dizia "Com login".
+- `gerar-login-monitor` passou a gravar em `monitores_biodiversidade.
+  email` o e-mail REALMENTE provisionado, para os dois nunca nascerem
+  divergentes, e ganhou as travas que o `gerar-login-brigadista` já
+  tinha: reaproveitar uma conta existente do Auth **troca a senha
+  dela**, então recusa se a conta já é de um usuário do sistema
+  (`usuarios`) ou de outro monitor. Sem isso, gerar login para um
+  monitor com o e-mail de um super_admin derrubaria o acesso dele.
+- **Nenhuma tela de erro do app pode ser beco sem saída.** O ramo
+  "não é monitor" mostrava a tela de login sem chamar
+  `bioIniciarTelaLogin()` (botão "Entrar" sem handler) e sem
+  `signOut()` — e a sessão do Biomonitor é persistida em localStorage,
+  então o app reabria nesse estado para sempre. Toda tela de login
+  mostrada fora do fluxo normal precisa de signOut + rebind; o rebind é
+  idempotente (`_bioLoginBind`), porque é chamado de vários pontos.
+- Monitor NÃO ganha linha em `usuarios` (diferente de brigadista e
+  motorista, cujas Edge Functions dão upsert lá) — por isso não aparece
+  em `pages/usuarios.html`. É como o fluxo sempre funcionou; unificar
+  depende de decidir qual `perfil` um monitor teria (o enum
+  `perfil_usuario` não tem valor para isso hoje), então é decisão de
+  produto, não bug.
+- Guarda: `tests/biomonitor-login.test.js` (verificado que reprova a
+  versão antiga). `pwa/sw.js`: biomonitor v38 → v39.
+
 ## Próxima tarefa
 **Recursos Hídricos e Qualidade Ambiental (DERHQA)** — Fases A, B e C
 ENTREGUES (ver "Recursos Hídricos — Fase B" e "— Fase C" acima).
