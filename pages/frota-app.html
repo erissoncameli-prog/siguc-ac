@@ -10,6 +10,7 @@
 <link rel="stylesheet" href="../css/global.css">
 <link rel="stylesheet" href="../css/avatar-foto.css">
 <link rel="stylesheet" href="../css/frota-wise-theme.css">
+<link rel="stylesheet" href="../css/pin-baralho.css">
 <script>
 // Stub de segurança: se o CDN não carregar (offline), config.js não quebra.
 window.supabase = window.supabase || { createClient: () => null }
@@ -57,6 +58,7 @@ const _frotaReady = _dbReady.then(function () {
 <script src="../js/frota-consumo.js"></script>
 <script src="../js/frota-passageiros.js"></script>
 <script src="../js/frota-viagens-status.js"></script>
+<script src="../js/pin-baralho.js"></script>
 <script>
 // Rede de segurança para js/fotos-privadas.js. Se ele não carregar — deploy
 // a meio caminho, cache do navegador, bloqueio de rede — as funções
@@ -4081,29 +4083,55 @@ async function fPinHash(pin) {
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('')
 }
 
+// ── Baralho de PIN (js/pin-baralho.js) ──────────────────────────
+// As cartas substituem as bolinhas; sem o módulo carregado, o
+// display continua como sempre foi. Ver "Regra do sistema — baralho
+// de PIN" no CLAUDE.md.
+function fPinDisplay() { return document.getElementById('fm-pin-dots') }
+
 function fPinAtualizarDots() {
-  document.querySelectorAll('#fm-pin-dots .fm-pin-dot').forEach((d, i) => d.classList.toggle('ativo', i < _fPinBuf.length))
+  const el = fPinDisplay()
+  if (typeof pinBaralhoPintar === 'function' && pinBaralhoPintar(el, _fPinBuf)) return
+  el.querySelectorAll('.fm-pin-dot').forEach((d, i) => d.classList.toggle('ativo', i < _fPinBuf.length))
+}
+
+// O PIN fechou: forma o monte e SÓ ENTÃO processa. O monte é o
+// próprio indicador de espera — nada de novo entra na tela.
+async function fPinFecharEProcessar() {
+  // 'setup1' só guarda o primeiro PIN — não confere nada, então o
+  // monte (que significa "estou conferindo") não se forma.
+  if (_fPinModo !== 'setup1' && typeof pinBaralhoFechar === 'function') {
+    await pinBaralhoFechar(fPinDisplay())
+  }
+  await fPinProcessar()
+}
+
+async function fPinResultado(aprovado) {
+  if (typeof pinBaralhoAprovar === 'function') {
+    await (aprovado ? pinBaralhoAprovar(fPinDisplay()) : pinBaralhoRecusar(fPinDisplay()))
+    return
+  }
+  fPinAtualizarDots()
 }
 
 function fPinInitKeypad() {
   if (_fPinKeypadInit) return; _fPinKeypadInit = true
+  if (typeof pinBaralhoMontar === 'function') pinBaralhoMontar(fPinDisplay())
   document.getElementById('fm-pin-keypad').addEventListener('click', ev => {
     const btn = ev.target.closest('button'); if (!btn) return
     if (btn.dataset.v != null) {
       if (_fPinBuf.length < 4) {
         _fPinBuf += btn.dataset.v; fPinAtualizarDots()
         document.getElementById('fm-pin-erro').hidden = true
-        if (_fPinBuf.length === 4) fPinProcessar()
+        if (_fPinBuf.length === 4) fPinFecharEProcessar()
       }
     } else if (btn.dataset.act === 'apagar') {
       _fPinBuf = _fPinBuf.slice(0, -1); fPinAtualizarDots()
     } else if (btn.dataset.act === 'ok') {
-      if (_fPinBuf.length === 4) fPinProcessar()
+      if (_fPinBuf.length === 4) fPinFecharEProcessar()
     }
   })
 }
-
-function fPinReset() { _fPinBuf = ''; fPinAtualizarDots() }
 
 function fPinMostrar(modo) {
   _fPinModo = modo; _fPinBuf = ''; _fPinPrimeiro = ''
@@ -4200,12 +4228,14 @@ async function fPinProcessar() {
       if (espera > 0) {
         erro.hidden = false
         erro.textContent = `Muitas tentativas. Aguarde ${espera > 60 ? Math.ceil(espera / 60) + ' min' : espera + 's'} antes de tentar de novo.`
-        fPinReset()
+        _fPinBuf = ''
+        await fPinResultado(false)
         return
       }
       const h = await fPinHash(_fPinBuf)
       if (h === await fOfflineGetConfig('pin_hash')) {
         await fPinZerarFalhas()
+        await fPinResultado(true)
         fPinFechar()
         if (_fPinResolve) { const r = _fPinResolve; _fPinResolve = null; r(true) }
       } else {
@@ -4213,7 +4243,8 @@ async function fPinProcessar() {
         if (falhas >= FPIN_MAX_TENTATIVAS) {
           // Derruba a sessão: daqui pra frente só com senha.
           erro.hidden = false; erro.textContent = 'Muitas tentativas. Entre de novo com sua senha.'
-          fPinReset()
+          _fPinBuf = ''
+          await fPinResultado(false)
           setTimeout(() => pinEsqueci(), 1200)
           return
         }
@@ -4222,7 +4253,8 @@ async function fPinProcessar() {
         erro.textContent = proxima > 0
           ? `PIN incorreto. Aguarde ${proxima >= 60e3 ? Math.round(proxima / 60e3) + ' min' : Math.round(proxima / 1000) + 's'} (${FPIN_MAX_TENTATIVAS - falhas} tentativa(s) antes de precisar da senha).`
           : 'PIN incorreto. Tente novamente.'
-        fPinReset()
+        _fPinBuf = ''
+        await fPinResultado(false)
       }
       return
     }
@@ -4236,16 +4268,19 @@ async function fPinProcessar() {
       erro.hidden = false; erro.textContent = 'Os PINs não coincidem. Comece de novo.'
       _fPinModo = 'setup1'; _fPinPrimeiro = ''; _fPinBuf = ''
       document.getElementById('fm-pin-sub').textContent = 'Escolha um PIN de 4 dígitos'
-      fPinAtualizarDots(); return
+      await fPinResultado(false); return
     }
     const h = await fPinHash(_fPinBuf)
     await fOfflineSetConfig('pin_hash', h)
     await fOfflineSetConfig('pin_dono', _usuario.id)
     await fPinZerarFalhas()
+    await fPinResultado(true)
     fPinFechar()
     if (_fPinResolve) { const r = _fPinResolve; _fPinResolve = null; r(true) }
   } catch (e) {
-    erro.hidden = false; erro.textContent = 'Erro ao processar o PIN. Tente de novo.'; fPinReset()
+    erro.hidden = false; erro.textContent = 'Erro ao processar o PIN. Tente de novo.'
+    _fPinBuf = ''
+    await fPinResultado(false)
   }
 }
 
@@ -4636,7 +4671,10 @@ if ('serviceWorker' in navigator && !fEhAppNativoFrota()) {
 .fm-pin-marca { font-family: var(--fw-font-display, 'Archivo', sans-serif); font-weight: 800; font-size: 16px; opacity: .85; }
 .fm-pin-titulo { font-size: 20px; font-weight: 800; margin-top: 18px; font-family: var(--fw-font-display, 'Archivo', sans-serif); }
 .fm-pin-sub { font-size: 13px; opacity: .75; margin-top: 4px; min-height: 18px; }
-.fm-pin-dots { display: flex; gap: 14px; justify-content: center; margin: 22px 0; }
+/* --pin-cor: cor do baralho de PIN (css/pin-baralho.css) — as cartas
+   substituem as bolinhas abaixo, que ficam como degradação para
+   quando o módulo não estiver carregado. */
+.fm-pin-dots { display: flex; gap: 14px; justify-content: center; margin: 22px 0; --pin-cor: var(--fw-green, #9FE870); }
 .fm-pin-dot { width: 14px; height: 14px; border-radius: 50%; border: 2px solid rgba(255,255,255,.5); box-sizing: border-box; }
 .fm-pin-dot.ativo { background: var(--fw-green, #9FE870); border-color: var(--fw-green, #9FE870); }
 .fm-pin-erro { color: #FCA5A5; font-size: 13px; min-height: 18px; margin-bottom: 8px; }

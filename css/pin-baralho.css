@@ -1,0 +1,139 @@
+/* ═══════════════════════════════════════════════════════════════
+   Baralho de PIN — display compartilhado pelos 4 apps de campo
+   (Brigadas, Biomonitor, Frota, Água). Par de js/pin-baralho.js.
+
+   Antes existiam 4 cópias do mesmo `.pin-dot` (css/agua-app.css,
+   css/brigada.css, css/biomonitor.css e um bloco inline no
+   frota-app.html) — mesma lição de js/frota-consumo.js: o desenho
+   vive num arquivo só e cada app entra apenas com a sua cor.
+
+   COR: cada app define `--pin-cor` no container do display (a regra
+   fica no CSS do próprio app, ao lado do `.pin-dot` que ele já
+   tinha). O padrão azul entra como FALLBACK em cada `var()`, nunca
+   como declaração deste arquivo: declará-lo em
+   `.pin-baralho.pin-baralho` (especificidade 0,2,0) venceria o
+   `.pin-display`/`.bio-pin-display` do app (0,1,0) e os quatro apps
+   ficariam azuis — foi o que aconteceu na primeira versão.
+
+   ⚠️ SELETOR DUPLICADO (`.pin-baralho.pin-baralho`) DE PROPÓSITO:
+   o container é o MESMO elemento que já tem `.pin-display`/
+   `.fm-pin-dots` com `display:flex; gap:14px`. Como as duas regras
+   teriam a mesma especificidade, quem vencesse dependeria da ordem
+   de carregamento — e no Frota o CSS do PIN é um `<style>` inline,
+   que sempre vem depois de qualquer `<link>`. Repetir a classe sobe
+   a especificidade e o baralho vence em qualquer ordem.
+   ═══════════════════════════════════════════════════════════════ */
+
+.pin-baralho.pin-baralho {
+  display: flex;
+  gap: 12px;
+  /* A espera acontece DENTRO deste espaço: as cartas se empilham por
+     transform, então a caixa nunca muda de tamanho e nada na tela
+     pula (mesma regra de btnEspera/skeleton do resto do sistema). */
+}
+
+.pin-carta {
+  width: 52px; height: 64px;
+  border-radius: 16px;
+  display: grid; place-items: center;
+  box-sizing: border-box;
+  background: rgba(255, 255, 255, .055);
+  border: 1px solid rgba(255, 255, 255, .12);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, .30), inset 0 1px 0 rgba(255, 255, 255, .07);
+  color: #F2FBF6;
+  font-size: 24px; font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  transition: transform .42s cubic-bezier(.22, 1.1, .3, 1),
+              background .2s, border-color .2s, box-shadow .3s;
+  will-change: transform;
+}
+
+/* A próxima casa a receber dígito — sinaliza onde o toque vai cair. */
+.pin-carta.mira { border-color: color-mix(in srgb, var(--pin-cor, #7DD3FC) 40%, transparent); }
+
+.pin-carta.cheia {
+  background: rgba(255, 255, 255, .10);
+  border-color: color-mix(in srgb, var(--pin-cor, #7DD3FC) 55%, transparent);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, .34),
+              0 0 18px color-mix(in srgb, var(--pin-cor, #7DD3FC) 22%, transparent),
+              inset 0 1px 0 rgba(255, 255, 255, .12);
+}
+
+.pin-glifo {
+  display: block;
+  transform: scale(.5); opacity: 0;
+  transition: transform .22s cubic-bezier(.2, 1.5, .4, 1), opacity .16s;
+}
+.pin-carta.cheia .pin-glifo { transform: scale(1); opacity: 1; }
+
+/* O dígito aparece por meio segundo e vira ponto (js/pin-baralho.js):
+   PIN é credencial, não código de SMS — dá para conferir o que se
+   digitou sem deixar o PIN legível por cima do ombro. */
+.pin-ponto {
+  /* `display:block` é obrigatório: um <span> é inline por padrão e
+     largura/altura simplesmente não se aplicam a ele — o ponto vira
+     uma caixa de 0×0 e o dígito some sem deixar nada no lugar. */
+  display: block;
+  width: 11px; height: 11px; border-radius: 50%;
+  background: var(--pin-cor, #7DD3FC);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--pin-cor, #7DD3FC) 60%, transparent);
+}
+
+/* ── Monte formado (o PIN fechou, o app está conferindo) ──────── */
+.pin-baralho.pin-empilhando .pin-carta {
+  box-shadow: 0 10px 28px rgba(0, 0, 0, .50), inset 0 1px 0 rgba(255, 255, 255, .10);
+}
+/* Só a carta do topo continua legível — as de baixo são o monte. */
+.pin-baralho.pin-empilhando .pin-carta:not(.pin-topo) .pin-glifo {
+  opacity: 0; transform: scale(.8);
+}
+
+.pin-baralho.pin-conferindo .pin-carta.pin-topo {
+  animation: pin-pulsa 1.1s ease-in-out infinite;
+}
+@keyframes pin-pulsa {
+  0%, 100% { box-shadow: 0 10px 28px rgba(0,0,0,.5), 0 0 0 0 color-mix(in srgb, var(--pin-cor, #7DD3FC) 40%, transparent); }
+  50%      { box-shadow: 0 10px 28px rgba(0,0,0,.5), 0 0 26px 5px color-mix(in srgb, var(--pin-cor, #7DD3FC) 34%, transparent); }
+}
+
+/* ── Aprovado ─────────────────────────────────────────────────── */
+.pin-carta.pin-aprovada {
+  background: linear-gradient(170deg, rgba(82, 183, 136, .30), rgba(82, 183, 136, .10));
+  border-color: #52B788;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .5), 0 0 30px rgba(82, 183, 136, .45);
+}
+.pin-carta.pin-aprovada .pin-glifo { opacity: 1; transform: scale(1); }
+.pin-selo {
+  width: 26px; height: 26px;
+  stroke: #52B788; fill: none;
+  stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round;
+}
+.pin-selo path { stroke-dasharray: 30; stroke-dashoffset: 30; animation: pin-risca .34s .06s ease-out forwards; }
+@keyframes pin-risca { to { stroke-dashoffset: 0; } }
+
+/* ── Recusado — o baralho se abre de volta nas quatro casas ───── */
+.pin-baralho.pin-recusado { animation: pin-tremor .42s cubic-bezier(.36, .07, .19, .97); }
+@keyframes pin-tremor {
+  10%, 90%      { transform: translateX(-2px); }
+  20%, 80%      { transform: translateX(4px); }
+  30%, 50%, 70% { transform: translateX(-7px); }
+  40%, 60%      { transform: translateX(7px); }
+}
+.pin-carta.pin-recusada { border-color: #F87171; background: rgba(248, 113, 113, .12); }
+
+/* Aparelho pequeno: as cartas encolhem, o monte continua igual. */
+@media (max-width: 340px) {
+  .pin-carta { width: 46px; height: 58px; border-radius: 14px; font-size: 21px; }
+  .pin-baralho.pin-baralho { gap: 10px; }
+}
+
+/* Movimento reduzido: o baralho não desliza nem pulsa — as cartas
+   trocam direto de estado. O aviso continua chegando, só sem
+   movimento (mesma abordagem do rio da tela de bloqueio da Água). */
+@media (prefers-reduced-motion: reduce) {
+  .pin-carta, .pin-glifo { transition-duration: .001ms !important; }
+  .pin-baralho.pin-conferindo .pin-carta.pin-topo,
+  .pin-baralho.pin-recusado,
+  .pin-selo path { animation: none !important; }
+  .pin-selo path { stroke-dashoffset: 0; }
+}
