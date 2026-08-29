@@ -1,6 +1,11 @@
 # Qualidade da Água — Etiqueta do frasco (impressão térmica Bluetooth)
 
-Plano. Nada codado ainda. Decisões do usuário já tomadas (ver §1).
+**Fase 1 ENTREGUE** (migration 325, `js/agua-etiqueta.js`,
+`tests/agua-etiqueta.test.js`) — tudo que não depende da impressora
+chegar. Fase 2 (transporte Bluetooth + driver do modelo) aguarda a
+compra; o requisito de §2 é o que vai para a cotação. Resumo da
+entrega e das divergências reais em relação ao plano original está no
+fim deste arquivo (§9). Decisões do usuário já tomadas (ver §1).
 
 ## 1. Decisões tomadas antes de planejar
 
@@ -140,3 +145,52 @@ impressora (nome BT, linguagem, largura, dpi) é **preferência por aparelho**
 - Guardar a impressora pareada no banco (é preferência de aparelho).
 - Bloquear o salvamento por falha de impressão.
 - Kit de frascos por parâmetro/preservante (decisão: uma etiqueta por coleta, N vias).
+
+## 9. Fase 1 — ENTREGUE (o que foi construído e o que divergiu do plano)
+
+- **Migration 325**: `agua_codigos_reservados` + `agua_reservar_codigos(qtd)`
+  (SECURITY DEFINER, mesmo contador da 273, teto 50/chamada e
+  200 em aberto por técnico) + trigger `trg_agua_marcar_codigo_usado`
+  (AFTER, marca `usado_em` sozinho quando a coleta sincroniza) +
+  `agua_codigos_reservados_pendentes()` (relatório de mesa). Achado do
+  advisor logo após aplicar: a função de trigger nasceu chamável direto
+  via RPC (mesmo padrão de sempre — `ALTER DEFAULT PRIVILEGES` do
+  projeto concede EXECUTE por nome) — corrigido na 325b com `REVOKE
+  ALL ... FROM PUBLIC, anon, authenticated`, mesmo molde da 179.
+- **`js/agua-etiqueta.js`**: canvas 40×60 mm a 203 dpi como fonte única
+  do desenho (preview, PDF de N vias, PDF em lote — todos a MESMA
+  imagem raster, nunca texto vetorial duplicado). QR desenhado direto
+  dos módulos internos de `js/qrcode-generator.js` (sem `<img>`
+  assíncrona — a etiqueta precisa sair pronta na mesma chamada).
+- **Divergência 1 — overlay só abre quando o código veio do pool.**
+  O plano original não previa essa distinção. Ao escrever o teste,
+  ficou claro que abrir o overlay em TODO salvamento quebraria o fluxo
+  comum (inclusive `tests/agua-app-fluxo.test.js`, que sempre digita
+  um código manual) — e que a distinção é também a coisa certa a
+  fazer: código digitado à mão significa frasco com etiqueta própria
+  (texto de ajuda do campo), imprimir a nossa por cima não serve pra
+  nada.
+- **Divergência 2 — relatório de reservados pendentes foi para
+  `pages/agua-pontos.html` (aba "Etiquetas"), não para
+  `agua-conferencia.html`** como o plano original cogitava. Decisão
+  tomada ao codar: ficou mais coeso ao lado do lote de reimpressão
+  (mesmo assunto — códigos/etiquetas), enquanto Conferência é sobre
+  promover dado de laudo em quarentena, outro assunto.
+- **"Lote de mesa" mudou de forma**: em vez de pré-imprimir etiquetas
+  em branco antes da campanha (o rótulo de ponto/data/coletor não
+  existe antes da coleta acontecer), virou REIMPRESSÃO de coletas já
+  sincronizadas — o cenário real descrito no próprio plano ("plano B
+  quando a térmica quebra no meio do rio" só faz sentido depois que a
+  coleta já aconteceu e foi enviada).
+- `pwa/sw.js`: agua v26 → v27. `app-agua/scripts/build-www.mjs`
+  atualizado nas 3 listas (dev, standalone, Capacitor).
+- Guarda: `tests/agua-etiqueta.test.js` (4 testes, rodados de verdade
+  contra `pages/agua-app.html`) — confirmado que
+  `tests/agua-app-fluxo.test.js` continua passando sem alteração.
+  `pages/agua-pontos.html` não tem suíte própria no repositório (nenhuma
+  das 45 páginas de mesa "sozinhas" tem); a aba nova foi conferida por
+  `node --check` e pelo padrão das abas irmãs, não por teste ponta a
+  ponta — registrado como limitação, não como lacuna escondida.
+- **Nada mudou nos itens que dependem da impressora** (§2, §5 Peça 3/4,
+  §6 Fase 2/3, §7) — seguem exatamente como planejados, aguardando a
+  compra.
