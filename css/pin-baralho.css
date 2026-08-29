@@ -33,6 +33,7 @@
 }
 
 .pin-carta {
+  position: relative;
   width: 52px; height: 64px;
   border-radius: 16px;
   display: grid; place-items: center;
@@ -48,8 +49,67 @@
   will-change: transform;
 }
 
-/* A próxima casa a receber dígito — sinaliza onde o toque vai cair. */
-.pin-carta.mira { border-color: color-mix(in srgb, var(--pin-cor, #7DD3FC) 40%, transparent); }
+/* A próxima casa a receber dígito. Além da borda tingida, um halo
+   constante em volta — é o que diz "o toque cai AQUI" de relance, sem
+   precisar contar quantas casas já foram preenchidas. */
+.pin-carta.mira {
+  border-color: color-mix(in srgb, var(--pin-cor, #7DD3FC) 60%, transparent);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, .30),
+              0 0 18px color-mix(in srgb, var(--pin-cor, #7DD3FC) 40%, transparent),
+              inset 0 1px 0 rgba(255, 255, 255, .07);
+}
+
+/* ── Filete que dá a volta na borda quando o dígito cai ───────────
+   O dígito ACONTECE: um fio de luz sai do canto e percorre a borda
+   inteira uma vez, em ~0,7s. Sem ele a carta só troca de cor, e num
+   aparelho ao sol a troca passa despercebida — foi exatamente o que
+   o usuário notou faltando comparado ao vídeo de referência.
+
+   Mecânica: um anel (::before) preenchido por um conic-gradient cujo
+   ângulo inicial é animado. A máscara recorta o miolo e deixa só a
+   moldura, então o gradiente aparece como um filete correndo pela
+   borda, acompanhando os cantos arredondados.
+
+   ⚠️ `@property` é o que permite ANIMAR um ângulo: sem ele o
+   navegador trata `--pin-ang` como texto e não interpola. Onde não
+   houver suporte (WebView antiga), o filete não gira — só acende e
+   apaga com a opacidade, que continua sendo um sinal de que o dígito
+   entrou. Degradação escolhida de propósito; nunca fica um arco
+   parado e permanente na tela. */
+@property --pin-ang {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+
+.pin-carta::before {
+  content: '';
+  position: absolute; inset: 0;
+  border-radius: inherit;
+  padding: 1.5px;                     /* espessura do filete */
+  opacity: 0;
+  pointer-events: none;
+  background: conic-gradient(from var(--pin-ang),
+    transparent 0 74%,
+    color-mix(in srgb, var(--pin-cor, #7DD3FC) 70%, transparent) 88%,
+    #FFFFFF 95%,
+    transparent 100%);
+  /* Recorta o miolo: sobra só a moldura. O par -webkit-/padrão é
+     necessário — o WebKit ainda exige o prefixo e a palavra `xor`. */
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+          mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+          mask-composite: exclude;
+}
+
+.pin-carta.varrendo::before { animation: pin-varre .7s linear 1; }
+
+@keyframes pin-varre {
+  0%   { opacity: 0;   --pin-ang: 0deg; }
+  12%  { opacity: 1; }
+  85%  { opacity: 1; }
+  100% { opacity: 0;   --pin-ang: 360deg; }
+}
 
 .pin-carta.cheia {
   background: rgba(255, 255, 255, .10);
@@ -136,4 +196,14 @@
   .pin-baralho.pin-recusado,
   .pin-selo path { animation: none !important; }
   .pin-selo path { stroke-dashoffset: 0; }
+  /* O filete não corre a borda; a moldura INTEIRA (sem o gradiente,
+     senão sobraria um arco parado num canto só) acende e apaga uma
+     vez. O aviso de "o dígito entrou" continua chegando, sem
+     movimento. */
+  .pin-carta::before { background: var(--pin-cor, #7DD3FC); }
+  .pin-carta.varrendo::before { animation: pin-varre-parado .5s linear 1; }
+  @keyframes pin-varre-parado {
+    0%, 100% { opacity: 0; }
+    30%, 70% { opacity: .9; }
+  }
 }
