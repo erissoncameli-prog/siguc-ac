@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8">
+<title>Harness do baralho de PIN</title>
+<!--
+  Página vazia dedicada, como o sidebar-harness.html: nenhuma das 4
+  páginas reais serve de base aqui — todas declaram seu próprio
+  `let db` no escopo global e carregam o app inteiro. O módulo do
+  baralho não depende de config.js nem de Supabase, então testar
+  contra um documento mínimo isola o que interessa.
+
+  O container reproduz o que as páginas reais têm: as bolinhas no
+  HTML (degradação) e a cor do app em --pin-cor.
+-->
+<link rel="stylesheet" href="/css/pin-baralho.css">
+<style>
+  body { background: #0A1A0F; margin: 0; padding: 40px; }
+  /* Mesma forma dos 4 apps: display:flex + gap próprio, para o teste
+     provar que o seletor duplicado do baralho vence mesmo declarado
+     DEPOIS (aqui o <style> inline, como no frota-app.html). */
+  /* Cor propositalmente DIFERENTE do padrão do módulo: é assim que o
+     teste percebe se o módulo voltou a declarar --pin-cor e a vencer
+     o app (regressão real da primeira versão). */
+  .pin-display { display: flex; gap: 14px; --pin-cor: #9FE870; }
+  .pin-dot { width: 13px; height: 13px; border-radius: 50%; border: 1.5px solid rgba(255,255,255,.32); }
+</style>
+</head><body>
+  <div class="pin-display" id="display">
+    <span class="pin-dot"></span><span class="pin-dot"></span>
+    <span class="pin-dot"></span><span class="pin-dot"></span>
+  </div>
+  <div class="pin-display" id="display-intocado">
+    <span class="pin-dot"></span><span class="pin-dot"></span>
+    <span class="pin-dot"></span><span class="pin-dot"></span>
+  </div>
+  <script src="/js/pin-baralho.js"></script>
+</body></html>

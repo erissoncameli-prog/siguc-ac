@@ -11,6 +11,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&family=Fraunces:wght@700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/brigada.css">
+  <link rel="stylesheet" href="/css/pin-baralho.css">
   <link rel="stylesheet" href="/css/avatar-foto.css">
 </head>
 <body class="brigada-app">
@@ -993,6 +994,7 @@ const _brigReady = _dbReady.then(function () {
   }
 });
 </script>
+<script src="/js/pin-baralho.js"></script>
 <script src="/js/brigada-offline.js"></script>
 <script src="/js/brigada-sync.js"></script>
 <script src="/js/brigada-captura.js"></script>
@@ -1606,12 +1608,14 @@ function initPinKeypad(prefix, aoConfirmar) {
   const clearBtn  = document.getElementById(`${prefix}-clear`)
   const okBtn     = document.getElementById(`${prefix}-ok`)
 
+  pinBaralhoAplicar(display)
+
   keypad.querySelectorAll('.pin-key[data-v]').forEach(btn => {
     btn.addEventListener('click', () => {
       if (_pinAtual.length < 4) {
         _pinAtual += btn.dataset.v
         atualizarPinDisplay(display, _pinAtual)
-        if (_pinAtual.length >= 4) aoConfirmar()
+        if (_pinAtual.length >= 4) pinFecharEConferir(display, aoConfirmar)
       }
     })
   })
@@ -1621,36 +1625,65 @@ function initPinKeypad(prefix, aoConfirmar) {
     atualizarPinDisplay(display, _pinAtual)
   })
   if (okBtn) okBtn.addEventListener('click', () => {
-    if (_pinAtual.length >= 4) aoConfirmar()
+    if (_pinAtual.length >= 4) pinFecharEConferir(display, aoConfirmar)
   })
 }
 
 function atualizarPinDisplay(displayEl, pinStr) {
+  // Baralho (js/pin-baralho.js) quando carregado; sem ele, as
+  // bolinhas que o HTML já traz continuam valendo.
+  if (typeof pinBaralhoPintar === 'function' && pinBaralhoPintar(displayEl, pinStr)) return
   displayEl.querySelectorAll('.pin-dot').forEach((dot, i) => {
     dot.classList.toggle('ativo', i < pinStr.length)
   })
 }
 
+// ── Baralho de PIN (js/pin-baralho.js) ──────────────────────────
+// Três funções finas: todas degradam para o comportamento antigo se
+// o módulo não estiver carregado. Ver "Regra do sistema — baralho de
+// PIN" no CLAUDE.md.
+function pinBaralhoAplicar(displayEl) {
+  if (typeof pinBaralhoMontar === 'function') pinBaralhoMontar(displayEl)
+}
+
+// O PIN fechou: forma o monte e SÓ ENTÃO confere. O monte é o próprio
+// indicador de espera — nenhum elemento novo, nenhuma altura muda.
+async function pinFecharEConferir(displayEl, aoConfirmar) {
+  if (typeof pinBaralhoFechar === 'function') await pinBaralhoFechar(displayEl)
+  await aoConfirmar()
+}
+
+// Resultado da conferência. Sempre limpa o display no final.
+async function pinBaralhoResultado(displayEl, aprovado) {
+  if (typeof pinBaralhoAprovar === 'function') {
+    await (aprovado ? pinBaralhoAprovar(displayEl) : pinBaralhoRecusar(displayEl))
+    return
+  }
+  atualizarPinDisplay(displayEl, '')
+}
+
 async function tentarDesbloquear() {
+  const display = document.getElementById('pin-display')
   try {
     const hash = await pinHash(_pinAtual, App.brigadista.id)
     const hashSalvo = await bOfflineGetConfig('pin_hash')
     if (hash === hashSalvo) {
       _pinAtual = ''
-      atualizarPinDisplay(document.getElementById('pin-display'), '')
+      await pinBaralhoResultado(display, true)
+      atualizarPinDisplay(display, '')
       entrarHome()
     } else {
       document.getElementById('lock-erro').hidden = false
       document.getElementById('lock-erro').textContent = 'PIN incorreto. Tente novamente.'
       _pinAtual = ''
-      atualizarPinDisplay(document.getElementById('pin-display'), '')
+      await pinBaralhoResultado(display, false)
     }
   } catch (e) {
     console.error('[tentarDesbloquear]', e)
     document.getElementById('lock-erro').hidden = false
     document.getElementById('lock-erro').textContent = 'Erro ao verificar PIN. Tente novamente.'
     _pinAtual = ''
-    atualizarPinDisplay(document.getElementById('pin-display'), '')
+    await pinBaralhoResultado(display, false)
   }
 }
 
@@ -1666,6 +1699,8 @@ function initPinSetupKeypad() {
   const keypad   = document.getElementById('pin-setup-keypad')
   const clearBtn = document.getElementById('pin-setup-clear')
   const okBtn    = document.getElementById('pin-setup-ok')
+
+  pinBaralhoAplicar(display)
 
   keypad.querySelectorAll('.pin-key[data-v]').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -1693,22 +1728,28 @@ function initPinSetupKeypad() {
 }
 
 async function confirmarPinSetup() {
+  const display = document.getElementById('pin-setup-display')
   try {
+    // Fase 1 não confere nada — só guarda o primeiro PIN. O baralho
+    // não se fecha aqui: o monte significa "estou conferindo", e não
+    // há o que conferir ainda.
     if (_pinSetupFase === 1) {
       _pinSetupPrim = _pinSetupAtual
       _pinSetupAtual = ''
-      atualizarPinDisplay(document.getElementById('pin-setup-display'), '')
+      atualizarPinDisplay(display, '')
       document.getElementById('pin-setup-dica').textContent = 'Confirme seu PIN de 4 dígitos'
       _pinSetupFase = 2
       return
     }
+
+    if (typeof pinBaralhoFechar === 'function') await pinBaralhoFechar(display)
 
     if (_pinSetupAtual !== _pinSetupPrim) {
       document.getElementById('pin-setup-erro').hidden = false
       document.getElementById('pin-setup-erro').textContent = 'PINs não coincidem. Tente novamente.'
       _pinSetupAtual = ''; _pinSetupPrim = ''; _pinSetupFase = 1
       document.getElementById('pin-setup-dica').textContent = 'Escolha um PIN de 4 dígitos'
-      atualizarPinDisplay(document.getElementById('pin-setup-display'), '')
+      await pinBaralhoResultado(display, false)
       return
     }
 
@@ -1716,13 +1757,15 @@ async function confirmarPinSetup() {
     await bOfflineSetConfig('pin_hash', hash)
     await bOfflineSetConfig('pin_dono', App.brigadista.id)
     _pinSetupAtual = ''; _pinSetupPrim = ''; _pinSetupFase = 1
+    await pinBaralhoResultado(display, true)
+    atualizarPinDisplay(display, '')
     entrarHome()
   } catch (e) {
     console.error('[confirmarPinSetup]', e)
     document.getElementById('pin-setup-erro').hidden = false
     document.getElementById('pin-setup-erro').textContent = 'Erro ao salvar PIN: ' + (e.message || 'tente novamente.')
     _pinSetupAtual = ''; _pinSetupPrim = ''; _pinSetupFase = 1
-    atualizarPinDisplay(document.getElementById('pin-setup-display'), '')
+    await pinBaralhoResultado(display, false)
   }
 }
 

@@ -15,7 +15,7 @@ const APP = SCOPE.includes('/pages/biomonitor.html') ? 'biomonitor'
 // Ao concluir uma implementação que toque arquivos web de um app,
 // incrementar SÓ o número daquele app (vN → vN+1) — não precisa mexer
 // nos outros dois.
-const VERSOES = { brigadas: 268, biomonitor: 39, frota: 103, agua: 24 }
+const VERSOES = { brigadas: 269, biomonitor: 40, frota: 104, agua: 25 }
 const CACHE = `siguc-${APP}-v${VERSOES[APP]}`
 
 const SHELLS = {
@@ -24,9 +24,11 @@ const SHELLS = {
     '/css/brigada.css',
     '/css/global.css',
     '/css/avatar-foto.css',
+    '/css/pin-baralho.css',
     '/js/config.js',
     '/js/fotos-privadas.js',
     '/js/avatar-foto.js',
+    '/js/pin-baralho.js',
     '/js/lgpd.js',
     '/js/lgpd-campo.js',
     '/js/qrcode-generator.js',
@@ -52,9 +54,11 @@ const SHELLS = {
     '/pages/biomonitor.html',
     '/css/biomonitor.css',
     '/css/avatar-foto.css',
+    '/css/pin-baralho.css',
     '/js/config.js',
     '/js/fotos-privadas.js',
     '/js/avatar-foto.js',
+    '/js/pin-baralho.js',
     '/js/lgpd.js',
     '/js/lgpd-campo.js',
     '/js/qrcode-generator.js',
@@ -78,6 +82,7 @@ const SHELLS = {
     '/pwa/icons/logo-frota.png',
     '/css/global.css',
     '/css/avatar-foto.css',
+    '/css/pin-baralho.css',
     '/css/frota-wise-theme.css',
     '/js/observability.js',
     '/js/queryLogger.js',
@@ -90,6 +95,7 @@ const SHELLS = {
     '/js/frota-notif-local.js',
     '/js/fotos-privadas.js',
     '/js/avatar-foto.js',
+    '/js/pin-baralho.js',
     '/js/lgpd.js',
     '/js/lgpd-campo.js',
     '/js/frota-consumo.js',
@@ -101,9 +107,11 @@ const SHELLS = {
     '/pages/agua-app.html',
     '/css/agua-app.css',
     '/css/avatar-foto.css',
+    '/css/pin-baralho.css',
     '/js/config.js',
     '/js/fotos-privadas.js',
     '/js/avatar-foto.js',
+    '/js/pin-baralho.js',
     '/js/lgpd.js',
     '/js/lgpd-campo.js',
     '/js/qrcode-generator.js',

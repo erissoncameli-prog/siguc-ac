@@ -175,6 +175,63 @@ estimada. O que virou regra permanente:
   ler `getComputedStyle().color` logo após `add('carregando')` pega
   `rgba(...,0.65)` no meio da animação — esperar a transição fechar.
 
+## Regra do sistema — baralho de PIN (os 4 apps de campo)
+O display de PIN dos 4 apps de campo é `js/pin-baralho.js` +
+`css/pin-baralho.css`. Cada dígito cai numa CARTA; quando o PIN
+fecha, as cartas deslizam para o centro em cascata de 40 ms e viram
+um MONTE que pulsa enquanto o app confere; aprovado, o monte fica
+verde com o visto; recusado, o baralho se abre de volta nas quatro
+casas e treme. Efeito trazido pelo usuário em vídeo (componente de
+OTP), adaptado — ver as três divergências deliberadas abaixo.
+
+- **Fonte única.** Antes eram 4 cópias do mesmo `.pin-dot`
+  (`css/agua-app.css`, `css/brigada.css`, `css/biomonitor.css` e um
+  `<style>` inline no `frota-app.html`) — mesma lição de
+  `js/frota-consumo.js`. Nenhuma página remonta a animação: entra só
+  com a cor (`--pin-cor`, no CSS do próprio app) e com o que
+  "conferir o PIN" significa ali.
+- **A espera é o PRÓPRIO PIN.** O monte se forma por `transform`
+  dentro da mesma caixa — nenhum spinner novo entra na tela e nenhuma
+  altura muda (a regra de `btnEspera`/`skeleton*HTML` do sistema vale
+  igual aqui). Razão de existir: a bolinha acendia e pronto, sem
+  dizer que o 4º dígito fechou o PIN nem que o app estava conferindo
+  — com sol na tela e luva no dedo, o brigadista digitava de novo.
+- **O dígito não fica na tela.** Aparece por 520 ms e vira ponto: o
+  vídeo é código de SMS, PIN é credencial. Divergência deliberada.
+- **Nada bloqueia o trabalho de campo.** Falha de rede/IndexedDB
+  segue o caminho de erro de sempre; sem o arquivo carregado
+  `pinBaralhoMontar` não existe, as bolinhas do HTML continuam
+  valendo e cada app funciona como antes (todo chamador guarda com
+  `typeof pinBaralho... === 'function'`).
+- **A navegação vem DEPOIS da animação de aprovado** — se a tela
+  trocar dentro do callback de conferência, o visto verde só aparece
+  numa tela que já saiu do ar. No Biomonitor isso virou
+  `opts.aoAprovar` de `bioIniciarKeypad`; nos outros três é o
+  `await pinBaralhoResultado(...)` antes do `entrarHome()`.
+- **O monte não se forma na 1ª fase do setup de PIN** (a que só
+  guarda o primeiro dígito para confirmar depois): monte significa
+  "estou conferindo", e ali não há o que conferir.
+- ⚠️ **A cor de cada app entra como FALLBACK do `var()`, nunca como
+  declaração do módulo.** `--pin-cor` declarado em
+  `.pin-baralho.pin-baralho` (0,2,0) vence o `.pin-display` do app
+  (0,1,0) e pinta os quatro de azul — foi a 1ª versão, pega no teste.
+- ⚠️ **`.pin-baralho.pin-baralho` com a classe REPETIDA de
+  propósito**: o container é o mesmo elemento que já tem
+  `display:flex; gap:14px` do app, e no Frota esse CSS é `<style>`
+  inline (sempre depois de qualquer `<link>`). Sem a especificidade
+  extra, quem vence depende da ordem de carregamento.
+- ⚠️ **Dois bugs reais achados pelo teste, não por leitura**: (1) o
+  timer que mascara o dígito chegava DEPOIS do visto e trocava o selo
+  verde por um ponto — `fechar()` cancela os timers pendentes; (2) o
+  ponto da máscara era `<span>` sem `display:block`, então
+  largura/altura não se aplicavam e ele nunca aparecia (caixa 0×0).
+- Guarda: `tests/pin-baralho.test.js` (10) +
+  `tests/fixtures/pin-baralho-harness.html`, com cor propositalmente
+  diferente do padrão para pegar a regressão de especificidade.
+- `pwa/sw.js`: os 4 shells ganharam os 2 arquivos — brigadas 268→269,
+  biomonitor 39→40, frota 103→104, agua 24→25. As 4 listas
+  `build-www.mjs` dos shells nativos atualizadas em paralelo.
+
 ## Regra do sistema — gráficos acessíveis por teclado
 `js/grafico-teclado.js` é a fonte única. Nenhuma tela reimplementa
 navegação, realce ou tabela alternativa — mesma lição de
