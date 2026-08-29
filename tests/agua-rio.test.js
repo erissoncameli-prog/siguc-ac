@@ -180,7 +180,12 @@ test.describe('Rio de fundo das telas de bloqueio', () => {
     await page.locator('#tela-config-pin .pin-key[data-v="7"]').click();
     await page.locator('#tela-config-pin .pin-key[data-v="4"]').click();
 
-    const marcados = await page.locator('#tela-config-pin .pin-dot.ativo').count();
+    // O que importa aqui é que o toque CHEGOU à tecla, não qual é o
+    // desenho do display: hoje são as cartas do baralho
+    // (js/pin-baralho.js), antes eram as bolinhas — as duas formas
+    // valem, porque o baralho degrada para as bolinhas.
+    const marcados = await page.locator(
+      '#tela-config-pin .pin-carta.cheia, #tela-config-pin .pin-dot.ativo').count();
     expect(marcados, 'os dois dígitos chegaram ao teclado').toBe(2);
     expect(errosDoApp(erros)).toEqual([]);
   });
