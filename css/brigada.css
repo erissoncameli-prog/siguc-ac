@@ -130,6 +130,10 @@
 /* PIN keypad */
 .pin-display {
   display: flex; gap: 14px; margin-bottom: 30px;
+  /* Cor do baralho de PIN (css/pin-baralho.css) — as cartas
+     substituem as bolinhas abaixo, que ficam como degradação para
+     quando o módulo não estiver carregado. */
+  --pin-cor: var(--soft);
 }
 .pin-dot {
   width: 13px; height: 13px; border-radius: 50%;
