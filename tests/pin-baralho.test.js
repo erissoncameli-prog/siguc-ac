@@ -108,6 +108,77 @@ test.describe('baralho de PIN', () => {
     await expect(primeira).toHaveText('');
   });
 
+  // O dígito precisa ACONTECER na tela: um filete de luz percorre a
+  // borda inteira uma vez. A 1ª versão só trocava a cor da borda, e no
+  // aparelho ao sol a troca passava despercebida — o usuário viu isso
+  // comparando com o vídeo de referência.
+  test('o dígito dispara um filete que percorre a borda', async ({ page }) => {
+    await abrir(page);
+    await montar(page);
+    const carta = page.locator('#display .pin-carta').first();
+
+    // Antes do dígito: nenhum filete pintado sobre a borda.
+    const caixa = await carta.boundingBox();
+    const alvo = { x: Math.round(caixa.x + caixa.width / 2), y: Math.round(caixa.y), width: 1, height: 1 };
+    const antes = await page.screenshot({ clip: alvo });
+
+    await digitar(page, '7');
+    await expect(carta).toHaveClass(/varrendo/);
+
+    // Logo no início o filete está no topo — o pixel do meio da aresta
+    // superior tem de mudar. Comparação por BYTES de um recorte 1×1
+    // (mesma técnica de tests/mapa-telacheia.test.js): não precisa
+    // decodificar PNG, e cor diferente dá bytes diferentes.
+    await page.waitForTimeout(60);
+    const durante = await page.screenshot({ clip: alvo });
+    expect(Buffer.compare(antes, durante), 'o filete pintou a borda').not.toBe(0);
+
+    // E ele ANDA: o ângulo do gradiente avança ao longo da volta. Sem
+    // isso o filete fica parado num canto (o que acontece se alguém
+    // remover o @property --pin-ang).
+    const ang = async () => parseFloat(await page.evaluate(() =>
+      getComputedStyle(document.querySelector('#display .pin-carta'), '::before')
+        .getPropertyValue('--pin-ang')));
+    const a1 = await ang();
+    await page.waitForTimeout(220);
+    const a2 = await ang();
+    expect(a2, `o filete avançou de ${a1}° para ${a2}°`).toBeGreaterThan(a1);
+  });
+
+  test('o mesmo dígito digitado de novo redispara o filete', async ({ page }) => {
+    await abrir(page);
+    await montar(page);
+    const carta = page.locator('#display .pin-carta').first();
+    await digitar(page, '7');
+    await expect(carta).toHaveClass(/varrendo/);
+    // Apaga e repete o MESMO dígito: sem o reflow forçado entre remover
+    // e recolocar a classe, o navegador agrupa as duas mudanças e a
+    // animação não recomeça.
+    await digitar(page, '');
+    await expect(carta).not.toHaveClass(/varrendo/);
+    await digitar(page, '7');
+    await expect(carta).toHaveClass(/varrendo/);
+    const ang1 = await page.evaluate(() => getComputedStyle(
+      document.querySelector('#display .pin-carta'), '::before').getPropertyValue('--pin-ang'));
+    await page.waitForTimeout(200);
+    const ang2 = await page.evaluate(() => getComputedStyle(
+      document.querySelector('#display .pin-carta'), '::before').getPropertyValue('--pin-ang'));
+    expect(parseFloat(ang2)).toBeGreaterThan(parseFloat(ang1));
+  });
+
+  test('a casa da vez tem halo, a vazia não', async ({ page }) => {
+    await abrir(page);
+    await montar(page);
+    await digitar(page, '1');
+    const sombras = await page.evaluate(() => {
+      const cs = [...document.querySelectorAll('#display .pin-carta')];
+      return { mira: getComputedStyle(cs[1]).boxShadow, vazia: getComputedStyle(cs[3]).boxShadow };
+    });
+    // O halo é um box-shadow colorido a mais na casa da vez.
+    expect(sombras.mira).not.toBe(sombras.vazia);
+    expect(sombras.mira.length).toBeGreaterThan(sombras.vazia.length);
+  });
+
   test('formar o monte não muda o tamanho da caixa', async ({ page }) => {
     await abrir(page);
     await montar(page);

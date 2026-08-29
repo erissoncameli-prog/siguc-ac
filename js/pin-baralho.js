@@ -92,6 +92,18 @@
     return true
   }
 
+  // Filete de luz que dá uma volta na borda quando o dígito cai
+  // (css/pin-baralho.css). A classe é retirada no fim para que o
+  // MESMO dígito digitado de novo — apagou e repetiu — volte a
+  // disparar: animação só reinicia se a classe sair e entrar.
+  function varrerBorda(carta) {
+    carta.classList.remove('varrendo')
+    // Força o reflow: sem ler o layout entre o remove e o add, o
+    // navegador agrupa os dois e a animação não recomeça.
+    void carta.offsetWidth
+    carta.classList.add('varrendo')
+  }
+
   // ── Pintura por dígito ──────────────────────────────────────────
   function aplicar(el, str) {
     cartas(el).forEach(function (c, i) {
@@ -99,10 +111,15 @@
       c.classList.toggle('cheia', preenchida)
       c.classList.toggle('mira', i === str.length)
       var g = c.querySelector('.pin-glifo')
-      if (!preenchida) { c.dataset.pinD = ''; g.textContent = ''; return }
+      // Casa vazia não guarda a marca de "acabou de receber dígito" —
+      // a animação é de uma passada só, então visualmente não muda
+      // nada, mas deixar a classe pendurada é estado velho esperando
+      // para confundir quem for mexer aqui depois.
+      if (!preenchida) { c.classList.remove('varrendo'); c.dataset.pinD = ''; g.textContent = ''; return }
       if (c.dataset.pinD === str[i]) return          // já mostrada, não repinta
       c.dataset.pinD = str[i]
       g.textContent = str[i]
+      varrerBorda(c)
       // Visível por meio segundo, depois vira ponto: dá para conferir
       // o que se digitou sem deixar o PIN legível de longe.
       agendar(el, function () {
@@ -212,7 +229,7 @@
     cancelarTimers(el)
     el.classList.remove('pin-empilhando', 'pin-conferindo', 'pin-recusado')
     cartas(el).forEach(function (c) {
-      c.classList.remove('pin-topo', 'pin-aprovada', 'pin-recusada')
+      c.classList.remove('pin-topo', 'pin-aprovada', 'pin-recusada', 'varrendo')
       c.style.transform = ''
       c.style.transitionDelay = ''
       c.style.zIndex = ''

@@ -190,6 +190,23 @@ OTP), adaptado — ver as três divergências deliberadas abaixo.
   `js/frota-consumo.js`. Nenhuma página remonta a animação: entra só
   com a cor (`--pin-cor`, no CSS do próprio app) e com o que
   "conferir o PIN" significa ali.
+- **O dígito ACONTECE: um filete de luz dá uma volta na borda** da
+  carta (~0,7 s, sentido horário) a cada tecla. A 1ª versão só trocava
+  a cor da borda — no aparelho ao sol a troca passa despercebida, e foi
+  isso que o usuário viu faltando ao comparar com o vídeo. Feito com
+  `@property --pin-ang` animando o ângulo de um `conic-gradient` num
+  `::before` mascarado (`mask-composite: exclude` + o par
+  `-webkit-mask-composite: xor`, que o WebKit ainda exige), de modo que
+  sobra só a moldura e a luz acompanha os cantos arredondados. Sem
+  suporte a `@property` o filete não gira, só acende e apaga — nunca
+  fica um arco parado num canto.
+  ⚠️ Redisparar exige `classList.remove` + **reflow forçado**
+  (`void el.offsetWidth`) + `add`: sem ler o layout entre os dois, o
+  navegador agrupa as mudanças e a animação não recomeça (apagar e
+  repetir o mesmo dígito não acendia nada).
+- **A casa DA VEZ tem halo constante**, além da borda tingida — é o que
+  diz "o toque cai aqui" de relance, sem contar casas preenchidas. Não
+  confundir com o filete, que é de uma passada só.
 - **A espera é o PRÓPRIO PIN.** O monte se forma por `transform`
   dentro da mesma caixa — nenhum spinner novo entra na tela e nenhuma
   altura muda (a regra de `btnEspera`/`skeleton*HTML` do sistema vale
@@ -225,12 +242,18 @@ OTP), adaptado — ver as três divergências deliberadas abaixo.
   verde por um ponto — `fechar()` cancela os timers pendentes; (2) o
   ponto da máscara era `<span>` sem `display:block`, então
   largura/altura não se aplicavam e ele nunca aparecia (caixa 0×0).
-- Guarda: `tests/pin-baralho.test.js` (10) +
+- Guarda: `tests/pin-baralho.test.js` (13) +
   `tests/fixtures/pin-baralho-harness.html`, com cor propositalmente
-  diferente do padrão para pegar a regressão de especificidade.
+  diferente do padrão para pegar a regressão de especificidade. O teste
+  do filete compara BYTES de um recorte 1×1 no meio da aresta superior
+  (mesma técnica de `tests/mapa-telacheia.test.js`): prova que a luz
+  PINTOU a borda, coisa que asserção de classe não prova.
 - `pwa/sw.js`: os 4 shells ganharam os 2 arquivos — brigadas 268→269,
   biomonitor 39→40, frota 103→104, agua 24→25. As 4 listas
   `build-www.mjs` dos shells nativos atualizadas em paralelo.
+  O filete + halo subiram de novo os 4: brigadas 269→270, biomonitor
+  40→41, frota 104→105, agua 25→26 (só os 2 arquivos mudaram, ambos já
+  no shell — nenhuma lista precisou mudar).
 
 ## Regra do sistema — gráficos acessíveis por teclado
 `js/grafico-teclado.js` é a fonte única. Nenhuma tela reimplementa
