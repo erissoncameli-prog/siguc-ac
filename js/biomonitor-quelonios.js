@@ -396,16 +396,20 @@ function bioIniciarTelaConfigPin() {
     if (!primeiroPin) {
       primeiroPin = pin
       if (dicaEl) dicaEl.textContent = 'Confirme seu PIN de 4 dígitos'
-      return
+      return null                       // sem veredito: nada a conferir ainda
     }
     if (pin !== primeiroPin) {
       if (erroEl) { erroEl.textContent = 'PINs não coincidem. Tente novamente.'; erroEl.hidden = false }
       primeiroPin = null
       if (dicaEl) dicaEl.textContent = 'Escolha um PIN de 4 dígitos'
-      return
+      return false
     }
     await bioOfflineSetPin(pin)
-    await bioEntrarNaHome()
+    return true
+  }, {
+    // Só a 2ª fase confere alguma coisa — na 1ª o baralho não fecha.
+    vaiConferir: () => primeiroPin !== null,
+    aoAprovar: () => bioEntrarNaHome(),
   })
 }
 
@@ -417,14 +421,13 @@ function bioIniciarTelaBloqueio() {
 
   bioIniciarKeypad('pin-lock', async (pin) => {
     const ok = await bioOfflineVerificarPin(pin)
-    if (ok) {
-      await bioEntrarNaHome()
-    } else {
+    if (!ok) {
       const erroEl = document.getElementById('bio-lock-erro')
       if (erroEl) { erroEl.textContent = 'PIN incorreto. Tente novamente.'; erroEl.hidden = false }
       setTimeout(() => { if (erroEl) erroEl.hidden = true }, 2500)
     }
-  })
+    return ok
+  }, { aoAprovar: () => bioEntrarNaHome() })
 
   document.getElementById('bio-btn-esqueci-pin')?.addEventListener('click', async () => {
     if (!confirm('Descartar o PIN deste aparelho e entrar novamente com e-mail e senha? É necessário ter internet.')) return
@@ -437,27 +440,56 @@ function bioIniciarTelaBloqueio() {
 }
 
 // ── Keypad genérico (usado em bloqueio e setup de PIN) ─────────
-function bioIniciarKeypad(prefixo, onConfirmar) {
+// Baralho de PIN (js/pin-baralho.js): ao fechar o PIN as cartas
+// viram um monte que pulsa enquanto `onConfirmar` roda, e o
+// resultado é pintado no próprio monte. Degrada para as bolinhas de
+// sempre se o módulo não estiver carregado.
+//
+// `onConfirmar(pin)` devolve o veredito: true (aprovado), false
+// (recusado) ou null/undefined quando não houve conferência — é o
+// caso da 1ª fase do setup, que só guarda o primeiro PIN.
+// `opts.vaiConferir()` diz, ANTES de chamar, se este toque vai
+// conferir alguma coisa: o monte significa "estou conferindo", então
+// não se forma na fase que não confere nada.
+// `opts.aoAprovar()` roda DEPOIS da animação de aprovado — é onde
+// vai a navegação. Se a tela trocasse dentro de `onConfirmar`, o
+// visto verde só apareceria numa tela que já saiu do ar.
+function bioIniciarKeypad(prefixo, onConfirmar, opts) {
   const digits = []
-  const dotEls = document.querySelectorAll(`#${prefixo}-display .bio-pin-dot`)
+  const displayEl  = document.getElementById(`${prefixo}-display`)
+  const vaiConferir = (opts && opts.vaiConferir) || (() => true)
+
+  if (typeof pinBaralhoMontar === 'function') pinBaralhoMontar(displayEl)
 
   function atualizar() {
-    dotEls.forEach((d, i) => d.classList.toggle('ativo', i < digits.length))
+    const str = digits.join('')
+    if (typeof pinBaralhoPintar === 'function' && pinBaralhoPintar(displayEl, str)) return
+    displayEl?.querySelectorAll('.bio-pin-dot')
+      .forEach((d, i) => d.classList.toggle('ativo', i < digits.length))
   }
 
+  // Não esconde o erro aqui: `reiniciar` roda logo depois de
+  // `onConfirmar`, que é justamente quem acabou de escrever a
+  // mensagem. Quem limpa é o próximo dígito digitado (abaixo).
   function reiniciar() {
     digits.length = 0; atualizar()
-    document.getElementById(`${prefixo}-erro`)?.setAttribute('hidden', '')
   }
 
   document.querySelectorAll(`#${prefixo}-keypad .bio-pin-key`).forEach(btn => {
     btn.addEventListener('click', async () => {
       const v = btn.dataset.v
       if (v !== undefined && digits.length < 4) {
+        if (!digits.length) document.getElementById(`${prefixo}-erro`)?.setAttribute('hidden', '')
         digits.push(v); atualizar()
         if (digits.length === 4) {
-          await onConfirmar(digits.join(''))
+          const confere = vaiConferir()
+          if (confere && typeof pinBaralhoFechar === 'function') await pinBaralhoFechar(displayEl)
+          const veredito = await onConfirmar(digits.join(''))
+          if (confere && typeof pinBaralhoAprovar === 'function' && veredito != null) {
+            await (veredito ? pinBaralhoAprovar(displayEl) : pinBaralhoRecusar(displayEl))
+          }
           reiniciar()
+          if (veredito === true && opts && opts.aoAprovar) await opts.aoAprovar()
         }
       } else if (btn.classList.contains('bio-pin-clear')) {
         digits.pop(); atualizar()

@@ -134,7 +134,10 @@ body { margin: 0; }
 .bio-btn-login:disabled { opacity: .6; cursor: not-allowed; }
 
 /* ── PIN keypad (idêntico ao brigadas, cor diferente) ────────── */
-.bio-pin-display { display: flex; gap: 14px; margin-bottom: 30px; }
+/* --pin-cor: cor do baralho de PIN (css/pin-baralho.css) — as cartas
+   substituem as bolinhas abaixo, que ficam como degradação para
+   quando o módulo não estiver carregado. */
+.bio-pin-display { display: flex; gap: 14px; margin-bottom: 30px; --pin-cor: var(--bio-soft); }
 .bio-pin-dot {
   width: 13px; height: 13px; border-radius: 50%;
   background: transparent; border: 1.5px solid rgba(255,255,255,.32);
