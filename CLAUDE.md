@@ -1984,6 +1984,39 @@ paralelo.
   quando a antecipação é relevante).
 - `pwa/sw.js`: biomonitor v35 → v36.
 
+## Regra do sistema — link de download do APK (páginas de instalação)
+Página de instalação NUNCA aponta para
+`/releases/latest/download/siguc-<app>.apk`. `latest` é do REPOSITÓRIO
+inteiro, e este repositório publica Release de 4 apps na mesma
+sequência (`brigadas-v*`, `biomonitor-v*`, `frota-v*`, `agua-v*`):
+quem buildou por último vence o `latest`, e como esse Release só tem o
+`.apk` DELE, o link dos outros 3 devolve **404**. Com o build
+automático (`apk-auto-trigger.yml`, disparado pelo contador `VERSOES`
+de `pwa/sw.js`), qual app está quebrado muda sozinho ao longo do dia —
+foi assim que apareceu, com a Água 404 numa hora e as 3 restantes 404
+na hora seguinte (medido: com `agua-v0.0.6` publicada, `latest` do
+frota e do brigadas devolvia 404 e a da água 200).
+- Fonte única: `api/apk-latest.js` (`/api/apk-latest?app=<slug>`) —
+  filtra os Releases pela TAG do app pedido, pega o mais recente NÃO
+  rascunho/pré-lançamento e redireciona (302) para o asset. Nasceu como
+  `api/biomonitor-apk-latest.js` (só um app) e virou genérico; a rota
+  antiga segue viva por rewrite no `vercel.json`, para não quebrar QR
+  ou link já impresso. **Um arquivo por app estouraria o limite de
+  Serverless Functions do plano Hobby** — mesma consolidação de
+  `/api/health`.
+- **Resolvido no SERVIDOR, não no navegador**: o CSP do site
+  (`vercel.json`) não libera `api.github.com` em `connect-src`, e não
+  deve — é domínio de terceiro. Assim o HTML fica com um `<a href>`
+  comum, que funciona sem JS (o usuário abre no celular, em campo).
+- **Slug sempre por whitelist** — nunca concatenado cru no filtro de
+  tag. E o fallback (API do GitHub fora do ar ou limite de requisição
+  estourado) é a página de Releases filtrada, nunca uma tela de erro.
+- App novo = uma linha em `APPS` no arquivo, mais nada.
+- Não mexe em `pwa/sw.js`: `pages/instalar-*.html` e `api/` não estão
+  em nenhum `SHELLS`.
+- Guarda: `tests/apk-latest.test.js` (6 testes, sem rede — a resposta
+  da API é injetada; verificado que reprova a versão antiga).
+
 ## Variáveis de ambiente
 SUPABASE_URL=https://atqtybcsvepdabsvgaly.supabase.co
 SUPABASE_ANON_KEY=(pública, já em config.js)
