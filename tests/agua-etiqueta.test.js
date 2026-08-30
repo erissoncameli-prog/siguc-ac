@@ -59,6 +59,7 @@ test('desenha a etiqueta no tamanho certo, com conteúdo de verdade', async ({ p
     const canvas = aguaEtiquetaCriarCanvas({
       codigo_amostra: 'COL-2026-0042',
       ponto_nome: 'Rio Acre — Ponte Metálica',
+      rio: 'Rio Acre',
       codigo_ana: '12345678',
       data_coleta: '2026-08-29',
       hora_coleta: '08:14',
@@ -81,6 +82,35 @@ test('desenha a etiqueta no tamanho certo, com conteúdo de verdade', async ({ p
   // Faixa preta do topo sozinha já teria milhares de pixels — se
   // "pretos" for baixo, o desenho não rodou de verdade.
   expect(r.pretos).toBeGreaterThan(1000);
+});
+
+test('nome do rio entra na etiqueta quando o ponto tem um cadastrado', async ({ page }) => {
+  await abrirAppSemLogin(page);
+
+  // Sem acesso ao texto desenhado num canvas, a prova é comparativa:
+  // a MESMA etiqueta com e sem `rio` tem que ter mais pixel preto com
+  // ele (a linha "Rio Acre · ANA 12345678" desenha algo a mais) — e o
+  // desenho não pode quebrar quando o ponto não tem rio cadastrado
+  // (ponto fora de curso d'água nomeado).
+  const r = await page.evaluate(() => {
+    const contarPretos = canvas => {
+      const ctx = canvas.getContext('2d')
+      const { data } = ctx.getImageData(0, 0, canvas.width, canvas.height)
+      let n = 0
+      for (let i = 0; i < data.length; i += 4) { if (data[i] < 50) n++ }
+      return n
+    }
+    const base = {
+      codigo_amostra: 'COL-2026-0043', ponto_nome: 'Rio Acre — Ponte Metálica',
+      codigo_ana: '12345678', data_coleta: '2026-08-29', hora_coleta: '08:14',
+      coletor_nome: 'J. Silva', lat: -9.9754, lng: -67.8243, via: 1, totalVias: 1,
+    }
+    const comRio = contarPretos(aguaEtiquetaCriarCanvas({ ...base, rio: 'Rio Acre' }))
+    const semRio = contarPretos(aguaEtiquetaCriarCanvas(base)) // sem `rio` — não pode quebrar
+    return { comRio, semRio }
+  })
+
+  expect(r.comRio).toBeGreaterThan(r.semRio);
 });
 
 test('código da amostra nunca vaza a margem direita, e o QR fica ABAIXO do texto, nunca por cima', async ({ page }) => {

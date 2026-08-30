@@ -3099,7 +3099,18 @@ foi homologada ainda.
   que ficar branca na altura do código — prova que não vaza) e uma
   faixa mais abaixo (tem que ter o QR — prova que ele só mudou de
   lugar, não sumiu).
-- `pwa/sw.js`: agua v27 → v28.
+- **Nome do rio** (`ponto_rio`/`agua_pontos_coleta.rio`) entrou na
+  MESMA linha do código ANA (`Rio Acre · ANA 12345678`), não numa
+  linha própria — a etiqueta já estava apertada com QR + rodapé fixos
+  (ver acima), e uma linha nova custaria altura que não sobra. Some
+  sozinho quando o ponto não tem rio cadastrado. Propagado às 4
+  superfícies que montam `dados` pra `aguaEtiquetaDesenhar` (pós-
+  salvar e Fila em `agua-app.html`, do cache local `ponto.rio`;
+  Histórico do app e lote de `agua-pontos.html`, de `ponto_rio` da
+  view — que já existia, só não estava no `select`). Guarda: 3º teste
+  em `tests/agua-etiqueta.test.js`, comparativo (mais pixel preto com
+  `rio` do que sem, e desenha sem quebrar quando falta).
+- `pwa/sw.js`: agua v28 → v29.
 
 **Pós-lançamento — ler a etiqueta por câmera em `agua-laudos.html`.**
 O QR da etiqueta (acima) só carrega o texto puro do `codigo_amostra` —
