@@ -145,6 +145,13 @@ function bioMostrarTela(id) {
     const mascote = faixa.querySelector('.bio-faixa-mascote')
     if (mascote) mascote.hidden = id !== 'tela-home'
   }
+  // Faixa do modo treinamento (js/biomonitor-offline.js): mesma regra
+  // de visibilidade da faixa institucional — nunca nas telas de
+  // autenticação, mesmo que o modo esteja ligado.
+  const faixaTreino = document.getElementById('bio-treino-faixa')
+  if (faixaTreino) {
+    faixaTreino.hidden = lockTelas.includes(id) || !(typeof bioModoTreinoAtivo === 'function' && bioModoTreinoAtivo())
+  }
 }
 
 /* ════════════════════════════════════════════════════════════
@@ -590,6 +597,9 @@ async function bioEntrarNaHome() {
     onConcluido: () => { bioAtualizarBadgeFila(); bioAtualizarCardCorrecao() },
     onErro:      (e) => console.warn('biomonitor sync:', e),
   })
+
+  bioPintarModoTreino()
+  bioIniciarGuias()
 
   bioMostrarTela('tela-home')
   bioMostrarTela('tela-home')  // força re-renderização
@@ -5056,6 +5066,77 @@ async function bioSincronizarDadosReferencia() {
   }
 }
 
+/* ════════════════════════════════════════════════════════════
+   MODO TREINAMENTO (sandbox) — ver js/biomonitor-offline.js para o
+   desenho do isolamento (banco físico separado + guard em
+   bioSyncTudo). Este bloco só cuida da INTERFACE: faixa, botão de
+   Config e o texto do botão.
+   ════════════════════════════════════════════════════════════ */
+function bioPintarModoTreino() {
+  const ligado = typeof bioModoTreinoAtivo === 'function' && bioModoTreinoAtivo()
+  document.body.classList.toggle('bio-modo-treino', ligado)
+  const faixa = document.getElementById('bio-treino-faixa')
+  if (faixa) faixa.hidden = !ligado || ['tela-login', 'tela-trocar-senha', 'tela-config-pin', 'tela-bloqueio']
+    .includes(document.querySelector('.bio-tela.ativa')?.id)
+  const rotulo = document.getElementById('bio-btn-modo-treino-rotulo')
+  if (rotulo) rotulo.textContent = ligado ? 'Sair do modo treinamento' : 'Modo treinamento'
+}
+
+async function bioDefinirModoTreino(ligar) {
+  if (!ligar) {
+    if (!confirm('Sair do modo treinamento descarta os registros de treino feitos neste aparelho. Continuar?')) return
+    await bioModoTreinoDesativar()
+    bioToast('Modo treinamento desligado. Os próximos registros valem de verdade.', 'ok')
+  } else {
+    await bioModoTreinoAtivar()
+    bioToast('Modo treinamento ligado — nada será enviado ao sistema.', 'warn')
+  }
+  bioPintarModoTreino()
+  bioMostrarTela('tela-home')
+}
+
+/* ════════════════════════════════════════════════════════════
+   GUIAS DE INTRODUÇÃO / TREINAMENTO (js/guia-app.js)
+   ════════════════════════════════════════════════════════════ */
+let _bioGuiasProntos = false
+
+function bioIniciarGuias() {
+  const btn = document.getElementById('bio-btn-ajuda-treinamento')
+  if (typeof guiaDefinir !== 'function' || typeof BIOMONITOR_GUIAS === 'undefined') {
+    if (btn) btn.hidden = true
+    return
+  }
+  if (!_bioGuiasProntos) {
+    guiaDefinir({ ...BIOMONITOR_GUIAS, aoTrocarTela: bioGuiaTrocarTela })
+    _bioGuiasProntos = true
+  }
+  guiaConvite({
+    container: '#tela-home', guia: 'primeiros-passos',
+    titulo: 'Primeira vez por aqui?',
+    texto: 'Um guia rápido mostra como registrar um ninho.',
+  })
+}
+
+// O guia pode levar a uma tela de LISTA (Abertos, Berçário) — nunca a
+// um formulário cru, que só nasce preenchido corretamente através da
+// função que o abre (bioAbrirFormNinho etc.). Ali o passo cai no
+// cartão de texto, que é o certo (mesma regra do app da Água).
+const BIO_GUIA_TELAS_CRUAS = new Set([
+  'tela-form-ninho', 'tela-form-transf', 'tela-form-eclosao', 'tela-form-visita',
+  'tela-form-entrada-bercario', 'tela-form-soltura', 'tela-form-ocorrencia',
+])
+function bioGuiaTrocarTela(id) {
+  if (BIO_GUIA_TELAS_CRUAS.has(id)) return
+  if (!document.getElementById(id)) return
+  bioMostrarTela(id)
+}
+
+document.addEventListener('click', ev => {
+  const b = ev.target.closest?.('[data-guia-tela]')
+  if (!b) return
+  if (typeof guiaAbrir === 'function') guiaAbrir(b.dataset.guiaTela, { voltarCentral: false })
+})
+
 async function bioCarregarConfig() {
   // Quota
   const quota = await bioQuotaArmazenamento()
@@ -5114,6 +5195,14 @@ function bioIniciarConfig() {
     bioMostrarTela('tela-equipamentos')
     if (typeof bioEquipIniciar === 'function') bioEquipIniciar()
   })
+
+  document.getElementById('bio-btn-ajuda-treinamento')?.addEventListener('click', () => {
+    if (typeof guiaAbrirCentral === 'function') guiaAbrirCentral()
+  })
+  document.getElementById('bio-btn-modo-treino')?.addEventListener('click', () => {
+    bioDefinirModoTreino(!(typeof bioModoTreinoAtivo === 'function' && bioModoTreinoAtivo()))
+  })
+  document.getElementById('bio-btn-treino-sair')?.addEventListener('click', () => bioDefinirModoTreino(false))
 
   document.getElementById('bio-btn-alterar-pin')?.addEventListener('click', async () => {
     bioMostrarTela('tela-config-pin')

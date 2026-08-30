@@ -698,6 +698,12 @@ async function bioSyncCacheEquipamentos(grupoId) {
 
 // ── Sincronização completa ────────────────────────────────────
 async function bioSyncTudo({ monitorId, onProgresso, onConcluido, onErro } = {}) {
+  // Modo treinamento: nunca sincroniza. Isto sozinho já bastaria (o
+  // banco de treino nem existe no servidor), mas é a segunda camada da
+  // garantia — a primeira é bioOfflineInit() nunca abrir o banco real
+  // enquanto o treino está ativo (js/biomonitor-offline.js). As duas
+  // juntas: mesmo que uma falhe, a outra segura.
+  if (typeof bioModoTreinoAtivo === 'function' && bioModoTreinoAtivo()) return
   if (_bioSyncEmAndamento) return
   if (!navigator.onLine)   return
 

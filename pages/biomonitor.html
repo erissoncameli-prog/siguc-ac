@@ -14,6 +14,14 @@
   <link rel="stylesheet" href="/css/biomonitor.css">
   <link rel="stylesheet" href="/css/pin-baralho.css">
   <link rel="stylesheet" href="/css/avatar-foto.css">
+  <link rel="stylesheet" href="/css/guia-app.css">
+  <style>
+    /* Cor de destaque dos guias neste app (js/guia-app.js). Entra como
+       variável da PÁGINA — o módulo nunca declara cor própria, mesma
+       regra de --pin-cor em css/pin-baralho.css e de --guia-cor em
+       pages/agua-app.html. */
+    body.bio-app { --guia-cor: #1A6B8C; }
+  </style>
 </head>
 <body class="bio-app">
 
@@ -154,6 +162,16 @@
   <button class="bio-btn-link" id="bio-btn-esqueci-pin">Esqueci o PIN — entrar com senha</button>
 </div>
 
+<!-- ══ FAIXA DO MODO TREINAMENTO ══════════════════════════════ -->
+<!-- Irmã das telas e da faixa institucional, nunca dentro de uma —
+     precisa aparecer em TODAS. Sem transform (mesma regra da barra
+     de abas do Frota: ancestral com transform vira containing block
+     de descendente fixed). -->
+<div id="bio-treino-faixa" class="bio-treino-faixa" hidden>
+  <span>MODO TREINAMENTO — nada é enviado ao sistema</span>
+  <button type="button" id="bio-btn-treino-sair">Sair</button>
+</div>
+
 <!-- ══ FAIXA INSTITUCIONAL GLOBAL (fixa em todas as telas de app) ══ -->
 <div id="bio-faixa-global" class="bio-faixa-inst" hidden>
   <div class="bio-faixa-logos">
@@ -181,6 +199,7 @@
         </div>
       </div>
     </div>
+    <button class="bio-btn-icon" data-guia-tela="primeiros-passos" aria-label="Ajuda desta tela" title="Ajuda desta tela"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></button>
     <button class="bio-btn-icon" id="bio-btn-sync-home" aria-label="Sincronizar" title="Sincronizar">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M23 4v6h-6M1 20v-6h6"/>
@@ -335,7 +354,7 @@
   <header class="bio-form-header">
     <button class="bio-btn-back" data-back="tela-home" aria-label="Voltar">‹</button>
     <span id="bio-form-ninho-titulo">Novo Ninho</span>
-    <span></span>
+    <button class="bio-btn-icon" data-guia-tela="registrar-ninho" aria-label="Ajuda desta tela" title="Ajuda desta tela"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></button>
   </header>
 
   <div class="bio-form-body">
@@ -371,7 +390,7 @@
         <span class="bio-radar-ponto"></span>
       </div>
       <div>
-        <span class="bio-form-label" style="margin-bottom:2px">Localização GPS</span>
+        <span class="bio-form-label" style="margin-bottom:2px">Localização GPS<button type="button" class="guia-ajuda-btn" data-guia-verbete="gps-continuo" aria-label="Ajuda sobre GPS">?</button></span>
         <span class="bio-gps-coords" id="bio-form-gps-coords" style="font-size:12px;display:block">Aguardando GPS…</span>
         <span id="bio-form-gps-progresso" style="display:none;font-size:12px;color:var(--bio-prim);font-weight:600"></span>
         <div id="bio-form-gps-barra" style="display:none;height:3px;background:rgba(82,183,136,.2);border-radius:2px;margin-top:5px;overflow:hidden">
@@ -388,7 +407,7 @@
 
     <!-- Número do ninho -->
     <div class="bio-form-section">
-      <label class="bio-form-label" for="bio-form-numero">N° do ninho / placa *</label>
+      <label class="bio-form-label" for="bio-form-numero">N° do ninho / placa *<button type="button" class="guia-ajuda-btn" data-guia-verbete="numero-ninho" aria-label="Ajuda sobre número do ninho">?</button></label>
       <div style="display:flex;gap:8px;align-items:center">
         <input type="text" id="bio-form-numero" class="bio-form-input"
           placeholder="Escolha a espécie…" autocomplete="off" readonly>
@@ -572,7 +591,7 @@
   <header class="bio-form-header">
     <button class="bio-btn-back" data-back="tela-abertos" aria-label="Voltar">‹</button>
     <span>Transferência de Ninho</span>
-    <span></span>
+    <button class="bio-btn-icon" data-guia-tela="transferencia" aria-label="Ajuda desta tela" title="Ajuda desta tela"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></button>
   </header>
 
   <div class="bio-form-body">
@@ -687,7 +706,7 @@
   <header class="bio-form-header">
     <button class="bio-btn-back" data-back="tela-abertos" aria-label="Voltar">‹</button>
     <span>Registro de Eclosão</span>
-    <span></span>
+    <button class="bio-btn-icon" data-guia-tela="eclosao" aria-label="Ajuda desta tela" title="Ajuda desta tela"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></button>
   </header>
 
   <div class="bio-form-body">
@@ -711,7 +730,7 @@
     <!-- Confirmação de postura estimada (só aparece quando o ninho foi
          cadastrado com "Estimado" — bio-form) -->
     <div id="bio-ecl-postura-box" class="bio-form-section" style="background:var(--bio-ouro-bg,#fdf6e3);border-color:rgba(201,168,76,.5)" hidden>
-      <span class="bio-form-label">Postura estimada neste ninho</span>
+      <span class="bio-form-label">Postura estimada neste ninho<button type="button" class="guia-ajuda-btn" data-guia-verbete="postura" aria-label="Ajuda sobre postura estimada">?</button></span>
       <p style="margin:4px 0 10px;font-size:13px;color:var(--bio-ink)">
         Total apurado nesta eclosão: <b id="bio-ecl-postura-apurado">0</b> ovos
         (estimativa original: <span id="bio-ecl-postura-original">—</span>).
@@ -739,7 +758,7 @@
 
     <!-- Filhotes com anomalia (subconjunto de vivos) -->
     <div class="bio-form-section">
-      <span class="bio-form-label">Destes vivos, com anomalia (deformidade)</span>
+      <span class="bio-form-label">Destes vivos, com anomalia (deformidade)<button type="button" class="guia-ajuda-btn" data-guia-verbete="anomalia" aria-label="Ajuda sobre anomalia em filhote">?</button></span>
       <div class="bio-counter-row">
         <button type="button" id="bio-ecl-anomalia-minus" class="bio-counter-btn">−</button>
         <div style="flex:1;text-align:center">
@@ -852,7 +871,7 @@
   <header class="bio-form-header">
     <button class="bio-btn-back" data-back="tela-abertos" aria-label="Voltar">‹</button>
     <span>Visita de Acompanhamento</span>
-    <span></span>
+    <button class="bio-btn-icon" data-guia-tela="visita" aria-label="Ajuda desta tela" title="Ajuda desta tela"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></button>
   </header>
 
   <div class="bio-form-body">
@@ -1081,7 +1100,7 @@
   <header class="bio-form-header">
     <button class="bio-btn-back" data-back="tela-destino-filhotes" aria-label="Voltar">‹</button>
     <span>Entrada no Berçário</span>
-    <span></span>
+    <button class="bio-btn-icon" data-guia-tela="bercario" aria-label="Ajuda desta tela" title="Ajuda desta tela"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></button>
   </header>
   <div class="bio-form-body">
 
@@ -1146,7 +1165,7 @@
   <header class="bio-form-header">
     <button class="bio-btn-back" id="bio-soltura-back" aria-label="Voltar">‹</button>
     <span id="bio-soltura-titulo">Soltura de Filhotes</span>
-    <span></span>
+    <button class="bio-btn-icon" data-guia-tela="bercario" aria-label="Ajuda desta tela" title="Ajuda desta tela"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></button>
   </header>
   <div class="bio-form-body">
 
@@ -1473,7 +1492,7 @@
   <header class="bio-form-header">
     <button class="bio-btn-back" id="bio-oc-back" aria-label="Voltar">‹</button>
     <span id="bio-form-ocorrencia-titulo">Nova Ocorrência</span>
-    <span></span>
+    <button class="bio-btn-icon" data-guia-tela="ocorrencia" aria-label="Ajuda desta tela" title="Ajuda desta tela"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></button>
   </header>
   <div class="bio-form-body">
 
@@ -1573,6 +1592,7 @@
   <header class="bio-form-header">
     <button class="bio-btn-back" data-back="tela-home" aria-label="Voltar">‹</button>
     <span>Ninhos Abertos</span>
+    <button class="bio-btn-icon" data-guia-tela="ninhos-abertos" aria-label="Ajuda desta tela" title="Ajuda desta tela"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></button>
     <button class="bio-btn-icon" id="bio-btn-reload-abertos" aria-label="Atualizar">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M23 4v6h-6M1 20v-6h6"/>
@@ -1631,6 +1651,7 @@
   <header class="bio-form-header">
     <button class="bio-btn-back" data-back="tela-home" aria-label="Voltar">‹</button>
     <span>Meus Ninhos</span>
+    <button class="bio-btn-icon" data-guia-tela="ninhos-abertos" aria-label="Ajuda desta tela" title="Ajuda desta tela"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></button>
     <button class="bio-btn-icon" id="bio-btn-sync-fila" aria-label="Sincronizar">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M23 4v6h-6M1 20v-6h6"/>
@@ -2035,6 +2056,19 @@
       </div>
     </div>
 
+    <button class="bio-btn-config-item" id="bio-btn-ajuda-treinamento" type="button">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+      </svg>
+      Ajuda e treinamento
+    </button>
+    <button class="bio-btn-config-item" id="bio-btn-modo-treino" type="button">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/>
+      </svg>
+      <span id="bio-btn-modo-treino-rotulo">Modo treinamento</span>
+    </button>
+    <p style="font-size:12px;color:#9CA3AF;margin:-6px 0 12px">Pratique o fluxo inteiro — ninho, visita, berçário — sem nada ir para o sistema.</p>
     <button class="bio-btn-config-item" id="bio-btn-alterar-pin" type="button">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
@@ -2118,7 +2152,7 @@
   <header class="bio-form-header">
     <button class="bio-btn-back" data-back="tela-config" aria-label="Voltar">‹</button>
     <span>Meus equipamentos</span>
-    <span></span>
+    <button class="bio-btn-icon" data-guia-tela="equipamentos" aria-label="Ajuda desta tela" title="Ajuda desta tela"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></button>
   </header>
   <div class="bio-form-body" id="bio-equip-corpo">
     <p style="color:#9CA3AF">Carregando...</p>
@@ -2244,6 +2278,8 @@ window.__API_MONITOR_OFF = true
 <script>window.LGPD_CAMPO_APP = 'biomonitor'</script>
 <script src="/js/lgpd-campo.js"></script>
 <script src="/js/qrcode-generator.js"></script>
+<script src="/js/guia-app.js"></script>
+<script src="/js/biomonitor-guias.js"></script>
 <script>
 // ── Cliente Supabase ISOLADO para o Biomonitor ────────────────
 // Usa localStorage + storageKey próprio (nunca toca a sessionStorage do SIGUC principal).

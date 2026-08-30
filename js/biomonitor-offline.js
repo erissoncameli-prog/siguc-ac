@@ -12,15 +12,56 @@ const BIO_DB_NAME    = 'siguc_biomonitor_v1'
 const BIO_DB_VERSION = 8
 let _bioDB = null
 
+// ── Modo treinamento (sandbox) — banco FÍSICO separado ─────────
+// A fonte da verdade de "estou treinando?" é o localStorage, nunca o
+// IndexedDB: bioOfflineInit() PRECISA decidir qual banco abrir antes
+// de qualquer leitura possível — se o flag morasse dentro de um dos
+// dois bancos, decidir qual abrir dependeria de já ter aberto um
+// deles (referência circular). localStorage não tem esse problema.
+//
+// Escolha de desenho (em vez de marcar cada registro com um campo
+// `treino: true` e filtrar em toda leitura): banco SEPARADO
+// (`siguc_biomonitor_treino_v1`, MESMO schema) faz TODAS as ~30
+// funções deste arquivo — e as ~15 chamadas de bioOfflineSalvar* em
+// js/biomonitor-quelonios.js e js/biomonitor-equipamentos.js —
+// funcionarem em treino SEM TOCAR EM NENHUMA DELAS. O ponto único de
+// decisão é esta função; nenhum outro lugar do código sabe que existe
+// um segundo banco. Mesma disciplina de "um lugar só" do resto do
+// projeto (js/frota-consumo.js etc.), aplicada à camada de
+// persistência em vez de a uma função de cálculo.
+//
+// A segunda metade da garantia (o banco de treino nunca é enviado ao
+// servidor) está em bioSyncTudo() — js/biomonitor-sync.js.
+const BIO_DB_NAME_TREINO = 'siguc_biomonitor_treino_v1'
+let _bioDBTreino = null
+
+function _bioEmTreino() {
+  try { return localStorage.getItem('siguc_bio_modo_treinamento') === '1' } catch { return false }
+}
+
+function bioModoTreinoAtivo() { return _bioEmTreino() }
+
 // ── Inicialização ──────────────────────────────────────────────
 function bioOfflineInit() {
+  if (_bioEmTreino()) return _bioOfflineInitBanco(BIO_DB_NAME_TREINO, () => _bioDBTreino, db => { _bioDBTreino = db })
+  return _bioOfflineInitBanco(BIO_DB_NAME, () => _bioDB, db => { _bioDB = db })
+}
+
+function _bioOfflineInitBanco(nome, obterCache, gravarCache) {
   return new Promise((resolve, reject) => {
-    if (_bioDB) { resolve(_bioDB); return }
-    const req = indexedDB.open(BIO_DB_NAME, BIO_DB_VERSION)
+    const cache = obterCache()
+    if (cache) { resolve(cache); return }
+    const req = indexedDB.open(nome, BIO_DB_VERSION)
+    req.onupgradeneeded = ev => _bioCriarSchema(ev.target.result)
+    req.onsuccess = ev => { gravarCache(ev.target.result); resolve(ev.target.result) }
+    req.onerror   = ev => reject(ev.target.error)
+  })
+}
 
-    req.onupgradeneeded = ev => {
-      const db = ev.target.result
-
+// Schema ÚNICO, usado pelos dois bancos (real e treino) — nunca pode
+// divergir entre eles, senão uma tela funcionaria num e quebraria no
+// outro.
+function _bioCriarSchema(db) {
       if (!db.objectStoreNames.contains('ninhos')) {
         const s = db.createObjectStore('ninhos', { keyPath: 'uuid_cliente' })
         s.createIndex('status',       'status')
@@ -114,11 +155,37 @@ function bioOfflineInit() {
         const oe = db.createObjectStore('ocorrencias_equipamento', { keyPath: 'uuid_cliente' })
         oe.createIndex('status_sync', 'status_sync')
       }
-    }
+}
 
-    req.onsuccess = ev => { _bioDB = ev.target.result; resolve(_bioDB) }
-    req.onerror   = ev => reject(ev.target.error)
-  })
+// ── Ativar/desativar o modo treinamento ─────────────────────────
+// Ativar: lê os caches de referência do banco REAL (praias, berçários,
+// equipamentos — dado público do grupo, não pessoal) ANTES de virar a
+// chave, e semeia o banco de treino com eles — sem isso o coletor
+// abriria o treino sem nenhuma praia pra escolher. É cópia num sentido
+// só (real → treino); nunca o inverso.
+async function bioModoTreinoAtivar() {
+  const [praias, bercarios, equipamentos] = await Promise.all([
+    bioOfflineListarPraias(),
+    bioOfflineListarBercarios(),
+    bioOfflineListarEquipamentos(),
+  ])
+  try { localStorage.setItem('siguc_bio_modo_treinamento', '1') } catch {}
+  // A partir daqui bioOfflineInit() já resolve para o banco de treino.
+  if (praias?.length)       await bioOfflineSalvarPraias(praias)
+  if (bercarios?.length)    await bioOfflineSalvarBercarios(bercarios)
+  if (equipamentos?.length) await bioOfflineSalvarEquipamentos(equipamentos)
+}
+
+// Desativar: apaga o banco de treino inteiro (não arrisca deixar lixo
+// crescendo num aparelho de campo) e devolve o app ao banco real.
+async function bioModoTreinoDesativar() {
+  try { localStorage.removeItem('siguc_bio_modo_treinamento') } catch {}
+  if (_bioDBTreino) { try { _bioDBTreino.close() } catch {} }
+  _bioDBTreino = null
+  try { await new Promise((res) => {
+    const req = indexedDB.deleteDatabase(BIO_DB_NAME_TREINO)
+    req.onsuccess = res; req.onerror = res; req.onblocked = res
+  }) } catch {}
 }
 
 // ── Config (chave-valor) ───────────────────────────────────────

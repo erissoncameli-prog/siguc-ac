@@ -1864,3 +1864,35 @@ body.field-mode .bio-home-nome { font-size: 26px; }
   background: rgba(82,183,136,.12); color: #1E6B4A; font-size: 13.5px;
 }
 .bio-ecl-viaveis b { font-weight: 700; }
+
+/* ── Modo treinamento (sandbox) ──────────────────────────────────
+   Faixa fixa acima de TUDO, presente em todas as telas de app (não
+   nas de autenticação — bioMostrarTela cuida disso, mesmo critério
+   já usado para #bio-faixa-global). Cor de alerta do design system,
+   nunca a de marca — tem de ser impossível confundir com o app
+   valendo de verdade. Sem transform em si (é irmã das telas e da
+   .bio-pill-nav — mesma regra da barra do app Frota). */
+.bio-treino-faixa {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 1200;
+  min-height: 30px; padding: 6px 12px calc(6px + env(safe-area-inset-top, 0px));
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  background: var(--bio-alerta); color: #2b1600;
+  font-size: 11.5px; font-weight: 700; letter-spacing: .03em;
+}
+.bio-treino-faixa[hidden] { display: none !important; }
+.bio-treino-faixa button {
+  min-height: 22px; padding: 3px 10px; border: 0; border-radius: 999px;
+  background: rgba(0, 0, 0, .18); color: #2b1600;
+  font: inherit; font-size: 10.5px; cursor: pointer;
+}
+.bio-treino-faixa button:focus-visible { outline: 2px solid #2b1600; outline-offset: 2px; }
+/* A faixa institucional (#bio-faixa-global) desce pra abrir espaço —
+   nunca sobrepor os logos. */
+body.bio-modo-treino .bio-faixa-inst { top: var(--bio-treino-h, 30px); }
+body.bio-modo-treino .bio-tela.ativa:not(.bio-lock) { padding-top: calc(var(--bio-faixa-h) + var(--bio-treino-h, 30px)); }
+body.bio-modo-treino #tela-home.ativa { padding-top: calc(var(--bio-faixa-h) + var(--bio-treino-h, 30px) + 46px); }
+
+/* ── Botão "Ajuda desta tela" (js/guia-app.js) ───────────────────
+   Reaproveita .bio-btn-icon (já usado por back/sync no cabeçalho) —
+   sem regra própria de cor, para não divergir se o tema do cabeçalho
+   mudar. Só precisa existir a classe pra achar o botão. */
