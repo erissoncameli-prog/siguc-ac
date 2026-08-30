@@ -1,0 +1,193 @@
+/* ── SIGUC — Guias de introdução / treinamento ──────────────────
+   Contraparte de js/guia-app.js. Folha ÚNICA: serve os apps de campo
+   e as telas de mesa — nenhuma página redesenha o painel do guia.
+   Cor de destaque entra por --guia-cor (a página declara; o padrão
+   é o verde do design system). Sempre como FALLBACK do var(), nunca
+   declarada aqui — mesma lição do --pin-cor de css/pin-baralho.css. */
+
+.guia-raiz {
+  position: fixed; inset: 0; z-index: 9000;
+  display: flex; align-items: flex-end; justify-content: center;
+  background: rgba(6, 18, 10, .55);
+  padding: 16px;
+  overscroll-behavior: contain;
+}
+.guia-raiz[hidden] { display: none !important; }
+
+/* Com destaque na tela real o fundo não escurece de novo — quem
+   escurece é o box-shadow do recorte, senão a página fica preta. */
+.guia-raiz.com-alvo { background: transparent; }
+
+.guia-spot {
+  position: fixed; border-radius: 12px; pointer-events: none;
+  box-shadow: 0 0 0 9999px rgba(6, 18, 10, .62);
+  outline: 2px solid var(--guia-cor, #52B788);
+  outline-offset: 2px;
+  animation: guia-pulso 1.8s ease-in-out infinite;
+}
+.guia-spot[hidden] { display: none !important; }
+@keyframes guia-pulso {
+  0%, 100% { outline-color: var(--guia-cor, #52B788); }
+  50%      { outline-color: rgba(255, 255, 255, .85); }
+}
+
+.guia-painel {
+  position: relative;
+  width: min(520px, 100%);
+  max-height: min(78vh, 640px);
+  overflow-y: auto;
+  background: #fff;
+  border-radius: 18px;
+  padding: 18px 18px 16px;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, .3);
+  font-family: var(--font-sans, 'DM Sans', system-ui, sans-serif);
+  color: #111827;
+  animation: guia-entra .22s ease-out;
+}
+/* Alvo na metade de cima da tela → painel embaixo, e vice-versa. */
+.guia-raiz.com-alvo { align-items: flex-start; }
+.guia-raiz.com-alvo .guia-painel.guia-painel-baixo { margin-top: auto; }
+@keyframes guia-entra { from { opacity: 0; transform: translateY(12px); } }
+
+.guia-cab { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+.guia-migalha {
+  font-size: 12px; text-transform: uppercase; letter-spacing: .06em;
+  color: #6B7280; font-weight: 600; flex: 1;
+}
+.guia-titulo {
+  /* Fraunces é da identidade de título e vale aqui (não é número de
+     KPI — ver a regra de tipografia dos KPIs no CLAUDE.md). */
+  font-family: var(--font-display, 'Fraunces', Georgia, serif);
+  font-size: 20px; line-height: 1.25; margin: 0; flex: 1; color: #0A1A0F;
+}
+.guia-fechar {
+  margin-left: auto; width: 32px; height: 32px; flex: 0 0 32px;
+  display: grid; place-items: center;
+  border: 0; border-radius: 999px; background: #F3F4F6; color: #374151;
+  cursor: pointer; font-size: 15px; line-height: 1;
+}
+.guia-fechar svg { width: 16px; height: 16px; }
+.guia-fechar:hover { background: #E5E7EB; }
+
+.guia-progresso { margin: 2px 0 12px; font-size: 12.5px; color: #6B7280; }
+
+/* ── Lista de guias (central) ───────────────────────────────── */
+.guia-lista { display: flex; flex-direction: column; gap: 8px; }
+.guia-item {
+  display: flex; align-items: center; gap: 12px; width: 100%;
+  min-height: 56px; padding: 10px 12px; text-align: left;
+  border: 1px solid #E5E7EB; border-radius: 14px; background: #fff;
+  cursor: pointer; font: inherit; color: inherit;
+}
+.guia-item:hover { border-color: var(--guia-cor, #52B788); background: #FAFDFB; }
+.guia-item-ic {
+  width: 36px; height: 36px; flex: 0 0 36px; display: grid; place-items: center;
+  border-radius: 10px; background: color-mix(in srgb, var(--guia-cor, #52B788) 14%, #fff);
+  color: var(--guia-cor, #52B788);
+}
+.guia-item-ic svg { width: 20px; height: 20px; }
+.guia-item-txt { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.guia-item-txt strong { font-size: 14.5px; }
+.guia-item-txt span { font-size: 12.5px; color: #6B7280; }
+.guia-item-estado { flex: 0 0 auto; }
+.guia-chip-ok, .guia-chip-n {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 11.5px; padding: 4px 8px; border-radius: 999px; white-space: nowrap;
+}
+.guia-chip-ok { background: #DCFCE7; color: #166534; }
+.guia-chip-ok svg { width: 12px; height: 12px; }
+.guia-chip-n  { background: #F3F4F6; color: #6B7280; }
+
+.guia-rodape { margin: 14px 0 0; font-size: 11.5px; color: #9CA3AF; }
+
+/* ── Passo ──────────────────────────────────────────────────── */
+.guia-passo { padding: 4px 0 2px; }
+.guia-passo-ic {
+  display: grid; place-items: center; width: 44px; height: 44px;
+  border-radius: 12px; margin-bottom: 10px;
+  background: color-mix(in srgb, var(--guia-cor, #52B788) 14%, #fff);
+  color: var(--guia-cor, #52B788);
+}
+.guia-passo-ic svg { width: 24px; height: 24px; }
+.guia-corpo { margin: 8px 0 0; font-size: 14.5px; line-height: 1.55; color: #374151; }
+.guia-lista-itens { margin: 10px 0 0; padding-left: 18px; }
+.guia-lista-itens li { font-size: 14px; line-height: 1.5; color: #374151; margin-bottom: 6px; }
+.guia-nota {
+  margin: 12px 0 0; padding: 10px 12px; border-radius: 10px;
+  background: #FEF9E7; border-left: 3px solid var(--ouro, #C9A84C);
+  font-size: 13px; line-height: 1.5; color: #4B3F14;
+}
+
+.guia-pontos { display: flex; gap: 5px; justify-content: center; margin: 16px 0 12px; }
+.guia-ponto { width: 6px; height: 6px; border-radius: 999px; background: #D1D5DB; }
+.guia-ponto.ativo { background: var(--guia-cor, #52B788); width: 18px; }
+
+/* ── Ações ──────────────────────────────────────────────────── */
+.guia-acoes { display: flex; gap: 10px; }
+.guia-btn {
+  flex: 1; min-height: 44px; padding: 10px 16px;
+  border-radius: 12px; border: 0; font: inherit; font-weight: 600;
+  font-size: 14.5px; cursor: pointer;
+}
+.guia-btn-sm { flex: 0 0 auto; min-height: 32px; padding: 6px 12px; font-size: 13px; }
+.guia-btn-prim { background: var(--guia-cor, #52B788); color: #fff; }
+.guia-btn-prim:hover { filter: brightness(.94); }
+.guia-btn-sec { background: #F3F4F6; color: #374151; }
+.guia-btn-sec:hover { background: #E5E7EB; }
+.guia-btn:disabled { opacity: .45; cursor: not-allowed; filter: none; }
+
+.guia-pular {
+  display: block; width: 100%; margin: 10px 0 0; min-height: 32px;
+  background: none; border: 0; font: inherit; font-size: 13px;
+  color: #6B7280; cursor: pointer; text-decoration: underline;
+}
+
+/* ── Botão "?" ao lado do rótulo do campo ───────────────────── */
+.guia-ajuda-btn {
+  display: inline-grid; place-items: center;
+  width: 24px; height: 24px; margin-left: 6px; vertical-align: middle;
+  border: 1px solid #D1D5DB; border-radius: 999px; background: #fff;
+  color: #6B7280; font: inherit; font-size: 12px; font-weight: 700;
+  line-height: 1; cursor: pointer; padding: 0;
+}
+.guia-ajuda-btn:hover { border-color: var(--guia-cor, #52B788); color: var(--guia-cor, #52B788); }
+
+/* ── Convite de primeiro acesso ─────────────────────────────── */
+.guia-convite {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; margin: 0 0 12px;
+  border-radius: 14px; border: 1px solid color-mix(in srgb, var(--guia-cor, #52B788) 40%, #fff);
+  background: color-mix(in srgb, var(--guia-cor, #52B788) 8%, #fff);
+  font-family: var(--font-sans, 'DM Sans', system-ui, sans-serif);
+}
+.guia-convite-ic { color: var(--guia-cor, #52B788); display: grid; place-items: center; }
+.guia-convite-ic svg { width: 22px; height: 22px; }
+.guia-convite-txt { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.guia-convite-txt strong { font-size: 13.5px; color: #0A1A0F; }
+.guia-convite-txt span { font-size: 12px; color: #4B5563; }
+.guia-convite-x {
+  width: 28px; height: 28px; flex: 0 0 28px; display: grid; place-items: center;
+  border: 0; border-radius: 999px; background: transparent; color: #6B7280;
+  cursor: pointer; font-size: 13px; padding: 0;
+}
+.guia-convite-x svg { width: 14px; height: 14px; }
+
+/* ── Estados de interface (regra do sistema) ────────────────── */
+.guia-raiz :focus-visible,
+.guia-ajuda-btn:focus-visible,
+.guia-convite :focus-visible {
+  outline: 2px solid var(--guia-cor, #52B788);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .guia-painel { animation: none; }
+  .guia-spot { animation: none; }
+}
+
+body.guia-aberto { overflow: hidden; }
+
+@media (max-width: 420px) {
+  .guia-raiz { padding: 10px; }
+  .guia-painel { padding: 16px 14px 14px; max-height: 84vh; }
+}
