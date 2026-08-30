@@ -14,6 +14,7 @@
 <script src="../js/layout.js"></script>
 <script src="../js/guia-app.js"></script>
 <script src="../js/agua-guias-mesa.js"></script>
+<script src="../js/agua-guias.js"></script>
 <script>guiaAutoDefinir(AGUA_GUIAS_MESA)</script>
 <script src="../js/mapa-recorte.js"></script>
 <script src="../js/reautenticar.js"></script>
@@ -269,6 +270,7 @@ const ACRE_CENTRO = [-9.5, -70.0]
           <button class="tab-btn" id="tab-equip" onclick="mudarAbaAgua('equip')">Equipamentos</button>
           <button class="tab-btn" id="tab-templates" onclick="mudarAbaAgua('templates')">Gabaritos de laudo</button>
           <button class="tab-btn" id="tab-etiquetas" onclick="mudarAbaAgua('etiquetas')">Etiquetas</button>
+          <button class="tab-btn" id="tab-capacitacao" onclick="mudarAbaAgua('capacitacao')">Capacitação</button>
         </div>
       </div>
 
@@ -332,6 +334,27 @@ const ACRE_CENTRO = [-9.5, -70.0]
           </table>
         </div></div></div>
       </div>
+      <div id="aba-capacitacao" style="display:none">
+        <p style="color:#6B7280;font-size:13px;margin:0 0 12px">
+          Quem já concluiu cada guia de introdução do módulo (js/guia-app.js). É histórico de
+          capacitação, nunca controle de acesso — nenhum guia libera ou bloqueia função nenhuma
+          do sistema, e concluir não é obrigatório.
+        </p>
+        <div class="filter-bar">
+          <select class="form-control" id="cap-escopo" onchange="carregarCapacitacao()" style="max-width:260px">
+            <option value="agua-app">App de campo</option>
+            <option value="agua-mesa">Telas de mesa</option>
+          </select>
+        </div>
+        <div id="cap-resumo"></div>
+        <div class="card"><div class="table-wrap"><div class="table-scroll">
+          <table>
+            <thead><tr><th>Pessoa</th><th>Guias concluídos</th><th>Último</th></tr></thead>
+            <tbody id="tbody-capacitacao"><tr><td colspan="3" style="padding:12px 14px" aria-busy="true" aria-label="Carregando"><div class="skeleton skeleton-linha" style="width:80%"></div><div class="skeleton skeleton-linha" style="width:64%"></div></td></tr></tbody>
+          </table>
+        </div></div></div>
+      </div>
+
       <div id="aba-etiquetas" style="display:none">
         <p style="color:#6B7280;font-size:13px;margin:0 0 12px">
           Reimprime a etiqueta de coletas já sincronizadas — plano B para quando a impressora
@@ -384,12 +407,72 @@ function mudarAbaAgua(aba) {
   document.getElementById('aba-equip').style.display     = aba === 'equip'     ? '' : 'none'
   document.getElementById('aba-templates').style.display = aba === 'templates' ? '' : 'none'
   document.getElementById('aba-etiquetas').style.display = aba === 'etiquetas' ? '' : 'none'
+  document.getElementById('aba-capacitacao').style.display = aba === 'capacitacao' ? '' : 'none'
   document.getElementById('tab-pontos').classList.toggle('ativo', aba === 'pontos')
   document.getElementById('tab-labs').classList.toggle('ativo', aba === 'labs')
   document.getElementById('tab-equip').classList.toggle('ativo', aba === 'equip')
   document.getElementById('tab-templates').classList.toggle('ativo', aba === 'templates')
   document.getElementById('tab-etiquetas').classList.toggle('ativo', aba === 'etiquetas')
+  document.getElementById('tab-capacitacao').classList.toggle('ativo', aba === 'capacitacao')
   if (aba === 'etiquetas' && !_etqPendentesCarregados) carregarEtiquetasPendentes()
+  if (aba === 'capacitacao' && !_capCarregada) carregarCapacitacao()
+}
+
+// ── Capacitação (guias de introdução) ─────────────────────────
+// Lê a RPC capacitacao_relatorio (migration 327), que decide o acesso
+// por pode_ver do módulo e devolve só nome + conclusão — nunca a linha
+// crua de `usuarios`. Os TÍTULOS dos guias vêm dos catálogos do
+// próprio cliente (js/agua-guias.js / js/agua-guias-mesa.js), então o
+// banco não guarda texto de guia nenhum.
+let _capCarregada = false
+
+function _capCatalogo(escopo) {
+  if (escopo === 'agua-app'  && typeof AGUA_GUIAS      !== 'undefined') return AGUA_GUIAS
+  if (escopo === 'agua-mesa' && typeof AGUA_GUIAS_MESA !== 'undefined') return AGUA_GUIAS_MESA
+  return { guias: [] }
+}
+
+async function carregarCapacitacao() {
+  _capCarregada = true
+  const escopo = document.getElementById('cap-escopo').value
+  const tbody = document.getElementById('tbody-capacitacao')
+  tbody.innerHTML = skeletonTabelaHTML(3, 3)
+
+  const { data, error } = await db.rpc('capacitacao_relatorio', { p_escopo: escopo })
+  if (error) {
+    tbody.innerHTML = `<tr><td colspan="3" style="padding:14px;color:#B91C1C">Não foi possível carregar: ${esc(error.message)}</td></tr>`
+    document.getElementById('cap-resumo').innerHTML = ''
+    return
+  }
+
+  const cat = _capCatalogo(escopo)
+  const totalGuias = cat.guias.length
+  const titulo = Object.fromEntries(cat.guias.map(g => [g.slug, g.titulo]))
+
+  // Agrega por pessoa. Guia que não está mais no catálogo (renomeado,
+  // removido) continua contando e aparece pelo slug — apagá-lo da tela
+  // reescreveria a história de quem foi capacitado nele.
+  const porPessoa = new Map()
+  for (const l of (data || [])) {
+    if (!porPessoa.has(l.usuario_id)) porPessoa.set(l.usuario_id, { nome: l.nome, guias: [], ultimo: null })
+    const p = porPessoa.get(l.usuario_id)
+    p.guias.push(titulo[l.guia] || l.guia)
+    if (!p.ultimo || l.concluido_em > p.ultimo) p.ultimo = l.concluido_em
+  }
+
+  const linhas = [...porPessoa.values()].sort((a, b) => b.guias.length - a.guias.length)
+  document.getElementById('cap-resumo').innerHTML = `
+    <p style="color:#6B7280;font-size:13px;margin:0 0 12px">
+      ${linhas.length} pessoa(s) com pelo menos um guia concluído, de ${totalGuias} guias no conjunto.
+    </p>`
+
+  tbody.innerHTML = linhas.length
+    ? linhas.map(p => `<tr>
+        <td>${esc(p.nome)}</td>
+        <td>${p.guias.length} de ${totalGuias}<div style="font-size:11.5px;color:#6B7280">${esc(p.guias.join(' · '))}</div></td>
+        <td>${p.ultimo ? formatData(p.ultimo) : '—'}</td>
+      </tr>`).join('')
+    : '<tr><td colspan="3" style="padding:14px;color:#6B7280">Ninguém concluiu nenhum guia deste conjunto ainda.</td></tr>'
 }
 
 // ── Cargas ────────────────────────────────────────────────────

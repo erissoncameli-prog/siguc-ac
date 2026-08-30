@@ -76,6 +76,53 @@ test('guia da tela aberta destaca o elemento real', async ({ page }) => {
   expect(cobre).toBe(true);
 });
 
+test('aba Capacitação existe e lê a RPC do relatório, nunca a tabela direto', async ({ page }) => {
+  const chamadas = [];
+  await page.route('**/cdn.jsdelivr.net/**', route => route.abort());
+  await page.addInitScript(usuario => {
+    window.__rpcChamadas = [];
+    window.loadEnv = () => Promise.resolve({ supabaseUrl: 'http://fake.test', supabaseKey: 'fake-key' });
+    const vazio = tabela => {
+      const q = { select: () => q, eq: () => q, in: () => q, is: () => q, order: () => q, limit: () => q,
+        single: async () => ({ data: usuario, error: null }),
+        maybeSingle: async () => ({ data: usuario, error: null }),
+        then: r => { window.__tabelas = (window.__tabelas || []).concat(tabela); return Promise.resolve({ data: [], error: null }).then(r) } };
+      return q;
+    };
+    window.supabase = { createClient: () => ({
+      auth: { getSession: async () => ({ data: { session: { user: { id: usuario.id } } } }), signOut: async () => ({}) },
+      rpc: async (nome, args) => {
+        window.__rpcChamadas.push({ nome, args });
+        if (nome === 'nivel_efetivo') return { data: 'editar', error: null };
+        if (nome === 'capacitacao_relatorio') return { data: [
+          { usuario_id: 'u1', nome: 'Ana', escopo: args.p_escopo, guia: 'primeiros-passos', versao: 1, concluido_em: '2026-08-20T10:00:00Z' },
+          { usuario_id: 'u1', nome: 'Ana', escopo: args.p_escopo, guia: 'fazer-uma-coleta', versao: 1, concluido_em: '2026-08-21T10:00:00Z' },
+        ], error: null };
+        return { data: null, error: null };
+      },
+      from: t => vazio(t),
+      storage: { from: () => ({ createSignedUrl: async () => ({ data: null, error: null }) }) },
+    }) };
+  }, USUARIO_STUB);
+
+  await page.goto(`${BASE}/pages/agua-pontos.html`);
+  await page.locator('#tab-capacitacao').waitFor({ state: 'visible', timeout: 20_000 });
+  await page.locator('#tab-capacitacao').click();
+
+  await expect(page.locator('#tbody-capacitacao')).toContainText('Ana');
+  // Os TÍTULOS vêm do catálogo do cliente — o banco não guarda texto de guia.
+  await expect(page.locator('#tbody-capacitacao')).toContainText('Fazer uma coleta');
+
+  const r = await page.evaluate(() => ({
+    rpcs: window.__rpcChamadas.map(c => c.nome),
+    tabelas: window.__tabelas || [],
+  }));
+  expect(r.rpcs).toContain('capacitacao_relatorio');
+  // A tabela nunca é lida direto: a RLS só devolveria as linhas do
+  // próprio usuário, e o relatório precisa do módulo inteiro.
+  expect(r.tabelas).not.toContain('capacitacao_conclusoes');
+});
+
 test('catálogo da mesa é íntegro (slugs únicos, passos presentes, verbetes apontando para guia existente)', async ({ page }) => {
   await abrirLaudosComStub(page);
   const r = await page.evaluate(() => {
