@@ -1720,3 +1720,26 @@ body { margin: 0; }
   -webkit-tap-highlight-color: transparent;
 }
 .medir-confirmar:disabled { opacity: .45; cursor: not-allowed; }
+
+/* ── Modo treinamento (sandbox) ──────────────────────────────────
+   Faixa fixa no topo, presente em TODAS as telas. Cor de alerta do
+   design system (nunca a de marca): tem de ser impossível confundir
+   com o app valendo de verdade. Sem `transform` — é irmã das telas e
+   da barra de abas, e transform em ancestral quebraria o
+   posicionamento fixo (mesma armadilha já documentada). */
+.treino-faixa {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 900;
+  min-height: 32px; padding: 6px 12px calc(6px + env(safe-area-inset-top, 0px));
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  background: var(--alerta, #E0A227); color: #241A02;
+  font-size: 12px; font-weight: 700; letter-spacing: .04em;
+}
+.treino-faixa[hidden] { display: none !important; }
+.treino-faixa button {
+  min-height: 24px; padding: 3px 10px; border: 0; border-radius: 999px;
+  background: rgba(0, 0, 0, .18); color: #241A02;
+  font: inherit; font-size: 11px; cursor: pointer;
+}
+.treino-faixa button:focus-visible { outline: 2px solid #241A02; outline-offset: 2px; }
+/* A faixa é fixa: sem esta folga ela cobriria o topo da tela ativa. */
+body.modo-treino .tela { padding-top: calc(34px + env(safe-area-inset-top, 0px)); }

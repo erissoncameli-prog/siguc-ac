@@ -297,3 +297,78 @@ test('todo botão "Ajuda desta tela" aponta para um guia que existe', async ({ p
   });
   expect(orfaos).toEqual([]);
 });
+
+// ── Modo treinamento (Fase 3) ─────────────────────────────────
+// O que estes testes existem para impedir: uma coleta de treino
+// chegar ao sistema, ou um código reservado ser gasto à toa (a
+// numeração é definitiva e um código gasto não volta).
+
+async function ligarTreinamento(page) {
+  await page.evaluate(async () => { await agDefinirModoTreino(true); });
+  await expect(page.locator('#treino-faixa')).toBeVisible();
+}
+
+test('modo treinamento: coleta não entra na fila real nem gasta código reservado', async ({ page }) => {
+  await abrirApp(page);
+  await entrarHomeDeTeste(page);
+
+  // Pool com 2 códigos reservados: nenhum pode ser consumido.
+  await page.evaluate(async () => {
+    await aOfflineSetConfig('etq_codigos_reservados', ['COL-2026-9001', 'COL-2026-9002']);
+  });
+  await ligarTreinamento(page);
+
+  await page.evaluate(async () => {
+    abrirFormulario();
+    document.getElementById('f-ponto').value = 'ponto-guia';
+    document.getElementById('f-data').value = '2026-08-30';
+    document.getElementById('f-ph').value = '7.1';
+    await salvarRegistro();
+  });
+
+  const r = await page.evaluate(async () => ({
+    fila: (await aOfflineListarTodos()).length,
+    pool: ((await aOfflineGetConfig('etq_codigos_reservados')) || []).length,
+    etiquetaAberta: !document.getElementById('etiqueta-overlay').hidden,
+    codigoNaEtiqueta: _etqDadosAtuais?.codigo_amostra,
+  }));
+
+  expect(r.fila).toBe(0);                    // nada na fila real
+  expect(r.pool).toBe(2);                    // nenhum código gasto
+  expect(r.etiquetaAberta).toBe(true);       // o fluxo é ensinado inteiro
+  expect(r.codigoNaEtiqueta).toBe('TREINO'); // nunca um código real
+});
+
+test('sair do modo treinamento devolve o app ao normal e a coleta volta a valer', async ({ page }) => {
+  await abrirApp(page);
+  await entrarHomeDeTeste(page);
+  await ligarTreinamento(page);
+
+  await page.evaluate(async () => {
+    window.confirm = () => true;             // descartar as de treino
+    await agDefinirModoTreino(false);
+  });
+  await expect(page.locator('#treino-faixa')).toBeHidden();
+
+  await page.evaluate(async () => {
+    abrirFormulario();
+    document.getElementById('f-ponto').value = 'ponto-guia';
+    document.getElementById('f-data').value = '2026-08-30';
+    await salvarRegistro();
+  });
+  expect(await page.evaluate(async () => (await aOfflineListarTodos()).length)).toBe(1);
+});
+
+test('o modo treinamento sobrevive a fechar o app (é estado, não sessão)', async ({ page }) => {
+  await abrirApp(page);
+  await entrarHomeDeTeste(page);
+  await ligarTreinamento(page);
+
+  await page.reload();
+  await page.locator('#tela-login').waitFor({ state: 'visible', timeout: 20_000 });
+  await entrarHomeDeTeste(page);
+  await expect(page.locator('#treino-faixa')).toBeVisible();
+
+  // Limpa para não vazar estado entre execuções no mesmo perfil.
+  await page.evaluate(async () => { window.confirm = () => true; await agDefinirModoTreino(false); });
+});
