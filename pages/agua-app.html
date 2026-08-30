@@ -156,6 +156,7 @@
         <h1 class="home-nome" id="home-nome">Coletor</h1>
       </div>
     </div>
+    <button class="btn-icon btn-guia-tela" data-guia-tela="primeiros-passos" aria-label="Ajuda desta tela" title="Ajuda desta tela"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></button>
     <button class="btn-icon" id="btn-sync-home" aria-label="Sincronizar" title="Sincronizar agora">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
     </button>
@@ -201,6 +202,7 @@
   <header class="form-header" id="form-header">
     <button class="btn-back" id="btn-back-form" aria-label="Voltar">‹</button>
     <span class="form-natureza-label">Nova coleta</span>
+    <button class="btn-icon btn-guia-tela" data-guia-tela="fazer-uma-coleta" aria-label="Ajuda desta tela" title="Ajuda desta tela"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></button>
     <button class="btn-icon btn-danger" id="btn-descartar" aria-label="Descartar">✕</button>
   </header>
 
@@ -313,7 +315,7 @@
   <header class="form-header">
     <button class="btn-back" id="btn-back-historico" aria-label="Voltar">‹</button>
     <span>Histórico de IQA</span>
-    <span></span>
+    <button class="btn-icon btn-guia-tela" data-guia-tela="historico-e-iqa" aria-label="Ajuda desta tela" title="Ajuda desta tela"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></button>
   </header>
 
   <div class="form-body">
@@ -338,6 +340,7 @@
   <header class="form-header">
     <button class="btn-back" id="btn-back-fila" aria-label="Voltar">‹</button>
     <span>Fila de Envio</span>
+    <button class="btn-icon btn-guia-tela" data-guia-tela="fila-e-sincronizacao" aria-label="Ajuda desta tela" title="Ajuda desta tela"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></button>
     <button class="btn-icon" id="btn-sync-fila" aria-label="Sincronizar">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
     </button>
@@ -2181,6 +2184,15 @@ document.addEventListener('DOMContentLoaded', () => {
   // silêncio: sem o arquivo carregado o botão some e nada mais muda.
   document.getElementById('btn-ajuda-treinamento').addEventListener('click', () => {
     if (typeof guiaAbrirCentral === 'function') guiaAbrirCentral()
+  })
+
+  // "Ajuda desta tela": abre o guia do assunto COM a tela aberta, e é
+  // isso que transforma o mesmo conteúdo em tour com destaque sobre os
+  // elementos reais (o motor só destaca alvo visível).
+  document.addEventListener('click', ev => {
+    const b = ev.target.closest('.btn-guia-tela')
+    if (!b) return
+    if (typeof guiaAbrir === 'function') guiaAbrir(b.dataset.guiaTela, { voltarCentral: false })
   })
 
   document.getElementById('btn-update-agora').addEventListener('click', aplicarUpdate)

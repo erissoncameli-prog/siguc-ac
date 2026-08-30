@@ -41,8 +41,14 @@ async function abrirApp(page) {
 async function entrarHomeDeTeste(page) {
   await page.evaluate(async () => {
     await aOfflineInit();
+    const ponto = {
+      id: 'ponto-guia', codigo_ana: '11112222', nome: 'Rio Teste — Guia',
+      municipio: 'Rio Branco', rio: 'Rio Teste',
+      geom: { type: 'Point', coordinates: [-67.8243, -9.9754] },
+    };
+    await aOfflineSalvarPontos([ponto]);
     App.coletor = { id: 'coletor-guia', nome_completo: 'Teste Guia' };
-    App.pontos = [];
+    App.pontos = [ponto];
     await entrarHome();
   });
   await page.locator('#tela-home').waitFor({ state: 'visible', timeout: 10_000 });
@@ -258,4 +264,36 @@ test('conclusão é enviada ao banco, e falhar o envio não quebra nada', async 
   expect(r.overlayFechado).toBe(true);
   // O que não subiu fica na fila para a próxima abertura — nunca se perde.
   expect(r.pendentesGuardados).toBeGreaterThan(0);
+});
+
+test('"Ajuda desta tela" no formulário vira tour com destaque no campo real', async ({ page }) => {
+  await abrirApp(page);
+  await entrarHomeDeTeste(page);
+  await page.evaluate(() => { agIniciarGuias(); abrirFormulario(); });
+  await page.locator('#tela-form').waitFor({ state: 'visible', timeout: 10_000 });
+
+  await page.locator('#tela-form .btn-guia-tela').click();
+  await expect(page.locator('.guia-spot')).toBeVisible();
+
+  // Com a tela ABERTA, o mesmo conteúdo que em Configurações é cartão
+  // de texto passa a destacar o elemento real — aqui, o seletor de
+  // ponto de coleta.
+  const cobre = await page.evaluate(() => {
+    const s = document.querySelector('.guia-spot').getBoundingClientRect();
+    const a = document.getElementById('f-ponto').getBoundingClientRect();
+    return s.left <= a.left + 1 && s.right >= a.right - 1 &&
+           s.top <= a.top + 1 && s.bottom >= a.bottom - 1;
+  });
+  expect(cobre).toBe(true);
+});
+
+test('todo botão "Ajuda desta tela" aponta para um guia que existe', async ({ page }) => {
+  await abrirApp(page);
+  const orfaos = await page.evaluate(() => {
+    const slugs = AGUA_GUIAS.guias.map(g => g.slug);
+    return [...document.querySelectorAll('[data-guia-tela]')]
+      .map(b => b.dataset.guiaTela)
+      .filter(s => !slugs.includes(s));
+  });
+  expect(orfaos).toEqual([]);
 });
