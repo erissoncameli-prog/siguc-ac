@@ -3264,6 +3264,75 @@ mesa) e chama `guiaDefinir`/`guiaAutoDefinir`.
 - Plano e o levantamento por trás das escolhas:
   `docs/qualidade-agua/plano-treinamento.md`.
 
+**Extensão ao app Biomonitor** (`pages/biomonitor.html`, mesmo motor,
+conteúdo próprio em `js/biomonitor-guias.js`, escopo `biomonitor-app`):
+11 guias (primeiros passos, antes de ir a campo, registrar ninho,
+visita, transferência, eclosão, berçário/soltura, ocorrência,
+equipamentos, Abertos×Histórico×Fila, modo treinamento), botão "Ajuda
+desta tela" em 11 cabeçalhos, 4 verbetes "?" nos campos mais confusos
+(número do ninho, GPS, postura estimada, anomalia). Entrada em
+Configurações › Ajuda e treinamento, junto do botão Modo treinamento.
+
+- **O modo treinamento aqui NÃO podia copiar o desenho da Água.** O
+  app da Água tem UM ponto de gravação (`salvarRegistro`); o Biomonitor
+  tem 15+, espalhados por um fluxo aninhado (ninho → visita →
+  transferência → eclosão → berçário → soltura → biometria →
+  ocorrência → equipamento) — marcar "não gravar" em cada call site
+  seria fácil de esquecer um. Desenho adotado em vez disso: **banco
+  IndexedDB inteiro separado** (`siguc_biomonitor_treino_v1`, MESMO
+  schema do real), escolhido num ÚNICO ponto —
+  `bioOfflineInit()` (`js/biomonitor-offline.js`) — que decide qual
+  banco abrir lendo `localStorage['siguc_bio_modo_treinamento']`.
+  Nenhum dos 15+ `bioOfflineSalvar*`/`bioOfflineListar*` nem nenhuma
+  das chamadas em `js/biomonitor-quelonios.js`/
+  `js/biomonitor-equipamentos.js` precisou ser tocado — todas já
+  passam por `bioOfflineInit()`, então todas passaram a operar no
+  banco de treino automaticamente, LEITURA e ESCRITA, o que é o que
+  permite treinar o ciclo completo (visitar/transferir/eclodir o MESMO
+  ninho de treino depois de criado, porque a tela "Abertos" volta a
+  encontrá-lo no mesmo banco isolado).
+- ⚠️ **A fonte da verdade do flag é `localStorage`, nunca o
+  IndexedDB.** `bioOfflineInit()` precisa saber qual banco abrir ANTES
+  de conseguir ler qualquer coisa — se o flag morasse dentro de um dos
+  dois bancos, decidir qual abrir dependeria de já ter aberto um deles
+  (referência circular). `localStorage` não tem esse problema.
+- **Segunda camada, independente da primeira**: `bioSyncTudo()`
+  (`js/biomonitor-sync.js`) recusa rodar com o treino ligado, ANTES de
+  checar `_bioSyncEmAndamento`/`navigator.onLine`. Mesmo que a primeira
+  camada falhasse por algum motivo, o banco de treino nunca seria
+  sincronizado — e mesmo que o guard do sync falhasse, o treino nunca
+  teria chegado ao banco real. As duas se sustentam sozinhas; nenhuma
+  depende da outra pra a garantia valer.
+- **Upload de foto está coberto de graça**: as 9 fotos de coleta só
+  sobem ao Storage de DENTRO dos `bioSync*` (nunca no momento de
+  salvar) — guardar `bioSyncTudo()` já impede a foto de treino de subir,
+  sem precisar de um guard próprio.
+- **Ativar o treino SEMEIA os caches de referência** (praias,
+  berçários, equipamentos — dado público do grupo, não pessoal) do
+  banco real para o de treino, ANTES de virar a chave — senão o
+  coletor abriria o treino sem nenhuma praia pra escolher. Cópia num
+  sentido só (real → treino); nunca o inverso.
+- **Desativar APAGA o banco de treino inteiro**
+  (`indexedDB.deleteDatabase`) — nunca deixa lixo crescendo num
+  aparelho de campo; reativar depois recria do zero.
+- Guarda: `tests/biomonitor-guia.test.js` (12 testes) — os mais
+  importantes percorrem o ciclo completo em treino (ninho salvo e
+  ainda visível na mesma sessão), confirmam que o banco REAL fica vazio
+  mesmo com o treino ativo, e que nem `bioSyncTudo()` explícito nem o
+  auto-sync disparado por `bioEntrarNaHome()` tocam nenhuma das
+  tabelas que os 12 uploaders gravam — mesmo com um cliente Supabase
+  que conta toda chamada. ⚠️ Achado ao escrever o teste, não bug do
+  app: `bioSyncTudo()` é chamado por `bioEntrarNaHome()` em
+  fire-and-forget (sem `await`) — o teste precisa esperar
+  `_bioSyncEmAndamento` voltar a `false` antes de zerar os contadores,
+  senão uma chamada tardia do sync LEGÍTIMO (treino ainda desligado
+  nesse instante) vaza pro período que o teste de isolamento mede.
+- `pwa/sw.js`: biomonitor 41 → 42 (`js/guia-app.js`,
+  `js/biomonitor-guias.js`, `css/guia-app.css` no shell).
+  `app-biomonitor/scripts/build-www.mjs` atualizado nas 3 listas
+  (copiar+transpilar, sanidade, verificação de operadores ES2021) +
+  cópia do CSS.
+
 ## Regra do sistema — identidade do monitor no app Biomonitor (migration 323)
 Quem autentica é `monitores_biodiversidade.usuario_id` → `auth.users`.
 `monitores_biodiversidade.email` é só CADASTRO: editá-lo NÃO troca o
