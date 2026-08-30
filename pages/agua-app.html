@@ -273,7 +273,7 @@
     <div class="form-section">
       <label class="form-label">Código da coleta</label>
       <input type="text" id="f-codigo-amostra" class="form-input" placeholder="Gerado automaticamente ao sincronizar — preencha só se o frasco já tiver etiqueta própria">
-      <div class="campo-dica">Deixe em branco: o sistema gera um código único (ex.: COL-2026-0001) para escrever no frasco depois de sincronizar.</div>
+      <div class="campo-dica" id="f-codigo-dica">Deixe em branco: o sistema gera um código único (ex.: COL-2026-0001) para escrever no frasco depois de sincronizar.</div>
     </div>
 
     <div class="form-section">
@@ -1206,6 +1206,18 @@ async function agSalvarEquipamentoPadrao() {
   await aOfflineSetConfig('equipamento_padrao_id', id || null)
 }
 
+// Avisa ANTES de coletar se há código reservado pra imprimir etiqueta
+// offline — sem isso, o coletor só descobria depois de salvar (achado
+// real: usuário achou que o botão de etiqueta tinha sumido/quebrado,
+// quando na verdade não havia reservado nada em Configurações).
+async function atualizarDicaCodigoAmostra() {
+  const dica = document.getElementById('f-codigo-dica')
+  const n = await aEtqContarDisponiveis()
+  dica.textContent = n > 0
+    ? `Deixe em branco: ${n} código${n > 1 ? 's' : ''} reservado${n > 1 ? 's' : ''} disponível${n > 1 ? 'is' : ''} — a etiqueta poderá ser impressa na hora.`
+    : 'Deixe em branco: sem código reservado, o sistema gera um ao sincronizar — a etiqueta só poderá ser impressa depois (reserve em Configurações › Etiquetas de amostra para imprimir na hora).'
+}
+
 async function abrirFormulario() {
   App.pontoAtual = null
   App.gpsAtual = null
@@ -1225,6 +1237,7 @@ async function abrirFormulario() {
   })
   document.getElementById('f-codigo-amostra').value = ''
   document.getElementById('f-obs').value = ''
+  await atualizarDicaCodigoAmostra()
   _agAlertas = []
   agPintarAlertas()
   mostrarTela('tela-form')
@@ -1437,7 +1450,6 @@ async function salvarRegistro() {
 
   try {
     await aOfflineSalvar(registro)
-    toast('Coleta salva! Será enviada quando houver conexão.', 'ok')
     await atualizarBadgeFila()
     aSyncRegistrarBackground()
     aSyncRodar()
@@ -1445,7 +1457,15 @@ async function salvarRegistro() {
     // Só oferece imprimir quando o código veio do pool reservado — se
     // o coletor digitou o código à mão, é porque o frasco já tem
     // etiqueta própria (texto de ajuda do campo), e imprimir a nossa
-    // por cima não faz sentido.
+    // por cima não faz sentido. Sem pool E sem código digitado, o
+    // silêncio confundia (achado real: usuário achou que o botão de
+    // etiqueta "não apareceu"/estava quebrado) — o toast agora diz o
+    // motivo em vez de só não abrir nada.
+    if (!codigoVeioDoPool && !codigoAmostra) {
+      toast('Coleta salva! Sem código reservado — reserve em Configurações › Etiquetas de amostra para imprimir em campo.', 'warn')
+    } else {
+      toast('Coleta salva! Será enviada quando houver conexão.', 'ok')
+    }
     if (codigoVeioDoPool) {
       const ponto = (App.pontos || []).find(p => p.id === pontoId)
       const pontoLatLng = ponto ? agLatLngDeGeom(ponto.geom) : null

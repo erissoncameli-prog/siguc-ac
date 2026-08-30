@@ -3182,6 +3182,26 @@ que tornou o buraco visível.
 - Sem mudança em nenhum arquivo web — é fix só de banco
   (`vw_agua_coletas_detalhe`), efeito imediato sem precisar de deploy.
 
+**Pós-lançamento — avisar ANTES de coletar se há código reservado.**
+Relato real do usuário: "o botão de imprimir etiqueta não apareceu na
+tela onde realizo a coleta". Comportamento CORRETO (sem código
+reservado no pool, não há código definitivo pra imprimir — só depois
+do sync), mas silencioso: o coletor só descobriria que precisava
+reservar em Configurações DEPOIS de salvar, e nem isso — o app
+simplesmente não oferecia nada, sem dizer por quê.
+- A dica do campo "Código da coleta" (`#f-codigo-dica`) agora avisa
+  ANTES, ao abrir o formulário (`atualizarDicaCodigoAmostra()`): com
+  pool cheio, diz quantos códigos tem disponíveis; sem pool, diz que a
+  etiqueta só sai depois de sincronizar e aponta o caminho
+  (Configurações › Etiquetas de amostra).
+- O toast pós-salvar também deixou de ser genérico quando não havia
+  nada pra imprimir — diz explicitamente "sem código reservado" em vez
+  de só silenciar a oferta de etiqueta.
+- Guarda: +1 teste em `tests/agua-etiqueta.test.js` (dica muda de
+  "sem código reservado" pra "1 código reservado disponível" ao
+  reservar).
+- `pwa/sw.js`: agua v29 → v30.
+
 ## Regra do sistema — identidade do monitor no app Biomonitor (migration 323)
 Quem autentica é `monitores_biodiversidade.usuario_id` → `auth.users`.
 `monitores_biodiversidade.email` é só CADASTRO: editá-lo NÃO troca o
