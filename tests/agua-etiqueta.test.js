@@ -63,6 +63,7 @@ test('desenha a etiqueta no tamanho certo, com conteúdo de verdade', async ({ p
       data_coleta: '2026-08-29',
       hora_coleta: '08:14',
       coletor_nome: 'J. Silva',
+      lat: -9.9754, lng: -67.8243,
       via: 1, totalVias: 1,
     });
     const ctx = canvas.getContext('2d');
@@ -80,6 +81,54 @@ test('desenha a etiqueta no tamanho certo, com conteúdo de verdade', async ({ p
   // Faixa preta do topo sozinha já teria milhares de pixels — se
   // "pretos" for baixo, o desenho não rodou de verdade.
   expect(r.pretos).toBeGreaterThan(1000);
+});
+
+test('código da amostra nunca vaza a margem direita, e o QR fica ABAIXO do texto, nunca por cima', async ({ page }) => {
+  await abrirAppSemLogin(page);
+
+  // Achado em produção (screenshot no PR): "COL-2026-0042" em fonte
+  // fixa vazava os 40mm e ficava por baixo/em cima do QR. Guarda dupla:
+  // (1) a margem direita reservada (pad) na ALTURA do código fica
+  // branca — o texto ocupa a largura útil, nunca vaza pra fora dela
+  // (a fonte se auto-ajusta pra isso, ver _aEtqAjustarFonte);
+  // (2) o QR existe mais abaixo, fora da linha do código — prova que
+  // ele desceu, não desapareceu.
+  const r = await page.evaluate(() => {
+    const canvas = aguaEtiquetaCriarCanvas({
+      codigo_amostra: 'COL-2026-0042', // o mesmo formato do bug relatado
+      ponto_nome: 'Rio Acre — Ponte Metálica',
+      codigo_ana: '12345678',
+      data_coleta: '2026-08-29', hora_coleta: '08:14',
+      coletor_nome: 'J. Silva', lat: -9.9754, lng: -67.8243,
+      via: 1, totalVias: 1,
+    });
+    const ctx = canvas.getContext('2d');
+    const dpi = 203, mmParaPx = v => Math.round(v * dpi / 25.4);
+    // Linha do código: logo abaixo da faixa preta (4mm) — mede a
+    // margem direita reservada (2mm de pad) nessa altura.
+    const yIni = mmParaPx(4.5), yFim = mmParaPx(9.5);
+    const padPx = mmParaPx(2);
+    const { data } = ctx.getImageData(canvas.width - padPx, yIni, padPx, yFim - yIni);
+    let pretosNaMargem = 0;
+    for (let i = 0; i < data.length; i += 4) {
+      if (data[i] < 50) pretosNaMargem++;
+    }
+
+    // O QR precisa existir em algum lugar mais abaixo (prova que não
+    // sumiu, só mudou de lugar) — mede uma faixa mais pro fim da
+    // etiqueta, antes do rodapé fixo (a 9mm do fundo).
+    const yQrIni = mmParaPx(30), yQrFim = mmParaPx(48);
+    const { data: dataQr } = ctx.getImageData(0, yQrIni, canvas.width, yQrFim - yQrIni);
+    let pretosNaFaixaDoQr = 0;
+    for (let i = 0; i < dataQr.length; i += 4) {
+      if (dataQr[i] < 50) pretosNaFaixaDoQr++;
+    }
+
+    return { pretosNaMargem, pretosNaFaixaDoQr };
+  });
+
+  expect(r.pretosNaMargem).toBe(0); // nada vazando pra fora da margem direita, na altura do código
+  expect(r.pretosNaFaixaDoQr).toBeGreaterThan(500); // o QR está lá embaixo
 });
 
 test('pool de códigos reservados: FIFO, sem duplicar, só consome quando pedido', async ({ page }) => {

@@ -1448,6 +1448,7 @@ async function salvarRegistro() {
     // por cima não faz sentido.
     if (codigoVeioDoPool) {
       const ponto = (App.pontos || []).find(p => p.id === pontoId)
+      const pontoLatLng = ponto ? agLatLngDeGeom(ponto.geom) : null
       abrirEtiquetaOverlay({
         codigo_amostra: codigoAmostra,
         ponto_nome: ponto?.nome,
@@ -1455,6 +1456,7 @@ async function salvarRegistro() {
         data_coleta: registro.data_coleta,
         hora_coleta: registro.hora_coleta,
         coletor_nome: App.coletor?.nome_completo,
+        lat: pontoLatLng?.lat, lng: pontoLatLng?.lng,
       }, 2)
     }
   } catch (err) {
@@ -1523,6 +1525,7 @@ async function imprimirEtiquetaDaFila(uuidCliente) {
   const r = todos.find(x => x.uuid_cliente === uuidCliente)
   if (!r) return
   const ponto = (App.pontos || []).find(p => p.id === r.ponto_id)
+  const pontoLatLng = ponto ? agLatLngDeGeom(ponto.geom) : null
   abrirEtiquetaOverlay({
     codigo_amostra: r.codigo_amostra,
     ponto_nome: ponto?.nome,
@@ -1530,11 +1533,14 @@ async function imprimirEtiquetaDaFila(uuidCliente) {
     data_coleta: r.data_coleta,
     hora_coleta: r.hora_coleta,
     coletor_nome: App.coletor?.nome_completo,
+    lat: pontoLatLng?.lat, lng: pontoLatLng?.lng,
   }, 1)
 }
 
 // Reimpressão a partir do detalhe de uma coleta já sincronizada
-// (vw_agua_coletas_detalhe já tem todos os campos prontos).
+// (vw_agua_coletas_detalhe já tem todos os campos prontos, inclusive
+// ponto_lat/ponto_lng — extraídos da geometria do PONTO cadastrado,
+// não do GPS do aparelho na hora da coleta).
 function cmImprimirEtiqueta() {
   const c = _coletaModalAtual
   if (!c) return
@@ -1545,6 +1551,7 @@ function cmImprimirEtiqueta() {
     data_coleta: c.data_coleta,
     hora_coleta: c.hora_coleta,
     coletor_nome: c.coletor_nome,
+    lat: c.ponto_lat, lng: c.ponto_lng,
   }, 1)
 }
 

@@ -3074,14 +3074,32 @@ foi homologada ainda.
   conexão), contador de quantos restam offline.
 - `pwa/sw.js`: agua v26 → v27 (`js/agua-etiqueta.js` no shell).
   `app-agua/scripts/build-www.mjs` atualizado nas 3 listas.
-- Guarda: `tests/agua-etiqueta.test.js` (4 testes — desenho com
+- Guarda: `tests/agua-etiqueta.test.js` (5 testes — desenho com
   conteúdo real por contagem de pixel preto, pool FIFO sem duplicar,
-  salvar com/sem código digitado, reimpressão pela Fila sem rede).
-  `pages/agua-pontos.html` não tem suíte de teste própria no repositório
-  (nenhuma das 45 páginas de mesa "sozinhas" tem, é convenção do
-  projeto) — a aba nova foi conferida por `node --check` (sintaxe) e
-  leitura cruzada com o padrão das abas irmãs (Pontos/Laboratórios/
-  Equipamentos/Gabaritos), não por teste executado ponta a ponta.
+  salvar com/sem código digitado, reimpressão pela Fila sem rede, e o
+  bug real abaixo). `pages/agua-pontos.html` não tem suíte de teste
+  própria no repositório (nenhuma das 45 páginas de mesa "sozinhas"
+  tem, é convenção do projeto) — a aba nova foi conferida por
+  `node --check` (sintaxe) e leitura cruzada com o padrão das abas
+  irmãs (Pontos/Laboratórios/Equipamentos/Gabaritos), não por teste
+  executado ponta a ponta.
+- **Bug real, achado com a etiqueta impressa de verdade**: o código
+  da amostra em fonte fixa (5,5mm bold monoespaçado) era mais largo
+  que os 40mm da etiqueta — vazava por baixo/por cima do QR, que
+  ficava ao lado. Corrigido com **auto-ajuste de fonte**
+  (`_aEtqAjustarFonte`, mede com `ctx.measureText` e reduz até caber —
+  nunca um tamanho fixo pra texto de largura variável) e **o QR
+  desceu pra baixo do bloco de texto** (nunca mais ao lado — o código
+  sozinho já ocupa a largura toda). Etiqueta ganhou também
+  **coordenada do ponto cadastrado** (`Coord: lat, lng`, 5 casas —
+  não é o GPS do aparelho na hora da coleta, é a coordenada
+  autoritativa do cadastro) e o rótulo "Coleta:" na data, pra não
+  confundir com a data de impressão. Guarda: 2º teste em
+  `tests/agua-etiqueta.test.js` mede a margem direita reservada (tem
+  que ficar branca na altura do código — prova que não vaza) e uma
+  faixa mais abaixo (tem que ter o QR — prova que ele só mudou de
+  lugar, não sumiu).
+- `pwa/sw.js`: agua v27 → v28.
 
 ## Regra do sistema — identidade do monitor no app Biomonitor (migration 323)
 Quem autentica é `monitores_biodiversidade.usuario_id` → `auth.users`.

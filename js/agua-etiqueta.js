@@ -75,8 +75,24 @@ async function aEtqReservarOnline(qtd) {
 // na Fase 2, bitmap 1-bit para a impressora. Sem libs.
 // ═══════════════════════════════════════════════════════════════
 
+// Reduz o tamanho da fonte até o texto caber na largura disponível —
+// necessário para o código da amostra: "COL-2026-0042" em negrito
+// monoespaçado num tamanho fixo já vazava a largura da etiqueta
+// (achado em produção, ver captura no PR — o texto ficava por baixo/
+// por cima do QR, cortado). Nunca adivinhar um tamanho fixo pra texto
+// que muda de conteúdo.
+function _aEtqAjustarFonte(ctx, texto, larguraMax, pesoFamilia, pxMax, pxMin) {
+  for (let tam = pxMax; tam >= pxMin; tam--) {
+    ctx.font = `${pesoFamilia} ${tam}px "Courier New", monospace`
+    if (ctx.measureText(texto).width <= larguraMax) return tam
+  }
+  ctx.font = `${pesoFamilia} ${pxMin}px "Courier New", monospace`
+  return pxMin
+}
+
 // `dados`: { codigo_amostra, ponto_nome, codigo_ana, data_coleta
-// ('AAAA-MM-DD'), hora_coleta ('HH:MM'), coletor_nome, via, totalVias }
+// ('AAAA-MM-DD'), hora_coleta ('HH:MM'), coletor_nome, lat, lng,
+// via, totalVias }
 function aguaEtiquetaDesenhar(canvas, dados, opts = {}) {
   const dpi = opts.dpi || AGUA_ETIQUETA_DPI
   const mm  = opts.mm  || AGUA_ETIQUETA_MM
@@ -93,6 +109,7 @@ function aguaEtiquetaDesenhar(canvas, dados, opts = {}) {
   ctx.textBaseline = 'top'
 
   const pad = px(2)
+  const larguraUtil = W - pad * 2
   let y = 0
 
   // Faixa superior preta com o rótulo institucional em negativo
@@ -104,28 +121,53 @@ function aguaEtiquetaDesenhar(canvas, dados, opts = {}) {
   ctx.fillStyle = '#000'
   y = faixaH + px(2.5)
 
-  // Código da amostra (grande) — o dado mais importante da etiqueta
-  ctx.font = `bold ${px(5.5)}px "Courier New", monospace`
-  ctx.fillText(dados.codigo_amostra || '—', pad, y)
-  y += px(6.5)
+  // Código da amostra (o dado mais importante da etiqueta) — fonte
+  // AUTO-AJUSTADA pra nunca vazar a largura, nunca um tamanho fixo.
+  const codigo = dados.codigo_amostra || '—'
+  const tamCodigo = _aEtqAjustarFonte(ctx, codigo, larguraUtil, 'bold', px(5.5), px(3))
+  ctx.fillText(codigo, pad, y)
+  y += Math.round(tamCodigo * 1.25)
 
-  // QR do código, alinhado à direita, ao lado do texto acima
-  if (dados.codigo_amostra && typeof qrcode === 'function') {
+  // Linha separadora
+  y += px(1)
+  ctx.beginPath(); ctx.moveTo(pad, y); ctx.lineTo(W - pad, y); ctx.lineWidth = px(0.15); ctx.stroke()
+  y += px(2.3)
+
+  ctx.font = `bold ${px(2.6)}px Arial, sans-serif`
+  const linhasPonto = _aEtqLinhasDeTexto(ctx, dados.ponto_nome || 'Ponto não identificado', larguraUtil, px(2.6))
+  linhasPonto.slice(0, 2).forEach(l => { ctx.fillText(l, pad, y); y += px(3.1) })
+
+  ctx.font = `${px(2.2)}px Arial, sans-serif`
+  if (dados.codigo_ana) { ctx.fillText(`ANA ${dados.codigo_ana}`, pad, y); y += px(2.8) }
+
+  if (dados.lat != null && dados.lng != null) {
+    ctx.fillText(`Coord: ${Number(dados.lat).toFixed(5)}, ${Number(dados.lng).toFixed(5)}`, pad, y)
+    y += px(2.8)
+  }
+
+  const dataFmt = dados.data_coleta ? new Date(dados.data_coleta + 'T00:00:00').toLocaleDateString('pt-BR') : '—'
+  const horaFmt = dados.hora_coleta ? String(dados.hora_coleta).slice(0, 5) : ''
+  ctx.fillText(`Coleta: ${dataFmt}${horaFmt ? '  ' + horaFmt : ''}`, pad, y); y += px(2.8)
+
+  if (dados.coletor_nome) {
+    ctx.fillText(`Coletor: ${dados.coletor_nome}`.slice(0, 40), pad, y); y += px(2.8)
+  }
+
+  // QR do código — abaixo do texto (nunca ao lado: o código sozinho já
+  // ocupa a largura toda), centralizado no espaço livre antes do
+  // rodapé fixo.
+  const rodapeY = H - px(9)
+  const espacoLivre = rodapeY - y
+  if (dados.codigo_amostra && typeof qrcode === 'function' && espacoLivre > px(8)) {
     try {
       const qr = qrcode(0, 'M')
       qr.addData(dados.codigo_amostra)
       qr.make()
-      const qrSizeMm = 15
-      const qrPx = px(qrSizeMm)
-      const qrImg = new Image()
-      // Desenho síncrono: qrcode-generator devolve <img>/<table> pela
-      // API createImgTag/createTableTag, mas createDataURL já entrega
-      // um PNG pronto — desenhamos direto do módulo interno em vez de
-      // depender de onload assíncrono (a etiqueta tem de sair pronta
-      // na mesma chamada, para virar PDF/bitmap sem esperar imagem).
+      const qrPx = Math.min(px(15), espacoLivre - px(1.5))
       const cellCount = qr.getModuleCount()
       const cell = qrPx / cellCount
-      const qx = W - pad - qrPx, qy = faixaH + px(2)
+      const qx = Math.round((W - qrPx) / 2)
+      const qy = y + px(1)
       for (let r = 0; r < cellCount; r++) {
         for (let c = 0; c < cellCount; c++) {
           if (qr.isDark(r, c)) ctx.fillRect(qx + c * cell, qy + r * cell, Math.ceil(cell), Math.ceil(cell))
@@ -134,28 +176,8 @@ function aguaEtiquetaDesenhar(canvas, dados, opts = {}) {
     } catch (e) { console.warn('[agua-etiqueta] QR falhou:', e) }
   }
 
-  // Linha separadora
-  y += px(1)
-  ctx.beginPath(); ctx.moveTo(pad, y); ctx.lineTo(W - pad, y); ctx.lineWidth = px(0.15); ctx.stroke()
-  y += px(2.5)
-
-  ctx.font = `bold ${px(2.6)}px Arial, sans-serif`
-  const linhas = _aEtqLinhasDeTexto(ctx, dados.ponto_nome || 'Ponto não identificado', W - pad * 2, px(2.6))
-  linhas.slice(0, 2).forEach(l => { ctx.fillText(l, pad, y); y += px(3.2) })
-
-  ctx.font = `${px(2.3)}px Arial, sans-serif`
-  if (dados.codigo_ana) { ctx.fillText(`ANA ${dados.codigo_ana}`, pad, y); y += px(3) }
-
-  const dataFmt = dados.data_coleta ? new Date(dados.data_coleta + 'T00:00:00').toLocaleDateString('pt-BR') : '—'
-  const horaFmt = dados.hora_coleta ? String(dados.hora_coleta).slice(0, 5) : ''
-  ctx.fillText(`${dataFmt}${horaFmt ? '  ' + horaFmt : ''}`, pad, y); y += px(3)
-
-  if (dados.coletor_nome) {
-    ctx.fillText(`Coletor: ${dados.coletor_nome}`.slice(0, 34), pad, y); y += px(3)
-  }
-
   // Rodapé: linha para anotar preservação a mão + via/total
-  y = H - px(9)
+  y = rodapeY
   ctx.beginPath(); ctx.moveTo(pad, y); ctx.lineTo(W - pad, y); ctx.lineWidth = px(0.12); ctx.stroke()
   y += px(1.5)
   ctx.font = `${px(2)}px Arial, sans-serif`
