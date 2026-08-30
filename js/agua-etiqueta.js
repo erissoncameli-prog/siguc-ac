@@ -138,7 +138,11 @@ function aguaEtiquetaDesenhar(canvas, dados, opts = {}) {
   linhasPonto.slice(0, 2).forEach(l => { ctx.fillText(l, pad, y); y += px(3.1) })
 
   ctx.font = `${px(2.2)}px Arial, sans-serif`
-  if (dados.codigo_ana) { ctx.fillText(`ANA ${dados.codigo_ana}`, pad, y); y += px(2.8) }
+  // Rio + código ANA na MESMA linha — economiza altura (a etiqueta já
+  // é apertada com QR + rodapé fixos); rio some sozinho se o ponto
+  // não tiver um cadastrado (ponto fora de curso d'água nomeado).
+  const infoLocal = [dados.rio, dados.codigo_ana ? `ANA ${dados.codigo_ana}` : null].filter(Boolean).join(' · ')
+  if (infoLocal) { ctx.fillText(infoLocal, pad, y); y += px(2.8) }
 
   if (dados.lat != null && dados.lng != null) {
     ctx.fillText(`Coord: ${Number(dados.lat).toFixed(5)}, ${Number(dados.lng).toFixed(5)}`, pad, y)
