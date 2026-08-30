@@ -564,7 +564,7 @@ async function buscarColetasEtiqueta() {
   tbody.innerHTML = '<tr><td colspan="5" style="padding:12px 14px;color:#6B7280">Buscando…</td></tr>'
 
   let q = db.from('vw_agua_coletas_detalhe')
-    .select('id,codigo_amostra,ponto_nome,codigo_ana,data_coleta,hora_coleta,coletor_nome')
+    .select('id,codigo_amostra,ponto_nome,codigo_ana,data_coleta,hora_coleta,coletor_nome,ponto_lat,ponto_lng')
     .not('codigo_amostra', 'is', null)
     .order('data_coleta', { ascending: false })
     .limit(100)
@@ -619,6 +619,7 @@ async function gerarPdfEtiquetasSelecionadas() {
     const pdf = await aguaEtiquetaMontarPdfLote(selecionadas.map(c => ({
       codigo_amostra: c.codigo_amostra, ponto_nome: c.ponto_nome, codigo_ana: c.codigo_ana,
       data_coleta: c.data_coleta, hora_coleta: c.hora_coleta, coletor_nome: c.coletor_nome,
+      lat: c.ponto_lat, lng: c.ponto_lng,
     })))
     aguaEtiquetaBaixarPdf(pdf, `etiquetas-lote-${new Date().toISOString().slice(0, 10)}.pdf`)
   } catch (e) {
