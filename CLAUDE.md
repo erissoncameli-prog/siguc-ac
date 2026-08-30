@@ -3011,6 +3011,78 @@ continuam sem amostra/necessidade real, registradas como estão).
 - Sem mudança em `pwa/sw.js`: `agua-pontos.html` e `agua-laudos.html`
   são telas de mesa, não app de campo.
 
+## Regra do sistema — etiqueta do frasco de amostra (Água, Fase 1 — migration 325)
+Impressão térmica Bluetooth portátil, pedida pelo usuário. Plano
+completo (requisito de compra da impressora, 5 peças, riscos) em
+`docs/qualidade-agua/plano-etiqueta-frasco.md`. **Fase 1 ENTREGUE**
+(tudo que não depende da impressora chegar); Fase 2 (transporte
+Bluetooth + driver do modelo comprado) fica para quando a impressora
+for definida — o requisito de compra já está escrito, nenhuma marca
+foi homologada ainda.
+
+- **O código só existe depois do sync** (`codigo_amostra`, trigger da
+  migration 273) — mas a etiqueta precisa dele OFFLINE, em campo, e
+  DEFINITIVO (o mesmo do laudo, nunca um provisório a reconciliar
+  depois). Solução: **reserva de bloco** — `agua_reservar_codigos(qtd)`
+  (RPC, migration 325) consome o MESMO contador
+  (`agua_coletas_contador`) que o trigger usa, então nunca colide. O
+  app guarda os códigos reservados no IndexedDB (store `config`
+  reaproveitada, chave `etq_codigos_reservados` — sem bump de schema)
+  e só tira um do pool (FIFO) no momento de SALVAR, nunca ao abrir o
+  formulário — abandonar a tela não pode "gastar" um código à toa.
+- **Buraco na numeração é consequência aceita e DECLARADA**, não bug:
+  um código reservado que nunca vira coleta (reservou 20, usou 12)
+  deixa `COL-2026-0042` inexistente para sempre — nunca reciclado
+  (reciclar abriria dois frascos físicos com o mesmo código). RPC
+  `agua_codigos_reservados_pendentes()` lista o que ficou pendente,
+  auditável em vez de misterioso (`pages/agua-pontos.html`, aba
+  "Etiquetas"). Marcação de uso é AUTOMÁTICA — trigger
+  `trg_agua_marcar_codigo_usado` (AFTER, roda depois do BEFORE INSERT
+  da 273) —, `js/agua-sync.js` não precisou de nenhuma mudança.
+- **Só oferece imprimir quando o código veio do POOL.** Se o coletor
+  digitou o código à mão no campo (texto de ajuda: "preencha só se o
+  frasco já tiver etiqueta própria"), o overlay de etiqueta nunca abre
+  — imprimir a nossa por cima de uma etiqueta que já existe não faz
+  sentido. Achado ao escrever o teste: sem essa distinção, TODO
+  salvamento (inclusive o de `tests/agua-app-fluxo.test.js`, que
+  sempre digita um código) abriria o overlay e bloquearia o clique
+  seguinte do teste — a distinção corrigiu o teste E é o comportamento
+  certo de produto ao mesmo tempo.
+- **Fonte única do desenho: `js/agua-etiqueta.js`** (mesma lição de
+  `js/frota-consumo.js`) — canvas raster (40×60 mm, 203 dpi, QR
+  desenhado direto dos módulos de `js/qrcode-generator.js`, sem
+  `<img>` assíncrona) alimenta o preview na tela, o PDF de N vias
+  (`aguaEtiquetaMontarPdfVias`) e o PDF em lote de mesa
+  (`aguaEtiquetaMontarPdfLote`) — a MESMA imagem, nunca uma segunda
+  implementação em texto vetorial. Isso também é o que vai alimentar o
+  bitmap da impressora na Fase 2, sem duplicar o layout de novo.
+- **3 pontos de entrada no app** (`pages/agua-app.html`): pós-salvar
+  (só quando código veio do pool, acima), card da Fila (reimpressão
+  100% offline — código/ponto/coletor já estão no registro local +
+  cache de pontos) e detalhe da coleta no Histórico (dados já vêm
+  prontos de `vw_agua_coletas_detalhe`). Overlay único
+  (`#etiqueta-overlay`), nunca 3 implementações.
+- **Mesa** (`pages/agua-pontos.html`, aba nova "Etiquetas"): busca
+  coletas já sincronizadas (código/ponto/período) e gera PDF em lote —
+  plano B para quando a térmica falha em campo — mais o relatório de
+  reservados pendentes acima. Decisão tomada ao codar (diverge do
+  plano original, que cogitava `agua-conferencia.html` para o
+  relatório): ficou junto do resto de Etiquetas, mais coeso que
+  misturar com a tela de conferência de laudo, que é sobre outra
+  coisa.
+- Config do app ganhou "Etiquetas de amostra": reservar (exige
+  conexão), contador de quantos restam offline.
+- `pwa/sw.js`: agua v26 → v27 (`js/agua-etiqueta.js` no shell).
+  `app-agua/scripts/build-www.mjs` atualizado nas 3 listas.
+- Guarda: `tests/agua-etiqueta.test.js` (4 testes — desenho com
+  conteúdo real por contagem de pixel preto, pool FIFO sem duplicar,
+  salvar com/sem código digitado, reimpressão pela Fila sem rede).
+  `pages/agua-pontos.html` não tem suíte de teste própria no repositório
+  (nenhuma das 45 páginas de mesa "sozinhas" tem, é convenção do
+  projeto) — a aba nova foi conferida por `node --check` (sintaxe) e
+  leitura cruzada com o padrão das abas irmãs (Pontos/Laboratórios/
+  Equipamentos/Gabaritos), não por teste executado ponta a ponta.
+
 ## Regra do sistema — identidade do monitor no app Biomonitor (migration 323)
 Quem autentica é `monitores_biodiversidade.usuario_id` → `auth.users`.
 `monitores_biodiversidade.email` é só CADASTRO: editá-lo NÃO troca o

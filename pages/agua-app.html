@@ -379,6 +379,21 @@
       </div>
     </div>
 
+    <div class="form-section">
+      <label class="form-label">Etiquetas de amostra</label>
+      <p class="campo-dica" id="etq-config-contagem">— códigos disponíveis offline</p>
+      <div class="etq-reservar-row">
+        <select id="etq-config-qtd" class="form-select">
+          <option value="10">10 códigos</option>
+          <option value="20" selected>20 códigos</option>
+          <option value="30">30 códigos</option>
+          <option value="50">50 códigos</option>
+        </select>
+        <button class="btn-sm btn-prim" type="button" id="btn-reservar-codigos">Reservar (online)</button>
+      </div>
+      <div class="campo-dica">Reserve antes de ir a campo — os códigos ficam salvos no aparelho e a etiqueta usa o código definitivo, mesmo offline.</div>
+    </div>
+
     <button class="btn-config-item" id="btn-alterar-pin" data-icon="key">Alterar PIN de campo</button>
     <button class="btn-config-item" id="btn-atualizar-pontos" data-icon="pin">Atualizar lista de pontos de coleta</button>
     <button class="btn-config-item" id="btn-qr-instalar" data-icon="qr">Instalar em outro aparelho (QR)</button>
@@ -456,11 +471,31 @@
       <button type="button" id="cm-fechar" class="coleta-modal-close" aria-label="Fechar">×</button>
     </div>
     <div class="coleta-modal-body" id="cm-corpo"></div>
-    <div class="coleta-modal-footer">
-      <button type="button" id="cm-exportar" class="btn-salvar" data-icon="download" style="margin-top:0">
+    <div class="coleta-modal-footer" style="display:flex;gap:8px">
+      <button type="button" id="cm-etiqueta" class="btn-salvar" data-icon="printer" style="margin-top:0;flex:1" onclick="cmImprimirEtiqueta()">
+        Etiqueta
+      </button>
+      <button type="button" id="cm-exportar" class="btn-salvar" data-icon="download" style="margin-top:0;flex:1">
         <span id="cm-exportar-label">Exportar PDF</span>
       </button>
     </div>
+  </div>
+</div>
+
+<!-- ══ OVERLAY: etiqueta do frasco (preview + imprimir/compartilhar) ═ -->
+<div id="etiqueta-overlay" class="qr-overlay" hidden>
+  <div class="qr-card etq-card">
+    <h3 data-icon="printer">Etiqueta do frasco</h3>
+    <p id="etq-sem-codigo" class="cm-hint" hidden>Esta coleta ainda não tem código de amostra — reserve códigos em Configurações ou aguarde a sincronização.</p>
+    <div id="etq-conteudo">
+      <canvas id="etq-canvas" class="etq-canvas"></canvas>
+      <div class="etq-vias-row">
+        <label for="etq-vias">Vias</label>
+        <input type="number" id="etq-vias" min="1" max="10" value="1">
+      </div>
+      <button type="button" class="btn-config-item" id="etq-btn-imprimir" data-icon="printer">Imprimir / Compartilhar</button>
+    </div>
+    <button class="btn-config-item" id="etiqueta-overlay-fechar">Fechar</button>
   </div>
 </div>
 
@@ -516,6 +551,7 @@ const _aguaReady = _dbReady.then(function () {
 </script>
 <script src="/js/agua-offline.js"></script>
 <script src="/js/agua-sync.js"></script>
+<script src="/js/agua-etiqueta.js"></script>
 <script src="/js/brigada-captura.js"></script>
 <script src="/js/grafico-teclado.js"></script>
 <script src="/js/agua-iqa-visual.js"></script>
@@ -1365,6 +1401,18 @@ async function salvarRegistro() {
   const [ano, mes] = dataColeta.split('-').map(Number)
   const ordem = mes <= 6 ? 'primeira' : 'segunda'   // cheia/seca — ver js/agua-sync.js
 
+  // Código da amostra: se o coletor não digitou nada, tenta tirar o
+  // próximo do pool reservado (js/agua-etiqueta.js) — só AGORA, no
+  // salvamento, nunca ao abrir o formulário (abandonar a tela não pode
+  // "gastar" um código à toa). Sem pool disponível, segue null: o
+  // trigger do banco gera um ao sincronizar, como sempre foi.
+  let codigoAmostra = document.getElementById('f-codigo-amostra').value.trim() || null
+  let codigoVeioDoPool = false
+  if (!codigoAmostra) {
+    codigoAmostra = await aEtqConsumirCodigo()
+    if (codigoAmostra) codigoVeioDoPool = true
+  }
+
   const registro = {
     uuid_cliente: crypto.randomUUID(),
     ponto_id: pontoId,
@@ -1380,7 +1428,7 @@ async function salvarRegistro() {
     od: agValorCampo('f-od'),
     turbidez: agValorCampo('f-turbidez'),
     condutividade_eletrica: agValorCampo('f-condutividade'),
-    codigo_amostra: document.getElementById('f-codigo-amostra').value.trim() || null,
+    codigo_amostra: codigoAmostra,
     observacoes: document.getElementById('f-obs').value.trim() || null,
     lat: App.gpsAtual?.lat ?? null,
     lng: App.gpsAtual?.lng ?? null,
@@ -1394,8 +1442,134 @@ async function salvarRegistro() {
     aSyncRegistrarBackground()
     aSyncRodar()
     mostrarTela('tela-home')
+    // Só oferece imprimir quando o código veio do pool reservado — se
+    // o coletor digitou o código à mão, é porque o frasco já tem
+    // etiqueta própria (texto de ajuda do campo), e imprimir a nossa
+    // por cima não faz sentido.
+    if (codigoVeioDoPool) {
+      const ponto = (App.pontos || []).find(p => p.id === pontoId)
+      abrirEtiquetaOverlay({
+        codigo_amostra: codigoAmostra,
+        ponto_nome: ponto?.nome,
+        codigo_ana: ponto?.codigo_ana,
+        data_coleta: registro.data_coleta,
+        hora_coleta: registro.hora_coleta,
+        coletor_nome: App.coletor?.nome_completo,
+      }, 2)
+    }
   } catch (err) {
     toast('Erro ao salvar: ' + err.message, 'erro')
+  }
+}
+
+// ════════════════════════════════════════════════════════════════
+// Etiqueta do frasco (js/agua-etiqueta.js é a fonte única do desenho
+// — este bloco só decide QUANDO mostrar o overlay e DE ONDE tirar os
+// dados, em cada uma das 3 entradas: pós-salvar, card da Fila e
+// detalhe da coleta no Histórico).
+// ════════════════════════════════════════════════════════════════
+let _etqDadosAtuais = null
+
+function abrirEtiquetaOverlay(dados, viasPadrao = 1) {
+  _etqDadosAtuais = dados
+  const overlay = document.getElementById('etiqueta-overlay')
+  const semCodigo = document.getElementById('etq-sem-codigo')
+  const conteudo = document.getElementById('etq-conteudo')
+  overlay.hidden = false
+
+  if (!dados?.codigo_amostra) {
+    semCodigo.hidden = false
+    conteudo.hidden = true
+    return
+  }
+  semCodigo.hidden = true
+  conteudo.hidden = false
+
+  const canvas = document.getElementById('etq-canvas')
+  aguaEtiquetaDesenhar(canvas, { ...dados, via: 1, totalVias: Number(document.getElementById('etq-vias').value) || 1 })
+  document.getElementById('etq-vias').value = viasPadrao
+}
+
+function fecharEtiquetaOverlay() {
+  document.getElementById('etiqueta-overlay').hidden = true
+  _etqDadosAtuais = null
+}
+
+async function imprimirEtiquetaAtual() {
+  if (!_etqDadosAtuais?.codigo_amostra) return
+  const vias = Math.max(1, Math.min(10, Number(document.getElementById('etq-vias').value) || 1))
+  const btn = document.getElementById('etq-btn-imprimir')
+  const textoOriginal = btn.textContent
+  btn.disabled = true
+  btn.textContent = 'Gerando…'
+  try {
+    const pdf = await aguaEtiquetaMontarPdfVias(_etqDadosAtuais, vias)
+    const filename = `etiqueta-${_etqDadosAtuais.codigo_amostra}.pdf`
+    await compartilharArquivo(pdf.output('blob'), filename, `Etiqueta — ${_etqDadosAtuais.codigo_amostra}`, msg => toast(msg, 'ok'))
+  } catch (e) {
+    console.error('[etiqueta]', e)
+    toast('Erro ao gerar etiqueta: ' + e.message, 'erro')
+  } finally {
+    btn.disabled = false
+    btn.textContent = textoOriginal
+  }
+}
+
+// Reimpressão a partir de um item da Fila (ainda pendente/offline —
+// os dados vêm todos do próprio registro local + cache de pontos,
+// sem precisar de conexão).
+async function imprimirEtiquetaDaFila(uuidCliente) {
+  const todos = await aOfflineListarTodos()
+  const r = todos.find(x => x.uuid_cliente === uuidCliente)
+  if (!r) return
+  const ponto = (App.pontos || []).find(p => p.id === r.ponto_id)
+  abrirEtiquetaOverlay({
+    codigo_amostra: r.codigo_amostra,
+    ponto_nome: ponto?.nome,
+    codigo_ana: ponto?.codigo_ana,
+    data_coleta: r.data_coleta,
+    hora_coleta: r.hora_coleta,
+    coletor_nome: App.coletor?.nome_completo,
+  }, 1)
+}
+
+// Reimpressão a partir do detalhe de uma coleta já sincronizada
+// (vw_agua_coletas_detalhe já tem todos os campos prontos).
+function cmImprimirEtiqueta() {
+  const c = _coletaModalAtual
+  if (!c) return
+  abrirEtiquetaOverlay({
+    codigo_amostra: c.codigo_amostra,
+    ponto_nome: c.ponto_nome,
+    codigo_ana: c.codigo_ana,
+    data_coleta: c.data_coleta,
+    hora_coleta: c.hora_coleta,
+    coletor_nome: c.coletor_nome,
+  }, 1)
+}
+
+// ── Config: reservar códigos (online) ─────────────────────────
+async function atualizarContagemEtiquetas() {
+  const n = await aEtqContarDisponiveis()
+  document.getElementById('etq-config-contagem').textContent =
+    n === 0 ? 'Nenhum código disponível offline' : `${n} código${n > 1 ? 's' : ''} disponível${n > 1 ? 'is' : ''} offline`
+}
+
+async function reservarCodigosEtiqueta() {
+  const qtd = Number(document.getElementById('etq-config-qtd').value)
+  const btn = document.getElementById('btn-reservar-codigos')
+  const textoOriginal = btn.textContent
+  btn.disabled = true
+  btn.textContent = 'Reservando…'
+  try {
+    await aEtqReservarOnline(qtd)
+    toast(`${qtd} códigos reservados — prontos para imprimir offline.`, 'ok')
+    await atualizarContagemEtiquetas()
+  } catch (e) {
+    toast(e.message || 'Não foi possível reservar — verifique a conexão.', 'erro')
+  } finally {
+    btn.disabled = false
+    btn.textContent = textoOriginal
   }
 }
 
@@ -1713,6 +1887,7 @@ function agRenderItemFila(r) {
         ${r.ultimo_erro ? `<span class="sync-erro-msg">⚠ ${esc(r.ultimo_erro)}</span>` : ''}
       </div>
       <span class="sync-status sync-${r.status}">${statusLabel[r.status] || r.status}</span>
+      ${r.codigo_amostra ? `<button type="button" class="sync-item-etq-btn" title="Imprimir etiqueta" aria-label="Imprimir etiqueta" onclick="imprimirEtiquetaDaFila('${esc(r.uuid_cliente)}')">${bico('printer')}</button>` : ''}
     </div>`
 }
 
@@ -1738,6 +1913,7 @@ async function carregarConfig() {
   document.getElementById('avatar-letra').textContent = (App.coletor?.nome_completo || 'C').charAt(0).toUpperCase()
   agRegistrarAvatarMenu()
   agAtualizarAvatar()
+  atualizarContagemEtiquetas()
 
   const quota = await aOfflineQuota()
   if (quota) {
@@ -1908,6 +2084,18 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.target.id === 'coleta-overlay') fecharColetaDetalhe()
   })
   document.getElementById('cm-exportar').addEventListener('click', exportarFichaColeta)
+
+  document.getElementById('etq-btn-imprimir').addEventListener('click', imprimirEtiquetaAtual)
+  document.getElementById('etq-vias').addEventListener('input', () => {
+    if (_etqDadosAtuais?.codigo_amostra) {
+      aguaEtiquetaDesenhar(document.getElementById('etq-canvas'), { ..._etqDadosAtuais, via: 1, totalVias: Number(document.getElementById('etq-vias').value) || 1 })
+    }
+  })
+  document.getElementById('etiqueta-overlay-fechar').addEventListener('click', fecharEtiquetaOverlay)
+  document.getElementById('etiqueta-overlay').addEventListener('click', e => {
+    if (e.target.id === 'etiqueta-overlay') fecharEtiquetaOverlay()
+  })
+  document.getElementById('btn-reservar-codigos').addEventListener('click', reservarCodigosEtiqueta)
 
   document.getElementById('btn-update-agora').addEventListener('click', aplicarUpdate)
   document.getElementById('btn-update-depois').addEventListener('click', () => { document.getElementById('update-banner').hidden = true })
