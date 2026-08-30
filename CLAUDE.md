@@ -3333,6 +3333,64 @@ Configurações › Ajuda e treinamento, junto do botão Modo treinamento.
   (copiar+transpilar, sanidade, verificação de operadores ES2021) +
   cópia do CSS.
 
+**Pós-lançamento — entrada mais visível + faixa de treino
+inconfundível.** Achado real do usuário testando em produção: a
+entrada do treinamento só existia em Configurações (texto numa lista)
+e a faixa de treino, fina e sem ícone, passava despercebida. As duas
+correções entraram no motor compartilhado (`js/guia-app.js` +
+`css/guia-app.css`), então valem para os dois apps de graça.
+
+- **Botão flutuante persistente** (`guiaBotaoFlutuante()`): círculo
+  com o ícone de ajuda, sempre visível acima da barra de abas (nunca
+  só na Home), com flutuação suave e um anel pulsante enquanto
+  `guiaAlgumConcluido()` for falso — some sozinho assim que a pessoa
+  abre o primeiro guia, sem precisar de uma segunda chave de "já
+  visto" no localStorage. Um balão de fala ("Precisa de ajuda? Toque
+  aqui!") aparece junto na primeira vez e fecha sozinho em 6s ou ao
+  tocar em qualquer lugar — reforço temporário, não um segundo convite
+  pra dispensar.
+- **Posição depende da altura da barra de abas, que varia por app** —
+  `--guia-fab-bottom` entra como variável da PÁGINA (fallback do
+  `var()`, nunca declarada no módulo — mesma regra de `--guia-cor` e
+  de `--pin-cor` em `css/pin-baralho.css`), calculada a partir do
+  `--nav-h`/`--bio-nav-h` de cada app.
+- **Some junto com o overlay do guia** (`body.guia-aberto .guia-fab`):
+  sem isso ficaria visível (só sem clique, porque o overlay intercepta
+  o toque) atrás do tour em modo transparente (destaque sobre
+  elemento real), o que confundia mais do que ajudava.
+- **Visibilidade segue a mesma regra de sempre**: cada app já tinha um
+  critério de "é tela de bloqueio?" pra esconder nav/faixa
+  institucional (`mostrarTela`/`bioMostrarTela`) — o botão flutuante
+  só ganhou mais uma linha nesse MESMO critério
+  (`guiaBotaoFlutuanteVisivel`), não um crivo próprio.
+- **Faixa de treino**: de uma linha de texto fina (32px) pra um bloco
+  com ícone pulsante, texto em duas linhas e fundo de listras
+  diagonais animadas (`repeating-linear-gradient` com
+  `background-position` animado) — o mesmo padrão visual de "ambiente
+  de teste" usado por ferramentas de deploy. Ícone e bloco de texto
+  (`.treino-faixa-icone`/`.treino-faixa-texto`) são regra ÚNICA em
+  `css/guia-app.css`; só cor de fundo, listras e botão continuam por
+  app (a cor de alerta é `--alerta`/`--bio-alerta`, próprias de cada
+  design system).
+- **Moldura em volta da tela inteira** (`body.modo-treino::after` /
+  `body.bio-modo-treino::after`, `box-shadow: inset ... 3px`): reforço
+  que não depende de olhar pro topo da tela — mesmo rolando um
+  formulário longo, a moldura (fixa, `position:fixed;inset:0`) segue
+  visível nas bordas. Nunca cobre nada (`pointer-events:none`).
+- `prefers-reduced-motion` desliga a flutuação do botão, o pulso do
+  anel, o balão e as listras animadas — a moldura e o texto continuam.
+- Guarda: +4 testes em `tests/agua-guia.test.js` e +3 em
+  `tests/biomonitor-guia.test.js` (botão visível/escondido conforme a
+  tela, abre a central de guias, balão aparece e some ao clicar,
+  faixa com ícone e moldura aplicada). ⚠️ O botão flutua sem parar via
+  CSS — os testes de clique precisam de
+  `page.emulateMedia({ reducedMotion: 'reduce' })` antes, senão o
+  Playwright nunca considera o alvo "estável" pra clicar (o elemento
+  está de fato se movendo o tempo todo).
+- `pwa/sw.js`: agua 33 → 34, biomonitor 42 → 43 (só `js/guia-app.js` e
+  `css/guia-app.css` mudaram — já estavam nos dois shells, nenhuma
+  lista nova).
+
 ## Regra do sistema — identidade do monitor no app Biomonitor (migration 323)
 Quem autentica é `monitores_biodiversidade.usuario_id` → `auth.users`.
 `monitores_biodiversidade.email` é só CADASTRO: editá-lo NÃO troca o

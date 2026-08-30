@@ -397,6 +397,74 @@ function guiaFechar() {
   _guiaEst = null
 }
 
+// ── Botão flutuante de ajuda ────────────────────────────────────
+// A entrada principal do treinamento: "Configurações › Ajuda" era fácil
+// de nunca ser descoberta — pedido do usuário para o app "guiar até o
+// guia" em vez de esperar que alguém procure. Persistente em toda tela
+// (não só na Home), acima da barra de abas, com um selinho pulsante
+// enquanto ninguém abriu guia nenhum — depois de aberto o primeiro
+// guia, o pulso some sozinho (`guiaAlgumConcluido()`), sem precisar de
+// uma segunda chave de "já visto" no localStorage.
+//
+// Posição: cada app define --guia-fab-bottom (fallback do var(), nunca
+// declarada aqui — mesma regra de --guia-cor) porque a altura da barra
+// de abas varia entre apps (--nav-h na Água, --bio-nav-h no
+// Biomonitor); o botão fica ACIMA dela, nunca sobreposto.
+function guiaBotaoFlutuante(opts = {}) {
+  if (!_guiaCat) return
+  let btn = document.getElementById('guia-fab')
+  if (!btn) {
+    btn = document.createElement('button')
+    btn.id = 'guia-fab'
+    btn.type = 'button'
+    btn.className = 'guia-fab'
+    btn.setAttribute('aria-label', 'Ajuda e treinamento')
+    btn.innerHTML = `<span class="guia-fab-anel"></span><span class="guia-fab-icone">${_guiaIcone(opts.icone || 'help') || '?'}</span>`
+    document.body.appendChild(btn)
+    btn.addEventListener('click', () => {
+      _guiaFabBalaoFechar()
+      guiaAbrirCentral()
+    })
+  }
+  btn.classList.toggle('guia-fab-novo', !guiaAlgumConcluido())
+  if (!guiaAlgumConcluido()) _guiaFabBalaoMostrar(opts.dica)
+  return btn
+}
+
+// Balão de fala breve, só na primeira vez (mesmo sinal do selinho
+// pulsante: "ninguém abriu guia nenhum ainda") — some sozinho depois
+// de alguns segundos ou ao tocar em qualquer lugar. Não é um segundo
+// "convite" para dispensar de novo; é só um empurrãozinho visual.
+let _guiaFabBalaoTimer = null
+function _guiaFabBalaoMostrar(texto) {
+  if (document.getElementById('guia-fab-balao')) return
+  const balao = document.createElement('div')
+  balao.id = 'guia-fab-balao'
+  balao.className = 'guia-fab-balao'
+  balao.textContent = texto || 'Precisa de ajuda? Toque aqui!'
+  document.body.appendChild(balao)
+  _guiaFabBalaoTimer = setTimeout(_guiaFabBalaoFechar, 6000)
+  document.addEventListener('pointerdown', _guiaFabBalaoCliqueFora, { capture: true })
+}
+function _guiaFabBalaoCliqueFora(ev) {
+  if (ev.target.closest?.('#guia-fab, #guia-fab-balao')) return
+  _guiaFabBalaoFechar()
+}
+function _guiaFabBalaoFechar() {
+  clearTimeout(_guiaFabBalaoTimer)
+  document.removeEventListener('pointerdown', _guiaFabBalaoCliqueFora, { capture: true })
+  document.getElementById('guia-fab-balao')?.remove()
+}
+
+// Esconder/mostrar nas telas de autenticação (a página chama isto de
+// dentro da própria função de trocar de tela, junto com o mesmo
+// critério já usado pra nav/faixa institucional).
+function guiaBotaoFlutuanteVisivel(visivel) {
+  const btn = document.getElementById('guia-fab')
+  if (btn) btn.hidden = !visivel
+  if (!visivel) _guiaFabBalaoFechar()
+}
+
 // ── Convite de primeiro acesso (dispensável para sempre) ───────
 function guiaConvite(opts = {}) {
   if (!_guiaCat || guiaAlgumConcluido()) return
@@ -434,6 +502,8 @@ if (typeof window !== 'undefined') {
   window.guiaVerbete = guiaVerbete
   window.guiaAjudaBtnHTML = guiaAjudaBtnHTML
   window.guiaConvite = guiaConvite
+  window.guiaBotaoFlutuante = guiaBotaoFlutuante
+  window.guiaBotaoFlutuanteVisivel = guiaBotaoFlutuanteVisivel
   window.guiaConcluido = guiaConcluido
   window.guiaCatalogo = guiaCatalogo
   window.addEventListener('online', () => _guiaEnviarPendentes())
