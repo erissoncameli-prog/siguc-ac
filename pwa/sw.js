@@ -15,7 +15,7 @@ const APP = SCOPE.includes('/pages/biomonitor.html') ? 'biomonitor'
 // Ao concluir uma implementação que toque arquivos web de um app,
 // incrementar SÓ o número daquele app (vN → vN+1) — não precisa mexer
 // nos outros dois.
-const VERSOES = { brigadas: 270, biomonitor: 41, frota: 105, agua: 30 }
+const VERSOES = { brigadas: 270, biomonitor: 41, frota: 105, agua: 31 }
 const CACHE = `siguc-${APP}-v${VERSOES[APP]}`
 
 const SHELLS = {
@@ -108,6 +108,7 @@ const SHELLS = {
     '/css/agua-app.css',
     '/css/avatar-foto.css',
     '/css/pin-baralho.css',
+    '/css/guia-app.css',
     '/js/config.js',
     '/js/fotos-privadas.js',
     '/js/avatar-foto.js',
@@ -115,6 +116,8 @@ const SHELLS = {
     '/js/lgpd.js',
     '/js/lgpd-campo.js',
     '/js/qrcode-generator.js',
+    '/js/guia-app.js',
+    '/js/agua-guias.js',
     '/js/agua-offline.js',
     '/js/agua-sync.js',
     '/js/agua-etiqueta.js',

@@ -14,11 +14,17 @@
   <link rel="stylesheet" href="/css/agua-app.css">
   <link rel="stylesheet" href="/css/pin-baralho.css">
   <link rel="stylesheet" href="/css/avatar-foto.css">
+  <link rel="stylesheet" href="/css/guia-app.css">
   <style>
     /* Divisor de seção dentro do formulário de coleta — não existe em
        css/agua-app.css (molde de brigada.css, que não tinha esse
        agrupamento); mesmo padrão local já usado em agua-laudos.html
        para .form-section-label. */
+    /* Cor de destaque dos guias neste app (js/guia-app.js). Entra como
+       variável da PÁGINA — o módulo nunca declara cor própria, mesma
+       regra de --pin-cor em css/pin-baralho.css. */
+    body.agua-app { --guia-cor: #0284C7; }
+
     .form-section-titulo {
       font-size: 11px; font-weight: 700; text-transform: uppercase;
       letter-spacing: .06em; opacity: .6; margin: 18px 0 4px;
@@ -165,6 +171,8 @@
     </div>
   </div>
 
+  <div id="home-guia-slot"></div>
+
   <p class="home-instrucao">Registre uma coleta de amostra de água</p>
 
   <button class="natureza-btn monitoramento" id="btn-nova-coleta" style="width:100%">
@@ -198,7 +206,7 @@
 
   <div class="form-body">
     <div class="form-section">
-      <label class="form-label">Ponto de coleta *</label>
+      <label class="form-label">Ponto de coleta *<button type="button" class="guia-ajuda-btn" data-guia-verbete="ponto" aria-label="Ajuda sobre ponto de coleta">?</button></label>
       <select id="f-ponto" class="form-select">
         <option value="">Selecione…</option>
       </select>
@@ -227,10 +235,11 @@
       </button>
     </div>
     <div class="campo-dica" id="f-gps-divergencia" hidden></div>
+    <div class="campo-dica">Leitura pontual, feita ao salvar.<button type="button" class="guia-ajuda-btn" data-guia-verbete="gps" aria-label="Ajuda sobre GPS da coleta">?</button></div>
 
-    <div class="form-section-titulo">Parâmetros de campo</div>
+    <div class="form-section-titulo">Parâmetros de campo<button type="button" class="guia-ajuda-btn" data-guia-verbete="parametros" aria-label="Ajuda sobre parâmetros de campo">?</button></div>
     <div class="form-section">
-      <label class="form-label">Equipamento de leitura (sonda)</label>
+      <label class="form-label">Equipamento de leitura (sonda)<button type="button" class="guia-ajuda-btn" data-guia-verbete="equipamento" aria-label="Ajuda sobre equipamento de leitura">?</button></label>
       <select id="f-equipamento" class="form-select" onchange="agSalvarEquipamentoPadrao()">
         <option value="">Não informado</option>
       </select>
@@ -271,14 +280,14 @@
 
     <div class="form-section-titulo">Amostra e foto</div>
     <div class="form-section">
-      <label class="form-label">Código da coleta</label>
+      <label class="form-label">Código da coleta<button type="button" class="guia-ajuda-btn" data-guia-verbete="codigo-amostra" aria-label="Ajuda sobre código da coleta">?</button></label>
       <input type="text" id="f-codigo-amostra" class="form-input" placeholder="Gerado automaticamente ao sincronizar — preencha só se o frasco já tiver etiqueta própria">
       <div class="campo-dica" id="f-codigo-dica">Deixe em branco: o sistema gera um código único (ex.: COL-2026-0001) para escrever no frasco depois de sincronizar.</div>
     </div>
 
     <div class="form-section">
       <div class="section-header">
-        <label class="form-label">Foto do ponto de coleta</label>
+        <label class="form-label">Foto do ponto de coleta<button type="button" class="guia-ajuda-btn" data-guia-verbete="foto" aria-label="Ajuda sobre foto do ponto">?</button></label>
         <div class="foto-acoes">
           <button class="btn-sm btn-prim" id="btn-abrir-camera" type="button" data-icon="camera">Câmera</button>
           <button class="btn-sm btn-galeria" id="btn-abrir-galeria" type="button" data-icon="image">Galeria</button>
@@ -290,7 +299,7 @@
     </div>
 
     <div class="form-section">
-      <label class="form-label">Observações</label>
+      <label class="form-label">Observações<button type="button" class="guia-ajuda-btn" data-guia-verbete="observacoes" aria-label="Ajuda sobre observações">?</button></label>
       <textarea id="f-obs" class="form-textarea" rows="3" placeholder="Opcional"></textarea>
     </div>
 
@@ -394,6 +403,7 @@
       <div class="campo-dica">Reserve antes de ir a campo — os códigos ficam salvos no aparelho e a etiqueta usa o código definitivo, mesmo offline.</div>
     </div>
 
+    <button class="btn-config-item" id="btn-ajuda-treinamento" data-icon="help">Ajuda e treinamento</button>
     <button class="btn-config-item" id="btn-alterar-pin" data-icon="key">Alterar PIN de campo</button>
     <button class="btn-config-item" id="btn-atualizar-pontos" data-icon="pin">Atualizar lista de pontos de coleta</button>
     <button class="btn-config-item" id="btn-qr-instalar" data-icon="qr">Instalar em outro aparelho (QR)</button>
@@ -549,6 +559,8 @@ const _aguaReady = _dbReady.then(function () {
   }
 });
 </script>
+<script src="/js/guia-app.js"></script>
+<script src="/js/agua-guias.js"></script>
 <script src="/js/agua-offline.js"></script>
 <script src="/js/agua-sync.js"></script>
 <script src="/js/agua-etiqueta.js"></script>
@@ -631,6 +643,43 @@ function agDistanciaMetros(a, b) {
   const dLat = toRad(b.lat - a.lat), dLng = toRad(b.lng - a.lng)
   const s = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2
   return R * 2 * Math.atan2(Math.sqrt(s), Math.sqrt(1 - s))
+}
+
+// ════════════════════════════════════════════════════════════════
+// Guias de introdução / treinamento
+// ════════════════════════════════════════════════════════════════
+// O catálogo (js/agua-guias.js) é declarado UMA vez; o motor
+// (js/guia-app.js) cuida de lista, passos, destaque e progresso.
+// Degrada em silêncio: sem os dois arquivos, o botão de Configurações
+// some e o app segue idêntico ao que era.
+let _agGuiasProntos = false
+
+function agIniciarGuias() {
+  const btn = document.getElementById('btn-ajuda-treinamento')
+  if (typeof guiaDefinir !== 'function' || typeof AGUA_GUIAS === 'undefined') {
+    if (btn) btn.hidden = true
+    return
+  }
+  if (!_agGuiasProntos) {
+    guiaDefinir({ ...AGUA_GUIAS, aoTrocarTela: agGuiaTrocarTela })
+    _agGuiasProntos = true
+  }
+  guiaConvite({
+    container: '#home-guia-slot', guia: 'primeiros-passos',
+    titulo: 'Primeira vez por aqui?',
+    texto: 'Um guia rápido mostra como registrar uma coleta.'
+  })
+}
+
+// O guia pode levar o usuário à tela do passo — menos ao FORMULÁRIO,
+// que só é montado por abrirFormulario() (com ponto, data e estado
+// zerados). Abrir a tela crua deixaria um formulário meio pronto na
+// mão de quem só queria ler o guia; ali o passo cai no cartão de
+// texto, sem destaque, que é o certo.
+function agGuiaTrocarTela(id) {
+  if (id === 'tela-form') return
+  if (!document.getElementById(id)) return
+  mostrarTela(id)
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -1146,6 +1195,7 @@ async function entrarHome() {
   agAtualizarAvatar()
 
   mostrarTela('tela-home')
+  agIniciarGuias()
 
   // Aviso de privacidade do app (LGPD Art. 9º) — nunca bloqueia o
   // trabalho: funciona do cache offline, ciência sincronizada depois.
@@ -2126,6 +2176,12 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.target.id === 'etiqueta-overlay') fecharEtiquetaOverlay()
   })
   document.getElementById('btn-reservar-codigos').addEventListener('click', reservarCodigosEtiqueta)
+
+  // Guias de introdução / treinamento (js/guia-app.js). Degrada em
+  // silêncio: sem o arquivo carregado o botão some e nada mais muda.
+  document.getElementById('btn-ajuda-treinamento').addEventListener('click', () => {
+    if (typeof guiaAbrirCentral === 'function') guiaAbrirCentral()
+  })
 
   document.getElementById('btn-update-agora').addEventListener('click', aplicarUpdate)
   document.getElementById('btn-update-depois').addEventListener('click', () => { document.getElementById('update-banner').hidden = true })
