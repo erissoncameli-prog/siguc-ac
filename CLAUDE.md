@@ -3202,6 +3202,68 @@ simplesmente não oferecia nada, sem dizer por quê.
   reservar).
 - `pwa/sw.js`: agua v29 → v30.
 
+## Regra do sistema — guias de introdução e treinamento (migration 327)
+Interface de treinamento do sistema. Fonte ÚNICA: `js/guia-app.js` +
+`css/guia-app.css` — nenhuma página desenha overlay de guia, navegação
+de passos, destaque de elemento ou marcação de "já visto" (mesma lição
+de `js/frota-consumo.js`). A página só declara CONTEÚDO
+(`js/agua-guias.js`, app de campo; `js/agua-guias-mesa.js`, telas de
+mesa) e chama `guiaDefinir`/`guiaAutoDefinir`.
+
+- **NADA bloqueia.** Todo guia é dispensável, todo passo tem "Pular",
+  Esc fecha. Treinamento não é gate — diferente do aceite de LGPD, e
+  pela mesma razão que "nada pode impedir o trabalho de campo".
+- **Conteúdo no CÓDIGO, não no banco**: precisa abrir offline no
+  primeiro dia, em aparelho que nunca sincronizou. `lgpd_documentos` é
+  para documento com valor jurídico e aceite versionado; guia não é
+  isso. Se um dia a SEMA quiser editar sem deploy, a migração é
+  aditiva (tabela + cache, com o código como fallback — molde de
+  `js/lgpd-campo.js`).
+- **Um conteúdo só serve de cartilha E de tour.** Passo com `alvo`
+  vira destaque sobre o elemento real quando ele está VISÍVEL, e
+  cartão de texto quando não está — é o que permite ler o mesmo guia
+  em Configurações e dentro da tela. ⚠️ Achado pelo teste: a 1ª versão
+  PULAVA passo de alvo invisível, e o guia "Fazer uma coleta" (todos
+  os passos no formulário) ficava VAZIO fora dele e se marcava como
+  concluído sem exibir nada. Só passo `soTour: true` é pulado.
+- **`aoTrocarTela` nunca abre o formulário cru** (`tela-form` só é
+  montada por `abrirFormulario`, com estado zerado) — ali o passo cai
+  no cartão de texto, que é o certo.
+- **Entrada na mesa é o botão "Ajuda" da topbar** (`js/layout.js`),
+  que nasce ESCONDIDO e só aparece onde há catálogo — as 45 páginas
+  ganham o ponto de entrada sem exibir botão inerte. `guiaAutoDefinir`
+  espera a topbar surgir (o layout é injetado dentro do init
+  assíncrono da página), o que deixa uma linha por página.
+- **Registro de capacitação** (migration 327, `capacitacao_conclusoes`,
+  transversal — `escopo` = 'agua-app'/'agua-mesa'/…, módulo derivado do
+  prefixo): grava local primeiro e sincroniza depois; falha de envio
+  fica na fila e retenta, nunca interrompe nada (fail-open). RLS só do
+  próprio titular; o relatório da gestão passa por
+  `capacitacao_relatorio` (SECURITY DEFINER, whitelist no RETURNS
+  TABLE, acesso por `pode_ver` — nunca `perfil = '...'`). Tela: aba
+  "Capacitação" em `agua-pontos.html`. ROPA: TRAT-020. App novo não
+  precisa de migration — só passa a gravar com o escopo dele.
+- **Modo treinamento** (app de campo, Configurações): o fluxo inteiro
+  sem nada chegar ao sistema. A coleta de treino NUNCA entra no store
+  `registros` do IndexedDB — o isolamento não depende de um `if` no
+  sync — e NUNCA consome código do pool reservado (código gasto não
+  volta à numeração); a etiqueta sai com o código `TREINO`, jamais um
+  real. Faixa amarela fixa em todas as telas (irmã das telas, sem
+  `transform` em ancestral — mesma regra da barra do app Frota).
+- Guardas: `tests/agua-guia.test.js` (16) e `tests/agua-guia-mesa.test.js`
+  (9). O segundo varre as 5 telas de mesa cobrando que nenhum
+  identificador global seja declarado duas vezes — foi assim que se
+  achou `const AGUA_STATUS_LABEL` duplicado entre
+  `js/agua-laudo-kpis.js` e o inline de `pages/agua-laudos.html`, que
+  quebrava o PARSE e deixava a página de Laudos SEM RENDERIZAR NADA
+  (introduzido em #337, corrigido aqui — o da página virou
+  `LZ_STATUS_FRASE`). Mesma armadilha do `let db` já documentada.
+- `pwa/sw.js`: agua 30 → 33; frota 105 → 106 (`js/layout.js` e
+  `css/global.css` estão no shell do Frota). `app-agua/scripts/
+  build-www.mjs` atualizado nas 3 listas + cópia do CSS.
+- Plano e o levantamento por trás das escolhas:
+  `docs/qualidade-agua/plano-treinamento.md`.
+
 ## Regra do sistema — identidade do monitor no app Biomonitor (migration 323)
 Quem autentica é `monitores_biodiversidade.usuario_id` → `auth.users`.
 `monitores_biodiversidade.email` é só CADASTRO: editá-lo NÃO troca o
