@@ -4,12 +4,16 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>SIGUC-AC · Qualidade da Água — Laudos</title>
 <link rel="stylesheet" href="../css/global.css">
+<link rel="stylesheet" href="../css/guia-app.css">
 <link rel="stylesheet" href="../css/agua-painel.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="../js/observability.js"></script>
 <script src="../js/queryLogger.js"></script>
 <script src="../js/config.js"></script>
 <script src="../js/layout.js"></script>
+<script src="../js/guia-app.js"></script>
+<script src="../js/agua-guias-mesa.js"></script>
+<script>guiaAutoDefinir(AGUA_GUIAS_MESA)</script>
 <script src="../js/fotos-privadas.js"></script>
 <script src="../js/reautenticar.js"></script>
 <script src="../js/agua-alertas.js"></script>
@@ -164,7 +168,14 @@ let _fila = [], _labs = [], _editandoId = null, _podeEditar = false
 // do navegador) — abre direto a coleta em vez de procurar na tabela.
 // O QR só tem o texto puro do código (js/agua-etiqueta.js), então
 // achar a coleta é a mesma busca por codigo_amostra de sempre.
-const AGUA_STATUS_LABEL = { aguardando_lab: 'aguardando laudo', quarentena: 'em conferência', completo: 'completo' }
+// Nome LOCAL de propósito: js/agua-laudo-kpis.js (carregado no <head>
+// desta mesma página) já declara `const AGUA_STATUS_LABEL` no escopo
+// global. Dois <script> clássicos compartilham o escopo léxico de
+// const/let, então o nome repetido quebrava o PARSE do bloco inteiro
+// ("Identifier 'AGUA_STATUS_LABEL' has already been declared") e a
+// página não renderizava nada. Mesma armadilha já documentada para o
+// `let db` em tests/fixtures/sidebar-harness.html.
+const LZ_STATUS_FRASE = { aguardando_lab: 'aguardando laudo', quarentena: 'em conferência', completo: 'completo' }
 
 async function lzEscanearQR() {
   const codigo = await qrScannerAbrir({ titulo: 'Escanear etiqueta da amostra' })
@@ -178,7 +189,7 @@ async function lzEscanearQR() {
   // coleta já lançada não é erro, é informação.
   const { data } = await db.from('agua_coletas').select('status').eq('codigo_amostra', codigo).maybeSingle()
   if (data) {
-    toast(`Essa amostra já está "${AGUA_STATUS_LABEL[data.status] || data.status}" — não está mais aguardando laudo.`, 'warning')
+    toast(`Essa amostra já está "${LZ_STATUS_FRASE[data.status] || data.status}" — não está mais aguardando laudo.`, 'warning')
   } else {
     toast(`Código "${codigo}" não encontrado.`, 'error')
   }

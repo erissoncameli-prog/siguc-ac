@@ -412,6 +412,16 @@ function gerarLayout(tituloPagina, paginaAtiva) {
         <div class="topbar-breadcrumb"><span>SIGUC-AC</span><span>›</span><span>${esc(tituloPagina)}</span></div>
         <div class="topbar-title">${esc(tituloPagina)}</div>
       </div>
+      <!-- Entrada única dos guias de introdução (js/guia-app.js). Nasce
+           ESCONDIDA e só aparece na página que declarou um catálogo
+           (guiaDefinir a revela) — assim as 45 páginas de mesa ganham o
+           ponto de entrada sem que nenhuma sem conteúdo mostre um botão
+           que não faz nada. -->
+      <button class="topbar-guia" id="topbar-guia" hidden type="button"
+              aria-label="Ajuda e treinamento" title="Ajuda e treinamento">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        <span>Ajuda</span>
+      </button>
     </header>
     <div class="page-body">`;
 }
