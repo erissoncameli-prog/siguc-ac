@@ -1,6 +1,10 @@
 # Qualidade da Água — Interface de treinamento (guias de introdução)
 
-Status: **PLANO** (nada implementado). Pedido do usuário: "criar uma
+Status: **ENTREGUE** — Fases 1, 2 e 3, telas de mesa e registro de
+capacitação no banco (migration 327). O resumo do que ficou como regra
+permanente está em `CLAUDE.md`, seção "Regra do sistema — guias de
+introdução e treinamento". Este documento preserva o estudo prévio; as
+decisões tomadas com o usuário depois dele estão na §8, ao final. Pedido do usuário: "criar uma
 interface de treinamento, como se fosse guias de introdução, para
 facilitar ao usuário".
 
@@ -173,3 +177,39 @@ Fases 1–3 acima.
    apontando para elemento removido numa refatoração futura.
 5. (Fase 3) salvar em modo treinamento não cria registro na fila real
    nem chama a RPC de reserva de códigos.
+
+
+---
+
+## 8. O que foi decidido e entregue (posterior ao estudo acima)
+
+O usuário escolheu o escopo máximo: as três fases, todas as superfícies
+e registro de capacitação no banco. O que mudou em relação ao estudo:
+
+- **§3/§4 — as três camadas entraram**, não só a Fase 1. O motor nasceu
+  com destaque de elemento (Fase 2) e o app ganhou o sandbox (Fase 3).
+- **§6 — as telas de mesa entraram** (`agua-laudos`, `agua-conferencia`,
+  `agua-pontos`, `agua-relatorios`, `agua-mapa`), com catálogo próprio
+  (`js/agua-guias-mesa.js`, escopo 'agua-mesa') e entrada pelo botão
+  "Ajuda" da topbar.
+- **§5 vale como escrito**: conteúdo no código. Mas o PROGRESSO passou a
+  ser também registrado no banco (migration 327), a pedido do usuário —
+  local primeiro, servidor depois, fail-open. O estudo previa só o
+  progresso local.
+- **Tour e cartilha viraram um conteúdo só**, decisão tomada ao codar:
+  em vez de escrever passos separados para o tour, o mesmo passo com
+  `alvo` vira destaque onde o elemento está visível. Metade do conteúdo
+  a manter, e nenhuma chance de as duas versões divergirem.
+- **Achado durante a entrega, fora do escopo**: `pages/agua-laudos.html`
+  estava quebrada em produção desde o PR #337 por um `const` global
+  declarado duas vezes. Corrigido, com varredura automatizada nas 5
+  telas para pegar a classe do erro de novo.
+
+Pendências deliberadas, não esquecimentos:
+- Os outros 3 apps de campo (Brigadas, Biomonitor, Frota) NÃO ganharam
+  guias — o motor é genérico e já serve os quatro, falta só escrever o
+  conteúdo de cada um. É trabalho de conteúdo, não de código.
+- O relatório de capacitação mostra conclusão por pessoa; não há
+  exportação nem cobrança automática de quem não concluiu. Cobrar
+  esbarraria na regra de que treinamento não é gate — se um dia for
+  pedido, é decisão de produto, não extensão natural.
