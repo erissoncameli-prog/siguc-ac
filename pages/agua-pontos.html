@@ -13,6 +13,8 @@
 <script src="../js/layout.js"></script>
 <script src="../js/mapa-recorte.js"></script>
 <script src="../js/reautenticar.js"></script>
+<script src="../js/qrcode-generator.js"></script>
+<script src="../js/agua-etiqueta.js"></script>
 </head>
 <body>
 <div id="app"></div>
@@ -262,6 +264,7 @@ const ACRE_CENTRO = [-9.5, -70.0]
           <button class="tab-btn" id="tab-labs" onclick="mudarAbaAgua('labs')">Laboratórios</button>
           <button class="tab-btn" id="tab-equip" onclick="mudarAbaAgua('equip')">Equipamentos</button>
           <button class="tab-btn" id="tab-templates" onclick="mudarAbaAgua('templates')">Gabaritos de laudo</button>
+          <button class="tab-btn" id="tab-etiquetas" onclick="mudarAbaAgua('etiquetas')">Etiquetas</button>
         </div>
       </div>
 
@@ -325,6 +328,44 @@ const ACRE_CENTRO = [-9.5, -70.0]
           </table>
         </div></div></div>
       </div>
+      <div id="aba-etiquetas" style="display:none">
+        <p style="color:#6B7280;font-size:13px;margin:0 0 12px">
+          Reimprime a etiqueta de coletas já sincronizadas — plano B para quando a impressora
+          térmica falhou em campo. O código, o ponto e a data vêm da coleta gravada; a etiqueta
+          sai em PDF, no tamanho exato do rótulo (40×60 mm), pronta para uma impressora comum.
+        </p>
+        <div class="filter-bar">
+          <input class="form-control search-input" id="etq-busca" placeholder="Código da amostra ou nome do ponto..." onkeydown="if(event.key==='Enter')buscarColetasEtiqueta()">
+          <input class="form-control" type="date" id="etq-data-ini" title="De" style="max-width:150px">
+          <input class="form-control" type="date" id="etq-data-fim" title="Até" style="max-width:150px">
+          <button class="btn btn-secondary" onclick="buscarColetasEtiqueta()">${bico('search')} Buscar</button>
+        </div>
+        <div class="card"><div class="table-wrap"><div class="table-scroll">
+          <table>
+            <thead><tr>
+              <th style="width:36px"><input type="checkbox" id="etq-marcar-todos" onchange="etqMarcarTodos(this.checked)"></th>
+              <th>Código</th><th>Ponto</th><th>Data</th><th>Coletor</th>
+            </tr></thead>
+            <tbody id="tbody-etq-coletas"><tr><td colspan="5" style="padding:12px 14px;color:#6B7280">Busque por código, ponto ou período.</td></tr></tbody>
+          </table>
+        </div></div></div>
+        <div style="display:flex;justify-content:flex-end;margin:12px 0 28px">
+          <button class="btn btn-primary" id="etq-btn-gerar" onclick="gerarPdfEtiquetasSelecionadas()" disabled>${bico('printer')} Gerar PDF das etiquetas selecionadas</button>
+        </div>
+
+        <div class="form-section-label">Códigos reservados sem uso</div>
+        <p style="color:#6B7280;font-size:13px;margin:0 0 12px">
+          Reservados para impressão offline (Config do app → Etiquetas) que nunca viraram coleta —
+          buraco aceito na numeração (não é dado perdido, é código que sobrou). Reservas com
+          mais de 30 dias merecem conferência.
+        </p>
+        <div class="card"><div class="table-wrap"><div class="table-scroll">
+          <table>
+            <thead><tr><th>Código</th><th>Reservado por</th><th>Reservado em</th><th>Expira em</th><th>Dias em aberto</th></tr></thead>
+            <tbody id="tbody-etq-pendentes"><tr><td colspan="5" style="padding:12px 14px" aria-busy="true" aria-label="Carregando"><div class="skeleton skeleton-linha" style="width:86%"></div><div class="skeleton skeleton-linha" style="width:72%"></div></td></tr></tbody>
+          </table>
+        </div></div></div>
+      </div>
     </div>` +
     '</div></div></div>'
 
@@ -338,10 +379,13 @@ function mudarAbaAgua(aba) {
   document.getElementById('aba-labs').style.display      = aba === 'labs'      ? '' : 'none'
   document.getElementById('aba-equip').style.display     = aba === 'equip'     ? '' : 'none'
   document.getElementById('aba-templates').style.display = aba === 'templates' ? '' : 'none'
+  document.getElementById('aba-etiquetas').style.display = aba === 'etiquetas' ? '' : 'none'
   document.getElementById('tab-pontos').classList.toggle('ativo', aba === 'pontos')
   document.getElementById('tab-labs').classList.toggle('ativo', aba === 'labs')
   document.getElementById('tab-equip').classList.toggle('ativo', aba === 'equip')
   document.getElementById('tab-templates').classList.toggle('ativo', aba === 'templates')
+  document.getElementById('tab-etiquetas').classList.toggle('ativo', aba === 'etiquetas')
+  if (aba === 'etiquetas' && !_etqPendentesCarregados) carregarEtiquetasPendentes()
 }
 
 // ── Cargas ────────────────────────────────────────────────────
@@ -498,6 +542,110 @@ async function carregarTemplates() {
   if (error) { toast(error.message || 'Erro ao carregar gabaritos', 'error'); return }
   _templates = data || []
   renderTemplates()
+}
+
+// ════════════════════════════════════════════════════════════════
+// Etiquetas (aba "Etiquetas" — Fase 1 do plano em
+// docs/qualidade-agua/plano-etiqueta-frasco.md). Reimpressão de
+// coletas já sincronizadas em lote — plano B para quando a impressora
+// térmica falhar em campo — e o relatório de códigos reservados que
+// nunca viraram coleta (buraco aceito e auditável na numeração).
+// js/agua-etiqueta.js é a fonte única do desenho da etiqueta.
+// ════════════════════════════════════════════════════════════════
+let _etqResultados = []
+let _etqSelecionados = new Set()
+let _etqPendentesCarregados = false
+
+async function buscarColetasEtiqueta() {
+  const termo = document.getElementById('etq-busca').value.trim()
+  const dataIni = document.getElementById('etq-data-ini').value
+  const dataFim = document.getElementById('etq-data-fim').value
+  const tbody = document.getElementById('tbody-etq-coletas')
+  tbody.innerHTML = '<tr><td colspan="5" style="padding:12px 14px;color:#6B7280">Buscando…</td></tr>'
+
+  let q = db.from('vw_agua_coletas_detalhe')
+    .select('id,codigo_amostra,ponto_nome,codigo_ana,data_coleta,hora_coleta,coletor_nome')
+    .not('codigo_amostra', 'is', null)
+    .order('data_coleta', { ascending: false })
+    .limit(100)
+  if (termo) q = q.or(`codigo_amostra.ilike.%${termo}%,ponto_nome.ilike.%${termo}%`)
+  if (dataIni) q = q.gte('data_coleta', dataIni)
+  if (dataFim) q = q.lte('data_coleta', dataFim)
+
+  const { data, error } = await q
+  if (error) { toast(error.message || 'Erro ao buscar coletas', 'error'); tbody.innerHTML = '<tr><td colspan="5" style="padding:12px 14px;color:#9CA3AF">Erro ao buscar.</td></tr>'; return }
+
+  _etqResultados = data || []
+  _etqSelecionados = new Set()
+  document.getElementById('etq-marcar-todos').checked = false
+  renderEtqCarregadas()
+}
+
+function renderEtqCarregadas() {
+  const tbody = document.getElementById('tbody-etq-coletas')
+  if (!_etqResultados.length) {
+    tbody.innerHTML = '<tr><td colspan="5" style="padding:12px 14px;color:#9CA3AF">Nenhuma coleta encontrada.</td></tr>'
+  } else {
+    tbody.innerHTML = _etqResultados.map(c => `
+      <tr>
+        <td><input type="checkbox" ${_etqSelecionados.has(c.id) ? 'checked' : ''} onchange="etqAlternarSelecao('${c.id}', this.checked)"></td>
+        <td style="font-family:var(--font-mono)">${esc(c.codigo_amostra)}</td>
+        <td>${esc(c.ponto_nome)}${c.codigo_ana ? ' · ' + esc(c.codigo_ana) : ''}</td>
+        <td>${formatData(c.data_coleta)}${c.hora_coleta ? ' ' + String(c.hora_coleta).slice(0, 5) : ''}</td>
+        <td>${esc(c.coletor_nome || '—')}</td>
+      </tr>`).join('')
+  }
+  document.getElementById('etq-btn-gerar').disabled = _etqSelecionados.size === 0
+}
+
+function etqAlternarSelecao(id, marcado) {
+  if (marcado) _etqSelecionados.add(id); else _etqSelecionados.delete(id)
+  document.getElementById('etq-btn-gerar').disabled = _etqSelecionados.size === 0
+}
+
+function etqMarcarTodos(marcado) {
+  _etqSelecionados = marcado ? new Set(_etqResultados.map(c => c.id)) : new Set()
+  renderEtqCarregadas()
+}
+
+async function gerarPdfEtiquetasSelecionadas() {
+  const selecionadas = _etqResultados.filter(c => _etqSelecionados.has(c.id))
+  if (!selecionadas.length) return
+  const btn = document.getElementById('etq-btn-gerar')
+  const textoOriginal = btn.textContent
+  btn.disabled = true
+  btn.textContent = 'Gerando PDF…'
+  try {
+    const pdf = await aguaEtiquetaMontarPdfLote(selecionadas.map(c => ({
+      codigo_amostra: c.codigo_amostra, ponto_nome: c.ponto_nome, codigo_ana: c.codigo_ana,
+      data_coleta: c.data_coleta, hora_coleta: c.hora_coleta, coletor_nome: c.coletor_nome,
+    })))
+    aguaEtiquetaBaixarPdf(pdf, `etiquetas-lote-${new Date().toISOString().slice(0, 10)}.pdf`)
+  } catch (e) {
+    toast('Erro ao gerar PDF: ' + e.message, 'error')
+  } finally {
+    btn.disabled = false
+    btn.textContent = textoOriginal
+  }
+}
+
+async function carregarEtiquetasPendentes() {
+  _etqPendentesCarregados = true
+  const tbody = document.getElementById('tbody-etq-pendentes')
+  const { data, error } = await db.rpc('agua_codigos_reservados_pendentes')
+  if (error) { tbody.innerHTML = `<tr><td colspan="5" style="padding:12px 14px;color:#9CA3AF">${esc(error.message)}</td></tr>`; return }
+  if (!data || !data.length) {
+    tbody.innerHTML = '<tr><td colspan="5" style="padding:12px 14px;color:#9CA3AF">Nenhum código reservado em aberto.</td></tr>'
+    return
+  }
+  tbody.innerHTML = data.map(r => `
+    <tr>
+      <td style="font-family:var(--font-mono)">${esc(r.codigo)}</td>
+      <td>${esc(r.reservado_por_nome || '—')}</td>
+      <td>${formatData(r.reservado_em)}</td>
+      <td>${formatData(r.expira_em)}</td>
+      <td style="color:${r.dias_desde_reserva > 30 ? '#C2410C' : 'inherit'}">${r.dias_desde_reserva}</td>
+    </tr>`).join('')
 }
 
 function renderTemplates() {
