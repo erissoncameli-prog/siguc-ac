@@ -176,6 +176,12 @@ body { font-family: var(--font-sans); background: var(--cinza-50); color: var(--
 .topbar-title { font-size: 15px; font-weight: 600; color: var(--cinza-900); letter-spacing: -.01em; }
 .topbar-breadcrumb { font-size: 11px; color: var(--cinza-400); display: flex; align-items: center; gap: 5px; margin-bottom: 1px; }
 .topbar-breadcrumb span:last-child { color: var(--cinza-600); font-weight: 500; }
+/* Botão "Ajuda" da topbar — entrada dos guias (js/guia-app.js). Só
+   aparece na página que declarou um catálogo. */
+.topbar-guia { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 6px 12px; border: 1px solid var(--borda); border-radius: 999px; background: var(--branco); color: var(--cinza-600); font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+.topbar-guia:hover { border-color: var(--verde-c, #52B788); color: var(--verde-escuro, #1F4E2C); }
+.topbar-guia[hidden] { display: none !important; }
+@media (max-width: 700px) { .topbar-guia span { display: none; } .topbar-guia { padding: 6px 8px; } }
 .page-body { padding: 24px 28px; flex: 1; }
 
 /* Modo embutido (?embed=1) — página existente dentro de um iframe em

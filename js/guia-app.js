@@ -27,10 +27,37 @@ const _GUIA_PENDENTE = 'siguc_guia_pendentes'   // conclusões ainda não enviad
 function guiaDefinir(cat) {
   _guiaCat = cat
   _guiaEnviarPendentes()
+  // Topbar das telas de mesa (js/layout.js): o botão nasce escondido e
+  // só aparece onde há catálogo declarado.
+  const btn = typeof document !== 'undefined' && document.getElementById('topbar-guia')
+  if (btn) {
+    btn.hidden = false
+    if (!btn.dataset.ligado) {
+      btn.dataset.ligado = '1'
+      btn.addEventListener('click', () => guiaAbrirCentral())
+    }
+  }
   return cat
 }
 
 function guiaCatalogo() { return _guiaCat }
+
+// Nas telas de MESA o layout (e com ele a topbar) é injetado por
+// gerarLayout() dentro de um init assíncrono — declarar o catálogo no
+// <head> encontraria a topbar ainda inexistente e o botão "Ajuda"
+// nunca apareceria. Isto declara já e reaplica quando o botão surgir,
+// para que cada página precise de uma linha só, idêntica em todas.
+function guiaAutoDefinir(cat) {
+  guiaDefinir(cat)
+  if (typeof document === 'undefined' || document.getElementById('topbar-guia')) return cat
+  const obs = new MutationObserver(() => {
+    if (document.getElementById('topbar-guia')) { obs.disconnect(); guiaDefinir(cat) }
+  })
+  const iniciar = () => obs.observe(document.body, { childList: true, subtree: true })
+  if (document.body) iniciar()
+  else document.addEventListener('DOMContentLoaded', iniciar, { once: true })
+  return cat
+}
 
 function _guiaPorSlug(slug) {
   return (_guiaCat?.guias || []).find(g => g.slug === slug) || null
@@ -400,6 +427,7 @@ function guiaConvite(opts = {}) {
 
 if (typeof window !== 'undefined') {
   window.guiaDefinir = guiaDefinir
+  window.guiaAutoDefinir = guiaAutoDefinir
   window.guiaAbrir = guiaAbrir
   window.guiaAbrirCentral = guiaAbrirCentral
   window.guiaFechar = guiaFechar
