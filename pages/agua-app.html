@@ -1452,6 +1452,7 @@ async function salvarRegistro() {
       abrirEtiquetaOverlay({
         codigo_amostra: codigoAmostra,
         ponto_nome: ponto?.nome,
+        rio: ponto?.rio,
         codigo_ana: ponto?.codigo_ana,
         data_coleta: registro.data_coleta,
         hora_coleta: registro.hora_coleta,
@@ -1529,6 +1530,7 @@ async function imprimirEtiquetaDaFila(uuidCliente) {
   abrirEtiquetaOverlay({
     codigo_amostra: r.codigo_amostra,
     ponto_nome: ponto?.nome,
+    rio: ponto?.rio,
     codigo_ana: ponto?.codigo_ana,
     data_coleta: r.data_coleta,
     hora_coleta: r.hora_coleta,
@@ -1547,6 +1549,7 @@ function cmImprimirEtiqueta() {
   abrirEtiquetaOverlay({
     codigo_amostra: c.codigo_amostra,
     ponto_nome: c.ponto_nome,
+    rio: c.ponto_rio,
     codigo_ana: c.codigo_ana,
     data_coleta: c.data_coleta,
     hora_coleta: c.hora_coleta,

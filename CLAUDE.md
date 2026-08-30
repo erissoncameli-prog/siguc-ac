@@ -3099,7 +3099,56 @@ foi homologada ainda.
   que ficar branca na altura do código — prova que não vaza) e uma
   faixa mais abaixo (tem que ter o QR — prova que ele só mudou de
   lugar, não sumiu).
-- `pwa/sw.js`: agua v27 → v28.
+- **Nome do rio** (`ponto_rio`/`agua_pontos_coleta.rio`) entrou na
+  MESMA linha do código ANA (`Rio Acre · ANA 12345678`), não numa
+  linha própria — a etiqueta já estava apertada com QR + rodapé fixos
+  (ver acima), e uma linha nova custaria altura que não sobra. Some
+  sozinho quando o ponto não tem rio cadastrado. Propagado às 4
+  superfícies que montam `dados` pra `aguaEtiquetaDesenhar` (pós-
+  salvar e Fila em `agua-app.html`, do cache local `ponto.rio`;
+  Histórico do app e lote de `agua-pontos.html`, de `ponto_rio` da
+  view — que já existia, só não estava no `select`). Guarda: 3º teste
+  em `tests/agua-etiqueta.test.js`, comparativo (mais pixel preto com
+  `rio` do que sem, e desenha sem quebrar quando falta).
+- `pwa/sw.js`: agua v28 → v29.
+
+**Pós-lançamento — ler a etiqueta por câmera em `agua-laudos.html`.**
+O QR da etiqueta (acima) só carrega o texto puro do `codigo_amostra` —
+não tinha, em nenhuma tela, quem o LESSE de volta. `js/qr-scanner.js`
+(novo, genérico — não sabe nada de "coleta"/"laudo", reaproveitável
+por qualquer tela que precise ler QR) usa a API nativa
+`BarcodeDetector` do navegador, sem lib vendorizada nova.
+- **Sem suporte (Firefox/Safari) = sem o botão**, nunca um caminho
+  quebrado: `qrScannerSuportado()` decide se `#lz-btn-scan` aparece;
+  a busca manual por texto continua exatamente como sempre foi.
+- **Escanear abre direto a coleta** (`lzEscanearQR` em
+  `agua-laudos.html` chama `abrirLaudo(id)` quando o código bate com
+  algo na fila de `aguardando_lab`). Se o código existir mas já tiver
+  laudo lançado, a mensagem diz o status real (nunca "não encontrado"
+  — são erros diferentes: um é "typo/etiqueta de outra amostra", o
+  outro é "alguém já lançou isso").
+- **Escopo desta entrega**: só abre a coleta certa por leitura de
+  câmera. NÃO é a "trava de identidade" que confronta data/procedência
+  do laudo OCR com a coleta (Entrega 2 de
+  `docs/qualidade-agua/plano-leitura-laudo-e-alertas.md`) — são coisas
+  diferentes que compartilham a palavra "identidade": aquela compara
+  dois DOCUMENTOS (laudo × coleta); esta só troca "procurar na
+  tabela" por "apontar a câmera".
+- ⚠️ **Achado pelo teste, não por leitura**: `await video.play()` em
+  alguns navegadores/streams sem track nunca resolve nem rejeita —
+  travava a função inteira antes de o loop de detecção começar.
+  Corrigido disparando `play()` sem aguardar (dispara e segue pro
+  loop; funciona igual numa câmera de verdade, que resolve rápido).
+- Guarda: `tests/qr-scanner.test.js` (5 testes, câmera sempre stubada
+  — `BarcodeDetector`/`getUserMedia` nunca são reais neste ambiente),
+  `tests/fixtures/qr-scanner-harness.html` (módulo não depende de
+  config.js/Supabase).
+- Sem mudança em `pwa/sw.js`: `agua-laudos.html` é tela de mesa, não
+  app de campo.
+- Pendente, se algum dia fizer sentido: o mesmo botão em
+  `agua-conferencia.html` e na busca da aba Etiquetas de
+  `agua-pontos.html` — `js/qr-scanner.js` já está pronto pra isso,
+  só falta o `<script>` e a chamada em cada página.
 
 ## Regra do sistema — identidade do monitor no app Biomonitor (migration 323)
 Quem autentica é `monitores_biodiversidade.usuario_id` → `auth.users`.

@@ -17,6 +17,7 @@
 <script src="../js/grafico-teclado.js"></script>
 <script src="../js/agua-iqa-visual.js"></script>
 <script src="../js/agua-laudo-kpis.js"></script>
+<script src="../js/qr-scanner.js"></script>
 </head>
 <body>
 <div id="app"></div>
@@ -142,6 +143,7 @@ let _fila = [], _labs = [], _editandoId = null, _podeEditar = false
       <div id="lz-kpis"></div>
       <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
         <input class="form-control" id="lz-filtro" placeholder="Filtrar por ponto, código ANA..." style="max-width:340px" oninput="renderFila()">
+        <button class="btn btn-secondary" id="lz-btn-scan" onclick="lzEscanearQR()" style="display:none">${bico('camera')} Escanear QR</button>
         <span id="lz-contador" style="font-size:12px;color:#6B7280"></span>
       </div>
       <div class="card"><div class="table-wrap"><div class="table-scroll">
@@ -154,8 +156,33 @@ let _fila = [], _labs = [], _editandoId = null, _podeEditar = false
     '</div></div></div>'
 
   carregarLogosSidebar()
+  document.getElementById('lz-btn-scan').style.display = qrScannerSuportado() ? '' : 'none'
   await Promise.all([carregarLabsAtivos(), carregarFila()])
 })()
+
+// Leitor de QR da etiqueta do frasco (js/qr-scanner.js, câmera nativa
+// do navegador) — abre direto a coleta em vez de procurar na tabela.
+// O QR só tem o texto puro do código (js/agua-etiqueta.js), então
+// achar a coleta é a mesma busca por codigo_amostra de sempre.
+const AGUA_STATUS_LABEL = { aguardando_lab: 'aguardando laudo', quarentena: 'em conferência', completo: 'completo' }
+
+async function lzEscanearQR() {
+  const codigo = await qrScannerAbrir({ titulo: 'Escanear etiqueta da amostra' })
+  if (!codigo) return
+
+  const c = _fila.find(x => x.codigo_amostra === codigo)
+  if (c) { abrirLaudo(c.id); return }
+
+  // Não está na fila de laudo — pode já ter sido lançada, ou o código
+  // não existir. As duas mensagens são diferentes de propósito: uma
+  // coleta já lançada não é erro, é informação.
+  const { data } = await db.from('agua_coletas').select('status').eq('codigo_amostra', codigo).maybeSingle()
+  if (data) {
+    toast(`Essa amostra já está "${AGUA_STATUS_LABEL[data.status] || data.status}" — não está mais aguardando laudo.`, 'warning')
+  } else {
+    toast(`Código "${codigo}" não encontrado.`, 'error')
+  }
+}
 
 async function carregarLabsAtivos() {
   const { data } = await db.from('agua_laboratorios').select('id,nome').eq('ativo', true).order('nome')
