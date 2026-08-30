@@ -3150,6 +3150,58 @@ por qualquer tela que precise ler QR) usa a API nativa
   `agua-pontos.html` — `js/qr-scanner.js` já está pronto pra isso,
   só falta o `<script>` e a chamada em cada página.
 
+**Pós-lançamento — bug real: nome do coletor sempre em branco para
+coleta feita pelo app (migration 326).** Achado ao testar a etiqueta
+("nome do coletor não aparece"): `agua_coletas.coletor_nome` é uma
+coluna de TEXTO LIVRE que **nunca foi preenchida por ninguém** —
+conferido em produção, não suposto: das 453 coletas, 450 (série
+histórica) não têm `coletor_id` nem `coletor_nome`, e as 3 feitas pelo
+app de campo (Fase 3) têm `coletor_id` (é `auth.uid()`) mas
+`coletor_nome` sempre NULL. `vw_agua_coletas_detalhe` sempre expôs
+`c.coletor_nome` cru, nunca resolveu pelo `coletor_id` — então TODO
+lugar que lê esse campo (modal de detalhe da coleta, ficha em PDF, e
+agora a etiqueta) mostrava "—" ou ficava em branco pra qualquer coleta
+do app, desde que a Fase 3 existe. Não é bug da etiqueta — só foi ela
+que tornou o buraco visível.
+- Corrigido na view: `coletor_nome` vira `COALESCE(c.coletor_nome,
+  u.nome_completo)` via `LEFT JOIN usuarios u ON u.id = c.coletor_id` —
+  texto livre antigo tem prioridade (preserva o que um dia possa ter
+  sido digitado à mão), nunca o contrário.
+- **Segurança**: a view é `security_invoker = true` — o JOIN novo não
+  abre nada que não estivesse aberto (a policy `usuarios_auth_select`
+  já libera qualquer autenticado a ler nome de qualquer colega, mesmo
+  ponto já registrado na seção de passageiros do Frota acima).
+  Recriada a partir do `pg_get_viewdef()` REAL de produção, não do
+  arquivo de migration 249 local (mesma cautela de sempre — achado de
+  drift documentado em `vw_praias_biomonitor`, migration 321).
+- **Efeito colateral bom**: a ficha de coleta em PDF
+  (`aguaRelMontarPdfColeta`) e o modal de detalhe no Histórico do app
+  também ganharam o nome do coletor de graça — liam a mesma view, o
+  mesmo bug os afetava, ninguém tinha notado porque "—" não chama
+  atenção como um espaço em branco na etiqueta impressa chama.
+- Sem mudança em nenhum arquivo web — é fix só de banco
+  (`vw_agua_coletas_detalhe`), efeito imediato sem precisar de deploy.
+
+**Pós-lançamento — avisar ANTES de coletar se há código reservado.**
+Relato real do usuário: "o botão de imprimir etiqueta não apareceu na
+tela onde realizo a coleta". Comportamento CORRETO (sem código
+reservado no pool, não há código definitivo pra imprimir — só depois
+do sync), mas silencioso: o coletor só descobriria que precisava
+reservar em Configurações DEPOIS de salvar, e nem isso — o app
+simplesmente não oferecia nada, sem dizer por quê.
+- A dica do campo "Código da coleta" (`#f-codigo-dica`) agora avisa
+  ANTES, ao abrir o formulário (`atualizarDicaCodigoAmostra()`): com
+  pool cheio, diz quantos códigos tem disponíveis; sem pool, diz que a
+  etiqueta só sai depois de sincronizar e aponta o caminho
+  (Configurações › Etiquetas de amostra).
+- O toast pós-salvar também deixou de ser genérico quando não havia
+  nada pra imprimir — diz explicitamente "sem código reservado" em vez
+  de só silenciar a oferta de etiqueta.
+- Guarda: +1 teste em `tests/agua-etiqueta.test.js` (dica muda de
+  "sem código reservado" pra "1 código reservado disponível" ao
+  reservar).
+- `pwa/sw.js`: agua v29 → v30.
+
 ## Regra do sistema — identidade do monitor no app Biomonitor (migration 323)
 Quem autentica é `monitores_biodiversidade.usuario_id` → `auth.users`.
 `monitores_biodiversidade.email` é só CADASTRO: editá-lo NÃO troca o

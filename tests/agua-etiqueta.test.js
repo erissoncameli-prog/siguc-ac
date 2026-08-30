@@ -268,3 +268,27 @@ test('reimpressão pelo card da Fila usa os dados do registro offline, sem rede'
   const canvasVisivel = await page.locator('#etq-canvas').isVisible();
   expect(canvasVisivel).toBe(true);
 });
+
+test('formulário avisa ANTES de coletar se há código reservado para imprimir na hora', async ({ page }) => {
+  // Achado real (relato do usuário): sem código reservado, o botão de
+  // etiqueta pós-salvar não aparece — comportamento correto (o código
+  // definitivo só existe se veio do pool), mas o coletor não tinha
+  // como saber disso ANTES de coletar e achou que o recurso tinha
+  // sumido. A dica do campo agora avisa de antemão.
+  await abrirAppSemLogin(page);
+  await entrarComoColetorDeTeste(page);
+  await page.evaluate(async () => { await aOfflineSetConfig('etq_codigos_reservados', []) });
+
+  await page.locator('#btn-nova-coleta').click();
+  await page.locator('#tela-form').waitFor({ state: 'visible' });
+  await expect(page.locator('#f-codigo-dica')).toContainText('sem código reservado');
+
+  await page.locator('#btn-back-form').click();
+  await page.evaluate(async () => {
+    await aEtqAdicionarAoPool([{ codigo: 'COL-2026-0088', expira_em: '2026-12-31T23:59:59Z' }]);
+  });
+
+  await page.locator('#btn-nova-coleta').click();
+  await page.locator('#tela-form').waitFor({ state: 'visible' });
+  await expect(page.locator('#f-codigo-dica')).toContainText('1 código reservado disponível');
+});
