@@ -152,6 +152,100 @@
 }
 .guia-ajuda-btn:hover { border-color: var(--guia-cor, #52B788); color: var(--guia-cor, #52B788); }
 
+/* ── Faixa do modo treinamento — partes compartilhadas ──────────
+   Cada app declara sua própria .treino-faixa/.bio-treino-faixa
+   (posição/cor/listras/botão — a classe e a cor de fundo variam
+   pouco entre apps), mas ícone e bloco de texto são sempre iguais.
+   Nunca duas cópias do mesmo desenho. */
+.treino-faixa-icone {
+  flex: 0 0 auto; width: 30px; height: 30px; border-radius: 999px;
+  display: grid; place-items: center;
+  background: rgba(255, 255, 255, .32);
+  animation: treino-faixa-icone-pulso 1.8s ease-in-out infinite;
+}
+.treino-faixa-texto { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.25; }
+.treino-faixa-texto strong { font-size: 12.5px; font-weight: 800; letter-spacing: .05em; }
+.treino-faixa-texto small { font-size: 10.5px; font-weight: 600; opacity: .82; }
+@keyframes treino-faixa-icone-pulso {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.12); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .treino-faixa-icone { animation: none; }
+}
+
+/* ── Botão flutuante de ajuda ─────────────────────────────────── */
+.guia-fab {
+  position: fixed;
+  right: 16px;
+  bottom: var(--guia-fab-bottom, 92px);
+  z-index: 850; /* abaixo da faixa de treino (1200) e do overlay (9000);
+                   acima do conteúdo comum das telas */
+  width: 52px; height: 52px;
+  border: 0; border-radius: 999px;
+  background: var(--guia-cor, #52B788);
+  color: #fff;
+  display: grid; place-items: center;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, .28), 0 2px 6px rgba(0, 0, 0, .18);
+  animation: guia-fab-flutua 2.6s ease-in-out infinite;
+}
+.guia-fab[hidden] { display: none !important; }
+.guia-fab-icone { display: grid; place-items: center; }
+.guia-fab-icone svg { width: 24px; height: 24px; }
+.guia-fab:active { transform: scale(.94); }
+
+/* Anel pulsante — só enquanto ninguém abriu nenhum guia ainda
+   (guiaAlgumConcluido() decide, sem chave própria de "já visto"). */
+.guia-fab-anel {
+  position: absolute; inset: -6px; border-radius: 999px;
+  border: 2px solid var(--guia-cor, #52B788);
+  opacity: 0; pointer-events: none;
+}
+.guia-fab.guia-fab-novo .guia-fab-anel {
+  animation: guia-fab-pulso 1.8s ease-out infinite;
+}
+
+@keyframes guia-fab-flutua {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-4px); }
+}
+@keyframes guia-fab-pulso {
+  0%   { opacity: .65; transform: scale(1); }
+  100% { opacity: 0;   transform: scale(1.55); }
+}
+
+/* Balão de fala do primeiro toque — cartão pequeno acima do botão. */
+.guia-fab-balao {
+  position: fixed;
+  right: 16px;
+  bottom: calc(var(--guia-fab-bottom, 92px) + 62px);
+  z-index: 849;
+  max-width: 190px;
+  padding: 9px 13px;
+  border-radius: 14px 14px 4px 14px;
+  background: #0A1A0F;
+  color: #fff;
+  font-family: var(--font-sans, 'DM Sans', system-ui, sans-serif);
+  font-size: 12.5px; line-height: 1.4; font-weight: 600;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, .3);
+  animation: guia-balao-entra .25s ease-out;
+}
+@keyframes guia-balao-entra {
+  from { opacity: 0; transform: translateY(6px) scale(.92); }
+}
+
+/* Some junto quando o guia está aberto — evita ficar "pisando" por
+   trás do overlay em modo tour (fundo transparente). */
+body.guia-aberto .guia-fab,
+body.guia-aberto .guia-fab-balao { display: none !important; }
+
+@media (prefers-reduced-motion: reduce) {
+  .guia-fab { animation: none; }
+  .guia-fab-anel { animation: none; }
+  .guia-fab-balao { animation: none; }
+}
+
 /* ── Convite de primeiro acesso ─────────────────────────────── */
 .guia-convite {
   display: flex; align-items: center; gap: 10px;

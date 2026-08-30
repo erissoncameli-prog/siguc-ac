@@ -140,6 +140,7 @@ function bioMostrarTela(id) {
   const nav   = document.getElementById('bio-pill-nav')
   const faixa = document.getElementById('bio-faixa-global')
   if (nav)   nav.hidden   = lockTelas.includes(id)
+  if (typeof guiaBotaoFlutuanteVisivel === 'function') guiaBotaoFlutuanteVisivel(!lockTelas.includes(id))
   if (faixa) {
     faixa.hidden = lockTelas.includes(id)
     const mascote = faixa.querySelector('.bio-faixa-mascote')
@@ -5115,6 +5116,7 @@ function bioIniciarGuias() {
     titulo: 'Primeira vez por aqui?',
     texto: 'Um guia rápido mostra como registrar um ninho.',
   })
+  guiaBotaoFlutuante()
 }
 
 // O guia pode levar a uma tela de LISTA (Abertos, Berçário) — nunca a

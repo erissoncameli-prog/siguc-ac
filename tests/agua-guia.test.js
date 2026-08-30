@@ -372,3 +372,59 @@ test('o modo treinamento sobrevive a fechar o app (é estado, não sessão)', as
   // Limpa para não vazar estado entre execuções no mesmo perfil.
   await page.evaluate(async () => { window.confirm = () => true; await agDefinirModoTreino(false); });
 });
+
+// ── Botão flutuante de ajuda e faixa de treino mais visíveis ────
+// Pedido do usuário: a entrada do treinamento estava "escondida"
+// (só em Configurações) e o modo treinamento não ficava claro o
+// bastante. Estes testes travam as duas melhorias.
+
+test('o botão flutuante de ajuda aparece na Home e abre a central de guias', async ({ page }) => {
+  // O botão flutua sem parar (CSS) — desliga a animação (mesmo caminho
+  // de prefers-reduced-motion) para o clique não flutuar de acordo com
+  // ele, senão o Playwright nunca o considera "estável" para clicar.
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await abrirApp(page);
+  await entrarHomeDeTeste(page);
+  const fab = page.locator('#guia-fab');
+  await expect(fab).toBeVisible();
+  await fab.click();
+  await expect(page.locator('.guia-lista')).toBeVisible();
+});
+
+test('o botão flutuante some nas telas de bloqueio', async ({ page }) => {
+  await abrirApp(page);
+  // Ainda na tela de login — nunca chamamos entrarHome().
+  await expect(page.locator('#guia-fab')).toHaveCount(0);
+});
+
+test('o balão de dica aparece uma vez e some ao tocar no botão', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await abrirApp(page);
+  await entrarHomeDeTeste(page);
+  await expect(page.locator('#guia-fab-balao')).toBeVisible();
+  await page.locator('#guia-fab').click();
+  await expect(page.locator('#guia-fab-balao')).toHaveCount(0);
+});
+
+test('modo treinamento: faixa com ícone/texto reforçados e moldura na tela inteira', async ({ page }) => {
+  await abrirApp(page);
+  await entrarHomeDeTeste(page);
+  await page.evaluate(async () => { await agDefinirModoTreino(true) });
+
+  const faixa = page.locator('#treino-faixa');
+  await expect(faixa).toBeVisible();
+  await expect(faixa.locator('.treino-faixa-icone')).toBeVisible();
+  await expect(faixa).toContainText('MODO TREINAMENTO');
+
+  // A moldura ao redor da tela (reforço que persiste mesmo se a faixa
+  // passar despercebida) é aplicada via ::after em body.modo-treino —
+  // não dá pra pegar com um locator comum, então lê o computed style.
+  const moldura = await page.evaluate(() => {
+    const st = getComputedStyle(document.body, '::after');
+    return { classe: document.body.classList.contains('modo-treino'), boxShadow: st.boxShadow };
+  });
+  expect(moldura.classe).toBe(true);
+  expect(moldura.boxShadow).toMatch(/inset/);
+
+  await page.evaluate(async () => { window.confirm = () => true; await agDefinirModoTreino(false); });
+});

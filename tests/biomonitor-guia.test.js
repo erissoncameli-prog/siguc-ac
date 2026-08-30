@@ -313,3 +313,46 @@ test('sair do modo treinamento apaga o banco de treino e devolve o app ao real',
   // (que já tinha "vazado" pro treino antes de desligar) não voltou.
   expect(r).not.toContain('treino-ninho-3')
 })
+
+// ── Botão flutuante de ajuda e faixa de treino mais visíveis ────
+// Mesmo pedido do usuário aplicado ao app da Água — a entrada do
+// treinamento estava "escondida" e o modo treinamento não ficava
+// claro o bastante. Mesmo motor (js/guia-app.js), então os testes
+// espelham tests/agua-guia.test.js.
+
+test('o botão flutuante de ajuda aparece na Home e abre a central de guias', async ({ page }) => {
+  // O botão flutua sem parar (CSS) — desliga a animação (mesmo caminho
+  // de prefers-reduced-motion) pro clique não perseguir um alvo em
+  // movimento.
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await abrirApp(page);
+  await entrarHomeDeTeste(page);
+  const fab = page.locator('#guia-fab');
+  await expect(fab).toBeVisible();
+  await fab.click();
+  await expect(page.locator('.guia-lista')).toBeVisible();
+});
+
+test('o botão flutuante some nas telas de bloqueio', async ({ page }) => {
+  await abrirApp(page);
+  // Ainda na tela de login — nunca chamamos bioEntrarNaHome().
+  await expect(page.locator('#guia-fab')).toHaveCount(0);
+});
+
+test('modo treinamento: faixa com ícone/texto reforçados e moldura na tela inteira', async ({ page }) => {
+  await abrirApp(page);
+  await entrarHomeDeTeste(page);
+  await page.evaluate(async () => { await bioModoTreinoAtivar(); bioPintarModoTreino() });
+
+  const faixa = page.locator('#bio-treino-faixa');
+  await expect(faixa).toBeVisible();
+  await expect(faixa.locator('.treino-faixa-icone')).toBeVisible();
+  await expect(faixa).toContainText('MODO TREINAMENTO');
+
+  const moldura = await page.evaluate(() => {
+    const st = getComputedStyle(document.body, '::after');
+    return { classe: document.body.classList.contains('bio-modo-treino'), boxShadow: st.boxShadow };
+  });
+  expect(moldura.classe).toBe(true);
+  expect(moldura.boxShadow).toMatch(/inset/);
+});
