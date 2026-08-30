@@ -184,6 +184,26 @@ const AGUA_GUIAS = {
         { titulo: 'Suas coletas', icone: 'user',
           texto: 'Abaixo do gráfico ficam as coletas que você registrou. Tocar em uma abre a ficha completa, com todos os parâmetros, e permite exportar em PDF (isso exige conexão).' }
       ]
+    },
+
+    {
+      slug: 'modo-treinamento', titulo: 'Praticar sem risco', icone: 'award', versao: 1,
+      resumo: 'O modo treinamento: a coleta inteira, sem nada chegar ao sistema.',
+      passos: [
+        { titulo: 'Para que serve', icone: 'award',
+          texto: 'Em **Configurações › Modo treinamento** o app inteiro entra em ensaio: você preenche o formulário, tira foto, lê o GPS e vê os alertas de valor atípico exatamente como na coleta real — e nada disso chega ao sistema.',
+          alvo: '#btn-modo-treino', tela: 'tela-config' },
+        { titulo: 'A faixa fica na tela o tempo todo', icone: 'bell',
+          texto: 'Enquanto o modo está ligado, uma faixa amarela no topo avisa em todas as telas. É de propósito: nunca pode haver dúvida sobre estar treinando ou coletando de verdade.' },
+        { titulo: 'O que NÃO acontece no treino', icone: 'shield',
+          texto: 'Três garantias, para praticar sem medo de estragar alguma coisa.',
+          lista: ['A coleta **não entra na fila de envio** — a sincronização nem toma conhecimento dela.',
+                  'Nenhum código de etiqueta reservado é gasto: a etiqueta de treino sai com o código "TREINO".',
+                  'Nada é gravado no servidor, nem aparece no histórico de ninguém.'] },
+        { titulo: 'Ao terminar', icone: 'check',
+          texto: 'Desligue o modo pelo botão da faixa ou por Configurações. As coletas de treino são descartadas e a próxima coleta volta a valer de verdade.',
+          nota: 'O modo continua ligado se você fechar o app — é estado, não sessão. Confira a faixa antes de começar a coleta do dia.' }
+      ]
     }
   ],
 

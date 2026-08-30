@@ -407,6 +407,8 @@
     </div>
 
     <button class="btn-config-item" id="btn-ajuda-treinamento" data-icon="help">Ajuda e treinamento</button>
+    <button class="btn-config-item" id="btn-modo-treino" data-icon="award">Modo treinamento</button>
+    <div class="campo-dica" style="margin:-4px 0 10px">Pratique a coleta inteira — foto, GPS e alertas de verdade — sem nada ir para o sistema.</div>
     <button class="btn-config-item" id="btn-alterar-pin" data-icon="key">Alterar PIN de campo</button>
     <button class="btn-config-item" id="btn-atualizar-pontos" data-icon="pin">Atualizar lista de pontos de coleta</button>
     <button class="btn-config-item" id="btn-qr-instalar" data-icon="qr">Instalar em outro aparelho (QR)</button>
@@ -421,6 +423,16 @@
       <p id="app-copyright"></p>
     </div>
   </div>
+</div>
+
+<!-- ══ FAIXA DO MODO TREINAMENTO ══════════════════════════════ -->
+<!-- Irmã das telas, nunca dentro de uma: precisa aparecer em TODAS,
+     inclusive nas que rolam. Fixa no topo, sem transform (mesma regra
+     da barra de abas — ancestral com transform vira containing block
+     de descendente fixed). -->
+<div id="treino-faixa" class="treino-faixa" hidden>
+  <span>MODO TREINAMENTO — nada é enviado ao sistema</span>
+  <button type="button" id="btn-treino-sair">Sair</button>
 </div>
 
 <!-- ══ NAV PILL ════════════════════════════════════════════════ -->
@@ -646,6 +658,51 @@ function agDistanciaMetros(a, b) {
   const dLat = toRad(b.lat - a.lat), dLng = toRad(b.lng - a.lng)
   const s = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2
   return R * 2 * Math.atan2(Math.sqrt(s), Math.sqrt(1 - s))
+}
+
+// ════════════════════════════════════════════════════════════════
+// Modo treinamento (sandbox)
+// ════════════════════════════════════════════════════════════════
+// Deixa o coletor exercitar o fluxo inteiro — escolher ponto, digitar
+// parâmetros, ver os alertas comparativos, tirar foto, ler GPS — sem
+// que NADA chegue ao sistema. É o que permite treinar uma turma sem
+// sujar a base e sem medo de errar.
+//
+// Isolamento, que é a única coisa que não pode falhar aqui:
+//  • a coleta de treino NUNCA entra no store `registros` do IndexedDB
+//    (a fila real), então a sincronização nem toma conhecimento dela —
+//    o isolamento não depende de um `if` dentro do sync;
+//  • NUNCA consome código do pool reservado (aEtqConsumirCodigo): a
+//    numeração é definitiva e um código gasto não volta;
+//  • a etiqueta de treino sai com código "TREINO", jamais um código
+//    real, para não existir frasco físico com etiqueta de mentira.
+let _treinoLista = []
+
+async function agCarregarModoTreino() {
+  App.treinamento = (await aOfflineGetConfig('modo_treinamento')) === true
+  agPintarModoTreino()
+}
+
+function agPintarModoTreino() {
+  const faixa = document.getElementById('treino-faixa')
+  if (faixa) faixa.hidden = !App.treinamento
+  document.body.classList.toggle('modo-treino', !!App.treinamento)
+  const btn = document.getElementById('btn-modo-treino')
+  if (btn) btn.textContent = App.treinamento ? 'Sair do modo treinamento' : 'Modo treinamento'
+  if (typeof bIconsAplicar === 'function') bIconsAplicar(btn?.parentElement || document)
+}
+
+async function agDefinirModoTreino(ligado) {
+  if (!ligado && _treinoLista.length &&
+      !confirm(`Sair do modo treinamento descarta ${_treinoLista.length} coleta(s) de treino. Continuar?`)) return
+  App.treinamento = !!ligado
+  _treinoLista = []
+  await aOfflineSetConfig('modo_treinamento', App.treinamento)
+  agPintarModoTreino()
+  toast(ligado
+    ? 'Modo treinamento ligado — nada será enviado ao sistema.'
+    : 'Modo treinamento desligado. As próximas coletas valem de verdade.', ligado ? 'warn' : 'ok')
+  mostrarTela('tela-home')
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -1199,6 +1256,7 @@ async function entrarHome() {
 
   mostrarTela('tela-home')
   agIniciarGuias()
+  await agCarregarModoTreino()
 
   // Aviso de privacidade do app (LGPD Art. 9º) — nunca bloqueia o
   // trabalho: funciona do cache offline, ciência sincronizada depois.
@@ -1474,7 +1532,9 @@ async function salvarRegistro() {
   // trigger do banco gera um ao sincronizar, como sempre foi.
   let codigoAmostra = document.getElementById('f-codigo-amostra').value.trim() || null
   let codigoVeioDoPool = false
-  if (!codigoAmostra) {
+  // Em treinamento o pool NUNCA é tocado: código reservado é definitivo
+  // e não volta para a numeração se for gasto à toa.
+  if (!codigoAmostra && !App.treinamento) {
     codigoAmostra = await aEtqConsumirCodigo()
     if (codigoAmostra) codigoVeioDoPool = true
   }
@@ -1499,6 +1559,25 @@ async function salvarRegistro() {
     lat: App.gpsAtual?.lat ?? null,
     lng: App.gpsAtual?.lng ?? null,
     foto_blob: fotos[0] || null,
+  }
+
+  // Treinamento para AQUI: a coleta não entra na fila real, então a
+  // sincronização nunca a vê — o isolamento não depende de um `if`
+  // dentro do sync.
+  if (App.treinamento) {
+    _treinoLista.push(registro)
+    mostrarTela('tela-home')
+    toast('Coleta de TREINO registrada — nada foi enviado ao sistema.', 'warn')
+    const pontoT = (App.pontos || []).find(p => p.id === pontoId)
+    const llT = pontoT ? agLatLngDeGeom(pontoT.geom) : null
+    abrirEtiquetaOverlay({
+      codigo_amostra: 'TREINO',       // nunca um código real
+      ponto_nome: pontoT?.nome, rio: pontoT?.rio, codigo_ana: pontoT?.codigo_ana,
+      data_coleta: registro.data_coleta, hora_coleta: registro.hora_coleta,
+      coletor_nome: App.coletor?.nome_completo,
+      lat: llT?.lat, lng: llT?.lng,
+    }, 1)
+    return
   }
 
   try {
@@ -2185,6 +2264,8 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-ajuda-treinamento').addEventListener('click', () => {
     if (typeof guiaAbrirCentral === 'function') guiaAbrirCentral()
   })
+  document.getElementById('btn-modo-treino').addEventListener('click', () => agDefinirModoTreino(!App.treinamento))
+  document.getElementById('btn-treino-sair').addEventListener('click', () => agDefinirModoTreino(false))
 
   // "Ajuda desta tela": abre o guia do assunto COM a tela aberta, e é
   // isso que transforma o mesmo conteúdo em tour com destaque sobre os
