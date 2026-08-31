@@ -674,15 +674,20 @@ body { margin: 0; }
   align-items: center; min-height: 44px;
 }
 .faixa-logo-chip {
-  /* logos brancas direto sobre a faixa — sem chip de fundo.
-     Mesma altura para as duas (gov/sec) — nunca uma maior que a
-     outra, senão o brasão pesa mais que o texto da SEMA — e um único
+  /* logos brancas direto sobre a faixa — sem chip de fundo. Um único
      tamanho para as 5 abas (Início/Coletar/Histórico/Fila/Config),
-     nunca uma variante "compacta" por tela. */
-  width: 100%; max-width: 140px; height: 36px;
+     nunca uma variante "compacta" por tela — essa parte é fixa.
+     Gov ficando MAIOR que sec aqui é proposital, não esquecido: o
+     brasão tem bastante margem/detalhe interno no próprio arquivo (é
+     um selo cheio de traço fino), então em caixas de mesma altura ele
+     lê visualmente menor que o bloco cheio "SEMA" — mesma razão pela
+     qual Brigadas/Biomonitor (css/biomonitor.css) também usam o
+     brasão maior que a SEMA. Sem essa compensação o peso visual das
+     duas logos fica desbalanceado mesmo com caixas "iguais". */
+  width: 100%; max-width: 132px; height: 38px;
   display: flex; align-items: center; justify-content: center;
 }
-.faixa-logo-chip.gov { grid-column: 1; justify-self: start; }
+.faixa-logo-chip.gov { grid-column: 1; justify-self: start; max-width: 165px; height: 48px; }
 .faixa-logo-chip.sec { grid-column: 3; justify-self: end; }
 .faixa-logo-chip img {
   width: 100%; height: 100%; object-fit: contain; display: block;
