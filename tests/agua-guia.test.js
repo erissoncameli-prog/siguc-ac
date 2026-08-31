@@ -442,3 +442,18 @@ test('botão "Sair" da faixa de treino tem alvo de toque confortável (bem acima
   await page.locator('#btn-treino-sair').click();
   await expect(page.locator('#treino-faixa')).toBeHidden();
 });
+
+test('a faixa de treino nunca cola no topo físico da tela (folga mínima pro relógio/status bar do Android)', async ({ page }) => {
+  // Achado real com screenshot do usuário: env(safe-area-inset-top) não
+  // é confiável no Android (chega a devolver 0 mesmo em tela cheia) —
+  // a faixa ficava colada no topo físico, atrás do relógio/ícones do
+  // sistema. Trava que a folga tem um PISO fixo, independente do que
+  // o navegador devolver pro safe-area.
+  await abrirApp(page);
+  await entrarHomeDeTeste(page);
+  await page.evaluate(async () => { await agDefinirModoTreino(true) });
+
+  const paddingTop = await page.evaluate(() =>
+    parseFloat(getComputedStyle(document.getElementById('treino-faixa')).paddingTop));
+  expect(paddingTop).toBeGreaterThanOrEqual(28);
+});

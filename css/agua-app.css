@@ -1734,7 +1734,18 @@ body { margin: 0; }
    posicionamento fixo (mesma armadilha já documentada). */
 .treino-faixa {
   position: fixed; top: 0; left: 0; right: 0; z-index: 900;
-  min-height: 54px; padding: 9px 14px calc(9px + env(safe-area-inset-top, 0px));
+  min-height: 54px;
+  /* ⚠️ Bug real achado em produção (screenshot do usuário): a correção
+     de notch/status bar tinha ido pro padding de BAIXO (3º valor do
+     shorthand de 3), não pro de CIMA — a faixa nascia colada no topo
+     físico da tela, atrás do relógio/ícones do Android, com folga
+     sobrando embaixo sem necessidade nenhuma. E mesmo corrigido de
+     lado, `env(safe-area-inset-top)` sozinho não bastava: Android não
+     reporta a altura da status bar por ali de forma confiável (relato
+     real: valor 0 com o ícone atrás do relógio) — só funciona de
+     verdade em notch de iOS. `max()` garante um piso de 28px mesmo
+     quando o env() devolve 0, e cresce sozinho num notch maior. */
+  padding: max(28px, calc(9px + env(safe-area-inset-top, 0px))) 14px 9px;
   display: flex; align-items: center; gap: 10px;
   background:
     repeating-linear-gradient(135deg, rgba(0,0,0,.09) 0 10px, transparent 10px 20px),
@@ -1761,7 +1772,9 @@ body.modo-treino::after {
 }
 
 /* A faixa é fixa: sem esta folga ela cobriria o topo da tela ativa. */
-body.modo-treino .tela { padding-top: calc(56px + env(safe-area-inset-top, 0px)); }
+/* Espelha exatamente a fórmula da faixa acima (max() + parte fixa
+   de baixo/conteúdo) — nunca um número solto que possa divergir. */
+body.modo-treino .tela { padding-top: calc(max(28px, calc(9px + env(safe-area-inset-top, 0px))) + 45px); }
 
 @media (prefers-reduced-motion: reduce) {
   .treino-faixa { animation: none; }

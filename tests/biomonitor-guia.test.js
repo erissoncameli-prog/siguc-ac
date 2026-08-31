@@ -370,3 +370,13 @@ test('botão "Sair" da faixa de treino tem alvo de toque confortável (bem acima
   await page.locator('#bio-btn-treino-sair').click();
   await expect(page.locator('#bio-treino-faixa')).toBeHidden();
 });
+
+test('a faixa de treino nunca cola no topo físico da tela (folga mínima pro relógio/status bar do Android)', async ({ page }) => {
+  await abrirApp(page);
+  await entrarHomeDeTeste(page);
+  await page.evaluate(async () => { await bioModoTreinoAtivar(); bioPintarModoTreino() });
+
+  const paddingTop = await page.evaluate(() =>
+    parseFloat(getComputedStyle(document.getElementById('bio-treino-faixa')).paddingTop));
+  expect(paddingTop).toBeGreaterThanOrEqual(28);
+});
