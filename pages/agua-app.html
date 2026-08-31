@@ -915,11 +915,24 @@ async function verificarConexao() {
 }
 
 // ── Faixa institucional (logos Governo/SEMA) ──────────────────
+// Home já nasce com a faixa no próprio HTML; as demais abas (Coletar,
+// Histórico, Fila, Config) ganham a mesma faixa por injeção, no molde
+// de `inserirFaixasInst` em pages/brigada.html — fonte única do
+// desenho (`.faixa-inst`/`.faixa-logo-chip`/`.faixa-mascote` em
+// css/agua-app.css), nunca uma cópia por tela.
 function inserirFaixasInst() {
-  // sem-op — o emblema da faixa (.faixa-mascote) é estático no HTML da
-  // Home, não injetado; mantém a função para o mesmo ponto de chamada do
-  // carregarLogosInstitucionais (que popula os .faixa-logo-chip, esses
-  // sim vindos da configuração).
+  const faixa = compacta => `
+    <div class="faixa-inst${compacta ? ' compacta' : ''}">
+      <div class="faixa-logos">
+        <span class="faixa-logo-chip gov" hidden><img alt="Governo do Acre"></span>
+        <span class="faixa-logo-chip sec" hidden><img alt="SEMA-AC"></span>
+      </div>
+      <img class="faixa-mascote" src="/pwa/icons/icon-agua-512.png" alt="">
+    </div>`
+  ;[['tela-historico', false], ['tela-fila', false], ['tela-config', false],
+    ['tela-form', true]].forEach(([id, compacta]) => {
+    document.getElementById(id)?.insertAdjacentHTML('afterbegin', faixa(compacta))
+  })
 }
 
 function renderFaixaLogos(c) {
