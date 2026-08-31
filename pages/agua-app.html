@@ -921,23 +921,48 @@ async function verificarConexao() {
 // desenho (`.faixa-inst`/`.faixa-logo-chip`/`.faixa-mascote` em
 // css/agua-app.css), nunca uma cópia por tela.
 function inserirFaixasInst() {
-  const faixa = compacta => `
-    <div class="faixa-inst${compacta ? ' compacta' : ''}">
+  const faixa = `
+    <div class="faixa-inst">
       <div class="faixa-logos">
         <span class="faixa-logo-chip gov" hidden><img alt="Governo do Acre"></span>
         <span class="faixa-logo-chip sec" hidden><img alt="SEMA-AC"></span>
       </div>
       <img class="faixa-mascote" src="/pwa/icons/icon-agua-512.png" alt="">
     </div>`
-  ;[['tela-historico', false], ['tela-fila', false], ['tela-config', false],
-    ['tela-form', true]].forEach(([id, compacta]) => {
-    document.getElementById(id)?.insertAdjacentHTML('afterbegin', faixa(compacta))
+  ;['tela-historico', 'tela-fila', 'tela-config', 'tela-form'].forEach(id => {
+    document.getElementById(id)?.insertAdjacentHTML('afterbegin', faixa)
   })
 }
 
 function renderFaixaLogos(c) {
   document.querySelectorAll('.faixa-logo-chip.gov img').forEach(img => { if (c?.gov) { img.src = c.gov; img.closest('.faixa-logo-chip').hidden = false } })
   document.querySelectorAll('.faixa-logo-chip.sec img').forEach(img => { if (c?.sec) { img.src = c.sec; img.closest('.faixa-logo-chip').hidden = false } })
+}
+
+// Converte a logo colorida em versão branca (knockout) para a faixa
+// escura: fundo claro vira transparente e o desenho vira silhueta
+// branca com alfa proporcional à "tinta" do pixel. Mesma função de
+// `pages/brigada.html`/`js/biomonitor-quelonios.js` — nunca uma
+// terceira implementação.
+async function logoParaBranco(blob) {
+  const img = new Image()
+  const url = URL.createObjectURL(blob)
+  await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = url })
+  const c = document.createElement('canvas')
+  c.width = img.naturalWidth; c.height = img.naturalHeight
+  const ctx = c.getContext('2d')
+  ctx.drawImage(img, 0, 0)
+  const d = ctx.getImageData(0, 0, c.width, c.height)
+  const p = d.data
+  for (let i = 0; i < p.length; i += 4) {
+    const lum = (p[i] * 0.299 + p[i + 1] * 0.587 + p[i + 2] * 0.114) / 255
+    const tinta = (1 - lum) * (p[i + 3] / 255)
+    p[i] = p[i + 1] = p[i + 2] = 255
+    p[i + 3] = Math.round(255 * Math.min(1, tinta * 1.25))
+  }
+  ctx.putImageData(d, 0, 0)
+  URL.revokeObjectURL(url)
+  return new Promise(res => c.toBlob(b => res(b), 'image/png'))
 }
 
 async function carregarLogosInstitucionais() {
@@ -953,16 +978,18 @@ async function carregarLogosInstitucionais() {
       const r = await fetch(url)
       return r.ok ? await r.blob() : null
     }
-    const preparar = async urlColorida => {
-      const blob = await baixar(urlColorida)
-      return blob ? await aOfflineBlobParaBase64(blob) : null
+    // Se houver versão branca oficial na config, usa direto; senão
+    // baixa a colorida e gera o knockout branco no aparelho.
+    const preparar = async (urlBranca, urlColorida) => {
+      const oficial = await baixar(urlBranca)
+      if (oficial) return await aOfflineBlobParaBase64(oficial)
+      const colorida = await baixar(urlColorida)
+      if (!colorida) return null
+      return await aOfflineBlobParaBase64(await logoParaBranco(colorida))
     }
-    // Sem o knockout branco do Brigadas: aqui as logos só aparecem em
-    // fundo escuro nas telas de PIN, e a versão colorida já contrasta
-    // o bastante — simplificação deliberada.
     const novo = {
-      gov: await preparar(logos.governo_url),
-      sec: await preparar(logos.secretaria_url),
+      gov: await preparar(logos.governo_branca_url,    logos.governo_url),
+      sec: await preparar(logos.secretaria_branca_url, logos.secretaria_url),
     }
     if (novo.gov || novo.sec) {
       await aOfflineSetConfig('logos_cache_v2', novo)

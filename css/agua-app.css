@@ -674,11 +674,15 @@ body { margin: 0; }
   align-items: center; min-height: 44px;
 }
 .faixa-logo-chip {
-  /* logos brancas direto sobre a faixa — sem chip de fundo */
-  width: 100%; max-width: 132px; height: 38px;
+  /* logos brancas direto sobre a faixa — sem chip de fundo.
+     Mesma altura para as duas (gov/sec) — nunca uma maior que a
+     outra, senão o brasão pesa mais que o texto da SEMA — e um único
+     tamanho para as 5 abas (Início/Coletar/Histórico/Fila/Config),
+     nunca uma variante "compacta" por tela. */
+  width: 100%; max-width: 140px; height: 36px;
   display: flex; align-items: center; justify-content: center;
 }
-.faixa-logo-chip.gov { grid-column: 1; justify-self: start; max-width: 165px; height: 48px; }
+.faixa-logo-chip.gov { grid-column: 1; justify-self: start; }
 .faixa-logo-chip.sec { grid-column: 3; justify-self: end; }
 .faixa-logo-chip img {
   width: 100%; height: 100%; object-fit: contain; display: block;
@@ -701,14 +705,6 @@ body { margin: 0; }
   width: 70px; height: 70px;
   border-radius: 0;
 }
-
-/* Variante compacta: telas de tarefa (formulário/fauna) — mesma
-   identidade, ocupando menos espaço vertical */
-.faixa-inst.compacta { padding: calc(8px + env(safe-area-inset-top)) 16px 8px; margin-bottom: 32px; }
-.faixa-inst.compacta .faixa-logos { min-height: 32px; grid-template-columns: 1fr 64px 1fr; }
-.faixa-inst.compacta .faixa-logo-chip { height: 28px; max-width: 104px; }
-.faixa-inst.compacta .faixa-logo-chip.gov { height: 34px; max-width: 124px; }
-.faixa-inst.compacta .faixa-mascote { width: 58px; height: 58px; bottom: -26px; }
 
 /* Emblema do app nas telas de login/bloqueio/PIN.
    Sem recorte circular (o molde de brigada.css usava 50% porque lá é
