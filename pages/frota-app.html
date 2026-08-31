@@ -11,6 +11,7 @@
 <link rel="stylesheet" href="../css/avatar-foto.css">
 <link rel="stylesheet" href="../css/frota-wise-theme.css">
 <link rel="stylesheet" href="../css/pin-baralho.css">
+<link rel="stylesheet" href="../css/luz-nav.css">
 <script>
 // Stub de segurança: se o CDN não carregar (offline), config.js não quebra.
 window.supabase = window.supabase || { createClient: () => null }
@@ -59,6 +60,7 @@ const _frotaReady = _dbReady.then(function () {
 <script src="../js/frota-passageiros.js"></script>
 <script src="../js/frota-viagens-status.js"></script>
 <script src="../js/pin-baralho.js"></script>
+<script src="../js/luz-nav.js"></script>
 <script>
 // Rede de segurança para js/fotos-privadas.js. Se ele não carregar — deploy
 // a meio caminho, cache do navegador, bloqueio de rede — as funções
@@ -801,6 +803,12 @@ function montarBarraNav(modo) {
   host.innerHTML = (modo && FM_NAVS[modo])
     ? `<nav class="fm-pill-nav">${FM_NAVS[modo]()}</nav>`
     : ''
+  // A barra inteira é recriada aqui (não só a aba ativa muda) — é o
+  // único ponto de chamada que o Frota precisa, porque é o único dos
+  // 4 apps onde o <nav> em si é substituído (troca de modo). luzNavMontar
+  // é idempotente: religa sozinha no <nav> novo, ou não faz nada se
+  // `modo` limpou a barra (host.innerHTML = '').
+  if (typeof luzNavMontar === 'function') luzNavMontar('.fm-pill-nav')
 }
 
 // Marca a aba ativa. Os três modos faziam exatamente isto inline; virou
@@ -4607,6 +4615,10 @@ if ('serviceWorker' in navigator && !fEhAppNativoFrota()) {
   max-width: calc(100vw - 16px);
   background: #0A1A0F; border-radius: 32px; height: 64px; padding: 0 8px;
   display: flex; align-items: center; gap: 3px; box-shadow: 0 8px 32px rgba(0,0,0,.35); z-index: 1000;
+  /* cor do anel/bastão (js/luz-nav.js + css/luz-nav.css) — o mesmo
+     verde já usado no resto do app (fm-primaria, cards), nunca uma
+     cor nova; sem --alerta próprio aqui, cai no fallback do módulo */
+  --luz-cor: var(--verde-c, #52B788);
 }
 
 /* ── Modais por cima da barra inferior ───────────────────────────
@@ -4621,7 +4633,7 @@ if ('serviceWorker' in navigator && !fEhAppNativoFrota()) {
 .fm-pill-btn {
   position: relative; width: 48px; height: 48px; border-radius: 50%;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  border: none; background: transparent; cursor: pointer; color: rgba(255,255,255,.5); gap: 2px;
+  border: none; background: transparent; cursor: pointer; color: rgba(255,255,255,.62); gap: 2px;
   transition: background .15s, color .15s; font-size: 9px; font-weight: 600; font-family: 'DM Sans', sans-serif;
   -webkit-tap-highlight-color: transparent;
 }

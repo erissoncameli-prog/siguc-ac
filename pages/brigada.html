@@ -13,6 +13,7 @@
   <link rel="stylesheet" href="/css/brigada.css">
   <link rel="stylesheet" href="/css/pin-baralho.css">
   <link rel="stylesheet" href="/css/avatar-foto.css">
+  <link rel="stylesheet" href="/css/luz-nav.css">
 </head>
 <body class="brigada-app">
 
@@ -995,6 +996,7 @@ const _brigReady = _dbReady.then(function () {
 });
 </script>
 <script src="/js/pin-baralho.js"></script>
+<script src="/js/luz-nav.js"></script>
 <script src="/js/brigada-offline.js"></script>
 <script src="/js/brigada-sync.js"></script>
 <script src="/js/brigada-captura.js"></script>
@@ -1063,6 +1065,7 @@ function mostrarTela(id, empurrar = true) {
   document.querySelectorAll('.pill-btn').forEach(b => {
     b.classList.toggle('ativa', b.dataset.tela === id)
   })
+  if (typeof luzNavMontar === 'function') luzNavMontar('.pill-nav')
 
   if (id === 'tela-fila') {
     carregarFila()

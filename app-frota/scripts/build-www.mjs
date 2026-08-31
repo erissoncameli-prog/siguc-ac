@@ -36,7 +36,7 @@ mkdirSync(join(WWW, 'vendor/fonts'), { recursive: true })
 const ARQUIVOS_JS = [
   'observability.js', 'queryLogger.js', 'config.js', 'lgpd.js', 'lgpd-campo.js',
   'qrcode-generator.js', 'frota-offline.js', 'frota-sync.js', 'frota-notif-local.js', 'layout.js',
-  'frota-wise.js', 'fotos-privadas.js', 'avatar-foto.js', 'pin-baralho.js', 'frota-consumo.js', 'frota-passageiros.js',
+  'frota-wise.js', 'fotos-privadas.js', 'avatar-foto.js', 'pin-baralho.js', 'luz-nav.js', 'frota-consumo.js', 'frota-passageiros.js',
   'frota-viagens-status.js',
 ]
 for (const f of ARQUIVOS_JS) {
@@ -50,7 +50,7 @@ cpSync(join(RAIZ, 'pwa/icons/logo-frota.png'), join(WWW, 'pwa/icons/logo-frota.p
 // ── CSS (remove @import do Google Fonts — fontes são locais) ──
 // Lista derivada de todo <link rel="stylesheet" href="../css/..."> em
 // pages/frota-app.html.
-const ARQUIVOS_CSS = ['global.css', 'avatar-foto.css', 'pin-baralho.css', 'frota-wise-theme.css']
+const ARQUIVOS_CSS = ['global.css', 'avatar-foto.css', 'pin-baralho.css', 'luz-nav.css', 'frota-wise-theme.css']
 for (const f of ARQUIVOS_CSS) {
   let css = readFileSync(join(RAIZ, 'css', f), 'utf8')
   css = css.replace(/@import url\('https:\/\/fonts\.googleapis\.com[^']*'\);?\n?/g, '')
