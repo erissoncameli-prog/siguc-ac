@@ -89,13 +89,18 @@
 .arm-leg-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
 .arm-leg-val{margin-left:auto;font-size:10px;font-weight:700;color:var(--cinza-500)}
 
-/* Card barras de quota */
-.arm-quota-card{background:#fff;border:1px solid var(--borda);border-radius:var(--raio-lg);padding:20px;display:flex;flex-direction:column;gap:18px;justify-content:center}
-.arm-quota-title{font-size:10px;font-weight:700;color:var(--cinza-500);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px}
-.arm-quota-bar-wrap{background:var(--cinza-100);border-radius:99px;height:10px;overflow:hidden}
-.arm-quota-bar{height:100%;border-radius:99px;transition:width .6s cubic-bezier(.4,0,.2,1)}
-.arm-quota-nums{display:flex;justify-content:space-between;font-size:10px;color:var(--cinza-500);margin-top:4px}
-.arm-quota-pct{font-weight:700}
+/* Card anéis de quota (estilo iOS) */
+.arm-quota-card{background:#fff;border:1px solid var(--borda);border-radius:var(--raio-lg);padding:20px;display:flex;flex-direction:column;gap:16px;justify-content:center}
+.arm-ring-row{display:flex;gap:14px}
+.arm-ring-item{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;text-align:center;min-width:0}
+.arm-ring-wrap{position:relative;width:104px;height:104px;flex-shrink:0}
+.arm-ring-wrap svg{filter:drop-shadow(0 1px 2px rgba(0,0,0,.06))}
+.arm-ring-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none}
+.arm-ring-pct{font-family:'Fraunces',Georgia,serif;font-size:19px;font-weight:700;line-height:1}
+.arm-ring-title{font-size:10.5px;font-weight:700;color:var(--cinza-600);text-transform:uppercase;letter-spacing:.05em;margin-top:8px}
+.arm-ring-sub{font-size:10.5px;color:var(--cinza-500);font-weight:600}
+.arm-ring-sub-fine{font-size:9.5px;color:var(--cinza-400)}
+.arm-quota-foot{font-size:10px;color:var(--cinza-400);padding-top:12px;border-top:1px solid var(--cinza-100);text-align:center}
 
 /* Lista de categorias */
 .arm-cat-list{display:flex;flex-direction:column;gap:0}
@@ -736,6 +741,17 @@ function _corBarra(pct){
   return '#1F4E2C';
 }
 
+function _desenharAnelPct(pct, cor, size = 104, sw = 11){
+  const r = (size - sw) / 2, cx = size / 2, cy = size / 2;
+  const circ = 2 * Math.PI * r;
+  const dash = Math.max(0, Math.min(100, pct)) / 100 * circ;
+  return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="display:block;transform:rotate(-90deg)">
+    <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#f1f5f9" stroke-width="${sw}"/>
+    <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${cor}" stroke-width="${sw}" stroke-linecap="round"
+      stroke-dasharray="${dash.toFixed(2)} ${circ.toFixed(2)}"/>
+  </svg>`;
+}
+
 function _desenharRosca(grupos, dbTotal){
   const r = 54, cx = 70, cy = 70, sw = 20;
   const circ = 2 * Math.PI * r;
@@ -805,33 +821,33 @@ function _renderArmazenamento(dados){
       <span class="arm-leg-val">${_formatBytes(g.valor)}</span>
     </div>`).join('');
 
-  // ── Barras de cota (DB e Storage) ───────────────────────────────
+  // ── Anéis de cota estilo iOS (DB e Storage) ─────────────────────
+  const dbCor = _corBarra(dbPct), stCor = _corBarra(stPct);
   const quotaHTML = `
-    <div>
-      <div class="arm-quota-title">Banco de Dados</div>
-      <div class="arm-quota-bar-wrap">
-        <div class="arm-quota-bar" style="width:${dbPct.toFixed(1)}%;background:${_corBarra(dbPct)}"></div>
+    <div class="arm-ring-row">
+      <div class="arm-ring-item">
+        <div class="arm-ring-wrap">
+          ${_desenharAnelPct(dbPct, dbCor)}
+          <div class="arm-ring-center">
+            <span class="arm-ring-pct" style="color:${dbCor}">${dbPct.toFixed(0)}%</span>
+          </div>
+        </div>
+        <div class="arm-ring-title">Banco de Dados</div>
+        <div class="arm-ring-sub">${_formatBytes(dbTotal)} de ${_formatBytes(_ARM_DB_LIMITE)}</div>
       </div>
-      <div class="arm-quota-nums">
-        <span>${_formatBytes(dbTotal)} usados</span>
-        <span class="arm-quota-pct" style="color:${_corBarra(dbPct)}">${dbPct.toFixed(1)}%</span>
-        <span>${_formatBytes(_ARM_DB_LIMITE)} limite</span>
+      <div class="arm-ring-item">
+        <div class="arm-ring-wrap">
+          ${_desenharAnelPct(stPct, stCor)}
+          <div class="arm-ring-center">
+            <span class="arm-ring-pct" style="color:${stCor}">${stPct.toFixed(0)}%</span>
+          </div>
+        </div>
+        <div class="arm-ring-title">Arquivos &amp; Fotos</div>
+        <div class="arm-ring-sub">${_formatBytes(stTotal)} de ${_formatBytes(_ARM_ST_LIMITE)}</div>
+        <div class="arm-ring-sub-fine">${stArqTotal.toLocaleString('pt-BR')} arquivo${stArqTotal!==1?'s':''}</div>
       </div>
     </div>
-    <div>
-      <div class="arm-quota-title">Arquivos &amp; Fotos</div>
-      <div class="arm-quota-bar-wrap">
-        <div class="arm-quota-bar" style="width:${stPct.toFixed(1)}%;background:${_corBarra(stPct)}"></div>
-      </div>
-      <div class="arm-quota-nums">
-        <span>${_formatBytes(stTotal)} usados · ${stArqTotal.toLocaleString('pt-BR')} arquivo${stArqTotal!==1?'s':''}</span>
-        <span class="arm-quota-pct" style="color:${_corBarra(stPct)}">${stPct.toFixed(1)}%</span>
-        <span>${_formatBytes(_ARM_ST_LIMITE)} limite</span>
-      </div>
-    </div>
-    <div style="font-size:10px;color:var(--cinza-400);padding-top:4px;border-top:1px solid var(--cinza-100)">
-      Plano Pro Supabase · 8 GB banco · 100 GB storage
-    </div>`;
+    <div class="arm-quota-foot">Plano Pro Supabase · 8 GB banco · 100 GB storage</div>`;
 
   // ── Lista de categorias do banco ─────────────────────────────────
   const maxValor = grupos[0]?.valor || 1;
