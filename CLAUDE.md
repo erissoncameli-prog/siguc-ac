@@ -626,6 +626,119 @@ viewport, zero transform nos ancestrais, fixa ao rolar, e clique real
 chegando ao botão. Qualquer elemento fixo novo no app deve seguir a
 mesma regra.
 
+## Regra do sistema — anel/bastão da barra de navegação (4 apps de campo)
+A aba ativa das 4 barras (Brigadas, Biomonitor, Frota, Água) tinha um
+preenchimento translúcido estático que trocava de botão por classe —
+o olho não acompanhava de onde veio. Proposta apresentada como
+Artifact (dois vídeos de referência analisados quadro a quadro, com o
+efeito implementado e medido no laboratório antes de codar — nunca
+supondo número). Trocado por um indicador em anel/bastão: um
+`<rect rx>` SVG com duas pontas independentes que **circunda** o
+botão (nunca cobre ícone nem rótulo — diferente da 1ª proposta, uma
+pílula de vidro preenchida, descartada por medir fantasma duplo no
+rótulo de 9px mesmo depois de ajustar escala/amortecimento).
+
+- **Regra que segura tudo**: sempre um ANEL numa aba (`ax === bx`, o
+  retângulo vira círculo) ou um BASTÃO reto entre duas. Nunca uma
+  curva, nunca uma ponta solta no ar. Duas molas independentes —
+  cabeça (`ax`) fixa, cauda (`bx`) com rigidez que cresce conforme a
+  DISTÂNCIA que falta (nunca a velocidade, que passa por zero no
+  sobrepasso). Constantes calibradas por varredura numérica para a
+  nossa geometria (350–420ms), não copiadas do vídeo de referência
+  (que dava ~600ms nesta geometria — barra tocada o dia inteiro em
+  campo pede mais rápido).
+- **Fonte única**: `js/luz-nav.js` + `css/luz-nav.css` — mesma lição
+  de `js/pin-baralho.js`/`js/frota-consumo.js`. API de uma função:
+  `luzNavMontar('.pill-nav')`, chamada de dentro da função central de
+  troca de tela que cada app já tem (`mostrarTela` do Brigadas/Água,
+  `bioMostrarTela`, `montarBarraNav` do Frota) — nenhuma tela nova
+  precisa chamar nada. O resto é `MutationObserver` na classe `.ativa`
+  que essas funções já tocam.
+- **Raio do anel vem do PRÓPRIO botão** (`getBoundingClientRect`),
+  nunca fixo — cobre os 52px de Brigadas/Água/Biomonitor, os 48px do
+  Frota normal, os 54–56px da aba primária do Frota e as reduções nos
+  breakpoints de 380px/330px, tudo sem config por app.
+- **Cor**: uma por app (`--luz-cor`, sempre `var()` com fallback —
+  nunca declarada dentro do módulo, mesma armadilha documentada em
+  `css/pin-baralho.css`: declarar ali venceria a barra e pintaria os
+  4 apps iguais). Reaproveita os tokens que já existiam —
+  `var(--soft)` em Brigadas/Água, `var(--bio-soft)` em Biomonitor,
+  `var(--verde-c, #52B788)` no Frota (não `--fw-green`, que é só das
+  telas de login/PIN — achado lendo o próprio uso do app antes de
+  inventar cor nova). **Exceção semântica**: crachá de pendência
+  visível (Fila, o pontinho de update no Config) puxa a cor para
+  `--luz-cor-alerta` — detecção genérica por 3 nomes de classe de
+  badge conhecidos (`.pill-badge`/`.bio-pill-badge`/`.fm-badge`),
+  nenhuma tela precisa marcar nada.
+- **Empilhamento**: a luz é `z-index:1` DENTRO da barra; os botões
+  sobem para `z-index:2` só quando `.tem-luz` está presente (gate que
+  também é a degradação em silêncio — sem o módulo carregado, nenhum
+  z-index novo entra e a barra funciona exatamente como antes). O
+  crachá, filho do botão, herda a camada de cima de graça — não
+  precisou de z-index próprio.
+- **Arrastar a luz pela barra**: solta imantada na aba mais próxima
+  via `.click()` no botão — nunca reimplementa o que aquele clique
+  faz. ⚠️ **Achado testando, não suposto, dois bugs reais**: (1) um
+  toque comum já É um `pointerdown`+`pointerup` (é assim que o
+  navegador gera o `click` nativo) — sem um limiar de movimento
+  (6px), TODO toque também disparava a lógica de arrasto, com
+  `.click()` sintético por cima do clique nativo que ia acontecer de
+  qualquer jeito; (2) `setPointerCapture` chamado já no `pointerdown`
+  (antes de saber se ia virar arrasto de verdade) redireciona o ALVO
+  do `pointerup`/`click` sintetizado para a `nav` em vez do botão — o
+  clique comum PARAVA DE NAVEGAR, em silêncio, porque
+  `ev.target.closest('button')` no listener de clique da página
+  passava a ver a nav como alvo. As duas correções: só marcar
+  `arrastando` (e só capturar o ponteiro) depois que o movimento
+  passa do limiar; um toque parado nunca chama nada além do que já
+  chamava.
+- **A chamada explícita de `luzNavMontar` NUNCA também sincroniza
+  quando a barra já está montada** — outro bug real pego pelo teste:
+  chamar `sincronizar()` ali TAMBÉM, além de deixar o
+  `MutationObserver` interno entregar a mesma mutação, gravava
+  `ultimoAtivo = destino` antes do observer rodar; quando o observer
+  entregava a mesma troca de classe logo depois, via `ultimoAtivo ===
+  ativo` e interpretava como "nada mudou" — o voo era cancelado antes
+  do 1º quadro, sempre. `religar()` com o nó já certo não faz nada; só
+  a 1ª montagem (ou o Frota recriando a barra do zero) sincroniza.
+- **Só o Frota precisa da chamada explícita depois do 1º boot** — é o
+  único app que RECRIA a `<nav>` inteira (troca de modo:
+  motorista/gestor/solicitante), então `montarBarraNav(modo)` chama
+  `luzNavMontar('.fm-pill-nav')` de novo a cada troca; a função é
+  idempotente e religa sozinha no nó novo.
+- **Peso do traço segue o ALONGAMENTO, não a velocidade** — mesma
+  razão da cauda: a velocidade da cabeça passa por zero no
+  sobrepasso, e um peso preso a ela afinaria o traço bem no meio do
+  voo. O CSS do vídeo de referência liga a `--speed`, mas o
+  COMENTÁRIO ao lado já explicava pelo alongamento — a implementação
+  segue o comentário.
+- **Contraste do rótulo inativo subiu de `.45`/`.5` para `.62`** nas
+  4 barras, na mesma entrega (pedido explícito do usuário, registrado
+  já na proposta) — `rgba(255,255,255,.45)` sobre `#0A1A0F` media
+  ≈3,4:1, abaixo do mínimo de 4,5:1 para texto de 9px.
+- Guarda: `tests/luz-nav.test.js` (12 testes) +
+  `tests/fixtures/luz-nav-harness.html` (3 barras com a geometria
+  real dos 4 apps — página vazia dedicada, mesmo motivo do
+  `pin-baralho-harness.html`: as páginas reais declaram `let db`
+  próprio e colidem). Os 12 cobrem a regra central (nunca forma
+  aberta, amostrado quadro a quadro), o bastão abrindo de verdade, o
+  peso engrossando, empilhamento (z-index + pixel do crachá), zero
+  `transform` em ancestral, clique funcionando com a luz em voo,
+  arrasto com solta imantada, cor não vazando entre 2 barras na mesma
+  página, degradação em silêncio, `reduzir movimento`, raio
+  acompanhando botões de tamanho diferente (Frota) e sobrevivência à
+  barra sendo recriada do zero. `tests/frota-app-barra.test.js` (14,
+  página real) e as suítes de Água/Biomonitor com página real
+  (`agua-app-fluxo.test.js`, `biomonitor-login.test.js`) continuam
+  passando sem alteração — confirma que a integração não regrediu o
+  que já existia.
+- `pwa/sw.js`: brigadas 270→271, biomonitor 43→44, frota 106→107,
+  agua 34→35 (`js/luz-nav.js` + `css/luz-nav.css` nos 4 shells — os 4
+  apps tocados na mesma entrega). Os 4 `build-www.mjs` nativos
+  atualizados em paralelo (Biomonitor/Água transpilam para ES2017;
+  Frota deriva a lista de sanidade de `ARQUIVOS_JS`/`ARQUIVOS_CSS`,
+  só duas linhas mudaram lá).
+
 ## Passageiros da viagem (migration 235)
 O que era texto livre (`frota_viagens.lista_passageiros`, migration
 184 — "um nome por linha") virou registro estruturado: tabela

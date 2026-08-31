@@ -15,6 +15,7 @@
   <link rel="stylesheet" href="/css/pin-baralho.css">
   <link rel="stylesheet" href="/css/avatar-foto.css">
   <link rel="stylesheet" href="/css/guia-app.css">
+  <link rel="stylesheet" href="/css/luz-nav.css">
   <style>
     /* Divisor de seção dentro do formulário de coleta — não existe em
        css/agua-app.css (molde de brigada.css, que não tinha esse
@@ -591,6 +592,7 @@ const _aguaReady = _dbReady.then(function () {
 <script src="/js/agua-alertas.js"></script>
 <script src="/js/agua-rio.js"></script>
 <script src="/js/pin-baralho.js"></script>
+<script src="/js/luz-nav.js"></script>
 <!-- Detalhe da coleta (Histórico) → exportar ficha em PDF: mesmo motor
      jsPDF do relatório por bacia (Fase 5) e o mesmo compartilhamento em
      3 camadas do Biomonitor. jsPDF/autotable em si são carregados sob
@@ -766,6 +768,7 @@ function mostrarTela(id, empurrar = true) {
   document.querySelectorAll('.pill-btn').forEach(b => {
     b.classList.toggle('ativa', b.dataset.tela === id)
   })
+  if (typeof luzNavMontar === 'function') luzNavMontar('.pill-nav')
 
   if (id === 'tela-fila')      carregarFila()
   if (id === 'tela-config')    carregarConfig()

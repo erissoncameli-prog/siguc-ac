@@ -1,0 +1,44 @@
+/* ── css/luz-nav.css — anel/bastão da barra de navegação ───────
+   Fonte única do DESENHO (traço, halo, empilhamento) para as 4
+   barras de campo (.pill-nav, .bio-pill-nav, .fm-pill-nav). O
+   movimento vive em js/luz-nav.js. Ver "Regra do sistema —
+   anel/bastão da barra de navegação" no CLAUDE.md.
+
+   A cor de cada app entra como FALLBACK do var(), nunca como
+   declaração aqui — mesma armadilha já documentada em
+   css/pin-baralho.css: declarar --luz-cor neste arquivo venceria o
+   valor de cada barra e pintaria os 4 apps da mesma cor. */
+
+.luz-nav-svg {
+  position: absolute; inset: 0; z-index: 1;
+  overflow: visible; pointer-events: none;
+  opacity: 0; transition: opacity .15s ease;
+}
+.luz-nav-nucleo { fill: none; }
+.luz-nav-halo   { fill: none; filter: blur(4px); opacity: .55; }
+
+/* Os botões da barra precisam ficar ACIMA da luz — sem isso o traço
+   pintaria por cima do ícone/rótulo em vez de circundar por trás
+   deles. `position:relative` já existe nos 3 seletores (crachá de
+   fila); só falta o z-index, que também garante que o crachá (filho
+   do botão) fique acima da luz sem precisar de regra própria — o
+   botão inteiro já forma uma camada acima dela. */
+.pill-nav.tem-luz .pill-btn,
+.bio-pill-nav.tem-luz .bio-pill-btn,
+.fm-pill-nav.tem-luz .fm-pill-btn {
+  z-index: 2;
+}
+
+/* Suprime o preenchimento translúcido antigo só quando o anel está
+   ativo — sem o módulo carregado (falha de rede, cache antigo), a
+   barra continua exatamente como antes: degradação em silêncio. */
+.pill-nav.tem-luz .pill-btn.ativa,
+.bio-pill-nav.tem-luz .bio-pill-btn.ativa,
+.fm-pill-nav.tem-luz .fm-pill-btn.ativa {
+  background: transparent;
+  color: var(--luz-cor, #52B788);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .luz-nav-svg { transition: none; }
+}

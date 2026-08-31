@@ -35,7 +35,7 @@ mkdirSync(join(WWW, 'js'),           { recursive: true })
 mkdirSync(join(WWW, 'vendor/fonts'), { recursive: true })
 
 // ── JS compartilhado (transpilado para ES2017) ────────────────
-for (const f of ['config.js', 'fotos-privadas.js', 'avatar-foto.js', 'pin-baralho.js', 'lgpd.js', 'lgpd-campo.js', 'qrcode-generator.js', 'guia-app.js', 'biomonitor-guias.js', 'biomonitor-offline.js', 'biomonitor-sync.js', 'biomonitor-alertas.js', 'brigada-captura.js', 'biomonitor-timeline.js', 'biomonitor-pdf-fonts.js', 'relatorio-cabecalho-pdf.js', 'biomonitor-relatorio-ninho.js', 'compartilhar-arquivo.js', 'biomonitor-relatorio-campo.js', 'biomonitor-equipamentos.js', 'biomonitor-quelonios.js']) {
+for (const f of ['config.js', 'fotos-privadas.js', 'avatar-foto.js', 'pin-baralho.js', 'luz-nav.js', 'lgpd.js', 'lgpd-campo.js', 'qrcode-generator.js', 'guia-app.js', 'biomonitor-guias.js', 'biomonitor-offline.js', 'biomonitor-sync.js', 'biomonitor-alertas.js', 'brigada-captura.js', 'biomonitor-timeline.js', 'biomonitor-pdf-fonts.js', 'relatorio-cabecalho-pdf.js', 'biomonitor-relatorio-ninho.js', 'compartilhar-arquivo.js', 'biomonitor-relatorio-campo.js', 'biomonitor-equipamentos.js', 'biomonitor-quelonios.js']) {
   copiarJsTranspilado(join(RAIZ, 'js', f), join(WWW, 'js', f))
 }
 
@@ -50,6 +50,7 @@ writeFileSync(join(WWW, 'css', 'biomonitor.css'), css)
 cpSync(join(RAIZ, 'css', 'avatar-foto.css'), join(WWW, 'css', 'avatar-foto.css'))
 cpSync(join(RAIZ, 'css', 'pin-baralho.css'), join(WWW, 'css', 'pin-baralho.css'))
 cpSync(join(RAIZ, 'css', 'guia-app.css'), join(WWW, 'css', 'guia-app.css'))
+cpSync(join(RAIZ, 'css', 'luz-nav.css'), join(WWW, 'css', 'luz-nav.css'))
 
 // ── Vendor: Supabase UMD (transpilado para ES2017) + fontes ────
 copiarJsTranspilado(join(APP, 'node_modules/@supabase/supabase-js/dist/umd/supabase.js'), join(WWW, 'vendor/supabase.js'))
@@ -132,7 +133,7 @@ html = html.replace('</head>', `<script>window.__SIGUC_ENV=${envJson}</script>\n
 writeFileSync(join(WWW, 'index.html'), html)
 
 // ── Sanidade ───────────────────────────────────────────────────
-for (const f of ['index.html', 'vendor/supabase.js', 'vendor/fonts.css', 'css/biomonitor.css', 'css/avatar-foto.css', 'css/pin-baralho.css', 'css/guia-app.css', 'js/config.js', 'js/fotos-privadas.js', 'js/avatar-foto.js', 'js/pin-baralho.js', 'js/lgpd.js', 'js/lgpd-campo.js', 'js/qrcode-generator.js', 'js/guia-app.js', 'js/biomonitor-guias.js', 'js/biomonitor-timeline.js', 'js/biomonitor-pdf-fonts.js', 'js/relatorio-cabecalho-pdf.js', 'js/biomonitor-relatorio-ninho.js', 'js/compartilhar-arquivo.js', 'js/biomonitor-relatorio-campo.js', 'js/biomonitor-equipamentos.js', 'js/biomonitor-quelonios.js', 'pwa/icons/biomonitor-logo.png']) {
+for (const f of ['index.html', 'vendor/supabase.js', 'vendor/fonts.css', 'css/biomonitor.css', 'css/avatar-foto.css', 'css/pin-baralho.css', 'css/guia-app.css', 'css/luz-nav.css', 'js/config.js', 'js/fotos-privadas.js', 'js/avatar-foto.js', 'js/pin-baralho.js', 'js/luz-nav.js', 'js/lgpd.js', 'js/lgpd-campo.js', 'js/qrcode-generator.js', 'js/guia-app.js', 'js/biomonitor-guias.js', 'js/biomonitor-timeline.js', 'js/biomonitor-pdf-fonts.js', 'js/relatorio-cabecalho-pdf.js', 'js/biomonitor-relatorio-ninho.js', 'js/compartilhar-arquivo.js', 'js/biomonitor-relatorio-campo.js', 'js/biomonitor-equipamentos.js', 'js/biomonitor-quelonios.js', 'pwa/icons/biomonitor-logo.png']) {
   if (!existsSync(join(WWW, f))) { console.error(`ERRO: faltando www/${f}`); process.exit(1) }
 }
 const indexFinal = readFileSync(join(WWW, 'index.html'), 'utf8')
@@ -159,7 +160,7 @@ if (!/window\.__SIGUC_ENV=\{.*supabaseUrl.*supabaseKey/.test(indexFinal)) {
 // quebravam o supabase.js em WebViews < 85. São sinais confiáveis (não
 // aparecem em strings do app), então servem de trava contra regressão do
 // alvo de transpilação. O esbuild também baixa ?. e ?? (ES2020) no mesmo passo.
-for (const f of ['vendor/supabase.js', 'js/config.js', 'js/fotos-privadas.js', 'js/avatar-foto.js', 'js/pin-baralho.js', 'js/lgpd.js', 'js/lgpd-campo.js', 'js/qrcode-generator.js', 'js/guia-app.js', 'js/biomonitor-guias.js', 'js/biomonitor-quelonios.js', 'js/biomonitor-sync.js', 'js/biomonitor-offline.js', 'js/biomonitor-alertas.js', 'js/brigada-captura.js', 'js/biomonitor-timeline.js', 'js/biomonitor-pdf-fonts.js', 'js/relatorio-cabecalho-pdf.js', 'js/biomonitor-relatorio-ninho.js', 'js/compartilhar-arquivo.js', 'js/biomonitor-relatorio-campo.js', 'js/biomonitor-equipamentos.js']) {
+for (const f of ['vendor/supabase.js', 'js/config.js', 'js/fotos-privadas.js', 'js/avatar-foto.js', 'js/pin-baralho.js', 'js/luz-nav.js', 'js/lgpd.js', 'js/lgpd-campo.js', 'js/qrcode-generator.js', 'js/guia-app.js', 'js/biomonitor-guias.js', 'js/biomonitor-quelonios.js', 'js/biomonitor-sync.js', 'js/biomonitor-offline.js', 'js/biomonitor-alertas.js', 'js/brigada-captura.js', 'js/biomonitor-timeline.js', 'js/biomonitor-pdf-fonts.js', 'js/relatorio-cabecalho-pdf.js', 'js/biomonitor-relatorio-ninho.js', 'js/compartilhar-arquivo.js', 'js/biomonitor-relatorio-campo.js', 'js/biomonitor-equipamentos.js']) {
   const js = readFileSync(join(WWW, f), 'utf8')
   const proibidos = js.match(/\|\|=|&&=|\?\?=/g)
   if (proibidos) {
