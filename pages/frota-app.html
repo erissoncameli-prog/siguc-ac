@@ -1010,20 +1010,77 @@ function montarShellMotorista() {
   carregarLogosFaixaMotorista()
 }
 
+function renderFaixaLogosMotorista(c) {
+  const aplicar = (sel, url) => {
+    if (!url) return
+    document.querySelectorAll(sel).forEach(chip => {
+      chip.querySelector('img').src = url
+      chip.hidden = false
+    })
+  }
+  aplicar('.fm-logo-chip.gov', c?.gov)
+  aplicar('.fm-logo-chip.sec', c?.sec)
+}
+
+// Converte a logo colorida em versão branca (knockout) para a faixa
+// escura: fundo claro vira transparente e o desenho vira silhueta
+// branca com alfa proporcional à "tinta" do pixel. Mesma função de
+// pages/brigada.html, js/biomonitor-quelonios.js e pages/agua-app.html
+// — nunca uma quarta implementação.
+async function logoParaBranco(blob) {
+  const img = new Image()
+  const url = URL.createObjectURL(blob)
+  await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = url })
+  const c = document.createElement('canvas')
+  c.width = img.naturalWidth; c.height = img.naturalHeight
+  const ctx = c.getContext('2d')
+  ctx.drawImage(img, 0, 0)
+  const d = ctx.getImageData(0, 0, c.width, c.height)
+  const p = d.data
+  for (let i = 0; i < p.length; i += 4) {
+    const lum = (p[i] * 0.299 + p[i + 1] * 0.587 + p[i + 2] * 0.114) / 255
+    const tinta = (1 - lum) * (p[i + 3] / 255)
+    p[i] = p[i + 1] = p[i + 2] = 255
+    p[i + 3] = Math.round(255 * Math.min(1, tinta * 1.25))
+  }
+  ctx.putImageData(d, 0, 0)
+  URL.revokeObjectURL(url)
+  return new Promise(res => c.toBlob(b => res(b), 'image/png'))
+}
+
 async function carregarLogosFaixaMotorista() {
   try {
+    const cache = await fOfflineGetConfig('logos_cache_v2')
+    if (cache) renderFaixaLogosMotorista(cache)
+    if (!db || !navigator.onLine) return
     const { data } = await db.from('config_sistema').select('dados').eq('id', 1).single()
     const logos = data?.dados?.logos
     if (!logos) return
-    const aplicar = (sel, url) => {
-      if (!url) return
-      document.querySelectorAll(sel).forEach(chip => {
-        chip.querySelector('img').src = url
-        chip.hidden = false
-      })
+    const baixar = async url => {
+      if (!url) return null
+      const r = await fetch(url)
+      return r.ok ? await r.blob() : null
     }
-    aplicar('.fm-logo-chip.gov', logos.governo_branca_url || logos.governo_url)
-    aplicar('.fm-logo-chip.sec', logos.secretaria_branca_url || logos.secretaria_url)
+    const blobParaBase64 = blob => new Promise((res, rej) => {
+      const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = rej; fr.readAsDataURL(blob)
+    })
+    // Se houver versão branca oficial na config, usa direto; senão
+    // baixa a colorida e gera o knockout branco no aparelho.
+    const preparar = async (urlBranca, urlColorida) => {
+      const oficial = await baixar(urlBranca)
+      if (oficial) return await blobParaBase64(oficial)
+      const colorida = await baixar(urlColorida)
+      if (!colorida) return null
+      return await blobParaBase64(await logoParaBranco(colorida))
+    }
+    const novo = {
+      gov: await preparar(logos.governo_branca_url,    logos.governo_url),
+      sec: await preparar(logos.secretaria_branca_url, logos.secretaria_url),
+    }
+    if (novo.gov || novo.sec) {
+      await fOfflineSetConfig('logos_cache_v2', novo)
+      renderFaixaLogosMotorista(novo)
+    }
   } catch (e) { console.warn('[frota-app] logos', e) }
 }
 
@@ -4544,7 +4601,13 @@ if ('serviceWorker' in navigator && !fEhAppNativoFrota()) {
   font-family: 'DM Sans', sans-serif; padding: 6px 12px; border-radius: 20px; margin-bottom: 10px;
 }
 .fm-voltar-btn svg { width: 14px; height: 14px; stroke: currentColor; }
-.fm-logo-chip { max-width: 140px; height: 38px; display: flex; align-items: center; }
+/* Mesma proporção da faixa institucional dos outros 3 apps de campo
+   (Água/Brigadas/Biomonitor): um único tamanho em toda tela do app, e
+   o brasão maior que a SEMA de propósito — tem bastante traço fino e
+   margem interna no próprio arquivo, então precisa de mais espaço
+   para pesar igual ao lado do bloco cheio "SEMA". */
+.fm-logo-chip { max-width: 132px; height: 38px; display: flex; align-items: center; }
+.fm-logo-chip.gov { max-width: 165px; height: 48px; }
 .fm-logo-chip img { width: 100%; height: 100%; object-fit: contain; display: block; filter: drop-shadow(0 1px 3px rgba(0,0,0,.3)); }
 .fm-conteudo {
   flex: 1; padding: 16px; padding-bottom: 112px;

@@ -1400,17 +1400,16 @@ function mascoteVideoFechar() {
 
 // ── Faixa institucional nas demais abas (mesma identidade da home) ─
 function inserirFaixasInst() {
-  const faixa = compacta => `
-    <div class="faixa-inst${compacta ? ' compacta' : ''}">
+  const faixa = `
+    <div class="faixa-inst">
       <div class="faixa-logos">
         <span class="faixa-logo-chip gov" hidden><img alt="Governo do Acre"></span>
         <span class="faixa-logo-chip sec" hidden><img alt="SEMA-AC"></span>
       </div>
       <img class="faixa-mascote" src="/pwa/icons/mascote.png" alt="Brigadistas Comunitários — SEMA">
     </div>`
-  ;[['tela-fila', false], ['tela-dados', false], ['tela-config', false],
-    ['tela-form', true], ['tela-fauna', true]].forEach(([id, compacta]) => {
-    document.getElementById(id)?.insertAdjacentHTML('afterbegin', faixa(compacta))
+  ;['tela-fila', 'tela-dados', 'tela-config', 'tela-form', 'tela-fauna'].forEach(id => {
+    document.getElementById(id)?.insertAdjacentHTML('afterbegin', faixa)
   })
 }
 
