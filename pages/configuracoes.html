@@ -683,8 +683,8 @@ function abrirMarcarRevisaoLgpd(){
 // PAINEL DE ARMAZENAMENTO NA NUVEM
 // ══════════════════════════════════════════════════════
 
-const _ARM_DB_LIMITE    = 500  * 1024 * 1024;  // 500 MB — plano free
-const _ARM_ST_LIMITE    = 1024 * 1024 * 1024;  // 1 GB  — plano free
+const _ARM_DB_LIMITE    = 8    * 1024 * 1024 * 1024;  // 8 GB   — plano Pro Supabase
+const _ARM_ST_LIMITE    = 100  * 1024 * 1024 * 1024;  // 100 GB — plano Pro Supabase
 let   _armCache         = null;
 
 // Mapeamento de tabelas → categorias visuais
@@ -830,7 +830,7 @@ function _renderArmazenamento(dados){
       </div>
     </div>
     <div style="font-size:10px;color:var(--cinza-400);padding-top:4px;border-top:1px solid var(--cinza-100)">
-      Plano Free Supabase · 500 MB banco · 1 GB storage
+      Plano Pro Supabase · 8 GB banco · 100 GB storage
     </div>`;
 
   // ── Lista de categorias do banco ─────────────────────────────────
