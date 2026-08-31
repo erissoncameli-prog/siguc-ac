@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8">
+<title>Harness do anel/bastão da barra de navegação</title>
+<!--
+  Página vazia dedicada, como o pin-baralho-harness.html: nenhuma das
+  4 páginas reais serve de base — todas declaram seu próprio `let db`
+  no escopo global e carregam o app inteiro. O módulo não depende de
+  config.js nem de Supabase.
+
+  Três barras, com a estrutura e as classes REAIS das 4 páginas:
+  - #nav-a: molde .pill-nav (Brigadas/Água) — 5 botões, um deles
+    ação (câmera, sem data-tela) e um com crachá de pendência (Fila).
+  - #nav-b: mesmo molde, cor DIFERENTE — prova que --luz-cor não vaza
+    entre barras montadas na mesma página.
+  - #nav-c: molde .fm-pill-nav (Frota) — botões de 48px + uma aba
+    "primária" de 56px, prova que o raio do anel acompanha o botão.
+-->
+<link rel="stylesheet" href="/css/luz-nav.css">
+<style>
+  body { background: #0A1A0F; margin: 0; padding: 40px; display: flex; flex-direction: column; gap: 40px; }
+
+  /* ── molde .pill-nav (Brigadas/Água), medidas reais ── */
+  .pill-nav {
+    position: relative; width: fit-content;
+    background: #0F1A13; border-radius: 32px; height: 64px; padding: 0 12px;
+    display: flex; align-items: center; gap: 4px;
+  }
+  .pill-btn {
+    position: relative; width: 52px; height: 52px; border-radius: 50%;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    border: none; background: transparent; cursor: pointer;
+    color: rgba(255,255,255,.62); gap: 2px; font-size: 9px;
+  }
+  .pill-btn.ativa { background: rgba(255,255,255,.12); color: #fff; }
+  .pill-badge {
+    position: absolute; top: 2px; right: 2px;
+    min-width: 16px; height: 16px; border-radius: 8px;
+    background: #EF5B3C; color: #fff; font-size: 10px; font-weight: 700;
+    text-align: center; line-height: 16px; padding: 0 4px;
+  }
+  #nav-a { --luz-cor: #7BE0AE; --luz-cor-alerta: #E0A227; }
+  #nav-b { --luz-cor: #7DD3FC; --luz-cor-alerta: #E0A227; }
+
+  /* ── molde .fm-pill-nav (Frota) — botões menores + primária maior ── */
+  .fm-pill-nav {
+    position: relative; width: fit-content;
+    background: #0A1A0F; border-radius: 32px; height: 64px; padding: 0 8px;
+    display: flex; align-items: center; gap: 3px;
+    --luz-cor: #9FE870;
+  }
+  .fm-pill-btn {
+    position: relative; width: 48px; height: 48px; border-radius: 50%;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    border: none; background: transparent; cursor: pointer;
+    color: rgba(255,255,255,.62); gap: 2px; font-size: 9px;
+  }
+  .fm-pill-btn.ativa { background: rgba(255,255,255,.14); color: #fff; }
+  .fm-pill-btn.fm-primaria { width: 56px; height: 56px; background: #52B788; color: #0A1A0F; margin: 0 4px; }
+  .fm-pill-btn.fm-primaria.ativa { background: #6FCB9F; }
+
+  /* ancestral de teste — precisa continuar SEM transform depois de
+     montar o módulo (a armadilha documentada no CLAUDE.md) */
+  .ancestral-limpo { padding: 4px; }
+</style>
+</head><body>
+
+<div class="ancestral-limpo">
+  <nav class="pill-nav" id="nav-a">
+    <button class="pill-btn ativa" data-tela="tela-home">
+      <svg width="22" height="22" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/></svg>
+      <span>Início</span>
+    </button>
+    <button class="pill-btn" data-nat-form>
+      <svg width="22" height="22" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/></svg>
+      <span>Registrar</span>
+    </button>
+    <button class="pill-btn" data-tela="tela-fila">
+      <span class="pill-badge" hidden>3</span>
+      <svg width="22" height="22" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/></svg>
+      <span>Fila</span>
+    </button>
+    <button class="pill-btn" data-tela="tela-dados">
+      <svg width="22" height="22" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/></svg>
+      <span>Dados</span>
+    </button>
+    <button class="pill-btn" data-tela="tela-config">
+      <svg width="22" height="22" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/></svg>
+      <span>Config</span>
+    </button>
+  </nav>
+</div>
+
+<nav class="pill-nav" id="nav-b">
+  <button class="pill-btn ativa" data-tela="tela-home">
+    <svg width="22" height="22" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/></svg>
+    <span>Início</span>
+  </button>
+  <button class="pill-btn" data-tela="tela-historico">
+    <svg width="22" height="22" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/></svg>
+    <span>Histórico</span>
+  </button>
+</nav>
+
+<nav class="fm-pill-nav" id="nav-c">
+  <button class="fm-pill-btn ativa" data-tab="inicio">
+    <svg width="20" height="20" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/></svg>
+    <span>Início</span>
+  </button>
+  <button class="fm-pill-btn" data-tab="solicitacoes">
+    <svg width="20" height="20" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/></svg>
+    <span>Solicit.</span>
+  </button>
+  <button class="fm-pill-btn fm-primaria" data-tab="nova">
+    <svg width="22" height="22" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/></svg>
+  </button>
+  <button class="fm-pill-btn" data-tab="historico">
+    <svg width="20" height="20" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/></svg>
+    <span>Histórico</span>
+  </button>
+</nav>
+
+<!-- barra que fica escondida (hidden) até um teste mandar mostrar —
+     prova o resync ao entrar em cena -->
+<nav class="pill-nav" id="nav-d" hidden>
+  <button class="pill-btn ativa" data-tela="tela-home">
+    <svg width="22" height="22" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/></svg>
+    <span>Início</span>
+  </button>
+  <button class="pill-btn" data-tela="tela-fila">
+    <svg width="22" height="22" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/></svg>
+    <span>Fila</span>
+  </button>
+</nav>
+
+<!-- host que simula o fm-nav-host do Frota: barra recriada do zero -->
+<div id="host-recriavel"></div>
+
+<script src="/js/luz-nav.js"></script>
+<script>
+  // Mesma função central que as 4 páginas já têm — o clique troca
+  // a classe .ativa e chama luzNavMontar, exatamente como
+  // mostrarTela/bioMostrarTela/fmMarcarAbaAtiva fazem.
+  // Mesmo comportamento das 4 páginas reais: só um botão de ABA
+  // (data-tela/data-tab) mexe em .ativa. O botão de ação (câmera,
+  // data-nat-form) tem handler PRÓPRIO que não toca a navegação —
+  // aqui só um no-op, mas sem tocar a classe, como o app de verdade.
+  document.querySelectorAll('.pill-nav, .fm-pill-nav').forEach(nav => {
+    nav.addEventListener('click', ev => {
+      const btn = ev.target.closest('button')
+      if (!btn) return
+      const chaveAba = btn.dataset.tela ? 'data-tela' : (btn.dataset.tab !== undefined ? 'data-tab' : null)
+      if (!chaveAba) return   // botão de ação — não é aba, não muda .ativa
+      const grupo = btn.classList.contains('fm-pill-btn') ? '.fm-pill-btn' : '.pill-btn'
+      nav.querySelectorAll(grupo).forEach(b => b.classList.remove('ativa'))
+      btn.classList.add('ativa')
+      if (typeof luzNavMontar === 'function') luzNavMontar('#' + nav.id)
+    })
+  })
+
+  // Simula o Frota: recria a barra inteira do zero num host vazio,
+  // sempre pela MESMA classe (nunca por id, que muda a cada recriação)
+  // — é o padrão de montarBarraNav(modo) em pages/frota-app.html.
+  window.recriarBarra = function (aba) {
+    document.getElementById('host-recriavel').innerHTML =
+      '<nav class="recriavel-nav fm-pill-nav">' +
+      '<button class="fm-pill-btn' + (aba === 'inicio' ? ' ativa' : '') + '" data-tab="inicio"><span>Início</span></button>' +
+      '<button class="fm-pill-btn' + (aba === 'dados' ? ' ativa' : '') + '" data-tab="dados"><span>Dados</span></button>' +
+      '</nav>'
+    if (typeof luzNavMontar === 'function') luzNavMontar('.recriavel-nav')
+  }
+  window.limparBarraRecriavel = function () {
+    document.getElementById('host-recriavel').innerHTML = ''
+    if (typeof luzNavMontar === 'function') luzNavMontar('.recriavel-nav')
+  }
+</script>
+</body></html>

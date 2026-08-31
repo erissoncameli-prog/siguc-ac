@@ -134,6 +134,7 @@ function bioMostrarTela(id) {
   document.querySelectorAll('.bio-pill-btn').forEach(b => b.classList.remove('ativa'))
   const navId = mapa[id]
   if (navId) document.getElementById(navId)?.classList.add('ativa')
+  if (typeof luzNavMontar === 'function') luzNavMontar('.bio-pill-nav')
 
   // Oculta nav e faixa em telas de autenticação
   const lockTelas = ['tela-login', 'tela-trocar-senha', 'tela-config-pin', 'tela-bloqueio']

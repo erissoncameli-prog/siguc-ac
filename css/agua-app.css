@@ -901,13 +901,17 @@ body { margin: 0; }
   height: var(--nav-h); padding: 0 12px;
   display: flex; align-items: center; gap: 4px;
   box-shadow: 0 8px 32px rgba(0,0,0,.4); z-index: 1000;
+  /* cor do anel/bastão (js/luz-nav.js + css/luz-nav.css) — o mesmo
+     ciano suave já usado no resto do app, nunca uma cor nova */
+  --luz-cor: var(--soft);
+  --luz-cor-alerta: var(--alerta);
 }
 .pill-btn {
   position: relative;
   width: 52px; height: 52px; border-radius: 50%;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   border: none; background: transparent; cursor: pointer;
-  color: rgba(255,255,255,.45); gap: 2px;
+  color: rgba(255,255,255,.62); gap: 2px;
   transition: background .15s, color .15s, transform .18s var(--spring);
   -webkit-tap-highlight-color: transparent;
   font-family: var(--font-ui); font-size: 9px; font-weight: 500;
