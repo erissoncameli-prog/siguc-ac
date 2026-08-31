@@ -687,7 +687,7 @@ body { margin: 0; }
   width: 100%; max-width: 132px; height: 38px;
   display: flex; align-items: center; justify-content: center;
 }
-.faixa-logo-chip.gov { grid-column: 1; justify-self: start; max-width: 165px; height: 48px; }
+.faixa-logo-chip.gov { grid-column: 1; justify-self: start; max-width: 297px; height: 86px; }
 .faixa-logo-chip.sec { grid-column: 3; justify-self: end; }
 .faixa-logo-chip img {
   width: 100%; height: 100%; object-fit: contain; display: block;
