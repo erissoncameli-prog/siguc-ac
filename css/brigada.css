@@ -657,7 +657,12 @@ body { margin: 0; }
   align-items: center; min-height: 44px;
 }
 .faixa-logo-chip {
-  /* logos brancas direto sobre a faixa — sem chip de fundo */
+  /* logos brancas direto sobre a faixa — sem chip de fundo. Um único
+     tamanho para toda tela do app, nunca uma variante "compacta" por
+     tela (era o caso antes — ver histórico no CLAUDE.md). Gov maior
+     que sec é proposital: o brasão tem bastante traço fino/margem
+     interna no próprio arquivo, então precisa de mais espaço para
+     pesar igual ao lado do bloco cheio "SEMA". */
   width: 100%; max-width: 132px; height: 38px;
   display: flex; align-items: center; justify-content: center;
 }
@@ -675,14 +680,6 @@ body { margin: 0; }
   border-radius: 50%;
   filter: drop-shadow(0 4px 10px rgba(10,26,15,.35));
 }
-
-/* Variante compacta: telas de tarefa (formulário/fauna) — mesma
-   identidade, ocupando menos espaço vertical */
-.faixa-inst.compacta { padding: calc(8px + env(safe-area-inset-top)) 16px 8px; margin-bottom: 32px; }
-.faixa-inst.compacta .faixa-logos { min-height: 32px; grid-template-columns: 1fr 64px 1fr; }
-.faixa-inst.compacta .faixa-logo-chip { height: 28px; max-width: 104px; }
-.faixa-inst.compacta .faixa-logo-chip.gov { height: 34px; max-width: 124px; }
-.faixa-inst.compacta .faixa-mascote { width: 58px; height: 58px; bottom: -26px; }
 
 /* Mascote nas telas de login/bloqueio/PIN */
 .lock-mascote { width: 84px; height: 84px; border-radius: 50%; }
