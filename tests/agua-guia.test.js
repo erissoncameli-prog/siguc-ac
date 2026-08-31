@@ -428,3 +428,17 @@ test('modo treinamento: faixa com ícone/texto reforçados e moldura na tela int
 
   await page.evaluate(async () => { window.confirm = () => true; await agDefinirModoTreino(false); });
 });
+
+test('botão "Sair" da faixa de treino tem alvo de toque confortável (bem acima do mínimo de 24px)', async ({ page }) => {
+  await abrirApp(page);
+  await entrarHomeDeTeste(page);
+  await page.evaluate(async () => { await agDefinirModoTreino(true) });
+
+  const box = await page.locator('#btn-treino-sair').boundingBox();
+  expect(box.height).toBeGreaterThanOrEqual(34);
+  expect(box.width).toBeGreaterThanOrEqual(34);
+
+  await page.evaluate(() => { window.confirm = () => true; });
+  await page.locator('#btn-treino-sair').click();
+  await expect(page.locator('#treino-faixa')).toBeHidden();
+});

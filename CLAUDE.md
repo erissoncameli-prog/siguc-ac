@@ -3504,6 +3504,22 @@ correções entraram no motor compartilhado (`js/guia-app.js` +
   `css/guia-app.css` mudaram — já estavam nos dois shells, nenhuma
   lista nova).
 
+**Pós-lançamento — botão "Sair" do modo treinamento maior e mais
+contrastado.** Relato real do usuário testando em produção: o botão
+"Sair" da faixa era pequeno (26px, fundo quase transparente) demais
+sobre o fundo já listrado, difícil de mirar e de enxergar como
+clicável. Correção no motor compartilhado: `.treino-faixa-sair`
+(`css/guia-app.css`) — alvo de toque 36px (bem acima do mínimo de
+24px do projeto), fundo sólido `rgba(0,0,0,.34)` em vez de `.2`, ícone
+de X junto do texto "Sair" (mais área clicável sem precisar de texto
+maior). Cada app só define a COR do botão (a de alerta diverge pouco
+entre eles); formato/tamanho é regra única, mesma lição do ícone/texto
+da faixa. A faixa cresceu de 46px para 54px pra acomodar o botão maior
+sem espremer — as 4 reservas de `padding-top` (`.tela`/`.bio-tela` nas
+duas apps + a extra do `#tela-home` do Biomonitor) subiram junto.
+Guarda: +1 teste por app (`boundingBox()` do botão ≥34×34px, clique de
+verdade desliga a faixa). `pwa/sw.js`: agua 34 → 35, biomonitor 43 → 44.
+
 ## Regra do sistema — identidade do monitor no app Biomonitor (migration 323)
 Quem autentica é `monitores_biodiversidade.usuario_id` → `auth.users`.
 `monitores_biodiversidade.email` é só CADASTRO: editá-lo NÃO troca o

@@ -174,6 +174,28 @@
   .treino-faixa-icone { animation: none; }
 }
 
+/* ── Botão "Sair" da faixa de treino — parte compartilhada ──────
+   Achado real do usuário: botão pequeno (26px, fundo quase
+   transparente) sobre um fundo listrado é difícil de mirar e de
+   enxergar. Alvo de toque ampliado bem acima do mínimo de 24px do
+   projeto, fundo mais opaco pra contrastar com as listras, e ícone +
+   texto pra aumentar a área clicável sem precisar de mais largura de
+   texto. Cor de fundo continua vindo do `button` de cada app (a cor
+   de alerta diverge pouco entre eles) — só o formato/tamanho é regra
+   única aqui, mesma lição do ícone/texto da faixa. */
+.treino-faixa-sair {
+  flex: 0 0 auto;
+  display: inline-flex; align-items: center; gap: 6px;
+  min-height: 36px; min-width: 36px;
+  padding: 8px 16px;
+  border: 0; border-radius: 999px;
+  font: inherit; font-size: 12.5px; font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, .22);
+}
+.treino-faixa-sair svg { width: 15px; height: 15px; flex-shrink: 0; }
+.treino-faixa-sair:active { transform: scale(.95); }
+
 /* ── Botão flutuante de ajuda ─────────────────────────────────── */
 .guia-fab {
   position: fixed;
