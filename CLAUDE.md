@@ -3520,6 +3520,45 @@ duas apps + a extra do `#tela-home` do Biomonitor) subiram junto.
 Guarda: +1 teste por app (`boundingBox()` do botão ≥34×34px, clique de
 verdade desliga a faixa). `pwa/sw.js`: agua 34 → 35, biomonitor 43 → 44.
 
+**Pós-lançamento — bug real: `env(safe-area-inset-top)` no padding
+ERRADO, faixa colada atrás do relógio do Android.** Segundo relato do
+mesmo usuário, com screenshot: o ícone/texto/botão da faixa nasciam a
+9px do topo FÍSICO da tela, atrás do relógio e dos ícones de
+sinal/bateria do Android. Causa raiz, não suposição: `padding: 9px
+14px calc(9px + env(safe-area-inset-top, 0px))` é shorthand de TRÊS
+valores (`top | left-right | bottom`) — a correção de notch tinha ido
+pro padding de BAIXO, não pro de CIMA, que é o lado que precisa de
+folga num elemento `position:fixed;top:0`. Achado ao reler o próprio
+CSS depois do screenshot, não por teste (nenhum teste media o valor
+antes, só a existência/visibilidade da faixa).
+- **Duas causas, duas correções.** Mesmo corrigindo o lado, sobrava o
+  problema de fundo: **Android não reporta `env(safe-area-inset-top)`
+  de forma confiável** mesmo em tela cheia (`viewport-fit=cover` já
+  estava lá) — o valor real observado era 0. `max(28px, calc(9px +
+  env(safe-area-inset-top, 0px)))` no padding-top resolve os dois
+  regimes: piso fixo de 28px quando o navegador devolve 0 (Android, o
+  caso medido), e cresce sozinho num notch de iOS que reporte valor
+  maior — nunca um `env()` sozinho de novo neste elemento.
+- **A reserva de espaço abaixo da faixa (`padding-top` de
+  `.tela`/`.bio-tela`) tem que espelhar a MESMA fórmula**, não um
+  número solto — senão diverge silenciosamente do que a faixa
+  realmente ocupa (sub ou sobra de espaço) toda vez que a fórmula da
+  faixa mudar. As 4 reservas (Água + as 3 do Biomonitor, que usa
+  `var(--bio-treino-h, ...)`) foram reescritas com o mesmo
+  `max(28px, calc(9px + env(...)))` mais a parte fixa de baixo/
+  conteúdo (45px), em vez de reincidir no número mágico.
+- **Conferido com `env(safe-area-inset-top)` real do Chromium**
+  (headless não simula status bar do Android, então a medida foi por
+  `getComputedStyle`, não por screenshot comparando com o relato) —
+  `paddingTop` passou de `9px` pra `28px`, altura total da faixa 73px.
+- Guarda: +1 teste por app trava `paddingTop >= 28` mesmo com
+  `env(safe-area-inset-top)` em 0 (que é como o Chromium do CI sempre
+  reporta, então o piso é o que garante a passagem — sem o `max()` o
+  teste reprovaria).
+- `pwa/sw.js`: agua 35 → 41, biomonitor 44 → 47 (números pulam porque
+  outra sessão mesclou 6 PRs de faixa institucional/nav no meio —
+  version bump combinado no merge, não perdido).
+
 ## Regra do sistema — identidade do monitor no app Biomonitor (migration 323)
 Quem autentica é `monitores_biodiversidade.usuario_id` → `auth.users`.
 `monitores_biodiversidade.email` é só CADASTRO: editá-lo NÃO troca o
