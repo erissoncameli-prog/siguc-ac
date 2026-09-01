@@ -59,11 +59,14 @@ function contarPixelsPretos(w, h, data) {
   return pretos;
 }
 
-test('etiqueta de ninho: 30×40mm, com QR e conteúdo de verdade', async ({ page }) => {
+test('etiqueta de ninho: 30×54mm, com praia/monitor/data-hora, QR e conteúdo de verdade', async ({ page }) => {
   await abrirAppSemSessao(page);
 
   const r = await page.evaluate(() => {
-    const canvas = bioEtiquetaNinhoCriarCanvas({ numero: 'PC-TT-2026-001' });
+    const canvas = bioEtiquetaNinhoCriarCanvas({
+      numero: 'PC-TT-2026-001', praia: 'Praia Zé Paraná', monitor_nome: 'Maria Souza',
+      criado_em: '2026-06-10T08:14:00.000Z',
+    });
     const ctx = canvas.getContext('2d');
     const { data } = ctx.getImageData(0, 0, canvas.width, canvas.height);
     let pretos = 0;
@@ -73,10 +76,63 @@ test('etiqueta de ninho: 30×40mm, com QR e conteúdo de verdade', async ({ page
     return { w: canvas.width, h: canvas.height, pretos };
   });
 
-  // 30×40 mm a 203 dpi ≈ 240×320 px
+  // 30×54 mm a 203 dpi ≈ 240×432 px
   expect(r.w).toBeCloseTo(240, -1);
-  expect(r.h).toBeCloseTo(320, -1);
+  expect(r.h).toBeCloseTo(432, -1);
   expect(r.pretos).toBeGreaterThan(500);
+});
+
+test('etiqueta de ninho: praia/monitor comparecem (mais pixel preto do que sem eles)', async ({ page }) => {
+  await abrirAppSemSessao(page);
+
+  const { comDados, semDados } = await page.evaluate(() => {
+    function contar(dados) {
+      const canvas = bioEtiquetaNinhoCriarCanvas(dados);
+      const ctx = canvas.getContext('2d');
+      const { data } = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      let p = 0;
+      for (let i = 0; i < data.length; i += 4) if (data[i] < 50) p++;
+      return p;
+    }
+    return {
+      comDados: contar({ numero: 'PC-TT-2026-002', praia: 'Praia Zé Paraná', monitor_nome: 'Maria Souza', criado_em: '2026-06-10T08:14:00.000Z' }),
+      semDados: contar({ numero: 'PC-TT-2026-002' }),
+    };
+  });
+  expect(comDados).toBeGreaterThan(semDados);
+});
+
+test('etiqueta de ninho: nome de praia muito longo é truncado com "…", nunca vaza a largura útil', async ({ page }) => {
+  await abrirAppSemSessao(page);
+
+  // Diferente do nome do berçário (placa de 40mm, cabe 2 linhas), a
+  // etiqueta de ninho tem só 30mm: _bioEtqLinhaTruncada corta em vez de
+  // quebrar linha. Mede a LARGURA MEDIDA do texto resultante (não
+  // pixel de canvas — perto do limite, anti-aliasing do glifo sangra
+  // 1-2px além do avanço medido, o que não é "vazar a etiqueta" de
+  // verdade) contra a largura útil real da função de desenho.
+  const r = await page.evaluate(() => {
+    const canvas = document.createElement('canvas');
+    const { ctx, W, px } = etqNovoCanvas(canvas, BIO_ETIQUETA_NINHO_MM, BIO_ETIQUETA_DPI);
+    const larguraUtil = W - px(1.5) * 2;
+    const nomeLongo = 'Praia da Restinga do Igarapé Grande da Reserva Extrativista';
+    const longo = _bioEtqLinhaTruncada(ctx, `Praia: ${nomeLongo}`, larguraUtil, 'normal', 'Arial, sans-serif', px(1.7), px(1.4));
+    ctx.font = `normal ${longo.tam}px Arial, sans-serif`;
+    const larguraMedidaLongo = ctx.measureText(longo.texto).width;
+
+    const nomeCurto = 'Praia Zé Paraná';
+    const curto = _bioEtqLinhaTruncada(ctx, `Praia: ${nomeCurto}`, larguraUtil, 'normal', 'Arial, sans-serif', px(1.7), px(1.4));
+
+    return {
+      larguraUtil, larguraMedidaLongo,
+      truncouLongo: longo.texto.endsWith('…') && longo.texto.length < `Praia: ${nomeLongo}`.length,
+      truncouCurto: curto.texto.endsWith('…'),
+    };
+  });
+
+  expect(r.larguraMedidaLongo).toBeLessThanOrEqual(r.larguraUtil);
+  expect(r.truncouLongo).toBe(true);
+  expect(r.truncouCurto).toBe(false); // nome curto cabe inteiro, sem "…" à toa
 });
 
 test('etiqueta de ninho: sem número, ainda desenha algo (nunca uma tela em branco)', async ({ page }) => {
