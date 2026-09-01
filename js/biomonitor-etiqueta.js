@@ -93,10 +93,25 @@ function bioEtiquetaBercarioDesenhar(canvas, dados, opts = {}) {
   ctx.fillStyle = '#000'
   y = faixaH + px(2.5)
 
+  // Nome vem de cadastro em texto livre (sem limite de tamanho) — o
+  // auto-ajuste de fonte sozinho não basta pra nome muito comprido
+  // (achado ao testar: no tamanho mínimo, ainda vaza a largura útil).
+  // Quebra em até 2 linhas no tamanho mínimo antes de aceitar o
+  // vazamento — nunca deixa o texto sair da placa.
   const nome = dados.nome || 'Berçário'
-  const tam = etqAjustarFonte(ctx, nome, larguraUtil, 'bold', 'Arial, sans-serif', px(4.2), px(2.4))
-  ctx.fillText(nome, pad, y)
-  y += Math.round(tam * 1.3) + px(1)
+  const tamMin = px(2.4), tamMax = px(4.2)
+  const tam = etqAjustarFonte(ctx, nome, larguraUtil, 'bold', 'Arial, sans-serif', tamMax, tamMin)
+  ctx.font = `bold ${tam}px Arial, sans-serif`
+  if (ctx.measureText(nome).width <= larguraUtil) {
+    ctx.fillText(nome, pad, y)
+    y += Math.round(tam * 1.3) + px(1)
+  } else {
+    const todasLinhas = etqLinhasDeTexto(ctx, nome, larguraUtil)
+    const linhas = todasLinhas.slice(0, 2)
+    if (todasLinhas.length > 2) linhas[1] += '…'
+    linhas.forEach(l => { ctx.fillText(l, pad, y); y += Math.round(tam * 1.3) })
+    y += px(1)
+  }
 
   ctx.beginPath(); ctx.moveTo(pad, y); ctx.lineTo(W - pad, y); ctx.lineWidth = px(0.15); ctx.stroke()
   y += px(2.3)
