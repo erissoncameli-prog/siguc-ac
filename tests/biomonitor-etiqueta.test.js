@@ -207,3 +207,29 @@ test('overlay do app: ninho sem número nenhum não abre o overlay (nada pra imp
   });
   await expect(page.locator('#bio-etq-overlay')).toBeHidden();
 });
+
+test('card do ninho: 6 botões de ação (com "Etiqueta") não estouram a largura do card em tela de celular', async ({ page }) => {
+  // Relatado em produção: a barra de ações (Corrigir/+Transferência/
+  // Eclosão/Visita/Gerar PDF/Etiqueta) usava flex sem quebra de linha —
+  // com 6 botões possíveis (status_validacao='em_correcao' + status
+  // 'encontrado', o pior caso), a barra ultrapassava a largura do card
+  // numa tela estreita. Corrigido com flex-wrap: wrap.
+  await page.setViewportSize({ width: 390, height: 844 }); // largura típica de celular
+  await abrirAppSemSessao(page);
+
+  await page.evaluate(() => {
+    document.getElementById('tela-abertos').classList.add('ativa');
+    bioRenderizarListaNinhos('bio-lista-abertos', [{
+      id: 'ninho-teste-overflow', status: 'encontrado', status_validacao: 'em_correcao',
+      numero_ninho: 'PC-TT-2026-099', especie: 'tracaja', data_encontro: '2026-06-01',
+    }], true);
+  });
+
+  const card = page.locator('.bio-nfc').first();
+  await expect(card).toBeVisible();
+  const botoes = card.locator('.bio-nfc-acoes .bio-btn-sm');
+  await expect(botoes).toHaveCount(6);
+
+  const overflow = await card.evaluate(el => el.scrollWidth - el.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(1); // tolerância de arredondamento de subpixel
+});
