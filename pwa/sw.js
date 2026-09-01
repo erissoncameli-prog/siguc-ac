@@ -131,6 +131,7 @@ const SHELLS = {
     '/js/agua-guias.js',
     '/js/agua-offline.js',
     '/js/agua-sync.js',
+    '/js/etiqueta-termica.js',
     '/js/agua-etiqueta.js',
     '/js/brigada-captura.js',
     '/js/grafico-teclado.js',
