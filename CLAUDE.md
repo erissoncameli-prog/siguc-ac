@@ -56,7 +56,11 @@ Sistema já tem login, sidebar, layout e páginas funcionando.
   frota-consumo.js, frota-passageiros.js, frota-viagens-status.js
   (status efetivo + blocos da lista de viagens);
   grafico-teclado.js (acesso por teclado a TODO gráfico SVG — ver
-  "Regra do sistema — gráficos acessíveis por teclado")
+  "Regra do sistema — gráficos acessíveis por teclado");
+  etiqueta-termica.js (motor de desenho/PDF compartilhado por
+  agua-etiqueta.js e biomonitor-etiqueta.js — ver "Regra do sistema —
+  etiqueta do frasco de amostra" e "— etiqueta de ninho, berçário e
+  lote")
 - css/ → sidebar.css, brigada.css (app de campo)
 - .claude/skills/ → 7 skills de UI/UX vindas de
   nextlevelbuilder/ui-ux-pro-max-skill (MIT), versionadas no repo em
@@ -3314,6 +3318,108 @@ simplesmente não oferecia nada, sem dizer por quê.
   "sem código reservado" pra "1 código reservado disponível" ao
   reservar).
 - `pwa/sw.js`: agua v29 → v30.
+
+## Regra do sistema — etiqueta de ninho, berçário e lote (Biomonitor, migration 328)
+Mesmo pedido do frasco da Água ("mesmo modelo"), mas os três objetos
+são bem diferentes entre si — plano com o levantamento completo e os
+protótipos apresentados antes de codar em
+`docs/biomonitor/plano-etiqueta-ninho-bercario.md`.
+
+- **Motor de desenho compartilhado com a Água**: `js/etiqueta-termica.js`
+  (novo — extraído de `js/agua-etiqueta.js` nesta entrega, 2º
+  consumidor da mesma lição de `js/frota-consumo.js`) tem só o que não
+  sabe nada de domínio — canvas na resolução mm×dpi, auto-ajuste de
+  fonte (`etqAjustarFonte`), quebra de linha simples (`etqLinhasDeTexto`),
+  desenho de QR (`etqDesenharQR`, lê `js/qrcode-generator.js`) e
+  montagem de PDF a partir de PNGs (`etqMontarPdfDePngs`/
+  `etqBaixarPdf`, jsPDF vendorizado). `js/agua-etiqueta.js` teve a API
+  pública mantida intacta (nenhuma das 12 telas/testes que a usam
+  mudou) e passou a chamar essas peças por baixo. `js/biomonitor-
+  etiqueta.js` (novo) só tem os TRÊS layouts do Biomonitor.
+- **Achado que mudou o desenho, antes de codar**: `numero_ninho` já
+  nasce no CLIENTE, na hora do cadastro (`bioGerarNumeroNinho`,
+  100% offline, sem trigger de banco) — diferente do
+  `codigo_amostra` da Água, o ninho NUNCA precisou de reserva de
+  código. Berçário é cadastro raro e sem concorrência de campo (1 em
+  produção) — resolvido com uma SEQUENCE simples, sem a complexidade
+  de pool/reserva da Água.
+- **`bercarios.codigo`** (migration 328): berçário não tinha
+  identificador curto algum, só `nome` (texto livre) — o QR da placa
+  precisa de algo pra CARREGAR e, se a leitura falhar (sol forte, tela
+  suja), algo pra DIGITAR à mão; um uuid não serve pra isso. Trigger
+  `bio_gerar_codigo_bercario()` gera `BERC-NN` (`SEQUENCE
+  bercarios_codigo_seq`, sem ano no prefixo — molde de `BIOEQ-AAAA-NNNN`
+  simplificado), com backfill dos berçários já existentes e a mesma
+  trava de segurança de sempre (`REVOKE ALL ... FROM PUBLIC, anon,
+  authenticated` — função só deve rodar via trigger). `vw_bercarios_
+  resumo` recriada com `codigo` sempre AO FINAL da lista de colunas
+  (a partir do `pg_get_viewdef()` real de produção, não do arquivo de
+  migration local — mesma cautela da 321).
+- **Três layouts, três decisões de produto diferentes** (confirmadas
+  com o usuário via protótipo antes de codar):
+  - **Ninho — adesivo QR pequeno (30×40mm), NUNCA substitui a placa
+    manuscrita.** Ninho fica exposto ao sol/chuva na praia por até
+    ~160 dias (jabuti/muçuã) — a placa física já resolve durabilidade;
+    o adesivo só acelera abrir o registro escaneando em vez de
+    digitar o número. Só QR + código, sem os demais dados do ninho (o
+    "PDF completo" continua sendo `bioGerarPDFCampo`/`js/biomonitor-
+    relatorio-ninho.js`, já existente — a etiqueta não duplica isso).
+  - **Berçário — placa completa (40×60mm), ambiente controlado.**
+    Estrutura fixa, mesma lógica da etiqueta de frasco: estático (tipo,
+    capacidade, responsável, UC) + QR. **Nunca imprime número que muda
+    todo dia (ocupação atual)** — isso já é `vw_bercarios_resumo` ao
+    vivo; o rodapé só diz "escaneie o QR acima" pra ver.
+  - **Lote — etiqueta de balde/bandeja (40×60mm)**, presa dentro do
+    berçário pra não confundir levas de ninhos diferentes no mesmo
+    tanque: origem (ninho), espécie, quantidade de entrada, data — e
+    um campo MANUSCRITO "Vivos hoje: ___" (mesma razão do campo
+    "Preservação" da etiqueta de frasco — esse número muda a cada
+    visita, imprimir um valor fixo o tornaria mentira no dia seguinte).
+    QR carrega `lote_id` (uuid — preferido o `server_id`, pós-sync;
+    sem sync ainda, cai no `uuid_cliente`, nunca bloqueia campo).
+- **Nome do berçário é texto livre, sem limite de tamanho** — o
+  auto-ajuste de fonte sozinho não bastava (achado pelo teste: no
+  tamanho mínimo, um nome de 60+ caracteres ainda vazava a largura
+  útil da placa). `bioEtiquetaBercarioDesenhar` quebra em até 2 linhas
+  no tamanho mínimo antes de aceitar o vazamento, com reticências se
+  sobrar uma 3ª linha — nunca deixa o texto sair da placa impressa.
+- **Overlay único no app** (`#bio-etq-overlay`, `js/biomonitor-
+  quelonios.js`), reaproveitando o chrome visual de `#bio-qr-overlay`
+  (`.bio-qr-overlay`/`.bio-qr-card`/`.bio-qr-fechar`, já existente) —
+  mesmo padrão de `abrirEtiquetaOverlay` em `pages/agua-app.html`, só
+  que um overlay serve os TRÊS tipos (`_bioEtqAbrir` guarda qual
+  função de desenho/PDF usar). Botão "Etiqueta" entra no card do ninho
+  (ao lado de "Gerar PDF") e por lote no histórico de ninhos do
+  berçário (`tela-detalhe-lote`) — cada lote sua própria etiqueta,
+  nunca uma por berçário (um berçário pode ter vários lotes ativos ao
+  mesmo tempo, de ninhos diferentes). Placa do berçário é ação de
+  MESA, não de campo — botão "Imprimir placa" em `admin-biomonitor.html`
+  (aba Berçários), baixa o PDF direto (mesa não precisa do fluxo de
+  compartilhamento mobile).
+- **`compartilharArquivo`/`js/vendor/jspdf-2.5.2.umd.min.js` entram no
+  shell offline do Biomonitor** (diferente da mesa, que carrega jsPDF
+  por CDN como já fazia `js/biomonitor-relatorio-ninho.js`): a
+  etiqueta usa o MESMO motor que a Água, cujo `etqCarregarJsPDF()`
+  aponta pro arquivo vendorizado (`../js/vendor/jspdf-2.5.2.umd.min.js`,
+  caminho relativo que resolve certo tanto em `pages/biomonitor.html`
+  quanto na raiz do app nativo) — sem vendorizar, o APK abriria o
+  overlay mas travaria ao tentar montar o PDF, offline ou não (caminho
+  relativo local, nunca alcançaria a internet). `app-biomonitor/
+  scripts/build-www.mjs` ganhou `mkdirSync(join(WWW, 'js/vendor'))` e a
+  cópia do arquivo (transpilado, mesmo padrão do `app-agua`), nas 3
+  listas de sanidade.
+- Guarda: `tests/biomonitor-etiqueta.test.js` (8 testes) — os 3
+  desenhos com conteúdo real por contagem de pixel, o caso do nome
+  comprido (mesma técnica de margem-direita-tem-que-ficar-branca de
+  `tests/agua-etiqueta.test.js`, medindo só a ALTURA da linha do nome —
+  medir desde y=0 pega a faixa preta do cabeçalho e dá falso positivo,
+  erro real cometido ao escrever este teste), e o overlay do app
+  (abre com o número certo, ninho sem número nenhum não abre nada pra
+  imprimir).
+- `pwa/sw.js`: biomonitor v47 → v48 (`js/etiqueta-termica.js`,
+  `js/biomonitor-etiqueta.js` e `js/vendor/jspdf-2.5.2.umd.min.js` no
+  shell); agua sem mudança de versão (só o arquivo interno mudou, API
+  idêntica).
 
 ## Regra do sistema — guias de introdução e treinamento (migration 327)
 Interface de treinamento do sistema. Fonte ÚNICA: `js/guia-app.js` +

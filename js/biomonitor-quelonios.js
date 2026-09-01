@@ -2772,16 +2772,32 @@ function bioRenderizarHistoricoNinhos(lotes) {
 
   const STATUS_LBL = { ativo: 'No berçário', soltado: 'Solto', cancelado: 'Cancelado' }
   lista.innerHTML = lotes.map(l => {
-    const espNome = BIO_ESPECIES.find(e => e.id === l.especie)?.nome ?? l.especie ?? '—'
+    const esp = BIO_ESPECIES.find(e => e.id === l.especie)
     return `
       <div class="bio-hist-ninho-item">
         <div>
-          <strong>Ninho #${l.ninho_numero ?? '—'}</strong> · ${espNome}
+          <strong>Ninho #${l.ninho_numero ?? '—'}</strong> · ${esp?.nome ?? l.especie ?? '—'}
           <div class="bio-hist-ninho-meta">Entrada: ${_bioFormatarData(l.data_entrada)} · ${l.qtd_entrada} filhotes</div>
         </div>
         <span class="bio-nfc-status-badge ${l.status === 'ativo' ? 'em_bercario' : l.status === 'soltado' ? 'soltado' : ''}">${STATUS_LBL[l.status] ?? l.status}</span>
+        <button type="button" class="bio-btn-sm ghost" data-lote-etiqueta="${l.uuid_cliente}">Etiqueta</button>
       </div>`
   }).join('')
+
+  lista.querySelectorAll('[data-lote-etiqueta]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const l = lotes.find(x => x.uuid_cliente === btn.dataset.loteEtiqueta)
+      if (!l) return
+      const esp = BIO_ESPECIES.find(e => e.id === l.especie)
+      bioAbrirEtiquetaLote({
+        // server_id (após sync) é preferível — estável e mais curto no QR;
+        // sem sync ainda, cai no uuid_cliente (nunca bloqueia o trabalho de campo).
+        id: l.server_id ?? l.uuid_cliente, bercario_nome: BioApp.bercarioAtual?.nome, numero_ninho: l.ninho_numero,
+        especie_nome: esp?.nome ?? l.especie, especie_sigla: esp?.sigla,
+        qtd_entrada: l.qtd_entrada, data_entrada: l.data_entrada,
+      })
+    })
+  })
 }
 
 // ── Visualizador de foto em tela cheia (histórico: ocorrências/soltura) ──
@@ -3919,6 +3935,7 @@ function bioNinhoCardInner(n, opts = {}) {
       ${status === 'eclodido' ? `<button class="bio-btn-sm prim" data-acao="soltar">Soltar</button>` : ''}
       ${status !== 'perdido' ? `<button class="bio-btn-sm ghost" data-acao="visita">Visita</button>` : ''}
       <button class="bio-btn-sm ghost" data-acao="pdf" ${navigator.onLine ? '' : 'disabled title="Requer conexão"'}>Gerar PDF</button>
+      <button class="bio-btn-sm ghost" data-acao="etiqueta">Etiqueta</button>
     </div>` : ''
 
   const histHtml = bioTimelineHtml(n._eventos)
@@ -3970,6 +3987,7 @@ function bioRenderizarListaNinhos(containerId, ninhos, mostrarAcoes) {
         if (btn.dataset.acao === 'visita')        bioAbrirFormVisita(n)
         if (btn.dataset.acao === 'soltar')        bioAbrirTelaDestino(n, null)
         if (btn.dataset.acao === 'pdf')           bioGerarPDFCampo(n)
+        if (btn.dataset.acao === 'etiqueta')      bioAbrirEtiquetaNinho(n)
       })
     })
     card.querySelectorAll('[data-nh-toggle]').forEach(btn => {
@@ -5033,6 +5051,60 @@ function bioAbrirQRInstalacao() {
   }
 }
 
+// ── Etiqueta de ninho/berçário/lote (js/biomonitor-etiqueta.js) ──
+// Overlay único, compartilhado pelos 3 tipos — mesmo padrão de
+// abrirEtiquetaOverlay em pages/agua-app.html. `dados`/`desenharFn`/
+// `montarPdfFn` mudam por tipo; o overlay em si não sabe a diferença.
+let _bioEtqAtual = null // { dados, desenharFn, montarPdfFn, arquivo }
+
+function _bioEtqAbrir(titulo, dados, desenharFn, montarPdfFn, arquivo) {
+  _bioEtqAtual = { dados, desenharFn, montarPdfFn, arquivo }
+  document.getElementById('bio-etq-titulo').textContent = titulo
+  document.getElementById('bio-etq-vias').value = 1
+  desenharFn(document.getElementById('bio-etq-canvas'), dados)
+  document.getElementById('bio-etq-overlay').hidden = false
+}
+
+function bioAbrirEtiquetaNinho(n) {
+  const numero = n.numero_atual ?? n.numero_ninho
+  if (!numero) { bioToast('Este ninho ainda não tem número.', 'err'); return }
+  _bioEtqAbrir('Etiqueta do ninho', { numero }, bioEtiquetaNinhoDesenhar, bioEtiquetaNinhoMontarPdfVias, `etiqueta-ninho-${numero}.pdf`)
+}
+
+function bioAbrirEtiquetaBercario(b) {
+  _bioEtqAbrir('Placa do berçário', {
+    codigo: b.codigo, nome: b.nome, tipo: b.tipo, capacidade_max: b.capacidade_max,
+    responsavel_nome: b.responsavel_nome, uc_nome: b.uc_nome,
+  }, bioEtiquetaBercarioDesenhar, bioEtiquetaBercarioMontarPdfVias, `etiqueta-bercario-${b.codigo}.pdf`)
+}
+
+function bioAbrirEtiquetaLote(lote) {
+  _bioEtqAbrir('Etiqueta do lote', {
+    lote_id: lote.id, bercario_nome: lote.bercario_nome, numero_ninho: lote.numero_ninho,
+    especie_nome: lote.especie_nome, especie_sigla: lote.especie_sigla,
+    qtd_entrada: lote.qtd_entrada, data_entrada: lote.data_entrada,
+  }, bioEtiquetaLoteDesenhar, bioEtiquetaLoteMontarPdfVias, `etiqueta-lote-${lote.id}.pdf`)
+}
+
+async function bioImprimirEtiquetaAtual() {
+  if (!_bioEtqAtual) return
+  const vias = Math.max(1, Math.min(10, Number(document.getElementById('bio-etq-vias').value) || 1))
+  const btn = document.getElementById('bio-etq-btn-imprimir')
+  const textoOriginal = btn.textContent
+  btn.disabled = true
+  btn.textContent = 'Gerando…'
+  try {
+    const pdf = await _bioEtqAtual.montarPdfFn(_bioEtqAtual.dados, vias)
+    await compartilharArquivo(pdf.output('blob'), _bioEtqAtual.arquivo, document.getElementById('bio-etq-titulo').textContent, msg => bioToast(msg, 'ok'))
+  } catch (e) {
+    console.error('[bio-etiqueta]', e)
+    bioToast('Erro ao gerar etiqueta: ' + (e?.message || e), 'err')
+  } finally {
+    btn.disabled = false
+    btn.textContent = textoOriginal
+  }
+}
+
 // ── Registro central de sincronizações de "cache de referência" ─
 // Cada entrada é um catálogo do tipo espelho-do-servidor (ver
 // bioOfflineSubstituirCacheReferencia em biomonitor-offline.js).
@@ -5233,6 +5305,17 @@ function bioIniciarConfig() {
   document.getElementById('bio-qr-overlay')?.addEventListener('click', e => {
     if (e.target === e.currentTarget) e.currentTarget.hidden = true
   })
+  document.getElementById('bio-etq-fechar')?.addEventListener('click', () => {
+    document.getElementById('bio-etq-overlay').hidden = true
+    _bioEtqAtual = null
+  })
+  document.getElementById('bio-etq-overlay')?.addEventListener('click', e => {
+    if (e.target === e.currentTarget) { e.currentTarget.hidden = true; _bioEtqAtual = null }
+  })
+  document.getElementById('bio-etq-vias')?.addEventListener('input', () => {
+    if (_bioEtqAtual) _bioEtqAtual.desenharFn(document.getElementById('bio-etq-canvas'), _bioEtqAtual.dados)
+  })
+  document.getElementById('bio-etq-btn-imprimir')?.addEventListener('click', bioImprimirEtiquetaAtual)
 }
 
 /* ════════════════════════════════════════════════════════════

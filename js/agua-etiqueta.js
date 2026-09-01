@@ -1,9 +1,10 @@
 // ── SIGUC Qualidade da Água — Etiqueta do frasco de amostra ───────
 // Fase 1 do plano em docs/qualidade-agua/plano-etiqueta-frasco.md.
-// Fonte única do desenho da etiqueta (mesma lição de
-// js/frota-consumo.js): o canvas desenhado aqui alimenta o preview na
-// tela, o PDF de contingência (Peça 1) e, na Fase 2, o bitmap enviado
-// à impressora térmica — nunca uma segunda implementação do layout.
+// O DESENHO em si (canvas, texto auto-ajustado, QR, PDF) vive em
+// js/etiqueta-termica.js — motor compartilhado com o Biomonitor
+// (js/biomonitor-etiqueta.js, 2º consumidor). Este arquivo só tem o
+// LAYOUT da etiqueta de frasco e a lógica exclusiva da Água: a
+// reserva de códigos.
 //
 // GEOMETRIA: 40×60 mm a 203 dpi (padrão de mercado de térmica
 // portátil) — configurável via `opts`, nunca hardcoded no meio do
@@ -70,25 +71,10 @@ async function aEtqReservarOnline(qtd) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// Desenho — canvas é a fonte única do visual (raster, não texto
-// vetorial): a MESMA imagem vira PNG de preview, página de PDF e,
-// na Fase 2, bitmap 1-bit para a impressora. Sem libs.
+// Desenho — usa o motor de js/etiqueta-termica.js. A MESMA imagem
+// alimenta o preview na tela, o PDF de N vias/lote e, no futuro, o
+// bitmap enviado à impressora.
 // ═══════════════════════════════════════════════════════════════
-
-// Reduz o tamanho da fonte até o texto caber na largura disponível —
-// necessário para o código da amostra: "COL-2026-0042" em negrito
-// monoespaçado num tamanho fixo já vazava a largura da etiqueta
-// (achado em produção, ver captura no PR — o texto ficava por baixo/
-// por cima do QR, cortado). Nunca adivinhar um tamanho fixo pra texto
-// que muda de conteúdo.
-function _aEtqAjustarFonte(ctx, texto, larguraMax, pesoFamilia, pxMax, pxMin) {
-  for (let tam = pxMax; tam >= pxMin; tam--) {
-    ctx.font = `${pesoFamilia} ${tam}px "Courier New", monospace`
-    if (ctx.measureText(texto).width <= larguraMax) return tam
-  }
-  ctx.font = `${pesoFamilia} ${pxMin}px "Courier New", monospace`
-  return pxMin
-}
 
 // `dados`: { codigo_amostra, ponto_nome, codigo_ana, data_coleta
 // ('AAAA-MM-DD'), hora_coleta ('HH:MM'), coletor_nome, lat, lng,
@@ -96,17 +82,7 @@ function _aEtqAjustarFonte(ctx, texto, larguraMax, pesoFamilia, pxMax, pxMin) {
 function aguaEtiquetaDesenhar(canvas, dados, opts = {}) {
   const dpi = opts.dpi || AGUA_ETIQUETA_DPI
   const mm  = opts.mm  || AGUA_ETIQUETA_MM
-  const px  = v => Math.round(v * dpi / 25.4)
-  const W = px(mm.w), H = px(mm.h)
-  canvas.width = W
-  canvas.height = H
-
-  const ctx = canvas.getContext('2d')
-  ctx.fillStyle = '#fff'
-  ctx.fillRect(0, 0, W, H)
-  ctx.fillStyle = '#000'
-  ctx.strokeStyle = '#000'
-  ctx.textBaseline = 'top'
+  const { ctx, W, H, px } = etqNovoCanvas(canvas, mm, dpi)
 
   const pad = px(2)
   const larguraUtil = W - pad * 2
@@ -124,7 +100,7 @@ function aguaEtiquetaDesenhar(canvas, dados, opts = {}) {
   // Código da amostra (o dado mais importante da etiqueta) — fonte
   // AUTO-AJUSTADA pra nunca vazar a largura, nunca um tamanho fixo.
   const codigo = dados.codigo_amostra || '—'
-  const tamCodigo = _aEtqAjustarFonte(ctx, codigo, larguraUtil, 'bold', px(5.5), px(3))
+  const tamCodigo = etqAjustarFonte(ctx, codigo, larguraUtil, 'bold', '"Courier New", monospace', px(5.5), px(3))
   ctx.fillText(codigo, pad, y)
   y += Math.round(tamCodigo * 1.25)
 
@@ -134,7 +110,7 @@ function aguaEtiquetaDesenhar(canvas, dados, opts = {}) {
   y += px(2.3)
 
   ctx.font = `bold ${px(2.6)}px Arial, sans-serif`
-  const linhasPonto = _aEtqLinhasDeTexto(ctx, dados.ponto_nome || 'Ponto não identificado', larguraUtil, px(2.6))
+  const linhasPonto = etqLinhasDeTexto(ctx, dados.ponto_nome || 'Ponto não identificado', larguraUtil)
   linhasPonto.slice(0, 2).forEach(l => { ctx.fillText(l, pad, y); y += px(3.1) })
 
   ctx.font = `${px(2.2)}px Arial, sans-serif`
@@ -162,22 +138,9 @@ function aguaEtiquetaDesenhar(canvas, dados, opts = {}) {
   // rodapé fixo.
   const rodapeY = H - px(9)
   const espacoLivre = rodapeY - y
-  if (dados.codigo_amostra && typeof qrcode === 'function' && espacoLivre > px(8)) {
-    try {
-      const qr = qrcode(0, 'M')
-      qr.addData(dados.codigo_amostra)
-      qr.make()
-      const qrPx = Math.min(px(15), espacoLivre - px(1.5))
-      const cellCount = qr.getModuleCount()
-      const cell = qrPx / cellCount
-      const qx = Math.round((W - qrPx) / 2)
-      const qy = y + px(1)
-      for (let r = 0; r < cellCount; r++) {
-        for (let c = 0; c < cellCount; c++) {
-          if (qr.isDark(r, c)) ctx.fillRect(qx + c * cell, qy + r * cell, Math.ceil(cell), Math.ceil(cell))
-        }
-      }
-    } catch (e) { console.warn('[agua-etiqueta] QR falhou:', e) }
+  if (dados.codigo_amostra && espacoLivre > px(8)) {
+    const qrPx = Math.min(px(15), espacoLivre - px(1.5))
+    etqDesenharQR(ctx, dados.codigo_amostra, Math.round((W - qrPx) / 2), y + px(1), qrPx)
   }
 
   // Rodapé: linha para anotar preservação a mão + via/total
@@ -192,25 +155,6 @@ function aguaEtiquetaDesenhar(canvas, dados, opts = {}) {
   ctx.fillText(`Via ${via} de ${totalVias}`, pad, y)
 
   return canvas
-}
-
-// Quebra de linha simples por largura disponível (sem lib) — usada só
-// para o nome do ponto, que pode ser longo.
-function _aEtqLinhasDeTexto(ctx, texto, larguraMax, fontPx) {
-  const palavras = String(texto).split(/\s+/)
-  const linhas = []
-  let atual = ''
-  for (const p of palavras) {
-    const teste = atual ? atual + ' ' + p : p
-    if (ctx.measureText(teste).width > larguraMax && atual) {
-      linhas.push(atual)
-      atual = p
-    } else {
-      atual = teste
-    }
-  }
-  if (atual) linhas.push(atual)
-  return linhas
 }
 
 function aguaEtiquetaCriarCanvas(dados, opts) {
@@ -230,60 +174,28 @@ function aguaEtiquetaPngBlob(dados, opts) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// PDF — N vias (mesma coleta) ou lote (N coletas, 1 via cada), uma
-// página por etiqueta, no tamanho exato da etiqueta (mm). Cada página
-// embute o PNG do canvas — nunca redesenha em texto vetorial do
-// jsPDF, para o documento nunca divergir do preview/bitmap.
-//
-// Carrega só o jsPDF (sem autotable — a etiqueta não usa tabela),
-// vendorizado no mesmo arquivo que js/agua-relatorio-pdf.js já usa.
-let _aEtqJsPdfPromise = null
-function _aEtqCarregarJsPDF() {
-  if (window.jspdf?.jsPDF) return Promise.resolve()
-  if (_aEtqJsPdfPromise) return _aEtqJsPdfPromise
-  _aEtqJsPdfPromise = new Promise((res, rej) => {
-    const s = document.createElement('script')
-    s.src = '../js/vendor/jspdf-2.5.2.umd.min.js'
-    s.onload = res
-    s.onerror = () => rej(new Error('Falha ao carregar jsPDF.'))
-    document.head.appendChild(s)
-  })
-  return _aEtqJsPdfPromise
-}
+// PDF — N vias (mesma coleta) ou lote (N coletas, 1 via cada).
+// Monta a lista de PNGs aqui (que é a parte específica da Água — os
+// campos de `dados`); a montagem do PDF em si é a peça compartilhada
+// de js/etiqueta-termica.js.
+// ═══════════════════════════════════════════════════════════════
 
 async function aguaEtiquetaMontarPdfVias(dados, vias, opts = {}) {
-  await _aEtqCarregarJsPDF()
   const mm = opts.mm || AGUA_ETIQUETA_MM
-  const { jsPDF } = window.jspdf
-  const pdf = new jsPDF({ unit: 'mm', format: [mm.w, mm.h], compress: true })
-  for (let v = 1; v <= vias; v++) {
-    if (v > 1) pdf.addPage([mm.w, mm.h])
-    const png = aguaEtiquetaPngDataURL({ ...dados, via: v, totalVias: vias }, opts)
-    pdf.addImage(png, 'PNG', 0, 0, mm.w, mm.h)
-  }
-  return pdf
+  const pngs = []
+  for (let v = 1; v <= vias; v++) pngs.push(aguaEtiquetaPngDataURL({ ...dados, via: v, totalVias: vias }, opts))
+  return etqMontarPdfDePngs(pngs, mm)
 }
 
 // Lote de mesa: uma etiqueta (1 via) por coleta da lista — reimpressão
 // em lote quando a térmica falhou em campo (plano B, ver plano da
 // Fase 1). `lista` já vem com os campos que aguaEtiquetaDesenhar usa.
 async function aguaEtiquetaMontarPdfLote(lista, opts = {}) {
-  await _aEtqCarregarJsPDF()
   const mm = opts.mm || AGUA_ETIQUETA_MM
-  const { jsPDF } = window.jspdf
-  const pdf = new jsPDF({ unit: 'mm', format: [mm.w, mm.h], compress: true })
-  lista.forEach((dados, i) => {
-    if (i > 0) pdf.addPage([mm.w, mm.h])
-    const png = aguaEtiquetaPngDataURL({ ...dados, via: 1, totalVias: 1 }, opts)
-    pdf.addImage(png, 'PNG', 0, 0, mm.w, mm.h)
-  })
-  return pdf
+  const pngs = lista.map(dados => aguaEtiquetaPngDataURL({ ...dados, via: 1, totalVias: 1 }, opts))
+  return etqMontarPdfDePngs(pngs, mm)
 }
 
 function aguaEtiquetaBaixarPdf(pdf, filename) {
-  const url = URL.createObjectURL(pdf.output('blob'))
-  const a = document.createElement('a')
-  a.href = url; a.download = filename
-  document.body.appendChild(a); a.click(); a.remove()
-  setTimeout(() => URL.revokeObjectURL(url), 30000)
+  etqBaixarPdf(pdf, filename)
 }
