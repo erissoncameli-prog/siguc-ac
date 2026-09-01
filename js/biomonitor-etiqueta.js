@@ -11,10 +11,13 @@
 // número do ninho de origem, que já existe.
 //
 // ETIQUETA DE NINHO: por decisão do usuário, é um ADESIVO PEQUENO,
-// só QR + código — complementa a placa manuscrita já usada em campo
-// (ninhos ficam meses expostos ao sol/chuva na praia; a placa física
-// já resolve a durabilidade, o adesivo só acelera abrir o registro
-// escaneando em vez de digitar). NUNCA substitui a placa manuscrita.
+// que complementa a placa manuscrita já usada em campo (ninhos ficam
+// meses expostos ao sol/chuva na praia; a placa física já resolve a
+// durabilidade, o adesivo só acelera abrir o registro escaneando em
+// vez de digitar). NUNCA substitui a placa manuscrita. Além do
+// código+QR, traz praia/monitor/data-hora de cadastro — o mínimo pra
+// identificar o ninho sem abrir o app (pedido do usuário); a ficha
+// completa continua sendo o PDF (bioGerarPDFCampo).
 //
 // ETIQUETA DE BERÇÁRIO: placa completa — estrutura fixa, ambiente
 // controlado, mesma lógica da etiqueta de frasco da Água. Nunca
@@ -26,22 +29,38 @@
 // tanque. Campo manuscrito "Vivos hoje" porque esse número muda a
 // cada visita (mesma razão de "Preservação" na etiqueta de frasco).
 
-const BIO_ETIQUETA_NINHO_MM    = { w: 30, h: 40 }
+const BIO_ETIQUETA_NINHO_MM    = { w: 30, h: 54 }
 const BIO_ETIQUETA_BERCARIO_MM = { w: 40, h: 60 }
 const BIO_ETIQUETA_LOTE_MM     = { w: 40, h: 60 }
 const BIO_ETIQUETA_DPI = 203
 
 const BIOETQ_TIPO_LABEL = { tanque_fibra: 'Tanque de fibra', piscina_alvenaria: 'Piscina de alvenaria', viveiro: 'Viveiro', outro: 'Outro' }
 
+// Linha de UM valor (praia/monitor — texto livre, sem limite de
+// tamanho) que nunca vaza a largura: primeiro encolhe a fonte
+// (etqAjustarFonte); se ainda não couber no tamanho mínimo, corta
+// caractere a caractere e troca o final por "…" — diferente do nome
+// do berçário (que tem espaço pra 2 linhas), aqui é 1 linha só numa
+// etiqueta de 30mm, então truncar é a única saída que não estoura.
+function _bioEtqLinhaTruncada(ctx, texto, larguraMax, peso, familia, pxMax, pxMin) {
+  const tam = etqAjustarFonte(ctx, texto, larguraMax, peso, familia, pxMax, pxMin)
+  ctx.font = `${peso} ${tam}px ${familia}`
+  let t = texto
+  while (t.length > 1 && ctx.measureText(t + '…').width > larguraMax) t = t.slice(0, -1)
+  return { texto: t.length < texto.length ? t + '…' : t, tam }
+}
+
 // ═══════════════════════════════════════════════════════════════
-// Ninho — adesivo QR (30×40mm)
-// `dados`: { numero (numero_atual ?? numero_ninho) }
+// Ninho — adesivo (30×54mm)
+// `dados`: { numero (numero_atual ?? numero_ninho), praia, monitor_nome,
+//            criado_em (ISO — data/hora de cadastro) }
 // ═══════════════════════════════════════════════════════════════
 function bioEtiquetaNinhoDesenhar(canvas, dados, opts = {}) {
   const dpi = opts.dpi || BIO_ETIQUETA_DPI
   const mm  = opts.mm  || BIO_ETIQUETA_NINHO_MM
   const { ctx, W, H, px } = etqNovoCanvas(canvas, mm, dpi)
   const pad = px(1.5)
+  const larguraUtil = W - pad * 2
   let y = 0
 
   const faixaH = px(4)
@@ -53,13 +72,41 @@ function bioEtiquetaNinhoDesenhar(canvas, dados, opts = {}) {
   y = faixaH + px(2)
 
   const codigo = dados.numero || '—'
-  const tam = etqAjustarFonte(ctx, codigo, W - pad * 2, 'bold', '"Courier New", monospace', px(3.4), px(2))
+  const tamCodigo = etqAjustarFonte(ctx, codigo, larguraUtil, 'bold', '"Courier New", monospace', px(3.4), px(2))
   ctx.fillText(codigo, pad, y)
-  y += Math.round(tam * 1.3) + px(1.5)
+  y += Math.round(tamCodigo * 1.3) + px(1.2)
+
+  // Praia/monitor/data-hora — o mínimo pra identificar o ninho sem
+  // abrir o app. Rótulo curto ("Praia:"/"Monitor:") porque a etiqueta
+  // é estreita (30mm); a data/hora não precisa de rótulo, o formato já
+  // é reconhecível.
+  ctx.font = `${px(1.7)}px Arial, sans-serif`
+  if (dados.praia) {
+    const { texto } = _bioEtqLinhaTruncada(ctx, `Praia: ${dados.praia}`, larguraUtil, 'normal', 'Arial, sans-serif', px(1.7), px(1.4))
+    ctx.font = `${px(1.7)}px Arial, sans-serif`
+    ctx.fillText(texto, pad, y)
+    y += px(2.4)
+  }
+  if (dados.monitor_nome) {
+    const { texto } = _bioEtqLinhaTruncada(ctx, `Monitor: ${dados.monitor_nome}`, larguraUtil, 'normal', 'Arial, sans-serif', px(1.7), px(1.4))
+    ctx.font = `${px(1.7)}px Arial, sans-serif`
+    ctx.fillText(texto, pad, y)
+    y += px(2.4)
+  }
+  if (dados.criado_em) {
+    const d = new Date(dados.criado_em)
+    if (!isNaN(d)) {
+      const dataHora = d.toLocaleDateString('pt-BR') + ' ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+      ctx.font = `${px(1.7)}px Arial, sans-serif`
+      ctx.fillText(dataHora, pad, y)
+      y += px(2.4)
+    }
+  }
+  y += px(1)
 
   const espacoLivre = H - px(3) - y
   if (dados.numero && espacoLivre > px(8)) {
-    const qrPx = Math.min(W - pad * 2, espacoLivre)
+    const qrPx = Math.min(larguraUtil, espacoLivre)
     etqDesenharQR(ctx, dados.numero, Math.round((W - qrPx) / 2), y, qrPx)
     y += qrPx + px(1.5)
   }
