@@ -3357,12 +3357,14 @@ protótipos apresentados antes de codar em
   migration local — mesma cautela da 321).
 - **Três layouts, três decisões de produto diferentes** (confirmadas
   com o usuário via protótipo antes de codar):
-  - **Ninho — adesivo QR pequeno (30×40mm), NUNCA substitui a placa
+  - **Ninho — adesivo QR pequeno (30×54mm — cresceu de 30×40mm num
+    pedido pós-lançamento, ver abaixo), NUNCA substitui a placa
     manuscrita.** Ninho fica exposto ao sol/chuva na praia por até
     ~160 dias (jabuti/muçuã) — a placa física já resolve durabilidade;
     o adesivo só acelera abrir o registro escaneando em vez de
-    digitar o número. Só QR + código, sem os demais dados do ninho (o
-    "PDF completo" continua sendo `bioGerarPDFCampo`/`js/biomonitor-
+    digitar o número. Código + praia + monitor + data/hora de
+    cadastro + QR — a ficha COMPLETA (ovos, condições, fotos...)
+    continua sendo o "PDF completo" (`bioGerarPDFCampo`/`js/biomonitor-
     relatorio-ninho.js`, já existente — a etiqueta não duplica isso).
   - **Berçário — placa completa (40×60mm), ambiente controlado.**
     Estrutura fixa, mesma lógica da etiqueta de frasco: estático (tipo,
@@ -3383,6 +3385,29 @@ protótipos apresentados antes de codar em
   útil da placa). `bioEtiquetaBercarioDesenhar` quebra em até 2 linhas
   no tamanho mínimo antes de aceitar o vazamento, com reticências se
   sobrar uma 3ª linha — nunca deixa o texto sair da placa impressa.
+
+**Pós-lançamento — praia, monitor e data/hora de cadastro na etiqueta
+de ninho.** Pedido explícito do usuário: a etiqueta (que só tinha
+código+QR) precisava dizer quem registrou, onde e quando, sem abrir o
+app. `BIO_ETIQUETA_NINHO_MM` cresceu de 30×40mm para 30×54mm (a altura
+é a que sobra pra imprimir em rolo contínuo; a largura de 30mm não
+muda — é a mesma bobina). `bioAbrirEtiquetaNinho(n)` passa
+`praia`(`praia_atual_nome ?? praia_nome`, mesmo fallback de
+`bioNinhoCardInner`)/`monitor_nome`/`criado_em` — os três já vêm no
+objeto `n` sem select novo, sempre presentes (`monitor_nome` é
+carimbado em `_local:true` na criação offline; `criado_em` é gravado
+no instante do cadastro, nunca a data de encontro do ninho, que é
+`data_encontro`).
+- **Truncamento, não quebra de linha** — diferente do nome do
+  berçário (placa de 40mm, cabe 2 linhas), a etiqueta de ninho tem só
+  30mm de largura: `_bioEtqLinhaTruncada` primeiro encolhe a fonte
+  (`etqAjustarFonte`) e, se ainda não couber no tamanho mínimo, corta
+  caractere a caractere até caber com "…" no final — nunca deixa
+  praia/monitor vazarem a largura da etiqueta.
+- Guarda: `tests/biomonitor-etiqueta.test.js` ganhou 3 testes (nova
+  dimensão com conteúdo real, comparação com/sem os campos novos, e o
+  caso de praia com nome extremamente longo truncando sem vazar).
+- `pwa/sw.js`: biomonitor v49 → v50.
 - **Overlay único no app** (`#bio-etq-overlay`, `js/biomonitor-
   quelonios.js`), reaproveitando o chrome visual de `#bio-qr-overlay`
   (`.bio-qr-overlay`/`.bio-qr-card`/`.bio-qr-fechar`, já existente) —

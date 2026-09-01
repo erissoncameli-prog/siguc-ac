@@ -5068,7 +5068,13 @@ function _bioEtqAbrir(titulo, dados, desenharFn, montarPdfFn, arquivo) {
 function bioAbrirEtiquetaNinho(n) {
   const numero = n.numero_atual ?? n.numero_ninho
   if (!numero) { bioToast('Este ninho ainda não tem número.', 'err'); return }
-  _bioEtqAbrir('Etiqueta do ninho', { numero }, bioEtiquetaNinhoDesenhar, bioEtiquetaNinhoMontarPdfVias, `etiqueta-ninho-${numero}.pdf`)
+  const dados = {
+    numero,
+    praia: n.praia_atual_nome ?? n.praia_nome,
+    monitor_nome: n.monitor_nome,
+    criado_em: n.criado_em,
+  }
+  _bioEtqAbrir('Etiqueta do ninho', dados, bioEtiquetaNinhoDesenhar, bioEtiquetaNinhoMontarPdfVias, `etiqueta-ninho-${numero}.pdf`)
 }
 
 function bioAbrirEtiquetaBercario(b) {
