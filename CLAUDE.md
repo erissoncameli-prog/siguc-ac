@@ -3421,6 +3421,21 @@ protótipos apresentados antes de codar em
   shell); agua sem mudança de versão (só o arquivo interno mudou, API
   idêntica).
 
+**Achado real, relatado pelo usuário logo após o deploy**: a barra de
+ações do card do ninho (`.bio-nfc-acoes`) era `display:flex` sem
+`flex-wrap`. Com status `encontrado`/`transferido` + `status_validacao
+='em_correcao'`, o card mostra até 6 botões ao mesmo tempo (Corrigir,
++Transferência, Eclosão, Visita, Gerar PDF, Etiqueta) — o 6º (o botão
+novo) estourava a largura do card em tela de celular, em vez de
+encolher ou quebrar linha. Corrigido com `flex-wrap:wrap` +
+`.bio-nfc-acoes .bio-btn-sm { flex:1 1 auto; min-width:84px }`: acima
+de 4 botões, a barra passa a ocupar 2 linhas em vez de vazar. Guarda:
+teste novo em `tests/biomonitor-etiqueta.test.js` que renderiza o
+card com os 6 botões numa viewport de celular (390px) e mede
+`scrollWidth - clientWidth` do card — confirmado que reprova sem o
+`flex-wrap` (regressão de propósito, revertendo o CSS antes de rodar).
+`pwa/sw.js`: biomonitor v48 → v49.
+
 ## Regra do sistema — guias de introdução e treinamento (migration 327)
 Interface de treinamento do sistema. Fonte ÚNICA: `js/guia-app.js` +
 `css/guia-app.css` — nenhuma página desenha overlay de guia, navegação
