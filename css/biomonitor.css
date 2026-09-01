@@ -972,6 +972,24 @@ body.field-mode .bio-home-nome { font-size: 26px; }
   cursor: pointer; color: #6B7280;
 }
 
+/* Etiqueta (js/biomonitor-etiqueta.js) — mesmo card do QR Overlay,
+   compartilha .bio-qr-overlay/.bio-qr-card/.bio-qr-fechar acima. */
+.bio-etq-card { max-width: 320px; }
+.bio-etq-canvas {
+  display: block; width: 100%; max-width: 220px; margin: 0 auto 14px;
+  border: 1px solid #E5E7EB; border-radius: 4px; background: #fff;
+}
+.bio-etq-vias-row {
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  margin-bottom: 14px;
+}
+.bio-etq-vias-row label { font-size: 13px; color: #374151; font-weight: 600; }
+.bio-etq-vias-row input {
+  width: 64px; padding: 8px 10px; border: 1px solid #D1D5DB; border-radius: 10px;
+  font-size: 14px; text-align: center;
+}
+.bio-etq-vias-row input:focus-visible { outline: 2px solid var(--bio-prim, #0369A1); outline-offset: 1px; }
+
 /* ── Toast ───────────────────────────────────────────────────── */
 .bio-toast {
   position: fixed; bottom: calc(var(--bio-nav-h) + 24px); left: 50%;

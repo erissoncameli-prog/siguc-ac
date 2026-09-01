@@ -13,6 +13,9 @@
 <script src="../js/queryLogger.js"></script>
 <script src="../js/config.js"></script>
 <script src="../js/layout.js"></script>
+<script src="../js/qrcode-generator.js"></script>
+<script src="../js/etiqueta-termica.js"></script>
+<script src="../js/biomonitor-etiqueta.js"></script>
 </head>
 <body>
 <div id="app"></div>
@@ -1665,9 +1668,32 @@
         <td><span class="badge ${b.status ? 'badge-success' : 'badge-secondary'}">${b.status ? 'Ativo' : 'Inativo'}</span></td>
         <td style="white-space:nowrap">
           <button class="btn btn-sm btn-secondary" onclick="editarBercario('${b.id}')">Editar</button>
+          <button class="btn btn-sm btn-secondary" onclick="imprimirPlacaBercario('${b.id}')">Imprimir placa</button>
         </td>
       </tr>`
     }).join('')
+  }
+
+  // Placa do berçário (js/biomonitor-etiqueta.js) — mesmo motor da
+  // etiqueta de frasco da Água (js/etiqueta-termica.js). Vias fixas em
+  // 1 aqui (mesa, reimprime quando quiser); overlay é o mesmo padrão
+  // do preview usado no app de campo (js/biomonitor-quelonios.js).
+  window.imprimirPlacaBercario = async function(id) {
+    const b = _bercarios.find(x => x.id === id)
+    if (!b) return
+    const uc   = _ucs.find(u => u.id === b.uc_id)
+    const resp = _monitores.find(m => m.id === b.responsavel_id)
+    const dados = {
+      codigo: b.codigo, nome: b.nome, tipo: b.tipo, capacidade_max: b.capacidade_max,
+      responsavel_nome: resp ? resp.nome_completo : null, uc_nome: uc ? uc.nome : null,
+    }
+    try {
+      const pdf = await bioEtiquetaBercarioMontarPdfVias(dados, 1)
+      pdf.save(`etiqueta-bercario-${b.codigo}.pdf`)
+    } catch (e) {
+      console.error('[placa-bercario]', e)
+      toast('Erro ao gerar a placa: ' + e.message, 'error')
+    }
   }
 
   window.abrirModalBercario = function() {

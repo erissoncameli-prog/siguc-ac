@@ -2183,6 +2183,24 @@
   </div>
 </div>
 
+<!-- ══ OVERLAY: etiqueta de ninho/berçário/lote (preview + imprimir) ═ -->
+<div id="bio-etq-overlay" class="bio-qr-overlay" hidden>
+  <div class="bio-qr-card bio-etq-card">
+    <button class="bio-qr-fechar" id="bio-etq-fechar" aria-label="Fechar">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+      </svg>
+    </button>
+    <p id="bio-etq-titulo" style="font-weight:700;font-size:15px;margin:0 0 14px;color:var(--bio-ink)">Etiqueta</p>
+    <canvas id="bio-etq-canvas" class="bio-etq-canvas"></canvas>
+    <div class="bio-etq-vias-row">
+      <label for="bio-etq-vias">Vias</label>
+      <input type="number" id="bio-etq-vias" min="1" max="10" value="1">
+    </div>
+    <button type="button" class="bio-btn-salvar" id="bio-etq-btn-imprimir">Imprimir / Compartilhar</button>
+  </div>
+</div>
+
 <!-- ══ SHEET: Seleção de praia ══════════════════════════════════ -->
 <div id="bio-sheet-praias" class="bio-sheet" hidden>
   <div class="bio-sheet-card">
@@ -2325,6 +2343,8 @@ const _bioReady = _dbReady.then(function () {
 <script src="/js/compartilhar-arquivo.js"></script>
 <script src="/js/biomonitor-relatorio-campo.js"></script>
 <script src="/js/biomonitor-equipamentos.js"></script>
+<script src="/js/etiqueta-termica.js"></script>
+<script src="/js/biomonitor-etiqueta.js"></script>
 <script src="/js/biomonitor-quelonios.js"></script>
 <script>
 // ── Listeners adicionais (pós-carregamento) ───────────────────
