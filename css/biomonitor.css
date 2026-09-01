@@ -1306,9 +1306,10 @@ body.field-mode .bio-home-nome { font-size: 26px; }
   background: var(--bio-perigo-bg); padding: 4px 8px; border-radius: 6px;
 }
 .bio-nfc-acoes {
-  display: flex; gap: 8px; margin-top: 10px; padding-top: 10px;
+  display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; padding-top: 10px;
   border-top: 1px solid #EFF3F6;
 }
+.bio-nfc-acoes .bio-btn-sm { flex: 1 1 auto; min-width: 84px; text-align: center; }
 
 /* Fila de envio — lista de cards */
 .bio-sync-queue { padding: 12px 16px; }
