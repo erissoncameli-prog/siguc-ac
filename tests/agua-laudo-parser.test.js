@@ -176,6 +176,70 @@ test.describe('trava de identidade (§3.3 do plano) — nunca autofill com amost
     expect(r.problemas.map(p => p.campo)).toContain('procedencia')
   })
 
+  // ── Ruído de OCR ≠ amostra errada ────────────────────────────
+  // O bug real relatado em produção: a leitura automática nunca
+  // preenchia nada. Causa medida contra os laudos do QUILAB no
+  // navegador — o ano sai com um dígito trocado ("24/09/2025" lido
+  // "24/09/2095") e a procedência com letra a mais ("Rio Iquiri" →
+  // "Rio Iqguiri"); a comparação era literal, então qualquer um dos
+  // dois bloqueava TUDO e ainda acusava, em vermelho, laudo de outra
+  // amostra. Estes testes travam a distinção que corrigiu isso.
+  test('ano ilegível do scanner com dia e mês batendo NÃO acusa amostra errada', async ({ page }) => {
+    await comOcr(page)
+    const r = await page.evaluate(() => aguaLaudoConferirIdentidade(
+      { data_coleta: 'ta: 24/09/2095 |', procedencia: 'Rio Purus / Santa Rosa' },
+      { data_coleta: '2025-09-24' },
+      { nome: 'Rio Purus', rio: 'Rio Purus', municipio: 'Santa Rosa', codigos_alias: [] },
+    ))
+    expect(r.nivel).toBe('confere')
+    expect(r.problemas).toHaveLength(0)
+    expect(r.avisos.some(a => a.motivo === 'ano_ilegivel')).toBe(true)
+  })
+
+  test('ano PLAUSÍVEL e diferente continua bloqueando — é outra campanha, não ruído', async ({ page }) => {
+    await comOcr(page)
+    const r = await page.evaluate(() => aguaLaudoConferirIdentidade(
+      { data_coleta: 'ta: 24/09/2024 |', procedencia: 'Rio Purus / Santa Rosa' },
+      { data_coleta: '2025-09-24' },
+      { nome: 'Rio Purus', rio: 'Rio Purus', municipio: 'Santa Rosa', codigos_alias: [] },
+    ))
+    expect(r.nivel).toBe('divergente')
+    expect(r.problemas.map(p => p.campo)).toContain('data_coleta')
+  })
+
+  test('letra trocada pelo scanner na procedência ainda confere', async ({ page }) => {
+    await comOcr(page)
+    const r = await page.evaluate(() => aguaLaudoConferirIdentidade(
+      { data_coleta: 'ta: 15/09/2025 |', procedencia: 'Rio Iqguiri/ Senador Guiomard |' },
+      { data_coleta: '2025-09-15' },
+      { nome: 'Rio Iquiri', rio: 'Rio Iquiri', municipio: 'Senador Guiomard', codigos_alias: [] },
+    ))
+    expect(r.nivel).toBe('confere')
+  })
+
+  test('identificação toda ilegível não confirma NEM contradiz — pede conferência humana, nunca acusa', async ({ page }) => {
+    await comOcr(page)
+    const r = await page.evaluate(() => aguaLaudoConferirIdentidade(
+      { data_coleta: '', procedencia: '' },
+      { data_coleta: '2025-09-15' },
+      { nome: 'Rio Iquiri', rio: 'Rio Iquiri', municipio: 'Senador Guiomard', codigos_alias: [] },
+    ))
+    expect(r.nivel).toBe('nao_confirmado')
+    expect(r.ok).toBe(false)          // não preenche sozinho
+    expect(r.problemas).toHaveLength(0)  // e não acusa amostra errada
+  })
+
+  test('tolerância não afrouxa a defesa: nome parecido de OUTRO ponto continua bloqueando', async ({ page }) => {
+    await comOcr(page)
+    const r = await page.evaluate(() => aguaLaudoConferirIdentidade(
+      { data_coleta: 'ta: 15/09/2025 |', procedencia: 'Rio Branco / Bujari' },
+      { data_coleta: '2025-09-15' },
+      { nome: 'Rio Iquiri', rio: 'Rio Iquiri', municipio: 'Senador Guiomard', codigos_alias: [] },
+    ))
+    expect(r.nivel).toBe('divergente')
+    expect(r.problemas.map(p => p.campo)).toContain('procedencia')
+  })
+
   test('alias cadastrado (grafia errada da série histórica) também confere, não só o nome oficial', async ({ page }) => {
     await comOcr(page)
     const r = await page.evaluate(() => aguaLaudoConferirIdentidade(
@@ -237,6 +301,20 @@ test.describe('pipeline completo no navegador, contra laudo real do QUILAB', () 
     for (const campo of Object.keys(TEMPLATE_QUILAB.campos)) {
       expect(r.campos[campo].recorteDataURL).toMatch(/^data:image\/png;base64,/)
     }
+  })
+
+  // O caso que reproduzia o bug relatado, ponta a ponta: neste laudo
+  // real o OCR lê o ano como "2095". Antes, isso bloqueava o
+  // preenchimento inteiro e a tela dizia que o laudo era de outra
+  // amostra. Agora libera, porque dia/mês e procedência confirmam.
+  test('amostra 9 — ano lido "2095" pelo scanner não impede mais o autofill', async ({ page }) => {
+    await comOcr(page)
+    const r = await processarFixture(page, 'quilab-amostra-9.pdf', {
+      coletaAberta: { data_coleta: '2025-09-24' },
+      ponto: { nome: 'Rio Purus', rio: 'Rio Purus', municipio: 'Santa Rosa', codigos_alias: [] },
+    })
+    expect(r.identidade.nivel).toBe('confere')
+    expect(Object.values(r.campos).some(c => c.valor != null)).toBe(true)
   })
 
   test('identidade de OUTRA amostra é detectada — nada preenchido quando a data não bate', async ({ page }) => {

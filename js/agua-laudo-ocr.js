@@ -163,39 +163,146 @@ function aguaLaudoInterpretarValor(textoOcr, casasDecimais) {
 
 // ── Trava de identidade (§3.3 do plano) ───────────────────────
 // Compara o que o PDF diz sobre a amostra com a coleta ABERTA na
-// tela. Divergiu qualquer um: NÃO preenche nada — devolve o confronto
-// para a tela mostrar. Normalização tolerante a acento/maiúscula
-// porque é o laboratório digitando à mão, não um sistema.
+// tela. É a defesa contra lançar o laudo do ponto A na coleta do
+// ponto B — nunca foi, e nunca pode virar, um simples aviso.
+//
+// POR QUE ELA NÃO PODE COMPARAR TEXTO DE OCR LITERALMENTE
+// Achado real, medido contra os laudos do QUILAB no navegador (a
+// mesma medição que gerou o alerta da migration 309 para o campo
+// `recebimento`): o ANO sai com um dígito trocado com frequência —
+// "24/09/2025" lido como "24/09/2095" — e a procedência vem com
+// letra a mais ou a menos ("Rio Iquiri" → "Rio Iqguiri"). A 1ª
+// versão comparava data por IGUALDADE e procedência por SUBSTRING
+// exata: um único caractere errado do scanner bloqueava TODO o
+// preenchimento e ainda acusava, em vermelho, que o laudo era de
+// outra amostra — falso, e exatamente o que fazia o técnico desistir
+// da leitura automática. O erro de OCR ficou provado sem sombra:
+// `recebimento` já tinha essa proteção (aguaLaudoExtrairDataPlausivel)
+// e `data_coleta`, que é quem BLOQUEIA, nunca ganhou.
+//
+// A REGRA QUE VALE AGORA — três estados, nunca dois:
+//   'divergente'      contradição de verdade (dia/mês de outro dia,
+//                     ano plausível e diferente, procedência de outro
+//                     ponto). Bloqueia, como sempre bloqueou.
+//   'nao_confirmado'  nada legível o bastante para CONFIRMAR, e nada
+//                     que contradiga. Não preenche sozinho: pede ao
+//                     técnico que olhe o recorte e libere.
+//   'confere'         pelo menos uma confirmação FORTE e nenhuma
+//                     contradição. Libera, listando em `avisos` o que
+//                     foi aceito apesar de ruído de OCR.
+// Ilegível nunca é contradição — só deixa de confirmar. É essa
+// distinção que separa "o scanner borrou" de "é outra amostra".
 function _normalizar(s) {
   return (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim()
 }
 
-function aguaLaudoConferirIdentidade(lido, coletaAberta, ponto) {
-  const problemas = []
+// Distância de Levenshtein — determinística e curta (o texto aqui tem
+// dezenas de caracteres, nunca vale otimizar). Existe só para tolerar
+// o ruído do scanner; NUNCA para "adivinhar" um ponto parecido.
+function _distancia(a, b) {
+  const m = a.length, n = b.length
+  if (!m) return n
+  if (!n) return m
+  let anterior = Array.from({ length: n + 1 }, (_, j) => j)
+  for (let i = 1; i <= m; i++) {
+    const atual = [i]
+    for (let j = 1; j <= n; j++) {
+      atual[j] = Math.min(
+        anterior[j] + 1,
+        atual[j - 1] + 1,
+        anterior[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1),
+      )
+    }
+    anterior = atual
+  }
+  return anterior[n]
+}
 
-  // Data da coleta: dd/mm/aaaa no laudo × data_coleta (ISO) na tela.
+// Tolerância proporcional ao tamanho da palavra: 1 erro até 7 letras,
+// 2 até 11, e assim por diante. Palavra curta quase não tolera erro —
+// é o que impede "Purus" de casar com "Purús de outro lugar" ou com
+// um nome curto qualquer.
+function _pareceMesmaPalavra(a, b) {
+  if (a === b) return true
+  const limite = Math.max(1, Math.floor(Math.max(a.length, b.length) / 4))
+  return _distancia(a, b) <= limite
+}
+
+const _PALAVRAS_VAZIAS = new Set(['rio', 'igarape', 'lago', 'estacao', 'ponto', 'de', 'do', 'da', 'dos', 'das', 'e'])
+
+function _tokens(s) {
+  return _normalizar(s).split(/[^a-z0-9]+/).filter(t => t.length >= 3 && !_PALAVRAS_VAZIAS.has(t))
+}
+
+// Um candidato (nome do ponto, rio, município, alias) "aparece" no
+// texto do laudo quando a MAIORIA das palavras significativas dele
+// tem correspondente aproximado no texto lido. Casar uma palavra só
+// de um nome composto não basta — senão "Rio Acre" casaria com
+// qualquer laudo que mencione um rio.
+function _apareceNoTexto(candidato, textoLido) {
+  const alvo = _tokens(candidato)
+  const texto = _tokens(textoLido)
+  if (!alvo.length || !texto.length) return false
+  const casados = alvo.filter(t => texto.some(u => _pareceMesmaPalavra(t, u))).length
+  return casados >= Math.ceil(alvo.length / 2)
+}
+
+function aguaLaudoConferirIdentidade(lido, coletaAberta, ponto) {
+  const problemas = []     // contradições — bloqueiam
+  const avisos = []        // aceito apesar de ruído de OCR, ou ilegível
+  const confirmacoes = []  // o que de fato confirmou a amostra
+
+  // ── Data da coleta ──────────────────────────────────────────
+  // dd/mm/aaaa no laudo × data_coleta (ISO) na tela. Dia e mês são
+  // confiáveis (medido); o ano é o dígito que o OCR troca.
   const m = (lido.data_coleta || '').match(/(\d{2})\/(\d{2})\/(\d{4})/)
   if (m && coletaAberta.data_coleta) {
-    const doPdf = `${m[3]}-${m[2]}-${m[1]}`
-    if (doPdf !== coletaAberta.data_coleta) {
-      problemas.push({ campo: 'data_coleta', pdf: `${m[1]}/${m[2]}/${m[3]}`, tela: coletaAberta.data_coleta })
+    const [, dia, mes, ano] = m
+    const [anoTela, mesTela, diaTela] = coletaAberta.data_coleta.split('-')
+    const anoNum = Number(ano)
+    const anoAtual = new Date().getFullYear()
+    const anoPlausivel = anoNum >= 2015 && anoNum <= anoAtual + 1
+
+    if (dia === diaTela && mes === mesTela) {
+      if (ano === anoTela) {
+        confirmacoes.push({ campo: 'data_coleta', valor: `${dia}/${mes}/${ano}` })
+      } else if (!anoPlausivel) {
+        // Ano impossível: é o erro de dígito conhecido do scanner, não
+        // outra amostra. Dia e mês batendo já confirmam — mas só de
+        // forma FRACA, então isto sozinho não libera o autofill.
+        avisos.push({ campo: 'data_coleta', pdf: `${dia}/${mes}/${ano}`, tela: coletaAberta.data_coleta, motivo: 'ano_ilegivel' })
+      } else {
+        problemas.push({ campo: 'data_coleta', pdf: `${dia}/${mes}/${ano}`, tela: coletaAberta.data_coleta })
+      }
+    } else {
+      problemas.push({ campo: 'data_coleta', pdf: `${dia}/${mes}/${ano}`, tela: coletaAberta.data_coleta })
     }
   } else if (coletaAberta.data_coleta) {
-    problemas.push({ campo: 'data_coleta', pdf: lido.data_coleta || '(não lido)', tela: coletaAberta.data_coleta, semData: true })
+    // Não deu para ler a data: não confirma NADA, mas também não
+    // contradiz nada. Antes isto bloqueava — era a causa mais comum
+    // de "o laudo parece ser de outra amostra" em laudo legítimo.
+    avisos.push({ campo: 'data_coleta', pdf: lido.data_coleta || '(não lido)', tela: coletaAberta.data_coleta, motivo: 'ilegivel' })
   }
 
-  // Procedência: precisa mencionar o nome do ponto OU o rio OU algum
-  // alias — nunca o inverso (o laudo escreve livre, "Rio X / Bairro
-  // Y"), então basta achar QUALQUER identificador do ponto no texto.
+  // ── Procedência ─────────────────────────────────────────────
+  // O laudo escreve livre ("Rio X / Bairro Y"), então basta achar
+  // QUALQUER identificador do ponto no texto — agora por semelhança,
+  // não por substring exata (o OCR troca letra).
   const texto = _normalizar(lido.procedencia)
-  const candidatos = [ponto?.nome, ponto?.rio, ponto?.municipio, ...(ponto?.codigos_alias || [])]
-    .filter(Boolean).map(_normalizar)
-  const bate = candidatos.some(c => c && (texto.includes(c) || c.includes(texto)))
-  if (!bate && texto) {
+  const candidatos = [ponto?.nome, ponto?.rio, ponto?.municipio, ...(ponto?.codigos_alias || [])].filter(Boolean)
+  if (!texto) {
+    avisos.push({ campo: 'procedencia', pdf: '(não lido)', tela: `${ponto?.nome || ''} (${ponto?.rio || ''})`, motivo: 'ilegivel' })
+  } else if (candidatos.some(c => _apareceNoTexto(c, texto))) {
+    confirmacoes.push({ campo: 'procedencia', valor: lido.procedencia })
+  } else {
     problemas.push({ campo: 'procedencia', pdf: lido.procedencia || '(não lido)', tela: `${ponto?.nome || ''} (${ponto?.rio || ''})` })
   }
 
-  return { ok: problemas.length === 0, problemas }
+  const nivel = problemas.length ? 'divergente'
+    : confirmacoes.length ? 'confere'
+    : 'nao_confirmado'
+
+  return { ok: nivel === 'confere', nivel, problemas, avisos, confirmacoes }
 }
 
 // ── Data de recebimento no laboratório (prazo de preservação) ──
