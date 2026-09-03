@@ -278,6 +278,7 @@ function abrirLaudo(id) {
 
   _origemDados = {}
   _resultadoParser = null
+  _identidadeLiberada = false
   document.getElementById('lz-prazo-alerta').innerHTML = ''
   document.getElementById('lz-parser-area').style.display = 'none'
   document.getElementById('lz-identidade-alerta').innerHTML = ''
@@ -293,6 +294,16 @@ function abrirLaudo(id) {
 let _origemDados = {}       // {parametro: 'parser'|'digitado'|'corrigido_apos_parser'}
 let _resultadoParser = null
 let _valoresPropostos = {}  // {parametro: valor} — o que foi ACEITO do parser, para detectar edição manual depois
+// Só vale para o estado 'nao_confirmado' (identificação ilegível no
+// papel). NUNCA libera 'divergente': contradição confirmada continua
+// sendo bloqueio, sem botão de escape — é a razão de a trava existir.
+let _identidadeLiberada = false
+
+function lzLiberarIdentidade() {
+  if (_resultadoParser?.identidade?.nivel !== 'nao_confirmado') return
+  _identidadeLiberada = true
+  lzMontarConferenciaParser()
+}
 
 function lzArquivoEscolhido() {
   const arquivo = document.getElementById('lz-arquivo').files[0]
@@ -301,6 +312,7 @@ function lzArquivoEscolhido() {
   document.getElementById('lz-identidade-alerta').innerHTML = ''
   document.getElementById('lz-conferencia-parser').innerHTML = ''
   _resultadoParser = null
+  _identidadeLiberada = false
 }
 
 async function lzLerLaudoAutomatico() {
@@ -349,25 +361,65 @@ async function lzLerLaudoAutomatico() {
   }
 }
 
+// Recorte da identidade lado a lado com o que a tela tem — a MESMA
+// razão de mostrar o recorte de cada valor: quando o OCR erra, só a
+// imagem do papel desempata. Antes os recortes já eram calculados e
+// devolvidos por aguaLaudoProcessarPdf e a tela nunca os exibia.
+function _lzRecorteIdentidadeHTML(campo, textoTela) {
+  const url = _resultadoParser?.identidade?.recortes?.[campo]
+  const rotulo = campo === 'data_coleta' ? 'Data da coleta' : 'Procedência'
+  return `<div style="display:flex;align-items:center;gap:8px;margin-top:6px">
+    <div style="min-width:104px;font-size:11.5px;opacity:.85">${rotulo} no laudo</div>
+    ${url ? `<img src="${url}" alt="recorte de ${esc(rotulo.toLowerCase())} no laudo" style="height:24px;border:1px solid #E5E7EB;border-radius:4px;background:#fff">`
+          : '<span style="font-size:11.5px;opacity:.7">(não foi possível recortar)</span>'}
+    <div style="font-size:11.5px;opacity:.85">· na coleta aberta: <strong>${esc(textoTela)}</strong></div>
+  </div>`
+}
+
 function lzMontarConferenciaParser() {
   const r = _resultadoParser
   if (!r) return
 
   const alertaEl = document.getElementById('lz-identidade-alerta')
-  if (!r.identidade.ok) {
+  const nivel = r.identidade.nivel || (r.identidade.ok ? 'confere' : 'divergente')
+
+  // Contradição de verdade — o laudo é de OUTRA amostra. Bloqueia,
+  // como sempre bloqueou; agora com o recorte junto, para o técnico
+  // conferir sem abrir o PDF.
+  if (nivel === 'divergente') {
     alertaEl.innerHTML = `<div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:8px;padding:10px 12px;font-size:12.5px;color:#991B1B;margin:8px 0">
       <div style="font-weight:600;margin-bottom:4px">O laudo parece ser de outra amostra — nada foi preenchido automaticamente</div>
       <ul style="margin:4px 0 0;padding-left:18px">
         ${r.identidade.problemas.map(p => `<li>${esc(p.campo === 'data_coleta' ? 'Data da coleta' : 'Procedência')}: o laudo diz "${esc(p.pdf)}", a coleta aberta é "${esc(p.tela)}"</li>`).join('')}
       </ul>
+      ${r.identidade.problemas.map(p => _lzRecorteIdentidadeHTML(p.campo, p.tela)).join('')}
       <div style="margin-top:6px">Confira se escolheu o laudo certo antes de digitar manualmente.</div>
     </div>`
     document.getElementById('lz-conferencia-parser').innerHTML = ''
     return
   }
 
+  // Nada legível o bastante para confirmar, e nada que contradiga —
+  // scanner ruim, não amostra errada. Não preenche sozinho: mostra o
+  // recorte e deixa o técnico liberar com o olho dele.
+  if (nivel === 'nao_confirmado' && !_identidadeLiberada) {
+    alertaEl.innerHTML = `<div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:8px;padding:10px 12px;font-size:12.5px;color:#92400E;margin:8px 0">
+      <div style="font-weight:600;margin-bottom:4px">Não deu para confirmar sozinho que este laudo é desta amostra</div>
+      <div>A leitura da identificação saiu ilegível — o que não quer dizer que o laudo esteja errado. Compare o recorte do papel com a coleta aberta e libere, se for a mesma.</div>
+      ${(r.identidade.avisos || []).map(a => _lzRecorteIdentidadeHTML(a.campo, a.tela)).join('')}
+      <button class="btn btn-xs btn-secondary" type="button" style="margin-top:8px" onclick="lzLiberarIdentidade()">Conferi o recorte — é esta amostra</button>
+    </div>`
+    document.getElementById('lz-conferencia-parser').innerHTML = ''
+    return
+  }
+
+  const avisos = (r.identidade.avisos || []).filter(a => a.motivo === 'ano_ilegivel')
   alertaEl.innerHTML = `<div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:8px;padding:8px 12px;font-size:12.5px;color:#166534;margin:8px 0">
-    Identidade da amostra confere com o laudo (${esc(r.numeroLaudo || 'nº não lido')}). Confira cada valor abaixo antes de aceitar — o recorte da imagem é a prova, o texto lido pode errar um dígito.
+    ${_identidadeLiberada
+      ? 'Identidade liberada por conferência sua — a leitura automática do papel estava ilegível.'
+      : `Identidade da amostra confere com o laudo (${esc(r.numeroLaudo || 'nº não lido')}).`}
+    Confira cada valor abaixo antes de aceitar — o recorte da imagem é a prova, o texto lido pode errar um dígito.
+    ${avisos.map(a => `<div style="margin-top:4px">Dia e mês da coleta batem; o ano saiu ilegível no papel ("${esc(a.pdf)}") — erro conhecido do scanner, não da amostra.</div>`).join('')}
   </div>`
 
   const TODOS = [...CAMPO_FIELDS, ...LAB_FIELDS]
