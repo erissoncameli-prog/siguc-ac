@@ -3021,11 +3021,73 @@ RPC, compara número com número e desenha. Seis tipos, três níveis:
   exercita a página REAL do app e cobra que a coleta seja salva
   mesmo com alerta na tela.
 - `pwa/sw.js`: agua 19 → 20.
-- **Achado de dado, novo**: ortofosfato dissolvido > fósforo total em
-  273 de 310 coletas (88%) — e NÃO é a conversão PO₄/P (daria fator
-  fixo 3,07): razão mediana 8,6, quartis 2,9 e 30,9, persistente em
-  todos os anos. Nada foi corrigido — é conferência humana com o laudo
-  físico, como os sólidos em suspensão.
+- **Achado de dado — revisado nas migrations 329/330.** Ortofosfato
+  dissolvido > fósforo total em 273 de 310 coletas (88%). A redação
+  anterior aqui dizia que "NÃO é a conversão PO₄/P"; isso está
+  PARCIALMENTE errado e foi corrigido lendo o laudo físico do QUILAB
+  (`tests/fixtures/laudos/`), que declara `Fosforo Total → mg/l P` e
+  `Ortofosfato Dissolvido → mg/l`, SEM base. Reportar o ortofosfato
+  como o íon PO₄ é prática do Standard Methods 4500-P e explica razão
+  de até 94,97/30,97 = **3,066** — o limiar do alerta passou a
+  respeitar isso (migration 330). Mas é um TETO, não a explicação
+  geral: medido, 42 das 310 já eram coerentes lendo como P, 52 deixam
+  de alertar com a base PO₄ e **216 (69,7%) seguem incoerentes mesmo
+  convertidas** (mediana 8,6; 2019 é ano à parte, ortofosfato mediano
+  8,13 mg/L contra fósforo total 0,022 — outra ordem de grandeza).
+  Segue pendente de resposta do laboratório em que base o ortofosfato
+  é de fato reportado.
+- **Sólidos em suspensão — a suspeita de erro de DIGITAÇÃO da 253 está
+  errada quanto à origem.** O laudo do QUILAB imprime, ele mesmo,
+  `Sólidos Suspensos — mg/l — 0,297` e `0,039`; o banco reproduz o
+  laudo fielmente. 0,039 mg/L de suspensão com 214 mg/L de dissolvidos
+  não é crível, mas isso é pergunta para o LABORATÓRIO — nenhuma
+  planilha de série histórica resolve, e as 228 linhas em quarentena
+  seguem esperando essa resposta.
+
+## Conferência da planilha de série histórica (Água, migrations 329/330)
+Planilha "Verificação de Dados (IQA 2026) SÓLIDOS TOTAIS" enviada pela
+SEMA, conferida célula a célula contra o banco (450 linhas, alinhadas
+por data+estação, zero desalinhamento).
+
+- **A coluna `Sólidos Totais` NÃO é dado novo e não foi importada.** É a
+  SOMA de `solidos_suspensao_totais + solidos_dissolvidos_totais` que o
+  banco já tem — a soma das 450 linhas bate exatamente (23.937,357026
+  dos dois lados, diferença 0). A planilha NÃO traz coluna de sólidos
+  dissolvidos nem de suspensão separadas, então **não resolve nenhuma
+  das 228 linhas em quarentena por sólidos**; e 82 linhas de 2016–2021
+  trazem `0` onde o banco não tem medição (importar trocaria "não
+  medido" por "medido igual a zero"). Registrado para que a próxima
+  sessão não reabra a mesma conferência.
+- **O que a planilha trouxe de real foi pH**: 21 linhas divergiam, com
+  o BANCO errado — seis fora da escala 0–14 (16,36 · 14,74 · 14,39 ·
+  13,29 · 12,52 · 12,50) e uma em 1,62. Corrigidas na 329, com o valor
+  antigo no `WHERE` (não sobrescreve correção manual em silêncio) e
+  guarda que falha alto se sobrar pH fora de 4–9. 13 das 21 mudam de
+  faixa do IQA; nenhuma muda de status (as 13 de 2024 seguem em
+  quarentena pelo motivo de SÓLIDOS, que continua valendo — só a
+  sentença do pH sai do texto do motivo).
+- ⚠️ **A série histórica não serve de referência para linha cujo INPUT
+  foi corrigido.** 18 das 21 estão entre as 268 linhas com IQA
+  calculado na planilha, e esse IQA foi calculado COM o pH errado —
+  medido: com elas, `tests/agua-iqa.test.js` cai para ±5 84,7% e
+  r 0,883 (abaixo dos pisos); sem elas, mediana 0,785 · ±5 90,4% ·
+  ±10 99,2% · r 0,950. O teste exclui as 18 (`LINHAS_PH_CORRIGIDO`) e
+  trava o TAMANHO da exclusão em 18, para não afrouxar em silêncio. O
+  outro teste do arquivo (faixa derivada) NÃO exclui nada — compara a
+  planilha consigo mesma, não depende do nosso cálculo.
+- ⚠️ `tests/agua-iqa.test.js` só roda com `/api/env` servido (é o que
+  cria `window.db`): servidor estático puro não basta. Ganhou o mesmo
+  guard de `executablePath` de `agua-alertas.test.js`, mas segue não
+  executável em sandbox sem essa rota — nesta entrega a conta dele foi
+  reproduzida por SQL contra produção, não pelo teste.
+- `docs/qualidade-agua/serie-historica.csv` foi realinhado ao banco:
+  os 21 pH e a linha 68 (`4.48` → `0.00448`, corrigida no banco pela
+  318 mas nunca no CSV). ⚠️ O arquivo é **CRLF**: editar com
+  `split('\n')`/rejoin troca todas as 451 terminações e o diff vira o
+  arquivo inteiro — editar por substituição de BYTES, ancorada nos
+  campos vizinhos.
+- Sem mudança em `pwa/sw.js`: a entrega é banco + docs + teste, nenhum
+  arquivo de shell de app.
 
 ## Regra do sistema — leitura assistida do laudo em PDF (Água)
 Entrega 2 do plano em `docs/qualidade-agua/plano-leitura-laudo-e-alertas.md`

@@ -41,6 +41,15 @@ const path = require('path');
 
 const BASE = process.env.TEST_BASE_URL || 'http://localhost:5500';
 
+// Mesmo guard de tests/agua-alertas.test.js: em ambiente de execução
+// remota o Chromium vem de /opt/pw-browsers e o headless shell que o
+// Playwright procura por padrão não existe. Fora desse ambiente o
+// caminho não existe e nada muda.
+const CHROMIUM_PATH = '/opt/pw-browsers/chromium';
+if (fs.existsSync(CHROMIUM_PATH)) {
+  test.use({ launchOptions: { executablePath: CHROMIUM_PATH } });
+}
+
 // index.html expõe `window.db` justamente para os testes de RPC
 // pública read-only, e não exige sessão.
 const PAGINA = `${BASE}/index.html`;
@@ -52,6 +61,23 @@ const BASELINE_MEDIANA = 1.75;
 // Serve para que um refino futuro que piore o resultado não passe
 // despercebido só por ainda estar abaixo do baseline antigo.
 const TETO_MEDIANA = 1.10;
+
+// ⚠ 18 linhas SAEM da regressão da série (migration 329).
+// O pH delas estava errado no banco E na planilha de origem — seis
+// fora da escala 0–14 (16,36 · 14,74 · 14,39 · 13,29 · 12,52 · 12,50)
+// e uma em 1,62. A conferência da planilha "Verificação de Dados
+// (IQA 2026)" corrigiu os 21 valores; 18 deles caem em linhas que têm
+// IQA calculado na planilha. Esse IQA histórico foi calculado COM o pH
+// errado, então comparar o cálculo certo contra ele é comparar com uma
+// referência sabidamente ruim: medido, as 268 linhas dariam ±5 84,7% e
+// r 0,883 (abaixo dos pisos abaixo) só por causa dessas 18. Sem elas:
+// mediana 0,785 · ±5 90,4% · ±10 99,2% · r 0,950.
+// Elas continuam valendo no OUTRO teste (a faixa derivada), que compara
+// a planilha consigo mesma e não depende do nosso cálculo.
+const LINHAS_PH_CORRIGIDO = new Set([
+  '175','176','178','179','180','181','182','183',
+  '366','367','368','369','370','371','372','373','374','375','376','377','378',
+]);
 
 // ── Leitura da série histórica ────────────────────────────────
 // Só normalização de texto — nenhuma conta do IQA acontece aqui.
@@ -201,8 +227,13 @@ test('a série histórica é reproduzida dentro da tolerância', async ({ page }
   test.setTimeout(300_000);
   await abrir(page);
 
-  const linhas = amostras();
-  expect(linhas.length).toBe(268);   // pega CSV trocado ou truncado
+  const todas = amostras();
+  expect(todas.length).toBe(268);    // pega CSV trocado ou truncado
+  const linhas = todas.filter(r => !LINHAS_PH_CORRIGIDO.has(String(r.linha)));
+  // Trava o tamanho da exclusão: se a lista crescer sem alguém mexer
+  // aqui de propósito, o teste acusa em vez de afrouxar em silêncio.
+  expect(todas.length - linhas.length).toBe(18);
+  expect(linhas.length).toBe(250);
 
   // ΔT neutro: mesmo método com que a planilha foi calculada.
   const comSat = (await comSaturacao(page, linhas)).map(r => ({ ...r, dt: null }));
