@@ -3036,13 +3036,23 @@ RPC, compara número com número e desenha. Seis tipos, três níveis:
   8,13 mg/L contra fósforo total 0,022 — outra ordem de grandeza).
   Segue pendente de resposta do laboratório em que base o ortofosfato
   é de fato reportado.
-- **Sólidos em suspensão — a suspeita de erro de DIGITAÇÃO da 253 está
-  errada quanto à origem.** O laudo do QUILAB imprime, ele mesmo,
-  `Sólidos Suspensos — mg/l — 0,297` e `0,039`; o banco reproduz o
-  laudo fielmente. 0,039 mg/L de suspensão com 214 mg/L de dissolvidos
-  não é crível, mas isso é pergunta para o LABORATÓRIO — nenhuma
-  planilha de série histórica resolve, e as 228 linhas em quarentena
-  seguem esperando essa resposta.
+- **Sólidos em suspensão — a mensagem do alerta contemplava só metade
+  do problema (corrigido na migration 331).** Ela dizia "provável valor
+  em g/L lançado como mg/L", acusando a DIGITAÇÃO. Os dois ramos são
+  reais: a 318 confirmou 108 linhas exatamente 1000x fora (erro de
+  lançamento de verdade), mas os laudos do QUILAB conferidos imprimem,
+  eles mesmos, `Sólidos Suspensos — mg/l — 0,297` e `0,039` — ali o
+  banco reproduz o laudo fielmente e mandar conferir a digitação faz o
+  técnico procurar onde não há o que achar. 0,039 mg/L de suspensão com
+  214 mg/L de dissolvidos não é crível, mas isso é pergunta para o
+  LABORATÓRIO. **O limiar (`v_sst / v_turb < 0.01`, turbidez > 10), o
+  tipo (`unidade`) e o nível (`confirmar`) NÃO mudaram** — só o texto:
+  não havia número no laudo que justificasse recalibrar (diferente do
+  ortofosfato, onde o fator 3,066 é dado), e mexer no limiar seria só
+  escolher um valor que faz o alerta calar. 228 em quarentena e 296
+  linhas disparando o alerta, antes e depois. Nenhuma planilha de série
+  histórica resolve isso — as 228 seguem esperando a resposta do
+  laboratório.
 
 ## Conferência da planilha de série histórica (Água, migrations 329/330)
 Planilha "Verificação de Dados (IQA 2026) SÓLIDOS TOTAIS" enviada pela
