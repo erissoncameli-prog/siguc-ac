@@ -3083,6 +3083,36 @@ reimplementar numa página). Os dois vendorizados em `js/vendor/`
 - Guarda: `tests/agua-laudo-parser.test.js` (10 testes, pipeline real
   no Chromium, contra páginas REAIS extraídas do lote enviado —
   `tests/fixtures/laudos/`, nunca fixture sintética).
+- ⚠️ **A trava de identidade NÃO pode comparar texto de OCR
+  literalmente — bug real relatado em produção: "não consegui fazer
+  ele ler o laudo em PDF".** Medido no navegador contra os dois
+  laudos reais do QUILAB: em um deles o ANO sai com dígito trocado
+  ("24/09/2025" lido "24/09/2095") e a procedência vem com letra a
+  mais ("Rio Iquiri" → "Rio Iqguiri"). A 1ª versão comparava data por
+  IGUALDADE e procedência por SUBSTRING exata, então UM caractere
+  errado do scanner bloqueava todo o preenchimento e ainda acusava,
+  em vermelho, que o laudo era de outra amostra. É o mesmo modo de
+  falha que a migration 309 já tinha documentado para `recebimento`
+  — só que `data_coleta`, que é quem BLOQUEIA, nunca ganhou a
+  proteção. **Ilegível nunca é contradição**: `aguaLaudoConferirIdentidade`
+  passou a devolver TRÊS estados — `divergente` (contradição real:
+  dia/mês de outro dia, ano plausível e diferente, procedência de
+  outro ponto → bloqueia como sempre), `nao_confirmado` (nada legível
+  o bastante; a tela mostra o RECORTE do papel e o técnico libera com
+  o olho dele — nunca há botão de escape para `divergente`) e
+  `confere` (≥1 confirmação forte e nenhuma contradição). Ano
+  implausível (fora de 2015..ano+1) com dia e mês batendo é ruído de
+  scanner, não outra amostra; procedência casa por semelhança
+  (Levenshtein com tolerância de 1 erro a cada 4 letras, exigindo a
+  MAIORIA das palavras significativas do nome — casar uma palavra só
+  faria "Rio Acre" bater com qualquer laudo que cite um rio).
+  Guarda: 6 testes novos em `tests/agua-laudo-parser.test.js` (18 no
+  total), verificado que reprovam a versão antiga.
+- **Os recortes da identidade agora são EXIBIDOS.** Eram calculados e
+  devolvidos por `aguaLaudoProcessarPdf` desde a Entrega 2 e nenhuma
+  tela mostrava — a mesma razão de mostrar o recorte de cada valor
+  (só a imagem do papel desempata quando o OCR erra) vale para a
+  identificação, e é o que sustenta a liberação manual.
 - Sem mudança em `pwa/sw.js`: `agua-laudos.html` é tela de mesa, não
   app de campo.
 - Pendente para a Entrega 3: cadastro de template pela mesa (hoje é
@@ -3127,6 +3157,36 @@ continuam sem amostra/necessidade real, registradas como estão).
   total).
 - Sem mudança em `pwa/sw.js`: `agua-pontos.html` e `agua-laudos.html`
   são telas de mesa, não app de campo.
+
+**Pós-lançamento — filtros por atributo na conferência de quarentena.**
+`pages/agua-conferencia.html` tinha só busca de texto para ~230 linhas.
+Ganhou 7 filtros (ano, campanha, bacia, rio, município, ponto, tipo de
+inconsistência), todos client-side sobre a lista já carregada — a
+quarentena inteira cabe numa consulta só, então trocar filtro não vai
+ao banco.
+- **Filtro COMBINA com a busca de texto e com os outros**, nunca
+  substitui — é o modo de falha clássico de filtro novo em tela que já
+  filtrava, e está travado por teste.
+- **Cada select lista só o que EXISTE na quarentena** (opção que não
+  recortaria nada é promessa falsa) e a escolha sobrevive ao próximo
+  render (`agPreencherSelect` preserva o valor; recriar as opções sem
+  isso apagaria o filtro recém-aplicado).
+- **Tipo de inconsistência é DERIVADO por palavra-chave, nunca gravado.**
+  `quarentena_motivo` é frase com o valor medido dentro ("Sólidos em
+  suspensão preenchidos (0.321 mg/L) — …"), então nenhum motivo se
+  repete literalmente e agrupar pelo texto cru daria ~180 opções de uma
+  linha cada. Motivo que não casa com nenhuma chave cai em 'Outro' e
+  **continua visível** — esconder linha por falta de rótulo perderia
+  trabalho de conferência, que é o que esta tela existe para evitar.
+- Lista vazia por FILTRO diz outra frase que lista vazia por quarentena
+  zerada — a mesma frase faria o conferente achar que a fila acabou.
+- `rio`/`bacia`/`municipio` entraram no `select` do join com
+  `agua_pontos_coleta` (a coluna existia, o join é que não a trazia).
+- Guarda: `tests/agua-conferencia-filtros.test.js` (9 testes, página
+  real com cliente Supabase stubado — mesmo contorno de
+  `tests/agua-guia-mesa.test.js`: sem bloquear o CDN o supabase-js real
+  sobrescreve o stub e a página cai no login).
+- Sem mudança em `pwa/sw.js`: tela de mesa.
 
 ## Regra do sistema — etiqueta do frasco de amostra (Água, Fase 1 — migration 325)
 Impressão térmica Bluetooth portátil, pedida pelo usuário. Plano

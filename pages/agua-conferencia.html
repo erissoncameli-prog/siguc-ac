@@ -118,9 +118,25 @@ let _coletas = [], _labs = [], _editandoId = null
         e decidir: corrigir e promover, ou manter quarentenada com justificativa.
       </p>
       <div id="ag-kpis"></div>
-      <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
-        <input class="form-control" id="ag-filtro" placeholder="Filtrar por ponto, código ANA ou nº da linha..." style="max-width:340px" oninput="renderLista()">
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
+        <input class="form-control" id="ag-filtro" placeholder="Filtrar por ponto, código ANA, código da amostra ou nº da linha..." style="max-width:340px" oninput="renderLista()">
         <span id="ag-contador" style="font-size:12px;color:#6B7280"></span>
+      </div>
+      <!-- Filtros por atributo. Todos operam sobre as coletas JÁ
+           carregadas (a quarentena inteira cabe numa consulta só), então
+           trocar filtro não vai ao banco e nunca perde o que a busca de
+           texto já recortou — os dois se combinam. Cada select só lista
+           o que EXISTE na quarentena: opção que não filtraria nada seria
+           promessa falsa. -->
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap" id="ag-filtros-attr">
+        <select class="form-control" id="ag-f-ano"      style="width:auto;min-width:145px" onchange="renderLista()"></select>
+        <select class="form-control" id="ag-f-campanha" style="width:auto;min-width:175px" onchange="renderLista()"></select>
+        <select class="form-control" id="ag-f-bacia"    style="width:auto;min-width:175px" onchange="renderLista()"></select>
+        <select class="form-control" id="ag-f-rio"      style="width:auto;min-width:165px" onchange="renderLista()"></select>
+        <select class="form-control" id="ag-f-municipio" style="width:auto;min-width:200px" onchange="renderLista()"></select>
+        <select class="form-control" id="ag-f-ponto"    style="width:auto;min-width:185px" onchange="renderLista()"></select>
+        <select class="form-control" id="ag-f-motivo"   style="width:auto;min-width:265px" onchange="renderLista()"></select>
+        <button class="btn btn-xs btn-ghost" id="ag-limpar" onclick="limparFiltros()" style="display:none">Limpar filtros</button>
       </div>
       <div class="card"><div class="table-wrap"><div class="table-scroll">
         <table>
@@ -145,7 +161,10 @@ async function carregarLabsAtivos() {
 async function carregarLista() {
   const [{ data, error }, { data: statusRows }] = await Promise.all([
     db.from('agua_coletas')
-      .select('*, agua_pontos_coleta(nome,codigo_ana), agua_campanhas(ano,ordem)')
+      // rio/bacia/municipio entram aqui por causa dos filtros — são do
+      // PONTO, não da coleta, e sem eles no select os selects abaixo
+      // nasceriam vazios (a coluna existe, o join é que não a trazia).
+      .select('*, agua_pontos_coleta(nome,codigo_ana,rio,bacia,municipio), agua_campanhas(ano,ordem)')
       .eq('status', 'quarentena')
       .order('linha_origem_planilha'),
     db.from('agua_coletas').select('status'),
@@ -156,6 +175,7 @@ async function carregarLista() {
   const totalColetas = (statusRows || []).length
   document.getElementById('ag-kpis').innerHTML = aguaKpisQuarentenaHTML(_coletas, totalColetas,
     c => `linha ${c.linha_origem_planilha ?? '—'} · ${c.agua_pontos_coleta?.nome || ''}`, counts, 'ag-kpis')
+  agMontarFiltros()
   renderLista()
 }
 
@@ -170,17 +190,115 @@ function aguaContarInconsistencias(motivo) {
   return motivo ? motivo.split(' | ').filter(s => s.trim()).length : 0
 }
 
+// ── Tipo de inconsistência ──────────────────────────────────────
+// `quarentena_motivo` é FRASE, não código: cada segmento traz o valor
+// medido dentro do texto ("Sólidos em suspensão preenchidos (0.321
+// mg/L) — incoerente…"), então nenhum motivo se repete literalmente e
+// agrupar pelo texto cru daria ~180 opções de uma linha cada. A
+// categoria sai de palavra-chave sobre o segmento — leitura, nunca
+// gravação: NADA aqui reclassifica coleta nenhuma no banco, é só um
+// recorte de tela. Motivo que não casar com nenhuma chave cai em
+// 'Outro' e continua visível — nunca sumir com linha por não saber
+// rotulá-la é a mesma cautela da quarentena aparecer no gráfico.
+const AG_MOTIVO_CATEGORIAS = [
+  ['solidos',   'Sólidos em suspensão (unidade)', /sólidos em suspens/i],
+  ['od',        'OD acima da saturação',          /\bOD\b|satura[çc]/i],
+  ['ph',        'pH fora da faixa física',        /\bpH\b/i],
+  ['ano',       'Ano da campanha divergente',     /ano da campanha/i],
+  ['sem_lab',   'Laudo sem resultado de lab.',    /sem nenhum resultado/i],
+]
+
+function agCategoriasDoMotivo(motivo) {
+  const segmentos = (motivo || '').split(' | ').filter(s => s.trim())
+  const achadas = new Set()
+  for (const seg of segmentos) {
+    const cat = AG_MOTIVO_CATEGORIAS.find(([, , re]) => re.test(seg))
+    achadas.add(cat ? cat[0] : 'outro')
+  }
+  return achadas
+}
+
+// Preenche um select com o que EXISTE na quarentena, preservando a
+// escolha atual (renderLista é chamada a cada troca; recriar as opções
+// sem isso apagaria o filtro que o conferente acabou de aplicar).
+function agPreencherSelect(id, rotuloVazio, valores) {
+  const sel = document.getElementById(id)
+  if (!sel) return
+  const atual = sel.value
+  sel.innerHTML = `<option value="">${rotuloVazio}</option>` +
+    valores.map(([valor, rotulo]) => `<option value="${esc(String(valor))}">${esc(String(rotulo))}</option>`).join('')
+  if (valores.some(([v]) => String(v) === atual)) sel.value = atual
+}
+
+function agMontarFiltros() {
+  const unicos = (fn) => [...new Set(_coletas.map(fn).filter(Boolean))]
+  agPreencherSelect('ag-f-ano', 'Todos os anos',
+    unicos(c => c.agua_campanhas?.ano).sort((a, b) => b - a).map(a => [a, a]))
+  agPreencherSelect('ag-f-campanha', 'Todas as campanhas', [['primeira', '1ª campanha'], ['segunda', '2ª campanha']])
+  agPreencherSelect('ag-f-bacia', 'Todas as bacias',
+    unicos(c => c.agua_pontos_coleta?.bacia).sort().map(b => [b, b]))
+  agPreencherSelect('ag-f-rio', 'Todos os rios',
+    unicos(c => c.agua_pontos_coleta?.rio).sort().map(r => [r, r]))
+  agPreencherSelect('ag-f-municipio', 'Todos os municípios',
+    unicos(c => c.agua_pontos_coleta?.municipio).sort().map(m => [m, m]))
+  agPreencherSelect('ag-f-ponto', 'Todos os pontos',
+    unicos(c => c.agua_pontos_coleta?.nome).sort().map(p => [p, p]))
+
+  // Só as categorias presentes, com a contagem ao lado — é o que diz
+  // ao conferente onde está o volume antes de ele clicar.
+  const contagem = {}
+  for (const c of _coletas) for (const cat of agCategoriasDoMotivo(c.quarentena_motivo)) contagem[cat] = (contagem[cat] || 0) + 1
+  const rotulo = Object.fromEntries(AG_MOTIVO_CATEGORIAS.map(([ch, r]) => [ch, r]))
+  rotulo.outro = 'Outro motivo'
+  agPreencherSelect('ag-f-motivo', 'Todos os motivos',
+    Object.keys(contagem).sort((a, b) => contagem[b] - contagem[a]).map(ch => [ch, `${rotulo[ch] || ch} (${contagem[ch]})`]))
+}
+
+const AG_FILTROS = ['ag-filtro', 'ag-f-ano', 'ag-f-campanha', 'ag-f-bacia', 'ag-f-rio', 'ag-f-municipio', 'ag-f-ponto', 'ag-f-motivo']
+
+function limparFiltros() {
+  for (const id of AG_FILTROS) { const el = document.getElementById(id); if (el) el.value = '' }
+  renderLista()
+}
+
 function renderLista() {
-  const termo = (document.getElementById('ag-filtro')?.value || '').trim().toLowerCase()
+  const v = (id) => (document.getElementById(id)?.value || '').trim()
+  const termo = v('ag-filtro').toLowerCase()
+  const f = {
+    ano: v('ag-f-ano'), campanha: v('ag-f-campanha'), bacia: v('ag-f-bacia'),
+    rio: v('ag-f-rio'), municipio: v('ag-f-municipio'), ponto: v('ag-f-ponto'), motivo: v('ag-f-motivo'),
+  }
+  const algumFiltro = !!termo || Object.values(f).some(Boolean)
+  const btnLimpar = document.getElementById('ag-limpar')
+  if (btnLimpar) btnLimpar.style.display = algumFiltro ? '' : 'none'
+
   const tbody = document.getElementById('tbody-ag')
   const lista = _coletas.filter(c => {
+    const p = c.agua_pontos_coleta || {}, ca = c.agua_campanhas || {}
+    if (f.ano && String(ca.ano) !== f.ano) return false
+    if (f.campanha && ca.ordem !== f.campanha) return false
+    if (f.bacia && p.bacia !== f.bacia) return false
+    if (f.rio && p.rio !== f.rio) return false
+    if (f.municipio && p.municipio !== f.municipio) return false
+    if (f.ponto && p.nome !== f.ponto) return false
+    if (f.motivo && !agCategoriasDoMotivo(c.quarentena_motivo).has(f.motivo)) return false
     if (!termo) return true
     return String(c.linha_origem_planilha).includes(termo)
-      || (c.agua_pontos_coleta?.nome || '').toLowerCase().includes(termo)
-      || (c.agua_pontos_coleta?.codigo_ana || '').includes(termo)
+      || (p.nome || '').toLowerCase().includes(termo)
+      || (p.codigo_ana || '').includes(termo)
+      || (c.codigo_amostra || '').toLowerCase().includes(termo)
   })
-  document.getElementById('ag-contador').textContent = `${lista.length} de ${_coletas.length} em quarentena`
-  if (!lista.length) { tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:24px;color:#9CA3AF">Nenhuma coleta em quarentena</td></tr>'; return }
+  document.getElementById('ag-contador').textContent =
+    `${lista.length} de ${_coletas.length} em quarentena${algumFiltro ? ' (filtrado)' : ''}`
+  if (!lista.length) {
+    // Distingue "acabou a quarentena" (boa notícia) de "seus filtros não
+    // acharam nada" (é só afrouxar) — a mesma frase para os dois casos
+    // faria o conferente achar que a fila zerou.
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:24px;color:#9CA3AF">${algumFiltro
+      ? 'Nenhuma coleta em quarentena com esses filtros — <a href="#" onclick="limparFiltros();return false">limpar filtros</a>'
+      : 'Nenhuma coleta em quarentena'}</td></tr>`
+    return
+  }
   tbody.innerHTML = lista.map(c => {
     const nInc = aguaContarInconsistencias(c.quarentena_motivo)
     return `
