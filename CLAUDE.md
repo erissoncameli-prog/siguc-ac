@@ -1805,6 +1805,50 @@ E) Dashboard Executivo por nível (UC / Diretoria / Secretaria)
 - Esta regra é permanente e deve ser seguida em todas as sessões, sem
   precisar ser solicitada novamente.
 
+## Regra do sistema — action de workflow sempre pinada em SHA
+Todo `uses:` de `.github/workflows/` aponta para um SHA de 40
+caracteres, com a versão legível em comentário ao lado
+(`uses: actions/checkout@11d5960a…  # v4.4.0`). Nunca `@v4`, `@v2`,
+`@main`.
+- **Motivo**: tag e branch são MÓVEIS — o dono da action repontar `v4`
+  troca, em silêncio, o código que roda com os segredos do repositório
+  (foi assim nos comprometimentos do `trivy-action` e do
+  `kics-github-action`). O SHA é imutável.
+- Achado ao investigar por que o job `sast` era vermelho em TODO PR:
+  dos 37 achados do Semgrep, **34 eram exatamente isto** e 3 eram a
+  `MainActivity` exportada (falso positivo, ver abaixo) — nenhum era
+  código do sistema. O `sast` estava vermelho havia tanto tempo que
+  virou paisagem, e um vermelho permanente não avisa mais nada.
+- **Como pinar**: `git ls-remote https://github.com/<repo>
+  refs/tags/<tag>^{}` devolve o commit real da tag (para tag anotada é
+  o `^{}` que dá o commit, não o objeto da tag). Conferido contra o
+  log do próprio CI, que imprime o SHA resolvido de `actions/checkout`.
+  `supabase/setup-cli@v1` é BRANCH, não tag (`refs/heads/v1`).
+- **Atualizar action** = trocar o SHA e o comentário na mesma linha. O
+  comentário não é decoração: sem ele ninguém sabe qual versão está
+  presa nem quando atualizar.
+- Guarda: item 7 de `scripts/guardrails.sh` (roda no job `guardrails`,
+  em segundos, e reprova o PR que reintroduzir tag móvel). ⚠️ A 1ª
+  versão da guarda usava regex de negação ("não parece SHA") e **não
+  pegava `@v4`** — achado rodando o contrafactual, não lendo. Agora
+  extrai a referência depois do `@` e cobra 40 hexadecimais exatos.
+  Sempre testar guarda nova reintroduzindo de propósito o que ela
+  deveria pegar.
+- **`nosemgrep` só vale na linha do match ou na IMEDIATAMENTE
+  anterior.** Os 3 `AndroidManifest.xml` (agua/biomonitor/frota) têm a
+  justificativa em comentário e a marca `<!-- nosemgrep: <rule-id> -->`
+  colada no `<activity>` — a 1ª versão punha a marca no topo de um
+  comentário de 8 linhas e não suprimia nada. Verificado com o Semgrep
+  de verdade, com contrafactual (sem a marca: 1 achado; com ela: 0).
+  A activity de LANÇAMENTO tem de ser exportada — desde o Android 12
+  declarar `android:exported` é obrigatório para quem tem
+  `intent-filter`, e sem isso o app não instala.
+- Não dá para rodar `semgrep --config p/owasp-top-ten` nas sessões de
+  desenvolvimento: `semgrep.dev` responde 403 na política de rede
+  (mesma limitação já documentada para os domínios da ANA/IBGE). Regra
+  local com o mesmo `id` serve para validar supressão; o ruleset
+  completo só roda no CI.
+
 ## Regras de desenvolvimento
 - VERSIONAMENTO: a cada implementação concluída, subir a versão do cache
   do(s) app(s) afetado(s) em `pwa/sw.js` (vN → vN+1) — ver seção

@@ -69,6 +69,28 @@ if [ "$N" -gt 0 ]; then
   AVISOS=$((AVISOS+1))
 fi
 
+# 7. CRÍTICO: action de workflow presa a tag/branch móvel
+# O dono da action pode repontar `v4` ou `main` a qualquer momento, e o
+# workflow passa a rodar código que ninguém revisou — foi assim nos
+# comprometimentos do trivy-action e do kics-github-action. Todo `uses:`
+# aponta para SHA de 40 caracteres, com a versão em comentário ao lado
+# (é o comentário que torna o pin legível e atualizável).
+# Guarda esta regra aqui, e não só no Semgrep, porque o guardrails roda
+# em segundos e falha no PR que introduzir a regressão.
+# Extrai a referência depois do @ e cobra 40 hexadecimais exatos — testar
+# "parece um SHA?" por regex de negação erra fácil (a 1ª versão desta
+# guarda não pegava `@v4`, achado rodando o contrafactual).
+MOVEIS=$(grep -rnE "^[[:space:]]*(-[[:space:]]*)?uses:" .github/workflows/ 2>/dev/null \
+  | sed -E 's/[[:space:]]*#.*$//' \
+  | awk -F'@' 'NF>1 { ref=$NF; if (ref !~ /^[0-9a-f]{40}$/) print $0 }' || true)
+if [ -n "$MOVEIS" ]; then
+  echo "$MOVEIS"
+  vermelho "✗ CRÍTICO: action de workflow em tag/branch móvel — pinar no SHA de 40 caracteres."
+  FALHAS=$((FALHAS+1))
+else
+  verde "✓ Todas as actions de workflow pinadas em SHA."
+fi
+
 echo "──────────────────────────────────────────────────────"
 echo "Falhas críticas: $FALHAS | Avisos: $AVISOS"
 

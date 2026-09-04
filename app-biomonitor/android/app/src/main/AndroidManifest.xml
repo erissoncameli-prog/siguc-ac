@@ -9,6 +9,14 @@
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
 
+        <!-- A activity de LANÇAMENTO tem de ser exportada: é ela que o
+             sistema abre quando o usuário toca no ícone, e desde o
+             Android 12 (API 31) declarar android:exported é OBRIGATÓRIO
+             para quem tem intent-filter — sem isso o app nem instala.
+             Não há superfície privilegiada atrás dela: é a WebView do
+             Capacitor, cujo acesso a dado depende de sessão/PIN, não de
+             quem disparou a intent. -->
+        <!-- nosemgrep: java.android.security.exported_activity.exported_activity -->
         <activity
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation|density"
             android:name=".MainActivity"
