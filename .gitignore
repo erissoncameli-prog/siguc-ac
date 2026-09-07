@@ -3,3 +3,9 @@
 # Artefatos do Playwright (gerados por npx playwright test)
 test-results/
 playwright-report/
+
+# Segredos de assinatura Android — NUNCA versionar (usar GitHub Secrets)
+Secrets/
+
+# Dependências — instaladas pelo npm/Vercel, não versionar
+node_modules/
