@@ -1,2 +1,34 @@
-# Projeto do app nativo (Capacitor) — não publicar no site
+# .vercelignore — o que NÃO deve ser enviado a cada deployment.
+# O site é HTML/JS/CSS estático + funções em api/. Tudo que não é
+# servido ao navegador nem usado pelo build da Vercel fica de fora —
+# assim cada deployment ocupa MUITO menos "Deployment Storage".
+#
+# O que CONTINUA subindo (servido/necessário): index.html, pages/, js/
+# (inclui js/vendor/), css/, data/, pwa/, api/, vercel.json, package.json.
+
+# Dependências: a Vercel instala a partir do package.json — não precisa
+# subir a pasta (são ~113 MB por deployment).
+node_modules
+
+# Shells nativos Capacitor (APK) — nunca publicados no site.
 app
+app-agua
+app-frota
+app-biomonitor
+
+# Banco, migrations e edge functions — rodam no Supabase, não na Vercel.
+supabase
+
+# Só desenvolvimento / CI / documentação — nada disso é servido.
+tests
+scripts
+docs
+.github
+
+# Segredos de assinatura Android — NUNCA devem ir para um site público.
+Secrets
+
+# Documentação e configs de projeto que o navegador não consome.
+*.md
+playwright.config.*
+.editorconfig
