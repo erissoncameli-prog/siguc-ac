@@ -3733,13 +3733,15 @@ async function bioCarregarAbertos() {
       } else {
         q = q.neq('status', 'perdido')
       }
-      // Filtra pela praia onde o ninho está incubando AGORA (praia atual)
-      if (filtroPraia) q = q.eq('praia_atual_id', filtroPraia.id)
+      // Filtra pela praia de ORIGEM (onde foi cadastrado) OU pela praia atual
+      // (onde incuba agora): o ninho transferido continua listado na praia de
+      // origem, marcado "Transferido para X", e também aparece no destino.
+      if (filtroPraia) q = q.or(`praia_id.eq.${filtroPraia.id},praia_atual_id.eq.${filtroPraia.id}`)
       const { data, error } = await q
       if (error) throw error
 
       // Mescla: inclui ninhos locais pendentes que ainda não chegaram no servidor
-      const localPend = (await bioOfflineListarNinhos(filtroPraia ? { praiaAtualId: filtroPraia.id } : {}))
+      const localPend = (await bioOfflineListarNinhos(filtroPraia ? { praiaQualquer: filtroPraia.id } : {}))
         .filter(n => bioNinhoNaTemporada(n, BioApp.temporadaAtual))
       const uuidsServ = new Set((data ?? []).map(n => n.uuid_cliente).filter(Boolean))
       const praias    = await bioOfflineListarPraias()
@@ -3753,14 +3755,14 @@ async function bioCarregarAbertos() {
       console.warn('[biomonitor abertos]', e)
       estadoEl.textContent = 'Sem conexão — exibindo dados locais'
       const praias   = await bioOfflineListarPraias()
-      const localAll = (await bioOfflineListarNinhos(filtroPraia ? { praiaAtualId: filtroPraia.id } : {}))
+      const localAll = (await bioOfflineListarNinhos(filtroPraia ? { praiaQualquer: filtroPraia.id } : {}))
         .filter(n => bioNinhoNaTemporada(n, BioApp.temporadaAtual))
       ninhos = localAll.filter(estaAberto).map(n => bioMapNinhoPraias(n, praias))
     }
   } else {
     estadoEl.textContent = 'Offline — exibindo dados locais'
     const praias   = await bioOfflineListarPraias()
-    const localAll = (await bioOfflineListarNinhos(filtroPraia ? { praiaAtualId: filtroPraia.id } : {}))
+    const localAll = (await bioOfflineListarNinhos(filtroPraia ? { praiaQualquer: filtroPraia.id } : {}))
       .filter(n => bioNinhoNaTemporada(n, BioApp.temporadaAtual))
     ninhos = localAll.filter(estaAberto).map(n => bioMapNinhoPraias(n, praias))
   }
@@ -3782,14 +3784,14 @@ async function bioCarregarAbertos() {
   }
 
   await bioCarregarEventosNinhos(ninhos)
-  bioRenderizarListaNinhos('bio-lista-abertos', ninhos, true)
+  bioRenderizarListaNinhos('bio-lista-abertos', ninhos, true, filtroPraia?.id ?? null)
 }
 
 async function bioAbrirTelaHistorico() {
   const praiaId = BioApp.praiaAtual?.id
   const ninhos  = (await bioOfflineListarNinhos({ praiaId }))
     .filter(n => bioNinhoNaTemporada(n, BioApp.temporadaAtual))
-  bioRenderizarListaNinhos('bio-lista-historico', ninhos, false)
+  bioRenderizarListaNinhos('bio-lista-historico', ninhos, false, praiaId ?? null)
   bioMostrarTela('tela-historico')
 }
 
@@ -3819,7 +3821,7 @@ function bioMostrarGeoSugTab(tab) {
 }
 
 function bioNinhoCardInner(n, opts = {}) {
-  const { mostrarAcoes = false } = opts
+  const { mostrarAcoes = false, contextoPraiaId = null } = opts
   const esp    = BIO_ESPECIES.find(e => e.id === n.especie)
   const status = n.status ?? 'encontrado'
   const data   = n.data_encontro
@@ -3917,15 +3919,26 @@ function bioNinhoCardInner(n, opts = {}) {
     ? '<span class="bio-nfc-ev-chip" style="background:#a78bfa22;color:#7c3aed">pendente</span>'
     : ''
 
-  // Número e praia ATUAIS (onde o ninho está incubando agora)
-  const numExib   = n.numero_atual ?? n.numero_ninho ?? '—'
-  const praiaExib = n.praia_atual_nome ?? n.praia_nome
   const transferido =
     (n.praia_atual_id && n.praia_id && n.praia_atual_id !== n.praia_id) ||
     (n.numero_atual && n.numero_ninho && n.numero_atual !== n.numero_ninho)
-  const origemHtml = transferido
-    ? `<div class="bio-nfc-origem" style="margin-top:5px;font-size:12px;font-weight:600;color:#7c3aed;background:#7c3aed14;border-radius:6px;padding:3px 8px;display:inline-block">Transferido de ${n.praia_nome ?? '—'}${n.numero_ninho ? ` · nº lá: ${n.numero_ninho}` : ''}</div>`
-    : ''
+  // Quando a lista está filtrada por uma praia (aba Abertos/Histórico) e o
+  // ninho está sendo visto pela sua praia de ORIGEM, mostra o número/praia de
+  // origem e o selo "Transferido para X" — senão o ninho transferido some da
+  // praia onde foi cadastrado. Sem filtro (Todas), mostra a praia atual.
+  const vistoNaOrigem = transferido && contextoPraiaId &&
+    n.praia_id === contextoPraiaId && n.praia_atual_id !== contextoPraiaId
+  // Número e praia exibidos: os de ORIGEM quando visto pela praia de origem;
+  // os ATUAIS (onde incuba agora) caso contrário.
+  const numExib   = vistoNaOrigem ? (n.numero_ninho ?? n.numero_atual ?? '—')
+                                  : (n.numero_atual ?? n.numero_ninho ?? '—')
+  const praiaExib = vistoNaOrigem ? (n.praia_nome ?? n.praia_atual_nome)
+                                  : (n.praia_atual_nome ?? n.praia_nome)
+  const origemHtml = !transferido
+    ? ''
+    : vistoNaOrigem
+      ? `<div class="bio-nfc-origem" style="margin-top:5px;font-size:12px;font-weight:600;color:#7c3aed;background:#7c3aed14;border-radius:6px;padding:3px 8px;display:inline-block">Transferido para ${n.praia_atual_nome ?? '—'}${n.numero_atual ? ` · nº lá: ${n.numero_atual}` : ''}</div>`
+      : `<div class="bio-nfc-origem" style="margin-top:5px;font-size:12px;font-weight:600;color:#7c3aed;background:#7c3aed14;border-radius:6px;padding:3px 8px;display:inline-block">Transferido de ${n.praia_nome ?? '—'}${n.numero_ninho ? ` · nº lá: ${n.numero_ninho}` : ''}</div>`
 
   const acoesHtml = mostrarAcoes ? `
     <div class="bio-nfc-acoes">
@@ -3965,7 +3978,7 @@ function bioNinhoCardInner(n, opts = {}) {
   `
 }
 
-function bioRenderizarListaNinhos(containerId, ninhos, mostrarAcoes) {
+function bioRenderizarListaNinhos(containerId, ninhos, mostrarAcoes, contextoPraiaId = null) {
   const el = document.getElementById(containerId)
   if (!el) return
   el.innerHTML = ''
@@ -3977,7 +3990,7 @@ function bioRenderizarListaNinhos(containerId, ninhos, mostrarAcoes) {
     const status = n.status ?? 'encontrado'
     const card   = document.createElement('div')
     card.className = `bio-nfc status-${status}`
-    card.innerHTML = bioNinhoCardInner(n, { mostrarAcoes })
+    card.innerHTML = bioNinhoCardInner(n, { mostrarAcoes, contextoPraiaId })
     card.querySelectorAll('[data-acao]').forEach(btn => {
       btn.addEventListener('click', e => {
         e.stopPropagation()
