@@ -117,7 +117,7 @@ async function bioBuscarEventosServidor(sb, ninhos) {
   try {
     const [rTransf, rVisita, rLote, rSol] = await Promise.all([
       sb.from('vw_transferencias_praia')
-        .select('ninho_id,data_transferencia,hora_transferencia,praia_destino_nome,local_destino,foto_urls')
+        .select('ninho_id,data_transferencia,hora_transferencia,praia_destino_nome,numero_atual,local_destino,foto_urls')
         .in('ninho_id', serverIds),
       sb.from('visitas_ninho')
         .select('ninho_id,data_visita,hora_visita,status_ninho,temperatura_substrato_c,temperatura_ar_c,umidade,predacao_incubacao,ovos_predados_n,ovos_perdidos_alagamento,ovos_perdidos_erosao,ovos_perdidos_humana,causa_destruicao,sinal_alagamento,intervencao,observacoes,foto_urls')
@@ -139,8 +139,10 @@ async function bioBuscarEventosServidor(sb, ninhos) {
 
     pushRows(rTransf, 'transf', r => ({
       data: r.data_transferencia, hora: r.hora_transferencia,
+      // Inclui a placa que o ninho recebeu na praia de destino (numero_atual),
+      // não só o nome da praia — é a identidade dele no berçário.
       txt: `Transferido${r.praia_destino_nome ? ' → ' + r.praia_destino_nome
-        : r.local_destino ? ' → ' + r.local_destino : ''}`,
+        : r.local_destino ? ' → ' + r.local_destino : ''}${r.numero_atual ? ' · nº ' + r.numero_atual : ''}`,
       fotos: r.foto_urls || [],
     }))
     pushRows(rVisita, 'visita', bioEventoVisita)
