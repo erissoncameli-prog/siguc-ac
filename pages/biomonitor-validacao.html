@@ -483,7 +483,8 @@
         <div style="background:rgba(139,92,246,.12);border-radius:8px;padding:8px 10px;margin-bottom:8px;font-size:.82rem">
           <strong style="color:#8b5cf6">Transferência:</strong>
           ${n.data_transferencia ? `${formatData(n.data_transferencia)} · ${n.qtd_ovos} ovos` : ''}
-          ${n.local_destino ? ` → ${n.local_destino}` : ''}
+          ${(n.praia_atual_nome && n.praia_atual_nome !== n.praia_nome) ? ` → ${esc(n.praia_atual_nome)}` : (n.local_destino ? ` → ${esc(n.local_destino)}` : '')}
+          ${(n.numero_atual && n.numero_atual !== n.numero_ninho) ? ` · <strong>nº ${esc(n.numero_atual)}</strong>` : ''}
         </div>` : ''}
 
         ${n.status === 'eclodido' || n.data_nascimento ? `
