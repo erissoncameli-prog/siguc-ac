@@ -141,6 +141,69 @@ ninho? Normalmente sim.
    — é sinal de que um cálculo de ovos/filhotes está mudando e as
    superfícies precisam ser revisadas juntas.
 
+## Eclosão creditada à praia de DESTINO (migrations 333/334/335)
+
+Regra de negócio (pedido do usuário): num ninho transferido, a
+**nidificação/postura** é da praia de ORIGEM (`praia_id`) e a
+**eclosão/filhotes/taxa de eclosão** é da praia onde ele EFETIVAMENTE
+incubou e eclodiu = praia ATUAL (`praia_atual_id`, o berçário/praia
+experimental). A praia que transferiu mantém o ninho na contagem de
+desova (rastreabilidade), mas NÃO recebe crédito de eclosão por ele; o
+berçário recebe. Ninho nunca transferido tem `praia_atual_id =
+praia_id`, então nada muda.
+
+- **Padrão de implementação** (o mesmo em toda superfície): nidificação
+  agregada por `praia_id`; eclosão (filhotes vivos/mortos, ovos não
+  nascidos, taxa de eclosão, `ninhos_eclodidos`, predação na eclosão)
+  agregada por `praia_atual_id`. Onde o ninho "aparece nas duas"
+  (contagem/mapa), a linha de origem não conta eclosão e a de destino
+  não conta nidificação. Campo novo `ninhos_recebidos` por praia.
+- **Filtro de praia**: `praia_id = P OR praia_atual_id = P` (transferido
+  aparece ao filtrar a praia de destino). Nos KPIs globais sem filtro de
+  praia o resultado é IDÊNTICO ao anterior (as flags
+  `conta_nidif`/`conta_ecl` são ambas verdadeiras).
+- **Superfícies tocadas** (checklist acima):
+  - [x] Mapa da mesa — `bio_mapa_praias` (333 fez aparecer nas duas; 335
+    passou a creditar eclosão só ao destino).
+  - [x] Mesa/admin — `vw_praias_biomonitor` (335): eclosão por
+    `praia_atual_id`; nidificação/ovos pela origem. `security_invoker`
+    reaplicado após o replace.
+  - [x] Relatório oficial — `bio_relatorio_completo` (334): quebra "Por
+    Praia" separa nidificação × eclosão (FULL OUTER JOIN origem/atual);
+    coluna "Receb." na tabela de `relatorios-biomonitor.html`.
+  - [x] Análise Científica — `bio_analise_praias` (335) + coluna
+    "Receb." em `js/biomonitor-analise.js`.
+  - [x] Painel de praias — `bio_dashboard_praias` (335).
+  - **PDF por ninho / `vw_ninhos_validacao`**: é POR NINHO (mostra
+    `praia_nome` de origem + `praia_atual_nome`), então a taxa individual
+    já é a do próprio ninho — não há atribuição por praia a corrigir.
+  - **`bio_analise_detalhada`**: taxas GLOBAIS do recorte (um ninho conta
+    uma vez), não uma quebra por praia — não precisou de atribuição.
+  - [x] **App, aba Dados — `bio_dados_aba`: já correto, sem mudança.**
+    Conferido: NÃO tem taxa de eclosão *por praia* (o único "por praia" é
+    `top_praias`, contagem de ninhos pela ORIGEM); as taxas de eclosão são
+    agregadas no NÍVEL DO GRUPO. Um ninho transferido mantém seu
+    `grupo_id` de origem, então sua eclosão (onde quer que tenha ocorrido)
+    já entra no total do grupo dono do ninho. O berçário é escopado pelo
+    grupo em duas frentes independentes, e por isso **um grupo nunca vê o
+    berçário de outro** (regra de negócio: grupos cobrem grandes áreas e
+    não compartilham berçário):
+      · `bio_dados_aba` filtra ninhos por `n.grupo_id = v_grupo_id`;
+      · os lotes de berçário são filtrados por `l.grupo_id = v_grupo_id`,
+        e `lotes_bercario.grupo_id` é derivado por trigger
+        (`trg_lotes_bercario_derivar_grupo`) do grupo do MONITOR que deu
+        entrada no lote — não do berçário (a tabela `bercarios` nem tem
+        `grupo_id`; as praias experimentais têm `grupo_id` NULL).
+    Não havia atribuição por praia a mudar aqui — a ressalva anterior
+    (de que creditar à praia atual poderia puxar berçário de outro grupo)
+    partiu da suposição errada de que esta RPC tinha quebra de eclosão por
+    praia como as de mesa. Não tem.
+- **Timeline de ocorrências do ninho** (`js/biomonitor-timeline.js`): a
+  transferência passou a mostrar a placa que o ninho recebeu no destino
+  (`numero_atual` de `vw_transferencias_praia`), não só o nome da praia —
+  "Transferido → {praia} · nº {numero_atual}". `pwa/sw.js`: biomonitor
+  v51 → v52.
+
 ## Postura de ovos por ESTIMATIVA (migration 322, 25/08/2026)
 
 Pedido do usuário: em noite de volume alto de ninhos, nem sempre dá

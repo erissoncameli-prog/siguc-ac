@@ -1219,9 +1219,12 @@
         <div class="rel-chart-card"><p class="rel-chart-title">Ninhos por UC</p><div class="rel-chart-wrap" id="wrap-ucs-h"><canvas id="graf-ucs-h"></canvas></div></div>
       </div>
       <p style="font-size:12px;font-weight:700;color:#6B7280;text-transform:uppercase;letter-spacing:.04em;margin:4px 0 8px">Praias</p>
+      <p style="font-size:11px;color:#9CA3AF;margin:-4px 0 8px">Ninhos = desovados na praia (origem). Recebidos = transferidos de outra praia. Eclodidos/Filhotes/Taxa referem-se à praia onde o ninho eclodiu (destino).</p>
       <div class="rel-table-wrap" style="margin-bottom:14px"><table class="rel-table"><thead><tr>
         <th>Praia</th><th>UC</th>
-        <th style="text-align:right">Ninhos</th><th style="text-align:right">Eclodidos</th>
+        <th style="text-align:right" title="Ninhos desovados nesta praia (origem)">Ninhos</th>
+        <th style="text-align:right" title="Ninhos recebidos por transferência de outra praia">Receb.</th>
+        <th style="text-align:right" title="Ninhos que eclodiram nesta praia (inclui recebidos)">Eclodidos</th>
         <th style="text-align:right">Perdidos</th><th style="text-align:right">Filhotes</th>
         <th style="text-align:right">Taxa eclosão</th><th style="text-align:right">Média ovos</th>
         <th style="text-align:right">Dist. rio</th>
@@ -1350,11 +1353,12 @@
   function renderTabelaPraias(praias) {
     const tb = document.getElementById('tbody-praias')
     if (!tb) return
-    if (!praias.length) { tb.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:20px;color:#9CA3AF">Sem dados</td></tr>'; return }
+    if (!praias.length) { tb.innerHTML = '<tr><td colspan="12" style="text-align:center;padding:20px;color:#9CA3AF">Sem dados</td></tr>'; return }
     tb.innerHTML = praias.map(p => `<tr>
       <td><strong>${p.praia_nome || '—'}</strong>${p.praia_codigo ? `<br><small style="color:#9CA3AF">${p.praia_codigo}</small>` : ''}</td>
       <td>${p.uc_sigla ? `<abbr title="${p.uc_nome}">${p.uc_sigla}</abbr>` : p.uc_nome || '—'}</td>
       <td class="num">${v(p.ninhos_total)}</td>
+      <td class="num"${(p.ninhos_recebidos||0)>0?' style="color:#7c3aed;font-weight:700"':''}>${p.ninhos_recebidos ? '+'+p.ninhos_recebidos : '—'}</td>
       <td class="num">${v(p.eclodidos)}</td>
       <td class="num">${v(p.perdidos)}</td>
       <td class="num">${v(p.filhotes_vivos)}</td>
@@ -2695,12 +2699,15 @@
     _mapaSlideNinho = n
     _mapaSlideMode  = 'ninho'
     _mapaSlideTab   = 'ident'
-    // Garante contexto de praia para botão "Voltar"
-    _mapaSlidePraia = _mapaPraiaData.find(p => p.id === n.praia_id) || _mapaSlidePraia || null
+    // Garante contexto de praia para botão "Voltar" — mantém a praia que o
+    // usuário estava vendo (origem OU destino), senão cai na atual/origem.
+    _mapaSlidePraia = (_mapaSlidePraia && (_mapaSlidePraia.id === n.praia_id || _mapaSlidePraia.id === n.praia_atual_id))
+      ? _mapaSlidePraia
+      : (_mapaPraiaData.find(p => p.id === n.praia_atual_id) || _mapaPraiaData.find(p => p.id === n.praia_id) || _mapaSlidePraia || null)
 
     document.getElementById('mapa-slide-num').textContent = n.numero_ninho || 'Ninho s/n'
     document.getElementById('mapa-slide-sub').textContent =
-      `${ESP_MAPA_LABEL[n.especie] || n.especie} · ${n.praia_nome || '—'}`
+      `${ESP_MAPA_LABEL[n.especie] || n.especie} · ${n.e_recebido ? `${n.praia_nome || '—'} → ${n.praia_atual_nome || '—'}` : (n.praia_nome || '—')}`
 
     document.getElementById('mapa-slide-voltar').style.display = _mapaSlidePraia ? '' : 'none'
     document.getElementById('mapa-btn-comparar').style.display = ''
@@ -2780,7 +2787,9 @@
       }
 
       if (_mapaSlideTab === 'ninhos') {
-        const ninhosDaPraia = _mapaNinhoData.filter(n => n.praia_id === p.id)
+        // Inclui ninhos RECEBIDOS por transferência (praia_atual_id), não só
+        // os de origem — a praia experimental/berçário existe para recebê-los.
+        const ninhosDaPraia = _mapaNinhoData.filter(n => n.praia_id === p.id || n.praia_atual_id === p.id)
         const semGPS = (p.ninhos_total || 0) - ninhosDaPraia.length
         const nota = `<div style="font-size:10.5px;color:#6B7280;margin-bottom:10px">
           <strong style="color:#111827">${p.ninhos_total||0}</strong> ninho${p.ninhos_total!==1?'s':''} registrado${p.ninhos_total!==1?'s':''}
@@ -2788,15 +2797,22 @@
           ${semGPS>0?`· <span style="color:#9CA3AF">${semGPS} sem GPS</span>`:''}</div>`
 
         const lista = ninhosDaPraia.length
-          ? ninhosDaPraia.map(n => `
+          ? ninhosDaPraia.map(n => {
+            // Procedência: recebido de outra praia × enviado para outra
+            let proc = ''
+            if (n.e_recebido && n.praia_atual_id === p.id)
+              proc = `<span style="color:#9a6b00"> · recebido de ${esc(n.praia_nome||'—')}</span>`
+            else if (n.e_recebido && n.praia_id === p.id)
+              proc = `<span style="color:#9a6b00"> · transferido p/ ${esc(n.praia_atual_nome||'—')}</span>`
+            return `
             <div class="slide-ninho-item" onclick="mapaAbrirNinhoById('${n.id}')">
               <div class="slide-ninho-dot" style="background:${ESP_MAPA_COR[n.especie]||'#9CA3AF'}"></div>
               <div class="slide-ninho-info">
                 <div class="slide-ninho-num">${esc(n.numero_ninho||'Ninho s/n')}</div>
-                <div class="slide-ninho-sub">${esc(ESP_MAPA_LABEL[n.especie]||n.especie||'—')} · ${esc(n.status||'—')}${n.qtd_ovos!=null?' · '+n.qtd_ovos+' ovos':''}</div>
+                <div class="slide-ninho-sub">${esc(ESP_MAPA_LABEL[n.especie]||n.especie||'—')} · ${esc(n.status||'—')}${n.qtd_ovos!=null?' · '+n.qtd_ovos+' ovos':''}${proc}</div>
               </div>
               <div class="slide-ninho-seta">›</div>
-            </div>`).join('')
+            </div>`}).join('')
           : '<div style="color:#6B7280;font-size:12px;padding:8px 0">Nenhum ninho com GPS cadastrado nesta praia.</div>'
 
         corpo.innerHTML = nota + lista

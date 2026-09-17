@@ -397,6 +397,7 @@ function acSecPraias(pr) {
       <td class="num">${km}</td>
       <td class="num">${ha}</td>
       <td class="num">${acFmt(p.ninhos_total)}</td>
+      <td class="num"${(p.ninhos_recebidos||0)>0?' style="color:#7c3aed;font-weight:700"':''}>${p.ninhos_recebidos ? '+'+acFmt(p.ninhos_recebidos) : '—'}</td>
       <td class="num">${p.densidade_ninhos_km != null ? p.densidade_ninhos_km : '—'}</td>
       <td class="num">${p.densidade_ninhos_ha != null ? p.densidade_ninhos_ha : '—'}</td>
       <td class="num">${acPct(p.taxa_eclosao_pct)}</td>
@@ -431,7 +432,7 @@ function acSecPraias(pr) {
     ${lista.length ? `<div class="ac-chart-wrap"><canvas id="ac-cv-praias" height="160"></canvas></div>
     <table class="ac-table"><thead><tr>
       <th>Praia</th><th>Localização</th><th>UC</th><th class="num">Compr.</th><th class="num">Área</th>
-      <th class="num">Ninhos</th><th class="num">Dens./km</th><th class="num">Dens./ha</th><th class="num">Eclosão</th>
+      <th class="num" title="Ninhos desovados (origem)">Ninhos</th><th class="num" title="Recebidos por transferência">Receb.</th><th class="num">Dens./km</th><th class="num">Dens./ha</th><th class="num" title="Da praia onde eclodiu">Eclosão</th>
       </tr></thead><tbody>${linhas}</tbody></table>` : ''}
     ${porTipo ? `${acMini('Rede por tipo de localização')}
       <table class="ac-table"><thead><tr><th>Localização</th><th class="num">Praias</th><th class="num">Ninhos</th></tr></thead>
