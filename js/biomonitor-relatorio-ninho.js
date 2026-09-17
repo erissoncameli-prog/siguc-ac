@@ -453,8 +453,8 @@ function _biopdfSecaoIdentificacao(ctx, n) {
   const linhas = [
     linha('Espécie', BIOREL_ESPECIE[n.especie] || n.especie),
     linha('Praia de origem', n.praia_nome),
-    (n.praia_atual_nome && n.praia_atual_nome !== n.praia_nome) ? linha('Praia atual', n.praia_atual_nome) : null,
-    (n.numero_atual && n.numero_atual !== n.numero_ninho) ? linha('Nº na praia atual', n.numero_atual) : null,
+    (n.praia_atual_nome && n.praia_atual_nome !== n.praia_nome) ? linha('Praia de destino', n.praia_atual_nome) : null,
+    (n.numero_atual && n.numero_atual !== n.numero_ninho) ? linha('Nº recebido no destino', n.numero_atual) : null,
     linha('Temporada', n.temporada_nome),
     linha('Monitor responsável', n.monitor_nome),
     linha('Grupo', n.grupo_nome),
