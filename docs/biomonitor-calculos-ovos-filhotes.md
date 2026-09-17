@@ -179,13 +179,25 @@ praia_id`, então nada muda.
     já é a do próprio ninho — não há atribuição por praia a corrigir.
   - **`bio_analise_detalhada`**: taxas GLOBAIS do recorte (um ninho conta
     uma vez), não uma quebra por praia — não precisou de atribuição.
-  - ⚠️ **EXCEÇÃO deliberada — `bio_dados_aba` (app, aba Dados)**: tem
-    quebra por praia, mas é filtrada por `grupo_id` do monitor. Creditar
-    eclosão à praia ATUAL pode apontar para um berçário de OUTRO grupo,
-    que sairia do recorte `n.grupo_id = v_grupo_id`. Como é a visão
-    operacional do próprio monitor (offline), ficou como está — a origem
-    continua exibindo o ninho transferido. Ao mexer nela, resolver o
-    escopo de grupo do berçário antes de mudar a atribuição.
+  - [x] **App, aba Dados — `bio_dados_aba`: já correto, sem mudança.**
+    Conferido: NÃO tem taxa de eclosão *por praia* (o único "por praia" é
+    `top_praias`, contagem de ninhos pela ORIGEM); as taxas de eclosão são
+    agregadas no NÍVEL DO GRUPO. Um ninho transferido mantém seu
+    `grupo_id` de origem, então sua eclosão (onde quer que tenha ocorrido)
+    já entra no total do grupo dono do ninho. O berçário é escopado pelo
+    grupo em duas frentes independentes, e por isso **um grupo nunca vê o
+    berçário de outro** (regra de negócio: grupos cobrem grandes áreas e
+    não compartilham berçário):
+      · `bio_dados_aba` filtra ninhos por `n.grupo_id = v_grupo_id`;
+      · os lotes de berçário são filtrados por `l.grupo_id = v_grupo_id`,
+        e `lotes_bercario.grupo_id` é derivado por trigger
+        (`trg_lotes_bercario_derivar_grupo`) do grupo do MONITOR que deu
+        entrada no lote — não do berçário (a tabela `bercarios` nem tem
+        `grupo_id`; as praias experimentais têm `grupo_id` NULL).
+    Não havia atribuição por praia a mudar aqui — a ressalva anterior
+    (de que creditar à praia atual poderia puxar berçário de outro grupo)
+    partiu da suposição errada de que esta RPC tinha quebra de eclosão por
+    praia como as de mesa. Não tem.
 - **Timeline de ocorrências do ninho** (`js/biomonitor-timeline.js`): a
   transferência passou a mostrar a placa que o ninho recebeu no destino
   (`numero_atual` de `vw_transferencias_praia`), não só o nome da praia —
