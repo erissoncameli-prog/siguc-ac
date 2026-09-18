@@ -47,7 +47,7 @@
           <label style="flex:1;min-width:220px;font-size:12px;color:var(--cinza-500)">Praia de origem
             <select class="form-control" id="tl-origem"></select>
           </label>
-          <label style="flex:1;min-width:220px;font-size:12px;color:var(--cinza-500)">Praia de destino
+          <label style="flex:1;min-width:220px;font-size:12px;color:var(--cinza-500)">Praia de destino <span style="color:var(--cinza-400)">(berçário/experimental)</span>
             <select class="form-control" id="tl-destino"></select>
           </label>
         </div>
@@ -106,7 +106,7 @@
 
   // ── Carrega dados ─────────────────────────────────────────────
   const [{ data: praias }, { data: ninhos }] = await Promise.all([
-    db.from('praias_monitoramento').select('id,nome,codigo,ativa')
+    db.from('praias_monitoramento').select('id,nome,codigo,ativa,experimental')
       .order('ativa', { ascending: false }).order('nome'),
     db.from('vw_ninhos_validacao')
       .select('id,numero_ninho,numero_atual,especie,status,praia_id,praia_atual_id,ninho_qtd_ovos')
@@ -115,9 +115,14 @@
   _praias = praias || []
   _ninhos = ninhos || []
 
-  const opts = _praias.map(p => `<option value="${p.id}">${esc(p.nome)}${p.ativa ? '' : ' (inativa)'}</option>`).join('')
+  const optHtml = p => `<option value="${p.id}">${esc(p.nome)}${p.ativa ? '' : ' (inativa)'}</option>`
+  const opts = _praias.map(optHtml).join('')
+  // Destino só pode ser praia experimental/berçário (que recebe transferências)
+  const optsDest = _praias.filter(p => p.experimental).map(optHtml).join('')
   document.getElementById('tl-origem').innerHTML  = '<option value="">Selecione…</option>' + opts
-  document.getElementById('tl-destino').innerHTML = '<option value="">Selecione…</option>' + opts
+  document.getElementById('tl-destino').innerHTML = optsDest
+    ? '<option value="">Selecione…</option>' + optsDest
+    : '<option value="">Nenhuma praia experimental cadastrada</option>'
   document.getElementById('tl-data').value = new Date().toISOString().slice(0, 10)
   document.getElementById('tl-origem').addEventListener('change', tlRenderNinhos)
 
