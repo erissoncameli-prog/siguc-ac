@@ -4327,6 +4327,28 @@ function _bioBarsH(canvasId, labels, data, cor, Chart) {
   const canvas = document.getElementById(canvasId)
   if (!canvas) return
   _bioCharts[canvasId]?.destroy()
+  const maxVal = Math.max(0, ...data.map(v => v || 0))
+  // Rótulo do valor no fim de cada barra (ex.: nº de ninhos no Top Praias).
+  // Plugin inline — sem dependência nova (chartjs-plugin-datalabels).
+  const rotuloValor = {
+    id: 'bioRotuloValorH',
+    afterDatasetsDraw(chart) {
+      const ctx = chart.ctx
+      const meta = chart.getDatasetMeta(0)
+      if (!meta) return
+      ctx.save()
+      ctx.font = '700 11px "DM Sans", system-ui, sans-serif'
+      ctx.fillStyle = '#0D1E27'          // --bio-ink
+      ctx.textBaseline = 'middle'
+      ctx.textAlign = 'left'
+      meta.data.forEach((bar, i) => {
+        const v = data[i]
+        if (v == null) return
+        ctx.fillText(String(v), bar.x + 6, bar.y)
+      })
+      ctx.restore()
+    }
+  }
   _bioCharts[canvasId] = new Chart(canvas.getContext('2d'), {
     type: 'bar',
     data: { labels, datasets: [{ data, backgroundColor: cor, borderRadius: 4 }] },
@@ -4334,12 +4356,15 @@ function _bioBarsH(canvasId, labels, data, cor, Chart) {
       indexAxis: 'y',
       responsive: true, maintainAspectRatio: false,
       animation: { duration: 600 },
+      layout: { padding: { right: 30 } },   // espaço p/ o rótulo não cortar
       plugins: { legend: { display: false } },
       scales: {
-        x: { grid: { color: 'rgba(0,0,0,.06)' }, ticks: { font: { size: 11 } }, beginAtZero: true },
+        // folga à direita para o número caber depois da barra mais longa
+        x: { grid: { color: 'rgba(0,0,0,.06)' }, ticks: { font: { size: 11 } }, beginAtZero: true, suggestedMax: maxVal ? maxVal * 1.12 : undefined },
         y: { grid: { display: false }, ticks: { font: { size: 11 } } }
       }
-    }
+    },
+    plugins: [rotuloValor]
   })
 }
 
