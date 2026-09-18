@@ -45,7 +45,7 @@
       <div class="card" id="passo-sel" style="padding:18px;margin-bottom:16px">
         <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:12px">
           <label style="flex:1;min-width:220px;font-size:12px;color:var(--cinza-500)">Praia de origem
-            <select class="form-control" id="tl-origem"></select>
+            <select class="form-control" id="tl-origem" onchange="tlRenderNinhos()"></select>
           </label>
           <label style="flex:1;min-width:220px;font-size:12px;color:var(--cinza-500)">Praia de destino <span style="color:var(--cinza-400)">(berçário/experimental)</span>
             <select class="form-control" id="tl-destino"></select>
@@ -124,7 +124,6 @@
     ? '<option value="">Selecione…</option>' + optsDest
     : '<option value="">Nenhuma praia experimental cadastrada</option>'
   document.getElementById('tl-data').value = new Date().toISOString().slice(0, 10)
-  document.getElementById('tl-origem').addEventListener('change', tlRenderNinhos)
 
   // ── Passo 1: lista de ninhos ──────────────────────────────────
   window.tlRenderNinhos = function () {
