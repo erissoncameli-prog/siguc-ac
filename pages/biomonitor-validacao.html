@@ -17,6 +17,53 @@
 <script src="../js/biomonitor-pdf-fonts.js"></script>
 <script src="../js/relatorio-cabecalho-pdf.js"></script>
 <script src="../js/biomonitor-relatorio-ninho.js"></script>
+<style>
+  /* Liquid glass — escopo da Validação de Ninhos (página de mesa).
+     Fundo ambiente MUITO sutil só para o vidro ter o que desfocar. */
+  .val-ambiente{
+    background:
+      radial-gradient(600px 360px at 8% -6%, rgba(82,183,136,.09), transparent 60%),
+      radial-gradient(520px 320px at 96% 0%, rgba(201,168,76,.08), transparent 62%),
+      radial-gradient(640px 460px at 84% 108%, rgba(59,130,246,.045), transparent 60%);
+  }
+  .lg-surface{
+    position:relative;
+    background:rgba(255,255,255,.45);
+    -webkit-backdrop-filter:blur(20px) saturate(175%);
+    backdrop-filter:blur(20px) saturate(175%);
+    border:1px solid rgba(255,255,255,.55);
+    box-shadow:0 8px 26px rgba(10,26,15,.10), 0 2px 6px rgba(10,26,15,.05),
+      inset 0 1px 1px rgba(255,255,255,.9), inset 0 -10px 24px rgba(255,255,255,.10);
+    overflow:hidden;
+  }
+  .lg-surface::before{
+    content:"";position:absolute;inset:0;pointer-events:none;border-radius:inherit;
+    background:linear-gradient(150deg, rgba(255,255,255,.5) 0%, rgba(255,255,255,.1) 26%, transparent 52%);
+    mix-blend-mode:screen;
+  }
+  .lg-surface > *{position:relative;z-index:1}
+  .lg-kpi{
+    min-width:110px;padding:10px 16px;border-radius:14px;cursor:pointer;
+    border-left:3px solid var(--ac);transition:box-shadow .15s, transform .1s;
+  }
+  .lg-kpi:hover{transform:translateY(-1px)}
+  .lg-kpi-num{font-family:var(--font-sans,'DM Sans',system-ui,sans-serif);font-size:1.5rem;font-weight:700;line-height:1.05}
+  .lg-kpi-lbl{font-size:.78rem;color:var(--cinza-500);margin-top:2px}
+  .lg-kpi.ativo{
+    box-shadow:0 8px 26px rgba(10,26,15,.13), inset 0 1px 1px rgba(255,255,255,.9),
+      0 0 0 2px color-mix(in srgb, var(--ac) 55%, transparent);
+  }
+  .lg-card{padding:16px;border-radius:16px}
+  .lg-card .btn-secondary{
+    -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
+    background:rgba(255,255,255,.42);border:1px solid rgba(255,255,255,.6);
+  }
+  /* Acessibilidade: quem pede menos transparência recebe superfície sólida. */
+  @media (prefers-reduced-transparency: reduce){
+    .lg-surface{background:var(--branco,#fff);-webkit-backdrop-filter:none;backdrop-filter:none;border-color:var(--borda,#e3e0d6)}
+    .lg-surface::before{display:none}
+  }
+</style>
 </head>
 <body>
 <div id="app"></div>
@@ -134,7 +181,7 @@
 
   document.getElementById('app').innerHTML =
     gerarLayout('Validação de Ninhos', 'biomonitor-validacao') +
-    `<div class="fade-in">
+    `<div class="fade-in val-ambiente">
       <div class="filter-bar">
         <input class="form-control search-input" id="busca" placeholder="Buscar ninho, monitor, praia..." oninput="renderLista()">
         <select class="form-control" id="fil-praia" style="width:200px" onchange="renderLista()">
@@ -153,8 +200,8 @@
           <option value="outro">Outro</option>
         </select>
         <select class="form-control" id="fil-status" style="width:160px" onchange="renderLista()">
-          <option value="" selected>Todos</option>
-          <option value="pendente">Pendentes</option>
+          <option value="">Todos</option>
+          <option value="pendente" selected>Pendentes</option>
           <option value="validado">Validados</option>
           <option value="rejeitado">Rejeitados</option>
           <option value="em_correcao">Em correção</option>
@@ -185,6 +232,10 @@
         </label>
         <input class="form-control" id="fil-numero" style="width:120px" placeholder="Nº (ex: 47)" oninput="renderLista()"
           title="Selecione praia e temporada para buscar por número do ninho" disabled>
+        <div style="margin-left:auto;display:flex;gap:4px;align-self:center">
+          <button id="btn-view-cards" class="btn btn-sm" onclick="setView('cards')" title="Ver em cards">Cards</button>
+          <button id="btn-view-lista" class="btn btn-sm" onclick="setView('lista')" title="Ver em lista">Lista</button>
+        </div>
       </div>
 
       <div id="stats-bar" style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap"></div>
@@ -197,6 +248,7 @@
   bIconsAplicar(document.getElementById('app'))
 
   let _ninhos = [], _rejeitar = null, _rejTipo = null, _alertasPorNinho = {}, _gpsNinhoId = null
+  let _viewMode = (function(){ try { return localStorage.getItem('siguc_bio_valid_view') || 'cards' } catch(e){ return 'cards' } })()
 
   const SPECIES_NOME = {
     tracaja: 'Tracajá', tartaruga: 'Tartaruga', cabecudo: 'Cabeçudo',
@@ -267,8 +319,8 @@
     _ninhos = data || []
     await carregarAlertas()
     await montarTimelines()
-    popularFiltros()
-    renderStats()
+    await popularFiltros()
+    _refreshViewBtns()
     renderLista()
   }
 
@@ -296,11 +348,26 @@
     })
   }
 
-  function popularFiltros() {
-    const praias = [...new Set(_ninhos.map(n => n.praia_nome).filter(Boolean))].sort()
+  async function popularFiltros() {
+    // Filtro de praia montado a partir do CADASTRO (praias_monitoramento),
+    // nunca só das praias que aparecem nos ninhos — senão praia sem ninho
+    // (ex.: berçário/experimental recém-cadastrado) some do filtro. As
+    // experimentais ficam num grupo próprio, e qualquer praia_nome que exista
+    // só nos ninhos (praia inativa/renomeada) entra num grupo "Outras".
+    const todas = await _carregarPraiasOpcoes()
+    const nomesEmNinhos = new Set(_ninhos.map(n => n.praia_nome).filter(Boolean))
+    const cadastradas = new Set(todas.map(p => p.nome))
+    const experimentais = todas.filter(p => p.experimental)
+    const comuns = todas.filter(p => !p.experimental)
+    const orfas = [...nomesEmNinhos].filter(nm => !cadastradas.has(nm)).sort()
     const sel = document.getElementById('fil-praia')
+    const valorAtual = sel.value
+    const opt = pr => `<option value="${esc(pr.nome)}">${esc(pr.nome)}${pr.ativa ? '' : ' (inativa)'}</option>`
     sel.innerHTML = `<option value="">Todas as praias</option>` +
-      praias.map(p => `<option value="${p}">${p}</option>`).join('')
+      (experimentais.length ? `<optgroup label="Berçário / Experimental">${experimentais.map(opt).join('')}</optgroup>` : '') +
+      `<optgroup label="Praias">${comuns.map(opt).join('')}</optgroup>` +
+      (orfas.length ? `<optgroup label="Outras (sem cadastro)">${orfas.map(nm => `<option value="${esc(nm)}">${esc(nm)}</option>`).join('')}</optgroup>` : '')
+    sel.value = valorAtual  // preserva a seleção ao recarregar os dados
 
     const monitores = [...new Set(_ninhos.map(n => n.monitor_nome).filter(Boolean))].sort()
     const selMon = document.getElementById('fil-monitor')
@@ -324,33 +391,39 @@
     }
   }
 
-  function renderStats() {
+  function renderStats(f) {
+    // KPIs faceteados: cada bloco respeita todos os filtros MENOS o seu
+    // próprio status — senão o padrão "pendentes" zeraria Validados/etc.
+    const baseVal = _filtrar(f, { ignorarValidacao: true })
+    const baseNin = _filtrar(f, { ignorarNinho: true })
     const stats = {
-      pendente:    _ninhos.filter(n => n.status_validacao === 'pendente').length,
-      validado:    _ninhos.filter(n => n.status_validacao === 'validado').length,
-      rejeitado:   _ninhos.filter(n => n.status_validacao === 'rejeitado').length,
-      em_correcao: _ninhos.filter(n => n.status_validacao === 'em_correcao').length,
+      pendente:    baseVal.filter(n => n.status_validacao === 'pendente').length,
+      validado:    baseVal.filter(n => n.status_validacao === 'validado').length,
+      rejeitado:   baseVal.filter(n => n.status_validacao === 'rejeitado').length,
+      em_correcao: baseVal.filter(n => n.status_validacao === 'em_correcao').length,
     }
     const porStatusNinho = Object.keys(NINHO_LBL).reduce((acc, s) => {
-      acc[s] = _ninhos.filter(n => n.status === s).length
+      acc[s] = baseNin.filter(n => n.status === s).length
       return acc
     }, {})
 
-    const kpi = (l, v, c) => `
-      <div style="background:var(--branco);border-radius:10px;padding:10px 16px;min-width:110px;border-left:3px solid ${c};border-top:1px solid var(--borda);border-right:1px solid var(--borda);border-bottom:1px solid var(--borda);box-shadow:var(--sombra)">
-        <div style="font-size:1.5rem;font-weight:700;color:${c}">${v}</div>
-        <div style="font-size:.78rem;color:var(--cinza-500)">${l}</div>
+    // dim/valor tornam o card um atalho de filtro; `ativo` aplica o realce.
+    const kpi = (l, v, c, dim, valor, ativo) => `
+      <div class="lg-surface lg-kpi${ativo ? ' ativo' : ''}" style="--ac:${c}"
+        onclick="kpiFiltro('${dim}','${valor}')" title="Filtrar por ${l}">
+        <div class="lg-kpi-num" style="color:${c}">${v}</div>
+        <div class="lg-kpi-lbl">${l}</div>
       </div>`
 
     const kpisValidacao = [
-      ['Pendentes',    stats.pendente,    '#f59e0b'],
-      ['Validados',    stats.validado,    '#10b981'],
-      ['Rejeitados',   stats.rejeitado,   '#ef4444'],
-      ['Em correção',  stats.em_correcao, '#6366f1'],
-    ].map(([l, v, c]) => kpi(l, v, c)).join('')
+      ['Pendentes',    stats.pendente,    '#f59e0b', 'pendente'],
+      ['Validados',    stats.validado,    '#10b981', 'validado'],
+      ['Rejeitados',   stats.rejeitado,   '#ef4444', 'rejeitado'],
+      ['Em correção',  stats.em_correcao, '#6366f1', 'em_correcao'],
+    ].map(([l, v, c, val]) => kpi(l, v, c, 'validacao', val, f.status === val)).join('')
 
     const kpisNinho = Object.keys(NINHO_LBL)
-      .map(s => kpi(NINHO_LBL[s], porStatusNinho[s], NINHO_CLR[s]))
+      .map(s => kpi(NINHO_LBL[s], porStatusNinho[s], NINHO_CLR[s], 'ninho', s, f.statusNinho === s))
       .join('')
 
     document.getElementById('stats-bar').innerHTML = kpisValidacao +
@@ -374,40 +447,133 @@
     if (!habilitado) inp.value = ''
   }
 
-  window.renderLista = function() {
-    const busca      = document.getElementById('busca')?.value.toLowerCase() || ''
-    const praia      = document.getElementById('fil-praia')?.value || ''
-    const especie    = document.getElementById('fil-especie')?.value || ''
-    const status     = document.getElementById('fil-status')?.value
-    const statusNinho = document.getElementById('fil-status-ninho')?.value || ''
-    const temp       = document.getElementById('fil-temporada')?.value || ''
-    const monitor    = document.getElementById('fil-monitor')?.value || ''
-    const grupo      = document.getElementById('fil-grupo')?.value || ''
-    const dataIni    = document.getElementById('fil-data-ini')?.value || ''
-    const dataFim    = document.getElementById('fil-data-fim')?.value || ''
-
+  // Leitura única dos filtros da barra (compartilhada por lista e KPIs).
+  function _lerFiltros() {
+    const praia = document.getElementById('fil-praia')?.value || ''
+    const temp  = document.getElementById('fil-temporada')?.value || ''
     _atualizarFiltroNumero(praia, temp)
     const numero = document.getElementById('fil-numero')?.value.trim() || ''
-    const numeroAlvo = (praia && temp && numero) ? parseInt(numero, 10) : null
+    return {
+      busca:       document.getElementById('busca')?.value.toLowerCase() || '',
+      praia,
+      especie:     document.getElementById('fil-especie')?.value || '',
+      status:      document.getElementById('fil-status')?.value || '',
+      statusNinho: document.getElementById('fil-status-ninho')?.value || '',
+      temp,
+      monitor:     document.getElementById('fil-monitor')?.value || '',
+      grupo:       document.getElementById('fil-grupo')?.value || '',
+      dataIni:     document.getElementById('fil-data-ini')?.value || '',
+      dataFim:     document.getElementById('fil-data-fim')?.value || '',
+      numeroAlvo:  (praia && temp && numero) ? parseInt(numero, 10) : null,
+    }
+  }
 
-    const lista = _ninhos.filter(n =>
-      (!busca       || n.numero_ninho?.toLowerCase().includes(busca) ||
-                       n.monitor_nome?.toLowerCase().includes(busca) ||
-                       n.praia_nome?.toLowerCase().includes(busca)) &&
-      (!praia       || n.praia_nome === praia) &&
-      (!especie     || n.especie === especie) &&
-      (!temp        || n.temporada_id === temp) &&
-      (!statusNinho || n.status === statusNinho) &&
-      (status === undefined || status === '' || n.status_validacao === status) &&
-      (!monitor     || n.monitor_nome === monitor) &&
-      (!grupo       || n.grupo_nome === grupo) &&
-      (!dataIni     || (n.data_encontro || '') >= dataIni) &&
-      (!dataFim     || (n.data_encontro || '') <= dataFim) &&
-      (numeroAlvo == null || _numeroSeq(n.numero_ninho) === numeroAlvo)
+  // Aplica os filtros sobre _ninhos. `ignorarValidacao`/`ignorarNinho` deixam
+  // de fora a própria dimensão de status — é o que torna cada bloco de KPI
+  // um panorama faceteado (respeita praia/temporada/etc., mas não se anula
+  // pelo seu próprio filtro).
+  function _filtrar(f, opts) {
+    opts = opts || {}
+    return _ninhos.filter(n =>
+      (!f.busca       || n.numero_ninho?.toLowerCase().includes(f.busca) ||
+                         n.monitor_nome?.toLowerCase().includes(f.busca) ||
+                         n.praia_nome?.toLowerCase().includes(f.busca)) &&
+      (!f.praia       || n.praia_nome === f.praia) &&
+      (!f.especie     || n.especie === f.especie) &&
+      (!f.temp        || n.temporada_id === f.temp) &&
+      (opts.ignorarNinho     || !f.statusNinho || n.status === f.statusNinho) &&
+      (opts.ignorarValidacao || !f.status      || n.status_validacao === f.status) &&
+      (!f.monitor     || n.monitor_nome === f.monitor) &&
+      (!f.grupo       || n.grupo_nome === f.grupo) &&
+      (!f.dataIni     || (n.data_encontro || '') >= f.dataIni) &&
+      (!f.dataFim     || (n.data_encontro || '') <= f.dataFim) &&
+      (f.numeroAlvo == null || _numeroSeq(n.numero_ninho) === f.numeroAlvo)
     )
+  }
+
+  // Clique num card de KPI aplica (ou remove, se já ativo) aquele status
+  // como filtro — atalho de navegação pedido pelo usuário.
+  window.kpiFiltro = function(dim, valor) {
+    const el = document.getElementById(dim === 'validacao' ? 'fil-status' : 'fil-status-ninho')
+    if (!el) return
+    el.value = (el.value === valor) ? '' : valor
+    renderLista()
+  }
+
+  // ── Alternação cards / lista ──────────────────────────────────
+  window.setView = function(modo) {
+    _viewMode = modo
+    try { localStorage.setItem('siguc_bio_valid_view', modo) } catch (e) {}
+    _refreshViewBtns()
+    renderLista()
+  }
+  function _refreshViewBtns() {
+    const bc = document.getElementById('btn-view-cards')
+    const bl = document.getElementById('btn-view-lista')
+    if (!bc || !bl) return
+    const on  = 'btn-primary', off = 'btn-secondary'
+    bc.classList.remove(on, off); bc.classList.add(_viewMode === 'cards' ? on : off)
+    bl.classList.remove(on, off); bl.classList.add(_viewMode === 'lista' ? on : off)
+  }
+
+  // Visão em tabela (compacta) — mesmas ações do card, sem timeline/rosca.
+  function renderTabela(cont, lista) {
+    cont.style.display = 'block'
+    const badge = (txt, clr) => `<span style="font-size:.72rem;padding:2px 7px;border-radius:6px;background:${clr}22;color:${clr};font-weight:600;white-space:nowrap">${txt}</span>`
+    const linhas = lista.map(n => {
+      const sclr = STATUS_CLR[n.status_validacao] || '#888'
+      const nclr = NINHO_CLR[n.status] || '#888'
+      const alertas = _alertasPorNinho[n.id] || []
+      const alertaBadge = alertas.length
+        ? `<span title="${esc(alertas.map(a => a.titulo).join(' \u00b7 '))}" style="margin-left:5px;color:${alertas.some(a => a.severidade === 'critica') ? '#ef4444' : '#f59e0b'};font-weight:700">\u26a0 ${alertas.length}</span>`
+        : ''
+      return `<tr style="border-bottom:1px solid var(--borda)">
+        <td style="padding:8px 10px;font-weight:600;color:var(--cinza-900);white-space:nowrap">${n.numero_ninho}${alertaBadge}</td>
+        <td style="padding:8px 10px">${SPECIES_NOME[n.especie] || n.especie}</td>
+        <td style="padding:8px 10px">${esc(n.praia_nome || '\u2014')}</td>
+        <td style="padding:8px 10px">${esc(n.monitor_nome || '\u2014')}</td>
+        <td style="padding:8px 10px;white-space:nowrap">${formatData(n.data_encontro)}</td>
+        <td style="padding:8px 10px;text-align:center">${n.qtd_ovos ?? '\u2014'}</td>
+        <td style="padding:8px 10px">${badge(NINHO_LBL[n.status] || n.status, nclr)}</td>
+        <td style="padding:8px 10px">${badge(STATUS_LBL[n.status_validacao] || n.status_validacao, sclr)}</td>
+        <td style="padding:8px 10px;white-space:nowrap;text-align:right">
+          ${!n.lat ? `<span title="Sem GPS — n\u00e3o aparece no mapa" style="color:#f59e0b;margin-right:4px">\u26a0</span>` : ''}
+          <button class="btn btn-sm btn-secondary" onclick="bioAbrirRelatorioNinho(db,'${n.id}')">PDF</button>
+          <button class="btn btn-sm btn-secondary" onclick="abrirModalGPS('${n.id}')">GPS</button>
+          ${n.status_validacao !== 'validado' ? `<button class="btn btn-sm btn-primary" onclick="validar('${n.id}')">Validar</button>` : ''}
+          ${n.status_validacao !== 'rejeitado' ? `<button class="btn btn-sm" style="background:#ef444433;color:#ef4444;border:none;border-radius:6px;padding:4px 9px;cursor:pointer" onclick="abrirRejeitar('${n.id}','${esc(n.numero_ninho)}','rejeitado')">Rejeitar</button>` : ''}
+          ${n.status_validacao !== 'em_correcao' ? `<button class="btn btn-sm" style="background:#6366f133;color:#6366f1;border:none;border-radius:6px;padding:4px 9px;cursor:pointer" onclick="abrirRejeitar('${n.id}','${esc(n.numero_ninho)}','em_correcao')">Corre\u00e7\u00e3o</button>` : ''}
+        </td>
+      </tr>`
+    }).join('')
+    cont.innerHTML = `<div style="overflow-x:auto;background:var(--branco);border-radius:12px;border:1px solid var(--borda);box-shadow:var(--sombra)">
+      <table style="width:100%;border-collapse:collapse;font-size:.85rem">
+        <thead><tr style="background:rgba(0,0,0,.03);text-align:left;color:var(--cinza-500)">
+          <th style="padding:9px 10px">N\u00ba</th>
+          <th style="padding:9px 10px">Esp\u00e9cie</th>
+          <th style="padding:9px 10px">Praia</th>
+          <th style="padding:9px 10px">Monitor</th>
+          <th style="padding:9px 10px">Data</th>
+          <th style="padding:9px 10px;text-align:center">Ovos</th>
+          <th style="padding:9px 10px">Ninho</th>
+          <th style="padding:9px 10px">Valida\u00e7\u00e3o</th>
+          <th style="padding:9px 10px;text-align:right">A\u00e7\u00f5es</th>
+        </tr></thead>
+        <tbody>${linhas}</tbody>
+      </table>
+    </div>`
+  }
+
+  window.renderLista = function() {
+    const f = _lerFiltros()
+    const lista = _filtrar(f)
+    renderStats(f)   // KPIs sempre refletem o recorte atual dos filtros
 
     const cont = document.getElementById('lista-ninhos')
-    if (!lista.length) { cont.innerHTML = `<p style="color:var(--cinza-500);grid-column:1/-1">Nenhum ninho encontrado com esses filtros.</p>`; return }
+    if (!lista.length) { cont.style.display = 'block'; cont.innerHTML = `<p style="color:var(--cinza-500)">Nenhum ninho encontrado com esses filtros.</p>`; return }
+
+    if (_viewMode === 'lista') { renderTabela(cont, lista); return }
+    cont.style.display = 'grid'
 
     cont.innerHTML = lista.map(n => {
       const sclr = STATUS_CLR[n.status_validacao] || '#888'
@@ -417,7 +583,7 @@
       const alertas = _alertasPorNinho[n.id] || []
       const borda = alertas.some(a => a.severidade === 'critica') ? '#ef4444'
                   : alertas.length ? '#f59e0b' : 'var(--borda)'
-      return `<div style="background:var(--branco);border-radius:12px;padding:16px;border:1px solid ${borda};box-shadow:var(--sombra)">
+      return `<div class="lg-surface lg-card"${alertas.length ? ` style="border-color:${borda}"` : ''}>
         <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
           <div>
             <div style="font-weight:600;font-size:1rem;color:var(--cinza-900)">${n.numero_ninho}</div>
@@ -842,7 +1008,7 @@
   async function _carregarPraiasOpcoes() {
     if (_praiasOpcoes) return _praiasOpcoes
     const { data, error } = await db.from('praias_monitoramento')
-      .select('id,nome,codigo,ativa').order('ativa', { ascending: false }).order('nome')
+      .select('id,nome,codigo,ativa,experimental').order('ativa', { ascending: false }).order('nome')
     if (error) { toast(error.message, 'error'); return [] }
     _praiasOpcoes = data || []
     return _praiasOpcoes
