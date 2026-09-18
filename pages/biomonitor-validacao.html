@@ -123,6 +123,75 @@
   </div>
 </div>
 
+<!-- ── Modal: Transferência de ninhos em lote (só mesa) ─────────── -->
+<div class="modal-overlay" id="modal-lote">
+  <div class="modal" style="max-width:840px">
+    <div class="modal-header">
+      <div class="modal-title">Transferência de ninhos em lote</div>
+      <button class="modal-close" onclick="loteFechar()">×</button>
+    </div>
+    <div class="modal-body">
+      <!-- Passo 1: seleção -->
+      <div id="lote-passo-sel">
+        <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:10px">
+          <label style="flex:1;min-width:220px;font-size:12px;color:var(--cinza-500)">Praia de origem
+            <select class="form-control" id="lote-origem" onchange="loteRenderNinhos()"></select>
+          </label>
+          <label style="flex:1;min-width:220px;font-size:12px;color:var(--cinza-500)">Praia de destino
+            <select class="form-control" id="lote-destino"></select>
+          </label>
+        </div>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:10px">
+          <label style="width:160px;font-size:12px;color:var(--cinza-500)">Data
+            <input type="date" class="form-control" id="lote-data">
+          </label>
+          <label style="flex:1;min-width:200px;font-size:12px;color:var(--cinza-500)">Motivo *
+            <select class="form-control" id="lote-motivo">
+              <option value="">Selecione…</option>
+              <option value="risco_inundacao">Risco de inundação</option>
+              <option value="predacao">Predação</option>
+              <option value="erosao">Erosão</option>
+              <option value="concentracao_manejo">Concentração para manejo</option>
+              <option value="pesquisa">Pesquisa</option>
+              <option value="outro">Outro</option>
+            </select>
+          </label>
+          <label style="flex:2;min-width:200px;font-size:12px;color:var(--cinza-500)">Observações
+            <input class="form-control" id="lote-obs" placeholder="Opcional">
+          </label>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <strong style="font-size:13px">Ninhos na praia de origem</strong>
+          <span style="font-size:12px;color:var(--cinza-500)">
+            <span id="lote-count">0</span> selecionado(s) ·
+            <a href="#" onclick="loteMarcarTodos(true);return false">Todos</a> ·
+            <a href="#" onclick="loteMarcarTodos(false);return false">Nenhum</a>
+          </span>
+        </div>
+        <div id="lote-ninhos" style="max-height:260px;overflow:auto;border:1px solid var(--borda);border-radius:8px;padding:4px 8px">
+          <p style="color:var(--cinza-500);font-size:13px;margin:8px 4px">Selecione a praia de origem.</p>
+        </div>
+      </div>
+
+      <!-- Passo 2: confirmação (placas editáveis) -->
+      <div id="lote-passo-conf" hidden>
+        <p style="font-size:.88rem;color:var(--cinza-500);margin:0 0 10px">
+          Confira/edite a placa que cada ninho receberá em <strong id="lote-conf-destino"></strong>.
+          As placas são sugeridas em sequência a partir do próximo número livre.
+        </p>
+        <div id="lote-conf-lista"></div>
+        <div id="lote-conf-problemas" style="margin-top:10px"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" id="lote-btn-voltar" onclick="loteVoltar()" hidden>← Voltar</button>
+      <button class="btn btn-secondary" onclick="loteFechar()">Cancelar</button>
+      <button class="btn btn-primary" id="lote-btn-preparar" onclick="lotePreparar()">Preparar transferência</button>
+      <button class="btn btn-primary" id="lote-btn-confirmar" onclick="loteConfirmar()" hidden>Confirmar transferência</button>
+    </div>
+  </div>
+</div>
+
 <script>
 ;(async function () {
   const usuario = await carregarUsuario()
@@ -185,6 +254,13 @@
         </label>
         <input class="form-control" id="fil-numero" style="width:120px" placeholder="Nº (ex: 47)" oninput="renderLista()"
           title="Selecione praia e temporada para buscar por número do ninho" disabled>
+      </div>
+
+      <div style="margin-bottom:12px">
+        <button class="btn btn-primary btn-sm" onclick="loteAbrir()" title="Transferir vários ninhos de uma praia para outra">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px"><path d="M4 7h13"/><path d="m13 3 4 4-4 4"/><path d="M20 17H7"/><path d="m11 21-4-4 4-4"/></svg>
+          Transferência em lote
+        </button>
       </div>
 
       <div id="stats-bar" style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap"></div>
@@ -846,6 +922,142 @@
     if (error) { toast(error.message, 'error'); return [] }
     _praiasOpcoes = data || []
     return _praiasOpcoes
+  }
+
+  /* ── Transferência em lote (mesa) ─────────────────────────────── */
+  let _loteSug = []
+
+  window.loteAbrir = async function () {
+    const praias = await _carregarPraiasOpcoes()
+    const opts = praias.map(p => `<option value="${p.id}">${esc(p.nome)}${p.ativa ? '' : ' (inativa)'}</option>`).join('')
+    document.getElementById('lote-origem').innerHTML  = '<option value="">Selecione…</option>' + opts
+    document.getElementById('lote-destino').innerHTML = '<option value="">Selecione…</option>' + opts
+    document.getElementById('lote-data').value   = new Date().toISOString().slice(0, 10)
+    document.getElementById('lote-motivo').value = ''
+    document.getElementById('lote-obs').value    = ''
+    document.getElementById('lote-ninhos').innerHTML =
+      '<p style="color:var(--cinza-500);font-size:13px;margin:8px 4px">Selecione a praia de origem.</p>'
+    document.getElementById('lote-count').textContent = '0'
+    loteVoltar()
+    document.getElementById('modal-lote').classList.add('aberto')
+  }
+  window.loteFechar = () => document.getElementById('modal-lote').classList.remove('aberto')
+
+  window.loteRenderNinhos = function () {
+    const origem = document.getElementById('lote-origem').value
+    const cont = document.getElementById('lote-ninhos')
+    document.getElementById('lote-count').textContent = '0'
+    if (!origem) { cont.innerHTML = '<p style="color:var(--cinza-500);font-size:13px;margin:8px 4px">Selecione a praia de origem.</p>'; return }
+    const elig = _ninhos
+      .filter(n => (n.praia_atual_id || n.praia_id) === origem && ['encontrado', 'transferido'].includes(n.status))
+      .sort((a, b) => (a.numero_ninho || '').localeCompare(b.numero_ninho || ''))
+    if (!elig.length) {
+      cont.innerHTML = '<p style="color:var(--cinza-500);font-size:13px;margin:8px 4px">Nenhum ninho transferível (status encontrado/transferido) nesta praia.</p>'
+      return
+    }
+    cont.innerHTML = elig.map(n => `
+      <label style="display:flex;align-items:center;gap:8px;padding:5px 2px;border-bottom:1px solid var(--cinza-100);font-size:13px;cursor:pointer">
+        <input type="checkbox" class="lote-chk" value="${n.id}" onchange="loteAtualizarCount()">
+        <span style="flex:1"><strong>${esc(n.numero_atual || n.numero_ninho || '—')}</strong>
+          · ${esc(SPECIES_NOME[n.especie] || n.especie || '—')}
+          · <span style="color:${NINHO_CLR[n.status] || '#666'}">${NINHO_LBL[n.status] || n.status}</span>
+          · ${n.ninho_qtd_ovos ?? n.qtd_ovos ?? '?'} ovos</span>
+      </label>`).join('')
+  }
+  window.loteAtualizarCount = () =>
+    document.getElementById('lote-count').textContent =
+      String(document.querySelectorAll('.lote-chk:checked').length)
+  window.loteMarcarTodos = (v) => {
+    document.querySelectorAll('.lote-chk').forEach(c => { c.checked = v })
+    loteAtualizarCount()
+  }
+
+  window.loteVoltar = function () {
+    document.getElementById('lote-passo-sel').hidden  = false
+    document.getElementById('lote-passo-conf').hidden = true
+    document.getElementById('lote-btn-preparar').hidden  = false
+    document.getElementById('lote-btn-confirmar').hidden = true
+    document.getElementById('lote-btn-voltar').hidden    = true
+  }
+
+  window.lotePreparar = async function () {
+    const origem  = document.getElementById('lote-origem').value
+    const destino = document.getElementById('lote-destino').value
+    const motivo  = document.getElementById('lote-motivo').value
+    const ids = [...document.querySelectorAll('.lote-chk:checked')].map(c => c.value)
+    if (!origem)  return toast('Selecione a praia de origem.', 'error')
+    if (!destino) return toast('Selecione a praia de destino.', 'error')
+    if (destino === origem) return toast('O destino deve ser diferente da origem.', 'error')
+    if (!motivo)  return toast('Motivo é obrigatório.', 'error')
+    if (!ids.length) return toast('Selecione ao menos um ninho.', 'error')
+
+    const btn = document.getElementById('lote-btn-preparar')
+    const restore = btnEspera(btn)
+    try {
+      const { data, error } = await db.rpc('bio_transferencia_lote_sugerir', {
+        p_ninho_ids: ids, p_praia_destino_id: destino,
+      })
+      if (error) throw error
+      _loteSug = (data || []).filter(x => x.elegivel)
+      const inelig = (data || []).filter(x => !x.elegivel)
+      if (!_loteSug.length) { toast('Nenhum ninho elegível na seleção.', 'error'); return }
+
+      const destNome = document.getElementById('lote-destino').selectedOptions[0].textContent
+      document.getElementById('lote-conf-destino').textContent = destNome
+      document.getElementById('lote-conf-lista').innerHTML = _loteSug.map(x => `
+        <div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--cinza-100);font-size:13px">
+          <span style="flex:1">${esc(x.numero_ninho || '—')} · ${esc(SPECIES_NOME[x.especie] || x.especie || '—')}</span>
+          <span style="color:var(--cinza-400)">→</span>
+          <input class="form-control lote-placa" data-ninho="${x.ninho_id}" style="width:190px" value="${esc(x.numero_atual_sugerido || '')}">
+        </div>`).join('') +
+        (inelig.length ? `<p style="font-size:12px;color:#b45309;margin-top:10px">
+          ${inelig.length} ninho(s) ignorado(s): ${inelig.map(x => esc(x.numero_ninho || '') + ' (' + esc(x.motivo_inelegivel || '') + ')').join(', ')}</p>` : '')
+      document.getElementById('lote-conf-problemas').innerHTML = ''
+
+      document.getElementById('lote-passo-sel').hidden  = true
+      document.getElementById('lote-passo-conf').hidden = false
+      btn.hidden = true
+      const conf = document.getElementById('lote-btn-confirmar')
+      conf.hidden = false
+      conf.textContent = `Confirmar transferência (${_loteSug.length})`
+      document.getElementById('lote-btn-voltar').hidden = false
+    } catch (e) {
+      toast(e.message || 'Falha ao preparar a transferência.', 'error')
+    } finally { restore() }
+  }
+
+  window.loteConfirmar = async function () {
+    const destino = document.getElementById('lote-destino').value
+    const motivo  = document.getElementById('lote-motivo').value
+    const data    = document.getElementById('lote-data').value
+    const obs     = document.getElementById('lote-obs').value.trim()
+    const itens = [...document.querySelectorAll('.lote-placa')].map(inp => ({
+      ninho_id: inp.dataset.ninho, numero_atual: inp.value.trim(),
+    }))
+    if (!data) return toast('Informe a data da transferência.', 'error')
+
+    const btn = document.getElementById('lote-btn-confirmar')
+    const restore = btnEspera(btn)
+    try {
+      const { data: res, error } = await db.rpc('bio_transferir_ninhos_lote', {
+        p_itens: itens, p_praia_destino_id: destino, p_data_transferencia: data,
+        p_motivo: motivo, p_observacoes: obs || null,
+      })
+      if (error) throw error
+      if (!res.ok) {
+        document.getElementById('lote-conf-problemas').innerHTML =
+          `<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:8px 10px;font-size:12.5px;color:#991b1b">
+            Corrija antes de confirmar:
+            <ul style="margin:6px 0 0 16px">${res.problemas.map(p => `<li>${esc(p.numero_ninho || p.ninho_id)}: ${esc(p.motivo)}</li>`).join('')}</ul>
+          </div>`
+        return
+      }
+      toast(`${res.total} ninho(s) transferido(s) com sucesso.`, 'success')
+      loteFechar()
+      await carregarDados()
+    } catch (e) {
+      toast(e.message || 'Falha na transferência em lote.', 'error')
+    } finally { restore() }
   }
 
   window.abrirModalGPS = async function(id) {
