@@ -1595,25 +1595,37 @@ body.field-mode .bio-home-nome { font-size: 26px; }
 }
 
 /* ── Aba Dados: KPI row ── */
+/* KPIs da aba Dados — estilo "linha com ícone" (Proposta B):
+   cada .bio-dados-kpi-row é UM cartão; cada .bio-kpi2 é uma linha
+   (badge de ícone com cor semântica + rótulo + valor), separadas por
+   filete. Valor em DM Sans (nunca serifada — regra do sistema), em tom
+   neutro; a cor mora no ícone. A cor de cada linha entra por --c inline. */
 .bio-dados-kpi-row {
-  display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
-  margin-bottom: 12px;
+  display: flex; flex-direction: column;
+  background: var(--bio-surface); border: 1px solid var(--bio-border);
+  border-radius: 14px; padding: 0 14px; margin-bottom: 10px;
+  box-shadow: 0 1px 2px rgba(13,30,39,.05);
 }
 .bio-kpi2 {
-  background: var(--bio-surface); border-radius: 12px;
-  padding: 12px 8px 10px; text-align: center;
-  border: 1px solid var(--bio-border);
-  border-top: 6px solid var(--bio-prim);
-  box-shadow: 0 4px 6px -2px rgba(0,0,0,.10);
-  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 0; text-align: left;
+  border-bottom: 1px solid var(--bio-border);
 }
-.bio-kpi2 strong {
-  font-size: 22px; font-weight: 800; font-family: var(--font-mono, monospace);
-  color: var(--bio-prim); line-height: 1;
+.bio-kpi2:last-child { border-bottom: 0; }
+.bio-kpi2-ico {
+  width: 38px; height: 38px; border-radius: 11px; flex: none;
+  display: grid; place-items: center;
+  background: color-mix(in srgb, var(--c, var(--bio-prim)) 14%, #fff);
+  color: var(--c, var(--bio-prim));
 }
-.bio-kpi2 span {
-  font-size: 10px; color: var(--bio-ink2); text-transform: uppercase;
-  letter-spacing: .04em; line-height: 1.3;
+.bio-kpi2-meta { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.bio-kpi2-meta > span {
+  font-size: 12.5px; font-weight: 600; color: var(--bio-ink2);
+  text-transform: none; letter-spacing: 0; line-height: 1.25;
+}
+.bio-kpi2-meta > strong {
+  font-family: var(--font-ui); font-weight: 700; font-size: 21px; line-height: 1.15;
+  color: var(--bio-ink); font-variant-numeric: tabular-nums; letter-spacing: -.01em;
 }
 
 /* ── Aba Dados: cartões de taxa ── */
