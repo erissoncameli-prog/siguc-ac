@@ -392,18 +392,23 @@
   }
 
   function renderStats(f) {
-    // KPIs faceteados: cada bloco respeita todos os filtros MENOS o seu
-    // próprio status — senão o padrão "pendentes" zeraria Validados/etc.
+    // KPIs de VALIDAÇÃO são faceteados: cada bloco respeita todos os filtros
+    // MENOS o seu próprio status — senão o padrão "Pendentes" zeraria
+    // Validados/etc.
     const baseVal = _filtrar(f, { ignorarValidacao: true })
-    const baseNin = _filtrar(f, { ignorarNinho: true })
     const stats = {
       pendente:    baseVal.filter(n => n.status_validacao === 'pendente').length,
       validado:    baseVal.filter(n => n.status_validacao === 'validado').length,
       rejeitado:   baseVal.filter(n => n.status_validacao === 'rejeitado').length,
       em_correcao: baseVal.filter(n => n.status_validacao === 'em_correcao').length,
     }
+    // KPIs de STATUS DO NINHO (Encontrado/Transferido) são o TOTAL ABSOLUTO da
+    // temporada carregada — nunca gateados por filtro nenhum, nem pelo de
+    // validação (que abre em "Pendentes"): "Encontrado" é a soma de TODOS os
+    // ninhos encontrados, independentemente de já terem sido validados ou de
+    // qualquer filtro da tela. O clique no card ainda filtra a LISTA.
     const porStatusNinho = Object.keys(NINHO_LBL).reduce((acc, s) => {
-      acc[s] = baseNin.filter(n => n.status === s).length
+      acc[s] = _ninhos.filter(n => n.status === s).length
       return acc
     }, {})
 
