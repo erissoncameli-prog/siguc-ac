@@ -1714,9 +1714,12 @@
     <span id="bio-dados-status" style="font-size:11px;color:#9CA3AF"></span>
   </header>
 
-  <!-- Seletor de temporada (default: atual) -->
-  <div style="padding:0 16px 4px">
-    <select id="bio-dados-temporada" class="bio-form-input" style="font-size:13px"></select>
+  <!-- Seletores globais: temporada + espécie (valem para TODAS as sub-abas) -->
+  <div style="padding:0 16px 4px;display:flex;gap:8px">
+    <select id="bio-dados-temporada" class="bio-form-input" style="font-size:13px;flex:1;min-width:0" aria-label="Temporada"></select>
+    <select id="bio-dados-especie" class="bio-form-input" style="font-size:13px;flex:1;min-width:0" aria-label="Filtrar por espécie">
+      <option value="">Todas as espécies</option>
+    </select>
   </div>
 
   <!-- Tab navigation -->
@@ -1735,30 +1738,51 @@
 
       <!-- KPIs topo -->
       <div class="bio-dados-kpi-row">
-        <div class="bio-kpi2">
-          <strong id="bio-kpi-ninhos">—</strong><span>Ninhos grupo</span>
+        <div class="bio-kpi2" style="--c:var(--bio-prim)">
+          <span class="bio-kpi2-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.5"/></svg></span>
+          <div class="bio-kpi2-meta"><span>Ninhos grupo</span><strong id="bio-kpi-ninhos">—</strong></div>
         </div>
-        <div class="bio-kpi2">
-          <strong id="bio-kpi-filhotes">—</strong><span>Filhotes vivos</span>
+        <div class="bio-kpi2" style="--c:var(--bio-verde)">
+          <span class="bio-kpi2-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22V12"/><path d="M12 12C7.6 12 5 9.4 5 5c4.4 0 7 2.6 7 7Z"/><path d="M12 13c0-3.3 2-5.5 5.5-5.5C17.5 10.8 15.5 13 12 13Z"/></svg></span>
+          <div class="bio-kpi2-meta"><span>Filhotes vivos</span><strong id="bio-kpi-filhotes">—</strong></div>
         </div>
-        <div class="bio-kpi2">
-          <strong id="bio-kpi-incubacao">—</strong><span>Dias incubação</span>
+        <div class="bio-kpi2" style="--c:var(--bio-ouro)">
+          <span class="bio-kpi2-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7.5V12l3 1.8"/></svg></span>
+          <div class="bio-kpi2-meta"><span>Dias incubação</span><strong id="bio-kpi-incubacao">—</strong></div>
         </div>
       </div>
       <div class="bio-dados-kpi-row">
-        <div class="bio-kpi2"><strong id="bio-kpi-ovos-postura">—</strong><span>Ovos (postura)</span></div>
-        <div class="bio-kpi2"><strong id="bio-kpi-ovos-viaveis" style="color:var(--bio-verde)">—</strong><span>Ovos viáveis</span></div>
-        <div class="bio-kpi2"><strong id="bio-kpi-ovos-perdidos" style="color:var(--bio-perigo)">—</strong><span>Ovos perdidos</span></div>
+        <div class="bio-kpi2" style="--c:var(--bio-ouro)">
+          <span class="bio-kpi2-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3c-3.6 0-6 4.6-6 9a6 6 0 0 0 12 0c0-4.4-2.4-9-6-9Z"/></svg></span>
+          <div class="bio-kpi2-meta"><span>Ovos (postura)</span><strong id="bio-kpi-ovos-postura">—</strong></div>
+        </div>
+        <div class="bio-kpi2" style="--c:var(--bio-verde)">
+          <span class="bio-kpi2-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+          <div class="bio-kpi2-meta"><span>Ovos viáveis</span><strong id="bio-kpi-ovos-viaveis">—</strong></div>
+        </div>
+        <div class="bio-kpi2" style="--c:var(--bio-perigo)">
+          <span class="bio-kpi2-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg></span>
+          <div class="bio-kpi2-meta"><span>Ovos perdidos</span><strong id="bio-kpi-ovos-perdidos">—</strong></div>
+        </div>
       </div>
       <!-- Postura estimada — ver "Regra do sistema — postura de ovos
            por estimativa". Aparece só quando há algum ninho estimado
            na temporada (acompanhamento das ações). -->
       <div class="bio-dados-kpi-row" id="bio-kpi-row-postura-estimada" hidden>
-        <div class="bio-kpi2"><strong id="bio-kpi-postura-pendente" style="color:#8a6d1f">—</strong><span>Postura estimada pendente</span></div>
-        <div class="bio-kpi2"><strong id="bio-kpi-postura-confirmada" style="color:var(--bio-verde)">—</strong><span>Postura confirmada</span></div>
+        <div class="bio-kpi2" style="--c:var(--bio-alerta)">
+          <span class="bio-kpi2-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l2.5 1.5"/></svg></span>
+          <div class="bio-kpi2-meta"><span>Postura estimada pendente</span><strong id="bio-kpi-postura-pendente">—</strong></div>
+        </div>
+        <div class="bio-kpi2" style="--c:var(--bio-verde)">
+          <span class="bio-kpi2-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+          <div class="bio-kpi2-meta"><span>Postura confirmada</span><strong id="bio-kpi-postura-confirmada">—</strong></div>
+        </div>
       </div>
       <div class="bio-dados-kpi-row">
-        <div class="bio-kpi2"><strong id="bio-kpi-anomalia" style="color:#B45309">—</strong><span>Filhotes c/ anomalia</span></div>
+        <div class="bio-kpi2" style="--c:var(--bio-alerta)">
+          <span class="bio-kpi2-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></span>
+          <div class="bio-kpi2-meta"><span>Filhotes c/ anomalia</span><strong id="bio-kpi-anomalia">—</strong></div>
+        </div>
       </div>
 
       <!-- Rate cards -->
@@ -1842,14 +1866,17 @@
 
       <!-- KPIs topo -->
       <div class="bio-dados-kpi-row">
-        <div class="bio-kpi2">
-          <strong id="bio-kpi2-eclodidos">—</strong><span>Eclodidos</span>
+        <div class="bio-kpi2" style="--c:var(--bio-verde)">
+          <span class="bio-kpi2-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+          <div class="bio-kpi2-meta"><span>Eclodidos</span><strong id="bio-kpi2-eclodidos">—</strong></div>
         </div>
-        <div class="bio-kpi2">
-          <strong id="bio-kpi2-perdidos">—</strong><span>Perdidos</span>
+        <div class="bio-kpi2" style="--c:var(--bio-perigo)">
+          <span class="bio-kpi2-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg></span>
+          <div class="bio-kpi2-meta"><span>Perdidos</span><strong id="bio-kpi2-perdidos">—</strong></div>
         </div>
-        <div class="bio-kpi2">
-          <strong id="bio-kpi2-transf">—</strong><span>Transferidos</span>
+        <div class="bio-kpi2" style="--c:var(--bio-prim)">
+          <span class="bio-kpi2-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h15"/><path d="m13 6 6 6-6 6"/></svg></span>
+          <div class="bio-kpi2-meta"><span>Transferidos</span><strong id="bio-kpi2-transf">—</strong></div>
         </div>
       </div>
 
@@ -1884,17 +1911,21 @@
 
       <!-- KPIs berçário -->
       <div class="bio-dados-kpi-row">
-        <div class="bio-kpi2">
-          <strong id="bio-kpi-berc-entrada">—</strong><span>Entrados</span>
+        <div class="bio-kpi2" style="--c:var(--bio-prim)">
+          <span class="bio-kpi2-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg></span>
+          <div class="bio-kpi2-meta"><span>Entrados</span><strong id="bio-kpi-berc-entrada">—</strong></div>
         </div>
-        <div class="bio-kpi2">
-          <strong id="bio-kpi-berc-soltado">—</strong><span>Soltados</span>
+        <div class="bio-kpi2" style="--c:var(--bio-verde)">
+          <span class="bio-kpi2-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21V9"/><path d="m7 14 5-5 5 5"/><path d="M5 3h14"/></svg></span>
+          <div class="bio-kpi2-meta"><span>Soltados</span><strong id="bio-kpi-berc-soltado">—</strong></div>
         </div>
-        <div class="bio-kpi2">
-          <strong id="bio-kpi-berc-taxasolt" style="color:var(--bio-prim)">—</strong><span>Taxa soltura</span>
+        <div class="bio-kpi2" style="--c:var(--bio-prim)">
+          <span class="bio-kpi2-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 5 5 19"/><circle cx="7.5" cy="7.5" r="2.5"/><circle cx="16.5" cy="16.5" r="2.5"/></svg></span>
+          <div class="bio-kpi2-meta"><span>Taxa soltura</span><strong id="bio-kpi-berc-taxasolt">—</strong></div>
         </div>
-        <div class="bio-kpi2">
-          <strong id="bio-kpi-berc-mortos" style="color:var(--bio-perigo)">—</strong><span>Mortos</span>
+        <div class="bio-kpi2" style="--c:var(--bio-perigo)">
+          <span class="bio-kpi2-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8 12h8"/></svg></span>
+          <div class="bio-kpi2-meta"><span>Mortos</span><strong id="bio-kpi-berc-mortos">—</strong></div>
         </div>
       </div>
 
@@ -1964,9 +1995,18 @@
     <!-- ── TAB: ECLOSÃO (monitoramento da previsão) ─────────────── -->
     <div id="bio-dtab-eclosao" hidden>
       <div class="bio-dados-kpi-row">
-        <div class="bio-kpi2"><strong id="bio-ecl-kpi-hoje" style="color:var(--bio-prim)">—</strong><span>Eclosão hoje</span></div>
-        <div class="bio-kpi2"><strong id="bio-ecl-kpi-proximos" style="color:#9a6b00">—</strong><span>Próximos 7 d</span></div>
-        <div class="bio-kpi2"><strong id="bio-ecl-kpi-atrasados" style="color:var(--bio-perigo)">—</strong><span>Atrasados</span></div>
+        <div class="bio-kpi2" style="--c:var(--bio-prim)">
+          <span class="bio-kpi2-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="16" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg></span>
+          <div class="bio-kpi2-meta"><span>Eclosão hoje</span><strong id="bio-ecl-kpi-hoje">—</strong></div>
+        </div>
+        <div class="bio-kpi2" style="--c:var(--bio-alerta)">
+          <span class="bio-kpi2-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="16" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/><path d="m14 15 1.5 1.5"/></svg></span>
+          <div class="bio-kpi2-meta"><span>Próximos 7 d</span><strong id="bio-ecl-kpi-proximos">—</strong></div>
+        </div>
+        <div class="bio-kpi2" style="--c:var(--bio-perigo)">
+          <span class="bio-kpi2-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7.5V12l3 1.8"/></svg></span>
+          <div class="bio-kpi2-meta"><span>Atrasados</span><strong id="bio-ecl-kpi-atrasados">—</strong></div>
+        </div>
       </div>
       <div id="bio-ecl-listas"></div>
       <div class="bio-chart-card" style="margin-top:10px">
@@ -1980,7 +2020,9 @@
     <!-- ── TAB: PRAIAS (dashboard por praia) ────────────────────── -->
     <div id="bio-dtab-praias" hidden>
       <div class="bio-dash-filtros">
-        <select id="bio-dash-especie"   class="bio-form-input"><option value="">Todas as espécies</option></select>
+        <!-- Espécie agora é o seletor GLOBAL do topo (#bio-dados-especie),
+             que vale para todas as sub-abas — não há mais filtro de espécie
+             próprio da sub-aba Praias. -->
         <select id="bio-dash-uc"        class="bio-form-input"><option value="">Todas as UCs</option></select>
         <select id="bio-dash-municipio" class="bio-form-input"><option value="">Todos os municípios</option></select>
         <select id="bio-dash-comunidade" class="bio-form-input"><option value="">Todas as comunidades</option></select>
@@ -1997,8 +2039,14 @@
     <div id="bio-dtab-local" style="margin-top:4px">
       <p style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#9CA3AF;margin:12px 0 8px">Dados locais (offline)</p>
       <div class="bio-dados-kpi-row">
-        <div class="bio-kpi2"><strong id="bio-kpi-ninhos-local">—</strong><span>Ninhos</span></div>
-        <div class="bio-kpi2"><strong id="bio-kpi-eclodidos-local">—</strong><span>Eclodidos</span></div>
+        <div class="bio-kpi2" style="--c:var(--bio-prim)">
+          <span class="bio-kpi2-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.5"/></svg></span>
+          <div class="bio-kpi2-meta"><span>Ninhos</span><strong id="bio-kpi-ninhos-local">—</strong></div>
+        </div>
+        <div class="bio-kpi2" style="--c:var(--bio-verde)">
+          <span class="bio-kpi2-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+          <div class="bio-kpi2-meta"><span>Eclodidos</span><strong id="bio-kpi-eclodidos-local">—</strong></div>
+        </div>
       </div>
     </div>
 
