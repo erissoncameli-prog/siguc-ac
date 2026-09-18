@@ -72,6 +72,7 @@ function gerarLayout(tituloPagina, paginaAtiva) {
     'relatorios-brigadas':      { svg: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>', cor: '#f87171', bg: 'rgba(248,113,113,0.18)' },
     'biomonitor-app':           { svg: '<circle cx="12" cy="10" r="3"/><path d="M12 2a8 8 0 0 1 8 8c0 5-8 12-8 12S4 15 4 10a8 8 0 0 1 8-8z"/>', cor: '#2A9D6F', bg: 'rgba(42,157,111,0.22)' },
     'biomonitor-validacao':     { svg: '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>', cor: '#7ECEE8', bg: 'rgba(126,206,232,0.22)' },
+    'biomonitor-transferencias':{ svg: '<path d="M4 7h13"/><path d="m13 3 4 4-4 4"/><path d="M20 17H7"/><path d="m11 21-4-4 4-4"/>', cor: '#8b5cf6', bg: 'rgba(139,92,246,0.18)' },
     'biomonitor-bercarios':     { svg: '<rect x="2" y="7" width="20" height="13" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/>', cor: '#2A9D6F', bg: 'rgba(42,157,111,0.18)' },
     'relatorios-biomonitor':    { svg: '<line x1="18" x2="18" y1="20" y2="10"/><line x1="12" x2="12" y1="20" y2="4"/><line x1="6" x2="6" y1="20" y2="14"/>', cor: '#1A6B8C', bg: 'rgba(26,107,140,0.22)' },
     'analise-cientifica-biomonitor': { svg: '<path d="M9 2v6l-4 8a2 2 0 0 0 2 3h10a2 2 0 0 0 2-3l-4-8V2"/><path d="M8 2h8"/><path d="M7 16h10"/>', cor: '#C9A84C', bg: 'rgba(201,168,76,0.22)' },
@@ -180,6 +181,8 @@ function gerarLayout(tituloPagina, paginaAtiva) {
       itens: [
         { id: 'biomonitor-app',        href: '../pages/biomonitor.html',           label: 'App de Campo', target: '_blank' },
         { id: 'biomonitor-validacao',  href: '../pages/biomonitor-validacao.html', label: 'Validação de Ninhos',
+          perfis: ['gestor','tecnico','super_admin'] },
+        { id: 'biomonitor-transferencias', href: '../pages/biomonitor-transferencias.html', label: 'Transferência em lote',
           perfis: ['gestor','tecnico','super_admin'] },
         { id: 'biomonitor-bercarios',  href: '../pages/biomonitor-bercarios.html', label: 'Berçários',
           perfis: ['gestor','tecnico','super_admin'] },

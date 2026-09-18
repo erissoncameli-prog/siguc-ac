@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>SIGUC-AC · Transferência em lote</title>
+<link rel="stylesheet" href="../css/global.css">
+<link rel="stylesheet" href="../css/biomonitor.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../js/observability.js"></script>
+<script src="../js/queryLogger.js"></script>
+<script src="../js/config.js"></script>
+<script src="../js/config-sistema.js"></script>
+<script src="../js/layout.js"></script>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+;(async function () {
+  const usuario = await carregarUsuario()
+  if (!usuario) { window.location.href = '../index.html'; return }
+  if (!['super_admin','gestor','tecnico'].includes(usuario.perfil)) {
+    window.location.href = '../pages/dashboard.html'; return
+  }
+
+  const SPECIES_NOME = {
+    tracaja: 'Tracajá', tartaruga: 'Tartaruga', cabecudo: 'Cabeçudo',
+    pitiU: 'Pitiú', cupido: 'Cupido', jabuti_pe_elefante: 'Jabuti-pé-de-elefante',
+    jabuti_piranga: 'Jabuti-piranga', mucua: 'Muçuã', outro: 'Outro'
+  }
+  const NINHO_CLR = { encontrado:'#3b82f6', transferido:'#8b5cf6' }
+  const NINHO_LBL = { encontrado:'Encontrado', transferido:'Transferido' }
+
+  let _ninhos = [], _praias = [], _sug = []
+
+  document.getElementById('app').innerHTML =
+    gerarLayout('Transferência em lote', 'biomonitor-transferencias') +
+    `<div class="fade-in" style="max-width:960px">
+      <p style="color:var(--cinza-500);font-size:.9rem;margin:0 0 16px">
+        Selecione a praia de origem, marque os ninhos e transfira todos de uma vez para outra praia.
+        A placa de cada ninho no destino é sugerida em sequência e pode ser ajustada antes de confirmar.
+      </p>
+
+      <!-- Passo 1 -->
+      <div class="card" id="passo-sel" style="padding:18px;margin-bottom:16px">
+        <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:12px">
+          <label style="flex:1;min-width:220px;font-size:12px;color:var(--cinza-500)">Praia de origem
+            <select class="form-control" id="tl-origem"></select>
+          </label>
+          <label style="flex:1;min-width:220px;font-size:12px;color:var(--cinza-500)">Praia de destino
+            <select class="form-control" id="tl-destino"></select>
+          </label>
+        </div>
+        <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:14px">
+          <label style="width:170px;font-size:12px;color:var(--cinza-500)">Data
+            <input type="date" class="form-control" id="tl-data">
+          </label>
+          <label style="flex:1;min-width:200px;font-size:12px;color:var(--cinza-500)">Motivo *
+            <select class="form-control" id="tl-motivo">
+              <option value="">Selecione…</option>
+              <option value="risco_inundacao">Risco de inundação</option>
+              <option value="predacao">Predação</option>
+              <option value="erosao">Erosão</option>
+              <option value="concentracao_manejo">Concentração para manejo</option>
+              <option value="pesquisa">Pesquisa</option>
+              <option value="outro">Outro</option>
+            </select>
+          </label>
+          <label style="flex:2;min-width:220px;font-size:12px;color:var(--cinza-500)">Observações
+            <input class="form-control" id="tl-obs" placeholder="Opcional">
+          </label>
+        </div>
+
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <strong style="font-size:13px">Ninhos na praia de origem</strong>
+          <span style="font-size:12px;color:var(--cinza-500)">
+            <span id="tl-count">0</span> selecionado(s) ·
+            <a href="#" onclick="tlMarcarTodos(true);return false">Todos</a> ·
+            <a href="#" onclick="tlMarcarTodos(false);return false">Nenhum</a>
+          </span>
+        </div>
+        <div id="tl-ninhos" style="max-height:340px;overflow:auto;border:1px solid var(--borda);border-radius:8px;padding:4px 10px">
+          <p style="color:var(--cinza-500);font-size:13px;margin:8px 4px">Selecione a praia de origem.</p>
+        </div>
+
+        <div style="margin-top:16px;text-align:right">
+          <button class="btn btn-primary" id="tl-btn-preparar" onclick="tlPreparar()">Preparar transferência</button>
+        </div>
+      </div>
+
+      <!-- Passo 2 -->
+      <div class="card" id="passo-conf" style="padding:18px;margin-bottom:16px" hidden>
+        <p style="font-size:.9rem;color:var(--cinza-500);margin:0 0 12px">
+          Confira/edite a placa que cada ninho receberá em <strong id="tl-conf-destino"></strong>.
+        </p>
+        <div id="tl-conf-lista"></div>
+        <div id="tl-conf-problemas" style="margin-top:12px"></div>
+        <div style="margin-top:16px;display:flex;justify-content:space-between">
+          <button class="btn btn-secondary" onclick="tlVoltar()">← Voltar</button>
+          <button class="btn btn-primary" id="tl-btn-confirmar" onclick="tlConfirmar()">Confirmar transferência</button>
+        </div>
+      </div>
+    </div>`
+
+  bIconsAplicar(document.getElementById('app'))
+
+  // ── Carrega dados ─────────────────────────────────────────────
+  const [{ data: praias }, { data: ninhos }] = await Promise.all([
+    db.from('praias_monitoramento').select('id,nome,codigo,ativa')
+      .order('ativa', { ascending: false }).order('nome'),
+    db.from('vw_ninhos_validacao')
+      .select('id,numero_ninho,numero_atual,especie,status,praia_id,praia_atual_id,ninho_qtd_ovos')
+      .in('status', ['encontrado','transferido']),
+  ])
+  _praias = praias || []
+  _ninhos = ninhos || []
+
+  const opts = _praias.map(p => `<option value="${p.id}">${esc(p.nome)}${p.ativa ? '' : ' (inativa)'}</option>`).join('')
+  document.getElementById('tl-origem').innerHTML  = '<option value="">Selecione…</option>' + opts
+  document.getElementById('tl-destino').innerHTML = '<option value="">Selecione…</option>' + opts
+  document.getElementById('tl-data').value = new Date().toISOString().slice(0, 10)
+  document.getElementById('tl-origem').addEventListener('change', tlRenderNinhos)
+
+  // ── Passo 1: lista de ninhos ──────────────────────────────────
+  window.tlRenderNinhos = function () {
+    const origem = document.getElementById('tl-origem').value
+    const cont = document.getElementById('tl-ninhos')
+    document.getElementById('tl-count').textContent = '0'
+    if (!origem) { cont.innerHTML = '<p style="color:var(--cinza-500);font-size:13px;margin:8px 4px">Selecione a praia de origem.</p>'; return }
+    const elig = _ninhos
+      .filter(n => (n.praia_atual_id || n.praia_id) === origem)
+      .sort((a, b) => (a.numero_ninho || '').localeCompare(b.numero_ninho || ''))
+    if (!elig.length) {
+      cont.innerHTML = '<p style="color:var(--cinza-500);font-size:13px;margin:8px 4px">Nenhum ninho transferível (status encontrado/transferido) nesta praia.</p>'
+      return
+    }
+    cont.innerHTML = elig.map(n => `
+      <label style="display:flex;align-items:center;gap:8px;padding:6px 2px;border-bottom:1px solid var(--cinza-100);font-size:13px;cursor:pointer">
+        <input type="checkbox" class="tl-chk" value="${n.id}" onchange="tlCount()">
+        <span style="flex:1"><strong>${esc(n.numero_atual || n.numero_ninho || '—')}</strong>
+          · ${esc(SPECIES_NOME[n.especie] || n.especie || '—')}
+          · <span style="color:${NINHO_CLR[n.status] || '#666'}">${NINHO_LBL[n.status] || n.status}</span>
+          · ${n.ninho_qtd_ovos ?? '?'} ovos</span>
+      </label>`).join('')
+  }
+  window.tlCount = () =>
+    document.getElementById('tl-count').textContent = String(document.querySelectorAll('.tl-chk:checked').length)
+  window.tlMarcarTodos = (v) => {
+    document.querySelectorAll('.tl-chk').forEach(c => { c.checked = v })
+    tlCount()
+  }
+
+  window.tlVoltar = function () {
+    document.getElementById('passo-conf').hidden = true
+    document.getElementById('passo-sel').hidden  = false
+  }
+
+  window.tlPreparar = async function () {
+    const origem  = document.getElementById('tl-origem').value
+    const destino = document.getElementById('tl-destino').value
+    const motivo  = document.getElementById('tl-motivo').value
+    const ids = [...document.querySelectorAll('.tl-chk:checked')].map(c => c.value)
+    if (!origem)  return toast('Selecione a praia de origem.', 'error')
+    if (!destino) return toast('Selecione a praia de destino.', 'error')
+    if (destino === origem) return toast('O destino deve ser diferente da origem.', 'error')
+    if (!motivo)  return toast('Motivo é obrigatório.', 'error')
+    if (!ids.length) return toast('Selecione ao menos um ninho.', 'error')
+
+    const btn = document.getElementById('tl-btn-preparar')
+    const restore = btnEspera(btn)
+    try {
+      const { data, error } = await db.rpc('bio_transferencia_lote_sugerir', {
+        p_ninho_ids: ids, p_praia_destino_id: destino,
+      })
+      if (error) throw error
+      _sug = (data || []).filter(x => x.elegivel)
+      const inelig = (data || []).filter(x => !x.elegivel)
+      if (!_sug.length) { toast('Nenhum ninho elegível na seleção.', 'error'); return }
+
+      document.getElementById('tl-conf-destino').textContent =
+        document.getElementById('tl-destino').selectedOptions[0].textContent
+      document.getElementById('tl-conf-lista').innerHTML = _sug.map(x => `
+        <div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--cinza-100);font-size:13px">
+          <span style="flex:1">${esc(x.numero_ninho || '—')} · ${esc(SPECIES_NOME[x.especie] || x.especie || '—')}</span>
+          <span style="color:var(--cinza-400)">→</span>
+          <input class="form-control tl-placa" data-ninho="${x.ninho_id}" style="width:200px" value="${esc(x.numero_atual_sugerido || '')}">
+        </div>`).join('') +
+        (inelig.length ? `<p style="font-size:12px;color:#b45309;margin-top:10px">
+          ${inelig.length} ninho(s) ignorado(s): ${inelig.map(x => esc(x.numero_ninho || '') + ' (' + esc(x.motivo_inelegivel || '') + ')').join(', ')}</p>` : '')
+      document.getElementById('tl-conf-problemas').innerHTML = ''
+      document.getElementById('tl-btn-confirmar').textContent = `Confirmar transferência (${_sug.length})`
+
+      document.getElementById('passo-sel').hidden  = true
+      document.getElementById('passo-conf').hidden = false
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    } catch (e) {
+      toast(e.message || 'Falha ao preparar a transferência.', 'error')
+    } finally { restore() }
+  }
+
+  window.tlConfirmar = async function () {
+    const destino = document.getElementById('tl-destino').value
+    const motivo  = document.getElementById('tl-motivo').value
+    const data    = document.getElementById('tl-data').value
+    const obs     = document.getElementById('tl-obs').value.trim()
+    const itens = [...document.querySelectorAll('.tl-placa')].map(inp => ({
+      ninho_id: inp.dataset.ninho, numero_atual: inp.value.trim(),
+    }))
+    if (!data) return toast('Informe a data da transferência.', 'error')
+
+    const btn = document.getElementById('tl-btn-confirmar')
+    const restore = btnEspera(btn)
+    try {
+      const { data: res, error } = await db.rpc('bio_transferir_ninhos_lote', {
+        p_itens: itens, p_praia_destino_id: destino, p_data_transferencia: data,
+        p_motivo: motivo, p_observacoes: obs || null,
+      })
+      if (error) throw error
+      if (!res.ok) {
+        document.getElementById('tl-conf-problemas').innerHTML =
+          `<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:8px 10px;font-size:12.5px;color:#991b1b">
+            Corrija antes de confirmar:
+            <ul style="margin:6px 0 0 16px">${res.problemas.map(p => `<li>${esc(p.numero_ninho || p.ninho_id)}: ${esc(p.motivo)}</li>`).join('')}</ul>
+          </div>`
+        return
+      }
+      toast(`${res.total} ninho(s) transferido(s) com sucesso.`, 'success')
+      // Recarrega os ninhos e volta ao passo 1 limpo
+      const { data: nv } = await db.from('vw_ninhos_validacao')
+        .select('id,numero_ninho,numero_atual,especie,status,praia_id,praia_atual_id,ninho_qtd_ovos')
+        .in('status', ['encontrado','transferido'])
+      _ninhos = nv || []
+      document.getElementById('tl-motivo').value = ''
+      document.getElementById('tl-obs').value = ''
+      tlRenderNinhos()
+      tlVoltar()
+    } catch (e) {
+      toast(e.message || 'Falha na transferência em lote.', 'error')
+    } finally { restore() }
+  }
+})()
+</script>
+</body>
+</html>
