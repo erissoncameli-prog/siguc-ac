@@ -1714,9 +1714,12 @@
     <span id="bio-dados-status" style="font-size:11px;color:#9CA3AF"></span>
   </header>
 
-  <!-- Seletor de temporada (default: atual) -->
-  <div style="padding:0 16px 4px">
-    <select id="bio-dados-temporada" class="bio-form-input" style="font-size:13px"></select>
+  <!-- Seletores globais: temporada + espécie (valem para TODAS as sub-abas) -->
+  <div style="padding:0 16px 4px;display:flex;gap:8px">
+    <select id="bio-dados-temporada" class="bio-form-input" style="font-size:13px;flex:1;min-width:0" aria-label="Temporada"></select>
+    <select id="bio-dados-especie" class="bio-form-input" style="font-size:13px;flex:1;min-width:0" aria-label="Filtrar por espécie">
+      <option value="">Todas as espécies</option>
+    </select>
   </div>
 
   <!-- Tab navigation -->
@@ -1980,7 +1983,9 @@
     <!-- ── TAB: PRAIAS (dashboard por praia) ────────────────────── -->
     <div id="bio-dtab-praias" hidden>
       <div class="bio-dash-filtros">
-        <select id="bio-dash-especie"   class="bio-form-input"><option value="">Todas as espécies</option></select>
+        <!-- Espécie agora é o seletor GLOBAL do topo (#bio-dados-especie),
+             que vale para todas as sub-abas — não há mais filtro de espécie
+             próprio da sub-aba Praias. -->
         <select id="bio-dash-uc"        class="bio-form-input"><option value="">Todas as UCs</option></select>
         <select id="bio-dash-municipio" class="bio-form-input"><option value="">Todos os municípios</option></select>
         <select id="bio-dash-comunidade" class="bio-form-input"><option value="">Todas as comunidades</option></select>

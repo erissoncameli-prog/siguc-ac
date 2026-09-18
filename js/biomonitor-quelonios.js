@@ -4607,9 +4607,26 @@ async function bioCarregarTelaDados() {
   }
   const _tempDados = selTemp?.value || BioApp.temporadaAtual?.id || null
 
-  // Dados locais (sempre disponíveis) — escopados à temporada selecionada
+  // Seletor de espécie GLOBAL (default: todas). Vale para todas as sub-abas.
+  // Opções fixas do catálogo, populadas 1x. Fonte: BIO_ESPECIES.
+  const selEspG = document.getElementById('bio-dados-especie')
+  if (selEspG && !selEspG._wired) {
+    selEspG._wired = true
+    selEspG.addEventListener('change', () => bioCarregarTelaDados())
+  }
+  if (selEspG && !selEspG.dataset.populado && BIO_ESPECIES?.length) {
+    const atual = selEspG.value
+    selEspG.innerHTML = '<option value="">Todas as espécies</option>' +
+      BIO_ESPECIES.filter(e => e.id !== 'outro').map(e => `<option value="${esc(e.id)}">${esc(e.nome)}</option>`).join('')
+    if (atual) selEspG.value = atual
+    selEspG.dataset.populado = '1'
+  }
+  const _espDados = selEspG?.value || null
+
+  // Dados locais (sempre disponíveis) — escopados à temporada E à espécie selecionadas
   const ninhos = (await bioOfflineListarNinhos())
-    .filter(n => !_tempDados || n.temporada_id === _tempDados)
+    .filter(n => (!_tempDados || n.temporada_id === _tempDados)
+              && (!_espDados  || n.especie === _espDados))
   _bioSetText('bio-kpi-ninhos-local', ninhos.length)
   _bioSetText('bio-kpi-eclodidos-local', ninhos.filter(n => ['eclodido', 'em_bercario', 'soltado'].includes(n.status)).length)
 
@@ -4623,7 +4640,7 @@ async function bioCarregarTelaDados() {
   if (statusEl) statusEl.textContent = 'carregando…'
 
   try {
-    const { data, error } = await bioSupabase().rpc('bio_dados_aba', { p_temporada_id: _tempDados })
+    const { data, error } = await bioSupabase().rpc('bio_dados_aba', { p_temporada_id: _tempDados, p_especie: _espDados })
     if (error || !data) {
       if (statusEl) statusEl.textContent = error ? 'erro' : 'sem dados'
       return
@@ -4670,15 +4687,15 @@ async function bioCarregarTelaDados() {
     }
 
     // Ovos viáveis/perdidos (base canônica) nos KPIs
-    bioSupabase().rpc('bio_ovos_resumo', { p_temporada_id: _tempDados || null }).then(({ data: ov }) => {
+    bioSupabase().rpc('bio_ovos_resumo', { p_temporada_id: _tempDados || null, p_especie: _espDados }).then(({ data: ov }) => {
       if (!ov) return
       _bioSetText('bio-kpi-ovos-postura',  ov.postura)
       _bioSetText('bio-kpi-ovos-viaveis',  ov.viaveis)
       _bioSetText('bio-kpi-ovos-perdidos', ov.perdidos)
     }).catch(() => {})
 
-    // Painéis de eclosão e dashboard por praia (RPCs próprias)
-    bioRenderPainelEclosao(_tempDados)
+    // Painéis de eclosão e dashboard por praia (RPCs próprias) — espécie global
+    bioRenderPainelEclosao(_tempDados, _espDados)
     bioRenderDashboardPraias(_tempDados)
 
     // Gráficos (carrega Chart.js lazily na primeira vez)
@@ -4693,10 +4710,10 @@ async function bioCarregarTelaDados() {
 /* ════════════════════════════════════════════════════════════
    PAINEL DE ECLOSÃO (seção 3) — bio_monitoramento_eclosao
    ════════════════════════════════════════════════════════════ */
-async function bioRenderPainelEclosao(temporadaId) {
+async function bioRenderPainelEclosao(temporadaId, especie) {
   let data
   try {
-    const r = await bioSupabase().rpc('bio_monitoramento_eclosao', { p_temporada_id: temporadaId || null })
+    const r = await bioSupabase().rpc('bio_monitoramento_eclosao', { p_temporada_id: temporadaId || null, p_especie: especie || null })
     if (r.error) throw r.error
     data = r.data
   } catch { return }
@@ -4774,24 +4791,19 @@ function bioPopularFiltrosDashboard(praias) {
 async function bioRenderDashboardPraias(temporadaId) {
   const $ = id => document.getElementById(id)
   const tempAtual = () => document.getElementById('bio-dados-temporada')?.value || BioApp.temporadaAtual?.id || null
-
-  // Espécie: opções fixas do catálogo (1x)
-  const selEsp = $('bio-dash-especie')
-  if (selEsp && !selEsp.dataset.populado) {
-    selEsp.innerHTML = '<option value="">Todas as espécies</option>' +
-      BIO_ESPECIES.filter(e => e.id !== 'outro').map(e => `<option value="${e.id}">${esc(e.nome)}</option>`).join('')
-    selEsp.dataset.populado = '1'
-  }
+  // Espécie: seletor GLOBAL do topo (#bio-dados-especie), não mais um filtro
+  // próprio da sub-aba Praias — lido ao vivo em cada render.
+  const espAtual = () => document.getElementById('bio-dados-especie')?.value || null
 
   // Liga os controles de filtro (1x) — qualquer mudança recarrega
   const wireEl = $('bio-dash-praias')
   if (wireEl && !wireEl.dataset.wired) {
     wireEl.dataset.wired = '1'
-    ;['bio-dash-especie','bio-dash-uc','bio-dash-municipio','bio-dash-comunidade',
+    ;['bio-dash-uc','bio-dash-municipio','bio-dash-comunidade',
       'bio-dash-data-inicio','bio-dash-data-fim'].forEach(id =>
       $(id)?.addEventListener('change', () => bioRenderDashboardPraias(tempAtual())))
     $('bio-dash-limpar')?.addEventListener('click', () => {
-      ['bio-dash-especie','bio-dash-uc','bio-dash-municipio','bio-dash-comunidade',
+      ['bio-dash-uc','bio-dash-municipio','bio-dash-comunidade',
        'bio-dash-data-inicio','bio-dash-data-fim'].forEach(id => { const el = $(id); if (el) el.value = '' })
       bioRenderDashboardPraias(tempAtual())
     })
@@ -4799,7 +4811,7 @@ async function bioRenderDashboardPraias(temporadaId) {
 
   const filtros = {
     p_temporada_id: temporadaId || null,
-    p_especie:      selEsp?.value || null,
+    p_especie:      espAtual(),
     p_uc_id:        $('bio-dash-uc')?.value || null,
     p_municipio:    $('bio-dash-municipio')?.value || null,
     p_comunidade:   $('bio-dash-comunidade')?.value || null,
@@ -4817,7 +4829,10 @@ async function bioRenderDashboardPraias(temporadaId) {
   // Popula UC/município/comunidade 1x, a partir de um retorno SEM filtros
   // (mantém as opções estáveis mesmo depois de filtrar). Só na 1ª carga
   // sem nenhum filtro aplicado além da temporada.
-  const semFiltros = !filtros.p_especie && !filtros.p_uc_id && !filtros.p_municipio
+  // Espécie NÃO entra aqui: é filtro global (do topo), não recorte próprio da
+  // sub-aba Praias — as opções de UC/município/comunidade devem popular mesmo
+  // com uma espécie selecionada.
+  const semFiltros = !filtros.p_uc_id && !filtros.p_municipio
     && !filtros.p_comunidade && !filtros.p_data_inicio && !filtros.p_data_fim
   if (semFiltros && Array.isArray(praias)) bioPopularFiltrosDashboard(praias)
 
