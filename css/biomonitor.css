@@ -632,13 +632,21 @@ input.bio-counter-val::-webkit-inner-spin-button { -webkit-appearance: none; mar
 .bio-sol-hist-obs { font-size: 13px; color: var(--bio-ink); font-style: italic; }
 
 /* ── Botões ─────────────────────────────────────────────────── */
+/* Cápsula "tinted" (estilo iOS: fill tonal, nunca contorno cinza) —
+   proposta aprovada como Artifact antes de codar (opção D, comparada
+   com pills tonais/CTA+contorno/grade de ícones). */
 .bio-btn-sm {
-  padding: 7px 14px; border-radius: 10px; border: none;
-  font-family: var(--font-ui); font-size: 13px; font-weight: 600;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 9px 16px; border-radius: 999px; border: none;
+  font-family: var(--font-ui); font-size: 13.5px; font-weight: 600; letter-spacing: -.005em;
   cursor: pointer; -webkit-tap-highlight-color: transparent;
 }
-.bio-btn-sm.prim { background: var(--bio-prim); color: #fff; }
-.bio-btn-sm.ghost { background: rgba(0,0,0,.06); color: var(--bio-ink); }
+.bio-btn-sm.prim { background: var(--bio-prim); color: #fff; box-shadow: 0 1px 3px rgba(13,30,39,.18); }
+/* Neutro = mesmo tom do fundo do app (--bio-app-bg), não um cinza
+   novo — já é o "quaternary fill" do iOS por acaso de paleta. */
+.bio-btn-sm.ghost { background: var(--bio-app-bg); color: var(--bio-ink); }
+.bio-btn-sm.ouro  { background: var(--bio-ouro-bg); color: #8A6D1F; }
+.bio-btn-sm.verde { background: var(--bio-verde-bg); color: #1A7A4A; }
 .bio-btn-sm.perigo { background: var(--bio-perigo); color: #fff; }
 
 /* ── Ovos na postura ──────────────────────────────────────────── */
@@ -1313,10 +1321,16 @@ body.field-mode .bio-home-nome { font-size: 26px; }
   background: var(--bio-perigo-bg); padding: 4px 8px; border-radius: 6px;
 }
 .bio-nfc-acoes {
-  display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; padding-top: 10px;
-  border-top: 1px solid #EFF3F6;
+  display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; padding-top: 12px;
+  /* Separador "hairline" (cor translúcida, não cinza sólido) — receita
+     iOS de divisor, sem depender de um tom de fundo específico. */
+  border-top: 1px solid rgba(13,30,39,.08);
 }
 .bio-nfc-acoes .bio-btn-sm { flex: 1 1 auto; min-width: 84px; text-align: center; }
+/* Só no card do ninho a ação principal (.prim) vira "prominent" —
+   cápsula cheia, linha inteira — nunca no par Ver/Soltar berçário,
+   que reaproveita a MESMA .bio-nfc-acoes lado a lado. */
+.bio-nfc-acoes-ninho .bio-btn-sm.prim { flex: 1 1 100%; }
 
 /* Fila de envio — lista de cards */
 .bio-sync-queue { padding: 12px 16px; }
