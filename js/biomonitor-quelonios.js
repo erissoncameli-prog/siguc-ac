@@ -2596,8 +2596,8 @@ async function bioCarregarBercarios() {
         <div class="bio-berc-stats">${linhasStats}</div>
       </div>
       <div class="bio-nfc-acoes">
-        <button class="bio-btn-sm prim" data-acao="ver-bercario">Ver berçário</button>
-        ${statusFiltro === 'soltado' ? '' : `<button class="bio-btn-sm prim" data-acao="soltar-bercario" style="background:var(--bio-verde)">Soltar berçário</button>`}
+        <button class="bio-btn-sm prim" data-acao="ver-bercario">${bico('eye')} Ver berçário</button>
+        ${statusFiltro === 'soltado' ? '' : `<button class="bio-btn-sm prim" data-acao="soltar-bercario" style="background:var(--bio-verde)">${bico('leaf')} Soltar berçário</button>`}
       </div>
     `
     card.querySelector('[data-acao="ver-bercario"]')?.addEventListener('click', () => {
@@ -2780,7 +2780,7 @@ function bioRenderizarHistoricoNinhos(lotes) {
           <div class="bio-hist-ninho-meta">Entrada: ${_bioFormatarData(l.data_entrada)} · ${l.qtd_entrada} filhotes</div>
         </div>
         <span class="bio-nfc-status-badge ${l.status === 'ativo' ? 'em_bercario' : l.status === 'soltado' ? 'soltado' : ''}">${STATUS_LBL[l.status] ?? l.status}</span>
-        <button type="button" class="bio-btn-sm ghost" data-lote-etiqueta="${l.uuid_cliente}">Etiqueta</button>
+        <button type="button" class="bio-btn-sm ghost" data-lote-etiqueta="${l.uuid_cliente}">${bico('qr')} Etiqueta</button>
       </div>`
   }).join('')
 
@@ -3942,10 +3942,10 @@ function bioNinhoCardInner(n, opts = {}) {
 
   const acoesHtml = mostrarAcoes ? `
     <div class="bio-nfc-acoes bio-nfc-acoes-ninho">
-      ${n.status_validacao === 'em_correcao' ? `<button class="bio-btn-sm prim" data-acao="corrigir">Corrigir</button>` : ''}
+      ${n.status_validacao === 'em_correcao' ? `<button class="bio-btn-sm prim" data-acao="corrigir">${bico('edit')} Corrigir</button>` : ''}
       ${status === 'encontrado' || status === 'transferido' ? `<button class="bio-btn-sm prim" data-acao="transferencia">${bico('swap')} + Transferência</button>` : ''}
       ${['encontrado', 'transferido'].includes(status) ? `<button class="bio-btn-sm ouro" data-acao="eclosao">${bico('egg')} Eclosão</button>` : ''}
-      ${status === 'eclodido' ? `<button class="bio-btn-sm prim" data-acao="soltar">Soltar</button>` : ''}
+      ${status === 'eclodido' ? `<button class="bio-btn-sm prim" data-acao="soltar">${bico('leaf')} Soltar</button>` : ''}
       ${status !== 'perdido' ? `<button class="bio-btn-sm verde" data-acao="visita">${bico('eye')} Visita</button>` : ''}
       <button class="bio-btn-sm ghost" data-acao="pdf" ${navigator.onLine ? '' : 'disabled title="Requer conexão"'}>${bico('file-text')} Gerar PDF</button>
       <button class="bio-btn-sm ghost" data-acao="etiqueta">${bico('qr')} Etiqueta</button>
@@ -4075,7 +4075,7 @@ async function bioCarregarFilaLocal() {
     box.innerHTML = `
       <div class="bio-sync-erros-head">
         <b>${erros.length} registro(s) não enviado(s)</b>
-        <button type="button" id="bio-sync-retry" class="bio-btn-sm prim">Tentar de novo</button>
+        <button type="button" id="bio-sync-retry" class="bio-btn-sm prim">${bico('refresh-cw')} Tentar de novo</button>
       </div>
       ${erros.map(er => `
         <div class="bio-sync-erro-item">

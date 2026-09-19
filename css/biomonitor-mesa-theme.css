@@ -1,0 +1,55 @@
+/* ── Biomonitor · botões "cápsula iOS" na mesa (isolado ao módulo) ──
+   Escopo: só afeta elementos dentro de .bio-mesa-theme — NÃO altera
+   css/global.css nem o design system institucional (sidebar, header,
+   demais páginas/módulos). Mesmo padrão de css/frota-wise-theme.css
+   (.fw-theme): tema isolado por classe, nunca reskin do .btn global.
+
+   Continua a identidade já aprovada como Artifact e implementada no
+   app de campo (js/biomonitor-quelonios.js, .bio-btn-sm) — cápsula
+   "tinted", nunca contorno cinza, só a ação principal em destaque.
+   Escopo desta entrega: SÓ botões (.btn/.btn-primary/.btn-secondary),
+   os mesmos elementos comparados no mockup. Tabelas, KPIs, abas e
+   chips das telas de mesa não entram aqui — já são um padrão próprio
+   e mais denso (CRUD/relatório), diferente do "card de ação" do app;
+   ficam para uma extensão futura, se pedida. */
+
+.bio-mesa-theme {
+  --biom-prim:      #1A6B8C;
+  --biom-prim-esc:  #124F68;
+  --biom-bg:        #F2F7FA;
+  --biom-ink:       #0D1E27;
+}
+
+.bio-mesa-theme .btn {
+  border-radius: 999px;
+  font-weight: 600;
+  border: none;
+  box-shadow: none;
+  transition: background .15s, transform .1s;
+}
+.bio-mesa-theme .btn:active { transform: scale(.97); }
+
+.bio-mesa-theme .btn-primary {
+  background: var(--biom-prim);
+  border-color: var(--biom-prim);
+  box-shadow: 0 1px 3px rgba(13,30,39,.18);
+}
+.bio-mesa-theme .btn-primary:hover { background: var(--biom-prim-esc); border-color: var(--biom-prim-esc); }
+
+.bio-mesa-theme .btn-secondary {
+  background: var(--biom-bg);
+  color: var(--biom-ink);
+  border-color: transparent;
+}
+.bio-mesa-theme .btn-secondary:hover { background: #E3ECF1; }
+
+.bio-mesa-theme .btn-ghost {
+  background: transparent;
+  color: var(--biom-prim);
+  border-color: transparent;
+}
+.bio-mesa-theme .btn-ghost:hover { background: var(--biom-bg); }
+
+@media (prefers-reduced-motion: reduce) {
+  .bio-mesa-theme .btn { transition: none; }
+}
