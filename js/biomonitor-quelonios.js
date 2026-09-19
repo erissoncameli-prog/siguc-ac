@@ -3941,14 +3941,14 @@ function bioNinhoCardInner(n, opts = {}) {
       : `<div class="bio-nfc-origem" style="margin-top:5px;font-size:12px;font-weight:600;color:#7c3aed;background:#7c3aed14;border-radius:6px;padding:3px 8px;display:inline-block">Transferido de ${n.praia_nome ?? '—'}${n.numero_ninho ? ` · nº lá: ${n.numero_ninho}` : ''}</div>`
 
   const acoesHtml = mostrarAcoes ? `
-    <div class="bio-nfc-acoes">
+    <div class="bio-nfc-acoes bio-nfc-acoes-ninho">
       ${n.status_validacao === 'em_correcao' ? `<button class="bio-btn-sm prim" data-acao="corrigir">Corrigir</button>` : ''}
-      ${status === 'encontrado' || status === 'transferido' ? `<button class="bio-btn-sm prim" data-acao="transferencia">+ Transferência</button>` : ''}
-      ${['encontrado', 'transferido'].includes(status) ? `<button class="bio-btn-sm ghost" data-acao="eclosao">Eclosão</button>` : ''}
+      ${status === 'encontrado' || status === 'transferido' ? `<button class="bio-btn-sm prim" data-acao="transferencia">${bico('swap')} + Transferência</button>` : ''}
+      ${['encontrado', 'transferido'].includes(status) ? `<button class="bio-btn-sm ouro" data-acao="eclosao">${bico('egg')} Eclosão</button>` : ''}
       ${status === 'eclodido' ? `<button class="bio-btn-sm prim" data-acao="soltar">Soltar</button>` : ''}
-      ${status !== 'perdido' ? `<button class="bio-btn-sm ghost" data-acao="visita">Visita</button>` : ''}
-      <button class="bio-btn-sm ghost" data-acao="pdf" ${navigator.onLine ? '' : 'disabled title="Requer conexão"'}>Gerar PDF</button>
-      <button class="bio-btn-sm ghost" data-acao="etiqueta">Etiqueta</button>
+      ${status !== 'perdido' ? `<button class="bio-btn-sm verde" data-acao="visita">${bico('eye')} Visita</button>` : ''}
+      <button class="bio-btn-sm ghost" data-acao="pdf" ${navigator.onLine ? '' : 'disabled title="Requer conexão"'}>${bico('file-text')} Gerar PDF</button>
+      <button class="bio-btn-sm ghost" data-acao="etiqueta">${bico('qr')} Etiqueta</button>
     </div>` : ''
 
   const histHtml = bioTimelineHtml(n._eventos)

@@ -403,6 +403,8 @@ const BICON_PATHS = {
   'chevron-down': '<polyline points="6 9 12 15 18 9"/>',
   'arrow-up':   '<line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/>',
   'arrow-down': '<line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/>',
+  swap: '<path d="M17 2l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>',
+  egg:  '<path d="M12 2C8 2 5 8 5 14a7 7 0 0 0 14 0c0-6-3-12-7-12z"/><path d="M9 12l2-2 1 2 2-2"/>',
 };
 
 function bico(nome, extraClasse) {
