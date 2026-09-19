@@ -34,7 +34,7 @@ mkdirSync(join(WWW, 'vendor/fonts'), { recursive: true })
 // ── JS compartilhado (transpilado para ES2017) ─────────────────
 // Lista derivada de todo <script src="../js/..."> em pages/frota-app.html.
 const ARQUIVOS_JS = [
-  'observability.js', 'queryLogger.js', 'config.js', 'lgpd.js', 'lgpd-campo.js',
+  'observability.js', 'queryLogger.js', 'config.js', 'foto-otimizar.js', 'lgpd.js', 'lgpd-campo.js',
   'qrcode-generator.js', 'frota-offline.js', 'frota-sync.js', 'frota-notif-local.js', 'layout.js',
   'frota-wise.js', 'fotos-privadas.js', 'avatar-foto.js', 'pin-baralho.js', 'luz-nav.js', 'frota-consumo.js', 'frota-passageiros.js',
   'frota-viagens-status.js',

@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8">
+<title>Harness de otimização de foto</title>
+<!--
+  Página vazia dedicada (mesmo motivo do pin-baralho-harness.html): o
+  módulo js/foto-otimizar.js não depende de config.js nem de Supabase,
+  então testar contra um documento mínimo isola o encode/resize/EXIF.
+-->
+<script src="/js/foto-otimizar.js"></script>
+</head>
+<body>
+<script>
+// Gera uma "foto de celular" grande e com detalhe (ruído) — sem ruído,
+// um retângulo sólido comprime a quase nada e não representa o caso real.
+window.gerarFotoGrande = async function (w, h, tipo = 'image/jpeg', q = 0.92) {
+  const c = document.createElement('canvas')
+  c.width = w; c.height = h
+  const ctx = c.getContext('2d')
+  const img = ctx.createImageData(w, h)
+  for (let i = 0; i < img.data.length; i += 4) {
+    img.data[i]   = (i * 7)  % 255
+    img.data[i+1] = (i * 13) % 255
+    img.data[i+2] = (i * 29) % 255
+    img.data[i+3] = 255
+  }
+  ctx.putImageData(img, 0, 0)
+  const blob = await new Promise(r => c.toBlob(b => r(b), tipo, q))
+  return blob
+}
+
+window.dimsDoBlob = async function (blob) {
+  const bmp = await createImageBitmap(blob)
+  const d = { w: bmp.width, h: bmp.height }
+  bmp.close && bmp.close()
+  return d
+}
+
+window.bytesDoBlob = async function (blob) {
+  return Array.from(new Uint8Array(await blob.arrayBuffer()))
+}
+
+window.canvasSimples = function (w, h) {
+  const c = document.createElement('canvas')
+  c.width = w; c.height = h
+  const ctx = c.getContext('2d')
+  ctx.fillStyle = '#2b7'; ctx.fillRect(0, 0, w, h)
+  ctx.fillStyle = '#123'; ctx.fillRect(w/4, h/4, w/2, h/2)
+  return c
+}
+</script>
+</body></html>
