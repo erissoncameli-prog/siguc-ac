@@ -15,7 +15,7 @@ const APP = SCOPE.includes('/pages/biomonitor.html') ? 'biomonitor'
 // Ao concluir uma implementação que toque arquivos web de um app,
 // incrementar SÓ o número daquele app (vN → vN+1) — não precisa mexer
 // nos outros dois.
-const VERSOES = { brigadas: 273, biomonitor: 58, frota: 110, agua: 41 }
+const VERSOES = { brigadas: 274, biomonitor: 59, frota: 111, agua: 42 }
 const CACHE = `siguc-${APP}-v${VERSOES[APP]}`
 
 const SHELLS = {
@@ -27,6 +27,7 @@ const SHELLS = {
     '/css/pin-baralho.css',
     '/css/luz-nav.css',
     '/js/config.js',
+    '/js/foto-otimizar.js',
     '/js/fotos-privadas.js',
     '/js/avatar-foto.js',
     '/js/pin-baralho.js',
@@ -59,6 +60,7 @@ const SHELLS = {
     '/css/pin-baralho.css',
     '/css/luz-nav.css',
     '/js/config.js',
+    '/js/foto-otimizar.js',
     '/js/fotos-privadas.js',
     '/js/avatar-foto.js',
     '/js/pin-baralho.js',
@@ -98,6 +100,7 @@ const SHELLS = {
     '/js/observability.js',
     '/js/queryLogger.js',
     '/js/config.js',
+    '/js/foto-otimizar.js',
     '/js/qrcode-generator.js',
     '/js/layout.js',
     '/js/frota-wise.js',
@@ -123,6 +126,7 @@ const SHELLS = {
     '/css/guia-app.css',
     '/css/luz-nav.css',
     '/js/config.js',
+    '/js/foto-otimizar.js',
     '/js/fotos-privadas.js',
     '/js/avatar-foto.js',
     '/js/pin-baralho.js',

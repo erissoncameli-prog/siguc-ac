@@ -10,6 +10,7 @@
 <script src="../js/observability.js"></script>
 <script src="../js/queryLogger.js"></script>
 <script src="../js/config.js"></script>
+<script src="../js/foto-otimizar.js"></script>
 <script src="../js/config-sistema.js"></script>
 <script src="../js/layout.js"></script>
 <script src="../js/mapa-recorte.js"></script>
@@ -495,8 +496,15 @@
     const el = document.getElementById(idArquivo)
     const arq = el?.files?.[0]
     if (!arq) return undefined // undefined = não mexe no campo
-    const path = `${prefixo}/${_atual.id}-${Date.now()}-${arq.name.replace(/[^\w.\-]+/g, '_')}`
-    const { error } = await db.storage.from(bucket).upload(path, arq, { contentType: arq.type })
+    // Otimiza (redimensiona + WebP/JPEG) quando for imagem; outros tipos
+    // (ex.: PDF) sobem intactos. Ver js/foto-otimizar.js.
+    let corpo = arq
+    if (arq.type?.startsWith('image/') && typeof otimizarFoto === 'function') corpo = await otimizarFoto(arq)
+    const ext = (typeof fotoExtDoTipo === 'function' && corpo.type?.startsWith('image/'))
+      ? fotoExtDoTipo(corpo, (arq.name.split('.').pop() || 'jpg').toLowerCase())
+      : (arq.name.split('.').pop() || 'bin').toLowerCase()
+    const path = `${prefixo}/${_atual.id}-${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+    const { error } = await db.storage.from(bucket).upload(path, corpo, { contentType: corpo.type })
     if (error) throw error
     const { data: { publicUrl } } = db.storage.from(bucket).getPublicUrl(path)
     return publicUrl

@@ -22,6 +22,7 @@ window.__API_MONITOR_OFF = true
 <script src="../js/observability.js"></script>
 <script src="../js/queryLogger.js"></script>
 <script src="../js/config.js"></script>
+<script src="../js/foto-otimizar.js"></script>
 <script src="../js/lgpd.js"></script>
 <script>window.LGPD_CAMPO_APP = 'frota'</script>
 <script src="../js/lgpd-campo.js"></script>
@@ -2481,13 +2482,17 @@ function pedirFotoChecklist(i) {
 
 // base64 na captura, mesmo motivo do abastecimento e do defeito: em
 // iOS/PWA o Blob fica inválido em segundo plano antes do sync.
-function capturarFotoChecklist(input) {
+// Otimiza (redimensiona + WebP/JPEG) ANTES do base64 — cupom/hodômetro
+// não precisam de resolução de impressão; ver js/foto-otimizar.js.
+async function capturarFotoChecklist(input) {
   const file = input.files?.[0]
   input.value = ''
   if (file == null || _clFotoIdx == null) return
+  const idx = _clFotoIdx; _clFotoIdx = null
+  const foto = (typeof otimizarFoto === 'function') ? await otimizarFoto(file) : file
   const reader = new FileReader()
-  reader.onload = () => { _clRespostas[_clFotoIdx].foto = reader.result; _clFotoIdx = null; renderChecklist() }
-  reader.readAsDataURL(file)
+  reader.onload = () => { _clRespostas[idx].foto = reader.result; renderChecklist() }
+  reader.readAsDataURL(foto)
 }
 
 function removerFotoChecklist(i) { _clRespostas[i].foto = null; renderChecklist() }
@@ -2780,9 +2785,10 @@ function calcularValorAbastecimento() {
 // Fotos convertidas para base64 na hora da captura — evita depender de
 // Blob (que fica inválido em background em iOS/PWA) até o sync subir
 // pro Storage (mesmo motivo da conversão em brigada-offline.js).
-function capturarFotoAbastecimento(input, qual) {
+async function capturarFotoAbastecimento(input, qual) {
   const file = input.files?.[0]
   if (!file) return
+  const foto = (typeof otimizarFoto === 'function') ? await otimizarFoto(file) : file
   const reader = new FileReader()
   reader.onload = () => {
     _abastFotos[qual] = reader.result
@@ -2790,7 +2796,7 @@ function capturarFotoAbastecimento(input, qual) {
       `<img src="${reader.result}" style="max-width:120px;max-height:120px;border-radius:8px;display:block">`
     document.querySelector(`#ab-foto-${qual}-btn .fm-foto-btn-label`).textContent = 'Trocar foto'
   }
-  reader.readAsDataURL(file)
+  reader.readAsDataURL(foto)
 }
 
 async function confirmarAbastecimento() {
@@ -2865,17 +2871,18 @@ let _defeitoViagemId = null, _defeitoVeiculos = [], _defeitoFotos = []
 // Fotos convertidas para base64 na captura (mesmo motivo do
 // abastecimento: Blob fica inválido em background em iOS/PWA até o
 // sync subir pro Storage). Até 5 por comunicado.
-function capturarFotoDefeito(input) {
+async function capturarFotoDefeito(input) {
   const file = input.files?.[0]
   input.value = ''
   if (!file) return
   if (_defeitoFotos.length >= 5) { toast('Máximo de 5 fotos por comunicado', 'error'); return }
+  const foto = (typeof otimizarFoto === 'function') ? await otimizarFoto(file) : file
   const reader = new FileReader()
   reader.onload = () => {
     _defeitoFotos.push(reader.result)
     renderFotosDefeito()
   }
-  reader.readAsDataURL(file)
+  reader.readAsDataURL(foto)
 }
 
 function removerFotoDefeito(i) {

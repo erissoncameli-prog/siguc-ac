@@ -992,6 +992,56 @@ js/frota-consumo.js.
   migration só DEPOIS do deploy do código que assina (ver cabeçalho
   das migrations 200 e 210).
 
+## Regra do sistema — formato/tamanho de foto (todos os apps)
+TODA foto enviada ao Storage é otimizada ANTES do upload por
+`js/foto-otimizar.js` (fonte única — mesma lição de
+`js/frota-consumo.js`/`js/mapa-recorte.js`; nenhuma tela reimplementa
+redimensionamento/reencode/EXIF). Motivo: Frota (defeito/abastecimento/
+checklist) e os cadastros de mesa (veículo/motorista/brigadista/
+equipamento Biomonitor/boletim RH) subiam o arquivo CRU do celular
+(3–12 MB, sem redimensionar nem recomprimir), enchendo o Storage.
+- **Formato: WebP com fallback JPEG.** `fotoWebpSuportado()` detecta o
+  encode UMA vez (`canvas.toDataURL('image/webp')`); sem suporte, cai
+  para JPEG. WebP rende ~25–35% menor na mesma qualidade. O Chromium/
+  WebView já emite WebP no formato ESTENDIDO (VP8X + ICCP) — o injetor
+  de EXIF cobre esse caso (liga a flag de EXIF + anexa chunk `EXIF`) E
+  o formato simples (monta o VP8X do zero).
+- **Alvo documental: lado máx 1600px, qualidade ~0,80** (`otimizarFoto`).
+  Evidência é lida em tela, não impressa — cupom/hodômetro seguem
+  legíveis. A pipeline de campo (`js/brigada-captura.js`, marca d'água)
+  também caiu de 1920 → 1600 (`B_FOTO_MAX`), com o encode final em
+  `fotoCanvasParaBlob` (WebP/JPEG + EXIF).
+- **EXIF GPS nos DOIS contêineres**: `fotoInjetarExif` detecta o tipo do
+  blob e injeta APP1 (JPEG) ou chunk RIFF `EXIF` (WebP). O construtor do
+  bloco TIFF (`fotoConstruirTiffGps`) é único; `bInjetarExifGps` em
+  `brigada-captura.js` ficou como DEGRADAÇÃO (só JPEG) para quando o
+  módulo não estiver carregado.
+- **FAIL-SAFE**: qualquer falha de decode/encode devolve o arquivo
+  ORIGINAL — otimizar nunca pode impedir o registro (regra do trabalho
+  de campo). Resultado que sairia MAIOR que o original (imagem já
+  pequena) também devolve o original. Todo chamador guarda com
+  `typeof otimizarFoto === 'function'`.
+- **Avatares NÃO mudaram**: `js/avatar-foto.js`/`js/perfil.js` já
+  reduzem a 512px/JPEG 0,85 (já otimizado, e a troca de foto passa pela
+  RPC delicada `perfil_atualizar_foto` com validação de path — não
+  reskinar por baixo).
+- **NÃO migra arquivos já existentes** — só uploads novos (mesma
+  filosofia das migrations de privacidade de bucket). A URL gravada é
+  só endereço; a extensão (`fotoExtDoTipo`) acompanha o tipo do blob.
+- Superfícies tocadas (todas na mesma entrega): campo
+  (`brigada-captura.js` → Brigadas/Biomonitor/Água), Frota app
+  (`capturarFotoDefeito`/`capturarFotoAbastecimento`/
+  `capturarFotoChecklist`), mesa (`frota-veiculos.html`,
+  `admin-brigadas.html`, `biomonitor-equipamentos.html`,
+  `rh-boletim.html` — só imagem; PDF sobe intacto).
+- Guarda: `tests/foto-otimizar.test.js` (8) +
+  `tests/fixtures/foto-otimizar-harness.html` — reduz de verdade no
+  Chromium real, EXIF nos dois contêineres decodificando, fail-safe.
+- `pwa/sw.js`: `js/foto-otimizar.js` nos 4 shells — brigadas 273→274,
+  biomonitor 58→59, frota 110→111, agua 41→42. Os 4 `build-www.mjs`
+  nativos atualizados em paralelo (o arquivo entra ANTES de
+  `brigada-captura.js`/das telas que o usam).
+
 ## Regra do sistema — exportar .xlsx: ExcelJS, nunca o pacote "xlsx"/SheetJS
 Sempre que uma tela precisar gerar um Excel de verdade (não CSV) com
 formatação (cabeçalho colorido, linha destacada, congelar painel),
