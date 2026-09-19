@@ -7,3 +7,12 @@ playwright-report/
 # Projeto nativo Android gerado pelo Capacitor — boilerplate da plataforma
 # (a MainActivity de launcher precisa de exported=true por exigência do Android 12+)
 app/android/
+
+# Bibliotecas de TERCEIROS vendorizadas (minificadas/bundladas) — não é
+# código do sistema, e escanear a lib alheia só gera achado que não podemos
+# corrigir. Achado real: o ruleset OWASP do Semgrep passou a marcar 3 pontos
+# do pptxgenjs (que não tocamos), deixando o job `sast` vermelho em todo PR.
+# SAST deve analisar o nosso código; os arquivos aqui são atualizados trocando
+# a versão vendorizada, não editando o conteúdo. (Os >1 MB já são pulados pelo
+# limite do Semgrep; este bloco cobre também os menores, ex.: pptxgenjs, jspdf.)
+js/vendor/
