@@ -9,6 +9,7 @@
 <script src="../js/observability.js"></script>
 <script src="../js/queryLogger.js"></script>
 <script src="../js/config.js"></script>
+<script src="../js/foto-otimizar.js"></script>
 <script src="../js/layout.js"></script>
 <script src="../js/fotos-privadas.js"></script>
 <script>
@@ -351,9 +352,10 @@ async function salvarEquipamento() {
   try {
     let foto_url
     if (_fotoEquipFile) {
-      const ext = (_fotoEquipFile.name.split('.').pop() || 'jpg').toLowerCase()
+      const foto = (typeof otimizarFoto === 'function') ? await otimizarFoto(_fotoEquipFile) : _fotoEquipFile
+      const ext  = (typeof fotoExtDoTipo === 'function') ? fotoExtDoTipo(foto) : ((_fotoEquipFile.name.split('.').pop() || 'jpg').toLowerCase())
       const path = `equipamentos/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`
-      const { error: upErr } = await db.storage.from('biomonitor-fotos').upload(path, _fotoEquipFile)
+      const { error: upErr } = await db.storage.from('biomonitor-fotos').upload(path, foto, { contentType: foto.type })
       if (upErr) throw upErr
       foto_url = db.storage.from('biomonitor-fotos').getPublicUrl(path).data.publicUrl
     }

@@ -5,6 +5,39 @@ let _capturaFotos = []   // array de Blobs (max 5)
 let _gpsAtual = null
 let _gpsWatchId = null
 
+// Lado máximo da foto de campo. Documental (evidência lida em tela, não
+// impressa) — 1600px basta e derruba o tamanho do arquivo. Ver decisão
+// em "Regra do sistema — formato/tamanho de foto" no CLAUDE.md.
+const B_FOTO_MAX = 1600
+
+// Encode final da foto de campo (canvas com marca d'água já desenhada).
+// Preferimos WebP via js/foto-otimizar.js (fonte única de reencode +
+// EXIF); sem o módulo carregado, degrada para o JPEG+EXIF legado, e a
+// captura funciona exatamente como antes.
+async function _bEncodeFoto(canvas, gps) {
+  if (typeof fotoCanvasParaBlob === 'function') {
+    const b = await fotoCanvasParaBlob(canvas, { qualidade: 0.80, gps })
+    if (b) return b
+  }
+  const blob = await new Promise(r => canvas.toBlob(b => r(b), 'image/jpeg', 0.85))
+  return await bInjetarExifGps(blob, gps)
+}
+
+// Canvas ajustado ao lado máximo, desenhando `fonte` (vídeo ou imagem)
+// já redimensionado. Devolve o contexto pronto para a marca d'água.
+function _bCanvasAjustado(fonte, wFonte, hFonte) {
+  let w = wFonte || 1280, h = hFonte || 720
+  if (Math.max(w, h) > B_FOTO_MAX) {
+    const r = B_FOTO_MAX / Math.max(w, h)
+    w = Math.round(w * r); h = Math.round(h * r)
+  }
+  const canvas = document.createElement('canvas')
+  canvas.width = w; canvas.height = h
+  const ctx = canvas.getContext('2d')
+  ctx.drawImage(fonte, 0, 0, w, h)
+  return { canvas, ctx, w, h }
+}
+
 // ── Câmera ────────────────────────────────────────────────────
 async function bCameraAbrir(videoEl) {
   bCameraFechar()
@@ -29,21 +62,12 @@ function bCameraFechar() {
 async function bCameraCapturar(videoEl, brigadista, gps, contexto = {}) {
   if (_capturaFotos.length >= 5) return null
 
-  const canvas = document.createElement('canvas')
-  canvas.width  = videoEl.videoWidth  || 1280
-  canvas.height = videoEl.videoHeight || 720
-  const ctx = canvas.getContext('2d')
-  ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height)
+  const { canvas, ctx, w, h } = _bCanvasAjustado(videoEl, videoEl.videoWidth, videoEl.videoHeight)
+  await bCameraAguaMarca(ctx, w, h, brigadista, gps, contexto)
 
-  await bCameraAguaMarca(ctx, canvas.width, canvas.height, brigadista, gps, contexto)
-
-  return new Promise(resolve => {
-    canvas.toBlob(async blob => {
-      blob = await bInjetarExifGps(blob, gps)
-      _capturaFotos.push(blob)
-      resolve(blob)
-    }, 'image/jpeg', 0.85)
-  })
+  const blob = await _bEncodeFoto(canvas, gps)
+  _capturaFotos.push(blob)
+  return blob
 }
 
 // Processa um arquivo de imagem (câmera nativa do SO via <input capture>
@@ -59,34 +83,16 @@ async function bCapturaProcessarArquivo(file, brigadista, gps, contexto = {}) {
   const img = new Image()
   await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = dataUrl })
 
-  const maxLado = 1920
-  let w = img.naturalWidth, h = img.naturalHeight
-  if (Math.max(w, h) > maxLado) {
-    const r = maxLado / Math.max(w, h)
-    w = Math.round(w * r); h = Math.round(h * r)
-  }
-  const canvas = document.createElement('canvas')
-  canvas.width = w; canvas.height = h
-  const ctx = canvas.getContext('2d')
-  ctx.drawImage(img, 0, 0, w, h)
+  const { canvas, ctx, w, h } = _bCanvasAjustado(img, img.naturalWidth, img.naturalHeight)
   await bCameraAguaMarca(ctx, w, h, brigadista, gps, contexto)
-  return new Promise(res => canvas.toBlob(
-    async b => res(await bInjetarExifGps(b, gps)),
-    'image/jpeg', 0.85
-  ))
+  return await _bEncodeFoto(canvas, gps)
 }
 
 // Captura sem adicionar ao array global — fauna usa sua própria lista
 async function bCameraCapturarPuro(videoEl, brigadista, gps, contexto = {}) {
-  const canvas = document.createElement('canvas')
-  canvas.width  = videoEl.videoWidth  || 1280
-  canvas.height = videoEl.videoHeight || 720
-  const ctx = canvas.getContext('2d')
-  ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height)
-  await bCameraAguaMarca(ctx, canvas.width, canvas.height, brigadista, gps, contexto)
-  return new Promise(resolve => {
-    canvas.toBlob(async blob => resolve(await bInjetarExifGps(blob, gps)), 'image/jpeg', 0.85)
-  })
+  const { canvas, ctx, w, h } = _bCanvasAjustado(videoEl, videoEl.videoWidth, videoEl.videoHeight)
+  await bCameraAguaMarca(ctx, w, h, brigadista, gps, contexto)
+  return await _bEncodeFoto(canvas, gps)
 }
 
 // ── Marca d'água ──────────────────────────────────────────────
@@ -260,7 +266,7 @@ async function bCameraNativaCapturar(brigadista, gps, source = 'CAMERA', context
       source,                 // 'CAMERA' (câmera) ou 'PHOTOS' (galeria)
       resultType: 'base64',
       quality: 85,
-      width: 1920,
+      width: B_FOTO_MAX,
       correctOrientation: true,
       saveToGallery: false,
     })
@@ -274,17 +280,10 @@ async function bCameraNativaCapturar(brigadista, gps, source = 'CAMERA', context
     img.src = `data:image/${foto.format ?? 'jpeg'};base64,${foto.base64String}`
   })
 
-  const canvas = document.createElement('canvas')
-  canvas.width  = img.naturalWidth
-  canvas.height = img.naturalHeight
-  const ctx = canvas.getContext('2d')
-  ctx.drawImage(img, 0, 0)
-  await bCameraAguaMarca(ctx, canvas.width, canvas.height, brigadista, gps, contexto)
+  const { canvas, ctx, w, h } = _bCanvasAjustado(img, img.naturalWidth, img.naturalHeight)
+  await bCameraAguaMarca(ctx, w, h, brigadista, gps, contexto)
 
-  return new Promise(resolve => canvas.toBlob(
-    async b => resolve(await bInjetarExifGps(b, gps)),
-    'image/jpeg', 0.85
-  ))
+  return await _bEncodeFoto(canvas, gps)
 }
 
 // ── GPS ───────────────────────────────────────────────────────
@@ -337,6 +336,11 @@ async function bGpsUmaLeitura() {
 // marcador SOI do JPEG gerado pelo canvas. Permite que aplicativos
 // de gestão de fotos, GIS e sistemas legais leiam as coordenadas
 // diretamente do arquivo, sem depender de metadados externos.
+//
+// Hoje o encode principal passa por js/foto-otimizar.js
+// (fotoCanvasParaBlob → fotoInjetarExif), que cobre JPEG E WebP.
+// Esta função continua como caminho de DEGRADAÇÃO (só JPEG) para quando
+// aquele módulo não estiver carregado — a captura funciona como antes.
 async function bInjetarExifGps(blob, gps) {
   if (!gps || !isFinite(gps.lat) || !isFinite(gps.lng)) return blob
 

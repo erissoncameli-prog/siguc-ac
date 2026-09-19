@@ -9,6 +9,7 @@
 <script src="../js/observability.js"></script>
 <script src="../js/queryLogger.js"></script>
 <script src="../js/config.js"></script>
+<script src="../js/foto-otimizar.js"></script>
 <script src="../js/layout.js"></script>
 <script src="../js/frota-wise.js"></script>
 <script src="../js/fotos-privadas.js"></script>
@@ -1189,9 +1190,10 @@ async function salvarVeiculo() {
   try {
     if (_vFotoFile) {
       btn.textContent = 'Enviando foto...'
-      const ext  = _vFotoFile.name.split('.').pop().toLowerCase() || 'jpg'
+      const foto = (typeof otimizarFoto === 'function') ? await otimizarFoto(_vFotoFile) : _vFotoFile
+      const ext  = (typeof fotoExtDoTipo === 'function') ? fotoExtDoTipo(foto) : (_vFotoFile.name.split('.').pop().toLowerCase() || 'jpg')
       const path = `${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`
-      const { error: upErr } = await db.storage.from('frota-veiculos').upload(path, _vFotoFile, { upsert: true })
+      const { error: upErr } = await db.storage.from('frota-veiculos').upload(path, foto, { upsert: true, contentType: foto.type })
       if (upErr) throw upErr
       const { data: urlData } = db.storage.from('frota-veiculos').getPublicUrl(path)
       payload.foto_url = urlData.publicUrl
@@ -1306,9 +1308,10 @@ async function salvarMotorista() {
   try {
     if (_mFotoFile) {
       btn.textContent = 'Enviando foto...'
-      const ext  = _mFotoFile.name.split('.').pop().toLowerCase() || 'jpg'
+      const foto = (typeof otimizarFoto === 'function') ? await otimizarFoto(_mFotoFile) : _mFotoFile
+      const ext  = (typeof fotoExtDoTipo === 'function') ? fotoExtDoTipo(foto) : (_mFotoFile.name.split('.').pop().toLowerCase() || 'jpg')
       const path = `${editando || 'novo'}/${Date.now()}.${ext}`
-      const { error: upErr } = await db.storage.from('frota-motoristas').upload(path, _mFotoFile, { upsert: true })
+      const { error: upErr } = await db.storage.from('frota-motoristas').upload(path, foto, { upsert: true, contentType: foto.type })
       if (upErr) throw upErr
       const { data: urlData } = db.storage.from('frota-motoristas').getPublicUrl(path)
       payload.foto_url = urlData.publicUrl

@@ -8,6 +8,7 @@
 <script src="../js/observability.js"></script>
 <script src="../js/queryLogger.js"></script>
 <script src="../js/config.js"></script>
+<script src="../js/foto-otimizar.js"></script>
 <script src="../js/fotos-privadas.js"></script>
 <script src="../js/qrcode-generator.js"></script>
 <script src="../js/layout.js"></script>
@@ -1337,9 +1338,10 @@ async function salvarBrigadista() {
     // Upload de foto se houver arquivo novo selecionado
     if (_mbrFotoFile) {
       btn.textContent = 'Enviando foto...'
-      const ext  = _mbrFotoFile.name.split('.').pop().toLowerCase() || 'jpg'
+      const foto = (typeof otimizarFoto === 'function') ? await otimizarFoto(_mbrFotoFile) : _mbrFotoFile
+      const ext  = (typeof fotoExtDoTipo === 'function') ? fotoExtDoTipo(foto) : (_mbrFotoFile.name.split('.').pop().toLowerCase() || 'jpg')
       const path = `${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`
-      const { error: upErr } = await db.storage.from('brigadistas').upload(path, _mbrFotoFile, { upsert: true })
+      const { error: upErr } = await db.storage.from('brigadistas').upload(path, foto, { upsert: true, contentType: foto.type })
       if (upErr) throw upErr
       const { data: urlData } = db.storage.from('brigadistas').getPublicUrl(path)
       payload.foto_url = urlData.publicUrl
