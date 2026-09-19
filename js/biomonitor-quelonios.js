@@ -4685,6 +4685,8 @@ async function bioCarregarTelaDados() {
     _bioSetText('bio-kpi2-eclodidos', data.eclodidos ?? ps.eclodido)
     _bioSetText('bio-kpi2-perdidos',  ps.perdido)
     _bioSetText('bio-kpi2-transf',    ps.transferido)
+    _bioSetText('bio-kpi2-validados',    data.ninhos_validados)
+    _bioSetText('bio-kpi2-naovalidados', data.ninhos_nao_validados)
 
     // KPIs — Tab Berçário
     _bioSetText('bio-kpi-berc-entrada', data.bercario_total_entrada)
