@@ -4968,7 +4968,7 @@ async function bioRenderDashboardPraias(temporadaId) {
           ${stat(p.filhotes_produzidos, 'Filhotes', '#1E6B4A')}
           ${stat(p.ovos_monitorados, 'Postura')}
           ${stat(p.ovos_viaveis, 'Viáveis', '#1E6B4A')}
-          ${stat(p.ovos_perdidos, 'Perdidos', '#b3261e')}
+          ${stat(p.ovos_perdidos, 'Ovos perdidos', '#b3261e')}
         </div>
         ${(p.ovos_perdidos > 0) ? `<div class="bio-dash-perdas">Perdas: ${[
           p.perdas_predacao   ? `${p.perdas_predacao} predação`     : null,
