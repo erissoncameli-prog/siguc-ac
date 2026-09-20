@@ -4909,6 +4909,11 @@ async function bioRenderDashboardPraias(temporadaId) {
        'bio-dash-data-inicio','bio-dash-data-fim'].forEach(id => { const el = $(id); if (el) el.value = '' })
       bioRenderDashboardPraias(tempAtual())
     })
+    wireEl.addEventListener('click', ev => {
+      const head = ev.target.closest('.bio-dash-head')
+      if (!head) return
+      head.closest('.bio-dash-card')?.classList.toggle('recolhido')
+    })
   }
 
   const filtros = {
@@ -4951,31 +4956,34 @@ async function bioRenderDashboardPraias(temporadaId) {
     const stat = (v, lbl, cor) => `<div class="bio-dash-stat"><b${cor ? ` style="color:${cor}"` : ''}>${v ?? 0}</b><span>${lbl}</span></div>`
     return `
       <div class="bio-dash-card">
-        <div class="bio-dash-head">
+        <button type="button" class="bio-dash-head">
+          ${bico('chevron-down', 'bio-dash-chevron')}
           <b>${esc(p.praia)}</b>${p.experimental ? ' <span class="bio-dash-tag">exp.</span>' : ''}
           <span class="bio-dash-sucesso">${p.sucesso_pct != null ? p.sucesso_pct + '% sucesso' : '—'}</span>
+        </button>
+        <div class="bio-dash-corpo">
+          <div class="bio-dash-grid">
+            ${stat(p.total, 'Total')}
+            ${stat(p.ativos, 'Ativos', '#1a6b8c')}
+            ${stat(p.transferidos, 'Transf.')}
+            ${stat(p.eclodidos, 'Eclodidos', '#1E6B4A')}
+            ${stat(p.proximos_eclosao, 'Próx. ecl.', '#9a6b00')}
+            ${stat(p.perdidos, 'Perdidos', '#b3261e')}
+            ${stat(p.predados, 'Predados', '#b3261e')}
+            ${stat(p.inundados, 'Inundados', '#b3261e')}
+            ${stat(p.falha_eclosao, 'Falha ecl.', '#b3261e')}
+            ${stat(p.filhotes_produzidos, 'Filhotes', '#1E6B4A')}
+            ${stat(p.ovos_monitorados, 'Postura')}
+            ${stat(p.ovos_viaveis, 'Viáveis', '#1E6B4A')}
+            ${stat(p.ovos_perdidos, 'Ovos perdidos', '#b3261e')}
+          </div>
+          ${(p.ovos_perdidos > 0) ? `<div class="bio-dash-perdas">Perdas: ${[
+            p.perdas_predacao   ? `${p.perdas_predacao} predação`     : null,
+            p.perdas_alagamento ? `${p.perdas_alagamento} alagamento` : null,
+            p.perdas_erosao     ? `${p.perdas_erosao} erosão`         : null,
+            p.perdas_humana     ? `${p.perdas_humana} humano`         : null,
+          ].filter(Boolean).join(' · ') || '—'}</div>` : ''}
         </div>
-        <div class="bio-dash-grid">
-          ${stat(p.total, 'Total')}
-          ${stat(p.ativos, 'Ativos', '#1a6b8c')}
-          ${stat(p.transferidos, 'Transf.')}
-          ${stat(p.eclodidos, 'Eclodidos', '#1E6B4A')}
-          ${stat(p.proximos_eclosao, 'Próx. ecl.', '#9a6b00')}
-          ${stat(p.perdidos, 'Perdidos', '#b3261e')}
-          ${stat(p.predados, 'Predados', '#b3261e')}
-          ${stat(p.inundados, 'Inundados', '#b3261e')}
-          ${stat(p.falha_eclosao, 'Falha ecl.', '#b3261e')}
-          ${stat(p.filhotes_produzidos, 'Filhotes', '#1E6B4A')}
-          ${stat(p.ovos_monitorados, 'Postura')}
-          ${stat(p.ovos_viaveis, 'Viáveis', '#1E6B4A')}
-          ${stat(p.ovos_perdidos, 'Ovos perdidos', '#b3261e')}
-        </div>
-        ${(p.ovos_perdidos > 0) ? `<div class="bio-dash-perdas">Perdas: ${[
-          p.perdas_predacao   ? `${p.perdas_predacao} predação`     : null,
-          p.perdas_alagamento ? `${p.perdas_alagamento} alagamento` : null,
-          p.perdas_erosao     ? `${p.perdas_erosao} erosão`         : null,
-          p.perdas_humana     ? `${p.perdas_humana} humano`         : null,
-        ].filter(Boolean).join(' · ') || '—'}</div>` : ''}
       </div>`
   }
   if (wrap) wrap.innerHTML = praias.map(card).join('')
