@@ -1648,6 +1648,14 @@ body.field-mode .bio-home-nome { font-size: 26px; }
   font-family: var(--font-ui); font-weight: 700; font-size: 21px; line-height: 1.15;
   color: var(--bio-ink); font-variant-numeric: tabular-nums; letter-spacing: -.01em;
 }
+/* Legenda de identificação sob o valor (ex.: nº do ninho + praia, no
+   KPI "Ninho com mais ovos") — precisa vencer .bio-kpi2-meta > span
+   (mesma especificidade, :last-child por último no arquivo) pra não
+   herdar o peso 600 do rótulo nem vazar a linha em nome de praia longo. */
+.bio-kpi2-meta > span:last-child {
+  font-weight: 500; color: var(--bio-ink2); max-width: 100%;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 
 /* ── Aba Dados: cartões de taxa ── */
 .bio-rate-list {

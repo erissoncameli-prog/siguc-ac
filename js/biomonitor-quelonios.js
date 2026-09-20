@@ -4368,6 +4368,71 @@ function _bioBarsH(canvasId, labels, data, cor, Chart) {
   })
 }
 
+// Barra horizontal para distribuição por categoria fixa (status, causa
+// de desfecho etc.) — substitui a rosca (_bioDonut) para esse caso.
+// Análise: com 4-6 categorias de nome longo e distribuição desigual
+// (uma categoria concentra quase tudo, o resto perto de zero), a rosca
+// espremia o anel contra uma legenda de altura fixa (180px) e cortava
+// a última linha — bug real relatado em produção. Barra resolve os
+// dois problemas: cada categoria vira 1 linha (altura cresce com a
+// lista, nunca corta) e uma fatia de 1-2% continua LEGÍVEL como barra
+// curta + número, o que numa rosca vira traço invisível.
+// Categoria com zero fica DE FORA — uma barra de comprimento zero não
+// informa nada, só rouba altura do card (mesmo princípio de nunca
+// mostrar linha vazia em tabela).
+function _bioBarsStatusH(canvasId, cardId, labels, data, cores, Chart, msgVazio) {
+  const canvas = document.getElementById(canvasId)
+  if (!canvas) return
+  const idx = labels.map((_, i) => i).filter(i => (data[i] || 0) > 0)
+  if (_bioChartVazio(cardId, !idx.length, msgVazio)) return
+  const labelsF = idx.map(i => labels[i])
+  const dataF   = idx.map(i => data[i])
+  const coresF  = idx.map(i => cores[i])
+
+  const wrap = canvas.closest('.bio-chart-wrap')
+  if (wrap) wrap.style.height = (labelsF.length * 34 + 30) + 'px'
+
+  _bioCharts[canvasId]?.destroy()
+  const maxVal = Math.max(...dataF)
+  const rotuloValor = {
+    id: 'bioRotuloValorStatus',
+    afterDatasetsDraw(chart) {
+      const ctx = chart.ctx
+      const meta = chart.getDatasetMeta(0)
+      if (!meta) return
+      ctx.save()
+      ctx.font = '700 11px "DM Sans", system-ui, sans-serif'
+      ctx.fillStyle = '#0D1E27'
+      ctx.textBaseline = 'middle'
+      ctx.textAlign = 'left'
+      meta.data.forEach((bar, i) => ctx.fillText(String(dataF[i]), bar.x + 6, bar.y))
+      ctx.restore()
+    }
+  }
+  _bioCharts[canvasId] = new Chart(canvas.getContext('2d'), {
+    type: 'bar',
+    data: { labels: labelsF, datasets: [{ data: dataF, backgroundColor: coresF, borderRadius: 4 }] },
+    options: {
+      indexAxis: 'y',
+      responsive: true, maintainAspectRatio: false,
+      animation: { duration: 500 },
+      layout: { padding: { right: 26 } },
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => `${ctx.label}: ${ctx.formattedValue}` } },
+      },
+      scales: {
+        // Eixo numérico escondido de propósito — o rótulo na ponta da
+        // barra já dá o valor exato; mostrar os dois seria redundância
+        // (mesma barra "carrega" a categoria via posição/cor + rótulo).
+        x: { display: false, grid: { display: false }, suggestedMax: maxVal * 1.15 },
+        y: { grid: { display: false }, ticks: { font: { size: 11.5 } } }
+      }
+    },
+    plugins: [rotuloValor]
+  })
+}
+
 function _bioLinha(canvasId, labels, datasets, Chart) {
   const canvas = document.getElementById(canvasId)
   if (!canvas) return
@@ -4389,23 +4454,25 @@ function _bioLinha(canvasId, labels, datasets, Chart) {
 }
 
 function _bioRenderizarGraficos(d, Chart) {
-  // ── Desfecho dos ovos (rosca – Tab Taxas)
+  // ── Desfecho dos ovos (barra – Tab Taxas)
   const df = d.desfecho_ovos || {}
-  _bioDonut('chart-desfecho',
+  _bioBarsStatusH('chart-desfecho', 'card-desfecho',
     ['Filhotes vivos', 'Filhotes mortos', 'Não nascidos', 'Descartados'],
     [df.filhotes_vivos || 0, df.filhotes_mortos || 0, df.ovos_nao_nascidos || 0, df.ovos_descartados || 0],
     ['#2A9D6F', '#DC2626', '#D97706', '#9CA3AF'],
-    Chart
+    Chart,
+    'Nenhum desfecho registrado nesta temporada.'
   )
 
-  // ── Status dos ninhos (rosca – Tab Ninhos) — inclui os status
-  // pós-eclosão (em berçário / soltado), senão o ninho some da rosca
+  // ── Status dos ninhos (barra – Tab Ninhos) — inclui os status
+  // pós-eclosão (em berçário / soltado), senão o ninho some do gráfico
   const ps = d.por_status || {}
-  _bioDonut('chart-status',
+  _bioBarsStatusH('chart-status', 'card-status',
     ['Encontrado', 'Transferido', 'Eclodido', 'Em berçário', 'Soltado', 'Perdido'],
     [ps.encontrado || 0, ps.transferido || 0, ps.eclodido || 0, ps.em_bercario || 0, ps.soltado || 0, ps.perdido || 0],
     ['#7ECEE8', '#C9A84C', '#2A9D6F', '#8B5CF6', '#1A6B8C', '#DC2626'],
-    Chart
+    Chart,
+    'Nenhum ninho registrado nesta temporada.'
   )
 
   // ── Ninhos por espécie (barras verticais – Tab Ninhos)
@@ -4719,6 +4786,14 @@ async function bioCarregarTelaDados() {
       _bioSetText('bio-kpi-ovos-postura',  ov.postura)
       _bioSetText('bio-kpi-ovos-viaveis',  ov.viaveis)
       _bioSetText('bio-kpi-ovos-perdidos', ov.perdidos)
+      const mp = ov.ninho_maior_postura
+      _bioSetText('bio-kpi-ninho-maior-ovos', mp?.postura)
+      const sub = document.getElementById('bio-kpi-ninho-maior-ovos-sub')
+      if (sub) {
+        const texto = mp ? `#${mp.numero ?? '—'}${mp.praia ? ' · ' + mp.praia : ''}` : ''
+        sub.textContent = texto
+        sub.title = texto
+      }
     }).catch(() => {})
 
     // Painéis de eclosão e dashboard por praia (RPCs próprias) — espécie global
