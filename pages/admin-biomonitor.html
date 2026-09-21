@@ -502,6 +502,11 @@
           <select class="form-control" id="fil-prog-praia" style="width:200px" onchange="filtrarPraias()">
             <option value="">Todos os programas</option>
           </select>
+          <select class="form-control" id="fil-coord-praia" style="width:190px" onchange="filtrarPraias()" title="Filtrar por praias com/sem coordenada cadastrada">
+            <option value="">Coordenadas: todas</option>
+            <option value="com">Com coordenadas</option>
+            <option value="sem">Sem coordenadas</option>
+          </select>
           <button class="btn btn-primary" onclick="abrirModalPraia()">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             Nova Praia
@@ -792,19 +797,27 @@
     </tr>`).join('')
   }
 
+  // Uma praia tem coordenada cadastrada se tem ponto de acesso (lat/lng) OU
+  // polígono de área — mesmo critério que a faz aparecer no mapa (aba Mapa).
+  function _praiaTemCoord(p) {
+    return (p.lat != null && p.lng != null) || !!p.area_geojson
+  }
+
   function renderPraias() {
     const busca  = document.getElementById('busca-praias')?.value.toLowerCase() || ''
     const prog   = document.getElementById('fil-prog-praia')?.value || ''
+    const coord  = document.getElementById('fil-coord-praia')?.value || ''
     const lista  = _praias.filter(p =>
       (!busca || p.nome.toLowerCase().includes(busca) || (p.codigo||'').toLowerCase().includes(busca)) &&
-      (!prog  || p.programa_id === prog)
+      (!prog  || p.programa_id === prog) &&
+      (!coord || (coord === 'com' ? _praiaTemCoord(p) : !_praiaTemCoord(p)))
     )
     const tbody = document.getElementById('tbody-praias')
     if (!lista.length) { tbody.innerHTML = `<tr><td colspan="8" class="empty-row">Nenhuma praia encontrada.</td></tr>`; return }
     tbody.innerHTML = lista.map(p => `<tr>
       <td><code style="font-size:.8rem">${p.codigo}</code></td>
       <td><strong>${p.nome}</strong>${p.comunidade || p.rio ? `<br><small style="color:var(--t2,#aaa)">${[p.comunidade, p.rio].filter(Boolean).join(' · ')}</small>` : ''}</td>
-      <td>${p.area_display || p.uc_nome || nomeUC(p.uc_id) || '—'}</td>
+      <td>${p.area_display || p.uc_nome || nomeUC(p.uc_id) || '—'}${_praiaTemCoord(p) ? '' : ` <span class="badge badge-neutral" title="Sem ponto de acesso nem polígono cadastrado — não aparece no mapa" style="font-size:.65rem">sem coordenada</span>`}</td>
       <td>${p.programa_nome || '—'}</td>
       <td>${p.comprimento_m ? formatNum(p.comprimento_m) + ' m' : '—'}</td>
       <td>${p.area_ha ? formatNum(p.area_ha, 2) + ' ha' : '—'}</td>
