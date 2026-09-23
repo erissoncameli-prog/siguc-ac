@@ -31,7 +31,14 @@
 <style>
 /* Só o que é desta tela — o painel (.adash-*/.adet-*) vive em
    css/agua-painel.css, compartilhado com agua-publico.html e
-   rh-bacias.html. */
+   rh-bacias.html.
+
+   Título em Arial (pedido do usuário — a serifada "Source Serif 4"
+   parecia "cara de IA"): sobrescrita RESTRITA a esta página, nunca na
+   classe .adash-titulo do css compartilhado — ela também é o h1 de
+   ar-qualidade.html/rh-bacias.html/rh-boletim.html/rh-estacoes.html,
+   que não foram pedidas nesta troca. */
+.adash-titulo { font-family: Arial, Helvetica, sans-serif }
 </style>
 </head>
 <body>
@@ -142,10 +149,15 @@
   let _coletasBaciaAtual = []
   let _relatorioAtual = null
   let _labelBaciaAtual = ''
-  // Estado só de EXIBIÇÃO (não altera o recorte do relatório exportado):
-  // qual campanha o card de distribuição está mostrando e qual ponto o
-  // gráfico de evolução está traçando.
-  let _chipCampanha = null
+  // Todas as campanhas da bacia carregada (não o recorte atual) — só
+  // pra desenhar a fileira de chips de campanha, sempre com todas as
+  // opções visíveis mesmo com uma delas escolhida (ver js/agua-painel.js).
+  let _campanhasBaciaAtual = []
+  // `pontoSerie` é só de EXIBIÇÃO (qual ponto o gráfico de evolução
+  // traça) — o chip de CAMPANHA não tem estado próprio: ele É o par
+  // Campanha inicial/final da gaveta (rl-de/rl-ate), lido a cada render
+  // em renderPainel(). Clicar num chip de campanha por isso ALTERA o
+  // recorte exportado — tela e PDF/PPTX/XLSX nunca divergem.
   let _pontoSerie = null
   // Base legal adicional (Configurações → Qualidade da Água) — some
   // fica igual com qualquer filtro. A Resolução CONAMA 357/2005 é
@@ -217,7 +229,7 @@
 
   async function carregarBacia() {
     const chave = sel('rl-bacia').value // '' = Acre todo
-    _relatorioAtual = null; _chipCampanha = null; _pontoSerie = null
+    _relatorioAtual = null; _pontoSerie = null
     atualizarBotoes()
     const ehAcreTodo = !chave
     _labelBaciaAtual = ehAcreTodo ? 'Acre (todas as bacias)' : (chave === AGUA_REL_SEM_BACIA ? 'Sem bacia definida' : chave)
@@ -231,6 +243,7 @@
       return
     }
     const campanhas = aguaRelCampanhasDe(_coletasBaciaAtual)
+    _campanhasBaciaAtual = campanhas
     const opts = campanhas.map(c => `<option value="${c.campanha_id}">${esc(aguaRelLabelCampanha(c))}</option>`).join('')
     sel('rl-de').innerHTML = opts; sel('rl-ate').innerHTML = opts
     if (campanhas.length) {
@@ -275,10 +288,10 @@
       conamaStatus: sel('rl-conama').value || null,
     })
     // Estado de exibição que não sobrevive ao novo recorte é zerado —
-    // um chip apontando para campanha que saiu do período mostraria
-    // "0 coletas" sem explicação.
-    const ids = new Set(_relatorioAtual.campanhas.map(c => c.campanha_id))
-    if (_chipCampanha && !ids.has(_chipCampanha)) _chipCampanha = null
+    // ponto escolhido no chip da evolução que saiu do recorte mostraria
+    // "0 coletas" sem explicação. O chip de campanha não precisa dessa
+    // limpeza: ele É os próprios rl-de/rl-ate, lidos direto em
+    // renderPainel() a cada chamada.
     if (_pontoSerie && !_relatorioAtual.pontos.some(p => p.ponto_id === _pontoSerie)) _pontoSerie = null
     renderPainel(_relatorioAtual)
     atualizarMapaPainel(_relatorioAtual)
@@ -290,7 +303,20 @@
     sel('rl-iqa-faixa').value = ''; sel('rl-conama').value = ''
     recalcularRelatorio()
   }
-  window.selecionarChipCampanha = function (id) { _chipCampanha = id || null; renderPainel(_relatorioAtual) }
+  // Clicar num chip de campanha SETA Campanha inicial = Campanha final
+  // para aquela campanha (ou volta ao período inteiro da bacia, em
+  // "Período") e recalcula — o mesmo caminho que a gaveta de filtros já
+  // usa, então o recorte exportado (PDF/PPTX/XLSX) muda junto com a
+  // tela, sempre. Nunca um estado de exibição paralelo.
+  window.selecionarChipCampanha = function (id) {
+    if (id) {
+      sel('rl-de').value = id; sel('rl-ate').value = id
+    } else if (_campanhasBaciaAtual.length) {
+      sel('rl-de').value = _campanhasBaciaAtual[0].campanha_id
+      sel('rl-ate').value = _campanhasBaciaAtual[_campanhasBaciaAtual.length - 1].campanha_id
+    }
+    recalcularRelatorio()
+  }
   window.selecionarPontoSerie = function (id) { _pontoSerie = id || null; renderPainel(_relatorioAtual) }
 
   // Label da bacia que efetivamente vale para exportação — se o
@@ -320,7 +346,13 @@
   // Desenho dos cards: js/agua-painel.js, compartilhado com
   // pages/agua-publico.html — esta função só encaixa a string no DOM.
   function renderPainel(rel) {
-    sel('rl-conteudo').innerHTML = aguaPainelHTML(rel, { chipCampanha: _chipCampanha, pontoSerie: _pontoSerie, baseLegal: _baseLegal })
+    // Chip de campanha ativo = Campanha inicial e final apontando para
+    // a MESMA campanha (é assim que selecionarChipCampanha os deixa) —
+    // derivado aqui, sem estado próprio, pra nunca divergir do que
+    // recalcularRelatorio() de fato usou pra montar `rel`.
+    const de = sel('rl-de').value, ate = sel('rl-ate').value
+    const chipCampanha = (de && de === ate) ? de : null
+    sel('rl-conteudo').innerHTML = aguaPainelHTML(rel, { chipCampanha, pontoSerie: _pontoSerie, campanhasBacia: _campanhasBaciaAtual, baseLegal: _baseLegal })
     bIconsAplicar(sel('rl-conteudo'))
   }
 

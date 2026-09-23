@@ -31,29 +31,48 @@
 
 /* ── Moldura pública: cabeçalho institucional + faixa + rodapé ────── */
 body { background:var(--cinza-50) }
+/* Título em Arial (pedido do usuário) — sobrescrita RESTRITA a esta
+   página, mesmo motivo do comentário em pages/agua-relatorios.html:
+   .adash-titulo é classe compartilhada com páginas fora deste pedido. */
+.adash-titulo { font-family: Arial, Helvetica, sans-serif }
+
+/* Cabeçalho institucional: fundo BRANCO (era azul #164070/#2563A8 nos
+   dois blocos — pedido do usuário, "cara de IA" o suficiente pra
+   incomodar mesmo sendo cor de marca). A identidade azul continua no
+   TEXTO/ícones e num filete dourado embaixo (mesmo acento que separa
+   header/conteúdo nos relatórios em PDF do módulo — nunca duas cores
+   de marca soltas sem fio condutor). */
 .apub-topo {
-  background:#164070; color:#fff; padding:16px 24px;
+  background:#fff; color:#164070; padding:16px 24px;
   display:flex; align-items:center; gap:16px;
+  border-bottom:1px solid var(--borda);
 }
 .apub-topo img { height:40px; width:auto; object-fit:contain; flex-shrink:0 }
+/* "Aumentar o logo do Acre em 50%" — só a logo do Governo (a da SEMA
+   não foi pedida, fica no tamanho de sempre). */
+#apub-logo-gov { height:60px }
 .apub-topo-tit { flex:1; min-width:0 }
-.apub-topo-tit strong { display:block; font-size:14.5px; font-weight:700 }
-.apub-topo-tit span { display:block; font-size:11.5px; opacity:.72; margin-top:1px }
+.apub-topo-tit strong { display:block; font-size:14.5px; font-weight:700; color:#164070 }
+.apub-topo-tit span { display:block; font-size:11.5px; color:var(--cinza-500); margin-top:1px }
 
 .apub-faixa {
-  background:#2563A8; color:#fff; padding:22px 24px 26px; text-align:center;
+  background:#fff; color:#164070; padding:22px 24px 26px; text-align:center;
+  border-bottom:3px solid #C9A84C;
 }
-.apub-faixa h1 { font-family:'Source Serif 4', Georgia, serif; font-size:26px; margin:0 0 6px; font-weight:700 }
-.apub-faixa p { font-size:13px; opacity:.88; max-width:60ch; margin:0 auto }
+.apub-faixa h1 { font-family: Arial, Helvetica, sans-serif; font-size:26px; margin:0 0 6px; font-weight:700; color:#164070 }
+.apub-faixa p { font-size:13px; color:var(--cinza-600); max-width:60ch; margin:0 auto }
 
 .apub-content { max-width:1400px; margin:0 auto; width:100%; padding:24px 28px }
 
 .apub-rodape {
   border-top:1px solid var(--borda); margin-top:24px; padding:20px 28px 32px;
   max-width:1400px; margin-left:auto; margin-right:auto;
-  display:flex; flex-wrap:wrap; gap:8px 20px; justify-content:space-between; align-items:center;
+  display:flex; flex-wrap:wrap; gap:20px 32px; justify-content:space-between; align-items:flex-start;
   font-size:11.5px; color:var(--cinza-500);
 }
+.apub-rodape-addr { display:flex; flex-direction:column; gap:3px; min-width:240px }
+.apub-rodape-addr strong { color:var(--cinza-700); font-size:12px; font-weight:700 }
+.apub-rodape-links { display:flex; flex-direction:column; gap:6px; max-width:420px; text-align:right }
 .apub-rodape a { color:#2563A8; text-decoration:none; font-weight:600 }
 .apub-rodape a:hover { text-decoration:underline }
 
@@ -74,6 +93,7 @@ body { background:var(--cinza-50) }
   .apub-content { padding:16px 14px }
   .apub-topo { padding:12px 16px }
   .apub-faixa { padding:18px 16px 22px }
+  .apub-rodape-links { text-align:left }
 }
 </style>
 </head>
@@ -157,8 +177,18 @@ body { background:var(--cinza-50) }
       </div>
     </div>
     <div class="apub-rodape">
-      <span>Fonte: SEMA-AC / DIMA — Sistema de Gestão de Unidades de Conservação do Acre (SIGUC-AC). Coleta em conferência aparece marcada, nunca escondida.</span>
-      <a href="privacidade.html" target="_blank" rel="noopener">Política de Privacidade</a>
+      <div class="apub-rodape-addr">
+        <strong>Secretaria de Estado de Meio Ambiente — SEMA-AC</strong>
+        <span>Rua Benjamin Constant, nº 856 - Centro.</span>
+        <span>Rio Branco – Acre</span>
+        <span>CEP: 69900-160</span>
+        <span>Horário de atendimento - Conforme Decreto Governamental de segunda à sexta - de 07h00min às 14h00min</span>
+        <span>E-mail: <a href="mailto:sema.gabin@gmail.com">sema.gabin@gmail.com</a></span>
+      </div>
+      <div class="apub-rodape-links">
+        <span>Fonte: SEMA-AC / DIMA — Sistema de Gestão de Unidades de Conservação do Acre (SIGUC-AC). Coleta em conferência aparece marcada, nunca escondida.</span>
+        <a href="privacidade.html" target="_blank" rel="noopener">Política de Privacidade</a>
+      </div>
     </div>
     <div class="modal-overlay" id="rl-iqa-modal"><div class="modal" style="max-width:560px">${aguaPainelExplicacaoIqaHTML()}</div></div>
     <div class="modal-overlay" id="adet-modal"><div class="modal" id="adet-modal-inner" style="max-width:600px"></div></div>`
@@ -241,7 +271,13 @@ body { background:var(--cinza-50) }
 
   let _relatorioAtual = null
   let _labelBaciaAtual = ''
-  let _chipCampanha = null
+  // Todas as campanhas da bacia carregada (não o recorte atual) — só
+  // pra desenhar a fileira de chips de campanha (ver js/agua-painel.js).
+  let _campanhasBaciaAtual = []
+  // `pontoSerie` é só de EXIBIÇÃO. O chip de CAMPANHA não tem estado
+  // próprio: ele É o par Campanha inicial/final da gaveta (rl-de/
+  // rl-ate), lido a cada render em renderPainel() — mesmo padrão de
+  // pages/agua-relatorios.html (par de duplicação obrigatória).
   let _pontoSerie = null
   let _filtrosAbertos = false
 
@@ -279,13 +315,14 @@ body { background:var(--cinza-50) }
   // e rio, exatamente como a tela de mesa faz depois de cada fetch.
   function aplicarBacia() {
     const chave = sel('rl-bacia').value // '' = Acre todo
-    _relatorioAtual = null; _chipCampanha = null; _pontoSerie = null
+    _relatorioAtual = null; _pontoSerie = null
     atualizarBotoes()
     const ehAcreTodo = !chave
     _labelBaciaAtual = ehAcreTodo ? 'Acre (todas as bacias)' : (chave === AGUA_REL_SEM_BACIA ? 'Sem bacia definida' : chave)
     const coletasDaBacia = ehAcreTodo ? _todasColetas : _todasColetas.filter(c => aguaRelChaveBacia(c.ponto_bacia) === chave)
 
     const campanhas = aguaRelCampanhasDe(coletasDaBacia)
+    _campanhasBaciaAtual = campanhas
     const opts = campanhas.map(c => `<option value="${c.campanha_id}">${esc(aguaRelLabelCampanha(c))}</option>`).join('')
     sel('rl-de').innerHTML = opts; sel('rl-ate').innerHTML = opts
     if (campanhas.length) {
@@ -325,8 +362,6 @@ body { background:var(--cinza-50) }
       iqaFaixa: sel('rl-iqa-faixa').value || null,
       conamaStatus: sel('rl-conama').value || null,
     })
-    const ids = new Set(_relatorioAtual.campanhas.map(c => c.campanha_id))
-    if (_chipCampanha && !ids.has(_chipCampanha)) _chipCampanha = null
     if (_pontoSerie && !_relatorioAtual.pontos.some(p => p.ponto_id === _pontoSerie)) _pontoSerie = null
     renderPainel(_relatorioAtual)
     atualizarMapaPainel(_relatorioAtual)
@@ -338,7 +373,18 @@ body { background:var(--cinza-50) }
     sel('rl-iqa-faixa').value = ''; sel('rl-conama').value = ''
     recalcularRelatorio()
   }
-  window.selecionarChipCampanha = function (id) { _chipCampanha = id || null; renderPainel(_relatorioAtual) }
+  // Mesmo mecanismo de pages/agua-relatorios.html: o chip de campanha
+  // seta Campanha inicial = Campanha final e recalcula — nunca um
+  // estado de exibição paralelo, pra tela e exportação nunca divergirem.
+  window.selecionarChipCampanha = function (id) {
+    if (id) {
+      sel('rl-de').value = id; sel('rl-ate').value = id
+    } else if (_campanhasBaciaAtual.length) {
+      sel('rl-de').value = _campanhasBaciaAtual[0].campanha_id
+      sel('rl-ate').value = _campanhasBaciaAtual[_campanhasBaciaAtual.length - 1].campanha_id
+    }
+    recalcularRelatorio()
+  }
   window.selecionarPontoSerie = function (id) { _pontoSerie = id || null; renderPainel(_relatorioAtual) }
 
   function labelBaciaExportacao() {
@@ -362,7 +408,9 @@ body { background:var(--cinza-50) }
   }
 
   function renderPainel(rel) {
-    sel('rl-conteudo').innerHTML = aguaPainelHTML(rel, { chipCampanha: _chipCampanha, pontoSerie: _pontoSerie, baseLegal: _cab?.baseLegal })
+    const de = sel('rl-de').value, ate = sel('rl-ate').value
+    const chipCampanha = (de && de === ate) ? de : null
+    sel('rl-conteudo').innerHTML = aguaPainelHTML(rel, { chipCampanha, pontoSerie: _pontoSerie, campanhasBacia: _campanhasBaciaAtual, baseLegal: _cab?.baseLegal })
     bIconsAplicar(sel('rl-conteudo'))
   }
 

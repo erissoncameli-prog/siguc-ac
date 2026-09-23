@@ -305,6 +305,25 @@ test.describe('painel público — render sem sessão, só com as RPCs anon', ()
     await expect(page.locator('.adash-tabela-linha')).toHaveCount(2); // só as 2 completas, quarentena fora
   });
 
+  test('chip de campanha recorta o painel INTEIRO no público também — mesmo mecanismo de agua-relatorios.html', async ({ page }) => {
+    await abrirPainelPublicoComStub(page);
+    await expect(page.locator('.adash-card-escuro .adash-num')).toHaveText('57.7'); // período inteiro (3 coletas)
+
+    const cardDist = page.locator('.adash-card', { hasText: 'Distribuição por faixa' });
+    await cardDist.getByRole('button', { name: '2024·1ª' }).click();
+
+    // Recorte real (o mesmo que o PDF/PPTX/XLSX públicos exportam), não
+    // só a distribuição: (78.4 + 82.1)/2 = 80.3, só Rio Branco/Porto
+    // Acre de c1 — a coleta de c3 (quarentena) sai do KPI e da tabela.
+    await expect(page.locator('.adash-card-escuro .adash-num')).toHaveText('80.3');
+    await expect(page.locator('#rl-de')).toHaveValue('c1');
+    await expect(page.locator('#rl-ate')).toHaveValue('c1');
+    await expect(page.locator('.adash-tabela-linha')).toHaveCount(2);
+
+    await cardDist.getByRole('button', { name: 'Período' }).click();
+    await expect(page.locator('.adash-card-escuro .adash-num')).toHaveText('57.7');
+  });
+
   test('sem coleta no recorte mostra vazio, nunca erro — export desabilitado', async ({ page }) => {
     await abrirPainelPublicoComStub(page, { coletas: [] });
     await expect(page.locator('.adash-vazio')).toBeVisible();

@@ -127,6 +127,13 @@ function aguaRelCompararCampanha(a, b) {
 function aguaRelLabelCampanha(c) {
   return `${c.campanha_ano} · ${c.campanha_ordem === 'primeira' ? '1ª' : '2ª'} campanha`
 }
+// Rótulo curto (chip/eixo de gráfico) — mesmo padrão usado pelo chip
+// de campanha do painel (js/agua-painel.js) e por aguaRelPorCampanha
+// abaixo; extraído pra fonte única em vez de recalcular a mesma string
+// em dois lugares.
+function aguaRelLabelCampanhaCurto(c) {
+  return `${c.campanha_ano}·${c.campanha_ordem === 'primeira' ? '1ª' : '2ª'}`
+}
 
 // Campanhas distintas presentes numa lista de coletas, em ordem
 // cronológica — só as que a bacia de fato tem dado (não a lista global
@@ -259,7 +266,7 @@ function aguaRelPorCampanha(rel) {
     return {
       campanha_id: camp.campanha_id,
       label: aguaRelLabelCampanha(camp),
-      labelCurto: `${camp.campanha_ano}·${camp.campanha_ordem === 'primeira' ? '1ª' : '2ª'}`,
+      labelCurto: aguaRelLabelCampanhaCurto(camp),
       nColetas: resumo.totalColetas,
       nPontos: resumo.nPontos,
       iqaMedio: resumo.iqaMedio,
