@@ -559,6 +559,71 @@ são do Acre.
   `ingest-focos` e do script) e está pública no repositório —
   recomendado rotacionar; ao trocar, trocar nos três lugares.
 
+## Regra do sistema — Painel de Fogo e Desmatamento (migrations 342–342d)
+`pages/painel-fogo-desmatamento.html` (menu Gestão): série histórica de
+focos e de desmatamento, com filtro por tipo (os dois / só queimadas / só
+desmatamento), por local (Acre todo / todas as UCs / uma UC) e por
+período. Gráficos de linha, barra, área, rosca e ranking, em SVG à mão.
+- **Agregação e desenho em `js/painel-fogo-desmatamento.js`** (funções
+  puras `pfd*`), nunca na página. Cores só das já validadas para
+  daltonismo (queimada #EA580C × desmatamento #166534; dentro #2F9E5B ×
+  fora #F59E0B), sempre com rótulo e valor ao lado.
+- **Fogo e desmatamento NUNCA no mesmo gráfico nem somados**: janela
+  diferente (temporada 1º/jul–4/nov × ano-PRODES ago–jul) e unidade
+  diferente (focos × hectares).
+- Focos por UC: `focos_uc_mes` (ano × mês × UC; `uc_id` NULL = fora de
+  UC), preenchida pelo mesmo `focos_resumo_ano_atualizar()` do cron
+  diário. `focos_calor` ganhou `uc_id` por trigger
+  (`encontrar_uc_por_ponto`), e `vw_focos_linha_tempo` expõe `uc_id` ao
+  final.
+- Desmatamento por UC: `prodes_uc_ano` = interseção dos polígonos do
+  PRODES (mesmo WFS do `prodes_resumo_ano`) com o limite de cada UC,
+  calculada no banco (`ST_MakeValid` nos dois lados — sem isso o GEOS
+  lança TopologyException). Conferido: 2024 somou 41.144 ha contra
+  41.135 do INPE. **"Acre todo" usa o número OFICIAL do INPE; o recorte
+  por UC é cálculo do sistema** — a página diz isso nas notas.
+- ⚠️ `prodes_resumo_coletar(p_max)` processa **um ano por chamada** (342c;
+  o cron 342d roda `(1)` às 10:20 e 10:40 de domingo): os 18 anos numa
+  transação só estouravam o `statement_timeout` de 2 min. O pedido só é
+  apagado quando a coleta dá certo (342b) — antes, um erro de
+  `round(double precision, int)` apagava os pedidos e gravava zero em
+  silêncio. Nunca rodar duas coletas em paralelo: as duas pegam o mesmo
+  ano.
+- Ano sem dado DIZ que não há dado (faixas de anos, `pfdFaixasAnos`),
+  nunca vira zero; ano corrente sai como parcial (ponto vazado).
+- **Filtro por esfera** (`escopo = 'esf:federal|estadual|municipal'`,
+  campo `unidades_conservacao.esfera`): recorta tudo, a rosca vira "UCs
+  federais × restante do Acre" e o ranking mostra só a esfera. Em "Todas
+  as UCs" entra a rosca por esfera (rampa de UM azul, separada por
+  luminosidade). Esfera sem UC cadastrada não vira opção.
+- **Tendência = Mann-Kendall + inclinação de Sen** (`pfdTendencia`), duas
+  leituras: período todo e últimos 5 anos FECHADOS. Só diz
+  "subindo"/"caindo" com p < 0,05; senão "sem tendência clara". Ano
+  parcial e sem dado ficam fora da conta; mínimo 5 anos. Nunca trocar por
+  regressão linear: um ano extremo (2022) arrastaria a reta — o teste
+  trava isso com uma série de resposta conhecida.
+- **Fonte BDQueimadas/INPE** (migration 343, seletor "Fonte dos focos"):
+  série do SATÉLITE DE REFERÊNCIA (AQUA_M-T), ANO CIVIL inteiro — a que o
+  INPE usa nas estatísticas oficiais. `focos_calor` não serve (todos os
+  satélites, só dias recentes). Tabelas `focos_bdq_ref` (pontos, UC por
+  junção espacial em lote), `focos_bdq_uc_mes`, `focos_bdq_resumo_ano`.
+  **Nunca somada com a do FIRMS** — o painel mostra uma fonte por vez.
+  Estado = campo `estado` do próprio INPE (para bater com o número
+  oficial). Conferido: 2024 jul–nov = 8.442 × 8.590 do MODIS Aqua da NASA
+  (mesmo satélite, outro processamento).
+- Importação: Edge Function `importar-bdq-referencia` (arquivos .zip —
+  o banco não descompacta), UM ano por chamada (limite de CPU), só ano
+  FECHADO e AUSENTE — chamar de novo é no-op, por isso é segura mesmo
+  pública (a chave dos crons é a anon). Arquivo do Acre
+  (`EstadosBr_sat_ref/AC`, até 2024) e, na falta, o do Brasil
+  (`Brasil_sat_ref`, 2025+). O `ingest-focos` diário a aciona quando
+  falta ano fechado — o ano entra sozinho quando o INPE publicar, sem
+  cron novo. ⚠️ Nunca rodar muitas importações em paralelo: 7 de uma vez
+  estouraram o timeout da reagregação (sozinha leva ~1,5 s).
+- Guarda: `tests/painel-fogo-desmatamento.test.js` (20), inclusive
+  página sem rolagem lateral em 390px.
+- `pwa/sw.js`: frota 112 → 113 (`js/layout.js` está no shell do Frota).
+
 Painel-resumo (`abrirResumoAlertas`, pages/mapa.html): abre junto com a
 camada, gráficos em SVG à mão (o projeto não tem lib de gráfico; padrão
 já era esse, ver `#usc-donut`).
