@@ -134,8 +134,27 @@ Deno.serve(async () => {
     else inseridos += lote.length
   }
 
+  // Série do BDQueimadas (satélite de referência, migration 343): se falta
+  // algum ano fechado, pede à importar-bdq-referencia o mais antigo que
+  // falta. Ano ainda não publicado pelo INPE volta "nao_publicado" sem
+  // gravar nada — a série se completa sozinha quando o arquivo sair.
+  let bdqSerie: unknown = null
+  try {
+    const { count } = await db.from('focos_bdq_resumo_ano').select('ano', { count: 'exact', head: true })
+    const esperados = new Date().getUTCFullYear() - 2003
+    if (count != null && count < esperados) {
+      const r = await fetch(`${SUPABASE_URL}/functions/v1/importar-bdq-referencia`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${SUPABASE_SRK}`, 'Content-Type': 'application/json' },
+        body: '{}',
+        signal: AbortSignal.timeout(120000),
+      })
+      bdqSerie = await r.json().catch(() => ({ status: r.status }))
+    }
+  } catch (e) { erros.push('BDQ série: ' + String((e as Error).message ?? e)) }
+
   return new Response(
-    JSON.stringify({ ok: true, inseridos, total: linhas.length, fora_do_acre: foraAcre, recorte_aplicado: comLimite, erros }),
+    JSON.stringify({ ok: true, inseridos, total: linhas.length, fora_do_acre: foraAcre, recorte_aplicado: comLimite, bdq_serie: bdqSerie, erros }),
     { headers: { 'Content-Type': 'application/json' } },
   )
 })

@@ -591,7 +591,36 @@ período. Gráficos de linha, barra, área, rosca e ranking, em SVG à mão.
   ano.
 - Ano sem dado DIZ que não há dado (faixas de anos, `pfdFaixasAnos`),
   nunca vira zero; ano corrente sai como parcial (ponto vazado).
-- Guarda: `tests/painel-fogo-desmatamento.test.js` (14), inclusive
+- **Filtro por esfera** (`escopo = 'esf:federal|estadual|municipal'`,
+  campo `unidades_conservacao.esfera`): recorta tudo, a rosca vira "UCs
+  federais × restante do Acre" e o ranking mostra só a esfera. Em "Todas
+  as UCs" entra a rosca por esfera (rampa de UM azul, separada por
+  luminosidade). Esfera sem UC cadastrada não vira opção.
+- **Tendência = Mann-Kendall + inclinação de Sen** (`pfdTendencia`), duas
+  leituras: período todo e últimos 5 anos FECHADOS. Só diz
+  "subindo"/"caindo" com p < 0,05; senão "sem tendência clara". Ano
+  parcial e sem dado ficam fora da conta; mínimo 5 anos. Nunca trocar por
+  regressão linear: um ano extremo (2022) arrastaria a reta — o teste
+  trava isso com uma série de resposta conhecida.
+- **Fonte BDQueimadas/INPE** (migration 343, seletor "Fonte dos focos"):
+  série do SATÉLITE DE REFERÊNCIA (AQUA_M-T), ANO CIVIL inteiro — a que o
+  INPE usa nas estatísticas oficiais. `focos_calor` não serve (todos os
+  satélites, só dias recentes). Tabelas `focos_bdq_ref` (pontos, UC por
+  junção espacial em lote), `focos_bdq_uc_mes`, `focos_bdq_resumo_ano`.
+  **Nunca somada com a do FIRMS** — o painel mostra uma fonte por vez.
+  Estado = campo `estado` do próprio INPE (para bater com o número
+  oficial). Conferido: 2024 jul–nov = 8.442 × 8.590 do MODIS Aqua da NASA
+  (mesmo satélite, outro processamento).
+- Importação: Edge Function `importar-bdq-referencia` (arquivos .zip —
+  o banco não descompacta), UM ano por chamada (limite de CPU), só ano
+  FECHADO e AUSENTE — chamar de novo é no-op, por isso é segura mesmo
+  pública (a chave dos crons é a anon). Arquivo do Acre
+  (`EstadosBr_sat_ref/AC`, até 2024) e, na falta, o do Brasil
+  (`Brasil_sat_ref`, 2025+). O `ingest-focos` diário a aciona quando
+  falta ano fechado — o ano entra sozinho quando o INPE publicar, sem
+  cron novo. ⚠️ Nunca rodar muitas importações em paralelo: 7 de uma vez
+  estouraram o timeout da reagregação (sozinha leva ~1,5 s).
+- Guarda: `tests/painel-fogo-desmatamento.test.js` (20), inclusive
   página sem rolagem lateral em 390px.
 - `pwa/sw.js`: frota 112 → 113 (`js/layout.js` está no shell do Frota).
 

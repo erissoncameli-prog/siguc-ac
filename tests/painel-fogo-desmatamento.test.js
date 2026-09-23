@@ -12,7 +12,14 @@
 //    vira "nesta UC × restante";
 //  - ranking lista todas as UCs, em ordem, e a UC filtrada é destacada;
 //  - cada gráfico desenha SVG com <title> por ponto (teclado/tabela) e
-//    diz "sem dados" em vez de desenhar um gráfico vazio.
+//    diz "sem dados" em vez de desenhar um gráfico vazio;
+//  - filtro por ESFERA (federal/estadual/municipal) recorta tudo e a
+//    rosca vira "UCs federais × restante do Acre";
+//  - FONTE dos focos: BDQueimadas é série à parte (ano inteiro, 12 meses,
+//    nunca parcial) — nunca somada com a do FIRMS;
+//  - TENDÊNCIA (Mann-Kendall + Sen) contra séries de resposta conhecida:
+//    sobe, desce, oscila sem direção, ano extremo não arrasta a reta, e
+//    ano parcial/sem dado fica fora da conta.
 
 const fs = require('node:fs');
 const path = require('node:path');
@@ -26,9 +33,16 @@ const ARQ = path.join(__dirname, '..', 'js', 'painel-fogo-desmatamento.js');
 
 const DADOS = {
   ucs: [
-    { id: 'A', nome: 'RESEX Chico Mendes', grupo: 'uso_sustentavel' },
-    { id: 'B', nome: 'Parque Estadual Chandless', grupo: 'protecao_integral' },
+    { id: 'A', nome: 'RESEX Chico Mendes', grupo: 'uso_sustentavel', esfera: 'federal' },
+    { id: 'B', nome: 'Parque Estadual Chandless', grupo: 'protecao_integral', esfera: 'estadual' },
   ],
+  bdqUcMes: [
+    { ano: 2024, mes: 2, uc_id: null, focos: 7 },
+    { ano: 2024, mes: 9, uc_id: 'A', focos: 40 },
+    { ano: 2024, mes: 9, uc_id: null, focos: 353 },
+    { ano: 2025, mes: 9, uc_id: 'B', focos: 4 },
+  ],
+  bdqResumo: [{ ano: 2024, focos: 400 }, { ano: 2025, focos: 4 }],
   focosUcMes: [
     { ano: 2024, mes: 8, uc_id: 'A', focos: 100 },
     { ano: 2024, mes: 9, uc_id: 'B', focos: 10 },
@@ -152,6 +166,105 @@ test('gráficos desenham SVG com <title> por ponto e avisam quando vazios', asyn
   expect(r.parcialVazado).toBe(true);
 });
 
+test('esfera: recorta focos e desmatamento só nas UCs daquela esfera', async ({ page }) => {
+  await carregar(page);
+  const fed = await rodar(page, 'pfdFocosPorAno', F({ escopo: 'esf:federal' }));
+  expect(fed.map(p => p.n)).toEqual([100, null, 5]);
+  const est = await rodar(page, 'pfdDesmatPorAno', F({ escopo: 'esf:estadual' }));
+  expect(est.map(p => p.ha)).toEqual([12, 0, null]);
+  const rosca = await rodar(page, 'pfdDentroFora', F({ escopo: 'esf:federal' }), 'queimada');
+  expect(rosca.map(i => [i.rotulo, i.n])).toEqual([['UCs federais', 105], ['Restante do Acre', 960]]);
+  const rank = await rodar(page, 'pfdRankingUC', F({ escopo: 'esf:estadual' }), 'desmatamento');
+  expect(rank.map(i => i.nome)).toEqual(['Parque Estadual Chandless']);   // só a esfera escolhida
+  const esf = await rodar(page, 'pfdPorEsfera', F({ escopo: 'ucs' }), 'desmatamento');
+  expect(esf.map(i => [i.rotulo, i.n])).toEqual([['UCs federais', 7305], ['UCs estaduais', 12], ['UCs municipais', 0]]);
+});
+
+test('fonte BDQueimadas: série à parte, ano inteiro, sem ano parcial', async ({ page }) => {
+  await carregar(page);
+  const anos = await rodar(page, 'pfdFocosPorAno', F({ fonte: 'bdq' }));
+  expect(anos).toEqual([
+    { ano: 2024, n: 400, parcial: false },
+    { ano: 2025, n: 4, parcial: false },
+    { ano: 2026, n: null, parcial: false },    // ainda não publicado — nunca zero
+  ]);
+  const meses = await rodar(page, 'pfdFocosPorMes', F({ fonte: 'bdq' }));
+  expect(meses.length).toBe(12);
+  expect(meses.find(m => m.mes === 2).n).toBe(7);   // fora da temporada, mas conta no ano inteiro
+  const uc = await rodar(page, 'pfdFocosPorAno', F({ fonte: 'bdq', escopo: 'A' }));
+  expect(uc.map(p => p.n)).toEqual([40, 0, null]);
+  // FIRMS continua intacto: as duas nunca se misturam
+  const firms = await rodar(page, 'pfdFocosPorAno', F({}));
+  expect(firms.map(p => p.n)).toEqual([1010, null, 55]);
+});
+
+test('tendência: Mann-Kendall + Sen contra séries de resposta conhecida', async ({ page }) => {
+  await carregar(page);
+  const r = await page.evaluate(() => {
+    const serie = vals => vals.map((v, i) => ({ ano: 2010 + i, valor: v }));
+    const sobe = pfdTendencia(serie([10, 20, 30, 40, 50, 60, 70, 80, 90, 100]));
+    const desce = pfdTendencia(serie([100, 90, 80, 70, 60, 50, 40, 30, 20, 10]));
+    const oscila = pfdTendencia(serie([5, 9, 4, 8, 5, 9, 4, 8]));
+    const curta = pfdTendencia(serie([1, 2, 3, 4]));
+    // ano extremo (seca) no meio de uma subida de 10/ano: Sen continua 10
+    const comExtremo = serie([100, 110, 120, 130, 5000, 150, 160, 170, 180, 190]);
+    const robusta = pfdTendencia(comExtremo);
+    // parcial e sem dado ficam fora da conta
+    const comParcial = pfdTendencia([...serie([10, 20, 30, 40, 50]), { ano: 2015, valor: 1, parcial: true }, { ano: 2016, valor: null }]);
+    const duas = pfdTendencias([...serie([10, 20, 30, 40, 50, 60, 70, 80]), { ano: 2018, valor: 2, parcial: true }]);
+    const frase = pfdTendenciaFrase(sobe, 'focos');
+    return { sobe, desce, oscila, curta, robusta, comParcial, duas, frase };
+  });
+  expect(r.sobe.direcao).toBe('subindo');
+  expect(r.sobe.inclinacao).toBe(10);
+  expect(r.sobe.S).toBe(45);
+  expect(r.sobe.p).toBeLessThan(0.001);   // z = 44/√125 ≈ 3,94
+  expect(r.desce.direcao).toBe('caindo');
+  expect(r.desce.inclinacao).toBe(-10);
+  expect(r.oscila.direcao).toBe('estavel');
+  expect(r.oscila.p).toBeGreaterThan(0.05);
+  expect(r.curta.insuficiente).toBe(true);
+  expect(r.robusta.inclinacao).toBe(10);   // regressão comum daria bem mais
+  expect(r.robusta.direcao).toBe('subindo');
+  expect(r.comParcial.n).toBe(5);
+  expect(r.comParcial.anoFim).toBe(2014);
+  expect(r.duas.total.anoIni).toBe(2010);
+  expect(r.duas.recente.anoIni).toBe(2013);   // últimos 5 anos FECHADOS
+  expect(r.duas.recente.anoFim).toBe(2017);
+  expect(r.frase).toMatch(/^subindo · \+10 focos\/ano/);
+});
+
+test('gráfico de tendência: barras navegáveis + retas rotuladas, veredito com texto', async ({ page }) => {
+  await carregar(page);
+  const r = await page.evaluate(() => {
+    const pontos = [10, 20, 30, 40, 50, 60].map((v, i) => ({ ano: 2019 + i, rotulo: String(2019 + i), valor: v }));
+    pontos.push({ ano: 2025, rotulo: '2025', valor: 5, parcial: true });
+    const tt = pfdTendencias(pontos);
+    const div = document.createElement('div');
+    div.innerHTML = pfdTendenciaHTML(pontos, tt, { cor: '#EA580C', unidade: 'focos', rotulo: 'x' });
+    const barras = div.querySelectorAll('rect[data-gt-ponto]');
+    const retas = [...div.querySelectorAll('line[stroke-width="3"], line[stroke-width="2.5"]')];
+    div.innerHTML = pfdTendenciaResumoHTML(tt, 'focos');
+    const itens = [...div.querySelectorAll('.pfd-tend-item')].map(li => [li.dataset.direcao, li.querySelector('.pfd-tend-veredito').textContent.trim()]);
+    const insuf = document.createElement('div');
+    insuf.innerHTML = pfdTendenciaResumoHTML(pfdTendencias(pontos.slice(0, 3)), 'focos');
+    return {
+      barras: barras.length,
+      parcialTitulo: [...barras].some(b => /fora da tendência/.test(b.textContent)),
+      retas: retas.map(l => l.querySelector('title').textContent),
+      itens,
+      insuf: insuf.textContent.replace(/\s+/g, ' '),
+    };
+  });
+  expect(r.barras).toBe(7);
+  expect(r.parcialTitulo).toBe(true);
+  expect(r.retas.length).toBe(2);
+  expect(r.retas[0]).toMatch(/Tendência do período 2019–2024: subindo/);
+  expect(r.itens).toEqual([['subindo', 'Subindo'], ['subindo', 'Subindo']]);
+  expect(r.insuf).toContain('Dados insuficientes');
+  expect(r.insuf).toContain('mínimo 5');
+});
+
 // ── Página real (cliente Supabase simulado) ───────────────────────
 // Mesmo contorno de tests/agua-conferencia-filtros.test.js: sem bloquear
 // o CDN, o supabase-js real sobrescreve o stub e a página cai no login.
@@ -159,8 +272,8 @@ const BASE = process.env.TEST_BASE_URL || 'http://localhost:5500';
 const USUARIO_STUB = { id: 'u-pfd', nome_completo: 'Gestora de Teste', email: 'g@x.invalid', perfil: 'gestor', ativo: true };
 const TABELAS = {
   unidades_conservacao: [
-    { id: 'A', nome: 'RESEX Chico Mendes', sigla: 'RCM', categoria: 'RESEX', grupo: 'uso_sustentavel' },
-    { id: 'B', nome: 'Parque Estadual Chandless', sigla: 'PEC', categoria: 'PI', grupo: 'protecao_integral' },
+    { id: 'A', nome: 'RESEX Chico Mendes', sigla: 'RCM', categoria: 'RESEX', grupo: 'uso_sustentavel', esfera: 'federal' },
+    { id: 'B', nome: 'Parque Estadual Chandless', sigla: 'PEC', categoria: 'PI', grupo: 'protecao_integral', esfera: 'estadual' },
   ],
   focos_uc_mes: [
     { ano: 2023, mes: 8, uc_id: 'A', focos: 300, origem: 'serie_historica' },
@@ -174,6 +287,13 @@ const TABELAS = {
     { ano: 2024, focos: 1010, origem: 'serie_historica', periodo_ini: '2024-07-01', periodo_fim: '2024-11-04' },
   ],
   prodes_resumo_ano: [{ ano: 2023, poligonos: 5877, area_ha: 46295 }, { ano: 2024, poligonos: 5699, area_ha: 41135 }],
+  focos_bdq_uc_mes: [
+    { ano: 2023, mes: 3, uc_id: null, focos: 12 },
+    { ano: 2023, mes: 9, uc_id: 'A', focos: 250 },
+    { ano: 2024, mes: 9, uc_id: 'B', focos: 8 },
+    { ano: 2024, mes: 9, uc_id: null, focos: 8400 },
+  ],
+  focos_bdq_resumo_ano: [{ ano: 2023, focos: 262, arquivo: 'x' }, { ano: 2024, focos: 8408, arquivo: 'y' }],
   prodes_uc_ano: [
     { ano: 2023, uc_id: 'A', poligonos: 600, area_ha: 3800 },
     { ano: 2024, uc_id: 'A', poligonos: 721, area_ha: 4305 },
@@ -240,13 +360,13 @@ test('página: no celular (390px) nada rola de lado', async ({ page }) => {
   expect(sw).toBeLessThanOrEqual(390);
 });
 
-test('página: abre com os 4 tipos de gráfico, KPIs e as duas seções', async ({ page }) => {
+test('página: abre com linha, barras, tendência, rosca, ranking e área nas duas seções', async ({ page }) => {
   await abrirPainel(page);
   await page.selectOption('#pfd-ini', '2023');
   const titulos = await page.locator('.pfd-card h3').allInnerTexts();
   expect(titulos).toEqual([
-    'Focos de calor por ano', 'Focos por mês da temporada', 'Focos dentro × fora de UCs', 'UCs com mais focos',
-    'Área desmatada por ano', 'Desmatamento acumulado', 'Área dentro × fora de UCs', 'UCs com mais área desmatada',
+    'Focos de calor por ano', 'Focos por mês da temporada', 'Tendência dos focos de calor', 'Focos dentro × fora de UCs', 'UCs com mais focos',
+    'Área desmatada por ano', 'Desmatamento acumulado', 'Tendência do desmatamento', 'Área dentro × fora de UCs', 'UCs com mais área desmatada',
   ]);
   // linha, barras, rosca e área desenhados de verdade (SVG com <title>)
   expect(await page.locator('.pfd-card svg title').count()).toBeGreaterThan(10);
@@ -283,4 +403,28 @@ test('página: período invertido é corrigido, nunca vira tela vazia', async ({
   // e "De" depois do "Até" empurra o "Até"
   await page.selectOption('#pfd-ini', '2024');
   await expect(page.locator('#pfd-fim')).toHaveValue('2024');
+});
+
+test('página: filtro por esfera e "Todas as UCs" com a rosca por esfera', async ({ page }) => {
+  await abrirPainel(page);
+  const opcoes = await page.locator('#pfd-local optgroup[label="Por esfera"] option').allInnerTexts();
+  expect(opcoes).toEqual(['UCs federais (1)', 'UCs estaduais (1)']);   // esfera sem UC não vira opção
+  await page.selectOption('#pfd-local', 'esf:federal');
+  await expect(page.locator('.pfd-secao-titulo').first()).toContainText('UCs federais');
+  await expect(page.locator('#pfd-conteudo')).toContainText('Restante do Acre');
+  await page.selectOption('#pfd-local', 'ucs');
+  await expect(page.locator('.pfd-card h3', { hasText: 'Focos em UCs por esfera' })).toBeVisible();
+  await expect(page.locator('.pfd-card h3', { hasText: 'Área desmatada em UCs por esfera' })).toBeVisible();
+});
+
+test('página: fonte BDQueimadas troca a série de focos, e some em "Só desmatamento"', async ({ page }) => {
+  await abrirPainel(page);
+  await page.selectOption('#pfd-ini', '2023');
+  await page.selectOption('#pfd-fonte', 'bdq');
+  await expect(page.locator('.pfd-kpi').first()).toContainText('8.670');     // 262 + 8.408, nunca somado ao FIRMS
+  await expect(page.locator('.pfd-secao-titulo').first()).toContainText('BDQueimadas/INPE');
+  await expect(page.locator('.pfd-card h3', { hasText: 'Focos por mês' })).toHaveText('Focos por mês');
+  await expect(page.locator('.pfd-aviso')).toContainText('o INPE só publica o ano');
+  await page.click('.pfd-seg button:has-text("Só desmatamento")');
+  await expect(page.locator('#pfd-campo-fonte')).toBeHidden();
 });
