@@ -19,7 +19,11 @@
 //    nunca parcial) — nunca somada com a do FIRMS;
 //  - TENDÊNCIA (Mann-Kendall + Sen) contra séries de resposta conhecida:
 //    sobe, desce, oscila sem direção, ano extremo não arrasta a reta, e
-//    ano parcial/sem dado fica fora da conta.
+//    ano parcial/sem dado fica fora da conta;
+//  - SALDO desmatado × floresta que resta: soma o acumulado até 2007 + a
+//    série anual + o resíduo (no ano da detecção); "Acre todo" usa os
+//    números do estado, UC/esfera a interseção; o ano segue o "Até" e
+//    para no último PRODES publicado.
 
 const fs = require('node:fs');
 const path = require('node:path');
@@ -43,6 +47,18 @@ const DADOS = {
     { ano: 2025, mes: 9, uc_id: 'B', focos: 4 },
   ],
   bdqResumo: [{ ano: 2024, focos: 400 }, { ano: 2025, focos: 4 }],
+  cobertura: [
+    { classe: 'area_total', ano: 0, uc_id: null, area_ha: 1000000 },
+    { classe: 'd2007', ano: 2007, uc_id: null, area_ha: 100000 },
+    { classe: 'residuo', ano: 2024, uc_id: null, area_ha: 1000 },
+    { classe: 'nao_floresta', ano: 2007, uc_id: null, area_ha: 500 },
+    { classe: 'hidrografia', ano: 2007, uc_id: null, area_ha: 1500 },
+    { classe: 'area_total', ano: 0, uc_id: 'A', area_ha: 100000 },
+    { classe: 'd2007', ano: 2007, uc_id: 'A', area_ha: 5000 },
+    { classe: 'residuo', ano: 2025, uc_id: 'A', area_ha: 100 },
+    { classe: 'area_total', ano: 0, uc_id: 'B', area_ha: 50000 },
+    { classe: 'd2007', ano: 2007, uc_id: 'B', area_ha: 0 },
+  ],
   focosUcMes: [
     { ano: 2024, mes: 8, uc_id: 'A', focos: 100 },
     { ano: 2024, mes: 9, uc_id: 'B', focos: 10 },
@@ -164,6 +180,60 @@ test('gráficos desenham SVG com <title> por ponto e avisam quando vazios', asyn
   expect(r.linhaVazia.vazio).toBe(true);
   expect(r.roscaVazia.vazio).toBe(true);
   expect(r.parcialVazado).toBe(true);
+});
+
+test('saldo: acumulado 2007 + anual + resíduo, por estado e por UC', async ({ page }) => {
+  await carregar(page);
+  // Acre: 100.000 (até 2007) + 41.135 (2024) + 1.000 (resíduo detectado em 2024)
+  const acre = await rodar(page, 'pfdCobertura', F({ anoFim: 2024 }));
+  expect(acre.anoRef).toBe(2024);
+  expect(acre.desmatado).toBe(142135);
+  expect(acre.resta).toBe(1000000 - 142135 - 2000);   // − não floresta − rios
+  expect(acre.pctDesmatado).toBeCloseTo(14.2135, 3);
+  expect(acre.serie.map(s => s.ano)).toEqual([2007, 2008, 2009, 2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024]);
+  expect(acre.serie[0].desmatado).toBe(100000);     // 2007 = só o acumulado
+  // "Até" depois do último PRODES publicado para no último (2025)
+  const depois = await rodar(page, 'pfdCobertura', F({ anoFim: 2026 }));
+  expect(depois.anoRef).toBe(2025);
+  expect(depois.desmatado).toBe(100000 + 41135 + 27546 + 1000);
+  // UC: interseção (5.000) + anual da UC (4.305 + 3.000) + resíduo (100)
+  const a = await rodar(page, 'pfdCobertura', F({ escopo: 'A', anoFim: 2026 }));
+  expect(a.area).toBe(100000);
+  expect(a.desmatado).toBe(5000 + 4305 + 3000 + 100);
+  // esfera: soma das UCs daquela esfera, nunca os números do estado
+  const est = await rodar(page, 'pfdCobertura', F({ escopo: 'esf:estadual', anoFim: 2026 }));
+  expect(est.area).toBe(50000);
+  expect(est.desmatado).toBe(12);
+  // "Até" antes de 2007: mostra 2007 e avisa
+  const antes = await rodar(page, 'pfdCobertura', F({ anoIni: 2003, anoFim: 2005 }));
+  expect(antes.anoRef).toBe(2007);
+  expect(antes.antesDoPeriodo).toBe(true);
+  // sem base de cobertura: null, nunca 100% floresta inventado
+  const vazio = await page.evaluate(() => pfdCobertura({ cobertura: [], prodesAno: [] }, { escopo: '', anoFim: 2024 }));
+  expect(vazio).toBeNull();
+});
+
+test('área empilhada: faixas até o total, um alvo com <title> por ano', async ({ page }) => {
+  await carregar(page);
+  const r = await page.evaluate(() => {
+    const camadas = [{ chave: 'd', rotulo: 'Desmatado', cor: '#9A3412' }, { chave: 'f', rotulo: 'Floresta', cor: '#0D9488' }];
+    const pontos = [2007, 2008, 2009].map((a, i) => ({ rotulo: String(a), valores: { d: 10 + i, f: 90 - i } }));
+    const div = document.createElement('div');
+    div.innerHTML = pfdEmpilhadaHTML(pontos, camadas, { total: 100, unidade: 'ha', rotulo: 'x' });
+    const alvos = [...div.querySelectorAll('rect[data-gt-ponto]')].map(el => el.querySelector('title').textContent);
+    const um = document.createElement('div');
+    um.innerHTML = pfdEmpilhadaHTML(pontos.slice(0, 1), camadas, { total: 100, unidade: 'ha', rotulo: 'x' });
+    return { alvos, faixas: div.querySelectorAll('svg path[fill="#9A3412"], svg path[fill="#0D9488"]').length,
+      legenda: div.querySelector('.pfd-legenda').textContent.replace(/\s+/g, ' '), umAlvo: um.querySelectorAll('rect[data-gt-ponto]').length };
+  });
+  expect(r.faixas).toBe(2);
+  expect(r.alvos).toEqual([
+    '2007 — Desmatado 10 ha (10,0%) · Floresta 90 ha (90,0%)',
+    '2008 — Desmatado 11 ha (11,0%) · Floresta 89 ha (89,0%)',
+    '2009 — Desmatado 12 ha (12,0%) · Floresta 88 ha (88,0%)',
+  ]);
+  expect(r.legenda).toContain('Floresta 88 88,0%');   // legenda com o último ano
+  expect(r.umAlvo).toBe(1);   // um ano só ainda desenha e navega
 });
 
 test('esfera: recorta focos e desmatamento só nas UCs daquela esfera', async ({ page }) => {
@@ -294,6 +364,17 @@ const TABELAS = {
     { ano: 2024, mes: 9, uc_id: null, focos: 8400 },
   ],
   focos_bdq_resumo_ano: [{ ano: 2023, focos: 262, arquivo: 'x' }, { ano: 2024, focos: 8408, arquivo: 'y' }],
+  prodes_cobertura: [
+    { classe: 'area_total', ano: 0, uc_id: null, area_ha: 16416639 },
+    { classe: 'd2007', ano: 2007, uc_id: null, area_ha: 1941849 },
+    { classe: 'residuo', ano: 2023, uc_id: null, area_ha: 5000 },
+    { classe: 'nao_floresta', ano: 2007, uc_id: null, area_ha: 7005 },
+    { classe: 'hidrografia', ano: 2007, uc_id: null, area_ha: 11334 },
+    { classe: 'area_total', ano: 0, uc_id: 'A', area_ha: 926748 },
+    { classe: 'd2007', ano: 2007, uc_id: 'A', area_ha: 39590 },
+    { classe: 'area_total', ano: 0, uc_id: 'B', area_ha: 693464 },
+    { classe: 'd2007', ano: 2007, uc_id: 'B', area_ha: 283 },
+  ],
   prodes_uc_ano: [
     { ano: 2023, uc_id: 'A', poligonos: 600, area_ha: 3800 },
     { ano: 2024, uc_id: 'A', poligonos: 721, area_ha: 4305 },
@@ -366,6 +447,7 @@ test('página: abre com linha, barras, tendência, rosca, ranking e área nas du
   const titulos = await page.locator('.pfd-card h3').allInnerTexts();
   expect(titulos).toEqual([
     'Focos de calor por ano', 'Focos por mês da temporada', 'Tendência dos focos de calor', 'Focos dentro × fora de UCs', 'UCs com mais focos',
+    'Área desmatada × floresta que resta — Acre todo', 'Como chegou até aqui — Acre todo',
     'Área desmatada por ano', 'Desmatamento acumulado', 'Tendência do desmatamento', 'Área dentro × fora de UCs', 'UCs com mais área desmatada',
   ]);
   // linha, barras, rosca e área desenhados de verdade (SVG com <title>)
@@ -427,4 +509,18 @@ test('página: fonte BDQueimadas troca a série de focos, e some em "Só desmata
   await expect(page.locator('.pfd-aviso')).toContainText('o INPE só publica o ano');
   await page.click('.pfd-seg button:has-text("Só desmatamento")');
   await expect(page.locator('#pfd-campo-fonte')).toBeHidden();
+});
+
+test('página: saldo desmatado × floresta que resta segue o local e o "Até"', async ({ page }) => {
+  await abrirPainel(page);
+  const resumo = page.locator('.pfd-cob-resumo');
+  // Acre até 2024: 1.941.849 + 46.295 + 41.135 + 5.000 = 2.034.279 ha
+  await expect(resumo).toContainText('2.034.279 ha');
+  await expect(resumo).toContainText('Até 2024');
+  await expect(page.locator('.pfd-card h3', { hasText: 'Área desmatada × floresta que resta' }).locator('xpath=..').locator('svg text').first()).toContainText('%');
+  await page.selectOption('#pfd-local', 'A');
+  await expect(resumo).toContainText('926.748 ha no total');   // a área da UC vira o total
+  await expect(page.locator('.pfd-card h3', { hasText: 'Como chegou até aqui — RESEX Chico Mendes' })).toBeVisible();
+  await page.selectOption('#pfd-fim', '2023');
+  await expect(resumo).toContainText('Até 2023');
 });

@@ -559,7 +559,7 @@ são do Acre.
   `ingest-focos` e do script) e está pública no repositório —
   recomendado rotacionar; ao trocar, trocar nos três lugares.
 
-## Regra do sistema — Painel de Fogo e Desmatamento (migrations 342–342d)
+## Regra do sistema — Painel de Fogo e Desmatamento (migrations 342–344)
 `pages/painel-fogo-desmatamento.html` (menu Gestão): série histórica de
 focos e de desmatamento, com filtro por tipo (os dois / só queimadas / só
 desmatamento), por local (Acre todo / todas as UCs / uma UC) e por
@@ -620,7 +620,31 @@ período. Gráficos de linha, barra, área, rosca e ranking, em SVG à mão.
   falta ano fechado — o ano entra sozinho quando o INPE publicar, sem
   cron novo. ⚠️ Nunca rodar muitas importações em paralelo: 7 de uma vez
   estouraram o timeout da reagregação (sozinha leva ~1,5 s).
-- Guarda: `tests/painel-fogo-desmatamento.test.js` (20), inclusive
+- **Desmatado × floresta que resta** (migration 344, `prodes_cobertura`,
+  `pfdCobertura`): rosca (situação no ano do "Até") + área empilhada
+  (2007 → ano escolhido), Acre todo e por UC/esfera. **A série anual
+  sozinha subestima o desmatado em ~2,7×** (750 mil × 2,7 mi ha): soma o
+  acumulado até 2007 (camada própria do PRODES), a série anual e o
+  resíduo (desmatamento antigo detectado tarde, no ano da detecção).
+  Floresta que resta = área − desmatado − não floresta − rios; o PRODES
+  não publica camada de floresta, e área regenerada continua desmatada
+  (é floresta primária, não cobertura vegetal) — a tela diz as duas
+  coisas. O "De" não se aplica: o que resta é saldo, não soma do período.
+  Paleta própria validada no `validate_palette.js` da skill de dataviz
+  (floresta #0D9488 — nunca o verde do desmatamento, que leria como
+  "mais desmatamento" — × #9A3412 × #F59E0B; cinza neutro).
+  Carga: `prodes_cobertura_solicitar()` → `prodes_cobertura_coletar(1)`
+  repetido (d2007 por UC vem recortado pelo retângulo da UC, cada UC
+  subdividida com `ST_Subdivide` antes de cruzar; a RESEX Chico Mendes
+  leva ~46 s). Cron mensal (dia 2) só renova o resíduo.
+- ⚠️ **Nunca converter várias respostas grandes do pg_net para JSON numa
+  consulta só.** Uma conferência que fazia `content::jsonb` nas 25
+  respostas de uma vez (~50 MB) estourou a memória da instância e
+  REINICIOU o banco de produção (23/09/2026 22:45 UTC); como
+  `net._http_response` é unlogged, as respostas também sumiram. Uma
+  resposta por vez (é por isso que os `*_coletar` recebem `p_max`), e
+  para conferir, `length()`/`substring()` no texto, nunca parse em lote.
+- Guarda: `tests/painel-fogo-desmatamento.test.js` (23), inclusive
   página sem rolagem lateral em 390px.
 - `pwa/sw.js`: frota 112 → 113 (`js/layout.js` está no shell do Frota).
 

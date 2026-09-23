@@ -88,6 +88,11 @@
   .pfd-tend-item { grid-template-columns:28px 1fr; }
   .pfd-tend-veredito, .pfd-tend-detalhe { grid-column:2; }
 }
+.pfd-legenda.pfd-legenda-linha { flex-direction:row; flex-wrap:wrap; gap:6px 18px; margin-top:8px; min-width:0; }
+.pfd-legenda.pfd-legenda-linha li { flex:0 1 auto; }
+.pfd-legenda.pfd-legenda-linha .pfd-leg-rot { flex:0 1 auto; }
+.pfd-cob-resumo { font-size:13px; color:#374151; margin:0 0 8px; line-height:1.5; }
+.pfd-cob-resumo strong { font-family:var(--font-sans, 'DM Sans', sans-serif); }
 [hidden] { display:none !important; }
 </style>
 </head>
@@ -133,7 +138,7 @@ async function _pfdTudo(montar) {
 }
 
 async function pfdCarregar() {
-  const [ucs, focosUcMes, focosResumo, prodesAno, prodesUcAno, bdqUcMes, bdqResumo] = await Promise.all([
+  const [ucs, focosUcMes, focosResumo, prodesAno, prodesUcAno, bdqUcMes, bdqResumo, cobertura] = await Promise.all([
     _pfdTudo(() => db.from('unidades_conservacao').select('id,nome,sigla,categoria,grupo,esfera').eq('ativo', true).order('nome')),
     _pfdTudo(() => db.from('focos_uc_mes').select('ano,mes,uc_id,focos,origem').order('ano')),
     _pfdTudo(() => db.from('focos_resumo_ano').select('ano,focos,origem,periodo_ini,periodo_fim').order('ano')),
@@ -141,8 +146,9 @@ async function pfdCarregar() {
     _pfdTudo(() => db.from('prodes_uc_ano').select('ano,uc_id,poligonos,area_ha').order('ano')),
     _pfdTudo(() => db.from('focos_bdq_uc_mes').select('ano,mes,uc_id,focos').order('ano')),
     _pfdTudo(() => db.from('focos_bdq_resumo_ano').select('ano,focos,arquivo').order('ano')),
+    _pfdTudo(() => db.from('prodes_cobertura').select('classe,ano,uc_id,area_ha').order('ano')),
   ])
-  return { ucs, focosUcMes, focosResumo, prodesAno, prodesUcAno, bdqUcMes, bdqResumo }
+  return { ucs, focosUcMes, focosResumo, prodesAno, prodesUcAno, bdqUcMes, bdqResumo, cobertura }
 }
 
 function pfdFiltrosHTML(ucs) {
@@ -300,6 +306,7 @@ function pfdRender() {
     const acum = pfdAcumulado(desm, 'ha').map(p => ({ rotulo: String(p.ano), valor: p.acumulado }))
     html += `<h2 class="pfd-secao-titulo"><span class="pfd-dot" style="background:${PFD_COR.desmatamento}"></span>Desmatamento — ${esc(onde)}, ${esc(periodo)}</h2>
     <div class="pfd-grade">
+      ${pfdCardsCobertura(d, f, onde)}
       <div class="pfd-card"><h3>Área desmatada por ano</h3><p class="pfd-sub">PRODES/INPE, em hectares (ano-PRODES: ago do ano anterior a jul).</p>
         ${pfdBarrasHTML(barras, { cor: PFD_COR.desmatamento, unidade: 'ha', rotulo: 'Área desmatada por ano' })}</div>
       <div class="pfd-card"><h3>Desmatamento acumulado</h3><p class="pfd-sub">Soma da área desmatada desde ${f.anoIni}, em hectares.</p>
@@ -324,10 +331,52 @@ function pfdRender() {
     <li>As duas séries de focos <strong>nunca são somadas</strong>: satélites e janelas diferentes contariam o mesmo fogo duas vezes.</li>
     <li><strong>Desmatamento</strong>: PRODES/INPE, disponível a partir de 2008. O total do Acre é o número oficial do
       INPE; a área por UC é o cruzamento dos polígonos do PRODES com o limite de cada UC, calculado no sistema.</li>
+    <li><strong>Desmatado × floresta que resta</strong>: soma o desmatamento acumulado até 2007 (camada própria do PRODES),
+      o desmatamento anual desde 2008 e o resíduo (desmatamento antigo detectado depois, contado no ano da detecção).
+      A floresta que resta é a área total menos o desmatado, a vegetação natural não florestal e os rios — o PRODES não
+      publica uma camada de floresta, então é uma subtração. Área que foi desmatada e depois regenerou continua contando
+      como desmatada: o que resta é floresta primária, não toda a cobertura vegetal.</li>
     <li>Fogo e desmatamento têm janelas de tempo diferentes e unidades diferentes (focos × hectares) — por isso nunca aparecem somados no mesmo gráfico.</li>
   </ul></div>`
 
   document.getElementById('pfd-conteudo').innerHTML = html
+}
+
+// Saldo acumulado (não o período): quanto já foi desmatado × quanto resta,
+// no ano escolhido em "Até". O "De" não se aplica — o que resta é estoque.
+function pfdCardsCobertura(d, f, onde) {
+  const c = pfdCobertura(d, f)
+  if (!c) return `<div class="pfd-card largo"><h3>Área desmatada × floresta que resta</h3>
+    <p class="pfd-vazio">Sem a base de cobertura do PRODES para este recorte.</p></div>`
+  const n = v => Number(v).toLocaleString('pt-BR', { maximumFractionDigits: 0 })
+  const p = v => Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+  const rotRecente = `Desmatado de 2008 a ${c.anoRef}`
+  const itens = [
+    { rotulo: 'Floresta que resta', n: c.resta, cor: PFD_COR.floresta },
+    { rotulo: 'Desmatado até 2007', n: c.d2007, cor: PFD_COR.desm2007 },
+    { rotulo: rotRecente, n: c.recente, cor: PFD_COR.desmRecente },
+    { rotulo: 'Não floresta e rios', n: c.outros, cor: PFD_COR.outros },
+  ]
+  const camadas = [
+    { chave: 'd2007', rotulo: 'Desmatado até 2007', cor: PFD_COR.desm2007 },
+    { chave: 'recente', rotulo: 'Desmatado desde 2008', cor: PFD_COR.desmRecente },
+    { chave: 'outros', rotulo: 'Não floresta e rios', cor: PFD_COR.outros },
+    { chave: 'resta', rotulo: 'Floresta que resta', cor: PFD_COR.floresta },
+  ]
+  const pontos = c.serie.map(s => ({ ano: s.ano, rotulo: String(s.ano),
+    valores: { d2007: c.d2007, recente: s.recente, outros: c.outros, resta: s.resta } }))
+  const avisoAno = c.antesDoPeriodo
+    ? ' O PRODES começa com o acumulado de 2007: antes disso não há como separar.'
+    : (Number(f.anoFim) > c.ultimoPublicado ? ` PRODES publicado até ${c.ultimoPublicado}.` : '')
+  const resumo = `<p class="pfd-cob-resumo">Até ${c.anoRef}, <strong>${p(c.pctDesmatado)}%</strong> da área (${n(c.desmatado)} ha)
+    já foi desmatada; restam <strong>${p(c.pctResta)}%</strong> de floresta (${n(c.resta)} ha), de ${n(c.area)} ha no total.${esc(avisoAno)}</p>`
+  return `<div class="pfd-card"><h3>Área desmatada × floresta que resta — ${esc(onde)}</h3>
+      <p class="pfd-sub">Situação acumulada até ${c.anoRef} (PRODES/INPE). Não depende do "De": o que resta é saldo, não soma do período.</p>
+      ${resumo}
+      ${pfdRoscaHTML(itens, { unidade: 'ha', rotulo: 'Área desmatada e floresta que resta', centro: { valor: p(c.pctDesmatado) + '%', rotulo: 'desmatado' } })}</div>
+    <div class="pfd-card"><h3>Como chegou até aqui — ${esc(onde)}</h3>
+      <p class="pfd-sub">Área total dividida ano a ano, de 2007 a ${c.anoRef}. Faixa de baixo = já desmatado; de cima = floresta que resta.</p>
+      ${pfdEmpilhadaHTML(pontos, camadas, { total: c.area, unidade: 'ha', rotulo: 'Desmatado acumulado e floresta que resta por ano' })}</div>`
 }
 
 function _pfdBdqPrimeiro() {
