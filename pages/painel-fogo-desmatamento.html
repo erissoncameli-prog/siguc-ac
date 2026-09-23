@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>SIGUC-AC · Painel de Fogo e Desmatamento</title>
+<link rel="stylesheet" href="../css/global.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../js/observability.js"></script>
+<script src="../js/queryLogger.js"></script>
+<script src="../js/config.js"></script>
+<script src="../js/layout.js"></script>
+<script src="../js/grafico-teclado.js"></script>
+<script src="../js/painel-fogo-desmatamento.js"></script>
+<style>
+.pfd { display:flex; flex-direction:column; gap:16px; }
+.pfd-intro { font-size:13px; color:var(--cinza-500); margin:0; max-width:900px; line-height:1.5; }
+
+/* ── filtros: uma linha acima dos gráficos ── */
+.pfd-filtros { display:flex; flex-wrap:wrap; gap:12px 16px; align-items:flex-end;
+  background:#fff; border:1px solid var(--borda); border-radius:12px; padding:14px 16px; }
+.pfd-campo { display:flex; flex-direction:column; gap:4px; }
+.pfd-campo > span { font-size:11px; font-weight:700; color:var(--cinza-500); text-transform:uppercase; letter-spacing:.04em; }
+.pfd-seg { display:inline-flex; background:var(--cinza-100); border-radius:10px; padding:3px; gap:2px; }
+.pfd-seg button { border:0; background:transparent; font:inherit; font-size:13px; font-weight:600;
+  color:var(--cinza-600); padding:7px 14px; border-radius:8px; cursor:pointer; min-height:32px;
+  display:inline-flex; align-items:center; gap:6px; }
+.pfd-seg button[aria-pressed="true"] { background:#fff; color:#111827; box-shadow:0 1px 3px rgba(0,0,0,.12); }
+.pfd-seg button:focus-visible { outline:3px solid rgba(82,183,136,.55); outline-offset:1px; }
+.pfd-seg .pfd-dot { width:9px; height:9px; }
+.pfd-filtros select.form-control { min-width:120px; height:38px; }
+#pfd-local { min-width:280px; }
+.pfd-filtros .btn { height:38px; }
+.pfd-filtros > * { min-width:0; }
+@media (max-width: 640px) {
+  .pfd-seg { display:flex; flex-wrap:wrap; width:100%; }
+  .pfd-seg button { flex:1 1 auto; justify-content:center; }
+  .pfd-campo { flex:1 1 130px; }
+  #pfd-local, .pfd-filtros select.form-control { min-width:0; width:100%; }
+  .pfd-campo:has(#pfd-local) { flex-basis:100%; }
+  .pfd-kpis { grid-template-columns:repeat(2, minmax(0,1fr)); }
+  .pfd-kpi-val { font-size:22px; }
+}
+
+/* ── KPIs (número em DM Sans, nunca Fraunces — regra do sistema) ── */
+.pfd-kpis { display:grid; grid-template-columns:repeat(auto-fit, minmax(190px, 1fr)); gap:12px; }
+.pfd-kpi { background:#fff; border:1px solid var(--borda); border-radius:12px; padding:14px 16px; border-top:3px solid var(--cinza-300); }
+.pfd-kpi.fogo { border-top-color:#EA580C; }
+.pfd-kpi.desm { border-top-color:#166534; }
+.pfd-kpi-val { font-family:var(--font-sans, 'DM Sans', sans-serif); font-size:26px; font-weight:800; color:#111827; line-height:1.1; }
+.pfd-kpi-val small { font-size:13px; font-weight:600; color:var(--cinza-500); }
+.pfd-kpi-lbl { font-size:11px; color:var(--cinza-500); margin-top:4px; text-transform:uppercase; letter-spacing:.04em; font-weight:700; }
+.pfd-kpi-sub { font-size:12px; color:var(--cinza-500); margin-top:4px; }
+
+/* ── cards de gráfico ── */
+.pfd-secao-titulo { display:flex; align-items:center; gap:8px; font-size:14px; font-weight:800; color:#1F2937; margin:4px 0 -4px; }
+.pfd-grade { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:14px; }
+@media (max-width: 1000px) { .pfd-grade { grid-template-columns:minmax(0,1fr); } }
+.pfd-card { background:#fff; border:1px solid var(--borda); border-radius:12px; padding:14px 16px; min-width:0; }
+.pfd-card h3 { font-size:13px; font-weight:800; color:#1F2937; margin:0; }
+.pfd-card .pfd-sub { font-size:12px; color:var(--cinza-500); margin:2px 0 10px; }
+.pfd-vazio { font-size:13px; color:var(--cinza-400); padding:28px 0; text-align:center; margin:0; }
+
+.pfd-dot { display:inline-block; width:10px; height:10px; border-radius:3px; flex-shrink:0; }
+.pfd-rosca { display:flex; align-items:center; gap:18px; flex-wrap:wrap; }
+.pfd-legenda { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:10px; flex:1; min-width:180px; }
+.pfd-legenda li { display:flex; align-items:center; gap:8px; font-size:13px; color:#374151; }
+.pfd-leg-rot { flex:1; }
+.pfd-leg-val { font-weight:700; color:#111827; font-variant-numeric:tabular-nums; }
+.pfd-leg-val small { font-weight:500; color:var(--cinza-500); margin-left:4px; }
+
+.pfd-notas { font-size:12px; color:var(--cinza-600); background:var(--cinza-50); border:1px solid var(--borda);
+  border-radius:10px; padding:12px 14px; line-height:1.55; }
+.pfd-notas ul { margin:6px 0 0; padding-left:18px; }
+.pfd-aviso { font-size:12px; color:#92400E; background:#FFFBEB; border:1px solid #FDE68A; border-radius:8px; padding:8px 12px; }
+[hidden] { display:none !important; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+const PFD_ANO_MIN = 2001
+const PFD_ANO_ATUAL = new Date().getFullYear()
+const _pfd = { dados: null, f: { tipo: 'ambos', escopo: '', anoIni: 2008, anoFim: PFD_ANO_ATUAL } }
+
+async function init() {
+  await carregarUsuario()
+  document.getElementById('app').innerHTML =
+    gerarLayout('Painel de Fogo e Desmatamento', 'painel-fogo-desmatamento') +
+    `<div class="fade-in pfd">
+      <p class="pfd-intro">Histórico de focos de calor (satélites MODIS e VIIRS S-NPP, temporada de fogo)
+      e de desmatamento (PRODES/INPE) no Acre, por Unidade de Conservação.</p>
+      <div class="pfd-filtros" id="pfd-filtros" role="group" aria-label="Filtros do painel">${pfdFiltrosHTML([])}</div>
+      <div id="pfd-conteudo">${skeletonBlocoHTML(6)}</div>
+    </div></div></div>`
+  try {
+    _pfd.dados = await pfdCarregar()
+    document.getElementById('pfd-filtros').innerHTML = pfdFiltrosHTML(_pfd.dados.ucs)
+    pfdRender()
+  } catch (e) {
+    console.error(e)
+    document.getElementById('pfd-conteudo').innerHTML =
+      `<p class="pfd-aviso">Não foi possível carregar os dados do painel. Tente recarregar a página.</p>`
+  }
+  _sigucBarCompleta()
+}
+
+// PostgREST devolve no máximo 1.000 linhas por chamada: pagina até o fim.
+async function _pfdTudo(montar) {
+  const out = []
+  for (let de = 0; ; de += 1000) {
+    const { data, error } = await montar().range(de, de + 999)
+    if (error) throw error
+    out.push(...(data || []))
+    if (!data || data.length < 1000) return out
+  }
+}
+
+async function pfdCarregar() {
+  const [ucs, focosUcMes, focosResumo, prodesAno, prodesUcAno] = await Promise.all([
+    _pfdTudo(() => db.from('unidades_conservacao').select('id,nome,sigla,categoria,grupo').eq('ativo', true).order('nome')),
+    _pfdTudo(() => db.from('focos_uc_mes').select('ano,mes,uc_id,focos,origem').order('ano')),
+    _pfdTudo(() => db.from('focos_resumo_ano').select('ano,focos,origem,periodo_ini,periodo_fim').order('ano')),
+    _pfdTudo(() => db.from('prodes_resumo_ano').select('ano,poligonos,area_ha').order('ano')),
+    _pfdTudo(() => db.from('prodes_uc_ano').select('ano,uc_id,poligonos,area_ha').order('ano')),
+  ])
+  return { ucs, focosUcMes, focosResumo, prodesAno, prodesUcAno }
+}
+
+function pfdFiltrosHTML(ucs) {
+  const f = _pfd.f
+  const seg = (v, rot, cor) => `<button type="button" aria-pressed="${f.tipo === v}" onclick="pfdSetTipo('${v}')">${cor ? `<span class="pfd-dot" style="background:${cor}"></span>` : ''}${rot}</button>`
+  const grupos = { protecao_integral: 'Proteção Integral', uso_sustentavel: 'Uso Sustentável' }
+  const porGrupo = {}
+  for (const u of ucs) (porGrupo[u.grupo] = porGrupo[u.grupo] || []).push(u)
+  const optsUC = Object.keys(porGrupo).sort().map(g => `<optgroup label="${esc(grupos[g] || g || 'Outras')}">${
+    porGrupo[g].map(u => `<option value="${u.id}" ${f.escopo === u.id ? 'selected' : ''}>${esc(u.nome)}</option>`).join('')}</optgroup>`).join('')
+  const anos = []
+  for (let a = PFD_ANO_ATUAL; a >= PFD_ANO_MIN; a--) anos.push(a)
+  const optAno = sel => anos.map(a => `<option value="${a}" ${a === sel ? 'selected' : ''}>${a}</option>`).join('')
+  return `
+  <div class="pfd-campo"><span id="pfd-lbl-tipo">Mostrar</span>
+    <div class="pfd-seg" role="group" aria-labelledby="pfd-lbl-tipo">
+      ${seg('ambos', 'Fogo e desmatamento')}${seg('queimada', 'Só queimadas', PFD_COR.queimada)}${seg('desmatamento', 'Só desmatamento', PFD_COR.desmatamento)}
+    </div></div>
+  <label class="pfd-campo"><span>Local</span>
+    <select class="form-control" id="pfd-local" onchange="pfdSetFiltro('escopo', this.value)">
+      <option value="" ${!f.escopo ? 'selected' : ''}>Acre todo</option>
+      <option value="ucs" ${f.escopo === 'ucs' ? 'selected' : ''}>Todas as Unidades de Conservação</option>
+      ${optsUC}
+    </select></label>
+  <label class="pfd-campo"><span>De</span>
+    <select class="form-control" id="pfd-ini" onchange="pfdSetFiltro('anoIni', +this.value)">${optAno(f.anoIni)}</select></label>
+  <label class="pfd-campo"><span>Até</span>
+    <select class="form-control" id="pfd-fim" onchange="pfdSetFiltro('anoFim', +this.value)">${optAno(f.anoFim)}</select></label>
+  <button type="button" class="btn btn-secondary" onclick="pfdLimpar()">Limpar filtros</button>`
+}
+
+function pfdSetTipo(t) {
+  _pfd.f.tipo = t
+  document.querySelectorAll('.pfd-seg button').forEach(b =>
+    b.setAttribute('aria-pressed', String(b.getAttribute('onclick').includes(`'${t}'`))))
+  pfdRender()
+}
+function pfdSetFiltro(campo, valor) {
+  _pfd.f[campo] = valor
+  // Período invertido é corrigido, nunca vira tela vazia sem explicação.
+  if (_pfd.f.anoIni > _pfd.f.anoFim) {
+    if (campo === 'anoIni') _pfd.f.anoFim = _pfd.f.anoIni
+    else _pfd.f.anoIni = _pfd.f.anoFim
+    document.getElementById('pfd-ini').value = _pfd.f.anoIni
+    document.getElementById('pfd-fim').value = _pfd.f.anoFim
+  }
+  pfdRender()
+}
+function pfdLimpar() {
+  _pfd.f = { tipo: 'ambos', escopo: '', anoIni: 2008, anoFim: PFD_ANO_ATUAL }
+  document.getElementById('pfd-filtros').innerHTML = pfdFiltrosHTML(_pfd.dados.ucs)
+  pfdRender()
+}
+
+function _pfdNomeEscopo() {
+  const e = _pfd.f.escopo
+  if (!e) return 'Acre todo'
+  if (e === 'ucs') return 'todas as UCs'
+  return _pfd.dados.ucs.find(u => u.id === e)?.nome || 'UC'
+}
+
+function pfdRender() {
+  const d = _pfd.dados, f = _pfd.f
+  const mostraFogo = f.tipo !== 'desmatamento', mostraDesm = f.tipo !== 'queimada'
+  const k = pfdKpis(d, f)
+  const onde = _pfdNomeEscopo()
+  const periodo = f.anoIni === f.anoFim ? String(f.anoIni) : `${f.anoIni} a ${f.anoFim}`
+  const n = v => v == null ? '—' : Number(v).toLocaleString('pt-BR', { maximumFractionDigits: 0 })
+
+  const kpis = []
+  if (mostraFogo) {
+    kpis.push(`<div class="pfd-kpi fogo"><div class="pfd-kpi-val">${n(k.focos)}</div><div class="pfd-kpi-lbl">Focos de calor</div>
+      <div class="pfd-kpi-sub">${k.anosFoco} temporada(s) com registro${k.anoParcial ? ` · ${k.anoParcial} parcial` : ''}</div></div>`)
+    kpis.push(`<div class="pfd-kpi fogo"><div class="pfd-kpi-val">${k.anoPicoFoco ? k.anoPicoFoco.ano : '—'}</div><div class="pfd-kpi-lbl">Ano com mais focos</div>
+      <div class="pfd-kpi-sub">${k.anoPicoFoco ? n(k.anoPicoFoco.n) + ' focos' : 'sem registro no período'}</div></div>`)
+  }
+  if (mostraDesm) {
+    kpis.push(`<div class="pfd-kpi desm"><div class="pfd-kpi-val">${n(k.areaHa)} <small>ha</small></div><div class="pfd-kpi-lbl">Área desmatada</div>
+      <div class="pfd-kpi-sub">${k.anosDesm} ano(s) PRODES no período</div></div>`)
+    kpis.push(`<div class="pfd-kpi desm"><div class="pfd-kpi-val">${n(k.poligonos)}</div><div class="pfd-kpi-lbl">Polígonos de desmatamento</div>
+      <div class="pfd-kpi-sub">${k.anoPicoDesm ? `pico em ${k.anoPicoDesm.ano}: ${n(k.anoPicoDesm.ha)} ha` : 'sem registro no período'}</div></div>`)
+  }
+
+  const avisos = []
+  if (mostraFogo && k.anosSemFoco.length) avisos.push(`Sem registro de focos no sistema para: ${pfdFaixasAnos(k.anosSemFoco)}.`)
+  if (mostraDesm && k.anosSemDesm.length) avisos.push(`PRODES ainda não publicado pelo INPE (ou anterior a 2008) para: ${pfdFaixasAnos(k.anosSemDesm)}.`)
+
+  const destaque = f.escopo && f.escopo !== 'ucs' ? f.escopo : null
+  let html = `<div class="pfd-kpis">${kpis.join('')}</div>`
+  if (avisos.length) html += `<p class="pfd-aviso">${avisos.map(esc).join(' ')}</p>`
+
+  if (mostraFogo) {
+    const serie = pfdFocosPorAno(d, f).map(p => ({ rotulo: String(p.ano), valor: p.n, parcial: p.parcial }))
+    const meses = pfdFocosPorMes(d, f).map(p => ({ rotulo: PFD_MESES[p.mes], rotuloLongo: PFD_MESES[p.mes] + ' (' + periodo + ')', valor: p.n }))
+    html += `<h2 class="pfd-secao-titulo"><span class="pfd-dot" style="background:${PFD_COR.queimada}"></span>Queimadas — ${esc(onde)}, ${esc(periodo)}</h2>
+    <div class="pfd-grade">
+      <div class="pfd-card"><h3>Focos de calor por ano</h3><p class="pfd-sub">Temporada de fogo (1º/jul a 4/nov). Ponto vazado = ano em curso, ainda parcial.</p>
+        ${pfdLinhaHTML(serie, { cor: PFD_COR.queimada, unidade: 'focos', rotulo: 'Focos de calor por ano' })}</div>
+      <div class="pfd-card"><h3>Focos por mês da temporada</h3><p class="pfd-sub">Soma de todos os anos do período.</p>
+        ${pfdBarrasHTML(meses, { cor: PFD_COR.queimada, unidade: 'focos', rotulo: 'Focos por mês da temporada' })}</div>
+      <div class="pfd-card"><h3>${destaque ? 'Focos nesta UC × restante do Acre' : 'Focos dentro × fora de UCs'}</h3><p class="pfd-sub">Total do Acre no período.</p>
+        ${pfdRoscaHTML(pfdDentroFora(d, f, 'queimada'), { unidade: 'focos', rotulo: 'Focos dentro e fora de UCs' })}</div>
+      <div class="pfd-card"><h3>UCs com mais focos</h3><p class="pfd-sub">10 maiores no período${destaque ? ' · UC escolhida em destaque' : ''}.</p>
+        ${pfdRankingHTML(pfdRankingUC(d, f, 'queimada'), { cor: PFD_COR.queimada, unidade: 'focos', rotulo: 'UCs com mais focos', destaque })}</div>
+    </div>`
+  }
+  if (mostraDesm) {
+    const desm = pfdDesmatPorAno(d, f)
+    const barras = desm.map(p => ({ rotulo: String(p.ano), valor: p.ha }))
+    const acum = pfdAcumulado(desm, 'ha').map(p => ({ rotulo: String(p.ano), valor: p.acumulado }))
+    html += `<h2 class="pfd-secao-titulo"><span class="pfd-dot" style="background:${PFD_COR.desmatamento}"></span>Desmatamento — ${esc(onde)}, ${esc(periodo)}</h2>
+    <div class="pfd-grade">
+      <div class="pfd-card"><h3>Área desmatada por ano</h3><p class="pfd-sub">PRODES/INPE, em hectares (ano-PRODES: ago do ano anterior a jul).</p>
+        ${pfdBarrasHTML(barras, { cor: PFD_COR.desmatamento, unidade: 'ha', rotulo: 'Área desmatada por ano' })}</div>
+      <div class="pfd-card"><h3>Desmatamento acumulado</h3><p class="pfd-sub">Soma da área desmatada desde ${f.anoIni}, em hectares.</p>
+        ${pfdAreaHTML(acum, { cor: PFD_COR.desmatamento, unidade: 'ha acumulados', rotulo: 'Desmatamento acumulado' })}</div>
+      <div class="pfd-card"><h3>${destaque ? 'Área nesta UC × restante do Acre' : 'Área dentro × fora de UCs'}</h3><p class="pfd-sub">Total do Acre no período, em hectares.</p>
+        ${pfdRoscaHTML(pfdDentroFora(d, f, 'desmatamento'), { unidade: 'ha', rotulo: 'Área desmatada dentro e fora de UCs' })}</div>
+      <div class="pfd-card"><h3>UCs com mais área desmatada</h3><p class="pfd-sub">10 maiores no período, em hectares${destaque ? ' · UC escolhida em destaque' : ''}.</p>
+        ${pfdRankingHTML(pfdRankingUC(d, f, 'desmatamento'), { cor: PFD_COR.desmatamento, unidade: 'ha', rotulo: 'UCs com mais área desmatada', destaque })}</div>
+    </div>`
+  }
+
+  html += `<div class="pfd-notas"><strong>Sobre os dados</strong><ul>
+    <li><strong>Focos de calor</strong>: satélites MODIS (Terra/Aqua) e VIIRS S-NPP, só dentro do Acre, na temporada de fogo
+      (1º/jul a 4/nov) — a mesma janela em todos os anos, para a comparação ser justa. Até ${_pfdUltimaSerie()} vêm do
+      arquivo definitivo do FIRMS/NASA; o ano em curso vem do registro diário e é parcial.</li>
+    <li><strong>Desmatamento</strong>: PRODES/INPE, disponível a partir de 2008. O total do Acre é o número oficial do
+      INPE; a área por UC é o cruzamento dos polígonos do PRODES com o limite de cada UC, calculado no sistema.</li>
+    <li>Fogo e desmatamento têm janelas de tempo diferentes (temporada de fogo × ano-PRODES) e unidades diferentes
+      (focos × hectares) — por isso nunca aparecem somados no mesmo gráfico.</li>
+  </ul></div>`
+
+  document.getElementById('pfd-conteudo').innerHTML = html
+}
+
+function _pfdUltimaSerie() {
+  const s = (_pfd.dados.focosResumo || []).filter(r => r.origem === 'serie_historica').map(r => r.ano)
+  return s.length ? Math.max(...s) : '—'
+}
+
+init()
+</script>
+</body>
+</html>
