@@ -428,8 +428,19 @@ body { background:var(--cinza-50) }
   // um texto fixo no lugar do número de protocolo.
   const PROTOCOLO_PUBLICO = 'Acesso público — não protocolado'
 
+  // Recorte de campanha no nome do arquivo — mesmo achado de
+  // pages/agua-relatorios.html: sem isso, um export "Acre todo" com o
+  // período inteiro e outro com só 2026 saíam com o MESMO nome de
+  // arquivo, fácil de confundir no Downloads com o recorte errado.
+  function periodoSlug(rel) {
+    if (!rel || !rel.campanhas.length) return 'sem-periodo'
+    const s = c => `${c.campanha_ano}-${c.campanha_ordem === 'primeira' ? '1a' : '2a'}`
+    const ini = s(rel.campanhas[0]), fim = s(rel.campanhas[rel.campanhas.length - 1])
+    return ini === fim ? ini : `${ini}-a-${fim}`
+  }
+
   function nomeArquivo() {
-    return `qualidade-agua-${labelBaciaExportacao()}`.toLowerCase()
+    return `qualidade-agua-${labelBaciaExportacao()}-${periodoSlug(_relatorioAtual)}`.toLowerCase()
       .normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^\w-]+/g, '-')
   }
 

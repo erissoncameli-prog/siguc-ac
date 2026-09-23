@@ -372,8 +372,20 @@
     return { cab, protocolo }
   }
 
+  // Recorte de campanha no nome do arquivo — achado real: sem isso, um
+  // export "Acre todo" com o período inteiro e outro com só 2026 saíam
+  // com o MESMO nome de arquivo (qualidade-agua-acre-todas-as-bacias.pdf),
+  // já que nomeArquivo() só codificava a bacia. Fácil abrir o arquivo
+  // errado do Downloads achando que é o recorte mais recente.
+  function periodoSlug(rel) {
+    if (!rel || !rel.campanhas.length) return 'sem-periodo'
+    const s = c => `${c.campanha_ano}-${c.campanha_ordem === 'primeira' ? '1a' : '2a'}`
+    const ini = s(rel.campanhas[0]), fim = s(rel.campanhas[rel.campanhas.length - 1])
+    return ini === fim ? ini : `${ini}-a-${fim}`
+  }
+
   function nomeArquivo() {
-    return `qualidade-agua-${labelBaciaExportacao()}`.toLowerCase()
+    return `qualidade-agua-${labelBaciaExportacao()}-${periodoSlug(_relatorioAtual)}`.toLowerCase()
       .normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^\w-]+/g, '-')
   }
 
