@@ -529,9 +529,35 @@ são do Acre.
   `(ano)::integer = N`, seq scan de 953 mil linhas, 3,9 s por clique).
   A coluna fica `smallint`, e o ramo do FIRMS é que converte (340b);
   índice parcial `(ano) WHERE dentro_acre` (340c) levou 2024 a 40 ms.
-- ⚠️ **Vão pendente**: nenhuma tabela tem focos de 2025 nem de
-  jan–jun/2026 (a série para em 2024; o diário começou em 03/07/2026).
-  A tela diz isso; fechar exige nova carga do arquivo FIRMS.
+- **A série é da TEMPORADA DE FOGO (1º/jul a 4/nov), nunca do ano
+  inteiro** — sempre foi (`MESES_FOGO` do script de importação). Jan–jun
+  não é "vão": nenhum ano da série tem. O diário é recortado na mesma
+  janela na view (341), senão o ano corrente contaria nov/dez e deixaria
+  de ser comparável.
+- **Série completada pelo próprio banco** (migrations 341/341b): o FIRMS
+  responde via pg_net (o proxy das sessões de desenvolvimento bloqueia;
+  o banco não). `focos_serie_verificar` → `focos_serie_solicitar` →
+  `focos_serie_coletar`, mesmos produtos (MODIS_SP + VIIRS_SNPP_SP),
+  mesmas 27 janelas de 5 dias, mesma chave única — reimportar é
+  idempotente. Validado antes de gravar: a janela 11–15/08/2024
+  reimportada casou 1.214/1.214 (MODIS) e 4.230/4.230 (VIIRS) com a
+  série. 2025 entrou assim: 22.098 focos no bbox, 14.527 no Acre.
+  **Ano PARCIAL nunca entra** — solicitar só enfileira quando o SP cobre
+  até 4/nov (o SP sai ~3 meses atrasado); senão `max(ano)` avançaria com
+  meia temporada e o ano nunca seria completado. pg_cron mensal (dia 5):
+  a temporada de 2026 entra sozinha quando o SP a cobrir (~fev/2027) e
+  passa do diário para a série sem mexer em nada.
+- ⚠️ `focos_calor_ac.geom` é coluna GERADA (migration 292, aplicada em
+  produção mas AUSENTE do repositório) — INSERT que a inclua falha com
+  428C9 (341b). O mesmo drift vale para `dentro_acre`/`uc_id`: foram
+  criadas pela 292 fora do controle de versão.
+- ⚠️ `focos_serie_coletar()` das 54 janelas leva ~90 s (classificação de
+  UC por ponto): passa do timeout de 60 s do `execute_sql` do MCP, mas
+  continua e COMMITA no banco — conferir por `pg_stat_activity`, não
+  rodar de novo por cima.
+- Chave do FIRMS está no código (`_focos_firms_chave()`, igual à de
+  `ingest-focos` e do script) e está pública no repositório —
+  recomendado rotacionar; ao trocar, trocar nos três lugares.
 
 Painel-resumo (`abrirResumoAlertas`, pages/mapa.html): abre junto com a
 camada, gráficos em SVG à mão (o projeto não tem lib de gráfico; padrão

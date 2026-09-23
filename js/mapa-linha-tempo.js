@@ -13,9 +13,12 @@
 // Funções puras (sem Leaflet, sem Supabase) — testadas em
 // tests/mapa-linha-tempo.test.js.
 
+// A série é da TEMPORADA DE FOGO (1º/jul a 4/nov), não do ano inteiro —
+// sempre foi (scripts/importar_focos_calor.py, MESES_FOGO), e o diário
+// é recortado na mesma janela (migration 341) para os anos baterem.
 const TL_ORIGEM_ROTULO = {
-  serie_historica: 'série histórica (MODIS + VIIRS S-NPP)',
-  firms_diario:    'registro diário FIRMS (MODIS + VIIRS S-NPP)',
+  serie_historica: 'temporada de fogo · MODIS + VIIRS S-NPP',
+  firms_diario:    'temporada de fogo · registro diário FIRMS, MODIS + VIIRS S-NPP',
 }
 
 function _tlFmtDataCurta(iso) {
