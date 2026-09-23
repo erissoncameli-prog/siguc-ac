@@ -499,8 +499,65 @@ desligada, cai para TODAS as UCs — "dentro de UC" é fato geográfico, e
 conjunto vazio faria o filtro limpar o mapa sem explicação.
 
 `focos_calor_ac` (953 mil linhas, série histórica 2001-2024) NÃO foi
-limpa — apagar ~30% de um arquivo histórico é irreversível. A linha do
-tempo recorta esses pontos no cliente (`_tlRenderAno`).
+limpa — apagar ~30% de um arquivo histórico é irreversível. A coluna
+`dentro_acre` dela bate 100% com `geo_ponto_no_acre()` (conferido em
+2024: 47.805 × 47.805), e é por ela que a linha do tempo filtra.
+
+## Regra do sistema — linha do tempo do mapa lê o banco, nunca constante
+Migrations 340/340b/340c. O slider do modo "Anos" (`pages/mapa.html`)
+vai até o ano corrente, mas os totais eram constantes no código
+(`TL_FOCOS_ANO`/`TL_PRODES_ANO`) paradas em 2024: 2025 e 2026 apareciam
+"—" sem explicação. E o total de focos contava a linha BRUTA da série,
+com o bbox da importação — 2024 mostrava 96.749, dos quais só 47.805
+são do Acre.
+- **Foco da linha do tempo = `vw_focos_linha_tempo`**, definição única:
+  série histórica (`dentro_acre`) + FIRMS diário (`focos_calor`) nos
+  anos que a série não cobre. Do diário entram só os MESMOS sensores da
+  série (VIIRS S-NPP `'N'` + MODIS Terra/Aqua) — NOAA-20 e BDQueimadas
+  ficam fora, senão o ano recente pareceria pior só por ter mais
+  satélite (ou a mesma detecção contada duas vezes).
+- Totais em `focos_resumo_ano` (pg_cron diário 09:45 UTC, depois do
+  `ingest-focos`) e `prodes_resumo_ano` (WFS do TerraBrasilis, mesma
+  camada que a tela desenha; pg_net em 2 passos — `prodes_resumo_solicitar`
+  dom 10:00 → `prodes_resumo_coletar` dom 10:20 UTC). Conferido: os 18
+  anos 2008–2025 do WFS batem com as constantes antigas. **Ano ainda
+  não publicado pelo INPE nunca grava zero** — fica sem linha.
+- Texto do painel em `js/mapa-linha-tempo.js` (`tlDescreverAno`): ano
+  corrente sai como PARCIAL com o período; ano sem dado DIZ que não há
+  dado, nunca "—" mudo. Guarda: `tests/mapa-linha-tempo.test.js`.
+- ⚠️ **`h.ano::int` na view desligava o índice** (filtro virava
+  `(ano)::integer = N`, seq scan de 953 mil linhas, 3,9 s por clique).
+  A coluna fica `smallint`, e o ramo do FIRMS é que converte (340b);
+  índice parcial `(ano) WHERE dentro_acre` (340c) levou 2024 a 40 ms.
+- **A série é da TEMPORADA DE FOGO (1º/jul a 4/nov), nunca do ano
+  inteiro** — sempre foi (`MESES_FOGO` do script de importação). Jan–jun
+  não é "vão": nenhum ano da série tem. O diário é recortado na mesma
+  janela na view (341), senão o ano corrente contaria nov/dez e deixaria
+  de ser comparável.
+- **Série completada pelo próprio banco** (migrations 341/341b): o FIRMS
+  responde via pg_net (o proxy das sessões de desenvolvimento bloqueia;
+  o banco não). `focos_serie_verificar` → `focos_serie_solicitar` →
+  `focos_serie_coletar`, mesmos produtos (MODIS_SP + VIIRS_SNPP_SP),
+  mesmas 27 janelas de 5 dias, mesma chave única — reimportar é
+  idempotente. Validado antes de gravar: a janela 11–15/08/2024
+  reimportada casou 1.214/1.214 (MODIS) e 4.230/4.230 (VIIRS) com a
+  série. 2025 entrou assim: 22.098 focos no bbox, 14.527 no Acre.
+  **Ano PARCIAL nunca entra** — solicitar só enfileira quando o SP cobre
+  até 4/nov (o SP sai ~3 meses atrasado); senão `max(ano)` avançaria com
+  meia temporada e o ano nunca seria completado. pg_cron mensal (dia 5):
+  a temporada de 2026 entra sozinha quando o SP a cobrir (~fev/2027) e
+  passa do diário para a série sem mexer em nada.
+- ⚠️ `focos_calor_ac.geom` é coluna GERADA (migration 292, aplicada em
+  produção mas AUSENTE do repositório) — INSERT que a inclua falha com
+  428C9 (341b). O mesmo drift vale para `dentro_acre`/`uc_id`: foram
+  criadas pela 292 fora do controle de versão.
+- ⚠️ `focos_serie_coletar()` das 54 janelas leva ~90 s (classificação de
+  UC por ponto): passa do timeout de 60 s do `execute_sql` do MCP, mas
+  continua e COMMITA no banco — conferir por `pg_stat_activity`, não
+  rodar de novo por cima.
+- Chave do FIRMS está no código (`_focos_firms_chave()`, igual à de
+  `ingest-focos` e do script) e está pública no repositório —
+  recomendado rotacionar; ao trocar, trocar nos três lugares.
 
 Painel-resumo (`abrirResumoAlertas`, pages/mapa.html): abre junto com a
 camada, gráficos em SVG à mão (o projeto não tem lib de gráfico; padrão

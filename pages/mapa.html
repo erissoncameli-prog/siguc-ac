@@ -477,6 +477,7 @@ body.mapa-imersivo .malerta-panel.aberto{transform:none;}
 <!-- Recorte geográfico (limite do Acre + ponto-em-UC): helper único,
      compartilhado com pages/alertas-ambientais.html. Ver js/mapa-recorte.js. -->
 <script src="../js/mapa-recorte.js"></script>
+<script src="../js/mapa-linha-tempo.js"></script>
 <script src="../js/grafico-teclado.js"></script>
 <script src="../js/rh-hidro.js"></script>
 </head>
@@ -4058,9 +4059,23 @@ let _tlAnoAtual = null         // ano selecionado no modo Anos
 const _tlMesSel = {}           // mês escolhido por ano (name do mosaico Planet)
 const _tlFocosCacheAno = {}
 
-// Estatísticas oficiais por ano (Acre) — focos: focos_calor_ac; desmatamento: PRODES yearly (≥2008)
-const TL_FOCOS_ANO = {2001:1673,2002:10928,2003:17926,2004:11025,2005:35072,2006:12094,2007:14946,2008:10246,2009:5937,2010:16837,2011:5020,2012:39242,2013:35042,2014:32461,2015:49076,2016:68075,2017:48140,2018:56425,2019:62284,2020:71645,2021:85616,2022:102470,2023:64387,2024:96749}
-const TL_PRODES_ANO = {2008:{n:2701,ha:28873},2009:{n:1725,ha:16162},2010:{n:2671,ha:26537},2011:{n:3049,ha:29579},2012:{n:2573,ha:27054},2013:{n:2265,ha:20024},2014:{n:3759,ha:34859},2015:{n:2100,ha:22300},2016:{n:4655,ha:36631},2017:{n:2224,ha:24573},2018:{n:4558,ha:42659},2019:{n:5842,ha:70694},2020:{n:5510,ha:66081},2021:{n:6934,ha:89243},2022:{n:10643,ha:100586},2023:{n:5877,ha:46295},2024:{n:5699,ha:41135}}
+// Totais por ano (Acre) — vêm do banco (migration 340), nunca de
+// constante no código: as antigas TL_FOCOS_ANO/TL_PRODES_ANO pararam em
+// 2024 e deixavam 2025/2026 vazios. Ver js/mapa-linha-tempo.js.
+let _tlResumo = null   // { focos: {ano: linha}, prodes: {ano: linha} }
+async function _tlCarregarResumo() {
+  if (_tlResumo) return _tlResumo
+  const [f, p] = await Promise.all([
+    db.from('focos_resumo_ano').select('ano,focos,origem,periodo_ini,periodo_fim'),
+    db.from('prodes_resumo_ano').select('ano,poligonos,area_ha'),
+  ])
+  if (f.error) console.warn('[linha do tempo] focos_resumo_ano:', f.error.message)
+  if (p.error) console.warn('[linha do tempo] prodes_resumo_ano:', p.error.message)
+  const r = { focos: tlIndexarPorAno(f.data), prodes: tlIndexarPorAno(p.data) }
+  // Só cacheia o que deu certo — falha de rede tenta de novo no próximo ano.
+  if (!f.error && !p.error) _tlResumo = r
+  return r
+}
 
 function toggleTimeline() {
   _tlAberta = !_tlAberta
@@ -4303,27 +4318,30 @@ function _tlPlotDeter(dia) {
 async function _tlRenderAno(ano) {
   const fonteImg = await _tlSetSatelite(ano)
   _tlSetProdes(ano)
+  const resumo = await _tlCarregarResumo()
+  const rf = resumo.focos[ano], rp = resumo.prodes[ano]
   let pts = _tlFocosCacheAno[ano]
-  if (!pts && _mostraFocos()) {
-    const { data } = await db.from('focos_calor_ac').select('lat,lon,source,frp,acq_date').eq('ano', ano).limit(1000)
-    // focos_calor_ac é a série histórica 2001-2024, importada por
-    // script com o mesmo bounding box retangular das ingestões — logo,
-    // também tem ponto de AM, RO, Peru e Bolívia. A migration 239 não
-    // mexe nessas 953 mil linhas (arquivo histórico), então o recorte
-    // acontece aqui, na exibição.
+  if (!pts && _mostraFocos() && rf) {
+    // vw_focos_linha_tempo é a definição única de "foco da linha do
+    // tempo" (migration 340): série histórica só dentro_acre + FIRMS
+    // diário nos anos que a série não cobre. O filtro no servidor faz
+    // os 1.000 pontos serem todos do Acre (antes metade vinha de AM/RO/
+    // Peru/Bolívia e sumia no recorte do cliente). O recorte aqui
+    // continua como segunda camada, barato.
+    const { data } = await db.from('vw_focos_linha_tempo').select('lat,lon,source,frp,acq_date').eq('ano', ano).limit(1000)
     await geoAcreCarregar()
     pts = (data || []).filter(p => geoNoAcre(Number(p.lat), Number(p.lon)))
     _tlFocosCacheAno[ano] = pts
   }
-  if (!_tlAberta || _tlModo !== 'anos') return
+  if (!_tlAberta || _tlModo !== 'anos' || _tlAnoAtual !== ano) return
   _tlPlotFocos((pts || []).map(p => ({
     lat: p.lat, lon: p.lon, frp: p.frp, satelite: p.source, data_hora: p.acq_date,
     cor: (p.source || '').includes('VIIRS') ? '#7c3aed' : '#ea580c'
   })))
-  const pr = TL_PRODES_ANO[ano]
-  _tlPainel(pr ? pr.n : null, pr ? pr.ha : null, TL_FOCOS_ANO[ano] ?? null)
+  const d = tlDescreverAno(ano, rf, rp)
+  _tlPainel(d.desmatN, d.areaHa, d.focosN)
   const st = document.getElementById('tl-stat')
-  if (st) st.textContent = (pr ? `` : `PRODES anual disponível a partir de 2008 · `)
+  if (st) st.textContent = d.avisos.join(' · ') + ' · '
     + (fonteImg === 'planet'   ? `Imagem Planet/NICFI ~4,7 m — dê zoom para ver detalhes da cobertura`
      : fonteImg === 'sentinel' ? `Imagem Sentinel-2 10 m (composição da época seca) — dê zoom para ver detalhes`
      :                           `Satélite NASA/MODIS 250 m (alta resolução disponível a partir de ${TL_S2_ANO_MIN})`)
