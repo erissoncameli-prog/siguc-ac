@@ -499,8 +499,39 @@ desligada, cai para TODAS as UCs — "dentro de UC" é fato geográfico, e
 conjunto vazio faria o filtro limpar o mapa sem explicação.
 
 `focos_calor_ac` (953 mil linhas, série histórica 2001-2024) NÃO foi
-limpa — apagar ~30% de um arquivo histórico é irreversível. A linha do
-tempo recorta esses pontos no cliente (`_tlRenderAno`).
+limpa — apagar ~30% de um arquivo histórico é irreversível. A coluna
+`dentro_acre` dela bate 100% com `geo_ponto_no_acre()` (conferido em
+2024: 47.805 × 47.805), e é por ela que a linha do tempo filtra.
+
+## Regra do sistema — linha do tempo do mapa lê o banco, nunca constante
+Migrations 340/340b/340c. O slider do modo "Anos" (`pages/mapa.html`)
+vai até o ano corrente, mas os totais eram constantes no código
+(`TL_FOCOS_ANO`/`TL_PRODES_ANO`) paradas em 2024: 2025 e 2026 apareciam
+"—" sem explicação. E o total de focos contava a linha BRUTA da série,
+com o bbox da importação — 2024 mostrava 96.749, dos quais só 47.805
+são do Acre.
+- **Foco da linha do tempo = `vw_focos_linha_tempo`**, definição única:
+  série histórica (`dentro_acre`) + FIRMS diário (`focos_calor`) nos
+  anos que a série não cobre. Do diário entram só os MESMOS sensores da
+  série (VIIRS S-NPP `'N'` + MODIS Terra/Aqua) — NOAA-20 e BDQueimadas
+  ficam fora, senão o ano recente pareceria pior só por ter mais
+  satélite (ou a mesma detecção contada duas vezes).
+- Totais em `focos_resumo_ano` (pg_cron diário 09:45 UTC, depois do
+  `ingest-focos`) e `prodes_resumo_ano` (WFS do TerraBrasilis, mesma
+  camada que a tela desenha; pg_net em 2 passos — `prodes_resumo_solicitar`
+  dom 10:00 → `prodes_resumo_coletar` dom 10:20 UTC). Conferido: os 18
+  anos 2008–2025 do WFS batem com as constantes antigas. **Ano ainda
+  não publicado pelo INPE nunca grava zero** — fica sem linha.
+- Texto do painel em `js/mapa-linha-tempo.js` (`tlDescreverAno`): ano
+  corrente sai como PARCIAL com o período; ano sem dado DIZ que não há
+  dado, nunca "—" mudo. Guarda: `tests/mapa-linha-tempo.test.js`.
+- ⚠️ **`h.ano::int` na view desligava o índice** (filtro virava
+  `(ano)::integer = N`, seq scan de 953 mil linhas, 3,9 s por clique).
+  A coluna fica `smallint`, e o ramo do FIRMS é que converte (340b);
+  índice parcial `(ano) WHERE dentro_acre` (340c) levou 2024 a 40 ms.
+- ⚠️ **Vão pendente**: nenhuma tabela tem focos de 2025 nem de
+  jan–jun/2026 (a série para em 2024; o diário começou em 03/07/2026).
+  A tela diz isso; fechar exige nova carga do arquivo FIRMS.
 
 Painel-resumo (`abrirResumoAlertas`, pages/mapa.html): abre junto com a
 camada, gráficos em SVG à mão (o projeto não tem lib de gráfico; padrão
