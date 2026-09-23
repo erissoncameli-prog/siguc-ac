@@ -241,7 +241,13 @@ body { background:var(--cinza-50) }
 
   let _relatorioAtual = null
   let _labelBaciaAtual = ''
-  let _chipCampanha = null
+  // Todas as campanhas da bacia carregada (não o recorte atual) — só
+  // pra desenhar a fileira de chips de campanha (ver js/agua-painel.js).
+  let _campanhasBaciaAtual = []
+  // `pontoSerie` é só de EXIBIÇÃO. O chip de CAMPANHA não tem estado
+  // próprio: ele É o par Campanha inicial/final da gaveta (rl-de/
+  // rl-ate), lido a cada render em renderPainel() — mesmo padrão de
+  // pages/agua-relatorios.html (par de duplicação obrigatória).
   let _pontoSerie = null
   let _filtrosAbertos = false
 
@@ -279,13 +285,14 @@ body { background:var(--cinza-50) }
   // e rio, exatamente como a tela de mesa faz depois de cada fetch.
   function aplicarBacia() {
     const chave = sel('rl-bacia').value // '' = Acre todo
-    _relatorioAtual = null; _chipCampanha = null; _pontoSerie = null
+    _relatorioAtual = null; _pontoSerie = null
     atualizarBotoes()
     const ehAcreTodo = !chave
     _labelBaciaAtual = ehAcreTodo ? 'Acre (todas as bacias)' : (chave === AGUA_REL_SEM_BACIA ? 'Sem bacia definida' : chave)
     const coletasDaBacia = ehAcreTodo ? _todasColetas : _todasColetas.filter(c => aguaRelChaveBacia(c.ponto_bacia) === chave)
 
     const campanhas = aguaRelCampanhasDe(coletasDaBacia)
+    _campanhasBaciaAtual = campanhas
     const opts = campanhas.map(c => `<option value="${c.campanha_id}">${esc(aguaRelLabelCampanha(c))}</option>`).join('')
     sel('rl-de').innerHTML = opts; sel('rl-ate').innerHTML = opts
     if (campanhas.length) {
@@ -325,8 +332,6 @@ body { background:var(--cinza-50) }
       iqaFaixa: sel('rl-iqa-faixa').value || null,
       conamaStatus: sel('rl-conama').value || null,
     })
-    const ids = new Set(_relatorioAtual.campanhas.map(c => c.campanha_id))
-    if (_chipCampanha && !ids.has(_chipCampanha)) _chipCampanha = null
     if (_pontoSerie && !_relatorioAtual.pontos.some(p => p.ponto_id === _pontoSerie)) _pontoSerie = null
     renderPainel(_relatorioAtual)
     atualizarMapaPainel(_relatorioAtual)
@@ -338,7 +343,18 @@ body { background:var(--cinza-50) }
     sel('rl-iqa-faixa').value = ''; sel('rl-conama').value = ''
     recalcularRelatorio()
   }
-  window.selecionarChipCampanha = function (id) { _chipCampanha = id || null; renderPainel(_relatorioAtual) }
+  // Mesmo mecanismo de pages/agua-relatorios.html: o chip de campanha
+  // seta Campanha inicial = Campanha final e recalcula — nunca um
+  // estado de exibição paralelo, pra tela e exportação nunca divergirem.
+  window.selecionarChipCampanha = function (id) {
+    if (id) {
+      sel('rl-de').value = id; sel('rl-ate').value = id
+    } else if (_campanhasBaciaAtual.length) {
+      sel('rl-de').value = _campanhasBaciaAtual[0].campanha_id
+      sel('rl-ate').value = _campanhasBaciaAtual[_campanhasBaciaAtual.length - 1].campanha_id
+    }
+    recalcularRelatorio()
+  }
   window.selecionarPontoSerie = function (id) { _pontoSerie = id || null; renderPainel(_relatorioAtual) }
 
   function labelBaciaExportacao() {
@@ -362,7 +378,9 @@ body { background:var(--cinza-50) }
   }
 
   function renderPainel(rel) {
-    sel('rl-conteudo').innerHTML = aguaPainelHTML(rel, { chipCampanha: _chipCampanha, pontoSerie: _pontoSerie, baseLegal: _cab?.baseLegal })
+    const de = sel('rl-de').value, ate = sel('rl-ate').value
+    const chipCampanha = (de && de === ate) ? de : null
+    sel('rl-conteudo').innerHTML = aguaPainelHTML(rel, { chipCampanha, pontoSerie: _pontoSerie, campanhasBacia: _campanhasBaciaAtual, baseLegal: _cab?.baseLegal })
     bIconsAplicar(sel('rl-conteudo'))
   }
 

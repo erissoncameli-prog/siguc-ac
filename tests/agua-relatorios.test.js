@@ -800,17 +800,36 @@ test.describe('painel (dashboard) — render com dado real da view', () => {
     await expect(page.locator('.adash-card', { hasText: 'Distribuição por faixa' })).toContainText('Péssima');
   });
 
-  test('chip de campanha recorta só a EXIBIÇÃO da distribuição, sem mexer no relatório exportado', async ({ page }) => {
+  test('chip de campanha recorta o painel INTEIRO — o mesmo recorte que o PDF/PPTX/XLSX exportam', async ({ page }) => {
     await abrirPainelComStub(page, fixtureColetasRioAcre());
     const cardDist = page.locator('.adash-card', { hasText: 'Distribuição por faixa' });
     const rosca = cardDist.locator('[data-total]');
 
     await expect(rosca).toHaveAttribute('data-total', '5'); // período inteiro
+    // KPI do período inteiro: 5 coletas / (78.4+61.2+12.5+82.1+74.0)/5 = 61.6
+    await expect(page.locator('.adash-card-escuro .adash-num')).toHaveText('61.6');
+
     await cardDist.getByRole('button', { name: '2024·1ª' }).click();
     await expect(rosca).toHaveAttribute('data-total', '2'); // só a 1ª campanha de 2024
 
-    // O KPI do período (e portanto o que o PDF exporta) NÃO mudou.
+    // O chip de campanha É Campanha inicial = Campanha final agora — o
+    // MESMO recorte (`_relatorioAtual`) que gerarPdf/gerarPptx/gerarXlsx
+    // exportam. Por isso o KPI do topo (não só a distribuição) muda
+    // junto: (78.4 + 82.1)/2 = 80.3, só Rio Branco e Porto Acre de c1.
+    await expect(page.locator('.adash-card-escuro .adash-num')).toHaveText('80.3');
+    await expect(page.locator('#rl-de')).toHaveValue('c1');
+    await expect(page.locator('#rl-ate')).toHaveValue('c1');
+    // Tabela "Pontos incluídos no relatório" também recortou — é a
+    // mesma lista que os 3 formatos exportam.
+    await expect(page.locator('.adash-tabela-linha')).toHaveCount(2);
+
+    // "Período" restaura o intervalo inteiro da bacia — nunca fica
+    // preso na campanha escolhida.
+    await cardDist.getByRole('button', { name: 'Período' }).click();
+    await expect(rosca).toHaveAttribute('data-total', '5');
     await expect(page.locator('.adash-card-escuro .adash-num')).toHaveText('61.6');
+    await expect(page.locator('#rl-de')).toHaveValue('c1');
+    await expect(page.locator('#rl-ate')).toHaveValue('c3');
   });
 
   test('painel de filtros abre pela pílula e o contador reflete os filtros ativos', async ({ page }) => {

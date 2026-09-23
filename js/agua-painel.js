@@ -31,25 +31,33 @@ function aguaPainelNomeCurto(nome) {
   return n.length > 11 ? n.slice(0, 10) + '…' : n
 }
 
-// `estado`: { chipCampanha, pontoSerie, baseLegal } — chipCampanha/
-// pontoSerie são só exibição (não alteram o recorte do relatório
-// exportado); baseLegal é a lista adicional de atos cadastrada em
-// Configurações (config_sistema.dados.agua.base_legal), sempre
-// mostrada JUNTO da Resolução CONAMA 357/2005 (fixa, ver
-// aguaPainelBaseLegalHTML).
+// `estado`: { chipCampanha, pontoSerie, campanhasBacia, baseLegal }.
+// `chipCampanha` é a campanha única escolhida via chip — quem chama já
+// seta Campanha inicial = Campanha final e remonta `rel` ANTES de
+// montar este estado, então `rel` já vem recortado por ela: chip de
+// campanha ALTERA o recorte exportado (tela e PDF/PPTX/XLSX nunca
+// divergem). `campanhasBacia` é a lista completa de campanhas da bacia
+// carregada (não o recorte atual) — só usada pra desenhar a fileira de
+// chips, senão as outras campanhas sumiriam da lista ao escolher uma.
+// `pontoSerie` continua só de EXIBIÇÃO (escolhe qual ponto o gráfico
+// de evolução traça) — não tira nenhum ponto do relatório exportado,
+// a tabela "Pontos incluídos no relatório" sempre lista todos.
+// `baseLegal` é a lista adicional de atos cadastrada em Configurações
+// (config_sistema.dados.agua.base_legal), sempre mostrada JUNTO da
+// Resolução CONAMA 357/2005 (fixa, ver aguaPainelBaseLegalHTML).
 function aguaPainelHTML(rel, estado) {
   if (!rel) return '<div class="adash-vazio">Carregando painel...</div>'
-  const { chipCampanha, pontoSerie, baseLegal } = estado || {}
+  const { chipCampanha, pontoSerie, campanhasBacia, baseLegal } = estado || {}
   const r = rel.resumo
   const porCampanha = aguaRelPorCampanha(rel)
   const variacao = aguaRelVariacaoIQA(porCampanha)
   const porPonto = aguaRelIqaPorPonto(rel)
   const ranking = aguaRelViolacoesRanking(r, 6)
 
-  // Card de distribuição: mostra o período inteiro ou só a campanha
-  // do chip selecionado.
-  const coletasChip = chipCampanha ? rel.coletas.filter(c => c.campanha_id === chipCampanha) : rel.coletas
-  const dist = aguaRelDistribuicaoFaixas(coletasChip)
+  // `rel` já vem recortado pela campanha do chip quando um está ativo
+  // (ver comentário do estado, acima) — a distribuição lê `rel.coletas`
+  // direto, nunca um segundo filtro por cima do que já foi filtrado.
+  const dist = aguaRelDistribuicaoFaixas(rel.coletas)
   const boasOuMelhor = (dist.contagem['Ótima'] || 0) + (dist.contagem['Boa'] || 0)
   const pctBoas = dist.comIQA ? (boasOuMelhor / dist.comIQA) * 100 : null
 
@@ -89,14 +97,18 @@ function aguaPainelHTML(rel, estado) {
     </div>
   </div>`
 
-  // Coluna 2: distribuição por faixa (rosca), com chips de campanha
+  // Coluna 2: distribuição por faixa (rosca), com chips de campanha.
+  // A lista vem de `campanhasBacia` (TODAS as campanhas da bacia
+  // carregada), não de `porCampanha`/`rel` — que, com o chip ativo, só
+  // teria a própria campanha escolhida.
+  const chipCampanhaAtual = chipCampanha ? (campanhasBacia || []).find(c => c.campanha_id === chipCampanha) : null
   const chips = [`<button type="button" class="adash-chip ${!chipCampanha ? 'ativo' : ''}" onclick="selecionarChipCampanha('')">Período</button>`]
-    .concat(porCampanha.map(c => `<button type="button" class="adash-chip ${chipCampanha === c.campanha_id ? 'ativo' : ''}" onclick="selecionarChipCampanha('${esc(c.campanha_id)}')" title="${esc(c.label)}">${esc(c.labelCurto)}</button>`))
+    .concat((campanhasBacia || []).map(c => `<button type="button" class="adash-chip ${chipCampanha === c.campanha_id ? 'ativo' : ''}" onclick="selecionarChipCampanha('${esc(c.campanha_id)}')" title="${esc(aguaRelLabelCampanha(c))}">${esc(aguaRelLabelCampanhaCurto(c))}</button>`))
     .join('')
   html += `<div class="adash-card">
     <div class="adash-card-topo">
       <div><p class="adash-card-tit">Distribuição por faixa do IQA</p>
-        <p class="adash-card-tit-sub">${chipCampanha ? esc(porCampanha.find(c => c.campanha_id === chipCampanha)?.label || '') : 'Todo o período selecionado'}</p></div>
+        <p class="adash-card-tit-sub">${chipCampanhaAtual ? esc(aguaRelLabelCampanha(chipCampanhaAtual)) : 'Todo o período selecionado'}</p></div>
       <span class="adash-card-mais">•••</span>
     </div>
     <div class="adash-chips">${chips}</div>
