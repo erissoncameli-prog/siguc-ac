@@ -42,6 +42,16 @@ const PFD_COR = {
   estadual: '#3B82F6',
   municipal: '#93C5FD',
   // Veredito da tendência (sempre acompanhado do texto, nunca só a cor)
+  // Cobertura (saldo desmatado × remanescente) — validado no
+  // validate_palette.js da skill de dataviz: CVD ΔE 16,0 (deutan) no pior
+  // par, normal 27,1. Âmbar tem contraste baixo (2,1:1): vai sempre com
+  // rótulo e valor ao lado. Cinza é NEUTRO (não floresta/rios), não
+  // categoria. A floresta NÃO usa o verde-escuro do desmatamento (#166534)
+  // nem o verde "dentro de UC": leria como "mais desmatamento".
+  floresta: '#0D9488',
+  desm2007: '#9A3412',
+  desmRecente: '#F59E0B',
+  outros: '#CBD5E1',
   subindo: '#B91C1C',
   caindo: '#15803D',
   estavel: '#6B7280',
@@ -63,7 +73,8 @@ function _pfdEsc(s) {
 
 // ── Filtro ────────────────────────────────────────────────────────
 // escopo: '' = Acre todo · 'ucs' = dentro de qualquer UC ·
-//         'esf:<federal|estadual|municipal>' = UCs daquela esfera · <uuid> = uma UC
+//         'esf:<federal|estadual|municipal>' = UCs daquela esfera · <uuid> = uma UC ·
+//         'mun:<código IBGE>' = um município (tabelas *_mun_*, migration 345)
 function _pfdPred(dados, escopo) {
   if (!escopo) return () => true
   if (escopo === 'ucs') return id => id != null
@@ -78,13 +89,26 @@ function pfdEscopoTipo(escopo) {
   if (!escopo) return 'acre'
   if (escopo === 'ucs') return 'ucs'
   if (escopo.startsWith('esf:')) return 'esfera'
+  if (escopo.startsWith('mun:')) return 'mun'
   return 'uc'
 }
-// Linhas e meses da fonte de focos escolhida.
-function _pfdFogo(dados, f) {
+// Linhas e meses da fonte de focos escolhida. Recorte por município lê as
+// tabelas por município (cd_ibge); os demais, as por UC (uc_id). As duas
+// somam o MESMO total do estado (conferido: 2024 = 47.805 nas duas).
+function _pfdFogo(dados, f, porMun) {
+  const mun = porMun ?? pfdEscopoTipo(f.escopo) === 'mun'
   return f.fonte === 'bdq'
-    ? { linhas: dados.bdqUcMes || [], resumo: dados.bdqResumo || [], meses: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], parcialAtual: false }
-    : { linhas: dados.focosUcMes || [], resumo: dados.focosResumo || [], meses: [7, 8, 9, 10, 11], parcialAtual: true }
+    ? { linhas: (mun ? dados.bdqMunMes : dados.bdqUcMes) || [], resumo: dados.bdqResumo || [], meses: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], parcialAtual: false }
+    : { linhas: (mun ? dados.focosMunMes : dados.focosUcMes) || [], resumo: dados.focosResumo || [], meses: [7, 8, 9, 10, 11], parcialAtual: true }
+}
+// "Esta linha está no recorte?" — olha cd_ibge (município) ou uc_id (UC).
+function _pfdNoLinha(dados, f) {
+  if (pfdEscopoTipo(f.escopo) === 'mun') {
+    const cd = f.escopo.slice(4)
+    return r => r.cd_ibge === cd
+  }
+  const no = _pfdPred(dados, f.escopo)
+  return r => no(r.uc_id)
 }
 function _pfdAnos(f) {
   const out = []
@@ -94,10 +118,10 @@ function _pfdAnos(f) {
 
 // ── Fogo ──────────────────────────────────────────────────────────
 function pfdFocosPorAno(dados, f) {
-  const fg = _pfdFogo(dados, f), no = _pfdPred(dados, f.escopo)
+  const fg = _pfdFogo(dados, f), no = _pfdNoLinha(dados, f)
   const soma = {}
   for (const r of fg.linhas) {
-    if (r.ano < f.anoIni || r.ano > f.anoFim || !no(r.uc_id)) continue
+    if (r.ano < f.anoIni || r.ano > f.anoFim || !no(r)) continue
     soma[r.ano] = (soma[r.ano] || 0) + Number(r.focos)
   }
   const resumo = {}
@@ -111,28 +135,29 @@ function pfdFocosPorAno(dados, f) {
 }
 
 function pfdFocosPorMes(dados, f) {
-  const fg = _pfdFogo(dados, f), no = _pfdPred(dados, f.escopo)
+  const fg = _pfdFogo(dados, f), no = _pfdNoLinha(dados, f)
   const soma = {}
   for (const m of fg.meses) soma[m] = 0
   for (const r of fg.linhas) {
-    if (r.ano < f.anoIni || r.ano > f.anoFim || !no(r.uc_id)) continue
+    if (r.ano < f.anoIni || r.ano > f.anoFim || !no(r)) continue
     if (soma[r.mes] != null) soma[r.mes] += Number(r.focos)
   }
   return fg.meses.map(mes => ({ mes, n: soma[mes] }))
 }
 
 // ── Desmatamento ──────────────────────────────────────────────────
-// Acre todo = número OFICIAL do INPE; UC = interseção calculada.
+// Acre todo = número OFICIAL do INPE; UC/município = interseção calculada.
 function pfdDesmatPorAno(dados, f) {
   const porAno = {}
-  const no = _pfdPred(dados, f.escopo)
+  const no = _pfdNoLinha(dados, f)
+  const linhas = (pfdEscopoTipo(f.escopo) === 'mun' ? dados.prodesMunAno : dados.prodesUcAno) || []
   if (!f.escopo) {
     for (const r of dados.prodesAno || []) porAno[r.ano] = { ha: Number(r.area_ha), poligonos: Number(r.poligonos) }
   } else {
-    const temAno = new Set((dados.prodesUcAno || []).map(r => r.ano))
+    const temAno = new Set(linhas.map(r => r.ano))
     for (const a of temAno) porAno[a] = { ha: 0, poligonos: 0 }
-    for (const r of dados.prodesUcAno || []) {
-      if (!no(r.uc_id)) continue
+    for (const r of linhas) {
+      if (!no(r)) continue
       porAno[r.ano].ha += Number(r.area_ha)
       porAno[r.ano].poligonos += Number(r.poligonos)
     }
@@ -160,7 +185,7 @@ function pfdRankingUC(dados, f, tipo) {
   const valor = {}
   const esfera = pfdEscopoTipo(f.escopo) === 'esfera' ? f.escopo.slice(4) : null
   if (tipo === 'queimada') {
-    for (const r of _pfdFogo(dados, f).linhas) {
+    for (const r of _pfdFogo(dados, f, false).linhas) {
       if (!r.uc_id || r.ano < f.anoIni || r.ano > f.anoFim) continue
       valor[r.uc_id] = (valor[r.uc_id] || 0) + Number(r.focos)
     }
@@ -176,11 +201,48 @@ function pfdRankingUC(dados, f, tipo) {
     .sort((a, b) => b.valor - a.valor || a.nome.localeCompare(b.nome, 'pt-BR'))
 }
 
+// ── Ranking de municípios (o escolhido fica destacado) ────────────
+function pfdRankingMun(dados, f, tipo) {
+  const valor = {}
+  if (tipo === 'queimada') {
+    for (const r of _pfdFogo(dados, f, true).linhas) {
+      if (!r.cd_ibge || r.ano < f.anoIni || r.ano > f.anoFim) continue
+      valor[r.cd_ibge] = (valor[r.cd_ibge] || 0) + Number(r.focos)
+    }
+  } else {
+    for (const r of dados.prodesMunAno || []) {
+      if (r.ano < f.anoIni || r.ano > f.anoFim) continue
+      valor[r.cd_ibge] = (valor[r.cd_ibge] || 0) + Number(r.area_ha)
+    }
+  }
+  return (dados.municipios || [])
+    .map(m => ({ uc_id: 'mun:' + m.cd_ibge, nome: m.nome, valor: valor[m.cd_ibge] || 0 }))
+    .sort((a, b) => b.valor - a.valor || a.nome.localeCompare(b.nome, 'pt-BR'))
+}
+
 // ── Dentro × fora (rosca) ─────────────────────────────────────────
-// Acre todo / todas as UCs: dentro × fora de UCs. Esfera ou uma UC:
-// o recorte escolhido × restante do Acre.
+// Acre todo / todas as UCs: dentro × fora de UCs. Esfera, uma UC ou um
+// município: o recorte escolhido × restante do Acre.
 function pfdDentroFora(dados, f, tipo) {
   const t = pfdEscopoTipo(f.escopo)
+  if (t === 'mun') {
+    const no = _pfdNoLinha(dados, f)
+    let dentro = 0, total = 0
+    if (tipo === 'queimada') {
+      for (const r of _pfdFogo(dados, f, true).linhas) {
+        if (r.ano < f.anoIni || r.ano > f.anoFim) continue
+        total += Number(r.focos)
+        if (no(r)) dentro += Number(r.focos)
+      }
+    } else {
+      for (const r of dados.prodesAno || []) if (r.ano >= f.anoIni && r.ano <= f.anoFim) total += Number(r.area_ha)
+      for (const r of dados.prodesMunAno || []) if (r.ano >= f.anoIni && r.ano <= f.anoFim && no(r)) dentro += Number(r.area_ha)
+    }
+    return [
+      { rotulo: 'Neste município', n: dentro, cor: PFD_COR.dentro },
+      { rotulo: 'Restante do Acre', n: Math.max(0, total - dentro), cor: PFD_COR.fora },
+    ]
+  }
   const no = t === 'acre' || t === 'ucs' ? (id => id != null) : _pfdPred(dados, f.escopo)
   let dentro = 0, total = 0
   if (tipo === 'queimada') {
@@ -212,7 +274,7 @@ function pfdPorEsfera(dados, f, tipo) {
   const esferaDe = {}
   for (const u of dados.ucs || []) esferaDe[u.id] = u.esfera
   const soma = { federal: 0, estadual: 0, municipal: 0 }
-  const linhas = tipo === 'queimada' ? _pfdFogo(dados, f).linhas : (dados.prodesUcAno || [])
+  const linhas = tipo === 'queimada' ? _pfdFogo(dados, f, false).linhas : (dados.prodesUcAno || [])
   for (const r of linhas) {
     if (!r.uc_id || r.ano < f.anoIni || r.ano > f.anoFim) continue
     const e = esferaDe[r.uc_id]
@@ -274,6 +336,58 @@ function pfdTendencias(pontos) {
   return {
     total: pfdTendencia(fechados),
     recente: pfdTendencia(fechados.slice(-PFD_TEND_MIN_ANOS)),
+  }
+}
+
+// ── Cobertura: quanto já foi desmatado × quanto resta ─────────────
+// Série anual do PRODES começa em 2008; o que veio antes está na camada
+// "acumulado até 2007" (dados.cobertura, migration 344). Resíduo é
+// desmatamento antigo detectado tarde — conta no ano da detecção, como
+// o INPE faz. Floresta que resta = área − desmatado − não floresta − rios
+// (o PRODES não publica camada de floresta: é subtração, e a tela diz).
+// Estado: números declarados pelo INPE; UC/esfera: interseção calculada.
+function pfdCobertura(dados, f) {
+  const linhas = dados.cobertura || []
+  const t = pfdEscopoTipo(f.escopo)
+  // Linha do ESTADO = sem UC e sem município; UC = uc_id; município = cd_ibge.
+  const noUc = _pfdPred(dados, f.escopo)
+  const cd = t === 'mun' ? f.escopo.slice(4) : null
+  const no = t === 'acre' ? (r => r.uc_id == null && r.cd_ibge == null)
+    : t === 'mun' ? (r => r.cd_ibge === cd)
+    : (r => r.uc_id != null && noUc(r.uc_id))
+  let area = 0, d2007 = 0, outros = 0, temArea = false
+  const residuo = {}
+  for (const r of linhas) {
+    if (!no(r)) continue
+    const v = Number(r.area_ha) || 0
+    if (r.classe === 'area_total') { area += v; temArea = true }
+    else if (r.classe === 'd2007') d2007 += v
+    else if (r.classe === 'residuo') residuo[r.ano] = (residuo[r.ano] || 0) + v
+    else outros += v   // nao_floresta + hidrografia
+  }
+  if (!temArea || !(area > 0)) return null
+  const anual = {}
+  const fonteAnual = t === 'acre' ? (dados.prodesAno || [])
+    : t === 'mun' ? (dados.prodesMunAno || []).filter(r => r.cd_ibge === cd)
+    : (dados.prodesUcAno || []).filter(r => noUc(r.uc_id))
+  for (const r of fonteAnual) anual[r.ano] = (anual[r.ano] || 0) + Number(r.area_ha)
+  const anosPublicados = (dados.prodesAno || []).map(r => r.ano)
+  const ultimo = anosPublicados.length ? Math.max(...anosPublicados) : 2007
+  const anoRef = Math.max(2007, Math.min(Number(f.anoFim), ultimo))
+  const serie = []
+  let recente = 0
+  for (let a = 2007; a <= anoRef; a++) {
+    if (a > 2007) recente += anual[a] || 0
+    recente += residuo[a] || 0
+    const desmatado = d2007 + recente
+    serie.push({ ano: a, desmatado, recente, resta: Math.max(0, area - desmatado - outros) })
+  }
+  const fim = serie[serie.length - 1]
+  return {
+    anoRef, ultimoPublicado: ultimo, antesDoPeriodo: Number(f.anoFim) < 2007,
+    area, d2007, recente: fim.recente, outros, desmatado: fim.desmatado, resta: fim.resta,
+    pctDesmatado: (fim.desmatado / area) * 100, pctResta: (fim.resta / area) * 100,
+    serie,
   }
 }
 
@@ -475,8 +589,8 @@ function pfdRoscaHTML(itens, o) {
     return `<path d="${d}" fill="${it.cor}" fill-rule="evenodd"><title>${_pfdEsc(it.rotulo)} — ${_pfdNum(it.n, o.casas)} ${_pfdEsc(o.unidade)} (${_pfdNum((it.n / total) * 100, 1)}%)</title></path>`
   }).join('')
   const svg = `<svg viewBox="0 0 180 180" width="180" height="180" role="img" aria-label="${_pfdEsc(o.rotulo)}">${fatias}
-<text x="${cx}" y="${cy + 2}" text-anchor="middle" font-size="18" font-weight="700" fill="#111827" font-family="var(--font-sans, 'DM Sans', sans-serif)">${_pfdCompacto(total)}</text>
-<text x="${cx}" y="${cy + 18}" text-anchor="middle" font-size="10" fill="${PFD_COR.eixo}">${_pfdEsc(o.unidade)}</text></svg>`
+<text x="${cx}" y="${cy + 2}" text-anchor="middle" font-size="18" font-weight="700" fill="#111827" font-family="var(--font-sans, 'DM Sans', sans-serif)">${_pfdEsc(o.centro ? o.centro.valor : _pfdCompacto(total))}</text>
+<text x="${cx}" y="${cy + 18}" text-anchor="middle" font-size="10" fill="${PFD_COR.eixo}">${_pfdEsc(o.centro ? o.centro.rotulo : o.unidade)}</text></svg>`
   const legenda = itens.map(it => `<li><span class="pfd-dot" style="background:${it.cor}"></span>
 <span class="pfd-leg-rot">${_pfdEsc(it.rotulo)}</span>
 <span class="pfd-leg-val">${_pfdNum(it.n, o.casas)} <small>${_pfdNum((it.n / total) * 100, 1)}%</small></span></li>`).join('')
@@ -557,12 +671,63 @@ function pfdTendenciaResumoHTML(tt, unidade, casas) {
   return `<ul class="pfd-tend">${linha('Período todo', tt.total, false)}${linha(`Últimos ${PFD_TEND_MIN_ANOS} anos`, tt.recente, true)}</ul>`
 }
 
+// Área empilhada 100% da área (estado ou recorte): camadas de baixo para
+// cima, topo = área total. Uma coluna invisível por ano carrega o <title>
+// com TODAS as camadas daquele ano — é a régua do teclado (data-gt-ponto)
+// e do tooltip, sem cobrir a leitura das faixas.
+// pontos: [{rotulo, valores:{chave: número}}]; camadas: [{chave, rotulo, cor}]
+function pfdEmpilhadaHTML(pontos, camadas, o) {
+  if (!pontos.length || !(o.total > 0)) return _pfdVazio(o.vazio || 'Sem dados no período.')
+  const W = 640, H = 260, m = { t: 16, r: 16, b: 32, l: 60 }
+  const iw = W - m.l - m.r, ih = H - m.t - m.b
+  const teto = o.total
+  const x = i => m.l + (pontos.length === 1 ? iw / 2 : (i * iw) / (pontos.length - 1))
+  const y = v => m.t + ih - (v / teto) * ih
+  const grade = [0, 0.25, 0.5, 0.75, 1].map(k => {
+    const yy = m.t + ih - k * ih
+    return `<line x1="${m.l}" x2="${W - m.r}" y1="${yy}" y2="${yy}" stroke="${PFD_COR.grade}" stroke-width="1"/>
+<text x="${m.l - 8}" y="${yy + 4}" text-anchor="end" font-size="11" fill="${PFD_COR.eixo}">${_pfdNum(k * 100)}%</text>`
+  }).join('')
+  // Um só ano: vira faixa de largura mínima, nunca some.
+  const xs = pontos.length === 1 ? [m.l + iw / 2 - 20, m.l + iw / 2 + 20] : null
+  const px = i => (xs ? (i === 0 ? xs[0] : xs[1]) : x(i))
+  const idx = pontos.length === 1 ? [0, 0] : pontos.map((_, i) => i)
+  let base = idx.map(() => 0)
+  const faixas = camadas.map(c => {
+    const topo = idx.map((i, k) => base[k] + (Number(pontos[i].valores[c.chave]) || 0))
+    const cima = idx.map((i, k) => `${k ? 'L' : 'M'}${px(k).toFixed(1)},${y(topo[k]).toFixed(1)}`).join(' ')
+    const baixo = idx.map((i, k) => `L${px(idx.length - 1 - k).toFixed(1)},${y(base[idx.length - 1 - k]).toFixed(1)}`).join(' ')
+    base = topo
+    // borda branca de 2px no topo de cada faixa: o vão entre as camadas
+    return `<path d="${cima} ${baixo} Z" fill="${c.cor}"/><path d="${cima}" fill="none" stroke="#fff" stroke-width="2"/>`
+  }).join('')
+  const passo = Math.max(1, Math.ceil(pontos.length / 10))
+  const rotX = pontos.map((p, i) => ((pontos.length - 1 - i) % passo)
+    ? '' : `<text x="${px(pontos.length === 1 ? 0 : i) + (pontos.length === 1 ? 20 : 0)}" y="${H - 10}" text-anchor="middle" font-size="11" fill="${PFD_COR.eixo}">${_pfdEsc(p.rotulo)}</text>`).join('')
+  const larg = pontos.length === 1 ? 40 : iw / Math.max(1, pontos.length - 1)
+  const alvos = pontos.map((p, i) => {
+    const cx = pontos.length === 1 ? m.l + iw / 2 : x(i)
+    const partes = camadas.map(c => {
+      const v = Number(p.valores[c.chave]) || 0
+      return `${c.rotulo} ${_pfdNum(v)} ${o.unidade} (${_pfdNum((v / teto) * 100, 1)}%)`
+    }).join(' · ')
+    return `<rect data-gt-ponto x="${(cx - larg / 2).toFixed(1)}" y="${m.t}" width="${larg.toFixed(1)}" height="${ih}" fill="transparent"><title>${_pfdEsc(p.rotulo)} — ${_pfdEsc(partes)}</title></rect>`
+  }).join('')
+  const svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="${_pfdEsc(o.rotulo)}">${faixas}${grade}${rotX}${alvos}</svg>`
+  const legenda = camadas.slice().reverse().map(c => {
+    const ult = Number(pontos[pontos.length - 1].valores[c.chave]) || 0
+    return `<li><span class="pfd-dot" style="background:${c.cor}"></span><span class="pfd-leg-rot">${_pfdEsc(c.rotulo)}</span>
+<span class="pfd-leg-val">${_pfdNum(ult)} <small>${_pfdNum((ult / teto) * 100, 1)}%</small></span></li>`
+  }).join('')
+  return `${_pfdEnvolver(svg, o.rotulo)}<ul class="pfd-legenda pfd-legenda-linha">${legenda}</ul>`
+}
+
 if (typeof window !== 'undefined') {
   Object.assign(window, {
     PFD_COR, PFD_MESES, pfdFocosPorAno, pfdFocosPorMes, pfdDesmatPorAno, pfdAcumulado,
-    PFD_ESFERAS, PFD_TEND_MIN_ANOS, pfdEscopoTipo, pfdPorEsfera, pfdTendencia, pfdTendencias,
+    PFD_ESFERAS, PFD_TEND_MIN_ANOS, pfdCobertura, pfdEmpilhadaHTML, pfdEscopoTipo, pfdPorEsfera, pfdTendencia, pfdTendencias,
     pfdTendenciaHTML, pfdTendenciaFrase, pfdTendenciaResumoHTML,
-    pfdRankingUC, pfdDentroFora, pfdKpis, pfdFaixasAnos,
+    pfdRankingUC, pfdRankingMun, pfdDentroFora, pfdKpis, pfdFaixasAnos,
     pfdLinhaHTML, pfdAreaHTML, pfdBarrasHTML, pfdRankingHTML, pfdRoscaHTML,
   })
 }
