@@ -12,7 +12,7 @@
 <script src="../js/grafico-teclado.js"></script>
 <script src="../js/painel-fogo-desmatamento.js"></script>
 <style>
-.pfd { display:flex; flex-direction:column; gap:16px; }
+.pfd { display:flex; flex-direction:column; gap:16px; min-width:0; max-width:100%; }
 .pfd-intro { font-size:13px; color:var(--cinza-500); margin:0; max-width:900px; line-height:1.5; }
 
 /* ── filtros: uma linha acima dos gráficos ── */
@@ -101,6 +101,22 @@
 .pfd-legenda.pfd-legenda-linha .pfd-leg-rot { flex:0 1 auto; }
 .pfd-cob-resumo { font-size:13px; color:#374151; margin:0 0 8px; line-height:1.5; }
 .pfd-cob-resumo strong { font-family:var(--font-sans, 'DM Sans', sans-serif); }
+/* ── parecer ── */
+.pfd-par { display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:10px 24px; }
+.pfd-par-bloco h4 { font-size:12px; font-weight:800; color:#1F2937; margin:0 0 4px; text-transform:uppercase; letter-spacing:.04em; }
+.pfd-par-bloco p { font-size:13px; color:#374151; line-height:1.55; margin:0 0 6px; max-width:72ch; }
+.pfd-parecer .pfd-aviso { margin:0 0 10px; }
+.pfd-par-fatores { margin-top:10px; min-width:0; }
+/* width:0 + min-width:100%: a tabela larga nunca empurra a largura da página
+   (a .main-content é item flex e cresceria até caber a tabela). */
+.pfd-par-fatores .table-wrap { width:0; min-width:100%; }
+.pfd-par-fatores summary { cursor:pointer; font-size:13px; font-weight:700; color:var(--verde-medio, #2D6A4F); padding:6px 0; min-height:24px; }
+.pfd-par-fatores summary:focus-visible { outline:3px solid rgba(82,183,136,.55); outline-offset:2px; border-radius:4px; }
+.pfd-tabela { width:100%; border-collapse:collapse; font-size:12px; }
+.pfd-tabela th, .pfd-tabela td { padding:6px 8px; border-bottom:1px solid var(--borda); text-align:left; white-space:nowrap; }
+.pfd-tabela th { font-weight:700; color:var(--cinza-600); background:var(--cinza-50); }
+.pfd-tabela td.num { text-align:right; font-variant-numeric:tabular-nums; }
+.pfd-par-nota { font-size:11px; color:var(--cinza-500); margin:10px 0 0; line-height:1.5; }
 [hidden] { display:none !important; }
 </style>
 </head>
@@ -150,7 +166,7 @@ async function _pfdTudo(montar) {
 
 async function pfdCarregar() {
   const [ucs, focosUcMes, focosResumo, prodesAno, prodesUcAno, bdqUcMes, bdqResumo, cobertura,
-         municipios, focosMunMes, bdqMunMes, prodesMunAno] = await Promise.all([
+         municipios, focosMunMes, bdqMunMes, prodesMunAno, clima, enso] = await Promise.all([
     _pfdTudo(() => db.from('unidades_conservacao').select('id,nome,sigla,categoria,grupo,esfera').eq('ativo', true).order('nome')),
     _pfdTudo(() => db.from('focos_uc_mes').select('ano,mes,uc_id,focos,origem').order('ano')),
     _pfdTudo(() => db.from('focos_resumo_ano').select('ano,focos,origem,periodo_ini,periodo_fim').order('ano')),
@@ -163,9 +179,13 @@ async function pfdCarregar() {
     _pfdTudo(() => db.from('focos_mun_mes').select('ano,mes,cd_ibge,focos,origem').order('ano')),
     _pfdTudo(() => db.from('focos_bdq_mun_mes').select('ano,mes,cd_ibge,focos').order('ano')),
     _pfdTudo(() => db.from('prodes_mun_ano').select('ano,cd_ibge,poligonos,area_ha').order('ano')),
+    // Clima e ENSO (migration 346) alimentam só o parecer: se falharem,
+    // o painel segue sem a leitura climática, nunca em branco.
+    _pfdTudo(() => db.from('clima_mun_ano').select('ano,cd_ibge,chuva_seca_mm,dias_secos,maior_seq_seca,tmax_seca_c,umid_min_seca,dias_na_seca').order('ano')).catch(() => []),
+    _pfdTudo(() => db.from('clima_enso').select('ano,mes,oni').gte('ano', 2000).order('ano')).catch(() => []),
   ])
   return { ucs, focosUcMes, focosResumo, prodesAno, prodesUcAno, bdqUcMes, bdqResumo, cobertura,
-           municipios, focosMunMes, bdqMunMes, prodesMunAno }
+           municipios, focosMunMes, bdqMunMes, prodesMunAno, clima, enso }
 }
 
 function pfdSincEscopo() {
@@ -381,6 +401,8 @@ function pfdRender() {
     if (semAtual.length) avisos.push(`Sem registro de focos ${bdq ? 'do BDQueimadas ' : ''}no sistema para: ${pfdFaixasAnos(semAtual)}.`)
     if (bdq && k.anosSemFoco.includes(PFD_ANO_ATUAL)) avisos.push(`BDQueimadas ${PFD_ANO_ATUAL}: o INPE só publica o ano do satélite de referência depois que ele fecha — use a fonte FIRMS para acompanhar o ano em curso.`)
   }
+  if (mostraFogo && !bdq && f.anoIni < PFD_FIRMS_VIIRS_DESDE && f.anoFim >= PFD_FIRMS_VIIRS_DESDE)
+    avisos.push(`FIRMS: a alta de 2011 para ${PFD_FIRMS_VIIRS_DESDE} é do satélite, não do fogo — o VIIRS entra na série em ${PFD_FIRMS_VIIRS_DESDE} e detecta muito mais focos pequenos. A tendência dos focos começa em ${PFD_FIRMS_VIIRS_DESDE}; para comparar anos anteriores, use a fonte BDQueimadas.`)
   if (mostraDesm && k.anosSemDesm.length) avisos.push(`PRODES ainda não publicado pelo INPE (ou anterior a 2008) para: ${pfdFaixasAnos(k.anosSemDesm)}.`)
   if (tEscopo === 'esfera' && f.escopo === 'esf:municipal') avisos.push('A esfera municipal tem uma única UC no cadastro, com números pequenos — os gráficos ficam quase vazios por isso, não por falha.')
 
@@ -398,6 +420,10 @@ function pfdRender() {
     <div class="pfd-ranking">${pfdRankingHTML(pfdRankingMun(d, f, tipo), { cor, unidade, rotulo: titulo, destaque: destaqueMun, max: 30, vazio: 'Nenhum município com registro no período.' })}</div></div>`
   let html = `<div class="pfd-kpis">${kpis.join('')}</div>`
   if (avisos.length) html += `<p class="pfd-aviso">${avisos.map(esc).join(' ')}</p>`
+  html += `<section class="pfd-card pfd-parecer" aria-labelledby="pfd-par-titulo">
+    <h3 id="pfd-par-titulo">Leitura do período — ${esc(onde)}, ${esc(periodo)}</h3>
+    <p class="pfd-sub">O que subiu ou caiu, e o que o clima e o desmatamento dizem sobre isso.</p>
+    ${pfdParecerHTML(pfdParecer(d, f))}</section>`
 
   const cardTendencia = (pontos, cor, unidade, rotulo, sub) => {
     const tt = pfdTendencias(pontos)
@@ -420,7 +446,8 @@ function pfdRender() {
         ${pfdLinhaHTML(serie, { cor: PFD_COR.queimada, unidade: 'focos', rotulo: 'Focos de calor por ano' })}</div>
       <div class="pfd-card"><h3>Focos por mês${bdq ? '' : ' da temporada'}</h3><p class="pfd-sub">Soma de todos os anos do período.</p>
         ${pfdBarrasHTML(meses, { cor: PFD_COR.queimada, unidade: 'focos', rotulo: 'Focos por mês' })}</div>
-      ${cardTendencia(serie, PFD_COR.queimada, 'focos', 'Tendência dos focos de calor', subTend)}
+      ${cardTendencia(bdq ? serie : serie.filter(p => p.ano >= PFD_FIRMS_VIIRS_DESDE), PFD_COR.queimada, 'focos',
+          'Tendência dos focos de calor' + (!bdq && f.anoIni < PFD_FIRMS_VIIRS_DESDE ? ` (desde ${PFD_FIRMS_VIIRS_DESDE})` : ''), subTend)}
       <div class="pfd-card"><h3>${recorte ? `Focos: ${esc(nesta)} × restante do Acre` : 'Focos dentro × fora de UCs'}</h3><p class="pfd-sub">Total do Acre no período.</p>
         ${pfdRoscaHTML(pfdDentroFora(d, f, 'queimada'), { unidade: 'focos', rotulo: 'Focos dentro e fora do recorte' })}</div>
       ${porEsfera ? `<div class="pfd-card"><h3>Focos em UCs por esfera</h3><p class="pfd-sub">Federal × estadual × municipal, no período.</p>
@@ -470,6 +497,10 @@ function pfdRender() {
       A floresta que resta é a área total menos o desmatado, a vegetação natural não florestal e os rios — o PRODES não
       publica uma camada de floresta, então é uma subtração. Área que foi desmatada e depois regenerou continua contando
       como desmatada: o que resta é floresta primária, não toda a cobertura vegetal.</li>
+    <li><strong>Leitura do período</strong>: texto montado por regras fixas a partir dos números desta tela — sem IA e sem
+      custo de API. Clima: reanálise ERA5 (Open-Meteo), chuva, dias sem chuva (&lt; 1 mm) e maior sequência seca na estação seca
+      (jun–set), no ponto central de cada município; o Acre é a média ponderada pela área dos 22. ENSO: índice ONI da NOAA.
+      Correlação de Spearman só com 8 anos ou mais, e sempre como associação, nunca como causa.</li>
     <li>Fogo e desmatamento têm janelas de tempo diferentes e unidades diferentes (focos × hectares) — por isso nunca aparecem somados no mesmo gráfico.</li>
   </ul></div>`
 

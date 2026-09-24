@@ -378,6 +378,97 @@ test('município: focos, desmatamento, ranking, rosca e saldo pelo cd_ibge', asy
   expect((await rodar(page, 'pfdCobertura', F({ anoFim: 2024 }))).area).toBe(1000000);
 });
 
+// ── Parecer (texto por regras, migration 346) ─────────────────────
+test('Spearman: resposta conhecida, empates e mínimo de 8 anos', async ({ page }) => {
+  await carregar(page);
+  const r = await page.evaluate(() => ({
+    perfeito: pfdSpearman([1, 2, 3, 4, 5, 6, 7, 8], [10, 20, 30, 40, 50, 60, 70, 80]),
+    inverso: pfdSpearman([1, 2, 3, 4, 5, 6, 7, 8], [8, 7, 6, 5, 4, 3, 2, 1]),
+    curto: pfdSpearman([1, 2, 3], [1, 2, 3]),
+    // x monótono, y = x² → ρ = 1 (Spearman é de posto, não linear)
+    monotono: pfdSpearman([1, 2, 3, 4, 5, 6, 7, 8], [1, 4, 9, 16, 25, 36, 49, 64]),
+    empate: pfdSpearman([1, 1, 2, 3, 4, 5, 6, 7], [1, 2, 3, 4, 5, 6, 7, 8]),
+  }));
+  expect(r.perfeito.rho).toBeCloseTo(1, 6);
+  expect(r.perfeito.p).toBeLessThan(0.01);
+  expect(r.inverso.rho).toBeCloseTo(-1, 6);
+  expect(r.curto).toBeNull();
+  expect(r.monotono.rho).toBeCloseTo(1, 6);
+  expect(r.empate.rho).toBeGreaterThan(0.95);
+});
+
+// Série sintética: 10 anos; focos acompanham os dias secos.
+const SERIE = (focosUlt, chuvaUlt) => {
+  const anos = [2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024];
+  const dias = [80, 85, 90, 95, 100, 70, 75, 105, 88, 110];
+  const focos = [800, 850, 900, 950, 1000, 700, 750, 1050, 880, focosUlt];
+  return {
+    focosUcMes: anos.map((a, i) => ({ ano: a, mes: 8, uc_id: null, focos: focos[i] })),
+    focosResumo: anos.map((a, i) => ({ ano: a, focos: focos[i], origem: 'serie_historica' })),
+    prodesAno: anos.map(a => ({ ano: a, poligonos: 1, area_ha: 1000 })),
+    clima: anos.map((a, i) => ({ ano: a, cd_ibge: 'AC', chuva_seca_mm: i === 9 ? chuvaUlt : 300 - dias[i], dias_secos: i === 9 ? (chuvaUlt < 150 ? 110 : 60) : dias[i],
+      maior_seq_seca: 20, tmax_seca_c: 32, umid_min_seca: 48, dias_na_seca: 122 })),
+    enso: [6, 7, 8, 9].map(mes => ({ ano: 2024, mes, oni: 1.6 })),
+    ucs: [], municipios: [],
+  };
+};
+async function parecer(page, dados, f) {
+  return page.evaluate(({ dados, f }) => {
+    const p = pfdParecer(dados, Object.assign({ tipo: 'queimada', escopo: '', fonte: 'firms', anoIni: 2015, anoFim: 2024, hoje: new Date('2025-01-10T12:00:00') }, f || {}));
+    return { texto: p.blocos.map(b => b.frases.join(' ')).join(' | '), avisos: p.avisos, tabela: p.tabela.length };
+  }, { dados, f });
+}
+
+test('parecer: alta com estação mais seca é "coerente"; cita chuva, sequência seca e ENSO', async ({ page }) => {
+  await carregar(page);
+  const r = await parecer(page, SERIE(1400, 100));
+  expect(r.texto).toContain('Em 2024, 1.400 focos: alta de 59% em relação a 2023');
+  expect(r.texto).toContain('coerente com uma estação seca mais seca');
+  expect(r.texto).toContain('El Niño forte');
+  expect(r.texto).toContain('a 1ª mais seca de 10 anos');
+  expect(r.texto).toMatch(/anos mais secos tiveram mais focos: correlação forte/);
+  expect(r.texto).toContain('não prova de causa');
+  expect(r.tabela).toBe(10);
+});
+
+test('parecer: alta com estação chuvosa diz que o clima NÃO explica, sem inventar causa', async ({ page }) => {
+  await carregar(page);
+  const r = await parecer(page, SERIE(1400, 400));
+  expect(r.texto).toContain('o clima não a explica');
+  expect(r.texto).toContain('hipóteses a verificar');
+  expect(r.texto).not.toContain('coerente com uma estação seca mais seca');
+});
+
+test('parecer: sem clima carregado, não fala de clima e avisa a carga', async ({ page }) => {
+  await carregar(page);
+  const d = SERIE(1400, 100); d.clima = []; d.enso = [];
+  const r = await parecer(page, d);
+  expect(r.texto).not.toMatch(/mm de chuva|El Niño|Spearman ρ = .*seca/);
+  expect(r.avisos.join(' ')).toContain('ainda em carga');
+  // desmatamento: nunca atribui causa
+  const r2 = await parecer(page, d, { tipo: 'desmatamento' });
+  expect(r2.texto).toContain('o texto não atribui causa');
+});
+
+test('parecer FIRMS: a entrada do VIIRS (2012) nunca vira alta — comparações começam em 2012', async ({ page }) => {
+  await carregar(page);
+  // 2008–2011 só MODIS (baixo), 2012+ com VIIRS (6× mais), depois estável
+  const anos = [2008, 2009, 2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019];
+  const v = [3000, 3200, 3100, 3300, 20000, 19500, 20500, 20000, 19800, 20200, 20100, 19900];
+  const d = { ucs: [], municipios: [], clima: [], enso: [], prodesAno: [],
+    focosUcMes: anos.map((a, i) => ({ ano: a, mes: 8, uc_id: null, focos: v[i] })),
+    focosResumo: anos.map((a, i) => ({ ano: a, focos: v[i], origem: 'serie_historica' })) };
+  const r = await parecer(page, d, { anoIni: 2008, anoFim: 2019 });
+  expect(r.texto).toContain('Comparações a partir de 2012');
+  expect(r.texto).toContain('Tendência desde 2012: sem tendência clara');
+  expect(r.texto).toContain('média de 2012 a 2019');
+  // BDQueimadas (um satélite) não sofre o corte
+  const d2 = Object.assign({}, d, { bdqUcMes: d.focosUcMes, bdqResumo: d.focosResumo });
+  const r2 = await parecer(page, d2, { anoIni: 2008, anoFim: 2019, fonte: 'bdq' });
+  expect(r2.texto).not.toContain('Comparações a partir de 2012');
+  expect(r2.texto).toContain('média de 2008 a 2019');
+});
+
 // ── Página real (cliente Supabase simulado) ───────────────────────
 // Mesmo contorno de tests/agua-conferencia-filtros.test.js: sem bloquear
 // o CDN, o supabase-js real sobrescreve o stub e a página cai no login.
@@ -431,6 +522,11 @@ const TABELAS = {
     { ano: 2023, mes: 9, cd_ibge: '1200401', focos: 262 },
     { ano: 2024, mes: 9, cd_ibge: '1200302', focos: 8408 },
   ],
+  clima_mun_ano: [
+    { ano: 2023, cd_ibge: 'AC', chuva_seca_mm: 200, dias_secos: 90, maior_seq_seca: 20, tmax_seca_c: 32, umid_min_seca: 48, dias_na_seca: 122 },
+    { ano: 2024, cd_ibge: 'AC', chuva_seca_mm: 100, dias_secos: 110, maior_seq_seca: 34, tmax_seca_c: 33.3, umid_min_seca: 41, dias_na_seca: 122 },
+  ],
+  clima_enso: [6, 7, 8, 9].map(mes => ({ ano: 2024, mes, oni: 0.2 })),
   prodes_mun_ano: [
     { ano: 2023, cd_ibge: '1200401', poligonos: 3000, area_ha: 20000 },
     { ano: 2023, cd_ibge: '1200302', poligonos: 2877, area_ha: 26295 },
@@ -451,7 +547,7 @@ async function abrirPainel(page, hash = '') {
     const consulta = (tabela) => {
       let de = 0, ate = 999;
       const q = {
-        select: () => q, in: () => q, is: () => q, order: () => q, limit: () => q, eq: () => q,
+        select: () => q, in: () => q, is: () => q, order: () => q, limit: () => q, eq: () => q, gte: () => q,
         range: (a, b) => { de = a; ate = b; return q },
         single: async () => ({ data: usuario, error: null }),
         maybeSingle: async () => ({ data: usuario, error: null }),
@@ -508,6 +604,7 @@ test('página: abre com linha, barras, tendência, rosca, ranking e área nas du
   await page.selectOption('#pfd-ini', '2023');
   const titulos = await page.locator('.pfd-card h3').allInnerTexts();
   expect(titulos).toEqual([
+    `Leitura do período — Acre todo, 2023 a ${new Date().getFullYear()}`,
     'Focos de calor por ano', 'Focos por mês da temporada', 'Tendência dos focos de calor', 'Focos dentro × fora de UCs', 'UCs com mais focos',
     'Focos por município',
     'Área desmatada × floresta que resta — Acre todo', 'Como chegou até aqui — Acre todo',
@@ -660,4 +757,16 @@ test('página: o recorte vai para o endereço e volta ao abrir o link', async ({
   await abrirPainel(pg3, '#onde=mun&mun=9999999&de=1800');
   await expect(pg3.locator('#pfd-mun')).toHaveValue('');
   await expect(pg3.locator('#pfd-ini')).toHaveValue('2008');
+});
+
+test('página: leitura do período aparece com texto e tabela de fatores', async ({ page }) => {
+  await abrirPainel(page);
+  await page.selectOption('#pfd-ini', '2023');
+  const card = page.locator('.pfd-parecer');
+  await expect(card).toBeVisible();
+  await expect(card).toContainText('Em 2024, 1.010 focos');
+  await expect(card).toContainText('estação seca de 2024');
+  await card.locator('summary').click();
+  await expect(card.locator('.pfd-tabela tbody tr')).toHaveCount(4);   // 2023..2026
+  await expect(card.locator('.table-wrap')).toHaveCount(1);
 });
