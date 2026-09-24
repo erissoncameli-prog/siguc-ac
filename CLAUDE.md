@@ -559,7 +559,7 @@ são do Acre.
   `ingest-focos` e do script) e está pública no repositório —
   recomendado rotacionar; ao trocar, trocar nos três lugares.
 
-## Regra do sistema — Painel de Fogo e Desmatamento (migrations 342–344)
+## Regra do sistema — Painel de Fogo e Desmatamento (migrations 342–345)
 `pages/painel-fogo-desmatamento.html` (menu Gestão): série histórica de
 focos e de desmatamento, com filtro por tipo (os dois / só queimadas / só
 desmatamento), por local (Acre todo / todas as UCs / uma UC) e por
@@ -644,7 +644,34 @@ período. Gráficos de linha, barra, área, rosca e ranking, em SVG à mão.
   `net._http_response` é unlogged, as respostas também sumiram. Uma
   resposta por vez (é por isso que os `*_coletar` recebem `p_max`), e
   para conferir, `length()`/`substring()` no texto, nunca parse em lote.
-- Guarda: `tests/painel-fogo-desmatamento.test.js` (23), inclusive
+  **Aconteceu de novo** (24/09/2026 00:03 UTC): uma função de depuração
+  que juntava várias respostas grandes numa instrução, chamada em sessões
+  paralelas, reiniciou o banco pela 2ª vez. Regra dura: UMA resposta por
+  chamada, em sequência, nunca em paralelo, nem para "só conferir".
+- **Recorte por MUNICÍPIO** (migration 345): `municipios_acre` (22,
+  malha do IBGE carregada por pg_net — `municipios_acre_solicitar()` →
+  `municipios_acre_carregar()`, que falha se não vierem exatamente 22) +
+  `municipios_acre_sub` (`ST_Subdivide` 256, índice GIST) para a junção
+  espacial. Foco ganha `cd_mun` por trigger (`focos_definir_municipio`)
+  nas 3 tabelas de focos; agregados `focos_mun_mes`, `focos_bdq_mun_mes`
+  (cron diário junto do resumo) e `prodes_mun_ano` (preenchida pelo
+  mesmo `prodes_resumo_coletar`); `prodes_cobertura.cd_ibge` para o
+  saldo por município — a linha do ESTADO é `uc_id IS NULL AND cd_ibge
+  IS NULL`, nunca só `uc_id IS NULL`. Conferido: soma dos municípios =
+  total do estado (focos exato; PRODES anual 99,9–100,0%). Pendente: o
+  acumulado até 2007 somado por município dá ~1,4% acima do estado —
+  investigar uma resposta por vez (regra acima).
+- **Filtro "Onde" em ETAPAS** (pedido do usuário — uma caixa só com
+  tudo ficava ruim): Acre todo | Municípios | Unidades de Conservação;
+  Municípios revela o seletor de município, UCs revela esfera e depois
+  UC. Trilha "Acre › Municípios › Feijó" com cada nível clicável para
+  voltar. `escopo` (o que o módulo JS lê) é DERIVADO de `nivel/mun/
+  esfera/uc` em `pfdSincEscopo()`, nunca editado direto. O recorte vai
+  para o endereço (`#onde=mun&mun=…&de=…`) — link copiado abre no mesmo
+  filtro; valor que não existe (UC desativada, link antigo) é ignorado
+  e cai no padrão. Com município escolhido, o ranking de UCs some (UC
+  atravessa divisa) e o ranking dos 22 municípios destaca o escolhido.
+- Guarda: `tests/painel-fogo-desmatamento.test.js` (27), inclusive
   página sem rolagem lateral em 390px.
 - `pwa/sw.js`: frota 112 → 113 (`js/layout.js` está no shell do Frota).
 

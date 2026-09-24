@@ -28,15 +28,23 @@
 .pfd-seg button:focus-visible { outline:3px solid rgba(82,183,136,.55); outline-offset:1px; }
 .pfd-seg .pfd-dot { width:9px; height:9px; }
 .pfd-filtros select.form-control { min-width:120px; height:38px; }
-#pfd-local { min-width:280px; }
+#pfd-uc { min-width:260px; }
+/* trilha do recorte (Acre › Municípios › Feijó): cada nível volta ao anterior */
+.pfd-trilha { display:flex; flex-wrap:wrap; align-items:center; gap:4px; font-size:13px; color:var(--cinza-500); flex-basis:100%; margin-top:-2px; }
+.pfd-trilha button { border:0; background:transparent; font:inherit; color:var(--verde-medio, #2D6A4F); font-weight:600;
+  padding:4px 6px; border-radius:6px; cursor:pointer; min-height:28px; }
+.pfd-trilha button:hover { background:var(--cinza-100); }
+.pfd-trilha button:focus-visible { outline:3px solid rgba(82,183,136,.55); outline-offset:1px; }
+.pfd-trilha [aria-current="page"] { color:#111827; font-weight:700; padding:4px 6px; }
+.pfd-trilha .pfd-sep { color:var(--cinza-400); }
 .pfd-filtros .btn { height:38px; }
 .pfd-filtros > * { min-width:0; }
 @media (max-width: 640px) {
   .pfd-seg { display:flex; flex-wrap:wrap; width:100%; }
   .pfd-seg button { flex:1 1 auto; justify-content:center; }
   .pfd-campo { flex:1 1 130px; }
-  #pfd-local, .pfd-filtros select.form-control { min-width:0; width:100%; }
-  .pfd-campo:has(#pfd-local) { flex-basis:100%; }
+  #pfd-uc, .pfd-filtros select.form-control { min-width:0; width:100%; }
+  .pfd-campo:has(#pfd-uc), .pfd-campo:has(#pfd-mun), .pfd-campo:has(.pfd-seg) { flex-basis:100%; }
   .pfd-kpis { grid-template-columns:repeat(2, minmax(0,1fr)); }
   .pfd-kpi-val { font-size:22px; }
 }
@@ -101,7 +109,9 @@
 <script>
 const PFD_ANO_MIN = 2001
 const PFD_ANO_ATUAL = new Date().getFullYear()
-const PFD_FILTRO_PADRAO = () => ({ tipo: 'ambos', escopo: '', fonte: 'firms', anoIni: 2008, anoFim: PFD_ANO_ATUAL })
+// Onde = filtro EM ETAPAS: nivel (acre|mun|uc) → município, ou esfera → UC.
+// `escopo` é derivado disso (pfdSincEscopo) e é o que o módulo JS lê.
+const PFD_FILTRO_PADRAO = () => ({ tipo: 'ambos', nivel: 'acre', mun: '', esfera: '', uc: '', escopo: '', fonte: 'firms', anoIni: 2008, anoFim: PFD_ANO_ATUAL })
 const _pfd = { dados: null, f: PFD_FILTRO_PADRAO() }
 
 async function init() {
@@ -110,13 +120,14 @@ async function init() {
     gerarLayout('Painel de Fogo e Desmatamento', 'painel-fogo-desmatamento') +
     `<div class="fade-in pfd">
       <p class="pfd-intro">Histórico de focos de calor (satélites MODIS e VIIRS S-NPP, temporada de fogo)
-      e de desmatamento (PRODES/INPE) no Acre, por Unidade de Conservação.</p>
-      <div class="pfd-filtros" id="pfd-filtros" role="group" aria-label="Filtros do painel">${pfdFiltrosHTML([])}</div>
+      e de desmatamento (PRODES/INPE) no Acre, por município e por Unidade de Conservação.</p>
+      <div class="pfd-filtros" id="pfd-filtros" role="group" aria-label="Filtros do painel">${pfdFiltrosHTML(null)}</div>
       <div id="pfd-conteudo">${skeletonBlocoHTML(6)}</div>
     </div></div></div>`
   try {
     _pfd.dados = await pfdCarregar()
-    document.getElementById('pfd-filtros').innerHTML = pfdFiltrosHTML(_pfd.dados.ucs)
+    pfdLerHash()
+    pfdAtualizarFiltros()
     pfdRender()
   } catch (e) {
     console.error(e)
@@ -138,7 +149,8 @@ async function _pfdTudo(montar) {
 }
 
 async function pfdCarregar() {
-  const [ucs, focosUcMes, focosResumo, prodesAno, prodesUcAno, bdqUcMes, bdqResumo, cobertura] = await Promise.all([
+  const [ucs, focosUcMes, focosResumo, prodesAno, prodesUcAno, bdqUcMes, bdqResumo, cobertura,
+         municipios, focosMunMes, bdqMunMes, prodesMunAno] = await Promise.all([
     _pfdTudo(() => db.from('unidades_conservacao').select('id,nome,sigla,categoria,grupo,esfera').eq('ativo', true).order('nome')),
     _pfdTudo(() => db.from('focos_uc_mes').select('ano,mes,uc_id,focos,origem').order('ano')),
     _pfdTudo(() => db.from('focos_resumo_ano').select('ano,focos,origem,periodo_ini,periodo_fim').order('ano')),
@@ -146,43 +158,62 @@ async function pfdCarregar() {
     _pfdTudo(() => db.from('prodes_uc_ano').select('ano,uc_id,poligonos,area_ha').order('ano')),
     _pfdTudo(() => db.from('focos_bdq_uc_mes').select('ano,mes,uc_id,focos').order('ano')),
     _pfdTudo(() => db.from('focos_bdq_resumo_ano').select('ano,focos,arquivo').order('ano')),
-    _pfdTudo(() => db.from('prodes_cobertura').select('classe,ano,uc_id,area_ha').order('ano')),
+    _pfdTudo(() => db.from('prodes_cobertura').select('classe,ano,uc_id,cd_ibge,area_ha').order('ano')),
+    _pfdTudo(() => db.from('municipios_acre').select('cd_ibge,nome').order('nome')),
+    _pfdTudo(() => db.from('focos_mun_mes').select('ano,mes,cd_ibge,focos,origem').order('ano')),
+    _pfdTudo(() => db.from('focos_bdq_mun_mes').select('ano,mes,cd_ibge,focos').order('ano')),
+    _pfdTudo(() => db.from('prodes_mun_ano').select('ano,cd_ibge,poligonos,area_ha').order('ano')),
   ])
-  return { ucs, focosUcMes, focosResumo, prodesAno, prodesUcAno, bdqUcMes, bdqResumo, cobertura }
+  return { ucs, focosUcMes, focosResumo, prodesAno, prodesUcAno, bdqUcMes, bdqResumo, cobertura,
+           municipios, focosMunMes, bdqMunMes, prodesMunAno }
 }
 
-function pfdFiltrosHTML(ucs) {
+function pfdSincEscopo() {
   const f = _pfd.f
-  const seg = (v, rot, cor) => `<button type="button" aria-pressed="${f.tipo === v}" onclick="pfdSetTipo('${v}')">${cor ? `<span class="pfd-dot" style="background:${cor}"></span>` : ''}${rot}</button>`
-  const sel = v => f.escopo === v ? 'selected' : ''
-  const optsEsfera = PFD_ESFERAS.map(e => {
-    const n = ucs.filter(u => u.esfera === e.chave).length
-    return n ? `<option value="esf:${e.chave}" ${sel('esf:' + e.chave)}>${e.rotulo} (${n})</option>` : ''
-  }).join('')
-  // UCs uma a uma, agrupadas pela esfera (mesma ordem do filtro acima)
-  const optsUC = PFD_ESFERAS.map(e => {
-    const lista = ucs.filter(u => u.esfera === e.chave)
-    return lista.length ? `<optgroup label="${esc(e.rotulo.replace('UCs ', 'UC '))}">${
-      lista.map(u => `<option value="${u.id}" ${sel(u.id)}>${esc(u.nome)}</option>`).join('')}</optgroup>` : ''
-  }).join('') + (() => {
-    const outras = ucs.filter(u => !PFD_ESFERAS.some(e => e.chave === u.esfera))
-    return outras.length ? `<optgroup label="Outras">${outras.map(u => `<option value="${u.id}" ${sel(u.id)}>${esc(u.nome)}</option>`).join('')}</optgroup>` : ''
-  })()
+  f.escopo = f.nivel === 'mun' ? (f.mun ? 'mun:' + f.mun : '')
+    : f.nivel === 'uc' ? (f.uc || (f.esfera ? 'esf:' + f.esfera : 'ucs'))
+    : ''
+}
+
+// Filtro em etapas: cada escolha revela só o próximo campo que faz sentido.
+function pfdFiltrosHTML(dados) {
+  const f = _pfd.f
+  const ucs = dados?.ucs || [], muns = dados?.municipios || []
+  const seg = (grupo, v, atual, rot, cor) => `<button type="button" data-grupo="${grupo}" aria-pressed="${atual === v}" onclick="pfdSet${grupo}('${v}')">${cor ? `<span class="pfd-dot" style="background:${cor}"></span>` : ''}${rot}</button>`
   const anos = []
   for (let a = PFD_ANO_ATUAL; a >= PFD_ANO_MIN; a--) anos.push(a)
   const optAno = sel => anos.map(a => `<option value="${a}" ${a === sel ? 'selected' : ''}>${a}</option>`).join('')
+  let etapa2 = ''
+  if (f.nivel === 'mun') {
+    etapa2 = `<label class="pfd-campo"><span>Município</span>
+      <select class="form-control" id="pfd-mun" onchange="pfdSetOnde('mun', this.value)">
+        <option value="" ${!f.mun ? 'selected' : ''}>Todos — comparar municípios</option>
+        ${muns.map(m => `<option value="${esc(m.cd_ibge)}" ${f.mun === m.cd_ibge ? 'selected' : ''}>${esc(m.nome)}</option>`).join('')}
+      </select></label>`
+  } else if (f.nivel === 'uc') {
+    const esferas = PFD_ESFERAS.map(e => ({ ...e, n: ucs.filter(u => u.esfera === e.chave).length })).filter(e => e.n)
+    const lista = ucs.filter(u => !f.esfera || u.esfera === f.esfera)
+    etapa2 = `<label class="pfd-campo"><span>Esfera</span>
+      <select class="form-control" id="pfd-esfera" onchange="pfdSetOnde('esfera', this.value)">
+        <option value="" ${!f.esfera ? 'selected' : ''}>Todas as esferas</option>
+        ${esferas.map(e => `<option value="${e.chave}" ${f.esfera === e.chave ? 'selected' : ''}>${esc(e.rotulo)} (${e.n})</option>`).join('')}
+      </select></label>
+      <label class="pfd-campo"><span>Unidade de Conservação</span>
+      <select class="form-control" id="pfd-uc" onchange="pfdSetOnde('uc', this.value)">
+        <option value="" ${!f.uc ? 'selected' : ''}>${f.esfera ? 'Todas desta esfera' : 'Todas as UCs'}</option>
+        ${lista.map(u => `<option value="${u.id}" ${f.uc === u.id ? 'selected' : ''}>${esc(u.nome)}</option>`).join('')}
+      </select></label>`
+  }
   return `
   <div class="pfd-campo"><span id="pfd-lbl-tipo">Mostrar</span>
     <div class="pfd-seg" role="group" aria-labelledby="pfd-lbl-tipo">
-      ${seg('ambos', 'Fogo e desmatamento')}${seg('queimada', 'Só queimadas', PFD_COR.queimada)}${seg('desmatamento', 'Só desmatamento', PFD_COR.desmatamento)}
+      ${seg('Tipo', 'ambos', f.tipo, 'Fogo e desmatamento')}${seg('Tipo', 'queimada', f.tipo, 'Só queimadas', PFD_COR.queimada)}${seg('Tipo', 'desmatamento', f.tipo, 'Só desmatamento', PFD_COR.desmatamento)}
     </div></div>
-  <label class="pfd-campo"><span>Local</span>
-    <select class="form-control" id="pfd-local" onchange="pfdSetFiltro('escopo', this.value)">
-      <option value="" ${!f.escopo ? 'selected' : ''}>Acre todo</option>
-      <option value="ucs" ${sel('ucs')}>Todas as Unidades de Conservação</option>
-      ${optsEsfera ? `<optgroup label="Por esfera">${optsEsfera}</optgroup>` : ''}
-      ${optsUC}
-    </select></label>
+  <div class="pfd-campo"><span id="pfd-lbl-onde">Onde</span>
+    <div class="pfd-seg" id="pfd-onde" role="group" aria-labelledby="pfd-lbl-onde">
+      ${seg('Nivel', 'acre', f.nivel, 'Acre todo')}${seg('Nivel', 'mun', f.nivel, 'Municípios')}${seg('Nivel', 'uc', f.nivel, 'Unidades de Conservação')}
+    </div></div>
+  ${etapa2}
   <label class="pfd-campo" id="pfd-campo-fonte" ${f.tipo === 'desmatamento' ? 'hidden' : ''}><span>Fonte dos focos</span>
     <select class="form-control" id="pfd-fonte" onchange="pfdSetFiltro('fonte', this.value)">
       <option value="firms" ${f.fonte === 'firms' ? 'selected' : ''}>FIRMS/NASA — temporada (jul–nov)</option>
@@ -192,15 +223,72 @@ function pfdFiltrosHTML(ucs) {
     <select class="form-control" id="pfd-ini" onchange="pfdSetFiltro('anoIni', +this.value)">${optAno(f.anoIni)}</select></label>
   <label class="pfd-campo"><span>Até</span>
     <select class="form-control" id="pfd-fim" onchange="pfdSetFiltro('anoFim', +this.value)">${optAno(f.anoFim)}</select></label>
-  <button type="button" class="btn btn-secondary" onclick="pfdLimpar()">Limpar filtros</button>`
+  <button type="button" class="btn btn-secondary" onclick="pfdLimpar()">Limpar filtros</button>
+  ${pfdTrilhaHTML(dados)}`
+}
+
+// Trilha do recorte: "Acre › Unidades de Conservação › UCs estaduais › <UC>".
+// Cada nível acima do atual é um botão que volta até ele.
+function pfdTrilhaHTML(dados) {
+  const f = _pfd.f
+  const niveis = [{ rot: 'Acre', ir: "pfdIrTrilha('acre')" }]
+  if (f.nivel === 'mun') {
+    niveis.push({ rot: 'Municípios', ir: "pfdIrTrilha('mun')" })
+    if (f.mun) niveis.push({ rot: (dados?.municipios || []).find(m => m.cd_ibge === f.mun)?.nome || 'Município' })
+  } else if (f.nivel === 'uc') {
+    niveis.push({ rot: 'Unidades de Conservação', ir: "pfdIrTrilha('uc')" })
+    if (f.esfera) niveis.push({ rot: PFD_ESFERAS.find(e => e.chave === f.esfera)?.rotulo || 'Esfera', ir: "pfdIrTrilha('esfera')" })
+    if (f.uc) niveis.push({ rot: (dados?.ucs || []).find(u => u.id === f.uc)?.nome || 'UC' })
+  }
+  const partes = niveis.map((n, i) => i === niveis.length - 1
+    ? `<span aria-current="page">${esc(n.rot)}</span>`
+    : `<button type="button" onclick="${n.ir}">${esc(n.rot)}</button>`)
+  return `<nav class="pfd-trilha" id="pfd-trilha" aria-label="Recorte escolhido">${partes.join('<span class="pfd-sep" aria-hidden="true">›</span>')}</nav>`
+}
+
+function pfdAtualizarFiltros() {
+  pfdSincEscopo()
+  const el = document.getElementById('pfd-filtros')
+  if (!el) return
+  // Mantém o foco no controle que o usuário acabou de usar (a barra é remontada).
+  const ativo = document.activeElement
+  const chave = ativo?.id || (ativo?.dataset?.grupo ? ativo.dataset.grupo + ':' + ativo.getAttribute('onclick') : null)
+  el.innerHTML = pfdFiltrosHTML(_pfd.dados)
+  if (chave) {
+    const alvo = ativo.id ? document.getElementById(ativo.id)
+      : [...el.querySelectorAll('button[data-grupo]')].find(b => b.dataset.grupo + ':' + b.getAttribute('onclick') === chave)
+    alvo?.focus()
+  }
+  pfdGravarHash()
 }
 
 function pfdSetTipo(t) {
   _pfd.f.tipo = t
-  const campoFonte = document.getElementById('pfd-campo-fonte')
-  if (campoFonte) campoFonte.hidden = t === 'desmatamento'   // fonte só vale para focos
-  document.querySelectorAll('.pfd-seg button').forEach(b =>
-    b.setAttribute('aria-pressed', String(b.getAttribute('onclick').includes(`'${t}'`))))
+  pfdAtualizarFiltros()
+  pfdRender()
+}
+function pfdSetNivel(n) {
+  const f = _pfd.f
+  if (f.nivel === n) return
+  f.nivel = n; f.mun = ''; f.esfera = ''; f.uc = ''
+  pfdAtualizarFiltros()
+  pfdRender()
+}
+function pfdSetOnde(campo, valor) {
+  const f = _pfd.f
+  f[campo] = valor
+  // Trocar de esfera invalida a UC escolhida se ela não for daquela esfera.
+  if (campo === 'esfera' && f.uc && valor && _pfd.dados.ucs.find(u => u.id === f.uc)?.esfera !== valor) f.uc = ''
+  pfdAtualizarFiltros()
+  pfdRender()
+}
+function pfdIrTrilha(ate) {
+  const f = _pfd.f
+  if (ate === 'acre') { f.nivel = 'acre'; f.mun = ''; f.esfera = ''; f.uc = '' }
+  else if (ate === 'mun') { f.nivel = 'mun'; f.mun = '' }
+  else if (ate === 'uc') { f.nivel = 'uc'; f.esfera = ''; f.uc = '' }
+  else if (ate === 'esfera') { f.uc = '' }
+  pfdAtualizarFiltros()
   pfdRender()
 }
 function pfdSetFiltro(campo, valor) {
@@ -212,12 +300,43 @@ function pfdSetFiltro(campo, valor) {
     document.getElementById('pfd-ini').value = _pfd.f.anoIni
     document.getElementById('pfd-fim').value = _pfd.f.anoFim
   }
+  pfdGravarHash()
   pfdRender()
 }
 function pfdLimpar() {
   _pfd.f = PFD_FILTRO_PADRAO()
-  document.getElementById('pfd-filtros').innerHTML = pfdFiltrosHTML(_pfd.dados.ucs)
+  pfdAtualizarFiltros()
   pfdRender()
+}
+
+// O recorte vai para o endereço (#…): link copiado abre no mesmo filtro.
+function pfdGravarHash() {
+  const f = _pfd.f, p = new URLSearchParams()
+  if (f.tipo !== 'ambos') p.set('tipo', f.tipo)
+  if (f.nivel !== 'acre') p.set('onde', f.nivel)
+  if (f.mun) p.set('mun', f.mun)
+  if (f.esfera) p.set('esfera', f.esfera)
+  if (f.uc) p.set('uc', f.uc)
+  if (f.fonte !== 'firms') p.set('fonte', f.fonte)
+  p.set('de', f.anoIni); p.set('ate', f.anoFim)
+  try { history.replaceState(null, '', '#' + p.toString()) } catch (_) { /* sandbox/iframe */ }
+}
+// Valor que não existe nos dados (link antigo, UC desativada) é ignorado,
+// nunca vira recorte vazio sem explicação.
+function pfdLerHash() {
+  const p = new URLSearchParams((location.hash || '').slice(1))
+  const f = PFD_FILTRO_PADRAO(), d = _pfd.dados
+  if (['queimada', 'desmatamento'].includes(p.get('tipo'))) f.tipo = p.get('tipo')
+  if (['mun', 'uc'].includes(p.get('onde'))) f.nivel = p.get('onde')
+  if (f.nivel === 'mun' && d.municipios.some(m => m.cd_ibge === p.get('mun'))) f.mun = p.get('mun')
+  if (f.nivel === 'uc' && PFD_ESFERAS.some(e => e.chave === p.get('esfera'))) f.esfera = p.get('esfera')
+  if (f.nivel === 'uc' && d.ucs.some(u => u.id === p.get('uc') && (!f.esfera || u.esfera === f.esfera))) f.uc = p.get('uc')
+  if (p.get('fonte') === 'bdq') f.fonte = 'bdq'
+  const de = +p.get('de'), ate = +p.get('ate')
+  if (de >= PFD_ANO_MIN && de <= PFD_ANO_ATUAL) f.anoIni = de
+  if (ate >= PFD_ANO_MIN && ate <= PFD_ANO_ATUAL) f.anoFim = ate
+  if (f.anoIni > f.anoFim) f.anoIni = f.anoFim
+  _pfd.f = f
 }
 
 function _pfdNomeEscopo() {
@@ -225,6 +344,7 @@ function _pfdNomeEscopo() {
   if (!e) return 'Acre todo'
   if (e === 'ucs') return 'todas as UCs'
   if (e.startsWith('esf:')) return PFD_ESFERAS.find(x => 'esf:' + x.chave === e)?.rotulo || 'UCs'
+  if (e.startsWith('mun:')) return _pfd.dados.municipios.find(m => m.cd_ibge === e.slice(4))?.nome || 'Município'
   return _pfd.dados.ucs.find(u => u.id === e)?.nome || 'UC'
 }
 
@@ -265,8 +385,17 @@ function pfdRender() {
   if (tEscopo === 'esfera' && f.escopo === 'esf:municipal') avisos.push('A esfera municipal tem uma única UC no cadastro, com números pequenos — os gráficos ficam quase vazios por isso, não por falha.')
 
   const destaque = tEscopo === 'uc' ? f.escopo : null
-  const recorte = tEscopo === 'uc' || tEscopo === 'esfera'
+  const recorte = tEscopo === 'uc' || tEscopo === 'esfera' || tEscopo === 'mun'
   const porEsfera = tEscopo === 'ucs'
+  const nesta = tEscopo === 'uc' ? 'nesta UC' : tEscopo === 'mun' ? 'neste município' : onde
+  // Ranking de UCs não recorta por município (UC atravessa divisa); no
+  // nível município quem compara é o ranking de municípios.
+  const mostraRankUC = tEscopo !== 'mun'
+  const mostraRankMun = f.nivel !== 'uc'
+  const destaqueMun = tEscopo === 'mun' ? f.escopo : null
+  const cardRankMun = (tipo, cor, unidade, titulo) => `<div class="pfd-card${mostraRankUC ? ' largo' : ''}"><h3>${titulo}</h3>
+    <p class="pfd-sub">Os ${(d.municipios || []).length} municípios no período${unidade === 'ha' ? ', em hectares' : ''}${destaqueMun ? ' · município escolhido em destaque' : ''}.</p>
+    <div class="pfd-ranking">${pfdRankingHTML(pfdRankingMun(d, f, tipo), { cor, unidade, rotulo: titulo, destaque: destaqueMun, max: 30, vazio: 'Nenhum município com registro no período.' })}</div></div>`
   let html = `<div class="pfd-kpis">${kpis.join('')}</div>`
   if (avisos.length) html += `<p class="pfd-aviso">${avisos.map(esc).join(' ')}</p>`
 
@@ -292,12 +421,13 @@ function pfdRender() {
       <div class="pfd-card"><h3>Focos por mês${bdq ? '' : ' da temporada'}</h3><p class="pfd-sub">Soma de todos os anos do período.</p>
         ${pfdBarrasHTML(meses, { cor: PFD_COR.queimada, unidade: 'focos', rotulo: 'Focos por mês' })}</div>
       ${cardTendencia(serie, PFD_COR.queimada, 'focos', 'Tendência dos focos de calor', subTend)}
-      <div class="pfd-card"><h3>${recorte ? `Focos: ${esc(tEscopo === 'uc' ? 'nesta UC' : onde)} × restante do Acre` : 'Focos dentro × fora de UCs'}</h3><p class="pfd-sub">Total do Acre no período.</p>
+      <div class="pfd-card"><h3>${recorte ? `Focos: ${esc(nesta)} × restante do Acre` : 'Focos dentro × fora de UCs'}</h3><p class="pfd-sub">Total do Acre no período.</p>
         ${pfdRoscaHTML(pfdDentroFora(d, f, 'queimada'), { unidade: 'focos', rotulo: 'Focos dentro e fora do recorte' })}</div>
       ${porEsfera ? `<div class="pfd-card"><h3>Focos em UCs por esfera</h3><p class="pfd-sub">Federal × estadual × municipal, no período.</p>
         ${pfdRoscaHTML(pfdPorEsfera(d, f, 'queimada'), { unidade: 'focos', rotulo: 'Focos em UCs por esfera' })}</div>` : ''}
-      <div class="pfd-card${porEsfera ? ' largo' : ''}"><h3>UCs com mais focos</h3><p class="pfd-sub">10 maiores no período${tEscopo === 'esfera' ? ' · só ' + esc(onde) : ''}${destaque ? ' · UC escolhida em destaque' : ''}.</p>
-        <div class="pfd-ranking">${pfdRankingHTML(pfdRankingUC(d, f, 'queimada'), { cor: PFD_COR.queimada, unidade: 'focos', rotulo: 'UCs com mais focos', destaque })}</div></div>
+      ${mostraRankUC ? `<div class="pfd-card${porEsfera ? ' largo' : ''}"><h3>UCs com mais focos</h3><p class="pfd-sub">10 maiores no período${tEscopo === 'esfera' ? ' · só ' + esc(onde) : ''}${destaque ? ' · UC escolhida em destaque' : ''}.</p>
+        <div class="pfd-ranking">${pfdRankingHTML(pfdRankingUC(d, f, 'queimada'), { cor: PFD_COR.queimada, unidade: 'focos', rotulo: 'UCs com mais focos', destaque })}</div></div>` : ''}
+      ${mostraRankMun ? cardRankMun('queimada', PFD_COR.queimada, 'focos', 'Focos por município') : ''}
     </div>`
   }
   if (mostraDesm) {
@@ -312,12 +442,13 @@ function pfdRender() {
       <div class="pfd-card"><h3>Desmatamento acumulado</h3><p class="pfd-sub">Soma da área desmatada desde ${f.anoIni}, em hectares.</p>
         ${pfdAreaHTML(acum, { cor: PFD_COR.desmatamento, unidade: 'ha acumulados', rotulo: 'Desmatamento acumulado' })}</div>
       ${cardTendencia(barras, PFD_COR.desmatamento, 'ha', 'Tendência do desmatamento', subTend)}
-      <div class="pfd-card"><h3>${recorte ? `Área: ${esc(tEscopo === 'uc' ? 'nesta UC' : onde)} × restante do Acre` : 'Área dentro × fora de UCs'}</h3><p class="pfd-sub">Total do Acre no período, em hectares.</p>
+      <div class="pfd-card"><h3>${recorte ? `Área: ${esc(nesta)} × restante do Acre` : 'Área dentro × fora de UCs'}</h3><p class="pfd-sub">Total do Acre no período, em hectares.</p>
         ${pfdRoscaHTML(pfdDentroFora(d, f, 'desmatamento'), { unidade: 'ha', rotulo: 'Área desmatada dentro e fora do recorte' })}</div>
       ${porEsfera ? `<div class="pfd-card"><h3>Área desmatada em UCs por esfera</h3><p class="pfd-sub">Federal × estadual × municipal, em hectares.</p>
         ${pfdRoscaHTML(pfdPorEsfera(d, f, 'desmatamento'), { unidade: 'ha', rotulo: 'Área desmatada em UCs por esfera' })}</div>` : ''}
-      <div class="pfd-card${porEsfera ? ' largo' : ''}"><h3>UCs com mais área desmatada</h3><p class="pfd-sub">10 maiores no período, em hectares${tEscopo === 'esfera' ? ' · só ' + esc(onde) : ''}${destaque ? ' · UC escolhida em destaque' : ''}.</p>
-        <div class="pfd-ranking">${pfdRankingHTML(pfdRankingUC(d, f, 'desmatamento'), { cor: PFD_COR.desmatamento, unidade: 'ha', rotulo: 'UCs com mais área desmatada', destaque })}</div></div>
+      ${mostraRankUC ? `<div class="pfd-card${porEsfera ? ' largo' : ''}"><h3>UCs com mais área desmatada</h3><p class="pfd-sub">10 maiores no período, em hectares${tEscopo === 'esfera' ? ' · só ' + esc(onde) : ''}${destaque ? ' · UC escolhida em destaque' : ''}.</p>
+        <div class="pfd-ranking">${pfdRankingHTML(pfdRankingUC(d, f, 'desmatamento'), { cor: PFD_COR.desmatamento, unidade: 'ha', rotulo: 'UCs com mais área desmatada', destaque })}</div></div>` : ''}
+      ${mostraRankMun ? cardRankMun('desmatamento', PFD_COR.desmatamento, 'ha', 'Área desmatada por município') : ''}
     </div>`
   }
 
@@ -330,7 +461,10 @@ function pfdRender() {
       FIRMS porque conta um satélite, não três. O ano entra quando o INPE publica o arquivo anual.</li>
     <li>As duas séries de focos <strong>nunca são somadas</strong>: satélites e janelas diferentes contariam o mesmo fogo duas vezes.</li>
     <li><strong>Desmatamento</strong>: PRODES/INPE, disponível a partir de 2008. O total do Acre é o número oficial do
-      INPE; a área por UC é o cruzamento dos polígonos do PRODES com o limite de cada UC, calculado no sistema.</li>
+      INPE; a área por UC e por município é o cruzamento dos polígonos do PRODES com o limite de cada um, calculado no sistema.</li>
+    <li><strong>Municípios</strong>: limites da malha municipal do IBGE. Cada foco e cada polígono do PRODES é atribuído ao
+      município onde cai; a soma dos 22 municípios bate com o total do Acre. Uma UC pode atravessar a divisa de municípios,
+      por isso o ranking de UCs não aparece quando um município está escolhido.</li>
     <li><strong>Desmatado × floresta que resta</strong>: soma o desmatamento acumulado até 2007 (camada própria do PRODES),
       o desmatamento anual desde 2008 e o resíduo (desmatamento antigo detectado depois, contado no ano da detecção).
       A floresta que resta é a área total menos o desmatado, a vegetação natural não florestal e os rios — o PRODES não

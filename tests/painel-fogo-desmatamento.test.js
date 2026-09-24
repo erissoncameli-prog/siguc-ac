@@ -23,7 +23,11 @@
 //  - SALDO desmatado × floresta que resta: soma o acumulado até 2007 + a
 //    série anual + o resíduo (no ano da detecção); "Acre todo" usa os
 //    números do estado, UC/esfera a interseção; o ano segue o "Até" e
-//    para no último PRODES publicado.
+//    para no último PRODES publicado;
+//  - MUNICÍPIO (migration 345): recorta focos/desmatamento/saldo pelas
+//    tabelas *_mun_*, ranking dos municípios com o escolhido destacado;
+//  - filtro EM ETAPAS: cada nível revela só o próximo campo, a trilha
+//    volta um nível, e o recorte sobrevive no endereço (#…).
 
 const fs = require('node:fs');
 const path = require('node:path');
@@ -58,6 +62,19 @@ const DADOS = {
     { classe: 'residuo', ano: 2025, uc_id: 'A', area_ha: 100 },
     { classe: 'area_total', ano: 0, uc_id: 'B', area_ha: 50000 },
     { classe: 'd2007', ano: 2007, uc_id: 'B', area_ha: 0 },
+    { classe: 'area_total', ano: 0, uc_id: null, cd_ibge: 'M1', area_ha: 500000 },
+    { classe: 'd2007', ano: 2007, uc_id: null, cd_ibge: 'M1', area_ha: 50000 },
+  ],
+  // Municípios (migration 345): somam o mesmo total do estado.
+  municipios: [{ cd_ibge: 'M1', nome: 'Rio Branco' }, { cd_ibge: 'M2', nome: 'Feijó' }],
+  focosMunMes: [
+    { ano: 2024, mes: 8, cd_ibge: 'M1', focos: 600 },
+    { ano: 2024, mes: 9, cd_ibge: 'M2', focos: 410 },
+    { ano: 2026, mes: 8, cd_ibge: 'M1', focos: 55 },
+  ],
+  prodesMunAno: [
+    { ano: 2024, cd_ibge: 'M1', poligonos: 3000, area_ha: 30000 },
+    { ano: 2024, cd_ibge: 'M2', poligonos: 2699, area_ha: 11135 },
   ],
   focosUcMes: [
     { ano: 2024, mes: 8, uc_id: 'A', focos: 100 },
@@ -335,6 +352,32 @@ test('gráfico de tendência: barras navegáveis + retas rotuladas, veredito com
   expect(r.insuf).toContain('mínimo 5');
 });
 
+test('município: focos, desmatamento, ranking, rosca e saldo pelo cd_ibge', async ({ page }) => {
+  await carregar(page);
+  const m = F({ escopo: 'mun:M2' });
+  expect(await rodar(page, 'pfdFocosPorAno', m)).toEqual([
+    { ano: 2024, n: 410, parcial: false },
+    { ano: 2025, n: null, parcial: false },
+    { ano: 2026, n: 0, parcial: true },
+  ]);
+  const desm = await rodar(page, 'pfdDesmatPorAno', m);
+  expect(desm.find(p => p.ano === 2024).ha).toBe(11135);
+  expect(desm.find(p => p.ano === 2025).ha).toBeNull();          // sem linha municipal = sem dado, nunca zero
+  const rank = await rodar(page, 'pfdRankingMun', F({}), 'queimada');
+  expect(rank.map(r => [r.nome, r.valor])).toEqual([['Rio Branco', 655], ['Feijó', 410]]);
+  expect(rank[0].uc_id).toBe('mun:M1');                           // mesma chave que o destaque usa
+  const rosca = await rodar(page, 'pfdDentroFora', m, 'desmatamento');
+  expect(rosca.map(r => r.rotulo)).toEqual(['Neste município', 'Restante do Acre']);
+  expect(rosca[0].n).toBe(11135);
+  expect(rosca[1].n).toBe(41135 + 27546 - 11135);
+  const cob = await rodar(page, 'pfdCobertura', F({ escopo: 'mun:M1', anoFim: 2024 }));
+  expect(cob.area).toBe(500000);
+  expect(cob.d2007).toBe(50000);
+  expect(cob.recente).toBe(30000);
+  // a linha municipal da cobertura nunca entra no total do estado
+  expect((await rodar(page, 'pfdCobertura', F({ anoFim: 2024 }))).area).toBe(1000000);
+});
+
 // ── Página real (cliente Supabase simulado) ───────────────────────
 // Mesmo contorno de tests/agua-conferencia-filtros.test.js: sem bloquear
 // o CDN, o supabase-js real sobrescreve o stub e a página cai no login.
@@ -374,6 +417,25 @@ const TABELAS = {
     { classe: 'd2007', ano: 2007, uc_id: 'A', area_ha: 39590 },
     { classe: 'area_total', ano: 0, uc_id: 'B', area_ha: 693464 },
     { classe: 'd2007', ano: 2007, uc_id: 'B', area_ha: 283 },
+    { classe: 'area_total', ano: 0, uc_id: null, cd_ibge: '1200302', area_ha: 2797000 },
+    { classe: 'd2007', ano: 2007, uc_id: null, cd_ibge: '1200302', area_ha: 100000 },
+  ],
+  municipios_acre: [{ cd_ibge: '1200302', nome: 'Feijó' }, { cd_ibge: '1200401', nome: 'Rio Branco' }],
+  focos_mun_mes: [
+    { ano: 2023, mes: 8, cd_ibge: '1200401', focos: 1000, origem: 'serie_historica' },
+    { ano: 2023, mes: 9, cd_ibge: '1200302', focos: 2300, origem: 'serie_historica' },
+    { ano: 2024, mes: 8, cd_ibge: '1200401', focos: 300, origem: 'serie_historica' },
+    { ano: 2024, mes: 9, cd_ibge: '1200302', focos: 710, origem: 'serie_historica' },
+  ],
+  focos_bdq_mun_mes: [
+    { ano: 2023, mes: 9, cd_ibge: '1200401', focos: 262 },
+    { ano: 2024, mes: 9, cd_ibge: '1200302', focos: 8408 },
+  ],
+  prodes_mun_ano: [
+    { ano: 2023, cd_ibge: '1200401', poligonos: 3000, area_ha: 20000 },
+    { ano: 2023, cd_ibge: '1200302', poligonos: 2877, area_ha: 26295 },
+    { ano: 2024, cd_ibge: '1200401', poligonos: 2000, area_ha: 11135 },
+    { ano: 2024, cd_ibge: '1200302', poligonos: 3699, area_ha: 30000 },
   ],
   prodes_uc_ano: [
     { ano: 2023, uc_id: 'A', poligonos: 600, area_ha: 3800 },
@@ -382,7 +444,7 @@ const TABELAS = {
   ],
 };
 
-async function abrirPainel(page) {
+async function abrirPainel(page, hash = '') {
   await page.route('**/cdn.jsdelivr.net/**', route => route.abort());
   await page.addInitScript(([usuario, tabelas]) => {
     window.loadEnv = () => Promise.resolve({ supabaseUrl: 'http://fake.test', supabaseKey: 'fake-key' });
@@ -410,7 +472,7 @@ async function abrirPainel(page) {
       }),
     };
   }, [USUARIO_STUB, TABELAS]);
-  await page.goto(`${BASE}/pages/painel-fogo-desmatamento.html`);
+  await page.goto(`${BASE}/pages/painel-fogo-desmatamento.html${hash}`);
   await page.locator('.pfd-kpis').waitFor({ state: 'visible', timeout: 20_000 });
 }
 
@@ -447,8 +509,10 @@ test('página: abre com linha, barras, tendência, rosca, ranking e área nas du
   const titulos = await page.locator('.pfd-card h3').allInnerTexts();
   expect(titulos).toEqual([
     'Focos de calor por ano', 'Focos por mês da temporada', 'Tendência dos focos de calor', 'Focos dentro × fora de UCs', 'UCs com mais focos',
+    'Focos por município',
     'Área desmatada × floresta que resta — Acre todo', 'Como chegou até aqui — Acre todo',
     'Área desmatada por ano', 'Desmatamento acumulado', 'Tendência do desmatamento', 'Área dentro × fora de UCs', 'UCs com mais área desmatada',
+    'Área desmatada por município',
   ]);
   // linha, barras, rosca e área desenhados de verdade (SVG com <title>)
   expect(await page.locator('.pfd-card svg title').count()).toBeGreaterThan(10);
@@ -470,7 +534,8 @@ test('página: "Só queimadas" esconde o desmatamento e vice-versa', async ({ pa
 test('página: escolher uma UC recorta os números e muda a rosca para "nesta UC"', async ({ page }) => {
   await abrirPainel(page);
   await page.selectOption('#pfd-ini', '2023');
-  await page.selectOption('#pfd-local', 'A');
+  await page.getByRole('button', { name: 'Unidades de Conservação' }).click();
+  await page.selectOption('#pfd-uc', 'A');
   await expect(page.locator('.pfd-secao-titulo').first()).toContainText('RESEX Chico Mendes');
   await expect(page.locator('.pfd-kpi').first()).toContainText('400');       // 300 + 100 focos na UC
   await expect(page.locator('.pfd-card h3', { hasText: 'nesta UC' }).first()).toBeVisible();
@@ -489,12 +554,17 @@ test('página: período invertido é corrigido, nunca vira tela vazia', async ({
 
 test('página: filtro por esfera e "Todas as UCs" com a rosca por esfera', async ({ page }) => {
   await abrirPainel(page);
-  const opcoes = await page.locator('#pfd-local optgroup[label="Por esfera"] option').allInnerTexts();
-  expect(opcoes).toEqual(['UCs federais (1)', 'UCs estaduais (1)']);   // esfera sem UC não vira opção
-  await page.selectOption('#pfd-local', 'esf:federal');
+  await page.getByRole('button', { name: 'Unidades de Conservação' }).click();
+  // "Todas as UCs" é o primeiro passo do nível UC
+  await expect(page.locator('.pfd-card h3', { hasText: 'Focos em UCs por esfera' })).toBeVisible();
+  const opcoes = await page.locator('#pfd-esfera option').allInnerTexts();
+  expect(opcoes).toEqual(['Todas as esferas', 'UCs federais (1)', 'UCs estaduais (1)']);   // esfera sem UC não vira opção
+  await page.selectOption('#pfd-esfera', 'federal');
   await expect(page.locator('.pfd-secao-titulo').first()).toContainText('UCs federais');
   await expect(page.locator('#pfd-conteudo')).toContainText('Restante do Acre');
-  await page.selectOption('#pfd-local', 'ucs');
+  // a lista de UCs passa a ter só as da esfera
+  expect(await page.locator('#pfd-uc option').allInnerTexts()).toEqual(['Todas desta esfera', 'RESEX Chico Mendes']);
+  await page.selectOption('#pfd-esfera', '');
   await expect(page.locator('.pfd-card h3', { hasText: 'Focos em UCs por esfera' })).toBeVisible();
   await expect(page.locator('.pfd-card h3', { hasText: 'Área desmatada em UCs por esfera' })).toBeVisible();
 });
@@ -518,9 +588,76 @@ test('página: saldo desmatado × floresta que resta segue o local e o "Até"', 
   await expect(resumo).toContainText('2.034.279 ha');
   await expect(resumo).toContainText('Até 2024');
   await expect(page.locator('.pfd-card h3', { hasText: 'Área desmatada × floresta que resta' }).locator('xpath=..').locator('svg text').first()).toContainText('%');
-  await page.selectOption('#pfd-local', 'A');
+  await page.getByRole('button', { name: 'Unidades de Conservação' }).click();
+  await page.selectOption('#pfd-uc', 'A');
   await expect(resumo).toContainText('926.748 ha no total');   // a área da UC vira o total
   await expect(page.locator('.pfd-card h3', { hasText: 'Como chegou até aqui — RESEX Chico Mendes' })).toBeVisible();
   await page.selectOption('#pfd-fim', '2023');
   await expect(resumo).toContainText('Até 2023');
+});
+
+test('página: filtro em etapas — cada nível revela só o próximo campo', async ({ page }) => {
+  await abrirPainel(page);
+  await expect(page.locator('#pfd-mun')).toHaveCount(0);
+  await expect(page.locator('#pfd-uc')).toHaveCount(0);
+  await expect(page.locator('#pfd-trilha')).toHaveText('Acre');
+  await page.getByRole('button', { name: 'Municípios' }).click();
+  await expect(page.locator('#pfd-mun')).toBeVisible();
+  await expect(page.locator('#pfd-uc')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Unidades de Conservação' }).click();
+  await expect(page.locator('#pfd-mun')).toHaveCount(0);
+  await expect(page.locator('#pfd-esfera')).toBeVisible();
+  await expect(page.locator('#pfd-uc')).toBeVisible();
+  await page.selectOption('#pfd-esfera', 'estadual');
+  await page.selectOption('#pfd-uc', 'B');
+  await expect(page.locator('#pfd-trilha')).toHaveText(/Acre\s*›\s*Unidades de Conservação\s*›\s*UCs estaduais\s*›\s*Parque Estadual Chandless/);
+  // a trilha volta um nível: esfera sem a UC
+  await page.locator('#pfd-trilha button', { hasText: 'UCs estaduais' }).click();
+  await expect(page.locator('#pfd-uc')).toHaveValue('');
+  await expect(page.locator('#pfd-esfera')).toHaveValue('estadual');
+  await page.locator('#pfd-trilha button', { hasText: 'Acre' }).click();
+  await expect(page.locator('#pfd-esfera')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Acre todo' })).toHaveAttribute('aria-pressed', 'true');
+});
+
+test('página: município recorta tudo, destaca no ranking e esconde o ranking de UCs', async ({ page }) => {
+  await abrirPainel(page);
+  await page.getByRole('button', { name: 'Municípios' }).click();
+  // sem município escolhido: Acre inteiro, ranking comparando os municípios
+  await expect(page.locator('.pfd-card h3', { hasText: 'Focos por município' })).toBeVisible();
+  await page.selectOption('#pfd-mun', '1200302');
+  await expect(page.locator('.pfd-secao-titulo').first()).toContainText('Feijó');
+  await expect(page.locator('.pfd-kpi').first()).toContainText('3.010');           // 2.300 + 710
+  await expect(page.locator('.pfd-kpis')).toContainText('56.295');                 // 26.295 + 30.000 ha
+  await expect(page.locator('.pfd-card h3', { hasText: 'neste município' }).first()).toBeVisible();
+  await expect(page.locator('.pfd-card h3', { hasText: 'UCs com mais' })).toHaveCount(0);
+  await expect(page.locator('.pfd-cob-resumo')).toContainText('2.797.000 ha no total');
+  // destaque: o escolhido em negrito no ranking
+  const negrito = await page.locator('.pfd-card', { hasText: 'Focos por município' })
+    .locator('svg text[font-weight="700"]').allTextContents();
+  expect(negrito).toEqual(['Feijó']);
+  await expect(page.locator('#pfd-trilha')).toHaveText(/Acre\s*›\s*Municípios\s*›\s*Feijó/);
+  await page.locator('#pfd-trilha button', { hasText: 'Municípios' }).click();
+  await expect(page.locator('#pfd-mun')).toHaveValue('');
+  await expect(page.locator('.pfd-secao-titulo').first()).toContainText('Acre todo');
+});
+
+test('página: o recorte vai para o endereço e volta ao abrir o link', async ({ page }) => {
+  await abrirPainel(page);
+  await page.getByRole('button', { name: 'Municípios' }).click();
+  await page.selectOption('#pfd-mun', '1200302');
+  await page.selectOption('#pfd-ini', '2023');
+  const hash = await page.evaluate(() => location.hash);
+  expect(hash).toContain('onde=mun');
+  expect(hash).toContain('mun=1200302');
+  const pg2 = await page.context().newPage();
+  await abrirPainel(pg2, hash);
+  await expect(pg2.locator('#pfd-mun')).toHaveValue('1200302');
+  await expect(pg2.locator('#pfd-ini')).toHaveValue('2023');
+  await expect(pg2.locator('.pfd-secao-titulo').first()).toContainText('Feijó');
+  // link com valor que não existe cai no padrão, nunca em tela vazia
+  const pg3 = await page.context().newPage();
+  await abrirPainel(pg3, '#onde=mun&mun=9999999&de=1800');
+  await expect(pg3.locator('#pfd-mun')).toHaveValue('');
+  await expect(pg3.locator('#pfd-ini')).toHaveValue('2008');
 });

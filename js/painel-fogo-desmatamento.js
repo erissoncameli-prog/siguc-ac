@@ -73,7 +73,8 @@ function _pfdEsc(s) {
 
 // ── Filtro ────────────────────────────────────────────────────────
 // escopo: '' = Acre todo · 'ucs' = dentro de qualquer UC ·
-//         'esf:<federal|estadual|municipal>' = UCs daquela esfera · <uuid> = uma UC
+//         'esf:<federal|estadual|municipal>' = UCs daquela esfera · <uuid> = uma UC ·
+//         'mun:<código IBGE>' = um município (tabelas *_mun_*, migration 345)
 function _pfdPred(dados, escopo) {
   if (!escopo) return () => true
   if (escopo === 'ucs') return id => id != null
@@ -88,13 +89,26 @@ function pfdEscopoTipo(escopo) {
   if (!escopo) return 'acre'
   if (escopo === 'ucs') return 'ucs'
   if (escopo.startsWith('esf:')) return 'esfera'
+  if (escopo.startsWith('mun:')) return 'mun'
   return 'uc'
 }
-// Linhas e meses da fonte de focos escolhida.
-function _pfdFogo(dados, f) {
+// Linhas e meses da fonte de focos escolhida. Recorte por município lê as
+// tabelas por município (cd_ibge); os demais, as por UC (uc_id). As duas
+// somam o MESMO total do estado (conferido: 2024 = 47.805 nas duas).
+function _pfdFogo(dados, f, porMun) {
+  const mun = porMun ?? pfdEscopoTipo(f.escopo) === 'mun'
   return f.fonte === 'bdq'
-    ? { linhas: dados.bdqUcMes || [], resumo: dados.bdqResumo || [], meses: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], parcialAtual: false }
-    : { linhas: dados.focosUcMes || [], resumo: dados.focosResumo || [], meses: [7, 8, 9, 10, 11], parcialAtual: true }
+    ? { linhas: (mun ? dados.bdqMunMes : dados.bdqUcMes) || [], resumo: dados.bdqResumo || [], meses: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], parcialAtual: false }
+    : { linhas: (mun ? dados.focosMunMes : dados.focosUcMes) || [], resumo: dados.focosResumo || [], meses: [7, 8, 9, 10, 11], parcialAtual: true }
+}
+// "Esta linha está no recorte?" — olha cd_ibge (município) ou uc_id (UC).
+function _pfdNoLinha(dados, f) {
+  if (pfdEscopoTipo(f.escopo) === 'mun') {
+    const cd = f.escopo.slice(4)
+    return r => r.cd_ibge === cd
+  }
+  const no = _pfdPred(dados, f.escopo)
+  return r => no(r.uc_id)
 }
 function _pfdAnos(f) {
   const out = []
@@ -104,10 +118,10 @@ function _pfdAnos(f) {
 
 // ── Fogo ──────────────────────────────────────────────────────────
 function pfdFocosPorAno(dados, f) {
-  const fg = _pfdFogo(dados, f), no = _pfdPred(dados, f.escopo)
+  const fg = _pfdFogo(dados, f), no = _pfdNoLinha(dados, f)
   const soma = {}
   for (const r of fg.linhas) {
-    if (r.ano < f.anoIni || r.ano > f.anoFim || !no(r.uc_id)) continue
+    if (r.ano < f.anoIni || r.ano > f.anoFim || !no(r)) continue
     soma[r.ano] = (soma[r.ano] || 0) + Number(r.focos)
   }
   const resumo = {}
@@ -121,28 +135,29 @@ function pfdFocosPorAno(dados, f) {
 }
 
 function pfdFocosPorMes(dados, f) {
-  const fg = _pfdFogo(dados, f), no = _pfdPred(dados, f.escopo)
+  const fg = _pfdFogo(dados, f), no = _pfdNoLinha(dados, f)
   const soma = {}
   for (const m of fg.meses) soma[m] = 0
   for (const r of fg.linhas) {
-    if (r.ano < f.anoIni || r.ano > f.anoFim || !no(r.uc_id)) continue
+    if (r.ano < f.anoIni || r.ano > f.anoFim || !no(r)) continue
     if (soma[r.mes] != null) soma[r.mes] += Number(r.focos)
   }
   return fg.meses.map(mes => ({ mes, n: soma[mes] }))
 }
 
 // ── Desmatamento ──────────────────────────────────────────────────
-// Acre todo = número OFICIAL do INPE; UC = interseção calculada.
+// Acre todo = número OFICIAL do INPE; UC/município = interseção calculada.
 function pfdDesmatPorAno(dados, f) {
   const porAno = {}
-  const no = _pfdPred(dados, f.escopo)
+  const no = _pfdNoLinha(dados, f)
+  const linhas = (pfdEscopoTipo(f.escopo) === 'mun' ? dados.prodesMunAno : dados.prodesUcAno) || []
   if (!f.escopo) {
     for (const r of dados.prodesAno || []) porAno[r.ano] = { ha: Number(r.area_ha), poligonos: Number(r.poligonos) }
   } else {
-    const temAno = new Set((dados.prodesUcAno || []).map(r => r.ano))
+    const temAno = new Set(linhas.map(r => r.ano))
     for (const a of temAno) porAno[a] = { ha: 0, poligonos: 0 }
-    for (const r of dados.prodesUcAno || []) {
-      if (!no(r.uc_id)) continue
+    for (const r of linhas) {
+      if (!no(r)) continue
       porAno[r.ano].ha += Number(r.area_ha)
       porAno[r.ano].poligonos += Number(r.poligonos)
     }
@@ -170,7 +185,7 @@ function pfdRankingUC(dados, f, tipo) {
   const valor = {}
   const esfera = pfdEscopoTipo(f.escopo) === 'esfera' ? f.escopo.slice(4) : null
   if (tipo === 'queimada') {
-    for (const r of _pfdFogo(dados, f).linhas) {
+    for (const r of _pfdFogo(dados, f, false).linhas) {
       if (!r.uc_id || r.ano < f.anoIni || r.ano > f.anoFim) continue
       valor[r.uc_id] = (valor[r.uc_id] || 0) + Number(r.focos)
     }
@@ -186,11 +201,48 @@ function pfdRankingUC(dados, f, tipo) {
     .sort((a, b) => b.valor - a.valor || a.nome.localeCompare(b.nome, 'pt-BR'))
 }
 
+// ── Ranking de municípios (o escolhido fica destacado) ────────────
+function pfdRankingMun(dados, f, tipo) {
+  const valor = {}
+  if (tipo === 'queimada') {
+    for (const r of _pfdFogo(dados, f, true).linhas) {
+      if (!r.cd_ibge || r.ano < f.anoIni || r.ano > f.anoFim) continue
+      valor[r.cd_ibge] = (valor[r.cd_ibge] || 0) + Number(r.focos)
+    }
+  } else {
+    for (const r of dados.prodesMunAno || []) {
+      if (r.ano < f.anoIni || r.ano > f.anoFim) continue
+      valor[r.cd_ibge] = (valor[r.cd_ibge] || 0) + Number(r.area_ha)
+    }
+  }
+  return (dados.municipios || [])
+    .map(m => ({ uc_id: 'mun:' + m.cd_ibge, nome: m.nome, valor: valor[m.cd_ibge] || 0 }))
+    .sort((a, b) => b.valor - a.valor || a.nome.localeCompare(b.nome, 'pt-BR'))
+}
+
 // ── Dentro × fora (rosca) ─────────────────────────────────────────
-// Acre todo / todas as UCs: dentro × fora de UCs. Esfera ou uma UC:
-// o recorte escolhido × restante do Acre.
+// Acre todo / todas as UCs: dentro × fora de UCs. Esfera, uma UC ou um
+// município: o recorte escolhido × restante do Acre.
 function pfdDentroFora(dados, f, tipo) {
   const t = pfdEscopoTipo(f.escopo)
+  if (t === 'mun') {
+    const no = _pfdNoLinha(dados, f)
+    let dentro = 0, total = 0
+    if (tipo === 'queimada') {
+      for (const r of _pfdFogo(dados, f, true).linhas) {
+        if (r.ano < f.anoIni || r.ano > f.anoFim) continue
+        total += Number(r.focos)
+        if (no(r)) dentro += Number(r.focos)
+      }
+    } else {
+      for (const r of dados.prodesAno || []) if (r.ano >= f.anoIni && r.ano <= f.anoFim) total += Number(r.area_ha)
+      for (const r of dados.prodesMunAno || []) if (r.ano >= f.anoIni && r.ano <= f.anoFim && no(r)) dentro += Number(r.area_ha)
+    }
+    return [
+      { rotulo: 'Neste município', n: dentro, cor: PFD_COR.dentro },
+      { rotulo: 'Restante do Acre', n: Math.max(0, total - dentro), cor: PFD_COR.fora },
+    ]
+  }
   const no = t === 'acre' || t === 'ucs' ? (id => id != null) : _pfdPred(dados, f.escopo)
   let dentro = 0, total = 0
   if (tipo === 'queimada') {
@@ -222,7 +274,7 @@ function pfdPorEsfera(dados, f, tipo) {
   const esferaDe = {}
   for (const u of dados.ucs || []) esferaDe[u.id] = u.esfera
   const soma = { federal: 0, estadual: 0, municipal: 0 }
-  const linhas = tipo === 'queimada' ? _pfdFogo(dados, f).linhas : (dados.prodesUcAno || [])
+  const linhas = tipo === 'queimada' ? _pfdFogo(dados, f, false).linhas : (dados.prodesUcAno || [])
   for (const r of linhas) {
     if (!r.uc_id || r.ano < f.anoIni || r.ano > f.anoFim) continue
     const e = esferaDe[r.uc_id]
@@ -297,11 +349,16 @@ function pfdTendencias(pontos) {
 function pfdCobertura(dados, f) {
   const linhas = dados.cobertura || []
   const t = pfdEscopoTipo(f.escopo)
-  const no = t === 'acre' ? (id => id == null) : _pfdPred(dados, f.escopo)
+  // Linha do ESTADO = sem UC e sem município; UC = uc_id; município = cd_ibge.
+  const noUc = _pfdPred(dados, f.escopo)
+  const cd = t === 'mun' ? f.escopo.slice(4) : null
+  const no = t === 'acre' ? (r => r.uc_id == null && r.cd_ibge == null)
+    : t === 'mun' ? (r => r.cd_ibge === cd)
+    : (r => r.uc_id != null && noUc(r.uc_id))
   let area = 0, d2007 = 0, outros = 0, temArea = false
   const residuo = {}
   for (const r of linhas) {
-    if (!no(r.uc_id) || (t !== 'acre' && r.uc_id == null)) continue
+    if (!no(r)) continue
     const v = Number(r.area_ha) || 0
     if (r.classe === 'area_total') { area += v; temArea = true }
     else if (r.classe === 'd2007') d2007 += v
@@ -310,7 +367,9 @@ function pfdCobertura(dados, f) {
   }
   if (!temArea || !(area > 0)) return null
   const anual = {}
-  const fonteAnual = t === 'acre' ? (dados.prodesAno || []) : (dados.prodesUcAno || []).filter(r => no(r.uc_id))
+  const fonteAnual = t === 'acre' ? (dados.prodesAno || [])
+    : t === 'mun' ? (dados.prodesMunAno || []).filter(r => r.cd_ibge === cd)
+    : (dados.prodesUcAno || []).filter(r => noUc(r.uc_id))
   for (const r of fonteAnual) anual[r.ano] = (anual[r.ano] || 0) + Number(r.area_ha)
   const anosPublicados = (dados.prodesAno || []).map(r => r.ano)
   const ultimo = anosPublicados.length ? Math.max(...anosPublicados) : 2007
@@ -668,7 +727,7 @@ if (typeof window !== 'undefined') {
     PFD_COR, PFD_MESES, pfdFocosPorAno, pfdFocosPorMes, pfdDesmatPorAno, pfdAcumulado,
     PFD_ESFERAS, PFD_TEND_MIN_ANOS, pfdCobertura, pfdEmpilhadaHTML, pfdEscopoTipo, pfdPorEsfera, pfdTendencia, pfdTendencias,
     pfdTendenciaHTML, pfdTendenciaFrase, pfdTendenciaResumoHTML,
-    pfdRankingUC, pfdDentroFora, pfdKpis, pfdFaixasAnos,
+    pfdRankingUC, pfdRankingMun, pfdDentroFora, pfdKpis, pfdFaixasAnos,
     pfdLinhaHTML, pfdAreaHTML, pfdBarrasHTML, pfdRankingHTML, pfdRoscaHTML,
   })
 }
