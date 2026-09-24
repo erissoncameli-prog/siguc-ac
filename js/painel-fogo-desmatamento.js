@@ -415,6 +415,239 @@ function pfdKpis(dados, f) {
 }
 
 // ══════════════════════════════════════════════════════════════════
+// Parecer: leitura escrita do recorte, montada por REGRAS a partir dos
+// números desta tela + clima (ERA5) + ENSO (migration 346). Nenhuma API
+// de IA: cada frase sai de uma comparação medida, e o texto diz o que é
+// associação e o que ele NÃO sabe. Nunca inventa causa.
+// ══════════════════════════════════════════════════════════════════
+const PFD_SECA_DIAS = 122   // jun–set completo
+// A série FIRMS (MODIS + VIIRS S-NPP) só tem o VIIRS a partir de 2012, e ele
+// detecta muito mais focos pequenos: o Acre passa de 3.418 (2011) a 23.974
+// (2012) sem o fogo ter sextuplicado. Comparar anos de um lado e do outro
+// dessa virada inventa alta. Tendência e comparações do FIRMS começam aqui;
+// o BDQueimadas (um satélite só) não tem essa quebra.
+const PFD_FIRMS_VIIRS_DESDE = 2012
+
+// Clima do recorte: município → o próprio; qualquer outro → estado ('AC').
+function pfdClimaDoRecorte(dados, f) {
+  const t = pfdEscopoTipo(f.escopo)
+  const cd = t === 'mun' ? f.escopo.slice(4) : 'AC'
+  const porAno = {}
+  for (const r of dados.clima || []) {
+    if (r.cd_ibge !== cd) continue
+    porAno[r.ano] = {
+      ano: Number(r.ano),
+      chuvaSeca: r.chuva_seca_mm == null ? null : Number(r.chuva_seca_mm),
+      diasSecos: r.dias_secos == null ? null : Number(r.dias_secos),
+      maiorSeca: r.maior_seq_seca == null ? null : Number(r.maior_seq_seca),
+      tmax: r.tmax_seca_c == null ? null : Number(r.tmax_seca_c),
+      umidMin: r.umid_min_seca == null ? null : Number(r.umid_min_seca),
+      completo: Number(r.dias_na_seca) >= PFD_SECA_DIAS,
+    }
+  }
+  return { fonte: t === 'mun' ? 'municipio' : 'estado', porAno }
+}
+
+// ENSO da estação seca (média do ONI jun–set). ≥ 0,5 El Niño; ≤ −0,5 La Niña.
+function pfdEnsoDoAno(dados, ano) {
+  const v = (dados.enso || []).filter(r => Number(r.ano) === ano && r.mes >= 6 && r.mes <= 9).map(r => Number(r.oni))
+  if (v.length < 4) return null
+  const oni = v.reduce((a, b) => a + b, 0) / v.length
+  const fase = oni >= 0.5 ? 'El Niño' : oni <= -0.5 ? 'La Niña' : 'neutro'
+  const forca = Math.abs(oni) >= 1.5 ? 'forte' : Math.abs(oni) >= 1 ? 'moderado' : Math.abs(oni) >= 0.5 ? 'fraco' : ''
+  return { oni, fase, forca }
+}
+
+// Spearman com postos médios nos empates. null com menos de 8 pares.
+function pfdSpearman(xs, ys) {
+  const pares = xs.map((x, i) => [x, ys[i]]).filter(([x, y]) => x != null && y != null)
+  const n = pares.length
+  if (n < 8) return null
+  const postos = v => {
+    const ord = v.map((x, i) => [x, i]).sort((a, b) => a[0] - b[0])
+    const r = new Array(v.length)
+    for (let i = 0; i < ord.length;) {
+      let j = i
+      while (j + 1 < ord.length && ord[j + 1][0] === ord[i][0]) j++
+      for (let k = i; k <= j; k++) r[ord[k][1]] = (i + j) / 2 + 1
+      i = j + 1
+    }
+    return r
+  }
+  const rx = postos(pares.map(p => p[0])), ry = postos(pares.map(p => p[1]))
+  const mx = rx.reduce((a, b) => a + b, 0) / n, my = ry.reduce((a, b) => a + b, 0) / n
+  let sxy = 0, sxx = 0, syy = 0
+  for (let i = 0; i < n; i++) { sxy += (rx[i] - mx) * (ry[i] - my); sxx += (rx[i] - mx) ** 2; syy += (ry[i] - my) ** 2 }
+  if (!sxx || !syy) return null
+  const rho = sxy / Math.sqrt(sxx * syy)
+  // teste t aproximado (n ≥ 8), bicaudal, pela normal
+  const tt = rho * Math.sqrt((n - 2) / Math.max(1e-9, 1 - rho * rho))
+  const p = 2 * (1 - _pfdPhi(Math.abs(tt)))
+  return { rho, n, p }
+}
+function _pfdForcaRho(r) {
+  const a = Math.abs(r.rho)
+  return a >= 0.6 ? 'forte' : a >= 0.3 ? 'moderada' : 'fraca'
+}
+function _pfdPct(a, b) { return b ? ((a - b) / b) * 100 : null }
+function _pfdRelMedia(pct, rot) {
+  if (pct == null) return ''
+  if (Math.abs(pct) < 5) return `perto da ${rot}`
+  return `${_pfdNum(Math.abs(pct), 0)}% ${pct > 0 ? 'acima' : 'abaixo'} da ${rot}`
+}
+function _pfdVar(pct) {
+  if (pct == null) return ''
+  if (Math.abs(pct) < 5) return 'praticamente igual'
+  return `${pct > 0 ? 'alta' : 'queda'} de ${_pfdNum(Math.abs(pct), 0)}%`
+}
+// posição do valor na série: "a 3ª mais seca de 25"
+function _pfdRanking(serie, ano, campo, maiorPrimeiro) {
+  const v = serie.filter(s => s[campo] != null && s.completo !== false)
+  const alvo = v.find(s => s.ano === ano)
+  if (!alvo || v.length < 5) return null
+  const ord = [...v].sort((a, b) => maiorPrimeiro ? b[campo] - a[campo] : a[campo] - b[campo])
+  return { pos: ord.findIndex(s => s.ano === ano) + 1, de: ord.length }
+}
+
+// Monta a leitura. Devolve { blocos: [{titulo, frases[]}], tabela: [...] }
+function pfdParecer(dados, f) {
+  const hoje = f.hoje instanceof Date ? f.hoje : new Date()
+  const mostraFogo = f.tipo !== 'desmatamento', mostraDesm = f.tipo !== 'queimada'
+  const focos = pfdFocosPorAno(dados, f)
+  const desm = pfdDesmatPorAno(dados, f)
+  const clima = pfdClimaDoRecorte(dados, f)
+  const n = v => _pfdNum(v, 0)
+  const blocos = []
+
+  // Tabela de fatores ano a ano (o que sustenta cada frase).
+  const tabela = focos.map(p => {
+    const c = clima.porAno[p.ano] || null
+    const d = desm.find(q => q.ano === p.ano)
+    return { ano: p.ano, focos: p.n, parcial: p.parcial, desmHa: d ? d.ha : null, clima: c, enso: pfdEnsoDoAno(dados, p.ano) }
+  })
+
+  const semClima = !tabela.some(t => t.clima && t.clima.completo)
+  const nomeClima = clima.fonte === 'municipio' ? 'no município' : 'no Acre (média ponderada dos 22 municípios)'
+
+  if (mostraFogo) {
+    const corteViirs = f.fonte !== 'bdq' && f.anoIni < PFD_FIRMS_VIIRS_DESDE
+    const fech = focos.filter(p => p.n != null && !p.parcial && (f.fonte === 'bdq' || p.ano >= PFD_FIRMS_VIIRS_DESDE))
+    const frases = []
+    if (corteViirs) frases.push(`Comparações a partir de ${PFD_FIRMS_VIIRS_DESDE}: antes disso a série FIRMS não tinha o satélite VIIRS, que detecta muito mais focos pequenos — misturar os dois períodos mostraria uma alta que é do satélite, não do fogo. Para olhar antes de ${PFD_FIRMS_VIIRS_DESDE}, use a fonte BDQueimadas.`)
+    if (fech.length < 2) {
+      frases.push('Período com menos de dois anos fechados de focos — não há comparação a fazer.')
+    } else {
+      const ult = fech[fech.length - 1], ant = fech[fech.length - 2]
+      const media = fech.reduce((a, p) => a + p.n, 0) / fech.length
+      const pico = fech.reduce((m, p) => (p.n > m.n ? p : m))
+      frases.push(`Em ${ult.ano}, ${n(ult.n)} focos: ${_pfdVar(_pfdPct(ult.n, ant.n))} em relação a ${ant.ano} (${n(ant.n)}), ${_pfdRelMedia(_pfdPct(ult.n, media), `média de ${fech[0].ano} a ${ult.ano}`)} (${n(media)} por ano).`)
+      if (pico.ano !== ult.ano) frases.push(`O ano com mais focos no período foi ${pico.ano} (${n(pico.n)}).`)
+      else frases.push(`${ult.ano} é o ano com mais focos do período.`)
+      const tt = pfdTendencias(fech.map(p => ({ ano: p.ano, valor: p.n })))
+      frases.push(`Tendência${corteViirs ? ` desde ${PFD_FIRMS_VIIRS_DESDE}` : ' do período'}: ${pfdTendenciaFrase(tt.total, 'focos')}.`)
+
+      // Clima do último ano fechado
+      const c = clima.porAno[ult.ano]
+      const serieC = Object.values(clima.porAno)
+      if (c && c.completo) {
+        const medChuva = _pfdMediana(serieC.filter(s => s.completo && s.chuvaSeca != null).map(s => s.chuvaSeca))
+        const rk = _pfdRanking(serieC, ult.ano, 'chuvaSeca', false)
+        const pctChuva = _pfdPct(c.chuvaSeca, medChuva)
+        const posTxt = !rk ? '' : rk.pos <= Math.ceil(rk.de / 2)
+          ? `, a ${rk.pos}ª mais seca de ${rk.de} anos` : `, a ${rk.de - rk.pos + 1}ª mais chuvosa de ${rk.de} anos`
+        frases.push(`Clima ${nomeClima}, estação seca de ${ult.ano} (jun–set): ${n(c.chuvaSeca)} mm de chuva (${_pfdRelMedia(pctChuva, `mediana de ${n(medChuva)} mm`)})${posTxt}; ${n(c.diasSecos)} dias sem chuva e maior sequência seca de ${n(c.maiorSeca)} dias.`)
+        const e = pfdEnsoDoAno(dados, ult.ano)
+        if (e) frases.push(e.fase === 'neutro'
+          ? `Oceano Pacífico em fase neutra na estação seca de ${ult.ano} (ONI ${_pfdNum(e.oni, 1)}).`
+          : `${e.fase} ${e.forca} na estação seca de ${ult.ano} (ONI ${_pfdNum(e.oni, 1)})${e.fase === 'El Niño' ? ' — fase associada a secas mais severas no sudoeste da Amazônia' : ' — fase que costuma trazer mais chuva à região'}.`)
+        // Leitura combinada: direção dos focos × estação seca
+        const subiu = ult.n > ant.n * 1.05, caiu = ult.n < ant.n * 0.95
+        const cAnt = clima.porAno[ant.ano]
+        const maisSeca = cAnt && cAnt.completo && c.chuvaSeca < cAnt.chuvaSeca * 0.9
+        const maisUmida = cAnt && cAnt.completo && c.chuvaSeca > cAnt.chuvaSeca * 1.1
+        if (subiu && maisSeca) frases.push(`A alta é coerente com uma estação seca mais seca que a de ${ant.ano}: menos chuva deixa a vegetação e o material das derrubadas mais inflamáveis.`)
+        else if (subiu && maisUmida) frases.push(`A alta aconteceu mesmo com uma estação seca mais chuvosa que a de ${ant.ano} — o clima não a explica. Ficam como hipóteses a verificar em campo: mais queima de áreas desmatadas ou de pastagem, e mudança no esforço de fiscalização.`)
+        else if (caiu && maisUmida) frases.push(`A queda é coerente com uma estação seca mais chuvosa que a de ${ant.ano}.`)
+        else if (caiu && maisSeca) frases.push(`A queda aconteceu apesar de uma estação seca mais seca que a de ${ant.ano} — o clima jogou contra, então outros fatores (prevenção, fiscalização, menos área derrubada para queimar) podem ter pesado; o sistema não mede esses fatores.`)
+        else if (subiu || caiu) frases.push(`A chuva da estação seca foi parecida com a de ${ant.ano}; a variação dos focos não se explica pelo volume de chuva.`)
+      } else if (!semClima) {
+        frases.push(`Sem dado de clima completo para a estação seca de ${ult.ano} neste recorte.`)
+      }
+
+      // Associação no período
+      const noCorte = t => f.fonte === 'bdq' || t.ano >= PFD_FIRMS_VIIRS_DESDE
+      const pares = tabela.filter(t => t.focos != null && !t.parcial && noCorte(t) && t.clima && t.clima.completo)
+      const rDias = pfdSpearman(pares.map(t => t.clima.diasSecos), pares.map(t => t.focos))
+      const rChuva = pfdSpearman(pares.map(t => t.clima.chuvaSeca), pares.map(t => t.focos))
+      const r = rDias && rChuva ? (Math.abs(rDias.rho) >= Math.abs(rChuva.rho) ? { ...rDias, var: 'dias sem chuva' } : { ...rChuva, var: 'chuva da estação seca' }) : null
+      if (r) {
+        if (r.p < 0.05) {
+          const sentido = (r.var === 'dias sem chuva') === (r.rho > 0) ? 'anos mais secos tiveram mais focos' : 'anos mais secos tiveram MENOS focos (relação contrária à esperada)'
+          frases.push(`No período (${r.n} anos), ${sentido}: correlação ${_pfdForcaRho(r)} entre focos e ${r.var} (Spearman ρ = ${_pfdNum(r.rho, 2)}). É associação, não prova de causa.`)
+        } else {
+          frases.push(`No período (${r.n} anos), a quantidade de focos não acompanhou de forma clara a seca de cada ano (Spearman ρ = ${_pfdNum(r.rho, 2)}, sem significância) — outros fatores, como o uso do solo, parecem pesar mais.`)
+        }
+      }
+      if (mostraDesm) {
+        const pd = tabela.filter(t => t.focos != null && !t.parcial && noCorte(t) && t.desmHa != null)
+        const rd = pfdSpearman(pd.map(t => t.desmHa), pd.map(t => t.focos))
+        if (rd && rd.p < 0.05) frases.push(`Focos e desmatamento andaram juntos no período (Spearman ρ = ${_pfdNum(rd.rho, 2)}, ${rd.n} anos): na Amazônia, boa parte do fogo é a queima do material derrubado.`)
+        else if (rd) frases.push(`Focos e desmatamento não andaram juntos de forma clara no período (Spearman ρ = ${_pfdNum(rd.rho, 2)}, ${rd.n} anos).`)
+      }
+    }
+    const parcial = focos.find(p => p.parcial && p.n != null)
+    if (parcial) frases.push(`${parcial.ano} ainda está em curso: ${n(parcial.n)} focos até agora, fora das comparações acima.`)
+    blocos.push({ titulo: 'Queimadas', frases })
+  }
+
+  if (mostraDesm) {
+    const fech = desm.filter(p => p.ha != null)
+    const frases = []
+    if (fech.length < 2) {
+      frases.push('Período com menos de dois anos do PRODES — não há comparação a fazer.')
+    } else {
+      const ult = fech[fech.length - 1], ant = fech[fech.length - 2]
+      const media = fech.reduce((a, p) => a + p.ha, 0) / fech.length
+      frases.push(`No ano-PRODES ${ult.ano} (ago/${ult.ano - 1} a jul/${ult.ano}), ${n(ult.ha)} ha desmatados: ${_pfdVar(_pfdPct(ult.ha, ant.ha))} em relação a ${ant.ano}, ${_pfdRelMedia(_pfdPct(ult.ha, media), 'média do período')} (${n(media)} ha/ano).`)
+      const tt = pfdTendencias(desm.map(p => ({ ano: p.ano, valor: p.ha })))
+      frases.push(`Tendência do período: ${pfdTendenciaFrase(tt.total, 'ha')}.`)
+      frases.push('O desmatamento responde sobretudo a fatores que esta base não mede — fiscalização, preço da terra e do gado, crédito, abertura de estradas —; por isso o texto não atribui causa às variações.')
+    }
+    blocos.push({ titulo: 'Desmatamento', frases })
+  }
+
+  const avisos = []
+  if (semClima) avisos.push(clima.fonte === 'municipio'
+    ? 'Dados de clima deste município ainda em carga (a série de 2001 em diante entra aos poucos, dentro da cota gratuita da fonte) — a leitura climática aparece assim que chegar.'
+    : 'Dados de clima do estado ainda em carga: a média do Acre só é calculada quando os 22 municípios estão completos.')
+  if (pfdEscopoTipo(f.escopo) !== 'mun' && pfdEscopoTipo(f.escopo) !== 'acre') avisos.push('Para UCs, o clima usado é a média do estado.')
+  return { blocos, tabela, avisos, fonteClima: clima.fonte, ano: hoje.getFullYear() }
+}
+
+// Parecer em HTML: blocos de texto + tabela de fatores (dentro de .table-wrap).
+function pfdParecerHTML(par) {
+  const n = v => v == null ? '—' : _pfdNum(v, 0)
+  const blocos = par.blocos.map(b => `<div class="pfd-par-bloco"><h4>${_pfdEsc(b.titulo)}</h4>
+    ${b.frases.map(fr => `<p>${_pfdEsc(fr)}</p>`).join('')}</div>`).join('')
+  const linhas = [...par.tabela].reverse().map(t => {
+    const c = t.clima && t.clima.completo ? t.clima : null
+    const e = t.enso ? (t.enso.fase === 'neutro' ? 'Neutro' : `${t.enso.fase} ${t.enso.forca}`) : '—'
+    return `<tr><td>${t.ano}${t.parcial ? ' <small>(parcial)</small>' : ''}</td><td class="num">${n(t.focos)}</td><td class="num">${n(t.desmHa)}</td>
+      <td class="num">${c ? n(c.chuvaSeca) : '—'}</td><td class="num">${c ? n(c.diasSecos) : '—'}</td><td class="num">${c ? n(c.maiorSeca) : '—'}</td>
+      <td class="num">${c && c.tmax != null ? _pfdNum(c.tmax, 1) : '—'}</td><td>${_pfdEsc(e)}</td></tr>`
+  }).join('')
+  return `${par.avisos.map(a => `<p class="pfd-aviso">${_pfdEsc(a)}</p>`).join('')}
+  <div class="pfd-par">${blocos}</div>
+  <details class="pfd-par-fatores"><summary>Fatores ano a ano (a base de cada frase)</summary>
+    <div class="table-wrap"><table class="pfd-tabela"><thead><tr><th>Ano</th><th>Focos</th><th>Desmatamento (ha)</th>
+      <th>Chuva jun–set (mm)</th><th>Dias sem chuva</th><th>Maior seca (dias)</th><th>Máx. média (°C)</th><th>ENSO</th></tr></thead>
+      <tbody>${linhas}</tbody></table></div></details>
+  <p class="pfd-par-nota">Texto montado automaticamente, por regras fixas, a partir dos números desta tela, do clima ERA5
+    (Open-Meteo, ${par.fonteClima === 'municipio' ? 'ponto central do município' : 'média ponderada dos municípios'}) e do índice ONI (NOAA).
+    Descreve associações medidas; não é parecer técnico assinado.</p>`
+}
+
+// ══════════════════════════════════════════════════════════════════
 // Gráficos (SVG à mão — o projeto não usa lib de gráfico)
 // ══════════════════════════════════════════════════════════════════
 function _pfdEnvolver(svg, rotulo) {
@@ -727,7 +960,7 @@ if (typeof window !== 'undefined') {
     PFD_COR, PFD_MESES, pfdFocosPorAno, pfdFocosPorMes, pfdDesmatPorAno, pfdAcumulado,
     PFD_ESFERAS, PFD_TEND_MIN_ANOS, pfdCobertura, pfdEmpilhadaHTML, pfdEscopoTipo, pfdPorEsfera, pfdTendencia, pfdTendencias,
     pfdTendenciaHTML, pfdTendenciaFrase, pfdTendenciaResumoHTML,
-    pfdRankingUC, pfdRankingMun, pfdDentroFora, pfdKpis, pfdFaixasAnos,
+    pfdRankingUC, pfdRankingMun, pfdDentroFora, PFD_FIRMS_VIIRS_DESDE, pfdParecer, pfdParecerHTML, pfdSpearman, pfdEnsoDoAno, pfdClimaDoRecorte, pfdKpis, pfdFaixasAnos,
     pfdLinhaHTML, pfdAreaHTML, pfdBarrasHTML, pfdRankingHTML, pfdRoscaHTML,
   })
 }

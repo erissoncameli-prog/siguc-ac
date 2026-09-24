@@ -559,7 +559,7 @@ são do Acre.
   `ingest-focos` e do script) e está pública no repositório —
   recomendado rotacionar; ao trocar, trocar nos três lugares.
 
-## Regra do sistema — Painel de Fogo e Desmatamento (migrations 342–345)
+## Regra do sistema — Painel de Fogo e Desmatamento (migrations 342–346)
 `pages/painel-fogo-desmatamento.html` (menu Gestão): série histórica de
 focos e de desmatamento, com filtro por tipo (os dois / só queimadas / só
 desmatamento), por local (Acre todo / todas as UCs / uma UC) e por
@@ -671,7 +671,35 @@ período. Gráficos de linha, barra, área, rosca e ranking, em SVG à mão.
   filtro; valor que não existe (UC desativada, link antigo) é ignorado
   e cai no padrão. Com município escolhido, o ranking de UCs some (UC
   atravessa divisa) e o ranking dos 22 municípios destaca o escolhido.
-- Guarda: `tests/painel-fogo-desmatamento.test.js` (27), inclusive
+- **Leitura do período (parecer SEM custo de API)** — migrations
+  346/346b + `pfdParecer`/`pfdParecerHTML`: texto montado por REGRAS a
+  partir dos números da tela, do clima e do ENSO. Nenhuma IA: cada frase
+  sai de uma comparação medida (último ano × anterior × média; posição da
+  estação seca na série; Spearman focos × dias sem chuva e focos ×
+  desmatamento, só com ≥ 8 anos e p < 0,05), e o texto diz o que é
+  associação e o que a base NÃO mede. Alta com estação mais chuvosa vira
+  "o clima não a explica — hipóteses a verificar", nunca uma causa
+  inventada. Tabela "Fatores ano a ano" mostra a base de cada frase.
+  Clima: ERA5 via Open-Meteo (`clima_mun_dia` → `clima_mun_ano`), estação
+  seca jun–set, "dia sem chuva" < 1 mm, no ponto interno de cada
+  município; Acre = média ponderada pela área, SÓ quando os 22 municípios
+  têm o ano. ENSO: ONI da NOAA (`clima_enso`). UC/esfera usam o clima do
+  estado (a tela avisa).
+- ⚠️ **Cota do Open-Meteo**: 1 "chamada" a cada 14 dias de dado — a série
+  2001→hoje de UM município vale ~670; limite 10.000/dia. Os 22 de uma vez
+  deram 17 × HTTP 429. Carga GRADUAL (346b): `clima_solicitar_faltantes(1)`
+  a cada 2 h + `clima_coletar(1)` a cada 10 min — a série completa leva ~2
+  dias; depois a renovação é incremental (último dia − 30). Nunca voltar a
+  pedir os 22 juntos.
+- ⚠️ **FIRMS antes de 2012 NÃO é comparável** (achado ao conferir o parecer
+  com dado real): o VIIRS S-NPP entra na série em 2012 e detecta muito mais
+  focos pequenos — o Acre vai de 3.418 (2011) a 23.974 (2012), e o salto
+  aparece igual em todo município. Tendência e comparações da fonte FIRMS
+  começam em 2012 (`PFD_FIRMS_VIIRS_DESDE`), a página avisa, e o card de
+  tendência dos focos só ajusta a partir daí. Sem o corte, a correlação
+  focos × desmatamento de Epitaciolândia dava ρ 0,53 — era o satélite. O
+  BDQueimadas (um satélite só) não tem a quebra.
+- Guarda: `tests/painel-fogo-desmatamento.test.js` (33), inclusive
   página sem rolagem lateral em 390px.
 - `pwa/sw.js`: frota 112 → 113 (`js/layout.js` está no shell do Frota).
 
