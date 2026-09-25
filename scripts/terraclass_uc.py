@@ -172,7 +172,7 @@ def agregar(feicoes, uc_geom, descartes=None):
         g = poligonal(shape(trocar_eixo_json(gj) if eixo_trocado(gj) else gj))
         if g is None:
             if descartes is not None:
-                descartes.append(f.get('id'))
+                descartes.append((f.get('id'), float((f.get('properties') or {}).get('area_km') or 0) * 100))
             continue
         if not uc_p.intersects(g):
             continue
@@ -223,10 +223,18 @@ def rodar_ucs(filtro, seco, resumo):
         feicoes = wfs_paginado(TC_WFS, TC_CAMADA, cql_tc(g))
         descartes = []
         agg = agregar(feicoes, g, descartes)
-        if len(descartes) > max(2, 0.005 * len(feicoes)):
-            raise RuntimeError(f'{nome}: {len(descartes)} polígonos irreparáveis de {len(feicoes)} — nada gravado')
+        # A trava é pela ÁREA descartada (area_km do próprio TerraClass),
+        # não pela contagem: o 1º run achou 52 de 5.826 polígonos
+        # irreparáveis na RESEX Alto Juruá — lascas degeneradas. Pesa o
+        # que some, não quantas lascas são.
+        total_ha = sum(float((f.get('properties') or {}).get('area_km') or 0) * 100 for f in feicoes)
+        perdido = sum(ha for _, ha in descartes)
+        if perdido > max(5.0, 0.002 * total_ha):
+            raise RuntimeError(f'{nome}: {len(descartes)} polígonos irreparáveis somando {perdido:,.1f} ha '
+                               f'de {total_ha:,.0f} ha baixados — nada gravado')
         if descartes:
-            print(f'  aviso: {len(descartes)} polígono(s) irreparável(is) fora da conta: {descartes[:5]}', flush=True)
+            print(f'  aviso: {len(descartes)} polígono(s) irreparável(is), {perdido:,.2f} ha fora da conta: '
+                  f'{[d[0] for d in descartes[:5]]}', flush=True)
         uso24 = sum(ha for (a, c), (_, ha) in agg.items() if a == 2024 and c not in NATURAIS)
         print(f'{nome}: {len(feicoes)} feições, {len(agg)} linhas, uso 2024 = {uso24:,.0f} ha ({time.time() - t0:.0f}s)', flush=True)
         resumo.append(f'| {nome} | {len(feicoes):,} | {uso24:,.0f} |')
@@ -294,6 +302,12 @@ def autoteste():
     d = []
     agg2 = agregar([{'id': 'x', 'properties': props(11), 'geometry': mapping(gravata)}], uc, d)
     assert agg2[(2024, 11)][1] > 0 and d == []
+    # polígono degenerado (sem área) entra nos descartes COM a área declarada
+    lasca = {'id': 'z', 'properties': {**props(11), 'area_km': 0.0},
+             'geometry': {'type': 'Polygon', 'coordinates': [[(-69.5, -9.5), (-69.4, -9.5), (-69.5, -9.5)]]}}
+    d = []
+    agregar([lasca], uc, d)
+    assert d == [('z', 0.0)], d
     # filtro de busca contém a UC inteira, em ordem lat lon
     fb = trocar_eixo(wkt.loads(filtro_uc(uc)))
     assert fb.contains(uc)
