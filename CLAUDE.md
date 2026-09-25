@@ -559,7 +559,7 @@ são do Acre.
   `ingest-focos` e do script) e está pública no repositório —
   recomendado rotacionar; ao trocar, trocar nos três lugares.
 
-## Regra do sistema — Painel de Fogo e Desmatamento (migrations 342–347)
+## Regra do sistema — Painel de Fogo e Desmatamento (migrations 342–348)
 `pages/painel-fogo-desmatamento.html` (menu Gestão): série histórica de
 focos e de desmatamento, com filtro por tipo (os dois / só queimadas / só
 desmatamento), por local (Acre todo / todas as UCs / uma UC) e por
@@ -746,6 +746,24 @@ período. Gráficos de linha, barra, área, rosca e ranking, em SVG à mão.
   `validate_palette.js` (pastagem #B45309, capoeira #65A30D,
   agricultura #7C3AED, urbano #BE185D, outros #0284C7). Capoeira segue
   contando como desmatada (PRODES = floresta primária).
+- **Uso do solo por UC (migration 348, `terraclass_uc`) é calculado
+  FORA do banco**: `scripts/terraclass_uc.py` no workflow
+  `.github/workflows/terraclass-uc.yml` (manual + mensal, dia 6). Baixa
+  do WFS só os polígonos que foram USO em algum ano (filtro CQL tira os
+  que são natural em todos os anos — sem isso, um polígono de floresta
+  sozinho tem 2,1 MB), paginado de 500 em 500 com conferência de total
+  (paginação inconsistente = nada gravado), corta pelo limite da UC e
+  mede área GEODÉSICA (pyproj.Geod = mesma medida do
+  `ST_Area(geography)`). Grava só os totais pela API de gerenciamento
+  com o `SUPABASE_ACCESS_TOKEN` que o deploy já usa — nenhuma chave
+  nova, nada no frontend. `--autoteste` (dado sintético, sem rede) roda
+  antes de qualquer gravação. Esfera/"todas as UCs" somam as UCs — UC
+  sobreposta conta a área comum em cada uma (a tela diz). UC ainda não
+  processada diz isso, nunca herda o número do estado. Modo `d2007` do
+  mesmo workflow mede o acumulado 2007 etapa por etapa (area_km do INPE
+  × área geodésica × depois de make_valid × união × soma das
+  interseções com os 22 municípios) — é a investigação dos +1,4%, sem
+  gravar nada.
 - Guarda: `tests/painel-fogo-desmatamento.test.js` (36), inclusive
   página sem rolagem lateral em 390px.
 - `pwa/sw.js`: frota 112 → 113 (`js/layout.js` está no shell do Frota).
