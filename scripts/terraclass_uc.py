@@ -70,9 +70,11 @@ def trocar_eixo(g):
 
 def eixo_trocado(geom_json):
     """True se a coordenada veio lat/lon (x dentro da faixa de latitude)."""
-    c = geom_json['coordinates']
-    while isinstance(c[0], (list, tuple)):
+    c = geom_json.get('coordinates') or []
+    while c and isinstance(c[0], (list, tuple)):
         c = c[0]
+    if len(c) < 2:          # geometria vazia (o PRODES tem) — nada a trocar
+        return False
     x, y = c[0], c[1]
     return LAT_MIN <= x <= LAT_MAX and LON_MIN <= y <= LON_MAX
 
@@ -250,14 +252,21 @@ def rodar_d2007(resumo):
     inpe = brutas = validas = 0.0
     invalidas = 0
     geoms = []
+    vazias = 0
     for f in feicoes:
         inpe += float(f['properties'].get('area_km') or 0) * 100
-        gj = f['geometry']
+        gj = f.get('geometry')
+        if not gj or not gj.get('coordinates'):
+            vazias += 1
+            continue
         g = shape(trocar_eixo_json(gj) if eixo_trocado(gj) else gj)
         brutas += area_ha(g)
         if not g.is_valid:
             invalidas += 1
-            g = make_valid(g)
+        g = poligonal(g)
+        if g is None:
+            vazias += 1
+            continue
         validas += area_ha(g)
         geoms.append(g)
     from shapely import union_all
@@ -265,12 +274,17 @@ def rodar_d2007(resumo):
     muns = sql('SELECT cd_ibge, nome, ST_AsGeoJSON(ST_MakeValid(geom), 7) AS g FROM public.municipios_acre')
     soma_mun = 0.0
     for m in muns:
-        mg = make_valid(shape(json.loads(m['g'])))
+        mg = poligonal(shape(json.loads(m['g'])))
         mp = prep(mg)
-        soma_mun += sum(area_ha(g.intersection(mg)) for g in geoms if mp.intersects(g))
+        for g in geoms:
+            if mp.intersects(g):
+                try:
+                    soma_mun += area_ha(g.intersection(mg))
+                except GEOSException:
+                    soma_mun += area_ha(g.buffer(0).intersection(mg.buffer(0)))
     pct = lambda v: f'{100 * v / inpe - 100:+.2f}%'
     resumo += ['## Diagnóstico — acumulado até 2007 (PRODES), Acre',
-               f'- Feições: {len(feicoes):,} ({invalidas:,} inválidas)',
+               f'- Feições: {len(feicoes):,} ({invalidas:,} inválidas, {vazias:,} vazias/irreparáveis)',
                f'- Soma do `area_km` do INPE (o que o estado usa): {inpe:,.0f} ha',
                f'- Área geodésica da geometria como veio: {brutas:,.0f} ha ({pct(brutas)})',
                f'- Depois de `make_valid`: {validas:,.0f} ha ({pct(validas)})',
@@ -308,6 +322,9 @@ def autoteste():
     d = []
     agregar([lasca], uc, d)
     assert d == [('z', 0.0)], d
+    # geometria vazia (o PRODES devolve) não derruba a checagem de eixo
+    assert eixo_trocado({'type': 'Polygon', 'coordinates': []}) is False
+    assert eixo_trocado({'type': 'MultiPolygon', 'coordinates': [[]]}) is False
     # filtro de busca contém a UC inteira, em ordem lat lon
     fb = trocar_eixo(wkt.loads(filtro_uc(uc)))
     assert fb.contains(uc)
