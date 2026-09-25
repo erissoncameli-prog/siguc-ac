@@ -20,7 +20,7 @@ on:
         options: [ucs, seco, d2007]
         default: ucs
       uc:
-        description: 'id da UC (vazio = todas)'
+        description: 'id da UC, ou vários separados por vírgula (vazio = todas)'
         required: false
         default: ''
   schedule:
@@ -60,8 +60,13 @@ jobs:
         run: |
           if [ "$MODO" = "d2007" ]; then echo 'ucs=[]' >> "$GITHUB_OUTPUT"
           elif [ -n "$UC" ]; then
-            [[ "$UC" =~ ^[0-9a-f-]{36}$ ]] || { echo "id de UC inválido"; exit 1; }
-            echo "ucs=[\"$UC\"]" >> "$GITHUB_OUTPUT"
+            # um id ou vários separados por vírgula (reprocessar só as que falharam)
+            lista=""
+            for id in ${UC//,/ }; do
+              [[ "$id" =~ ^[0-9a-f-]{36}$ ]] || { echo "id de UC inválido: $id"; exit 1; }
+              lista="${lista:+$lista,}\"$id\""
+            done
+            echo "ucs=[$lista]" >> "$GITHUB_OUTPUT"
           else echo "ucs=$(python scripts/terraclass_uc.py --listar)" >> "$GITHUB_OUTPUT"; fi
 
   recorte:
