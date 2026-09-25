@@ -406,6 +406,9 @@ test('uso do solo: agrupa o TerraClass, ano mais próximo do "Até", Acre = soma
     antes: pfdUsoSolo(TC, { escopo: 'mun:M1', anoFim: 2005 }),
     acre: pfdUsoSolo(TC, { escopo: '', anoFim: 2024 }),
     uc: pfdUsoSolo(TC, { escopo: 'A', anoFim: 2024 }),
+    ucCom: pfdUsoSolo(Object.assign({}, TC, { ucs: [{ id: 'A', esfera: 'federal' }, { id: 'B', esfera: 'estadual' }],
+      terraclassUc: [{ ano: 2024, uc_id: 'A', classe: 11, area_ha: 70 }, { ano: 2024, uc_id: 'B', classe: 11, area_ha: 5 }] }),
+      { escopo: 'A', anoFim: 2024 }),
   }), TC);
   expect(r.m1.ano).toBe(2024);
   expect(r.m1.primeiro).toBe(2008);
@@ -419,7 +422,8 @@ test('uso do solo: agrupa o TerraClass, ano mais próximo do "Até", Acre = soma
   expect(r.m1_2010.ano).toBe(2008);                        // série bienal: o mais próximo ANTES do "Até"
   expect(r.antes).toEqual({ ano: null, primeiro: 2008 });  // antes do TerraClass diz isso, nunca zero
   expect(r.acre.antropizado).toBe(950 + 1050);
-  expect(r.uc).toBeNull();                                 // UC ainda sem recorte — nunca o número do estado
+  expect(r.uc).toBeNull();                                 // UC sem recorte calculado — nunca o número do estado
+  expect(r.ucCom.antropizado).toBe(70);                    // com terraclass_uc: só a UC escolhida
 });
 
 test('uso do solo e minimapa: SVG com <title>, legenda com valor e variação', async ({ page }) => {
@@ -614,6 +618,10 @@ const TABELAS = {
     { codigo: 11, nome: 'Pastagem herbácea', grupo: 'pastagem' },
     { codigo: 17, nome: 'Urbanizada', grupo: 'urbano' },
   ],
+  terraclass_uc: [
+    { ano: 2024, uc_id: 'A', classe: 11, area_ha: 31000 },
+    { ano: 2024, uc_id: 'A', classe: 2, area_ha: 4000 },
+  ],
   terraclass_mun: [
     { ano: 2022, cd_ibge: '1200302', classe: 11, area_ha: 80000 },
     { ano: 2024, cd_ibge: '1200302', classe: 1, area_ha: 2600000 },
@@ -736,7 +744,7 @@ test('página: escolher uma UC recorta os números e muda a rosca para "nesta UC
   await expect(page.locator('.pfd-secao-titulo').first()).toContainText('RESEX Chico Mendes');
   await expect(page.locator('.pfd-kpi').first()).toContainText('400');       // 300 + 100 focos na UC
   await expect(page.locator('.pfd-card h3', { hasText: 'nesta UC' }).first()).toBeVisible();
-  await expect(page.locator('.pfd-legenda').first()).toContainText('Restante do Acre');
+  await expect(page.locator('.pfd-legenda:not(.pfd-uso-legenda)').first()).toContainText('Restante do Acre');
 });
 
 test('página: período invertido é corrigido, nunca vira tela vazia', async ({ page }) => {
@@ -892,10 +900,15 @@ test('página: território mostra área total, desmatado, minimapa e o que a ár
   await page.getByRole('button', { name: 'Unidades de Conservação' }).click();
   await page.selectOption('#pfd-uc', 'A');
   await expect(card.locator('.pfd-terr-resumo')).toContainText('926.748 ha');
-  await expect(card).toContainText('ainda não está disponível para UCs');
+  await expect(card.locator('.pfd-uso-legenda')).toContainText('31.000 ha');     // recorte da própria UC (terraclass_uc)
+  await expect(card).toContainText('pelo limite da UC');
+  // UC sem recorte calculado ainda: diz isso, nunca mostra o número do estado
+  await page.selectOption('#pfd-uc', 'B');
+  await expect(card).toContainText('ainda não foi calculado');
   await expect(card.locator('.pfd-uso-legenda')).toHaveCount(0);
+  await page.selectOption('#pfd-uc', 'A');
   // o contorno é pedido uma vez por recorte, não a cada redesenho
   await page.selectOption('#pfd-fim', '2023');
   const pedidos = await page.evaluate(() => window._pfdRpcs);
-  expect(pedidos.filter(e => e === 'A')).toHaveLength(1);
+  expect(pedidos.filter(e => e === 'A')).toHaveLength(1);   // A pedido uma vez, mesmo voltando a ele
 });

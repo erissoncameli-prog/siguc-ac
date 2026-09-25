@@ -559,7 +559,7 @@ são do Acre.
   `ingest-focos` e do script) e está pública no repositório —
   recomendado rotacionar; ao trocar, trocar nos três lugares.
 
-## Regra do sistema — Painel de Fogo e Desmatamento (migrations 342–347)
+## Regra do sistema — Painel de Fogo e Desmatamento (migrations 342–348)
 `pages/painel-fogo-desmatamento.html` (menu Gestão): série histórica de
 focos e de desmatamento, com filtro por tipo (os dois / só queimadas / só
 desmatamento), por local (Acre todo / todas as UCs / uma UC) e por
@@ -648,6 +648,25 @@ período. Gráficos de linha, barra, área, rosca e ranking, em SVG à mão.
   que juntava várias respostas grandes numa instrução, chamada em sessões
   paralelas, reiniciou o banco pela 2ª vez. Regra dura: UMA resposta por
   chamada, em sequência, nunca em paralelo, nem para "só conferir".
+  **3ª vez** (25/09/2026 21:29 UTC): uma página de 2.000 polígonos do
+  TerraClass COM geometria (`maxFeatures=2000`, para cruzar com as UCs)
+  pedida por pg_net, seguida de `substring(content from '…')` (regex) em
+  cima da resposta. O TerraClass tem feições enormes (um polígono de
+  floresta sozinho = 2,1 MB; a 1ª página da RESEX Chico Mendes nem
+  terminou de chegar). Regra dura nova: **geometria de camada
+  vetorial grande NUNCA entra pelo pg_net** — só atributos (sem `geom`
+  no `propertyName`), como já faz `terraclass_solicitar`. Antes de
+  qualquer regex/`::jsonb`, conferir `length(content)` sozinho. Recorte
+  que exige geometria (TerraClass por UC) vai para FORA do banco.
+  ⚠️ Depois de um reinício, `net._http_response` volta vazia e o
+  contador de `request_id` do pg_net RECOMEÇA em 1: pedido pendente
+  nas tabelas `*_pedidos` com id antigo passa a casar com resposta de
+  OUTRA requisição. Após reinício, apagar os pedidos pendentes (foi
+  feito: `municipios_acre_pedido` id 47 e `focos_serie_pedidos` id
+  80085, ambos órfãos desde 23/09).
+  CQL do GeoServer do TerraClass (EPSG:4674, WFS 1.1.0): a geometria
+  literal em `INTERSECTS` vai em ordem LAT LON (`ST_FlipCoordinates`) —
+  em lon/lat devolve 0 feições sem erro.
 - **Recorte por MUNICÍPIO** (migration 345): `municipios_acre` (22,
   malha do IBGE carregada por pg_net — `municipios_acre_solicitar()` →
   `municipios_acre_carregar()`, que falha se não vierem exatamente 22) +
@@ -660,7 +679,13 @@ período. Gráficos de linha, barra, área, rosca e ranking, em SVG à mão.
   IS NULL`, nunca só `uc_id IS NULL`. Conferido: soma dos municípios =
   total do estado (focos exato; PRODES anual 99,9–100,0%). Pendente: o
   acumulado até 2007 somado por município dá ~1,4% acima do estado —
-  investigar uma resposta por vez (regra acima).
+  conferido (25/09): SÓ o d2007 diverge (área total 0,00%, resíduo
+  0,01%, rios −0,25%, não floresta −0,07%), então não é método de área
+  nem malha municipal. O estado soma o `area_km` do INPE; o município
+  soma `ST_Area(ST_Intersection(ST_MakeValid(geom)))` — suspeita:
+  `ST_MakeValid` em polígonos inválidos grandes do d2007. Confirmar
+  exige baixar a geometria do d2007 de novo — ver a regra do pg_net
+  acima antes de tentar.
 - **Filtro "Onde" em ETAPAS** (pedido do usuário — uma caixa só com
   tudo ficava ruim): Acre todo | Municípios | Unidades de Conservação;
   Municípios revela o seletor de município, UCs revela esfera e depois
@@ -721,6 +746,24 @@ período. Gráficos de linha, barra, área, rosca e ranking, em SVG à mão.
   `validate_palette.js` (pastagem #B45309, capoeira #65A30D,
   agricultura #7C3AED, urbano #BE185D, outros #0284C7). Capoeira segue
   contando como desmatada (PRODES = floresta primária).
+- **Uso do solo por UC (migration 348, `terraclass_uc`) é calculado
+  FORA do banco**: `scripts/terraclass_uc.py` no workflow
+  `.github/workflows/terraclass-uc.yml` (manual + mensal, dia 6). Baixa
+  do WFS só os polígonos que foram USO em algum ano (filtro CQL tira os
+  que são natural em todos os anos — sem isso, um polígono de floresta
+  sozinho tem 2,1 MB), paginado de 500 em 500 com conferência de total
+  (paginação inconsistente = nada gravado), corta pelo limite da UC e
+  mede área GEODÉSICA (pyproj.Geod = mesma medida do
+  `ST_Area(geography)`). Grava só os totais pela API de gerenciamento
+  com o `SUPABASE_ACCESS_TOKEN` que o deploy já usa — nenhuma chave
+  nova, nada no frontend. `--autoteste` (dado sintético, sem rede) roda
+  antes de qualquer gravação. Esfera/"todas as UCs" somam as UCs — UC
+  sobreposta conta a área comum em cada uma (a tela diz). UC ainda não
+  processada diz isso, nunca herda o número do estado. Modo `d2007` do
+  mesmo workflow mede o acumulado 2007 etapa por etapa (area_km do INPE
+  × área geodésica × depois de make_valid × união × soma das
+  interseções com os 22 municípios) — é a investigação dos +1,4%, sem
+  gravar nada.
 - Guarda: `tests/painel-fogo-desmatamento.test.js` (36), inclusive
   página sem rolagem lateral em 390px.
 - `pwa/sw.js`: frota 112 → 113 (`js/layout.js` está no shell do Frota).

@@ -434,14 +434,20 @@ const _PFD_USO_GRUPO = { pastagem: 'pastagem', secundaria: 'secundaria', agricul
   urbano: 'urbano', outros_usos: 'outros', desmat_ano: 'outros' }
 
 // Uso do solo no ano TerraClass mais próximo do "Até" (a série é bienal:
-// 2008, 2010 … 2024). Só Acre e município — UC ainda não tem o recorte.
+// 2008, 2010 … 2024). Acre/município: soma por atributo (terraclass_mun);
+// UC/esfera: recorte geométrico feito fora do banco (terraclass_uc, 348).
 function pfdUsoSolo(dados, f) {
   const t = pfdEscopoTipo(f.escopo)
-  if (t !== 'acre' && t !== 'mun') return null
   const cd = t === 'mun' ? f.escopo.slice(4) : null
   const grupoDe = {}
   for (const c of dados.tcClasses || []) grupoDe[c.codigo] = c.grupo
-  const linhas = (dados.terraclass || []).filter(r => !cd || r.cd_ibge === cd)
+  let linhas
+  if (t === 'acre' || t === 'mun') {
+    linhas = (dados.terraclass || []).filter(r => !cd || r.cd_ibge === cd)
+  } else {
+    const noUc = _pfdPred(dados, f.escopo)
+    linhas = (dados.terraclassUc || []).filter(r => noUc(r.uc_id))
+  }
   const anos = [...new Set(linhas.map(r => Number(r.ano)))].sort((a, b) => a - b)
   if (!anos.length) return null
   const ano = [...anos].reverse().find(a => a <= Number(f.anoFim)) ?? null

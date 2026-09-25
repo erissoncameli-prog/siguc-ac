@@ -187,7 +187,7 @@ async function _pfdTudo(montar) {
 
 async function pfdCarregar() {
   const [ucs, focosUcMes, focosResumo, prodesAno, prodesUcAno, bdqUcMes, bdqResumo, cobertura,
-         municipios, focosMunMes, bdqMunMes, prodesMunAno, clima, enso, terraclass, tcClasses] = await Promise.all([
+         municipios, focosMunMes, bdqMunMes, prodesMunAno, clima, enso, terraclass, tcClasses, terraclassUc] = await Promise.all([
     _pfdTudo(() => db.from('unidades_conservacao').select('id,nome,sigla,categoria,grupo,esfera').eq('ativo', true).order('nome')),
     _pfdTudo(() => db.from('focos_uc_mes').select('ano,mes,uc_id,focos,origem').order('ano')),
     _pfdTudo(() => db.from('focos_resumo_ano').select('ano,focos,origem,periodo_ini,periodo_fim').order('ano')),
@@ -208,9 +208,10 @@ async function pfdCarregar() {
     // território: falhou, o card mostra área e desmatado sem a quebra.
     _pfdTudo(() => db.from('terraclass_mun').select('ano,cd_ibge,classe,area_ha').order('ano')).catch(() => []),
     _pfdTudo(() => db.from('terraclass_classes').select('codigo,nome,grupo').order('codigo')).catch(() => []),
+    _pfdTudo(() => db.from('terraclass_uc').select('ano,uc_id,classe,area_ha').order('ano')).catch(() => []),
   ])
   return { ucs, focosUcMes, focosResumo, prodesAno, prodesUcAno, bdqUcMes, bdqResumo, cobertura,
-           municipios, focosMunMes, bdqMunMes, prodesMunAno, clima, enso, terraclass, tcClasses }
+           municipios, focosMunMes, bdqMunMes, prodesMunAno, clima, enso, terraclass, tcClasses, terraclassUc }
 }
 
 function pfdSincEscopo() {
@@ -528,7 +529,8 @@ function pfdRender() {
       virou vem do <strong>TerraClass</strong> (INPE/Embrapa), que qualifica exatamente a área que o PRODES marcou como
       desmatada: pastagem, vegetação secundária (capoeira), agricultura, área urbana e outros usos, a cada 2 anos desde 2008.
       Capoeira continua contando como desmatada no PRODES — regenerar não devolve a floresta primária. Por município, é a
-      soma dos polígonos do próprio TerraClass; para UCs, o recorte ainda não foi calculado. O MapBiomas usa outra
+      soma dos polígonos do próprio TerraClass; por UC, é o polígono do TerraClass recortado pelo limite da UC, calculado pelo
+      sistema (área geodésica, só dos polígonos que foram uso em algum ano). O MapBiomas usa outra
       metodologia e não é misturado aqui.</li>
     <li><strong>Leitura do período</strong>: texto montado por regras fixas a partir dos números desta tela — sem IA e sem
       custo de API. Clima: reanálise ERA5 (Open-Meteo), chuva, dias sem chuva (&lt; 1 mm) e maior sequência seca na estação seca
@@ -561,19 +563,18 @@ function pfdCardTerritorio(d, f, onde) {
         (${p(c.pctDesmatado)}%) já foram desmatados até ${c.anoRef}, segundo o PRODES/INPE.</p>`
   }
   let uso = ''
-  if (ehUC) {
-    uso = `<p class="pfd-par-nota">O que a área desmatada virou (pastagem, capoeira, agricultura) ainda não está disponível
-      para UCs — por enquanto só para o Acre e os municípios.</p>`
-  } else {
-    const u = pfdUsoSolo(d, f)
-    if (u && u.ano == null) {
-      uso = `<p class="pfd-par-nota">O TerraClass começa em ${u.primeiro}: escolha um "Até" a partir desse ano para ver o que a área desmatada virou.</p>`
-    } else if (u) {
-      uso = `<h4 class="pfd-terr-h4">O que a área desmatada virou — TerraClass ${u.ano}</h4>
-        <p class="pfd-sub">${n(u.antropizado)} ha de uso da terra mapeados${c ? ` (o PRODES conta ${n(c.desmatado)} ha desmatados)` : ''}.
-        Ano TerraClass mais próximo do "Até" — a série sai a cada 2 anos.${u.ano !== u.primeiro ? ` Variação desde ${u.primeiro} ao lado de cada uso.` : ''}</p>
-        ${pfdUsoBarraHTML(u, { rotulo: 'O que a área desmatada virou' })}`
-    }
+  const u = pfdUsoSolo(d, f)
+  if (!u && ehUC) {
+    uso = `<p class="pfd-par-nota">O que a área desmatada virou ainda não foi calculado para ${t === 'uc' ? 'esta UC' : 'estas UCs'} —
+      o recorte do TerraClass por UC roda fora do painel e entra aqui assim que for processado.</p>`
+  } else if (u && u.ano == null) {
+    uso = `<p class="pfd-par-nota">O TerraClass começa em ${u.primeiro}: escolha um "Até" a partir desse ano para ver o que a área desmatada virou.</p>`
+  } else if (u) {
+    const sobrepoe = t === 'esfera' || t === 'ucs'
+    uso = `<h4 class="pfd-terr-h4">O que a área desmatada virou — TerraClass ${u.ano}</h4>
+      <p class="pfd-sub">${n(u.antropizado)} ha de uso da terra mapeados${c ? ` (o PRODES conta ${n(c.desmatado)} ha desmatados)` : ''}.
+      Ano TerraClass mais próximo do "Até" — a série sai a cada 2 anos.${u.ano !== u.primeiro ? ` Variação desde ${u.primeiro} ao lado de cada uso.` : ''}${ehUC ? ' Recorte do TerraClass pelo limite da UC, calculado pelo sistema.' : ''}${sobrepoe ? ' UCs que se sobrepõem contam a área comum em cada uma.' : ''}</p>
+      ${pfdUsoBarraHTML(u, { rotulo: 'O que a área desmatada virou' })}`
   }
   return `<section class="pfd-card pfd-territorio" aria-labelledby="pfd-terr-titulo">
     <h3 id="pfd-terr-titulo">Território — ${esc(onde)}</h3>

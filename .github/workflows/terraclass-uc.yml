@@ -1,0 +1,55 @@
+name: TerraClass por UC
+
+# Recorte do TerraClass pelo limite de cada UC (migration 348) e o
+# diagnóstico do acumulado 2007 por município. Roda FORA do banco de
+# propósito: geometria de camada grande pelo pg_net reiniciou a produção
+# (ver CLAUDE.md, 25/09/2026). Grava só totais, pela API de
+# gerenciamento, com o mesmo SUPABASE_ACCESS_TOKEN do deploy.
+
+on:
+  workflow_dispatch:
+    inputs:
+      modo:
+        description: 'ucs = calcula e grava; seco = calcula sem gravar; d2007 = diagnóstico do acumulado 2007'
+        type: choice
+        options: [ucs, seco, d2007]
+        default: ucs
+      uc:
+        description: 'id da UC (vazio = todas)'
+        required: false
+        default: ''
+  schedule:
+    # TerraClass sai a cada 2 anos; conferir 1×/mês é folga de sobra.
+    - cron: '17 6 6 * *'
+
+concurrency:
+  group: terraclass-uc
+  cancel-in-progress: false
+
+jobs:
+  recorte:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    permissions:
+      contents: read
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5.6.0
+        with:
+          python-version: '3.12'
+      - name: Dependências
+        run: pip install 'shapely==2.1.2' 'pyproj==3.7.2' 'requests==2.32.5'
+      - name: Autoteste (sem rede)
+        run: python scripts/terraclass_uc.py --autoteste
+      - name: Rodar
+        env:
+          MODO: ${{ inputs.modo || 'ucs' }}
+          UC: ${{ inputs.uc }}
+        run: |
+          case "$MODO" in
+            d2007) python scripts/terraclass_uc.py --d2007 ;;
+            seco)  python scripts/terraclass_uc.py --seco ${UC:+--uc "$UC"} ;;
+            *)     python scripts/terraclass_uc.py ${UC:+--uc "$UC"} ;;
+          esac
