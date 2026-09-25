@@ -648,6 +648,25 @@ período. Gráficos de linha, barra, área, rosca e ranking, em SVG à mão.
   que juntava várias respostas grandes numa instrução, chamada em sessões
   paralelas, reiniciou o banco pela 2ª vez. Regra dura: UMA resposta por
   chamada, em sequência, nunca em paralelo, nem para "só conferir".
+  **3ª vez** (25/09/2026 21:29 UTC): uma página de 2.000 polígonos do
+  TerraClass COM geometria (`maxFeatures=2000`, para cruzar com as UCs)
+  pedida por pg_net, seguida de `substring(content from '…')` (regex) em
+  cima da resposta. O TerraClass tem feições enormes (um polígono de
+  floresta sozinho = 2,1 MB; a 1ª página da RESEX Chico Mendes nem
+  terminou de chegar). Regra dura nova: **geometria de camada
+  vetorial grande NUNCA entra pelo pg_net** — só atributos (sem `geom`
+  no `propertyName`), como já faz `terraclass_solicitar`. Antes de
+  qualquer regex/`::jsonb`, conferir `length(content)` sozinho. Recorte
+  que exige geometria (TerraClass por UC) vai para FORA do banco.
+  ⚠️ Depois de um reinício, `net._http_response` volta vazia e o
+  contador de `request_id` do pg_net RECOMEÇA em 1: pedido pendente
+  nas tabelas `*_pedidos` com id antigo passa a casar com resposta de
+  OUTRA requisição. Após reinício, apagar os pedidos pendentes (foi
+  feito: `municipios_acre_pedido` id 47 e `focos_serie_pedidos` id
+  80085, ambos órfãos desde 23/09).
+  CQL do GeoServer do TerraClass (EPSG:4674, WFS 1.1.0): a geometria
+  literal em `INTERSECTS` vai em ordem LAT LON (`ST_FlipCoordinates`) —
+  em lon/lat devolve 0 feições sem erro.
 - **Recorte por MUNICÍPIO** (migration 345): `municipios_acre` (22,
   malha do IBGE carregada por pg_net — `municipios_acre_solicitar()` →
   `municipios_acre_carregar()`, que falha se não vierem exatamente 22) +
@@ -660,7 +679,13 @@ período. Gráficos de linha, barra, área, rosca e ranking, em SVG à mão.
   IS NULL`, nunca só `uc_id IS NULL`. Conferido: soma dos municípios =
   total do estado (focos exato; PRODES anual 99,9–100,0%). Pendente: o
   acumulado até 2007 somado por município dá ~1,4% acima do estado —
-  investigar uma resposta por vez (regra acima).
+  conferido (25/09): SÓ o d2007 diverge (área total 0,00%, resíduo
+  0,01%, rios −0,25%, não floresta −0,07%), então não é método de área
+  nem malha municipal. O estado soma o `area_km` do INPE; o município
+  soma `ST_Area(ST_Intersection(ST_MakeValid(geom)))` — suspeita:
+  `ST_MakeValid` em polígonos inválidos grandes do d2007. Confirmar
+  exige baixar a geometria do d2007 de novo — ver a regra do pg_net
+  acima antes de tentar.
 - **Filtro "Onde" em ETAPAS** (pedido do usuário — uma caixa só com
   tudo ficava ruim): Acre todo | Municípios | Unidades de Conservação;
   Municípios revela o seletor de município, UCs revela esfera e depois
