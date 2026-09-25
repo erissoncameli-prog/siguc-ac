@@ -378,6 +378,76 @@ test('município: focos, desmatamento, ranking, rosca e saldo pelo cd_ibge', asy
   expect((await rodar(page, 'pfdCobertura', F({ anoFim: 2024 }))).area).toBe(1000000);
 });
 
+// ── Território e uso do solo (TerraClass, migration 347) ──────────
+const TC = {
+  tcClasses: [
+    { codigo: 1, grupo: 'floresta' }, { codigo: 2, grupo: 'secundaria' }, { codigo: 11, grupo: 'pastagem' },
+    { codigo: 15, grupo: 'agricultura' }, { codigo: 17, grupo: 'urbano' }, { codigo: 22, grupo: 'desmat_ano' },
+    { codigo: 23, grupo: 'agua' },
+  ],
+  terraclass: [
+    { ano: 2008, cd_ibge: 'M1', classe: 11, area_ha: 500 },
+    { ano: 2008, cd_ibge: 'M1', classe: 2, area_ha: 300 },
+    { ano: 2024, cd_ibge: 'M1', classe: 1, area_ha: 9000 },
+    { ano: 2024, cd_ibge: 'M1', classe: 11, area_ha: 600 },
+    { ano: 2024, cd_ibge: 'M1', classe: 2, area_ha: 200 },
+    { ano: 2024, cd_ibge: 'M1', classe: 15, area_ha: 100 },
+    { ano: 2024, cd_ibge: 'M1', classe: 22, area_ha: 50 },
+    { ano: 2024, cd_ibge: 'M1', classe: 23, area_ha: 40 },
+    { ano: 2024, cd_ibge: 'M2', classe: 11, area_ha: 1000 },
+    { ano: 2024, cd_ibge: 'M2', classe: 17, area_ha: 50 },
+  ],
+};
+test('uso do solo: agrupa o TerraClass, ano mais próximo do "Até", Acre = soma dos municípios', async ({ page }) => {
+  await carregar(page);
+  const r = await page.evaluate((TC) => ({
+    m1: pfdUsoSolo(TC, { escopo: 'mun:M1', anoFim: 2026 }),
+    m1_2010: pfdUsoSolo(TC, { escopo: 'mun:M1', anoFim: 2010 }),
+    antes: pfdUsoSolo(TC, { escopo: 'mun:M1', anoFim: 2005 }),
+    acre: pfdUsoSolo(TC, { escopo: '', anoFim: 2024 }),
+    uc: pfdUsoSolo(TC, { escopo: 'A', anoFim: 2024 }),
+  }), TC);
+  expect(r.m1.ano).toBe(2024);
+  expect(r.m1.primeiro).toBe(2008);
+  expect(r.m1.floresta).toBe(9000);
+  expect(r.m1.naturalOutros).toBe(40);                    // água nunca vira uso antrópico
+  const u = Object.fromEntries(r.m1.usos.map(x => [x.chave, x.ha]));
+  expect(u).toEqual({ pastagem: 600, secundaria: 200, agricultura: 100, urbano: 0, outros: 50 });
+  expect(r.m1.antropizado).toBe(950);
+  expect(r.m1.usos.find(x => x.chave === 'pastagem').ha0).toBe(500);
+  expect(r.m1.usos.reduce((a, x) => a + x.pct, 0)).toBeCloseTo(100, 6);
+  expect(r.m1_2010.ano).toBe(2008);                        // série bienal: o mais próximo ANTES do "Até"
+  expect(r.antes).toEqual({ ano: null, primeiro: 2008 });  // antes do TerraClass diz isso, nunca zero
+  expect(r.acre.antropizado).toBe(950 + 1050);
+  expect(r.uc).toBeNull();                                 // UC ainda sem recorte — nunca o número do estado
+});
+
+test('uso do solo e minimapa: SVG com <title>, legenda com valor e variação', async ({ page }) => {
+  await carregar(page);
+  const r = await page.evaluate((TC) => {
+    const html = pfdUsoBarraHTML(pfdUsoSolo(TC, { escopo: 'mun:M1', anoFim: 2024 }), { rotulo: 'Uso' });
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    const q = (x, y) => ({ type: 'Polygon', coordinates: [[[x, y], [x + 1, y], [x + 1, y + 1], [x, y + 1], [x, y]]] });
+    const mapa = pfdMiniMapaSVG({ acre: q(-73, -11), municipios: [{ nome: 'Feijó', g: q(-73, -11) }], alvo: [q(-73, -11)] }, { rotulo: 'Mapa' });
+    const dm = new DOMParser().parseFromString(mapa, 'text/html');
+    return {
+      segmentos: [...doc.querySelectorAll('svg rect')].map(e => e.querySelector('title').textContent),
+      legenda: [...doc.querySelectorAll('.pfd-uso-legenda li')].map(li => li.textContent.replace(/\s+/g, ' ').trim()),
+      vazio: pfdUsoBarraHTML(null, { rotulo: 'x' }),
+      paths: dm.querySelectorAll('svg path').length,
+      titulo: dm.querySelector('svg path title')?.textContent,
+      semGeo: pfdMiniMapaSVG(null),
+    };
+  }, TC);
+  expect(r.segmentos).toHaveLength(4);                     // uso com zero ha não vira segmento
+  expect(r.segmentos[0]).toMatch(/^Pastagem — 600 ha/);
+  expect(r.legenda[0]).toContain('+100 ha desde 2008');
+  expect(r.vazio).toContain('Sem dado de uso do solo');
+  expect(r.paths).toBe(3);
+  expect(r.titulo).toBe('Feijó');
+  expect(r.semGeo).toContain('Contorno indisponível');
+});
+
 // ── Parecer (texto por regras, migration 346) ─────────────────────
 test('Spearman: resposta conhecida, empates e mínimo de 8 anos', async ({ page }) => {
   await carregar(page);
@@ -538,11 +608,32 @@ const TABELAS = {
     { ano: 2024, uc_id: 'A', poligonos: 721, area_ha: 4305 },
     { ano: 2024, uc_id: 'B', poligonos: 3, area_ha: 12 },
   ],
+  terraclass_classes: [
+    { codigo: 1, nome: 'Vegetação natural florestal primária', grupo: 'floresta' },
+    { codigo: 2, nome: 'Vegetação natural florestal secundária', grupo: 'secundaria' },
+    { codigo: 11, nome: 'Pastagem herbácea', grupo: 'pastagem' },
+    { codigo: 17, nome: 'Urbanizada', grupo: 'urbano' },
+  ],
+  terraclass_mun: [
+    { ano: 2022, cd_ibge: '1200302', classe: 11, area_ha: 80000 },
+    { ano: 2024, cd_ibge: '1200302', classe: 1, area_ha: 2600000 },
+    { ano: 2024, cd_ibge: '1200302', classe: 11, area_ha: 90000 },
+    { ano: 2024, cd_ibge: '1200302', classe: 2, area_ha: 10000 },
+    { ano: 2024, cd_ibge: '1200401', classe: 11, area_ha: 300000 },
+    { ano: 2024, cd_ibge: '1200401', classe: 17, area_ha: 5000 },
+  ],
+};
+// Contorno simplificado que painel_recorte_geo devolve (migration 347).
+const QUAD = (x, y) => ({ type: 'Polygon', coordinates: [[[x, y], [x + 1, y], [x + 1, y + 1], [x, y + 1], [x, y]]] });
+const GEO = {
+  acre: { type: 'MultiPolygon', coordinates: [QUAD(-73, -11).coordinates, QUAD(-72, -11).coordinates] },
+  municipios: [{ cd: '1200302', nome: 'Feijó', g: QUAD(-73, -11) }, { cd: '1200401', nome: 'Rio Branco', g: QUAD(-72, -11) }],
 };
 
 async function abrirPainel(page, hash = '') {
   await page.route('**/cdn.jsdelivr.net/**', route => route.abort());
-  await page.addInitScript(([usuario, tabelas]) => {
+  await page.addInitScript(([usuario, tabelas, geo]) => {
+    window._pfdRpcs = [];
     window.loadEnv = () => Promise.resolve({ supabaseUrl: 'http://fake.test', supabaseKey: 'fake-key' });
     const consulta = (tabela) => {
       let de = 0, ate = 999;
@@ -562,12 +653,20 @@ async function abrirPainel(page, hash = '') {
           getUser: async () => ({ data: { user: { id: usuario.id } } }),
           signOut: async () => ({}),
         },
-        rpc: async (nome) => (nome === 'nivel_efetivo' ? { data: 'editar', error: null } : { data: null, error: null }),
+        rpc: async (nome, args) => {
+          if (nome === 'nivel_efetivo') return { data: 'editar', error: null };
+          if (nome === 'painel_recorte_geo') {
+            window._pfdRpcs.push(args.p_escopo);
+            const cd = (args.p_escopo || '').startsWith('mun:') ? args.p_escopo.slice(4) : null;
+            return { data: { ...geo, alvo: cd ? geo.municipios.filter(m => m.cd === cd).map(m => m.g) : [] }, error: null };
+          }
+          return { data: null, error: null };
+        },
         from: (tabela) => consulta(tabela),
         storage: { from: () => ({ createSignedUrl: async () => ({ data: null, error: null }) }) },
       }),
     };
-  }, [USUARIO_STUB, TABELAS]);
+  }, [USUARIO_STUB, TABELAS, GEO]);
   await page.goto(`${BASE}/pages/painel-fogo-desmatamento.html${hash}`);
   await page.locator('.pfd-kpis').waitFor({ state: 'visible', timeout: 20_000 });
 }
@@ -604,6 +703,7 @@ test('página: abre com linha, barras, tendência, rosca, ranking e área nas du
   await page.selectOption('#pfd-ini', '2023');
   const titulos = await page.locator('.pfd-card h3').allInnerTexts();
   expect(titulos).toEqual([
+    'Território — Acre todo',
     `Leitura do período — Acre todo, 2023 a ${new Date().getFullYear()}`,
     'Focos de calor por ano', 'Focos por mês da temporada', 'Tendência dos focos de calor', 'Focos dentro × fora de UCs', 'UCs com mais focos',
     'Focos por município',
@@ -769,4 +869,33 @@ test('página: leitura do período aparece com texto e tabela de fatores', async
   await card.locator('summary').click();
   await expect(card.locator('.pfd-tabela tbody tr')).toHaveCount(4);   // 2023..2026
   await expect(card.locator('.table-wrap')).toHaveCount(1);
+});
+
+test('página: território mostra área total, desmatado, minimapa e o que a área virou', async ({ page }) => {
+  await abrirPainel(page);
+  const card = page.locator('.pfd-territorio');
+  await expect(card.locator('h3')).toHaveText('Território — Acre todo');
+  await expect(card.locator('.pfd-terr-resumo')).toContainText('16.416.639 ha');
+  await expect(card.locator('.pfd-terr-resumo')).toContainText('2.034.279 ha');
+  await expect(card.locator('#pfd-minimapa svg path')).toHaveCount(4);         // Acre + 2 municípios + destaque
+  await expect(card).toContainText('TerraClass 2024');
+  // município: área dele, minimapa com ele em destaque, uso só dele
+  await page.getByRole('button', { name: 'Municípios' }).click();
+  await page.selectOption('#pfd-mun', '1200302');
+  await expect(card.locator('h3')).toHaveText('Território — Feijó');
+  await expect(card.locator('.pfd-terr-resumo')).toContainText('2.797.000 ha');
+  await expect(card.locator('#pfd-minimapa')).toHaveAttribute('data-escopo', 'mun:1200302');
+  await expect(card.locator('#pfd-minimapa svg path[fill-opacity]')).toHaveCount(1);
+  await expect(card.locator('.pfd-uso-legenda')).toContainText('Pastagem');
+  await expect(card.locator('.pfd-uso-legenda')).toContainText('+10.000 ha desde 2022');
+  // UC: área e desmatado sim; uso do solo declara que ainda não tem
+  await page.getByRole('button', { name: 'Unidades de Conservação' }).click();
+  await page.selectOption('#pfd-uc', 'A');
+  await expect(card.locator('.pfd-terr-resumo')).toContainText('926.748 ha');
+  await expect(card).toContainText('ainda não está disponível para UCs');
+  await expect(card.locator('.pfd-uso-legenda')).toHaveCount(0);
+  // o contorno é pedido uma vez por recorte, não a cada redesenho
+  await page.selectOption('#pfd-fim', '2023');
+  const pedidos = await page.evaluate(() => window._pfdRpcs);
+  expect(pedidos.filter(e => e === 'A')).toHaveLength(1);
 });

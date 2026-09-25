@@ -559,7 +559,7 @@ são do Acre.
   `ingest-focos` e do script) e está pública no repositório —
   recomendado rotacionar; ao trocar, trocar nos três lugares.
 
-## Regra do sistema — Painel de Fogo e Desmatamento (migrations 342–346)
+## Regra do sistema — Painel de Fogo e Desmatamento (migrations 342–347)
 `pages/painel-fogo-desmatamento.html` (menu Gestão): série histórica de
 focos e de desmatamento, com filtro por tipo (os dois / só queimadas / só
 desmatamento), por local (Acre todo / todas as UCs / uma UC) e por
@@ -699,7 +699,29 @@ período. Gráficos de linha, barra, área, rosca e ranking, em SVG à mão.
   tendência dos focos só ajusta a partir daí. Sem o corte, a correlação
   focos × desmatamento de Epitaciolândia dava ρ 0,53 — era o satélite. O
   BDQueimadas (um satélite só) não tem a quebra.
-- Guarda: `tests/painel-fogo-desmatamento.test.js` (33), inclusive
+- **Card "Território" + uso do solo (migration 347)**: para QUALQUER
+  recorte (Acre, município, esfera, UC) mostra área total, desmatado
+  até o "Até" e floresta que resta (mesma `pfdCobertura` do saldo —
+  nunca outra conta), com minimapa em SVG (`pfdMiniMapaSVG`, contorno
+  simplificado de `painel_recorte_geo(escopo)`, SECURITY INVOKER,
+  pedido UMA vez por recorte e cacheado na página). O que a área
+  desmatada VIROU vem do **TerraClass** (INPE/Embrapa, WFS
+  `TerraClass:tc_transicoes_ac_amz_v6`, bienal 2008–2024): qualifica
+  exatamente o polígono que o PRODES marcou, por isso é a fonte certa
+  aqui — o MapBiomas é outra metodologia e nunca é somado.
+  `terraclass_classes` = legenda OFICIAL (GetLegendGraphic do raster
+  2024), com `grupo`; `terraclass_mun` por ano × município × classe,
+  carregada por `terraclass_solicitar()` → `terraclass_coletar(1)`
+  repetido (pg_net, uma resposta por vez; confere `numberReturned =
+  totalFeatures` antes de gravar). Acre = soma dos 22 (cobertura
+  99,6–100% da área oficial). `pfdUsoSolo` usa o ano TerraClass mais
+  próximo ANTES do "Até" e diz quando o "Até" é anterior a 2008. **UC
+  ainda não tem uso do solo** (exige junção espacial) — a tela diz
+  isso, nunca mostra o número do estado. Paleta dos 5 usos validada no
+  `validate_palette.js` (pastagem #B45309, capoeira #65A30D,
+  agricultura #7C3AED, urbano #BE185D, outros #0284C7). Capoeira segue
+  contando como desmatada (PRODES = floresta primária).
+- Guarda: `tests/painel-fogo-desmatamento.test.js` (36), inclusive
   página sem rolagem lateral em 390px.
 - `pwa/sw.js`: frota 112 → 113 (`js/layout.js` está no shell do Frota).
 
