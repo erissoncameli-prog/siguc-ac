@@ -415,6 +415,111 @@ function pfdKpis(dados, f) {
 }
 
 // ══════════════════════════════════════════════════════════════════
+// Território: área do recorte, minimapa e o que virou a área desmatada
+// (TerraClass, migration 347). O PRODES diz QUANTO foi desmatado; o
+// TerraClass diz O QUE aquilo virou. Mesma área do PRODES — o MapBiomas
+// é outra metodologia e nunca é somado aqui.
+// ══════════════════════════════════════════════════════════════════
+// Grupos do desmatado — paleta validada no validate_palette.js da skill
+// de dataviz (CVD ΔE 8,6 deutan no pior par; normal 23,3; contraste ≥ 3:1).
+// Sempre com rótulo e valor ao lado, nunca só a cor.
+const PFD_USO = [
+  { chave: 'pastagem',    rotulo: 'Pastagem',                         cor: '#B45309' },
+  { chave: 'secundaria',  rotulo: 'Vegetação secundária (capoeira)',  cor: '#65A30D' },
+  { chave: 'agricultura', rotulo: 'Agricultura e silvicultura',       cor: '#7C3AED' },
+  { chave: 'urbano',      rotulo: 'Área urbana',                      cor: '#BE185D' },
+  { chave: 'outros',      rotulo: 'Mineração, outros usos e desmatamento do ano', cor: '#0284C7' },
+]
+const _PFD_USO_GRUPO = { pastagem: 'pastagem', secundaria: 'secundaria', agricultura: 'agricultura',
+  urbano: 'urbano', outros_usos: 'outros', desmat_ano: 'outros' }
+
+// Uso do solo no ano TerraClass mais próximo do "Até" (a série é bienal:
+// 2008, 2010 … 2024). Só Acre e município — UC ainda não tem o recorte.
+function pfdUsoSolo(dados, f) {
+  const t = pfdEscopoTipo(f.escopo)
+  if (t !== 'acre' && t !== 'mun') return null
+  const cd = t === 'mun' ? f.escopo.slice(4) : null
+  const grupoDe = {}
+  for (const c of dados.tcClasses || []) grupoDe[c.codigo] = c.grupo
+  const linhas = (dados.terraclass || []).filter(r => !cd || r.cd_ibge === cd)
+  const anos = [...new Set(linhas.map(r => Number(r.ano)))].sort((a, b) => a - b)
+  if (!anos.length) return null
+  const ano = [...anos].reverse().find(a => a <= Number(f.anoFim)) ?? null
+  if (ano == null) return { ano: null, primeiro: anos[0] }
+  const somar = a => {
+    const g = {}
+    for (const r of linhas) if (Number(r.ano) === a) {
+      const k = grupoDe[r.classe] || 'outros_usos'
+      g[k] = (g[k] || 0) + Number(r.area_ha)
+    }
+    return g
+  }
+  const g = somar(ano), g0 = somar(anos[0])
+  const total = Object.values(g).reduce((a, b) => a + b, 0)
+  const porUso = k => Object.entries(g).filter(([gr]) => _PFD_USO_GRUPO[gr] === k).reduce((a, [, v]) => a + v, 0)
+  const porUso0 = k => Object.entries(g0).filter(([gr]) => _PFD_USO_GRUPO[gr] === k).reduce((a, [, v]) => a + v, 0)
+  const usos = PFD_USO.map(u => ({ ...u, ha: porUso(u.chave), ha0: porUso0(u.chave) }))
+  const antropizado = usos.reduce((a, u) => a + u.ha, 0)
+  for (const u of usos) u.pct = antropizado ? (u.ha / antropizado) * 100 : 0
+  return {
+    ano, primeiro: anos[0], total, antropizado,
+    floresta: g.floresta || 0,
+    naturalOutros: (g.agua || 0) + (g.natural_nao_florestal || 0) + (g.nao_observado || 0),
+    usos,
+  }
+}
+
+// Barra 100% (um segmento por uso, vão de 2px) + legenda com valor.
+function pfdUsoBarraHTML(uso, o) {
+  if (!uso || !uso.antropizado) return _pfdVazio((o && o.vazio) || 'Sem dado de uso do solo para este recorte.')
+  const W = 640, H = 34, vao = 2
+  let x = 0
+  const itens = uso.usos.filter(u => u.ha > 0)
+  const larguraUtil = W - vao * (itens.length - 1)
+  const segs = itens.map((u, i) => {
+    const w = Math.max(1, (u.ha / uso.antropizado) * larguraUtil)
+    const r = `<rect x="${x.toFixed(1)}" y="0" width="${w.toFixed(1)}" height="${H}" rx="4" fill="${u.cor}"><title>${_pfdEsc(u.rotulo)} — ${_pfdNum(u.ha)} ha (${_pfdNum(u.pct, 1)}%)</title></rect>`
+    x += w + (i < itens.length - 1 ? vao : 0)
+    return r
+  }).join('')
+  const svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" preserveAspectRatio="none" role="img" aria-label="${_pfdEsc(o.rotulo)}">${segs}</svg>`
+  // Uso sem área agora nem no primeiro ano não entra na legenda (lista de zeros é ruído).
+  const leg = uso.usos.filter(u => u.ha > 0 || u.ha0 > 0).map(u => {
+    const dif = u.ha - u.ha0
+    const var_ = uso.ano !== uso.primeiro && Math.abs(dif) >= 1
+      ? `<small>${dif > 0 ? '+' : '−'}${_pfdNum(Math.abs(dif))} ha desde ${uso.primeiro}</small>` : ''
+    return `<li><span class="pfd-dot" style="background:${u.cor}"></span><span class="pfd-leg-rot">${_pfdEsc(u.rotulo)}</span>
+      <span class="pfd-leg-val">${_pfdNum(u.ha)} ha <small>${_pfdNum(u.pct, 1)}%</small>${var_}</span></li>`
+  }).join('')
+  return `${_pfdEnvolver(svg, o.rotulo)}<ul class="pfd-legenda pfd-uso-legenda">${leg}</ul>`
+}
+
+// Minimapa em SVG: municípios em linha fina, limite do Acre e o recorte
+// preenchido. Projeção equiretangular corrigida pela latitude (cos) —
+// desenho de referência, não medida.
+function pfdMiniMapaSVG(geo, o) {
+  o = o || {}
+  const aneis = g => !g ? [] : g.type === 'Polygon' ? g.coordinates : g.type === 'MultiPolygon' ? g.coordinates.flat() : []
+  const todos = [...aneis(geo && geo.acre), ...((geo && geo.municipios) || []).flatMap(m => aneis(m.g)), ...((geo && geo.alvo) || []).flatMap(aneis)]
+  if (!todos.length) return _pfdVazio('Contorno indisponível.')
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
+  for (const anel of todos) for (const [lx, ly] of anel) {
+    if (lx < minX) minX = lx; if (lx > maxX) maxX = lx; if (ly < minY) minY = ly; if (ly > maxY) maxY = ly
+  }
+  const k = Math.cos(((minY + maxY) / 2) * Math.PI / 180)
+  const W = 320, m = 6
+  const esc = (W - 2 * m) / ((maxX - minX) * k || 1)
+  const H = Math.round((maxY - minY) * esc + 2 * m)
+  const px = lx => (m + (lx - minX) * k * esc).toFixed(1)
+  const py = ly => (m + (maxY - ly) * esc).toFixed(1)
+  const caminho = g => aneis(g).map(a => 'M' + a.map(([lx, ly]) => px(lx) + ',' + py(ly)).join('L') + 'Z').join('')
+  const muns = ((geo && geo.municipios) || []).map(mu => `<path d="${caminho(mu.g)}" fill="none" stroke="#CBD5E1" stroke-width="0.8"><title>${_pfdEsc(mu.nome)}</title></path>`).join('')
+  const acre = geo && geo.acre ? `<path d="${caminho(geo.acre)}" fill="#F8FAFC" stroke="#64748B" stroke-width="1.4"/>` : ''
+  const alvo = ((geo && geo.alvo) || []).map(g => `<path d="${caminho(g)}" fill="${o.cor || '#0D9488'}" fill-opacity="0.35" stroke="${o.cor || '#0D9488'}" stroke-width="1.6"/>`).join('')
+  return `<svg class="pfd-minimapa" viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="${_pfdEsc(o.rotulo || 'Mapa do recorte')}">${acre}${muns}${alvo}</svg>`
+}
+
+// ══════════════════════════════════════════════════════════════════
 // Parecer: leitura escrita do recorte, montada por REGRAS a partir dos
 // números desta tela + clima (ERA5) + ENSO (migration 346). Nenhuma API
 // de IA: cada frase sai de uma comparação medida, e o texto diz o que é
@@ -960,7 +1065,7 @@ if (typeof window !== 'undefined') {
     PFD_COR, PFD_MESES, pfdFocosPorAno, pfdFocosPorMes, pfdDesmatPorAno, pfdAcumulado,
     PFD_ESFERAS, PFD_TEND_MIN_ANOS, pfdCobertura, pfdEmpilhadaHTML, pfdEscopoTipo, pfdPorEsfera, pfdTendencia, pfdTendencias,
     pfdTendenciaHTML, pfdTendenciaFrase, pfdTendenciaResumoHTML,
-    pfdRankingUC, pfdRankingMun, pfdDentroFora, PFD_FIRMS_VIIRS_DESDE, pfdParecer, pfdParecerHTML, pfdSpearman, pfdEnsoDoAno, pfdClimaDoRecorte, pfdKpis, pfdFaixasAnos,
+    pfdRankingUC, pfdRankingMun, pfdDentroFora, PFD_FIRMS_VIIRS_DESDE, PFD_USO, pfdUsoSolo, pfdUsoBarraHTML, pfdMiniMapaSVG, pfdParecer, pfdParecerHTML, pfdSpearman, pfdEnsoDoAno, pfdClimaDoRecorte, pfdKpis, pfdFaixasAnos,
     pfdLinhaHTML, pfdAreaHTML, pfdBarrasHTML, pfdRankingHTML, pfdRoscaHTML,
   })
 }

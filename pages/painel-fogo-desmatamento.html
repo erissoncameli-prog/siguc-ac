@@ -99,8 +99,8 @@
 .pfd-legenda.pfd-legenda-linha { flex-direction:row; flex-wrap:wrap; gap:6px 18px; margin-top:8px; min-width:0; }
 .pfd-legenda.pfd-legenda-linha li { flex:0 1 auto; }
 .pfd-legenda.pfd-legenda-linha .pfd-leg-rot { flex:0 1 auto; }
-.pfd-cob-resumo { font-size:13px; color:#374151; margin:0 0 8px; line-height:1.5; }
-.pfd-cob-resumo strong { font-family:var(--font-sans, 'DM Sans', sans-serif); }
+.pfd-cob-resumo, .pfd-terr-resumo { font-size:13px; color:#374151; margin:0 0 8px; line-height:1.5; }
+.pfd-cob-resumo strong, .pfd-terr-resumo strong { font-family:var(--font-sans, 'DM Sans', sans-serif); }
 /* ── parecer ── */
 .pfd-par { display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:10px 24px; }
 .pfd-par-bloco h4 { font-size:12px; font-weight:800; color:#1F2937; margin:0 0 4px; text-transform:uppercase; letter-spacing:.04em; }
@@ -116,7 +116,28 @@
 .pfd-tabela th, .pfd-tabela td { padding:6px 8px; border-bottom:1px solid var(--borda); text-align:left; white-space:nowrap; }
 .pfd-tabela th { font-weight:700; color:var(--cinza-600); background:var(--cinza-50); }
 .pfd-tabela td.num { text-align:right; font-variant-numeric:tabular-nums; }
-.pfd-par-nota { font-size:11px; color:var(--cinza-500); margin:10px 0 0; line-height:1.5; }
+/* ── território ── */
+.pfd-terr { display:grid; grid-template-columns:minmax(180px, 280px) minmax(0,1fr); gap:16px 24px; align-items:start; }
+
+.pfd-terr-mapa svg { display:block; width:100%; height:auto; }
+.pfd-terr-num { display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:10px; margin:0 0 10px; }
+.pfd-terr-num > div { background:var(--cinza-50); border:1px solid var(--borda); border-radius:10px; padding:10px 12px; }
+.pfd-terr-num dt { font-size:11px; font-weight:700; color:var(--cinza-500); text-transform:uppercase; letter-spacing:.04em; }
+.pfd-terr-num dd { margin:2px 0 0; white-space:nowrap; font-family:var(--font-sans, 'DM Sans', sans-serif); font-size:20px; font-weight:800; color:#111827; }
+.pfd-terr-num dd small { font-size:12px; font-weight:600; color:var(--cinza-500); }
+.pfd-terr-num dd.pfd-terr-sub { font-size:12px; font-weight:600; color:var(--cinza-500); }
+.pfd-terr-h4 { font-size:12px; font-weight:800; color:#1F2937; margin:12px 0 2px; text-transform:uppercase; letter-spacing:.04em; }
+.pfd-uso-legenda { margin-top:8px; }
+.pfd-uso-legenda .pfd-leg-val { text-align:right; }
+.pfd-uso-legenda .pfd-leg-val small + small { display:block; margin-top:1px; }
+@media (max-width: 640px) {
+  .pfd-terr { grid-template-columns:minmax(0,1fr); }
+  .pfd-terr-mapa { max-width:200px; }
+  .pfd-terr-num { grid-template-columns:minmax(0,1fr); }
+  .pfd-terr-num > div { display:flex; flex-wrap:wrap; align-items:baseline; gap:2px 10px; }
+  .pfd-terr-num dt { flex-basis:100%; }
+  .pfd-terr-num dd { font-size:18px; }
+}.pfd-par-nota { font-size:11px; color:var(--cinza-500); margin:10px 0 0; line-height:1.5; }
 [hidden] { display:none !important; }
 </style>
 </head>
@@ -166,7 +187,7 @@ async function _pfdTudo(montar) {
 
 async function pfdCarregar() {
   const [ucs, focosUcMes, focosResumo, prodesAno, prodesUcAno, bdqUcMes, bdqResumo, cobertura,
-         municipios, focosMunMes, bdqMunMes, prodesMunAno, clima, enso] = await Promise.all([
+         municipios, focosMunMes, bdqMunMes, prodesMunAno, clima, enso, terraclass, tcClasses] = await Promise.all([
     _pfdTudo(() => db.from('unidades_conservacao').select('id,nome,sigla,categoria,grupo,esfera').eq('ativo', true).order('nome')),
     _pfdTudo(() => db.from('focos_uc_mes').select('ano,mes,uc_id,focos,origem').order('ano')),
     _pfdTudo(() => db.from('focos_resumo_ano').select('ano,focos,origem,periodo_ini,periodo_fim').order('ano')),
@@ -183,9 +204,13 @@ async function pfdCarregar() {
     // o painel segue sem a leitura climática, nunca em branco.
     _pfdTudo(() => db.from('clima_mun_ano').select('ano,cd_ibge,chuva_seca_mm,dias_secos,maior_seq_seca,tmax_seca_c,umid_min_seca,dias_na_seca').order('ano')).catch(() => []),
     _pfdTudo(() => db.from('clima_enso').select('ano,mes,oni').gte('ano', 2000).order('ano')).catch(() => []),
+    // Uso do solo (TerraClass, migration 347) só qualifica o card de
+    // território: falhou, o card mostra área e desmatado sem a quebra.
+    _pfdTudo(() => db.from('terraclass_mun').select('ano,cd_ibge,classe,area_ha').order('ano')).catch(() => []),
+    _pfdTudo(() => db.from('terraclass_classes').select('codigo,nome,grupo').order('codigo')).catch(() => []),
   ])
   return { ucs, focosUcMes, focosResumo, prodesAno, prodesUcAno, bdqUcMes, bdqResumo, cobertura,
-           municipios, focosMunMes, bdqMunMes, prodesMunAno, clima, enso }
+           municipios, focosMunMes, bdqMunMes, prodesMunAno, clima, enso, terraclass, tcClasses }
 }
 
 function pfdSincEscopo() {
@@ -420,6 +445,7 @@ function pfdRender() {
     <div class="pfd-ranking">${pfdRankingHTML(pfdRankingMun(d, f, tipo), { cor, unidade, rotulo: titulo, destaque: destaqueMun, max: 30, vazio: 'Nenhum município com registro no período.' })}</div></div>`
   let html = `<div class="pfd-kpis">${kpis.join('')}</div>`
   if (avisos.length) html += `<p class="pfd-aviso">${avisos.map(esc).join(' ')}</p>`
+  html += pfdCardTerritorio(d, f, onde)
   html += `<section class="pfd-card pfd-parecer" aria-labelledby="pfd-par-titulo">
     <h3 id="pfd-par-titulo">Leitura do período — ${esc(onde)}, ${esc(periodo)}</h3>
     <p class="pfd-sub">O que subiu ou caiu, e o que o clima e o desmatamento dizem sobre isso.</p>
@@ -497,6 +523,13 @@ function pfdRender() {
       A floresta que resta é a área total menos o desmatado, a vegetação natural não florestal e os rios — o PRODES não
       publica uma camada de floresta, então é uma subtração. Área que foi desmatada e depois regenerou continua contando
       como desmatada: o que resta é floresta primária, não toda a cobertura vegetal.</li>
+    <li><strong>Território e uso do solo</strong>: área total e desmatado vêm da mesma base do PRODES dos gráficos
+      (área oficial do INPE para o Acre; limite do IBGE para municípios; limite cadastrado para UCs). O que a área desmatada
+      virou vem do <strong>TerraClass</strong> (INPE/Embrapa), que qualifica exatamente a área que o PRODES marcou como
+      desmatada: pastagem, vegetação secundária (capoeira), agricultura, área urbana e outros usos, a cada 2 anos desde 2008.
+      Capoeira continua contando como desmatada no PRODES — regenerar não devolve a floresta primária. Por município, é a
+      soma dos polígonos do próprio TerraClass; para UCs, o recorte ainda não foi calculado. O MapBiomas usa outra
+      metodologia e não é misturado aqui.</li>
     <li><strong>Leitura do período</strong>: texto montado por regras fixas a partir dos números desta tela — sem IA e sem
       custo de API. Clima: reanálise ERA5 (Open-Meteo), chuva, dias sem chuva (&lt; 1 mm) e maior sequência seca na estação seca
       (jun–set), no ponto central de cada município; o Acre é a média ponderada pela área dos 22. ENSO: índice ONI da NOAA.
@@ -505,6 +538,78 @@ function pfdRender() {
   </ul></div>`
 
   document.getElementById('pfd-conteudo').innerHTML = html
+  pfdPreencherMiniMapa()
+}
+
+// ── Território: área total, minimapa, quanto já foi desmatado e o que
+// virou (TerraClass). Vale para Acre, município, esfera e UC.
+function pfdCardTerritorio(d, f, onde) {
+  const c = pfdCobertura(d, f)
+  const t = pfdEscopoTipo(f.escopo)
+  const n = v => Number(v).toLocaleString('pt-BR', { maximumFractionDigits: 0 })
+  const p = v => Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+  const km = v => Number(v / 100).toLocaleString('pt-BR', { maximumFractionDigits: 0 })
+  const ehUC = t === 'uc' || t === 'esfera' || t === 'ucs'
+  let numeros = '<p class="pfd-vazio">Sem a área do recorte na base do PRODES.</p>'
+  if (c) {
+    numeros = `<dl class="pfd-terr-num">
+        <div><dt>Área total</dt><dd>${n(c.area)} <small>ha</small></dd><dd class="pfd-terr-sub">${km(c.area)} km²</dd></div>
+        <div><dt>Desmatado até ${c.anoRef}</dt><dd>${n(c.desmatado)} <small>ha</small></dd><dd class="pfd-terr-sub">${p(c.pctDesmatado)}% da área</dd></div>
+        <div><dt>Floresta que resta</dt><dd>${n(c.resta)} <small>ha</small></dd><dd class="pfd-terr-sub">${p(c.pctResta)}% da área</dd></div>
+      </dl>
+      <p class="pfd-terr-resumo">Dos <strong>${n(c.area)} ha</strong> de ${esc(onde)}, <strong>${n(c.desmatado)} ha</strong>
+        (${p(c.pctDesmatado)}%) já foram desmatados até ${c.anoRef}, segundo o PRODES/INPE.</p>`
+  }
+  let uso = ''
+  if (ehUC) {
+    uso = `<p class="pfd-par-nota">O que a área desmatada virou (pastagem, capoeira, agricultura) ainda não está disponível
+      para UCs — por enquanto só para o Acre e os municípios.</p>`
+  } else {
+    const u = pfdUsoSolo(d, f)
+    if (u && u.ano == null) {
+      uso = `<p class="pfd-par-nota">O TerraClass começa em ${u.primeiro}: escolha um "Até" a partir desse ano para ver o que a área desmatada virou.</p>`
+    } else if (u) {
+      uso = `<h4 class="pfd-terr-h4">O que a área desmatada virou — TerraClass ${u.ano}</h4>
+        <p class="pfd-sub">${n(u.antropizado)} ha de uso da terra mapeados${c ? ` (o PRODES conta ${n(c.desmatado)} ha desmatados)` : ''}.
+        Ano TerraClass mais próximo do "Até" — a série sai a cada 2 anos.${u.ano !== u.primeiro ? ` Variação desde ${u.primeiro} ao lado de cada uso.` : ''}</p>
+        ${pfdUsoBarraHTML(u, { rotulo: 'O que a área desmatada virou' })}`
+    }
+  }
+  return `<section class="pfd-card pfd-territorio" aria-labelledby="pfd-terr-titulo">
+    <h3 id="pfd-terr-titulo">Território — ${esc(onde)}</h3>
+    <p class="pfd-sub">Área do recorte e quanto dela já foi desmatado (saldo acumulado, não soma do período).</p>
+    <div class="pfd-terr">
+      <div class="pfd-terr-mapa" id="pfd-minimapa" data-escopo="${esc(f.escopo)}">${skeletonBlocoHTML(4)}</div>
+      <div class="pfd-terr-dados">${numeros}${uso}</div>
+    </div></section>`
+}
+
+// Contorno vem do banco (painel_recorte_geo, simplificado) uma vez por
+// recorte; o card é redesenhado a cada filtro e reaproveita o cache.
+const _pfdGeoCache = {}
+async function pfdPreencherMiniMapa() {
+  const el = document.getElementById('pfd-minimapa')
+  if (!el) return
+  const escopo = el.dataset.escopo || ''
+  const rotulo = 'Mapa do recorte: ' + _pfdNomeEscopo()
+  try {
+    if (!_pfdGeoCache[escopo]) {
+      const { data, error } = await db.rpc('painel_recorte_geo', { p_escopo: escopo })
+      if (error) throw error
+      _pfdGeoCache[escopo] = data || {}
+    }
+  } catch (e) {
+    console.error(e)
+    _pfdGeoCache[escopo] = null
+  }
+  const atual = document.getElementById('pfd-minimapa')
+  if (!atual || (atual.dataset.escopo || '') !== escopo) return   // o filtro já mudou
+  let geo = _pfdGeoCache[escopo]
+  // Acre todo: o próprio estado é o recorte em destaque.
+  if (geo && !escopo && geo.acre && !(geo.alvo || []).length) geo = { ...geo, alvo: [geo.acre] }
+  atual.innerHTML = geo ? pfdMiniMapaSVG(geo, { rotulo, cor: '#1D4ED8' })
+    : '<p class="pfd-vazio">Contorno indisponível.</p>'
+  if (!geo) delete _pfdGeoCache[escopo]
 }
 
 // Saldo acumulado (não o período): quanto já foi desmatado × quanto resta,
