@@ -42,7 +42,7 @@ ANOS = list(range(2008, 2025, 2))
 # não florestal. Polígono que é só isso em TODOS os anos não qualifica
 # desmatado nenhum e fica fora da consulta (e do download).
 NATURAIS = (1, 23, 25, 51)
-PAGINA = 500
+PAGINA = 1000
 GEOD = Geod(ellps='GRS80')
 # Caixa do Acre com folga: coordenada fora disso vem com eixo trocado.
 LON_MIN, LON_MAX, LAT_MIN, LAT_MAX = -75.5, -65.5, -12.5, -6.5
@@ -310,7 +310,13 @@ def main():
     ap.add_argument('--uc', default=None)
     ap.add_argument('--seco', action='store_true')
     ap.add_argument('--d2007', action='store_true')
+    ap.add_argument('--listar', action='store_true', help='imprime o JSON das UCs (matriz do workflow)')
     a = ap.parse_args()
+    if a.listar:
+        linhas = sql('SELECT id::text AS id FROM public.unidades_conservacao WHERE ativo AND geom IS NOT NULL '
+                     'ORDER BY ST_Area(geom::geography) DESC')
+        print(json.dumps([r['id'] for r in linhas]))
+        return
     autoteste()
     if a.autoteste:
         return

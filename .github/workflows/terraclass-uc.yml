@@ -5,6 +5,11 @@ name: TerraClass por UC
 # propósito: geometria de camada grande pelo pg_net reiniciou a produção
 # (ver CLAUDE.md, 25/09/2026). Grava só totais, pela API de
 # gerenciamento, com o mesmo SUPABASE_ACCESS_TOKEN do deploy.
+#
+# Uma UC por job: o WFS do TerraClass é lento (~1.000 polígonos a cada
+# 1,5 min no 1º run) e a RESEX Chico Mendes tem ~26 mil — todas num job
+# só não caberiam no limite de tempo. max-parallel 3 para não martelar o
+# servidor do INPE.
 
 on:
   workflow_dispatch:
@@ -26,14 +31,18 @@ concurrency:
   group: terraclass-uc
   cancel-in-progress: false
 
+permissions:
+  contents: read
+
+env:
+  SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
 jobs:
-  recorte:
+  preparar:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
-    permissions:
-      contents: read
-    env:
-      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+    timeout-minutes: 10
+    outputs:
+      ucs: ${{ steps.lista.outputs.ucs }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5.6.0
@@ -43,13 +52,54 @@ jobs:
         run: pip install 'shapely==2.1.2' 'pyproj==3.7.2' 'requests==2.32.5'
       - name: Autoteste (sem rede)
         run: python scripts/terraclass_uc.py --autoteste
-      - name: Rodar
+      - name: Lista de UCs
+        id: lista
         env:
-          MODO: ${{ inputs.modo || 'ucs' }}
           UC: ${{ inputs.uc }}
+          MODO: ${{ inputs.modo || 'ucs' }}
         run: |
-          case "$MODO" in
-            d2007) python scripts/terraclass_uc.py --d2007 ;;
-            seco)  python scripts/terraclass_uc.py --seco ${UC:+--uc "$UC"} ;;
-            *)     python scripts/terraclass_uc.py ${UC:+--uc "$UC"} ;;
-          esac
+          if [ "$MODO" = "d2007" ]; then echo 'ucs=[]' >> "$GITHUB_OUTPUT"
+          elif [ -n "$UC" ]; then
+            [[ "$UC" =~ ^[0-9a-f-]{36}$ ]] || { echo "id de UC inválido"; exit 1; }
+            echo "ucs=[\"$UC\"]" >> "$GITHUB_OUTPUT"
+          else echo "ucs=$(python scripts/terraclass_uc.py --listar)" >> "$GITHUB_OUTPUT"; fi
+
+  recorte:
+    needs: preparar
+    if: needs.preparar.outputs.ucs != '[]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        uc: ${{ fromJSON(needs.preparar.outputs.ucs) }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5.6.0
+        with:
+          python-version: '3.12'
+      - name: Dependências
+        run: pip install 'shapely==2.1.2' 'pyproj==3.7.2' 'requests==2.32.5'
+      - name: Recortar e gravar
+        env:
+          UC: ${{ matrix.uc }}
+          MODO: ${{ inputs.modo || 'ucs' }}
+        run: |
+          if [ "$MODO" = "seco" ]; then python scripts/terraclass_uc.py --seco --uc "$UC"
+          else python scripts/terraclass_uc.py --uc "$UC"; fi
+
+  d2007:
+    needs: preparar
+    if: inputs.modo == 'd2007'
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5.6.0
+        with:
+          python-version: '3.12'
+      - name: Dependências
+        run: pip install 'shapely==2.1.2' 'pyproj==3.7.2' 'requests==2.32.5'
+      - name: Diagnóstico
+        run: python scripts/terraclass_uc.py --d2007
