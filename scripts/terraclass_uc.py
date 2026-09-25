@@ -26,8 +26,9 @@ from collections import defaultdict
 
 import requests
 from pyproj import Geod
-from shapely import make_valid, wkt
-from shapely.geometry import box, mapping, shape
+from shapely import get_parts, make_valid, wkt
+from shapely.errors import GEOSException
+from shapely.geometry import MultiPolygon, Polygon, box, mapping, shape
 from shapely.ops import transform
 from shapely.prepared import prep
 
@@ -74,6 +75,28 @@ def eixo_trocado(geom_json):
         c = c[0]
     x, y = c[0], c[1]
     return LAT_MIN <= x <= LAT_MAX and LON_MIN <= y <= LON_MAX
+
+
+def poligonal(g):
+    """Geometria válida só com a parte de ÁREA, ou None se irreparável.
+    O TerraClass tem polígonos que o `make_valid` padrão recusa ("Overlay
+    input is mixed-dimension", achado no 1º run) — tenta a reconstrução
+    estrutural e, na falta, o buffer(0)."""
+    if g.is_valid and g.geom_type in ('Polygon', 'MultiPolygon'):
+        return g
+    for reparo in (lambda x: make_valid(x, method='structure', keep_collapsed=False),
+                   lambda x: make_valid(x), lambda x: x.buffer(0)):
+        try:
+            r = reparo(g)
+        except GEOSException:
+            continue
+        partes = [p for p in get_parts(r) if isinstance(p, (Polygon, MultiPolygon)) and not p.is_empty]
+        if partes:
+            r = partes[0] if len(partes) == 1 else MultiPolygon(
+                [q for p in partes for q in (p.geoms if isinstance(p, MultiPolygon) else [p])])
+            if r.is_valid:
+                return r
+    return None
 
 
 def area_ha(g):
@@ -137,20 +160,26 @@ def wfs_paginado(url, camada, cql, propriedades=None):
 
 
 # ── Agregação (pura) ────────────────────────────────────────────────────
-def agregar(feicoes, uc_geom):
-    """(ano, classe) → [polígonos, hectares] da parte DENTRO da UC."""
+def agregar(feicoes, uc_geom, descartes=None):
+    """(ano, classe) → [polígonos, hectares] da parte DENTRO da UC.
+    Polígono irreparável não some em silêncio: entra em `descartes`."""
     uc_p = prep(uc_geom)
     agg = defaultdict(lambda: [0, 0.0])
     for f in feicoes:
         gj = f.get('geometry')
         if not gj:
             continue
-        g = shape(trocar_eixo_json(gj) if eixo_trocado(gj) else gj)
-        if not g.is_valid:
-            g = make_valid(g)
+        g = poligonal(shape(trocar_eixo_json(gj) if eixo_trocado(gj) else gj))
+        if g is None:
+            if descartes is not None:
+                descartes.append(f.get('id'))
+            continue
         if not uc_p.intersects(g):
             continue
-        parte = g if uc_p.contains(g) else g.intersection(uc_geom)
+        try:
+            parte = g if uc_p.contains(g) else g.intersection(uc_geom)
+        except GEOSException:
+            parte = g.buffer(0).intersection(uc_geom.buffer(0))
         ha = area_ha(parte)
         if ha <= 0:
             continue
@@ -184,7 +213,7 @@ def ucs(filtro):
     onde = '' if filtro in (None, 'todas') else f" AND id = '{filtro}'::uuid"
     linhas = sql('SELECT id::text AS id, nome, ST_AsGeoJSON(ST_MakeValid(geom), 7) AS g '
                  f'FROM public.unidades_conservacao WHERE ativo AND geom IS NOT NULL{onde} ORDER BY nome')
-    return [(r['id'], r['nome'], make_valid(shape(json.loads(r['g'])))) for r in linhas]
+    return [(r['id'], r['nome'], poligonal(shape(json.loads(r['g'])))) for r in linhas]
 
 
 def rodar_ucs(filtro, seco, resumo):
@@ -192,7 +221,12 @@ def rodar_ucs(filtro, seco, resumo):
     for uc_id, nome, g in ucs(filtro):
         t0 = time.time()
         feicoes = wfs_paginado(TC_WFS, TC_CAMADA, cql_tc(g))
-        agg = agregar(feicoes, g)
+        descartes = []
+        agg = agregar(feicoes, g, descartes)
+        if len(descartes) > max(2, 0.005 * len(feicoes)):
+            raise RuntimeError(f'{nome}: {len(descartes)} polígonos irreparáveis de {len(feicoes)} — nada gravado')
+        if descartes:
+            print(f'  aviso: {len(descartes)} polígono(s) irreparável(is) fora da conta: {descartes[:5]}', flush=True)
         uso24 = sum(ha for (a, c), (_, ha) in agg.items() if a == 2024 and c not in NATURAIS)
         print(f'{nome}: {len(feicoes)} feições, {len(agg)} linhas, uso 2024 = {uso24:,.0f} ha ({time.time() - t0:.0f}s)', flush=True)
         resumo.append(f'| {nome} | {len(feicoes):,} | {uso24:,.0f} |')
@@ -254,6 +288,12 @@ def autoteste():
     assert abs(agg[(2024, 2)][1] - area_ha(meio) / 2) / (area_ha(meio) / 2) < 0.01   # só a metade de dentro
     assert abs(agg[(2024, 17)][1] - a_dentro) < 1e-6                 # eixo trocado é corrigido
     assert agg[(2008, 11)][0] == 3                                   # cada ano conta o seu uso
+    # polígono inválido (gravata-borboleta) é reparado, não derruba nem some
+    gravata = Polygon([(-69.8, -9.8), (-69.7, -9.7), (-69.7, -9.8), (-69.8, -9.7), (-69.8, -9.8)])
+    assert not gravata.is_valid and poligonal(gravata) is not None and area_ha(poligonal(gravata)) > 0
+    d = []
+    agg2 = agregar([{'id': 'x', 'properties': props(11), 'geometry': mapping(gravata)}], uc, d)
+    assert agg2[(2024, 11)][1] > 0 and d == []
     # filtro de busca contém a UC inteira, em ordem lat lon
     fb = trocar_eixo(wkt.loads(filtro_uc(uc)))
     assert fb.contains(uc)
