@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Harness — rótulos de rosca</title>
+<!-- Página vazia dedicada (mesmo motivo do pin-baralho-harness.html): a
+     página real do relatório exige sessão Supabase. Chart.js vem de
+     tests/fixtures/vendor — o CDN oscila na política de rede do sandbox. -->
+<style>body{margin:0;background:#fff;font-family:sans-serif} .w{width:520px;height:280px}</style>
+<script src="vendor/chart-4.5.1.umd.min.js"></script>
+<script src="../../js/chart-rosca-rotulos.js"></script>
+</head>
+<body>
+<div class="w"><canvas id="c1"></canvas></div>
+<div class="w"><canvas id="c2"></canvas></div>
+<script>
+window.desenhar = function (id, tipo, dados, cores, opcoes, comRotulos) {
+  const cfg = {
+    type: tipo,
+    data: { labels: dados.map((_, i) => 'Fatia ' + i), datasets: [{ data: dados, backgroundColor: cores, borderWidth: 0 }] },
+    options: { animation: false, responsive: true, maintainAspectRatio: false, cutout: tipo === 'doughnut' ? '58%' : 0,
+      plugins: { legend: { position: 'right' } } }
+  }
+  if (comRotulos) roscaRotulosAplicar(cfg, opcoes || {})
+  const el = document.getElementById(id)
+  Chart.getChart(el)?.destroy()
+  return new Chart(el.getContext('2d'), cfg)
+}
+</script>
+</body>
+</html>
