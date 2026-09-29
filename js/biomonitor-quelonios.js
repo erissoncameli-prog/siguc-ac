@@ -4380,6 +4380,17 @@ function _bioBarsH(canvasId, labels, data, cor, Chart) {
 // Categoria com zero fica DE FORA — uma barra de comprimento zero não
 // informa nada, só rouba altura do card (mesmo princípio de nunca
 // mostrar linha vazia em tabela).
+// Percentual do rótulo das barras de status/desfecho: número e % juntos,
+// mesmo formato das roscas do relatório (js/chart-rosca-rotulos.js).
+function _bioPctTexto(v, total) {
+  if (!total || !v) return '0%'
+  const p = 100 * v / total
+  if (p < 0.1) return '<0,1%'
+  // ≥ 99,5% com sobra: nunca "100%" enquanto existe outra fatia.
+  if (p >= 10 && (p < 99.5 || v >= total)) return Math.round(p) + '%'
+  return p.toFixed(1).replace('.', ',').replace(',0', '') + '%'
+}
+
 function _bioBarsStatusH(canvasId, cardId, labels, data, cores, Chart, msgVazio) {
   const canvas = document.getElementById(canvasId)
   if (!canvas) return
@@ -4394,6 +4405,7 @@ function _bioBarsStatusH(canvasId, cardId, labels, data, cores, Chart, msgVazio)
 
   _bioCharts[canvasId]?.destroy()
   const maxVal = Math.max(...dataF)
+  const totalF = dataF.reduce((t, x) => t + x, 0)
   const rotuloValor = {
     id: 'bioRotuloValorStatus',
     afterDatasetsDraw(chart) {
@@ -4405,7 +4417,7 @@ function _bioBarsStatusH(canvasId, cardId, labels, data, cores, Chart, msgVazio)
       ctx.fillStyle = '#0D1E27'
       ctx.textBaseline = 'middle'
       ctx.textAlign = 'left'
-      meta.data.forEach((bar, i) => ctx.fillText(String(dataF[i]), bar.x + 6, bar.y))
+      meta.data.forEach((bar, i) => ctx.fillText(`${dataF[i].toLocaleString('pt-BR')} · ${_bioPctTexto(dataF[i], totalF)}`, bar.x + 6, bar.y))
       ctx.restore()
     }
   }
@@ -4425,7 +4437,7 @@ function _bioBarsStatusH(canvasId, cardId, labels, data, cores, Chart, msgVazio)
         // Eixo numérico escondido de propósito — o rótulo na ponta da
         // barra já dá o valor exato; mostrar os dois seria redundância
         // (mesma barra "carrega" a categoria via posição/cor + rótulo).
-        x: { display: false, grid: { display: false }, suggestedMax: maxVal * 1.15 },
+        x: { display: false, grid: { display: false }, suggestedMax: maxVal * 1.45 },
         y: { grid: { display: false }, ticks: { font: { size: 11.5 } } }
       }
     },
@@ -4454,12 +4466,15 @@ function _bioLinha(canvasId, labels, datasets, Chart) {
 }
 
 function _bioRenderizarGraficos(d, Chart) {
-  // ── Desfecho dos ovos (barra – Tab Taxas)
+  // ── Desfecho dos ovos (barra – Tab Taxas) — mesmas categorias e cores
+  // da rosca do relatório (pages/relatorios-biomonitor.html, grafDesfecho):
+  // ovos viáveis ainda em incubação e de ninho perdido entram (migration
+  // 349), e "Descartados" soma registro + visitas (descartes_ovos).
   const df = d.desfecho_ovos || {}
   _bioBarsStatusH('chart-desfecho', 'card-desfecho',
-    ['Filhotes vivos', 'Filhotes mortos', 'Não nascidos', 'Descartados'],
-    [df.filhotes_vivos || 0, df.filhotes_mortos || 0, df.ovos_nao_nascidos || 0, df.ovos_descartados || 0],
-    ['#2A9D6F', '#DC2626', '#D97706', '#9CA3AF'],
+    ['Em incubação', 'Filhotes vivos', 'Filhotes mortos', 'Não nascidos', 'Ninho perdido', 'Descartados'],
+    [df.ovos_em_incubacao || 0, df.filhotes_vivos || 0, df.filhotes_mortos || 0, df.ovos_nao_nascidos || 0, df.ovos_ninho_perdido || 0, df.ovos_descartados || 0],
+    ['#C9A84C', '#2A9D6F', '#DC2626', '#D97706', '#7B57B0', '#9CA3AF'],
     Chart,
     'Nenhum desfecho registrado nesta temporada.'
   )

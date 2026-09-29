@@ -15,6 +15,7 @@
 <script src="../js/biomonitor-pdf-fonts.js"></script>
 <script src="../js/relatorio-cabecalho-pdf.js"></script>
 <script src="../js/biomonitor-relatorio-ninho.js"></script>
+<script src="../js/chart-rosca-rotulos.js"></script>
 <style>
 /* ── Relatório Biomonitor ── */
 .rel-filtros {
@@ -766,7 +767,12 @@
       const q = r.qtd || 0
       if (r.motivo in _descAgg) _descAgg[r.motivo] += q
       _descAgg.total += q
-      const causa = ['predacao','alagamento','erosao','humana'].includes(r.causa) ? r.causa : 'natural'
+      // Causa efetiva = causa fina (visita) ou, se vazia, o motivo do
+      // registro do ninho que tem equivalente (predação/humana) — mesma
+      // regra de vw_ninho_ovos (migration 349). Antes o descarte do
+      // registro caía inteiro em "Natural (postura)", inclusive predação.
+      const c = r.causa || (['predacao','humana'].includes(r.motivo) ? r.motivo : null)
+      const causa = ['predacao','alagamento','erosao','humana'].includes(c) ? c : 'natural'
       _descAgg.porCausa[causa] += q
     })
 
@@ -1065,7 +1071,7 @@
         ${kpiCard('Perdidos / Predados', v(k.perdidos),             '#ef4444')}
       </div>
       <div class="rel-charts-row">
-        <div class="rel-chart-card"><p class="rel-chart-title">Status dos Ninhos</p><div class="rel-chart-wrap"><canvas id="graf-status"></canvas></div></div>
+        <div class="rel-chart-card"><p class="rel-chart-title">Desfecho dos ninhos</p><div class="rel-chart-wrap"><canvas id="graf-status"></canvas></div></div>
         <div class="rel-chart-card"><p class="rel-chart-title">Desfecho dos Ovos</p><div class="rel-chart-wrap"><canvas id="graf-desfecho"></canvas></div></div>
       </div>
       <div style="font-size:11px;color:#6B7280;margin-top:8px">
@@ -1426,12 +1432,54 @@
         }
       }
     }
+    // Número e % escritos na fatia + total no centro (js/chart-rosca-rotulos.js).
+    // `cfg.rosca` = opções do módulo ({ centro: 'ninhos' }); sem o arquivo
+    // carregado a rosca sai como antes, só com o tooltip.
+    if ((cfg.type === 'doughnut' || cfg.type === 'pie') && typeof roscaRotulosAplicar === 'function') {
+      roscaRotulosAplicar(cfg, cfg.rosca || {})
+    }
+    delete cfg.rosca
     _charts[id] = new Chart(el.getContext('2d'), cfg)
     attachClickTooltip(_charts[id])
   }
 
   const gridColor = 'rgba(0,0,0,.06)'
   const tickFont  = { size: 11, family: 'DM Sans, sans-serif' }
+
+  // Cores ÚNICAS das roscas — Painel e relatório detalhado leem daqui, nunca
+  // uma paleta por gráfico (antes Encontrado/Transferido/Soltado vinham
+  // trocados entre as duas abas).
+  const DESFECHO_NINHO = [
+    { k:'eclodidos_status', lbl:'Eclodido',    cor:'#2A9D6F' },
+    { k:'em_bercario',      lbl:'Em berçário', cor:'#8b5cf6' },
+    { k:'soltados',         lbl:'Soltado',     cor:'#7ECEE8' },
+    { k:'transferidos',     lbl:'Transferido', cor:'#1A6B8C' },
+    { k:'pendentes',        lbl:'Encontrado',  cor:'#C9A84C' },
+    { k:'perdidos',         lbl:'Perdido',     cor:'#ef4444' },
+  ]
+  // Perdas de ovos por causa — mesma ordem/cor no Painel (pizza) e no
+  // detalhado (colunas). "Natural (postura)" = perda natural lançada no
+  // registro do ninho, que não tem causa fina (migration 349).
+  const PERDA_CAUSA = [
+    { k:'predacao',   lbl:'Predação',          cor:'#ef4444' },
+    { k:'alagamento', lbl:'Alagamento',        cor:'#1A6B8C' },
+    { k:'erosao',     lbl:'Erosão',            cor:'#C9A84C' },
+    { k:'humana',     lbl:'Ação humana',       cor:'#7B57B0' },
+    { k:'natural',    lbl:'Natural (postura)', cor:'#38bdf8' },
+  ]
+
+  function roscaDesfechoNinhos(id, k) {
+    mkChart(id, {
+      type:'doughnut',
+      rosca:{ centro:'ninhos' },
+      data:{
+        labels: DESFECHO_NINHO.map(d => d.lbl),
+        datasets:[{ data: DESFECHO_NINHO.map(d => k[d.k] || 0),
+          backgroundColor: DESFECHO_NINHO.map(d => d.cor), borderWidth:2, borderColor:'rgba(0,0,0,.15)', hoverOffset:8 }]
+      },
+      options:{ cutout:'58%', responsive:true, maintainAspectRatio:false, plugins:{ legend:{...legendOpts, position:'right'} }, animation:{duration:600} }
+    })
+  }
   const legendOpts = { labels: { color:'#374151', font: tickFont, usePointStyle:true, padding:12 } }
 
   function grafFenologia(mes, anos) {
@@ -1479,33 +1527,39 @@
     })
   }
 
+  // Desfecho dos ovos: onde está cada ovo da postura. "Em incubação" e
+  // "Ninho perdido" = ovos viáveis de ninho ainda sem eclosão (migration
+  // 349); "Descartados" = soma de descartes_ovos (registro + visitas) —
+  // a coluna antiga ninhos_quelonios.ovos_descartados fica só de fallback.
   function grafDesfecho(k) {
+    const F = [
+      { lbl:'Em incubação',      v:k.total_ovos_em_incubacao,  cor:'#C9A84C' },
+      { lbl:'Filhotes vivos',    v:k.total_filhotes_vivos,     cor:'#2A9D6F' },
+      { lbl:'Filhotes mortos',   v:k.total_filhotes_mortos,    cor:'#ef4444' },
+      { lbl:'Ovos não nascidos', v:k.total_ovos_nao_nascidos,  cor:'#D97706' },
+      { lbl:'Ninho perdido',     v:k.total_ovos_ninho_perdido, cor:'#7B57B0' },
+      { lbl:'Descartados',       v:k.total_ovos_descartes ?? k.total_ovos_descartados, cor:'#6b7280' },
+    ]
     mkChart('graf-desfecho', {
       type:'doughnut',
+      rosca:{ centro:'ovos' },
       data:{
-        labels:['Filhotes vivos','Filhotes mortos','Ovos não nascidos','Descartados'],
-        datasets:[{ data:[k.total_filhotes_vivos||0,k.total_filhotes_mortos||0,k.total_ovos_nao_nascidos||0,k.total_ovos_descartados||0],
-          backgroundColor:['#2A9D6F','#ef4444','#D97706','#6b7280'], borderWidth:2, borderColor:'rgba(0,0,0,.15)', hoverOffset:8 }]
+        labels: F.map(f => f.lbl),
+        datasets:[{ data: F.map(f => f.v || 0),
+          backgroundColor: F.map(f => f.cor), borderWidth:2, borderColor:'rgba(0,0,0,.15)', hoverOffset:8 }]
       },
       options:{ cutout:'58%', responsive:true, maintainAspectRatio:false, plugins:{ legend:{...legendOpts, position:'right'} }, animation:{duration:600} }
     })
   }
 
+  // Mesmas cores e ordem do "Desfecho dos ninhos" do Painel (DESFECHO_NINHO).
   function grafStatus(k) {
-    mkChart('graf-status', {
-      type:'doughnut',
-      data:{
-        labels:['Encontrado','Transferido','Eclodido','Em berçário','Soltado','Perdido'],
-        datasets:[{ data:[k.pendentes||0, k.transferidos||0, k.eclodidos_status||0, k.em_bercario||0, k.soltados||0, k.perdidos||0],
-          backgroundColor:['#7ECEE8','#C9A84C','#2A9D6F','#8b5cf6','#1A6B8C','#ef4444'], borderWidth:2, borderColor:'rgba(0,0,0,.15)', hoverOffset:8 }]
-      },
-      options:{ cutout:'58%', responsive:true, maintainAspectRatio:false, plugins:{ legend:{...legendOpts, position:'right'} }, animation:{duration:600} }
-    })
+    roscaDesfechoNinhos('graf-status', k)
   }
 
   function grafDescartesCausa() {
     const f = _descAgg.porCausa
-    const dados = [f.predacao, f.alagamento, f.erosao, f.humana, f.natural]
+    const dados = PERDA_CAUSA.map(c => f[c.k] || 0)
     const wrap = document.getElementById('wrap-desc-causa')
     if (!dados.some(x => x > 0)) {
       if (wrap) wrap.innerHTML = '<div class="rel-loading" style="padding:40px 10px">Nenhuma perda de ovos registrada nos filtros atuais.</div>'
@@ -1515,8 +1569,8 @@
     mkChart('graf-desc-causa', {
       type:'bar',
       data:{
-        labels:['Predação','Alagamento','Erosão','Ação humana','Natural (postura)'],
-        datasets:[{ data:dados, backgroundColor:['#ef4444','#1A6B8C','#C9A84C','#7B57B0','#38bdf8'], borderRadius:5 }]
+        labels: PERDA_CAUSA.map(c => c.lbl),
+        datasets:[{ data:dados, backgroundColor: PERDA_CAUSA.map(c => c.cor), borderRadius:5 }]
       },
       options:{
         responsive:true, maintainAspectRatio:false, animation:{duration:600},
@@ -1862,6 +1916,7 @@
         alagamento: soma('perdas_alagamento'),
         erosao:     soma('perdas_erosao'),
         humana:     soma('perdas_humana'),
+        natural:    soma('perdas_natural'),
       },
       inundados:     soma('inundados'),
       predados:      soma('predados'),
@@ -1989,18 +2044,10 @@
     const ag = painelAgregados()
 
     // Rosca — desfecho dos ninhos
-    mkChart('graf-p-desfecho', {
-      type:'doughnut',
-      data:{
-        labels:['Eclodido','Em berçário','Soltado','Transferido','Encontrado','Perdido'],
-        datasets:[{ data:[k.eclodidos_status||0, k.em_bercario||0, k.soltados||0, k.transferidos||0, k.pendentes||0, k.perdidos||0],
-          backgroundColor:['#2A9D6F','#8b5cf6','#7ECEE8','#1A6B8C','#C9A84C','#ef4444'], borderWidth:2, borderColor:'rgba(0,0,0,.15)', hoverOffset:8 }]
-      },
-      options:{ cutout:'58%', responsive:true, maintainAspectRatio:false, plugins:{ legend:{...legendOpts, position:'right'} }, animation:{duration:600} }
-    })
+    roscaDesfechoNinhos('graf-p-desfecho', k)
 
     // Pizza — perdas por causa fina
-    const pv = [ag.perdas.predacao, ag.perdas.alagamento, ag.perdas.erosao, ag.perdas.humana]
+    const pv = PERDA_CAUSA.map(c => ag.perdas[c.k] || 0)
     const totPerdas = pv.reduce((s,x)=>s+x,0)
     const elPerdas = document.getElementById('graf-p-perdas')
     if (!totPerdas && elPerdas) {
@@ -2009,8 +2056,8 @@
       mkChart('graf-p-perdas', {
         type:'pie',
         data:{
-          labels:['Predação','Alagamento','Erosão','Ação humana'],
-          datasets:[{ data:pv, backgroundColor:['#ef4444','#1A6B8C','#C9A84C','#7B57B0'], borderWidth:2, borderColor:'rgba(0,0,0,.15)', hoverOffset:8 }]
+          labels: PERDA_CAUSA.map(c => c.lbl),
+          datasets:[{ data:pv, backgroundColor: PERDA_CAUSA.map(c => c.cor), borderWidth:2, borderColor:'rgba(0,0,0,.15)', hoverOffset:8 }]
         },
         options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{...legendOpts, position:'right'} }, animation:{duration:600} }
       })

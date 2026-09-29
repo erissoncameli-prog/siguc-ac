@@ -2299,6 +2299,34 @@ nunca chegavam ao relatório oficial nem ao PDF por ninho.
   que uma coluna existe — foi assim que o bug acima foi encontrado, não
   lendo código.
 
+**Perda do REGISTRO do ninho por causa + desfecho dos ovos (migrations
+349/349b).** `descartes_ovos` tem `motivo` (grosso, único que o registro
+do ninho preenche) e `causa` (fina, só a visita preenche). `vw_ninho_ovos`
+separava as perdas só por `causa`: o descarte do registro entrava no total
+e em nenhuma causa — o gráfico "Perdas de ovos por causa" do Painel dizia
+"nenhuma perda" com 26 ovos descartados (12 predação, 3 humana, 11
+natural), e o do detalhado jogava os 26 em "Natural". Agora causa efetiva
+= `causa` ou, vazia, o `motivo` com equivalente (predação/humana); natural
+sem causa vira `perda_natural` (coluna nova ao final). "Desfecho dos ovos"
+(relatório e app) ganhou `ovos_em_incubacao`/`ovos_ninho_perdido` (viáveis
+de ninho sem eclosão) e "Descartados" passou a somar `descartes_ovos`
+(registro + visitas), não a coluna legada `ninhos_quelonios.ovos_descartados`.
+- As RPCs grandes foram alteradas por troca pontual no corpo ATUAL de
+  produção (`pg_temp.mig349_trocar`, aborta se o trecho não aparecer
+  exatamente 1×) — nunca recopiando o corpo de uma migration antiga.
+- ⚠️ `kpis` de `bio_relatorio_completo` já usa 98 dos 100 argumentos de
+  `jsonb_build_object`: campo novo entra em `|| jsonb_build_object(...)`.
+- ⚠️ `CREATE OR REPLACE VIEW` sem `WITH (security_invoker = true)` ZERA a
+  opção da view (achado pelo advisor, corrigido na 349b) — repetir o WITH.
+- Número e percentual NA rosca/pizza + total no centro:
+  `js/chart-rosca-rotulos.js` (fonte única, aplicado em `mkChart` de
+  `pages/relatorios-biomonitor.html` a toda rosca/pizza; vai para o PDF
+  do Painel porque é desenhado no canvas). Fatia < 4% sem texto, sempre
+  com número e % na legenda. Cores de desfecho dos ninhos e de perdas por
+  causa em `DESFECHO_NINHO`/`PERDA_CAUSA`, compartilhadas por Painel e
+  detalhado. Guarda: `tests/chart-rosca-rotulos.test.js`. `pwa/sw.js`:
+  biomonitor 64 → 65 (barras do app com número · %).
+
 ## Biomonitor — Anomalias congênitas em filhotes (migration 321)
 Registro de eclosão ganhou contador `filhotes_anomalia` (SUBCONJUNTO
 de `filhotes_vivos`, CHECK `<=`, nunca um 4º balde somado ao total —

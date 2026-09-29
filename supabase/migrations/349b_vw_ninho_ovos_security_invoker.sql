@@ -1,0 +1,12 @@
+-- 349b_vw_ninho_ovos_security_invoker.sql
+--
+-- A 349 recriou vw_ninho_ovos com CREATE OR REPLACE VIEW sem `WITH
+-- (security_invoker = true)`, o que zerou a opção que a view tinha em
+-- produção (aplicada fora do repositório, junto das demais views em
+-- seg_views_security_invoker) — o advisor de segurança voltou a acusar
+-- 0010 (view sem security_invoker). Restaura a opção. Nenhum consumidor muda:
+-- as RPCs que leem a view rodam como dono (definer) e as views que a usam
+-- (vw_praias_biomonitor, vw_ninhos_validacao) já são security_invoker.
+-- Lição: CREATE OR REPLACE VIEW numa view com reloptions tem de repetir
+-- o WITH (...), senão a opção some em silêncio.
+ALTER VIEW public.vw_ninho_ovos SET (security_invoker = true);
