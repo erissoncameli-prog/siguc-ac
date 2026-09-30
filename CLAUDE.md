@@ -889,6 +889,27 @@ opcionais. Sem mapa (pedido do usuário). Exporta PDF (timbre), Excel
     Resumo, tabelas e **exportação seguem o recorte** (decisão do
     usuário), com os filtros escritos no PDF/Excel e `_filtrado` no nome
     do arquivo.
+- **Resumo clicável** (3ª rodada, pedido do usuário): todo número de
+  card do resumo (KPIs, Titulares, Prioridade, Quanto está na UC,
+  Município, Situação, Classe, Tipo, Tamanho, Zonas) é um atalho para o
+  MESMO `CARUC_FILTROS` — nunca um filtro paralelo. Atributos montados
+  por `_carucClic(chave, valor, n)` (`role=button`, `tabindex`,
+  `aria-pressed`, `data-fk/fv/n`); clique delegado em `#caruc-conteudo`
+  (+ Enter/Espaço). Clicar liga o filtro, rola até a relação
+  (`#caruc-tabela-card`, suave salvo "reduzir movimento") e foca o
+  título; clicar de novo DESLIGA, sem rolar. **Invariante travada por
+  teste: o número mostrado = linhas depois do clique** — por isso
+  situação/classe/tipo/faixa passaram a contar TODOS os imóveis (UC +
+  ZA), como o filtro. KPI cujo número não é contagem de imóvel (nº de
+  titulares, nº de focos) leva a contagem de imóveis em `data-n`.
+- **Agrupar por titular** (`carucAgruparPorTitular`/`carucGrupoRotulo`,
+  pelo `titular_grupo` do banco): liga sozinho com o filtro "Mais de um
+  CAR nesta UC" ou "Possível fracionamento"; a caixa "Agrupar por
+  titular" sobrepõe a escolha automática até limpar os filtros. Grupo
+  maior primeiro; imóvel sem titular na planilha fica num bloco final.
+  Exportação segue: CSV na ordem agrupada, PDF com linha de cabeçalho
+  por titular, Excel com aba "Titulares" a mais, e "Agrupado por
+  titular" entre os filtros escritos.
 - ⚠️ **`--verde-c` NÃO existe em `css/global.css`** (lá é `--verde-claro`),
   apesar de ser o nome usado no design system deste arquivo. Usado
   numa página, dá cor transparente em silêncio: a aba ativa, a barra de
@@ -899,7 +920,7 @@ opcionais. Sem mapa (pedido do usuário). Exporta PDF (timbre), Excel
   larga fazia a PÁGINA inteira rolar de lado no celular (1.410px em
   390px), mesmo dentro do `.table-wrap`. Corrigido com `min-width:0`
   só nesta página; a guarda de 390px pega a volta.
-- Guarda: `tests/car-uc-relatorio.test.js` (16). Página real com stub,
+- Guarda: `tests/car-uc-relatorio.test.js` (21). Página real com stub,
   PDF/Excel/CSV gerados de verdade, e guardas conferidas por
   contrafactual (reprovam sem a correção).
 - Sem mudança em `pwa/sw.js` (tela de mesa).

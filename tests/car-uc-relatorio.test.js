@@ -164,6 +164,24 @@ test('filtros: facetas contam dentro dos outros filtros e descrição sai legív
   expect(caruc.carucDescreverFiltros({ classe: 'Vermelho' }, ' xapuri ')).toEqual(['Classe SICAR: Vermelho', 'Busca: "xapuri"']);
 });
 
+test('agrupar por titular: maior grupo primeiro, sem titular por último, rótulo legível', () => {
+  const im = [
+    { cod: 'X', titular_grupo: 2, titular: 'Ana', documento: '***.1-**', titular_cars_relatorio: 1, titular_cars_estado: 1, area_analise_ha: 900 },
+    { cod: 'S', titular_grupo: null, area_analise_ha: 10 },
+    { cod: 'A', titular_grupo: 1, titular: 'Bia', documento: '***.2-**', titular_cars_relatorio: 2, titular_cars_estado: 7, area_analise_ha: 10.5 },
+    { cod: 'B', titular_grupo: 1, titular: 'Bia', documento: '***.2-**', titular_cars_relatorio: 2, titular_cars_estado: 7, area_analise_ha: 20 },
+  ];
+  const g = caruc.carucAgruparPorTitular(im);
+  expect(g.map(x => x.grupo)).toEqual([1, 2, null]);            // quantidade vence área
+  expect(g[0].imoveis.map(i => i.cod)).toEqual(['B', 'A']);      // dentro do grupo, maior área primeiro
+  expect(caruc.carucGrupoRotulo(g[0])).toBe('Titular nº 1 · Bia · ***.2-** · 2 CAR(s) nesta UC · 7 no Acre · 30,50 ha');
+  expect(caruc.carucGrupoRotulo(g[2])).toBe('Sem titular identificado na planilha local · 1 imóvel(is)');
+  // agrupar reordena, nunca perde nem duplica
+  const r = caruc.carucRelFiltrado({ imoveis: im, uc: {} }, {}, '', { agrupar: true });
+  expect(r.imoveis.map(i => i.cod)).toEqual(['B', 'A', 'X', 'S']);
+  expect(r.filtros).toContain('Agrupado por titular');
+});
+
 // ── Página real ───────────────────────────────────────────────────────
 const UC = { id: 'uc-teste', codigo: 'UC-999', nome: 'RESEX de Teste', sigla: 'RESEX', categoria: 'RESEX', grupo: 'uso_sustentavel', esfera: 'estadual', area_ha: 12000, data_criacao: '2000-01-01' };
 const quad = (x0, y0, x1, y1) => ({ type: 'Polygon', coordinates: [[[x0, y0], [x1, y0], [x1, y1], [x0, y1], [x0, y0]]] });
@@ -237,6 +255,10 @@ async function abrir(page) {
   await page.locator('#caruc-uc option[value="uc-teste"]').waitFor({ state: 'attached', timeout: 20_000 });
 }
 
+// Só linhas de imóvel — o cabeçalho de grupo (agrupar por titular) é
+// outra <tr> e não pode entrar na contagem.
+const LINHAS = '#caruc-tabela tbody tr:not(.caruc-grupo-tr)';
+
 // Linha pelo nº do CAR na 2ª célula — filtrar por texto pegaria também
 // a linha que só CITA o código ("Sobrepõe: AC-A").
 const linhaCar = (page, cod) => page.locator('#caruc-tabela tbody tr')
@@ -258,7 +280,7 @@ test('lista só os imóveis que se sobrepõem à UC, com zonas e atenção', asy
   await expect(page.locator('#caruc-za')).toBeDisabled();   // sem ZA cadastrada, a opção não engana
   await gerar(page);
 
-  const linhas = page.locator('#caruc-tabela tbody tr');
+  const linhas = page.locator(LINHAS);
   await expect(linhas).toHaveCount(3);
   await expect(page.locator('#caruc-tabela')).not.toContainText('AC-FORA');
 
@@ -310,7 +332,7 @@ test('filtros por atributo combinam entre si e com a busca; resumo segue o recor
   await expect(page.locator('#caruc-f-municipio option')).toHaveText(['Todos', 'Xapuri (2)', 'Epitaciolândia (1)']);
 
   await page.selectOption('#caruc-f-titular', 'Possível fracionamento');
-  await expect(page.locator('#caruc-tabela tbody tr')).toHaveCount(2);
+  await expect(page.locator(LINHAS)).toHaveCount(2);
   await expect(page.locator('#caruc-chips')).toContainText('Titular: Possível fracionamento');
   // o contador do botão tem de estar VISÍVEL na mesma linha (regra global de .btn span o jogava para fora)
   await expect(page.locator('#caruc-filtros-n')).toBeVisible();
@@ -326,18 +348,18 @@ test('filtros por atributo combinam entre si e com a busca; resumo segue o recor
   await expect(page.locator('#caruc-f-municipio option')).toHaveText(['Todos', 'Epitaciolândia (1)', 'Xapuri (1)']);   // empate: alfabética
 
   await page.selectOption('#caruc-f-municipio', 'Xapuri');
-  await expect(page.locator('#caruc-tabela tbody tr')).toHaveCount(1);
+  await expect(page.locator(LINHAS)).toHaveCount(1);
   await expect(page.locator('.caruc-kpis')).toContainText('Imóveis na UC1');
 
   await page.fill('#caruc-busca', 'gama');   // contradiz o município: vazio, não "um vence"
   await expect(page.locator('#caruc-tabela tbody')).toContainText('Nenhum imóvel com esses filtros');
 
   await page.click('.caruc-chip:has-text("Município")');
-  await expect(page.locator('#caruc-tabela tbody tr')).toHaveCount(1);
+  await expect(page.locator(LINHAS)).toHaveCount(1);
   await expect(page.locator('#caruc-tabela tbody')).toContainText('AC-C');
 
   await page.click('#caruc-limpar');
-  await expect(page.locator('#caruc-tabela tbody tr')).toHaveCount(3);
+  await expect(page.locator(LINHAS)).toHaveCount(3);
   await expect(page.locator('#caruc-recorte')).toContainText('3 imóveis, sem filtro');
 });
 
@@ -397,4 +419,90 @@ test('celular (390px): filtros abertos e tabela sem rolagem lateral da página',
   expect(vaza).toBeLessThanOrEqual(0);   // a tabela rola dentro do .table-wrap, nunca a página
   const chip = await page.locator('#caruc-btn-filtros').boundingBox();
   expect(chip.height).toBeGreaterThanOrEqual(24);
+});
+
+// ── Resumo clicável (rodada 3) ────────────────────────────────────────
+test('todo número clicável do resumo leva exatamente a esse número de imóveis', async ({ page }) => {
+  await abrir(page);
+  await gerar(page, ['caruc-focos', 'caruc-deter']);
+  const alvos = await page.locator('#caruc-conteudo [data-fk]:not(.caruc-clic-zero)').evaluateAll(els =>
+    els.filter(e => !e.closest('#caruc-tabela')).map(e => ({ fk: e.dataset.fk, fv: e.dataset.fv, n: +e.dataset.n })));
+  expect(alvos.length).toBeGreaterThan(8);
+  for (const a of alvos) {
+    const el = page.locator(`#caruc-conteudo [data-fk="${a.fk}"][data-fv="${a.fv}"]`).first();
+    await el.click();
+    await expect(page.locator(LINHAS), `${a.fk} = ${a.fv}`).toHaveCount(a.n);
+    await expect(page.locator(`#caruc-conteudo [data-fk="${a.fk}"][data-fv="${a.fv}"]`).first()).toHaveAttribute('aria-pressed', 'true');
+    // clicar de novo desliga
+    await page.locator(`#caruc-conteudo [data-fk="${a.fk}"][data-fv="${a.fv}"]`).first().click();
+    await expect(page.locator(LINHAS)).toHaveCount(3);
+  }
+});
+
+test('clicar em "titulares com mais de um CAR" filtra, rola até a relação e agrupa', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 600 });
+  await abrir(page);
+  await gerar(page);
+  await page.evaluate(() => window.scrollTo(0, 0));
+  const topoAntes = await page.locator('#caruc-tabela-card').evaluate(e => e.getBoundingClientRect().top);
+  expect(topoAntes).toBeGreaterThan(600);   // a relação começa fora da tela
+
+  await page.locator('#caruc-conteudo [data-fk="titular"][data-fv="Mais de um CAR nesta UC"]').first().click();
+  await expect(page.locator(LINHAS)).toHaveCount(2);
+  await expect.poll(() => page.locator('#caruc-tabela-card').evaluate(e => e.getBoundingClientRect().top)).toBeLessThan(200);
+  await expect(page.locator('#caruc-tabela-titulo')).toBeFocused();
+  await expect(page.locator('#caruc-chips')).toContainText('Mais de um CAR nesta UC');
+
+  // agrupamento liga sozinho com esse filtro, com o cabeçalho do titular
+  await expect(page.locator('#caruc-agrupar')).toBeChecked();
+  await expect(page.locator('#caruc-tabela tr.caruc-grupo-tr')).toHaveCount(1);
+  await expect(page.locator('#caruc-tabela tr.caruc-grupo-tr')).toContainText('Titular nº 1 · Maria Teste · ***.456.789-** · 2 CAR(s) nesta UC · 5 no Acre');
+
+  // desmarcar é escolha da pessoa e vale enquanto o filtro estiver lá
+  await page.uncheck('#caruc-agrupar');
+  await expect(page.locator('#caruc-tabela tr.caruc-grupo-tr')).toHaveCount(0);
+  await expect(page.locator(LINHAS)).toHaveCount(2);
+
+  // agrupar sem filtro nenhum: todos os titulares, cada um com seu cabeçalho
+  await page.click('#caruc-limpar');
+  await expect(page.locator('#caruc-agrupar')).not.toBeChecked();
+  await page.check('#caruc-agrupar');
+  await expect(page.locator('#caruc-tabela tr.caruc-grupo-tr')).toHaveCount(2);
+  await expect(page.locator(LINHAS)).toHaveCount(3);
+});
+
+test('teclado: Enter liga o filtro do resumo', async ({ page }) => {
+  await abrir(page);
+  await gerar(page);
+  await page.locator('#caruc-conteudo [data-fk="titular"][data-fv="Possível fracionamento"]').first().focus();
+  await page.keyboard.press('Enter');
+  await expect(page.locator(LINHAS)).toHaveCount(2);
+});
+
+test('exportação segue o filtro do clique e o agrupamento por titular', async ({ page }) => {
+  await abrir(page);
+  await gerar(page);
+  await page.locator('#caruc-conteudo [data-fk="titular"][data-fv="Mais de um CAR nesta UC"]').first().click();
+  await expect(page.locator(LINHAS)).toHaveCount(2);
+
+  const [dCsv] = await Promise.all([page.waitForEvent('download'), page.click('button:has-text("CSV")')]);
+  const csv = fs.readFileSync(await dCsv.path(), 'utf8');
+  expect(csv).not.toContain('AC-B');
+  expect(csv).toMatch(/AC-[AC][\s\S]*AC-[AC]/);
+
+  const [dPdf] = await Promise.all([page.waitForEvent('download', { timeout: 30_000 }), page.click('button:has-text("PDF")')]);
+  const { PDFParse } = require('pdf-parse');
+  const texto = (await new PDFParse({ data: fs.readFileSync(await dPdf.path()) }).getText()).text;
+  expect(texto).toContain('Titular nº 1');
+  expect(texto).toContain('Agrupado por titular');
+  expect(texto).not.toContain('Comunidade Beta');
+
+  const [dX] = await Promise.all([page.waitForEvent('download', { timeout: 30_000 }), page.click('button:has-text("Excel")')]);
+  const JSZip = require('jszip');
+  const zip = await JSZip.loadAsync(fs.readFileSync(await dX.path()));
+  const wb = await zip.file('xl/workbook.xml').async('string');
+  expect(wb).toContain('name="Titulares"');
+  const strings = await zip.file('xl/sharedStrings.xml').async('string');
+  expect(strings).toContain('Titular: Mais de um CAR nesta UC');
+  expect(strings).not.toContain('Comunidade Beta');
 });

@@ -78,6 +78,28 @@
 .caruc-prio.media { background:#FFFBEB; color:#92400E; border:1px solid #D97706; }
 .caruc-prio.baixa { background:#F3F4F6; color:#4B5563; border:1px solid #D1D5DB; }
 .caruc-cod { font-family:ui-monospace,monospace; font-size:11px; display:block; }
+.caruc-clic { cursor:pointer; }
+.caruc-mini tr.caruc-clic:hover td, .caruc-mini tr.caruc-clic:focus-visible td { background:#F0FDF4; }
+.caruc-mini tr.caruc-clic td:first-child::after { content:""; display:inline-block; width:11px; height:11px; margin-left:6px; vertical-align:-1px; opacity:0; transition:opacity .15s;
+  background:no-repeat center/contain url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%232D6A4F' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolygon points='22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3'/%3E%3C/svg%3E"); }
+.caruc-mini tr.caruc-clic:hover td:first-child::after, .caruc-mini tr.caruc-clic:focus-visible td:first-child::after { opacity:1; }
+.caruc-mini tr.caruc-clic.ativo td { background:#DCFCE7; font-weight:600; }
+.caruc-mini tr.caruc-clic.ativo td:first-child { box-shadow:inset 3px 0 0 var(--verde-medio); }
+.caruc-mini tr.caruc-clic.ativo td:first-child::after { opacity:1;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%232D6A4F' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 12'/%3E%3C/svg%3E"); }
+.caruc-mini tr.caruc-clic:focus-visible { outline:2px solid var(--verde-medio); outline-offset:-2px; }
+.caruc-mini tr.caruc-clic-zero td { color:#9CA3AF; }
+.kpi-card.caruc-clic:hover { box-shadow:0 0 0 2px var(--verde-claro), 0 6px 10px -3px rgba(0,0,0,.14); }
+.kpi-card.caruc-clic.ativo { box-shadow:0 0 0 3px var(--verde-medio); background:#F0FDF4; }
+.kpi-card.caruc-clic:focus-visible { outline:2px solid var(--verde-medio); outline-offset:2px; }
+span.caruc-clic { text-decoration:underline; text-underline-offset:2px; color:#1E3A8A; }
+span.caruc-clic.ativo { font-weight:700; color:var(--verde-medio); }
+span.caruc-clic:focus-visible { outline:2px solid var(--verde-medio); outline-offset:2px; border-radius:3px; }
+#caruc-tabela-card { scroll-margin-top:84px; }
+#caruc-tabela-titulo:focus { outline:none; }
+#caruc-tabela-titulo:focus-visible { outline:2px solid var(--verde-medio); outline-offset:2px; }
+.caruc-link { background:none; border:none; padding:0; color:#1E3A8A; text-decoration:underline; cursor:pointer; font:inherit; min-height:24px; }
+#caruc-tabela tr.caruc-grupo-tr th { text-align:left; font-size:12px; font-weight:700; color:#14532D; background:#E8F5EE; padding:8px 10px; border-top:2px solid var(--verde-claro); }
 .caruc-tit { display:block; font-size:10.5px; color:#1E3A8A; margin-top:2px; }
 #caruc-tabela td.num { text-align:right; white-space:nowrap; }
 </style>
@@ -406,12 +428,24 @@ async function carucGerar() {
   }
 }
 
-function _carucMiniTabela(titulo, lista, rotulo) {
+// Atributos de um item de resumo clicável. `chave`/`valor` são os MESMOS
+// de CARUC_FILTROS (o rótulo da linha já é o valor do filtro), então o
+// clique não cria regra de filtragem nenhuma — só liga/desliga um filtro
+// que a gaveta já tem. n = 0 não é clicável: prometeria lista vazia.
+function _carucClic(chave, valor, n) {
+  if (!chave || !n) return ' class="caruc-clic-zero"'
+  const ativo = _carucFiltro[chave] === valor
+  return ` class="caruc-clic${ativo ? ' ativo' : ''}" role="button" tabindex="0" aria-pressed="${ativo}"`
+    + ` data-fk="${esc(chave)}" data-fv="${esc(valor)}" data-n="${n}"`
+    + ` title="${ativo ? 'Remover filtro' : 'Filtrar a relação'}: ${esc(valor)}"`
+}
+
+function _carucMiniTabela(titulo, lista, rotulo, chave) {
   if (!lista?.length) return ''
   return `<div class="card"><div class="card-header"><div class="card-title" style="font-size:13px">${esc(titulo)}</div></div>
     <div class="card-body" style="padding-top:4px"><div class="table-wrap"><table class="caruc-mini">
       <thead><tr><th>${esc(rotulo)}</th><th class="num">Imóveis</th><th class="num">Área (ha)</th></tr></thead>
-      <tbody>${lista.map(g => `<tr><td>${esc(g.rotulo)}</td><td class="num">${formatNum(g.n, 0)}</td><td class="num">${formatNum(g.ha, 2)}</td></tr>`).join('')}</tbody>
+      <tbody>${lista.map(g => `<tr${_carucClic(chave, g.rotulo, g.n)}><td>${esc(g.rotulo)}</td><td class="num">${formatNum(g.n, 0)}</td><td class="num">${formatNum(g.ha, 2)}</td></tr>`).join('')}</tbody>
     </table></div></div></div>`
 }
 
@@ -422,10 +456,20 @@ function _carucMiniTabela(titulo, lista, rotulo) {
 let _carucFiltro = {}
 let _carucBusca = ''
 let _carucBuscaTimer = null
+// Agrupar por titular: null = automático (liga com o filtro de titular
+// que é sobre GRUPO — "Mais de um CAR" / "Possível fracionamento");
+// true/false = escolha da pessoa, que vale até limpar os filtros.
+let _carucAgruparManual = null
+const CARUC_AGRUPAR_AUTO = ['Mais de um CAR nesta UC', 'Possível fracionamento']
+
+function _carucAgruparAtivo() {
+  return _carucAgruparManual ?? CARUC_AGRUPAR_AUTO.includes(_carucFiltro.titular)
+}
 
 function carucRender(rel) {
   _carucFiltro = {}
   _carucBusca = ''
+  _carucAgruparManual = null
   const avisos = []
   if (rel.falhas.prodes) avisos.push(`${rel.falhas.prodes} de ${rel.falhas.prodes_quadrantes} quadrantes do PRODES não responderam — os valores de PRODES podem estar incompletos.`)
   if (rel.falhas.ambiental) avisos.push(`Focos/DETER não puderam ser calculados para ${rel.falhas.ambiental} imóvel(is).`)
@@ -456,7 +500,42 @@ function carucRender(rel) {
     </div>
     <div id="caruc-conteudo"></div>`
   if (typeof bIconsAplicar === 'function') bIconsAplicar(document.getElementById('caruc-resultado'))
+  const cont = document.getElementById('caruc-conteudo')
+  cont.addEventListener('click', ev => {
+    const alvo = ev.target.closest('[data-fk]')
+    if (alvo && cont.contains(alvo)) carucClicarResumo(alvo.dataset.fk, alvo.dataset.fv)
+  })
+  cont.addEventListener('keydown', ev => {
+    if (ev.key !== 'Enter' && ev.key !== ' ') return
+    const alvo = ev.target.closest('[data-fk]')
+    if (!alvo) return
+    ev.preventDefault()
+    carucClicarResumo(alvo.dataset.fk, alvo.dataset.fv)
+  })
   carucAtualizar()
+}
+
+// Clique num número do resumo: liga o filtro (e rola até a relação) ou,
+// se já estava ligado, desliga (sem rolar — a pessoa continua onde está).
+function carucClicarResumo(chave, valor) {
+  const ligar = _carucFiltro[chave] !== valor
+  if (ligar) _carucFiltro[chave] = valor; else delete _carucFiltro[chave]
+  carucAtualizar()
+  if (!ligar) {
+    document.querySelector(`#caruc-conteudo [data-fk="${CSS.escape(chave)}"][data-fv="${CSS.escape(valor)}"]`)?.focus({ preventScroll: true })
+    return
+  }
+  const alvo = document.getElementById('caruc-tabela-card')
+  if (!alvo) return
+  const reduzir = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+  alvo.scrollIntoView({ behavior: reduzir ? 'auto' : 'smooth', block: 'start' })
+  document.getElementById('caruc-tabela-titulo')?.focus({ preventScroll: true })
+}
+
+function carucAlternarAgrupar(marcado) {
+  _carucAgruparManual = marcado
+  carucAtualizar()
+  document.getElementById('caruc-agrupar')?.focus({ preventScroll: true })
 }
 
 function carucAlternarFiltros() {
@@ -478,12 +557,13 @@ function carucFiltroAlterado(chave, valor) {
 function carucLimparFiltros() {
   _carucFiltro = {}
   _carucBusca = ''
+  _carucAgruparManual = null
   const b = document.getElementById('caruc-busca'); if (b) b.value = ''
   carucAtualizar()
 }
 
 function _carucRelAtual() {
-  return carucRelFiltrado(_carucRel, _carucFiltro, _carucBusca)
+  return carucRelFiltrado(_carucRel, _carucFiltro, _carucBusca, { agrupar: _carucAgruparAtivo() })
 }
 
 function carucAtualizar(focarChave) {
@@ -517,32 +597,38 @@ function carucAtualizar(focarChave) {
 
 function _carucConteudoHTML(rel) {
   const r = rel.resumo, o = rel.opcoes
-  const kpi = (rot, val, sub, cls = '') => `<div class="kpi-card ${cls}" style="padding:14px 16px"><div class="kpi-label">${rot}</div><div class="kpi-valor">${val}</div>${sub ? `<div class="kpi-sub">${sub}</div>` : ''}</div>`
+  // Cartão com `f` = [chave, valor, nº de imóveis que o filtro traz] é
+  // clicável; sem `f` (totais) não filtra nada.
+  const kpi = (rot, val, sub, cls = '', f) => `<div${f ? _carucClic(f[0], f[1], f[2]).replace('class="', `class="kpi-card ${cls} `) : ` class="kpi-card ${cls}"`} style="padding:14px 16px"><div class="kpi-label">${rot}</div><div class="kpi-valor">${val}</div>${sub ? `<div class="kpi-sub">${sub}</div>` : ''}</div>`
   const alta = r.por_prioridade.find(p => p.nivel === 'alta')?.n || 0
+  const comAmb = (fn) => rel.imoveis.filter(fn).length
   const kpis = [
     kpi('Imóveis na UC', formatNum(r.na_uc, 0), rel.zoneamento.usouZa ? `+ ${formatNum(r.so_za, 0)} só na zona de amortecimento` : ''),
     kpi('Área sobreposta', formatNum(r.soma_sobreposicao_ha, 0) + ' ha', r.pct_soma_da_uc != null ? `${formatNum(r.pct_soma_da_uc, 1)}% da UC (soma; imóveis se sobrepõem)` : '', 'ouro'),
-    kpi('Prioridade alta', formatNum(alta, 0), (o.prodes || o.deter) ? '' : 'exige PRODES ou DETER no relatório', alta ? 'erro' : ''),
-    kpi('Titulares com mais de um CAR', formatNum(r.titulares_multi, 0), `${formatNum(r.imoveis_titular_multi, 0)} imóveis`, 'azul'),
-    kpi('CARs sobrepostos entre si', formatNum(r.com_sobreposicao, 0), 'imóveis com conflito de área ≥ 0,1 ha', r.com_sobreposicao ? 'roxo' : ''),
+    kpi('Prioridade alta', formatNum(alta, 0), (o.prodes || o.deter) ? '' : 'exige PRODES ou DETER no relatório', alta ? 'erro' : '', ['prioridade', 'Alta', alta]),
+    kpi('Titulares com mais de um CAR', formatNum(r.titulares_multi, 0), `${formatNum(r.imoveis_titular_multi, 0)} imóveis`, 'azul', ['titular', 'Mais de um CAR nesta UC', r.imoveis_titular_multi]),
+    kpi('CARs sobrepostos entre si', formatNum(r.com_sobreposicao, 0), 'imóveis com conflito de área ≥ 0,1 ha', r.com_sobreposicao ? 'roxo' : '', ['sobreposicao', 'Com sobreposição', r.com_sobreposicao]),
   ]
-  if (o.focos) kpis.push(kpi(`Focos ${o.focosDe}–${o.focosAte}`, formatNum(r.focos_total, 0), 'na parte do imóvel na UC/ZA', 'erro'))
-  if (o.deter) kpis.push(kpi('Alertas DETER', formatNum(r.deter_alertas, 0), `${formatNum(r.deter_ha, 1)} ha · desde jun/2026`, 'roxo'))
-  if (o.prodes) kpis.push(kpi('PRODES após 2008', formatNum(r.prodes_pos_marco_ha, 0) + ' ha', `até 2007: ${formatNum(r.prodes_ate2007_ha, 0)} ha`, 'azul'))
+  if (o.focos) kpis.push(kpi(`Focos ${o.focosDe}–${o.focosAte}`, formatNum(r.focos_total, 0), 'na parte do imóvel na UC/ZA', 'erro', ['ambiental', 'Focos no período', comAmb(i => i.ambiental && i.ambiental.focos_periodo > 0)]))
+  if (o.deter) kpis.push(kpi('Alertas DETER', formatNum(r.deter_alertas, 0), `${formatNum(r.deter_ha, 1)} ha · desde jun/2026`, 'roxo', ['ambiental', 'Alerta DETER', comAmb(i => i.ambiental && i.ambiental.deter_alertas > 0)]))
+  if (o.prodes) kpis.push(kpi('PRODES após 2008', formatNum(r.prodes_pos_marco_ha, 0) + ' ha', `até 2007: ${formatNum(r.prodes_ate2007_ha, 0)} ha`, 'azul', ['ambiental', 'Desmatamento PRODES após 2008', comAmb(i => i.prodes && i.prodes.pos_marco_ha >= 0.01)]))
 
   const zonaHTML = !rel.zoneamento.tem
     ? `<div class="caruc-aviso" style="margin:0">UC sem zoneamento cadastrado no sistema — não é possível comparar os imóveis com as zonas de manejo.</div>`
     : `<div class="caruc-nota">Fonte: ${esc(rel.zoneamento.fonte)}</div>
        ${r.por_zona.length ? `<div class="table-wrap"><table class="caruc-mini">
          <thead><tr><th>Zona</th><th>Enquadramento</th><th class="num">Imóveis</th><th class="num">Área sobreposta (ha)</th></tr></thead>
-         <tbody>${r.por_zona.map(z => `<tr><td>${esc(z.nome)}</td><td><span class="caruc-zona ${z.nivel}">${esc(carucEnquadrarZona(z.codigo, z.nome).rotulo)}</span></td><td class="num">${formatNum(z.n, 0)}</td><td class="num">${formatNum(z.ha, 2)}</td></tr>`).join('')}</tbody>
+         <tbody>${r.por_zona.map(z => `<tr${_carucClic('zona', z.nome, z.n)}><td>${esc(z.nome)}</td><td><span class="caruc-zona ${z.nivel}">${esc(carucEnquadrarZona(z.codigo, z.nome).rotulo)}</span></td><td class="num">${formatNum(z.n, 0)}</td><td class="num">${formatNum(z.ha, 2)}</td></tr>`).join('')}</tbody>
        </table></div>` : '<div class="caruc-nota">Nenhum imóvel do recorte atinge as zonas cadastradas.</div>'}
-       ${r.sem_zona ? `<div class="caruc-nota">${formatNum(r.sem_zona, 0)} imóvel(is) na UC fora de qualquer zona cadastrada.</div>` : ''}`
+       ${r.sem_zona ? `<div class="caruc-nota"><span${_carucClic('zona', 'Fora de zona cadastrada', r.sem_zona)}>${formatNum(r.sem_zona, 0)} imóvel(is) na UC fora de qualquer zona cadastrada</span>.</div>` : ''}`
 
   const thAmb = (o.focos ? `<th class="num">Focos ${o.focosDe}–${o.focosAte}</th>` : '') + (o.deter ? '<th class="num">DETER</th>' : '') + (o.prodes ? '<th class="num">PRODES após 2008 (ha)</th>' : '')
   const nCols = 9 + (o.focos ? 1 : 0) + (o.deter ? 1 : 0) + (o.prodes ? 1 : 0)
   const linhas = rel.imoveis.length
-    ? rel.imoveis.map(i => _carucLinhaHTML(i, o)).join('')
+    ? (rel.agrupado && rel.grupos
+        ? rel.grupos.map(g => `<tr class="caruc-grupo-tr"><th colspan="${nCols}" scope="rowgroup">${esc(carucGrupoRotulo(g))}</th></tr>`
+            + g.imoveis.map(i => _carucLinhaHTML(i, o)).join('')).join('')
+        : rel.imoveis.map(i => _carucLinhaHTML(i, o)).join(''))
     : `<tr><td colspan="${nCols}" style="text-align:center;color:#9CA3AF;padding:16px">${rel.total_sem_filtro ? 'Nenhum imóvel com esses filtros.' : 'Nenhum imóvel do CAR se sobrepõe a esta UC.'}</td></tr>`
 
   return `
@@ -552,17 +638,17 @@ function _carucConteudoHTML(rel) {
     </div></div>
 
     <div class="caruc-grid4" style="margin-bottom:16px">
-      ${_carucMiniTabela('Prioridade para fiscalização', r.por_prioridade.filter(p => p.n), 'Prioridade')}
+      ${_carucMiniTabela('Prioridade para fiscalização', r.por_prioridade.filter(p => p.n), 'Prioridade', 'prioridade')}
       <div class="card"><div class="card-header"><div class="card-title" style="font-size:13px">Titulares</div></div>
         <div class="card-body" style="padding-top:4px"><table class="caruc-mini"><tbody>
-          <tr><td>Titulares com mais de um CAR nesta UC</td><td class="num">${formatNum(r.titulares_multi, 0)}</td></tr>
-          <tr><td>Imóveis desses titulares</td><td class="num">${formatNum(r.imoveis_titular_multi, 0)}</td></tr>
-          <tr><td>Possível fracionamento</td><td class="num">${formatNum(r.fracionamento, 0)}</td></tr>
-          <tr><td>Mesmo nome, documento diferente</td><td class="num">${formatNum(r.homonimos, 0)}</td></tr>
-          <tr><td>Área declarada diverge do polígono</td><td class="num">${formatNum(r.area_divergente, 0)}</td></tr>
+          <tr${_carucClic('titular', 'Mais de um CAR nesta UC', r.imoveis_titular_multi)}><td>Titulares com mais de um CAR nesta UC</td><td class="num">${formatNum(r.titulares_multi, 0)}</td></tr>
+          <tr${_carucClic('titular', 'Mais de um CAR nesta UC', r.imoveis_titular_multi)} data-rotulo-imoveis><td>Imóveis desses titulares</td><td class="num">${formatNum(r.imoveis_titular_multi, 0)}</td></tr>
+          <tr${_carucClic('titular', 'Possível fracionamento', r.fracionamento)}><td>Possível fracionamento</td><td class="num">${formatNum(r.fracionamento, 0)}</td></tr>
+          <tr${_carucClic('titular', 'Mesmo nome, documento diferente', r.homonimos)}><td>Mesmo nome, documento diferente</td><td class="num">${formatNum(r.homonimos, 0)}</td></tr>
+          <tr${_carucClic('atencao', 'Área declarada diverge do polígono', r.area_divergente)}><td>Área declarada diverge do polígono</td><td class="num">${formatNum(r.area_divergente, 0)}</td></tr>
         </tbody></table>
         <p class="caruc-nota">O agrupamento por CPF/CNPJ é feito no servidor: o documento não chega ao navegador.</p></div></div>
-      ${_carucMiniTabela('Quanto do imóvel está na UC', r.por_faixa_uc, 'Faixa')}
+      ${_carucMiniTabela('Quanto do imóvel está na UC', r.por_faixa_uc, 'Faixa', 'faixaUC')}
     </div>
 
     <div class="card" style="margin-bottom:16px">
@@ -571,15 +657,19 @@ function _carucConteudoHTML(rel) {
     </div>
 
     <div class="caruc-grid4" style="margin-bottom:16px">
-      ${_carucMiniTabela('Por município', r.por_municipio, 'Município')}
-      ${_carucMiniTabela('Por situação do cadastro', r.por_situacao, 'Situação')}
-      ${_carucMiniTabela('Por classe SICAR', r.por_classe, 'Classe')}
-      ${_carucMiniTabela('Por tipo de imóvel', r.por_tipo, 'Tipo')}
-      ${_carucMiniTabela('Por tamanho (módulos fiscais)', r.por_faixa, 'Faixa')}
+      ${_carucMiniTabela('Por município', r.por_municipio, 'Município', 'municipio')}
+      ${_carucMiniTabela('Por situação do cadastro', r.por_situacao, 'Situação', 'situacao')}
+      ${_carucMiniTabela('Por classe SICAR', r.por_classe, 'Classe', 'classe')}
+      ${_carucMiniTabela('Por tipo de imóvel', r.por_tipo, 'Tipo', 'tipo')}
+      ${_carucMiniTabela('Por tamanho (módulos fiscais)', r.por_faixa, 'Faixa', 'faixaMF')}
     </div>
 
-    <div class="card" style="margin-bottom:16px">
-      <div class="card-header"><div class="card-title">Relação dos imóveis (${formatNum(rel.imoveis.length, 0)})</div></div>
+    <div class="card" style="margin-bottom:16px" id="caruc-tabela-card">
+      <div class="card-header">
+        <div><div class="card-title" id="caruc-tabela-titulo" tabindex="-1">Relação dos imóveis (${formatNum(rel.imoveis.length, 0)}${rel.filtros.length && rel.imoveis.length !== rel.total_sem_filtro ? ` de ${formatNum(rel.total_sem_filtro, 0)}` : ''})</div>
+        ${Object.keys(_carucFiltro).length || _carucBusca ? `<div class="card-subtitle">${esc(carucDescreverFiltros(_carucFiltro, _carucBusca).join(' · '))} · <button type="button" class="caruc-link" onclick="carucLimparFiltros()">limpar filtros</button></div>` : ''}</div>
+        <label class="caruc-check" style="margin:0"><input type="checkbox" id="caruc-agrupar" ${rel.agrupado ? 'checked' : ''} onchange="carucAlternarAgrupar(this.checked)"><span>Agrupar por titular</span></label>
+      </div>
       <div class="card-body">
         <div class="table-wrap"><table class="table" id="caruc-tabela">
           <thead><tr><th>Prioridade</th><th>Nº do CAR</th><th>Imóvel / titular</th><th>Município</th><th>Situação / classe</th><th>Tipo</th><th class="num">Área na UC (ha)</th><th>Zonas</th><th>Inscrição</th>${thAmb}</tr></thead>
