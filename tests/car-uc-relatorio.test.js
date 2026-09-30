@@ -109,6 +109,61 @@ test('CSV: BOM, ponto e vírgula, vírgula decimal e CPF só como veio', () => {
   expect(csv.split('\r\n')[0]).toContain('Focos 2020–2024');
 });
 
+test('enriquecer: grupo de titular, fracionamento só com CPF, homônimo, faixa e divergência', () => {
+  const uc = { sigla: 'RESEX', data_criacao: '2000-01-01' };
+  const base = { local: 'uc', zonas: [], situacao: 'Ativo', status: 'Ativo', na_planilha: true };
+  const im = [
+    { ...base, cod: 'A', titular: 'João da Silva', titular_grupo: 1, titular_tipo_doc: 'cpf', titular_cars_estado: 4, modulos: 3, tipo_imovel: 'IRU', pct_analise: 100, area_declarada_ha: 100, area_total_ha: 100, data_inscricao: '2010-01-01' },
+    { ...base, cod: 'B', titular: 'JOÃO DA SILVA', titular_grupo: 1, titular_tipo_doc: 'cpf', titular_cars_estado: 4, modulos: 2, tipo_imovel: 'IRU', pct_analise: 5, area_declarada_ha: 100, area_total_ha: 130, data_inscricao: '1999-01-01' },
+    { ...base, cod: 'C', titular: 'Joao da Silva', titular_grupo: 2, titular_tipo_doc: 'cpf', titular_cars_estado: 1, modulos: 1, tipo_imovel: 'PCT', pct_analise: 60 },
+    { ...base, cod: 'D', titular: 'INCRA', titular_grupo: 3, titular_tipo_doc: 'cnpj', titular_cars_estado: 4030, modulos: 1, tipo_imovel: 'AST', pct_analise: 30 },
+    { ...base, cod: 'E', titular: 'INCRA', titular_grupo: 3, titular_tipo_doc: 'cnpj', titular_cars_estado: 4030, modulos: 4, tipo_imovel: 'AST', pct_analise: 30 },
+  ];
+  caruc.carucEnriquecer(im, uc, caruc.carucEnquadrarCategoria(uc));
+  const [A, B, C, D] = im;
+  expect(A.titular_cars_relatorio).toBe(2);
+  expect(A.fracionamento).toBe(true);          // 3 + 2 > 4, todos ≤ 4, CPF
+  expect(D.fracionamento).toBe(false);         // CNPJ (órgão) nunca
+  expect(A.homonimo).toBe(true);               // C tem o mesmo nome (sem acento/caixa) e outro grupo
+  expect(D.homonimo).toBe(false);              // mesmo nome E mesmo grupo = mesma pessoa, não homônimo
+  expect(A.faixa_uc).toBe('Integral (95% ou mais)');
+  expect(B.faixa_uc).toBe('Borda (menos de 10%)');
+  expect(B.area_divergente).toBe(true);
+  expect(A.area_divergente).toBe(false);
+  expect(A.inscricao_vs_uc).toBe('depois');
+  expect(A.prioridade.nivel).toBe('media');
+  expect(A.prioridade.motivos).toEqual(expect.arrayContaining(['imóvel particular em UC de domínio público', 'possível fracionamento']));
+  expect(C.prioridade.nivel).toBe('baixa');
+});
+
+test('prioridade Alta exige proteção E dano; motivo sempre escrito', () => {
+  const pi = caruc.carucEnquadrarCategoria({ sigla: 'PARES' });
+  const alta = caruc.carucPrioridade({ local: 'uc', zonas: [], ambiental: { deter_alertas: 2 } }, pi);
+  expect(alta).toEqual({ nivel: 'alta', motivos: ['UC de proteção integral', '2 alerta(s) DETER'] });
+  const semDano = caruc.carucPrioridade({ local: 'uc', zonas: [] }, pi);
+  expect(semDano.nivel).toBe('media');
+  const apa = caruc.carucEnquadrarCategoria({ sigla: 'APA' });
+  const danoSemProtecao = caruc.carucPrioridade({ local: 'uc', zonas: [], prodes: { pos_marco_ha: 10 } }, apa);
+  expect(danoSemProtecao.nivel).toBe('baixa');
+});
+
+test('filtros: facetas contam dentro dos outros filtros e descrição sai legível', () => {
+  const im = [
+    { cod: '1', municipio: 'Xapuri', classe: 'Verde', atencoes: [], zonas: [], prioridade: { nivel: 'baixa' } },
+    { cod: '2', municipio: 'Xapuri', classe: 'Vermelho', atencoes: ['Alerta DETER'], zonas: [], prioridade: { nivel: 'alta' } },
+    { cod: '3', municipio: 'Brasiléia', classe: 'Vermelho', atencoes: [], zonas: [], prioridade: { nivel: 'media' } },
+  ];
+  expect(caruc.carucFiltrar(im, { classe: 'Vermelho' }).map(i => i.cod)).toEqual(['2', '3']);
+  expect(caruc.carucFiltrar(im, { classe: 'Vermelho', municipio: 'Xapuri' }).map(i => i.cod)).toEqual(['2']);
+  const ops = caruc.carucOpcoesFiltro(im, { classe: 'Vermelho' });
+  expect(ops.find(o => o.chave === 'municipio').opcoes).toEqual([{ valor: 'Brasiléia', n: 1 }, { valor: 'Xapuri', n: 1 }]);
+  // dentro de "Vermelho" não há imóvel Baixa: a opção nem aparece (nunca promete recorte vazio)
+  expect(ops.find(o => o.chave === 'prioridade').opcoes.map(o => o.valor)).toEqual(['Alta', 'Média']);
+  // sem filtro, a ordem é a da gravidade, não a da contagem
+  expect(caruc.carucOpcoesFiltro(im, {}).find(o => o.chave === 'prioridade').opcoes.map(o => o.valor)).toEqual(['Alta', 'Média', 'Baixa']);
+  expect(caruc.carucDescreverFiltros({ classe: 'Vermelho' }, ' xapuri ')).toEqual(['Classe SICAR: Vermelho', 'Busca: "xapuri"']);
+});
+
 // ── Página real ───────────────────────────────────────────────────────
 const UC = { id: 'uc-teste', codigo: 'UC-999', nome: 'RESEX de Teste', sigla: 'RESEX', categoria: 'RESEX', grupo: 'uso_sustentavel', esfera: 'estadual', area_ha: 12000, data_criacao: '2000-01-01' };
 const quad = (x0, y0, x1, y1) => ({ type: 'Polygon', coordinates: [[[x0, y0], [x1, y0], [x1, y1], [x0, y1], [x0, y0]]] });
@@ -117,14 +172,19 @@ const CAMADAS = [{ nome: 'Teste - Zoneamento', uc_id: UC.id, geojson: { features
   { type: 'Feature', geometry: quad(-70, -10, -69.95, -9.9), properties: { zona_codigo: 'ZP', zona_nome: 'Zona Primitiva' } },
   { type: 'Feature', geometry: quad(-69.95, -10, -69.9, -9.9), properties: { zona_codigo: 'ZEX', zona_nome: 'Zona de Extrativismo' } },
 ] } }];
-const WFS = { type: 'FeatureCollection', totalFeatures: 3, features: [
+// AC-C cruza AC-A (≈ 180 ha) e é do MESMO titular (grupo 1): os dois
+// têm até 4 MF e somam mais de 4 → possível fracionamento. AC-B tem o
+// mesmo NOME de A com outro documento → homônimo a verificar.
+const WFS = { type: 'FeatureCollection', totalFeatures: 4, features: [
+  { type: 'Feature', geometry: quad(-69.98, -9.985, -69.96, -9.965), properties: { cod_imovel: 'AC-C', condicao: 'Ativo', tipo_imovel: 'IRU', municipio: 'Epitaciolândia', area: 480 } },
   { type: 'Feature', geometry: quad(-69.99, -9.99, -69.97, -9.97), properties: { cod_imovel: 'AC-A', condicao: 'Ativo', tipo_imovel: 'IRU', municipio: 'Xapuri', area: 480 } },
   { type: 'Feature', geometry: quad(-69.92, -9.99, -69.88, -9.97), properties: { cod_imovel: 'AC-B', condicao: 'Ativo', tipo_imovel: 'PCT', municipio: 'Xapuri', area: 960 } },
   { type: 'Feature', geometry: quad(-69.5, -9.5, -69.4, -9.4), properties: { cod_imovel: 'AC-FORA', condicao: 'Ativo', tipo_imovel: 'IRU', municipio: 'Xapuri', area: 100 } },
 ] };
 const CADASTRO = {
-  'AC-A': { cod_imovel: 'AC-A', nom_imovel: 'Colocação Alfa', nome_compl: 'Maria Teste', cpf_cnpj_mascarado: '***.456.789-**', num_area_i: 480, num_modulo: 4.8, nom_munici: 'Xapuri', condicao_i: 'Ativo', nome_class: 'Vermelho', dat_criaca: '2015-06-01' },
-  'AC-B': { cod_imovel: 'AC-B', nom_imovel: 'Comunidade Beta', nome_compl: 'Associação Beta', cpf_cnpj_mascarado: '**.345.678/****-**', num_area_i: 960, num_modulo: 1, nom_munici: 'Xapuri', condicao_i: 'Ativo', nome_class: 'Verde', dat_criaca: '1999-01-01' },
+  'AC-A': { cod_imovel: 'AC-A', nom_imovel: 'Colocação Alfa', nome_compl: 'Maria Teste', cpf_cnpj_mascarado: '***.456.789-**', num_area_i: 480, num_modulo: 3, nom_munici: 'Xapuri', condicao_i: 'Ativo', nome_class: 'Vermelho', dat_criaca: '2015-06-01', titular_grupo: 1, titular_cars_estado: 5, titular_tipo_doc: 'cpf' },
+  'AC-B': { cod_imovel: 'AC-B', nom_imovel: 'Comunidade Beta', nome_compl: 'Maria Teste', cpf_cnpj_mascarado: '**.345.678/****-**', num_area_i: 960, num_modulo: 1, nom_munici: 'Xapuri', condicao_i: 'Ativo', nome_class: 'Verde', dat_criaca: '1999-01-01', titular_grupo: 2, titular_cars_estado: 1, titular_tipo_doc: 'cnpj' },
+  'AC-C': { cod_imovel: 'AC-C', nom_imovel: 'Colocação Gama', nome_compl: 'Maria Teste', cpf_cnpj_mascarado: '***.456.789-**', num_area_i: 480, num_modulo: 2.5, nom_munici: 'Epitaciolândia', condicao_i: 'Ativo', nome_class: 'Verde', dat_criaca: '1998-01-01', titular_grupo: 1, titular_cars_estado: 5, titular_tipo_doc: 'cpf' },
 };
 
 async function abrir(page) {
@@ -177,6 +237,11 @@ async function abrir(page) {
   await page.locator('#caruc-uc option[value="uc-teste"]').waitFor({ state: 'attached', timeout: 20_000 });
 }
 
+// Linha pelo nº do CAR na 2ª célula — filtrar por texto pegaria também
+// a linha que só CITA o código ("Sobrepõe: AC-A").
+const linhaCar = (page, cod) => page.locator('#caruc-tabela tbody tr')
+  .filter({ has: page.locator('.caruc-cod', { hasText: new RegExp('^' + cod + '$') }) });
+
 async function gerar(page, marcar = []) {
   await page.selectOption('#caruc-uc', 'uc-teste');
   await expect(page.locator('#caruc-gerar')).toBeEnabled();
@@ -194,22 +259,28 @@ test('lista só os imóveis que se sobrepõem à UC, com zonas e atenção', asy
   await gerar(page);
 
   const linhas = page.locator('#caruc-tabela tbody tr');
-  await expect(linhas).toHaveCount(2);
+  await expect(linhas).toHaveCount(3);
   await expect(page.locator('#caruc-tabela')).not.toContainText('AC-FORA');
 
   const cad = await page.evaluate(() => window.__rpc.filter(r => r.nome === 'car_relatorio_uc_cadastro'));
   expect(cad).toHaveLength(1);
   expect(cad[0].args.p_uc_id).toBe('uc-teste');
-  expect(cad[0].args.p_cod_imoveis.sort()).toEqual(['AC-A', 'AC-B']);   // o de fora nunca gera log LGPD
+  expect(cad[0].args.p_cod_imoveis.sort()).toEqual(['AC-A', 'AC-B', 'AC-C']);   // o de fora nunca gera log LGPD; e vai numa chamada só (o grupo de titular vale por chamada)
 
-  const a = linhas.filter({ hasText: 'AC-A' });
+  const a = linhaCar(page, 'AC-A');
   await expect(a).toContainText('Zona Primitiva');
   await expect(a).toContainText('Atinge zona de proteção');
   await expect(a).toContainText('Imóvel particular (IRU) em UC de domínio público');
   await expect(a).toContainText('***.456.789-**');
+  await expect(a).toContainText('Titular nº 1 · 2 CAR(s) nesta UC · 5 no Acre');
+  await expect(a).toContainText('Possível fracionamento');
+  await expect(a).toContainText('Sobreposição com outro CAR');
+  await expect(a).toContainText(/Sobrepõe: AC-C \(1\d\d,\d ha, mesmo titular\)/);
+  await expect(a.locator('.caruc-prio')).toHaveText('Média');   // sem PRODES/DETER no relatório, Alta não existe
 
-  const b = linhas.filter({ hasText: 'AC-B' });
+  const b = linhaCar(page, 'AC-B');
   await expect(b).toContainText('Zona de Extrativismo');
+  await expect(b).toContainText('mesmo nome de outro titular — verificar');
   // metade do imóvel B está fora da UC
   await expect(b.locator('td.num .caruc-nota').first()).toHaveText(/^50(,\d)?% do imóvel$/);
 
@@ -223,22 +294,74 @@ test('dados ambientais entram quando marcados e respeitam o período', async ({ 
   await page.selectOption('#caruc-focos-de', '2020');
   await page.selectOption('#caruc-focos-ate', '2024');
   await gerar(page, ['caruc-focos', 'caruc-deter']);
-  const a = page.locator('#caruc-tabela tbody tr').filter({ hasText: 'AC-A' });
-  await expect(a.locator('td').nth(8)).toHaveText('5');           // 2023 + 2024; 2019 fica fora
+  const a = linhaCar(page, 'AC-A');
+  await expect(a.locator('td').nth(9)).toHaveText('5');           // 2023 + 2024; 2019 fica fora
   await expect(a).toContainText('Alerta DETER');
+  // zona primitiva + alerta DETER = Alta, com o motivo escrito
+  await expect(a.locator('.caruc-prio')).toHaveText('Alta');
+  await expect(a).toContainText('Zona Primitiva; 1 alerta(s) DETER');
   await expect(page.locator('#caruc-tabela thead')).toContainText('Focos 2020–2024');
 });
 
-test('filtro de texto e "só com atenção" combinam', async ({ page }) => {
+test('filtros por atributo combinam entre si e com a busca; resumo segue o recorte', async ({ page }) => {
   await abrir(page);
   await gerar(page);
-  await page.fill('#caruc-busca', 'beta');
+  await page.click('#caruc-btn-filtros');
+  await expect(page.locator('#caruc-f-municipio option')).toHaveText(['Todos', 'Xapuri (2)', 'Epitaciolândia (1)']);
+
+  await page.selectOption('#caruc-f-titular', 'Possível fracionamento');
+  await expect(page.locator('#caruc-tabela tbody tr')).toHaveCount(2);
+  await expect(page.locator('#caruc-chips')).toContainText('Titular: Possível fracionamento');
+  // o contador do botão tem de estar VISÍVEL na mesma linha (regra global de .btn span o jogava para fora)
+  await expect(page.locator('#caruc-filtros-n')).toBeVisible();
+  await expect(page.locator('#caruc-filtros-n')).toHaveText('1');
+  // a cor vem de variável do design system; variável inexistente (--verde-c) deixava o
+  // fundo transparente e o número branco invisível — medido, não suposto.
+  const cores = await page.evaluate(() => [getComputedStyle(document.getElementById('caruc-filtros-n')).backgroundColor,
+    getComputedStyle(document.getElementById('aba-btn-car')).borderBottomColor])
+  expect(cores[0]).not.toBe('rgba(0, 0, 0, 0)');
+  expect(cores[1]).not.toBe('rgba(0, 0, 0, 0)');
+  await expect(page.locator('#caruc-recorte')).toContainText('Filtrado: 2 de 3');
+  // facetas: com o titular escolhido, o município conta só dentro do recorte
+  await expect(page.locator('#caruc-f-municipio option')).toHaveText(['Todos', 'Epitaciolândia (1)', 'Xapuri (1)']);   // empate: alfabética
+
+  await page.selectOption('#caruc-f-municipio', 'Xapuri');
   await expect(page.locator('#caruc-tabela tbody tr')).toHaveCount(1);
-  await page.check('#caruc-so-atencao');
-  await expect(page.locator('#caruc-tabela tbody')).toContainText('Nenhum imóvel com esse filtro');
-  await page.fill('#caruc-busca', '');
+  await expect(page.locator('.caruc-kpis')).toContainText('Imóveis na UC1');
+
+  await page.fill('#caruc-busca', 'gama');   // contradiz o município: vazio, não "um vence"
+  await expect(page.locator('#caruc-tabela tbody')).toContainText('Nenhum imóvel com esses filtros');
+
+  await page.click('.caruc-chip:has-text("Município")');
   await expect(page.locator('#caruc-tabela tbody tr')).toHaveCount(1);
-  await expect(page.locator('#caruc-contagem')).toHaveText('1 de 2 imóveis');
+  await expect(page.locator('#caruc-tabela tbody')).toContainText('AC-C');
+
+  await page.click('#caruc-limpar');
+  await expect(page.locator('#caruc-tabela tbody tr')).toHaveCount(3);
+  await expect(page.locator('#caruc-recorte')).toContainText('3 imóveis, sem filtro');
+});
+
+test('exportação sai com o recorte filtrado e diz quais filtros', async ({ page }) => {
+  await abrir(page);
+  await gerar(page);
+  await page.click('#caruc-btn-filtros');
+  await page.selectOption('#caruc-f-titular', 'Possível fracionamento');
+
+  const [dCsv] = await Promise.all([page.waitForEvent('download'), page.click('button:has-text("CSV")')]);
+  expect(dCsv.suggestedFilename()).toMatch(/_filtrado\.csv$/);
+  const csv = fs.readFileSync(await dCsv.path(), 'utf8');
+  expect(csv).toContain('AC-A');
+  expect(csv).toContain('AC-C');
+  expect(csv).not.toContain('AC-B');
+  expect(csv.split('\r\n')[0]).toContain('Titular nº (neste relatório)');
+  expect(csv).not.toMatch(/\d{3}\.\d{3}\.\d{3}-\d{2}/);   // nenhum CPF inteiro
+
+  const [dX] = await Promise.all([page.waitForEvent('download', { timeout: 30_000 }), page.click('button:has-text("Excel")')]);
+  const JSZip = require('jszip');
+  const zip = await JSZip.loadAsync(fs.readFileSync(await dX.path()));
+  const strings = await zip.file('xl/sharedStrings.xml').async('string');
+  expect(strings).toContain('Titular: Possível fracionamento');
+  expect(strings).not.toContain('Comunidade Beta');
 });
 
 test('PDF e Excel saem com o CPF mascarado e a relação completa', async ({ page }) => {
@@ -262,4 +385,16 @@ test('PDF e Excel saem com o CPF mascarado e a relação completa', async ({ pag
   expect(strings).toContain('Nº do CAR');
   expect(strings).toContain('Colocação Alfa');
   expect(strings).toContain('**.345.678/****-**');
+});
+
+test('celular (390px): filtros abertos e tabela sem rolagem lateral da página', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await abrir(page);
+  await gerar(page, ['caruc-focos', 'caruc-deter']);
+  await page.click('#caruc-btn-filtros');
+  await expect(page.locator('#caruc-filtros-grid')).toBeVisible();
+  const vaza = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(vaza).toBeLessThanOrEqual(0);   // a tabela rola dentro do .table-wrap, nunca a página
+  const chip = await page.locator('#caruc-btn-filtros').boundingBox();
+  expect(chip.height).toBeGreaterThanOrEqual(24);
 });

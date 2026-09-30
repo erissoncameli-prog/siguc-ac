@@ -24,7 +24,12 @@
 const CARUC_WFS_BASE = 'https://geoserver.car.gov.br/geoserver/sicar/wfs'
 const CARUC_WFS_PAGINA = 1000
 const CARUC_LOTE_AMBIENTAL = 80      // RPC aceita 150; 80 deixa folga no timeout de 8 s
-const CARUC_LOTE_CADASTRO = 1000
+// O agrupamento de titular (migration 351) numera os grupos DENTRO de
+// uma chamada: a lista vai inteira, nunca em lotes (cada lote teria o
+// seu "Titular 1"). Limite da RPC: 10.000 (medido 2,6 s).
+const CARUC_LIMITE_CADASTRO = 10000
+const CARUC_SOBREP_HA_MIN = 0.1      // sobreposição entre CARs abaixo disso é desenho de divisa, não conflito
+const CARUC_DIVERGENCIA_AREA = 0.10  // área declarada × polígono
 const CARUC_PRODES_MARCO = 2009      // PRODES 2009 = ago/2008–jul/2009: 1º ano inteiro após 22/07/2008
 const CARUC_PRODES_MAX_FEAT = 2000   // mesmo PRODES_MAX_FEAT do proxy
 const CARUC_PRODES_QUADRO = 0.25     // graus
@@ -209,7 +214,204 @@ function carucAtencoes(im, uc, enqCat) {
   if (/cancel|suspens/.test(st)) a.push('CAR cancelado ou suspenso')
   if (im.prodes && im.prodes.pos_marco_ha >= CARUC_HA_MIN) a.push('Desmatamento PRODES após 22/07/2008')
   if (im.ambiental && im.ambiental.deter_alertas > 0) a.push('Alerta DETER')
+  if (im.fracionamento) a.push('Possível fracionamento')
+  if ((im.sobreposicoes || []).length) a.push('Sobreposição com outro CAR')
+  if (im.area_divergente) a.push('Área declarada diverge do polígono')
   return a
+}
+
+// Quanto do imóvel está dentro da UC. "Borda" (< 10%) quase sempre é
+// erro de divisa ou de desenho, não ocupação — separar limpa a análise.
+function carucFaixaNaUC(im) {
+  if (im.local === 'za') return 'Só na zona de amortecimento'
+  const p = Number(im.pct_analise)
+  if (!isFinite(p)) return 'Sem cálculo'
+  if (p >= 95) return 'Integral (95% ou mais)'
+  if (p >= 50) return 'Majoritário (50% a 95%)'
+  if (p >= 10) return 'Parcial (10% a 50%)'
+  return 'Borda (menos de 10%)'
+}
+
+// Prioridade para fiscalização — regra aceita pelo usuário, sempre com
+// o MOTIVO ao lado (nunca uma nota sem explicação).
+//   Alta: (UC de proteção integral OU zona de proteção) COM desmatamento
+//         PRODES após o marco ou alerta DETER — só existe quando esses
+//         dados foram pedidos no relatório.
+//   Média: CAR em proteção integral, zona de proteção, IRU em UC de
+//         domínio público, inscrição após a criação, fracionamento,
+//         classe Vermelho ou sobreposição com outro CAR.
+//   Baixa: nenhum dos anteriores.
+function carucPrioridade(im, enqCat) {
+  const naUC = im.local === 'uc'
+  const protecao = []
+  if (naUC && enqCat?.nivel === 'conflito') protecao.push('UC de proteção integral')
+  const zp = (im.zonas || []).filter(z => z.nivel === 'protecao' && z.ha >= CARUC_HA_MIN)
+  if (zp.length) protecao.push(zp.map(z => z.nome).join(', '))
+  const dano = []
+  if (im.prodes && im.prodes.pos_marco_ha >= CARUC_HA_MIN) dano.push(`${im.prodes.pos_marco_ha.toFixed(1).replace('.', ',')} ha PRODES após 2008`)
+  if (im.ambiental && im.ambiental.deter_alertas > 0) dano.push(`${im.ambiental.deter_alertas} alerta(s) DETER`)
+  if (protecao.length && dano.length) return { nivel: 'alta', motivos: [...protecao, ...dano] }
+
+  const m = [...protecao]
+  const tipo = String(im.tipo_imovel || '').toUpperCase()
+  if (naUC && enqCat?.nivel === 'verificar' && tipo === 'IRU') m.push('imóvel particular em UC de domínio público')
+  if (im.inscricao_vs_uc === 'depois') m.push('inscrito após a criação da UC')
+  if (im.fracionamento) m.push('possível fracionamento')
+  if (carucNorm(im.classe) === 'vermelho') m.push('classe Vermelho')
+  if ((im.sobreposicoes || []).length) m.push('sobreposição com outro CAR')
+  if (m.length) return { nivel: 'media', motivos: m }
+  return { nivel: 'baixa', motivos: [] }
+}
+
+const CARUC_PRIORIDADE_ROTULO = { alta: 'Alta', media: 'Média', baixa: 'Baixa' }
+
+// Classificações que dependem do CONJUNTO (titular repetido, homônimo,
+// fracionamento) — calculadas sobre o relatório inteiro, antes de
+// qualquer filtro, para o filtro nunca mudar o que um imóvel é.
+function carucEnriquecer(imoveis, uc, enqCat) {
+  const porGrupo = new Map(), porNome = new Map()
+  for (const i of imoveis) {
+    if (i.titular_grupo != null) {
+      const g = porGrupo.get(i.titular_grupo) || []
+      g.push(i); porGrupo.set(i.titular_grupo, g)
+    }
+    const nome = carucNorm(i.titular)
+    if (nome) {
+      const g = porNome.get(nome) || []
+      g.push(i); porNome.set(nome, g)
+    }
+  }
+  const criacaoUC = carucData(uc?.data_criacao)
+  for (const i of imoveis) {
+    const g = i.titular_grupo != null ? porGrupo.get(i.titular_grupo) : [i]
+    i.titular_cars_relatorio = g.length
+    const mesmoNome = porNome.get(carucNorm(i.titular)) || []
+    // Mesmo nome com OUTRO documento (ou sem documento): pode ser
+    // homônimo, parente ou erro de cadastro — "verificar", nunca "mesma pessoa".
+    i.homonimo = mesmoNome.some(o => o !== i && (o.titular_grupo == null || o.titular_grupo !== i.titular_grupo))
+    // Fracionamento: só pessoa física (CNPJ de órgão, como o do INCRA,
+    // tem milhares de imóveis e não é isso); 2+ imóveis no relatório,
+    // todos até 4 MF, somando mais de 4.
+    const mods = g.map(x => Number(x.modulos))
+    i.fracionamento = i.titular_tipo_doc === 'cpf' && g.length >= 2
+      && mods.every(m => isFinite(m) && m > 0 && m <= 4) && mods.reduce((a, b) => a + b, 0) > 4
+    const insc = carucData(i.data_inscricao)
+    i.inscricao_vs_uc = !insc || !criacaoUC ? 'sem_data' : (insc > criacaoUC ? 'depois' : 'antes')
+    const decl = Number(i.area_declarada_ha), calc = Number(i.area_total_ha)
+    i.area_divergente = decl > 0 && calc > 0 && Math.abs(decl - calc) / decl > CARUC_DIVERGENCIA_AREA
+    i.faixa_uc = carucFaixaNaUC(i)
+    i.sobreposicoes = i.sobreposicoes || []
+  }
+  for (const i of imoveis) {
+    i.atencoes = carucAtencoes(i, uc, enqCat)
+    i.prioridade = carucPrioridade(i, enqCat)
+  }
+  return imoveis
+}
+
+// Sobreposição entre CARs na área analisada (parte na UC/ZA). Varredura
+// ordenada pelo x mínimo: só compara quem se cruza no eixo x, e o
+// retângulo antes do polígono. Nada abaixo de CARUC_SOBREP_HA_MIN.
+async function carucSobreposicoesEntreCars(imoveis, aoProgresso) {
+  const itens = imoveis.filter(i => i._geom).map(i => ({ i, bb: turf.bbox(i._geom) }))
+  itens.sort((a, b) => a.bb[0] - b.bb[0])
+  for (const x of itens) x.i.sobreposicoes = []
+  for (let a = 0; a < itens.length; a++) {
+    const A = itens[a]
+    for (let b = a + 1; b < itens.length && itens[b].bb[0] <= A.bb[2]; b++) {
+      const B = itens[b]
+      if (!_carucBboxSobrepoe(A.bb, B.bb)) continue
+      const inter = carucInterseccao(A.i._geom, B.i._geom, A.bb)
+      const ha = inter ? carucAreaHa(inter) : 0
+      if (ha < CARUC_SOBREP_HA_MIN) continue
+      const mesmo = A.i.titular_grupo != null && A.i.titular_grupo === B.i.titular_grupo
+      A.i.sobreposicoes.push({ cod: B.i.cod, ha, mesmo_titular: mesmo })
+      B.i.sobreposicoes.push({ cod: A.i.cod, ha, mesmo_titular: mesmo })
+    }
+    if (a % 50 === 0) { aoProgresso?.(a, itens.length); await new Promise(r => setTimeout(r, 0)) }
+  }
+  for (const x of itens) x.i.sobreposicoes.sort((p, q) => q.ha - p.ha)
+}
+
+// ── Filtros (definição única: tela, contagens e texto da exportação) ─
+// `valores(i)` devolve a lista de rótulos do imóvel naquela dimensão
+// (uma dimensão "multi" pode ter vários: um imóvel atinge 2 zonas).
+const CARUC_FILTROS = [
+  { chave: 'prioridade', rotulo: 'Prioridade', ordem: ['Alta', 'Média', 'Baixa'], valores: i => [CARUC_PRIORIDADE_ROTULO[i.prioridade?.nivel] || 'Baixa'] },
+  { chave: 'municipio', rotulo: 'Município', valores: i => [i.municipio || 'Não informado'] },
+  { chave: 'situacao', rotulo: 'Situação', valores: i => [i.situacao || 'Não informado'] },
+  { chave: 'status', rotulo: 'Status', valores: i => [i.status || 'Não informado'] },
+  { chave: 'classe', rotulo: 'Classe SICAR', valores: i => [i.classe || 'Não informado'] },
+  { chave: 'tipo', rotulo: 'Tipo de imóvel', valores: i => [carucTipoImovel(i.tipo_imovel)] },
+  { chave: 'faixaMF', rotulo: 'Tamanho (módulos fiscais)', ordem: ['Pequena (até 4 MF)', 'Média (4 a 15 MF)', 'Grande (acima de 15 MF)', 'Sem informação'], valores: i => [carucFaixaModulos(i.modulos)] },
+  { chave: 'faixaUC', rotulo: 'Quanto está na UC', ordem: ['Integral (95% ou mais)', 'Majoritário (50% a 95%)', 'Parcial (10% a 50%)', 'Borda (menos de 10%)', 'Só na zona de amortecimento'], valores: i => [i.faixa_uc] },
+  { chave: 'zona', rotulo: 'Zona de manejo', valores: i => {
+      const z = (i.zonas || []).filter(x => x.ha >= CARUC_HA_MIN).map(x => x.nome)
+      return z.length ? z : [i.local === 'za' ? 'Só na zona de amortecimento' : 'Fora de zona cadastrada']
+    } },
+  { chave: 'titular', rotulo: 'Titular', valores: i => {
+      const t = []
+      if (i.titular_cars_relatorio > 1) t.push('Mais de um CAR nesta UC')
+      if (i.titular_cars_estado > i.titular_cars_relatorio) t.push('Tem CARs fora desta UC')
+      if (i.homonimo) t.push('Mesmo nome, documento diferente')
+      if (i.fracionamento) t.push('Possível fracionamento')
+      if (!i.na_planilha) t.push('Sem dados na planilha local')
+      return t.length ? t : ['Um CAR só']
+    } },
+  { chave: 'inscricao', rotulo: 'Inscrição no CAR', valores: i => [{ antes: 'Antes da criação da UC', depois: 'Depois da criação da UC' }[i.inscricao_vs_uc] || 'Sem data'] },
+  { chave: 'sobreposicao', rotulo: 'Sobreposição com outro CAR', valores: i => [(i.sobreposicoes || []).length ? 'Com sobreposição' : 'Sem sobreposição'] },
+  { chave: 'ambiental', rotulo: 'Dado ambiental', valores: i => {
+      const t = []
+      if (i.prodes && i.prodes.pos_marco_ha >= CARUC_HA_MIN) t.push('Desmatamento PRODES após 2008')
+      if (i.ambiental && i.ambiental.focos_periodo > 0) t.push('Focos no período')
+      if (i.ambiental && i.ambiental.deter_alertas > 0) t.push('Alerta DETER')
+      return t.length ? t : ['Sem registro']
+    } },
+  { chave: 'atencao', rotulo: 'Ponto de atenção', valores: i => (i.atencoes || []).length ? i.atencoes : ['Sem ponto de atenção'] },
+]
+
+// Opções de cada filtro com a contagem, considerando os OUTROS filtros
+// ativos (facetas): escolher "Xapuri" faz o filtro de classe contar só
+// dentro de Xapuri, e nenhuma opção promete um recorte vazio.
+function carucOpcoesFiltro(imoveis, filtro, busca) {
+  const saida = []
+  for (const def of CARUC_FILTROS) {
+    const outros = { ...filtro }; delete outros[def.chave]
+    const base = carucFiltrar(imoveis, outros, busca)
+    const cont = new Map()
+    for (const i of base) for (const v of new Set(def.valores(i))) cont.set(v, (cont.get(v) || 0) + 1)
+    let ops = [...cont.entries()].map(([valor, n]) => ({ valor, n }))
+    if (def.ordem) ops.sort((a, b) => (def.ordem.indexOf(a.valor) + 99) % 99 - (def.ordem.indexOf(b.valor) + 99) % 99 || b.n - a.n)
+    else ops.sort((a, b) => b.n - a.n || a.valor.localeCompare(b.valor, 'pt-BR'))
+    const sel = filtro?.[def.chave]
+    if (sel && !cont.has(sel)) ops.unshift({ valor: sel, n: 0 })
+    saida.push({ chave: def.chave, rotulo: def.rotulo, opcoes: ops })
+  }
+  return saida
+}
+
+function carucFiltrar(imoveis, filtro, busca) {
+  const termo = carucNorm(busca || '')
+  const ativos = CARUC_FILTROS.filter(d => filtro?.[d.chave])
+  return imoveis.filter(i => {
+    for (const d of ativos) if (!d.valores(i).includes(filtro[d.chave])) return false
+    if (termo && !carucNorm([i.cod, i.nome_imovel, i.titular, i.municipio].join(' ')).includes(termo)) return false
+    return true
+  })
+}
+
+function carucDescreverFiltros(filtro, busca) {
+  const t = CARUC_FILTROS.filter(d => filtro?.[d.chave]).map(d => `${d.rotulo}: ${filtro[d.chave]}`)
+  if (busca && busca.trim()) t.push(`Busca: "${busca.trim()}"`)
+  return t
+}
+
+// Relatório recortado pelo filtro — a MESMA estrutura do completo, com
+// o resumo recalculado. É o que a tela desenha e o que se exporta.
+function carucRelFiltrado(rel, filtro, busca) {
+  const imoveis = carucFiltrar(rel.imoveis, filtro, busca)
+  const filtros = carucDescreverFiltros(filtro, busca)
+  return { ...rel, imoveis, resumo: carucAgregar(imoveis, rel.uc), filtros, total_sem_filtro: rel.imoveis.length }
 }
 
 // ── Agregação do resumo (pura) ──────────────────────────────────────
@@ -255,6 +457,18 @@ function carucAgregar(imoveis, uc) {
     por_tipo: _carucContar(naUC, i => carucTipoImovel(i.tipo_imovel)),
     por_faixa: _carucContar(naUC, i => carucFaixaModulos(i.modulos)),
     por_zona: [...porZona.values()].sort((a, b) => b.ha - a.ha),
+    por_prioridade: ['alta', 'media', 'baixa'].map(k => {
+      const l = imoveis.filter(i => (i.prioridade?.nivel || 'baixa') === k)
+      return { rotulo: CARUC_PRIORIDADE_ROTULO[k], nivel: k, n: l.length, ha: l.reduce((s, i) => s + (i.area_analise_ha || 0), 0) }
+    }),
+    por_faixa_uc: _carucContar(imoveis, i => i.faixa_uc),
+    por_municipio: _carucContar(imoveis, i => i.municipio),
+    titulares_multi: new Set(imoveis.filter(i => i.titular_cars_relatorio > 1).map(i => i.titular_grupo)).size,
+    imoveis_titular_multi: imoveis.filter(i => i.titular_cars_relatorio > 1).length,
+    fracionamento: imoveis.filter(i => i.fracionamento).length,
+    homonimos: imoveis.filter(i => i.homonimo).length,
+    com_sobreposicao: imoveis.filter(i => (i.sobreposicoes || []).length).length,
+    area_divergente: imoveis.filter(i => i.area_divergente).length,
     sem_zona: semZona.length,
     com_atencao: imoveis.filter(i => (i.atencoes || []).length).length,
     sem_planilha: imoveis.filter(i => !i.na_planilha).length,
@@ -380,12 +594,13 @@ async function carucBuscarImoveisSicar(bbox, aoProgresso) {
 }
 
 async function carucBuscarCadastro(ucId, cods) {
-  const mapa = new Map()
-  for (let i = 0; i < cods.length; i += CARUC_LOTE_CADASTRO) {
-    const { data, error } = await db.rpc('car_relatorio_uc_cadastro', { p_uc_id: ucId, p_cod_imoveis: cods.slice(i, i + CARUC_LOTE_CADASTRO) })
-    if (error) throw new Error('Planilha SICAR local: ' + error.message)
-    for (const r of (data || [])) mapa.set(r.cod_imovel, r)
+  if (cods.length > CARUC_LIMITE_CADASTRO) {
+    throw new Error(`${cods.length} imóveis passam do limite de ${CARUC_LIMITE_CADASTRO} por relatório.`)
   }
+  const mapa = new Map()
+  const { data, error } = await db.rpc('car_relatorio_uc_cadastro', { p_uc_id: ucId, p_cod_imoveis: cods })
+  if (error) throw new Error('Planilha SICAR local: ' + error.message)
+  for (const r of (data || [])) mapa.set(r.cod_imovel, r)
   return mapa
 }
 
@@ -540,6 +755,9 @@ async function carucGerarRelatorio(uc, ucGeom, fontesZonas, opcoes, aoEtapa) {
       area_declarada_ha: l?.num_area_i != null ? Number(l.num_area_i) : (parseFloat(p.area) || null),
       data_inscricao: carucData(l?.dat_criaca || p.dat_criacao),
       relacao_juridica: l?.tipo_docum || null,
+      titular_grupo: l?.titular_grupo ?? null,
+      titular_cars_estado: l?.titular_cars_estado ?? null,
+      titular_tipo_doc: l?.titular_tipo_doc ?? null,
       area_total_ha: g.area_total_ha,
       area_analise_ha: g.area_analise_ha,
       pct_analise: g.pct_analise,
@@ -579,11 +797,12 @@ async function carucGerarRelatorio(uc, ucGeom, fontesZonas, opcoes, aoEtapa) {
     prodesInfo = { falhas: prodes.falhas, quadrantes: prodes.quadrantes }
   }
 
+  etapa('Verificando sobreposição entre os CARs…', 0, imoveis.length)
+  await carucSobreposicoesEntreCars(imoveis, (a, b) => etapa('Verificando sobreposição entre os CARs…', a, b))
+
   const enqCat = carucEnquadrarCategoria(uc)
-  for (const i of imoveis) {
-    i.atencoes = carucAtencoes(i, uc, enqCat)
-    delete i._geom
-  }
+  carucEnriquecer(imoveis, uc, enqCat)
+  for (const i of imoveis) delete i._geom
   imoveis.sort((a, b) => (a.local === b.local ? 0 : a.local === 'uc' ? -1 : 1) || b.area_analise_ha - a.area_analise_ha)
 
   return {
@@ -609,6 +828,9 @@ function carucColunasExportacao(rel) {
     { rotulo: 'Imóvel', valor: i => i.nome_imovel || '' },
     { rotulo: 'Titular', valor: i => i.titular || '' },
     { rotulo: 'CPF/CNPJ (mascarado)', valor: i => i.documento || '' },
+    { rotulo: 'Titular nº (neste relatório)', valor: i => i.titular_grupo ?? null, casas: 0 },
+    { rotulo: 'CARs do titular nesta UC', valor: i => i.titular_grupo != null ? i.titular_cars_relatorio : null, casas: 0 },
+    { rotulo: 'CARs do titular no Acre', valor: i => i.titular_cars_estado ?? null, casas: 0 },
     { rotulo: 'Município', valor: i => i.municipio || '' },
     { rotulo: 'Situação', valor: i => i.situacao || '' },
     { rotulo: 'Status', valor: i => i.status || '' },
@@ -618,6 +840,9 @@ function carucColunasExportacao(rel) {
     { rotulo: 'Área total (ha)', valor: i => n(i.area_total_ha), casas: 2 },
     { rotulo: 'Área na UC/ZA (ha)', valor: i => n(i.area_analise_ha), casas: 2 },
     { rotulo: '% do imóvel na UC/ZA', valor: i => n(i.pct_analise), casas: 1 },
+    { rotulo: 'Quanto está na UC', valor: i => i.faixa_uc || '' },
+    { rotulo: 'Área declarada (ha)', valor: i => n(i.area_declarada_ha), casas: 2 },
+    { rotulo: 'Sobreposição com outros CARs', valor: i => (i.sobreposicoes || []).map(o => `${o.cod} (${Number(o.ha).toFixed(2).replace('.', ',')} ha${o.mesmo_titular ? ', mesmo titular' : ''})`).join('; ') },
     { rotulo: 'Zonas atingidas', valor: i => (i.zonas || []).map(z => `${z.nome} (${Number(z.ha).toFixed(2).replace('.', ',')} ha)`).join('; ') },
     { rotulo: 'Inscrição no CAR', valor: i => i.data_inscricao ? i.data_inscricao.split('-').reverse().join('/') : '' },
   ]
@@ -631,6 +856,8 @@ function carucColunasExportacao(rel) {
     cols.push({ rotulo: 'PRODES após o marco (ha)', valor: i => i.prodes ? i.prodes.pos_marco_ha : null, casas: 2 })
     cols.push({ rotulo: 'Desmatado até 2007 (ha)', valor: i => i.prodes ? i.prodes.ate2007_ha : null, casas: 2 })
   }
+  cols.push({ rotulo: 'Prioridade', valor: i => CARUC_PRIORIDADE_ROTULO[i.prioridade?.nivel] || '' })
+  cols.push({ rotulo: 'Motivo da prioridade', valor: i => (i.prioridade?.motivos || []).join('; ') })
   cols.push({ rotulo: 'Pontos de atenção', valor: i => (i.atencoes || []).join('; ') })
   return cols
 }
@@ -660,5 +887,7 @@ if (typeof module !== 'undefined') {
     carucNorm, carucTipoImovel, carucStatus, carucFaixaModulos, carucEnquadrarCategoria,
     carucEnquadrarZona, carucZonaDePropriedades, carucZonasDaUC, carucAtencoes, carucAgregar,
     carucFocosNoPeriodo, carucColunasExportacao, carucFormatarValor, carucCsv, CARUC_ZONAS_ARQUIVO_UC,
+    carucFaixaNaUC, carucPrioridade, carucEnriquecer, carucOpcoesFiltro, carucFiltrar,
+    carucDescreverFiltros, carucRelFiltrado, CARUC_FILTROS,
   }
 }

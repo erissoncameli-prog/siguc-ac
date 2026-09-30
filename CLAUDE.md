@@ -853,8 +853,55 @@ opcionais. Sem mapa (pedido do usuário). Exporta PDF (timbre), Excel
   O que continua falhando vira aviso na tela e no PDF, nunca zero
   silencioso. "Após o marco" = anos PRODES ≥ 2009 (o ano PRODES vai de
   agosto a julho).
-- Guarda: `tests/car-uc-relatorio.test.js` (11). Página real com stub,
-  e o PDF/Excel gerados de verdade.
+- **Filtros e classificações** (migrations 351/351b/351c), pedidos
+  depois da 1ª entrega:
+  - **Titular com mais de um CAR**: o banco agrupa (`titular_grupo`,
+    número válido só naquela chamada, numerado pelo menor `cod_imovel`,
+    nunca pela ordem do documento; + `titular_cars_estado`). O documento
+    nunca sai do servidor, nem como hash: o espaço de CPF é pequeno o
+    bastante para qualquer hash fixo ser revertido. **Por isso a lista
+    vai numa chamada só** (limite 10.000; medido 2,6 s): em lotes, cada
+    lote teria o seu "Titular 1". ⚠️ A 351 falhava em TODA chamada
+    (`min(cod_imovel)` ambíguo com a coluna de saída do RETURNS TABLE,
+    42702) — achado pelo teste como usuário autenticado logo após
+    aplicar; 351b corrige. Em PL/pgSQL com RETURNS TABLE, qualificar
+    SEMPRE a coluna.
+  - **Homônimo** (mesmo nome normalizado, outro documento) é "verificar",
+    nunca "mesma pessoa". **Possível fracionamento** = mesmo CPF com 2+
+    imóveis de até 4 MF somando mais de 4; **CNPJ fica de fora** (o
+    maior titular do Acre tem 4.030 CARs, órgão de assentamento).
+  - **Quanto está na UC**: integral ≥ 95%, majoritário ≥ 50%, parcial ≥
+    10%, borda < 10% (quase sempre erro de divisa).
+  - **Sobreposição entre CARs** na área analisada, a partir de 0,1 ha,
+    por varredura ordenada pelo x mínimo (2.000 imóveis e 11 mil pares
+    em 0,6 s).
+  - **Prioridade** (Alta/Média/Baixa) com o MOTIVO escrito ao lado:
+    Alta = (proteção integral OU zona de proteção) COM (PRODES após 2008
+    OU DETER) — só existe se esses dados foram pedidos; Média = CAR em
+    PI, zona de proteção, IRU em UC de domínio público, inscrição após a
+    criação, fracionamento, classe Vermelho ou sobreposição com outro
+    CAR.
+  - Classificações que dependem do CONJUNTO (titular, homônimo,
+    fracionamento) são calculadas sobre o relatório inteiro ANTES do
+    filtro (`carucEnriquecer`) — filtrar nunca muda o que um imóvel é.
+  - Filtros: definição única em `CARUC_FILTROS`; cada select conta
+    **dentro dos outros filtros** (facetas) e só mostra opção que existe.
+    Resumo, tabelas e **exportação seguem o recorte** (decisão do
+    usuário), com os filtros escritos no PDF/Excel e `_filtrado` no nome
+    do arquivo.
+- ⚠️ **`--verde-c` NÃO existe em `css/global.css`** (lá é `--verde-claro`),
+  apesar de ser o nome usado no design system deste arquivo. Usado
+  numa página, dá cor transparente em silêncio: a aba ativa, a barra de
+  progresso e o contador do botão de filtros ficavam invisíveis. A
+  guarda compara a cor calculada. `pages/estrutura-organizacional.html`
+  tem o mesmo problema (não corrigido nesta entrega).
+- ⚠️ **`.main-content` é item flex com `min-width:auto`**: uma tabela
+  larga fazia a PÁGINA inteira rolar de lado no celular (1.410px em
+  390px), mesmo dentro do `.table-wrap`. Corrigido com `min-width:0`
+  só nesta página; a guarda de 390px pega a volta.
+- Guarda: `tests/car-uc-relatorio.test.js` (16). Página real com stub,
+  PDF/Excel/CSV gerados de verdade, e guardas conferidas por
+  contrafactual (reprovam sem a correção).
 - Sem mudança em `pwa/sw.js` (tela de mesa).
 
 ## Regra do sistema — painéis na tela cheia do mapa
