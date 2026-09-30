@@ -58,6 +58,7 @@ async function carucMontarPdf(rel, protocolo) {
       ['Criação', uc.data_criacao ? uc.data_criacao.split('-').reverse().join('/') : '—'],
       ['Base do CAR', `SICAR (consulta ao vivo em ${new Date(rel.gerado_em).toLocaleString('pt-BR')}) + planilha SICAR local`],
       ['Recorte', rel.zoneamento.usouZa ? 'Imóveis na UC e imóveis só na zona de amortecimento' : 'Imóveis que se sobrepõem à UC'],
+      ['Filtros aplicados', rel.filtros?.length ? `${rel.filtros.join(' · ')} — ${rel.imoveis.length} de ${rel.total_sem_filtro} imóveis` : 'Nenhum (relação completa)'],
     ],
     theme: 'plain',
     columnStyles: { 0: { fontStyle: 'bold', cellWidth: 55 } },
@@ -71,6 +72,9 @@ async function carucMontarPdf(rel, protocolo) {
     ['Imóveis que se sobrepõem à UC', String(r.na_uc)],
     ['Soma das áreas sobrepostas', `${_carucN(r.soma_sobreposicao_ha)} ha${r.pct_soma_da_uc != null ? ` (${_carucN(r.pct_soma_da_uc, 1)}% da área da UC)` : ''}`],
     ['Imóveis com ponto de atenção', String(r.com_atencao)],
+    ['Titulares com mais de um CAR nesta UC (imóveis)', `${r.titulares_multi} (${r.imoveis_titular_multi})`],
+    ['Possível fracionamento · mesmo nome com documento diferente', `${r.fracionamento} · ${r.homonimos}`],
+    ['Imóveis com sobreposição entre CARs (≥ 0,1 ha)', String(r.com_sobreposicao)],
     ['Imóveis sem dados na planilha local', String(r.sem_planilha)],
   ]
   if (rel.zoneamento.usouZa) linhasResumo.splice(1, 0, ['Imóveis só na zona de amortecimento', String(r.so_za)])
@@ -95,6 +99,9 @@ async function carucMontarPdf(rel, protocolo) {
     if (r.sem_zona) _agpdfParagrafo(ctx, `${r.sem_zona} imóvel(is) na UC fora de qualquer zona cadastrada.`, { muted: true })
   }
 
+  _carucTabelaContagem(ctx, 'Prioridade para fiscalização', r.por_prioridade.filter(p => p.n), 'Prioridade')
+  _carucTabelaContagem(ctx, 'Quanto do imóvel está na UC', r.por_faixa_uc, 'Faixa')
+  _carucTabelaContagem(ctx, 'Por município', r.por_municipio, 'Município')
   _carucTabelaContagem(ctx, 'Por situação do cadastro', r.por_situacao, 'Situação')
   _carucTabelaContagem(ctx, 'Por classe SICAR', r.por_classe, 'Classe')
   _carucTabelaContagem(ctx, 'Por tipo de imóvel', r.por_tipo, 'Tipo')
@@ -103,7 +110,12 @@ async function carucMontarPdf(rel, protocolo) {
   // Relação completa — nova página, mesmas colunas do CSV/Excel.
   _agpdfNovaPagina(ctx)
   _agpdfTitulo(ctx, `Relação dos imóveis (${rel.imoveis.length})`)
-  const cols = carucColunasExportacao(rel).filter(c => !['Localização', 'Status', 'Módulos fiscais'].includes(c.rotulo) || (c.rotulo === 'Localização' && rel.zoneamento.usouZa))
+  // O PDF (paisagem) leva as colunas de leitura; Excel/CSV levam todas.
+  const FORA_DO_PDF = ['Status', 'Módulos fiscais', 'Titular nº (neste relatório)', 'CARs do titular no Acre',
+    'Área total (ha)', 'Área declarada (ha)', 'Quanto está na UC', 'Sobreposição com outros CARs', 'Pontos de atenção']
+  const todas = carucColunasExportacao(rel)
+  const cols = [todas.find(c => c.rotulo === 'Prioridade'),
+    ...todas.filter(c => c.rotulo !== 'Prioridade' && !FORA_DO_PDF.includes(c.rotulo) && (c.rotulo !== 'Localização' || rel.zoneamento.usouZa))]
   _agpdfTabela(ctx, {
     head: [cols.map(c => c.rotulo)],
     body: rel.imoveis.map(i => cols.map(c => carucFormatarValor(c.valor(i), c.casas))),
@@ -122,6 +134,8 @@ async function carucMontarPdf(rel, protocolo) {
   if (o.prodes) notas.push('PRODES/INPE (TerraBrasilis): o ano PRODES vai de agosto a julho; "após o marco" soma os anos 2009 em diante, os primeiros inteiramente posteriores a 22/07/2008 (Lei 12.651/2012). "Até 2007" é a camada de desmatamento acumulado do INPE.')
   if (rel.falhas.prodes) notas.push(`ATENÇÃO: ${rel.falhas.prodes} de ${rel.falhas.prodes_quadrantes} quadrantes do PRODES não responderam — os valores de PRODES podem estar incompletos.`)
   if (rel.falhas.ambiental) notas.push(`ATENÇÃO: focos/DETER não puderam ser calculados para ${rel.falhas.ambiental} imóvel(is).`)
+  notas.push('Prioridade — Alta: UC de proteção integral ou zona de proteção, com desmatamento PRODES após 2008 ou alerta DETER (só quando pedidos). Média: CAR em proteção integral, zona de proteção, imóvel particular em UC de domínio público, inscrição após a criação da UC, possível fracionamento, classe Vermelho ou sobreposição com outro CAR. Baixa: nenhum desses.')
+  notas.push('Titular: o agrupamento por CPF/CNPJ é feito no servidor e o número do titular vale só neste relatório. Possível fracionamento: mesmo CPF com 2 ou mais imóveis de até 4 módulos fiscais somando mais de 4. Sobreposição entre CARs conta a partir de 0,1 ha.')
   notas.forEach(n => _agpdfParagrafo(ctx, n, { muted: true }))
 
   const logos = {
@@ -172,17 +186,26 @@ async function carucMontarXlsx(rel) {
   const titulo = t => { const row = add(t); row.font = { bold: true }; row.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8F5EE' } } }
   titulo(`Imóveis do CAR na UC — ${rel.uc.nome}`)
   add('Gerado em', new Date(rel.gerado_em).toLocaleString('pt-BR'))
+  add('Filtros aplicados', rel.filtros?.length ? rel.filtros.join(' · ') : 'Nenhum (relação completa)')
+  if (rel.filtros?.length) add('Imóveis no recorte', rel.imoveis.length, `de ${rel.total_sem_filtro}`)
   add('Enquadramento da categoria', rel.enquadramento.rotulo)
   add('Imóveis na UC', r.na_uc)
   if (rel.zoneamento.usouZa) add('Imóveis só na zona de amortecimento', r.so_za)
   add('Soma das áreas sobrepostas (ha)', Number(r.soma_sobreposicao_ha.toFixed(2)))
   add('Imóveis com ponto de atenção', r.com_atencao)
+  add('Titulares com mais de um CAR nesta UC', r.titulares_multi, `${r.imoveis_titular_multi} imóveis`)
+  add('Possível fracionamento (imóveis)', r.fracionamento)
+  add('Mesmo nome, documento diferente (imóveis)', r.homonimos)
+  add('Imóveis com sobreposição entre CARs', r.com_sobreposicao)
   add('Zoneamento', rel.zoneamento.tem ? rel.zoneamento.fonte : 'UC sem zoneamento cadastrado')
   const bloco = (t, lista, rot) => {
     if (!lista?.length) return
     add(''); titulo(t); add(rot, 'Imóveis', 'Área sobreposta (ha)').font = { bold: true }
     lista.forEach(g => add(g.rotulo || g.nome, g.n, Number(g.ha.toFixed(2))))
   }
+  bloco('Prioridade para fiscalização', r.por_prioridade.filter(p => p.n), 'Prioridade')
+  bloco('Quanto do imóvel está na UC', r.por_faixa_uc, 'Faixa')
+  bloco('Por município', r.por_municipio, 'Município')
   bloco('Por zona de manejo', r.por_zona.map(z => ({ rotulo: z.nome, n: z.n, ha: z.ha })), 'Zona')
   bloco('Por situação', r.por_situacao, 'Situação')
   bloco('Por classe SICAR', r.por_classe, 'Classe')
@@ -202,5 +225,5 @@ function carucBaixarBlob(blob, nome) {
 
 function carucNomeArquivo(rel, ext) {
   const slug = carucNorm(rel.uc.nome).replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
-  return `car-na-uc_${slug}_${rel.gerado_em.slice(0, 10)}.${ext}`
+  return `car-na-uc_${slug}_${rel.gerado_em.slice(0, 10)}${rel.filtros?.length ? '_filtrado' : ''}.${ext}`
 }
