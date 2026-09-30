@@ -408,10 +408,51 @@ function carucDescreverFiltros(filtro, busca) {
 
 // Relatório recortado pelo filtro — a MESMA estrutura do completo, com
 // o resumo recalculado. É o que a tela desenha e o que se exporta.
-function carucRelFiltrado(rel, filtro, busca) {
-  const imoveis = carucFiltrar(rel.imoveis, filtro, busca)
+// opts.agrupar: ordena a relação por titular e devolve os grupos —
+// a tela e as três exportações leem a MESMA ordem.
+function carucRelFiltrado(rel, filtro, busca, opts = {}) {
+  let imoveis = carucFiltrar(rel.imoveis, filtro, busca)
   const filtros = carucDescreverFiltros(filtro, busca)
-  return { ...rel, imoveis, resumo: carucAgregar(imoveis, rel.uc), filtros, total_sem_filtro: rel.imoveis.length }
+  let grupos = null
+  if (opts.agrupar) {
+    grupos = carucAgruparPorTitular(imoveis)
+    imoveis = grupos.flatMap(g => g.imoveis)
+    filtros.push('Agrupado por titular')
+  }
+  return { ...rel, imoveis, grupos, agrupado: !!opts.agrupar, resumo: carucAgregar(imoveis, rel.uc), filtros, total_sem_filtro: rel.imoveis.length }
+}
+
+// Agrupa a relação por titular (titular_grupo, que o BANCO atribui por
+// documento). Titular com mais imóveis no recorte vem primeiro; imóvel
+// sem dado na planilha fica num bloco final — nunca some.
+function carucAgruparPorTitular(imoveis) {
+  const m = new Map()
+  const sem = []
+  for (const i of imoveis) {
+    if (i.titular_grupo == null) { sem.push(i); continue }
+    let g = m.get(i.titular_grupo)
+    if (!g) {
+      g = { grupo: i.titular_grupo, titular: i.titular, documento: i.documento, cars_uc: i.titular_cars_relatorio,
+            cars_estado: i.titular_cars_estado, ha: 0, imoveis: [] }
+      m.set(i.titular_grupo, g)
+    }
+    g.imoveis.push(i); g.ha += i.area_analise_ha || 0
+  }
+  const lista = [...m.values()].sort((a, b) => b.imoveis.length - a.imoveis.length || b.ha - a.ha || a.grupo - b.grupo)
+  for (const g of lista) g.imoveis.sort((a, b) => b.area_analise_ha - a.area_analise_ha)
+  if (sem.length) lista.push({ grupo: null, titular: null, documento: null, cars_uc: null, cars_estado: null,
+    ha: sem.reduce((s, i) => s + (i.area_analise_ha || 0), 0), imoveis: sem })
+  return lista
+}
+
+function carucGrupoRotulo(g) {
+  if (g.grupo == null) return `Sem titular identificado na planilha local · ${g.imoveis.length} imóvel(is)`
+  const partes = [`Titular nº ${g.grupo}`, g.titular || 'nome não informado']
+  if (g.documento) partes.push(g.documento)
+  partes.push(`${g.cars_uc} CAR(s) nesta UC`)
+  if (g.cars_estado != null) partes.push(`${g.cars_estado} no Acre`)
+  partes.push(`${g.ha.toFixed(2).replace('.', ',')} ha`)
+  return partes.join(' · ')
 }
 
 // ── Agregação do resumo (pura) ──────────────────────────────────────
@@ -452,10 +493,13 @@ function carucAgregar(imoveis, uc) {
     so_za: soZa.length,
     soma_sobreposicao_ha: somaHa,
     pct_soma_da_uc: areaUC ? somaHa / areaUC * 100 : null,
-    por_situacao: _carucContar(naUC, i => i.situacao),
-    por_classe: _carucContar(naUC, i => i.classe),
-    por_tipo: _carucContar(naUC, i => carucTipoImovel(i.tipo_imovel)),
-    por_faixa: _carucContar(naUC, i => carucFaixaModulos(i.modulos)),
+    // Contam o MESMO conjunto que o filtro recorta (UC + zona de
+    // amortecimento, quando incluída): a linha do quadro é clicável e o
+    // número dela tem de ser o número de imóveis depois do clique.
+    por_situacao: _carucContar(imoveis, i => i.situacao),
+    por_classe: _carucContar(imoveis, i => i.classe),
+    por_tipo: _carucContar(imoveis, i => carucTipoImovel(i.tipo_imovel)),
+    por_faixa: _carucContar(imoveis, i => carucFaixaModulos(i.modulos)),
     por_zona: [...porZona.values()].sort((a, b) => b.ha - a.ha),
     por_prioridade: ['alta', 'media', 'baixa'].map(k => {
       const l = imoveis.filter(i => (i.prioridade?.nivel || 'baixa') === k)
@@ -888,6 +932,6 @@ if (typeof module !== 'undefined') {
     carucEnquadrarZona, carucZonaDePropriedades, carucZonasDaUC, carucAtencoes, carucAgregar,
     carucFocosNoPeriodo, carucColunasExportacao, carucFormatarValor, carucCsv, CARUC_ZONAS_ARQUIVO_UC,
     carucFaixaNaUC, carucPrioridade, carucEnriquecer, carucOpcoesFiltro, carucFiltrar,
-    carucDescreverFiltros, carucRelFiltrado, CARUC_FILTROS,
+    carucDescreverFiltros, carucRelFiltrado, CARUC_FILTROS, carucAgruparPorTitular, carucGrupoRotulo,
   }
 }

@@ -116,9 +116,18 @@ async function carucMontarPdf(rel, protocolo) {
   const todas = carucColunasExportacao(rel)
   const cols = [todas.find(c => c.rotulo === 'Prioridade'),
     ...todas.filter(c => c.rotulo !== 'Prioridade' && !FORA_DO_PDF.includes(c.rotulo) && (c.rotulo !== 'Localização' || rel.zoneamento.usouZa))]
+  const linhaImovel = i => cols.map(c => carucFormatarValor(c.valor(i), c.casas))
+  // Agrupado: cada titular vira uma linha de cabeçalho do bloco, na
+  // mesma ordem da tela (rel.grupos, de carucAgruparPorTitular).
+  const corpo = rel.agrupado && rel.grupos
+    ? rel.grupos.flatMap(g => [
+        [{ content: carucGrupoRotulo(g), colSpan: cols.length, styles: { fontStyle: 'bold', fillColor: [232, 245, 238], textColor: AGPDF_COR.floresta, fontSize: 6.6 } }],
+        ...g.imoveis.map(linhaImovel),
+      ])
+    : rel.imoveis.map(linhaImovel)
   _agpdfTabela(ctx, {
     head: [cols.map(c => c.rotulo)],
-    body: rel.imoveis.map(i => cols.map(c => carucFormatarValor(c.valor(i), c.casas))),
+    body: corpo,
     styles: { font: 'DMSans', fontSize: 6.2, cellPadding: 1, overflow: 'linebreak', lineColor: AGPDF_COR.borda, lineWidth: 0.1 },
     headStyles: { fillColor: AGPDF_COR.floresta, textColor: 255, fontStyle: 'bold', fontSize: 6 },
     columnStyles: Object.fromEntries(cols.map((c, k) => [k, c.casas != null ? { halign: 'right' } : {}])),
@@ -178,6 +187,26 @@ async function carucMontarXlsx(rel) {
   cab.font = { bold: true, color: { argb: 'FFFFFFFF' } }
   cab.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0A1A0F' } }
   ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: cols.length } }
+
+  // Agrupado: a aba "Imóveis" continua com UMA linha por imóvel (linha de
+  // cabeçalho no meio quebraria o filtro e a ordenação da planilha), já
+  // na ordem por titular, e o resumo por titular vai numa aba própria.
+  if (rel.agrupado && rel.grupos) {
+    const wt = wb.addWorksheet('Titulares', { views: [{ state: 'frozen', ySplit: 1 }] })
+    wt.columns = [
+      { header: 'Titular nº', width: 11 }, { header: 'Titular', width: 36 }, { header: 'CPF/CNPJ (mascarado)', width: 22 },
+      { header: 'Imóveis no recorte', width: 16 }, { header: 'CARs nesta UC', width: 14 }, { header: 'CARs no Acre', width: 13 },
+      { header: 'Área na UC/ZA (ha)', width: 17 }, { header: 'Nº dos CAR', width: 60 },
+    ]
+    for (const g of rel.grupos) {
+      const l = wt.addRow([g.grupo ?? '', g.titular || (g.grupo == null ? 'Sem titular identificado' : ''), g.documento || '',
+        g.imoveis.length, g.cars_uc ?? '', g.cars_estado ?? '', Number(g.ha.toFixed(2)), g.imoveis.map(i => i.cod).join('; ')])
+      l.getCell(7).numFmt = '#,##0.00'
+    }
+    const ct = wt.getRow(1)
+    ct.font = { bold: true, color: { argb: 'FFFFFFFF' } }
+    ct.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0A1A0F' } }
+  }
 
   const r = rel.resumo
   const wr = wb.addWorksheet('Resumo')
