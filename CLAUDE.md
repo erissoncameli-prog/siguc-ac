@@ -797,6 +797,66 @@ Guardas: `tests/mapa-recorte.test.js` (geometria) e
 gaveta anima 0,28s: esperar o `transform` virar identidade antes de
 medir ou clicar, senão o alvo está em movimento.
 
+## Regra do sistema — relatório "CAR na UC" (Gestão › Relatórios, migration 350)
+Aba "CAR na UC" em `pages/relatorios.html` (a página ganhou abas; a
+"Visão geral" é o conteúdo antigo, intacto). Lista os imóveis do CAR que
+se sobrepõem a uma UC: nº, situação, classe, tipo, titular, área na UC,
+zonas de manejo atingidas e pontos de atenção. Focos, DETER e PRODES são
+opcionais. Sem mapa (pedido do usuário). Exporta PDF (timbre), Excel
+(ExcelJS) e CSV, que usam a mesma lista de colunas (`carucColunasExportacao`).
+- **Decisões do usuário**: geometria do CAR **AO VIVO** do WFS do SICAR
+  (`/api/car-proxy`, o mesmo do mapa); a planilha `car_dados_locais` só
+  complementa. **CPF/CNPJ sempre mascarado**. Acesso: todo o grupo
+  Gestão (`pode_ver('monitoramento')`, o mesmo gate do menu).
+- Cálculo em `js/car-uc-relatorio.js` (funções `caruc*`, puras onde
+  dá); exportação em `js/car-uc-relatorio-export.js`, carregada só ao
+  exportar. Ela reaproveita os primitivos de `js/agua-relatorio-pdf.js`,
+  como o `rh-relatorio-pdf.js` já faz.
+- **Máscara no SERVIDOR** (`car_mascarar_documento`): o número inteiro
+  nunca chega ao navegador. `car_relatorio_uc_cadastro` grava **uma linha
+  por imóvel devolvido** em `lgpd_acesso_dado_terceiro`, com as colunas
+  novas `origem = 'relatorio_car_uc'` e `uc_id`. Só são enviados os
+  códigos que de fato caem na UC: mandar código a mais registraria acesso
+  a titular que o relatório nem mostra (o teste trava isso). ROPA
+  TRAT-013 e RIPD do CAR v1.2 atualizados.
+- **Interseção em turf com `bboxClip` antes de `intersect`**: a UC
+  inteira contra cada imóvel seria lenta demais (a Chico Mendes tem 10
+  mil vértices). Medido: 2.000 imóveis em 0,4 s.
+- **Zonas**: o arquivo `data/uc_zonas_acre.geojson` casa pelo **CÓDIGO
+  da UC** (`CARUC_ZONAS_ARQUIVO_UC`), nunca pelo nome. O "São Francisco"
+  do arquivo é a APA Igarapé São Francisco (UC-012), não a FLONA. UC fora
+  do arquivo usa as camadas "… - Zoneamento" / "… - Zona de Amortecimento"
+  do Mapa (`camadas_mapa.uc_id`). Hoje, 7 UCs têm zonas internas:
+  Antimary, Chandless, Rio Gregório, Mogno e Rio Liberdade (arquivo),
+  mais ARIE Japiim-Pentecoste e APA Lago do Amapá (camadas). A APA
+  Igarapé São Francisco só tem zona de amortecimento. UC sem
+  zoneamento **diz isso**, nunca mostra tabela vazia. O usuário está em
+  busca dos zoneamentos oficiais que faltam; ao chegar, basta subir como
+  camada com o `uc_id` certo (sem código novo).
+- ⚠️ Duas camadas "Zona de Amortecimento" (ARIE e FE Rio Liberdade)
+  contêm feição de zoneamento, não buffer. Só são usadas para imóvel que
+  NÃO toca a UC, então não contaminam a lista principal. Vale corrigir a
+  camada na origem.
+- Enquadramento por categoria (SNUC): proteção integral = conflito;
+  RESEX/RDS/FLONA/FLOE = verificar (CAR PCT esperado, IRU indica área a
+  regularizar); APA/ARIE/RPPN/MONA/RVS = admitido. Por zona: o código
+  decide; sem código, palavra de proteção é testada ANTES da de uso
+  ("Uso Restrito" é proteção).
+- **Focos** = mesma definição de `vw_focos_linha_tempo`, via
+  `focos_linha_tempo_em(geom)`. Existe à parte porque a view não expõe
+  geometria e o planner NÃO empurra `ST_Intersects` para dentro do UNION
+  ALL (medido: 33 s × ~1 s com o GIST de cada ramo). Mudou a regra da
+  view → mudar a função junto. `car_relatorio_uc_ambiental` aceita até
+  150 imóveis por chamada (pior caso: 3,7 s); o cliente manda 80.
+- **PRODES** via `/api/prodes-proxy` em quadrantes de 0,25°: quadrante
+  que bate no teto de 2000 feições (ou falha) divide em 4, até 3 níveis.
+  O que continua falhando vira aviso na tela e no PDF, nunca zero
+  silencioso. "Após o marco" = anos PRODES ≥ 2009 (o ano PRODES vai de
+  agosto a julho).
+- Guarda: `tests/car-uc-relatorio.test.js` (11). Página real com stub,
+  e o PDF/Excel gerados de verdade.
+- Sem mudança em `pwa/sw.js` (tela de mesa).
+
 ## Regra do sistema — painéis na tela cheia do mapa
 Em `pages/mapa.html`, TODO painel do nível do `<body>` (CAR, PRODES,
 projeto de análise, análise do alerta, painel-resumo, barra de
