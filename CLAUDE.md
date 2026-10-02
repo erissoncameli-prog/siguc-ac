@@ -2455,6 +2455,32 @@ de ninho sem eclosão) e "Descartados" passou a somar `descartes_ovos`
   detalhado. Guarda: `tests/chart-rosca-rotulos.test.js`. `pwa/sw.js`:
   biomonitor 64 → 65 (barras do app com número · %).
 
+## Biomonitor — histórico de validação do ninho + IP real no login (migration 353)
+Achado ao investigar 25 ninhos da Praia da Curva Grande "em correção"
+(24/09/2026, motivo "CORRIGIR CODIGO DO NINHO") que a equipe não se
+lembrava de ter pedido: só sobrevivia o último `validado_por`, então
+não havia como provar quem fez o quê.
+- `ninhos_validacao_historico`: uma linha por mudança de
+  `status_validacao` ou de `numero_ninho` (de → para, motivo, quem,
+  perfil). Gravada SÓ pelo trigger `trg_ninhos_historico_validacao`
+  (SECURITY DEFINER, sem policy de escrita); leitura por
+  `pode_ver('biomonitor')`. Antes de 02/10/2026 só existe o último
+  estado conhecido (`status_de` NULL). Botão "Histórico" nos cards e na
+  tabela de `biomonitor-validacao.html`.
+- `registrar_tentativa_acesso` grava o IP visto pelo SERVIDOR
+  (`request.headers`: cf-connecting-ip → x-forwarded-for → x-real-ip).
+  O `obterIP()` do cliente chama api.ipify.org, que o CSP bloqueia —
+  por isso `auditoria_acessos.ip_address` era nulo em 100% das linhas.
+- `bioGerarNumeroNinho` lê a sigla da praia do SERVIDOR quando há rede
+  (e atualiza o cache): a cópia local desatualizada gerou 18 ninhos
+  "PR-…" em vez de "PRCG-…".
+- O par atual (número/praia) acompanhar a correção é a migration 352
+  (`trg_ninhos_sincronizar_atual`). ⚠️ `trg_ninhos_seguir_origem` ficou
+  no banco NEUTRALIZADO (`RETURN NEW`), criado à mão nesta investigação;
+  o DROP está no fim da 353 e não rodou porque o MCP do Supabase pede
+  confirmação para DROP e expirava — rodar à mão quando possível.
+- `pwa/sw.js`: biomonitor 65 → 66.
+
 ## Biomonitor — Anomalias congênitas em filhotes (migration 321)
 Registro de eclosão ganhou contador `filhotes_anomalia` (SUBCONJUNTO
 de `filhotes_vivos`, CHECK `<=`, nunca um 4º balde somado ao total —

@@ -1081,7 +1081,23 @@ async function bioGerarNumeroNinho(praiaId, especie, campo = 'numero_ninho') {
   const esp    = BIO_ESPECIES.find(e => e.id === especie)
   const praias = await bioOfflineListarPraias()
   const praia  = praias.find(p => p.id === praiaId)
-  const cod    = praia?.sigla ?? 'XX'
+  let   cod    = praia?.sigla ?? 'XX'
+  // A cópia local da praia pode estar desatualizada: a sigla trocada na
+  // mesa só chega ao aparelho no próximo pull. Foi assim que 18 ninhos da
+  // Praia da Curva Grande saíram "PR-…" em vez de "PRCG-…" (18/09/2026).
+  // Com rede, a sigla vem do servidor; sem rede, segue a do cache.
+  if (navigator.onLine && window._bioDB_client && praiaId) {
+    try {
+      const { data } = await bioSupabase()
+        .from('praias_monitoramento').select('sigla').eq('id', praiaId).maybeSingle()
+      if (data?.sigla) {
+        cod = data.sigla
+        if (praia && praia.sigla !== data.sigla) {
+          await bioOfflineSalvarPraias(praias.map(p => p.id === praiaId ? { ...p, sigla: data.sigla } : p))
+        }
+      }
+    } catch (_) {}
+  }
   const sig    = esp?.sigla   ?? '?'
   // Numeração reinicia por temporada: inclui o ano-base da temporada atual
   const ano    = BioApp.temporadaAtual?.ano_base ?? new Date().getFullYear()

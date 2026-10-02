@@ -92,6 +92,21 @@
   </div>
 </div>
 
+<!-- ── Modal: Histórico de validação (migration 353) ───── -->
+<div class="modal-overlay" id="modal-historico">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-header">
+      <div class="modal-title">Histórico de validação</div>
+      <button class="modal-close" onclick="fecharModalHistorico()" aria-label="Fechar">×</button>
+    </div>
+    <div class="modal-body">
+      <p style="margin:0 0 12px;font-size:.9rem;color:var(--cinza-500)">Ninho: <strong id="hist-numero"></strong></p>
+      <div id="hist-conteudo"></div>
+      <p style="margin:12px 0 0;font-size:.75rem;color:var(--cinza-500)">Registrado automaticamente pelo banco a cada mudança de validação ou de número. Ações anteriores a 02/10/2026 aparecem só pelo último estado conhecido.</p>
+    </div>
+  </div>
+</div>
+
 <!-- ── Modal: Localização (GPS + praia) ────────────────── -->
 <div class="modal-overlay" id="modal-gps">
   <div class="modal" style="max-width:440px">
@@ -546,6 +561,7 @@
           ${!n.lat ? `<span title="Sem GPS — n\u00e3o aparece no mapa" style="color:#f59e0b;margin-right:4px">\u26a0</span>` : ''}
           <button class="btn btn-sm btn-secondary" onclick="bioAbrirRelatorioNinho(db,'${n.id}')">PDF</button>
           <button class="btn btn-sm btn-secondary" onclick="abrirModalGPS('${n.id}')">GPS</button>
+          <button class="btn btn-sm btn-secondary" onclick="verHistorico('${n.id}','${esc(n.numero_ninho)}')">Histórico</button>
           ${n.status_validacao !== 'validado' ? `<button class="btn btn-sm btn-primary" onclick="validar('${n.id}')">Validar</button>` : ''}
           ${n.status_validacao !== 'rejeitado' ? `<button class="btn btn-sm" style="background:#ef444433;color:#ef4444;border:none;border-radius:6px;padding:4px 9px;cursor:pointer" onclick="abrirRejeitar('${n.id}','${esc(n.numero_ninho)}','rejeitado')">Rejeitar</button>` : ''}
           ${n.status_validacao !== 'em_correcao' ? `<button class="btn btn-sm" style="background:#6366f133;color:#6366f1;border:none;border-radius:6px;padding:4px 9px;cursor:pointer" onclick="abrirRejeitar('${n.id}','${esc(n.numero_ninho)}','em_correcao')">Corre\u00e7\u00e3o</button>` : ''}
@@ -675,6 +691,7 @@
 
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px solid var(--borda)">
           <button class="btn btn-sm btn-secondary" onclick="bioAbrirRelatorioNinho(db,'${n.id}')">Gerar PDF</button>
+          <button class="btn btn-sm btn-secondary" onclick="verHistorico('${n.id}','${esc(n.numero_ninho)}')">Histórico</button>
           ${totalFotosOcorrencias ? `<button class="btn btn-sm btn-secondary" onclick="verFotos('${n.id}')">Fotos (${totalFotosOcorrencias})</button>` : ''}
           ${podeReprocessar ? `<button class="btn btn-sm btn-secondary" onclick="abrirModalEditarFotos('${n.id}')">Editar fotos${temFotosPostura ? ` (${n.foto_urls.length})` : ''}</button>` : ''}
           ${temFotosPostura && podeReprocessar ? `<button class="btn btn-sm btn-secondary" onclick="reprocessarFotos('${n.id}')">Reaplicar marca d'água</button>` : ''}
@@ -713,6 +730,36 @@
   }
 
   window.fecharModalRejeitar = () => document.getElementById('modal-rejeitar').classList.remove('aberto')
+
+  // ── Histórico de validação (ninhos_validacao_historico, migration 353) ──
+  const HIST_ACAO = {
+    validado: 'Validou', rejeitado: 'Rejeitou', em_correcao: 'Pediu correção', pendente: 'Reenviou para validação',
+  }
+  window.fecharModalHistorico = () => document.getElementById('modal-historico').classList.remove('aberto')
+  window.verHistorico = async function(id, numero) {
+    document.getElementById('hist-numero').textContent = numero
+    const cont = document.getElementById('hist-conteudo')
+    cont.innerHTML = skeletonBlocoHTML(3)
+    document.getElementById('modal-historico').classList.add('aberto')
+    const { data, error } = await db.from('ninhos_validacao_historico')
+      .select('status_de,status_para,motivo,numero_de,numero_para,usuario_nome,perfil,em')
+      .eq('ninho_id', id).order('em', { ascending: true })
+    if (error) { cont.innerHTML = `<p style="color:#ef4444">Não foi possível carregar o histórico: ${esc(error.message)}</p>`; return }
+    if (!data?.length) { cont.innerHTML = '<p style="color:var(--cinza-500)">Nenhuma ação de validação registrada para este ninho.</p>'; return }
+    cont.innerHTML = `<ol style="list-style:none;margin:0;padding:0;display:grid;gap:8px">${data.map(h => {
+      const mudouStatus = h.status_de !== h.status_para
+      const acao = h.status_de == null
+        ? `Último estado conhecido: ${esc(STATUS_LBL[h.status_para] || h.status_para || '—')}`
+        : mudouStatus ? esc(HIST_ACAO[h.status_para] || `Mudou para ${h.status_para}`) : 'Alterou o número'
+      const quando = h.em ? new Date(h.em).toLocaleString('pt-BR') : '—'
+      return `<li style="border-left:3px solid ${STATUS_CLR[h.status_para] || '#888'};padding:6px 10px;background:var(--cinza-50, rgba(0,0,0,.03));border-radius:6px;font-size:.85rem">
+        <div><strong>${acao}</strong> · ${esc(quando)}</div>
+        <div style="color:var(--cinza-500)">${esc(h.usuario_nome || 'Usuário não identificado')}${h.perfil ? ` (${esc(h.perfil)})` : ''}</div>
+        ${h.numero_de || h.numero_para ? `<div>Número: ${esc(h.numero_de || '—')} → <strong>${esc(h.numero_para || '—')}</strong></div>` : ''}
+        ${h.motivo ? `<div style="color:#6366f1">Motivo: ${esc(h.motivo)}</div>` : ''}
+      </li>`
+    }).join('')}</ol>`
+  }
 
   window.confirmarRejeicao = async function() {
     const motivo = document.getElementById('rej-motivo').value.trim()
