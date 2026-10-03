@@ -910,6 +910,38 @@ opcionais. Sem mapa (pedido do usuário). Exporta PDF (timbre), Excel
   Exportação segue: CSV na ordem agrupada, PDF com linha de cabeçalho
   por titular, Excel com aba "Titulares" a mais, e "Agrupado por
   titular" entre os filtros escritos.
+- **Mapa por titular + CARs fora da UC** (4ª rodada, migration 356,
+  `js/car-uc-mapa.js`): com "Agrupar por titular" ligado, todo titular
+  com **2 ou mais** CARs no recorte ganha, logo abaixo do cabeçalho do
+  grupo, o quadro da UC (limite + zonas) com os polígonos numerados
+  EXATAMENTE como as linhas da tabela (`.caruc-pino`; o PDF ganha a
+  coluna "Nº no mapa"). Fonte única do desenho: o PDF rasteriza o
+  MESMO SVG da tela (`carucMapaSvgParaImagem`), nunca outro layout.
+  - **Fundo escolhido na consulta** (Satélite × Sem fundo), vale para
+    tela E PDF. Satélite = **Esri World Imagery** montada em canvas
+    (Web Mercator, a mesma projeção do vetor). O híbrido do Google do
+    Mapa das UCs NÃO serve: sem CORS o canvas fica contaminado e não vai
+    para o PDF. Falhou o satélite → mapa sem fundo + aviso, nunca some.
+    Crédito da imagem na tela e nas notas do PDF.
+  - **CARs do mesmo CPF/CNPJ fora da UC**: caixa na consulta, desmarcada
+    por padrão (registra acesso a mais titulares). `car_relatorio_uc_fora`
+    recebe a MESMA lista do cadastro e numera os titulares do mesmo jeito
+    (dense_rank pelo menor `cod_imovel`) — o `titular_grupo` casa sem o
+    documento sair do servidor. Só titulares com 2+ na lista; CPF E CNPJ
+    sem teto (decisão do usuário; o maior CNPJ devolve 4.027 linhas em
+    0,4 s). Log LGPD por imóvel (`origem = relatorio_car_uc_fora`) na
+    MESMA instrução que devolve a lista (CTE com INSERT). Geometria
+    via WFS do SICAR por `cod_imovel IN (...)` em lotes de 60. Aparecem
+    no 2º quadro (Acre inteiro — um CAR em outro município deixaria a UC
+    minúscula num quadro só) como F1, F2… e numa sub-lista própria;
+    **nunca entram em total nenhum da UC**. Tela e PDF listam até 30 por
+    titular; a lista completa vai na aba "Fora da UC" do Excel.
+  - ⚠️ `apply_migration`/`execute_sql` do MCP do Supabase **travam
+    (timeout de 60 s) em UPDATE de dado** — a função entrou por
+    `apply_migration` só com o DDL; o `UPDATE lgpd_tratamentos` (nota
+    no ROPA TRAT-013) está no arquivo da 356 mas ficou PENDENTE de rodar
+    à mão no SQL Editor. Com TRUNCATE/UPDATE no corpo, a migration
+    inteira não aplicava.
 - ⚠️ **`--verde-c` NÃO existe em `css/global.css`** (lá é `--verde-claro`),
   apesar de ser o nome usado no design system deste arquivo. Usado
   numa página, dá cor transparente em silêncio: a aba ativa, a barra de
@@ -920,7 +952,7 @@ opcionais. Sem mapa (pedido do usuário). Exporta PDF (timbre), Excel
   larga fazia a PÁGINA inteira rolar de lado no celular (1.410px em
   390px), mesmo dentro do `.table-wrap`. Corrigido com `min-width:0`
   só nesta página; a guarda de 390px pega a volta.
-- Guarda: `tests/car-uc-relatorio.test.js` (21). Página real com stub,
+- Guarda: `tests/car-uc-relatorio.test.js` (27). Página real com stub,
   PDF/Excel/CSV gerados de verdade, e guardas conferidas por
   contrafactual (reprovam sem a correção).
 - Sem mudança em `pwa/sw.js` (tela de mesa).

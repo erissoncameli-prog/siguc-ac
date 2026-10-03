@@ -415,7 +415,7 @@ function carucRelFiltrado(rel, filtro, busca, opts = {}) {
   const filtros = carucDescreverFiltros(filtro, busca)
   let grupos = null
   if (opts.agrupar) {
-    grupos = carucAgruparPorTitular(imoveis)
+    grupos = carucAgruparPorTitular(imoveis, rel.fora)
     imoveis = grupos.flatMap(g => g.imoveis)
     filtros.push('Agrupado por titular')
   }
@@ -425,7 +425,7 @@ function carucRelFiltrado(rel, filtro, busca, opts = {}) {
 // Agrupa a relação por titular (titular_grupo, que o BANCO atribui por
 // documento). Titular com mais imóveis no recorte vem primeiro; imóvel
 // sem dado na planilha fica num bloco final — nunca some.
-function carucAgruparPorTitular(imoveis) {
+function carucAgruparPorTitular(imoveis, fora) {
   const m = new Map()
   const sem = []
   for (const i of imoveis) {
@@ -439,7 +439,11 @@ function carucAgruparPorTitular(imoveis) {
     g.imoveis.push(i); g.ha += i.area_analise_ha || 0
   }
   const lista = [...m.values()].sort((a, b) => b.imoveis.length - a.imoveis.length || b.ha - a.ha || a.grupo - b.grupo)
-  for (const g of lista) g.imoveis.sort((a, b) => b.area_analise_ha - a.area_analise_ha)
+  for (const g of lista) {
+    g.imoveis.sort((a, b) => b.area_analise_ha - a.area_analise_ha)
+    // Os de fora acompanham o titular — nunca entram nos totais da UC.
+    g.fora = (fora || []).filter(f => f.titular_grupo === g.grupo)
+  }
   if (sem.length) lista.push({ grupo: null, titular: null, documento: null, cars_uc: null, cars_estado: null,
     ha: sem.reduce((s, i) => s + (i.area_analise_ha || 0), 0), imoveis: sem })
   return lista
@@ -648,6 +652,50 @@ async function carucBuscarCadastro(ucId, cods) {
   return mapa
 }
 
+// CARs do mesmo documento fora da UC (migration 356). Recebe a MESMA
+// lista do cadastro: a numeração de titular só casa assim.
+async function carucBuscarFora(ucId, cods) {
+  const { data, error } = await db.rpc('car_relatorio_uc_fora', { p_uc_id: ucId, p_cod_imoveis: cods })
+  if (error) throw new Error('CARs fora da UC: ' + error.message)
+  return data || []
+}
+
+// Polígonos do SICAR por nº do CAR (CQL IN, em lotes) — mesmo caminho da
+// busca do Mapa das UCs. Devolve Map cod → geometry; código que o WFS
+// não devolve fica de fora (a tela conta e avisa).
+async function carucBuscarGeomsPorCodigos(cods, aoProgresso) {
+  const LOTE = 60, PARALELO = 3
+  const mapa = new Map()
+  const lotes = []
+  for (let i = 0; i < cods.length; i += LOTE) lotes.push(cods.slice(i, i + LOTE))
+  let feitos = 0
+  for (let i = 0; i < lotes.length; i += PARALELO) {
+    await Promise.all(lotes.slice(i, i + PARALELO).map(async lote => {
+      const lista = lote.map(c => `'${String(c).replace(/'/g, "''")}'`).join(',')
+      const url = `${CARUC_WFS_BASE}?service=WFS&version=1.1.0&request=GetFeature`
+        + `&typeName=sicar:sicar_imoveis_ac&outputFormat=application/json&maxFeatures=${lote.length}`
+        + `&CQL_FILTER=${encodeURIComponent(`cod_imovel IN (${lista})`)}`
+      try {
+        const r = await _carucFetchWfs(url)
+        for (const f of (r.features || [])) if (f.properties?.cod_imovel && f.geometry) mapa.set(f.properties.cod_imovel, f.geometry)
+      } catch (e) { console.warn('[caruc] lote de polígonos fora da UC falhou', e) }
+      feitos += lote.length
+      aoProgresso?.(Math.min(feitos, cods.length), cods.length)
+    }))
+  }
+  return mapa
+}
+
+// Geometria leve para o mapa (o polígono do SICAR tem milhares de
+// vértices; o quadro tem 600 px). ~11 m de tolerância — abaixo de 1 px
+// até numa UC pequena.
+function carucGeomMapa(geom) {
+  if (!geom || !/Polygon/.test(geom.type)) return null
+  if (typeof turf === 'undefined' || !turf.simplify) return geom
+  try { return turf.simplify({ type: 'Feature', geometry: geom, properties: {} }, { tolerance: 0.0001 }).geometry }
+  catch { return geom }
+}
+
 async function carucBuscarAmbiental(ucId, lista, aoProgresso) {
   const mapa = new Map()
   let falhas = 0
@@ -807,6 +855,7 @@ async function carucGerarRelatorio(uc, ucGeom, fontesZonas, opcoes, aoEtapa) {
       pct_analise: g.pct_analise,
       zonas: g.zonas,
       _geom: g.geomAnalise,
+      _mapa: carucGeomMapa(f.geometry),
     }
   })
 
@@ -844,6 +893,30 @@ async function carucGerarRelatorio(uc, ucGeom, fontesZonas, opcoes, aoEtapa) {
   etapa('Verificando sobreposição entre os CARs…', 0, imoveis.length)
   await carucSobreposicoesEntreCars(imoveis, (a, b) => etapa('Verificando sobreposição entre os CARs…', a, b))
 
+  // CARs do mesmo CPF/CNPJ fora da UC (opcional — registra acesso a mais
+  // titulares no log LGPD). Só para titulares com 2+ imóveis no relatório,
+  // os que ganham mapa; titular_grupo casa com o do cadastro.
+  let fora = [], foraSemGeom = 0
+  if (opcoes.foraUc && cods.length) {
+    etapa('Procurando CARs dos mesmos titulares fora da UC…')
+    const linhas = await carucBuscarFora(uc.id, cods)
+    if (linhas.length) {
+      const geoms = await carucBuscarGeomsPorCodigos(linhas.map(l => l.cod_imovel),
+        (a, b) => etapa('Baixando os polígonos dos CARs fora da UC…', a, b))
+      fora = linhas.map(l => ({
+        cod: l.cod_imovel,
+        titular_grupo: l.titular_grupo,
+        nome_imovel: l.nom_imovel || null,
+        municipio: l.nom_munici || null,
+        situacao: l.condicao_i || null,
+        status: carucStatus(l.ind_status),
+        area_declarada_ha: l.num_area_i != null ? Number(l.num_area_i) : null,
+        _mapa: carucGeomMapa(geoms.get(l.cod_imovel)),
+      }))
+      foraSemGeom = fora.filter(f => !f._mapa).length
+    }
+  }
+
   const enqCat = carucEnquadrarCategoria(uc)
   carucEnriquecer(imoveis, uc, enqCat)
   for (const i of imoveis) delete i._geom
@@ -855,8 +928,10 @@ async function carucGerarRelatorio(uc, ucGeom, fontesZonas, opcoes, aoEtapa) {
     zoneamento: { tem: zonas.length > 0, fonte: fonteZonas, temZa: za.length > 0, fonteZa, usouZa: usarZa },
     sicar_no_retangulo: sicar.total,
     imoveis,
+    fora,
+    geo: { uc: carucGeomMapa(ucGeom), zonas: zonas.map(z => carucGeomMapa(z.geometry)).filter(Boolean) },
     resumo: carucAgregar(imoveis, uc),
-    falhas: { ambiental: falhasAmbiental, prodes: prodesInfo?.falhas || 0, prodes_quadrantes: prodesInfo?.quadrantes || 0 },
+    falhas: { ambiental: falhasAmbiental, prodes: prodesInfo?.falhas || 0, prodes_quadrantes: prodesInfo?.quadrantes || 0, fora_sem_geom: foraSemGeom },
   }
 }
 
@@ -933,5 +1008,6 @@ if (typeof module !== 'undefined') {
     carucFocosNoPeriodo, carucColunasExportacao, carucFormatarValor, carucCsv, CARUC_ZONAS_ARQUIVO_UC,
     carucFaixaNaUC, carucPrioridade, carucEnriquecer, carucOpcoesFiltro, carucFiltrar,
     carucDescreverFiltros, carucRelFiltrado, CARUC_FILTROS, carucAgruparPorTitular, carucGrupoRotulo,
+    carucGeomMapa,
   }
 }
