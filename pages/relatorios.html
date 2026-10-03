@@ -13,6 +13,7 @@
 <script src="../js/config-sistema.js"></script>
 <script src="../js/vendor/turf-6.5.0.min.js"></script>
 <script src="../js/car-uc-relatorio.js"></script>
+<script src="../js/car-uc-mapa.js"></script>
 <style>
 .tabs { display:flex; gap:4px; margin-bottom:20px; border-bottom:2px solid #E5E7EB; flex-wrap:wrap; }
 .tab-btn {
@@ -102,6 +103,25 @@ span.caruc-clic:focus-visible { outline:2px solid var(--verde-medio); outline-of
 #caruc-tabela tr.caruc-grupo-tr th { text-align:left; font-size:12px; font-weight:700; color:#14532D; background:#E8F5EE; padding:8px 10px; border-top:2px solid var(--verde-claro); }
 .caruc-tit { display:block; font-size:10.5px; color:#1E3A8A; margin-top:2px; }
 #caruc-tabela td.num { text-align:right; white-space:nowrap; }
+/* Mapa por titular (js/car-uc-mapa.js): logo abaixo do cabeçalho do grupo. */
+#caruc-tabela tr.caruc-mapa-tr td { background:#fff; padding:10px 10px 14px; }
+.caruc-mapas { display:grid; grid-template-columns:minmax(0,2fr) minmax(0,1fr); gap:10px; max-width:900px; }
+.caruc-mapas.so-uc { grid-template-columns:minmax(0,1fr); max-width:620px; }
+.caruc-mapa { position:relative; border:1px solid #D1D5DB; border-radius:8px; overflow:hidden; background:#EEF1EA; min-height:120px; }
+.caruc-mapa svg { display:block; width:100%; height:auto; }
+.caruc-mapa-rot { position:absolute; left:8px; top:8px; background:rgba(10,26,15,.78); color:#fff; font-size:11px; font-weight:700; border-radius:4px; padding:2px 7px; pointer-events:none; }
+.caruc-mapa-leg { display:flex; flex-wrap:wrap; gap:4px 14px; font-size:11px; color:#4B5563; margin-top:6px; max-width:900px; }
+.caruc-mapa-leg i { display:inline-block; width:14px; height:10px; border-radius:2px; margin-right:5px; vertical-align:-1px; }
+.caruc-pino { display:inline-grid; place-items:center; min-width:20px; height:20px; padding:0 4px; border-radius:99px; background:#EA580C; color:#fff; font-size:11px; font-weight:700; margin-right:6px; vertical-align:1px; }
+.caruc-pino.fora { background:#B45309; }
+#caruc-tabela tr.caruc-fora-tr th { text-align:left; font-size:11px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:#92400E; background:#FFFBEB; padding:6px 10px; border-top:1px dashed #F59E0B; }
+#caruc-tabela tr.caruc-fora-linha td { background:#FFFDF7; }
+.caruc-seg { display:inline-flex; border:1px solid #D1D5DB; border-radius:8px; overflow:hidden; margin-top:4px; }
+.caruc-seg label { display:inline-flex; align-items:center; min-height:32px; padding:0 12px; font-size:13px; cursor:pointer; background:#fff; }
+.caruc-seg input { position:absolute; opacity:0; pointer-events:none; }
+.caruc-seg input:checked + span { font-weight:700; }
+.caruc-seg label:has(input:checked) { background:var(--verde-medio); color:#fff; }
+.caruc-seg label:has(input:focus-visible) { outline:2px solid var(--verde-medio); outline-offset:-2px; }
 </style>
 </head>
 <body>
@@ -144,6 +164,15 @@ span.caruc-clic:focus-visible { outline:2px solid var(--verde-medio); outline-of
                 <div class="caruc-periodo"><label for="caruc-focos-de">De</label><select class="form-control" id="caruc-focos-de"></select><label for="caruc-focos-ate">até</label><select class="form-control" id="caruc-focos-ate"></select></div>
                 <label class="caruc-check"><input type="checkbox" id="caruc-deter"><span>Alertas DETER<small>Base do sistema, desde jun/2026</small></span></label>
                 <label class="caruc-check"><input type="checkbox" id="caruc-prodes"><span>Desmatamento PRODES<small>Consulta o INPE na hora — mais lento em UC grande</small></span></label>
+              </div>
+              <div>
+                <span class="caruc-rot" id="caruc-fundo-rot">Mapa por titular</span>
+                <div class="caruc-seg" role="radiogroup" aria-labelledby="caruc-fundo-rot">
+                  <label><input type="radio" name="caruc-fundo" id="caruc-fundo-sat" value="satelite" checked><span>Satélite</span></label>
+                  <label><input type="radio" name="caruc-fundo" id="caruc-fundo-sem" value="sem"><span>Sem fundo</span></label>
+                </div>
+                <p class="caruc-nota">Aparece com "Agrupar por titular" ligado, para quem tem 2 ou mais CARs. Vale para a tela e para o PDF; sem fundo o PDF fica menor e imprime melhor em preto e branco.</p>
+                <label class="caruc-check"><input type="checkbox" id="caruc-fora"><span>Buscar também os CARs do mesmo CPF/CNPJ fora da UC<small>Cada imóvel de fora mostrado fica registrado no log de acesso a dado de terceiro (LGPD).</small></span></label>
               </div>
             </div>
             <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px;align-items:center">
@@ -406,6 +435,8 @@ async function carucGerar() {
     prodes: document.getElementById('caruc-prodes').checked,
     focosDe: Number(document.getElementById('caruc-focos-de').value),
     focosAte: Number(document.getElementById('caruc-focos-ate').value),
+    fundoMapa: document.getElementById('caruc-fundo-sem').checked ? 'sem' : 'satelite',
+    foraUc: document.getElementById('caruc-fora').checked,
   }
   if (opcoes.focos && opcoes.focosDe > opcoes.focosAte) { toast('O ano inicial dos focos é maior que o final.', 'warning'); return }
   if (typeof turf === 'undefined' || typeof turf.intersect !== 'function') { toast('Biblioteca de cálculo espacial não carregou. Recarregue a página.', 'error'); return }
@@ -473,6 +504,7 @@ function carucRender(rel) {
   const avisos = []
   if (rel.falhas.prodes) avisos.push(`${rel.falhas.prodes} de ${rel.falhas.prodes_quadrantes} quadrantes do PRODES não responderam — os valores de PRODES podem estar incompletos.`)
   if (rel.falhas.ambiental) avisos.push(`Focos/DETER não puderam ser calculados para ${rel.falhas.ambiental} imóvel(is).`)
+  if (rel.falhas.fora_sem_geom) avisos.push(`${rel.falhas.fora_sem_geom} CAR(s) do mesmo titular fora da UC não vieram do SICAR — aparecem na lista, mas não no mapa.`)
   if (rel.resumo.sem_planilha) avisos.push(`${rel.resumo.sem_planilha} imóvel(is) do SICAR não estão na planilha local — aparecem sem titular, classe e módulos.`)
 
   document.getElementById('caruc-resultado').innerHTML = `
@@ -593,6 +625,69 @@ function carucAtualizar(focarChave) {
     : `${formatNum(_carucRel.imoveis.length, 0)} imóveis, sem filtro.`
 
   document.getElementById('caruc-conteudo').innerHTML = _carucConteudoHTML(relF)
+  _carucDesenharMapas(relF)
+}
+
+// Mapas por titular: o vetor sai na hora; com satélite, a imagem entra
+// quando os ladrilhos chegam. Cada redesenho da tabela invalida o
+// anterior (_carucMapaVez), para um filtro novo não receber o mapa velho.
+let _carucMapaVez = 0
+async function _carucDesenharMapas(rel) {
+  const vez = ++_carucMapaVez
+  if (!rel.agrupado || !rel.grupos || typeof carucMapaGrupo !== 'function') return
+  const grupos = rel.grupos.filter(carucMapaGrupoTemMapa)
+  if (!grupos.length) return
+  const fundo = rel.opcoes.fundoMapa || 'satelite'
+  const acre = grupos.some(g => g.fora?.length) ? await carucMapaAcre() : null
+  for (const g of grupos) {
+    if (vez !== _carucMapaVez) return
+    const alvo = document.querySelector(`.caruc-mapas[data-grupo="${g.grupo}"]`)
+    if (!alvo) continue
+    // 1º o vetor (instantâneo), depois o satélite por cima.
+    const vet = carucMapaSVGs(carucMapaDadosGrupo(rel, g, acre), carucMapaVistas(carucMapaDadosGrupo(rel, g, acre)), { fundo: 'sem' })
+    _carucPintarMapa(alvo, g, vet)
+    if (fundo !== 'satelite') continue
+    const m = await carucMapaGrupo(rel, g, fundo, acre)
+    if (vez !== _carucMapaVez) return
+    _carucPintarMapa(alvo, g, m)
+    if (m.semSatelite) alvo.parentElement.querySelector('.caruc-mapa-cred').textContent = 'Imagem de satélite indisponível agora — mapa sem fundo.'
+  }
+}
+
+function _carucPintarMapa(alvo, g, m) {
+  const nFora = (g.fora || []).filter(f => f._mapa).length
+  alvo.classList.toggle('so-uc', !m.acre)
+  alvo.innerHTML = `<div class="caruc-mapa"><span class="caruc-mapa-rot">${esc(_carucRel.uc.sigla || 'UC')} · ${g.imoveis.filter(i => i._mapa).length} CAR(s)</span>${m.uc || ''}</div>`
+    + (m.acre ? `<div class="caruc-mapa"><span class="caruc-mapa-rot">Acre · ${nFora} fora da UC</span>${m.acre}</div>` : '')
+}
+
+function _carucMapaLinhaHTML(rel, g, nCols) {
+  const sat = (rel.opcoes.fundoMapa || 'satelite') === 'satelite'
+  const temFora = (g.fora || []).some(f => f._mapa)
+  return `<tr class="caruc-mapa-tr"><td colspan="${nCols}">
+    <div class="caruc-mapas${temFora ? '' : ' so-uc'}" data-grupo="${g.grupo}"><div class="caruc-mapa">${skeletonBlocoHTML(3)}</div></div>
+    <div class="caruc-mapa-leg">
+      <span><i style="background:${sat ? '#FACC15' : '#EA580C'};opacity:.8"></i>CAR do titular no recorte (nº = linha abaixo)</span>
+      <span><i style="border:2px solid #0A1A0F;background:none"></i>Limite da UC</span>
+      ${rel.geo?.zonas?.length ? '<span><i style="border:1px dashed #4B5563;background:none"></i>Zonas de manejo</span>' : ''}
+      ${temFora ? '<span><i style="background:#B45309;border-radius:50%;width:10px"></i>CAR do titular fora da UC (F1, F2…)</span>' : ''}
+    </div>
+    <div class="caruc-nota caruc-mapa-cred">${sat ? esc(CARUC_MAPA_CREDITO) + '.' : 'Sem imagem de fundo.'} Limites: SICAR ao vivo e zoneamento cadastrado.</div>
+  </td></tr>`
+}
+
+const CARUC_FORA_NA_TELA = 30
+function _carucForaHTML(g, nCols) {
+  const fora = g.fora || []
+  if (!fora.length) return ''
+  const mostrar = fora.slice(0, CARUC_FORA_NA_TELA)
+  return `<tr class="caruc-fora-tr"><th colspan="${nCols}" scope="rowgroup">Fora da UC · mesmo titular · ${formatNum(fora.length, 0)} CAR(s) · não entram nos totais da UC</th></tr>`
+    + mostrar.map((f, k) => `<tr class="caruc-fora-linha"><td><span class="caruc-pino fora">F${k + 1}</span></td>
+      <td><span class="caruc-cod">${esc(f.cod)}</span>${f._mapa ? '' : '<span class="caruc-nota">sem polígono no SICAR</span>'}</td>
+      <td>${esc(f.nome_imovel || '—')}</td><td>${esc(f.municipio || '—')}</td><td>${esc(f.situacao || '—')}</td><td>—</td>
+      <td class="num">—<br><span class="caruc-nota">${f.area_declarada_ha != null ? formatNum(f.area_declarada_ha, 2) + ' ha declarados' : ''}</span></td>
+      <td colspan="${nCols - 7}"></td></tr>`).join('')
+    + (fora.length > mostrar.length ? `<tr class="caruc-fora-linha"><td colspan="${nCols}" class="caruc-nota">… e mais ${formatNum(fora.length - mostrar.length, 0)} CAR(s) fora da UC — todos estão no mapa e na planilha Excel (aba "Fora da UC").</td></tr>` : '')
 }
 
 function _carucConteudoHTML(rel) {
@@ -626,8 +721,14 @@ function _carucConteudoHTML(rel) {
   const nCols = 9 + (o.focos ? 1 : 0) + (o.deter ? 1 : 0) + (o.prodes ? 1 : 0)
   const linhas = rel.imoveis.length
     ? (rel.agrupado && rel.grupos
-        ? rel.grupos.map(g => `<tr class="caruc-grupo-tr"><th colspan="${nCols}" scope="rowgroup">${esc(carucGrupoRotulo(g))}</th></tr>`
-            + g.imoveis.map(i => _carucLinhaHTML(i, o)).join('')).join('')
+        ? rel.grupos.map(g => {
+            const mapa = typeof carucMapaGrupoTemMapa === 'function' && carucMapaGrupoTemMapa(g)
+            let n = 0
+            return `<tr class="caruc-grupo-tr"><th colspan="${nCols}" scope="rowgroup">${esc(carucGrupoRotulo(g))}</th></tr>`
+              + (mapa ? _carucMapaLinhaHTML(rel, g, nCols) : '')
+              + g.imoveis.map(i => _carucLinhaHTML(i, o, mapa && i._mapa ? ++n : null)).join('')
+              + (mapa ? _carucForaHTML(g, nCols) : '')
+          }).join('')
         : rel.imoveis.map(i => _carucLinhaHTML(i, o)).join(''))
     : `<tr><td colspan="${nCols}" style="text-align:center;color:#9CA3AF;padding:16px">${rel.total_sem_filtro ? 'Nenhum imóvel com esses filtros.' : 'Nenhum imóvel do CAR se sobrepõe a esta UC.'}</td></tr>`
 
@@ -692,7 +793,7 @@ function _carucConteudoHTML(rel) {
     </div>`
 }
 
-function _carucLinhaHTML(i, o) {
+function _carucLinhaHTML(i, o, pino) {
   const zonas = (i.zonas || []).map(z => `<span class="caruc-zona ${z.nivel}" title="${esc(formatNum(z.ha, 2))} ha">${esc(z.nome)}</span>`).join('')
   // Um parágrafo só, separado por " · ": um por linha deixava a linha da tabela alta demais.
   const aten = (i.atencoes || []).length ? `<span class="caruc-atencao">${i.atencoes.map(esc).join(' · ')}</span>` : ''
@@ -704,9 +805,9 @@ function _carucLinhaHTML(i, o) {
   const amb = (o.focos ? `<td class="num">${i.ambiental ? formatNum(i.ambiental.focos_periodo, 0) : '—'}</td>` : '')
     + (o.deter ? `<td class="num">${i.ambiental ? `${formatNum(i.ambiental.deter_alertas, 0)}${i.ambiental.deter_alertas ? ` · ${formatNum(i.ambiental.deter_ha, 1)} ha` : ''}` : '—'}</td>` : '')
     + (o.prodes ? `<td class="num">${i.prodes ? formatNum(i.prodes.pos_marco_ha, 2) : '—'}</td>` : '')
-  return `<tr>
+  return `<tr class="caruc-imovel-tr">
     <td><span class="caruc-prio ${prio.nivel}">${esc(CARUC_PRIORIDADE_ROTULO[prio.nivel])}</span>${prio.motivos.length ? `<span class="caruc-nota" style="display:block;max-width:180px">${esc(prio.motivos.join('; '))}</span>` : ''}</td>
-    <td><span class="caruc-cod">${esc(i.cod)}</span>${i.local === 'za' ? '<br><span class="caruc-nota">só na zona de amortecimento</span>' : ''}${aten}${sob ? `<span class="caruc-nota" style="display:block">Sobrepõe: ${sob}</span>` : ''}</td>
+    <td>${pino ? `<span class="caruc-pino" title="Nº no mapa do titular">${pino}</span>` : ''}<span class="caruc-cod"${pino ? ' style="display:inline"' : ''}>${esc(i.cod)}</span>${i.local === 'za' ? '<br><span class="caruc-nota">só na zona de amortecimento</span>' : ''}${aten}${sob ? `<span class="caruc-nota" style="display:block">Sobrepõe: ${sob}</span>` : ''}</td>
     <td>${esc(i.nome_imovel || '—')}<br><span class="caruc-nota">${esc(i.titular || 'sem dados na planilha local')}${i.documento ? ' · ' + esc(i.documento) : ''}</span>${tit}${i.homonimo ? '<span class="caruc-tit">mesmo nome de outro titular — verificar</span>' : ''}</td>
     <td>${esc(i.municipio || '—')}</td>
     <td>${esc(i.situacao || '—')}${i.classe ? `<br><span class="caruc-nota">${esc(i.classe)}</span>` : ''}</td>

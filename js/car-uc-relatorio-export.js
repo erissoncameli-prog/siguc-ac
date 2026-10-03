@@ -117,21 +117,47 @@ async function carucMontarPdf(rel, protocolo) {
   const cols = [todas.find(c => c.rotulo === 'Prioridade'),
     ...todas.filter(c => c.rotulo !== 'Prioridade' && !FORA_DO_PDF.includes(c.rotulo) && (c.rotulo !== 'Localização' || rel.zoneamento.usouZa))]
   const linhaImovel = i => cols.map(c => carucFormatarValor(c.valor(i), c.casas))
-  // Agrupado: cada titular vira uma linha de cabeçalho do bloco, na
-  // mesma ordem da tela (rel.grupos, de carucAgruparPorTitular).
-  const corpo = rel.agrupado && rel.grupos
-    ? rel.grupos.flatMap(g => [
-        [{ content: carucGrupoRotulo(g), colSpan: cols.length, styles: { fontStyle: 'bold', fillColor: [232, 245, 238], textColor: AGPDF_COR.floresta, fontSize: 6.6 } }],
-        ...g.imoveis.map(linhaImovel),
-      ])
-    : rel.imoveis.map(linhaImovel)
-  _agpdfTabela(ctx, {
-    head: [cols.map(c => c.rotulo)],
-    body: corpo,
+  const estiloRel = {
     styles: { font: 'DMSans', fontSize: 6.2, cellPadding: 1, overflow: 'linebreak', lineColor: AGPDF_COR.borda, lineWidth: 0.1 },
     headStyles: { fillColor: AGPDF_COR.floresta, textColor: 255, fontStyle: 'bold', fontSize: 6 },
     columnStyles: Object.fromEntries(cols.map((c, k) => [k, c.casas != null ? { halign: 'right' } : {}])),
-  })
+  }
+  let usouSatelite = false
+  if (rel.agrupado && rel.grupos) {
+    // Agrupado: um bloco por titular, na ordem da tela — cabeçalho, mapa
+    // (2+ CARs, o MESMO SVG da tela rasterizado) e os imóveis dele.
+    const fundo = o.fundoMapa || 'satelite'
+    const comMapa = typeof carucMapaGrupo === 'function'
+    const acre = comMapa && rel.grupos.some(g => g.fora?.length) ? await carucMapaAcre() : null
+    for (const g of rel.grupos) {
+      const temMapa = comMapa && carucMapaGrupoTemMapa(g)
+      _agpdfTabela(ctx, { body: [[carucGrupoRotulo(g)]], theme: 'plain',
+        styles: { font: 'DMSans', fontStyle: 'bold', fontSize: 7.4, fillColor: [232, 245, 238], textColor: AGPDF_COR.floresta, cellPadding: 1.6 } })
+      ctx.y -= 4
+      if (temMapa) usouSatelite = (await _carucPdfMapaGrupo(ctx, rel, g, fundo, acre)) || usouSatelite
+      let n = 0
+      const pinos = temMapa ? g.imoveis.map(i => i._mapa ? String(++n) : '') : null
+      _agpdfTabela(ctx, {
+        ...estiloRel,
+        head: [[...(pinos ? ['Nº no mapa'] : []), ...cols.map(c => c.rotulo)]],
+        body: g.imoveis.map((i, k) => [...(pinos ? [pinos[k]] : []), ...linhaImovel(i)]),
+        columnStyles: Object.fromEntries(cols.map((c, k) => [k + (pinos ? 1 : 0), c.casas != null ? { halign: 'right' } : {}])),
+      })
+      if (temMapa && g.fora?.length) {
+        const fora = g.fora.slice(0, 30)
+        _agpdfTabela(ctx, {
+          ...estiloRel,
+          head: [['No mapa', 'Fora da UC · mesmo titular · Nº do CAR', 'Imóvel', 'Município', 'Situação', 'Área declarada (ha)']],
+          headStyles: { ...estiloRel.headStyles, fillColor: [146, 64, 14] },
+          body: fora.map((f, k) => ['F' + (k + 1), f.cod, f.nome_imovel || '—', f.municipio || '—', f.situacao || '—', _carucN(f.area_declarada_ha)]),
+          columnStyles: { 5: { halign: 'right' } },
+        })
+        if (g.fora.length > fora.length) _agpdfParagrafo(ctx, `… e mais ${g.fora.length - fora.length} CAR(s) deste titular fora da UC — todos estão no mapa e na planilha Excel (aba "Fora da UC").`, { muted: true })
+      }
+    }
+  } else {
+    _agpdfTabela(ctx, { ...estiloRel, head: [cols.map(c => c.rotulo)], body: rel.imoveis.map(linhaImovel) })
+  }
 
   _agpdfTitulo(ctx, 'Notas')
   const notas = [
@@ -145,6 +171,8 @@ async function carucMontarPdf(rel, protocolo) {
   if (rel.falhas.ambiental) notas.push(`ATENÇÃO: focos/DETER não puderam ser calculados para ${rel.falhas.ambiental} imóvel(is).`)
   notas.push('Prioridade — Alta: UC de proteção integral ou zona de proteção, com desmatamento PRODES após 2008 ou alerta DETER (só quando pedidos). Média: CAR em proteção integral, zona de proteção, imóvel particular em UC de domínio público, inscrição após a criação da UC, possível fracionamento, classe Vermelho ou sobreposição com outro CAR. Baixa: nenhum desses.')
   notas.push('Titular: o agrupamento por CPF/CNPJ é feito no servidor e o número do titular vale só neste relatório. Possível fracionamento: mesmo CPF com 2 ou mais imóveis de até 4 módulos fiscais somando mais de 4. Sobreposição entre CARs conta a partir de 0,1 ha.')
+  if (rel.agrupado) notas.push(`Mapa por titular (2 ou mais CARs no recorte): o número no polígono é o da linha da tabela. ${o.foraUc ? 'F1, F2… são CARs do mesmo CPF/CNPJ fora da UC — não entram em nenhum total da UC; a consulta registrou cada um no log de acesso a dado de terceiro (LGPD).' : 'Os CARs do mesmo titular fora da UC não foram pedidos nesta consulta.'}`)
+  if (usouSatelite) notas.push(CARUC_MAPA_CREDITO + '.')
   notas.forEach(n => _agpdfParagrafo(ctx, n, { muted: true }))
 
   const logos = {
@@ -153,6 +181,40 @@ async function carucMontarPdf(rel, protocolo) {
   }
   _agpdfAplicarCabecalhoRodapeGlobal(ctx, logos)
   return pdf
+}
+
+// Mapa do titular no PDF: os dois quadros lado a lado, 70 mm de altura
+// (cabe com folga na paisagem). Devolve true se o satélite entrou.
+async function _carucPdfMapaGrupo(ctx, rel, g, fundo, acre) {
+  const ALT = 70
+  try {
+    const m = await carucMapaGrupo(rel, g, fundo, acre)
+    const sat = fundo === 'satelite' && !m.semSatelite
+    const uc = m.uc ? await carucMapaSvgParaImagem(m.uc, 2, sat) : null
+    const ac = m.acre ? await carucMapaSvgParaImagem(m.acre, 2, sat) : null
+    if (!uc && !ac) return false
+    _agpdfGarantirEspaco(ctx, ALT + 8)
+    let x = AGPDF_M
+    for (const im of [uc, ac].filter(Boolean)) {
+      const w = ALT * im.w / im.h
+      ctx.pdf.addImage(im.dataUrl, sat ? 'JPEG' : 'PNG', x, ctx.y, w, ALT)
+      ctx.pdf.setDrawColor(...AGPDF_COR.borda); ctx.pdf.setLineWidth(0.2); ctx.pdf.rect(x, ctx.y, w, ALT)
+      x += w + 3
+    }
+    ctx.y += ALT + 3.5
+    ctx.pdf.setFont('DMSans', 'normal'); ctx.pdf.setFontSize(6.6); ctx.pdf.setTextColor(...AGPDF_COR.muted)
+    const leg = ['Polígono numerado: CAR do titular (nº = coluna "Nº no mapa")', 'traço contínuo: limite da UC']
+    if (rel.geo?.zonas?.length) leg.push('tracejado: zonas de manejo')
+    if (m.acre) leg.push('pontos F1, F2…: CARs do mesmo titular fora da UC')
+    if (m.semSatelite) leg.push('imagem de satélite indisponível na geração — sem fundo')
+    ctx.pdf.text(leg.join(' · '), AGPDF_M, ctx.y)
+    ctx.y += 4
+    return sat
+  } catch (e) {
+    console.warn('[caruc] mapa do titular no PDF', e)
+    _agpdfParagrafo(ctx, 'Mapa do titular indisponível nesta geração.', { muted: true })
+    return false
+  }
 }
 
 // ── Excel (ExcelJS — nunca SheetJS, ver CLAUDE.md) ──────────────────
@@ -197,15 +259,37 @@ async function carucMontarXlsx(rel) {
       { header: 'Titular nº', width: 11 }, { header: 'Titular', width: 36 }, { header: 'CPF/CNPJ (mascarado)', width: 22 },
       { header: 'Imóveis no recorte', width: 16 }, { header: 'CARs nesta UC', width: 14 }, { header: 'CARs no Acre', width: 13 },
       { header: 'Área na UC/ZA (ha)', width: 17 }, { header: 'Nº dos CAR', width: 60 },
+      { header: 'CARs fora da UC', width: 15 },
     ]
     for (const g of rel.grupos) {
       const l = wt.addRow([g.grupo ?? '', g.titular || (g.grupo == null ? 'Sem titular identificado' : ''), g.documento || '',
-        g.imoveis.length, g.cars_uc ?? '', g.cars_estado ?? '', Number(g.ha.toFixed(2)), g.imoveis.map(i => i.cod).join('; ')])
+        g.imoveis.length, g.cars_uc ?? '', g.cars_estado ?? '', Number(g.ha.toFixed(2)), g.imoveis.map(i => i.cod).join('; '),
+        rel.opcoes.foraUc && g.grupo != null ? (g.fora?.length || 0) : ''])
       l.getCell(7).numFmt = '#,##0.00'
     }
     const ct = wt.getRow(1)
     ct.font = { bold: true, color: { argb: 'FFFFFFFF' } }
     ct.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0A1A0F' } }
+
+    const comFora = rel.grupos.filter(g => g.grupo != null && g.fora?.length)
+    if (comFora.length) {
+      // Lista COMPLETA (a tela e o PDF mostram as 30 primeiras por titular).
+      const wf = wb.addWorksheet('Fora da UC', { views: [{ state: 'frozen', ySplit: 1 }] })
+      wf.columns = [
+        { header: 'Titular nº', width: 11 }, { header: 'Titular', width: 36 }, { header: 'No mapa', width: 9 },
+        { header: 'Nº do CAR', width: 48 }, { header: 'Imóvel', width: 30 }, { header: 'Município', width: 20 },
+        { header: 'Situação', width: 14 }, { header: 'Área declarada (ha)', width: 18 },
+      ]
+      for (const g of comFora) g.fora.forEach((f, k) => {
+        const l = wf.addRow([g.grupo, g.titular || '', 'F' + (k + 1), f.cod, f.nome_imovel || '', f.municipio || '', f.situacao || '',
+          f.area_declarada_ha != null ? Number(f.area_declarada_ha) : ''])
+        l.getCell(8).numFmt = '#,##0.00'
+      })
+      const cf = wf.getRow(1)
+      cf.font = { bold: true, color: { argb: 'FFFFFFFF' } }
+      cf.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF92400E' } }
+      wf.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: 8 } }
+    }
   }
 
   const r = rel.resumo

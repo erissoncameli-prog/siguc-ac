@@ -32,6 +32,7 @@ if (fs.existsSync(CHROMIUM_PATH)) {
 }
 
 const caruc = require('../js/car-uc-relatorio.js');
+const cmapa = require('../js/car-uc-mapa.js');
 
 // ── Funções puras ─────────────────────────────────────────────────────
 test('categoria: proteção integral é conflito; RESEX verificar; APA admitido', () => {
@@ -182,6 +183,27 @@ test('agrupar por titular: maior grupo primeiro, sem titular por último, rótul
   expect(r.filtros).toContain('Agrupado por titular');
 });
 
+test('mapa: vista enquadra a bbox sem distorcer e numera os polígonos como a tabela', () => {
+  const v = cmapa.carucMapaVista([-70, -10, -69.9, -9.9], 600, 340);
+  const [x0, y0] = v.proj(-70, -9.9), [x1, y1] = v.proj(-69.9, -10);
+  for (const [x, y] of [[x0, y0], [x1, y1]]) { expect(x).toBeGreaterThanOrEqual(0); expect(x).toBeLessThanOrEqual(600); expect(y).toBeGreaterThanOrEqual(0); expect(y).toBeLessThanOrEqual(340); }
+  // quadrado de 0,1° no Acre fica quase quadrado (Mercator), nunca esticado para 600×340
+  expect(Math.abs((x1 - x0) - (y1 - y0)) / (x1 - x0)).toBeLessThan(0.02);
+  const g = { grupo: 1, imoveis: [{ cod: 'A', _mapa: quad(-69.99, -9.99, -69.97, -9.97) }, { cod: 'SEM' }, { cod: 'C', _mapa: quad(-69.98, -9.985, -69.96, -9.965) }],
+    fora: [{ cod: 'F', _mapa: quad(-68.6, -9.1, -68.58, -9.08) }, { cod: 'G' }] };
+  expect(cmapa.carucMapaGrupoTemMapa(g)).toBe(true);
+  expect(cmapa.carucMapaGrupoTemMapa({ ...g, imoveis: g.imoveis.slice(0, 2) })).toBe(false);   // 1 polígono só: sem mapa
+  const d = cmapa.carucMapaDadosGrupo({ geo: { uc: UC_GEOM, zonas: [] } }, g, null);
+  expect(d.cars.map(c => c.rot + c.cod)).toEqual(['1A', '2C']);   // sem polígono não ganha número (a tabela também não)
+  expect(d.fora.map(c => c.rot + c.cod)).toEqual(['F1F']);        // F2 (sem polígono) fica só na lista
+  const svg = cmapa.carucMapaSVGs(d, cmapa.carucMapaVistas(d), { fundo: 'sem' });
+  expect((svg.uc.match(/<title>\d · /g) || []).length).toBe(2);
+  expect(svg.uc).not.toContain('<image');
+  expect(svg.acre).toContain('F1 · F');
+  const sat = cmapa.carucMapaSVGs(d, cmapa.carucMapaVistas(d), { fundo: 'satelite', imagemUC: 'data:image/jpeg;base64,AA', imagemAcre: 'data:image/jpeg;base64,AA' });
+  expect(sat.uc).toContain('<image');
+});
+
 // ── Página real ───────────────────────────────────────────────────────
 const UC = { id: 'uc-teste', codigo: 'UC-999', nome: 'RESEX de Teste', sigla: 'RESEX', categoria: 'RESEX', grupo: 'uso_sustentavel', esfera: 'estadual', area_ha: 12000, data_criacao: '2000-01-01' };
 const quad = (x0, y0, x1, y1) => ({ type: 'Polygon', coordinates: [[[x0, y0], [x1, y0], [x1, y1], [x0, y1], [x0, y0]]] });
@@ -205,10 +227,29 @@ const CADASTRO = {
   'AC-C': { cod_imovel: 'AC-C', nom_imovel: 'Colocação Gama', nome_compl: 'Maria Teste', cpf_cnpj_mascarado: '***.456.789-**', num_area_i: 480, num_modulo: 2.5, nom_munici: 'Epitaciolândia', condicao_i: 'Ativo', nome_class: 'Verde', dat_criaca: '1998-01-01', titular_grupo: 1, titular_cars_estado: 5, titular_tipo_doc: 'cpf' },
 };
 
+// CARs do titular nº 1 fora da UC: F1 tem polígono no SICAR, F2 não.
+const FORA = [
+  { titular_grupo: 1, cod_imovel: 'AC-FORA-1', nom_imovel: 'Sítio Longe', nom_munici: 'Sena Madureira', condicao_i: 'Ativo', ind_status: 'AT', num_area_i: 50 },
+  { titular_grupo: 1, cod_imovel: 'AC-FORA-2', nom_imovel: 'Sítio Sem Mapa', nom_munici: 'Feijó', condicao_i: 'Ativo', ind_status: 'AT', num_area_i: 30 },
+];
+const FORA_GEOM = { 'AC-FORA-1': quad(-68.6, -9.1, -68.58, -9.08) };
+// Ladrilho de satélite falso (1×1 verde) com CORS liberado, como a Esri responde.
+const TILE_PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADgQF/e4nZ2AAAAABJRU5ErkJggg==', 'base64');
+
 async function abrir(page) {
+  page.__tiles = 0;
   await page.route('**/cdn.jsdelivr.net/**', route => route.abort());
-  await page.route('**/api/car-proxy**', route => route.fulfill({ contentType: 'application/json', body: JSON.stringify(WFS) }));
-  await page.addInitScript(([usuario, uc, ucGeom, camadas, cadastro]) => {
+  await page.route('**/server.arcgisonline.com/**', route => { page.__tiles++; route.fulfill({ contentType: 'image/png', body: TILE_PNG, headers: { 'Access-Control-Allow-Origin': '*' } }); });
+  await page.route('**/api/car-proxy**', route => {
+    const alvo = decodeURIComponent(new URL(route.request().url()).searchParams.get('url') || '');
+    if (/CQL_FILTER/.test(alvo)) {
+      const feats = Object.entries(FORA_GEOM).filter(([c]) => alvo.includes(`'${c}'`))
+        .map(([c, g]) => ({ type: 'Feature', geometry: g, properties: { cod_imovel: c } }));
+      return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ type: 'FeatureCollection', features: feats }) });
+    }
+    route.fulfill({ contentType: 'application/json', body: JSON.stringify(WFS) });
+  });
+  await page.addInitScript(([usuario, uc, ucGeom, camadas, cadastro, fora]) => {
     window.__rpc = [];
     window.loadEnv = () => Promise.resolve({ supabaseUrl: 'http://fake.test', supabaseKey: 'fake-key' });
     const consulta = (tabela) => {
@@ -241,6 +282,7 @@ async function abrir(page) {
         rpc: async (nome, args) => {
           window.__rpc.push({ nome, args });
           if (nome === 'car_relatorio_uc_cadastro') return { data: args.p_cod_imoveis.map(c => cadastro[c]).filter(Boolean), error: null };
+          if (nome === 'car_relatorio_uc_fora') return { data: fora, error: null };
           if (nome === 'car_relatorio_uc_ambiental') return { data: args.p_imoveis.map(i => ({ cod_imovel: i.cod, focos_por_ano: { 2019: 9, 2023: 2, 2024: 3 }, focos_total: 14, deter_alertas: i.cod === 'AC-A' ? 1 : 0, deter_ha: i.cod === 'AC-A' ? 2.5 : 0, deter_ultimo: null })), error: null };
           if (nome === 'gerar_protocolo_relatorio') return { data: 'SIGUC-2026-0001', error: null };
           if (nome === 'nivel_efetivo') return { data: 'editar', error: null };
@@ -250,14 +292,14 @@ async function abrir(page) {
         storage: { from: () => ({ createSignedUrl: async () => ({ data: null, error: null }) }) },
       }),
     };
-  }, [{ id: 'u1', nome_completo: 'Gestora Teste', email: 'g@x.invalid', perfil: 'gestor', ativo: true }, UC, UC_GEOM, CAMADAS, CADASTRO]);
+  }, [{ id: 'u1', nome_completo: 'Gestora Teste', email: 'g@x.invalid', perfil: 'gestor', ativo: true }, UC, UC_GEOM, CAMADAS, CADASTRO, FORA]);
   await page.goto(`${BASE}/pages/relatorios.html#car`);
   await page.locator('#caruc-uc option[value="uc-teste"]').waitFor({ state: 'attached', timeout: 20_000 });
 }
 
-// Só linhas de imóvel — o cabeçalho de grupo (agrupar por titular) é
-// outra <tr> e não pode entrar na contagem.
-const LINHAS = '#caruc-tabela tbody tr:not(.caruc-grupo-tr)';
+// Só linhas de imóvel na UC — cabeçalho de grupo, mapa do titular e a
+// lista dos CARs de fora são outras <tr> e não podem entrar na contagem.
+const LINHAS = '#caruc-tabela tbody tr.caruc-imovel-tr';
 
 // Linha pelo nº do CAR na 2ª célula — filtrar por texto pegaria também
 // a linha que só CITA o código ("Sobrepõe: AC-A").
@@ -419,6 +461,10 @@ test('celular (390px): filtros abertos e tabela sem rolagem lateral da página',
   expect(vaza).toBeLessThanOrEqual(0);   // a tabela rola dentro do .table-wrap, nunca a página
   const chip = await page.locator('#caruc-btn-filtros').boundingBox();
   expect(chip.height).toBeGreaterThanOrEqual(24);
+  // com o mapa do titular aberto, a página continua sem rolagem lateral
+  await page.locator('#caruc-conteudo [data-fk="titular"][data-fv="Mais de um CAR nesta UC"]').first().click();
+  await expect(page.locator('.caruc-mapas[data-grupo="1"] svg')).toHaveCount(1);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
 });
 
 // ── Resumo clicável (rodada 3) ────────────────────────────────────────
@@ -505,4 +551,106 @@ test('exportação segue o filtro do clique e o agrupamento por titular', async 
   const strings = await zip.file('xl/sharedStrings.xml').async('string');
   expect(strings).toContain('Titular: Mais de um CAR nesta UC');
   expect(strings).not.toContain('Comunidade Beta');
+});
+
+// ── Mapa por titular (rodada 4) ───────────────────────────────────────
+async function agruparMulti(page) {
+  await page.locator('#caruc-conteudo [data-fk="titular"][data-fv="Mais de um CAR nesta UC"]').first().click();
+  await expect(page.locator('#caruc-agrupar')).toBeChecked();
+}
+
+test('mapa do titular: polígonos numerados como as linhas, com satélite e crédito', async ({ page }) => {
+  await abrir(page);
+  await gerar(page);
+  await agruparMulti(page);
+  const mapa = page.locator('.caruc-mapas[data-grupo="1"]');
+  await expect(mapa.locator('svg')).toHaveCount(1);            // sem CARs de fora pedidos: só o quadro da UC
+  await expect(mapa.locator('svg title')).toHaveText([/^1 · AC-[AC]$/, /^2 · AC-[AC]$/]);
+  await expect.poll(() => mapa.locator('svg image').count()).toBe(1);   // satélite entrou
+  expect(page.__tiles).toBeGreaterThan(0);
+  await expect(page.locator('.caruc-mapa-cred').first()).toContainText('Esri World Imagery');
+  // o nº do polígono é o nº da linha: o 1 é o imóvel de maior área no recorte
+  const pinos = await page.locator(LINHAS).evaluateAll(trs => trs.map(tr => [tr.querySelector('.caruc-pino')?.textContent, tr.querySelector('.caruc-cod')?.textContent]));
+  const titulos = await mapa.locator('svg title').allTextContents();
+  for (const [n, cod] of pinos) expect(titulos).toContain(`${n} · ${cod}`);
+  // sem "Agrupar por titular", nenhum mapa
+  await page.uncheck('#caruc-agrupar');
+  await expect(page.locator('.caruc-mapas')).toHaveCount(0);
+});
+
+test('"Sem fundo" desenha só o vetor e não baixa ladrilho nenhum', async ({ page }) => {
+  await abrir(page);
+  await page.locator('label', { has: page.locator('#caruc-fundo-sem') }).click();
+  await gerar(page);
+  await agruparMulti(page);
+  const mapa = page.locator('.caruc-mapas[data-grupo="1"]');
+  await expect(mapa.locator('svg title')).toHaveCount(2);
+  await page.waitForTimeout(300);
+  await expect(mapa.locator('svg image')).toHaveCount(0);
+  expect(page.__tiles).toBe(0);
+  await expect(page.locator('.caruc-mapa-cred').first()).toContainText('Sem imagem de fundo');
+});
+
+test('CARs do mesmo titular fora da UC: só quando pedidos, no mapa do Acre e numa lista à parte', async ({ page }) => {
+  await abrir(page);
+  await gerar(page);
+  expect(await page.evaluate(() => window.__rpc.filter(r => r.nome === 'car_relatorio_uc_fora').length)).toBe(0);   // não marcado → não consulta (nem registra acesso)
+
+  await page.check('#caruc-fora');
+  await page.click('#caruc-gerar');
+  await page.locator(LINHAS).first().waitFor();
+  const rpc = await page.evaluate(() => window.__rpc.filter(r => r.nome === 'car_relatorio_uc_fora'));
+  expect(rpc).toHaveLength(1);
+  expect(rpc[0].args.p_cod_imoveis.sort()).toEqual(['AC-A', 'AC-B', 'AC-C']);   // a MESMA lista do cadastro: a numeração casa
+  await expect(page.locator('#caruc-resultado')).toContainText('1 CAR(s) do mesmo titular fora da UC não vieram do SICAR');
+
+  await agruparMulti(page);
+  const mapa = page.locator('.caruc-mapas[data-grupo="1"]');
+  await expect(mapa.locator('svg')).toHaveCount(2);            // UC + Acre
+  await expect(mapa.locator('svg').nth(1).locator('title')).toContainText(['F1 · AC-FORA-1']);
+  await expect(page.locator('tr.caruc-fora-tr')).toContainText('2 CAR(s)');
+  await expect(page.locator('tr.caruc-fora-linha')).toHaveCount(2);
+  await expect(page.locator('tr.caruc-fora-linha').nth(1)).toContainText('sem polígono no SICAR');
+  // os de fora nunca entram nos totais da UC
+  await expect(page.locator(LINHAS)).toHaveCount(2);
+  await expect(page.locator('.caruc-kpis')).toContainText('Imóveis na UC2');
+});
+
+test('PDF e Excel levam o mapa do titular e os CARs de fora', async ({ page }) => {
+  await abrir(page);
+  await page.check('#caruc-fora');
+  await gerar(page);
+  await agruparMulti(page);
+  await expect.poll(() => page.locator('.caruc-mapas[data-grupo="1"] svg image').count()).toBe(2);
+
+  const [dPdf] = await Promise.all([page.waitForEvent('download', { timeout: 60_000 }), page.click('button:has-text("PDF")')]);
+  const buf = fs.readFileSync(await dPdf.path());
+  expect((buf.toString('latin1').match(/\/Subtype \/Image/g) || []).length).toBeGreaterThanOrEqual(2);   // os dois quadros
+  const { PDFParse } = require('pdf-parse');
+  const texto = (await new PDFParse({ data: buf }).getText()).text;
+  expect(texto).toContain('Nº no mapa');
+  expect(texto).toContain('AC-FORA-1');
+  expect(texto).toContain('Esri World Imagery');
+  expect(texto).not.toMatch(/\d{3}\.\d{3}\.\d{3}-\d{2}/);
+
+  const [dX] = await Promise.all([page.waitForEvent('download', { timeout: 30_000 }), page.click('button:has-text("Excel")')]);
+  const JSZip = require('jszip');
+  const zip = await JSZip.loadAsync(fs.readFileSync(await dX.path()));
+  expect(await zip.file('xl/workbook.xml').async('string')).toContain('name="Fora da UC"');
+  expect(await zip.file('xl/sharedStrings.xml').async('string')).toContain('AC-FORA-2');
+});
+
+test('PDF sem fundo: mapa entra sem imagem de satélite e sem crédito', async ({ page }) => {
+  await abrir(page);
+  await page.locator('label', { has: page.locator('#caruc-fundo-sem') }).click();
+  await gerar(page);
+  await agruparMulti(page);
+  const [dPdf] = await Promise.all([page.waitForEvent('download', { timeout: 60_000 }), page.click('button:has-text("PDF")')]);
+  const buf = fs.readFileSync(await dPdf.path());
+  expect((buf.toString('latin1').match(/\/Subtype \/Image/g) || []).length).toBeGreaterThanOrEqual(1);
+  const { PDFParse } = require('pdf-parse');
+  const texto = (await new PDFParse({ data: buf }).getText()).text;
+  expect(texto).toContain('Nº no mapa');
+  expect(texto).not.toContain('Esri World Imagery');
+  expect(page.__tiles).toBe(0);
 });
