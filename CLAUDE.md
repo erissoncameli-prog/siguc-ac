@@ -2481,6 +2481,18 @@ não havia como provar quem fez o quê.
   rodou porque o MCP do Supabase pede confirmação para DROP e expirava
   — rodar à mão no SQL Editor quando possível (sem efeito até lá).
 - `pwa/sw.js`: biomonitor 65 → 66.
+- **Migration 354** (não existe placa física — o número do sistema É a
+  identidade): os 18 `PR-TR-2026-001…018` viraram `PRCG-TR-2026-007…024`
+  na mesma ordem, e os 25 da praia voltaram para `pendente` (histórico
+  anotado como correção administrativa). `PRCG-C-2026-007` (pitiú) não
+  mudou: o catálogo hoje dá sigla `IA` ao pitiú e o código do app tinha
+  `C`; outros 4 pitiús de outras praias também usam `C`, então trocar só
+  este criaria inconsistência — pendência de decisão, não de código.
+- `bioSyncPullNinhos` passa a trazer `numero_ninho`/`praia_id` corrigidos
+  no servidor (antes só o par atual): sem isso o aparelho ficava com o
+  número antigo e o card lia a divergência como "Transferido de …".
+  Não sobrescreve edição local ainda não enviada. `pwa/sw.js`:
+  biomonitor 66 → 67.
 
 ## Biomonitor — Anomalias congênitas em filhotes (migration 321)
 Registro de eclosão ganhou contador `filhotes_anomalia` (SUBCONJUNTO
