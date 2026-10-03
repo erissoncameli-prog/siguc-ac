@@ -13,6 +13,7 @@
 <script src="../js/fotos-privadas.js"></script>
 <script src="../js/config-sistema.js"></script>
 <script src="../js/layout.js"></script>
+<script src="../js/biomonitor-especies.js"></script>
 <script src="../js/brigada-captura.js"></script>
 <script src="../js/biomonitor-timeline.js"></script>
 <script src="../js/biomonitor-pdf-fonts.js"></script>
@@ -190,6 +191,8 @@
 ;(async function () {
   const usuario = await carregarUsuario()
   if (!usuario) { window.location.href = '../index.html'; return }
+  // Nomes de espécie do catálogo (Administrar › Espécies) antes de montar a tela
+  if (typeof bioEspCarregar === 'function') await bioEspCarregar(db)
   if (!['super_admin','gestor','tecnico'].includes(usuario.perfil)) {
     window.location.href = '../pages/dashboard.html'; return
   }
@@ -208,7 +211,7 @@
           <option value="tracaja">Tracajá</option>
           <option value="tartaruga">Tartaruga</option>
           <option value="cabecudo">Cabeçudo</option>
-          <option value="pitiU">Pitiú</option>
+          <option value="pitiU">Iaçá</option>
           <option value="cupido">Cupido</option>
           <option value="jabuti_pe_elefante">Jabuti-pé-elefante</option>
           <option value="jabuti_piranga">Jabuti-piranga</option>
@@ -266,11 +269,15 @@
   let _ninhos = [], _rejeitar = null, _rejTipo = null, _alertasPorNinho = {}, _gpsNinhoId = null
   let _viewMode = (function(){ try { return localStorage.getItem('siguc_bio_valid_view') || 'cards' } catch(e){ return 'cards' } })()
 
-  const SPECIES_NOME = {
+  const SPECIES_NOME = (typeof bioEspNomes === 'function' ? bioEspNomes : m => m)({
     tracaja: 'Tracajá', tartaruga: 'Tartaruga', cabecudo: 'Cabeçudo',
-    pitiU: 'Pitiú', cupido: 'Cupido', jabuti_pe_elefante: 'Jabuti-pé-de-elefante',
+    pitiU: 'Iaçá', cupido: 'Cupido', jabuti_pe_elefante: 'Jabuti-pé-de-elefante',
     jabuti_piranga: 'Jabuti-piranga', mucua: 'Muçuã', outro: 'Outro'
-  }
+  })
+  // O filtro de espécie é HTML fixo: os rótulos seguem o catálogo também.
+  document.querySelectorAll('#fil-especie option[value]').forEach(o => {
+    if (o.value && SPECIES_NOME[o.value]) o.textContent = SPECIES_NOME[o.value]
+  })
   const STATUS_CLR = { pendente:'#f59e0b', validado:'#10b981', rejeitado:'#ef4444', em_correcao:'#6366f1' }
   const STATUS_LBL = { pendente:'Pendente', validado:'Validado', rejeitado:'Rejeitado', em_correcao:'Em correção' }
   const NINHO_CLR = { encontrado:'#3b82f6', transferido:'#8b5cf6', eclodido:'#10b981', em_bercario:'#eab308', soltado:'#06b6d4', perdido:'#ef4444' }

@@ -11,6 +11,7 @@
 <script src="../js/config.js"></script>
 <script src="../js/config-sistema.js"></script>
 <script src="../js/layout.js"></script>
+<script src="../js/biomonitor-especies.js"></script>
 <script src="../js/config-sistema.js"></script>
 <script src="../js/biomonitor-fundamentacao.js"></script>
 <script src="../js/biomonitor-analise.js"></script>
@@ -208,6 +209,8 @@
 ;(async function () {
   const usuario = await carregarUsuario()
   if (!usuario) { window.location.href = '../index.html'; return }
+  // Nomes de espécie do catálogo (Administrar › Espécies) antes de montar a tela
+  if (typeof bioEspCarregar === 'function') await bioEspCarregar(db)
 
   document.getElementById('app').innerHTML =
     gerarLayout('Relatório Científico', 'analise-cientifica-biomonitor') +

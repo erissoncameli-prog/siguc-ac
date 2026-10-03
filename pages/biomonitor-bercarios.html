@@ -12,6 +12,7 @@
 <script src="../js/config.js"></script>
 <script src="../js/fotos-privadas.js"></script>
 <script src="../js/layout.js"></script>
+<script src="../js/biomonitor-especies.js"></script>
 <style>
 .berc-tab-btn { background:transparent;border:none;padding:6px 14px;border-radius:7px;cursor:pointer;font-size:.85rem;font-weight:600;color:var(--bio-prim,#1A6B8C);opacity:.6;transition:all .15s }
 .berc-tab-btn.ativo { background:white;color:var(--bio-prim,#1A6B8C);opacity:1;box-shadow:0 1px 4px rgba(0,0,0,.12) }
@@ -68,6 +69,8 @@
 ;(async function () {
   const usuario = await carregarUsuario()
   if (!usuario) { window.location.href = '../index.html'; return }
+  // Nomes de espécie do catálogo (Administrar › Espécies) antes de montar a tela
+  if (typeof bioEspCarregar === 'function') await bioEspCarregar(db)
   if (!['super_admin','gestor','tecnico'].includes(usuario.perfil)) {
     window.location.href = '../pages/dashboard.html'; return
   }
@@ -111,11 +114,11 @@
   const SEV_LBL = { critica:'Crítica', alta:'Alta', media:'Média', baixa:'Baixa' }
   const TIPO_OC_LBL = { alimentacao:'Alimentação', biometria:'Biometria', mortalidade:'Mortalidade', doenca:'Doença', tratamento:'Tratamento', observacao:'Observação' }
   const TIPO_OC_CLR = { alimentacao:'#2A9D6F', biometria:'#1A6B8C', mortalidade:'#DC2626', doenca:'#D97706', tratamento:'#7B57B0', observacao:'#6b7280' }
-  const SPECIES_NOME = {
+  const SPECIES_NOME = (typeof bioEspNomes === 'function' ? bioEspNomes : m => m)({
     tracaja: 'Tracajá', tartaruga: 'Tartaruga', cabecudo: 'Cabeçudo',
-    pitiU: 'Pitiú', cupido: 'Cupido', jabuti_pe_elefante: 'Jabuti-pé-de-elefante',
+    pitiU: 'Iaçá', cupido: 'Cupido', jabuti_pe_elefante: 'Jabuti-pé-de-elefante',
     jabuti_piranga: 'Jabuti-piranga', mucua: 'Muçuã', outro: 'Outro'
-  }
+  })
 
   function corMortalidade(pct) {
     if (pct == null) return '#6b7280'

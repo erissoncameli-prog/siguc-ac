@@ -14,6 +14,7 @@
 <script src="../js/queryLogger.js"></script>
 <script src="../js/config.js"></script>
 <script src="../js/layout.js"></script>
+<script src="../js/biomonitor-especies.js"></script>
 <script src="../js/qrcode-generator.js"></script>
 <script src="../js/etiqueta-termica.js"></script>
 <script src="../js/biomonitor-etiqueta.js"></script>
@@ -422,6 +423,8 @@
 ;(async function () {
   const usuario = await carregarUsuario()
   if (!usuario) { window.location.href = '../index.html'; return }
+  // Nomes de espécie do catálogo (Administrar › Espécies) antes de montar a tela
+  if (typeof bioEspCarregar === 'function') await bioEspCarregar(db)
   if (!['super_admin','gestor','tecnico'].includes(usuario.perfil)) {
     window.location.href = '../pages/dashboard.html'; return
   }
@@ -885,6 +888,9 @@
       .order('ordem')
     if (error) { toast('Erro ao carregar espécies: ' + error.message, 'error'); return }
     _especies = data || []
+    // Mesma lista vira a fonte dos nomes em todas as telas (js/biomonitor-especies.js):
+    // renomear aqui já vale na hora para as outras páginas abertas neste navegador.
+    if (typeof bioEspDefinir === 'function') bioEspDefinir(_especies)
     renderEspecies()
   }
 
@@ -1019,10 +1025,10 @@
     await recarregarAlertas()
   }
 
-  const LIM_NOME = {
-    tartaruga:'Tartaruga', tracaja:'Tracajá', cabecudo:'Cabeçudo', pitiU:'Pitiú',
+  const LIM_NOME = (typeof bioEspNomes === 'function' ? bioEspNomes : m => m)({
+    tartaruga:'Tartaruga', tracaja:'Tracajá', cabecudo:'Cabeçudo', pitiU:'Iaçá',
     cupido:'Cupido', jabuti_pe_elefante:'Jabuti-pé-elefante', jabuti_piranga:'Jabuti-piranga', mucua:'Muçuã', outro:'Outro'
-  }
+  })
   const LIM_CAMPOS = ['temp_letal_min','temp_macho_max','temp_pivotal','temp_femea_min','temp_critico_max','umidade_min_pct','umidade_max_pct','dist_rio_min_m','incubacao_dias_max','friagem_temp_ar_min']
 
   function renderLimiares() {

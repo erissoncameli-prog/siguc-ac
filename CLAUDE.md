@@ -2494,6 +2494,42 @@ não havia como provar quem fez o quê.
   Não sobrescreve edição local ainda não enviada. `pwa/sw.js`:
   biomonitor 66 → 67.
 
+## Regra do sistema — nome de espécie do Biomonitor vem do catálogo
+A SEMA renomeou o pitiú para **Iaçá** em Administrar › Espécies
+(`especies_quelonio_catalogo`, 21/09/2026) e metade do sistema seguiu
+mostrando "Pitiú": 9 listas fixas de nome, uma por tela. O código interno
+continua `pitiU` (enum `especie_quelonio`, histórico) — a espécie é o
+Iaçá, *Podocnemis sextuberculata* (confirmado pela SEMA em 03/10/2026).
+- **Fonte única: `js/biomonitor-especies.js`** (mesma lição de
+  `js/frota-consumo.js`). Página registra seu mapa com
+  `bioEspNomes({...})` — o próprio objeto é atualizado quando o catálogo
+  chega, então quem já guardou a referência lê o nome certo — e chama
+  `await bioEspCarregar(db)` logo depois do `carregarUsuario()`. Nome
+  avulso: `bioEspecieNome(cod)`/`bioEspecieSigla(cod)`. **Nunca uma lista
+  de nomes nova numa página**; o mapa da página é só reserva.
+- Lê o catálogo INTEIRO, inclusive desativadas (ninho antigo nunca sai
+  com o código cru); cache em `localStorage['siguc_bio_especies_catalogo']`
+  aplicado já no carregamento do arquivo (nome certo na 1ª pintura e
+  offline). Administrar › Espécies chama `bioEspDefinir` ao recarregar a
+  lista. ⚠️ O app já tinha um `const bioEspNome` global em
+  `js/biomonitor-quelonios.js` — por isso as funções do arquivo novo se
+  chamam `bioEspecieNome`/`bioEspecieSigla` (duas declarações iguais
+  quebram o parse da página inteira).
+- App: `bioCarregarEspecies` busca todas, entrega ao helper e deixa só as
+  ATIVAS nos chips; `bioEspObj(cod)` substituiu as 19 buscas
+  `BIO_ESPECIES.find(...)`, caindo no catálogo completo para espécie
+  desativada. Reserva embutida = Iaçá/IA.
+- Fundamentação (`js/biomonitor-fundamentacao.js`): `pitiU` passou a ter
+  os parâmetros de *P. sextuberculata* (antes era *P. erythrocephala*, a
+  irapuca — ninhos de Iaçá eram comparados com outra espécie).
+  ⚠️ `cabecudo` (desativado) ainda traz *P. sextuberculata* no catálogo e
+  na fundamentação; cabeçudo costuma ser *Peltocephalus dumerilianus* —
+  revisar com o biólogo antes de reativar.
+- Guarda: `tests/biomonitor-especies.test.js` (5), inclusive varredura que
+  reprova "Pitiú" fixo em `pages/` e `js/`.
+- `pwa/sw.js`: biomonitor 67 → 68 (`js/biomonitor-especies.js` no shell;
+  as 3 listas de `app-biomonitor/scripts/build-www.mjs` atualizadas).
+
 ## Biomonitor — Anomalias congênitas em filhotes (migration 321)
 Registro de eclosão ganhou contador `filhotes_anomalia` (SUBCONJUNTO
 de `filhotes_vivos`, CHECK `<=`, nunca um 4º balde somado ao total —

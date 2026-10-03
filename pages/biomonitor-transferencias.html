@@ -12,6 +12,7 @@
 <script src="../js/config.js"></script>
 <script src="../js/config-sistema.js"></script>
 <script src="../js/layout.js"></script>
+<script src="../js/biomonitor-especies.js"></script>
 </head>
 <body class="bio-mesa-theme">
 <div id="app"></div>
@@ -20,15 +21,17 @@
 ;(async function () {
   const usuario = await carregarUsuario()
   if (!usuario) { window.location.href = '../index.html'; return }
+  // Nomes de espécie do catálogo (Administrar › Espécies) antes de montar a tela
+  if (typeof bioEspCarregar === 'function') await bioEspCarregar(db)
   if (!['super_admin','gestor','tecnico'].includes(usuario.perfil)) {
     window.location.href = '../pages/dashboard.html'; return
   }
 
-  const SPECIES_NOME = {
+  const SPECIES_NOME = (typeof bioEspNomes === 'function' ? bioEspNomes : m => m)({
     tracaja: 'Tracajá', tartaruga: 'Tartaruga', cabecudo: 'Cabeçudo',
-    pitiU: 'Pitiú', cupido: 'Cupido', jabuti_pe_elefante: 'Jabuti-pé-de-elefante',
+    pitiU: 'Iaçá', cupido: 'Cupido', jabuti_pe_elefante: 'Jabuti-pé-de-elefante',
     jabuti_piranga: 'Jabuti-piranga', mucua: 'Muçuã', outro: 'Outro'
-  }
+  })
   const NINHO_CLR = { encontrado:'#3b82f6', transferido:'#8b5cf6' }
   const NINHO_LBL = { encontrado:'Encontrado', transferido:'Transferido' }
 

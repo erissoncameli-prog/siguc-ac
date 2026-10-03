@@ -73,24 +73,40 @@ const BioApp = {
 // app abra offline antes de ter cache local salvo.
 let BIO_ESPECIES = [
   { id: 'tracaja',   sigla: 'TR',  nome: 'Tracajá',            nome_cientifico: 'Podocnemis unifilis',       incubacao_dias: 68 },
-  { id: 'tartaruga', sigla: 'TA',  nome: 'Tartaruga',          nome_cientifico: 'Podocnemis expansa',        incubacao_dias: 55 },
+  { id: 'tartaruga', sigla: 'TA',  nome: 'Tartaruga-da-amazônia', nome_cientifico: 'Podocnemis expansa',        incubacao_dias: 55 },
   { id: 'cabecudo',  sigla: 'R',   nome: 'Cabeçudo',           nome_cientifico: 'Podocnemis sextuberculata', incubacao_dias: 52 },
-  { id: 'pitiU',     sigla: 'C',   nome: 'Pitiú',              nome_cientifico: 'Podocnemis erythrocephala', incubacao_dias: 70 },
+  // 'pitiU' é código histórico: no Acre a espécie é o Iaçá (P. sextuberculata)
+  { id: 'pitiU',     sigla: 'IA',  nome: 'Iaçá',               nome_cientifico: 'Podocnemis sextuberculata', incubacao_dias: 70 },
   { id: 'mucua',     sigla: 'MU',  nome: 'Muçuã',              nome_cientifico: 'Kinosternon scorpioides',   incubacao_dias: 135 },
   { id: 'jabuti_pe_elefante', sigla: 'JE', nome: 'Jabuti-pé-de-elefante', nome_cientifico: 'Chelonoidis denticulatus', incubacao_dias: 140 },
   { id: 'jabuti_piranga',     sigla: 'JP', nome: 'Jabuti-piranga',       nome_cientifico: 'Chelonoidis carbonarius',  incubacao_dias: 140 },
   { id: 'outro',     sigla: 'OU',  nome: 'Outro',              nome_cientifico: '',                          incubacao_dias: 65 },
 ]
 
+// Espécie pelo código, para EXIBIR. BIO_ESPECIES só tem as ativas (é o
+// que alimenta os chips do formulário); ninho antigo de espécie
+// desativada cai no catálogo completo de js/biomonitor-especies.js e
+// nunca aparece com o código cru.
+function bioEspObj(id) {
+  if (!id) return null
+  const ativa = BIO_ESPECIES.find(e => e.id === id)
+  if (ativa) return ativa
+  if (typeof bioEspecieNome !== 'function') return null
+  return { id, sigla: bioEspecieSigla(id), nome: bioEspecieNome(id), nome_cientifico: '', incubacao_dias: undefined }
+}
+
 // ── Catálogo de espécies (editável) ──────────────────────────
 async function bioCarregarEspecies() {
   try {
-    const { data, error } = await bioSupabase()
+    const { data: todas, error } = await bioSupabase()
       .from('especies_quelonio_catalogo')
-      .select('codigo,nome_popular,nome_cientifico,sigla_placa,ordem,incubacao_dias_media')
-      .eq('ativo', true)
+      .select('codigo,nome_popular,nome_cientifico,sigla_placa,ordem,incubacao_dias_media,ativo')
       .order('ordem')
     if (error) throw error
+    // Catálogo inteiro (inclusive desativadas) para os NOMES em toda tela;
+    // só as ativas viram chip de escolha no formulário.
+    if (todas?.length && typeof bioEspDefinir === 'function') bioEspDefinir(todas)
+    const data = (todas || []).filter(e => e.ativo !== false)
     if (data?.length) {
       BIO_ESPECIES = data.map(e => ({
         id: e.codigo, sigla: e.sigla_placa || '?', nome: e.nome_popular, nome_cientifico: e.nome_cientifico || '',
@@ -1078,7 +1094,7 @@ async function bioVerificarPraiaProxima(lat, lng) {
 // fica embutida no prefixo, então varrer por prefixo equivale a varrer
 // só aquela praia.
 async function bioGerarNumeroNinho(praiaId, especie, campo = 'numero_ninho') {
-  const esp    = BIO_ESPECIES.find(e => e.id === especie)
+  const esp    = bioEspObj(especie)
   const praias = await bioOfflineListarPraias()
   const praia  = praias.find(p => p.id === praiaId)
   let   cod    = praia?.sigla ?? 'XX'
@@ -1592,7 +1608,7 @@ function bioIniciarFotosForm() {
 async function bioAbrirFormTransf(ninho) {
   BioApp.formNinhoAtualizar = ninho
   document.getElementById('bio-transf-ninho-num').textContent = ninho.numero_ninho
-  document.getElementById('bio-transf-especie').textContent   = BIO_ESPECIES.find(e => e.id === ninho.especie)?.nome ?? ninho.especie
+  document.getElementById('bio-transf-especie').textContent   = bioEspObj(ninho.especie)?.nome ?? ninho.especie
   document.getElementById('bio-transf-data').value            = new Date().toISOString().slice(0, 10)
   document.getElementById('bio-transf-ovos').value            = ''
   // Limite de ovos transferidos = íntegros encontrados (fallback: total).
@@ -1715,7 +1731,7 @@ function bioPrevisaoEclosao(n) {
   if (!n?.data_encontro) return null
   let prevista = n.data_prevista_eclosao
   if (!prevista) {
-    const esp  = BIO_ESPECIES.find(e => e.id === n.especie)
+    const esp  = bioEspObj(n.especie)
     const dias = n.incubacao_dias_previstos ?? esp?.incubacao_dias ?? 65
     const d = new Date(n.data_encontro + 'T12:00')
     if (isNaN(d)) return null
@@ -1942,7 +1958,7 @@ async function bioSalvarTransf() {
 async function bioAbrirFormEclosao(ninho) {
   BioApp.formNinhoAtualizar = ninho
   document.getElementById('bio-ecl-ninho-num').textContent  = ninho.numero_ninho
-  document.getElementById('bio-ecl-especie').textContent    = BIO_ESPECIES.find(e => e.id === ninho.especie)?.nome ?? ninho.especie
+  document.getElementById('bio-ecl-especie').textContent    = bioEspObj(ninho.especie)?.nome ?? ninho.especie
   document.getElementById('bio-ecl-data').value             = new Date().toISOString().slice(0, 10)
 
   // Fotos
@@ -2136,7 +2152,7 @@ async function bioSalvarEclosao() {
 function bioAbrirTelaDestino(ninho, filhotesVivos) {
   BioApp.formDestinoCtx = { ninho, filhotesVivos: filhotesVivos ?? 0 }
   document.getElementById('bio-dest-ninho-num').textContent = ninho.numero_ninho
-  document.getElementById('bio-dest-especie').textContent   = BIO_ESPECIES.find(e => e.id === ninho.especie)?.nome ?? ninho.especie
+  document.getElementById('bio-dest-especie').textContent   = bioEspObj(ninho.especie)?.nome ?? ninho.especie
   document.getElementById('bio-dest-filhotes').textContent  = filhotesVivos ?? 0
   bioMostrarTela('tela-destino-filhotes')
 }
@@ -2148,7 +2164,7 @@ function bioAbrirFormEntradaBercario() {
   const { ninho, filhotesVivos } = BioApp.formDestinoCtx ?? {}
   if (!ninho) return
   document.getElementById('bio-berc-ninho-num').textContent = ninho.numero_ninho
-  document.getElementById('bio-berc-especie').textContent   = BIO_ESPECIES.find(e => e.id === ninho.especie)?.nome ?? ninho.especie
+  document.getElementById('bio-berc-especie').textContent   = bioEspObj(ninho.especie)?.nome ?? ninho.especie
   BioApp.formBercarioSelecionado = null
   const nomeSpan = document.getElementById('bio-berc-nome-txt')
   if (nomeSpan) nomeSpan.textContent = 'Selecionar berçário…'
@@ -2177,7 +2193,7 @@ async function bioSalvarEntradaBercario() {
   const temporadaNinho = ninho.temporada_id ?? BioApp.temporadaAtual?.id ?? null
   const especieAtual = bioBercarioEspecieAtual(berc.id, await bioOfflineLotesAtivos(), temporadaNinho)
   if (especieAtual && ninho.especie && especieAtual !== ninho.especie) {
-    const espNome = BIO_ESPECIES.find(e => e.id === especieAtual)?.nome ?? especieAtual
+    const espNome = bioEspObj(especieAtual)?.nome ?? especieAtual
     alert(`Este berçário já está em uso com a espécie "${espNome}".\nNão é possível misturar espécies diferentes ali.\n\nEscolha outro berçário.`)
     bioAbrirSeletorBercario(b => {
       BioApp.formBercarioSelecionado = b
@@ -2283,7 +2299,7 @@ function bioAbrirFormSoltura(ctx) {
     if (ctxLabelEl)  ctxLabelEl.textContent = 'Berçário'
     if (numPrefixEl) numPrefixEl.hidden     = true
     document.getElementById('bio-sol-ninho-num').textContent = bercario.nome
-    document.getElementById('bio-sol-especie').textContent   = BIO_ESPECIES.find(e => e.id === especie)?.nome ?? especie ?? ''
+    document.getElementById('bio-sol-especie').textContent   = bioEspObj(especie)?.nome ?? especie ?? ''
     infoEl.textContent = `${lotesComVivos.length} lote${lotesComVivos.length !== 1 ? 's' : ''} · ${totalVivos} filhotes vivos`
     infoEl.hidden = false
     if (mortSecEl) mortSecEl.hidden = true
@@ -2297,7 +2313,7 @@ function bioAbrirFormSoltura(ctx) {
     if (ctxLabelEl)  ctxLabelEl.textContent = 'Ninho'
     if (numPrefixEl) numPrefixEl.hidden     = false
     document.getElementById('bio-sol-ninho-num').textContent = ninho.numero_ninho
-    document.getElementById('bio-sol-especie').textContent   = BIO_ESPECIES.find(e => e.id === ninho.especie)?.nome ?? ninho.especie
+    document.getElementById('bio-sol-especie').textContent   = bioEspObj(ninho.especie)?.nome ?? ninho.especie
     infoEl.hidden = true
     if (mortSecEl) mortSecEl.hidden = false
     bioSetContador('bio-sol-qtd', filhotesVivos ?? 0)
@@ -2564,7 +2580,7 @@ async function bioCarregarBercarios() {
   statsPorGrupo.forEach(st => {
     const { grupo, totalEntrada, mortes, datasEntrada, soltos, datasSoltura, bercario, doentes } = st
     const especieAtual = bioBercarioEspecieAtual(grupo.id, grupo.lotes)
-    const espLabel = especieAtual ? (BIO_ESPECIES.find(e => e.id === especieAtual)?.nome ?? especieAtual) : null
+    const espLabel = especieAtual ? (bioEspObj(especieAtual)?.nome ?? especieAtual) : null
     const temporadaAnterior = grupo.temporadaId != null && grupo.temporadaId !== temporadaAtualId
 
     const header = document.createElement('div')
@@ -2663,7 +2679,7 @@ async function bioAbrirSeletorBercario(callback, especieNova, temporadaId) {
       lista.forEach(b => {
         const especieAtual = bioBercarioEspecieAtual(b.id, lotesAtivos, temporadaAtual)
         const bloqueado = !!(especieAtual && especieNova && especieAtual !== especieNova)
-        const espNome = especieAtual ? (BIO_ESPECIES.find(e => e.id === especieAtual)?.nome ?? especieAtual) : null
+        const espNome = especieAtual ? (bioEspObj(especieAtual)?.nome ?? especieAtual) : null
         const card = document.createElement('div')
         card.className = 'bio-berc-sel-card' + (bloqueado ? ' bloqueado' : '')
         card.innerHTML = `
@@ -2706,7 +2722,7 @@ async function bioAbrirDetalheBercario(grupo) {
 
   const todosLotes = await bioOfflineLotesDoBercario(grupo.id, grupo.temporadaId)
   const especieAtual = bioBercarioEspecieAtual(grupo.id, grupo.lotes)
-  const espNome = especieAtual ? (BIO_ESPECIES.find(e => e.id === especieAtual)?.nome ?? especieAtual) : '—'
+  const espNome = especieAtual ? (bioEspObj(especieAtual)?.nome ?? especieAtual) : '—'
   const totalEntrada = grupo.lotes.reduce((s, l) => s + (l.qtd_entrada || 0), 0)
 
   if (el('bio-det-ninho-num'))  el('bio-det-ninho-num').textContent  = grupo.nome
@@ -2788,7 +2804,7 @@ function bioRenderizarHistoricoNinhos(lotes) {
 
   const STATUS_LBL = { ativo: 'No berçário', soltado: 'Solto', cancelado: 'Cancelado' }
   lista.innerHTML = lotes.map(l => {
-    const esp = BIO_ESPECIES.find(e => e.id === l.especie)
+    const esp = bioEspObj(l.especie)
     return `
       <div class="bio-hist-ninho-item">
         <div>
@@ -2804,7 +2820,7 @@ function bioRenderizarHistoricoNinhos(lotes) {
     btn.addEventListener('click', () => {
       const l = lotes.find(x => x.uuid_cliente === btn.dataset.loteEtiqueta)
       if (!l) return
-      const esp = BIO_ESPECIES.find(e => e.id === l.especie)
+      const esp = bioEspObj(l.especie)
       bioAbrirEtiquetaLote({
         // server_id (após sync) é preferível — estável e mais curto no QR;
         // sem sync ainda, cai no uuid_cliente (nunca bloqueia o trabalho de campo).
@@ -3434,7 +3450,7 @@ function bioIniciarPosEclosao() {
 async function bioAbrirFormVisita(ninho) {
   BioApp.formNinhoAtualizar = ninho
   document.getElementById('bio-vis-ninho-num').textContent = ninho.numero_ninho
-  document.getElementById('bio-vis-especie').textContent   = BIO_ESPECIES.find(e => e.id === ninho.especie)?.nome ?? ninho.especie
+  document.getElementById('bio-vis-especie').textContent   = bioEspObj(ninho.especie)?.nome ?? ninho.especie
   document.getElementById('bio-vis-data').value            = new Date().toISOString().slice(0, 10)
   document.getElementById('bio-vis-hora').value            = new Date().toTimeString().slice(0, 5)
   document.getElementById('bio-vis-temp-sub').value        = ''
@@ -3838,7 +3854,7 @@ function bioMostrarGeoSugTab(tab) {
 
 function bioNinhoCardInner(n, opts = {}) {
   const { mostrarAcoes = false, contextoPraiaId = null } = opts
-  const esp    = BIO_ESPECIES.find(e => e.id === n.especie)
+  const esp    = bioEspObj(n.especie)
   const status = n.status ?? 'encontrado'
   const data   = n.data_encontro
     ? new Date(n.data_encontro + 'T12:00').toLocaleDateString('pt-BR')
@@ -4115,7 +4131,7 @@ async function bioCarregarFilaLocal() {
   }
 
   ninhos.forEach(n => {
-    const esp      = BIO_ESPECIES.find(e => e.id === n.especie)
+    const esp      = bioEspObj(n.especie)
     const praia    = praias.find(p => p.id === (n.praia_atual_id ?? n.praia_id))
     const numExib  = n.numero_atual ?? n.numero_ninho
     const syncOk   = n.status_sync === 'confirmado'
@@ -4233,7 +4249,7 @@ const BIO_ESP_COR = {
   jabuti_pe_elefante: '#6366F1', jabuti_piranga: '#8B5CF6', outro: '#9CA3AF',
 }
 const bioEspCor  = id => BIO_ESP_COR[id] || '#9CA3AF'
-const bioEspNome = id => (BIO_ESPECIES.find(e => e.id === id)?.nome) || id || '—'
+const bioEspNome = id => (bioEspObj(id)?.nome) || id || '—'
 
 // Estado vazio de um card de gráfico: esconde o canvas e mostra a msg.
 // Retorna true quando vazio (para o chamador dar early-return).
@@ -4859,7 +4875,7 @@ async function bioRenderPainelEclosao(temporadaId, especie) {
   _bioSetText('bio-ecl-kpi-atrasados', c.atrasados ?? 0)
   if (vazio) vazio.hidden = (c.em_incubacao ?? 0) > 0
 
-  const nomeEsp = cod => BIO_ESPECIES.find(e => e.id === cod)?.nome ?? cod
+  const nomeEsp = cod => bioEspObj(cod)?.nome ?? cod
   const item = (n, cls) => `
     <div class="bio-ecl-item ${cls}">
       <span class="bio-ecl-num">#${esc(n.numero ?? '—')}</span>
