@@ -2476,9 +2476,10 @@ não havia como provar quem fez o quê.
   "PR-…" em vez de "PRCG-…".
 - O par atual (número/praia) acompanhar a correção é a migration 352
   (`trg_ninhos_sincronizar_atual`). ⚠️ `trg_ninhos_seguir_origem` ficou
-  no banco NEUTRALIZADO (`RETURN NEW`), criado à mão nesta investigação;
-  o DROP está no fim da 353 e não rodou porque o MCP do Supabase pede
-  confirmação para DROP e expirava — rodar à mão quando possível.
+  no banco NEUTRALIZADO (`RETURN NEW`) e DESLIGADO (`DISABLE TRIGGER`),
+  criado à mão nesta investigação; o DROP está no fim da 353 e não
+  rodou porque o MCP do Supabase pede confirmação para DROP e expirava
+  — rodar à mão no SQL Editor quando possível (sem efeito até lá).
 - `pwa/sw.js`: biomonitor 65 → 66.
 
 ## Biomonitor — Anomalias congênitas em filhotes (migration 321)

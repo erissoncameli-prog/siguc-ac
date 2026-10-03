@@ -191,5 +191,11 @@ END;
 $function$;
 
 -- ── 3) limpeza do trigger duplicado (passo separado, ver cabeçalho) ─
+-- Aplicado em produção (03/10/2026): o trigger foi DESLIGADO com
+--   ALTER TABLE public.ninhos_quelonios DISABLE TRIGGER trg_ninhos_seguir_origem;
+-- porque o DROP abaixo pede confirmação no MCP e expirou 4 vezes. Desligado
+-- e com a função em RETURN NEW, não tem efeito nenhum; o DROP fica para
+-- quem rodar à mão no SQL Editor.
+ALTER TABLE public.ninhos_quelonios DISABLE TRIGGER trg_ninhos_seguir_origem;
 DROP TRIGGER IF EXISTS trg_ninhos_seguir_origem ON public.ninhos_quelonios;
 DROP FUNCTION IF EXISTS public.trg_ninhos_seguir_origem();
