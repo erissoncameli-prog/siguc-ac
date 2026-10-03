@@ -936,6 +936,26 @@ opcionais. Sem mapa (pedido do usuário). Exporta PDF (timbre), Excel
     minúscula num quadro só) como F1, F2… e numa sub-lista própria;
     **nunca entram em total nenhum da UC**. Tela e PDF listam até 30 por
     titular; a lista completa vai na aba "Fora da UC" do Excel.
+  - **Três quadros, não um** (5ª rodada, relato do usuário com o PDF da
+    FE do Afluente): na escala da UC inteira um CAR de ~50 ha ocupa 2–3
+    px e some atrás do próprio número — o PDF mostrava só bolinhas. O 1º
+    quadro agora é ZOOM nos CARs do titular (bbox deles + folga, lado
+    mínimo `CARUC_MAPA_ZOOM_MIN_GRAUS` ≈ 2,2 km), o 2º é a UC inteira
+    com um retângulo marcando a área ampliada, o 3º o Acre (só com CARs
+    de fora). Contorno com borda escura por baixo; o número fica DENTRO
+    do polígono quando cabe e AO LADO, com linha guia, quando não cabe —
+    nunca cobre o desenho. Na tela a caixa dos mapas é `sticky` com a
+    largura VISÍVEL do card (`_carucAjustarMapaBox`): a linha do mapa
+    mede a largura da tabela larga, e o 3º quadro ficava fora da tela.
+  - **Tabela do PDF é de LEITURA, não de dados** (`_carucPdfColunas`/
+    `_carucPdfNota`): 11 colunas com largura fixa — Nº, CAR, Imóvel,
+    Município, Situação/classe, Tipo, Área (ha · %), Zonas, Inscrição,
+    Ambiental (focos/DETER/PRODES numa coluna só, só se pedidos),
+    Prioridade — e o texto longo (motivo, atenção, sobreposição) numa
+    linha própria de largura inteira abaixo de cada imóvel. Agrupado,
+    titular/CPF/CARs ficam só no cabeçalho do grupo. Eram ~25 colunas e
+    o "Motivo da prioridade" virava uma letra por linha. Excel e CSV
+    seguem com TODAS as colunas separadas (`carucColunasExportacao`).
   - ⚠️ `apply_migration`/`execute_sql` do MCP do Supabase **travam
     (timeout de 60 s) em UPDATE de dado** — a função entrou por
     `apply_migration` só com o DDL; o `UPDATE lgpd_tratamentos` (nota

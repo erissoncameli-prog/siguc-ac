@@ -105,8 +105,13 @@ span.caruc-clic:focus-visible { outline:2px solid var(--verde-medio); outline-of
 #caruc-tabela td.num { text-align:right; white-space:nowrap; }
 /* Mapa por titular (js/car-uc-mapa.js): logo abaixo do cabeçalho do grupo. */
 #caruc-tabela tr.caruc-mapa-tr td { background:#fff; padding:10px 10px 14px; }
-.caruc-mapas { display:grid; grid-template-columns:minmax(0,2fr) minmax(0,1fr); gap:10px; max-width:900px; }
-.caruc-mapas.so-uc { grid-template-columns:minmax(0,1fr); max-width:620px; }
+/* A linha do mapa ocupa a largura da TABELA (larga, rola de lado); a caixa
+   gruda na borda esquerda e tem a largura VISÍVEL do card, senão o 3º
+   quadro ficava fora da tela até rolar a tabela. */
+.caruc-mapa-box { position:sticky; left:10px; }
+.caruc-mapas { display:grid; grid-template-columns:minmax(0,56fr) minmax(0,26fr) minmax(0,26fr); gap:10px; max-width:1080px; }
+.caruc-mapas.so-uc { grid-template-columns:minmax(0,56fr) minmax(0,26fr); max-width:820px; }
+@media (max-width:700px) { .caruc-mapas, .caruc-mapas.so-uc { grid-template-columns:minmax(0,1fr) minmax(0,1fr); } .caruc-mapas > .caruc-mapa:first-child { grid-column:1 / -1; } }
 .caruc-mapa { position:relative; border:1px solid #D1D5DB; border-radius:8px; overflow:hidden; background:#EEF1EA; min-height:120px; }
 .caruc-mapa svg { display:block; width:100%; height:auto; }
 .caruc-mapa-rot { position:absolute; left:8px; top:8px; background:rgba(10,26,15,.78); color:#fff; font-size:11px; font-weight:700; border-radius:4px; padding:2px 7px; pointer-events:none; }
@@ -625,6 +630,7 @@ function carucAtualizar(focarChave) {
     : `${formatNum(_carucRel.imoveis.length, 0)} imóveis, sem filtro.`
 
   document.getElementById('caruc-conteudo').innerHTML = _carucConteudoHTML(relF)
+  _carucAjustarMapaBox()
   _carucDesenharMapas(relF)
 }
 
@@ -632,6 +638,14 @@ function carucAtualizar(focarChave) {
 // quando os ladrilhos chegam. Cada redesenho da tabela invalida o
 // anterior (_carucMapaVez), para um filtro novo não receber o mapa velho.
 let _carucMapaVez = 0
+
+function _carucAjustarMapaBox() {
+  const wrap = document.querySelector('#caruc-tabela')?.closest('.table-wrap')
+  if (!wrap) return
+  const w = Math.max(240, wrap.clientWidth - 22)
+  document.querySelectorAll('.caruc-mapa-box').forEach(b => { b.style.width = w + 'px' })
+}
+window.addEventListener('resize', () => _carucAjustarMapaBox())
 async function _carucDesenharMapas(rel) {
   const vez = ++_carucMapaVez
   if (!rel.agrupado || !rel.grupos || typeof carucMapaGrupo !== 'function') return
@@ -657,23 +671,27 @@ async function _carucDesenharMapas(rel) {
 function _carucPintarMapa(alvo, g, m) {
   const nFora = (g.fora || []).filter(f => f._mapa).length
   alvo.classList.toggle('so-uc', !m.acre)
-  alvo.innerHTML = `<div class="caruc-mapa"><span class="caruc-mapa-rot">${esc(_carucRel.uc.sigla || 'UC')} · ${g.imoveis.filter(i => i._mapa).length} CAR(s)</span>${m.uc || ''}</div>`
+  // 1º quadro: zoom nos CARs (onde dá para ver cada polígono); 2º: a UC
+  // inteira com a área ampliada marcada; 3º: o Acre com os de fora.
+  alvo.innerHTML = `<div class="caruc-mapa"><span class="caruc-mapa-rot">${g.imoveis.filter(i => i._mapa).length} CAR(s) do titular</span>${m.zoom || ''}</div>`
+    + (m.uc ? `<div class="caruc-mapa"><span class="caruc-mapa-rot">${esc(_carucRel.uc.sigla || 'UC')} inteira</span>${m.uc}</div>` : '')
     + (m.acre ? `<div class="caruc-mapa"><span class="caruc-mapa-rot">Acre · ${nFora} fora da UC</span>${m.acre}</div>` : '')
 }
 
 function _carucMapaLinhaHTML(rel, g, nCols) {
   const sat = (rel.opcoes.fundoMapa || 'satelite') === 'satelite'
   const temFora = (g.fora || []).some(f => f._mapa)
-  return `<tr class="caruc-mapa-tr"><td colspan="${nCols}">
+  return `<tr class="caruc-mapa-tr"><td colspan="${nCols}"><div class="caruc-mapa-box">
     <div class="caruc-mapas${temFora ? '' : ' so-uc'}" data-grupo="${g.grupo}"><div class="caruc-mapa">${skeletonBlocoHTML(3)}</div></div>
     <div class="caruc-mapa-leg">
       <span><i style="background:${sat ? '#FACC15' : '#EA580C'};opacity:.8"></i>CAR do titular no recorte (nº = linha abaixo)</span>
       <span><i style="border:2px solid #0A1A0F;background:none"></i>Limite da UC</span>
+      <span><i style="border:2px solid ${sat ? '#FACC15' : '#C2410C'};background:none"></i>Área ampliada no 1º quadro</span>
       ${rel.geo?.zonas?.length ? '<span><i style="border:1px dashed #4B5563;background:none"></i>Zonas de manejo</span>' : ''}
       ${temFora ? '<span><i style="background:#B45309;border-radius:50%;width:10px"></i>CAR do titular fora da UC (F1, F2…)</span>' : ''}
     </div>
     <div class="caruc-nota caruc-mapa-cred">${sat ? esc(CARUC_MAPA_CREDITO) + '.' : 'Sem imagem de fundo.'} Limites: SICAR ao vivo e zoneamento cadastrado.</div>
-  </td></tr>`
+  </div></td></tr>`
 }
 
 const CARUC_FORA_NA_TELA = 30

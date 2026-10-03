@@ -197,8 +197,15 @@ test('mapa: vista enquadra a bbox sem distorcer e numera os polígonos como a ta
   expect(d.cars.map(c => c.rot + c.cod)).toEqual(['1A', '2C']);   // sem polígono não ganha número (a tabela também não)
   expect(d.fora.map(c => c.rot + c.cod)).toEqual(['F1F']);        // F2 (sem polígono) fica só na lista
   const svg = cmapa.carucMapaSVGs(d, cmapa.carucMapaVistas(d), { fundo: 'sem' });
-  expect((svg.uc.match(/<title>\d · /g) || []).length).toBe(2);
-  expect(svg.uc).not.toContain('<image');
+  expect((svg.zoom.match(/<title>\d · /g) || []).length).toBe(2);
+  expect(svg.zoom).not.toContain('<image');
+  expect(svg.uc).toContain('Área ampliada no 1º quadro');          // a UC inteira marca onde está o zoom
+  // o zoom enquadra os CARs, não a UC: o polígono ocupa boa parte do quadro
+  // (na escala da UC, um CAR de 50 ha tinha 2–3 px e sumia atrás do número)
+  const vz = cmapa.carucMapaVistas(d).zoom;
+  const [ax, ay] = vz.proj(-69.99, -9.97), [bx, by] = vz.proj(-69.97, -9.99);
+  expect(bx - ax).toBeGreaterThan(80);
+  expect(by - ay).toBeGreaterThan(80);
   expect(svg.acre).toContain('F1 · F');
   const sat = cmapa.carucMapaSVGs(d, cmapa.carucMapaVistas(d), { fundo: 'satelite', imagemUC: 'data:image/jpeg;base64,AA', imagemAcre: 'data:image/jpeg;base64,AA' });
   expect(sat.uc).toContain('<image');
@@ -463,7 +470,7 @@ test('celular (390px): filtros abertos e tabela sem rolagem lateral da página',
   expect(chip.height).toBeGreaterThanOrEqual(24);
   // com o mapa do titular aberto, a página continua sem rolagem lateral
   await page.locator('#caruc-conteudo [data-fk="titular"][data-fv="Mais de um CAR nesta UC"]').first().click();
-  await expect(page.locator('.caruc-mapas[data-grupo="1"] svg')).toHaveCount(1);
+  await expect(page.locator('.caruc-mapas[data-grupo="1"] svg')).toHaveCount(2);
   expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
 });
 
@@ -564,14 +571,14 @@ test('mapa do titular: polígonos numerados como as linhas, com satélite e cré
   await gerar(page);
   await agruparMulti(page);
   const mapa = page.locator('.caruc-mapas[data-grupo="1"]');
-  await expect(mapa.locator('svg')).toHaveCount(1);            // sem CARs de fora pedidos: só o quadro da UC
-  await expect(mapa.locator('svg title')).toHaveText([/^1 · AC-[AC]$/, /^2 · AC-[AC]$/]);
-  await expect.poll(() => mapa.locator('svg image').count()).toBe(1);   // satélite entrou
+  await expect(mapa.locator('svg')).toHaveCount(2);            // sem CARs de fora pedidos: zoom + UC inteira
+  await expect(mapa.locator('svg').first().locator('title')).toHaveText([/^1 · AC-[AC]$/, /^2 · AC-[AC]$/]);
+  await expect.poll(() => mapa.locator('svg image').count()).toBe(2);   // satélite entrou nos dois
   expect(page.__tiles).toBeGreaterThan(0);
   await expect(page.locator('.caruc-mapa-cred').first()).toContainText('Esri World Imagery');
   // o nº do polígono é o nº da linha: o 1 é o imóvel de maior área no recorte
   const pinos = await page.locator(LINHAS).evaluateAll(trs => trs.map(tr => [tr.querySelector('.caruc-pino')?.textContent, tr.querySelector('.caruc-cod')?.textContent]));
-  const titulos = await mapa.locator('svg title').allTextContents();
+  const titulos = await mapa.locator('svg').first().locator('title').allTextContents();
   for (const [n, cod] of pinos) expect(titulos).toContain(`${n} · ${cod}`);
   // sem "Agrupar por titular", nenhum mapa
   await page.uncheck('#caruc-agrupar');
@@ -584,7 +591,7 @@ test('"Sem fundo" desenha só o vetor e não baixa ladrilho nenhum', async ({ pa
   await gerar(page);
   await agruparMulti(page);
   const mapa = page.locator('.caruc-mapas[data-grupo="1"]');
-  await expect(mapa.locator('svg title')).toHaveCount(2);
+  await expect(mapa.locator('svg').first().locator('title')).toHaveCount(2);
   await page.waitForTimeout(300);
   await expect(mapa.locator('svg image')).toHaveCount(0);
   expect(page.__tiles).toBe(0);
@@ -606,8 +613,8 @@ test('CARs do mesmo titular fora da UC: só quando pedidos, no mapa do Acre e nu
 
   await agruparMulti(page);
   const mapa = page.locator('.caruc-mapas[data-grupo="1"]');
-  await expect(mapa.locator('svg')).toHaveCount(2);            // UC + Acre
-  await expect(mapa.locator('svg').nth(1).locator('title')).toContainText(['F1 · AC-FORA-1']);
+  await expect(mapa.locator('svg')).toHaveCount(3);            // zoom + UC inteira + Acre
+  await expect(mapa.locator('svg').nth(2).locator('title')).toContainText(['F1 · AC-FORA-1']);
   await expect(page.locator('tr.caruc-fora-tr')).toContainText('2 CAR(s)');
   await expect(page.locator('tr.caruc-fora-linha')).toHaveCount(2);
   await expect(page.locator('tr.caruc-fora-linha').nth(1)).toContainText('sem polígono no SICAR');
@@ -621,14 +628,17 @@ test('PDF e Excel levam o mapa do titular e os CARs de fora', async ({ page }) =
   await page.check('#caruc-fora');
   await gerar(page);
   await agruparMulti(page);
-  await expect.poll(() => page.locator('.caruc-mapas[data-grupo="1"] svg image').count()).toBe(2);
+  await expect.poll(() => page.locator('.caruc-mapas[data-grupo="1"] svg image').count()).toBe(3);
 
   const [dPdf] = await Promise.all([page.waitForEvent('download', { timeout: 60_000 }), page.click('button:has-text("PDF")')]);
   const buf = fs.readFileSync(await dPdf.path());
-  expect((buf.toString('latin1').match(/\/Subtype \/Image/g) || []).length).toBeGreaterThanOrEqual(2);   // os dois quadros
+  expect((buf.toString('latin1').match(/\/Subtype \/Image/g) || []).length).toBeGreaterThanOrEqual(3);   // os três quadros
   const { PDFParse } = require('pdf-parse');
   const texto = (await new PDFParse({ data: buf }).getText()).text;
-  expect(texto).toContain('Nº no mapa');
+  // tabela de leitura: titular/CPF só no cabeçalho do grupo; texto longo em linha própria
+  expect(texto).toContain('Situação / classe');
+  expect(texto).not.toContain('CPF/CNPJ (mascarado)');
+  expect(texto).toMatch(/Motivo: /);
   expect(texto).toContain('AC-FORA-1');
   expect(texto).toContain('Esri World Imagery');
   expect(texto).not.toMatch(/\d{3}\.\d{3}\.\d{3}-\d{2}/);
@@ -650,7 +660,7 @@ test('PDF sem fundo: mapa entra sem imagem de satélite e sem crédito', async (
   expect((buf.toString('latin1').match(/\/Subtype \/Image/g) || []).length).toBeGreaterThanOrEqual(1);
   const { PDFParse } = require('pdf-parse');
   const texto = (await new PDFParse({ data: buf }).getText()).text;
-  expect(texto).toContain('Nº no mapa');
+  expect(texto).toContain('Situação / classe');
   expect(texto).not.toContain('Esri World Imagery');
   expect(page.__tiles).toBe(0);
 });
