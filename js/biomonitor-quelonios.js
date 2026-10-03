@@ -74,7 +74,7 @@ const BioApp = {
 let BIO_ESPECIES = [
   { id: 'tracaja',   sigla: 'TR',  nome: 'Tracajá',            nome_cientifico: 'Podocnemis unifilis',       incubacao_dias: 68 },
   { id: 'tartaruga', sigla: 'TA',  nome: 'Tartaruga-da-amazônia', nome_cientifico: 'Podocnemis expansa',        incubacao_dias: 55 },
-  { id: 'cabecudo',  sigla: 'R',   nome: 'Cabeçudo',           nome_cientifico: 'Podocnemis sextuberculata', incubacao_dias: 52 },
+  { id: 'cabecudo',  sigla: 'R',   nome: 'Cabeçudo',           nome_cientifico: 'Peltocephalus dumerilianus', incubacao_dias: 52 },
   // 'pitiU' é código histórico: no Acre a espécie é o Iaçá (P. sextuberculata)
   { id: 'pitiU',     sigla: 'IA',  nome: 'Iaçá',               nome_cientifico: 'Podocnemis sextuberculata', incubacao_dias: 70 },
   { id: 'mucua',     sigla: 'MU',  nome: 'Muçuã',              nome_cientifico: 'Kinosternon scorpioides',   incubacao_dias: 135 },

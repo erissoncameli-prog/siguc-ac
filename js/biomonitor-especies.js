@@ -26,7 +26,7 @@ const BIO_ESP_CACHE_CHAVE = 'siguc_bio_especies_catalogo'
 const BIO_ESP_PADRAO = {
   tracaja:            { nome: 'Tracajá',               sigla: 'TR', nome_cientifico: 'Podocnemis unifilis' },
   tartaruga:          { nome: 'Tartaruga-da-amazônia', sigla: 'TA', nome_cientifico: 'Podocnemis expansa' },
-  cabecudo:           { nome: 'Cabeçudo',              sigla: 'R',  nome_cientifico: '' },
+  cabecudo:           { nome: 'Cabeçudo',              sigla: 'R',  nome_cientifico: 'Peltocephalus dumerilianus' },
   pitiU:              { nome: 'Iaçá',                  sigla: 'IA', nome_cientifico: 'Podocnemis sextuberculata' },
   mucua:              { nome: 'Muçuã',                 sigla: 'MU', nome_cientifico: 'Kinosternon scorpioides' },
   jabuti_pe_elefante: { nome: 'Jabuti-pé-de-elefante', sigla: 'JE', nome_cientifico: 'Chelonoidis denticulatus' },
