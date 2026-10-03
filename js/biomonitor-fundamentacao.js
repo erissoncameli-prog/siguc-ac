@@ -44,24 +44,25 @@ const BIO_ESPECIES_REF = {
       'podendo aguardar semanas no ninho até as primeiras chuvas. Proposta como ' +
       'indicador biológico de mudança climática.',
   },
-  // ⚠️ Espécie DESATIVADA no catálogo. Os parâmetros abaixo são de
-  // P. sextuberculata, que no Acre é o IAÇÁ (código 'pitiU', confirmado
-  // pela SEMA em 03/10/2026). O cabeçudo costuma ser outra espécie
-  // (Peltocephalus dumerilianus) — revisar com o biólogo antes de reativar.
+  // Espécie DESATIVADA no catálogo. Nome científico conferido pela SEMA
+  // (03/10/2026): Peltocephalus dumerilianus. Até 03/10 este bloco trazia
+  // os parâmetros de P. sextuberculata, que são do Iaçá ('pitiU', abaixo).
+  // Parâmetros de referência de P. dumerilianus ainda NÃO cadastrados —
+  // ficam nulos (a tela mostra "—", a TSD cai na pivotal genérica marcada
+  // como aproximada) até alguém preencher com fonte, antes de reativar.
   cabecudo: {
-    nome_cientifico: 'Podocnemis sextuberculata',
+    nome_cientifico: 'Peltocephalus dumerilianus',
     nome_popular: 'Cabeçudo',
-    incubacao_dias: [50, 70],
-    postura_media: 12,
-    postura_faixa: [6, 20],
-    temp_pivotal_c: 33.7,
-    temp_pivotal_aprox: false,
-    tsd_padrao: 'TSD Ia — faixa transicional estreita (~1,2 °C)',
-    periodo_termossensivel: 'terço final da incubação',
-    status_nacional: 'Vulnerável (VU)',
-    refs: ['tsd_sextuberculata', 'pqa'],
-    obs: 'Pivotal ~33,7 °C com faixa transicional estreita (~1,16 °C) — pouca ' +
-      'margem evolutiva frente ao aquecimento.',
+    incubacao_dias: null,
+    postura_media: null,
+    postura_faixa: null,
+    temp_pivotal_c: null,
+    temp_pivotal_aprox: true,
+    tsd_padrao: 'A confirmar',
+    periodo_termossensivel: 'a confirmar',
+    status_nacional: null,
+    refs: [],
+    obs: 'Parâmetros de referência ainda não cadastrados para esta espécie.',
   },
   // Código interno 'pitiU' é histórico (nasceu como pitiú). No Acre a
   // espécie registrada é o IAÇÁ, Podocnemis sextuberculata — confirmado

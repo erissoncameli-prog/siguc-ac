@@ -2522,13 +2522,16 @@ Iaçá, *Podocnemis sextuberculata* (confirmado pela SEMA em 03/10/2026).
 - Fundamentação (`js/biomonitor-fundamentacao.js`): `pitiU` passou a ter
   os parâmetros de *P. sextuberculata* (antes era *P. erythrocephala*, a
   irapuca — ninhos de Iaçá eram comparados com outra espécie).
-  ⚠️ `cabecudo` (desativado) ainda traz *P. sextuberculata* no catálogo e
-  na fundamentação; cabeçudo costuma ser *Peltocephalus dumerilianus* —
-  revisar com o biólogo antes de reativar.
+  `cabecudo` (desativado) = *Peltocephalus dumerilianus* (catálogo
+  corrigido pela SEMA em 03/10/2026). Na fundamentação ele ficou SEM
+  parâmetros de referência (nulos → "—" na tela, pivotal genérica
+  aproximada na TSD) — preencher com fonte antes de reativar; nunca
+  herdar os do Iaçá de novo.
 - Guarda: `tests/biomonitor-especies.test.js` (5), inclusive varredura que
   reprova "Pitiú" fixo em `pages/` e `js/`.
 - `pwa/sw.js`: biomonitor 67 → 68 (`js/biomonitor-especies.js` no shell;
-  as 3 listas de `app-biomonitor/scripts/build-www.mjs` atualizadas).
+  as 3 listas de `app-biomonitor/scripts/build-www.mjs` atualizadas);
+  68 → 69 (cabeçudo = *P. dumerilianus* nas reservas e na fundamentação).
 
 ## Biomonitor — Anomalias congênitas em filhotes (migration 321)
 Registro de eclosão ganhou contador `filhotes_anomalia` (SUBCONJUNTO
