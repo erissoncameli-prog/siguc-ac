@@ -3782,6 +3782,17 @@ ao banco.
   sobrescreve o stub e a página cai no login).
 - Sem mudança em `pwa/sw.js`: tela de mesa.
 
+**Exclusão de coleta é LÓGICA** (`excluido_em`/`excluido_por`/
+`exclusao_justificativa`, RPC `agua_excluir_coleta`, migration 270),
+nunca `DELETE`. `vw_agua_coletas_detalhe` e as `agua_publico_*` já
+escondem a excluída; **toda tela que ler a TABELA `agua_coletas` direto
+tem de filtrar `.is('excluido_em', null)`** — achado ao excluir as 3
+coletas de teste da 2ª campanha de 2026 (migration 355): Conferência e
+Laudos liam a tabela sem o filtro e continuariam mostrando/contando as
+excluídas. Guarda: `tests/agua-conferencia-filtros.test.js` (o stub
+devolve uma coleta excluída se a página não pedir o filtro). Ainda não
+há botão de excluir em tela nenhuma — a RPC existe, sem chamador.
+
 ## Regra do sistema — etiqueta do frasco de amostra (Água, Fase 1 — migration 325)
 Impressão térmica Bluetooth portátil, pedida pelo usuário. Plano
 completo (requisito de compra da impressora, 5 peças, riscos) em

@@ -187,7 +187,7 @@ async function lzEscanearQR() {
   // Não está na fila de laudo — pode já ter sido lançada, ou o código
   // não existir. As duas mensagens são diferentes de propósito: uma
   // coleta já lançada não é erro, é informação.
-  const { data } = await db.from('agua_coletas').select('status').eq('codigo_amostra', codigo).maybeSingle()
+  const { data } = await db.from('agua_coletas').select('status').eq('codigo_amostra', codigo).is('excluido_em', null).maybeSingle()
   if (data) {
     toast(`Essa amostra já está "${LZ_STATUS_FRASE[data.status] || data.status}" — não está mais aguardando laudo.`, 'warning')
   } else {
@@ -205,7 +205,7 @@ async function carregarLabsAtivos() {
 async function carregarFila() {
   const [{ data, error }, { data: statusRows }] = await Promise.all([
     db.from('vw_agua_coletas_detalhe').select('*').eq('status', 'aguardando_lab').order('data_coleta'),
-    db.from('agua_coletas').select('status'),
+    db.from('agua_coletas').select('status').is('excluido_em', null),
   ])
   if (error) { toast(error.message || 'Erro ao carregar fila', 'error'); return }
   _fila = data || []

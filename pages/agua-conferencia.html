@@ -166,8 +166,12 @@ async function carregarLista() {
       // nasceriam vazios (a coluna existe, o join é que não a trazia).
       .select('*, agua_pontos_coleta(nome,codigo_ana,rio,bacia,municipio), agua_campanhas(ano,ordem)')
       .eq('status', 'quarentena')
+      // Lê a TABELA, não a view — então o filtro de exclusão lógica
+      // (agua_excluir_coleta / migration 355) tem de vir aqui; a view
+      // vw_agua_coletas_detalhe já o aplica sozinha.
+      .is('excluido_em', null)
       .order('linha_origem_planilha'),
-    db.from('agua_coletas').select('status'),
+    db.from('agua_coletas').select('status').is('excluido_em', null),
   ])
   if (error) { toast(error.message || 'Erro ao carregar', 'error'); return }
   _coletas = data || []

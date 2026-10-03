@@ -62,16 +62,26 @@ async function abrirConferencia(page) {
   await page.route('**/cdn.jsdelivr.net/**', route => route.abort());
   await page.addInitScript(([usuario, coletas]) => {
     window.loadEnv = () => Promise.resolve({ supabaseUrl: 'http://fake.test', supabaseKey: 'fake-key' });
+    // Coleta EXCLUÍDA (exclusão lógica, migration 355) que o "banco"
+    // devolve se a página não pedir `.is('excluido_em', null)` — a tela
+    // lê a tabela, não a view que já filtra. Sem o filtro, a contagem de
+    // linhas de TODOS os testes deste arquivo sai com uma a mais.
+    const excluida = { id: 'cx', linha_origem_planilha: 99, codigo_amostra: 'COL-2026-0016', data_coleta: '2026-08-15',
+      status: 'quarentena', quarentena_motivo: 'Coleta de teste', excluido_em: '2026-10-03T00:00:00Z',
+      agua_pontos_coleta: { nome: 'Brasiléia', codigo_ana: '13470000', rio: 'Rio Acre', bacia: 'Purus', municipio: 'Brasiléia' },
+      agua_campanhas: { ano: 2026, ordem: 'segunda' } };
     const consulta = (tabela) => {
-      let filtroStatus = null;
+      let filtroStatus = null, semExcluidas = false;
       const q = {
-        select: () => q, in: () => q, is: () => q, order: () => q, limit: () => q,
+        select: () => q, in: () => q, order: () => q, limit: () => q,
+        is: (col, val) => { if (col === 'excluido_em' && val === null) semExcluidas = true; return q },
         eq: (col, val) => { if (col === 'status') filtroStatus = val; return q },
         single: async () => ({ data: usuario, error: null }),
         maybeSingle: async () => ({ data: usuario, error: null }),
         then: (r) => {
           let data = [];
-          if (tabela === 'agua_coletas') data = filtroStatus === 'quarentena' ? coletas : coletas.map(c => ({ status: c.status }));
+          const base = semExcluidas ? coletas : [...coletas, excluida];
+          if (tabela === 'agua_coletas') data = filtroStatus === 'quarentena' ? base : base.map(c => ({ status: c.status }));
           return Promise.resolve({ data, error: null }).then(r);
         },
       };
@@ -192,4 +202,10 @@ test('lista vazia por filtro não se confunde com quarentena zerada', async ({ p
   const vazio = page.locator('#tbody-ag');
   await expect(vazio).toContainText('com esses filtros');
   await expect(vazio).not.toContainText('Nenhuma coleta em quarentena<');
+});
+
+test('coleta excluída (exclusão lógica) não aparece na lista nem nos filtros', async ({ page }) => {
+  await abrirConferencia(page);   // já cobra exatamente COLETAS.length linhas
+  await expect(page.locator('#tbody-ag')).not.toContainText('COL-2026-0016');
+  expect(await page.locator('#ag-f-ano option').allInnerTexts()).not.toContain('2026');
 });
