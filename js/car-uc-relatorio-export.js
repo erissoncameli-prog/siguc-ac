@@ -107,23 +107,31 @@ async function carucMontarPdf(rel, protocolo) {
   _carucTabelaContagem(ctx, 'Por tipo de imóvel', r.por_tipo, 'Tipo')
   _carucTabelaContagem(ctx, 'Por tamanho (módulos fiscais)', r.por_faixa, 'Faixa')
 
-  // Relação completa — nova página, mesmas colunas do CSV/Excel.
+  // Relação completa — nova página. O PDF leva uma tabela de LEITURA
+  // (11 colunas, larguras fixas, texto longo numa linha própria por
+  // imóvel); Excel/CSV continuam com todas as colunas separadas.
   _agpdfNovaPagina(ctx)
   _agpdfTitulo(ctx, `Relação dos imóveis (${rel.imoveis.length})`)
-  // O PDF (paisagem) leva as colunas de leitura; Excel/CSV levam todas.
-  const FORA_DO_PDF = ['Status', 'Módulos fiscais', 'Titular nº (neste relatório)', 'CARs do titular no Acre',
-    'Área total (ha)', 'Área declarada (ha)', 'Quanto está na UC', 'Sobreposição com outros CARs', 'Pontos de atenção']
-  const todas = carucColunasExportacao(rel)
-  const cols = [todas.find(c => c.rotulo === 'Prioridade'),
-    ...todas.filter(c => c.rotulo !== 'Prioridade' && !FORA_DO_PDF.includes(c.rotulo) && (c.rotulo !== 'Localização' || rel.zoneamento.usouZa))]
-  const linhaImovel = i => cols.map(c => carucFormatarValor(c.valor(i), c.casas))
+  const agrupado = !!(rel.agrupado && rel.grupos)
+  const cols = _carucPdfColunas(rel, agrupado)
   const estiloRel = {
-    styles: { font: 'DMSans', fontSize: 6.2, cellPadding: 1, overflow: 'linebreak', lineColor: AGPDF_COR.borda, lineWidth: 0.1 },
-    headStyles: { fillColor: AGPDF_COR.floresta, textColor: 255, fontStyle: 'bold', fontSize: 6 },
-    columnStyles: Object.fromEntries(cols.map((c, k) => [k, c.casas != null ? { halign: 'right' } : {}])),
+    styles: { font: 'DMSans', fontSize: 6.4, cellPadding: 1.1, overflow: 'linebreak', lineColor: AGPDF_COR.borda, lineWidth: 0.1, valign: 'top' },
+    headStyles: { fillColor: AGPDF_COR.floresta, textColor: 255, fontStyle: 'bold', fontSize: 6.2 },
+    alternateRowStyles: {},
   }
+  const corpoImoveis = (lista, pinos) => lista.flatMap((i, k) => {
+    const linha = cols.map(c => c.valor(i, pinos?.[k]))
+    const nota = _carucPdfNota(i)
+    return nota ? [linha, [{ content: nota, colSpan: cols.length, styles: { fontSize: 5.8, textColor: AGPDF_COR.muted, cellPadding: { top: 0.4, bottom: 1.4, left: 2.4, right: 1.1 } } }]] : [linha]
+  })
+  const tabelaImoveis = (lista, pinos) => _agpdfTabela(ctx, {
+    ...estiloRel,
+    head: [cols.map(c => c.rotulo)],
+    body: corpoImoveis(lista, pinos),
+    columnStyles: Object.fromEntries(cols.map((c, k) => [k, { cellWidth: c.largura ?? 'auto', halign: c.direita ? 'right' : 'left' }])),
+  })
   let usouSatelite = false
-  if (rel.agrupado && rel.grupos) {
+  if (agrupado) {
     // Agrupado: um bloco por titular, na ordem da tela — cabeçalho, mapa
     // (2+ CARs, o MESMO SVG da tela rasterizado) e os imóveis dele.
     const fundo = o.fundoMapa || 'satelite'
@@ -136,27 +144,21 @@ async function carucMontarPdf(rel, protocolo) {
       ctx.y -= 4
       if (temMapa) usouSatelite = (await _carucPdfMapaGrupo(ctx, rel, g, fundo, acre)) || usouSatelite
       let n = 0
-      const pinos = temMapa ? g.imoveis.map(i => i._mapa ? String(++n) : '') : null
-      _agpdfTabela(ctx, {
-        ...estiloRel,
-        head: [[...(pinos ? ['Nº no mapa'] : []), ...cols.map(c => c.rotulo)]],
-        body: g.imoveis.map((i, k) => [...(pinos ? [pinos[k]] : []), ...linhaImovel(i)]),
-        columnStyles: Object.fromEntries(cols.map((c, k) => [k + (pinos ? 1 : 0), c.casas != null ? { halign: 'right' } : {}])),
-      })
+      tabelaImoveis(g.imoveis, temMapa ? g.imoveis.map(i => i._mapa ? String(++n) : '') : null)
       if (temMapa && g.fora?.length) {
         const fora = g.fora.slice(0, 30)
         _agpdfTabela(ctx, {
           ...estiloRel,
-          head: [['No mapa', 'Fora da UC · mesmo titular · Nº do CAR', 'Imóvel', 'Município', 'Situação', 'Área declarada (ha)']],
+          head: [['Nº', 'Fora da UC · mesmo titular · Nº do CAR', 'Imóvel', 'Município', 'Situação', 'Área declarada (ha)']],
           headStyles: { ...estiloRel.headStyles, fillColor: [146, 64, 14] },
           body: fora.map((f, k) => ['F' + (k + 1), f.cod, f.nome_imovel || '—', f.municipio || '—', f.situacao || '—', _carucN(f.area_declarada_ha)]),
-          columnStyles: { 5: { halign: 'right' } },
+          columnStyles: { 0: { cellWidth: 8 }, 1: { cellWidth: 62 }, 5: { halign: 'right', cellWidth: 26 } },
         })
         if (g.fora.length > fora.length) _agpdfParagrafo(ctx, `… e mais ${g.fora.length - fora.length} CAR(s) deste titular fora da UC — todos estão no mapa e na planilha Excel (aba "Fora da UC").`, { muted: true })
       }
     }
   } else {
-    _agpdfTabela(ctx, { ...estiloRel, head: [cols.map(c => c.rotulo)], body: rel.imoveis.map(linhaImovel) })
+    tabelaImoveis(rel.imoveis, null)
   }
 
   _agpdfTitulo(ctx, 'Notas')
@@ -183,19 +185,64 @@ async function carucMontarPdf(rel, protocolo) {
   return pdf
 }
 
-// Mapa do titular no PDF: os dois quadros lado a lado, 70 mm de altura
-// (cabe com folga na paisagem). Devolve true se o satélite entrou.
+// ── Tabela de leitura do PDF ─────────────────────────────────────────
+// 11 colunas no máximo, larguras fixas (paisagem: 267 mm úteis). Agrupado:
+// titular/CPF/CARs saem da linha — já estão no cabeçalho do grupo. Focos,
+// DETER e PRODES viram UMA coluna "Ambiental", só quando pedidos.
+function _carucPdfColunas(rel, agrupado) {
+  const o = rel.opcoes || {}
+  const n2 = v => _carucN(v)
+  const amb = o.focos || o.deter || o.prodes
+  const cols = []
+  if (agrupado) cols.push({ rotulo: 'Nº', largura: 7, valor: (i, pino) => pino || '' })
+  cols.push({ rotulo: 'Nº do CAR', largura: 40,
+    valor: i => i.cod + (rel.zoneamento?.usouZa && i.local !== 'uc' ? '\n(só na zona de amortecimento)' : '') })
+  cols.push(agrupado
+    ? { rotulo: 'Imóvel', valor: i => i.nome_imovel || '—' }
+    : { rotulo: 'Imóvel / titular', valor: i => [i.nome_imovel || '—', [i.titular, i.documento].filter(Boolean).join(' · ')].filter(Boolean).join('\n') })
+  cols.push({ rotulo: 'Município', largura: 20, valor: i => i.municipio || '—' })
+  cols.push({ rotulo: 'Situação / classe', largura: 25, valor: i => [i.situacao || '—', i.classe].filter(Boolean).join('\n') })
+  cols.push({ rotulo: 'Tipo', largura: 17, valor: i => carucTipoImovel(i.tipo_imovel) })
+  cols.push({ rotulo: 'Área na UC (ha · %)', largura: 19, direita: true,
+    valor: i => `${n2(i.area_analise_ha)}${i.pct_analise != null ? `\n${carucFormatarValor(i.pct_analise, 1)}%` : ''}` })
+  cols.push({ rotulo: 'Zonas', valor: i => (i.zonas || []).map(z => z.nome).join('; ') || '—' })
+  cols.push({ rotulo: 'Inscrição', largura: 15, valor: i => i.data_inscricao ? i.data_inscricao.split('-').reverse().join('/') : '—' })
+  if (amb) cols.push({ rotulo: 'Ambiental', largura: 34, valor: i => {
+    const p = []
+    if (o.focos) p.push(`Focos ${o.focosDe}–${o.focosAte}: ${i.ambiental ? carucFormatarValor(i.ambiental.focos_periodo, 0) : '—'}`)
+    if (o.deter) p.push(`DETER: ${i.ambiental ? `${carucFormatarValor(i.ambiental.deter_alertas, 0)} (${n2(i.ambiental.deter_ha)} ha)` : '—'}`)
+    if (o.prodes) p.push(`PRODES pós-2008: ${i.prodes ? n2(i.prodes.pos_marco_ha) + ' ha' : '—'}`)
+    return p.join('\n')
+  } })
+  cols.push({ rotulo: 'Prioridade', largura: 15, valor: i => CARUC_PRIORIDADE_ROTULO[i.prioridade?.nivel] || '—' })
+  return cols
+}
+
+// Linha própria, de largura inteira, abaixo do imóvel: o texto longo que
+// espremido numa coluna virava uma letra por linha.
+function _carucPdfNota(i) {
+  const partes = []
+  if (i.prioridade?.motivos?.length) partes.push('Motivo: ' + i.prioridade.motivos.join('; '))
+  if (i.atencoes?.length) partes.push('Atenção: ' + i.atencoes.join('; '))
+  if (i.sobreposicoes?.length) partes.push('Sobrepõe: ' + i.sobreposicoes.slice(0, 4).map(s => `${s.cod} (${_carucN(s.ha)} ha${s.mesmo_titular ? ', mesmo titular' : ''})`).join('; ')
+    + (i.sobreposicoes.length > 4 ? ` e mais ${i.sobreposicoes.length - 4}` : ''))
+  return partes.join('   ·   ')
+}
+
+// Mapa do titular no PDF: zoom nos CARs + UC inteira (+ Acre quando há
+// CARs de fora), lado a lado, 66 mm de altura — cabe na paisagem com
+// folga. Devolve true se o satélite entrou.
 async function _carucPdfMapaGrupo(ctx, rel, g, fundo, acre) {
-  const ALT = 70
+  const ALT = 66
   try {
     const m = await carucMapaGrupo(rel, g, fundo, acre)
     const sat = fundo === 'satelite' && !m.semSatelite
-    const uc = m.uc ? await carucMapaSvgParaImagem(m.uc, 2, sat) : null
-    const ac = m.acre ? await carucMapaSvgParaImagem(m.acre, 2, sat) : null
-    if (!uc && !ac) return false
+    const imgs = []
+    for (const svg of [m.zoom, m.uc, m.acre]) if (svg) imgs.push(await carucMapaSvgParaImagem(svg, 2, sat))
+    if (!imgs.length) return false
     _agpdfGarantirEspaco(ctx, ALT + 8)
     let x = AGPDF_M
-    for (const im of [uc, ac].filter(Boolean)) {
+    for (const im of imgs) {
       const w = ALT * im.w / im.h
       ctx.pdf.addImage(im.dataUrl, sat ? 'JPEG' : 'PNG', x, ctx.y, w, ALT)
       ctx.pdf.setDrawColor(...AGPDF_COR.borda); ctx.pdf.setLineWidth(0.2); ctx.pdf.rect(x, ctx.y, w, ALT)
@@ -203,9 +250,9 @@ async function _carucPdfMapaGrupo(ctx, rel, g, fundo, acre) {
     }
     ctx.y += ALT + 3.5
     ctx.pdf.setFont('DMSans', 'normal'); ctx.pdf.setFontSize(6.6); ctx.pdf.setTextColor(...AGPDF_COR.muted)
-    const leg = ['Polígono numerado: CAR do titular (nº = coluna "Nº no mapa")', 'traço contínuo: limite da UC']
+    const leg = ['1º quadro: CARs do titular ampliados (nº = coluna "Nº")', '2º: UC inteira, retângulo = área ampliada', 'traço contínuo: limite da UC']
     if (rel.geo?.zonas?.length) leg.push('tracejado: zonas de manejo')
-    if (m.acre) leg.push('pontos F1, F2…: CARs do mesmo titular fora da UC')
+    if (m.acre) leg.push('3º: Acre, pontos F1, F2… = CARs do mesmo titular fora da UC')
     if (m.semSatelite) leg.push('imagem de satélite indisponível na geração — sem fundo')
     ctx.pdf.text(leg.join(' · '), AGPDF_M, ctx.y)
     ctx.y += 4

@@ -20,18 +20,19 @@
 
 const CARUC_MAPA_TILE = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
 const CARUC_MAPA_CREDITO = 'Imagem de fundo: Esri World Imagery (Esri, Maxar, Earthstar Geographics)'
-const CARUC_MAPA_UC = { w: 600, h: 340 }
-const CARUC_MAPA_ACRE = { w: 300, h: 340 }
+const CARUC_MAPA_ZOOM = { w: 560, h: 360 }     // quadro principal: os CARs do titular
+const CARUC_MAPA_LOC = { w: 260, h: 360 }      // UC inteira e Acre
+const CARUC_MAPA_ZOOM_MIN_GRAUS = 0.02         // ~2,2 km de lado no mínimo
 const CARUC_MAPA_MIN_CARS = 2          // decisão do usuário: 2 ou mais CARs no recorte
 const CARUC_MAPA_MAX_TILES = 48
 const CARUC_MAPA_ROTULOS_FORA = 15     // acima disso, os de fora viram só pontos (sem "F12" empilhado)
 
 const CARUC_MAPA_COR = {
   satelite: { uc: '#FFFFFF', zona: 'rgba(255,255,255,.55)', zonaFill: ['rgba(255,255,255,.10)', 'rgba(255,255,255,.04)'],
-    car: '#FACC15', carFill: 'rgba(250,204,21,.30)', rotFundo: '#0A1A0F', rotTexto: '#FACC15',
+    car: '#FACC15', carFill: 'rgba(250,204,21,.30)', carSombra: 'rgba(0,0,0,.75)', rotFundo: '#0A1A0F', rotTexto: '#FACC15', destaque: '#FACC15',
     fora: '#F59E0B', foraBorda: '#FFFFFF', texto: '#FFFFFF', acreFill: 'none' },
   sem: { fundo: '#EEF1EA', uc: '#0A1A0F', zona: 'rgba(10,26,15,.55)', zonaFill: ['#B7D7C1', '#DCEBC9'],
-    car: '#9A3412', carFill: 'rgba(234,88,12,.35)', rotFundo: '#FFFFFF', rotTexto: '#9A3412',
+    car: '#9A3412', carFill: 'rgba(234,88,12,.35)', carSombra: 'rgba(255,255,255,.9)', rotFundo: '#FFFFFF', rotTexto: '#9A3412', destaque: '#C2410C',
     fora: '#B45309', foraBorda: '#FFFFFF', texto: '#0A1A0F', acreFill: '#FFFFFF' },
 }
 
@@ -124,54 +125,115 @@ function _carucMapaAbrir(vista, fundo, cores, rotulo) {
   return `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 ${vista.w} ${vista.h}" width="${vista.w}" height="${vista.h}" role="img" aria-label="${_carucMapaEsc(rotulo)}">${base}`
 }
 
-// ── Os dois quadros de um titular ────────────────────────────────────
+// ── Os três quadros de um titular ────────────────────────────────────
+// 1º ZOOM nos CARs do titular (o quadro principal); 2º a UC inteira com
+// um retângulo marcando a área do zoom; 3º o Acre com os CARs de fora
+// (só quando pedidos). O zoom existe porque, na escala da UC, um CAR de
+// 50 ha ocupa 2–3 px e some atrás do próprio número (relato do usuário
+// com o PDF da FE do Afluente).
+//
 // dados = { uc: geometry, zonas: [geometry], cars: [{ rot, cod, geom }],
 //           fora: [{ rot, cod, geom }], acre: geometry|null }
 // Devolve as vistas (para o satélite) — o SVG sai de carucMapaSVGs.
 function carucMapaVistas(dados) {
-  const geomsUC = [dados.uc, ...dados.cars.map(c => c.geom)].filter(Boolean)
-  const bUC = carucMapaBbox(geomsUC)
-  const vistas = { uc: bUC ? carucMapaVista(bUC, CARUC_MAPA_UC.w, CARUC_MAPA_UC.h) : null, acre: null }
+  const vistas = { zoom: null, uc: null, acre: null }
+  let bCars = carucMapaBbox(dados.cars.map(c => c.geom))
+  if (bCars) {
+    // Largura mínima (~2,2 km): dois imóveis pequenos colados não viram
+    // um quadro de 200 m onde nada se reconhece.
+    const MIN = CARUC_MAPA_ZOOM_MIN_GRAUS
+    const cx = (bCars[0] + bCars[2]) / 2, cy = (bCars[1] + bCars[3]) / 2
+    const meiaW = Math.max(bCars[2] - bCars[0], MIN) / 2, meiaH = Math.max(bCars[3] - bCars[1], MIN) / 2
+    bCars = [cx - meiaW, cy - meiaH, cx + meiaW, cy + meiaH]
+    vistas.zoom = carucMapaVista(bCars, CARUC_MAPA_ZOOM.w, CARUC_MAPA_ZOOM.h, 0.12)
+  }
+  const bUC = carucMapaBbox([dados.uc, ...dados.cars.map(c => c.geom)].filter(Boolean))
+  if (bUC) vistas.uc = carucMapaVista(bUC, CARUC_MAPA_LOC.w, CARUC_MAPA_LOC.h, 0.06)
   if (dados.fora?.length) {
     const bA = carucMapaBbox([dados.acre, dados.uc, ...dados.fora.map(f => f.geom)].filter(Boolean))
-    if (bA) vistas.acre = carucMapaVista(bA, CARUC_MAPA_ACRE.w, CARUC_MAPA_ACRE.h, 0.05)
+    if (bA) vistas.acre = carucMapaVista(bA, CARUC_MAPA_LOC.w, CARUC_MAPA_LOC.h, 0.05)
   }
   return vistas
 }
 
+// Área do quadro de zoom em lon/lat (para o retângulo do quadro da UC).
+function _carucMapaVistaBbox(v) {
+  const lon = x => x * 360 - 180
+  const lat = y => Math.atan(Math.sinh(Math.PI * (1 - 2 * y))) * 180 / Math.PI
+  return [lon(v.mx0), lat(v.my0 + v.h / v.escala), lon(v.mx0 + v.w / v.escala), lat(v.my0)]
+}
+
+function _carucMapaRetangulo(bbox, proj, cor) {
+  const [x0, y0] = proj(bbox[0], bbox[3]), [x1, y1] = proj(bbox[2], bbox[1])
+  // Nunca menor que 8 px: numa UC enorme o zoom seria um ponto invisível.
+  const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2
+  const w = Math.max(x1 - x0, 8), h = Math.max(y1 - y0, 8)
+  return `<rect x="${(cx - w / 2).toFixed(1)}" y="${(cy - h / 2).toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" fill="none" stroke="${cor}" stroke-width="2.4"><title>Área ampliada no 1º quadro</title></rect>`
+}
+
+// Rótulo do polígono: DENTRO quando cabe; senão AO LADO, com linha fina
+// até o polígono — o número nunca cobre o desenho que ele identifica.
+function _carucMapaRotulo(geom, proj, rot, cor, k) {
+  const b = carucMapaBbox([geom])
+  if (!b) return ''
+  const [x0, y0] = proj(b[0], b[3]), [x1, y1] = proj(b[2], b[1])
+  const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2
+  const r = 8
+  const texto = (x, y) => `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r}" fill="${cor.rotFundo}" stroke="${cor.car}" stroke-width="1.4"/>`
+    + `<text x="${x.toFixed(1)}" y="${(y + 3.6).toFixed(1)}" text-anchor="middle" font-size="10.5" font-weight="700" font-family="DM Sans,Arial,sans-serif" fill="${cor.rotTexto}">${_carucMapaEsc(rot)}</text>`
+  if (Math.min(x1 - x0, y1 - y0) >= 2 * r + 8) return `<g>${texto(cx, cy)}</g>`
+  const OFF = [[1, -1], [1, 1], [-1, 1], [-1, -1]][k % 4]
+  const d = Math.max(x1 - x0, y1 - y0) / 2 + r + 6
+  const lx = cx + OFF[0] * d * 0.75, ly = cy + OFF[1] * d * 0.75
+  return `<g><line x1="${cx.toFixed(1)}" y1="${cy.toFixed(1)}" x2="${lx.toFixed(1)}" y2="${ly.toFixed(1)}" stroke="${cor.car}" stroke-width="1.2"/>${texto(lx, ly)}</g>`
+}
+
 function carucMapaSVGs(dados, vistas, opts = {}) {
   const sat = opts.fundo === 'satelite'
-  const fundoUC = sat ? opts.imagemUC : null
-  const fundoAcre = sat ? opts.imagemAcre : null
-  const out = { uc: null, acre: null }
+  const img = { zoom: sat ? opts.imagemZoom : null, uc: sat ? opts.imagemUC : null, acre: sat ? opts.imagemAcre : null }
+  const out = { zoom: null, uc: null, acre: null }
 
-  if (vistas.uc) {
-    const v = vistas.uc, cor = CARUC_MAPA_COR[fundoUC ? 'satelite' : 'sem']
-    let s = _carucMapaAbrir(v, fundoUC, cor, `Mapa da UC com ${dados.cars.length} CAR(s) do titular`)
+  const zonasEUc = (v, cor, peso) => {
+    let s = ''
     dados.zonas.forEach((z, k) => {
       s += `<path d="${_carucMapaPath(z, v.proj)}" fill="${cor.zonaFill[k % 2]}" fill-rule="evenodd" stroke="${cor.zona}" stroke-width="1" stroke-dasharray="5 4"/>`
     })
-    if (dados.uc) s += `<path d="${_carucMapaPath(dados.uc, v.proj)}" fill="none" stroke="${cor.uc}" stroke-width="2.6" fill-rule="evenodd"/>`
-    // CARs de fora que caem no quadro da UC (vizinhos dela) também aparecem aqui.
+    if (dados.uc) s += `<path d="${_carucMapaPath(dados.uc, v.proj)}" fill="none" stroke="${cor.uc}" stroke-width="${peso}" fill-rule="evenodd"/>`
+    return s
+  }
+
+  if (vistas.zoom) {
+    const v = vistas.zoom, cor = CARUC_MAPA_COR[img.zoom ? 'satelite' : 'sem']
+    let s = _carucMapaAbrir(v, img.zoom, cor, `Mapa dos ${dados.cars.length} CAR(s) do titular`)
+    s += zonasEUc(v, cor, 2.6)
+    // CARs de fora que caem no quadro (vizinhos da UC) também aparecem aqui.
     for (const f of (dados.fora || [])) {
-      s += `<path d="${_carucMapaPath(f.geom, v.proj)}" fill="none" stroke="${cor.fora}" stroke-width="1.6" stroke-dasharray="3 3"><title>${_carucMapaEsc(f.rot + ' · ' + f.cod)} (fora da UC)</title></path>`
+      s += `<path d="${_carucMapaPath(f.geom, v.proj)}" fill="none" stroke="${cor.fora}" stroke-width="1.8" stroke-dasharray="4 3"><title>${_carucMapaEsc(f.rot + ' · ' + f.cod)} (fora da UC)</title></path>`
     }
     for (const c of dados.cars) {
-      s += `<path d="${_carucMapaPath(c.geom, v.proj)}" fill="${cor.carFill}" fill-rule="evenodd" stroke="${cor.car}" stroke-width="2"><title>${_carucMapaEsc(c.rot + ' · ' + c.cod)}</title></path>`
+      const d = _carucMapaPath(c.geom, v.proj)
+      // Borda escura por baixo + cor por cima: destaca o contorno em qualquer fundo.
+      s += `<path d="${d}" fill="none" stroke="${cor.carSombra}" stroke-width="4.4" stroke-linejoin="round"/>`
+        + `<path d="${d}" fill="${cor.carFill}" fill-rule="evenodd" stroke="${cor.car}" stroke-width="2.2" stroke-linejoin="round"><title>${_carucMapaEsc(c.rot + ' · ' + c.cod)}</title></path>`
     }
-    for (const c of dados.cars) {
-      const p = _carucMapaCentro(c.geom, v.proj)
-      if (!p) continue
-      s += `<g><circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="10" fill="${cor.rotFundo}" stroke="${cor.car}" stroke-width="1.5"/>`
-        + `<text x="${p[0].toFixed(1)}" y="${(p[1] + 4).toFixed(1)}" text-anchor="middle" font-size="12" font-weight="700" font-family="DM Sans,Arial,sans-serif" fill="${cor.rotTexto}">${_carucMapaEsc(c.rot)}</text></g>`
-    }
+    dados.cars.forEach((c, k) => { s += _carucMapaRotulo(c.geom, v.proj, c.rot, cor, k) })
+    s += _carucMapaNorte(v, cor.texto) + _carucMapaEscala(v, cor.texto) + '</svg>'
+    out.zoom = s
+  }
+
+  if (vistas.uc) {
+    const v = vistas.uc, cor = CARUC_MAPA_COR[img.uc ? 'satelite' : 'sem']
+    let s = _carucMapaAbrir(v, img.uc, cor, 'UC inteira com a área ampliada marcada')
+    s += zonasEUc(v, cor, 2)
+    for (const c of dados.cars) s += `<path d="${_carucMapaPath(c.geom, v.proj)}" fill="${cor.car}" stroke="${cor.car}" stroke-width="1"/>`
+    if (vistas.zoom) s += _carucMapaRetangulo(_carucMapaVistaBbox(vistas.zoom), v.proj, cor.destaque)
     s += _carucMapaNorte(v, cor.texto) + _carucMapaEscala(v, cor.texto) + '</svg>'
     out.uc = s
   }
 
   if (vistas.acre) {
-    const v = vistas.acre, cor = CARUC_MAPA_COR[fundoAcre ? 'satelite' : 'sem']
-    let s = _carucMapaAbrir(v, fundoAcre, cor, `Acre com ${dados.fora.length} CAR(s) do titular fora da UC`)
+    const v = vistas.acre, cor = CARUC_MAPA_COR[img.acre ? 'satelite' : 'sem']
+    let s = _carucMapaAbrir(v, img.acre, cor, `Acre com ${dados.fora.length} CAR(s) do titular fora da UC`)
     if (dados.acre) s += `<path d="${_carucMapaPath(dados.acre, v.proj)}" fill="${cor.acreFill}" stroke="${cor.uc}" stroke-width="1.6"/>`
     if (dados.uc) s += `<path d="${_carucMapaPath(dados.uc, v.proj)}" fill="${cor.carFill}" stroke="${cor.car}" stroke-width="1.4"><title>UC</title></path>`
     const rotular = dados.fora.length <= CARUC_MAPA_ROTULOS_FORA
@@ -181,7 +243,7 @@ function carucMapaSVGs(dados, vistas, opts = {}) {
       if (!p) continue
       // Na escala do estado o imóvel some: o ponto é o que se vê.
       s += `<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="4" fill="${cor.fora}" stroke="${cor.foraBorda}" stroke-width="1.2"><title>${_carucMapaEsc(f.rot + ' · ' + f.cod)}</title></circle>`
-      if (rotular) s += `<text x="${(p[0] + 6).toFixed(1)}" y="${(p[1] + 4).toFixed(1)}" font-size="10" font-weight="700" font-family="DM Sans,Arial,sans-serif" fill="${cor.texto}" stroke="${fundoAcre ? '#000' : '#fff'}" stroke-width="2.5" paint-order="stroke">${_carucMapaEsc(f.rot)}</text>`
+      if (rotular) s += `<text x="${(p[0] + 6).toFixed(1)}" y="${(p[1] + 4).toFixed(1)}" font-size="10" font-weight="700" font-family="DM Sans,Arial,sans-serif" fill="${cor.texto}" stroke="${img.acre ? '#000' : '#fff'}" stroke-width="2.5" paint-order="stroke">${_carucMapaEsc(f.rot)}</text>`
     }
     s += _carucMapaNorte(v, cor.texto) + '</svg>'
     out.acre = s
@@ -289,15 +351,16 @@ function carucMapaDadosGrupo(rel, g, acre) {
 async function carucMapaGrupo(rel, g, fundo, acre) {
   const dados = carucMapaDadosGrupo(rel, g, acre)
   const vistas = carucMapaVistas(dados)
-  let imagemUC = null, imagemAcre = null, semSatelite = false
+  let imagemZoom = null, imagemUC = null, imagemAcre = null, semSatelite = false
   if (fundo === 'satelite') {
-    ;[imagemUC, imagemAcre] = await Promise.all([
+    ;[imagemZoom, imagemUC, imagemAcre] = await Promise.all([
+      vistas.zoom ? carucMapaFundoSatelite(vistas.zoom) : null,
       vistas.uc ? carucMapaFundoSatelite(vistas.uc) : null,
       vistas.acre ? carucMapaFundoSatelite(vistas.acre) : null,
     ])
-    semSatelite = (vistas.uc && !imagemUC) || (vistas.acre && !imagemAcre)
+    semSatelite = !!((vistas.zoom && !imagemZoom) || (vistas.uc && !imagemUC) || (vistas.acre && !imagemAcre))
   }
-  return { ...carucMapaSVGs(dados, vistas, { fundo, imagemUC, imagemAcre }), dados, semSatelite }
+  return { ...carucMapaSVGs(dados, vistas, { fundo, imagemZoom, imagemUC, imagemAcre }), dados, semSatelite }
 }
 
 // Rasteriza o SVG (o MESMO da tela) para o PDF. Satélite sai JPEG (foto);
