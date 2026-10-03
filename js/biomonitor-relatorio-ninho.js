@@ -21,11 +21,13 @@
 // institucional, fonte única, compartilhada com o relatório da Água);
 // jsPDF + jspdf-autotable, carregados sob demanda via CDN.
 
-const BIOREL_ESPECIE = {
+// Nomes vêm do catálogo (js/biomonitor-especies.js); este objeto é só
+// reserva se o arquivo não carregar.
+const BIOREL_ESPECIE = (typeof bioEspNomes === 'function' ? bioEspNomes : m => m)({
   tracaja: 'Tracajá', tartaruga: 'Tartaruga', cabecudo: 'Cabeçudo',
-  pitiU: 'Pitiú', cupido: 'Cupido', jabuti_pe_elefante: 'Jabuti-pé-de-elefante',
+  pitiU: 'Iaçá', cupido: 'Cupido', jabuti_pe_elefante: 'Jabuti-pé-de-elefante',
   jabuti_piranga: 'Jabuti-piranga', mucua: 'Muçuã', outro: 'Outro',
-}
+})
 const BIOREL_STATUS_NINHO = {
   encontrado: 'Encontrado', transferido: 'Transferido', eclodido: 'Eclodido',
   em_bercario: 'Em berçário', soltado: 'Soltado', perdido: 'Perdido',

@@ -11,6 +11,7 @@
 <script src="../js/config.js"></script>
 <script src="../js/config-sistema.js"></script>
 <script src="../js/layout.js"></script>
+<script src="../js/biomonitor-especies.js"></script>
 <script src="../js/biomonitor-timeline.js"></script>
 <script src="../js/biomonitor-pdf-fonts.js"></script>
 <script src="../js/relatorio-cabecalho-pdf.js"></script>
@@ -428,6 +429,8 @@
 ;(async function () {
   const usuario = await carregarUsuario()
   if (!usuario) { window.location.href = '../index.html'; return }
+  // Nomes de espécie do catálogo (Administrar › Espécies) antes de montar a tela
+  if (typeof bioEspCarregar === 'function') await bioEspCarregar(db)
 
   document.getElementById('app').innerHTML =
     gerarLayout('Relatórios Biomonitor', 'relatorios-biomonitor') +
@@ -961,11 +964,11 @@
       </div>`
   }
 
-  const ESP_LABEL = {
+  const ESP_LABEL = (typeof bioEspNomes === 'function' ? bioEspNomes : m => m)({
     tracaja:'Tracajá', tartaruga:'Tartaruga', cabecudo:'Cabeçudo',
-    pitiU:'Pitiú', cupido:'Cupido', jabuti_pe_elefante:'Jabuti',
+    pitiU:'Iaçá', cupido:'Cupido', jabuti_pe_elefante:'Jabuti',
     jabuti_piranga:'Jabuti-piranga', mucua:'Muçuã', outro:'Outro'
-  }
+  })
   const ESP_COR = {
     tracaja:'#2A9D6F', tartaruga:'#1A6B8C', cabecudo:'#C9A84C',
     pitiU:'#7ECEE8', cupido:'#D97706', jabuti_pe_elefante:'#6366f1',
@@ -2277,9 +2280,10 @@
 
     const chipsEsp = [
       ['tracaja','TR'],['tartaruga','TA'],['cabecudo','R'],
-      ['pitiU','Pi'],['cupido','Cu'],['jabuti_pe_elefante','JP'],['outro','OUT']
-    ].map(([v,l]) =>
-      `<span class="mapa-chip" data-esp="${v}" onclick="mapaToggleChip(this,'esp')">${l}</span>`
+      ['pitiU','IA'],['cupido','Cu'],['jabuti_pe_elefante','JP'],['outro','OUT']
+    ].map(([v,l]) => [v, (typeof bioEspecieSigla === 'function' && bioEspecieSigla(v)) || l])
+    .map(([v,l]) =>
+      `<span class="mapa-chip" data-esp="${v}" title="${esc(ESP_LABEL[v] || v)}" onclick="mapaToggleChip(this,'esp')">${l}</span>`
     ).join('')
 
     const chipsStatus = [
@@ -2377,11 +2381,11 @@
     encontrado:'#7ECEE8', transferido:'#C9A84C', eclodido:'#2A9D6F',
     em_bercario:'#8b5cf6', soltado:'#1A6B8C', perdido:'#ef4444'
   }
-  const ESP_MAPA_LABEL = {
+  const ESP_MAPA_LABEL = (typeof bioEspNomes === 'function' ? bioEspNomes : m => m)({
     tracaja:'Tracajá', tartaruga:'Tartaruga', cabecudo:'Cabeçudo',
-    pitiU:'Pitiú', cupido:'Cupido', jabuti_pe_elefante:'Jabuti-pé-elefante',
+    pitiU:'Iaçá', cupido:'Cupido', jabuti_pe_elefante:'Jabuti-pé-elefante',
     jabuti_piranga:'Jabuti-piranga', mucua:'Muçuã', outro:'Outro'
-  }
+  })
   const SEV_COR = { critica:'#ef4444', alta:'#fb923c', media:'#C9A84C', baixa:'#9CA3AF' }
 
   // ── Carrega Leaflet lazily ─────────────────────────────────────

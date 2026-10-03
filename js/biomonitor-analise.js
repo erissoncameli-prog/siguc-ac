@@ -11,11 +11,13 @@
 // demanda); BIO_ESPECIES_REF, bioEstimativaSexoCoorte, bioReferenciasHTML,
 // BIO_CONTEXTO (biomonitor-fundamentacao.js).
 
-const AC_ESP_LABEL = {
+// Nomes vêm do catálogo (js/biomonitor-especies.js); este objeto é só
+// reserva se o arquivo não carregar.
+const AC_ESP_LABEL = (typeof bioEspNomes === 'function' ? bioEspNomes : m => m)({
   tracaja: 'Tracajá', tartaruga: 'Tartaruga-da-Amazônia', cabecudo: 'Cabeçudo',
-  pitiU: 'Pitiú', cupido: 'Cupido', jabuti_pe_elefante: 'Jabuti-pé-de-elefante',
+  pitiU: 'Iaçá', cupido: 'Cupido', jabuti_pe_elefante: 'Jabuti-pé-de-elefante',
   jabuti_piranga: 'Jabuti-piranga', mucua: 'Muçuã', outro: 'Outra',
-}
+})
 const AC_ESP_COR = {
   tracaja: '#2A9D6F', tartaruga: '#1A6B8C', cabecudo: '#C9A84C', pitiU: '#7ECEE8',
   cupido: '#D97706', jabuti_pe_elefante: '#6366f1', jabuti_piranga: '#8b5cf6',

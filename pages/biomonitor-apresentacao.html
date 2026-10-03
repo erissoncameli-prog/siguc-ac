@@ -1377,8 +1377,7 @@ var hero = {pt:"BIO<em>MONITOR</em>", en:"BIO<em>MONITOR</em>", es:"BIO<em>MONIT
 var SPECIES = [
   {sci:"Podocnemis expansa", pt:"Tartaruga-da-amazônia", en:"Giant South American turtle", es:"Tortuga arrau", c:"var(--series-1)"},
   {sci:"Podocnemis unifilis", pt:"Tracajá", en:"Yellow-spotted river turtle", es:"Taricaya", c:"var(--series-2)"},
-  {sci:"Podocnemis sextuberculata", pt:"Iaçá / Cabeçudo", en:"Six-tubercled Amazon River turtle", es:"Cupiso", c:"var(--series-3)"},
-  {sci:"Podocnemis erythrocephala", pt:"Pitiú", en:"Red-headed Amazon River turtle", es:"Cabezón", c:"var(--series-4)"},
+  {sci:"Podocnemis sextuberculata", pt:"Iaçá", en:"Six-tubercled Amazon River turtle", es:"Cupiso", c:"var(--series-3)"},
   {sci:"Chelonoidis denticulatus", pt:"Jabuti-pé-elefante", en:"Yellow-footed tortoise", es:"Motelo", c:"var(--forest)"},
   {sci:"Chelonoidis carbonarius", pt:"Jabuti-piranga", en:"Red-footed tortoise", es:"Charapa de tierra", c:"var(--sand)"},
   {sci:"Kinosternon scorpioides", pt:"Muçuã", en:"Scorpion mud turtle", es:"Charapilla", c:"var(--coral)"},
@@ -1386,6 +1385,7 @@ var SPECIES = [
 ];
 
 function speciesLabel(s,lang){ return s[lang]; }
+function _esp(sci){ return SPECIES.filter(function(s){ return s.sci===sci; })[0]; }
 
 var ROLES = [
   {icon:"user", t:{pt:"Monitor de campo",en:"Field monitor",es:"Monitor de campo"}, p:{pt:"Registra ninhos, transferências e eclosões direto na praia.",en:"Records nests, transfers and hatchings right on the beach.",es:"Registra nidos, transferencias y eclosiones directo en la playa."}},
@@ -1844,8 +1844,12 @@ function chartTooltip(container){
 function renderSpeciesChart(){
   var LBL = {pt:"ninhos",en:"nests",es:"nidos"};
   var DATA = [
-    {s:SPECIES[1], v:168},{s:SPECIES[0], v:121},{s:SPECIES[2], v:94},
-    {s:SPECIES[3], v:52},{s:SPECIES[4], v:31},{s:SPECIES[6], v:16}
+    // por nome científico, não por posição: a lista perdeu o pitiú
+    // (P. erythrocephala), que o programa não registra — no Acre a
+    // espécie do código 'pitiU' é o Iaçá (P. sextuberculata).
+    {s:_esp("Podocnemis unifilis"), v:168},{s:_esp("Podocnemis expansa"), v:121},
+    {s:_esp("Podocnemis sextuberculata"), v:94},{s:_esp("Chelonoidis denticulatus"), v:31},
+    {s:_esp("Kinosternon scorpioides"), v:16}
   ];
   var host = document.getElementById("chartSpecies");
   host.innerHTML="";

@@ -853,12 +853,26 @@ async function bioSyncPullNinhos(grupoId) {
     } else {
       // Atualiza status/validação e a localização atual (praia + placa)
       // se mudou no servidor — ex.: transferência feita por outro monitor.
-      if (local.status !== n.status ||
+      // Número/praia de ORIGEM também podem ser corrigidos no servidor
+      // (mesa ou correção administrativa — migration 354). Sem trazê-los,
+      // o aparelho ficava com o número antigo e, como o atual já vinha
+      // novo, o card lia a divergência como "Transferido de …". Só não
+      // sobrescreve edição local ainda não enviada (status_sync pendente).
+      const localTemEnvio = local.status_sync === 'pendente' || local.status_sync === 'enviando'
+      const origemMudou = !localTemEnvio && (
+        (n.numero_ninho && local.numero_ninho !== n.numero_ninho) ||
+        (n.praia_id && local.praia_id !== n.praia_id))
+      if (origemMudou ||
+          local.status !== n.status ||
           local.status_validacao !== n.status_validacao ||
           local.praia_atual_id !== n.praia_atual_id ||
           local.numero_atual !== n.numero_atual) {
         await bioOfflineSalvarNinho({
           ...local,
+          ...(origemMudou ? {
+            numero_ninho: n.numero_ninho ?? local.numero_ninho,
+            praia_id:     n.praia_id     ?? local.praia_id,
+          } : {}),
           status:           n.status,
           status_validacao: n.status_validacao,
           motivo_rejeicao:  n.motivo_rejeicao,

@@ -2455,6 +2455,81 @@ de ninho sem eclosão) e "Descartados" passou a somar `descartes_ovos`
   detalhado. Guarda: `tests/chart-rosca-rotulos.test.js`. `pwa/sw.js`:
   biomonitor 64 → 65 (barras do app com número · %).
 
+## Biomonitor — histórico de validação do ninho + IP real no login (migration 353)
+Achado ao investigar 25 ninhos da Praia da Curva Grande "em correção"
+(24/09/2026, motivo "CORRIGIR CODIGO DO NINHO") que a equipe não se
+lembrava de ter pedido: só sobrevivia o último `validado_por`, então
+não havia como provar quem fez o quê.
+- `ninhos_validacao_historico`: uma linha por mudança de
+  `status_validacao` ou de `numero_ninho` (de → para, motivo, quem,
+  perfil). Gravada SÓ pelo trigger `trg_ninhos_historico_validacao`
+  (SECURITY DEFINER, sem policy de escrita); leitura por
+  `pode_ver('biomonitor')`. Antes de 02/10/2026 só existe o último
+  estado conhecido (`status_de` NULL). Botão "Histórico" nos cards e na
+  tabela de `biomonitor-validacao.html`.
+- `registrar_tentativa_acesso` grava o IP visto pelo SERVIDOR
+  (`request.headers`: cf-connecting-ip → x-forwarded-for → x-real-ip).
+  O `obterIP()` do cliente chama api.ipify.org, que o CSP bloqueia —
+  por isso `auditoria_acessos.ip_address` era nulo em 100% das linhas.
+- `bioGerarNumeroNinho` lê a sigla da praia do SERVIDOR quando há rede
+  (e atualiza o cache): a cópia local desatualizada gerou 18 ninhos
+  "PR-…" em vez de "PRCG-…".
+- O par atual (número/praia) acompanhar a correção é a migration 352
+  (`trg_ninhos_sincronizar_atual`). ⚠️ `trg_ninhos_seguir_origem` ficou
+  no banco NEUTRALIZADO (`RETURN NEW`) e DESLIGADO (`DISABLE TRIGGER`),
+  criado à mão nesta investigação; o DROP está no fim da 353 e não
+  rodou porque o MCP do Supabase pede confirmação para DROP e expirava
+  — rodar à mão no SQL Editor quando possível (sem efeito até lá).
+- `pwa/sw.js`: biomonitor 65 → 66.
+- **Migration 354** (não existe placa física — o número do sistema É a
+  identidade): os 18 `PR-TR-2026-001…018` viraram `PRCG-TR-2026-007…024`
+  na mesma ordem, e os 25 da praia voltaram para `pendente` (histórico
+  anotado como correção administrativa). `PRCG-C-2026-007` (pitiú) não
+  mudou: o catálogo hoje dá sigla `IA` ao pitiú e o código do app tinha
+  `C`; outros 4 pitiús de outras praias também usam `C`, então trocar só
+  este criaria inconsistência — pendência de decisão, não de código.
+- `bioSyncPullNinhos` passa a trazer `numero_ninho`/`praia_id` corrigidos
+  no servidor (antes só o par atual): sem isso o aparelho ficava com o
+  número antigo e o card lia a divergência como "Transferido de …".
+  Não sobrescreve edição local ainda não enviada. `pwa/sw.js`:
+  biomonitor 66 → 67.
+
+## Regra do sistema — nome de espécie do Biomonitor vem do catálogo
+A SEMA renomeou o pitiú para **Iaçá** em Administrar › Espécies
+(`especies_quelonio_catalogo`, 21/09/2026) e metade do sistema seguiu
+mostrando "Pitiú": 9 listas fixas de nome, uma por tela. O código interno
+continua `pitiU` (enum `especie_quelonio`, histórico) — a espécie é o
+Iaçá, *Podocnemis sextuberculata* (confirmado pela SEMA em 03/10/2026).
+- **Fonte única: `js/biomonitor-especies.js`** (mesma lição de
+  `js/frota-consumo.js`). Página registra seu mapa com
+  `bioEspNomes({...})` — o próprio objeto é atualizado quando o catálogo
+  chega, então quem já guardou a referência lê o nome certo — e chama
+  `await bioEspCarregar(db)` logo depois do `carregarUsuario()`. Nome
+  avulso: `bioEspecieNome(cod)`/`bioEspecieSigla(cod)`. **Nunca uma lista
+  de nomes nova numa página**; o mapa da página é só reserva.
+- Lê o catálogo INTEIRO, inclusive desativadas (ninho antigo nunca sai
+  com o código cru); cache em `localStorage['siguc_bio_especies_catalogo']`
+  aplicado já no carregamento do arquivo (nome certo na 1ª pintura e
+  offline). Administrar › Espécies chama `bioEspDefinir` ao recarregar a
+  lista. ⚠️ O app já tinha um `const bioEspNome` global em
+  `js/biomonitor-quelonios.js` — por isso as funções do arquivo novo se
+  chamam `bioEspecieNome`/`bioEspecieSigla` (duas declarações iguais
+  quebram o parse da página inteira).
+- App: `bioCarregarEspecies` busca todas, entrega ao helper e deixa só as
+  ATIVAS nos chips; `bioEspObj(cod)` substituiu as 19 buscas
+  `BIO_ESPECIES.find(...)`, caindo no catálogo completo para espécie
+  desativada. Reserva embutida = Iaçá/IA.
+- Fundamentação (`js/biomonitor-fundamentacao.js`): `pitiU` passou a ter
+  os parâmetros de *P. sextuberculata* (antes era *P. erythrocephala*, a
+  irapuca — ninhos de Iaçá eram comparados com outra espécie).
+  ⚠️ `cabecudo` (desativado) ainda traz *P. sextuberculata* no catálogo e
+  na fundamentação; cabeçudo costuma ser *Peltocephalus dumerilianus* —
+  revisar com o biólogo antes de reativar.
+- Guarda: `tests/biomonitor-especies.test.js` (5), inclusive varredura que
+  reprova "Pitiú" fixo em `pages/` e `js/`.
+- `pwa/sw.js`: biomonitor 67 → 68 (`js/biomonitor-especies.js` no shell;
+  as 3 listas de `app-biomonitor/scripts/build-www.mjs` atualizadas).
+
 ## Biomonitor — Anomalias congênitas em filhotes (migration 321)
 Registro de eclosão ganhou contador `filhotes_anomalia` (SUBCONJUNTO
 de `filhotes_vivos`, CHECK `<=`, nunca um 4º balde somado ao total —
