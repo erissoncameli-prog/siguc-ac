@@ -378,7 +378,7 @@
     // experimentais ficam num grupo próprio, e qualquer praia_nome que exista
     // só nos ninhos (praia inativa/renomeada) entra num grupo "Outras".
     const todas = await _carregarPraiasOpcoes()
-    const nomesEmNinhos = new Set(_ninhos.map(n => n.praia_nome).filter(Boolean))
+    const nomesEmNinhos = new Set(_ninhos.flatMap(n => [n.praia_nome, n.praia_atual_nome]).filter(Boolean))
     const cadastradas = new Set(todas.map(p => p.nome))
     const experimentais = todas.filter(p => p.experimental)
     const comuns = todas.filter(p => !p.experimental)
@@ -505,8 +505,12 @@
     return _ninhos.filter(n =>
       (!f.busca       || n.numero_ninho?.toLowerCase().includes(f.busca) ||
                          n.monitor_nome?.toLowerCase().includes(f.busca) ||
-                         n.praia_nome?.toLowerCase().includes(f.busca)) &&
-      (!f.praia       || n.praia_nome === f.praia) &&
+                         n.praia_nome?.toLowerCase().includes(f.busca) ||
+                         n.praia_atual_nome?.toLowerCase().includes(f.busca)) &&
+      // Praia casa pela ORIGEM ou pela praia ATUAL: ninho transferido para
+      // um berçário guarda a origem em praia_nome e o berçário em
+      // praia_atual_nome — filtrar só pela origem deixava o berçário vazio.
+      (!f.praia       || n.praia_nome === f.praia || n.praia_atual_nome === f.praia) &&
       (!f.especie     || n.especie === f.especie) &&
       (!f.temp        || n.temporada_id === f.temp) &&
       (opts.ignorarNinho     || !f.statusNinho || n.status === f.statusNinho) &&
@@ -558,7 +562,7 @@
       return `<tr style="border-bottom:1px solid var(--borda)">
         <td style="padding:8px 10px;font-weight:600;color:var(--cinza-900);white-space:nowrap">${n.numero_ninho}${alertaBadge}</td>
         <td style="padding:8px 10px">${SPECIES_NOME[n.especie] || n.especie}</td>
-        <td style="padding:8px 10px">${esc(n.praia_nome || '\u2014')}</td>
+        <td style="padding:8px 10px">${esc(n.praia_nome || '\u2014')}${(n.praia_atual_nome && n.praia_atual_nome !== n.praia_nome) ? ` <span style="color:var(--cinza-500)">→ ${esc(n.praia_atual_nome)}</span>` : ''}</td>
         <td style="padding:8px 10px">${esc(n.monitor_nome || '\u2014')}</td>
         <td style="padding:8px 10px;white-space:nowrap">${formatData(n.data_encontro)}</td>
         <td style="padding:8px 10px;text-align:center">${n.qtd_ovos ?? '\u2014'}</td>
