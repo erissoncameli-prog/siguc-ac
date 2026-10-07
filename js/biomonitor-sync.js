@@ -1128,9 +1128,36 @@ async function bioSyncPullOcorrencias(grupoId) {
   }
 }
 
+// Espera uma sincronização em andamento terminar e roda uma completa.
+// bioSyncTudo() sai na hora se outra já está rodando — quem precisa do
+// RESULTADO (o aviso de preparo para campo) não pode confundir isso com
+// "terminou". Teto de 90 s para nunca prender quem chama.
+async function bioSyncTudoAguardando(opts = {}) {
+  const ate = Date.now() + 90000
+  while (_bioSyncEmAndamento && Date.now() < ate) await new Promise(ok => setTimeout(ok, 400))
+  await bioSyncTudo(opts)
+  while (_bioSyncEmAndamento && Date.now() < ate) await new Promise(ok => setTimeout(ok, 400))
+}
+
 // ── Online/offline listeners ──────────────────────────────────
+// Sincroniza sempre que o app volta a ter rede OU volta do segundo plano
+// (o monitor deixa o app aberto e só traz para a frente horas depois — sem
+// isto, só a abertura "fria" sincronizava). Volta do segundo plano só
+// dispara se a última sincronização dos ninhos passou de 5 min.
+const BIO_SYNC_RETORNO_MIN_MS = 5 * 60 * 1000
+
 function bioSyncIniciarListeners(ctx) {
-  window.addEventListener('online',  () => bioSyncTudo(ctx))
+  const disparar = () => {
+    if (typeof BioApp === 'undefined' || !BioApp.monitor) return   // ainda na tela de login/PIN
+    bioSyncTudo({ ...ctx, monitorId: ctx.monitorId ?? BioApp.monitor.id })
+  }
+  window.addEventListener('online', disparar)
+  document.addEventListener('visibilitychange', async () => {
+    if (document.visibilityState !== 'visible' || !navigator.onLine) return
+    const ultima = await bioOfflineGetConfig('ninhos_ultima_sync').catch(() => null)
+    if (ultima && Date.now() - new Date(ultima).getTime() < BIO_SYNC_RETORNO_MIN_MS) return
+    disparar()
+  })
   window.addEventListener('offline', () => {
     const el = document.getElementById('bio-conn-chip')
     if (el) { el.classList.remove('on'); el.classList.add('off') }

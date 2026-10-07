@@ -76,6 +76,10 @@ async function entrarHomeDeTeste(page, { comClienteContador = false } = {}) {
     }
     await bioOfflineInit()
     BioApp.monitor = { id: 'monitor-teste', nome_completo: 'Teste Guia', grupo_id: 'grupo-teste', grupo_nome: 'Grupo Teste' }
+    // O aviso de preparo para campo (popup que cobre a tela ao entrar na
+    // Home) tem suíte própria — tests/biomonitor-aviso-campo.test.js. Aqui
+    // ele só interceptaria os cliques do tour.
+    BioApp._avisoCampoFeito = true
     await bioEntrarNaHome()
     // bioEntrarNaHome() dispara bioSyncTudo() em paralelo, SEM esperar
     // (fire-and-forget) — com o treino ainda desligado nesse momento,

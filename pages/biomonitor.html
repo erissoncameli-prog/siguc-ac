@@ -2247,6 +2247,23 @@
   </div>
 </div>
 
+<!-- ══ OVERLAY: preparo para campo (js/biomonitor-quelonios.js, bioAvisoPreparoCampo) ═ -->
+<div id="bio-campo-overlay" class="bio-qr-overlay" hidden>
+  <div class="bio-qr-card bio-campo-card" role="dialog" aria-modal="true" aria-labelledby="bio-campo-titulo">
+    <button class="bio-qr-fechar" id="bio-campo-fechar" aria-label="Fechar">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+      </svg>
+    </button>
+    <svg class="bio-campo-icone" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/>
+    </svg>
+    <p id="bio-campo-titulo" class="bio-campo-titulo"></p>
+    <p id="bio-campo-msg" class="bio-campo-msg"></p>
+    <button type="button" class="bio-btn-salvar" id="bio-campo-entendi">Entendi</button>
+  </div>
+</div>
+
 <!-- ══ OVERLAY: etiqueta de ninho/berçário/lote (preview + imprimir) ═ -->
 <div id="bio-etq-overlay" class="bio-qr-overlay" hidden>
   <div class="bio-qr-card bio-etq-card">

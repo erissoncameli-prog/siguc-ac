@@ -986,6 +986,21 @@ body.field-mode .bio-home-nome { font-size: 26px; }
   cursor: pointer; color: #6B7280;
 }
 
+/* Aviso de preparo para campo (bioAvisoPreparoCampo) — mesmo card do
+   QR Overlay. A cor do ícone/borda diz o estado; o texto diz o mesmo,
+   nunca só a cor. */
+.bio-campo-card { max-width: 340px; text-align: center; border-top: 5px solid #0369A1; }
+.bio-campo-icone { color: #0369A1; margin: 4px 0 8px; }
+.bio-campo-titulo { font-weight: 700; font-size: 16px; margin: 0 0 10px; color: var(--bio-ink, #111827); padding: 0 28px; }
+.bio-campo-msg { font-size: 14px; line-height: 1.45; color: #374151; margin: 0 0 16px; }
+.bio-campo-card[data-estado="ok"] { border-top-color: #15803D; }
+.bio-campo-card[data-estado="ok"] .bio-campo-icone { color: #15803D; }
+.bio-campo-card[data-estado="falhou"],
+.bio-campo-card[data-estado="offline_antigo"] { border-top-color: #B45309; }
+.bio-campo-card[data-estado="falhou"] .bio-campo-icone,
+.bio-campo-card[data-estado="offline_antigo"] .bio-campo-icone { color: #B45309; }
+.bio-campo-card .bio-btn-salvar { width: 100%; }
+
 /* Etiqueta (js/biomonitor-etiqueta.js) — mesmo card do QR Overlay,
    compartilha .bio-qr-overlay/.bio-qr-card/.bio-qr-fechar acima. */
 .bio-etq-card { max-width: 320px; }
