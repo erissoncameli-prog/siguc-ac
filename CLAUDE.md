@@ -2578,6 +2578,23 @@ ficava vazia para os monitores. Quatro causas independentes:
   passa por `bioComTimeout`.**
 - Guarda: `tests/biomonitor-abertos-offline.test.js` (5, reprovam o código
   antigo). `pwa/sw.js`: biomonitor 69 → 70.
+- **Sincronizar ao abrir e ao voltar + aviso de preparo para campo**
+  (pedido do usuário). Abrir o app com internet já rodava `bioSyncTudo`
+  (envio + download de ninhos/lotes/filhotes/solturas/ocorrências); faltava
+  voltar do SEGUNDO PLANO (o monitor deixa o app aberto) — agora
+  `visibilitychange` sincroniza se a última passou de 5 min. O listener de
+  reconexão mandava `monitorId: null` (fixado no boot); agora usa o
+  monitor logado. `bioAvisoPreparoCampo` (popup `#bio-campo-overlay`) diz,
+  a cada abertura, de quando são os dados do aparelho e lembra de abrir
+  com internet antes de área sem sinal: online mostra "atualizando…" e
+  troca pelo resultado do sync DESTA abertura (`bioSyncTudoAguardando` —
+  `bioSyncTudo` sai na hora se outro já roda, e isso não pode ser lido
+  como "terminou"); sucesso no máximo 1×/dia, falha ou sem internet
+  SEMPRE (dados com mais de 24 h = alerta de desatualizado). Nunca bloqueia;
+  não aparece em modo treinamento. Guarda:
+  `tests/biomonitor-aviso-campo.test.js` (6); os testes de guia marcam
+  `BioApp._avisoCampoFeito` para o popup não interceptar o tour.
+  `pwa/sw.js`: biomonitor 70 → 71.
 
 ## Regra do sistema — nome de espécie do Biomonitor vem do catálogo
 A SEMA renomeou o pitiú para **Iaçá** em Administrar › Espécies

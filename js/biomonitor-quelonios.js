@@ -609,8 +609,8 @@ async function bioEntrarNaHome() {
   await bioAtualizarBadgeFila()
   await bioAtualizarCardCorrecao()
 
-  // Sync automático
-  bioSyncTudo({
+  // Sync automático — e o aviso de preparo para campo acompanha o resultado
+  const syncAbertura = bioSyncTudoAguardando({
     monitorId:   monitor.id,
     onConcluido: () => { bioAtualizarBadgeFila(); bioAtualizarCardCorrecao() },
     onErro:      (e) => console.warn('biomonitor sync:', e),
@@ -625,6 +625,92 @@ async function bioEntrarNaHome() {
   // Aviso de privacidade do app (LGPD Art. 9º, migration 213) —
   // offline-safe, ver js/lgpd-campo.js.
   lgpdCampoIniciar()
+
+  bioAvisoPreparoCampo(syncAbertura)
+}
+
+/* ════════════════════════════════════════════════════════════
+   AVISO DE PREPARO PARA CAMPO
+   O app trabalha offline com o que está guardado no aparelho — e só
+   guarda o que baixou da última vez que abriu COM internet. Na praia sem
+   sinal, ninho que não foi baixado não existe para o monitor. Este aviso
+   diz, a cada abertura, de quando são os dados do aparelho e lembra de
+   abrir com internet antes de ir para área sem cobertura.
+   Nunca bloqueia: fecha no X, no botão ou tocando fora.
+   - Online: mostra "atualizando…" e troca pelo resultado do sync desta
+     abertura. Sucesso aparece no máximo 1× por dia (abrir o app várias
+     vezes no mesmo dia com sinal não precisa repetir o lembrete).
+   - Sem internet ou sync falhou: aparece SEMPRE, com a data dos dados.
+   ════════════════════════════════════════════════════════════ */
+const BIO_AVISO_CAMPO_CHAVE = 'siguc_bio_aviso_campo_dia'
+const BIO_DADOS_ANTIGOS_MS  = 24 * 60 * 60 * 1000
+
+async function bioAvisoPreparoCampo(syncPromessa) {
+  if (BioApp._avisoCampoFeito) return          // 1× por abertura do app
+  BioApp._avisoCampoFeito = true
+  if (typeof bioModoTreinoAtivo === 'function' && bioModoTreinoAtivo()) return
+  const el = document.getElementById('bio-campo-overlay')
+  if (!el) return
+
+  const fmt = iso => {
+    const d = new Date(iso)
+    return `${d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })} às ${d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
+  }
+  const quantos = async () => {
+    const t = BioApp.temporadaAtual
+    const ns = await bioOfflineListarNinhos().catch(() => [])
+    return ns.filter(n => bioNinhoNaTemporada(n, t)).length
+  }
+  const hoje = new Date().toISOString().slice(0, 10)
+  let jaHoje = false
+  try { jaHoje = localStorage.getItem(BIO_AVISO_CAMPO_CHAVE) === hoje } catch (_) {}
+
+  const antes = await bioOfflineGetConfig('ninhos_ultima_sync').catch(() => null)
+
+  if (navigator.onLine && syncPromessa) {
+    if (!jaHoje) _bioAvisoCampoPintar('atualizando', {})
+    try { await syncPromessa } catch (_) {}
+    const depois = await bioOfflineGetConfig('ninhos_ultima_sync').catch(() => null)
+    const n = await quantos()
+    if (depois && depois !== antes) {
+      if (jaHoje) return
+      try { localStorage.setItem(BIO_AVISO_CAMPO_CHAVE, hoje) } catch (_) {}
+      _bioAvisoCampoPintar('ok', { quando: fmt(depois), n })
+    } else {
+      _bioAvisoCampoPintar('falhou', { quando: depois ? fmt(depois) : null, n })
+    }
+    return
+  }
+
+  const n = await quantos()
+  const antigo = !antes || (Date.now() - new Date(antes).getTime()) > BIO_DADOS_ANTIGOS_MS
+  _bioAvisoCampoPintar(antigo ? 'offline_antigo' : 'offline', { quando: antes ? fmt(antes) : null, n })
+}
+
+function _bioAvisoCampoPintar(estado, { quando, n }) {
+  const el = document.getElementById('bio-campo-overlay')
+  if (!el) return
+  const tit  = document.getElementById('bio-campo-titulo')
+  const msg  = document.getElementById('bio-campo-msg')
+  const card = el.querySelector('.bio-campo-card')
+  const lembrete = 'Antes de ir para uma área <strong>sem sinal</strong>, abra o app num lugar <strong>com internet</strong> e espere esta atualização terminar.'
+  const qtd = n === 1 ? '1 ninho da temporada' : `${n ?? 0} ninhos da temporada`
+  const T = {
+    atualizando:    ['Atualizando dados do aparelho…', `Baixando os ninhos da sua equipe para usar sem internet. Aguarde alguns segundos.<br><br>${lembrete}`],
+    ok:             ['Pronto para ir a campo', `${qtd} guardados no aparelho, atualizados em ${quando}.<br><br>${lembrete}`],
+    falhou:         ['Não foi possível atualizar agora', `A conexão não permitiu baixar os dados. ${quando ? `No aparelho estão os dados de ${quando} (${qtd}).` : 'Este aparelho ainda não tem ninhos guardados.'}<br><br>${lembrete}`],
+    offline:        ['Você está sem internet', `O app está usando os dados guardados no aparelho: ${qtd}, de ${quando}.<br><br>${lembrete}`],
+    offline_antigo: ['Atenção: dados do aparelho desatualizados', `${quando ? `Os dados guardados são de ${quando} (${qtd}) — ninhos registrados ou transferidos por outros monitores depois disso não aparecem.` : 'Este aparelho ainda não baixou os ninhos da equipe.'}<br><br>${lembrete}`],
+  }[estado]
+  tit.textContent = T[0]
+  msg.innerHTML   = T[1]
+  card.dataset.estado = estado
+  el.hidden = false
+}
+
+function bioAvisoCampoFechar() {
+  const el = document.getElementById('bio-campo-overlay')
+  if (el) el.hidden = true
 }
 
 function bioAtualizarChipConexao() {
@@ -5828,6 +5914,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       const busca = document.getElementById('bio-sheet-praias-busca')
       if (busca) busca.value = ''
     }
+  })
+
+  // Aviso de preparo para campo: fecha no X, no botão ou tocando fora
+  document.getElementById('bio-campo-fechar')?.addEventListener('click', bioAvisoCampoFechar)
+  document.getElementById('bio-campo-entendi')?.addEventListener('click', bioAvisoCampoFechar)
+  document.getElementById('bio-campo-overlay')?.addEventListener('click', e => {
+    if (e.target.id === 'bio-campo-overlay') bioAvisoCampoFechar()
   })
 
   // Foto viewer
