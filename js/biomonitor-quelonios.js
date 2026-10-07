@@ -3698,7 +3698,7 @@ function bioMapNinhoPraias(n, praias) {
 // ovos viáveis — via js/biomonitor-timeline.js (compartilhado com a
 // página de validação). Aqui só mescla as visitas locais (IndexedDB),
 // pendentes de sync ou registradas offline.
-async function bioCarregarEventosNinhos(ninhos) {
+async function bioCarregarEventosNinhos(ninhos, { soLocal = false } = {}) {
   const mapa = {}
   ninhos.forEach(n => { mapa[n.uuid_cliente] = [] })
 
@@ -3715,14 +3715,22 @@ async function bioCarregarEventosNinhos(ninhos) {
     }
   }
 
-  if (!navigator.onLine) {
-    await mesclarVisitasLocais(false)   // offline: todas as visitas locais
+  // Offline (ou só o desenho rápido da lista): todas as visitas locais.
+  // Com prazo estourado no servidor, idem — o histórico nunca prende a tela.
+  const soVisitasLocais = async () => {
+    await mesclarVisitasLocais(false)
     ninhos.forEach(n => { n._eventos = bioMontarHistoricoNinho(n, mapa[n.uuid_cliente]) })
-    return
   }
+  if (soLocal || !navigator.onLine) return soVisitasLocais()
 
-  const mapaServidor = await bioBuscarEventosServidor(bioSupabase(), ninhos)
-  Object.keys(mapaServidor).forEach(uuid => { mapa[uuid].push(...mapaServidor[uuid]) })
+  let mapaServidor
+  try {
+    mapaServidor = await bioComTimeout(bioBuscarEventosServidor(bioSupabase(), ninhos), BIO_TIMEOUT_SYNC_MS)
+  } catch (e) {
+    console.warn('[biomonitor histórico]', e)
+    return soVisitasLocais()
+  }
+  Object.keys(mapaServidor).forEach(uuid => { mapa[uuid]?.push(...mapaServidor[uuid]) })
 
   // Visitas locais ainda não sincronizadas (recém-registradas) — para
   // aparecerem no histórico imediatamente, sem esperar o sync.
@@ -3731,13 +3739,22 @@ async function bioCarregarEventosNinhos(ninhos) {
   ninhos.forEach(n => { n._eventos = bioMontarHistoricoNinho(n, mapa[n.uuid_cliente]) })
 }
 
+// "Abertos" abre PRIMEIRO pelo que está no aparelho e só depois tenta o
+// servidor, com prazo. Antes era o contrário: com o aparelho achando que
+// tinha rede (navigator.onLine true sem internet de verdade) a consulta
+// pendurava e a tela ficava em "Carregando do servidor…" para sempre, sem
+// nunca mostrar os ninhos guardados. Cada chamada recebe um número de
+// sequência: resposta de um filtro que já foi trocado é descartada (antes,
+// a mais lenta a chegar sobrescrevia a lista do filtro atual).
+let _bioAbertosSeq = 0
+
 async function bioCarregarAbertos() {
+  const seq          = ++_bioAbertosSeq
+  const atual        = () => seq === _bioAbertosSeq
   const filtroPraia  = BioApp.abertosFiltroPraia
   const filtroStatus = BioApp.abertosStatusFiltro
   const estadoEl = document.getElementById('bio-abertos-estado')
   const listaEl  = document.getElementById('bio-lista-abertos')
-  estadoEl.textContent = 'Carregando do servidor…'; estadoEl.hidden = false
-  listaEl.innerHTML = ''
 
   // "Eclodido" agrega os status pós-eclosão — depois da eclosão o ninho
   // avança para em_bercario/soltado e sumia do filtro
@@ -3745,78 +3762,117 @@ async function bioCarregarAbertos() {
   const estaAberto = n => filtroStatus
     ? (filtroStatus === 'eclodido' ? POS_ECLOSAO.includes(n.status) : n.status === filtroStatus)
     : n.status !== 'perdido'
+  const soCorrecao = lista => BioApp.abertosSoCorrecao
+    ? lista.filter(n => n.status_validacao === 'em_correcao') : lista
 
-  let ninhos = []
+  const mensagemVazia = () => BioApp.abertosSoCorrecao
+    ? 'Nenhum ninho aguardando correção.'
+    : filtroPraia ? `Nenhum ninho aberto em ${filtroPraia.nome}.` : 'Nenhum ninho aberto encontrado.'
 
-  if (navigator.onLine && BioApp.monitor?.grupo_id) {
-    try {
-      let q = bioSupabase()
-        .from('vw_ninhos_validacao')
-        .select('id,uuid_cliente,numero_ninho,numero_atual,especie,data_encontro,hora_desova,status,status_validacao,motivo_rejeicao,qtd_ovos,ovos_integros,ovos_descartados,descartados_natural,descartados_predacao,descartados_humana,ovos_viaveis,ovos_perdidos_total,dist_rio_m,dist_rio_metodo,temperatura_c,umidade_pct,profundidade_cm,observacoes,foto_urls,lat,lng,precisao_gps_m,criado_em,praia_id,praia_nome,praia_atual_id,praia_atual_nome,monitor_id,monitor_nome,data_nascimento,filhotes_vivos,filhotes_mortos,ovos_nao_nascidos,incubacao_dias_previstos,data_prevista_eclosao,dias_para_eclosao,temp_media_observada,data_prevista_eclosao_ajustada,dias_antecipacao_estimados,contagem_ovos_metodo,qtd_ovos_estimado_original')
-        .eq('grupo_id', BioApp.monitor.grupo_id)
-        .order('numero_atual', { ascending: false })
-      // Escopa à temporada atual — sem isso, ninhos de temporadas encerradas
-      // (ex.: histórico lançado no sistema) aparecem misturados na lista.
-      if (BioApp.temporadaAtual?.id) q = q.eq('temporada_id', BioApp.temporadaAtual.id)
-      if (filtroStatus === 'eclodido') {
-        q = q.in('status', POS_ECLOSAO)
-      } else if (filtroStatus) {
-        q = q.eq('status', filtroStatus)
-      } else {
-        q = q.neq('status', 'perdido')
-      }
-      // Filtra pela praia de ORIGEM (onde foi cadastrado) OU pela praia atual
-      // (onde incuba agora): o ninho transferido continua listado na praia de
-      // origem, marcado "Transferido para X", e também aparece no destino.
-      if (filtroPraia) q = q.or(`praia_id.eq.${filtroPraia.id},praia_atual_id.eq.${filtroPraia.id}`)
-      const { data, error } = await q
-      if (error) throw error
-
-      // Mescla: inclui ninhos locais pendentes que ainda não chegaram no servidor
-      const localPend = (await bioOfflineListarNinhos(filtroPraia ? { praiaQualquer: filtroPraia.id } : {}))
-        .filter(n => bioNinhoNaTemporada(n, BioApp.temporadaAtual))
-      const uuidsServ = new Set((data ?? []).map(n => n.uuid_cliente).filter(Boolean))
-      const praias    = await bioOfflineListarPraias()
-      const locaisSo  = localPend
-        .filter(n => !uuidsServ.has(n.uuid_cliente) && estaAberto(n))
-        .map(n => ({ ...bioMapNinhoPraias(n, praias), monitor_nome: BioApp.monitor?.nome_completo, _local: true }))
-
-      ninhos = [...locaisSo, ...(data ?? [])]
+  // Aviso pequeno acima da lista (ou mensagem grande quando a lista é vazia)
+  const aviso = (txt, lista) => {
+    if (!atual()) return
+    if (!lista.length) {
+      estadoEl.style.padding = '32px'; estadoEl.style.fontSize = ''
+      estadoEl.textContent = txt ? `${mensagemVazia()} ${txt}` : mensagemVazia()
+      estadoEl.hidden = false
+    } else if (txt) {
+      estadoEl.style.padding = '6px 12px'; estadoEl.style.fontSize = '12px'
+      estadoEl.textContent = txt
+      estadoEl.hidden = false
+    } else {
       estadoEl.hidden = true
-    } catch (e) {
-      console.warn('[biomonitor abertos]', e)
-      estadoEl.textContent = 'Sem conexão — exibindo dados locais'
-      const praias   = await bioOfflineListarPraias()
-      const localAll = (await bioOfflineListarNinhos(filtroPraia ? { praiaQualquer: filtroPraia.id } : {}))
-        .filter(n => bioNinhoNaTemporada(n, BioApp.temporadaAtual))
-      ninhos = localAll.filter(estaAberto).map(n => bioMapNinhoPraias(n, praias))
     }
-  } else {
-    estadoEl.textContent = 'Offline — exibindo dados locais'
-    const praias   = await bioOfflineListarPraias()
-    const localAll = (await bioOfflineListarNinhos(filtroPraia ? { praiaQualquer: filtroPraia.id } : {}))
-      .filter(n => bioNinhoNaTemporada(n, BioApp.temporadaAtual))
-    ninhos = localAll.filter(estaAberto).map(n => bioMapNinhoPraias(n, praias))
   }
 
-  // Card "precisam de correção": restringe aos devolvidos pelo gestor
-  if (BioApp.abertosSoCorrecao) {
-    ninhos = ninhos.filter(n => n.status_validacao === 'em_correcao')
+  const desenhar = async (lista, { soLocal }) => {
+    await bioCarregarEventosNinhos(lista, { soLocal })
+    if (!atual()) return
+    bioRenderizarListaNinhos('bio-lista-abertos', lista, true, filtroPraia?.id ?? null)
   }
 
-  if (!ninhos.length) {
-    estadoEl.textContent = BioApp.abertosSoCorrecao
-      ? 'Nenhum ninho aguardando correção.'
-      : filtroPraia
-        ? `Nenhum ninho aberto em ${filtroPraia.nome}.`
-        : 'Nenhum ninho aberto encontrado.'
-    estadoEl.hidden = false
-  } else {
-    estadoEl.hidden = true
+  const quandoSalvo = async () => {
+    const iso = await bioOfflineGetConfig('ninhos_ultima_sync').catch(() => null)
+    if (!iso) return ''
+    const d = new Date(iso)
+    return ` (atualizado em ${d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })} ${d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })})`
   }
 
-  await bioCarregarEventosNinhos(ninhos)
-  bioRenderizarListaNinhos('bio-lista-abertos', ninhos, true, filtroPraia?.id ?? null)
+  // ── 1) Aparelho: aparece na hora, com ou sem sinal ──
+  const praias  = await bioOfflineListarPraias()
+  const locais  = (await bioOfflineListarNinhos(filtroPraia ? { praiaQualquer: filtroPraia.id } : {}))
+    .filter(n => bioNinhoNaTemporada(n, BioApp.temporadaAtual))
+    .filter(estaAberto)
+    .map(n => ({ ...bioMapNinhoPraias(n, praias), _local: n.status_sync !== 'confirmado' }))
+    // Mesma ordem da consulta ao servidor (numero_atual desc) — a lista não
+    // "embaralha" quando a resposta do servidor substitui a local.
+    .sort((a, b) => String(b.numero_atual ?? b.numero_ninho ?? '').localeCompare(String(a.numero_atual ?? a.numero_ninho ?? '')))
+  const listaLocal = soCorrecao(locais)
+  if (!atual()) return
+
+  const vaiAoServidor = navigator.onLine && !!BioApp.monitor?.grupo_id
+  aviso(vaiAoServidor ? 'Atualizando do servidor…'
+                      : `Sem conexão — dados salvos no aparelho${await quandoSalvo()}.`, listaLocal)
+  if (!atual()) return
+  if (!listaLocal.length) listaEl.innerHTML = ''
+  else await desenhar(listaLocal, { soLocal: true })
+  if (!vaiAoServidor || !atual()) return
+
+  // ── 2) Servidor, com prazo ──
+  let data
+  try {
+    let q = bioSupabase()
+      .from('vw_ninhos_validacao')
+      .select(BIO_NINHO_COLUNAS)
+      .eq('grupo_id', BioApp.monitor.grupo_id)
+      .order('numero_atual', { ascending: false })
+    // Escopa à temporada atual — sem isso, ninhos de temporadas encerradas
+    // (ex.: histórico lançado no sistema) aparecem misturados na lista.
+    if (BioApp.temporadaAtual?.id) q = q.eq('temporada_id', BioApp.temporadaAtual.id)
+    if (filtroStatus === 'eclodido') {
+      q = q.in('status', POS_ECLOSAO)
+    } else if (filtroStatus) {
+      q = q.eq('status', filtroStatus)
+    } else {
+      q = q.neq('status', 'perdido')
+    }
+    // Filtra pela praia de ORIGEM (onde foi cadastrado) OU pela praia atual
+    // (onde incuba agora): o ninho transferido continua listado na praia de
+    // origem, marcado "Transferido para X", e também aparece no destino.
+    if (filtroPraia) q = q.or(`praia_id.eq.${filtroPraia.id},praia_atual_id.eq.${filtroPraia.id}`)
+    const r = await bioComTimeout(q, BIO_TIMEOUT_LISTA_MS)
+    if (r.error) throw r.error
+    data = r.data ?? []
+  } catch (e) {
+    console.warn('[biomonitor abertos]', e)
+    if (atual()) aviso(`Sem conexão com o servidor — dados salvos no aparelho${await quandoSalvo()}.`, listaLocal)
+    return
+  }
+  if (!atual()) return
+
+  // O que veio do servidor fica guardado no aparelho para o uso offline —
+  // abrir esta aba com sinal já basta para levar os ninhos para a praia.
+  bioSyncMesclarNinhosServidor(data).catch(e => console.warn('[biomonitor abertos] guardar', e))
+
+  // Mescla: ninhos locais ainda não enviados que o servidor não conhece
+  const uuidsServ = new Set(data.map(n => n.uuid_cliente).filter(Boolean))
+  const locaisSo  = locais
+    .filter(n => n._local && !uuidsServ.has(n.uuid_cliente))
+    .map(n => ({ ...n, monitor_nome: n.monitor_nome ?? BioApp.monitor?.nome_completo }))
+  const lista = soCorrecao([...locaisSo, ...data])
+
+  aviso(lista.length ? 'Carregando histórico dos ninhos…' : '', lista)
+  // Lista primeiro (sem esperar o histórico de centenas de ninhos), depois
+  // o histórico completo do servidor, que redesenha mantendo a rolagem.
+  await desenhar(lista, { soLocal: true })
+  if (!atual()) return
+  const telaEl = listaEl.closest('.bio-tela')
+  const rolagem = [document.scrollingElement?.scrollTop ?? 0, telaEl?.scrollTop ?? 0]
+  await desenhar(lista, { soLocal: false })
+  if (!atual()) return
+  if (document.scrollingElement) document.scrollingElement.scrollTop = rolagem[0]
+  if (telaEl) telaEl.scrollTop = rolagem[1]
+  aviso('', lista)
 }
 
 async function bioAbrirTelaHistorico() {

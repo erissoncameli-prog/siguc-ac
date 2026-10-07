@@ -281,6 +281,21 @@ async function bioOfflineSalvarNinho(ninho) {
   })
 }
 
+// Grava vários ninhos numa transação só (pull do servidor: centenas de
+// ninhos de uma vez — uma transação por ninho levava segundos no celular).
+async function bioOfflineSalvarNinhosLote(ninhos) {
+  if (!ninhos?.length) return
+  const db = await bioOfflineInit()
+  return new Promise((res, rej) => {
+    const tx = db.transaction('ninhos', 'readwrite')
+    const st = tx.objectStore('ninhos')
+    ninhos.forEach(n => st.put(n))
+    tx.oncomplete = () => res()
+    tx.onerror    = () => rej(tx.error)
+    tx.onabort    = () => rej(tx.error)
+  })
+}
+
 async function bioOfflineGetNinho(uuid) {
   const db = await bioOfflineInit()
   return new Promise((res, rej) => {
@@ -307,7 +322,7 @@ async function bioOfflineListarNinhos({ praiaId, praiaAtualId, praiaQualquer, st
         n.praia_id === praiaQualquer || (n.praia_atual_id ?? n.praia_id) === praiaQualquer)
       if (status)       lista = lista.filter(n => n.status === status)
       if (statusSync)   lista = lista.filter(n => n.status_sync === statusSync)
-      lista.sort((a, b) => b.criado_em.localeCompare(a.criado_em))
+      lista.sort((a, b) => (b.criado_em || '').localeCompare(a.criado_em || ''))
       res(lista)
     }
     req.onerror = () => rej(req.error)
@@ -889,6 +904,33 @@ async function bioOfflineReenfileirar(store, uuid) {
 }
 
 // ── Limpar confirmados antigos (> 7 dias) ──────────────────────
+const BIO_LIMPEZA_BASE_TRABALHO = ['ninhos', 'lotes', 'individuos']
+
+// Filtra a lista de candidatos à limpeza deixando só o que pertence a uma
+// temporada que NÃO é a atual. Filhote segue o lote dele (só sai se o lote
+// já não está mais no aparelho).
+async function _bioOfflineSoForaDaTemporada(nome, candidatos) {
+  if (!candidatos.length) return []
+  const t = await bioOfflineGetConfig('temporada_atual').catch(() => null)
+  if (!t?.id) return []
+  const foraDaTemporada = i => {
+    if (i.temporada_id) return i.temporada_id !== t.id
+    const d = i.data_encontro || i.data_entrada
+    if (!d || !t.data_inicio) return false
+    return d < t.data_inicio
+  }
+  if (nome !== 'individuos') return candidatos.filter(foraDaTemporada)
+  const db = await bioOfflineInit()
+  const lotes = await new Promise(res => {
+    const req = db.transaction('lotes', 'readonly').objectStore('lotes').getAll()
+    req.onsuccess = () => res(req.result)
+    req.onerror   = () => res(null)
+  })
+  if (!lotes) return []
+  const lotesNoAparelho = new Set(lotes.map(l => l.uuid_cliente))
+  return candidatos.filter(i => i.lote_uuid && !lotesNoAparelho.has(i.lote_uuid))
+}
+
 async function bioOfflineLimparConfirmados() {
   const db     = await bioOfflineInit()
   const limite = new Date(Date.now() - 7 * 86400 * 1000).toISOString()
@@ -903,7 +945,16 @@ async function bioOfflineLimparConfirmados() {
       req.onsuccess = () => res(req.result)
       req.onerror   = () => rej(req.error)
     })
-    const antigos = lista.filter(i => (i.sincronizado_em ?? '') < limite)
+    let antigos = lista.filter(i => (i.sincronizado_em ?? '') < limite)
+    // Ninhos, lotes e filhotes são a BASE DE TRABALHO do monitor em campo
+    // (eclosão, visita, berçário saem deles), não registros de envio. Antes
+    // eram apagados 7 dias depois do sync — e o pull do servidor os gravava
+    // com a data do sync ORIGINAL, então o ninho baixado era apagado na mesma
+    // sincronização: a aba "Abertos" offline ficava vazia. Agora só sai o que
+    // é de OUTRA temporada; sem temporada conhecida, nada sai.
+    if (BIO_LIMPEZA_BASE_TRABALHO.includes(nome)) {
+      antigos = await _bioOfflineSoForaDaTemporada(nome, antigos)
+    }
     for (const item of antigos) {
       await new Promise((res, rej) => {
         const tx  = db.transaction(nome, 'readwrite')

@@ -2387,6 +2387,23 @@ const _bioReady = _dbReady.then(function () {
         autoRefreshToken:   true,
         detectSessionInUrl: false,
       },
+      // Prazo para TODA chamada REST (consultas, RPCs e envio da fila): com
+      // sinal fraco ou rede sem internet (navigator.onLine continua true),
+      // uma requisição sem prazo pendurava a tela e a sincronização para
+      // sempre. Upload de foto (Storage) e login (Auth) ficam de fora — foto
+      // grande em sinal fraco pode levar mais que isso legitimamente. Quem
+      // já passa o próprio signal (bioComTimeout) controla o próprio prazo.
+      global: {
+        fetch: (url, opts = {}) => {
+          const u = String((url && url.url) || url)
+          if (!u.includes('/rest/v1/') || opts.signal || typeof AbortController !== 'function') {
+            return fetch(url, opts)
+          }
+          const ctrl = new AbortController()
+          const t = setTimeout(() => ctrl.abort(), 45000)
+          return fetch(url, { ...opts, signal: ctrl.signal }).finally(() => clearTimeout(t))
+        },
+      },
     })
     console.info('[biomonitor] cliente isolado ativo')
   } catch (e) {
