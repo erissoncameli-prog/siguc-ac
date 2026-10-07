@@ -2546,6 +2546,39 @@ não havia como provar quem fez o quê.
   Não sobrescreve edição local ainda não enviada. `pwa/sw.js`:
   biomonitor 66 → 67.
 
+## Regra do sistema — ninhos abertos no app Biomonitor (offline e sem travar, migrations 357/357b)
+Achado em 07/10/2026, às vésperas das eclosões: a aba "Ninhos Abertos"
+ficava vazia para os monitores. Quatro causas independentes:
+- **RLS (357)**: a 263 trocou o SELECT de grupos/programas/temporadas/
+  equipamentos para `pode_ver('biomonitor')` — monitor de campo não tem
+  linha em `usuarios`, então perdeu a leitura. `vw_ninhos_validacao.grupo_id`
+  vinha do JOIN em grupos e virava NULL: 568 ninhos visíveis na tabela,
+  0 na view. Corrigido com policy ADICIONAL só do próprio grupo
+  (`bio_meu_grupo_ids()`, SECURITY DEFINER, monitor ativo) — nunca o
+  `USING(true)` antigo — e a view passou a usar `n.grupo_id` (357b).
+  **Policy nova de tabela de configuração do Biomonitor precisa considerar
+  o monitor de campo, que não passa por `pode_ver`.** Testado como monitor
+  (568), super_admin (568) e autenticado sem vínculo (0).
+- **Limpeza de 7 dias** (`bioOfflineLimparConfirmados`) apagava ninhos,
+  lotes e filhotes — e o pull os gravava com a data do sync ORIGINAL, então
+  saíam na mesma sincronização. Agora esses três só saem se forem de OUTRA
+  temporada (`BIO_LIMPEZA_BASE_TRABALHO`); eventos enviados seguem limpos.
+- **Pull** (`bioSyncPullNinhos`) trazia 200 ninhos com poucos campos. Agora
+  pagina TODOS da temporada pela view, com `BIO_NINHO_COLUNAS` (a mesma
+  lista da aba Abertos), e grava via `bioSyncMesclarNinhosServidor`: ninho
+  com envio pendente nunca é sobrescrito, só recebe validação/localização.
+- **"Carregando do servidor…" eterno**: `navigator.onLine` fica true sem
+  internet de verdade (dados desligados com Wi-Fi, sinal fraco). A aba abre
+  PRIMEIRO pelo aparelho e só depois tenta o servidor com prazo
+  (`bioComTimeout`, 8 s lista / 20 s sync e histórico); abrir a aba com
+  sinal já guarda os ninhos no aparelho. Número de sequência descarta a
+  resposta de filtro antigo. O cliente do app também tem prazo global de
+  45 s em toda chamada REST (`global.fetch` em `pages/biomonitor.html`;
+  Storage e Auth fora). **Consulta nova da qual uma tela do app dependa
+  passa por `bioComTimeout`.**
+- Guarda: `tests/biomonitor-abertos-offline.test.js` (5, reprovam o código
+  antigo). `pwa/sw.js`: biomonitor 69 → 70.
+
 ## Regra do sistema — nome de espécie do Biomonitor vem do catálogo
 A SEMA renomeou o pitiú para **Iaçá** em Administrar › Espécies
 (`especies_quelonio_catalogo`, 21/09/2026) e metade do sistema seguiu

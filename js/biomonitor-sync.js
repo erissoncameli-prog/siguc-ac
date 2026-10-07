@@ -822,67 +822,106 @@ async function bioSyncCachePraias(grupoId) {
   await bioOfflineSetConfig('praias_ultima_sync', new Date().toISOString())
 }
 
-// ── Pull: busca ninhos do servidor para atualizar o IndexedDB ─
-async function bioSyncPullNinhos(grupoId) {
-  if (!navigator.onLine) return
+// ── Tempo limite para chamadas ao servidor ────────────────────
+// `navigator.onLine` diz só se o aparelho tem ALGUMA rede — com dados
+// móveis desligados e Wi-Fi ligado, Wi-Fi sem internet ou sinal fraco na
+// praia ele continua true, e uma consulta sem prazo ficava pendurada para
+// sempre ("Carregando do servidor…" eterno, nunca caía nos dados locais).
+// Toda consulta da qual a tela depende passa por aqui: estoura o prazo,
+// rejeita com erro e o chamador segue com o que tem no aparelho.
+const BIO_TIMEOUT_LISTA_MS = 8000
+const BIO_TIMEOUT_SYNC_MS  = 20000
 
-  const { data, error } = await bioSupabase()
-    .from('ninhos_quelonios')
-    .select(`
-      id, uuid_cliente, numero_ninho, numero_atual, especie, data_encontro,
-      status, status_validacao, motivo_rejeicao,
-      foto_urls, observacoes, praia_id, praia_atual_id, uc_id, grupo_id, monitor_id,
-      sincronizado_em, criado_em
-    `)
-    .eq('grupo_id', grupoId)
-    .order('data_encontro', { ascending: false })
-    .limit(200)
+function bioComTimeout(consulta, ms = BIO_TIMEOUT_LISTA_MS) {
+  const ctrl = typeof AbortController === 'function' ? new AbortController() : null
+  const q = (ctrl && consulta && typeof consulta.abortSignal === 'function')
+    ? consulta.abortSignal(ctrl.signal) : consulta
+  let timer
+  const prazo = new Promise((_, rej) => {
+    timer = setTimeout(() => {
+      try { ctrl?.abort() } catch (_) {}
+      const e = new Error('tempo esgotado ao falar com o servidor')
+      e.timeout = true
+      rej(e)
+    }, ms)
+  })
+  return Promise.race([Promise.resolve(q), prazo]).finally(() => clearTimeout(timer))
+}
 
-  if (error || !data) return
+// Colunas de ninho que a aba "Abertos", o card e os formulários de
+// eclosão/visita/transferência usam. Uma lista só: o pull que guarda no
+// aparelho e a consulta da aba leem as MESMAS colunas — senão o ninho
+// offline aparece com menos dado que o online.
+const BIO_NINHO_COLUNAS = 'id,uuid_cliente,numero_ninho,numero_atual,especie,data_encontro,hora_desova,status,status_validacao,motivo_rejeicao,qtd_ovos,ovos_integros,ovos_descartados,descartados_natural,descartados_predacao,descartados_humana,ovos_viaveis,ovos_perdidos_total,dist_rio_m,dist_rio_metodo,temperatura_c,umidade_pct,profundidade_cm,observacoes,foto_urls,lat,lng,precisao_gps_m,criado_em,sincronizado_em,praia_id,praia_nome,praia_atual_id,praia_atual_nome,monitor_id,monitor_nome,grupo_id,temporada_id,data_nascimento,filhotes_vivos,filhotes_mortos,ovos_nao_nascidos,incubacao_dias_previstos,data_prevista_eclosao,dias_para_eclosao,temp_media_observada,data_prevista_eclosao_ajustada,dias_antecipacao_estimados,contagem_ovos_metodo,qtd_ovos_estimado_original'
 
-  for (const n of data) {
-    const local = await bioOfflineGetNinho(n.uuid_cliente)
-    if (!local) {
-      // Ninho registrado por outro monitor do grupo — adiciona localmente
-      await bioOfflineSalvarNinho({
-        ...n,
-        server_id:  n.id,
-        status_sync: 'confirmado',
-        sincronizado_em: n.sincronizado_em ?? new Date().toISOString(),
-      })
-    } else {
-      // Atualiza status/validação e a localização atual (praia + placa)
-      // se mudou no servidor — ex.: transferência feita por outro monitor.
-      // Número/praia de ORIGEM também podem ser corrigidos no servidor
-      // (mesa ou correção administrativa — migration 354). Sem trazê-los,
-      // o aparelho ficava com o número antigo e, como o atual já vinha
-      // novo, o card lia a divergência como "Transferido de …". Só não
-      // sobrescreve edição local ainda não enviada (status_sync pendente).
-      const localTemEnvio = local.status_sync === 'pendente' || local.status_sync === 'enviando'
-      const origemMudou = !localTemEnvio && (
-        (n.numero_ninho && local.numero_ninho !== n.numero_ninho) ||
-        (n.praia_id && local.praia_id !== n.praia_id))
-      if (origemMudou ||
-          local.status !== n.status ||
-          local.status_validacao !== n.status_validacao ||
-          local.praia_atual_id !== n.praia_atual_id ||
-          local.numero_atual !== n.numero_atual) {
-        await bioOfflineSalvarNinho({
+// Grava no IndexedDB os ninhos vindos do servidor (linhas de
+// vw_ninhos_validacao). Regras:
+//   * ninho que não existe no aparelho → entra como 'confirmado';
+//   * ninho já confirmado no aparelho → recebe o estado do servidor (que é
+//     a verdade para o que já subiu: validação, transferência de outro
+//     monitor, correção de número pela mesa — migration 354);
+//   * ninho com envio PENDENTE no aparelho (status_sync ≠ 'confirmado') →
+//     nunca é sobrescrito; só recebe o que é decisão da gestão
+//     (status_validacao/motivo) e a localização atual, como já era.
+// Devolve quantos registros foram gravados.
+async function bioSyncMesclarNinhosServidor(linhas) {
+  const validas = (linhas || []).filter(r => r && r.uuid_cliente)
+  if (!validas.length) return 0
+  const locais = new Map((await bioOfflineListarNinhos()).map(n => [n.uuid_cliente, n]))
+  const agora  = new Date().toISOString()
+  const gravar = []
+  for (const r of validas) {
+    const local = locais.get(r.uuid_cliente)
+    const temEnvio = local && local.status_sync && local.status_sync !== 'confirmado'
+    if (temEnvio) {
+      if (local.status_validacao !== r.status_validacao ||
+          local.praia_atual_id   !== r.praia_atual_id ||
+          local.numero_atual     !== r.numero_atual) {
+        gravar.push({
           ...local,
-          ...(origemMudou ? {
-            numero_ninho: n.numero_ninho ?? local.numero_ninho,
-            praia_id:     n.praia_id     ?? local.praia_id,
-          } : {}),
-          status:           n.status,
-          status_validacao: n.status_validacao,
-          motivo_rejeicao:  n.motivo_rejeicao,
-          praia_atual_id:   n.praia_atual_id ?? local.praia_atual_id,
-          numero_atual:     n.numero_atual   ?? local.numero_atual,
+          status_validacao: r.status_validacao,
+          motivo_rejeicao:  r.motivo_rejeicao,
+          praia_atual_id:   r.praia_atual_id ?? local.praia_atual_id,
+          numero_atual:     r.numero_atual   ?? local.numero_atual,
         })
       }
+      continue
     }
+    const { dias_para_eclosao, ...campos } = r   // derivado do dia — o card recalcula
+    gravar.push({
+      ...(local || {}),
+      ...campos,
+      server_id:       r.id,
+      status_sync:     'confirmado',
+      criado_em:       r.criado_em ?? local?.criado_em ?? agora,
+      sincronizado_em: local?.sincronizado_em ?? r.sincronizado_em ?? agora,
+    })
   }
+  if (gravar.length) await bioOfflineSalvarNinhosLote(gravar)
+  return gravar.length
+}
 
+// ── Pull: busca ninhos do servidor para atualizar o IndexedDB ─
+// TODOS os ninhos do grupo na temporada atual, paginados. Antes vinham só
+// os 200 mais recentes (o grupo do Rio Abunã tem 568) e com poucos campos
+// — sem data prevista de eclosão, ovos ou GPS.
+async function bioSyncPullNinhos(grupoId) {
+  if (!navigator.onLine || !grupoId) return
+  const temporada = await bioOfflineGetConfig('temporada_atual').catch(() => null)
+  const PAGINA = 500
+  for (let de = 0; ; de += PAGINA) {
+    let q = bioSupabase()
+      .from('vw_ninhos_validacao')
+      .select(BIO_NINHO_COLUNAS)
+      .eq('grupo_id', grupoId)
+    if (temporada?.id) q = q.eq('temporada_id', temporada.id)
+    q = q.order('criado_em', { ascending: true }).order('id', { ascending: true })
+      .range(de, de + PAGINA - 1)
+    const { data, error } = await bioComTimeout(q, BIO_TIMEOUT_SYNC_MS)
+    if (error || !data) return
+    await bioSyncMesclarNinhosServidor(data)
+    if (data.length < PAGINA) break
+  }
   await bioOfflineSetConfig('ninhos_ultima_sync', new Date().toISOString())
 }
 
