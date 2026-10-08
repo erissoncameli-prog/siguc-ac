@@ -909,6 +909,7 @@ async function bioSyncPullNinhos(grupoId) {
   if (!navigator.onLine || !grupoId) return
   const temporada = await bioOfflineGetConfig('temporada_atual').catch(() => null)
   const PAGINA = 500
+  const todos  = []
   for (let de = 0; ; de += PAGINA) {
     let q = bioSupabase()
       .from('vw_ninhos_validacao')
@@ -920,7 +921,21 @@ async function bioSyncPullNinhos(grupoId) {
     const { data, error } = await bioComTimeout(q, BIO_TIMEOUT_SYNC_MS)
     if (error || !data) return
     await bioSyncMesclarNinhosServidor(data)
+    todos.push(...data)
     if (data.length < PAGINA) break
+  }
+  // Histórico de cada ninho (transferências, visitas, berçário, solturas)
+  // guardado junto, para o card mostrar tudo offline. Lotes de 150 ids:
+  // a consulta vai por URL (`in.(...)`), e 568 ids juntos dão ~22 KB.
+  if (typeof bioBuscarEventosServidor === 'function') {
+    for (let i = 0; i < todos.length; i += 150) {
+      const lote = todos.slice(i, i + 150)
+      try {
+        const quando = new Date().toISOString()
+        const mapa = await bioComTimeout(bioBuscarEventosServidor(bioSupabase(), lote), BIO_TIMEOUT_SYNC_MS)
+        if (!mapa._falhou) await bioOfflineGravarEventosCache(mapa, quando)
+      } catch (e) { console.warn('[sync] histórico dos ninhos', e) }
+    }
   }
   await bioOfflineSetConfig('ninhos_ultima_sync', new Date().toISOString())
 }
