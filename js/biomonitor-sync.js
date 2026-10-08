@@ -1160,6 +1160,7 @@ async function bioSyncTudoAguardando(opts = {}) {
 // isto, só a abertura "fria" sincronizava). Volta do segundo plano só
 // dispara se a última sincronização dos ninhos passou de 5 min.
 const BIO_SYNC_RETORNO_MIN_MS = 5 * 60 * 1000
+let _bioOcultoEm = null   // quando o app foi para o segundo plano
 
 function bioSyncIniciarListeners(ctx) {
   const disparar = () => {
@@ -1168,7 +1169,24 @@ function bioSyncIniciarListeners(ctx) {
   }
   window.addEventListener('online', disparar)
   document.addEventListener('visibilitychange', async () => {
-    if (document.visibilityState !== 'visible' || !navigator.onLine) return
+    if (document.visibilityState === 'hidden') { _bioOcultoEm = Date.now(); return }
+    if (document.visibilityState !== 'visible') return
+    const ausente = _bioOcultoEm ? Date.now() - _bioOcultoEm : 0
+    _bioOcultoEm = null
+    // Voltou depois de um tempo fora = "abriu o app": sincroniza (com
+    // internet) e mostra o aviso de preparo para campo, como na abertura.
+    const telaAtiva = document.querySelector('.bio-tela.ativa')?.id
+    const telaBloqueio = ['tela-login', 'tela-trocar-senha', 'tela-config-pin', 'tela-bloqueio'].includes(telaAtiva)
+    if (ausente >= BIO_SYNC_RETORNO_MIN_MS && !telaBloqueio &&
+        typeof BioApp !== 'undefined' && BioApp.monitor && typeof bioAvisoPreparoCampo === 'function') {
+      BioApp._avisoCampoFeito = false
+      const sync = navigator.onLine
+        ? bioSyncTudoAguardando({ ...ctx, monitorId: ctx.monitorId ?? BioApp.monitor.id })
+        : null
+      bioAvisoPreparoCampo(sync)
+      return
+    }
+    if (!navigator.onLine) return
     const ultima = await bioOfflineGetConfig('ninhos_ultima_sync').catch(() => null)
     if (ultima && Date.now() - new Date(ultima).getTime() < BIO_SYNC_RETORNO_MIN_MS) return
     disparar()

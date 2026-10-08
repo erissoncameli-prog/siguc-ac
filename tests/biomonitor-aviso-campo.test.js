@@ -97,7 +97,6 @@ async function preparar(page, { online }) {
     BioApp.monitor = { id: 'm-1', grupo_id: 'g-abuna', nome_completo: 'Monitor Teste' };
     BioApp.temporadaAtual = { id: 't-2026', data_inicio: '2026-07-01', data_fim: '2027-06-30' };
     BioApp._avisoCampoFeito = false;
-    try { localStorage.removeItem('siguc_bio_aviso_campo_dia'); } catch (_) {}
   }, online);
 }
 
@@ -122,18 +121,45 @@ test('online: sincroniza e o popup diz "pronto para ir a campo" com a quantidade
   expect(r.texto).toContain('sem sinal');
 });
 
-test('online no MESMO dia: sucesso não repete o popup', async ({ page }) => {
+test('o popup aparece em TODA abertura (não só na primeira do dia)', async ({ page }) => {
   await abrirApp(page);
   await preparar(page, { online: true });
   const r = await page.evaluate(async () => {
     window.__stubResposta = () => ({ data: [], error: null });
     await bioAvisoPreparoCampo(bioSyncTudoAguardando({ monitorId: 'm-1' }));
+    const primeira = !document.getElementById('bio-campo-overlay').hidden;
     bioAvisoCampoFechar();
     BioApp._avisoCampoFeito = false;           // simula reabrir o app
     await bioAvisoPreparoCampo(bioSyncTudoAguardando({ monitorId: 'm-1' }));
-    return document.getElementById('bio-campo-overlay').hidden;
+    return { primeira, segunda: !document.getElementById('bio-campo-overlay').hidden };
   });
-  expect(r).toBe(true);
+  expect(r).toEqual({ primeira: true, segunda: true });
+});
+
+test('trazer o app de volta do segundo plano depois de 5 min mostra o popup de novo', async ({ page }) => {
+  await abrirApp(page);
+  await preparar(page, { online: false });
+  const r = await page.evaluate(async () => {
+    await bioOfflineSetConfig('ninhos_ultima_sync', '2026-09-01T12:00:00Z');
+    await bioAvisoPreparoCampo(null);
+    bioAvisoCampoFechar();
+    bioMostrarTela('tela-home');
+    let estado = 'hidden';
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => estado });
+    document.dispatchEvent(new Event('visibilitychange'));       // foi para o segundo plano
+    _bioOcultoEm = Date.now() - 6 * 60000;                       // ... há 6 minutos
+    estado = 'visible';
+    document.dispatchEvent(new Event('visibilitychange'));       // voltou
+    await new Promise(ok => setTimeout(ok, 500));
+    const depoisDe6min = !document.getElementById('bio-campo-overlay').hidden;
+    // volta rápida (menos de 5 min) não incomoda
+    bioAvisoCampoFechar();
+    estado = 'hidden'; document.dispatchEvent(new Event('visibilitychange'));
+    estado = 'visible'; document.dispatchEvent(new Event('visibilitychange'));
+    await new Promise(ok => setTimeout(ok, 500));
+    return { depoisDe6min, voltaRapida: !document.getElementById('bio-campo-overlay').hidden };
+  });
+  expect(r).toEqual({ depoisDe6min: true, voltaRapida: false });
 });
 
 test('online mas a sincronização falha: o popup avisa SEMPRE, com a data dos dados guardados', async ({ page }) => {
@@ -142,7 +168,6 @@ test('online mas a sincronização falha: o popup avisa SEMPRE, com a data dos d
   const r = await page.evaluate(async () => {
     await bioOfflineSetConfig('ninhos_ultima_sync', '2026-10-01T12:00:00Z');
     window.__stubResposta = () => ({ data: null, error: { message: 'falhou' } });
-    localStorage.setItem('siguc_bio_aviso_campo_dia', new Date().toISOString().slice(0, 10));
     await bioAvisoPreparoCampo(bioSyncTudoAguardando({ monitorId: 'm-1' }));
     return {
       visivel: !document.getElementById('bio-campo-overlay').hidden,
