@@ -296,6 +296,34 @@ async function bioOfflineSalvarNinhosLote(ninhos) {
   })
 }
 
+// Guarda no registro de cada ninho o histórico vindo do servidor
+// (transferências, visitas, berçário, solturas), para o card mostrar o
+// histórico completo offline. Atualiza só os dois campos — nunca o resto
+// do registro, que pode ter edição local ainda não enviada. Ninho que não
+// está no aparelho é ignorado. `mapa` = { uuid_cliente: [eventos] }.
+async function bioOfflineGravarEventosCache(mapa, quando) {
+  const uuids = Object.keys(mapa || {})
+  if (!uuids.length) return
+  const db = await bioOfflineInit()
+  return new Promise((res, rej) => {
+    const tx = db.transaction('ninhos', 'readwrite')
+    const st = tx.objectStore('ninhos')
+    uuids.forEach(uuid => {
+      const req = st.get(uuid)
+      req.onsuccess = () => {
+        const n = req.result
+        if (!n) return
+        n.eventos_cache    = mapa[uuid] || []
+        n.eventos_cache_em = quando
+        st.put(n)
+      }
+    })
+    tx.oncomplete = () => res()
+    tx.onerror    = () => rej(tx.error)
+    tx.onabort    = () => rej(tx.error)
+  })
+}
+
 async function bioOfflineGetNinho(uuid) {
   const db = await bioOfflineInit()
   return new Promise((res, rej) => {

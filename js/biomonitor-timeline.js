@@ -130,6 +130,13 @@ async function bioBuscarEventosServidor(sb, ninhos) {
         .in('ninho_id', serverIds),
     ])
 
+    // Consulta que voltou com erro não pode virar "sem histórico": quem
+    // guarda o histórico no aparelho (app offline) apagaria o que tinha.
+    // A tela segue mostrando o que veio; só o mapa sai marcado.
+    if ([rTransf, rVisita, rLote, rSol].some(r => r?.error)) {
+      Object.defineProperty(mapa, '_falhou', { value: true })
+    }
+
     const pushRows = (res, tipo, fn) => {
       ;(res.data ?? []).forEach(r => {
         const uuid = idMap[r.ninho_id]
@@ -161,6 +168,8 @@ async function bioBuscarEventosServidor(sb, ninhos) {
     }))
   } catch (e) {
     console.warn('[biomonitor timeline]', e)
+    // Marca (fora do Object.keys) que este mapa está incompleto
+    Object.defineProperty(mapa, '_falhou', { value: true })
   }
 
   return mapa

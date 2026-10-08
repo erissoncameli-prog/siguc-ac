@@ -2595,6 +2595,23 @@ ficava vazia para os monitores. Quatro causas independentes:
   `tests/biomonitor-aviso-campo.test.js` (6); os testes de guia marcam
   `BioApp._avisoCampoFeito` para o popup não interceptar o tour.
   `pwa/sw.js`: biomonitor 70 → 71.
+- **Histórico do ninho offline** (relato do usuário, 08/10/2026: offline o
+  card só mostrava a "Localização" — nenhuma transferência — e a visita
+  feita offline não aparecia). Transferências/visitas/berçário/solturas
+  vinham do servidor NA HORA e nunca ficavam no aparelho. Agora ficam no
+  próprio registro do ninho (`eventos_cache` + `eventos_cache_em`, sem
+  store nova nem bump de schema), gravados por `bioOfflineGravarEventosCache`
+  no sync (`bioSyncPullNinhos`, lotes de 150 ids) e a cada consulta online
+  da aba. Offline o card junta o cache + o que foi feito NESTE aparelho
+  depois dele (visitas e transferências pendentes ou enviadas após
+  `eventos_cache_em` — nunca duplicando a já enviada). ⚠️ Consulta de
+  histórico com erro NÃO pode virar "sem histórico" (apagaria o cache):
+  `bioBuscarEventosServidor` marca o mapa com `_falhou` (não enumerável —
+  validação e PDF por ninho seguem iguais) e quem guarda descarta.
+  Salvar visita voltava para a lista ANTIGA — agora recarrega
+  (`bioCarregarAbertos`). Guarda: +3 em
+  `tests/biomonitor-abertos-offline.test.js` (8; os 3 reprovam o código
+  antigo). `pwa/sw.js`: biomonitor 71 → 72.
 
 ## Regra do sistema — nome de espécie do Biomonitor vem do catálogo
 A SEMA renomeou o pitiú para **Iaçá** em Administrar › Espécies

@@ -201,3 +201,78 @@ test('resposta de filtro antigo que chega por último NÃO sobrescreve a lista d
   }, [ninhoServidor(1), ninhoServidor(2)]);
   expect(r).toBe(2);
 });
+
+// ── Histórico (transferências/visitas) disponível offline ──────────────
+// Relato do usuário (08/10/2026): offline, o card mostrava só a
+// "Localização" — a transferência não aparecia em NENHUM ninho — e uma
+// visita feita offline também não aparecia.
+
+const TRANSF_SRV = { ninho_id: 'srv-1', data_transferencia: '2026-08-21', hora_transferencia: '08:00',
+  praia_destino_nome: 'Praia Berçário 01 JE', numero_atual: 'BER01-TR-2026-001', local_destino: null, foto_urls: [] };
+
+test('sync guarda o histórico do servidor e o card offline mostra a transferência', async ({ page }) => {
+  await abrirApp(page);
+  const r = await page.evaluate(async ({ ns, tr }) => {
+    window.__stubResposta = (tabela) => {
+      if (tabela === 'vw_ninhos_validacao') return { data: ns, error: null };
+      if (tabela === 'vw_transferencias_praia') return { data: [tr], error: null };
+      return { data: [], error: null };
+    };
+    await bioSyncPullNinhos('g-abuna');
+    const local = await bioOfflineGetNinho('u-1');
+    // agora sem internet
+    Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => false });
+    BioApp.monitor = { grupo_id: 'g-abuna', nome_completo: 'Monitor Teste' };
+    BioApp.temporadaAtual = { id: 't-2026', data_inicio: '2026-07-01', data_fim: '2027-06-30' };
+    BioApp.abertosFiltroPraia = null; BioApp.abertosStatusFiltro = null;
+    bioMostrarTela('tela-abertos');
+    await bioCarregarAbertos();
+    return { cache: local.eventos_cache?.length,
+             texto: document.getElementById('bio-lista-abertos').textContent };
+  }, { ns: [ninhoServidor(1), ninhoServidor(2)], tr: TRANSF_SRV });
+  expect(r.cache).toBe(1);
+  expect(r.texto).toContain('Transferido → Praia Berçário 01 JE');
+});
+
+test('visita feita offline aparece no histórico ao voltar para a lista (sem duplicar a já enviada)', async ({ page }) => {
+  await abrirApp(page);
+  const r = await page.evaluate(async (n) => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => false });
+    BioApp.monitor = { grupo_id: 'g-abuna', nome_completo: 'Monitor Teste' };
+    BioApp.temporadaAtual = { id: 't-2026', data_inicio: '2026-07-01', data_fim: '2027-06-30' };
+    BioApp.abertosFiltroPraia = null; BioApp.abertosStatusFiltro = null;
+    // ninho com cache do servidor que JÁ contém a visita de 01/09
+    await bioSyncMesclarNinhosServidor([n]);
+    await bioOfflineGravarEventosCache({ 'u-1': [bioEventoVisita({ data_visita: '2026-09-01', status_ninho: 'integro' })] },
+      '2026-09-02T00:00:00Z');
+    // a mesma visita, confirmada antes do cache → não pode duplicar
+    await bioOfflineSalvarVisita({ uuid_cliente: 'v-antiga', ninho_uuid: 'u-1', data_visita: '2026-09-01',
+      status_ninho: 'integro', status_sync: 'confirmado', sincronizado_em: '2026-09-01T12:00:00Z', criado_em: '2026-09-01T10:00:00Z' });
+    // visita nova, feita offline agora (pendente)
+    await bioOfflineSalvarVisita({ uuid_cliente: 'v-nova', ninho_uuid: 'u-1', data_visita: '2026-10-08',
+      status_ninho: 'integro', observacoes: 'VISITA-DE-TESTE', status_sync: 'pendente', criado_em: '2026-10-08T10:00:00Z' });
+    bioMostrarTela('tela-abertos');
+    await bioCarregarAbertos();
+    const card = document.querySelector('#bio-lista-abertos .bio-nfc');
+    return { texto: card.textContent, n: (card.textContent.match(/01\/09/g) || []).length };
+  }, ninhoServidor(1));
+  expect(r.texto).toMatch(/3 eventos/);       // localização + visita antiga + visita nova
+  expect(r.n).toBe(1);                         // a visita de 01/09 não aparece duas vezes
+});
+
+test('falha ao buscar o histórico NÃO apaga o histórico já guardado', async ({ page }) => {
+  await abrirApp(page);
+  const r = await page.evaluate(async ({ ns, tr }) => {
+    window.__stubResposta = (tabela) => {
+      if (tabela === 'vw_ninhos_validacao') return { data: ns, error: null };
+      if (tabela === 'vw_transferencias_praia') return { data: [tr], error: null };
+      return { data: [], error: null };
+    };
+    await bioSyncPullNinhos('g-abuna');
+    window.__stubResposta = (tabela) => tabela === 'vw_ninhos_validacao'
+      ? { data: ns, error: null } : { data: null, error: { message: 'caiu' } };
+    await bioSyncPullNinhos('g-abuna');
+    return (await bioOfflineGetNinho('u-1')).eventos_cache?.length;
+  }, { ns: [ninhoServidor(1)], tr: TRANSF_SRV });
+  expect(r).toBe(1);
+});

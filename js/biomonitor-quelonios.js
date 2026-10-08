@@ -3713,6 +3713,9 @@ async function bioSalvarVisita() {
   bioSyncTudo({ monitorId: BioApp.monitor?.id, onConcluido: () => bioAtualizarBadgeFila() })
   bioToast('Visita registrada!', 'ok')
   bioMostrarTela('tela-abertos')
+  // A lista precisa ser redesenhada: sem isto voltava a lista ANTIGA e a
+  // visita recém-salva (já no aparelho) não aparecia no histórico.
+  bioCarregarAbertos()
 }
 
 function bioIniciarFormVisita() {
@@ -3788,39 +3791,64 @@ async function bioCarregarEventosNinhos(ninhos, { soLocal = false } = {}) {
   const mapa = {}
   ninhos.forEach(n => { mapa[n.uuid_cliente] = [] })
 
-  // Mescla as visitas locais (IndexedDB) no histórico, para que apareçam
-  // mesmo offline ou antes de sincronizar. `somentePendentes` evita
-  // duplicar as que já subiram e voltam do servidor.
-  const mesclarVisitasLocais = async (somentePendentes) => {
+  // Histórico do SERVIDOR guardado no próprio registro do ninho
+  // (eventos_cache, gravado por bioOfflineGravarEventosCache a cada
+  // consulta online e no sync). Sem isso, offline o card só mostrava a
+  // "Localização": transferências, visitas antigas, berçário e solturas
+  // vinham do servidor na hora e nunca ficavam no aparelho.
+  const locaisPorUuid = new Map((await bioOfflineListarNinhos().catch(() => [])).map(x => [x.uuid_cliente, x]))
+
+  // Eventos registrados NESTE aparelho que o cache do servidor ainda não
+  // tem: os pendentes de envio e os enviados DEPOIS da última gravação do
+  // cache (senão o mesmo evento apareceria duas vezes).
+  const mesclarEventosLocais = async (cacheEm) => {
     for (const n of ninhos) {
       const arr = mapa[n.uuid_cliente]; if (!arr) continue
-      const locais = await bioOfflineVisitasDoNinho(n.uuid_cliente).catch(() => [])
-      locais
-        .filter(v => !somentePendentes || v.status_sync !== 'confirmado')
-        .forEach(v => arr.push(bioEventoVisita(v)))
+      // corte = quando o servidor foi lido; sem leitura nenhuma, vale tudo
+      const corte = cacheEm === undefined ? (locaisPorUuid.get(n.uuid_cliente)?.eventos_cache_em || null) : cacheEm
+      const faltaNoServidor = r => !corte || r.status_sync !== 'confirmado' || (r.sincronizado_em || '') > corte
+      const visitas = await bioOfflineVisitasDoNinho(n.uuid_cliente).catch(() => [])
+      visitas.filter(faltaNoServidor).forEach(v => arr.push(bioEventoVisita(v)))
+      const transfs = await bioOfflineTransfDoNinho(n.uuid_cliente).catch(() => [])
+      transfs.filter(faltaNoServidor)
+        .forEach(t => arr.push({
+          tipo: 'transf', data: t.data_transferencia, hora: t.hora_transferencia,
+          txt: `Transferido${t.praia_destino_nome ? ' → ' + t.praia_destino_nome
+            : t.local_destino ? ' → ' + t.local_destino : ''}${t.numero_atual ? ' · nº ' + t.numero_atual : ''}`,
+          fotos: t.foto_urls || [],
+        }))
     }
   }
 
-  // Offline (ou só o desenho rápido da lista): todas as visitas locais.
-  // Com prazo estourado no servidor, idem — o histórico nunca prende a tela.
-  const soVisitasLocais = async () => {
-    await mesclarVisitasLocais(false)
+  // Offline (ou só o desenho rápido da lista): cache do servidor + o que
+  // foi feito neste aparelho. Com prazo estourado no servidor, idem — o
+  // histórico nunca prende a tela.
+  const soLocalHistorico = async () => {
+    ninhos.forEach(n => {
+      const cache = locaisPorUuid.get(n.uuid_cliente)?.eventos_cache
+      if (Array.isArray(cache)) mapa[n.uuid_cliente].push(...cache)
+    })
+    await mesclarEventosLocais(undefined)
     ninhos.forEach(n => { n._eventos = bioMontarHistoricoNinho(n, mapa[n.uuid_cliente]) })
   }
-  if (soLocal || !navigator.onLine) return soVisitasLocais()
+  if (soLocal || !navigator.onLine) return soLocalHistorico()
 
   let mapaServidor
   try {
     mapaServidor = await bioComTimeout(bioBuscarEventosServidor(bioSupabase(), ninhos), BIO_TIMEOUT_SYNC_MS)
+    if (mapaServidor._falhou) throw new Error('histórico do servidor incompleto')
   } catch (e) {
     console.warn('[biomonitor histórico]', e)
-    return soVisitasLocais()
+    return soLocalHistorico()
   }
+  const agora = new Date().toISOString()
   Object.keys(mapaServidor).forEach(uuid => { mapa[uuid]?.push(...mapaServidor[uuid]) })
+  // Guarda o que veio do servidor para o uso offline (sem esperar)
+  bioOfflineGravarEventosCache(mapaServidor, agora).catch(e => console.warn('[biomonitor histórico] cache', e))
 
-  // Visitas locais ainda não sincronizadas (recém-registradas) — para
-  // aparecerem no histórico imediatamente, sem esperar o sync.
-  await mesclarVisitasLocais(true)
+  // Eventos deste aparelho que ainda não estão no servidor — aparecem no
+  // histórico imediatamente, sem esperar o sync.
+  await mesclarEventosLocais(agora)
 
   ninhos.forEach(n => { n._eventos = bioMontarHistoricoNinho(n, mapa[n.uuid_cliente]) })
 }
