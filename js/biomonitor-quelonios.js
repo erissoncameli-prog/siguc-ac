@@ -637,12 +637,15 @@ async function bioEntrarNaHome() {
    diz, a cada abertura, de quando são os dados do aparelho e lembra de
    abrir com internet antes de ir para área sem cobertura.
    Nunca bloqueia: fecha no X, no botão ou tocando fora.
+   Aparece a CADA abertura: ao abrir o app do zero (bioEntrarNaHome) e ao
+   trazê-lo de volta do segundo plano depois de BIO_SYNC_RETORNO_MIN_MS
+   (listener em js/biomonitor-sync.js) — no celular, "abrir o app" quase
+   sempre é isso. A 1ª versão mostrava o sucesso só 1×/dia e só na
+   abertura do zero, e o usuário leu como "o popup parou de funcionar".
    - Online: mostra "atualizando…" e troca pelo resultado do sync desta
-     abertura. Sucesso aparece no máximo 1× por dia (abrir o app várias
-     vezes no mesmo dia com sinal não precisa repetir o lembrete).
-   - Sem internet ou sync falhou: aparece SEMPRE, com a data dos dados.
+     abertura.
+   - Sem internet ou sync falhou: a data dos dados guardados.
    ════════════════════════════════════════════════════════════ */
-const BIO_AVISO_CAMPO_CHAVE = 'siguc_bio_aviso_campo_dia'
 const BIO_DADOS_ANTIGOS_MS  = 24 * 60 * 60 * 1000
 
 async function bioAvisoPreparoCampo(syncPromessa) {
@@ -661,20 +664,14 @@ async function bioAvisoPreparoCampo(syncPromessa) {
     const ns = await bioOfflineListarNinhos().catch(() => [])
     return ns.filter(n => bioNinhoNaTemporada(n, t)).length
   }
-  const hoje = new Date().toISOString().slice(0, 10)
-  let jaHoje = false
-  try { jaHoje = localStorage.getItem(BIO_AVISO_CAMPO_CHAVE) === hoje } catch (_) {}
-
   const antes = await bioOfflineGetConfig('ninhos_ultima_sync').catch(() => null)
 
   if (navigator.onLine && syncPromessa) {
-    if (!jaHoje) _bioAvisoCampoPintar('atualizando', {})
+    _bioAvisoCampoPintar('atualizando', {})
     try { await syncPromessa } catch (_) {}
     const depois = await bioOfflineGetConfig('ninhos_ultima_sync').catch(() => null)
     const n = await quantos()
     if (depois && depois !== antes) {
-      if (jaHoje) return
-      try { localStorage.setItem(BIO_AVISO_CAMPO_CHAVE, hoje) } catch (_) {}
       _bioAvisoCampoPintar('ok', { quando: fmt(depois), n })
     } else {
       _bioAvisoCampoPintar('falhou', { quando: depois ? fmt(depois) : null, n })

@@ -2589,8 +2589,13 @@ ficava vazia para os monitores. Quatro causas independentes:
   com internet antes de área sem sinal: online mostra "atualizando…" e
   troca pelo resultado do sync DESTA abertura (`bioSyncTudoAguardando` —
   `bioSyncTudo` sai na hora se outro já roda, e isso não pode ser lido
-  como "terminou"); sucesso no máximo 1×/dia, falha ou sem internet
-  SEMPRE (dados com mais de 24 h = alerta de desatualizado). Nunca bloqueia;
+  como "terminou"); aparece a CADA abertura — do zero ou de volta do
+  segundo plano depois de 5 min (`_bioOcultoEm`, listener de
+  `visibilitychange` em `js/biomonitor-sync.js`; nunca sobre tela de
+  login/PIN). ⚠️ A 1ª versão mostrava o sucesso 1×/dia e só na abertura do
+  zero — no celular "abrir o app" quase sempre é voltar do segundo plano,
+  e o usuário relatou "o popup parou de funcionar" (biomonitor 72 → 73).
+  Dados com mais de 24 h = alerta de desatualizado. Nunca bloqueia;
   não aparece em modo treinamento. Guarda:
   `tests/biomonitor-aviso-campo.test.js` (6); os testes de guia marcam
   `BioApp._avisoCampoFeito` para o popup não interceptar o tour.
