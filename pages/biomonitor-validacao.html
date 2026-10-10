@@ -649,7 +649,9 @@
           <div>Monitor: <span style="color:var(--cinza-900)">${n.monitor_nome || '—'}</span></div>
           <div>Data: <span style="color:var(--cinza-900)">${formatData(n.data_encontro)}</span></div>
           ${n.lat
-            ? `<div>GPS: <span style="color:var(--cinza-900)">${Number(n.lat).toFixed(5)}, ${Number(n.lng).toFixed(5)}</span> ${n.precisao_gps_m ? `(±${n.precisao_gps_m}m)` : ''}</div>`
+            ? (n.localizacao_estimada
+                ? `<div>Posição estimada: <span style="color:var(--cinza-900)">${Number(n.lat).toFixed(5)}, ${Number(n.lng).toFixed(5)}</span> <span style="color:#b45309;font-size:.78rem" title="Sorteada dentro do polígono da praia de encontro — ninho lançado de planilha, sem GPS de campo">(dentro da praia, sem GPS de campo)</span></div>`
+                : `<div>GPS: <span style="color:var(--cinza-900)">${Number(n.lat).toFixed(5)}, ${Number(n.lng).toFixed(5)}</span> ${n.precisao_gps_m ? `(±${n.precisao_gps_m}m)` : ''}</div>`)
             : `<div style="color:#f59e0b;font-size:.78rem">Sem GPS — não aparece no mapa</div>`}
           ${n.dist_rio_m != null ? `<div>Dist. ao rio: <span style="color:var(--cinza-900)">${n.dist_rio_m} m</span> <span style="opacity:.6;font-size:.85em">(${n.dist_rio_metodo === 'tracker' ? 'GPS tracker' : 'estimativa'})</span></div>` : ''}
         </div>

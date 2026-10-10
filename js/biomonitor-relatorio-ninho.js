@@ -449,8 +449,11 @@ function _biopdfTabela(ctx, opts) {
 function _biopdfSecaoIdentificacao(ctx, n) {
   _biopdfTitulo(ctx, 'Identificação e Postura')
   const linha = (l, v) => (v != null && v !== '') ? [l, String(v)] : null
+  // Posição estimada (migration 358): nunca se passa por GPS de campo
   const gps = n.lat != null
-    ? `${Number(n.lat).toFixed(5)}, ${Number(n.lng).toFixed(5)}${n.precisao_gps_m ? ` (±${n.precisao_gps_m} m)` : ''}`
+    ? (n.localizacao_estimada
+        ? `${Number(n.lat).toFixed(5)}, ${Number(n.lng).toFixed(5)} (estimada dentro da praia de encontro — lançado de planilha, sem GPS de campo)`
+        : `${Number(n.lat).toFixed(5)}, ${Number(n.lng).toFixed(5)}${n.precisao_gps_m ? ` (±${n.precisao_gps_m} m)` : ''}`)
     : 'Sem GPS registrado'
   const linhas = [
     linha('Espécie', BIOREL_ESPECIE[n.especie] || n.especie),
