@@ -239,6 +239,14 @@ const BIO_REFERENCIAS = {
     fonte: 'Animal Conservation (Wiley)',
     url: 'https://zslpublications.onlinelibrary.wiley.com/doi/10.1111/acv.12986',
   },
+  // Definições de sucesso de eclosão × emergência usadas pelo Relatório
+  // Científico (migration 359). Capítulo de manual, sem link estável.
+  sucesso_eclosao: {
+    autores: 'Miller, J.D.',
+    titulo: 'Determining clutch size and hatching success',
+    fonte: 'In: Eckert, K.L. et al. (eds.) Research and Management Techniques for the Conservation of Sea Turtles. IUCN/SSC Marine Turtle Specialist Group, Publ. 4, 1999, p. 124–129',
+    url: null,
+  },
 }
 
 // Fatos-âncora do contexto regional/programático (camada de referência).
@@ -280,14 +288,15 @@ function bioEstimativaSexoCoorte(especie, tempMedia) {
 // HTML da lista de referências (numerada), para a seção de fontes.
 function bioReferenciasHTML(ids) {
   const chaves = (ids && ids.length) ? ids : Object.keys(BIO_REFERENCIAS)
-  return chaves.map((k, i) => {
+  // Filtra antes de numerar: chave sem referência cadastrada não pode
+  // deixar buraco na numeração.
+  return chaves.filter(k => BIO_REFERENCIAS[k]).map((k, i) => {
     const r = BIO_REFERENCIAS[k]
-    if (!r) return ''
     return `<li class="ac-ref">
       <span class="ac-ref-n">${i + 1}</span>
       <span class="ac-ref-txt">
         <strong>${esc(r.autores)}</strong>. ${esc(r.titulo)}. <em>${esc(r.fonte)}</em>.
-        <a href="${esc(r.url)}" target="_blank" rel="noopener">${esc(r.url)}</a>
+        ${r.url ? `<a href="${esc(r.url)}" target="_blank" rel="noopener">${esc(r.url)}</a>` : ''}
       </span></li>`
   }).join('')
 }
