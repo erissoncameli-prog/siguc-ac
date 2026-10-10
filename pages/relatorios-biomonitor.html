@@ -231,6 +231,31 @@
 }
 #mapa-bio { flex:1; min-height:360px; }
 
+/* Tela cheia do mapa — mapa + painel de praias/camadas + filtros.
+   O .mapa-outer é MOVIDO para o <body> enquanto está em tela cheia: o
+   .fade-in da página deixa transform no ancestral (animation-fill-mode
+   both), e position:fixed dentro dele ficaria preso à caixa da página,
+   não à viewport (mesma armadilha da barra do app Frota). O fullscreen
+   nativo é pedido no <html>, nunca no mapa: assim o painel do ninho
+   (#mapa-slide-panel, z 2100) e a barra de comparação (z 2000), que
+   vivem no <body>, continuam pintando por cima (regra do Mapa das UCs). */
+.mapa-outer.tela-cheia {
+  position:fixed; inset:0; z-index:1500; height:auto; min-height:0;
+  padding:12px; background:var(--cinza-100);
+}
+.mapa-outer.tela-cheia .mapa-panel-esq { max-height:none; }
+@media (max-width:820px) {
+  .mapa-outer.tela-cheia { grid-template-rows:auto minmax(0,1fr); overflow:hidden; }
+  .mapa-outer.tela-cheia .mapa-panel-esq { max-height:32vh; }
+}
+body.mapa-em-tela-cheia { overflow:hidden; }
+.mapa-fs-btn {
+  width:34px; height:34px; display:grid; place-items:center;
+  background:#fff; border:0; border-radius:4px; cursor:pointer; color:#1F2937;
+}
+.mapa-fs-btn:hover { background:#F3F4F6; }
+.mapa-fs-btn:focus-visible { outline:3px solid rgba(82,183,136,.6); outline-offset:2px; }
+
 .mapa-filtros-ponto {
   background:var(--branco); border-top:1px solid var(--borda);
   padding:8px 12px; display:flex; flex-wrap:wrap; gap:8px; align-items:center;
@@ -902,6 +927,7 @@
   // ── Renderização principal ──────────────────────────────────────
   function renderTudo(d, el) {
     const k = d.kpis || {}
+    if (window.mapaEmTelaCheia && window.mapaEmTelaCheia()) window.mapaAlternarTelaCheia(false)
     _mapaLeafletInst = null  // força reinicialização do mapa ao re-aplicar filtros
     el.innerHTML = `
       ${htmlSecGeral(k)}
@@ -2443,12 +2469,101 @@
       _mapaCamadas.ninhos    = L.layerGroup().addTo(_mapaLeafletInst)
       _mapaCamadas.transf    = L.layerGroup().addTo(_mapaLeafletInst)
       _mapaCamadas.calor     = null
+      mapaAdicionarBotaoTelaCheia(_mapaLeafletInst)
     }
     await mapaCarregarDados()
     // A aba Mapa fica oculta até ser aberta; ao exibir, o Leaflet precisa
     // recalcular o tamanho do container para os tiles preencherem a área.
     setTimeout(() => { try { _mapaLeafletInst && _mapaLeafletInst.invalidateSize() } catch(e) {} }, 160)
   }
+
+  // ── Tela cheia do mapa ──────────────────────────────────────────
+  const MAPA_ICO_EXPANDIR = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>'
+  const MAPA_ICO_RECOLHER = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="14" y1="10" x2="21" y2="3"/><line x1="3" y1="21" x2="10" y2="14"/></svg>'
+  let _mapaFsMarcador = null   // guarda o lugar do .mapa-outer na página
+
+  function mapaAdicionarBotaoTelaCheia(mapa) {
+    const Ctl = L.Control.extend({
+      options: { position: 'topleft' },
+      onAdd() {
+        const box = L.DomUtil.create('div', 'leaflet-bar')
+        const b = L.DomUtil.create('button', 'mapa-fs-btn', box)
+        b.type = 'button'
+        b.id = 'mapa-fs-btn'
+        mapaAtualizarBotaoTelaCheia(b, false)
+        L.DomEvent.disableClickPropagation(box)
+        L.DomEvent.on(b, 'click', ev => { L.DomEvent.preventDefault(ev); window.mapaAlternarTelaCheia() })
+        return box
+      },
+    })
+    mapa.addControl(new Ctl())
+  }
+
+  function mapaAtualizarBotaoTelaCheia(b, ativo) {
+    b = b || document.getElementById('mapa-fs-btn')
+    if (!b) return
+    b.innerHTML = ativo ? MAPA_ICO_RECOLHER : MAPA_ICO_EXPANDIR
+    const rot = ativo ? 'Sair da tela cheia' : 'Ver mapa em tela cheia'
+    b.title = rot + (ativo ? ' (Esc)' : '')
+    b.setAttribute('aria-label', rot)
+    b.setAttribute('aria-pressed', ativo ? 'true' : 'false')
+  }
+
+  function mapaRedimensionar() {
+    ;[0, 120, 320].forEach(t => setTimeout(() => {
+      try { _mapaLeafletInst && _mapaLeafletInst.invalidateSize() } catch (e) {}
+    }, t))
+  }
+
+  window.mapaEmTelaCheia = function() { return !!document.querySelector('.mapa-outer.tela-cheia') }
+
+  window.mapaAlternarTelaCheia = function(forcar) {
+    const ativo = window.mapaEmTelaCheia()
+    const quer = typeof forcar === 'boolean' ? forcar : !ativo
+    if (quer === ativo) return
+    if (quer) {
+      const outer = document.querySelector('#sec-mapa .mapa-outer')
+      if (!outer) return
+      _mapaFsMarcador = document.createComment('mapa-tela-cheia')
+      outer.parentNode.insertBefore(_mapaFsMarcador, outer)
+      document.body.appendChild(outer)
+      outer.classList.add('tela-cheia')
+      document.body.classList.add('mapa-em-tela-cheia')
+      // Fullscreen nativo é opcional (iPad não tem fora de <video>): quem
+      // dá o visual é a classe; pedir no <html> só tira a barra do navegador.
+      const raiz = document.documentElement
+      if (raiz.requestFullscreen && !document.fullscreenElement) raiz.requestFullscreen().catch(() => {})
+    } else {
+      const outer = document.querySelector('.mapa-outer.tela-cheia')
+      if (outer) {
+        outer.classList.remove('tela-cheia')
+        if (_mapaFsMarcador && _mapaFsMarcador.parentNode) _mapaFsMarcador.replaceWith(outer)
+        else outer.remove()   // seção já re-renderizada: a cópia antiga sai
+      }
+      _mapaFsMarcador = null
+      document.body.classList.remove('mapa-em-tela-cheia')
+      if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {})
+    }
+    mapaAtualizarBotaoTelaCheia(null, quer)
+    mapaRedimensionar()
+    if (quer) { const b = document.getElementById('mapa-fs-btn'); b && b.focus() }
+  }
+
+  document.addEventListener('keydown', ev => {
+    // Com fullscreen nativo o navegador consome o Esc e sai sozinho —
+    // quem acompanha é o fullscreenchange abaixo. Se o Esc chegou aqui, a
+    // página é que deve tratar (iPad, ou navegador que não deu fullscreen).
+    if (ev.key === 'Escape' && window.mapaEmTelaCheia()) {
+      // Esc fecha primeiro o painel do ninho, se estiver aberto; depois a tela cheia.
+      const painel = document.getElementById('mapa-slide-panel')
+      if (painel && painel.classList.contains('aberto')) { window.mapaFecharSlide(); return }
+      window.mapaAlternarTelaCheia(false)
+    }
+  })
+  // Esc no fullscreen nativo sai dele sem passar pelo botão: acompanha.
+  document.addEventListener('fullscreenchange', () => {
+    if (!document.fullscreenElement && window.mapaEmTelaCheia()) window.mapaAlternarTelaCheia(false)
+  })
 
   // ── Carrega dados das RPCs ─────────────────────────────────────
   async function mapaCarregarDados() {
