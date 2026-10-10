@@ -109,20 +109,23 @@ const AC_CMP_M = {
     { label: 'Ovos na postura',                  get: b => acN(b.kpis.total_ovos_postura),                 pol: 'alta',   dec: 0 },
     { label: 'Ovos íntegros',                    get: b => acN(b.det?.ovos?.total_integros),               pol: 'alta',   dec: 0 },
     { label: 'Média de ovos por ninho',          get: b => b.det?.ovos?.media_postura,                     pol: 'neutra', dec: 1 },
-    { label: 'Fertilidade',                      get: b => b.det?.ovos?.taxa_fertilidade_pct,              pol: 'alta',   dec: 1, unidade: '%' },
+    { label: 'Ovos íntegros no registro',        get: b => b.det?.ovos?.taxa_fertilidade_pct,              pol: 'alta',   dec: 1, unidade: '%' },
   ],
   eclosao: [
     { label: 'Filhotes vivos',                   get: b => acN(b.det?.eclosao?.vivos),                     pol: 'alta',   dec: 0 },
     { label: 'Filhotes mortos',                  get: b => acN(b.det?.eclosao?.mortos),                    pol: 'baixa',  dec: 0 },
     { label: 'Ovos não nascidos',                get: b => acN(b.det?.eclosao?.nao_nascidos),              pol: 'baixa',  dec: 0 },
-    { label: 'Taxa de eclosão',                  get: b => b.det?.eclosao?.taxa_eclosao_pct,               pol: 'alta',   dec: 1, unidade: '%' },
-    { label: 'Mortalidade embrionária',          get: b => b.det?.eclosao?.taxa_mortalidade_embrionaria_pct, pol: 'baixa', dec: 1, unidade: '%' },
+    { label: 'Sucesso de eclosão (÷ incubados)', get: b => b.det?.eclosao?.taxa_sucesso_eclosao_pct,       pol: 'alta',   dec: 1, unidade: '%' },
+    { label: 'Sucesso de emergência (÷ incubados)', get: b => b.det?.eclosao?.taxa_emergencia_pct,         pol: 'alta',   dec: 1, unidade: '%' },
+    { label: 'Ovos não eclodidos (÷ incubados)', get: b => b.det?.eclosao?.taxa_ovos_nao_eclodidos_pct,    pol: 'baixa',  dec: 1, unidade: '%' },
+    { label: 'Vivos ÷ ovos abertos (taxa antiga)', get: b => b.det?.eclosao?.taxa_eclosao_pct,             pol: 'alta',   dec: 1, unidade: '%' },
   ],
   perdas: [
     { label: 'Ovos perdidos — alagamento',       get: b => acN(b.det?.perdas?.ovos_alagamento),            pol: 'baixa',  dec: 0 },
     { label: 'Ovos perdidos — erosão',           get: b => acN(b.det?.perdas?.ovos_erosao),                pol: 'baixa',  dec: 0 },
     { label: 'Ovos perdidos — ação humana',      get: b => acN(b.det?.perdas?.ovos_humana),                pol: 'baixa',  dec: 0 },
     { label: 'Ovos predados',                    get: b => acN(b.det?.perdas?.ovos_predacao),              pol: 'baixa',  dec: 0 },
+    { label: 'Ovos perdidos — causa natural',    get: b => acN(b.det?.perdas?.ovos_natural),               pol: 'baixa',  dec: 0 },
     { label: 'Ninhos perdidos',                  get: b => acN(b.det?.perdas?.ninhos_perdidos),            pol: 'baixa',  dec: 0 },
     { label: 'Predação por animais (registros)', get: b => acN(b.kpis.predacao_animais),                   pol: 'baixa',  dec: 0 },
     { label: 'Predação por pessoas (registros)', get: b => acN(b.kpis.predacao_pessoas),                   pol: 'baixa',  dec: 0 },
@@ -152,7 +155,7 @@ const AC_CMP_M_SUMARIO = [
   { label: 'Ninhos monitorados',        get: b => acN(b.kpis.total_ninhos),          pol: 'alta',  dec: 0 },
   { label: 'Ninhos perdidos',           get: b => acN(b.kpis.perdidos),              pol: 'baixa', dec: 0 },
   { label: 'Filhotes vivos',            get: b => acN(b.det?.eclosao?.vivos ?? b.kpis.total_filhotes_vivos), pol: 'alta', dec: 0 },
-  { label: 'Taxa de eclosão',           get: b => b.kpis.taxa_eclosao_pct,           pol: 'alta',  dec: 1, unidade: '%' },
+  { label: 'Sucesso de emergência',     get: b => b.det?.eclosao?.taxa_emergencia_pct, pol: 'alta', dec: 1, unidade: '%' },
   { label: 'Taxa de sucesso de nidificação', get: b => b.kpis.taxa_sucesso_nidificacao_pct, pol: 'alta', dec: 1, unidade: '%' },
 ]
 
@@ -346,7 +349,7 @@ function acCmpSecSumario(bundles) {
       <div class="ac-fase-grid">
         <div><b>${acFmt(b.kpis.total_ninhos)}</b><span>ninhos</span></div>
         <div><b>${acFmt(b.det?.eclosao?.vivos ?? b.kpis.total_filhotes_vivos)}</b><span>filhotes vivos</span></div>
-        <div><b>${acPct(b.kpis.taxa_eclosao_pct)}</b><span>eclosão</span></div>
+        <div><b>${acPct(b.det?.eclosao?.taxa_emergencia_pct)}</b><span>emergência</span></div>
         <div><b>${acFmt(b.pr?.resumo?.total_praias)}</b><span>praias</span></div>
       </div></div>`
   }).join('')

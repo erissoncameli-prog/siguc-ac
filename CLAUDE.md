@@ -2648,6 +2648,46 @@ polígono da praia de ENCONTRO (`praia_id`, nunca `praia_atual_id`).
   confirmação): usar `CREATE OR REPLACE TRIGGER` (PG14+).
 - `pwa/sw.js`: biomonitor 73 → 74 (`js/biomonitor-relatorio-ninho.js`).
 
+## Regra do sistema — Relatório Científico da Temporada (Biomonitor, migration 359)
+`pages/analise-cientifica-biomonitor.html` + `js/biomonitor-analise.js`
+(montagem) + `js/biomonitor-analise-ciencia.js` (funções puras: IC,
+fase, postura, funil, calendário, achados — testáveis fora do DOM).
+Revisão de 10/2026 conferida contra a temporada 2026/2027 em produção.
+- **Perdas por causa vêm de `vw_ninho_ovos`** em `bio_analise_detalhada`
+  — a seção dizia 0 predados com 26 ovos perdidos no registro (mesmo
+  defeito da 349). Ganhou `ovos_natural`.
+- **Eclosão no padrão da literatura (Miller 1999)**, chaves NOVAS em
+  `bio_analise_detalhada.eclosao`: `ovos_incubados` (por ninho aberto,
+  MAIOR(viáveis, vivos+mortos+não nascidos)), `taxa_sucesso_eclosao_pct`
+  ((vivos+mortos) ÷ incubados), `taxa_emergencia_pct` (vivos ÷
+  incubados), `taxa_ovos_nao_eclodidos_pct`,
+  `taxa_mortalidade_filhote_ninho_pct`. As antigas `taxa_eclosao_pct` e
+  `taxa_mortalidade_embrionaria_pct` NÃO mudaram de valor (outras telas
+  as leem); no relatório aparecem como "vivos ÷ ovos abertos". Levar as
+  novas ao relatório oficial/PDF por ninho/app fica para entrega própria
+  (checklist de superfícies da regra de cálculos de ovos).
+- **`bio_analise_complementar`** (nova, mesma guarda das irmãs): datas
+  reais dos eventos, funil, praias de PROTEÇÃO (destino da
+  transferência, m² por ninho), postura por espécie, tempo até a
+  transferência, calendário de eclosão previsto, completude.
+- **Fase pelos eventos, nunca por terços da janela**: a temporada vai de
+  27/03 a 27/02 e todos os ninhos caíam no "meio". `accFaseBiologica`:
+  postura até 7 dias após o último encontro → incubação → eclosão (1ª
+  abertura ou previsão já iniciada) → soltura.
+- **Praia de proteção não é praia de desova**: sai da densidade e da
+  contagem da rede (`acPraiasDesova`).
+- Visual (skill ui-ux-pro-max): 5 partes (A–E) com índice lateral ≥1280px,
+  "Principais achados" por regras, selos Observado/Referência/Estimado,
+  KPI em DM Sans tabular, gráficos novos em SVG com `<title>` +
+  `graficoTecladoEnvolver`, nenhum gráfico com dois eixos Y, paleta de
+  espécie validada no `validate_palette.js` (iaçá deixou o azul-claro
+  que reprovava em contraste).
+- Achado de dado: 14 transferências com data anterior ao encontro do
+  ninho — o relatório aponta e recomenda corrigir na Validação.
+- Guarda: `tests/biomonitor-relatorio-cientifico.test.js` (11),
+  contrafactual conferido (fonte monoespaçada e praia de proteção na
+  rede reprovam). Sem mudança em `pwa/sw.js` (tela de mesa).
+
 ## Regra do sistema — nome de espécie do Biomonitor vem do catálogo
 A SEMA renomeou o pitiú para **Iaçá** em Administrar › Espécies
 (`especies_quelonio_catalogo`, 21/09/2026) e metade do sistema seguiu
