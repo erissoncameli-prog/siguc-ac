@@ -2648,6 +2648,27 @@ polígono da praia de ENCONTRO (`praia_id`, nunca `praia_atual_id`).
   confirmação): usar `CREATE OR REPLACE TRIGGER` (PG14+).
 - `pwa/sw.js`: biomonitor 73 → 74 (`js/biomonitor-relatorio-ninho.js`).
 
+## Regra do sistema — tela cheia do mapa do relatório do Biomonitor
+`pages/relatorios-biomonitor.html`, aba Mapa: botão de tela cheia no
+controle do Leaflet (abaixo do zoom, `#mapa-fs-btn`, `mapaAlternarTelaCheia`).
+Entram o mapa, o painel de praias/camadas e os filtros (`.mapa-outer`).
+- **O `.mapa-outer` é MOVIDO para o `<body>`** enquanto está em tela
+  cheia (um comentário marca o lugar e ele volta ao sair). O `.fade-in`
+  da página usa `animation-fill-mode: both` e deixa `transform` no
+  ancestral, que prende o `position:fixed` à caixa da página — medido:
+  sem mover, o mapa abria a 268 px da esquerda. Mesma armadilha da barra
+  do app Frota.
+- **Fullscreen nativo é pedido no `<html>`, nunca no mapa** (regra do
+  Mapa das UCs): o painel do ninho (`#mapa-slide-panel`, z 2100) e a
+  barra de comparação (z 2000) vivem no `<body>` e continuam por cima. A
+  tela cheia usa z 1500. É opcional: quem dá o visual é a classe
+  `.tela-cheia`, então funciona também no iPad.
+- Esc fecha o painel do ninho primeiro e depois a tela cheia; com o
+  fullscreen nativo o navegador consome o Esc e o `fullscreenchange`
+  sai junto. Re-aplicar filtros sai da tela cheia antes de re-renderizar.
+- Guarda: `tests/biomonitor-mapa-telacheia.test.js` (4), contrafactual
+  conferido. Sem mudança em `pwa/sw.js` (tela de mesa).
+
 ## Regra do sistema — Relatório Científico da Temporada (Biomonitor, migration 359)
 `pages/analise-cientifica-biomonitor.html` + `js/biomonitor-analise.js`
 (montagem) + `js/biomonitor-analise-ciencia.js` (funções puras: IC,
