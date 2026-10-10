@@ -2618,6 +2618,36 @@ ficava vazia para os monitores. Quatro causas independentes:
   `tests/biomonitor-abertos-offline.test.js` (8; os 3 reprovam o código
   antigo). `pwa/sw.js`: biomonitor 71 → 72.
 
+## Regra do sistema — posição ESTIMADA do ninho (Biomonitor, migrations 358/358b/358c)
+Os 568 ninhos da temporada 2026 foram achados em campo SEM o app, anotados
+em planilha e lançados depois: 471 sem coordenada e 97 com o GPS do celular
+na hora da DIGITAÇÃO (~105 km da praia, nenhum dentro do polígono). Por
+decisão do usuário, cada ninho recebeu uma posição SORTEADA dentro do
+polígono da praia de ENCONTRO (`praia_id`, nunca `praia_atual_id`).
+- `bio_distribuir_ninhos_poligono(p_praia_id)` (sem GRANT, só SQL Editor):
+  semente fixa por praia, recuo de 1 m da borda, `ST_Within` conferido
+  ponto a ponto, espaçamento mínimo (0,6·√(área/n), 0,5–3 m) — nunca
+  sobreposto, nunca fora. Idempotente: só pega ninho sem ponto ou com ponto
+  fora do polígono. Resultado em 09/10/2026: 502 posicionados, 502/502
+  dentro, menor distância 1,50 m. **66 ninhos de 6 praias sem polígono**
+  (Acreana, Teteo, dos 4, Merenda, Basá, Piquete) seguem sem posição —
+  desenhar o polígono e rodar a função de novo.
+- `localizacao_estimada` = true marca o ponto como SIMULADO. A coordenada
+  antiga fica em `localizacao_anterior`; `bio_desfazer_posicao_estimada()`
+  devolve. Mapa do relatório: marcador VAZADO; validação e PDF dizem
+  "estimada". **Ponto estimado nunca entra em análise espacial.**
+- Trigger `trg_ninhos_protege_posicao_estimada`: a fila offline reenvia
+  `localizacao` no upsert — o GPS do escritório voltaria por cima. Só
+  substitui a estimativa um ponto DENTRO da praia de encontro (GPS de campo
+  real) ou a correção da mesa (`biomonitor_corrigir_localizacao_ninho`,
+  GUC `bio.loc_manual`); nos dois casos a marca sai.
+- `bio_mapa_ninhos` passou a plotar a posição de ENCONTRO; o ponto de
+  acesso da praia de destino (decisão da 333) só vale para ninho sem
+  posição nenhuma. As linhas de transferência seguem origem→destino.
+- ⚠️ `apply_migration` do MCP expira com `DROP TRIGGER IF EXISTS` (pede
+  confirmação): usar `CREATE OR REPLACE TRIGGER` (PG14+).
+- `pwa/sw.js`: biomonitor 73 → 74 (`js/biomonitor-relatorio-ninho.js`).
+
 ## Regra do sistema — nome de espécie do Biomonitor vem do catálogo
 A SEMA renomeou o pitiú para **Iaçá** em Administrar › Espécies
 (`especies_quelonio_catalogo`, 21/09/2026) e metade do sistema seguiu
