@@ -226,6 +226,10 @@ test('postura × referência: SVG com um ponto por espécie, legível por teclad
 test('completude e transferências com data invertida aparecem para a equipe corrigir', async ({ page }) => {
   await abrir(page)
   await expect(page.locator('#ac-completude')).toContainText('502 posições são estimadas')
+  // posição estimada dentro da praia conta no mapa, nunca como GPS de campo
+  const mapa = page.locator('#ac-completude tr', { hasText: 'Posição no mapa' })
+  await expect(mapa).toContainText('502 de 568')
+  await expect(page.locator('#ac-completude tr', { hasText: 'GPS de campo' })).toContainText('0 de 568')
   await expect(page.locator('#ac-tempos .ac-row-alert')).toContainText('14')
   await expect(page.locator('#ac-recomendacoes')).toContainText('Datas a revisar')
 })

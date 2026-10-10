@@ -2705,6 +2705,11 @@ Revisão de 10/2026 conferida contra a temporada 2026/2027 em produção.
   que reprovava em contraste).
 - Achado de dado: 14 transferências com data anterior ao encontro do
   ninho — o relatório aponta e recomenda corrigir na Validação.
+- Completude separa **"Posição no mapa (dentro da praia)"** (campo +
+  estimada, 502/568 — as estimadas estão todas dentro do polígono da
+  praia de encontro) de **"Posição por GPS de campo"** (0/568, a única
+  que entra em análise espacial). Mostrar só a 2ª fazia parecer que a
+  correção das posições (358) não tinha valido.
 - Guarda: `tests/biomonitor-relatorio-cientifico.test.js` (11),
   contrafactual conferido (fonte monoespaçada e praia de proteção na
   rede reprovam). Sem mudança em `pwa/sw.js` (tela de mesa).
