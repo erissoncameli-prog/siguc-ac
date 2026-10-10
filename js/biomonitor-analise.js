@@ -360,7 +360,7 @@ function acSecCompletude(ctx) {
     </tr>`
   }).join('')
   const notas = []
-  if (acN(c.gps_estimado) > 0) notas.push(`<strong>${acFmt(c.gps_estimado)} posições são estimadas</strong> (sorteadas dentro do polígono da praia de encontro, porque os ninhos foram lançados depois, sem GPS de campo). Nenhuma métrica espacial deste relatório as usa.`)
+  if (acN(c.gps_estimado) > 0) notas.push(`<strong>${acFmt(c.gps_estimado)} posições são estimadas</strong>: os ninhos foram lançados depois, sem GPS de campo, e cada um recebeu uma posição sorteada dentro do polígono da praia de encontro. Por isso aparecem no mapa, dentro da praia certa, e contam em "Posição no mapa" — mas não em "GPS de campo": a posição exata do ninho na praia não foi medida, e nenhuma métrica espacial deste relatório a usa.`)
   if (acN(c.sem_localizacao) > 0) notas.push(`${acFmt(c.sem_localizacao)} ninho(s) sem posição nenhuma, em praias ainda sem polígono desenhado.`)
   if (acN(c.praias_sem_poligono) > 0) notas.push(`${acFmt(c.praias_sem_poligono)} praia(s) usadas sem polígono cadastrado.`)
   const corpo = `

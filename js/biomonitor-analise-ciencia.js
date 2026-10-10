@@ -316,6 +316,10 @@ function accCompletudeItens(c) {
     it('Ninhos validados pela equipe científica', c.validados, n, 'Tudo o relatório'),
     it('Ovos contados (não estimados)', c.ovos_contados, n, 'Postura e funil'),
     it('Hora da desova registrada', c.com_hora_desova, n, 'Janela de transferência'),
+    // Posição no mapa = qualquer ponto (campo ou estimado na praia de
+    // encontro, migration 358). GPS de campo segue separado: só ele entra
+    // em análise espacial.
+    it('Posição no mapa (dentro da praia)', _accNum(c.gps_campo) + _accNum(c.gps_estimado), n, 'Mapa e contagem por praia'),
     it('Posição por GPS de campo', c.gps_campo, n, 'Análise espacial'),
     it('Ninhos com ao menos 1 visita', c.ninhos_com_visita, n, 'Perdas na incubação'),
     it('Temperatura medida (encontro ou visita)', _accNum(c.com_temp_encontro) + _accNum(c.visitas_com_temp), n, 'Razão sexual (TSD)'),
