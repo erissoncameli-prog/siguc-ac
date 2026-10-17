@@ -1,0 +1,62 @@
+name: Embargos ambientais (IBAMA + IMAC)
+
+# Carga dos embargos do Acre (migration 360), usados pelo relatório "CAR na
+# UC" e pelo relatório do imóvel do Mapa no cruzamento por sobreposição.
+# Roda FORA do banco de propósito: o CSV do IBAMA tem ~210 MB e os ZIPs do
+# IMAC são binários — nenhum dos dois pode passar pelo pg_net (ver
+# CLAUDE.md). Grava pela API de gerenciamento, com o mesmo
+# SUPABASE_ACCESS_TOKEN do deploy. Upsert + limpeza só no fim: uma fonte que
+# falhar nunca esvazia a tabela.
+
+on:
+  workflow_dispatch:
+    inputs:
+      modo:
+        description: 'grava = baixa e grava; seco = só mostra o resumo'
+        type: choice
+        options: [grava, seco]
+        default: grava
+      fonte:
+        description: 'ibama, imac ou vazio (as duas)'
+        required: false
+        default: ''
+  schedule:
+    # IBAMA atualiza quase todo dia; IMAC de tempos em tempos. Semanal basta.
+    - cron: '23 7 * * 1'
+  push:
+    # Mudar o script ou o workflow já roda a carga — é o que permite testar
+    # a partir de uma branch (workflow_dispatch só existe na main).
+    paths:
+      - 'scripts/embargos_carga.py'
+      - '.github/workflows/embargos.yml'
+
+concurrency:
+  group: embargos-carga
+  cancel-in-progress: false
+
+jobs:
+  carga:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5.6.0
+        with:
+          python-version: '3.12'
+      - name: Dependências
+        run: pip install 'requests==2.32.5' 'shapely==2.1.2' 'pyproj==3.7.2' 'pyogrio==0.11.1' 'geopandas==1.1.1'
+      - name: Autoteste (sem rede)
+        run: python scripts/embargos_carga.py --autoteste
+      - name: Carga
+        env:
+          MODO: ${{ inputs.modo || 'grava' }}
+          FONTE: ${{ inputs.fonte }}
+        run: |
+          ARGS=""
+          [ "$MODO" = "seco" ] && ARGS="--seco"
+          [ -n "$FONTE" ] && ARGS="$ARGS --fonte $FONTE"
+          python scripts/embargos_carga.py $ARGS
