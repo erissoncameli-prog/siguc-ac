@@ -987,7 +987,31 @@ opcionais. Sem mapa (pedido do usuário). Exporta PDF (timbre), Excel
   lotes (542 em 22/04/2026, 444 em 17/02/2025) e os ativos quase nunca caem
   nesses dias (7 de 3.000). Rótulo sempre "última atualização no SICAR" + nota
   no PDF: se o registro for alterado depois, a data anda junto.
-- Guarda: `tests/car-uc-relatorio.test.js` (28). Página real com stub,
+- **Embargos ambientais (migrations 360/360b)** — mesmas fontes do Selo
+  Verde AC (CSR/UFMG, `csr.ufmg.br/mappiadb/api/run/327`). `embargos_ambientais`
+  (IBAMA + IMAC; ICMBio previsto, arquivo público não localizado), SEM nome,
+  CPF/CNPJ do embargado nem nome do imóvel — o vínculo é geométrico ou pelo
+  nº do CAR. Carga FORA do banco: `scripts/embargos_carga.py` +
+  `.github/workflows/embargos.yml` (semanal, e roda no push que muda o
+  script — é como se testa de uma branch). IBAMA = CSV nacional de ~210 MB
+  (dados abertos, sem nº do CAR → só sobreposição); IMAC = 1 ZIP de shapefile
+  por ano em `imac.ac.gov.br/fiscalizacao-autuacoes/` (traz `COD_CAR` →
+  casa também pelo número). Upsert por (fonte, chave) e limpeza só no fim:
+  fonte que falha nunca esvazia a tabela; `embargos_cargas` registra cada
+  tentativa e a tela diz de quando é cada fonte ("sem carga" nunca vira
+  "sem embargo"). ⚠️ Ler o CSV do IBAMA direto do fluxo de rede quebrou
+  ("I/O operation on closed file") — baixar para disco antes. ⚠️ Os dois
+  domínios são recusados pelo proxy das sessões de desenvolvimento (o banco
+  e o GitHub Actions alcançam). Regra igual nos dois relatórios:
+  `carucEmbargosDoImovel` (CAR na UC) e `_relEmbargos` (relatório do imóvel
+  do Mapa) — mudou num, muda no outro. Embargo VIGENTE = ponto de atenção
+  e motivo de prioridade (dano na Alta, também na Média). Consulta
+  `car_embargos_busca` (retângulo OU nº do CAR); `car_embargos_bbox` (360)
+  ficou sem chamador — `DROP` pendente no SQL Editor.
+- Selo Verde AC (`seloverde.sema.ac.gov.br/consultar-car/`): o relatório por
+  CAR é protegido por captcha (`cap.js`, `/imagery/get_by_car_unificado.php`)
+  — NÃO é fonte automatizável; usamos as fontes abertas que ele cita.
+- Guarda: `tests/car-uc-relatorio.test.js` (29). Página real com stub,
   PDF/Excel/CSV gerados de verdade, e guardas conferidas por
   contrafactual (reprovam sem a correção).
 - Sem mudança em `pwa/sw.js` (tela de mesa).
