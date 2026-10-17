@@ -171,15 +171,23 @@ def ibama_linha(r):
         'area_ha': numero(r.get('QTD_AREA_EMBARGADA')),
         'municipio': (r.get('MUNICIPIO') or '').strip() or None,
         'descricao': ((r.get('DES_TAD') or '').strip() or None),
+        'cod_car': None,
         'geom': geom,
     }
 
 
 def ibama_baixar():
     csv.field_size_limit(10 ** 9)
+    # Baixa para disco antes de ler: ler o fluxo da rede direto (resp.raw)
+    # quebrou na 1ª carga com "I/O operation on closed file".
+    arq = tempfile.NamedTemporaryFile(suffix='.csv', delete=False)
     with requests.get(IBAMA_CSV, headers=UA, stream=True, timeout=600) as resp:
         resp.raise_for_status()
-        texto = io.TextIOWrapper(resp.raw, encoding='utf-8-sig', newline='')
+        for bloco in resp.iter_content(1 << 20):
+            arq.write(bloco)
+    arq.close()
+    print(f'[ibama] baixados {os.path.getsize(arq.name)} bytes')
+    with open(arq.name, encoding='utf-8-sig', newline='') as texto:
         leitor = csv.DictReader(texto, delimiter=';')
         total, regs, sit = 0, [], {}
         for r in leitor:
@@ -189,22 +197,28 @@ def ibama_baixar():
                 regs.append(reg)
                 k = (norm(r.get('SIT_DESEMBARGO')) or '-', norm(r.get('TIPO_DESEMBARGO')) or '-', str(r.get('SIT_CANCELADO') or '-'))
                 sit[k] = sit.get(k, 0) + 1
+    os.unlink(arq.name)
     print(f'[ibama] {total} linhas no Brasil, {len(regs)} no Acre')
     print('[ibama] (sit_desembargo, tipo_desembargo, sit_cancelado) → n:', json.dumps({'|'.join(k): v for k, v in sit.items()}, ensure_ascii=False))
     return regs
 
 
 # ── IMAC ────────────────────────────────────────────────────────────────
+# Colunas dos shapefiles do IMAC conferidas na 1ª carga (17/10/2026):
+# NUM_AI, INFRACAO, ENQUADR, NUM_PROC, DT_EMB, SITUACAO, AREA_HA, MUNICIPIO,
+# TIPO_EMB, COD_CAR (+ AUTUADO/CPF_CNPJ/IMOVEL/LAT/LONG, nunca gravadas).
 CAMPOS_IMAC = [
-    ('num_termo', re.compile(r'termo|tad|^n_?emb|num.*emb|embargo_n|^te$')),
-    ('num_auto', re.compile(r'auto|^ai$|^n_?ai')),
-    ('num_processo', re.compile(r'process')),
+    ('num_termo', re.compile(r'termo|tad|^n_?emb|num_emb|embargo_n|^te$')),
+    ('num_auto', re.compile(r'auto|^ai$|^n_?ai|num_ai')),
+    ('num_processo', re.compile(r'proc')),
+    ('cod_car', re.compile(r'cod_?car|^car$|n_?car')),
     ('data_desembargo', re.compile(r'desemb')),
     ('data_embargo', re.compile(r'(^|_)(data|dt|dat)(_|$)|data_emb|dt_emb')),
     ('situacao', re.compile(r'situa|status')),
     ('area_ha', re.compile(r'area|^ha$|hectar')),
     ('municipio', re.compile(r'munic')),
-    ('descricao', re.compile(r'desc|infra|motivo|obs|tipo')),
+    ('descricao', re.compile(r'infra|desc|motivo|obs')),
+    ('tipo', re.compile(r'tipo')),
 ]
 
 
@@ -281,7 +295,9 @@ def imac_baixar():
                     pega = lambda campo: (None if campo not in mapa else
                                           (None if str(row[mapa[campo]]) in ('None', 'nan', 'NaT', '') else row[mapa[campo]]))
                     termo = pega('num_termo')
-                    base = f'{nome}|{termo}' if termo else f'{nome}|{i}|{hashlib.sha1(wkt.encode()).hexdigest()[:16]}'
+                    ident = termo or pega('num_auto')
+                    base = f'{nome}|{ident}|{i}' if ident else f'{nome}|{i}|{hashlib.sha1(wkt.encode()).hexdigest()[:16]}'
+                    desc = ' — '.join(str(x).strip() for x in (pega('tipo'), pega('descricao')) if x is not None and str(x).strip())
                     d_desemb = data_iso(pega('data_desembargo'))
                     regs.append({
                         'fonte': 'imac', 'chave': hashlib.sha1(base.encode()).hexdigest()[:24],
@@ -293,7 +309,8 @@ def imac_baixar():
                         'data_desembargo': d_desemb,
                         'area_ha': numero(pega('area_ha')),
                         'municipio': str(pega('municipio')).strip() if pega('municipio') is not None else None,
-                        'descricao': str(pega('descricao')).strip()[:1000] if pega('descricao') is not None else None,
+                        'descricao': desc[:1000] or None,
+                        'cod_car': str(pega('cod_car')).strip().upper() if pega('cod_car') is not None else None,
                         'geom': wkt,
                     })
     print(f'[imac] {len(regs)} embargos com geometria no Acre')
@@ -302,7 +319,7 @@ def imac_baixar():
 
 # ── Gravação ────────────────────────────────────────────────────────────
 COLS = ['fonte', 'chave', 'num_termo', 'num_auto', 'num_processo', 'data_embargo', 'situacao',
-        'data_desembargo', 'area_ha', 'municipio', 'descricao']
+        'data_desembargo', 'area_ha', 'municipio', 'descricao', 'cod_car']
 
 
 def valores(r):
@@ -357,7 +374,8 @@ def resumo(regs):
     com_ponto = sum(1 for r in regs if r['geom'] and r['geom'].upper().startswith('POINT'))
     sem = sum(1 for r in regs if not r['geom'])
     anos = sorted({r['data_embargo'][:4] for r in regs if r['data_embargo']})
-    return f'situação {sit}; polígono {com_poligono}, ponto {com_ponto}, sem geometria {sem}; anos {anos[:1]}…{anos[-1:]}'
+    com_car = sum(1 for r in regs if r.get('cod_car'))
+    return f'com nº do CAR {com_car}; situação {sit}; polígono {com_poligono}, ponto {com_ponto}, sem geometria {sem}; anos {anos[:1]}…{anos[-1:]}'
 
 
 # ── Autoteste (sem rede) ────────────────────────────────────────────────
@@ -384,6 +402,15 @@ def autoteste():
     assert mapa == {'num_termo': 'N_TERMO', 'data_embargo': 'DATA', 'situacao': 'SITUACAO',
                     'area_ha': 'AREA_HA', 'municipio': 'MUNICIPIO'}, mapa
     assert desc == ['NOME_AUTUADO', 'CPF_CNPJ']
+    # colunas reais do IMAC (1ª carga, 17/10/2026)
+    reais = ['AUTUADO', 'CPF_CNPJ', 'NUM_AI', 'INFRACAO', 'ENQUADR', 'NUM_PROC', 'DT_EMB', 'SITUACAO',
+             'AREA_HA', 'MUNICIPIO', 'TIPO_EMB', 'COD_CAR', 'IMOVEL', 'LAT', 'LONG', 'geometry']
+    mapa, desc = imac_mapear(reais)
+    assert mapa == {'num_auto': 'NUM_AI', 'num_processo': 'NUM_PROC', 'cod_car': 'COD_CAR', 'data_embargo': 'DT_EMB',
+                    'situacao': 'SITUACAO', 'area_ha': 'AREA_HA', 'municipio': 'MUNICIPIO',
+                    'descricao': 'INFRACAO', 'tipo': 'TIPO_EMB'}, mapa
+    assert desc == ['AUTUADO', 'CPF_CNPJ'] and 'IMOVEL' not in mapa.values()
+    assert imac_situacao('EMBARGADO', None) == 'vigente'
     assert imac_situacao('Desembargado', None) == 'desembargado'
     assert imac_situacao(None, '2025-01-01') == 'desembargado'
     assert data_iso('03/02/2024') == '2024-02-03'

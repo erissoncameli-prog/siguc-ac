@@ -509,6 +509,7 @@ function carucRender(rel) {
   const avisos = []
   if (rel.falhas.prodes) avisos.push(`${rel.falhas.prodes} de ${rel.falhas.prodes_quadrantes} quadrantes do PRODES não responderam — os valores de PRODES podem estar incompletos.`)
   if (rel.falhas.ambiental) avisos.push(`Focos/DETER não puderam ser calculados para ${rel.falhas.ambiental} imóvel(is).`)
+  if (rel.falhas.embargos) avisos.push(carucEmbargosFonteTexto(rel))
   if (rel.falhas.fora_sem_geom) avisos.push(`${rel.falhas.fora_sem_geom} CAR(s) do mesmo titular fora da UC não vieram do SICAR — aparecem na lista, mas não no mapa.`)
   if (rel.resumo.sem_planilha) avisos.push(`${rel.resumo.sem_planilha} imóvel(is) do SICAR não estão na planilha local — aparecem sem titular, classe e módulos.`)
 
@@ -814,6 +815,7 @@ function _carucConteudoHTML(rel) {
         <p class="caruc-nota">Possível fracionamento: mesmo CPF com 2 ou mais imóveis neste relatório, todos de até 4 módulos fiscais, somando mais de 4 (CNPJ fica de fora — órgãos como o INCRA têm milhares de imóveis). Sobreposição entre CARs: só conta a partir de 0,1 ha, dentro da área analisada. Área divergente: diferença acima de 10% entre a área declarada e a do polígono.</p>
         ${o.focos ? '<p class="caruc-nota">Focos: mesma série da linha do tempo do Mapa das UCs — temporada de fogo (1º/jul a 4/nov), VIIRS S-NPP + MODIS. Antes de 2012 a série não é comparável (entrada do VIIRS).</p>' : ''}
         ${o.deter ? '<p class="caruc-nota">DETER: alertas gravados no sistema, que começam em jun/2026.</p>' : ''}
+        <p class="caruc-nota">${esc(carucEmbargosFonteTexto(rel))}</p>
         ${o.prodes ? '<p class="caruc-nota">PRODES/INPE: o ano PRODES vai de agosto a julho; "após 2008" soma os anos 2009 em diante, os primeiros inteiramente posteriores ao marco de 22/07/2008 (Lei 12.651/2012). "Até 2007" é o desmatamento acumulado do INPE.</p>' : ''}
       </div>
     </div>`
@@ -828,12 +830,14 @@ function _carucLinhaHTML(i, o, pino) {
   const tit = i.titular_grupo != null && (i.titular_cars_relatorio > 1 || i.titular_cars_estado > 1)
     ? `<span class="caruc-tit">Titular nº ${i.titular_grupo} · ${formatNum(i.titular_cars_relatorio, 0)} CAR(s) nesta UC · ${formatNum(i.titular_cars_estado, 0)} no Acre</span>` : ''
   const prio = i.prioridade || { nivel: 'baixa', motivos: [] }
+  const emb = (i.embargos || []).slice(0, 3).map(e => `<span class="caruc-nota" style="display:block;color:${e.situacao === 'vigente' ? '#B91C1C' : 'inherit'}">Embargo ${esc(carucEmbargoRotulo(e))} — ${esc(CARUC_EMBARGO_SITUACAO[e.situacao] || e.situacao)}</span>`).join('')
+    + ((i.embargos || []).length > 3 ? `<span class="caruc-nota" style="display:block">+ ${i.embargos.length - 3} embargo(s) — lista completa no Excel</span>` : '')
   const amb = (o.focos ? `<td class="num">${i.ambiental ? formatNum(i.ambiental.focos_periodo, 0) : '—'}</td>` : '')
     + (o.deter ? `<td class="num">${i.ambiental ? `${formatNum(i.ambiental.deter_alertas, 0)}${i.ambiental.deter_alertas ? ` · ${formatNum(i.ambiental.deter_ha, 1)} ha` : ''}` : '—'}</td>` : '')
     + (o.prodes ? `<td class="num">${i.prodes ? formatNum(i.prodes.pos_marco_ha, 2) : '—'}</td>` : '')
   return `<tr class="caruc-imovel-tr">
     <td><span class="caruc-prio ${prio.nivel}">${esc(CARUC_PRIORIDADE_ROTULO[prio.nivel])}</span>${prio.motivos.length ? `<span class="caruc-nota" style="display:block;max-width:180px">${esc(prio.motivos.join('; '))}</span>` : ''}</td>
-    <td>${pino ? `<span class="caruc-pino" title="Nº no mapa do titular">${pino}</span>` : ''}<span class="caruc-cod"${pino ? ' style="display:inline"' : ''}>${esc(i.cod)}</span>${i.local === 'za' ? '<br><span class="caruc-nota">só na zona de amortecimento</span>' : ''}${aten}${sob ? `<span class="caruc-nota" style="display:block">Sobrepõe: ${sob}</span>` : ''}</td>
+    <td>${pino ? `<span class="caruc-pino" title="Nº no mapa do titular">${pino}</span>` : ''}<span class="caruc-cod"${pino ? ' style="display:inline"' : ''}>${esc(i.cod)}</span>${i.local === 'za' ? '<br><span class="caruc-nota">só na zona de amortecimento</span>' : ''}${aten}${emb}${sob ? `<span class="caruc-nota" style="display:block">Sobrepõe: ${sob}</span>` : ''}</td>
     <td>${esc(i.nome_imovel || '—')}<br><span class="caruc-nota">${esc(i.titular || 'sem dados na planilha local')}${i.documento ? ' · ' + esc(i.documento) : ''}</span>${tit}${i.homonimo ? '<span class="caruc-tit">mesmo nome de outro titular — verificar</span>' : ''}</td>
     <td>${esc(i.municipio || '—')}</td>
     <td>${esc(i.situacao || '—')}${_carucCanceladoHTML(i)}${i.classe ? `<br><span class="caruc-nota">${esc(i.classe)}</span>` : ''}</td>

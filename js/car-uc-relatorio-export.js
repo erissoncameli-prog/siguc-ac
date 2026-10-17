@@ -167,12 +167,13 @@ async function carucMontarPdf(rel, protocolo) {
     'Área na UC/ZA: interseção do polígono do imóvel com o limite da UC (ou da zona de amortecimento), calculada no sistema.',
   ]
   notas.push('Situação e status vêm do SICAR no momento da consulta (a planilha local só completa o que o SICAR não trouxer). O SICAR não publica a data do cancelamento: "Cancelado em" é a data da última atualização do registro no SICAR, que nos cancelados coincide com o lote de cancelamento — se o registro for alterado depois, a data acompanha.')
+  notas.push(carucEmbargosFonteTexto(rel))
   if (o.focos) notas.push(`Focos: mesma série da linha do tempo do mapa — temporada de fogo (1º/jul a 4/nov), VIIRS S-NPP + MODIS; antes de 2012 não é comparável (entrada do VIIRS).`)
   if (o.deter) notas.push('DETER: alertas gravados no sistema, que começam em jun/2026.')
   if (o.prodes) notas.push('PRODES/INPE (TerraBrasilis): o ano PRODES vai de agosto a julho; "após o marco" soma os anos 2009 em diante, os primeiros inteiramente posteriores a 22/07/2008 (Lei 12.651/2012). "Até 2007" é a camada de desmatamento acumulado do INPE.')
   if (rel.falhas.prodes) notas.push(`ATENÇÃO: ${rel.falhas.prodes} de ${rel.falhas.prodes_quadrantes} quadrantes do PRODES não responderam — os valores de PRODES podem estar incompletos.`)
   if (rel.falhas.ambiental) notas.push(`ATENÇÃO: focos/DETER não puderam ser calculados para ${rel.falhas.ambiental} imóvel(is).`)
-  notas.push('Prioridade — Alta: UC de proteção integral ou zona de proteção, com desmatamento PRODES após 2008 ou alerta DETER (só quando pedidos). Média: CAR em proteção integral, zona de proteção, imóvel particular em UC de domínio público, inscrição após a criação da UC, possível fracionamento, classe Vermelho ou sobreposição com outro CAR. Baixa: nenhum desses.')
+  notas.push('Prioridade — Alta: UC de proteção integral ou zona de proteção, com desmatamento PRODES após 2008, alerta DETER (só quando pedidos) ou embargo vigente. Média: CAR em proteção integral, zona de proteção, imóvel particular em UC de domínio público, inscrição após a criação da UC, possível fracionamento, classe Vermelho, sobreposição com outro CAR ou embargo vigente. Baixa: nenhum desses.')
   notas.push('Titular: o agrupamento por CPF/CNPJ é feito no servidor e o número do titular vale só neste relatório. Possível fracionamento: mesmo CPF com 2 ou mais imóveis de até 4 módulos fiscais somando mais de 4. Sobreposição entre CARs conta a partir de 0,1 ha.')
   if (rel.agrupado) notas.push(`Mapa por titular (2 ou mais CARs no recorte): o número no polígono é o da linha da tabela. ${o.foraUc ? 'F1, F2… são CARs do mesmo CPF/CNPJ fora da UC — não entram em nenhum total da UC; a consulta registrou cada um no log de acesso a dado de terceiro (LGPD).' : 'Os CARs do mesmo titular fora da UC não foram pedidos nesta consulta.'}`)
   if (usouSatelite) notas.push(CARUC_MAPA_CREDITO + '.')
@@ -230,6 +231,8 @@ function _carucPdfNota(i) {
   const partes = []
   if (i.prioridade?.motivos?.length) partes.push('Motivo: ' + i.prioridade.motivos.join('; '))
   if (i.atencoes?.length) partes.push('Atenção: ' + i.atencoes.join('; '))
+  if (i.embargos?.length) partes.push('Embargo: ' + i.embargos.slice(0, 4).map(e => `${carucEmbargoRotulo(e)} (${CARUC_EMBARGO_SITUACAO[e.situacao] || e.situacao})`).join('; ')
+    + (i.embargos.length > 4 ? ` e mais ${i.embargos.length - 4}` : ''))
   if (i.sobreposicoes?.length) partes.push('Sobrepõe: ' + i.sobreposicoes.slice(0, 4).map(s => `${s.cod} (${_carucN(s.ha)} ha${s.mesmo_titular ? ', mesmo titular' : ''})`).join('; ')
     + (i.sobreposicoes.length > 4 ? ` e mais ${i.sobreposicoes.length - 4}` : ''))
   return partes.join('   ·   ')

@@ -241,6 +241,8 @@ function carucAtencoes(im, uc, enqCat) {
   if (/cancel|suspens/.test(st)) a.push('CAR cancelado ou suspenso')
   if (im.prodes && im.prodes.pos_marco_ha >= CARUC_HA_MIN) a.push('Desmatamento PRODES após 22/07/2008')
   if (im.ambiental && im.ambiental.deter_alertas > 0) a.push('Alerta DETER')
+  const embV = carucEmbargosVigentes(im)
+  if (embV.length) a.push('Embargo vigente (' + [...new Set(embV.map(e => CARUC_EMBARGO_FONTE[e.fonte] || e.fonte))].join(', ') + ')')
   if (im.fracionamento) a.push('Possível fracionamento')
   if ((im.sobreposicoes || []).length) a.push('Sobreposição com outro CAR')
   if (im.area_divergente) a.push('Área declarada diverge do polígono')
@@ -277,6 +279,8 @@ function carucPrioridade(im, enqCat) {
   const dano = []
   if (im.prodes && im.prodes.pos_marco_ha >= CARUC_HA_MIN) dano.push(`${im.prodes.pos_marco_ha.toFixed(1).replace('.', ',')} ha PRODES após 2008`)
   if (im.ambiental && im.ambiental.deter_alertas > 0) dano.push(`${im.ambiental.deter_alertas} alerta(s) DETER`)
+  const embV = carucEmbargosVigentes(im)
+  if (embV.length) dano.push(`embargo vigente ${embV.map(carucEmbargoRotulo).join('; ')}`)
   if (protecao.length && dano.length) return { nivel: 'alta', motivos: [...protecao, ...dano] }
 
   const m = [...protecao]
@@ -286,6 +290,7 @@ function carucPrioridade(im, enqCat) {
   if (im.fracionamento) m.push('possível fracionamento')
   if (carucNorm(im.classe) === 'vermelho') m.push('classe Vermelho')
   if ((im.sobreposicoes || []).length) m.push('sobreposição com outro CAR')
+  if (embV.length) m.push(`embargo vigente ${embV.map(carucEmbargoRotulo).join('; ')}`)
   if (m.length) return { nivel: 'media', motivos: m }
   return { nivel: 'baixa', motivos: [] }
 }
@@ -393,6 +398,14 @@ const CARUC_FILTROS = [
       if (i.ambiental && i.ambiental.focos_periodo > 0) t.push('Focos no período')
       if (i.ambiental && i.ambiental.deter_alertas > 0) t.push('Alerta DETER')
       return t.length ? t : ['Sem registro']
+    } },
+  { chave: 'embargo', rotulo: 'Embargo ambiental', ordem: ['Embargo vigente', 'Embargo encerrado', 'Sem embargo'], valores: i => {
+      const e = i.embargos || []
+      if (!e.length) return ['Sem embargo']
+      const t = []
+      if (e.some(x => x.situacao === 'vigente')) t.push('Embargo vigente')
+      if (e.some(x => x.situacao !== 'vigente')) t.push('Embargo encerrado')
+      return t
     } },
   { chave: 'atencao', rotulo: 'Ponto de atenção', valores: i => (i.atencoes || []).length ? i.atencoes : ['Sem ponto de atenção'] },
 ]
@@ -543,6 +556,8 @@ function carucAgregar(imoveis, uc) {
     fracionamento: imoveis.filter(i => i.fracionamento).length,
     homonimos: imoveis.filter(i => i.homonimo).length,
     com_sobreposicao: imoveis.filter(i => (i.sobreposicoes || []).length).length,
+    com_embargo_vigente: imoveis.filter(i => carucEmbargosVigentes(i).length).length,
+    com_embargo: imoveis.filter(i => (i.embargos || []).length).length,
     area_divergente: imoveis.filter(i => i.area_divergente).length,
     sem_zona: semZona.length,
     com_atencao: imoveis.filter(i => (i.atencoes || []).length).length,
@@ -822,6 +837,92 @@ function carucProdesDoImovel(geom, prodes) {
   return { por_ano: porAno, total_ha: total, pos_marco_ha: posMarco, ate2007_ha: ate2007 }
 }
 
+// ── Embargos ambientais (IBAMA, IMAC — migration 360) ───────────────
+// O banco guarda os polígonos embargados do Acre (carga semanal fora do
+// banco); o CAR vem ao vivo do SICAR, então a sobreposição é calculada
+// aqui, como PRODES e zonas. A fonte não traz nº do CAR: é a GEOMETRIA
+// que liga um ao outro. Embargo que é só ponto (termo sem polígono) conta
+// se o ponto cai dentro do imóvel.
+const CARUC_EMBARGO_FONTE = { ibama: 'IBAMA', imac: 'IMAC', icmbio: 'ICMBio' }
+const CARUC_EMBARGO_SITUACAO = { vigente: 'vigente', desembargado: 'desembargado', cancelado: 'cancelado', desconhecida: 'situação não informada' }
+
+function carucEmbargosVigentes(im) {
+  return (im.embargos || []).filter(e => e.situacao === 'vigente')
+}
+
+function carucEmbargoRotulo(e) {
+  const partes = [CARUC_EMBARGO_FONTE[e.fonte] || e.fonte]
+  if (e.num_termo) partes.push('termo ' + e.num_termo)
+  else if (e.num_auto) partes.push('AI ' + e.num_auto)
+  if (e.data_embargo) partes.push(e.data_embargo.split('-').reverse().join('/'))
+  const onde = e.ha != null ? ` · ${Number(e.ha).toFixed(2).replace('.', ',')} ha no imóvel`
+    : e.vinculo === 'car' ? ' · pelo nº do CAR (polígono do embargo não toca o do CAR)' : ' · ponto do termo dentro do imóvel'
+  return partes.join(' ') + onde
+}
+
+// Uma frase para tela e PDF: de quando é cada fonte. Fonte sem carga diz
+// isso — "sem embargo" nunca pode ser lido como "conferido e limpo".
+function carucEmbargosFonteTexto(rel) {
+  const info = rel?.embargos || {}
+  if (info.falhou) return `Embargos não puderam ser consultados (${info.falhou}) — a ausência de embargo NÃO foi conferida.`
+  const por = {}
+  for (const a of (info.atualizacao || [])) por[a.fonte] = a
+  const partes = ['ibama', 'imac'].map(f => {
+    const a = por[f]
+    if (!a) return `${CARUC_EMBARGO_FONTE[f]}: ainda sem carga no sistema`
+    const d = carucDataAcre(a.executado_em)
+    return `${CARUC_EMBARGO_FONTE[f]}: carga de ${d ? d.split('-').reverse().join('/') : '—'}${a.ok ? '' : ' (a última tentativa falhou — dado pode estar desatualizado)'}`
+  })
+  return 'Embargos ambientais: IMAC pelo nº do CAR informado no embargo ou por sobreposição; IBAMA só por sobreposição (a fonte não traz o nº do CAR). '
+    + partes.join('; ') + '. ICMBio: arquivo público não localizado, não consultado.'
+}
+
+async function carucBuscarEmbargos(bbox, cods) {
+  const [xmin, ymin, xmax, ymax] = bbox
+  const [r, a] = await Promise.all([
+    db.rpc('car_embargos_busca', { p_xmin: xmin, p_ymin: ymin, p_xmax: xmax, p_ymax: ymax, p_cods: cods?.length ? cods : null }),
+    db.rpc('car_embargos_atualizacao'),
+  ])
+  if (r.error) throw new Error('Embargos: ' + r.error.message)
+  const lista = []
+  for (const e of (r.data || [])) {
+    let geom = null
+    try { geom = JSON.parse(e.geojson) } catch { /* geometria inválida fica fora */ }
+    if (!geom) continue
+    const f = { type: 'Feature', geometry: geom, properties: {} }
+    lista.push({ ...e, geojson: undefined, f, bb: turf.bbox(f) })
+  }
+  return { lista, atualizacao: a.error ? [] : (a.data || []) }
+}
+
+// Vínculo = mesmo nº do CAR (quando a fonte informa — o IMAC informa) OU
+// sobreposição geométrica. `vinculo` diz qual dos dois, para quem lê.
+function carucEmbargosDoImovel(geom, embargos, cod) {
+  const bb = turf.bbox(geom)
+  const achados = []
+  const codN = String(cod || '').trim().toUpperCase()
+  for (const e of embargos.lista) {
+    const peloCar = !!codN && String(e.cod_car || '').trim().toUpperCase() === codN
+    let ha = null, sobrepoe = false
+    if (_carucBboxSobrepoe(bb, e.bb)) {
+      if (e.f.geometry.type === 'Point') {
+        try { sobrepoe = turf.booleanPointInPolygon(e.f, { type: 'Feature', geometry: geom, properties: {} }) } catch { sobrepoe = false }
+      } else {
+        const inter = carucInterseccao(geom, e.f, bb)
+        ha = inter ? carucAreaHa(inter) : 0
+        sobrepoe = ha >= CARUC_HA_MIN
+      }
+    }
+    if (!peloCar && !sobrepoe) continue
+    achados.push({ vinculo: peloCar && sobrepoe ? 'car_e_sobreposicao' : peloCar ? 'car' : 'sobreposicao',
+      id: e.id, fonte: e.fonte, num_termo: e.num_termo, num_auto: e.num_auto, num_processo: e.num_processo,
+      data_embargo: e.data_embargo, situacao: e.situacao, data_desembargo: e.data_desembargo,
+      area_embargada_ha: e.area_ha != null ? Number(e.area_ha) : null, ha: sobrepoe ? ha : null, descricao: e.descricao })
+  }
+  return achados.sort((a, b) => (a.situacao === 'vigente' ? 0 : 1) - (b.situacao === 'vigente' ? 0 : 1)
+    || String(b.data_embargo || '').localeCompare(String(a.data_embargo || '')))
+}
+
 // ── Orquestração ────────────────────────────────────────────────────
 // opcoes: { incluirZa, focos, deter, prodes, focosDe, focosAte }
 // aoEtapa(texto, feito?, total?) informa o progresso.
@@ -920,6 +1021,20 @@ async function carucGerarRelatorio(uc, ucGeom, fontesZonas, opcoes, aoEtapa) {
     prodesInfo = { falhas: prodes.falhas, quadrantes: prodes.quadrantes }
   }
 
+  // Embargos: consulta só o banco (rápida), por isso vem sempre — não é opção.
+  let embargosInfo = { atualizacao: [], falhou: null }
+  if (imoveis.length) {
+    etapa('Cruzando com embargos ambientais (IBAMA, IMAC)…')
+    try {
+      const emb = await carucBuscarEmbargos(bbox, imoveis.map(i => i.cod))
+      for (const im of imoveis) im.embargos = carucEmbargosDoImovel(im._geom, emb, im.cod)
+      embargosInfo.atualizacao = emb.atualizacao
+    } catch (e) {
+      console.warn('[caruc] embargos', e)
+      embargosInfo.falhou = e.message || String(e)
+    }
+  }
+
   etapa('Verificando sobreposição entre os CARs…', 0, imoveis.length)
   await carucSobreposicoesEntreCars(imoveis, (a, b) => etapa('Verificando sobreposição entre os CARs…', a, b))
 
@@ -966,7 +1081,8 @@ async function carucGerarRelatorio(uc, ucGeom, fontesZonas, opcoes, aoEtapa) {
     fora,
     geo: { uc: carucGeomMapa(ucGeom), zonas: zonas.map(z => carucGeomMapa(z.geometry)).filter(Boolean) },
     resumo: carucAgregar(imoveis, uc),
-    falhas: { ambiental: falhasAmbiental, prodes: prodesInfo?.falhas || 0, prodes_quadrantes: prodesInfo?.quadrantes || 0, fora_sem_geom: foraSemGeom },
+    falhas: { ambiental: falhasAmbiental, prodes: prodesInfo?.falhas || 0, prodes_quadrantes: prodesInfo?.quadrantes || 0, fora_sem_geom: foraSemGeom, embargos: embargosInfo.falhou },
+    embargos: embargosInfo,
   }
 }
 
@@ -1011,6 +1127,8 @@ function carucColunasExportacao(rel) {
     cols.push({ rotulo: 'PRODES após o marco (ha)', valor: i => i.prodes ? i.prodes.pos_marco_ha : null, casas: 2 })
     cols.push({ rotulo: 'Desmatado até 2007 (ha)', valor: i => i.prodes ? i.prodes.ate2007_ha : null, casas: 2 })
   }
+  cols.push({ rotulo: 'Embargos vigentes', valor: i => carucEmbargosVigentes(i).length, casas: 0 })
+  cols.push({ rotulo: 'Embargos (fonte, nº, data, situação, ha no imóvel)', valor: i => (i.embargos || []).map(e => `${carucEmbargoRotulo(e)} (${CARUC_EMBARGO_SITUACAO[e.situacao] || e.situacao}${e.data_desembargo ? ' em ' + e.data_desembargo.split('-').reverse().join('/') : ''})`).join('; ') })
   cols.push({ rotulo: 'Prioridade', valor: i => CARUC_PRIORIDADE_ROTULO[i.prioridade?.nivel] || '' })
   cols.push({ rotulo: 'Motivo da prioridade', valor: i => (i.prioridade?.motivos || []).join('; ') })
   cols.push({ rotulo: 'Pontos de atenção', valor: i => (i.atencoes || []).join('; ') })
@@ -1045,5 +1163,6 @@ if (typeof module !== 'undefined') {
     carucFaixaNaUC, carucPrioridade, carucEnriquecer, carucOpcoesFiltro, carucFiltrar,
     carucDescreverFiltros, carucRelFiltrado, CARUC_FILTROS, carucAgruparPorTitular, carucGrupoRotulo,
     carucGeomMapa, carucSituacaoAtual, carucDataAcre,
+    carucEmbargosDoImovel, carucEmbargosVigentes, carucEmbargoRotulo, CARUC_EMBARGO_FONTE, carucEmbargosFonteTexto,
   }
 }

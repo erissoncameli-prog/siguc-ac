@@ -527,6 +527,71 @@ function _relColetarImoveis() {
   return _carAbertoFeat ? [_carAbertoFeat] : [];
 }
 
+// ── Embargos ambientais (IBAMA, IMAC — migration 360/360b) ───────────────
+// Mesma regra do relatório "CAR na UC" (carucEmbargosDoImovel em
+// js/car-uc-relatorio.js — mudou num, muda no outro): vínculo pelo nº do
+// CAR (o IMAC informa) ou por sobreposição com o polígono (o IBAMA não
+// informa o CAR). Falha de consulta nunca vira "sem embargo".
+const _REL_EMB_FONTE = { ibama: 'IBAMA', imac: 'IMAC', icmbio: 'ICMBio' };
+const _REL_EMB_SIT = { vigente: 'Vigente', desembargado: 'Desembargado', cancelado: 'Cancelado', desconhecida: 'Situação não informada' };
+async function _relEmbargos(carPoly, cod) {
+  if (!carPoly || typeof db === 'undefined') return { lista: [], falhou: 'consulta indisponível' };
+  try {
+    const bb = turf.bbox(carPoly);
+    const [r, a] = await Promise.all([
+      db.rpc('car_embargos_busca', { p_xmin: bb[0], p_ymin: bb[1], p_xmax: bb[2], p_ymax: bb[3], p_cods: cod ? [cod] : null }),
+      db.rpc('car_embargos_atualizacao'),
+    ]);
+    if (r.error) throw r.error;
+    const codN = String(cod || '').trim().toUpperCase();
+    const lista = [];
+    for (const e of (r.data || [])) {
+      let g = null; try { g = JSON.parse(e.geojson); } catch (_) {}
+      const f = g ? { type: 'Feature', geometry: g, properties: {} } : null;
+      const peloCar = !!codN && String(e.cod_car || '').trim().toUpperCase() === codN;
+      let ha = null, sobrepoe = false;
+      if (f) {
+        try {
+          if (g.type === 'Point') sobrepoe = turf.booleanPointInPolygon(f, carPoly);
+          else { const inter = turf.intersect(carPoly, f); ha = inter ? turf.area(inter) / 10000 : 0; sobrepoe = ha >= 0.01; }
+        } catch (_) { sobrepoe = false; }
+      }
+      if (!peloCar && !sobrepoe) continue;
+      lista.push({ ...e, geojson: undefined, ha: sobrepoe ? ha : null, vinculo: peloCar && sobrepoe ? 'nº do CAR e sobreposição' : peloCar ? 'nº do CAR' : 'sobreposição' });
+    }
+    lista.sort((x, y) => (x.situacao === 'vigente' ? 0 : 1) - (y.situacao === 'vigente' ? 0 : 1) || String(y.data_embargo || '').localeCompare(String(x.data_embargo || '')));
+    return { lista, falhou: null, atualizacao: a.error ? [] : (a.data || []) };
+  } catch (e) {
+    console.warn('[relatorio-car] embargos', e);
+    return { lista: [], falhou: e.message || String(e) };
+  }
+}
+
+function _relEmbargosHTML(emb) {
+  if (!emb) return '';
+  const fontes = ['ibama', 'imac'].map(f => {
+    const a = (emb.atualizacao || []).find(x => x.fonte === f);
+    return `${_REL_EMB_FONTE[f]}: ${a ? 'carga de ' + _relDataBR(String(a.executado_em).slice(0, 10)) + (a.ok ? '' : ' (última tentativa falhou)') : 'sem carga no sistema'}`;
+  }).join(' · ');
+  if (emb.falhou) return `<div class="rel-secao-subtitulo">Embargos ambientais</div>
+    <div style="font-size:9px;color:#92400e">Não foi possível consultar os embargos (${_relEsc(emb.falhou)}) — a ausência de embargo NÃO foi conferida.</div>`;
+  const nota = `<div style="font-size:8px;color:#6b7280;margin-top:3px">IMAC: pelo nº do CAR informado no embargo ou por sobreposição; IBAMA: só por sobreposição (a fonte não traz o nº do CAR). ${_relEsc(fontes)}. ICMBio não consultado (arquivo público não localizado).</div>`;
+  if (!emb.lista.length) return `<div class="rel-secao-subtitulo">Embargos ambientais</div>
+    <div style="font-size:9px">Nenhum embargo do IBAMA ou do IMAC sobre este imóvel.</div>${nota}`;
+  return `<div class="rel-secao-subtitulo">Embargos ambientais</div>
+    <table class="rel-table rel-table-sm">
+      <tr><th>Órgão</th><th>Termo / AI</th><th>Data</th><th>Situação</th><th>No imóvel</th><th>Descrição</th></tr>
+      ${emb.lista.map(e => `<tr>
+        <td>${_relEsc(_REL_EMB_FONTE[e.fonte] || e.fonte)}</td>
+        <td>${_relEsc(e.num_termo || (e.num_auto ? 'AI ' + e.num_auto : '—'))}${e.num_processo ? `<br><span style="color:#6b7280">Proc. ${_relEsc(e.num_processo)}</span>` : ''}</td>
+        <td>${_relEsc(_relDataBR(e.data_embargo))}</td>
+        <td><strong style="color:${e.situacao === 'vigente' ? '#dc2626' : '#374151'}">${_relEsc(_REL_EMB_SIT[e.situacao] || e.situacao)}</strong>${e.data_desembargo ? `<br>em ${_relEsc(_relDataBR(e.data_desembargo))}` : ''}</td>
+        <td>${e.ha != null ? _relF2(e.ha) + ' ha' : '—'}<br><span style="color:#6b7280">${_relEsc(e.vinculo)}</span></td>
+        <td>${_relEsc(e.descricao || '—')}</td>
+      </tr>`).join('')}
+    </table>${nota}`;
+}
+
 // ── Monta dados de um imóvel (usa caches existentes) ─────────────────────
 
 async function _montarDadosRelatorio(feat) {
@@ -555,6 +620,7 @@ async function _montarDadosRelatorio(feat) {
   const numModulo = parseFloat(local.num_modulo || p.num_modulo || 0);
   const pequenaProp = numModulo > 0 && numModulo <= 4;
   const sit = _relSituacaoAtual(local, p);
+  const embargos = await _relEmbargos(carPoly, cod);
   const totalGeral  = pr?.totalGeral || 0;
   const haConsol    = pr?.haConsolidado || 0;
 
@@ -569,6 +635,8 @@ async function _montarDadosRelatorio(feat) {
     ind_status:   sit.status,                        // ponto 5 — SICAR ao vivo primeiro
     condicao_analise: sit.condicao,                  // condição (legível; no cancelado, o motivo)
     dat_cancelamento: sit.dataCanc ? _relDataBR(sit.dataCanc) : '',
+    embargos,
+    embargosVigentes: embargos.lista.filter(e => e.situacao === 'vigente').length,
     nome_class:   local.nome_class  || '—',
     num_modulo:   numModulo,
     dat_criaca:   _relDataBR(local.dat_criaca),      // ponto 5
@@ -876,6 +944,7 @@ function _htmlFolhasDetalhadas(d, cab, protocolo, idx, total, multi) {
           ${!d.naPlanilha?`<tr><td>Cadastro local</td><td><strong style="color:#d97706">⚠️ Imóvel não consta na planilha SICAR local — proprietário e CPF/CNPJ não disponíveis</strong></td></tr>`:''}
           ${d.emUC?`<tr><td>Sobreposição com UC</td><td><strong style="color:#d97706">⚠️ ${_relEsc(d.ucNome||'UC do Acre')} — ${_relF2(d.areaUC)} ha sobrepostos</strong></td></tr>`:''}
         </table>
+        ${_relEmbargosHTML(d.embargos)}
       </div>
 
       <div class="rel-secao">
@@ -1032,6 +1101,7 @@ function _htmlFolhasDetalhadas(d, cab, protocolo, idx, total, multi) {
           </th></tr>
           <tr><td>Prioridade</td><td>${d.haAVerificar>0&&d.asvBase&&d.focosCorrelAnos.length?'🔴 Alta':d.haAVerificar>0?'🟡 Média':'🟢 Baixa'}</td></tr>
           <tr><td>Recomendação</td><td>${rec}</td></tr>
+          ${d.embargosVigentes ? `<tr><td>Embargo</td><td><strong style="color:#dc2626">${d.embargosVigentes} embargo(s) vigente(s) sobre o imóvel — ver seção 1</strong></td></tr>` : ''}
           ${d.nome_class==='Vermelho'?`<tr><td>Crédito rural</td><td>Art. 78-A CF: restrição aplicável até regularização</td></tr>`:''}
         </table>
       </div>

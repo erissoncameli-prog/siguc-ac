@@ -318,6 +318,16 @@ async function abrir(page) {
           if (nome === 'car_relatorio_uc_cadastro') return { data: args.p_cod_imoveis.map(c => cadastro[c]).filter(Boolean), error: null };
           if (nome === 'car_relatorio_uc_fora') return { data: fora, error: null };
           if (nome === 'car_relatorio_uc_ambiental') return { data: args.p_imoveis.map(i => ({ cod_imovel: i.cod, focos_por_ano: { 2019: 9, 2023: 2, 2024: 3 }, focos_total: 14, deter_alertas: i.cod === 'AC-A' ? 1 : 0, deter_ha: i.cod === 'AC-A' ? 2.5 : 0, deter_ultimo: null })), error: null };
+          // Embargos (360b): IBAMA vigente sobre o imóvel B (só sobreposição — o
+          // IBAMA não traz o CAR) e IMAC desembargado ligado ao C pelo nº do
+          // CAR, com polígono longe dele (vínculo só pelo número).
+          if (nome === 'car_embargos_busca') return { data: [
+            { id: 1, fonte: 'ibama', num_termo: 'TAD123 E', num_auto: null, num_processo: '0200', data_embargo: '2024-05-02', situacao: 'vigente', data_desembargo: null, area_ha: 30, municipio: 'Xapuri', descricao: 'Desmatamento', cod_car: null,
+              geojson: JSON.stringify({ type: 'Polygon', coordinates: [[[-69.915, -9.985], [-69.905, -9.985], [-69.905, -9.975], [-69.915, -9.975], [-69.915, -9.985]]] }) },
+            { id: 2, fonte: 'imac', num_termo: null, num_auto: 'AI-77', num_processo: null, data_embargo: '2023-03-01', situacao: 'desembargado', data_desembargo: '2025-01-10', area_ha: 5, municipio: 'Epitaciolândia', descricao: 'Queimada', cod_car: 'AC-C',
+              geojson: JSON.stringify({ type: 'Point', coordinates: [-69.0, -9.0] }) },
+          ], error: null };
+          if (nome === 'car_embargos_atualizacao') return { data: [{ fonte: 'imac', executado_em: '2026-10-17T19:27:51Z', ok: true, linhas: 790 }], error: null };
           if (nome === 'gerar_protocolo_relatorio') return { data: 'SIGUC-2026-0001', error: null };
           if (nome === 'nivel_efetivo') return { data: 'editar', error: null };
           return { data: null, error: null };
@@ -385,6 +395,26 @@ test('lista só os imóveis que se sobrepõem à UC, com zonas e atenção', asy
   await expect(page.locator('#caruc-resultado')).toContainText('Uso sustentável');
   const ambiental = await page.evaluate(() => window.__rpc.filter(r => r.nome === 'car_relatorio_uc_ambiental').length);
   expect(ambiental).toBe(0);   // não marcado → não pedido
+});
+
+test('embargos: IBAMA por sobreposição, IMAC pelo nº do CAR, e a fonte sem carga diz isso', async ({ page }) => {
+  await abrir(page);
+  await gerar(page);
+  const busca = await page.evaluate(() => window.__rpc.filter(r => r.nome === 'car_embargos_busca'));
+  expect(busca).toHaveLength(1);                                   // uma consulta só, para a UC inteira
+  expect(busca[0].args.p_cods.sort()).toEqual(['AC-A', 'AC-B', 'AC-C']);
+  const b = linhaCar(page, 'AC-B');
+  await expect(b).toContainText('Embargo vigente (IBAMA)');
+  await expect(b).toContainText(/Embargo IBAMA termo TAD123 E 02\/05\/2024 · 122,\d\d ha no imóvel — vigente/);
+  await expect(b.locator('.caruc-prio')).toHaveText('Média');           // embargo vigente sobe para Média
+  const c = linhaCar(page, 'AC-C');
+  await expect(c).toContainText('pelo nº do CAR');
+  await expect(c).toContainText('desembargado');
+  await expect(c).not.toContainText('Embargo vigente');         // encerrado não vira ponto de atenção
+  await expect(linhaCar(page, 'AC-A')).not.toContainText('Embargo');
+  // De quando é cada fonte — e o IBAMA ainda sem carga é dito, nunca "sem embargo" calado.
+  await expect(page.locator('#caruc-resultado')).toContainText('IBAMA: ainda sem carga no sistema');
+  await expect(page.locator('#caruc-resultado')).toContainText('IMAC: carga de 17/10/2026');
 });
 
 test('dados ambientais entram quando marcados e respeitam o período', async ({ page }) => {
