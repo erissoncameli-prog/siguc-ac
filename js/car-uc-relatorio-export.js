@@ -43,7 +43,7 @@ async function carucMontarPdf(rel, protocolo) {
   const cab = await getCabecalhoRelatorio(CARUC_PDF_MODULO)
   const pdf = _carucPdfNovoDocumento()
   const ctx = _agpdfCtx(pdf, cab, protocolo)
-  ctx.linhaModulo = 'Unidades de Conservação · CAR'
+  ctx.linhaModulo = 'Relatório CAR na UC'
   const { uc, resumo: r, opcoes: o } = rel
 
   pdf.setFont('DMSans', 'bold'); pdf.setFontSize(14); pdf.setTextColor(...AGPDF_COR.floresta)
@@ -257,14 +257,17 @@ async function _carucPdfMapaGrupo(ctx, rel, g, fundo, acre) {
       ctx.pdf.setDrawColor(...AGPDF_COR.borda); ctx.pdf.setLineWidth(0.2); ctx.pdf.rect(x, ctx.y, w, ALT)
       x += w + 3
     }
-    ctx.y += ALT + 3.5
-    ctx.pdf.setFont('DMSans', 'normal'); ctx.pdf.setFontSize(6.6); ctx.pdf.setTextColor(...AGPDF_COR.muted)
-    const leg = ['1º quadro: CARs do titular ampliados (nº = coluna "Nº")', '2º: UC inteira, retângulo = área ampliada', 'traço contínuo: limite da UC']
-    if (rel.geo?.zonas?.length) leg.push('tracejado: zonas de manejo')
-    if (m.acre) leg.push('3º: Acre, pontos F1, F2… = CARs do mesmo titular fora da UC')
-    if (m.semSatelite) leg.push('imagem de satélite indisponível na geração — sem fundo')
-    ctx.pdf.text(leg.join(' · '), AGPDF_M, ctx.y)
-    ctx.y += 4
+    ctx.y += ALT + 1.5
+    // Legenda + referência + fundo: o MESMO SVG que a tela mostra
+    // (carucMapaRodapeSVG / js/mapa-moldura.js), na largura da fileira.
+    const larguraFileira = x - 3 - AGPDF_M
+    if (m.rodape) {
+      const rod = await carucMapaSvgParaImagem(m.rodape, 2, false)
+      const h = larguraFileira * rod.h / rod.w
+      _agpdfGarantirEspaco(ctx, h + 2)
+      ctx.pdf.addImage(rod.dataUrl, 'PNG', AGPDF_M, ctx.y, larguraFileira, h)
+      ctx.y += h + 3
+    }
     return sat
   } catch (e) {
     console.warn('[caruc] mapa do titular no PDF', e)

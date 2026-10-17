@@ -632,7 +632,17 @@ test('mapa do titular: polígonos numerados como as linhas, com satélite e cré
   await expect(mapa.locator('svg').first().locator('title')).toHaveText([/^1 · AC-[AC]$/, /^2 · AC-[AC]$/]);
   await expect.poll(() => mapa.locator('svg image').count()).toBe(2);   // satélite entrou nos dois
   expect(page.__tiles).toBeGreaterThan(0);
-  await expect(page.locator('.caruc-mapa-cred').first()).toContainText('Esri World Imagery');
+  // Rodapé único (js/mapa-moldura.js), o mesmo desenho que vai ao PDF:
+  // crédito do fundo, referência SIRGAS 2000 e a grade UTM do 1º quadro.
+  const rodape = () => page.locator('.caruc-mapa-rodape svg').first().evaluate(el => el.textContent)
+  await expect.poll(rodape).toContain('Esri World Imagery')
+  expect(await rodape()).toMatch(/Datum SIRGAS 2000 · grade UTM 19S \(EPSG:31979, km\)/)
+  expect(await rodape()).toContain('Limite da UC')
+  // grade UTM só no quadro ampliado, com rótulos em km; barra de escala nos dois
+  await expect(mapa.locator('svg').first().locator('g[aria-hidden="true"] text').first()).toBeAttached()
+  await expect(mapa.locator('svg').nth(1).locator('g[aria-hidden="true"]')).toHaveCount(0)
+  await expect(mapa.locator('svg g[aria-label^="Escala"]')).toHaveCount(2)
+  await expect(mapa.locator('svg g[aria-label="Norte"]')).toHaveCount(2)
   // o nº do polígono é o nº da linha: o 1 é o imóvel de maior área no recorte
   const pinos = await page.locator(LINHAS).evaluateAll(trs => trs.map(tr => [tr.querySelector('.caruc-pino')?.textContent, tr.querySelector('.caruc-cod')?.textContent]));
   const titulos = await mapa.locator('svg').first().locator('title').allTextContents();
@@ -652,7 +662,7 @@ test('"Sem fundo" desenha só o vetor e não baixa ladrilho nenhum', async ({ pa
   await page.waitForTimeout(300);
   await expect(mapa.locator('svg image')).toHaveCount(0);
   expect(page.__tiles).toBe(0);
-  await expect(page.locator('.caruc-mapa-cred').first()).toContainText('Sem imagem de fundo');
+  await expect.poll(() => page.locator('.caruc-mapa-rodape svg').first().evaluate(el => el.textContent)).toContain('Sem imagem de fundo');
 });
 
 test('CARs do mesmo titular fora da UC: só quando pedidos, no mapa do Acre e numa lista à parte', async ({ page }) => {
@@ -692,7 +702,7 @@ test('PDF e Excel levam o mapa do titular e os CARs de fora', async ({ page }) =
 
   const [dPdf] = await Promise.all([page.waitForEvent('download', { timeout: 60_000 }), page.click('button:has-text("PDF")')]);
   const buf = fs.readFileSync(await dPdf.path());
-  expect((buf.toString('latin1').match(/\/Subtype \/Image/g) || []).length).toBeGreaterThanOrEqual(3);   // os três quadros
+  expect((buf.toString('latin1').match(/\/Subtype \/Image/g) || []).length).toBeGreaterThanOrEqual(4);   // os três quadros + o rodapé do mapa
   const { PDFParse } = require('pdf-parse');
   const texto = (await new PDFParse({ data: buf }).getText()).text;
   // tabela de leitura: titular/CPF só no cabeçalho do grupo; texto longo em linha própria

@@ -1034,6 +1034,46 @@ opcionais. Sem mapa (pedido do usuário). Exporta PDF (timbre), Excel
   contrafactual (reprovam sem a correção).
 - Sem mudança em `pwa/sw.js` (tela de mesa).
 
+## Regra do sistema — relatórios do mapa: moldura e cabeçalho únicos (17/10/2026)
+Os 4 relatórios que saem do Mapa das UCs e do CAR na UC seguem um padrão só:
+relatório do imóvel CAR (`js/relatorio-car.js`), impressão do mapa
+(`CART.imprimir`, `js/mapa-cartografia.js`), desmatamento por zona de manejo
+(`_zonasImprimir`, `pages/mapa.html`) e CAR na UC (`js/car-uc-mapa.js` +
+`js/car-uc-relatorio-export.js`).
+- **Moldura cartográfica = `js/mapa-moldura.js`** (fonte única, prefixo
+  `mold`): norte, **barra de escala gráfica** (nunca "1:N" — só vale num
+  tamanho de impressão; o meio sai na mesma unidade do total), referência
+  (`moldReferencia`: Datum SIRGAS 2000, grade UTM da zona, exibição Web
+  Mercator — o PROJECAO antigo dizia WGS 84/EPSG:4326, errado), legenda
+  (`moldLegendaHTML`; linha branca ganha borda escura), rodapé em SVG
+  (`moldRodapeSVG`) e grade UTM em SVG (`moldGradeUtmSVG`, precisa do proj4
+  vendorizado; sem ele, sem grade). Mapa novo em relatório usa estas peças.
+- **Cabeçalho HTML = mesma ordem do timbre em PDF**: Secretaria (negrito) /
+  Diretoria / Departamento · módulo (`cab.linhaModulo`), Acre à esquerda,
+  SEMA à direita com protocolo acima. Departamento lido do módulo
+  `monitoramento` (`REL_CAB_MODULO`) — o campo genérico de Configurações
+  estava "Conservacao", sem acento. Sem logo = espaço vazio, nunca emoji.
+- **Fundo dos mapas**: satélite Esri (padrão, com crédito) ou "sem fundo",
+  nos dois relatórios com mapa. No satélite o contorno do CAR vira amarelo e
+  o da UC branco com traço escuro por baixo (`_relCor`) — verde-escuro some
+  na floresta.
+- **Impressão do mapa leva o mapa de verdade**: o próprio `#mapa` é movido
+  para a folha A4 deitada (`relAbrirPreview`, página nomeada `paisagem`) e
+  volta ao fechar. A versão antiga abria uma janela que não copiava o mapa e
+  imprimia um aviso no lugar. Na folha os controles de baixo do Leaflet
+  somem (a moldura da direita é a oficial).
+- **`relAbrirPreview({titulo, modo, html, aoFechar})`** é a prévia única
+  (barra Fechar/Imprimir, Esc fecha). "Abrir em nova aba" foi removido:
+  abria os mapas em branco e sem DM Sans.
+- **CAR na UC**: grade UTM só no quadro ampliado; legenda + referência +
+  fundo + data num rodapé SVG único (`carucMapaRodapeSVG`) — a tela mostra e
+  o PDF rasteriza o MESMO desenho (antes, legenda HTML na tela e uma linha de
+  texto no PDF). Módulo do timbre: "Relatório CAR na UC".
+- Guarda: `tests/relatorios-mapa-padrao.test.js` (5, harness
+  `tests/fixtures/relatorio-mapa-harness.html`) + `tests/car-uc-relatorio.test.js`
+  (29). O teste da impressão reprova a versão antiga do `CART.imprimir`.
+- Sem mudança em `pwa/sw.js` (telas de mesa).
+
 ## Regra do sistema — painéis na tela cheia do mapa
 Em `pages/mapa.html`, TODO painel do nível do `<body>` (CAR, PRODES,
 projeto de análise, análise do alerta, painel-resumo, barra de

@@ -13,6 +13,8 @@
 <script src="../js/config-sistema.js"></script>
 <script src="../js/vendor/turf-6.5.0.min.js"></script>
 <script src="../js/car-uc-relatorio.js"></script>
+<script src="../js/vendor/proj4-2.11.0.min.js"></script>
+<script src="../js/mapa-moldura.js"></script>
 <script src="../js/car-uc-mapa.js"></script>
 <style>
 .tabs { display:flex; gap:4px; margin-bottom:20px; border-bottom:2px solid #E5E7EB; flex-wrap:wrap; }
@@ -115,8 +117,8 @@ span.caruc-clic:focus-visible { outline:2px solid var(--verde-medio); outline-of
 .caruc-mapa { position:relative; border:1px solid #D1D5DB; border-radius:8px; overflow:hidden; background:#EEF1EA; min-height:120px; }
 .caruc-mapa svg { display:block; width:100%; height:auto; }
 .caruc-mapa-rot { position:absolute; left:8px; top:8px; background:rgba(10,26,15,.78); color:#fff; font-size:11px; font-weight:700; border-radius:4px; padding:2px 7px; pointer-events:none; }
-.caruc-mapa-leg { display:flex; flex-wrap:wrap; gap:4px 14px; font-size:11px; color:#4B5563; margin-top:6px; max-width:900px; }
-.caruc-mapa-leg i { display:inline-block; width:14px; height:10px; border-radius:2px; margin-right:5px; vertical-align:-1px; }
+.caruc-mapa-rodape { max-width:860px; margin-top:6px; border:1px solid #E5E7EB; border-radius:6px; overflow:hidden; }
+.caruc-mapa-rodape svg { display:block; width:100%; height:auto; }
 .caruc-pino { display:inline-grid; place-items:center; min-width:20px; height:20px; padding:0 4px; border-radius:99px; background:#EA580C; color:#fff; font-size:11px; font-weight:700; margin-right:6px; vertical-align:1px; }
 .caruc-pino.fora { background:#B45309; }
 #caruc-tabela tr.caruc-fora-tr th { text-align:left; font-size:11px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:#92400E; background:#FFFBEB; padding:6px 10px; border-top:1px dashed #F59E0B; }
@@ -659,13 +661,14 @@ async function _carucDesenharMapas(rel) {
     const alvo = document.querySelector(`.caruc-mapas[data-grupo="${g.grupo}"]`)
     if (!alvo) continue
     // 1º o vetor (instantâneo), depois o satélite por cima.
-    const vet = carucMapaSVGs(carucMapaDadosGrupo(rel, g, acre), carucMapaVistas(carucMapaDadosGrupo(rel, g, acre)), { fundo: 'sem' })
+    const dados = carucMapaDadosGrupo(rel, g, acre), vistas = carucMapaVistas(dados)
+    const vet = carucMapaSVGs(dados, vistas, { fundo: 'sem' })
+    vet.rodape = carucMapaRodapeSVG(dados, vistas, { fundo: 'sem' })
     _carucPintarMapa(alvo, g, vet)
     if (fundo !== 'satelite') continue
     const m = await carucMapaGrupo(rel, g, fundo, acre)
     if (vez !== _carucMapaVez) return
     _carucPintarMapa(alvo, g, m)
-    if (m.semSatelite) alvo.parentElement.querySelector('.caruc-mapa-cred').textContent = 'Imagem de satélite indisponível agora — mapa sem fundo.'
   }
 }
 
@@ -677,21 +680,16 @@ function _carucPintarMapa(alvo, g, m) {
   alvo.innerHTML = `<div class="caruc-mapa"><span class="caruc-mapa-rot">${g.imoveis.filter(i => i._mapa).length} CAR(s) do titular</span>${m.zoom || ''}</div>`
     + (m.uc ? `<div class="caruc-mapa"><span class="caruc-mapa-rot">${esc(_carucRel.uc.sigla || 'UC')} inteira</span>${m.uc}</div>` : '')
     + (m.acre ? `<div class="caruc-mapa"><span class="caruc-mapa-rot">Acre · ${nFora} fora da UC</span>${m.acre}</div>` : '')
+  // Legenda + referência + fundo: o MESMO desenho que vai para o PDF.
+  const rod = alvo.parentElement.querySelector('.caruc-mapa-rodape')
+  if (rod) rod.innerHTML = m.rodape || ''
 }
 
 function _carucMapaLinhaHTML(rel, g, nCols) {
-  const sat = (rel.opcoes.fundoMapa || 'satelite') === 'satelite'
   const temFora = (g.fora || []).some(f => f._mapa)
   return `<tr class="caruc-mapa-tr"><td colspan="${nCols}"><div class="caruc-mapa-box">
     <div class="caruc-mapas${temFora ? '' : ' so-uc'}" data-grupo="${g.grupo}"><div class="caruc-mapa">${skeletonBlocoHTML(3)}</div></div>
-    <div class="caruc-mapa-leg">
-      <span><i style="background:${sat ? '#FACC15' : '#EA580C'};opacity:.8"></i>CAR do titular no recorte (nº = linha abaixo)</span>
-      <span><i style="border:2px solid #0A1A0F;background:none"></i>Limite da UC</span>
-      <span><i style="border:2px solid ${sat ? '#FACC15' : '#C2410C'};background:none"></i>Área ampliada no 1º quadro</span>
-      ${rel.geo?.zonas?.length ? '<span><i style="border:1px dashed #4B5563;background:none"></i>Zonas de manejo</span>' : ''}
-      ${temFora ? '<span><i style="background:#B45309;border-radius:50%;width:10px"></i>CAR do titular fora da UC (F1, F2…)</span>' : ''}
-    </div>
-    <div class="caruc-nota caruc-mapa-cred">${sat ? esc(CARUC_MAPA_CREDITO) + '.' : 'Sem imagem de fundo.'} Limites: SICAR ao vivo e zoneamento cadastrado.</div>
+    <div class="caruc-mapa-rodape"></div>
   </div></td></tr>`
 }
 

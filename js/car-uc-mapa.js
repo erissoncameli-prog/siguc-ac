@@ -18,8 +18,13 @@
 // Projeção Web Mercator (a mesma dos ladrilhos), para o vetor casar com
 // a imagem pixel a pixel.
 
-const CARUC_MAPA_TILE = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
-const CARUC_MAPA_CREDITO = 'Imagem de fundo: Esri World Imagery (Esri, Maxar, Earthstar Geographics)'
+// Norte, barra de escala, grade UTM, legenda e referência vêm de
+// js/mapa-moldura.js — os mesmos do relatório do imóvel e da impressão do
+// Mapa das UCs. Fundo e crédito também (a constante local é só reserva).
+const CARUC_MAPA_TILE = typeof MOLD_SATELITE_URL !== 'undefined' ? MOLD_SATELITE_URL
+  : 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
+const CARUC_MAPA_CREDITO = typeof MOLD_SATELITE_CREDITO !== 'undefined' ? MOLD_SATELITE_CREDITO
+  : 'Imagem de fundo: Esri World Imagery (Esri, Maxar, Earthstar Geographics)'
 const CARUC_MAPA_ZOOM = { w: 560, h: 360 }     // quadro principal: os CARs do titular
 const CARUC_MAPA_LOC = { w: 260, h: 360 }      // UC inteira e Acre
 const CARUC_MAPA_ZOOM_MIN_GRAUS = 0.02         // ~2,2 km de lado no mínimo
@@ -69,6 +74,11 @@ function carucMapaVista(bbox, w, h, folga = 0.06) {
   const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2
   const vista = { w, h, escala, mx0: cx - w / escala / 2, my0: cy - h / escala / 2, latCentro: (bbox[1] + bbox[3]) / 2 }
   vista.proj = (lon, lat) => [(carucMercX(lon) - vista.mx0) * escala, (carucMercY(lat) - vista.my0) * escala]
+  vista.inv = (x, y) => {
+    const mx = vista.mx0 + x / escala, my = vista.my0 + y / escala
+    return [mx * 360 - 180, Math.atan(Math.sinh(Math.PI * (1 - 2 * my))) * 180 / Math.PI]
+  }
+  vista.lonCentro = (bbox[0] + bbox[2]) / 2
   return vista
 }
 
@@ -101,21 +111,28 @@ function _carucMapaEsc(s) {
   return String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
 }
 
-// Barra de escala com comprimento "redondo" (1, 2, 5 × 10^n) perto de 80 px.
+// Metros por pixel da vista (Web Mercator, na latitude do centro).
+function carucMapaMetrosPorPx(vista) {
+  return 40075016.686 * Math.cos(vista.latCentro * Math.PI / 180) / vista.escala
+}
+
+// Barra de escala gráfica e norte — peças de js/mapa-moldura.js. No
+// satélite ganham contorno escuro para ler sobre imagem clara ou escura.
 function _carucMapaEscala(vista, cor) {
-  const mPorPx = 40075016.686 * Math.cos(vista.latCentro * Math.PI / 180) / vista.escala
-  const alvo = mPorPx * 80
-  const p10 = Math.pow(10, Math.floor(Math.log10(alvo)))
-  const m = [1, 2, 5, 10].map(k => k * p10).reduce((a, b) => Math.abs(b - alvo) < Math.abs(a - alvo) ? b : a)
-  const px = m / mPorPx
-  const rot = m >= 1000 ? `${(m / 1000).toLocaleString('pt-BR')} km` : `${m} m`
-  return `<g transform="translate(14,${vista.h - 14})"><rect width="${px.toFixed(1)}" height="4" fill="${cor}"/>`
-    + `<text y="-5" font-size="10" font-family="DM Sans,Arial,sans-serif" fill="${cor}">0 · ${rot}</text></g>`
+  const halo = cor === '#FFFFFF' ? 'rgba(0,0,0,.7)' : null
+  if (typeof moldEscalaG !== 'function') return ''
+  return moldEscalaG(14, vista.h - 12, carucMapaMetrosPorPx(vista), cor, cor === '#FFFFFF' ? '#0A1A0F' : '#FFFFFF', 80, halo)
 }
 
 function _carucMapaNorte(vista, cor) {
-  return `<g transform="translate(${vista.w - 22},26)"><path d="M0,-13 L6,6 L0,2 L-6,6 Z" fill="${cor}"/>`
-    + `<text y="19" text-anchor="middle" font-size="10" font-weight="700" font-family="DM Sans,Arial,sans-serif" fill="${cor}">N</text></g>`
+  if (typeof moldNorteG !== 'function') return ''
+  return moldNorteG(vista.w - 22, 28, cor, cor === '#FFFFFF' ? 'rgba(0,0,0,.7)' : null)
+}
+
+// Zona UTM do quadro ampliado (a grade só vai nele: na UC inteira e no
+// Acre ela polui sem ajudar a localizar nada).
+function carucMapaZonaUtm(vista) {
+  return typeof moldUtmZona === 'function' ? moldUtmZona(vista.lonCentro) : null
 }
 
 function _carucMapaAbrir(vista, fundo, cores, rotulo) {
@@ -217,6 +234,10 @@ function carucMapaSVGs(dados, vistas, opts = {}) {
         + `<path d="${d}" fill="${cor.carFill}" fill-rule="evenodd" stroke="${cor.car}" stroke-width="2.2" stroke-linejoin="round"><title>${_carucMapaEsc(c.rot + ' · ' + c.cod)}</title></path>`
     }
     dados.cars.forEach((c, k) => { s += _carucMapaRotulo(c.geom, v.proj, c.rot, cor, k) })
+    if (typeof moldGradeUtmSVG === 'function') {
+      s += moldGradeUtmSVG({ w: v.w, h: v.h, proj: v.proj, inv: v.inv, zona: carucMapaZonaUtm(v),
+        cor: img.zoom ? '#FFFFFF' : '#374151', halo: img.zoom ? 'rgba(0,0,0,.6)' : 'rgba(255,255,255,.85)' })
+    }
     s += _carucMapaNorte(v, cor.texto) + _carucMapaEscala(v, cor.texto) + '</svg>'
     out.zoom = s
   }
@@ -249,6 +270,32 @@ function carucMapaSVGs(dados, vistas, opts = {}) {
     out.acre = s
   }
   return out
+}
+
+// ── Rodapé do mapa (legenda + referência + fundo + data) ─────────────
+// UM desenho para a tela e para o PDF (rasterizado como os quadros). A
+// legenda só lista o que aparece nos quadros deste titular.
+function carucMapaRodapeSVG(dados, vistas, opts = {}) {
+  const sat = opts.fundo === 'satelite' && !opts.semSatelite
+  const cor = CARUC_MAPA_COR[sat ? 'satelite' : 'sem']
+  const halo = sat ? '#374151' : null
+  const itens = [
+    { rotulo: 'CAR do titular no recorte (nº = linha da tabela)', cor: cor.car, tipo: 'area', preenchimento: sat ? '#FDE68A' : '#FDBA74' },
+    { rotulo: 'Limite da UC', cor: cor.uc, tipo: 'linha', halo },
+  ]
+  if (dados.zonas?.length) itens.push({ rotulo: 'Zonas de manejo', cor: sat ? '#FFFFFF' : '#0A1A0F', tipo: 'linha', tracejado: true, halo })
+  if (vistas.zoom && vistas.uc) itens.push({ rotulo: 'Área ampliada no 1º quadro', cor: cor.destaque, tipo: 'contorno' })
+  if (dados.fora?.length) itens.push({ rotulo: 'CAR do titular fora da UC (F1, F2…)', cor: cor.fora, tipo: 'ponto' })
+  const zona = vistas.zoom ? carucMapaZonaUtm(vistas.zoom) : null
+  const fundo = opts.fundo === 'satelite'
+    ? (opts.semSatelite ? 'Imagem de satélite indisponível nesta geração — mapa sem fundo' : CARUC_MAPA_CREDITO)
+    : 'Sem imagem de fundo'
+  const linhas = [
+    (typeof moldReferencia === 'function' ? moldReferencia(zona) : 'Datum SIRGAS 2000')
+      + (zona ? ' — grade só no 1º quadro' : ''),
+    `${fundo} · Limites: SICAR ao vivo e zoneamento cadastrado · Emitido em ${new Date().toLocaleDateString('pt-BR')}`,
+  ]
+  return typeof moldRodapeSVG === 'function' ? moldRodapeSVG({ largura: opts.largura || 860, itens, linhas }) : ''
 }
 
 // ── Satélite (Esri) ──────────────────────────────────────────────────
@@ -360,7 +407,11 @@ async function carucMapaGrupo(rel, g, fundo, acre) {
     ])
     semSatelite = !!((vistas.zoom && !imagemZoom) || (vistas.uc && !imagemUC) || (vistas.acre && !imagemAcre))
   }
-  return { ...carucMapaSVGs(dados, vistas, { fundo, imagemZoom, imagemUC, imagemAcre }), dados, semSatelite }
+  return {
+    ...carucMapaSVGs(dados, vistas, { fundo, imagemZoom, imagemUC, imagemAcre }),
+    rodape: carucMapaRodapeSVG(dados, vistas, { fundo, semSatelite }),
+    dados, semSatelite,
+  }
 }
 
 // Rasteriza o SVG (o MESMO da tela) para o PDF. Satélite sai JPEG (foto);
@@ -386,6 +437,6 @@ function carucMapaSvgParaImagem(svg, fator = 2, jpeg = false) {
 if (typeof module !== 'undefined') {
   module.exports = {
     carucMercX, carucMercY, carucMapaBbox, carucMapaVista, carucMapaVistas, carucMapaSVGs,
-    carucMapaGrupoTemMapa, carucMapaDadosGrupo, CARUC_MAPA_MIN_CARS,
+    carucMapaGrupoTemMapa, carucMapaDadosGrupo, CARUC_MAPA_MIN_CARS, carucMapaRodapeSVG, carucMapaMetrosPorPx,
   }
 }

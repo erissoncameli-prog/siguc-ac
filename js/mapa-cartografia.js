@@ -14,7 +14,7 @@ window.CART = (function () {
 
   // ─── Constantes institucionais ────────────────────────────────
   const DATUM      = 'SIRGAS 2000';
-  const PROJECAO   = 'WGS 84 (EPSG:4326)';
+  const PROJECAO   = 'exibição Web Mercator (EPSG:3857)';
   const FONTES     = 'ICMBio · FUNAI · IBGE · SEMA-AC · SICAR/CAR · MapBiomas · INPE/PRODES';
   const ORGAO      = 'SEMA/AC — Secretaria de Meio Ambiente do Acre';
   const SISTEMA    = 'SIGUC-AC';
@@ -204,119 +204,64 @@ window.CART = (function () {
   }
 
   // ─── 5. PRINT ─────────────────────────────────────────────────
-  function imprimir(titulo) {
+  // Folha A4 deitada com o MAPA DE VERDADE: o próprio #mapa é movido para
+  // dentro da prévia (relAbrirPreview, js/relatorio-car.js) e volta ao
+  // fechar. Antes abria uma janela nova que não conseguia copiar o mapa e
+  // imprimia um aviso no lugar dele. Timbre, norte, barra de escala e
+  // referência vêm das mesmas peças dos outros relatórios
+  // (_htmlCabecalho + js/mapa-moldura.js).
+  async function imprimir(titulo) {
     const tituloFinal = titulo || 'Mapa das Unidades de Conservação — Acre';
     const mapEl = document.getElementById('mapa');
-    if (!mapEl) { window.print(); return; }
+    if (!mapEl || !_map || typeof relAbrirPreview !== 'function') { window.print(); return; }
 
-    // Força Leaflet a renderizar tiles antes de imprimir
-    if (_map) _map.invalidateSize();
-
-    // Abre janela de print com snapshot do estado atual
-    const printWin = window.open('', '_blank', 'width=1200,height=900');
-    if (!printWin) { window.print(); return; }
-
-    const legEl  = document.getElementById('cart-legenda-ctrl');
-    const legHTML = legEl ? legEl.outerHTML : '';
-    const escala = document.querySelector('.leaflet-control-scale')?.outerHTML || '';
-    const rosa   = document.querySelector('.rosa-norte')?.outerHTML || '';
-    const ano    = new Date().getFullYear();
-    const dataHoje = new Date().toLocaleDateString('pt-BR', { day:'2-digit', month:'long', year:'numeric' });
-
-    printWin.document.write(`<!DOCTYPE html>
-<html lang="pt-BR"><head>
-<meta charset="UTF-8">
-<title>${_esc(tituloFinal)}</title>
-<style>
-  @page { size: A3 landscape; margin: 12mm; }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'DM Sans', Arial, sans-serif; background:#fff; color:#111; }
-  .print-wrap { display:flex; flex-direction:column; height:100vh; gap:0; }
-  /* Cabeçalho */
-  .print-header { display:flex; align-items:center; gap:14px; padding:10px 14px;
-    border-bottom:3px solid #1F4E2C; background:#f0fdf4; flex-shrink:0; }
-  .print-header-logo { width:38px; height:38px; background:#1F4E2C; border-radius:8px;
-    display:flex; align-items:center; justify-content:center; font-size:20px; flex-shrink:0; }
-  .print-header-titulo { font-size:17px; font-weight:700; color:#1F4E2C; }
-  .print-header-sub { font-size:10px; color:#6b7280; margin-top:2px; }
-  .print-header-meta { margin-left:auto; text-align:right; font-size:9px; color:#6b7280; line-height:1.6; }
-  /* Área do mapa */
-  .print-mapa-area { flex:1; display:flex; gap:0; min-height:0; position:relative; }
-  .print-mapa-img { flex:1; background:#e5e7eb; position:relative; overflow:hidden; }
-  .print-mapa-img .mapa-placeholder { width:100%; height:100%; display:flex; align-items:center;
-    justify-content:center; font-size:13px; color:#9ca3af; }
-  /* Rodapé cartográfico */
-  .print-footer { display:flex; align-items:center; gap:16px; padding:6px 14px;
-    border-top:2px solid #1F4E2C; background:#f0fdf4; flex-shrink:0; font-size:9px; color:#374151; }
-  .print-footer-block { display:flex; flex-direction:column; gap:1px; }
-  .print-footer-label { font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:#1F4E2C; font-size:8px; }
-  .print-footer-sep { width:1px; background:#d1fae5; align-self:stretch; flex-shrink:0; }
-  .print-footer-right { margin-left:auto; text-align:right; }
-  /* Legenda */
-  .print-legenda { width:180px; flex-shrink:0; border-left:1px solid #e5e7eb;
-    padding:10px 12px; display:flex; flex-direction:column; gap:6px; background:#fff; }
-  .print-leg-titulo { font-size:10px; font-weight:700; color:#1F4E2C;
-    text-transform:uppercase; letter-spacing:.06em; padding-bottom:5px;
-    border-bottom:1px solid #e5e7eb; margin-bottom:2px; }
-  .cart-leg-item { display:flex; align-items:center; gap:5px; font-size:10px; color:#374151; margin-bottom:3px; }
-  /* Escala e norte */
-  .print-controles { display:flex; align-items:flex-end; gap:8px; margin-top:auto; }
-  .leaflet-control-scale-line { border:2px solid #1F4E2C!important; border-top:none!important;
-    background:#fff!important; font-size:9px!important; font-weight:700!important; color:#1F4E2C!important;
-    white-space:nowrap!important; padding:1px 4px!important; }
-</style>
-</head><body>
-<div class="print-wrap">
-  <div class="print-header">
-    <div class="print-header-logo">🗺</div>
-    <div>
-      <div class="print-header-titulo">${_esc(tituloFinal)}</div>
-      <div class="print-header-sub">${ORGAO} · ${SISTEMA}</div>
-    </div>
-    <div class="print-header-meta">
-      Emitido em: ${dataHoje}<br>
-      Datum: ${DATUM}<br>
-      Projeção: ${PROJECAO}
-    </div>
-  </div>
-
-  <div class="print-mapa-area">
-    <div class="print-mapa-img">
-      <div class="mapa-placeholder">
-        [ Captura do mapa — utilize Ctrl+P após fechar esta prévia ou use a exportação por imagem ]
+    const centro = _map.getCenter(), zoom = _map.getZoom(), limites = _map.getBounds();
+    const hoje = new Date().toLocaleDateString('pt-BR');
+    let cab = null;
+    try { cab = await getCabecalhoRelatorio('monitoramento'); cab.linhaModulo = 'Mapa interativo'; } catch (_) {}
+    const cabecalho = cab && typeof _htmlCabecalho === 'function' ? _htmlCabecalho(cab, null, hoje) : '';
+    const legEl = document.getElementById('cart-legenda-ctrl');
+    const legenda = legEl && legEl.querySelector('.cart-leg-item') ? legEl.innerHTML : '<div style="color:#9ca3af">Nenhuma camada temática ligada.</div>';
+    const html = `<div class="rel-a4 rel-a4-paisagem">
+      ${cabecalho}
+      <div class="rel-mapa-titulo" style="margin:10px 24px 0">${_esc(tituloFinal)}</div>
+      <div class="rel-mapa-folha" style="margin-top:0">
+        <div class="rel-mapa-folha-mapa" id="cart-print-slot"></div>
+        <div class="rel-mapa-folha-lado">
+          <h4>Legenda</h4><div>${legenda}</div>
+          <h4>Norte e escala</h4>
+          <div style="display:flex;gap:10px;align-items:flex-end">${typeof moldNorteSVG === 'function' ? moldNorteSVG() : ''}<span class="rel-mapa-escala" id="cart-print-escala"></span></div>
+          <h4>Referência</h4><div>${typeof moldReferencia === 'function' ? _esc(moldReferencia()) : DATUM}</div>
+          <h4>Fontes dos dados</h4><div>${_esc(FONTES)}</div>
+          <div style="margin-top:auto;color:#9ca3af">Imagem de fundo: a camada base ligada no mapa no momento da impressão.</div>
+        </div>
       </div>
-    </div>
-    <div class="print-legenda">
-      <div class="print-leg-titulo">Legenda</div>
-      ${legHTML}
-      <div class="print-controles">${escala}${rosa}</div>
-    </div>
-  </div>
+      <div class="rel-pag-rodape"><span>${_esc(cab ? cab.secretaria + ' · ' + cab.siglaDiret + ' · ' + cab.siglaDep : ORGAO)}</span><span>${SISTEMA} · Emitido em ${hoje}</span></div>
+    </div>`;
 
-  <div class="print-footer">
-    <div class="print-footer-block">
-      <span class="print-footer-label">Datum / Projeção</span>
-      <span>${DATUM} · ${PROJECAO}</span>
-    </div>
-    <div class="print-footer-sep"></div>
-    <div class="print-footer-block">
-      <span class="print-footer-label">Fontes dos dados</span>
-      <span>${FONTES}</span>
-    </div>
-    <div class="print-footer-sep"></div>
-    <div class="print-footer-block">
-      <span class="print-footer-label">Referência</span>
-      <span>Dados: ${ANO_DADOS} · Emissão: ${dataHoje}</span>
-    </div>
-    <div class="print-footer-right print-footer-block">
-      <span class="print-footer-label">${SISTEMA}</span>
-      <span>${ORGAO}</span>
-    </div>
-  </div>
-</div>
-<script>window.onload=()=>window.print();<\/script>
-</body></html>`);
-    printWin.document.close();
+    const marcador = document.createComment('lugar do mapa durante a impressão');
+    mapEl.parentNode.insertBefore(marcador, mapEl);
+    const escala = () => {
+      const el = document.getElementById('cart-print-escala');
+      const m = typeof moldMetrosPorPxLeaflet === 'function' ? moldMetrosPorPxLeaflet(_map) : null;
+      if (el && m) el.innerHTML = moldEscalaSVG(m, '#0A1A0F', 90);
+    };
+    const pv = relAbrirPreview({
+      titulo: tituloFinal, modo: 'MAPA',
+      html,
+      aoFechar: () => {
+        _map.off('zoomend moveend', escala);
+        marcador.parentNode.insertBefore(mapEl, marcador);
+        marcador.remove();
+        _map.invalidateSize();
+        _map.setView(centro, zoom, { animate: false });
+      },
+    });
+    pv.area.querySelector('#cart-print-slot').appendChild(mapEl);
+    _map.invalidateSize();
+    _map.fitBounds(limites, { animate: false });
+    _map.on('zoomend moveend', escala);
+    escala();
   }
 
   // ─── 6. RODAPÉ HTML para relatórios/exports ───────────────────
