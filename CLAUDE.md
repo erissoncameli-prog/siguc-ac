@@ -580,8 +580,26 @@ período. Gráficos de linha, barra, área, rosca e ranking, em SVG à mão.
   PRODES (mesmo WFS do `prodes_resumo_ano`) com o limite de cada UC,
   calculada no banco (`ST_MakeValid` nos dois lados — sem isso o GEOS
   lança TopologyException). Conferido: 2024 somou 41.144 ha contra
-  41.135 do INPE. **"Acre todo" usa o número OFICIAL do INPE; o recorte
-  por UC é cálculo do sistema** — a página diz isso nas notas.
+  41.135 do INPE. **"Acre todo" usa a soma dos POLÍGONOS publicada pelo
+  INPE (não é a taxa oficial — ver abaixo); o recorte por UC é cálculo do
+  sistema** — a página diz isso nas notas.
+- **Taxa oficial do INPE ≠ área dos polígonos** (migrations 361/361b,
+  `prodes_taxa_ano`): a taxa leva correção de nuvem e outros ajustes
+  (2025: 324 km² de taxa × 275 km² de polígonos; 2022: 840 × 1.006). Série
+  à parte, desde 2008, lida todo dia do arquivo do próprio painel do
+  TerraBrasilis (`app/prodes/dashboard/deforestation/files/rates<ANO>.json`,
+  ~24 KB; o nome leva o ano da última estimativa, por isso pede ano−1/ano/
+  ano+1). Acre = `loiname` 18278, com trava: 1988 ≠ 620 km² ⇒ nada gravado.
+  O ano mais recente nasce `estimada` e vira `consolidada` quando o valor
+  muda (o estimado fica em `km2_estimado`) ou a partir de 1º/ago do ano
+  seguinte. Na tela: card "Taxa oficial de desmatamento do INPE" **só em
+  "Acre todo"** (o INPE não publica taxa por UC/município), estimativa em
+  barra vazada; **nunca somada aos polígonos, nunca no gráfico de área nem
+  na tendência** (`pfdTaxaOficial`/`pfdTaxaCardHTML`). Ano com taxa e sem
+  polígonos: aviso e nota na tendência dizem onde está o número, e
+  `prodes_poligonos_verificar()` (cron diário) pede só esse ano até os
+  polígonos saírem. ⚠️ Variável de laço com o mesmo nome do apelido da
+  consulta (`r`) quebra o PL/pgSQL em toda chamada (361b).
 - ⚠️ `prodes_resumo_coletar(p_max)` processa **um ano por chamada** (342c;
   o cron 342d roda `(1)` às 10:20 e 10:40 de domingo): os 18 anos numa
   transação só estouravam o `statement_timeout` de 2 min. O pedido só é
@@ -764,7 +782,7 @@ período. Gráficos de linha, barra, área, rosca e ranking, em SVG à mão.
   × área geodésica × depois de make_valid × união × soma das
   interseções com os 22 municípios) — é a investigação dos +1,4%, sem
   gravar nada.
-- Guarda: `tests/painel-fogo-desmatamento.test.js` (36), inclusive
+- Guarda: `tests/painel-fogo-desmatamento.test.js` (38), inclusive
   página sem rolagem lateral em 390px.
 - `pwa/sw.js`: frota 112 → 113 (`js/layout.js` está no shell do Frota).
 
