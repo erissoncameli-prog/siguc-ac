@@ -17,6 +17,23 @@ function _traduzStatusCAR(v) {
   const k = String(v).trim().toUpperCase();
   return _SICAR_STATUS[k] || String(v); // se já vier legível, mantém
 }
+// Situação ATUAL: o SICAR ao vivo (WFS) vence a planilha local (retrato de
+// ago/2025, em que ~1/3 dos cancelados ainda constava "Ativo"). O SICAR não
+// publica data de cancelamento; a única é data_atualizacao (última alteração
+// do registro, em UTC → dia no fuso do Acre). Mesma regra de
+// carucSituacaoAtual (js/car-uc-relatorio.js) — mudou lá, muda aqui.
+function _relSituacaoAtual(local, p) {
+  const cod = p.status_imovel || local.ind_status || null;
+  const condicao = p.condicao || local.condicao_i || '';
+  const cancelado = String(cod || '').trim().toUpperCase() === 'CA'
+    || /cancel/i.test(String(condicao).normalize('NFD').replace(/[\u0300-\u036f]/g, ''));
+  let dataCanc = null;
+  if (cancelado && p.data_atualizacao) {
+    const d = new Date(p.data_atualizacao);
+    if (!isNaN(d.getTime())) dataCanc = new Date(d.getTime() - 5 * 3600 * 1000).toISOString().slice(0, 10);
+  }
+  return { status: _traduzStatusCAR(cod || condicao), condicao, dataCanc };
+}
 // Formata data ISO (YYYY-MM-DD) ou qualquer data para pt-BR
 function _relDataBR(v) {
   if (!v || v === '—') return '—';
@@ -537,6 +554,7 @@ async function _montarDadosRelatorio(feat) {
 
   const numModulo = parseFloat(local.num_modulo || p.num_modulo || 0);
   const pequenaProp = numModulo > 0 && numModulo <= 4;
+  const sit = _relSituacaoAtual(local, p);
   const totalGeral  = pr?.totalGeral || 0;
   const haConsol    = pr?.haConsolidado || 0;
 
@@ -548,8 +566,9 @@ async function _montarDadosRelatorio(feat) {
     nome_compl:   local.nome_compl  || '',
     cpf_cnpj:     local.cpf_cnpj    || p.cpf_cnpj || '—',
     nom_munici:   local.nom_munici  || p.municipio || '—',
-    ind_status:   _traduzStatusCAR(local.ind_status || p.condicao),  // ponto 5
-    condicao_analise: local.condicao_i || '',        // condição de análise (legível)
+    ind_status:   sit.status,                        // ponto 5 — SICAR ao vivo primeiro
+    condicao_analise: sit.condicao,                  // condição (legível; no cancelado, o motivo)
+    dat_cancelamento: sit.dataCanc ? _relDataBR(sit.dataCanc) : '',
     nome_class:   local.nome_class  || '—',
     num_modulo:   numModulo,
     dat_criaca:   _relDataBR(local.dat_criaca),      // ponto 5
@@ -851,6 +870,7 @@ function _htmlFolhasDetalhadas(d, cab, protocolo, idx, total, multi) {
           <tr><td>Módulos fiscais</td><td>${d.num_modulo>0?_relF1(d.num_modulo)+' módulos'+(d.pequenaPropriedade?' (pequena propriedade — Art. 67 CF)':''):'—'}</td></tr>
           <tr><td>Situação CAR</td><td>${_relEsc(d.ind_status)}</td></tr>
           ${d.condicao_analise?`<tr><td>Condição (análise)</td><td>${_relEsc(d.condicao_analise)}</td></tr>`:''}
+          ${d.dat_cancelamento?`<tr><td>Cancelado em</td><td>${_relEsc(d.dat_cancelamento)} <span style="color:#9ca3af">(data da última atualização do registro no SICAR — o SICAR não publica a data do cancelamento)</span></td></tr>`:''}
           <tr><td>Classificação SICAR</td><td>${d.nome_class==='Vermelho'?'<strong style="color:#dc2626">🔴 Vermelho — Art. 78-A CF aplicável</strong>':_relEsc(d.nome_class)}</td></tr>
           ${d.dat_criaca&&d.dat_criaca!=='—'?`<tr><td>Data de cadastro</td><td>${_relEsc(d.dat_criaca)}</td></tr>`:''}
           ${!d.naPlanilha?`<tr><td>Cadastro local</td><td><strong style="color:#d97706">⚠️ Imóvel não consta na planilha SICAR local — proprietário e CPF/CNPJ não disponíveis</strong></td></tr>`:''}

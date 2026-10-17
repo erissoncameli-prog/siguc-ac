@@ -694,6 +694,14 @@ function _carucMapaLinhaHTML(rel, g, nCols) {
   </div></td></tr>`
 }
 
+// O SICAR não publica a data do cancelamento: é a última atualização do
+// registro (ver carucSituacaoAtual em js/car-uc-relatorio.js).
+function _carucCanceladoHTML(i) {
+  return i.data_cancelamento
+    ? `<span class="caruc-nota" style="display:block" title="O SICAR não publica a data do cancelamento: esta é a data da última atualização do registro no SICAR">Cancelado em ${formatData(i.data_cancelamento)}</span>`
+    : ''
+}
+
 const CARUC_FORA_NA_TELA = 30
 function _carucForaHTML(g, nCols) {
   const fora = g.fora || []
@@ -702,7 +710,7 @@ function _carucForaHTML(g, nCols) {
   return `<tr class="caruc-fora-tr"><th colspan="${nCols}" scope="rowgroup">Fora da UC · mesmo titular · ${formatNum(fora.length, 0)} CAR(s) · não entram nos totais da UC</th></tr>`
     + mostrar.map((f, k) => `<tr class="caruc-fora-linha"><td><span class="caruc-pino fora">F${k + 1}</span></td>
       <td><span class="caruc-cod">${esc(f.cod)}</span>${f._mapa ? '' : '<span class="caruc-nota">sem polígono no SICAR</span>'}</td>
-      <td>${esc(f.nome_imovel || '—')}</td><td>${esc(f.municipio || '—')}</td><td>${esc(f.situacao || '—')}</td><td>—</td>
+      <td>${esc(f.nome_imovel || '—')}</td><td>${esc(f.municipio || '—')}</td><td>${esc(f.situacao || '—')}${_carucCanceladoHTML(f)}</td><td>—</td>
       <td class="num">—<br><span class="caruc-nota">${f.area_declarada_ha != null ? formatNum(f.area_declarada_ha, 2) + ' ha declarados' : ''}</span></td>
       <td colspan="${nCols - 7}"></td></tr>`).join('')
     + (fora.length > mostrar.length ? `<tr class="caruc-fora-linha"><td colspan="${nCols}" class="caruc-nota">… e mais ${formatNum(fora.length - mostrar.length, 0)} CAR(s) fora da UC — todos estão no mapa e na planilha Excel (aba "Fora da UC").</td></tr>` : '')
@@ -828,7 +836,7 @@ function _carucLinhaHTML(i, o, pino) {
     <td>${pino ? `<span class="caruc-pino" title="Nº no mapa do titular">${pino}</span>` : ''}<span class="caruc-cod"${pino ? ' style="display:inline"' : ''}>${esc(i.cod)}</span>${i.local === 'za' ? '<br><span class="caruc-nota">só na zona de amortecimento</span>' : ''}${aten}${sob ? `<span class="caruc-nota" style="display:block">Sobrepõe: ${sob}</span>` : ''}</td>
     <td>${esc(i.nome_imovel || '—')}<br><span class="caruc-nota">${esc(i.titular || 'sem dados na planilha local')}${i.documento ? ' · ' + esc(i.documento) : ''}</span>${tit}${i.homonimo ? '<span class="caruc-tit">mesmo nome de outro titular — verificar</span>' : ''}</td>
     <td>${esc(i.municipio || '—')}</td>
-    <td>${esc(i.situacao || '—')}${i.classe ? `<br><span class="caruc-nota">${esc(i.classe)}</span>` : ''}</td>
+    <td>${esc(i.situacao || '—')}${_carucCanceladoHTML(i)}${i.classe ? `<br><span class="caruc-nota">${esc(i.classe)}</span>` : ''}</td>
     <td>${esc(carucTipoImovel(i.tipo_imovel))}</td>
     <td class="num">${formatNum(i.area_analise_ha, 2)}<br><span class="caruc-nota">${i.pct_analise != null ? formatNum(i.pct_analise, 1) + '% do imóvel' : ''}</span></td>
     <td>${zonas || '<span class="caruc-nota">—</span>'}</td>

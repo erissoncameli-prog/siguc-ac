@@ -92,6 +92,30 @@ test('pontos de atenção saem de regra', () => {
   expect(za).toEqual(['CAR cancelado ou suspenso']);   // fora da UC não acusa inscrição/domínio
 });
 
+// Os 3 casos medidos em 17/10/2026 numa amostra de 3.000 cancelados do SICAR:
+// fora da planilha, na planilha como Ativo sem condição (saía "Ativo" com o
+// motivo do cancelamento ao lado) e na planilha com condição preenchida
+// (o cancelamento sumia do relatório).
+test('situação atual: o SICAR ao vivo vence a planilha e o cancelado traz a data', () => {
+  const canc = { status_imovel: 'CA', condicao: 'Cancelado por decisão administrativa', data_atualizacao: '2026-06-30T13:07:56.647Z' }
+  expect(caruc.carucSituacaoAtual(null, canc)).toEqual({ status: 'Cancelado', situacao: 'Cancelado por decisão administrativa', data_cancelamento: '2026-06-30' })
+  expect(caruc.carucSituacaoAtual({ ind_status: 'AT', condicao_i: null }, canc).status).toBe('Cancelado')
+  const comCond = caruc.carucSituacaoAtual({ ind_status: 'AT', condicao_i: 'Em análise' }, canc)
+  expect(comCond.status).toBe('Cancelado')
+  expect(comCond.situacao).toBe('Cancelado por decisão administrativa')
+  // Ativo: sem data de cancelamento, mesmo com data_atualizacao.
+  const at = caruc.carucSituacaoAtual({ ind_status: 'AT', condicao_i: 'Em análise' }, { status_imovel: 'AT', condicao: null, data_atualizacao: '2026-06-30T13:07:56Z' })
+  expect(at).toEqual({ status: 'Ativo', situacao: 'Em análise', data_cancelamento: null })
+  // Sem o WFS (CAR fora do recorte), a planilha segue valendo.
+  expect(caruc.carucSituacaoAtual({ ind_status: 'PE', condicao_i: 'Aguardando análise' }, null).status).toBe('Pendente')
+  // UTC → dia do Acre (UTC−5): 02h UTC ainda é o dia anterior.
+  expect(caruc.carucDataAcre('2026-04-23T02:00:00Z')).toBe('2026-04-22')
+  // A coluna entra na exportação.
+  const col = caruc.carucColunasExportacao({ opcoes: {} }).find(c => /^Cancelado em/.test(c.rotulo))
+  expect(col.valor({ data_cancelamento: '2026-04-22' })).toBe('22/04/2026')
+  expect(col.valor({ data_cancelamento: null })).toBe('')
+})
+
 test('focos no período somam só os anos pedidos', () => {
   expect(caruc.carucFocosNoPeriodo({ 2010: 5, 2012: 3, 2020: 4, 2024: 1 }, 2012, 2020)).toBe(7);
 });
@@ -240,6 +264,9 @@ const FORA = [
   { titular_grupo: 1, cod_imovel: 'AC-FORA-2', nom_imovel: 'Sítio Sem Mapa', nom_munici: 'Feijó', condicao_i: 'Ativo', ind_status: 'AT', num_area_i: 30 },
 ];
 const FORA_GEOM = { 'AC-FORA-1': quad(-68.6, -9.1, -68.58, -9.08) };
+// F1 está "Ativo" na planilha local, mas o SICAR ao vivo já diz cancelado —
+// o relatório tem de mostrar o SICAR, com a data no fuso do Acre.
+const FORA_PROPS = { 'AC-FORA-1': { status_imovel: 'CA', condicao: 'Cancelado por decisão administrativa', data_atualizacao: '2026-04-23T02:00:00Z' } };
 // Ladrilho de satélite falso (1×1 verde) com CORS liberado, como a Esri responde.
 const TILE_PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADgQF/e4nZ2AAAAABJRU5ErkJggg==', 'base64');
 
@@ -251,7 +278,7 @@ async function abrir(page) {
     const alvo = decodeURIComponent(new URL(route.request().url()).searchParams.get('url') || '');
     if (/CQL_FILTER/.test(alvo)) {
       const feats = Object.entries(FORA_GEOM).filter(([c]) => alvo.includes(`'${c}'`))
-        .map(([c, g]) => ({ type: 'Feature', geometry: g, properties: { cod_imovel: c } }));
+        .map(([c, g]) => ({ type: 'Feature', geometry: g, properties: { cod_imovel: c, ...(FORA_PROPS[c] || {}) } }));
       return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ type: 'FeatureCollection', features: feats }) });
     }
     route.fulfill({ contentType: 'application/json', body: JSON.stringify(WFS) });
@@ -618,6 +645,9 @@ test('CARs do mesmo titular fora da UC: só quando pedidos, no mapa do Acre e nu
   await expect(page.locator('tr.caruc-fora-tr')).toContainText('2 CAR(s)');
   await expect(page.locator('tr.caruc-fora-linha')).toHaveCount(2);
   await expect(page.locator('tr.caruc-fora-linha').nth(1)).toContainText('sem polígono no SICAR');
+  await expect(page.locator('tr.caruc-fora-linha').nth(0)).toContainText('Cancelado por decisão administrativa');
+  await expect(page.locator('tr.caruc-fora-linha').nth(0)).toContainText('Cancelado em 22/04/2026');
+  await expect(page.locator('tr.caruc-fora-linha').nth(1)).not.toContainText('Cancelado em');
   // os de fora nunca entram nos totais da UC
   await expect(page.locator(LINHAS)).toHaveCount(2);
   await expect(page.locator('.caruc-kpis')).toContainText('Imóveis na UC2');

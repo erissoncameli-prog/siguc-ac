@@ -93,6 +93,33 @@ function carucData(v) {
   return isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10)
 }
 
+// Data no fuso do Acre (UTC−5). O SICAR grava data_atualizacao em UTC:
+// cortar a string pegaria o dia seguinte para o que mudou à noite.
+function carucDataAcre(v) {
+  if (!v) return null
+  if (/^\d{4}-\d{2}-\d{2}$/.test(String(v))) return String(v)
+  const d = new Date(v)
+  if (isNaN(d.getTime())) return carucData(v)
+  return new Date(d.getTime() - 5 * 3600 * 1000).toISOString().slice(0, 10)
+}
+
+// Situação ATUAL do imóvel. O SICAR ao vivo (WFS) vence a planilha local,
+// que é um retrato de ago/2025: ~1/3 dos cancelados da amostra conferida
+// em 17/10/2026 ainda estava "Ativo" nela. A planilha só completa o que o
+// WFS não trouxer. O SICAR não publica data de cancelamento: a única data
+// é data_atualizacao (última alteração do registro). Nos cancelados ela se
+// concentra nos dias dos lotes de cancelamento, e os ativos quase nunca
+// caem nesses dias — por isso vale como data do cancelamento, sempre com
+// o rótulo "última atualização no SICAR".
+function carucSituacaoAtual(l, p) {
+  p = p || {}
+  const statusCod = p.status_imovel || l?.ind_status || p.ind_status || null
+  const status = carucStatus(statusCod)
+  const situacao = p.condicao || l?.condicao_i || null
+  const cancelado = String(statusCod || '').trim().toUpperCase() === 'CA' || /cancel/.test(carucNorm(situacao))
+  return { status, situacao, data_cancelamento: cancelado ? carucDataAcre(p.data_atualizacao) : null }
+}
+
 // ── Enquadramento pela CATEGORIA da UC (SNUC, Lei 9.985/2000) ───────
 // nivel: 'conflito' (domínio público, sem exceção) · 'verificar'
 // (domínio público que admite população tradicional) · 'admitido'
@@ -661,7 +688,8 @@ async function carucBuscarFora(ucId, cods) {
 }
 
 // Polígonos do SICAR por nº do CAR (CQL IN, em lotes) — mesmo caminho da
-// busca do Mapa das UCs. Devolve Map cod → geometry; código que o WFS
+// busca do Mapa das UCs. Devolve Map cod → { geometry, properties } (a
+// situação ATUAL vem junto, ver carucSituacaoAtual); código que o WFS
 // não devolve fica de fora (a tela conta e avisa).
 async function carucBuscarGeomsPorCodigos(cods, aoProgresso) {
   const LOTE = 60, PARALELO = 3
@@ -677,7 +705,7 @@ async function carucBuscarGeomsPorCodigos(cods, aoProgresso) {
         + `&CQL_FILTER=${encodeURIComponent(`cod_imovel IN (${lista})`)}`
       try {
         const r = await _carucFetchWfs(url)
-        for (const f of (r.features || [])) if (f.properties?.cod_imovel && f.geometry) mapa.set(f.properties.cod_imovel, f.geometry)
+        for (const f of (r.features || [])) if (f.properties?.cod_imovel) mapa.set(f.properties.cod_imovel, { geometry: f.geometry || null, properties: f.properties })
       } catch (e) { console.warn('[caruc] lote de polígonos fora da UC falhou', e) }
       feitos += lote.length
       aoProgresso?.(Math.min(feitos, cods.length), cods.length)
@@ -831,6 +859,7 @@ async function carucGerarRelatorio(uc, ucGeom, fontesZonas, opcoes, aoEtapa) {
   const imoveis = analisados.map(({ f, g }) => {
     const p = f.properties || {}
     const l = cadastro.get(p.cod_imovel)
+    const sit = carucSituacaoAtual(l, p)
     return {
       cod: p.cod_imovel,
       local: g.local,
@@ -839,8 +868,9 @@ async function carucGerarRelatorio(uc, ucGeom, fontesZonas, opcoes, aoEtapa) {
       titular: l?.nome_compl || null,
       documento: l?.cpf_cnpj_mascarado || null,
       municipio: l?.nom_munici || p.municipio || null,
-      situacao: l?.condicao_i || p.condicao || null,
-      status: carucStatus(l?.ind_status || p.status_imovel || p.ind_status),
+      situacao: sit.situacao,
+      status: sit.status,
+      data_cancelamento: sit.data_cancelamento,
       classe: l?.nome_class || null,
       tipo_imovel: p.tipo_imovel || null,
       modulos: l?.num_modulo ?? p.mod_fiscal ?? null,
@@ -903,16 +933,21 @@ async function carucGerarRelatorio(uc, ucGeom, fontesZonas, opcoes, aoEtapa) {
     if (linhas.length) {
       const geoms = await carucBuscarGeomsPorCodigos(linhas.map(l => l.cod_imovel),
         (a, b) => etapa('Baixando os polígonos dos CARs fora da UC…', a, b))
-      fora = linhas.map(l => ({
-        cod: l.cod_imovel,
-        titular_grupo: l.titular_grupo,
-        nome_imovel: l.nom_imovel || null,
-        municipio: l.nom_munici || null,
-        situacao: l.condicao_i || null,
-        status: carucStatus(l.ind_status),
-        area_declarada_ha: l.num_area_i != null ? Number(l.num_area_i) : null,
-        _mapa: carucGeomMapa(geoms.get(l.cod_imovel)),
-      }))
+      fora = linhas.map(l => {
+        const w = geoms.get(l.cod_imovel)
+        const sit = carucSituacaoAtual(l, w?.properties)
+        return {
+          cod: l.cod_imovel,
+          titular_grupo: l.titular_grupo,
+          nome_imovel: l.nom_imovel || null,
+          municipio: l.nom_munici || null,
+          situacao: sit.situacao,
+          status: sit.status,
+          data_cancelamento: sit.data_cancelamento,
+          area_declarada_ha: l.num_area_i != null ? Number(l.num_area_i) : null,
+          _mapa: carucGeomMapa(w?.geometry),
+        }
+      })
       foraSemGeom = fora.filter(f => !f._mapa).length
     }
   }
@@ -953,6 +988,7 @@ function carucColunasExportacao(rel) {
     { rotulo: 'Município', valor: i => i.municipio || '' },
     { rotulo: 'Situação', valor: i => i.situacao || '' },
     { rotulo: 'Status', valor: i => i.status || '' },
+    { rotulo: 'Cancelado em (última atualização no SICAR)', valor: i => i.data_cancelamento ? i.data_cancelamento.split('-').reverse().join('/') : '' },
     { rotulo: 'Classe SICAR', valor: i => i.classe || '' },
     { rotulo: 'Tipo', valor: i => carucTipoImovel(i.tipo_imovel) },
     { rotulo: 'Módulos fiscais', valor: i => n(i.modulos), casas: 2 },
@@ -1008,6 +1044,6 @@ if (typeof module !== 'undefined') {
     carucFocosNoPeriodo, carucColunasExportacao, carucFormatarValor, carucCsv, CARUC_ZONAS_ARQUIVO_UC,
     carucFaixaNaUC, carucPrioridade, carucEnriquecer, carucOpcoesFiltro, carucFiltrar,
     carucDescreverFiltros, carucRelFiltrado, CARUC_FILTROS, carucAgruparPorTitular, carucGrupoRotulo,
-    carucGeomMapa,
+    carucGeomMapa, carucSituacaoAtual, carucDataAcre,
   }
 }

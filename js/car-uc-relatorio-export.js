@@ -151,7 +151,7 @@ async function carucMontarPdf(rel, protocolo) {
           ...estiloRel,
           head: [['Nº', 'Fora da UC · mesmo titular · Nº do CAR', 'Imóvel', 'Município', 'Situação', 'Área declarada (ha)']],
           headStyles: { ...estiloRel.headStyles, fillColor: [146, 64, 14] },
-          body: fora.map((f, k) => ['F' + (k + 1), f.cod, f.nome_imovel || '—', f.municipio || '—', f.situacao || '—', _carucN(f.area_declarada_ha)]),
+          body: fora.map((f, k) => ['F' + (k + 1), f.cod, f.nome_imovel || '—', f.municipio || '—', [f.situacao || '—', _carucCanceladoEm(f)].filter(Boolean).join('\n'), _carucN(f.area_declarada_ha)]),
           columnStyles: { 0: { cellWidth: 8 }, 1: { cellWidth: 62 }, 5: { halign: 'right', cellWidth: 26 } },
         })
         if (g.fora.length > fora.length) _agpdfParagrafo(ctx, `… e mais ${g.fora.length - fora.length} CAR(s) deste titular fora da UC — todos estão no mapa e na planilha Excel (aba "Fora da UC").`, { muted: true })
@@ -166,6 +166,7 @@ async function carucMontarPdf(rel, protocolo) {
     'Geometria dos imóveis: WFS público do SICAR, consultado no momento da geração. Atributos cadastrais: planilha SICAR local importada no sistema; CPF/CNPJ sempre mascarado. A consulta foi registrada no log de acesso a dado de terceiro (LGPD).',
     'Área na UC/ZA: interseção do polígono do imóvel com o limite da UC (ou da zona de amortecimento), calculada no sistema.',
   ]
+  notas.push('Situação e status vêm do SICAR no momento da consulta (a planilha local só completa o que o SICAR não trouxer). O SICAR não publica a data do cancelamento: "Cancelado em" é a data da última atualização do registro no SICAR, que nos cancelados coincide com o lote de cancelamento — se o registro for alterado depois, a data acompanha.')
   if (o.focos) notas.push(`Focos: mesma série da linha do tempo do mapa — temporada de fogo (1º/jul a 4/nov), VIIRS S-NPP + MODIS; antes de 2012 não é comparável (entrada do VIIRS).`)
   if (o.deter) notas.push('DETER: alertas gravados no sistema, que começam em jun/2026.')
   if (o.prodes) notas.push('PRODES/INPE (TerraBrasilis): o ano PRODES vai de agosto a julho; "após o marco" soma os anos 2009 em diante, os primeiros inteiramente posteriores a 22/07/2008 (Lei 12.651/2012). "Até 2007" é a camada de desmatamento acumulado do INPE.')
@@ -201,7 +202,7 @@ function _carucPdfColunas(rel, agrupado) {
     ? { rotulo: 'Imóvel', valor: i => i.nome_imovel || '—' }
     : { rotulo: 'Imóvel / titular', valor: i => [i.nome_imovel || '—', [i.titular, i.documento].filter(Boolean).join(' · ')].filter(Boolean).join('\n') })
   cols.push({ rotulo: 'Município', largura: 20, valor: i => i.municipio || '—' })
-  cols.push({ rotulo: 'Situação / classe', largura: 25, valor: i => [i.situacao || '—', i.classe].filter(Boolean).join('\n') })
+  cols.push({ rotulo: 'Situação / classe', largura: 25, valor: i => [i.situacao || '—', _carucCanceladoEm(i), i.classe].filter(Boolean).join('\n') })
   cols.push({ rotulo: 'Tipo', largura: 17, valor: i => carucTipoImovel(i.tipo_imovel) })
   cols.push({ rotulo: 'Área na UC (ha · %)', largura: 19, direita: true,
     valor: i => `${n2(i.area_analise_ha)}${i.pct_analise != null ? `\n${carucFormatarValor(i.pct_analise, 1)}%` : ''}` })
@@ -216,6 +217,11 @@ function _carucPdfColunas(rel, agrupado) {
   } })
   cols.push({ rotulo: 'Prioridade', largura: 15, valor: i => CARUC_PRIORIDADE_ROTULO[i.prioridade?.nivel] || '—' })
   return cols
+}
+
+// "Cancelado em dd/mm/aaaa" — data_atualizacao do SICAR (ver carucSituacaoAtual).
+function _carucCanceladoEm(i) {
+  return i.data_cancelamento ? 'Cancelado em ' + i.data_cancelamento.split('-').reverse().join('/') : ''
 }
 
 // Linha própria, de largura inteira, abaixo do imóvel: o texto longo que
@@ -326,16 +332,18 @@ async function carucMontarXlsx(rel) {
         { header: 'Titular nº', width: 11 }, { header: 'Titular', width: 36 }, { header: 'No mapa', width: 9 },
         { header: 'Nº do CAR', width: 48 }, { header: 'Imóvel', width: 30 }, { header: 'Município', width: 20 },
         { header: 'Situação', width: 14 }, { header: 'Área declarada (ha)', width: 18 },
+        { header: 'Cancelado em (última atualização no SICAR)', width: 22 },
       ]
       for (const g of comFora) g.fora.forEach((f, k) => {
         const l = wf.addRow([g.grupo, g.titular || '', 'F' + (k + 1), f.cod, f.nome_imovel || '', f.municipio || '', f.situacao || '',
-          f.area_declarada_ha != null ? Number(f.area_declarada_ha) : ''])
+          f.area_declarada_ha != null ? Number(f.area_declarada_ha) : '',
+          f.data_cancelamento ? f.data_cancelamento.split('-').reverse().join('/') : ''])
         l.getCell(8).numFmt = '#,##0.00'
       })
       const cf = wf.getRow(1)
       cf.font = { bold: true, color: { argb: 'FFFFFFFF' } }
       cf.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF92400E' } }
-      wf.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: 8 } }
+      wf.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: 9 } }
     }
   }
 

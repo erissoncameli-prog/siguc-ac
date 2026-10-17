@@ -972,7 +972,22 @@ opcionais. Sem mapa (pedido do usuário). Exporta PDF (timbre), Excel
   larga fazia a PÁGINA inteira rolar de lado no celular (1.410px em
   390px), mesmo dentro do `.table-wrap`. Corrigido com `min-width:0`
   só nesta página; a guarda de 390px pega a volta.
-- Guarda: `tests/car-uc-relatorio.test.js` (27). Página real com stub,
+- **Situação ATUAL vem do SICAR ao vivo, nunca da planilha** (17/10/2026):
+  `carucSituacaoAtual(l, p)` (e o espelho `_relSituacaoAtual` em
+  `js/relatorio-car.js`, relatório do imóvel pelo Mapa — mudou num, muda no
+  outro). `car_dados_locais` é um retrato de ago/2025 e NÃO tem nenhum
+  cancelado: numa amostra de 3.000 cancelados do WFS, 992 ainda constavam
+  "Ativo"/"Pendente" nela — o relatório mostrava "Ativo" com o motivo do
+  cancelamento ao lado, ou escondia o cancelamento. A planilha só completa o
+  que o WFS não trouxer (inclusive na lista "Fora da UC", que agora pega a
+  situação na mesma consulta que baixa os polígonos).
+- **"Cancelado em" = `data_atualizacao` do SICAR**, no fuso do Acre (UTC−5).
+  O SICAR não publica data de cancelamento (12 atributos na camada, conferido
+  por DescribeFeatureType); nos cancelados a data se concentra nos dias dos
+  lotes (542 em 22/04/2026, 444 em 17/02/2025) e os ativos quase nunca caem
+  nesses dias (7 de 3.000). Rótulo sempre "última atualização no SICAR" + nota
+  no PDF: se o registro for alterado depois, a data anda junto.
+- Guarda: `tests/car-uc-relatorio.test.js` (28). Página real com stub,
   PDF/Excel/CSV gerados de verdade, e guardas conferidas por
   contrafactual (reprovam sem a correção).
 - Sem mudança em `pwa/sw.js` (tela de mesa).
