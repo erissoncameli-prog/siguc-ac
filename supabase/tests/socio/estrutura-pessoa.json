@@ -1,0 +1,14 @@
+{
+  "identificacao": {"nome": "nao", "gps": "nao"},
+  "blocos": [
+    {"id": "pesca", "titulo": "Pesca", "perguntas": [
+      {"n": 1, "chave": "pesca_dias", "tipo": "inteiro", "texto": "Dias de pesca por semana", "min": 0, "max": 7},
+      {"n": 2, "chave": "pesca_local", "tipo": "multipla", "texto": "Onde pesca?",
+       "opcoes": [{"v": "rio", "r": "Rio"}, {"v": "lago", "r": "Lago"}, {"v": "igarape", "r": "Igarapé"}, {"v": "outro", "r": "Outro", "especificar": true}]},
+      {"n": 3, "chave": "pesca_lago_nome", "tipo": "texto", "texto": "Nome do lago", "mostrar_se": {"se": "pesca_local", "op": "contem", "valor": "lago"}},
+      {"n": 4, "chave": "conflito", "tipo": "unica", "texto": "Há conflito de pesca?",
+       "opcoes": [{"v": "sim", "r": "Sim"}, {"v": "nao", "r": "Não"}, {"v": "nao_sabe", "r": "Não sabe"}]},
+      {"n": 5, "chave": "conflito_desc", "tipo": "texto_longo", "texto": "Descreva", "mostrar_se": {"se": "conflito", "op": "in", "valor": ["sim"]}}
+    ]}
+  ]
+}

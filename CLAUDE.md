@@ -4819,7 +4819,58 @@ monitor para aquele `auth.uid()`. Achado em produção com 1 monitor
   `tests/biomonitor-admin-monitor.test.js` (consistência de fonte entre
   o payload de `salvarMonitor` e o `select` de `carregarDados`).
 
+## Regra do sistema — Diagnóstico Socioeconômico (migrations 362/362b/362c)
+Questionários de campo de VÁRIOS instrumentos, cada um DONO de um departamento.
+Plano, formato da estrutura e decisões em `docs/socioeconomico/plano.md`. Fase 1
+(banco + interpretador) entregue em 18/10/2026; mesa, app de campo, indicadores e
+retenção são as Fases 2–5. Nada veio do DIMA (nem fichas, nem estrutura).
+- **Modelo**: `socio_instrumentos` (dono = `unidade_org_id`) → `socio_questionarios`
+  (versão; publicada = imutável, hash SHA-256 gerado) → `socio_campanhas` (período,
+  território, equipe em `socio_campanha_aplicadores`) → `socio_fichas`. UC é
+  OPCIONAL: cada campanha diz se exige município/UC e quais aceita.
+- **Acesso = `fn_socio_pode_de(uid, instrumento, acao)`, fonte única** (`ver`,
+  `ler_fichas`, `aplicar`, `treinar`, `gerir`, `ver_identificacao`, `admin`). NÃO
+  usa `pode_ver`/`nivel_efetivo`: o módulo é aberto a todos, o instrumento não.
+  Departamento = `usuario_unidades()` (lotação + cargo) com herança para baixo;
+  chefe (titular do cargo da unidade) é gestor nato; gestor designa
+  gestor/aplicador/leitor SÓ entre quem é do departamento. Chefia acima vê só
+  estrutura e agregados. Outro departamento: `socio_pedir_acesso` (agregados |
+  leitor | aplicador, justificativa ≥ 20, prazo ≤ 1 ano) → decide o GESTOR do
+  dono (nunca quem pediu, nunca o super_admin). **super_admin vê o catálogo mas
+  NÃO lê ficha** sem pedir; troca o dono (`socio_transferir_instrumento`) e
+  corrige papéis só com justificativa (vai para a `trilha_auditoria`).
+  ⚠️ Sem lotação nem cargo = sem departamento, e NÃO há fail-open (medido em
+  18/10/2026: 14 de 71 usuários ativos têm lotação). Cadastrar a lotação antes
+  da 1ª campanha.
+- **Identificação separada**: `socio_fichas_identificacao` (nome, GPS, colunas
+  `identificacao` da lista) só para o gestor e o próprio entrevistador — leitor e
+  quem é de fora nunca. A lista do domicílio mora em jsonb na ficha
+  (`socio_fichas.linhas`), sem tabela de moradores: reenviar regrava sem apagar.
+- **Escrita só por RPC** `socio_*` (SECURITY DEFINER; nenhuma policy de escrita —
+  não criar). Envio = `socio_enviar_ficha` (idempotente por `uuid_cliente`, código
+  `<CODIGO>-…`, treino = `TRE-` e aceita rascunho; carência de 15 dias após o fim
+  da campanha para ficha concluída a tempo). Validação = `socio_mudar_status`.
+  Erros no formato `socio:<codigo>: <texto>`.
+- **Interpretador em DOIS lugares, idênticos**: SQL (`fn_socio_*`, 362b) e
+  `js/socio-regras.js`. Regra nova entra nos dois e no teste cruzado. O que no
+  DIMA era fixo do questionário de domicílio aqui é declarado na estrutura:
+  `lista`, `derivada` (`total_linhas`, `existe_linha`, `maior_nivel`) e
+  `coerencia` (`igual_total_linhas`, `nega_linha`). `length()` do Postgres conta
+  caracteres — o JS usa `Array.from(s).length`, nunca `.length`.
+- `fn_socio_validar_estrutura(jsonb)` devolve a lista de erros legíveis (salto
+  para pergunta posterior, chave/opção repetida, derivada inválida…): rascunho
+  salva com erro, publicar não.
+- Notificação: `tipo = 'sistema'` + `meta.modulo = 'socio'` + `meta.subtipo`.
+  ROPA: TRAT-021.
+- Guarda: `supabase/tests/socio/rodar.sh` (Postgres 16 local + stub do SIGUC):
+  ~70 asserções de acesso e fluxo + 1.800 casos aleatórios JS × SQL. Contrafactual
+  conferido (super_admin lendo ficha e JS divergente reprovam).
+- Sem mudança em `pwa/sw.js`: nenhuma página usa o módulo ainda.
+
 ## Próxima tarefa
+**Diagnóstico Socioeconômico** — Fase 2 (mesa: catálogo, editor de versões,
+papéis, pedidos de acesso) em `docs/socioeconomico/plano.md` §3/§5.
+
 **Recursos Hídricos e Qualidade Ambiental (DERHQA)** — Fases A, B e C
 ENTREGUES (ver "Recursos Hídricos — Fase B" e "— Fase C" acima).
 Próximo passo é a Fase D (Qualidade do Ar) — só estrutura reservada

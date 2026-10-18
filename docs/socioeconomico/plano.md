@@ -1,6 +1,8 @@
 # Diagnóstico Socioeconômico — Plano
 
-> **Status:** proposta para aprovação. Nenhuma migration nem código criado.
+> **Status:** Fase 1 ENTREGUE (18/10/2026) — migrations 362/362b/362c aplicadas em
+> produção, `js/socio-regras.js`, testes em `supabase/tests/socio/rodar.sh`.
+> Fases 2–5 a fazer.
 > **Origem:** o Diagnóstico Socioambiental do dima-plataforma (`diag_*`,
 > migrations `20260926_diag_01` a `20261009_diag_20`). O desenho e as regras
 > vêm de lá. O código é portado e adaptado ao SIGUC, não copiado às cegas.
@@ -17,6 +19,10 @@
 | UC | **opcional**: o instrumento não depende de UC. Cada campanha decide se exige UC, município ou nenhum dos dois (§1.3) | 18/10/2026 |
 | Dono | **todo instrumento pertence ao departamento que o solicitou** (`unidades_organizacionais`) | 18/10/2026 |
 | Acesso | o módulo é **aberto a todos**; um departamento **não vê** o instrumento de outro sem **pedir e receber permissão** (§2) | 18/10/2026 |
+| super_admin | administra o catálogo, mas **também pede** para ler ficha (Q1) | 18/10/2026 |
+| Chefia acima | **só agregados** (Q2) | 18/10/2026 |
+| 1º instrumento | **nenhum vem do DIMA** — nem fichas, nem a estrutura do v7 (Q3) | 18/10/2026 |
+| Pedido de acesso | **só por pessoa** na v1 (Q4) | 18/10/2026 |
 
 Regras do projeto que valem aqui sem exceção:
 - nada impede o trabalho de campo;
@@ -83,9 +89,39 @@ Mesmo desenho do DIMA, já testado em campo:
 - modo treino (`treino`, código `TRE-`), fora de todo indicador;
 - histórico de status imutável.
 
-**1º instrumento (opcional):** carregar a *estrutura* do questionário v7 do
-DIMA (DSA, 91 perguntas) como `rascunho` de um departamento a definir. O dono
-revisa e publica. Nenhuma ficha vem junto.
+**Nada vem do DIMA** (decisão de 18/10/2026): cada departamento escreve o seu
+instrumento do zero. A lista do domicílio mora em `socio_fichas.linhas` (jsonb,
+sem identificação) e em `socio_fichas_identificacao.linhas` (as colunas marcadas
+`identificacao`) — sem tabela de moradores, para nunca precisar apagar linha ao
+reenviar.
+
+### 1.5 Formato da estrutura (o "questionário como dado")
+```json
+{
+  "identificacao": {"nome": "nao|opcional", "gps": "nao|opcional"},
+  "texto_max_len": 2000, "outro_max_len": 120,
+  "lista": {"titulo": "...", "max_linhas": 30, "minimo": 1, "marca_entrevistado": true,
+            "colunas": [{"chave": "idade", "rotulo": "Idade", "tipo": "unica|inteiro|texto|booleano",
+                         "opcoes": [{"v": "...", "r": "...", "nivel": "..."}], "min": 0, "max": 120,
+                         "max_len": 120, "identificacao": false}]},
+  "coerencia": [{"tipo": "igual_total_linhas", "chave": "qtd_moradores"},
+                {"tipo": "nega_linha", "chave": "atividades_mulheres", "valor": "nao_ha_mulheres",
+                 "onde": {"coluna": "sexo", "op": "=", "valor": "mulher"}}],
+  "blocos": [{"id": "agua", "titulo": "Água", "perguntas": [
+    {"n": 8, "rotulo": "8", "chave": "agua_fonte", "tipo": "unica|multipla|inteiro|decimal|texto|texto_longo|tabela",
+     "texto": "...", "opcoes": [{"v": "outro", "r": "Outro", "especificar": true, "exclusiva": false}],
+     "mostrar_se": {"se": "chave_anterior", "op": "=|!=|in|contem|nao_contem", "valor": "..."},
+     "opcional": false, "min": 0, "max": 10, "aviso_min": 18, "aviso_max": 15, "max_len": 80, "max_marcar": 3,
+     "derivada": {"tipo": "total_linhas"}}]}]
+}
+```
+- `mostrar_se` aceita `{"todas": [...]}`; só referencia pergunta **anterior**.
+- `derivada`: `total_linhas` (inteiro), `existe_linha` + `onde` (única com sim/não),
+  `maior_nivel` + `coluna` (única; `nivel` da opção da coluna = opção da pergunta).
+- `onde` (filtro de linha): `=`, `!=`, `in`, `entre` `[mín, máx]`; valor ausente só casa com `!=`.
+- A pergunta `tipo: "tabela"` só marca ONDE a lista aparece (uma por questionário).
+- Conferência: `fn_socio_validar_estrutura(jsonb)` devolve a lista de erros legíveis;
+  rascunho salva com erro, publicar não.
 
 ---
 
@@ -177,9 +213,23 @@ todos (sem `modulo:` de gate). As páginas são:
 
 ---
 
-## 6. Perguntas em aberto
+## 6. Perguntas — respondidas em 18/10/2026
 
-- **Q1** — super_admin lê fichas identificadas de qualquer departamento (como no resto do SIGUC) ou também precisa pedir (§2.5)? *Proposta: precisa pedir.*
-- **Q2** — Chefia acima (diretoria, secretaria) vê só agregados (§2.2) ou também fichas sem identificação? *Proposta: só agregados.*
-- **Q3** — Quem é o departamento dono do 1º instrumento (o DSA do DIMA), ou ele nem deve ser carregado?
-- **Q4** — Pedido de acesso pode ser por **departamento inteiro** (vale para todos de lá) ou só por **pessoa**? *Proposta: só pessoa na v1.*
+As 4 propostas foram aceitas: super_admin pede para ler ficha (Q1), chefia acima
+vê só agregados (Q2), nada vem do DIMA (Q3), pedido só por pessoa (Q4).
+
+## 7. Desvios da proposta, decididos ao codar (Fase 1)
+
+- **Log de `lgpd_acesso_dado_terceiro` não foi criado** (§4): pela regra final,
+  ninguém de outro departamento lê identificação — nem o leitor, nem o aplicador
+  de fora (só a da própria ficha). Não há leitura de terceiro para registrar.
+- **Notificação usa `tipo = 'sistema'`** com `meta.modulo = 'socio'` e
+  `meta.subtipo` (acesso_pedido/aprovado/recusado/revogado, acesso_sem_gestor,
+  ficha_devolvida): evita uma migration só de `ALTER TYPE ... ADD VALUE`.
+- **Fichas fora da trilha de auditoria**: a trilha copia a linha inteira e o
+  super_admin a lê — seria ler ficha sem pedir. O histórico de status
+  (`socio_fichas_historico`) cobre a ficha.
+- **Bucket `socio-fotos` fica para a Fase 3** (app de campo). A RPC de envio já
+  confere o caminho `socio-fotos/<uuid_cliente da ficha>/…`.
+- **Departamento sem chefe nem gestor**: pedido de acesso avisa o super_admin,
+  que designa um gestor (`socio_definir_papel`, com justificativa na trilha).
