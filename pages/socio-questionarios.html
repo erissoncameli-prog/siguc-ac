@@ -332,7 +332,10 @@ function renderLista() {
         <button class="soc-aba" role="tab" id="aba-pedidos" aria-selected="${_aba === 'pedidos'}" onclick="mudarAba('pedidos')">Pedidos
           ${recebidos ? `<span class="soc-contador" aria-label="${recebidos} aguardando sua decisão">${recebidos}</span>` : ''}</button>
       </div>
-      ${(_deps.length) ? `<button class="btn btn-primary" type="button" onclick="abrirNovo()">${bico('plus')} Novo questionário</button>` : ''}
+      <div class="soc-acoes">
+        <a class="btn btn-secondary" href="socio-app.html" target="_blank" rel="noopener">${bico('smartphone')} App de campo</a>
+        ${(_deps.length) ? `<button class="btn btn-primary" type="button" onclick="abrirNovo()">${bico('plus')} Novo questionário</button>` : ''}
+      </div>
     </div>
     <div id="soc-conteudo"></div>`
   renderAba()

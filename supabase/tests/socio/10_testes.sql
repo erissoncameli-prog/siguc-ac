@@ -325,6 +325,56 @@ select pg_temp.erro('tdebio', format($$select socio_enviar_ficha(jsonb_build_obj
   'questionario_id',%L,'campanha_id',%L,'cd_mun','1200401','finalizada_em',now(),'aviso_lido',true,'aceitou_participar',true,'respostas','{}'::jsonb))$$,
   pg_temp.id('dsa_v2'), pg_temp.id('camp')), 'socio:questionario_invalido');
 
+-- ── 7b. App de campo (363): pacote offline e bucket de fotos ────────────
+select pg_temp.como('tdeuc');
+create temp table t_pac as select socio_app_pacote() p;
+select pg_temp.raiz();
+select pg_temp.ok((select jsonb_array_length(p->'campanhas') = 1 and (p->'campanhas'->0->>'aceita_nova')::boolean
+                     and p->'campanhas'->0->'questionario'->>'id' = pg_temp.id('dsa_v1')::text from t_pac),
+                  'pacote: campanha da equipe, com a versão do questionário');
+select pg_temp.ok((select jsonb_array_length(p->'treino') = 1 and jsonb_array_length(p->'municipios') = 3 from t_pac),
+                  'pacote: instrumento de treino e municípios');
+select pg_temp.ok((select jsonb_array_length(p->'minhas_fichas') = (select count(*) from socio_fichas where entrevistador_id = pg_temp.u('tdeuc'))
+                            and (p->'minhas_fichas')::text like '%DSA-261018-AB12-01%' and (p->'minhas_fichas')::text like '%TRE-%'
+                            and (p->'minhas_fichas')::text not like '%CD34%' from t_pac),
+                  'pacote: só as fichas da própria pessoa (reais e de treino)');
+select pg_temp.como('sem');
+select pg_temp.ok((select jsonb_array_length(socio_app_pacote()->'campanhas') = 0 and jsonb_array_length(socio_app_pacote()->'treino') = 0),
+                  'sem lotação: pacote vazio');
+select pg_temp.raiz();
+select pg_temp.erro('', $$select socio_app_pacote()$$, 'socio:nao_autorizado');
+select pg_temp.erro('inativo', $$select socio_app_pacote()$$, 'socio:nao_autorizado');
+
+select pg_temp.ok(fn_socio_foto_pasta('11111111-0000-0000-0000-000000000001/a.webp') = '11111111-0000-0000-0000-000000000001'::uuid
+                  and fn_socio_foto_pasta('x/a.webp') is null
+                  and fn_socio_foto_pasta('11111111-0000-0000-0000-000000000001/s/a.webp') is null
+                  and fn_socio_foto_pasta('11111111-0000-0000-0000-000000000001/') is null, 'pasta da foto = uuid da ficha, sem subpasta');
+create function pg_temp.envia(quem text, nome text) returns boolean language plpgsql as $$
+declare r boolean;
+begin perform pg_temp.como(quem); r := fn_socio_foto_pode_enviar(nome); perform pg_temp.raiz(); return r; end $$;
+create function pg_temp.le(quem text, nome text) returns boolean language plpgsql as $$
+declare r boolean;
+begin perform pg_temp.como(quem); r := fn_socio_foto_pode_ler(nome); perform pg_temp.raiz(); return r; end $$;
+grant execute on all functions in schema pg_temp to authenticated;
+select pg_temp.ok(pg_temp.envia('tdeuc', '99999999-0000-0000-0000-000000000001/a.webp'), 'aplicador sobe foto antes da ficha existir');
+select pg_temp.ok(pg_temp.envia('tdeuc', '11111111-0000-0000-0000-000000000001/b.webp'), 'entrevistador sobe foto na própria ficha');
+select pg_temp.ok(not pg_temp.envia('tdebio', '11111111-0000-0000-0000-000000000001/b.webp'), 'ninguém sobe foto na ficha de outro');
+select pg_temp.ok(not pg_temp.envia('sem', '99999999-0000-0000-0000-000000000001/a.webp'), 'sem papel não sobe foto');
+select pg_temp.ok(not pg_temp.envia('tdeuc', 'solta.webp'), 'foto fora de pasta de ficha é recusada');
+select pg_temp.ok(pg_temp.le('tdeuc', '11111111-0000-0000-0000-000000000001/a.webp'), 'entrevistador vê a foto da própria ficha');
+select pg_temp.ok(pg_temp.le('tduc', '11111111-0000-0000-0000-000000000001/a.webp'), 'gestor vê a foto');
+select pg_temp.ok(not pg_temp.le('tdebio', '11111111-0000-0000-0000-000000000001/a.webp'), 'leitor de outro departamento não vê a foto');
+select pg_temp.ok(not pg_temp.le('admin', '11111111-0000-0000-0000-000000000001/a.webp'), 'super_admin não vê a foto sem pedir');
+select pg_temp.ok(not pg_temp.le('tdeuc', '99999999-0000-0000-0000-000000000001/a.webp'), 'foto sem ficha ainda não é lida por ninguém');
+-- a policy de verdade no storage.objects
+select pg_temp.como('tdeuc');
+insert into storage.objects (bucket_id, name) values ('socio-fotos', '99999999-0000-0000-0000-000000000001/a.webp');
+select pg_temp.raiz();
+select pg_temp.erro('sem', $$insert into storage.objects (bucket_id, name) values ('socio-fotos', '99999999-0000-0000-0000-000000000002/a.webp')$$,
+                    'row-level security');
+select pg_temp.ok(pg_temp.conta('tdeuc', 'socio_fotos') = 1, 'conferência: foto registrada continua visível ao entrevistador');
+select pg_temp.ok(exists (select 1 from storage.buckets where id = 'socio-fotos' and not public), 'bucket socio-fotos é privado');
+
 -- ── 8. Quem vê quais fichas ─────────────────────────────────────────────
 -- fichas reais: f1 (tdeuc), f2 (tdebio), f_recusa (tdeuc); treino: f_treino (tdeuc)
 select pg_temp.ok(pg_temp.conta('chefe',  'socio_fichas') = 4, 'gestor vê todas, inclusive treino');

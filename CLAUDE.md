@@ -4883,10 +4883,31 @@ retenção são as Fases 2–5. Nada veio do DIMA (nem fichas, nem estrutura).
   memória; contrafactual conferido). `tests/sidebar-grupos.test.js` passou a
   esperar 'socio' depois de 'principal'.
 - `pwa/sw.js`: frota 113 → 114 (`js/layout.js` está no shell do Frota).
+- **App de campo — Fase 3** (`pages/socio-app.html`, migration 363; detalhe em
+  §8 do plano): 5º app offline, PWA com escopo próprio (`VERSOES.socio`,
+  `SHELLS.socio`; sem APK ainda — o `apk-auto-trigger.yml` só avisa e pula app
+  sem workflow). Login SIGUC + PIN (`pin-baralho`), cliente isolado com sessão em
+  `localStorage['siguc-socio-session']`. Tudo vem de `socio_app_pacote()` (uma
+  chamada; guardado no IndexedDB `siguc_socio_v1`) e a ficha guarda a CÓPIA da
+  versão aplicada. Formulário desenhado da estrutura por `js/socio-form.js`
+  (salto, lista, derivada, especifique, "Não respondeu"; nenhuma regra própria —
+  tudo de `js/socio-regras.js`); armazenamento em `js/socio-offline.js` (fotos
+  como BYTES, nunca Blob — iPhone); fila em `js/socio-sync.js`: foto antes da
+  ficha em `socio-fotos/<uuid_cliente>/…`, depois `socio_enviar_ficha`
+  (idempotente). Erro `socio:<codigo>` → ficha "Com problema", com Corrigir;
+  outro erro → segue pendente. Correção mantém uuid, código e `finalizada_em`.
+  ⚠️ `FileList` de `<input type=file>` é VIVA: zerar o `value` antes de ler
+  esvazia a lista — copiar com `Array.from` primeiro (bug real achado no teste).
+  Guarda: `tests/socio-app.test.js` (8, página real + Supabase falso + "internet"
+  ligada/desligada por `page.route`; contrafactual conferido) e o bloco 7b do
+  `supabase/tests/socio/10_testes.sql` (pacote e policies do bucket).
+  `pwa/sw.js`: socio 1 (novo).
 
 ## Próxima tarefa
-**Diagnóstico Socioeconômico** — Fases 1 e 2 entregues; próxima é a Fase 3
-(app de campo offline + bucket `socio-fotos`), em `docs/socioeconomico/plano.md` §3/§5.
+**Diagnóstico Socioeconômico** — Fases 1, 2 e 3 entregues; próxima é a Fase 4
+(campanhas e validação na mesa), em `docs/socioeconomico/plano.md` §5. Hoje a
+campanha só se cria pela RPC `socio_salvar_campanha` — sem tela, o app de campo
+não tem o que mostrar.
 
 **Recursos Hídricos e Qualidade Ambiental (DERHQA)** — Fases A, B e C
 ENTREGUES (ver "Recursos Hídricos — Fase B" e "— Fase C" acima).

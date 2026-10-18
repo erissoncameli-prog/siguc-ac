@@ -3,7 +3,9 @@
 > **Status:** Fase 1 ENTREGUE (18/10/2026) — migrations 362/362b/362c aplicadas em
 > produção, `js/socio-regras.js`, testes em `supabase/tests/socio/rodar.sh`.
 > Fase 2 ENTREGUE (18/10/2026) — `pages/socio-questionarios.html` (mesa: catálogo,
-> versões com editor e pré-visualização, equipe, pedidos de acesso). Fases 3–5 a fazer.
+> versões com editor e pré-visualização, equipe, pedidos de acesso).
+> Fase 3 ENTREGUE (18/10/2026) — `pages/socio-app.html` (app de campo offline, PWA),
+> migration 363 (bucket `socio-fotos` + `socio_app_pacote()`). Fases 4–5 a fazer.
 > **Origem:** o Diagnóstico Socioambiental do dima-plataforma (`diag_*`,
 > migrations `20260926_diag_01` a `20261009_diag_20`). O desenho e as regras
 > vêm de lá. O código é portado e adaptado ao SIGUC, não copiado às cegas.
@@ -234,3 +236,39 @@ vê só agregados (Q2), nada vem do DIMA (Q3), pedido só por pessoa (Q4).
   confere o caminho `socio-fotos/<uuid_cliente da ficha>/…`.
 - **Departamento sem chefe nem gestor**: pedido de acesso avisa o super_admin,
   que designa um gestor (`socio_definir_papel`, com justificativa na trilha).
+
+## 8. Fase 3 — app de campo (18/10/2026)
+
+- **Uma chamada traz tudo**: `socio_app_pacote()` devolve campanhas em que a
+  pessoa está na equipe (abertas, ou encerradas ainda nos 15 dias de carência —
+  `aceita_nova` diz se pode começar entrevista nova), a versão do questionário de
+  cada uma (estrutura + aviso + hash), instrumentos em que pode treinar (versão
+  mais nova não arquivada, rascunho incluído), comunidades, municípios, UCs e as
+  próprias fichas dos últimos 120 dias (para mostrar devolvida/validada). Fica
+  guardado no aparelho; o app abre e entrevista sem rede.
+- **A ficha guarda a cópia da versão com que foi aplicada**: mudar o pacote
+  depois (versão nova publicada) não altera entrevista em andamento.
+- **Foto sobe antes da ficha** para `socio-fotos/<uuid_cliente da ficha>/<uuid
+  da foto>.<ext>`. A policy de envio aceita pasta de ficha que ainda não existe
+  (para quem pode treinar ou aplicar algum instrumento) e, se a ficha existe, só
+  do próprio entrevistador e com a ficha enviada ou devolvida. Leitura = quem lê
+  a identificação. Sem policy de alteração nem de remoção: reenvio que acha o
+  arquivo trata o 409 como sucesso; expurgo é da Fase 5.
+- **Erro `socio:<codigo>` = problema de conteúdo** (fora do período, sem
+  permissão…): a ficha vai para "Com problema" com o texto do banco e um botão
+  Corrigir; nunca some. Outro erro (rede, sessão) = continua pendente e a fila
+  tenta de novo (ao abrir, ao voltar a rede, ao voltar do segundo plano e a cada
+  minuto). `codigo_duplicado` gera outro código e reenvia uma vez.
+- **Correção mantém uuid, código e `finalizada_em`** — o banco confere o período
+  pela hora em que a entrevista terminou, não pela hora da correção.
+- **Nada obrigatório para avançar** nos blocos: pendência aparece na revisão e o
+  banco a guarda como alerta. Só se trava o que o banco recusaria de qualquer
+  jeito (município/UC exigidos pela campanha, aviso lido, aceite) e valor que a
+  estrutura não aceita (fora do intervalo) — este mostrado na revisão.
+- **Identificação só quando o instrumento pede** (`identificacao.nome/gps`): o
+  app nem mostra o campo, e o envio não manda o que não foi pedido.
+- Aviso de campo do aplicador (`lgpd-campo`, slug `socio`): sem documento
+  cadastrado o app segue (fail-open). Cadastrar o texto em `lgpd_documentos`
+  (`tipo = 'aviso_campo'`, `app = 'socio'`) quando a redação estiver pronta.
+- **Ainda não**: APK (`app-socio/`), guia de treinamento (motor `guia-app`),
+  página de instalação, GPS contínuo (só leitura pontual, por decisão), áudio.

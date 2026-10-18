@@ -22,13 +22,15 @@ PSQL=(psql -h "$TMP" -p "$PORTA" -U postgres -d postgres -v ON_ERROR_STOP=1 -q -
 "${PSQL[@]}" -f "$DIR/00_stub.sql"
 for f in "$RAIZ"/supabase/migrations/362_socio_estrutura.sql \
          "$RAIZ"/supabase/migrations/362b_socio_interpretador.sql \
-         "$RAIZ"/supabase/migrations/362c_socio_rpcs.sql; do
+         "$RAIZ"/supabase/migrations/362c_socio_rpcs.sql \
+         "$RAIZ"/supabase/migrations/363_socio_app_campo.sql; do
   echo "· aplicando $(basename "$f")"
   "${PSQL[@]}" -f "$f"
 done
 # idempotência: reaplicar não pode falhar nem duplicar o ROPA
 for f in "$RAIZ"/supabase/migrations/362b_socio_interpretador.sql \
-         "$RAIZ"/supabase/migrations/362c_socio_rpcs.sql; do
+         "$RAIZ"/supabase/migrations/362c_socio_rpcs.sql \
+         "$RAIZ"/supabase/migrations/363_socio_app_campo.sql; do
   "${PSQL[@]}" -f "$f"
 done
 

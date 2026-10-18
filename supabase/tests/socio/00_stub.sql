@@ -46,7 +46,7 @@ create table public.usuario_lotacoes (
   data_inicio date not null default current_date - 30, data_fim date);
 
 create table public.municipios_acre (cd_ibge text primary key, nome text not null);
-create table public.unidades_conservacao (id uuid primary key default gen_random_uuid(), nome text not null);
+create table public.unidades_conservacao (id uuid primary key default gen_random_uuid(), nome text not null, sigla text, ativo boolean default true);
 
 create table public.notificacoes (
   id uuid primary key default gen_random_uuid(), tipo public.tipo_notificacao not null,
@@ -115,3 +115,11 @@ $$;
 -- PUBLIC padrão do Postgres faz o mesmo papel para os testes de REVOKE
 grant select on all tables in schema public to anon, authenticated;
 revoke select on public.trilha_teste from anon, authenticated;
+
+-- Storage mínimo (migration 363: bucket socio-fotos e suas policies)
+create schema if not exists storage;
+grant usage on schema storage to anon, authenticated;
+create table storage.buckets (id text primary key, name text, public boolean, file_size_limit bigint, allowed_mime_types text[]);
+create table storage.objects (id uuid primary key default gen_random_uuid(), bucket_id text, name text, owner uuid default auth.uid());
+alter table storage.objects enable row level security;
+grant select, insert on storage.objects to authenticated;
