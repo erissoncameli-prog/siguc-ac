@@ -1099,6 +1099,21 @@ federais do AC, 110 polígonos, SIRGAS 2000), enviado por Pedro Henrique em
 - PA Porto Alonso e PA Bandeirante (Porto Acre) têm ~42% do polígono fora do
   limite do Acre de `data/acre_estado.geojson` — dado da fonte, não recortado.
 - Sem dado pessoal no arquivo (só o projeto) → fora do ROPA.
+- **CAR por assentamento** (18/10/2026): 3º modo da guia do CAR ("Por
+  Assentamento", `carregarDadosCARAssentamento(cd_sipra)` em `pages/mapa.html`),
+  mesmo caminho da carga por UC — WFS do SICAR no retângulo do PA + só o que
+  toca o polígono (`turf.booleanIntersects`); "Incluir entorno" = retângulo
+  inteiro (`_carPaBbox`, cache por `pa_<sipra>_<poli|bbox>`). Lista agrupada
+  por modalidade (`_popularFiltroCarPA`, lê `paCarregar`). Resumo por tipo do
+  cadastro (`_carPaTiposHTML`): AST = o assentamento inteiro, IRU = lotes por
+  cima — a nota diz que essa sobreposição é esperada. Detalhe do imóvel mostra
+  "Assentamento (INCRA)" (`_carPaAtual`; zerado ao trocar de modo e na
+  consulta). Botão "Ver CARs deste assentamento" na janela do PA
+  (`data-pa-car`, delegação em `js/mapa-assentamentos.js` →
+  `carAbrirAssentamento`). Sem log LGPD novo: a camada mostra o mesmo dado
+  público do WFS que os outros modos (nome/CPF só pela `car_consultar_local`).
+  Guarda: `tests/mapa-car-assentamento.test.js` (4, página real com o SICAR
+  trocado por stub montado com o próprio polígono).
 - Guarda: `tests/mapa-assentamentos.test.js` (6) + harness
   `tests/fixtures/mapa-assentamentos-harness.html` (`PA_GEOJSON_URL` aponta o
   arquivo a partir do harness). Sem mudança em `pwa/sw.js` (tela de mesa).
