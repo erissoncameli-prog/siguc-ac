@@ -49,6 +49,14 @@
 .areas-sec-head.uc{border-left:3px solid #1F4E2C;}
 .areas-sec-head.ti{border-left:3px solid #d97706;}
 .areas-sec-head.pa{border-left:3px solid #6D28D9;}
+.pa-btn-car{margin-top:8px;width:100%;min-height:30px;background:#6D28D9;color:#fff;border:none;border-radius:6px;font:600 11.5px 'DM Sans',sans-serif;cursor:pointer}
+.pa-btn-car:hover{background:#5B21B6}
+.pa-btn-car:focus-visible{outline:2px solid #FACC15;outline-offset:2px}
+.car-pa-tipos{margin-top:8px;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:8px;padding:7px 9px;font-size:11px;color:#4C1D95}
+.car-pa-tipos-l{display:flex;flex-wrap:wrap;gap:4px 10px}
+.car-pa-tipo b{font-variant-numeric:tabular-nums}
+.car-pa-tipo small{color:#6b7280;font-size:10px}
+.car-pa-nota{margin-top:5px;color:#5B21B6;font-size:10.5px;line-height:1.35}
 .pa-resumo{display:flex;gap:6px;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:8px;padding:8px 10px;margin-top:10px}
 .pa-resumo>div{flex:1;text-align:center;display:flex;flex-direction:column;gap:2px}
 .pa-resumo b{font-size:15px;font-weight:700;color:#5B21B6;line-height:1;font-variant-numeric:tabular-nums}
@@ -1950,9 +1958,9 @@ function _renderDropdown(id){
         ⚙ Configurar
       </button>
     </div>
-    <p style="font-size:11px;color:var(--cinza-500);margin:0 0 10px">Dados públicos do SICAR. Carregamento por UC ou município.</p>
+    <p style="font-size:11px;color:var(--cinza-500);margin:0 0 10px">Dados públicos do SICAR. Carregamento por UC, município ou assentamento.</p>
     <div id="car-filtros-wrap" style="display:none;flex-direction:column;gap:8px">
-      <div style="display:flex;gap:4px">
+      <div style="display:flex;gap:4px;flex-wrap:wrap">
         <label style="display:flex;align-items:center;gap:5px;font-size:11px;cursor:pointer;background:var(--cinza-50);border:1px solid var(--borda);border-radius:var(--raio);padding:4px 8px;flex:1;justify-content:center">
           <input type="radio" name="car-modo" value="uc" checked style="accent-color:#1F4E2C;width:12px;height:12px" onchange="carModoChange('uc')">
           Por UC
@@ -1960,6 +1968,10 @@ function _renderDropdown(id){
         <label style="display:flex;align-items:center;gap:5px;font-size:11px;cursor:pointer;background:var(--cinza-50);border:1px solid var(--borda);border-radius:var(--raio);padding:4px 8px;flex:1;justify-content:center">
           <input type="radio" name="car-modo" value="municipio" style="accent-color:#1F4E2C;width:12px;height:12px" onchange="carModoChange('municipio')">
           Por Município
+        </label>
+        <label style="display:flex;align-items:center;gap:5px;font-size:11px;cursor:pointer;background:var(--cinza-50);border:1px solid var(--borda);border-radius:var(--raio);padding:4px 8px;flex:1;justify-content:center">
+          <input type="radio" name="car-modo" value="pa" style="accent-color:#1F4E2C;width:12px;height:12px" onchange="carModoChange('pa')">
+          Por Assentamento
         </label>
       </div>
       <div id="car-wrap-uc">
@@ -1971,6 +1983,17 @@ function _renderDropdown(id){
           <input type="checkbox" id="car-bbox-mode" style="accent-color:#1F4E2C;width:12px;height:12px" onchange="carBboxModeChange(this.checked)">
           Ampliar para BBOX da UC (inclui entorno)
         </label>
+      </div>
+      <div id="car-wrap-pa" style="display:none">
+        <label style="font-size:11px;font-weight:600;color:var(--cinza-600);display:block;margin-bottom:4px">Projeto de Assentamento (INCRA):</label>
+        <select id="car-sel-pa" style="width:100%;font-size:12px;padding:5px 8px;border:1px solid var(--borda);border-radius:var(--raio)" onchange="carregarDadosCARAssentamento(this.value)">
+          <option value="">Selecione um assentamento...</option>
+        </select>
+        <label style="display:flex;align-items:center;gap:5px;font-size:11px;margin-top:6px;cursor:pointer;color:var(--cinza-600)">
+          <input type="checkbox" id="car-pa-bbox" style="accent-color:#1F4E2C;width:12px;height:12px" onchange="carPaBboxChange(this.checked)">
+          Incluir entorno (retângulo do assentamento)
+        </label>
+        <div id="car-pa-tipos" class="car-pa-tipos" style="display:none"></div>
       </div>
       <div id="car-wrap-mun" style="display:none">
         <label style="font-size:11px;font-weight:600;color:var(--cinza-600);display:block;margin-bottom:4px">Município:</label>
@@ -5747,6 +5770,9 @@ async function toggleCamadaCAR(el){
   const wrapMun = document.getElementById('car-wrap-mun');
   if(wrapUC)  wrapUC.style.display  = _carModo === 'uc' ? '' : 'none';
   if(wrapMun) wrapMun.style.display = _carModo === 'municipio' ? '' : 'none';
+  const wrapPa  = document.getElementById('car-wrap-pa');
+  if(wrapPa)  wrapPa.style.display  = _carModo === 'pa' ? '' : 'none';
+  if(_carModo === 'pa') _popularFiltroCarPA();
 }
 
 // Calcula BBOX [minX,minY,maxX,maxY] de uma UC
@@ -5853,7 +5879,9 @@ async function carregarDadosCAR(ucNome){
 }
 
 // ── CAR por município ─────────────────────────────────────────────────────
-let _carModo = 'uc';     // 'uc' | 'municipio'
+let _carModo = 'uc';     // 'uc' | 'municipio' | 'pa'
+let _carPaBbox = false;  // assentamento: false = só o que toca o polígono; true = retângulo inteiro
+let _carPaAtual = null;  // cd_sipra do assentamento carregado (detalhe do imóvel mostra o nome)
 let _carBboxMode = false; // false = centroide dentro da UC; true = BBOX completa
 let _municipiosGeojson = null;
 
@@ -5863,7 +5891,11 @@ function carModoChange(modo){
   const wrapMun = document.getElementById('car-wrap-mun');
   if(wrapUC)  wrapUC.style.display  = modo === 'uc' ? '' : 'none';
   if(wrapMun) wrapMun.style.display = modo === 'municipio' ? '' : 'none';
+  const wrapPa  = document.getElementById('car-wrap-pa');
+  if(wrapPa)  wrapPa.style.display  = modo === 'pa' ? '' : 'none';
   if(modo === 'municipio') _popularFiltroMunicipio();
+  if(modo === 'pa') _popularFiltroCarPA();
+  if(modo !== 'pa'){ _carPaAtual = null; const t=document.getElementById('car-pa-tipos'); if(t){ t.style.display='none'; t.innerHTML=''; } }
   // Limpa camada ao trocar modo
   if(_carLayer){ mapaL.removeLayer(_carLayer); _carLayer = null; }
   _carFeatures = [];
@@ -5982,6 +6014,122 @@ async function carregarDadosCARMunicipio(munNome){
   }finally{
     _carCarregando = false;
   }
+}
+
+// ── CAR por Projeto de Assentamento (INCRA) ──────────────────────────────
+// Mesmo caminho da carga por UC: pede ao SICAR o retângulo do assentamento
+// e mantém só o que toca o polígono (turf.booleanIntersects). O polígono vem
+// da camada de assentamentos (js/mapa-assentamentos.js, paCarregar).
+async function _popularFiltroCarPA(){
+  const sel = document.getElementById('car-sel-pa'); if(!sel) return;
+  if(sel.options.length > 1) return;
+  const gj = typeof paCarregar === 'function' ? await paCarregar() : null;
+  const feats = gj?.features || [];
+  if(!feats.length){ sel.innerHTML = '<option value="">Assentamentos indisponíveis</option>'; return; }
+  const grupos = {};
+  feats.forEach(f=>{ const p=f.properties||{}; (grupos[p.modalidade||'Outro'] = grupos[p.modalidade||'Outro'] || []).push(p); });
+  const ordem = ['PA','PAE','PDS','PAF','Outro'];
+  let html = '<option value="">Selecione um assentamento...</option>';
+  ordem.forEach(m=>{
+    const g = grupos[m]; if(!g?.length) return;
+    g.sort((a,b)=>(a.nome||'').localeCompare(b.nome||'','pt-BR'));
+    const rot = (typeof PA_MODALIDADES!=='undefined' && PA_MODALIDADES[m]) ? `${m} — ${PA_MODALIDADES[m]}` : m;
+    html += `<optgroup label="${escHtml(rot)}">` + g.map(p=>`<option value="${escHtml(p.cd_sipra||'')}">${escHtml(p.nome_completo||p.nome)}${p.municipio?' · '+escHtml(p.municipio):''}</option>`).join('') + '</optgroup>';
+  });
+  sel.innerHTML = html;
+}
+
+function carPaBboxChange(checked){
+  _carPaBbox = !!checked;
+  const v = document.getElementById('car-sel-pa')?.value;
+  if(v) carregarDadosCARAssentamento(v);
+}
+
+// Contagem por tipo do cadastro: em assentamento é comum UM CAR do
+// assentamento inteiro (AST) com os lotes (IRU) por cima — o resumo diz isso
+// em vez de parecer sobreposição sem explicação.
+function _carPaTiposHTML(feats){
+  const cont = {};
+  feats.forEach(f=>{ const t=(f.properties?.tipo_imovel||'—').toString().trim().toUpperCase() || '—'; cont[t]=(cont[t]||0)+1; });
+  const NOME = { IRU:'Imóvel rural', AST:'Assentamento', PCT:'Povos e comunidades tradicionais' };
+  const ordem = ['AST','IRU','PCT'];
+  const chaves = [...ordem.filter(k=>cont[k]), ...Object.keys(cont).filter(k=>!ordem.includes(k)).sort()];
+  const itens = chaves.map(k=>`<span class="car-pa-tipo"><b>${cont[k]}</b> ${escHtml(k)}${NOME[k]?' <small>'+NOME[k]+'</small>':''}</span>`).join('');
+  const nota = cont.AST && cont.IRU
+    ? '<div class="car-pa-nota">AST é o cadastro do assentamento inteiro; os IRU são lotes inscritos por cima dele — a sobreposição é esperada.</div>'
+    : '';
+  return `<div class="car-pa-tipos-l">${itens}</div>${nota}`;
+}
+
+async function carregarDadosCARAssentamento(cdSipra){
+  if(!cdSipra) return;
+  if(_carCarregando) return;
+  const statusEl = document.getElementById('car-status-txt');
+  const setStatus = html => { if(statusEl) statusEl.innerHTML = html; };
+  const tiposEl = document.getElementById('car-pa-tipos');
+  const gj = typeof paCarregar === 'function' ? await paCarregar() : null;
+  const feat = (gj?.features||[]).find(f=>f.properties?.cd_sipra === cdSipra);
+  if(!feat?.geometry){ setStatus('⚠ Assentamento não encontrado na camada do INCRA'); return; }
+  const rotulo = feat.properties.nome_completo || feat.properties.nome || cdSipra;
+
+  const fim = (feats, cache) => {
+    _carFeatures = feats; _carUCAtual = rotulo; _carPaAtual = cdSipra;
+    _aplicarCamadaCAR();
+    const n = feats.length;
+    setStatus(n ? `✅ <strong>${n}</strong> imóvel(is) em ${escHtml(rotulo)}${cache?' (cache)':''}`
+                : `⚠ Nenhum imóvel CAR encontrado em <strong>${escHtml(rotulo)}</strong>${_carPaBbox?'':' <span style="color:var(--cinza-400)">(tente "Incluir entorno")</span>'}`);
+    const badge = document.getElementById('car-count-badge');
+    if(badge){ badge.textContent = n; badge.style.display = n ? '' : 'none'; }
+    if(tiposEl){ tiposEl.innerHTML = n ? _carPaTiposHTML(feats) : ''; tiposEl.style.display = n ? '' : 'none'; }
+    if(n && mapaL){ try{ mapaL.fitBounds(_carLayer.getBounds(),{padding:[20,20]}); }catch(e){} }
+  };
+
+  const cacheKey = `pa_${cdSipra}_${_carPaBbox?'bbox':'poli'}`;
+  if(_carCacheUC.has(cacheKey)){ fim(_carCacheUC.get(cacheKey), true); return; }
+
+  let bb;
+  try{ bb = turf.bbox(feat); }catch(e){ setStatus('⚠ Geometria do assentamento inválida'); return; }
+  const bbox = `${bb[0]},${bb[1]},${bb[2]},${bb[3]},EPSG:4326`;
+  _carCarregando = true;
+  setStatus(`⏳ Buscando imóveis CAR em <strong>${escHtml(rotulo)}</strong>...`);
+  try{
+    const base = `${CAR_WFS_BASE}?service=WFS&version=1.1.0&request=GetFeature`
+               + `&typeName=sicar:sicar_imoveis_ac&outputFormat=application/json&BBOX=${bbox}&maxFeatures=${CAR_PAGE}`;
+    const res0 = await _carFetchJson(`${base}&startIndex=0`);
+    const total = res0.numberMatched || res0.totalFeatures || (res0.features||[]).length;
+    const features = [...(res0.features||[])];
+    if(total > CAR_PAGE){
+      const npages = Math.ceil(total / CAR_PAGE);
+      setStatus(`⏳ Carregando ${npages} páginas de imóveis em ${escHtml(rotulo)}...`);
+      const pages = await Promise.all(Array.from({length:npages-1}, (_,i)=>_carFetchJson(`${base}&startIndex=${(i+1)*CAR_PAGE}`)));
+      pages.forEach(pg => features.push(...(pg.features||[])));
+    }
+    let dentro = features;
+    if(!_carPaBbox && typeof turf?.booleanIntersects === 'function'){
+      dentro = features.filter(f=>{ if(!f.geometry) return false; try{ return turf.booleanIntersects(f, feat); }catch(e){ return false; } });
+    }
+    if(dentro.length) _carCacheUC.set(cacheKey, dentro);
+    await _carregarMarcados();
+    fim(dentro, false);
+  }catch(err){
+    setStatus(`⚠ Erro ao carregar CAR: ${escHtml(String(err.message||err).substring(0,120))}`);
+  }finally{
+    _carCarregando = false;
+  }
+}
+
+// Atalho da janela do assentamento ("Ver CARs deste assentamento"):
+// liga a camada CAR, passa para o modo assentamento e carrega.
+async function carAbrirAssentamento(cdSipra){
+  try{ mapaL?.closePopup(); }catch(e){}
+  const toggle = document.getElementById('car-toggle');
+  if(toggle && !toggle.checked){ toggle.checked = true; await toggleCamadaCAR(toggle); }
+  const radio = document.querySelector('input[name="car-modo"][value="pa"]');
+  if(radio) radio.checked = true;
+  if(_carModo !== 'pa') carModoChange('pa');
+  await _popularFiltroCarPA();
+  const sel = document.getElementById('car-sel-pa'); if(sel) sel.value = cdSipra;
+  await carregarDadosCARAssentamento(cdSipra);
 }
 
 // ── Estado extra CAR ─────────────────────────────────────────────────────
@@ -6268,6 +6416,7 @@ async function confirmarConsultaCAR(){
     if(toggle && !toggle.checked){ toggle.checked = true; await toggleCamadaCAR(toggle); }
     _carFeatures = features;
     _carUCAtual  = 'Consulta: ' + (document.getElementById('car-consulta-input')?.value || '').trim();
+    _carPaAtual  = null;
     await _carregarMarcados();
     _aplicarCamadaCAR();
     if(mapaL && _carLayer){ try{ mapaL.fitBounds(_carLayer.getBounds(),{padding:[24,24]}); }catch(e){} }
@@ -6543,8 +6692,8 @@ function _htmlCarAtributos(f){
       <div class="car-det-value">${escHtml(municExib)} · ${escHtml(p.uf||'AC')}</div></div>
     <div class="car-det-field"><div class="car-det-label">Tipo de Imóvel</div>
       <div class="car-det-value">${escHtml(p.tipo_imovel||'—')}</div></div>
-    <div class="car-det-field"><div class="car-det-label">UC correspondente</div>
-      <div class="car-det-value">${_carUCAtual?'🌿 '+escHtml(_carUCAtual):'—'}</div></div>
+    <div class="car-det-field"><div class="car-det-label">${_carPaAtual?'Assentamento (INCRA)':'UC correspondente'}</div>
+      <div class="car-det-value">${_carUCAtual?(_carPaAtual?'':'🌿 ')+escHtml(_carUCAtual):'—'}</div></div>
     <div class="car-det-field"><div class="car-det-label">Data de Cadastro</div>
       <div class="car-det-value">${fDt(p.dat_criacao||p.dat_criaca)}</div></div>
     <div class="car-det-field"><div class="car-det-label">Código CAR</div>

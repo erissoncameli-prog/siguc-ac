@@ -69,6 +69,9 @@ function paPopupHTML(p) {
       ${linha('Forma de obtenção', _paEsc(p.forma_obtencao))}
       ${linha('Obtido em', _paData(p.obtido_em))}
       <div class="cp-row" style="color:#6b7280;font-size:10px"><span>Fonte: INCRA — Acervo Fundiário (recebido em 07/10/2026)</span></div>
+      ${p.cd_sipra && typeof carAbrirAssentamento === 'function'
+        ? `<button type="button" class="pa-btn-car" data-pa-car="${_paEsc(p.cd_sipra)}">Ver CARs deste assentamento</button>`
+        : ''}
     </div>
   </div>`;
 }
@@ -259,3 +262,9 @@ function paSecaoHTML() {
     </div>
     <div id="pa-stat" style="font-size:10px;color:var(--cinza-400);text-align:right;margin-top:6px"></div>`;
 }
+
+// Clique no botão da janela → camada CAR no modo assentamento (pages/mapa.html)
+document.addEventListener('click', ev => {
+  const b = ev.target.closest && ev.target.closest('[data-pa-car]');
+  if (b && typeof carAbrirAssentamento === 'function') carAbrirAssentamento(b.dataset.paCar);
+});
