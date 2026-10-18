@@ -296,11 +296,11 @@ def imac_baixar():
                                           (None if str(row[mapa[campo]]) in ('None', 'nan', 'NaT', '') else row[mapa[campo]]))
                     termo = pega('num_termo')
                     ident = termo or pega('num_auto')
-                    base = f'{nome}|{ident}|{i}' if ident else f'{nome}|{i}|{hashlib.sha1(wkt.encode()).hexdigest()[:16]}'
+                    base = f'{nome}|{ident}|{i}' if ident else f'{nome}|{i}|{hashlib.sha256(wkt.encode()).hexdigest()[:16]}'
                     desc = ' — '.join(str(x).strip() for x in (pega('tipo'), pega('descricao')) if x is not None and str(x).strip())
                     d_desemb = data_iso(pega('data_desembargo'))
                     regs.append({
-                        'fonte': 'imac', 'chave': hashlib.sha1(base.encode()).hexdigest()[:24],
+                        'fonte': 'imac', 'chave': hashlib.sha256(base.encode()).hexdigest()[:24],
                         'num_termo': str(termo).strip() if termo is not None else None,
                         'num_auto': str(pega('num_auto')).strip() if pega('num_auto') is not None else None,
                         'num_processo': str(pega('num_processo')).strip() if pega('num_processo') is not None else None,
