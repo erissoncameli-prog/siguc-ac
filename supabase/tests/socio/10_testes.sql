@@ -436,6 +436,57 @@ select pg_temp.raiz();
 select pg_temp.erro('tdeuc', format($$select socio_enviar_ficha(%L, %L)$$, pg_temp.ficha('DSA-261018-AB12-01', '11111111-0000-0000-0000-000000000001'), pg_temp.linhas()), 'socio:ja_validada');
 select pg_temp.ok((select count(*) from socio_fichas_historico where ficha_id = pg_temp.id('f1')) = 4, 'histórico: enviada, devolvida, enviada, validada');
 
+-- ── 9b. Mesa: campanhas, equipe, lista e detalhe (364) ─────────────────
+create function pg_temp.q(quem text, sql text) returns jsonb language plpgsql as $$
+declare r jsonb;
+begin perform pg_temp.como(quem); execute sql into r; perform pg_temp.raiz(); return r; end $$;
+grant execute on all functions in schema pg_temp to authenticated;
+select pg_temp.ok((pg_temp.q('dir', format($$select jsonb_agg(r) from socio_campanhas_resumo(%L) r$$, pg_temp.id('dsa')))->0->>'n_validadas')::int = 1,
+                  'chefia acima vê a campanha com as contagens');
+select pg_temp.ok((pg_temp.q('chefe', format($$select jsonb_agg(r) from socio_campanhas_resumo(%L) r$$, pg_temp.id('dsa')))->0->>'n_enviadas')::int = 2,
+                  'contagem não inclui treino');
+select pg_temp.erro('sem', format($$select * from socio_campanhas_resumo(%L)$$, pg_temp.id('dsa')), 'socio:nao_autorizado');
+select pg_temp.ok((select jsonb_array_length(pg_temp.q('chefe', format($$select jsonb_agg(r) from socio_campanha_equipe(%L) r$$, pg_temp.id('camp'))))) = 3,
+                  'equipe: aplicadores do departamento e de fora com acesso');
+select pg_temp.ok((pg_temp.q('chefe', format($$select jsonb_agg(r) from socio_campanha_equipe(%L) r where r.usuario_id = %L$$, pg_temp.id('camp'), pg_temp.u('tdebio')))->0->>'origem') = 'acesso',
+                  'quem veio de outro departamento aparece como acesso');
+select pg_temp.erro('tdeuc', format($$select * from socio_campanha_equipe(%L)$$, pg_temp.id('camp')), 'socio:nao_autorizado');
+select pg_temp.ok((select jsonb_array_length(pg_temp.q('chefe', format($$select jsonb_agg(r) from socio_fichas_lista(%L) r$$, pg_temp.id('dsa'))))) = 3,
+                  'lista do gestor: as 3 reais, sem treino');
+select pg_temp.ok((select jsonb_array_length(pg_temp.q('chefe', format($$select jsonb_agg(r) from socio_fichas_lista(%L, null, null, true) r$$, pg_temp.id('dsa'))))) = 1,
+                  'treino só quando pedido');
+select pg_temp.ok((select jsonb_array_length(pg_temp.q('chefe', format($$select jsonb_agg(r) from socio_fichas_lista(%L, null, 'validada') r$$, pg_temp.id('dsa'))))) = 1,
+                  'filtro por situação');
+select pg_temp.erro('dir', format($$select * from socio_fichas_lista(%L)$$, pg_temp.id('dsa')), 'socio:nao_autorizado');
+select pg_temp.erro('admin', format($$select * from socio_fichas_lista(%L)$$, pg_temp.id('dsa')), 'socio:nao_autorizado');
+-- detalhe: identificação e fotos só para quem pode
+select pg_temp.ok((select d ? 'identificacao' and d->'identificacao'->>'entrevistado_nome' = 'Maria do Rio'
+                          and jsonb_array_length(d->'fotos') = 1 and (d->>'pode_gerir')::boolean
+                     from pg_temp.q('chefe', format($$select socio_ficha_detalhe(%L)$$, pg_temp.id('f1'))) d),
+                  'gestor vê a ficha com identificação e fotos');
+select pg_temp.ok((select d->'identificacao' = 'null'::jsonb and d->'fotos' = 'null'::jsonb and d->'ficha'->'respostas' ? 'qtd_moradores'
+                          and d->'questionario'->'estrutura' ? 'blocos'
+                     from pg_temp.q('tdebio', format($$select socio_ficha_detalhe(%L)$$, pg_temp.id('f1'))) d),
+                  'leitor de fora vê respostas sem identificação nem fotos');
+select pg_temp.ok((select jsonb_array_length(d->'historico') = 4 and d->'historico'->1->>'motivo' = 'Confira a quantidade de moradores.'
+                     from pg_temp.q('chefe', format($$select socio_ficha_detalhe(%L)$$, pg_temp.id('f1'))) d),
+                  'detalhe traz o histórico com o motivo');
+select pg_temp.erro('admin', format($$select socio_ficha_detalhe(%L)$$, pg_temp.id('f1')), 'socio:nao_autorizado');
+select pg_temp.erro('dir', format($$select socio_ficha_detalhe(%L)$$, pg_temp.id('f1')), 'socio:nao_autorizado');
+-- comunidade nova ligada à cadastrada
+select pg_temp.como('chefe');
+select pg_temp.guarda('com_cz', socio_salvar_comunidade('Vila Nova', '1200203'));
+select pg_temp.guarda('com_rb', socio_salvar_comunidade('Lago Azul', '1200401'));
+select pg_temp.raiz();
+update socio_fichas set comunidade_nova = 'Vila Nova (digitado)', alertas = alertas || '[{"tipo":"comunidade_nova"}]' where id = pg_temp.id('f2');
+select pg_temp.erro('chefe', format($$select socio_vincular_comunidade(%L, %L)$$, pg_temp.id('f2'), pg_temp.id('com_rb')), 'socio:territorio_invalido');
+select pg_temp.erro('tdeuc', format($$select socio_vincular_comunidade(%L, %L)$$, pg_temp.id('f2'), pg_temp.id('com_cz')), 'socio:nao_autorizado');
+select pg_temp.como('chefe');
+select socio_vincular_comunidade(pg_temp.id('f2'), pg_temp.id('com_cz'));
+select pg_temp.raiz();
+select pg_temp.ok((select comunidade_id = pg_temp.id('com_cz') and comunidade_nova is null and not (alertas @> '[{"tipo":"comunidade_nova"}]')
+                     from socio_fichas where id = pg_temp.id('f2')), 'vincular troca a comunidade nova pela cadastrada e tira o alerta');
+
 -- ── 10. Revogação e carência ────────────────────────────────────────────
 select pg_temp.erro('tdebio', format($$select socio_encerrar_acesso(%L, 'Não preciso mais.')$$, pg_temp.id('ped2')), 'socio:nao_autorizado');
 select pg_temp.erro('tduc',   format($$select socio_encerrar_acesso(%L, '')$$, pg_temp.id('ped2')), 'socio:parecer_obrigatorio');

@@ -4902,12 +4902,25 @@ retenção são as Fases 2–5. Nada veio do DIMA (nem fichas, nem estrutura).
   ligada/desligada por `page.route`; contrafactual conferido) e o bloco 7b do
   `supabase/tests/socio/10_testes.sql` (pacote e policies do bucket).
   `pwa/sw.js`: socio 1 (novo).
+- **Mesa — Fase 4** (abas Campanhas e Fichas do questionário, migration 364;
+  detalhe em §9 do plano): não são páginas próprias — `js/socio-campanhas.js` e
+  `js/socio-fichas.js`, carregados por `pages/socio-questionarios.html`. Leituras
+  montadas no banco: `socio_campanhas_resumo` (quem vê), `socio_campanha_equipe`
+  (gestor), `socio_fichas_lista` (filtra por `fn_socio_pode_ver_ficha`) e
+  `socio_ficha_detalhe` (identificação/fotos = `null` para quem não pode — a tela
+  só desenha o que veio). Escrita: `socio_salvar_campanha`,
+  `socio_situacao_campanha`, `socio_definir_aplicador`, `socio_mudar_status`
+  (devolver/descartar com motivo) e `socio_vincular_comunidade` (364, mesmo
+  município). Respostas desenhadas pela estrutura da VERSÃO da ficha.
+  ⚠️ Janela injetada no fim do `<body>` ficava por cima da confirmação (mesmo
+  z-index): `socAbrir` empilha pelo z-index na ordem de abertura.
+  Guarda: `tests/socio-mesa-fase4.test.js` (7; contrafactual conferido) e o
+  bloco 9b do `10_testes.sql`. Sem mudança em `pwa/sw.js` (tela de mesa).
 
 ## Próxima tarefa
-**Diagnóstico Socioeconômico** — Fases 1, 2 e 3 entregues; próxima é a Fase 4
-(campanhas e validação na mesa), em `docs/socioeconomico/plano.md` §5. Hoje a
-campanha só se cria pela RPC `socio_salvar_campanha` — sem tela, o app de campo
-não tem o que mostrar.
+**Diagnóstico Socioeconômico** — Fases 1 a 4 entregues; próxima é a Fase 5
+(indicadores com supressão abaixo de 5 fichas, exportação registrada em ExcelJS e
+retenção de identificação/fotos por cron), em `docs/socioeconomico/plano.md` §5.
 
 **Recursos Hídricos e Qualidade Ambiental (DERHQA)** — Fases A, B e C
 ENTREGUES (ver "Recursos Hídricos — Fase B" e "— Fase C" acima).

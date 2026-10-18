@@ -5,7 +5,10 @@
 > Fase 2 ENTREGUE (18/10/2026) — `pages/socio-questionarios.html` (mesa: catálogo,
 > versões com editor e pré-visualização, equipe, pedidos de acesso).
 > Fase 3 ENTREGUE (18/10/2026) — `pages/socio-app.html` (app de campo offline, PWA),
-> migration 363 (bucket `socio-fotos` + `socio_app_pacote()`). Fases 4–5 a fazer.
+> migration 363 (bucket `socio-fotos` + `socio_app_pacote()`).
+> Fase 4 ENTREGUE (18/10/2026) — abas Campanhas e Fichas em
+> `pages/socio-questionarios.html` (`js/socio-campanhas.js`, `js/socio-fichas.js`),
+> migration 364 (leituras da mesa + ligar ficha a comunidade). Fase 5 a fazer.
 > **Origem:** o Diagnóstico Socioambiental do dima-plataforma (`diag_*`,
 > migrations `20260926_diag_01` a `20261009_diag_20`). O desenho e as regras
 > vêm de lá. O código é portado e adaptado ao SIGUC, não copiado às cegas.
@@ -210,7 +213,7 @@ todos (sem `modulo:` de gate). As páginas são:
 | **1** | Banco: instrumentos, versões, campanhas, comunidades, fichas e satélites, `fn_socio_papel`, pedidos de acesso, RLS, ROPA, interpretador SQL + `js/socio-regras.js` | teste cruzado SQL × JS (porte do `supabase/tests/diagnostico`); testes de acesso como membro, como outro departamento antes e depois da concessão, como sem lotação e como `anon` |
 | **2** | `socio-instrumentos.html` (catálogo, editor, membros, pedidos) | Playwright com stub |
 | **3** | App de campo offline + envio + treino | Playwright: salvar offline, reenviar sem duplicar, treino isolado |
-| **4** | Campanhas + validação | — |
+| **4** | Campanhas + validação (abas, não páginas — ver §9) | `tests/socio-mesa-fase4.test.js` + bloco 9b do `10_testes.sql` |
 | **5** | Indicadores + exportação + retenção | — |
 | depois | áudio + transcrição local, editor visual, APK, visita com vários instrumentos no mesmo domicílio | — |
 
@@ -272,3 +275,45 @@ vê só agregados (Q2), nada vem do DIMA (Q3), pedido só por pessoa (Q4).
   (`tipo = 'aviso_campo'`, `app = 'socio'`) quando a redação estiver pronta.
 - **Ainda não**: APK (`app-socio/`), guia de treinamento (motor `guia-app`),
   página de instalação, GPS contínuo (só leitura pontual, por decisão), áudio.
+
+## 9. Fase 4 — campanhas e validação na mesa (18/10/2026)
+
+**Desvio da §3**: em vez de `socio-campanhas.html` e `socio-validacao.html`, são
+duas ABAS do questionário em `pages/socio-questionarios.html` — campanha e ficha
+só fazem sentido dentro de um instrumento, e a pessoa já está ali. O código fica
+em arquivos próprios (`js/socio-campanhas.js`, `js/socio-fichas.js`), carregados
+pela página e usando os utilitários dela (`rpc`, `socAbrir`, `confirmar`…).
+
+- **Campanhas** (todos que veem o questionário; editar só gestor): tabela com
+  período, situação, versão, território, equipe e contagem de fichas
+  (`socio_campanhas_resumo`, treino fora). Criar/editar por `socio_salvar_campanha`
+  (municípios e UCs por caixas; nenhum marcado = qualquer), abrir/encerrar/reabrir
+  por `socio_situacao_campanha` com confirmação, equipe por
+  `socio_campanha_equipe` + `socio_definir_aplicador` (só entra quem pode
+  aplicar; tirar não apaga ficha). Cadastro de comunidades (comum a todos os
+  questionários) no fim da aba, para o gestor.
+- **Fichas** (leitor, gestor ou aplicador): filtro por campanha, situação (abre em
+  "Aguardando validação") e treino (gestor/aplicador), busca sem acento.
+  `socio_fichas_lista` já devolve só o que a pessoa pode ver
+  (`fn_socio_pode_ver_ficha` linha a linha). Coluna "Conferir" resume em branco,
+  alertas, comunidade a cadastrar e carência.
+- **Ficha aberta** (`socio_ficha_detalhe`): respostas desenhadas pela estrutura da
+  VERSÃO aplicada (salto = "não se aplica", `_nr` = "Não respondeu", vazio = "em
+  branco", `_outro`, derivadas marcadas), lista com as colunas de identificação
+  só para quem o banco deixa ver (ocultas avisadas), identificação e fotos (URL
+  assinada, `fotos-privadas.js`) só para gestor e o próprio entrevistador —
+  para os outros o banco manda `null` e a tela diz "Identificação oculta".
+  Histórico de situação com motivo.
+- **Validar / devolver / descartar** por `socio_mudar_status`: devolver e
+  descartar pedem motivo (≥ 5), validar avisa se há pergunta em branco. Ficha de
+  treino não tem ação.
+- **Comunidade nova** (`socio_vincular_comunidade`, 364): o gestor liga a ficha a
+  uma comunidade do MESMO município (a de nome igual vem pré-selecionada) ou
+  cadastra a digitada e liga na sequência. O alerta `comunidade_nova` sai da ficha.
+- Log LGPD de terceiro (§4) não foi necessário: ninguém de fora do departamento
+  recebe identificação — o leitor com acesso concedido lê sem nome, GPS nem foto.
+- ⚠️ Bug real achado pelo teste: as janelas novas são injetadas no fim do
+  `<body>`, depois da de confirmação, e com o mesmo `z-index` ficavam POR CIMA
+  dela (o clique em "Validar" da confirmação não chegava). `socAbrir` agora põe
+  cada janela acima da anterior pela ordem de abertura.
+

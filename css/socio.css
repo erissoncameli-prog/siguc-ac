@@ -104,3 +104,42 @@
 
 /* texto só para leitor de tela (cabeçalho de coluna de ações) */
 .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0 }
+
+/* ── Fase 4: campanhas e fichas ── */
+.soc-checks {
+  display:grid; grid-template-columns:repeat(auto-fill, minmax(180px, 1fr)); gap:2px 8px;
+  max-height:180px; overflow:auto; padding:8px 10px; margin-top:6px;
+  border:1px solid var(--borda); border-radius:var(--raio); background:var(--cinza-50);
+}
+.soc-checks-alto { max-height:240px; grid-template-columns:repeat(auto-fill, minmax(260px, 1fr)) }
+.soc-checks .soc-papel { margin-right:0 }
+
+.soc-filtros { display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap; margin-bottom:12px }
+.soc-filtro { display:flex; flex-direction:column; gap:4px; font-size:12px; color:var(--cinza-600); min-width:160px }
+.soc-filtro-busca { flex:1; min-width:220px }
+.soc-conf { color:var(--aviso) }
+
+.modal.soc-ficha-modal { max-width:980px; width:96vw }
+.soc-fd-meta { display:grid; grid-template-columns:repeat(auto-fill, minmax(200px, 1fr)); gap:10px 16px; margin:0 0 16px }
+.soc-fd-meta dt { font-size:11.5px; color:var(--cinza-500); text-transform:uppercase; letter-spacing:.04em }
+.soc-fd-meta dd { margin:2px 0 0; font-size:13px; color:var(--cinza-900) }
+.soc-fd-bloco { margin-bottom:18px }
+.soc-fd-bloco h4 { margin:0 0 8px; font-size:12px; text-transform:uppercase; letter-spacing:.05em; color:var(--verde-medio) }
+.soc-fd-resp { margin:0; border:1px solid var(--borda); border-radius:var(--raio); overflow:hidden }
+.soc-fd-linha { display:grid; grid-template-columns:minmax(0, 3fr) minmax(0, 2fr); gap:12px; padding:8px 12px; border-top:1px solid var(--borda) }
+.soc-fd-linha:first-child { border-top:none }
+.soc-fd-larga { grid-template-columns:minmax(0, 1fr) }
+.soc-fd-linha dt { font-size:13px; color:var(--cinza-700); line-height:1.45 }
+.soc-fd-linha dd { margin:0; font-size:13px; color:var(--cinza-900); font-weight:500; overflow-wrap:break-word }
+.soc-fd-pulada dt { color:var(--cinza-400) }
+@media (max-width: 640px) { .soc-fd-linha { grid-template-columns:minmax(0, 1fr); gap:4px } }
+.soc-nr { color:var(--cinza-500) }
+.soc-falta { color:var(--erro); font-weight:600 }
+.soc-fd-alertas { margin:0; padding-left:20px; font-size:13px; line-height:1.6 }
+.soc-fd-vinc { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:8px }
+.soc-fd-vinc select { max-width:320px }
+.soc-fd-fotos { display:grid; grid-template-columns:repeat(auto-fill, minmax(160px, 1fr)); gap:10px }
+.soc-fd-fotos figure { margin:0 }
+.soc-fd-fotos img { width:100%; aspect-ratio:4/3; object-fit:cover; border-radius:var(--raio); background:var(--cinza-100) }
+.soc-fd-fotos figcaption { font-size:12px; color:var(--cinza-600); margin-top:4px }
+.soc-fd-hist { margin:0; padding-left:20px; font-size:13px; line-height:1.6 }

@@ -12,6 +12,9 @@
 <script src="../js/layout.js"></script>
 <script src="../js/socio-regras.js"></script>
 <script src="../js/socio-previa.js"></script>
+<script src="../js/fotos-privadas.js"></script>
+<script src="../js/socio-campanhas.js"></script>
+<script src="../js/socio-fichas.js"></script>
 </head>
 <body>
 <div id="app"></div>
@@ -217,6 +220,9 @@ const _pilha = []
 function socAbrir(qual) {
   const el = document.getElementById(`modal-${qual}`)
   _pilha.push({ qual, origem: document.activeElement })
+  // a de cima fica por cima, qualquer que seja a ordem no DOM (as janelas
+  // da Fase 4 são injetadas no fim do <body>, depois da de confirmação)
+  el.style.zIndex = 200 + _pilha.length
   el.classList.add('aberto')
   const alvo = el.querySelector('input:not([type=hidden]):not([disabled]), textarea:not([readonly]), select, button:not(.modal-close)')
   setTimeout(() => alvo && alvo.focus(), 30)
@@ -468,7 +474,9 @@ async function abrirInstrumento(id, manterSub) {
       <p class="soc-det-fin">${esc(c.finalidade)}</p></div>
       <div class="soc-papeis">${seuAcessoHTML(c)}</div></div></div>
     <div class="soc-topo"><div class="soc-abas" role="tablist" aria-label="Partes do questionário">
-      ${[['versoes', 'Versões'], ...((c.pode_gerir || _admin) ? [['equipe', 'Equipe'], ['acessos', 'Acessos'], ['cadastro', 'Cadastro']] : [])]
+      ${[['versoes', 'Versões'], ['campanhas', 'Campanhas'],
+        ...((c.pode_ler_fichas || c.pode_gerir || c.pode_aplicar) ? [['fichas', 'Fichas']] : []),
+        ...((c.pode_gerir || _admin) ? [['equipe', 'Equipe'], ['acessos', 'Acessos'], ['cadastro', 'Cadastro']] : [])]
         .map(([k, t]) => {
           const n = k === 'acessos' ? _acessos.filter(a => a.instrumento_id === id && a.status === 'pendente').length : 0
           return `<button class="soc-aba" role="tab" id="sub-${k}" aria-selected="${_subAba === k}" onclick="mudarSub('${k}')">${t}${n ? ` <span class="soc-contador">${n}</span>` : ''}</button>`
@@ -483,6 +491,8 @@ async function renderSub() {
   const el = document.getElementById('soc-sub')
   try {
     if (_subAba === 'versoes') el.innerHTML = await versoesHTML()
+    else if (_subAba === 'campanhas') el.innerHTML = await campanhasHTML()
+    else if (_subAba === 'fichas') el.innerHTML = await fichasHTML()
     else if (_subAba === 'equipe') el.innerHTML = await equipeHTML()
     else if (_subAba === 'acessos') el.innerHTML = acessosHTML()
     else el.innerHTML = cadastroHTML()
