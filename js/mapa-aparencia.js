@@ -56,7 +56,7 @@ function apBlocoHTML(cfg) {
   if (fill) _apHandlers[fill.id] = fill.ao;
   const propria = linha.propria
     ? `<button type="button" class="ap-cor ap-cor-propria${linha.propria.ativa ? ' sel' : ''}" data-ap-propria="${linha.propria.ao}"
-        title="Cor de cada UC" aria-label="Cor de cada UC" aria-pressed="${!!linha.propria.ativa}"></button>` : '';
+        title="${_apEsc(linha.propria.rotulo || 'Cor de cada UC')}" aria-label="${_apEsc(linha.propria.rotulo || 'Cor de cada UC')}" aria-pressed="${!!linha.propria.ativa}"></button>` : '';
   const opPeso = peso.opcoes.map(([v, r]) => `<option value="${v}"${String(peso.valor) === String(v) ? ' selected' : ''}>${r}</option>`).join('');
   const opDash = AP_TRACOS.map(([v, r]) => `<option value="${v}"${String(dash.valor ?? '') === v ? ' selected' : ''}>${r}</option>`).join('');
   const op = Math.round(parseFloat(opac.valor) || 0);

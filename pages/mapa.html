@@ -93,6 +93,25 @@
 .ap-restaurar{align-self:flex-end;background:none;border:none;color:var(--cinza-500);font:600 11px 'DM Sans',sans-serif;cursor:pointer;text-decoration:underline;min-height:24px;padding:0 2px}
 .ap-restaurar:hover{color:var(--cinza-800)}
 .mlb-dropdown.mlb-estreito{min-width:0;width:300px}
+/* "Colorir por" das UCs (js/mapa-uc-tipos.js) */
+.uct{margin:2px 0 10px;display:flex;flex-direction:column;gap:6px}
+.uct-ops{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid var(--cinza-300);border-radius:7px;overflow:hidden}
+.uct-op{min-height:28px;border:none;border-left:1px solid var(--cinza-300);background:#fff;font:600 11px 'DM Sans',sans-serif;color:var(--cinza-600);cursor:pointer;padding:0 4px}
+.uct-op:first-child{border-left:none}
+.uct-op.sel{background:#1F4E2C;color:#fff}
+.uct-op:focus-visible{outline:2px solid #1F4E2C;outline-offset:-3px}
+.uct-lista{display:flex;flex-direction:column;gap:2px}
+.uct-linha{display:flex;align-items:center;gap:8px;min-height:30px;padding:0 2px;border-radius:6px}
+.uct-linha:hover{background:var(--cinza-50)}
+.uct-linha.off .uct-nome,.uct-linha.off .uct-n{opacity:.45}
+.uct-chk{flex:1;min-width:0;display:flex;align-items:center;gap:7px;font-size:11.5px;cursor:pointer;min-height:24px}
+.uct-chk input{accent-color:#1F4E2C;width:14px;height:14px;flex-shrink:0}
+.uct-nome{line-height:1.25}
+.uct-n{font-size:10.5px;color:var(--cinza-500);font-variant-numeric:tabular-nums}
+.uct-cor{width:24px;height:24px;border-radius:6px;border:1px solid rgba(0,0,0,.25);cursor:pointer;padding:0;flex-shrink:0}
+.uct-cor:focus-visible{outline:2px solid #1F4E2C;outline-offset:2px}
+.uct-paleta{display:flex;flex-wrap:wrap;gap:5px;align-items:center;padding:6px 4px 8px 24px;--ap-acento:#1F4E2C}
+.uct-aviso{font-size:10.5px;color:#92400e;background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:5px 8px;margin-top:4px}
 .areas-sec-head.uc{border-left:3px solid #1F4E2C;}
 .areas-sec-head.ti{border-left:3px solid #d97706;}
 .areas-sec-head.pa{border-left:3px solid #6D28D9;}
@@ -544,6 +563,7 @@ body.mapa-imersivo .malerta-panel.aberto{transform:none;}
      compartilhado com pages/alertas-ambientais.html. Ver js/mapa-recorte.js. -->
 <script src="../js/mapa-recorte.js"></script>
 <script src="../js/mapa-aparencia.js"></script>
+<script src="../js/mapa-uc-tipos.js"></script>
 <script src="../js/mapa-assentamentos.js"></script>
 <script src="../js/mapa-linha-tempo.js"></script>
 <script src="../js/grafico-teclado.js"></script>
@@ -2047,6 +2067,7 @@ function _renderDropdown(id){
       <label style="font-size:11px;cursor:pointer;display:flex;align-items:center;gap:4px"><input type="checkbox" id="uc-esfera-federal"   style="accent-color:#1F4E2C" onchange="toggleUCEsfera()"> Federal</label>
       <label style="font-size:11px;cursor:pointer;display:flex;align-items:center;gap:4px"><input type="checkbox" id="uc-esfera-municipal" style="accent-color:#1F4E2C" onchange="toggleUCEsfera()"> Municipal</label>
     </div>
+    ${uctBlocoHTML()}
     <div id="uc-loading" style="display:none;align-items:center;gap:8px;font-size:11px;color:var(--cinza-500);padding:8px 0"><div class="spinner" style="width:14px;height:14px"></div> Carregando...</div>
     <div id="uc-controles" style="display:none">
       <div class="uc-secao-titulo">Proteção Integral</div><div id="uc-tipos-pi"></div>
@@ -2764,8 +2785,10 @@ function _atualizarLegendaMapa(){
     const feats = _ucsFeaturesVisiveis();
     const nomesAtivos = new Set(Array.from(document.querySelectorAll('[data-uc-nome]:checked')).map(e=>e.dataset.ucNome));
     const filtradas = nomesAtivos.size ? feats.filter(f => nomesAtivos.has(f.properties.nome)) : feats;
-    const temPI = filtradas.some(f => _ucGrupoId(f.properties?.grupo) === 'pi');
-    const temUS = filtradas.some(f => _ucGrupoId(f.properties?.grupo) === 'us');
+    const porTipo = uctItensLegenda(filtradas, _ucOpacity);
+    const temPI = !porTipo && filtradas.some(f => _ucGrupoId(f.properties?.grupo) === 'pi');
+    const temUS = !porTipo && filtradas.some(f => _ucGrupoId(f.properties?.grupo) === 'us');
+    if(porTipo) itens.push(...porTipo);
     if(temPI) itens.push({ simbolo:'rect', cor:'#dc2626', opacidade:_ucOpacity, label:'UC — Proteção Integral' });
     if(temUS) itens.push({ simbolo:'rect', cor:'#2563eb', opacidade:_ucOpacity, label:'UC — Uso Sustentável' });
   }
@@ -4414,7 +4437,7 @@ function _aplicarEstiloUCGlobal(){
   _ucDash     = document.getElementById('uc-dash')?.value     || '';
   _ucPeso     = parseFloat(document.getElementById('uc-peso')?.value) || 2;
   try{ localStorage.setItem('siguc_uc_estilo', JSON.stringify({cor:_ucCorLinha,dash:_ucDash,peso:_ucPeso})); }catch(e){}
-  if(_ucLayer) _ucLayer.setStyle(f=>{ const cor=_ucCorNome(f.properties.nome,f.properties.cor); return {color:_ucCorLinha||cor,weight:_ucPeso,dashArray:_ucDash||null,opacity:.9,fillColor:cor,fillOpacity:_ucOpacity}; });
+  if(_ucLayer) _ucLayer.setStyle(f=>{ const cor=uctCor(f.properties); return {color:_ucCorLinha||cor,weight:_ucPeso,dashArray:_ucDash||null,opacity:.9,fillColor:cor,fillOpacity:_ucOpacity}; });
   _atualizarLegendaMapa?.();
   _prefsAgendarSalvamento();
 }
@@ -4422,7 +4445,7 @@ function ucUsarCorPropria(){ _aplicarEstiloUCGlobal(); }
 const AP_PESOS = [['0.8','Fina'],['2','Normal'],['3','Grossa'],['4','Muito grossa']];
 function _ucAparenciaHTML(){
   return apBlocoHTML({ chave:'uc', cor:'#1F4E2C',
-    linha:{ id:'uc-cor-linha', valor:_ucCorLinha||'#1F4E2C', ao:'_aplicarEstiloUCGlobal()', propria:{ ativa:!_ucCorLinha, ao:'ucUsarCorPropria' } },
+    linha:{ id:'uc-cor-linha', valor:_ucCorLinha||'#1F4E2C', ao:'_aplicarEstiloUCGlobal()', propria:{ ativa:!_ucCorLinha, ao:'ucUsarCorPropria', rotulo:'Mesma cor do preenchimento' } },
     dash:{ id:'uc-dash', valor:_ucDash, ao:'_aplicarEstiloUCGlobal()' },
     peso:{ id:'uc-peso', valor:String(_ucPeso), ao:'_aplicarEstiloUCGlobal()', opcoes:AP_PESOS },
     opac:{ id:'uc-opacity', valorId:'uc-opacity-val', valor:Math.round(_ucOpacity*100), ao:'ucAlterarOpacidade(this.value)' },
@@ -4552,6 +4575,7 @@ function _ucConstruirPainel(){
   const piEl=document.getElementById('uc-tipos-pi'), usEl=document.getElementById('uc-tipos-us');
   if(piEl) piEl.innerHTML=pi.length?buildList(pi):'<span style="font-size:10px;color:var(--cinza-400)">Nenhuma</span>';
   if(usEl) usEl.innerHTML=us.length?buildList(us):'<span style="font-size:10px;color:var(--cinza-400)">Nenhuma</span>';
+  uctAtualizarPainel();
 }
 
 // Retorna as features do GeoJSON que estão atualmente visíveis no mapa
@@ -4563,6 +4587,7 @@ function _ucsFeaturesVisiveis() {
     if (esf === 'estadual'  && !_ucEsfEst) return false
     if (esf === 'municipal' && !_ucEsfMun) return false
     if (_ucNomesAtivos && !_ucNomesAtivos.has(f.properties.nome)) return false
+    if (!uctVisivel(f.properties)) return false
     return true
   })
 }
@@ -4618,22 +4643,23 @@ function _renderizarUC(){
     const feat=(_ucGeojson?.features||[]).find(f=>f.properties.nome===nome);
     const esf=(feat?.properties?.esfera||'').toLowerCase();
     const esfOk=(esf==='federal'?esfFed:esf==='estadual'?esfEst:esf==='municipal'?esfMun:true);
-    row.style.display=esfOk?'':'none';
+    row.style.display=(esfOk&&(!feat||uctVisivel(feat.properties)))?'':'none';
   });
   const nomesAtivos=new Set(Array.from(document.querySelectorAll('[data-uc-nome]:checked')).map(e=>e.dataset.ucNome));
   let count=0;
   _ucLayer=L.geoJSON(_ucGeojson,{
-    style: f => { const p=f.properties; const cor=_ucCorNome(p.nome,p.cor); return {color:_ucCorLinha||cor,weight:_ucPeso,dashArray:_ucDash||null,opacity:.9,fillColor:cor,fillOpacity:_ucOpacity}; },
+    style: f => { const p=f.properties; const cor=uctCor(p); return {color:_ucCorLinha||cor,weight:_ucPeso,dashArray:_ucDash||null,opacity:.9,fillColor:cor,fillOpacity:_ucOpacity}; },
     filter: f => {
       const esf=(f.properties.esfera||'').toLowerCase();
       if(esf==='federal'&&!esfFed) return false;
       if(esf==='estadual'&&!esfEst) return false;
       if(esf==='municipal'&&!esfMun) return false;
       if(nomesAtivos.size>0&&!nomesAtivos.has(f.properties.nome)) return false;
+      if(!uctVisivel(f.properties)) return false;
       count++; return true;
     },
     onEachFeature: (f,layer) => {
-      const p=f.properties; const cor=_ucCorNome(p.nome,p.cor);
+      const p=f.properties; const cor=uctCor(p);
       const gid=_ucGrupoId(p.grupo); const corG=gid==='pi'?'#dc2626':'#2563eb'; const lblG=gid==='pi'?'Proteção Integral':'Uso Sustentável';
       const det=_ucDetalhes[p.nome]||{};
       // uc_detalhes é a fonte oficial (SNUC/ICMBio/SEMA) — GeoJSON é fallback
@@ -4823,7 +4849,7 @@ function _ucStatsAtualizar(filteredFeats){
       esfEl.innerHTML = '<div style="font-size:9px;font-weight:700;color:var(--cinza-400);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Por esfera de gestão</div>' +
         ativosBadge.map(esf=>{
           const d=byEsfera[esf]||{count:0,area:0};
-          const barW = areaTotal>0 ? Math.max(4,(d.area/maxArea)*100).toFixed(0) : 4;
+          const barW = areaUC>0 ? Math.max(4,(d.area/maxArea)*100).toFixed(0) : 4;
           const cor = esfCores[esf]||'#6b7280';
           return `<div class="usc-esfera-row">
             <span style="width:52px;color:var(--cinza-700);text-transform:capitalize;flex-shrink:0">${badgeCfg[esf]?.label||esf}</span>
@@ -8977,6 +9003,7 @@ function _prefsCapturar(){
     uc_estilo:   { cor: _ucCorLinha, dash: _ucDash, peso: _ucPeso },
     uc_opacity:  _ucOpacity,
     uc_cores:    _ucCoresLS || {},
+    uc_tipos:    uctPrefsCapturar(),
     ti:          _tiEstadoUI || {},
     pa:          typeof paPrefsCapturar==='function' ? paPrefsCapturar() : {},
     acre:        _acreEstilo || {},
@@ -9006,6 +9033,8 @@ function _prefsAplicar(dados){
     _ucCoresLS = dados.uc_cores;
     try{ localStorage.setItem('siguc_uc_cores', JSON.stringify(_ucCoresLS)); }catch(e){}
   }
+  // Colorir por tipo/nível e filtros por tipo
+  if(dados.uc_tipos) uctPrefsAplicar(dados.uc_tipos);
   // TI
   if(dados.ti && Object.keys(dados.ti).length){
     _tiEstadoUI = dados.ti;
@@ -9048,10 +9077,8 @@ async function _prefsCarregar(){
     if(error || !data?.dados) return;
     _prefsAplicar(data.dados);
     // Reaplicar visualmente se a camada UC já está carregada
-    if(_ucLayer) _ucLayer.setStyle(f=>{
-      const cor=_ucCorNome(f.properties.nome,f.properties.cor);
-      return {color:_ucCorLinha||cor,weight:_ucPeso,dashArray:_ucDash||null,opacity:.9,fillColor:cor,fillOpacity:_ucOpacity};
-    });
+    // redesenha (não só restila): os filtros por tipo podem ter mudado
+    if(_ucLayer){ _renderizarUC(); _atualizarLegendaMapa(); }
     if(_tiLayer) _tiLayer.setStyle(_getTIEstilo());
   }catch(e){ console.warn('[prefs] carregar:', e); }
 }

@@ -1140,7 +1140,22 @@ própria) e os controles de cor do PA ficavam abaixo da borda do painel.
   da UC lê essa marca — sem isso, mexer na espessura voltava tudo para uma cor só.
 - Aparência aberta ⇒ painel estreito (`.mlb-estreito`, 300 px) e o mapa enquadra a camada à
   direita dele (`apAoAlternar`, `fitBounds` com `paddingTopLeft` = largura do painel).
-- Guarda: `tests/mapa-areas-aparencia.test.js` (3, página REAL a 1366×768 com stub do
+- **UCs por tipo e nível — "Colorir por"** (`js/mapa-uc-tipos.js`, prefixo `uct`): Cada UC
+  (cor individual de sempre, `_ucCoresLS`) · Grupo (PI/US) · Categoria · Esfera. Cada tipo tem cor
+  editável (mesmas amostras da Aparência) e caixa de mostrar/ocultar, com contagem. **Toda cor de
+  preenchimento da camada passa por `uctCor(p)`** (nunca `_ucCorNome` direto num estilo novo) e todo
+  filtro de UC visível testa `uctVisivel(p)` (`_renderizarUC` e `_ucsFeaturesVisiveis`).
+  **Filtros se somam** (decisão do usuário): grupo/categoria ocultos valem em qualquer modo, junto com a
+  esfera — que continua no filtro de sempre (`_ucEsf*`; no modo Esfera a caixa só marca a original e
+  chama `toggleUCEsfera`). UC oculta uma a uma no modo "Cada UC" segue oculta nos outros modos, com aviso.
+  Legenda (tela e impressão) por tipo via `uctItensLegenda`. Preferências: `siguc_uc_colorir`,
+  `siguc_uc_cores_tipo`, `siguc_uc_tipo_ocultos` + `preferencias_mapa.dados.uc_tipos`. Cores iniciais:
+  PI vermelho/US azul (convenção do mapa); categoria e esfera em Okabe-Ito + vinho de Paul Tol.
+  No modo por tipo, a "Mesma cor do preenchimento" da Aparência faz a borda seguir o tipo.
+- ⚠️ Bug antigo corrigido junto: `_ucStatsAtualizar` usava `areaTotal` (inexistente) no quadro "Por
+  esfera" — com 2+ esferas ligadas lançava ReferenceError e cortava o resto do redesenho (legenda,
+  contadores). Agora usa `areaUC`.
+- Guarda: `tests/mapa-areas-aparencia.test.js` (5, página REAL a 1366×768 com stub do
   supabase-js e dos plugins de CDN do Leaflet). Sem mudança em `pwa/sw.js` (tela de mesa).
 
 ## Regra do sistema — painéis na tela cheia do mapa
